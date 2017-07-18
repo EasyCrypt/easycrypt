@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import NewLogic Option FSet NewFMap Real NewDistr StdOrder StdRing.
+require import AllCore FSet NewFMap Distr StdOrder StdRing.
 (*---*) import RField RealOrder.
 require import Dexcepted.
 require (*--*) NewPRP.
@@ -63,7 +63,7 @@ equiv f_perm: RandomPermutation.f ~ RandomPermutation.f:
       /\ is_permutation RandomPermutation.m{1} RandomPermutation.mi{1}.
 proof.
 proc; if=> //=; auto=> |> &2 is_perm x_notin_m yL.
-rewrite support_dexcepted in_rng negb_exists=>- [] _ /= m__neq_yL.
+rewrite supp_dexcepted in_rng negb_exists=>- [] _ /= m__neq_yL.
 split=> [x'|y']; rewrite !getP !dom_set !inE.
 + case: (x' = x{2})=> //= x'_neq_x.
   have [] mmi mim ^ /mmi mimx':= is_perm.
@@ -80,7 +80,7 @@ equiv fi_perm: RandomPermutation.fi ~ RandomPermutation.fi:
       /\ is_permutation RandomPermutation.m{1} RandomPermutation.mi{1}.
 proof.
 proc; if=> //=; auto=> |> &2 is_perm y_notin_mi xL.
-rewrite support_dexcepted in_rng negb_exists=>- [] _ /= mi__neq_xL.
+rewrite supp_dexcepted in_rng negb_exists=>- [] _ /= mi__neq_xL.
 split=> [x'|y']; rewrite !getP !dom_set !inE.
 + case: (x' = xL)=> //=; smt w=in_dom.
 case: (y' = y{2})=> //= y'_neq_y.
@@ -95,15 +95,15 @@ proof.
 move=> dD_fu. proc; if=> //=; auto=> /> &m h.
 have [] x0 x0_notinr_m:= endo_dom_rng RandomPermutation.m{m} _.
 + by exists x{m}.
-rewrite -/predT -/(weight _) weight_dexcepted /b2r /weight.
+rewrite -/predT weight_dexcepted /b2r.
 case: {-1}(mu _ _ = mu _ _)
         (eq_refl (mu dD predT = mu dD (mem (rng RandomPermutation.m{m}))))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.
 rewrite (mu_split _ _ (mem (rng RandomPermutation.m{m}))) /predI /predT /predC /=.
 rewrite -(etaE (mem _)) etaP.
-rewrite addrC addrA (addrC (-_)) addrN add0r.
+rewrite addrC addrA (addrC (-_)%Real) addrN add0r.
 apply/(ltr_le_trans (mu dD (pred1 x0))).
-+ by rewrite -/(in_supp _ _) -/(support _ _) dD_fu.
++ by rewrite dD_fu.
 by apply/mu_sub=> x ->.
 qed.
 
@@ -113,14 +113,14 @@ proof.
 move=> dD_fu. proc; if=> //=; auto=> /> &m h.
 have [] y0 y0_notinr_mi:= endo_dom_rng RandomPermutation.mi{m} _.
 + by exists y{m}.
-rewrite -/predT -/(weight _) weight_dexcepted /b2r /weight.
+rewrite -/predT weight_dexcepted /b2r.
 case: {-1}(mu _ _ = mu _ _)
         (eq_refl (mu dD predT = mu dD (mem (rng RandomPermutation.mi{m}))))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.
 rewrite (mu_split _ _ (mem (rng RandomPermutation.mi{m}))) /predI /predT /predC /=.
 rewrite -(etaE (mem _)) etaP.
-rewrite addrC addrA (addrC (-_)) addrN add0r.
+rewrite addrC addrA (addrC (-_)%Real) addrN add0r.
 apply/(ltr_le_trans (mu dD (pred1 y0))).
-+ by rewrite -/(in_supp _ _) -/(support _ _) dD_fu.
++ by rewrite dD_fu.
 by apply/mu_sub=> y ->.
 qed.

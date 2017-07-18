@@ -192,6 +192,7 @@ module Prover : sig
     pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
+    pl_selected   : bool option;
   }
 
   val empty_options : smt_options

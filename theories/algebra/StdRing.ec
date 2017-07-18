@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Bool Int Real RealExtra.
+require import Bool Int IntExtra Real RealExtra.
 require (*--*) Ring.
 
 (* -------------------------------------------------------------------- *)
@@ -52,7 +52,7 @@ instance ring with int
   op add   = Int.( + )
   op opp   = Int.([-])
   op mul   = Int.( * )
-  op expr  = Int.( ^ )
+  op expr  = IntExtra.( ^ )
 
   proof oner_neq0 by smt
   proof addr0     by smt

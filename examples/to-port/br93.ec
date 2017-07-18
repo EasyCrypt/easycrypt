@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import Option Fun Bool Int Real NewDistr List FSet Array NewFMap DBool.
+require import Option Fun Bool Int Real Distr List FSet Array NewFMap DBool.
 require (*--*) AWord ROM.
 
 (** We consider three lengths of bitstrings **)

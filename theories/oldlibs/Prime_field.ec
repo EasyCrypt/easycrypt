@@ -120,7 +120,7 @@ by rewrite gf_q_opp_mult gf_q_distr -2!gf_q_opp_mult.
 qed.
 
 theory Dgf_q.
-  require import Distr.
+  require import OldDistr.
   require import Real.
 
   op dgf_q: gf_q distr.
@@ -128,8 +128,8 @@ theory Dgf_q.
   axiom supp_def: forall (s:gf_q),
     in_supp s dgf_q.
 
-  axiom mu_x_def_in: forall (s:gf_q),
-    mu_x dgf_q s = 1%r/q%r.
+  axiom mu1_def_in: forall (s:gf_q),
+    mu1 dgf_q s = 1%r/q%r.
 
   axiom lossless: weight dgf_q = 1%r.
 

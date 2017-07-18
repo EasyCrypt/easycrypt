@@ -1189,14 +1189,14 @@ proof.
   by fun; wp.
  rnd; wp; do !rnd; wp; skip; progress.
  apply (_ :forall p, Fun.(==) p  Fun.cpTrue => mu dgroup p = 1%r).
- rewrite -Dgroup.lossless /Distr.weight => //=; smt.
+ rewrite -Dgroup.lossless /OldDistr.weight => //=; smt.
  rewrite /Fun.(==) /Fun.cpTrue /= => x.
  apply (_ : forall p, p => p = true);first smt.
  split; last smt.
  move=> gz2 gy; move: ( gy ^ log x / gz2) => y.
- rewrite -(Dgroup.mu_x_def_in y) /Distr.mu_x.
- apply Distr.mu_eq; rewrite /Fun.(==) /= => x'; smt.
- by rewrite -Dgroup.lossless /Distr.weight.
+ rewrite -(Dgroup.mu_x_def_in y) /OldDistr.mu_x.
+ apply OldDistr.mu_eq; rewrite /Fun.(==) /= => x'; smt.
+ by rewrite -Dgroup.lossless /OldDistr.weight.
 save.
 
 lemma Conclusion &m :

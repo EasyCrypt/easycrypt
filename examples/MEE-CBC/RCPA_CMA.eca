@@ -1,5 +1,5 @@
 (** Encrypt-then-MAC and MAC-then-Encrypt -- Generic Reductions **)
-require import Option Bool Int FSet Real NewDistr DProd.
+require import Option Bool Int FSet Real Distr DProd.
 require (*--*) SKE_INDR MACs.
 
 (** We now reason about the security of MtE(E,M) for an

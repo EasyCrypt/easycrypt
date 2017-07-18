@@ -11,7 +11,7 @@ require import ISet.
   import ISet.Finite.
 require import Real.
 require import Int.
-require import Distr.
+require import OldDistr.
 
 theory RandOracle.
 

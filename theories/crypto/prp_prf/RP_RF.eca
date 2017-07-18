@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun Option NewLogic Int List FSet NewFMap Real Distr.
+require import AllCore List FSet NewFMap Real Distr.
 require import Dexcepted.
 require (*--*) NewPRP WeakPRP IdealPRP.
 require (*--*) NewPRF IdealPRF.
@@ -14,7 +14,7 @@ require (*--*) Birthday.
 (** We assume a finite domain D, equipped with its uniform
     distribution. **)
 type D.
-op uD: { D distr | is_uniform_over uD predT } as uD_uf_fu.
+op uD: { D distr | is_uniform uD /\ is_lossless uD /\ is_full uD} as uD_uf_fu.
 
 (** and a type K equipped with a lossless distribution **)
 type K.
@@ -129,7 +129,7 @@ lemma nosmt notin_supportIP (P : 'a -> bool) (d : 'a distr):
   (exists a, support d a /\ !P a) <=> mu d P < mu d predT.
 proof.
 rewrite (mu_split _ predT P) /predI /predT /predC /=.
-rewrite (exists_eq (fun a => support d a /\ !P a) (fun a => !P a /\ in_supp a d)) /=.
+rewrite (exists_eq (fun a => support d a /\ !P a) (fun a => !P a /\ a \in d)) /=.
 + by move=> a /=; rewrite andbC.
 by rewrite -(witness_support (predC P)) -/(predC _) /#.
 qed.
@@ -139,11 +139,10 @@ lemma excepted_lossless (m:(D,D) fmap):
   (exists x, !mem (dom m) x) =>
   mu (uD \ (mem (rng m))) predT = 1%r.
 proof.
-move=> /endo_dom_rng h; rewrite -/(weight _) dexcepted_ll //.
+move=> /endo_dom_rng [x h]; rewrite dexcepted_ll //.
 + smt w=uD_uf_fu.
-have [/pred_ext] + [<- _]:= uD_uf_fu.
-rewrite -(etaE (support uD)) etaP=> h'.
-by apply/notin_supportIP; rewrite h'.
+have [?[<- @/is_full Hsupp]]:= uD_uf_fu.
+apply/notin_supportIP;exists x => />;apply Hsupp.
 qed.
 
 phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !mem X x ==> true] = 1%r.
@@ -165,7 +164,7 @@ proc; if=> //=; wp; call Indirect_ll.
 skip; progress.
 have:= excepted_lossless (PRPi.m{hr}) _.
 + by exists x{hr}.
-rewrite -/(weight _) weight_dexcepted /b2r.
+rewrite weight_dexcepted /b2r.
 case (weight uD = mu uD (mem (rng PRPi.m{hr})))=> //=.
 rewrite notin_supportIP /= -(etaE (mem (rng _))) etaP.
 by rewrite StdOrder.RealOrder.ltr_def=> -> /=; exact/mu_sub.
@@ -251,8 +250,9 @@ section Upto.
     move=> &2 bad; conseq (_: true ==> true: =1%r) (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
       by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.
-    by seq  2: (X = rng PRPi.m /\ !mem (dom PRPi.m) x) 1%r 1%r 0%r _=> //=;
-         [auto|if=> //=; auto|hoare; auto]; smt.
+    seq  2: (X = rng PRPi.m /\ !mem (dom PRPi.m) x) 1%r 1%r 0%r _=> //=;
+         [auto|if=> //=; auto|hoare; auto]=> />;rewrite ?dD_ll //.
+    by move=> ???;apply excepted_lossless;exists x{hr}.
     move=> &1; conseq (_: collision PRFi.m ==> collision PRFi.m: =1%r)=> //=.
     by proc; if; auto; smt.
   by inline *; auto; progress; smt.
@@ -299,8 +299,15 @@ section CollisionProbability.
   local clone import Birthday as BBound with
     op   q <- q,
     type T <- D,
-    op   uT <- uD
-  proof * by smt.
+    op   uT <- uD,
+    op maxu <- witness
+  proof *.
+  realize ge0_q by apply ge0_q.
+  realize maxuP. 
+  proof.
+  move=> x;apply StdOrder.RealOrder.lerr_eq.
+  case: uD_uf_fu => uni [ll fu];apply uni;apply fu.
+  qed.
 
   (* We construct a Birthday Bound adversary from the IND
      experiment. *)
@@ -360,7 +367,7 @@ section CollisionProbability.
     rewrite H3 //=; split.
       move=> x0; rewrite rng_set !inE.
       by rewrite rng_rem; smt.
-      by rewrite NewLogic.negb_and /= collision_add // H H0 orbC.
+      by rewrite negb_and /= collision_add // H H0 orbC.
   auto; progress.
     by rewrite rng0 in_fset0.
     smt.
@@ -368,9 +375,9 @@ section CollisionProbability.
 
   lemma pr_PRFi_collision &m:
     Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
-    <= (q^2)%r * mu uD (pred1 witness).
+    <= (q^2)%r * mu1 uD witness.
   proof.
-  by rewrite (pr_PRFi_Exp_collision &m) (pr_collision A A_ll A_bounded &m).
+  rewrite (pr_PRFi_Exp_collision &m) (pr_collision A A_ll A_bounded &m).
   qed.
 end section CollisionProbability.
 
@@ -379,7 +386,7 @@ lemma PartialConclusion (D <: PRF_Distinguisher {PRPi, PRFi, DBounder}) &m:
   (forall (O <: PRF_Oracle {D}), islossless O.f => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi'(Indirect),DBounder(D)).main() @ &m: res]
     - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
-  <= (q^2)%r * mu uD (pred1 witness).
+  <= (q^2)%r * mu1 uD witness.
 proof.
 move=> D_ll.
 have:= pr_PRFi_collision D D_ll &m.
@@ -432,13 +439,12 @@ section PRPi_PRPi'_Indirect.
     phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ (mem X)) (pred1 a)): (r0 = a).
       (* Bound *)
       progress.
-      rewrite -/(mu_x (uD \ (mem X){2}) _) mux_dexcepted a_notin_X /=.
-      rewrite /weight /mu_x.
+      rewrite dexcepted1E a_notin_X /=. 
       cut not_empty: mu uD predT - mu uD (mem X{2}) <> 0%r.
         rewrite -mu_not.
         cut: 0%r < mu uD (predC (mem X{2})); last smt.
         rewrite witness_support; exists a; rewrite /predC /= a_notin_X /=.
-        by have [->]:= uD_uf_fu.
+        by have [_[_ ->]]:= uD_uf_fu.
       by smt ml=0 w=uD_uf_fu.
       (* case r0 = a *)
       seq  2: (a = r0) (mu uD (pred1 a)) 1%r _ 0%r (r0 = r /\ X = X{2}).
@@ -488,7 +494,7 @@ lemma Conclusion (D <: PRF_Distinguisher {PRPi, PRFi, DBounder}) &m:
   (forall (O <: PRF_Oracle {D}), islossless O.f => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi,DBounder(D)).main() @ &m: res]
     - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
-  <= (q^2)%r * mu uD (pred1 witness).
+  <= (q^2)%r * mu1 uD witness.
 proof.
 move=> D_ll.
 by rewrite (pr_PRPi_PRPi'_Indirect (DBounder(D)) &m) (PartialConclusion D &m D_ll).

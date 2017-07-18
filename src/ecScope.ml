@@ -542,6 +542,7 @@ module Prover = struct
     pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
+    pl_selected   : bool option;
   }
 
   (* -------------------------------------------------------------------- *)
@@ -556,6 +557,7 @@ module Prover = struct
     pl_iterate   = None;
     pl_wanted    = None;
     pl_unwanted  = None;
+    pl_selected  = None;
   }
 
   (* -------------------------------------------------------------------- *)
@@ -589,6 +591,7 @@ module Prover = struct
       pl_iterate   = ppr.plem_iterate;
       pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
       pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
+      pl_selected  = ppr.plem_selected;
     }
 
   (* -------------------------------------------------------------------- *)
@@ -606,6 +609,7 @@ module Prover = struct
     let pr_iterate   = odfl dft.pr_iterate options.pl_iterate in
     let pr_wanted    = odfl dft.pr_wanted options.pl_wanted in
     let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
+    let pr_selected  = odfl dft.pr_selected options.pl_selected in
     let pr_provers   =
       let l = odfl dft.pr_provers (fst options.po_provers) in
       let do_ar l (k, p) =
@@ -616,7 +620,7 @@ module Prover = struct
 
     { pr_maxprocs; pr_provers; pr_timelimit; pr_cpufactor;
       pr_wrapper ; pr_verbose; pr_all      ; pr_max      ;
-      pr_iterate ; pr_wanted ; pr_unwanted }
+      pr_iterate ; pr_wanted ; pr_unwanted ; pr_selected}
 
   (* -------------------------------------------------------------------- *)
   let set_wrapper scope wrapper =

@@ -6,14 +6,14 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Int.
+require import Int.
 
 (* -------------------------------------------------------------------- *)
 lemma lt0n n : (0 <= n) => (0 < n <=> n <> 0).
 proof. by rewrite ltz_def => ->. qed.
 
 lemma eqn0Ngt n : (0 <= n) => (n = 0) <=> !(0 < n).
-proof. by rewrite eq_sym lez_eqVlt -ora_or => -[<-|?->]. qed.
+proof. by rewrite eq_sym lez_eqVlt -oraE => -[<-|?->]. qed.
 
 lemma ltzS m n : (m < n+1) <=> (m <= n).
 proof. by rewrite -lez_add1r addzC lez_add2r. qed.
@@ -180,4 +180,125 @@ by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
 qed.
 
 (* -------------------------------------------------------------------- *)
-abbrev minz = argmin (fun (i : int)=> i).
+abbrev minz = argmin (fun (i : int) => i).
+
+(* -------------------------------------------------------------------- *)
+(* TO BE REMOVED                                                        *)
+
+op fold : ('a -> 'a) -> 'a -> int -> 'a.
+
+axiom foldle0 p (f : 'a -> 'a) a: p <= 0 => fold f a p = a.
+axiom foldS (f : 'a -> 'a) a n: 0 <= n => fold f a (n+1) = f (fold f a n).
+
+lemma fold0 (f : 'a -> 'a) a: fold f a 0 = a.
+proof. by rewrite foldle0. qed.
+
+lemma nosmt foldpos (f : 'a -> 'a) a n: 0 < n =>
+  f (fold f a (n-1)) = fold f a n.
+proof. by move=> gt0_n; rewrite -foldS /#. qed.
+
+lemma fold_add (f : 'a -> 'a) a n1 n2 : 0 <= n1 => 0 <= n2 =>
+   fold f (fold f a n2) n1 = fold f a (n1 + n2).
+proof. elim/intind: n1; smt(fold0 foldS). qed.
+
+(* -------------------------------------------------------------------- *)
+(* Power *)
+
+op ( ^ ) (x:int) (p:int) = fold (( * ) x) 1 p
+  axiomatized by powE.
+
+lemma nosmt powNeg p x: p <= 0 => x ^ p = 1.
+proof. by move=> le0_p; rewrite powE foldle0. qed.
+
+lemma pow0 x: x ^ 0 = 1.
+proof. by rewrite powE fold0. qed.
+
+lemma pow1 (n:int): n ^ 1 = n.
+proof. by rewrite powE -foldpos //= fold0 mulz1. qed.
+
+lemma powS p x: 0 <= p => x ^ (p+1) = x * x ^ p.
+proof. by move=> ge0_p; rewrite !powE foldS. qed.
+
+lemma pow_le0 p x: p <= 0 => x ^ p = 1.
+proof. by move=> ?; rewrite powE foldle0. qed.
+
+lemma pow_add z p1 p2: 0 <= p1 => 0 <= p2 => z^p1 * z^p2 = z^(p1+p2).
+proof. by move=> ge0_p1; elim/intind: p2; smt(pow0 powS). qed.
+
+lemma pow_mul z p1 p2: 0 <= p1 => 0 <= p2 => (z^p1)^p2 = z^(p1*p2).
+proof.
+move=> ge0_p1; elim/intind: p2 => /=; first by rewrite !pow0.
+by move=> i ge0_i ih; rewrite powS // mulzDr -pow_add /#.
+qed.
+
+lemma powPos z p: 0 < z => 0 < z ^ p.
+proof.
+case: (p <= 0)=> [le0_p|]; first by rewrite pow_le0.
+move/ltzNge=> /ltzW h gt0_z; elim/intind: p h; first by rewrite pow0.
+by move=> i ge0_i ih; rewrite powS //#.
+qed.
+
+lemma pow_Mle x y: 0 <= x <= y => 2^x <= 2^y.
+proof.
+case=> ge0_x le_xy; have ge0_y : 0 <= y by smt().
+by elim/intind: y ge0_y le_xy; smt(powPos powS).
+qed.
+
+(* -------------------------------------------------------------------- *)
+theory Extrema.
+  op min (a b:int) = if (a < b) then a else b.
+
+  lemma nosmt minC a b : min a b = min b a by smt().
+
+  lemma nosmt min_lel a b : a <= b => min a b = a by smt().
+
+  lemma nosmt min_ler a b : a <= b => min b a = a by smt().
+
+  lemma nosmt min_is_lb a b:
+    min a b <= a /\
+    min a b <= b
+  by smt().
+
+  lemma nosmt min_is_glb x a b:
+    x <= a => x <= b =>
+    x <= min a b
+  by smt().
+
+  lemma nosmt min_is_extremum a b:
+    min a b = a \/ min a b = b
+  by smt().
+
+  op max (a b:int) = if (a < b) then b else a.
+
+  lemma nosmt maxC a b : max a b = max b a by smt().
+
+  lemma nosmt max_lel a b : a <= b => max b a = b by smt().
+
+  lemma nosmt max_ler a b : a <= b => max a b = b by smt().
+
+  lemma leq_maxl m n : m <= max m n by smt().
+
+  lemma leq_maxr m n : n <= max m n by smt().
+
+  lemma geq_max m n1 n2 : (max n1 n2 <= m) <=> (n1 <= m) /\ (n2 <= m)
+  by smt().
+
+  lemma gt_max m n1 n2 : (max n1 n2 < m) <=> (n1 < m) /\ (n2 < m)
+  by smt().
+
+  lemma nosmt max_is_ub a b:
+    a <= max a b /\
+    b <= max a b
+  by smt().
+
+  lemma nosmt max_is_lub x a b:
+    a <= x => b <= x =>
+    max a b <= x
+  by smt().
+
+  lemma nosmt max_is_extremum a b:
+    max a b = a \/ max a b = b
+  by smt().
+end Extrema.
+
+export Extrema.

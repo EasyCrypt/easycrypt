@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Int IntExtra Ring StdOrder.
+require import Core Int IntExtra Ring StdOrder.
 (*---*) import Ring.IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -224,7 +224,13 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma oddP z: odd z <=> (z %% 2 <> 0).
-proof. smt. qed.
+proof.
+rewrite {1}(divz_eq _ 2); case: (z %% 2 = 0) => /=.
++ by move=> ->/=; rewrite oddM odd2.
+move=> nz_z2; suff ->/=: z %% 2 = 1.
++ by rewrite oddD oddM odd2 odd1.
+smt(ltz_pmod modz_ge0).         (* FIXME: use case for nat *)
+qed.
 
 lemma oddPn z: !odd z <=> (z %% 2 = 0).
 proof. by rewrite oddP /#. qed.
@@ -299,7 +305,7 @@ move: d; have wl: forall d, 0 < d => 0 < p => p * m %/ (p * d) = m %/ d.
   rewrite pmulr_rge0 ?modz_ge0 //= 1:gtr_eqF //= normrM gtr0_norm //.
   by rewrite ltr_pmul2l // ltz_mod gtr_eqF.
 move=> d; case: (d = 0) => [->|]; first by rewrite ?divz0.
-rewrite eqr_le anda_and -nand -!ltrNge => -[/wl //|lt0_d gt0_p].
+rewrite eqr_le andaE negb_and -!ltrNge => -[/wl //|lt0_d gt0_p].
 by rewrite -(opprK d) mulrN divzN wl 1:oppr_gt0 // -divzN.
 qed.
 
@@ -495,7 +501,7 @@ lemma nosmt eqz_mul d m n : d <> 0 => d %| m =>
   (m = n * d) <=> (m %/ d = n).
 proof. by move=> d_gt0 dv_d_m; rewrite eq_sym -eqz_div // eq_sym. qed.
 
-lemma nosmt leq_div2r d m n :
+lemma nosmt leq_div2r (d m n : int) :
   m <= n => 0 <= d => m %/ d <= n %/ d.
 proof.
 move=> le_mn /ler_eqVlt [<-|gt0_d]; first by rewrite !divz0.

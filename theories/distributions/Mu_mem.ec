@@ -15,7 +15,7 @@ lemma mu_mem_le (s:'a fset): forall (d:'a distr) (bd:real),
   mu d (mem s) <= (card s)%r * bd.
 proof.
   elim/fset_ind s=> [d bd mu_bound|x s x_notin_s ih d bd mu_bound].
-    by rewrite (mu_eq d _ pred0) 2:mu_false 2:fcards0 // => x; rewrite inE.
+    by rewrite (mu_eq d _ pred0) 2:mu0 2:fcards0 // => x; rewrite inE.
   rewrite fcardUI_indep 1:fsetP 2:fcard1.
     by move=> x0; rewrite !inE; split=> [[h ->>]|].
   rewrite addzC fromintD mulrDl /=.
@@ -32,7 +32,7 @@ lemma mu_mem_ge (s:'a fset): forall (d:'a distr) (bd:real),
   mu d (mem s) >= (card s)%r * bd.
 proof.
   elim/fset_ind s=> [d bd mu_bound|x s x_notin_s ih d bd mu_bound].
-    by rewrite (mu_eq d _ pred0) 2:mu_false 2:fcards0 // => x; rewrite inE.
+    by rewrite (mu_eq d _ pred0) 2:mu0 2:fcards0 // => x; rewrite inE.
   rewrite fcardUI_indep 1:fsetP 2:fcard1.
     by move=> x0; rewrite !inE; split=> [[h ->>]|].
   rewrite addzC fromintD mulrDl /=.
@@ -85,7 +85,7 @@ lemma mu_mem_le_size (l:'a list) (d:'a distr) (bd:real):
   mu d (mem l) <= (size l)%r * bd.
 proof.
   case l=> [//=|x l mu_bound].
-    by rewrite (mu_eq _ _ pred0) // mu_false.
+    by rewrite (mu_eq _ _ pred0) // mu0.
   have le0_mu: 0%r <= bd.
     by have := mu_bound x _=> //; smt.
   move: (x::l) mu_bound=> {x l} l mu_bound.

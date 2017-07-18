@@ -6,12 +6,9 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pred Int IntExtra IntDiv Real RealExtra Ring List.
-require import StdRing StdOrder.
+require import AllCore IntDiv Ring List StdRing StdOrder.
 require (*--*) Bigop Bigalg.
 (*---*) import RField IntID IntOrder.
-
-pragma Proofs:weak.
 
 (* -------------------------------------------------------------------- *)
 theory Bigint.
@@ -32,7 +29,7 @@ clone include Bigalg.BigOrder with
     op Num.( <= ) <- Int.(<=),
     op Num.( <  ) <- Int.(< )
 
-    proof Num.Domain.* by smt, Num.Axioms.* by smt
+    proof Num.Domain.* by smt(), Num.Axioms.* by smt()
 
     rename [theory] "BAdd" as "BIA"
            [theory] "BMul" as "BIM"
@@ -50,7 +47,16 @@ proof. by rewrite BIA.sumr_const -IntID.intmulz. qed.
 lemma nosmt big_count (P : 'a -> bool) s:
     BIA.big P (fun (x : 'a) => count (pred1 x) s) (undup s)
   = size (filter P s).
-proof. admit. qed.
+proof.
+rewrite size_filter -(mul1r (count _ _)) -big_constz.
+have := perm_undup_count s => /BIA.eq_big_perm <-.
+rewrite BIA.big_flatten BIA.big_map /predT /(\o).
+rewrite BIA.big_mkcond; apply/BIA.eq_bigr=> x _ /=.
+rewrite big_constz mul1r -filter_pred1 count_filter.
+case: (P x)=> [Px|NPx]; last rewrite count_pred0_eq //.
++ by apply/eq_count => y @/pred1; split=> [->|[]].
++ by move=> y @/predI @/pred1; case: (y = x).
+qed.
 
 abbrev sumid i j = BIA.bigi predT (fun n => n) i j.
 
@@ -182,7 +188,7 @@ lemma nosmt b2i_big (P1 P2 : 'a -> bool) (s : 'a list) :
    b2i (big P1 P2 s) <= BIA.big P1 (fun i => b2i (P2 i)) s.
 proof.
 elim: s => [|x s ih] //=; rewrite big_cons BIA.big_cons.
-case: (P1 x)=> //= P1x; rewrite ora_or b2i_or.
+case: (P1 x)=> //= P1x; rewrite oraE b2i_or.
 rewrite -addrA ler_add2l ler_subl_addr ler_paddr //.
 by rewrite -b2i_and b2i_ge0.
 qed.

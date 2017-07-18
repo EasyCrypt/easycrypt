@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Option Distr List FSet NewFMap.
+require import AllCore Distr List FSet NewFMap.
 require (*--*) FinType NewROM.
 
 clone include NewROM.
@@ -51,12 +51,7 @@ lemma RO_init_ll:
   islossless RO.init.
 proof.
   move=> dsampleL; proc.
-  while (true) (size work).
-    auto; progress.
-      by apply dsampleL.
-      move: (work{hr}) H=> {H1 v H0 &hr dsampleL}.
-      by case=> //=; smt.
-  by auto; smt.
+  while (true) (size work); auto; smt (head_behead size_eq0 size_ge0).
 qed.
 
 lemma RO_o_ll: islossless RO.o.

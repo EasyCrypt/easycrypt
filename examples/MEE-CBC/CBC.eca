@@ -1,6 +1,6 @@
 (*** A proof that CBC mode turns any weak PRP into an IND$- CPA-secure
      symmetric encryption scheme **when used with random IVs**  ***)
-require import Option Fun Int Real NewDistr List FSet NewFMap.
+require import Option Fun Int Real Distr List FSet NewFMap.
 require import StdRing StdOrder DList.
 require (*ab*) NewPRP ConcretePRP NewPRF SKE_INDR. (* Definitions and Security Notions *)
 require (*ab*) RP_RF.            (* Generic Arguments *)
@@ -20,14 +20,14 @@ type key.
 (* TODO: replace the following axiomatization with "uniform
    distribution over the full type block", or generalize instead *)
 op dKey: key distr.
-axiom dKey_uffu: is_uniform_over dKey predT.
+axiom dKey_uffu: is_uniform dKey /\ is_lossless dKey /\ is_full dKey.
 
 (* -------------------------------------------------------------------- *)
 (** An abstract type for plaintext/ciphertext blocks **)
 type block.
 
 op dBlock: block distr.
-axiom dBlock_uffu: is_uniform_over dBlock predT.
+axiom dBlock_uffu: is_uniform dBlock /\ is_lossless dBlock /\ is_full dBlock.
 
 op zeros: block.
 op (+): block -> block -> block.

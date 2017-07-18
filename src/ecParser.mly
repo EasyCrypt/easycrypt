@@ -167,6 +167,7 @@
     | `WANTEDLEMMAS   of EcParsetree.pdbhint
     | `VERBOSE        of int option
     | `VERSION        of [ `Full | `Lazy ]
+    | `SELECTED
   ]
 
   module SMT : sig
@@ -190,7 +191,7 @@
        option_matching
          [ "all"; "timeout"; "maxprovers"; "maxlemmas";
            "wantedlemmas"; "unwantedlemmas";
-           "prover"; "verbose"; "lazy"; "full"; "iterate" ]
+           "prover"; "verbose"; "lazy"; "full"; "iterate"; "selected" ]
 
     let as_int = function
       | None          -> `None
@@ -247,6 +248,7 @@
       | "full"           -> `VERSION        (get_as_none s o; `Full)
       | "all"            -> get_as_none s o; (`ALL)
       | "iterate"        -> get_as_none s o; (`ITERATE)
+      | "selected"       -> get_as_none s o; (`SELECTED)
       | _                ->  assert false
 
     let mk_smt_option (os : smt list) =
@@ -260,6 +262,7 @@
       let verbose  = ref None in
       let version  = ref None in
       let iterate  = ref None in
+      let selected = ref None in
 
       let add_prover (k, p) =
         let r = odfl empty_pprover_list !pnames in
@@ -281,6 +284,7 @@
         | `VERSION        v -> version  := Some v
         | `ITERATE          -> iterate  := Some true
         | `PROVER         p -> List.iter add_prover p
+        | `SELECTED         -> selected := Some true
       in
 
       List.iter do1 os;
@@ -299,7 +303,9 @@
         plem_max        = !mlemmas;
         plem_iterate    = !iterate;
         plem_wanted     = !wanted;
-        plem_unwanted   = !unwanted; }
+        plem_unwanted   = !unwanted;
+        plem_selected   = !selected;
+      }
   end
 %}
 
@@ -475,6 +481,7 @@
 %token REFLEX
 %token REMOVE
 %token RENAME
+%token REPLACE
 %token REQUIRE
 %token RES
 %token RETURN
@@ -1249,6 +1256,9 @@ lvalue_u:
 | x=loc(lvalue_u) { x }
 
 base_instr:
+| x=lident
+    { PSident x }
+
 | x=lvalue EQ SAMPLE e=expr
 | x=lvalue LESAMPLE  e=expr
     { PSrnd (x, e) }
@@ -1813,35 +1823,129 @@ theory_import: IMPORT xs=uqident* { xs }
 theory_export: EXPORT xs=uqident* { xs }
 
 (* -------------------------------------------------------------------- *)
-(* pattern selection (tactics)                                          *)
-idpattern:
-| x=ident { [x] }
-| LBRACKET xs=ident+ RBRACKET { xs }
+(* Instruction matching                                                 *)
 
-ipattern:
+%inline im_block_start:
+| LBRACE  { Without_anchor }
+| LPBRACE { With_anchor    }
+
+%inline im_block_end:
+| RBRACE  { Without_anchor }
+| RPBRACE { With_anchor    }
+
+im_block:
+| a1=im_block_start s=im_stmt a2=im_block_end
+   { ((a1, a2), s) }
+
+im_stmt_atomic:
 | UNDERSCORE
-    { PtAny }
+   { IM_Any }
 
-| UNDERSCORE CEQ f=idpattern LPAREN UNDERSCORE RPAREN
-    { PtAsgn f }
+| LARROW
+| UNDERSCORE LARROW UNDERSCORE
+   { IM_Assign }
 
-| IF UNDERSCORE LBRACE p=spattern RBRACE
-    { PtIf (p, `NoElse) }
+| LESAMPLE
+| UNDERSCORE LESAMPLE UNDERSCORE
+   { IM_Sample }
 
-| IF UNDERSCORE LBRACE p=spattern RBRACE UNDERSCORE
-    { PtIf (p, `MaybeElse) }
+| LEAT
+| UNDERSCORE LEAT UNDERSCORE
+   { IM_Call }
 
-| IF UNDERSCORE LBRACE p1=spattern RBRACE ELSE LBRACE p2=spattern RBRACE
-    { PtIf (p1, `Else p2) }
+| IF
+   { IM_If (None, None) }
 
-| WHILE UNDERSCORE LBRACE p=spattern RBRACE
-    { PtWhile p }
+| WHILE
+   { IM_While None }
 
-spattern:
-| UNDERSCORE { () }
+| n=lident
+   { IM_Named (n, None) }
 
-tselect:
-| p=ipattern { p }
+im_stmt_base_r(S):
+| x=im_stmt_atomic S
+   { x }
+
+| IF x1=im_block
+   { IM_If (Some x1, None) }
+
+| IF x1=im_block ELSE x2=im_block
+   { IM_If (Some x1, Some x2) }
+
+| WHILE x=im_block
+   { IM_While (Some x) }
+
+| x=paren(im_stmt) S
+   { IM_Parens x }
+
+| s=im_repeat_mark x=im_stmt_base_r(S)
+   { IM_Repeat (s, x) }
+
+im_stmt_base(S):
+| x=im_stmt_base_r(S)
+   { x }
+
+| xs=plist2(im_stmt_base_r(empty), PIPE) S
+   { IM_Choice xs }
+
+im_stmt_seq_r:
+| x=im_stmt_base(empty)
+   { [x] }
+
+| x=im_stmt_base(SEMICOLON) xs=im_stmt_seq_r
+   { x :: xs }
+
+%inline im_stmt_seq_named:
+| x=im_stmt_seq_r AS n=lident
+   { IM_Named (n, Some (IM_Seq x)) }
+
+im_stmt_seq:
+| x=im_stmt_seq_named
+   { [x] }
+
+| xs=im_stmt_seq_r
+   { xs }
+
+| x=im_stmt_seq_named SEMICOLON xs=im_stmt_seq
+    { x :: xs }
+
+%inline im_stmt:
+| xs=im_stmt_seq?
+   { IM_Seq (odfl [] xs) }
+
+im_base_repeat_mark:
+| x=im_range NOT
+   { IM_R_Repeat x }
+
+| x=im_range_question QUESTION
+   { IM_R_May x }
+
+im_repeat_mark:
+| b=boption(TILD) x=im_base_repeat_mark
+   { (not b, x) }
+
+im_range:
+| empty
+   { (None, None) }
+
+| i=word
+   { (Some i, Some i) }
+
+| LBRACKET n=word DOTDOT m=word RBRACKET
+   { (Some n, Some m) }
+
+| LBRACKET n=word DOTDOT RBRACKET
+   { (Some n, None) }
+
+| LBRACKET DOTDOT m=word RBRACKET
+   { (None, Some m) }
+
+im_range_question:
+| empty
+  { None }
+
+| i=word
+  { Some i }
 
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
@@ -2531,9 +2635,6 @@ phltactic:
 | KILL s=side? o=codepos NOT STAR
     { Pkill (s, o, None) }
 
-| p=tselect INLINE
-    { Pinline (`ByPattern p) }
-
 | ALIAS s=side? o=codepos
     { Palias (s, o, None) }
 
@@ -2625,6 +2726,9 @@ phltactic:
 | SIM info=eqobs_in
     { Psim info }
 
+| REPLACE rk=repl_kind h1=repl_hyp h2=repl_hyp
+    { Ptrans_stmt (rk, fst h1, snd h1, fst h2, snd h2) }
+
 | TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
     { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
 
@@ -2702,12 +2806,23 @@ bdhoare_split:
 | NOT b1=sform b2=sform
     { BDH_split_not (Some b1,b2) }
 
-trans_kind:
- | s=side  c=brace(stmt) { TKstmt(Some s, c) }
- | f=loc(fident) { TKfun (f) }
+%inline trans_kind:
+| s=side c=brace(stmt)
+    { TKstmt(Some s, c) }
 
-trans_hyp:
+| f=loc(fident)
+    { TKfun (f) }
+
+%inline trans_hyp:
 | LPAREN p=form LONGARROW q=form RPAREN { (p,q) }
+
+%inline repl_kind:
+| s=side p=im_block BY c=brace(stmt)
+    { TKparsedStmt (Some s, p, c) }
+
+%inline repl_hyp:
+| h=trans_hyp
+    { h }
 
 fel_pred_spec:
 | f=loc(fident) COLON p=sform

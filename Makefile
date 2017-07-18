@@ -36,11 +36,10 @@ SHRDIR := $(PREFIX)/share/easycrypt
 SYSDIR := $(LIBDIR)/system
 
 # --------------------------------------------------------------------
-XUNITOUT  ?= xunit.xml
 ECARGS    ?=
-ECTOUT    ?= 5
+ECTOUT    ?= 10
 ECJOBS    ?= 1
-ECEXTRA   ?= --pretty
+ECEXTRA   ?= --report=report.log
 ECPROVERS ?= Alt-Ergo Z3 Eprover
 CHECKPY   ?=
 CHECK     := $(CHECKPY) scripts/testing/runtest
@@ -50,7 +49,7 @@ CHECK     += $(ECEXTRA) config/tests.config
 CHECKCATS ?= prelude stdlib
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native tests check weak-check check-xunit examples
+.PHONY: all build byte native tests check weak-check examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
 .PHONY: callprover license
 .PHONY: %.ml %.mli %.inferred.mli
@@ -90,7 +89,7 @@ define check-for-staled-files
 	fi
 endef
 
-install: ec.native uninstall
+install: build uninstall
 	-@$(call check-for-staled-files)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt$(EXE)
@@ -125,17 +124,14 @@ uninstall-purge:
 
 tests: check
 
-examples:
+examples: build
 	$(CHECK) examples
 
-check: ec.native
+check: build
 	$(CHECK) $(CHECKCATS)
 
-weak-check: ec.native
+weak-check: build
 	$(CHECK) --bin-args="-pragmas Proofs:weak" $(CHECKCATS) '!unit'
-
-check-xunit: ec.native
-	$(CHECK) --xunit="$(XUNITOUT)" $(CHECKCATS)
 
 license:
 	scripts/srctx/license COPYRIGHT.yaml \

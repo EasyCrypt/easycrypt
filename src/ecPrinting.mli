@@ -50,6 +50,7 @@ val pp_topmod  : PPEnv.t -> mpath pp
 val pp_form    : PPEnv.t -> form pp
 val pp_type    : PPEnv.t -> ty pp
 val pp_tyname  : PPEnv.t -> path pp
+val pp_axname : PPEnv.t -> path pp
 
 val pp_mem      : PPEnv.t -> EcIdent.t pp
 val pp_tyvar    : PPEnv.t -> ident pp
@@ -72,7 +73,7 @@ val pp_hoareS   : PPEnv.t -> hoareS  pp
 val pp_bdhoareS : PPEnv.t -> bdHoareS pp
 val pp_equivS   : PPEnv.t -> equivS  pp
 
-val pp_stmt  : PPEnv.t -> stmt pp
+val pp_stmt  : ?lineno:bool -> PPEnv.t -> stmt pp
 val pp_instr : PPEnv.t -> instr pp
 
 (* -------------------------------------------------------------------- *)

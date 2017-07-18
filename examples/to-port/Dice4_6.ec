@@ -1,4 +1,4 @@
-require import Int Real NewDistr List FSet.
+require import Int Real Distr List FSet.
 require import DInterval.
 
 require (*--*) Dice_sampling.

@@ -1,5 +1,5 @@
 require import Pred.
-require import Distr.
+require import OldDistr.
 require import Int.
 require import Real.
 require import FMap.

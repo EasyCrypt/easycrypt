@@ -7,7 +7,6 @@
 
 (* Definitions for Public-Key Signatures Schemes *)
 require import FSet.
-require import Pair.
 
 type pkey.
 type skey.

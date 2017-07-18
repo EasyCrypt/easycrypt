@@ -85,7 +85,7 @@ module CI_Real : sig
   val p_RealExtra : path
   val p_RealOrder : path
 
-  val p_real0       : path 
+  val p_real0       : path
   val p_real1       : path
   val p_real_opp    : path
   val p_real_add    : path
@@ -102,6 +102,15 @@ module CI_Real : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Pred : sig
+  val i_Pred : symbol
+  val p_Pred : path
+
+  val p_predT      : path
+  val p_pred1      : path
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Distr : sig
   val i_Distr : symbol
   val p_Distr : path
@@ -111,10 +120,9 @@ module CI_Distr : sig
   val p_dbitstring : path
   val p_dinter     : path
 
-  val p_in_supp : path
+  val p_support : path
   val p_mu      : path
-  val p_mu_x    : path
-  val p_weight  : path
+  val p_lossless: path
 end
 
 (* -------------------------------------------------------------------- *)
@@ -140,7 +148,6 @@ module CI_Logic : sig
   val p_Logic  : path
   val mk_logic : symbol -> path
 
-  val p_cut_lemma     : path
   val p_unit_elim     : path
   val p_false_elim    : path
   val p_bool_elim     : path
@@ -169,22 +176,16 @@ module CI_Logic : sig
   val p_fcongr        : path
   val p_eq_sym        : path
   val p_eq_sym_imp    : path
-  val p_imp_trans     : path
-  val p_negbTE        : path
   val p_negeqF        : path
-
-  val p_rewrite_l     : path
-  val p_rewrite_r     : path
-  val p_rewrite_iff_l : path
-  val p_rewrite_iff_r : path
-  val p_rewrite_bool  : path
 
   val p_iff_lr        : path
   val p_iff_rl        : path
 
+  val p_cut_lemma     : path
   val p_case_eq_bool  : path
-
   val p_ip_dup        : path
+
+  val p_negbTE        : path
 end
 
 module CI_Map : sig

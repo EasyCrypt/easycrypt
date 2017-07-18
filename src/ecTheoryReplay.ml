@@ -137,7 +137,27 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, otyd) =
 
       | `Inline ->
           let subst =
-            EcSubst.add_tydef subst (xpath ove x) (List.map fst nargs, ntyd)
+            EcSubst.add_tydef
+              subst (xpath ove x) (List.map fst nargs, ntyd) in
+
+          let subst =
+            (* FIXME: HACK *)
+            match otyd.tyd_type, ntyd.ty_node with
+            | `Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
+                match (EcEnv.Ty.by_path np scenv).tyd_type with
+                | `Datatype { tydt_ctors = _ } ->
+                    List.fold_left (fun subst (name, _) ->
+                      Printf.printf "%s / %s\n%!"
+                        (EcPath.tostring (xpath ove name))
+                        (EcPath.tostring (EcPath.pqoname (EcPath.prefix np) name));
+                      EcSubst.add_path subst
+                        ~src:(xpath ove name)
+                        ~dst:(EcPath.pqoname (EcPath.prefix np) name))
+                      subst octors
+                | _ -> subst
+              end
+            | _, _ -> subst
+
           in (subst, ops, proofs, scope)
   end
 

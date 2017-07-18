@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require export Int.
+require export Int IntExtra.
 require import Ring AlgTactic.
 
 (* -------------------------------------------------------------------- *)
@@ -16,7 +16,7 @@ instance ring with int
   op add   = (+)
   op opp   = [-]
   op mul   = ( * )
-  op expr  = ( ^ )
+  op expr  = IntExtra.( ^ )
 
   proof oner_neq0 by smt
   proof addr0     by smt

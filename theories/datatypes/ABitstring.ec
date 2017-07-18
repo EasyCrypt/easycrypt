@@ -135,8 +135,3 @@ proof -strict.
   rewrite sub_app_fst_le //;smt.
 qed.
 
-theory DBitstring.
-  require import Distr.
-
-  op dbitstring: int -> bitstring distr.
-end DBitstring.

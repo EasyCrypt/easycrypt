@@ -5,4 +5,5 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require export Logic.
+(* -------------------------------------------------------------------- *)
+require export Core Int IntExtra Real RealExtra.

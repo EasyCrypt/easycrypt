@@ -2586,7 +2586,7 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Srnd (lv, e) ->
-    Format.fprintf fmt "@[<hov 2>%a <$@ @[$%a@];"
+    Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@];"
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
@@ -2812,6 +2812,16 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
       Format.fprintf fmt "%a exact : %a."
         (pp_list " " pp_string) ((if lc then ["local"] else []) @ ["hint"])
         (pp_list "@ " (pp_axname ppe)) (EcPath.Sp.elements p)
+
+(* -------------------------------------------------------------------- *)
+let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
+  let ppnode = collect2_s stmt.s_node [] in
+  let ppnode = c_ppnode ~width:80 ppe ppnode in
+  Format.fprintf fmt "%a" (pp_node `Left) ppnode
+
+(* -------------------------------------------------------------------- *)
+let pp_stmt ?(lineno = false) =
+  if lineno then pp_stmt_with_nums else pp_stmt
 
 (* -------------------------------------------------------------------- *)
 module ObjectInfo = struct

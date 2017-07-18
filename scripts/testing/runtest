@@ -5,6 +5,23 @@ import sys, os, errno, re, glob, shutil, itertools, logging
 import subprocess as sp, time, datetime, socket, cStringIO as sio
 
 # --------------------------------------------------------------------
+import collections as cl, yaml
+
+class folded_unicode(unicode):
+    pass
+
+class literal_unicode(unicode):
+    pass
+
+def folded_unicode_representer(dumper, data):
+    return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='>')
+def literal_unicode_representer(dumper, data):
+    return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
+
+yaml.add_representer(folded_unicode , folded_unicode_representer)
+yaml.add_representer(literal_unicode, literal_unicode_representer)
+
+# --------------------------------------------------------------------
 class Object(object):
     def __init__(self, **kw):
         self.__dict__.update(kw)
@@ -57,13 +74,6 @@ def _options():
         help    = 'append ARGS to EasyCrypt command (cumulative)')
 
     parser.add_option(
-        '', '--xunit',
-        action  = 'store',
-        default = None,
-        metavar = 'FILE',
-        help    = 'dump result to FILE using xUnit format')
-
-    parser.add_option(
         '', '--timeout',
         action  = 'store',
         default = None,
@@ -80,10 +90,11 @@ def _options():
         help    = 'number of maximum parallel test jobs')
 
     parser.add_option(
-        '', '--pretty',
-        action  = 'store_true',
-        default = False,
-        help    = 'prettify XML xUnit')
+        '', '--report',
+        action  = 'store',
+        default = None,
+        metavar = 'FILE',
+        help    = 'dump result to FILE')
 
     (cmdopt, args) = parser.parse_args()
 
@@ -98,10 +109,9 @@ def _options():
         parse.error('jobs must be positive')
 
     options = Object(scenarios = dict())
-    options.xunit   = cmdopt.xunit
-    options.timeout = cmdopt.timeout
-    options.jobs    = cmdopt.jobs
-    options.pretty  = cmdopt.pretty
+    options.timeout  = cmdopt.timeout
+    options.jobs     = cmdopt.jobs
+    options.report   = cmdopt.report
 
     defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
 
@@ -147,80 +157,47 @@ def _options():
     return options
 
 # --------------------------------------------------------------------
-def _xunit_dump(config, results, pretty=False):
-    import xml.etree.ElementTree as E
-
-    try:
-        import lxml, lxml.etree
-    except ImportError:
-        lxml = None
-
+def _dump_report(config, results, out):
     totaltime = sum([x.time for x in results])
     grouped   = dict()
+    aout      = []
 
     for result in results:
         grouped.setdefault(result.config.group, []).append(result)
 
-    root = E.Element('testsuites')
     for gname, group in grouped.items():
-        ok = [x for x in group if     x.success]
-        ko = [x for x in group if not x.success]
+        ok   = [x for x in group if     x.success]
+        ko   = [x for x in group if not x.success]
+        node = cl.OrderedDict()
 
-        node = E.Element('testsuite',
-                         name      = gname,
-                         hostname  = config.hostname,
-                         timestamp = config.timestamp.isoformat(),
-                         tests     = str(len(group)),
-                         errors    = "0",
-                         failures  = str(len(ko)),
-                         time      = "%.3f" % totaltime)
-
-        node.append(E.Element('properties'))
+        node['name']      = gname
+        node['hostname']  = config.hostname
+        node['timestamp'] = config.timestamp.isoformat()
+        node['tests']     = len(group)
+        node['failures']  = len(ko)
+        node['time']      = '%.3f' % totaltime
+        node['details']   = []
 
         for result in group:
+            subnode = cl.OrderedDict()
+
             name = os.path.basename(result.config.filename)
             name = os.path.splitext(name)[0]
+            name = '%s (%s)' % (name, result.config.filename)
 
-            classname = os.path.dirname(result.config.filename)
-            classname = classname.split(os.path.sep)
-            if classname == [] or classname[0] != 'tests':
-                classname.insert(0, 'tests')
-            classname = '.'.join(classname)
+            subnode['name']       = name
+            subnode['time']       = '%.3f' % (result.time,)
+            subnode['success']    = result.success
+            subnode['shouldpass'] = result.config.isvalid
+            subnode['output']     = literal_unicode(result.stderr.rstrip('\r\n'))
 
-            rnode = E.Element('testcase',
-                name      = name,
-                classname = classname,
-                time      = "%.3f" % (result.time,))
-            longmsg  = result.stderr.strip('\r\n')
-            shortmsg = \
-                      'invalid-exit-status (should-pass: %r)' % \
-                      (result.config.isvalid,)
-            if longmsg:
-                shortmsg = [shortmsg] + longmsg.splitlines()[-20:]
-                shortmsg = '\n'.join(shortmsg)
-            if not result.success:
-                rnode.append(E.Element('failure',
-                        message = shortmsg,
-                        type = 'should-pass: %r' % (result.config.isvalid,),))
-                rnode.text = longmsg
-            node.append(rnode)
+            node['details'].append(subnode)
 
-        node.append(E.Element("system-out"))
-        node.append(E.Element("system-err"))
+        aout.append(node)
 
-        root.append(node)
+    opts = dict(default_flow_style = None, encoding = 'utf-8')
 
-    xml = E.tostring(root, method = 'xml', encoding = 'utf-8')
-    xml = unicode(xml, 'utf-8')
-    xml = '<?xml version="1.0" encoding="utf-8"?>%s\n' % (xml,)
-
-    if not pretty or lxml is None:
-        return xml
-
-    parser = lxml.etree.XMLParser(remove_blank_text=True)
-    tree   = lxml.etree.parse(sio.StringIO(xml), parser)
-
-    return lxml.etree.tostring(tree, pretty_print=True)
+    out.write(yaml.dump(aout, **opts))
 
 # --------------------------------------------------------------------
 def _run_test(config, options):
@@ -354,10 +331,9 @@ def _main():
         logging.info("--- END FAILING SCRIPTS ---")
         logging.critical("some tests did NOT pass")
 
-    if options.xunit is not None:
-        open(options.xunit, 'wb')\
-            .write(_xunit_dump(mainconfig, result, options.pretty) \
-                   .encode('utf-8'))
+    if options.report is not None:
+        with open(options.report, 'wb') as output:
+            _dump_report(mainconfig, result, output)
 
     exit (2 if errors else 0)
 

@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* Trapdoor one-way permutations *)
-require import Distr.
+require import Core Distr.
 
 (** Abstract declarations to be refined when instantiating *)
 (* Support *)
@@ -32,7 +32,7 @@ axiom challengeL pk:
 
 axiom challengeU pk:
   valid_pkey pk =>
-  is_subuniform (challenge pk).
+  is_uniform (challenge pk).
 
 (** Concrete definitions *)
 op f: pkey -> t -> t.

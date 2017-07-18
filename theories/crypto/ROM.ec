@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Fun Int IntExtra Real RealExtra.
-require import Finite List FSet NewFMap Distr.
+require import AllCore Finite List FSet NewFMap Distr.
 require import StdRing StdBigop StdOrder FelTactic.
 (*---*) import RealOrder.
 
@@ -144,7 +143,10 @@ theory Eager.
     islossless RO.init.
   proof.
     move=> fType dsampleL; proc.
-    by while (true) (card work); auto; smt.
+    while (true) (card work); auto => />.
+    + move=> &hr Hw;rewrite dsampleL /= => ??. 
+      rewrite (fcardD1 work{hr} (pick work{hr})) mem_pick //= /#.   
+    smt (fcard_ge0 fcard_eq0).
   qed.
 
   lemma RO_o_ll: islossless RO.o.
@@ -245,7 +247,8 @@ theory LazyEager.
       + call (_: Lazy.RO.m{1} = IND_Lazy.H.m{2}); first by sim.
         by call (_: ={glob D} ==> Lazy.RO.m{1} = IND_Lazy.H.m{2})=> //; proc; wp.
       inline IND_Lazy.resample; while{2} (true) (card work{2}).
-        by auto; smt.
+        auto=> /> &hr Hw;rewrite dsampleL /= => ??. 
+        by rewrite (fcardD1 work{hr} (pick work{hr})) mem_pick //= /#.   
       by auto; smt.
     qed.
 
@@ -333,8 +336,7 @@ theory LazyEager.
          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
           by move=> &1 &2 H; exists IND_Eager.H.m{2} work{2} x{2}; move: H.
-        by sim; rnd{2}; sim: (={x,IND_Eager.H.m}); smt.
-
+        + by sim; rnd{2}; sim: (={x,IND_Eager.H.m})=> /> ?;apply dsampleL.
         wp; symmetry; eager
           while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //;
           first by rnd.
@@ -368,7 +370,8 @@ theory LazyEager.
                  IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
                  mem (dom IND_Lazy.H.m{2}) x{2} /\
                  oget IND_Eager.H.m.[x]{1} = result{2}).
-         by auto; smt.
+         auto => /> &m2 Hin ????. 
+         rewrite domP in_fsetU Hin /= getP_neq // /#.
       by auto; smt.
     qed.
 
@@ -401,8 +404,10 @@ theory LazyEager.
       while (={work} /\
              (forall x, !FSet.mem (dom IND_Eager.H.m{1}) x <=>
                         mem work{1} x) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
-        by auto; progress; smt.
-      by auto; smt.
+        auto;smt (domP in_fsetD in_fsetU in_fset1 mem_pick).
+      auto => />;split=> [x| m].
+      + by rewrite dom0 in_fset0 mem_oflist mem_to_seq.
+      by move=> H x;have := H x;rewrite in_fset0.
     qed.
 
     lemma eagerRO:
@@ -411,9 +416,9 @@ theory LazyEager.
       equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
     proof.
       move=> fromF dsampleL; bypr (res{1}) (res{2})=> // &1 &2 a eq_D.
-      apply (eq_trans _ Pr[IND_Lazy.main() @ &1: a = res]);
+      apply (@eq_trans _ Pr[IND_Lazy.main() @ &1: a = res]);
         first by byequiv (IND_Lazy _ _).
-      apply (eq_trans _ Pr[IND_Eager.main() @ &1: a = res]);
+      apply (@eq_trans _ Pr[IND_Eager.main() @ &1: a = res]);
         first by byequiv (eager_aux _ _).
       by byequiv (IND_Eager _ _).
     qed.
@@ -596,7 +601,7 @@ theory SetLog.
         by wp; call (_: true); auto; smt.
       auto; progress.
         by apply/(lez_trans _ _ _ H)/subset_leq_fcard; smt.
-        smt.
+        smt ().
     by inline *; wp; call (_: true).
   qed.
 end SetLog.

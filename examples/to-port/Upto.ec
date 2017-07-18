@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Pair Int Real NewDistr StdOrder StdBigop.
+require import Pair Int Real Distr StdOrder StdBigop.
 (*---*) import RealOrder Bigreal BRA.
 require (*--*) FelTactic.
 

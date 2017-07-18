@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Pred Fun Int IntExtra Real RealExtra List.
-require import NewDistr NewLogic StdOrder.
+require import AllCore List Distr StdOrder.
 require (*--*) FinType Tuple.
 (*---*) import RealOrder.
 
@@ -193,34 +192,31 @@ proof. by rewrite size_map Enum.size_wordn max_ler ?ge0_n. qed.
 (* -------------------------------------------------------------------- *)
 op dword : word distr = MUniform.duniform words.
 
+(* FIXME this should be a clone of MFinite *)
 theory DWord.
 import MUniform.
 
 lemma dwordE p: mu dword p = (count p words)%r / (Alphabet.card^n)%r.
 proof. by rewrite duniformE !undup_id ?enum_uniq // -word_card. qed.
 
-lemma dword1E w: mu dword (pred1 w) = 1%r / (Alphabet.card^n)%r.
+lemma dword1E w: mu1 dword w = 1%r / (Alphabet.card^n)%r.
 proof. by rewrite dwordE count_uniq_mem 1:enum_uniq // enumP /b2i. qed.
 
-lemma support_dword w: support dword w.
+lemma supp_dword w: w \in dword.
 proof.
-rewrite /support /in_supp dword1E divr_gt0 //.
-by rewrite lt_fromint; apply/powPos/Alphabet.card_gt0.
+rewrite /support dword1E divr_gt0 // lt_fromint.
+by apply/powPos/Alphabet.card_gt0.
 qed.
 
 lemma dword_ll: mu dword predT = 1%r.
 proof.
-apply/duniform_ll/negP=> zw; move: (enumP witness).
-by rewrite zw.
+by apply/duniform_ll/negP=> zw; move: (enumP witness); rewrite zw.
 qed.
 
-lemma dword_uf: is_uniform dword.
-proof.
-apply/duniform_uf/negP=> zw; move: (enumP witness).
-by rewrite zw.
-qed.
+lemma dword_funi: is_funiform dword.
+proof. by move=> ??; rewrite !dword1E. qed.
 
-lemma dword_fu: support dword = predT.
-proof. by rewrite pred_ext=> x; rewrite support_dword. qed.
+lemma dword_fu: is_full dword.
+proof. by move=> ?; apply supp_dword. qed.
 
 end DWord.

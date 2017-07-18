@@ -28,7 +28,7 @@ abbrev [-printing] ( >= ) (x y : real) = y <= x.
 op from_int: int -> real.
 
 (* -------------------------------------------------------------------- *)
-op b2r (b:bool) = if b then from_int 1 else from_int 0.
+abbrev b2r (b:bool) = if b then from_int 1 else from_int 0.
 
 (* -------------------------------------------------------------------- *)
 op "`|_|" x = if from_int 0 <= x then x else -x.

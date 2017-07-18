@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Pair OldMonoid Finite Int Real FSet Distr.
+require import AllCore OldMonoid Finite FSet Distr.
 
 type input.
 type output.
@@ -30,20 +30,20 @@ module Rand (W:Worker) = {
 lemma prCond (A <: Worker) &m (v:input)
              (ev:input -> glob A -> output -> bool):
     Pr[Rand(A).main() @ &m: ev v (glob A) (snd res) /\ v = fst res] =
-      (mu_x d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
+      (mu1 d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
 proof.
 byphoare (_: (glob A) = (glob A){m} ==>
                  ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
 pose pr := Pr[A.work(v) @ &m: ev v (glob A) res];
-conseq (_: _: = (mu_x d v * pr)). (* WEIRD! *)
-proc; seq 1 : (v = x) (mu_x d v) pr 1%r 0%r ((glob A)=(glob A){m})=> //.
-  by rnd.
-  by rnd; skip; progress; rewrite /mu_x pred1E; apply/mu_eq.
-  call (_: (glob A) = (glob A){m} /\ x = v ==>
+conseq (_: _: = (mu1 d v * pr)). (* WEIRD! *)
+proc; seq 1 : (v = x) (mu1 d v) pr 1%r 0%r ((glob A)=(glob A){m})=> //.
++ by rnd.
++ by rnd; skip; progress; rewrite pred1E. 
++ call (_: (glob A) = (glob A){m} /\ x = v ==>
            ev v (glob A) res) => //.
   simplify pr; bypr => &m' eqGlob.
   by byequiv (_: ={glob A, x} ==> ={res, glob A}) => //; proc true.
-  by hoare; rewrite /fst /snd /=; call (_: true); auto; progress; rewrite eq_sym H.
+by hoare; rewrite /fst /snd /=; call (_: true); auto; progress; rewrite eq_sym H.
 qed.
 
 lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):
@@ -54,7 +54,7 @@ lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):
         cpOrs (image (fun v r, ev v (glob A) (snd r) /\ v = fst r) sup) res].
 proof strict.
 move=> Fsup sup.
-byequiv (_: ={glob A} ==> ={glob A, res} /\ in_supp (fst res{1}) d)=> //;
+byequiv (_: ={glob A} ==> ={glob A, res} /\ (fst res{1}) \in d)=> //;
   first by proc; call (_: true); rnd.
 move=> &m1 &m2 [[<- <-] Hin].
 rewrite /cpOrs or_exists;split.
@@ -71,7 +71,7 @@ lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool):
   let sup = oflist (to_seq (support d)) in
   Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)] =
    Mrplus.sum
-     (fun (v:input), mu_x d v * Pr[A.work(v)@ &m:ev v (glob A) res])
+     (fun (v:input), mu1 d v * Pr[A.work(v)@ &m:ev v (glob A) res])
      sup.
 proof.
 move=> Fsup /=.
@@ -98,7 +98,7 @@ elim/fset_ind (oflist (to_seq (support d))).
 qed.
 
 lemma Mean_uni (A<:Worker) &m (ev:input -> glob A -> output -> bool) r:
-   (forall x, in_supp x d => mu_x d x = r) =>
+   (forall x, x \in d => mu1 d x = r) =>
    is_finite (support d) =>
    let sup = oflist (to_seq (support d)) in
    Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)] =

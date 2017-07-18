@@ -9,7 +9,7 @@ require import Pair.
 require import Option.
 require import Int.
 require import Real.
-require import Distr.
+require import OldDistr.
 (*---*) import Dprod.
 (*---*) import Dapply.
 require import FMap.

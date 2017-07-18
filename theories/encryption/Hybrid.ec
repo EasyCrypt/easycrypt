@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int Real FSet Finite Pair Distr DInterval.
+require import AllCore FSet Finite Distr DInterval.
 require import OldMonoid.
 require Means.
 
@@ -322,11 +322,11 @@ section.
     move=> p';rewrite (GLB_WL &m p') (GRB_WR &m p').
     simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
     cut Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
-      by move=> x; rewrite !mem_oflist !List.Iota.mem_iota /support support_dinter; smt.
+      by move=> x; rewrite !mem_oflist !List.Iota.mem_iota  supp_dinter; smt.
     cut Hfin: is_finite (support [0..q - 1]).
       by exists (List.Iota.iota_ 0 q); smt.
-    cut Huni : forall (x : int), in_supp x [0..q - 1] => mu_x [0..q - 1] x = 1%r / q%r.
-      by move=> x Hx;rewrite mux_dinter //;smt.
+    cut Huni : forall (x : int), x \in [0..q - 1] => mu1 [0..q - 1] x = 1%r / q%r.
+      by move=> x Hx;rewrite dinter1E //;smt.
     pose ev :=
       fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
         let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
@@ -334,8 +334,6 @@ section.
     cut := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
     cut -> : oflist (to_seq (support [0..q - 1])) = oflist (List.Iota.iota_ 0 q).
       by apply FSet.fsetP => x; rewrite !mem_oflist mem_to_seq// smt.
-    (* BUG type are not normalized in ev => assert failure in ecWhy *)
-    clear ev.
     cut {1}->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 1 (q - 1)) `|` fset1 0.
       by apply/fsetP=> x; rewrite !inE !mem_oflist !List.Iota.mem_iota; smt.
     cut ->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 0 (q - 1)) `|` fset1 (q - 1).

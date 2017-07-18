@@ -416,5 +416,3 @@ let process_inline infos tc =
        process_inline_codepos side pos tc
 
   | `All side -> process_inline_all side None tc
-
-  | `ByPattern _ -> failwith "not-implemented"

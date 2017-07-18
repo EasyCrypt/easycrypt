@@ -168,8 +168,7 @@ by [].
 
 lemma nosmt toofint (x:int): 0 <= x => x < q => toint (ofint x) = x.
 proof.
-  move=> Hp Hlt;rewrite toofint_mod.
-  smt all.
+  move=> Hp Hlt;rewrite toofint_mod IntDiv.modz_small /#.
 qed.
 
 lemma nosmt ofint1_: ofint 1 = F.one
@@ -182,13 +181,13 @@ theory FDistr.
   (* distrinution *)
   op dt: t distr.
 
-  axiom supp_def: forall (s:t),
-    in_supp s dt.
+  axiom dt_fu: is_full dt.
 
-  axiom mu_x_def_in: forall (s:t),
-    mu_x dt s = (1%r/q%r)%Real.
+  axiom dt1E: forall (s:t), mu1 dt s = (1%r/q%r)%Real.
 
-  axiom lossless: weight dt = 1%r.
+  axiom dt_ll: is_lossless dt.
 
+  lemma dt_funi: is_funiform dt.
+  proof. by move=> ??;rewrite !dt1E. qed.
 end FDistr.
 

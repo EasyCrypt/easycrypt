@@ -6,9 +6,9 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Int IntExtra Real RealExtra Distr List.
+require import AllCore List Distr Ring.
+require import StdRing StdOrder StdBigop FelTactic.
 require (*--*) Mu_mem.
-require import Ring StdRing StdOrder StdBigop FelTactic.
 (*---*) import RField IntOrder RealOrder.
 
 (** A non-negative integer q **)
@@ -18,7 +18,8 @@ op q : { int | 0 <= q } as ge0_q.
 type T.
 
 op uT: T distr.
-axiom uT_ufT: is_uniform_over uT predT.
+op maxu : T.
+axiom maxuP x: mu1 uT x <= mu1 uT maxu.
 
 (** A module that samples in uT on queries to s **)
 module Sample = {
@@ -70,21 +71,18 @@ section.
 
   lemma pr_Sample_le &m:
     Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l]
-    <= (q^2)%r * mu uT (pred1 witness).
+    <= (q^2)%r * mu1 uT maxu.
   proof.
-    fel 1 (size Sample.l) (fun x, q%r * mu uT (pred1 witness)) q (!uniq Sample.l) []=> //.
+    fel 1 (size Sample.l) (fun x, q%r * mu1 uT maxu) q (!uniq Sample.l) []=> //.
     + rewrite Bigreal.sumr_const count_predT size_range /=.
       rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
       have ->: q^2 = q * q by rewrite (_:2 = 1 + 1) // powS // pow1.
       by rewrite -fromintM le_fromint ler_wpmul2r 1:ge0_q /#.
     + by inline*; auto.
     + proc;wp; rnd (mem Sample.l); skip=> // /> &hr ???.
-      have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
-      + move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt ml=0.
-        have [uT_fu [_ uT_suf]]:= uT_ufT.
-        by apply uT_suf; apply uT_fu.
-      move /(ler_trans ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
-      by apply/ler_wpmul2r; smt w=(mu_bounded).
+      have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu1 uT maxu) _.
+      + by move=> x _;rewrite maxuP.
+      move=> /ler_trans Hle;apply/Hle/ler_wpmul2r;smt (mu_bounded).
     by move=> c; proc; auto=> /#.
   qed.
 
@@ -92,7 +90,7 @@ section.
 
   lemma pr_collision &m:
     Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu uT (pred1 witness).
+    <= (q^2)%r * mu1 uT maxu.
   proof.
     cut ->: Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l] =
             Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
@@ -159,7 +157,7 @@ section.
 
   lemma pr_collision_bounded_oracles &m:
     Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu uT (pred1 witness).
+    <= (q^2)%r * mu1 uT maxu.
   proof.
     cut ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l] =
             Pr[Exp(Sample,Bounded(A)).main() @ &m: !uniq Sample.l].

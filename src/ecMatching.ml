@@ -18,6 +18,7 @@ open EcEnv
 open EcTypes
 open EcModules
 open EcFol
+open EcGenRegexp
 
 (* -------------------------------------------------------------------- *)
 module Zipper = struct
@@ -39,7 +40,7 @@ module Zipper = struct
   type zipper = {
     z_head : instr list;                (* instructions on my left (rev)       *)
     z_tail : instr list;                (* instructions on my right (me incl.) *)
-    z_path : ipath ;                    (* path (zipper) leading to me         *)
+    z_path : ipath;                     (* path (zipper) leading to me         *)
   }
 
   let zipper hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; }
@@ -912,3 +913,170 @@ type cptenv = CPTEnv of f_subst
 
 let can_concretize ev ue =
   EcUnify.UniEnv.closed ue && MEV.filled ev
+
+(* -------------------------------------------------------------------------- *)
+type regexp_instr = regexp1_instr gen_regexp
+
+and regexp1_instr =
+  | RAssign    (*of lvalue * expr*)
+  | RSample    (*of lvalue * expr*)
+  | RCall      (*of lvalue option * EcPath.xpath * expr list*)
+  | RIf        of (*expr *) regexp_instr * regexp_instr
+  | RWhile     of (*expr *) regexp_instr
+
+
+module RegexpBaseInstr = struct
+  open Zipper
+
+  type regexp = regexp_instr
+  type regexp1 = regexp1_instr
+
+  type pos  = int
+  type path = int list
+
+  type subject = instr list
+
+  type engine  = {
+    e_zipper : zipper;
+    e_pos    : pos;
+    e_path   : pos list;
+  }
+
+  let mkengine (s : subject) = {
+    e_zipper = zipper [] s ZTop;
+    e_pos    = 0;
+    e_path   = [];
+  }
+
+  let position (e : engine) =
+    e.e_pos
+
+  let at_start (e : engine) =
+    List.is_empty e.e_zipper.z_head
+
+  let at_end (e : engine) =
+    List.is_empty e.e_zipper.z_tail
+
+  let path (e : engine) =
+    e.e_pos :: e.e_path
+
+  let eat_option (f : 'a -> 'a -> unit) (x : 'a option) (xn : 'a option) =
+    match x, xn with
+    | None  , Some _ -> raise NoMatch
+    | Some _, None   -> raise NoMatch
+    | None  , None   -> ()
+    | Some x, Some y -> f x y
+
+  let eat_list (f : 'a -> 'a -> unit) (x : 'a list) (xn : 'a list) =
+    try  List.iter2 f x xn
+    with Invalid_argument _ -> raise NoMatch (* FIXME *)
+
+  let eat_lvalue (lv : lvalue) (lvn : lvalue) =
+    if not (lv_equal lv lvn) then raise NoMatch
+
+  let eat_expr (e : expr) (en : expr) =
+    if not (e_equal e en) then raise NoMatch
+
+  let eat_xpath (f : EcPath.xpath) (fn : EcPath.xpath) =
+    if not (EcPath.x_equal f fn) then raise NoMatch
+
+  let rec eat_base (eng : engine) (r : regexp1) =
+    let z = eng.e_zipper in
+
+    match z.z_tail with
+    | [] -> raise NoMatch
+
+    | i :: tail -> begin
+       match (i.i_node,r) with
+       | Sasgn _, RAssign
+       | Srnd  _, RSample
+       | Scall _, RCall   -> (eat eng, [])
+
+       | Sif (e, st, sf), RIf (stn, sfn) -> begin
+           let e_t = mkengine st.s_node in
+           let e_t =
+             let zp = ZIfThen (e, ((z.z_head, tail), z.z_path), sf) in
+             let zp = { e_t.e_zipper with z_path = zp; } in
+             { e_t with e_path = 0 :: eng.e_pos :: eng.e_path; e_zipper = zp; } in
+
+           let e_f = mkengine sf.s_node in
+           let e_f =
+             let zp = ZIfElse (e, st, ((z.z_head, tail), z.z_path)) in
+             let zp = { e_f.e_zipper with z_path = zp; } in
+             { e_f with e_path = 1 :: eng.e_pos :: eng.e_path; e_zipper = zp; } in
+
+           (eat eng, [(e_t, stn); (e_f, sfn)])
+         end
+
+       | Swhile (e, s), RWhile sn -> begin
+            let es = mkengine s.s_node in
+            let es =
+              let zp = ZWhile (e, ((z.z_head, tail), z.z_path)) in
+              let zp = { es.e_zipper with z_path = zp; } in
+              { es with e_path = 0 :: eng.e_pos :: eng.e_path; e_zipper = zp; }  in
+
+            (eat eng, [(es, sn)])
+         end
+
+       | _, _ -> raise NoMatch
+     end
+
+  and eat (e : engine) = {
+    e with e_zipper = zip_eat e.e_zipper;
+           e_pos    = e.e_pos + 1;
+  }
+
+  and zip_eat (z : zipper) =
+    match z.z_tail with
+    | []        -> raise NoMatch
+    | i :: tail -> zipper (i :: z.z_head) tail z.z_path
+
+  let extract (e : engine) ((lo, hi) : pos * pos) =
+    if hi <= lo then [] else
+
+    let s = List.rev_append e.e_zipper.z_head e.e_zipper.z_tail in
+    List.of_enum (List.enum s |> Enum.skip lo |> Enum.take (hi-lo))
+
+  let rec next_zipper (z : zipper) =
+    match z.z_tail with
+    | i :: tail ->
+       begin match i.i_node with
+       | Sif (e, stmttrue, stmtfalse) ->
+          let z = (i::z.z_head, tail), z.z_path in
+          let path = ZIfThen (e, z, stmtfalse) in
+          let z' = zipper [] stmttrue.s_node path in
+          Some z'
+
+       | Swhile (e, block) ->
+          let z = (i::z.z_head, tail), z.z_path in
+          let path = ZWhile (e, z) in
+          let z' = zipper [] block.s_node path in
+          Some z'
+
+       | Sasgn _ | Srnd _ | Scall _ | _ ->
+          Some { z with z_head = i :: z.z_head ; z_tail = tail }
+       end
+
+    | [] ->
+       match z.z_path with
+       | ZTop -> None
+
+       | ZWhile (_e, ((head, tail), path)) ->
+          let z' = zipper head tail path in
+          next_zipper z'
+
+       | ZIfThen (e, father, stmtfalse) ->
+          let stmttrue = stmt (List.rev z.z_head) in
+          let z' = zipper [] stmtfalse.s_node (ZIfElse (e, stmttrue, father)) in
+          next_zipper z'
+
+       | ZIfElse (_e, _stmttrue, ((head, tail), path)) ->
+          let z' = zipper head tail path in
+          next_zipper z'
+
+  let next (e : engine) =
+    next_zipper e.e_zipper |> omap (fun z ->
+      { e with e_zipper = z; e_pos = List.length z.z_head })
+end
+
+module RegexpStmt = EcGenRegexp.Regexp(RegexpBaseInstr)

@@ -131,6 +131,7 @@
     "done"        , DONE       ;        (* KW: bytac *)
 
     (* PHL: tactics *)
+    "replace"     , REPLACE    ;        (* KW: tactic *)
     "transitivity", TRANSITIVITY;       (* KW: tactic *)
     "symmetry"    , SYMMETRY   ;        (* KW: tactic *)
     "seq"         , SEQ        ;        (* KW: tactic *)

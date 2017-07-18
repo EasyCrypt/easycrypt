@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Int IntExtra Real RealExtra StdRing StdOrder RealFun.
+require import Int IntExtra Real RealExtra StdRing StdOrder RealFun.
 (*---*) import RField RealOrder.
 
 (* -------------------------------------------------------------------- *)
