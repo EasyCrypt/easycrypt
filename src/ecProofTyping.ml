@@ -119,10 +119,7 @@ let tc1_process_aprhl_formula tc pf =
   tc1_process_aprhl_form tc tbool pf
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_stmt tc mt c =
-=======
 let tc1_process_stmt  ?map tc mt c =
->>>>>>> 1.0
   let hyps = FApi.tc1_hyps tc in
   let hyps = LDecl.push_active (mhr,mt) hyps in
   let env  = LDecl.toenv hyps in

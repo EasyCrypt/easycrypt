@@ -61,14 +61,13 @@ val tc1_process_aprhl_formula : tcenv1 -> pformula -> form
 
 val tc1_process_stmt : tcenv1 -> EcMemory.memtype -> pstmt -> stmt
 val tc1_process_prhl_stmt : tcenv1 -> side -> pstmt -> stmt
-=======
+
 val tc1_process_stmt :
      ?map:EcTyping.ismap -> tcenv1 -> EcMemory.memtype
   -> pstmt -> stmt
 
 val tc1_process_prhl_stmt :
      ?map:EcTyping.ismap -> tcenv1 -> side -> pstmt -> stmt
->>>>>>> 1.0
 
 (* -------------------------------------------------------------------- *)
 exception NoMatch

@@ -210,6 +210,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Peager infos              -> curry EcPhlEager.process_eager infos
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto
+    | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
     | Paprhl Atoequiv           -> EcPhlAequiv.t_toequiv
     | Paprhl Aofequiv           -> EcPhlAequiv.t_ofequiv
     | Paprhl Atohoare           -> EcPhlAequiv.t_tohoare
