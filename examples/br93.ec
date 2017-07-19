@@ -7,12 +7,412 @@ require (*--*) BitWord OW ROM.
 pragma -oldip.
 pragma +implicits.
 
-(*** We consider a concrete instance:
-     - plaintexts are bitstrings of length k > 0
-     - nonces are bitstrings of length l > 0
-     - ciphertexts are bitstrings of length n = k + l                 ***)
-(** A type for plaintexts **)
-op k : { int | 0 < k } as gt0_k. (* size of plaintexts *)
+(* -------------------------------------------------------------------- *)
+(* We start by proving Bellare and Rogaway's algorithm IND-CPA secure   *)
+(* on abstract datatypes with minimal structure. We then instantiate to *)
+(* semi-concrete fixed-length bitstrings (with abstract lengths).       *)
+(* -------------------------------------------------------------------- *)
+
+abstract theory BR93.
+(* A set `ptxt` of plaintexts, equipped with an nilpotent addition (+^) *)
+type ptxt.
+
+op (+^): ptxt -> ptxt -> ptxt.
+axiom addA p1 p2 p3: (p1 +^ p2) +^ p3 = p1 +^ (p2 +^ p3).
+axiom addC p1 p2: p1 +^ p2 = p2 +^ p1.
+axiom addKp p1 p2: (p1 +^ p1) +^ p2 = p2.
+
+lemma addpK p1 p2: p1 +^ p2 +^ p2 = p1.
+proof. by rewrite addC -addA addC -addA addKp. qed.
+
+(* and a lossless, full, uniform distribution dptxt                     *)
+op dptxt: { ptxt distr |    is_lossless dptxt
+                         /\ is_full dptxt
+                         /\ is_uniform dptxt } as dptxt_llfuuni.
+lemma dptxt_ll: is_lossless dptxt by exact/(andWl _ dptxt_llfuuni).
+lemma dptxt_uni: is_uniform dptxt by have [#]:= dptxt_llfuuni.
+lemma dptxt_fu: is_full dptxt by have [#]:= dptxt_llfuuni.
+lemma dptxt_funi: is_funiform dptxt
+by exact/(is_full_funiform dptxt_fu dptxt_uni).
+
+(* A set `rand` of nonces, equipped with                                *)
+(*                               a lossless, uniform distribution drand *)
+type rand.
+op drand: { rand distr |    is_lossless drand
+                         /\ is_uniform drand } as drand_lluni.
+lemma drand_ll: is_lossless drand by exact/(andWl _ drand_lluni).
+lemma drand_uni: is_uniform drand by exact/(andWr _ drand_lluni).
+
+(* A set `ctxt` of ciphertexts defined as                               *)
+(*                           the cartesian product of `rand` and `ptxt` *)
+type ctxt = rand * ptxt.
+
+(* A set `pkey * skey` of keypairs, equipped with                       *)
+(*                         a lossless, full, uniform distribution dkeys *)
+type pkey, skey.
+op dkeys: { (pkey * skey) distr |    is_lossless dkeys
+                                  /\ is_funiform dkeys } as dkeys_llfuni.
+lemma dkeys_ll: is_lossless dkeys by exact/(andWl _ dkeys_llfuni).
+lemma dkeys_funi: is_funiform dkeys by exact/(andWr _ dkeys_llfuni).
+
+(* A family `f` of trapdoor permutations over `rand`,                   *)
+(*        indexed by `pkey`, with inverse family `fi` indexed by `skey` *)
+op f : pkey -> rand -> rand.
+op fi: skey -> rand -> rand.
+axiom fK pk sk x: (pk,sk) \in dkeys => fi sk (f pk x) = x.
+
+lemma fI pk x y: (exists sk, (pk,sk) \in dkeys) =>
+  f pk x = f pk y => x = y.
+proof. by move=> [sk] + fx_eq_fy - /fK ^ /(_ x) <- /(_ y) <-; congr. qed.
+
+(* A random oracle from `rand` to `ptxt`, modelling a hash function H   *)
+clone import ROM.Lazy as H with
+  type from  <- rand,
+  type to    <- ptxt,
+  op dsample <- fun _ => dptxt.
+import Types.
+
+(* We can define the Bellare-Rogaway 93 PKE Scheme                      *)
+module BR93(H:Oracle) = {
+  proc keygen() = {
+    var kp;
+
+    kp <$ dkeys;
+    return kp;
+  }
+
+  proc enc(pk, m) = {
+    var r, h;
+
+    r <$ drand;
+    h <@ H.o(r);
+    return (f pk r,h +^ m);
+  }
+
+  proc dec(sk, c) = {
+    var r, h, m;
+
+    (r,m) <- c;
+    r     <- fi sk r;
+    h     <- H.o(r);
+    return h +^ m;
+  }
+}.
+
+(* And we can quickly prove it correct                                  *)
+section Correctness.
+local module Correctness = {
+  proc main(m) = {
+    var pk, sk, c, m';
+
+    (pk,sk) <@ BR93(RO).keygen();
+    c       <@ BR93(RO).enc(pk,m);
+    m'      <@ BR93(RO).dec(sk,c);
+    return (m = m');
+  }
+}.
+
+local lemma BR93_correct &m m: Pr[Correctness.main(m) @ &m: res] = 1%r.
+proof.
+byphoare=> //; conseq (: _ ==> true) (: _ ==> res)=> //.
++ proc; inline *.
+  rcondf 17.
+  + auto=> /> &hr [pk sk] kp_in_dkeys r _ y _ /=.
+    rewrite fK //; split=> [_ _ _|-> //].
+    by rewrite in_dom getP_eq.
+  auto=> /> &hr [pk sk] kp_in_dkeys r _ y _ /=.
+  rewrite fK //; split=> [_ y' _|].
+  + by rewrite getP_eq -addA addKp.
+  rewrite in_dom; case: (RO.m{hr}.[r])=> [|p] //= _ _.
+  by rewrite -addA addKp.
+by proc; inline *; auto=> />; rewrite dkeys_ll drand_ll dptxt_ll.
+qed.
+end section Correctness.
+
+(* However, what we are really interested in is proving that it is      *)
+(* IND-CPA secure if `f` is a one-way trapdoor permutation.             *)
+
+(* We use cloning to get definitions for OWTP security                  *)
+clone import OW as OW_rand with
+  type D           <- rand,
+  type R           <- rand,
+  type pkey        <- pkey,
+  type skey        <- skey,
+  op   dkeys       <- dkeys,
+  op   challenge _ <- drand,
+  op   f           <- f,
+  op   finv        <- fi
+proof dkeys_ll, finvof, challenge_ll, challenge_uni.
+realize dkeys_ll by exact/dkeys_ll.
+realize challenge_ll by move=> _ _; exact/drand_ll.
+realize challenge_uni by move=> _ _; exact/drand_uni.
+realize finvof by move=> pk sk x /fK ->.
+
+(* But we can't do it (yet) for IND-CPA because of the random oracle    *)
+(*             Instead, we define CPA for BR93 with that particular RO. *)
+module type Adv (ARO: ARO)  = {
+  proc a1(p:pkey): (ptxt * ptxt)
+  proc a2(c:ctxt): bool
+}.
+
+(* We need to log the random oracle queries made to the adversary       *)
+(*                               in order to express the final theorem. *)
+module Log (H:Oracle) = {
+  var qs: rand list
+
+  proc init() = {
+    qs <- [];
+          H.init();
+  }
+
+  proc o(x) = {
+    var r;
+
+    qs <- x::qs;
+    r  <@ H.o(x);
+    return r;
+  }
+}.
+
+module BR93_CPA(A:Adv) = {
+  proc main(): bool = {
+    var pk, sk, m0, m1, c, b, b';
+
+                Log(RO).init();
+    (pk,sk)  <@ BR93(RO).keygen();
+    (m0,m1)  <@ A(Log(RO)).a1(pk);
+    b        <$ {0,1};
+    c        <@ BR93(RO).enc(pk,b?m0:m1);
+    b'       <@ A(Log(RO)).a2(c);
+    return b' = b;
+  }
+}.
+
+(* We want to prove the following:                                      *)
+(*   forall (valid) CPA adversary A which makes at most q queries to H, *)
+(*     there exists a OW adversary I such that                          *)
+(*          `|Pr[BR_CPA(A): res] - 1/2| <= Pr[OW_f(I): res]             *)
+(* We construct I as follows, using A.a1 and A.a2 as black boxes        *)
+module I(A:Adv): Inverter = {
+  var x:rand
+
+  proc invert(pk:pkey,y:rand): rand = {
+    var m0, m1, h, b;
+
+               Log(RO).init();
+    (m0,m1) <@ A(Log(RO)).a1(pk);
+    h       <$ dptxt;
+    b       <@ A(Log(RO)).a2(y,h);
+    x       <- nth witness Log.qs (find (fun p => f pk p = y) Log.qs);
+
+    return x;
+  }
+}.
+
+(* We now prove the result using a sequence of games                    *)
+section.
+(* All lemmas in this section hold for all (valid) CPA adversary A      *)
+declare module A : Adv { RO, Log }.
+
+axiom A_a1_ll (O <: ARO {A}): islossless O.o => islossless A(O).a1.
+axiom A_a2_ll (O <: ARO {A}): islossless O.o => islossless A(O).a2.
+
+(* Step 1: replace RO call with random sampling                         *)
+local module Game1 = {
+  var r: rand
+
+  proc main() = {
+    var pk, sk, m0, m1, b, h, c, b';
+                Log(RO).init();
+    (pk,sk)  <$ dkeys;
+    (m0,m1)  <@ A(Log(RO)).a1(pk);
+    b        <$ {0,1};
+
+    r        <$ drand;
+    h        <$ dptxt;
+    c        <- ((f pk r),h +^ (b?m0:m1));
+
+    b'       <@ A(Log(RO)).a2(c);
+    return b' = b;
+  }
+}.
+
+local lemma pr_Game0_Game1 &m:
+     Pr[BR93_CPA(A).main() @ &m: res]
+  <=   Pr[Game1.main() @ &m: res]
+     + Pr[Game1.main() @ &m: Game1.r \in Log.qs].
+proof.
+byequiv=> //; proc.
+inline BR93(RO).enc BR93(RO).keygen.
+(* Until the replaced RO call, the two games are in sync.               *)
+(*        In addition, the log's contents coincide with the RO queries. *)
+seq  8  5: (   ={glob A, glob RO, glob Log, pk, sk, b}
+            /\ pk0{1} = pk{2}
+            /\ m{1} = (b?m0:m1){2}
+            /\ r{1} = Game1.r{2}
+            /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
++ auto; call (:   ={glob Log, glob RO}
+               /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
+  + proc; inline RO.o.
+    by auto=> /> &2 log_is_dom y _; smt(@NewFMap).
+  by inline *; auto=> />; rewrite dom0=> _ _ x; rewrite in_fset0.
+(* We now deal with everything that happens after the programs differ: *)
+(*   - until r gets queried to the random oracle by the adversary      *)
+(*     (and if it wasn't already queried by a1), we guarantee that the *)
+(*     random oracles agree except on r                                *)
+(*   - if the adversary queries r to the random oracle (or if it has   *)
+(*     already done so in a1), we give up                              *)
+(* Because we reason up to bad, we need to prove that bad is stable    *)
+(* and that the adversary and its oracles are lossless                 *)
+call (_: Game1.r \in Log.qs,
+         eq_except RO.m{1} RO.m{2} (pred1 Game1.r{2})).
++ exact/A_a2_ll.
++ proc; inline RO.o.
+  auto=> /> &1 &2 -> /= m1_eqe_m2 yL y_in_dptxt; split.
+  + move=> x_notin_m; split.
+    + by rewrite !getP_eq eq_except_set.
+    move: m1_eqe_m2 x_notin_m=> + + + r_neq_x.
+    by rewrite eq_exceptP pred1E !in_dom=> /(_ x{2} r_neq_x) ->.
+  move=> x_in_m; split.
+  + move: m1_eqe_m2 x_in_m=> + + + r_neq_x.
+    by rewrite eq_exceptP pred1E !in_dom=> /(_ x{2} r_neq_x) ->.
+  by move: m1_eqe_m2=> + _ r_neq_x- /eq_exceptP /(_ x{2}); rewrite pred1E=> /(_ r_neq_x) ->.
++ by move=> &2 _; proc; call (RO_o_ll dptxt_ll); auto.
++ move=> _ /=; proc; inline *.
+  conseq (: true ==> true: =1%r) (: Game1.r \in Log.qs ==> Game1.r \in Log.qs)=> //=.
+  + by auto=> />.
+  by auto=> />; exact/dptxt_ll.
+inline RO.o; case: ((r \in (dom RO.m)){1}).
++ conseq (: _ ==> ={b} /\ Game1.r{2} \in Log.qs{2})=> //=.
+  + by move=> /> &1 &2 _ _ rR _ _ _ _ _ h /h [] -> //.
+  by auto=> /> &2 <- ->.
+rcondt{1} 3; 1:by auto.
+auto=> /> &2 log_is_dom r_notin_m y _; rewrite !getP_eq oget_some /=.
+split.
++ by move=> _; rewrite eq_exceptP /pred1=> x; rewrite getP=> ->.
+by move=> _ rR aL mL aR qsR mR h /h [] ->.
+qed.
+
+(* Step 2: replace h ^ m with h in the challenge encryption            *)
+local module Game2 = {
+  var r: rand
+
+  proc main() = {
+    var pk, sk, m0, m1, b, h, c, b';
+                Log(RO).init();
+    (pk,sk)  <$ dkeys;
+    (m0,m1)  <@ A(Log(RO)).a1(pk);
+    b        <$ {0,1};
+
+    r        <$ drand;
+    h        <$ dptxt;
+    c        <- ((f pk r),h);
+
+    b'       <@ A(Log(RO)).a2(c);
+    return b' = b;
+  }
+}.
+
+local equiv eq_Game1_Game2: Game1.main ~ Game2.main:
+  ={glob A} ==> ={glob Log, res} /\ Game1.r{1} = Game2.r{2}.
+proof.
+proc.
+call (: ={glob Log, glob RO}); 1: by sim.
+wp; rnd (fun x=> x +^ (b?m0:m1){2}).
+auto; call (: ={glob Log, glob RO}); 1: by sim.
+inline *; auto=> /> _ _ rR b _ rL _; split=> [|_].
++ by move=> hR _; rewrite addpK.
+split=> [|_].
++ by move=> hR _; exact/dptxt_funi.
+by move=> hL _; rewrite dptxt_fu /= addpK.
+qed.
+
+local lemma pr_Game1_Game2 &m:
+  Pr[Game1.main() @ &m: res] = Pr[Game2.main() @ &m: res].
+proof. by byequiv eq_Game1_Game2. qed.
+
+local lemma pr_bad_Game1_Game2 &m:
+    Pr[Game1.main() @ &m: Game1.r \in Log.qs]
+  = Pr[Game2.main() @ &m: Game2.r \in Log.qs].
+proof. by byequiv eq_Game1_Game2. qed.
+
+local lemma pr_Game2 &m: Pr[Game2.main() @ &m: res] = 1%r / 2%r.
+proof.
+byphoare=> //=; proc.
+swap 4 4.
+wp; rnd (pred1 b')=> //=.
+inline *; call (_: true).
++ exact A_a2_ll. (* adversary *)
++ by proc; call (RO_o_ll dptxt_ll); auto. (* oracle *)
+auto; call (_: true).
++ exact A_a1_ll. (* adversary *)
++ by proc; call (RO_o_ll dptxt_ll); auto. (* oracle *)
+auto=> />; rewrite dkeys_ll drand_ll dptxt_ll /predT /=.
+by move=> _ _ _ _ _ _ r; rewrite dbool1E pred1E.
+qed.
+
+(* Step 3: The reduction step -- if A queries the RO with the randomness *)
+(*     used to encrypt the challenge, then I(A) inverts the OW challenge *)
+(* We need a version of the one-way game where the challenge is a global *)
+local module OWr (I : Inverter) = {
+  var x : rand
+
+  proc main() : bool = {
+    var x', pk, sk;
+
+    (pk,sk) <$ dkeys;
+    x       <$ drand;
+    x'      <@ I.invert(pk,f pk x);
+    return (x = x');
+  }
+}.
+
+(* We can easily prove that it is strictly equivalent to OW              *)
+local lemma OW_OWr &m (I <: Inverter {OWr}):
+  Pr[OW(I).main() @ &m: res]
+  = Pr[OWr(I).main() @ &m: res].
+proof. by byequiv=> //=; sim. qed.
+
+local lemma pr_Game2_OW &m:
+  Pr[Game2.main() @ &m: Game2.r \in Log.qs]
+  <= Pr[OW(I(A)).main() @ &m: res].
+proof.
+rewrite (OW_OWr &m (I(A))). (* Note: we proved it forall (abstract) I    *)
+byequiv => //=; proc; inline *; wp.
+conseq
+  (_ : _ ==>
+       support dkeys (pk0{2}, sk{2}) /\
+       Game2.r{1} = OWr.x{2} /\ Log.qs{1} = Log.qs{2} /\
+       y{2} = f pk0{2} Game2.r{1}).
++ move=> /> qs x pk sk vk x_in_qs; pose P := fun p => f _ p = _.
+  have h := nth_find witness P qs _.
+  + by rewrite hasP; exists x.
+  apply/(fI pk).
+  + by exists sk.
+  by rewrite h.
+(* rest of proof *)
+call (: ={glob Log, glob RO}); 1: by sim.
+swap{1} 6 -2.
+auto; call (: ={glob Log, glob RO}); 1: by sim.
+by auto=> /> [pk sk] ->; rewrite dbool_ll.
+qed.
+
+lemma Reduction &m:
+  Pr[BR93_CPA(A).main() @ &m : res] - 1%r/2%r
+  <= Pr[OW(I(A)).main() @ &m: res].
+proof.
+smt(pr_Game0_Game1 pr_Game1_Game2 pr_bad_Game1_Game2 pr_Game2 pr_Game2_OW).
+qed.
+end section.
+end BR93.
+
+(* We now consider a concrete instance:                                 *)
+(*   - plaintexts are bitstrings of length k > 0                        *)
+(*   - nonces are bitstrings of length l > 0                            *)
+(*   - ciphertexts are bitstrings of length n = k + l                   *)
+
+(* Plaintexts                                                           *)
+op k : { int | 0 < k } as gt0_k.
 
 clone import BitWord as Plaintext with
   op n <- k
@@ -22,8 +422,8 @@ rename
   "dunifin" as "dptxt".
 import DWord.
 
-(** A type for nonces **)
-op l : { int | 0 < l } as gt0_l. (* size of nonces *)
+(* Nonces                                                               *)
+op l : { int | 0 < l } as gt0_l.
 
 clone import BitWord as Randomness with
   op n <- l
@@ -33,8 +433,8 @@ rename
   "dunifin" as "drand".
 import DWord.
 
-(** A type for ciphertexts **)
-op n = k + l.                    (* size of ciphertexts *)
+(* Ciphertexts                                                          *)
+op n = l + k.
 lemma gt0_n: 0 < n by smt(gt0_k gt0_l).
 
 clone import BitWord as Ciphertext with
@@ -42,77 +442,83 @@ clone import BitWord as Ciphertext with
 proof gt0_n by exact/Self.gt0_n
 rename "word" as "ctxt".
 
-(** ... and define the concatenation of nonce and plaintext into
-    a ciphertext.                                                      **)
-op (||) (x:rand) (y:ptxt):ctxt = mkctxt ((ofrand x) ++ (ofptxt y)).
+(* Parsing and Formatting                                               *)
+op (||) (r:rand) (p:ptxt) : ctxt = mkctxt ((ofrand r) ++ (ofptxt p)).
+op parse (c:ctxt): rand * ptxt =
+  (mkrand (take l (ofctxt c)),mkptxt (drop l (ofctxt c))).
 
-(*** We consider a one-way trapdoor permutation over nonces
-     (with abstract keys)                                             ***)
-(** Note: this hides a few existential axioms:
-      * existence of two types pkey and skey such that
-        a lossless distribution dkeys exists on (pkey * skey), and
-      * existence of, for each valid pair (pk,sk) in the support
-        of dkeys, a bijection `f pk` (and its inverse `finj sk`)       **)
-clone import OW as OW_rand with
-  type D           <- rand,
-  type R           <- rand,
-  op   challenge _ <- drand
-proof challenge_ll, challenge_uni.
-realize challenge_ll by move=> _ _; exact/drand_ll.
-realize challenge_uni by move=> _ _; exact/drand_uni.
-(** f is a secure OWTP if, for any inverter I,
-      Adv^{OW}^f(I) = Pr[OW(I).main() @ &m: res]
-    is small. **)
+lemma parseK r p: parse (r || p) = (r,p).
+proof.
+rewrite /parse /(||) ofctxtK 1:size_cat 1:size_rand 1:size_ptxt //=.
+by rewrite take_cat drop_cat size_rand take0 drop0 cats0 mkrandK mkptxtK.
+qed.
 
-(*** We make use of a hash function (ROM) from randomness to
-  plaintext. We let the adversary query it qH times at most. ***)
-(** qH is left abstract, so the result is universally quantified **)
-op qH : { int | 0 < qH } as qH_pos.
+lemma formatI (r : rand) (p : ptxt) r' p':
+  (r || p) = (r' || p') => (r,p) = (r',p').
+proof. by move=> h; rewrite -(@parseK r p) -(@parseK r' p') h. qed.
 
-clone import ROM.ListLog as RandOrcl_BR with
-  type from  <- rand,
-  type to    <- ptxt,
-  op dsample <- fun (x:rand) => dptxt,
-  op qH      <- qH.
-import Lazy.
-import Types.
+(* A set `pkey * skey` of keypairs, equipped with                       *)
+(*                         a lossless, full, uniform distribution dkeys *)
+type pkey, skey.
+op dkeys: { (pkey * skey) distr |    is_lossless dkeys
+                                  /\ is_funiform dkeys } as dkeys_llfuni.
 
-(*** We can now define what it means to be a CPA-secure public-key
-   * encryption scheme ***)
-(**  [See theory PKE_CPA.ec, note the issue with oracles] **)
-module type Scheme(RO : Oracle) = {
-  proc kg(): (pkey * skey)
+(* A family `f` of trapdoor permutations over `rand`,                   *)
+(*        indexed by `pkey`, with inverse family `fi` indexed by `skey` *)
+op f : pkey -> rand -> rand.
+op fi: skey -> rand -> rand.
+axiom fK pk sk x: (pk,sk) \in dkeys => fi sk (f pk x) = x.
+
+(* Random Oracle                                                        *)
+clone import ROM.Lazy as H with
+  type from      <- rand,
+  type to        <- ptxt,
+  op   dsample _ <- dptxt.
+
+(* A Definition for OWTP Security                                       *)
+module type Inverter = {
+  proc invert(pk:pkey, x:rand): rand
+}.
+
+module Exp_OW (I : Inverter) = {
+  proc main(): bool = {
+    var pk, sk, x, x';
+
+    (pk,sk) <$ dkeys;
+    x       <$ drand;
+    x'      <@ I.invert(pk,f pk x);
+    return (x = x');
+  }
+}.
+
+(* A Definition for CPA Security                                        *)
+module type Scheme (RO : Oracle) = {
+  proc keygen(): (pkey * skey)
   proc enc(pk:pkey, m:ptxt): ctxt
 }.
 
-module type Adv (ARO: ARO)  = {
+module type Adv (ARO : ARO)  = {
   proc a1(p:pkey): (ptxt * ptxt)
   proc a2(c:ctxt): bool
 }.
 
-module CPA(S:Scheme, A:Adv) = {
-  module ARO = Log(RO)
-  module A = A(ARO)
-  module SO = S(RO)
-
+module CPA (O : Oracle) (S:Scheme) (A:Adv) = {
   proc main(): bool = {
     var pk, sk, m0, m1, c, b, b';
 
-    ARO.init();
-    (pk,sk)  = SO.kg();
-    (m0,m1)  = A.a1(pk);
-    b  <$ {0,1};
-    c  <@ SO.enc(pk,b?m0:m1);
-    b' <@ A.a2(c);
+               O.init();
+    (pk,sk) <@ S(O).keygen();
+    (m0,m1) <@ A(O).a1(pk);
+    b       <$ {0,1};
+    c       <@ S(O).enc(pk,b?m0:m1);
+    b'      <@ A(O).a2(c);
     return b' = b;
   }
 }.
-(** A PKE Scheme E is IND-CPA secure if, for any A,
-      Adv^{CPA}_{S}(A) = `|Pr[CPA(S,A).main() @ &m: res] - 1/2|
-    is small. **)
 
-module (BR : Scheme) (R:Oracle) = {
-  proc kg():(pkey * skey) = {
+(* And a definition for the concrete Bellare-Rogaway Scheme             *)
+module (BR : Scheme) (H : Oracle) = {
+  proc keygen():(pkey * skey) = {
     var pk, sk;
 
     (pk,sk) <$ dkeys;
@@ -123,264 +529,112 @@ module (BR : Scheme) (R:Oracle) = {
     var h, r;
 
     r <$ drand;
-    h <@ R.o(r);
+    h <@ H.o(r);
     return ((f pk r) || m +^ h);
+  }
+
+  proc dec(sk:skey, c:ctxt): ptxt = {
+    var r, p, h;
+
+    (r,p) <- parse c;
+    r     <- fi sk r;
+    h     <@ H.o(r);
+    return p +^ h;
   }
 }.
 
-(** Given a CPA adversary A, we construct a OW inverter **)
-module BR_OW(A:Adv): Inverter = {
-  module ARO = Log(RO)
-  module A = A(ARO)
+(* And our inverter                                                     *)
+module I (A:Adv) (H : Oracle) = {
+  var qs : rand list
 
-  var x:rand
+  module QRO = {
+    proc o(x:rand) = {
+      var r;
+
+      qs <- x::qs;
+      r  <@ H.o(x);
+      return r;
+    }
+  }
 
   proc invert(pk:pkey,y:rand): rand = {
-    var m0,m1,h,b;
+    var x, m0, m1, h, b;
 
-    ARO.init();
-
-    (m0,m1) <@ A.a1(pk);
+    qs      <- [];
+               H.init();
+    (m0,m1) <@ A(QRO).a1(pk);
     h       <$ dptxt;
-    b       <@ A.a2(y || h);
-    x       <- nth witness ARO.qs (find (fun p => f pk p = y) ARO.qs);
+    b       <@ A(QRO).a2(y || h);
+    x       <- nth witness qs (find (fun p => f pk p = y) qs);
 
     return x;
   }
 }.
 
-lemma ARO_init_ll: islossless Log(RO).init.
-proof. by apply/(Log_init_ll RO)/RO_init_ll. qed.
+(* We will need to turn a concrete CPA adversary into an abstract one.  *)
+(*      We do not need to do it for the inverter as the types coincide. *)
+module A_CPA (A : Adv) (H : ARO) = {
+  proc a1 = A(H).a1
 
-lemma ARO_o_ll : islossless Log(RO).o.
-proof. by apply/(Log_o_ll RO)/RO_o_ll/dptxt_ll. qed.
+  proc a2(c:rand * ptxt): bool = {
+    var b;
 
-(** such that Adv^{CPA}_{S}(A) <= Adv^{OW}^{f}(I(A)).
-    We now prove this bound. **)
+    b <@ A(H).a2(c.`1 || c.`2);
+    return b;
+  }
+}.
+
 section.
-  (* Forall CPA adversary A whose memory footprint is disjoint from
-     that of RO, Log and OW *)
-  declare module A : Adv {RO,Log,OW}.
+declare module A : Adv { RO, I }.
 
-  (* and whose two procedures are lossless provided the random oracle is *)
-  axiom a1_ll (O <: ARO{A}): islossless O.o => islossless A(O).a1.
-  axiom a2_ll (O <: ARO{A}): islossless O.o => islossless A(O).a2.
+axiom A_a1_ll (O <: ARO {A}): islossless O.o => islossless A(O).a1.
+axiom A_a2_ll (O <: ARO {A}): islossless O.o => islossless A(O).a2.
 
-  (* the following lemmas hold on the following constructions *)
+local clone import BR93 as Instance with
+  type pkey  <- pkey,
+  type skey  <- skey,
+  op   dkeys <- dkeys,
+  op   f     <- f,
+  op   fi    <- fi,
+  type ptxt  <- ptxt,
+  op   (+^)  <- Plaintext.(+^),
+  op   dptxt <- dptxt,
+  type rand  <- rand,
+  op   drand <- drand
+proof addA, addC, addKp, dptxt_llfuuni, drand_lluni, dkeys_llfuni, fK.
+realize addA          by move=> p1 p2 p3; algebra.
+realize addC          by move=> p1 p2; algebra.
+realize addKp         by move=> p1 p2; algebra.
+realize dptxt_llfuuni by smt(@Plaintext.DWord).
+realize drand_lluni   by smt(@Randomness.DWord).
+realize dkeys_llfuni  by exact/dkeys_llfuni.
+realize fK            by exact/fK.
 
-  (** Step 1: replace RO call with random sampling **)
-  local module (BR1:Scheme) (R:Oracle) = {
-    var r:rand
-
-    proc kg = BR(R).kg
-
-    proc enc(pk:pkey, m:ptxt): ctxt = {
-      var h;
-
-      r <$ drand;
-      h <$ dptxt;
-      return ((f pk r) || m +^ h);
-    }
-  }.
-
-  (** The success probability of A in CPA(BR) is bounded by
-      the success probability of A in CPA(BR1) plus the probability
-      of the adversary querying the RO with the randomness used in
-      the challenge encryption. **)
-  local lemma BR_BR1 &m:
-    Pr[CPA(BR,A).main() @ &m: res]
-    <= Pr[CPA(BR1,A).main() @ &m: res]
-       + Pr[CPA(BR1,A).main() @ &m: BR1.r \in Log.qs].
-  proof.
-  byequiv=> //=; proc.
-  inline CPA(BR,A).ARO.init CPA(BR1,A).ARO.init
-         CPA(BR,A).SO.kg CPA(BR1,A).SO.kg
-         CPA(BR,A).SO.enc CPA(BR1,A).SO.enc.
-  seq  9  9: (   ={glob A, glob RO, Log.qs, pk, sk, b, m, pk1}
-              /\ r{1} = BR1.r{2}
-              /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
-  + auto. call (:   ={Log.qs, RO.m}
-                 /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
-    + proc; inline RO.o.
-      auto=> /> &2 log_is_dom y _; smt (@NewFMap).
-    by inline *; auto=> />; rewrite dom0=> _ _ x; rewrite in_fset0.
-  (* Until the adversary queries the ROM with r, knowing that
-     the two ROMs agree on all points except r is sufficient
-     to prove the equivalence of the adversary's views        *)
-  call (_: BR1.r \in Log.qs,
-           eq_except RO.m{1} RO.m{2} (pred1 BR1.r{2})).
-    (* Adversary is lossless *)
-  + exact/a2_ll.
-    (* Oracles are equivalent up to the failure event *)
-  + proc. inline RO.o.
-    auto=> /> &1 &2 -> /= m1_eqe_m2 yL y_in_dptxt; split.
-    + move=> x_notin_m; split.
-      + by rewrite !getP_eq eq_except_set.
-      move: m1_eqe_m2 x_notin_m=> + + + r_neq_x.
-      by rewrite eq_exceptP pred1E !in_dom=> /(_ x{2} r_neq_x) ->.
-    move=> x_in_m; split.
-    + move: m1_eqe_m2 x_in_m=> + + + r_neq_x.
-      by rewrite eq_exceptP pred1E !in_dom=> /(_ x{2} r_neq_x) ->.
-    by move: m1_eqe_m2=> + _ r_neq_x- /eq_exceptP /(_ x{2}); rewrite pred1E=> /(_ r_neq_x) ->.
-    (* Left oracle is lossless *)
-    move=> &2 _; exact/ARO_o_ll.
-    (* Right oracle is lossless and preserves bad once set *)
-    move=> _ /=; proc; inline *.
-    (* We simplify the goal by splitting it into:
-         1) the oracle is lossless; and
-         2) `bad` (`BR1.r \in Log.qs`) is monotonic. *)
-    conseq (: true ==> true: =1%r) (: BR1.r \in Log.qs ==> BR1.r \in Log.qs)=> //=.
-    + by auto=> />.
-    by auto=> />; exact/dptxt_ll.
-  (* We return to the main game *)
-  inline RO.o. case: ((r \in (dom RO.m)){1}).
-  + conseq (: _ ==> ={b} /\ BR1.r{2} \in Log.qs{2})=> //=.
-    + by move=> /> &1 &2 _ _ rR _ _ _ _ _ h /h [] -> //.
-    by auto=> /> &2 <- ->.
-  rcondt{1} 3; 1:by auto.
-  auto=> /> &2 log_is_dom r_notin_m y _; rewrite !getP_eq oget_some /=.
-  split.
-  + by move=> _; rewrite eq_exceptP /pred1=> x; rewrite getP=> ->.
-  by move=> _ rR aL mL aR qsR mR h /h [] ->.
-  qed.
-
-  (** Step 2: replace h ^ m with h in challenge encryption **)
-  local module (BR2:Scheme) (R:Oracle) = {
-    var r:rand
-
-    proc kg():(pkey * skey) = {
-      var pk, sk;
-
-      (pk,sk) <$ dkeys;
-      return (pk,sk);
-    }
-
-    proc enc(pk:pkey, m:ptxt): ctxt = {
-      var h;
-
-      r <$ drand;
-      h <$ dptxt;
-      return ((f pk r) || h);
-    }
-  }.
-
-  (* The success probabilities in both games are the same *)
-  local lemma BR1_BR2 &m:
-    Pr[CPA(BR1,A).main() @ &m: res]
-    = Pr[CPA(BR2,A).main() @ &m: res].
-  proof.
-  byequiv=> //=; proc.
-  call (_: ={RO.m}).
+lemma Reduction &m:
+     Pr[CPA(RO, BR, A).main() @ &m : res] - 1%r / 2%r
+  <= Pr[Exp_OW(Self.I(A, RO)).main() @ &m : res].
+proof.
+have <-:   Pr[BR93_CPA(A_CPA(A)).main() @ &m: res]
+         = Pr[CPA(RO,BR,A).main() @ &m: res].
++ byequiv=> //=; proc.
+  inline A_CPA(A,Log(H.RO)).a2.
+  wp; call (: H.RO.m{1} = RO.m{2}).
+  + by proc; inline *; auto.
+  inline BR93(H.RO).enc BR(RO).enc H.RO.o RO.o; auto.
+  call (: H.RO.m{1} = RO.m{2}).
+  + by proc; inline *; auto.
+  inline *; auto=> /> [pk sk] _ [m0 m1] c b _ r _ h _ /=.
+  by rewrite addC /= addC.
+have <-:   Pr[OW_rand.OW(I(A_CPA(A))).main() @ &m: res]
+         = Pr[Exp_OW(Self.I(A,RO)).main() @ &m: res].
++ byequiv=> //=; proc.
+  inline *; auto; call (: H.RO.m{1} = RO.m{2} /\ ={qs}(Log,Self.I)).
   + by sim.
-  inline CPA(BR1,A).SO.enc CPA(BR2,A).SO.enc.
-  wp; rnd (fun x => m{2} +^ x).
-  auto; call (_: ={RO.m}).
+  auto; call (: H.RO.m{1} = RO.m{2} /\ ={qs}(Log,Self.I)).
   + by sim.
-  inline *; auto=> /> _ _ rR bL _ rL _; split=> [|_].
-  + by move=> hR _; ring.
-  split=> [|_].
-  + by move=> hR _; exact/dptxt_funi.
-  by move=> hL _; rewrite dptxt_fu /=; ring.
-  qed.
-
-  (* The probability of the failure event is the same in both games *)
-  local lemma BR1_BR2_bad &m:
-    Pr[CPA(BR1,A).main() @ &m: BR1.r \in Log.qs]
-    = Pr[CPA(BR2,A).main() @ &m: BR2.r \in Log.qs].
-  proof.
-  byequiv=> //=; proc.
-  call (_:    ={Log.qs, RO.m}
-           /\ BR1.r{1} = BR2.r{2}).
-  + by sim.
-  inline CPA(BR1,A).SO.enc CPA(BR2,A).SO.enc.
-  wp; rnd (fun x => m{2} +^ x).
-  auto; call (_: ={Log.qs, RO.m}).
-  + by sim.
-  inline *; auto=> /> _ _ rR bL _ rL _; split=> [|_].
-  + by move=> hR _; ring.
-  split=> [|_].
-  + by move=> hR _; exact/dptxt_funi.
-  by move=> hL _; rewrite dptxt_fu /=; ring.
-  qed.
-  (** Exercise: What single "equiv" lemma could be used to prove both
-      BR1_BR2 and BR1_BR2_bad in one? Prove it and use it to prove
-      BR1_BR2_bad and BR1_BR2. **)
-
-  (** We can now prove that the success probability of A in CPA(BR2) is
-    * exactly 1/2 **)
-  local lemma pr_BR2_res &m: Pr[CPA(BR2,A).main() @ &m: res] = 1%r / 2%r.
-  proof.
-  byphoare=> //=; proc.
-  inline CPA(BR2, A).SO.enc.
-  swap 6 4; swap 4 5.
-  wp; rnd (pred1 b')=> //=.
-  inline *; call (_: true).
-  + exact a2_ll. (* adversary *)
-  + exact ARO_o_ll. (* oracle *)
-  auto; call (_: true).
-  + exact a1_ll. (* adversary *)
-  + exact ARO_o_ll. (* oracle *)
-  auto=> />; rewrite dkeys_ll drand_ll dptxt_ll /predT /=.
-  by move=> _ _ _ _ _ _ r; rewrite dbool1E pred1E.
-  qed.
-
-  local lemma pr_BR_BR2 &m:
-    Pr[CPA(BR,A).main() @ &m: res] - 1%r/2%r
-    <= Pr[CPA(BR2,A).main() @ &m: BR2.r \in Log.qs].
-  proof. smt(BR_BR1 BR1_BR2 BR1_BR2_bad pr_BR2_res). qed.
-
-  (** Step 3: Finally, we can do the reduction and prove that whenever
-      A queries the RO with the randomness used in the challenge
-      encryption, BR_OW(A) inverts the OW challenge. **)
-  (* We need a version of the one-way game where the challenge is a global *)
-  local module OWr (I : Inverter) = {
-    var x : rand
-
-    proc main() : bool = {
-      var x', pk, sk;
-
-      (pk,sk) <$ dkeys;
-      x       <$ drand;
-      x'      <@ I.invert(pk,f pk x);
-      return (x = x');
-    }
-  }.
-
-  (* We can easily prove that it is strictly equivalent to OW *)
-  local lemma OW_OWr &m (I <: Inverter {OWr}):
-    Pr[OW(I).main() @ &m: res]
-    = Pr[OWr(I).main() @ &m: res].
-  proof. by byequiv=> //=; sim. qed.
-
-  local lemma BR2_OW &m:
-    Pr[CPA(BR2,A).main() @ &m: BR2.r \in Log.qs]
-    <= Pr[OW(BR_OW(A)).main() @ &m: res].
-  proof.
-  rewrite (OW_OWr &m (BR_OW(A))).
-  byequiv => //=; proc; inline *; wp.
-  (* simplify postcondition to no longer have find *)
-  conseq
-    (_ : _ ==>
-         support dkeys (pk0{2}, sk{2}) /\
-         BR2.r{1} = OWr.x{2} /\ Log.qs{1} = Log.qs{2} /\
-         y{2} = f pk0{2} BR2.r{1}).
-  + move=> /> x qs pk sk vk x_in_qs; pose P := fun p => f _ p = _.
-    have h := nth_find witness P qs _.
-    + by rewrite hasP; exists x.
-    by rewrite (f_pk_inj _ _ vk _ _ h) // /f_dom drand_fu.
-  (* rest of proof *)
-  swap {1} 3 - 2; swap {1} 9 -7; swap {1} 9 3; swap {1} 7 4.
-  wp; rnd{1}.
-  call (_: ={RO.m, Log.qs}); first by sim.
-  auto.
-  call (_: ={RO.m, Log.qs}); first by sim.
-  by auto=> /> [pk sk] /= ->; rewrite dbool_ll.
-  qed.
-
-  lemma Reduction &m:
-    Pr[CPA(BR,A).main() @ &m : res] - 1%r/2%r
-    <= Pr[OW(BR_OW(A)).main() @ &m: res].
-  proof. smt(pr_BR_BR2 BR2_OW). qed.
+  by auto.
+apply/(Reduction (A_CPA(A)) _ _ &m).
++ by move=> O O_o_ll; exact/(A_a1_ll O O_o_ll).
+by move=> O O_o_ll; proc; call (A_a2_ll O O_o_ll).
+qed.
 end section.
-
-print Reduction.
