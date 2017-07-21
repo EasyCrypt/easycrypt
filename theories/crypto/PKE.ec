@@ -51,22 +51,34 @@ const qD : int.
 
 axiom qD_pos : 0 < qD.
 
-module CCA (S:Scheme, A:Adversary) = {
+module type CCA_ORC = {
+  proc dec(c:ciphertext) : plaintext option
+}.
+
+module type CCA_ADV (O:CCA_ORC) = {
+  proc choose(pk:pkey)     : plaintext * plaintext {O.dec}
+  proc guess(c:ciphertext) : bool {O.dec}
+}.
+
+module CCA (S:Scheme, A:CCA_ADV) = {
   var log : ciphertext list
-  var cstar : ciphertext
-  var guess : bool
+  var cstar : ciphertext option
   var sk : skey
 
-  proc dec(c:ciphertext) : plaintext option = {
-    var m : plaintext option;
+  module O = {
+    proc dec(c:ciphertext) : plaintext option = {
+      var m : plaintext option;
 
-    if (size log < qD && (guess => c <> cstar)) {
-      log = c :: log;
-      m = S.dec(sk, c);
+      if (size log < qD && (Some c <> cstar)) {
+        log = c :: log;
+        m = S.dec(sk, c);
+      }
+      else m = None;
+      return m;
     }
-    else m = None;
-    return m;
   }
+
+  module A = A(O)
 
   proc main() : bool = {
     var pk : pkey;
@@ -74,13 +86,13 @@ module CCA (S:Scheme, A:Adversary) = {
     var c : ciphertext;
     var b, b' : bool;
 
-    log = [];
-    guess = false;
+    log      = [];
+    cstar    = None;
     (pk, sk) = S.kg();
     (m0, m1) = A.choose(pk);
     b        = ${0,1};
     c        = S.enc(pk, b ? m1 : m0);
-    guess    = true;
+    cstar    = Some c;
     b'       = A.guess(c);
     return (b' = b);
   }
