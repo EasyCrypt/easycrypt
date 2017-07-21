@@ -33,6 +33,7 @@ require import AllCore List.
 require import Ring StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
 (*---*) import IterOp Bigint Bigreal Bigreal.BRA.
 (*---*) import IntOrder RealOrder RField.
+require import Finite.
 require (*--*) FinType.
 
 pragma +implicits.
@@ -191,8 +192,16 @@ proof.
 by move=> ext_p_q; congr=> //; apply fun_ext.
 qed.
 
+lemma mu_eq_support : forall (d : 'a distr) (p q : 'a -> bool),
+  (forall (x : 'a), x \in d => p x = q x) => mu d p = mu d q.
+proof. smt (mu_le). qed.
+
 lemma mu0 (d:'a distr): mu d pred0 = 0%r.
 proof. by rewrite muE /pred0 /= sum0. qed.
+
+lemma mu0_false ['a] (d:'a distr) (p:'a -> bool) : 
+  (forall x, x \in d => !p x) => mu d p = 0%r.
+proof. by rewrite -(@mu0 d)=> H;apply mu_eq_support => x /H ->. qed.
 
 axiom mu_disjoint (d:'a distr) (p q:('a -> bool)):
   (predI p q) <= pred0 =>
@@ -212,6 +221,124 @@ axiom nosmt mu_and  (d:'a distr) (p q:'a -> bool):
 
 axiom witness_support P (d:'a distr):
   0%r < mu d P <=> (exists x, P x /\ x \in d).
+
+lemma mu_and_weight ['a] Q (d:'a distr) P :
+  mu d P = weight d => mu d (predI P Q) = mu d Q.
+proof.
+  move=> Hw;rewrite mu_and.
+  have -> /# : mu d (predU P Q) = mu d P.
+  have ? : mu d (predU P Q) <= mu d P.
+  + by rewrite Hw;apply mu_le.
+  have /# : mu d P <= mu d (predU P Q).
+  by apply mu_le => ? _ ?;left.
+qed.
+
+lemma mu_in_weight ['a] P (d:'a distr) x : 
+  mu d P = weight d => x \in d => P x.
+proof.
+  by rewrite /support => /(mu_and_weight (pred1 x)) <- /witness_support [y [] []] ? <-. 
+qed.
+
+(* -------------------------------------------------------------------- *)
+
+lemma mu_mem_uniq ['a] (dt : 'a distr) (l:'a list) : 
+  uniq l => mu dt (mem l) = BRA.big predT (mu1 dt) l.
+proof.
+  elim: l => [_ | x l Hrec [Hx Hu] /=];1: by rewrite BRA.big_nil mu0.
+  have -> : mu dt (mem (x :: l)) = mu dt (predU (pred1 x) (mem l)).
+  + by apply mu_eq.
+  rewrite mu_or BRA.big_cons {1}/predT /= -Hrec //.  
+  have -> // : mu dt (predI (pred1 x) (mem l)) = 0%r.
+  apply mu0_false => /#.
+qed.
+
+lemma big_undup_iterop_count ['a] (P: 'a -> bool) (F:'a -> real) (l:'a list): 
+  BRA.big P F l = BRA.big P (fun a => (count (pred1 a) l)%r * F a) (undup l).
+proof.
+  have <- := BRA.eq_big_perm P F _ _ (perm_undup_count l).
+  rewrite BRA.big_flatten BRA.big_map (@BRA.big_mkcond P);apply BRA.eq_big => //=.
+  rewrite /(\o) => i _;case: (P i) => HP.
+  + have -> : BRA.big P F (nseq (count (pred1 i) l) i) = 
+              BRA.big P (fun _ => F i) (nseq (count (pred1 i) l) i).
+    + by apply BRA.congr_big_seq=> // x;rewrite mem_nseq.
+    rewrite Bigreal.sumr_const;congr. 
+    rewrite all_count_in ?all_nseq ?HP // size_nseq;smt (count_ge0).
+  by apply BRA.big1_seq => i';rewrite mem_nseq => [#?? <<-].
+qed.
+
+lemma mu_mem ['a] (dt : 'a distr) (l:'a list) : mu dt (mem l) = BRA.big predT (mu1 dt) (undup l).
+proof.
+  have -> : mu dt (mem l) = mu dt (mem (undup l)).
+  + by apply mu_eq => x;rewrite mem_undup.
+  by rewrite mu_mem_uniq // undup_uniq.
+qed.
+
+lemma mu_mem_le ['a] (dt : 'a distr) (l:'a list) : mu dt (mem l) <= BRA.big predT (mu1 dt) l.
+proof.
+  rewrite big_undup_iterop_count (@mu_mem dt l);apply ler_sum_seq => //= a.
+  rewrite mem_undup -has_pred1 has_count => H _. 
+  have /le_fromint Hc : 1 <= count (pred1 a) l by smt ().
+  by apply ler_pemull;smt (mu_bounded). 
+qed.
+
+(* -------------------------------------------------------------------- *)
+
+lemma uniform_finite ['a] (dt : 'a distr) : is_uniform dt => is_finite (support dt).
+proof.
+  move=> dt_uni;case: (is_finite (support dt)) => //.
+  rewrite /is_finite negb_exists => H.
+  have H1: forall n, 0 <= n => exists l, uniq l /\ size l = n /\ forall x, x \in l => x \in dt.
+  + move=> n;elim /intind : n;1: by exists [].
+    move=> n le0n [l [#uniql sizel Hin]].
+    have := H l; rewrite /= uniql /= negb_forall /= => H1.
+    have {H1} [a [anin ain]]: exists a, !a \in l /\ a \in dt by smt().
+    exists (a::l). rewrite cons_uniq anin uniql /= addzC sizel /= /#. 
+  have [x xin]: exists x, x \in dt. 
+  + have [ [] // x ? [#] _ _ _ /(_ x) Hin]:= H1 1 _ => //;exists x;apply Hin.
+  pose r := mu1 dt x.
+  have [n [H0n Hn]]: exists n, 0 < n /\ 0%r < 1%r/n%r <= r.
+  + have lec : inv r <= (ceil (inv r))%r by case : (ceil_bound (inv r)).    
+    have ltr : 0%r < (ceil (inv r))%r.
+    + by apply (ltr_le_trans (inv r)) => //; rewrite invr_gt0 xin.
+    exists (ceil (inv r));split; 1:by rewrite -lt_fromint /#.
+    split; 1: by apply divr_gt0 => // /#.
+    by move=> _;apply ler_pdivr_mulr => // /#.
+  have [l [# Ul Sl Inl]]:= H1 n _; 1: by apply ltzW.
+  have H2 := H l.
+  rewrite /= Ul /= negb_forall /= in H2.
+  have {H1} [a [anin ain]]: exists a, !a \in l /\ a \in dt by smt().
+  have : 1%r < mu dt (mem (a::l)); 2: smt (mu_bounded).
+  rewrite mu_mem_uniq /= 1:anin 1:Ul // BRA.big_cons {1}/predT /=.
+  have -> : BRA.big predT (fun (x0 : 'a) => mu1 dt x0) l = BRA.big predT (fun _ => r) l.
+  + by apply BRA.congr_big_seq => //= z /Inl Hz _ _;apply dt_uni.
+  rewrite Bigreal.sumr_const;have /all_count -> := all_predT l. 
+  apply (ltr_le_trans (mu1 dt a + (size l)%r / n%r)).
+  + rewrite Sl StdRing.RField.mulfV;[smt (lt_fromint) | smt (mu_bounded)].
+  apply ler_add => //;apply ler_wpmul2l;2:smt().
+  by rewrite le_fromint size_ge0.
+qed.
+
+lemma mu1_uni ['a] (dt : 'a distr) x : 
+  is_uniform dt => 
+  mu1 dt x = if x \in dt then weight dt / (size (to_seq (support dt)))%r else 0%r.
+proof.
+  move=> dt_uni;case: (x \in dt) => Hx; 2: by smt (mu_bounded).
+  have Hf:= uniform_finite dt dt_uni.
+  have : mu dt (mem (to_seq (support dt))) = weight dt.  
+  + by apply mu_eq_support => ?;rewrite mem_to_seq 1:// => ->.
+  rewrite mu_mem_uniq 1:uniq_to_seq //.
+  have -> : BRA.big predT (fun (x0 : 'a) => mu1 dt x0) (to_seq (support dt)) = 
+            BRA.big predT (fun (x0 : 'a) => mu1 dt x) (to_seq (support dt)).
+  + by apply BRA.congr_big_seq => // z;rewrite mem_to_seq //= => ? _ _;apply dt_uni.
+  rewrite Bigreal.sumr_const count_predT=> <-;field.
+  have /has_predT /lt_fromint /#: has predT (to_seq (support dt)).
+  by rewrite hasP;exists x;rewrite mem_to_seq.
+qed.
+
+lemma mu1_uni_ll ['a] (dt : 'a distr) x : 
+  is_uniform dt => is_lossless dt => 
+  mu1 dt x = if x \in dt then 1%r/ (size (to_seq (support dt)))%r else 0%r.
+proof. by move=> dt_uni dt_ll;rewrite mu1_uni // dt_ll. qed.
 
 (* -------------------------------------------------------------------- *)
 op mnull ['a] = fun (x : 'a) => 0%r.
