@@ -39,8 +39,9 @@ let t_bdhoare_ppr_r tc =
     | FHge -> fun x y -> f_real_le y x
     | FHeq -> f_eq
   in
-  let concl = fop (f_pr m f_xpath args post) bhf.bhf_bd in
-  let concl = f_imp (Fsubst.f_subst_mem (fst penv) m pre) concl in
+  let subst = Fsubst.f_subst_mem (fst penv) m in
+  let concl = fop (f_pr m f_xpath args post) (subst bhf.bhf_bd) in
+  let concl = f_imp (subst pre) concl in
   let concl = f_forall_mems [m,snd penv] concl in
   FApi.xmutate1 tc `PPR [concl]
 
@@ -65,8 +66,8 @@ let t_equiv_ppr_r ty phi_l phi_r tc =
   let smem2 = Fsubst.f_bind_mem Fsubst.f_subst_id mright mhr in
   let phi1 = Fsubst.f_subst smem1 phi_l in
   let phi2 = Fsubst.f_subst smem2 phi_r in
-  let pr1 = f_pr (fst penvl) fl argsl (f_eq a_f phi1) in
-  let pr2 = f_pr (fst penvr) fr argsr (f_eq a_f phi2) in
+  let pr1 = f_pr (fst penvl) fl argsl (f_eq phi1 a_f) in
+  let pr2 = f_pr (fst penvr) fr argsr (f_eq phi2 a_f) in
   let concl_pr =
     f_forall_mems [penvl; penvr]
       (f_forall_simpl [a_id,GTty ty]
