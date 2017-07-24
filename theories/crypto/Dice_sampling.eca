@@ -17,6 +17,8 @@ op d : input -> t distr.
 op test : input -> t -> bool.
 
 module SampleE = {
+  proc init () = { }
+
   proc sample(i:input) = {
     var r;
     r <$ d i \ test i;
@@ -25,6 +27,8 @@ module SampleE = {
 }.
 
 module SampleI = {
+  proc init () = { }
+
   proc sample(i:input) = {
     var r;
     r <$ d i;
@@ -34,6 +38,8 @@ module SampleI = {
 }.
 
 module SampleWi = {
+  proc init () = { }
+
   proc sample(i:input, r:t) = {
     while (test i r) r <$ d i;
     return r;
@@ -41,6 +47,8 @@ module SampleWi = {
 }.
 
 module SampleW = {
+  proc init () = { }
+
   proc sample(i:input) = {
     var r;
     r <$ d i;
