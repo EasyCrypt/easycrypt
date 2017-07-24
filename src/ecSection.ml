@@ -40,13 +40,18 @@ let is_local who p (lc : locals) =
   | `Lemma  -> Mp.find_opt p (snd lc.lc_lemmas) |> omap fst = Some `Local
   | `Module -> Sp.mem p lc.lc_modules
 
-let rec is_mp_local mp (lc : locals) =
-  let toplocal =
-    match mp.m_top with
-    | `Local _ -> false
-    | `Concrete (p, _) -> is_local `Module p lc
-  in
-    toplocal || (List.exists (is_mp_local^~ lc) mp.m_args)
+exception UseLocal of EcPath.mpath
+
+let rec use_mp_local (lc : locals) mp =
+  begin match mp.m_top with
+  | `Local _ -> ()
+  | `Concrete (p, _) -> if is_local `Module p lc then raise (UseLocal mp)
+  end;
+  List.iter (use_mp_local lc) mp.m_args
+
+let is_mp_local mp (lc : locals) =
+  try use_mp_local lc mp; false
+  with UseLocal _ -> true
 
 let rec is_mp_abstract mp (lc : locals) =
   let toplocal =
@@ -296,29 +301,24 @@ and on_mpath_fun_oi cb oi =
   List.iter (fun x -> cb x.x_top) oi.oi_calls
 
 (* -------------------------------------------------------------------- *)
-exception UseLocal
-
-let check_use_local lc mp =
-  if is_mp_local mp lc then
-    raise UseLocal
 
 let check_use_local_or_abs lc mp =
   if is_mp_local mp lc || is_mp_abstract mp lc then
-    raise UseLocal
+    raise (UseLocal mp)
 
 let form_use_local f lc =
-  try  on_mpath_form (check_use_local lc) f; false
-  with UseLocal -> true
+  try  on_mpath_form (use_mp_local lc) f; None
+  with UseLocal mp -> Some mp
 
 (* -------------------------------------------------------------------- *)
 let form_use_local_or_abs f lc =
   try  on_mpath_form (check_use_local_or_abs lc) f; false
-  with UseLocal -> true
+  with UseLocal _ -> true
 
 (* -------------------------------------------------------------------- *)
 let module_use_local_or_abs m lc =
   try  on_mpath_module (check_use_local_or_abs lc) m; false
-  with UseLocal -> true
+  with UseLocal _ -> true
 
 (* -------------------------------------------------------------------- *)
 let opdecl_use_local_or_abs opdecl lc =
@@ -369,7 +369,7 @@ let opdecl_use_local_or_abs opdecl lc =
            in on_mpath_branches f.opf_branches);
     false
 
-  with UseLocal -> true
+  with UseLocal _ -> true
 
 (* -------------------------------------------------------------------- *)
 let tydecl_use_local_or_abs tydecl lc =
@@ -389,7 +389,7 @@ let tydecl_use_local_or_abs tydecl lc =
         List.iter (on_mpath_form cb) [dt.tydt_schelim; dt.tydt_schcase]);
     false
 
-  with UseLocal -> true
+  with UseLocal _ -> true
 
 (* -------------------------------------------------------------------- *)
 let abstracts lc = lc.lc_abstracts

@@ -868,9 +868,12 @@ module Ax = struct
       match EcSection.olocals scope.sc_section with
       | None -> ()
       | Some locals ->
-          if EcSection.form_use_local concl locals then
-            hierror "this lemma uses local modules and must be declared as local"
-    end;
+        match EcSection.form_use_local concl locals with
+        | Some mp ->
+          let ppe = EcPrinting.PPEnv.ofenv scope.sc_env in
+          hierror "@[<hov>this lemma uses local modules : %a@\n and must be declared as local@]" (EcPrinting.pp_topmod ppe) mp
+        | None -> ()
+      end;
 
     if ax.pa_local && EcDecl.is_axiom axd.ax_kind then
       hierror "an axiom cannot be local";
