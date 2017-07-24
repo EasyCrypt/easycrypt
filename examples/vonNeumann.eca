@@ -69,7 +69,7 @@ module SamplePair = {
 equiv SamplePair: SamplePair.sample ~ Fair.sample: true ==> ={res}.
 proof.
 bypr (res{1}) (res{2})=> // &1 &2 b0.
-have ->: Pr[Fair.sample() @ &2: b0 = res] = 1%r/2%r.
+have ->: Pr[Fair.sample() @ &2: res = b0] = 1%r/2%r.
  byphoare (_: true ==> res = b0)=> //.
  by proc; rnd (pred1 b0); skip=> />; rewrite dbool1E.
 byphoare (_: true ==> res = b0)=> //.
