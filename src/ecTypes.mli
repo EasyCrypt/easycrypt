@@ -216,6 +216,9 @@ val destr_var       : expr -> prog_var
 val destr_tuple_var : expr -> prog_var list
 
 (* -------------------------------------------------------------------- *)
+val split_args : expr -> expr * expr list
+
+(* -------------------------------------------------------------------- *)
 val e_map :
      (ty   -> ty  ) (* 1-subtype op. *)
   -> (expr -> expr) (* 1-subexpr op. *)
