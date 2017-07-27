@@ -97,12 +97,37 @@ let xnpath ove x =
   EcPath.pappend ove.ovre_npath (EcPath.fromqsymbol (ove.ovre_prefix, x))
 
 (* -------------------------------------------------------------------- *)
+let string_of_renaming_kind = function
+  | `Lemma   -> "lemma"
+  | `Op      -> "operator"
+  | `Pred    -> "predicate"
+  | `Type    -> "type"
+  | `Module  -> "module"
+  | `ModType -> "module type"
+  | `Theory  -> "theory"
+
+(* -------------------------------------------------------------------- *)
 let rename ove subst (kind, name) =
   try
     let newname =
       List.find_map
         (fun rnm -> EcThCloning.rename rnm (kind, name))
         ove.ovre_rnms in
+
+    let nameok =
+      match kind with
+      | `Lemma | `Op | `Pred | `Type ->
+          EcIo.is_sym_ident newname
+      | `Module | `ModType | `Theory ->
+          EcIo.is_mod_ident newname
+    in
+
+    if not nameok then
+      ove.ovre_hooks.herr
+        (Format.sprintf
+           "renamings generated an invalid (%s) name: %s -> %s"
+           (string_of_renaming_kind kind) name newname);
+
     let subst =
       EcSubst.add_path subst
         ~src:(xpath ove name) ~dst:(xnpath ove newname)
