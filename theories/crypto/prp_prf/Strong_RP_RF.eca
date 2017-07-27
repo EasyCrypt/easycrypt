@@ -498,10 +498,9 @@ section PRPi_PRPi'_Indirect.
   bypr (res{1}) (res{2})=> //. (* Pointwise equality of distributions *)
   progress.
   (* We first perform the computation on the easy side,... *)
-  cut ->: Pr[Direct.sample(X{1}) @ &1: a = res] = mu (uD \ (mem X){1}) (pred1 a).
+  cut ->: Pr[Direct.sample(X{1}) @ &1: res = a] = mu (uD \ (mem X){1}) (pred1 a).
     byphoare (_: X = X{1} ==> _)=> //=.
-    proc; rnd=> //=; skip; progress.
-    by rewrite pred1E -{2}(etaP ((=) a)) etaE.
+    by proc; rnd=> //=; auto.
   subst X{1}.
   (* ... and we are left with the difficult side *)
   byphoare (_: X = X{2} ==> _)=> //=.

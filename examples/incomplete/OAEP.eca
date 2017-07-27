@@ -1,0 +1,276 @@
+require import AllCore List FSet.
+require import Distr DBool DProd.
+require (*--*) Ring ROM.
+
+(* Type for G's outputs (and H's inputs)                                    *)
+clone import Ring.ZModule as GTag
+rename [type] "t" as "gtag".
+
+op dgtag: { gtag distr |    is_lossless dgtag
+                         /\ is_uniform  dgtag
+                         /\ is_full     dgtag } as dgtag_ll_uni_fu.
+
+lemma dgtag_ll  : is_lossless dgtag by smt(dgtag_ll_uni_fu).
+lemma dgtag_uni : is_uniform  dgtag by smt(dgtag_ll_uni_fu).
+lemma dgtag_fu  : is_full     dgtag by smt(dgtag_ll_uni_fu).
+lemma dgtag_funi: is_funiform dgtag by smt(dgtag_ll_uni_fu).
+
+(* Type for H's outputs (and G's inputs)                                    *)
+clone import Ring.ZModule as HTag
+rename [type] "t" as "htag".
+
+op dhtag: { htag distr |    is_lossless dhtag
+                         /\ is_uniform  dhtag
+                         /\ is_full     dhtag } as dhtag_ll_uni_fu.
+
+lemma dhtag_ll  : is_lossless dhtag by smt(dhtag_ll_uni_fu).
+lemma dhtag_uni : is_uniform  dhtag by smt(dhtag_ll_uni_fu).
+lemma dhtag_fu  : is_full     dhtag by smt(dhtag_ll_uni_fu).
+lemma dhtag_funi: is_funiform dhtag by smt(dhtag_ll_uni_fu).
+
+(* The type of plaintext must be injected strictly into gtag:               *)
+(*                                  redundancy is crucial for OAEP to work! *)
+type ptxt.
+
+op pad  : ptxt -> gtag.
+op unpad: gtag -> ptxt option.
+
+axiom padK  : pcancel pad unpad.
+axiom unpadK: ocancel unpad pad.
+
+(* The permutation works on pairs of GTag and HTag                          *)
+clone import Ring.ZModule as D with
+  type t                       <- gtag * htag,
+  op   zeror                   <- (GTag.zeror,HTag.zeror),
+  op   (+) (x y : gtag * htag) <- ((x.`1 + y.`1),(x.`2 + y.`2)),
+  op   [-] (x : gtag * htag)   <- (-x.`1,-x.`2)
+proof *.
+realize addrA. by move=> x y z /=; rewrite GTag.addrA HTag.addrA. qed.
+realize addrC. by move=> x y /=; rewrite GTag.addrC HTag.addrC. qed.
+realize add0r. by move=> [x1 x2] /=; rewrite GTag.add0r HTag.add0r. qed.
+realize addNr. by move=> [x1 x2] /=; rewrite GTag.addNr HTag.addNr. qed.
+
+op dd = dgtag `*` dhtag.
+
+lemma dd_ll  : is_lossless dd by rewrite dprod_ll dgtag_ll dhtag_ll.
+lemma dd_uni : is_uniform  dd by rewrite dprod_uni 1:dgtag_uni// dhtag_uni.
+lemma dd_fu  : is_full     dd by rewrite dprod_fu dgtag_fu dhtag_fu.
+lemma dd_funi: is_funiform dd by rewrite dprod_funi 1:dgtag_funi// dhtag_funi.
+
+(* The permutation itself (with abstract keys)                              *)
+type pkey, skey.
+
+op dkeys : { (pkey * skey) distr | is_lossless dkeys } as dkeys_ll.
+
+op f : pkey -> gtag * htag -> gtag * htag.
+op fi: skey -> gtag * htag -> gtag * htag.
+
+axiom fK pk sk : (pk,sk) \in dkeys => cancel (f pk) (fi sk).
+axiom fiK pk sk: (pk,sk) \in dkeys => cancel (fi sk) (f pk).
+
+(* The G random oracle                                                      *)
+clone import ROM.Lazy as G with
+  type from      <- htag,
+  type to        <- gtag,
+  op   dsample _ <- dgtag
+proof *
+rename
+  "RO"     as "G"
+  "Oracle" as "Gt".
+import Types.
+
+(* The H random oracle                                                      *)
+clone import ROM.Lazy as H with
+  type from      <- gtag,
+  type to        <- htag,
+  op   dsample _ <- dhtag
+proof *
+rename
+  "RO"     as "H"
+  "Oracle" as "Ht".
+import Types.
+
+(* ------------------------------------------------------------------------ *)
+module OAEP (H : AH) (G : AG) = {
+  proc kg() = {
+    var pk, sk;
+
+    (pk,sk) <$ dkeys;
+    return (pk,sk);
+  }
+
+  proc enc(pk : pkey, m : ptxt) = {
+    var r, s, t;
+
+    r <$ dhtag;
+    s <@ G.o(r);
+    s <- s + (pad m);
+    t <@ H.o(s);
+    t <- t + r;
+    return f pk (s,t);
+  }
+
+  proc dec(sk : skey, c : gtag * htag) = {
+    var s, t, r, m;
+
+    (s,t) <- fi sk c;
+    r <@ H.o(s);
+    r <- r + t;
+    m <@ G.o(r);
+    m <- m + s;
+    return unpad m;
+  }
+}.
+
+(* ------------------------------------------------------------------------ *)
+module type PKE = {
+  proc kg(): pkey * skey
+  proc enc(pk : pkey, m : ptxt): gtag * htag
+  proc dec(sk : skey, c : gtag * htag): ptxt option
+}.
+
+module type HG_PKE (H : AH) (G : AG) = {
+  proc kg(): pkey * skey
+  proc enc(pk : pkey, m : ptxt): gtag * htag
+  proc dec(sk : skey, c : gtag * htag): ptxt option
+}.
+
+module type APKE = {
+  proc dec(c : gtag * htag): ptxt option
+}.
+
+module type CCA_ADV (H : AH) (G : AG) (S : APKE) = {
+  proc choose(pk : pkey): ptxt * ptxt
+  proc guess(c : gtag * htag): bool
+}.
+
+module IND_CCA (H : Ht) (G : Gt) (S : HG_PKE) (A : CCA_ADV) = {
+  var sk : skey
+  var c' : gtag * htag
+
+  module Sc = {
+    proc dec(c : gtag * htag) = {
+      var r <- None;
+
+      r <@ S(H,G).dec(sk,c);
+      return r;
+    }
+  }
+
+  module Sg = {
+    proc dec(c : gtag * htag) = {
+      var r <- None;
+
+      if (c <> c') {
+        r <@ S(H,G).dec(sk,c);
+      }
+      return r;
+    }
+  }
+
+  proc main() = {
+    var pk, m0, m1, b, b';
+
+               H.init();
+               G.init();
+
+    (pk,sk) <$ dkeys;
+    (m0,m1) <@ A(H,G,Sc).choose(pk);
+    b       <$ {0,1};
+    c'      <@ S(H,G).enc(pk,b?m0:m1);
+    b'      <@ A(H,G,Sg).guess(c');
+  }
+}.
+
+(* ------------------------------------------------------------------------ *)
+(* A quick note here: our inverter *does not* take over the random oracles, *)
+(* but simply uses them. This does not really make a difference if this is  *)
+(* the end of the proof, but will make a huge difference if we then compose *)
+(* this proof with another one that requires the random oracles to be true  *)
+(* random oracles. It may be a good idea to write something about this...   *)
+(* ------------------------------------------------------------------------ *)
+module type Inverter (H : AH) (G : AG) = {
+  proc invert(pk : pkey, c : gtag * htag): gtag list (* could use fset *)
+}.
+
+module SPDOW (H : Ht) (G : Gt) (I : Inverter) = {
+  proc main() = {
+    var pk, sk, s, t, ss;
+
+               H.init();
+               G.init();
+
+    (pk,sk) <$ dkeys;
+    (s,t)   <$ dd;
+    ss      <@ I(H,G).invert(pk,f pk (s,t));
+    return s \in ss;
+  }
+}.
+
+op find2 (p : 'x -> 'y -> bool) (xs : 'x list) (ys : 'y list) =
+  with xs = []    => (0,size ys)
+  with xs = x::xs =>
+    let j = find (p x) ys in
+    if   j < size ys
+    then (0,j) 
+    else let (i,j) = find2 p xs ys in (i + 1,j).
+
+module I (A : CCA_ADV) (H : AH) (G : AG) = {
+  var pk  : pkey
+  var logH: (gtag * htag) list
+  var logG: (htag * gtag) list
+
+  module H' = {
+    proc o(x : gtag) = {
+      var r;
+
+      r    <@ H.o(x);
+      logH <- (x,r)::logH;
+      return r;
+    }
+  }
+
+  module G' = {
+    proc o(x : htag) = {
+      var r;
+
+      r    <@ G.o(x);
+      logG <- (x,r)::logG;
+      return r;
+    }
+  }
+
+  module S = {
+    proc dec(c : gtag * htag): ptxt option = {
+      var i, j, s, g;
+      var m <- None;
+
+      (* Could reduce asymptotic and proof complexity here.                 *)
+      (*                        Need to find the original OAEP proof again. *)
+      (i,j) <- find2 (fun (sh : gtag * htag) (rg : htag * gtag)=>
+                        let (s,h) = sh in
+                        let (r,g) = rg in
+                           c = f pk (s,r + h)
+                        /\ unpad (s + g) <> None)
+                     logH logG;
+      if (i < size logH /\ j < size logG) {
+        s <- (nth (GTag.zeror,HTag.zeror) logH i).`1;
+        g <- (nth (HTag.zeror,GTag.zeror) logG j).`2;
+        m <- unpad (s + g);
+      }
+      return m;
+    }
+  }
+
+  proc invert(pk' : pkey, c : gtag * htag) = {
+    var m0, m1;
+
+    logH    <- [];
+    logG    <- [];
+    pk      <- pk';
+
+    (m0,m1) <@ A(H,G,S).choose(pk);
+               A(H,G,S).guess(c);
+    return logH;
+  }
+}.

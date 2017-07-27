@@ -1373,14 +1373,24 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
 
   let try_notation (p, (tv, nt)) =
     if not (Sp.mem p ppe.PPEnv.ppe_fb) then begin
-      let ev = MEV.of_idents (List.map fst nt.ont_args) `Form in
-      let ue = EcUnify.UniEnv.create None in
-      let ov = EcUnify.UniEnv.opentvi ue tv None in
-      let ti = Tvar.subst ov in
-      let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
-      let mr = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
-      let bd = form_of_expr mr nt.ont_body in
-      let bd = Fsubst.subst_tvar ov bd in
+      let na   =
+          List.length nt.ont_args
+        + List.length (snd (EcTypes.split_args nt.ont_body)) in
+      let oty  = f.f_ty in
+      let f, a = split_args f in
+      let f, a =
+        if na < List.length a then
+          let a1, a2 = List.split_at na a in
+          f_app f a1 (toarrow (List.map f_ty a2) oty), a2
+        else f_app f a oty, [] in
+      let ev   = MEV.of_idents (List.map fst nt.ont_args) `Form in
+      let ue   = EcUnify.UniEnv.create None in
+      let ov   = EcUnify.UniEnv.opentvi ue tv None in
+      let ti   = Tvar.subst ov in
+      let hy   = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
+      let mr   = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
+      let bd   = form_of_expr mr nt.ont_body in
+      let bd   = Fsubst.subst_tvar ov bd in
 
       try
         let (ue, ev) =
@@ -1396,6 +1406,7 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
         let f    = f_op p tv (toarrow tv rty) in
         let f    = f_app f args rty in
         let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev) f in
+        let f    = f_app f a oty in
         pp_form_core_r ppe outer fmt f; true
 
       with EcMatching.MatchFailure ->

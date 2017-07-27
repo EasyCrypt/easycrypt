@@ -1016,3 +1016,9 @@ let destr_tuple_var e =
    match e.e_node with
   | Etuple es -> List.map destr_var es
   | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let split_args e =
+  match e.e_node with
+  | Eapp (e, args) -> (e, args)
+  | _ -> (e, [])

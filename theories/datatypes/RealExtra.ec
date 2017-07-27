@@ -131,6 +131,15 @@ instance field with real
   proof ofintN    by smt ml=0.
 
 (* -------------------------------------------------------------------- *)
+op floor : real -> int.
+op ceil  : real -> int.
+
+axiom floor_bound (x:real) : x - 1%r <= (floor x)%r <= x.
+axiom  ceil_bound (x:real) : x <= (ceil x)%r <= x + 1%r.
+axiom from_int_floor n : floor n%r = n.
+axiom from_int_ceil  n : ceil  n%r = n.
+
+(* -------------------------------------------------------------------- *)
 (* WARNING Lemmas used by tactics: *)
 lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
    0%r <= x1 =>

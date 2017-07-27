@@ -60,6 +60,8 @@ op card ['a] (s : 'a fset) = size (elems s) axiomatized by cardE.
 op mem ['a] (s : 'a fset) (x : 'a) = mem (elems s) x
   axiomatized by memE.
 
+abbrev (\in) (z : 'a) (s : 'a fset) = mem s z.
+
 lemma mem_oflist (s : 'a list):
   forall x, mem (oflist s) x <=> mem s x.
 proof.

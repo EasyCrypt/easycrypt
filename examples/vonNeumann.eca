@@ -11,8 +11,9 @@
  * Von Neumann's trick to simulate a fair coin toss using only a
  * biased coin (of unknown bias). *)
 
-require import Bool Pair Int IntExtra Real RealExtra List Distr.
-require import StdRing StdOrder DBool Mu_mem.
+require import AllCore Int IntExtra Real RealExtra List.
+require import Distr DBool.
+require import StdRing StdOrder.
 (*---*) import MUniform RField RealOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -28,7 +29,8 @@ module Fair = {
 (* -------------------------------------------------------------------- *)
 op p : { real | 0%r < p < 1%r } as in01_p.
 
-clone import FixedBiased as Biased with op p <- p proof *.
+clone import FixedBiased as Biased with
+  op p <- p proof *.
 realize in01_p by apply/in01_p.
 
 module Simulate = {
@@ -49,7 +51,7 @@ module Simulate = {
 op svn = [(true, false); (false, true)].
 op dvn = duniform svn.
 
-lemma vn1E a b : mu_x dvn (a, b) = (1%r / 2%r) * b2r (a <> b).
+lemma vn1E a b : mu1 dvn (a, b) = (1%r / 2%r) * b2r (a <> b).
 proof. by rewrite duniform1E; case: a b => [] [] @/svn. qed.
 
 lemma vnE E : mu dvn E = 1%r/2%r * (count E svn)%r.
@@ -67,9 +69,9 @@ module SamplePair = {
 equiv SamplePair: SamplePair.sample ~ Fair.sample: true ==> ={res}.
 proof.
 bypr (res{1}) (res{2})=> // &1 &2 b0.
-have ->: Pr[Fair.sample() @ &2: b0 = res] = 1%r/2%r.
+have ->: Pr[Fair.sample() @ &2: res = b0] = 1%r/2%r.
  byphoare (_: true ==> res = b0)=> //.
- by proc; rnd (pred1 b0); skip=> />; rewrite dboolb.
+ by proc; rnd (pred1 b0); skip=> />; rewrite dbool1E.
 byphoare (_: true ==> res = b0)=> //.
 proc; rnd ((pred1 b0) \o fst); skip => />.
 rewrite vnE; pose c := count _ _; suff ->//: c%r = 1%r.
@@ -101,8 +103,10 @@ while true (b2i (b = b')) 1 (2%r * p * (1%r - p))=> />.
 + by auto=> />; rewrite dbiased_ll.
 split => //= [|z]; first by smt w=(in01_p).
 conseq (_: true ==> b <> b'); first by move=> /#.
-seq 1: b p (1%r - p) (1%r - p) p=> //;
-  try by rnd; skip=> />; rewrite prbiasedE.
-+ by rnd; skip=> /> _ -> />; rewrite prbiasedE.
-by smt w=(in01_p).
+seq 1: b p (1%r - p) (1%r - p) p=> //.
++ by rnd; skip=> />; rewrite dbiasedE.
++ by rnd; skip=> />; rewrite dbiasedE.
++ by rnd; skip=> />; rewrite dbiasedE.
++ by rnd; skip=> /> &hr ->; rewrite dbiasedE.
+smt(in01_p).
 qed.

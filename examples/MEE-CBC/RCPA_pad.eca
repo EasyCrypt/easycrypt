@@ -1,4 +1,4 @@
-require import Option Real Distr.
+require import AllCore Real Distr.
 require (*--*) SKE_INDR.
 
 type key, ptxt, ctxt.
@@ -25,7 +25,7 @@ op unpad: ptxt -> msg option.
 axiom pcan_pad m: unpad (pad m) = Some m.
 axiom leak_pad m: dC_m (leak_m m) = dC_p (leak_p (pad m)).
 
-clone SKE_INDR as Core with
+clone SKE_INDR as CoreDefs with
   type eK    <- key,
   type ptxt  <- ptxt,
   type ctxt  <- ctxt,
@@ -44,7 +44,7 @@ clone import SKE_INDR as PtE with
 proof * by smt.
 import RCPA.
 
-module PadThenEncrypt (S:Core.Enc_Scheme): Enc_Scheme = {
+module PadThenEncrypt (S:CoreDefs.Enc_Scheme): Enc_Scheme = {
   proc keygen = S.keygen
 
   proc enc(k:key,m:msg): ctxt = {
@@ -62,7 +62,7 @@ module PadThenEncrypt (S:Core.Enc_Scheme): Enc_Scheme = {
   }
 }.
 
-module RCPAa (A:RCPA_Adversary,O:Core.RCPA.RCPA_Oracles) = {
+module RCPAa (A:RCPA_Adversary,O:CoreDefs.RCPA.RCPA_Oracles) = {
   module S = {
     proc enc(m:msg): ctxt = {
       var c;
@@ -76,12 +76,12 @@ module RCPAa (A:RCPA_Adversary,O:Core.RCPA.RCPA_Oracles) = {
 }.
 
 section RCPA.
-  declare module S : Core.Enc_Scheme { RCPA_Wrap, Core.RCPA.RCPA_Wrap }.
-  declare module A : RCPA_Adversary  { RCPA_Wrap, Core.RCPA.RCPA_Wrap, S }.
+  declare module S : CoreDefs.Enc_Scheme { RCPA_Wrap, CoreDefs.RCPA.RCPA_Wrap }.
+  declare module A : RCPA_Adversary  { RCPA_Wrap, CoreDefs.RCPA.RCPA_Wrap, S }.
 
   local lemma PtE_Ideal &m:
     Pr[INDR_CPA(Ideal,A).main() @ &m: res]
-    = Pr[Core.RCPA.INDR_CPA(Core.RCPA.Ideal,RCPAa(A)).main() @ &m: res].
+    = Pr[CoreDefs.RCPA.INDR_CPA(CoreDefs.RCPA.Ideal,RCPAa(A)).main() @ &m: res].
   proof.
     byequiv=> //=; proc.
     call (_: true).
@@ -92,13 +92,13 @@ section RCPA.
   lemma RCPA_preservation &m:
     `|Pr[INDR_CPA(PadThenEncrypt(S),A).main() @ &m: res]
       - Pr[INDR_CPA(Ideal,A).main() @ &m: res]|
-    = `|Pr[Core.RCPA.INDR_CPA(S,RCPAa(A)).main() @ &m: res]
-        - Pr[Core.RCPA.INDR_CPA(Core.RCPA.Ideal,RCPAa(A)).main() @ &m: res]|.
+    = `|Pr[CoreDefs.RCPA.INDR_CPA(S,RCPAa(A)).main() @ &m: res]
+        - Pr[CoreDefs.RCPA.INDR_CPA(CoreDefs.RCPA.Ideal,RCPAa(A)).main() @ &m: res]|.
   proof.
     rewrite (PtE_Ideal &m); do !congr.
     byequiv=> //=; proc; inline *.
     call (_:    ={glob S}
-             /\ ={k}(RCPA_Wrap,Core.RCPA.RCPA_Wrap)).
+             /\ ={k}(RCPA_Wrap,CoreDefs.RCPA.RCPA_Wrap)).
       by proc; inline *; wp; call (_: true); auto; smt.
     by call (_: true).
   qed.

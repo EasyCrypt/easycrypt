@@ -1,4 +1,4 @@
-require import Option Int Real Distr.
+require import AllCore Int Real Distr.
 
 (** Given types for keys, plaintexts  and ciphertexts **)
 type eK, ptxt, ctxt.

@@ -234,11 +234,11 @@ theory SubuniformReference.
   proof.
   move=> support_M Xi_neq0.
   bypr (res{1}) (res{2})=> //= &1 &2 a [] i_def xs_def.
-  rewrite !(@eq_sym a); case: (mem (X arg{1}) a); last first.
+  case: (mem (X arg{1}) a); last first.
   + move=> ^a_notin_X /(@pr_res_notin_X a arg{1} X &1 support_M) ->.
     byphoare (_: (i,xs) = (arg,X arg){1} ==> _)=> //=.
     hoare; proc; auto=> /> r.
-    rewrite -/(support _ _) supp_dscalar 1:gt0_k.
+    rewrite supp_dscalar 1:gt0_k.
     + by rewrite duniform_ll 1:Xi_neq0 // le1_k.
     case: (r = a)=> [->|//];by rewrite supp_duniform.
   move=> a_in_X. rewrite (@is_subuniform arg{1} X a &1 support_M a_in_X).

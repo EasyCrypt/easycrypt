@@ -1,0 +1,123 @@
+require import AllCore Distr Dexcepted List FSet. 
+require Dice_sampling.
+
+clone import MFinite as MF.
+print MF.
+
+module type Sample = {
+  proc sample (s:t fset) : t
+}.
+
+type t_res.
+
+module type Adv_Sample (S:Sample) = {
+  proc main () : t_res { S.sample }
+}.
+
+theory MainOracle.
+
+  (* Maximum number of elements that can be rejected *)
+  op k : int.
+  axiom k_pos : 0 <= k.
+  axiom lt_k  : k < Support.card.
+
+  (* Maximun number of call to the oracle *)
+  op q : int. 
+ 
+  module MainS (A:Adv_Sample, S:Sample) = {
+    var c : int
+
+    module O = {
+      proc sample(s: t fset) = {
+        var r : t;
+        r = witness;
+        if (c < q /\ card s <= k) {
+          r = S.sample(s);
+          c = c + 1;
+        }
+        return r;
+      }
+    }
+
+    module A = A(O)
+    
+    proc main() = {
+      var r;
+      c = 0;
+      r = A.main();
+      return r;
+    }
+  }.
+
+  module Se = {
+    proc sample(s:t fset) = {
+      var r;
+      r <$ dunifin \ (mem s);
+      return r;
+    }
+  }.
+
+  module S = {
+    proc sample(s: t fset) = {
+      var r;
+      r <$ dunifin;
+      return r;
+    }
+  }.
+
+  section PROOFS.
+
+   declare module A:Adv_Sample {MainS}. 
+
+   local clone Dice_sampling as DS with
+     type input <- t fset,
+     op valid <- fun s => card s <= k,
+     type t <- t,
+     op d <- fun (s:t fset) => dunifin,
+     op test <- fun s => oflist Support.enum `\` s,
+     type t' <- t,
+     op d' <- fun (s: t fset) => dunifin \ (mem s)
+     proof *.
+   realize valid_nonempty.  
+   proof. by exists fset0;rewrite fcards0 k_pos. qed.
+   realize dU.
+   proof. by move=> _ _;apply dunifin_uni. qed.
+   realize test_in_d.
+   proof. by move=> _ _ _ _;apply dunifin_fu. qed.
+   realize d'_uni.
+   proof.    
+     move=> s x; rewrite supp_dexcepted => -[_ Hin].
+     rewrite dexcepted1E dunifin1E Hin /= dunifin_ll dunifinE fcardD;congr.
+     rewrite !cardE.
+     admit.
+   qed.
+
+   print DS.
+
+module Sample = {
+  proc sample (i:input) : t' = {
+    var r : t';
+    r = $d' i;
+    return r;
+  }
+}.
+
+axiom d'_uni : forall i x, x \in (d' i) => mu1 (d' i) x = 1%r/(card(test i))%r.
+
+
+
+     .
+   
+   lemma pr_except (E:glob A -> t_res -> bool) &m : 
+      `| Pr[MainS(A,Se).main() @ &m : E (glob A) res] - Pr[MainS(A,S).main() @ &m : E (glob A) res] | <= 
+       q%r * k%r / n%r.
+
+   
+
+
+ module Sw = {
+   proc sample (s: t fset) = {
+     var r;
+     r <$ dt;
+     while dt 
+ 
