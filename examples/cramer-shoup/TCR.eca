@@ -1,0 +1,27 @@
+require import AllCore.
+
+type K.
+op dk : K distr.
+
+type t_from.
+type t_to.
+
+op H : K -> t_from -> t_to.
+
+module type ADV_TCR = {
+  proc c1 () : t_from
+  proc c2 (k:K) : t_from
+}.
+
+module TCR (A:ADV_TCR) = {
+  proc main() = {
+    var x,y,k;
+    x <- A.c1();
+    k <$ dk;
+    y <- A.c2(k);
+    return (H k x = H k y /\ x <> y);
+  }
+}.
+
+
+    
