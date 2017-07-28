@@ -327,6 +327,8 @@ module Ty : sig
   val signature : env -> ty -> ty list * ty
 end
 
+val ty_hnorm : ty -> env -> ty
+
 (* -------------------------------------------------------------------- *)
 module Algebra : sig
   val add_ring  : ty -> EcDecl.ring  -> env -> env

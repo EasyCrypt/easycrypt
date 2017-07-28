@@ -1223,7 +1223,7 @@ let transexp (env : EcEnv.env) mode ue e =
     | PEproji (sube, i) -> begin
       let sube', ety = transexp env sube in
       let ty = Tuni.offun (EcUnify.UniEnv.assubst ue) ety in
-      match (EcEnv.Ty.hnorm ty env).ty_node with
+      match (EcEnv.ty_hnorm ty env).ty_node with
       | Ttuple l when i < List.length l ->
         let ty = List.nth l i in
         e_proj sube' i ty, ty
@@ -2306,7 +2306,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     | PFproji (psubf, i) -> begin
       let subf = transf env psubf in
       let ty   = Tuni.offun (EcUnify.UniEnv.assubst ue) subf.f_ty in
-      match (EcEnv.Ty.hnorm ty env).ty_node with
+      match (EcEnv.ty_hnorm ty env).ty_node with
       | Ttuple l when i < List.length l ->
           f_proj subf i (List.nth l i)
       | _ ->
