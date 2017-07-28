@@ -45,6 +45,9 @@ theory F.
   axiom mulfDl (x y z:t): x * y + x * z = x * (y + z).
   axiom div_def (x y:t): x / y = x * (inv y).
 
+  axiom mulf_eq0:
+    forall (x y : t), x * y = zero <=> x = zero \/ y = zero.
+
   (* Exponentiation *)
   axiom pow0 (x:t): x ^ 0 = one.
   axiom powS (x:t) (n:int): Int.(<=) 0 n => x ^ (Int.(+) n 1) = x * x ^ n.
@@ -62,6 +65,7 @@ theory F.
   axiom toint_bounded (x:t): 0 <= toint x < q.
   axiom oftoint (x:t): ofint (toint x) = x.
   axiom toofint_mod (x:int): toint (ofint x) = IntDiv.(%%) x q.
+
 end F.
 export F.
 

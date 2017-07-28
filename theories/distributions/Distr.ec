@@ -281,6 +281,16 @@ proof.
   by apply ler_pemull;smt (mu_bounded). 
 qed.
 
+lemma mu_mem_le_mu1 ['a] (dt : 'a distr) (l:'a list) r: 
+  (forall x, mu1 dt x <= r) =>
+  mu dt (mem l) <= (size l)%r * r.
+proof.
+  move=> Hmu1; have H := mu_mem_le dt l; apply (ler_trans _ H).
+  apply (ler_trans (big predT (fun (x : 'a) => r) l)).
+  + by apply ler_sum_seq => /= ???;apply Hmu1.
+  by rewrite BRA.sumr_const StdRing.RField.intmulr count_predT mulrC. 
+qed.
+
 (* -------------------------------------------------------------------- *)
 
 lemma uniform_finite ['a] (dt : 'a distr) : is_uniform dt => is_finite (support dt).
