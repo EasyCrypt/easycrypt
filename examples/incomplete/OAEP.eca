@@ -1,6 +1,9 @@
-require import AllCore List FSet.
+require import AllCore List FSet NewFMap.
 require import Distr DBool DProd.
 require (*--*) Ring ROM.
+
+pragma +implicits.
+pragma -oldip.
 
 (* Type for G's outputs (and H's inputs)                                    *)
 clone import Ring.ZModule as GTag
@@ -179,6 +182,7 @@ module IND_CCA (H : Ht) (G : Gt) (S : HG_PKE) (A : CCA_ADV) = {
     b       <$ {0,1};
     c'      <@ S(H,G).enc(pk,b?m0:m1);
     b'      <@ A(H,G,Sg).guess(c');
+    return b = b';
   }
 }.
 
@@ -207,13 +211,35 @@ module SPDOW (H : Ht) (G : Gt) (I : Inverter) = {
   }
 }.
 
-op find2 (p : 'x -> 'y -> bool) (xs : 'x list) (ys : 'y list) =
-  with xs = []    => (0,size ys)
+(*
+op extract (p : 'x -> bool) (xs : 'x list) =
+  with xs = []    => None
   with xs = x::xs =>
-    let j = find (p x) ys in
-    if   j < size ys
-    then (0,j) 
-    else let (i,j) = find2 p xs ys in (i + 1,j).
+    if   p x
+    then Some x
+    else extract p xs. 
+
+op extract2 (p : 'x -> 'y -> bool) (xs : 'x list) (ys : 'y list) =
+  with xs = []    => None
+  with xs = x::xs =>
+    let y = extract (p x) ys in
+    if   y <> None
+    then Some (x,oget y)
+    else extract2 p xs ys.
+
+lemma extract_correct (p : 'x -> bool) xs a:
+     extract p xs = Some a
+  => p a.
+proof. by elim: xs=> //= x xs ih; case: (p x). qed.
+
+lemma extract2_correct (p : 'x -> 'y -> bool) xs ys a b:
+     extract2 p xs ys = Some (a,b)
+  => p a b.
+proof.
+elim: xs=> //= x xs ih.
+case: {-1}(extract (p x) ys) (eq_refl (extract (p x) ys))=> // y.
+by move=> /extract_correct; rewrite oget_some=> /= + [#] <- <-.
+qed.
 
 module I (A : CCA_ADV) (H : AH) (G : AG) = {
   var pk  : pkey
@@ -242,21 +268,19 @@ module I (A : CCA_ADV) (H : AH) (G : AG) = {
 
   module S = {
     proc dec(c : gtag * htag): ptxt option = {
-      var i, j, s, g;
+      var sg, s, g;
       var m <- None;
 
-      (* Could reduce asymptotic and proof complexity here.                 *)
-      (*                        Need to find the original OAEP proof again. *)
-      (i,j) <- find2 (fun (sh : gtag * htag) (rg : htag * gtag)=>
+      (* Could probably reduce asymptotic and proof complexity here.        *)
+      sg <- extract2 (fun (sh : gtag * htag) (rg : htag * gtag)=>
                         let (s,h) = sh in
                         let (r,g) = rg in
-                           c = f pk (s,r + h)
-                        /\ unpad (s + g) <> None)
+                            c = f pk (s,r + h)
+                         /\ unpad (s + g) <> None)
                      logH logG;
-      if (i < size logH /\ j < size logG) {
-        s <- (nth (GTag.zeror,HTag.zeror) logH i).`1;
-        g <- (nth (HTag.zeror,GTag.zeror) logG j).`2;
-        m <- unpad (s + g);
+      if (sg <> None) {
+        (s,g) <- ((oget sg).`1.`1,(oget sg).`2.`2);
+        m     <- unpad (s + g);
       }
       return m;
     }
@@ -274,3 +298,224 @@ module I (A : CCA_ADV) (H : AH) (G : AG) = {
     return logH;
   }
 }.
+*)
+
+section.
+declare module A : CCA_ADV {H, G,(* I,*) IND_CCA}.
+
+axiom A_choose_ll (H <: AH {A}) (G <: AG {A}) (S <: APKE {A}):
+  islossless S.dec => islossless G.o => islossless H.o =>
+  islossless A(H,G,S).choose.
+
+axiom A_guess_ll (H <: AH {A}) (G <: AG {A}) (S <: APKE {A}):
+  islossless S.dec => islossless G.o => islossless H.o =>
+  islossless A(H,G,S).guess.
+
+local module Game0 (H : Ht) (G : Gt) = {
+  var sk: skey
+  var c': gtag * htag
+
+  module Sc = {
+    proc dec(c : gtag * htag) = {
+      var r <- None;
+
+      r <@ OAEP(H,G).dec(sk,c);
+      return r;
+    }
+  }
+
+  module Sg = {
+    proc dec(c : gtag * htag) = {
+      var r <- None;
+
+      if (c <> c') {
+        r <@ OAEP(H,G).dec(sk,c);
+      }
+      return r;
+    }
+  }
+
+  proc main() = {
+    var pk, m0, m1, b, b', r, s, t;
+
+               H.init();
+               G.init();
+
+    (pk,sk) <$ dkeys;
+    (m0,m1) <@ A(H,G,Sc).choose(pk);
+    b       <$ {0,1};
+    r       <$ dhtag;
+    s       <@ G.o(r);
+    s       <- s + pad (b?m0:m1);
+    t       <@ H.o(s);
+    t       <- t + r;
+    c'      <- f pk (s,t);
+    b'      <@ A(H,G,Sg).guess(c');
+    return b = b';
+  }
+}.
+
+local lemma eq_INDCCA_Game0 (H <: Ht {A, Game0, IND_CCA})
+                            (G <: Gt {A, H, Game0, IND_CCA}):
+  equiv [IND_CCA(H,G,OAEP,A).main ~ Game0(H,G).main:
+           ={glob A, glob H, glob G} ==> ={res}].
+proof.
+proc; call (:   ={glob H, glob G}
+             /\ ={sk,c'}(IND_CCA,Game0)).
++ by sim.
++ by sim.
++ by sim.
+inline OAEP(H,G).enc.
+auto; call (: true).
+auto; call (: true).
+auto.
+call (:   ={glob H, glob G}
+       /\ ={sk}(IND_CCA,Game0)).
++ by sim.
++ by sim.
++ by sim.
+by auto; call (: true); call (: true).
+qed.
+
+local module Game1 (H : Ht) (G : Gt) = {
+  var sk : skey
+  var r  : htag
+  var c' : gtag * htag
+  var log: htag fset
+
+  module G' = {
+    proc o(x : htag) = {
+      var r;
+
+      log <- log `|` fset1 x;
+      r   <@ G.o(x);
+      return r;
+    }
+  }
+
+  module Sc = {
+    proc dec(c : gtag * htag) = {
+      var r <- None;
+
+      r <@ OAEP(H,G).dec(sk,c);
+      return r;
+    }
+  }
+
+  module Sg = {
+    proc dec(c : gtag * htag) = {
+      var r <- None;
+
+      if (c <> c') {
+        r <@ OAEP(H,G).dec(sk,c);
+      }
+      return r;
+    }
+  }
+
+  proc main() = {
+    var pk, m0, m1, b, b', s, t;
+
+               H.init();
+    log     <- fset0;
+               G.init();
+
+    (pk,sk) <$ dkeys;
+    r       <$ dhtag;
+    s       <$ dgtag;
+    (m0,m1) <@ A(H,G,Sc).choose(pk);
+    t       <@ H.o(s);
+    t       <- t + r;
+    c'      <- f pk (s,t);
+    b       <$ {0,1};
+    b'      <@ A(H,G,Sg).guess(c');
+    return b = b';
+  }
+}.
+
+local lemma eq_Game0_Game1 (H <: Ht {G, Game0, Game1}):
+  islossless H.o =>
+  equiv [Game0(H,G).main ~ Game1(H,G).main:
+           ={glob A, glob H} ==>
+              !(Game1.r \in dom G.m){2}
+           => ={res}].
+proof.
+move=> H_o_ll; proc.
+swap{2} [5..6] 1. swap{2} 11 -5.
+call (: Game1.r \in dom G.m,
+        ={glob H} /\
+        ={sk, c'}(Game0,Game1) /\
+        eq_except G.m{1} G.m{2} (pred1 Game1.r{2})).
++ exact/A_guess_ll.
++ proc; sp; if=> //=; inline OAEP(H,G).dec G.o.
+  auto; call (: true); auto=> /> &1 &2 not_bad eqe_m1_m2 c_neq_c' r s _.
+  rewrite !getP_eq oget_some /= eq_except_set //=.
+  case: (Game1.r{2} = r + (fi Game1.sk c).`2{2}).
+  + by move: not_bad=> + <-; rewrite !in_dom getP_eq=> /= ->.
+  move: not_bad=> + r_neq_x; rewrite !in_dom.
+  have -> //: G.m{1}.[r + (fi Game1.sk c).`2]{2} =
+              G.m.[r + (fi Game1.sk c).`2]{2}.
+  have:= eq_exceptP (G.m{1}) (G.m{2}) (pred1 Game1.r{2}).
+  by rewrite eqe_m1_m2 pred1E=> /= /(_ (r + (fi Game1.sk c).`2{2})) /(_ r_neq_x).
++ move=> _ _; proc; sp; if=> //=; call (: true)=> //=.
+  by wp; call (G_o_ll dgtag_ll); wp; call H_o_ll; auto.
++ move=> _; proc; sp; if=> //=.
+  call (: Game1.r \in dom G.m ==> Game1.r \in dom G.m)=> //=.
+  + proc; inline G.o; auto; call (: true)=> //=; auto; rewrite dgtag_ll /=.
+    smt(@NewFMap).
++ proc; auto=> />; smt(@NewFMap).
++ move=> _ _; exact/(G_o_ll dgtag_ll).
++ move=> _; proc; auto; smt(@NewFMap dgtag_ll).
++ proc (   (!Game1.r \in dom G.m){2}
+        /\ eq_except G.m{1} G.m{2} (pred1 Game1.r{2})
+        /\ ={sk, c'}(Game0,Game1))=> //=.
++ move=> _ _; exact/H_o_ll.
++ by move=> _; proc (Game1.r \in dom G.m).
+wp; call (: Game1.r \in dom G.m, true); inline G.o; wp.
+rnd (fun x=> x + pad (if b then m0 else m1){2})
+    (fun x=> x - pad (if b then m0 else m1){2}).
+auto.
+call (: ={glob H, glob G} /\ ={sk}(Game0,Game1)).
++ by sim.
++ by sim.
++ by sim.
+inline *; auto; call (: true); auto=> /> [pk sk] vk [m0 m1] Gm b _ r _; split=> [g _ /=|_].
++ by rewrite subrK.
+split=> [g _|_ g _].
++ exact/dgtag_funi.
+rewrite dgtag_fu /= -addrA subrr addr0 /= !getP /= oget_some /=.
+by rewrite set_eq_except /= /#.
+qed.
+
+local lemma pr_INDCCA_Game1 (H <: Ht {A, G, Game0, Game1, IND_CCA}) &m:
+  islossless H.init =>
+  islossless H.o =>
+     Pr[IND_CCA(H,G,OAEP,A).main() @ &m: res] - 1%r/2%r
+  <= Pr[Game1(H,G).main() @ &m: Game1.r \in dom G.m].
+proof.
+move=> H_init_ll H_o_ll.
+have ->:   Pr[IND_CCA(H,G,OAEP,A).main() @ &m: res]
+         = Pr[Game0(H,G).main() @ &m: res].
++ by byequiv (eq_INDCCA_Game0 H G).
+rewrite StdOrder.RealOrder.ler_subl_addl.
+have <-: Pr[Game1(H,G).main() @ &m: res] = 1%r/2%r.
++ byphoare=> //=; proc; swap 11 1; rnd (pred1 b').
+  conseq (: true)=> //=.
+  + by move=> b'; rewrite dbool1E.
+  call (A_guess_ll H G (<: Game1(H,G).Sg) _ _ _).
+  + proc; sp; if=> //=; call (: true)=> //=.
+    by wp; call (G_o_ll dgtag_ll); wp; call H_o_ll; auto.
+  + exact/(G_o_ll dgtag_ll).
+  + exact/H_o_ll.
+  auto; call H_o_ll.
+  call (A_choose_ll H G (<: Game1(H,G).Sc) _ _ _).
+  + proc; call (: true); auto=> //=.
+    by wp; call (G_o_ll dgtag_ll); wp; call H_o_ll; auto.
+  + exact/(G_o_ll dgtag_ll).
+  + exact/H_o_ll.
+  auto; call G_init_ll; auto; call H_init_ll; auto=> />.
+  by rewrite dkeys_ll dhtag_ll dgtag_ll.
+by byequiv (eq_Game0_Game1 H H_o_ll)=> /#.
+qed.
+
+end section.
