@@ -268,6 +268,15 @@ def _main():
 
         return [config(x) for x in scripts]
 
+    def is_excluded(src,excludes):
+        for path in excludes:
+            if path.startswith('!'):
+                if src.startswith(path[1:]):
+                    return True
+            elif src == path:
+                return True
+        return False
+
     def gather_for_scenario(scenario):
         def expand(dirs):
             def for1(x):
@@ -288,7 +297,7 @@ def _main():
                          for x in expand(scenario.okdirs)])
         dirs.extend([Object(src = x, valid = False, args = scenario.args) \
                          for x in expand(scenario.kodirs)])
-        dirs = [x for x in dirs if x.src not in scenario.exclude]
+        dirs = [x for x in dirs if not is_excluded(x.src,scenario.exclude)]
         dirs = map(lambda x : gather(x, scenario), dirs)
         return list(itertools.chain.from_iterable(dirs))
 
