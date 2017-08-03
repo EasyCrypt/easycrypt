@@ -395,21 +395,21 @@ local module Game1 (H : Ht) (G : Gt) = {
 
   module Sc = {
     proc dec(c : gtag * htag) = {
-      var r <- None;
+      var p <- None;
 
-      r <@ OAEP(H,G).dec(sk,c);
-      return r;
+      p <@ OAEP(H,G).dec(sk,c);
+      return p;
     }
   }
 
   module Sg = {
     proc dec(c : gtag * htag) = {
-      var r <- None;
+      var p <- None;
 
       if (c <> c') {
-        r <@ OAEP(H,G).dec(sk,c);
+        p <@ OAEP(H,G).dec(sk,c);
       }
-      return r;
+      return p;
     }
   }
 
@@ -433,6 +433,65 @@ local module Game1 (H : Ht) (G : Gt) = {
   }
 }.
 
+local lemma eq_upto_G_o P:
+  equiv [G.o ~ G.o:
+    (forall x, x \in dom G.m{2} => !P x) /\
+    ={x} /\
+    eq_except G.m{1} G.m{2} P
+    ==> (forall x, x \in dom G.m{2} => !P x) =>
+        ={res} /\
+        eq_except G.m{1} G.m{2} P].
+proof.
+proc; auto=> /> &1 &2 not_bad eqe g _; split.
++ rewrite !getP_eq dom_set eq_except_set=> //= x_notin_m2 x_in_m1 /(_ x{2}).
+  rewrite in_fsetU in_fset1=> //= x_notin_P.
+  have /iffLR /(_ eqe x{2} x_notin_P) eq_mx:= eq_exceptP G.m{1} G.m{2} P.
+  by move: x_in_m1 x_notin_m2; rewrite !in_dom eq_mx.
+rewrite !getP_eq oget_some=> ^ + /not_bad x_notin_P.
+have /iffLR /(_ eqe x{2} x_notin_P) eq_mx:= eq_exceptP G.m{1} G.m{2} P.
+by rewrite !in_dom eq_mx.
+qed.
+
+local lemma eq_upto1_G_o r:
+  equiv [G.o ~ G.o:
+    !(r \in dom G.m){2} /\
+    ={x} /\
+    eq_except G.m{1} G.m{2} (pred1 r)
+    ==> !(r \in dom G.m){2} =>
+        ={res} /\
+        eq_except G.m{1} G.m{2} (pred1 r)].
+proof.
+have not_memP: forall (s : htag fset),
+  !(r \in s) <=> (forall x, x \in s => x <> r).
++ smt().
+by conseq (eq_upto_G_o (pred1 r))=> /#.
+qed.
+
+local lemma eq_upto_OAEP_dec (H <: Ht {G, Game0, Game1}):
+  equiv [OAEP(H,G).dec ~ OAEP(H,G).dec:
+    !(Game1.r \in dom G.m){2} /\
+    ={glob H, c, sk} /\
+    ={sk, c'}(Game0,Game1) /\
+    eq_except G.m{1} G.m{2} (pred1 Game1.r{2})
+    ==> !(Game1.r \in dom G.m){2} =>
+        ={glob H, res} /\
+        ={sk, c'}(Game0,Game1) /\
+        eq_except G.m{1} G.m{2} (pred1 Game1.r{2})].
+proof.
+proc; exists * Game1.r{2}; elim *=> r.
+wp; call (eq_upto1_G_o r).
+wp; call (: true).
+by auto=> /#.
+qed.
+
+local lemma OAEP_dec_ll (H <: Ht) (G <: Gt):
+  islossless H.o =>
+  islossless G.o =>
+  islossless OAEP(H,G).dec.
+proof.
+by move=> H_o_ll G_o_ll; proc; wp; call G_o_ll; wp; call H_o_ll; auto.
+qed.
+
 local lemma eq_Game0_Game1 (H <: Ht {G, Game0, Game1}):
   islossless H.o =>
   equiv [Game0(H,G).main ~ Game1(H,G).main:
@@ -447,30 +506,18 @@ call (: Game1.r \in dom G.m,
         ={sk, c'}(Game0,Game1) /\
         eq_except G.m{1} G.m{2} (pred1 Game1.r{2})).
 + exact/A_guess_ll.
-+ proc; sp; if=> //=; inline OAEP(H,G).dec G.o.
-  auto; call (: true); auto=> /> &1 &2 not_bad eqe_m1_m2 c_neq_c' r s _.
-  rewrite !getP_eq oget_some /= eq_except_set //=.
-  case: (Game1.r{2} = r + (fi Game1.sk c).`2{2}).
-  + by move: not_bad=> + <-; rewrite !in_dom getP_eq=> /= ->.
-  move: not_bad=> + r_neq_x; rewrite !in_dom.
-  have -> //: G.m{1}.[r + (fi Game1.sk c).`2]{2} =
-              G.m.[r + (fi Game1.sk c).`2]{2}.
-  have:= eq_exceptP (G.m{1}) (G.m{2}) (pred1 Game1.r{2}).
-  by rewrite eqe_m1_m2 pred1E=> /= /(_ (r + (fi Game1.sk c).`2{2})) /(_ r_neq_x).
-+ move=> _ _; proc; sp; if=> //=; call (: true)=> //=.
-  by wp; call (G_o_ll dgtag_ll); wp; call H_o_ll; auto.
-+ move=> _; proc; sp; if=> //=.
-  call (: Game1.r \in dom G.m ==> Game1.r \in dom G.m)=> //=.
-  + proc; inline G.o; auto; call (: true)=> //=; auto; rewrite dgtag_ll /=.
-    smt(@NewFMap).
-+ proc; auto=> />; smt(@NewFMap).
++ by proc; sp; if=> //=; call (eq_upto_OAEP_dec H); auto=> /#.
++ by move=> _ _; proc; sp; if=> //=; call (OAEP_dec_ll H G H_o_ll (G_o_ll dgtag_ll)).
++ move=> _; conseq (: true) (: Game1.r \in dom G.m ==> Game1.r \in dom G.m)=> //=.
+  + by proc; inline *; sp; if=> //=; auto; call (: true); auto=> />; smt(dom_set in_fsetU).
+  by proc; sp; if=> //=; call (OAEP_dec_ll H G H_o_ll (G_o_ll dgtag_ll)).
++ by proc *; exists * Game1.r{2}; elim *=> r; call (eq_upto1_G_o r).
 + move=> _ _; exact/(G_o_ll dgtag_ll).
-+ move=> _; proc; auto; smt(@NewFMap dgtag_ll).
-+ proc (   (!Game1.r \in dom G.m){2}
-        /\ eq_except G.m{1} G.m{2} (pred1 Game1.r{2})
-        /\ ={sk, c'}(Game0,Game1))=> //=.
++ move=> _; conseq (G_o_ll dgtag_ll) (: Game1.r \in dom G.m ==> Game1.r \in dom G.m)=> //=.
+  by proc; auto=> />; smt(dom_set in_fsetU).
++ by proc *; call (: true).
 + move=> _ _; exact/H_o_ll.
-+ by move=> _; proc (Game1.r \in dom G.m).
++ by move=> />; conseq H_o_ll (: true).
 wp; call (: Game1.r \in dom G.m, true); inline G.o; wp.
 rnd (fun x=> x + pad (if b then m0 else m1){2})
     (fun x=> x - pad (if b then m0 else m1){2}).
