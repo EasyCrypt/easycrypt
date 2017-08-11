@@ -6,9 +6,9 @@
  * -------------------------------------------------------------------- *)
 
 (*
- * This file contains a formalization of (disrete) distributions
+ * This file contains a formalization of (discrete) distributions
  *
- * [mu1 d x]      : probability of the value [x] in the distribution [d].
+ * [mu1 d x]       : probability of the value [x] in the distribution [d].
  * [mu d E]        : probability of the event [E] in the distribution [d].
  * [x \in d]       : [x] is in the support of [d].
  * [x \notin d]    : [x] isn't in the support of [d].
