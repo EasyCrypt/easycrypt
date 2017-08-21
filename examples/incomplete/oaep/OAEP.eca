@@ -546,25 +546,25 @@ local module Game1_1 (A : CCA_ADV) = {
       var p <- None;
 
       (s,t) <- fi sk c;
+      g     <$ dgtag;
       if (s \in dom H.m) {
-        r <- H.o(s);
+        r <@ H.o(s);
         r <- r + t;
         if (r \in dom G.m) {
           g <- oget G.m.[r];
           p <- unpad (g + s);
         } else {
-          g   <@ G.o(r);
-          p   <- unpad (g + s);
-          bad <- bad \/ p <> None;
-          p   <- None;
+          G.m.[r] <- g;
+          bad <- bad \/ unpad (g + s) <> None;
         }
       } else {
-        r    <- H.o(s);
+        r    <@ H.o(s);
         r    <- r + t;
-        g    <- G.o(r);
-        p    <- unpad (g + s);
-        bad' <- bad' \/ p <> None;
-        p    <- None;
+        bad' <- bad' \/ r \in dom G.m;
+        if (!r \in dom G.m) {
+          G.m.[r] <- g;
+          bad     <- bad \/ unpad (g + s) <> None;
+        }
       }
       return p;
     }
@@ -612,31 +612,35 @@ call (: Game1_1.bad \/ Game1_1.bad',
 + exact/A_guess_ll.
 + proc; sp; if=> //=; inline OAEP(H,G).dec Game1_1(A).S.dec.
   sp; case: ((s \in dom H.m){2}).
-  + rcondt{2} 1=> //=.
+  + rcondt{2} 2; first by auto.
+    swap{2} 1 2.
     seq  2  2: (   !Game1_1.bad{2}
                 /\ !Game1_1.bad'{2}
                 /\ ={glob G, glob H, s, t, p, r}
                 /\ ={sk, c'}(Game1,Game1_1)
-                /\ p0{2} = p{2}).
+                /\ p0{2} = p{2}
+                /\ p{2} = None).
     + by inline *; auto=> /> &1 &2 <- [#] 2!-> /#.
     case: ((r \in dom G.m){2}).
-    + rcondt{2} 1=> //=.
+    + rcondt{2} 2; first by auto.
       inline G.o; rcondf{1} 3; first by auto.
-      by auto=> />; rewrite dgtag_ll.
-    rcondf{2} 1=> //=; inline *; auto=> /> &2 not_bad not_bad' r_notin_mG g _.
-    by rewrite not_bad not_bad'.
-  rcondf{2} 1=> //=; inline *; auto=> /> &1 &2 <- [#] ->> ->> /> /negb_or [] -> -> _ _ h _ g _.
-  by rewrite !getP_eq.
+      by auto.
+    rcondf{2} 2; first by auto.
+    inline G.o; rcondt{1} 3; first by auto.
+    auto=> /> &2 not_bad not_bad' r_notin_mG g _.
+    by rewrite not_bad not_bad' getP_eq.
+  rcondf{2} 2; first by auto.
+  swap{2} 1 2.
+  inline *; auto=> /> &1 &2 <- [#] ->> ->> /> /negb_or [] -> -> _ _ h _ g _.
+  by rewrite !getP_eq=> ->.
 + by move=> _ _; proc; sp; if=> //=; call (OAEP_dec_ll H G (H_o_ll dhtag_ll) (G_o_ll dgtag_ll)).
 + move=> />; conseq (: true) (: Game1_1.bad \/ Game1_1.bad')=> //=.
-  + proc; inline *; sp; if=> //=; sp; if=> //=.
-    + seq 5: (Game1_1.bad \/ Game1_1.bad'); first by auto.
-      by if=> //=; auto=> /#.
-    by auto=> /#.
-  proc; inline *; sp; if=> //=; sp; if=> //=.
-  + seq 5: true=> //=; first by auto; rewrite dhtag_ll.
-    by if=> //=; auto; rewrite dgtag_ll.
-  by auto; rewrite dgtag_ll dhtag_ll.
+  + proc; inline *; sp; if=> //=.
+    + seq 4: (Game1_1.bad \/ Game1_1.bad'); first by auto.
+      by if=> //=; wp; auto=> /> &hr [|] ->.
+  proc; inline *; sp; if=> //=.
+  + seq 4: true=> //=; first by auto; rewrite dgtag_ll.
+  by if=> //=; auto; rewrite dhtag_ll.
 + by proc; inline *; auto.
 + by move=> _ _; exact/(G_o_ll dgtag_ll).
 + by move=> />; conseq (G_o_ll dgtag_ll).
@@ -650,30 +654,32 @@ call (: Game1_1.bad \/ Game1_1.bad',
 + exact/A_choose_ll.
 + proc; inline OAEP(H,G).dec Game1_1(A).S.dec.
   sp; case: ((s \in dom H.m){2}).
-  + rcondt{2} 1=> //=.
+  + rcondt{2} 2; first by auto.
+    swap{2} 1 2.
     seq  2  2: (   !Game1_1.bad{2}
                 /\ !Game1_1.bad'{2}
                 /\ ={glob G, glob H, s, t, r}
-                /\ ={sk}(Game1,Game1_1)).
+                /\ ={sk}(Game1,Game1_1)
+                /\ p{2} = None).
     + by inline *; auto=> /> &1 &2 <- [#] 2!-> /#.
     case: ((r \in dom G.m){2}).
-    + rcondt{2} 1=> //=.
+    + rcondt{2} 2; first by auto.
       inline G.o; rcondf{1} 3; first by auto.
       by auto=> />; rewrite dgtag_ll.
-    rcondf{2} 1=> //=; inline *; auto=> /> &2 not_bad not_bad' r_notin_mG g _.
-    by rewrite not_bad not_bad'.
-  rcondf{2} 1=> //=; inline *; auto=> /> &1 &2 <- [#] ->> ->> /> /negb_or [#] -> -> _ h _ g _.
-  by rewrite getP_eq.
+    rcondf{2} 2; first by auto.
+    inline *; auto=> /> &2 not_bad not_bad' r_notin_mG g _.
+    by rewrite not_bad not_bad' getP_eq.
+  rcondf{2} 2; first by auto.
+  swap{2} 1 2.
+  inline *; auto=> /> &1 &2 <- [#] ->> ->> /> /negb_or [#] -> -> _ h _ g _.
+  by rewrite !getP_eq=> ->.
 + by move=> _ _; proc; call (OAEP_dec_ll H G (H_o_ll dhtag_ll) (G_o_ll dgtag_ll)); auto.
 + move=> />; conseq (: true) (: Game1_1.bad \/ Game1_1.bad')=> //=.
-  + proc; inline *; sp; if=> //=.
-    + seq 5: (Game1_1.bad \/ Game1_1.bad'); first by auto.
-      by if=> //=; auto=> /#.
-    by auto=> /#.
-  proc; inline *; sp; if=> //=.
-  + seq 5: true=> //=; first by auto; rewrite dhtag_ll.
-    by if=> //=; auto; rewrite dgtag_ll.
-  by auto; rewrite dgtag_ll dhtag_ll.
+  + proc; inline *; seq 3: (Game1_1.bad \/ Game1_1.bad'); first by auto.
+    by if=> //=; auto=> /> &hr [|] ->.
+  proc; inline *.
+  + seq 3: true=> //=; first by auto; rewrite dgtag_ll.
+    by if=> //=; auto; rewrite dhtag_ll.
 + by proc; inline *; auto.
 + by move=> _ _; exact/(G_o_ll dgtag_ll).
 + by move=> _; conseq (G_o_ll dgtag_ll).
@@ -690,9 +696,9 @@ move=> g_in_mHR; split.
 by move=> g_in_mHL b' _; split=> [/upto [#] <*> /=|_] /#.
 qed.  
 
-lemma mu_dgtag_unpad (s : gtag):
-    mu dgtag (fun x=> unpad (x + s) <> None)
-  = mu dgtag (fun x=> unpad x <> None).
+lemma mu_dgtag_xor (P : gtag -> bool) (s : gtag):
+    mu dgtag (fun x=> P (x + s))
+  = mu dgtag P.
 proof.
 rewrite {2}(: dgtag = dmap dgtag (fun x=> x + s)).
 + apply/eq_distr=> x; rewrite dmap1E /(\o).
@@ -702,19 +708,28 @@ rewrite {2}(: dgtag = dmap dgtag (fun x=> x + s)).
 by rewrite dmapE /(\o).
 qed.
 
+lemma mu_dhtag_xor (P : htag -> bool) (t : htag):
+    mu dhtag (fun x=> P (x + t))
+  = mu dhtag P.
+proof.
+rewrite {2}(: dhtag = dmap dhtag (fun x=> x + t)).
++ apply/eq_distr=> x; rewrite dmap1E /(\o).
+  have ->: (fun x0=> x0 + t = x) = pred1 (x - t).
+  + by apply/fun_ext=> x0; smt(@HTag).
+  by apply/dhtag_funi.
+by rewrite dmapE /(\o).
+qed.
+
 local phoare pBad_Game1_1_dec (A <: CCA_ADV):
      [Game1_1(A).S.dec: !Game1_1.bad ==> Game1_1.bad]
   <= (mu dgtag (fun x=> unpad x <> None)).
 proof.
-proc; sp; if=> //=.
-+ seq 2: (!Game1_1.bad) 1%r (mu dgtag (fun x=> unpad x <> None)) 0%r _=> //=.
-  + if=> //=.
-    + by hoare; auto; first by smt(mu_bounded).
-    inline *; wp; rnd (fun x=> unpad (x + s) <> None); auto=> &m [#] -> -> /=; split=> [|_ v _].
-    + by rewrite mu_dgtag_unpad.
-    by rewrite getP_eq oget_some.
-  by hoare=> //=; inline *; auto.
-by inline *; hoare; auto; first by smt(mu_bounded).
+proc.
+seq 3: (unpad (g + s) <> None) (mu dgtag (fun x=> unpad x <> None)) 1%r _ 0%r (!Game1_1.bad)=> //=.
++ by auto.
++ rnd (fun x=> unpad (x + s) <> None); auto.
+  by move=> &hr _; rewrite (@mu_dgtag_xor (fun x=> unpad x <> None)).
+by hoare; if=> //=; inline *; auto=> />.
 qed.
 
 local module DecA (H : AH) (G : AG) (S : APKE) = {
@@ -753,33 +768,111 @@ fel 4 (DecA.qD) (fun x, mu dgtag (fun x=> unpad x <> None)) qD Game1_1.bad []=> 
 + by move=> c; proc; call (: true)=> //=; auto=> /#.
 qed.
 
-local module Game2 = {
-  var sk : skey
-  var r  : htag
-  var c' : gtag * htag
+local phoare pBad'_Game1_1_dec (A <: CCA_ADV):
+     [Game1_1(A).S.dec: !Game1_1.bad' ==> Game1_1.bad']
+  <= (mu dhtag (fun x=> x \in dom G.m)).
+proof.
+exists* (dom G.m); elim*=> S; conseq (: _ : <=(mu dhtag (fun x=> x \in S)))=> //=.
+proc; seq 3: (S = dom G.m /\ !Game1_1.bad') 1%r (mu dhtag (fun x=> x \in S)) 0%r _=> //=.
++ if=> //=.
+  + by hoare; [smt(mu_bounded) | conseq (:true)].
+  seq 1: (r + t \in S) (mu dhtag (fun x=> x + t \in S)) 1%r _ 0%r
+         (!Game1_1.bad' /\ S = dom G.m)=> //=.
+  + by conseq (: true).
+  + inline *; rcondt 3; 1:by auto.
+    wp; rnd (fun x=> x + t \in S); auto=> &m _; split=> [|_ v _] //=.
+    by rewrite !getP_eq.
+  + by hoare; auto=> /> &m -> ->.
+  by move=> &m _; rewrite (@mu_dhtag_xor (fun x=> x \in S)).
+by hoare; auto.
+qed.
 
-  var lG : htag fset
-  var lH : gtag fset
+lemma mu_dhtag_mem (S : htag fset):
+    mu dhtag (mem S)
+  = mu1 dhtag witness * (card S)%r.
+proof.
+elim/fset_ind: S.
++ by rewrite fcards0 /= -(@mu_eq _ pred0) 2:mu0=> // x; rewrite in_fset0.
+move=> h S h_notin_S ih; rewrite fcardU fcard1.
+have->: S `&` fset1 h = fset0.
++ by apply/fsetP=> x; rewrite in_fsetI in_fset1 in_fset0; case: (x = h).
+rewrite fcards0 /= -(@mu_eq _ (predU (mem S) (pred1 h))).
++ by move=> x; rewrite in_fsetU in_fset1.
+rewrite mu_or.
+have ->: predI (mem S) (pred1 h) = pred0.
++ apply/fun_ext=> x; rewrite /predI /pred1 /pred0; case: (x = h)=> />.
+  + by rewrite h_notin_S.
+by rewrite mu0 /= ih (@dhtag_funi h witness) /#.
+qed.
+
+local module DecGA (H : AH) (G : AG) (S : APKE) = {
+  var qD : int
+  var qG : int
 
   module G' = {
     proc o(x : htag) = {
-      var r;
+      var g;
 
-      lG <- lG `|` fset1 x;
-      r  <@ G.o(x);
-      return r;
+      qG <- qG + 1;
+      g  <@ G.o(x);
+      return g;
     }
   }
 
-  module H' = {
-    proc o(x : gtag) = {
-      var r;
+  module S' = {
+    proc dec(c : gtag * htag) = {
+      var p;
 
-      lH <- lH `|` fset1 x;
-      r  <@ H.o(x);
-      return r;
+      qD <- qD + 1;
+      p  <@ S.dec(c);
+      return p;
     }
   }
+
+  proc choose = A(H,G',S').choose
+  proc guess  = A(H,G',S').guess
+}.
+
+(** FIXME: This is not completely good because of limitations of fel, but gives confidence that a final version would go through, and gives hints as to useful features for fel to have
+    e.g.: if !P is stable by the oracles (i.e. {!P} o {!P} for all oracles) and P is in the event, then P is a 'free' precondition to all oracle-based proof obligations **)
+local lemma prBad'_Game1_1 qD qG &m:
+     DecGA.qG{m} = 0
+  => DecGA.qD{m} = 0
+  => 0 < qD
+  => 0 < qG
+  =>    Pr[Game1_1(DecGA).main() @ &m: Game1_1.bad' /\ DecGA.qD <= qD /\ card (dom G.m) <= qD + qG]
+     <= qD%r * (qD + qG)%r * mu1 dhtag witness.
+proof.
+move=> DecGA_qG0 DecGA_gD0 gt0_qD gt0_qG.
+fel 4 (DecGA.qD) (fun x, (qD + qG)%r * mu1 dhtag witness) qD Game1_1.bad' [DecGA(H, G, Game1_1(DecGA).S).S'.dec: (card (dom G.m) <= qD + qG); DecGA(H, G, Game1_1(DecGA).Sg).S'.dec: (card (dom G.m) <= qD + qG)]=> //=.
++ rewrite StdBigop.Bigreal.BRA.big_const count_predT size_range /max gt0_qD /=.
+  rewrite -StdRing.RField.mulrA (@StdRing.RField.mulrC qD%r).
+  rewrite -StdRing.RField.intmulr /intmul -StdRing.RField.AddMonoid.iteropE.
+  by have ->: !qD < 0 by smt().
++ by inline *; auto=> />; rewrite dom0 fcards0.
++ conseq (: _ : <= (mu dhtag (mem (dom G.m)))).
+  + move=> &hr [#] _ _ _; rewrite mu_dhtag_mem StdRing.RField.mulrC -le_fromint.
+    by move: gt0_qG gt0_qD; rewrite -!lt_fromint; smt.
+  by proc; call (pBad'_Game1_1_dec DecGA); auto.
++ by move=> c; proc; call (: true)=> //=; auto=> /#.
++ admit. (* at the moment, bad can still be set after more than (qD+qG) entries in the ROM... EXCEPT for the fact that the lemma explicitly limits the number of entries to (qD+qG) *)
++ conseq (: _ : <= (mu dhtag (mem (dom G.m)))).
+  + move=> &hr [#] _ _ _; rewrite mu_dhtag_mem StdRing.RField.mulrC -le_fromint.
+    by move: gt0_qG gt0_qD; rewrite -!lt_fromint; smt.
+  proc; inline Game1_1(DecGA).Sg.dec.
+  case: (c <> Game1_1.c').
+  + rcondt 4; first by auto.
+    by wp; call (pBad'_Game1_1_dec DecGA); auto.
+  hoare; first by smt(mu_bounded).
+  by rcondf 4; auto.
++ by move=> c; proc; call (: true)=> //=; auto=> /#.
+admit. (* at the moment, bad can still be set after more than (qD+qG) entries in the ROM... EXCEPT for the fact that the lemma explicitly limits the number of entries to (qD+qG) *)
+qed.
+
+local module Game2 (A : CCA_ADV) = {
+  var sk : skey
+  var r  : htag
+  var c' : gtag * htag
 
   module S = {
     proc dec(c : gtag * htag) = {
@@ -787,20 +880,21 @@ local module Game2 = {
       var p <- None;
 
       (s,t) <- fi sk c;
-      if (s \in lH) {
-        r <- H.o(s);
+      g     <$ dgtag;
+      if (s \in dom H.m) {
+        r <@ H.o(s);
         r <- r + t;
-        if (r \in lG) {
+        if (r \in dom G.m) {
           g <- oget G.m.[r];
-          p <- unpad (s + g);
+          p <- unpad (g + s);
         } else {
-                 G.o(r);
+          G.m.[r] <- g;
         }
       } else {
-        r <- H.o(s);
-        r <- r + t;
-        if (!r \in lG) {
-               G.o(r);
+        r    <@ H.o(s);
+        r    <- r + t;
+        if (!r \in dom G.m) {
+          G.m.[r] <- g;
         }
       }
       return p;
@@ -821,8 +915,6 @@ local module Game2 = {
   proc main() = {
     var pk, m0, m1, b, b', s, t;
 
-    lG      <- fset0;
-    lH      <- fset0;
                G.init();
                H.init();
 
@@ -839,6 +931,8 @@ local module Game2 = {
   }
 }.
 
-
-
+local equiv eq1_1__2: Game1_1(A).main ~ Game2(A).main:
+  ={glob A} ==> ={res}.
+proof. by sim. qed.
+  
 end section.
