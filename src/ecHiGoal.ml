@@ -544,7 +544,7 @@ let process_delta ?target (s, o, p) tc =
         | EcDecl.OB_pred (Some (EcDecl.PR_Plain f)) ->
             (snd p, op.EcDecl.op_tparams, f, args)
         | _ ->
-            tc_error !!tc "the operator cannot be unfold"
+            tc_error !!tc "the operator cannot be unfolded"
     end
 
     | SFlocal x when LDecl.can_unfold x hyps ->
