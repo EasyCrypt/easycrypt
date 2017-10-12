@@ -1014,6 +1014,29 @@ lemma count_rem ['a] (p : 'a -> bool) (s : 'a list) x : x \in s =>
   count p s = b2i (p x) + count p (rem x s).
 proof. by move/perm_to_rem/perm_eqP/(_ p)=> ->. qed.
 
+lemma count_gt0 ['a] (p : 'a -> bool) s :
+  0 < count p s => exists x,
+    perm_eq s (x :: rem x s) /\ p x /\ count p (rem x s) = count p s - 1.
+proof.
+rewrite -has_count => /hasP[x [x_in_s px]]; exists x; do! split => //.
++ by apply/perm_to_rem.
++ by move/perm_eqP: (perm_to_rem _ _ x_in_s) => -> /#.
+qed.
+
+lemma count_eq1 ['a] (p : 'a -> bool) s :
+  count p s = 1 => exists x,
+    x \in s /\ p x /\ forall y, y \in s => y <> x => !p y.
+proof.
+move=> h; have /count_gt0 [c] |>: 0 < count p s by smt().
+move=> eqs pc hc; exists c; do! split=> //.
++ by move/perm_eq_mem: eqs => ->.
+move=> c' c'_in_s ne; move: hc; rewrite h /=.
+move/count_eq0; apply contra => pc'; apply/hasP.
+exists c'; rewrite pc' /=; have: c' \in c :: rem c s.
++ by move/perm_eq_mem: eqs => <-.
++ by rewrite /= ne.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                        Element insertion                             *)
 (* -------------------------------------------------------------------- *)
