@@ -994,6 +994,23 @@ hint rewrite invr_lte1 : invr_le1 invr_lt1.
 hint rewrite invr_cp1  : invr_le1 invr_lt1.
 
 (* -------------------------------------------------------------------- *)
+lemma ge0_exp n x : zeror <= x => zeror <= exp x n.
+proof.
+move=> ge0_x; elim/intwlog: n.
++ by move=> n; rewrite exprN invr_ge0.
++ by rewrite expr0 ler01.
++ by move=> n ge0_n ge0_e; rewrite exprS // mulr_ge0.
+qed.
+
+lemma ler_pexp n x y :
+  0 <= n => zeror <= x <= y => exp x n <= exp y n.
+proof.
+move=> h; elim/intind: n h x y => [|n ge0_n ih] x y [ge0_x le_xy].
++ by rewrite !expr0.
++ by rewrite !exprS // ler_pmul // ?ge0_exp ?ih.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt ler_norm_sub (x y : t):
   `|x - y| <= `|x| + `|y|.
 proof. by rewrite -(@normrN y) ler_norm_add. qed.
