@@ -460,6 +460,10 @@ proof. by []. qed.
 lemma has_count p (s : 'a list): has p s <=> (0 < count p s).
 proof. by elim: s => //= x s -> /=; case: (p x); smt. qed.
 
+lemma count_eq0 ['a] (p : 'a -> bool) s :
+  !(has p s) <=> count p s = 0.
+proof. by rewrite has_count ltzNge /= lez_eqVlt ltzNge count_ge0. qed.
+
 lemma has_pred0 (s : 'a list): has pred0 s <=> false.
 proof. by rewrite has_count count_pred0. qed.
 
@@ -1005,6 +1009,10 @@ qed.
 
 lemma all_rem p (x : 'a) (s : 'a list): all p s => all p (rem x s).
 proof. by move=> /allP h; apply/allP=> y /mem_rem /h. qed.
+
+lemma count_rem ['a] (p : 'a -> bool) (s : 'a list) x : x \in s =>
+  count p s = b2i (p x) + count p (rem x s).
+proof. by move/perm_to_rem/perm_eqP/(_ p)=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                        Element insertion                             *)
@@ -2150,6 +2158,14 @@ lemma filter_subseq a (s : 'a list) : subseq (filter a s) s.
 proof.
 elim: s => //= y s ih; case: (a y)=> //= Nay.
 by apply/(subseq_trans s)/subseq_cons/ih.
+qed.
+
+lemma count_subseq ['a] (p : 'a -> bool) s1 s2 : subseq s1 s2 =>
+  count p s1 <= count p s2.
+proof.
+elim: s2 s1 => [|y s2 ih] [|x s1] //=.
++ by rewrite addz_ge0 ?(count_ge0, b2i_ge0).
++ by case: (y = x) => [-> /ih|? /ih] /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
