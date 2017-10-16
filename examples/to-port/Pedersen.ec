@@ -151,17 +151,27 @@ section PedersenSecurity.
     byequiv.
     proc; inline*.
     auto; call (_: true); wp.
-    rnd; skip.
-    progress.
-    pose c := result_R.`1.
-    pose m := result_R.`2.
-    pose d := result_R.`3.
-    pose m':= result_R.`4.
-    pose d':= result_R.`5.
-    pose x := x0L.
+    rnd; skip; simplify; progress.
+
     (* Here the proof needs a hand... *)
-    have hand : (c = g ^ d * g ^ x ^ m /\ c = g ^ d' * g ^ x ^ m' /\ m <> m') =>
-                    (d - d' + x*m = x*m') by smt.
+    move: H1 H2 H3.
+    pose c := result_R.`1;
+    pose m := result_R.`2;
+    pose d := result_R.`3;
+    pose m':= result_R.`4;
+    pose d':= result_R.`5;
+    pose x := x0L.
+    have ->: (g^d  * g^x^m  = g^(d  + x*m )) by smt.
+    have ->: (g^d' * g^x^m' = g^(d' + x*m')) by smt.
+    move => *.
+
+    (* Manual steps *)
+    have ->: ((d - d') * inv (m' - m) = x) <=> (d + -d' = x*(m' + -m)) by progress; smt.
+    have <- : (x*m' + x*(-m) = x*(m' + -m)) by apply (mulfDl x m' (-m)).
+    have -> : (x*(-m) = - x*m) by apply (mulfN m x).
+    have -> : ((d + -d' = x * m' + - x * m) <=> (d + -d' + x*m = x*m')) by progress; smt.
+    have -> : ((d + -d' + x*m = x*m') <=> (d + d' + -d' + x*m = d' + x*m')) by smt.
+    have -> : (d + d' + -d' + x*m = d + x*m) by progress; smt.
     smt.
     trivial.
     trivial.
