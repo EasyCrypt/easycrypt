@@ -12,7 +12,7 @@ linux:
 	scripts/build-linux.sh
 
 linux-on-macos:
-	docker run -t -i -v "$$PWD:/home/ci/package" easycryptpa/ec-build-box \
+	docker run -t -i -e "ECBRANCH=$$ECBRANCH" -v "$$PWD:/home/ci/package" easycryptpa/ec-build-box \
 	  sh -c '( set -ex; cp -a package package.dev && make -C package.dev linux && cp -a package.dev/_build-linux package )'
 
 macos:
