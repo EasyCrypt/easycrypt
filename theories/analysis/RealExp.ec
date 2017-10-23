@@ -250,7 +250,6 @@ abbrev sqrt (x : real) = x ^ (inv 2%r).
 lemma sqrtE x : sqrt x = if x <= 0%r then 0%r else exp (ln x / 2%r).
 proof. by rewrite /(^); case: (_ <= 0%r) => //=; rewrite invr_eq0. qed.
 
-
 lemma ge0_sqrt x : 0%r <= sqrt x.
 proof.
 by rewrite sqrtE -rpoweE; case: (_ <= 0%r) => //=; apply/rpow_ge0.
@@ -259,4 +258,31 @@ qed.
 lemma ge1_sqrt x: 1%r <= x => 1%r <= sqrt x.
 proof.
 by move=> ge1_x; rewrite -{1}(rpow1r (1%r/2%r)) rpow_hmono /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op D2 (a b c : real) = exp b 2 - 4%r * a * c.
+
+lemma poly2_canon (a b c : real) (x : real) : a <> 0%r =>
+  let A = -b / (2%r * a) in
+  let B = - (D2 a b c / (4%r * a)) in
+  a * exp x 2 + b * x + c = a * exp (x - A) 2 + B.
+proof.
+move=> nz_a AE BE; rewrite /AE /BE /D2 -!powrE #field;
+  by rewrite ?mulf_eq0 nz_a.
+qed.
+
+lemma poly2_solve (a b c : real) (x : real) :
+     a <> 0%r => 0%r <= D2 a b c
+  => (   a * exp x 2 + b * x + c = 0%r
+     <=> exists z, exp z 2 = D2 a b c /\ x = (-b + z) / (2%r * a)).
+proof.
+move=> nz_a ge0_D2; split; last first.
++ case=> z []; rewrite -!powrE => z2E ->; rewrite #field ?mulf_eq0 //.
+  by rewrite z2E /D2 -!powrE #ring.
+have /= -> := poly2_canon a b c x nz_a; rewrite subr_eq0.
+rewrite -(mulr1 (D2 a b c / (4%r * a))) (mulrC a) -eqf_div // divr1.
+move=> h; exists ((x + b / (2%r * a)) * (2%r * a)); split.
++ by rewrite expfM h -!powrE #field ?mulf_eq0.
++ by rewrite #field mulf_eq0.
 qed.
