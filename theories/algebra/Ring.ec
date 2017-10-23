@@ -456,6 +456,20 @@ abstract theory ComRing.
     by rewrite addzAC !exprS ?addz_ge0 // ih mulrA.
   qed.
 
+  lemma expr0n n : 0 <= n => exp zeror n = if n = 0 then oner else zeror.
+  proof.
+  elim: n => [|n ge0_n _]; first by rewrite expr0.
+  by rewrite exprS // mul0r addz1_neq0.
+  qed.
+
+  lemma expr0z z : exp zeror z = if z = 0 then oner else zeror.
+  proof.
+  case: (0 <= z) => [/expr0n // | /ltzNge lt0_z].
+  rewrite -{1}(@oppzK z) exprN; have ->/=: z <> 0 by smt().
+  rewrite invr_eq0 expr0n ?oppz_ge0 1:ltzW //.
+  by have ->/=: -z <> 0 by smt().
+  qed.
+
   lemma sqrrD x y :
     exp (x + y) 2 = exp x 2 + intmul (x * y) 2 + exp y 2.
   proof.

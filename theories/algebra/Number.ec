@@ -1010,6 +1010,12 @@ move=> h; elim/intind: n h x y => [|n ge0_n ih] x y [ge0_x le_xy].
 + by rewrite !exprS // ler_pmul // ?ge0_exp ?ih.
 qed.
 
+lemma ge0_sqr x : zeror <= exp x 2.
+proof.
+rewrite expr2; case: (zeror <= x); first by move=> h; apply/mulr_ge0.
+by rewrite lerNgt /= => /ltrW le0_x; apply/mulr_le0.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt ler_norm_sub (x y : t):
   `|x - y| <= `|x| + `|y|.
