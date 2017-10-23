@@ -153,16 +153,24 @@ abstract theory ZModule.
 
   lemma mulrNz (x : t) (n : int): intmul x (-n) = -(intmul x n).
   proof.
-    case: (n = 0)=> [->|nz_c]; first by rewrite oppz0 mulr0z oppr0.
-    rewrite /intmul oppz_lt0 oppzK ltz_def nz_c lezNgt /=.
-    by case: (n < 0); rewrite ?opprK.
+  case: (n = 0)=> [->|nz_c]; first by rewrite oppz0 mulr0z oppr0.
+  rewrite /intmul oppz_lt0 oppzK ltz_def nz_c lezNgt /=.
+  by case: (n < 0); rewrite ?opprK.
   qed.
 
   lemma mulrS (x : t) (n : int): 0 <= n =>
     intmul x (n+1) = x + intmul x n.
   proof.
-    move=> ge0n; rewrite !intmulpE 1:addz_ge0 //.
-    by rewrite !AddMonoid.iteropE iterS.
+  move=> ge0n; rewrite !intmulpE 1:addz_ge0 //.
+  by rewrite !AddMonoid.iteropE iterS.
+  qed.
+
+  lemma mulNrz x n : intmul (- x) n = - (intmul x n).
+  proof.
+  elim/intwlog: n => [n h| | n ge0_n ih].
+  + by rewrite -(@oppzK n) !(@mulrNz _ (- n)) h.
+  + by rewrite !mulr0z oppr0.
+  + by rewrite !mulrS // ih opprD.
   qed.
 end ZModule.
 
@@ -448,6 +456,19 @@ abstract theory ComRing.
     by rewrite addzAC !exprS ?addz_ge0 // ih mulrA.
   qed.
 
+  lemma sqrrD x y :
+    exp (x + y) 2 = exp x 2 + intmul (x * y) 2 + exp y 2.
+  proof.
+  by rewrite !expr2 mulrDl !mulrDr mulr2z !addrA (@mulrC y x).
+  qed.
+
+  lemma sqrrN x : exp (-x) 2 = exp x 2.
+  proof. by rewrite !expr2 mulrNN. qed.
+
+  lemma sqrrB x y :
+    exp (x - y) 2 = exp x 2 - intmul (x * y) 2 + exp y 2.
+  proof.   by rewrite sqrrD sqrrN mulrN mulNrz. qed.
+
   lemma signr_odd n : 0 <= n => exp (-oner) (b2i (odd n)) = exp (-oner) n.
   proof.
     elim: n => [|n ge0_nih]; first by rewrite odd0 expr0.
@@ -536,6 +557,14 @@ abstract theory Field.
     (have nz_Vy1: invr y1 <> zeror by rewrite invr_eq0);
     (have nz_Vy2: invr y2 <> zeror by rewrite invr_eq0).
   by move/(mulIf _ nz_Vy1)/(mulIf _ nz_Vy2).
+  qed.
+
+  lemma expfM x y n : exp (x * y) n = exp x n * exp y n.
+  proof.
+  elim/intwlog: n => [n h | | n ge0_n ih].
+  + by rewrite -(@oppzK n) !(@exprN _ (-n)) h invfM.
+  + by rewrite !expr0 mulr1.
+  + by rewrite !exprS // mulrCA -!mulrA -ih mulrCA.
   qed.
 end Field.
 
