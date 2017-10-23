@@ -664,7 +664,7 @@ and rwoptions = rwside * trepeat option * rwocc
 and rwside    = [`LtoR | `RtoL]
 and rwocc     = rwocci option
 and rwocci    = [`Inclusive of Sint.t | `Exclusive of Sint.t | `All]
-and rwtactic  = [`Ring]
+and rwtactic  = [`Ring | `Field]
 
 (* -------------------------------------------------------------------- *)
 let norm_rwocci (x : rwocci) =

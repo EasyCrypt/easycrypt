@@ -755,6 +755,9 @@ let rec process_rewrite1_r ttenv ?target ri tc =
   | RWTactic `Ring ->
       process_algebra `Solve `Ring [] tc
 
+  | RWTactic `Field ->
+      process_algebra `Solve `Field [] tc
+
 (* -------------------------------------------------------------------- *)
 let rec process_rewrite1 ttenv ?target ri tc =
   EcCoreGoal.reloc (loc ri) (process_rewrite1_r ttenv ?target ri) tc
