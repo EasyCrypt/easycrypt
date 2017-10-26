@@ -202,7 +202,6 @@ module PVM = struct
         check_binding (fst hs.bhs_m) s;
         EcFol.f_map (fun ty -> ty) aux f
       | Fpr pr ->
-        check_binding EcFol.mhr s;
         check_binding pr.pr_mem s;
         EcFol.f_map (fun ty -> ty) aux f
       | Fquant(q,b,f1) ->
