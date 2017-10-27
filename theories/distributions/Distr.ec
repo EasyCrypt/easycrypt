@@ -240,23 +240,34 @@ proof. by rewrite -(@mu0 d)=> H;apply mu_eq_support => x /H ->. qed.
 axiom mu_or (d : 'a distr) (p q : 'a -> bool):
   mu d (predU p q) = mu d p + mu d q - mu d (predI p q).
 
-axiom mu_disjoint (d : 'a distr) (p q : 'a -> bool):
+lemma mu_and (d : 'a distr) (p q : 'a -> bool) :
+  mu d (predI p q) = mu d p + mu d q - mu d (predU p q).
+proof. by rewrite (@mu_or d p q) #ring. qed.
+
+lemma mu_disjoint (d : 'a distr) (p q : 'a -> bool):
   (predI p q) <= pred0 => mu d (predU p q) = mu d p + mu d q.
+proof.
+move=> h; rewrite mu_or (@mu0_false _ (predI _ _)) //.
+by move=> x _; apply/negP => /h.
+qed.
 
 lemma mu_disjointL (d : 'a distr) (p q : 'a -> bool) :
   (forall x, p x => !q x) => mu d (predU p q) = mu d p + mu d q.
 proof. by move=> h; rewrite mu_disjoint // => x [/h]. qed.
 
-axiom mu_split (d : 'a distr) (p q : 'a -> bool):
+lemma mu_split (d : 'a distr) (p q : 'a -> bool) :
   mu d p = mu d (predI p q) + mu d (predI p (predC q)).
+proof.
+have {1}->: p = predU (predI p q) (predI p (predC q)).
++ by apply/fun_ext=> x /#.
++ by rewrite mu_disjointL 1:/#.
+qed.
 
-axiom mu_not (d : 'a distr) (p : 'a -> bool):
-  mu d (predC p) = mu d predT - mu d p.
+lemma mu_not (d : 'a distr) (p : 'a -> bool):
+  mu d (predC p) = weight d - mu d p.
+proof. by rewrite -(@predCU p) mu_disjointL // #ring. qed.
 
-axiom nosmt mu_and (d : 'a distr) (p q : 'a -> bool):
-  mu d (predI p q) = mu d p + mu d q - mu d (predU p q).
-
-axiom witness_support P (d:'a distr):
+axiom witness_support P (d : 'a distr) :
   0%r < mu d P <=> (exists x, P x /\ x \in d).
 
 lemma mu_and_weight ['a] P Q (d : 'a distr) : (* FIXME: name *)
