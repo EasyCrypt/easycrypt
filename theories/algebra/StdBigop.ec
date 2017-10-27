@@ -135,6 +135,13 @@ proof.
 move=> ge0_n; rewrite -sumr_ofint -sumidE_r //.
 by rewrite fromintM mulrAC divff.
 qed.
+
+lemma sumr_undup ['a] (P : 'a -> bool) (F : 'a -> real) s :
+  BRA.big P F s = BRA.big P (fun a => (count (pred1 a) s)%r * (F a)) (undup s).
+proof.
+rewrite BRA.sumr_undup; apply/BRA.eq_bigr=> x _ /=.
+by rewrite intmulr mulrC.
+qed.
 end Bigreal.
 
 import Bigreal.

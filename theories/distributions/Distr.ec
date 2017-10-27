@@ -75,8 +75,7 @@ axiom distrW (P : 'a distr -> bool):
 axiom muK (m : 'a -> real): isdistr m => mass (mk m) = m.
 axiom mkK (d : 'a distr): mk (mass d) = d.
 
-lemma ge0_mass ['a] (d : 'a distr) (x : 'a):
-  0%r <= mass d x.
+lemma ge0_mass ['a] (d : 'a distr) (x : 'a) : 0%r <= mass d x.
 proof. by elim/distrW: d x => m dm; rewrite muK //; case: dm. qed.
 
 lemma le1_mass ['a] (d : 'a distr) (s : 'a list) :
@@ -94,6 +93,11 @@ qed.
 
 lemma ge0_mu1 (d : 'a distr) x : 0%r <= mu1 d x.
 proof. by rewrite -massE ge0_mass. qed.
+
+lemma le1_mu1 (d : 'a distr) x : mu1 d x <= 1%r.
+proof.
+by have := le1_mass d [x] _ => //; rewrite big_seq1 -massE.
+qed.
 
 lemma summable_mass ['a] (d : 'a distr) : summable (mass d).
 proof.
@@ -202,6 +206,12 @@ proof. by move=> H ????;apply H. qed.
 (* -------------------------------------------------------------------- *)
 axiom mu_bounded (d:'a distr) (p:'a -> bool) : 0%r <= mu d p <= 1%r.
 
+lemma ge0_mu (d : 'a distr) p : 0%r <= mu d p.
+proof. by case: (mu_bounded d p). qed.
+
+lemma le1_mu (d : 'a distr) p : mu d p <= 1%r.
+proof. by case: (mu_bounded d p). qed.
+
 axiom mu_le (d:'a distr) (p q:'a -> bool):
   (forall x, x \in d => p x => q x) =>
   mu d p <= mu d q.
@@ -220,136 +230,100 @@ lemma mu_eq_support : forall (d : 'a distr) (p q : 'a -> bool),
   (forall (x : 'a), x \in d => p x = q x) => mu d p = mu d q.
 proof. smt (mu_le). qed.
 
-lemma mu0 (d:'a distr): mu d pred0 = 0%r.
+lemma mu0 (d : 'a distr) : mu d pred0 = 0%r.
 proof. by rewrite muE /pred0 /= sum0. qed.
 
-lemma mu0_false ['a] (d:'a distr) (p:'a -> bool) : 
+lemma mu0_false ['a] (d : 'a distr) (p : 'a -> bool) :
   (forall x, x \in d => !p x) => mu d p = 0%r.
 proof. by rewrite -(@mu0 d)=> H;apply mu_eq_support => x /H ->. qed.
 
-axiom mu_disjoint (d:'a distr) (p q:('a -> bool)):
-  (predI p q) <= pred0 =>
-  mu d (predU p q) = mu d p + mu d q.
-
-axiom mu_split (d:'a distr) (p q:('a -> bool)):
-  mu d p = mu d (predI p q) + mu d (predI p (predC q)).
-
-axiom mu_not (d:'a distr) (p:('a -> bool)):
-  mu d (predC p) = mu d predT - mu d p.
-
-axiom mu_or (d:'a distr) (p q:('a -> bool)):
+axiom mu_or (d : 'a distr) (p q : 'a -> bool):
   mu d (predU p q) = mu d p + mu d q - mu d (predI p q).
 
-axiom nosmt mu_and  (d:'a distr) (p q:'a -> bool):
+axiom mu_disjoint (d : 'a distr) (p q : 'a -> bool):
+  (predI p q) <= pred0 => mu d (predU p q) = mu d p + mu d q.
+
+lemma mu_disjointL (d : 'a distr) (p q : 'a -> bool) :
+  (forall x, p x => !q x) => mu d (predU p q) = mu d p + mu d q.
+proof. by move=> h; rewrite mu_disjoint // => x [/h]. qed.
+
+axiom mu_split (d : 'a distr) (p q : 'a -> bool):
+  mu d p = mu d (predI p q) + mu d (predI p (predC q)).
+
+axiom mu_not (d : 'a distr) (p : 'a -> bool):
+  mu d (predC p) = mu d predT - mu d p.
+
+axiom nosmt mu_and (d : 'a distr) (p q : 'a -> bool):
   mu d (predI p q) = mu d p + mu d q - mu d (predU p q).
 
 axiom witness_support P (d:'a distr):
   0%r < mu d P <=> (exists x, P x /\ x \in d).
 
-lemma mu_and_weight ['a] Q (d:'a distr) P :
+lemma mu_and_weight ['a] P Q (d : 'a distr) : (* FIXME: name *)
   mu d P = weight d => mu d (predI P Q) = mu d Q.
 proof.
-  move=> Hw;rewrite mu_and.
-  have -> /# : mu d (predU P Q) = mu d P.
-  have ? : mu d (predU P Q) <= mu d P.
-  + by rewrite Hw;apply mu_le.
-  have /# : mu d P <= mu d (predU P Q).
-  by apply mu_le => ? _ ?;left.
+move=> h; rewrite mu_and; suff ->: mu d (predU P Q) = mu d P by smt().
+by rewrite eqr_le {1}h !mu_le // => x _ Px; left.
 qed.
 
-lemma mu_in_weight ['a] P (d:'a distr) x : 
+lemma mu_in_weight ['a] P (d : 'a distr) x : 
   mu d P = weight d => x \in d => P x.
 proof.
-  by rewrite /support => /(mu_and_weight (pred1 x)) <- /witness_support [y [] []] ? <-. 
+move/(mu_and_weight _ (pred1 x)) => @/support <-.
+by case/witness_support=> y /> Py <-.
 qed.
 
 (* -------------------------------------------------------------------- *)
-
-lemma mu_mem_uniq ['a] (dt : 'a distr) (l:'a list) : 
-  uniq l => mu dt (mem l) = BRA.big predT (mu1 dt) l.
+lemma mu_mem_uniq ['a] (d : 'a distr) (s : 'a list) : 
+  uniq s => mu d (mem s) = BRA.big predT (mu1 d) s.
 proof.
-  elim: l => [_ | x l Hrec [Hx Hu] /=];1: by rewrite BRA.big_nil mu0.
-  have -> : mu dt (mem (x :: l)) = mu dt (predU (pred1 x) (mem l)).
-  + by apply mu_eq.
-  rewrite mu_or BRA.big_cons {1}/predT /= -Hrec //.  
-  have -> // : mu dt (predI (pred1 x) (mem l)) = 0%r.
-  apply mu0_false => /#.
+elim: s => [_|x s ih [xs uq_s]]; first by rewrite big_nil mu0.
+rewrite big_cons {1}/predT /= -ih // -mu_disjointL => [y ->//|].
+by apply/mu_eq=> y.
 qed.
 
-lemma big_undup_iterop_count ['a] (P: 'a -> bool) (F:'a -> real) (l:'a list): 
-  BRA.big P F l = BRA.big P (fun a => (count (pred1 a) l)%r * F a) (undup l).
+lemma mu_mem ['a] (d : 'a distr) (s : 'a list) :
+  mu d (mem s) = BRA.big predT (mu1 d) (undup s).
 proof.
-  have <- := BRA.eq_big_perm P F _ _ (perm_undup_count l).
-  rewrite BRA.big_flatten BRA.big_map (@BRA.big_mkcond P);apply BRA.eq_big => //=.
-  rewrite /(\o) => i _;case: (P i) => HP.
-  + have -> : BRA.big P F (nseq (count (pred1 i) l) i) = 
-              BRA.big P (fun _ => F i) (nseq (count (pred1 i) l) i).
-    + by apply BRA.congr_big_seq=> // x;rewrite mem_nseq.
-    rewrite Bigreal.sumr_const;congr. 
-    rewrite all_count_in ?all_nseq ?HP // size_nseq;smt (count_ge0).
-  by apply BRA.big1_seq => i';rewrite mem_nseq => [#?? <<-].
+rewrite -mu_mem_uniq ?undup_uniq; apply/mu_eq.
+by move=> x; rewrite mem_undup.
 qed.
 
-lemma mu_mem ['a] (dt : 'a distr) (l:'a list) : mu dt (mem l) = BRA.big predT (mu1 dt) (undup l).
+lemma mu_mem_le ['a] (d : 'a distr) (s : 'a list) :
+  mu d (mem s) <= BRA.big predT (mu1 d) s.
 proof.
-  have -> : mu dt (mem l) = mu dt (mem (undup l)).
-  + by apply mu_eq => x;rewrite mem_undup.
-  by rewrite mu_mem_uniq // undup_uniq.
+rewrite sumr_undup mu_mem; apply/ler_sum_seq => //= x.
+rewrite mem_undup => x_in_s _; rewrite intmulr.
+apply/ler_pemulr; first by apply/ge0_mu1.
+by rewrite le_fromint -(@ltzE 0) -has_count has_pred1.
 qed.
 
-lemma mu_mem_le ['a] (dt : 'a distr) (l:'a list) : mu dt (mem l) <= BRA.big predT (mu1 dt) l.
+lemma mu_mem_le_mu1 ['a] (d : 'a distr) (s : 'a list) r :
+  (forall x, mu1 d x <= r) => mu d (mem s) <= (size s)%r * r.
 proof.
-  rewrite big_undup_iterop_count (@mu_mem dt l);apply ler_sum_seq => //= a.
-  rewrite mem_undup -has_pred1 has_count => H _. 
-  have /le_fromint Hc : 1 <= count (pred1 a) l by smt ().
-  by apply ler_pemull;smt (mu_bounded). 
-qed.
-
-lemma mu_mem_le_mu1 ['a] (dt : 'a distr) (l:'a list) r: 
-  (forall x, mu1 dt x <= r) =>
-  mu dt (mem l) <= (size l)%r * r.
-proof.
-  move=> Hmu1; have H := mu_mem_le dt l; apply (ler_trans _ H).
-  apply (ler_trans (big predT (fun (x : 'a) => r) l)).
-  + by apply ler_sum_seq => /= ???;apply Hmu1.
-  by rewrite BRA.sumr_const StdRing.RField.intmulr count_predT mulrC. 
+move=> le; apply/(ler_trans (big predT (fun (x : 'a) => r) s)).
++ by have := mu_mem_le d s => /ler_trans; apply; apply/ler_sum.
+by rewrite Bigreal.sumr_const count_predT.
 qed.
 
 (* -------------------------------------------------------------------- *)
-
-lemma uniform_finite ['a] (dt : 'a distr) : is_uniform dt => is_finite (support dt).
+lemma uniform_finite ['a] (d : 'a distr) :
+  is_uniform d => is_finite (support d).
 proof.
-  move=> dt_uni;case: (is_finite (support dt)) => //.
-  rewrite /is_finite negb_exists => H.
-  have H1: forall n, 0 <= n => exists l, uniq l /\ size l = n /\ forall x, x \in l => x \in dt.
-  + move=> n;elim /intind : n;1: by exists [].
-    move=> n le0n [l [#uniql sizel Hin]].
-    have := H l; rewrite /= uniql /= negb_forall /= => H1.
-    have {H1} [a [anin ain]]: exists a, !a \in l /\ a \in dt by smt().
-    exists (a::l). rewrite cons_uniq anin uniql /= addzC sizel /= /#. 
-  have [x xin]: exists x, x \in dt. 
-  + have [ [] // x ? [#] _ _ _ /(_ x) Hin]:= H1 1 _ => //;exists x;apply Hin.
-  pose r := mu1 dt x.
-  have [n [H0n Hn]]: exists n, 0 < n /\ 0%r < 1%r/n%r <= r.
-  + have lec : inv r <= (ceil (inv r))%r by case : (ceil_bound (inv r)).    
-    have ltr : 0%r < (ceil (inv r))%r.
-    + by apply (ltr_le_trans (inv r)) => //; rewrite invr_gt0 xin.
-    exists (ceil (inv r));split; 1:by rewrite -lt_fromint /#.
-    split; 1: by apply divr_gt0 => // /#.
-    by move=> _;apply ler_pdivr_mulr => // /#.
-  have [l [# Ul Sl Inl]]:= H1 n _; 1: by apply ltzW.
-  have H2 := H l.
-  rewrite /= Ul /= negb_forall /= in H2.
-  have {H1} [a [anin ain]]: exists a, !a \in l /\ a \in dt by smt().
-  have : 1%r < mu dt (mem (a::l)); 2: smt (mu_bounded).
-  rewrite mu_mem_uniq /= 1:anin 1:Ul // BRA.big_cons {1}/predT /=.
-  have -> : BRA.big predT (fun (x0 : 'a) => mu1 dt x0) l = BRA.big predT (fun _ => r) l.
-  + by apply BRA.congr_big_seq => //= z /Inl Hz _ _;apply dt_uni.
-  rewrite Bigreal.sumr_const;have /all_count -> := all_predT l. 
-  apply (ltr_le_trans (mu1 dt a + (size l)%r / n%r)).
-  + rewrite Sl StdRing.RField.mulfV;[smt (lt_fromint) | smt (mu_bounded)].
-  apply ler_add => //;apply ler_wpmul2l;2:smt().
-  by rewrite le_fromint size_ge0.
+move=> uf_d; case: (is_finite (support d)) => //.
+(* FIXME: not having the explicit proof arg leads to InvalidGoalShape *)
+move=> ^h /(NfiniteP 1 _ lez01) [] [//|x s [_] xsd].
+have {xsd s} xd: x \in d by apply/xsd.
+pose r := 1 + ceil (1%r / mu1 d x).
+have ge0_cr: 0 <= r by smt(ceil_bound).
+case/(NfiniteP _ _ ge0_cr): h => s [[sz_s uq_s] les].
+have := le1_mu d (mem s); rewrite mu_mem_uniq //.
+rewrite big_seq -(@eq_bigr _ (fun _ => mu1 d x)).
++ by move=> y /= /les yd; apply/uf_d.
+rewrite -big_seq Bigreal.sumr_const count_predT negP -ltrNge.
+apply/(@ltr_le_trans (r%r * mu1 d x)); last first.
++ by apply/ler_wpmul2r/le_fromint => //; apply/ge0_mu1.
+by have: 0%r <> mu1 d x; [rewrite ltr_eqF | smt(ceil_bound)].
 qed.
 
 lemma mu1_uni ['a] (dt : 'a distr) x : 
@@ -372,7 +346,7 @@ qed.
 lemma mu1_uni_ll ['a] (dt : 'a distr) x : 
   is_uniform dt => is_lossless dt => 
   mu1 dt x = if x \in dt then 1%r/ (size (to_seq (support dt)))%r else 0%r.
-proof. by move=> dt_uni dt_ll;rewrite mu1_uni // dt_ll. qed.
+proof. by move=> dt_uni dt_ll; rewrite mu1_uni // dt_ll. qed.
 
 (* -------------------------------------------------------------------- *)
 op mnull ['a] = fun (x : 'a) => 0%r.

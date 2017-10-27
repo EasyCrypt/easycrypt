@@ -50,6 +50,14 @@ proof. by rewrite sumrN sumrD; apply/eq_bigr=> /= x. qed.
 lemma nosmt sumr_const (P : 'a -> bool) x s:
   big P (fun i => x) s = intmul x (count P s).
 proof. by rewrite big_const intmulpE 1:count_ge0 // -ZM.AddMonoid.iteropE. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma sumr_undup ['a] (P : 'a -> bool) F s :
+  big P F s = big P (fun a => intmul (F a) (count (pred1 a) s)) (undup s).
+proof.
+rewrite big_undup; apply/eq_bigr=> x _ /=.
+by rewrite intmulpE ?count_ge0 ZM.AddMonoid.iteropE.
+qed.
 end BigZModule.
 
 (* -------------------------------------------------------------------- *)
