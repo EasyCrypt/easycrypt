@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python2
 
 # --------------------------------------------------------------------
 import sys, os, re, time, errno, itertools as it, StringIO as sio
@@ -9,6 +9,7 @@ MODES = dict(
     emacs      = False,
     javascript = False,
     latex      = False,
+    python     = False,
     template   = True )
 
 # --------------------------------------------------------------------
@@ -114,6 +115,14 @@ def _do_latex(keywords, options):
             dict(macro = v.capitalize().replace('_', ''), name = v)
 
     sys.stdout.write(buffer.getvalue())
+
+# --------------------------------------------------------------------
+def _do_python(keywords, options):
+    wd = max(*[len(x) for x in keywords.keys()])
+    print "keywords = dict("
+    for k in sorted(keywords.keys()):
+        print "    %-*s = [%s]," % (wd, k, ', '.join(["'%s'" % x for x in keywords[k]]))
+    print ")"
 
 # --------------------------------------------------------------------
 def process():
