@@ -13,4 +13,6 @@ RUN \
 	  texlive-latex-extra \
 	  texlive-latex-recommended \
 	  texlive-math-extra \
+	  python3 python3-pip \
+	&& pip3 --no-cache-dir install sphinx sphinx-rtd-theme \
 	&& sudo apt-get -q -y clean
