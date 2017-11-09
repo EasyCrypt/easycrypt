@@ -381,6 +381,7 @@ val is_pr        : form -> bool
 val is_eq_or_iff : form -> bool
 
 (* -------------------------------------------------------------------- *)
+val split_fun  : form -> bindings * form
 val split_args : form -> form * form list
 
 (* -------------------------------------------------------------------- *)

@@ -127,29 +127,29 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
 
   let tx =
     match unloc t with
-    | Preflexivity      -> process_reflexivity
-    | Passumption       -> process_assumption
-    | Psmt pi           -> process_smt ~loc:(loc t) ttenv pi
-    | Psplit            -> process_split
-    | Pfield st         -> process_algebra `Solve `Field st
-    | Pring st          -> process_algebra `Solve `Ring  st
-    | Palg_norm         -> EcStrongRing.t_alg_eq
-    | Pexists fs        -> process_exists fs
-    | Pleft             -> process_left
-    | Pright            -> process_right
-    | Pcongr            -> process_congr
-    | Ptrivial          -> process_trivial
-    | Pelim pe          -> process_elim pe
-    | Papply pe         -> process_apply ~implicits:ttenv.tt_implicits pe
-    | Pcut (m, ip, f, t)-> process_cut ~mode:m engine ttenv (ip, f, t)
-    | Pcutdef (ip, f)   -> process_cutdef ttenv (ip, f)
-    | Pmove pr          -> process_move pr.pr_view pr.pr_rev
-    | Pclear l          -> process_clear l
-    | Prewrite (ri, x)  -> process_rewrite ttenv ?target:x ri
-    | Psubst   ri       -> process_subst ri
-    | Psimplify ri      -> process_simplify ri
-    | Pchange pf        -> process_change pf
-    | Ppose (x, o, p)   -> process_pose x o p
+    | Preflexivity        -> process_reflexivity
+    | Passumption         -> process_assumption
+    | Psmt pi             -> process_smt ~loc:(loc t) ttenv pi
+    | Psplit              -> process_split
+    | Pfield st           -> process_algebra `Solve `Field st
+    | Pring st            -> process_algebra `Solve `Ring  st
+    | Palg_norm           -> EcStrongRing.t_alg_eq
+    | Pexists fs          -> process_exists fs
+    | Pleft               -> process_left
+    | Pright              -> process_right
+    | Pcongr              -> process_congr
+    | Ptrivial            -> process_trivial
+    | Pelim pe            -> process_elim pe
+    | Papply pe           -> process_apply ~implicits:ttenv.tt_implicits pe
+    | Pcut (m, ip, f, t)  -> process_cut ~mode:m engine ttenv (ip, f, t)
+    | Pcutdef (ip, f)     -> process_cutdef ttenv (ip, f)
+    | Pmove pr            -> process_move pr.pr_view pr.pr_rev
+    | Pclear l            -> process_clear l
+    | Prewrite (ri, x)    -> process_rewrite ttenv ?target:x ri
+    | Psubst   ri         -> process_subst ri
+    | Psimplify ri        -> process_simplify ri
+    | Pchange pf          -> process_change pf
+    | Ppose (x, xs, o, p) -> process_pose x xs o p
 
     | _ -> assert false
   in

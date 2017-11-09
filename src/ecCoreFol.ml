@@ -1204,6 +1204,12 @@ let split_args f =
   | _ -> (f, [])
 
 (* -------------------------------------------------------------------- *)
+let split_fun f =
+  match f_node f with
+  | Fquant (Llambda, bds, body) -> (bds, body)
+  | _ -> ([], f)
+
+(* -------------------------------------------------------------------- *)
 let quantif_of_equantif (qt : equantif) =
   match qt with
   | `ELambda -> Llambda

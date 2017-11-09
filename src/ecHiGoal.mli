@@ -90,7 +90,7 @@ val process_congr       : backward
 val process_trivial     : backward
 val process_change      : pformula -> backward
 val process_simplify    : preduction -> backward
-val process_pose        : psymbol -> rwocc -> pformula -> backward
+val process_pose        : psymbol -> ptybindings -> rwocc -> pformula -> backward
 val process_done        : backward
 
 (* -------------------------------------------------------------------- *)

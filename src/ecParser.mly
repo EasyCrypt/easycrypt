@@ -2453,8 +2453,8 @@ logtactic:
 | ior_(CUT, HAVE) ip=loc(intro_pattern)* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
 
-| POSE o=rwocc? x=ident CEQ p=form_h %prec prec_below_IMPL
-   { Ppose (x, o, p) }
+| POSE o=rwocc? x=ident xs=ptybindings? CEQ p=form_h %prec prec_below_IMPL
+   { Ppose (x, odfl [] xs, o, p) }
 
 eager_info:
 | h=ident

@@ -1512,14 +1512,18 @@ let process_move ?doeq views pr (tc : tcenv1) =
     tc
 
 (* -------------------------------------------------------------------- *)
-let process_pose xsym o p (tc : tcenv1) =
-  let (hyps, concl) = FApi.tc1_flat tc in
+let process_pose xsym bds o p (tc : tcenv1) =
+  let (env, hyps, concl) = FApi.tc1_eflat tc in
   let o = norm_rwocc o in
 
   let (ptenv, p) =
-    let (ps, ue), p = TTC.tc1_process_pattern tc p in
-    let ev = MEV.of_idents (Mid.keys ps) `Form in
-      (ptenv !!tc hyps (ue, ev), p)
+    let ps  = ref Mid.empty in
+    let ue  = TTC.unienv_of_hyps hyps in
+    let (senv, bds) = EcTyping.trans_binding env ue bds in
+    let p = EcTyping.trans_pattern senv (ps, ue) p in
+    let ev = MEV.of_idents (Mid.keys !ps) `Form in
+    (ptenv !!tc hyps (ue, ev),
+     f_lambda (List.map (snd_map gtty) bds) p)
   in
 
   let dopat =
