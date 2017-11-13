@@ -79,7 +79,7 @@ theory Lazy.
   lemma RO_o_ll:
     (forall x, mu (dsample x) predT = 1%r) =>
     islossless RO.o.
-  proof. by move=> dsampleL; proc; auto; smt. qed.
+  proof. by move=> dsampleL; proc; auto=> />; smt. qed.
 
   equiv RO_init_eq: RO.init ~ RO.init: true ==> ={glob RO}.
   proof. by sim. qed.
@@ -88,7 +88,7 @@ theory Lazy.
   proof. by sim. qed.
 
   hoare dom_RO_o d x': RO.o: x = x' /\ dom RO.m = d ==> dom RO.m = d `|` fset1 x'.
-  proof. by proc; auto; smt. qed.
+  proof. by proc; auto=> />; smt. qed.
 end Lazy.
 
 (* -------------------------------------------------------------------- *)
@@ -133,8 +133,8 @@ theory Eager.
   proof.
     move=> fType; proc.
     while (forall x, FSet.mem work x \/ mem (dom RO.m) x).
-      by auto; smt.
-    by auto; smt.
+      by auto=> />; smt.
+    by auto=> />; smt.
   qed.
 
   lemma RO_init_ll:
@@ -165,7 +165,7 @@ theory Eager.
     hoare [RO.init: true ==> FSet.mem (dom RO.m) x].
   proof.
     move=> fType; proc; while (forall x, !FSet.mem work x => mem (dom RO.m) x);
-      by auto; smt.
+      by auto=> />; smt.
   qed.
 end Eager.
 
@@ -249,7 +249,7 @@ theory LazyEager.
       inline IND_Lazy.resample; while{2} (true) (card work{2}).
         auto=> /> &hr Hw;rewrite dsampleL /= => ??. 
         by rewrite (fcardD1 work{hr} (pick work{hr})) mem_pick //= /#.   
-      by auto; smt.
+      by auto=> />; smt.
     qed.
 
     local module IND_Eager = {
@@ -303,7 +303,7 @@ theory LazyEager.
       seq 1 1: (={x,work} /\
                 IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
                 mem work{1} x{1});
-        first by auto; smt.
+        first by auto=> />; smt.
       case (!mem (dom IND_Lazy.H.m{2}) x{2});
         [rcondt{2} 2; first by auto | rcondf{2} 2; first by auto].
         transitivity{1} {
@@ -342,7 +342,7 @@ theory LazyEager.
           first by rnd.
           swap{2} 5 -4; swap [2..3] -1; case ((x = pick work){1}).
             by wp; rnd{2}; rnd; rnd{1}; wp; skip; smt.
-            by auto; smt.
+            by auto=> />; smt.
           by sim.
 
         wp; while (={x, work} /\
@@ -364,7 +364,7 @@ theory LazyEager.
           rewrite in_fsetD1 dom_set !getP !inE //= eq_sym => -> -> //=.
           rewrite m_x eq_except_set 1:[smt (@NewFMap)] //=.
           smt (@NewFMap @FSet).
-        by auto; smt.
+        by auto=> />; smt.
 
       wp; while (={x,work} /\
                  IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
@@ -372,7 +372,7 @@ theory LazyEager.
                  oget IND_Eager.H.m.[x]{1} = result{2}).
          auto => /> &m2 Hin ????. 
          rewrite domP in_fsetU Hin /= getP_neq // /#.
-      by auto; smt.
+      by auto=> />; smt.
     qed.
 
     local lemma eager_aux:
@@ -565,7 +565,7 @@ theory SetLog.
   proof. by proc; wp; call (_: true); skip; smt. qed.
 
   hoare Log_o_Dom: Log(RO).o: Log.qs = dom RO.m ==> Log.qs = dom RO.m.
-  proof. proc; inline*; auto; smt. qed.
+  proof. proc; inline*; auto=> />; smt. qed.
 
   module Bound(O:Oracle) = {
     module LO = Log(O)
@@ -598,7 +598,7 @@ theory SetLog.
     call (_: ={glob O} /\ card Log.qs{1} <= card Log.qs{2} /\ (card Log.qs{1} < qH => ={glob Log})).
       proc*; inline Log(Bound(O)).o Bound(O).o Bound(O).LO.o.
       sp; if; first smt.
-        by wp; call (_: true); auto; smt.
+        by wp; call (_: true); auto=> />; smt.
       auto; progress.
         by apply/(lez_trans _ _ _ H)/subset_leq_fcard; smt.
         smt ().
@@ -731,8 +731,8 @@ theory ROM_BadCall.
             by apply (RO_o_ll _); smt.
           inline RO.o; auto.
           call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
-            by proc; inline RO.o; auto; smt.
-          by inline Log(RO).init RO.init; auto; smt.
+            by proc; inline RO.o; auto=> />; smt.
+          by inline Log(RO).init RO.init; auto=> />; smt.
         by rewrite Pr [mu_or]; smt.
       qed.
     end section.
@@ -832,8 +832,8 @@ theory ROM_BadCall.
             by apply (RO_o_ll _); smt.
           inline RO.o; auto.
           call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
-            by proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto; smt.
-          by inline Bound(RO).init Log(RO).init RO.init; auto; smt.
+            by proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto=> />; smt.
+          by inline Bound(RO).init Log(RO).init RO.init; auto=> />; smt.
         by rewrite Pr [mu_or]; smt.
       qed.
     end section.
@@ -938,7 +938,7 @@ theory ROM_Bad.
           proc; sp;rcondt 1 => //.
           by wp; call (_: !bad (glob O2) ==> bad (glob O2)).
           by progress; proc; sp; if=> //; wp; call (_: true); skip; smt.
-          by progress; proc; rcondf 2; auto; smt.
+          by progress; proc; rcondf 2; auto=> />; smt.
       smt.
     qed.
   end section.
