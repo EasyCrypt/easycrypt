@@ -470,6 +470,14 @@ abstract theory ComRing.
   by have ->/=: -z <> 0 by smt().
   qed.
 
+  lemma expr1z z : exp oner z = oner.
+  proof.
+  elim/intwlog: z.
+  + by move=> n h; rewrite -(@oppzK n) exprN h invr1.
+  + by rewrite expr0.
+  + by move=> n ge0_n ih; rewrite exprS // mul1r ih.
+  qed.
+
   lemma sqrrD x y :
     exp (x + y) 2 = exp x 2 + intmul (x * y) 2 + exp y 2.
   proof.
@@ -523,6 +531,14 @@ abstract theory IDomain.
 
   lemma mulf_neq0 (x y : t): x <> zeror => y <> zeror => x * y <> zeror.
   proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0; smt. qed.
+
+  lemma expf_eq0 x n : (exp x n = zeror) <=> (n <> 0 /\ x = zeror).
+  proof.
+  elim/intwlog: n => [n| |n ge0_n ih].
+  + by rewrite exprN invr_eq0 /#.
+  + by rewrite expr0 oner_neq0.
+  by rewrite exprS // mulf_eq0 ih addz1_neq0 ?andKb.
+  qed.
 
   lemma mulfI (x : t): x <> zeror => injective (( * ) x).
   proof.

@@ -183,7 +183,7 @@ lemma nosmt prodr_ge0 (P : 'a -> bool) F s:
   => zeror <= BMul.big P F s.
 proof.
 move=> h; apply: (@BMul.big_ind (fun x => zeror <= x)) => //=.
-  by apply/mulr_ge0. by apply/ler01.
+  by apply/mulr_ge0.
 qed.
 
 lemma nosmt prodr_gt0 (P : 'a -> bool) F s:
@@ -191,7 +191,7 @@ lemma nosmt prodr_gt0 (P : 'a -> bool) F s:
   => zeror < BMul.big P F s.
 proof.
 move=> h; apply: (@BMul.big_ind (fun x => zeror < x)) => //=.
-  by apply/mulr_gt0. by apply/ltr01.
+  by apply/mulr_gt0.
 qed.
 
 lemma nosmt ler_prod (P : 'a -> bool) (F1 F2 :'a -> t) s:
