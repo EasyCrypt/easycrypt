@@ -324,9 +324,10 @@ section.
     cut Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
       by move=> x; rewrite !mem_oflist !List.Iota.mem_iota  supp_dinter; smt.
     cut Hfin: is_finite (support [0..q - 1]).
-      by exists (List.Iota.iota_ 0 q); smt.
+      exists (List.Iota.iota_ 0 q).
+      by rewrite List.Iota.iota_uniq=> /= x; rewrite List.Iota.mem_iota supp_dinter=> /#.
     cut Huni : forall (x : int), x \in [0..q - 1] => mu1 [0..q - 1] x = 1%r / q%r.
-      by move=> x Hx;rewrite dinter1E //;smt.
+      by move=> x Hx; rewrite dinter1E /=; smt(supp_dinter).
     pose ev :=
       fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
         let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
