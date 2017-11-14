@@ -79,7 +79,7 @@ theory Lazy.
   lemma RO_o_ll:
     (forall x, mu (dsample x) predT = 1%r) =>
     islossless RO.o.
-  proof. by move=> dsampleL; proc; auto; smt(). qed.
+  proof. by move=> dsampleL; proc; auto=> /#. qed.
 
   equiv RO_init_eq: RO.init ~ RO.init: true ==> ={glob RO}.
   proof. by sim. qed.
@@ -151,7 +151,7 @@ theory Eager.
   while (true) (card work); auto => />.
   + move=> &hr Hw;rewrite dsampleL /= => ??. 
     rewrite (fcardD1 work{hr} (pick work{hr})) mem_pick //= /#.   
-  smt (fcard_ge0 fcard_eq0).
+  smt(fcard_ge0 fcard_eq0).
   qed.
 
   lemma RO_o_ll: islossless RO.o.
@@ -368,12 +368,19 @@ theory LazyEager.
           rewrite in_fsetD1 eq_sym dom_set !inE !getP=> -> /=.
           rewrite eq_except_set 1:eq_except_refl /=.
           by split=> ^ + ->.
-        case: (pick work{2} = x{2})=> [<<*> _|].
-        + rewrite in_fsetD1 dom_set !getP !inE //=.
-          smt (@NewFMap).
-        rewrite in_fsetD1 dom_set !getP !inE //= eq_sym => -> -> //=.
-        rewrite m_x eq_except_set 1:[smt (@NewFMap)] //=.
-        smt (@NewFMap @FSet).
+        case: (pick work{2} = x{2})=> [<<*> _ {Hpart}|].
+        + rewrite in_fsetD1 dom_set !getP !inE //= in_dom.
+          have -> /= := m_x.
+          move: upd_cond; rewrite in_dom.
+          case: (IND_Eager.H.m{1}.[pick work{2}] <> None)=> //= m'_x /eq_exceptP @/pred1 eqe_m_m'.
+          rewrite fmapP=> x; rewrite getP; case: (x = pick work{2})=> [->|/eqe_m_m'] //.
+          by rewrite m_x.
+        rewrite in_fsetD1 dom_set !getP !inE=> //= ^ pw_neq_x; rewrite eq_sym=> -> -> //=.
+        rewrite m_x eq_except_set //=.
+        + move: upd_cond; case: (x{2} \in dom IND_Eager.H.m{1})=> [_ ->|_ ->] //.
+          by rewrite eq_except_refl.
+        move: upd_cond; rewrite !in_dom !eq_exceptP /pred1 /=.
+        by case: (IND_Eager.H.m{1}.[x{2}])=> //= /(_ (pick work{2}) pw_neq_x) ->.
       auto=> /> &2 x_in_w x_notin_m y _.
       rewrite getP_eq eq_except_sym set_eq_except=> /= mL mR.
       by rewrite in_fset0=> /= -> /= + -> - ->.
@@ -741,7 +748,7 @@ theory ROM_BadCall.
       cut ->: Pr[G1(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: res].
       + by byequiv (_: ={glob D} ==> ={res}); first by sim.
       cut: Pr[G0(D,RO).main() @ &m: res] <= Pr[G1'(D,RO).main() @ &m: res \/ mem Log.qs G1'.x].
-      byequiv (_: ={glob D} ==> !mem Log.qs{2} G1'.x{2} => ={res})=> //; last smt.
+      byequiv (_: ={glob D} ==> !mem Log.qs{2} G1'.x{2} => ={res})=> //; last smt().
       proc.
       call (_: mem Log.qs G1'.x,
                ={glob Log} /\
@@ -966,7 +973,7 @@ theory ROM_Bad.
         done.
       fel 1 Bound.c (fun x, eps) qH (bad (glob O2)) [Bound(O2).o: (Bound.c < qH)]=> //.
         rewrite Bigreal.sumr_const count_predT size_range /=.
-        by move: qH_pos; smt().
+        by move: qH_pos=> /#.
         by call (_: true ==> !bad (glob O2) /\ Bound.c = 0);
           first proc; wp; call badinit.
         proc; sp;rcondt 1 => //.
