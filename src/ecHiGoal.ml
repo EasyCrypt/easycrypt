@@ -1854,3 +1854,26 @@ let process_congr tc =
       EcLowGoal.t_reflex tc
 
   | _, _ -> tacuerror "not a congruence"
+
+(* -------------------------------------------------------------------- *)
+let process_wlog ids wlog tc =
+  let hyps, _ = FApi.tc1_flat tc in
+
+  let toid s =
+    if not (LDecl.has_name (unloc s) hyps) then
+      tc_lookup_error !!tc ~loc:s.pl_loc `Local ([], unloc s);
+    fst (LDecl.by_name (unloc s) hyps) in
+
+  let ids = List.map toid ids in
+
+  let gen =
+    let wlog = TTC.tc1_process_formula tc wlog in
+    let tc   = t_rotate `Left 1 (EcLowGoal.t_cut wlog tc) in
+    let tc   = t_first (t_generalize_hyps ~clear:`Yes ids) tc in
+    FApi.tc_goal tc
+  in
+
+  t_rotate `Left 1
+    (t_first
+       (t_seq (t_clears ids) (t_intros_i ids))
+       (t_cut gen tc))
