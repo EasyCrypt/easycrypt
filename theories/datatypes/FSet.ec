@@ -150,6 +150,13 @@ qed.
 (* -------------------------------------------------------------------- *)
 hint rewrite inE : in_fset0 in_fset1 in_fsetU in_fsetI in_fsetD.
 
+lemma oflist_cons ['a] (x : 'a) s : oflist (x::s) = fset1 x `|` oflist s.
+proof. by apply fsetP => z;rewrite mem_oflist !inE mem_oflist /=. qed.
+
+lemma oflist_cat ['a] (s1 s2 : 'a list) : 
+  oflist (s1 ++ s2) = oflist s1 `|` oflist s2.
+proof. by apply fsetP => z; rewrite in_fsetU !mem_oflist mem_cat. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma in_fsetU1 (s : 'a fset) x:
   forall x', mem (s `|` fset1 x) x' <=> mem s x' \/ x' = x.
