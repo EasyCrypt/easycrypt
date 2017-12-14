@@ -1,4 +1,4 @@
-require import AllCore Distr DBool DInterval List.
+require import AllCore Distr Bool DBool DInterval List.
 
 require BitWord Bigop.
 
@@ -22,7 +22,7 @@ proof. by exists [] s. qed.
 
 lemma sxor2_cons (s s':int list) (i j:int):
   sxor2 s s' i => sxor2 (j::s) (j::s') i.
-proof. smt []. qed.
+proof. smt (). qed.
 
 (* The database *)
 op a : int -> word.
@@ -71,14 +71,14 @@ proof.
     + by move=> &m -> s s' [] [s1 s2 [-> ->]];rewrite !big_cat big_consT;ring.
     while (j <= N /\ if j <= i then PIR.s = PIR.s' else sxor2 PIR.s PIR.s' i).
     + wp;rnd;skip => /= &m [[_]] + HjN. 
-      have -> /= : j{m} + 1 <= N by smt [].
-      case: (j{m} <= i{m}) => Hji;2: by smt [].
+      have -> /= : j{m} + 1 <= N by smt ().
+      case: (j{m} <= i{m}) => Hji;2: by smt ().
       move=> -> b _;case: (j{m} = i{m}) => [->> | /#].
-      by rewrite (_ : !(i{m}+1 <= i{m})) 1:/# /=; smt w=sxor_cons.
+      by rewrite (_ : !(i{m}+1 <= i{m})) 1:/# /=; smt (sxor_cons).
     by auto => /#.
   proc;inline *;wp.
   while (true) (N-j).
-  + move=> z;wp;rnd predT;skip => &hr />;smt w=dbool_ll.
+  + move=> z;wp;rnd predT;skip => &hr />;smt (dbool_ll).
   by auto=> /#. 
 qed.
 
@@ -88,19 +88,128 @@ proof.
   while (={j,PIR.s});auto.
 qed.
 
+hint exact : dbool_funi.
+hint exact : dbool_fu.
+
 equiv PIR_secure2: PIR.main ~ PIR.main : true ==> ={PIR.s'}.
 proof.
   proc;inline *;wp.
   while (={j,PIR.s'});2: by auto.
-  case: ((j = i){1}).
-  + rcondt{1} 2; 1:by auto.
-    case: ((j = i){2}); 1: by rcondt{2} 2; auto.
-    rcondf{2} 2; 1:by auto.  
-    wp;rnd (fun x => !x);skip => &m1 &m2 /> ??; split=>[??| _ b _];1:by apply dbool_funi.
-    by apply dbool_fu.
-  rcondf{1} 2; 1:by auto.
-  case: ((j = i){2}); 2: by rcondf{2} 2; auto.
-  rcondt{2} 2; 1: by auto.
-  wp;rnd (fun x => !x);skip => &m1 &m2 /> ??; split=>[??| _ b _];1:by apply dbool_funi.
-  by apply dbool_fu.
+  wp; case: ((j = i){1} = (j = i){2}).
+  + auto;smt (dbool_funi dbool_fu).
+  rnd (fun x => !x);skip;smt (dbool_funi dbool_fu).
+qed.
+
+(* Alternative proof: we show that the distribution of PIR.s and PIR.s' is uniform *)
+require import List FSet.
+
+op restr (s : int fset) n = 
+ s `&` oflist (iota_ 0 n).
+
+op is_restr (s : int fset) n = 
+  s = restr s n.
+
+lemma restrS s j : 0 <= j => 
+  restr  s (j + 1) = 
+  (if (j \in s) then fset1 j else fset0) `|` restr s j.
+proof.
+  move=> H0j;rewrite /restr iotaSr //= -cats1 oflist_cat.
+  by rewrite fsetUC fsetIUr -set1E fsetI1.
+qed.
+
+lemma nin_is_restr n s : is_restr s n => !n \in s.
+proof.
+  by move=> ->;rewrite /restr in_fsetI mem_oflist mem_iota.
+qed.
+
+(* TODO: rename mem_oflist in in_oflist *)
+lemma is_restr_diff n s1 s2 : is_restr s2 n => fset1 n `|` s1 <> s2.
+proof.
+  move => /nin_is_restr Hs2;apply contraT => Heq.
+  rewrite /= in Heq;subst s2.
+  by apply Hs2;rewrite in_fsetU in_fset1.
+qed.
+
+lemma is_restr_Ueq n s1 s2 : 
+  is_restr s1 n => is_restr s2 n => 
+  (fset1 n `|` s1 =  fset1 n `|` s2) = (s1 = s2).
+proof.
+  move=> Hs1 Hs2;rewrite eq_iff;split => [ | -> //].
+  rewrite !fsetP => H x; have := H x.
+  rewrite !in_fsetU in_fset1;case: (x = n) => /= [-> | //].
+  by rewrite !nin_is_restr.
+qed.
+
+lemma is_restr_addS n s : 
+  0 <= n =>
+  is_restr s n => is_restr (fset1 n `|` s) (n + 1).
+proof.
+  move=> Hn Hs;apply fsetP => x.
+  rewrite /restr !(in_fsetI, in_fsetU, in_fset1) Hs !(in_fsetI, mem_oflist, mem_iota) /#.
+qed.
+
+lemma is_restrS n s :
+  0 <= n =>
+  is_restr s n => is_restr s (n + 1).
+proof.
+  by move=> Hn Hs;rewrite /is_restr restrS // (nin_is_restr _ _ Hs) /= fset0U.
+qed.
+
+lemma is_restr_restr n s : is_restr (restr s n) n.
+proof.
+  apply fsetP => x;rewrite /restr !in_fsetI !mem_oflist /#.
+qed.
+
+lemma is_restr_fset0 n : is_restr fset0 n.
+proof. by apply fsetP => x;rewrite /restr in_fsetI in_fset0. qed.
+
+lemma restr_0 s : restr s 0 = fset0.
+proof. 
+  apply fsetP => x;rewrite /restr in_fsetI in_fset0 mem_oflist mem_iota /#.
+qed.
+
+lemma PIR_s_uniform (x1 x2 : int fset):
+  0 <= N =>
+  is_restr x1 N => 
+  is_restr x2 N =>
+  equiv [PIR.main ~ PIR.main : ={i} ==> (oflist PIR.s{1} = x1) = (oflist PIR.s{2} = x2)].
+proof.
+  move=> HN B1 B2;proc;inline *;wp.
+  while (={i,j} /\ 0 <= j{1} <= N /\ 
+         is_restr (oflist PIR.s{1}) j{1} /\ is_restr (oflist PIR.s{2}) j{1} /\
+         ((oflist PIR.s{1} = restr x1 j{1}) = (oflist PIR.s{2} = restr x2 j{1}))).
+  + wp.
+    rnd (fun b => b ^^ (j{1} \in x1) ^^ (j{1} \in x2)). 
+    skip => &m1 &m2 /> H0j HjN Hrs1 Hrs2 Hs Hj; split.
+    + move=> b _;ring.
+    move=> _;split.
+    + by move=> b _;apply dbool_funi.
+    move=> _ b _;rewrite dbool_fu /=;split;1: by ring.
+    move=> _; rewrite !oflist_cons !restrS //. 
+    smt (is_restr_addS is_restrS is_restr_diff is_restr_Ueq is_restr_restr  fset0U).
+  auto => &m1 &m2 />.
+  rewrite !restr_0 -set0E /=;smt (is_restr_fset0).
+qed.
+
+lemma PIR_s'_uniform (x1 x2 : int fset):
+  0 <= N =>
+  is_restr x1 N => 
+  is_restr x2 N =>
+  equiv [PIR.main ~ PIR.main : ={i} ==> (oflist PIR.s'{1} = x1) = (oflist PIR.s'{2} = x2)].
+proof.
+  move=> HN B1 B2;proc;inline *;wp.
+  while (={i,j} /\ 0 <= j{1} <= N /\ 
+         is_restr (oflist PIR.s'{1}) j{1} /\ is_restr (oflist PIR.s'{2}) j{1} /\
+         ((oflist PIR.s'{1} = restr x1 j{1}) = (oflist PIR.s'{2} = restr x2 j{1}))).
+  + wp.
+    rnd (fun b => b ^^ (j{1} \in x1) ^^ (j{1} \in x2)). 
+    skip => &m1 &m2 [#] 2!->> H0j HjN Hrs1 Hrs2 Hs Hj _; split.
+    + move=> b _;ring.
+    move=> _;split.
+    + by move=> b _;apply dbool_funi.
+    move=> _ b _;rewrite dbool_fu /=;split;1: by ring.
+    move=> _; rewrite !oflist_cons !restrS //. 
+    smt (is_restr_addS is_restrS is_restr_diff is_restr_Ueq is_restr_restr  fset0U).
+  auto => &m1 &m2 />.
+  rewrite !restr_0 -set0E /=;smt (is_restr_fset0).
 qed.
