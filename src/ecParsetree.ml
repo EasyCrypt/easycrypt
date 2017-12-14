@@ -690,7 +690,7 @@ type intropattern1 =
   | IPSmt      of (bool * pprover_infos)
   | IPSubstTop of (int option * [`LtoR | `RtoL] option)
   | IPSimplify of [`Default | `Variant]
-  | IPCrush    of bool
+  | IPCrush    of crushmode
   | IPBreak
 
 and intropattern = (intropattern1 located) list
@@ -704,6 +704,8 @@ and ipcore = [
 
 and icasemode =
   [`One | `Full of (bool * bool) * icasemode_full option]
+
+and crushmode = { cm_simplify : bool; cm_solve : bool; }
 
 and icasemode_full =
   [`AtMost of int | `AsMuch]

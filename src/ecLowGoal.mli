@@ -284,7 +284,7 @@ val t_progress :
      ?ti:(EcIdent.t -> EcCoreGoal.FApi.backward) ->
      FApi.backward -> FApi.backward
 
-val t_crush : ?delta:bool -> FApi.backward
+val t_crush : ?delta:bool -> ?tsolve:FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_congr : form pair -> form pair list * ty -> FApi.backward

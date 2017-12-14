@@ -448,6 +448,7 @@
 %token PHOARE
 %token PIPE
 %token PIPEGT
+%token PIPEPIPEGT
 %token PLUS
 %token POSE
 %token PR
@@ -493,9 +494,10 @@
 %token SIMPLIFY
 %token SKIP
 %token SLASH
+%token SLASHEQ
 %token SLASHGT
 %token SLASHSHARP
-%token SLASHEQ
+%token SLASHSLASHGT
 %token SLASHTILDEQ
 %token SLASHSLASH
 %token SLASHSLASHEQ
@@ -2033,10 +2035,16 @@ intro_pattern:
    { IPBreak }
 
 | PIPEGT
-   { IPCrush false }
+   { IPCrush { cm_simplify = false; cm_solve = false; } }
 
 | SLASHGT
-   { IPCrush true }
+   { IPCrush { cm_simplify = true ; cm_solve = false; } }
+
+| PIPEPIPEGT
+   { IPCrush { cm_simplify = false; cm_solve = true ; } }
+
+| SLASHSLASHGT
+   { IPCrush { cm_simplify = true ; cm_solve = true ; } }
 
 gpterm_head(F):
 | exp=iboption(AT) p=qident tvi=tvars_app?

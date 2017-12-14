@@ -1290,8 +1290,11 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
       ~clear:`Yes ~missing:true
       (List.rev !togen) (FApi.as_tcenv1 tc)
 
-  and intro1_crush (_st : ST.state) (d : bool) (gs : tcenv1) =
-    EcLowGoal.t_crush ~delta:d gs
+  and intro1_crush (_st : ST.state) (d : crushmode) (gs : tcenv1) =
+    EcLowGoal.t_crush
+      ~delta:d.cm_simplify
+      ?tsolve:(if d.cm_solve then Some process_trivial else None)
+      gs
 
   and dointro (st : ST.state) nointro pis (gs : tcenv) =
     match pis with [] -> gs | { pl_desc = pi; pl_loc = ploc } :: pis ->

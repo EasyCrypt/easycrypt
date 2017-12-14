@@ -218,6 +218,8 @@
     ("//=" , (SLASHSLASHEQ     , true ));
     ("/>"  , (SLASHGT          , true ));
     ("|>"  , (PIPEGT           , true ));
+    ("//>" , (SLASHSLASHGT     , true ));
+    ("||>" , (PIPEPIPEGT       , true ));
     ("=>"  , (IMPL             , true ));
     ("|"   , (PIPE             , true ));
     (":="  , (CEQ              , true ));
