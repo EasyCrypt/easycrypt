@@ -352,32 +352,44 @@ let t_rewrite_prept info pt tc =
   LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
-let process_auto (tc : tcenv1) =
+let process_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
   let module E = struct
       exception Done of tcenv
       exception Fail
   end in
 
-  let for1 (p : EcPath.path) tc =
+  let bases = EcEnv.Auto.getall bases (FApi.tc1_env tc) in
+
+  let rec forall ctn tc =
+    if ctn >= depth then t_fail tc else begin
+      List.iter
+        (fun p -> try raise (E.Done (for1 ctn p tc)) with E.Fail -> ())
+        bases;
+      t_id tc
+    end
+
+  and for1 ctn (p : EcPath.path) tc =
     let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
 
     try
       FApi.t_seqs
         [EcLowGoal.Apply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
-         EcLowGoal.t_trivial; EcLowGoal.t_fail]
+         EcLowGoal.t_trivial; forall (ctn+1)]
         tc
 
     with EcLowGoal.Apply.NoInstance _ ->
       raise E.Fail
   in
 
-  try
-    Sp.iter
-      (fun p -> try raise (E.Done (for1 p tc)) with E.Fail -> ())
-      (EcEnv.Auto.get (FApi.tc1_env tc));
-    t_id tc
+  try forall 0 tc with E.Done tc -> tc
 
-  with E.Done tc -> tc
+(* -------------------------------------------------------------------- *)
+let process_solve ?bases ?depth (tc : tcenv1) =
+  match FApi.t_try_base (process_auto ?bases ?depth) tc with
+  | `Failure _ ->
+      tc_error (FApi.tc1_penv tc) "[solve]: cannot close goal"
+  | `Success tc ->
+      tc
 
 (* -------------------------------------------------------------------- *)
 let process_trivial (tc : tcenv1) =

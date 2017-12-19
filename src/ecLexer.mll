@@ -121,6 +121,7 @@
     "by"          , BY         ;        (* KW: bytac *)
     "reflexivity" , REFLEX     ;        (* KW: bytac *)
     "done"        , DONE       ;        (* KW: bytac *)
+    "solve"       , SOLVE      ;        (* KW: bytac *)
 
     (* PHL: tactics *)
     "replace"     , REPLACE    ;        (* KW: tactic *)

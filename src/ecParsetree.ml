@@ -782,6 +782,7 @@ and ptactic_core_r =
   | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core
   | Pby         of (ptactics) option
+  | Psolve      of (int option * psymbol list option)
   | Por         of ptactic * ptactic
   | Pseq        of ptactics
   | Pcase       of (bool * pcaseoptions * prevertv)
@@ -1002,6 +1003,14 @@ type save = [ `Qed | `Admit | `Abort ]
 type theory_clear = (pqsymbol option) list
 
 (* -------------------------------------------------------------------- *)
+type phint = {
+  ht_local : bool;
+  ht_prio  : int;
+  ht_base  : psymbol option;
+  ht_names : pqsymbol list;
+}
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gdeclare     of pdeclare
   | Gmodule      of pmodule_def
@@ -1015,7 +1024,7 @@ type global_action =
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (bool * pqsymbol * pqsymbol list)
-  | Gaddat       of (bool * pqsymbol list)
+  | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list
   | GthOpen      of (bool * psymbol)

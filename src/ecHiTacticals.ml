@@ -46,6 +46,11 @@ and process1_by (ttenv : ttenv) (t : ptactic list option) (tc : tcenv1) =
   t_onall process_done (process1_seq ttenv (odfl [] t) tc)
 
 (* -------------------------------------------------------------------- *)
+and process1_solve (_ttenv : ttenv) (i, t) (tc : tcenv1) =
+  let bases = omap (fun t -> List.map unloc t) t in
+  process_solve ?bases ?depth:i tc
+
+(* -------------------------------------------------------------------- *)
 and process1_do (ttenv : ttenv) (b, n) (t : ptactic_core) (tc : tcenv1) =
   FApi.t_do b n (process1_core ttenv t) tc
 
@@ -289,6 +294,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Plogic    t           -> `One (process1_logic    ttenv (mk_loc loc t))
     | PPhl      t           -> `One (process1_phl      ttenv (mk_loc loc t))
     | Pby       t           -> `One (process1_by       ttenv t)
+    | Psolve    t           -> `One (process1_solve    ttenv t)
     | Pdo       ((b, n), t) -> `One (process1_do       ttenv (b, n) t)
     | Ptry      t           -> `One (process1_try      ttenv t)
     | Por       (t1, t2)    -> `One (process1_or       ttenv t1 t2)

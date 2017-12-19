@@ -43,7 +43,7 @@ and 'a ovrhooks = {
   hexport  : 'a -> EcPath.path -> 'a;
   hbaserw  : 'a -> symbol -> 'a;
   haddrw   : 'a -> EcPath.path * EcPath.path list -> 'a;
-  hauto    : 'a -> bool * Sp.t -> 'a;
+  hauto    : 'a -> bool * int * string option * EcPath.path list -> 'a;
   htycl    : 'a -> symbol * typeclass -> 'a;
   hinst    : 'a -> (ty_params * ty) * tcinstance -> 'a;
   hthenter : 'a -> thmode -> symbol -> 'a;
@@ -58,4 +58,3 @@ val replay : 'a ovrhooks
   -> opath:path -> npath:path -> evclone
   -> 'a -> symbol * ctheory_item list
   ->  axclone list * 'a
-

@@ -2738,10 +2738,11 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
       Format.fprintf fmt "hint rewrite %a : @[<hov 2>%a@]."
         (pp_rwname ppe) p (pp_list "@ " (pp_axname ppe)) l
 
-  | EcTheory.CTh_auto (lc, p) ->
-      Format.fprintf fmt "%a exact : %a."
+  | EcTheory.CTh_auto (lc, lvl, base, p) ->
+      Format.fprintf fmt "%a solve %d %s : %a."
         (pp_list " " pp_string) ((if lc then ["local"] else []) @ ["hint"])
-        (pp_list "@ " (pp_axname ppe)) (EcPath.Sp.elements p)
+        lvl (odfl "" base)
+        (pp_list "@ " (pp_axname ppe)) p
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =

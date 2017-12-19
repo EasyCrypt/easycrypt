@@ -501,8 +501,8 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
   | Th_addrw (b, ls) ->
       Th_addrw (s.s_p b, List.map s.s_p ls)
 
-  | Th_auto (lc, ps) ->
-      Th_auto (lc, Sp.translate s.s_p ps)
+  | Th_auto (lc, lvl, base, ps) ->
+      Th_auto (lc, lvl, base, List.map s.s_p ps)
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : _subst) (items : theory) =
@@ -544,8 +544,8 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
   | CTh_addrw (b, ls) ->
       CTh_addrw (s.s_p b, List.map s.s_p ls)
 
-  | CTh_auto (lc, ps) ->
-      CTh_auto (lc, Sp.translate s.s_p ps)
+  | CTh_auto (lc, lvl, base, ps) ->
+      CTh_auto (lc, lvl, base, List.map s.s_p ps)
 
 (* -------------------------------------------------------------------- *)
 and subst_ctheory_struct (s : _subst) (th : ctheory_struct) =

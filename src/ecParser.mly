@@ -504,6 +504,7 @@
 %token SLASHSLASHTILDEQ
 %token SLASHSLASHSHARP
 %token SMT
+%token SOLVE
 %token SP
 %token SPLIT
 %token SPLITWHILE
@@ -583,16 +584,17 @@
 (* -------------------------------------------------------------------- *)
 _lident:
 | x=LIDENT { x }
+| ABORT    { "abort"    }
+| ADMITTED { "admitted" }
+| ASYNC    { "async"    }
 | DUMP     { "dump"     }
 | EXPECT   { "expect"   }
 | FIRST    { "first"    }
 | LAST     { "last"     }
 | LEFT     { "left"     }
 | RIGHT    { "right"    }
+| SOLVE    { "solve"    }
 | STRICT   { "strict"   }
-| ADMITTED { "admitted" }
-| ABORT    { "abort"    }
-| ASYNC    { "async"    }
 | WLOG     { "wlog"     }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
@@ -2859,6 +2861,9 @@ tactic_core_r:
 | BY bracket(empty) | DONE
    { Pby None }
 
+| SOLVE dp=word? base=option(paren(plist1(lident, COMMA)))
+   { Psolve (dp, base) }
+
 | DO r=do_repeat? t=tactic_core
    { Pdo (odfl (`All, None) r, t) }
 
@@ -3280,9 +3285,14 @@ addrw:
 | local=boption(LOCAL) HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
-addat:
-| local=boption(LOCAL) HINT EXACT COLON l=qident*
-    { (local, l) }
+hint:
+| local=boption(LOCAL) HINT EXACT base=lident? COLON l=qident*
+    { { ht_local = local; ht_prio  = 0;
+        ht_base  = base ; ht_names = l; } }
+
+| local=boption(LOCAL) HINT SOLVE i=word base=lident? COLON l=qident*
+    { { ht_local = local; ht_prio  = i;
+        ht_base  = base ; ht_names = l; } }
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
@@ -3317,7 +3327,7 @@ global_action:
 | x=loc(realize)   { Grealize     x  }
 | gprover_info     { Gprover_info $1 }
 | addrw            { Gaddrw       $1 }
-| addat            { Gaddat       $1 }
+| hint             { Ghint        $1 }
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
 | SEARCH x=search+ { Gsearch      x  }

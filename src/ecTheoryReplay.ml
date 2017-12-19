@@ -47,7 +47,7 @@ and 'a ovrhooks = {
   hexport  : 'a -> EcPath.path -> 'a;
   hbaserw  : 'a -> symbol -> 'a;
   haddrw   : 'a -> EcPath.path * EcPath.path list -> 'a;
-  hauto    : 'a -> bool * Sp.t -> 'a;
+  hauto    : 'a -> bool * int * string option * EcPath.path list -> 'a;
   htycl    : 'a -> symbol * typeclass -> 'a;
   hinst    : 'a -> (ty_params * ty) * tcinstance -> 'a;
   hthenter : 'a -> thmode -> symbol -> 'a;
@@ -414,10 +414,10 @@ and replay_addrw
 
 (* -------------------------------------------------------------------- *)
 and replay_auto
-  (ove : _ ovrenv) (subst, ops, proofs, scope) (lc, ps)
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (lc, lvl, base, ps)
 =
-  let ps = Sp.map (EcSubst.subst_path subst) ps in
-  let scope = ove.ovre_hooks.hauto scope (lc, ps) in
+  let ps = List.map (EcSubst.subst_path subst) ps in
+  let scope = ove.ovre_hooks.hauto scope (lc, lvl, base, ps) in
   (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
@@ -538,8 +538,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   | CTh_addrw (p, l) ->
      replay_addrw ove (subst, ops, proofs, scope) (p, l)
 
-  | CTh_auto (lc, ps) ->
-     replay_auto ove (subst, ops, proofs, scope) (lc, ps)
+  | CTh_auto (lc, lvl, base, ps) ->
+     replay_auto ove (subst, ops, proofs, scope) (lc, lvl, base, ps)
 
   | CTh_typeclass (x, tc) ->
      replay_typeclass ove (subst, ops, proofs, scope) (x, tc)
