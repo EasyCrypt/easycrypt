@@ -2855,6 +2855,9 @@ tactic_core_r:
 | TRY t=tactic_core
    { Ptry t }
 
+| TRY NOT t=tactic_core
+   { Pnstrict t }
+
 | BY t=tactics
    { Pby (Some t) }
 

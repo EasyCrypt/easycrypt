@@ -790,6 +790,7 @@ and ptactic_core_r =
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option
   | Psubgoal    of ptactic_chain
+  | Pnstrict    of ptactic_core
   | Padmit
   | Pdebug
 

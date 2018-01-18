@@ -127,6 +127,13 @@ and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =
   aux ts (tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
+and process1_nstrict (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
+  if ttenv.tt_smtmode <> `Strict then
+    tc_error !!tc "try! can only be used in strict proof mode";
+  let ttenv = { ttenv with tt_smtmode = `Standard } in
+  process1_try ttenv t tc
+
+(* -------------------------------------------------------------------- *)
 and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
   let engine = process1_core ttenv in
 
@@ -303,6 +310,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Pprogress (o, t)      -> `One (process1_progress ttenv o t)
     | Pdebug                -> `One (process1_debug    ttenv)
     | Psubgoal  tt          -> `All (process_chain     ttenv tt)
+    | Pnstrict  t           -> `One (process1_nstrict  ttenv t)
   in
   (match tactic with `One t -> t_onall t | `All t -> t) tc
 
