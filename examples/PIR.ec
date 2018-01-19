@@ -7,7 +7,7 @@ clone import Bigop as BBS with
    type t <- BS.word,
    op Support.idm <- BS.zerow,
    op Support.( + ) <- BS.(+^)
-   proof * by smt.
+   proof * by smt(xorwA xorwC xorw0).
 
 op N:int.
 
