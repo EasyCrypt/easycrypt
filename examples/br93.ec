@@ -12,8 +12,11 @@ pragma +implicits.
 (* on abstract datatypes with minimal structure. We then instantiate to *)
 (* semi-concrete fixed-length bitstrings (with abstract lengths).       *)
 (* -------------------------------------------------------------------- *)
-
 abstract theory BR93.
+(* -------------------------------------------------------------------- *)
+(* Let us consider the following abstract scenario construction. Given: *)
+(* -------------------------------------------------------------------- *)
+
 (* A set `ptxt` of plaintexts, equipped with an nilpotent addition (+^) *)
 type ptxt.
 
@@ -25,7 +28,7 @@ axiom addKp p1 p2: (p1 +^ p1) +^ p2 = p2.
 lemma addpK p1 p2: p1 +^ p2 +^ p2 = p1.
 proof. by rewrite addC -addA addC -addA addKp. qed.
 
-(* and a lossless, full, uniform distribution dptxt                     *)
+(*                    and a lossless, full, uniform distribution dptxt; *)
 op dptxt: { ptxt distr |    is_lossless dptxt
                          /\ is_full dptxt
                          /\ is_uniform dptxt } as dptxt_llfuuni.
@@ -36,7 +39,7 @@ lemma dptxt_funi: is_funiform dptxt
 by exact/(is_full_funiform dptxt_fu dptxt_uni).
 
 (* A set `rand` of nonces, equipped with                                *)
-(*                               a lossless, uniform distribution drand *)
+(*                              a lossless, uniform distribution drand; *)
 type rand.
 op drand: { rand distr |    is_lossless drand
                          /\ is_uniform drand } as drand_lluni.
@@ -44,11 +47,11 @@ lemma drand_ll: is_lossless drand by exact/(andWl _ drand_lluni).
 lemma drand_uni: is_uniform drand by exact/(andWr _ drand_lluni).
 
 (* A set `ctxt` of ciphertexts defined as                               *)
-(*                           the cartesian product of `rand` and `ptxt` *)
+(*                          the cartesian product of `rand` and `ptxt`; *)
 type ctxt = rand * ptxt.
 
 (* A set `pkey * skey` of keypairs, equipped with                       *)
-(*                         a lossless, full, uniform distribution dkeys *)
+(*                        a lossless, full, uniform distribution dkeys; *)
 type pkey, skey.
 op dkeys: { (pkey * skey) distr |    is_lossless dkeys
                                   /\ is_funiform dkeys } as dkeys_llfuni.
@@ -56,7 +59,7 @@ lemma dkeys_ll: is_lossless dkeys by exact/(andWl _ dkeys_llfuni).
 lemma dkeys_funi: is_funiform dkeys by exact/(andWr _ dkeys_llfuni).
 
 (* A family `f` of trapdoor permutations over `rand`,                   *)
-(*        indexed by `pkey`, with inverse family `fi` indexed by `skey` *)
+(*       indexed by `pkey`, with inverse family `fi` indexed by `skey`; *)
 op f : pkey -> rand -> rand.
 op fi: skey -> rand -> rand.
 axiom fK pk sk x: (pk,sk) \in dkeys => fi sk (f pk x) = x.
@@ -65,15 +68,23 @@ lemma fI pk x y: (exists sk, (pk,sk) \in dkeys) =>
   f pk x = f pk y => x = y.
 proof. by move=> [sk] + fx_eq_fy - /fK ^ /(_ x) <- /(_ y) <-; congr. qed.
 
-(* A random oracle from `rand` to `ptxt`, modelling a hash function H   *)
+(* A random oracle from `rand` to `ptxt`, modelling a hash function H;  *)
+(* (we simply instantiate the generic theory of Random Oracles with     *)
+(*    the types and output distribution declared above, discharging all *)
+(*          assumptions on the instantiated parameters--there are none) *)
 clone import ROM.Lazy as H with
   type from  <- rand,
   type to    <- ptxt,
-  op dsample <- fun _ => dptxt.
+  op dsample <- fun _ => dptxt
+proof *.
 import Types.
 
-(* We can define the Bellare-Rogaway 93 PKE Scheme                      *)
-module BR93(H:Oracle) = {
+(* We can define the Bellare-Rogaway 93 PKE Scheme.                     *)
+(* BR93 is a module that, given access to an oracle H from type         *)
+(*   `from` to type `rand` (see `print Oracle.`), implements procedures *)
+(*   `keygen`, `enc` and `dec` as follows described below.              *)
+module BR93 (H:Oracle) = {
+  (* `keygen` simply samples a key pair in `dkeys` *)
   proc keygen() = {
     var kp;
 
@@ -81,6 +92,10 @@ module BR93(H:Oracle) = {
     return kp;
   }
 
+  (* `enc` samples a random string `r` in `drand` and uses it to       *)
+  (*   produce a random mask `h` using the hash function, then returns *)
+  (*      the image of `r` by permutation `f` and the plaintext masked *)
+  (*                                                         with `h`. *)
   proc enc(pk, m) = {
     var r, h;
 
@@ -89,6 +104,11 @@ module BR93(H:Oracle) = {
     return (f pk r,h +^ m);
   }
 
+  (* `dec` parses its input as a nonce `r` and a masked plaintext `m` *)
+  (*  before recovering the original random string from `r` using the *)
+  (*      inverse permutation `fi` and computing its image `h` by the *)
+  (*  random oracle. The original plaintext is recovered by unmasking *)
+  (*                                                    `m` with `h`. *)
   proc dec(sk, c) = {
     var r, h, m;
 
@@ -99,7 +119,7 @@ module BR93(H:Oracle) = {
   }
 }.
 
-(* And we can quickly prove it correct                                  *)
+(* We can quickly prove it correct as a sanity check.                 *)
 section Correctness.
 local module Correctness = {
   proc main(m) = {
