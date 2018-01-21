@@ -26,7 +26,7 @@ type 'a ovrenv = {
   ovre_ntclr    : EcPath.Sp.t;
   ovre_opath    : EcPath.path;
   ovre_npath    : EcPath.path;
-  ovre_prefix   : symbol list;
+  ovre_prefix   : (symbol list) EcUtils.pair;
   ovre_glproof  : (ptactic_core option * evtags option) list;
   ovre_abstract : bool;
   ovre_local    : bool;
