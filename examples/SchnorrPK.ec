@@ -119,22 +119,7 @@ module Foo = {
   }
 }.
 
-lemma foo &m:
-  Pr[Foo.foo() @ &m : res] = Pr[Foo.bar() @ &m : res].
-proof.
-byequiv.
-proc;inline*.
-rnd (fun z, z - F.one) (fun z, z + F.one).
-simplify.
-skip.
-progress by smt.
-trivial.
-trivial.
-qed.
-
-
 section SchnorrPKSecurity.
-
   (* Completeness *)
   lemma schnorr_proof_of_knowledge_completeness_ll:
     islossless Completeness(SchnorrPK).main.
