@@ -26,6 +26,7 @@ ENV OPAMJOBS    2
 
 RUN \
 	opam init -a && \
+	opam switch -v -A 4.03.0 easycrypt && \
 	opam remote add easycrypt https://github.com/EasyCrypt/opam.git && \
 	opam install depext && opam depext easycrypt ec-provers && \
 	opam install ec-provers && \
