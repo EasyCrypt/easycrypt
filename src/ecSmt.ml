@@ -1071,8 +1071,10 @@ let core_theories = [
   ((["map"], "Map"),
      [(CI_Map.p_get, "get");
       (CI_Map.p_set, "set");
-      (CI_Map.p_cst, "const");
      ]);
+
+  ((["map"], "Const"),
+     [(CI_Map.p_cst, "const")]);
 ]
 
 let core_ty_theories = [
@@ -1103,7 +1105,6 @@ let core_theories = Lazy.from_fun (fun () ->
   let ty_known = Hp.create 7 in
   List.iter (add_core_ty ty_known) core_ty_theories;
   ty_known, known
-
 )
 
 (* -------------------------------------------------------------------- *)

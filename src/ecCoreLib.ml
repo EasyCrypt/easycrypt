@@ -104,17 +104,16 @@ end
 (* -------------------------------------------------------------------- *)
 module CI_Distr = struct
   let i_Distr = "Distr"
-  let p_Distr  = EcPath.pqname p_top i_Distr
+  let p_Distr = EcPath.pqname p_top i_Distr
   let p_distr = _Pervasive "distr"
+  let _Distr  = fun x -> EcPath.pqname p_Distr x
 
-  let _Distr   = fun x -> EcPath.pqname p_Distr x
+  let p_dbool      = EcPath.extend p_top ["DBool"; "dbool"]
+  let p_dbitstring = EcPath.extend p_Distr ["Dbitstring"; "dbitstring"]
+  let p_dinter     = EcPath.extend p_top ["DInterval"; "dinter"]
 
-  let p_dbool = List.fold_left EcPath.pqname p_top ["DBool"; "dbool"]
-  let p_dbitstring = List.fold_left EcPath.pqname p_Distr ["Dbitstring"; "dbitstring"]
-  let p_dinter     = List.fold_left EcPath.pqname p_top ["DInterval"; "dinter"]
-
-  let p_support = _Distr "support"
-  let p_mu      = _Pervasive "mu"
+  let p_support  = _Distr "support"
+  let p_mu       = _Pervasive "mu"
   let p_lossless = _Distr "is_lossless"
 
 end
@@ -123,7 +122,7 @@ end
 module CI_Map = struct
   let i_Map = "CoreMap"
   let p_Map = EcPath.pqname p_top i_Map
-  let _Map = fun x -> EcPath.pqname p_Map x
+  let _Map  = fun x -> EcPath.pqname p_Map x
 
   let p_map = _Map "map"
   let p_get = _Map s_get
