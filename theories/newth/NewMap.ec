@@ -18,7 +18,6 @@ axiom nosmt tofunK  (f : 'a -> 'b)     : tofun (offun f) = f.
 axiom nosmt setE (m : ('a, 'b) map) x b : 
   m.[x <- b] = offun (fun y => if x = y then b else m.[y]).
 
-
 (* -------------------------------------------------------------------- *)
 lemma nosmt map_ext (m1 m2:('a,'b) map) : 
   (forall (a:'a), m1.[a] = m2.[a]) => m1 = m2.

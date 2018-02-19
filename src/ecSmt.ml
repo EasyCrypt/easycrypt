@@ -1070,12 +1070,13 @@ let core_theories = [
   ((["map"], "Map"),
      [(CI_Map.p_get, "get");
       (CI_Map.p_set, "set");
+      (CI_Map.p_cst, "const");
      ]);
 ]
 
 let core_ty_theories = [
   ((["map"], "Map"),
-   [(CI_Map.p_map, "map")]);
+     [(CI_Map.p_map, "map")]);
 ]
 
 let core_theories = Lazy.from_fun (fun () ->

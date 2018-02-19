@@ -6,6 +6,13 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+let s_get  = "_.[_]"
+let s_set  = "_.[_<-_]"
+let s_nil  = "[]"
+let s_cons = "::"
+let s_abs  = "`|_|"
+
+(* -------------------------------------------------------------------- *)
 let i_top  = "Top"
 let i_self = "Self"
 let p_top  = EcPath.psymbol i_top
@@ -111,6 +118,18 @@ module CI_Distr = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Map = struct
+  let i_Map = "CoreMap"
+  let p_Map = EcPath.pqname p_top i_Map
+  let _Map = fun x -> EcPath.pqname p_Map x
+
+  let p_map = _Map "map"
+  let p_get = _Map s_get
+  let p_set = _Map s_set
+  let p_cst = _Map "cst"
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Logic = struct
   let i_Logic  = "Tactics"
   let p_Logic  = EcPath.pqname p_top i_Logic
@@ -157,13 +176,6 @@ module CI_Logic = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let s_get  = "_.[_]"
-let s_set  = "_.[_<-_]"
-let s_nil  = "[]"
-let s_cons = "::"
-let s_abs  = "`|_|"
-
-(* -------------------------------------------------------------------- *)
 let is_mixfix_op =
   let ops = [s_get; s_set; s_nil; s_abs] in
   fun op -> List.mem op ops
@@ -173,14 +185,3 @@ let s_real_of_int = EcPath.toqsymbol CI_Real.p_real_of_int
 let s_dbool       = EcPath.toqsymbol CI_Distr.p_dbool
 let s_dbitstring  = EcPath.toqsymbol CI_Distr.p_dbitstring
 let s_dinter      = EcPath.toqsymbol CI_Distr.p_dinter
-
-
-(* -------------------------------------------------------------------- *)
-module CI_Map = struct
-  let i_Map = "CoreMap"
-  let p_Map = EcPath.pqname p_top i_Map
-  let _Map = fun x -> EcPath.pqname p_Map x
-  let p_map = _Map "map"
-  let p_get = _Map s_get
-  let p_set = _Map s_set
-end
