@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -1890,7 +1891,12 @@ type cstate = {
   cs_sbeq : Sid.t option;
 }
 
-let t_crush ?(delta = true) (tc : tcenv1) =
+let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
+  let dtsolve =
+    [t_assumption `Conv; t_absurd_hyp ~conv:`Conv; t_false ~conv:`Conv] in
+
+  let tsolve = odfl (FApi.t_ors dtsolve) tsolve in
+
   let t_progress_subst ?(tg : Sid.t option) ?eqid =
     let sk1 = { empty_subst_kind with sk_local = true ; } in
     let sk2 = {  full_subst_kind with sk_local = false; } in
@@ -1973,12 +1979,7 @@ let t_crush ?(delta = true) (tc : tcenv1) =
 
          match FApi.t_try_base (FApi.t_seq thesplit (aux0 stsub)) tc with
          | `Success tc -> tc
-         | `Failure _  ->
-            FApi.t_try
-              (FApi.t_ors [t_assumption `Conv;
-                           t_absurd_hyp ~conv:`Conv;
-                           t_false ~conv:`Conv])
-              tc in
+         | `Failure _  -> FApi.t_try tsolve tc in
        let pr = proofenv_of_proof (proof_of_tcenv tc) in
        let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in
        let nl = List.length cl in

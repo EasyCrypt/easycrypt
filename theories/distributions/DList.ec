@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -179,8 +180,8 @@ abstract theory Program.
     }
   }.
 
-  lemma pr_Sample _n &m xs: Pr[Sample.sample(_n) @ &m: xs = res] = mu (dlist d _n) (pred1 xs).
-  proof. by byphoare (_: n = _n ==> xs = res)=> //=; proc; rnd (pred1 xs); auto; smt. qed.
+  lemma pr_Sample _n &m xs: Pr[Sample.sample(_n) @ &m: res = xs] = mu (dlist d _n) (pred1 xs).
+  proof. by byphoare (_: n = _n ==> res = xs)=> //=; proc; rnd. qed.
 
   equiv Sample_SampleCons_eq: Sample.sample ~ SampleCons.sample: 0 < n{1} /\ ={n} ==> ={res}.
   proof.

@@ -1,12 +1,13 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Core List.
+require import AllCore List.
 
 pred is_finite (p : 'a -> bool) =
   exists s,
@@ -80,4 +81,16 @@ lemma finiteD (A B : 'a -> bool):
 proof.
 move=> fin_A; apply/(finite_leq A)=> //= x.
 by rewrite /predD.
+qed.
+
+lemma NfiniteP ['a] n (p : 'a -> bool) : 0 <= n =>
+  !is_finite p => exists s, (n <= size s /\ uniq s) /\ (mem s) <= p.
+proof.
+move=> ge0_n; rewrite /is_finite negb_exists /= => h.
+elim: n ge0_n => [|n ge0_n [s [[sz uq_s] ih]]]; first by exists [].
+suff [x [px x_notin_s]]: exists x, p x /\ !(x \in s).
++ exists (x :: s); rewrite /= x_notin_s uq_s /= addzC.
+  by rewrite lez_add2l sz /= => y; rewrite in_cons => -[->//|/ih].
+move: (h s); apply/contraR; rewrite negb_exists uq_s /=.
+by move=> + x - /(_ x); rewrite negb_and /= /#.
 qed.

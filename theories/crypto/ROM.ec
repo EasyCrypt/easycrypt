@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -79,7 +80,7 @@ theory Lazy.
   lemma RO_o_ll:
     (forall x, mu (dsample x) predT = 1%r) =>
     islossless RO.o.
-  proof. by move=> dsampleL; proc; auto; smt. qed.
+  proof. by move=> dsampleL; proc; auto=> /#. qed.
 
   equiv RO_init_eq: RO.init ~ RO.init: true ==> ={glob RO}.
   proof. by sim. qed.
@@ -88,7 +89,7 @@ theory Lazy.
   proof. by sim. qed.
 
   hoare dom_RO_o d x': RO.o: x = x' /\ dom RO.m = d ==> dom RO.m = d `|` fset1 x'.
-  proof. by proc; auto; smt. qed.
+  proof. by proc; auto=> />; smt(dom_set fsetP in_fsetU in_fset1). qed.
 end Lazy.
 
 (* -------------------------------------------------------------------- *)
@@ -131,10 +132,15 @@ theory Eager.
     is_finite predT<:from> =>
     hoare [RO.init: true ==> forall x, FSet.mem (dom RO.m) x].
   proof.
-    move=> fType; proc.
-    while (forall x, FSet.mem work x \/ mem (dom RO.m) x).
-      by auto; smt.
-    by auto; smt.
+  move=> fType; proc.
+  while (forall x, FSet.mem work x \/ mem (dom RO.m) x).
+  + auto=> /> &m w_m_part w_non_empty y _ x.
+    case: (x = pick work{m}).
+    + by rewrite dom_set in_fsetU in_fset1.
+    + by rewrite dom_set in_fsetU in_fsetD in_fset1 /#.
+  auto=> />; split=> [x|m h x].
+  + by rewrite mem_oflist mem_to_seq.
+  by have:= h x; rewrite in_fset0.
   qed.
 
   lemma RO_init_ll:
@@ -142,11 +148,11 @@ theory Eager.
     (forall x, mu (dsample x) predT = 1%r) =>
     islossless RO.init.
   proof.
-    move=> fType dsampleL; proc.
-    while (true) (card work); auto => />.
-    + move=> &hr Hw;rewrite dsampleL /= => ??. 
-      rewrite (fcardD1 work{hr} (pick work{hr})) mem_pick //= /#.   
-    smt (fcard_ge0 fcard_eq0).
+  move=> fType dsampleL; proc.
+  while (true) (card work); auto => />.
+  + move=> &hr Hw;rewrite dsampleL /= => ??. 
+    rewrite (fcardD1 work{hr} (pick work{hr})) mem_pick //= /#.   
+  smt(fcard_ge0 fcard_eq0).
   qed.
 
   lemma RO_o_ll: islossless RO.o.
@@ -164,8 +170,14 @@ theory Eager.
     is_finite predT<:from> =>
     hoare [RO.init: true ==> FSet.mem (dom RO.m) x].
   proof.
-    move=> fType; proc; while (forall x, !FSet.mem work x => mem (dom RO.m) x);
-      by auto; smt.
+  move=> fType; proc; while (forall x, !FSet.mem work x => mem (dom RO.m) x).
+  + auto=> /> &m w_m_part w_non_empty y _ x'.
+    case: (x' = pick work{m}).
+    + by rewrite dom_set in_fsetU in_fset1.
+    + by rewrite dom_set in_fsetU in_fsetD in_fset1 /#.
+  auto=> />; split=> [x'|m h].
+  + by rewrite mem_oflist mem_to_seq // /predT.
+  by have:= h x; rewrite in_fset0.
   qed.
 end Eager.
 
@@ -243,13 +255,13 @@ theory LazyEager.
       => (forall x, mu (dsample x) predT = 1%r)
       => equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: ={glob D} ==> ={res}].
     proof.
-      move=> fromF dsampleL; proc; seq 2 2: (={b}).
-      + call (_: Lazy.RO.m{1} = IND_Lazy.H.m{2}); first by sim.
-        by call (_: ={glob D} ==> Lazy.RO.m{1} = IND_Lazy.H.m{2})=> //; proc; wp.
-      inline IND_Lazy.resample; while{2} (true) (card work{2}).
-        auto=> /> &hr Hw;rewrite dsampleL /= => ??. 
-        by rewrite (fcardD1 work{hr} (pick work{hr})) mem_pick //= /#.   
-      by auto; smt.
+    move=> fromF dsampleL; proc; seq 2 2: (={b}).
+    + call (_: Lazy.RO.m{1} = IND_Lazy.H.m{2}); first by sim.
+      by call (_: ={glob D} ==> Lazy.RO.m{1} = IND_Lazy.H.m{2})=> //; proc; wp.
+    inline IND_Lazy.resample; while{2} (true) (card work{2}).
+    + auto=> /> &hr Hw;rewrite dsampleL /= => ??.
+      by rewrite (fcardD1 work{hr} (pick work{hr})) mem_pick //= /#.
+    by auto=> />; smt(fcard_ge0 fcard_eq0).
     qed.
 
     local module IND_Eager = {
@@ -298,31 +310,31 @@ theory LazyEager.
         ={x} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==>
         ={res} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}].
     proof.
-      move=> fromF dsampleL; eager proc.
-      inline IND_Eager.resample IND_Lazy.resample; swap{2} 4 -3.
-      seq 1 1: (={x,work} /\
-                IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
-                mem work{1} x{1});
-        first by auto; smt.
-      case (!mem (dom IND_Lazy.H.m{2}) x{2});
-        [rcondt{2} 2; first by auto | rcondf{2} 2; first by auto].
-        transitivity{1} {
-          y0 <$ dsample x;
-          while (work <> fset0) {
-            f <- pick work;
-            y <$ dsample f;
-            if (!mem (dom IND_Eager.H.m) f)
-              IND_Eager.H.m.[f] <- if f = x then y0 else y;
-            work <- work `\` fset1 f;
-          }
-          result <- oget IND_Eager.H.m.[x];
+    move=> fromF dsampleL; eager proc.
+    inline IND_Eager.resample IND_Lazy.resample; swap{2} 4 -3.
+    seq 1 1: (={x,work} /\
+              IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
+              mem work{1} x{1}).
+    + by auto=> /> &2; rewrite mem_oflist mem_to_seq.
+    case (!mem (dom IND_Lazy.H.m{2}) x{2});
+      [rcondt{2} 2; first by auto | rcondf{2} 2; first by auto].
+    + transitivity{1} {
+        y0 <$ dsample x;
+        while (work <> fset0) {
+          f <- pick work;
+          y <$ dsample f;
+          if (!mem (dom IND_Eager.H.m) f)
+            IND_Eager.H.m.[f] <- if f = x then y0 else y;
+          work <- work `\` fset1 f;
         }
-        (={x, work, IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
-        ((={x,work} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\  mem work{1} x{1})
-          /\ !mem (dom IND_Lazy.H.m{2}) x{2} ==>
-            ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
-        by move=> &1 &2 H; exists IND_Lazy.H.m{2} work{2} x{2}; move: H.
-        transitivity{1} {
+        result <- oget IND_Eager.H.m.[x];
+      }
+      (={x, work, IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
+      ((={x,work} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\  mem work{1} x{1})
+        /\ !mem (dom IND_Lazy.H.m{2}) x{2} ==>
+          ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
+      + by move=> &1 &2 H; exists IND_Lazy.H.m{2} work{2} x{2}; move: H.
+      + transitivity{1} {
           while (work <> fset0) {
             f <- pick work;
             y <$ dsample f;
@@ -332,47 +344,54 @@ theory LazyEager.
             }
             y0 <$ dsample x;
             result <- oget IND_Eager.H.m.[x];
-         }
-         (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
-         (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
-          by move=> &1 &2 H; exists IND_Eager.H.m{2} work{2} x{2}; move: H.
+          }
+          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
+          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
+        + by move=> &1 &2 H; exists IND_Eager.H.m{2} work{2} x{2}; move: H.
         + by sim; rnd{2}; sim: (={x,IND_Eager.H.m})=> /> ?;apply dsampleL.
         wp; symmetry; eager
           while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //;
           first by rnd.
-          swap{2} 5 -4; swap [2..3] -1; case ((x = pick work){1}).
-            by wp; rnd{2}; rnd; rnd{1}; wp; skip; smt.
-            by auto; smt.
-          by sim.
-
-        wp; while (={x, work} /\
-                   (!mem work x => mem (dom IND_Eager.H.m) x){1} /\
-                   IND_Lazy.H.m.[x]{2} = Some y0{1} /\
-                   if (mem (dom IND_Eager.H.m) x){1}
-                   then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
-                   else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (pred1 x{1})).
-          auto=> /> &1 &2 Hpart m_x upd_cond work_neq_nil y _.
-          case: (mem work{2} x{2})=> [|^x_in_work /Hpart x_in_Em]; last first.
-          + move: upd_cond; rewrite x_in_Em=> /= <*>.
-            case: (pick work{2} = x{2})=> //= ^pkwork_neq_x.
-            rewrite in_fsetD1 eq_sym dom_set !inE !getP=> -> /=.
-            rewrite eq_except_set 1:eq_except_refl /=.
-            by split=> ^ + ->.
-          case: (pick work{2} = x{2})=> [<<*> _|].
-          + rewrite in_fsetD1 dom_set !getP !inE //=.
-            smt (@NewFMap).
-          rewrite in_fsetD1 dom_set !getP !inE //= eq_sym => -> -> //=.
-          rewrite m_x eq_except_set 1:[smt (@NewFMap)] //=.
-          smt (@NewFMap @FSet).
-        by auto; smt.
-
-      wp; while (={x,work} /\
-                 IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
-                 mem (dom IND_Lazy.H.m{2}) x{2} /\
-                 oget IND_Eager.H.m.[x]{1} = result{2}).
-         auto => /> &m2 Hin ????. 
-         rewrite domP in_fsetU Hin /= getP_neq // /#.
-      by auto; smt.
+        + swap{2} 5 -4; swap [2..3] -1; case ((x = pick work){1}).
+          + by wp; rnd{2}; rnd; rnd{1}; wp; skip=> /#.
+          by auto=> /> &1 _; rewrite eq_sym=> ->.
+        by sim.
+      wp; while (={x, work} /\
+                 (!mem work x => mem (dom IND_Eager.H.m) x){1} /\
+                 IND_Lazy.H.m.[x]{2} = Some y0{1} /\
+                 if (mem (dom IND_Eager.H.m) x){1}
+                 then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
+                 else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (pred1 x{1})).
+      + auto=> /> &1 &2 Hpart m_x upd_cond work_neq_nil y _.
+        case: (mem work{2} x{2})=> [|^x_in_work /Hpart x_in_Em]; last first.
+        + move: upd_cond; rewrite x_in_Em=> /= <*>.
+          case: (pick work{2} = x{2})=> //= ^pkwork_neq_x.
+          rewrite in_fsetD1 eq_sym dom_set !inE !getP=> -> /=.
+          rewrite eq_except_set 1:eq_except_refl /=.
+          by split=> ^ + ->.
+        case: (pick work{2} = x{2})=> [<<*> _ {Hpart}|].
+        + rewrite in_fsetD1 dom_set !getP !inE //= in_dom.
+          have -> /= := m_x.
+          move: upd_cond; rewrite in_dom.
+          case: (IND_Eager.H.m{1}.[pick work{2}] <> None)=> //= m'_x /eq_exceptP @/pred1 eqe_m_m'.
+          rewrite fmapP=> x; rewrite getP; case: (x = pick work{2})=> [->|/eqe_m_m'] //.
+          by rewrite m_x.
+        rewrite in_fsetD1 dom_set !getP !inE=> //= ^ pw_neq_x; rewrite eq_sym=> -> -> //=.
+        rewrite m_x eq_except_set //=.
+        + move: upd_cond; case: (x{2} \in dom IND_Eager.H.m{1})=> [_ ->|_ ->] //.
+          by rewrite eq_except_refl.
+        move: upd_cond; rewrite !in_dom !eq_exceptP /pred1 /=.
+        by case: (IND_Eager.H.m{1}.[x{2}])=> //= /(_ (pick work{2}) pw_neq_x) ->.
+      auto=> /> &2 x_in_w x_notin_m y _.
+      rewrite getP_eq eq_except_sym set_eq_except=> /= mL mR.
+      by rewrite in_fset0=> /= -> /= + -> - ->.
+    wp; while (={x,work} /\
+               IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
+               mem (dom IND_Lazy.H.m{2}) x{2} /\
+               oget IND_Eager.H.m.[x]{1} = result{2}).
+    + auto => /> &m2 Hin ????. 
+      by rewrite domP in_fsetU Hin /= getP_neq // /#.
+    by auto=> /#.
     qed.
 
     local lemma eager_aux:
@@ -380,16 +399,16 @@ theory LazyEager.
       (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND_Lazy.main ~ IND_Eager.main: ={glob D} ==> ={res}].
     proof.
-      move=> fromF dsampleL; proc; inline IND_Lazy.H.init.
-      seq 1 1: (={glob D} /\ IND_Lazy.H.m{1} = IND_Eager.H.m{2}); first by wp.
-      symmetry.
-      eager (H: IND_Eager.resample(); ~ IND_Lazy.resample();:
-                  IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==> IND_Eager.H.m{1} = IND_Lazy.H.m{2}):
-            (={glob D} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //;
-        first by sim.
-      eager proc H (IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
-        first by apply eager_query.
-      by sim.
+    move=> fromF dsampleL; proc; inline IND_Lazy.H.init.
+    seq 1 1: (={glob D} /\ IND_Lazy.H.m{1} = IND_Eager.H.m{2}); first by wp.
+    symmetry.
+    eager (H: IND_Eager.resample(); ~ IND_Lazy.resample();:
+                IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==> IND_Eager.H.m{1} = IND_Lazy.H.m{2}):
+          (={glob D} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //;
+      first by sim.
+    eager proc H (IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
+      first by apply eager_query.
+    by sim.
     qed.
 
     local lemma IND_Eager:
@@ -397,17 +416,17 @@ theory LazyEager.
       (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND_Eager.main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
     proof.
-      move=> fromF dsampleL; proc.
-      call (_: (forall x, FSet.mem (dom IND_Eager.H.m{1}) x) /\ IND_Eager.H.m{1} = Eager.RO.m{2});
-        first by proc; skip; smt.
-      inline RO.init IND_Eager.resample.
-      while (={work} /\
-             (forall x, !FSet.mem (dom IND_Eager.H.m{1}) x <=>
-                        mem work{1} x) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
-        auto;smt (domP in_fsetD in_fsetU in_fset1 mem_pick).
-      auto => />;split=> [x| m].
-      + by rewrite dom0 in_fset0 mem_oflist mem_to_seq.
-      by move=> H x;have := H x;rewrite in_fset0.
+    move=> fromF dsampleL; proc.
+    call (_: (forall x, FSet.mem (dom IND_Eager.H.m{1}) x) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
+    + by proc; skip; smt(@NewFMap).
+    inline RO.init IND_Eager.resample.
+    while (={work} /\
+           (forall x, !FSet.mem (dom IND_Eager.H.m{1}) x <=>
+                      mem work{1} x) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
+    + auto; smt(domP in_fsetD in_fsetU in_fset1 mem_pick).
+    auto => />;split=> [x| m].
+    + by rewrite dom0 in_fset0 mem_oflist mem_to_seq.
+    by move=> H x;have := H x;rewrite in_fset0.
     qed.
 
     lemma eagerRO:
@@ -415,12 +434,12 @@ theory LazyEager.
       (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
     proof.
-      move=> fromF dsampleL; bypr (res{1}) (res{2})=> // &1 &2 a eq_D.
-      apply (@eq_trans _ Pr[IND_Lazy.main() @ &1: a = res]);
-        first by byequiv (IND_Lazy _ _).
-      apply (@eq_trans _ Pr[IND_Eager.main() @ &1: a = res]);
-        first by byequiv (eager_aux _ _).
-      by byequiv (IND_Eager _ _).
+    move=> fromF dsampleL; bypr (res{1}) (res{2})=> // &1 &2 a eq_D.
+    apply (@eq_trans _ Pr[IND_Lazy.main() @ &1: a = res]);
+      first by byequiv (IND_Lazy _ _).
+    apply (@eq_trans _ Pr[IND_Eager.main() @ &1: a = res]);
+      first by byequiv (eager_aux _ _).
+    by byequiv (IND_Eager _ _).
     qed.
   end section.
 end LazyEager.
@@ -562,10 +581,17 @@ theory SetLog.
   proof. by move=> O_o_ll; proc; wp; call O_o_ll; wp. qed.
 
   hoare Log_o_stable (O <: Oracle {Log}) x: Log(O).o: mem Log.qs x ==> mem Log.qs x.
-  proof. by proc; wp; call (_: true); skip; smt. qed.
+  proof. by proc; wp; call (_: true); skip=> &m; rewrite in_fsetU in_fset1=> ->. qed.
 
   hoare Log_o_Dom: Log(RO).o: Log.qs = dom RO.m ==> Log.qs = dom RO.m.
-  proof. proc; inline*; auto; smt. qed.
+  proof.
+  proc; inline*; auto. move=> &m -> y _ /=; rewrite 2!fsetP.
+  split=> /= h x'.
+  + by rewrite dom_set.
+  case: (x' = x{m})=> [->>|].
+  + by rewrite in_fsetU h.
+  by rewrite in_fsetU in_fset1=> ->.
+  qed.
 
   module Bound(O:Oracle) = {
     module LO = Log(O)
@@ -594,15 +620,25 @@ theory SetLog.
   equiv Log_Bound (O <: Oracle {Log}) (D <: Dist {O,Log}):
     IND(Bound(O),D).main ~ IND(Log(Bound(O)),D).main: ={glob O, glob D} ==> ={res}.
   proof.
-    proc.
-    call (_: ={glob O} /\ card Log.qs{1} <= card Log.qs{2} /\ (card Log.qs{1} < qH => ={glob Log})).
-      proc*; inline Log(Bound(O)).o Bound(O).o Bound(O).LO.o.
-      sp; if; first smt.
-        by wp; call (_: true); auto; smt.
-      auto; progress.
-        by apply/(lez_trans _ _ _ H)/subset_leq_fcard; smt.
-        smt ().
-    by inline *; wp; call (_: true).
+  proc.
+  call (_: ={glob O} /\ card Log.qs{1} <= card Log.qs{2} /\ (card Log.qs{1} < qH => ={glob Log})).
+    proc *; inline Log(Bound(O)).o Bound(O).o Bound(O).LO.o.
+    sp; if=> />; first by smt().
+    + wp; call (: true); auto=> /> &1 &2.
+      move=> le_c1_c2 h ^ + /h <<-.
+      have /#: Log.qs{1} `|` fset1 x{2} `|` fset1 x{2} = Log.qs{1} `|` fset1 x{2}.
+      by rewrite fsetP=> x; rewrite !(in_fsetU, in_fset1)=> /#.
+    auto=> /> &1 &2; rewrite fcardU fcard1; case: (x{2} \in Log.qs{2})=> [x_in_qs|x_notin_qs].
+    + have ->: Log.qs{2} `&` fset1 x{2} = fset1 x{2}.
+      + by rewrite fsetP=> x'; rewrite in_fsetI in_fset1 /#.
+      by rewrite fcard1 addzK.
+    have ->: Log.qs{2} `&` fset1 x{2} = fset0.
+    + rewrite fsetP=> x'; rewrite in_fsetI in_fset1.
+      case: (x' = x{2})=> [->>|].
+      + by rewrite x_notin_qs in_fset0.
+      by rewrite in_fset0.
+    by rewrite fcards0 /#.
+  by inline *; wp; call (: true).
   qed.
 end SetLog.
 
@@ -704,36 +740,39 @@ theory ROM_BadCall.
       lemma ROM_BadCall &m:
         Pr[G0(D,RO).main() @ &m: res] <= Pr[G1(D,RO).main() @ &m: res] + Pr[G2(D,RO).main() @ &m: res].
       proof.
-        cut ->: Pr[G2(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: mem Log.qs G1'.x].
-          byequiv (_: ={glob D} ==> res{1} = (mem Log.qs G1'.x){2})=> //.
-          proc.
-          call (_: ={glob Log, glob RO}); first by sim.
-          rnd; call (_: ={glob Log, glob RO}); first by sim.
-          by inline *; wp.
-        cut ->: Pr[G1(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: res].
-          by byequiv (_: ={glob D} ==> ={res}); first by sim.
-        cut: Pr[G0(D,RO).main() @ &m: res] <= Pr[G1'(D,RO).main() @ &m: res \/ mem Log.qs G1'.x].
-          byequiv (_: ={glob D} ==> !mem Log.qs{2} G1'.x{2} => ={res})=> //; last smt.
-          proc.
-          call (_: mem Log.qs G1'.x,
-                   ={glob Log} /\
-                   Log.qs{2} = dom RO.m{2} /\
-                   eq_except RO.m{1} RO.m{2} (pred1 G1'.x{2})).
-            by apply Da2L.
-            proc; inline RO.o; auto=> /> //= &1 &2 x2_notin_G1' eqe y _.
-            rewrite !inE !getP x2_notin_G1' /= oget_some dom_set eq_except_set //= eq_sym.
-            move: eqe; rewrite eq_exceptP !in_dom /pred1 /= => h.
-            split. by move=> + + /h eq_m; rewrite eq_m.
-            move=> h'; split=> + /h eq_m; rewrite eq_m h' //=.
-            by apply/fsetP=> x'; rewrite !inE in_dom /#.
-            by progress; apply (Log_o_ll RO); apply (RO_o_ll _); smt.
-            progress; exists* G1'.x; elim* => x; conseq (Log_o_ll RO _) (Log_o_stable RO x)=> //.
-            by apply (RO_o_ll _); smt.
-          inline RO.o; auto.
-          call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
-            by proc; inline RO.o; auto; smt.
-          by inline Log(RO).init RO.init; auto; smt.
-        by rewrite Pr [mu_or]; smt.
+      cut ->: Pr[G2(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: mem Log.qs G1'.x].
+      + byequiv (_: ={glob D} ==> res{1} = (mem Log.qs G1'.x){2})=> //.
+        proc.
+        call (_: ={glob Log, glob RO}); first by sim.
+        rnd; call (_: ={glob Log, glob RO}); first by sim.
+        by inline *; wp.
+      cut ->: Pr[G1(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: res].
+      + by byequiv (_: ={glob D} ==> ={res}); first by sim.
+      cut: Pr[G0(D,RO).main() @ &m: res] <= Pr[G1'(D,RO).main() @ &m: res \/ mem Log.qs G1'.x].
+      byequiv (_: ={glob D} ==> !mem Log.qs{2} G1'.x{2} => ={res})=> //; last smt().
+      proc.
+      call (_: mem Log.qs G1'.x,
+               ={glob Log} /\
+               Log.qs{2} = dom RO.m{2} /\
+               eq_except RO.m{1} RO.m{2} (pred1 G1'.x{2})).
+      + by apply Da2L.
+      + proc; inline RO.o; auto=> /> //= &1 &2 x2_notin_G1' eqe y _.
+        rewrite !inE !getP x2_notin_G1' /= oget_some dom_set eq_except_set //= eq_sym.
+        move: eqe; rewrite eq_exceptP !in_dom /pred1 /= => h.
+        split. by move=> + + /h eq_m; rewrite eq_m.
+        move=> h'; split=> + /h eq_m; rewrite eq_m h' //=.
+        by apply/fsetP=> x'; rewrite !inE in_dom /#.
+      + by progress; apply (Log_o_ll RO); apply (RO_o_ll _); smt(dsampleL).
+      + progress; exists* G1'.x; elim* => x; conseq (Log_o_ll RO _) (Log_o_stable RO x)=> //.
+        by apply (RO_o_ll _); smt(dsampleL).
+      + inline RO.o; auto.
+        call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
+        + proc; inline RO.o; auto=> /> &2 y _; rewrite dom_set /=.
+          by move=> x_in_m; rewrite fsetP=> x'; rewrite in_fsetU in_fset1 /#.
+        inline Log(RO).init RO.init; auto=> />; split=> [|_ r m y _].
+        + by rewrite fsetP=> x; rewrite dom0.
+        rewrite getP_eq set_eq_except /oget /#.
+      by rewrite Pr [mu_or]; smt(mu_bounded).
       qed.
     end section.
   end OnLog.
@@ -805,36 +844,39 @@ theory ROM_BadCall.
       lemma ROM_BadCall &m:
         Pr[G0(D,RO).main() @ &m: res] <= Pr[G1(D,RO).main() @ &m: res] + Pr[G2(D,RO).main() @ &m: res].
       proof.
-        cut ->: Pr[G2(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: mem Log.qs G1'.x].
-          byequiv (_: ={glob D} ==> res{1} = (mem Log.qs G1'.x){2})=> //.
-          proc.
-          call (_: ={glob Log, glob RO}); first by sim.
-          rnd; call (_: ={glob Log, glob RO}); first by sim.
-          by inline *; wp.
-        cut ->: Pr[G1(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: res].
-          by byequiv (_: ={glob D} ==> ={res}); first by sim.
-        cut: Pr[G0(D,RO).main() @ &m: res] <= Pr[G1'(D,RO).main() @ &m: res \/ mem Log.qs G1'.x].
-          byequiv (_: ={glob D} ==> !mem Log.qs{2} G1'.x{2} => ={res})=> //; last smt.
-          proc.
-          call (_: mem Log.qs G1'.x,
-                   ={glob Log} /\
-                   Log.qs{2} = dom RO.m{2} /\
-                   eq_except RO.m{1} RO.m{2} (pred1 G1'.x{2})).
-            by apply Da2L.
-            proc; inline *; sp; if=> //=; auto=> /> &1 &2 x2_notin_G1' eqe c y _.
-            rewrite !inE !getP x2_notin_G1' /= oget_some dom_set eq_except_set //= eq_sym.
-            move: eqe; rewrite eq_exceptP !in_dom /pred1 /= => h.
-            split. by move=> + + /h eq_m; rewrite eq_m.
-            move=> h'; split=> + /h eq_m; rewrite eq_m h' //=.
-            by apply/fsetP=> x'; rewrite !inE in_dom /#.
-            by progress; apply (Bound_o_ll RO); apply (RO_o_ll _); smt.
-            progress; exists* G1'.x; elim* => x; conseq (Bound_o_ll RO _) (Bound_o_stable RO x)=> //.
-            by apply (RO_o_ll _); smt.
-          inline RO.o; auto.
+      cut ->: Pr[G2(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: mem Log.qs G1'.x].
+      + byequiv (_: ={glob D} ==> res{1} = (mem Log.qs G1'.x){2})=> //.
+        proc.
+        call (_: ={glob Log, glob RO}); first by sim.
+        rnd; call (_: ={glob Log, glob RO}); first by sim.
+        by inline *; wp.
+      cut ->: Pr[G1(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: res].
+        by byequiv (_: ={glob D} ==> ={res}); first by sim.
+      cut: Pr[G0(D,RO).main() @ &m: res] <= Pr[G1'(D,RO).main() @ &m: res \/ mem Log.qs G1'.x].
+        byequiv (_: ={glob D} ==> !mem Log.qs{2} G1'.x{2} => ={res})=> //; last by smt().
+        proc.
+        call (_: mem Log.qs G1'.x,
+                 ={glob Log} /\
+                 Log.qs{2} = dom RO.m{2} /\
+                 eq_except RO.m{1} RO.m{2} (pred1 G1'.x{2})).
+        + by apply Da2L.
+        + proc; inline *; sp; if=> //=; auto=> /> &1 &2 x2_notin_G1' eqe c y _.
+          rewrite !inE !getP x2_notin_G1' /= oget_some dom_set eq_except_set //= eq_sym.
+          move: eqe; rewrite eq_exceptP !in_dom /pred1 /= => h.
+          split. by move=> + + /h eq_m; rewrite eq_m.
+          move=> h'; split=> + /h eq_m; rewrite eq_m h' //=.
+          by apply/fsetP=> x'; rewrite !inE in_dom /#.
+        + by progress; apply (Bound_o_ll RO); apply (RO_o_ll _); smt(dsampleL).
+        + progress; exists* G1'.x; elim* => x; conseq (Bound_o_ll RO _) (Bound_o_stable RO x)=> //.
+          by apply (RO_o_ll _); smt(dsampleL).
+        + inline RO.o; auto.
           call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
-            by proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto; smt.
-          by inline Bound(RO).init Log(RO).init RO.init; auto; smt.
-        by rewrite Pr [mu_or]; smt.
+          + proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto=> /> &2 _ y _.
+            by rewrite dom_set=> /= x_in_m; rewrite fsetP=> x'; rewrite in_fsetU in_fset1 /#.
+        inline Bound(RO).init Log(RO).init RO.init; auto=> />; split=> [|_ r m y _].
+        + by rewrite dom0.
+        by rewrite getP_eq set_eq_except /oget /#.
+      by rewrite Pr [mu_or]; smt(mu_bounded).
       qed.
     end section.
   end OnBound.
@@ -900,46 +942,46 @@ theory ROM_Bad.
                           !bad (glob O2){2} => ={res} /\ Phi (glob O1){1} (glob O2){2}] =>
       Pr[Experiment(O1,D).main() @ &m: res] <= Pr[Experiment(O2,D).main() @ &m: res] + qH%r * eps.
     proof.
-      move=> eps_pos badinit eq_init bad_preserved bad1 eq_upto.
-      apply (ler_trans (Pr[Experiment(O2,D).main() @ &m: res] + Pr[Experiment(O2,D).main() @ &m: bad (glob O2)])).
-        cut: Pr[Experiment(O1,D).main() @ &m: res] <= Pr[Experiment(O2,D).main() @ &m: res \/ bad (glob O2)].
-          byequiv (_: ={glob D} ==> !bad (glob O2){2} => ={res})=> //; last smt.
-          proc.
-          call (_: bad (glob O2),
-                   ={glob Bound} /\
-                   Phi (glob O1){1} (glob O2){2}).
-            by apply D_distinguish_ll.
-            by proc; sp; if=> //; wp; call eq_upto.
-            by progress; proc; sp; if=> //; wp; call O1_o_ll.
-            by progress; proc; sp; if=> //; wp;
-               call (_: bad (glob O2) ==> bad (glob O2));
-                 first by conseq O2_o_ll bad_preserved.
-          call (_: true ==> ={glob Bound} /\ Phi (glob O1){1} (glob O2){2} /\ !bad (glob O2){2}).
-            proc; inline Bound(O1).init Bound(O2).init; wp.
-            by call (_: true ==> Phi (glob O1){1} (glob O2){2} /\ !bad (glob O2){2});
-                 first conseq eq_init _ badinit=> //.
-          by skip; smt.
-        by rewrite Pr [mu_or]; smt.
-      cut: Pr[Experiment(O2,D).main() @ &m: bad (glob O2)] <= qH%r * eps.
-        cut ->: Pr[Experiment(O2,D).main() @ &m: bad (glob O2)]
-                = Pr[Experiment(O2,D).main() @ &m: bad (glob O2) /\ Bound.c <= qH].
-          byequiv (_: ={glob D, glob O2} ==> bad (glob O2){1} <=> bad (glob O2){2} /\ Bound.c{2} <= qH)=> //.
-          proc.
-          call (_: ={glob O2, glob Bound} /\ Bound.c{2} <= qH)=> //.
-            by proc; sp; if=> //; wp; call (_: true); skip; smt.
-          call (_: ={glob O2} ==> ={glob O2, glob Bound} /\ Bound.c{2} <= qH).
-            by proc*; inline Bound(O2).init; wp; call (_: true); skip; smt.
-          done.
-        fel 1 Bound.c (fun x, eps) qH (bad (glob O2)) [Bound(O2).o: (Bound.c < qH)]=> //.
-          rewrite Bigreal.sumr_const count_predT size_range /=.
-          by move: qH_pos; smt ml=0.
-          by call (_: true ==> !bad (glob O2) /\ Bound.c = 0);
-            first proc; wp; call badinit.
-          proc; sp;rcondt 1 => //.
-          by wp; call (_: !bad (glob O2) ==> bad (glob O2)).
-          by progress; proc; sp; if=> //; wp; call (_: true); skip; smt.
-          by progress; proc; rcondf 2; auto; smt.
-      smt.
+    move=> eps_pos badinit eq_init bad_preserved bad1 eq_upto.
+    apply (ler_trans (Pr[Experiment(O2,D).main() @ &m: res] + Pr[Experiment(O2,D).main() @ &m: bad (glob O2)])).
+      cut: Pr[Experiment(O1,D).main() @ &m: res] <= Pr[Experiment(O2,D).main() @ &m: res \/ bad (glob O2)].
+        byequiv (_: ={glob D} ==> !bad (glob O2){2} => ={res})=> //; last smt().
+        proc.
+        call (_: bad (glob O2),
+                 ={glob Bound} /\
+                 Phi (glob O1){1} (glob O2){2}).
+          by apply D_distinguish_ll.
+          by proc; sp; if=> //; wp; call eq_upto.
+          by progress; proc; sp; if=> //; wp; call O1_o_ll.
+          by progress; proc; sp; if=> //; wp;
+             call (_: bad (glob O2) ==> bad (glob O2));
+               first by conseq O2_o_ll bad_preserved.
+        call (_: true ==> ={glob Bound} /\ Phi (glob O1){1} (glob O2){2} /\ !bad (glob O2){2}).
+          proc; inline Bound(O1).init Bound(O2).init; wp.
+          by call (_: true ==> Phi (glob O1){1} (glob O2){2} /\ !bad (glob O2){2});
+               first conseq eq_init _ badinit=> //.
+        by skip=> /#.
+      by rewrite Pr [mu_or]; smt(mu_bounded).
+    cut: Pr[Experiment(O2,D).main() @ &m: bad (glob O2)] <= qH%r * eps.
+      cut ->: Pr[Experiment(O2,D).main() @ &m: bad (glob O2)]
+              = Pr[Experiment(O2,D).main() @ &m: bad (glob O2) /\ Bound.c <= qH].
+        byequiv (_: ={glob D, glob O2} ==> bad (glob O2){1} <=> bad (glob O2){2} /\ Bound.c{2} <= qH)=> //.
+        proc.
+        call (_: ={glob O2, glob Bound} /\ Bound.c{2} <= qH)=> //.
+          by proc; sp; if=> //; wp; call (_: true); skip=> /#.
+        call (_: ={glob O2} ==> ={glob O2, glob Bound} /\ Bound.c{2} <= qH).
+          by proc*; inline Bound(O2).init; wp; call (_: true); skip; smt(qH_pos).
+        done.
+      fel 1 Bound.c (fun x, eps) qH (bad (glob O2)) [Bound(O2).o: (Bound.c < qH)]=> //.
+        rewrite Bigreal.sumr_const count_predT size_range /=.
+        by move: qH_pos=> /#.
+        by call (_: true ==> !bad (glob O2) /\ Bound.c = 0);
+          first proc; wp; call badinit.
+        proc; sp;rcondt 1 => //.
+        by wp; call (_: !bad (glob O2) ==> bad (glob O2)).
+        by progress; proc; sp; if=> //; wp; call (_: true); skip; smt(dsampleL).
+        by progress; proc; rcondf 2; auto; smt(dsampleL).
+    smt(mu_bounded).
     qed.
   end section.
 end ROM_Bad.

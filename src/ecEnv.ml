@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -24,6 +25,7 @@ module Mp   = EcPath.Mp
 module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
 module TC   = EcTypeClass
+module Mint = EcMaps.Mint
 
 (* -------------------------------------------------------------------- *)
 type 'a suspension = {
@@ -139,7 +141,7 @@ type preenv = {
   env_tci      : ((ty_params * ty) * tcinstance) list;
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
-  env_atbase   : Sp.t;
+  env_atbase   : (path list Mint.t) Msym.t;
   env_ntbase   : (path * env_notation) list;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : ctheory_item list;     (* in reverse order *)
@@ -242,7 +244,7 @@ let empty gstate =
     env_tci      = [];
     env_tc       = TC.Graph.empty;
     env_rwbase   = Mip.empty;
-    env_atbase   = Sp.empty;
+    env_atbase   = Msym.empty;
     env_ntbase   = [];
     env_modlcs   = Sid.empty;
     env_item     = [];
@@ -1343,16 +1345,40 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Auto = struct
-  let add ~local (ps : Sp.t) (env : env) =
+  let dname : symbol = ""
+
+  let updatedb ~level ?base (ps : path list) (db : (path list Mint.t) Msym.t) =
+    let nbase = (odfl dname base) in
+    let ps' = Msym.find_def Mint.empty nbase db in
+    let ps' =
+      let doit x = Some (ofold (fun x ps -> ps @ x) ps x) in
+      Mint.change doit level ps' in
+    Msym.add nbase ps' db
+
+  let add ~local ~level ?base (ps : path list) (env : env) =
     { env with
-        env_atbase = Sp.union env.env_atbase ps;
-        env_item   = CTh_auto (local, ps) :: env.env_item; }
+        env_atbase = updatedb ?base ~level ps env.env_atbase;
+        env_item   = CTh_auto (local, level, base, ps) :: env.env_item; }
 
-  let add1 ~local (p : path) (env : env) =
-    add ~local (Sp.singleton p) env
+  let add1 ~local ~level ?base (p : path) (env : env) =
+    add ~local ?base ~level [p] env
 
-  let get (env : env) =
-    env.env_atbase
+  let get_core ?base (env : env) =
+    Msym.find_def Mint.empty (odfl dname base) env.env_atbase
+
+  let flatten_db (db : path list Mint.t) =
+    Mint.fold_left (fun ps _ ps' -> ps @ ps') [] db
+
+  let get ?base (env : env) =
+    flatten_db (get_core ?base env)
+
+  let getall (bases : symbol list) (env : env) =
+    let dbs = List.map (fun base -> get_core ~base env) bases in
+    let dbs =
+      List.fold_left (fun db mi ->
+        Mint.union (fun _ sp1 sp2 -> Some (sp1 @ sp2)) db mi)
+        Mint.empty dbs
+    in flatten_db dbs
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2344,6 +2370,12 @@ module NormMp = struct
     EcTypes.pv_equal (norm_pvar env pv1) (norm_pvar env pv2)
 end
 
+let rec ty_hnorm (ty : ty) (env : env) =
+    match ty.ty_node with
+    | Tconstr (p, tys) when Ty.defined p env -> ty_hnorm (Ty.unfold p tys env) env
+    | Tglob p -> NormMp.norm_tglob env p
+    | _ -> ty
+
 (* -------------------------------------------------------------------- *)
 module ModTy = struct
   type t = module_sig
@@ -2433,6 +2465,7 @@ module ModTy = struct
     { mis_params = params;
       mis_body   = List.map do1 items }
 end
+
 
 (* -------------------------------------------------------------------- *)
 module Op = struct
@@ -2777,9 +2810,9 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let bind_at_cth =
-    let for1 _path base = function
-      | CTh_auto (false, ps) ->
-         Some (Sp.union base ps)
+    let for1 _path db = function
+      | CTh_auto (false, level, base, ps) ->
+         Some (Auto.updatedb ?base ~level ps db)
       | _ -> None
 
     in bind_base_cth for1
@@ -2910,9 +2943,9 @@ module Theory = struct
           let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
           if List.is_empty ps then None else Some (CTh_addrw (p, ps))
 
-      | CTh_auto (lc, ps) ->
-          let ps = Sp.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
-          if Sp.is_empty ps then None else Some (CTh_auto (lc, ps))
+      | CTh_auto (lc, lvl, base, ps) ->
+          let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
+          if List.is_empty ps then None else Some (CTh_auto (lc, lvl, base, ps))
 
       | (CTh_export p) as item ->
           if Sp.mem p cleared then None else Some item

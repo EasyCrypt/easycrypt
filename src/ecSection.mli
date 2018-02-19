@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -22,7 +23,7 @@ val items_of_locals : locals -> EcTheory.ctheory_item list
 val is_local : [`Lemma | `Module] -> path -> locals -> bool
 val is_mp_local : mpath -> locals -> bool
 
-val form_use_local : form  -> locals -> bool
+val form_use_local : form  -> locals -> mpath option
 
 val form_use_local_or_abs   : form        -> locals -> bool
 val module_use_local_or_abs : module_expr -> locals -> bool

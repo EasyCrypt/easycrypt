@@ -1,9 +1,13 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+module Enum = BatEnum
 
 (* -------------------------------------------------------------------- *)
 exception Unexpected
@@ -198,6 +202,15 @@ let ofold (f : 'a -> 'b -> 'b) (v : 'b) (x : 'a option) =
 
 let omap (f : 'a -> 'b) (x : 'a option) =
   match x with None -> None | Some x -> Some (f x)
+
+let opair (f : 'a -> 'b option) x y =
+  match f x with
+  | Some fx -> begin
+      match f y with
+      | Some fy -> Some (fx, fy)
+      | None -> None
+    end
+  | _ -> None
 
 let omap_dfl (f : 'a -> 'b) (d : 'b) (x : 'a option) =
   match x with None -> d  | Some x -> f x

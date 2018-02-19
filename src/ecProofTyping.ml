@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -12,6 +13,8 @@ open EcTypes
 open EcFol
 open EcEnv
 open EcCoreGoal
+
+module Msym = EcSymbols.Msym
 
 (* -------------------------------------------------------------------- *)
 type ptnenv = ty Mid.t * EcUnify.unienv
@@ -101,22 +104,22 @@ let tc1_process_prhl_formula tc pf =
   tc1_process_prhl_form tc tbool pf
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_stmt tc mt c =
+let tc1_process_stmt  ?map tc mt c =
   let hyps = FApi.tc1_hyps tc in
   let hyps = LDecl.push_active (mhr,mt) hyps in
   let env  = LDecl.toenv hyps in
   let ue   = unienv_of_hyps hyps in
-  let c    = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt env ue c) in
+  let c    = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt ?map env ue c) in
   let esub = Exn.recast_pe !!tc hyps (fun () -> Tuni.offun (EcUnify.UniEnv.close ue)) in
   let esub = { e_subst_id with es_ty = esub; } in
   EcModules.s_subst esub c
 
 
-let tc1_process_prhl_stmt tc side c =
+let tc1_process_prhl_stmt ?map tc side c =
   let concl = FApi.tc1_goal tc in
   let es = match concl.f_node with FequivS es -> es | _ -> assert false in
   let mt   = snd (match side with `Left -> es.es_ml | `Right -> es.es_mr) in
-  tc1_process_stmt tc mt c
+  tc1_process_stmt tc mt ?map c
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_exp tc side ty e =

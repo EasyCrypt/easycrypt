@@ -1,0 +1,58 @@
+require import AllCore List Int IntDiv Real.
+require import Distr.
+
+(*
+  TODO:
+    - Dynamic index range? Allow the game to choose it?
+    - Provide another version for arbitrary distributions where the
+      probability is upper-bounded by maximum probability of element
+      in support of distribution.
+*)
+type tval.
+op indices : { tval list | indices <> [] } as indices_not_nil.
+abbrev card = size (undup indices).
+
+type tin, tres.
+
+module type Game = {
+  proc main(x:tin): tres
+}.
+
+module Guess (G:Game) = {
+  proc main(x:tin): tval * tres = {
+    var i, o;
+
+    o = G.main(x);
+    i = $duniform indices;
+    return (i,o);
+  }
+}.
+
+lemma PBound (G <: Game)
+             (phi : (glob G) -> tres -> bool)
+             (psi : (glob G) -> tres -> tval)
+             x0 &m:
+  (forall gG o, psi gG o \in indices) =>
+  (1%r/card%r) * Pr[G.main(x0) @ &m: phi (glob G) res]
+  = Pr[Guess(G).main(x0) @ &m:
+         phi (glob G) res.`2 /\
+         res.`1 = psi (glob G) res.`2].
+proof.
+move=> psi_in_indices.
+byphoare (_: (glob G) = (glob G){m} /\ x0 = x ==>
+             phi (glob G) (snd res) /\
+             res.`1 = psi (glob G) res.`2)=> //.
+pose p:= Pr[G.main(x0) @ &m: phi (glob G) res].
+proc.
+seq  1: (phi (glob G) o)
+        (p) (1%r/card%r)
+        _ 0%r => //.
+  (* FIXME: This is more verbose than it should be! *)
++ call (: (glob G) = (glob G){m} /\ x = x0 ==> phi (glob G) res) => //.
+  bypr=> &m0 @/p [#] eq_globs ->.
+  byequiv (: ={glob G, x} ==> ={glob G, res})=> //=.
+  by proc true.
++ rnd (pred1 (psi (glob G) o)); skip=> /> &m0.
+  by rewrite duniform1E psi_in_indices.
+by hoare; auto=> /> &m0 ->.
+qed.

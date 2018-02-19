@@ -1,12 +1,14 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcLocation
+open EcSymbols
 open EcParsetree
 open EcFol
 open EcCoreGoal
@@ -87,11 +89,14 @@ val process_elim        : prevert * pqsymbol option -> backward
 val process_case        : ?doeq:bool -> prevertv -> backward
 val process_exists      : ppt_arg located list -> backward
 val process_congr       : backward
+val process_auto        : ?bases:symbol list -> ?depth:int -> backward
+val process_solve       : ?bases:symbol list -> ?depth:int -> backward
 val process_trivial     : backward
 val process_change      : pformula -> backward
 val process_simplify    : preduction -> backward
-val process_pose        : psymbol -> rwocc -> pformula -> backward
+val process_pose        : psymbol -> ptybindings -> rwocc -> pformula -> backward
 val process_done        : backward
+val process_wlog        : psymbol list -> pformula -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_algebra : [`Solve] -> [`Ring|`Field] -> psymbol list -> backward

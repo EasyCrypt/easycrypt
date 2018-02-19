@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -30,7 +31,7 @@ and theory_item =
   | Th_typeclass of (symbol * typeclass)
   | Th_baserw    of symbol
   | Th_addrw     of EcPath.path * EcPath.path list
-  | Th_auto      of (bool * Sp.t)
+  | Th_auto      of (bool * int * symbol option * path list)
 
 and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
 and thmode     = [ `Abstract | `Concrete ]
@@ -59,7 +60,7 @@ and ctheory_item =
   | CTh_typeclass of (symbol * typeclass)
   | CTh_baserw    of symbol
   | CTh_addrw     of EcPath.path * EcPath.path list
-  | CTh_auto      of (bool * Sp.t)
+  | CTh_auto      of (bool * int * symbol option * path list)
 
 and ctheory_clone = {
   cthc_base : EcPath.path;

@@ -1,9 +1,13 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+module Enum = BatEnum
 
 (* -------------------------------------------------------------------- *)
 exception Unexpected
@@ -124,6 +128,7 @@ val oiter      : ('a -> unit) -> 'a option -> unit
 val obind      : ('a -> 'b option) -> 'a option -> 'b option
 val ofold      : ('a -> 'b -> 'b) -> 'b -> 'a option -> 'b
 val omap       : ('a -> 'b) -> 'a option -> 'b option
+val opair      : ('a -> 'b option) -> 'a -> 'a -> ('b * 'b) option
 val oif        : ('a -> bool) -> 'a option -> bool
 val odfl       : 'a -> 'a option -> 'a
 val ofdfl      : (unit -> 'a) -> 'a option -> 'a

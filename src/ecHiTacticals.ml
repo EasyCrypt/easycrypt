@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -44,6 +45,11 @@ let rec process1_debug (_ttenv : ttenv) (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 and process1_by (ttenv : ttenv) (t : ptactic list option) (tc : tcenv1) =
   t_onall process_done (process1_seq ttenv (odfl [] t) tc)
+
+(* -------------------------------------------------------------------- *)
+and process1_solve (_ttenv : ttenv) (i, t) (tc : tcenv1) =
+  let bases = omap (fun t -> List.map unloc t) t in
+  process_solve ?bases ?depth:i tc
 
 (* -------------------------------------------------------------------- *)
 and process1_do (ttenv : ttenv) (b, n) (t : ptactic_core) (tc : tcenv1) =
@@ -122,34 +128,42 @@ and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =
   aux ts (tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
+and process1_nstrict (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
+  if ttenv.tt_smtmode <> `Strict then
+    tc_error !!tc "try! can only be used in strict proof mode";
+  let ttenv = { ttenv with tt_smtmode = `Standard } in
+  process1_try ttenv t tc
+
+(* -------------------------------------------------------------------- *)
 and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
   let engine = process1_core ttenv in
 
   let tx =
     match unloc t with
-    | Preflexivity      -> process_reflexivity
-    | Passumption       -> process_assumption
-    | Psmt pi           -> process_smt ~loc:(loc t) ttenv pi
-    | Psplit            -> process_split
-    | Pfield st         -> process_algebra `Solve `Field st
-    | Pring st          -> process_algebra `Solve `Ring  st
-    | Palg_norm         -> EcStrongRing.t_alg_eq
-    | Pexists fs        -> process_exists fs
-    | Pleft             -> process_left
-    | Pright            -> process_right
-    | Pcongr            -> process_congr
-    | Ptrivial          -> process_trivial
-    | Pelim pe          -> process_elim pe
-    | Papply pe         -> process_apply ~implicits:ttenv.tt_implicits pe
-    | Pcut (m, ip, f, t)-> process_cut ~mode:m engine ttenv (ip, f, t)
-    | Pcutdef (ip, f)   -> process_cutdef ttenv (ip, f)
-    | Pmove pr          -> process_move pr.pr_view pr.pr_rev
-    | Pclear l          -> process_clear l
-    | Prewrite (ri, x)  -> process_rewrite ttenv ?target:x ri
-    | Psubst   ri       -> process_subst ri
-    | Psimplify ri      -> process_simplify ri
-    | Pchange pf        -> process_change pf
-    | Ppose (x, o, p)   -> process_pose x o p
+    | Preflexivity        -> process_reflexivity
+    | Passumption         -> process_assumption
+    | Psmt pi             -> process_smt ~loc:(loc t) ttenv pi
+    | Psplit              -> process_split
+    | Pfield st           -> process_algebra `Solve `Field st
+    | Pring st            -> process_algebra `Solve `Ring  st
+    | Palg_norm           -> EcStrongRing.t_alg_eq
+    | Pexists fs          -> process_exists fs
+    | Pleft               -> process_left
+    | Pright              -> process_right
+    | Pcongr              -> process_congr
+    | Ptrivial            -> process_trivial
+    | Pelim pe            -> process_elim pe
+    | Papply pe           -> process_apply ~implicits:ttenv.tt_implicits pe
+    | Pcut (m, ip, f, t)  -> process_cut ~mode:m engine ttenv (ip, f, t)
+    | Pcutdef (ip, f)     -> process_cutdef ttenv (ip, f)
+    | Pmove pr            -> process_move pr.pr_view pr.pr_rev
+    | Pclear l            -> process_clear l
+    | Prewrite (ri, x)    -> process_rewrite ttenv ?target:x ri
+    | Psubst   ri         -> process_subst ri
+    | Psimplify ri        -> process_simplify ri
+    | Pchange pf          -> process_change pf
+    | Ppose (x, xs, o, p) -> process_pose x xs o p
+    | Pwlog (ids, f)      -> process_wlog ids f
 
     | _ -> assert false
   in
@@ -205,7 +219,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Peager infos              -> curry EcPhlEager.process_eager infos
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto
-
+    | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
   in
 
   try  tx tc
@@ -288,6 +302,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Plogic    t           -> `One (process1_logic    ttenv (mk_loc loc t))
     | PPhl      t           -> `One (process1_phl      ttenv (mk_loc loc t))
     | Pby       t           -> `One (process1_by       ttenv t)
+    | Psolve    t           -> `One (process1_solve    ttenv t)
     | Pdo       ((b, n), t) -> `One (process1_do       ttenv (b, n) t)
     | Ptry      t           -> `One (process1_try      ttenv t)
     | Por       (t1, t2)    -> `One (process1_or       ttenv t1 t2)
@@ -296,6 +311,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Pprogress (o, t)      -> `One (process1_progress ttenv o t)
     | Pdebug                -> `One (process1_debug    ttenv)
     | Psubgoal  tt          -> `All (process_chain     ttenv tt)
+    | Pnstrict  t           -> `One (process1_nstrict  ttenv t)
   in
   (match tactic with `One t -> t_onall t | `All t -> t) tc
 

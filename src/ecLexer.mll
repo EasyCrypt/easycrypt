@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -94,6 +95,7 @@
     "suff"        , SUFF       ;        (* KW: tactic *)
     "elim"        , ELIM       ;        (* KW: tactic *)
     "clear"       , CLEAR      ;        (* KW: tactic *)
+    "wlog"        , WLOG       ;        (* KW: tactic *)
 
     (* Auto tactics *)
     "apply"       , APPLY      ;        (* KW: tactic *)
@@ -120,8 +122,10 @@
     "by"          , BY         ;        (* KW: bytac *)
     "reflexivity" , REFLEX     ;        (* KW: bytac *)
     "done"        , DONE       ;        (* KW: bytac *)
+    "solve"       , SOLVE      ;        (* KW: bytac *)
 
     (* PHL: tactics *)
+    "replace"     , REPLACE    ;        (* KW: tactic *)
     "transitivity", TRANSITIVITY;       (* KW: tactic *)
     "symmetry"    , SYMMETRY   ;        (* KW: tactic *)
     "seq"         , SEQ        ;        (* KW: tactic *)
@@ -216,6 +220,8 @@
     ("//=" , (SLASHSLASHEQ     , true ));
     ("/>"  , (SLASHGT          , true ));
     ("|>"  , (PIPEGT           , true ));
+    ("//>" , (SLASHSLASHGT     , true ));
+    ("||>" , (PIPEPIPEGT       , true ));
     ("=>"  , (IMPL             , true ));
     ("|"   , (PIPE             , true ));
     (":="  , (CEQ              , true ));

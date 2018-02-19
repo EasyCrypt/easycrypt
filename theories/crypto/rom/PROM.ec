@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -321,7 +322,7 @@ abstract theory GenEager.
   lemma RRO_resample_ll : islossless RRO.resample.
   proof. 
   proc; call (iter_ll RRO.I _)=> //.
-  by proc; auto=> /= ?; apply/sampleto_ll. 
+  proc; auto=> /> ?; apply/sampleto_ll. 
   qed.
 
   lemma eager_init :
@@ -726,4 +727,5 @@ abstract theory GenEager.
     by rewrite fmapP=> x; rewrite restrP mapP; case: (RO.m{ml}.[x]).
     qed.
   end section.
+
 end GenEager.

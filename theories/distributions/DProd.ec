@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -123,13 +124,13 @@ module S = {
 equiv sample_sample2 : S.sample ~ S.sample2 : true ==> ={res}.
 proof.
 bypr (res{1}) (res{2}) => // &m1 &m2 a.
-have ->: Pr[S.sample() @ &m1 : a = res] = mu1 (d1 `*` d2) a.
-+ by byphoare=> //=; proc; rnd (pred1 a); skip=> />;rewrite pred1E.
+have ->: Pr[S.sample() @ &m1 : res = a] = mu1 (d1 `*` d2) a.
++ by byphoare=> //=; proc; rnd; skip. 
 elim: a=> a1 a2; have -> := dprod1E d1 d2 a1 a2.
 byphoare=> //=.
-proc; seq  1: (a1 = r1) (mu1 d1 a1) (mu1 d2 a2) _ 0%r true=> //=.
-+ by rnd (pred1 a1); skip=> />; rewrite pred1E.
-+ by rnd (pred1 a2); skip=> />; rewrite pred1E.
+proc; seq  1: (r1 = a1) (mu1 d1 a1) (mu1 d2 a2) _ 0%r true=> //=.
++ by rnd.  
++ by rnd.
 by hoare; auto=> /> ? ->.
 qed.
 end ProdSampling.

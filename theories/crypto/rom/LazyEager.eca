@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -76,13 +77,7 @@ section.
       by call (_: ={glob D} ==> LazyRO.RO.m{1} = IND_Lazy.H.m{2});
         first by proc; wp.
     inline IND_Lazy.resample.
-    while{2} (true) (size work{2}).
-      auto; progress.
-        by apply dsampleL.
-        move: (work{hr}) H=> {H1 v H0 &hr dsampleL}.
-        by case=> //=; smt.
-    auto; progress.
-    by rewrite -size_eq0; apply/lez_anti; rewrite size_ge0.
+    while{2} (true) (size work{2});auto; smt (head_behead size_eq0 size_ge0).
   qed.
 
   local module IND_Eager = {

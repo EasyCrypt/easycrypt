@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -416,5 +417,3 @@ let process_inline infos tc =
        process_inline_codepos side pos tc
 
   | `All side -> process_inline_all side None tc
-
-  | `ByPattern _ -> failwith "not-implemented"

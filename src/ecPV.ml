@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -202,7 +203,6 @@ module PVM = struct
         check_binding (fst hs.bhs_m) s;
         EcFol.f_map (fun ty -> ty) aux f
       | Fpr pr ->
-        check_binding EcFol.mhr s;
         check_binding pr.pr_mem s;
         EcFol.f_map (fun ty -> ty) aux f
       | Fquant(q,b,f1) ->

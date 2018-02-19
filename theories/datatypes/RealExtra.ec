@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -129,6 +130,15 @@ instance field with real
   proof ofint1    by smt ml=0
   proof ofintS    by smt ml=0
   proof ofintN    by smt ml=0.
+
+(* -------------------------------------------------------------------- *)
+op floor : real -> int.
+op ceil  : real -> int.
+
+axiom floor_bound (x:real) : x - 1%r <= (floor x)%r <= x.
+axiom  ceil_bound (x:real) : x <= (ceil x)%r <= x + 1%r.
+axiom from_int_floor n : floor n%r = n.
+axiom from_int_ceil  n : ceil  n%r = n.
 
 (* -------------------------------------------------------------------- *)
 (* WARNING Lemmas used by tactics: *)

@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -1196,6 +1197,18 @@ let is_bdHoareS  f = is_from_destr destr_bdHoareS  f
 let is_bdHoareF  f = is_from_destr destr_bdHoareF  f
 let is_pr        f = is_from_destr destr_pr        f
 let is_eq_or_iff f = (is_eq f) || (is_iff f)
+
+(* -------------------------------------------------------------------- *)
+let split_args f =
+  match f_node f with
+  | Fapp (f, args) -> (f, args)
+  | _ -> (f, [])
+
+(* -------------------------------------------------------------------- *)
+let split_fun f =
+  match f_node f with
+  | Fquant (Llambda, bds, body) -> (bds, body)
+  | _ -> ([], f)
 
 (* -------------------------------------------------------------------- *)
 let quantif_of_equantif (qt : equantif) =

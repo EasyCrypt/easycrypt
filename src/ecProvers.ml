@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -34,7 +35,7 @@ end = struct
     let pop (version : string) =
       let rex = EcRegexp.regexp "^([0-9]+)[.-]?(.*)" in
       match EcRegexp.exec (`C rex) version with
-      | Some m -> 
+      | Some m ->
          let m = EcRegexp.Match.groups m in
          (int_of_string (oget m.(1)), (oget m.(2)))
 
@@ -321,6 +322,7 @@ type prover_infos = {
   pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
+  pr_selected  : bool;
 }
 
 
@@ -336,6 +338,7 @@ let dft_prover_infos = {
   pr_max       = 50;
   pr_wanted    = Hints.empty;
   pr_unwanted  = Hints.empty;
+  pr_selected  = false;
 }
 
 let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]

@@ -16,7 +16,10 @@ notifications:
   - tracker@easycrypt.info
 before_install:
 - docker pull easycryptpa/ec-build-box
+after_failure:
+- >-
+  [ -f report.log ] && curl -sT report.log http://chunk.io/
 script:
 - >-
   docker run -v $PWD:/home/ci/easycrypt easycryptpa/ec-build-box
-  sh -c "cd easycrypt && opam config exec -- make ${TARGETS}"
+  sh -c "git clone easycrypt easycrypt.dev && cd easycrypt.dev && opam config exec -- make ${TARGETS}"

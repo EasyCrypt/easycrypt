@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -153,16 +154,24 @@ abstract theory ZModule.
 
   lemma mulrNz (x : t) (n : int): intmul x (-n) = -(intmul x n).
   proof.
-    case: (n = 0)=> [->|nz_c]; first by rewrite oppz0 mulr0z oppr0.
-    rewrite /intmul oppz_lt0 oppzK ltz_def nz_c lezNgt /=.
-    by case: (n < 0); rewrite ?opprK.
+  case: (n = 0)=> [->|nz_c]; first by rewrite oppz0 mulr0z oppr0.
+  rewrite /intmul oppz_lt0 oppzK ltz_def nz_c lezNgt /=.
+  by case: (n < 0); rewrite ?opprK.
   qed.
 
   lemma mulrS (x : t) (n : int): 0 <= n =>
     intmul x (n+1) = x + intmul x n.
   proof.
-    move=> ge0n; rewrite !intmulpE 1:addz_ge0 //.
-    by rewrite !AddMonoid.iteropE iterS.
+  move=> ge0n; rewrite !intmulpE 1:addz_ge0 //.
+  by rewrite !AddMonoid.iteropE iterS.
+  qed.
+
+  lemma mulNrz x n : intmul (- x) n = - (intmul x n).
+  proof.
+  elim/intwlog: n => [n h| | n ge0_n ih].
+  + by rewrite -(@oppzK n) !(@mulrNz _ (- n)) h.
+  + by rewrite !mulr0z oppr0.
+  + by rewrite !mulrS // ih opprD.
   qed.
 end ZModule.
 
@@ -448,6 +457,41 @@ abstract theory ComRing.
     by rewrite addzAC !exprS ?addz_ge0 // ih mulrA.
   qed.
 
+  lemma expr0n n : 0 <= n => exp zeror n = if n = 0 then oner else zeror.
+  proof.
+  elim: n => [|n ge0_n _]; first by rewrite expr0.
+  by rewrite exprS // mul0r addz1_neq0.
+  qed.
+
+  lemma expr0z z : exp zeror z = if z = 0 then oner else zeror.
+  proof.
+  case: (0 <= z) => [/expr0n // | /ltzNge lt0_z].
+  rewrite -{1}(@oppzK z) exprN; have ->/=: z <> 0 by smt().
+  rewrite invr_eq0 expr0n ?oppz_ge0 1:ltzW //.
+  by have ->/=: -z <> 0 by smt().
+  qed.
+
+  lemma expr1z z : exp oner z = oner.
+  proof.
+  elim/intwlog: z.
+  + by move=> n h; rewrite -(@oppzK n) exprN h invr1.
+  + by rewrite expr0.
+  + by move=> n ge0_n ih; rewrite exprS // mul1r ih.
+  qed.
+
+  lemma sqrrD x y :
+    exp (x + y) 2 = exp x 2 + intmul (x * y) 2 + exp y 2.
+  proof.
+  by rewrite !expr2 mulrDl !mulrDr mulr2z !addrA (@mulrC y x).
+  qed.
+
+  lemma sqrrN x : exp (-x) 2 = exp x 2.
+  proof. by rewrite !expr2 mulrNN. qed.
+
+  lemma sqrrB x y :
+    exp (x - y) 2 = exp x 2 - intmul (x * y) 2 + exp y 2.
+  proof.   by rewrite sqrrD sqrrN mulrN mulNrz. qed.
+
   lemma signr_odd n : 0 <= n => exp (-oner) (b2i (odd n)) = exp (-oner) n.
   proof.
     elim: n => [|n ge0_nih]; first by rewrite odd0 expr0.
@@ -488,6 +532,14 @@ abstract theory IDomain.
 
   lemma mulf_neq0 (x y : t): x <> zeror => y <> zeror => x * y <> zeror.
   proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0; smt. qed.
+
+  lemma expf_eq0 x n : (exp x n = zeror) <=> (n <> 0 /\ x = zeror).
+  proof.
+  elim/intwlog: n => [n| |n ge0_n ih].
+  + by rewrite exprN invr_eq0 /#.
+  + by rewrite expr0 oner_neq0.
+  by rewrite exprS // mulf_eq0 ih addz1_neq0 ?andKb.
+  qed.
 
   lemma mulfI (x : t): x <> zeror => injective (( * ) x).
   proof.
@@ -536,6 +588,14 @@ abstract theory Field.
     (have nz_Vy1: invr y1 <> zeror by rewrite invr_eq0);
     (have nz_Vy2: invr y2 <> zeror by rewrite invr_eq0).
   by move/(mulIf _ nz_Vy1)/(mulIf _ nz_Vy2).
+  qed.
+
+  lemma expfM x y n : exp (x * y) n = exp x n * exp y n.
+  proof.
+  elim/intwlog: n => [n h | | n ge0_n ih].
+  + by rewrite -(@oppzK n) !(@exprN _ (-n)) h invfM.
+  + by rewrite !expr0 mulr1.
+  + by rewrite !exprS // mulrCA -!mulrA -ih mulrCA.
   qed.
 end Field.
 

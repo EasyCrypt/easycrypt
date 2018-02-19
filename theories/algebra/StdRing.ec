@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -43,6 +44,14 @@ theory RField.
 
   lemma nosmt double_half (x : real) : x / 2%r + x / 2%r = x.
   proof. by rewrite -ofintR -mulrDl -mul1r2z -mulrA divff // ofintR. qed.
+
+  lemma powrE (x : real) (n : int) : x ^ n = exp x n.
+  proof.
+  elim/intwlog: n => [n h| |n gt0_n ih].
+  + by rewrite -(oppzK n) powrN exprN h.
+  + by rewrite powr0 expr0 fromint1.
+  + by rewrite !(powrS, exprS) // ih mulrC.
+  qed.
 end RField.
 
 (* -------------------------------------------------------------------- *)

@@ -1,0 +1,531 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
+require import AllCore List Distr Dexcepted FelTactic.
+require import StdOrder StdBigop.
+import RealOrder Bigreal.
+require Dice_sampling.
+
+type input.
+type t.
+  
+op d : input -> t distr.
+axiom d_ll i : is_lossless (d i).
+
+type out.
+
+module type SAMPLE = {
+  proc init () : unit 
+  proc sample (i:input, X:t list) : t
+}.
+  
+  
+module type SAMPLE_ADV = {
+  proc sample (i:input, X:t list) : t
+}.
+  
+module Sample = {
+  proc init() = { }
+    
+  proc sample(i:input, X:t list) = {
+    var r;
+    r <$ d i;
+    return r;
+  }
+}.
+
+module type AdvRndE (O:SAMPLE_ADV) = {
+   proc main () : out 
+}.
+
+clone include Dice_sampling with
+  type input <- input * t list,
+  type t     <- t,
+  op   d     <- fun (x:input * t list) => d x.`1,
+  op   test  <- fun (x:input * t list) => mem x.`2
+  proof *.
+
+abstract theory Adversary.
+   
+  op test : input -> t list -> bool.
+  axiom test_spec i X: test i X => is_lossless (d i \ mem X).
+
+  module R (O:SAMPLE) = {
+    proc init = O.init
+
+    proc sample (i:input, X:t list) = {
+      var r: t;
+      r = witness;
+      if (test i X) r = O.sample(i,X);
+      return r;
+    }
+  }.
+
+  module Main (O:SAMPLE) (A:AdvRndE) = {
+
+    proc main() = {
+      var r;
+      O.init();
+      r <@ A(O).main();
+      return r;
+    }
+  }.
+ 
+  abstract theory Bad.
+     
+  module SampleB = {
+    var bad:bool
+  
+    proc init() = { 
+      bad <- false; 
+    }
+    
+    proc sample(i:input, X:t list) = {
+      var r;
+      r <$ d i;
+      bad <- bad || r \in X;
+      return r;
+    }
+  }.
+   
+  module SampleEB = {
+    
+    proc init = SampleB.init
+    
+    proc sample(i:input, X:t list) = {
+      var r;
+      r <$ d i;
+      if (r \in X) { 
+        SampleB.bad <- true;
+        r <$ d i \ (mem X);
+      }
+      return r;
+    }
+  }.
+  
+  equiv sampleE_sampleEB : SampleE.sample ~ SampleEB.sample : 
+    i{1} = (i{2}, X{2}) ==> ={res}.
+  proof.
+    transitivity SampleI.sample 
+       (={i} ==> ={res})
+       (i{1} = (i{2}, X{2}) ==> ={res}) => //=.
+    + by move=> &m1 &m2 ->;exists (i{m2}, X{m2}).
+    + conseq sampleE_sampleI => /> ?;apply d_ll.
+    proc; seq 1 1 : (i{1} = (i{2}, X{2}) /\ ={r});1: by auto.
+    by if; auto.
+  qed.
+  
+  equiv sampleB_sample : SampleB.sample ~ Sample.sample : ={i, X} ==> ={res}.
+  proof. by proc;auto. qed.
+ 
+
+  section PROOFS.
+ 
+  declare module A:AdvRndE { SampleB }.
+
+  equiv A_sampleE_sampleEB : Main(R(SampleE),A).main ~ Main(R(SampleEB),A).main : 
+    ={glob A} ==> ={res, glob A}.
+  proof.
+    proc; call (_: true) => /=. 
+    + by proc;sp 1 1;if => //;call sampleE_sampleEB.
+    inline *;auto.
+  qed.
+
+  equiv A_sampleB_sample :  Main(R(SampleB),A).main ~ Main(R(Sample),A).main : 
+    ={glob A} ==> ={res, glob A}.
+  proof.
+    proc;call (_: true)=> //=. 
+    + by proc;sp 1 1;if => //;call sampleB_sample.
+    inline*;auto.
+  qed.
+ 
+  axiom A_ll : (forall (O <: SAMPLE_ADV{A}), islossless O.sample => islossless A(O).main).
+ 
+  equiv A_upto : 
+     Main(R(SampleEB),A).main ~ Main(R(SampleB),A).main : 
+            ={glob A} ==> ={SampleB.bad} /\ (!SampleB.bad{2} => ={res,glob A}).
+  proof.
+    proc.
+    call (_: SampleB.bad, ={SampleB.bad}, ={SampleB.bad}); 1: apply A_ll.
+    + proc=> /=; sp 1 1; if => //;inline *.
+      seq 3 3 : (={r0,i0,X0,SampleB.bad} /\ (test i0 X0){1} /\ !SampleB.bad{2}); 1: by auto.
+      wp;if{1}; 2 : by  auto => /#.
+      by rnd{1};auto => &m1 &m2 /> /test_spec.
+    + move=> &m2 ?;proc;sp 1;if => //;inline *.
+      seq 3 : true 1%r 1%r 0%r _  (test i0 X0 /\ SampleB.bad = SampleB.bad{m2}) => //.
+      + by auto. 
+      + by rnd;auto => &hr />;rewrite d_ll.
+      + wp;if. 
+        + by rnd;auto;rewrite H => &hr /> /test_spec. 
+      by auto.
+    + move=> _;proc;sp;if =>//.
+      by inline *;auto => &hr />;rewrite d_ll.
+    inline*; auto => /#.
+  qed.
+
+  lemma pr_A_upto (E:out -> glob A -> bool) &m : 
+    `|Pr[Main(R(SampleE),A).main() @ &m : E res (glob A)] -
+      Pr[Main(R(Sample), A).main() @ &m : E res (glob A)] | <= 
+      Pr[Main(R(SampleB),A).main() @ &m : SampleB.bad].
+  proof.
+    have -> : Pr[Main(R(SampleE),A).main() @ &m : E res (glob A)]  = 
+              Pr[Main(R(SampleEB),A).main() @ &m : E res (glob A)].
+    + by byequiv A_sampleE_sampleEB.
+    have <- : Pr[Main(R(SampleB),A).main() @ &m : E res (glob A)]  = 
+              Pr[Main(R(Sample),A).main() @ &m : E res (glob A)].
+    + by byequiv A_sampleB_sample.
+    have -> : Pr[Main(R(SampleEB), A).main() @ &m : E res (glob A)] = 
+       Pr[Main(R(SampleEB), A).main() @ &m : (E res (glob A) /\ SampleB.bad) \/ 
+                                          (E res (glob A) /\ !SampleB.bad) ].
+    + by rewrite Pr [mu_eq] => /#.
+    rewrite Pr [mu_or].
+    have -> /= : Pr[Main(R(SampleEB), A).main() @ &m :
+                  (E res (glob A) /\ SampleB.bad) /\ E res (glob A) /\ !SampleB.bad] = 0%r.
+    + byphoare (_ : _ ==> false) => // /#.
+    have -> : Pr[Main(R(SampleB), A).main() @ &m : E res (glob A)] = 
+       Pr[Main(R(SampleB), A).main() @ &m : (E res (glob A) /\ SampleB.bad) \/ 
+                                          (E res (glob A) /\ !SampleB.bad) ].
+    + by rewrite Pr [mu_eq] => /#.
+    rewrite Pr [mu_or].
+    have -> /= : Pr[Main(R(SampleB), A).main() @ &m :
+                  (E res (glob A) /\ SampleB.bad) /\ E res (glob A) /\ !SampleB.bad] = 0%r.
+    + byphoare (_ : _ ==> false) => // /#.
+    have -> : 
+      Pr[Main(R(SampleEB), A).main() @ &m : E res (glob A) /\ !SampleB.bad] =
+      Pr[Main(R(SampleB), A).main() @ &m : E res (glob A) /\ !SampleB.bad].
+    + byequiv A_upto => /#.
+    have H1 : Pr[Main(R(SampleB), A).main() @ &m : E res (glob A) /\ SampleB.bad] <= 
+           Pr[Main(R(SampleB), A).main() @ &m : SampleB.bad].
+    + by rewrite Pr [mu_sub].
+    have H2 : Pr[Main(R(SampleEB), A).main() @ &m : E res (glob A) /\ SampleB.bad] <= 
+              Pr[Main(R(SampleEB), A).main() @ &m : SampleB.bad].
+    + by rewrite Pr [mu_sub].
+    have H3 :  Pr[Main(R(SampleB), A).main() @ &m : SampleB.bad] = 
+               Pr[Main(R(SampleEB), A).main() @ &m : SampleB.bad].
+    + apply eq_sym;byequiv A_upto => //.
+    smt (mu_bounded).
+  qed.
+ 
+  end section PROOFS.
+
+  end Bad.
+
+end Adversary.
+
+abstract theory AdversaryN.
+
+  (* The maximum size of X *)
+  op p : int.
+  axiom p_pos : 0 <= p.
+  axiom p_d_ll i (X:t list) : size X <= p => is_lossless (d i \ (mem X)).
+
+  (* The maximum number of queries *)
+  op q : int.
+  axiom q_pos : 0 <= q.
+
+  (* probability of an element in d *)
+  op n : int.
+  axiom n_pos : 0 < n.
+  axiom d_uni i (x:t) : mu1 (d i) x = 1%r / n%r.
+
+  clone include Adversary with
+    op test <- fun (i:input) (X:t list) => size X <= p
+    proof test_spec by apply p_d_ll.
+
+  abstract theory Count.
+
+  module Count (O:SAMPLE_ADV) = {
+     var c:int
+   
+     proc sample(i:input, X:t list) = {
+      var r;
+      r = witness;
+      if (c < q) {
+        r <@ O.sample(i,X);
+        c = c + 1;
+      }
+      return r;
+    } 
+  }.
+
+  module CountI (O:SAMPLE) = {
+
+    proc init() = {
+      Count.c <- 0;
+      O.init();
+    }
+
+    proc sample = Count(O).sample
+
+  }.
+
+  module CountA (A:AdvRndE, O:SAMPLE_ADV) = { 
+    
+    proc main() = {
+      var r;
+      Count.c <- 0;
+      r <@ A(Count(O)).main();
+      return r;
+    }
+  }.
+
+  section PROOFS.
+  
+  declare module A:AdvRndE { Count }.
+
+  local clone import Bad as Bad1.
+ 
+  axiom A_ll : (forall (O <: SAMPLE_ADV{A}), islossless O.sample => islossless A(O).main).
+
+  local lemma pr_bad &m : 
+    Pr[Main(CountI(R(SampleB)),A).main() @ &m : SampleB.bad /\ 0 <= Count.c <= q ] <= q%r * p%r / n%r .
+  proof.
+    fel 1 Count.c (fun x => p%r / n%r) q SampleB.bad [CountI(R(SampleB)).sample : (size X <= p /\ Count.c < q)] => //.
+    + rewrite BRA.sumr_const StdRing.RField.intmulr count_predT.
+      smt (size_range q_pos).
+    + inline *;auto.
+    + proc;inline *;sp 1;if;last by hoare.
+      sp 3;wp;if;last by hoare.
+      wp;conseq (_ : _ ==> r1 \in X1)=> [ /# | ].
+      rnd;auto => &hr /> ??? Hs. 
+      apply (ler_trans (BRA.big predT (fun (x : t) => 1%r/n%r) X{hr})).
+      + apply (ler_trans _ _ _ (mu_mem_le (d i{hr}) X{hr})).
+        by apply ler_sum_seq => /= ???;rewrite d_uni.
+      rewrite BRA.sumr_const StdRing.RField.intmulr count_predT.  
+      by have /# : 0%r < inv n%r; apply invr_gt0; rewrite lt_fromint n_pos.
+    + move=> c;proc;sp;inline *.
+      by rcondt 1 => //;wp;conseq (_: _ ==> true) => // /#.
+    move=> b c;proc;sp;inline *;if => //.
+    sp;wp;if;auto => /#.
+  qed.
+
+  local lemma pr_bad_eq &m :
+    Pr[Main(R(SampleB), CountA(A)).main() @ &m : SampleB.bad ] = 
+    Pr[Main(CountI(R(SampleB)),A).main() @ &m : SampleB.bad /\ 0 <= Count.c <= q ].
+  proof.
+    byequiv => //; proc;inline *;wp.
+    call (_: ={Count.c, SampleB.bad} /\ 0 <= Count.c{2} <= q); 2: by auto => />;apply q_pos.
+    proc;sp; if => //;inline *.
+    wp;sp;if=> //; auto => /> /#.
+  qed.
+
+  lemma pr_abs &m (E:out -> int -> glob A -> bool) : 
+     `| Pr[Main(R(SampleE), CountA(A)).main() @ &m : E res Count.c (glob A) ] - 
+        Pr[Main(R(Sample), CountA(A)).main() @ &m : E res Count.c (glob A) ] | <= q%r * p%r / n%r .
+  proof. 
+    apply (ler_trans _ _ _ (pr_A_upto (CountA(A)) _ (fun r (x: int *  glob A) => E r x.`1 x.`2) &m)).
+    + move=> O O_ll;proc. 
+      call (A_ll (Count(O)) _); 2 : by auto.
+      by proc;sp;if => //;wp;call O_ll.
+    rewrite (pr_bad_eq &m); apply (pr_bad &m).
+  qed.
+
+  end section PROOFS.
+
+  end Count.
+
+end AdversaryN.
+
+abstract theory Adversary1.
+
+  (* The maximum size of X *)
+  op p : int.
+  axiom p_pos : 0 <= p.
+  axiom p_d_ll i (X:t list) : size X <= p => is_lossless (d i \ (mem X)).
+
+  (* probability of an element in d *)
+  op n : int.
+  axiom n_pos : 0 < n.
+  axiom d_uni i (x:t) : mu1 (d i) x = 1%r / n%r.
+
+
+  module type ADV = {
+    proc a1 () : input * t list
+    proc a2 (x:t) : out
+  }.
+
+  module MainE (A:ADV) = {
+    proc main () = {
+      var i, _X, x, r;
+      (i, _X) <@ A.a1();
+      x <- witness;
+      if (size _X <= p) x <$ d i \ mem _X;
+      r <@ A.a2(x);
+      return r;
+    }
+  }.
+
+  module Main (A:ADV) = {
+    proc main () = {
+      var i, _X, x, r;
+      (i, _X) <@ A.a1();
+      x <- witness;
+      if (size _X <= p) x <$ d i;
+      r <@ A.a2(x);
+      return r;
+    }
+  }.
+
+  section PROOFS.
+
+  declare module A:ADV.
+
+  axiom a1_ll : islossless A.a1.
+  axiom a2_ll : islossless A.a2.
+
+  local clone AdversaryN as Ad1 with
+    op p <- p,
+    op q <- 1,
+    op n <- n
+    proof * by smt (p_pos p_d_ll n_pos d_uni).
+
+  local clone import Ad1.Count proof *.
+
+  local module Adv(O:SAMPLE_ADV) = { 
+     proc main() = {
+       var i, _X, x, r;
+       (i, _X) <@ A.a1();
+        x <- witness;
+        x <@ O.sample (i, _X);
+        r <@ A.a2(x);
+        return r;
+     }
+   }.
+
+  lemma pr_abs &m (E:out -> glob A -> bool) : 
+     `| Pr[MainE(A).main() @ &m : E res (glob A) ] - 
+        Pr[Main(A).main() @ &m : E res (glob A) ] | <= p%r / n%r .
+  proof.  
+    have -> : Pr[MainE(A).main() @ &m : E res (glob A)] =
+           Pr[Ad1.Main(Ad1.R(SampleE), CountA(Adv)).main() @ &m : E res (glob A)].    
+    + byequiv (_: ={glob A} ==> ={res, glob A}) => //.
+      proc;inline *.
+      wp;call (_ : true).
+      seq 2 3 : (={glob A, i, _X, x} /\ Count.c{2} = 0 /\ x{1} = witness).     
+      + by wp;call (_: true);auto.
+      rcondt {2} 4;1 : by auto.
+      by if{1};[rcondt {2} 7 | rcondf {2} 7];auto.
+    have -> : Pr[Main(A).main() @ &m : E res (glob A)] =
+           Pr[Ad1.Main(Ad1.R(Sample), CountA(Adv)).main() @ &m : E res (glob A)].    
+    + byequiv (_: ={glob A} ==> ={res, glob A}) => //.
+      proc;inline *.
+      wp;call (_ : true).
+      seq 2 3 : (={glob A, i, _X, x} /\ Count.c{2} = 0 /\ x{1} = witness).     
+      + by wp;call (_: true);auto.
+      rcondt {2} 4;1 : by auto.
+      by if{1};[rcondt {2} 7 | rcondf {2} 7];auto.
+    apply (pr_abs Adv _ &m (fun r c g => E r g)).
+    move=> O O_ll;proc.
+    call a2_ll; call O_ll;wp;call a1_ll;auto.
+  qed.
+    
+  end section PROOFS.
+
+end  Adversary1.
+
+abstract theory Adversary1_1.
+ 
+  (* probability of an element in d *)
+  op n : int.
+  axiom gt1_n : 1 < n.
+  axiom d_uni i (x:t) : mu1 (d i) x = 1%r / n%r.
+
+  module type ADV = {
+    proc a1 () : input * t
+    proc a2 (x:t) : out
+  }.
+
+  module MainE (A:ADV) = {
+    proc main () = {
+      var i, _x, x, r;
+      (i, _x) <@ A.a1();
+      x <$ d i \ (pred1 _x);
+      r <@ A.a2(x);
+      return r;
+    }
+  }.
+
+  module Main (A:ADV) = {
+    proc main () = {
+      var i, _x, x, r;
+      (i, _x) <@ A.a1();
+      x <$ d i;
+      r <@ A.a2(x);
+      return r;
+    }
+  }.
+
+  section PROOFS.
+
+  declare module A:ADV.
+
+  axiom a1_ll : islossless A.a1.
+  axiom a2_ll : islossless A.a2.
+
+  local lemma n_pos : 0 < n by smt (gt1_n).
+
+  local clone Adversary1 as Ad1 with
+    op p <- 1,
+    op n <- n
+    proof *.
+  realize p_pos by done.  
+  realize p_d_ll.
+  proof. 
+    move=>  i X HX;apply dexcepted_ll; 1: by apply d_ll.
+    apply (ler_lt_trans _ _ _ (mu_mem_le (d i) X)).
+    apply (ler_lt_trans (BRA.big predT (fun (x : t) => 1%r/n%r) X)).
+    + by apply ler_sum=> x _ /=; rewrite d_uni.
+    rewrite sumr_const count_predT. 
+    apply (ler_lt_trans (1%r * 1%r / n%r)). 
+    + apply ler_pmul => //; 1: by rewrite le_fromint;apply size_ge0.
+      + by apply divr_ge0 => //; rewrite le_fromint; apply ltzW; apply n_pos. 
+      by rewrite /= le_fromint.
+    rewrite StdRing.RField.mulr1 ltr_pdivr_mulr.  
+    + rewrite lt_fromint n_pos.
+    by rewrite /= lt_fromint gt1_n.
+  qed.
+  realize n_pos by apply n_pos.
+  realize d_uni by move=> i x;apply d_uni. 
+
+  local module LA = {
+    proc a1 () : input * t list = {
+      var i, _x;
+      (i,_x) <@ A.a1();
+      return (i,[_x]);
+    }
+        
+    proc a2 = A.a2
+  }.
+
+  lemma pr_abs &m (E:out -> glob A -> bool) : 
+     `| Pr[MainE(A).main() @ &m : E res (glob A) ] - 
+        Pr[Main(A).main() @ &m : E res (glob A) ] | <= 1%r / n%r .
+  proof.  
+    have -> : Pr[MainE(A).main() @ &m : E res (glob A)] =
+              Pr[Ad1.MainE(LA).main() @ &m : E res (glob A)].
+    + byequiv ( _: ={glob A} ==> ={res,glob A}) => //.
+      proc;inline *;call (_:true).
+      rcondt {2} 4.
+      + auto;call (_: true);auto.
+      rnd;auto;call (_: true);auto.
+    have -> : Pr[Main(A).main() @ &m : E res (glob A)] =
+              Pr[Ad1.Main(LA).main() @ &m : E res (glob A)].
+    + byequiv ( _: ={glob A} ==> ={res,glob A}) => //.
+      proc;inline *;call (_:true).
+      rcondt {2} 4.
+      + auto;call (_: true);auto.
+      rnd;auto;call (_: true);auto.         
+    apply (Ad1.pr_abs LA _ a2_ll &m E).
+    by proc;call a1_ll.
+  qed.
+
+  end section PROOFS.
+
+end  Adversary1_1.
+ 
+ 

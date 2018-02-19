@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -16,6 +17,10 @@ require (*--*) Birthday.
 type D.
 op uD: { D distr | is_uniform uD /\ is_lossless uD /\ is_full uD} as uD_uf_fu.
 
+lemma uD_ll:  is_lossless uD by smt(uD_uf_fu).
+lemma uD_uni: is_uniform uD by smt(uD_uf_fu).
+lemma uD_fu:  is_full uD by smt(uD_uf_fu).
+
 (** and a type K equipped with a lossless distribution **)
 type K.
 op dK: { K distr | is_lossless dK } as dK_ll.
@@ -24,14 +29,14 @@ clone import WeakPRP as PRPt with
   type K  <- K,
     op dK <- dK,
   type D  <- D
-proof * by smt ml=0 w=dK_ll.
+proof * by smt(dK_ll).
 
 clone import IdealPRP as PRPi with
   type K  <- K,
     op dK <- dK,
   type D  <- D,
     op dD <- uD
-proof * by smt ml=0 w=(dK_ll uD_uf_fu)
+proof * by smt(dK_ll uD_ll)
 rename "RandomPermutation" as "PRPi".
 
 clone import IdealPRF as PRFi with
@@ -40,7 +45,7 @@ clone import IdealPRF as PRFi with
   type R  <- D,
   op   dK <- dK,
   op   dR <- uD
-proof * by smt ml=0 w=(dK_ll uD_uf_fu)
+proof * by smt(dK_ll uD_ll)
 rename "RandomFunction" as "PRFi".
 
 op q : { int | 0 <= q } as ge0_q.
@@ -51,15 +56,15 @@ op q : { int | 0 <= q } as ge0_q.
       x' that are both in m's domain and have the same image by m." *)
 pred collision (m:(D,D) fmap) = exists x x',
   x' <> x /\
-  mem (dom m) x /\ mem (dom m) x' /\ m.[x] = m.[x'].
+  x \in (dom m) /\ x' \in (dom m) /\ m.[x] = m.[x'].
 
 (* Some useful facts about the bad event *)
 lemma no_collision (m:(D,D) fmap):
   !collision m <=>
   forall x x',
     x' = x \/
-    !mem (dom m) x  \/
-    !mem (dom m) x' \/
+    !x \in (dom m)  \/
+    !x' \in (dom m) \/
     m.[x] <> m.[x'].
 proof.
 rewrite /collision negb_exists /=; apply/forall_iff=> /= x.
@@ -67,23 +72,23 @@ by rewrite negb_exists /=; apply/forall_iff=> /= x'; rewrite !negb_and.
 qed.
 
 lemma collision_add (m:(D,D) fmap) x y:
-  !mem (dom m) x =>
-  collision m.[x <- y] <=> collision m \/ mem (rng m) y.
+  !x \in (dom m) =>
+  collision m.[x <- y] <=> collision m \/ y \in (rng m).
 proof.
 move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
 + rewrite dom_set !inE=> -[z_in_m] [z'_in_m] mz_eq_mz'.
-  case (mem (rng m) y)=> //= y_notin_rngm.
-  by exists z z'; smt ml=0 w=@NewFMap.
+  case (y \in (rng m))=> //= y_notin_rngm.
+  by exists z z'; smt(@NewFMap).
 move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|/in_rng [x' mx']].
 + exists z z'; rewrite z'_neq_z dom_set !inE !getP mz_eq_mz' z_in_m z'_in_m /=.
   rewrite (contra _ _ (congr1 (mem (dom m)) z  x)) 1:x_notin_m 1:z_in_m //=.
   by rewrite (contra _ _ (congr1 (mem (dom m)) z' x)) 1:x_notin_m 1:z'_in_m.
-by exists x x'; smt ml=0 w=@NewFMap.
+by exists x x'; smt(@NewFMap).
 qed.
 
 lemma collision_stable (m:(D,D) fmap) y y':
   collision m =>
-  !mem (dom m) y =>
+  !y \in (dom m) =>
   collision m.[y <- y']
 by [].
 
@@ -136,36 +141,31 @@ qed.
 
 (* Some losslessness lemmas *)
 lemma excepted_lossless (m:(D,D) fmap):
-  (exists x, !mem (dom m) x) =>
+  (exists x, !x \in (dom m)) =>
   mu (uD \ (mem (rng m))) predT = 1%r.
 proof.
-move=> /endo_dom_rng [x h]; rewrite dexcepted_ll //.
-+ smt w=uD_uf_fu.
-have [?[<- @/is_full Hsupp]]:= uD_uf_fu.
-apply/notin_supportIP;exists x => />;apply Hsupp.
+move=> /endo_dom_rng [x h]; rewrite dexcepted_ll 1:uD_ll //.
+by rewrite -uD_ll; apply/notin_supportIP; exists x=> />; exact/uD_fu.
 qed.
 
-phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !mem X x ==> true] = 1%r.
+phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !x \in X ==> true] = 1%r.
 proof.
-proc; seq  1: (exists x, support uD x /\ !mem X x)=> //=.
-+ by rnd (predT); skip; smt ml=0 w=uD_uf_fu.
+proc; seq  1: (exists x, support uD x /\ !x \in X)=> //=.
++ by rnd (predT); auto; rewrite uD_ll /#.
 if=> //=.
-+ rnd (predT); skip.
-  progress [-split]; split=> //=.
-  apply/dexcepted_ll.
-  * smt ml=0 w=uD_uf_fu.
-  * by have [_ [<- _]]:= uD_uf_fu; apply/notin_supportIP; exists x.
-by hoare; rnd=> //=; skip=> &hr ->.
++ rnd (predT); auto=> /> &m x _ x_notin_X _.
+  by rewrite dexcepted_ll 1:uD_ll // -uD_ll; apply/notin_supportIP; exists x.
+by hoare; auto=> />.
 qed.
 
 lemma PRPi'_Indirect_ll: islossless PRPi'(Indirect).f.
 proof.
 proc; if=> //=; wp; call Indirect_ll.
-skip; progress.
-have:= excepted_lossless (PRPi.m{hr}) _.
-+ by exists x{hr}.
-rewrite weight_dexcepted /b2r.
-case (weight uD = mu uD (mem (rng PRPi.m{hr})))=> //=.
+auto=> /> &m _.
+have:= excepted_lossless (PRPi.m{m}) _.
++ by exists x{m}.
+rewrite weight_dexcepted.
+case (weight uD = mu uD (mem (rng PRPi.m{m})))=> //=.
 rewrite notin_supportIP /= -(etaE (mem (rng _))) etaP.
 by rewrite StdOrder.RealOrder.ltr_def=> -> /=; exact/mu_sub.
 qed.
@@ -229,33 +229,36 @@ section Upto.
     <= Pr[IND(PRFi,D).main() @ &m: collision PRFi.m].
   proof.
   rewrite (PRPi'_Indirect_eq &m).
-  byequiv: PRP_indirect_bad.bad=> //=; 2:smt.
+  byequiv: PRP_indirect_bad.bad=> //=; 2:by smt().
   proc.
   call (_: collision PRFi.m,
            ={m}(PRPi,PRFi) /\ (PRP_indirect_bad.bad{1} <=> collision PRFi.m{2}),
            PRP_indirect_bad.bad{1} <=> collision PRFi.m{2}).
-    exact D_ll.
-    proc.
+  + exact D_ll.
+  + proc.
     if=> //=; inline *.
     swap{1} 1.
     seq  1  1: (={x} /\
                 !mem (dom PRPi.m{1}) x{1} /\
                 PRFi.m{2} = PRPi.m.[x <- r]{1} /\
                 ((PRP_indirect_bad.bad \/ mem (rng PRPi.m) r){1} <=> collision PRFi.m{2})).
-      by auto; smt.
-      sp; if{1}.
-        conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
-        by auto; smt.
-      by auto; smt.
+    + by auto=> />; smt(@NewFMap).
+    sp; if{1}.
+    + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
+      auto=> /> &1 &2 x_notin_m coll_def r_inrng_m; smt. (** FIXME: Investigate **)
+    by auto; smt. (** FIXME: Investigate **)
     move=> &2 bad; conseq (_: true ==> true: =1%r) (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
-      by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
+    + by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.
     seq  2: (X = rng PRPi.m /\ !mem (dom PRPi.m) x) 1%r 1%r 0%r _=> //=;
          [auto|if=> //=; auto|hoare; auto]=> />;rewrite ?dD_ll //.
     by move=> ???;apply excepted_lossless;exists x{hr}.
     move=> &1; conseq (_: collision PRFi.m ==> collision PRFi.m: =1%r)=> //=.
-    by proc; if; auto; smt.
-  by inline *; auto; progress; smt.
+    by proc; if; auto=> />; rewrite uD_ll //=; smt (@NewFMap).
+  inline *; auto=> />; split=> [|_].
+  + by rewrite no_collision=> x x'; rewrite !map0P dom0 in_fset0.
+  move=> rL rR DL b mL DR mR [-> //|^ /no_collision + -> [#] -> _ _ ^ + {1}-> /= x x'].
+  by move=> /(_ x x') [->|[->|[->|->]]].
   qed.
 end section Upto.
 
@@ -365,9 +368,9 @@ section CollisionProbability.
     sp; if=> //=; auto.
     progress [-split].
     rewrite H3 //=; split.
-      move=> x0; rewrite rng_set !inE.
-      by rewrite rng_rem; smt.
-      by rewrite negb_and /= collision_add // H H0 orbC.
+    + move=> x0; rewrite rng_set !inE.
+      by rewrite rng_rem -H; smt(@NewFMap).
+    by rewrite negb_and /= collision_add // H H0 orbC.
   auto; progress.
     by rewrite rng0 in_fset0.
     smt.
@@ -410,10 +413,9 @@ section PRPi_PRPi'_Indirect.
   bypr (res{1}) (res{2})=> //. (* Pointwise equality of distributions *)
   progress.
   (* We first perform the computation on the easy side,... *)
-  cut ->: Pr[Direct.sample(X{1}) @ &1: a = res] = mu (uD \ (mem X){1}) (pred1 a).
+  cut ->: Pr[Direct.sample(X{1}) @ &1: res = a] = mu (uD \ (mem X){1}) (pred1 a).
     byphoare (_: X = X{1} ==> _)=> //=.
-    proc; rnd=> //=; skip; progress.
-    by rewrite pred1E -{2}(etaP ((=) a)) etaE.
+    by proc; rnd=> //=; auto.
   subst X{1}.
   (* ... and we are left with the difficult side *)
   byphoare (_: X = X{2} ==> _)=> //=.
@@ -435,17 +437,17 @@ section PRPi_PRPi'_Indirect.
     alias 2 r0 = r.
     (* There are two scenarios that lead to a = r:
          - r0 = a /\ r = a (with probability mu uD (pred1 a));
-         - r0 <> a /\ r = a (with probability mu uD (fun x, mem x X) * mu (uD \ X) (pred1 a)). *)
+         - r0 <> a /\ r = a (with probability mu uD (mem X) * mu (uD \ X) (pred1 a)). *)
     phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ (mem X)) (pred1 a)): (r0 = a).
       (* Bound *)
-      progress.
+      move=> />.
       rewrite dexcepted1E a_notin_X /=. 
-      cut not_empty: mu uD predT - mu uD (mem X{2}) <> 0%r.
+      cut not_empty: 0%r < mu uD predT - mu uD (mem X{2}).
         rewrite -mu_not.
         cut: 0%r < mu uD (predC (mem X{2})); last smt.
-        rewrite witness_support; exists a; rewrite /predC /= a_notin_X /=.
-        by have [_[_ ->]]:= uD_uf_fu.
-      by smt ml=0 w=uD_uf_fu.
+        by rewrite witness_support; exists a; rewrite /predC /= a_notin_X /= uD_fu.
+      rewrite uD_ll.
+      smt. (** Investigate **)
       (* case r0 = a *)
       seq  2: (a = r0) (mu uD (pred1 a)) 1%r _ 0%r (r0 = r /\ X = X{2}).
         by auto.

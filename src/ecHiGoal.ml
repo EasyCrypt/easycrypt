@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -352,32 +353,44 @@ let t_rewrite_prept info pt tc =
   LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
-let process_auto (tc : tcenv1) =
+let process_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
   let module E = struct
       exception Done of tcenv
       exception Fail
   end in
 
-  let for1 (p : EcPath.path) tc =
+  let bases = EcEnv.Auto.getall bases (FApi.tc1_env tc) in
+
+  let rec forall ctn tc =
+    if ctn >= depth then t_fail tc else begin
+      List.iter
+        (fun p -> try raise (E.Done (for1 ctn p tc)) with E.Fail -> ())
+        bases;
+      t_id tc
+    end
+
+  and for1 ctn (p : EcPath.path) tc =
     let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
 
     try
       FApi.t_seqs
         [EcLowGoal.Apply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
-         EcLowGoal.t_trivial; EcLowGoal.t_fail]
+         EcLowGoal.t_trivial; forall (ctn+1)]
         tc
 
     with EcLowGoal.Apply.NoInstance _ ->
       raise E.Fail
   in
 
-  try
-    Sp.iter
-      (fun p -> try raise (E.Done (for1 p tc)) with E.Fail -> ())
-      (EcEnv.Auto.get (FApi.tc1_env tc));
-    t_id tc
+  try forall 0 tc with E.Done tc -> tc
 
-  with E.Done tc -> tc
+(* -------------------------------------------------------------------- *)
+let process_solve ?bases ?depth (tc : tcenv1) =
+  match FApi.t_try_base (process_auto ?bases ?depth) tc with
+  | `Failure _ ->
+      tc_error (FApi.tc1_penv tc) "[solve]: cannot close goal"
+  | `Success tc ->
+      tc
 
 (* -------------------------------------------------------------------- *)
 let process_trivial (tc : tcenv1) =
@@ -544,7 +557,7 @@ let process_delta ?target (s, o, p) tc =
         | EcDecl.OB_pred (Some (EcDecl.PR_Plain f)) ->
             (snd p, op.EcDecl.op_tparams, f, args)
         | _ ->
-            tc_error !!tc "the operator cannot be unfold"
+            tc_error !!tc "the operator cannot be unfolded"
     end
 
     | SFlocal x when LDecl.can_unfold x hyps ->
@@ -754,6 +767,9 @@ let rec process_rewrite1_r ttenv ?target ri tc =
 
   | RWTactic `Ring ->
       process_algebra `Solve `Ring [] tc
+
+  | RWTactic `Field ->
+      process_algebra `Solve `Field [] tc
 
 (* -------------------------------------------------------------------- *)
 let rec process_rewrite1 ttenv ?target ri tc =
@@ -1287,8 +1303,11 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
       ~clear:`Yes ~missing:true
       (List.rev !togen) (FApi.as_tcenv1 tc)
 
-  and intro1_crush (_st : ST.state) (d : bool) (gs : tcenv1) =
-    EcLowGoal.t_crush ~delta:d gs
+  and intro1_crush (_st : ST.state) (d : crushmode) (gs : tcenv1) =
+    EcLowGoal.t_crush
+      ~delta:d.cm_simplify
+      ?tsolve:(if d.cm_solve then Some process_trivial else None)
+      gs
 
   and dointro (st : ST.state) nointro pis (gs : tcenv) =
     match pis with [] -> gs | { pl_desc = pi; pl_loc = ploc } :: pis ->
@@ -1509,14 +1528,18 @@ let process_move ?doeq views pr (tc : tcenv1) =
     tc
 
 (* -------------------------------------------------------------------- *)
-let process_pose xsym o p (tc : tcenv1) =
-  let (hyps, concl) = FApi.tc1_flat tc in
+let process_pose xsym bds o p (tc : tcenv1) =
+  let (env, hyps, concl) = FApi.tc1_eflat tc in
   let o = norm_rwocc o in
 
   let (ptenv, p) =
-    let (ps, ue), p = TTC.tc1_process_pattern tc p in
-    let ev = MEV.of_idents (Mid.keys ps) `Form in
-      (ptenv !!tc hyps (ue, ev), p)
+    let ps  = ref Mid.empty in
+    let ue  = TTC.unienv_of_hyps hyps in
+    let (senv, bds) = EcTyping.trans_binding env ue bds in
+    let p = EcTyping.trans_pattern senv (ps, ue) p in
+    let ev = MEV.of_idents (Mid.keys !ps) `Form in
+    (ptenv !!tc hyps (ue, ev),
+     f_lambda (List.map (snd_map gtty) bds) p)
   in
 
   let dopat =
@@ -1847,3 +1870,26 @@ let process_congr tc =
       EcLowGoal.t_reflex tc
 
   | _, _ -> tacuerror "not a congruence"
+
+(* -------------------------------------------------------------------- *)
+let process_wlog ids wlog tc =
+  let hyps, _ = FApi.tc1_flat tc in
+
+  let toid s =
+    if not (LDecl.has_name (unloc s) hyps) then
+      tc_lookup_error !!tc ~loc:s.pl_loc `Local ([], unloc s);
+    fst (LDecl.by_name (unloc s) hyps) in
+
+  let ids = List.map toid ids in
+
+  let gen =
+    let wlog = TTC.tc1_process_formula tc wlog in
+    let tc   = t_rotate `Left 1 (EcLowGoal.t_cut wlog tc) in
+    let tc   = t_first (t_generalize_hyps ~clear:`Yes ids) tc in
+    FApi.tc_goal tc
+  in
+
+  t_rotate `Left 1
+    (t_first
+       (t_seq (t_clears ids) (t_intros_i ids))
+       (t_cut gen tc))

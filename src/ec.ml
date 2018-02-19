@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -96,7 +97,7 @@ let print_config config =
       (try Sys.getenv "PATH" with Not_found -> ""))
 
 (* -------------------------------------------------------------------- *)
-let _ =
+let main () =
   let myname  = Filename.basename Sys.executable_name
   and mydir   = Filename.dirname  Sys.executable_name in
 
@@ -322,3 +323,6 @@ let _ =
   with e ->
     (try EcTerminal.finalize terminal with _ -> ());
     raise e
+
+(* -------------------------------------------------------------------- *)
+let () = main ()

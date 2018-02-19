@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -63,6 +64,14 @@ let pr_split m f args ev1 ev2 =
   let pr2 = f_pr m f args (f_and ev1 (f_not ev2)) in
   f_eq pr (f_real_add pr1 pr2)
 
+let pr_ge0 m f args ev =
+  let pr = f_pr m f args ev in
+  f_eq (f_real_le f_r0 pr) f_true
+
+let pr_le1 m f args ev =
+  let pr = f_pr m f args ev in
+  f_eq (f_real_le pr f_r1) f_true
+
 (* -------------------------------------------------------------------- *)
 exception FoundPr of form
 
@@ -90,6 +99,28 @@ let select_pr_cmp on_cmp sid f =
 
   | _ -> false
 
+let select_pr_ge0 sid f =
+  match f.f_node with
+  | Fapp({f_node = Fop(op,_)}, [f'; {f_node = Fpr _}]) ->
+      if    EcPath.p_equal EcCoreLib.CI_Real.p_real_le op
+         && f_equal f' f_r0
+         && Mid.set_disjoint f.f_fv sid
+      then raise (FoundPr f)
+      else false
+
+  | _ -> false
+
+let select_pr_le1 sid f =
+  match f.f_node with
+  | Fapp({f_node = Fop(op,_)}, [{f_node = Fpr _}; f']) ->
+      if    EcPath.p_equal EcCoreLib.CI_Real.p_real_le op
+         && f_equal f' f_r1
+         && Mid.set_disjoint f.f_fv sid
+      then raise (FoundPr f)
+      else false
+
+  | _ -> false
+
 (* -------------------------------------------------------------------- *)
 let pr_rewrite_lemma =
   ["mu_eq"      , `MuEq;
@@ -98,7 +129,9 @@ let pr_rewrite_lemma =
    "mu_not"     , `MuNot;
    "mu_or"      , `MuOr;
    "mu_disjoint", `MuDisj;
-   "mu_split"   , `MuSplit]
+   "mu_split"   , `MuSplit;
+   "mu_ge0"     , `MuGe0;
+   "mu_le1"     , `MuLe1]
 
 (* -------------------------------------------------------------------- *)
 
@@ -123,7 +156,9 @@ let t_pr_rewrite_low (s,dof) tc =
     | `MuNot   -> select_pr is_not
     | `MuOr
     | `MuDisj  -> select_pr is_or
-    | `MuSplit -> select_pr (fun _ev -> true) in
+    | `MuSplit -> select_pr (fun _ev -> true)
+    | `MuGe0   -> select_pr_ge0
+    | `MuLe1   -> select_pr_le1 in
 
   let select xs fp = if select xs fp then `Accept (-1) else `Continue in
   let env, _, concl = FApi.tc1_eflat tc in
@@ -171,6 +206,22 @@ let t_pr_rewrite_low (s,dof) tc =
       let pr = destr_pr torw in
       let ev' = (oget dof) tc torw in
       (pr_split pr.pr_mem pr.pr_fun pr.pr_args pr.pr_event ev', 0)
+
+    | `MuGe0 -> begin
+      match torw.f_node with
+      | Fapp({f_node = Fop _}, [_; {f_node = Fpr pr}]) ->
+            let { pr_mem = m; pr_fun = f; pr_args = args; pr_event = ev } = pr in
+            (pr_ge0 m f args ev, 0)
+      | _ -> assert false
+      end
+
+    | `MuLe1 -> begin
+      match torw.f_node with
+      | Fapp({f_node = Fop _}, [{f_node = Fpr pr}; _]) ->
+            let { pr_mem = m; pr_fun = f; pr_args = args; pr_event = ev } = pr in
+            (pr_le1 m f args ev, 0)
+      | _ -> assert false
+      end
 
   in
 

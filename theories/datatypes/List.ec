@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -460,6 +461,10 @@ proof. by []. qed.
 lemma has_count p (s : 'a list): has p s <=> (0 < count p s).
 proof. by elim: s => //= x s -> /=; case: (p x); smt. qed.
 
+lemma count_eq0 ['a] (p : 'a -> bool) s :
+  !(has p s) <=> count p s = 0.
+proof. by rewrite has_count ltzNge /= lez_eqVlt ltzNge count_ge0. qed.
+
 lemma has_pred0 (s : 'a list): has pred0 s <=> false.
 proof. by rewrite has_count count_pred0. qed.
 
@@ -471,6 +476,9 @@ proof. by elim: s => //= x s -> @/predC; case: (p x). qed.
 
 lemma all_count p (s : 'a list): all p s <=> (count p s = size s).
 proof. by elim: s => //= x s; case: (p x) => _ /=; smt. qed.
+
+lemma all_count_in p (s : 'a list): all p s => count p s = size s.
+proof. by apply/all_count. qed.
 
 lemma all_pred0 (s : 'a list): all pred0 s <=> (size s = 0).
 proof. by rewrite all_count count_pred0 eq_sym. qed.
@@ -1002,6 +1010,33 @@ qed.
 
 lemma all_rem p (x : 'a) (s : 'a list): all p s => all p (rem x s).
 proof. by move=> /allP h; apply/allP=> y /mem_rem /h. qed.
+
+lemma count_rem ['a] (p : 'a -> bool) (s : 'a list) x : x \in s =>
+  count p s = b2i (p x) + count p (rem x s).
+proof. by move/perm_to_rem/perm_eqP/(_ p)=> ->. qed.
+
+lemma count_gt0 ['a] (p : 'a -> bool) s :
+  0 < count p s => exists x,
+    perm_eq s (x :: rem x s) /\ p x /\ count p (rem x s) = count p s - 1.
+proof.
+rewrite -has_count => /hasP[x [x_in_s px]]; exists x; do! split => //.
++ by apply/perm_to_rem.
++ by move/perm_eqP: (perm_to_rem _ _ x_in_s) => -> /#.
+qed.
+
+lemma count_eq1 ['a] (p : 'a -> bool) s :
+  count p s = 1 => exists x,
+    x \in s /\ p x /\ forall y, y \in s => y <> x => !p y.
+proof.
+move=> h; have /count_gt0 [c] |>: 0 < count p s by smt().
+move=> eqs pc hc; exists c; do! split=> //.
++ by move/perm_eq_mem: eqs => ->.
+move=> c' c'_in_s ne; move: hc; rewrite h /=.
+move/count_eq0; apply contra => pc'; apply/hasP.
+exists c'; rewrite pc' /=; have: c' \in c :: rem c s.
++ by move/perm_eq_mem: eqs => <-.
++ by rewrite /= ne.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                        Element insertion                             *)
@@ -2147,6 +2182,14 @@ lemma filter_subseq a (s : 'a list) : subseq (filter a s) s.
 proof.
 elim: s => //= y s ih; case: (a y)=> //= Nay.
 by apply/(subseq_trans s)/subseq_cons/ih.
+qed.
+
+lemma count_subseq ['a] (p : 'a -> bool) s1 s2 : subseq s1 s2 =>
+  count p s1 <= count p s2.
+proof.
+elim: s2 s1 => [|y s2 ih] [|x s1] //=.
++ by rewrite addz_ge0 ?(count_ge0, b2i_ge0).
++ by case: (y = x) => [-> /ih|? /ih] /#.
 qed.
 
 (* -------------------------------------------------------------------- *)

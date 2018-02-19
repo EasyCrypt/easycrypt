@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -30,7 +31,7 @@ type 'a ovrenv = {
   ovre_ntclr    : EcPath.Sp.t;
   ovre_opath    : EcPath.path;
   ovre_npath    : EcPath.path;
-  ovre_prefix   : symbol list;
+  ovre_prefix   : (symbol list) pair;
   ovre_glproof  : (ptactic_core option * evtags option) list;
   ovre_abstract : bool;
   ovre_local    : bool;
@@ -47,7 +48,7 @@ and 'a ovrhooks = {
   hexport  : 'a -> EcPath.path -> 'a;
   hbaserw  : 'a -> symbol -> 'a;
   haddrw   : 'a -> EcPath.path * EcPath.path list -> 'a;
-  hauto    : 'a -> bool * Sp.t -> 'a;
+  hauto    : 'a -> bool * int * string option * EcPath.path list -> 'a;
   htycl    : 'a -> symbol * typeclass -> 'a;
   hinst    : 'a -> (ty_params * ty) * tcinstance -> 'a;
   hthenter : 'a -> thmode -> symbol -> 'a;
@@ -90,11 +91,23 @@ let check_evtags (tags : evtags) (src : symbol list) =
 
 (* -------------------------------------------------------------------- *)
 let xpath ove x =
-  EcPath.pappend ove.ovre_opath (EcPath.fromqsymbol (ove.ovre_prefix, x))
+  EcPath.pappend ove.ovre_opath
+    (EcPath.fromqsymbol (fst ove.ovre_prefix, x))
 
 (* -------------------------------------------------------------------- *)
 let xnpath ove x =
-  EcPath.pappend ove.ovre_npath (EcPath.fromqsymbol (ove.ovre_prefix, x))
+  EcPath.pappend ove.ovre_npath
+    (EcPath.fromqsymbol (snd ove.ovre_prefix, x))
+
+(* -------------------------------------------------------------------- *)
+let string_of_renaming_kind = function
+  | `Lemma   -> "lemma"
+  | `Op      -> "operator"
+  | `Pred    -> "predicate"
+  | `Type    -> "type"
+  | `Module  -> "module"
+  | `ModType -> "module type"
+  | `Theory  -> "theory"
 
 (* -------------------------------------------------------------------- *)
 let rename ove subst (kind, name) =
@@ -103,6 +116,21 @@ let rename ove subst (kind, name) =
       List.find_map
         (fun rnm -> EcThCloning.rename rnm (kind, name))
         ove.ovre_rnms in
+
+    let nameok =
+      match kind with
+      | `Lemma | `Op | `Pred | `Type ->
+          EcIo.is_sym_ident newname
+      | `Module | `ModType | `Theory ->
+          EcIo.is_mod_ident newname
+    in
+
+    if not nameok then
+      ove.ovre_hooks.herr
+        (Format.sprintf
+           "renamings generated an invalid (%s) name: %s -> %s"
+           (string_of_renaming_kind kind) name newname);
+
     let subst =
       EcSubst.add_path subst
         ~src:(xpath ove name) ~dst:(xnpath ove newname)
@@ -137,7 +165,27 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, otyd) =
 
       | `Inline ->
           let subst =
-            EcSubst.add_tydef subst (xpath ove x) (List.map fst nargs, ntyd)
+            EcSubst.add_tydef
+              subst (xpath ove x) (List.map fst nargs, ntyd) in
+
+          let subst =
+            (* FIXME: HACK *)
+            match otyd.tyd_type, ntyd.ty_node with
+            | `Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
+                match (EcEnv.Ty.by_path np scenv).tyd_type with
+                | `Datatype { tydt_ctors = _ } ->
+                    List.fold_left (fun subst (name, _) ->
+                      Printf.printf "%s / %s\n%!"
+                        (EcPath.tostring (xpath ove name))
+                        (EcPath.tostring (EcPath.pqoname (EcPath.prefix np) name));
+                      EcSubst.add_path subst
+                        ~src:(xpath ove name)
+                        ~dst:(EcPath.pqoname (EcPath.prefix np) name))
+                      subst octors
+                | _ -> subst
+              end
+            | _, _ -> subst
+
           in (subst, ops, proofs, scope)
   end
 
@@ -176,7 +224,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopd) =
               (List.map fst reftyvars, refty)
               (List.map fst (EcUnify.UniEnv.tparams ue), ty)
           with Incompatible err ->
-            clone_error scenv (CE_OpIncompatible ((ove.ovre_prefix, x), err))
+            clone_error scenv (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
         end;
 
         if not (EcUnify.UniEnv.closed ue) then
@@ -200,7 +248,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopd) =
       in
 
       let ops =
-        let opp = EcPath.fromqsymbol (ove.ovre_prefix, x) in
+        let opp = EcPath.fromqsymbol (snd ove.ovre_prefix, x) in
         Mp.add opp (newop, alias) ops in
       let scope =
         if alias then ove.ovre_hooks.hop scope (x, newop) else scope
@@ -242,7 +290,7 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopr) =
                (List.map fst (EcUnify.UniEnv.tparams ue), body.EcFol.f_ty)
            with Incompatible err ->
              clone_error scenv
-               (CE_OpIncompatible ((ove.ovre_prefix, x), err))
+               (CE_OpIncompatible ((snd ove.ovre_prefix, x), err))
          end;
 
          if not (EcUnify.UniEnv.closed ue) then
@@ -311,7 +359,7 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, ax) =
       | Some (pt, axclear)  ->
           let ax  = { ax with ax_kind = `Lemma } in
           let axc = { axc_axiom = (x, ax);
-                      axc_path  = EcPath.fromqsymbol (ove.ovre_prefix, x);
+                      axc_path  = EcPath.fromqsymbol (snd ove.ovre_prefix, x);
                       axc_tac   = pt;
                       axc_env   = scenv; } in
             (ax, axc :: proofs, axclear) in
@@ -369,10 +417,10 @@ and replay_addrw
 
 (* -------------------------------------------------------------------- *)
 and replay_auto
-  (ove : _ ovrenv) (subst, ops, proofs, scope) (lc, ps)
+  (ove : _ ovrenv) (subst, ops, proofs, scope) (lc, lvl, base, ps)
 =
-  let ps = Sp.map (EcSubst.subst_path subst) ps in
-  let scope = ove.ovre_hooks.hauto scope (lc, ps) in
+  let ps = List.map (EcSubst.subst_path subst) ps in
+  let scope = ove.ovre_hooks.hauto scope (lc, lvl, base, ps) in
   (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
@@ -493,8 +541,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   | CTh_addrw (p, l) ->
      replay_addrw ove (subst, ops, proofs, scope) (p, l)
 
-  | CTh_auto (lc, ps) ->
-     replay_auto ove (subst, ops, proofs, scope) (lc, ps)
+  | CTh_auto (lc, lvl, base, ps) ->
+     replay_auto ove (subst, ops, proofs, scope) (lc, lvl, base, ps)
 
   | CTh_typeclass (x, tc) ->
      replay_typeclass ove (subst, ops, proofs, scope) (x, tc)
@@ -502,14 +550,14 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   | CTh_instance ((typ, ty), tc) ->
      replay_instance ove (subst, ops, proofs, scope) ((typ, ty), tc)
 
-  | CTh_theory (x, (cth, thmode)) -> begin
-      let (subst, x) = rename ove subst (`Theory, x) in
+  | CTh_theory (ox, (cth, thmode)) -> begin
+      let (subst, x) = rename ove subst (`Theory, ox) in
       let subovrds = Msym.find_opt x ove.ovre_ovrd.evc_ths in
       let subovrds = EcUtils.odfl evc_empty subovrds in
       let subove   = { ove with
         ovre_ovrd     = subovrds;
         ovre_abstract = ove.ovre_abstract || (thmode = `Abstract);
-        ovre_prefix   = ove.ovre_prefix @ [x];
+        ovre_prefix   = (fst ove.ovre_prefix @ [ox], snd ove.ovre_prefix @ [x]);
         ovre_glproof  =
           if   List.is_empty subovrds.evc_lemmas.ev_global
           then ove.ovre_glproof
@@ -539,7 +587,7 @@ let replay (hooks : 'a ovrhooks)
     ovre_ntclr    = clears;
     ovre_opath    = opath;
     ovre_npath    = npath;
-    ovre_prefix   = [];
+    ovre_prefix   = ([], []);
     ovre_abstract = abstract;
     ovre_local    = local;
     ovre_hooks    = hooks;

@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -34,7 +35,7 @@ type tymod_cnv_failure =
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
-| E_TyModCnv_SubTypeArg        of 
+| E_TyModCnv_SubTypeArg        of
     EcIdent.t * module_type * module_type * tymod_cnv_failure
 
 type modapp_error =
@@ -65,6 +66,7 @@ type tyerror =
 | UnknownTypeName        of qsymbol
 | UnknownTypeClass       of qsymbol
 | UnknownRecFieldName    of qsymbol
+| UnknownInstrMetaVar    of symbol
 | DuplicatedRecFieldName of symbol
 | MissingRecField        of symbol
 | MixingRecFields        of EcPath.path tuple2
@@ -135,12 +137,22 @@ val trans_gbinding : env -> EcUnify.unienv -> pgtybindings ->
   env * (EcIdent.t * EcFol.gty) list
 
 (* -------------------------------------------------------------------- *)
-val transexp         : env -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
-val transexpcast     : env -> [`InProc|`InOp] -> EcUnify.unienv -> ty -> pexpr -> expr
-val transexpcast_opt : env -> [`InProc|`InOp] -> EcUnify.unienv -> ty option -> pexpr -> expr
+val transexp :
+  env -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
+
+val transexpcast :
+  env -> [`InProc|`InOp] -> EcUnify.unienv -> ty -> pexpr -> expr
+
+val transexpcast_opt :
+  env -> [`InProc|`InOp] -> EcUnify.unienv -> ty option -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
-val transstmt    : env -> EcUnify.unienv -> pstmt -> stmt
+val translvalue : EcUnify.unienv -> env -> plvalue -> lvalue * ty
+
+(* -------------------------------------------------------------------- *)
+type ismap = (instr list) EcMaps.Mstr.t
+
+val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref

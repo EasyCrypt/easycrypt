@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -15,6 +16,7 @@ open EcModules
 open EcFol
 open EcUnify
 open EcEnv
+open EcGenRegexp
 
 (* -------------------------------------------------------------------- *)
 module Zipper : sig
@@ -179,3 +181,21 @@ end
 type cptenv = CPTEnv of f_subst
 
 val can_concretize : mevmap -> EcUnify.unienv -> bool
+
+(* -------------------------------------------------------------------------- *)
+type regexp_instr = regexp1_instr gen_regexp
+
+and regexp1_instr =
+  | RAssign
+  | RSample
+  | RCall
+  | RIf        of regexp_instr * regexp_instr
+  | RWhile     of regexp_instr
+
+module RegexpStmt : sig
+  type regexp  = regexp_instr
+  type subject = instr list
+  type matches = subject Mstr.t
+
+  val search : regexp -> subject -> matches option
+end

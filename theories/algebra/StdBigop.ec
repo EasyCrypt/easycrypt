@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -134,6 +135,13 @@ lemma sumidE n : 0 <= n =>
 proof.
 move=> ge0_n; rewrite -sumr_ofint -sumidE_r //.
 by rewrite fromintM mulrAC divff.
+qed.
+
+lemma sumr_undup ['a] (P : 'a -> bool) (F : 'a -> real) s :
+  BRA.big P F s = BRA.big P (fun a => (count (pred1 a) s)%r * (F a)) (undup s).
+proof.
+rewrite BRA.sumr_undup; apply/BRA.eq_bigr=> x _ /=.
+by rewrite intmulr mulrC.
 qed.
 end Bigreal.
 

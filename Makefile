@@ -36,11 +36,10 @@ SHRDIR := $(PREFIX)/share/easycrypt
 SYSDIR := $(LIBDIR)/system
 
 # --------------------------------------------------------------------
-XUNITOUT  ?= xunit.xml
 ECARGS    ?=
 ECTOUT    ?= 10
 ECJOBS    ?= 1
-ECEXTRA   ?= --pretty
+ECEXTRA   ?= --report=report.log
 ECPROVERS ?= Alt-Ergo Z3 Eprover
 CHECKPY   ?=
 CHECK     := $(CHECKPY) scripts/testing/runtest
@@ -50,7 +49,7 @@ CHECK     += $(ECEXTRA) config/tests.config
 CHECKCATS ?= prelude stdlib
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native tests check weak-check check-xunit examples
+.PHONY: all build byte native tests check weak-check examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
 .PHONY: callprover license
 .PHONY: %.ml %.mli %.inferred.mli
@@ -133,9 +132,6 @@ check: build
 
 weak-check: build
 	$(CHECK) --bin-args="-pragmas Proofs:weak" $(CHECKCATS) '!unit'
-
-check-xunit: build
-	$(CHECK) --xunit="$(XUNITOUT)" $(CHECKCATS)
 
 license:
 	scripts/srctx/license COPYRIGHT.yaml \

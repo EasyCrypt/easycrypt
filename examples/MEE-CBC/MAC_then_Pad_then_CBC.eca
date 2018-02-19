@@ -1,4 +1,4 @@
-require import Pred Fun Option Int Real List Distr.
+require import AllCore Int Real List Distr.
 require import DList.
 require (*..*) WeakPRP MACs RCPA_CMA CBC RCPA_pad.
 
@@ -6,10 +6,11 @@ require (*..*) WeakPRP MACs RCPA_CMA CBC RCPA_pad.
 type eK, block.
 
 op d_eK: eK distr.
-axiom d_eK_uffu: is_uniform_over d_eK predT.
+
+axiom d_eK_uffu: is_lossless d_eK /\ is_funiform d_eK.
 
 op d_block: block distr.
-axiom d_block_uffu: is_uniform_over d_block predT.
+axiom d_block_uffu: is_lossless d_block /\ is_funiform d_block.
 
 op P : eK -> block -> block.
 op Pi: eK -> block -> block.
@@ -62,7 +63,7 @@ proof * by smt (add0b addbA addbC addbK).
 type mK, msg, tag.
 
 op d_mK: mK distr.
-axiom d_mK_uffu: is_uniform_over d_mK predT.
+axiom d_mK_uffu: is_lossless d_mK /\ is_funiform d_mK.
 
 op mac: mK -> msg -> tag.
 
@@ -278,13 +279,13 @@ section RCPA.
   proof *.
   realize gt0_q       by exact/gt0_q.
   realize gt0_ell     by smt (gt1_n).
-  realize dKey_uffu   by exact/d_eK_uffu.
-  realize dBlock_uffu by exact/d_block_uffu.
+  realize dKey_uffu   by smt(@Distr d_eK_uffu).
+  realize dBlock_uffu by smt(@Distr d_block_uffu).
   realize add0b       by exact/add0b.
   realize addbA       by exact/addbA.
   realize addbC       by exact/addbC.
   realize addbK       by exact/addbK.
-  realize bijective_P. by move=> k; apply/bijectiveP; smt (d_eK_uffu). qed.
+  realize bijective_P. by move=> k; apply/bijectiveP; smt(@Distr d_eK_uffu). qed.
 
   (** We really want to clone only MtE, but since RCPA_CPA is
       abstract, its inner theories don't exist until cloned...
@@ -349,7 +350,7 @@ section RCPA.
 
   local lemma PtE_security &m:
     `|Pr[SKEa.RCPA.INDR_CPA(PadThenEncrypt(IV_Wrap(CBC(PRPr))),RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))).main() @ &m: res] - Pr[SKEa.RCPA.INDR_CPA(SKEa.RCPA.Ideal,RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))).main() @ &m: res]|
-    = `|Pr[Core.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res] - Pr[Core.RCPA.INDR_CPA(Core.RCPA.Ideal,RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res]|.
+    = `|Pr[CoreDefs.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res] - Pr[CoreDefs.RCPA.INDR_CPA(CoreDefs.RCPA.Ideal,RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res]|.
   proof.
     (* The same issue arises here *)
     rewrite -(RCPA_preservation (<: IV_Wrap(CBC(PRPr))) (<: RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))) &m).
@@ -362,8 +363,8 @@ section RCPA.
   qed.
 
   local lemma CBC_security &m:
-    `|Pr[Core.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main () @ &m: res]
-      - Pr[Core.RCPA.INDR_CPA(Core.RCPA.Ideal,RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main () @ &m: res]|
+    `|Pr[CoreDefs.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main () @ &m: res]
+      - Pr[CoreDefs.RCPA.INDR_CPA(CoreDefs.RCPA.Ideal,RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main () @ &m: res]|
     = `|Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
               - Pr[CBCa.SKEa.RCPA.INDR_CPA(CBCa.SKEa.RCPA.Ideal,QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]|.
   proof.
@@ -408,7 +409,7 @@ section RCPA.
     byequiv=> //=; proc.
     inline *; wp.
     call (_:    ={glob RCPA_QueryBounder, glob RCPA_WUF_RCPA.RCPAa}
-             /\ ={k}(Core.RCPA.RCPA_Wrap,CBCa.SKEa.RCPA.RCPA_Wrap)).
+             /\ ={k}(CoreDefs.RCPA.RCPA_Wrap,CBCa.SKEa.RCPA.RCPA_Wrap)).
       by proc; inline *; sp; if=> //=; sim.
     by auto.
   qed.
@@ -564,13 +565,13 @@ section PTXT.
   proof *.
   realize gt0_q       by exact/gt0_q.
   realize gt0_ell     by smt (gt1_n).
-  realize dKey_uffu   by exact/d_eK_uffu.
-  realize dBlock_uffu by exact/d_block_uffu.
+  realize dKey_uffu   by smt(@Distr d_eK_uffu).
+  realize dBlock_uffu by smt(@Distr d_block_uffu).
   realize add0b       by exact/add0b.
   realize addbA       by exact/addbA.
   realize addbC       by exact/addbC.
   realize addbK       by exact/addbK.
-  realize bijective_P. by move=> k; apply/bijectiveP; smt (d_eK_uffu). qed.
+  realize bijective_P. by move=> k; apply/bijectiveP; smt(@Distr d_eK_uffu). qed.
 
   (** TODO: ditto **)
   local clone import RCPA_pad as PtEb (* FIXME *) with

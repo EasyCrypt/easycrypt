@@ -1,158 +1,251 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Core Int FSet Real Distr.
-require (*--*) Mu_mem.
+require import AllCore Distr List Finite StdOrder StdBigop Dexcepted.
+import RealOrder Bigreal.
 
-(* The distribution and test can be parameterized by some input *)
-(* We allow a validity condition on inputs (also known as "poor man's subtyping") *)
-type input.
-op valid: { input -> bool | exists x, valid x } as valid_nonempty.
+type input. 
 
-(* The distribution is subuniform on some subset of some type t *)
 type t.
-op d : { input -> t distr | forall i, valid i => is_uniform (d i) } as dU.
 
-(* And we have a test that is a subset of the distribution's domain (for all valid inputs) *)
-op test : { input -> t fset | 
-            forall i x, valid i => mem (test i) x => x \in d i } 
-as test_in_d.
+op d : input -> t distr.
+  
+op test : input -> t -> bool.
 
-module RsampleW = {
-  proc sample (i:input, r:t) : t = {
-    while (!mem (test i) r) {
-       r = $(d i);
-    }
+module SampleE = {
+  proc init () = { }
+
+  proc sample(i:input) = {
+    var r;
+    r <$ d i \ test i;
     return r;
   }
 }.
 
-equiv RsampleW_uni a b:
-  RsampleW.sample ~ RsampleW.sample:
-       ={i, r}
-    /\ valid i{1}
-    /\ mem (test i{1}) a
-    /\ mem (test i{1}) b
-    /\ !mem (test i{1}) r{1}
-  ==> res{1} = a <=> res{2} = b.
-proof.
-proc=> /=; while (   ={i}
-                  /\ valid i{1}
-                  /\ mem (test i{1}) a
-                  /\ mem (test i{1}) b
-                  /\ (r{1} = a <=> r{2} = b))=> //=.
-rnd (fun x=> if x = b then a else if x = a then b else x); skip.
-move=> //= &1 &2 [#] ->> valid_i a_in_test b_in_test h_ab r1_notin_test r2_notin_test.
-split=> [/#|_]; split=> [x x_in_di|_]; first by smt (dU test_in_d).
-by move=> r r_in_di; split=> [|/#]; first smt (test_in_d).
-qed.
+module SampleI = {
+  proc init () = { }
 
-lemma prRsampleW k &m: forall i dfl,
-  valid i =>
-  !mem (test i) dfl =>
-  weight (d i) = 1%r =>
-  Pr[RsampleW.sample(i,dfl) @ &m : res = k] =
-    if mem (test i) k then 1%r/(card(test i))%r else 0%r.
-proof.
-  move=> i0 dfl0.
-  pose bdt := (card(test i0))%r.
-  cut bdt_pos: 0 <= card (test i0) by exact/fcard_ge0.
-  cut bdt_posr: 0%r <= (card (test i0))%r by exact/RealExtra.le_fromint.
-  case (mem (test i0) k) => Htk Hvalid Hdfl Hweight;
-    byphoare (_: !mem (test i) r /\ i0 = i ==> k = res) => //;proc.
-    (* case : test i k *)
-    pose bd := mu1 (d i0) k.
-    cut d_uni : forall x, x \in (d i0) => mu1 (d i0) x = bd.
-       by move=> x Hx;rewrite /bd; apply dU => //; apply test_in_d.
-    cut Hdiff: bdt <> 0%r.
-      by have h: mem (test i0) k; smt.
-    conseq (_:i=i0 ==> k = r : = (if mem (test i) r then b2r (k = r) else 1%r / bdt)) => //;
-      first by smt.
-    while (i0=i) (if mem (test i) r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
-      move=> Hw; alias 2 r0 = r.
-      cut:= Htk=> Hmemk.
-      phoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
-        move=> &hr [H1 H2]; rewrite (_: mem (test i{hr}) r{hr} = false) 1:neqF //=.
-        by cut {1}->: bd = bd * bdt / bdt; smt (@Real).
-        (* bounding pr : k = r0 /\ k = r *)
-        seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
-          by wp;rnd => //.
-          wp;rnd;skip;progress => //.
-          rewrite /bd pred1E; apply mu_eq => w' //.
-          by conseq Hw; progress => //; rewrite Htk.
-        hoare; conseq (_: _ ==> true)=> // /#.
-      (* bounding pr : ! k = r0 /\ k = r *)
-     seq 2 : (mem (test i) r0) _ 0%r (1%r - bdt*bd) (1%r/bdt)
-                         (i0 = i /\ mem (test i) k /\ r0 = r) => //.
-     + by wp;rnd.
-     + case (k = r0);first by conseq (_ : _ ==> false) => //.
-       by conseq Hw;progress => //;rewrite H0 H1.
-     + phoare split ! 1%r (bdt*bd);wp;rnd => //.
-       skip; progress=> //.
-       rewrite -(mu_eq (d i{hr}) (mem (test i{hr}))) => [x //| ].
-       apply (Mu_mem.mu_mem (test i{hr}) (d i{hr}) bd _) => x Hx.
-       by apply d_uni; apply test_in_d.
-     + conseq Hw=> // &hr => [ /> ? /negeqF -> // | /#].
-     by conseq (_ : _ ==> true) => //;rnd;skip;progress. 
-    split;first by cut: 0%r < bd; smt (test_in_d).
-    move=> z;conseq (_ : _ ==>  mem (test i) r); first smt ().
-    rnd;skip;progress => //.
-    rewrite -(mu_eq (d i{hr}) (mem (test i{hr}))) => //.
-    rewrite (Mu_mem.mu_mem (test i{hr}) (d i{hr}) bd) => // x Hx.
-    by apply d_uni; apply test_in_d=> //.
-  (* case ! test i0 k *)
-  hoare; while (!mem (test i) k); first rnd => //.
-  by skip; smt().
-qed.
-
-type t'.
-op d' : input -> t' distr.
-
-module Sample = {
-  proc sample (i:input) : t' = {
-    var r : t';
-    r = $d' i;
+  proc sample(i:input) = {
+    var r;
+    r <$ d i;
+    if (test i r) r <$ d i \ test i;
     return r;
   }
 }.
 
-axiom d'_uni : forall i x, x \in (d' i) => mu1 (d' i) x = 1%r/(card(test i))%r.
+module SampleWi = {
+  proc init () = { }
 
-lemma prSample : forall i k &m, Pr[Sample.sample(i) @ &m : res = k] = mu1 (d' i) k.
+  proc sample(i:input, r:t) = {
+    while (test i r) r <$ d i;
+    return r;
+  }
+}.
+
+module SampleW = {
+  proc init () = { }
+
+  proc sample(i:input) = {
+    var r;
+    r <$ d i;
+    r = SampleWi.sample(i, r);
+    return r;
+  }
+}.
+
+lemma pr_sampleE (a:t) i0 &m : 
+  Pr[SampleE.sample(i0) @ &m : res = a] = mu1 ((d i0) \ test i0) a.
 proof.
-  move=> i0 k &m; byphoare (_: i0 = i ==> k = res) => //;proc.
-  rnd;skip;progress.
-  apply/(mu_eq (d' i{hr}) (fun x => k = x) (pred1 k)).
-  by rewrite pred1E.
+  by byphoare (_ : i = i0 ==> res = a) => //; proc; rnd; skip. 
 qed.
 
-equiv Sample_RsampleW (f : t' -> t) (finv : t -> t') :
-   Sample.sample ~ RsampleW.sample :
-     ={i} /\ valid i{2} /\ !mem (test i){2} r{2} /\ weight (d i{2}) = 1%r /\
-     (forall rL, rL \in (d' i{1}) <=> mem (test i){1} (f rL)) /\
-     (forall rR, mem (test i){2} rR => f (finv rR) = rR) /\
-     (forall rL, rL \in (d' i{1}) => finv (f rL) = rL) ==>
-     res{1} = finv res{2}.
+lemma phoare_sampleE a : 
+  phoare [SampleE.sample : true ==> res = a ] = (mu1 ((d i) \ test i) a).
+proof. bypr => &hr; apply (pr_sampleE a i{hr} &hr). qed.
+
+lemma pr_sampleI (a:t) i0 &m :
+  is_lossless (d i0) =>
+  Pr[SampleI.sample(i0) @ &m : res = a] = mu1 ((d i0) \ test i0) a.
 proof.
-  bypr (res{1}) (finv res{2}) => //.
-  move=> &m1 &m2 k [Heqi [Hv [Ht [Hw [Htin [Hffi Hfif]]]]]].
-  rewrite (_:Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : k = finv res] =
-             Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : res = f k]).
-    byequiv (_: ={i,r} /\ i{2} = i{m2} ==>
-                      ={res} /\ mem (test i){m2} res{2}) => //.
-      by proc;while (={i,r});[rnd | ];trivial.
-    progress => //.
-      by rewrite Hffi.
-    by rewrite Hfif // Htin Heqi.
-  rewrite (_:Pr[Sample.sample(i{m1}) @ &m1 : k = res] =
-             Pr[Sample.sample(i{m1}) @ &m1 : res = k]).
-    by rewrite Pr[mu_eq].
-  rewrite (prSample i{m1} k &m1) (prRsampleW (f k) &m2 i{m2} r{m2}) //.
-  case (mem (test i){m2} (f k)).
-    by rewrite -Heqi -Htin; apply d'_uni.
-  rewrite -Heqi -Htin;smt (mu_bounded).
+  move=> d_ll;byphoare (_ : i = i0 ==> res = a) => //; proc. 
+  case @[ambient] (test i0 a) => test_a.
+  + seq 1 : (test i r) _ 0%r (mu (d i0) (test i0)) 0%r (i = i0)=> //.
+    + by auto.
+    + by rcondt 1 => //;rnd; skip => &m1 />;rewrite dexceptedE mu0_false // /#.
+    + by rcondf 1 => //; conseq (_ : _ ==> false);auto => /#.
+    by move=> &m1 ?;rewrite mu0_false // => x /supp_dexcepted /#.
+  pose Pa := mu1 (d i0) a; pose Pt := mu (d i0) (test i0). 
+  case @[ambient]: (Pt = 1%r) => Hpt.
+  + conseq (_ : _ : = 0%r) => //.
+    + by move=> &hr ->>; rewrite dexcepted1E d_ll -/Pt Hpt.
+    seq 1 : (test i r) 1%r 0%r 0%r _ (i = i0) => //.
+    + by auto.
+    + rcondt 1 => // ;rnd; skip => &hr /= [] ->> Ht.
+      by rewrite dexceptedE -/Pt d_ll Hpt.
+    by rnd;skip => &hr /= ->>;rewrite mu_not -/Pt Hpt d_ll.
+  (* This the interesting case *)
+  alias 2 r0 = r.
+  phoare split Pa (Pt*(Pa/(1%r-Pt))) : (a=r0).   
+  + move=> &m1 ->>;rewrite dexcepted1E test_a /= /Pw d_ll -/Pt -/Pa; field => /#.
+  (* case r0 = a *)
+  + seq  2: (a = r0) (mu1 (d i) a) 1%r _ 0%r (r0 = r /\ i = i0) => //.
+    + by auto.
+    + by wp; rnd; skip => &hr />;apply mu_eq => /#.
+    + by rcondf 1.
+    by hoare;conseq (_: _ ==> true) => //= /#.
+   (* case r0 <> a *)
+  seq  2: (test i0 r) Pt (Pa / (1%r - Pt)) _ 0%r (r0 = r /\ i = i0) => //.
+  + by auto.
+  + by wp; rnd.
+  + rcondt 1=> //=; rnd (pred1 a);skip => &hr /> ht;split;2: smt().
+    by rewrite dexcepted1E test_a /= d_ll.   
+  by hoare;rcondf 1;auto => &hr /#.
 qed.
+
+lemma phoare_sampleI a : 
+  phoare [SampleI.sample : is_lossless (d i) ==> res = a ] = (mu1 ((d i) \ test i) a).
+proof. bypr => &hr; apply (pr_sampleI a i{hr} &hr). qed.
+
+lemma pr_sampleWi (a:t) i0 r0 &m :
+  is_lossless (d i0) =>
+  Pr[SampleWi.sample(i0,r0) @ &m : res = a] = 
+     if test i0 r0 then mu1 ((d i0) \ test i0) a
+     else b2r (a=r0).
+proof.
+  move=> d_ll.
+  byphoare (_ : i = i0 /\ r = r0 ==> a = res) => //;proc.
+  case @[ambient]: (test i0 a) => Hta.
+  + conseq (_: _ : = 0%r).
+    + move=> &hr [!->>];case (a = r0) => [<<- | ].
+      + by rewrite dexcepted1E Hta.
+      by case: (test i0 r0) => //;rewrite dexcepted1E Hta.
+    by hoare;while (true) => //;skip => /#.
+  conseq (_ : _ : = (if test i0 r then mu1 (d i0 \ test i0) a else b2r (a = r))) => //.
+  pose Pa := mu1 (d i0) a; pose Pt := mu (d i0) (test i0). 
+  case @[ambient]: (Pt = 1%r) => Hpt.
+  + case @[ambient]: (test i0 r0) => Htr.
+    + conseq (_ : _ : = 0%r).
+      + by move=> &hr [->> <<-]; rewrite Htr /= dexcepted1E d_ll -/Pt Hpt.
+      hoare;while (test i r /\ i0 = i). 
+      + rnd;skip => &hr /> _ r.
+        have := (mu_in_weight (test i{hr}) (d i{hr}) r).
+        by rewrite d_ll => /(_ Hpt).
+      skip => /#.   
+    rcondf 1 => //;case @[ambient]: (a = r0) => Ha.
+    + by skip => &hr />;rewrite Htr Ha.
+    by hoare;auto => &hr />;rewrite Htr Ha.
+  while (i0=i) (if test i0 r then 1 else 0) 1 (mu (d i0) (predC (test i0))) => //.
+  + by move=> &hr r [!<<-] !->.
+  + smt().
+  + move=> Hw {r0}.
+    alias 2 r0 = r.
+    phoare split Pa (Pt*(Pa/(1%r-Pt))) : (a=r0).   
+    + by move=> &m1 [<<- ->];rewrite dexcepted1E Hta /= /Pw d_ll -/Pt -/Pa; field => /#.
+    (* case r0 = a *)
+    + seq 2 : (a = r0) Pa 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
+      + by wp;rnd => //.
+      + by wp;rnd;skip;progress => //;apply mu_eq=> /#.
+      + by conseq Hw; progress => //;rewrite Hta.
+      by hoare; conseq (_: _ ==> true)=> // /#.
+    (* case r0 <> a *)
+    seq 2 : (test i r0) Pt (Pa/(1%r-Pt)) _ 0%r (i0 = i /\ r0 = r) => //.
+    + by wp;rnd.
+    + by wp;rnd;skip.
+    + conseq Hw => &hr //. 
+      + by move=> />;rewrite dexcepted1E Hta d_ll.
+      smt (). 
+    rcondf 1 => //;hoare;auto => /#.
+  + rnd;auto.  
+  split.
+  + by move=> &hr <<-;rewrite mu_not d_ll;smt (mu_bounded).      
+  move=> z.
+  conseq (_ : _ ==> !test i0 r); 1: by smt().
+  by rnd;skip. 
+qed.
+
+lemma phoare_sampleWi a : 
+  phoare [SampleWi.sample : is_lossless (d i) ==> res = a ] = 
+    (if test i r then mu1 ((d i) \ test i) a
+     else b2r (a=r)).
+proof. bypr => &hr; apply (pr_sampleWi a i{hr}r{hr} &hr). qed.
+
+lemma pr_sampleW (a:t) i_0 &m :
+  is_lossless (d i_0) =>
+  Pr[SampleW.sample(i_0) @ &m : res = a] = mu1 ((d i_0) \ test i_0) a.
+proof.
+  move=> d_ll;byphoare (_ : i = i_0 ==> res = a) => //; proc. 
+  case @[ambient] (test i_0 a) => test_a.
+  + seq 1 : true _ 0%r 1%r 0%r (i = i_0)=> //.
+    + by auto.
+    + call (_ : is_lossless (d i) /\ i = i_0 ==> res = a) => //.
+      conseq (phoare_sampleWi a) => //.
+      move=> &hr [] ? <<-;case (test i{hr} r{hr}) => Htr;2 : smt().
+      by rewrite dexcepted1E test_a.
+    by move=> &hr <<-;rewrite dexcepted1E test_a.
+  pose Pa := mu1 (d i_0) a; pose Pt := mu (d i_0) (test i_0). 
+  case @[ambient]: (Pt = 1%r) => Hpt.
+  + conseq (_ : _ : = 0%r) => //.
+    + by move=> &hr ->>; rewrite dexcepted1E d_ll -/Pt Hpt.
+    seq 1 : true _ 0%r 0%r _ (i = i_0 /\ test i r) => //.
+    + rnd; skip => &hr ->> /= r. 
+      have := mu_in_weight (test i_0) (d i_0) r.
+      by rewrite -/Pt Hpt d_ll.
+    call (_ : is_lossless (d i) /\ i = i_0 /\ test i r ==> res = a) => //.
+    conseq (phoare_sampleWi a) => //.
+    by move=> &hr [#] ? <<- Htr;rewrite Htr /= dexcepted1E test_a d_ll -/Pt Hpt.
+  (* This the interesting case *)
+  alias 2 r0 = r.
+  phoare split Pa (Pt*(Pa/(1%r-Pt))) : (a=r0).   
+  + move=> &m1 ->>;rewrite dexcepted1E test_a /= /Pw d_ll -/Pt -/Pa; field => /#.
+  (* case r0 = a *)
+  + seq  2: (a = r0) (mu1 (d i) a) 1%r _ 0%r (r0 = r /\ i = i_0) => //.
+    + by auto.
+    + by wp; rnd; skip => &hr />;apply mu_eq => /#.
+    + call (_ : is_lossless (d i) /\ i = i_0 /\ r = a ==> res = a) => //.
+      by conseq (phoare_sampleWi a) => // &hr [#] ? <<- <<-;rewrite test_a.
+    by hoare;conseq (_: _ ==> true) => //= /#.
+   (* case r0 <> a *)
+  seq  2: (test i_0 r) Pt (Pa / (1%r - Pt)) _ 0%r (r0 = r /\ i = i_0) => //.
+  + by auto.
+  + by wp; rnd.
+  + call (_ : is_lossless (d i) /\ i = i_0 /\ test i_0 r ==> res = a) => //.
+    + conseq (phoare_sampleWi a) => // &hr [#] ? <<- Htr.
+      by rewrite Htr /= dexcepted1E test_a d_ll.        
+    by skip => /= &hr /#.
+  inline *;rcondf 3; 1: by auto.
+  by hoare;auto => /#.
+qed.
+
+lemma phoare_sampleW a : 
+  phoare [SampleW.sample : is_lossless (d i) ==> res = a ] = (mu1 ((d i) \ test i) a).
+proof. bypr=> &m; apply (pr_sampleW a i{m} &m). qed.
+
+(* we now the result to prove the equivalence between the different version *)
+
+equiv sampleE_sampleI : SampleE.sample ~ SampleI.sample : 
+  ={i} /\ is_lossless (d i{1}) ==> ={res}.
+proof.
+  bypr (res{1}) (res{2}) => // &m1 &m2 a [<- d_ll].
+  by rewrite (pr_sampleE a i{m1} &m1) (pr_sampleI a i{m1} &m2).
+qed.
+
+equiv sampleE_sampleWi : SampleE.sample ~ SampleWi.sample : 
+  ={i} /\ is_lossless (d i{1}) /\ test i{2} r{2} ==> ={res}. 
+proof.
+  bypr (res{1}) (res{2}) => // &m1 &m2 a [<- [d_ll Htr]].
+  by rewrite (pr_sampleE a i{m1} &m1) (pr_sampleWi a i{m1} r{m2} &m2) // Htr.
+qed.
+
+equiv sampleE_sampleW : SampleE.sample ~ SampleW.sample : 
+  ={i} /\ is_lossless (d i{1}) ==> ={res}. 
+proof.
+  bypr (res{1}) (res{2}) => // &m1 &m2 a [<- d_ll].
+  by rewrite (pr_sampleE a i{m1} &m1) (pr_sampleW a i{m1} &m2).
+qed.
+
+  

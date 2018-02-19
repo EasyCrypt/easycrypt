@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -1436,6 +1437,17 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
 
   let execute_task toadd =
+    if pi.P.pr_selected then begin
+      let buffer = Buffer.create 0 in
+      let fmt    = Format.formatter_of_buffer buffer in
+      let ppe    = EcPrinting.PPEnv.ofenv env in
+      let l      = List.map fst toadd in
+      let pp fmt = EcPrinting.pp_list "@ " (EcPrinting.pp_axname ppe) fmt in
+      Format.fprintf fmt "selected lemmas: @[%a@]@." pp l;
+      notify |> oiter (fun notify -> notify `Warning
+        (lazy (Buffer.contents buffer)))
+    end;
+
     List.iter (trans_axiom tenv) toadd;
     let task = WTask.add_decl tenv.te_task decl in
     let tkid = Counter.next cnt in

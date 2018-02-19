@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -102,6 +103,7 @@ type plvalue_r =
 and plvalue = plvalue_r located
 
 type pinstr_r =
+  | PSident  of psymbol
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
   | PScall   of plvalue option * pgamepath * (pexpr list) located
@@ -427,9 +429,37 @@ type tac_dir = Backs | Fwds
 type pfel_spec_preds = (pgamepath*pformula) list
 
 (* -------------------------------------------------------------------- *)
+type pim_repeat_kind =
+  | IM_R_Repeat of int option pair
+  | IM_R_May    of int option
+
+type pim_repeat =
+  bool * pim_repeat_kind
+
+type anchor =
+  | Without_anchor
+  | With_anchor
+
+type pim_regexp =
+  | IM_Any
+  | IM_Parens of pim_regexp
+  | IM_Assign
+  | IM_Sample
+  | IM_Call
+  | IM_If     of pim_block option * pim_block option
+  | IM_While  of pim_block option
+  | IM_Named  of psymbol * pim_regexp option
+  | IM_Repeat of pim_repeat * pim_regexp
+  | IM_Seq    of pim_regexp list
+  | IM_Choice of pim_regexp list
+
+and pim_block = anchor pair * pim_regexp
+
+(* -------------------------------------------------------------------- *)
 type trans_kind =
-  | TKfun  of pgamepath
-  | TKstmt of oside * pstmt
+  | TKfun        of pgamepath
+  | TKstmt       of oside * pstmt
+  | TKparsedStmt of oside * pim_block * pstmt
 
 type trans_info =
   trans_kind * pformula * pformula * pformula * pformula
@@ -481,7 +511,6 @@ type async_while_info = {
 (* -------------------------------------------------------------------- *)
 type inline_info = [
   | `ByName    of oside * (pgamepath list * int list option)
-  | `ByPattern of pipattern
   | `CodePos   of (oside * codepos)
   | `All       of oside
 ]
@@ -514,6 +543,7 @@ type pcqoptions = (bool * pcqoption) list
 (* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
+  | Prepl_stmt     of trans_info
   | Pfun           of fun_info
   | Papp           of app_info
   | Pwp            of int doption option
@@ -596,6 +626,7 @@ type pprover_infos = {
   plem_iterate    : bool option;
   plem_wanted     : pdbhint option;
   plem_unwanted   : pdbhint option;
+  plem_selected   : bool option
 }
 
 let empty_pprover = {
@@ -610,6 +641,7 @@ let empty_pprover = {
   plem_iterate    = None;
   plem_wanted     = None;
   plem_unwanted   = None;
+  plem_selected   = None;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -633,7 +665,7 @@ and rwoptions = rwside * trepeat option * rwocc
 and rwside    = [`LtoR | `RtoL]
 and rwocc     = rwocci option
 and rwocci    = [`Inclusive of Sint.t | `Exclusive of Sint.t | `All]
-and rwtactic  = [`Ring]
+and rwtactic  = [`Ring | `Field]
 
 (* -------------------------------------------------------------------- *)
 let norm_rwocci (x : rwocci) =
@@ -659,7 +691,7 @@ type intropattern1 =
   | IPSmt      of (bool * pprover_infos)
   | IPSubstTop of (int option * [`LtoR | `RtoL] option)
   | IPSimplify of [`Default | `Variant]
-  | IPCrush    of bool
+  | IPCrush    of crushmode
   | IPBreak
 
 and intropattern = (intropattern1 located) list
@@ -673,6 +705,8 @@ and ipcore = [
 
 and icasemode =
   [`One | `Full of (bool * bool) * icasemode_full option]
+
+and crushmode = { cm_simplify : bool; cm_solve : bool; }
 
 and icasemode_full =
   [`AtMost of int | `AsMuch]
@@ -740,7 +774,8 @@ type logtactic =
   | Psubst      of pformula list
   | Psimplify   of preduction
   | Pchange     of pformula
-  | Ppose       of (psymbol * rwocc * pformula)
+  | Ppose       of (psymbol * ptybinding list * rwocc * pformula)
+  | Pwlog       of (psymbol list * pformula)
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core_r =
@@ -748,6 +783,7 @@ and ptactic_core_r =
   | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core
   | Pby         of (ptactics) option
+  | Psolve      of (int option * psymbol list option)
   | Por         of ptactic * ptactic
   | Pseq        of ptactics
   | Pcase       of (bool * pcaseoptions * prevertv)
@@ -755,6 +791,7 @@ and ptactic_core_r =
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option
   | Psubgoal    of ptactic_chain
+  | Pnstrict    of ptactic_core
   | Padmit
   | Pdebug
 
@@ -968,6 +1005,14 @@ type save = [ `Qed | `Admit | `Abort ]
 type theory_clear = (pqsymbol option) list
 
 (* -------------------------------------------------------------------- *)
+type phint = {
+  ht_local : bool;
+  ht_prio  : int;
+  ht_base  : psymbol option;
+  ht_names : pqsymbol list;
+}
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gdeclare     of pdeclare
   | Gmodule      of pmodule_def
@@ -981,7 +1026,7 @@ type global_action =
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (bool * pqsymbol * pqsymbol list)
-  | Gaddat       of (bool * pqsymbol list)
+  | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list
   | GthOpen      of (bool * psymbol)
