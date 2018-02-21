@@ -291,7 +291,9 @@
       List.iter do1 os;
 
       oiter
-        (fun r -> pnames := Some { r with pp_add_rm = List.rev r.pp_add_rm })
+        (fun r ->
+           pnames := Some { pp_use_only = List.rev r.pp_use_only;
+                            pp_add_rm   = List.rev r.pp_add_rm })
         !pnames;
 
       { pprov_max       = !mprovers;
