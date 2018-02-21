@@ -567,12 +567,16 @@ module Prover = struct
       match ppr.pprov_names with
       | None -> None, []
       | Some pl ->
-        let do_uo s =
-          if s.pl_desc = "ALL" then all_provers ()
-          else [check_prover_name s] in
+        let do_uo uo s =
+          match s.pl_desc with
+          | "ALL" -> all_provers ()
+          | "CLEAR" -> []
+          | _ ->
+            let x = check_prover_name s in
+            if List.exists ((=) x) uo then uo else x :: uo in
         let uo =
           if pl.pp_use_only = [] then None
-          else Some (List.flatten (List.map do_uo pl.pp_use_only)) in
+          else Some (List.fold_left do_uo [] pl.pp_use_only) in
         let do_ar (k,s) = k, check_prover_name s in
         uo, List.map do_ar pl.pp_add_rm in
     let verbose = omap (odfl 1) ppr.pprov_verbose in
