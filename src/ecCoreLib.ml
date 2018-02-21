@@ -7,6 +7,13 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+let s_get  = "_.[_]"
+let s_set  = "_.[_<-_]"
+let s_nil  = "[]"
+let s_cons = "::"
+let s_abs  = "`|_|"
+
+(* -------------------------------------------------------------------- *)
 let i_top  = "Top"
 let i_self = "Self"
 let p_top  = EcPath.psymbol i_top
@@ -97,19 +104,30 @@ end
 (* -------------------------------------------------------------------- *)
 module CI_Distr = struct
   let i_Distr = "Distr"
-  let p_Distr  = EcPath.pqname p_top i_Distr
+  let p_Distr = EcPath.pqname p_top i_Distr
   let p_distr = _Pervasive "distr"
+  let _Distr  = fun x -> EcPath.pqname p_Distr x
 
-  let _Distr   = fun x -> EcPath.pqname p_Distr x
+  let p_dbool      = EcPath.extend p_top ["DBool"; "dbool"]
+  let p_dbitstring = EcPath.extend p_Distr ["Dbitstring"; "dbitstring"]
+  let p_dinter     = EcPath.extend p_top ["DInterval"; "dinter"]
 
-  let p_dbool = List.fold_left EcPath.pqname p_top ["DBool"; "dbool"]
-  let p_dbitstring = List.fold_left EcPath.pqname p_Distr ["Dbitstring"; "dbitstring"]
-  let p_dinter     = List.fold_left EcPath.pqname p_top ["DInterval"; "dinter"]
-
-  let p_support = _Distr "support"
-  let p_mu      = _Pervasive "mu"
+  let p_support  = _Distr "support"
+  let p_mu       = _Pervasive "mu"
   let p_lossless = _Distr "is_lossless"
 
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_Map = struct
+  let i_Map = "CoreMap"
+  let p_Map = EcPath.pqname p_top i_Map
+  let _Map  = fun x -> EcPath.pqname p_Map x
+
+  let p_map = _Map "map"
+  let p_get = _Map s_get
+  let p_set = _Map s_set
+  let p_cst = _Map "cst"
 end
 
 (* -------------------------------------------------------------------- *)
@@ -159,13 +177,6 @@ module CI_Logic = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let s_get  = "_.[_]"
-let s_set  = "_.[_<-_]"
-let s_nil  = "[]"
-let s_cons = "::"
-let s_abs  = "`|_|"
-
-(* -------------------------------------------------------------------- *)
 let is_mixfix_op =
   let ops = [s_get; s_set; s_nil; s_abs] in
   fun op -> List.mem op ops
@@ -175,15 +186,3 @@ let s_real_of_int = EcPath.toqsymbol CI_Real.p_real_of_int
 let s_dbool       = EcPath.toqsymbol CI_Distr.p_dbool
 let s_dbitstring  = EcPath.toqsymbol CI_Distr.p_dbitstring
 let s_dinter      = EcPath.toqsymbol CI_Distr.p_dinter
-
-
-(* -------------------------------------------------------------------- *)
-module CI_Map = struct
-  let i_Map = "NewMap"
-  let p_Map = EcPath.pqname p_top i_Map
-  let _Map = fun x -> EcPath.pqname p_Map x
-  let p_map = _Map "map"
-  let p_get = _Map s_get
-  let p_set = _Map s_set
-  let p_cnst = _Map "cnst"
-end
