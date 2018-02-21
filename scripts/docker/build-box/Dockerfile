@@ -14,7 +14,8 @@ RUN \
 
 COPY sudo-ci /etc/sudoers.d/ci
 
-RUN adduser --disabled-password --gecos "CI" ci
+RUN addgroup --gid 2000 ci
+RUN adduser --disabled-password --gecos "CI" --uid 2000 --gid 2000 ci
 RUN chmod 440 /etc/sudoers.d/ci
 
 USER    ci
