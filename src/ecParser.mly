@@ -308,9 +308,9 @@
 
       List.iter do1 os;
 
-      let _ =
-        let r = odfl empty_pprover_list !pnames in
-          pnames := Some { r with pp_add_rm = List.rev r.pp_add_rm } in
+      oiter
+        (fun r -> pnames := Some { r with pp_add_rm = List.rev r.pp_add_rm })
+        !pnames;
 
       { pprov_max       = !mprovers;
         pprov_timeout   = !timeout;
