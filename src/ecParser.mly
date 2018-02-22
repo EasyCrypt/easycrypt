@@ -265,13 +265,31 @@
       let iterate  = ref None in
       let selected = ref None in
 
+      let is_universal p = unloc p = "" || unloc p = "!" in
+
+      let ok_use_only pp p =
+        if pp.pp_add_rm <> []
+        then let msg = "use-only elements must come at beginning"
+	     in parse_error (loc p) (Some msg)
+	else if pp.pp_use_only <> [] && is_universal p
+             then let msg = "cannot add universal to non-empty use-only"
+                  in parse_error (loc p) (Some msg)
+        else match pp.pp_use_only with
+             | [q] ->
+	       if is_universal q
+	       then let msg = "use-only part is already universal"
+		    in parse_error (loc p) (Some msg)
+	       else ()
+             | _ -> () in
+
       let add_prover (k, p) =
         let r = odfl empty_pprover_list !pnames in
         pnames := Some
           (match k with
-          | `Only    -> { r with pp_use_only =            p  :: r.pp_use_only }
-          | `Include -> { r with pp_add_rm   = (`Include, p) :: r.pp_add_rm   }
-          | `Exclude -> { r with pp_add_rm   = (`Exclude, p) :: r.pp_add_rm   }) in
+           | `Only    ->
+	     (ok_use_only r p; { r with pp_use_only = p  :: r.pp_use_only })
+           | `Include -> { r with pp_add_rm = (`Include, p) :: r.pp_add_rm }
+           | `Exclude -> { r with pp_add_rm = (`Exclude, p) :: r.pp_add_rm }) in
 
       let do1 o  =
         match o with
@@ -290,11 +308,9 @@
 
       List.iter do1 os;
 
-      oiter
-        (fun r ->
-           pnames := Some { pp_use_only = List.rev r.pp_use_only;
-                            pp_add_rm   = List.rev r.pp_add_rm })
-        !pnames;
+      let _ =
+        let r = odfl empty_pprover_list !pnames in
+          pnames := Some { r with pp_add_rm = List.rev r.pp_add_rm } in
 
       { pprov_max       = !mprovers;
         pprov_timeout   = !timeout;
