@@ -112,6 +112,10 @@ proof. by []. qed.
 abbrev (\in)    ['a 'b] x (m : ('a, 'b) fmap) = (dom m x).
 abbrev (\notin) ['a 'b] x (m : ('a, 'b) fmap) = ! (dom m x).
 
+op rng ['a 'b] (m : ('a, 'b) fmap) =
+  fun y => exists x, m.[x] = Some y
+axiomatized by rngE.
+
 (* -------------------------------------------------------------------- *)
 lemma getE ['a 'b] (m : ('a, 'b) fmap) x : m.[x] = (tomap m).[x].
 proof. by []. qed.
@@ -124,6 +128,19 @@ axiom ofmapK ['a 'b] (m : ('a, 'b option) map) :
 
 axiom isfmap_offmap (m : ('a, 'b) fmap) :
   is_finite (fun x => (tomap m).[x] <> None).
+
+lemma nosmt finite_dom (m : ('a, 'b) fmap) :
+  is_finite (dom m).
+proof. exact/isfmap_offmap. qed.
+
+lemma nosmt finite_rng (m : ('a, 'b) fmap) :
+  is_finite (rng m).
+proof.
+exists (undup (map (fun x=> oget m.[x]) (to_seq (dom m)))); split.
++ exact/undup_uniq.
+move=> y; rewrite rngE mem_undup mapP /=; apply/exists_iff=> /= x.
+by rewrite mem_to_seq 1:finite_dom domE; case: (m.[x]).
+qed.
 
 (* -------------------------------------------------------------------- *)
 op empty ['a 'b] : ('a, 'b) fmap = ofmap (cst None).
