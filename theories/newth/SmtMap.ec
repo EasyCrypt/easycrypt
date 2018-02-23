@@ -129,17 +129,24 @@ axiom ofmapK ['a 'b] (m : ('a, 'b option) map) :
 axiom isfmap_offmap (m : ('a, 'b) fmap) :
   is_finite (fun x => (tomap m).[x] <> None).
 
-lemma nosmt finite_dom (m : ('a, 'b) fmap) :
+lemma nosmt finite_dom ['a 'b] (m : ('a, 'b) fmap) :
   is_finite (dom m).
 proof. exact/isfmap_offmap. qed.
 
-lemma nosmt finite_rng (m : ('a, 'b) fmap) :
+lemma nosmt finite_rng ['a 'b] (m : ('a, 'b) fmap) :
   is_finite (rng m).
 proof.
 exists (undup (map (fun x=> oget m.[x]) (to_seq (dom m)))); split.
 + exact/undup_uniq.
 move=> y; rewrite rngE mem_undup mapP /=; apply/exists_iff=> /= x.
 by rewrite mem_to_seq 1:finite_dom domE; case: (m.[x]).
+qed.
+
+lemma nosmt fmap_eqP ['a 'b] (m1 m2 : ('a, 'b) fmap) :
+  (forall x, m1.[x] = m2.[x]) <=> m1 = m2.
+proof.
+split=> [pw_eq|->] //; rewrite -tomapK -(tomapK m2).
+by congr; apply/Map.map_eqP=> x; rewrite pw_eq.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -230,6 +237,46 @@ proof. by apply/Map.eq_except_trans<:'a, 'b option>. qed.
 lemma eq_exceptP ['a 'b] X (m1 m2 : ('a, 'b) fmap) :
   eq_except X m1 m2 <=> (forall x, !X x => m1.[x] = m2.[x]).
 proof. by split=> h x /h. qed.
+
+lemma eq_except0 ['a 'b] (m1 m2 : ('a, 'b) fmap) :
+  eq_except pred0 m1 m2 <=> m1 = m2.
+proof. by rewrite eq_exceptP /pred0 /= fmap_eqP. qed.
+
+lemma eq_exceptSm ['a 'b] X x y (m1 m2 : ('a, 'b) fmap) :
+  eq_except X m1 m2 =>
+  eq_except (predU X (pred1 x)) m1.[x <- y] m2.
+proof.
+move=> eqeX_m1_m2; rewrite eq_exceptP=> x0; rewrite get_setE /predU /pred1.
+move=> /negb_or []; move: eqeX_m1_m2=> /eq_exceptP h /h ->.
+by rewrite eq_sym=> ->.
+qed.
+
+lemma eq_except1Sm ['a 'b] x y (m : ('a, 'b) fmap) :
+  eq_except (pred1 x) m.[x <- y] m.
+proof.
+have ->: pred1 x = predU pred0 (pred1 x); first exact/fun_ext.
+exact/eq_exceptSm/eq_except0.
+qed.
+
+lemma eq_exceptmS ['a 'b] X x y (m1 m2 : ('a, 'b) fmap) :
+  eq_except X m1 m2 =>
+  eq_except (predU X (pred1 x)) m1 m2.[x <- y].
+proof. by move=> /eq_except_sym /eq_exceptSm h; exact/eq_except_sym/h. qed.
+
+lemma eq_except1mS ['a 'b] x y (m : ('a, 'b) fmap) :
+  eq_except (pred1 x) m m.[x <- y].
+proof.
+have ->: pred1 x = predU pred0 (pred1 x); first exact/fun_ext.
+exact/eq_exceptmS/eq_except0.
+qed.
+
+lemma eq_exceptSS ['a 'b] X x y (m1 m2 : ('a, 'b) fmap) :
+  eq_except X m1 m2 =>
+  eq_except X m1.[x <- y] m2.[x <- y].
+proof.
+move=> /eq_exceptP eqeX_m1_m2; rewrite eq_exceptP=> x0; rewrite !get_setE.
+by move=> /eqeX_m1_m2 ->.
+qed.
 
 (* ==================================================================== *)
 op fdom ['a 'b] (m : ('a, 'b) fmap) =
