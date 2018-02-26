@@ -278,6 +278,27 @@ move=> /eq_exceptP eqeX_m1_m2; rewrite eq_exceptP=> x0; rewrite !get_setE.
 by move=> /eqeX_m1_m2 ->.
 qed.
 
+(* -------------------------------------------------------------------- *)
+op map ['a 'b 'c] (f : 'a -> 'b -> 'c) (m : ('a, 'b) fmap) = 
+   ofmap (Map.map (fun x => omap (f x)) (tomap m)).
+
+lemma mapE ['a 'b 'c] (f : 'a -> 'b -> 'c) (m : ('a, 'b) fmap) x :
+  (map f m).[x] = omap (f x) m.[x].
+proof.
+rewrite /map getE -/map ofmapK.
++ exists (to_seq (dom m)); rewrite uniq_to_seq 1:finite_dom=> /= x0.
+  rewrite mem_to_seq 1:finite_dom domE Map.offunE /= -getE.
+  by case: (m.[x0]).
+by rewrite Map.offunE /= -getE.
+qed.
+
+lemma map_set (f : 'a -> 'b -> 'c) (m : ('a, 'b) fmap) x b :
+  map f (m.[x <- b]) = (map f m).[x <- f x b].
+proof.
+apply/fmap_eqP => y; rewrite mapE !get_setE.
+by case: (x = y) => //; rewrite mapE.
+qed.
+
 (* ==================================================================== *)
 op fdom ['a 'b] (m : ('a, 'b) fmap) =
   oflist (to_seq (dom m)) axiomatized by fdomE.
