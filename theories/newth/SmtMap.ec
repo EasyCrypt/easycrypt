@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore CoreMap Finite List.
+require import AllCore CoreMap Finite List FSet.
 
 (* ==================================================================== *)
 theory Map.
@@ -112,6 +112,10 @@ proof. by []. qed.
 abbrev (\in)    ['a 'b] x (m : ('a, 'b) fmap) = (dom m x).
 abbrev (\notin) ['a 'b] x (m : ('a, 'b) fmap) = ! (dom m x).
 
+op rng ['a 'b] (m : ('a, 'b) fmap) =
+  fun y => exists x, m.[x] = Some y
+axiomatized by rngE.
+
 (* -------------------------------------------------------------------- *)
 lemma getE ['a 'b] (m : ('a, 'b) fmap) x : m.[x] = (tomap m).[x].
 proof. by []. qed.
@@ -125,6 +129,19 @@ axiom ofmapK ['a 'b] (m : ('a, 'b option) map) :
 axiom isfmap_offmap (m : ('a, 'b) fmap) :
   is_finite (fun x => (tomap m).[x] <> None).
 
+lemma nosmt finite_dom (m : ('a, 'b) fmap) :
+  is_finite (dom m).
+proof. exact/isfmap_offmap. qed.
+
+lemma nosmt finite_rng (m : ('a, 'b) fmap) :
+  is_finite (rng m).
+proof.
+exists (undup (map (fun x=> oget m.[x]) (to_seq (dom m)))); split.
++ exact/undup_uniq.
+move=> y; rewrite rngE mem_undup mapP /=; apply/exists_iff=> /= x.
+by rewrite mem_to_seq 1:finite_dom domE; case: (m.[x]).
+qed.
+
 (* -------------------------------------------------------------------- *)
 op empty ['a 'b] : ('a, 'b) fmap = ofmap (cst None).
 
@@ -136,7 +153,7 @@ qed.
 lemma emptyE ['a 'b] x : empty<:'a, 'b>.[x] = None.
 proof. by rewrite getE empty_valE Map.cstE. qed.
 
-lemma dom_empty ['a 'b] x : x \notin empty<:'a, 'b>.
+lemma mem_empty ['a 'b] x : x \notin empty<:'a, 'b>.
 proof. by rewrite domE emptyE. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -186,13 +203,13 @@ lemma nosmt remE ['a 'b] (m : ('a, 'b) fmap) x y :
 proof. by rewrite /rem /"_.[_]" rem_valE Map.get_setE. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma dom_set ['a 'b] (m : ('a, 'b) fmap) x b y :
-  y \in m.[x <- b] = y \in m \/ y = x.
+lemma mem_set ['a 'b] (m : ('a, 'b) fmap) x b y :
+  y \in m.[x <- b] <=> (y \in m \/ y = x).
 proof. by rewrite !domE get_setE (eq_sym x y); case: (y = x). qed.
 
 (* -------------------------------------------------------------------- *)
-lemma dom_rem ['a 'b] (m : ('a, 'b) fmap) x y :
-  y \in (rem m x) = (y \in m /\ y <> x).
+lemma mem_rem ['a 'b] (m : ('a, 'b) fmap) x y :
+  y \in (rem m x) <=> (y \in m /\ y <> x).
 proof. by rewrite !domE remE (eq_sym x y); case: (y = x) => //=. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -213,3 +230,70 @@ proof. by apply/Map.eq_except_trans<:'a, 'b option>. qed.
 lemma eq_exceptP ['a 'b] X (m1 m2 : ('a, 'b) fmap) :
   eq_except X m1 m2 <=> (forall x, !X x => m1.[x] = m2.[x]).
 proof. by split=> h x /h. qed.
+
+(* ==================================================================== *)
+op fdom ['a 'b] (m : ('a, 'b) fmap) =
+  oflist (to_seq (dom m)) axiomatized by fdomE.
+
+lemma mem_fdom ['a 'b] (m : ('a, 'b) fmap) (x : 'a) :
+  x \in fdom m <=> x \in m.
+proof. by rewrite fdomE mem_oflist mem_to_seq ?isfmap_offmap. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma fdom0 ['a 'b] : fdom empty<:'a, 'b> = fset0.
+proof. by apply/fsetP=> x; rewrite mem_fdom mem_empty in_fset0. qed.
+
+lemma nosmt fdom_set ['a 'b] (m : ('a, 'b) fmap) x v :
+  fdom m.[x <- v] = fdom m `|` fset1 x.
+proof.
+by apply/fsetP=> y; rewrite in_fsetU1 !mem_fdom mem_set.
+qed.
+
+lemma fdom_rem ['a 'b] (m : ('a, 'b) fmap) x :
+  fdom (rem m x) = fdom m `\` fset1 x.
+proof. 
+by apply/fsetP=> y; rewrite in_fsetD1 !mem_fdom mem_rem.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mem_fdom_set ['a 'b] (m : ('a, 'b) fmap) x v y :
+  y \in fdom m.[x <- v] <=> (y \in fdom m \/ y = x).
+proof. by rewrite fdom_set in_fsetU1. qed.
+
+lemma mem_fdom_rem ['a 'b] (m : ('a, 'b) fmap) x y :
+  y \in fdom (rem m x) <=> (y \in fdom m /\ y <> x).
+proof. by rewrite fdom_rem in_fsetD1. qed.
+
+(* ==================================================================== *)
+op card ['a 'b] (m : ('a, 'b) fmap) =
+  size (to_seq (dom m)) axiomatized by cardE.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt fdom_card ['a 'b] (m : ('a, 'b) fmap) :
+  card (fdom m) = card m.
+proof.
+rewrite fdomE cardE FSet.cardE -(perm_eq_size _ _ (oflistK _)).
+by rewrite undup_id // uniq_to_seq ?isfmap_offmap.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma card0 ['a 'b] : card<:'a, 'b> empty = 0.
+proof. by rewrite -fdom_card fdom0 fcards0. qed.
+
+lemma card_set ['a 'b] (m : ('a, 'b) fmap) x v :
+  card m.[x <- v] = card m + b2i (x \notin m).
+proof.
+rewrite -fdom_card fdom_set; case: (x \in m) => /= h.
++ rewrite fsetUC subset_fsetU_id -?fdom_card //.
+  by move=> y /in_fset1 ->; rewrite mem_fdom.
++ rewrite fcardUI_indep ?fcard1 -?fdom_card //.
+  apply/fsetP=> y; rewrite in_fsetI mem_fdom.
+  by rewrite in_fset1 in_fset0; case: (y = x).
+qed.
+
+lemma card_rem ['a 'b] (m : ('a, 'b) fmap) x :
+  card (rem m x) = card m - b2i (x \in m).
+proof.
+rewrite -!fdom_card fdom_rem (fcardD1 (fdom m) x).
+by rewrite /b2i mem_fdom -addzA; case: (x \in m).
+qed.
