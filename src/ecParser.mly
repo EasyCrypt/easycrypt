@@ -3267,7 +3267,7 @@ smt_info:
 
 smt_info1:
 | t=word
-    { `MAXLEMMAS (Some t)      }
+    { `MAXLEMMAS (Some t) }
 
 | TIMEOUT EQ t=word
     { `TIMEOUT t }
