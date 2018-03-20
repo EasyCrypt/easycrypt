@@ -334,12 +334,21 @@ rewrite /map getE -/map ofmapK.
 by rewrite Map.offunE /= -getE.
 qed.
 
+lemma mem_map ['a 'b 'c] (f : 'a -> 'b -> 'c) (m : ('a, 'b) fmap) x :
+  x \in map f m <=> x \in m.
+proof. by rewrite !domE mapE iff_negb; case: (m.[x]). qed.
+
 lemma map_set (f : 'a -> 'b -> 'c) (m : ('a, 'b) fmap) x b :
   map f (m.[x <- b]) = (map f m).[x <- f x b].
 proof.
 apply/fmap_eqP => y; rewrite mapE !get_setE.
 by case: (x = y) => //; rewrite mapE.
 qed.
+
+lemma map_map ['a 'b 'c 'd] (f : 'a -> 'b -> 'c)
+                            (g : 'a -> 'c -> 'd) (m : ('a, 'b) fmap) :
+  map g (map f m) = map (fun a b => g a (f a b)) m.
+proof. by apply/fmap_eqP=> a; rewrite !mapE; case: (m.[a]). qed.
 
 (* -------------------------------------------------------------------- *)
 op filter ['a 'b] (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
