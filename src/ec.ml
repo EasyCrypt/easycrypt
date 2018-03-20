@@ -33,6 +33,9 @@ let copyright =
 let psep = match Sys.os_type with "Win32" -> ";" | _ -> ":"
 
 (* -------------------------------------------------------------------- *)
+let confname = "easycypt.conf"
+
+(* -------------------------------------------------------------------- *)
 type pconfig = {
   pc_why3     : string option;
   pc_pwrapper : string option;
@@ -140,7 +143,13 @@ let main () =
 
   (* Parse command line arguments *)
   let options =
-    let ini = resource ["etc"; "easycrypt.ini"] in
+    let ini =
+      let xdgini =
+        XDG.Config.file ~exists:true ~mode:`All ~appname:EcVersion.app
+          confname
+      in List.hd (List.append xdgini [resource ["etc"; "easycrypt.conf"]]) in
+
+
     let ini =
       try  Some (EcOptions.read_ini_file ini)
       with
@@ -162,7 +171,16 @@ let main () =
   in
 
   (* Initialize why3 engine *)
-  let why3conf = options.o_options.o_why3
+  let why3conf =
+    match options.o_options.o_why3 with
+    | None ->
+        let confs =
+          XDG.Config.file
+            ~exists:true ~mode:`All ~appname:EcVersion.app "why3.conf"
+        in List.nth_opt confs 0
+
+    | Some _ as aout -> aout
+
   and ovrevict = options.o_options.o_ovrevict in
 
   begin

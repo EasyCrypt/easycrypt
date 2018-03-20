@@ -38,7 +38,7 @@ let fortune_from_stream : in_channel -> string list =
 let init () =
   let conffiles =
     XDG.Data.file
-      ~exists:true ~appname:"easycrypt" ~mode:`All
+      ~exists:true ~appname:EcVersion.app ~mode:`All
       "fortune.conf"
   in
 
