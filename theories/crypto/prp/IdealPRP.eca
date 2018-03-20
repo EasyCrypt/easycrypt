@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore FSet NewFMap Distr StdOrder StdRing.
+require import AllCore FSet OldFMap Distr StdOrder StdRing.
 (*---*) import RField RealOrder.
 require import Dexcepted.
 require (*--*) NewPRP.

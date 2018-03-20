@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Distr NewFMap.
+require import Distr.
 
 (* Input and output types *)
 type from, to.

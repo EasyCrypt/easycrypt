@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore List FSet NewFMap Distr.
+require import AllCore List SmtMap Distr.
 require (*--*) IterProc.
 
 pragma -oldip.
@@ -19,9 +19,9 @@ lemma neqK_eqU f : f <> Known <=> f = Unknown.
 proof. by case: f. qed.
 
 (* -------------------------------------------------------------------- *)
-(** Properties of flagged maps -- Generalize and push to NewFMap? **)
+(** Properties of flagged maps -- Generalize and push to OldFMap? **)
 op in_dom_with (m : ('from, 'to * 'flag) fmap) (x:'from) (f:'flag) =
-   mem (dom m) x /\ (oget (m.[x])).`2 = f.
+   x \in m /\ (oget (m.[x])).`2 = f.
 
 op restr f (m : ('from, 'to * 'flag) fmap) =
   let m = filter (fun _ (p:'to*'flag) => p.`2=f) m in
@@ -31,47 +31,51 @@ lemma restrP (m : ('from, 'to * 'flag) fmap) f x:
   (restr f m).[x]
   = obind (fun (p:'to*'flag)=> if p.`2=f then Some p.`1 else None) m.[x].
 proof.
-rewrite /restr /= mapP filterP in_dom /=.
-by case (m.[x])=> //= -[x0 f'] /=; rewrite oget_some /= (@fun_if (omap _)).
+rewrite /restr /= mapE filterE //=.
+by case: (m.[x])=> //= y; case: (y.`2=f).
 qed.
 
 lemma dom_restr (m : ('from, 'to * 'flag) fmap) f x:
-  mem (dom (restr f m)) x <=> in_dom_with m x f.
+  x \in (restr f m) <=> in_dom_with m x f.
 proof.
-rewrite /in_dom_with !in_dom; case: (m.[x]) (restrP m f x)=>//= -[t f'] /=.
+rewrite /in_dom_with !domE; case: (m.[x]) (restrP m f x)=>//= -[t f'] /=.
 by rewrite oget_some /=; case (f' = f)=> [_ ->|].
 qed.
 
 lemma restr_set (m : ('from, 'to * 'flag) fmap) f1 f2 x y:
   restr f1 m.[x<-(y,f2)]
-  = if f1 = f2 then (restr f1 m).[x<-y] else rem x (restr f1 m).
+  = if f1 = f2 then (restr f1 m).[x<-y] else rem (restr f1 m) x.
 proof.
-rewrite fmapP; case: (f1=f2)=> [->|Hneq]x0; rewrite !(restrP,getP); 1:by case (x0=x).
-case: (x0=x)=> [->|Hnx]; 1:by rewrite (@eq_sym f2) Hneq remP_eq.
-by rewrite remP Hnx restrP.
+apply/fmap_eqP; case: (f1 = f2)=> [->>|Hneq] x0; rewrite !(restrP, get_setE).
++ by case: (x = x0).
+case: (x = x0)=> [->>|Hnx].
++ by rewrite (@eq_sym f2) Hneq remE.
+by rewrite remE Hnx restrP.
 qed.
 
 lemma restr_set_eq (m : ('from, 'to * 'flag) fmap) f x y:
   restr f m.[x<-(y,f)] = (restr f m).[x<-y].
 proof. by rewrite restr_set. qed.
 
-lemma restr0 f: restr f map0<:'from, 'to * 'flag> = map0.
-proof. by apply fmapP=>x; rewrite restrP !map0P. qed.
+lemma restr0 f: restr f empty<:'from, 'to * 'flag> = empty.
+proof. by apply/fmap_eqP=>x; rewrite restrP !emptyE. qed.
 
 lemma restr_set_neq f2 f1 (m : ('from, 'to * 'flag) fmap) x y:
-  !mem (dom m) x =>
+  x \notin m =>
   f2 <> f1 => restr f1 m.[x<-(y,f2)] = restr f1 m.
 proof.
 move=> Hm Hneq.
-by rewrite restr_set (@eq_sym f1) Hneq rem_id // dom_restr /in_dom_with Hm.
+rewrite restr_set (@eq_sym f1) Hneq /=; apply/fmap_eqP=> x'.
+rewrite remE; case: (x = x')=> [->>|//].
+by move: Hm; rewrite domE /= restrP=> ->.
 qed.
 
-lemma restr_rem (m : ('from,'to*'flag) fmap) x f:
-  restr f (rem x m)
-  = if in_dom_with m x f then rem x (restr f m) else restr f m.
+lemma restr_rem (m : ('from,'to*'flag) fmap) (x : 'from) f:
+  restr f (rem m x)
+  = if in_dom_with m x f then rem (restr f m) x else restr f m.
 proof.
-rewrite fmapP=>z; rewrite restrP.
-by case: (in_dom_with m x f); rewrite !(restrP,remP) /in_dom_with in_dom /#.
+apply/fmap_eqP=> z; rewrite restrP.
+by case: (in_dom_with m x f); rewrite !(restrP,remE) /in_dom_with domE /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -109,12 +113,12 @@ abstract theory Ideal.
   module RO : RO = {
     var m : (from, to)fmap
 
-    proc init () = { m <- map0; }
+    proc init () = { m <- empty; }
 
     proc get(x:from) = {
       var r;
       r <$ sampleto x;
-      if (!mem (dom m) x) m.[x] <- r;
+      if (x \notin m) m.[x] <- r;
       return (oget m.[x]);
     }
 
@@ -123,7 +127,7 @@ abstract theory Ideal.
     }
 
     proc rem (x:from) = {
-      m <- rem x m;
+      m <- rem m x;
     }
 
     proc sample(x:from) = {
@@ -139,12 +143,12 @@ abstract theory Ideal.
   module FRO : FRO = {
     var m : (from, to * flag)fmap
 
-    proc init () = { m <- map0; }
+    proc init () = { m <- empty; }
 
     proc get(x:from) = {
       var r;
       r <$ sampleto x;
-      if (mem (dom m) x) r <- (oget m.[x]).`1;
+      if (x \in m) r <- (oget m.[x]).`1;
       m.[x] <- (r,Known);
       return r;
     }
@@ -154,13 +158,13 @@ abstract theory Ideal.
     }
 
      proc rem (x:from) = {
-      m <- rem x m;
+      m <- rem m x;
     }
 
     proc sample(x:from) = {
       var c;
       c <$ sampleto x;
-      if (!mem (dom m) x) m.[x] <- (c,Unknown);
+      if (x \notin m) m.[x] <- (c,Unknown);
     }
 
     proc in_dom(x:from, f:flag) = {
@@ -176,17 +180,17 @@ abstract theory Ideal.
   (* Equivalence between RO and trivial Flagged RO: oracles *)
   equiv RO_FRO_init :
     RO.init ~ FRO.init : true ==> RO.m{1} = map (fun _=> fst) FRO.m{2}.
-  proof. by proc; auto; rewrite map_map0. qed.
+  proof. by proc; auto=> />; apply/fmap_eqP=> x; rewrite mapE !emptyE. qed.
 
   equiv RO_FRO_get : RO.get ~ FRO.get :
          ={x} /\ RO.m{1} = map (fun _=> fst) FRO.m{2}
      ==> ={res} /\ RO.m{1} = map (fun _=> fst) FRO.m{2}.
   proof.
-  proc; auto=> ? &ml [] -> -> /= ? -> /=.
-  rewrite !dom_map !map_set/fst/= getP_eq oget_some; progress.
-  + by rewrite mapP oget_omap_some // -in_dom. 
-  apply/eq_sym/set_eq; rewrite get_oget ?dom_map //.
-  by rewrite mapP oget_omap_some // -in_dom.
+  proc; auto=> /> &2 r _; rewrite !domE !mapE !map_set !get_set_eqE //=.
+  rewrite none_omap oget_some=> /= />.
+  case: {-1}(FRO.m.[x]{2}) (eq_refl FRO.m.[x]{2})=> //= - [y f] /=.
+  rewrite oget_some=> /= mx; apply/fmap_eqP=> x'; rewrite get_setE.
+  by case: (x{2} = x')=> //= <<-; rewrite mapE mx.
   qed.
 
   equiv RO_FRO_set : RO.set ~ FRO.set :
@@ -197,13 +201,17 @@ abstract theory Ideal.
   equiv RO_FRO_rem : RO.rem ~ FRO.rem :
          ={x} /\ RO.m{1} = map (fun _=> fst) FRO.m{2}
      ==> RO.m{1} = map (fun _=> fst) FRO.m{2}.
-  proof. by proc; auto=> ? ?; rewrite map_rem. qed.
+  proof.
+  proc; auto=> /> &2.
+  by apply/fmap_eqP=> x'; rewrite !(remE, mapE); case: (x{2} = x').
+  qed.
 
   equiv RO_FRO_sample : RO.sample ~ FRO.sample :
          ={x} /\ RO.m{1} = map (fun _=> fst) FRO.m{2}
      ==> RO.m{1} = map (fun _=> fst) FRO.m{2}.
-  proof. 
-  by proc; inline *; auto=>? &ml [] 2!-> /= ? ->; rewrite dom_map map_set. 
+  proof.
+  proc; inline *; auto=> /> &2 r _; rewrite !domE !map_set /= !mapE /=.
+  by rewrite none_omap.
   qed.
 
   (* ------------------------------------------------------------------ *)
@@ -275,7 +283,7 @@ abstract theory GenEager.
     proc get(x:from) = {
       var r;
       r <$ sampleto x;
-      if (!mem (dom FRO.m) x || (oget FRO.m.[x]).`2 = Unknown) {
+      if (x \notin FRO.m \/ (oget FRO.m.[x]).`2 = Unknown) {
         FRO.m.[x] <- (r,Known);
       }
       return (oget FRO.m.[x]).`1;
@@ -300,7 +308,7 @@ abstract theory GenEager.
     }
 
     proc resample () = {
-      Iter(I).iter (elems (dom (restr Unknown FRO.m)));
+      Iter(I).iter (FSet.elems (fdom (restr Unknown FRO.m)));
     }
   }.
 
@@ -329,9 +337,13 @@ abstract theory GenEager.
     eager [RRO.resample(); , FRO.init ~ RRO.init, RRO.resample(); :
            ={FRO.m} ==> ={FRO.m} ].
   proof.
-  eager proc. inline{2} *; rcondf{2}3; auto=> /=.
-  + by move=> ? _; rewrite restr0 dom0 elems_fset0.
-  conseq (_:) (_: true==>true: =1%r) _=> //. by call RRO_resample_ll.
+  eager proc; inline{2} *; rcondf{2}3; auto=> />.
+  + rewrite restr0 fdomE; apply/perm_eq_small=> //.
+    apply/uniq_perm_eq=> //; 1:exact/FSet.uniq_elems.
+    move=> x. rewrite -FSet.memE FSet.mem_oflist Finite.mem_to_seq 1:finite_dom.
+    by rewrite domE emptyE.
+  conseq (_:) (_: true==>true: =1%r) _=> //.
+  by call RRO_resample_ll.
   qed.
 
   equiv iter_perm2 (i1 i2 : from):
@@ -340,39 +352,41 @@ abstract theory GenEager.
   proof.
   proc; inline *; case: ((t1 = t2){1}); 1:by auto.
   swap{2}[4..5] -3. auto=> &ml &mr [#] 3-> neq /= ? -> ? -> /=.
-  by rewrite set_set neq.
+  apply/fmap_eqP=> x; rewrite !get_setE.
+  by case: (t2{mr} = x); case: (t1{mr} = x)=> //= + <<- //.
   qed.
 
   equiv I_f_neq x1 mx1: RRO.I.f ~ RRO.I.f :
-      ={x,FRO.m} /\ x1 <> x{1} /\ FRO.m{1}.[x1] = mx1
+      ={x,FRO.m} /\ x{1} <> x1 /\ FRO.m{1}.[x1] = mx1
     ==> ={FRO.m} /\ FRO.m{1}.[x1] = mx1.
   proof.
-  by proc; auto=> ? &mr [#] 2-> Hneq Heq /= ? ->; rewrite getP Hneq.
+  by proc; auto=> ? &mr [#] 2-> Hneq Heq /= ? ->; rewrite get_setE Hneq.
   qed.
 
   equiv I_f_eqex x1 mx1 mx2: RRO.I.f ~ RRO.I.f :
          ={x}
-      /\ x1 <> x{1}
-      /\ eq_except FRO.m{1} FRO.m{2} (pred1 x1)
+      /\ x{1} <> x1
+      /\ eq_except (pred1 x1) FRO.m{1} FRO.m{2}
       /\ FRO.m{1}.[x1] = mx1 /\ FRO.m{2}.[x1] = mx2
-    ==>    eq_except FRO.m{1} FRO.m{2} (pred1 x1)
+    ==>    eq_except (pred1 x1) FRO.m{1} FRO.m{2}
         /\ FRO.m{1}.[x1] = mx1
         /\ FRO.m{2}.[x1] = mx2.
   proof.
   proc; auto=> ? &mr [#] -> Hneq Heq /= Heq1 Heq2 ? -> /=.
-  by rewrite !getP Hneq eq_except_set.
+  by rewrite !get_setE Hneq eq_exceptSS_eq.
   qed.
 
   equiv I_f_set x1 r1 : RRO.I.f ~ RRO.I.f : 
          ={x}
-      /\ x1 <> x{1}
+      /\ x{1} <> x1
       /\ FRO.m{1}.[x1] = None
       /\ FRO.m{2} = FRO.m{1}.[x1 <- (r1, Known)]
     ==>    FRO.m{1}.[x1] = None
         /\ FRO.m{2} = FRO.m{1}.[x1 <- (r1, Known)].
   proof.
   proc; auto=> ? &mr [#] -> Hneq H1 -> /= ? ->.
-  by rewrite getP Hneq/= H1 set_set Hneq.
+  rewrite get_setE Hneq/= H1=> //=; apply/fmap_eqP=> y.
+  by rewrite !get_setE; case: (x{mr} = y); case: (x1 = y).
   qed.
 
   lemma eager_get :
@@ -380,59 +394,73 @@ abstract theory GenEager.
            ={x,FRO.m} ==> ={res,FRO.m} ].
   proof.
   eager proc.
-  wp; case: ((mem (dom FRO.m) x /\ (oget FRO.m.[x]).`2=Known){1}).
+  wp; case: ((x \in FRO.m /\ (oget FRO.m.[x]).`2=Known){1}).
   + rnd{1};rcondf{2} 2;1:by auto=> /#.
     exists* x{1}, ((oget FRO.m.[x{2}]){1}); elim* => x1 mx.
     inline RRO.resample.
-    call (iter_inv RRO.I (fun z=> x1 <> z) (relI (=) (fun o _ => o.[x1] = Some mx)) _).
+    call (iter_inv RRO.I (fun z=> z <> x1) (relI (=) (fun o _ => o.[x1] = Some mx)) _).
     + by conseq (I_f_neq x1 (Some mx))=> @/relI /=.
     auto=> @/relI ? &mr [#] 4-> Hd Hget; rewrite sampleto_ll /= => ? _; split.
-    + by rewrite get_oget // oget_some /= => x; rewrite -memE dom_restr /#.
+    + have:= Hd; have:= Hget; rewrite domE; case: (FRO.m{mr}.[x{mr}])=> //= -[t f].
+      by rewrite oget_some=> /= ->> x'; rewrite -FSet.memE mem_fdom dom_restr /#.
     move=> @/relI [#] _ Heq ? mr [#] -> Heq' ? _.
-    by rewrite in_dom Heq' oget_some /= set_eq /#.
-  case: ((mem (dom FRO.m) x){1}).
+    by rewrite domE Heq' oget_some /=; apply/fmap_eqP=> y; rewrite get_setE /#.
+  case: ((x \in FRO.m){1}).
   + inline{1} RRO.resample=> /=; rnd{1}.
     transitivity{1} 
-      { Iter(RRO.I).iter_1s(x, elems ((dom (restr Unknown FRO.m)) `\` fset1 x)); }
-      (={x,FRO.m} /\ mem (dom FRO.m{1}) x{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown ==>
+      { Iter(RRO.I).iter_1s(x, FSet.elems ( FSet.(`\`) (fdom (restr Unknown FRO.m)) (FSet.fset1 x))); }
+      (={x,FRO.m} /\ x{1} \in FRO.m{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown ==>
        ={x,FRO.m})
-      (={x,FRO.m} /\ mem (dom FRO.m{1}) x{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown==>
-       ={x} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
+      (={x,FRO.m} /\ x{1} \in FRO.m{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown==>
+       ={x} /\ eq_except (pred1 x{1}) FRO.m{1} FRO.m{2} /\
        FRO.m{1}.[x{2}] = Some (result{2},Unknown) /\
        FRO.m{2}.[x{2}] = Some (result{2},Known)).
     + by move=> ? &mr [#] -> -> ? ?; exists FRO.m{mr} x{mr}=> /#.
-    + move=> ? ? ?; rewrite in_dom=> [#] <*> [#] -> /eq_except_sym H Hxm Hx2.
+    + move=> ? &2 &m; rewrite domE=> [#] <*> [#] -> /eq_except_sym H Hxm Hx2.
       rewrite sampleto_ll=> r _; rewrite /= Hxm oget_some /=; apply /eq_sym.
-      have /(congr1 oget):= Hx2 => <-; apply/eq_except_set_eq=> //.
-      by rewrite in_dom Hx2.
+      have /(congr1 oget):= Hx2 => <-; apply/fmap_eqP=> x'; rewrite !get_setE.
+      case: (x' = x{m})=> [<<-| x_neq].
+      + by case: (FRO.m{m}.[x']) Hx2.
+      by move: H; rewrite (@eq_sym x{m}) x_neq eq_exceptP=> /(_ _ x_neq).
     + symmetry; call (iter1_perm RRO.I iter_perm2).
       skip=> &1 &2 [[->> ->>]] [Hdom Hm]; split=>//=.
-      by apply /perm_eq_sym/perm_to_rem/dom_restr; rewrite /in_dom_with Hdom Hm.
+      apply/uniq_perm_eq.
+      + split.
+        + by rewrite -FSet.memE FSet.setDE FSet.mem_oflist mem_filter /predC FSet.in_fset1.
+        exact/FSet.uniq_elems.
+      + exact/FSet.uniq_elems.
+      move=> x'=> //=; case: (x' = x{1})=> [<<-|] /=.
+      + by rewrite -FSet.memE mem_fdom dom_restr /#.
+      by rewrite -!FSet.memE FSet.in_fsetD FSet.in_fset1.
     inline Iter(RRO.I).iter_1s RRO.I.f RRO.resample.
-    seq 5 3 : (={x} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
-               (l = elems (dom (restr Unknown FRO.m) `\` fset1 x)){1} /\
+    seq 5 3 : (={x} /\ eq_except (pred1 x{1}) FRO.m{1} FRO.m{2} /\
+               (l = FSet.elems (FSet.(`\`) (fdom (restr Unknown FRO.m)) (FSet.fset1 x))){1} /\
                FRO.m{1}.[x{2}] = Some (result{2}, Unknown) /\
                FRO.m{2}.[x{2}] = Some (result{2}, Known)).
-    + auto=> ? &mr [#] 2 -> /= ^Hdom -> ^Hget -> ? -> /=.
-      by rewrite !getP /= oget_some !restr_set /= dom_set set2_eq_except fsetDK.
+    + auto=> ? &mr [#] 2 -> /= ^Hdom -> ^Hget -> c -> /=.
+      rewrite !get_setE /= oget_some !restr_set /=.
+      have ->: pred1 x{mr} = predU pred0 (pred1 x{mr}) by done. (* Really? *)
+      rewrite eq_exceptSS_neq //=.
+      congr; apply/FSet.fsetP=> x'; rewrite !FSet.in_fsetD FSet.in_fset1 !mem_fdom.
+      by rewrite mem_set; case: (x' = x{mr}).
     exists* x{1}, FRO.m{1}.[x{2}], FRO.m{2}.[x{2}]; elim*=>x1 mx1 mx2.
     call (iter_inv RRO.I
-           (fun z=> x1 <> z) 
-           (fun o1 o2 => eq_except o1 o2 (pred1 x1) /\ o1.[x1]= mx1 /\ o2.[x1]=mx2)
+           (fun z=> z <> x1)
+           (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1]= mx1 /\ o2.[x1]=mx2)
            (I_f_eqex x1 mx1 mx2))=> /=.
-    + auto=> ? &mr [#] 4-> ^H -> -> ^H1 -> ^H2 -> /=; split.
-      + congr; rewrite fsetP=> z; rewrite !inE !dom_restr /in_dom_with !in_dom.
-        case: (z = x{mr})=> /= [->|]; 1:by rewrite H2 /= oget_some.
-        by move: H=> /eq_exceptP h; move: (h z)=> {h} h /h ->.
-    by move=> x; rewrite -memE in_fsetD1 eq_sym.
-  swap{1}-1; seq  1  1: (={r,x,FRO.m} /\ ! mem (dom FRO.m{1}) x{1}); 1:by auto. 
+    + auto=> /> &1 &2 eqe_x2_m1_m2 ^H1 -> ^H2 -> //=; split=> [|/>].
+      split.
+      + congr; apply/FSet.fsetP=> z; rewrite !FSet.inE !mem_fdom !dom_restr /in_dom_with.
+        by have:= eqe_x2_m1_m2=> /eq_exceptP /(_ z) /#.
+      by move=> x2; rewrite -FSet.memE !FSet.inE mem_fdom.
+  swap{1}-1; seq  1  1: (={r,x,FRO.m} /\ x{1} \notin FRO.m{1}); 1:by auto. 
   inline RRO.resample; exists* x{1}, r{1}; elim* => x1 r1.
-  call (iter_inv RRO.I (fun z=>x1<>z) 
+  call (iter_inv RRO.I (fun z=> z <> x1) 
            (fun o1 o2 => o1.[x1] = None /\ o2= o1.[x1<-(r1,Known)]) (I_f_set x1 r1)).
-  auto=> ? &mr [#] 5 -> ^Hnin ^ + -> /=; rewrite in_dom=> /= -> /=.
+  auto=> ? &mr [#] 5 -> ^Hnin ^ + -> /=; rewrite domE=> /= -> /=.
   rewrite restr_set_neq //=; split.
-  + by move=> z; rewrite -memE dom_restr /#. 
-  by move=> _ ? mr [#] ^Hmem 2->; rewrite in_dom Hmem /= getP /= oget_some.
+  + by move=> z; rewrite -FSet.memE mem_fdom dom_restr /#. 
+  by move=> _ ? mr [#] ^Hmem 2->; rewrite domE Hmem /= get_setE /= oget_some.
   qed.
 
   lemma eager_set :
@@ -440,40 +468,55 @@ abstract theory GenEager.
            ={x,y} /\ ={FRO.m} ==> ={res,FRO.m} ].
   proof.
   eager proc. inline RRO.resample=> /=; wp.
-  case ((mem (dom FRO.m) x /\ (oget FRO.m.[x]).`2 = Unknown){1}).
-  + transitivity{1} { Iter(RRO.I).iter_1s(x,elems (dom (restr Unknown FRO.m) `\` fset1 x));}
-      (={x,y,FRO.m} /\ mem (dom FRO.m{1}) x{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown ==>
+  case ((x \in FRO.m /\ (oget FRO.m.[x]).`2 = Unknown){1}).
+  + transitivity{1} { Iter(RRO.I).iter_1s(x,FSet.elems (FSet.(`\`) (fdom (restr Unknown FRO.m)) (FSet.fset1 x)));}
+      (={x,y,FRO.m} /\ x{1} \in FRO.m{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown ==>
        ={x,y,FRO.m})
-      (={x,y,FRO.m} /\ mem (dom FRO.m{1}) x{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown==>
-       ={x,y} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
+      (={x,y,FRO.m} /\ x{1} \in FRO.m{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown==>
+       ={x,y} /\ eq_except (pred1 x{1}) FRO.m{1} FRO.m{2} /\
        FRO.m{2}.[x{2}] = Some (y{2},Known)).
     + by move=> ? &mr [#] 2-> ? ? ?; exists FRO.m{mr} x{mr} y{mr}=> /#.
-    + move=> ? &m &mr [#] <*> [#] 2-> Hex Hm2.
-      by rewrite (@eq_except_set_eq FRO.m{mr} FRO.m{m} x{mr}) ?in_dom ?Hm2 // eq_except_sym.
-    + symmetry; call (iter1_perm RRO.I iter_perm2); auto=> ? &mr [#] 3 -> Hdom Hm; split=> //=.
-      by apply/perm_eq_sym/perm_to_rem/dom_restr; rewrite /in_dom_with Hdom.
+    + move=> /> &m &mr [#] <*> [#] Hex Hm2.
+      apply/fmap_eqP=> z; rewrite get_setE; case: (x{mr} = z)=> //= [->>|].
+      + by rewrite Hm2.
+      by rewrite eq_sym; move: Hex=> /eq_exceptP + h=> /(_ z h).
+    + symmetry; call (iter1_perm RRO.I iter_perm2); auto=> |> &1 Hdom Hm.
+      apply/uniq_perm_eq=> //=.
+      + split.
+        + by rewrite -FSet.memE FSet.in_fsetD FSet.in_fset1.
+        exact/FSet.uniq_elems.
+      + exact/FSet.uniq_elems.
+      by move=> z; rewrite -!FSet.memE FSet.in_fsetD FSet.in_fset1 !mem_fdom dom_restr /#.
     inline{1}Iter(RRO.I).iter_1s.
-    seq 3 1: (={x,y} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
-              l{1} = (elems (dom (restr Unknown FRO.m))){2} /\ !mem l{1} x{1} /\
+    seq 3 1: (={x,y} /\ eq_except (pred1 x{1}) FRO.m{1} FRO.m{2} /\
+              l{1} = (FSet.elems (fdom (restr Unknown FRO.m))){2} /\ !mem l{1} x{1} /\
               (FRO.m.[x]=Some(y, Known)){2}).
     + inline *; auto=> ? &mr [#] 3-> /= Hmem Hget; rewrite sampleto_ll=> ? _.
-      by rewrite set2_eq_except getP_eq restr_set /= dom_rem -memE !inE negb_and.
+      have ->: pred1 x{mr} = predU pred0 (pred1 x{mr}) by done.
+      rewrite (@eq_exceptSS_neq _ _ (_,Unknown) (_,Known) _ _) //=.
+      split.
+      + congr; rewrite FSet.fsetP=> z; rewrite !FSet.inE !mem_fdom !dom_restr /in_dom_with mem_set.
+        case: (z = x{mr})=> [<<-|] //=.
+        + by rewrite get_set_eqE.
+        by rewrite eq_sym=> h; rewrite get_setE h.
+      by rewrite get_set_sameE /= -FSet.memE !FSet.inE mem_fdom.
     exists* x{1},y{1},(FRO.m.[x]{1}); elim* => x1 y1 mx1; pose mx2:= Some(y1,Known).
-    call (iter_inv RRO.I (fun z=>x1<>z) 
-           (fun o1 o2 => eq_except o1 o2 (pred1 x1) /\ o1.[x1]= mx1 /\ o2.[x1]=mx2) 
+    call (iter_inv RRO.I (fun z=> z <> x1) 
+           (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1]= mx1 /\ o2.[x1]=mx2) 
            (I_f_eqex x1 mx1 mx2))=>/=.
-    by auto=> ? &mr [#] -> <- 2-> ->> 2-> Hmem -> /#.
+    by auto=> &1 &2 |> Hex Hx2 -> //= z /#.
   exists* x{1},y{1},(FRO.m.[x]{1}); elim* => x1 y1 mx1; pose mx2:= Some(y1,Known).
-  call (iter_inv RRO.I (fun z=>x1<>z) 
-         (fun o1 o2 => eq_except o1 o2 (pred1 x1) /\ o1.[x1]= mx1 /\ o2.[x1]=mx2) 
+  call (iter_inv RRO.I (fun z=> z <> x1) 
+         (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1]= mx1 /\ o2.[x1]=mx2) 
          (I_f_eqex x1 mx1 mx2))=> /=.
   auto=> ? &mr [#] -> <- 2-> ->> -> /= Hidm.
-  rewrite restr_set getP_eq /mx2 eq_except_sym set_eq_except /=; split; [split|].
-  + by congr; apply/fsetP=> z; rewrite !(dom_rem,inE,dom_restr) /#.
-  + by move=> z; rewrite -memE dom_restr /#.
-  move=> _ ? ? [#] Hex HLx HRx; apply/eq_sym. 
-  have /(congr1 oget):= HRx=> <-; apply/eq_except_set_eq=> //; 1:by rewrite in_dom HRx.
-  by apply /eq_except_sym.
+  rewrite restr_set get_set_sameE /mx2 /=; split=> [|_].
+  + do !split.
+    + by congr; apply/FSet.fsetP=> z; rewrite !mem_fdom mem_rem dom_restr /#.
+    + by move=> z; rewrite -FSet.memE mem_fdom dom_restr /#.
+    exact/eq_except1mS.
+  move=> m1 m2 [#] /eq_exceptP Hex _ m2x; apply/fmap_eqP=> z; rewrite get_setE.
+  by have:= Hex z=> @/pred1; rewrite eq_sym; case: (x{mr} = z)=> [<<-|] //=; rewrite m2x.
   qed.
 
   lemma eager_rem: 
@@ -483,38 +526,51 @@ abstract theory GenEager.
   eager proc;case ((in_dom_with FRO.m x Unknown){1}).
   + inline RRO.resample;wp.
     transitivity{1} 
-      { Iter(RRO.I).iter_1s(x,elems (dom (restr Unknown FRO.m) `\` fset1 x)); }
+      { Iter(RRO.I).iter_1s(x,FSet.elems (FSet.(`\`) (fdom (restr Unknown FRO.m)) (FSet.fset1 x))); }
       (={x,FRO.m}/\(in_dom_with FRO.m x Unknown){1}==> ={x,FRO.m}) 
-      (={x,FRO.m}/\ (in_dom_with FRO.m x Unknown){1} ==> (rem x FRO.m){1} = FRO.m{2})=>//.
+      (={x,FRO.m}/\ (in_dom_with FRO.m x Unknown){1} ==> (rem FRO.m x){1} = FRO.m{2})=>//.
     + by move=> ? &mr [#] 2-> ?; exists FRO.m{mr} x{mr}.
-    + symmetry; call (iter1_perm RRO.I iter_perm2); skip=> ? &mr [#] 2-> ? /=; split=> //.
-      by apply/perm_eq_sym/perm_to_rem/dom_restr. 
+    + symmetry; call (iter1_perm RRO.I iter_perm2); skip=> |> &1 x_in_m_with_U.
+      apply/uniq_perm_eq=> /=.
+      + split.
+        + by rewrite -FSet.memE FSet.in_fsetD FSet.in_fset1.
+        exact/FSet.uniq_elems.
+      + exact/FSet.uniq_elems.
+      move=> x'; rewrite -!FSet.memE FSet.in_fsetD FSet.in_fset1 mem_fdom dom_restr.
+      by case: (x' = x{1})=> //=.
     inline{1}Iter(RRO.I).iter_1s.
-    seq 3 1: (={x} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
-              l{1} = (elems (dom (restr Unknown FRO.m))){2} /\ !mem l{1} x{1} /\
-              (FRO.m.[x]=None){2}).
-    + inline *; auto=> ? ? [#] 2-> Hidm /=; rewrite sampleto_ll=> ? _.
-      rewrite eq_except_rem 2:set_eq_except // remP -memE in_fsetD1 negb_and /=.
-      by rewrite restr_rem Hidm /= dom_rem.
+    seq 3 1: (={x} /\ eq_except (pred1 x{1}) FRO.m{1} FRO.m{2} /\
+              l{1} = (FSet.elems (fdom (restr Unknown FRO.m))){2} /\ !mem l{1} x{1} /\
+        (FRO.m.[x]=None){2}).
+    + inline *; auto=> |> &2 x_in_m_with_U; rewrite sampleto_ll=> |> /= t _.
+      do !split.
+      + by apply/eq_exceptP=> x' @/pred1 /=; rewrite eq_sym=> neq_x; rewrite remE get_setE neq_x //.
+      + congr; apply/FSet.fsetP=> x'; rewrite FSet.in_fsetD FSet.in_fset1 !mem_fdom !dom_restr.
+        by rewrite /in_dom_with mem_rem remE (@eq_sym x{2}); case: (x' = x{2}).
+      + by rewrite -FSet.memE FSet.in_fsetD FSet.in_fset1.
+      by rewrite remE.
     exists* x{1},(FRO.m.[x]{1}); elim* => x1 mx1.
-    call (iter_inv RRO.I (fun z=>x1<>z) 
-           (fun o1 o2 => eq_except o1 o2 (pred1 x1) /\ o1.[x1]= mx1 /\ o2.[x1]=None) _).
+    call (iter_inv RRO.I (fun z=> z <> x1) 
+           (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1]= mx1 /\ o2.[x1]=None) _).
     + by conseq (I_f_eqex x1 mx1 None).
-    auto=> ? &mr [#] 3-> ^Hex 2-> Hmem ^Hx -> /=.
-    split=> [/#|_ mL mR [#] /eq_exceptP Hex' ? Heq].
-    apply fmapP=> z; rewrite remP; case: (z=x{mr})=> [->/=|Hneq]; 1:by rewrite Heq.
-    by apply Hex'.
+    auto=> |> &1 &2 eqex _ x_notin_m; split=> [|_ mL mR].
+    + by move=> x'; rewrite -FSet.memE mem_fdom dom_restr /in_dom_with domE /#.
+    move=> eqex_x_mL_mR mL_x mR_x; apply/fmap_eqP=> x'.
+    rewrite remE; case: (x{2} = x')=> //= [<<-|].
+    + by rewrite mR_x.
+    by rewrite eq_sym; move: eqex_x_mL_mR=> /eq_exceptP h /h.
   inline RRO.resample; wp.
   exists *x{1},(FRO.m.[x]{1}); elim* => x1 mx1.
-  call (iter_inv RRO.I (fun z=>x1<>z) 
-         (fun o1 o2 => eq_except o1 o2 (pred1 x1) /\ o1.[x1]= mx1 /\ o2.[x1]=None) _).
+  call (iter_inv RRO.I (fun z=> z <> x1) 
+         (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1]= mx1 /\ o2.[x1]=None) _).
   + by conseq (I_f_eqex x1 mx1 None).
   auto=> ? &mr [#] 4-> Hin /=.
-  rewrite restr_rem Hin /= remP eq_except_rem // 1:eq_except_refl /=; split.
-  + by move=> z; rewrite -memE dom_restr /#.
-  move=> _ mL mR [#] /eq_exceptP Hex' ? Heq.
-  apply fmapP=> z; rewrite remP; case: (z=x{mr})=> [->/=|Hneq]; 1:by rewrite Heq.
-  by apply Hex'.
+  rewrite restr_rem Hin /=; do !split=> [x'|||_ mL mR [#] /eq_exceptP @/pred1 eqe_x_mL_mR].
+  + by rewrite -FSet.memE mem_fdom dom_restr; case: (x' = x{mr})=> [->>|].
+  + by apply/eq_exceptP=> x' @/pred1; rewrite eq_sym remE=> ->.
+  + by rewrite remE.
+  move=> mL_x mR_x; apply/fmap_eqP=> x'; rewrite remE (@eq_sym x{mr}).
+  by move: (eqe_x_mL_mR x'); case: (x' = x{mr})=> //= ->>; rewrite mR_x.
   qed.
 
   lemma eager_in_dom:
@@ -525,12 +581,8 @@ abstract theory GenEager.
   while (={l,FRO.m} /\ (forall z, mem l z => in_dom_with FRO.m z Unknown){1} /\
          in_dom_with FRO.m{1} x{1} f{1} = result{2}).
   + auto=> &m1 &m2 [#] 2-> Hz <- ? _ /= ? -> /=.
-    split=> [z /mem_drop Hm|]; rewrite /in_dom_with dom_set getP !inE.
-      smt ().
-    case: (x{m1} = head witness l{m2})=> //=.
-    rewrite oget_some /=; have + ->>:= Hz (head witness l{m2}) _; 1: smt.
-    by rewrite /in_dom_with=>- [] -> ->.    
-  by auto=> ? &mr /= [#] 3-> /=; split=> // z; rewrite -memE dom_restr.
+    split=> [z /mem_drop Hm|]; rewrite /in_dom_with domE get_setE /#.
+  by auto=> ? &mr /= [#] 3-> /=; split=> // z; rewrite -FSet.memE mem_fdom dom_restr.
   qed.
 
   lemma eager_restrK:
@@ -541,10 +593,12 @@ abstract theory GenEager.
   while (={l,FRO.m} /\ (forall z, mem l z => in_dom_with FRO.m z Unknown){1} /\
          restr Known FRO.m{1} = result{2}).
   + auto=> ? &mr [#] 2-> Hz <- _ H /= ? -> /=.
-    split=>[z /mem_drop Hm|];1:by rewrite /in_dom_with dom_set getP !inE /#.
-    rewrite restr_set rem_id?dom_restr//.
-    by move: H=> /(mem_head_behead witness) /(_ (head witness l{mr})) /= /Hz /#.
-  by auto=> ? &mr /= -> /=; split=> // z; rewrite -memE dom_restr. 
+    split=>[z /mem_drop Hm|];1:by rewrite /in_dom_with domE get_setE /#.
+    rewrite restr_set /=; apply/fmap_eqP=> x'; rewrite remE; case: (head witness l{mr} = x')=> //=.
+    move: H=> /(mem_head_behead witness) /(_ (head witness l{mr})) /= /Hz + h; rewrite h.
+    rewrite eq_sym -(negbK ((restr Known FRO.m{mr}).[x'] = None)) -domE dom_restr.
+    by rewrite /in_dom_with=> [#] -> ->.
+  by auto=> |> &2 z; rewrite -FSet.memE mem_fdom dom_restr.
   qed.
 
   lemma eager_sample:
@@ -552,37 +606,46 @@ abstract theory GenEager.
            ={x,FRO.m} ==> ={res,FRO.m} ].
   proof.
   eager proc.
-  case: (!mem (dom (FRO.m{2})) x{2}).
+  case: (x{2} \notin FRO.m{2}).
   + rcondt{2} 2; 1:by auto.
     transitivity{2} { c <$ sampleto x;
                       FRO.m.[x] <- (c, Unknown);
-                      Iter(RRO.I).iter_1s(x,elems ((dom (restr Unknown FRO.m)) `\` fset1 x)); }
-                    (={x,FRO.m} /\ ! mem (dom FRO.m{2}) x{2} ==> ={x,FRO.m}) 
-                    (={x,FRO.m} /\ ! mem (dom FRO.m{2}) x{2} ==> ={x,FRO.m})=> //; last first.
+                      Iter(RRO.I).iter_1s(x,FSet.elems (FSet.(`\`) (fdom (restr Unknown FRO.m)) (FSet.fset1 x))); }
+                    (={x,FRO.m} /\ x{2} \notin FRO.m{2} ==> ={x,FRO.m}) 
+                    (={x,FRO.m} /\ x{2} \notin FRO.m{2} ==> ={x,FRO.m})=> //; last first.
     + inline{2} RRO.resample;call (iter1_perm RRO.I iter_perm2).
       auto=> ? &mr [#] 2-> Hmem /= ? -> /=.
-      by apply/perm_eq_sym/perm_to_rem; rewrite restr_set /= dom_set !inE.
+      apply/uniq_perm_eq=> /=.
+      + by rewrite -FSet.memE !FSet.inE /= FSet.uniq_elems.
+      + exact/FSet.uniq_elems.
+      move=> x'; rewrite -!FSet.memE !FSet.inE mem_fdom; case: (x' = x{mr})=> //= <<-.
+      by rewrite dom_restr /in_dom_with mem_set get_setE.
     + by move=> ? &mr [#] 2-> ?; exists FRO.m{mr} x{mr}.
     inline Iter(RRO.I).iter_1s RRO.I.f RRO.resample; wp; swap{1} -1.
-    seq  1  7: (={x} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
-                l{2} = (elems (dom (restr Unknown FRO.m))){1} /\
+    seq  1  7: (={x} /\ eq_except (pred1 x{1}) FRO.m{1} FRO.m{2} /\
+                l{2} = (FSet.elems (fdom (restr Unknown FRO.m))){1} /\
                 (FRO.m.[x]){2} = Some(c{1},Unknown) /\ (FRO.m.[x]){1} = None).
-    + wp; rnd; auto=> ? &mr [#] 2->; rewrite in_dom sampleto_ll /= => Heq ? _ ? ->.
-      rewrite getP_eq restr_set /= dom_set fsetDK eq_except_sym set_set Heq /= set_eq_except /=.
-      congr; apply fsetP=> z; rewrite in_fsetD1 dom_restr /in_dom_with !in_dom /#.
+    + wp; rnd; auto=> ? &mr [#] 2->; rewrite domE sampleto_ll /= => Heq ? _ ? ->; do !split=> //=.
+      + have ->: pred1 x{mr} = predU (pred1 x{mr}) (pred1 x{mr}).
+        + by apply/fun_ext=> z /#.
+        exact/eq_exceptmS/eq_except1mS.
+      + congr; apply/FSet.fsetP=> z; rewrite !FSet.inE !mem_fdom !dom_restr /in_dom_with.
+        by rewrite mem_set get_setE (@eq_sym x{mr}); case: (z = x{mr})=> //= <<-; rewrite domE Heq.
+      + by rewrite get_setE.
     exists* x{1},c{1}; elim* => x1 c1; pose mx2:= Some(c1,Unknown).
-    call (iter_inv RRO.I (fun z=>x1<>z) 
-           (fun o1 o2 => eq_except o1 o2 (pred1 x1) /\ o1.[x1]= None /\ o2.[x1]=mx2) _).
+    call (iter_inv RRO.I (fun z=> z <> x1) 
+           (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1]= None /\ o2.[x1]=mx2) _).
     + by conseq (I_f_eqex x1 None mx2).
-    auto=> ? &mr [#] 2<- -> ^Hex 3-> ^Hx1 -> @/mx2 /=; split=> [z|_ mL mR [#]].
-    + by rewrite -memE dom_restr /in_dom_with in_dom /#.
-    rewrite in_dom=> Hex' -> HRx /=; apply/eq_sym.
-    have /(congr1 oget):= HRx=> <-; apply eq_except_set_eq; 1:by rewrite in_dom HRx.
-    by apply eq_except_sym.
+    auto=> &1 |> &2 eqe_m1_m2 m2_x m1_x; split=> [|_ mL mR /eq_exceptP eqe_x_mL_mR mL_x mR_x].
+    + move=> x2; rewrite -FSet.memE mem_fdom dom_restr /in_dom_with domE; case: (x2 = x{2})=> //= <<-.
+      by rewrite m1_x.
+    rewrite domE mL_x /=; apply/fmap_eqP=> z; rewrite get_setE; case: (x{2} = z)=> [<<-|].
+    + by rewrite mR_x m2_x.
+    by rewrite eq_sym=> /eqe_x_mL_mR.
   rcondf{2} 2; 1:by auto. 
   swap{1} 2 -1; inline*; auto.
-  while (={l,FRO.m} /\ (mem (dom FRO.m) x){1}); auto.
-  by move=> ? &mr [#] 2-> Hm Hl _ /= ? -> ;rewrite dom_set !inE Hm.
+  while (={l,FRO.m} /\ (x \in FRO.m){1}); auto.
+  by move=> ? &mr [#] 2-> Hm Hl _ /= ? -> ;rewrite mem_set Hm.
   qed.
 
   (* ------------------------------------------------------------------------ *)
@@ -631,7 +694,9 @@ abstract theory GenEager.
       (={glob D} ==> ={b,FRO.m,glob D})=> //.
     + by move=> ? &mr ->; exists (glob D){mr}.
     + inline *; rcondf{2} 3; 2:by sim.
-      by auto=> ?; rewrite restr0 dom0 elems_fset0.
+      auto=> />. apply/perm_eq_small=> //=; apply/uniq_perm_eq=> //.
+      + exact/FSet.uniq_elems.
+      by move=> z; rewrite -FSet.memE mem_fdom dom_restr /in_dom_with mem_empty.
     seq  1  1: (={glob D, FRO.m}); 1:by inline *; auto.
     by eager call eager_D.
     qed.
@@ -647,9 +712,9 @@ abstract theory GenEager.
     ==> ={res} /\ RO.m{1} = restr Known FRO.m{2}.
   proof. 
   proc;auto=> ? &ml [] -> -> /= ? -> /=.
-  rewrite dom_restr negb_and oraE neqK_eqU.
-  rewrite !restr_set /= !getP_eq oget_some=> />.
-  by rewrite negb_or/= restrP in_dom /#.
+  rewrite dom_restr /in_dom_with negb_and neqK_eqU.
+  rewrite !restr_set /= !get_set_sameE oget_some=> />.
+  by rewrite negb_or/= restrP domE /#.
   qed.
 
   equiv LRO_RRO_set : LRO.set ~ RRO.set :
@@ -661,14 +726,16 @@ abstract theory GenEager.
   proof. 
   proc; inline *; auto=> ? &mr [#] -> ->; rewrite restr_rem.
   case (in_dom_with FRO.m{mr} x{mr} Known)=> // Hidw.
-  by rewrite rem_id // dom_restr.
+  apply/fmap_eqP=> x'; rewrite remE; case: (x{mr} = x')=> //= ->>.
+  by move: Hidw; rewrite -dom_restr domE=> /= ->.
   qed.
 
   equiv LRO_RRO_sample : LRO.sample ~ RRO.sample:
     ={x} /\ RO.m{1} = restr Known FRO.m{2} ==> RO.m{1} = restr Known FRO.m{2}.
   proof. 
   proc; auto=> ? &ml [] _ ->; rewrite sampleto_ll=> ? ?; rewrite restr_set /= =>Hnd.
-  by rewrite rem_id // dom_restr /in_dom_with Hnd.
+  apply/fmap_eqP=> x'; rewrite remE; case: (x{ml} = x')=> //= ->>.
+  by move: Hnd; rewrite restrP domE=> /= ->.
   qed.
 
   equiv LRO_RRO_D (D<:RO_Distinguisher{RO,FRO}) : 
@@ -677,8 +744,11 @@ abstract theory GenEager.
       ={res,glob D} /\ RO.m{1} = restr Known FRO.m{2}.
   proof.
   proc (RO.m{1} = restr Known FRO.m{2})=> //.
-  + by conseq LRO_RRO_init. + by conseq LRO_RRO_get. + by conseq LRO_RRO_set.
-  + by conseq LRO_RRO_rem. + by conseq LRO_RRO_sample. 
+  + by conseq LRO_RRO_init.
+  + by conseq LRO_RRO_get.
+  + by conseq LRO_RRO_set.
+  + by conseq LRO_RRO_rem.
+  by conseq LRO_RRO_sample. 
   qed.
 
   section.
@@ -713,9 +783,10 @@ abstract theory GenEager.
     + proc*; inline M.main1; wp; call (RO_FRO_D D); inline *.
       rcondf{2} 2; auto.
       + move=> &mr [] _ ->; apply mem_eq0=> z.
-        rewrite -memE dom_restr /in_dom_with mapP dom_map in_dom.
+        rewrite -FSet.memE mem_fdom dom_restr /in_dom_with mapE mem_map domE.
         by case: (RO.m{m}.[_]).
-      by move=> ? &mr [] 2-> /=; rewrite map_comp /fst /= map_id.
+      move=> /> &mr; rewrite map_map /fst /=.
+      by apply/fmap_eqP=> z; rewrite mapE /=; case: (_.[z]).
     transitivity M.main2
        (={glob D, FRO.m} ==> ={res, glob D})
        (={glob D} /\ FRO.m{1} = map (fun _ c => (c,Known)) RO.m{2} ==>
@@ -724,7 +795,7 @@ abstract theory GenEager.
     + by proc; eager call (eager_D D); auto.
     proc*; inline M.main2; wp; call{1} RRO_resample_ll.
     symmetry; call (LRO_RRO_D D); auto=> &ml &mr [#] 2->; split=> //=.
-    by rewrite fmapP=> x; rewrite restrP mapP; case: (RO.m{ml}.[x]).
+    by apply/fmap_eqP=> x; rewrite restrP mapE; case: (RO.m{ml}.[x]).
     qed.
   end section.
 

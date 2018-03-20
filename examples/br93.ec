@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List FSet NewFMap.
+require import AllCore List FSet OldFMap.
 require import Distr DBool.
 require (*--*) BitWord OW ROM.
 
@@ -274,7 +274,7 @@ seq  8  5: (   ={glob A, glob RO, glob Log, pk, sk, b}
 + auto; call (:   ={glob Log, glob RO}
                /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
   + proc; inline RO.o.
-    by auto=> /> &2 log_is_dom y _; smt(@NewFMap).
+    by auto=> /> &2 log_is_dom y _; smt(@OldFMap).
   by inline *; auto=> />; rewrite dom0=> _ _ x; rewrite in_fset0.
 (* We now deal with everything that happens after the programs differ: *)
 (*   - until r gets queried to the random oracle by the adversary      *)

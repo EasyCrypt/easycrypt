@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore Int List Real Distr FSet NewFMap.
+require import AllCore Int List Real Distr FSet OldFMap.
 require import IntExtra IntDiv RealExtra Mu_mem StdRing StdOrder StdBigop.
 (*---*) import Bigint Ring.IntID RField IntOrder RealOrder BIA.
 require (*--*) FinType.

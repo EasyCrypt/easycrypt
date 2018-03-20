@@ -1,4 +1,4 @@
-require import AllCore List FSet NewFMap.
+require import AllCore List FSet OldFMap.
 require import Distr DBool DProd.
 require (*--*) Ring ROM.
 

@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore List FSet NewFMap Real Distr.
+require import AllCore List FSet OldFMap Real Distr.
 require import Dexcepted.
 require (*--*) NewPRP WeakPRP IdealPRP.
 require (*--*) NewPRF IdealPRF.
@@ -78,12 +78,12 @@ proof.
 move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
 + rewrite dom_set !inE=> -[z_in_m] [z'_in_m] mz_eq_mz'.
   case (y \in (rng m))=> //= y_notin_rngm.
-  by exists z z'; smt(@NewFMap).
+  by exists z z'; smt(@OldFMap).
 move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|/in_rng [x' mx']].
 + exists z z'; rewrite z'_neq_z dom_set !inE !getP mz_eq_mz' z_in_m z'_in_m /=.
   rewrite (contra _ _ (congr1 (mem (dom m)) z  x)) 1:x_notin_m 1:z_in_m //=.
   by rewrite (contra _ _ (congr1 (mem (dom m)) z' x)) 1:x_notin_m 1:z'_in_m.
-by exists x x'; smt(@NewFMap).
+by exists x x'; smt(@OldFMap).
 qed.
 
 lemma collision_stable (m:(D,D) fmap) y y':
@@ -242,7 +242,7 @@ section Upto.
                 !mem (dom PRPi.m{1}) x{1} /\
                 PRFi.m{2} = PRPi.m.[x <- r]{1} /\
                 ((PRP_indirect_bad.bad \/ mem (rng PRPi.m) r){1} <=> collision PRFi.m{2})).
-    + by auto=> />; smt(@NewFMap).
+    + by auto=> />; smt(@OldFMap).
     sp; if{1}.
     + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
       auto=> /> &1 &2 x_notin_m coll_def r_inrng_m; smt. (** FIXME: Investigate **)
@@ -254,7 +254,7 @@ section Upto.
          [auto|if=> //=; auto|hoare; auto]=> />;rewrite ?dD_ll //.
     by move=> ???;apply excepted_lossless;exists x{hr}.
     move=> &1; conseq (_: collision PRFi.m ==> collision PRFi.m: =1%r)=> //=.
-    by proc; if; auto=> />; rewrite uD_ll //=; smt (@NewFMap).
+    by proc; if; auto=> />; rewrite uD_ll //=; smt (@OldFMap).
   inline *; auto=> />; split=> [|_].
   + by rewrite no_collision=> x x'; rewrite !map0P dom0 in_fset0.
   move=> rL rR DL b mL DR mR [-> //|^ /no_collision + -> [#] -> _ _ ^ + {1}-> /= x x'].
@@ -369,7 +369,7 @@ section CollisionProbability.
     progress [-split].
     rewrite H3 //=; split.
     + move=> x0; rewrite rng_set !inE.
-      by rewrite rng_rem -H; smt(@NewFMap).
+      by rewrite rng_rem -H; smt(@OldFMap).
     by rewrite negb_and /= collision_add // H H0 orbC.
   auto; progress.
     by rewrite rng0 in_fset0.
