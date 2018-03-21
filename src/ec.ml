@@ -172,17 +172,17 @@ let main () =
   in
 
   (* Initialize why3 engine *)
-  let cp_why3conf ~exists : string option =
+  let cp_why3conf ~exists ~mode : string option =
     match options.o_options.o_why3 with
     | None ->
         let confs =
           XDG.Config.file
-            ~exists ~mode:`All ~appname:EcVersion.app "why3.conf"
+            ~exists ~mode ~appname:EcVersion.app "why3.conf"
         in List.nth_opt confs 0
 
     | Some _ as aout -> aout in
 
-  let why3conf = cp_why3conf ~exists:true
+  let why3conf = cp_why3conf ~exists:true ~mode:`All
   and ovrevict = options.o_options.o_ovrevict in
 
   if options.o_command <> `Why3Config then begin
@@ -223,7 +223,7 @@ let main () =
         print_config config; exit 0
 
     | `Why3Config -> begin
-        let conf = cp_why3conf ~exists:false in
+        let conf = cp_why3conf ~exists:false ~mode:`User in
 
         let () =
           let ulnk = conf |> odfl why3dflconf in
