@@ -185,7 +185,7 @@ let main () =
   let why3conf = cp_why3conf ~exists:true
   and ovrevict = options.o_options.o_ovrevict in
 
-  begin
+  if options.o_command <> `Why3Config then begin
     try
       EcProvers.initialize ~ovrevict ?why3conf ()
     with e ->
