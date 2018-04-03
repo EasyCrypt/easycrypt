@@ -818,17 +818,18 @@ let pp_opname_with_tvi ppe fmt (nm, op, tvi) =
         (pp_list "@, " (pp_type ppe)) tvi
 
 let pp_opapp
-     (ppe    : PPEnv.t)
-     (t_ty   : 'a -> EcTypes.ty)
-    ((dt_sub : 'a -> (EcPath.path * _ * 'a list) option),
-     (pp_sub : PPEnv.t -> _ * (opprec * iassoc) -> _ -> 'a -> unit),
-     (is_trm : 'a -> bool))
-     (outer  : symbol list * ((_ * fixity) * iassoc))
-     (fmt    : Format.formatter)
-     ((pred  : [`Expr | `Form]),
-      (op    : EcPath.path),
-      (tvi   : EcTypes.ty list),
-      (es    : 'a list))
+     (ppe     : PPEnv.t)
+     (t_ty    : 'a -> EcTypes.ty)
+    ((dt_sub  : 'a -> (EcPath.path * _ * 'a list) option),
+     (pp_sub  : PPEnv.t -> _ * (opprec * iassoc) -> _ -> 'a -> unit),
+     (is_trm  : 'a -> bool),
+     (is_proj : EcPath.path -> 'a -> (EcIdent.t * int) option))
+     (outer   : symbol list * ((_ * fixity) * iassoc))
+     (fmt     : Format.formatter)
+     ((pred   : [`Expr | `Form]),
+      (op     : EcPath.path),
+      (tvi    : EcTypes.ty list),
+      (es     : 'a list))
 =
   let (nm, opname) =
     PPEnv.op_symb ppe op (Some (pred, tvi, List.map t_ty es)) in
@@ -995,26 +996,69 @@ let pp_opapp
 
   and try_pp_record () =
     let env = ppe.PPEnv.ppe_env in
-      match EcEnv.Op.by_path_opt op env with
-      | Some op when EcDecl.is_rcrd op -> begin
-          let recp = EcDecl.operator_as_rcrd op in
-            match EcEnv.Ty.by_path_opt recp env with
-            | Some { tyd_type = `Record (_, fields) } -> begin
-                if List.length fields = List.length es then
-                  let pp fmt () =
-                    let pp_field fmt ((name, _), e) =
-                      Format.fprintf fmt "%s =@ %a" name
-                        (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) e
-                    in
-                      Format.fprintf fmt "{|@[<hov 2> %a;@ @]|}"
-                        (pp_list ";@ " pp_field) (List.combine fields es)
-                  in
-                    Some pp
-                else None
-              end
-            | _ -> None
-        end
+
+    match EcEnv.Op.by_path_opt op env with
+    | Some op when EcDecl.is_rcrd op -> begin
+
+      let recp = EcDecl.operator_as_rcrd op in
+
+      match EcEnv.Ty.by_path_opt recp env with
+      | Some { tyd_type = `Record (_, fields) }
+          when List.length fields = List.length es
+        -> begin
+          let wmap =
+            List.fold_left (fun m e ->
+              match is_proj recp e with
+              | None -> m
+              | Some (var, idx) ->
+                  Mid.change
+                    (fun x -> Some (Sint.add idx (odfl Sint.empty x)))
+                    var m
+            ) Mid.empty es in
+
+          let wmap =
+            List.sort
+              (fun (_, x) (_, y) ->
+                compare (Sint.cardinal x) (Sint.cardinal y))
+              (Mid.bindings wmap) in
+
+          let wmap =
+            let n = List.length fields in
+            List.filter (fun (_, x) -> Sint.cardinal x <> n) wmap in
+
+          match List.Exceptionless.hd wmap with
+          | None ->
+              let pp fmt () =
+                let pp_field fmt ((name, _), e) =
+                  Format.fprintf fmt "%s =@ %a" name
+                    (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) e
+                in
+                  Format.fprintf fmt "{|@[<hov 2> %a;@ @]|}"
+                    (pp_list ";@ " pp_field) (List.combine fields es)
+              in Some pp
+
+          | Some (x, idxs) ->
+              let fields = List.combine fields es in
+              let fields = List.pmapi
+                (fun i x -> if Sint.mem i idxs then None else Some x)
+                fields in
+
+              let pp fmt () =
+                let pp_field fmt ((name, _), e) =
+                  Format.fprintf fmt "%s =@ %a" name
+                    (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) e
+                in
+                  Format.fprintf fmt "{| %a with @[<hov 2> %a;@ @]|}"
+                    (pp_local ppe) x
+                    (pp_list ";@ " pp_field) fields
+              in Some pp
+      end
+
       | _ -> None
+
+    end
+
+    | _ -> None
 
   and try_pp_proj () =
     let env = ppe.PPEnv.ppe_env in
@@ -1438,12 +1482,21 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       | Fint _ | Flocal _ | Fpvar _ | Fop _ | Ftuple _ -> true
       | _ -> false
 
+    and is_proj (rc : EcPath.path) (f : form) =
+      match f.f_node with
+      | Fapp ({ f_node = Fop (p, _) }, [{ f_node = Flocal x }]) -> begin
+          match (EcEnv.Op.by_path p ppe.PPEnv.ppe_env).op_kind with
+          | OB_oper (Some (OP_Proj (rc', i, _))) when EcPath.p_equal rc rc' ->
+              Some (x, i)
+          | _ -> None
+      end
+      | _ -> None
+
     in
       pp_opapp ppe f_ty
-        (dt_sub, pp_form_r, is_trm)
+        (dt_sub, pp_form_r, is_trm, is_proj)
         outer fmt (`Form, op, tys, es)
   in
-
 
   match f.f_node with
   | Fint n ->
