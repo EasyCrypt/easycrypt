@@ -866,7 +866,10 @@ sexpr_u:
    { PEident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
 
 | LPBRACE fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
-   { PErecord fields }
+   { PErecord (None, fields) }
+
+| LPBRACE b=sexpr WITH fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
+   { PErecord (Some b, fields) }
 
 | e=sexpr DOTTICK x=qident
    { PEproj (e, x) }
@@ -1040,7 +1043,10 @@ sform_u(P):
    { PFtuple fs }
 
 | LPBRACE fields=rlist1(form_field, SEMICOLON) SEMICOLON? RPBRACE
-   { PFrecord fields }
+   { PFrecord (None, fields) }
+
+| LPBRACE b=sform WITH fields=rlist1(form_field, SEMICOLON) SEMICOLON? RPBRACE
+   { PFrecord (Some b, fields) }
 
 | LBRACKET ti=tvars_app? es=loc(plist0(form_r(P), SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }

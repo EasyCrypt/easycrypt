@@ -80,7 +80,7 @@ and pexpr_r =
   | PEforall of ptybindings * pexpr               (* forall quant.      *)
   | PEexists of ptybindings * pexpr               (* exists quant.      *)
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
-  | PErecord of pexpr rfield list                 (* record             *)
+  | PErecord of pexpr option * pexpr rfield list  (* record             *)
   | PEproj   of pexpr * pqsymbol                  (* projection         *)
   | PEproji  of pexpr * int                       (* tuple projection   *)
   | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
@@ -240,7 +240,7 @@ and pformula_r =
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
-  | PFrecord of pformula rfield list
+  | PFrecord of pformula option * pformula rfield list
   | PFproj   of pformula * pqsymbol
   | PFproji  of pformula * int
   | PFglob   of pmsymbol located
