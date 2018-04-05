@@ -266,6 +266,7 @@ module List : sig
   val min : ?cmp:('a -> 'a -> int) -> 'a list -> 'a
   val max : ?cmp:('a -> 'a -> int) -> 'a list -> 'a
 
+  val nth_opt    : 'a list -> int -> 'a option
   val mbfilter   : ('a -> bool) -> 'a list -> 'a list
   val fusion     : ('a -> 'a -> 'a) -> 'a list -> 'a list -> 'a list
   val is_unique  : ?eq:('a -> 'a -> bool) -> 'a list -> bool

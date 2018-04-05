@@ -451,6 +451,10 @@ module List = struct
   include Parallel
 
   (* ------------------------------------------------------------------ *)
+  let nth_opt (s : 'a list) (i : int) =
+    try  Some (List.nth s i)
+    with Failure _ | Invalid_argument _ -> None
+
   let last (s : 'a list) =
     match Exceptionless.last s with
     | None   -> failwith "List.last"
