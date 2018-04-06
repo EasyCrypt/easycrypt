@@ -163,6 +163,9 @@ proof. by rewrite getE empty_valE Map.cstE. qed.
 lemma mem_empty ['a 'b] x : x \notin empty<:'a, 'b>.
 proof. by rewrite domE emptyE. qed.
 
+lemma mem_rng_empty ['a 'b] y : !rng empty<:'a, 'b> y.
+proof. by rewrite rngE /= negb_exists=> /= x; rewrite emptyE. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt set_valE ['a 'b] (m : ('a, 'b) fmap) x v :
   tomap m.[x <- v] = (tomap m).[x <- Some v].
@@ -391,6 +394,13 @@ proof. by rewrite fdomE mem_oflist mem_to_seq ?isfmap_offmap. qed.
 lemma fdom0 ['a 'b] : fdom empty<:'a, 'b> = fset0.
 proof. by apply/fsetP=> x; rewrite mem_fdom mem_empty in_fset0. qed.
 
+lemma fdom_eq0 ['a 'b] (m : ('a, 'b) fmap) : fdom m = fset0 => m = empty.
+proof.
+rewrite fsetP -fmap_eqP=> h x; rewrite emptyE.
+have ->: m.[x] = None <=> x \notin m by done.
+by rewrite -mem_fdom h in_fset0.
+qed.
+
 lemma nosmt fdom_set ['a 'b] (m : ('a, 'b) fmap) x v :
   fdom m.[x <- v] = fdom m `|` fset1 x.
 proof.
@@ -413,35 +423,13 @@ lemma mem_fdom_rem ['a 'b] (m : ('a, 'b) fmap) x y :
 proof. by rewrite fdom_rem in_fsetD1. qed.
 
 (* ==================================================================== *)
-op card ['a 'b] (m : ('a, 'b) fmap) =
-  size (to_seq (dom m)) axiomatized by cardE.
+op frng ['a 'b] (m : ('a, 'b) fmap) =
+  oflist (to_seq (rng m)) axiomatized by frngE.
+
+lemma mem_frng ['a 'b] (m : ('a, 'b) fmap) (y : 'b) :
+  y \in frng m <=> rng m y.
+proof. by rewrite frngE mem_oflist mem_to_seq ?finite_rng. qed.  
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt fdom_card ['a 'b] (m : ('a, 'b) fmap) :
-  card (fdom m) = card m.
-proof.
-rewrite fdomE cardE FSet.cardE -(perm_eq_size _ _ (oflistK _)).
-by rewrite undup_id // uniq_to_seq ?isfmap_offmap.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma card0 ['a 'b] : card<:'a, 'b> empty = 0.
-proof. by rewrite -fdom_card fdom0 fcards0. qed.
-
-lemma card_set ['a 'b] (m : ('a, 'b) fmap) x v :
-  card m.[x <- v] = card m + b2i (x \notin m).
-proof.
-rewrite -fdom_card fdom_set; case: (x \in m) => /= h.
-+ rewrite fsetUC subset_fsetU_id -?fdom_card //.
-  by move=> y /in_fset1 ->; rewrite mem_fdom.
-+ rewrite fcardUI_indep ?fcard1 -?fdom_card //.
-  apply/fsetP=> y; rewrite in_fsetI mem_fdom.
-  by rewrite in_fset1 in_fset0; case: (y = x).
-qed.
-
-lemma card_rem ['a 'b] (m : ('a, 'b) fmap) x :
-  card (rem m x) = card m - b2i (x \in m).
-proof.
-rewrite -!fdom_card fdom_rem (fcardD1 (fdom m) x).
-by rewrite /b2i mem_fdom -addzA; case: (x \in m).
-qed.
+lemma frng0 ['a 'b] : frng empty<:'a, 'b> = fset0.
+proof. by apply/fsetP=> x; rewrite mem_frng mem_rng_empty in_fset0. qed.

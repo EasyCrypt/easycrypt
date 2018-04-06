@@ -95,6 +95,9 @@ op (`\`) ['a] (s1 s2 : 'a fset) = oflist (filter (predC (mem s2)) (elems s1))
 lemma in_fset0: forall x, mem fset0<:'a> x <=> false.
 proof. by move=> x; rewrite set0E mem_oflist. qed.
 
+lemma in_eq_fset0 ['a] (X : 'a fset): (forall x, !x \in X) => X = fset0.
+proof. by move=> mem_X; apply/fsetP=> x; rewrite mem_X in_fset0. qed.
+
 lemma elems_fset0 ['a]: elems fset0 = [<:'a>].
 proof.
 rewrite set0E; apply/perm_eq_small/perm_eq_sym=> //=.
@@ -108,6 +111,10 @@ qed.
 
 lemma in_fset1 z: forall x, mem (fset1<:'a> z) x <=> x = z.
 proof. by move=> x; rewrite set1E /= mem_oflist. qed.
+
+lemma in_eq_fset1 ['a] (X : 'a fset) x0:
+  (forall x, x \in X <=> x = x0) => X = fset1 x0.
+proof. by move=> mem_X; apply/fsetP=> x; rewrite in_fset1 mem_X. qed.
 
 lemma elems_fset1 (x : 'a) : elems (fset1 x) = [x].
 proof.

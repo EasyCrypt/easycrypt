@@ -19,7 +19,7 @@ lemma neqK_eqU f : f <> Known <=> f = Unknown.
 proof. by case: f. qed.
 
 (* -------------------------------------------------------------------- *)
-(** Properties of flagged maps -- Generalize and push to OldFMap? **)
+(** Properties of flagged maps -- Generalize into a separate theory? **)
 op in_dom_with (m : ('from, 'to * 'flag) fmap) (x:'from) (f:'flag) =
    x \in m /\ (oget (m.[x])).`2 = f.
 

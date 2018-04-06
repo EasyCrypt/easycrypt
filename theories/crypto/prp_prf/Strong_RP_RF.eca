@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore Distr List FSet OldFMap StdRing StdOrder.
+require import AllCore Distr List FSet SmtMap StdRing StdOrder.
 require import Dexcepted.
 require (*--*) NewPRP StrongPRP IdealPRP FelTactic.
 (*---*) import RField RealOrder.
@@ -42,17 +42,17 @@ module ARP = {
   var m, mi: (D,D) fmap
 
   proc init(): unit = {
-    m    <- map0;
-    mi   <- map0;
+    m    <- empty;
+    mi   <- empty;
     coll <- false;
   }
 
   proc f(x : D) = {
     var y;
 
-    if (!mem (dom m) x) {
+    if (x \notin m) {
       y      <$ uD;
-      coll   <- coll \/ mem (rng m) y;
+      coll   <- coll \/ rng m y;
       m.[x]  <- y;
       mi.[y] <- x;
     }
@@ -62,9 +62,9 @@ module ARP = {
   proc fi(y : D) = {
     var x;
 
-    if (!mem (dom mi) y) {
+    if (y \notin mi) {
       x      <$ uD;
-      coll   <- coll \/ mem (rng mi) x;
+      coll   <- coll \/ rng mi x;
       m.[x]  <- y;
       mi.[y] <- x;
     }
@@ -78,25 +78,25 @@ op q : { int | 0 <= q } as ge0_q.
     procedure that samples its output, and provide two instantiations
     of it. **)
 module type Sample_t = {
-  proc sample(X:D fset): D
+  proc sample(X:D -> bool): D
 }.
 
 module Direct = {
-  proc sample(X:D fset): D = {
+  proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD \ (mem X);
+    r = $uD \ X;
     return r;
   }
 }.
 
 module Indirect = {
-  proc sample(X:D fset): D = {
+  proc sample(X:D -> bool): D = {
     var r;
 
     r = $uD;
-    if (mem X r) {
-      r = $uD \ (mem X);
+    if (X r) {
+      r = $uD \ X;
     }
     return r;
   }
@@ -106,7 +106,7 @@ module PRPi'(S:Sample_t) = {
   proc init =  PRPi.init
 
   proc f(x:D): D = {
-    if (!mem (dom PRPi.m) x) {
+    if (x \notin PRPi.m) {
       PRPi.m.[x] = S.sample(rng PRPi.m);
       PRPi.mi.[oget PRPi.m.[x]] <- x;
     }
@@ -114,7 +114,7 @@ module PRPi'(S:Sample_t) = {
   }
 
   proc fi(x:D): D = {
-    if (!mem (dom PRPi.mi) x) {
+    if (x \notin PRPi.mi) {
       PRPi.mi.[x] = S.sample(rng PRPi.mi);
       PRPi.m.[oget PRPi.mi.[x]] <- x;
     }
@@ -136,8 +136,8 @@ by rewrite -(witness_support (predC P)) -/(predC _) /#.
 qed.
 
 lemma excepted_lossless (m:(D,D) fmap):
-  (exists x, !mem (dom m) x) =>
-  mu (uD \ (mem (rng m))) predT = 1%r.
+  (exists x, x \notin m) =>
+  mu (uD \ (rng m)) predT = 1%r.
 proof. 
 move=> /endo_dom_rng [x h]; rewrite dexcepted_ll //.
 + smt w=uD_uf_fu.
@@ -145,9 +145,9 @@ have [?[<- @/is_full Hsupp]]:= uD_uf_fu.
 apply/notin_supportIP;exists x => />;apply Hsupp.
 qed.
 
-phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !mem X x ==> true] = 1%r.
+phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !X x ==> true] = 1%r.
 proof.
-proc; seq  1: (exists x, support uD x /\ !mem X x)=> //=.
+proc; seq  1: (exists x, support uD x /\ !X x)=> //=.
 + by rnd (predT); skip; smt ml=0 w=uD_uf_fu.
 if=> //=.
 + rnd (predT); skip.
@@ -199,19 +199,19 @@ section Upto.
       bad <- false;
     }
 
-    proc sample(X:D fset): D = {
+    proc sample(X:D -> bool): D = {
       var r;
 
       r = $uD;
-      if (mem X r) {
+      if (X r) {
         bad <- true;
-        r = $uD \ (mem X);
+        r = $uD \ X;
       }
       return r;
     }
 
     proc f(x:D): D = {
-      if (!mem (dom PRPi.m) x) {
+      if (x \notin PRPi.m) {
         PRPi.m.[x] = sample(rng PRPi.m);
         PRPi.mi.[oget PRPi.m.[x]] <- x;
       }
@@ -219,7 +219,7 @@ section Upto.
     }
 
     proc fi(y:D): D = {
-     if (!mem (dom PRPi.mi) y) {
+     if (y \notin PRPi.mi) {
         PRPi.mi.[y] = sample(rng PRPi.mi);
         PRPi.m.[oget PRPi.mi.[y]] <- y;
       }
@@ -249,21 +249,21 @@ section Upto.
   + proc. if=> //=; inline *.
     swap{1} 1.
     seq  1  4: (={x} /\
-                !mem (dom PRPi.m{1}) x{1} /\
+                x{1} \notin PRPi.m{1} /\
                 ARP.m{2} = PRPi.m.[x <- r]{1} /\
                 ARP.mi{2} = PRPi.mi.[r <- x]{1} /\
-                ((PRP_indirect_bad.bad \/ mem (rng PRPi.m) r){1} <=> ARP.coll{2})).
+                ((PRP_indirect_bad.bad \/ rng PRPi.m r){1} <=> ARP.coll{2})).
       by auto=> /#.
     sp; if{1}.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
       auto; progress [-split]; split=> //= [|_]; 1:smt.
       by progress; right.
-    by auto; progress [-split]; rewrite H0 /=; split=> //=; rewrite getP.
+    by auto; progress [-split]; rewrite H0 /=; split=> //=; rewrite get_setE.
   + move=> &2 bad; conseq (_: true ==> true: =1%r)
                           (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
       by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.
-    seq  2: (X = rng PRPi.m /\ !mem (dom PRPi.m) x) 1%r 1%r 0%r _ => //=.
+    seq  2: (X = rng PRPi.m /\ x \notin PRPi.m) 1%r 1%r 0%r _ => //=.
       by auto; rewrite -/predT; smt ml=0 w=uD_uf_fu. (* predT should be an abbreviation *)
       by if=> //=; auto; smt.
       by hoare; auto.
@@ -273,21 +273,21 @@ section Upto.
   + proc. if=> //=; inline *.
     swap{1} 1.
     seq  1  4: (={y} /\
-                !mem (dom PRPi.mi{1}) y{1} /\
+                y{1} \notin PRPi.mi{1} /\
                 ARP.m{2} = PRPi.m.[r <- y]{1} /\
                 ARP.mi{2} = PRPi.mi.[y <- r]{1} /\
-                ((PRP_indirect_bad.bad \/ mem (rng PRPi.mi) r){1} <=> ARP.coll{2})).
+                ((PRP_indirect_bad.bad \/ rng PRPi.mi r){1} <=> ARP.coll{2})).
       by auto=> /#.
     sp; if{1}.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
       auto; progress [-split]; split=> //= [|_]; 1:smt.
       by progress; right.
-    by auto; progress [-split]; rewrite H0 /=; split=> //=; rewrite getP.
+    by auto; progress [-split]; rewrite H0 /=; split=> //=; rewrite get_setE.
   + move=> &2 bad; conseq (_: true ==> true: =1%r)
                           (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
       by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.
-    seq  2: (X = rng PRPi.mi /\ !mem (dom PRPi.mi) y) 1%r 1%r 0%r _ => //=.
+    seq  2: (X = rng PRPi.mi /\ y \notin PRPi.mi) 1%r 1%r 0%r _ => //=.
       by auto; rewrite -/predT; smt ml=0 w=uD_uf_fu. (* predT should be an abbreviation *)
       by if=> //=; auto; smt.
       by hoare; auto.
@@ -356,7 +356,7 @@ section CollisionProbability.
         var r = witness;
 
         if (c < q) {
-          if (card (rng ARP.m) < q) {
+          if (card (frng ARP.m) < q) {
             r = ARP.f(x);
           }
           c = c + 1;
@@ -368,7 +368,7 @@ section CollisionProbability.
         var r = witness;
 
         if (c < q) {
-          if (card (rng ARP.mi) < q) {
+          if (card (frng ARP.mi) < q) {
             r = ARP.fi(x);
           }
           c = c + 1;
@@ -403,32 +403,36 @@ section CollisionProbability.
   have ->: Pr[IND(ARP,DBounder(D)).main() @ &m: ARP.coll /\ DBounder.FBounder.c <= q]
            = Pr[FEL(D).main() @ &m: ARP.coll /\ FEL.c <= q].
   + byequiv=> //=; proc; inline *; wp.
-    call (_: ={glob ARP} /\ ={c}(DBounder.FBounder,FEL) /\ card (rng ARP.m){1} <= FEL.c{2} /\ card (rng ARP.mi){1} <= FEL.c{2}).
+    call (_: ={glob ARP} /\ ={c}(DBounder.FBounder,FEL) /\ card (frng ARP.m){1} <= FEL.c{2} /\ card (frng ARP.mi){1} <= FEL.c{2}).
     * proc; sp; if=> //=. rcondt{2} 1; first by auto=> /#.
       inline *; sp; if=> //=; auto.
       - progress.
-        + apply/(ler_trans (card (rng ARP.m{2} `|` fset1 yL))).
-            apply/subset_leq_fcard=> x; rewrite rng_set !inE rng_rem in_rng.
-            by move=> [[a] [] _ ma|-> //=]; left; exists a.
+        + apply/(ler_trans (card (frng ARP.m{2} `|` fset1 yL))).
+            apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
+            rewrite get_setE; case: (x{2} = x0)=> [<<- /= ->|_ mx0] //.
+            by left; exists x0.
           smt.
-        + apply/(ler_trans (card (rng ARP.mi{2} `|` fset1 x{2}))).
-            apply/subset_leq_fcard=> x; rewrite rng_set !inE rng_rem in_rng.
-            by move=> [[a] [] _ ma|-> //=]; left; exists a.
+        + apply/(ler_trans (card (frng ARP.mi{2} `|` fset1 x{2}))).
+            apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
+            rewrite get_setE; case: (yL = x0)=> [<<- //|_ mx0].
+            by left; exists x0.
           smt.
       - smt ml=0.
     * proc; sp; if=> //=. rcondt{2} 1; first by auto=> /#.
       inline *; sp; if=> //=; auto.
       - progress.
-        + apply/(ler_trans (card (rng ARP.m{2} `|` fset1 x{2}))).
-            apply/subset_leq_fcard=> x; rewrite rng_set !inE rng_rem in_rng.
-            by move=> [[a] [] _ ma|-> //=]; left; exists a.
+        + apply/(ler_trans (card (frng ARP.m{2} `|` fset1 x{2}))).
+            apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
+            rewrite get_setE; case: (x0L = x0)=> [<<- //|_ mx0].
+            by left; exists x0.
           smt.
-        + apply/(ler_trans (card (rng ARP.mi{2} `|` fset1 x0L))).
-            apply/subset_leq_fcard=> x; rewrite rng_set !inE rng_rem in_rng.
-            by move=> [[a] [] _ ma|-> //=]; left; exists a.
+        + apply/(ler_trans (card (frng ARP.mi{2} `|` fset1 x0L))).
+            apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
+            rewrite get_setE; case: (x{2} = x0)=> [<<- //|_ mx0].
+            by left; exists x0.
           smt.
       - smt ml=0.
-    by auto; progress; rewrite rng0 fcards0.
+    by auto=> />; rewrite frng0 fcards0.
   fel 2 FEL.c (fun x, q%r * mu uD (pred1 witness)) q (ARP.coll) [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]=> //.
   + rewrite sumr_const count_predT size_range /= max_ler 1:ge0_q.
     by rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM mulrC mulrA.
@@ -438,9 +442,11 @@ section CollisionProbability.
     * hoare; auto=> // /> &hr _ _ _ _.
       by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
     sp; if=> //=.
-    * wp; rnd (mem (rng ARP.m)); skip.
+    * wp; rnd (rng ARP.m); skip.
       progress.
-      - apply/(RealOrder.ler_trans ((card (rng ARP.m{hr}))%r * mu uD (pred1 witness))).
+      - apply/(RealOrder.ler_trans ((card (frng ARP.m{hr}))%r * mu uD (pred1 witness))).
+        have ->: rng ARP.m{hr} = mem (frng ARP.m{hr}).
+        + by apply/fun_ext=> x; rewrite mem_frng.
         apply/mu_mem_le; move=> x _; have [] uD_suf [] ? uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW).
@@ -454,9 +460,11 @@ section CollisionProbability.
   + proc; sp; rcondt 1=> //=.
     inline *; sp; if=> //=; last by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
     sp; if=> //=.
-    * wp; rnd (mem (rng ARP.mi)); skip.
+    * wp; rnd (rng ARP.mi); skip.
       progress.
-      - apply/(RealOrder.ler_trans ((card (rng ARP.mi{hr}))%r * mu uD (pred1 witness))).
+      - apply/(RealOrder.ler_trans ((card (frng ARP.mi{hr}))%r * mu uD (pred1 witness))).
+        have ->: rng ARP.mi{hr} = mem (frng ARP.mi{hr}).
+        + by apply/fun_ext=> x; rewrite mem_frng.
         apply/mu_mem_le; move=> x _; have [] uD_suf [] _ uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         smt w=(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW).
@@ -499,7 +507,7 @@ section PRPi_PRPi'_Indirect.
   bypr (res{1}) (res{2})=> //. (* Pointwise equality of distributions *)
   progress.
   (* We first perform the computation on the easy side,... *)
-  cut ->: Pr[Direct.sample(X{1}) @ &1: res = a] = mu (uD \ (mem X){1}) (pred1 a).
+  cut ->: Pr[Direct.sample(X{1}) @ &1: res = a] = mu (uD \ X{1}) (pred1 a).
     byphoare (_: X = X{1} ==> _)=> //=.
     by proc; rnd=> //=; auto.
   subst X{1}.
@@ -507,15 +515,15 @@ section PRPi_PRPi'_Indirect.
   byphoare (_: X = X{2} ==> _)=> //=.
   (* We deal separately with the case where a is in X and thus has
      probability 0 of being sampled) *)
-  case (mem X{2} a)=> [a_in_X | a_notin_X].
+  case (X{2} a)=> [a_in_X | a_notin_X].
     conseq (_: _ ==> _: 0%r); first smt.
     proc.
-    seq  1: (mem X r)
+    seq  1: (X r)
             _ 0%r
             _ 0%r
             (X = X{2}).
       by auto.
-      by rcondt 1=> //=; rnd=> //=; skip; smt.
+      by rcondt 1=> //=; rnd=> //=; auto=> /> _ _; rewrite dexcepted1E a_in_X.
       by rcondf 1=> //=; hoare; skip; smt.
       done.
   (* And we are now left with the case where a is not in X *)
@@ -524,14 +532,14 @@ section PRPi_PRPi'_Indirect.
     (* There are two scenarios that lead to a = r:
          - r0 = a /\ r = a (with probability mu uD (pred1 a));
          - r0 <> a /\ r = a (with probability mu uD (fun x, mem x X) * mu (uD \ X) (pred1 a)). *)
-    phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ (mem X)) (pred1 a)): (r0 = a).
+    phoare split (mu uD (pred1 a)) (mu uD X * mu (uD \ X) (pred1 a)): (r0 = a).
       (* Bound *)
       progress.
       rewrite dexcepted1E.
       have [] uD_suf [] uD_ll uD_fu /=:= uD_uf_fu.
-      cut not_empty: mu uD predT - mu uD (mem X{2}) <> 0%r.
+      cut not_empty: mu uD predT - mu uD X{2} <> 0%r.
         rewrite -mu_not.
-        cut: 0%r < mu uD (predC (mem X{2})); last smt.
+        cut: 0%r < mu uD (predC X{2}); last smt.
         by rewrite witness_support; exists a; rewrite uD_fu /= /predC a_notin_X.
       by smt ml=0 w=uD_uf_fu.
       (* case r0 = a *)
@@ -542,9 +550,9 @@ section PRPi_PRPi'_Indirect.
         by hoare; conseq (_: _ ==> true)=> //=; smt.
         done.
     (* case r0 <> a *)
-    seq  2: (!mem X r)
+    seq  2: (!X r)
             _                 0%r
-            (mu uD (mem X)) (mu (uD \ (mem X)) (pred1 a))
+            (mu uD X) (mu (uD \ X) (pred1 a))
             (r0 = r /\ X = X{2}).
       by auto.
       by hoare; rcondf 1=> //=; skip; smt.
@@ -561,7 +569,7 @@ section PRPi_PRPi'_Indirect.
   transitivity PRPi'(Direct).f (={PRPi.m,PRPi.mi,x} ==> ={PRPi.m,PRPi.mi,res}) (={PRPi.m,PRPi.mi,x} ==> ={PRPi.m,PRPi.mi,res}).
   + by move=> &1 &2 [->> [->> ->>]]; exists PRPi.m{2} PRPi.mi{2} x{2}.
   + done.
-  + by proc; inline *; if=> //=; auto; progress; rewrite getP.
+  + by proc; inline *; if=> //=; auto; progress; rewrite get_setE.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
   qed.
 
@@ -571,7 +579,7 @@ section PRPi_PRPi'_Indirect.
   transitivity PRPi'(Direct).fi (={PRPi.m,PRPi.mi} /\ y{1} = x{2} ==> ={PRPi.m,PRPi.mi,res}) (={PRPi.m,PRPi.mi,x} ==> ={PRPi.m,PRPi.mi,res}).
   + by move=> &1 &2 [->> [->> ->>]]; exists PRPi.m{2} PRPi.mi{2} x{2}.
   + done.
-  + by proc; inline *; if=> //=; auto; progress; rewrite getP.
+  + by proc; inline *; if=> //=; auto; progress; rewrite get_setE.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
   qed.
 

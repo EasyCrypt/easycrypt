@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore List FSet OldFMap Real Distr.
+require import AllCore List FSet SmtMap Real Distr.
 require import Dexcepted.
 require (*--*) NewPRP WeakPRP IdealPRP.
 require (*--*) NewPRF IdealPRF.
@@ -56,15 +56,15 @@ op q : { int | 0 <= q } as ge0_q.
       x' that are both in m's domain and have the same image by m." *)
 pred collision (m:(D,D) fmap) = exists x x',
   x' <> x /\
-  x \in (dom m) /\ x' \in (dom m) /\ m.[x] = m.[x'].
+  x \in m /\ x' \in m /\ m.[x] = m.[x'].
 
 (* Some useful facts about the bad event *)
 lemma no_collision (m:(D,D) fmap):
   !collision m <=>
   forall x x',
     x' = x \/
-    !x \in (dom m)  \/
-    !x' \in (dom m) \/
+    !x \in m  \/
+    !x' \in m \/
     m.[x] <> m.[x'].
 proof.
 rewrite /collision negb_exists /=; apply/forall_iff=> /= x.
@@ -72,23 +72,24 @@ by rewrite negb_exists /=; apply/forall_iff=> /= x'; rewrite !negb_and.
 qed.
 
 lemma collision_add (m:(D,D) fmap) x y:
-  !x \in (dom m) =>
-  collision m.[x <- y] <=> collision m \/ y \in (rng m).
+  !x \in m =>
+  collision m.[x <- y] <=> collision m \/ rng m y.
 proof.
 move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
-+ rewrite dom_set !inE=> -[z_in_m] [z'_in_m] mz_eq_mz'.
-  case (y \in (rng m))=> //= y_notin_rngm.
-  by exists z z'; smt(@OldFMap).
-move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|/in_rng [x' mx']].
-+ exists z z'; rewrite z'_neq_z dom_set !inE !getP mz_eq_mz' z_in_m z'_in_m /=.
-  rewrite (contra _ _ (congr1 (mem (dom m)) z  x)) 1:x_notin_m 1:z_in_m //=.
-  by rewrite (contra _ _ (congr1 (mem (dom m)) z' x)) 1:x_notin_m 1:z'_in_m.
-by exists x x'; smt(@OldFMap).
++ rewrite mem_set=> -[z_in_m] [z'_in_m] mz_eq_mz'.
+  case (rng m y)=> //= y_notin_rngm.
+  by exists z z'; smt(@SmtMap).
+move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|].
++ exists z z'; rewrite z'_neq_z !mem_set !get_setE mz_eq_mz' z_in_m z'_in_m /=.
+  rewrite (contra _ _ (congr1 (dom m) x z)) 1:x_notin_m 1:z_in_m //=.
+  by rewrite (contra _ _ (congr1 (dom m) x z')) 1:x_notin_m 1:z'_in_m.
+rewrite rngE=> - /= [x'] mx'_y.
+by exists x x'; smt(@SmtMap).
 qed.
 
 lemma collision_stable (m:(D,D) fmap) y y':
   collision m =>
-  !y \in (dom m) =>
+  y \notin m =>
   collision m.[y <- y']
 by [].
 
@@ -96,25 +97,25 @@ by [].
     procedure that samples its output, and provide two instantiations
     of it. **)
 module type Sample_t = {
-  proc sample(X:D fset): D
+  proc sample(X:D -> bool): D
 }.
 
 module Direct = {
-  proc sample(X:D fset): D = {
+  proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD \ (mem X);
+    r = $uD \ X;
     return r;
   }
 }.
 
 module Indirect = {
-  proc sample(X:D fset): D = {
+  proc sample(X:D -> bool): D = {
     var r;
 
     r = $uD;
-    if (mem X r) {
-      r = $uD \ (mem X);
+    if (X r) {
+      r = $uD \ X;
     }
     return r;
   }
@@ -124,7 +125,7 @@ module PRPi'(S:Sample_t) = {
   proc init =  PRPi.init
 
   proc f(x:D): D = {
-    if (!mem (dom PRPi.m) x)
+    if (x \notin PRPi.m)
       PRPi.m.[x] = S.sample(rng PRPi.m);
     return oget PRPi.m.[x];
   }
@@ -141,16 +142,25 @@ qed.
 
 (* Some losslessness lemmas *)
 lemma excepted_lossless (m:(D,D) fmap):
-  (exists x, !x \in (dom m)) =>
-  mu (uD \ (mem (rng m))) predT = 1%r.
+  (exists x, x \notin m) =>
+  mu (uD \ (rng m)) predT = 1%r.
 proof.
 move=> /endo_dom_rng [x h]; rewrite dexcepted_ll 1:uD_ll //.
 by rewrite -uD_ll; apply/notin_supportIP; exists x=> />; exact/uD_fu.
 qed.
 
-phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !x \in X ==> true] = 1%r.
+lemma excepted_lossless_mem (m:(D,D) fmap):
+  (exists x, x \notin m) =>
+  mu (uD \ (mem (frng m))) predT = 1%r.
 proof.
-proc; seq  1: (exists x, support uD x /\ !x \in X)=> //=.
+have ->: mem (frng m) = rng m.
++ by apply/fun_ext=> a; rewrite mem_frng.
+exact/excepted_lossless.
+qed.
+
+phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !X x ==> true] = 1%r.
+proof.
+proc; seq  1: (exists x, support uD x /\ !X x)=> //=.
 + by rnd (predT); auto; rewrite uD_ll /#.
 if=> //=.
 + rnd (predT); auto=> /> &m x _ x_notin_X _.
@@ -165,8 +175,8 @@ auto=> /> &m _.
 have:= excepted_lossless (PRPi.m{m}) _.
 + by exists x{m}.
 rewrite weight_dexcepted.
-case (weight uD = mu uD (mem (rng PRPi.m{m})))=> //=.
-rewrite notin_supportIP /= -(etaE (mem (rng _))) etaP.
+case (weight uD = mu uD (rng PRPi.m{m}))=> //=.
+rewrite notin_supportIP /=.
 by rewrite StdOrder.RealOrder.ltr_def=> -> /=; exact/mu_sub.
 qed.
 
@@ -198,19 +208,19 @@ section Upto.
       bad <- false;
     }
 
-    proc sample(X:D fset): D = {
+    proc sample(X:D -> bool): D = {
       var r;
 
       r = $uD;
-      if (mem X r) {
+      if (X r) {
         bad <- true;
-        r = $uD \ (mem X);
+        r = $uD \ X;
       }
       return r;
     }
 
     proc f(x:D): D = {
-      if (!mem (dom PRPi.m) x)
+      if (x \notin PRPi.m)
         PRPi.m.[x] = sample(rng PRPi.m);
       return oget PRPi.m.[x];
     }
@@ -239,24 +249,26 @@ section Upto.
     if=> //=; inline *.
     swap{1} 1.
     seq  1  1: (={x} /\
-                !mem (dom PRPi.m{1}) x{1} /\
+                x{1} \notin PRPi.m{1} /\
                 PRFi.m{2} = PRPi.m.[x <- r]{1} /\
-                ((PRP_indirect_bad.bad \/ mem (rng PRPi.m) r){1} <=> collision PRFi.m{2})).
-    + by auto=> />; smt(@OldFMap).
+                ((PRP_indirect_bad.bad \/ rng PRPi.m r){1} <=> collision PRFi.m{2})).
+    + auto=> /> &2 coll x_notin_m r _; rewrite coll /=; split=> [|x0 x'].
+      + rewrite rngE /= /collision=> - [x'] mx'; exists x{2} x'; smt(domE get_setE).
+      smt(@SmtMap).
     sp; if{1}.
     + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
-      auto=> /> &1 &2 x_notin_m coll_def r_inrng_m; smt. (** FIXME: Investigate **)
+      auto=> /> &1 &2 x_notin_m coll_def rng_m_r; smt.
     by auto; smt. (** FIXME: Investigate **)
     move=> &2 bad; conseq (_: true ==> true: =1%r) (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
     + by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.
-    seq  2: (X = rng PRPi.m /\ !mem (dom PRPi.m) x) 1%r 1%r 0%r _=> //=;
+    seq  2: (X = rng PRPi.m /\ x \notin PRPi.m) 1%r 1%r 0%r _=> //=;
          [auto|if=> //=; auto|hoare; auto]=> />;rewrite ?dD_ll //.
-    by move=> ???;apply excepted_lossless;exists x{hr}.
+    by move=> ???; apply excepted_lossless; exists x{hr}.
     move=> &1; conseq (_: collision PRFi.m ==> collision PRFi.m: =1%r)=> //=.
-    by proc; if; auto=> />; rewrite uD_ll //=; smt (@OldFMap).
+    by proc; if; auto=> />; rewrite uD_ll //=; smt(domE get_setE).
   inline *; auto=> />; split=> [|_].
-  + by rewrite no_collision=> x x'; rewrite !map0P dom0 in_fset0.
+  + by rewrite no_collision=> x x'; rewrite mem_empty.
   move=> rL rR DL b mL DR mR [-> //|^ /no_collision + -> [#] -> _ _ ^ + {1}-> /= x x'].
   by move=> /(_ x x') [->|[->|[->|->]]].
   qed.
@@ -320,7 +332,7 @@ section CollisionProbability.
       proc init = PRFi.init
 
       proc f(x:D): D = {
-        if (!mem (dom PRFi.m) x) {
+        if (x \notin PRFi.m) {
           PRFi.m.[x] = S.s();
         }
         return oget PRFi.m.[x];
@@ -361,19 +373,23 @@ section CollisionProbability.
   byequiv (_: ={glob D} ==> collision PRFi.m{1} <=> !uniq Sample.l{2})=> //=.
   proc; inline*; wp.
   call (_: ={PRFi.m,DBounder.FBounder.c} /\
-           (forall x, mem (rng PRFi.m) x <=> mem Sample.l x){2} /\
+           (forall x, mem (frng PRFi.m) x <=> mem Sample.l x){2} /\
            (collision PRFi.m{1} <=> !uniq Sample.l{2})).
     proc; inline*.
     sp; if=> //=.
     sp; if=> //=; auto.
     progress [-split].
     rewrite H3 //=; split.
-    + move=> x0; rewrite rng_set !inE.
-      by rewrite rng_rem -H; smt(@OldFMap).
-    by rewrite negb_and /= collision_add // H H0 orbC.
-  auto; progress.
-    by rewrite rng0 in_fset0.
-    smt.
+    + move=> x0; rewrite -H !mem_frng !rngE /=; split=> [[x]|].
+      + by rewrite get_setE /#.
+      case=> [<<-|[x'] mx'].
+      + by exists x{2}; rewrite get_setE.
+      by exists x'; rewrite get_setE /#.
+    by rewrite negb_and /= collision_add // -mem_frng H H0 orbC.
+  auto=> />; split=> [x|].
+  search rng empty.
+  + by rewrite mem_frng mem_rng_empty.
+  smt.
   qed.
 
   lemma pr_PRFi_collision &m:
@@ -413,7 +429,7 @@ section PRPi_PRPi'_Indirect.
   bypr (res{1}) (res{2})=> //. (* Pointwise equality of distributions *)
   progress.
   (* We first perform the computation on the easy side,... *)
-  cut ->: Pr[Direct.sample(X{1}) @ &1: res = a] = mu (uD \ (mem X){1}) (pred1 a).
+  cut ->: Pr[Direct.sample(X{1}) @ &1: res = a] = mu (uD \ X{1}) (pred1 a).
     byphoare (_: X = X{1} ==> _)=> //=.
     by proc; rnd=> //=; auto.
   subst X{1}.
@@ -421,10 +437,10 @@ section PRPi_PRPi'_Indirect.
   byphoare (_: X = X{2} ==> _)=> //=.
   (* We deal separately with the case where a is in X and thus has
      probability 0 of being sampled) *)
-  case (mem X{2} a)=> [a_in_X | a_notin_X].
+  case (X{2} a)=> [a_in_X | a_notin_X].
     conseq (_: _ ==> _: 0%r); first smt.
     proc.
-    seq  1: (mem X r)
+    seq  1: (X r)
             _ 0%r
             _ 0%r
             (X = X{2}).
@@ -438,15 +454,14 @@ section PRPi_PRPi'_Indirect.
     (* There are two scenarios that lead to a = r:
          - r0 = a /\ r = a (with probability mu uD (pred1 a));
          - r0 <> a /\ r = a (with probability mu uD (mem X) * mu (uD \ X) (pred1 a)). *)
-    phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ (mem X)) (pred1 a)): (r0 = a).
+    phoare split (mu uD (pred1 a)) (mu uD X * mu (uD \ X) (pred1 a)): (r0 = a).
       (* Bound *)
       move=> />.
       rewrite dexcepted1E a_notin_X /=. 
-      cut not_empty: 0%r < mu uD predT - mu uD (mem X{2}).
+      cut not_empty: 0%r < mu uD predT - mu uD X{2}.
         rewrite -mu_not.
-        cut: 0%r < mu uD (predC (mem X{2})); last smt.
-        by rewrite witness_support; exists a; rewrite /predC /= a_notin_X /= uD_fu.
-      rewrite uD_ll.
+        cut: 0%r < mu uD (predC X{2}); last smt.
+        by rewrite witness_support; exists a; rewrite /predC /= a_notin_X /= uD_fu.       
       smt. (** Investigate **)
       (* case r0 = a *)
       seq  2: (a = r0) (mu uD (pred1 a)) 1%r _ 0%r (r0 = r /\ X = X{2}).
@@ -456,9 +471,9 @@ section PRPi_PRPi'_Indirect.
         by hoare; conseq (_: _ ==> true)=> //=; smt.
         done.
     (* case r0 <> a *)
-    seq  2: (!mem X r)
+    seq  2: (!X r)
             _                 0%r
-            (mu uD (mem X)) (mu (uD \ (mem X)) (pred1 a))
+            (mu uD X) (mu (uD \ X) (pred1 a))
             (r0 = r /\ X = X{2}).
       by auto.
       by hoare; rcondf 1=> //=; skip; smt.
