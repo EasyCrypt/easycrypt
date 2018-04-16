@@ -32,7 +32,7 @@ proof. by move=> m; apply/map_eqP=> x; rewrite offunE. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt setE ['a 'b] (m : ('a, 'b) map) x v : 
-  m.[x <- v] = offun (fun y => if x = y then v else m.[y]).
+  m.[x <- v] = offun (fun y => if y = x then v else m.[y]).
 proof. by apply/map_eqP=> y /=; rewrite offunE /#. qed.
 
 lemma nosmt getE ['a 'b] (m : ('a, 'b) map) x : m.[x] = (tofun m) x.
@@ -40,7 +40,7 @@ proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt get_setE ['a 'b] (m : ('a, 'b) map) (x y : 'a) b :
-  m.[x <- b].[y] = if x = y then b else m.[y].
+  m.[x <- b].[y] = if y = x then b else m.[y].
 proof. by rewrite setE getE offunK. qed.
 
 lemma nosmt get_set_sameE (m : ('a,'b) map) (x : 'a) b :
@@ -48,11 +48,11 @@ lemma nosmt get_set_sameE (m : ('a,'b) map) (x : 'a) b :
 proof. by rewrite get_setE. qed.
 
 lemma nosmt get_set_eqE (m : ('a, 'b) map) (x y : 'a) b :
-  x = y => m.[x <- b].[y] = b.
+  y = x => m.[x <- b].[y] = b.
 proof. by move=> <-; rewrite get_set_sameE. qed.
 
 lemma nosmt get_set_neqE (m : ('a, 'b) map) (x y : 'a) b :
-  x <> y => m.[x <- b].[y] = m.[y].
+  y <> x => m.[x <- b].[y] = m.[y].
 proof. by rewrite get_setE => ->. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -71,7 +71,7 @@ lemma map_set (f : 'a -> 'b -> 'c) (m : ('a, 'b) map) x b :
   map f (m.[x <- b]) = (map f m).[x <- f x b].
 proof.
 apply/map_eqP => y; rewrite mapE !get_setE.
-by case: (x = y) => //; rewrite mapE.
+by case: (y = x) => //; rewrite mapE.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -174,12 +174,12 @@ pose s := to_seq (fun x => (tomap m).[x] <> None).
 rewrite /"_.[_<-_]" ofmapK //; exists (undup (x :: s)).
 split; [by rewrite undup_uniq | move=> y; rewrite mem_undup].
 case: (y = x) => [|^neq] ->/=; first by rewrite Map.get_set_sameE.
-by rewrite Map.get_set_neqE 1:eq_sym //; apply/mem_to_seq/isfmap_offmap.
+by rewrite Map.get_set_neqE //; apply/mem_to_seq/isfmap_offmap.
 qed.
 
 (* --------------------------------------------------------------------- *)
 lemma get_setE ['a 'b] (m : ('a, 'b) fmap) (x y : 'a) b :
-  m.[x <- b].[y] = if x = y then Some b else m.[y].
+  m.[x <- b].[y] = if y = x then Some b else m.[y].
 proof. by rewrite /"_.[_]" /"_.[_<-_]" set_valE Map.get_setE. qed.
 
 lemma nosmt get_set_sameE (m : ('a,'b) fmap) (x : 'a) b :
@@ -187,20 +187,20 @@ lemma nosmt get_set_sameE (m : ('a,'b) fmap) (x : 'a) b :
 proof. by rewrite get_setE. qed.
 
 lemma nosmt get_set_eqE (m : ('a, 'b) fmap) (x y : 'a) b :
-  x = y => m.[x <- b].[y] = Some b.
+  y = x => m.[x <- b].[y] = Some b.
 proof. by move=> <-; rewrite get_set_sameE. qed.
 
 lemma nosmt get_set_neqE (m : ('a, 'b) fmap) (x y : 'a) b :
-  x <> y => m.[x <- b].[y] = m.[y].
+  y <> x => m.[x <- b].[y] = m.[y].
 proof. by rewrite get_setE => ->. qed.
 
 lemma nosmt fmapSSE (m : ('a, 'b) fmap) (x x' : 'a) b b' :
-  m.[x <- b].[x' <- b'] = if   x = x' then m.[x' <- b']
+  m.[x <- b].[x' <- b'] = if   x' = x then m.[x' <- b']
                           else m.[x' <- b'].[x <- b].
 proof.
-apply/fmap_eqP=> y; rewrite !get_setE; case: (x = x')=> //= [<<-|].
-+ by rewrite !get_setE; case: (x = y).
-by rewrite !get_setE; case: (x' = y)=> //= ->> ->.
+apply/fmap_eqP=> y; rewrite !get_setE; case: (x' = x)=> //= [<<-|].
++ by rewrite !get_setE; case: (y = x').
+by rewrite !get_setE; case: (y = x')=> //= ->> ->.
 qed.
 
 lemma nosmt fmapSS_sameE (m : ('a, 'b) fmap) (x : 'a) b b' :
@@ -208,12 +208,12 @@ lemma nosmt fmapSS_sameE (m : ('a, 'b) fmap) (x : 'a) b b' :
 proof. by rewrite fmapSSE. qed.
 
 lemma nosmt fmapSS_eqE (m : ('a, 'b) fmap) (x x' : 'a) b b' :
-  x = x' =>
+  x' = x =>
   m.[x <- b].[x' <- b'] = m.[x <- b'].
 proof. by rewrite fmapSSE. qed.
 
 lemma nosmt fmapSS_neqE (m : ('a, 'b) fmap) (x x' : 'a) b b' :
-  x <> x' =>
+  x' <> x =>
   m.[x <- b].[x' <- b'] = m.[x' <- b'].[x <- b].
 proof. by rewrite fmapSSE=> ->. qed.
 
@@ -227,23 +227,23 @@ lemma nosmt rem_valE ['a 'b] (m : ('a, 'b) fmap) x :
 proof.
 rewrite /rem ofmapK //; pose P z := (tomap m).[z] <> None.
 apply/(finite_leq P)/isfmap_offmap => y @/P.
-by rewrite !Map.get_setE; case: (x = y).
+by rewrite !Map.get_setE; case: (y = x).
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt remE ['a 'b] (m : ('a, 'b) fmap) x y :
-  (rem m x).[y] = if x = y then None else m.[y].
+  (rem m x).[y] = if y = x then None else m.[y].
 proof. by rewrite /rem /"_.[_]" rem_valE Map.get_setE. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mem_set ['a 'b] (m : ('a, 'b) fmap) x b y :
   y \in m.[x <- b] <=> (y \in m \/ y = x).
-proof. by rewrite !domE get_setE (eq_sym x y); case: (y = x). qed.
+proof. by rewrite !domE get_setE; case: (y = x). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mem_rem ['a 'b] (m : ('a, 'b) fmap) x y :
   y \in (rem m x) <=> (y \in m /\ y <> x).
-proof. by rewrite !domE remE (eq_sym x y); case: (y = x) => //=. qed.
+proof. by rewrite !domE remE; case: (y = x) => //=. qed.
 
 (* -------------------------------------------------------------------- *)
 op eq_except ['a 'b] X (m1 m2 : ('a, 'b) fmap) =
@@ -273,8 +273,7 @@ lemma eq_exceptSm ['a 'b] X x y (m1 m2 : ('a, 'b) fmap) :
   eq_except (predU X (pred1 x)) m1.[x <- y] m2.
 proof.
 move=> eqeX_m1_m2; rewrite eq_exceptP=> x0; rewrite get_setE /predU /pred1.
-move=> /negb_or []; move: eqeX_m1_m2=> /eq_exceptP h /h ->.
-by rewrite eq_sym=> ->.
+by move=> /negb_or []; move: eqeX_m1_m2=> /eq_exceptP h /h -> ->.
 qed.
 
 lemma eq_except1Sm ['a 'b] x y (m : ('a, 'b) fmap) :
@@ -302,8 +301,7 @@ lemma eq_exceptSS ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
 proof.
 move=> /eq_exceptP eqeX_m1_m2; rewrite eq_exceptP=> x0; rewrite !get_setE.
 rewrite if_arg fun_if /predU /pred1 negb_or.
-case: (y = y')=> /= [<<-|neq_y_y' []] /eqeX_m1_m2 -> //.
-by rewrite eq_sym=> ->.
+by case: (y = y')=> /= [<<-|neq_y_y' []] /eqeX_m1_m2 -> // ->.
 qed.
 
 lemma eq_exceptSS_eq ['a 'b] X x y (m1 m2 : ('a, 'b) fmap) :
@@ -345,7 +343,7 @@ lemma map_set (f : 'a -> 'b -> 'c) (m : ('a, 'b) fmap) x b :
   map f (m.[x <- b]) = (map f m).[x <- f x b].
 proof.
 apply/fmap_eqP => y; rewrite mapE !get_setE.
-by case: (x = y) => //; rewrite mapE.
+by case: (y = x) => //; rewrite mapE.
 qed.
 
 lemma map_map ['a 'b 'c 'd] (f : 'a -> 'b -> 'c)
@@ -375,7 +373,7 @@ lemma filter_set (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) x b :
                           else rem (filter p m) x.
 proof.
 apply/fmap_eqP => y; rewrite !filterE !get_setE.
-case: (x = y) => [<<- | ] //=; case: (p x b)=> //=.
+case: (y = x) => [->> | ] //=; case: (p x b)=> //=.
 + by rewrite get_setE.
 + by rewrite remE //.
 + by rewrite get_setE=> + -> /=; rewrite filterE.
