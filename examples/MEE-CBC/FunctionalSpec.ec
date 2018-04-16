@@ -1,5 +1,5 @@
 require import AllCore Int IntExtra IntDiv List.
-require import Ring StdRing StdOrder StdBigop ABitstring Distr.
+require import Ring StdRing StdOrder StdBigop Distr.
 require import BitEncoding.
 require (*--*) BitWord MAC_then_Pad_then_CBC.
 (*---*) import BS2Int BitChunking IntID IntOrder Bigint BIA.
