@@ -65,12 +65,12 @@ equiv f_perm: RandomPermutation.f ~ RandomPermutation.f:
 proof.
 proc; if=> //=; auto=> |> &2 is_perm x_notin_m yL.
 rewrite supp_dexcepted rngE /= negb_exists=>- [] _ /= m__neq_yL.
-split=> [x'|y']; rewrite !get_setE !mem_set (eq_sym x{2}).
+split=> [x'|y']; rewrite !get_setE !mem_set.
 + case: (x' = x{2})=> //= x'_neq_x.
   have [] mmi mim ^ /mmi mimx':= is_perm.
   rewrite mimx' domE; elim: (RandomPermutation.m{2}.[x']) (m__neq_yL x')=> //= x0.
-  by rewrite (eq_sym x0) oget_some=> ->.
-by rewrite (eq_sym y'); case: (y' = yL)=> //=; smt(domE).
+  by rewrite oget_some=> ->.
+by case: (y' = yL)=> //=; smt(domE).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -84,10 +84,10 @@ proc; if=> //=; auto=> |> &2 is_perm y_notin_mi xL.
 rewrite supp_dexcepted rngE /= negb_exists=>- [] _ /= mi__neq_xL.
 split=> [x'|y']; rewrite !get_setE !mem_set.
 + case: (x' = xL)=> //=; smt(domE).
-rewrite (eq_sym y{2}); case: (y' = y{2})=> //= y'_neq_y.
+case: (y' = y{2})=> //= y'_neq_y.
 have [] mmi mim ^ /mim mmiy':= is_perm.
 rewrite mmiy' domE; elim: (RandomPermutation.mi{2}.[y']) (mi__neq_xL y')=> //= y0.
-by rewrite (eq_sym y0) oget_some=> ->.
+by rewrite oget_some=> ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -99,18 +99,18 @@ elim/fset_ind: (fdom m) {-2}m (eq_refl (fdom m))=> {m} [m /fdom_eq0 ->|].
 + by rewrite frng0 fdom0 !fcards0.
 move=> x s x_notin_s ih m dom_m.
 cut ->: m = (rem m x).[x <- oget m.[x]].
-+ apply/fmap_eqP=> x'; rewrite get_setE remE; case: (x = x')=> [<<-|//].
++ apply/fmap_eqP=> x'; rewrite get_setE remE; case: (x' = x)=> [->>|//].
   have /fsetP /(_ x):= dom_m; rewrite in_fsetU in_fset1 /= mem_fdom domE.
   by case: m.[x].
 have ->: frng (rem m x).[x <- oget m.[x]] = frng (rem m x) `|` fset1 (oget m.[x]).
 + apply/fsetP=> y'; rewrite in_fsetU in_fset1 !mem_frng !rngE /=.
   split=> [[] a|].
-  + rewrite get_setE remE; case: (x = a)=> [<<-|x_neq_a ma_y'].
+  + rewrite get_setE remE; case: (a = x)=> [->>|a_neq_x ma_y'].
     + rewrite -some_oget 1:-domE 1:-mem_fdom 1:dom_m 1:in_fsetU 1:in_fset1 //.
       by move=> ->.
-    by left; exists a; rewrite remE x_neq_a.
+    by left; exists a; rewrite remE a_neq_x.
   case=> [[a]|->].
-  + rewrite remE; case: (x = a)=> //= x_neq_a ma_y'.
+  + rewrite remE; case: (a = x)=> //= x_neq_a ma_y'.
     by exists a; rewrite get_setE remE x_neq_a.
   by exists x; rewrite get_set_sameE.
 rewrite fcardU fsetI1 fun_if !fcard1 fcards0.

@@ -81,8 +81,8 @@ move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
   by exists z z'; smt(@SmtMap).
 move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|].
 + exists z z'; rewrite z'_neq_z !mem_set !get_setE mz_eq_mz' z_in_m z'_in_m /=.
-  rewrite (contra _ _ (congr1 (dom m) x z)) 1:x_notin_m 1:z_in_m //=.
-  by rewrite (contra _ _ (congr1 (dom m) x z')) 1:x_notin_m 1:z'_in_m.
+  rewrite (contra _ _ (congr1 (dom m) z x)) 1:x_notin_m 1:z_in_m //=.
+  by rewrite (contra _ _ (congr1 (dom m) z' x)) 1:x_notin_m 1:z'_in_m.
 rewrite rngE=> - /= [x'] mx'_y.
 by exists x x'; smt(@SmtMap).
 qed.

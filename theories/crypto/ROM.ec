@@ -373,19 +373,17 @@ theory LazyEager.
       + auto=> /> &1 &2 Hpart m_x upd_cond work_neq_nil y _.
         case: (mem work{2} x{2})=> [|^x_in_work /Hpart x_in_Em]; last first.
         + move: upd_cond=> /= <*>. rewrite 2!x_in_Em=> /= <*>. (* ?? why do I need to do this twice? *)
-          case: (x{2} = pick work{2})=> //= ^pkwork_neq_x.
+          case: (pick work{2} = x{2})=> //= ^pkwork_neq_x.
           rewrite in_fsetD1 eq_sym mem_set !get_setE=> -> /=.
           rewrite eq_exceptP /pred1 /=.
-          split=> ^ + -> //=.
-          by rewrite x_in_Em m_x.
+          by split=> ^ + -> //=.
         case: (pick work{2} = x{2})=> [<<*> _ {Hpart}|].
         + rewrite in_fsetD1 mem_set !get_setE //= domE.
           have -> /= := m_x.
           move: upd_cond; rewrite domE.
           case: (IND_Eager.H.m{1}.[pick work{2}] <> None)=> //= m'_x /eq_exceptP @/pred1 eqe_m_m'.
-          rewrite -fmap_eqP=> x; rewrite get_setE; case: (x = pick work{2})=> [->|^ + /eqe_m_m'] //.
-          + by rewrite m_x.
-          by rewrite eq_sym=> -> ->.
+          rewrite -fmap_eqP=> x; rewrite get_setE; case: (x = pick work{2})=> [->|^ + /eqe_m_m' ->] //.
+          by rewrite m_x.
         rewrite mem_set !get_setE !inE=> //= ^ pw_neq_x; rewrite eq_sym=> -> -> //=.
         rewrite m_x !eq_exceptP //=.
         move: upd_cond; case: (x{2} \in IND_Eager.H.m{1})=> [_ ->|/=] //.
