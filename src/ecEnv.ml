@@ -2611,6 +2611,7 @@ module Ax = struct
     fst (lookup name env)
 
   let bind name ax env =
+    let ax = NormMp.norm_ax env ax in
     let env = MC.bind_axiom name ax env in
     { env with env_item = CTh_axiom (name, ax) :: env.env_item }
 
