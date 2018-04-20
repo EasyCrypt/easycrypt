@@ -39,6 +39,7 @@ type prover_infos = {
   pr_provers   : string list;
   pr_timelimit : int;
   pr_cpufactor : int;
+  pr_quorum    : int;
   pr_wrapper   : string option;
   pr_verbose   : int;
   pr_all       : bool;
