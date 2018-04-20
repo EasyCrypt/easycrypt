@@ -569,9 +569,9 @@ module Prover = struct
       | Some pl ->
         let do_uo uo s =
           match s.pl_desc with
-          | "" -> all_provers ()
-          | "!" -> []
-          | _ ->
+          | "!" -> all_provers ()
+          | ""  -> []
+          | _   ->
             let x = check_prover_name s in
             if List.exists ((=) x) uo then uo else x :: uo in
         let uo =
