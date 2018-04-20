@@ -2618,21 +2618,26 @@ and pp_stmt ppe fmt s =
   pp_list "@," (pp_instr ppe) fmt s.s_node
 
 let rec pp_modexp ppe fmt (p, me) =
-  let (ppe, pp) = pp_mod_params ppe me.me_sig.mis_params in
+  let params =
+    match me.me_body with
+    | ME_Alias (i,_) -> List.take i me.me_sig.mis_params
+    | ME_Decl  _     -> []
+    | _              -> me.me_sig.mis_params in
+  let (ppe, pp) = pp_mod_params ppe params in
   Format.fprintf fmt "@[<v>module %s%t = %a@]"
     me.me_name pp (pp_modbody ppe) (p, me.me_body)
 
 and pp_modbody ppe fmt (p, body) =
   match body with
   | ME_Alias (_, mp) ->
-      Format.fprintf fmt "%a" (pp_topmod ppe) mp
+    Format.fprintf fmt "%a" (pp_topmod ppe) mp
 
   | ME_Structure ms ->
       Format.fprintf fmt "{@,  @[<v>%a@]@,}"
         (pp_list "@,@," (fun fmt i -> pp_moditem ppe fmt (p, i))) ms.ms_body
 
   | ME_Decl (mt, restr) ->
-      Format.fprintf fmt "%a" (pp_modtype ppe) (mt, restr)
+      Format.fprintf fmt "[Abstract : %a]" (pp_modtype ppe) (mt, restr)
 
 and pp_moditem ppe fmt (p, i) =
   match i with
