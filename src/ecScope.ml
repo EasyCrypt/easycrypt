@@ -537,6 +537,7 @@ module Prover = struct
     po_cpufactor  : int option;
     po_nprovers   : int option;
     po_provers    : string list option * (include_exclude * string) list;
+    po_quorum     : int option;
     po_verbose    : int option;
     pl_all        : bool option;
     pl_max        : int option;
@@ -552,6 +553,7 @@ module Prover = struct
     po_cpufactor = None;
     po_nprovers  = None;
     po_provers   = (None, []);
+    po_quorum    = None;
     po_verbose   = None;
     pl_all       = None;
     pl_max       = None;
@@ -585,6 +587,7 @@ module Prover = struct
       po_cpufactor = ppr.pprov_cpufactor;
       po_nprovers  = ppr.pprov_max;
       po_provers   = provers;
+      po_quorum    = ppr.pprov_quorum;
       po_verbose   = verbose;
       pl_all       = ppr.plem_all;
       pl_max       =
@@ -615,6 +618,7 @@ module Prover = struct
     let pr_wanted    = odfl dft.pr_wanted options.pl_wanted in
     let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
     let pr_selected  = odfl dft.pr_selected options.pl_selected in
+    let pr_quorum    = max 1 (odfl dft.pr_quorum options.po_quorum) in
     let pr_provers   =
       let l = odfl dft.pr_provers (fst options.po_provers) in
       let do_ar l (k, p) =
@@ -625,7 +629,8 @@ module Prover = struct
 
     { pr_maxprocs; pr_provers; pr_timelimit; pr_cpufactor;
       pr_wrapper ; pr_verbose; pr_all      ; pr_max      ;
-      pr_iterate ; pr_wanted ; pr_unwanted ; pr_selected}
+      pr_iterate ; pr_wanted ; pr_unwanted ; pr_selected ;
+      pr_quorum  ; }
 
   (* -------------------------------------------------------------------- *)
   let set_wrapper scope wrapper =

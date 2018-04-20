@@ -619,6 +619,7 @@ type pprover_infos = {
   pprov_timeout   : int option;
   pprov_cpufactor : int option;
   pprov_names     : pprover_list option;
+  pprov_quorum    : int option;
   pprov_verbose   : int option option;
   pprov_version   : [`Lazy | `Full] option;
   plem_all        : bool option;
@@ -634,6 +635,7 @@ let empty_pprover = {
   pprov_timeout   = None;
   pprov_cpufactor = None;
   pprov_names     = None;
+  pprov_quorum    = None;
   pprov_verbose   = None;
   pprov_version   = None;
   plem_all        = None;

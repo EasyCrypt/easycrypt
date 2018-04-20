@@ -315,6 +315,7 @@ type prover_infos = {
   pr_provers   : string list;
   pr_timelimit : int;
   pr_cpufactor : int;
+  pr_quorum    : int;
   pr_wrapper   : string option;
   pr_verbose   : int;
   pr_all       : bool;
@@ -331,6 +332,7 @@ let dft_prover_infos = {
   pr_provers   = [];
   pr_timelimit = 3;
   pr_cpufactor = 1;
+  pr_quorum    = 1;
   pr_wrapper   = None;
   pr_verbose   = 0;
   pr_all       = false;
@@ -428,9 +430,9 @@ module POSIX : PExec = struct
           pi.pr_provers;
 
         (* Wait for the first prover giving a definitive answer *)
-        let status = ref None in
+        let status = ref 0 in
         let alives = ref (-1) in
-        while !alives <> 0 && !status = None do
+        while !alives <> 0 && 0 <= !status && !status < pi.pr_quorum do
           let pid, st =
             try  restartable_syscall Unix.wait
             with Unix.Unix_error _ -> (-1, Unix.WEXITED 127)
@@ -445,8 +447,8 @@ module POSIX : PExec = struct
                   let result = CP.post_wait_call pc st () in
                   let answer = result.CP.pr_answer in
                   match answer with
-                  | CP.Valid   -> status := Some true
-                  | CP.Invalid -> status := Some false
+                  | CP.Valid   -> incr status
+                  | CP.Invalid -> status := (-1)
                   | CP.Failure _ | CP.HighFailure ->
                     notify |> oiter (fun notify -> notify `Warning (lazy (
                       let buf = Buffer.create 0 in
@@ -461,7 +463,10 @@ module POSIX : PExec = struct
                 if pcs.(i) <> None then incr alives
           done
         done;
-        !status)
+
+             if !status < 0 then Some false
+        else if !status = 0 then None
+        else if !status < pi.pr_quorum then None else Some true)
 
       (* Clean-up: hard kill + wait for remaining provers *)
       (fun () ->
@@ -481,7 +486,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Win32 : PExec = struct
-  exception Answer of bool
+  type answero = Answer of bool | Unknown
 
   let execute_task ?(notify : notify option) (pi : prover_infos) task =
     let module CP = Call_provers in
@@ -491,26 +496,37 @@ module Win32 : PExec = struct
       let answer = result.CP.pr_answer in
 
       match answer with
-      | CP.Valid   -> raise (Answer true)
-      | CP.Invalid -> raise (Answer false)
+      | CP.Valid   -> Answer true
+      | CP.Invalid -> Answer false
       | CP.Failure _ | CP.HighFailure ->
           notify |> oiter (fun notify -> notify `Warning (lazy (
             let buf = Buffer.create 0 in
             let fmt = Format.formatter_of_buffer buf in
               Format.fprintf fmt "prover %s exited with %a%!"
                 prover CP.print_prover_answer answer;
-              Buffer.contents buf)))
-      | _ -> ()
+              Buffer.contents buf)));
+          Unknown
+      | _ -> Unknown
 
     in
 
     let do1 (prover : string) =
       run_prover ?notify pi prover task |>
-        oiter (fun (prover, pc) -> wait1 (prover, pc))
-     in
+        omap (fun (prover, pc) -> wait1 (prover, pc))
+    in
 
-     try  List.iter do1 pi.pr_provers; None
-     with Answer b -> Some b
+    let rec doall okc provers =
+      match okc, provers with
+      | _, _ when okc >= pi.pr_quorum -> Some true
+      | _, [] -> None
+      | _, pr :: provers -> begin
+          match do1 pr with
+          | Some (Answer false) -> Some false
+          | Some (Answer true)  -> doall (okc+1) provers
+          | None | Some Unknown -> doall okc provers
+        end
+
+    in doall 0 pi.pr_provers
 end
 
 (* -------------------------------------------------------------------- *)
