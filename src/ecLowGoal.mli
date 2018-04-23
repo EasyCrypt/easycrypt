@@ -241,17 +241,20 @@ type genclear = [`Clear | `TryClear | `NoClear]
 val t_generalize_hyps_x :
      ?missing:bool
   -> ?naming:(ident -> symbol option)
+  -> ?letin:bool
   -> (genclear * EcIdent.t) list
   -> FApi.backward
 
 val t_generalize_hyps :
      ?clear:[`Yes|`No|`Try] -> ?missing:bool
   -> ?naming:(ident -> symbol option)
+  -> ?letin:bool
   -> EcIdent.t list -> FApi.backward
 
 val t_generalize_hyp  :
      ?clear:[`Yes|`No|`Try] -> ?missing:bool
   -> ?naming:(ident -> symbol option)
+  -> ?letin:bool
   -> EcIdent.t -> FApi.backward
 
 (* -------------------------------------------------------------------- *)

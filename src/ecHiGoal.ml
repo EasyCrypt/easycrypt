@@ -1481,6 +1481,20 @@ let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
           let pt, ax = PT.concretize pt in
           t_cutdef pt ax tc
     end
+
+    | `LetIn x ->
+        let id =
+          let binding =
+            try  Some (LDecl.by_name (unloc x) hyps)
+            with EcEnv.LDecl.LdeclError _ -> None in
+
+            match binding  with
+            | Some (id, LD_var (_, Some _)) -> id
+            | _ ->
+                let msg = "symbol must reference let-in" in
+                tc_error ~loc:(loc x) !!tc "%s" msg
+
+        in t_generalize_hyp ~clear ~letin:true id tc
   in
 
   match ffpattern_of_genpattern hyps pattern with
