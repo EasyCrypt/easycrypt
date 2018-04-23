@@ -184,7 +184,8 @@ proof.
 move=> gt0_r; rewrite size_flatten sumzE big_map.
 pose F := fun (x : 'a list) => r; rewrite predT_comp /(\o) /= big_seq.
 rewrite (@eq_bigr _ _ F) /F /=; first by move=> i; apply/in_chunk_size.
-by rewrite -big_seq big_constz count_predT size_chunk // mulrC.
+rewrite -(@big_seq _ (chunk r bs)) big_constz count_predT.
+by rewrite size_chunk // mulrC.
 qed.
 
 lemma chunkK r (bs : 'a list) : 0 < r =>
