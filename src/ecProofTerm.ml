@@ -404,6 +404,7 @@ let ffpattern_of_genpattern hyps (ge : genpattern) =
   | `ProofTerm pe     -> Some pe
   | `Form (Some _, _) -> None
   | `Form (None, fp)  -> ffpattern_of_form hyps fp
+  | `LetIn _          -> None
 
 (* -------------------------------------------------------------------- *)
 let process_named_pterm pe (tvi, fp) =
