@@ -958,7 +958,7 @@ let trans_binding env ue bd =
   env, bd
 
 (* -------------------------------------------------------------------- *)
-let trans_record env ue subtt (loc, fields) =
+let trans_record env ue (subtt, proj) (loc, b, fields) =
   let fields =
     let for1 rf =
       let filter = fun op -> EcDecl.is_proj op in
@@ -989,33 +989,53 @@ let trans_record env ue subtt (loc, fields) =
   let rec_   = snd (EcDecl.tydecl_as_record recty) in
   let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
   let reccty, rtvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
+  let tysopn = Tvar.init (List.map fst recty.tyd_params) rtvi in
+
   let fields =
     List.fold_left
       (fun map (((_, idx), _, _) as field) ->
          if Mint.mem idx map then
            let name = fst (List.nth rec_ idx) in
            let exn  = DuplicatedRecFieldName name in
-             tyerror loc env exn
+           tyerror loc env exn
          else
            Mint.add idx field map)
       Mint.empty fields in
 
-  List.iteri
-    (fun i (name, _) ->
-       if not (Mint.mem i fields) then
-         let exn = MissingRecField name in
-           tyerror loc env exn)
-    rec_;
+  let dflrec =
+    let doit f =
+      let (dfl, dflty) = subtt f in
+      unify_or_fail env ue f.pl_loc ~expct:reccty dflty; dfl
+    in b |> omap doit
+  in
 
-  let fields = Mint.values fields in (* sorted by field idx *)
   let fields =
-    let for1 (_, opty, rf) =
-      let pty = EcUnify.UniEnv.fresh ue in
-      (try  EcUnify.unify env ue (tfun reccty pty) opty
-       with EcUnify.UnificationFailure _ -> assert false);
-      let e, ety = subtt rf.rf_value in
-      unify_or_fail env ue rf.rf_value.pl_loc ~expct:pty ety;
-      (e, ety)
+    let get_field i name rty =
+      match Mint.find_opt i fields with
+      | Some (_, opty, rf) ->
+          `Set (opty, rf.rf_value)
+
+      | None ->
+          match dflrec with
+          | None   -> tyerror loc env (MissingRecField name)
+          | Some _ -> `Dfl (Tvar.subst tysopn rty, name)
+    in List.mapi (fun i (name, rty) -> get_field i name rty) rec_
+  in
+
+  let fields =
+    let for1 = function
+      | `Set (opty, value) ->
+          let pty = EcUnify.UniEnv.fresh ue in
+          (try  EcUnify.unify env ue (tfun reccty pty) opty
+           with EcUnify.UnificationFailure _ -> assert false);
+          let e, ety = subtt value in
+          unify_or_fail env ue value.pl_loc ~expct:pty ety;
+          (e, pty)
+
+      | `Dfl (rty, name) ->
+          let nm = oget (EcPath.prefix recp) in
+          (proj (nm, name, (rtvi, reccty), rty, oget dflrec), rty)
+
     in
       List.map for1 fields
   in
@@ -1170,9 +1190,13 @@ let transexp (env : EcEnv.env) mode ue e =
         let ty = toarrow (List.map snd xs) ty in
         (e_lam xs e, ty)
 
-    | PErecord fields ->
+    | PErecord (b, fields) ->
         let (ctor, fields, (rtvi, reccty)) =
-          trans_record env ue (transexp env) (loc, fields) in
+          let proj (recp, name, (rtvi, reccty), pty, arg) =
+            let proj = EcPath.pqname recp name in
+            let proj = e_op proj rtvi (tfun reccty pty) in
+            e_app proj [arg] pty
+          in trans_record env ue (transexp env, proj) (loc, b, fields) in
         let ctor = e_op ctor rtvi (toarrow (List.map snd fields) reccty) in
         let ctor = e_app ctor (List.map fst fields) reccty in
           ctor, reccty
@@ -2246,14 +2270,17 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let f = transf env f1 in
           f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) xs) f
 
-    | PFrecord fields ->
+    | PFrecord (b, fields) ->
         let (ctor, fields, (rtvi, reccty)) =
+          let proj (recp, name, (rtvi, reccty), pty, arg) =
+            let proj = EcPath.pqname recp name in
+            let proj = f_op proj rtvi (tfun reccty pty) in
+            f_app proj [arg] pty in
           trans_record env ue
-            (fun f -> let f = transf env f in (f, f.f_ty))
-            (f.pl_loc, fields) in
+            ((fun f -> let f = transf env f in (f, f.f_ty)), proj)
+            (f.pl_loc, b, fields) in
         let ctor = f_op ctor rtvi (toarrow (List.map snd fields) reccty) in
-        let ctor = f_app ctor (List.map fst fields) reccty in
-          ctor
+        f_app ctor (List.map fst fields) reccty
 
     | PFproj (subf, x) -> begin
       let subf = transf env subf in

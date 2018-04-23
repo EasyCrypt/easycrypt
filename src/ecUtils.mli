@@ -106,6 +106,7 @@ val swap: 'a * 'b -> 'b * 'a
 type 'a eq  = 'a -> 'a -> bool
 type 'a cmp = 'a -> 'a -> int
 
+val pair_map   : ('a -> 'b) -> 'a pair -> 'b pair
 val pair_equal : 'a eq -> 'b eq -> ('a * 'b) eq
 val opt_equal  : 'a eq -> 'a option eq
 
@@ -265,6 +266,7 @@ module List : sig
   val min : ?cmp:('a -> 'a -> int) -> 'a list -> 'a
   val max : ?cmp:('a -> 'a -> int) -> 'a list -> 'a
 
+  val nth_opt    : 'a list -> int -> 'a option
   val mbfilter   : ('a -> bool) -> 'a list -> 'a list
   val fusion     : ('a -> 'a -> 'a) -> 'a list -> 'a list -> 'a list
   val is_unique  : ?eq:('a -> 'a -> bool) -> 'a list -> bool
@@ -273,6 +275,7 @@ module List : sig
   val find_pivot : ('a -> bool) -> 'a list -> 'a list * 'a * 'a list
   val map_fold   : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
   val mapi_fold  : (int -> 'a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
+  val pmapi      : (int -> 'a -> 'b option) -> 'a list -> 'b list
   val pmap       : ('a -> 'b option) -> 'a list -> 'b list
   val rev_pmap   : ('a -> 'b option) -> 'a list -> 'b list
   val rotate     : [`Left|`Right] -> int -> 'a list -> int * 'a list

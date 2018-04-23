@@ -11,6 +11,7 @@ type command = [
 | `Compile of cmp_option
 | `Cli     of cli_option
 | `Config
+| `Why3Config
 ]
 
 and options = {

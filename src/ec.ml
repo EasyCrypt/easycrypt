@@ -33,6 +33,10 @@ let copyright =
 let psep = match Sys.os_type with "Win32" -> ";" | _ -> ":"
 
 (* -------------------------------------------------------------------- *)
+let confname    = "easycypt.conf"
+let why3dflconf = Filename.concat XDG.home "why3.conf"
+
+(* -------------------------------------------------------------------- *)
 type pconfig = {
   pc_why3     : string option;
   pc_pwrapper : string option;
@@ -140,7 +144,13 @@ let main () =
 
   (* Parse command line arguments *)
   let options =
-    let ini = resource ["etc"; "easycrypt.ini"] in
+    let ini =
+      let xdgini =
+        XDG.Config.file ~exists:true ~mode:`All ~appname:EcVersion.app
+          confname
+      in List.hd (List.append xdgini [resource ["etc"; "easycrypt.conf"]]) in
+
+
     let ini =
       try  Some (EcOptions.read_ini_file ini)
       with
@@ -162,11 +172,22 @@ let main () =
   in
 
   (* Initialize why3 engine *)
-  let why3conf = options.o_options.o_why3
+  let cp_why3conf ~exists ~mode : string option =
+    match options.o_options.o_why3 with
+    | None ->
+        let confs =
+          XDG.Config.file
+            ~exists ~mode ~appname:EcVersion.app "why3.conf"
+        in List.nth_opt confs 0
+
+    | Some _ as aout -> aout in
+
+  let why3conf = cp_why3conf ~exists:true ~mode:`All
   and ovrevict = options.o_options.o_ovrevict in
 
-  begin
-    try  EcProvers.initialize ~ovrevict ?why3conf ()
+  if options.o_command <> `Why3Config then begin
+    try
+      EcProvers.initialize ~ovrevict ?why3conf ()
     with e ->
       Format.eprintf
         "cannot initialize Why3 engine: %a@."
@@ -200,6 +221,26 @@ let main () =
         } in
 
         print_config config; exit 0
+
+    | `Why3Config -> begin
+        let conf = cp_why3conf ~exists:false ~mode:`User in
+
+        let () =
+          let ulnk = conf |> odfl why3dflconf in
+          try Unix.unlink ulnk with Unix.Unix_error _ -> ()
+        in
+
+        let pid =
+          let args = ["why3"; "config"; "--detect"] in
+          let args = args @ (conf |> omap (fun x -> ["-C"; x])|> odfl []) in
+
+          Printf.eprintf "Executing: %s\n%!" (String.concat " " args);
+          Unix.create_process "why3" (Array.of_list args)
+            Unix.stdin Unix.stdout Unix.stderr
+        in
+
+        exit (fst (Unix.waitpid [] pid))
+      end
 
     | `Cli cliopts -> begin
         let terminal =

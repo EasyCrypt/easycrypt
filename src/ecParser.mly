@@ -160,6 +160,7 @@
   type smt = [
     | `ALL
     | `ITERATE
+    | `QUORUM         of int
     | `MAXLEMMAS      of int option
     | `MAXPROVERS     of int
     | `PROVER         of prover list
@@ -190,9 +191,19 @@
 
     let option_matching =
        option_matching
-         [ "all"; "timeout"; "maxprovers"; "maxlemmas";
-           "wantedlemmas"; "unwantedlemmas";
-           "prover"; "verbose"; "lazy"; "full"; "iterate"; "selected" ]
+         [ "all"           ;
+           "quorum"        ;
+           "timeout"       ;
+           "maxprovers"    ;
+           "maxlemmas"     ;
+           "wantedlemmas"  ;
+           "unwantedlemmas";
+           "prover"        ;
+           "verbose"       ;
+           "lazy"          ;
+           "full"          ;
+           "iterate"       ;
+           "selected"      ]
 
     let as_int = function
       | None          -> `None
@@ -239,6 +250,7 @@
 
       match unloc s with
       | "timeout"        -> `TIMEOUT        (get_as     ("int"   , as_int) s o)
+      | "quorum"         -> `QUORUM         (get_as     ("int"   , as_int) s o)
       | "maxprovers"     -> `MAXPROVERS     (get_as     ("int"   , as_int) s o)
       | "maxlemmas"      -> `MAXLEMMAS      (get_opt_as ("int"   , as_int) s o)
       | "wantedlemmas"   -> `WANTEDLEMMAS   (get_as     ("dbhint", as_dbhint) s o)
@@ -256,6 +268,7 @@
       let mprovers = ref None in
       let timeout  = ref None in
       let pnames   = ref None in
+      let quorum   = ref None in
       let all      = ref None in
       let mlemmas  = ref None in
       let wanted   = ref None in
@@ -265,17 +278,38 @@
       let iterate  = ref None in
       let selected = ref None in
 
+      let is_universal p = unloc p = "" || unloc p = "!" in
+
+      let ok_use_only pp p =
+        if pp.pp_add_rm <> [] then
+          let msg = "use-only elements must come at beginning" in
+          parse_error (loc p) (Some msg)
+        else if pp.pp_use_only <> [] && is_universal p then
+          let msg = "cannot add universal to non-empty use-only" in
+          parse_error (loc p) (Some msg)
+        else
+          match pp.pp_use_only with
+          | [q] ->
+              if is_universal q then
+                let msg = "use-only part is already universal" in
+                parse_error (loc p) (Some msg)
+          | _ -> () in
+
       let add_prover (k, p) =
-        let r = odfl empty_pprover_list !pnames in
-        pnames := Some
-          (match k with
-          | `Only    -> { r with pp_use_only =            p  :: r.pp_use_only }
-          | `Include -> { r with pp_add_rm   = (`Include, p) :: r.pp_add_rm   }
-          | `Exclude -> { r with pp_add_rm   = (`Exclude, p) :: r.pp_add_rm   }) in
+        let r  = odfl empty_pprover_list !pnames in
+        let pr =
+          match k with
+          | `Only ->
+	            ok_use_only r p; { r with pp_use_only = p :: r.pp_use_only }
+          | `Include -> { r with pp_add_rm = (`Include, p) :: r.pp_add_rm }
+          | `Exclude -> { r with pp_add_rm = (`Exclude, p) :: r.pp_add_rm }
+
+        in pnames := Some pr in
 
       let do1 o  =
         match o with
         | `ALL              -> all      := Some true
+        | `QUORUM         n -> quorum   := Some n
         | `TIMEOUT        n -> timeout  := Some n
         | `MAXPROVERS     n -> mprovers := Some n
         | `MAXLEMMAS      n -> mlemmas  := Some n
@@ -298,6 +332,7 @@
         pprov_timeout   = !timeout;
         pprov_cpufactor =  None;
         pprov_names     = !pnames;
+        pprov_quorum    = !quorum;
         pprov_verbose   = !verbose;
         pprov_version   = !version;
         plem_all        = !all;
@@ -848,7 +883,10 @@ sexpr_u:
    { PEident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
 
 | LPBRACE fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
-   { PErecord fields }
+   { PErecord (None, fields) }
+
+| LPBRACE b=sexpr WITH fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
+   { PErecord (Some b, fields) }
 
 | e=sexpr DOTTICK x=qident
    { PEproj (e, x) }
@@ -1022,7 +1060,10 @@ sform_u(P):
    { PFtuple fs }
 
 | LPBRACE fields=rlist1(form_field, SEMICOLON) SEMICOLON? RPBRACE
-   { PFrecord fields }
+   { PFrecord (None, fields) }
+
+| LPBRACE b=sform WITH fields=rlist1(form_field, SEMICOLON) SEMICOLON? RPBRACE
+   { PFrecord (Some b, fields) }
 
 | LBRACKET ti=tvars_app? es=loc(plist0(form_r(P), SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
@@ -3249,7 +3290,7 @@ smt_info:
 
 smt_info1:
 | t=word
-    { `MAXLEMMAS (Some t)      }
+    { `MAXLEMMAS (Some t) }
 
 | TIMEOUT EQ t=word
     { `TIMEOUT t }

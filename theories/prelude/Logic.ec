@@ -92,20 +92,20 @@ pred monomorphism_2 (f : 'a -> 'b) (aR : 'a -> 'a -> 'c) rR =
   forall x y, rR (f x) (f y) = aR x y.
 
 (* -------------------------------------------------------------------- *)
- pred injective (f : 'a -> 'b) =
-   forall x y, f x = f y => x = y.
+pred injective (f : 'a -> 'b) =
+  forall x y, f x = f y => x = y.
 
- pred surjective (f: 'a -> 'b) = 
-   forall x, exists y, x = f y.
+pred surjective (f: 'a -> 'b) =
+  forall x, exists y, x = f y.
 
- pred cancel (f : 'a -> 'b) (g : 'b -> 'a) =
-   forall x, g (f x) = x.
+pred cancel (f : 'a -> 'b) (g : 'b -> 'a) =
+  forall x, g (f x) = x.
 
- pred pcancel (f : 'a -> 'b) (g : 'b -> 'a option) =
-   forall x, g (f x) = Some x.
+pred pcancel (f : 'a -> 'b) (g : 'b -> 'a option) =
+  forall x, g (f x) = Some x.
 
- pred ocancel (g : 'b -> 'a option) h =
-   forall x, oapp h x (g x) = x.
+pred ocancel (g : 'b -> 'a option) h =
+  forall x, oapp h x (g x) = x.
 
 pred bijective ['a 'b] (f : 'b -> 'a) =
   exists g, cancel f g /\ cancel g f.
