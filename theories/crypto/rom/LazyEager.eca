@@ -181,7 +181,7 @@ section.
         + smt(mem_set).
         + smt(get_setE domE).
         + smt(get_setE domE eq_exceptP).
-        + smt(mem_set eq_exceptSS eq_exceptP).
+        + smt(mem_set eq_except_set eq_exceptP).
         + smt(mem_head_behead).
         + smt(get_setE domE).
         + smt().

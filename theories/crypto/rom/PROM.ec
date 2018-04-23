@@ -373,7 +373,7 @@ abstract theory GenEager.
         /\ FRO.m{2}.[x1] = mx2.
   proof.
   proc; auto=> ? &mr [#] -> Hneq Heq /= Heq1 Heq2 ? -> /=.
-  by rewrite !get_setE Hneq eq_exceptSS_eq.
+  by rewrite !get_setE Hneq eq_except_set_eq.
   qed.
 
   equiv I_f_set x1 r1 : RRO.I.f ~ RRO.I.f : 
@@ -440,7 +440,7 @@ abstract theory GenEager.
     + auto=> ? &mr [#] 2 -> /= ^Hdom -> ^Hget -> c -> /=.
       rewrite !get_setE /= oget_some !restr_set /=.
       have ->: pred1 x{mr} = predU pred0 (pred1 x{mr}) by done. (* Really? *)
-      rewrite eq_exceptSS_neq //=.
+      rewrite eq_except_set_neq //=.
       congr; apply/FSet.fsetP=> x'; rewrite !FSet.in_fsetD FSet.in_fset1 !mem_fdom.
       by rewrite mem_set; case: (x' = x{mr}).
     exists* x{1}, FRO.m{1}.[x{2}], FRO.m{2}.[x{2}]; elim*=>x1 mx1 mx2.
@@ -493,7 +493,7 @@ abstract theory GenEager.
               (FRO.m.[x]=Some(y, Known)){2}).
     + inline *; auto=> ? &mr [#] 3-> /= Hmem Hget; rewrite sampleto_ll=> ? _.
       have ->: pred1 x{mr} = predU pred0 (pred1 x{mr}) by done.
-      rewrite (@eq_exceptSS_neq _ _ (_,Unknown) (_,Known) _ _) //=.
+      rewrite (@eq_except_set_neq _ _ (_,Unknown) (_,Known) _ _) //=.
       split.
       + congr; rewrite FSet.fsetP=> z; rewrite !FSet.inE !mem_fdom !dom_restr /in_dom_with mem_set.
         case: (z = x{mr})=> [<<-|z_neq_x] //=.
@@ -514,7 +514,7 @@ abstract theory GenEager.
   + do !split.
     + by congr; apply/FSet.fsetP=> z; rewrite !mem_fdom mem_rem dom_restr /#.
     + by move=> z; rewrite -FSet.memE mem_fdom dom_restr /#.
-    exact/eq_except1mS.
+    exact/eq_except_setr.
   move=> m1 m2 [#] /eq_exceptP Hex _ m2x; apply/fmap_eqP=> z; rewrite get_setE.
   by have:= Hex z=> @/pred1; rewrite eq_sym; case: (x{mr} = z)=> [<<-|] //=; rewrite m2x.
   qed.
@@ -628,7 +628,7 @@ abstract theory GenEager.
     + wp; rnd; auto=> ? &mr [#] 2->; rewrite domE sampleto_ll /= => Heq ? _ ? ->; do !split=> //=.
       + have ->: pred1 x{mr} = predU (pred1 x{mr}) (pred1 x{mr}).
         + by apply/fun_ext=> z /#.
-        exact/eq_exceptmS/eq_except1mS.
+        exact/eq_exceptmS/eq_except_setr.
       + congr; apply/FSet.fsetP=> z; rewrite !FSet.inE !mem_fdom !dom_restr /in_dom_with.
         by rewrite mem_set get_setE; case: (z = x{mr})=> //= <<-; rewrite domE Heq.
       + by rewrite get_setE.
@@ -784,7 +784,7 @@ abstract theory GenEager.
       + move=> &mr [] _ ->; apply mem_eq0=> z.
         rewrite -FSet.memE mem_fdom dom_restr /in_dom_with mapE mem_map domE.
         by case: (RO.m{m}.[_]).
-      move=> /> &mr; rewrite map_map /fst /=.
+      move=> /> &mr; rewrite map_comp /fst /=.
       by apply/fmap_eqP=> z; rewrite mapE /=; case: (_.[z]).
     transitivity M.main2
        (={glob D, FRO.m} ==> ={res, glob D})

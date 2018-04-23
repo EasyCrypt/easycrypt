@@ -290,7 +290,7 @@ call (_: Game1.r \in Log.qs,
 + proc; inline RO.o.
   auto=> /> &1 &2 -> /= m1_eqe_m2 yL y_in_dptxt; split.
   + move=> x_notin_m; split.
-    + by rewrite !get_set_sameE eq_exceptSS_eq.
+    + by rewrite !get_set_sameE eq_except_set_eq.
     move: m1_eqe_m2 x_notin_m=> + + + r_neq_x.
     by rewrite eq_exceptP pred1E !domE=> /(_ x{2} r_neq_x) ->.
   move=> x_in_m; split.

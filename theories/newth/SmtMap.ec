@@ -333,7 +333,7 @@ lemma nosmt eq_except_set_same ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
 proof. by move=> <-; apply/eq_except_set_eq. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt eq_exceptSS_neq ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
+lemma nosmt eq_except_set_neq ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
      y <> y'
   => eq_except X m1 m2
   => eq_except (predU X (pred1 x)) m1.[x <- y] m2.[x <- y'].
