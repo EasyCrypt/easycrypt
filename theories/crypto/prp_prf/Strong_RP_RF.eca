@@ -545,7 +545,7 @@ section PRPi_PRPi'_Indirect.
       (* case r0 = a *)
       seq  2: (a = r0) (mu uD (pred1 a)) 1%r _ 0%r (r0 = r /\ X = X{2}).
         by auto.
-        by wp; rnd; skip; progress; rewrite pred1E -(etaE ((=) a)) etaP.
+        by wp; rnd; skip; progress; rewrite pred1E.
         by rcondf 1.
         by hoare; conseq (_: _ ==> true)=> //=; smt.
         done.

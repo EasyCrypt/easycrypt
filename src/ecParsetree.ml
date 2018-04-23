@@ -714,7 +714,9 @@ and icasemode_full =
   [`AtMost of int | `AsMuch]
 
 type genpattern =
-  [ `ProofTerm of ppterm | `Form of (rwocc * pformula) ]
+  [ `ProofTerm of ppterm
+  | `Form of (rwocc * pformula)
+  | `LetIn of psymbol ]
 
 type prevert = {
   pr_clear : psymbol list;

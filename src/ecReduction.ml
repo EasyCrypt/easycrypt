@@ -513,9 +513,9 @@ let rec h_red ri env hyps f =
       f_app_simpl op args f.f_ty
 
     (* η-reduction *)
-  | Fquant (Llambda, [x, GTty _], { f_node = Fapp (f, [{ f_node = Flocal y }]) })
-      when id_equal x y && not (Mid.mem x f.f_fv)
-    -> f
+  | Fquant (Llambda, [x, GTty _], { f_node = Fapp (fn, args) })
+      when can_eta x (fn, args)
+    -> f_app fn (List.take (List.length args - 1) args) f.f_ty
 
     (* contextual rule - let *)
   | Flet (lp, f1, f2) -> f_let lp (h_red ri env hyps f1) f2
@@ -541,6 +541,13 @@ let rec h_red ri env hyps f =
     end
 
   | _ -> raise NotReducible
+
+and can_eta x (f, args) =
+  match List.rev args with
+  | { f_node = Flocal y } :: args ->
+      let check v = not (Mid.mem x v.f_fv) in
+      id_equal x y && List.for_all check (f :: args)
+  | _ -> false
 
 and h_red_args ri env hyps args =
   match args with

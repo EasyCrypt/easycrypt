@@ -2248,6 +2248,9 @@ genpattern:
   RPAREN
     { `ProofTerm (mk_pterm exp (FPCut (Some f)) args) }
 
+| AT x=ident
+    { `LetIn x }
+
 simplify_arg:
 | DELTA l=qoident* { `Delta l }
 | ZETA             { `Zeta }
