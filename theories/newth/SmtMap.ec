@@ -136,7 +136,9 @@ proof. exact/isfmap_offmap. qed.
 lemma nosmt finite_rng ['a 'b] (m : ('a, 'b) fmap) :
   is_finite (rng m).
 proof.
-exists (undup (map (fun x=> oget m.[x]) (to_seq (dom m)))); split.
+
+
+exists (undup (map (fun x => oget m.[x]) (to_seq (dom m)))); split.
 + exact/undup_uniq.
 move=> y; rewrite rngE mem_undup mapP /=; apply/exists_iff=> /= x.
 by rewrite mem_to_seq 1:finite_dom domE; case: (m.[x]).
