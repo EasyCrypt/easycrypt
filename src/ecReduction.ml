@@ -752,20 +752,24 @@ and check_alpha_equal ri hyps f1 f2 =
       | None ->
         match h_red_opt ri env hyps f2 with
         | Some f2 -> aux env subst f1 f2
-        | None ->
-          let ty,codom =
-            match f1.f_node, f2.f_node with
-            | Fquant(Llambda,(_,GTty ty)::bd, f1'), _ ->
-              ty, toarrow (List.map (fun (_,gty)-> gty_as_ty gty) bd) f1'.f_ty
-            | _,  Fquant(Llambda,(_,GTty ty)::bd,f2') ->
-              ty, toarrow (List.map (fun (_,gty)-> gty_as_ty gty) bd) f2'.f_ty
-            | _, _ -> raise e in
-          let x = f_local (EcIdent.create "_") ty in
-          let f1 = f_app_simpl f1 [x] codom in
-          let f2 = f_app_simpl f2 [x] codom in
-          aux env subst f1 f2
-  in
-  aux env Fsubst.f_subst_id f1 f2
+        | None when EqTest.for_type env f1.f_ty f2.f_ty -> begin
+            let ty, codom =
+              match f1.f_node, f2.f_node with
+              | Fquant (Llambda, (_, GTty ty) :: bd, f1'), _ ->
+                  ty, toarrow (List.map (gty_as_ty |- snd) bd) f1'.f_ty
+              | _,  Fquant(Llambda, (_, GTty ty) :: bd, f2') ->
+                  ty, toarrow (List.map (gty_as_ty |- snd) bd) f2'.f_ty
+              | _, _ -> raise e
+            in
+
+              let x  = f_local (EcIdent.create "_") ty in
+              let f1 = f_app_simpl f1 [x] codom in
+              let f2 = f_app_simpl f2 [x] codom in
+              aux env subst f1 f2
+        end
+        | _ -> raise e
+
+  in aux env Fsubst.f_subst_id f1 f2
 
 and check_alpha_eq f1 f2 = check_alpha_equal no_red   f1 f2
 and check_conv     f1 f2 = check_alpha_equal full_red f1 f2
