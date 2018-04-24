@@ -778,7 +778,7 @@ qed.
 
 lemma weight_dmap (d : 'a distr) (f : 'a -> 'b) :
   weight (dmap d f) = weight d.
-proof. by rewrite /weight {2}(_: predT = preim f predT) // dmapE. qed.
+proof. by rewrite (_: predT = preim f predT) // dmapE. qed.
 
 lemma dmap_ll (d : 'a distr) (f : 'a -> 'b) : 
   is_lossless d => is_lossless (dmap d f).
