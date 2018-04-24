@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore Int List Real Distr FSet NewFMap.
+require import AllCore Int List Real Distr FSet SmtMap.
 require import IntExtra IntDiv RealExtra Mu_mem StdRing StdOrder StdBigop.
 (*---*) import Bigint Ring.IntID RField IntOrder RealOrder BIA.
 require (*--*) FinType.
@@ -91,7 +91,7 @@ module F = {
   var m:(seed,seed * output) fmap
 
   proc init(): unit = {
-     m <- map0;
+     m <- empty;
   }
 
   proc f (x:seed) : seed * output = {
@@ -99,7 +99,7 @@ module F = {
 
     r1 <$ dseed;
     r2 <$ dout;
-    if (!mem (dom m) x)
+    if (x \notin m)
       m.[x] <- (r1,r2);
 
     return oget (m.[x]);
@@ -226,14 +226,14 @@ section.
    *  - an adversary query collides with an internal seed. *)
   inductive Bad logP (m : ('a,'b) fmap) =
     | Cycle of (!uniq logP)
-    | Collision r of (mem logP r) & (mem (dom m) r).
+    | Collision r of (mem logP r) & (r \in m).
 
   lemma negBadE logP (m : ('a,'b) fmap):
     !Bad logP m <=>
-      (uniq logP /\ forall r, !mem logP r \/ !mem (dom m) r).
+      (uniq logP /\ forall r, !mem logP r \/ r \notin m).
   proof.
   rewrite -iff_negb negbK negb_and negb_forall /=.
-  rewrite (@ exists_iff _ (predI (mem logP) (mem (dom m))) _).
+  rewrite (@ exists_iff _ (predI (mem logP) (dom m)) _).
   + by move=> a /=; rewrite negb_or /predI.
   split=> [[->|r r_in_log r_in_m]|[/(Cycle _ m)|[r] @/predI [] /(Collision _ m r)]] //.
   by right; exists r.
@@ -242,8 +242,8 @@ section.
   (* In this game, we replace the PRF queries with fresh sampling operations *)
   inductive inv (m1 m2 : ('a,'b) fmap) (logP : 'a list) =
     | Invariant of
-          (forall r, mem (dom m1) r <=> (mem (dom m2) r \/ mem logP r))
-        & (forall r, mem (dom m2) r => m1.[r] = m2.[r]).
+          (forall r, r \in m1 <=> (r \in m2 \/ mem logP r))
+        & (forall r, r \in m2 => m1.[r] = m2.[r]).
 
   local lemma Plog_Psample &m:
     Pr[Exp(A,F,Plog).main() @ &m: res] <=
@@ -260,11 +260,11 @@ section.
     (* [Psample.prg ~ Plog.prg: I] when Bad does not hold *)
     proc; inline F.f. swap{2} 3 -2.
     auto=> /> &1 &2 _ [] m1_is_m2Ulog m2_le_m1 r1 _ r2 _.
-    rewrite negBadE; case: (mem (dom F.m{1}) P.seed{2})=> [/#|//=].
-    rewrite !getP /= oget_some /=.
+    rewrite negBadE; case: (P.seed{2} \in F.m{1})=> [/#|//=].
+    rewrite !get_setE /= oget_some /=.
     move=> seed_notin_m1 _; split.
-      by move=> r; rewrite dom_set !inE m1_is_m2Ulog /#.
-    move=> r ^/m2_le_m1; rewrite !getP=> -> r_in_m2.
+      by move=> r; rewrite mem_set m1_is_m2Ulog /#.
+    move=> r ^/m2_le_m1; rewrite !get_setE=> -> r_in_m2.
     by move: (iffRL _ _ (m1_is_m2Ulog r)); rewrite r_in_m2 /#.
     (* Plog.prg is lossless when Bad holds *)
     by move=> _ _; proc; inline F.f; auto=> />; rewrite dseed_ll dout_ll.
@@ -276,23 +276,23 @@ section.
     (* [F.f ~ F.f: I] when Bad does not hold *)
     proc; auto=> /> &1 &2; rewrite !negBadE.
     move=> -[] uniq_log r_notin_logIm [] m_is_mUlog m2_le_m1 r1L _ r2L _.
-    case: (mem (dom F.m{2}) x{2})=> [/#|//=].
-    case: (mem (dom F.m{1}) x{2})=> /=.
+    case: (x{2} \in F.m{2})=> [/#|//=].
+    case: (x{2} \in F.m{1})=> /=.
     + rewrite negBadE uniq_log=> /= /m_is_mUlog + x_notin_m2 h'; rewrite x_notin_m2 /=.
-      by move: (h' x{2}); rewrite dom_set !inE.
-    rewrite !getP /= => x_notin_m1 x_notin_m2 _; split.
-    + by move=> r; rewrite !dom_set !inE m_is_mUlog /#.
-    by move=> r; rewrite !dom_set !inE !getP=> -[/m2_le_m1|] ->.
+      by move: (h' x{2}); rewrite mem_set.
+    rewrite !get_setE /= => x_notin_m1 x_notin_m2 _; split.
+    + by move=> r; rewrite !mem_set m_is_mUlog /#.
+    by move=> r; rewrite !mem_set !get_setE=> -[/m2_le_m1|] ->.
     (* F.f is lossless when Bad holds *)
     by move=> _ _; apply FfL.
     (* F.f preserves bad *)
     move=> _ //=; proc.
-    case (mem (dom F.m) x).
+    case (x \in F.m).
     + by rcondf 3; auto=> />; rewrite dseed_ll dout_ll.
     rcondt 3; first by do !rnd; wp.
     auto=> />; rewrite dseed_ll dout_ll //= => &hr bad_init x_notin_m v _ _ v0 _ _.
     case: bad_init=> [/(Cycle<:seed,seed * output>) -> //|r r_in_log r_in_m].
-    by apply/(@Collision _ _ r)=> //=; rewrite dom_set !inE r_in_m.
+    by apply/(@Collision _ _ r)=> //=; rewrite mem_set r_in_m.
   (* Returning to main *)
   call (_: ={glob F} ==> ={glob P} /\ inv F.m{1} F.m{2} P.logP{2}).
   + by proc; auto=> /> &2 _ _; split.
@@ -461,10 +461,10 @@ section.
   seq 3: true
          1%r ((qP * qF + (qP - 1) * qP %/ 2)%r / Support.card%r)
          0%r 1%r
-         (size P.logP <= qP /\ card (dom F.m) <= qF)=> //.
+         (size P.logP <= qP /\ card (fdom F.m) <= qF)=> //.
   + inline Exp'(C(A)).A.a; wp.
     call (_: size P.logP = C.cP /\ C.cP <= qP /\
-             card (dom F.m) <= C.cF /\ C.cF <= qF).
+             card (fdom F.m) <= C.cF /\ C.cF <= qF).
     (* prg *)
     + proc; sp; if=> //.
       call (_: size P.logP = C.cP - 1 ==> size P.logP = C.cP).
@@ -472,19 +472,19 @@ section.
       by auto=> /#.
     (* f *)
     proc; sp; if=> //.
-    call (_: card (dom F.m) < C.cF ==> card (dom F.m) <= C.cF).
+    call (_: card (fdom F.m) < C.cF ==> card (fdom F.m) <= C.cF).
     proc; auto=> /> &hr h r1 _ r2 _.
-    + by rewrite dom_set fcardU fcard1; smt w=fcard_ge0.
+    + by rewrite fdom_set fcardU fcard1; smt w=fcard_ge0.
     by auto=> /#.
   + inline *; auto=> />.
-    by rewrite dom0 fcards0 /=; smt w=(ge0_qP ge0_qF).
+    by rewrite fdom0 fcards0 /=; smt w=(ge0_qP ge0_qF).
   inline Resample.resample.
   exists* P.logP; elim* => logP.
   seq 3: true
          1%r  ((qP * qF + (qP - 1) * qP %/ 2)%r / Support.card%r)
          0%r 1%r
          (n = size logP /\ n <= qP /\ P.logP = [] /\
-          card (dom F.m) <= qF)=> //.
+          card (fdom F.m) <= qF)=> //.
   + by rnd; wp.
   conseq (_ : _ : <= (if Bad P.logP F.m then 1%r else
       (sumid (qF + size P.logP) (qF + n))%r / Support.card%r)).
@@ -498,7 +498,7 @@ section.
     rewrite sumidE ?size_ge0 leq_div2r // mulrC.
     move: (size_ge0 logP) szlog_le_qP => /IntOrder.ler_eqVlt [<- /#|gt0_sz le].
     by apply/IntOrder.ler_pmul => // /#.
-  while{1} (n <= qP /\ card (dom F.m) <= qF).
+  while{1} (n <= qP /\ card (fdom F.m) <= qF).
   + move=> Hw; exists* P.logP, F.m, n; elim* => logPw m n0.
     case: (Bad P.logP F.m).
     + by conseq (_ : _ : <= (1%r))=> // /#.
@@ -506,22 +506,26 @@ section.
            ((qF + size logPw)%r / Support.card%r) 1%r 1%r
            ((sumid (qF + (size logPw + 1)) (qF + n))%r / Support.card%r)
            (n = n0 /\ F.m = m /\ r::logPw = P.logP /\
-            n <= qP /\ card (dom F.m) <= qF)=> //.
+            n <= qP /\ card (fdom F.m) <= qF)=> //.
     + by wp; rnd=> //.
     + wp; rnd; auto=> /> &hr _ /le_fromint domF_le_qF _.
       rewrite (negBadE A AaL)=> //= -[uniq_logP logP_disj_domF].
-      apply (ler_trans (mu dseed (predU (mem (dom F.m{hr}))
+      apply (ler_trans (mu dseed (predU (dom F.m{hr})
                                         (mem P.logP{hr})))).
       + by apply mu_sub=> x [] /#.
-      rewrite mu_or (@mu_mem (dom F.m{hr}) dseed (inv (Support.card%r))).
+      have ->: dom F.m{hr} = mem (fdom F.m{hr}).
+      + by apply/fun_ext=> x; rewrite mem_fdom.
+      rewrite mu_or (@mu_mem (fdom F.m{hr}) dseed (inv (Support.card%r))).
       + by move=> x _; rewrite dseed1E.
       rewrite (@mu_mem_card (P.logP{hr}) dseed (inv (Support.card%r))).
       + by move=> x _; rewrite dseed1E.
       rewrite (@cardE (oflist P.logP{hr})) (@perm_eq_size _ (P.logP{hr})) 1:perm_eq_sym 1:oflist_uniq //.
-      have -> /=: mu dseed (predI (mem (dom F.m{hr})) (mem P.logP{hr})) = 0%r.
-      + by rewrite -(@mu0 dseed) /predI; apply/mu_eq=> x; move: (logP_disj_domF x)=> [] ->.
+      have -> /=: mu dseed (predI (mem (fdom F.m{hr})) (mem P.logP{hr})) = 0%r.
+      + have ->: mem (fdom F.m{hr}) = dom F.m{hr}.
+        + by apply/fun_ext=> x; rewrite mem_fdom.
+        by rewrite -(@mu0 dseed) /predI; apply/mu_eq=> x; move: (logP_disj_domF x)=> [] ->.
       rewrite -mulrDl fromintD.
-      have: (card (dom F.m{hr}))%r + (size P.logP{hr})%r <= qF%r + (size P.logP{hr})%r.
+      have: (card (fdom F.m{hr}))%r + (size P.logP{hr})%r <= qF%r + (size P.logP{hr})%r.
       + exact/ler_add.
       have: 0%r <= Support.card%r by smt(@Support).
       smt (@RealExtra).

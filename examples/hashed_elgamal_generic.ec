@@ -1,4 +1,4 @@
-require import AllCore Int Real NewFMap FSet.
+require import AllCore Int Real FSet.
 require (*--*) BitWord Distr DInterval.
 (*---*) import StdOrder.RealOrder.
 require (*--*) DiffieHellman ROM PKE_CPA.

@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore FSet NewFMap Distr StdOrder StdRing.
+require import AllCore FSet SmtMap Distr StdOrder StdRing.
 (*---*) import RField RealOrder.
 require import Dexcepted.
 require (*--*) NewPRP.
@@ -24,15 +24,15 @@ module RandomPermutation = {
   var mi: (D,D) fmap
 
   proc init(): unit = {
-    m  <- map0;
-    mi <- map0;
+    m  <- empty;
+    mi <- empty;
   }
 
   proc f(x:D): D = {
     var y;
 
-    if (!mem (dom m) x) {
-      y      <$ dD \ (mem (rng m));
+    if (x \notin m) {
+      y      <$ dD \ (rng m);
       m.[x]  <- y;
       mi.[y] <- x;
     }
@@ -42,8 +42,8 @@ module RandomPermutation = {
   proc fi(y:D): D = {
     var x;
 
-    if (!mem (dom mi) y) {
-      x      <$ dD \ (mem (rng mi));
+    if (y \notin mi) {
+      x      <$ dD \ (rng mi);
       mi.[y] <- x;
       m.[x]  <- y;
     }
@@ -53,8 +53,8 @@ module RandomPermutation = {
 
 (* -------------------------------------------------------------------- *)
 pred is_permutation (m mi : (D,D) fmap) =
-     (forall x, mem (dom m) x => mi.[oget m.[x]] = Some x)
-  /\ (forall x, mem (dom mi) x => m.[oget mi.[x]] = Some x).
+     (forall x, x \in m => mi.[oget m.[x]] = Some x)
+  /\ (forall x, x \in mi => m.[oget mi.[x]] = Some x).
 
 (* -------------------------------------------------------------------- *)
 equiv f_perm: RandomPermutation.f ~ RandomPermutation.f:
@@ -64,13 +64,13 @@ equiv f_perm: RandomPermutation.f ~ RandomPermutation.f:
       /\ is_permutation RandomPermutation.m{1} RandomPermutation.mi{1}.
 proof.
 proc; if=> //=; auto=> |> &2 is_perm x_notin_m yL.
-rewrite supp_dexcepted in_rng negb_exists=>- [] _ /= m__neq_yL.
-split=> [x'|y']; rewrite !getP !dom_set !inE.
+rewrite supp_dexcepted rngE /= negb_exists=>- [] _ /= m__neq_yL.
+split=> [x'|y']; rewrite !get_setE !mem_set.
 + case: (x' = x{2})=> //= x'_neq_x.
   have [] mmi mim ^ /mmi mimx':= is_perm.
-  rewrite mimx' in_dom; elim: (RandomPermutation.m{2}.[x']) (m__neq_yL x')=> //= x0.
+  rewrite mimx' domE; elim: (RandomPermutation.m{2}.[x']) (m__neq_yL x')=> //= x0.
   by rewrite oget_some=> ->.
-by case: (y' = yL)=> //=; smt w=in_dom.
+by case: (y' = yL)=> //=; smt(domE).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -81,27 +81,78 @@ equiv fi_perm: RandomPermutation.fi ~ RandomPermutation.fi:
       /\ is_permutation RandomPermutation.m{1} RandomPermutation.mi{1}.
 proof.
 proc; if=> //=; auto=> |> &2 is_perm y_notin_mi xL.
-rewrite supp_dexcepted in_rng negb_exists=>- [] _ /= mi__neq_xL.
-split=> [x'|y']; rewrite !getP !dom_set !inE.
-+ case: (x' = xL)=> //=; smt w=in_dom.
+rewrite supp_dexcepted rngE /= negb_exists=>- [] _ /= mi__neq_xL.
+split=> [x'|y']; rewrite !get_setE !mem_set.
++ case: (x' = xL)=> //=; smt(domE).
 case: (y' = y{2})=> //= y'_neq_y.
 have [] mmi mim ^ /mim mmiy':= is_perm.
-rewrite mmiy' in_dom; elim: (RandomPermutation.mi{2}.[y']) (mi__neq_xL y')=> //= y0.
+rewrite mmiy' domE; elim: (RandomPermutation.mi{2}.[y']) (mi__neq_xL y')=> //= y0.
 by rewrite oget_some=> ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
+(** TODO: brutal carry over from SmtMap -- needs more elegance **)
+lemma leq_card_rng_dom (m:('a,'b) fmap):
+  card (frng m) <= card (fdom m).
+proof.
+elim/fset_ind: (fdom m) {-2}m (eq_refl (fdom m))=> {m} [m /fdom_eq0 ->|].
++ by rewrite frng0 fdom0 !fcards0.
+move=> x s x_notin_s ih m dom_m.
+cut ->: m = (rem m x).[x <- oget m.[x]].
++ apply/fmap_eqP=> x'; rewrite get_setE remE; case: (x' = x)=> [->>|//].
+  have /fsetP /(_ x):= dom_m; rewrite in_fsetU in_fset1 /= mem_fdom domE.
+  by case: m.[x].
+have ->: frng (rem m x).[x <- oget m.[x]] = frng (rem m x) `|` fset1 (oget m.[x]).
++ apply/fsetP=> y'; rewrite in_fsetU in_fset1 !mem_frng !rngE /=.
+  split=> [[] a|].
+  + rewrite get_setE remE; case: (a = x)=> [->>|a_neq_x ma_y'].
+    + rewrite -some_oget 1:-domE 1:-mem_fdom 1:dom_m 1:in_fsetU 1:in_fset1 //.
+      by move=> ->.
+    by left; exists a; rewrite remE a_neq_x.
+  case=> [[a]|->].
+  + rewrite remE; case: (a = x)=> //= x_neq_a ma_y'.
+    by exists a; rewrite get_setE remE x_neq_a.
+  by exists x; rewrite get_set_sameE.
+rewrite fcardU fsetI1 fun_if !fcard1 fcards0.
+rewrite fdom_set fcardUI_indep 2:fcard1.
++ by apply/fsetP=> x0; rewrite in_fsetI fdom_rem !inE -andbA andNb.
+rewrite StdOrder.IntOrder.ler_subl_addr; apply/StdOrder.IntOrder.ler_paddr.
++ by case: (mem (frng _) _).
+apply/StdOrder.IntOrder.ler_add2r/ih/fsetP=> x0.
+by rewrite fdom_rem dom_m !inE; case: (x0 = x).
+qed.
+
+lemma endo_dom_rng (m:('a,'a) fmap):
+  (exists x, x \notin m) =>
+  exists x, !rng m x.
+proof.
+elim=> x x_notin_m.
+have h: 0 < card (((fdom m) `|` fset1 x) `\` (frng m)); last first.
++ have [a]: exists a, a \in (fdom m `|` fset1 x) `\` frng m.
+  + have ->: forall b, b = !!b by done.
+    rewrite negb_exists /= -negP=> /in_eq_fset0 h'.
+    by move: h' h=> ->; rewrite fcards0.
+  by rewrite in_fsetD mem_frng=> - [] _ a_notin_rng_m; exists a.
+rewrite fcardD fcardUI_indep.
++ by apply/fsetP=> x'; rewrite !inE mem_fdom /#.
+rewrite fcard1 fsetIUl fcardUI_indep.
++ by apply/fsetP=> x'; rewrite !inE mem_fdom /#.
+have ->: card (fset1 x `&` frng m) = if x \in (frng m) then 1 else 0.
++ smt (@FSet).
+by move: x_notin_m; rewrite -mem_fdom; smt (leq_card_rng_dom @FSet).
+qed.
+
 lemma f_ll: is_full dD => islossless RandomPermutation.f.
 proof.
-move=> dD_fu. proc; if=> //=; auto=> /> &m h.
+move=> dD_fu.
+proc; if=> //=; auto=> /> &m h.
 have [] x0 x0_notinr_m:= endo_dom_rng RandomPermutation.m{m} _.
 + by exists x{m}.
 rewrite -/predT weight_dexcepted /b2r.
 case: {-1}(mu _ _ = mu _ _)
-        (eq_refl (mu dD predT = mu dD (mem (rng RandomPermutation.m{m}))))=> //=.
+        (eq_refl (mu dD predT = mu dD (rng RandomPermutation.m{m})))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.
-rewrite (mu_split _ _ (mem (rng RandomPermutation.m{m}))) /predI /predT /predC /=.
-rewrite -(etaE (mem _)) etaP.
+rewrite (mu_split _ _ (rng RandomPermutation.m{m})) /predI /predT /predC /=.
 rewrite addrC addrA (addrC (-_)%Real) addrN add0r.
 apply/(ltr_le_trans (mu dD (pred1 x0))).
 + by rewrite dD_fu.
@@ -111,15 +162,15 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma fi_ll: is_full dD => islossless RandomPermutation.fi.
 proof.
-move=> dD_fu. proc; if=> //=; auto=> /> &m h.
+move=> dD_fu.
+proc; if=> //=; auto=> /> &m h.
 have [] y0 y0_notinr_mi:= endo_dom_rng RandomPermutation.mi{m} _.
 + by exists y{m}.
 rewrite -/predT weight_dexcepted /b2r.
 case: {-1}(mu _ _ = mu _ _)
-        (eq_refl (mu dD predT = mu dD (mem (rng RandomPermutation.mi{m}))))=> //=.
+        (eq_refl (mu dD predT = mu dD (rng RandomPermutation.mi{m})))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.
-rewrite (mu_split _ _ (mem (rng RandomPermutation.mi{m}))) /predI /predT /predC /=.
-rewrite -(etaE (mem _)) etaP.
+rewrite (mu_split _ _ (rng RandomPermutation.mi{m})) /predI /predT /predC /=.
 rewrite addrC addrA (addrC (-_)%Real) addrN add0r.
 apply/(ltr_le_trans (mu dD (pred1 y0))).
 + by rewrite dD_fu.

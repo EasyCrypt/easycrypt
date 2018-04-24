@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import AllCore Finite List FSet NewFMap Distr.
+require import AllCore Finite List FSet SmtMap Distr.
 require import StdRing StdBigop StdOrder FelTactic.
 (*---*) import RealOrder.
 
@@ -63,13 +63,13 @@ theory Lazy.
     var m:(from, to) fmap
 
     proc init():unit = {
-      m <- map0;
+      m <- empty;
     }
 
     proc o(x:from):to = {
       var y:to;
       y <$ dsample x;
-      if (!mem (dom m) x) m.[x] = y;
+      if (x \notin m) m.[x] = y;
       return oget (m.[x]);
     }
   }.
@@ -88,8 +88,16 @@ theory Lazy.
   equiv RO_o_eq: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}.
   proof. by sim. qed.
 
-  hoare dom_RO_o d x': RO.o: x = x' /\ dom RO.m = d ==> dom RO.m = d `|` fset1 x'.
-  proof. by proc; auto=> />; smt(dom_set fsetP in_fsetU in_fset1). qed.
+  hoare dom_RO_o d x':
+    RO.o: x = x' /\ dom RO.m = d ==>
+          dom RO.m = predU d (pred1 x').
+  proof.
+  proc; auto=> /> &m y _; split.
+  + by move=> x_notin_m; apply/fun_ext=> x0; rewrite mem_set.
+  move=> x_in_m; apply/fun_ext=> x0 @/predU @/pred1.
+  by case: (x0 = x{m})=> // ->>; rewrite x_in_m.
+  qed.
+
 end Lazy.
 
 (* -------------------------------------------------------------------- *)
@@ -112,7 +120,7 @@ theory Eager.
       var work:from fset;
       var f:from;
 
-      m    <- map0;
+      m    <- empty;
       work <- FSet.oflist (to_seq predT);
       while (work <> fset0)
       {
@@ -130,14 +138,14 @@ theory Eager.
 
   lemma RO_init_full:
     is_finite predT<:from> =>
-    hoare [RO.init: true ==> forall x, FSet.mem (dom RO.m) x].
+    hoare [RO.init: true ==> forall x, x \in RO.m].
   proof.
   move=> fType; proc.
-  while (forall x, FSet.mem work x \/ mem (dom RO.m) x).
+  while (forall x, FSet.mem work x \/ x \in RO.m).
   + auto=> /> &m w_m_part w_non_empty y _ x.
     case: (x = pick work{m}).
-    + by rewrite dom_set in_fsetU in_fset1.
-    + by rewrite dom_set in_fsetU in_fsetD in_fset1 /#.
+    + by rewrite mem_set.
+    + by rewrite mem_set in_fsetD in_fset1=> -> /=; exact/w_m_part.
   auto=> />; split=> [x|m h x].
   + by rewrite mem_oflist mem_to_seq.
   by have:= h x; rewrite in_fset0.
@@ -168,13 +176,13 @@ theory Eager.
 
   lemma dom_RO_init x:
     is_finite predT<:from> =>
-    hoare [RO.init: true ==> FSet.mem (dom RO.m) x].
+    hoare [RO.init: true ==> x \in RO.m].
   proof.
-  move=> fType; proc; while (forall x, !FSet.mem work x => mem (dom RO.m) x).
+  move=> fType; proc; while (forall x, !FSet.mem work x => x \in RO.m).
   + auto=> /> &m w_m_part w_non_empty y _ x'.
     case: (x' = pick work{m}).
-    + by rewrite dom_set in_fsetU in_fset1.
-    + by rewrite dom_set in_fsetU in_fsetD in_fset1 /#.
+    + by rewrite mem_set.
+    + by rewrite mem_set in_fsetD in_fset1=> -> /=; exact/w_m_part.
   auto=> />; split=> [x'|m h].
   + by rewrite mem_oflist mem_to_seq // /predT.
   by have:= h x; rewrite in_fset0.
@@ -211,13 +219,13 @@ theory LazyEager.
         var m : (from, to) fmap
 
         proc init():unit = {
-          m <- map0;
+          m <- empty;
         }
 
         proc o(x:from):to = {
           var y:to;
           y <$ dsample x;
-          if (!FSet.mem (dom m) x) m.[x] = y;
+          if (x \notin m) m.[x] = y;
           return oget (m.[x]);
         }
       }
@@ -232,7 +240,7 @@ theory LazyEager.
         {
           f <- pick work;
           y <$ dsample f;
-          if (!FSet.mem (dom H.m) f) H.m.[f] = y;
+          if (f \notin H.m) H.m.[f] = y;
           work <- work `\` fset1 f;
         }
       }
@@ -283,7 +291,7 @@ theory LazyEager.
         {
           f <- pick work;
           y <$ dsample f;
-          if (!FSet.mem (dom H.m) f) H.m.[f] = y;
+          if (f \notin H.m) H.m.[f] = y;
           work = work `\` fset1 f;
         }
       }
@@ -293,7 +301,7 @@ theory LazyEager.
       proc main(): bool = {
         var b:bool;
 
-        H.m <- map0;
+        H.m <- empty;
         resample();
         b <@ D.distinguish();
 
@@ -316,14 +324,14 @@ theory LazyEager.
               IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
               mem work{1} x{1}).
     + by auto=> /> &2; rewrite mem_oflist mem_to_seq.
-    case (!mem (dom IND_Lazy.H.m{2}) x{2});
+    case (x{2} \notin IND_Lazy.H.m{2});
       [rcondt{2} 2; first by auto | rcondf{2} 2; first by auto].
     + transitivity{1} {
         y0 <$ dsample x;
         while (work <> fset0) {
           f <- pick work;
           y <$ dsample f;
-          if (!mem (dom IND_Eager.H.m) f)
+          if (f \notin IND_Eager.H.m)
             IND_Eager.H.m.[f] <- if f = x then y0 else y;
           work <- work `\` fset1 f;
         }
@@ -331,14 +339,14 @@ theory LazyEager.
       }
       (={x, work, IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
       ((={x,work} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\  mem work{1} x{1})
-        /\ !mem (dom IND_Lazy.H.m{2}) x{2} ==>
+        /\ x{2} \notin IND_Lazy.H.m{2} ==>
           ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
       + by move=> &1 &2 H; exists IND_Lazy.H.m{2} work{2} x{2}; move: H.
       + transitivity{1} {
           while (work <> fset0) {
             f <- pick work;
             y <$ dsample f;
-            if (!mem (dom IND_Eager.H.m) f)
+            if (f \notin IND_Eager.H.m)
               IND_Eager.H.m.[f] <- y;
               work <- work `\` fset1 f;
             }
@@ -357,40 +365,43 @@ theory LazyEager.
           by auto=> /> &1 _; rewrite eq_sym=> ->.
         by sim.
       wp; while (={x, work} /\
-                 (!mem work x => mem (dom IND_Eager.H.m) x){1} /\
+                 (!mem work x => x \in IND_Eager.H.m){1} /\
                  IND_Lazy.H.m.[x]{2} = Some y0{1} /\
-                 if (mem (dom IND_Eager.H.m) x){1}
+                 if (x \in IND_Eager.H.m){1}
                  then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
-                 else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (pred1 x{1})).
+                 else eq_except (pred1 x{1}) IND_Eager.H.m{1} IND_Lazy.H.m{2}).
       + auto=> /> &1 &2 Hpart m_x upd_cond work_neq_nil y _.
         case: (mem work{2} x{2})=> [|^x_in_work /Hpart x_in_Em]; last first.
-        + move: upd_cond; rewrite x_in_Em=> /= <*>.
+        + move: upd_cond=> /= <*>. rewrite 2!x_in_Em=> /= <*>. (* ?? why do I need to do this twice? *)
           case: (pick work{2} = x{2})=> //= ^pkwork_neq_x.
-          rewrite in_fsetD1 eq_sym dom_set !inE !getP=> -> /=.
-          rewrite eq_except_set 1:eq_except_refl /=.
-          by split=> ^ + ->.
+          rewrite in_fsetD1 eq_sym mem_set !get_setE=> -> /=.
+          rewrite eq_exceptP /pred1 /=.
+          by split=> ^ + -> //=.
         case: (pick work{2} = x{2})=> [<<*> _ {Hpart}|].
-        + rewrite in_fsetD1 dom_set !getP !inE //= in_dom.
+        + rewrite in_fsetD1 mem_set !get_setE //= domE.
           have -> /= := m_x.
-          move: upd_cond; rewrite in_dom.
+          move: upd_cond; rewrite domE.
           case: (IND_Eager.H.m{1}.[pick work{2}] <> None)=> //= m'_x /eq_exceptP @/pred1 eqe_m_m'.
-          rewrite fmapP=> x; rewrite getP; case: (x = pick work{2})=> [->|/eqe_m_m'] //.
+          rewrite -fmap_eqP=> x; rewrite get_setE; case: (x = pick work{2})=> [->|^ + /eqe_m_m' ->] //.
           by rewrite m_x.
-        rewrite in_fsetD1 dom_set !getP !inE=> //= ^ pw_neq_x; rewrite eq_sym=> -> -> //=.
-        rewrite m_x eq_except_set //=.
-        + move: upd_cond; case: (x{2} \in dom IND_Eager.H.m{1})=> [_ ->|_ ->] //.
-          by rewrite eq_except_refl.
-        move: upd_cond; rewrite !in_dom !eq_exceptP /pred1 /=.
-        by case: (IND_Eager.H.m{1}.[x{2}])=> //= /(_ (pick work{2}) pw_neq_x) ->.
+        rewrite mem_set !get_setE !inE=> //= ^ pw_neq_x; rewrite eq_sym=> -> -> //=.
+        rewrite m_x !eq_exceptP //=.
+        move: upd_cond; case: (x{2} \in IND_Eager.H.m{1})=> [_ ->|/=] //.
+        rewrite eq_exceptP=> _ h; split.
+        + move=> pw_notin_Lm; split.
+          + by move=> pw_notin_Em x0 /h; rewrite !get_setE=> ->.
+          by move: pw_neq_x pw_notin_Lm=> /h; rewrite !domE=> ->.
+        by move: pw_neq_x=> /h; rewrite !domE=> ->.
       auto=> /> &2 x_in_w x_notin_m y _.
-      rewrite getP_eq eq_except_sym set_eq_except=> /= mL mR.
+      rewrite get_set_eqE //= eq_except_sym; first exact/eq_except_setl.
+      move=> /= mL mR.
       by rewrite in_fset0=> /= -> /= + -> - ->.
     wp; while (={x,work} /\
                IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
-               mem (dom IND_Lazy.H.m{2}) x{2} /\
+               x{2} \in IND_Lazy.H.m{2} /\
                oget IND_Eager.H.m.[x]{1} = result{2}).
     + auto => /> &m2 Hin ????. 
-      by rewrite domP in_fsetU Hin /= getP_neq // /#.
+      by rewrite domE get_set_neqE /#.
     by auto=> /#.
     qed.
 
@@ -417,16 +428,19 @@ theory LazyEager.
       equiv [IND_Eager.main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
     proof.
     move=> fromF dsampleL; proc.
-    call (_: (forall x, FSet.mem (dom IND_Eager.H.m{1}) x) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
-    + by proc; skip; smt(@NewFMap).
+    call (_: (forall x, x \in IND_Eager.H.m{1}) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
+    + by proc; skip; smt(@SmtMap).
     inline RO.init IND_Eager.resample.
     while (={work} /\
-           (forall x, !FSet.mem (dom IND_Eager.H.m{1}) x <=>
+           (forall x, x \notin IND_Eager.H.m{1} <=>
                       mem work{1} x) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
-    + auto; smt(domP in_fsetD in_fsetU in_fset1 mem_pick).
-    auto => />;split=> [x| m].
-    + by rewrite dom0 in_fset0 mem_oflist mem_to_seq.
-    by move=> H x;have := H x;rewrite in_fset0.
+    + auto=> /> &2 in_mVw.
+      move=> notempty_w y _; split.
+      + by move=> pw_notin_m x; rewrite mem_set in_fsetD in_fset1 negb_or in_mVw.
+      by move: notempty_w=> /mem_pick /in_mVw.
+    auto => />; split=> [x| m].
+    + by rewrite mem_empty mem_oflist mem_to_seq.
+    by move=> h x; have:= h x; rewrite in_fset0.
     qed.
 
     lemma eagerRO:
@@ -583,14 +597,14 @@ theory SetLog.
   hoare Log_o_stable (O <: Oracle {Log}) x: Log(O).o: mem Log.qs x ==> mem Log.qs x.
   proof. by proc; wp; call (_: true); skip=> &m; rewrite in_fsetU in_fset1=> ->. qed.
 
-  hoare Log_o_Dom: Log(RO).o: Log.qs = dom RO.m ==> Log.qs = dom RO.m.
+  hoare Log_o_Dom: Log(RO).o:
+    (forall x, x \in Log.qs = x \in RO.m) ==>
+    (forall x, x \in Log.qs = x \in RO.m).
   proof.
-  proc; inline*; auto. move=> &m -> y _ /=; rewrite 2!fsetP.
-  split=> /= h x'.
-  + by rewrite dom_set.
-  case: (x' = x{m})=> [->>|].
-  + by rewrite in_fsetU h.
-  by rewrite in_fsetU in_fset1=> ->.
+  proc; inline*; auto=> &m eq_qs_m y _ /=; split=> /=.
+  + by move=> x_notin_m x0; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
+  move=> x_in_m x0; rewrite in_fsetU in_fset1 eq_qs_m.
+  by case: (x0 = x{m})=> //= ->; rewrite x_in_m.
   qed.
 
   module Bound(O:Oracle) = {
@@ -753,25 +767,33 @@ theory ROM_BadCall.
       proc.
       call (_: mem Log.qs G1'.x,
                ={glob Log} /\
-               Log.qs{2} = dom RO.m{2} /\
-               eq_except RO.m{1} RO.m{2} (pred1 G1'.x{2})).
+               (forall x, x \in Log.qs{2} = x \in RO.m{2}) /\
+               eq_except (pred1 G1'.x{2}) RO.m{1} RO.m{2}).
       + by apply Da2L.
-      + proc; inline RO.o; auto=> /> //= &1 &2 x2_notin_G1' eqe y _.
-        rewrite !inE !getP x2_notin_G1' /= oget_some dom_set eq_except_set //= eq_sym.
-        move: eqe; rewrite eq_exceptP !in_dom /pred1 /= => h.
-        split. by move=> + + /h eq_m; rewrite eq_m.
-        move=> h'; split=> + /h eq_m; rewrite eq_m h' //=.
-        by apply/fsetP=> x'; rewrite !inE in_dom /#.
+      + proc; inline RO.o; auto=> /> //= &1 &2 x2_notin_qs eq_qs_m eqe y _.
+        rewrite !inE !get_setE x2_notin_qs /= oget_some eq_except_set_eq //= eq_sym.
+        split.
+        + move=> x_notin_m2; split.
+          + by move=> x_notin_m1 + x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
+          move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
+          by rewrite domE eq_mx -domE.
+        move=> x_in_m2; split.
+        + move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
+          by rewrite domE eq_mx -domE.
+        move=> x_in_m1 x2_neq_G1'x. move: eqe; rewrite eq_exceptP=> -> //= x1.
+        by rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> [->|] //=; rewrite x_in_m2.
       + by progress; apply (Log_o_ll RO); apply (RO_o_ll _); smt(dsampleL).
       + progress; exists* G1'.x; elim* => x; conseq (Log_o_ll RO _) (Log_o_stable RO x)=> //.
         by apply (RO_o_ll _); smt(dsampleL).
       + inline RO.o; auto.
-        call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
-        + proc; inline RO.o; auto=> /> &2 y _; rewrite dom_set /=.
-          by move=> x_in_m; rewrite fsetP=> x'; rewrite in_fsetU in_fset1 /#.
-        inline Log(RO).init RO.init; auto=> />; split=> [|_ r m y _].
-        + by rewrite fsetP=> x; rewrite dom0.
-        rewrite getP_eq set_eq_except /oget /#.
+        call (_: ={glob Log, glob RO} /\ (forall x, x \in Log.qs{2} = x \in RO.m{2})).
+        + proc; inline RO.o; auto=> /> &2 eq_qs_m y _; split.
+          + by move=> x_notin_m x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
+          move=> x_in_m x1; rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> //=.
+          by move=> ->; rewrite x_in_m.          
+        inline Log(RO).init RO.init; auto=> />; split=> [x1|_ r qs m eq_qs_m y _].
+        + by rewrite in_fset0 mem_empty.
+        by rewrite get_set_eqE // oget_some /= eq_except_setl /= eq_qs_m /#.
       by rewrite Pr [mu_or]; smt(mu_bounded).
       qed.
     end section.
@@ -857,25 +879,33 @@ theory ROM_BadCall.
         proc.
         call (_: mem Log.qs G1'.x,
                  ={glob Log} /\
-                 Log.qs{2} = dom RO.m{2} /\
-                 eq_except RO.m{1} RO.m{2} (pred1 G1'.x{2})).
+                 (forall x, x \in Log.qs{2} = x \in RO.m{2}) /\
+                 eq_except (pred1 G1'.x{2}) RO.m{1} RO.m{2}).
         + by apply Da2L.
-        + proc; inline *; sp; if=> //=; auto=> /> &1 &2 x2_notin_G1' eqe c y _.
-          rewrite !inE !getP x2_notin_G1' /= oget_some dom_set eq_except_set //= eq_sym.
-          move: eqe; rewrite eq_exceptP !in_dom /pred1 /= => h.
-          split. by move=> + + /h eq_m; rewrite eq_m.
-          move=> h'; split=> + /h eq_m; rewrite eq_m h' //=.
-          by apply/fsetP=> x'; rewrite !inE in_dom /#.
+        + proc; inline *; sp; if=> //=; auto=> /> //= &1 &2 x2_notin_qs eq_qs_m eqe _ y _.
+          rewrite !inE !get_setE x2_notin_qs /= oget_some eq_except_set_eq //= eq_sym.
+          split.
+          + move=> x_notin_m2; split.
+            + by move=> x_notin_m1 + x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
+            move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
+            by rewrite domE eq_mx -domE.
+          move=> x_in_m2; split.
+          + move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
+            by rewrite domE eq_mx -domE.
+          move=> x_in_m1 x2_neq_G1'x. move: eqe; rewrite eq_exceptP=> -> //= x1.
+          by rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> [->|] //=; rewrite x_in_m2.
         + by progress; apply (Bound_o_ll RO); apply (RO_o_ll _); smt(dsampleL).
         + progress; exists* G1'.x; elim* => x; conseq (Bound_o_ll RO _) (Bound_o_stable RO x)=> //.
           by apply (RO_o_ll _); smt(dsampleL).
         + inline RO.o; auto.
-          call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
-          + proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto=> /> &2 _ y _.
-            by rewrite dom_set=> /= x_in_m; rewrite fsetP=> x'; rewrite in_fsetU in_fset1 /#.
-        inline Bound(RO).init Log(RO).init RO.init; auto=> />; split=> [|_ r m y _].
-        + by rewrite dom0.
-        by rewrite getP_eq set_eq_except /oget /#.
+          call (_: ={glob Log, glob RO} /\ (forall x, x \in Log.qs{2} = x \in RO.m{2})).
+          + proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto=> /> &2 eq_qs_m _ y _; split.
+            + by move=> x_notin_m x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
+            move=> x_in_m x1; rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> //=.
+            by move=> ->; rewrite x_in_m.          
+          inline Log(RO).init RO.init; auto=> />; split=> [x1|_ r qs m eq_qs_m y _].
+          + by rewrite in_fset0 mem_empty.
+        by rewrite get_set_eqE // oget_some /= eq_except_setl /= eq_qs_m /#.
       by rewrite Pr [mu_or]; smt(mu_bounded).
       qed.
     end section.

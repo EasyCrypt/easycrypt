@@ -1,6 +1,6 @@
 (*** A proof that CBC mode turns any weak PRP into an IND$- CPA-secure
      symmetric encryption scheme **when used with random IVs**  ***)
-require import AllCore Int Real Distr List FSet NewFMap.
+require import AllCore Int Real Distr List FSet SmtMap.
 require import StdRing StdOrder DList.
 require (*ab*) NewPRP ConcretePRP NewPRF SKE_INDR. (* Definitions and Security Notions *)
 require (*ab*) RP_RF.            (* Generic Arguments *)
@@ -557,14 +557,14 @@ section Reduce.
     proc.
     call (_: DoubleQuery.bad,
                   ={glob DoubleQuery}
-               /\ forall x, mem DoubleQuery.qs{1} x <=> mem (dom PRFi.m){1} x,
+               /\ forall x, mem DoubleQuery.qs{1} x <=> dom PRFi.m{1} x,
                ={DoubleQuery.bad}).
     + exact/A_distinguish_ll.
     + proc.
       while (   ={DoubleQuery.bad, i, p}
              /\ (!DoubleQuery.bad{2}
                  =>    ={s, c, glob DoubleQuery}
-                    /\ forall x, mem DoubleQuery.qs{1} x <=> mem (dom PRFi.m){1} x)).
+                    /\ forall x, mem DoubleQuery.qs{1} x <=> dom PRFi.m{1} x)).
         case (DoubleQuery.bad{2}).
           inline *.
           seq  4  4: (DoubleQuery.bad{2} /\ ={DoubleQuery.bad, i, p}).
@@ -575,7 +575,7 @@ section Reduce.
           by auto; smt (dD_ll).
         * rcondt{1} 2; 1:by auto=> /#.
           auto=> /> &1 &2 ih lt_i_szp /ih [#] !->> eq_qs h m _.
-          by rewrite !getP /= oget_some //= dom_set => b; rewrite !inE eq_qs.
+          by rewrite !get_setE /= oget_some=> //= b; rewrite mem_set !inE eq_qs.
       by auto; smt ml=0.
     + move=> &2 bad; proc.
       while (   DoubleQuery.bad = DoubleQuery.bad{2}
@@ -592,7 +592,8 @@ section Reduce.
         by move=> z; inline *; auto=> />; rewrite -/predT; smt (dBlock_uffu size_ge0).
       by auto=> />; rewrite -/predT; smt (dBlock_uffu size_ge0).
     inline *; auto=> />.
-    split=> [|_]; 1:by move=> x; rewrite dom0.
+    split=> [|_].
+    + by move=> x; rewrite mem_empty in_fset0.
     by move=> rL rR gaL mL qsL badL gaR [].
   qed.
 end section Reduce.

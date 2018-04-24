@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (*** A formalization of pseudo-random permutations **)
-require import AllCore Distr FSet NewFMap Dexcepted.
+require import AllCore Distr FSet SmtMap Dexcepted.
 
 (** A PRP is a family of permutations P on domain D indexed by a
     keyspace K equipped with a distribution dK. For simplicity of use,
@@ -99,10 +99,10 @@ theory Weak_PRP.
   module PRPi = {
     var m:(D,D) fmap
 
-    proc init(): unit = { m = map0; }
+    proc init(): unit = { m = empty; }
 
     proc f(x:D): D = {
-      if (!mem (dom m) x) m.[x] = $dD \ (mem (rng m));
+      if (x \notin m) m.[x] = $dD \ (rng m);
       return (oget m.[x]);
     }
   }.
@@ -146,15 +146,15 @@ theory Strong_PRP.
     var minv: (D,D) fmap
 
     proc init(): unit = {
-      m    <- map0;
-      minv <- map0;
+      m    <- empty;
+      minv <- empty;
     }
 
     proc f(x:D): D = {
       var y;
 
-      if (!mem (dom m) x) {
-        y        <$ dD \ (mem (dom minv));
+      if (x \notin m) {
+        y        <$ dD \ (dom minv);
         m.[x]    <- y;
         minv.[y] <- x;
       }
@@ -164,8 +164,8 @@ theory Strong_PRP.
     proc finv(x:D): D = {
       var y;
 
-      if (!mem (dom minv) x) {
-        y        <$ dD \ (mem (dom m));
+      if (x \notin minv) {
+        y        <$ dD \ (dom m);
         minv.[x] <- y;
         m.[y]    <- x;
       }

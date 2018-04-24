@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore Int Real NewFMap FSet Distr DBool.
+require import AllCore Int Real Distr DBool.
 require (*--*) DiffieHellman PKE_CPA.
 
 (* ---------------- Sane Default Behaviours --------------------------- *)

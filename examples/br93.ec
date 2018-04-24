@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List FSet NewFMap.
+require import AllCore List FSet SmtMap.
 require import Distr DBool.
 require (*--*) BitWord OW ROM.
 
@@ -139,11 +139,11 @@ byphoare=> //; conseq (: _ ==> true) (: _ ==> res)=> //.
   rcondf 17.
   + auto=> /> &hr [pk sk] kp_in_dkeys r _ y _ /=.
     rewrite fK //; split=> [_ _ _|-> //].
-    by rewrite in_dom getP_eq.
+    by rewrite mem_set.
   auto=> /> &hr [pk sk] kp_in_dkeys r _ y _ /=.
   rewrite fK //; split=> [_ y' _|].
-  + by rewrite getP_eq -addA addKp.
-  rewrite in_dom; case: (RO.m{hr}.[r])=> [|p] //= _ _.
+  + by rewrite get_set_sameE -addA addKp.
+  rewrite domE; case: (RO.m{hr}.[r])=> [|p] //= _ _.
   by rewrite -addA addKp.
 by proc; inline *; auto=> />; rewrite dkeys_ll drand_ll dptxt_ll.
 qed.
@@ -270,12 +270,12 @@ seq  8  5: (   ={glob A, glob RO, glob Log, pk, sk, b}
             /\ pk0{1} = pk{2}
             /\ m{1} = (b?m0:m1){2}
             /\ r{1} = Game1.r{2}
-            /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
+            /\ (forall x, x \in Log.qs{1} <=> x \in RO.m{1})).
 + auto; call (:   ={glob Log, glob RO}
-               /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
+               /\ (forall x, x \in Log.qs{1} <=> x \in RO.m{1})).
   + proc; inline RO.o.
-    by auto=> /> &2 log_is_dom y _; smt(@NewFMap).
-  by inline *; auto=> />; rewrite dom0=> _ _ x; rewrite in_fset0.
+    by auto=> /> &2 log_is_dom y _; smt(@SmtMap).
+  by inline *; auto=> /> _ _ x; rewrite mem_empty.
 (* We now deal with everything that happens after the programs differ: *)
 (*   - until r gets queried to the random oracle by the adversary      *)
 (*     (and if it wasn't already queried by a1), we guarantee that the *)
@@ -285,31 +285,31 @@ seq  8  5: (   ={glob A, glob RO, glob Log, pk, sk, b}
 (* Because we reason up to bad, we need to prove that bad is stable    *)
 (* and that the adversary and its oracles are lossless                 *)
 call (_: Game1.r \in Log.qs,
-         eq_except RO.m{1} RO.m{2} (pred1 Game1.r{2})).
+         eq_except (pred1 Game1.r{2}) RO.m{1} RO.m{2}).
 + exact/A_a2_ll.
 + proc; inline RO.o.
   auto=> /> &1 &2 -> /= m1_eqe_m2 yL y_in_dptxt; split.
   + move=> x_notin_m; split.
-    + by rewrite !getP_eq eq_except_set.
+    + by rewrite !get_set_sameE eq_except_set_eq.
     move: m1_eqe_m2 x_notin_m=> + + + r_neq_x.
-    by rewrite eq_exceptP pred1E !in_dom=> /(_ x{2} r_neq_x) ->.
+    by rewrite eq_exceptP pred1E !domE=> /(_ x{2} r_neq_x) ->.
   move=> x_in_m; split.
   + move: m1_eqe_m2 x_in_m=> + + + r_neq_x.
-    by rewrite eq_exceptP pred1E !in_dom=> /(_ x{2} r_neq_x) ->.
+    by rewrite eq_exceptP pred1E !domE=> /(_ x{2} r_neq_x) ->.
   by move: m1_eqe_m2=> + _ r_neq_x- /eq_exceptP /(_ x{2}); rewrite pred1E=> /(_ r_neq_x) ->.
 + by move=> &2 _; proc; call (RO_o_ll dptxt_ll); auto.
 + move=> _ /=; proc; inline *.
   conseq (: true ==> true: =1%r) (: Game1.r \in Log.qs ==> Game1.r \in Log.qs)=> //=.
   + by auto=> />.
   by auto=> />; exact/dptxt_ll.
-inline RO.o; case: ((r \in (dom RO.m)){1}).
+inline RO.o; case: ((r \in RO.m){1}).
 + conseq (: _ ==> ={b} /\ Game1.r{2} \in Log.qs{2})=> //=.
   + by move=> /> &1 &2 _ _ rR _ _ _ _ _ h /h [] -> //.
   by auto=> /> &2 <- ->.
 rcondt{1} 3; 1:by auto.
-auto=> /> &2 log_is_dom r_notin_m y _; rewrite !getP_eq oget_some /=.
+auto=> /> &2 log_is_dom r_notin_m y _; rewrite !get_set_sameE oget_some /=.
 split.
-+ by move=> _; rewrite eq_exceptP /pred1=> x; rewrite getP=> ->.
++ by move=> _; rewrite eq_exceptP /pred1=> x; rewrite get_setE eq_sym=> ->.
 by move=> _ rR aL mL aR qsR mR h /h [] ->.
 qed.
 

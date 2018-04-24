@@ -8,7 +8,7 @@
 
 (** FIXME: This is a Random Function (see ROM) -- make sure we only
     have one copy of this **)
-require import FSet NewFMap Distr.
+require import FSet SmtMap Distr.
 require (*--*) NewPRF.
 
 clone include NewPRF.
@@ -20,11 +20,11 @@ module RandomFunction = {
   var m : (D,R) fmap
 
   proc init(): unit = {
-    m  <- map0;
+    m  <- empty;
   }
 
   proc f(x:D): R = {
-    if (!mem (dom m) x) {
+    if (x \notin m) {
       m.[x]  <$ dR;
     }
     return (oget m.[x]);

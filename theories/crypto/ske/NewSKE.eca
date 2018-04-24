@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Bool FSet NewFMap.
+require import Bool FSet SmtMap.
 
 type key, plain, cipher.
 
