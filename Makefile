@@ -125,7 +125,7 @@ uninstall-purge:
 tests: check
 
 examples: build
-	$(CHECK) examples
+	$(CHECK) examples mee-cbc
 
 check: build
 	$(CHECK) $(CHECKCATS)
