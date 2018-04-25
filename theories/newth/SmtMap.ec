@@ -420,9 +420,15 @@ qed.
 op fdom ['a 'b] (m : ('a, 'b) fmap) =
   oflist (to_seq (dom m)) axiomatized by fdomE.
 
+(* -------------------------------------------------------------------- *)
 lemma mem_fdom ['a 'b] (m : ('a, 'b) fmap) (x : 'a) :
   x \in fdom m <=> x \in m.
 proof. by rewrite fdomE mem_oflist mem_to_seq ?isfmap_offmap. qed.  
+
+(* -------------------------------------------------------------------- *)
+lemma fdomP ['a 'b] (m : ('a, 'b) fmap) (x : 'a) :
+  x \in fdom m <=> m.[x] <> None.
+proof. by rewrite mem_fdom. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma fdom0 ['a 'b] : fdom empty<:'a, 'b> = fset0.
@@ -451,6 +457,11 @@ by apply/fsetP=> y; rewrite in_fsetD1 !mem_fdom mem_rem.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma fdom_map ['a 'b 'c] (f : 'a -> 'b -> 'c) m :
+  fdom (map f m) = fdom m.
+proof. by apply/fsetP=> x; rewrite !mem_fdom mem_map. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma mem_fdom_set ['a 'b] (m : ('a, 'b) fmap) x v y :
   y \in fdom m.[x <- v] <=> (y \in fdom m \/ y = x).
 proof. by rewrite fdom_set in_fsetU1. qed.
@@ -470,3 +481,25 @@ proof. by rewrite frngE mem_oflist mem_to_seq ?finite_rng. qed.
 (* -------------------------------------------------------------------- *)
 lemma frng0 ['a 'b] : frng empty<:'a, 'b> = fset0.
 proof. by apply/fsetP=> x; rewrite mem_frng mem_rng_empty in_fset0. qed.
+
+(* ==================================================================== *)
+lemma fmapW ['a 'b] (p : ('a, 'b) fmap -> bool) :
+      p empty
+   => (forall m k v, !k \in fdom m => p m => p m.[k <- v])
+   => forall m, p m.
+proof.
+move=> h0 hS; suff: forall s, forall m, fdom m = s => p m.
++ by move=> h m; apply/(h (fdom m)).
+elim/fset_ind => [|x s x_notin_s ih] m => [/fdom_eq0 ->//|].
+move=> fdmE; have x_in_m: x \in fdom m by rewrite fdmE in_fsetU1.
+have ->: m = (rem m x).[x <- oget m.[x]].
++ apply/fmap_eqP => y; case: (y = x) => [->|ne_xy].
+  - by move/fdomP: x_in_m; rewrite get_set_sameE; case: m.[x].
+  - by rewrite get_set_neqE // remE ne_xy.
+apply/hS; first by rewrite mem_fdom_rem x_in_m.
+apply/ih; rewrite fdom_rem fdmE fsetDK; apply/fsetP.
+by move=> y; rewrite in_fsetD1 andb_idr //; apply/contraL.
+qed.
+
+
+
