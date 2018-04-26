@@ -1368,6 +1368,27 @@ and transmodsig_body
 
   let names = ref [] in
 
+  let mk_calls = function
+    | None ->
+      let do_one mp calls =
+        let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
+        if sig_.mis_params <> [] then calls
+        else
+          let fs = List.map (fun (Tys_function (fsig, _)) ->
+                       EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body
+          in
+          fs@calls
+      in
+      Sm.fold do_one sa []
+    | Some pfd_uses ->
+      List.map (fun name ->
+          let f = fst (lookup_fun env name) in
+          let p = f.EcPath.x_top in
+          if not (Sm.mem p sa) then
+            tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
+          f)
+        pfd_uses in
+
   let transsig1 = function
     | `FunctionDecl f ->
       let name = f.pfd_name in
@@ -1394,30 +1415,7 @@ and transmodsig_body
       let resty = transty_for_decl env f.pfd_tyresult in
 
       let (uin, calls) =
-        let calls =
-          match snd f.pfd_uses with
-          | None ->
-            let do_one mp calls =
-              let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
-              if sig_.mis_params <> [] then calls
-              else
-                let fs = List.map (fun (Tys_function (fsig, _)) ->
-                   EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body
-                in
-                fs@calls
-            in
-            Sm.fold do_one sa []
-
-          | Some pfd_uses ->
-            List.map (fun name ->
-              let f = fst (lookup_fun env name) in
-              let p = f.EcPath.x_top in
-                if not (Sm.mem p sa) then
-                  tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
-                f)
-              pfd_uses
-        in
-        (fst f.pfd_uses, calls)
+        (fst f.pfd_uses, mk_calls (snd f.pfd_uses))
       in
 
       let sig_ = { fs_name   = name.pl_desc;
@@ -1427,14 +1425,36 @@ and transmodsig_body
       and oi = { oi_calls = calls; oi_in = uin; } in
       [Tys_function (sig_, oi)]
 
-    | `Include i ->
+    | `Include (i,proc,restr) ->
       let (_modty,sig_) = transmodtype env i in
       if sig_.mis_params <> [] then
         tyerror i.pl_loc env (InvalidModType MTE_IncludeFunctor);
-      let add (Tys_function (fs, _)) =
-        names := mk_loc (loc i) fs.fs_name :: !names in
-      List.iter add sig_.mis_body;
-      sig_.mis_body
+      let check_xs xs =
+        List.iter (fun x ->
+          let s = unloc x in
+          if not (List.exists (fun (Tys_function(fs,_)) ->
+                      sym_equal fs.fs_name s) sig_.mis_body) then
+            let modsymb = fst (unloc i) @ [snd (unloc i)] in
+            let funsymb = unloc x in
+            tyerror (loc x) env (UnknownFunName (modsymb,funsymb))) xs in
+      let in_xs (Tys_function(fs,_oi)) xs =
+        List.exists (fun x -> sym_equal fs.fs_name (unloc x)) xs in
+      let calls = mk_calls restr in
+      let add (Tys_function(fs,oi)) =
+        names := mk_loc (loc i) fs.fs_name :: !names;
+        Tys_function( fs, {oi with oi_calls = calls} ) in
+      match proc with
+      | None -> List.map add sig_.mis_body
+      | Some (`Include_proc xs) ->
+        check_xs xs;
+        List.pmap
+          (fun fs -> if in_xs fs xs then Some (add fs) else None)
+          sig_.mis_body
+      | Some (`Exclude_proc xs) ->
+        check_xs xs;
+        List.pmap
+          (fun fs -> if not (in_xs fs xs) then Some (add fs) else None)
+          sig_.mis_body
   in
 
   let items = List.flatten (List.map transsig1 is) in
@@ -1670,9 +1690,36 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   | Pst_alias ({pl_desc = name},f) ->
     [transstruct1_alias env name f]
 
-  | Pst_maliases (xs, m) ->
-    let do1 x = transstruct1_alias env (unloc x) (mk_loc (loc x) (m, x)) in
-    List.map do1 xs
+  | Pst_maliases (m, xs) ->
+    let (mo,ms) = trans_msymbol env m in
+    if ms.mis_params <> [] then
+      tyerror (loc m) env (InvalidModType MTE_InnerFunctor);
+    let check_xs xs =
+      List.iter (fun x ->
+          let s = unloc x in
+          if not (List.exists (fun (Tys_function(fs,_)) ->
+                    sym_equal fs.fs_name s) ms.mis_body) then
+            let modsymb = List.map (unloc -| fst) (unloc m)
+            and funsymb = unloc x in
+            tyerror (loc x) env (UnknownFunName (modsymb,funsymb))) xs in
+    let in_xs (Tys_function(fs,_)) xs =
+      List.exists (fun x -> sym_equal fs.fs_name (unloc x)) xs in
+    let mk_fun (Tys_function(fs,_)) =
+      (fs.fs_name,
+       MI_Function { f_name = fs.fs_name;
+                     f_sig  = fs;
+                     f_def  = FBalias (EcPath.xpath_fun mo fs.fs_name) }) in
+    match xs with
+    | None ->
+      List.map mk_fun ms.mis_body
+    | Some (`Include_proc xs) ->
+      check_xs xs;
+      List.pmap (fun fs ->
+        if in_xs fs xs then Some (mk_fun fs) else None) ms.mis_body
+    | Some (`Exclude_proc xs) ->
+      check_xs xs;
+      List.pmap (fun fs ->
+        if not (in_xs fs xs) then Some (mk_fun fs) else None) ms.mis_body
 
 and transstruct1_alias env name f =
   let f = trans_gamepath env f in
