@@ -44,6 +44,7 @@ type modapp_error =
 | MAE_AccesSubModFunctor
 
 type modtyp_error =
+| MTE_IncludeFunctor
 | MTE_InnerFunctor
 | MTE_DupProcName of symbol
 

@@ -53,6 +53,7 @@ type modapp_error =
 | MAE_AccesSubModFunctor
 
 type modtyp_error =
+| MTE_IncludeFunctor
 | MTE_InnerFunctor
 | MTE_DupProcName of symbol
 
@@ -1268,10 +1269,6 @@ let transexpcast_opt (env : EcEnv.env) mode ue oty e =
   | Some t -> transexpcast env mode ue t e
 
 (* -------------------------------------------------------------------- *)
-let name_of_sigitem = function
-  | `FunctionDecl f -> f.pfd_name
-
-(* -------------------------------------------------------------------- *)
 let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
   match EcEnv.ModTy.lookup_opt (unloc name) env with
   | None   -> tyerror name.pl_loc env (UnknownTyModName (unloc name))
@@ -1368,45 +1365,50 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
 and transmodsig_body
   (env : EcEnv.env) (sa : Sm.t) (is : pmodule_sig_struct_body)
 =
-  let transsig1 (`FunctionDecl f) =
-    let name = f.pfd_name in
-    let tyarg, tyargs =
-      match f.pfd_tyargs with
-      | Fparams_exp args ->
-        let tyargs =
-          List.map              (* FIXME: continuation *)
-            (fun (x, ty) -> {
-                 v_name = x.pl_desc;
-                 v_type = transty_for_decl env ty}) args
-        in
 
-        Msym.odup unloc (List.map fst args) |> oiter (fun (_, a) ->
-          tyerror name.pl_loc env
+  let names = ref [] in
+
+  let transsig1 = function
+    | `FunctionDecl f ->
+      let name = f.pfd_name in
+      names := name::!names;
+      let tyarg, tyargs =
+        match f.pfd_tyargs with
+        | Fparams_exp args ->
+          let tyargs =
+            List.map              (* FIXME: continuation *)
+              (fun (x, ty) -> {
+                   v_name = x.pl_desc;
+                   v_type = transty_for_decl env ty}) args
+          in
+
+          Msym.odup unloc (List.map fst args) |> oiter (fun (_, a) ->
+            tyerror name.pl_loc env
             (InvalidModSig (MTS_DupArgName (unloc name, unloc a))));
-        let tyarg = ttuple (List.map (fun vd -> vd.v_type) tyargs) in
-        tyarg, Some tyargs
-      | Fparams_imp ty ->
-        let tyarg = transty_for_decl env ty in
-        tyarg, None in
+          let tyarg = ttuple (List.map (fun vd -> vd.v_type) tyargs) in
+          tyarg, Some tyargs
+        | Fparams_imp ty ->
+          let tyarg = transty_for_decl env ty in
+          tyarg, None in
 
-    let resty = transty_for_decl env f.pfd_tyresult in
+      let resty = transty_for_decl env f.pfd_tyresult in
 
-    let (uin, calls) =
-      let calls =
-        match snd f.pfd_uses with
-        | None ->
+      let (uin, calls) =
+        let calls =
+          match snd f.pfd_uses with
+          | None ->
             let do_one mp calls =
               let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
-                if sig_.mis_params <> [] then calls
-                else
-                  let fs = List.map (fun (Tys_function (fsig, _)) ->
-                    EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body
-                  in
-                    fs@calls
+              if sig_.mis_params <> [] then calls
+              else
+                let fs = List.map (fun (Tys_function (fsig, _)) ->
+                   EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body
+                in
+                fs@calls
             in
-              Sm.fold do_one sa []
+            Sm.fold do_one sa []
 
-        | Some pfd_uses ->
+          | Some pfd_uses ->
             List.map (fun name ->
               let f = fst (lookup_fun env name) in
               let p = f.EcPath.x_top in
@@ -1414,21 +1416,29 @@ and transmodsig_body
                   tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
                 f)
               pfd_uses
-      in
+        in
         (fst f.pfd_uses, calls)
-    in
+      in
 
-    let sig_ = { fs_name   = name.pl_desc;
-                 fs_arg    = tyarg;
-                 fs_anames = tyargs;
-                 fs_ret    = resty; }
-    and oi = { oi_calls = calls; oi_in = uin; } in
-      Tys_function (sig_, oi)
+      let sig_ = { fs_name   = name.pl_desc;
+                   fs_arg    = tyarg;
+                   fs_anames = tyargs;
+                   fs_ret    = resty; }
+      and oi = { oi_calls = calls; oi_in = uin; } in
+      [Tys_function (sig_, oi)]
 
+    | `Include i ->
+      let (_modty,sig_) = transmodtype env i in
+      if sig_.mis_params <> [] then
+        tyerror i.pl_loc env (InvalidModType MTE_IncludeFunctor);
+      let add (Tys_function (fs, _)) =
+        names := mk_loc (loc i) fs.fs_name :: !names in
+      List.iter add sig_.mis_body;
+      sig_.mis_body
   in
 
-  let items = List.map transsig1 is in
-  let names = List.map name_of_sigitem is in
+  let items = List.flatten (List.map transsig1 is) in
+  let names = List.rev !names in
 
   Msym.odup unloc names |> oiter (fun (_, x) ->
     tyerror (loc x) env (InvalidModSig (MTS_DupProcName (unloc x))));
@@ -1655,17 +1665,25 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
         }
       in
         [(decl.pfd_name.pl_desc, MI_Function fun_)]
-  end
+    end
 
   | Pst_alias ({pl_desc = name},f) ->
-    let f = trans_gamepath env f in
-    let sig_ = (EcEnv.Fun.by_xpath f env).f_sig in
-    let fun_ = {
+    [transstruct1_alias env name f]
+
+  | Pst_maliases (xs, m) ->
+    let do1 x = transstruct1_alias env (unloc x) (mk_loc (loc x) (m, x)) in
+    List.map do1 xs
+
+and transstruct1_alias env name f =
+  let f = trans_gamepath env f in
+  let sig_ = (EcEnv.Fun.by_xpath f env).f_sig in
+  let fun_ = {
       f_name = name;
       f_sig = { sig_ with fs_name = name };
       f_def = FBalias f;
     } in
-    [(name, MI_Function fun_)]
+  (name, MI_Function fun_)
+
 
 (* -------------------------------------------------------------------- *)
 and transbody ue symbols (env : EcEnv.env) retty pbody =

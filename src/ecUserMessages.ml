@@ -302,6 +302,9 @@ end = struct
     | InvalidModAppl err ->
         msg "invalid module application:@ %a" (pp_modappl_error env1) err
 
+    | InvalidModType MTE_IncludeFunctor ->
+        msg "cannot include functors"
+
     | InvalidModType MTE_InnerFunctor ->
         msg "functors must be top-level modules"
 

@@ -1390,6 +1390,12 @@ mod_item:
 | PROC x=lident EQ f=loc(fident)
     { Pst_alias (x, f) }
 
+| PROC x=lident EQ m=mod_qident
+    { Pst_maliases ([x], m) }
+
+| PROC xs=plist2(lident, COMMA) EQ m=mod_qident
+    { Pst_maliases (xs, m) }
+
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
 
@@ -1460,6 +1466,7 @@ sig_param:
 | x=uident COLON i=mod_type { (x, i) }
 
 signature_item:
+| INCLUDE i=mod_type { `Include i }
 | PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) qs=brace(qident*)?
     { `FunctionDecl
           { pfd_name     = x;
