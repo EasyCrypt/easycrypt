@@ -2080,3 +2080,35 @@ let t_smt ~(mode:smtmode) pi tc =
   if   EcSmt.check ~notify pi hyps concl
   then FApi.xmutate1 tc `Smt []
   else error ()
+
+(* -------------------------------------------------------------------- *)
+let t_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
+  let module E = struct
+      exception Done of tcenv
+      exception Fail
+  end in
+
+  let bases = EcEnv.Auto.getall bases (FApi.tc1_env tc) in
+
+  let rec forall ctn tc =
+    if ctn >= depth then t_fail tc else begin
+      List.iter
+        (fun p -> try raise (E.Done (for1 ctn p tc)) with E.Fail -> ())
+        bases;
+      t_id tc
+    end
+
+  and for1 ctn (p : EcPath.path) tc =
+    let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
+
+    try
+      FApi.t_seqs
+        [Apply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
+         t_trivial; forall (ctn+1)]
+        tc
+
+    with Apply.NoInstance _ ->
+      raise E.Fail
+  in
+
+  try forall 0 tc with E.Done tc -> tc

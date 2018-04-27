@@ -82,7 +82,7 @@ let t_bdhoare_app_r i info tc =
   let tactic tc =
     let hs  = tc1_as_hoareS tc in
     let tt1 = EcPhlConseq.t_hoareS_conseq_nm hs.hs_pr f_true in
-    let tt2 = EcHiGoal.process_trivial in
+    let tt2 = EcPhlAuto.t_pl_trivial in
     FApi.t_seqs [tt1; tt2; t_fail] tc
   in
 

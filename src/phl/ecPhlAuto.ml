@@ -119,3 +119,11 @@ let t_phl_trivial_r tc =
 
 (* -------------------------------------------------------------------- *)
 let t_phl_trivial = FApi.t_low0 "phl-trivial" t_phl_trivial_r
+
+(* -------------------------------------------------------------------- *)
+let t_pl_trivial_r tc =
+  let subtc = FApi.t_seqs [t_phl_trivial; EcLowGoal.t_auto] in
+  EcLowGoal.t_trivial ~subtc tc
+
+(* -------------------------------------------------------------------- *)
+let t_pl_trivial = FApi.t_low0 "pl-trivial" t_pl_trivial_r
