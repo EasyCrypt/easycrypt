@@ -274,6 +274,9 @@ lemma nosmt andaE a b : (a && b) <=> (a /\ b) by [].
 lemma nosmt oraE  a b : (a || b) <=> (a \/ b) by [].
 
 (* -------------------------------------------------------------------- *)
+lemma eqboolP (b1 b2 : bool) : (b1 = b2) <=> (b1 <=> b2) by [].
+
+(* -------------------------------------------------------------------- *)
 (* These should be declared as externals (SMT-LIB knows them)
    external (\x): bool -> bool -> bool.
    external ite : bool -> bool -> bool -> bool. *)
@@ -353,6 +356,10 @@ by [].
 
 lemma  iffP p q r :
   (r <=> q) => (p => q) => (q => p) => r <=> p
+by [].
+
+lemma iffE (b1 b2 : bool) :
+  (b1 <=> b2) <=> ((b1 => b2) /\ (b2 => b1))
 by [].
 
 (* -------------------------------------------------------------------- *)
