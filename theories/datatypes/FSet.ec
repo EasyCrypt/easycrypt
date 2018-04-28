@@ -252,7 +252,15 @@ proof. by []. qed.
 
 lemma nosmt subset_trans (s1 s2 s3 : 'a fset): 
   s1 \subset s2 => s2 \subset s3 => s1 \subset s3.
-proof. by move=> H1 H2 ? H3;apply /H2/H1. qed.
+proof. by move=> le1 le2 ? le3; apply/le2/le1. qed.
+
+lemma properP (X Y : 'a fset) :
+  X \proper Y <=> X \subset Y /\ exists y, y \in Y /\ ! y \in X.
+proof.
+rewrite /(\proper) &(andb_id2l) fsetP negb_forall /= => le_XY.
+apply/eqboolP/exists_eq => x /=; rewrite -negb_imply; congr.
+by rewrite iffE eqboolP &(andb_idl) => _; apply/le_XY.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt eqEsubset (A B : 'a fset) : (A = B) <=> (A \subset B) /\ (B \subset A).
