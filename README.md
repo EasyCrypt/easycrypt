@@ -12,6 +12,9 @@ the Merkle-Damgaard iterative hash function design, and of the ZAEP encryption s
 EasyCrypt has been initially developed by the IMDEA Software Institute and Inria. It is now developed
 at the IMDEA Software Institute, Inria and École Polytechnique.
 
+| <img src="https://www.easycrypt.info/trac/chrome/site/inria.png" alt="INRIA Logo" width="100px" height="48px"> | <img src="https://www.easycrypt.info/trac/chrome/site/imdea.png" alt="IMDEA Logo" width="100px" height="49px">| <img src="https://www.easycrypt.info/trac/chrome/site/X.png" alt="X Logo" width="50px" height="68px"> |
+|:---:|:---:|:---:|
+
 
 Table of Contents
 -----------------
