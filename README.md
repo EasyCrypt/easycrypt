@@ -1,7 +1,25 @@
+EasyCrypt: Computer-Aided Cryptographic Proofs
+==============================================
+
 [![Build Status](https://travis-ci.org/EasyCrypt/easycrypt.svg?branch=1.0)](https://travis-ci.org/EasyCrypt/easycrypt)
 
-Installing requirements
-=======================
+EasyCrypt is a toolset for reasoning about relational properties of probabilistic computations with
+adversarial code. Its main application is the construction and verification of game-based
+cryptographic proofs. The development of EasyCrypt was initiated in 2009, and the initial prototype
+was used to prove the security of several constructions, including the Cramer-Shoup encryption scheme,
+the Merkle-Damgaard iterative hash function design, and of the ZAEP encryption scheme.
+
+EasyCrypt has been initially developed by the IMDEA Software Institute and Inria. It is now developed
+at the IMDEA Software Institute, Inria and École Polytechnique.
+
+<span>
+      <img src="https://www.easycrypt.info/trac/chrome/site/inria.png" alt="INRIA Logo" style="float:right; margin-left: 10px" width="100px" height="43px">
+      <img src="https://www.easycrypt.info/trac/chrome/site/imdea.png" alt="IMDEA Logo" style="float:right; margin-left: 10px" width="100px" height="49px">
+      <img src="https://www.easycrypt.info/trac/chrome/site/X.png" alt="École Polytechnique Logo" style="float:right; margin-left: 10px" width="50px" height="68px">
+</span>
+
+Installation requirements
+-------------------------
 
 EasyCrypt uses the following third-party tools/libraries:
 
