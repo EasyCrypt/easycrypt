@@ -12,11 +12,21 @@ the Merkle-Damgaard iterative hash function design, and of the ZAEP encryption s
 EasyCrypt has been initially developed by the IMDEA Software Institute and Inria. It is now developed
 at the IMDEA Software Institute, Inria and École Polytechnique.
 
-<span>
-      <img src="https://www.easycrypt.info/trac/chrome/site/inria.png" alt="INRIA Logo" style="float:right; margin-left: 10px" width="100px" height="43px">
-      <img src="https://www.easycrypt.info/trac/chrome/site/imdea.png" alt="IMDEA Logo" style="float:right; margin-left: 10px" width="100px" height="49px">
-      <img src="https://www.easycrypt.info/trac/chrome/site/X.png" alt="École Polytechnique Logo" style="float:right; margin-left: 10px" width="50px" height="68px">
-</span>
+
+Table of Contents
+-----------------
+
+   * [EasyCrypt: Computer-Aided Cryptographic Proofs](#easycrypt-computer-aided-cryptographic-proofs)
+      * [Installation requirements](#installation-requirements)
+      * [Installing OPAM (POSIX systems)](#installing-opam-posix-systems)
+      * [Installing requirements using OPAM (POSIX systems)](#installing-requirements-using-opam-posix-systems)
+      * [Installing requirements using OPAM (non-POSIX systems)](#installing-requirements-using-opam-non-posix-systems)
+   * [Configuring Why3](#configuring-why3)
+   * [Installing/Compiling EasyCrypt](#installingcompiling-easycrypt)
+   * [Proof General Front-End](#proof-general-front-end)
+      * [Installing using opam](#installing-using-opam)
+      * [Installing from sources](#installing-from-sources)
+
 
 Installation requirements
 -------------------------
