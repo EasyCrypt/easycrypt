@@ -164,6 +164,7 @@ type prept = [
   | `Hy   of EcIdent.t
   | `G    of EcPath.path * ty list
   | `UG   of EcPath.path
+  | `HD   of handle
   | `App  of prept * prept_arg list
 ]
 
@@ -176,3 +177,21 @@ and prept_arg =  [
 ]
 
 val pt_of_prept: tcenv1 -> prept -> pt_ev
+
+(* -------------------------------------------------------------------- *)
+module Prept : sig
+  val (@)   : prept -> prept_arg list -> prept
+
+  val hyp   : EcIdent.t -> prept
+  val glob  : EcPath.path -> ty list -> prept
+  val uglob : EcPath.path -> prept
+  val hdl   : handle -> prept
+
+  val aform : form -> prept_arg
+  val amem  : EcMemory.memory -> prept_arg
+  val amod  : EcPath.mpath -> EcModules.module_sig -> prept_arg
+  val asub  : prept -> prept_arg
+  val h_    : prept_arg
+  val ahyp  : EcIdent.t -> prept_arg
+  val ahdl  : handle -> prept_arg
+end

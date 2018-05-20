@@ -62,7 +62,7 @@ module LowApply = struct
     | `Tc (tc, target) -> RApi.tc_hyps ?target tc
 
   (* ------------------------------------------------------------------ *)
-  let eq_hyps (hy1 : LDecl.hyps) (hy2 : LDecl.hyps) =
+  let sub_hyps (hy1 : LDecl.hyps) (hy2 : LDecl.hyps) =
     if hy1 (*φ*)== hy2 then true else
 
     let env1, ld1 = LDecl.baseenv hy1, LDecl.tohyps hy1 in
@@ -70,34 +70,41 @@ module LowApply = struct
 
     if env1        (*φ*)!= env2        then false else
     if ld1.h_tvar  (*φ*)!= ld2.h_tvar  then false else
-    if ld1.h_local (*φ*)== ld2.h_local then true  else
+    if ld1.h_local (*φ*)== ld2.h_local then true  else (
 
     let env  = env1 in
     let hyps = LDecl.init env ld1.h_tvar in
 
-    let h_eq (x1, h1) (x2, h2) =
-      (id_equal x1 x2) && ((h1 (*φ*)== h2) || begin
-        match h1, h2 with
-        | LD_var (t1, f1), LD_var (t2, f2) ->
-              EqTest.for_type env t1 t2
-           && oeq (is_alpha_eq hyps) f1 f2
+    let rec h_eqs h1 h2 =
+      match h1, h2 with
+      | [], _ -> true
+      | _, [] -> false
 
-        | LD_mem m1, LD_mem m2 ->
-           oeq EcMemory.lmt_equal m1 m2
+      | (x1, v1) :: subh1, (x2, v2) :: subh2 ->
+        if not (id_equal x1 x2) then h_eqs h1 subh2 else
+        if v1 (*φ*)== v2 then h_eqs subh1 subh2 else begin
+          match v1, v2 with
+          | LD_var (t1, f1), LD_var (t2, f2) ->
+                EqTest.for_type env t1 t2
+             && oeq (is_alpha_eq hyps) f1 f2
 
-        | LD_modty (mt1, mr1), LD_modty (mt2, mr2) ->
-           (mt1 == mt2) && (mr1 == mr2)
+          | LD_mem m1, LD_mem m2 ->
+             oeq EcMemory.lmt_equal m1 m2
 
-        | LD_hyp f1, LD_hyp f2 ->
-           is_alpha_eq hyps f1 f2
+          | LD_modty (mt1, mr1), LD_modty (mt2, mr2) ->
+             (mt1 == mt2) && (mr1 == mr2)
 
-        | LD_abs_st au1, LD_abs_st au2 ->
-           au1 == au2
+          | LD_hyp f1, LD_hyp f2 ->
+             is_alpha_eq hyps f1 f2
 
-        | _, _ -> false
-      end)
+          | LD_abs_st au1, LD_abs_st au2 ->
+             au1 (*φ*)== au2
 
-   in List.all2 h_eq ld1.h_local ld2.h_local
+          | _, _ -> false
+
+        end && h_eqs subh1 subh2
+
+   in h_eqs ld1.h_local ld2.h_local)
 
   (* ------------------------------------------------------------------ *)
   let rec check_pthead (pt : pt_head) (tc : ckenv) =
@@ -120,7 +127,7 @@ module LowApply = struct
           | `Tc   tc -> RApi.tc_get_pregoal_by_id hd (fst tc)
         in
         (* proof reuse - fetch corresponding subgoal*)
-        if not (eq_hyps subgoal.g_hyps (hyps_of_ckenv tc)) then
+        if not (sub_hyps subgoal.g_hyps (hyps_of_ckenv tc)) then
           raise InvalidProofTerm;
 
         (pt, subgoal.g_concl)

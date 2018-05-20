@@ -88,6 +88,9 @@ let paglobal p tys =
 let palocal x =
   PASub (Some { pt_head = PTLocal x; pt_args = []; })
 
+let pahandle x =
+  PASub (Some { pt_head = PTHandle x; pt_args = []; })
+
 (* -------------------------------------------------------------------- *)
 type rwproofterm = {
   rpt_proof : proofterm;

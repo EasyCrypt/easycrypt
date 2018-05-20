@@ -81,6 +81,7 @@ val pamemory  : EcMemory.memory -> pt_arg
 val pamodule  : EcPath.mpath * EcModules.module_sig -> pt_arg
 val paglobal  : EcPath.path -> ty list -> pt_arg
 val palocal   : EcIdent.t -> pt_arg
+val pahandle  : handle -> pt_arg
 
 (* -------------------------------------------------------------------- *)
 (* EasyCrypt rewrite proof-term:                                        *)
