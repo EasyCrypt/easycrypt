@@ -80,13 +80,11 @@ section DLogSecurity.
     Pr[DLog.DLogExperiment(L).main() @ &m : res] <=
     Pr[DLog.DLogStdExperiment(StdRedAdversary(L)).main() @ &m : res].
   proof.
-    byequiv.
-    proc; inline*.
-    wp.
-    seq 2 3: (x'{1} = lx{2} /\ x{1} = x{2}).
-    call (_: true); auto.
-    if{2}; auto; smt.
-    smt. auto; smt.
+    byequiv => //; proc; inline*.
+    wp; seq 2 3: (x'{1} = lx{2} /\ x{1} = x{2}).
+    + call (_: true); auto.
+    if{2} => //; last by auto.
+    + rnd{2}; skip; progress; apply (FDistr.dt_ll).
   qed.
 
 end section DLogSecurity.
