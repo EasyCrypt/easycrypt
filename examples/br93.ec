@@ -288,7 +288,7 @@ call (_: Game1.r \in Log.qs,
          eq_except (pred1 Game1.r{2}) RO.m{1} RO.m{2}).
 + exact/A_a2_ll.
 + proc; inline RO.o.
-  auto=> /> &1 &2 -> /= m1_eqe_m2 yL y_in_dptxt; split.
+  auto=> /> &1 &2 _ m1_eqe_m2 yL y_in_dptxt; split.
   + move=> x_notin_m; split.
     + by rewrite !get_set_sameE eq_except_set_eq.
     move: m1_eqe_m2 x_notin_m=> + + + r_neq_x.

@@ -758,6 +758,13 @@ module FApi = struct
     | `Success tc -> tc
 
   (* ------------------------------------------------------------------ *)
+  let t_xswitch ?(on = `Focus) tt ~iffail tc =
+    match on, t_try_base tt tc with
+    | _     , `Failure _  -> iffail tc
+    | `All  , `Success (tc, cont) -> t_onall cont tc
+    | `Focus, `Success (tc, cont) -> t_focus cont tc
+
+  (* ------------------------------------------------------------------ *)
   let t_switch ?(on = `Focus) tt ~ifok ~iffail tc =
     match on, t_try_base tt tc with
     | _     , `Failure _  -> iffail tc

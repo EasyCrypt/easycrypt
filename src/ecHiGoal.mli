@@ -100,3 +100,6 @@ val process_wlog        : psymbol list -> pformula -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_algebra : [`Solve] -> [`Ring|`Field] -> psymbol list -> backward
+
+(* -------------------------------------------------------------------- *)
+val process_crushmode : crushmode -> bool * backward option

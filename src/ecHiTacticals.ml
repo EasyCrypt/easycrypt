@@ -170,6 +170,11 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     tx tc
 
 (* -------------------------------------------------------------------- *)
+and process_conseqauto cm tc =
+  let delta, tsolve = process_crushmode cm in
+  EcPhlConseq.t_conseqauto ~delta ?tsolve tc
+
+(* -------------------------------------------------------------------- *)
 and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   let (tx : tcenv1 -> tcenv) =
     match unloc t with
@@ -198,6 +203,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pset info                 -> EcPhlCodeTx.process_set info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
+    | Pconseqauto cm            -> process_conseqauto cm
     | Phrex_elim                -> EcPhlExists.t_hr_exists_elim
     | Phrex_intro fs            -> EcPhlExists.process_exists_intro fs
     | Pexfalso                  -> EcPhlAuto.t_exfalso

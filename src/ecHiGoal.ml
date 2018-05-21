@@ -369,6 +369,10 @@ let process_trivial (tc : tcenv1) =
   EcPhlAuto.t_pl_trivial tc
 
 (* -------------------------------------------------------------------- *)
+let process_crushmode d =
+  d.cm_simplify, if d.cm_solve then Some process_trivial else None
+
+(* -------------------------------------------------------------------- *)
 let process_done tc =
   let tc = process_trivial tc in
 
@@ -1275,9 +1279,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
       (List.rev !togen) (FApi.as_tcenv1 tc)
 
   and intro1_crush (_st : ST.state) (d : crushmode) (gs : tcenv1) =
-    EcLowGoal.t_crush
-      ~delta:d.cm_simplify
-      ?tsolve:(if d.cm_solve then Some process_trivial else None)
+    let delta, tsolve = process_crushmode d in
+    FApi.t_or
+      (EcPhlConseq.t_conseqauto ~delta ?tsolve)
+      (EcLowGoal.t_crush ~delta ?tsolve)
       gs
 
   and dointro (st : ST.state) nointro pis (gs : tcenv) =

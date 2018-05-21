@@ -447,7 +447,6 @@ let generalize_mod_ env m modi f =
 
   (* 3.a. Add the global variables *)
 
-(*  let scheck = proj3_3 (generalize_subst_ env m melts mglob )in *)
   let (bd', bd, s ) = generalize_subst_ env m uelts uglob in
    (* 3.b. Check that the modify variables does not clash with
            the variables not generalized *)

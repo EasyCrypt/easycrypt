@@ -48,3 +48,5 @@ val process_bd_equiv : side -> pformula pair -> FApi.backward
 val process_conseq_opt :
   pcqoptions -> conseq_ppterm option tuple3 -> FApi.backward
 
+(* -------------------------------------------------------------------- *)
+val t_conseqauto : ?delta:bool -> ?tsolve:FApi.backward -> FApi.backward
