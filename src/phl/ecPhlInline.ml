@@ -54,11 +54,12 @@ module LowSubst = struct
     | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst m), f, List.map esubst es)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
+    | Smatch (e, bs)     -> i_match  (esubst e, List.Smart.map (snd_map ssubst) bs)
     | Sassert e          -> i_assert (esubst e)
     | Sabstract _        -> i
 
   and issubst m (is : instr list) =
-    List.map (isubst m) is
+    List.Smart.map (isubst m) is
 
   and ssubst m (st : stmt) =
     stmt (issubst m st.s_node)

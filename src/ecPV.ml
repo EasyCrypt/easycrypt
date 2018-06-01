@@ -132,11 +132,12 @@ module Mpv = struct
     | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst env s), f, List.map esubst es)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
+    | Smatch (e, b)      -> i_match  (esubst e, List.Smart.map (snd_map ssubst) b)
     | Sassert e          -> i_assert (esubst e)
     | Sabstract _        -> i
 
   and issubst env (s : esubst) (is : instr list) =
-    List.map (isubst env s) is
+    List.Smart.map (isubst env s) is
 
   and ssubst env (s : esubst) (st : stmt) =
     stmt (issubst env s st.s_node)
@@ -480,6 +481,9 @@ and i_write_r ?(except=Sx.empty) env w i =
   | Swhile (_, s) ->
       s_write_r ~except env w s
 
+  | Smatch (e, b) ->
+      List.fold_left (fun w (_, b) -> s_write_r ~except env w b) w b
+
   | Sabstract id ->
       let us = AbsStmt.byid id env in
       let add_pv w (pv,ty) = PV.add env pv ty w in
@@ -543,6 +547,11 @@ and i_read_r env r i =
 
   | Swhile (e, s) ->
       s_read_r env (e_read_r env r e) s
+
+  | Smatch (e, b) ->
+      List.fold_left
+        (fun r (_, b) -> s_read_r env r b)
+        (e_read_r env r e) b
 
   | Sabstract id ->
       let us = AbsStmt.byid id env in
@@ -992,6 +1001,9 @@ and i_eqobs_in_refl env i eqo =
       if PV.subset eqi eqo then eqo
       else aux (PV.union eqi eqo) in
     aux (add_eqs_refl env eqo e)
+
+  | Smatch(e,b) ->
+    assert false                (* FIXME: match *)
 
   | Sassert e -> add_eqs_refl env eqo e
   | Sabstract _ -> assert false
