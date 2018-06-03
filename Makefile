@@ -40,7 +40,7 @@ ECARGS    ?=
 ECTOUT    ?= 10
 ECJOBS    ?= 1
 ECEXTRA   ?= --report=report.log
-ECPROVERS ?= Alt-Ergo Z3 Eprover
+ECPROVERS ?= Alt-Ergo Z3 CVC4
 CHECKPY   ?=
 CHECK     := $(CHECKPY) scripts/testing/runtest
 CHECK     += --bin-args="$(ECARGS)" --bin-args="$(ECPROVERS:%=-p %)"

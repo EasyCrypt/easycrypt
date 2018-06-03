@@ -94,7 +94,11 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma dprod_fu (da : 'a distr) (db : 'b distr):
   is_full (da `*` db) <=> (is_full da /\ is_full db).
-proof. smt (supp_dprod). qed.
+proof.
+split=> [h|[] ha hb].
++ by split=> [a|b]; [move: (h (a,witness))|move: (h (witness,b))]; rewrite supp_dprod.
+by move=> [] a b; rewrite supp_dprod ha hb.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* TODO : generalize this to parametric distribution *)
