@@ -5,6 +5,7 @@
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
+pragma -oldip.
 
 require import Core List.
 
@@ -71,11 +72,15 @@ while (={glob O} /\ l{1} = l0{2}).
 + by auto; call (_: true).
 wp; while (={glob O} /\ l{1} = l{2}++_l2).
 + auto; call (_: true); auto.
-  move=> ? &ml [#] 2!->; case: (l{ml})=> //= x l' ll2_neq_l2.
-  rewrite !drop0 /=; progress=> [/#|/#|].
-  have/contra -> //:= congr1 size (l' ++ _l2) _l2.
-  by rewrite size_cat; smt w=size_ge0.
-by auto; progress=> [/#|/#|]; smt w=(size_cat size_ge0).
+  move=> ? &ml [#] 2!->; case: (l{ml})=> //= x l'.
+  rewrite !drop0=> /= _ Ol Or ->> /= - {Ol Or}; split=> [[] _|].
+  + by apply/contraLR=> /= ->.
+  rewrite -size_eq0=> size_l'.
+  by split; rewrite -negP=> /(congr1 size); rewrite size_cat [smt(size_ge0)].
+auto=> /> &2; split=> [_|].
++ by apply/contraLR=> /= ->.
+rewrite -size_eq0=> size_l1.
+by split; rewrite -negP=> /(congr1 size); rewrite size_cat [smt(size_ge0)].
 qed.
 
 equiv iter_cat_cat (O <: Orcl):
@@ -126,13 +131,15 @@ section.
     (={glob O} /\ l{1} = i::i'::(s1++s2) /\ l1{2} = [i;i'] /\ l2{2} = s1++s2 ==>
      ={glob O})
     (={glob O} /\ l1{1} = [i;i'] /\ l2{1} = s1 ++ s2 /\ l{2} = i'::(s1++i::s2) ==>
-     ={glob O})=> [/#|//||].
+     ={glob O})=> //.
+  + by move=> /> &2; exists ((glob O){2}) ([i;i'],s1++s2).
   + by conseq (iter_cat O)=> ? &ml [#] 4!->.
   transitivity Iter(O).iters
     (={glob O,l2} /\ l1{1} = [i;i'] /\ l1{2} = [i';i] /\ l2{1} = s1++s2 ==>
      ={glob O})
     (={glob O} /\ l1{1} = [i';i] /\ l2{1} = s1 ++ s2 /\ l{2} = i'::(s1++i::s2) ==>
-     ={glob O})=> [/#|//||].
+     ={glob O})=> //.
+  + by move=> /> &1 &2 _ ->; exists ((glob O){2}) ([i'; i],s1++s2).
   + proc; call (_: ={glob O}).
     * by while (={glob O,l}); auto; call (_: true).
     conseq (_: ={glob O} /\ l1{1} = [i;i'] /\ l1{2} = [i';i] ==> ={glob O})=> //.
@@ -149,16 +156,18 @@ section.
     (={glob O} /\ l1{1} = [i';i] /\ l2{1} = s1++s2 /\ l1{2} = [i'] /\ l2{2} = i::(s1++s2) ==>
      ={glob O})
     (={glob O} /\ l1{1} = [i'] /\ l2{1} = i::s1++s2 /\ l{2} = i'::(s1++i::s2) ==>
-     ={glob O})=> [/#|//||].
+     ={glob O})=> //.
+  + by move=> /> &1 &2 _ _; exists ((glob O){2}) ([i'],i::(s1++s2)).
   + by conseq (iter_cat_cat O)=> ? &ml [#] 5!->.
   transitivity Iter(O).iters
     (={glob O,l1} /\ l1{1} = [i'] /\ l2{1} = i::s1++s2 /\ l2{2} = s1++i::s2 ==>
      ={glob O})
     (={glob O} /\ l1{1} = [i'] /\ l2{1} = s1++i::s2 /\ l{2} = i'::s1++i::s2 ==>
-     ={glob O})=> [/#|//||]; last first.
-  + by symmetry; conseq (iter_cat O)=> // ? &ml [#] 4!->.
-  proc; call Hrec; call (_: ={glob O})=> //.
-  by while (={glob O, l}); auto; call (_: true).
+     ={glob O})=> //.
+  + by move=> /> &1 &2 -> _; exists ((glob O){2}) ([i'],s1++i::s2).
+  + proc; call Hrec; call (_: ={glob O})=> //.
+    by while (={glob O, l}); auto; call (_: true).
+  by symmetry; conseq (iter_cat O)=> // ? &ml [#] 4!->.
   qed.
 
   lemma iter_perm :
@@ -181,7 +190,7 @@ section.
     transitivity{1} {Iter(O).iter(l);}
       (={l,glob O} ==> ={glob O})
       (s1 = l{1} /\ l{2} = s3 ++ s4 /\ ={glob O} ==> ={glob O})=> //.
-    + by move=> ? &mr [#] 3!->; exists (glob O){mr} l{1}.
+    + by move=> &1 &mr [#] 3!->; exists (glob O){mr} l{1}.
     + by inline Iter(O).iter; sim.
     transitivity{1} {Iter(O).iter(l);}
       (s1 = l{1} /\ l{2} = s3 ++ s4 /\ ={glob O} ==> ={glob O})
@@ -191,7 +200,7 @@ section.
       rewrite perm_catCA /= perm_cons perm_eq_sym=> Hp.
       by call (ih (s3++s4) Hp).
     by inline Iter(O).iter; sim.
-  by apply (iter_swap s3 i s4). (* FIXME: apply iter_swap fail! *)
+  by apply/(iter_swap s3 i s4). (* FIXME: apply iter_swap fail! *)
   qed.
 
   lemma iters_perm:

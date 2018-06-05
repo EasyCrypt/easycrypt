@@ -580,8 +580,12 @@ abstract theory GenEager.
   eager proc; inline *; wp.
   while (={l,FRO.m} /\ (forall z, mem l z => in_dom_with FRO.m z Unknown){1} /\
          in_dom_with FRO.m{1} x{1} f{1} = result{2}).
-  + auto=> &m1 &m2 [#] 2-> Hz <- ? _ /= ? -> /=.
-    split=> [z /mem_drop Hm|]; rewrite /in_dom_with domE get_setE /#.
+  + auto=> &m1 &m2 [#] 2-> Hz <- _ l_not_nil /= ? -> /=.
+    split=> [z /mem_drop Hm|]; rewrite /in_dom_with domE get_setE.
+    + smt().
+    case: (x{m1} = head witness l{m2})=> //= ->; rewrite oget_some /=.
+    have /Hz @/in_dom_with [] -> -> //: head witness l{m2} \in l{m2}.
+    by move: l_not_nil; case: (l{m2}).    
   by auto=> ? &mr /= [#] 3-> /=; split=> // z; rewrite -FSet.memE mem_fdom dom_restr.
   qed.
 
