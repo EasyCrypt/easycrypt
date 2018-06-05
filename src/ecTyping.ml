@@ -67,6 +67,18 @@ type funapp_error =
 type mem_error =
 | MAE_IsConcrete
 
+type fxerror =
+| FXE_EmptyMatch
+| FXE_MatchParamsMixed
+| FXE_MatchParamsDup
+| FXE_MatchParamsUnk
+| FXE_MatchNonLinear
+| FXE_MatchDupBranches
+| FXE_MatchPartial
+| FXE_CtorUnk
+| FXE_CtorAmbiguous
+| FXE_CtorInvalidArity of (int * int)
+
 type tyerror =
 | UniVarNotAllowed
 | FreeTypeVariables
@@ -94,6 +106,7 @@ type tyerror =
 | TypeClassMismatch
 | TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
+| NotAnInductive
 | AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
@@ -107,12 +120,14 @@ type tyerror =
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
+| InvalidMatch           of fxerror
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
 | MemNotAllowed
 | UnknownScope           of qsymbol
 
+(* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
 let tyerror loc env e = raise (TyError (loc, env, e))
@@ -234,7 +249,9 @@ let (_i_inuse, s_inuse, se_inuse) =
 
     | Sassert e ->
       se_inuse map e
-    | Sabstract _ -> assert false (* FIXME *)
+
+    | Sabstract _ ->
+      assert false (* FIXME *)
 
   and s_inuse (map : uses) (s : stmt) =
     List.fold_left i_inuse map s.s_node
@@ -1047,6 +1064,73 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
       (Printf.sprintf "mk_%s" (EcPath.basename recp))
   in
     (ctor, fields, (rtvi, reccty))
+
+(* -------------------------------------------------------------------- *)
+let trans_match ~loc env ue (gindty, gind) pbs =
+  let pbs =
+    let trans_b ((pb, body) : ppattern * _) =
+      let filter = fun op -> EcDecl.is_ctor op in
+      let PPApp ((cname, tvi), cargs) = pb in
+      let tvi = tvi |> omap (transtvi env ue) in
+      let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+
+      match cts with
+      | [] ->
+          tyerror cname.pl_loc env (InvalidMatch FXE_CtorUnk)
+
+      | _ :: _ :: _ ->
+          tyerror cname.pl_loc env (InvalidMatch FXE_CtorAmbiguous)
+
+      | [(cp, tvi), opty, subue, _] ->
+          let ctor = oget (EcEnv.Op.by_path_opt cp env) in
+          let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
+          let indty = oget (EcEnv.Ty.by_path_opt indp env) in
+          let ind = (EcDecl.tydecl_as_datatype indty).tydt_ctors in
+          let ctorsym, ctorty = List.nth ind ctoridx in
+
+          let args_exp = List.length ctorty in
+          let args_got = List.length cargs in
+
+          if args_exp <> args_got then
+            tyerror cname.pl_loc env
+              (InvalidMatch (FXE_CtorInvalidArity (args_exp, args_got)));
+
+          let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
+
+          if not (List.is_unique cargs_lin) then
+            tyerror cname.pl_loc env (InvalidMatch FXE_MatchNonLinear);
+
+          EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+
+          let ctorty =
+            let tvi = Some (EcUnify.TVIunamed tvi) in
+              fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
+          let pty = EcUnify.UniEnv.fresh ue in
+
+          (try  EcUnify.unify env ue (toarrow ctorty pty) opty
+           with EcUnify.UnificationFailure _ -> assert false);
+          unify_or_fail env ue loc pty gindty;
+
+          let create o = EcIdent.create (omap_dfl unloc "_" o) in
+          let pvars = List.map (create |- unloc) cargs in
+          let pvars = List.combine pvars ctorty in
+
+          (ctorsym, (pvars, body))
+
+    in List.map trans_b pbs
+  in
+
+  if List.length pbs < List.length gind.tydt_ctors then
+    tyerror loc env (InvalidMatch FXE_MatchPartial);
+
+  if List.length pbs > List.length gind.tydt_ctors then
+    tyerror loc env (InvalidMatch FXE_MatchDupBranches);
+
+  let pbs = Msym.of_list pbs in
+
+  List.map
+    (fun (x, _) -> oget (Msym.find_opt x pbs))
+    gind.tydt_ctors
 
 (*-------------------------------------------------------------------- *)
 let expr_of_opselect
