@@ -1267,6 +1267,10 @@ and pp_instr_for_form (ppe : PPEnv.t) fmt i =
       Format.fprintf fmt "while (%a) {...}"
         (pp_expr ppe) e
 
+  | Smatch (e, _) ->
+      Format.fprintf fmt "match (%a) {...}"
+        (pp_expr ppe) e
+
   | Sif (e, _, _) ->
       Format.fprintf fmt "if (%a) {...}"
         (pp_expr ppe) e

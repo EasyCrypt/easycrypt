@@ -470,6 +470,7 @@
 %token LOSSLESS
 %token LPAREN
 %token LPBRACE
+%token MATCH
 %token MINUS
 %token MODPATH
 %token MODULE
@@ -1301,6 +1302,9 @@ instr:
 | WHILE LPAREN c=expr RPAREN b=block
    { PSwhile (c, b) }
 
+| MATCH c=expr WITH PIPE? bs=plist0(match_branch, PIPE) END SEMICOLON
+   { PSmatch (c, bs) }
+
 if_expr:
 | IF c=paren(expr) b=block el=if_else_expr
    { PSif ((c, b), fst el, snd el) }
@@ -1311,6 +1315,10 @@ if_else_expr:
 
 | ELIF e=paren(expr) b=block el=if_else_expr
     { ((e, b) :: fst el, snd el) }
+
+match_branch:
+| c=opptn IMPL b=block
+    { (c, b) }
 
 block:
 | i=loc(base_instr) SEMICOLON
@@ -1644,13 +1652,17 @@ opbr:
    { { pop_patterns = ptn; pop_body = e; } }
 
 %inline opcase:
-| x=ident EQ p=opptn(sbinop)
+| x=ident EQ p=opptn
     { { pop_name = x; pop_pattern = p; } }
 
-| x=ident EQ p=paren(opptn(binop))
-    { { pop_name = x; pop_pattern = p; } }
+%inline opptn:
+| p=opptn_r(sbinop)
+    { p }
 
-opptn(BOP):
+| p=paren(opptn_r(binop))
+    { p }
+
+opptn_r(BOP):
 | c=qoident tvi=tvars_app? ps=bdident*
     { PPApp ((c, tvi), ps) }
 

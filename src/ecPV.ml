@@ -481,7 +481,7 @@ and i_write_r ?(except=Sx.empty) env w i =
   | Swhile (_, s) ->
       s_write_r ~except env w s
 
-  | Smatch (e, b) ->
+  | Smatch (_, b) ->
       List.fold_left (fun w (_, b) -> s_write_r ~except env w b) w b
 
   | Sabstract id ->

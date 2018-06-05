@@ -102,6 +102,9 @@ type plvalue_r =
 
 and plvalue = plvalue_r located
 
+type ppattern =
+| PPApp of (pqsymbol * ptyannot option) * osymbol list
+
 type pinstr_r =
   | PSident  of psymbol
   | PSasgn   of plvalue * pexpr
@@ -109,6 +112,7 @@ type pinstr_r =
   | PScall   of plvalue option * pgamepath * (pexpr list) located
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
+  | PSmatch  of pexpr * (ppattern * pstmt) list
   | PSassert of pexpr
 
 and pscond = pexpr * pstmt
@@ -198,7 +202,6 @@ and pfunction_local = {
   pfl_init  : pexpr option;
 }
 
-
 type pmodule_decl = {
   ptmd_name  : psymbol;
   ptmd_modty : pmodule_type_restr;
@@ -279,9 +282,6 @@ let rec pf_ident ?(raw = false) f =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-type ppattern =
-| PPApp of (pqsymbol * ptyannot option) * osymbol list
-
 type ptyvardecls =
   (psymbol * pqsymbol list) list
 

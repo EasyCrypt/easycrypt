@@ -52,6 +52,7 @@
     "var"         , VAR        ;        (* KW: prog *)
     "proc"        , PROC       ;        (* KW: prog *)
     "if"          , IF         ;        (* KW: prog *)
+    "match"       , MATCH      ;        (* KW: prog *)
     "then"        , THEN       ;        (* KW: prog *)
     "else"        , ELSE       ;        (* KW: prog *)
     "elif"        , ELIF       ;        (* KW: prog *)

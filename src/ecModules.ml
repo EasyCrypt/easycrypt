@@ -560,8 +560,11 @@ and i_get_uninit_read (w : Sx.t) (i : instr) =
       let rs = snd (s_get_uninit_read w s) in
       (w, Sx.union r rs)
 
-  | Smatch (e, b) ->
-      assert false (* FIXME: match *)
+  | Smatch (e, bs) ->
+      let r   = Sx.diff (Uninit.e_pv is_loc e) w in
+      let wrs = List.map (fun (_, b) -> s_get_uninit_read w b) bs in
+      let ws, rs = List.split wrs in
+      (Sx.union w (Sx.big_inter ws), Sx.big_union (r :: rs))
 
   | Sassert e ->
       (w, Sx.diff (Uninit.e_pv is_loc e) w)
