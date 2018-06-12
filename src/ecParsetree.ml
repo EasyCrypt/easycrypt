@@ -563,7 +563,7 @@ type phltactic =
   | Pasyncwhile    of async_while_info
   | Pfission       of (oside * codepos * (int * (int * int)))
   | Pfusion        of (oside * codepos * (int * (int * int)))
-  | Punroll        of (oside * codepos)
+  | Punroll        of (oside * codepos * bool)
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
   | Prcond         of (oside * bool * int)

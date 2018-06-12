@@ -431,6 +431,7 @@
 %token FINAL
 %token FIRST
 %token FISSION
+%token FOR
 %token FORALL
 %token FUN
 %token FUSION
@@ -2685,8 +2686,8 @@ phltactic:
 | FUSION s=side? o=codepos NOT i=word AT d1=word COMMA d2=word
     { Pfusion (s, o, (i, (d1, d2))) }
 
-| UNROLL s=side? o=codepos
-    { Punroll (s, o) }
+| UNROLL b=boption(FOR) s=side? o=codepos
+    { Punroll (s, o, b) }
 
 | SPLITWHILE s=side? o=codepos COLON c=expr %prec prec_tactic
     { Psplitwhile (c, s, o) }
