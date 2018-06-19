@@ -743,6 +743,13 @@ case=> ge0_n le_sz; rewrite size_take //; move: le_sz.
 by rewrite lez_eqVlt => -[] ->.
 qed.
 
+lemma size_take_le n (s : 'a list) : 0 <= n => size (take n s) <= n.
+proof.
+move=> ge0_n; case: (n <= size s).
++ by move=> gt_ns; rewrite size_takel // ge0_n.
++ by move=> /ltzNge lt_sn; rewrite take_oversize 1?ltzW.
+qed.
+
 lemma take_cat n (s1 s2 : 'a list):
    take n (s1 ++ s2) =
      if n < size s1 then take n s1 else s1 ++ take (n - size s1) s2.
