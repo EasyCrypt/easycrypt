@@ -305,6 +305,7 @@ type poperator = {
   po_kind   : [`Op | `Const];
   po_name   : psymbol;
   po_aliases: psymbol list;
+  po_tags   : psymbol list;
   po_tyvars : ptyvardecls option;
   po_args   : ptybindings;
   po_def    : pop_def;

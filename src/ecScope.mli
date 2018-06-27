@@ -215,8 +215,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Auto : sig
-  val addrw   : scope -> local:bool -> base:pqsymbol -> pqsymbol list -> scope
-  val addhint : scope -> phint -> scope
+  val add_rw   : scope -> local:bool -> base:pqsymbol -> pqsymbol list -> scope
+  val add_hint : scope -> phint -> scope
 end
 
 (* -------------------------------------------------------------------- *)

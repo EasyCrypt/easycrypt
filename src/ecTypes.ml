@@ -155,6 +155,17 @@ let rec tyfun_flat (ty : ty) =
       ([], ty)
 
 (* -------------------------------------------------------------------- *)
+let as_tdistr (ty : ty) =
+  match ty.ty_node with
+  | Tconstr (p, [sty])
+      when EcPath.p_equal p EcCoreLib.CI_Distr.p_distr
+    -> Some sty
+
+  | _ -> None
+
+let is_tdistr (ty : ty) = as_tdistr ty <> None
+
+(* -------------------------------------------------------------------- *)
 module TySmart = struct
   let tglob (ty, mp) (mp') =
     if mp == mp' then ty else tglob mp'

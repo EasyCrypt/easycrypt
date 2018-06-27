@@ -487,11 +487,11 @@ and process_option (scope : EcScope.scope) (name, value) =
 
 (* -------------------------------------------------------------------- *)
 and process_addrw scope (local, base, names) =
-  EcScope.Auto.addrw scope ~local ~base names
+  EcScope.Auto.add_rw scope ~local ~base names
 
 (* -------------------------------------------------------------------- *)
 and process_hint scope hint =
-  EcScope.Auto.addhint scope hint
+  EcScope.Auto.add_hint scope hint
 
 (* -------------------------------------------------------------------- *)
 and process_dump_why3 scope filename =

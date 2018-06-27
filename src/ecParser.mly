@@ -1603,7 +1603,7 @@ op_or_const:
 | CONST { `Const }
 
 operator:
-| k=op_or_const st=nosmt x=plist1(oident, COMMA)
+| k=op_or_const st=nosmt tags=bracket(ident*)? x=plist1(oident, COMMA)
     tyvars=tyvars_decl? args=ptybindings_decl?
     sty=prefix(COLON, loc(type_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
 
@@ -1614,19 +1614,21 @@ operator:
     { po_kind    = k;
       po_name    = List.hd x;
       po_aliases = List.tl x;
+      po_tags    = odfl [] tags;
       po_tyvars  = tyvars;
       po_args    = odfl [] args;
       po_def     = opdef_of_opbody sty (omap (unloc |- fst) b);
       po_ax      = obind snd b;
       po_nosmt   = st; } }
 
-| k=op_or_const st=nosmt x=plist1(oident, COMMA)
+| k=op_or_const st=nosmt tags=bracket(ident*)? x=plist1(oident, COMMA)
     tyvars=tyvars_decl? args=ptybindings_decl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
 
   { { po_kind    = k;
       po_name    = List.hd x;
       po_aliases = List.tl x;
+      po_tags    = odfl [] tags;
       po_tyvars  = tyvars;
       po_args    = odfl [] args;
       po_def     = opdef_of_opbody sty (Some (`Reft (rname, reft)));
