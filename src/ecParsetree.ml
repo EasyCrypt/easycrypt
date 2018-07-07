@@ -71,6 +71,7 @@ type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
 
 and pexpr_r =
+  | PEcast   of pexpr * pty                       (* type cast          *)
   | PEint    of zint                              (* int. literal       *)
   | PEident  of pqsymbol * ptyannot option        (* symbol             *)
   | PEapp    of pexpr * pexpr list                (* op. application    *)
@@ -237,6 +238,7 @@ type pformula  = pformula_r located
 
 and pformula_r =
   | PFhole
+  | PFcast   of pformula * pty
   | PFint    of zint
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option

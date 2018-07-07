@@ -412,6 +412,7 @@ rule main = parse
   | "`|"  { [TICKPIPE  ] }
   | "<$"  { [LESAMPLE  ] }
   | "<@"  { [LEAT      ] }
+  | ":~"  { [COLONTILD ] }
 
   | "/~="  { [SLASHTILDEQ     ] }
   | "//~=" { [SLASHSLASHTILDEQ] }
