@@ -783,7 +783,7 @@ type logtactic =
   | Ptrivial
   | Pcongr
   | Pelim       of (prevert * pqsymbol option)
-  | Papply      of apply_info
+  | Papply      of (apply_info * prevert option)
   | Pcut        of pcut
   | Pcutdef     of (intropattern * pcutdef)
   | Pmove       of prevertv

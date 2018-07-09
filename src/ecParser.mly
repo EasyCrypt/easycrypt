@@ -2483,25 +2483,34 @@ logtactic:
    { Pelim (e, Some p) }
 
 | APPLY
-   { Papply (`Top `Apply) }
+   { Papply (`Top `Apply, None) }
 
-| APPLY COLON? e=pterm
-   { Papply (`Apply ([e], `Apply)) }
+| APPLY e=pterm
+   { Papply (`Apply ([e], `Apply), None) }
+
+| APPLY COLON e=pterm rv=revert
+   { Papply (`Apply ([e], `Apply), Some rv) }
 
 | APPLY es=prefix(SLASH, pterm)+
-   { Papply (`Apply (es, `Apply)) }
+   { Papply (`Apply (es, `Apply), None) }
 
-| APPLY COLON? e=pterm IN x=ident
-   { Papply (`ApplyIn (e, x)) }
+| APPLY e=pterm IN x=ident
+   { Papply (`ApplyIn (e, x), None) }
+
+| APPLY COLON e=pterm rv=revert IN x=ident
+   { Papply (`ApplyIn (e, x), Some rv) }
 
 | EXACT
-   { Papply (`Top `Exact) }
+   { Papply (`Top `Exact, None) }
 
-| EXACT COLON? e=pterm
-   { Papply (`Apply ([e], `Exact)) }
+| EXACT e=pterm
+   { Papply (`Apply ([e], `Exact), None) }
+
+| EXACT COLON e=pterm rv=revert
+   { Papply (`Apply ([e], `Exact), Some rv) }
 
 | EXACT es=prefix(SLASH, pterm)+
-   { Papply (`Apply (es, `Exact)) }
+   { Papply (`Apply (es, `Exact), None) }
 
 | l=simplify
    { Psimplify (mk_simplify l) }
