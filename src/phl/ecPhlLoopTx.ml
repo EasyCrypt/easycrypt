@@ -273,7 +273,7 @@ let process_unroll_for side cpos tc =
     | [] -> t_id tc
     | z :: zs ->
       ((t_rcond side (zs <> []) pos) @+
-      [t_intro_i m @!
+      [FApi.t_try (t_intro_i m) @!
        t_conseq (f_eq x (f_int z)) @!
        t_set i pos z;
        t_doit (i+1) (pos + blen) zs]) tc in
