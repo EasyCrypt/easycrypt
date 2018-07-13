@@ -359,8 +359,6 @@
 %token ANDA AND (* asym : &&, sym : /\ *)
 %token ORA  OR  (* asym : ||, sym : \/ *)
 
-%token <EcParsetree.codepos> CPOS
-
 %token<[`Raw|`Eq]> RING
 %token<[`Raw|`Eq]> FIELD
 
@@ -2313,15 +2311,46 @@ tac_dir:
 | FWDS  { Fwds }
 | empty { Backs }
 
-codepos:
-| i=word { (i, None) }
-| c=CPOS { c }
+icodepos_r:
+| IF       { (`If     :> cp_match) }
+| WHILE    { (`While  :> cp_match) }
+| LARROW   { (`Assign :> cp_match) }
+| LESAMPLE { (`Sample :> cp_match) }
+| LEAT     { (`Call   :> cp_match) }
 
-code_position:
-| n=sword
+%inline icodepos:
+ | HAT x=icodepos_r { x }
+
+codepos1_wo_off:
+| i=word
+    { (`ByPos i :> cp_base) }
+
+| k=icodepos i=option(brace(sword))
+    { (`ByMatch (i, k) :> cp_base) }
+
+codepos1:
+| cp=codepos1_wo_off { (0, cp) }
+
+| cp=codepos1_wo_off PLUS  i=word { ( i, cp) }
+| cp=codepos1_wo_off MINUS i=word { (-i, cp) }
+
+%inline nm1_codepos:
+| i=codepos1 k=ID(DOT { 0 } | QUESTION { 1 } )
+    { (i, k) }
+
+codepos:
+| nm=rlist0(nm1_codepos, empty) i=codepos1
+    { (List.rev nm, i) }
+
+o_codepos1:
+| UNDERSCORE { None }
+| i=codepos1 { Some i}
+
+s_codepos1:
+| n=codepos1
     { Single n }
 
-| n1=sword n2=sword
+| n1=codepos1 n2=codepos1
     { Double (n1, n2) }
 
 while_tac_info:
@@ -2553,8 +2582,8 @@ eager_info:
     { LE_todo (h, s1, s2, pr, po) }
 
 eager_tac:
-| SEQ n1=word n2=word i=eager_info COLON p=sform
-    { Peager_seq (i,(n1,n2),p) }
+| SEQ n1=codepos1 n2=codepos1 i=eager_info COLON p=sform
+    { Peager_seq (i, (n1, n2), p) }
 
 | IF
     { Peager_if }
@@ -2581,25 +2610,24 @@ form_or_double_form:
 | LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
     { Double (f1, f2) }
 
-code_pos:
-| i=word { i }
-
-code_pos_underscore:
-| UNDERSCORE { None }
-| i=code_pos { Some i}
-
 %inline if_option:
-| s=side?
+| s=option(side)
    { `Head s }
 
-| i1=code_pos_underscore i2=code_pos_underscore COLON f=sform
-   { `Seq (None, i1, i2, f) }
+| s=option(side) i1=o_codepos1 i2=o_codepos1 COLON f=sform
+   { `Seq (s, (i1, i2), f) }
 
-| s=side i1=code_pos_underscore i2=code_pos_underscore COLON f=sform
-   { `Seq (Some s, i1, i2, f) }
-
-| s=side i=code_pos? COLON  LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
-   { `SeqOne (s, i, f1, f2) }
+| s=option(side) i=codepos1? COLON LPAREN
+    UNDERSCORE COLON f1=form LONGARROW f2=form
+  RPAREN
+   {
+     match s with
+     | None ->
+       let loc = EcLocation.make $startpos $endpos in
+        parse_error loc (Some (
+          "must provide a side when only one code-position is given"))
+      | Some s -> `SeqOne (s, i, f1, f2)
+   }
 
 byequivopt:
 | b=boption(MINUS) x=lident {
@@ -2623,13 +2651,13 @@ phltactic:
 | PROC STAR
    { Pfun `Code }
 
-| SEQ s=side? d=tac_dir pos=code_position COLON p=form_or_double_form f=app_bd_info
+| SEQ s=side? d=tac_dir pos=s_codepos1 COLON p=form_or_double_form f=app_bd_info
    { Papp (s, d, pos, p, f) }
 
-| WP n=code_position?
+| WP n=s_codepos1?
    { Pwp n }
 
-| SP n=code_position?
+| SP n=s_codepos1?
     { Psp n }
 
 | SKIP
@@ -2644,10 +2672,10 @@ phltactic:
 | CALL s=side? info=gpterm(call_info)
     { Pcall (s, info) }
 
-| RCONDT s=side? i=word
+| RCONDT s=side? i=codepos1
     { Prcond (s, true, i) }
 
-| RCONDF s=side? i=word
+| RCONDF s=side? i=codepos1
     { Prcond (s, false, i) }
 
 | IF opt=if_option
@@ -2760,7 +2788,8 @@ phltactic:
 | BYPR f1=sform f2=sform
     { PPr (Some (f1, f2)) }
 
-| FEL at_pos=word cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
+| FEL at_pos=codepos1 cntr=sform delta=sform q=sform
+    f_event=sform some_p=fel_pred_specs inv=sform?
     { let info = {
         pfel_cntr  = cntr;
         pfel_asg   = delta;
@@ -2836,7 +2865,7 @@ fel_pred_specs:
     {assoc_ps}
 
 eqobs_in_pos:
-| i1=word i2=word { i1, i2 }
+| i1=codepos1 i2=codepos1 { (i1, i2) }
 
 eqobs_in_eqglob1:
 | LPAREN mp1= uoption(loc(fident)) TILD mp2= uoption(loc(fident)) COLON
@@ -3539,3 +3568,7 @@ or3(X, Y, Z):
 %inline ior_(X, Y):
 | x=X { `Left  x }
 | y=Y { `Right y }
+
+(* -------------------------------------------------------------------- *)
+%inline ID(X):
+| x=X { x }

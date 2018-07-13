@@ -230,11 +230,10 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
 
   try  tx tc
   with (* PHL Specific low errors *)
-  | EcLowPhlGoal.InvalidSplit (i, lo, hi) ->
+  | EcLowPhlGoal.InvalidSplit cpos1 ->
       tc_error_lazy !!tc (fun fmt ->
-        Format.fprintf fmt
-          "invalid split index: %d is not in the interval [%d..%d]"
-          i lo hi)
+        Format.fprintf fmt "invalid split index: %s"
+          (EcPrinting.string_of_cpos1 cpos1))
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =

@@ -418,7 +418,7 @@ let process_eqobs_inS info tc =
       let _, eqi =
         try s_eqobs_in_full (stmt sl2) (stmt sr2) sim eqo
         with EqObsInError -> tc_error !!tc "cannot apply sim" in
-      (EcPhlApp.t_equiv_app (p1,p2) (Mpv2.to_form mleft mright eqi inv) @+ [
+      (EcPhlApp.t_equiv_app (p1, p2) (Mpv2.to_form mleft mright eqi inv) @+ [
         t_id;
         fun tc ->
           FApi.t_last
@@ -467,5 +467,3 @@ let process_eqobs_in info tc =
   | FequivF _ -> process_eqobs_inF info tc
   | FequivS _ -> process_eqobs_inS info tc
   | _ -> tc_error_noXhl ~kinds:[`Equiv `Any] !!tc
-
-

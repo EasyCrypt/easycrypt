@@ -224,30 +224,22 @@ let set_pre ~pre f =
  | _            -> assert false
 
 (* -------------------------------------------------------------------- *)
-exception InvalidSplit of int * int * int
-
-let s_split_i i s =
-  let len = List.length s.s_node in
-    if i <= -len || len < i then
-      raise (InvalidSplit (i, 1, len));
-    let (hd, tl) =
-      if   0 <= i
-      then EcModules.s_split (i-1) s
-      else EcModules.s_split (len+i-1) s
-    in (hd, List.hd tl, List.tl tl)
+exception InvalidSplit of codepos1
 
 let s_split i s =
-  let len = List.length s.s_node in
-    if i < -len || len < i then
-      raise (InvalidSplit (i, 0, len));
-    if   0 <= i
-    then EcModules.s_split i s
-    else EcModules.s_split (len+i) s
+  let module Zpr = EcMatching.Zipper in
+  try  Zpr.split_at_cpos1 i s
+  with Zpr.InvalidCPos -> raise (InvalidSplit i)
 
-let s_split_o i s =
-  match i with
-  | None   -> ([], s.s_node)
-  | Some i -> s_split i s
+let s_split_i i s =
+  let module Zpr = EcMatching.Zipper in
+  try  Zpr.find_by_cpos1 ~rev:false i s
+  with Zpr.InvalidCPos -> raise (InvalidSplit i)
+
+let o_split ?rev i s =
+  let module Zpr = EcMatching.Zipper in
+  try  Zpr.may_split_at_cpos1 ?rev i s
+  with Zpr.InvalidCPos -> raise (InvalidSplit (oget i))
 
 (* -------------------------------------------------------------------- *)
 let t_hS_or_bhS_or_eS ?th ?tbh ?te tc =

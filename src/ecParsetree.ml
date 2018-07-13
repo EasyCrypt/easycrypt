@@ -398,7 +398,11 @@ type preduction = {
 }
 
 (* -------------------------------------------------------------------- *)
-type codepos = int * ((int * codepos) option)
+type cp_match = [ `If | `While | `Assign | `Sample | `Call ]
+type cp_base  = [ `ByPos of int | `ByMatch of int option * cp_match ]
+
+type codepos1 = int * cp_base
+type codepos  = (codepos1 * int) list * codepos1
 
 (* -------------------------------------------------------------------- *)
 type 'a doption =
@@ -496,13 +500,13 @@ type fun_info = [
 
 (* -------------------------------------------------------------------- *)
 type app_info =
-  oside * tac_dir * int doption * pformula doption * p_app_bd_info
+  oside * tac_dir * codepos1 doption * pformula doption * p_app_bd_info
 
 (* -------------------------------------------------------------------- *)
 type pcond_info = [
   | `Head   of oside
-  | `Seq    of oside * int option * int option * pformula
-  | `SeqOne of side * int option * pformula * pformula
+  | `Seq    of oside * codepos1 option pair * pformula
+  | `SeqOne of  side * codepos1 option * pformula * pformula
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -542,7 +546,7 @@ type conseq_ppterm = ((pformula option pair) * (phoarecmp option * pformula) opt
 
 (* -------------------------------------------------------------------- *)
 type sim_info = {
-  sim_pos  : int pair option;
+  sim_pos  : codepos1 pair option;
   sim_hint : (pgamepath option pair * pformula) list * pformula option;
   sim_eqs  : pformula option
 }
@@ -560,8 +564,8 @@ type phltactic =
   | Prepl_stmt     of trans_info
   | Pfun           of fun_info
   | Papp           of app_info
-  | Pwp            of int doption option
-  | Psp            of int doption option
+  | Pwp            of codepos1 doption option
+  | Psp            of codepos1 doption option
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info
   | Pfission       of (oside * codepos * (int * (int * int)))
@@ -569,7 +573,7 @@ type phltactic =
   | Punroll        of (oside * codepos * bool)
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
-  | Prcond         of (oside * bool * int)
+  | Prcond         of (oside * bool * codepos1)
   | Pcond          of pcond_info
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
@@ -585,7 +589,7 @@ type phltactic =
   | Pexfalso
   | Pbydeno        of ([`PHoare | `Equiv ] * (deno_ppterm * bool * pformula option))
   | PPr            of (pformula * pformula) option
-  | Pfel           of (int * fel_info)
+  | Pfel           of (codepos1 * fel_info)
   | Phoare
   | Pprbounded
   | Psim           of sim_info
@@ -594,7 +598,7 @@ type phltactic =
   | Pbdhoare_split of bdh_split
 
     (* Eager *)
-  | Peager_seq       of (eager_info * int pair * pformula)
+  | Peager_seq       of (eager_info * codepos1 pair * pformula)
   | Peager_if
   | Peager_while     of (eager_info)
   | Peager_fun_def

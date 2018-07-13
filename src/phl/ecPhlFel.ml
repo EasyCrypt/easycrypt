@@ -139,12 +139,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     with _ -> tc_error !!tc "not applicable to abstract functions"
   in
 
-  let s_hd, s_tl =
-    let len = List.length fdef.f_body.s_node in
-    if len < at_pos then
-      tc_error !!tc
-      "the size of the initialization code %i should be smaller than the size of the function body %i" at_pos len;
-    s_split at_pos fdef.f_body in
+  let s_hd, s_tl = EcLowPhlGoal.s_split at_pos fdef.f_body in
   let fve        = PV.fv env mhr f_event in
   let fvc        = PV.fv env mhr cntr in
   let fvi        = PV.fv env mhr inv in

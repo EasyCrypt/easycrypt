@@ -198,14 +198,14 @@ let process_splitwhile (b, side, cpos) tc =
 
 (* -------------------------------------------------------------------- *)
 let process_unroll_for side cpos tc =
-  if snd cpos <> None then
+  if not (List.is_empty (fst cpos)) then
     tc_error !!tc "cannot use deep code position";
 
-  let pos  = fst cpos in
   let env  = FApi.tc1_env tc in
   let hyps = FApi.tc1_hyps tc in
   let c    = EcLowPhlGoal.tc1_get_stmt side tc in
   let z    = Zpr.zipper_of_cpos cpos c in
+  let pos  = 1 + List.length z.Zpr.z_head in
 
   (* Extract loop condition / body *)
   let t, wbody  =
@@ -272,7 +272,7 @@ let process_unroll_for side cpos tc =
     match zs with
     | [] -> t_id tc
     | z :: zs ->
-      ((t_rcond side (zs <> []) pos) @+
+      ((t_rcond side (zs <> []) (Zpr.cpos pos)) @+
       [FApi.t_try (t_intro_i m) @!
        t_conseq (f_eq x (f_int z)) @!
        t_set i pos z;
@@ -286,13 +286,13 @@ let process_unroll_for side cpos tc =
     if Array.length hds <= i then t_id tc else
     let (_h,pos,_z) = oget hds.(i) in
     if i = 0 then
-      (EcPhlWp.t_wp (Some (Single (pos-2))) @!
+      (EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos - 2)))) @!
        t_conseq f_true @! EcPhlTAuto.t_hoare_true) tc
     else
       let (h', pos', z') = oget hds.(i-1) in
       FApi.t_seqs [
-        EcPhlWp.t_wp (Some (Single (pos-2)));
-        EcPhlApp.t_hoare_app (pos' - 1) (f_eq x (f_int z')) @+
+        EcPhlWp.t_wp (Some (Single (Zpr.cpos (pos-2))));
+        EcPhlApp.t_hoare_app (Zpr.cpos (pos' - 1)) (f_eq x (f_int z')) @+
         [t_apply_hd h'; t_conseq_nm] ] tc
   in
 

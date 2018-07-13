@@ -1224,6 +1224,33 @@ let string_of_hcmp = function
   | FHge -> ">="
 
 (* -------------------------------------------------------------------- *)
+let string_of_cpos1 ((off, cp) : EcParsetree.codepos1) =
+  let s =
+    match cp with
+    | `ByPos i ->
+        string_of_int i
+
+    | `ByMatch (i, k) ->
+        let s =
+          let k =
+            match k with
+            | `If     -> "if"
+            | `While  -> "while"
+            | `Assign -> "<-"
+            | `Sample -> "<$"
+            | `Call   -> "<@"
+          in Printf.sprintf "^%s" k in
+
+        match i with
+        | None | Some 1 -> s
+        | Some i -> Printf.sprintf "%s{%d}" s i
+  in
+
+  if off = 0 then s else
+
+  Printf.sprintf "%s%s%d" s (if off < 0 then "-" else "+") (abs off)
+
+(* -------------------------------------------------------------------- *)
 let rec pp_lvalue (ppe : PPEnv.t) fmt lv =
   match lv with
   | LvVar (p, _) ->

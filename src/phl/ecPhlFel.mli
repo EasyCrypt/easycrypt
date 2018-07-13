@@ -14,11 +14,11 @@ open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
 val t_failure_event :
-     int
+     codepos1
   -> form -> form -> form -> form
   -> (xpath * form) list
   -> form
   -> backward
 
 (* -------------------------------------------------------------------- *)
-val process_fel : int -> fel_info -> backward
+val process_fel : codepos1 -> fel_info -> backward

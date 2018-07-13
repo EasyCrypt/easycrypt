@@ -41,8 +41,8 @@ let pf_hSS pf hyps h =
 let tc1_destr_eagerS tc s s' =
   let es = tc1_as_equivS tc in
   let c , c' = es.es_sl, es.es_sr in
-  let s1, c  = s_split (List.length s.s_node) c in
-  let c',s1' = s_split (List.length c'.s_node - List.length s'.s_node) c' in
+  let s1, c  = s_split (Zpr.cpos (List.length s.s_node)) c in
+  let c',s1' = s_split (Zpr.cpos (List.length c'.s_node - List.length s'.s_node)) c' in
 
   if not (List.all2 i_equal s1 s.s_node) then begin
     let ppe  = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in

@@ -26,6 +26,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 val string_of_hcmp : EcFol.hoarecmp -> string
+val string_of_cpos1 : EcParsetree.codepos1 -> string
+
 (* -------------------------------------------------------------------- *)
 type 'a pp = Format.formatter -> 'a -> unit
 
