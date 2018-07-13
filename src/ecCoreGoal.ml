@@ -683,6 +683,8 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let t_on1 idx ?ttout tt (tc : tcenv) =
+    let idx = idx mod tc_count tc in
+    let idx = if idx < 0 then idx + tc_count tc else idx in
     t_onselect ((=) idx) ?ttout tt tc
 
   (* ------------------------------------------------------------------ *)

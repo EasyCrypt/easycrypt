@@ -2826,7 +2826,11 @@ phltactic:
 | PHOARE EQUIV s=side pr=sform po=sform
     { Pbd_equiv (s, pr, po) }
 
-| AUTO { Pauto }
+| AUTO
+    { Pauto }
+
+| LOSSLESS
+    { Plossless }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
