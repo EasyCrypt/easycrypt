@@ -481,9 +481,16 @@ and process_pragma (scope : EcScope.scope) opt =
 
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
-  try  EcScope.Options.set scope (unloc name) value
-  with EcScope.UnknownFlag _ ->
-    EcScope.hierror "unknown option: %s" (unloc name)
+  match value with
+  | `Bool value -> begin
+      try  EcScope.Options.set scope (unloc name) value
+      with EcScope.UnknownFlag _ ->
+        EcScope.hierror "unknown option: %s" (unloc name)
+    end
+
+  | (`Int _) as value ->
+      let gs = EcEnv.gstate (EcScope.env scope) in
+      EcGState.setvalue (unloc name) value gs; scope
 
 (* -------------------------------------------------------------------- *)
 and process_addrw scope (local, base, names) =

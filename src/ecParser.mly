@@ -3446,8 +3446,10 @@ global_action:
 | WHY3 x=STRING    { GdumpWhy3    x  }
 
 | PRAGMA       x=pragma { Gpragma x }
-| PRAGMA PLUS  x=pragma { Goption (x, true ) }
-| PRAGMA MINUS x=pragma { Goption (x, false) }
+| PRAGMA PLUS  x=pragma { Goption (x, `Bool true ) }
+| PRAGMA MINUS x=pragma { Goption (x, `Bool false) }
+
+| PRAGMA x=pragma EQ i=sword { Goption (x, `Int i) }
 
 pragma_r:
 | x=_lident

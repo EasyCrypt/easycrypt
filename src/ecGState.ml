@@ -18,21 +18,30 @@ type notifier = {
   nt_cb : loglevel -> string Lazy.t -> unit;
 }
 
+type value = [ `Int of int ]
+
 type gstate = {
   mutable gs_flags     : bool Mstr.t;
+  mutable gs_values    : value Mstr.t;
   mutable gs_notifiers : notifier list;
   mutable gs_loglevel  : loglevel;
 }
 
 (* -------------------------------------------------------------------- *)
+let asint ~(default : int) (value : value option) =
+  match value with Some (`Int i) -> i | _ -> default
+
+(* -------------------------------------------------------------------- *)
 let create () : gstate =
   { gs_flags     = Mstr.empty;
+    gs_values    = Mstr.empty;
     gs_notifiers = [];
     gs_loglevel  = `Info; }
 
 (* -------------------------------------------------------------------- *)
 let copy (gs : gstate) : gstate =
   { gs_flags     = gs.gs_flags    ;
+    gs_values    = gs.gs_values   ;
     gs_notifiers = gs.gs_notifiers;
     gs_loglevel  = gs.gs_loglevel ; }
 
@@ -48,6 +57,14 @@ let getflag ?(default = false) (name : string) (g : gstate) =
 (* -------------------------------------------------------------------- *)
 let setflag (name : string) (value : bool) (g : gstate) =
   g.gs_flags <- Mstr.add name value g.gs_flags
+
+(* -------------------------------------------------------------------- *)
+let getvalue (name : string) (g : gstate) =
+  Mstr.find_opt name g.gs_values
+
+(* -------------------------------------------------------------------- *)
+let setvalue (name : string) (value : value) (g : gstate) =
+  g.gs_values <- Mstr.add name value g.gs_values
 
 (* -------------------------------------------------------------------- *)
 let add_notifier (notifier : loglevel -> string Lazy.t -> unit) (gs : gstate) =

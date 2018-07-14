@@ -37,14 +37,19 @@ module PPEnv = struct
     ppe_inuse  : Ssym.t;
     ppe_univar : (symbol Mint.t * Ssym.t) ref;
     ppe_fb     : Sp.t;
+    ppe_width  : int;
   }
 
   let ofenv (env : EcEnv.env) =
+    let width =
+      EcGState.asint 0 (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
+
     { ppe_env    = env;
       ppe_locals = Mid.empty;
       ppe_inuse  = Ssym.empty;
       ppe_univar = ref (Mint.empty, Ssym.empty);
-      ppe_fb     = Sp.empty; }
+      ppe_fb     = Sp.empty;
+      ppe_width  = max 20 width; }
 
   let enter_by_memid ppe id =
     match EcEnv.Memory.byid id ppe.ppe_env with
@@ -2285,7 +2290,7 @@ let pp_hoareF (ppe : PPEnv.t) fmt hf =
 let pp_hoareS (ppe : PPEnv.t) fmt hs =
   let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
   let ppnode = collect2_s hs.hs_s.s_node [] in
-  let ppnode = c_ppnode ~width:80 ppe ppnode
+  let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppe ppnode
   in
     Format.fprintf fmt "Context : %a@\n%!" (pp_funname ppe) (EcMemory.xpath hs.hs_m);
     Format.fprintf fmt "@\n%!";
@@ -2315,7 +2320,7 @@ let pp_bdhoareF (ppe : PPEnv.t) fmt hf =
 let pp_bdhoareS (ppe : PPEnv.t) fmt hs =
   let ppe = PPEnv.push_mem ppe ~active:true hs.bhs_m in
   let ppnode = collect2_s hs.bhs_s.s_node [] in
-  let ppnode = c_ppnode ~width:80 ppe ppnode
+  let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppe ppnode
   in
 
   let scmp = string_of_hrcmp hs.bhs_cmp in
@@ -2355,13 +2360,15 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
     if insync then begin
       let ppe    = PPEnv.push_mem ~active:true ppe es.es_ml in
       let ppnode = collect2_s es.es_sl.s_node [] in
-      let ppnode = c_ppnode ~width:80 ppe ppnode in
+      let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppe ppnode in
       fun fmt -> pp_node `Left fmt ppnode
     end else begin
       let ppnode = collect2_s es.es_sl.s_node es.es_sr.s_node in
       let ppnode =
-        c_ppnode ~width:40 ~mem:(fst es.es_ml, fst es.es_mr)
-                 ppe ppnode
+        c_ppnode
+          ~width:(ppe.PPEnv.ppe_width / 2)
+          ~mem:(fst es.es_ml, fst es.es_mr)
+          ppe ppnode
       in fun fmt -> pp_node `Both fmt ppnode
     end in
 
@@ -2833,7 +2840,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
 (* -------------------------------------------------------------------- *)
 let pp_stmt_with_nums (ppe : PPEnv.t) fmt stmt =
   let ppnode = collect2_s stmt.s_node [] in
-  let ppnode = c_ppnode ~width:80 ppe ppnode in
+  let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppe ppnode in
   Format.fprintf fmt "%a" (pp_node `Left) ppnode
 
 (* -------------------------------------------------------------------- *)

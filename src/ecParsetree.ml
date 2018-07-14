@@ -1068,7 +1068,7 @@ type global_action =
   | Gprover_info of pprover_infos
   | Gsave        of save located
   | Gpragma      of psymbol
-  | Goption      of (psymbol * bool)
+  | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
 
 type global = {
