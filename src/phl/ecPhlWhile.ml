@@ -517,7 +517,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
       let p0    = Fsubst.f_subst subst p0  in
       let p1    = Fsubst.f_subst subst p1  in
 
-      let pre = f_ands [inv; form_of_expr mhr er; f_not p0; p1] in
+      let pre = f_ands [inv; form_of_expr mhr el; f_not p0; p1] in
       f_forall_mems [evs.es_mr]
         (f_hoareS (mhr, EcMemory.memtype evs.es_ml) pre cl inv)
 
@@ -529,7 +529,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
 
       let pre = f_ands [inv; form_of_expr mhr er; f_not p0; f_not p1] in
       f_forall_mems [evs.es_ml]
-        (f_hoareS (mhr, EcMemory.memtype evs.es_mr) pre cl inv)
+        (f_hoareS (mhr, EcMemory.memtype evs.es_mr) pre cr inv)
 
     in (hr1, hr2)
   in
