@@ -82,8 +82,8 @@ section DLogSecurity.
   proof.
     byequiv => //; proc; inline*.
     wp; seq 2 3: (x'{1} = lx{2} /\ x{1} = x{2}).
-    + call (_: true); auto.
-    if{2} => //; last by auto.
+    + call (_: true); wp; rnd; skip; progress.
+    if{2} => //; last by wp; skip; progress.
     + rnd{2}; skip; progress; apply (FDistr.dt_ll).
   qed.
 
