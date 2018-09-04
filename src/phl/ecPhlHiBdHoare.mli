@@ -7,11 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-open EcSymbols
 open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
-val t_exfalso     : backward
-val t_phl_trivial : backward
-val t_pl_trivial  : ?bases:symbol list -> backward
-val t_auto        : backward
+val process_bdhoare_split : EcParsetree.bdh_split -> backward

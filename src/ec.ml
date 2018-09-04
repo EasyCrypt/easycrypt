@@ -150,7 +150,6 @@ let main () =
           confname
       in List.hd (List.append xdgini [resource ["etc"; "easycrypt.conf"]]) in
 
-
     let ini =
       try  Some (EcOptions.read_ini_file ini)
       with
@@ -317,12 +316,22 @@ let main () =
 
             let notifier (lvl : EcGState.loglevel) (lazy msg) =
               EcTerminal.notice ~immediate:true lvl msg terminal
-            in EcCommands.addnotifier notifier;
+            in
 
+            EcCommands.addnotifier notifier;
+            oiter (fun ppwidth ->
+              let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
+              EcGState.setvalue "PP:width" (`Int ppwidth) gs)
+              prvopts.prvo_ppwidth;
             first := `Loop
 
         | `Loop -> ()
         end;
+
+        oiter (EcTerminal.setwidth terminal)
+          (let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
+           match EcGState.getvalue "PP:width" gs with
+           | Some (`Int i) -> Some i | _ -> None);
 
         begin
           match EcLocation.unloc (EcTerminal.next terminal) with

@@ -112,8 +112,8 @@ let t_equiv_app_onesided side i pre post tc =
   in
   let ij =
     match side with
-    | `Left  -> (i, List.length s'. s_node)
-    | `Right -> (List.length s'. s_node, i) in
+    | `Left  -> (i, Zpr.cpos (List.length s'. s_node))
+    | `Right -> (Zpr.cpos (List.length s'. s_node), i) in
   let _s1, s2 = s_split i s in
 
   let modi = EcPV.s_write env (EcModules.stmt s2) in

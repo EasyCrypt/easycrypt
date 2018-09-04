@@ -64,22 +64,18 @@ let wp ?(uselet=true) ?(onesided=false) env m s post =
 
 (* -------------------------------------------------------------------- *)
 module TacInternal = struct
-  let check_wp_progress tc i s rm =
-    match i with
-    | None   -> List.length s.s_node - List.length rm
-    | Some i ->
-        if not (List.is_empty rm) then
-          tc_error !!tc "remaining %i instruction(s)" (List.length rm);
-        i
+  let check_wp_progress tc i (_s : stmt) rm =
+    if EcUtils.is_some i && not (List.is_empty rm) then
+      tc_error !!tc "remaining %i instruction(s)" (List.length rm)
 
   let t_hoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
-    let (s_hd, s_wp) = s_split_o i hs.hs_s in
+    let (s_hd, s_wp) = o_split i hs.hs_s in
     let m = EcMemory.memory hs.hs_m in
     let s_wp = EcModules.stmt s_wp in
     let (s_wp, post) = wp ~uselet ~onesided:true env m s_wp hs.hs_po in
-    ignore (check_wp_progress tc i hs.hs_s s_wp : int);
+    check_wp_progress tc i hs.hs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
     FApi.xmutate1 tc `Wp [concl]
@@ -87,11 +83,11 @@ module TacInternal = struct
   let t_bdhoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
     let bhs = tc1_as_bdhoareS tc in
-    let (s_hd, s_wp) = s_split_o i bhs.bhs_s in
+    let (s_hd, s_wp) = o_split i bhs.bhs_s in
     let s_wp = EcModules.stmt s_wp in
     let m = EcMemory.memory bhs.bhs_m in
     let s_wp,post = wp ~uselet env m s_wp bhs.bhs_po in
-    ignore (check_wp_progress tc i bhs.bhs_s s_wp : int);
+    check_wp_progress tc i bhs.bhs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
     FApi.xmutate1 tc `Wp [concl]
@@ -100,15 +96,15 @@ module TacInternal = struct
     let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
     let i = omap fst ij and j = omap snd ij in
-    let s_hdl,s_wpl = s_split_o i es.es_sl in
-    let s_hdr,s_wpr = s_split_o j es.es_sr in
+    let s_hdl,s_wpl = o_split i es.es_sl in
+    let s_hdr,s_wpr = o_split j es.es_sr in
     let meml, s_wpl = EcMemory.memory es.es_ml, EcModules.stmt s_wpl in
     let memr, s_wpr = EcMemory.memory es.es_mr, EcModules.stmt s_wpr in
     let post = es.es_po in
     let s_wpl, post = wp ~uselet env meml s_wpl post in
     let s_wpr, post = wp ~uselet env memr s_wpr post in
-    ignore (check_wp_progress tc i es.es_sl s_wpl : int);
-    ignore (check_wp_progress tc j es.es_sr s_wpr : int);
+    check_wp_progress tc i es.es_sl s_wpl;
+    check_wp_progress tc j es.es_sr s_wpr;
     let sl = EcModules.stmt (s_hdl @ s_wpl) in
     let sr = EcModules.stmt (s_hdr @ s_wpr) in
     let concl = f_equivS_r {es with es_sl = sl; es_sr=sr; es_po = post} in

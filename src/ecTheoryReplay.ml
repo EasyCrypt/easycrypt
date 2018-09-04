@@ -119,8 +119,10 @@ let rename ove subst (kind, name) =
 
     let nameok =
       match kind with
-      | `Lemma | `Op | `Pred | `Type ->
+      | `Lemma | `Type ->
           EcIo.is_sym_ident newname
+      | `Op | `Pred ->
+          EcIo.is_op_ident newname
       | `Module | `ModType | `Theory ->
           EcIo.is_mod_ident newname
     in

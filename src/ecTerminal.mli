@@ -22,6 +22,7 @@ val next        : terminal -> EcParsetree.prog
 val notice      : immediate:bool -> loglevel -> string -> terminal -> unit
 val finish      : status -> terminal -> unit
 val finalize    : terminal -> unit
+val setwidth    : terminal -> int -> unit
 
 (* -------------------------------------------------------------------- *)
 val from_channel : ?gcstats:bool -> name:string -> in_channel -> terminal

@@ -23,6 +23,10 @@ let i_Pervasive = "Pervasive"
 let p_Pervasive = EcPath.pqname p_top i_Pervasive
 let _Pervasive  = fun x -> EcPath.pqname p_Pervasive x
 
+(* -------------------------------------------------------------------- *)
+let base_rnd = "random"
+let base_ll  = "lossless"
+
 (*-------------------------------------------------------------------- *)
 module CI_Unit = struct
   let p_unit  = _Pervasive "unit"
@@ -115,7 +119,8 @@ module CI_Distr = struct
   let p_support  = _Distr "support"
   let p_mu       = _Pervasive "mu"
   let p_lossless = _Distr "is_lossless"
-
+  let p_uniform  = _Distr "is_uniform"
+  let p_full     = _Distr "is_full"
 end
 
 (* -------------------------------------------------------------------- *)

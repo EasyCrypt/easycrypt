@@ -284,8 +284,6 @@ let s_match    arg = stmt [i_match arg]
 let s_assert   arg = stmt [i_assert arg]
 let s_abstract arg = stmt [i_abstract arg]
 
-let s_split n s = List.takedrop n s.s_node
-
 (* -------------------------------------------------------------------- *)
 let get_asgn = function
   | { i_node = Sasgn (lv, e) } -> Some (lv, e)

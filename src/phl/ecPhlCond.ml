@@ -29,7 +29,7 @@ module LowInternal = struct
 
    let t_sub b tc =
      FApi.t_on1seq 0
-       (EcPhlRCond.t_rcond side b 1)
+       (EcPhlRCond.t_rcond side b (Zpr.cpos 1))
        (FApi.t_seqs
            [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h];
             FApi.t_or
@@ -104,34 +104,9 @@ let rec t_equiv_cond side tc =
              (FApi.t_seqsub
                 (t_equiv_cond (Some `Left))
                 [FApi.t_seqsub
-                   (EcPhlRCond.Low.t_equiv_rcond `Right true  1)
+                   (EcPhlRCond.Low.t_equiv_rcond `Right true (Zpr.cpos 1))
                    [t_aux; t_clear hiff];
                  FApi.t_seqsub
-                   (EcPhlRCond.Low.t_equiv_rcond `Right false 1)
+                   (EcPhlRCond.Low.t_equiv_rcond `Right false (Zpr.cpos 1))
                    [t_aux; t_clear hiff]]))
           tc
-
-(* -------------------------------------------------------------------- *)
-let process_cond info tc =
-  let default_if i s = ofdfl (fun _ -> tc1_pos_last_if tc s) i in
-
-  match info with
-  | `Head side ->
-    t_hS_or_bhS_or_eS ~th:t_hoare_cond ~tbh:t_bdhoare_cond ~te:(t_equiv_cond side) tc
-
-  | `Seq (side, i1, i2, f) ->
-    let es = tc1_as_equivS tc in
-    let f  = EcProofTyping.tc1_process_prhl_formula tc f in
-    let n1 = default_if i1 es.es_sl in
-    let n2 = default_if i2 es.es_sr in
-    FApi.t_seqsub (EcPhlApp.t_equiv_app (n1,n2) f)
-      [ t_id; t_equiv_cond side ] tc
-
-  | `SeqOne (s, i, f1, f2) ->
-    let es = tc1_as_equivS tc in
-    let n = default_if i (match s with `Left -> es.es_sl | `Right -> es.es_sr) in
-    let f1 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f1 in
-    let f2 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f2 in
-    FApi.t_seqsub
-      (EcPhlApp.t_equiv_app_onesided s n f1 f2)
-      [ t_id; t_bdhoare_cond] tc

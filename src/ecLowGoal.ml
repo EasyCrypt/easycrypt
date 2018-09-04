@@ -34,6 +34,9 @@ let (@!) (t1 : FApi.backward) (t2 : FApi.backward) =
 let (@+) (t : FApi.backward) (ts : FApi.backward list) =
   FApi.t_seqsub t ts
 
+let (@>) (t1 : FApi.backward) (t2 : FApi.backward) =
+  fun tc -> FApi.t_last t1 (t2 tc)
+
 let (@~) (t : FApi.backward) (tt : FApi.tactical) =
   fun tc -> tt (t tc)
 
