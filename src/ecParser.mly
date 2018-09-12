@@ -2322,7 +2322,7 @@ icodepos_r:
  | HAT x=icodepos_r { x }
 
 codepos1_wo_off:
-| i=word
+| i=sword
     { (`ByPos i :> cp_base) }
 
 | k=icodepos i=option(brace(sword))
@@ -2331,8 +2331,8 @@ codepos1_wo_off:
 codepos1:
 | cp=codepos1_wo_off { (0, cp) }
 
-| cp=codepos1_wo_off PLUS  i=word { ( i, cp) }
-| cp=codepos1_wo_off MINUS i=word { (-i, cp) }
+| cp=codepos1_wo_off AMP PLUS  i=word { ( i, cp) }
+| cp=codepos1_wo_off AMP MINUS i=word { (-i, cp) }
 
 %inline nm1_codepos:
 | i=codepos1 k=ID(DOT { 0 } | QUESTION { 1 } )
