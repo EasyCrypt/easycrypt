@@ -86,6 +86,7 @@ module Zipper = struct
   let split_at_cp_base ~after (cb : cp_base) (s : stmt) =
     match cb with
     | `ByPos i -> begin
+        let i = if i < 0 then List.length s.s_node + i else i in
         try  List.takedrop (i - if after then 0 else 1) s.s_node
         with (Invalid_argument _ | Not_found) -> raise InvalidCPos
       end
