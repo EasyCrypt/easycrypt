@@ -98,9 +98,7 @@ rewrite size_map /= mulrDl /= addrC; congr.
 have: forall y, mem s y => F y = size (allperms_r n s).
   move=> y sy @/F @/(\o); rewrite size_map; case: (x = y)=> //.
   move=> ne_xy; rewrite !ih //= ?size_rem //.
-    by rewrite addrCA.
     by rewrite rem_uniq //=; apply/negP=> /mem_rem.
-  by rewrite addrC -addrA.
 move/eq_in_map=> ->; rewrite big_map predT_comp /(\o) /=.
 by rewrite sumr_const intmulz count_predT mulrC.
 qed.
