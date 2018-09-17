@@ -389,7 +389,7 @@ section CollisionProbability.
 
   lemma pr_PRFi_collision &m:
     Pr[IND(ARP,DBounder(D)).main() @ &m: ARP.coll]
-    <= (q^2)%r * mu uD (pred1 witness).
+    <= (q^2 - q)%r / 2%r * mu uD (pred1 witness).
   proof.
   have ->: Pr[IND(ARP,DBounder(D)).main() @ &m: ARP.coll]
            = Pr[IND(ARP,DBounder(D)).main() @ &m: ARP.coll /\ DBounder.FBounder.c <= q].
@@ -433,13 +433,17 @@ section CollisionProbability.
           smt.
       - smt ml=0.
     by auto=> />; rewrite frng0 fcards0.
-  fel 2 FEL.c (fun x, q%r * mu uD (pred1 witness)) q (ARP.coll) [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]=> //.
-  + rewrite sumr_const count_predT size_range /= max_ler 1:ge0_q.
-    by rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM mulrC mulrA.
-  + by inline*; auto; rewrite dom0 fcards0.
-  + proc; sp; rcondt 1=> //.
+  fel 2 FEL.c (fun x, x%r * mu uD (pred1 witness)) q (ARP.coll) 
+           [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]
+           (card (fdom ARP.m) <= FEL.c /\ card (fdom ARP.mi) <= FEL.c)=> //.
+  + rewrite -mulr_suml Bigreal.sumidE 1:ge0_q. 
+    by rewrite (powS 1) // pow1;smt(mu_bounded ge0_q).
+  + by inline*; auto=> />; rewrite fdom0 fcards0.
+  + exists*FEL.c;elim*=> c.
+    conseq(:_==>_ : (c%r * mu1 uD witness))=> />.
+    proc; sp; rcondt 1=> //.
     inline *; sp; if=> //=; last first.
-    * hoare; auto=> // /> &hr _ _ _ _.
+    * hoare; auto=> // /> &hr _ _ _ _ _ _.
       by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (rng ARP.m); skip.
@@ -449,15 +453,19 @@ section CollisionProbability.
         + by apply/fun_ext=> x; rewrite mem_frng.
         apply/mu_mem_le; move=> x _; have [] uD_suf [] ? uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
-        by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW).
-      - by move: H7;rewrite H1.
+        by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW leq_card_rng_dom).
+      - by move: H9;rewrite H1.
     * by hoare; auto=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc. rcondt 2; 1:by auto.
     sp; if=> //=.
-    * by wp; call (_: true); auto=> /#.
+    * inline*;sp;if;auto; 2:smt().
+      move=> &hr /> + + + + + y />.
+      by rewrite !fdom_set !fcardU !fcard1; smt(fcard_ge0).
     * by auto=> /#.
   + by move=> b c; proc; rcondf 2; auto.
-  + proc; sp; rcondt 1=> //=.
+  + exists*FEL.c;elim*=> c.
+    conseq(:_==>_ : (c%r * mu1 uD witness));progress.
+    proc; sp; rcondt 1=> //=.
     inline *; sp; if=> //=; last by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (rng ARP.mi); skip.
@@ -467,12 +475,14 @@ section CollisionProbability.
         + by apply/fun_ext=> x; rewrite mem_frng.
         apply/mu_mem_le; move=> x _; have [] uD_suf [] _ uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
-        smt w=(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW).
-      - by move: H7; rewrite H1.
+        smt w=(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW leq_card_rng_dom).
+      - by move: H9; rewrite H1.
     * by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc; rcondt 2; 1:by auto.
     sp; if=> //=.
-    * by wp; call (_: true); auto=> /#.
+    * inline*;sp;if;auto; 2:smt().
+      move=> &hr /> + + + + + x.
+      by rewrite !fdom_set !fcardU !fcard1; smt(fcard_ge0).
     * by auto=> /#.
   + by move=> b c; proc; rcondf 2; auto.
   qed.
@@ -483,7 +493,7 @@ lemma PartialConclusion (D <: Distinguisher {PRPi, ARP, DBounder}) &m:
   (forall (O <: Oracles {D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi'(Indirect),DBounder(D)).main() @ &m: res]
     - Pr[IND(ARP,DBounder(D)).main() @ &m: res]|
-  <= (q^2)%r * mu uD (pred1 witness).
+  <= (q^2 - q)%r / 2%r * mu uD (pred1 witness).
 proof.
 move=> D_ll.
 have:= pr_PRFi_collision D D_ll &m.
@@ -601,7 +611,7 @@ lemma Conclusion (D <: Distinguisher {PRPi, ARP, DBounder}) &m:
   (forall (O <: Oracles {D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi,DBounder(D)).main() @ &m: res]
     - Pr[IND(ARP,DBounder(D)).main() @ &m: res]|
-  <= (q^2)%r * mu uD (pred1 witness).
+  <= (q^2 - q)%r / 2%r * mu uD (pred1 witness).
 proof.
 move=> D_ll.
 by rewrite (pr_PRPi_PRPi'_Indirect (DBounder(D)) &m) (PartialConclusion D &m D_ll).
