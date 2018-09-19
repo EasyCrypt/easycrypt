@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore CoreMap Finite List FSet.
+require import AllCore CoreMap Finite List FSet StdOrder.
 
 (* ==================================================================== *)
 theory Map.
@@ -501,8 +501,6 @@ apply/ih; rewrite fdom_rem fdmE fsetDK; apply/fsetP.
 by move=> y; rewrite in_fsetD1 andb_idr //; apply/contraL.
 qed.
 
-
-
 (* ==================================================================== *)
 op (+) (m1 m2 : ('a,'b) fmap) : ('a,'b) fmap =
   ofmap (Map.offun (fun x=> if x \in m2 then m2.[x] else m1.[x])).
@@ -521,3 +519,124 @@ qed.
 lemma mem_join ['a 'b] (m1 m2 : ('a,'b) fmap) (x : 'a):
   x \in (m1 + m2) <=> x \in m1 \/ x \in m2.
 proof. by rewrite domE joinE !domE; case: (m2.[x]). qed.
+
+prover [""].
+
+(* ==================================================================== *)
+lemma get_none (m : ('a, 'b) fmap, x : 'a) :
+  x \notin m => m.[x] = None.
+proof. by rewrite domE. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma get_some (m : ('a, 'b) fmap, x : 'a) :
+  x \in m => m.[x] = Some (oget m.[x]).
+proof. move=> /domE; by case m.[x]. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma set_same (m : ('a, 'b) fmap, x : 'a) :
+  x \in m => m.[x <- oget m.[x]] = m.
+proof.
+move=> x_in_m.
+apply fmap_eqP => y.
+case (y = x) => [->> | ne_y_x].
+by rewrite get_set_sameE get_some.
+by rewrite get_setE ne_y_x.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma set_eq (m : ('a, 'b) fmap, x : 'a, y : 'b) :
+  m.[x] = Some y => m.[x <- y] = m.
+proof.
+move=> m_get_x_eq_y.
+have x_in_m : x \in m by rewrite domE m_get_x_eq_y.
+have -> : y = oget m.[x] by rewrite m_get_x_eq_y oget_some.
+by rewrite set_same.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma frng_set (m : ('a, 'b) fmap, x : 'a, y : 'b) :
+  frng m.[x <- y] = frng (rem m x) `|` fset1 y.
+proof.
+apply fsetP => z; rewrite in_fsetU in_fset1 2!mem_frng 2!rngE /=.
+split => [[x'] | [[x'] | ->]].
+case (x' = x) => [-> | ne_x'_x].
+by rewrite get_set_sameE /= => ->.
+rewrite get_setE ne_x'_x /= => get_x'_some_z.
+left; exists x'; by rewrite remE ne_x'_x.
+rewrite remE.
+case (x' = x) => // ne_x'_x get_x'_some_z.
+exists x'; by rewrite get_setE ne_x'_x.
+exists x; by rewrite get_set_sameE.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_except_notp_in (X : 'a -> bool, y : 'a, m1 m2 : ('a, 'b) fmap) :
+  eq_except X m1 m2 => ! X y => y \in m1 => y \in m2.
+proof. move=> /eq_exceptP eq_exc not_X_y; by rewrite 2!domE eq_exc. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_except_setr_as_l (m1 m2 : ('a, 'b) fmap, x) :
+  x \in m1 => eq_except (pred1 x) m1 m2 =>
+  m1 = m2.[x <- oget m1.[x]].
+proof.
+rewrite eq_exceptP -fmap_eqP=> x_in_m1 eqe x'.
+rewrite get_setE /oget; case (x' = x)=> [->> |].
+by move: x_in_m1; rewrite domE; case (m1.[x]).
+by move=> ne_x'_x; rewrite eqe.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_except_set_both (X : 'a -> bool, x, b, b', m : ('a, 'b) fmap):
+  X x => eq_except X m.[x <- b] m.[x <- b'].
+proof.
+move=> X_x; rewrite eq_exceptP=> x' not_X_x'; rewrite !get_setE.
+by case (x' = x).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_except_rem (m1 m2 : ('a,'b) fmap, X : 'a -> bool, x) :
+   X x => eq_except X m1 m2 => eq_except X m1 (rem m2 x).
+proof.
+move=> X_x /eq_exceptP eq_exc; rewrite eq_exceptP=> y not_X_y; rewrite remE.
+case (y = x)=> [->> // | ne_y_x]; by apply eq_exc.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma rem_id (m : ('a, 'b) fmap, x : 'a) :
+  x \notin m => rem m x = m.
+proof.
+move=> x_notin_m; apply fmap_eqP => y; rewrite remE.
+case (y = x) => // ->.
+case (None = m.[x]) => // get_not_none.
+rewrite eq_sym -domE // in get_not_none.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma map_empty (f : 'a -> 'b -> 'c, m : ('a, 'b) fmap) :
+  map f empty = empty.
+proof. by rewrite -fmap_eqP=> x; rewrite mapE 2!emptyE. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma map_rem (f:'a -> 'b -> 'c, m, x) :
+  map f (rem m x) = rem (map f m) x.
+proof.
+rewrite -fmap_eqP=> z; by rewrite !(mapE,remE); case (z = x).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma map_id (m : ('a,'b) fmap) :
+  map (fun _ b => b) m = m.
+proof. by rewrite -fmap_eqP=>x; rewrite mapE; case (m.[x]). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma le_card_frng_fdom (m : ('a, 'b) fmap) :
+  card (frng m) <= card (fdom m).
+proof.
+elim /fmapW: m=> [| m k v k_notin_m IH].
+by rewrite frng0 fdom0 2!fcards0.
+rewrite mem_fdom in k_notin_m.
+rewrite frng_set rem_id // fdom_set.
+rewrite (fcardUI_indep _ (fset1 k)) 1:fsetI1 1:mem_fdom 1:k_notin_m //.
+rewrite fcard1 fcardU fcard1 -addzA IntOrder.ler_add //.
+rewrite -{2}(addz0 1) IntOrder.ler_add // oppz_le0 fcard_ge0.
+qed.
