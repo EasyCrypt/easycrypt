@@ -8,7 +8,7 @@
 
 (* ==================== Programmable Random Oracle ==================== *)
 
-require import Core List MapAux SmtMap FSet Distr.
+require import Core List SmtMap FSet Distr.
 require IterProc.
 
 type flag = [ Unknown | Known ].  (* map setting known by distinguisher? *)
