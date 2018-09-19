@@ -520,8 +520,6 @@ lemma mem_join ['a 'b] (m1 m2 : ('a,'b) fmap) (x : 'a):
   x \in (m1 + m2) <=> x \in m1 \/ x \in m2.
 proof. by rewrite domE joinE !domE; case: (m2.[x]). qed.
 
-prover [""].
-
 (* ==================================================================== *)
 lemma get_none (m : ('a, 'b) fmap, x : 'a) :
   x \notin m => m.[x] = None.
