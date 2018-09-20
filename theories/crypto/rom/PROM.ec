@@ -77,10 +77,10 @@ proof.
   case (z = x)=> //.
   case (z = x)=> // ->.
   rewrite negb_and; elim=> [x_not_in_m | ne_get_m_x_2_f].
-  by rewrite (get_none m x).
-  case (m.[x] = None)=> [get_x_none | get_x_some];
-    [by rewrite get_x_none |
-     rewrite -domE in get_x_some; by rewrite get_some //= ne_get_m_x_2_f].
+  by rewrite (iffLR _ _ (domNE m x)).
+  case (m.[x] = None)=> [get_x_none | get_x_some].
+  + by rewrite get_x_none.
+  by case: m.[x] get_x_some ne_get_m_x_2_f => //= x' ->.
 qed.
 
 (* ------------------Random Oracles and Flag Random Oracles------------------ *)
@@ -192,7 +192,7 @@ proof.
   proc; auto=> &1 &2 [] 2!-> /= ? -> /=.
   rewrite mem_map !map_set /fst /= get_set_sameE oget_some => |>; progress.
   + by rewrite mapE oget_omap_some 1:-domE.
-  + by rewrite eq_sym set_eq 1:mapE /= 1:get_some.
+  + by rewrite eq_sym set_get_eq 1:mapE ///= (some_oget _.[_]).
 qed.
 
 equiv RO_FRO_set : RO.set ~ FRO.set :
@@ -396,12 +396,12 @@ proof.
     + by conseq (I_f_neq x1 (Some mx))=> //.
     auto=> ? &mr [#] 4-> Hd Hget; split; first apply sampleto_ll.
     move=> /= _ ? _; split.
-    + rewrite get_some // oget_some /= => z; rewrite -memE mem_fdom dom_restr
-              /in_dom_with;
-        case (x{mr} = z)=> [<- | //]; by rewrite Hget.
+    + rewrite -some_oget // /= => z.
+      rewrite -memE mem_fdom dom_restr /in_dom_with.
+      by case (x{mr} = z)=> [<- | //]; rewrite Hget.
     move=> [#] _ Heq ? mr [#] -> Heq'.
     split=> [| _ r _]; first apply sampleto_ll.
-    by rewrite domE Heq' oget_some /= set_eq 1:Heq'
+    by rewrite domE Heq' oget_some /= set_get_eq 1:Heq'
                1:{1}(pairS (oget FRO.m{mr}.[x{mr}])) 1:Hget.
   case ((dom FRO.m x){1}).
   + inline{1} RRO.resample=> /=; rnd{1}.
@@ -418,7 +418,7 @@ proof.
     + move=> ? ? ?; rewrite domE=> [#] <*> [#] -> /eq_except_sym H Hxm Hx2.
       split=> [| _ r _]; first apply sampleto_ll.
       rewrite /= Hxm oget_some /=; apply /eq_sym.
-      have /(congr1 oget) := Hx2 => <-; apply eq_except_setr_as_l=> //.
+      have /(congr1 oget) := Hx2 => <-; apply eq_except_set_getlr=> //.
       by rewrite domE Hx2.
     + symmetry; call (iter1_perm RRO.I iter_perm2).
       skip=> &1 &2 [[->> ->>]] [Hdom Hm]; split=> //=.
@@ -431,7 +431,7 @@ proof.
                FRO.m{2}.[x{2}] = Some (result{2}, Known)).
     + auto=> ? &mr [#] 2-> /= ^Hdom -> ^Hget -> ? -> /=.
       by rewrite !get_setE /= oget_some !restr_set /= fdom_set
-                 eq_except_set_both //= fsetDK.
+                 eq_except_setlr //= fsetDK.
     exists* x{1}, FRO.m{1}.[x{2}], FRO.m{2}.[x{2}]; elim*=> x1 mx1 mx2.
     call (iter_inv RRO.I (fun z => x1 <> z) 
            (fun o1 o2 =>
@@ -481,7 +481,7 @@ proof.
     + by move=> &ml &mr [#] 3-> x_in_m get_m_x_2_unk;
         exists FRO.m{mr} x{mr} y{mr}.
     + move=> ? &m &mr [#] <*> [#] 2-> Hex Hm2.
-      by rewrite (eq_except_setr_as_l FRO.m{mr} FRO.m{m} x{mr}) ?in_dom ?Hm2 //
+      by rewrite (eq_except_set_getlr FRO.m{mr} FRO.m{m} x{mr}) ?in_dom ?Hm2 //
          1:domE 1:Hm2 // eq_except_sym.
     + symmetry; call (iter1_perm RRO.I iter_perm2); auto=> ? &mr [#] 3 -> Hdom Hm;
       split=> //=.
@@ -493,7 +493,7 @@ proof.
        (FRO.m.[x] = Some (y, Known)){2}).
     + inline *; auto=> ? &mr [#] 3-> /= Hmem Hget.
       split=> [|_ c _]; first apply sampleto_ll.
-      by rewrite (eq_except_set_both _ _ (c, Unknown)) //=
+      by rewrite (eq_except_setlr _ _ _ (c, Unknown)) //=
                  get_set_sameE restr_set /= fdom_rem /= -memE in_fsetD1.
     exists* x{1}, y{1}, (FRO.m.[x]{1}); elim*=> x1 y1 mx1;
       pose mx2 := Some (y1, Known).
@@ -549,7 +549,7 @@ proof.
               (FRO.m.[x] = None){2}).
     + inline *; auto=> &1 &2 [#] 2-> Hidm /=.
       split=> [| _ c _]; first apply sampleto_ll.
-      rewrite (eq_except_rem _ FRO.m{2} (pred1 x{2}) x{2}) /pred1 //
+      rewrite (eq_except_remr (pred1 x{2}) _ FRO.m{2} x{2}) /pred1 //
               1:eq_except_setl /= remE -memE in_fsetD1 negb_and /=
               restr_rem Hidm /=.
       congr; by rewrite fdom_rem.
@@ -577,7 +577,7 @@ proof.
   rewrite -memE mem_fdom dom_restr /in_dom_with.
   rewrite /in_dom_with in Hin.
   case (x{mr} = z) => [<- // | //].
-  split=> //; rewrite eq_except_rem //.
+  split=> //; rewrite eq_except_remr //.
   rewrite -fmap_eqP=> z; rewrite remE.
   case (z = x{mr})=> [-> | ne_z_xmr];
     [by rewrite m_R_x |
