@@ -1,48 +1,40 @@
 EasyCrypt: Computer-Aided Cryptographic Proofs
-==============================================
+====================================================================
 
 [![Build Status](https://travis-ci.org/EasyCrypt/easycrypt.svg?branch=1.0)](https://travis-ci.org/EasyCrypt/easycrypt)
 
-EasyCrypt is a toolset for reasoning about relational properties of probabilistic computations with
-adversarial code. Its main application is the construction and verification of game-based
-cryptographic proofs. The development of EasyCrypt was initiated in 2009, and the initial prototype
-was used to prove the security of several constructions, including the Cramer-Shoup encryption scheme,
-the Merkle-Damgaard iterative hash function design, and of the ZAEP encryption scheme.
-
-EasyCrypt has been initially developed by the IMDEA Software Institute and Inria. It is now developed
-at the IMDEA Software Institute, Inria and École Polytechnique.
-
-| <img src="https://www.easycrypt.info/trac/chrome/site/inria.png" alt="INRIA Logo" width="100px" height="48px"> | <img src="https://www.easycrypt.info/trac/chrome/site/imdea.png" alt="IMDEA Logo" width="100px" height="49px">| <img src="https://www.easycrypt.info/trac/chrome/site/X.png" alt="X Logo" width="50px" height="68px"> |
-|:---:|:---:|:---:|
-
+EasyCrypt is a toolset for reasoning about relational properties of
+probabilistic computations with adversarial code. Its main application
+is the construction and verification of game-based cryptographic
+proofs.
 
 Table of Contents
------------------
+--------------------------------------------------------------------
 
-   * [EasyCrypt: Computer-Aided Cryptographic Proofs](#easycrypt-computer-aided-cryptographic-proofs)
-      * [Installation requirements](#installation-requirements)
-      * [Installing OPAM (POSIX systems)](#installing-opam-posix-systems)
-      * [Installing requirements using OPAM (POSIX systems)](#installing-requirements-using-opam-posix-systems)
-      * [Installing requirements using OPAM (non-POSIX systems)](#installing-requirements-using-opam-non-posix-systems)
-   * [Configuring Why3](#configuring-why3)
-   * [Installing/Compiling EasyCrypt](#installingcompiling-easycrypt)
-   * [Proof General Front-End](#proof-general-front-end)
-      * [Installing using opam](#installing-using-opam)
-      * [Installing from sources](#installing-from-sources)
+ * [EasyCrypt: Computer-Aided Cryptographic Proofs](#easycrypt-computer-aided-cryptographic-proofs)
+    - [Installation requirements](#installation-requirements)
+    - [Installing OPAM (POSIX systems)](#installing-opam-posix-systems)
+    - [Installing requirements using OPAM (POSIX systems)](#installing-requirements-using-opam-posix-systems)
+    - [Installing requirements using OPAM (non-POSIX systems)](#installing-requirements-using-opam-non-posix-systems)
+ * [Configuring Why3](#configuring-why3)
+ * [Installing/Compiling EasyCrypt](#installingcompiling-easycrypt)
+ * [Proof General Front-End](#proof-general-front-end)
+    - [Installing using opam](#installing-using-opam)
+    - [Installing from sources](#installing-from-sources)
 
 
 Installation requirements
--------------------------
+--------------------------------------------------------------------
 
 EasyCrypt uses the following third-party tools/libraries:
 
- * OCaml (>= 4.02)
+ * OCaml (>= 4.02, 4.05)
 
      Available at http://caml.inria.fr/
 
  * OCamlbuild (only for OCaml >= 4.03)
 
- * Why3 (>= 0.87)
+ * Why3 (>= 0.87, < 0.88)
 
      Available at <http://why3.lri.fr/>
 
@@ -66,7 +58,7 @@ install EasyCrypt and all its dependencies via `opam`.
 
 
 Installing OPAM (POSIX systems)
--------------------------------
+--------------------------------------------------------------------
 
 Opam can be easily installed from source or via your packages manager:
 
@@ -104,11 +96,12 @@ For any issues encountered installing `opam` see:
 
   * [https://opam.ocaml.org/doc/Usage.html] for how to initialize opam.
 
-To install `opam` on non-POSIX systems [see the section below](#installing-requirements-using-opam-non-posix-systems).
+To install `opam` on non-POSIX systems
+[see the section below](#installing-requirements-using-opam-non-posix-systems).
 
 
 Installing requirements using OPAM (POSIX systems)
---------------------------------------------------
+--------------------------------------------------------------------
 
 Starting with opam 1.2.0, you can install all the needed dependencies
 via the opam OCaml packages manager.
@@ -162,7 +155,7 @@ via the opam OCaml packages manager.
 
 
 Installing requirements using OPAM (non-POSIX systems)
-------------------------------------------------------
+--------------------------------------------------------------------
 
 You can install all the needed dependencies via the opam OCaml packages manager.
 
@@ -206,7 +199,7 @@ You can install all the needed dependencies via the opam OCaml packages manager.
 
 
 Configuring Why3
-================
+====================================================================
 
 Before running EasyCrypt and after the installation/removal/update
 of an SMT prover, you need to (re)configure Why3.
@@ -230,7 +223,7 @@ where `$WHY3CONF` must be replaced by some custom location.
 
 
 Installing/Compiling EasyCrypt
-==============================
+====================================================================
 
 If installing from source, running
 
@@ -262,10 +255,10 @@ EasyCrypt binary is named `easycrypt`.
 
 
 Proof General Front-End
-=======================
+====================================================================
 
 Installing using opam
----------------------
+--------------------------------------------------------------------
 
 If you installed the EasyCrypt dependencies using opam, you can
 install ProofGeneral via opam too. Running
@@ -296,7 +289,7 @@ $> opam config var prefix
 
 
 Installing from sources
------------------------
+--------------------------------------------------------------------
 
-EasyCrypt mode has been integrated upstream. Please, go to
-<https://github.com/ProofGeneral/PG> and follow the instructions.
+EasyCrypt mode has been integrated upstream. Please, go
+to <https://github.com/ProofGeneral/PG> and follow the instructions.
