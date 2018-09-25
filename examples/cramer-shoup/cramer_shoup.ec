@@ -379,7 +379,7 @@ section Security_Aux.
        CCA.sk{1} = (G1.k{2}, g, G1.g_{2}, G1.x1{2}, G1.x2{2}, G1.y1{2}, G1.y2{2}, G1.z1{2}, G1.z2{2})).
   proof.
     proc;sp 0 1;inline *;if => //;auto.
-    move=> &m1 &m2 /> -> /=;rewrite negb_and /=.
+    move=> &m1 &m2 /> _ /=;rewrite negb_and /=.
     case: (ci{m2}) => a a_ c d => /=.
     case: (a_ = a ^ G1.w{m2}) => [ -> _ _ | _ _ _ -> ] //=.
     have -> : 

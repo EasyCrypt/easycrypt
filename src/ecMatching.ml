@@ -44,27 +44,118 @@ module Zipper = struct
     z_path : ipath;                     (* path (zipper) leading to me         *)
   }
 
+  let cpos (i : int) : codepos1 = (0, `ByPos i)
+
   let zipper hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; }
 
-  let rec zipper_of_cpos ((i, sub) : codepos) zpr s =
-    let (s1, i, s2) =
-      try  List.pivot_at (i-1) s.s_node
-      with (Invalid_argument _ | Not_found) -> raise InvalidCPos
-    in
-    match sub with
-    | None -> zipper s1 (i::s2) zpr
-    | Some (b, sub) -> begin
-      match i.i_node, b with
-      | Swhile (e, sw), 0 ->
-          zipper_of_cpos sub (ZWhile (e, ((s1, s2), zpr))) sw
-      | Sif (e, ifs1, ifs2), 0 ->
-          zipper_of_cpos sub (ZIfThen (e, ((s1, s2), zpr), ifs2)) ifs1
-      | Sif (e, ifs1, ifs2), 1 ->
-          zipper_of_cpos sub (ZIfElse (e, ifs1, ((s1, s2), zpr))) ifs2
-      | _ -> raise InvalidCPos
-    end
+  let find_by_cp_match ((i, cm) : int option * cp_match) (s : stmt) =
+    let rec progress (acc : instr list) (s : instr list) (i : int) =
+      if i <= 0 then
+        let shd = oget (List.Exceptionless.hd acc) in
+        let stl = oget (List.Exceptionless.tl acc) in
+        (stl, shd, s)
+      else
 
-  let zipper_of_cpos cpos s = zipper_of_cpos cpos ZTop s
+      let ir, s =
+        match s with [] -> raise InvalidCPos | ir :: s -> (ir, s)
+      in
+
+      let i =
+        match ir.i_node, cm with
+        | Swhile _, `While  -> i-1
+        | Sif    _, `If     -> i-1
+        | Sasgn  _, `Assign -> i-1
+        | Srnd   _, `Sample -> i-1
+        | Scall  _, `Call   -> i-1
+        | _       , _       -> i
+
+      in progress (ir :: acc) s i
+
+    in
+
+    let i = odfl 1 i in if i = 0 then raise InvalidCPos;
+    let rev, i = (i < 0), abs i in
+
+    let s1, ir, s2 =
+      progress [] (if rev then List.rev s.s_node else s.s_node) i in
+
+    match rev with
+    | false -> (s1, ir, s2)
+    | true  -> (s2, ir, s1)
+
+  let split_at_cp_base ~after (cb : cp_base) (s : stmt) =
+    match cb with
+    | `ByPos i -> begin
+        let i = if i < 0 then List.length s.s_node + i else i in
+        try  List.takedrop (i - if after then 0 else 1) s.s_node
+        with (Invalid_argument _ | Not_found) -> raise InvalidCPos
+      end
+
+    | `ByMatch (i, cm) ->
+        let (s1, i, s2) = find_by_cp_match (i, cm) s in
+
+        match after with
+        | false -> (List.rev s1, i :: s2)
+        | true  -> (List.rev_append s1 [i], s2)
+
+  let split_at_cpos1 ~after ((ipos, cb) : codepos1) s =
+    let (s1, s2) = split_at_cp_base ~after cb s in
+
+    let (s1, s2) =
+      match ipos with
+      | off when off > 0 ->
+          let (ss1, ss2) =
+            try  List.takedrop off s2
+            with (Invalid_argument _ | Not_found) -> raise InvalidCPos in
+          (s1 @ ss1, ss2)
+
+      | off when off < 0 ->
+          let (ss1, ss2) =
+            try  List.takedrop (List.length s1 + off) s1
+            with (Invalid_argument _ | Not_found) -> raise InvalidCPos in
+          (ss1, ss2 @ s2)
+
+      | _ -> (s1, s2)
+
+    in (s1, s2)
+
+  let find_by_cpos1 ?(rev = true) (cpos1 : codepos1) s =
+    match split_at_cpos1 ~after:false cpos1 s with
+    | (s1, i :: s2) -> ((if rev then List.rev s1 else s1), i, s2)
+    | _ -> raise InvalidCPos
+
+  let zipper_at_nm_cpos1 ((cp1, sub) : codepos1 * int) s zpr =
+    let (s1, i, s2) = find_by_cpos1 cp1 s in
+
+    match i.i_node, sub with
+    | Swhile (e, sw), 0 ->
+        (ZWhile (e, ((s1, s2), zpr)), sw)
+
+    | Sif (e, ifs1, ifs2), 0 ->
+        (ZIfThen (e, ((s1, s2), zpr), ifs2), ifs1)
+
+    | Sif (e, ifs1, ifs2), 1 ->
+        (ZIfElse (e, ifs1, ((s1, s2), zpr)), ifs2)
+
+    | _ -> raise InvalidCPos
+
+  let zipper_of_cpos ((nm, cp1) : codepos) s =
+    let zpr, s =
+      List.fold_left
+        (fun (zpr, s) nm1 -> zipper_at_nm_cpos1 nm1 s zpr)
+        (ZTop, s) nm in
+
+    let s1, i, s2 = find_by_cpos1 cp1 s in
+
+    zipper s1 (i :: s2) zpr
+
+  let split_at_cpos1 cpos1 s =
+    split_at_cpos1 ~after:true cpos1 s
+
+  let may_split_at_cpos1 ?(rev = false) cpos1 s =
+    ofdfl
+      (fun () -> if rev then (s.s_node, []) else ([], s.s_node))
+      (omap (split_at_cpos1^~ s) cpos1)
 
   let rec zip i ((hd, tl), ip) =
     let s = stmt (List.rev_append hd (List.ocons i tl)) in

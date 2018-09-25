@@ -218,7 +218,7 @@ proof. by move=> le0_n; rewrite iterS. qed.
 lemma nseqSr n (x : 'a): 0 <= n => nseq (n+1) x = rcons (nseq n x) x.
 proof.
 elim: n=> /= [|i ge0_i ih]; first by rewrite nseq0 nseq1.
-by rewrite nseqS ?addz_ge0 // {1}ih nseqS.
+by rewrite (@nseqS (i+1)) ?addz_ge0 // {1}ih nseqS.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -619,7 +619,7 @@ elim: s => [/#|y s ih] //=; rewrite -ih; split=> [h|[h1 h2]].
   have := h (i+1); rewrite addzC ltz_add2l lt_is /=.
   by rewrite addz_ge0 // !addz_neq0 //= addzAC.
 move=> i []; elim: i => [//|i ge0_i _]; rewrite addzC ltz_add2l.
-by move=> lt_is; rewrite addz_neq0 //= addzAC /=; apply/h2.
+by move=> lt_is; rewrite addz_neq0 //=; apply/h2.
 qed.
 
 lemma has_nthP (p : 'a -> bool) s x0 :
@@ -741,6 +741,13 @@ lemma size_takel n (s : 'a list ):
 proof.
 case=> ge0_n le_sz; rewrite size_take //; move: le_sz.
 by rewrite lez_eqVlt => -[] ->.
+qed.
+
+lemma size_take_le n (s : 'a list) : 0 <= n => size (take n s) <= n.
+proof.
+move=> ge0_n; case: (n <= size s).
++ by move=> gt_ns; rewrite size_takel // ge0_n.
++ by move=> /ltzNge lt_sn; rewrite take_oversize 1?ltzW.
 qed.
 
 lemma take_cat n (s1 s2 : 'a list):
@@ -1515,7 +1522,7 @@ proof.
   elim: s => //= y s ih inj_f s_x; rewrite index_cons.
   case: (f x = f y) => eqf /=; 1: by apply/eq_sym/inj_f.
   move: s_x eqf; case: (x = y)=> //= ne_xy s_x _.
-  rewrite addz1_neq0 1:index_ge0 //= -addzA /= ih //.
+  rewrite addz1_neq0 1:index_ge0 //= ih //.
   by move=> x' y' s_x' s_y'; apply/inj_f; rewrite ?(s_x', s_y').
 qed.
 
@@ -1582,9 +1589,9 @@ theory Iota.
 
   lemma nth_iota m n i w: 0 <= i < n => nth w (iota_ m n) i = m + i.
   proof.
-    case=> ge0_i lt_in; rewrite (_ : n = i + ((n-i-1)+1)) 1:smt.
-    rewrite iota_add // 1:smt nth_cat size_iota max_ler //=.
-    by rewrite iotaS // smt.
+    case=> ge0_i lt_in; rewrite (_ : n = i + ((n-i-1)+1)) 1:/#.
+    rewrite iota_add // 1:/# nth_cat size_iota max_ler //=.
+    by rewrite (iotaS _ (n-i-1)) //#.
   qed.
 
   lemma iota_addl (m1 m2:int) n: iota_ (m1 + m2) n = map ((+) m1) (iota_ m2 n).
@@ -1730,7 +1737,7 @@ lemma assoc_cons x y s a:
   = if a = x then Some y else assoc s a.
 proof.
   rewrite /assoc /= index_cons /=; case: (a = x)=> //=.
-  by move=> _; rewrite -addzA /=addz1_neq0 // index_ge0.
+  by move=> _; rewrite addz1_neq0 // index_ge0.
 qed.
 
 lemma assoc_head x y s: assoc<:'a, 'b> ((x, y) :: s) x = Some y.

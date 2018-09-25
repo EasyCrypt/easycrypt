@@ -81,6 +81,7 @@ val pamemory  : EcMemory.memory -> pt_arg
 val pamodule  : EcPath.mpath * EcModules.module_sig -> pt_arg
 val paglobal  : EcPath.path -> ty list -> pt_arg
 val palocal   : EcIdent.t -> pt_arg
+val pahandle  : handle -> pt_arg
 
 (* -------------------------------------------------------------------- *)
 (* EasyCrypt rewrite proof-term:                                        *)
@@ -345,6 +346,7 @@ module FApi : sig
   val t_try_base : backward -> tcenv1 -> [`Failure of exn | `Success of tcenv]
 
   val t_try    : backward -> backward
+  val t_xswitch: ?on:[`All|`Focus] -> (tcenv1 -> tcenv * backward) -> iffail:backward -> backward
   val t_switch : ?on:[`All|`Focus] -> backward -> ifok:backward -> iffail:backward -> backward
   val t_do_r   : ?focus:int -> [`All | `Maybe] -> int option -> backward -> tcenv -> tcenv
   val t_do     : [`All | `Maybe] -> int option -> backward -> backward

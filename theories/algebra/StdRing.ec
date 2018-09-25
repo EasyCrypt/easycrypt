@@ -20,7 +20,21 @@ theory RField.
     op   [ - ] <- Real.([-]),
     op   ( * ) <- Real.( * ),
     op   invr  <- Real.inv
-    proof * by smt remove abbrev (-) remove abbrev (/).
+    proof *
+  remove abbrev (-) remove abbrev (/).
+  realize addrA     by smt().
+  realize addrC     by smt().
+  realize add0r     by smt().
+  realize addNr     by smt().
+  realize oner_neq0 by smt().
+  realize mulrA     by smt().
+  realize mulrC     by smt().
+  realize mul1r     by smt().
+  realize mulrDl    by smt().
+  realize mulVr     by rewrite /left_inverse_in /#.
+  realize unitP     by smt().
+  realize unitout   by move=> x /= ->; exact/invr0.
+  realize mulf_eq0  by smt().
 
   lemma nosmt ofintR (i : int): ofint i = i%r.
   proof.
@@ -63,17 +77,17 @@ instance ring with int
   op mul   = Int.( * )
   op expr  = IntExtra.( ^ )
 
-  proof oner_neq0 by smt
-  proof addr0     by smt
-  proof addrA     by smt
-  proof addrC     by smt
-  proof addrN     by smt
-  proof mulr1     by smt
-  proof mulrA     by smt
-  proof mulrC     by smt
-  proof mulrDl    by smt
-  proof expr0     by smt
-  proof exprS     by smt.
+  proof oner_neq0 by smt()
+  proof addr0     by smt()
+  proof addrA     by smt()
+  proof addrC     by smt()
+  proof addrN     by smt()
+  proof mulr1     by smt()
+  proof mulrA     by smt()
+  proof mulrC     by smt()
+  proof mulrDl    by smt()
+  proof expr0     by smt(pow0)
+  proof exprS     by smt(powS).
 
 op bid (b:bool) = b.
 
@@ -84,14 +98,14 @@ instance bring with bool
   op mul   = (/\)
   op opp   = bid
 
-  proof oner_neq0 by smt
-  proof addr0     by smt
-  proof addrA     by smt
-  proof addrC     by smt
-  proof addrK     by smt
-  proof mulr1     by smt
-  proof mulrA     by smt
-  proof mulrC     by smt
-  proof mulrDl    by smt
-  proof mulrK     by smt
-  proof oppr_id   by smt.
+  proof oner_neq0 by smt()
+  proof addr0     by smt()
+  proof addrA     by smt()
+  proof addrC     by smt()
+  proof addrK     by smt()
+  proof mulr1     by smt()
+  proof mulrA     by smt()
+  proof mulrC     by smt()
+  proof mulrDl    by smt()
+  proof mulrK     by smt()
+  proof oppr_id   by smt().

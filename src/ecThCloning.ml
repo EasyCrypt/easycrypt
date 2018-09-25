@@ -376,7 +376,7 @@ end = struct
            let tc = FPNamed (loced (thd @ prefix, x),
                              Some (loced (TVIunamed params))) in
            let tc = { fp_mode = `Explicit; fp_head = tc; fp_args = []; } in
-           let tc = Papply (`Apply ([tc], `Exact)) in
+           let tc = Papply (`Apply ([tc], `Exact), None) in
            let tc = loced (Plogic tc) in
            let pr = { pthp_mode   = `Named (loced (xdth @ prefix, x));
                       pthp_tactic = Some tc }

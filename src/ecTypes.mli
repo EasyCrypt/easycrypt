@@ -60,6 +60,10 @@ val tytuple_flat : ty -> ty list
 val tyfun_flat   : ty -> (dom * ty)
 
 (* -------------------------------------------------------------------- *)
+val is_tdistr : ty -> bool
+val as_tdistr : ty -> ty option
+
+(* -------------------------------------------------------------------- *)
 exception FoundUnivar
 
 val ty_check_uni : ty -> unit

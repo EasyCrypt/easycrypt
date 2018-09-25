@@ -25,7 +25,7 @@ module Low = struct
       | _ ->
           tc_error_lazy pf (fun fmt ->
             Format.fprintf fmt
-              "the %ith instruction is not a conditionnal" at_pos)
+              "the targetted instruction is not a conditionnal")
     in
     let e = form_of_expr m e in
     let e = if b then e else f_not e in

@@ -27,6 +27,7 @@ object
   method notice      : immediate:bool -> loglevel -> string -> unit
   method finish      : status -> unit
   method finalize    : unit
+  method setwidth    : int -> unit
 end
 
 (* -------------------------------------------------------------------- *)
@@ -45,6 +46,9 @@ let finish status (t : terminal) =
 let finalize (t : terminal) =
   t#finalize
 
+let setwidth (t : terminal) (i : int) =
+  t#setwidth i
+
 (* -------------------------------------------------------------------- *)
 class from_emacs () : terminal =
 object(self)
@@ -62,7 +66,7 @@ object(self)
     in
       List.iteri
         (fun i x ->
-          Printf.printf "%s%s%s\n%!"
+          Format.printf "%s%s%s\n%!"
           prefix (if i = 0 then "+ " else "| ") x)
         (String.split_lines msg)
 
@@ -73,7 +77,7 @@ object(self)
         startpos <- lexbuf.L.lex_curr_p.L.pos_cnum
     end;
 
-    Printf.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
+    Format.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
     EcIo.parse iparser
 
   method notice ~(immediate:bool) (lvl : loglevel) (msg : string) =
@@ -102,6 +106,10 @@ object(self)
 
   method finalize =
     EcIo.finalize iparser
+
+  method setwidth (i : int) =
+    Format.pp_set_margin Format.std_formatter i;
+    Format.pp_set_margin Format.err_formatter i
 end
 
 let from_emacs () = new from_emacs ()
@@ -114,14 +122,14 @@ object
   method interactive = true
 
   method next =
-    Printf.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
+    Format.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
     EcIo.drain iparser;
     EcIo.parse iparser
 
   method notice ~(immediate:bool) (_ : loglevel) (msg : string) =
     ignore immediate;
     List.iter
-      (fun x -> Printf.fprintf stderr "%s\n%!" x)
+      (fun x -> Format.eprintf "%s\n%!" x)
       (String.split_lines msg)
 
   method finish (status : status) =
@@ -134,6 +142,10 @@ object
 
   method finalize =
     EcIo.finalize iparser
+
+  method setwidth (i : int) =
+    Format.pp_set_margin Format.std_formatter i;
+    Format.pp_set_margin Format.err_formatter i
 end
 
 let from_tty () = new from_tty ()
@@ -180,7 +192,7 @@ object(self)
       let unu, unust = human unu "B" ["kB"; "MB"; "GB"] in
 
       tick <- tick + 1;
-      Printf.eprintf "[%c] [%.4d] %.1f %% (%.1f%s / [frag %.1f%s])\r%!"
+      Format.eprintf "[%c] [%.4d] %.1f %% (%.1f%s / [frag %.1f%s])\r%!"
         ticks.[tick mod (String.length ticks)] lineno
         (100. *. ((float_of_int position) /. (float_of_int sz)))
         mem memst unu unust
@@ -190,8 +202,8 @@ object(self)
     if erase then begin
       let fmt = "[*] [----] ---.- (------.-?B% - [---- ------.-?B%])" in
         if sz >= 0 && doprg then
-          Printf.eprintf "%*s\r%!" (String.length fmt) ""
-    end else Printf.eprintf "\n%!";
+          Format.eprintf "%*s\r%!" (String.length fmt) ""
+    end else Format.eprintf "\n%!";
     doprg <- doprg && not final
 
   method private _notice ?subloc ~immediate (lvl : loglevel) (msg : string) =
@@ -201,11 +213,11 @@ object(self)
       let prefix = EcGState.string_of_loglevel lvl in
       let strloc =
         match subloc with
-        | None -> Printf.sprintf "%s:%d" name (fst (loc.LC.loc_end))
+        | None -> Format.sprintf "%s:%d" name (fst (loc.LC.loc_end))
         | Some loc -> LC.tostring loc
       in
         self#_clear_update ~final:false ();
-        Printf.eprintf "[%.8s] [%s] %s\n%!" prefix strloc msg;
+        Format.eprintf "[%.8s] [%s] %s\n%!" prefix strloc msg;
         self#_update_progress
 
   method interactive = false
@@ -246,6 +258,10 @@ object(self)
         sz <- stat.Unix.st_size
     with Unix.Unix_error _ -> ()
   end
+
+  method setwidth (i : int) =
+    Format.pp_set_margin Format.std_formatter i;
+    Format.pp_set_margin Format.err_formatter i
 end
 
 let from_channel ?gcstats ~name stream =

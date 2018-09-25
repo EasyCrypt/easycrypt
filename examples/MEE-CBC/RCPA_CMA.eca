@@ -279,7 +279,7 @@ theory MtE.
                       /\ (ek,mk){1} = k{1}).
             by call (_: true); auto.
           if=> //=.
-            auto; call (_: true); auto=> /> &1 &2 -> /> eq_qs -> /> _.
+            auto; call (_: true); auto=> /> &1 &2 _ /> eq_qs _ /> _.
             by case: (pt{2})=> //= -[p t] r; case: r=> //= _; rewrite !oget_some /= eq_qs.
           by auto; smt.
         (* lossless after win *)

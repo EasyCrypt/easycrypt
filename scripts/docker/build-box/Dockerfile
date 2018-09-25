@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM ubuntu:18.04
 
 MAINTAINER Pierre-Yves Strub <pierre-yves@strub.nu>
 
@@ -27,10 +27,10 @@ ENV OPAMJOBS    2
 
 RUN \
 	opam init -a && \
-	opam switch -v -A 4.03.0 easycrypt && \
+	opam switch -v -A 4.04.0 easycrypt && \
 	opam remote add easycrypt https://github.com/EasyCrypt/opam.git && \
 	opam install depext && opam depext easycrypt ec-provers && \
-	opam install ec-provers && \
+	opam install alt-ergo eprover && sudo apt-get -q -y install z3 cvc4 && \
 	opam install --deps-only easycrypt && \
 	rm -rf .opam/packages.dev/* && sudo apt-get -q -y clean
 

@@ -96,7 +96,7 @@ theory IterOp.
     0 <= n => iter (n + 1) opr x = iter n opr (opr x).
   proof.
     elim: n=> /=; first by rewrite (iterS 0) ?iter0.
-    by move=> n geo0 ih; rewrite iterS 2:ih ?iterS // addz_ge0.
+    by move=> n geo0 ih; rewrite (iterS (n+1)) 2:ih ?iterS // addz_ge0.
   qed.
 
   op iterop ['a] (n : int) opr (x z : 'a) : 'a =
@@ -114,7 +114,7 @@ theory IterOp.
     iterop (n+1) opr x z = iter n (opr x) x.
   proof.
     rewrite /iterop; elim: n=> /=; first by rewrite iter0 ?(iteriS 0).
-    move=> n ge0_n /= ih; rewrite iteriS 1:addz_ge0 //= ih.
+    move=> n ge0_n /= ih; rewrite (@iteriS (n+1)) 1:addz_ge0 //= ih.
     by rewrite {1}addzC lez_add1r ltzNge ge0_n /= iterS.
   qed.
 end IterOp.

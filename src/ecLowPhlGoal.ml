@@ -166,6 +166,21 @@ let tc1_as_equivS   tc = pf_as_equivS   !!tc (FApi.tc1_goal tc)
 let tc1_as_eagerF   tc = pf_as_eagerF   !!tc (FApi.tc1_goal tc)
 
 (* -------------------------------------------------------------------- *)
+let tc1_get_stmt side tc =
+  let concl = FApi.tc1_goal tc in
+  match side, concl.f_node with
+  | None, FhoareS hs -> hs.hs_s
+  | None, FbdHoareS hs -> hs.bhs_s
+  | Some _ , (FhoareS _ | FbdHoareS _) ->
+      tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
+  | Some `Left, FequivS es   -> es.es_sl
+  | Some `Right, FequivS es  -> es.es_sr
+  | None, FequivS _ ->
+      tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
+  | _            ->
+      tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
+
+(* -------------------------------------------------------------------- *)
 let get_pre f =
   match f.f_node with
   | FhoareF hf   -> Some (hf.hf_pr )
@@ -209,30 +224,22 @@ let set_pre ~pre f =
  | _            -> assert false
 
 (* -------------------------------------------------------------------- *)
-exception InvalidSplit of int * int * int
-
-let s_split_i i s =
-  let len = List.length s.s_node in
-    if i <= -len || len < i then
-      raise (InvalidSplit (i, 1, len));
-    let (hd, tl) =
-      if   0 <= i
-      then EcModules.s_split (i-1) s
-      else EcModules.s_split (len+i-1) s
-    in (hd, List.hd tl, List.tl tl)
+exception InvalidSplit of codepos1
 
 let s_split i s =
-  let len = List.length s.s_node in
-    if i < -len || len < i then
-      raise (InvalidSplit (i, 0, len));
-    if   0 <= i
-    then EcModules.s_split i s
-    else EcModules.s_split (len+i) s
+  let module Zpr = EcMatching.Zipper in
+  try  Zpr.split_at_cpos1 i s
+  with Zpr.InvalidCPos -> raise (InvalidSplit i)
 
-let s_split_o i s =
-  match i with
-  | None   -> ([], s.s_node)
-  | Some i -> s_split i s
+let s_split_i i s =
+  let module Zpr = EcMatching.Zipper in
+  try  Zpr.find_by_cpos1 ~rev:false i s
+  with Zpr.InvalidCPos -> raise (InvalidSplit i)
+
+let o_split ?rev i s =
+  let module Zpr = EcMatching.Zipper in
+  try  Zpr.may_split_at_cpos1 ?rev i s
+  with Zpr.InvalidCPos -> raise (InvalidSplit (oget i))
 
 (* -------------------------------------------------------------------- *)
 let t_hS_or_bhS_or_eS ?th ?tbh ?te tc =
@@ -447,7 +454,6 @@ let generalize_mod_ env m modi f =
 
   (* 3.a. Add the global variables *)
 
-(*  let scheck = proj3_3 (generalize_subst_ env m melts mglob )in *)
   let (bd', bd, s ) = generalize_subst_ env m uelts uglob in
    (* 3.b. Check that the modify variables does not clash with
            the variables not generalized *)

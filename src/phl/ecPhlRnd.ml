@@ -14,7 +14,9 @@ open EcModules
 open EcFol
 open EcPV
 
+open EcCoreLib
 open EcCoreGoal
+open EcLowGoal
 open EcLowPhlGoal
 
 module TTC = EcProofTyping
@@ -108,6 +110,117 @@ let wp_equiv_rnd_r bij tc =
   let concl = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=concl; } in
 
   FApi.xmutate1 tc `Rnd [concl]
+
+(* -------------------------------------------------------------------- *)
+let wp_equiv_rnd_r bij tc =
+  let module E = struct exception Abort end in
+
+  let tc = wp_equiv_rnd_r bij tc in
+  let es = tc1_as_equivS (FApi.as_tcenv1 tc) in
+
+  let c1, c2, c3 = destr_and3 es.es_po in
+  let (x, xty, c3) = destr_forall1 c3 in
+  let ind, (c3, c4) = snd_map destr_and (destr_imp c3) in
+  let newc2 = EcFol.f_forall_mems [es.es_ml; es.es_mr] c2 in
+  let newc3 = EcFol.f_forall_mems [es.es_ml; es.es_mr]
+                (f_forall [x, xty] (f_imp ind c3)) in
+
+  let solve n f tc =
+    let tt =
+      FApi.t_seqs
+        [EcLowGoal.t_intros_n n;
+         EcLowGoal.t_auto ~bases:["random"] ~depth:2;
+         EcLowGoal.t_fail] in
+
+    let subtc, hd = FApi.newgoal tc f in
+
+    try
+      let subtc =
+        FApi.t_last
+          (fun tc1 ->
+            match FApi.t_try_base tt tc1 with
+            | `Failure _  -> raise E.Abort
+            | `Success tc -> tc)
+          subtc
+      in (subtc, Some hd)
+
+    with E.Abort -> tc, None in
+
+  let subtc = tc in
+  let subtc, hdc2 = solve 4 newc2 subtc in
+  let subtc, hdc3 = solve 4 newc3 subtc in
+
+  let po =
+    match hdc2, hdc3 with
+    | None  , None   -> None
+    | Some _, Some _ -> Some (f_anda c1 (f_forall [x, xty] (f_imp ind c4)))
+    | Some _, None   -> Some (f_anda c1 (f_forall [x, xty] (f_imp ind (f_anda c3 c4))))
+    | None  , Some _ -> Some (f_andas [c1; c2; f_forall [x, xty] (f_imp ind c4)])
+  in
+
+  let t_apply_prept pt tc =
+    Apply.t_apply_bwd_r (EcProofTerm.pt_of_prept tc pt) tc in
+
+  match po with None -> tc | Some po ->
+
+  let m1  = EcIdent.create "_" in
+  let m2  = EcIdent.create "_" in
+  let h   = EcIdent.create "_" in
+  let h1  = EcIdent.create "_" in
+  let h2  = EcIdent.create "_" in
+  let h3  = EcIdent.create "_" in
+  let x   = EcIdent.create "_" in
+  let hin = EcIdent.create "_" in
+
+  FApi.t_onalli (function
+    | 0 -> EcLowGoal.t_trivial ?subtc:None
+    | 1 ->
+      let open EcProofTerm.Prept in
+
+     let proj1 pt =
+       uglob CI_Logic.p_anda_proj_l @ [h_; h_; asub pt] in
+
+     let proj2 pt h =
+       uglob CI_Logic.p_anda_proj_r @ [h_; h_; asub pt; ahyp h] in
+
+      let t_c1  = t_apply_prept (proj1 (hyp h)) in
+
+      let t_c2 =
+        let pt =
+          match hdc2 with
+          | None -> proj1 (proj2 (hyp h) h1)
+          | Some hd -> hdl hd @ [amem m1; amem m2] in
+        t_apply_prept pt in
+
+      let t_c3_c4 =
+        let pt =
+          match hdc2 with
+          | None   -> proj2 (proj2 (hyp h) h1) h2
+          | Some _ -> proj2 (hyp h) h1 in
+        match hdc3 with
+        | None -> t_apply_prept pt
+        | Some hd ->
+          let fx = f_local x (gty_as_ty xty) in
+          (  t_intros_i [x; hin]
+          @! t_split
+          @+ [ t_apply_prept (hdl hd @ [amem m1; amem m2; aform fx; ahyp hin])
+             ; t_intros_i [h3]
+               @! t_apply_prept (pt @ [aform fx; ahyp hin])])
+      in
+
+      (  t_intros_i [m1; m2; h]
+      @! t_split
+      @+ [ t_c1
+         ; t_intros_i [h1] @! t_split
+         @+ [ t_c2
+            ; t_intros_i [h2] @! t_c3_c4 ]])
+
+
+    | _ -> EcLowGoal.t_id)
+
+    (FApi.t_first
+      (EcPhlConseq.t_equivS_conseq es.es_pr po)
+      subtc)
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_rnd_r tc =

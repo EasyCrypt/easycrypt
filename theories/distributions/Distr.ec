@@ -925,3 +925,9 @@ case: (weight d = 0%r) => Hw.
 apply dscalar_uni =>//; smt (ge0_weight @Real).
 qed.
 
+(* -------------------------------------------------------------------- *)
+lemma nosmt rnd_funi ['a] (d : 'a distr) :
+  is_funiform d => forall x y, mu1 d x = mu1 d y.
+proof. by apply. qed.
+
+hint solve 0 random : rnd_funi.

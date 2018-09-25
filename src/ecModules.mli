@@ -85,8 +85,6 @@ val s_empty    : stmt
 val stmt  : instr list -> stmt
 val rstmt : instr list -> stmt
 
-val s_split : int -> stmt -> instr list * instr list
-
 (* the following functions raise Not_found if the argument does not match *)
 val destr_asgn   : instr -> lvalue * expr
 val destr_rnd    : instr -> lvalue * expr

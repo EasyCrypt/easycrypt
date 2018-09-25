@@ -528,7 +528,9 @@ section Reduce.
       split=> [|_ r _]; 1:smt (dBlock_uffu).
       split=> [|_]; 1:smt (dBlock_uffu).
       split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
-      by rewrite Ring.IntID.subrK; split=> ->; smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+split.
+      by move=> h; rewrite -Block.addrA Block.subrr Block.addr0 /= /#.
+      by move=> h; rewrite -Block.addrA Block.subrr Block.addr0 /= /#.
     wp; rnd (fun x => x + pi{2}).
     auto=> /> &2 szp_neq_0; split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
     split=> [|_ s _]; 1:smt (dBlock_uffu).

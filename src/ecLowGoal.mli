@@ -29,6 +29,7 @@ type lazyred = EcProofTyping.lazyred
 (* -------------------------------------------------------------------- *)
 val (@!) : FApi.backward -> FApi.backward -> FApi.backward
 val (@+) : FApi.backward -> FApi.backward list -> FApi.backward
+val (@>) : FApi.backward -> FApi.backward -> FApi.backward
 
 val (@~)  : FApi.backward -> FApi.tactical -> FApi.backward
 val (@!+) : FApi.tactical -> FApi.backward -> FApi.tactical
@@ -194,11 +195,11 @@ type rwspec = [`LtoR|`RtoL] * ptnpos option
 type rwmode = [`Bool | `Eq]
 
 val t_rewrite :
-     ?xconv:xconv -> ?target:ident -> ?mode:rwmode
+     ?xconv:xconv -> ?target:ident -> ?mode:rwmode -> ?donot:bool
   -> proofterm -> rwspec -> FApi.backward
 
 val t_rewrite_hyp :
-     ?xconv:xconv -> ?mode:rwmode -> EcIdent.t
+     ?xconv:xconv -> ?mode:rwmode -> ?donot:bool -> EcIdent.t
   -> rwspec -> FApi.backward
 
 type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
@@ -288,7 +289,9 @@ val t_progress :
      ?ti:(EcIdent.t -> EcCoreGoal.FApi.backward) ->
      FApi.backward -> FApi.backward
 
-val t_crush : ?delta:bool -> ?tsolve:FApi.backward -> FApi.backward
+(* -------------------------------------------------------------------- *)
+val t_crush     : ?delta:bool -> ?tsolve:FApi.backward -> FApi.backward
+val t_crush_fwd : ?delta:bool -> int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_congr : form pair -> form pair list * ty -> FApi.backward

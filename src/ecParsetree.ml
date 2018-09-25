@@ -71,6 +71,7 @@ type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
 
 and pexpr_r =
+  | PEcast   of pexpr * pty                       (* type cast          *)
   | PEint    of zint                              (* int. literal       *)
   | PEident  of pqsymbol * ptyannot option        (* symbol             *)
   | PEapp    of pexpr * pexpr list                (* op. application    *)
@@ -237,6 +238,7 @@ type pformula  = pformula_r located
 
 and pformula_r =
   | PFhole
+  | PFcast   of pformula * pty
   | PFint    of zint
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option
@@ -305,6 +307,7 @@ type poperator = {
   po_kind   : [`Op | `Const];
   po_name   : psymbol;
   po_aliases: psymbol list;
+  po_tags   : psymbol list;
   po_tyvars : ptyvardecls option;
   po_args   : ptybindings;
   po_def    : pop_def;
@@ -395,7 +398,11 @@ type preduction = {
 }
 
 (* -------------------------------------------------------------------- *)
-type codepos = int * ((int * codepos) option)
+type cp_match = [ `If | `While | `Assign | `Sample | `Call ]
+type cp_base  = [ `ByPos of int | `ByMatch of int option * cp_match ]
+
+type codepos1 = int * cp_base
+type codepos  = (codepos1 * int) list * codepos1
 
 (* -------------------------------------------------------------------- *)
 type 'a doption =
@@ -493,13 +500,13 @@ type fun_info = [
 
 (* -------------------------------------------------------------------- *)
 type app_info =
-  oside * tac_dir * int doption * pformula doption * p_app_bd_info
+  oside * tac_dir * codepos1 doption * pformula doption * p_app_bd_info
 
 (* -------------------------------------------------------------------- *)
 type pcond_info = [
   | `Head   of oside
-  | `Seq    of oside * int option * int option * pformula
-  | `SeqOne of side * int option * pformula * pformula
+  | `Seq    of oside * codepos1 option pair * pformula
+  | `SeqOne of  side * codepos1 option * pformula * pformula
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -539,7 +546,7 @@ type conseq_ppterm = ((pformula option pair) * (phoarecmp option * pformula) opt
 
 (* -------------------------------------------------------------------- *)
 type sim_info = {
-  sim_pos  : int pair option;
+  sim_pos  : codepos1 pair option;
   sim_hint : (pgamepath option pair * pformula) list * pformula option;
   sim_eqs  : pformula option
 }
@@ -549,21 +556,24 @@ type pcqoption  = [ `Frame ]
 type pcqoptions = (bool * pcqoption) list
 
 (* -------------------------------------------------------------------- *)
+type crushmode = { cm_simplify : bool; cm_solve : bool; }
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
   | Pfun           of fun_info
   | Papp           of app_info
-  | Pwp            of int doption option
-  | Psp            of int doption option
+  | Pwp            of codepos1 doption option
+  | Psp            of codepos1 doption option
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info
   | Pfission       of (oside * codepos * (int * (int * int)))
   | Pfusion        of (oside * codepos * (int * (int * int)))
-  | Punroll        of (oside * codepos)
+  | Punroll        of (oside * codepos * bool)
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
-  | Prcond         of (oside * bool * int)
+  | Prcond         of (oside * bool * codepos1)
   | Pcond          of pcond_info
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
@@ -573,12 +583,13 @@ type phltactic =
   | Palias         of (oside * codepos * osymbol_r)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
+  | Pconseqauto    of crushmode
   | Phrex_elim
   | Phrex_intro    of pformula list
   | Pexfalso
   | Pbydeno        of ([`PHoare | `Equiv ] * (deno_ppterm * bool * pformula option))
   | PPr            of (pformula * pformula) option
-  | Pfel           of (int * fel_info)
+  | Pfel           of (codepos1 * fel_info)
   | Phoare
   | Pprbounded
   | Psim           of sim_info
@@ -587,7 +598,7 @@ type phltactic =
   | Pbdhoare_split of bdh_split
 
     (* Eager *)
-  | Peager_seq       of (eager_info * int pair * pformula)
+  | Peager_seq       of (eager_info * codepos1 pair * pformula)
   | Peager_if
   | Peager_while     of (eager_info)
   | Peager_fun_def
@@ -600,6 +611,7 @@ type phltactic =
 
     (* Automation *)
   | Pauto
+  | Plossless
 
 (* -------------------------------------------------------------------- *)
 type include_exclude = [ `Include | `Exclude ]
@@ -716,7 +728,7 @@ and ipcore = [
 and icasemode =
   [`One | `Full of (bool * bool) * icasemode_full option]
 
-and crushmode = { cm_simplify : bool; cm_solve : bool; }
+
 
 and icasemode_full =
   [`AtMost of int | `AsMuch]
@@ -776,7 +788,7 @@ type logtactic =
   | Ptrivial
   | Pcongr
   | Pelim       of (prevert * pqsymbol option)
-  | Papply      of apply_info
+  | Papply      of (apply_info * prevert option)
   | Pcut        of pcut
   | Pcutdef     of (intropattern * pcutdef)
   | Pmove       of prevertv
@@ -1056,7 +1068,7 @@ type global_action =
   | Gprover_info of pprover_infos
   | Gsave        of save located
   | Gpragma      of psymbol
-  | Goption      of (psymbol * bool)
+  | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
 
 type global = {

@@ -215,12 +215,6 @@ module LowInternal = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let s_split pos stmt =
-  match pos with
-  | None   -> (stmt.s_node, [])
-  | Some i -> s_split i stmt
-
-(* -------------------------------------------------------------------- *)
 let t_sp_side pos tc =
   let module LI = LowInternal in
 
@@ -246,7 +240,7 @@ let t_sp_side pos tc =
   match concl.f_node, pos with
   | FhoareS hs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
-      let stmt1, stmt2 = s_split pos hs.hs_s in
+      let stmt1, stmt2 = o_split ~rev:true pos hs.hs_s in
       let stmt1, hs_pr = LI.sp_stmt (EcMemory.memory hs.hs_m) env stmt1 hs.hs_pr in
       check_sp_progress pos stmt1;
       let subgoal = f_hoareS_r { hs with hs_s = stmt (stmt1@stmt2); hs_pr } in
@@ -254,7 +248,7 @@ let t_sp_side pos tc =
 
   | FbdHoareS bhs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
-      let stmt1, stmt2 = s_split pos bhs.bhs_s in
+      let stmt1, stmt2 = o_split ~rev:true pos bhs.bhs_s in
       begin
         let write_set = EcPV.s_write env (EcModules.stmt stmt1) in
         let read_set  = EcPV.PV.fv env (EcMemory.memory bhs.bhs_m) bhs.bhs_bd in
@@ -271,8 +265,8 @@ let t_sp_side pos tc =
       let posL = pos |> omap fst in
       let posR = pos |> omap snd in
 
-      let stmtL1, stmtL2 = s_split posL es.es_sl in
-      let stmtR1, stmtR2 = s_split posR es.es_sr in
+      let stmtL1, stmtL2 = o_split ~rev:true posL es.es_sl in
+      let stmtR1, stmtR2 = o_split ~rev:true posR es.es_sr in
 
       let         es_pr = es.es_pr in
       let stmtL1, es_pr = LI.sp_stmt (EcMemory.memory es.es_ml) env stmtL1 es_pr in

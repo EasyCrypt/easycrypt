@@ -55,6 +55,7 @@
     "then"        , THEN       ;        (* KW: prog *)
     "else"        , ELSE       ;        (* KW: prog *)
     "elif"        , ELIF       ;        (* KW: prog *)
+    "for"         , FOR        ;        (* KW: prog *)
     "while"       , WHILE      ;        (* KW: prog *)
     "assert"      , ASSERT     ;        (* KW: prog *)
     "return"      , RETURN     ;        (* KW: prog *)
@@ -308,28 +309,6 @@
   let lex_tick_operator (op : string) =
     let name = Printf.sprintf "`%s`" op in
     lex_std_op ~name op
-
-  (* ------------------------------------------------------------------ *)
-  exception InvalidCodePosition
-
-  let cposition_of_string =
-    let cpos1 x =
-      try  int_of_string x
-      with Failure x when x = "int_of_string" ->
-        raise InvalidCodePosition
-    in
-
-    let rec doit = function
-      | Str.Text c :: []                  -> (cpos1 c, None)
-      | Str.Text c :: Str.Delim "." :: tl -> (cpos1 c, Some (0, doit tl))
-      | Str.Text c :: Str.Delim "?" :: tl -> (cpos1 c, Some (1, doit tl))
-      | _ -> raise InvalidCodePosition
-    in
-      fun s -> doit (Str.full_split (Str.regexp "[.?]") s)
-
-  let cposition_of_string s =
-    try  Some (cposition_of_string s)
-    with InvalidCodePosition -> None
 }
 
 let empty   = ""
@@ -385,11 +364,6 @@ rule main = parse
   | ".`"    { [DOTTICK  ] }
   | "{0,1}" { [RBOOL    ] }
 
-  (* position *)
-  | (digit+ ['.' '?'])+ digit+ {
-      [CPOS (oget (cposition_of_string (Lexing.lexeme lexbuf)))]
-    }
-
   (* punctuation *)
   | '_'   { [UNDERSCORE] }
   | "#<"  { [DASHLT    ] }
@@ -411,6 +385,7 @@ rule main = parse
   | "`|"  { [TICKPIPE  ] }
   | "<$"  { [LESAMPLE  ] }
   | "<@"  { [LEAT      ] }
+  | ":~"  { [COLONTILD ] }
 
   | "/~="  { [SLASHTILDEQ     ] }
   | "//~=" { [SLASHSLASHTILDEQ] }

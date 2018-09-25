@@ -170,6 +170,11 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     tx tc
 
 (* -------------------------------------------------------------------- *)
+and process_conseqauto cm tc =
+  let delta, tsolve = process_crushmode cm in
+  EcPhlConseq.t_conseqauto ~delta ?tsolve tc
+
+(* -------------------------------------------------------------------- *)
 and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   let (tx : tcenv1 -> tcenv) =
     match unloc t with
@@ -182,7 +187,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pwp wp                    -> EcPhlWp.t_wp wp
     | Psp sp                    -> EcPhlSp.t_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
-    | Pcond side                -> EcPhlCond.process_cond side
+    | Pcond side                -> EcPhlHiCond.process_cond side
     | Pwhile (side, info)       -> EcPhlWhile.process_while side info
     | Pasyncwhile info          -> EcPhlWhile.process_async_while info
     | Pfission info             -> EcPhlLoopTx.process_fission info
@@ -198,6 +203,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pset info                 -> EcPhlCodeTx.process_set info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
+    | Pconseqauto cm            -> process_conseqauto cm
     | Phrex_elim                -> EcPhlExists.t_hr_exists_elim
     | Phrex_intro fs            -> EcPhlExists.process_exists_intro fs
     | Pexfalso                  -> EcPhlAuto.t_exfalso
@@ -205,7 +211,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | PPr pr                    -> EcPhlPr.process_ppr pr
     | Pfel (pos, info)          -> EcPhlFel.process_fel pos info
     | Phoare                    -> EcPhlBdHoare.t_hoare_bd_hoare
-    | Pbdhoare_split i          -> EcPhlBdHoare.process_bdhoare_split i
+    | Pbdhoare_split i          -> EcPhlHiBdHoare.process_bdhoare_split i
     | Pprbounded                -> EcPhlPr.t_prbounded true
     | Psim info                 -> EcPhlEqobs.process_eqobs_in info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
@@ -219,16 +225,16 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Peager infos              -> curry EcPhlEager.process_eager infos
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto
+    | Plossless                 -> EcPhlHiAuto.t_lossless
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
   in
 
   try  tx tc
   with (* PHL Specific low errors *)
-  | EcLowPhlGoal.InvalidSplit (i, lo, hi) ->
+  | EcLowPhlGoal.InvalidSplit cpos1 ->
       tc_error_lazy !!tc (fun fmt ->
-        Format.fprintf fmt
-          "invalid split index: %d is not in the interval [%d..%d]"
-          i lo hi)
+        Format.fprintf fmt "invalid split index: %s"
+          (EcPrinting.string_of_cpos1 cpos1))
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =

@@ -252,7 +252,7 @@ lemma cbc_enc_rcons (P : block -> block -> block) k st (p:block list) pn:
   = cbc_enc P k st (rcons p pn).
 proof.
   elim p st=> //= pi p ih st /=.
-  by rewrite add1z_neq0 1:size_ge0 /= -addzA addzC -addzA (addzC (-1)) -ih.
+  by rewrite add1z_neq0 1:size_ge0 /= addzC (addzC (-1)) -ih.
 qed.
 
 lemma cbc_dec_rcons (Pi : block -> block -> block) k st (c:block list) cn:
@@ -261,7 +261,7 @@ lemma cbc_dec_rcons (Pi : block -> block -> block) k st (c:block list) cn:
 proof.
   elim c st=> //= ci c ih st //=.
   rewrite -lez_add1r /= ler_addl size_ge0 /=.
-  rewrite -addzA addzC -addzA (addzC (-1)) -ih /=.
+  rewrite addzC -ih /=.
   by rewrite ltzNge lez_eqVlt negb_or ltzNge size_ge0 /= if_neg.
 qed.
 
@@ -481,7 +481,7 @@ proof.
       rewrite (take_nth witness) //= -cbc_enc_rcons -cats1 /=.
       by rewrite size_take // lti_szpadded.
     have -> /=: i{hr} + 1 <> 0 by smt ().
-    by rewrite cats1 nth_rcons size_cbc_enc size_take // lti_szpadded /= -addzA.
+    by rewrite cats1 nth_rcons size_cbc_enc size_take // lti_szpadded /=.
   wp=> //=.
   conseq (_: _ ==> s :: mee_enc AES hmac_sha256 _ek _mk s _p = _c)=> //=.
     move=> &m [->>] ->> iv //=; split=> [[[le0_size _] h]|<<-].
