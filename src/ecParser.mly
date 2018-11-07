@@ -413,6 +413,7 @@
 %token DROP
 %token DUMP
 %token EAGER
+%token ECALL
 %token ELIF
 %token ELIM
 %token ELSE
@@ -424,6 +425,7 @@
 %token EXACT
 %token EXFALSO
 %token EXIST
+%token EXLIM
 %token EXPECT
 %token EXPORT
 %token FEL
@@ -632,6 +634,8 @@ _lident:
 | SOLVE    { "solve"    }
 | STRICT   { "strict"   }
 | WLOG     { "wlog"     }
+| EXLIM    { "exlim"    }
+| ECALL    { "ecall"    }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -2776,8 +2780,13 @@ phltactic:
 | ELIM STAR
     { Phrex_elim }
 
-| EXIST STAR l=iplist1(sform, COMMA) %prec prec_below_comma
-    { Phrex_intro l }
+| b=ID(EXIST STAR { false } | EXLIM { true })
+    l=iplist1(sform, COMMA) %prec prec_below_comma
+
+    { Phrex_intro (l, b) }
+
+| ECALL s=side? x=paren(p=qident tvi=tvars_app? fs=sform* { (p, tvi, fs) })
+    { Phecall (s, x) }
 
 | EXFALSO
     { Pexfalso }

@@ -25,6 +25,7 @@ val t_hoare_call   : form -> form -> backward
 val t_bdhoare_call : form -> form -> form option -> backward
 val t_equiv_call   : form -> form -> backward
 val t_equiv_call1  : side -> form -> form -> backward
+val t_call         : oside -> form -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_call : oside -> call_info gppterm -> backward
