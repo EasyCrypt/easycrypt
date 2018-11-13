@@ -255,7 +255,7 @@ let t_call side ax tc =
   | FbdHoareF hf, FequivS _ ->
       let side =
         match side with
-        | None -> tc_error !!tc "FIXME"
+        | None -> tc_error !!tc "call: a side {1|2} should be provided"
         | Some side -> side
       in
         t_equiv_call1 side hf.bhf_pr hf.bhf_po tc
