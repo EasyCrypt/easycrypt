@@ -727,6 +727,29 @@ let pp_stype ppe fmt ty =
   pp_type_r ppe ((1 + fst t_prio_tpl, `NonAssoc), `NonAssoc) fmt ty
 
 (* -------------------------------------------------------------------- *)
+let pp_opname fmt (nm, op) =
+  let op =
+    if EcCoreLib.is_mixfix_op op then
+      Printf.sprintf "\"%s\"" op
+    else if is_binop op then begin
+      if op.[0] = '*' || op.[String.length op - 1] = '*'
+      then Format.sprintf "( %s )" op
+      else Format.sprintf "(%s)" op
+    end else op
+
+  in EcSymbols.pp_qsymbol fmt (nm, op)
+
+let pp_opname_with_tvi ppe fmt (nm, op, tvi) =
+  match tvi with
+  | None ->
+      pp_opname fmt (nm, op)
+
+  | Some tvi ->
+      Format.fprintf fmt "%a<:%a>"
+        pp_opname (nm, op)
+        (pp_list "@, " (pp_type ppe)) tvi
+
+(* -------------------------------------------------------------------- *)
 let pp_if3 (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
   let pp fmt (b, e1, e2)=
     Format.fprintf fmt "@[<hov 2>%a@ ? %a@ : %a@]"
@@ -744,6 +767,44 @@ let pp_if_form (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
       (pp_sub ppe (fst outer, (e_bin_prio_if, `Right   ))) e2 (* FIXME *)
   in
     maybe_paren outer ([], e_bin_prio_if) pp fmt (b, e1, e2)
+
+(* -------------------------------------------------------------------- *)
+let pp_match_form (ppe : PPEnv.t) pp_sub outer fmt (b, bs) =
+  let env = ppe.PPEnv.ppe_env in
+  let dt =
+    match (EcEnv.Ty.hnorm b.f_ty ppe.PPEnv.ppe_env).ty_node with
+    | Tconstr (p, _) ->
+        EcDecl.tydecl_as_datatype (oget (EcEnv.Ty.by_path_opt p env))
+    | _ -> assert false
+  in
+
+  let bs = List.combine dt.tydt_ctors bs in
+
+  let pp_branch fmt ((name, argsty), br) =
+    let xs, br = EcFol.decompose_lambda br in
+    let xs, br =
+      let xs1, xs2 = List.split_at (List.length argsty) xs in
+      (List.fst xs1, f_lambda xs2 br) in
+
+    begin match xs with
+    | [] ->
+        Format.fprintf fmt "| %a" pp_opname ([], name)
+
+    | [x] ->
+        Format.fprintf fmt "| %a %a"
+          pp_opname ([], name) (pp_local ppe) x
+
+    | _ ->
+        Format.fprintf fmt "| %a (%a)" pp_opname ([], name)
+          (pp_list ", " (pp_local ppe)) xs
+    end;
+
+    Format.fprintf fmt " => %a"
+      (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) br in
+
+  Format.fprintf fmt "@[@[<hov 2>match %a@ with %t end@]@]"
+    (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) b
+    (fun fmt -> pp_list "@ " pp_branch fmt bs)
 
 (* -------------------------------------------------------------------- *)
 let pp_tuple mode (ppe : PPEnv.t) pp_sub osc fmt es =
@@ -800,28 +861,6 @@ let pp_app (ppe : PPEnv.t) (pp_first, pp_sub) outer fmt (e, args) =
       maybe_paren outer ([], e_app_prio) pp fmt ()
 
 (* -------------------------------------------------------------------- *)
-let pp_opname fmt (nm, op) =
-  let op =
-    if EcCoreLib.is_mixfix_op op then
-      Printf.sprintf "\"%s\"" op
-    else if is_binop op then begin
-      if op.[0] = '*' || op.[String.length op - 1] = '*'
-      then Format.sprintf "( %s )" op
-      else Format.sprintf "(%s)" op
-    end else op
-
-  in EcSymbols.pp_qsymbol fmt (nm, op)
-
-let pp_opname_with_tvi ppe fmt (nm, op, tvi) =
-  match tvi with
-  | None ->
-      pp_opname fmt (nm, op)
-
-  | Some tvi ->
-      Format.fprintf fmt "%a<:%a>"
-        pp_opname (nm, op)
-        (pp_list "@, " (pp_type ppe)) tvi
-
 let pp_opapp
      (ppe     : PPEnv.t)
      (t_ty    : 'a -> EcTypes.ty)
@@ -1572,8 +1611,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Fif (b, f1, f2) ->
       pp_if_form ppe pp_form_r outer fmt (b, f1, f2)
 
-  | Fmatch _ ->
-      Format.fprintf fmt "%s" "no-syntax-yet"
+  | Fmatch (b, bs, _) ->
+      pp_match_form ppe pp_form_r outer fmt (b, bs)
 
   | Flet (lp, f1, f2) ->
       pp_let ~fv:f2.f_fv ppe pp_form_r outer fmt (lp, f1, f2)
