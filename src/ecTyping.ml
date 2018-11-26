@@ -1289,7 +1289,7 @@ let transexp (env : EcEnv.env) mode ue e =
 
         let rty = EcUnify.UniEnv.fresh ue in
 
-        List.iter (fun (ty, loc) -> unify_or_fail env ue loc ~expct:rty ty) bty;
+        List.iter (fun (ty, loc) -> unify_or_fail env ue loc ~expct:ty rty) bty;
         e_match ce branches rty, rty
 
     | PEforall (xs, pe) ->

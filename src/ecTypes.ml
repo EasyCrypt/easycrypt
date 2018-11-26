@@ -731,7 +731,7 @@ module ExprSmart = struct
   let e_match (e, (b, es, ty)) (b', es', ty') =
     if   b == b' && es == es' && ty == ty'
     then e
-    else e_match b es ty
+    else e_match b' es' ty'
 
   let e_lam (e, (b, body)) (b', body') =
     if   b == b' && body == body'
