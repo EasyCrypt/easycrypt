@@ -1171,12 +1171,16 @@ let transexp (env : EcEnv.env) mode ue e =
     end
 
     | PEif (pc, pe1, pe2) ->
-      let c, tyc = transexp env pc in
-      let e1, ty1 = transexp env pe1 in
-      let e2, ty2 = transexp env pe2 in
+        let c, tyc = transexp env pc in
+        let e1, ty1 = transexp env pe1 in
+        let e2, ty2 = transexp env pe2 in
         unify_or_fail env ue pc .pl_loc ~expct:tbool tyc;
         unify_or_fail env ue pe2.pl_loc ~expct:ty1   ty2;
         (e_if c e1 e2, ty1)
+
+    | PEmatch (pe, _pb) ->
+        let _e, _tye = transexp env pe in
+        assert false
 
     | PEforall (xs, pe) ->
         let env, xs = trans_binding env ue xs in
@@ -2318,6 +2322,10 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           unify_or_fail env ue pf1.pl_loc ~expct:tbool   f1.f_ty;
           unify_or_fail env ue pf3.pl_loc ~expct:f2.f_ty f3.f_ty;
           f_if f1 f2 f3
+
+    | PFmatch (pf, _pb) ->
+        let _f = transf env pf in
+        assert false
 
     | PFlet (lp, (pf1, paty), f2) ->
         let (penv, p, pty) = transpattern env ue lp in

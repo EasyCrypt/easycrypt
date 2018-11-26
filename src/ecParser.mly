@@ -472,6 +472,7 @@
 %token LOSSLESS
 %token LPAREN
 %token LPBRACE
+%token MATCH
 %token MINUS
 %token MODPATH
 %token MODULE
@@ -928,6 +929,11 @@ expr_u:
 | IF c=expr THEN e1=expr ELSE e2=expr
    { PEif (c, e1, e2) }
 
+| MATCH e=expr WITH
+    PIPE? bs=plist0(p=mcptn(sbinop) IMPL be=expr { (p, be) }, PIPE)
+  END
+    { PEmatch (e, bs) }
+
 | LET p=lpattern EQ e1=expr IN e2=expr
    { PElet (p, (e1, None), e2) }
 
@@ -1127,6 +1133,11 @@ form_u(P):
 
 | c=form_r(P) QUESTION e1=form_r(P) COLON e2=form_r(P) %prec LOP2
     { PFif (c, e1, e2) }
+
+| MATCH f=form_r(P) WITH
+    PIPE? bs=plist0(p=mcptn(sbinop) IMPL bf=form_r(P) { (p, bf) }, PIPE)
+  END
+    { PFmatch (f, bs) }
 
 | EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE
     { PFeqveq (xs, None) }
@@ -1656,13 +1667,13 @@ opbr:
    { { pop_patterns = ptn; pop_body = e; } }
 
 %inline opcase:
-| x=ident EQ p=opptn(sbinop)
+| x=ident EQ p=mcptn(sbinop)
     { { pop_name = x; pop_pattern = p; } }
 
-| x=ident EQ p=paren(opptn(binop))
+| x=ident EQ p=paren(mcptn(binop))
     { { pop_name = x; pop_pattern = p; } }
 
-opptn(BOP):
+mcptn(BOP):
 | c=qoident tvi=tvars_app? ps=bdident*
     { PPApp ((c, tvi), ps) }
 
