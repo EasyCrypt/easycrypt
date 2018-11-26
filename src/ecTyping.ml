@@ -1262,9 +1262,35 @@ let transexp (env : EcEnv.env) mode ue e =
         unify_or_fail env ue pe2.pl_loc ~expct:ty1   ty2;
         (e_if c e1 e2, ty1)
 
-    | PEmatch (pe, _pb) ->
-        let _e, _tye = transexp env pe in
-        assert false
+    | PEmatch (pce, pb) ->
+        let ce, ety = transexp env pce in
+        let inddecl =
+          match (EcEnv.ty_hnorm ety env).ty_node with
+          | Tconstr (indp, _) -> begin
+              match EcEnv.Ty.by_path indp env with
+              | { tyd_type = `Datatype dt } ->
+                  Some (indp, dt)
+              | _ -> None
+            end
+          | _ -> None in
+
+        let (_indp, inddecl) =
+          match inddecl with
+          | None   -> tyerror pce.pl_loc env NotAnInductive
+          | Some x -> x in
+
+        let branches =
+          trans_match ~loc:e.pl_loc env ue (ety, inddecl) pb in
+
+        let branches, bty = List.split (List.map (fun (lcs, s) ->
+          let env  = EcEnv.Var.bind_locals lcs env in
+          let bdy  = transexp env s in
+          e_lam lcs (fst bdy), (snd bdy, s.pl_loc)) branches) in
+
+        let rty = EcUnify.UniEnv.fresh ue in
+
+        List.iter (fun (ty, loc) -> unify_or_fail env ue loc ~expct:rty ty) bty;
+        e_match ce branches rty, rty
 
     | PEforall (xs, pe) ->
         let env, xs = trans_binding env ue xs in
@@ -2407,9 +2433,35 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           unify_or_fail env ue pf3.pl_loc ~expct:f2.f_ty f3.f_ty;
           f_if f1 f2 f3
 
-    | PFmatch (pf, _pb) ->
-        let _f = transf env pf in
-        assert false
+    | PFmatch (pcf, pb) ->
+        let cf = transf env pcf in
+        let inddecl =
+          match (EcEnv.ty_hnorm cf.f_ty env).ty_node with
+          | Tconstr (indp, _) -> begin
+              match EcEnv.Ty.by_path indp env with
+              | { tyd_type = `Datatype dt } ->
+                  Some (indp, dt)
+              | _ -> None
+            end
+          | _ -> None in
+
+        let (_indp, inddecl) =
+          match inddecl with
+          | None   -> tyerror pcf.pl_loc env NotAnInductive
+          | Some x -> x in
+
+        let branches =
+          trans_match ~loc:f.pl_loc env ue (cf.f_ty, inddecl) pb in
+
+        let branches, bty = List.split (List.map (fun (lcs, s) ->
+          let env  = EcEnv.Var.bind_locals lcs env in
+          let bdy  = transf env s in
+          f_lambda (List.map (snd_map gtty) lcs) bdy, (bdy.f_ty, s.pl_loc)) branches) in
+
+        let rty = EcUnify.UniEnv.fresh ue in
+
+        List.iter (fun (ty, loc) -> unify_or_fail env ue loc ~expct:rty ty) bty;
+        f_match cf branches rty
 
     | PFlet (lp, (pf1, paty), f2) ->
         let (penv, p, pty) = transpattern env ue lp in
