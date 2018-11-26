@@ -24,7 +24,7 @@ theory Ad1.
     op n <- q
     proof *.
   realize gt1_n by apply gt1_q.
-  realize d_uni by move=> _ x;apply FDistr.dt1E.
+  realize d_uni by move=> _ x; rewrite FDistr.dt1E.
 
 end Ad1.
 

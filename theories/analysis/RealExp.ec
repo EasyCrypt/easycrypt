@@ -178,7 +178,7 @@ proof.
 elim: n=> [|n ge0n ih] ge0x; first by rewrite powr0 -fromint1 rpow0.
 rewrite powrS // fromintD; move: ge0x.
 rewrite ler_eqVlt=> -[<-|]; first rewrite (mul0r 0%r).
-  by rewrite rpow0r -fromintD /#.
+  by rewrite rpow0r -fromintD eq_fromint /#.
 by move=> gt0x; rewrite rpowD // rpow1 // ih 1:ltrW.
 qed.
 
@@ -396,7 +396,7 @@ realize addrA.
 proof. by move=> v1 v2 v3; apply/eqvP=> i; rewrite !addvE addrA. qed.
 
 realize addNr.
-proof. by move=> v; apply/eqvP=> i; rewrite addvE oppvE zerovE addNr. qed.
+proof. by move=> v; apply/eqvP=> i; rewrite addvE oppvE. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma scalevA a b v : a ** (b ** v) = a * b ** v.
@@ -464,7 +464,7 @@ lemma dotpBr x y1 y2 : dotp x (y1 - y2) = dotp x y1 - dotp x y2.
 proof. by rewrite dotpDr dotpNr. qed.
 
 lemma dotpv0 x : dotp x zerov = 0%r.
-proof. by rewrite -(@subrr zerov) dotpBr subrr. qed.
+proof. by rewrite -(@subrr zerov) dotpBr. qed.
 
 lemma dotp0v x : dotp zerov x = 0%r.
 proof. by rewrite dotpC dotpv0. qed.

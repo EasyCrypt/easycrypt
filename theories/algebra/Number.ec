@@ -174,7 +174,7 @@ qed.
 lemma ltr0Sn n : 0 <= n => zeror < ofint (n + 1).
 proof.
 elim: n=> /= [|n ge0n ih]; first by rewrite ofint1 ltr01.
-by rewrite ofintS // ?(addz_ge0, addr_gt0) // ltr01.
+by rewrite (@ofintS (n+1)) // ?(addz_ge0, addr_gt0) // ltr01.
 qed.
 
 lemma ltr0n n : 0 <= n => (zeror < ofint n) = (0 < n).
@@ -1039,7 +1039,7 @@ proof.
 move=> nge0 xgt1; case: n nge0 => [|n nge0 _]; 1: by rewrite expr0 ltrr.
 elim: n nge0 => [|n ge0n]; 1: by rewrite expr1.
 rewrite !addz1_neq0 ?addz_ge0 //= => ih.
-by rewrite exprS 1:addz_ge0 // mulr_egt1.
+by rewrite (@exprS _ (n+1)) 1:addz_ge0 // mulr_egt1.
 qed.
 
 hint rewrite exprn_egte1 : exprn_ege1 exprn_egt1.
@@ -1056,8 +1056,8 @@ proof.
 move=> nge0 [xgt0 xlt1]; case: n nge0 => /= [|n nge0 _].
 + by rewrite expr0 ltrNge ltrW.
 case: n nge0 => /= [|n nge0 _]; first by rewrite expr1 ltrr.
-rewrite (@ltz_add2r 1 0) -lez_add1r /= lez_addr nge0 /=.
-rewrite exprS 1:addz_ge0 // gtr_pmulr //.
+rewrite (@ltz_add2r 1 0 (n+1)) -lez_add1r /= lez_addr nge0 /=.
+rewrite (@exprS _ (n+1)) 1:addz_ge0 // gtr_pmulr //.
 by rewrite exprn_ilt1 ?(addz_neq0, addz_ge0) // ltrW.
 qed.
 
@@ -1075,8 +1075,8 @@ lemma nosmt ltr_eexpr x n : 0 <= n => oner < x => (x < exp x n <=> 1 < n).
 proof.
 move=> ge0_n lt1_x; case: n ge0_n; 1: by rewrite expr0 ltrNge ltrW.
 move=> + + _; case=> /= [|n ge0_n _]; first by rewrite expr1 ltrr.
-rewrite (@ltz_add2r 1 0) -lez_add1r /= lez_addr ge0_n /=.
-rewrite exprS 1:addz_ge0 // ltr_pmulr 1:&(@ltr_trans oner) //.
+rewrite (@ltz_add2r 1 0 (n+1)) -lez_add1r /= lez_addr ge0_n /=.
+rewrite (@exprS _ (n+1)) 1:addz_ge0 // ltr_pmulr 1:&(@ltr_trans oner) //.
 by rewrite exprn_egt1 // ?(addz_neq0, addz_ge0).
 qed.
 

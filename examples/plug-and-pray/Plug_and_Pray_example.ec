@@ -104,9 +104,7 @@ proc; inline G0(A).main.
 swap{2} 1 3; auto.
 call (: ={k}(G0,G1)).
 + by sim.
-auto=> /> k; split=> [i|_ i].
-+ rewrite supp_dinter dinter1E duniform1E.
-  smt(mem_range undup_id range_uniq size_range gt0_q).
-rewrite supp_duniform mem_range supp_dinter.
-smt(gt0_q modz_ge0 ltz_pmod).
+auto=> /> k _ i h1 h2; split => [|_].
++ by rewrite modz_ge0 smt(gt0_q).
++ by rewrite ltz_pmod gt0_q.
 qed.
