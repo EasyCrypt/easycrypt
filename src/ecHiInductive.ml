@@ -300,7 +300,7 @@ let trans_matchfix
               let ctor = oget (EcEnv.Op.by_path_opt cp env) in
               let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
               let indty = oget (EcEnv.Ty.by_path_opt indp env) in
-              let ind = (EcDecl.tydecl_as_datatype indty).tydt_ctors in
+              let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
               let ctorsym, ctorty = List.nth ind ctoridx in
 
               let args_exp = List.length ctorty in

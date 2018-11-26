@@ -1452,6 +1452,11 @@ module Ty = struct
       end
       | _ -> None
 
+  let get_top_decl (ty : ty) (env : env) =
+    match (hnorm ty env).ty_node with
+    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys)
+    | _ -> None
+
   let rebind name ty env =
     let env = MC.bind_tydecl name ty env in
 

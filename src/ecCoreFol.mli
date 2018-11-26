@@ -30,6 +30,10 @@ val gtty    : EcTypes.ty -> gty
 val gtmodty : module_type -> mod_restr -> gty
 val gtmem   : EcMemory.memtype -> gty
 
+val as_gtty  : gty -> EcTypes.ty
+val as_modty : gty -> module_type * mod_restr
+val as_mem   : gty -> EcMemory.memtype
+
 val gty_equal : gty  -> gty -> bool
 val gty_fv    : gty -> int Mid.t
 

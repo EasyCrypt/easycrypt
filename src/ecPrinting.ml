@@ -771,14 +771,9 @@ let pp_if_form (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
 (* -------------------------------------------------------------------- *)
 let pp_match_form (ppe : PPEnv.t) pp_sub outer fmt (b, bs) =
   let env = ppe.PPEnv.ppe_env in
-  let dt =
-    match (EcEnv.Ty.hnorm b.f_ty ppe.PPEnv.ppe_env).ty_node with
-    | Tconstr (p, _) ->
-        EcDecl.tydecl_as_datatype (oget (EcEnv.Ty.by_path_opt p env))
-    | _ -> assert false
-  in
-
-  let bs = List.combine dt.tydt_ctors bs in
+  let dt  = proj3_2 (oget (EcEnv.Ty.get_top_decl b.f_ty env)) in
+  let dt  = oget (EcDecl.tydecl_as_datatype dt) in
+  let bs  = List.combine dt.tydt_ctors bs in
 
   let pp_branch fmt ((name, argsty), br) =
     let xs, br = EcFol.decompose_lambda br in

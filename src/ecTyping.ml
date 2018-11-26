@@ -864,7 +864,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
       in
 
       let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
-      let rec_   = snd (EcDecl.tydecl_as_record recty) in
+      let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
       let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
       let reccty, rectvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
       let fields =
@@ -1004,7 +1004,7 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
   in
 
   let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
-  let rec_   = snd (EcDecl.tydecl_as_record recty) in
+  let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
   let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
   let reccty, rtvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
   let tysopn = Tvar.init (List.map fst recty.tyd_params) rtvi in
@@ -1085,7 +1085,7 @@ let trans_match ~loc env ue (gindty, gind) pbs =
           let ctor = oget (EcEnv.Op.by_path_opt cp env) in
           let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
           let indty = oget (EcEnv.Ty.by_path_opt indp env) in
-          let ind = (EcDecl.tydecl_as_datatype indty).tydt_ctors in
+          let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
           let ctorsym, ctorty = List.nth ind ctoridx in
 
           let args_exp = List.length ctorty in
@@ -1269,7 +1269,7 @@ let transexp (env : EcEnv.env) mode ue e =
           | Tconstr (indp, _) -> begin
               match EcEnv.Ty.by_path indp env with
               | { tyd_type = `Datatype dt } ->
-                  Some (indp, dt)
+                    Some (indp, dt)
               | _ -> None
             end
           | _ -> None in
