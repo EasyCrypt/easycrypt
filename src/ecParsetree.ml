@@ -67,6 +67,9 @@ type plpattern_r =
 
 and plpattern = plpattern_r located
 
+type ppattern =
+| PPApp of (pqsymbol * ptyannot option) * osymbol list
+
 type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
 
@@ -78,6 +81,7 @@ and pexpr_r =
   | PElet    of plpattern * pexpr_wty * pexpr     (* let binding        *)
   | PEtuple  of pexpr list                        (* tuple constructor  *)
   | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
+  | PEmatch  of pexpr * (ppattern * pexpr) list   (* match              *)
   | PEforall of ptybindings * pexpr               (* forall quant.      *)
   | PEexists of ptybindings * pexpr               (* exists quant.      *)
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
@@ -102,9 +106,6 @@ type plvalue_r =
   | PLvMap    of pqsymbol * ptyannot option * pexpr
 
 and plvalue = plvalue_r located
-
-type ppattern =
-| PPApp of (pqsymbol * ptyannot option) * osymbol list
 
 type pinstr_r =
   | PSident  of psymbol
@@ -249,6 +250,7 @@ and pformula_r =
   | PFside   of pformula * symbol located
   | PFapp    of pformula * pformula list
   | PFif     of pformula * pformula * pformula
+  | PFmatch  of pformula * (ppattern * pformula) list
   | PFlet    of plpattern * (pformula * pty option) * pformula
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula

@@ -159,7 +159,6 @@ end = struct
           "you may have to add type annotations"
           (fun fmt -> oiter (Format.fprintf fmt " on %s")) s
 
-
     | UnboundTypeParameter x ->
         msg "unbound type parameter: %s" x
 

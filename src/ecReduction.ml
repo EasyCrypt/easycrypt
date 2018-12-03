@@ -297,6 +297,19 @@ let is_record env f =
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
+let reduce_match env (f, bs, ty) =
+  let op, args = destr_app f in
+
+  match op.f_node with
+  | Fop (p, _) when EcEnv.Op.is_dtype_ctor env p ->
+      let idx = EcEnv.Op.by_path p env in
+      let idx = snd (EcDecl.operator_as_ctor idx) in
+      let br  = oget (List.nth_opt bs idx) in
+      f_app br args ty
+
+  | _ -> raise NotReducible
+
+(* -------------------------------------------------------------------- *)
 let rec h_red ri env hyps f =
   match f.f_node with
     (* β-reduction *)
@@ -367,6 +380,15 @@ let rec h_red ri env hyps f =
   | Fif (f1, f2, f3) when ri.iota ->
       let f' = f_if_simpl f1 f2 f3 in
         if f_equal f f' then f_if (h_red ri env hyps f1) f2 f3 else f'
+
+    (* ι-reduction (if-then-else) *)
+
+  | Fmatch (cf, bs, ty) when ri.iota -> begin
+      try
+        let f' = reduce_match env (cf, bs, ty) in
+        if f_equal f f' then raise NotReducible else f'
+      with NotReducible -> f_match (h_red ri env hyps cf) bs ty
+  end
 
     (* ι-reduction (match-fix) *)
   | Fapp ({ f_node = Fop (p, tys); } as f1, fargs)
@@ -617,7 +639,8 @@ and check_alpha_equal ri hyps f1 f2 =
     | _, _ -> error () in
 
   let check_bindings env subst bd1 bd2 =
-    List.fold_left2 check_binding (env,subst) bd1 bd2 in
+    try  List.fold_left2 check_binding (env,subst) bd1 bd2
+    with Invalid_argument _ -> error () in
 
   let check_local subst id1 f2 id2 =
     match (Mid.find_def f2 id2 subst.fs_loc).f_node with
@@ -657,6 +680,13 @@ and check_alpha_equal ri hyps f1 f2 =
 
     | Fif(a1,b1,c1), Fif(a2,b2,c2) ->
       aux env subst a1 a2; aux env subst b1 b2; aux env subst c1 c2
+
+    | Fmatch(f1,bs1,ty1), Fmatch(f2,bs2,ty2) -> begin
+      aux env subst f1 f2;
+      ensure (EqTest.for_type env ty1 ty2);
+      try  List.iter2 (aux env subst) bs1 bs2
+      with Invalid_argument _ -> error ()
+    end
 
     | Flet(p1,f1',g1), Flet(p2,f2',g2) ->
       aux env subst f1' f2';
