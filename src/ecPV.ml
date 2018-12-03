@@ -1002,8 +1002,11 @@ and i_eqobs_in_refl env i eqo =
       else aux (PV.union eqi eqo) in
     aux (add_eqs_refl env eqo e)
 
-  | Smatch(e,b) ->
-    assert false                (* FIXME: match *)
+  | Smatch(e,bs) ->
+    (* FIXME: match: something to do with constructors variables? *)
+    let eqs = List.map (fun s -> s_eqobs_in_refl env s eqo) (List.snd bs) in
+    let eqs = List.fold_left PV.union PV.empty eqs in
+    add_eqs_refl env eqs e
 
   | Sassert e -> add_eqs_refl env eqo e
   | Sabstract _ -> assert false
