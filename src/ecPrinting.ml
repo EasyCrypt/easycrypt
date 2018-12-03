@@ -2044,14 +2044,15 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
 
 (* -------------------------------------------------------------------- *)
 type ppnode1 = [
-  | `Asgn   of (EcModules.lvalue * EcTypes.expr)
-  | `Assert of (EcTypes.expr)
-  | `Call   of (EcModules.lvalue option * P.xpath * EcTypes.expr list)
-  | `Rnd    of (EcModules.lvalue * EcTypes.expr)
+  | `Asgn     of (EcModules.lvalue * EcTypes.expr)
+  | `Assert   of (EcTypes.expr)
+  | `Call     of (EcModules.lvalue option * P.xpath * EcTypes.expr list)
+  | `Rnd      of (EcModules.lvalue * EcTypes.expr)
   | `Abstract of EcIdent.t
-  | `If     of (EcTypes.expr)
+  | `If       of EcTypes.expr
   | `Else
-  | `While  of (EcTypes.expr)
+  | `While    of EcTypes.expr
+  | `Match    of EcTypes.expr
   | `None
   | `EBlk
 ]
@@ -2673,6 +2674,23 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
     in
       Format.fprintf fmt "@[<v>if (@[%a@]) %a%a@]"
       (pp_expr ppe) e (pp_block ppe) s1 (pp_else ppe) s2
+
+  | Smatch (e, ps) ->
+    let p, tyd, typ = oget (EcEnv.Ty.get_top_decl e.e_ty ppe.PPEnv.ppe_env) in
+    let tyd = oget (EcDecl.tydecl_as_datatype tyd) in
+    let ps  = List.combine ps tyd.EcDecl.tydt_ctors in
+
+    let pp_branch fmt ((vars, s), (cname, _)) =
+      let ptn = EcTypes.toarrow (List.snd vars) e.e_ty in
+      let ptn = f_op (EcPath.pqoname (EcPath.prefix p) cname) typ ptn in
+      let ptn = f_app ptn (List.map (fun (x, ty) -> f_local x ty) vars) e.e_ty in
+
+      Format.fprintf fmt "| %a => @[<hov 2>%a@]@ "
+        (pp_form ppe) ptn (pp_block ppe) s
+    in
+
+    Format.fprintf fmt "@[<v>match (@[%a@]) with@ %aend@]"
+      (pp_expr ppe) e (pp_list "" pp_branch) ps
 
   | Sabstract id ->
     Format.fprintf fmt "%s" (EcIdent.name id)
