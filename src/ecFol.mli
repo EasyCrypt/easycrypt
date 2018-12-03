@@ -72,6 +72,10 @@ val f_lossless : EcTypes.ty -> form -> form
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
 
 (* -------------------------------------------------------------------- *)
+(* "typed" soft-constructors                                            *)
+val f_ty_app : EcEnv.env -> form -> form list -> form
+
+(* -------------------------------------------------------------------- *)
 (* WARNING : this function should be use only in a context ensuring
  * that the quantified variables can be instanciated *)
 

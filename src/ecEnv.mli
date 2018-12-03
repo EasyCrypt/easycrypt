@@ -322,6 +322,8 @@ module Ty : sig
   val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
   val hnorm   : EcTypes.ty -> env -> EcTypes.ty
 
+  val decompose_fun : EcTypes.ty -> env -> EcTypes.dom * EcTypes.ty
+
   val scheme_of_ty :
     [`Ind | `Case] -> EcTypes.ty -> env -> (path * EcTypes.ty list) option
 

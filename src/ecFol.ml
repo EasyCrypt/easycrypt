@@ -145,6 +145,15 @@ let f_identity ?(name = "x") ty =
     f_lambda [name, GTty ty] (f_local name ty)
 
 (* -------------------------------------------------------------------- *)
+let f_ty_app (env : EcEnv.env) (f : form) (args : form list) =
+  let ty, rty = EcEnv.Ty.decompose_fun f.f_ty env in
+  let ty, ety =
+    try  List.split_at (List.length args) ty
+    with Failure _ -> assert false in
+
+  ignore ty; f_app f args (toarrow ety rty)
+
+(* -------------------------------------------------------------------- *)
 module type DestrRing = sig
   val le  : form -> form * form
   val lt  : form -> form * form
