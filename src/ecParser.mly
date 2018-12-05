@@ -2704,6 +2704,9 @@ phltactic:
 | RCONDF s=side? i=codepos1
     { Prcond (s, false, i) }
 
+| MATCH s=side? i=codepos1 c=oident
+    { Prmatch (s, unloc c, i) }
+
 | IF opt=if_option
     { Pcond opt }
 
