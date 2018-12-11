@@ -48,7 +48,7 @@ lemma M_equiv (A <: I) : islossless A.step =>
   equiv[M(A).f ~ M(A).g : ={glob A, x} ==> ={res}].
 proof. move=> llA; proc.
 seq 1 1 : (i{1} = 0 /\ ={glob A, x, i}) => //.
-+ by auto => &1 &2 />; rewrite dvdz0.
++ by auto => &1 &2 />.
 async while
   [ (fun r => i%r < k%r * r), (i{2} + 1)%r ]
   [ (fun r => i%r < r), (i{2} + 1)%r ]
