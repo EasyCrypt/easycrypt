@@ -42,8 +42,6 @@ module M(A : I) = {
   }
 }.
 
-pred p.
-
 lemma M_equiv (A <: I) : islossless A.step =>
   equiv[M(A).f ~ M(A).g : ={glob A, x} ==> ={res}].
 proof. move=> llA; proc.
@@ -59,28 +57,19 @@ async while
 + by move=> &1 &2 />; smt(gt0_k).
 + by move=> &2; exfalso=> &1; smt(gt0_k).
 + by move=> &2; exfalso=> &1; smt(gt0_k).
-+ move=> v1 v2; rcondt {2} 1.
-  * by move=> &1; auto=> &2 /> /#.
-  rcondf {2} 4; last (sp; wp).
-  * move=> &1; seq 3 : (i%r = v2) => //.
-    wp; conseq (_ : (i + 1)%r = v2 ==> _) => //.
-    by while ((i + 1)%r = v2); wp => //; call (_ : true).
-  while (   ={glob A, x} 
++ move=> v1 v2.
+  rcondt {2} 1; 1: by auto => /> /#.
+  rcondf{2} 4; 1: by auto; conseq (_: true);auto.
+  wp;while (   ={glob A, x} 
          /\ i{1} = k * i{2} + j{2}
          /\ v1 = (i{2} + 1)%r
          /\ 0 <= i{2} <  n
          /\ 0 <= j{2} <= k) => /=; last by auto; smt(gt0_k ge0_n).
-  wp; call (_ : true); skip => &1 &2 /= /> [#] />.
-  (* FIXME: WTF? *)
-  move=> *; do! split => *; ~-1: smt(); split; last by smt().  
-  rewrite (_ : n = (n - 1) + 1) // mulrDl.
-  rewrite -addrA mul1r ler_lt_add // (mulrC _ k).
-  by rewrite ler_wpmul2l ?ge0_k /#.
-+ while true (n * k - i) => //; last by auto=> /#.
-  by move=> z; wp; call (_ : true) => //; auto => /#.
-+ while true (n - i) => //; last by auto => /#.
-  move=> z; sp; wp; conseq (_ : j = 0 /\ n - i = z ==> _) => //.
-  while (0 <= j <= k) (k - j); last by auto; smt(gt0_k).
-  by move=> z'; wp; call (_ : true) => //; auto => /#.
+  wp; call (_ : true); skip => &1 &2 /= />.
+  rewrite -fromintM !lt_fromint => *. 
+  by have := StdOrder.IntOrder.ler_wpmul2l k{2} _ i{2} (n - 1); smt().
++ by while true (n * k - i) => //; auto;1: call llA; auto => /#.
++ while true (n - i);2: by auto=>/#.
+  move=> z;wp; while (true) (k - j);auto;1:call llA;auto => /#.
 qed.
 
