@@ -116,7 +116,7 @@ let fop_lossless ty =
 
 let f_support f1 f2 = f_app (fop_support f2.f_ty) [f1; f2] tbool
 let f_in_supp f1 f2 = f_support f2 f1
-let f_pred1   f1    = f_app (fop_pred1 f1.f_ty) [f1] tbool
+let f_pred1   f1    = f_app (fop_pred1 f1.f_ty) [f1] (toarrow [f1.f_ty] tbool)
 
 let f_mu_x    f1 f2 =
   f_app (fop_mu f2.f_ty) [f1; (f_pred1 f2)] treal
