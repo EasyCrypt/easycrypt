@@ -638,6 +638,7 @@ _lident:
 | WLOG     { "wlog"     }
 | EXLIM    { "exlim"    }
 | ECALL    { "ecall"    }
+| IS       { "is"       }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
