@@ -257,7 +257,7 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
 
   let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
   let tyargs = List.map (EcTypes.tvar |- fst) axpm in
-  let op     = f_op path tyargs axbd.EcCoreFol.f_ty in
+  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcCoreFol.f_ty) in
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 
