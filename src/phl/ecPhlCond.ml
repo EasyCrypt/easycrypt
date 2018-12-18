@@ -151,12 +151,13 @@ let t_equiv_match tc =
     (List.combine dt.EcDecl.tydt_ctors (List.combine bsl bsr)) in
 
   let get_eqv_goal ((c, _), ((cl, bl), (cr, br))) =
-    let bhl  = List.map (fst_map EcIdent.fresh) cl in
-    let bhr  = List.map (fst_map EcIdent.fresh) cr in
-    let cop  = EcPath.pqoname (EcPath.prefix pl) c in
-    let copl = f_op cop tyl (toarrow (List.snd cl) fl.f_ty) in
-    let copr = f_op cop tyr (toarrow (List.snd cr) fr.f_ty) in
-    let pre  = f_ands_simpl
+    let sb      = EcTypes.e_subst_id in
+    let sb, bhl = EcTypes.add_locals sb cl in
+    let sb, bhr = EcTypes.add_locals sb cr in
+    let cop     = EcPath.pqoname (EcPath.prefix pl) c in
+    let copl    = f_op cop tyl (toarrow (List.snd cl) fl.f_ty) in
+    let copr    = f_op cop tyr (toarrow (List.snd cr) fr.f_ty) in
+    let pre     = f_ands_simpl
       [ f_eq fl (f_app copl (List.map (curry f_local) bhl) fl.f_ty);
         f_eq fr (f_app copr (List.map (curry f_local) bhr) fr.f_ty) ]
       es.es_pr in
@@ -165,9 +166,10 @@ let t_equiv_match tc =
       ( (List.map (snd_map gtty) bhl) @
         (List.map (snd_map gtty) bhr) )
       ( f_equivS_r
-          { es with es_sl = EcModules.stmt (bl.s_node @ sl.s_node);
-                    es_sr = EcModules.stmt (br.s_node @ sr.s_node);
-                    es_pr = pre; } )
+          { es with
+              es_sl = EcModules.stmt ((s_subst sb bl).s_node @ sl.s_node);
+              es_sr = EcModules.stmt ((s_subst sb br).s_node @ sr.s_node);
+              es_pr = pre; } )
 
   in
 
