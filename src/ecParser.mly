@@ -455,6 +455,7 @@
 %token INLINE
 %token INSTANCE
 %token IOTA
+%token IS
 %token KILL
 %token LARROW
 %token LAST
@@ -1322,10 +1323,13 @@ instr:
 | WHILE LPAREN c=expr RPAREN b=block
    { PSwhile (c, b) }
 
-| MATCH c=expr WITH PIPE? bs=plist0(match_branch, PIPE) END SEMICOLON
-   { PSmatch (c, bs) }
+| MATCH e=expr WITH PIPE? bs=plist0(match_branch, PIPE) END SEMICOLON
+   { PSmatch (e, `Full bs) }
 
-if_expr:
+| IF LPAREN e=expr IS c=opptn RPAREN b1=block b2=option(prefix(ELSE, block))
+   { PSmatch (e, `If ((c, b1), b2)) }
+
+%inline if_expr:
 | IF c=paren(expr) b=block el=if_else_expr
    { PSif ((c, b), fst el, snd el) }
 

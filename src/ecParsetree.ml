@@ -114,8 +114,13 @@ type pinstr_r =
   | PScall   of plvalue option * pgamepath * (pexpr list) located
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
-  | PSmatch  of pexpr * (ppattern * pstmt) list
+  | PSmatch  of pexpr * psmatch
   | PSassert of pexpr
+
+and psmatch = [
+  | `Full of (ppattern * pstmt) list
+  | `If   of (ppattern * pstmt) * pstmt option
+]
 
 and pscond = pexpr * pstmt
 and pinstr = pinstr_r located

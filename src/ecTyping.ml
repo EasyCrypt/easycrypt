@@ -1071,59 +1071,58 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
     (ctor, fields, (rtvi, reccty))
 
 (* -------------------------------------------------------------------- *)
+let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
+  let filter = fun op -> EcDecl.is_ctor op in
+  let PPApp ((cname, tvi), cargs) = pb in
+  let tvi = tvi |> omap (transtvi env ue) in
+  let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+
+  match cts with
+  | [] ->
+      tyerror cname.pl_loc env (InvalidMatch FXE_CtorUnk)
+
+  | _ :: _ :: _ ->
+      tyerror cname.pl_loc env (InvalidMatch FXE_CtorAmbiguous)
+
+  | [(cp, tvi), opty, subue, _] ->
+      let ctor = oget (EcEnv.Op.by_path_opt cp env) in
+      let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
+      let indty = oget (EcEnv.Ty.by_path_opt indp env) in
+      let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
+      let ctorsym, ctorty = List.nth ind ctoridx in
+
+      let args_exp = List.length ctorty in
+      let args_got = List.length cargs in
+
+      if args_exp <> args_got then
+        tyerror cname.pl_loc env
+          (InvalidMatch (FXE_CtorInvalidArity (args_exp, args_got)));
+
+      let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
+
+      if not (List.is_unique cargs_lin) then
+        tyerror cname.pl_loc env (InvalidMatch FXE_MatchNonLinear);
+
+      EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+
+      let ctorty =
+        let tvi = Some (EcUnify.TVIunamed tvi) in
+          fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
+      let pty = EcUnify.UniEnv.fresh ue in
+
+      (try  EcUnify.unify env ue (toarrow ctorty pty) opty
+       with EcUnify.UnificationFailure _ -> assert false);
+      unify_or_fail env ue loc pty gindty;
+
+      let create o = EcIdent.create (omap_dfl unloc "_" o) in
+      let pvars = List.map (create |- unloc) cargs in
+      let pvars = List.combine pvars ctorty in
+
+      (ctorsym, (pvars, body))
+
+(* -------------------------------------------------------------------- *)
 let trans_match ~loc env ue (gindty, gind) pbs =
-  let pbs =
-    let trans_b ((pb, body) : ppattern * _) =
-      let filter = fun op -> EcDecl.is_ctor op in
-      let PPApp ((cname, tvi), cargs) = pb in
-      let tvi = tvi |> omap (transtvi env ue) in
-      let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
-
-      match cts with
-      | [] ->
-          tyerror cname.pl_loc env (InvalidMatch FXE_CtorUnk)
-
-      | _ :: _ :: _ ->
-          tyerror cname.pl_loc env (InvalidMatch FXE_CtorAmbiguous)
-
-      | [(cp, tvi), opty, subue, _] ->
-          let ctor = oget (EcEnv.Op.by_path_opt cp env) in
-          let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
-          let indty = oget (EcEnv.Ty.by_path_opt indp env) in
-          let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
-          let ctorsym, ctorty = List.nth ind ctoridx in
-
-          let args_exp = List.length ctorty in
-          let args_got = List.length cargs in
-
-          if args_exp <> args_got then
-            tyerror cname.pl_loc env
-              (InvalidMatch (FXE_CtorInvalidArity (args_exp, args_got)));
-
-          let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
-
-          if not (List.is_unique cargs_lin) then
-            tyerror cname.pl_loc env (InvalidMatch FXE_MatchNonLinear);
-
-          EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-
-          let ctorty =
-            let tvi = Some (EcUnify.TVIunamed tvi) in
-              fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
-          let pty = EcUnify.UniEnv.fresh ue in
-
-          (try  EcUnify.unify env ue (toarrow ctorty pty) opty
-           with EcUnify.UnificationFailure _ -> assert false);
-          unify_or_fail env ue loc pty gindty;
-
-          let create o = EcIdent.create (omap_dfl unloc "_" o) in
-          let pvars = List.map (create |- unloc) cargs in
-          let pvars = List.combine pvars ctorty in
-
-          (ctorsym, (pvars, body))
-
-    in List.map trans_b pbs
-  in
+  let pbs = List.map (trans_branch ~loc env ue gindty) pbs in
 
   if List.length pbs < List.length gind.tydt_ctors then
     tyerror loc env (InvalidMatch FXE_MatchPartial);
@@ -1135,6 +1134,17 @@ let trans_match ~loc env ue (gindty, gind) pbs =
 
   List.map
     (fun (x, _) -> oget (Msym.find_opt x pbs))
+    gind.tydt_ctors
+
+(* -------------------------------------------------------------------- *)
+let trans_if_match ~loc env ue (gindty, gind) (c, b1, b2) =
+  let (c, (cargs, b1)) = trans_branch ~loc env ue gindty (c, b1) in
+
+  List.map
+    (fun (x, xargs) ->
+      if   sym_equal c x
+      then (cargs, Some b1)
+      else (List.map (fun ty -> (EcIdent.create "_", ty)) xargs), b2)
     gind.tydt_ctors
 
 (*-------------------------------------------------------------------- *)
@@ -2062,7 +2072,7 @@ and transinstr
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       [ i_while (e, body) ]
 
-  | PSmatch (pe, pbranches) ->
+  | PSmatch (pe, pbranches) -> begin
       let e, ety = transexp env `InProc ue pe in
       let inddecl =
         match (EcEnv.ty_hnorm ety env).ty_node with
@@ -2080,13 +2090,22 @@ and transinstr
         | Some x -> x in
 
       let branches =
-        trans_match ~loc:i.pl_loc env ue (ety, inddecl) pbranches in
+        match pbranches with
+        | `Full pbranches ->
+            let aout = trans_match ~loc:i.pl_loc env ue (ety, inddecl) pbranches in
+            List.map (snd_map some) aout
+
+        | `If ((c, b1), b2) ->
+            trans_if_match ~loc:i.pl_loc env ue (ety, inddecl) (c, b1, b2)
+
+      in
 
       let branches = List.map (fun (lcs, s) ->
         let env = EcEnv.Var.bind_locals lcs env in
-        (lcs, transstmt env ue s)) branches in
+        (lcs, omap (transstmt env ue) s |> odfl (stmt []))) branches in
 
       [ i_match (e, branches) ]
+    end
 
   | PSassert pe ->
       let e, ety = transexp env `InProc ue pe in
