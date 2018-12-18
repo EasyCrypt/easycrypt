@@ -2704,11 +2704,14 @@ phltactic:
 | RCONDF s=side? i=codepos1
     { Prcond (s, false, i) }
 
-| MATCH s=side? i=codepos1 c=oident
+| MATCH c=oident s=side? i=codepos1
     { Prmatch (s, unloc c, i) }
 
 | IF opt=if_option
     { Pcond opt }
+
+| MATCH
+    { Pmatch }
 
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }

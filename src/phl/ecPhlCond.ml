@@ -8,6 +8,8 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcTypes
+open EcModules
 open EcFol
 open EcEnv
 
@@ -110,3 +112,66 @@ let rec t_equiv_cond side tc =
                    (EcPhlRCond.Low.t_equiv_rcond `Right false (Zpr.cpos 1))
                    [t_aux; t_clear hiff]]))
           tc
+
+(* -------------------------------------------------------------------- *)
+let t_equiv_match tc =
+  let hyps = FApi.tc1_hyps tc in
+  let env  = LDecl.toenv hyps in
+  let es   = tc1_as_equivS tc in
+
+  let (el, bsl), sl = tc1_first_match tc es.es_sl in
+  let (er, bsr), sr = tc1_first_match tc es.es_sr in
+
+  let pl, dt, tyl = oget (EcEnv.Ty.get_top_decl el.e_ty env) in
+  let pr, _ , tyr = oget (EcEnv.Ty.get_top_decl er.e_ty env) in
+
+  if not (EcPath.p_equal pl pr) then
+    tc_error !!tc "match statements on different inductive types";
+
+  let dt = oget (EcDecl.tydecl_as_datatype dt) in
+  let fl = form_of_expr (EcMemory.memory es.es_ml) el in
+  let fr = form_of_expr (EcMemory.memory es.es_mr) er in
+
+  let get_eqv_cond ((c, _), ((cl, _), (cr, _))) =
+    let bhl  = List.map (fst_map EcIdent.fresh) cl in
+    let bhr  = List.map (fst_map EcIdent.fresh) cr in
+    let cop  = EcPath.pqoname (EcPath.prefix pl) c in
+    let copl = f_op cop tyl (toarrow (List.snd cl) fl.f_ty) in
+    let copr = f_op cop tyr (toarrow (List.snd cr) fr.f_ty) in
+
+    let lhs = f_eq fl (f_app copl (List.map (curry f_local) bhl) fl.f_ty) in
+    let lhs = f_exists (List.map (snd_map gtty) bhl) lhs in
+
+    let rhs = f_eq fr (f_app copr (List.map (curry f_local) bhr) fr.f_ty) in
+    let rhs = f_exists (List.map (snd_map gtty) bhr) rhs in
+
+    f_forall_mems [es.es_ml; es.es_mr] (f_imp_simpl es.es_pr (f_iff lhs rhs)) in
+
+  let infos =
+    (List.combine dt.EcDecl.tydt_ctors (List.combine bsl bsr)) in
+
+  let get_eqv_goal ((c, _), ((cl, bl), (cr, br))) =
+    let bhl  = List.map (fst_map EcIdent.fresh) cl in
+    let bhr  = List.map (fst_map EcIdent.fresh) cr in
+    let cop  = EcPath.pqoname (EcPath.prefix pl) c in
+    let copl = f_op cop tyl (toarrow (List.snd cl) fl.f_ty) in
+    let copr = f_op cop tyr (toarrow (List.snd cr) fr.f_ty) in
+    let pre  = f_ands_simpl
+      [ f_eq fl (f_app copl (List.map (curry f_local) bhl) fl.f_ty);
+        f_eq fr (f_app copr (List.map (curry f_local) bhr) fr.f_ty) ]
+      es.es_pr in
+
+    f_forall
+      ( (List.map (snd_map gtty) bhl) @
+        (List.map (snd_map gtty) bhr) )
+      ( f_equivS_r
+          { es with es_sl = EcModules.stmt (bl.s_node @ sl.s_node);
+                    es_sr = EcModules.stmt (br.s_node @ sr.s_node);
+                    es_pr = pre; } )
+
+  in
+
+  let concl1 = List.map get_eqv_cond infos in
+  let concl2 = List.map get_eqv_goal infos in
+
+  FApi.xmutate1 tc `Match (concl1 @ concl2)
