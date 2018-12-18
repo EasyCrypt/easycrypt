@@ -116,7 +116,7 @@ let fop_lossless ty =
 
 let f_support f1 f2 = f_app (fop_support f2.f_ty) [f1; f2] tbool
 let f_in_supp f1 f2 = f_support f2 f1
-let f_pred1   f1    = f_app (fop_pred1 f1.f_ty) [f1] tbool
+let f_pred1   f1    = f_app (fop_pred1 f1.f_ty) [f1] (toarrow [f1.f_ty] tbool)
 
 let f_mu_x    f1 f2 =
   f_app (fop_mu f2.f_ty) [f1; (f_pred1 f2)] treal
@@ -143,6 +143,15 @@ let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
 let f_identity ?(name = "x") ty =
   let name  = EcIdent.create name in
     f_lambda [name, GTty ty] (f_local name ty)
+
+(* -------------------------------------------------------------------- *)
+let f_ty_app (env : EcEnv.env) (f : form) (args : form list) =
+  let ty, rty = EcEnv.Ty.decompose_fun f.f_ty env in
+  let ty, ety =
+    try  List.split_at (List.length args) ty
+    with Failure _ -> assert false in
+
+  ignore ty; f_app f args (toarrow ety rty)
 
 (* -------------------------------------------------------------------- *)
 module type DestrRing = sig
