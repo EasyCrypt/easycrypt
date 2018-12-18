@@ -16,4 +16,4 @@ val t_bdhoare_cond : backward
 val t_equiv_cond   : oside -> backward
 
 (* -------------------------------------------------------------------- *)
-val t_equiv_match : backward
+val t_equiv_match : [ `Eq | `ConstrSynced ] -> backward

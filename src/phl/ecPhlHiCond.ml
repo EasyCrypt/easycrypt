@@ -43,5 +43,5 @@ let process_cond info tc =
       [ t_id; t_bdhoare_cond] tc
 
 (* -------------------------------------------------------------------- *)
-let process_match tc =
-  t_hS_or_bhS_or_eS ~te:t_equiv_match tc
+let process_match infos tc =
+  t_hS_or_bhS_or_eS ~te:(t_equiv_match infos) tc

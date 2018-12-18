@@ -2710,8 +2710,8 @@ phltactic:
 | IF opt=if_option
     { Pcond opt }
 
-| MATCH
-    { Pmatch }
+| MATCH eq=boption(EQ)
+    { Pmatch (if eq then `Eq else `ConstrSynced) }
 
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }

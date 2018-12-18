@@ -578,7 +578,7 @@ type phltactic =
   | Prcond         of (oside * bool * codepos1)
   | Prmatch        of (oside * symbol * codepos1)
   | Pcond          of pcond_info
-  | Pmatch
+  | Pmatch         of [ `Eq | `ConstrSynced ]
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
   | Pinline        of inline_info
