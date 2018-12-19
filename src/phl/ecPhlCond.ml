@@ -201,7 +201,9 @@ let t_equiv_match_eq tc =
   let fl = form_of_expr (EcMemory.memory es.es_ml) el in
   let fr = form_of_expr (EcMemory.memory es.es_mr) er in
 
-  let eqv_cond = f_imp_simpl es.es_pr (f_eq fl fr) in
+  let eqv_cond =
+    f_forall_mems [es.es_ml; es.es_mr]
+      (f_imp_simpl es.es_pr (f_eq fl fr)) in
 
   let get_eqv_goal ((c, _), ((cl, bl), (cr, br))) =
     let sb     = { EcTypes.e_subst_id with es_freshen = true; } in
