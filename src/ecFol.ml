@@ -105,7 +105,7 @@ let f_real_div f1 f2 =
 
 (* -------------------------------------------------------------------- *)
 let f_predT     ty = f_op CI.CI_Pred.p_predT [ty] (tcpred ty)
-let fop_pred1   ty = f_op CI.CI_Pred.p_pred1 [ty] (tcpred ty)
+let fop_pred1   ty = f_op CI.CI_Pred.p_pred1 [ty] (toarrow [ty; ty] tbool)
 
 let fop_support ty =
   f_op CI.CI_Distr.p_support  [ty] (toarrow [tdistr ty; ty] tbool)
