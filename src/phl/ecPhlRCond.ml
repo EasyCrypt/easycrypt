@@ -94,11 +94,11 @@ module LowMatch = struct
   (* ------------------------------------------------------------------ *)
   let gen_rcond (pf, env) c m at_pos s =
     let head, i, tail = s_split_i at_pos s in
-    let e, (cname, cty), (cvars, subs) =
+    let e, infos, (cvars, subs) =
       match i.i_node with
       | Smatch (e, bs) -> begin
-          let typ, tyd, _ = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
-          let tyd = oget (EcDecl.tydecl_as_datatype tyd) in
+          let typ, tydc, tyinst = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+          let tyd = oget (EcDecl.tydecl_as_datatype tydc) in
           let ctor =
             let test (_i : int) = sym_equal c -| fst in
             List.Exceptionless.findi test tyd.tydt_ctors in
@@ -109,10 +109,11 @@ module LowMatch = struct
                   Format.fprintf fmt
                     "cannot find the constructor %s" c)
 
-          | Some (i, (cname, cty)) ->
+          | Some (i, (cname, _cty)) ->
               let b = oget (List.nth_opt bs i) in
               let cname = EcPath.pqoname (EcPath.prefix typ) cname in
-              (e, (cname, cty), b)
+              let tyinst = List.combine tydc.tyd_params tyinst in
+              (e, ((typ, tyd, tyinst), cname), b)
         end
 
       | _ ->
@@ -123,23 +124,38 @@ module LowMatch = struct
 
     let e = form_of_expr m e in
 
-    (stmt head, e, stmt (head @ subs.s_node @ tail))
+    (stmt head, e, infos, cvars, stmt (head @ subs.s_node @ tail))
 
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond_match_r c at_pos tc =
     let hs = tc1_as_hoareS tc in
     let m  = EcMemory.memory hs.hs_m in
-    let hd, _e, s = gen_rcond (!!tc, FApi.tc1_env tc) c m at_pos hs.hs_s in
-    let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = f_true; } in
+    let hd, e, ((_typ, _tyd, tyinst), cname), cvars, s =
+      gen_rcond (!!tc, FApi.tc1_env tc) c m at_pos hs.hs_s in
+
+    let po1 =
+      let names = List.map (
+        fun (x, xty) ->
+          let x =
+            if   EcIdent.name x = "_"
+            then EcIdent.create (symbol_of_ty xty)
+            else EcIdent.fresh x
+          in (x, xty)) cvars in
+      let vars  = List.map (curry f_local) names in
+      let po = f_op cname (List.snd tyinst) e.f_ty in
+      let po = f_app po vars e.f_ty in
+      f_exists (List.map (snd_map gtty) names) (f_eq e po) in
+
+    let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = po1; } in
     let concl2  = f_hoareS_r { hs with hs_s = s; } in
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
-  let t_bdhoare_rcond_match_r c at_pos tc =
+  let t_bdhoare_rcond_match_r _c _at_pos tc =
     EcLowGoal.t_id tc
 
   (* ------------------------------------------------------------------ *)
-  let t_equiv_rcond_match_r side c at_pos tc =
+  let t_equiv_rcond_match_r _side _c _at_pos tc =
     EcLowGoal.t_id tc
 
   (* ------------------------------------------------------------------ *)
