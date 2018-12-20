@@ -12,4 +12,4 @@ open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
 val process_cond  : pcond_info -> backward
-val process_match : [ `Eq | `ConstrSynced ] -> backward
+val process_match : matchmode -> backward

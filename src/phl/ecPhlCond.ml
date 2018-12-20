@@ -115,6 +115,50 @@ let rec t_equiv_cond side tc =
           tc
 
 (* -------------------------------------------------------------------- *)
+let t_equiv_match s tc =
+  let hyps = FApi.tc1_hyps tc in
+  let env  = LDecl.toenv hyps in
+  let es   = tc1_as_equivS tc in
+
+  let me, st =
+    match s with
+    | `Left  -> es.es_ml, es.es_sl
+    | `Right -> es.es_mr, es.es_sr in
+
+  let sets st =
+    match s with
+    | `Left  -> { es with es_sl = st; }
+    | `Right -> { es with es_sr = st; } in
+
+  let (e, bs), tl = tc1_first_match tc st in
+  let indp, indt, tyinst = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+  let indt = oget (EcDecl.tydecl_as_datatype indt) in
+  let f = form_of_expr (EcMemory.memory me) e in
+
+  let do1 ((ids, b), (cname, _)) =
+    let subst, lvars =
+      add_locals { e_subst_id with es_freshen = true; } ids in
+
+    let cop = EcPath.pqoname (EcPath.prefix indp) cname in
+    let cop = f_op cop tyinst (toarrow (List.snd ids) f.f_ty) in
+    let cop =
+      let args = List.map (curry f_local) lvars in
+      f_app cop args f.f_ty in
+    let cop = f_eq f cop in
+
+    f_forall
+      (List.map (snd_map gtty) lvars)
+      (f_equivS_r
+         { (sets (stmt ((s_subst subst b).s_node @ tl.s_node)))
+             with es_pr = f_and_simpl cop es.es_pr })
+
+  in
+
+  let concl = List.map do1 (List.combine bs indt.EcDecl.tydt_ctors) in
+
+  FApi.xmutate1 tc (`Match s) concl
+
+(* -------------------------------------------------------------------- *)
 let t_equiv_match_same_constr tc =
   let hyps = FApi.tc1_hyps tc in
   let env  = LDecl.toenv hyps in
@@ -244,5 +288,6 @@ let t_equiv_match_eq tc =
 (* -------------------------------------------------------------------- *)
 let t_equiv_match infos tc =
   match infos with
-  | `Eq -> t_equiv_match_eq tc
-  | `ConstrSynced -> t_equiv_match_same_constr tc
+  | `DSided `Eq -> t_equiv_match_eq tc
+  | `DSided `ConstrSynced -> t_equiv_match_same_constr tc
+  | `SSided s -> t_equiv_match s tc

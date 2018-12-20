@@ -2714,8 +2714,13 @@ phltactic:
 | IF opt=if_option
     { Pcond opt }
 
-| MATCH eq=boption(EQ)
-    { Pmatch (if eq then `Eq else `ConstrSynced) }
+| MATCH s=loc(side?) eq=boption(EQ)
+    { match unloc s, eq with
+      | None  , false -> Pmatch (`DSided `ConstrSynced)
+      | None  , true  -> Pmatch (`DSided `Eq)
+      | Some s, false -> Pmatch (`SSided s)
+      | Some _, true  ->
+          parse_error s.pl_loc (Some "cannot give side and '='") }
 
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }

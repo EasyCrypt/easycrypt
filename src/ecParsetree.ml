@@ -566,6 +566,12 @@ type pcqoptions = (bool * pcqoption) list
 type crushmode = { cm_simplify : bool; cm_solve : bool; }
 
 (* -------------------------------------------------------------------- *)
+type matchmode = [
+  | `DSided of [ `Eq | `ConstrSynced ]
+  | `SSided of side
+]
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
@@ -583,7 +589,7 @@ type phltactic =
   | Prcond         of (oside * bool * codepos1)
   | Prmatch        of (oside * symbol * codepos1)
   | Pcond          of pcond_info
-  | Pmatch         of [ `Eq | `ConstrSynced ]
+  | Pmatch         of matchmode
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
   | Pinline        of inline_info
