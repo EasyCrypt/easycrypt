@@ -125,11 +125,12 @@ let tfun t1 t2   = mk_ty (Tfun (t1, t2))
 let tglob m      = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)
-let tunit      = tconstr EcCoreLib.CI_Unit .p_unit  []
-let tbool      = tconstr EcCoreLib.CI_Bool .p_bool  []
-let tint       = tconstr EcCoreLib.CI_Int  .p_int   []
-let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr [ty]
-let treal      = tconstr EcCoreLib.CI_Real .p_real  []
+let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
+let tbool      = tconstr EcCoreLib.CI_Bool .p_bool    []
+let tint       = tconstr EcCoreLib.CI_Int  .p_int     []
+let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr   [ty]
+let toption ty = tconstr EcCoreLib.CI_Option.p_option [ty]
+let treal      = tconstr EcCoreLib.CI_Real .p_real    []
 let tcpred ty  = tfun ty tbool
 
 let ttuple lt    =
@@ -678,6 +679,18 @@ let e_app x args ty =
     match x.e_node with
     | Eapp(x', args') -> mk_expr (Eapp (x', (args'@args))) ty
     | _ -> mk_expr (Eapp (x, args)) ty
+
+(* -------------------------------------------------------------------- *)
+let e_none (ty : ty) : expr =
+  e_op EcCoreLib.CI_Option.p_none [ty] (toption ty)
+
+let e_some ({ e_ty = ty } as e : expr) : expr =
+  let op = e_op EcCoreLib.CI_Option.p_some [ty] (tfun ty (toption ty)) in
+  e_app op [e] (toption ty)
+
+let e_oget (e : expr) (ty : ty) : expr =
+  let op = e_op EcCoreLib.CI_Option.p_oget [ty] (tfun (toption ty) ty) in
+  e_app op [e] ty
 
 (* -------------------------------------------------------------------- *)
 module ExprSmart = struct

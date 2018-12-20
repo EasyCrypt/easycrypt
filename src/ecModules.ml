@@ -76,6 +76,11 @@ let ty_of_lv = function
   | LvTuple tys           -> EcTypes.ttuple (List.map snd tys)
   | LvMap   (_, _, _, ty) -> ty
 
+let lv_of_list = function
+  | [] -> None
+  | [(pv, ty)] -> Some (LvVar (pv, ty))
+  | pvs -> Some (LvTuple pvs)
+
 (* -------------------------------------------------------------------- *)
 type instr = {
   i_node : instr_node;

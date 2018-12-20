@@ -601,6 +601,7 @@ let e_bin_prio_lambda = ( 5, `Prefix)
 let e_bin_prio_impl   = (10, `Infix `Right)
 let e_bin_prio_iff    = (12, `NonAssoc)
 let e_bin_prio_if     = (15, `Prefix)
+let e_bin_prio_match  = (15, `Prefix)
 let e_bin_prio_letin  = (18, `Prefix)
 let e_bin_prio_nop    = (19, `Infix `Left)
 let e_bin_prio_or     = (20, `Infix `Right)
@@ -770,36 +771,49 @@ let pp_if_form (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
 
 (* -------------------------------------------------------------------- *)
 let pp_match_form (ppe : PPEnv.t) pp_sub outer fmt (b, bs) =
-  let env = ppe.PPEnv.ppe_env in
-  let dt  = proj3_2 (oget (EcEnv.Ty.get_top_decl b.f_ty env)) in
-  let dt  = oget (EcDecl.tydecl_as_datatype dt) in
-  let bs  = List.combine dt.tydt_ctors bs in
+  let pp fmt (b, bs) =
+    let env = ppe.PPEnv.ppe_env in
+    let dt  = proj3_2 (oget (EcEnv.Ty.get_top_decl b.f_ty env)) in
+    let dt  = oget (EcDecl.tydecl_as_datatype dt) in
+    let bs  = List.combine dt.tydt_ctors bs in
 
-  let pp_branch fmt ((name, argsty), br) =
-    let xs, br = EcFol.decompose_lambda br in
-    let xs, br =
-      let xs1, xs2 = List.split_at (List.length argsty) xs in
-      (List.fst xs1, f_lambda xs2 br) in
+    let pp_branch fmt ((name, argsty), br) =
+      let xs, br = EcFol.decompose_lambda br in
+      let xs, br =
+        let (xs1, xs2), rem =
+          try  (List.split_at (List.length argsty) xs, [])
+          with Invalid_argument _ ->
+            let rem =
+              List.map
+                (fun ty -> (EcIdent.create (symbol_of_ty ty), ty))
+                (List.drop (List.length xs) argsty) in
+              (xs, []), rem in
 
-    begin match xs with
-    | [] ->
-        Format.fprintf fmt "| %a" pp_opname ([], name)
+        (List.fst xs1 @ List.fst rem,
+         f_ty_app ppe.PPEnv.ppe_env
+           (f_lambda xs2 br) (List.map (curry f_local) rem)) in
 
-    | [x] ->
-        Format.fprintf fmt "| %a %a"
-          pp_opname ([], name) (pp_local ppe) x
+      begin match xs with
+      | [] ->
+          Format.fprintf fmt "| %a" pp_opname ([], name)
 
-    | _ ->
-        Format.fprintf fmt "| %a (%a)" pp_opname ([], name)
-          (pp_list ", " (pp_local ppe)) xs
-    end;
+      | [x] ->
+          Format.fprintf fmt "| %a %a"
+            pp_opname ([], name) (pp_local ppe) x
 
-    Format.fprintf fmt " => %a"
-      (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) br in
+      | _ ->
+          Format.fprintf fmt "| %a (%a)" pp_opname ([], name)
+            (pp_list ", " (pp_local ppe)) xs
+      end;
 
-  Format.fprintf fmt "@[@[<hov 2>match %a@ with %t end@]@]"
-    (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) b
-    (fun fmt -> pp_list "@ " pp_branch fmt bs)
+      Format.fprintf fmt " => %a"
+        (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) br in
+
+    Format.fprintf fmt "@[@[<hov 2>match %a@ with %t end@]@]"
+      (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) b
+      (fun fmt -> pp_list "@ " pp_branch fmt bs)
+
+  in maybe_paren outer ([], e_bin_prio_match) pp fmt (b, bs)
 
 (* -------------------------------------------------------------------- *)
 let pp_tuple mode (ppe : PPEnv.t) pp_sub osc fmt es =

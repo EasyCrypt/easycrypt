@@ -8,6 +8,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcIdent
 open EcSymbols
 open EcTypes
 open EcDecl
@@ -122,15 +123,15 @@ module LowMatch = struct
               "the targetted instruction is not a match")
     in
 
-    let e = form_of_expr m e in
+    let f = form_of_expr m e in
 
-    (stmt head, e, infos, cvars, stmt (head @ subs.s_node @ tail))
+    ((stmt head, subs, tail), (e, f), infos, cvars)
 
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond_match_r c at_pos tc =
     let hs = tc1_as_hoareS tc in
     let m  = EcMemory.memory hs.hs_m in
-    let hd, e, ((_typ, _tyd, tyinst), cname), cvars, s =
+    let (hd, s, tl), (e, f), ((typ, _tyd, tyinst), cname), cvars =
       gen_rcond (!!tc, FApi.tc1_env tc) c m at_pos hs.hs_s in
 
     let po1 =
@@ -142,12 +143,41 @@ module LowMatch = struct
             else EcIdent.fresh x
           in (x, xty)) cvars in
       let vars  = List.map (curry f_local) names in
-      let po = f_op cname (List.snd tyinst) e.f_ty in
-      let po = f_app po vars e.f_ty in
-      f_exists (List.map (snd_map gtty) names) (f_eq e po) in
+      let po = f_op cname (List.snd tyinst) f.f_ty in
+      let po = f_app po vars f.f_ty in
+      f_exists (List.map (snd_map gtty) names) (f_eq f po) in
+
+    let me, pvs = List.fold_left_map (fun m (x, xty) ->
+        let var = { v_name = EcIdent.name x; v_type = xty; } in
+        EcLowPhlGoal.fresh_pv m var
+      ) hs.hs_m cvars in
+
+    let subst, pvs =
+      let px = EcMemory.xpath hs.hs_m in
+      let s, pvs =
+        List.fold_left_map (fun s ((x, xty), name) ->
+            let pv = pv_loc px name in
+            let s  = Mid.add x (e_var pv xty) s in
+            (s, (pv, xty)))
+          Mid.empty (List.combine cvars pvs) in
+      ({ e_subst_id with es_loc = s; }, pvs) in
+
+    let asgn =
+      EcModules.lv_of_list pvs |> omap (fun lv ->
+        (* FIXME: factorize out *)
+        let rty  = ttuple (List.snd cvars) in
+        let proj = EcInductive.datatype_proj_path typ (EcPath.basename cname) in
+        let proj = e_op proj (List.snd tyinst) (tfun e.e_ty (toption rty)) in
+        let proj = e_app proj [e] (toption rty) in
+        let proj = e_oget proj rty in
+        i_asgn (lv, proj)) in
+
+    let asgn = otolist asgn in
 
     let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = po1; } in
-    let concl2  = f_hoareS_r { hs with hs_s = s; } in
+    let concl2  = f_hoareS_r {
+      hs with hs_m = me; hs_s = stmt (asgn @ (s_subst subst s).s_node @ tl); } in
+
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)

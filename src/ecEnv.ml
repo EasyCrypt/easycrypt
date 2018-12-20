@@ -748,7 +748,14 @@ module MC = struct
 
           let mc = _up_axiom candup mc (fst schcase) (fst_map ipath schcase) in
           let mc = _up_axiom candup mc (fst schelim) (fst_map ipath schelim) in
-            mc
+
+          let projs = (mypath, tyd.tyd_params, dtype) in
+          let projs = EcInductive.datatype_projectors projs in
+
+          List.fold_left (fun mc (c, op) ->
+              let name = EcInductive.datatype_proj_name c in
+              _up_operator candup mc name (ipath name, op)
+            ) mc projs
 
       | `Record (scheme, fields) ->
           let params  = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
