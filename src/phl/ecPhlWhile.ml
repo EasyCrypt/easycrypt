@@ -387,8 +387,8 @@ let process_while side winfos tc =
 module ASyncWhile = struct
   exception CannotTranslate
 
-  let form_of_expr env mh =
-    let map = ref Mid.empty in
+  let form_of_expr env mother mh =
+    let map = ref (Mid.add mother (EcPV.PVMap.create env) Mid.empty) in
 
     let rec aux fp =
       match fp.f_node with
@@ -560,7 +560,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id ml mhr in
         let inv     = Fsubst.f_subst subst inv in
         let test    = f_ands [fe1; f_not p0; p1] in
-        let test, m = ASyncWhile.form_of_expr env ml test in
+        let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_mr) ml test in
         let c       = s_while (test, cl) in
         xhyps m
           (f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1)
@@ -569,7 +569,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
         let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in
         let inv     = Fsubst.f_subst subst inv in
         let test    = f_ands [fe1; f_not p0; f_not p1] in
-        let test, m = ASyncWhile.form_of_expr env mr test in
+        let test, m = ASyncWhile.form_of_expr env (EcMemory.memory evs.es_ml) mr test in
         let c       = s_while (test, cr) in
         xhyps m
           (f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1)
