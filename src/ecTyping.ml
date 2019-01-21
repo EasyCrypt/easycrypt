@@ -2074,6 +2074,8 @@ and transinstr
 
   | PSmatch (pe, pbranches) -> begin
       let e, ety = transexp env `InProc ue pe in
+      let ety = Tuni.offun (EcUnify.UniEnv.assubst ue) ety in
+
       let inddecl =
         match (EcEnv.ty_hnorm ety env).ty_node with
         | Tconstr (indp, _) -> begin
