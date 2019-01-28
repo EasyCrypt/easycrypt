@@ -1068,11 +1068,14 @@ let pp_opapp
   and try_pp_proj () =
     let env = ppe.PPEnv.ppe_env in
       match es, EcEnv.Op.by_path_opt op env with
-      | [arg], Some op when EcDecl.is_proj op ->
+      | arg :: args, Some op when EcDecl.is_proj op ->
           let pp fmt () =
-            Format.fprintf fmt "%a.`%a"
+            Format.fprintf fmt "%a.`%a%(%)%a"
               (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) arg
               pp_opname (nm, opname)
+              (if List.is_empty args then "" else "@ ")
+              (pp_list "@ " (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))))
+              args
           in
             Some pp
       | _ -> None
