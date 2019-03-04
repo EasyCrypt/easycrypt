@@ -14,18 +14,22 @@ let why3_for_ec = stdenv.lib.overrideDerivation why3 (o: {
 });
 in
 
+let
+  python2Env = python27Packages.python.withPackages(p: [ p.pyyaml ]);
+in
+
 stdenv.mkDerivation rec {
   name = "easycrypt-${version}";
   version = "1.0";
   src = ./.;
-  buildInputs = [ z3 alt-ergo ]
-  ++ (with ocaml-ng.ocamlPackages_4_04; [ ocaml findlib ocamlbuild batteries menhir merlin zarith inifiles why3_for_ec ])
-  ++ (with python27Packages; [ python pyyaml ]);
-  makeFlags = [ "PREFIX=$(out)" ];
-  preBuild = ''
+  buildInputs = [ git python2Env ]
+  ++ [ z3 alt-ergo ]
+  ++ (with ocaml-ng.ocamlPackages_4_04; [ ocaml findlib ocamlbuild batteries menhir merlin zarith inifiles why3_for_ec ]);
+  preConfigure = ''
     patchShebangs scripts/install
     patchShebangs scripts/testing
     patchShebangs scripts/packaging/emacs-based/scripts
     patchShebangs scripts/docker/test-box/hooks/build
   '';
+  makeFlags = [ "PREFIX=$(out)" ];
 }
