@@ -377,8 +377,10 @@ let rec h_red ri env hyps f =
           let op  = oget (EcEnv.Op.by_path_opt p env) in
           let fix = EcDecl.operator_as_fix op in
 
-            if List.length fargs <> snd (fix.EcDecl.opf_struct) then
-              raise NotReducible;
+          if List.length fargs < snd (fix.EcDecl.opf_struct) then
+            raise NotReducible;
+
+          let fargs, eargs = List.split_at (snd (fix.EcDecl.opf_struct)) fargs in
 
           let args  = Array.of_list fargs in
           let pargs = List.fold_left (fun (opb, acc) v ->
@@ -422,7 +424,7 @@ let rec h_red ri env hyps f =
             EcFol.Fsubst.subst_tvar
               (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
 
-            Fsubst.f_subst subst body
+          f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
         with NotReducible ->
           f_app (h_red ri env hyps f1) fargs f.f_ty
