@@ -405,12 +405,25 @@ let process_call side info tc =
       form
   in
 
-  let pt, ax =
-    PT.tc1_process_full_closed_pterm_cut
-      ~prcut:(process_cut tc) tc info
+  let pt = PT.tc1_process_full_pterm_cut ~prcut:(process_cut tc) tc info
   in
+
+  let pt =
+    let rec doit pt =
+      match TTC.destruct_product ~reduce:true (FApi.tc1_hyps tc) pt.PT.ptev_ax with
+      | None   -> pt
+      | Some _ -> doit (EcProofTerm.apply_pterm_to_hole pt)
+    in doit pt in
+
+  let pt, ax =
+    if not (PT.can_concretize pt.PT.ptev_env) then
+      tc_error !!tc "cannot infer all placeholders";
+    PT.concretize pt in
 
   FApi.t_seqsub
     (t_call side ax)
-    [FApi.t_seq (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) !subtactic; t_id]
+    [FApi.t_seqs
+       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
+        !subtactic; t_logic_trivial];
+     t_id]
     tc
