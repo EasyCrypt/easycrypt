@@ -336,6 +336,9 @@ end = struct
     | UnknownScope sc ->
         msg "unknown scope: `%a'" pp_qsymbol sc
 
+    | NoWP ->
+        msg "cannot compute weakest precondition"
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
     let pp_v fmt xp = EcPrinting.pp_pv ppe fmt (pv_glob xp) in

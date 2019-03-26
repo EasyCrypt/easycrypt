@@ -27,6 +27,10 @@ module NormMp = EcEnv.NormMp
 module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
+type wp = EcEnv.env -> EcMemory.memory -> stmt -> form -> form option
+let  wp = (ref (None : wp option))
+
+(* -------------------------------------------------------------------- *)
 type opmatch = [
   | `Op   of EcPath.path * EcTypes.ty list
   | `Lc   of EcIdent.t
@@ -112,6 +116,7 @@ type tyerror =
 | PatternNotAllowed
 | MemNotAllowed
 | UnknownScope           of qsymbol
+| NoWP
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -2147,6 +2152,64 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let ty = transty tp_relax env ue pty in
         let aout = transf env pf in
         unify_or_fail env ue pf.pl_loc ~expct:ty aout.f_ty; aout
+
+    | PFWP (fn, args, phi) ->
+        let fpath   = EcEnv.NormMp.norm_xfun env (trans_gamepath env fn) in
+        let fun_    = EcEnv.Fun.by_xpath fpath env in
+        let args, argsty =
+          transcall (transexp env `InProc ue)
+            env ue f.pl_loc fun_.f_sig args in
+
+        let body, ret =
+          let init =
+            match fun_.f_sig.fs_anames with
+            | None ->
+                [i_asgn (LvVar (pv_arg fpath, argsty), e_tuple args)]
+            | Some anames ->
+                List.map2 (fun x e ->
+                    i_asgn (LvVar (pv_loc fpath x.v_name, e.e_ty), e))
+                  anames args
+          in
+
+          let def =
+            match fun_.f_def with
+            | FBdef def -> def
+            | _ -> tyerror f.pl_loc env NoWP in
+
+          (stmt (init @ def.f_body.s_node), def.f_ret) in
+
+        let mem = EcIdent.create "wp" in
+        let ret = form_of_expr mem (odfl e_tt ret) in
+        let env =
+          let menv = EcEnv.Fun.prF_memenv mem fpath env in
+          EcEnv.Memory.push_active menv env in
+        let phi = transf env phi in
+        let phi =
+          let rec subst f =
+            match f.f_node with
+            | Fpvar (pv, m) when
+                   EcMemory.mem_equal m mem
+                && pv_equal (pv_res fpath) (EcEnv.NormMp.norm_pvar env pv)
+              -> ret
+
+            | _ -> EcFol.f_map (fun ty -> ty) subst f
+          in subst phi in
+
+        let phi =
+          match oget !wp env mem body phi with
+          | None -> tyerror f.pl_loc env NoWP
+          | Some phi -> phi in
+
+        let () =
+          let rec check subf =
+            match subf.f_node with
+            | Fpvar (pv, m) when EcMemory.mem_equal mem m ->
+                Format.eprintf "[W]%s@." (EcPath.x_tostring pv.pv_name);
+                tyerror f.pl_loc env NoWP
+            | _ -> EcFol.f_iter check subf
+          in check phi in
+
+        phi
 
     | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
 

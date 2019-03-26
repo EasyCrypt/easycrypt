@@ -264,6 +264,7 @@ and pformula_r =
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
+  | PFWP       of pgamepath * pexpr list * pformula
 
 and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list
