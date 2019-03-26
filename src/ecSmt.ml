@@ -65,11 +65,18 @@ type w3absmod = {
 }
 
 (* -------------------------------------------------------------------- *)
+type kpattern =
+  | KHole
+  | KApp  of EcPath.path * kpattern list
+  | KProj of kpattern * int
+
+(* -------------------------------------------------------------------- *)
 type tenv = {
   (*---*) te_env        : EcEnv.env;
   mutable te_task       : WTask.task;
   (*---*) ty_known_w3   : w3_known_ty Hp.t;
   (*---*) te_known_w3   : w3_known_op Hp.t;
+  (*---*) tk_known_w3   : (kpattern * w3_known_op) list;
   (*---*) te_ty         : w3ty Hp.t;
   (*---*) te_op         : w3op Hp.t;
   (*---*) te_lc         : w3op Hid.t;
@@ -79,11 +86,12 @@ type tenv = {
   (*---*) te_absmod     : w3absmod Hid.t;     (* abstract module *)
 }
 
-let empty_tenv env task known_ty known =
+let empty_tenv env task (kwty, kw, kwk) =
   { te_env        = env;
     te_task       = task;
-    te_known_w3   = known;
-    ty_known_w3   = known_ty;
+    te_known_w3   = kw;
+    ty_known_w3   = kwty;
+    tk_known_w3   = kwk;
     te_ty         = Hp.create 0;
     te_op         = Hp.create 0;
     te_lc         = Hid.create 0;
@@ -561,7 +569,62 @@ let trans_lambda genv wvs wbody =
       flam_app
 
 (* -------------------------------------------------------------------- *)
-let rec trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
+let kmatch =
+  let module E = struct exception MFailure end in
+
+  let rec doit (acc : form list) (k : kpattern) (f : form) =
+    match k, fst_map f_node (destr_app f) with
+    | KHole, _ ->
+        f :: acc
+
+    | KProj (sk, i), (Fproj (sf, j), []) when i = j ->
+        doit acc sk sf
+
+    | KApp (sp, ks), (Fop (p, _), fs)
+        when EcPath.p_equal sp p && List.length ks = List.length fs
+      -> List.fold_left2 doit acc ks fs
+
+    | _, _ -> raise E.MFailure
+  in
+
+  fun k f -> try Some (List.rev (doit [] k f)) with E.MFailure -> None
+
+(* -------------------------------------------------------------------- *)
+let rec trans_kpattern env (k, (ls, wth)) f =
+  match kmatch k f with None -> raise CanNotTranslate | Some args ->
+
+  load_wtheory (fst env) wth;
+
+  let dom, codom = List.map f_ty args, f.f_ty in
+
+  let wdom   = trans_tys env dom in
+  let wcodom =
+    if   ER.EqTest.is_bool (fst env).te_env codom
+    then None
+    else Some (trans_ty env codom) in
+
+  let w3op =
+    let name = ls.WTerm.ls_name.WIdent.id_string in
+    { w3op_fo = `LDecl ls;
+      w3op_ta = instantiate [] wdom wcodom;
+      w3op_ho = `HO_TODO (name, wdom, wcodom); }
+  in
+
+  let wargs = List.map (trans_form env) args in
+
+  apply_wop (fst env) w3op [] wargs
+
+(* -------------------------------------------------------------------- *)
+and trans_kpatterns env (ks : (kpattern * w3_known_op) list) (f : form) =
+  EcUtils.oget ~exn:CanNotTranslate
+    (List.Exceptionless.find_map
+       (fun k -> try Some (trans_kpattern env k f) with CanNotTranslate -> None)
+       ks)
+
+(* -------------------------------------------------------------------- *)
+and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
+  try trans_kpatterns env genv.tk_known_w3 fp with CanNotTranslate ->
+
   match fp.f_node with
   | Fquant (qt, bds, body) ->
     begin
@@ -1082,9 +1145,14 @@ let core_ty_theories = [
      [(CI_Map.p_map, "map")]);
 ]
 
+let core_match_theories = [
+    ((["int"], "EuclideanDivision"),
+     [(KProj (KApp (CI_Int.p_int_edivz, [KHole; KHole]), 0), "div");
+      (KProj (KApp (CI_Int.p_int_edivz, [KHole; KHole]), 1), "mod")])
+]
+
 let core_theories = Lazy.from_fun (fun () ->
   let add_core_theory tbl (thname, operators) =
-
     let theory = curry P.get_w3_th thname in
     let namesp = theory.WTheory.th_export in
     List.iter (fun (p, name) ->
@@ -1104,7 +1172,20 @@ let core_theories = Lazy.from_fun (fun () ->
       tys in
   let ty_known = Hp.create 7 in
   List.iter (add_core_ty ty_known) core_ty_theories;
-  ty_known, known
+
+  let add_kwk thname (k, name) =
+    let theory = curry P.get_w3_th thname in
+    let namesp = theory.WTheory.th_export in
+    (k, (WTheory.ns_find_ls namesp [name], theory))
+  in
+
+  let kwk =
+    List.rev (List.flatten
+      (List.map
+         (fun (wth, syms) -> List.map (add_kwk wth) syms)
+         core_match_theories)) in
+
+  ty_known, known, kwk
 )
 
 (* -------------------------------------------------------------------- *)
@@ -1401,8 +1482,8 @@ let create_global_task () =
 
 (* -------------------------------------------------------------------- *)
 let dump_why3 (env : EcEnv.env) (filename : string) =
-  let ty_known, known = Lazy.force core_theories in
-  let tenv  = empty_tenv env (create_global_task ()) ty_known known in
+  let known = Lazy.force core_theories in
+  let tenv  = empty_tenv env (create_global_task ()) known in
   let ()    = add_core_bindings tenv in
 
   List.iter (trans_axiom tenv) (EcEnv.Ax.all env);
@@ -1429,8 +1510,8 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let env   = LDecl.toenv hyps in
   let hyps  = LDecl.tohyps hyps in
   let task  = create_global_task () in
-  let ty_known, known = Lazy.force core_theories in
-  let tenv  = empty_tenv env task ty_known known in
+  let known = Lazy.force core_theories in
+  let tenv  = empty_tenv env task known in
   let ()    = add_core_bindings tenv in
   let lenv  = lenv_of_hyps tenv hyps in
   let wterm = Cast.force_prop (trans_form (tenv, lenv) concl) in
