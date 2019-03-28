@@ -3036,7 +3036,7 @@ tactic:
 | t=tactic_ip %prec prec_below_IMPL
     { t }
 
-| t1=tactic_ip ORA t2=tactic_ip
+| t1=tactic_ip ORA t2=tactic
     { let loc = EcLocation.make $startpos $endpos in
         mk_core_tactic (mk_loc loc (Por (t1, t2))) }
 
