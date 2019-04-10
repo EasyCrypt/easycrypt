@@ -9,6 +9,7 @@
  *)
 require import Int.
 require import Real.
+require import Distr.
 require import CyclicGroup.
 
 require (*--*) SigmaProtocol.
@@ -124,7 +125,8 @@ section SchnorrPKSecurity.
   lemma schnorr_proof_of_knowledge_completeness_ll:
     islossless Completeness(SchnorrPK).main.
   proof.
-    proc; inline*; auto; simplify; smt.
+    proc; inline*.
+    wp; rnd; wp; rnd; wp; skip; progress by apply FDistr.dt_ll.
   qed.
 
 
@@ -133,13 +135,18 @@ section SchnorrPKSecurity.
     Pr[Completeness(SchnorrPK).main(h, w') @ &m : res] = 1%r.
   proof.
     rewrite /R /R_DL; move => sigmarel.
-    byphoare (_: h = x /\ w' = w ==> _).
+    byphoare (_: h = x /\ w' = w ==> _) => //.
     proc; inline*; swap 3 -2; swap 8 -7.
-    wp; rewrite /snd.
+    wp; rewrite /snd /=.
     rnd; rnd; skip.
-    progress; subst x{hr}; smt.
-    smt.
-    smt.
+    progress => //. subst x{hr}.
+    have <-/=: predT = fun x => mu FDistr.dt (fun (x0 : t) => g ^ x0 * g ^ w{hr} ^ x = g ^ (x0 + x * w{hr})) = 1%r.
+      rewrite fun_ext => x; rewrite muE /=.
+      have ->/=: (fun (x0 : t) => if g ^ x0 * g ^ w{hr} ^ x = g ^ (x0 + x * w{hr}) then mass FDistr.dt x0 else 0%r) = (fun x0 => mass FDistr.dt x0).
+        rewrite fun_ext => z.
+        have ->//: g ^ z * g ^ w{hr} ^ x = g ^ (z + x * w{hr}) by rewrite pow_pow mul_pow mulC //.
+      rewrite -weightE FDistr.dt_ll /predT //.
+    rewrite FDistr.dt_ll //.
   qed.
 
   (* Special soundness *)
@@ -152,16 +159,24 @@ section SchnorrPKSecurity.
     move => challenges_differ.
     move => accepting_transcript_1.
     move => accepting_transcript_2.
-    byphoare (_: h = x /\ msg = m /\ ch = e /\ ch' = e' /\ r = z /\ r' = z' ==> _).
+    byphoare (_: h = x /\ msg = m /\ ch = e /\ ch' = e' /\ r = z /\ r' = z' ==> _) => //.
     proc; simplify; inline*.
     auto; rewrite /R /R_DL /oget.
-    move=>*.
-    (* Here the proof needs a hand... *)
-    have algebra_part1 : (g ^ z{hr} / (g ^ z'{hr}) = m{hr} * x{hr} ^ e{hr} / m{hr} / x{hr} ^ e'{hr}) by smt.
-    have algebra_part2 : (g ^ z{hr} / (g ^ z'{hr}) = x{hr} ^ e{hr} / (x{hr} ^ e'{hr})) by smt.
-    smt.
-    trivial.
-    trivial.
+    move => &hr [_] [_] [_] [_] [_] _; subst.
+    rewrite challenges_differ accepting_transcript_1 accepting_transcript_2 /=.
+    have algebra_part1 : (g ^ z{hr} / (g ^ z'{hr}) = m{hr} * x{hr} ^ e{hr} / m{hr} / x{hr} ^ e'{hr}).
+      rewrite accepting_transcript_1 accepting_transcript_2.
+      rewrite -3!div_def log_gpow -pow_bij 2!log_mul.
+      rewrite sub_def -oppfD addA -2!sub_def //.
+    have algebra_part2 : (g ^ z{hr} / (g ^ z'{hr}) = x{hr} ^ e{hr} / (x{hr} ^ e'{hr})).
+      rewrite algebra_part1.
+      rewrite -3!div_def log_gpow -pow_bij log_mul.
+      rewrite addC 2!sub_def addC -addA addfN addf0 addC -sub_def //.
+    have algebra_part3 : g ^ z{hr} / g ^ z'{hr} = g ^ z{hr} * g ^ -z'{hr}.
+      rewrite pow_opp inv_def -div_def 2!log_pow sub_def -mul_pow -pow_pow gpow_log //.
+    have ->//: x{hr} = g ^ ((z{hr} - z'{hr}) / (e{hr} - e'{hr})).
+      rewrite div_def 2!sub_def -pow_pow -mul_pow -algebra_part3 algebra_part2.
+      rewrite -div_def pow_pow 2!log_pow sub_def; algebra.
   qed.
 
   (* Special honest verifier zero knowledge *)
@@ -169,21 +184,32 @@ section SchnorrPKSecurity.
     Pr[SimulateHonestVerifier(SchnorrPK, SchnorrPKAlgorithms, D).gameIdeal() @ &m : res] = 
     Pr[SimulateHonestVerifier(SchnorrPK, SchnorrPKAlgorithms, D).gameReal() @ &m : res].
   proof.
-    byequiv.
+    move : FDistr.dt_ll FDistr.dt_fu FDistr.dt1E; rewrite /is_full => dt_ll dt_fu dt_supp.
+    byequiv => //.
     proc; inline*.
     seq 27 22: ((glob D){1} = (glob D){2} /\ i{1} = 0 /\ x{1} = h{1} /\ x{2} = h{2} /\ to{1} = Some t{2} /\ ={h, w, e}).
     swap{1} 15 -7; swap{2} 12 -5; swap{1} 11 -3; wp.
     (* Let's play with randomness... *)
     rnd (fun z, z - w{1}*e{1}) (fun r, r + w{1}*e{1}).
-    rnd; rnd{1}; auto.
-    progress.
-      smt. smt. (algebra || smt). smt. smt. smt. smt.
-      (algebra || smt). smt. smt. smt. smt. smt. smt.
-      (algebra || smt). smt. smt. smt.
+    rnd; rnd{1}; wp; rnd; skip; progress => //.
+    + rewrite mulN1f sub_def -addA oppK (addC _ eL) -sub_def subff addf0 //.
+    + rewrite 2!dt_supp //.
+    + rewrite dt_fu //.
+    + rewrite mulN1f sub_def -addA oppK -sub_def subff addf0 //.
+    + algebra.
+    + algebra.
+    + rewrite mulN1f sub_def -addA oppK mulC mulN1f -sub_def subff addf0 //.
+    + rewrite sub_def -addA -sub_def subff addf0 //.
+    + rewrite 2!dt_supp //.
+    + rewrite dt_fu //.
+    + rewrite sub_def -addA (addC _ (w0L * eL)) -sub_def subff addf0 //.
+    + algebra.
+    + algebra.
+    + rewrite sub_def -addA mulC (addC _ (eL * w0L)) -sub_def subff addf0 //.
     seq 2 0 : ((glob D){1} = (glob D){2} /\ ={x, t}); wp.
-    while{1} (to{1} = Some t{2}) (i{1}); auto; auto.
-    call (_: true); simplify; skip.
-    progress by smt. smt. smt.
+    while{1} (to{1} = Some t{2}) (i{1}); progress.
+    wp; rnd; wp; skip; progress.
+    call (_: true); simplify; skip; progress.
   qed.
   (* The above three theorems prove that the Schnorr proof of knowledge is a Sigma protocol *)
 
