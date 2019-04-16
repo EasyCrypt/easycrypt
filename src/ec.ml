@@ -33,7 +33,7 @@ let copyright =
 let psep = match Sys.os_type with "Win32" -> ";" | _ -> ":"
 
 (* -------------------------------------------------------------------- *)
-let confname    = "easycypt.conf"
+let confname    = "easycrypt.conf"
 let why3dflconf = Filename.concat XDG.home "why3.conf"
 
 (* -------------------------------------------------------------------- *)
