@@ -29,3 +29,6 @@ script:
 - >-
   docker run -v $PWD:/home/ci/easycrypt:rw easycryptpa/ec-build-box
   sh -c "cd easycrypt && opam config exec -- make ${TARGETS}"
+# Please generate an AppImage and upload it to GitHub Releases.
+# Also, please enable GitHub Issues so that one can contribute without having to send pull requests like this one.
+# Thanks.
