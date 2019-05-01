@@ -1,16 +1,16 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # --------------------------------------------------------------------
 import sys, os, errno, re, glob, shutil, itertools, logging
-import subprocess as sp, time, datetime, socket, cStringIO as sio
+import subprocess as sp, time, datetime, socket, io
 
 # --------------------------------------------------------------------
 import collections as cl, yaml
 
-class folded_unicode(unicode):
+class folded_unicode(str):
     pass
 
-class literal_unicode(unicode):
+class literal_unicode(str):
     pass
 
 def folded_unicode_representer(dumper, data):
@@ -61,7 +61,7 @@ def rcolor(txt, b):
 
 # --------------------------------------------------------------------
 def _options():
-    import ConfigParser as cp
+    import configparser as cp
     from optparse import OptionParser
 
     parser = OptionParser()
@@ -223,8 +223,11 @@ def _run_test(config, options):
     except OSError as e:
         logging.error("cannot run `%s': %s" % (options.bin, e))
         exit (1)
+
     timestamp = time.time() - timestamp
     success   = (bool(status) != bool(config.isvalid))
+    out       = out.decode('utf-8', errors='ignore')
+    err       = err.decode('utf-8', errors='ignore')
 
     logging.info("result for `%s': success: %s" % \
                      (config.filename, rcolor(success, success)))
@@ -320,10 +323,13 @@ def _main():
         import concurrent.futures as futures
 
     if options.jobs > 1:
-        with futures.ThreadPoolExecutor(options.jobs) as executor:
+        with futures.ThreadPoolExecutor(options.jobs, thread_name_prefix = 'Thread') \
+             as executor:
+
             result = list(executor.map(
                 lambda config : _run_test(config, options),
                 allscripts))
+
     else:
         result = []
         for config in allscripts:
