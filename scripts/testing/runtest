@@ -90,6 +90,12 @@ def _options():
         help    = 'number of maximum parallel test jobs')
 
     parser.add_option(
+        '', '--timing',
+        action  = 'store_true',
+        default = False,
+        help    = 'add timing statistics')
+
+    parser.add_option(
         '', '--report',
         action  = 'store',
         default = None,
@@ -110,6 +116,7 @@ def _options():
 
     options = Object(scenarios = dict())
     options.timeout  = cmdopt.timeout
+    options.timing   = cmdopt.timing
     options.jobs     = cmdopt.jobs
     options.report   = cmdopt.report
 
@@ -200,6 +207,8 @@ def _dump_report(config, results, out):
     out.write(yaml.dump(aout, **opts))
 
 # --------------------------------------------------------------------
+TIMING_DIR = 'timing'
+
 def _run_test(config, options):
     logging.info("running ec on `%s' [valid: %s]" % \
                      (config.filename, config.isvalid))
@@ -209,6 +218,12 @@ def _run_test(config, options):
         command = [options.bin] + options.args + config.args
         if options.timeout:
             command.extend(['-timeout', str(options.timeout)])
+        if options.timing:
+            tfilename = os.path.join(
+                TIMING_DIR, os.path.splitext(config.filename)[0] + '.stats')
+            os.makedirs(os.path.dirname(tfilename), exist_ok = True)
+            command.extend(['-tstats', tfilename])
+            
         command.extend([config.filename])
 
         logging.info('command: %r' % (command,))
@@ -220,6 +235,7 @@ def _run_test(config, options):
         finally:
             try   : sp.kill()
             except: pass
+
     except OSError as e:
         logging.error("cannot run `%s': %s" % (options.bin, e))
         exit (1)
