@@ -731,18 +731,18 @@ let reset () =
   context := Some (rootctxt (oget !context).ct_root)
 
 (* -------------------------------------------------------------------- *)
-let process ?(timed = false) (g : global_action located) : unit =
+let process ?(timed = false) (g : global_action located) : float option =
   let current = oget !context in
   let scope   = current.ct_current in
-  let timed   = if timed then EcUtils.timed else (fun f x -> (-1.0, f  x)) in
 
   try
-    let (tdelta, oscope) = timed (process loader scope) g in
+    let (tdelta, oscope) = EcUtils.timed (process loader scope) g in
     oscope |> oiter (fun scope -> context := Some (push_context scope current));
-    if tdelta >= 0. then
-      EcScope.notify scope `Info "time: %f" tdelta
+    if timed then
+      EcScope.notify scope `Info "time: %f" tdelta;
+    Some tdelta
   with
-  | Pragma `Reset   -> reset ()
+  | Pragma `Reset   -> reset (); None
   | Pragma `Restart -> raise Restart
 
 (* -------------------------------------------------------------------- *)

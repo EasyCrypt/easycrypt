@@ -268,6 +268,16 @@ let main () =
        | None     -> EcCommands.addidir Filename.current_dir_name
        | Some pwd -> EcCommands.addidir pwd);
 
+  let tstats : EcLocation.t -> float option -> unit =
+    match options.o_command with
+    | `Compile { cmpo_tstats = Some out } ->
+        let channel = Format.formatter_of_out_channel (open_out out) in
+        let fmt loc tdelta =
+          Format.fprintf channel "%s %f\n%!"
+            (EcLocation.tostring_raw ~with_fname:false loc) tdelta in
+        fun loc tdelta -> oiter (fmt loc) tdelta
+    | _ -> fun _ _ -> () in
+
   (* Instantiate terminal *)
   let lazy terminal = terminal in
 
@@ -340,7 +350,10 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
-                     try  EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
+                     try
+                       let tdelta =
+                         EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
+                       in tstats loc tdelta
                      with
                      | EcCommands.Restart ->
                          raise EcCommands.Restart
