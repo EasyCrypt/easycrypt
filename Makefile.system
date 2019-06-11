@@ -3,12 +3,17 @@
 # --------------------------------------------------------------------
 OCAML    := $(shell ocamlbuild -which ocamlc 2>/dev/null || echo false)
 CC       := gcc
+TAR      := tar
 MACHINE  := $(shell $(OCAML) -ccopt -dumpmachine dummy.c 2>/dev/null)
 UNAME    := $(shell uname -s)
 EXE      :=
 
 ifneq (,$(findstring CYGWIN,$(UNAME)))
-  CC = $(MACHINE)-gcc
+  CC := $(MACHINE)-gcc
+endif
+
+ifneq (,$(findstring Darwin,$(UNAME)))
+  TAR := gtar
 endif
 
 ifneq (,$(findstring mingw,$(MACHINE)))

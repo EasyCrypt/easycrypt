@@ -611,7 +611,6 @@ module Prover = struct
     let pr_timelimit = max 0 (odfl dft.pr_timelimit options.po_timeout) in
     let pr_cpufactor = max 0 (odfl dft.pr_cpufactor options.po_cpufactor) in
     let pr_verbose   = max 0 (odfl dft.pr_verbose options.po_verbose) in
-    let pr_wrapper   = dft.pr_wrapper in
     let pr_all       = odfl dft.pr_all options.pl_all in
     let pr_max       = odfl dft.pr_max options.pl_max in
     let pr_iterate   = odfl dft.pr_iterate options.pl_iterate in
@@ -627,16 +626,9 @@ module Prover = struct
         | `Include -> if List.exists ((=) p) l then l else p::l
       in List.fold_left do_ar l (snd options.po_provers) in
 
-    { pr_maxprocs; pr_provers; pr_timelimit; pr_cpufactor;
-      pr_wrapper ; pr_verbose; pr_all      ; pr_max      ;
-      pr_iterate ; pr_wanted ; pr_unwanted ; pr_selected ;
-      pr_quorum  ; }
-
-  (* -------------------------------------------------------------------- *)
-  let set_wrapper scope wrapper =
-    let pi = Prover_info.get scope.sc_options in
-    let pi = { pi with EcProvers.pr_wrapper = wrapper } in
-    { scope with sc_options = Prover_info.set scope.sc_options pi; }
+    { pr_maxprocs; pr_provers ; pr_timelimit; pr_cpufactor;
+      pr_verbose ; pr_all     ; pr_max      ; pr_iterate  ;
+      pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum  ; }
 
   (* -------------------------------------------------------------------- *)
   let do_prover_info scope ppr =

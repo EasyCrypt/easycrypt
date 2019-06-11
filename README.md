@@ -28,13 +28,13 @@ Installation requirements
 
 EasyCrypt uses the following third-party tools/libraries:
 
- * OCaml (>= 4.02, 4.05)
+ * OCaml (>= 4.05)
 
      Available at http://caml.inria.fr/
 
- * OCamlbuild (only for OCaml >= 4.03)
+ * OCamlbuild
 
- * Why3 (>= 0.87, < 0.88)
+ * Why3 (>= 1.0)
 
      Available at <http://why3.lri.fr/>
 
@@ -100,19 +100,19 @@ To install `opam` on non-POSIX systems
 [see the section below](#installing-requirements-using-opam-non-posix-systems).
 
 
-Installing requirements using OPAM (POSIX systems)
+Installing requirements using OPAM 2 (POSIX systems)
 --------------------------------------------------------------------
 
-Starting with opam 1.2.0, you can install all the needed dependencies
-via the opam OCaml packages manager.
+You can install all the needed dependencies via the opam OCaml
+packages manager.
 
   0. Optionally, switch to a dedicated compiler for EasyCrypt:
 
       ```
-      $> opam switch -A $OVERSION easycrypt
+      $> opam switch create easycrypt $OVERSION
       ```
 
-      where `$OVERSION` is a valid OCaml version (e.g. 4.02.1)
+      where `$OVERSION` is a valid OCaml version (e.g. ocaml-base-compiler.4.07.0)
 
   1. Add the EasyCrypt repository:
       
