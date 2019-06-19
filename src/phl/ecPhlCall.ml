@@ -116,7 +116,20 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let post = wp_asgn_call env m lp fres bhs.bhs_po in
   let fpost = PVM.subst1 env pvres m fres fpost in
   let modi = f_write env f in
-  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
+  let post =
+    match bhs.bhs_cmp with
+    | FHle -> f_imp_simpl   post fpost
+    | FHge -> f_imp_simpl  fpost  post
+
+    | FHeq when f_equal bhs.bhs_bd f_r0 ->
+        f_imp_simpl post fpost
+
+    | FHeq when f_equal bhs.bhs_bd f_r1 ->
+        f_imp_simpl  fpost post
+
+    | FHeq -> f_iff_simpl fpost  post in
+
+  let post = generalize_mod env m modi post in
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre = subst_args_call env m f (e_tuple args) PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
