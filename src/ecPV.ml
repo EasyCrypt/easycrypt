@@ -582,7 +582,10 @@ module Mpv2 = struct
     s_gl : Sm.t;
   }
 
+  type local = EcIdent.t EcIdent.Mid.t
+
   let empty = { s_pv = Mnpv.empty; s_gl = Sm.empty }
+  let empty_local = EcIdent.Mid.empty
 
   let add env ty pv1 pv2 eqs =
     let pv1 = pvm env pv1 in
@@ -902,11 +905,11 @@ module Mpv2 = struct
 
 (*add_eqs env local eqs e1 e2 : collect a set of equalities with ensure the
    equality of e1 and e2 *)
-  let rec add_eqs env local eqs e1 e2 =
+  let rec add_eqs_loc env local eqs e1 e2 =
     match e1.e_node, e2.e_node with
     | Equant(qt1,bds1,e1), Equant(qt2,bds2,e2) when qt_equal qt1 qt2 ->
       let local = enter_local env local bds1 bds2 in
-      add_eqs env local eqs e1 e2
+      add_eqs_loc env local eqs e1 e2
     | Eint i1, Eint i2 when EcBigInt.equal i1 i2 -> eqs
     | Elocal x1, Elocal x2 when
         opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs
@@ -919,24 +922,24 @@ module Mpv2 = struct
       when EcPath.p_equal op1 op2 &&
         List.all2  (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
     | Eapp(f1,a1), Eapp(f2,a2) ->
-      List.fold_left2 (add_eqs env local) eqs (f1::a1) (f2::a2)
+      List.fold_left2 (add_eqs_loc env local) eqs (f1::a1) (f2::a2)
     | Elet(lp1,a1,b1), Elet(lp2,a2,b2) ->
       let blocal = enter_local env local (lp_bind lp1) (lp_bind lp2) in
-      let eqs = add_eqs env local eqs a1 a2 in
-      add_eqs env blocal eqs b1 b2
+      let eqs = add_eqs_loc env local eqs a1 a2 in
+      add_eqs_loc env blocal eqs b1 b2
     | Etuple es1, Etuple es2 ->
-      List.fold_left2 (add_eqs env local) eqs es1 es2
+      List.fold_left2 (add_eqs_loc env local) eqs es1 es2
     | Eproj(es1,i1), Eproj(es2,i2) when i1 = i2 ->
-      add_eqs env local eqs es1 es2
+      add_eqs_loc env local eqs es1 es2
     | Eif(e1,t1,f1), Eif(e2,t2,f2) ->
-      List.fold_left2 (add_eqs env local) eqs [e1;t1;f1] [e2;t2;f2]
+      List.fold_left2 (add_eqs_loc env local) eqs [e1;t1;f1] [e2;t2;f2]
     | Ematch(b1,es1,ty1), Ematch(b2,es2,ty2)
       when EcReduction.EqTest.for_type env ty1 ty2
         && EcReduction.EqTest.for_type env b1.e_ty b2.e_ty ->
-      List.fold_left2 (add_eqs env local) eqs (b1::es1) (b2::es2)
+      List.fold_left2 (add_eqs_loc env local) eqs (b1::es1) (b2::es2)
     | _, _ -> raise EqObsInError
 
-  let add_eqs env e1 e2 eqs =  add_eqs env Mid.empty eqs e1 e2
+  let add_eqs env e1 e2 eqs =  add_eqs_loc env Mid.empty eqs e1 e2
 
 end
 
