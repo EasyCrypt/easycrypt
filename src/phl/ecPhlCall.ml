@@ -116,7 +116,20 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let post = wp_asgn_call env m lp fres bhs.bhs_po in
   let fpost = PVM.subst1 env pvres m fres fpost in
   let modi = f_write env f in
-  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
+  let post =
+    match bhs.bhs_cmp with
+    | FHle -> f_imp_simpl   post fpost
+    | FHge -> f_imp_simpl  fpost  post
+
+    | FHeq when f_equal bhs.bhs_bd f_r0 ->
+        f_imp_simpl post fpost
+
+    | FHeq when f_equal bhs.bhs_bd f_r1 ->
+        f_imp_simpl  fpost post
+
+    | FHeq -> f_iff_simpl fpost  post in
+
+  let post = generalize_mod env m modi post in
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre = subst_args_call env m f (e_tuple args) PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
@@ -405,12 +418,25 @@ let process_call side info tc =
       form
   in
 
-  let pt, ax =
-    PT.tc1_process_full_closed_pterm_cut
-      ~prcut:(process_cut tc) tc info
+  let pt = PT.tc1_process_full_pterm_cut ~prcut:(process_cut tc) tc info
   in
+
+  let pt =
+    let rec doit pt =
+      match TTC.destruct_product ~reduce:true (FApi.tc1_hyps tc) pt.PT.ptev_ax with
+      | None   -> pt
+      | Some _ -> doit (EcProofTerm.apply_pterm_to_hole pt)
+    in doit pt in
+
+  let pt, ax =
+    if not (PT.can_concretize pt.PT.ptev_env) then
+      tc_error !!tc "cannot infer all placeholders";
+    PT.concretize pt in
 
   FApi.t_seqsub
     (t_call side ax)
-    [FApi.t_seq (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) !subtactic; t_id]
+    [FApi.t_seqs
+       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
+        !subtactic; t_logic_trivial];
+     t_id]
     tc

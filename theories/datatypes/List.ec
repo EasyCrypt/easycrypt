@@ -2213,7 +2213,7 @@ abbrev unzip2 ['a 'b] (s : ('a * 'b) list) = map snd s.
 
 lemma zip_unzip ['a 'b] (s : ('a * 'b) list) :
   zip (unzip1 s) (unzip2 s) = s.
-proof. by elim: s => // -[x y s /= ->]. qed.
+proof. by elim: s => // -[x y s]. qed.
 
 lemma unzip1_zip ['a 'b] (s : 'a list) (t : 'b list) :
   size s <= size t => unzip1 (zip s t) = s.

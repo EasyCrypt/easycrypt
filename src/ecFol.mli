@@ -108,10 +108,11 @@ val f_int_lt_simpl  : form -> form -> form
 val f_real_le_simpl : form -> form -> form
 val f_real_lt_simpl : form -> form -> form
 
-val f_int_add_simpl : form -> form -> form
-val f_int_opp_simpl : form -> form
-val f_int_sub_simpl : form -> form -> form
-val f_int_mul_simpl : form -> form -> form
+val f_int_add_simpl   : form -> form -> form
+val f_int_opp_simpl   : form -> form
+val f_int_sub_simpl   : form -> form -> form
+val f_int_mul_simpl   : form -> form -> form
+val f_int_edivz_simpl : form -> form -> form
 
 val f_real_add_simpl : form -> form -> form
 val f_real_opp_simpl : form -> form
@@ -145,6 +146,7 @@ type op_kind = [
   | `Int_mul
   | `Int_pow
   | `Int_opp
+  | `Int_edivz
   | `Real_add
   | `Real_opp
   | `Real_mul

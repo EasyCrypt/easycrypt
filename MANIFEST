@@ -27,12 +27,6 @@ find:extraction:*.ml
 find:extraction:*.mli
 find:extraction:*.ec
 
-# system
-system/Makefile
-system/*.c
-system/win32/*.c
-system/unix/*.c
-
 # EasyCrypt examples
 find:examples:*.ec
 find:examples:*.eca
@@ -42,4 +36,3 @@ scripts/install/install-sh
 scripts/install/distribution
 scripts/testing/runtest
 scripts/srctx/keywords
-find:scripts/patches/:*

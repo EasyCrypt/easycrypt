@@ -81,7 +81,7 @@ proof. by apply/asint_inj; rewrite !(addE, zeroE) add0z smt. qed.
 lemma addNr (x : zmod): (-x) + x = Self.zero.
 proof.
 apply/asint_inj; rewrite !(zeroE, addE, oppE).
-by rewrite modzDml addNz mod0z.
+by rewrite modzDml addNz.
 qed.
 end ZModule.
 

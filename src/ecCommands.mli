@@ -25,7 +25,6 @@ type checkmode = {
   cm_cpufactor: int;
   cm_nprovers : int;
   cm_provers  : string list option;
-  cm_wrapper  : string option;
   cm_profile  : bool;
   cm_iterate  : bool;
 }
@@ -41,7 +40,7 @@ val current     : unit -> EcScope.scope
 val addnotifier : notifier -> unit
 
 (* -------------------------------------------------------------------- *)
-val process : ?timed:bool -> EcParsetree.global_action located -> unit
+val process : ?timed:bool -> EcParsetree.global_action located -> float option
 
 val undo  : int  -> unit
 val reset : unit -> unit

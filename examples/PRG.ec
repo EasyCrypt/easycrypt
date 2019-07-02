@@ -527,8 +527,8 @@ section.
       rewrite -mulrDl fromintD.
       have: (card (fdom F.m{hr}))%r + (size P.logP{hr})%r <= qF%r + (size P.logP{hr})%r.
       + exact/ler_add.
-      have: 0%r <= Support.card%r by smt(@Support).
-      smt (@RealExtra).
+      have: 0%r <= Support.card%r by smt(@Support). 
+      by move => /invr_ge0 h1; apply: ler_wpmul2r.
     + conseq Hw; progress=> //.
       by rewrite H1 /= (Ring.IntID.addrC 1) lerr.
     progress=> //; rewrite H2 /= -mulrDl addrA -fromintD.

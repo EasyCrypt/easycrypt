@@ -42,6 +42,12 @@ let of_lexbuf (lb : lexbuf) =
   let p2 = Lexing.lexeme_end_p lb in
   make p1 p2
 
+let tostring_raw ?(with_fname = true) (p : t) =
+  let aout =
+    Printf.sprintf "%d:%d %d:%d"
+      (fst p.loc_start) (snd p.loc_start) (fst p.loc_end) (snd p.loc_end) in
+  if with_fname then Printf.sprintf "%s %s" p.loc_fname aout else aout
+
 let tostring (p : t) =
   let spos =
     if p.loc_start = p.loc_end then

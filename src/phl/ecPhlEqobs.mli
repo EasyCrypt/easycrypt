@@ -12,5 +12,4 @@ open EcParsetree
 open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
-
-val process_eqobs_in : sim_info -> backward
+val process_eqobs_in : crushmode option -> sim_info -> backward

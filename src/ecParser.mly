@@ -2067,7 +2067,6 @@ crushmode:
 
 | SLASHSLASHGT { { cm_simplify = true ; cm_solve = true ; } }
 
-
 intro_pattern:
 | x=ipcore
    { IPCore x }
@@ -2845,8 +2844,8 @@ phltactic:
         pfel_inv   = inv;
       } in Pfel (at_pos, info) }
 
-| SIM info=eqobs_in
-    { Psim info }
+| SIM cm=crushmode? info=eqobs_in
+    { Psim (cm, info) }
 
 | REPLACE rk=repl_kind h1=repl_hyp h2=repl_hyp
     { Ptrans_stmt (rk, fst h1, snd h1, fst h2, snd h2) }
@@ -3074,7 +3073,7 @@ tactic:
 | t=tactic_ip %prec prec_below_IMPL
     { t }
 
-| t1=tactic_ip ORA t2=tactic_ip
+| t1=tactic_ip ORA t2=tactic
     { let loc = EcLocation.make $startpos $endpos in
         mk_core_tactic (mk_loc loc (Por (t1, t2))) }
 
