@@ -1426,6 +1426,12 @@ module Ty = struct
     | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
     | _ -> ty
 
+  let rec decompose_fun (ty : ty) (env : env) : dom * ty =
+    match (hnorm ty env).ty_node with
+    | Tfun (ty1, ty2) ->
+        fst_map (fun tys -> ty1 :: tys) (decompose_fun ty2 env)
+    | _ -> ([], ty)
+
   let signature env =
     let rec doit acc ty =
       match (hnorm ty env).ty_node with

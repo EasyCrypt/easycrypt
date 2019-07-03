@@ -1832,7 +1832,7 @@ let process_exists args (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process_congr tc =
-  let (hyps, concl) = FApi.tc1_flat tc in
+  let (env, hyps, concl) = FApi.tc1_eflat tc in
 
   if not (EcFol.is_eq_or_iff concl) then
     tc_error !!tc "goal must be an equality or an equivalence";
@@ -1864,6 +1864,10 @@ let process_congr tc =
 
   | Ftuple _, Ftuple _ when iseq ->
       FApi.t_seqs [t_split; t_logic_trivial] tc
+
+  | Fproj (f1, i1), Fproj (f2, i2)
+      when i1 = i2 && EcReduction.EqTest.for_type env f1.f_ty f2.f_ty
+    -> EcCoreGoal.FApi.xmutate1 tc `CongrProj [f_eq f1 f2]
 
   | _, _ when iseq && EcReduction.is_alpha_eq hyps f1 f2 ->
       EcLowGoal.t_reflex tc

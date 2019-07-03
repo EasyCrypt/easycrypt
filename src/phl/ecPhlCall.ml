@@ -116,7 +116,20 @@ let t_bdhoare_call fpre fpost opt_bd tc =
   let post = wp_asgn_call env m lp fres bhs.bhs_po in
   let fpost = PVM.subst1 env pvres m fres fpost in
   let modi = f_write env f in
-  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
+  let post =
+    match bhs.bhs_cmp with
+    | FHle -> f_imp_simpl   post fpost
+    | FHge -> f_imp_simpl  fpost  post
+
+    | FHeq when f_equal bhs.bhs_bd f_r0 ->
+        f_imp_simpl post fpost
+
+    | FHeq when f_equal bhs.bhs_bd f_r1 ->
+        f_imp_simpl  fpost post
+
+    | FHeq -> f_iff_simpl fpost  post in
+
+  let post = generalize_mod env m modi post in
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre = subst_args_call env m f (e_tuple args) PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
@@ -205,6 +218,62 @@ let t_equiv_call1 side fpre fpost tc =
   let concl  = f_equivS_r concl in
 
   FApi.xmutate1 tc `HlCall [fconcl; concl]
+
+(* -------------------------------------------------------------------- *)
+let t_call side ax tc =
+  let env   = FApi.tc1_env  tc in
+  let concl = FApi.tc1_goal tc in
+
+  match ax.f_node, concl.f_node with
+  | FhoareF hf, FhoareS hs ->
+      let (_, f, _), _ = tc1_last_call tc hs.hs_s in
+      if not (EcEnv.NormMp.x_equal env hf.hf_f f) then
+        tc_error_lazy !!tc (fun fmt ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+            Format.fprintf fmt
+              "call cannot be used with a lemma referring to `%a': \
+               the last statement is a call to `%a'"
+              (EcPrinting.pp_funname ppe) hf.hf_f
+              (EcPrinting.pp_funname ppe) f);
+      t_hoare_call hf.hf_pr hf.hf_po tc
+
+  | FbdHoareF hf, FbdHoareS hs ->
+      let (_, f, _), _ = tc1_last_call tc hs.bhs_s in
+      if not (EcEnv.NormMp.x_equal env hf.bhf_f f) then
+        tc_error_lazy !!tc (fun fmt ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+            Format.fprintf fmt
+              "call cannot be used with a lemma referring to `%a': \
+               the last statement is a call to `%a'"
+              (EcPrinting.pp_funname ppe) hf.bhf_f
+              (EcPrinting.pp_funname ppe) f);
+      t_bdhoare_call hf.bhf_pr hf.bhf_po None tc
+
+  | FequivF ef, FequivS es ->
+      let (_, fl, _), _ = tc1_last_call tc es.es_sl in
+      let (_, fr, _), _ = tc1_last_call tc es.es_sr in
+      if not (EcEnv.NormMp.x_equal env ef.ef_fl fl) ||
+         not (EcEnv.NormMp.x_equal env ef.ef_fr fr) then
+        tc_error_lazy !!tc (fun fmt ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+            Format.fprintf fmt
+              "call cannot be used with a lemma referring to `%a/%a': \
+               the last statement is a call to `%a/%a'"
+              (EcPrinting.pp_funname ppe) ef.ef_fl
+              (EcPrinting.pp_funname ppe) ef.ef_fr
+              (EcPrinting.pp_funname ppe) fl
+              (EcPrinting.pp_funname ppe) fr);
+      t_equiv_call ef.ef_pr ef.ef_po tc
+
+  | FbdHoareF hf, FequivS _ ->
+      let side =
+        match side with
+        | None -> tc_error !!tc "call: a side {1|2} should be provided"
+        | Some side -> side
+      in
+        t_equiv_call1 side hf.bhf_pr hf.bhf_po tc
+
+  | _, _ -> tc_error !!tc "call: invalid goal shape"
 
 (* -------------------------------------------------------------------- *)
 let mk_inv_spec (_pf : proofenv) env inv fl fr =
@@ -349,68 +418,25 @@ let process_call side info tc =
       form
   in
 
+  let pt = PT.tc1_process_full_pterm_cut ~prcut:(process_cut tc) tc info
+  in
+
+  let pt =
+    let rec doit pt =
+      match TTC.destruct_product ~reduce:true (FApi.tc1_hyps tc) pt.PT.ptev_ax with
+      | None   -> pt
+      | Some _ -> doit (EcProofTerm.apply_pterm_to_hole pt)
+    in doit pt in
+
   let pt, ax =
-    PT.tc1_process_full_closed_pterm_cut
-      ~prcut:(process_cut tc) tc info
-  in
+    if not (PT.can_concretize pt.PT.ptev_env) then
+      tc_error !!tc "cannot infer all placeholders";
+    PT.concretize pt in
 
-  let t_call tc =
-    let env   = FApi.tc1_env  tc in
-    let concl = FApi.tc1_goal tc in
-
-    match ax.f_node, concl.f_node with
-    | FhoareF hf, FhoareS hs ->
-        let (_, f, _), _ = tc1_last_call tc hs.hs_s in
-        if not (EcEnv.NormMp.x_equal env hf.hf_f f) then
-          tc_error_lazy !!tc (fun fmt ->
-            let ppe = EcPrinting.PPEnv.ofenv env in
-              Format.fprintf fmt
-                "call cannot be used with a lemma referring to `%a': \
-                 the last statement is a call to `%a'"
-                (EcPrinting.pp_funname ppe) hf.hf_f
-                (EcPrinting.pp_funname ppe) f);
-        t_hoare_call hf.hf_pr hf.hf_po tc
-
-    | FbdHoareF hf, FbdHoareS hs ->
-        let (_, f, _), _ = tc1_last_call tc hs.bhs_s in
-        if not (EcEnv.NormMp.x_equal env hf.bhf_f f) then
-          tc_error_lazy !!tc (fun fmt ->
-            let ppe = EcPrinting.PPEnv.ofenv env in
-              Format.fprintf fmt
-                "call cannot be used with a lemma referring to `%a': \
-                 the last statement is a call to `%a'"
-                (EcPrinting.pp_funname ppe) hf.bhf_f
-                (EcPrinting.pp_funname ppe) f);
-        t_bdhoare_call hf.bhf_pr hf.bhf_po None tc
-
-    | FequivF ef, FequivS es ->
-        let (_, fl, _), _ = tc1_last_call tc es.es_sl in
-        let (_, fr, _), _ = tc1_last_call tc es.es_sr in
-        if not (EcEnv.NormMp.x_equal env ef.ef_fl fl) ||
-           not (EcEnv.NormMp.x_equal env ef.ef_fr fr) then
-          tc_error_lazy !!tc (fun fmt ->
-            let ppe = EcPrinting.PPEnv.ofenv env in
-              Format.fprintf fmt
-                "call cannot be used with a lemma referring to `%a/%a': \
-                 the last statement is a call to `%a/%a'"
-                (EcPrinting.pp_funname ppe) ef.ef_fl
-                (EcPrinting.pp_funname ppe) ef.ef_fr
-                (EcPrinting.pp_funname ppe) fl
-                (EcPrinting.pp_funname ppe) fr);
-        t_equiv_call ef.ef_pr ef.ef_po tc
-
-    | FbdHoareF hf, FequivS _ ->
-        let side =
-          match side with
-          | None -> tc_error !!tc "side can only be given for prhl judgements"
-          | Some side -> side
-        in
-          t_equiv_call1 side hf.bhf_pr hf.bhf_po tc
-
-    | _, _ -> tc_error !!tc "call: invalid goal shape"
-
-  in
-    FApi.t_seqsub
-      t_call
-      [FApi.t_seq (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) !subtactic; t_id]
-      tc
+  FApi.t_seqsub
+    (t_call side ax)
+    [FApi.t_seqs
+       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
+        !subtactic; t_logic_trivial];
+     t_id]
+    tc

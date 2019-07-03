@@ -413,6 +413,7 @@
 %token DROP
 %token DUMP
 %token EAGER
+%token ECALL
 %token ELIF
 %token ELIM
 %token ELSE
@@ -424,6 +425,7 @@
 %token EXACT
 %token EXFALSO
 %token EXIST
+%token EXLIM
 %token EXPECT
 %token EXPORT
 %token FEL
@@ -632,6 +634,8 @@ _lident:
 | SOLVE    { "solve"    }
 | STRICT   { "strict"   }
 | WLOG     { "wlog"     }
+| EXLIM    { "exlim"    }
+| ECALL    { "ecall"    }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -2037,7 +2041,6 @@ crushmode:
 
 | SLASHSLASHGT { { cm_simplify = true ; cm_solve = true ; } }
 
-
 intro_pattern:
 | x=ipcore
    { IPCore x }
@@ -2776,8 +2779,13 @@ phltactic:
 | ELIM STAR
     { Phrex_elim }
 
-| EXIST STAR l=iplist1(sform, COMMA) %prec prec_below_comma
-    { Phrex_intro l }
+| b=ID(EXIST STAR { false } | EXLIM { true })
+    l=iplist1(sform, COMMA) %prec prec_below_comma
+
+    { Phrex_intro (l, b) }
+
+| ECALL s=side? x=paren(p=qident tvi=tvars_app? fs=sform* { (p, tvi, fs) })
+    { Phecall (s, x) }
 
 | EXFALSO
     { Pexfalso }
@@ -2799,8 +2807,8 @@ phltactic:
         pfel_inv   = inv;
       } in Pfel (at_pos, info) }
 
-| SIM info=eqobs_in
-    { Psim info }
+| SIM cm=crushmode? info=eqobs_in
+    { Psim (cm, info) }
 
 | REPLACE rk=repl_kind h1=repl_hyp h2=repl_hyp
     { Ptrans_stmt (rk, fst h1, snd h1, fst h2, snd h2) }
@@ -3028,7 +3036,7 @@ tactic:
 | t=tactic_ip %prec prec_below_IMPL
     { t }
 
-| t1=tactic_ip ORA t2=tactic_ip
+| t1=tactic_ip ORA t2=tactic
     { let loc = EcLocation.make $startpos $endpos in
         mk_core_tactic (mk_loc loc (Por (t1, t2))) }
 

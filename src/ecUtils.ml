@@ -59,6 +59,8 @@ let (|-) g f = fun x -> g (f x)
 let (|>) x f = f x
 let (<|) f x = f x
 
+let (|?) = BatPervasives.(|?)
+
 let curry   f (x, y) = f x y
 let uncurry f x y = f (x, y)
 

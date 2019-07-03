@@ -32,6 +32,16 @@ proof. smt ml=1. qed.
 lemma asint_inj: injective asint by apply/Sub.val_inj.
 
 (* -------------------------------------------------------------------- *)
+abbrev zmodcgr (z1 z2 : int) = z1 %% p = z2 %% p.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_inzmod (z1 z2 : int) : zmodcgr z1 z2 <=> inzmod z1 = inzmod z2.
+proof. split.
++ by move=> h; apply/asint_inj; rewrite !inzmodK.
++ by move/(congr1 asint); rewrite !inzmodK.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op zero      = inzmod 0.
 op one       = inzmod 1.
 op [ - ] x   = inzmod (- asint x).
@@ -71,7 +81,7 @@ proof. by apply/asint_inj; rewrite !(addE, zeroE) add0z smt. qed.
 lemma addNr (x : zmod): (-x) + x = Self.zero.
 proof.
 apply/asint_inj; rewrite !(zeroE, addE, oppE).
-by rewrite modzDml addNz mod0z.
+by rewrite modzDml addNz.
 qed.
 end ZModule.
 

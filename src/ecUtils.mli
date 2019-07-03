@@ -37,6 +37,7 @@ val (|-) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 
 val (|>) : 'a -> ('a -> 'b) -> 'b
 val (<|) : ('a -> 'b) -> 'a -> 'b
+val (|?) : 'a option -> 'a -> 'a
 
 val curry   : ('a1 -> 'a2 -> 'b) -> 'a1 * 'a2 -> 'b
 val uncurry : ('a1 * 'a2 -> 'b) -> 'a1 -> 'a2 -> 'b

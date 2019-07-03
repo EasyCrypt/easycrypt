@@ -27,6 +27,7 @@ and cmp_option = {
   cmpo_input   : string;
   cmpo_provers : prv_options;
   cmpo_gcstats : bool;
+  cmpo_tstats  : string option;
 }
 
 and cli_option = {
@@ -234,7 +235,8 @@ let specs = {
     ("compile", "Check an EasyCrypt file", [
       `Group "loader";
       `Group "provers";
-      `Spec  ("gcstats", `Flag, "Display GC statistics")]);
+      `Spec  ("gcstats", `Flag, "Display GC statistics");
+      `Spec  ("tstats", `String, "Save timing statistics to <file>")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -354,7 +356,8 @@ let cli_options_of_values ?ini values =
 let cmp_options_of_values ?ini values input =
   { cmpo_input   = input;
     cmpo_provers = prv_options_of_values ?ini values;
-    cmpo_gcstats = get_flag "gcstats" values; }
+    cmpo_gcstats = get_flag "gcstats" values;
+    cmpo_tstats  = get_string "tstats" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse ?ini argv =

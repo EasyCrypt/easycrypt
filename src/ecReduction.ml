@@ -341,7 +341,7 @@ let rec h_red ri env hyps f =
       when ri.iota && EcEnv.Op.is_projection env p -> begin
         try
           match args with
-          | [mk] -> begin
+          | mk :: args -> begin
               match (odfl mk (h_red_opt ri env hyps mk)).f_node with
               | Fapp ({ f_node = Fop (mkp, _) }, mkargs) ->
                   if not (EcEnv.Op.is_record_ctor env mkp) then
@@ -349,7 +349,8 @@ let rec h_red ri env hyps f =
                   let v = oget (EcEnv.Op.by_path_opt p env) in
                   let v = proj3_2 (EcDecl.operator_as_proj v) in
                   let v = List.nth mkargs v in
-                    odfl v (h_red_opt ri env hyps v)
+                  f_app (odfl v (h_red_opt ri env hyps v)) args f.f_ty
+
               | _ -> raise NotReducible
             end
           | _ -> raise NotReducible
@@ -376,8 +377,10 @@ let rec h_red ri env hyps f =
           let op  = oget (EcEnv.Op.by_path_opt p env) in
           let fix = EcDecl.operator_as_fix op in
 
-            if List.length fargs <> snd (fix.EcDecl.opf_struct) then
-              raise NotReducible;
+          if List.length fargs < snd (fix.EcDecl.opf_struct) then
+            raise NotReducible;
+
+          let fargs, eargs = List.split_at (snd (fix.EcDecl.opf_struct)) fargs in
 
           let args  = Array.of_list fargs in
           let pargs = List.fold_left (fun (opb, acc) v ->
@@ -421,7 +424,7 @@ let rec h_red ri env hyps f =
             EcFol.Fsubst.subst_tvar
               (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
 
-            Fsubst.f_subst subst body
+          f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
         with NotReducible ->
           f_app (h_red ri env hyps f1) fargs f.f_ty
@@ -463,6 +466,7 @@ let rec h_red ri env hyps f =
         | Some (`Int_add  ), [f1;f2] -> f_int_add_simpl f1 f2
         | Some (`Int_opp  ), [f]     -> f_int_opp_simpl f
         | Some (`Int_mul  ), [f1;f2] -> f_int_mul_simpl f1 f2
+        | Some (`Int_edivz), [f1;f2] -> f_int_edivz_simpl f1 f2
         | Some (`Real_add ), [f1;f2] -> f_real_add_simpl f1 f2
         | Some (`Real_opp ), [f]     -> f_real_opp_simpl f
         | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2

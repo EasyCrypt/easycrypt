@@ -20,7 +20,6 @@ open EcLowPhlGoal
 
 module TTC = EcProofTyping
 
-
 (* -------------------------------------------------------------------- *)
 let extend_body f fsig body =
   let arg = pv_arg f in
@@ -40,8 +39,6 @@ let extend_body f fsig body =
     (arg, s_seq (stmt i) body)
 
 (* -------------------------------------------------------------------- *)
-
-
 (* Invariant ifvl,ifvr = PV.fv env ml inv, PV.fv env mr inv *)
 type sim = {
   sim_env      : env;
@@ -126,6 +123,7 @@ let check_not_r sim lvr eqo =
       not (Mpv2.mem_pv_r sim.sim_env pv eqo) in
   check_lvalue aux lvr
 
+(* -------------------------------------------------------------------- *)
 let remove sim lvl lvr eqs =
   let env = sim.sim_env in
   let aux eqs (pvl,tyl) (pvr,tyr) =
@@ -147,12 +145,14 @@ let remove sim lvl lvr eqs =
     add_eqs sim (Mpv2.remove env pvl pvr eqs) el er
   | _, _ -> raise EqObsInError
 
+(* -------------------------------------------------------------------- *)
 let oremove sim lvl lvr eqs =
   match lvl, lvr with
   | None, None -> eqs
   | Some lvl, Some lvr -> remove sim lvl lvr eqs
   | _, _ -> raise EqObsInError
 
+(* -------------------------------------------------------------------- *)
 let rec check_deadcode_i check_lv i =
   match i.i_node with
   | Sasgn(lv,_) -> check_lv lv
@@ -167,6 +167,7 @@ let rec check_deadcode_i check_lv i =
 and check_deadcode_s check_lv s =
   List.for_all (check_deadcode_i check_lv) s.s_node
 
+(* -------------------------------------------------------------------- *)
 let rec s_eqobs_in_rev rsl rsr sim (eqo:Mpv2.t) =
   match rsl, rsr with
   | { i_node = Sasgn(LvVar (xl,_), el)}::rsl, _
@@ -242,8 +243,8 @@ and s_eqobs_in_full sl sr sim eqo =
 and s_eqobs_in sl sr sim eqo =
   s_eqobs_in_rev (List.rev sl.s_node) (List.rev sr.s_node) sim eqo
 
+(* -------------------------------------------------------------------- *)
 and f_eqobs_in fl fr sim eqO =
-
   let env = sim.sim_env in
   let nfl  = NormMp.norm_xfun env fl in
   let nfr  = NormMp.norm_xfun env fr in
@@ -311,6 +312,7 @@ and f_eqobs_in fl fr sim eqO =
       default_spec sim nfl nfr outf in
   sim, Mpv2.union eqnm eqi
 
+(* -------------------------------------------------------------------- *)
 let mk_inv_spec2 env inv (fl, fr, eqi, eqo) =
   let defl = Fun.by_xpath fl env in
   let defr = Fun.by_xpath fr env in
@@ -328,9 +330,11 @@ let mk_inv_spec2 env inv (fl, fr, eqi, eqo) =
   let post = f_and eq_res (Mpv2.to_form mleft mright eqo inv) in
   f_equivF pre fl fr post
 
+(* -------------------------------------------------------------------- *)
 let mk_inv_spec env inv (fl, fr, eqg) =
   mk_inv_spec2 env inv (fl, fr, eqg, eqg)
 
+(* -------------------------------------------------------------------- *)
 let t_eqobs_inS_r sim eqo tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let sim = { sim with sim_env = env } in
@@ -353,8 +357,10 @@ let t_eqobs_inS_r sim eqo tc =
 
   FApi.xmutate1 tc `EqobsIn (sg @ [concl])
 
+(* -------------------------------------------------------------------- *)
 let t_eqobs_inS = FApi.t_low2 "eqobs-in" t_eqobs_inS_r
 
+(* -------------------------------------------------------------------- *)
 let t_eqobs_inF_r sim eqo tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let sim = { sim with sim_env = env } in
@@ -369,8 +375,10 @@ let t_eqobs_inF_r sim eqo tc =
     tc_error !!tc "cannot apply sim for fun";
   FApi.xmutate1 tc `EqobsIn sg
 
+(* -------------------------------------------------------------------- *)
 let t_eqobs_inF = FApi.t_low2 "eqobs-in" t_eqobs_inF_r
 
+(* -------------------------------------------------------------------- *)
 let process_eqs env tc f =
    try
       Mpv2.of_form env mleft mright f
@@ -381,6 +389,7 @@ let process_eqs env tc f =
          "cannot recognize %a as a set of equalities"
          (EcPrinting.pp_form ppe) f)
 
+(* -------------------------------------------------------------------- *)
 let process_hint tc hyps (feqs, inv) =
   let env = LDecl.toenv hyps in
   let ienv = LDecl.inv_memenv hyps in
@@ -393,6 +402,7 @@ let process_hint tc hyps (feqs, inv) =
   let ginv = odfl f_true (omap doinv inv) in
   geqs, ginv
 
+(* -------------------------------------------------------------------- *)
 let process_eqobs_inS info tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let es = tc1_as_equivS tc in
@@ -430,8 +440,7 @@ let process_eqobs_inS info tc =
      t_logic_trivial;
      t_main]) tc
 
-
-
+(* -------------------------------------------------------------------- *)
 let process_eqobs_inF info tc =
   if info.EcParsetree.sim_pos <> None then
     tc_error !!tc "no positions excepted";
@@ -459,11 +468,18 @@ let process_eqobs_inF info tc =
     t_logic_trivial;
      t_eqobs_inF sim eqo]) tc
 
+(* -------------------------------------------------------------------- *)
+let process_eqobs_in cm info tc =
+  let prett cm tc =
+    let dt, ts = EcHiGoal.process_crushmode cm in
+      EcPhlConseq.t_conseqauto ~delta:dt ?tsolve:ts tc in
 
+  let tt tc =
+    let concl = FApi.tc1_goal tc in
+    match concl.f_node with
+    | FequivF _ -> process_eqobs_inF info tc
+    | FequivS _ -> process_eqobs_inS info tc
+    | _ -> tc_error_noXhl ~kinds:[`Equiv `Any] !!tc
+  in
 
-let process_eqobs_in info tc =
-  let concl = FApi.tc1_goal tc in
-  match concl.f_node with
-  | FequivF _ -> process_eqobs_inF info tc
-  | FequivS _ -> process_eqobs_inS info tc
-  | _ -> tc_error_noXhl ~kinds:[`Equiv `Any] !!tc
+  FApi.t_last tt ((omap prett cm |> odfl t_id) tc)

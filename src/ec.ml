@@ -33,13 +33,12 @@ let copyright =
 let psep = match Sys.os_type with "Win32" -> ";" | _ -> ":"
 
 (* -------------------------------------------------------------------- *)
-let confname    = "easycypt.conf"
+let confname    = "easycrypt.conf"
 let why3dflconf = Filename.concat XDG.home "why3.conf"
 
 (* -------------------------------------------------------------------- *)
 type pconfig = {
   pc_why3     : string option;
-  pc_pwrapper : string option;
   pc_loadpath : (bool * string) list;
 }
 
@@ -60,12 +59,6 @@ let print_config config =
   begin match config.pc_why3 with
   | None   -> Format.eprintf "  <why3 default>@\n%!"
   | Some f -> Format.eprintf "  %s@\n%!" f end;
-
-  (* Print prover wrapper *)
-  Format.eprintf "prover wrapper@\n%!";
-  begin match config.pc_pwrapper with
-  | None -> Format.eprintf "  <none>@\n%!"
-  | Some wrapper -> Format.eprintf "  %s@\n%!" wrapper end;
 
   (* Print list of known provers *)
   begin
@@ -110,12 +103,6 @@ let main () =
     EcRegexp.match_ (`C rex) myname
   in
 
-  let bin =
-    match Sys.os_type with
-    | "Win32" | "Cygwin" -> fun (x : string) -> x ^ ".exe"
-    | _ -> fun (x : string) -> x
-  in
-
   let resource name =
     match eclocal with
     | true ->
@@ -129,17 +116,6 @@ let main () =
     | false ->
         List.fold_left Filename.concat mydir
           ([Filename.parent_dir_name; "lib"; "easycrypt"] @ name)
-  in
-
-  let pwrapper =
-    (* Find provers wrapper *)
-    match Sys.os_type with
-    | "Win32" -> None
-    | _ ->
-      let wrapper = resource ["system"; bin "callprover"] in
-        if   Sys.file_exists wrapper
-        then Some wrapper
-        else None
   in
 
   (* Parse command line arguments *)
@@ -215,7 +191,6 @@ let main () =
     | `Config ->
         let config = {
           pc_why3     = why3conf;
-          pc_pwrapper = pwrapper;
           pc_loadpath = EcCommands.loadpath ();
         } in
 
@@ -268,6 +243,16 @@ let main () =
        | None     -> EcCommands.addidir Filename.current_dir_name
        | Some pwd -> EcCommands.addidir pwd);
 
+  let tstats : EcLocation.t -> float option -> unit =
+    match options.o_command with
+    | `Compile { cmpo_tstats = Some out } ->
+        let channel = Format.formatter_of_out_channel (open_out out) in
+        let fmt loc tdelta =
+          Format.fprintf channel "%s %f\n%!"
+            (EcLocation.tostring_raw ~with_fname:false loc) tdelta in
+        fun loc tdelta -> oiter (fmt loc) tdelta
+    | _ -> fun _ _ -> () in
+
   (* Instantiate terminal *)
   let lazy terminal = terminal in
 
@@ -302,7 +287,6 @@ let main () =
               EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
               EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
               EcCommands.cm_provers   = prvopts.prvo_provers;
-              EcCommands.cm_wrapper   = pwrapper;
               EcCommands.cm_profile   = prvopts.prvo_profile;
               EcCommands.cm_iterate   = prvopts.prvo_iterate;
             } in
@@ -340,7 +324,10 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
-                     try  EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
+                     try
+                       let tdelta =
+                         EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
+                       in tstats loc tdelta
                      with
                      | EcCommands.Restart ->
                          raise EcCommands.Restart

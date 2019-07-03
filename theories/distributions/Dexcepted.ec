@@ -26,6 +26,14 @@ lemma dexcepted1E d P (x : 'a) :
     else (mu1 d x / (weight d - mu d (P))).
 proof. by rewrite dscale1E weight_dfilter dfilter1E; case: (P x). qed.
 
+lemma nosmt dexcepted1E_notin (d : 'a distr) P x:
+  !P x => mu1 (d \ P) x = (mu1 d x / (weight d - mu d (P))).
+proof. by rewrite dexcepted1E => ->. qed.
+
+lemma nosmt dexcepted1E_in d P (x:'a):
+  P x => mu1 (d \ P) x = 0%r.
+proof. by rewrite dexcepted1E => ->. qed.
+
 lemma dexceptedE d P (E : 'a -> bool) :
   mu (d \ P) E
   = mu d (predI E (predC (P))) / (weight d - mu d (P)).

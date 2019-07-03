@@ -384,8 +384,9 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
       let tparams  = EcUnify.UniEnv.tparams ue in
       let codom    = uni codom in
       let opexpr   = EcPath.pqname (EcEnv.root env) name in
-      let opexpr   = e_op opexpr (List.map (tvar |- fst) tparams) codom in
       let args     = List.map (snd_map uni) args in
+      let opexpr   = e_op opexpr (List.map (tvar |- fst) tparams)
+                       (toarrow (List.map snd args) codom) in
       let ebsubst  =
         let lcmap = Mid.add opname opexpr e_subst_id.es_loc in
         { e_subst_id with es_freshen = false; es_ty = uni; es_loc = lcmap; }

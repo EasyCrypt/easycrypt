@@ -200,7 +200,6 @@ module Prover : sig
   val empty_options : smt_options
 
   val process     : scope -> pprover_infos -> scope
-  val set_wrapper : scope -> string option -> scope
 
   val set_default : scope -> smt_options -> scope
   val full_check  : scope -> scope

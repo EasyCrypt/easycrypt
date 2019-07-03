@@ -231,7 +231,7 @@ abstract theory AdversaryN.
   (* probability of an element in d *)
   op n : int.
   axiom n_pos : 0 < n.
-  axiom d_uni i (x:t) : mu1 (d i) x = 1%r / n%r.
+  axiom d_uni i (x:t) : mu1 (d i) x <= 1%r / n%r.
 
   clone include Adversary with
     op test <- fun (i:input) (X:t list) => size X <= p
@@ -341,7 +341,7 @@ abstract theory Adversary1.
   (* probability of an element in d *)
   op n : int.
   axiom n_pos : 0 < n.
-  axiom d_uni i (x:t) : mu1 (d i) x = 1%r / n%r.
+  axiom d_uni i (x:t) : mu1 (d i) x <= 1%r / n%r.
 
 
   module type ADV = {
@@ -433,7 +433,7 @@ abstract theory Adversary1_1.
   (* probability of an element in d *)
   op n : int.
   axiom gt1_n : 1 < n.
-  axiom d_uni i (x:t) : mu1 (d i) x = 1%r / n%r.
+  axiom d_uni i (x:t) : mu1 (d i) x <= 1%r / n%r.
 
   module type ADV = {
     proc a1 () : input * t

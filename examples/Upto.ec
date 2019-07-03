@@ -141,7 +141,7 @@ fel 2 Experiment.WO.cO g qO (Experiment.WO.bad)
   exists* Experiment.WO.cO; elim* => cO.
   conseq (: _ : (g cO))=> //.
   exists* Experiment.WO.bad; elim* => b.
-  by call (hbound_bad cO); auto.
+  call (hbound_bad cO); auto; smt().
 + move=> c; proc; sp; if=> //; wp.
   exists* Experiment.WO.cO; elim* => cO.
   by call (hf2 cO); auto=> /> /#.

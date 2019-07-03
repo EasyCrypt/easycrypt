@@ -556,6 +556,9 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             failure ();
           List.iter2 (doit env ilc) fs1 fs2
 
+      | Fproj (f1, i), Fproj (f2, j) ->
+          if i <> j then failure () else doit env ilc f1 f2
+
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
           if not (EcPath.p_equal op1 op2) then
             failure ();

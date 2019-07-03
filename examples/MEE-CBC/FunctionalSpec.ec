@@ -352,7 +352,7 @@ rewrite max_ler.
 + case: (size m < 16)=> [|/lezNgt] szm_16.
   + by rewrite modz_small 1:size_ge0.
   smt (@IntDiv).
-by congr; ringeq; rewrite -divzE modzMl.
+by do 2! congr; ringeq; rewrite -divzE modzMl.
 qed.
 
 (* -------------------------------------------------------------------- *)
