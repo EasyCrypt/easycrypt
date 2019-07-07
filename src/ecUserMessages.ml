@@ -135,8 +135,10 @@ end = struct
     | FXE_CtorAmbiguous ->
         msg "ambiguous constructor name"
 
-    | FXE_CtorInvalidArity _ ->
-        ()
+    | FXE_CtorInvalidArity (cname, i, j) ->
+        msg
+          "the constructor %s expects %d argument(s) (%d argument(s) given)"
+          cname i j
 
   let pp_tyerror env1 fmt error =
     let env   = EcPrinting.PPEnv.ofenv env1 in

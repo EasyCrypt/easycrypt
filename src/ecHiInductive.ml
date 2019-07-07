@@ -33,8 +33,8 @@ type dterror =
 | DTE_Empty
 
 type fxerror =
-  | FXLowError of EcTyping.tyerror
-  | FXError    of EcTyping.fxerror
+| FXLowError of EcTyping.tyerror
+| FXError    of EcTyping.fxerror
 
 (* -------------------------------------------------------------------- *)
 exception RcError of EcLocation.t * EcEnv.env * rcerror
@@ -308,7 +308,7 @@ let trans_matchfix
 
               if args_exp <> args_got then
                 fxerror cname.pl_loc env
-                  (TT.FXE_CtorInvalidArity (args_exp, args_got));
+                  (TT.FXE_CtorInvalidArity (snd (unloc cname), args_exp, args_got));
 
               let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
 

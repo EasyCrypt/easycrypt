@@ -77,7 +77,7 @@ type fxerror =
 | FXE_MatchPartial
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
-| FXE_CtorInvalidArity of (int * int)
+| FXE_CtorInvalidArity of (symbol * int * int)
 
 type tyerror =
 | UniVarNotAllowed
@@ -1094,9 +1094,10 @@ let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
       let args_exp = List.length ctorty in
       let args_got = List.length cargs in
 
-      if args_exp <> args_got then
-        tyerror cname.pl_loc env
-          (InvalidMatch (FXE_CtorInvalidArity (args_exp, args_got)));
+      if args_exp <> args_got then begin
+        tyerror cname.pl_loc env (InvalidMatch
+          (FXE_CtorInvalidArity (snd (unloc cname), args_exp, args_got)))
+      end;
 
       let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
 

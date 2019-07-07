@@ -28,8 +28,8 @@ type dterror =
 | DTE_Empty
 
 type fxerror =
-  | FXLowError of EcTyping.tyerror
-  | FXError    of EcTyping.fxerror
+| FXLowError of EcTyping.tyerror
+| FXError    of EcTyping.fxerror
 
 (* -------------------------------------------------------------------- *)
 exception RcError of EcLocation.t * EcEnv.env * rcerror
