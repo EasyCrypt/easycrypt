@@ -157,7 +157,7 @@ end = struct
       let load_prover p config =
         let name    = p.Whyconf.prover_name in
         let version = p.Whyconf.prover_version in
-        let driver  = Driver.load_driver w3_env config.Whyconf.driver [] in
+        let driver  = Whyconf.load_driver main w3_env config.Whyconf.driver [] in
 
         { pr_prover  =
             { pr_name    = name;
@@ -316,7 +316,6 @@ type prover_infos = {
   pr_timelimit : int;
   pr_cpufactor : int;
   pr_quorum    : int;
-  pr_wrapper   : string option;
   pr_verbose   : int;
   pr_all       : bool;
   pr_max       : int;
@@ -333,7 +332,6 @@ let dft_prover_infos = {
   pr_timelimit = 3;
   pr_cpufactor = 1;
   pr_quorum    = 1;
-  pr_wrapper   = None;
   pr_verbose   = 0;
   pr_all       = false;
   pr_iterate   = false;
@@ -348,189 +346,150 @@ let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit
 
-let rec run_prover ?(notify : notify option) (pi : prover_infos) (prover : string) task =
-  try
-    let { pr_config = pr; pr_driver = dr; } = get_prover prover in
-    let pc =
-      let command = pr.Whyconf.command in
-      let command =
-        match pi.pr_wrapper with
-        | None -> command
-        | Some wrapper -> Printf.sprintf "%s %s" wrapper command
+let rec run_prover
+  ?(notify : notify option) (pi : prover_infos) (prover : string) task
+=
+  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
+
+  EcUtils.try_finally (fun () ->
+    try
+      let { pr_config = pr; pr_driver = dr; } = get_prover prover in
+      let pc =
+        let command = pr.Whyconf.command in
+
+        let limit = { Call_provers.empty_limit with
+          Call_provers.limit_time =
+            let limit = pi.pr_timelimit * pi.pr_cpufactor in
+            if limit <= 0 then 0 else limit;
+        } in
+
+        let rec doit gcdone =
+          try  Driver.prove_task ~command ~limit dr task
+          with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
+            Gc.compact (); doit true
+        in
+
+        if EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin
+          let stream = open_out (Printf.sprintf "%s.smt" prover) in
+          let fmt = Format.formatter_of_out_channel stream in
+          EcUtils.try_finally
+            (fun () -> Format.fprintf fmt "%a@." (Driver.print_task dr) task)
+            (fun () -> close_out stream)
+        end;
+
+        doit false
+
       in
+        Some (prover, pc)
 
-      let limit = { Call_provers.empty_limit with
-        Call_provers.limit_time =
-          let limit = pi.pr_timelimit * pi.pr_cpufactor in
-          if limit <= 0 then None else Some limit;
-      } in
+    with e ->
+      notify |> oiter (fun notify -> notify `Warning (lazy (
+        let buf = Buffer.create 0 in
+        let fmt = Format.formatter_of_buffer buf in
+        Format.fprintf fmt "error when starting `%s': %a%!"
+          prover EcPException.exn_printer e;
+        Buffer.contents buf)));
+      None)
 
-      let rec doit gcdone =
-        try  Driver.prove_task ~command ~limit dr task ()
-        with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
-          Gc.compact (); doit true
-      in
-
-      if EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin
-        let stream = open_out (Printf.sprintf "%s.smt" prover) in
-        let fmt = Format.formatter_of_out_channel stream in
-        EcUtils.try_finally
-          (fun () -> Format.fprintf fmt "%a@." (Driver.print_task dr) task)
-          (fun () -> close_out stream)
-      end;
-
-      doit false
-
-    in
-      Some (prover, pc)
-
-  with e ->
-    notify |> oiter (fun notify -> notify `Warning (lazy (
-      let buf = Buffer.create 0 in
-      let fmt = Format.formatter_of_buffer buf in
-      Format.fprintf fmt "error when starting `%s': %a%!"
-        prover EcPException.exn_printer e;
-      Buffer.contents buf)));
-    None
+  (fun () ->
+     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ())
 
 (* -------------------------------------------------------------------- *)
-module type PExec = sig
-  val execute_task : ?notify:notify -> prover_infos -> Why3.Task.task -> bool option
-end
+let execute_task ?(notify : notify option) (pi : prover_infos) task =
+  let module CP = Call_provers in
 
-(* -------------------------------------------------------------------- *)
-module POSIX : PExec = struct
-  let restartable_syscall (call : unit -> 'a) : 'a =
-    let output = ref None in
-      while !output = None do
-        try  output := Some (call ())
-        with
-        | Unix.Unix_error (errno, _, _) when errno = Unix.EINTR -> ()
-      done;
-      EcUtils.oget !output
+  Prove_client.set_max_running_provers pi.pr_maxprocs;
 
-  let execute_task ?(notify : notify option) (pi : prover_infos) task =
-    let module CP = Call_provers in
+  let pcs = Array.make pi.pr_maxprocs None in
 
-    let pcs = Array.make pi.pr_maxprocs None in
+  (* Run process, ignoring prover failing to start *)
+  let run i prover =
+      run_prover ?notify pi prover task
+        |> oiter (fun (prover, pc) -> pcs.(i) <- Some (prover, pc))
+  in
 
-    (* Run process, ignoring prover failing to start *)
-    let run i prover =
-        run_prover ?notify pi prover task
-          |> oiter (fun (prover, pc) -> pcs.(i) <- Some (prover, pc))
-    in
+  EcUtils.try_finally
+    (fun () ->
+      (* Start the provers, at most maxprocs run in the same time *)
+      let pqueue = Queue.create () in
+      List.iteri
+        (fun i prover ->
+           if i < pi.pr_maxprocs then run i prover else Queue.add prover pqueue)
+        pi.pr_provers;
 
-    EcUtils.try_finally
-      (fun () ->
-        (* Start the provers, at most maxprocs run in the same time *)
-        let pqueue = Queue.create () in
-        List.iteri
-          (fun i prover ->
-             if i < pi.pr_maxprocs then run i prover else Queue.add prover pqueue)
-          pi.pr_provers;
+      (* Wait for the first prover giving a definitive answer *)
+      let status = ref 0 in
+      let alives = ref (-1) in
+      while !alives <> 0 && 0 <= !status && !status < pi.pr_quorum do
+        if not (Queue.is_empty pqueue) && !alives < Array.length pcs then begin
+            for i = 0 to (Array.length pcs) - 1 do
+              if is_none pcs.(i) && not (Queue.is_empty pqueue) then
+                run i (Queue.take pqueue)
+            done
+        end;
 
-        (* Wait for the first prover giving a definitive answer *)
-        let status = ref 0 in
-        let alives = ref (-1) in
-        while !alives <> 0 && 0 <= !status && !status < pi.pr_quorum do
-          let pid, st =
-            try  restartable_syscall Unix.wait
-            with Unix.Unix_error _ -> (-1, Unix.WEXITED 127)
-          in
-          alives := 0;
-          for i = 0 to (Array.length pcs) - 1 do
-            match pcs.(i) with
-            | None -> ()
-            | Some (prover, pc) ->
-                if CP.prover_call_pid pc = pid then begin
-                  pcs.(i) <- None;            (* DO IT FIRST *)
-                  let result = CP.post_wait_call pc st () in
-                  let answer = result.CP.pr_answer in
-                  match answer with
-                  | CP.Valid   -> incr status
-                  | CP.Invalid -> status := (-1)
-                  | CP.Failure _ | CP.HighFailure ->
-                    notify |> oiter (fun notify -> notify `Warning (lazy (
-                      let buf = Buffer.create 0 in
-                      let fmt = Format.formatter_of_buffer buf in
-                      Format.fprintf fmt "prover %s exited with %a%!"
-                        prover CP.print_prover_answer answer;
-                      Buffer.contents buf)));
-                    if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
-                  | _ ->
-                    if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
-                end;
-                if pcs.(i) <> None then incr alives
-          done
-        done;
+        let infos = CP.get_new_results ~blocking:true in
 
-             if !status < 0 then Some false
-        else if !status = 0 then None
-        else if !status < pi.pr_quorum then None else Some true)
-
-      (* Clean-up: hard kill + wait for remaining provers *)
-      (fun () ->
+        alives := 0;
         for i = 0 to (Array.length pcs) - 1 do
           match pcs.(i) with
           | None -> ()
-          | Some (_prover,pc) ->
-              let pid = CP.prover_call_pid pc in
-              pcs.(i) <- None;
-              begin try Unix.kill pid 15 with Unix.Unix_error _ -> () end;
-              let _, st =
-                restartable_syscall (fun () -> Unix.waitpid [] pid)
+          | Some (prover, pc) ->
+              let myinfos = List.pmap
+                (fun (pc', upd) -> if pc = pc' then Some upd else None)
+                infos in
+
+              let handle_answer = function
+                | CP.Valid   -> incr status
+                | CP.Invalid -> status := (-1)
+                | (CP.Failure _ | CP.HighFailure) as answer->
+                  notify |> oiter (fun notify -> notify `Warning (lazy (
+                    let buf = Buffer.create 0 in
+                    let fmt = Format.formatter_of_buffer buf in
+                    Format.fprintf fmt "prover %s exited with %a%!"
+                      prover CP.print_prover_answer answer;
+                    Buffer.contents buf)));
+                | _ ->
+                    ()
               in
-              ignore (CP.post_wait_call pc st ());
-        done)
-end
 
-(* -------------------------------------------------------------------- *)
-module Win32 : PExec = struct
-  type answero = Answer of bool | Unknown
+              let rec handle_info upd =
+                match upd with
+                | CP.NoUpdates
+                | CP.ProverStarted ->
+                    ()
 
-  let execute_task ?(notify : notify option) (pi : prover_infos) task =
-    let module CP = Call_provers in
+                | CP.ProverInterrupted
+                | CP.InternalFailure _ ->
+                    pcs.(i) <- None
 
-    let wait1 (prover, pc) =
-      let result = CP.wait_on_call pc () in
-      let answer = result.CP.pr_answer in
+                | CP.ProverFinished answer ->
+                    pcs.(i) <- None;
+                    handle_answer answer.CP.pr_answer
+              in
 
-      match answer with
-      | CP.Valid   -> Answer true
-      | CP.Invalid -> Answer false
-      | CP.Failure _ | CP.HighFailure ->
-          notify |> oiter (fun notify -> notify `Warning (lazy (
-            let buf = Buffer.create 0 in
-            let fmt = Format.formatter_of_buffer buf in
-              Format.fprintf fmt "prover %s exited with %a%!"
-                prover CP.print_prover_answer answer;
-              Buffer.contents buf)));
-          Unknown
-      | _ -> Unknown
+              let rec handle_infos myinfos =
+                match myinfos with
+                | [] -> ()
+                | myinfo :: myinfos ->
+                    handle_info myinfo;
+                    if is_some pcs.(i) then handle_infos myinfos in
 
-    in
+              handle_infos myinfos;
+              if pcs.(i) <> None then incr alives
+        done
+      done;
 
-    let do1 (prover : string) =
-      run_prover ?notify pi prover task |>
-        omap (fun (prover, pc) -> wait1 (prover, pc))
-    in
+           if !status < 0 then Some false
+      else if !status = 0 then None
+      else if !status < pi.pr_quorum then None else Some true)
 
-    let rec doall okc provers =
-      match okc, provers with
-      | _, _ when okc >= pi.pr_quorum -> Some true
-      | _, [] -> None
-      | _, pr :: provers -> begin
-          match do1 pr with
-          | Some (Answer false) -> Some false
-          | Some (Answer true)  -> doall (okc+1) provers
-          | None | Some Unknown -> doall okc provers
-        end
-
-    in doall 0 pi.pr_provers
-end
-
-(* -------------------------------------------------------------------- *)
-let execute_task =
-  match Sys.os_type with
-  | "Win32" -> Win32.execute_task
-  | _       -> POSIX.execute_task
+    (* Clean-up: hard kill + wait for remaining provers *)
+    (fun () ->
+      for i = 0 to (Array.length pcs) - 1 do
+        match pcs.(i) with
+        | None -> ()
+        | Some (_prover, pc) ->
+            CP.interrupt_call pc;
+            (try ignore (CP.wait_on_call pc : CP.prover_result) with _ -> ());
+      done)

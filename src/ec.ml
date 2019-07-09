@@ -39,7 +39,6 @@ let why3dflconf = Filename.concat XDG.home "why3.conf"
 (* -------------------------------------------------------------------- *)
 type pconfig = {
   pc_why3     : string option;
-  pc_pwrapper : string option;
   pc_loadpath : (bool * string) list;
 }
 
@@ -60,12 +59,6 @@ let print_config config =
   begin match config.pc_why3 with
   | None   -> Format.eprintf "  <why3 default>@\n%!"
   | Some f -> Format.eprintf "  %s@\n%!" f end;
-
-  (* Print prover wrapper *)
-  Format.eprintf "prover wrapper@\n%!";
-  begin match config.pc_pwrapper with
-  | None -> Format.eprintf "  <none>@\n%!"
-  | Some wrapper -> Format.eprintf "  %s@\n%!" wrapper end;
 
   (* Print list of known provers *)
   begin
@@ -110,12 +103,6 @@ let main () =
     EcRegexp.match_ (`C rex) myname
   in
 
-  let bin =
-    match Sys.os_type with
-    | "Win32" | "Cygwin" -> fun (x : string) -> x ^ ".exe"
-    | _ -> fun (x : string) -> x
-  in
-
   let resource name =
     match eclocal with
     | true ->
@@ -129,17 +116,6 @@ let main () =
     | false ->
         List.fold_left Filename.concat mydir
           ([Filename.parent_dir_name; "lib"; "easycrypt"] @ name)
-  in
-
-  let pwrapper =
-    (* Find provers wrapper *)
-    match Sys.os_type with
-    | "Win32" -> None
-    | _ ->
-      let wrapper = resource ["system"; bin "callprover"] in
-        if   Sys.file_exists wrapper
-        then Some wrapper
-        else None
   in
 
   (* Parse command line arguments *)
@@ -215,7 +191,6 @@ let main () =
     | `Config ->
         let config = {
           pc_why3     = why3conf;
-          pc_pwrapper = pwrapper;
           pc_loadpath = EcCommands.loadpath ();
         } in
 
@@ -312,7 +287,6 @@ let main () =
               EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
               EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
               EcCommands.cm_provers   = prvopts.prvo_provers;
-              EcCommands.cm_wrapper   = pwrapper;
               EcCommands.cm_profile   = prvopts.prvo_profile;
               EcCommands.cm_iterate   = prvopts.prvo_iterate;
             } in

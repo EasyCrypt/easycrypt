@@ -621,14 +621,12 @@ type checkmode = {
   cm_cpufactor : int;
   cm_nprovers  : int;
   cm_provers   : string list option;
-  cm_wrapper   : string option;
   cm_profile   : bool;
   cm_iterate   : bool;
 }
 
 let initial ~checkmode ~boot =
   let checkall  = checkmode.cm_checkall  in
-  let wrapper   = checkmode.cm_wrapper   in
   let profile   = checkmode.cm_profile   in
   let poptions  = { EcScope.Prover.empty_options with
     EcScope.Prover.po_timeout   = Some checkmode.cm_timeout;
@@ -649,7 +647,6 @@ let initial ~checkmode ~boot =
                   List.fold_left (process_th_require1 loader)
                                  scope [tactics; prelude] in
 
-  let scope = EcScope.Prover.set_wrapper scope wrapper in
   let scope = EcScope.Prover.set_default scope poptions in
   let scope = if checkall then EcScope.Prover.full_check scope else scope in
 
