@@ -137,7 +137,7 @@ let t_equiv_match s tc =
 
   let do1 ((ids, b), (cname, _)) =
     let subst, lvars =
-      add_locals { e_subst_id with es_freshen = true; } ids in
+      add_locals e_subst_id ids in
 
     let cop = EcPath.pqoname (EcPath.prefix indp) cname in
     let cop = f_op cop tyinst (toarrow (List.snd ids) f.f_ty) in
