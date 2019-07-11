@@ -534,3 +534,14 @@ lemma nosmt big_int_recr_cond (n m : int) P F: m <= n =>
   bigi P F m (n+1) =
     bigi P F m n + (if P n then F n else idm).
 proof. by move=> lemn; rewrite !(@big_mkcond P) big_int_recr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_eq_filter_cat ['a] (P : 'a -> bool) (F : 'a -> t) s :
+  big predT F s = big P F s + big (predC P) F s.
+proof. rewrite - (@eq_big_perm predT F ((filter P s) ++ (filter (predC P) s)) s). apply perm_filterC. smt. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_eq_idm_filter ['a] (P : 'a -> bool) (F : 'a -> t) s :
+  (forall (x : 'a), (predC P) x => F x = idm) =>
+  big predT F s = big P F s.
+proof. move=> H. rewrite (@big_eq_filter_cat P F s). rewrite (@big1 (predC P)). apply H. by rewrite addm0. qed.
