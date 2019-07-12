@@ -789,7 +789,7 @@ lemma dmap_uni_in_inj (d : 'a distr) (f : 'a -> 'b) :
   is_uniform d => is_uniform (dmap d f).
 proof.
   move=> finj duni x y /supp_dmap [a [ina ->]] /supp_dmap [b [inb ->]].
-  rewrite !dmap1E. print (\o). rewrite /(\o) /pred1.
+  rewrite !dmap1E. rewrite /(\o) /pred1.
   rewrite (@mu_eq_support d _ (pred1 a)). by move=>c inc; smt.
   rewrite (@mu_eq_support d (fun (x0 : 'a) => f x0 = f b) (pred1 b)).
   by move=> c inc; smt. 
