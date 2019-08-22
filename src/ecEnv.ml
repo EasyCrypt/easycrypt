@@ -88,7 +88,7 @@ type varbind = {
   vb_kind  : [`Var of EcTypes.pvar_kind | `Proj of int];
 }
 
-type obj = [
+type _obj = [
   | `Variable of varbind
   | `Function of function_
   | `Module   of module_expr

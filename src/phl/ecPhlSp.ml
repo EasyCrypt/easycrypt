@@ -51,7 +51,7 @@ module LowInternal = struct
 
   and assignables = assignable list
 
-  type assoc_t = (assignable list * form) list
+  type _assoc_t = (assignable list * form) list
 
   (* ------------------------------------------------------------------ *)
   let isAPVar  = function APVar  _ -> true | _ -> false

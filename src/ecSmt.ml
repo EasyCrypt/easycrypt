@@ -1279,7 +1279,7 @@ let unwanted_ops =
 (* See "Lightweight Relevance Filtering for Machine-Generated           *)
 (* Resolution Problems" for a description of axioms selection.          *)
 
-type ax_info = {
+type _ax_info = {
   ax_name : path;
   ax_symb : Sp.t;
 }
