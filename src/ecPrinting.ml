@@ -2584,7 +2584,7 @@ module PPGoal = struct
           | Some pk -> Format.fprintf fmt "%t " pk in
 
         Format.fprintf fmt
-          "%-.2s%t: @[<hov 2>%t@]@\n%!"
+          "%s%t: @[<hov 2>%t@]@\n%!"
           (PPEnv.local_symb ppe id) pk dk)
         pps
     end;
@@ -2625,7 +2625,7 @@ let pp_hyps (ppe : PPEnv.t) fmt hyps =
       | Some pk -> Format.fprintf fmt "%t" pk in
 
     Format.fprintf fmt
-      "%-.2s%t: @[<hov 2>%t@]@\n%!"
+      "%s%t: @[<hov 2>%t@]@\n%!"
       (PPEnv.local_symb ppe id) pk dk)
     pps
 

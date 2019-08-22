@@ -55,7 +55,7 @@ let print_config config =
     Format.eprintf "load-path:@\n%!";
     List.iter
       (fun (nm, dir) ->
-         Format.eprintf "  %.10s@@%s@\n%!" (string_of_namespace nm) dir)
+         Format.eprintf "  %s@@%s@\n%!" (string_of_namespace nm) dir)
       (EcCommands.loadpath ());
   end;
 

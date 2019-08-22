@@ -1,8 +1,5 @@
 *~
 _build
-*.native
-*.byte
-*.exe
 *.pyc
 *.pyo
 .vagrant
@@ -15,10 +12,6 @@ setup.log
 /attic
 /attic.ec*
 /theories/attic
-
-/system/*.o
-/system/callprover
-/system/callprover.exe
 
 *.aux
 *.bbl
@@ -53,3 +46,6 @@ setup.log
 
 /*.smt
 /*.why
+
+.merlin
+*.install
