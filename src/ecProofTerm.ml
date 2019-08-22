@@ -148,7 +148,7 @@ let concretize_form pe f =
   concretize_e_form (concretize_env pe) f
 
 (* -------------------------------------------------------------------- *)
-let rec concretize ({ ptev_env = pe } as pt) =
+let concretize ({ ptev_env = pe } as pt) =
   let (CPTEnv subst) as cptenv = concretize_env pe in
   (concretize_e_pt cptenv pt.ptev_pt, Fsubst.f_subst subst pt.ptev_ax)
 

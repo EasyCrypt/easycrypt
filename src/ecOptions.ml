@@ -89,7 +89,7 @@ type xvalue = [ `Bool of bool | `Int of int | `String of string ]
 let print_usage ?progname ?(out = stderr) ?msg specs =
   let progname = odfl Sys.argv.(0) progname in
 
-  let rec ccspecs hashelp specs =
+  let ccspecs hashelp specs =
     let for1 = function
       | `Spec (name, kind, help) ->
         let kind =

@@ -89,7 +89,7 @@ let on_mpath_bindings cb bds =
 let rec on_mpath_expr cb (e : expr) =
   let cbrec = on_mpath_expr cb in
 
-  let rec fornode () =
+  let fornode () =
     match e.e_node with
     | Eint   _            -> ()
     | Elocal _            -> ()
