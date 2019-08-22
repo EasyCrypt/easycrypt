@@ -217,7 +217,7 @@ object(self)
         | Some loc -> LC.tostring loc
       in
         self#_clear_update ~final:false ();
-        Format.eprintf "[%.8s] [%s] %s\n%!" prefix strloc msg;
+        Format.eprintf "[%s] [%s] %s\n%!" prefix strloc msg;
         self#_update_progress
 
   method interactive = false
