@@ -2287,9 +2287,9 @@ module Cloning = struct
 
     let default = { clo_abstract = false; }
 
-    let merge1 opts (b, (x : theory_cloning_option)) =
+    let merge1 _opts (b, (x : theory_cloning_option)) =
       match x with
-      | `Abstract -> { opts with clo_abstract = b; }
+      | `Abstract -> { clo_abstract = b; }
 
     let merge opts (specs : theory_cloning_options) =
       List.fold_left merge1 opts specs

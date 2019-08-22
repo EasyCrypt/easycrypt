@@ -1131,9 +1131,9 @@ type cqpotions = {
 module CQOptions = struct
   let default = { cqo_frame = true; }
 
-  let merge1 opts ((b, x) : bool * EcParsetree.pcqoption) =
+  let merge1 _opts ((b, x) : bool * EcParsetree.pcqoption) =
     match x with
-    | `Frame -> { opts with cqo_frame = b; }
+    | `Frame -> { cqo_frame = b; }
 
   let merge opts (specs : EcParsetree.pcqoptions) =
     List.fold_left merge1 opts specs

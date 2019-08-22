@@ -62,9 +62,8 @@ module Graph = struct
           (odfl Sp.empty (Mp.find_opt dst g.tcg_closure))
           (Sp.add dst (odfl Sp.empty m))
       in
-        { g with
-            tcg_nodes   = Mp.change (some -| up_node) src g.tcg_nodes;
-            tcg_closure = Mp.change (some -| up_clos) src g.tcg_closure; }
+        { tcg_nodes   = Mp.change (some -| up_node) src g.tcg_nodes;
+          tcg_closure = Mp.change (some -| up_clos) src g.tcg_closure; }
 end
 
 (* -------------------------------------------------------------------- *)
