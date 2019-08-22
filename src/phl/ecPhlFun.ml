@@ -436,7 +436,7 @@ let t_fun_to_code_r tc =
   let teg = t_fun_to_code_eager in
   t_hF_or_bhF_or_eF ~th ~tbh ~te ~teg tc
 
-let t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
+let _t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
 
 (* -------------------------------------------------------------------- *)
 let t_fun_r inv tc =

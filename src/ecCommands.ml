@@ -132,8 +132,8 @@ module Loader : sig
                   loader -> (namespace option * string * kind) option
 
   val push      : string -> loader -> unit
-  val pop       : loader -> string option
-  val context   : loader -> string list
+  val _pop       : loader -> string option
+  val _context   : loader -> string list
   val incontext : string -> loader -> bool
 end = struct
   type loader = {
@@ -184,12 +184,12 @@ end = struct
   let push (p : string) (ld : loader) =
     ld.ld_stack <- norm p :: ld.ld_stack
 
-  let pop (ld : loader) =
+  let _pop (ld : loader) =
     match ld.ld_stack with
     | [] -> None
     | p :: tl -> ld.ld_stack <- tl; Some p
 
-  let context (ld : loader) =
+  let _context (ld : loader) =
     ld.ld_stack
 
   let incontext (p : string) (ld : loader) =

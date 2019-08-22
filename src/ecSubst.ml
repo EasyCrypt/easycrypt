@@ -634,7 +634,7 @@ let subst_form         s = fun f -> (Fsubst.f_subst (f_subst_of_subst (_subst_of
 let subst_ty           s = fun t -> ((_subst_of_subst s).s_ty t)
 let subst_genty        s = fun t -> (subst_genty (_subst_of_subst s) t)
 
-let subst_instance     s = subst_instance (_subst_of_subst s)
+let _subst_instance     s = subst_instance (_subst_of_subst s)
 
 let open_oper            = open_oper (_subst_of_subst empty)
 let open_tydecl          = open_tydecl (_subst_of_subst empty)

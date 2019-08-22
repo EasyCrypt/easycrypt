@@ -86,11 +86,11 @@ end = struct
     Cont (Lazy.from_fun (fun () -> raise NoMatch))
 
   (* ------------------------------------------------------------------ *)
-  let single_continuation (ctn : continuation1) =
+  let _single_continuation (ctn : continuation1) =
     Cont (Lazy.from_val (ctn, no_continuation))
 
   (* ------------------------------------------------------------------ *)
-  let single_mr (e : engine) : matchr =
+  let _single_mr (e : engine) : matchr =
     (e, no_continuation)
 
   (* -------------------------------------------------------------------- *)
@@ -215,7 +215,7 @@ end = struct
     (e, chain_continuation ctn1 ctn2)
 
   (* ------------------------------------------------------------------ *)
-  and apply1_on_continuation f (ctn : continuation) : continuation =
+  and _apply1_on_continuation f (ctn : continuation) : continuation =
     apply_on_continuation (fun e -> (f e, no_continuation)) ctn
 
   (* ------------------------------------------------------------------ *)

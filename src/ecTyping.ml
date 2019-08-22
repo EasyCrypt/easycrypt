@@ -2089,7 +2089,7 @@ module PFS : sig
   val create : unit -> pfstate
 
   val set_memused : pfstate -> unit
-  val get_memused : pfstate -> bool
+  val _get_memused : pfstate -> bool
   val new_memused : ('a -> 'b) -> pfstate -> 'a -> bool * 'b
 end = struct
   type pfstate = { mutable pfa_memused : bool; }
@@ -2099,7 +2099,7 @@ end = struct
   let set_memused state =
     state.pfa_memused <- true
 
-  let get_memused state =
+  let _get_memused state =
     state.pfa_memused
 
   let new_memused f state x =

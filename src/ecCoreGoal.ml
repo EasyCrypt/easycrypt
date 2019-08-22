@@ -293,7 +293,7 @@ module FApi = struct
     get_pregoal_by_id pe.pr_main pe
 
   (* ------------------------------------------------------------------ *)
-  let tc1_get_pregoal_by_id (hd : handle) (tc : tcenv1) =
+  let _tc1_get_pregoal_by_id (hd : handle) (tc : tcenv1) =
     (tc1_get_goal_by_id hd tc).g_goal
 
   (* ------------------------------------------------------------------ *)

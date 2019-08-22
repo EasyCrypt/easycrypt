@@ -1104,24 +1104,24 @@ module RegexpBaseInstr = struct
   let path (e : engine) =
     e.e_pos :: e.e_path
 
-  let eat_option (f : 'a -> 'a -> unit) (x : 'a option) (xn : 'a option) =
+  let _eat_option (f : 'a -> 'a -> unit) (x : 'a option) (xn : 'a option) =
     match x, xn with
     | None  , Some _ -> raise NoMatch
     | Some _, None   -> raise NoMatch
     | None  , None   -> ()
     | Some x, Some y -> f x y
 
-  let eat_list (f : 'a -> 'a -> unit) (x : 'a list) (xn : 'a list) =
+  let _eat_list (f : 'a -> 'a -> unit) (x : 'a list) (xn : 'a list) =
     try  List.iter2 f x xn
     with Invalid_argument _ -> raise NoMatch (* FIXME *)
 
-  let eat_lvalue (lv : lvalue) (lvn : lvalue) =
+  let _eat_lvalue (lv : lvalue) (lvn : lvalue) =
     if not (lv_equal lv lvn) then raise NoMatch
 
-  let eat_expr (e : expr) (en : expr) =
+  let _eat_expr (e : expr) (en : expr) =
     if not (e_equal e en) then raise NoMatch
 
-  let eat_xpath (f : EcPath.xpath) (fn : EcPath.xpath) =
+  let _eat_xpath (f : EcPath.xpath) (fn : EcPath.xpath) =
     if not (EcPath.x_equal f fn) then raise NoMatch
 
   let rec eat_base (eng : engine) (r : regexp1) =

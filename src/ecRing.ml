@@ -331,7 +331,7 @@ module Make (C : Coef) : Rnorm = struct
       | _ , _  -> false
 
     let zero : t = []
-    let one  : t = [C.c1, Mon.one]
+    let _one  : t = [C.c1, Mon.one]
 
     let cmon (c : C.c) (m : Mon.t) : t =
       if C.ceq c C.c0 then zero else [c, m]

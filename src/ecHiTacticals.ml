@@ -26,7 +26,7 @@ type caseoption = {
 module CaseOptions = struct
   let default = { cod_ambient = false; }
 
-  let merged1 opts (b, x) =
+  let _merged1 opts (b, x) =
     match x with
     | `Ambient -> { opts with cod_ambient  = b; }
 

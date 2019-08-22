@@ -305,7 +305,7 @@ module ISmart : sig
   val i_if       : (instr * i_if      ) -> i_if       -> instr
   val i_while    : (instr * i_while   ) -> i_while    -> instr
   val i_assert   : (instr * i_assert  ) -> i_assert   -> instr
-  val i_abstract : (instr * i_abstract) -> i_abstract -> instr
+  val _i_abstract : (instr * i_abstract) -> i_abstract -> instr
 
   val s_stmt : stmt -> instr list -> stmt
 end = struct
@@ -347,7 +347,7 @@ end = struct
   let i_assert (i, e) e' =
     if e == e' then i else i_assert e'
 
-  let i_abstract (i, x) x' =
+  let _i_abstract (i, x) x' =
     if x == x' then i else i_abstract x
 
   let s_stmt s is' =

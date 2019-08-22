@@ -536,7 +536,7 @@ let f_local  x ty   = mk_form (Flocal x) ty
 let f_pvar   x ty m = mk_form (Fpvar(x, m)) ty
 let f_pvarg  f ty m = f_pvar (pv_arg f) ty m
 let f_pvloc  f v  m = f_pvar (EcTypes.pv_loc f v.v_name) v.v_type m
-let f_pvlocs f vs m = List.map (fun v -> f_pvloc f v m) vs
+let _f_pvlocs f vs m = List.map (fun v -> f_pvloc f v m) vs
 let f_glob   mp m   = mk_form (Fglob (mp, m)) (tglob mp)
 
 (* -------------------------------------------------------------------- *)
@@ -1128,7 +1128,7 @@ let destr_op = function
 let destr_app = function
   { f_node = Fapp (f, fs) } -> (f, fs) | f -> (f, [])
 
-let destr_op_app f =
+let _destr_op_app f =
   let (fo, args) = destr_app f in destr_op fo, args
 
 let destr_tuple = function
@@ -1704,7 +1704,7 @@ module Fsubst = struct
   let uni_subst uidmap =
     fty_subst { ty_subst_id with ts_u = uidmap }
 
-  let mapty sty =
+  let _mapty sty =
     f_subst (fty_subst sty)
 
   let uni uidmap =
@@ -1718,7 +1718,7 @@ module Fsubst = struct
           (try Mid.find id s with Not_found -> f)
       | _ -> f_map (fun ty -> ty) aux f)
 
-  let subst_local id f1 f2 =
+  let _subst_local id f1 f2 =
     subst_locals (Mid.singleton id f1) f2
 
   (* ------------------------------------------------------------------ *)
