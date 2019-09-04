@@ -473,7 +473,7 @@ lemma map_id (m : ('a,'b) fmap) :
 proof. by apply/fmap_eqP => x; rewrite mapE /=; case: m.[x]. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma map_empty (f : 'a -> 'b -> 'c, m : ('a, 'b) fmap) :
+lemma map_empty (f : 'a -> 'b -> 'c) :
   map f empty = empty.
 proof. by apply/fmap_eqP => x; rewrite mapE !emptyE. qed.
 
