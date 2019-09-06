@@ -132,6 +132,9 @@ lemma oddN z : odd (-z) = odd z by [].
 lemma odd_abs z : odd `|z| = odd z by [].
 lemma oddS z : odd (z + 1) = !(odd z) by [].
 
+lemma odd3 : odd 3.
+proof. by rewrite (oddS 2) odd2. qed.
+
 lemma oddD z1 z2 : odd (z1 + z2) = (odd z1 = !odd z2).
 proof. by elim/intwlog: z1 z2; smt(odd0 oddS oddN). qed.
 

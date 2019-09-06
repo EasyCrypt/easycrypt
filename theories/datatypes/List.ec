@@ -1526,6 +1526,21 @@ proof.
   by move=> x' y' s_x' s_y'; apply/inj_f; rewrite ?(s_x', s_y').
 qed.
 
+lemma in_inj_map ['a 'b] (f : 'a -> 'b) p :
+     (forall x y, p x => p y => f x = f y => x = y)
+  => forall s1 s2, all p s1 => all p s2 => map f s1 = map f s2 => s1 = s2.
+proof.
+move=> inj_f; elim=> [|x1 s1 ih] [|x2 s2] //=.
+case=> [p1 ps1] [p2 ps2] [eqf eqm].
+by rewrite (inj_f x1 x2) //=; apply/ih.
+qed.
+
+lemma inj_map ['a 'b] (f : 'a -> 'b) :
+  injective f => injective (map f).
+proof.
+by move=> inj_f s1 s2; apply/(@in_inj_map _ predT); try apply/all_predT.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                         Partial mapping                              *)
 (* -------------------------------------------------------------------- *)
@@ -1554,6 +1569,31 @@ lemma pmap_some ['a 'b] (f : 'a -> 'b) s:
 proof.
 rewrite pmap_map filter_map -!map_comp.
 by rewrite -(@eq_filter predT) ?filter_predT.
+qed.
+
+lemma pmap_inj_in_uniq (f : 'a -> 'b option) (s : 'a list) :
+      (forall (x y : 'a) v, x \in s => y \in s =>
+         f x = Some v => f y = Some v => x = y)
+   => uniq s => uniq (pmap f s).
+proof.
+elim: s => //= x s ih inj_f [xs uqs]; case _: (f x) => /= [|v] E.
+- by rewrite ih // => x' y' v' x's y's; apply/inj_f; right.
+rewrite ih //; 1: by move => x' y' v' x's y's; apply/inj_f; right.
+rewrite /oget /= pmap_map; apply/negP => /mapP.
+case=> -[|v']; rewrite mem_filter // => -[[_ vs] @/oget /=].
+apply/negP=> <<-; move: vs; rewrite -E => /mapP.
+case=> y [ys eq_f]; suff <<-//: x = y.
+by apply: (@inj_f x y v); rewrite ?ys //= -eq_f.
+qed.
+
+lemma pmapP ['a, 'b] (f : 'a -> 'b option) s y :
+  y \in pmap f s <=> exists (x : 'a), (x \in s) /\ Some y = f x.
+proof.
+rewrite pmap_map; split => [|/mapP].
++ case/mapP=> z; rewrite mem_filter /predC1 => />.
+  by case: z => // z _ /mapP; apply.
++ case/mapP=> x [xs fxE]; apply/mapP; exists (Some y).
+  by rewrite mem_filter /predC1 /=; apply/mapP; exists x.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -2046,6 +2086,25 @@ case: (lez_total 0 k) => [ge0_k|le0_k]; last first.
 rewrite max_ler //; elim: k ge0_k => [|k ge0_k ih].
   by rewrite nseq0 flatten_nil.
 by rewrite nseqS // flatten_cons count_cat /#.
+qed.
+
+lemma nosmt perm_eq_pair ['a 'b] (s : ('a * 'b) list) : uniq s => perm_eq s
+  (flatten
+     (map (fun a => filter (fun xy : _ * _ => xy.`1 = a) s)
+          (undup (map fst s)))).
+proof.
+move=> uq_s; apply: uniq_perm_eq => //=.
++ apply: uniq_flatten_map => /=.
+  * by move=> x; rewrite filter_uniq.
+  * move=> x y; rewrite !mem_undup => /mapP[] [/=] a1 b1 [_ ->].
+    case/mapP=> -[/=] a2 b2 [_ ->] /hasP[] [a b] /=.
+    by rewrite !mem_filter /= => -[] [-> _] [-> _].
+  * by apply: undup_uniq.
+case=> a b; split => [ab_in_s|].
++ apply/flatten_mapP; exists a; rewrite mem_undup /= ?mem_filter //=.
+  by rewrite ab_in_s /= &(mapP); exists (a, b).
+case/flatten_mapP=> a'; rewrite mem_undup => -[] /mapP[].
+by case=> a2 b2 /= [_ ->>] {a'}; rewrite mem_filter /= => -[].
 qed.
 
 (* -------------------------------------------------------------------- *)

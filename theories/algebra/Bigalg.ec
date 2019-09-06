@@ -99,6 +99,28 @@ proof. by rewrite big_distrr //; (apply/mulr0 || apply/mulrDr). qed.
 lemma divr_suml (P : 'a -> bool) F s x :
   (big P F s) / x = big P (fun i => F i / x) s.
 proof. by rewrite mulr_suml; apply/eq_bigr. qed.
+
+lemma nosmt sum_pair_dep ['a 'b] u v J : uniq J =>
+    big predT (fun (ij : 'a * 'b) => (u ij.`1 * v ij.`1 ij.`2)%CR) J
+  = big predT
+      (fun i => u i * big predT
+         (fun ij : _ * _ => v ij.`1 ij.`2)
+         (filter (fun ij : _ * _ => ij.`1 = i) J))
+      (undup (unzip1 J)).
+proof.
+move=> uqJ; rewrite big_pair // &(eq_bigr) => /= a _.
+by rewrite mulr_sumr !big_filter &(eq_bigr) => -[a' b] /= ->>.
+qed.
+
+lemma nosmt sum_pair ['a 'b] u v J : uniq J =>
+    big predT (fun (ij : 'a * 'b) => (u ij.`1 * v ij.`2)%CR) J
+  = big predT
+      (fun i => u i * big predT v (unzip2 (filter (fun ij : _ * _ => ij.`1 = i) J)))
+      (undup (unzip1 J)).
+proof.
+move=> uqJ; rewrite (@sum_pair_dep u (fun _ => v)) // &(eq_bigr) /=.
+by move=> a _ /=; congr; rewrite big_map predT_comp /(\o).
+qed.
 end BAdd.
 
 (* -------------------------------------------------------------------- *)
@@ -177,6 +199,13 @@ lemma nosmt sumr_ge0 (P : 'a -> bool) (F : 'a -> t) s:
 proof.
 move=> h; apply: (@BAdd.big_ind (fun x => zeror <= x)) => //=.
   by apply/addr_ge0.
+qed.
+
+lemma sumr_norm P F s :
+  (forall x, P x => zeror <= F x) =>
+    BAdd.big<:'a> P (fun x => `|F x|) s = BAdd.big P F s.
+proof.
+by move=> ge0_F; apply: BAdd.eq_bigr => /= a Pa; rewrite ger0_norm /#.
 qed.
 
 lemma nosmt prodr_ge0 (P : 'a -> bool) F s:
