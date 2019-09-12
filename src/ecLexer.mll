@@ -49,6 +49,7 @@
     "glob"        , GLOB       ;        (* KW: prog *)
     "let"         , LET        ;        (* KW: prog *)
     "in"          , IN         ;        (* KW: prog *)
+    "for"         , FOR        ;        (* KW: prog *)
     "var"         , VAR        ;        (* KW: prog *)
     "proc"        , PROC       ;        (* KW: prog *)
     "if"          , IF         ;        (* KW: prog *)

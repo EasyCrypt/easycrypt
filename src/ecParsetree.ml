@@ -242,6 +242,7 @@ and pformula_r =
   | PFint    of zint
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option
+  | PFref    of psymbol * pffilter list
   | PFmem    of psymbol
   | PFside   of pformula * symbol located
   | PFapp    of pformula * pformula list
@@ -272,6 +273,24 @@ and pgty =
 | PGTY_Type  of pty
 | PGTY_ModTy of pmodule_type_restr
 | PGTY_Mem
+
+and pffilter =
+| PFRange      of bool * pfrange list
+| PFMatch      of bool * psymbol * pformula
+| PFMatchBuild of bool * psymbol list * pformula * pformula
+| PFKeep       of bool * bool * bool * pffilter_pattern
+
+and pffilter_pattern = [
+  | `Pattern of pformula
+  | `VarSet  of (pqsymbol * psymbol option) list
+]
+
+and pfrange = [
+  | `Single of pfindex
+  | `Range  of pfindex option pair
+]
+
+and pfindex = [ `Index of int | `Match of pformula * int option]
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =
