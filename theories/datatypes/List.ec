@@ -2270,6 +2270,9 @@ op zip ['a 'b] (s : 'a list) (t : 'b list) =
 abbrev unzip1 ['a 'b] (s : ('a * 'b) list) = map fst s.
 abbrev unzip2 ['a 'b] (s : ('a * 'b) list) = map snd s.
 
+abbrev amap ['a 'b 'c] (f : 'a -> 'b -> 'c) (xs : ('a * 'b) list) =
+  map (fun xy => (fst xy, f (fst xy) (snd xy))) xs.
+
 lemma zip_unzip ['a 'b] (s : ('a * 'b) list) :
   zip (unzip1 s) (unzip2 s) = s.
 proof. by elim: s => // -[x y s]. qed.
