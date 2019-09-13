@@ -9,7 +9,7 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import AllCore List.
+require import AllCore List StdOrder.
 require (*--*) Bigop Ring Number.
 
 import Ring.IntID.
@@ -265,11 +265,31 @@ move=> h; rewrite !(@BMul.big_seq_cond P).
 by rewrite prodr_gt0=> //= x []; apply/h.
 qed.
 
-lemma nosmt ler_prod_seq (P : 'a -> bool) (F1 F2 :'a -> t) s:
+lemma nosmt ler_prod_seq (P : 'a -> bool) (F1 F2 : 'a -> t) s:
      (forall a, mem s a => P a => zeror <= F1 a <= F2 a)
   => (BMul.big P F1 s <= BMul.big P F2 s).
 proof.
 move=> h; rewrite !(@BMul.big_seq_cond P).
 by rewrite ler_prod=> //= x []; apply/h.
+qed.
+
+lemma nosmt prodr_eq0 P F s:
+      (exists x, P x /\ x \in s /\ F x = zeror)
+  <=> BMul.big<:'a> P F s = zeror.
+proof. split.
++ case=> x [# Px x_in_s z_Fx]; rewrite (@BMul.big_rem _ _ _ x) //.
+  by rewrite Px /= z_Fx Num.Domain.mul0r.
++ elim: s => [|x s ih] /=; 1: by rewrite BMul.big_nil oner_neq0.
+  rewrite BMul.big_cons /=; case: (P x) => Px; last first.
+  - by move/ih; case=> y [# Py ys z_Fy]; exists y; rewrite Py ys z_Fy.
+  rewrite mulf_eq0; case=> [z_Fx|]; first by exists x.
+  by move/ih; case=> y [# Py ys z_Fy]; exists y; rewrite Py ys z_Fy.
+qed.
+
+lemma nosmt mulr_const s c:
+  BMul.big<:'a> predT (fun _ => c) s = exp c (size s).
+proof.
+rewrite BMul.big_const -MulMonoid.iteropE /exp.
+by rewrite IntOrder.ltrNge size_ge0 /= count_predT.
 qed.
 end BigOrder.

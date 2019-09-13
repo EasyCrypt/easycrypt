@@ -239,6 +239,13 @@ lemma onth_nth (z : 'a) xs n:
   0 <= n < size xs => onth xs n = Some (nth z xs n).
 proof. by elim: xs n => //= /#. qed.
 
+lemma nth0_head (z : 'a) xs: nth z xs 0 = head z xs.
+proof. by case: xs. qed.
+
+lemma nth_behead (z : 'a) xs n: 0 <= n =>
+  nth z (behead xs) n = nth z xs (n+1).
+proof. by move=> ge0_n; case: xs => //= x xs; rewrite addz1_neq0. qed.
+
 lemma nth_default (z : 'a) s n: size s <= n => nth z s n = z.
 proof.
 elim: s n => //= x s ih n; case: (n = 0) => [->|_ _].
@@ -2337,6 +2344,25 @@ proof.
 elim: s1 s2 => [|x s1 ih] [|y s2] //=; 1,2,3: smt(size_ge0).
 by move/addzI=> eq_sz; rewrite !(rev_cons, zip_rcons) ?size_rev // ih.
 qed.
+
+lemma mem_zip ['a 'b] xs ys (x : 'a) (y : 'b):
+  (x, y) \in zip xs ys => x \in xs /\ y \in ys.
+proof.
+by elim: xs ys => [|x0 xs ih] [|y0 ys] //=; case=> [|/ih] [] 2!->.
+qed.
+
+lemma zip_map ['a1 'a2 'b1 'b2] (f : 'a1 -> 'a2) (g : 'b1 -> 'b2) xs ys :
+    zip (map f xs) (map g ys)
+  = map (fun xy => (f (fst xy), g (snd xy))) (zip xs ys).
+proof. by elim: xs ys => [|x xs ih] [|y ys] //=; rewrite ih. qed.
+
+lemma zip_mapl ['a1 'a2 'b] (f : 'a1 -> 'a2) xs (ys : 'b list) :
+  zip (map f xs) ys = map (fun xy => (f (fst xy), snd xy)) (zip xs ys).
+proof. by rewrite -(@map_id ys) zip_map map_id. qed.
+
+lemma zip_mapr ['a 'b1 'b2] (g : 'b1 -> 'b2) (xs : 'a list) ys :
+  zip xs (map g ys) = map (fun xy => (fst xy, g (snd xy))) (zip xs ys).
+proof. by rewrite -(@map_id xs) zip_map map_id. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)

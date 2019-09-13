@@ -862,8 +862,12 @@ apply/eq_distr=> x; rewrite dlet1E dnull1E (@sumE_fin _ []) //= => x0.
 by rewrite dnull1E.
 qed.
 
-lemma dlet_d_dnull (d:'a distr): dlet d (fun a => dnull<:'b>) = dnull.
+lemma dlet_d_dnull (d : 'a distr): dlet d (fun a => dnull<:'b>) = dnull.
 proof. by apply/eq_distr=> x; rewrite dlet1E dnull1E /= (@sumE_fin _ []). qed.
+
+lemma eq_dlet ['a 'b] (F1 F2 : 'a -> 'b distr) d1 d2 :
+  d1 = d2 => F1 == F2 => dlet d1 F1 = dlet d2 F2.
+proof. by move=> -> eq_F; congr; apply/fun_ext. qed.
 
 (* -------------------------------------------------------------------- *)
 abbrev dlift (F: 'a -> 'b distr) : 'a distr -> 'b distr =
@@ -930,6 +934,20 @@ lemma dmap_fu (d : 'a distr) (f : 'a -> 'b) :
 proof. 
   move=> fsurj fu x;rewrite supp_dmap.
   have [a ->]:= fsurj x;exists a => /=;apply fu.
+qed.
+
+lemma dmap_dunit ['a 'b] (f : 'a -> 'b) (x : 'a) :
+  dmap (dunit x) f = dunit (f x).
+proof. by apply/eq_distr=> y; rewrite dmap1E !dunitE. qed.
+
+lemma dmap_id (d: 'a distr) : dmap d (fun x=>x) = d.
+proof. by rewrite /dmap /(\o) dlet_d_unit. qed.
+
+lemma dmap_comp ['a 'b 'c] (f : 'a -> 'b) (g : 'b -> 'c) d :
+ dmap (dmap d f) g = dmap d (g \o f).
+proof.
+rewrite /dmap dlet_dlet &(eq_dlet) //=.
+by move=> x @/(\o) /=; rewrite dlet_unit.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1133,6 +1151,160 @@ proof.
 + by move: (h (x, witness)); rewrite supp_dprod.
 + by move: (h (witness, x)); rewrite supp_dprod.
 + by rewrite supp_dprod !(ha, hb).
+qed.
+
+lemma dprod_dlet ['a 'b] (da : 'a distr) (db : 'b distr):
+  da `*` db = dlet da (fun a => dlet db (fun b => dunit (a, b))).
+proof.
+apply/eq_distr; case=> a b; rewrite dprod1E dlet1E /=.
+rewrite (@sumE_fin _ [a]) //= => [a'|].
++ rewrite dlet1E (@sumE_fin _ [b]) //= => [b'|].
+  + by rewrite dunitE /pred1 /= mulf_eq0 /#.
+  by rewrite big_seq1 /= dunitE !mulf_eq0 /#.
+rewrite big_seq1 /= dlet1E  (@sumE_fin _ [b]) //= => [b'|].
++ by rewrite dunitE /pred1 /= mulf_eq0 /#.
+by rewrite big_seq1 /= dunitE.
+qed.
+
+lemma dmap_dprod ['a1 'a2 'b1 'b2]
+  (d1 : 'a1 distr ) (d2 : 'a2 distr )
+  (f1 : 'a1 -> 'b1) (f2 : 'a2 -> 'b2)
+:
+    dmap d1 f1 `*` dmap d2 f2
+  = dmap (d1 `*` d2) (fun xy : _ * _ => (f1 xy.`1, f2 xy.`2)).
+proof.
+apply/eq_distr=> -[b1 b2]; rewrite !dprod1E !dmap1E /(\o) /=.
+by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1 /=; rewrite andabP.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op djoin (ds : 'a distr list) : 'a list distr =
+ foldr
+   (fun d1 dl => dapply (fun xy : _ * _ => xy.`1 :: xy.`2) (d1 `*` dl))
+   (dunit []) ds
+ axiomatized by djoin_axE.
+
+abbrev djoinmap ['a 'b] (d : 'a -> 'b distr) xs = djoin (map d xs).
+
+lemma djoin_nil ['a]: djoin<:'a> [] = dunit [].
+proof. by rewrite djoin_axE. qed.
+
+lemma djoin_cons (d : 'a distr) (ds : 'a distr list): 
+ djoin (d :: ds) = dapply (fun xy : _ * _ => xy.`1 :: xy.`2) (d `*` djoin ds).
+proof. by rewrite !djoin_axE. qed.
+
+hint rewrite djoinE : djoin_nil djoin_cons.
+
+lemma djoin1E (ds : 'a distr list) xs: mu1 (djoin ds) xs =
+  if   size ds = size xs
+  then BRM.big predT (fun xy : _ * _ => mu1 xy.`1 xy.`2) (zip ds xs)
+  else 0%r.
+proof.
+elim: ds xs => [|d ds ih] xs /=; 1: rewrite djoin_nil dunitE.
++ by case: xs => [|x xs] /=; [rewrite BRM.big_nil | rewrite add1z_neqC0 1:size_ge0].
+rewrite djoin_cons /= dmap1E /(\o) /=; case: xs => [|x xs] /=.
++ by rewrite add1z_neq0 1:size_ge0 /= mu0_false.
+rewrite -(@mu_eq _ (pred1 (x, xs))).
++ by case=> y ys @/pred1 /=; rewrite andabP.
+rewrite dprod1E ih BRM.big_cons /predT /=; pose B := BRM.big _ _ _.
+by rewrite (@fun_if (( * ) (mu1 d x))) /= /#.
+qed.
+
+lemma djoin_nil1E (ds : 'a list):
+  mu1 (djoin []) ds = b2r (ds = []).
+proof. by rewrite djoinE /= dunit1E (@eq_sym ds). qed.
+
+lemma djoin_cons1E (d : 'a distr) (ds : 'a distr list) x xs :
+  mu1 (djoin (d :: ds)) (x :: xs) = mu1 d x * mu1 (djoin ds) xs.
+proof. by rewrite /= djoin_cons /= dmap1E -dprod1E &(mu_eq) => -[] /#. qed.
+
+lemma djoin_cons1nilE (d : 'a distr) (ds: ('a distr) list):
+  mu1 (djoin (d::ds)) [] = 0%r.
+proof. by rewrite djoin1E /= add1z_neq0 //= size_ge0. qed.
+
+lemma supp_djoin (ds : 'a distr list) xs : xs \in djoin ds <=>
+  size ds = size xs /\ all (fun (xy : _ * _) => support xy.`1 xy.`2) (zip ds xs).
+proof.
+rewrite supportP djoin1E; case: (size ds = size xs) => //= eq_sz; split.
++ apply: contraR; rewrite -has_predC => /hasP[] @/predC [d x] /=.
+  case=> hmem xNd; apply/prodr_eq0; exists (d, x) => @/predT /=.
+  by rewrite hmem /= -supportPn.
++ apply: contraL => /prodr_eq0[] @/predT [d x] /= [hmem xNd].
+  rewrite -has_predC &(hasP); exists (d, x).
+  by rewrite hmem /predC /= supportPn.
+qed.
+
+lemma supp_djoin_size (ds : 'a distr list) xs :
+  xs \in djoin ds => size xs = size ds.
+proof. by case/supp_djoin=> ->. qed.
+
+lemma weight_djoin (ds : 'a distr list) :
+  weight (djoin ds) = BRM.big predT weight ds.
+proof.
+elim: ds => [|d ds ih]; rewrite djoinE /=.
++ by rewrite dunit_ll BRM.big_nil.
++ by rewrite weight_dmap weight_dprod BRM.big_cons -ih.
+qed.
+
+lemma djoin_ll (ds : 'a distr list):
+  (forall d, d \in ds => is_lossless d) => is_lossless (djoin ds).
+proof.
+move=> ds_ll; rewrite /is_lossless weight_djoin.
+rewrite BRM.big_seq -(@BRM.eq_bigr _ (fun _ => 1%r)) /=.
++ by move=> d /ds_ll ll_d; apply/eq_sym.
++ by rewrite -(@BRM.big_seq _ ds) mulr_const RField.expr1z.
+qed.
+
+lemma weight_djoin_nil: weight (djoin<:'a> []) = 1%r.
+proof. by rewrite weight_djoin BRM.big_nil. qed.
+
+lemma weight_djoin_cons d (ds:'a distr list):
+  weight (djoin (d :: ds)) = weight d * weight (djoin ds).
+proof. by rewrite weight_djoin BRM.big_cons -weight_djoin. qed.
+
+lemma djoin_nilE P : mu (djoin<:'a> []) P = b2r (P []).
+proof. by rewrite djoin_nil // dunitE. qed.
+
+lemma djoin_consE (dflt:'a) (d: 'a distr) ds P Q :
+    mu
+      (djoin (d :: ds))
+      (fun xs => P (head dflt xs) /\ Q (behead xs))
+  = mu d P * mu (djoin ds) Q.
+proof. by rewrite djoin_cons /= dmapE dprodE. qed.
+
+lemma djoin_fu (ds : 'a distr list) (xs : 'a list): 
+     size ds = size xs
+  => (forall d x, d \in ds => x \in d)
+  => xs \in djoin ds.
+proof. 
+move=> eq_sz hfu; rewrite supportP djoin1E eq_sz /=.
+rewrite RealOrder.gtr_eqF // Bigreal.prodr_gt0_seq.
+case=> d x /= /mem_zip [d_ds x_xs] _.
+by rewrite supportP -supportPn /=; apply: hfu.
+qed.
+
+lemma djoin_uni (ds:'a distr list): 
+  (forall d, d \in ds => is_uniform d) => is_uniform (djoin ds).
+proof.
+elim: ds => [|d ds ih] h //=; rewrite !djoinE; 1: by apply/dunit_uni.
+rewrite dmap_uni => [[x xs] [y ys] /= [2!->//]|].
+apply: dprod_uni; [apply/h | apply/ih] => //.
+by move=> d' hd'; apply/h => /=; rewrite hd'.
+qed.
+
+lemma djoin_dmap ['a 'b 'c] (d : 'a -> 'b distr) (xs : 'a list) (f : 'b -> 'c):
+  dmap (djoin (map d xs)) (map f) = djoin (map (fun x => dmap (d x) f) xs).
+proof.
+elim: xs => [|x xs ih]; rewrite ?djoinE ?dmap_dunit //=.
+by rewrite !djoin_cons -ih /= dmap_dprod /= !dmap_comp.
+qed.
+
+lemma supp_djoinmap ['a 'b] (d : 'a -> 'b distr) xs ys:
+  ys \in djoinmap d xs <=> size xs = size ys /\
+    all (fun xy => support (d (fst xy)) (snd xy)) (zip xs ys).
+proof.
+rewrite supp_djoin size_map; congr; apply/eq_iff.
+by rewrite zip_mapl all_map &(eq_all).
 qed.
 
 (* -------------------------------------------------------------------- *)
