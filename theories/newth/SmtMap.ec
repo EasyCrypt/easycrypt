@@ -132,10 +132,6 @@ op rng ['a 'b] (m : ('a, 'b) fmap) =
   fun y => exists x, m.[x] = Some y
 axiomatized by rngE.
 
-lemma get_none (m : ('a, 'b) fmap, x : 'a) :
-  x \notin m => m.[x] = None.
-proof. by rewrite domE. qed.
-
 lemma get_some (m : ('a, 'b) fmap, x : 'a) :
   x \in m => m.[x] = Some (oget m.[x]).
 proof. move=> /domE; by case m.[x]. qed.
