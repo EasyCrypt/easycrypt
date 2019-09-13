@@ -640,3 +640,35 @@ qed.
 lemma mem_join ['a 'b] (m1 m2 : ('a,'b) fmap) (x : 'a):
   x \in (m1 + m2) <=> x \in m1 \/ x \in m2.
 proof. by rewrite domE joinE !domE; case: (m2.[x]). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma fdom_join ['a, 'b] (m1 m2 : ('a,'b) fmap):
+ fdom (m1 + m2) = fdom m1 `|` fdom m2.
+proof.
+by apply/fsetP=> x; rewrite mem_fdom mem_join in_fsetU !mem_fdom.
+qed.
+
+(* ==================================================================== *)
+op ofassoc ['a 'b] (xs : ('a * 'b) list) =
+  ofmap (Map.offun (fun k => List.assoc xs k)).
+
+(* -------------------------------------------------------------------- *)
+lemma ofassoc_get ['a 'b] (xs : ('a * 'b) list) k :
+  (ofassoc xs).[k] = List.assoc xs k.
+proof.
+rewrite getE ofmapK /= 1:&(finiteP) 2:Map.offunE //.
+by exists (map fst xs) => a /=; rewrite Map.offunE &(assocTP).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mem_ofassoc ['a, 'b] (xs : ('a * 'b) list) k:
+ k \in ofassoc xs <=> k \in map fst xs.
+proof. by rewrite domE ofassoc_get &(assocTP). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma fdom_ofassoc ['a 'b] (xs : ('a * 'b) list) :
+  fdom (ofassoc xs) = oflist (map fst xs).
+proof.
+apply/fsetP=> a; rewrite mem_oflist mem_fdom.
+by rewrite /(_ \in _) ofassoc_get &(assocTP).
+qed.

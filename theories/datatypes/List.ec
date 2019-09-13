@@ -316,6 +316,13 @@ move=> gt0_n; rewrite (last_nth x0) size_nseq max_ler ?ltzW //=.
 by rewrite eqn0Ngt ?ltzW // gt0_n /= nth_nseq /#.
 qed.
 
+lemma onth_some ['a] (xs : 'a list) (n : int) x:
+  onth xs n = Some x => 0 <= n < size xs /\ nth witness xs n = x.
+proof. by rewrite nth_onth => ^h -> /=; elim: xs n x h => //#. qed.
+
+lemma onth_some_rg l n (x:'a): onth l n = Some x => 0 <= n < size l.
+proof. by move/onth_some. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                       Sequence membership                            *)
 (* -------------------------------------------------------------------- *)
@@ -378,6 +385,10 @@ proof. by move=> x; rewrite -cats1 /= !mem_cat /= orbC. qed.
 
 lemma mem_nth (x0 : 'a) s n : 0 <= n < size s => mem s (nth x0 s n).
 proof. by elim: s n => [|x s ih] //= n; smt. qed.
+
+lemma onth_some_mem ['a] (xs : 'a list) (n : int) x:
+  onth xs n = Some x => x \in xs.
+proof. by move/onth_some => [? <-]; apply/mem_nth. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                  find, filter, count, has, all                       *)
@@ -660,6 +671,17 @@ proof.
   rewrite -has_pred1 => h; apply (nth_find z0 (pred1 x)) in h.
   by move: h; rewrite /pred1 => {2}<-.
 qed.
+
+lemma nosmt onth_index ['a] (x : 'a) xs:
+  x \in xs => onth xs (index x xs) = Some x.
+proof.
+move=> x_in_xs; rewrite (onth_nth witness).
++ by rewrite index_mem index_ge0. + by rewrite nth_index.
+qed.
+
+lemma nosmt onth_mem ['a] (x : 'a) xs:
+  x \in xs => exists n, onth xs n = Some x.
+proof. by move/onth_index=> <-; exists (index x xs). qed.
 
 lemma index_cat x (s1 s2 : 'a list):
  index x (s1 ++ s2) = if mem s1 x then index x s1 else size s1 + index x s2.
@@ -1548,6 +1570,20 @@ proof.
 by move=> inj_f s1 s2; apply/(@in_inj_map _ predT); try apply/all_predT.
 qed.
 
+lemma nosmt onth_map_some ['a 'b] (f : 'a->'b) (xs : 'a list) n v:
+ onth (map f xs) n = Some v <=> exists y, onth xs n = Some y /\ v = f y.
+proof.
+by elim: xs n => //= x xs ih n; case: (n = 0) => _; [smt() | apply/ih].
+qed.
+
+lemma index_map ['a 'b] (f : 'a -> 'b) x xs:
+ injective f => index (f x) (map f xs) = index x xs.
+proof.
+move=> /inj_eq inj_f; elim: xs => // x' xs ih.
+rewrite map_cons !index_cons inj_f; case: (x = x') => //.
+by move=> _; rewrite ih.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                         Partial mapping                              *)
 (* -------------------------------------------------------------------- *)
@@ -1694,6 +1730,14 @@ theory Iota.
   rewrite iota_add ?subz_ge0 // drop_cat size_iota.
   by rewrite max_ler // ltzz /= drop0.
   qed.
+
+  lemma nosmt onth_iota_some start sz n x:
+    onth (iota_ start sz) n = Some x <=> 0 <= n < sz /\ x = start + n.
+  proof. split.
+  + by move/onth_some; rewrite size_iota => -[h]; rewrite nth_iota /#.
+  + move=> h; rewrite (onth_nth witness) 1:size_iota 1:/#.
+    by congr; rewrite nth_iota /#.
+  qed.
 end Iota.
 
 export Iota.
@@ -1816,6 +1860,18 @@ proof.
   by rewrite assoc_cons => ->.
 qed.
 
+lemma nosmt assocTP ['a 'b] (xs : ('a * 'b) list) k :
+  assoc xs k <> None <=> k \in map fst xs.
+proof.
+by split=> h; have := assocP xs k; rewrite h //= => -[b [_ ->]].
+qed.
+
+lemma assoc_some ['a, 'b] (xs : ('a * 'b) list) k v:
+ assoc xs k = Some v => (k, v) \in xs.
+proof.
+by elim: xs => // -[a b] xs ih /=; rewrite assoc_cons; case: (k = a).
+qed.
+
 lemma perm_eq_assoc (s1 s2 : ('a * 'b) list) x:
      uniq (map fst s2)
   => perm_eq s1 s2 => assoc s1 x = assoc s2 x.
@@ -1837,6 +1893,17 @@ proof.
     by rewrite assoc_cons. by rewrite ih=> ->.
   by case: ((\o) _ _ _)=> //=; rewrite assoc_cons ne_xx'.
 qed.
+
+lemma assoc_get_mem ['a 'b] (xs : ('a * 'b) list) k:
+  k \in map fst xs => (k, oget (assoc xs k)) \in xs.
+proof.
+elim: xs => // [[k' v] xs] ih /= [<<- /=|]; 1: by rewrite assoc_cons.
+by rewrite !assoc_cons /= => /ih {ih}ih; case: (k = k').
+qed.
+
+lemma nosmt assoc_some_onth_mem ['a 'b] (xs : ('a * 'b) list) (k : 'a) (v : 'b):
+ assoc xs k = Some v => (exists n, onth xs n = Some (k, v)).
+proof. by move/assoc_some => /onth_mem. qed.
 
 (* -------------------------------------------------------------------- *)
 (*         Sequence from a function computing from indexes              *)
@@ -2351,6 +2418,14 @@ proof.
 by elim: xs ys => [|x0 xs ih] [|y0 ys] //=; case=> [|/ih] [] 2!->.
 qed.
 
+lemma nosmt mem_zip_fst ['a 'b] (xs : 'a list) (ys : 'b list) xy:
+  xy \in zip xs ys => fst xy \in xs.
+proof. by case: xy => [x y]; move/mem_zip. qed.
+
+lemma nosmt mem_zip_snd ['a 'b] (xs : 'a list) (ys : 'b list) xy:
+  xy \in zip xs ys => snd xy \in ys.
+proof. by case: xy => [x y]; move/mem_zip. qed.
+
 lemma zip_map ['a1 'a2 'b1 'b2] (f : 'a1 -> 'a2) (g : 'b1 -> 'b2) xs ys :
     zip (map f xs) (map g ys)
   = map (fun xy => (f (fst xy), g (snd xy))) (zip xs ys).
@@ -2363,6 +2438,69 @@ proof. by rewrite -(@map_id ys) zip_map map_id. qed.
 lemma zip_mapr ['a 'b1 'b2] (g : 'b1 -> 'b2) (xs : 'a list) ys :
   zip xs (map g ys) = map (fun xy => (fst xy, g (snd xy))) (zip xs ys).
 proof. by rewrite -(@map_id xs) zip_map map_id. qed.
+
+lemma assoc_zip ['a, 'b] (ks : 'a list) (vs : 'b list) k:
+ size ks = size vs => assoc (zip ks vs) k = onth vs (index k ks).
+proof.
+elim: ks vs => [|k' ks ih] [|v vs] //=; rewrite ?(assoc_cons, index_cons).
++ by rewrite eq_sym addzC addz1_neq0.
+move/addzI => /ih -> /=; case: (k = k') => //=.
+by rewrite addz1_neq0 1:index_ge0.
+qed.
+
+lemma map_fst_zip ['a1, 'a2, 'b] (f : 'a1 -> 'a2) xs (ys : 'b list) :
+ size xs = size ys => map (f \o fst) (zip xs ys) = map f xs.
+proof. by move => eq_sz; rewrite map_comp unzip1_zip // eq_sz. qed.
+
+lemma map_snd_zip ['a, 'b1, 'b2] (g : 'b1 -> 'b2) (xs : 'a list) ys :
+ size xs = size ys => map (g \o snd) (zip xs ys) = map g ys.
+proof. by move => eq_sz; rewrite map_comp unzip2_zip // eq_sz. qed.
+
+lemma nosmt zip_map_proj ['a, 'b, 'c] (f : 'a -> 'b * 'c) xs:
+  zip (map (fst \o f) xs) (map (snd \o f) xs) = map f xs.
+proof. by elim: xs => // x xs ih @/(\o) /=; rewrite ih /=; case: (f x). qed.
+
+lemma nosmt onth_zip_some ['a 'b] (xs : 'a list) (ys : 'b list) n xy:
+      onth (zip xs ys) n = Some xy
+  <=> (onth xs n = Some (fst xy)) /\ (onth ys n = Some (snd xy)).
+proof.
+elim: xs ys n => [|x xs ih] [|y ys] n //=; case: xy ih => [x' y'] ih.
+by case: (n = 0) => // _; apply/ih.
+qed.
+
+lemma nosmt eq_keys_amap ['a, 'b1, 'b2, 'c]
+  (f : 'a -> 'b1 -> 'c) (g : 'a -> 'b2 -> 'c) xs ys
+: amap f xs = amap g ys => unzip1 xs = unzip1 ys.
+proof. move=> eq_amap.
+have ->: (map fst xs) = (map fst (amap f xs)) by rewrite -map_comp.
+have ->: (map fst ys) = (map fst (amap g ys)) by rewrite -map_comp.
+by rewrite eq_amap.
+qed.
+
+lemma assoc_amap ['a, 'b, 'c] (f : 'a -> 'b -> 'c) xs k:
+ assoc (amap f xs) k = omap (f k) (assoc xs k).
+proof.
+elim: xs => /= [|[k' v'] xs ih]; 1: by rewrite !assoc_nil.
+by rewrite !assoc_cons /=; case: (k = k').
+qed.
+
+lemma nosmt map_zip_nth ['a, 'b, 'c] dk dv (f: 'a * 'b -> 'c) ks vs:
+ size ks = size vs => map f (zip ks vs)
+   = map (fun i => f (nth dk ks i, nth dv vs i)) (range 0 (size ks)).
+proof.
+move=> eq_sz; rewrite -(@map_nth_range (dk, dv) (zip ks vs)).
+rewrite /range /= size_zip min_ler ?eq_sz //= -map_comp.
+by apply: eq_in_map => i @/(\o); rewrite mem_iota /= nth_zip.
+qed.
+
+lemma amap_assoc_zip ['a, 'b, 'c] (f : 'a -> 'b -> 'c) ks vs:
+ size ks = size vs => uniq ks => amap f (zip ks vs) =
+   amap (fun k _ => f k (nth witness vs (index k ks))) (zip ks vs).
+proof.
+move=> eq_sz uq_ks; rewrite (map_zip_nth witness witness) //= eq_sym.
+rewrite (map_zip_nth witness witness) //= &(eq_in_map).
+by move=> x /mem_range [? ?] /=; congr; rewrite index_uniq.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)
