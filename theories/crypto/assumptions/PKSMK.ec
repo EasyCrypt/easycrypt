@@ -1,5 +1,5 @@
 require import AllCore Distr DInterval FSet List SmtMap.
-require RndO.
+require PROM.
 
 (***************************************)
 (* Definitions for Public-Key Signatures 
@@ -572,7 +572,7 @@ abstract theory UF1_UF.
       rewrite /phi /psi /=; smt (lt0_q_gen).
     qed.
 
-    local clone import RndO.GenEager as Eager with 
+    local clone import PROM.GenEager as Eager with 
       type from <- unit,
       type to <- pkey * skey,
       op sampleto <- fun (_:unit) => keygen,
