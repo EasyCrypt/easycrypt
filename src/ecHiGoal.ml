@@ -1020,8 +1020,8 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
             | `Clear       -> Some (None      , EcIdent.create "_")
             | `Named s     -> Some (None      , EcIdent.create s)
             | `Anonymous a ->
-               if (a = Some None || a = Some (Some 0)) && kind = `None then
-                 None
+               if   (a = Some None && kind = `None) || a = Some (Some 0)
+               then None
                else Some (None, LDecl.fresh_id hyps name)
           else
             match unloc s with
@@ -1030,9 +1030,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
             | `Named s     -> Some (None      , EcIdent.create s)
             | `Anonymous a ->
                match a, kind with
-               | Some None    , `None -> None
-               | Some (Some 0), _     -> None
-
+               | Some None, `None ->
+                  None
+               | (Some (Some 0), _) ->
+                  None
                | _, `Named ->
                   Some (None, LDecl.fresh_id hyps ("`" ^ name))
                | _, _ ->
@@ -1055,7 +1056,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
               match unloc s with
               | `Anonymous (Some None) when kind <> `None ->
                  compile ((hyps, form), torev) newids [s]
-              | `Anonymous (Some (Some i)) when 0 < i ->
+              | `Anonymous (Some (Some i)) when 1 < i ->
                  let s = mk_loc (loc s) (`Anonymous (Some (Some (i-1)))) in
                  compile ((hyps, form), torev) newids [s]
               | _ -> ((hyps, form), torev), newids
