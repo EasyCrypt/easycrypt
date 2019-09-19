@@ -534,10 +534,6 @@ type funsig = {
 }
 
 (* -------------------------------------------------------------------- *)
-type oracle_info = {
-  oi_calls : xpath list;
-  oi_in    : bool;
-}
 
 type module_type = {
   mt_params : (EcIdent.t * module_type) list;
@@ -545,8 +541,7 @@ type module_type = {
   mt_args   : EcPath.mpath list;
 }
 
-type module_sig_body_item =
-| Tys_function of funsig * oracle_info
+type module_sig_body_item = Tys_function of funsig
 
 type module_sig_body = module_sig_body_item list
 
@@ -577,7 +572,7 @@ type function_def = {
 type function_body =
 | FBdef   of function_def
 | FBalias of xpath
-| FBabs   of oracle_info
+| FBabs
 
 type function_ = {
   f_name   : symbol;
@@ -593,10 +588,27 @@ type abs_uses = {
 }
 
 (* -------------------------------------------------------------------- *)
-type mod_restr = EcPath.Sx.t * EcPath.Sm.t
+type oracle_info = {
+  oi_calls : xpath list;
+  oi_in    : bool;
+}
 
-let mr_equal (rx1,r1) (rx2,r2) =
-  EcPath.Sx.equal rx1 rx2 && EcPath.Sm.equal r1 r2
+let oi_equal oi1 oi2 =
+     oi1.oi_in = oi2.oi_in
+  && List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
+
+type mod_restr = {
+  mr_xpaths : EcPath.Sx.t;
+  mr_mpaths : EcPath.Sm.t;
+  mr_oinfos : (symbol * oracle_info) list;
+}
+
+let mr_equal mr1 mr2 =
+     EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
+  && EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
+  && List.all2 (fun (s1,oi1) (s2,oi2) ->
+      EcSymbols.sym_equal s1 s2 && oi_equal oi1 oi2
+     ) mr1.mr_oinfos mr2.mr_oinfos
 
 type module_expr = {
   me_name      : symbol;
@@ -649,6 +661,19 @@ let rec mty_subst sp sm mty =
   let mt_args   = List.map sm mty.mt_args in
   { mt_params; mt_name; mt_args; }
 
+let oi_subst sx oi =
+  { oi_calls  = List.map sx oi.oi_calls;
+    oi_in     = oi.oi_in;
+  }
+
+let mr_subst sx sm mr =
+  { mr_xpaths = Sx.fold (fun m rx ->
+        Sx.add (sx m) rx) mr.mr_xpaths Sx.empty;
+    mr_mpaths = Sm.fold (fun m r ->
+        Sm.add (sm m) r) mr.mr_mpaths Sm.empty;
+    mr_oinfos = List.map (fun (s,oi) -> s, oi_subst sx oi) mr.mr_oinfos;
+  }
+
 let mty_hash mty =
   Why3.Hashcons.combine2
     (EcPath.p_hash mty.mt_name)
@@ -665,7 +690,7 @@ let rec mty_equal mty1 mty2 =
 (* -------------------------------------------------------------------- *)
 let get_uninit_read_of_fun (fp : xpath) (f : function_) =
   match f.f_def with
-  | FBalias _ | FBabs _ -> Sx.empty
+  | FBalias _ | FBabs -> Sx.empty
 
   | FBdef fd ->
       let w =

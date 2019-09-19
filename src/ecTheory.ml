@@ -73,11 +73,11 @@ and ctheory_override =
 (* -------------------------------------------------------------------- *)
 let module_comps_of_module_sig_comps (comps : module_sig_body) =
   let onitem = function
-    | Tys_function(funsig, oi) ->
+    | Tys_function funsig ->
         MI_Function {
           f_name = funsig.fs_name;
           f_sig  = funsig;
-          f_def  = FBabs oi;
+          f_def  = FBabs;
         }
   in
     List.map onitem comps

@@ -129,18 +129,9 @@ type module_type = {                   (* Always in eta-normal form *)
   mt_args   : EcPath.mpath list;
 }
 
-(* [oi_calls]: The list of oracle that can be called
- * [oi_in]: true if equality of globals is required to ensure
- * equality of result and globals
-*)
-type oracle_info = {
-  oi_calls : xpath list;
-  oi_in    : bool;
-}
 
 type module_sig_body_item =
-(* oracle_info contain only function provided by the module parameters *)
-| Tys_function of funsig * oracle_info
+| Tys_function of funsig
 
 type module_sig_body = module_sig_body_item list
 
@@ -168,7 +159,7 @@ type function_def = {
 type function_body =
   | FBdef   of function_def
   | FBalias of xpath
-  | FBabs   of oracle_info
+  | FBabs
 
 type function_ = {
   f_name   : symbol;
@@ -184,7 +175,20 @@ type abs_uses = {
 }
 
 (* -------------------------------------------------------------------- *)
-type mod_restr = EcPath.Sx.t * EcPath.Sm.t
+(* [oi_calls]: The list of oracle that can be called
+ * [oi_in]: true if equality of globals is required to ensure
+ * equality of result and globals
+*)
+type oracle_info = {
+  oi_calls : xpath list;
+  oi_in    : bool;
+}
+
+type mod_restr = {
+  mr_xpaths : EcPath.Sx.t;
+  mr_mpaths : EcPath.Sm.t;
+  mr_oinfos : (symbol * oracle_info) list;
+}
 
 val mr_equal : mod_restr -> mod_restr -> bool
 
@@ -227,6 +231,7 @@ val fd_equal : function_def -> function_def -> bool
 val fd_hash  : function_def -> int
 
 val mty_subst : (path -> path) -> (mpath -> mpath) -> module_type -> module_type
+val mr_subst : (xpath -> xpath) -> (mpath -> mpath) -> mod_restr -> mod_restr
 
 val mty_equal : module_type -> module_type -> bool
 val mty_hash  : module_type -> int

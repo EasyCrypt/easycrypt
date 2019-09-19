@@ -1574,7 +1574,7 @@ module Fun = struct
 
   let actmem_body me path fun_ =
     match fun_.f_def with
-    | FBabs _ -> assert false (* FIXME error message *)
+    | FBabs -> assert false (* FIXME error message *)
     | FBalias _ -> assert false (* FIXME error message *)
     | FBdef fd ->
       let mem = EcMemory.empty_local me path in
@@ -1682,7 +1682,7 @@ module Var = struct
                 { vb_type = v.v_type; vb_kind = `Var PVloc; }
               with Not_found -> lookup_error (`XPath p)
             end
-            | FBabs _ | FBalias _ -> lookup_error (`XPath p)
+            | FBabs | FBalias _ -> lookup_error (`XPath p)
           end
       end
       | _ -> lookup_error (`XPath p)
@@ -1827,7 +1827,7 @@ module Mod = struct
     { mis_params = remaining;
       mis_body   =
         List.map
-          (function Tys_function (s, oi) ->
+          (function Tys_function s ->
             Tys_function (s, { oi_calls = List.filter keepcall oi.oi_calls;
                                oi_in    = oi.oi_in; }))
           sig_.mis_body }

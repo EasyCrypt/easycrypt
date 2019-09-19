@@ -149,8 +149,7 @@ let subst_funsig (s : _subst) (funsig : funsig) =
 (* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : _subst) (item : module_sig_body_item) =
   match item with
-  | Tys_function (funsig, oi) ->
-      Tys_function (subst_funsig s funsig, subst_oracle_info s oi)
+  | Tys_function funsig -> Tys_function (subst_funsig s funsig)
 
 (* -------------------------------------------------------------------- *)
 and subst_modsig_body (s : _subst) (sbody : module_sig_body) =
@@ -213,10 +212,22 @@ let subst_function (s : _subst) (f : function_) =
     match f.f_def with
     | FBdef def -> FBdef (subst_function_def s def)
     | FBalias f -> FBalias (EcPath.x_subst s.s_fmp f)
-    | FBabs oi  -> FBabs (subst_oracle_info s oi) in
+    | FBabs  -> FBabs in
   { f_name = f.f_name;
     f_sig  = sig';
     f_def  = def' }
+
+(* -------------------------------------------------------------------- *)
+let subst_mod_restr (s : _subst) (mr : mod_restr) =
+  let rx = EcPath.Sx.fold (fun x r ->
+      EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r
+    ) mr.mr_xpaths EcPath.Sx.empty in
+  let r = EcPath.Sm.fold (fun x r ->
+      EcPath.Sm.add (s.s_fmp x) r
+    ) mr.mr_mpaths EcPath.Sm.empty in
+  let ois = List.map (fun (sym,oi) ->
+      sym, subst_oracle_info s oi) mr.mr_oinfos in
+  { mr_xpaths = rx; mr_mpaths = r; mr_oinfos = ois }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_module_item (s : _subst) (item : module_item) =
@@ -250,15 +261,7 @@ and subst_module_body (s : _subst) (body : module_body) =
   | ME_Structure bstruct ->
       ME_Structure (subst_module_struct s bstruct)
 
-  | ME_Decl (p, (rx,r)) ->
-    let rx =
-      EcPath.Sx.fold
-        (fun x r -> EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r) rx EcPath.Sx.empty in
-    let r =
-      EcPath.Sm.fold
-        (fun x r -> EcPath.Sm.add (s.s_fmp x) r) r EcPath.Sm.empty
-      in
-        ME_Decl (subst_modtype s p, (rx, r))
+  | ME_Decl (p, mr) -> ME_Decl (subst_modtype s p, subst_mod_restr s mr)
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : _subst) (comps : module_comps) =
