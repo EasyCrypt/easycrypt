@@ -442,7 +442,7 @@ let tymod_cnv_failure e =
   raise (TymodCnvFailure e)
 
 let tysig_item_name = function
-  | Tys_function (f, _) -> f.fs_name
+  | Tys_function f -> f.fs_name
 
 let tysig_item_kind = function
   | Tys_function _ -> `Function
@@ -477,7 +477,7 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
 
   let env =
     List.fold_left (fun env (xin,tyin) ->
-      EcEnv.Mod.bind_local xin tyin (EcPath.Sx.empty, EcPath.Sm.empty) env)
+      EcEnv.Mod.bind_local xin tyin env)
       env sin.mis_params in
 
   let check_item_compatible =
@@ -1388,7 +1388,7 @@ and transmodsig_body
         let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
         if sig_.mis_params <> [] then calls
         else
-          let fs = List.map (fun (Tys_function (fsig, _)) ->
+          let fs = List.map (fun (Tys_function fsig) ->
                        EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body
           in
           fs@calls

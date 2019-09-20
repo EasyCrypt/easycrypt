@@ -23,11 +23,11 @@ val mright : memory
 
 type gty =
   | GTty    of EcTypes.ty
-  | GTmodty of module_type * mod_restr
+  | GTmodty of module_type
   | GTmem   of EcMemory.memtype
 
 val gtty    : EcTypes.ty -> gty
-val gtmodty : module_type -> mod_restr -> gty
+val gtmodty : module_type -> gty
 val gtmem   : EcMemory.memtype -> gty
 
 val gty_equal : gty  -> gty -> bool
@@ -164,7 +164,7 @@ val form_forall: (form -> bool) -> form -> bool
 (* -------------------------------------------------------------------- *)
 val gty_as_ty  : gty -> EcTypes.ty
 val gty_as_mem : gty -> EcMemory.memtype
-val gty_as_mod : gty -> module_type * mod_restr
+val gty_as_mod : gty -> module_type
 val kind_of_gty: gty -> [`Form | `Mem | `Mod]
 
 (* soft-constructors - common leaves *)

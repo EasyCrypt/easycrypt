@@ -1431,10 +1431,8 @@ module Mod = struct
     let scope =
       let restr = Sx.empty, Sm.of_list restr in
       { scope with
-          sc_env = EcEnv.Mod.declare_local
-            name tysig restr scope.sc_env;
-          sc_section = EcSection.add_abstract
-            name (tysig, restr) scope.sc_section }
+          sc_env = EcEnv.Mod.declare_local name tysig scope.sc_env;
+          sc_section = EcSection.add_abstract name tysig scope.sc_section }
     in
       scope
 end

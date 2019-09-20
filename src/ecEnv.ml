@@ -1813,24 +1813,31 @@ module Mod = struct
     in
       f s o
 
-  let clearparams n sig_ =
-    let used, remaining = List.takedrop n sig_.mis_params in
+  (* TODO: (Adrien) what should be done with that? *)
+  (* let clearparams n sig_ =
+   *   let used, remaining = List.takedrop n sig_.mis_params in
+   *
+   *   let keepcall =
+   *     let used = EcIdent.Sid.of_list (List.map fst used) in
+   *       fun xp ->
+   *         match xp.EcPath.x_top.EcPath.m_top with
+   *         | `Local id -> not (EcIdent.Sid.mem id used)
+   *         | _ -> true
+   *   in
+   *
+   *   { mis_params = remaining;
+   *     mis_body   =
+   *       List.map
+   *         (function Tys_function s ->
+   *           Tys_function (s, { oi_calls = List.filter keepcall oi.oi_calls;
+   *                              oi_in    = oi.oi_in; }))
+   *         sig_.mis_body } *)
 
-    let keepcall =
-      let used = EcIdent.Sid.of_list (List.map fst used) in
-        fun xp ->
-          match xp.EcPath.x_top.EcPath.m_top with
-          | `Local id -> not (EcIdent.Sid.mem id used)
-          | _ -> true
-    in
+  let clearparams n sig_ =
+    let _, remaining = List.takedrop n sig_.mis_params in
 
     { mis_params = remaining;
-      mis_body   =
-        List.map
-          (function Tys_function s ->
-            Tys_function (s, { oi_calls = List.filter keepcall oi.oi_calls;
-                               oi_in    = oi.oi_in; }))
-          sig_.mis_body }
+      mis_body   = sig_.mis_body }
 
   let unsuspend istop (i, args) (spi, params) me =
     let me =
@@ -1904,7 +1911,7 @@ module Mod = struct
           env_item = CTh_module me :: env.env_item;
           env_norm = ref !(env.env_norm); }
 
-  let me_of_mt env name modty restr =
+  let me_of_mt env name modty =
     let modsig =
       let modsig =
         match
@@ -1920,10 +1927,10 @@ module Mod = struct
       EcSubst.subst_modsig
         ~params:(List.map fst modty.mt_params) EcSubst.empty modsig
     in
-    module_expr_of_module_sig name modty modsig restr
+    module_expr_of_module_sig name modty modsig
 
-  let bind_local name modty restr env =
-    let me = me_of_mt env name modty restr in
+  let bind_local name modty env =
+    let me = me_of_mt env name modty in
     let path  = IPIdent (name, None) in
     let comps = MC.mc_of_module_param name me in
 
@@ -1940,20 +1947,29 @@ module Mod = struct
     in
       env
 
-  let declare_local id modty restr env =
-    { (bind_local id modty restr env) with
+  let declare_local id modty env =
+    { (bind_local id modty env) with
         env_modlcs = Sid.add id env.env_modlcs; }
 
-  let add_restr_to_locals restr env =
+  let add_restr_to_locals (restr : mod_restr) env =
 
-    let union_restr (rx1,r1) (rx2,r2) =
-      Sx.union rx1 rx2, Sm.union r1 r2 in
+    let union_restr mr1 mr2 =
+      { mr_xpaths = Sx.union mr1.mr_xpaths mr2.mr_xpaths;
+        mr_mpaths = Sm.union mr1.mr_mpaths mr2.mr_mpaths;
+        mr_oinfos = Msym.union (fun _ oi1 oi2 ->
+            Some { oi_calls = List.sort_uniq
+                       EcPath.x_compare (oi1.oi_calls @ oi2.oi_calls);
+                   oi_in = oi1.oi_in || oi2.oi_in; }
+          ) mr1.mr_oinfos mr2.mr_oinfos;
+      }
+    in
 
     let update_id id mods =
       let update me =
         match me.me_body with
-        | ME_Decl (mt, r) ->
-          { me with me_body = ME_Decl (mt, union_restr restr r) }
+        | ME_Decl mt ->
+          let mr = union_restr restr mt.mt_restr in
+          { me with me_body = ME_Decl { mt with mt_restr = mr } }
         | _ -> me
       in
       MMsym.map_at
@@ -1976,7 +1992,7 @@ module Mod = struct
 
   let bind_locals bindings env =
     List.fold_left
-      (fun env (name, me) -> bind_local name me (Sx.empty,Sm.empty) env)
+      (fun env (name, me) -> bind_local name me env)
       env bindings
 
   let enter name params env =
@@ -1986,7 +2002,7 @@ module Mod = struct
   let add_mod_binding bd env =
     let do1 env (x,gty) =
       match gty with
-      | GTmodty (p, r) -> bind_local x p r env
+      | GTmodty p -> bind_local x p env
       | _ -> env
     in
       List.fold_left do1 env bd
@@ -2167,13 +2183,27 @@ module NormMp = struct
           let vars = Sx.union f_uses.us_reads f_uses.us_writes in
           let us = Sx.fold (add_var env) vars us in
           List.fold_left fun_use us f_uses.us_calls
-        | FBabs oi ->
-          let id =
-            match f.x_top.m_top with
-            | `Local id -> id
-            | _ -> assert false in
-          let us = add_glob_except rm id us in
-          List.fold_left fun_use us oi.oi_calls
+
+        | FBabs ->
+            let id =
+              match f.x_top.m_top with
+              | `Local id -> id
+              | _ -> assert false in
+            let us = add_glob_except rm id us in
+
+            let mp = norm_mpath env f.x_top in
+            let me = Mod.by_mpath mp env in
+            begin match me.me_body with
+              | ME_Alias _ -> assert false (* TODO: check *)
+              | ME_Structure _ -> assert false
+              (* We cannot have abstract procedures in concrete modules. *)
+
+              | ME_Decl mt ->
+                try
+                  let oi = Msym.find f1.f_name mt.mt_restr.mr_oinfos in
+                  List.fold_left fun_use us oi.oi_calls
+                with Not_found -> us end
+
         | FBalias _ -> assert false in
     fun_use
 
@@ -2226,19 +2256,23 @@ module NormMp = struct
       env.env_norm := { en with mod_use = Mm.add mp res en.mod_use };
       res
 
-  let norm_restr env (rx,r) =
-    let restr = Sx.fold (fun xp r -> add_var env xp r) rx use_empty in
-    Sm.fold (fun mp r -> use_union r (mod_use env mp)) r restr
+  let norm_restr env (mr : mod_restr) =
+    let restr = Sx.fold (fun xp r ->
+        add_var env xp r) mr.mr_xpaths use_empty in
+    Sm.fold (fun mp r -> use_union r (mod_use env mp)
+            ) mr.mr_mpaths restr
+(* TODO: (Adrien) what should be done there? *)
 
   let get_restr env mp =
     try Mm.find mp !(env.env_norm).get_restr with Not_found ->
       let res =
         match (Mod.by_mpath mp env).me_body with
-        | EcModules.ME_Decl(_,restr) -> norm_restr env restr
+        | EcModules.ME_Decl mt -> norm_restr env mt.mt_restr
         | _ -> assert false in
       let en = !(env.env_norm) in
       env.env_norm := { en with get_restr = Mm.add mp res en.get_restr };
       res
+(* TODO: (Adrien) what should be done there? *)
 
   let equal_restr env r1 r2 = use_equal (norm_restr env r1) (norm_restr env r2)
 
@@ -2366,7 +2400,7 @@ module NormMp = struct
   let is_abstract_fun f env =
     let f = norm_xfun env f in
     match (Fun.by_xpath f env).f_def with
-    | FBabs _ -> true
+    | FBabs -> true
     | _ -> false
 
   let x_equal env f1 f2 =
@@ -2425,6 +2459,9 @@ module ModTy = struct
     if List.length mty1.mt_args <> List.length mty2.mt_args then
       raise ModTypeNotEquiv;
 
+    if not (NormMp.equal_restr env mty1.mt_restr mty2.mt_restr) then
+      raise ModTypeNotEquiv;
+
     let subst =
       List.fold_left2
         (fun subst (x1, p1) (x2, p2) ->
@@ -2459,17 +2496,20 @@ module ModTy = struct
     let items =
       EcSubst.subst_modsig_body subst sig_.mis_body in
     let params = mt.mt_params in
-    let keep =
-      List.fold_left (fun k (x,_) ->
-        EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
-    let keep_info f =
-      EcPath.Sm.mem (f.EcPath.x_top) keep in
-    let do1 = function
-      | Tys_function(s,oi) ->
-        Tys_function(s,{oi_calls = List.filter keep_info oi.oi_calls;
-                        oi_in = oi.oi_in}) in
+
+    (* TODO: (Adrien) Check *)
+    (* let keep =
+     *   List.fold_left (fun k (x,_) ->
+     *     EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
+     * let keep_info f =
+     *   EcPath.Sm.mem (f.EcPath.x_top) keep in
+     * let do1 = function
+     *   | Tys_function (s,oi) ->
+     *     Tys_function(s,{oi_calls = List.filter keep_info oi.oi_calls;
+     *                     oi_in = oi.oi_in}) in *)
+
     { mis_params = params;
-      mis_body   = List.map do1 items }
+      mis_body   = items }
 end
 
 
@@ -3091,9 +3131,9 @@ module LDecl = struct
         let mt = EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt
         in LD_mem mt
 
-    | LD_modty (p, r) ->
-        let (p, r) = gty_as_mod (Fsubst.gty_subst s (GTmodty (p, r)))
-        in LD_modty (p, r)
+    | LD_modty p ->
+        let p = gty_as_mod (Fsubst.gty_subst s (GTmodty p))
+        in LD_modty p
 
     | LD_hyp f ->
         LD_hyp (Fsubst.f_subst s f)
@@ -3111,8 +3151,8 @@ module LDecl = struct
       EcMemory.mt_fv mt
   | LD_hyp f ->
       f.f_fv
-  | LD_modty (p, r) ->
-      gty_fv (GTmodty(p,r))
+  | LD_modty p ->
+      gty_fv (GTmodty p)
   | LD_abs_st us ->
       let add fv (x,_) =  EcPath.x_fv fv x.pv_name in
       let fv = Mid.empty in
@@ -3229,7 +3269,7 @@ module LDecl = struct
     match k with
     | LD_var (ty, _)  -> Var.bind_local x ty env
     | LD_mem mt       -> Memory.push (x, mt) env
-    | LD_modty (i, r) -> Mod.bind_local x i r env
+    | LD_modty i -> Mod.bind_local x i env
     | LD_hyp   _      -> env
     | LD_abs_st us    -> AbsStmt.bind x us env
 

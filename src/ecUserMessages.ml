@@ -83,8 +83,8 @@ end = struct
       let ppe = EcPrinting.PPEnv.ofenv env in
       msg "@[<v>for argument %s:@   %a is not a subtype of %a because@   %a@]"
         (EcIdent.name x)
-        (EcPrinting.pp_modtype1 ppe) t1
-        (EcPrinting.pp_modtype1 ppe) t2
+        (EcPrinting.pp_modtype ppe) t1
+        (EcPrinting.pp_modtype ppe) t2
         (pp_cnv_failure env) err
 
 
@@ -199,7 +199,7 @@ end = struct
     | TypeModMismatch(mp, mt, err) ->
         msg "the module %a does not have the module type %a:@\n"
           (EcPrinting.pp_topmod env) mp
-          (EcPrinting.pp_modtype1 env) mt;
+          (EcPrinting.pp_modtype env) mt;
         msg "  @[<hov 2>%t@]" (fun fmt -> pp_cnv_failure env1 fmt err)
 
     | NotAFunction ->

@@ -26,7 +26,7 @@ open EcBigInt.Notations
 (* -------------------------------------------------------------------- *)
 type gty =
   | GTty    of EcTypes.ty
-  | GTmodty of module_type * mod_restr
+  | GTmodty of module_type
   | GTmem   of EcMemory.memtype
 
 type quantif =
@@ -144,8 +144,8 @@ let gty_equal ty1 ty2 =
   | GTty ty1, GTty ty2 ->
       EcTypes.ty_equal ty1 ty2
 
-  | GTmodty (p1, r1), GTmodty (p2, r2)  ->
-    EcModules.mty_equal p1 p2 && mr_equal r1 r2
+  | GTmodty p1, GTmodty p2  ->
+    EcModules.mty_equal p1 p2
 
   | GTmem mt1, GTmem mt2 ->
       EcMemory.mt_equal mt1 mt2
@@ -154,31 +154,33 @@ let gty_equal ty1 ty2 =
 
 let gty_hash = function
   | GTty ty -> EcTypes.ty_hash ty
-  | GTmodty (p, _)  ->  EcModules.mty_hash p
+  | GTmodty p  ->  EcModules.mty_hash p
   | GTmem _ -> 1
+
+let mr_fv mr =
+  EcPath.Sm.fold (fun mp fv ->
+      EcPath.m_fv fv mp
+    ) mr.mr_mpaths EcIdent.Mid.empty
+
+  |> EcPath.Sx.fold (fun xp fv ->
+      EcPath.x_fv fv xp
+    ) mr.mr_xpaths
+
+  |> EcSymbols.Msym.fold (fun _ oi fv ->
+      List.fold_left EcPath.x_fv fv oi.oi_calls
+    ) mr.mr_oinfos
 
 let gty_fv = function
   | GTty ty -> ty.ty_fv
-  | GTmodty(_, mr) ->
-    let fv = EcPath.Sm.fold (fun mp fv ->
-          EcPath.m_fv fv mp
-        ) mr.mr_mpaths EcIdent.Mid.empty in
-
-    let fv = EcPath.Sx.fold (fun xp fv ->
-        EcPath.x_fv fv xp
-      ) mr.mr_xpaths fv in
-
-    List.fold_left (fun fv (_,oi) ->
-        List.fold_left EcPath.x_fv fv oi.oi_calls
-      ) fv mr.mr_oinfos
+  | GTmodty mty -> mr_fv mty.mt_restr
 
   | GTmem mt -> EcMemory.mt_fv mt
 
 let gtty (ty : EcTypes.ty) =
   GTty ty
 
-let gtmodty (mt : module_type) (mr : mod_restr) =
-  GTmodty (mt, mr)
+let gtmodty (mt : module_type) =
+  GTmodty mt
 
 let gtmem (mt : EcMemory.memtype) =
   GTmem mt
@@ -499,8 +501,7 @@ let gty_as_ty =
 let gty_as_mem =
   function GTmem m -> m  | _ -> assert false
 
-let gty_as_mod =
-  function GTmodty (mt, mr) -> (mt, mr) | _ -> assert false
+let gty_as_mod = function GTmodty mt -> mt | _ -> assert false
 
 let kind_of_gty = function
   | GTty    _ -> `Form
@@ -1413,15 +1414,14 @@ module Fsubst = struct
         let ty' = s.fs_ty ty in
         if ty == ty' then gty else GTty ty'
 
-    | GTmodty (p, mr) ->
+    | GTmodty p ->
         let sub  = s.fs_sty.ts_mp in
         let xsub = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
-        let p'   = mty_subst s.fs_sty.ts_p sub p in
-        let mr' = mr_subst xsub sub mr in
+        let p'   = mty_subst s.fs_sty.ts_p sub xsub p in
 
-        if   p == p' && mr_equal mr mr'
+        if   p == p'
         then gty
-        else GTmodty (p', mr')
+        else GTmodty p'
 
     | GTmem mt ->
         let mt' = EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt in

@@ -607,10 +607,9 @@ and check_alpha_equal ri hyps f1 f2 =
       env,
       if id_equal x1 x2 then subst else
         Fsubst.f_bind_rename subst x2 x1 ty1
-    | GTmodty (p1, r1) , GTmodty(p2, r2) ->
-      ensure (ModTy.mod_type_equiv env p1 p2 &&
-                NormMp.equal_restr env r1 r2);
-      Mod.bind_local x1 p1 r1 env,
+    | GTmodty p1 , GTmodty p2 ->
+      ensure (ModTy.mod_type_equiv env p1 p2);
+      Mod.bind_local x1 p1 env,
       if id_equal x1 x2 then subst
       else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
     | GTmem   me1, GTmem me2  ->

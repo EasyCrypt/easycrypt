@@ -147,6 +147,18 @@ let subst_funsig (s : _subst) (funsig : funsig) =
     fs_ret    = fs_ret; }
 
 (* -------------------------------------------------------------------- *)
+let subst_mod_restr (s : _subst) (mr : mod_restr) =
+  let rx = EcPath.Sx.fold (fun x r ->
+      EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r
+    ) mr.mr_xpaths EcPath.Sx.empty in
+  let r = EcPath.Sm.fold (fun x r ->
+      EcPath.Sm.add (s.s_fmp x) r
+    ) mr.mr_mpaths EcPath.Sm.empty in
+  let ois = EcSymbols.Msym.map (fun oi ->
+      subst_oracle_info s oi) mr.mr_oinfos in
+  { mr_xpaths = rx; mr_mpaths = r; mr_oinfos = ois }
+
+(* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : _subst) (item : module_sig_body_item) =
   match item with
   | Tys_function funsig -> Tys_function (subst_funsig s funsig)
@@ -195,7 +207,8 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
 and subst_modtype (s : _subst) (modty : module_type) =
   { mt_params = List.map (snd_map (subst_modtype s)) modty.mt_params;
     mt_name   = s.s_p modty.mt_name;
-    mt_args   = List.map s.s_fmp modty.mt_args; }
+    mt_args   = List.map s.s_fmp modty.mt_args;
+    mt_restr = subst_mod_restr s modty.mt_restr; }
 
 (* -------------------------------------------------------------------- *)
 let subst_function_def (s : _subst) (def : function_def) =
@@ -217,17 +230,6 @@ let subst_function (s : _subst) (f : function_) =
     f_sig  = sig';
     f_def  = def' }
 
-(* -------------------------------------------------------------------- *)
-let subst_mod_restr (s : _subst) (mr : mod_restr) =
-  let rx = EcPath.Sx.fold (fun x r ->
-      EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r
-    ) mr.mr_xpaths EcPath.Sx.empty in
-  let r = EcPath.Sm.fold (fun x r ->
-      EcPath.Sm.add (s.s_fmp x) r
-    ) mr.mr_mpaths EcPath.Sm.empty in
-  let ois = List.map (fun (sym,oi) ->
-      sym, subst_oracle_info s oi) mr.mr_oinfos in
-  { mr_xpaths = rx; mr_mpaths = r; mr_oinfos = ois }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_module_item (s : _subst) (item : module_item) =
@@ -261,7 +263,7 @@ and subst_module_body (s : _subst) (body : module_body) =
   | ME_Structure bstruct ->
       ME_Structure (subst_module_struct s bstruct)
 
-  | ME_Decl (p, mr) -> ME_Decl (subst_modtype s p, subst_mod_restr s mr)
+  | ME_Decl p -> ME_Decl (subst_modtype s p)
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : _subst) (comps : module_comps) =

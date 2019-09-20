@@ -534,11 +534,33 @@ type funsig = {
 }
 
 (* -------------------------------------------------------------------- *)
+type oracle_info = {
+  oi_calls : xpath list;
+  oi_in    : bool;
+}
+
+let oi_equal oi1 oi2 =
+     oi1.oi_in = oi2.oi_in
+  && List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
+
+type mod_restr = {
+  mr_xpaths : EcPath.Sx.t;
+  mr_mpaths : EcPath.Sm.t;
+  mr_oinfos : oracle_info Msym.t;
+}
+
+let mr_equal mr1 mr2 =
+     EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
+  && EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
+  && Msym.equal oi_equal mr1.mr_oinfos mr2.mr_oinfos
+
+(* -------------------------------------------------------------------- *)
 
 type module_type = {
   mt_params : (EcIdent.t * module_type) list;
   mt_name   : EcPath.path;
   mt_args   : EcPath.mpath list;
+  mt_restr  : mod_restr;
 }
 
 type module_sig_body_item = Tys_function of funsig
@@ -587,29 +609,6 @@ type abs_uses = {
   aus_writes : (EcTypes.prog_var * EcTypes.ty) list;
 }
 
-(* -------------------------------------------------------------------- *)
-type oracle_info = {
-  oi_calls : xpath list;
-  oi_in    : bool;
-}
-
-let oi_equal oi1 oi2 =
-     oi1.oi_in = oi2.oi_in
-  && List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
-
-type mod_restr = {
-  mr_xpaths : EcPath.Sx.t;
-  mr_mpaths : EcPath.Sm.t;
-  mr_oinfos : (symbol * oracle_info) list;
-}
-
-let mr_equal mr1 mr2 =
-     EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
-  && EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
-  && List.all2 (fun (s1,oi1) (s2,oi2) ->
-      EcSymbols.sym_equal s1 s2 && oi_equal oi1 oi2
-     ) mr1.mr_oinfos mr2.mr_oinfos
-
 type module_expr = {
   me_name      : symbol;
   me_body      : module_body;
@@ -620,10 +619,10 @@ type module_expr = {
 and module_body =
   | ME_Alias       of int * EcPath.mpath
   | ME_Structure   of module_structure
-  | ME_Decl        of module_type * mod_restr
+  | ME_Decl        of module_type
 
 and module_structure = {
-  ms_body : module_item list;
+  ms_body      : module_item list;
 }
 
 and module_item =
@@ -655,12 +654,6 @@ let fd_hash f =
     (Why3.Hashcons.combine_list vd_hash 0 f.f_locals)
 
 (* -------------------------------------------------------------------- *)
-let rec mty_subst sp sm mty =
-  let mt_params = List.map (snd_map (mty_subst sp sm)) mty.mt_params in
-  let mt_name   = sp mty.mt_name in
-  let mt_args   = List.map sm mty.mt_args in
-  { mt_params; mt_name; mt_args; }
-
 let oi_subst sx oi =
   { oi_calls  = List.map sx oi.oi_calls;
     oi_in     = oi.oi_in;
@@ -671,21 +664,48 @@ let mr_subst sx sm mr =
         Sx.add (sx m) rx) mr.mr_xpaths Sx.empty;
     mr_mpaths = Sm.fold (fun m r ->
         Sm.add (sm m) r) mr.mr_mpaths Sm.empty;
-    mr_oinfos = List.map (fun (s,oi) -> s, oi_subst sx oi) mr.mr_oinfos;
+    mr_oinfos = Msym.map (fun oi -> oi_subst sx oi) mr.mr_oinfos;
   }
 
-let mty_hash mty =
+let rec mty_subst sp sm sx mty =
+  let mt_params = List.map (snd_map (mty_subst sp sm sx)) mty.mt_params in
+  let mt_name   = sp mty.mt_name in
+  let mt_args   = List.map sm mty.mt_args in
+  let mt_restr   = mr_subst sx sm mty.mt_restr in
+  { mt_params; mt_name; mt_args; mt_restr; }
+
+let oi_hash oi =
+  Why3.Hashcons.combine
+    (if oi.oi_in then 0 else 1)
+    (Why3.Hashcons.combine_list EcPath.x_hash 0
+       (List.sort EcPath.x_compare oi.oi_calls))
+
+let mr_hash mr =
   Why3.Hashcons.combine2
+    (Why3.Hashcons.combine_list EcPath.x_hash 0
+       (EcPath.Sx.ntr_elements mr.mr_xpaths))
+    (Why3.Hashcons.combine_list EcPath.m_hash 0
+       (EcPath.Sm.ntr_elements mr.mr_mpaths))
+    (Why3.Hashcons.combine_list
+       (Why3.Hashcons.combine_pair Hashtbl.hash oi_hash) 0
+       (EcSymbols.Msym.bindings mr.mr_oinfos
+        |> List.sort (fun (s,_) (s',_) -> EcSymbols.sym_compare s s')))
+
+let mty_hash mty =
+  Why3.Hashcons.combine3
     (EcPath.p_hash mty.mt_name)
     (Why3.Hashcons.combine_list
        (fun (x, _) -> EcIdent.id_hash x)
        0 mty.mt_params)
     (Why3.Hashcons.combine_list EcPath.m_hash 0 mty.mt_args)
+    (mr_hash mty.mt_restr)
 
 let rec mty_equal mty1 mty2 =
      (EcPath.p_equal mty1.mt_name mty2.mt_name)
   && (List.all2 EcPath.m_equal mty1.mt_args mty2.mt_args)
-  && (List.all2 (pair_equal EcIdent.id_equal mty_equal) mty1.mt_params mty2.mt_params)
+  && (List.all2 (pair_equal EcIdent.id_equal mty_equal)
+        mty1.mt_params mty2.mt_params)
+  && (mr_equal mty1.mt_restr mty1.mt_restr)
 
 (* -------------------------------------------------------------------- *)
 let get_uninit_read_of_fun (fp : xpath) (f : function_) =

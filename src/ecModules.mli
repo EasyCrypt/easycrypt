@@ -121,12 +121,34 @@ type funsig = {
 }
 
 (* -------------------------------------------------------------------- *)
+(* [oi_calls]: The list of oracle that can be called
+ * [oi_in]: true if equality of globals is required to ensure
+ * equality of result and globals
+*)
+type oracle_info = {
+  oi_calls : xpath list;
+  oi_in    : bool;
+}
+
+val oi_hash  : oracle_info -> int
+
+type mod_restr = {
+  mr_xpaths : EcPath.Sx.t;
+  mr_mpaths : EcPath.Sm.t;
+  mr_oinfos : oracle_info Msym.t;
+}
+
+val mr_equal : mod_restr -> mod_restr -> bool
+val mr_hash  : mod_restr -> int
+
+(* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)
 
 type module_type = {                   (* Always in eta-normal form *)
   mt_params : (EcIdent.t * module_type) list;
   mt_name   : EcPath.path;
   mt_args   : EcPath.mpath list;
+  mt_restr  : mod_restr;
 }
 
 
@@ -175,24 +197,6 @@ type abs_uses = {
 }
 
 (* -------------------------------------------------------------------- *)
-(* [oi_calls]: The list of oracle that can be called
- * [oi_in]: true if equality of globals is required to ensure
- * equality of result and globals
-*)
-type oracle_info = {
-  oi_calls : xpath list;
-  oi_in    : bool;
-}
-
-type mod_restr = {
-  mr_xpaths : EcPath.Sx.t;
-  mr_mpaths : EcPath.Sm.t;
-  mr_oinfos : (symbol * oracle_info) list;
-}
-
-val mr_equal : mod_restr -> mod_restr -> bool
-
-(* -------------------------------------------------------------------- *)
 type module_expr = {
   me_name  : symbol;
   me_body  : module_body;
@@ -204,7 +208,7 @@ and module_body =
   | ME_Alias       of int * EcPath.mpath
                       (* The int represent the number of argument *)
   | ME_Structure   of module_structure
-  | ME_Decl        of module_type * mod_restr
+  | ME_Decl        of module_type
 
 (* [ms_vars]: the set of global variables declared by the module and
  * all it submodules.
@@ -230,8 +234,12 @@ and module_comps_item = module_item
 val fd_equal : function_def -> function_def -> bool
 val fd_hash  : function_def -> int
 
-val mty_subst : (path -> path) -> (mpath -> mpath) -> module_type -> module_type
-val mr_subst : (xpath -> xpath) -> (mpath -> mpath) -> mod_restr -> mod_restr
+val mty_subst :
+  (path -> path) ->
+  (mpath -> mpath) ->
+  (xpath -> xpath) ->
+  module_type ->
+  module_type
 
 val mty_equal : module_type -> module_type -> bool
 val mty_hash  : module_type -> int

@@ -687,10 +687,8 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               else Fsubst.f_bind_mem subst x2 x1
             in (env, subst)
 
-        | GTmodty (p1, r1), GTmodty (p2, r2) ->
+        | GTmodty p1, GTmodty p2 ->
             if not (ModTy.mod_type_equiv env p1 p2) then
-              raise MatchFailure;
-            if not (NormMp.equal_restr env r1 r2) then
               raise MatchFailure;
 
             let subst =
@@ -698,7 +696,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               then subst
               else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
 
-            and env = EcEnv.Mod.bind_local x1 p1 r1 env in
+            and env = EcEnv.Mod.bind_local x1 p1 env in
 
             (env, subst)
 
