@@ -28,6 +28,8 @@ Installation requirements
 
 EasyCrypt uses the following third-party tools/libraries:
 
+ * `autoconf`
+
  * OCaml (>= 4.05)
 
      Available at http://caml.inria.fr/
@@ -46,7 +48,7 @@ EasyCrypt uses the following third-party tools/libraries:
  * Menhir <http://gallium.inria.fr/~fpottier/menhir/>
 
  * OCaml Batteries Included <http://batteries.forge.ocamlcore.org/>
- 
+
  * OCaml PCRE (>= 7) <https://github.com/mmottl/pcre-ocaml>
 
  * OCaml Zarith <https://forge.ocamlcore.org/projects/zarith>
@@ -63,7 +65,7 @@ Installing OPAM (POSIX systems)
 Opam can be easily installed from source or via your packages manager:
 
   * On Ubuntu and derivatives:
-      
+
       ```
       $> add-apt-repository ppa:avsm/ppa
       $> apt-get update
@@ -76,7 +78,7 @@ Opam can be easily installed from source or via your packages manager:
       $> sudo dnf update
       $> sudo dnf install ocaml ocaml-docs ocaml-camlp4-devel opam
       ```
-        
+
   * On MacOSX using brew:
 
       ```
@@ -115,7 +117,7 @@ packages manager.
       where `$OVERSION` is a valid OCaml version (e.g. ocaml-base-compiler.4.07.0)
 
   1. Add the EasyCrypt repository:
-      
+
       ```
       $> opam repository add easycrypt git://github.com/EasyCrypt/opam.git
       $> opam update
@@ -145,6 +147,7 @@ packages manager.
       $> opam install --deps-only easycrypt
       $> opam install ec-provers
       ```
+      If you are missing `autoconf`, you may run into a problem running `opam install ec-provers`. To install it on MacOSX, run `brew install autoconf`.
 
       If you get errors about OCaml Build failing because it's already installed, the
       check can be skipped with the following:
