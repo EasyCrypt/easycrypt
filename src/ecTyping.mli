@@ -198,14 +198,11 @@ type restriction_error = restriction_who * restriction_err
 
 exception RestrictionError of EcEnv.env * restriction_error
 
-val check_sig_mt_cnv :
-  env -> module_sig -> module_type -> unit
-
 val check_restrictions_fun :
-  env -> xpath -> use -> mod_restr -> unit
+  env -> xpath -> mod_restr -> unit
 
 val check_modtype_with_restrictions :
-  env -> mpath -> module_sig -> module_type -> mod_restr -> unit
+  env -> mpath -> module_sig -> module_type -> unit
 
 (* -------------------------------------------------------------------- *)
 val get_ring  : (ty_params * ty) -> env -> EcDecl.ring  option

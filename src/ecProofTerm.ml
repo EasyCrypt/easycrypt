@@ -647,11 +647,11 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
          tc_pterm_apperror ?loc pe (AE_WrongArgKind (ak, `Mem))
   end
 
-  | GTmodty (emt, restr) -> begin
+  | GTmodty emt -> begin
       match dfl_arg_for_mod pe arg with
       | PVAModule (mp, mt) -> begin
         try
-          EcTyping.check_modtype_with_restrictions env mp mt emt restr;
+          EcTyping.check_modtype_with_restrictions env mp mt emt;
           EcPV.check_module_in env mp emt;
           (Fsubst.f_subst_mod x mp f, PAModule (mp, mt))
         with

@@ -222,24 +222,26 @@ end
 
 (* -------------------------------------------------------------------- *)
 type use = {
+  us_calls : Sx.t Msym.t;              (* TODO: (Adrien) is this correctly populated? *)
   us_pv : ty EcPath.Mx.t;
   us_gl : EcIdent.Sid.t;
 }
 
 module NormMp : sig
-  val norm_mpath : env -> mpath -> mpath
-  val norm_xfun  : env -> xpath -> xpath
-  val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
-  val norm_form  : env -> form -> form
-  val mod_use    : env -> mpath -> use
-  val fun_use    : env -> xpath -> use
-  val norm_restr : env -> mod_restr  -> use
-  val equal_restr : env -> mod_restr -> mod_restr -> bool
-  val get_restr  : env -> mpath -> use
-  val use_mem_xp : xpath -> use -> bool
-  val use_mem_gl : mpath -> use -> bool
-  val norm_glob  : env -> EcMemory.memory -> mpath -> form
-  val norm_tglob : env -> mpath -> EcTypes.ty
+  val norm_mpath   : env -> mpath -> mpath
+  val norm_xfun    : env -> xpath -> xpath
+  val norm_pvar    : env -> EcTypes.prog_var -> EcTypes.prog_var
+  val norm_form    : env -> form -> form
+  val mod_use      : env -> mpath -> use
+  val fun_use      : env -> xpath -> use
+  val norm_restr   : env -> mod_restr  -> use
+  val equal_restr  : env -> mod_restr -> mod_restr -> bool
+  val get_restr    : env -> mpath -> use
+  val use_mem_call : symbol -> xpath -> use -> bool
+  val use_mem_xp   : xpath -> use -> bool
+  val use_mem_gl   : mpath -> use -> bool
+  val norm_glob    : env -> EcMemory.memory -> mpath -> form
+  val norm_tglob   : env -> mpath -> EcTypes.ty
   val tglob_reducible : env -> mpath -> bool
   val is_abstract_fun : xpath -> env -> bool
   val x_equal         : env -> xpath -> xpath -> bool

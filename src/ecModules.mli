@@ -138,8 +138,9 @@ type mod_restr = {
   mr_oinfos : oracle_info Msym.t;
 }
 
-val mr_equal : mod_restr -> mod_restr -> bool
-val mr_hash  : mod_restr -> int
+val mr_equal  : mod_restr -> mod_restr -> bool
+val mr_hash   : mod_restr -> int
+val mr_empty  : mod_restr
 
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)
@@ -160,6 +161,7 @@ type module_sig_body = module_sig_body_item list
 type module_sig = {
   mis_params : (EcIdent.t * module_type) list;
   mis_body   : module_sig_body;
+  mis_restr : mod_restr;
 }
 
 (* -------------------------------------------------------------------- *)

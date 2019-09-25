@@ -115,6 +115,7 @@ type mc = {
 }
 
 type use = {
+  us_calls : Sx.t Msym.t;
   us_pv : ty Mx.t;
   us_gl : Sid.t;
 }
@@ -1813,31 +1814,26 @@ module Mod = struct
     in
       f s o
 
-  (* TODO: (Adrien) what should be done with that? *)
-  (* let clearparams n sig_ =
-   *   let used, remaining = List.takedrop n sig_.mis_params in
-   *
-   *   let keepcall =
-   *     let used = EcIdent.Sid.of_list (List.map fst used) in
-   *       fun xp ->
-   *         match xp.EcPath.x_top.EcPath.m_top with
-   *         | `Local id -> not (EcIdent.Sid.mem id used)
-   *         | _ -> true
-   *   in
-   *
-   *   { mis_params = remaining;
-   *     mis_body   =
-   *       List.map
-   *         (function Tys_function s ->
-   *           Tys_function (s, { oi_calls = List.filter keepcall oi.oi_calls;
-   *                              oi_in    = oi.oi_in; }))
-   *         sig_.mis_body } *)
-
   let clearparams n sig_ =
-    let _, remaining = List.takedrop n sig_.mis_params in
+    let used, remaining = List.takedrop n sig_.mis_params in
+
+    let keepcall =
+      let used = EcIdent.Sid.of_list (List.map fst used) in
+        fun xp ->
+          match xp.EcPath.x_top.EcPath.m_top with
+          | `Local id -> not (EcIdent.Sid.mem id used)
+          | _ -> true
+    in
+
+    let oi_map ois = Msym.map (fun oi ->
+        { oi_calls = List.filter keepcall oi.oi_calls;
+          oi_in    = oi.oi_in; }) ois in
+    let restr = { sig_.mis_restr with
+                  mr_oinfos = oi_map sig_.mis_restr.mr_oinfos } in
 
     { mis_params = remaining;
-      mis_body   = sig_.mis_body }
+      mis_body   = sig_.mis_body;
+      mis_restr  = restr; }
 
   let unsuspend istop (i, args) (spi, params) me =
     let me =
@@ -2142,14 +2138,22 @@ module NormMp = struct
         env.env_norm := { en with norm_xpv = Mx.add p res en.norm_xpv };
         res
 
-  let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty }
+  let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty; us_calls = Msym.empty }
   let use_equal us1 us2 =
     Mx.equal (fun _ _ -> true) us1.us_pv us2.us_pv &&
       Sid.equal us1.us_gl us2.us_gl
 
   let use_union us1 us2 =
     { us_pv = Mx.union  (fun _ ty _ -> Some ty) us1.us_pv us2.us_pv;
-      us_gl = Sid.union us1.us_gl us2.us_gl }
+      us_gl = Sid.union us1.us_gl us2.us_gl;
+      us_calls = Msym.union (fun _ call1 call2 ->
+          some @@ Sx.union call1 call2)
+          us1.us_calls us2.us_calls; }
+
+  let use_mem_call fn fx us = match Msym.find fn us.us_calls with
+    | s -> Mx.mem fx s
+    | exception Not_found -> false
+
   let use_mem_xp xp us = Mx.mem xp us.us_pv
   let use_mem_gl mp us =
     assert (mp.m_args = []);
@@ -2170,7 +2174,13 @@ module NormMp = struct
   let add_glob_except rm id us =
     if Sid.mem id rm then us else add_glob id us
 
-  let gen_fun_use env fdone rm =
+  let add_call caller f us =
+    { us with us_calls = Msym.change (function
+          | Some s -> Sx.add f s |> some
+          | None -> Sx.singleton f |> some
+        ) caller us.us_calls }
+
+  let gen_fun_use env caller fdone rm =
     let rec fun_use us f =
       let f = norm_xfun env f in
       if Mx.mem f !fdone then us
@@ -2182,6 +2192,8 @@ module NormMp = struct
           let f_uses = fdef.f_uses in
           let vars = Sx.union f_uses.us_reads f_uses.us_writes in
           let us = Sx.fold (add_var env) vars us in
+          let us = List.fold_left (fun us f ->
+              add_call caller f us) us f_uses.us_calls in
           List.fold_left fun_use us f_uses.us_calls
 
         | FBabs ->
@@ -2194,13 +2206,15 @@ module NormMp = struct
             let mp = norm_mpath env f.x_top in
             let me = Mod.by_mpath mp env in
             begin match me.me_body with
-              | ME_Alias _ -> assert false (* TODO: check *)
+              | ME_Alias _ -> assert false (* TODO: (Adrien) check *)
               | ME_Structure _ -> assert false
               (* We cannot have abstract procedures in concrete modules. *)
 
               | ME_Decl mt ->
                 try
                   let oi = Msym.find f1.f_name mt.mt_restr.mr_oinfos in
+                  let us = List.fold_left (fun us f ->
+                      add_call caller f us) us oi.oi_calls in
                   List.fold_left fun_use us oi.oi_calls
                 with Not_found -> us end
 
@@ -2208,7 +2222,7 @@ module NormMp = struct
     fun_use
 
   let fun_use env xp =
-    gen_fun_use env (ref Sx.empty) Sid.empty use_empty xp
+    gen_fun_use env (xbasename xp) (ref Sx.empty) Sid.empty use_empty xp
 
   let mod_use env mp =
     let mp = norm_mpath env mp in
@@ -2243,9 +2257,9 @@ module NormMp = struct
       match item with
       | MI_Module me -> mod_use us (EcPath.mqname mp me.me_name)
       | MI_Variable v -> add_var env' (xpath_fun mp v.v_name) us
-      | MI_Function f -> fun_use us (xpath_fun mp f.f_name)
+      | MI_Function f -> fun_use us f.f_name (xpath_fun mp f.f_name)
 
-    and fun_use us f = gen_fun_use env' fdone rm us f in
+    and fun_use us caller f = gen_fun_use env' caller fdone rm us f in
 
     mod_use use_empty mp'
 
@@ -2259,9 +2273,9 @@ module NormMp = struct
   let norm_restr env (mr : mod_restr) =
     let restr = Sx.fold (fun xp r ->
         add_var env xp r) mr.mr_xpaths use_empty in
-    Sm.fold (fun mp r -> use_union r (mod_use env mp)
-            ) mr.mr_mpaths restr
-(* TODO: (Adrien) what should be done there? *)
+    let restr = Sm.fold (fun mp r -> use_union r (mod_use env mp)
+                        ) mr.mr_mpaths restr in
+    assert false (* TODO: (Adrien) what should be done there? *)
 
   let get_restr env mp =
     try Mm.find mp !(env.env_norm).get_restr with Not_found ->
@@ -2272,7 +2286,6 @@ module NormMp = struct
       let en = !(env.env_norm) in
       env.env_norm := { en with get_restr = Mm.add mp res en.get_restr };
       res
-(* TODO: (Adrien) what should be done there? *)
 
   let equal_restr env r1 r2 = use_equal (norm_restr env r1) (norm_restr env r2)
 
@@ -2497,19 +2510,20 @@ module ModTy = struct
       EcSubst.subst_modsig_body subst sig_.mis_body in
     let params = mt.mt_params in
 
-    (* TODO: (Adrien) Check *)
-    (* let keep =
-     *   List.fold_left (fun k (x,_) ->
-     *     EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
-     * let keep_info f =
-     *   EcPath.Sm.mem (f.EcPath.x_top) keep in
-     * let do1 = function
-     *   | Tys_function (s,oi) ->
-     *     Tys_function(s,{oi_calls = List.filter keep_info oi.oi_calls;
-     *                     oi_in = oi.oi_in}) in *)
+    let keep =
+      List.fold_left (fun k (x,_) ->
+        EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
+    let keep_info f =
+      EcPath.Sm.mem (f.EcPath.x_top) keep in
+    let do1 oi =
+      {oi_calls = List.filter keep_info oi.oi_calls;
+       oi_in = oi.oi_in} in
+    let restr = { mt.mt_restr with
+                  mr_oinfos = Msym.map do1 mt.mt_restr.mr_oinfos } in
 
     { mis_params = params;
-      mis_body   = items }
+      mis_body   = items;
+      mis_restr  = restr; }
 end
 
 

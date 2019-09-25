@@ -549,6 +549,12 @@ type mod_restr = {
   mr_oinfos : oracle_info Msym.t;
 }
 
+let mr_empty = {
+  mr_xpaths = EcPath.Sx.empty;
+  mr_mpaths = EcPath.Sm.empty;
+  mr_oinfos = Msym.empty;
+}
+
 let mr_equal mr1 mr2 =
      EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
   && EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
@@ -570,6 +576,7 @@ type module_sig_body = module_sig_body_item list
 type module_sig = {
   mis_params : (EcIdent.t * module_type) list;
   mis_body   : module_sig_body;
+  mis_restr : mod_restr;
 }
 
 (* -------------------------------------------------------------------- *)
