@@ -545,11 +545,14 @@ let pp_restr ppe fmt mr =
   let sep1,sep2 = match EcPath.Sx.is_empty mr.mr_xpaths,
                         EcPath.Sm.is_empty mr.mr_mpaths,
                         Msym.is_empty mr.mr_oinfos with
-  | true,true,true                          -> true,true
-  | true,true,false   | true,false,true     -> true,false
-  | false,false,false | false,false,true
-  | false,true,false  | true,false,false    -> false,false
-  | false,true,true                         -> false,true in
+  | true,true,true
+  | true,true,false
+  | false,true,true
+  | true,false,true   -> false, false
+  | false,false,false -> true, true
+  | false,true,false
+  | false,false,true  -> true, false
+  | true,false,false  -> false, true in
 
   Format.fprintf fmt "{@[%a%a%a%a%a@]}"
     pp_rx mr.mr_xpaths
@@ -2631,7 +2634,7 @@ let pp_orclinfo ppe fmt oi =
  *     (pp_funsig ppe) (oi.oi_in, fs) (pp_orclinfo ppe) oi *)
 
 let pp_sigitem ppe fmt (Tys_function fs) =
-  Format.fprintf fmt "@[<hov 2>%a@@]"
+  Format.fprintf fmt "@[<hov 2>%a@]"
     (pp_funsig ppe) fs
 
 let pp_modsig ppe fmt (p,ms) =

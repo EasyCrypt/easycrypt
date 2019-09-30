@@ -28,7 +28,7 @@ type locals = {
   lc_name      : symbol option;
   lc_lemmas    : (path * lvl) list * lvl Mp.t;
   lc_modules   : Sp.t;
-  lc_abstracts : (EcIdent.t * (module_type * mod_restr)) list * Sid.t;
+  lc_abstracts : (EcIdent.t * module_type) list * Sid.t;
   lc_items     : EcTheory.ctheory_item list;
 }
 
@@ -156,16 +156,17 @@ let on_mpath_memenv cb (m : EcMemory.memenv) =
 
 let rec on_mpath_modty cb mty =
   List.iter (fun (_, mty) -> on_mpath_modty cb mty) mty.mt_params;
-  List.iter cb mty.mt_args
+  List.iter cb mty.mt_args;
+  Sx.iter (fun x -> cb x.x_top) mty.mt_restr.mr_xpaths;
+  Sm.iter cb mty.mt_restr.mr_mpaths
 
 let on_mpath_gbinding cb b =
   match b with
   | EcFol.GTty ty ->
       on_mpath_ty cb ty
-  | EcFol.GTmodty (mty, (rx,r)) ->
-      on_mpath_modty cb mty;
-      Sx.iter (fun x -> cb x.x_top) rx;
-      Sm.iter cb r
+  | EcFol.GTmodty mty ->
+      on_mpath_modty cb mty
+
   | EcFol.GTmem None->
       ()
   | EcFol.GTmem (Some m) ->
@@ -256,13 +257,14 @@ let rec on_mpath_form cb (f : EcFol.form) =
 let rec on_mpath_module cb (me : module_expr) =
   match me.me_body with
   | ME_Alias (_, mp)  -> cb mp
-  | ME_Structure st   -> on_mpath_mstruct cb st
-  | ME_Decl (mty, sm) -> on_mpath_mdecl cb (mty, sm)
+  | ME_Structure st   ->
+    on_mpath_mstruct cb st;
+    EcSymbols.Msym.iter (fun _ oi -> on_mpath_fun_oi cb oi)
+      me.me_sig.mis_restr.mr_oinfos
+  | ME_Decl mty -> on_mpath_mdecl cb mty
 
-and on_mpath_mdecl cb (mty,(rx,r)) =
+and on_mpath_mdecl cb mty =
   on_mpath_modty cb mty;
-  Sx.iter (fun x -> cb x.x_top) rx;
-  Sm.iter cb r
 
 and on_mpath_mstruct cb st =
   List.iter (on_mpath_mstruct1 cb) st.ms_body
@@ -285,7 +287,7 @@ and on_mpath_fun_body cb fbody =
   match fbody with
   | FBalias xp -> cb xp.x_top
   | FBdef fdef -> on_mpath_fun_def cb fdef
-  | FBabs oi   -> on_mpath_fun_oi  cb oi
+  | FBabs -> ()
 
 and on_mpath_fun_def cb fdef =
   List.iter (fun v -> on_mpath_ty cb v.v_type) fdef.f_locals;
@@ -410,10 +412,10 @@ let generalize env lc (f : EcFol.form) =
       then f
       else begin
         List.fold_right
-          (fun (x, (mty, rt)) f ->
+          (fun (x, mty) f ->
              match Mid.mem x f.EcFol.f_fv with
              | false -> f
-             | true  -> EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f)
+             | true  -> EcFol.f_forall [(x, EcFol.GTmodty mty)] f)
           (fst lc.lc_abstracts) f
       end
 
@@ -425,8 +427,8 @@ let generalize env lc (f : EcFol.form) =
       in
           List.fold_right do1 axioms f in
     let f =
-      let do1 (x, (mty, rt)) f =
-        EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f
+      let do1 (x, mty) f =
+        EcFol.f_forall [(x, EcFol.GTmodty mty)] f
       in
         List.fold_right do1 (fst lc.lc_abstracts) f
     in

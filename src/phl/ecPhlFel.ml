@@ -62,7 +62,8 @@ let rec callable_oracles_f env modv os f =
   | FBalias _ ->
       assert false (* normal form *)
 
-  | FBabs oi ->
+  | FBabs ->
+    let oi = NormMp.get_oicalls env f' in
       let called_fs =
         List.fold_left
           (fun s o ->

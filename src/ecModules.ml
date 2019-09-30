@@ -539,6 +539,8 @@ type oracle_info = {
   oi_in    : bool;
 }
 
+let oi_empty = { oi_calls = []; oi_in = true; }
+
 let oi_equal oi1 oi2 =
      oi1.oi_in = oi2.oi_in
   && List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
@@ -559,6 +561,21 @@ let mr_equal mr1 mr2 =
      EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
   && EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
   && Msym.equal oi_equal mr1.mr_oinfos mr2.mr_oinfos
+
+let add_oinfo restr f ocalls oin =
+  { restr with
+    mr_oinfos = Msym.add f { oi_calls = ocalls; oi_in = oin; } restr.mr_oinfos }
+
+let change_oicalls restr f ocalls =
+  let oi_in = match Msym.find f restr.mr_oinfos with
+    | oi -> oi.oi_in
+    | exception Not_found -> true in
+  add_oinfo restr f ocalls oi_in
+
+let oicalls_filter restr f filter =
+  match Msym.find f restr.mr_oinfos with
+  | oi -> add_oinfo restr f (List.filter filter oi.oi_calls) oi.oi_in
+  | exception Not_found -> restr
 
 (* -------------------------------------------------------------------- *)
 

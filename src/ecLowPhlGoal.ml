@@ -492,9 +492,12 @@ let abstract_info env f1 =
   let f   = EcEnv.NormMp.norm_xfun env f1 in
   let top = EcPath.m_functor f.EcPath.x_top in
   let def = EcEnv.Fun.by_xpath f env in
+
   let oi  =
     match def.f_def with
-    | FBabs oi -> oi
+    | FBabs ->
+      let m = EcEnv.Mod.by_mpath f.EcPath.x_top env in
+      EcSymbols.Msym.find_def oi_empty def.f_name m.me_sig.mis_restr.mr_oinfos
     | _ ->
       let ppe = EcPrinting.PPEnv.ofenv env in
         if EcPath.x_equal f1 f then

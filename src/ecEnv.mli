@@ -222,7 +222,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 type use = {
-  us_calls : Sx.t Msym.t;              (* TODO: (Adrien) is this correctly populated? *)
+  us_call : Sx.t Msym.t;              (* TODO: (Adrien) is this correctly populated? *)
   us_pv : ty EcPath.Mx.t;
   us_gl : EcIdent.Sid.t;
 }
@@ -237,7 +237,7 @@ module NormMp : sig
   val norm_restr   : env -> mod_restr  -> use
   val equal_restr  : env -> mod_restr -> mod_restr -> bool
   val get_restr    : env -> mpath -> use
-  val use_mem_call : symbol -> xpath -> use -> bool
+  val get_oicalls  : env -> xpath -> oracle_info
   val use_mem_xp   : xpath -> use -> bool
   val use_mem_gl   : mpath -> use -> bool
   val norm_glob    : env -> EcMemory.memory -> mpath -> form

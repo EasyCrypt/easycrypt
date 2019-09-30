@@ -115,7 +115,7 @@ type mc = {
 }
 
 type use = {
-  us_calls : Sx.t Msym.t;
+  us_call : Sx.t Msym.t;
   us_pv : ty Mx.t;
   us_gl : Sid.t;
 }
@@ -1800,7 +1800,9 @@ module Mod = struct
   type t = module_expr
 
   let unsuspend_r f istop (i, args) (spi, params) o =
-    if i <> spi || List.length args > List.length params then
+    if List.length args > List.length params then
+      assert false;
+    if i <> spi then
       assert false;
     if (not istop && List.length args <> List.length params) then
       assert false;
@@ -2138,7 +2140,7 @@ module NormMp = struct
         env.env_norm := { en with norm_xpv = Mx.add p res en.norm_xpv };
         res
 
-  let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty; us_calls = Msym.empty }
+  let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty; us_call = Msym.empty }
   let use_equal us1 us2 =
     Mx.equal (fun _ _ -> true) us1.us_pv us2.us_pv &&
       Sid.equal us1.us_gl us2.us_gl
@@ -2146,11 +2148,11 @@ module NormMp = struct
   let use_union us1 us2 =
     { us_pv = Mx.union  (fun _ ty _ -> Some ty) us1.us_pv us2.us_pv;
       us_gl = Sid.union us1.us_gl us2.us_gl;
-      us_calls = Msym.union (fun _ call1 call2 ->
+      us_call = Msym.union (fun _ call1 call2 ->
           some @@ Sx.union call1 call2)
-          us1.us_calls us2.us_calls; }
+          us1.us_call us2.us_call; }
 
-  let use_mem_call fn fx us = match Msym.find fn us.us_calls with
+  let use_mem_call fn fx us = match Msym.find fn us.us_call with
     | s -> Mx.mem fx s
     | exception Not_found -> false
 
@@ -2175,10 +2177,10 @@ module NormMp = struct
     if Sid.mem id rm then us else add_glob id us
 
   let add_call caller f us =
-    { us with us_calls = Msym.change (function
+    { us with us_call = Msym.change (function
           | Some s -> Sx.add f s |> some
           | None -> Sx.singleton f |> some
-        ) caller us.us_calls }
+        ) caller us.us_call }
 
   let gen_fun_use env caller fdone rm =
     let rec fun_use us f =
@@ -2235,8 +2237,6 @@ module NormMp = struct
     let mp' =
       EcPath.m_apply mp (List.map (fun (id,_) -> EcPath.mident id) params) in
 
-    let fdone = ref Sx.empty in
-
     let rec mod_use us mp =
       let mp = norm_mpath env' mp in
       let me = Mod.by_mpath mp env' in
@@ -2259,7 +2259,9 @@ module NormMp = struct
       | MI_Variable v -> add_var env' (xpath_fun mp v.v_name) us
       | MI_Function f -> fun_use us f.f_name (xpath_fun mp f.f_name)
 
-    and fun_use us caller f = gen_fun_use env' caller fdone rm us f in
+    and fun_use us caller f =
+      let fdone = ref Sx.empty in
+      gen_fun_use env' caller fdone rm us f in
 
     mod_use use_empty mp'
 
@@ -2275,7 +2277,11 @@ module NormMp = struct
         add_var env xp r) mr.mr_xpaths use_empty in
     let restr = Sm.fold (fun mp r -> use_union r (mod_use env mp)
                         ) mr.mr_mpaths restr in
-    assert false (* TODO: (Adrien) what should be done there? *)
+    Msym.fold (fun f oi r ->
+        List.fold_left (fun r xp ->
+            gen_fun_use env f (ref Sx.empty) Sid.empty r xp) r oi.oi_calls
+      ) mr.mr_oinfos restr
+
 
   let get_restr env mp =
     try Mm.find mp !(env.env_norm).get_restr with Not_found ->
@@ -2286,6 +2292,12 @@ module NormMp = struct
       let en = !(env.env_norm) in
       env.env_norm := { en with get_restr = Mm.add mp res en.get_restr };
       res
+
+  let get_oicalls env xp =
+    let ml = Mod.by_mpath xp.x_top env in
+    EcSymbols.Msym.find_def
+      oi_empty (basename xp.x_sub) ml.me_sig.mis_restr.mr_oinfos
+
 
   let equal_restr env r1 r2 = use_equal (norm_restr env r1) (norm_restr env r2)
 

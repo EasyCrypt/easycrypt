@@ -258,7 +258,10 @@ and f_eqobs_in fl fr sim eqO =
   let sim, eqi =
     try
       match defl.f_def, defr.f_def with
-      | FBabs oil, FBabs oir ->
+      | FBabs, FBabs ->
+        let oil = NormMp.get_oicalls env nfl
+        and oir = NormMp.get_oicalls env nfr in
+
         let (topl,_,_,_), (topr,_,_,_) =
           try EcLowPhlGoal.abstract_info2 env fl fr
           with TcError _ -> raise EqObsInError in

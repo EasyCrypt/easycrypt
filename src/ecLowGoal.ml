@@ -94,8 +94,8 @@ module LowApply = struct
           | LD_mem m1, LD_mem m2 ->
              oeq EcMemory.lmt_equal m1 m2
 
-          | LD_modty (mt1, mr1), LD_modty (mt2, mr2) ->
-             (mt1 == mt2) && (mr1 == mr2)
+          | LD_modty mt1, LD_modty mt2 ->
+            mt1 == mt2
 
           | LD_hyp f1, LD_hyp f2 ->
              is_alpha_eq hyps f1 f2
@@ -375,9 +375,9 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
     | GTmem me ->
         LowIntro.check_name_validity !!tc `Memory name;
         (id, LD_mem me, Fsubst.f_bind_mem sbt x (tg_val id))
-    | GTmodty (i, r) ->
+    | GTmodty i ->
         LowIntro.check_name_validity !!tc `Module name;
-        (id, LD_modty (i, r), Fsubst.f_bind_mod sbt x (EcPath.mident (tg_val id)))
+        (id, LD_modty i, Fsubst.f_bind_mod sbt x (EcPath.mident (tg_val id)))
   in
 
   let add_ld id ld hyps =
@@ -681,12 +681,12 @@ let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =
         let args = PAMemory id :: args in
         (s, bds, args, cls)
 
-      | LD_modty (mt,r) ->
+      | LD_modty mt ->
         let x    = fresh id in
         let s    = Fsubst.f_bind_mod s id (EcPath.mident x) in
         let mp   = EcPath.mident id in
         let sig_ = (EcEnv.Mod.by_mpath mp env).EcModules.me_sig in
-        let bds  = `Forall (x, GTmodty (mt, r)) :: bds in
+        let bds  = `Forall (x, GTmodty mt) :: bds in
         let args = PAModule (mp, sig_) :: args in
         (s, bds, args, cls)
 

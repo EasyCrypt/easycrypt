@@ -445,9 +445,17 @@ let rec f_write_r ?(except=Sx.empty) env w f =
       (* [f] is in normal-form *)
       assert false
 
-  | FBabs oi ->
-      let mp = get_abs_functor f in
-      List.fold_left folder (PV.add_glob env mp w) oi.oi_calls
+  | FBabs ->
+    let mp = get_abs_functor f in
+    (* TODO: (Adrien) is this what we want? *)
+    let m = EcEnv.Mod.by_mpath mp env in
+    begin
+      match EcSymbols.Msym.find func.f_name m.me_sig.mis_restr.mr_oinfos with
+      | oi -> List.fold_left folder (PV.add_glob env mp w) oi.oi_calls
+      | exception Not_found ->
+        (* TODO: (Adrien) check this *)
+        assert false
+        (* PV.add_glob env mp w *) end
 
   | FBdef fdef ->
       let add x w =
@@ -496,10 +504,19 @@ let rec f_read_r env r f =
       (* [f] is in normal form *)
       assert false
 
-  | FBabs oi ->
-      let mp = get_abs_functor f in
-      let r = if oi.oi_in then (PV.add_glob env mp r) else r in
-      List.fold_left (f_read_r env) r oi.oi_calls
+  | FBabs ->
+    let mp = get_abs_functor f in
+    (* TODO: (Adrien) is this what we want? *)
+    let m = EcEnv.Mod.by_mpath mp env in
+    begin
+      match EcSymbols.Msym.find func.f_name m.me_sig.mis_restr.mr_oinfos with
+      | oi ->
+        let r = if oi.oi_in then (PV.add_glob env mp r) else r in
+        List.fold_left (f_read_r env) r oi.oi_calls
+
+      | exception Not_found ->
+        (* TODO: (Adrien) check this *)
+        assert false (* r *) end
 
   | FBdef fdef ->
       let add x r =
@@ -1021,7 +1038,14 @@ and eqobs_inF_refl env f' eqo =
       EcCoreGoal.tacuerror "In function %a, %a are used before being initialized"
         (EcPrinting.pp_funname ppe) f' (PV.pp env) diff
 
-  | FBabs oi ->
+  | FBabs ->
+    let mp = get_abs_functor f in
+    (* TODO: (Adrien) is this what we want? *)
+    let m = EcEnv.Mod.by_mpath mp env in
+    let oi =
+      try EcSymbols.Msym.find ffun.f_name m.me_sig.mis_restr.mr_oinfos with
+      | Not_found -> oi_empty in
+
     let do1 eqo o = PV.union (eqobs_inF_refl env o eqo) eqo in
     let top = EcPath.m_functor f.x_top in
     let rec aux eqo =
@@ -1045,13 +1069,19 @@ let check_module_in env mp mt =
   let global = PV.fv env mhr (NormMp.norm_glob env mhr mp) in
   let env = List.fold_left
     (fun env (id,mt) ->
-      Mod.bind_local id mt (Sx.empty,Sm.empty) env) env params in
+      Mod.bind_local id mt env) env params in
   let extra = List.map (fun (id,_) -> EcPath.mident id) params in
   let mp = EcPath.mpath mp.m_top (mp.m_args @ extra) in
   let check = function
-    | Tys_function(fs,oi) ->
+    | Tys_function fs ->
       let f = EcPath.xpath_fun mp fs.fs_name in
       let eqi = eqobs_inF_refl env f global in
+
+      let m = EcEnv.Mod.by_mpath mp env in
+      let oi =
+        try EcSymbols.Msym.find fs.fs_name m.me_sig.mis_restr.mr_oinfos with
+        | Not_found -> oi_empty in
+
       (* We remove the paramater not take into account *)
       let eqi =
         List.fold_left (fun eqi mp -> PV.remove_glob mp eqi) eqi extra in

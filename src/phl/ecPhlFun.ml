@@ -31,7 +31,10 @@ module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 let check_oracle_use (_pf : proofenv) env adv o =
-  EcTyping.check_restrictions_fun env o (Sx.empty, Sm.singleton adv)
+  (* TODO: (Adrien) maybe do this differently? *)
+  EcTyping.check_restrictions_fun env o { mr_xpaths = Sx.empty;
+                                          mr_mpaths = Sm.singleton adv;
+                                          mr_oinfos = EcSymbols.Msym.empty; }
 
 let check_concrete pf env f =
   if NormMp.is_abstract_fun f env then
@@ -46,7 +49,11 @@ let lossless_hyps env top sub =
   let sig_ = (EcEnv.Mod.by_mpath top env).me_sig in
   let bd =
     List.map
-      (fun (id, mt) -> (id, GTmodty (mt, (Sx.empty, Sm.singleton top))))
+      (fun (id, mt) -> (id,
+                        GTmodty { mt with
+                                  mt_restr = { mt.mt_restr with
+                                               mr_xpaths = Sx.empty;
+                                               mr_mpaths = Sm.singleton top }}))
       sig_.mis_params
   in
   (* WARN: this implies that the oracle do not have access to top *)
@@ -54,12 +61,7 @@ let lossless_hyps env top sub =
   let concl = f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub) in
   let calls =
     let name = EcPath.basename sub in
-    let Tys_function (_, oi) =
-      oget (List.ofind
-        (fun (Tys_function(fs,_)) -> fs.fs_name = name)
-        sig_.mis_body)
-    in
-    oi.oi_calls
+    (EcSymbols.Msym.find name sig_.mis_restr.mr_oinfos).oi_calls
   in
   let hyps = List.map f_losslessF calls in
     f_forall bd (f_imps hyps concl)

@@ -1378,9 +1378,10 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
     List.fold_left (fun sa (x,_) -> Sm.add (EcPath.mident x) sa) Sm.empty margs
   in
   let env  = EcEnv.Mod.enter name margs env in
-  let body = transmodsig_body env sa modty.pmsig_body in
+  let body, mr = transmodsig_body env sa modty.pmsig_body in
   { mis_params = margs;
-    mis_body   = body; }
+    mis_body   = body;
+    mis_restr  = mr; }
 
 (* -------------------------------------------------------------------- *)
 and transmodsig_body
@@ -1410,7 +1411,7 @@ and transmodsig_body
           f)
         pfd_uses in
 
-  let transsig1 = function
+  let transsig1 mr = function
     | `FunctionDecl f ->
       let name = f.pfd_name in
       names := name::!names;
@@ -1443,47 +1444,57 @@ and transmodsig_body
                    fs_arg    = tyarg;
                    fs_anames = tyargs;
                    fs_ret    = resty; }
-      and oi = { oi_calls = calls; oi_in = uin; } in
-      [Tys_function (sig_, oi)]
+      and mr = EcModules.add_oinfo mr name.pl_desc calls uin in
+      [Tys_function sig_], mr
 
     | `Include (i,proc,restr) ->
       let (_modty,sig_) = transmodtype env i in
       if sig_.mis_params <> [] then
         tyerror i.pl_loc env (InvalidModType MTE_IncludeFunctor);
+
       let check_xs xs =
         List.iter (fun x ->
           let s = unloc x in
-          if not (List.exists (fun (Tys_function(fs,_)) ->
+          if not (List.exists (fun (Tys_function fs) ->
                       sym_equal fs.fs_name s) sig_.mis_body) then
             let modsymb = fst (unloc i) @ [snd (unloc i)] in
             let funsymb = unloc x in
             tyerror (loc x) env (UnknownFunName (modsymb,funsymb))) xs in
-      let in_xs (Tys_function(fs,_oi)) xs =
-        List.exists (fun x -> sym_equal fs.fs_name (unloc x)) xs in
-      let calls = mk_calls restr in
-      let add (Tys_function(fs,oi)) =
-        names := mk_loc (loc i) fs.fs_name :: !names;
-        Tys_function( fs, {oi with oi_calls = calls} ) in
-      match proc with
-      | None -> List.map add sig_.mis_body
-      | Some (`Include_proc xs) ->
-        check_xs xs;
-        List.pmap
-          (fun fs -> if in_xs fs xs then Some (add fs) else None)
-          sig_.mis_body
-      | Some (`Exclude_proc xs) ->
-        check_xs xs;
-        List.pmap
-          (fun fs -> if not (in_xs fs xs) then Some (add fs) else None)
-          sig_.mis_body
-  in
 
-  let items = List.flatten (List.map transsig1 is) in
+      let in_xs (Tys_function fs) xs =
+        List.exists (fun x -> sym_equal fs.fs_name (unloc x)) xs in
+
+      let calls = mk_calls restr in
+
+      let add mr (Tys_function fs) =
+        names := mk_loc (loc i) fs.fs_name :: !names;
+        EcModules.change_oicalls mr fs.fs_name calls in
+
+      let mr = match proc with
+        | None -> List.fold_left add mr sig_.mis_body
+        | Some (`Include_proc xs) ->
+          check_xs xs;
+          List.fold_left
+            (fun mr fs -> if in_xs fs xs then add mr fs else mr)
+            mr sig_.mis_body
+        | Some (`Exclude_proc xs) ->
+          check_xs xs;
+          List.fold_left
+            (fun mr fs -> if not (in_xs fs xs) then add mr fs else mr)
+            mr sig_.mis_body in
+
+      sig_.mis_body, mr in
+
+  let items, mr = List.fold_left (fun (its,mr) i ->
+      let l, mr = transsig1 mr i in
+      l @ its, mr
+    ) ([],EcModules.mr_empty) is in
+  let items = List.rev items in
   let names = List.rev !names in
 
   Msym.odup unloc names |> oiter (fun (_, x) ->
     tyerror (loc x) env (InvalidModSig (MTS_DupProcName (unloc x))));
-  items
+  items, mr
 
 (* -------------------------------------------------------------------- *)
 let rec transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
@@ -1506,17 +1517,27 @@ and transmod_header
     let torm =
       List.fold_left (fun mparams (id,_) ->
         Sm.add (EcPath.mident id) mparams) Sm.empty rm in
+
     let filter f =
       let ftop = EcPath.m_functor f.EcPath.x_top in
       not (Sm.mem ftop torm) in
-    let clear (Tys_function(fsig,oi)) =
-      Tys_function(fsig, {oi with oi_calls = List.filter filter oi.oi_calls}) in
-    let mis_body = List.map clear me.me_sig.mis_body in
-    let tymod = { mis_params; mis_body } in
+
+    let clear mr (Tys_function fsig) =
+      oicalls_filter mr fsig.fs_name filter in
+
+    let mis_restr =
+      List.fold_left clear
+        me.me_sig.mis_restr
+        me.me_sig.mis_body in
+
+    let mis_body = me.me_sig.mis_body in
+    let tymod = { mis_params;
+                  mis_body;
+                  mis_restr; } in
     (* Check that the signature is a subtype *)
     let check s =
       let (aty, _asig) = transmodtype env s in
-      try  check_sig_mt_cnv_no_restr env tymod aty (* TODO: (Adrien) is this correct? *)
+      try  check_sig_mt_cnv_no_restr env tymod aty
       with TymodCnvFailure err ->
         let args = List.map (fun (id,_) -> EcPath.mident id) rm in
         let mp = mpath_crt (psymbol me.me_name) args None in
@@ -1557,7 +1578,9 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
 
 (* -------------------------------------------------------------------- *)
-and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure located) =
+and transstruct
+    ~attop (env : EcEnv.env) (x : symbol)
+    stparams (st:pstructure located) =
   let { pl_loc = loc; pl_desc = st; } = st in
 
   if not attop && stparams <> [] then
@@ -1584,19 +1607,25 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure lo
     let mparams =
       List.fold_left (fun mparams (id,_) ->
         Sm.add (EcPath.mident id) mparams) Sm.empty stparams in
-    let tymod1 = function
-      | MI_Module   _ -> None
-      | MI_Variable _ -> None
+    let tymod1 restr = function
+      | MI_Module   _ -> None,restr
+      | MI_Variable _ -> None,restr
       | MI_Function f ->
         let rec f_call c f =
           let f = EcEnv.NormMp.norm_xfun envi f in
           if EcPath.Sx.mem f c then c
           else
             let c = EcPath.Sx.add f c in
-            match (EcEnv.Fun.by_xpath f envi).f_def with
+            let fun_ = (EcEnv.Fun.by_xpath f envi) in
+            match fun_.f_def with
             | FBalias _ -> assert false
             | FBdef def -> List.fold_left f_call c def.f_uses.us_calls
-            | FBabs oi  -> List.fold_left f_call c oi.oi_calls in
+            | FBabs  ->
+              let me = EcEnv.Mod.by_mpath f.x_top envi in
+              match Msym.find fun_.f_name me.me_sig.mis_restr.mr_oinfos with
+              | oi -> List.fold_left f_call c oi.oi_calls
+              | exception Not_found -> c in
+
         let all_calls =
           match f.f_def with
           | FBalias f -> f_call EcPath.Sx.empty f
@@ -1607,12 +1636,21 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure lo
           let ftop = EcPath.m_functor f.EcPath.x_top in
           Sm.mem ftop mparams in
         let calls = List.filter filter (EcPath.Sx.elements all_calls) in
-        Some (Tys_function (f.f_sig, { oi_calls = calls; oi_in = true; }))
-    in
+        let restr = { restr with
+                      mr_oinfos = Msym.add f.f_name
+                          { oi_calls = calls; oi_in = true; }
+                          restr.mr_oinfos } in
+        Some (Tys_function f.f_sig), restr in
 
-    let sigitems = List.pmap tymod1 items in
+    let sigitems, restr = List.fold_left (fun (its, restr) it ->
+        match tymod1 restr it with
+        | None,restr -> its,restr
+        | Some x, restr -> x :: its, restr
+      ) ([],EcModules.mr_empty) items  in
+
     { mis_params = stparams;
-      mis_body   = sigitems; };
+      mis_body   = List.rev sigitems;
+      mis_restr = restr; };
   in
   (* Construct structure representation *)
   let me =
@@ -2129,12 +2167,16 @@ let trans_gbinding env ue decl =
       | PGTY_ModTy (mi, restr) ->
         let mi = fst (transmodtype env mi) in
         let restr = Sm.of_list (List.map (trans_topmsymbol env) restr) in
-        let restr = Sx.empty, restr in
-        let ty = GTmodty (mi, restr) in
+        let mr = { mi.mt_restr with
+                   mr_mpaths = Sm.union
+                       mi.mt_restr.mr_mpaths
+                       restr; } in
+        let mi = { mi with mt_restr = mr } in
+        let ty = GTmodty mi in
 
         let add1 env x =
           let x   = ident_of_osymbol (unloc x) in
-          let env = EcEnv.Mod.bind_local x mi restr env in
+          let env = EcEnv.Mod.bind_local x mi env in
           (env, (x, ty))
 
         in List.map_fold add1 env xs

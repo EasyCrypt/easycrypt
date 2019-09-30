@@ -30,7 +30,7 @@ val module_use_local_or_abs : module_expr -> locals -> bool
 val opdecl_use_local_or_abs : operator    -> locals -> bool
 val tydecl_use_local_or_abs : tydecl      -> locals -> bool
 
-val abstracts : locals -> (EcIdent.t * (module_type * mod_restr)) list * Sid.t
+val abstracts : locals -> (EcIdent.t * module_type) list * Sid.t
 
 val generalize : EcEnv.env -> locals -> form -> form
 
@@ -59,4 +59,4 @@ type lvl = [`Local | `Global] * [`Axiom | `Lemma]
 val add_local_mod : path -> t -> t
 val add_lemma     : path -> lvl -> t -> t
 val add_item      : EcTheory.ctheory_item -> t -> t
-val add_abstract  : EcIdent.t -> (module_type * mod_restr) -> t -> t
+val add_abstract  : EcIdent.t -> module_type -> t -> t
