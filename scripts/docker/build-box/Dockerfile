@@ -35,18 +35,16 @@ RUN \
 RUN \
 	opam install --deps-only easycrypt && opam clean
 
-ENV CVC4V=1.6 Z3V=4.8.4 Z3H=d6df51951f4c
+ENV CVC4V=1.6 Z3V=4.8.6
 
 RUN \
 	opam install alt-ergo && \
-	wget https://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-${CVC4V}-x86_64-linux-opt && \
-        wget https://github.com/Z3Prover/z3/releases/download/z3-${Z3V}/z3-${Z3V}.${Z3H}-x64-debian-8.11.zip && \
-        unzip -j z3-${Z3V}.${Z3H}-x64-debian-8.11.zip z3-${Z3V}.${Z3H}-x64-debian-8.11/bin/z3 && \
-        rm z3-${Z3V}.${Z3H}-x64-debian-8.11.zip && \
-        sudo mv z3 /usr/local/bin/z3 && \
-	sudo mv cvc4-${CVC4V}-x86_64-linux-opt /usr/local/bin/cvc4 && \
-        sudo chmod u+x /usr/local/bin/cvc4 && \
-        sudo chmod u+x /usr/local/bin/z3
+	wget -O cvc4 https://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-${CVC4V}-x86_64-linux-opt && \
+        wget https://github.com/Z3Prover/z3/releases/download/z3-${Z3V}/z3-${Z3V}-x64-ubuntu-16.04.zip && \
+        unzip -j z3-${Z3V}-x64-ubuntu-16.04.zip z3-${Z3V}-x64-ubuntu-16.04/bin/z3 && \
+        rm z3-${Z3V}-x64-ubuntu-16.04.zip && \
+        sudo install -o root -g root -m 0755 -t /usr/local/bin z3 cvc4 && \
+	rm -f z3 cvc4
 
 RUN \
 	opam config exec -- why3 config --detect
