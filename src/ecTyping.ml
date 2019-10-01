@@ -34,15 +34,21 @@ type opmatch = [
   | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
 ]
 
+type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
+
 type mismatch_funsig =
 | MF_targs of ty * ty (* expected, got *)
 | MF_tres  of ty * ty (* expected, got *)
-| MF_restr of EcEnv.env * [`Eq of Sx.t * Sx.t | `Sub of Sx.t ]
+| MF_restr of EcEnv.env * Sx.t mismatch_sets
+
+type 'a mismatch_restr = [`Eq of 'a * 'a | `Sub of 'a ]
 
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
+| E_TyModCnv_MismatchVarRestr  of symbol * Sx.t mismatch_sets
+| E_TyModCnv_MismatchModRestr  of symbol * Sm.t mismatch_sets
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
 | E_TyModCnv_SubTypeArg        of
     EcIdent.t * module_type * module_type * tymod_cnv_failure
@@ -444,11 +450,7 @@ let tymod_cnv_failure e =
 let tysig_item_name = function
   | Tys_function f -> f.fs_name
 
-let tysig_item_kind = function
-  | Tys_function _ -> `Function
-
-
-let check_fun_compatible env fin fout =
+let check_item_compatible env mode (fin,oin) (fout,oout) =
   assert (fin.fs_name = fout.fs_name);
 
   let (iargs, oargs) = (fin.fs_arg, fout.fs_arg) in
@@ -460,15 +462,7 @@ let check_fun_compatible env fin fout =
 
   if not (EqTest.for_type env ires ores) then
     tymod_cnv_failure
-      (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_tres(ores,ires)))
-
-let check_item_compatible env f_in f_out = match f_in, f_out with
-  | Tys_function fin, Tys_function fout ->
-    check_fun_compatible env fin fout
-
-(* TODO: (Adrien) use where appropriate *)
-let check_fun_compatible_with_oi_restr env mode (fin,oin) (fout,oout) =
-  check_fun_compatible env fin fout;
+      (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_tres(ores,ires)));
 
   let norm oi =
     List.fold_left (fun s f ->
@@ -490,7 +484,7 @@ let check_fun_compatible_with_oi_restr env mode (fin,oin) (fout,oout) =
                                    MF_restr(env, `Eq(ocalls, icalls))))
 
 
-let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
+let rec check_sig_cnv mode env sym_in (sin:module_sig) (sout:module_sig) =
   (* Check parameters for compatibility. Parameters names may be
    * different, hence, substitute in [tin.tym_params] types the names
    * of [tout.tym_params] *)
@@ -503,7 +497,8 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
       (fun subst (xin, tyin) (xout, tyout) ->
         let tyout = EcSubst.subst_modtype subst tyout in
         begin
-          try check_modtype_cnv_no_restr ~mode env tyout tyin
+          try check_modtype_cnv
+                ~mode env tyout tyin
           with TymodCnvFailure err ->
             tymod_cnv_failure
               (E_TyModCnv_SubTypeArg(xin, tyout, tyin, err))
@@ -511,62 +506,93 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
         EcSubst.add_module subst xout (EcPath.mident xin))
       EcSubst.empty sin.mis_params sout.mis_params
   in
-  (* Check for body inclusion (w.r.t the parameters names substitution).
+  let bout = EcSubst.subst_modsig_body bsubst sout.mis_body
+  and rout = EcSubst.subst_mod_restr bsubst sout.mis_restr in
+
+  (* Check for restrictions inclusion. *)
+  let sx_in = Sx.map (EcEnv.NormMp.norm_xfun env) sin.mis_restr.mr_xpaths
+  and sx_out = Sx.map (EcEnv.NormMp.norm_xfun env) rout.mr_xpaths
+  and sm_in = Sm.map (EcEnv.NormMp.norm_mpath env) sin.mis_restr.mr_mpaths
+  and sm_out = Sm.map (EcEnv.NormMp.norm_mpath env) rout.mr_mpaths in
+
+  let () = match mode with
+    | `Sub ->
+      (* We check that [sout] has less restrictions than [sin]. *)
+
+      if not (Sx.subset sx_out sx_in) then
+        let sx = Sx.diff sx_out sx_in in
+        tymod_cnv_failure (E_TyModCnv_MismatchVarRestr(sym_in, `Sub sx))
+      else ();
+      if not (Sm.subset sm_out sm_in) then
+        let sm = Sm.diff sm_out sm_in in
+        tymod_cnv_failure (E_TyModCnv_MismatchModRestr(sym_in, `Sub sm));
+
+    | `Eq  ->
+      (* We check that [sout] and [sin] have the same restrictions. *)
+      if not (Sx.subset sx_in sx_out) then
+        tymod_cnv_failure
+          (E_TyModCnv_MismatchVarRestr(sym_in, `Eq(sx_in,sx_out)))
+      else ();
+      if not (Sm.subset sm_in sm_out) then
+        tymod_cnv_failure
+          (E_TyModCnv_MismatchModRestr(sym_in, `Eq(sm_in,sm_out)));
+  in
+
+  (* Check for body inclusion.
    * This includes:
    * - functions inclusion with equal signatures + included use modifiers.
    *)
-  let tin  = sin.mis_body
-  and tout = EcSubst.subst_modsig_body bsubst sout.mis_body in
-
   let env =
     List.fold_left (fun env (xin,tyin) ->
       EcEnv.Mod.bind_local xin tyin env)
       env sin.mis_params in
 
-  let check_for_item (o_item : module_sig_body_item) =
-    let o_name = tysig_item_name o_item
-    and o_kind = tysig_item_kind o_item in
+  let check_for_item (Tys_function fout : module_sig_body_item) =
+    let o_name = fout.fs_name in
 
     let i_item =
       List.ofind
         (fun i_item ->
-             (tysig_item_name i_item) = o_name
-          && (tysig_item_kind i_item) = o_kind)
-        tin
+             (tysig_item_name i_item) = o_name)
+        sin.mis_body
     in
       match i_item with
       | None -> tymod_cnv_failure (E_TyModCnv_MissingComp o_name)
-      | Some i_item -> check_item_compatible env i_item o_item
+      | Some (Tys_function fin) ->
+        let oin = EcSymbols.Msym.find_def
+            EcModules.oi_empty fin.fs_name sin.mis_restr.mr_oinfos in
+        let oout =
+          EcSymbols.Msym.find_def
+            EcModules.oi_empty fout.fs_name rout.mr_oinfos in
+        check_item_compatible env mode (fin,oin) (fout,oout)
   in
-    List.iter check_for_item tout;
+    List.iter check_for_item bout;
 
     if mode = `Eq then begin
       List.iter
         (fun i_item ->
-          let i_name = tysig_item_name i_item
-          and i_kind = tysig_item_kind i_item in
+          let i_name = tysig_item_name i_item in
           let b =
             List.exists
               (fun o_item ->
-                   (tysig_item_name o_item) = i_name
-                && (tysig_item_kind o_item) = i_kind)
-              tout
+                   (tysig_item_name o_item) = i_name)
+              bout
           in
             if not b then
               tymod_cnv_failure (E_TyModCnv_MissingComp i_name))
-        tin
+        sin.mis_body
     end
 
-and check_modtype_cnv_no_restr
+and check_modtype_cnv
   ?(mode = `Eq) env (tyin:module_type) (tyout:module_type)
 =
   let sin = EcEnv.ModTy.sig_of_mt env tyin in
   let sout = EcEnv.ModTy.sig_of_mt env tyout in
-  check_sig_cnv mode env sin sout
+  check_sig_cnv mode env (EcPath.basename tyin.mt_name) sin sout
 
-let check_sig_mt_cnv_no_restr env sin tyout =
+let check_sig_mt_cnv env sym_in sin tyout =
   let sout = EcEnv.ModTy.sig_of_mt env tyout in
-  check_sig_cnv `Sub env sin sout
+  check_sig_cnv `Sub env sym_in sin sout
 
 (* -------------------------------------------------------------------- *)
 let check_restrictions env who use restr =
@@ -625,7 +651,11 @@ let check_restrictions_fun env xp restr =
 
 (* -------------------------------------------------------------------- *)
 let check_modtype_with_restrictions env mp mt i =
-  check_sig_mt_cnv_no_restr env mt i;
+  let sym = match mp.m_top with
+    | `Local id -> id.EcIdent.id_symb
+    | `Concrete (p,_) -> EcPath.basename p in
+  check_sig_mt_cnv env sym mt i;
+
   let restr = i.mt_restr in
   let use = NormMp.mod_use env mp in
   check_restrictions env (RW_mod mp) use restr
@@ -716,10 +746,10 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
       let params, remn = List.takedrop lena params in
 
       let args = List.map2
-        (fun (_,tp) ((a,loc),ta) ->
+        (fun (x,tp) ((a,loc),ta) ->
           try
-            (* TODO: (Adrien) is this correct? *)
-            check_modtype_with_restrictions env a ta tp; a
+            let env = EcEnv.Mod.bind_local x tp env in
+            check_sig_mt_cnv env x.EcIdent.id_symb ta tp; a
           with TymodCnvFailure error ->
             tyerror loc env (InvalidModAppl (MAE_InvalidArgType(a, error))))
         params args in
@@ -1537,7 +1567,7 @@ and transmod_header
     (* Check that the signature is a subtype *)
     let check s =
       let (aty, _asig) = transmodtype env s in
-      try  check_sig_mt_cnv_no_restr env tymod aty
+      try  check_sig_mt_cnv env me.me_name tymod aty
       with TymodCnvFailure err ->
         let args = List.map (fun (id,_) -> EcPath.mident id) rm in
         let mp = mpath_crt (psymbol me.me_name) args None in

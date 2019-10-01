@@ -56,7 +56,7 @@ val subst_module_comps : subst -> module_comps -> module_comps
 val subst_modtype      : subst -> module_type -> module_type
 val subst_modsig       : ?params:(ident list) -> subst -> module_sig -> module_sig
 val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
-
+val subst_mod_restr    : subst -> mod_restr -> mod_restr
 (* -------------------------------------------------------------------- *)
 val subst_genty : subst -> (ty_params * ty) -> (ty_params * ty)
 val subst_ty    : subst -> ty   -> ty

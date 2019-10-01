@@ -2702,7 +2702,6 @@ let rec pp_modexp ppe fmt (p, me) =
   let params =
     match me.me_body with
     | ME_Alias (i,_) -> List.take i me.me_sig.mis_params
-    | ME_Decl  _     -> []
     | _              -> me.me_sig.mis_params in
   let (ppe, pp) = pp_mod_params ppe params in
   Format.fprintf fmt "@[<v>module %s%t%a = %a@]"

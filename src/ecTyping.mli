@@ -25,15 +25,21 @@ type opmatch = [
   | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
 ]
 
+type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
+
 type mismatch_funsig =
 | MF_targs of ty * ty (* expected, got *)
 | MF_tres  of ty * ty (* expected, got *)
-| MF_restr of EcEnv.env * [`Eq of Sx.t * Sx.t | `Sub of Sx.t ]
+| MF_restr of EcEnv.env * Sx.t mismatch_sets
+
+type 'a mismatch_restr = [`Eq of 'a * 'a | `Sub of 'a ]
 
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
+| E_TyModCnv_MismatchVarRestr  of symbol * Sx.t mismatch_sets
+| E_TyModCnv_MismatchModRestr  of symbol * Sm.t mismatch_sets
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
 | E_TyModCnv_SubTypeArg        of
     EcIdent.t * module_type * module_type * tymod_cnv_failure

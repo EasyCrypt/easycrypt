@@ -65,6 +65,9 @@ end = struct
   let rec pp_cnv_failure env fmt error =
     let msg x = Format.fprintf fmt x in
 
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    let pp_v fmt xp = EcPrinting.pp_pv ppe fmt (pv_glob xp) in
+
     match error with
     | E_TyModCnv_ParamCountMismatch ->
         msg "not the same number of module arguments"
@@ -75,6 +78,30 @@ end = struct
 
     | E_TyModCnv_MissingComp x ->
         msg "procedure `%s' is missing" x
+
+    | E_TyModCnv_MismatchVarRestr (x,`Sub xs) ->
+      msg "the module `%s' is not allowed to use the variable(s)@ %a"
+        x (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xs)
+
+    | E_TyModCnv_MismatchVarRestr (x,`Eq (xl,xr)) ->
+      msg "the module `%s' variable restriction@ %a@ \
+           is not compatible with the variable restriction@ %a" x
+        (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xl)
+        (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xr)
+
+    | E_TyModCnv_MismatchModRestr (x,`Sub ms) ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      msg "the module `%s' is not allowed to use the modules(s)@ %a" x
+        (EcPrinting.pp_list " and@ " (EcPrinting.pp_topmod ppe))
+        (Sm.ntr_elements ms)
+
+    | E_TyModCnv_MismatchModRestr (x,`Eq (xl,xr)) ->
+      msg "the module `%s' module restriction@ %a@ \
+           is not compatible with the module restriction@ %a" x
+        (EcPrinting.pp_list " and@ " (EcPrinting.pp_topmod ppe))
+        (Sm.ntr_elements xl)
+        (EcPrinting.pp_list " and@ " (EcPrinting.pp_topmod ppe))
+        (Sm.ntr_elements xr)
 
     | E_TyModCnv_MismatchFunSig (x,err) ->
         msg "procedure `%s' is not compatible: %a"

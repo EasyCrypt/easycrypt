@@ -132,8 +132,7 @@ let subst_fun_uses (s : _subst) (u : uses) =
 let subst_oracle_info (s:_subst) (x:oracle_info) =
   let x_subst = EcPath.x_subst s.s_fmp in
     { oi_calls  = List.map x_subst x.oi_calls;
-      oi_in     = x.oi_in;
-    }
+      oi_in     = x.oi_in; }
 
 (* -------------------------------------------------------------------- *)
 let subst_funsig (s : _subst) (funsig : funsig) =
@@ -600,6 +599,7 @@ let subst_module_comps s = subst_module_comps (_subst_of_subst s)
 let subst_modtype      s = subst_modtype (_subst_of_subst s)
 let subst_modsig         = fun ?params s x -> snd (subst_modsig ?params (_subst_of_subst s) x)
 let subst_modsig_body  s = subst_modsig_body (_subst_of_subst s)
+let subst_mod_restr    s = subst_mod_restr (_subst_of_subst s)
 
 let subst_mpath        s = (_subst_of_subst s).s_fmp
 let subst_path         s = (_subst_of_subst s).s_p
