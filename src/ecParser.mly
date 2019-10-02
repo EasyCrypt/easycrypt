@@ -434,6 +434,7 @@
 %token FISSION
 %token FOR
 %token FORALL
+%token FROM
 %token FUN
 %token FUSION
 %token FWDS
@@ -636,6 +637,7 @@ _lident:
 | WLOG     { "wlog"     }
 | EXLIM    { "exlim"    }
 | ECALL    { "ecall"    }
+| FROM     { "from"     }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -1898,8 +1900,16 @@ import_flag:
 | IMPORT { `Import }
 | EXPORT { `Export }
 
-theory_require :
-| REQUIRE ip=import_flag? x=uident+ { (x, ip) }
+theory_require:
+| nm=prefix(FROM, uident)? REQUIRE ip=import_flag? x=theory_require_1+
+    { (nm, x, ip) }
+
+theory_require_1:
+| x=uident
+    { (x, None) }
+
+| LBRACKET x=uident AS y=uident RBRACKET
+    { (x, Some y) }
 
 theory_import: IMPORT xs=uqident* { xs }
 theory_export: EXPORT xs=uqident* { xs }

@@ -1057,6 +1057,10 @@ type phint = {
 }
 
 (* -------------------------------------------------------------------- *)
+type threquire =
+  psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gdeclare     of pdeclare
   | Gmodule      of pmodule_def
@@ -1076,7 +1080,7 @@ type global_action =
   | GthOpen      of (bool * psymbol)
   | GthClose     of (theory_clear * psymbol)
   | GthClear     of theory_clear
-  | GthRequire   of (psymbol list * [`Import|`Export] option)
+  | GthRequire   of threquire
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
   | GthClone     of theory_cloning

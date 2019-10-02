@@ -169,6 +169,7 @@
     "abort"       , ABORT      ;        (* KW: global *)
     "goal"        , GOAL       ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)
+    "from"        , FROM       ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
     "include"     , INCLUDE    ;        (* KW: global *)
