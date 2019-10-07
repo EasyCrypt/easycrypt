@@ -1060,8 +1060,7 @@ let check_module_in env mp mt =
 
       let m = EcEnv.Mod.by_mpath mp env in
       let oi =
-        try EcSymbols.Msym.find fs.fs_name m.me_sig.mis_restr.mr_oinfos with
-        | Not_found -> oi_empty in
+        EcSymbols.Msym.find fs.fs_name m.me_sig.mis_restr.mr_oinfos in
 
       (* We remove the paramater not take into account *)
       let eqi =

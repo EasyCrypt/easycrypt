@@ -497,7 +497,7 @@ let abstract_info env f1 =
     match def.f_def with
     | FBabs ->
       let m = EcEnv.Mod.by_mpath f.EcPath.x_top env in
-      EcSymbols.Msym.find_def oi_empty def.f_name m.me_sig.mis_restr.mr_oinfos
+      EcSymbols.Msym.find def.f_name m.me_sig.mis_restr.mr_oinfos
     | _ ->
       let ppe = EcPrinting.PPEnv.ofenv env in
         if EcPath.x_equal f1 f then

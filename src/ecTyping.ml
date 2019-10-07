@@ -559,11 +559,9 @@ let rec check_sig_cnv mode env sym_in (sin:module_sig) (sout:module_sig) =
       match i_item with
       | None -> tymod_cnv_failure (E_TyModCnv_MissingComp o_name)
       | Some (Tys_function fin) ->
-        let oin = EcSymbols.Msym.find_def
-            EcModules.oi_empty fin.fs_name sin.mis_restr.mr_oinfos in
+        let oin = EcSymbols.Msym.find fin.fs_name sin.mis_restr.mr_oinfos in
         let oout =
-          EcSymbols.Msym.find_def
-            EcModules.oi_empty fout.fs_name rout.mr_oinfos in
+          EcSymbols.Msym.find fout.fs_name rout.mr_oinfos in
         check_item_compatible env mode (fin,oin) (fout,oout)
   in
     List.iter check_for_item bout;
@@ -1652,10 +1650,10 @@ and transstruct
             | FBalias _ -> assert false
             | FBdef def -> List.fold_left f_call c def.f_uses.us_calls
             | FBabs  ->
-              let me = EcEnv.Mod.by_mpath f.x_top envi in
-              match Msym.find fun_.f_name me.me_sig.mis_restr.mr_oinfos with
-              | oi -> List.fold_left f_call c oi.oi_calls
-              | exception Not_found -> c in
+              let mp = EcEnv.NormMp.norm_mpath envi f.x_top in
+              let me = EcEnv.Mod.by_mpath mp envi in
+              let oi = Msym.find fun_.f_name me.me_sig.mis_restr.mr_oinfos in
+              List.fold_left f_call c oi.oi_calls in
 
         let all_calls =
           match f.f_def with

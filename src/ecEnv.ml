@@ -2143,8 +2143,7 @@ module NormMp = struct
   let get_oicalls env xp =
     let mp = norm_mpath env xp.x_top in
     let ml = Mod.by_mpath mp env in
-    EcSymbols.Msym.find_def
-      oi_empty (basename xp.x_sub) ml.me_sig.mis_restr.mr_oinfos
+    EcSymbols.Msym.find (basename xp.x_sub) ml.me_sig.mis_restr.mr_oinfos
 
   let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty; }
   let use_equal us1 us2 =
