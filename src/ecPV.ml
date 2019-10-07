@@ -91,7 +91,7 @@ module Mpv = struct
         raise (AliasClash(env,AC_abstract_abstract(mp,mp')))
 
   let check_glob env mp m =
-    let restr = NormMp.get_restr env mp in
+    let restr = NormMp.get_restr_use env mp in
     let check npv _ =
       if is_glob npv then
         check_npv_mp env npv mp restr in
@@ -101,7 +101,7 @@ module Mpv = struct
 
   let add_glob env mp f m =
     check_glob env mp m;
-    { m with s_gl = Mm.add mp (NormMp.get_restr env mp, f) m.s_gl }
+    { m with s_gl = Mm.add mp (NormMp.get_restr_use env mp, f) m.s_gl }
 
   let find_glob env mp m =
     try snd (Mm.find mp m.s_gl)
@@ -274,7 +274,7 @@ module PV = struct
 
   (* We assume that mp is an abstract functor *)
   let mem_glob env mp fv =
-    ignore (NormMp.get_restr env mp);
+    ignore (NormMp.get_restr_use env mp);
     Sm.mem mp fv.s_gl
 
   let union fv1 fv2 =
@@ -330,7 +330,8 @@ module PV = struct
     let vs,gs = ntr_elements fv in
     let pp_vs fmt (pv,_) = EcPrinting.pp_pv ppe fmt pv in
     let pp_gl fmt mp =
-      Format.fprintf fmt "(glob %a)" (EcPrinting.pp_topmod ppe) mp in
+      Format.fprintf fmt "(glob %a)" (EcPrinting.pp_topmod ppe) mp
+    in
 
     begin
       if vs = [] || gs = [] then
@@ -345,7 +346,7 @@ module PV = struct
 
   let check_depend env fv mp =
     try
-      let restr = NormMp.get_restr env mp in
+      let restr = NormMp.get_restr_use env mp in
       let check_v v _ =
         if is_loc v then begin
           let ppe = EcPrinting.PPEnv.ofenv env in
@@ -357,7 +358,7 @@ module PV = struct
       Mnpv.iter check_v fv.s_pv;
       let check_m mp' =
         if not (NormMp.use_mem_gl mp' restr) then
-          let restr' = NormMp.get_restr env mp' in
+          let restr' = NormMp.get_restr_use env mp' in
           if not (NormMp.use_mem_gl mp restr') then
             raise (AliasClash(env,AC_abstract_abstract(mp,mp')))
       in
@@ -373,17 +374,17 @@ module PV = struct
       Mnpv.mem pv fv2.s_pv ||
         (is_glob pv &&
            let check1 mp =
-             let restr = NormMp.get_restr env mp in
+             let restr = NormMp.get_restr_use env mp in
              not (NormMp.use_mem_xp pv.pv_name restr) in
            Sm.exists check1 fv2.s_gl) in
     let test_mp mp =
-      let restr = NormMp.get_restr env mp in
+      let restr = NormMp.get_restr_use env mp in
       let test_pv pv _ =
         is_glob pv &&
           not (NormMp.use_mem_xp pv.pv_name restr) in
       let test_mp mp' =
         not (NormMp.use_mem_gl mp' restr ||
-             NormMp.use_mem_gl mp (NormMp.get_restr env mp')) in
+             NormMp.use_mem_gl mp (NormMp.get_restr_use env mp')) in
       Mnpv.exists test_pv fv2.s_pv || Sm.exists test_mp fv2.s_gl in
 
     { s_pv = Mnpv.filter test_pv fv1.s_pv;
@@ -403,7 +404,7 @@ module PV = struct
         if is_glob pv then begin
           let pv = EcEnv.NormMp.norm_pvar env pv in
           let check1 mp =
-            let restr = NormMp.get_restr env mp in
+            let restr = NormMp.get_restr_use env mp in
             Mpv.check_npv_mp env pv mp restr in
           Sm.iter check1 fv.s_gl
         end;
@@ -446,16 +447,9 @@ let rec f_write_r ?(except=Sx.empty) env w f =
       assert false
 
   | FBabs ->
+    let oi = EcEnv.NormMp.get_oicalls env f in
     let mp = get_abs_functor f in
-    (* TODO: (Adrien) is this what we want? *)
-    let m = EcEnv.Mod.by_mpath mp env in
-    begin
-      match EcSymbols.Msym.find func.f_name m.me_sig.mis_restr.mr_oinfos with
-      | oi -> List.fold_left folder (PV.add_glob env mp w) oi.oi_calls
-      | exception Not_found ->
-        (* TODO: (Adrien) check this *)
-        assert false
-        (* PV.add_glob env mp w *) end
+    List.fold_left folder (PV.add_glob env mp w) oi.oi_calls
 
   | FBdef fdef ->
       let add x w =
@@ -505,18 +499,10 @@ let rec f_read_r env r f =
       assert false
 
   | FBabs ->
+    let oi = EcEnv.NormMp.get_oicalls env f in
     let mp = get_abs_functor f in
-    (* TODO: (Adrien) is this what we want? *)
-    let m = EcEnv.Mod.by_mpath mp env in
-    begin
-      match EcSymbols.Msym.find func.f_name m.me_sig.mis_restr.mr_oinfos with
-      | oi ->
-        let r = if oi.oi_in then (PV.add_glob env mp r) else r in
-        List.fold_left (f_read_r env) r oi.oi_calls
-
-      | exception Not_found ->
-        (* TODO: (Adrien) check this *)
-        assert false (* r *) end
+    let r = if oi.oi_in then (PV.add_glob env mp r) else r in
+    List.fold_left (f_read_r env) r oi.oi_calls
 
   | FBdef fdef ->
       let add x r =
@@ -656,20 +642,20 @@ module Mpv2 = struct
       if is_glob pv then
         let x = pv.pv_name in
         let check_mp mp =
-          let restr = NormMp.get_restr env mp in
+          let restr = NormMp.get_restr_use env mp in
           not (EcPath.Mx.mem x restr.us_pv) in
         Sm.exists check_mp mod_.PV.s_gl
       else false
 
   let is_mod_mp env mp mod_ =
     let id = EcPath.mget_ident mp in
-    let restr = NormMp.get_restr env mp in
+    let restr = NormMp.get_restr_use env mp in
     let check_v pv _ty =
       let x = pv.pv_name in
       not (EcPath.Mx.mem x restr.us_pv) in
     let check_mp mp' =
       not (Sid.mem (EcPath.mget_ident mp') restr.us_gl ||
-           Sid.mem id (NormMp.get_restr env mp').us_gl) in
+           Sid.mem id (NormMp.get_restr_use env mp').us_gl) in
     Mnpv.exists check_v mod_.PV.s_pv ||
     Sm.exists check_mp mod_.PV.s_gl
 
@@ -1039,12 +1025,7 @@ and eqobs_inF_refl env f' eqo =
         (EcPrinting.pp_funname ppe) f' (PV.pp env) diff
 
   | FBabs ->
-    let mp = get_abs_functor f in
-    (* TODO: (Adrien) is this what we want? *)
-    let m = EcEnv.Mod.by_mpath mp env in
-    let oi =
-      try EcSymbols.Msym.find ffun.f_name m.me_sig.mis_restr.mr_oinfos with
-      | Not_found -> oi_empty in
+    let oi = EcEnv.NormMp.get_oicalls env f in
 
     let do1 eqo o = PV.union (eqobs_inF_refl env o eqo) eqo in
     let top = EcPath.m_functor f.x_top in

@@ -595,10 +595,11 @@ let check_sig_mt_cnv env sym_in sin tyout =
   check_sig_cnv `Sub env sym_in sin sout
 
 (* -------------------------------------------------------------------- *)
+(* TODO: (Adrien) this only checks the variables restricitons, not the oracle calls. *)
 let check_restrictions env who use restr =
   let re_error = fun env x -> raise (RestrictionError (env, (who, x))) in
 
-  let restr = NormMp.norm_restr env restr in
+  let restr = NormMp.restr_use env restr in
 
   let check_xp xp _ =
     (* We check that the variable is not a variable in restr *)
@@ -609,7 +610,7 @@ let check_restrictions env who use restr =
      * abstract module in restr. *)
     let check id2 =
       let mp2 = EcPath.mident id2 in
-      let r2  = NormMp.get_restr env mp2 in
+      let r2  = NormMp.get_restr_use env mp2 in
 
       if not (NormMp.use_mem_xp xp r2) then
         re_error env (RE_UseVariableViaModule (xp, mp2));
@@ -624,7 +625,7 @@ let check_restrictions env who use restr =
     if NormMp.use_mem_gl mp1 restr then
       re_error env (RE_UseModule mp1);
 
-    let r1 = NormMp.get_restr env mp1 in
+    let r1 = NormMp.get_restr_use env mp1 in
 
     let check_v xp2 _ =
       if not (NormMp.use_mem_xp xp2 r1) then
@@ -636,7 +637,7 @@ let check_restrictions env who use restr =
       let mp2 = EcPath.mident id2 in
 
       if not (NormMp.use_mem_gl mp2 r1) then
-        let r2 = NormMp.get_restr env mp2 in
+        let r2 = NormMp.get_restr_use env mp2 in
         if not (NormMp.use_mem_gl mp1 r2) then
           re_error env (RE_MMissingRestriction (mp1, (mp1, mp2)));
     in

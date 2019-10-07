@@ -459,14 +459,14 @@ let generalize_mod_ env m modi f =
            the variables not generalized *)
   let restrs =
     List.fold_left (fun r mp ->
-      let restr = NormMp.get_restr env mp in
+      let restr = NormMp.get_restr_use env mp in
       EcPath.Mm.add mp restr r) EcPath.Mm.empty mglob in
   List.iter (fun (npv,_) ->
     if is_glob npv then
       let check1 mp restr =  Mpv.check_npv_mp env npv mp restr in
       EcPath.Mm.iter check1 restrs) nelts;
   List.iter (fun mp ->
-    let restr = NormMp.get_restr env mp in
+    let restr = NormMp.get_restr_use env mp in
     let check (npv,_) =
       if is_glob npv then
         Mpv.check_npv_mp env npv mp restr in
