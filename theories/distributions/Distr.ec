@@ -908,9 +908,22 @@ lemma dmap_ll (d : 'a distr) (f : 'a -> 'b) :
   is_lossless d => is_lossless (dmap d f).
 proof. by rewrite /is_lossless weight_dmap. qed.
 
+lemma dmap_uni_support (d : 'a distr) (f : 'a -> 'b) :
+  (forall x y, x \in d => y \in d => f x = f y => x = y) =>
+  is_uniform d =>
+  is_uniform (dmap d f).
+proof.
+  move=> finj_in duni x y /supp_dmap [a [ina ->]] /supp_dmap [b [inb ->]].
+  rewrite !dmap1E.
+  have Heq: forall z, z \in d => mu d (pred1 (f z) \o f) = mu d (pred1 z).
+  + move=> z inz; rewrite (@mu_eq_support d (pred1 (f z) \o f) (pred1 z)) //.
+    move=> x0 inx0 @/(\o) @/pred1 /=; rewrite eq_iff=> />; exact/finj_in.
+  by rewrite !Heq //; exact/duni.
+qed.
+
 lemma dmap_uni (d : 'a distr) (f : 'a -> 'b) : 
   injective f => is_uniform d => is_uniform (dmap d f).
-proof. 
+proof.
   move=> finj duni x y /supp_dmap [a [ina ->]] /supp_dmap [b [inb ->]].
   rewrite !dmap1E.
   have Heq: forall z, pred1 (f z) \o f = pred1 z.
