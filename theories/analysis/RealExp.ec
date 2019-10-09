@@ -495,29 +495,27 @@ proof. by rewrite !sqnormv !(dotpDl, dotpDr) (@dotpC y x) #ring. qed.
 (* -------------------------------------------------------------------- *)
 lemma CZ x y : dotp x y <= norm x * norm y.
 proof.
-  case: (dotp x y < 0%r) => ge0_xy.
-  * have tr2 : 0%r <= norm x * norm y by rewrite mulr_ge0 // ge0_normv.
-    move : ge0_xy; rewrite ltr_def; move => [_] tr1.
-    by rewrite (ler_trans _ _ _ tr1 tr2).
-  * case: (y = zerov) => [->|nz_y]; first by rewrite normv0 dotpv0 mulr0.
-    pose P := fun t => (norm (x + t ** y))^2.
-    pose a := (norm y)^2; pose b := 2%r * dotp x y; pose c := (norm x)^2.
-    have PE : forall t, P t = a * exp t 2 + b * t + c.
-    + move=> t @/P @/a @/b @/c; rewrite sqnormvD dotpZr mulrA #ring.
-    rewrite !powrE normvZ expfM mulNr addrC subr_eq0; congr.
-    by rewrite -normrX_nat // ger0_norm // ge0_sqr.
-    have nz_a : a <> 0%r by rewrite /a sqnormv; apply/negP => /dotp_def.
-    have ge0_aP : forall t, 0%r <= a * P t.
-    + move=> t @/P; rewrite powrE mulr_ge0.
-    * by rewrite /a powrE ge0_sqr. * by apply/ge0_sqr.
-    have @/D2 := poly2_same_sign a b c nz_a _.
-    + by move=> t; have := ge0_aP t; rewrite PE.
-    have ->: 4%r = exp 2%r 2 by rewrite expr2.
-    rewrite subr_le0 /a /c !powrE -!expfM /b -!powrE mulrAC.
-    have ge0_lhs : 0%r <= 2%r * dotp x y by rewrite mulr_ge0 //; move : ge0_xy; apply absurd; first by rewrite ltrNge.
-    have ge0_rhs : 0%r <= 2%r * norm x * norm y.
-    + by rewrite !mulr_ge0 // ge0_normv.
-    by rewrite -!rpow_int // rpow_mono // -!mulrA ler_pmul2l.
+case: (dotp x y < 0%r) => ge0_xy.
++ by apply/ltrW/(ltr_le_trans _ _ _ ge0_xy)/mulr_ge0; apply: ge0_normv.
+case: (y = zerov) => [->|nz_y]; first by rewrite normv0 dotpv0 mulr0.
+pose P := fun t => (norm (x + t ** y))^2.
+pose a := (norm y)^2; pose b := 2%r * dotp x y; pose c := (norm x)^2.
+have PE : forall t, P t = a * exp t 2 + b * t + c.
++ move=> t @/P @/a @/b @/c; rewrite sqnormvD dotpZr mulrA #ring.
+rewrite !powrE normvZ expfM mulNr addrC subr_eq0; congr.
+by rewrite -normrX_nat // ger0_norm // ge0_sqr.
+have nz_a : a <> 0%r by rewrite /a sqnormv; apply/negP => /dotp_def.
+have ge0_aP : forall t, 0%r <= a * P t.
++ move=> t @/P; rewrite powrE mulr_ge0.
+* by rewrite /a powrE ge0_sqr. * by apply/ge0_sqr.
+have @/D2 := poly2_same_sign a b c nz_a _.
++ by move=> t; have := ge0_aP t; rewrite PE.
+have ->: 4%r = exp 2%r 2 by rewrite expr2.
+rewrite subr_le0 /a /c !powrE -!expfM /b -!powrE mulrAC.
+have ge0_lhs : 0%r <= 2%r * dotp x y by rewrite mulr_ge0 // lerNgt.
+have ge0_rhs : 0%r <= 2%r * norm x * norm y.
++ by rewrite !mulr_ge0 // ge0_normv.
+by rewrite -!rpow_int // rpow_mono // -!mulrA ler_pmul2l.
 qed.
 
 end CauchySchwarz.
