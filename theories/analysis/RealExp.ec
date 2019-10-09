@@ -337,7 +337,8 @@ by rewrite invfM (mulrCA a) divff // mulr1 pmulr_lle0 ?invr_gt0.
 qed.
 
 (* -------------------------------------------------------------------- *)
-theory CauchySchwarz.
+abstract theory CauchySchwarz.
+
 (* -------------------------------------------------------------------- *)
 type t.
 
