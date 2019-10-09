@@ -98,6 +98,12 @@ proof. by move=> h x /h ->. qed.
 lemma nosmt eq_except_trans ['a 'b] X (m2 m1 m3 : ('a, 'b) map) :
   eq_except X m1 m2 => eq_except X m2 m3 => eq_except X m1 m3.
 proof. by move=> h1 h2 x ^/h1 -> /h2 ->. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt eq_except_sub ['a 'b] (X Y : 'a -> bool) (m1 m2 : ('a, 'b) map) :
+   X <= Y => eq_except X m1 m2 => eq_except Y m1 m2.
+proof. by move=> hsub + x hx => -> //; apply: contra (hsub x) hx. qed.
+
 end Map.
 
 (* -------------------------------------------------------------------- *)
@@ -125,6 +131,14 @@ abbrev (\notin) ['a 'b] x (m : ('a, 'b) fmap) = ! (dom m x).
 op rng ['a 'b] (m : ('a, 'b) fmap) =
   fun y => exists x, m.[x] = Some y
 axiomatized by rngE.
+
+lemma get_none (m : ('a, 'b) fmap, x : 'a) :
+  x \notin m => m.[x] = None.
+proof. by rewrite domE. qed.
+
+lemma get_some (m : ('a, 'b) fmap, x : 'a) :
+  x \in m => m.[x] = Some (oget m.[x]).
+proof. move=> /domE; by case m.[x]. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma getE ['a 'b] (m : ('a, 'b) fmap) x : m.[x] = (tomap m).[x].
@@ -307,6 +321,10 @@ lemma eq_except_trans ['a 'b] X (m1 m2 m3 : ('a, 'b) fmap) :
   eq_except X m1 m2 => eq_except X m2 m3 => eq_except X m1 m3.
 proof. by apply/Map.eq_except_trans<:'a, 'b option>. qed.
 
+lemma eq_except_sub ['a 'b] (X Y : 'a -> bool) (m1 m2 : ('a, 'b) fmap) :
+   X <= Y => eq_except X m1 m2 => eq_except Y m1 m2.
+proof. by apply/Map.eq_except_sub<:'a, 'b option>. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma eq_exceptP ['a 'b] X (m1 m2 : ('a, 'b) fmap) :
   eq_except X m1 m2 <=> (forall x, !X x => m1.[x] = m2.[x]).
@@ -455,7 +473,7 @@ lemma map_id (m : ('a,'b) fmap) :
 proof. by apply/fmap_eqP => x; rewrite mapE /=; case: m.[x]. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma map_empty (f : 'a -> 'b -> 'c, m : ('a, 'b) fmap) :
+lemma map_empty (f : 'a -> 'b -> 'c) :
   map f empty = empty.
 proof. by apply/fmap_eqP => x; rewrite mapE !emptyE. qed.
 
@@ -622,6 +640,37 @@ qed.
 lemma mem_join ['a 'b] (m1 m2 : ('a,'b) fmap) (x : 'a):
   x \in (m1 + m2) <=> x \in m1 \/ x \in m2.
 proof. by rewrite domE joinE !domE; case: (m2.[x]). qed.
+
+lemma fdom_join ['a, 'b] (m1 m2 : ('a,'b) fmap):
+ fdom (m1 + m2) = fdom m1 `|` fdom m2.
+proof.
+by apply/fsetP=> x; rewrite mem_fdom mem_join in_fsetU !mem_fdom.
+qed.
+
+(* ==================================================================== *)
+op ofassoc ['a 'b] (xs : ('a * 'b) list) =
+  ofmap (Map.offun (fun k => List.assoc xs k)).
+
+(* -------------------------------------------------------------------- *)
+lemma ofassoc_get ['a 'b] (xs : ('a * 'b) list) k :
+  (ofassoc xs).[k] = List.assoc xs k.
+proof.
+rewrite getE ofmapK /= 1:&(finiteP) 2:Map.offunE //.
+by exists (map fst xs) => a /=; rewrite Map.offunE &(assocTP).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mem_ofassoc ['a, 'b] (xs : ('a * 'b) list) k:
+ k \in ofassoc xs <=> k \in map fst xs.
+proof. by rewrite domE ofassoc_get &(assocTP). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma fdom_ofassoc ['a 'b] (xs : ('a * 'b) list) :
+  fdom (ofassoc xs) = oflist (map fst xs).
+proof.
+apply/fsetP=> a; rewrite mem_oflist mem_fdom.
+by rewrite /(_ \in _) ofassoc_get &(assocTP).
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                             Flagged Maps                             *)

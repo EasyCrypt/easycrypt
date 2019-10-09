@@ -722,3 +722,11 @@ module Os = struct
   let listdir (dir : string) =
     BatEnum.fold (fun xs x -> x :: xs) [] (BatSys.files_of dir)
 end
+
+(* -------------------------------------------------------------------- *)
+module Array = struct
+  include BatArray
+
+  let count f a =
+    Array.fold_left (fun i x -> if f x then i+1 else i) 0 a
+end

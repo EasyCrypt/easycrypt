@@ -573,14 +573,15 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             fst_map f_node (destr_app subject)
       with
       | (Fop (op1, tys1), args1), (Fop (op2, tys2), args2) -> begin
-          try
+(*          try
             if not (EcPath.p_equal op1 op2) then
               failure ();
             try
               List.iter2 (EcUnify.unify env ue) tys1 tys2;
               doit_args env ilc args1 args2
             with EcUnify.UnificationFailure _ -> failure ()
-          with MatchFailure ->
+          with MatchFailure -> *)
+(* Benj: Fixme user reduction ... *)
             if EcEnv.Op.reducible env op1 then
               doit_reduce env ((doit env ilc)^~ subject) ptn.f_ty op1 tys1 args1
             else if EcEnv.Op.reducible env op2 then

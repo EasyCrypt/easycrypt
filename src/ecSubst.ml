@@ -315,13 +315,13 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
         let sty   = init_tparams s tyd.tyd_params params' in
         let dtype =
           { tydt_ctors   = List.map (snd_map (List.map sty.s_ty)) dtype.tydt_ctors;
-            tydt_schelim = Fsubst.f_subst (f_subst_of_subst s) dtype.tydt_schelim;
-            tydt_schcase = Fsubst.f_subst (f_subst_of_subst s) dtype.tydt_schcase; }
+            tydt_schelim = Fsubst.f_subst (f_subst_of_subst sty) dtype.tydt_schelim;
+            tydt_schcase = Fsubst.f_subst (f_subst_of_subst sty) dtype.tydt_schcase; }
         in
           `Datatype dtype
     | `Record (scheme, fields) ->
       let sty = init_tparams s tyd.tyd_params params' in
-        `Record (Fsubst.f_subst (f_subst_of_subst s) scheme,
+        `Record (Fsubst.f_subst (f_subst_of_subst sty) scheme,
                  List.map (snd_map sty.s_ty) fields)
   in
     { tyd_params = params'; tyd_type = body; }

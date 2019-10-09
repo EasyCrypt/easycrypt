@@ -1,18 +1,9 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* ==================== Programmable Random Oracle ==================== *)
 
 require import Core List SmtMap FSet Distr.
 require IterProc.
 
 (* flag type for use with flagged maps of SmtMap: ('from, 'to * 'flag) fmap *)
-
 type flag = [ Unknown | Known ].  (* map setting known by distinguisher? *)
 
 lemma neqK_eqU f : f <> Known <=> f = Unknown.
@@ -26,6 +17,9 @@ type from, to.
 
 op sampleto : from -> to distr.
 
+type input.
+type output.
+
 module type RO = {
   proc init  ()                  : unit
   proc get   (x : from)          : to
@@ -35,7 +29,7 @@ module type RO = {
 }.
 
 module type RO_Distinguisher(G : RO) = {
-  proc distinguish(): bool 
+  proc distinguish(_:input): output 
 }.
 
 module type FRO = {
@@ -50,7 +44,7 @@ module type FRO = {
 }.
 
 module type FRO_Distinguisher(G : FRO) = {
-  proc distinguish(): bool 
+  proc distinguish(_ : input): output
 }.
 
 module RO : RO = {
@@ -119,7 +113,7 @@ module FRO : FRO = {
 }.
 
 equiv RO_FRO_init : RO.init ~ FRO.init : true ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> /=; by rewrite (map_empty _ empty). qed.
+proof. by proc; auto=> /=; by rewrite map_empty. qed.
 
 equiv RO_FRO_get : RO.get ~ FRO.get :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> ={res} /\ RO.m{1} = noflags FRO.m{2}.
@@ -146,7 +140,7 @@ qed.
 
 lemma RO_FRO_D (D <: RO_Distinguisher{RO, FRO}) :
   equiv [D(RO).distinguish ~ D(FRO).distinguish : 
-         ={glob D} /\ RO.m{1} = noflags FRO.m{2} ==>
+         ={arg, glob D} /\ RO.m{1} = noflags FRO.m{2} ==>
          ={res, glob D} /\ RO.m{1} = noflags FRO.m{2}].
 proof.
   proc (RO.m{1} = noflags FRO.m{2})=> //.
@@ -627,7 +621,7 @@ declare module D : FRO_Distinguisher {FRO}.
 lemma eager_D :
   eager [RRO.resample();, D(FRO).distinguish ~ 
          D(RRO).distinguish, RRO.resample(); :
-         ={glob D, FRO.m} ==> ={FRO.m, glob D} /\ ={res}].
+         ={glob D, FRO.m, arg} ==> ={FRO.m, glob D} /\ ={res}].
 proof.
   eager proc (H_: RRO.resample(); ~ RRO.resample();: ={FRO.m} ==> ={FRO.m})
              (={FRO.m}) =>//; try by sim.
@@ -637,34 +631,34 @@ proof.
 qed.
 
 module Eager (D : FRO_Distinguisher) = {
-  proc main1() = {
+  proc main1(x:input) = {
     var b;
     FRO.init();
-    b <@ D(FRO).distinguish();
+    b <@ D(FRO).distinguish(x);
     return b;
   }
 
-  proc main2() = {
+  proc main2(x:input) = {
     var b;
     FRO.init();
-    b <@ D(RRO).distinguish();
+    b <@ D(RRO).distinguish(x);
     RRO.resample();
     return b;
   }
 }.
 
 equiv Eager_1_2 : Eager(D).main1 ~ Eager(D).main2 :
-  ={glob D} ==> ={res, glob FRO, glob D}.
+  ={glob D, arg} ==> ={res, glob FRO, glob D}.
 proof.
   proc.
   transitivity{1} 
-    { FRO.init(); RRO.resample(); b <@ D(FRO).distinguish(); }
-    (={glob D} ==> ={b, FRO.m, glob D})
-    (={glob D} ==> ={b, FRO.m, glob D})=> //.
-  + by move=> ? &mr ->; exists (glob D){mr}.
+    { FRO.init(); RRO.resample(); b <@ D(FRO).distinguish(x); }
+    (={glob D, x} ==> ={b, FRO.m, glob D})
+    (={glob D, x} ==> ={b, FRO.m, glob D})=> />. 
+  + by move=> /> &mr; exists (glob D){mr} x{mr}.
   + inline *; rcondf{2} 3; 2:by sim.
     by auto=> ?; rewrite restr0 fdom0 elems_fset0.
-  seq 1 1 : (={glob D, FRO.m}); 1:by inline *; auto.
+  seq 1 1 : (={glob D, FRO.m, x}); 1:by inline *; auto.
   by eager call eager_D. 
 qed.
 
@@ -711,7 +705,7 @@ qed.
 
 lemma LRO_RRO_D (D <: RO_Distinguisher{RO, FRO}) :
   equiv [D(LRO).distinguish ~ D(RRO).distinguish : 
-         ={glob D} /\ RO.m{1} = restr Known FRO.m{2} ==>
+         ={glob D, arg} /\ RO.m{1} = restr Known FRO.m{2} ==>
          ={res, glob D} /\ RO.m{1} = restr Known FRO.m{2}].
 proof.
   proc (RO.m{1} = restr Known FRO.m{2})=> //.
@@ -724,16 +718,16 @@ section.
 declare module D : RO_Distinguisher{RO, FRO}.
 
 local module M = {
-  proc main1() = {
+  proc main1(x:input) = {
     var b;
     RRO.resample();
-    b <@ D(FRO).distinguish();
+    b <@ D(FRO).distinguish(x);
     return b;
   }
   
-  proc main2() = {
+  proc main2(x:input) = {
     var b;
-    b <@ D(RRO).distinguish();
+    b <@ D(RRO).distinguish(x);
     RRO.resample();
     return b;
   }
@@ -741,29 +735,27 @@ local module M = {
 
 lemma RO_LRO_D :
   equiv [D(RO).distinguish ~ D(LRO).distinguish :
-         ={glob D, RO.m} ==> ={res, glob D}].
+         ={glob D, RO.m, arg} ==> ={res, glob D}].
 proof.
   transitivity M.main1 
-     (={glob D} /\ FRO.m{2} = map (fun _ c => (c, Known)) RO.m{1} ==>
+     (={glob D, arg} /\ FRO.m{2} = map (fun _ c => (c, Known)) RO.m{1} ==>
         ={res, glob D})
-     (={glob D} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>
+     (={glob D, arg} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>
         ={res, glob D})=> //.
-  + by move=> ? &mr [] 2!->;
-      exists (glob D){mr} (map (fun _ c =>(c, Known)) RO.m{mr}).
-  + proc*; inline M.main1; wp; call (RO_FRO_D D); inline *; rcondf{2} 2; auto.
+  + by move=> /> &mr; exists (glob D){mr} (map (fun _ c =>(c, Known)) RO.m{mr}) arg{mr}.
+  + proc*; inline M.main1; wp; call (RO_FRO_D D); inline *; rcondf{2} 3; auto.
     + move=> &mr [] _ ->; apply mem_eq0=> z;
         rewrite -memE mem_fdom dom_restr /in_dom_with mapE mem_map domE.
-     by case (RO.m{m}.[_]).
-     by move=> ? &mr [] 2!-> /=; rewrite map_comp /fst /= map_id.
+      by case (RO.m{m}.[_]).
+  + by move=> /> &1; rewrite map_comp /fst /= map_id.
   transitivity M.main2
-     (={glob D, FRO.m} ==> ={res, glob D})
-     (={glob D} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>
+     (={glob D, FRO.m, arg} ==> ={res, glob D})
+     (={glob D, arg} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>
         ={res, glob D})=>//.
-  + by move=> ? &mr [] 2!->;
-      exists (glob D){mr} (map(fun _ c =>(c, Known)) RO.m{mr}).
+  + by move=> /> &mr; exists (glob D){mr} (map (fun _ c =>(c, Known)) RO.m{mr}) arg{mr}.
   + by proc; eager call (eager_D D); auto.
   proc*; inline M.main2; wp; call{1} RRO_resample_ll. 
-  symmetry; call (LRO_RRO_D D); auto=> &ml &mr [#] 2->; split=> //=.
+  symmetry; call (LRO_RRO_D D); auto=> &ml &mr />.
   by rewrite -fmap_eqP=> x; rewrite restrP mapE; case (RO.m{ml}.[x]).
 qed.
 

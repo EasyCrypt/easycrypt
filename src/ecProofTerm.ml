@@ -511,7 +511,7 @@ and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
       let ptn = ref Mid.empty in
       let fp  =
 
-      try  EcTyping.trans_pattern env (ptn, pe.pte_ue) fp
+      try  EcTyping.trans_pattern env ptn pe.pte_ue fp
       with EcTyping.TyError (loc, env, err) ->
         tc_pterm_apperror ~loc pe (AE_InvalidArgForm (IAF_TyError (env, err)))
       in
