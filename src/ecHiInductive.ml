@@ -43,7 +43,7 @@ type fxerror =
 | FXE_MatchPartial
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
-| FXE_CtorInvalidArity of (int * int)
+| FXE_CtorInvalidArity of (symbol * int * int)
 
 (* -------------------------------------------------------------------- *)
 exception RcError of EcLocation.t * EcEnv.env * rcerror
@@ -314,7 +314,8 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
               let args_got = List.length cargs in
 
               if args_exp <> args_got then
-                fxerror cname.pl_loc env (FXE_CtorInvalidArity (args_exp, args_got));
+                fxerror cname.pl_loc env
+                  (FXE_CtorInvalidArity (snd (unloc cname), args_exp, args_got));
 
               let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
 

@@ -186,26 +186,24 @@ module Tuples = struct
     let vl = ref [] in
     for _i = 1 to n do
       vl := WTy.create_tvsymbol (WIdent.id_fresh "a") :: !vl done;
-    WTy.create_tysymbol (WIdent.id_fresh ("tuple" ^ string_of_int n)) !vl None)
+    WTy.create_tysymbol (WIdent.id_fresh ("tuple" ^ string_of_int n)) !vl WTy.NoDef)
 
-  let proj = Hdint.memo 17 (fun (n,k) ->
+  let proj = Hdint.memo 17 (fun (n, k) ->
     assert (0 <= k && k < n);
     let ts = ts n in
-    let opaque = WTy.Stv.of_list ts.WTy.ts_args in
     let tl = List.map WTy.ty_var ts.WTy.ts_args in
     let ta = WTy.ty_app ts tl in
     let tr = List.nth tl k in
     let id =
       WIdent.id_fresh ("proj" ^ string_of_int n ^ "_" ^ string_of_int k) in
-    WTerm.create_fsymbol ~opaque id [ta] tr)
+    WTerm.create_fsymbol id [ta] tr)
 
   let fs = Hint.memo 17 (fun n ->
     let ts = ts n in
-    let opaque = WTy.Stv.of_list ts.WTy.ts_args in
     let tl = List.map WTy.ty_var ts.WTy.ts_args in
     let ty = WTy.ty_app ts tl in
     let id = WIdent.id_fresh ("Tuple" ^ string_of_int n) in
-    WTerm.create_fsymbol ~opaque ~constr:1 id tl ty)
+    WTerm.create_fsymbol ~constr:1 id tl ty)
 
   let theory = Hint.memo 17 (fun n ->
     let ts = ts n and fs = fs n in
@@ -259,7 +257,7 @@ let lenv_of_tparams ts =
 
 let lenv_of_tparams_for_hyp genv ts =
   let trans_tv env ((id, _) : ty_param) = (* FIXME: TC HOOK *)
-    let ts = WTy.create_tysymbol (preid id) [] None in
+    let ts = WTy.create_tysymbol (preid id) [] WTy.NoDef in
     genv.te_task <- WTask.add_ty_decl genv.te_task ts;
     { env with le_tv = Mid.add id (WTy.ty_app ts []) env.le_tv }, ts
   in
@@ -302,7 +300,7 @@ let w3op_fo w3op =
   | `LDecl    ls -> WTerm.t_app ls
 
 (* -------------------------------------------------------------------- *)
-let ts_mem = WTy.create_tysymbol (WIdent.id_fresh "memory") [] None
+let ts_mem = WTy.create_tysymbol (WIdent.id_fresh "memory") [] WTy.NoDef
 let ty_mem = WTy.ty_app ts_mem []
 
 let ts_distr, fs_mu, distr_theory =
@@ -311,7 +309,7 @@ let ts_distr, fs_mu, distr_theory =
   let th  = WTheory.use_export th WTheory.highord_theory in
   let vta = WTy.create_tvsymbol (WIdent.id_fresh "ta") in
   let ta  = WTy.ty_var vta in
-  let tdistr = WTy.create_tysymbol (WIdent.id_fresh "distr") [vta] None in
+  let tdistr = WTy.create_tysymbol (WIdent.id_fresh "distr") [vta] WTy.NoDef in
   let th  = WTheory.add_ty_decl th tdistr in
   let mu  =
     WTerm.create_fsymbol (WIdent.id_fresh "mu")
@@ -333,7 +331,7 @@ let mk_tglob genv mp =
   | None ->
     (* create the type symbol *)
     let pid = preid id in
-    let ts = WTy.create_tysymbol pid [] None in
+    let ts = WTy.create_tysymbol pid [] WTy.NoDef in
     genv.te_task <- WTask.add_ty_decl genv.te_task ts;
     let ty = WTy.ty_app ts [] in
     Hid.add genv.te_absmod id { w3am_ty = ty };
@@ -383,17 +381,17 @@ and trans_tydecl genv (p, tydecl) =
   let ts, opts, decl =
     match tydecl.tyd_type with
     | `Abstract _ ->
-        let ts = WTy.create_tysymbol pid tparams None in
+        let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
         (ts, [], WDecl.create_ty_decl ts)
 
     | `Concrete ty ->
         let ty = trans_ty (genv, lenv) ty in
-        let ts = WTy.create_tysymbol pid tparams (Some ty) in
+        let ts = WTy.create_tysymbol pid tparams (WTy.Alias ty) in
         (ts, [], WDecl.create_ty_decl ts)
 
     | `Datatype dt ->
         let ncs  = List.length dt.tydt_ctors in
-        let ts   = WTy.create_tysymbol pid tparams None in
+        let ts   = WTy.create_tysymbol pid tparams WTy.NoDef in
 
         Hp.add genv.te_ty p ts;
 
@@ -412,7 +410,7 @@ and trans_tydecl genv (p, tydecl) =
         (ts, opts, WDecl.create_data_decl [ts, wdtype])
 
     | `Record (_, rc) ->
-        let ts = WTy.create_tysymbol pid tparams None in
+        let ts = WTy.create_tysymbol pid tparams WTy.NoDef in
 
         Hp.add genv.te_ty p ts;
 
@@ -638,9 +636,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
       with CanNotTranslate -> trans_gen env fp
     end
   | Fint n ->
-      let n = BI.to_string n in
-      let n = Why3.Number.ConstInt (Why3.Number.int_const_dec n) in
-      WTerm.t_const n
+      WTerm.t_bigint_const (BI.to_why3 n)
 
   | Fif    _ -> trans_app env fp []
   | Fmatch _ -> trans_app env fp []
@@ -651,9 +647,13 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
     (* Special case for `%r` *)
   | Fapp({ f_node = Fop (p, [])},  [{f_node = Fint n}])
       when p_equal p CI_Real.p_real_of_int ->
-    let n = BI.to_string n in
-    let n = Why3.Number.ConstReal (Why3.Number.real_const_dec n "" None) in
-    WTerm.t_const n
+    let an = BI.to_string (BI.abs n) in
+    let c  = {
+      Why3.Number.rc_negative = (BI.lt n BI.zero);
+      Why3.Number.rc_abs      = Why3.Number.real_const_dec an "" None;
+    } in
+
+    WTerm.t_const (Why3.Number.ConstReal c) WTy.ty_real
 
   | Fapp (f,args) -> trans_app env f (List.map (trans_form env) args)
 
@@ -887,11 +887,17 @@ and trans_body (genv, lenv) wdom wcodom topbody =
   in (params, body)
 
 (* -------------------------------------------------------------------- *)
-and trans_fix (genv, lenv) o =
+and trans_fix (genv, lenv) (wdom, o) =
   let (lenv, vs) = trans_lvars genv lenv o.opf_args in
   let pterm   = List.map (List.nth vs) (fst o.opf_struct) in
   let ptermty = List.map (fun x -> x.WTerm.vs_ty) pterm in
   let ptermc  = List.length ptermty in
+
+  let eparams =
+    let preid = WIdent.id_fresh "x" in
+    List.map (WTerm.create_vsymbol preid) (List.drop (List.length vs) wdom) in
+
+  let eargs = List.map WTerm.t_var eparams in
 
   let ptns =
     let rec compile ptns (ctors, m) =
@@ -909,7 +915,7 @@ and trans_fix (genv, lenv) o =
           let lenv, cvs = List.map_fold (trans_lvars genv) lenv locals in
           let fe = EcCoreFol.form_of_expr EcCoreFol.mhr e in
 
-          let we = trans_form (genv, lenv) fe in
+          let we = trans_app (genv, lenv) fe eargs in
 
           let ptn =
             let for1 (cl, cvs) pty =
@@ -943,7 +949,7 @@ and trans_fix (genv, lenv) o =
 
   let body = WTerm.t_case mtch ptns in
 
-  (vs, body)
+  (vs @ eparams, body)
 
 (* -------------------------------------------------------------------- *)
 and create_op ?(body = false) (genv : tenv) p =
@@ -991,7 +997,7 @@ and create_op ?(body = false) (genv : tenv) p =
 
       | true, OB_oper (Some (OP_Fix body)) ->
         OneShot.now register;
-        let wparams, wbody = trans_fix (genv, lenv) body in
+        let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
         let wbody = Cast.arg wbody ls.WTerm.ls_value in
         WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
 

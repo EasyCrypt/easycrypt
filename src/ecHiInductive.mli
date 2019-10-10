@@ -38,7 +38,7 @@ type fxerror =
 | FXE_MatchPartial
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
-| FXE_CtorInvalidArity of (int * int)
+| FXE_CtorInvalidArity of (symbol * int * int)
 
 (* -------------------------------------------------------------------- *)
 exception RcError of EcLocation.t * EcEnv.env * rcerror

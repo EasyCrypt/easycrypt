@@ -27,6 +27,7 @@ and cmp_option = {
   cmpo_input   : string;
   cmpo_provers : prv_options;
   cmpo_gcstats : bool;
+  cmpo_tstats  : string option;
 }
 
 and cli_option = {
@@ -47,8 +48,7 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : string list;
-  ldro_rdirs : string list;
+  ldro_idirs : (string option * string) list;
   ldro_boot  : bool;
 }
 
@@ -65,8 +65,7 @@ type ini_options = {
   ini_why3     : string option;
   ini_ovrevict : string list;
   ini_provers  : string list;
-  ini_idirs    : string list;
-  ini_rdirs    : string list;
+  ini_idirs    : (string option * string) list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -234,7 +233,8 @@ let specs = {
     ("compile", "Check an EasyCrypt file", [
       `Group "loader";
       `Group "provers";
-      `Spec  ("gcstats", `Flag, "Display GC statistics")]);
+      `Spec  ("gcstats", `Flag, "Display GC statistics");
+      `Spec  ("tstats", `String, "Save timing statistics to <file>")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -301,15 +301,23 @@ let get_strings name values =
   let xs = List.map (function `String x -> x | _ -> assert false) xs in
     List.rev xs
 
+let expand (x : string) =
+  EcRegexp.sub
+    (`C (EcRegexp.regexp "^~"))
+    (`S XDG.home) x
+
+let parse_idir s =
+  match String.Exceptionless.split ~by:":" s with
+  | None -> (None, expand s)
+  | Some (nm, s) -> (Some (expand nm), expand s)
+
 (* -------------------------------------------------------------------- *)
 let ldr_options_of_values ?ini values =
   if get_flag "boot" values then
-    { ldro_idirs = []; ldro_rdirs = []; ldro_boot = true; }
+    { ldro_idirs = []; ldro_boot = true; }
   else
     let idirs = omap_dfl (fun x -> x.ini_idirs) [] ini in
-    let rdirs = omap_dfl (fun x -> x.ini_idirs) [] ini in
-    { ldro_idirs = idirs @ (get_strings "I" values);
-      ldro_rdirs = rdirs @ (get_strings "R" values);
+    { ldro_idirs = idirs @ List.map parse_idir (get_strings "I" values);
       ldro_boot  = false; }
 
 let glb_options_of_values ?ini values =
@@ -354,7 +362,8 @@ let cli_options_of_values ?ini values =
 let cmp_options_of_values ?ini values input =
   { cmpo_input   = input;
     cmpo_provers = prv_options_of_values ?ini values;
-    cmpo_gcstats = get_flag "gcstats" values; }
+    cmpo_gcstats = get_flag "gcstats" values;
+    cmpo_tstats  = get_string "tstats" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse ?ini argv =
@@ -453,22 +462,15 @@ let read_ini_file (filename : string) =
     | Inifiles.Invalid_section _
     | Inifiles.Invalid_element _ -> [] in
 
-  let expand (x : string) =
-    EcRegexp.sub
-      (`C (EcRegexp.regexp "^~"))
-      (`S XDG.home) x in
-
   let ini =
-    { ini_ppwidth  = tryint  "pp-width" ;
+    { ini_ppwidth  = tryint  "pp-width";
       ini_why3     = tryget  "why3conf";
       ini_ovrevict = trylist "no-evict";
       ini_provers  = trylist "provers" ;
-      ini_idirs    = trylist "idirs"   ;
-      ini_rdirs    = trylist "rdirs"   ; } in
+      ini_idirs    = List.map parse_idir (trylist "idirs"); } in
 
   { ini_ppwidth  = ini.ini_ppwidth;
     ini_why3     = omap expand ini.ini_why3;
     ini_ovrevict = ini.ini_ovrevict;
     ini_provers  = ini.ini_provers;
-    ini_idirs    = List.map expand ini.ini_idirs;
-    ini_rdirs    = List.map expand ini.ini_rdirs; }
+    ini_idirs    = ini.ini_idirs; }

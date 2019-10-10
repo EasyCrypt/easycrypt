@@ -572,4 +572,4 @@ qed.
 
 lemma nosmt modz_pow2_div n p i: 0 <= i => 0 <= p <= n =>
   (i %% 2^n) %/ 2^p = (i %/ 2^p) %% 2^(n-p).
-proof. admit. qed.
+proof. admitted.

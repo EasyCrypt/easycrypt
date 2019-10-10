@@ -434,6 +434,7 @@
 %token FISSION
 %token FOR
 %token FORALL
+%token FROM
 %token FUN
 %token FUSION
 %token FWDS
@@ -636,6 +637,7 @@ _lident:
 | WLOG     { "wlog"     }
 | EXLIM    { "exlim"    }
 | ECALL    { "ecall"    }
+| FROM     { "from"     }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -1020,6 +1022,52 @@ qident_or_res_or_glob:
 | x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
 | GLOB mp=loc(mod_qident) { GVglob mp }
 
+pfpos:
+| i=sword
+    { `Index i }
+
+| f=bracket(form_h) off=pfoffset?
+    { `Match (f, off) }
+
+pfoffset:
+| PLUS  w=word {  w }
+| MINUS w=word { -w }
+
+pffilter:
+| LBRACKET flat=iboption(SLASH)
+    rg=plist0(
+      i=pfpos? COLON j=pfpos? { `Range (i, j) }
+    | i=pfpos { `Single i }, COMMA)
+  RBRACKET
+
+  { PFRange (flat, rg) }
+
+| LPBRACE flat=iboption(SLASH) x=ident IN h=form_h RPBRACE
+
+  { PFMatch (flat, x, h) }
+
+| LPBRACE flat=iboption(SLASH)
+    f=form FOR xs=plist1(ident, COMMA) IN h=form_h
+  RPBRACE
+
+  { PFMatchBuild (flat, xs, f, h) }
+
+| LBRACE
+    flat=iboption(SLASH)
+    exclude=iboption(TILD)
+    rooted=iboption(HAT)
+    h=pffilter_pattern
+  RBRACE
+
+  { PFKeep (flat, rooted, exclude, h) }
+
+pffilter_pattern:
+| f=form_h
+    { `Pattern f}
+
+| LBRACE xs=plist0(x=qoident s=loc(pside)? { (x, s) }, COMMA) RBRACE
+    { `VarSet xs }
+
 sform_u(P):
 | x=P
    { x }
@@ -1038,6 +1086,9 @@ sform_u(P):
          parse_error p.pl_loc (Some "invalid scope name");
        PFscope (pqsymb_of_symb p.pl_loc "<top>", f)
      end }
+
+| SHARP pf=pffilter* x=ident
+   { PFref (x, pf) }
 
 | LPAREN f=form_r(P) COLONTILD ty=loc(type_exp) RPAREN
    { PFcast (f, ty) }
@@ -1849,8 +1900,16 @@ import_flag:
 | IMPORT { `Import }
 | EXPORT { `Export }
 
-theory_require :
-| REQUIRE ip=import_flag? x=uident+ { (x, ip) }
+theory_require:
+| nm=prefix(FROM, uident)? REQUIRE ip=import_flag? x=theory_require_1+
+    { (nm, x, ip) }
+
+theory_require_1:
+| x=uident
+    { (x, None) }
+
+| LBRACKET x=uident AS y=uident RBRACKET
+    { (x, Some y) }
 
 theory_import: IMPORT xs=uqident* { xs }
 theory_export: EXPORT xs=uqident* { xs }
