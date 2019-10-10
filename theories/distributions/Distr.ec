@@ -908,16 +908,20 @@ lemma dmap_ll (d : 'a distr) (f : 'a -> 'b) :
   is_lossless d => is_lossless (dmap d f).
 proof. by rewrite /is_lossless weight_dmap. qed.
 
-lemma dmap_uni (d : 'a distr) (f : 'a -> 'b) : 
-  injective f => is_uniform d => is_uniform (dmap d f).
-proof. 
-  move=> finj duni x y /supp_dmap [a [ina ->]] /supp_dmap [b [inb ->]].
-  rewrite !dmap1E.
-  have Heq: forall z, pred1 (f z) \o f = pred1 z.
-  + move=> z;apply fun_ext => z' @/(\o) @/pred1 /=.
-    apply eq_iff => />; apply finj.
-  by rewrite !Heq;apply duni.
+lemma dmap_uni_in_inj (d : 'a distr) (f : 'a -> 'b) :
+     (forall (x, y : 'a), x \in d => y \in d => f x = f y => x = y)
+  => is_uniform d => is_uniform (dmap d f).
+proof.
+move=> finj_in duni x y /supp_dmap [a [ina ->]] /supp_dmap [b [inb ->]].
+have eq: forall z, z \in d => mu d (pred1 (f z) \o f) = mu d (pred1 z).
++ move=> z inz; rewrite (@mu_eq_support d (pred1 (f z) \o f) (pred1 z)) //.
+  move=> x0 inx0 @/(\o) @/pred1 /=; rewrite eq_iff=> />; exact/finj_in.
+by rewrite !dmap1E !eq //; apply/duni.
 qed.
+
+lemma dmap_uni (d : 'a distr) (f : 'a -> 'b) :
+  injective f => is_uniform d => is_uniform (dmap d f).
+proof. by move=> finj; apply dmap_uni_in_inj=> x y _ _; apply/finj. qed.
 
 lemma dmap_funi (d : 'a distr) (f : 'a -> 'b) : 
   bijective f => is_funiform d => is_funiform (dmap d f).
