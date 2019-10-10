@@ -203,18 +203,17 @@ elim/natind: n => [n le0n|n ge0n ih] @/nseq.
 by rewrite iterS //= ih !max_ler 1?addzC // addz_ge0.
 qed.
 
-lemma nseqS_nseqS_max n (x : 'a) : nseq n x = nseq (max 0 n) x.
-proof.
-elim/natind: n => [n le0n|n ge0n ih] @/nseq.
-  by rewrite max_lel ?iter0.
-by rewrite max_ler 1:/# iterS.
-qed.
-
 lemma nseq0 (x : 'a): nseq 0 x = [].
 proof. by rewrite iter0. qed.
 
 lemma nseq0_le n (x : 'a) : n <= 0 => nseq n x = [].
 proof. by move=> le0_n; rewrite iter0. qed.
+
+lemma nseq_max0 n (x : 'a) : nseq (max 0 n) x = nseq n x.
+proof.
+rewrite /max; case: (0 < n) => // /lezNgt.
+by rewrite nseq0 => /nseq0_le<:'a> ->.
+qed.
 
 lemma nseq1 (x : 'a) : nseq 1 x = [x].
 proof. by rewrite iter1. qed.
@@ -228,13 +227,12 @@ elim: n=> /= [|i ge0_i ih]; first by rewrite nseq0 nseq1.
 by rewrite (@nseqS (i+1)) ?addz_ge0 // {1}ih nseqS.
 qed.
 
-lemma cat_nseq n1 n2 (x : 'a) :
-  nseq n1 x ++ nseq n2 x = nseq (max 0 n1 + max 0 n2) x.
+lemma cat_nseq n1 n2 (x : 'a) : 0 <= n1 => 0 <= n2 =>
+  nseq n1 x ++ nseq n2 x = nseq (n1 + n2) x.
 proof.
-rewrite (nseqS_nseqS_max n1) (nseqS_nseqS_max n2).
-move: (leq_maxl 0 n1); elim: (max 0 n1)=> {n1} /=.
-  + by rewrite nseq0.
-by move=> n1 ge0_n1 ih; rewrite -addzAC !nseqS //#.
+move=> ge0_n1 ge0_n2; elim: n1 ge0_n1 => [|n1 ge0_n1 ih].
++ by rewrite nseq0.
++ by rewrite -addzAC !nseqS // 1:addz_ge0.
 qed.
 
 (* -------------------------------------------------------------------- *)
