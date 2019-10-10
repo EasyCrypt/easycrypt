@@ -340,6 +340,19 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma bigU ['a] (P Q : 'a -> bool) F s : (forall x, !(P x /\ Q x)) =>
+  big (predU P Q) F s = big P F s + big Q F s.
+proof.
+move=> dj_PQ; rewrite (@bigID (predU _ _) _ P).
+by congr; apply: eq_bigl => /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma bigEM ['a] (P : 'a -> bool) (F : 'a -> t) s :
+  big predT F s = big P F s + big (predC P) F s.
+proof. by rewrite -bigU 1:/#; apply: eq_bigl => /#. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt big_reindex ['a 'b]
   (P : 'a -> bool) (F : 'a -> t) (f : 'b -> 'a) (f' : 'a -> 'b) s
 :
@@ -386,6 +399,13 @@ proof. by move/eq_bigr=> ->; apply/big1_eq. qed.
 lemma big1_seq (P : 'a -> bool) F s:
   (forall i, P i /\ (mem s i) => F i = idm) => big P F s = idm.
 proof. by move=> eqF1; rewrite big_seq_cond big_andbC big1. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_eq_idm_filter ['a] (P : 'a -> bool) (F : 'a -> t) s :
+  (forall (x : 'a), !P x => F x = idm) => big predT F s = big P F s.
+proof.
+by move=> eq1; rewrite (@bigEM P) (@big1 (predC _)) // addm0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_flatten (P : 'a -> bool) F rr :
