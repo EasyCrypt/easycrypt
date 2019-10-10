@@ -675,68 +675,61 @@ qed.
 (* -------------------------------------------------------------------- *)
 (*                             Flagged Maps                             *)
 (* -------------------------------------------------------------------- *)
-op noflags (m : ('from, 'to * 'flag) fmap) : ('from, 'to) fmap =
-  map (fun _ (p : 'to * 'flag) => p.`1) m.
+op noflags ['k, 'v, 'f] (m : ('k, 'v * 'f) fmap) =
+  map (fun _ (p : _ * _) => p.`1) m.
 
-op in_dom_with (m : ('from, 'to * 'flag) fmap) (x : 'from) (f : 'flag) = 
-   dom m x /\ (oget (m.[x])).`2 = f.
+op in_dom_with ['k, 'v, 'f] (m : ('k, 'v * 'f) fmap) (x : 'k) (f : 'f) =
+ dom m x /\ (oget (m.[x])).`2 = f.
 
-op restr f (m : ('from, 'to * 'flag) fmap) = 
-  let m = filter (fun _ (p : 'to * 'flag) => p.`2 = f) m in
+op restr ['k, 'v, 'f] f (m : ('k, 'v * 'f) fmap) = 
+  let m = filter (fun _ (p : 'v * 'f) => p.`2 = f) m in
   noflags m.
 
-lemma restrP (m : ('from, 'to * 'flag) fmap) f x :
-  (restr f m).[x] = 
-  obind (fun (p : 'to * 'flag) => if p.`2 = f then Some p.`1 else None) m.[x].
+lemma restrP ['k, 'v, 'f] (m : ('k, 'v * 'f) fmap) f x : (restr f m).[x] =
+  obind (fun (p : _ * _) => if p.`2 = f then Some p.`1 else None) m.[x].
 proof.
-  rewrite /restr /= mapE filterE /=.
-  by case (m.[x])=> //= -[x1 f'] /=; case (f' = f).
+rewrite /restr /= mapE filterE /=.
+by case (m.[x])=> //= -[x1 f'] /=; case (f' = f).
 qed.
 
-lemma dom_restr (m : ('from, 'to * 'flag) fmap) f x :
+lemma dom_restr ['k, 'v, 'f] (m : ('k, 'v * 'f) fmap) f x :
   dom (restr f m) x <=> in_dom_with m x f. 
 proof. 
-  rewrite /in_dom_with !domE; case: (m.[x]) (restrP m f x)=> //= -[t f'] /=.
-  by rewrite oget_some /=; case (f' = f)=> [_ -> |].
+rewrite /in_dom_with !domE; case: (m.[x]) (restrP m f x)=> //= -[t f'] /=.
+by rewrite oget_some /=; case (f' = f)=> [_ -> |].
 qed.
 
-lemma restr_set (m : ('from, 'to * 'flag) fmap) f1 f2 x y :
-  restr f1 m.[x <- (y, f2)] =
-  if f1 = f2 then (restr f1 m).[x <- y] else rem (restr f1 m) x.
+lemma restr_set ['k, 'v, 'f] (m : ('k, 'v * 'f) fmap) f1 f2 x y :
+  restr f1 m.[x <- (y, f2)]
+    = if f1 = f2 then (restr f1 m).[x <- y] else rem (restr f1 m) x.
 proof.
-  rewrite -fmap_eqP.
-  case (f1 = f2)=> [-> | Hneq] x0; rewrite !(restrP, get_setE);
-    1: by case (x = x0)=> [-> // |]; 1: rewrite (eq_sym x0);
-    1: move=> ->//.
-  case (x0 = x)=> [-> /= /= | Hnx]; 1: by rewrite (eq_sym f2) Hneq remE.
-  by rewrite remE Hnx restrP.
+rewrite -fmap_eqP=> k; case: (f1 = f2) => [->|neq_f12].
++ by rewrite !(restrP, get_setE); case: (k = x).
+rewrite !(restrP, get_setE); case: (k = x) => [->|ne_kx].
++ by rewrite (@eq_sym f2) neq_f12 /= remE.
+by rewrite remE ne_kx /= restrP.
 qed.
 
-lemma restr_set_eq (m : ('from, 'to * 'flag) fmap) f x y :
+lemma restr_set_eq ['k, 'v, 'f] (m : ('k, 'v * 'f) fmap) f x y :
   restr f m.[x <- (y, f)] = (restr f m).[x <- y].
 proof. by rewrite restr_set. qed.
 
-lemma restr0 f : restr f empty<:'from, 'to * 'flag> = empty.
+lemma restr0 ['k, 'v, 'f] f : restr f empty<:'k, 'v * 'f> = empty.
 proof. by apply fmap_eqP=> x; rewrite restrP !emptyE. qed.
 
-lemma restr_set_neq f2 f1 (m : ('from, 'to * 'flag) fmap) x y :
+lemma restr_set_neq ['k, 'v, 'f] f2 f1 (m : ('k, 'v * 'f) fmap) x y :
   ! dom m x => f2 <> f1 => restr f1 m.[x <- (y, f2)] = restr f1 m.
 proof.
-  by move=> Hm Hneq;
-    rewrite restr_set (eq_sym f1) Hneq rem_id // dom_restr /in_dom_with Hm.
+move=> Hm Hneq; rewrite restr_set (eq_sym f1) Hneq rem_id //.
+by rewrite dom_restr /in_dom_with Hm.
 qed.
 
-lemma restr_rem (m : ('from, 'to * 'flag) fmap) (x:'from) f :
-  restr f (rem m x) =
-  (if in_dom_with m x f then rem (restr f m) x else restr f m).
+lemma restr_rem ['k, 'v, 'f] (m : ('k, 'v * 'f) fmap) (x : 'k) f :
+  restr f (rem m x)
+    = (if in_dom_with m x f then rem (restr f m) x else restr f m).
 proof.
-  rewrite -fmap_eqP=>z; rewrite restrP; case (in_dom_with m x f);
-  rewrite !(restrP, remE); rewrite /in_dom_with.
-  case (z = x)=> //.
-  case (z = x)=> // ->.
-  rewrite negb_and; elim=> [x_not_in_m | ne_get_m_x_2_f].
-  by rewrite (iffLR _ _ (domNE m x)).
-  case (m.[x] = None)=> [get_x_none | get_x_some].
-  + by rewrite get_x_none.
-  by case: m.[x] get_x_some ne_get_m_x_2_f => //= x' ->.
+rewrite -fmap_eqP => z; rewrite restrP; case: (in_dom_with m x f);
+rewrite !(restrP, remE); rewrite /in_dom_with; case (z = x)=> // ->.
+rewrite negb_and => -[Nxm|]; first by rewrite (iffLR _ _ (domNE m x)).
+by case: m.[x] => //= x' ->.
 qed.

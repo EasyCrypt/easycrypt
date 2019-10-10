@@ -9,16 +9,14 @@ type flag = [ Unknown | Known ].  (* map setting known by distinguisher? *)
 lemma neqK_eqU f : f <> Known <=> f = Unknown.
 proof. by case: f. qed.
 
-(* ------------------Random Oracles and Flag Random Oracles------------------ *)
+(* -------------------------------------------------------------------- *)
+(* Random Oracles and Flag Random Oracles                               *)
 
 abstract theory Ideal.
 
-type from, to.
+type from, to, input, output.
 
 op sampleto : from -> to distr.
-
-type input.
-type output.
 
 module type RO = {
   proc init  ()                  : unit
@@ -121,7 +119,7 @@ proof.
   proc; auto=> &1 &2 [] 2!-> /= ? -> /=.
   rewrite mem_map !map_set /fst /= get_set_sameE oget_some => |>; progress.
   + by rewrite mapE oget_omap_some 1:-domE.
-  + by rewrite eq_sym set_get_eq 1:mapE ///= (some_oget _.[_]).
+  + by rewrite eq_sym set_get_eq 1:mapE /= 1:get_some.
 qed.
 
 equiv RO_FRO_set : RO.set ~ FRO.set :
@@ -144,8 +142,11 @@ lemma RO_FRO_D (D <: RO_Distinguisher{RO, FRO}) :
          ={res, glob D} /\ RO.m{1} = noflags FRO.m{2}].
 proof.
   proc (RO.m{1} = noflags FRO.m{2})=> //.
-  + by conseq RO_FRO_init. + by conseq RO_FRO_get. + by conseq RO_FRO_set. 
-  + by conseq RO_FRO_rem. + by conseq RO_FRO_sample.
+  + by conseq RO_FRO_init.
+  + by conseq RO_FRO_get.
+  + by conseq RO_FRO_set. 
+  + by conseq RO_FRO_rem.
+  + by conseq RO_FRO_sample.
 qed.
 
 section LL. 
@@ -186,8 +187,7 @@ end section LL.
  
 end Ideal.
 
-(* -------------------------------------------------------------------------- *)
-
+(* -------------------------------------------------------------------- *)
 abstract theory GenEager.
 
 clone include Ideal. 
@@ -197,10 +197,11 @@ axiom sampleto_ll : forall x, Distr.weight (sampleto x) = 1%r.
 clone include IterProc with type t <- from.
 
 (* RRO is an FRO that resamples a query if the associated value is
-   unknown; it also has a resample procedure that resamples all
-   queries whose results are unknown
-
-   uses the map of FRO *)
+ * unknown; it also has a resample procedure that resamples all
+ * queries whose results are unknown.
+ *
+ * Uses the map of FRO
+ *)
 
 module RRO : FRO = {
   proc init = FRO.init
@@ -237,9 +238,10 @@ module RRO : FRO = {
   }
 }.
 
-(* LRO is an RO whose sample procedure is lazy, i.e., does nothing
-
-   uses the map of RO *)
+(* LRO is an RO whose sample procedure is lazy, i.e., does nothing.
+ *
+ * Uses the map of RO.
+ *)
 
 module LRO : RO = {
   proc init = RO.init
@@ -255,8 +257,8 @@ module LRO : RO = {
 
 lemma RRO_resample_ll : islossless RRO.resample.
 proof. 
-  proc; call (iter_ll RRO.I _)=> //; proc; auto=> /= ?;
-    by split; first apply sampleto_ll. 
+  proc; call (iter_ll RRO.I _)=> //; proc; auto=> /= ?.
+  by split; first apply sampleto_ll. 
 qed.
 
 (* now we use the eager tactics to show a series of lemmas
@@ -282,8 +284,8 @@ lemma iter_perm2 (i1 i2 : from) :
          ={glob RRO.I, t1, t2} ==> ={glob RRO.I}].
 proof.
   proc; inline *; case ((t1 = t2){1}); 1:by auto.
-  * by swap{2} [4..5] -3; auto=> &ml &mr [#] 3-> neq /= ? -> ? ->;
-    rewrite set_setE (eq_sym t2{mr}) neq.
+  * swap{2} [4..5] -3; auto=> &ml &mr [#] 3-> neq /= ? -> ? ->.
+    by rewrite set_setE (eq_sym t2{mr}) neq.
 qed.
 
 equiv I_f_neq x1 mx1 : RRO.I.f ~ RRO.I.f :
@@ -299,8 +301,8 @@ equiv I_f_eqex x1 mx1 mx2 : RRO.I.f ~ RRO.I.f :
     eq_except (pred1 x1) FRO.m{1} FRO.m{2} /\
     FRO.m{1}.[x1] = mx1 /\ FRO.m{2}.[x1] = mx2.
 proof.
-  by proc; auto=> ? &mr [#] -> Hneq Heq /= Heq1 Heq2 ? -> /=;
-    rewrite !get_setE Hneq eq_except_set_eq.
+  proc; auto=> ? &mr [#] -> Hneq Heq /= Heq1 Heq2 ? -> /=.
+  by rewrite !get_setE Hneq eq_except_set_eq.
 qed.
 
 equiv I_f_set x1 r1 : RRO.I.f ~ RRO.I.f :
@@ -308,8 +310,8 @@ equiv I_f_set x1 r1 : RRO.I.f ~ RRO.I.f :
   FRO.m{2} = FRO.m{1}.[x1 <- (r1, Known)] ==>
   FRO.m{1}.[x1] = None /\ FRO.m{2} = FRO.m{1}.[x1 <- (r1, Known)].
 proof.
-  by proc; auto=> ? &mr [#] -> Hneq H1 -> /= ? ->;
-    rewrite get_setE Hneq/= set_setE (eq_sym _ x1) Hneq.
+  proc; auto=> ? &mr [#] -> Hneq H1 -> /= ? ->.
+  by rewrite get_setE Hneq/= set_setE (eq_sym _ x1) Hneq.
 qed.
 
 lemma eager_get :
