@@ -44,6 +44,14 @@ op omap ['a 'b] (f : 'a -> 'b) ox =
 
 op oget (ox : 'a option) = odflt witness<:'a> ox.
 
+op is_none (ox : 'a option) =
+  with ox = None   => true
+  with ox = Some _ => false.
+
+op is_some (ox : 'a option) =
+  with ox = None   => false
+  with ox = Some _ => true.
+
 op (\c) ['a 'b 'c] (f : 'b -> 'a option) (g : 'c -> 'b option) =
   fun x => obind f (g x).
 
@@ -71,6 +79,9 @@ op eta_ (f : 'a -> 'b) = fun x => f x
 (* -------------------------------------------------------------------- *)
 op (\o) ['a 'b 'c] (g : 'b -> 'c) (f : 'a -> 'b) =
   fun x => g (f x).
+
+op (\o2) ['a 'b 'c 'd] (f : 'c -> 'd) (g : 'a -> 'b -> 'c) =
+  fun a b => f (g a b).
 
 (* -------------------------------------------------------------------- *)
 pred morphism_1 (f : 'a -> 'b) aF rF =
@@ -199,6 +210,15 @@ pred associative (o:'a -> 'a -> 'a) =
 
 pred interchange op1 op2 =
   forall (x:'a) y z t, op1 (op2 x y) (op2 z t) = op2 (op1 x z) (op1 y t).
+
+(* -------------------------------------------------------------------- *)
+op pswap ['a 'b] (x : 'a * 'b) = (x.`2, x.`1).
+
+lemma pswapK ['a 'b] : cancel pswap<:'a, 'b> pswap.
+proof. by case. qed.
+
+lemma bij_pswap ['a 'b] : bijective pswap<:'a, 'b>.
+proof. by exists pswap; rewrite !pswapK. qed.
 
 (* -------------------------------------------------------------------- *)
 op pred0  ['a] = fun (x : 'a) => false.

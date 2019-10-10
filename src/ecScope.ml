@@ -2310,7 +2310,7 @@ module Search = struct
         | _ ->
           let ps = ref Mid.empty in
           let ue = EcUnify.UniEnv.create None in
-          let fp = EcTyping.trans_pattern scope.sc_env (ps, ue) fp in
+          let fp = EcTyping.trans_pattern scope.sc_env ps ue fp in
           `ByPattern ((ps, ue), fp)
       in List.map do1 qs in
 

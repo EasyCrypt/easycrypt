@@ -34,25 +34,6 @@ lemma b2r1: b2r true = 1%r.
 proof. by rewrite b2rE b2i1. qed.
 
 (* -------------------------------------------------------------------- *)
-op lub (E : real -> bool) : real.
-
-op nonempty (E : real -> bool) =
-  exists x, E x.
-
-op ub (E : real -> bool) (z : real) =
-  forall y, E y => y <= z.
-
-op has_ub  (E : real -> bool) = nonempty (ub E).
-op has_lub (E : real -> bool) = nonempty E /\ has_ub E.
-
-axiom lub_upper_bound (E : real -> bool): has_lub E =>
-  forall x, E x => x <= lub E.
-
-axiom lub_adherent (E : real -> bool): has_lub E =>
-  forall eps, 0%r < eps =>
-    exists e, E e /\ (lub E - eps) < e.
-
-(* -------------------------------------------------------------------- *)
 lemma nosmt fromint0 : 0%r = Real.zero by [].
 lemma nosmt fromint1 : 1%r = Real.one  by [].
 
@@ -76,6 +57,36 @@ by smt ml=0.
 lemma nosmt fromint_abs  (z : int) : `|z|%r = `|z%r| by smt ml=0.
 
 hint rewrite lte_fromint : le_fromint lt_fromint.
+
+(* -------------------------------------------------------------------- *)
+op lub (E : real -> bool) : real.
+
+op nonempty (E : real -> bool) =
+  exists x, E x.
+
+op ub (E : real -> bool) (z : real) =
+  forall y, E y => y <= z.
+
+op has_ub  (E : real -> bool) = nonempty (ub E).
+op has_lub (E : real -> bool) = nonempty E /\ has_ub E.
+
+axiom lub_upper_bound (E : real -> bool): has_lub E =>
+  forall x, E x => x <= lub E.
+
+axiom lub_adherent (E : real -> bool): has_lub E =>
+  forall eps, 0%r < eps =>
+    exists e, E e /\ (lub E - eps) < e.
+
+(* -------------------------------------------------------------------- *)
+op intp x = choiceb (fun i => i%r <= x < (i+1)%r) 0.
+
+axiom le_intp x : (intp x)%r <= x.
+axiom gt_intp x : x < (intp x + 1)%r.
+
+lemma leup_intp z x : z%r <= x => z <= intp x.
+proof.
+by move=> le_zx; have := le_intp x; have := gt_intp x => /#.
+qed.
 
 (* -------------------------------------------------------------------- *)
 instance ring with real

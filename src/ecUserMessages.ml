@@ -142,6 +142,9 @@ end = struct
     | UnknownInstrMetaVar x ->
         msg "unkown instruction meta-variable: %a" pp_symbol x
 
+    | UnknownMetaVar x ->
+        msg "unknown meta-variable: %a" pp_symbol x
+
     | DuplicatedRecFieldName qs ->
         msg "duplicated (record) field name: %s" qs
 
@@ -204,6 +207,10 @@ end = struct
 
     | AbbrevLowArgs ->
         msg "this abbreviation is not applied enough"
+
+    | UnknownProgVar (p, mem) ->
+        msg "unknown program variable (in %a): `%a'"
+          (EcPrinting.pp_mem env) mem pp_qsymbol p
 
     | UnknownVarOrOp (name, []) ->
         msg "unknown variable or constant: `%a'" pp_qsymbol name
@@ -320,6 +327,12 @@ end = struct
     | InvalidMem (name, MAE_IsConcrete) ->
         msg "the memory %s must be abstract" name
 
+    | InvalidFilter (FE_InvalidIndex i) ->
+        msg "invalid filter index: %d" i
+
+    | InvalidFilter FE_NoMatch ->
+        msg "invalid filter pattern (no match)"
+
     | FunNotInModParam name ->
         msg "the function %a is not provided by a module parameter"
           pp_qsymbol name
@@ -335,6 +348,9 @@ end = struct
 
     | UnknownScope sc ->
         msg "unknown scope: `%a'" pp_qsymbol sc
+
+    | FilterMatchFailure ->
+        msg "filter pattern does not match"
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

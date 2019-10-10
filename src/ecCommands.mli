@@ -13,8 +13,8 @@ open EcLocation
 exception Restart
 
 (* -------------------------------------------------------------------- *)
-val addidir  : ?system:bool -> ?recursive:bool -> string -> unit
-val loadpath : unit -> (bool * string) list
+val addidir  : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
+val loadpath : unit -> (EcLoader.namespace option * string) list
 
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit

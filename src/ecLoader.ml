@@ -10,10 +10,11 @@
 open EcUtils
 
 (* -------------------------------------------------------------------- *)
-type idx_t = int * int
+type idx_t     = int * int
+type namespace = [ `System | `Named of string ]
 
 type ecloader = {
-  mutable ecl_idirs : ((bool * string) * idx_t) list;
+  mutable ecl_idirs : ((namespace option * string) * idx_t) list;
 }
 
 type kind = [`Ec | `EcA]
@@ -30,14 +31,17 @@ let dup (ld : ecloader) = { ecl_idirs = ld.ecl_idirs; }
 
 (* -------------------------------------------------------------------- *)
 let forsys (ld : ecloader) =
-  { ecl_idirs = List.filter (fun ((b, _), _) -> b) ld.ecl_idirs; }
+  { ecl_idirs =
+      List.filter
+        (fun ((b, _), _) -> b = Some `System)
+        ld.ecl_idirs; }
 
 (* -------------------------------------------------------------------- *)
-let rec addidir ?(system = false) ?(recursive = false) (idir : string) (ecl : ecloader) =
+let rec addidir ?namespace ?(recursive = false) (idir : string) (ecl : ecloader) =
   if recursive then begin
     let isdir filename =
       let filename = Filename.concat idir filename in
-        try Sys.is_directory filename with Sys_error _ -> false
+      try Sys.is_directory filename with Sys_error _ -> false
     in
 
     let dirs = (try EcUtils.Os.listdir idir with Unix.Unix_error _ -> []) in
@@ -46,7 +50,7 @@ let rec addidir ?(system = false) ?(recursive = false) (idir : string) (ecl : ec
       List.iter (fun filename ->
         if not (String.starts_with filename ".") then
           let filename = Filename.concat idir filename in
-            addidir ~system ~recursive filename ecl)
+            addidir ?namespace ~recursive filename ecl)
         dirs
   end;
 
@@ -59,11 +63,11 @@ let rec addidir ?(system = false) ?(recursive = false) (idir : string) (ecl : ec
       | "Win32" ->
           let test ((_, name), _) = name = idir in
           if not (List.exists test ecl.ecl_idirs) then
-            ecl.ecl_idirs <- ((system, idir), idx) :: ecl.ecl_idirs
+            ecl.ecl_idirs <- ((namespace, idir), idx) :: ecl.ecl_idirs
 
       | _ ->
           if not (List.exists ((=) idx |- snd) ecl.ecl_idirs) then
-            ecl.ecl_idirs <- ((system, idir), idx) :: ecl.ecl_idirs
+            ecl.ecl_idirs <- ((namespace, idir), idx) :: ecl.ecl_idirs
   end
 
 (* -------------------------------------------------------------------- *)
@@ -99,37 +103,44 @@ let check_case idir name (dev, ino) =
     with Unix.Unix_error _ -> false
 
 (* -------------------------------------------------------------------- *)
-let locate ?(onlysys = false) (name : string) (ecl : ecloader) =
+let locate ?(namespaces = [None]) (name : string) (ecl : ecloader) =
   if not (EcRegexp.match_ (`S "^[a-zA-Z0-9_]+$") name) then
     None
   else
-    let locate kind ((issys, idir), _) =
+    let locate kind ((inamespace, idir), _) =
       let name =
         match kind with
         | `Ec  -> Printf.sprintf "%s.ec"  name
         | `EcA -> Printf.sprintf "%s.eca" name
       in
 
-      match onlysys && not issys with
-      | true  -> None
-      | false ->
-        let stat =
-          let oname = norm_name `Upper name in
-          let iname = norm_name `Lower name in
-            List.fpick
-              (List.map
-                 (fun name ->
-                   let fullname = Filename.concat idir name in
-                     fun () -> try_stat fullname |> omap (fun s -> (s, name)))
-                 [iname; oname])
-        in
-          match stat with
-          | None -> None
-          | Some (stat, name) ->
-            let stat = (stat.Unix.st_dev, stat.Unix.st_ino) in
-              if   not (check_case idir name stat)
-              then None
-              else Some (Filename.concat idir name, kind)
+      let nmok =
+        let for1 namespace =
+          match namespace, inamespace with
+          | Some nm, Some inm -> nm = inm
+          | None   , (None | Some `System) -> true
+          | _      , _                     -> false
+        in List.exists for1 namespaces in
+
+      if not nmok then None else
+
+      let stat =
+        let oname = norm_name `Upper name in
+        let iname = norm_name `Lower name in
+          List.fpick
+            (List.map
+               (fun name ->
+                 let fullname = Filename.concat idir name in
+                   fun () -> try_stat fullname |> omap (fun s -> (s, name)))
+               [iname; oname])
+      in
+        match stat with
+        | None -> None
+        | Some (stat, name) ->
+          let stat = (stat.Unix.st_dev, stat.Unix.st_ino) in
+            if   not (check_case idir name stat)
+            then None
+            else Some (inamespace, Filename.concat idir name, kind)
     in
 
     match
