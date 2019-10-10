@@ -340,6 +340,19 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma bigU ['a] (P Q : 'a -> bool) F s : (forall x, !(P x /\ Q x)) =>
+  big (predU P Q) F s = big P F s + big Q F s.
+proof.
+move=> dj_PQ; rewrite (@bigID (predU _ _) _ P).
+by congr; apply: eq_bigl => /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma bigEM ['a] (P : 'a -> bool) (F : 'a -> t) s :
+  big predT F s = big P F s + big (predC P) F s.
+proof. by rewrite -bigU 1:/#; apply: eq_bigl => /#. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt big_reindex ['a 'b]
   (P : 'a -> bool) (F : 'a -> t) (f : 'b -> 'a) (f' : 'a -> 'b) s
 :
@@ -386,6 +399,13 @@ proof. by move/eq_bigr=> ->; apply/big1_eq. qed.
 lemma big1_seq (P : 'a -> bool) F s:
   (forall i, P i /\ (mem s i) => F i = idm) => big P F s = idm.
 proof. by move=> eqF1; rewrite big_seq_cond big_andbC big1. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_eq_idm_filter ['a] (P : 'a -> bool) (F : 'a -> t) s :
+  (forall (x : 'a), !P x => F x = idm) => big predT F s = big P F s.
+proof.
+by move=> eq1; rewrite (@bigEM P) (@big1 (predC _)) // addm0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_flatten (P : 'a -> bool) F rr :
@@ -553,14 +573,3 @@ lemma nosmt big_int_recr_cond (n m : int) P F: m <= n =>
   bigi P F m (n+1) =
     bigi P F m n + (if P n then F n else idm).
 proof. by move=> lemn; rewrite !(@big_mkcond P) big_int_recr. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma big_eq_filter_cat ['a] (P : 'a -> bool) (F : 'a -> t) s :
-  big predT F s = big P F s + big (predC P) F s.
-proof. rewrite - (@eq_big_perm predT F ((filter P s) ++ (filter (predC P) s)) s). apply perm_filterC. smt. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma big_eq_idm_filter ['a] (P : 'a -> bool) (F : 'a -> t) s :
-  (forall (x : 'a), (predC P) x => F x = idm) =>
-  big predT F s = big P F s.
-proof. move=> H. rewrite (@big_eq_filter_cat P F s). rewrite (@big1 (predC P)). apply H. by rewrite addm0. qed.
