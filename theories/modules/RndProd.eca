@@ -1,0 +1,246 @@
+require import Distr DProd SmtMap.
+require (****) PROM.
+
+
+
+
+type a, b, t_in.
+
+type d_input, d_output.
+
+op da : a distr.
+axiom da_ll : is_lossless da.
+
+op db : b distr.
+axiom db_ll : is_lossless db.
+
+op dab : (a * b) distr = da `*` db.
+
+
+
+module type Oracles = {
+  proc init() : unit
+  proc f (_: t_in) : a * b
+  proc fa (_: t_in) : a
+  proc fb (_: t_in) : b
+}.
+
+module type Distinguisher (O : Oracles) = {
+  proc distinguish (_: d_input) : d_output
+}.
+
+module Game (D : Distinguisher) (O : Oracles) = {
+  proc main (i: d_input) : d_output = {
+    var r;
+    O.init();
+    r <@ D(O).distinguish(i);
+    return r;
+  }
+}.
+
+
+clone PROM.GenEager as ROa with
+  type from <- t_in,
+  type to   <- a,
+  type input <- d_input,
+  type output <- d_output,
+  op sampleto <- fun _ => da
+proof * by smt(da_ll).
+
+clone PROM.GenEager as ROb with
+  type from <- t_in,
+  type to   <- b,
+  type input <- d_input,
+  type output <- d_output,
+  op sampleto <- fun _ => db
+proof * by smt(db_ll).
+
+clone PROM.GenEager as ROab with
+  type from <- t_in,
+  type to   <- a * b,
+  type input <- d_input,
+  type output <- d_output,
+  op sampleto <- fun _ => dab
+proof * by smt(weight_dprod da_ll db_ll). 
+
+
+module O1 (O : ROab.RO) : Oracles = {
+  proc init () = {
+    O.init();
+  }
+  proc f = O.get
+  proc fa (m : t_in) = {
+    var xa;
+    xa <@ f(m);
+    return xa.`1;
+  }
+  proc fb (m : t_in) = {
+    var xb;
+    xb <@ f(m);
+    return xb.`2;
+  }
+}.
+
+module O2 (Oa : ROa.RO) (Ob : ROb.RO) = {
+  proc init () = {
+    Oa.init();
+    Ob.init();
+  }
+  proc f (m : t_in) = {
+    var xa, xb;
+    xa <@ Oa.get(m);
+    xb <@ Ob.get(m);
+    return (xa,xb);
+  }
+  proc fa = Oa.get
+  proc fb = Ob.get
+}.
+
+
+
+section.
+declare module D : 
+  Distinguisher { ROa.RO, ROa.FRO, ROb.RO, ROb.FRO, ROab.RO, ROab.FRO }.
+
+
+local module O3 (Oa : ROa.RO) (Ob : ROb.RO) = {
+  proc init () = {
+    Oa.init();
+    Ob.init();
+  }
+  proc f (m : t_in) = {
+    var xa, xb;
+    xa <@ Oa.get(m);
+    xb <@ Ob.get(m);
+    return (xa,xb);
+  }
+  proc fa (m : t_in) = {
+    var xa;
+    xa <@ Oa.get(m);
+    Ob.sample(m);
+    return xa;
+  }
+  proc fb (m : t_in) = {
+    var xb;
+    xb <@ Ob.get(m);
+    Oa.sample(m);
+    return xb;
+  }
+}.
+
+
+op map_prod (m : (t_in, a * b) fmap) (ma : (t_in, a) fmap) (mb : (t_in, b) fmap) =
+  fdom m = fdom ma && fdom m = fdom mb &&
+  forall x, x \in m => exists a b, m.[x] = Some (a,b) /\ ma.[x] = Some a /\ mb.[x] = Some b.
+
+local clone import DProd.ProdSampling as PS with
+  type t1 <- a,
+  type t2 <- b
+proof *.
+
+local equiv eq_1 :
+  Game(D,O1(ROab.RO)).main ~ Game(D,O3(ROa.RO,ROb.RO)).main :
+  ={arg, glob D} ==>
+  ={res, glob D} /\ map_prod ROab.RO.m{1} ROa.RO.m{2} ROb.RO.m{2}.
+proof.
+proc; inline*.
+call(: map_prod ROab.RO.m{1} ROa.RO.m{2} ROb.RO.m{2}); auto.
++ by proc; inline*; auto; smt(mem_empty fdom0).
++ proc; inline*.
+  sp; swap{2} 5 -3.
+  wp; conseq/>.
+  + move=> &l &r /> eqa eqb.
+    move=> hyp xab xa xb.
+    rewrite -3!mem_fdom -eqa -eqb=> />.
+  conseq(:_==> r{1} = (r,r0){2})=> />. 
+  + move=> &l &r eqa eqb hyp xa xb.
+    rewrite -3!mem_fdom -eqa -eqb=> />.
+    rewrite mem_fdom 3!get_setE/= 3!fdom_set -eqa -eqb /= Core.oget_some /=.
+    smt(mem_set get_setE).
+  transitivity{1} {
+      r <@ PS.S.sample(da,db);
+    }
+  (true ==> ={r}) (true ==> r{1} = (r{2}, r0{2}))=> //=.
+  + by inline*; auto.
+  transitivity{1} {
+      r <@ PS.S.sample2(da,db);
+    }
+    (true ==> ={r}) (true ==> r{1} = (r{2}, r0{2}))=> //=; last first.
+  + by inline*; auto. 
+  by call PS.sample_sample2; auto.
++ proc; inline*.
+  sp; swap{2} 6 -4.
+  wp; conseq(:_==> r{1} = (r,r0){2})=> />. 
+  + move=> &l &r eqa eqb hyp xa xb.
+    rewrite -3!mem_fdom -eqa -eqb=> />.
+    rewrite mem_fdom 2!get_setE/= 3!fdom_set -eqa -eqb /= 2!Core.oget_some /=.
+    smt(mem_set get_setE).
+  transitivity{1} {
+      r <@ PS.S.sample(da,db);
+    }
+  (true ==> ={r}) (true ==> r{1} = (r{2}, r0{2}))=> //=.
+  + by inline*; auto.
+  transitivity{1} {
+      r <@ PS.S.sample2(da,db);
+    }
+    (true ==> ={r}) (true ==> r{1} = (r{2}, r0{2}))=> //=; last first.
+  + by inline*; auto. 
+  by call PS.sample_sample2; auto.
++ proc; inline*.
+  sp; swap{2} 6 -5.
+  wp; conseq(:_==> r{1} = (r0,r){2})=> />. 
+  + move=> &l &r eqa eqb hyp xa xb.
+    rewrite -3!mem_fdom -eqa -eqb=> />.
+    rewrite mem_fdom 2!get_setE/= 3!fdom_set -eqa -eqb /= 2!Core.oget_some /=.
+    smt(mem_set get_setE).
+  transitivity{1} {
+      r <@ PS.S.sample(da,db);
+    }
+  (true ==> ={r}) (true ==> r{1} = (r0{2}, r{2}))=> //=.
+  + by inline*; auto.
+  transitivity{1} {
+      r <@ PS.S.sample2(da,db);
+    }
+    (true ==> ={r}) (true ==> r{1} = (r0{2}, r{2}))=> //=; last first.
+  + by inline*; auto. 
+  by call PS.sample_sample2; auto.
+smt(mem_empty fdom0).
+qed.
+
+local equiv eq_2 :
+  D(O3(ROa.LRO,ROb.LRO)).distinguish ~ D(O2(ROa.RO,ROb.RO)).distinguish :
+  ={arg, glob D, ROa.RO.m, ROb.RO.m} ==>
+  ={res, glob D, ROa.RO.m, ROb.RO.m}.
+proof.
+proc( ={ROa.RO.m, ROb.RO.m})=> //=.
++ by proc; inline*; auto.
++ by proc; inline*; sim.
++ by proc; inline*; sp; wp 2 2; sim.
+by proc; inline*; sp; wp 2 2; sim.
+qed.
+
+local module D1 (Ob : ROb.RO) (Oa : ROa.RO) = D(O3(Oa,Ob)).
+local module D2 (Oa : ROa.RO) (Ob : ROb.RO) = D(O3(Oa,Ob)).
+
+equiv prod_split :
+  Game(D,O1(ROab.RO)).main ~ Game(D,O2(ROa.RO,ROb.RO)).main :
+  ={arg, glob D} ==> ={res, glob D}.
+proof.
+transitivity Game(D, O3(ROa.RO, ROb.RO)).main
+  (={arg, glob D} ==> ={res, glob D})
+  (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
++ by conseq eq_1=> />.
+transitivity Game(D, O3(ROa.LRO, ROb.RO)).main
+  (={arg, glob D} ==> ={res, glob D})
+  (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
++ proc; inline*. 
+  by call(ROa.RO_LRO_D (D1(ROb.RO))); auto.
+transitivity Game(D, O3(ROa.LRO, ROb.LRO)).main
+  (={arg, glob D} ==> ={res, glob D})
+  (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
++ proc; inline*. 
+  by call(ROb.RO_LRO_D (D2(ROa.LRO))); auto.
+by proc; inline*; call eq_2; auto.
+qed.
+
+end section.

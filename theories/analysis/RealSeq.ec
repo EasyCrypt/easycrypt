@@ -11,6 +11,7 @@ require import AllCore Bool Ring StdRing StdOrder StdBigop List.
 (*---*) import IterOp Bigreal.BRA IntID RField IntOrder RealOrder.
 
 pragma +implicits.
+pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 op convergeto (s : int -> real) (x : real) =
@@ -196,7 +197,7 @@ by apply/(@bounded_cnvto l2).
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma le_cnvto_form s1 s2 l1 l2:
+lemma le_cnvto_from s1 s2 l1 l2:
      (exists N, forall n, (N <= n)%Int => (s1 n <= s2 n)%Real)
   => convergeto s1 l1 => convergeto s2 l2 => l1 <= l2.
 proof.
@@ -212,6 +213,56 @@ move/ltr_le_trans/(_ _ le0_s12); rewrite -(@mulr1 (l1-l2)) /e.
 rewrite -mulrBr pmulr_llt0 1:subr_gt0 1:invr_lt1 //.
 by rewrite subr_lt0 ltrNge (ltrW lt_l21).
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma cnvto_lub_bmono_from (s : int -> real) M N :
+     (forall n p, (N <= n <= p)%Int => s n <= s p)
+  => (forall n, N <= n => s n <= M)
+  => convergeto s (lub (fun x => exists n, N <= n /\ s n = x)).
+proof.
+move=> mono_s bd_s; pose E x := exists n, N <= n /\ s n = x.
+have: has_lub E; first (split; first by exists (s N) N).
++ by exists M => x [n [leNn <-]]; apply/bd_s.
+move=> ^/lub_upper_bound h1 /lub_adherent h2.
+move=> e gt0_e; case/(_ _ gt0_e): h2 => _ [[K] [leKn <<-]] h2.
+exists K => n leNn; rewrite distrC ger0_norm ?subr_ge0.
++ by apply/h1; exists n => /=; apply/(@lez_trans K).
+by rewrite ltr_subl_addr -ltr_subl_addl; apply/(ltr_le_trans _ h2)/mono_s.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma cnv_bmono_from (s : int -> real) M N :
+     (forall n p, (N <= n <= p)%Int => s n <= s p)
+  => (forall n, N <= n => s n <= M)
+  => converge s.
+proof.
+move=> h1 h2; exists (lub (fun x => exists n, N <= n /\ s n = x)).
+by apply/(@cnvto_lub_bmono_from _ M N).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma cnvD (s1 s2 : int -> real) :
+  converge s1 => converge s2 => converge (fun x => s1 x + s2 x).
+proof. by case=> [l1 h1] [l2 h2]; exists (l1 + l2); apply/cnvtoD. qed.
+
+lemma cnvZ c (s : int -> real) :
+  converge s => converge (fun x => c * s x).
+proof. by case=> [l h]; exists (c * l); apply/cnvtoZ. qed.
+
+lemma cnvZ_iff c (s : int -> real) : c <> 0%r =>
+  converge (fun x => c * s x) <=> converge s.
+proof.
+move=> nz_c; split; last by apply/cnvZ.
+suff {2}->: s = fun x => inv c * (c * s x) by apply/cnvZ.
+by apply/fun_ext=> x; rewrite mulrA (@mulrC _ c) divff.
+qed.
+
+lemma cnvN s : converge s => converge (fun x => -s x).
+proof. by move/(@cnvZ (-1)%r) => /#. qed.
+
+lemma cnvB s1 s2 :
+  converge s1 => converge s2 => converge (fun x => s1 x - s2 x).
+proof.  by move=> h1 h2; rewrite cnvD // cnvN. qed.
 
 (* -------------------------------------------------------------------- *)
 op lim (s : int -> real) =
@@ -251,3 +302,29 @@ proof. by apply/limC_eq_from. qed.
 
 lemma limC c : lim (fun x => c) = c.
 proof. by apply/limC_eq. qed.
+
+lemma limZ c (s : int -> real) :
+  lim (fun x => c * s x) = c * lim s.
+proof.
+case: (converge s) => [[l] ^/cnvtoZ /(_ c) h1 h2|].
++ by rewrite (lim_cnvto h1) (lim_cnvto h2).
+case: (c = 0%r) => [-> _ /=|nz_c ^h1]; first by rewrite limC.
+by rewrite -(@cnvZ_iff c) // => h2; rewrite !lim_Ncnv.
+qed.
+
+lemma limD (s1 s2 : int -> real) :
+  converge s1 => converge s2 =>
+    lim (fun x => s1 x + s2 x) = lim s1 + lim s2.
+proof.
+case=> [l1 h1] [l2 h2]; rewrite (lim_cnvto h1) (lim_cnvto h2).
+by have := cnvtoD _ _ _ _ h1 h2 => /lim_cnvto ->.
+qed.
+
+lemma limN (s : int -> real) : lim (fun x => - s x) = - lim s.
+proof. by rewrite -mulN1r -limZ /#. qed.
+
+lemma limB (s1 s2 : int -> real) :
+  converge s1 => converge s2 =>
+    lim (fun x => s1 x - s2 x) = lim s1 - lim s2.
+proof. by move=> h1 h2; rewrite limD // 1:cnvN // limN. qed.
+

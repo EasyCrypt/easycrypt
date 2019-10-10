@@ -419,18 +419,23 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
 
       (* Wait for the first prover giving a definitive answer *)
       let status = ref 0 in
-      let alives = ref (-1) in
-      while !alives <> 0 && 0 <= !status && !status < pi.pr_quorum do
+      let alives = ref (Array.count is_some pcs) in
+
+      while (   (!alives <> 0 || not (Queue.is_empty pqueue))
+             && (0 <= !status && !status < pi.pr_quorum)) do
+
         if not (Queue.is_empty pqueue) && !alives < Array.length pcs then begin
-            for i = 0 to (Array.length pcs) - 1 do
-              if is_none pcs.(i) && not (Queue.is_empty pqueue) then
-                run i (Queue.take pqueue)
-            done
+          for i = 0 to (Array.length pcs) - 1 do
+            if is_none pcs.(i) && not (Queue.is_empty pqueue) then begin
+              run i (Queue.take pqueue)
+            end
+          done
         end;
 
         let infos = CP.get_new_results ~blocking:true in
 
         alives := 0;
+
         for i = 0 to (Array.length pcs) - 1 do
           match pcs.(i) with
           | None -> ()

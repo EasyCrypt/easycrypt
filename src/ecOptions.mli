@@ -44,8 +44,7 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : string list;
-  ldro_rdirs : string list;
+  ldro_idirs : (string option * string) list;
   ldro_boot  : bool;
 }
 
@@ -62,8 +61,7 @@ type ini_options = {
   ini_why3     : string option;
   ini_ovrevict : string list;
   ini_provers  : string list;
-  ini_idirs    : string list;
-  ini_rdirs    : string list;
+  ini_idirs    : (string option * string) list;
 }
 
 (* -------------------------------------------------------------------- *)

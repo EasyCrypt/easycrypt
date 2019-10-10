@@ -39,7 +39,7 @@ let why3dflconf = Filename.concat XDG.home "why3.conf"
 (* -------------------------------------------------------------------- *)
 type pconfig = {
   pc_why3     : string option;
-  pc_loadpath : (bool * string) list;
+  pc_loadpath : (EcLoader.namespace option * string) list;
 }
 
 let print_config config =
@@ -47,12 +47,17 @@ let print_config config =
   Format.eprintf "git-hash: %s@\n%!" EcVersion.hash;
 
   (* Print load path *)
-  Format.eprintf "load-path:@\n%!";
-  List.iter
-    (fun (sys, dir) ->
-       Format.eprintf "  <%.6s>@@%s@\n%!"
-         (if sys then "system" else "user") dir)
-    (EcCommands.loadpath ());
+  begin
+    let string_of_namespace = function
+      | None            -> "<none>"
+      | Some `System    -> "<system>"
+      | Some (`Named x) -> x in
+    Format.eprintf "load-path:@\n%!";
+    List.iter
+      (fun (nm, dir) ->
+         Format.eprintf "  %.10s@@%s@\n%!" (string_of_namespace nm) dir)
+      (EcCommands.loadpath ());
+  end;
 
   (* Print why3 configuration file location *)
   Format.eprintf "why3 configuration file@\n%!";
@@ -176,10 +181,12 @@ let main () =
   begin
     let theories = resource ["theories"] in
 
-    EcCommands.addidir ~system:true (Filename.concat theories "prelude");
+    EcCommands.addidir ~namespace:`System (Filename.concat theories "prelude");
     if not ldropts.ldro_boot then
-      EcCommands.addidir ~system:true ~recursive:true theories;
-    List.iter EcCommands.addidir ldropts.ldro_idirs;
+      EcCommands.addidir ~namespace:`System ~recursive:true theories;
+    List.iter (fun (onm, x) ->
+        EcCommands.addidir ?namespace:(omap (fun nm -> `Named nm) onm) x)
+      ldropts.ldro_idirs;
   end;
 
   (* Register user messages printers *)

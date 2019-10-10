@@ -230,6 +230,13 @@ module Buffer : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Array : sig
+  include module type of BatArray
+
+  val count : ('a -> bool) -> 'a array -> int
+end
+
+(* -------------------------------------------------------------------- *)
 module List : sig
   include module type of BatList
 
