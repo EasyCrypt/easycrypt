@@ -21,25 +21,53 @@ exception Restart
 type pragma = {
   pm_verbose : bool; (* true  => display goal after each command *)
   pm_g_prall : bool; (* true  => display all open goals *)
+  pm_g_prpo  : EcPrinting.prpo_display;
   pm_check   : [`Check | `WeakCheck | `Report];
 }
 
 let dpragma = {
   pm_verbose = true  ;
   pm_g_prall = false ;
+  pm_g_prpo  = EcPrinting.{ prpo_pr = false; prpo_po = false; };
   pm_check   = `Check;
 }
 
-let pragma = ref dpragma
+module Pragma : sig
+  val get : unit -> pragma
+  val set : pragma -> unit
+  val upd : (pragma -> pragma) -> unit
+end = struct
+  let pragma = ref dpragma
+
+  let notify () =
+    EcUserMessages.set_ppo
+      EcUserMessages.{ ppo_prpo = (!pragma).pm_g_prpo }
+
+  let () = notify ()
+
+  let get () = !pragma
+  let set x  = pragma := x; notify ()
+  let upd f  = set (f (get ()))
+end
 
 let pragma_verbose (b : bool) =
-  pragma := { !pragma with pm_verbose = b; }
+  Pragma.upd (fun pragma -> { pragma with pm_verbose = b; })
 
 let pragma_g_prall (b : bool) =
-  pragma := {!pragma with pm_g_prall = b; }
+  Pragma.upd (fun pragma -> { pragma with pm_g_prall = b; })
+
+let pragma_g_pr_display (b : bool) =
+  Pragma.upd (fun pragma ->
+    { pragma with pm_g_prpo =
+        EcPrinting.{ pragma.pm_g_prpo with prpo_pr = b; } })
+
+let pragma_g_po_display (b : bool) =
+  Pragma.upd (fun pragma ->
+    { pragma with pm_g_prpo =
+        EcPrinting.{ pragma.pm_g_prpo with prpo_po = b; } })
 
 let pragma_check mode =
-  pragma := { !pragma with pm_check = mode; }
+  Pragma.upd (fun pragma -> { pragma with pm_check = mode; })
 
 module Pragmas = struct
   let silent     = "silent"
@@ -55,21 +83,34 @@ module Pragmas = struct
     let printall = "Goals:printall"
     let printone = "Goals:printone"
   end
+
+  module PrPo = struct
+    let prpo_pr_raw = "PrPo:pr:raw"
+    let prpo_pr_spl = "PrPo:pr:ands"
+    let prpo_po_raw = "PrPo:po:raw"
+    let prpo_po_spl = "PrPo:po:ands"
+  end
+
 end
 
 exception InvalidPragma of string
 
 let apply_pragma (x : string) =
   match x with
-  | x when x = Pragmas.silent         -> pragma_verbose false
-  | x when x = Pragmas.verbose        -> pragma_verbose true
-  | x when x = Pragmas.Proofs.check   -> pragma_check   `Check
-  | x when x = Pragmas.Proofs.weak    -> pragma_check   `WeakCheck
-  | x when x = Pragmas.Proofs.report  -> pragma_check   `Report
-  | x when x = Pragmas.Goals.printone -> pragma_g_prall false
-  | x when x = Pragmas.Goals.printall -> pragma_g_prall true
+  | x when x = Pragmas.silent           -> pragma_verbose false
+  | x when x = Pragmas.verbose          -> pragma_verbose true
+  | x when x = Pragmas.Proofs.check     -> pragma_check   `Check
+  | x when x = Pragmas.Proofs.weak      -> pragma_check   `WeakCheck
+  | x when x = Pragmas.Proofs.report    -> pragma_check   `Report
+  | x when x = Pragmas.Goals.printone   -> pragma_g_prall false
+  | x when x = Pragmas.Goals.printall   -> pragma_g_prall true
+  | x when x = Pragmas.PrPo.prpo_pr_raw -> pragma_g_pr_display false
+  | x when x = Pragmas.PrPo.prpo_pr_spl -> pragma_g_pr_display true
+  | x when x = Pragmas.PrPo.prpo_po_raw -> pragma_g_po_display false
+  | x when x = Pragmas.PrPo.prpo_po_spl -> pragma_g_po_display true
+  | x when x = Pragmas.Goals.printall   -> pragma_g_prall true
 
-  | _ -> raise (InvalidPragma x)
+  | _ -> Printf.eprintf "%s\n%!" x; raise (InvalidPragma x)
 
 (* -------------------------------------------------------------------- *)
 module Loader : sig
@@ -210,7 +251,8 @@ module HiPrinting = struct
                         goal.EcCoreGoal.g_concl) in
 
             Format.fprintf fmt "Printing Goal %d\n\n%!" n;
-            EcPrinting.pp_goal ppe fmt (goal, `One sz)
+            EcPrinting.pp_goal ppe (Pragma.get ()).pm_g_prpo
+              fmt (goal, `One sz)
         end
     end
 end
@@ -277,7 +319,7 @@ and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
 (* -------------------------------------------------------------------- *)
 and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
   EcScope.check_state `InTop "type class instance" scope;
-  EcScope.Ty.add_instance scope (!pragma).pm_check tci
+  EcScope.Ty.add_instance scope (Pragma.get ()).pm_check tci
 
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) m =
@@ -339,7 +381,7 @@ and process_abbrev (scope : EcScope.scope) (a : pabbrev located) =
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
-  let (name, scope) = EcScope.Ax.add scope (!pragma).pm_check ax in
+  let (name, scope) = EcScope.Ax.add scope (Pragma.get ()).pm_check ax in
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
@@ -395,14 +437,13 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
       Loader.addidir ?namespace:fnm dirname subld;
 
       let loader iscope =
-        let i_pragma = !pragma in
+        let i_pragma = Pragma.get () in
 
-        try
+        try_finally (fun () ->
           let commands = EcIo.parseall (EcIo.from_file filename) in
           let commands = List.fold_left (process_internal subld) iscope commands in
-            pragma := i_pragma; commands
-        with e ->
-          pragma := i_pragma; raise e
+          commands)
+        (fun () -> Pragma.set i_pragma)
       in
 
       let kind = match kind with `Ec -> `Concrete | `EcA -> `Abstract in
@@ -432,7 +473,7 @@ and process_th_export (scope : EcScope.scope) (names : pqsymbol list) =
 (* -------------------------------------------------------------------- *)
 and process_th_clone (scope : EcScope.scope) thcl =
   EcScope.check_state `InTop "theory cloning" scope;
-  EcScope.Cloning.clone scope (!pragma).pm_check thcl
+  EcScope.Cloning.clone scope (Pragma.get ()).pm_check thcl
 
 (* -------------------------------------------------------------------- *)
 and process_sct_open (scope : EcScope.scope) name =
@@ -446,7 +487,7 @@ and process_sct_close (scope : EcScope.scope) name =
 
 (* -------------------------------------------------------------------- *)
 and process_tactics (scope : EcScope.scope) t =
-  let mode = !pragma.pm_check in
+  let mode = (Pragma.get ()).pm_check in
   match t with
   | `Actual t  -> snd (EcScope.Tactics.process scope mode t)
   | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
@@ -465,7 +506,7 @@ and process_save (scope : EcScope.scope) ed =
 
 (* -------------------------------------------------------------------- *)
 and process_realize (scope : EcScope.scope) pr =
-  let mode = !pragma.pm_check in
+  let mode = (Pragma.get ()).pm_check in
   let (name, scope) = EcScope.Ax.realize scope mode pr in
     name |> EcUtils.oiter
       (fun x -> EcScope.notify scope `Info "added lemma: `%s'" x);
@@ -486,20 +527,19 @@ and process_pragma (scope : EcScope.scope) opt =
   in
 
   match unloc opt with
-  | x when x = Pragmas.silent         -> pragma_verbose false
-  | x when x = Pragmas.verbose        -> pragma_verbose true
   | x when x = Pragmas.Proofs.weak    -> pragma_check   `WeakCheck
   | x when x = Pragmas.Proofs.check   -> pragma_check   `Check
   | x when x = Pragmas.Proofs.report  -> pragma_check   `Report
-  | x when x = Pragmas.Goals.printall -> pragma_g_prall true
-  | x when x = Pragmas.Goals.printone -> pragma_g_prall false
 
   | "noop"    -> ()
   | "compact" -> Gc.compact ()
   | "reset"   -> raise (Pragma `Reset)
   | "restart" -> raise (Pragma `Restart)
 
-  | x -> EcScope.notify scope `Warning "unknown pragma: `%s'" x
+  | x ->
+      try  apply_pragma x
+      with InvalidPragma _ ->
+        EcScope.notify scope `Warning "unknown pragma: `%s'" x
 
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
@@ -533,7 +573,7 @@ and process_dump scope (source, tc) =
   let input, (p1, p2) = source.tcd_source in
 
   let goals, scope  =
-    let mode = !pragma.pm_check in
+    let mode = (Pragma.get ()).pm_check in
      EcScope.Tactics.process scope mode tc
   in
 
@@ -569,7 +609,8 @@ and process_dump scope (source, tc) =
 
               source.tcd_width |> oiter (Format.pp_set_margin fbuf);
 
-              Format.fprintf fbuf "%a@?" (EcPrinting.pp_goal ppe)
+              Format.fprintf fbuf "%a@?"
+                (EcPrinting.pp_goal ppe (Pragma.get ()).pm_g_prpo)
                 ((EcEnv.LDecl.tohyps hyps, concl), `One (-1)))
             (fun () -> close_out output)
         with Sys_error _ -> wrerror ecfname)
@@ -712,7 +753,7 @@ let push_context scope context =
 (* -------------------------------------------------------------------- *)
 let initialize ~restart ~undo ~boot ~checkmode =
   assert (restart || EcUtils.is_none !context);
-  if restart then pragma := dpragma;
+  if restart then Pragma.set dpragma;
   context := Some (rootctxt ~undo (initial ~checkmode ~boot))
 
 (* -------------------------------------------------------------------- *)
@@ -733,7 +774,7 @@ let uuid () : int =
 
 (* -------------------------------------------------------------------- *)
 let mode () : string =
-  match (!pragma).pm_check with
+  match (Pragma.get ()).pm_check with
   | `Check     -> "check"
   | `WeakCheck -> "weakcheck"
   | `Report    -> "report"
@@ -803,13 +844,15 @@ let pp_current_goal ?(all = false) stream =
                 let subgoals = EcCoreGoal.all_opened pf in
                 let subgoals = odfl [] (List.otail subgoals) in
                 let subgoals = List.map get_hc subgoals in
-                EcPrinting.pp_goal ppe stream (get_hc g, `All subgoals)
+                EcPrinting.pp_goal ppe (Pragma.get ()).pm_g_prpo
+                  stream (get_hc g, `All subgoals)
               else
-                EcPrinting.pp_goal ppe stream (get_hc g, `One n)
+                EcPrinting.pp_goal ppe (Pragma.get ()).pm_g_prpo
+                  stream (get_hc g, `One n)
       end
   end
 
 let pp_maybe_current_goal stream =
-  match (!pragma).pm_verbose with
-  | true  -> pp_current_goal ~all:(!pragma).pm_g_prall stream
+  match (Pragma.get ()).pm_verbose with
+  | true  -> pp_current_goal ~all:(Pragma.get ()).pm_g_prall stream
   | false -> ()

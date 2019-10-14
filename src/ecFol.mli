@@ -125,6 +125,7 @@ val f_real_inv_simpl : form -> form
 
 (* -------------------------------------------------------------------- *)
 val destr_exists_prenex : form -> bindings * form
+val destr_ands : deep:bool -> form -> form list
 
 (* -------------------------------------------------------------------- *)
 (* projects 'a Distr type into 'a *)

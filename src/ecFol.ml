@@ -924,3 +924,13 @@ let destr_exists_prenex f =
     match prenex_exists [] f with
     | [] , _ -> destr_error "exists"
     | bds, f -> (bds, f)
+
+(* -------------------------------------------------------------------- *)
+let destr_ands ~deep =
+  let rec doit f =
+    try
+      let (f1, f2) = destr_and f in
+      (if deep then doit f1 else [f1]) @ (doit f2)
+    with DestrError _ -> [f]
+
+  in fun f -> doit f

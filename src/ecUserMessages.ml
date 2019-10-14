@@ -15,6 +15,16 @@ open EcTypes
 open EcEnv
 
 (* -------------------------------------------------------------------- *)
+type pp_options = {
+  ppo_prpo : EcPrinting.prpo_display;
+}
+
+let ppo : (pp_options option) ref = ref None
+
+let set_ppo (newppo : pp_options) =
+  ppo := Some newppo
+
+(* -------------------------------------------------------------------- *)
 module TypingError : sig
   open EcTyping
 
@@ -97,10 +107,10 @@ end = struct
         msg "wrong number of arguments (expected %i, got %i)" ex got
 
     | MAE_InvalidArgType (mp,error) ->
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      msg "argument %a does not match required interface, %a"
-        (EcPrinting.pp_topmod ppe) mp
-        (pp_cnv_failure env) error
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        msg "argument %a does not match required interface, %a"
+          (EcPrinting.pp_topmod ppe) mp
+          (pp_cnv_failure env) error
 
     | MAE_AccesSubModFunctor ->
         msg "cannot access a sub-module of a partially applied functor"
@@ -732,7 +742,7 @@ let pp_tc_error fmt error =
 
     Format.fprintf fmt "\nInitial goal was:\n\n%!";
     Format.fprintf fmt "%a\n%!"
-      (EcPrinting.pp_goal ppe)
+      (EcPrinting.pp_goal ppe (oget !ppo).ppo_prpo)
       ((LDecl.tohyps goal.G.g_hyps, goal.G.g_concl), `One (-1))
 
   in
@@ -760,51 +770,51 @@ let pp_error_clear fmt err =
 
 (* -------------------------------------------------------------------- *)
 let pp fmt exn =
-match exn with
-| EcHiInductive.RcError (_, env, e) -> InductiveError.pp_rcerror env fmt e
-| EcHiInductive.DtError (_, env, e) -> InductiveError.pp_dterror env fmt e
-| EcHiInductive.FxError (_, env, e) -> InductiveError.pp_fxerror env fmt e
+  match exn with
+  | EcHiInductive.RcError (_, env, e) -> InductiveError.pp_rcerror env fmt e
+  | EcHiInductive.DtError (_, env, e) -> InductiveError.pp_dterror env fmt e
+  | EcHiInductive.FxError (_, env, e) -> InductiveError.pp_fxerror env fmt e
 
-| EcHiPredicates.TransPredError (_, env, e) ->
-   PredError.pp_tperror env fmt e
+  | EcHiPredicates.TransPredError (_, env, e) ->
+     PredError.pp_tperror env fmt e
 
-| EcHiNotations.NotationError (_, env, e) ->
-   NotationsError.pp_nterror env fmt e
+  | EcHiNotations.NotationError (_, env, e) ->
+     NotationsError.pp_nterror env fmt e
 
-| EcPV.AliasClash (env, ac) ->
-    pp_alias_clash env fmt ac
+  | EcPV.AliasClash (env, ac) ->
+      pp_alias_clash env fmt ac
 
-| EcThCloning.CloneError (env, e) ->
-    CloneError.pp_clone_error env fmt e
+  | EcThCloning.CloneError (env, e) ->
+      CloneError.pp_clone_error env fmt e
 
-| EcCoreGoal.TcError error ->
-    pp_tc_error fmt error
+  | EcCoreGoal.TcError error ->
+      pp_tc_error fmt error
 
-| EcParsetree.ParseError (_loc, msg) ->
-    pp_parse_error fmt msg
+  | EcParsetree.ParseError (_loc, msg) ->
+      pp_parse_error fmt msg
 
-| EcReduction.IncompatibleForm (env, (f1, f2)) ->
-    RedError.pp_incompatible_form fmt env (f1, f2)
+  | EcReduction.IncompatibleForm (env, (f1, f2)) ->
+      RedError.pp_incompatible_form fmt env (f1, f2)
 
-| EcReduction.IncompatibleType (env, (t1, t2)) ->
-    RedError.pp_incompatible_type fmt env (t1, t2)
+  | EcReduction.IncompatibleType (env, (t1, t2)) ->
+      RedError.pp_incompatible_type fmt env (t1, t2)
 
-| EcTyping.TyError (_, env, e) ->
-    TypingError.pp_tyerror env fmt e
+  | EcTyping.TyError (_, env, e) ->
+      TypingError.pp_tyerror env fmt e
 
-| EcTyping.RestrictionError (env, e) ->
-    TypingError.pp_restr_error env fmt e
+  | EcTyping.RestrictionError (env, e) ->
+      TypingError.pp_restr_error env fmt e
 
-| EcProofTerm.ProofTermError e ->
-    PTermError.pp_pterm_apperror fmt e
+  | EcProofTerm.ProofTermError e ->
+      PTermError.pp_pterm_apperror fmt e
 
-| EcCoreGoal.ClearError e ->
-    pp_error_clear fmt e
+  | EcCoreGoal.ClearError e ->
+      pp_error_clear fmt e
 
-| EcLowGoal.Apply.NoInstance e ->
-    pp_apply_error fmt e
+  | EcLowGoal.Apply.NoInstance e ->
+      pp_apply_error fmt e
 
-| _ -> raise exn
+  | _ -> raise exn
 
 (* -------------------------------------------------------------------- *)
 let register =
