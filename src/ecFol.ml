@@ -103,6 +103,20 @@ let f_real_sub f1 f2 =
 let f_real_div f1 f2 =
   f_real_mul f1 (f_real_inv f2)
 
+let f_decimal (n, (l, f)) =
+  let nv = f_real_of_int (f_int n) in
+
+  if EcBigInt.equal f EcBigInt.zero then nv else
+
+  let f = f_real_of_int (f_int f) in
+  let u = f_int (EcBigInt.pow (EcBigInt.of_int 10) l) in
+  let u = f_real_of_int u in
+  let d = f_real_div f u in
+
+  if EcBigInt.equal n EcBigInt.zero then d else
+
+  f_real_add (f_real_of_int (f_int n)) d
+
 (* -------------------------------------------------------------------- *)
 let f_predT     ty = f_op CI.CI_Pred.p_predT [ty] (tcpred ty)
 let fop_pred1   ty = f_op CI.CI_Pred.p_pred1 [ty] (toarrow [ty; ty] tbool)

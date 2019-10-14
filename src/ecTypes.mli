@@ -198,6 +198,7 @@ val e_ty      : expr -> ty
 (* -------------------------------------------------------------------- *)
 val e_tt       : expr
 val e_int      : zint -> expr
+val e_decimal  : zint * (int * zint) -> expr
 val e_local    : EcIdent.t -> ty -> expr
 val e_var      : prog_var -> ty -> expr
 val e_op       : EcPath.path -> ty list -> ty -> expr

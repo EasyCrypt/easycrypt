@@ -679,6 +679,45 @@ let e_app x args ty =
     | Eapp(x', args') -> mk_expr (Eapp (x', (args'@args))) ty
     | _ -> mk_expr (Eapp (x, args)) ty
 
+let e_app_op ?(tyargs=[]) op args ty =
+  e_app (e_op op tyargs (toarrow (List.map e_ty args) ty)) args ty
+
+(* -------------------------------------------------------------------- *)
+module Reals : sig
+  val of_lit : EcBigInt.zint -> expr
+  val of_int : expr -> expr
+  val add    : expr -> expr -> expr
+  val opp    : expr -> expr
+  val sub    : expr -> expr -> expr
+  val mul    : expr -> expr -> expr
+  val inv    : expr -> expr
+  val div    : expr -> expr -> expr
+end = struct
+  module CIR = EcCoreLib.CI_Real
+
+  let of_int f = e_app_op CIR.p_real_of_int [f] treal
+  let of_lit n = of_int (e_int n)
+
+  let add f1 f2 = e_app_op CIR.p_real_add [f1; f2] treal
+  let opp f     = e_app_op CIR.p_real_opp [f] treal
+  let sub f1 f2 = add f1 (opp f2)
+  let mul f1 f2 = e_app_op CIR.p_real_mul [f1; f2] treal
+  let inv f     = e_app_op CIR.p_real_inv [f] treal
+  let div f1 f2 = mul f1 (inv f2)
+end
+
+(* -------------------------------------------------------------------- *)
+let e_decimal (n, (l, f)) =
+  let nv = Reals.of_lit n in
+
+  if EcBigInt.equal f EcBigInt.zero then nv else
+
+  let f = Reals.of_lit f in
+  let u = Reals.of_lit (EcBigInt.pow (EcBigInt.of_int 10) l) in
+  let d = Reals.div f u in
+
+  if EcBigInt.equal n EcBigInt.zero then d else Reals.add nv d
+
 (* -------------------------------------------------------------------- *)
 module ExprSmart = struct
   let l_symbol (lp, x) x' =

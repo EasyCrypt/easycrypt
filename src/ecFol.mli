@@ -57,6 +57,8 @@ val f_real_inv : form -> form
 val f_real_div : form -> form -> form
 val f_real_abs : form -> form
 
+val f_decimal : zint * (int * zint) -> form
+
 (* soft constructors - distributions *)
 val fop_support : EcTypes.ty -> form
 

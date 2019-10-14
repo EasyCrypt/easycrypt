@@ -349,6 +349,11 @@ rule main = parse
   | mident       { [MIDENT (Lexing.lexeme lexbuf)] }
   | uint         { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
 
+  | (digit+ as n) '.' (digit+ as f) {
+      let nv, fv = BI.of_string n, BI.of_string f in
+      [DECIMAL (nv, (String.length f, fv))]
+    }
+
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { [PBINOP s] }
 
