@@ -230,6 +230,14 @@ lemma nosmt get_set_neqE (m : ('a, 'b) fmap) (x y : 'a) b :
 proof. by rewrite get_setE => ->. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma get_set_id (m : ('a,'b) fmap) x y:
+  m.[x] = Some y => m.[x <- y] = m.
+proof.
+move=> mxE; apply/fmap_eqP=> z; rewrite get_setE.
+by case: (z = x) => [->|] //; rewrite mxE.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt set_setE ['a 'b] (m : ('a, 'b) fmap) x x' b b' :
   m.[x <- b].[x' <- b']
     = (x' = x) ? m.[x' <- b'] : m.[x' <- b'].[x <- b].
