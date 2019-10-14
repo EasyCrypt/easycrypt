@@ -1989,7 +1989,7 @@ module Theory = struct
     let ((cth, required), section, (name, mode), scope) = cth in
     let scope = List.fold_right require_loaded required scope in
     let scope = cth |> ofold (fun cth scope ->
-      let scope = bind scope (name, (cth, mode)) in
+    let scope = bind scope (name, (cth, mode)) in
       { scope with sc_env =
           add_restr section
             (EcPath.pqname (path scope) name) (cth, mode) scope.sc_env })
