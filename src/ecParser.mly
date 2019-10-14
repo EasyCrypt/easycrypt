@@ -455,6 +455,7 @@
 %token INCLUDE
 %token INDUCTIVE
 %token INLINE
+%token INTERLEAVE
 %token INSTANCE
 %token IOTA
 %token KILL
@@ -624,22 +625,23 @@
 
 (* -------------------------------------------------------------------- *)
 _lident:
-| x=LIDENT { x }
-| ABORT    { "abort"    }
-| ADMITTED { "admitted" }
-| ASYNC    { "async"    }
-| DUMP     { "dump"     }
-| EXPECT   { "expect"   }
-| FIRST    { "first"    }
-| LAST     { "last"     }
-| LEFT     { "left"     }
-| RIGHT    { "right"    }
-| SOLVE    { "solve"    }
-| STRICT   { "strict"   }
-| WLOG     { "wlog"     }
-| EXLIM    { "exlim"    }
-| ECALL    { "ecall"    }
-| FROM     { "from"     }
+| x=LIDENT   { x }
+| ABORT      { "abort"      }
+| ADMITTED   { "admitted"   }
+| ASYNC      { "async"      }
+| DUMP       { "dump"       }
+| EXPECT     { "expect"     }
+| FIRST      { "first"      }
+| INTERLEAVE { "interleave" }
+| LAST       { "last"       }
+| LEFT       { "left"       }
+| RIGHT      { "right"      }
+| SOLVE      { "solve"      }
+| STRICT     { "strict"     }
+| WLOG       { "wlog"       }
+| EXLIM      { "exlim"      }
+| ECALL      { "ecall"      }
+| FROM       { "from"       }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -2712,6 +2714,14 @@ byequivopt:
           (Some ("invalid option: " ^ (unloc x)))
   }
 
+interleavepos:
+| LBRACKET c=word COLON n=word RBRACKET
+  { c, n }
+
+interleave_info:
+| s=side? c1=interleavepos c2=interleavepos c3=interleavepos* k=word
+   { (s, c1, c2 :: c3, k) }
+
 phltactic:
 | PROC
    { Pfun `Def }
@@ -2757,6 +2767,9 @@ phltactic:
 
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }
+
+| INTERLEAVE info=loc(interleave_info)
+    { Pinterleave info }
 
 | CFOLD s=side? c=codepos NOT n=word
     { Pcfold (s, c, Some n) }

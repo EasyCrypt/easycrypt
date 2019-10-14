@@ -436,6 +436,8 @@ type swap_kind =
   | SKmovei     of int * int
   | SKmoveinter of int * int * int
 
+type interleave_info = oside * (int * int) * ((int * int) list) * int
+
 type pipattern =
   | PtAny
   | PtAsgn  of psymbol list
@@ -603,6 +605,7 @@ type phltactic =
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
   | Pinline        of inline_info
+  | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
   | Prnd           of oside * (pformula, pformula option, pformula) rnd_tac_info
   | Palias         of (oside * codepos * osymbol_r)

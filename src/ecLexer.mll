@@ -152,6 +152,7 @@
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
     "exfalso"     , EXFALSO    ;        (* KW: tactic *)
     "inline"      , INLINE     ;        (* KW: tactic *)
+    "interleave"  , INTERLEAVE ;        (* KW: tactic *)
     "alias"       , ALIAS      ;        (* KW: tactic *)
     "fission"     , FISSION    ;        (* KW: tactic *)
     "fusion"      , FUSION     ;        (* KW: tactic *)
