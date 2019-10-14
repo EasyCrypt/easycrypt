@@ -552,10 +552,12 @@ type async_while_info = {
 }
 
 (* -------------------------------------------------------------------- *)
+type inlineopt = [`UseTuple of bool] option
+
 type inline_info = [
-  | `ByName    of oside * (pgamepath list * int list option)
-  | `CodePos   of (oside * codepos)
-  | `All       of oside
+  | `ByName    of oside * inlineopt * (pgamepath list * int list option)
+  | `CodePos   of (oside * inlineopt * codepos)
+  | `All       of oside * inlineopt
 ]
 
 (* -------------------------------------------------------------------- *)

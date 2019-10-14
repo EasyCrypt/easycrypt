@@ -2724,6 +2724,16 @@ byequivopt:
           (Some ("invalid option: " ^ (unloc x)))
   }
 
+inlineopt:
+| LBRACKET b=boption(MINUS) x=lident RBRACKET {
+    match unloc x with
+    | "tuple" -> `UseTuple (not b)
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("invalid option: " ^ (unloc x)))
+
+  }
+
 interleavepos:
 | LBRACKET c=word COLON n=word RBRACKET
   { c, n }
@@ -2790,14 +2800,14 @@ phltactic:
 | RND s=side? info=rnd_info
     { Prnd (s, info) }
 
-| INLINE s=side? o=occurences? f=plist1(loc(fident), empty)
-    { Pinline (`ByName (s, (f, o))) }
+| INLINE s=side? u=inlineopt? o=occurences? f=plist1(loc(fident), empty)
+    { Pinline (`ByName (s, u, (f, o))) }
 
-| INLINE s=side? p=codepos
-    { Pinline (`CodePos (s, p)) }
+| INLINE s=side? u=inlineopt? p=codepos
+    { Pinline (`CodePos (s, u, p)) }
 
-| INLINE s=side? STAR
-    { Pinline (`All s) }
+| INLINE s=side? u=inlineopt? STAR
+    { Pinline (`All (s, u)) }
 
 | KILL s=side? o=codepos
     { Pkill (s, o, Some 1) }

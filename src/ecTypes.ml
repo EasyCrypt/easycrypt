@@ -653,6 +653,11 @@ let e_if    = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
 let e_match = fun e es ty -> mk_expr (Ematch (e, es, ty)) ty
 let e_proj  = fun e i ty -> mk_expr (Eproj(e,i)) ty
 
+let e_proj_simpl e i ty =
+  match e.e_node with
+  | Etuple es -> List.nth es i
+  | _ -> e_proj e i ty
+
 let e_quantif q b e =
   if List.is_empty b then e else
 
