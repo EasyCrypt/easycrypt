@@ -2142,7 +2142,7 @@ let t_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
 
     try
       FApi.t_seqs
-        [Apply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
+        [Apply.t_apply_bwd_r ~mode:fmdelta ~canview:false pt;
          t_trivial; forall (ctn+1)]
         tc
 
