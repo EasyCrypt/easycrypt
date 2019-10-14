@@ -2882,10 +2882,16 @@ phltactic:
     { Psim (cm, info) }
 
 | REPLACE rk=repl_kind h1=repl_hyp h2=repl_hyp
-    { Ptrans_stmt (rk, fst h1, snd h1, fst h2, snd h2) }
+    { Ptrans_stmt (rk, TFform(fst h1, snd h1, fst h2, snd h2)) }
+
+| REPLACE STAR rk=repl_kind
+    { Ptrans_stmt (rk, TFeq) }
 
 | TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
-    { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
+    { Ptrans_stmt (tk, TFform(fst h1, snd h1, fst h2, snd h2)) }
+
+| TRANSITIVITY STAR tk=trans_kind
+    { Ptrans_stmt (tk, TFeq) }
 
 | SYMMETRY
     { Psymmetry }
@@ -2923,7 +2929,7 @@ bdhoare_split:
 
 %inline trans_kind:
 | s=side c=brace(stmt)
-    { TKstmt(Some s, c) }
+    { TKstmt(s, c) }
 
 | f=loc(fident)
     { TKfun (f) }
@@ -2933,7 +2939,7 @@ bdhoare_split:
 
 %inline repl_kind:
 | s=side p=im_block BY c=brace(stmt)
-    { TKparsedStmt (Some s, p, c) }
+    { TKparsedStmt (s, p, c) }
 
 %inline repl_hyp:
 | h=trans_hyp

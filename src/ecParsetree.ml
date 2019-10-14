@@ -494,11 +494,15 @@ and pim_block = anchor pair * pim_regexp
 (* -------------------------------------------------------------------- *)
 type trans_kind =
   | TKfun        of pgamepath
-  | TKstmt       of oside * pstmt
-  | TKparsedStmt of oside * pim_block * pstmt
+  | TKstmt       of side * pstmt
+  | TKparsedStmt of side * pim_block * pstmt
+
+type trans_formula =
+  | TFform of pformula * pformula * pformula * pformula
+  | TFeq
 
 type trans_info =
-  trans_kind * pformula * pformula * pformula * pformula
+  trans_kind * trans_formula
 
 (* -------------------------------------------------------------------- *)
 type eager_info =
