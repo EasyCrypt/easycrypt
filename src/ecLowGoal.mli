@@ -158,6 +158,7 @@ val t_elim          : ?reduce:lazyred -> FApi.backward
 val t_elim_hyp      : EcIdent.t -> FApi.backward
 val t_elim_prind    : ?reduce:lazyred -> [ `Case | `Ind ] -> FApi.backward
 val t_elim_iso_and  : ?reduce:lazyred -> tcenv1 -> int * tcenv
+val t_elim_iso_or   : ?reduce:lazyred -> tcenv1 -> int list * tcenv
 
 (* Elimination using an custom elimination principle. *)
 val t_elimT_form : proofterm -> ?sk:int -> form -> FApi.backward

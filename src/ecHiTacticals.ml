@@ -164,7 +164,6 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Pchange pf          -> process_change pf
     | Ppose (x, xs, o, p) -> process_pose x xs o p
     | Pwlog (ids, f)      -> process_wlog ids f
-
     | _ -> assert false
   in
     tx tc

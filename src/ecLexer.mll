@@ -218,6 +218,7 @@
   let _operators = [
     (":"   , (COLON            , true ));
     ("#"   , (SHARP            , true ));
+    ("#|"   ,(SHARPPIPE        , true ));
     ("//"  , (SLASHSLASH       , true ));
     ("//#" , (SLASHSLASHSHARP  , true ));
     ("/="  , (SLASHEQ          , true ));

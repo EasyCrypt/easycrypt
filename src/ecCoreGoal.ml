@@ -623,6 +623,7 @@ module FApi = struct
     let (ln1, ln2) = List.takedrop (max 0 (nhandles-(List.length tt))) handles in
     let pe, ln2    = on_sub_goals tt ln2 tc.tce_tcenv.tce_penv in
     let handles    = (List.flatten (ln1 :: ln2)) in
+    Printf.eprintf "%d\n%!" (List.length handles);
     tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt handles pe
 
   (* ------------------------------------------------------------------ *)
@@ -844,6 +845,15 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   let rec t_ors (tts : backward list) (tc : tcenv1) =
     t_ors_pmap (fun x -> Some x) tts tc
+
+  (* ------------------------------------------------------------------ *)
+  let t_or_map (tts : (tcenv1 -> 'a * tcenv) list) (tc : tcenv1) =
+    let r  = ref None in
+    let tc =
+      t_ors
+        (List.map (fun tt tc -> let (x, tc) = tt tc in r := Some x; tc) tts)
+        tc
+    in (oget !r, tc)
 end
 
 (* -------------------------------------------------------------------- *)

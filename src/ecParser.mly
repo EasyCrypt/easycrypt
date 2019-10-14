@@ -529,6 +529,7 @@
 %token SEMICOLON
 %token SEQ
 %token SHARP
+%token SHARPPIPE
 %token SIM
 %token SIMPLIFY
 %token SKIP
@@ -2066,18 +2067,22 @@ ipcore:
 | s=ipcore_name
    { `Named s }
 
+%inline sharp:
+| SHARP { false }
+| SHARPPIPE {true}
+
 %inline icasemode:
 | /* empty */
    { `One    }
 
-| opt=icasemode_full_opt SHARP
-   { `Full (opt, None) }
+| opt=icasemode_full_opt wb=sharp
+   { `Full (opt, wb, None) }
 
-| i=word NOT opt=icasemode_full_opt SHARP
-    { `Full (opt, Some (`AtMost i)) }
+| i=word NOT opt=icasemode_full_opt wb=sharp
+    { `Full (opt, wb, Some (`AtMost i)) }
 
-| NOT opt=icasemode_full_opt SHARP
-    { `Full (opt, Some (`AsMuch)) }
+| NOT opt=icasemode_full_opt wb=sharp
+    { `Full (opt, wb, Some (`AsMuch)) }
 
 %inline icasemode_full_opt:
 | h=iboption(TILD) d=iboption(SLASH) { (h, d) }

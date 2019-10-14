@@ -1309,14 +1309,28 @@ let t_elim_iso_and ?reduce tc =
   try
     (2, t_elim_and ?reduce tc)
   with InvalidGoalShape ->
-    let outgoals = ref (-1) in
+    let outgoals = ref None in
 
     let accept pri =
       match EcInductive.prind_is_iso_ands pri with
       | None -> false
-      | Some (_, ngoals) -> outgoals := ngoals; true in
+      | Some (_, ngoals) -> outgoals := Some ngoals; true in
 
-    let tc = t_elim_prind_r ?reduce ~accept `Case tc in (!outgoals, tc)
+    let tc = t_elim_prind_r ?reduce ~accept `Case tc in (oget !outgoals, tc)
+
+(* -------------------------------------------------------------------- *)
+let t_elim_iso_or ?reduce tc =
+  try
+    ([1; 1], t_elim_or ?reduce tc)
+  with InvalidGoalShape ->
+    let outgoals = ref None in
+
+    let accept pri =
+      match EcInductive.prind_is_iso_ors pri with
+      | None -> false
+      | Some ((_, n1), (_, n2)) -> outgoals := Some [n1; n2]; true in
+
+    let tc = t_elim_prind_r ?reduce ~accept `Case tc in (oget !outgoals, tc)
 
 (* -------------------------------------------------------------------- *)
 let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
