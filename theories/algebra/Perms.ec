@@ -29,7 +29,7 @@ lemma nosmt allperms_rP n (s t : 'a list) : size s = size n =>
   (mem (allperms_r n s) t) <=> (perm_eq s t).
 proof.
 elim: n s t => [s t /size_eq0 ->|_ n ih s t] //=; rewrite ?ap_r /=.
-  split=> [->|]; first by apply/perm_eq_refl.
+  split => [->|]; first by apply/perm_eq_refl.
   by move/perm_eq_sym; apply/perm_eq_small.
 case: s=> [|x s]; first by rewrite addz_neq0 ?size_ge0.
 (pose s' := undup _)=> /=; move/addrI=> eq_sz; split.

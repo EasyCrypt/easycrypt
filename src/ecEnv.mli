@@ -368,6 +368,16 @@ module BaseRw : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Reduction : sig
+  type rule   = EcTheory.rule
+  type topsym = [ `Path of path | `Tuple ]
+
+  val add1 : path * rule option -> env -> env
+  val add  : (path * rule option) list -> env -> env
+  val get  : topsym -> env -> rule list
+end
+
+(* -------------------------------------------------------------------- *)
 module Auto : sig
   val dname  : symbol
   val add1   : local:bool -> level:int -> ?base:symbol -> path -> env -> env

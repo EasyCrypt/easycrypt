@@ -49,12 +49,22 @@ val t_logic_trivial    : FApi.backward
 val t_trivial          : ?subtc:FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_simplify :
-     ?target:ident -> ?delta:bool -> ?logic:rlogic_info
-  -> FApi.backward
+type simplify_t =
+  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
 
-val t_simplify_with_info :
+type simplify_with_info_t =
   ?target:ident -> reduction_info -> FApi.backward
+
+type smode = [ `Cbv | `Cbn ]
+
+val t_cbv : simplify_t
+val t_cbn : simplify_t
+
+val t_cbv_with_info : simplify_with_info_t
+val t_cbn_with_info : simplify_with_info_t
+
+val t_simplify : ?mode:smode -> simplify_t
+val t_simplify_with_info : ?mode:smode -> simplify_with_info_t
 
 (* -------------------------------------------------------------------- *)
 val t_change : ?target:ident -> form -> tcenv1 -> tcenv1

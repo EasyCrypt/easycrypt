@@ -2859,6 +2859,9 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
       Format.fprintf fmt "hint rewrite %a : @[<hov 2>%a@]."
         (pp_rwname ppe) p (pp_list "@ " (pp_axname ppe)) l
 
+  | EcTheory.CTh_reduction _ ->
+      Format.fprintf fmt "hint simplify."
+
   | EcTheory.CTh_auto (lc, lvl, base, p) ->
       Format.fprintf fmt "%a solve %d %s : %a."
         (pp_list " " pp_string) ((if lc then ["local"] else []) @ ["hint"])

@@ -82,6 +82,7 @@
     "logic"       , LOGIC      ;        (* KW: tactic *)
     "delta"       , DELTA      ;        (* KW: tactic *)
     "simplify"    , SIMPLIFY   ;        (* KW: tactic *)
+    "cbv"         , CBV        ;        (* KW: tactic *)
     "congr"       , CONGR      ;        (* KW: tactic *)
 
     (* Logic tactics *)

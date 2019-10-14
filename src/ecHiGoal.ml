@@ -97,7 +97,7 @@ let process_change fp (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change fp tc)
 
 (* -------------------------------------------------------------------- *)
-let process_simplify ri (tc : tcenv1) =
+let process_simplify_info ri (tc : tcenv1) =
   let env, hyps, _ = FApi.tc1_eflat tc in
 
   let do1 (sop, sid) ps =
@@ -119,7 +119,7 @@ let process_simplify ri (tc : tcenv1) =
       |> odfl (predT, predT)
   in
 
-  let ri = {
+  {
     EcReduction.beta    = ri.pbeta;
     EcReduction.delta_p = delta_p;
     EcReduction.delta_h = delta_h;
@@ -128,9 +128,16 @@ let process_simplify ri (tc : tcenv1) =
     EcReduction.eta     = ri.peta;
     EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
-  } in
+    EcReduction.user    = ri.puser;
+  }
 
-    t_simplify_with_info ri tc
+(*-------------------------------------------------------------------- *)
+let process_simplify ri (tc : tcenv1) =
+  t_simplify_with_info (process_simplify_info ri tc) tc
+
+(* -------------------------------------------------------------------- *)
+let process_cbv ri (tc : tcenv1) =
+  t_cbv_with_info (process_simplify_info ri tc) tc
 
 (* -------------------------------------------------------------------- *)
 let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =

@@ -102,7 +102,7 @@
       { pbeta  = true; pzeta  = true;
         piota  = true; peta   = true;
         plogic = true; pdelta = None;
-        pmodpath = true }
+        pmodpath = true; puser = true; }
     else
       let doarg acc = function
         | `Delta l ->
@@ -116,14 +116,15 @@
         | `Eta     -> { acc with peta     = true }
         | `Logic   -> { acc with plogic   = true }
         | `ModPath -> { acc with pmodpath = true }
+        | `User    -> { acc with puser    = true }
       in
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
             piota  = false; peta   = false;
             plogic = false; pdelta = Some [];
-            pmodpath = false } l
+            pmodpath = false; puser = false; } l
 
-  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath]
+  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
 
   let mk_pterm explicit head args =
     { fp_mode = if explicit then `Explicit else `Implicit;
@@ -389,6 +390,7 @@
 %token BYPR
 %token CALL
 %token CASE
+%token CBV
 %token CEQ
 %token CFOLD
 %token CHANGE
@@ -2360,6 +2362,11 @@ simplify:
 | SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
 | SIMPLIFY DELTA      { `Delta [] :: simplify_red }
 
+cbv:
+| CBV            { simplify_red }
+| CBV l=qoident+ { `Delta l  :: simplify_red  }
+| CBV DELTA      { `Delta [] :: simplify_red }
+
 conseq:
 | empty                           { None, None }
 | UNDERSCORE LONGARROW UNDERSCORE { None, None }
@@ -2619,6 +2626,9 @@ logtactic:
 
 | l=simplify
    { Psimplify (mk_simplify l) }
+
+| l=cbv
+   { Pcbv (mk_simplify l) }
 
 | CHANGE f=sform
    { Pchange f }
@@ -3492,17 +3502,30 @@ gprover_info:
     { { empty_pprover with pprov_cpufactor = Some t; } }
 
 addrw:
-| local=boption(LOCAL) HINT REWRITE p=lqident COLON l=lqident*
+| local=iboption(LOCAL) HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
 hint:
-| local=boption(LOCAL) HINT EXACT base=lident? COLON l=qident*
+| local=iboption(LOCAL) HINT EXACT base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = 0;
         ht_base  = base ; ht_names = l; } }
 
-| local=boption(LOCAL) HINT SOLVE i=word base=lident? COLON l=qident*
+| local=iboption(LOCAL) HINT SOLVE i=word base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = i;
         ht_base  = base ; ht_names = l; } }
+
+(* -------------------------------------------------------------------- *)
+(* User reduction                                                       *)
+reduction:
+| HINT SIMPLIFY xs=plist1(user_red_info, COMMA)
+    { xs }
+
+user_red_info:
+| x=qident i=prefix(AT, word)?
+    { ([x], i) }
+
+| xs=paren(plist1(qident, COMMA)) i=prefix(AT, sword)?
+    { (xs, i) }
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
@@ -3531,6 +3554,7 @@ global_action:
 | predicate        { Gpredicate   $1 }
 | notation         { Gnotation    $1 }
 | abbreviation     { Gabbrev      $1 }
+| reduction        { Greduction   $1 }
 | axiom            { Gaxiom       $1 }
 | tactics_or_prf   { Gtactics     $1 }
 | tactic_dump      { Gtcdump      $1 }

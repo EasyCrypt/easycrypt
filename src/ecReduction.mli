@@ -41,6 +41,26 @@ end
 val is_alpha_eq : LDecl.hyps -> form -> form -> bool
 
 (* -------------------------------------------------------------------- *)
+module User : sig
+  type error =
+    | MissingVarInLhs   of EcIdent.t
+    | MissingTyVarInLhs of EcIdent.t
+    | NotAnEq
+    | NotFirstOrder
+    | RuleDependsOnMemOrModule
+    | HeadedByVar
+
+  exception InvalidUserRule of error
+
+  type rule = EcEnv.Reduction.rule
+
+  val compile : prio:int -> EcEnv.env -> EcPath.path -> rule
+end
+
+(* -------------------------------------------------------------------- *)
+val can_eta : ident -> form * form list -> bool
+
+(* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
   delta_p : (path  -> bool); (* None means all *)
@@ -50,6 +70,7 @@ type reduction_info = {
   eta     : bool;            (* reduce eta-expansion *)
   logic   : rlogic_info;     (* perform logical simplification *)
   modpath : bool;            (* reduce module path *)
+  user    : bool             (* reduce user defined rules *)
 }
 
 and rlogic_info = [`Full | `ProductCompat] option
@@ -62,6 +83,12 @@ val nodelta      : reduction_info
 
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form
+
+val reduce_user_gen :
+  [`All | `AfterDelta | `BeforeDelta] ->
+  (EcFol.form -> EcFol.form) ->
+  reduction_info ->
+  EcEnv.env -> EcEnv.LDecl.hyps -> EcFol.form -> EcFol.form
 
 val simplify : reduction_info -> LDecl.hyps -> form -> form
 

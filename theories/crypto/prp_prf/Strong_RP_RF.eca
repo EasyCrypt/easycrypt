@@ -258,7 +258,7 @@ section Upto.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
       auto; progress [-split]; split=> //= [|_]; 1:smt.
       by progress; right.
-    by auto; progress [-split]; rewrite H0 /=; split=> //=; rewrite get_setE.
+    by auto; progress [-split]; rewrite H0 /= => -> /=; rewrite get_setE.
   + move=> &2 bad; conseq (_: true ==> true: =1%r)
                           (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
       by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
@@ -282,7 +282,7 @@ section Upto.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
       auto; progress [-split]; split=> //= [|_]; 1:smt.
       by progress; right.
-    by auto; progress [-split]; rewrite H0 /=; split=> //=; rewrite get_setE.
+    by auto; progress [-split]; rewrite H0 => /= ->; rewrite get_setE.
   + move=> &2 bad; conseq (_: true ==> true: =1%r)
                           (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
       by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].

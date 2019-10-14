@@ -179,7 +179,7 @@ op empty ['a 'b] : ('a, 'b) fmap = ofmap (cst None).
 
 lemma nosmt empty_valE ['a, 'b] : tomap empty<:'a, 'b> = cst None.
 proof.
-by rewrite /empty ofmapK //; exists [] => /= x; rewrite Map.cstE.
+by rewrite /empty ofmapK //; exists [] => /=.
 qed.
 
 (* -------------------------------------------------------------------- *)

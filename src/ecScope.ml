@@ -2158,12 +2158,37 @@ module Section = struct
           | T.CTh_addrw (p, l) ->
               { scope with sc_env = EcEnv.BaseRw.addto p l scope.sc_env }
 
+          | T.CTh_reduction rule ->
+              { scope with sc_env = EcEnv.Reduction.add rule scope.sc_env }
+
           | T.CTh_auto (local, level, base, ps) ->
               { scope with sc_env =
                   EcEnv.Auto.add ~local ~level ?base ps scope.sc_env }
         in
 
         List.fold_left bind1 scope oitems
+end
+
+(* -------------------------------------------------------------------- *)
+module Reduction = struct
+  let add_reduction scope reds =
+    check_state `InTop "hint simplify" scope;
+    if EcSection.in_section scope.sc_section then
+      hierror "cannot add reduction rule in a section";
+
+    let rules =
+      let for1 idx name =
+        let idx      = odfl 0 idx in
+        let lemma    = fst (EcEnv.Ax.lookup (unloc name) (env scope)) in
+        let red_info = EcReduction.User.compile ~prio:idx (env scope) lemma in
+        (lemma, Some red_info) in
+
+      let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
+      List.flatten rules
+
+    in
+
+    { scope with sc_env = EcEnv.Reduction.add rules (env scope) }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2195,6 +2220,7 @@ module Cloning = struct
       R.haddrw   = onenv (curry EcEnv.BaseRw.addto);
       R.hauto    = onenv (fun (local, level, base, names) ->
                             EcEnv.Auto.add ~local ~level ?base names);
+      R.husered  = onenv EcEnv.Reduction.add;
       R.htycl    = onenv (curry EcEnv.TypeClass.bind);
       R.hinst    = onenv (curry EcEnv.TypeClass.add_instance);
       R.hthenter = thenter;

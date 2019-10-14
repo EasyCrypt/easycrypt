@@ -159,7 +159,7 @@ theory IntPair.
 
   lemma inj_encode : injective encode.
   proof.
-  case=> [x1 y1] [x2 y2] @/encode /=; rewrite andabP.
+  case=> [x1 y1] [x2 y2] @/encode /=.
   rewrite -(inj_eq _ inj_int2nat x1) -(inj_eq _ inj_int2nat y1).
   by apply/FTA23; apply/ge0_int2nat.
   qed.

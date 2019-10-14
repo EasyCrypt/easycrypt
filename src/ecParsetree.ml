@@ -416,6 +416,7 @@ type preduction = {
   peta     : bool;                      (* η-reduction *)
   plogic   : bool;                      (* logical simplification *)
   pmodpath : bool;                      (* modpath normalization *)
+  puser    : bool;                      (* user reduction *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -824,6 +825,7 @@ type logtactic =
   | Prwnormal   of pformula * pqsymbol list
   | Psubst      of pformula list
   | Psimplify   of preduction
+  | Pcbv        of preduction
   | Pchange     of pformula
   | Ppose       of (psymbol * ptybinding list * rwocc * pformula)
   | Pwlog       of (psymbol list * pformula)
@@ -1064,6 +1066,8 @@ type phint = {
 }
 
 (* -------------------------------------------------------------------- *)
+type puserred = (pqsymbol list * int option) list
+
 type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option
 
@@ -1081,6 +1085,7 @@ type global_action =
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (bool * pqsymbol * pqsymbol list)
+  | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list

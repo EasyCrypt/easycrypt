@@ -459,7 +459,7 @@ section Security_Aux.
     have H2 : forall x1L x2L, x1L + xL * x2L = x1L + xL * x2L - xL * x2L + xL * x2L.
     +  by move=> ??;ring.
     rewrite -!H2 /=;split=> [ | _].
-    + by split=> [ | _] ;ring.
+    + by split ;ring.
     move=> ??????? Hbad ? -> /=.
     have <- /= : g ^ zL = g ^ xL ^ (zL / xL).
     + by rewrite log_bij !(log_g, log_pow, log_mul);field.
@@ -705,8 +705,8 @@ section Security_Aux.
     pose v := H _ _. rewrite !negb_or => [[]] Hg3 Hcilog Hstareq.
     rewrite Hg3 /=. 
     case: (G1.bad{m1}) => [_ -> | ] //=. 
-    move=> Hbad Hsize Hstar;rewrite !negb_and /=.
-    case (v = G2.v{m2}) => [->> /= ? [#] !->> Hstar1 ->>| /=].
+    move=> Hbad Hsize Hstar;rewrite !negb_and /= 2!negb_or /= -!andaE.
+    case (v = G2.v{m2}) => [->> /= ? [#]!->> Hstar1 ->>| /=].
     + by case: (G1.cstar{m2}) Hstareq Hstar Hstar1.
     move=> Hv Ha _ ->>;left.
     rewrite !(log_g, log_pow, log_mul);field => //.

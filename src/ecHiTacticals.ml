@@ -161,10 +161,11 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Prewrite (ri, x)    -> process_rewrite ttenv ?target:x ri
     | Psubst   ri         -> process_subst ri
     | Psimplify ri        -> process_simplify ri
+    | Pcbv ri             -> process_cbv ri
     | Pchange pf          -> process_change pf
     | Ppose (x, xs, o, p) -> process_pose x xs o p
     | Pwlog (ids, f)      -> process_wlog ids f
-    | _ -> assert false
+    | Prwnormal _         -> assert false
   in
     tx tc
 
