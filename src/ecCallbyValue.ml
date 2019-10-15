@@ -391,7 +391,23 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
       app_red st
         (f_if (norm st s f) (norm st s f1) (norm st s f2)) args
 
-  | Fmatch _ -> assert false
+  | Fmatch (cf, bs, ty) ->
+      if st.st_ri.iota then
+        let cf = cbv_init st s cf in
+        match fst_map f_node (destr_app cf) with
+        | Fop (p, _), cargs when EcEnv.Op.is_dtype_ctor st.st_env p ->
+            let idx = EcEnv.Op.by_path p st.st_env in
+            let idx = snd (EcDecl.operator_as_ctor idx) in
+            let br  = oget (List.nth_opt bs idx) in
+            cbv st s br (Aapp (cargs, args))
+
+        | _ ->
+          let bs = List.map (norm st s) bs in
+          app_red st (f_match (norm_lambda st cf) bs ty) args
+
+      else
+        let bs = List.map (norm st s) bs in
+        app_red st (f_match (norm st s cf) bs ty) args
 
   | Flet (p, f1, f2) ->
     let f1 = cbv_init st s f1 in
