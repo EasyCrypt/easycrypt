@@ -1244,7 +1244,7 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
           (tc, pt, 0)
 
       | None ->
-          match (EcEnv.Ty.hnorm ty env).ty_node with
+          match (EcEnv.ty_hnorm ty env).ty_node with
           | Ttuple tys ->
               let indtc  = pf_gen_tuple_elim ~witheq:false tys hyps in
               let tc, hd = FApi.bwd1_of_fwd indtc tc in
