@@ -702,8 +702,15 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
       let wt, wf = Cast.merge_if wt wf in
       WTerm.t_if_simp (Cast.force_prop wb) wt wf
 
-  | Fmatch _ ->
-       failwith "not implemented yet"
+  | Fmatch (fb, bs, _ty) ->
+      let p, dty, tvs = oget (EcEnv.Ty.get_top_decl fb.f_ty genv.te_env) in
+      let dty = oget (EcDecl.tydecl_as_datatype dty) in
+      let bs = List.combine bs dty.tydt_ctors in
+
+      let wfb = trans_form env fb in
+      let wbs = List.map (trans_branch env (p, dty, tvs)) bs in
+      let wbs = Cast.merge_branches wbs in
+      WTerm.t_case_close_simp wfb wbs
 
   | Fapp (f, args') ->
       let args' = List.map (trans_form env) args' in
@@ -711,6 +718,28 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
 
   | _ ->
       apply_highorder (trans_form env f) args
+
+(* -------------------------------------------------------------------- *)
+and trans_branch (genv, lenv) (p, _dty, tvs) (f, (cname, argsty)) =
+  let nargs = List.length argsty in
+  let xs, f =
+    let xs, f = decompose_lambda f in
+    let xs1, xs2 = List.split_at nargs xs in
+    let xs1 = List.map (snd_map as_gtty) xs1 in
+    (xs1, f_lambda xs2 f) in
+  let csymb = EcPath.pqoname (EcPath.prefix p) cname in
+  let csymb =
+    match (trans_op genv csymb).w3op_fo with
+    | `LDecl csymb -> csymb | _ -> assert false
+  in
+
+  let lenv, ws = trans_lvars genv lenv xs in
+  let wcty = trans_ty (genv, lenv) (tconstr p tvs) in
+  let ws = List.map WTerm.pat_var ws in
+  let ws = WTerm.pat_app csymb ws wcty in
+  let wf = trans_app (genv, lenv) f [] in
+
+  (ws, wf)
 
 (* -------------------------------------------------------------------- *)
 and trans_fun (genv, lenv) bds body args =

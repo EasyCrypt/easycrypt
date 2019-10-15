@@ -98,7 +98,7 @@ let default_spec sim fl fr eqo =
     else { sim with needed_spec = (fl,fr,eqi)::sim.needed_spec } in
   sim, eqi
 
-let add_eqs sim eqs e1 e2 = Mpv2.add_eqs sim.sim_env e1 e2 eqs
+let add_eqs sim local eqs e1 e2 = Mpv2.add_eqs_loc sim.sim_env local eqs e1 e2
 
 let check sim pv fv = PV.check_notmod sim.sim_env pv fv
 
@@ -124,7 +124,7 @@ let check_not_r sim lvr eqo =
   check_lvalue aux lvr
 
 (* -------------------------------------------------------------------- *)
-let remove sim lvl lvr eqs =
+let remove sim local lvl lvr eqs =
   let env = sim.sim_env in
   let aux eqs (pvl,tyl) (pvr,tyr) =
     if EcReduction.EqTest.for_type env tyl tyr then begin
@@ -142,14 +142,14 @@ let remove sim lvl lvr eqs =
       EcPath.p_equal pl pr &&
         List.all2  (EcReduction.EqTest.for_type env) (tyl::tysl) (tyr::tysr) &&
         check sim pvl sim.sim_ifvl && check sim pvr sim.sim_ifvr ->
-    add_eqs sim (Mpv2.remove env pvl pvr eqs) el er
+    add_eqs sim local (Mpv2.remove env pvl pvr eqs) el er
   | _, _ -> raise EqObsInError
 
 (* -------------------------------------------------------------------- *)
-let oremove sim lvl lvr eqs =
+let oremove sim local lvl lvr eqs =
   match lvl, lvr with
   | None, None -> eqs
-  | Some lvl, Some lvr -> remove sim lvl lvr eqs
+  | Some lvl, Some lvr -> remove sim local lvl lvr eqs
   | _, _ -> raise EqObsInError
 
 (* -------------------------------------------------------------------- *)
@@ -159,6 +159,7 @@ let rec check_deadcode_i check_lv i =
   | Sif(_,s1,s2) -> check_deadcode_s check_lv s1 && check_deadcode_s check_lv s2
   | _ -> false
         (* TODO :
+           Add case for Smatch.
            For random we need a way to known that the distribution
            is lossless;
            For while we can do the same if we are able to ensure
@@ -168,80 +169,97 @@ and check_deadcode_s check_lv s =
   List.for_all (check_deadcode_i check_lv) s.s_node
 
 (* -------------------------------------------------------------------- *)
-let rec s_eqobs_in_rev rsl rsr sim (eqo:Mpv2.t) =
+let rec s_eqobs_in_rev rsl rsr sim local (eqo:Mpv2.t) =
   match rsl, rsr with
   | { i_node = Sasgn(LvVar (xl,_), el)}::rsl, _
     when is_var el && check sim xl sim.sim_ifvl ->
-    s_eqobs_in_rev rsl rsr sim (Mpv2.subst_l sim.sim_env xl (destr_var el) eqo)
+    s_eqobs_in_rev rsl rsr sim local (Mpv2.subst_l sim.sim_env xl (destr_var el) eqo)
   | _, { i_node = Sasgn(LvVar (xr,_), er)} :: rsr
     when is_var er && check sim xr sim.sim_ifvr ->
-    s_eqobs_in_rev rsl rsr sim (Mpv2.subst_r sim.sim_env xr (destr_var er) eqo)
+    s_eqobs_in_rev rsl rsr sim local (Mpv2.subst_r sim.sim_env xr (destr_var er) eqo)
 
   | { i_node = Sasgn(LvTuple xls, el)}::rsl, _
     when is_tuple_var el && checks sim xls sim.sim_ifvl ->
-    s_eqobs_in_rev rsl rsr sim
+    s_eqobs_in_rev rsl rsr sim local
       (Mpv2.substs_l sim.sim_env xls (destr_tuple_var el) eqo)
   | _, { i_node = Sasgn(LvTuple xrs, er)} :: rsr
     when is_tuple_var er && checks sim xrs sim.sim_ifvr ->
-    s_eqobs_in_rev rsl rsr sim
+    s_eqobs_in_rev rsl rsr sim local
       (Mpv2.substs_r sim.sim_env xrs (destr_tuple_var er) eqo)
 
     (* this is dead code *)
   | il :: rsl, _ when check_deadcode_i (fun lv -> check_not_l sim lv eqo) il ->
-    s_eqobs_in_rev rsl rsr sim eqo
+    s_eqobs_in_rev rsl rsr sim local eqo
   | _, ir::rsr when check_deadcode_i (fun lv -> check_not_r sim lv eqo) ir ->
-    s_eqobs_in_rev rsl rsr sim eqo
+    s_eqobs_in_rev rsl rsr sim local eqo
 
   | il::rsl', ir::rsr' ->
     let o =
-      try Some (i_eqobs_in il ir sim eqo) with EqObsInError -> None in
+      try Some (i_eqobs_in il ir sim local eqo) with EqObsInError -> None in
     begin match o with
     | None -> rsl, rsr, sim, eqo
-    | Some (sim, eqi) -> s_eqobs_in_rev rsl' rsr' sim eqi
+    | Some (sim, eqi) -> s_eqobs_in_rev rsl' rsr' sim local eqi
     end
 
   | _, _ -> rsl, rsr, sim, eqo
 
-and i_eqobs_in il ir sim (eqo:Mpv2.t) =
+and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
   match il.i_node, ir.i_node with
   | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
-    sim, add_eqs sim (remove sim lvl lvr eqo) el er
+    sim, add_eqs sim local (remove sim local lvl lvr eqo) el er
 
   | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr)
     when List.length argsl = List.length argsr ->
-    let eqo = oremove sim lvl lvr eqo in
+    let eqo = oremove sim local lvl lvr eqo in
     let env = sim.sim_env in
     let modl, modr = f_write env fl, f_write env fr in
     let eqnm = Mpv2.split_nmod env modl modr eqo in
     let outf = Mpv2.split_mod  env modl modr eqo in
     Mpv2.check_glob outf;
     let sim, eqi = f_eqobs_in fl fr sim outf in
-    let eqi = List.fold_left2 (add_eqs sim) (Mpv2.union eqnm eqi) argsl argsr in
+    let eqi = List.fold_left2 (add_eqs sim local) (Mpv2.union eqnm eqi) argsl argsr in
     sim, eqi
 
   | Sif(el,stl,sfl), Sif(er,str,sfr) ->
-    let sim, eqs1 = s_eqobs_in_full stl str sim eqo in
-    let sim, eqs2 = s_eqobs_in_full sfl sfr sim eqo in
-    let eqi = add_eqs sim (Mpv2.union eqs1 eqs2) el er in
+    let sim, eqs1 = s_eqobs_in_full stl str sim local eqo in
+    let sim, eqs2 = s_eqobs_in_full sfl sfr sim local eqo in
+    let eqi = add_eqs sim local (Mpv2.union eqs1 eqs2) el er in
     sim, eqi
 
   | Swhile(el,sl), Swhile(er,sr) ->
     let rec aux eqo =
-      let sim', eqi = s_eqobs_in_full sl sr sim eqo in
+      let sim', eqi = s_eqobs_in_full sl sr sim local eqo in
       if Mpv2.subset eqi eqo then sim', eqo
       else aux (Mpv2.union eqi eqo) in
-    aux (add_eqs sim eqo el er)
+    aux (add_eqs sim local eqo el er)
 
-  | Sassert el, Sassert er -> sim, add_eqs sim eqo el er
+  | Smatch(el,bsl), Smatch(er, bsr) ->
+    let env = sim.sim_env in
+    let typl, _, tyinstl = oget (EcEnv.Ty.get_top_decl el.e_ty env) in
+    let typr, _, tyinstr = oget (EcEnv.Ty.get_top_decl el.e_ty env) in
+    let test =
+      EcPath.p_equal typl typr &&
+        List.for_all2 (EcReduction.EqTest.for_type env) tyinstl tyinstr in
+    if not test then raise EqObsInError;
+    let rsim = ref sim in
+    let doit eqs1 (argsl,sl) (argsr, sr) =
+      let local = Mpv2.enter_local env local argsl argsr in
+      let sim, eqs2 = s_eqobs_in_full sl sr !rsim local eqo in
+      rsim := sim;
+      Mpv2.union eqs1 eqs2 in
+    let eqs = List.fold_left2 doit Mpv2.empty bsl bsr in
+    !rsim, add_eqs !rsim local eqs el er
+
+  | Sassert el, Sassert er -> sim, add_eqs sim local eqo el er
   | _, _ -> raise EqObsInError
 
-and s_eqobs_in_full sl sr sim eqo =
-  let r1,r2,sim, eqi = s_eqobs_in sl sr sim eqo in
+and s_eqobs_in_full sl sr sim local eqo =
+  let r1,r2,sim, eqi = s_eqobs_in sl sr sim local eqo in
   if r1 <> [] || r2 <> [] then raise EqObsInError;
   sim, eqi
 
-and s_eqobs_in sl sr sim eqo =
-  s_eqobs_in_rev (List.rev sl.s_node) (List.rev sr.s_node) sim eqo
+and s_eqobs_in sl sr sim local eqo =
+  s_eqobs_in_rev (List.rev sl.s_node) (List.rev sr.s_node) sim local eqo
 
 (* -------------------------------------------------------------------- *)
 and f_eqobs_in fl fr sim eqO =
@@ -288,6 +306,7 @@ and f_eqobs_in fl fr sim eqO =
         sim, eqi
 
       | FBdef funl, FBdef funr ->
+        let local = Mpv2.empty_local in
         let sigl, sigr = defl.f_sig, defr.f_sig in
         let testty =
           EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
@@ -297,12 +316,12 @@ and f_eqobs_in fl fr sim eqO =
         let eqo' =
           match funl.f_ret, funr.f_ret with
           | None, None -> outf
-          | Some el, Some er -> add_eqs sim outf el er
+          | Some el, Some er -> add_eqs sim Mpv2.empty_local outf el er
           | _, _ -> raise EqObsInError in
 
         let argl, bodyl = extend_body nfl sigl funl.f_body in
         let argr, bodyr = extend_body nfr sigr funr.f_body in
-        let sim, eqi    = s_eqobs_in_full bodyl bodyr sim eqo' in
+        let sim, eqi    = s_eqobs_in_full bodyl bodyr sim local eqo' in
 
         let eqi = Mpv2.remove sim.sim_env argl argr eqi in
         Mpv2.check_glob eqi;
@@ -341,7 +360,7 @@ let t_eqobs_inS_r sim eqo tc =
   let es = tc1_as_equivS tc in
   let ml = fst (es.es_ml) and mr = fst (es.es_mr) in
   let sl, sr, sim, eqi =
-    try s_eqobs_in es.es_sl es.es_sr sim eqo
+    try s_eqobs_in es.es_sl es.es_sr sim Mpv2.empty_local eqo
     with EqObsInError -> tc_error !!tc "cannot apply sim ..."
   in
   let inv = sim.sim_inv in
@@ -426,7 +445,7 @@ let process_eqobs_inS info tc =
       let _,sl2 = s_split p1 es.es_sl in
       let _,sr2 = s_split p2 es.es_sr in
       let _, eqi =
-        try s_eqobs_in_full (stmt sl2) (stmt sr2) sim eqo
+        try s_eqobs_in_full (stmt sl2) (stmt sr2) sim Mpv2.empty_local eqo
         with EqObsInError -> tc_error !!tc "cannot apply sim" in
       (EcPhlApp.t_equiv_app (p1, p2) (Mpv2.to_form mleft mright eqi inv) @+ [
         t_id;

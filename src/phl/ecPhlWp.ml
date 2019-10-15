@@ -44,8 +44,24 @@ module LowInternal = struct
           let post1 = mk_let_of_lv_substs env letsf1 in
           let post2 = mk_let_of_lv_substs env letsf2 in
           let post  = f_if (form_of_expr m e) post1 post2 in
-            ([], post)
+          ([], post)
         end else raise No_wp
+
+    | Smatch (c,bs) -> begin
+        let wps =
+          let do1 (_, s) = wp_stmt onesided env m (List.rev s.s_node) letsf in
+          List.map do1 bs in
+
+        if not (List.for_all (fun (r, _) -> List.is_empty r) wps) then
+          raise No_wp;
+        let pbs =
+          List.map2
+            (fun (bds, _) (_, letsf) ->
+              let post = mk_let_of_lv_substs env letsf in
+              f_lambda (List.map (snd_map gtty) bds) post)
+            bs wps
+        in ([], f_match (form_of_expr m c) pbs EcTypes.tbool)
+      end
 
     | Sassert e when onesided ->
         let phi = form_of_expr m e in

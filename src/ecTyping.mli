@@ -58,6 +58,18 @@ type funapp_error =
 type mem_error =
 | MAE_IsConcrete
 
+type fxerror =
+| FXE_EmptyMatch
+| FXE_MatchParamsMixed
+| FXE_MatchParamsDup
+| FXE_MatchParamsUnk
+| FXE_MatchNonLinear
+| FXE_MatchDupBranches
+| FXE_MatchPartial
+| FXE_CtorUnk
+| FXE_CtorAmbiguous
+| FXE_CtorInvalidArity of (symbol * int * int)
+
 type filter_error =
 | FE_InvalidIndex of int
 | FE_NoMatch
@@ -91,6 +103,7 @@ type tyerror =
 | TypeClassMismatch
 | TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
+| NotAnInductive
 | AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
@@ -104,6 +117,7 @@ type tyerror =
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
+| InvalidMatch           of fxerror
 | InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
 | NoActiveMemory

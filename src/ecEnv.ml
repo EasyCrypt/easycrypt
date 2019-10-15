@@ -770,7 +770,14 @@ module MC = struct
 
           let mc = _up_axiom candup mc (fst schcase) (fst_map ipath schcase) in
           let mc = _up_axiom candup mc (fst schelim) (fst_map ipath schelim) in
-            mc
+
+          let projs = (mypath, tyd.tyd_params, dtype) in
+          let projs = EcInductive.datatype_projectors projs in
+
+          List.fold_left (fun mc (c, op) ->
+              let name = EcInductive.datatype_proj_name c in
+              _up_operator candup mc name (ipath name, op)
+            ) mc projs
 
       | `Record (scheme, fields) ->
           let params  = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
@@ -1526,6 +1533,11 @@ module Ty = struct
           | _ -> None
       end
       | _ -> None
+
+  let get_top_decl (ty : ty) (env : env) =
+    match (hnorm ty env).ty_node with
+    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys)
+    | _ -> None
 
   let rebind name ty env =
     let env = MC.bind_tydecl name ty env in

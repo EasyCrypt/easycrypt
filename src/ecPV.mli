@@ -152,6 +152,11 @@ exception EqObsInError
 
 module Mpv2 : sig
   type t
+  val empty : t
+  type local
+  val empty_local : local
+  val enter_local: env -> local -> (EcIdent.t * ty) list ->
+                   (EcIdent.t * ty) list -> local
   val to_form : EcIdent.t -> EcIdent.t -> t -> form -> form
   val of_form : env -> EcIdent.t -> EcIdent.t -> form -> t
   val needed_eq : env -> EcIdent.t -> EcIdent.t -> form -> t
@@ -162,6 +167,7 @@ module Mpv2 : sig
   (* remove_glob mp t, mp should be a top abstract functor *)
   val remove_glob : mpath -> t -> t
   val add_glob : env -> mpath -> mpath -> t -> t
+  val add_eqs_loc : env -> local -> t -> expr -> expr -> t
   val add_eqs : env -> expr -> expr -> t -> t
   val subst_l : env -> prog_var -> prog_var -> t -> t
   val subst_r : env -> prog_var -> prog_var -> t -> t
