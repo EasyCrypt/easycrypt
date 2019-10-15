@@ -148,3 +148,10 @@ let t_wp_r ?(uselet=true) k g =
     t_hS_or_bhS_or_eS ?th ?tbh ?te g
 
 let t_wp ?(uselet=true) = FApi.t_low1 "wp" (t_wp_r ~uselet)
+
+(* -------------------------------------------------------------------- *)
+let typing_wp env m s f =
+  match wp ~onesided:true env m  s f with
+  | [], f -> Some f | _, _ -> None
+
+let () = EcTyping.wp := Some typing_wp

@@ -1168,6 +1168,11 @@ sform_u(P):
   RBRACKET
     { PFprob (mp, args, pn, event) }
 
+| WP LBRACKET
+    mp=loc(fident) args=paren(plist0(expr, COMMA)) COLON f=form_r(P)
+  RBRACKET
+    { PFWP (mp, args, f) }
+
 | r=loc(RBOOL)
     { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
 
