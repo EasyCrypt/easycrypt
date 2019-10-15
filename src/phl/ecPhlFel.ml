@@ -62,20 +62,19 @@ let rec callable_oracles_f env modv os f =
   | FBalias _ ->
       assert false (* normal form *)
 
-  | FBabs ->
-    let oi = NormMp.get_oicalls env f' in
-      let called_fs =
-        List.fold_left
-          (fun s o ->
-             if   PV.indep env modv (f_write env o)
-             then s
-             else EcPath.Sx.add o s)
-          EcPath.Sx.empty oi.oi_calls
-      in
-
+  | FBabs oi ->
+    let called_fs =
       List.fold_left
-        (callable_oracles_f env modv)
-        os (EcPath.Sx.elements called_fs)
+        (fun s o ->
+           if   PV.indep env modv (f_write env o)
+           then s
+           else EcPath.Sx.add o s)
+        EcPath.Sx.empty oi.oi_calls
+    in
+
+    List.fold_left
+      (callable_oracles_f env modv)
+      os (EcPath.Sx.elements called_fs)
 
   | FBdef fdef ->
       let called_fs =

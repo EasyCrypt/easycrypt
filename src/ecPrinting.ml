@@ -2755,7 +2755,7 @@ and pp_moditem ppe fmt (p, i) =
       | FBalias g ->
           Format.fprintf fmt "%a" (pp_funname ppe) g
 
-      | FBabs ->
+      | FBabs _ ->
           Format.fprintf fmt "?ABSTRACT?"
     in
 

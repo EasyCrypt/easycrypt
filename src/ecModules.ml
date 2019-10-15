@@ -618,7 +618,7 @@ type function_def = {
 type function_body =
 | FBdef   of function_def
 | FBalias of xpath
-| FBabs
+| FBabs   of oracle_info
 
 type function_ = {
   f_name   : symbol;
@@ -734,7 +734,7 @@ let rec mty_equal mty1 mty2 =
 (* -------------------------------------------------------------------- *)
 let get_uninit_read_of_fun (fp : xpath) (f : function_) =
   match f.f_def with
-  | FBalias _ | FBabs -> Sx.empty
+  | FBalias _ | FBabs _ -> Sx.empty
 
   | FBdef fd ->
       let w =

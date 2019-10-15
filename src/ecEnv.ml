@@ -1575,7 +1575,7 @@ module Fun = struct
 
   let actmem_body me path fun_ =
     match fun_.f_def with
-    | FBabs -> assert false (* FIXME error message *)
+    | FBabs _ -> assert false (* FIXME error message *)
     | FBalias _ -> assert false (* FIXME error message *)
     | FBdef fd ->
       let mem = EcMemory.empty_local me path in
@@ -1683,7 +1683,7 @@ module Var = struct
                 { vb_type = v.v_type; vb_kind = `Var PVloc; }
               with Not_found -> lookup_error (`XPath p)
             end
-            | FBabs | FBalias _ -> lookup_error (`XPath p)
+            | FBabs _ | FBalias _ -> lookup_error (`XPath p)
           end
       end
       | _ -> lookup_error (`XPath p)
@@ -2188,14 +2188,12 @@ module NormMp = struct
           let us = Sx.fold (add_var env) vars us in
           List.fold_left fun_use us f_uses.us_calls
 
-        | FBabs ->
+        | FBabs oi ->
             let id =
               match f.x_top.m_top with
               | `Local id -> id
               | _ -> assert false in
             let us = add_glob_except rm id us in
-
-            let oi = get_oicalls env f in
             List.fold_left fun_use us oi.oi_calls
 
         | FBalias _ -> assert false in
@@ -2400,7 +2398,7 @@ module NormMp = struct
   let is_abstract_fun f env =
     let f = norm_xfun env f in
     match (Fun.by_xpath f env).f_def with
-    | FBabs -> true
+    | FBabs _ -> true
     | _ -> false
 
   let x_equal env f1 f2 =

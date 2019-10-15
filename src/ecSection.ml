@@ -287,7 +287,7 @@ and on_mpath_fun_body cb fbody =
   match fbody with
   | FBalias xp -> cb xp.x_top
   | FBdef fdef -> on_mpath_fun_def cb fdef
-  | FBabs -> ()
+  | FBabs oi   -> on_mpath_fun_oi  cb oi
 
 and on_mpath_fun_def cb fdef =
   List.iter (fun v -> on_mpath_ty cb v.v_type) fdef.f_locals;

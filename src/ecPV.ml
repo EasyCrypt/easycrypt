@@ -446,8 +446,7 @@ let rec f_write_r ?(except=Sx.empty) env w f =
       (* [f] is in normal-form *)
       assert false
 
-  | FBabs ->
-    let oi = EcEnv.NormMp.get_oicalls env f in
+  | FBabs oi ->
     let mp = get_abs_functor f in
     List.fold_left folder (PV.add_glob env mp w) oi.oi_calls
 
@@ -498,8 +497,7 @@ let rec f_read_r env r f =
       (* [f] is in normal form *)
       assert false
 
-  | FBabs ->
-    let oi = EcEnv.NormMp.get_oicalls env f in
+  | FBabs oi ->
     let mp = get_abs_functor f in
     let r = if oi.oi_in then (PV.add_glob env mp r) else r in
     List.fold_left (f_read_r env) r oi.oi_calls
@@ -1024,9 +1022,7 @@ and eqobs_inF_refl env f' eqo =
       EcCoreGoal.tacuerror "In function %a, %a are used before being initialized"
         (EcPrinting.pp_funname ppe) f' (PV.pp env) diff
 
-  | FBabs ->
-    let oi = EcEnv.NormMp.get_oicalls env f in
-
+  | FBabs oi ->
     let do1 eqo o = PV.union (eqobs_inF_refl env o eqo) eqo in
     let top = EcPath.m_functor f.x_top in
     let rec aux eqo =

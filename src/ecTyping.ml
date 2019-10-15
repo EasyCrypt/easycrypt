@@ -1649,10 +1649,7 @@ and transstruct
             match fun_.f_def with
             | FBalias _ -> assert false
             | FBdef def -> List.fold_left f_call c def.f_uses.us_calls
-            | FBabs  ->
-              let mp = EcEnv.NormMp.norm_mpath envi f.x_top in
-              let me = EcEnv.Mod.by_mpath mp envi in
-              let oi = Msym.find fun_.f_name me.me_sig.mis_restr.mr_oinfos in
+            | FBabs oi  ->
               List.fold_left f_call c oi.oi_calls in
 
         let all_calls =
@@ -1660,7 +1657,7 @@ and transstruct
           | FBalias f -> f_call EcPath.Sx.empty f
           | FBdef def ->
             List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls
-          | FBabs -> assert false in
+          | FBabs _ -> assert false in
         let filter f =
           let ftop = EcPath.m_functor f.EcPath.x_top in
           Sm.mem ftop mparams in

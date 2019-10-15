@@ -71,20 +71,21 @@ and ctheory_override =
 | CTHO_Type   of EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
-let module_comps_of_module_sig_comps (comps : module_sig_body) =
+let module_comps_of_module_sig_comps (comps : module_sig_body) restr =
   let onitem = function
     | Tys_function funsig ->
+      let oi = Msym.find funsig.fs_name restr.mr_oinfos in
         MI_Function {
           f_name = funsig.fs_name;
           f_sig  = funsig;
-          f_def  = FBabs;
+          f_def  = FBabs oi;
         }
   in
     List.map onitem comps
 
 (* -------------------------------------------------------------------- *)
 let module_expr_of_module_sig name mp tymod =
-  let tycomps = module_comps_of_module_sig_comps tymod.mis_body in
+  let tycomps = module_comps_of_module_sig_comps tymod.mis_body mp.mt_restr in
 
     { me_name  = EcIdent.name name;
       me_body  = ME_Decl mp;

@@ -226,7 +226,7 @@ let subst_function (s : _subst) (f : function_) =
     match f.f_def with
     | FBdef def -> FBdef (subst_function_def s def)
     | FBalias f -> FBalias (EcPath.x_subst s.s_fmp f)
-    | FBabs  -> FBabs in
+    | FBabs oi  -> FBabs (subst_oracle_info s oi) in
   { f_name = f.f_name;
     f_sig  = sig';
     f_def  = def' }
