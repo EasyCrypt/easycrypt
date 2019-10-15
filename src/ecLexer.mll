@@ -49,6 +49,7 @@
     "glob"        , GLOB       ;        (* KW: prog *)
     "let"         , LET        ;        (* KW: prog *)
     "in"          , IN         ;        (* KW: prog *)
+    "for"         , FOR        ;        (* KW: prog *)
     "var"         , VAR        ;        (* KW: prog *)
     "proc"        , PROC       ;        (* KW: prog *)
     "if"          , IF         ;        (* KW: prog *)
@@ -81,6 +82,7 @@
     "logic"       , LOGIC      ;        (* KW: tactic *)
     "delta"       , DELTA      ;        (* KW: tactic *)
     "simplify"    , SIMPLIFY   ;        (* KW: tactic *)
+    "cbv"         , CBV        ;        (* KW: tactic *)
     "congr"       , CONGR      ;        (* KW: tactic *)
 
     (* Logic tactics *)
@@ -151,6 +153,7 @@
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
     "exfalso"     , EXFALSO    ;        (* KW: tactic *)
     "inline"      , INLINE     ;        (* KW: tactic *)
+    "interleave"  , INTERLEAVE ;        (* KW: tactic *)
     "alias"       , ALIAS      ;        (* KW: tactic *)
     "fission"     , FISSION    ;        (* KW: tactic *)
     "fusion"      , FUSION     ;        (* KW: tactic *)
@@ -168,6 +171,7 @@
     "abort"       , ABORT      ;        (* KW: global *)
     "goal"        , GOAL       ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)
+    "from"        , FROM       ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
     "include"     , INCLUDE    ;        (* KW: global *)
@@ -216,6 +220,7 @@
   let _operators = [
     (":"   , (COLON            , true ));
     ("#"   , (SHARP            , true ));
+    ("#|"   ,(SHARPPIPE        , true ));
     ("//"  , (SLASHSLASH       , true ));
     ("//#" , (SLASHSLASHSHARP  , true ));
     ("/="  , (SLASHEQ          , true ));
@@ -345,6 +350,11 @@ rule main = parse
   | tident       { [TIDENT (Lexing.lexeme lexbuf)] }
   | mident       { [MIDENT (Lexing.lexeme lexbuf)] }
   | uint         { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
+
+  | (digit+ as n) '.' (digit+ as f) {
+      let nv, fv = BI.of_string n, BI.of_string f in
+      [DECIMAL (nv, (String.length f, fv))]
+    }
 
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { [PBINOP s] }

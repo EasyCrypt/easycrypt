@@ -128,6 +128,20 @@ type env_norm = {
 }
 
 (* -------------------------------------------------------------------- *)
+type red_topsym = [ `Path of path | `Tuple ]
+
+module Mrd = EcMaps.Map.Make(struct
+  type t = red_topsym
+
+  let compare (p1 : t) (p2 : t) =
+    match p1, p2 with
+    | `Path p1, `Path p2 ->  EcPath.p_compare p1 p2
+    | `Tuple  , `Tuple   ->  0
+    | `Tuple  , `Path _  -> -1
+    | `Path _ , `Tuple   ->  1
+end)
+
+(* -------------------------------------------------------------------- *)
 type preenv = {
   env_top      : EcPath.path option;
   env_gstate   : EcGState.gstate;
@@ -142,6 +156,7 @@ type preenv = {
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : (path list Mint.t) Msym.t;
+  env_redbase  : mredinfo;
   env_ntbase   : (path * env_notation) list;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : ctheory_item list;     (* in reverse order *)
@@ -160,6 +175,12 @@ and tcinstance = [
   | `Field   of EcDecl.field
   | `General of EcPath.path
 ]
+
+and redinfo =
+  { ri_priomap : (EcTheory.rule list) Mint.t;
+    ri_list    : (EcTheory.rule list) Lazy.t; }
+
+and mredinfo = redinfo Mrd.t
 
 and env_notation = ty_params * EcDecl.notation
 
@@ -245,6 +266,7 @@ let empty gstate =
     env_tc       = TC.Graph.empty;
     env_rwbase   = Mip.empty;
     env_atbase   = Msym.empty;
+    env_redbase  = Mrd.empty;
     env_ntbase   = [];
     env_modlcs   = Sid.empty;
     env_item     = [];
@@ -1035,7 +1057,8 @@ module MC = struct
       | CTh_baserw x ->
           (add2mc _up_rwbase x (expath x) mc, None)
 
-      | CTh_export _ | CTh_addrw _ | CTh_instance _ | CTh_auto _ ->
+      | CTh_export _ | CTh_addrw _ | CTh_instance _
+      | CTh_auto   _ | CTh_reduction _ ->
           (mc, None)
     in
 
@@ -1341,6 +1364,52 @@ module BaseRw = struct
             (IPPath p) env.env_rwbase;
         env_item = CTh_addrw (p, l) :: env.env_item; }
 
+end
+
+(* -------------------------------------------------------------------- *)
+module Reduction = struct
+  type rule   = EcTheory.rule
+  type topsym = red_topsym
+
+  let add_rule ((_, rule) : path * rule option) (db : mredinfo) =
+    match rule with None -> db | Some rule ->
+
+    let p =
+      match rule.rl_ptn with
+      | Rule (`Op p , _) -> `Path (fst p)
+      | Rule (`Tuple, _) -> `Tuple
+      | Var _ | Int _ -> assert false in
+
+    Mrd.change (fun rls ->
+      let { ri_priomap } =
+        match rls with
+        | None   -> { ri_priomap = Mint.empty; ri_list = Lazy.from_val [] }
+        | Some x -> x in
+
+      let ri_priomap =
+        let change prules = Some (odfl [] prules @ [rule]) in
+        Mint.change change (abs rule.rl_prio) ri_priomap in
+
+      let ri_list =
+        Lazy.from_fun (fun () -> List.flatten (Mint.values ri_priomap)) in
+
+      Some { ri_priomap; ri_list }) p db
+
+  let add_rules (rules : (path * rule option) list) (db : mredinfo) =
+    List.fold_left ((^~) add_rule) db rules
+
+  let add (rules : (path * rule option) list) (env : env) =
+    { env with
+        env_redbase = add_rules rules env.env_redbase;
+        env_item    = CTh_reduction rules :: env.env_item; }
+
+  let add1 (prule : path * rule option) (env : env) =
+    add [prule] env
+
+  let get (p : topsym) (env : env) =
+    Mrd.find_opt p env.env_redbase
+    |> omap (fun x -> Lazy.force x.ri_list)
+    |> odfl []
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2701,6 +2770,7 @@ module Theory = struct
     | Th_instance  (ty, cr) -> CTh_instance  (ty, cr)
     | Th_baserw    x        -> CTh_baserw x
     | Th_addrw     (b, l)   -> CTh_addrw     (b, l)
+    | Th_reduction rule     -> CTh_reduction rule
     | Th_auto      ps       -> CTh_auto      ps
 
     | Th_theory (x, (th, md)) ->
@@ -2834,6 +2904,15 @@ module Theory = struct
     in bind_base_cth for1
 
   (* ------------------------------------------------------------------ *)
+  let bind_rd_cth =
+    let for1 _path db = function
+      | CTh_reduction x ->
+         Some (Reduction.add_rules x db)
+      | _ -> None
+
+    in bind_base_cth for1
+
+  (* ------------------------------------------------------------------ *)
   let bind ?(mode = `Concrete) name cth env =
     let th = (cth, mode) in
 
@@ -2842,13 +2921,14 @@ module Theory = struct
 
     match mode with
     | `Concrete ->
-        let thname     = EcPath.pqname (root env) name in
-        let env_tci    = bind_instance_cth thname env.env_tci cth in
-        let env_tc     = bind_tc_cth thname env.env_tc cth in
-        let env_rwbase = bind_br_cth thname env.env_rwbase cth in
-        let env_atbase = bind_at_cth thname env.env_atbase cth in
-        let env_ntbase = bind_nt_cth thname env.env_ntbase cth in
-        { env with env_tci; env_tc; env_rwbase; env_atbase; env_ntbase; }
+        let thname      = EcPath.pqname (root env) name in
+        let env_tci     = bind_instance_cth thname env.env_tci cth in
+        let env_tc      = bind_tc_cth thname env.env_tc cth in
+        let env_rwbase  = bind_br_cth thname env.env_rwbase cth in
+        let env_atbase  = bind_at_cth thname env.env_atbase cth in
+        let env_ntbase  = bind_nt_cth thname env.env_ntbase cth in
+        let env_redbase = bind_rd_cth thname env.env_redbase cth in
+        { env with env_tci; env_tc; env_rwbase; env_atbase; env_ntbase; env_redbase; }
 
     | `Abstract ->
         env
@@ -2896,7 +2976,7 @@ module Theory = struct
         | CTh_baserw x ->
             MC.import_rwbase (xpath x) env
 
-        | CTh_addrw _ | CTh_instance _ | CTh_auto _ ->
+        | CTh_addrw _ | CTh_instance _ | CTh_auto _ | CTh_reduction _ ->
             env
 
       in
@@ -3008,12 +3088,17 @@ module Theory = struct
 
     let env = { env with env_current = current; env_comps = comps; } in
 
-    { env with
-        env_tci    = bind_instance_cth thpath env.env_tci cth;
-        env_tc     = bind_tc_cth thpath env.env_tc cth;
-        env_rwbase = bind_br_cth thpath env.env_rwbase cth;
-        env_atbase = bind_at_cth thpath env.env_atbase cth;
-        env_ntbase = bind_nt_cth thpath env.env_ntbase cth; }
+    match mode with
+    | `Abstract -> env
+
+    | `Concrete ->
+      { env with
+          env_tci     = bind_instance_cth thpath env.env_tci cth;
+          env_tc      = bind_tc_cth thpath env.env_tc cth;
+          env_rwbase  = bind_br_cth thpath env.env_rwbase cth;
+          env_atbase  = bind_at_cth thpath env.env_atbase cth;
+          env_ntbase  = bind_nt_cth thpath env.env_ntbase cth;
+          env_redbase = bind_rd_cth thpath env.env_redbase cth; }
 end
 
 (* -------------------------------------------------------------------- *)

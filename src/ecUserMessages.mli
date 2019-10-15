@@ -12,6 +12,13 @@ open EcTypes
 open EcEnv
 
 (* -------------------------------------------------------------------- *)
+type pp_options = {
+  ppo_prpo : EcPrinting.prpo_display;
+}
+
+val set_ppo : pp_options -> unit
+
+(* -------------------------------------------------------------------- *)
 module TypingError : sig
   open EcTyping
 

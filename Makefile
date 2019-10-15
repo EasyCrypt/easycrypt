@@ -33,7 +33,6 @@ include Makefile.system
 BINDIR := $(PREFIX)/bin
 LIBDIR := $(PREFIX)/lib/easycrypt
 SHRDIR := $(PREFIX)/share/easycrypt
-SYSDIR := $(LIBDIR)/system
 
 # --------------------------------------------------------------------
 ECARGS    ?=
@@ -51,13 +50,13 @@ CHECKCATS ?= prelude stdlib
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check weak-check examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
-.PHONY: callprover license
+.PHONY: license
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
 	@true
 
-build: callprover native
+build: native
 
 define do-core-build
 	$(OCAMLBUILD) "$(1)"
@@ -78,9 +77,6 @@ byte:
 native:
 	$(call do-build,ec.native)
 
-callprover:
-	$(MAKE) -C system
-
 define check-for-staled-files
 	if [ -d "$(DESTDIR)$(PREFIX)/lib/easycrypt/" ]; then   \
 	  cd "$(DESTDIR)$(LIBDIR)/" &&           \
@@ -94,9 +90,7 @@ install: build uninstall
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt$(EXE)
 	$(INSTALL) -m 0755 -T scripts/testing/runtest $(DESTDIR)$(BINDIR)/ec-runtest$(EXE)
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(SYSDIR)
-	$(INSTALL) -m 0755 -T system/callprover$(EXE) $(DESTDIR)$(SYSDIR)/callprover$(EXE)
-	for i in $$(find theories -type d); do \
+	for i in $$(find theories -type d -mindepth 1); do \
 	  $(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/$$i ';'; \
 	  $(INSTALL) -m 0644 -t $(DESTDIR)$(LIBDIR)/$$i $$i/*.ec*; \
 	done
@@ -107,8 +101,6 @@ endef
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/easycrypt
-	rm -f $(DESTDIR)$(SYSDIR)/callprover
-	$(call rmdir,$(DESTDIR)$(SYSDIR))
 	for i in $$(find theories -depth -type d); do \
 	  for j in $$i/*.ec*; do rm -f $(DESTDIR)$(LIBDIR)/$$j; done; \
 	  rmdir $(DESTDIR)$(LIBDIR)/$$i 2>/dev/null || true; \
@@ -143,23 +135,22 @@ clean:
 	$(OCAMLBUILD) -clean
 	rm -f ec.native ec.byte
 	rm -f ec.native.exe ec.byte.exe
-	$(MAKE) -C system clean
 
 # --------------------------------------------------------------------
 dist:
 	if [ -e $(DISTDIR) ]; then rm -rf $(DISTDIR); fi
 	./scripts/install/distribution $(DISTDIR) MANIFEST
-	BZIP2=-9 tar -cjf $(DISTDIR).tar.bz2 --owner=0 --group=0 $(DISTDIR)
+	BZIP2=-9 $(TAR) -cjf $(DISTDIR).tar.bz2 --owner=0 --group=0 $(DISTDIR)
 	rm -rf $(DISTDIR)
 
 distcheck: dist
-	tar -xof $(DISTDIR).tar.bz2
+	$(TAR) -xof $(DISTDIR).tar.bz2
 	set -x; \
 	     $(MAKE) -C $(DISTDIR) \
 	  && $(MAKE) -C $(DISTDIR) dist \
 	  && mkdir $(DISTDIR)/dist1 $(DISTDIR)/dist2 \
-	  && ( cd $(DISTDIR)/dist1 && tar -xof ../$(DISTDIR).tar.bz2 ) \
-	  && ( cd $(DISTDIR)/dist2 && tar -xof ../../$(DISTDIR).tar.bz2 ) \
+	  && ( cd $(DISTDIR)/dist1 && $(TAR) -xof ../$(DISTDIR).tar.bz2 ) \
+	  && ( cd $(DISTDIR)/dist2 && $(TAR) -xof ../../$(DISTDIR).tar.bz2 ) \
 	  && diff -rq $(DISTDIR)/dist1 $(DISTDIR)/dist2 \
 	  || exit 1
 	rm -rf $(DISTDIR)

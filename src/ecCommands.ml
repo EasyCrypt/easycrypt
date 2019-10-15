@@ -21,25 +21,53 @@ exception Restart
 type pragma = {
   pm_verbose : bool; (* true  => display goal after each command *)
   pm_g_prall : bool; (* true  => display all open goals *)
+  pm_g_prpo  : EcPrinting.prpo_display;
   pm_check   : [`Check | `WeakCheck | `Report];
 }
 
 let dpragma = {
   pm_verbose = true  ;
   pm_g_prall = false ;
+  pm_g_prpo  = EcPrinting.{ prpo_pr = false; prpo_po = false; };
   pm_check   = `Check;
 }
 
-let pragma = ref dpragma
+module Pragma : sig
+  val get : unit -> pragma
+  val set : pragma -> unit
+  val upd : (pragma -> pragma) -> unit
+end = struct
+  let pragma = ref dpragma
+
+  let notify () =
+    EcUserMessages.set_ppo
+      EcUserMessages.{ ppo_prpo = (!pragma).pm_g_prpo }
+
+  let () = notify ()
+
+  let get () = !pragma
+  let set x  = pragma := x; notify ()
+  let upd f  = set (f (get ()))
+end
 
 let pragma_verbose (b : bool) =
-  pragma := { !pragma with pm_verbose = b; }
+  Pragma.upd (fun pragma -> { pragma with pm_verbose = b; })
 
 let pragma_g_prall (b : bool) =
-  pragma := {!pragma with pm_g_prall = b; }
+  Pragma.upd (fun pragma -> { pragma with pm_g_prall = b; })
+
+let pragma_g_pr_display (b : bool) =
+  Pragma.upd (fun pragma ->
+    { pragma with pm_g_prpo =
+        EcPrinting.{ pragma.pm_g_prpo with prpo_pr = b; } })
+
+let pragma_g_po_display (b : bool) =
+  Pragma.upd (fun pragma ->
+    { pragma with pm_g_prpo =
+        EcPrinting.{ pragma.pm_g_prpo with prpo_po = b; } })
 
 let pragma_check mode =
-  pragma := { !pragma with pm_check = mode; }
+  Pragma.upd (fun pragma -> { pragma with pm_check = mode; })
 
 module Pragmas = struct
   let silent     = "silent"
@@ -55,36 +83,53 @@ module Pragmas = struct
     let printall = "Goals:printall"
     let printone = "Goals:printone"
   end
+
+  module PrPo = struct
+    let prpo_pr_raw = "PrPo:pr:raw"
+    let prpo_pr_spl = "PrPo:pr:ands"
+    let prpo_po_raw = "PrPo:po:raw"
+    let prpo_po_spl = "PrPo:po:ands"
+  end
+
 end
 
 exception InvalidPragma of string
 
 let apply_pragma (x : string) =
   match x with
-  | x when x = Pragmas.silent         -> pragma_verbose false
-  | x when x = Pragmas.verbose        -> pragma_verbose true
-  | x when x = Pragmas.Proofs.check   -> pragma_check   `Check
-  | x when x = Pragmas.Proofs.weak    -> pragma_check   `WeakCheck
-  | x when x = Pragmas.Proofs.report  -> pragma_check   `Report
-  | x when x = Pragmas.Goals.printone -> pragma_g_prall false
-  | x when x = Pragmas.Goals.printall -> pragma_g_prall true
+  | x when x = Pragmas.silent           -> pragma_verbose false
+  | x when x = Pragmas.verbose          -> pragma_verbose true
+  | x when x = Pragmas.Proofs.check     -> pragma_check   `Check
+  | x when x = Pragmas.Proofs.weak      -> pragma_check   `WeakCheck
+  | x when x = Pragmas.Proofs.report    -> pragma_check   `Report
+  | x when x = Pragmas.Goals.printone   -> pragma_g_prall false
+  | x when x = Pragmas.Goals.printall   -> pragma_g_prall true
+  | x when x = Pragmas.PrPo.prpo_pr_raw -> pragma_g_pr_display false
+  | x when x = Pragmas.PrPo.prpo_pr_spl -> pragma_g_pr_display true
+  | x when x = Pragmas.PrPo.prpo_po_raw -> pragma_g_po_display false
+  | x when x = Pragmas.PrPo.prpo_po_spl -> pragma_g_po_display true
+  | x when x = Pragmas.Goals.printall   -> pragma_g_prall true
 
-  | _ -> raise (InvalidPragma x)
+  | _ -> Printf.eprintf "%s\n%!" x; raise (InvalidPragma x)
 
 (* -------------------------------------------------------------------- *)
 module Loader : sig
   type loader
 
-  type kind  = EcLoader.kind
-  type idx_t = EcLoader.idx_t
+  type kind      = EcLoader.kind
+  type idx_t     = EcLoader.idx_t
+  type namespace = EcLoader.namespace
 
   val create  : unit   -> loader
   val forsys  : loader -> loader
-  val dup     : loader -> loader
+  val dup     : ?namespace:EcLoader.namespace -> loader -> loader
 
-  val addidir : ?system:bool -> ?recursive:bool -> string -> loader -> unit
-  val aslist  : loader -> ((bool * string) * idx_t) list
-  val locate  : ?onlysys:bool -> string -> loader -> (string * kind) option
+  val namespace : loader -> EcLoader.namespace option
+
+  val addidir : ?namespace:namespace -> ?recursive:bool -> string -> loader -> unit
+  val aslist  : loader -> ((namespace option * string) * idx_t) list
+  val locate  : ?namespaces:namespace option list -> string ->
+                  loader -> (namespace option * string * kind) option
 
   val push      : string -> loader -> unit
   val pop       : loader -> string option
@@ -92,12 +137,14 @@ module Loader : sig
   val incontext : string -> loader -> bool
 end = struct
   type loader = {
-    (*---*) ld_core  : EcLoader.ecloader;
-    mutable ld_stack : string list;
+    (*---*) ld_core      : EcLoader.ecloader;
+    mutable ld_stack     : string list;
+    (*---*) ld_namespace : EcLoader.namespace option;
   }
 
-  type kind  = EcLoader.kind
-  type idx_t = EcLoader.idx_t
+  type kind      = EcLoader.kind
+  type idx_t     = EcLoader.idx_t
+  type namespace = EcLoader.namespace
 
   module Path = BatPathGen.OfString
 
@@ -106,25 +153,33 @@ end = struct
     with Path.Malformed_path -> p
 
   let create () =
-    { ld_core  = EcLoader.create ();
-      ld_stack = []; }
+    { ld_core      = EcLoader.create ();
+      ld_stack     = [];
+      ld_namespace = None; }
 
   let forsys (ld : loader) =
-    { ld_core  = EcLoader.forsys ld.ld_core;
-      ld_stack = ld.ld_stack; }
+    { ld_core      = EcLoader.forsys ld.ld_core;
+      ld_stack     = ld.ld_stack;
+      ld_namespace = None; }
 
-  let dup (ld : loader) =
-    { ld_core  = EcLoader.dup ld.ld_core;
-      ld_stack = ld.ld_stack; }
+  let dup ?namespace (ld : loader) =
+    { ld_core      = EcLoader.dup ld.ld_core;
+      ld_stack     = ld.ld_stack;
+      ld_namespace =
+        match namespace with
+        | Some _ -> namespace
+        | None   -> ld.ld_namespace; }
 
-  let addidir ?system ?recursive (path : string) (ld : loader) =
-    EcLoader.addidir ?system ?recursive path ld.ld_core
+  let namespace { ld_namespace = nm } = nm
+
+  let addidir ?namespace ?recursive (path : string) (ld : loader) =
+    EcLoader.addidir ?namespace ?recursive path ld.ld_core
 
   let aslist (ld : loader) =
     EcLoader.aslist ld.ld_core
 
-  let locate ?onlysys (path : string) (ld : loader) =
-    EcLoader.locate ?onlysys path ld.ld_core
+  let locate ?namespaces (path : string) (ld : loader) =
+    EcLoader.locate ?namespaces path ld.ld_core
 
   let push (p : string) (ld : loader) =
     ld.ld_stack <- norm p :: ld.ld_stack
@@ -196,7 +251,8 @@ module HiPrinting = struct
                         goal.EcCoreGoal.g_concl) in
 
             Format.fprintf fmt "Printing Goal %d\n\n%!" n;
-            EcPrinting.pp_goal ppe fmt (goal, `One sz)
+            EcPrinting.pp_goal ppe (Pragma.get ()).pm_g_prpo
+              fmt (goal, `One sz)
         end
     end
 end
@@ -263,7 +319,7 @@ and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
 (* -------------------------------------------------------------------- *)
 and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
   EcScope.check_state `InTop "type class instance" scope;
-  EcScope.Ty.add_instance scope (!pragma).pm_check tci
+  EcScope.Ty.add_instance scope (Pragma.get ()).pm_check tci
 
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) m =
@@ -325,7 +381,7 @@ and process_abbrev (scope : EcScope.scope) (a : pabbrev located) =
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
-  let (name, scope) = EcScope.Ax.add scope (!pragma).pm_check ax in
+  let (name, scope) = EcScope.Ax.add scope (Pragma.get ()).pm_check ax in
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
@@ -354,47 +410,54 @@ and process_th_clear (scope : EcScope.scope) clears =
   EcScope.Theory.add_clears clears scope
 
 (* -------------------------------------------------------------------- *)
-and process_th_require1 ld scope (x, io) =
+and process_th_require1 ld scope (nm, (sysname, thname), io) =
   EcScope.check_state `InTop "theory require" scope;
 
-  let name  = x.pl_desc in
-    match Loader.locate name ld with
-    | None ->
-        EcScope.hierror "cannot locate theory `%s'" name
+  let sysname, thname = (unloc sysname, omap unloc thname) in
+  let thname = odfl sysname thname in
 
-    | Some (filename, kind) ->
-        if Loader.incontext filename ld then
-          EcScope.hierror "circular requires involving `%s'" name;
+  let nm = omap (fun x -> `Named (unloc x)) nm in
+  let nm =
+    if   is_none nm && is_some (Loader.namespace ld)
+    then [Loader.namespace ld; None]
+    else [nm] in
 
-        let dirname = Filename.dirname filename in
-        let subld   = Loader.dup ld in
+  match Loader.locate ~namespaces:nm sysname ld with
+  | None ->
+      EcScope.hierror "cannot locate theory `%s'" sysname
 
-        Loader.push    filename subld;
-        Loader.addidir dirname  subld;
+  | Some (fnm, filename, kind) ->
+      if Loader.incontext filename ld then
+        EcScope.hierror "circular requires involving `%s'" sysname;
 
-        let loader iscope =
-          let i_pragma = !pragma in
+      let dirname = Filename.dirname filename in
+      let subld   = Loader.dup ?namespace:fnm ld in
 
-          try
-            let commands = EcIo.parseall (EcIo.from_file filename) in
-            let commands = List.fold_left (process_internal subld) iscope commands in
-              pragma := i_pragma; commands
-          with e ->
-            pragma := i_pragma; raise e
-        in
+      Loader.push    filename subld;
+      Loader.addidir ?namespace:fnm dirname subld;
 
-        let kind = match kind with `Ec -> `Concrete | `EcA -> `Abstract in
+      let loader iscope =
+        let i_pragma = Pragma.get () in
 
-        let scope = EcScope.Theory.require scope (name, kind) loader in
-          match io with
-          | None         -> scope
-          | Some `Export -> EcScope.Theory.export scope ([], name)
-          | Some `Import -> EcScope.Theory.import scope ([], name)
+        try_finally (fun () ->
+          let commands = EcIo.parseall (EcIo.from_file filename) in
+          let commands = List.fold_left (process_internal subld) iscope commands in
+          commands)
+        (fun () -> Pragma.set i_pragma)
+      in
+
+      let kind = match kind with `Ec -> `Concrete | `EcA -> `Abstract in
+
+      let scope = EcScope.Theory.require scope (thname, kind) loader in
+        match io with
+        | None         -> scope
+        | Some `Export -> EcScope.Theory.export scope ([], thname)
+        | Some `Import -> EcScope.Theory.import scope ([], thname)
 
 (* -------------------------------------------------------------------- *)
-and process_th_require ld scope (xs, io) =
+and process_th_require ld scope (nm, xs, io) =
   List.fold_left
-    (fun scope x -> process_th_require1 ld scope (x, io))
+    (fun scope x -> process_th_require1 ld scope (nm, x, io))
     scope xs
 
 (* -------------------------------------------------------------------- *)
@@ -410,7 +473,7 @@ and process_th_export (scope : EcScope.scope) (names : pqsymbol list) =
 (* -------------------------------------------------------------------- *)
 and process_th_clone (scope : EcScope.scope) thcl =
   EcScope.check_state `InTop "theory cloning" scope;
-  EcScope.Cloning.clone scope (!pragma).pm_check thcl
+  EcScope.Cloning.clone scope (Pragma.get ()).pm_check thcl
 
 (* -------------------------------------------------------------------- *)
 and process_sct_open (scope : EcScope.scope) name =
@@ -424,7 +487,7 @@ and process_sct_close (scope : EcScope.scope) name =
 
 (* -------------------------------------------------------------------- *)
 and process_tactics (scope : EcScope.scope) t =
-  let mode = !pragma.pm_check in
+  let mode = (Pragma.get ()).pm_check in
   match t with
   | `Actual t  -> snd (EcScope.Tactics.process scope mode t)
   | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
@@ -443,7 +506,7 @@ and process_save (scope : EcScope.scope) ed =
 
 (* -------------------------------------------------------------------- *)
 and process_realize (scope : EcScope.scope) pr =
-  let mode = !pragma.pm_check in
+  let mode = (Pragma.get ()).pm_check in
   let (name, scope) = EcScope.Ax.realize scope mode pr in
     name |> EcUtils.oiter
       (fun x -> EcScope.notify scope `Info "added lemma: `%s'" x);
@@ -464,20 +527,19 @@ and process_pragma (scope : EcScope.scope) opt =
   in
 
   match unloc opt with
-  | x when x = Pragmas.silent         -> pragma_verbose false
-  | x when x = Pragmas.verbose        -> pragma_verbose true
   | x when x = Pragmas.Proofs.weak    -> pragma_check   `WeakCheck
   | x when x = Pragmas.Proofs.check   -> pragma_check   `Check
   | x when x = Pragmas.Proofs.report  -> pragma_check   `Report
-  | x when x = Pragmas.Goals.printall -> pragma_g_prall true
-  | x when x = Pragmas.Goals.printone -> pragma_g_prall false
 
   | "noop"    -> ()
   | "compact" -> Gc.compact ()
   | "reset"   -> raise (Pragma `Reset)
   | "restart" -> raise (Pragma `Restart)
 
-  | x -> EcScope.notify scope `Warning "unknown pragma: `%s'" x
+  | x ->
+      try  apply_pragma x
+      with InvalidPragma _ ->
+        EcScope.notify scope `Warning "unknown pragma: `%s'" x
 
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
@@ -497,6 +559,10 @@ and process_addrw scope (local, base, names) =
   EcScope.Auto.add_rw scope ~local ~base names
 
 (* -------------------------------------------------------------------- *)
+and process_reduction scope name =
+  EcScope.Reduction.add_reduction scope name
+
+(* -------------------------------------------------------------------- *)
 and process_hint scope hint =
   EcScope.Auto.add_hint scope hint
 
@@ -511,7 +577,7 @@ and process_dump scope (source, tc) =
   let input, (p1, p2) = source.tcd_source in
 
   let goals, scope  =
-    let mode = !pragma.pm_check in
+    let mode = (Pragma.get ()).pm_check in
      EcScope.Tactics.process scope mode tc
   in
 
@@ -547,7 +613,8 @@ and process_dump scope (source, tc) =
 
               source.tcd_width |> oiter (Format.pp_set_margin fbuf);
 
-              Format.fprintf fbuf "%a@?" (EcPrinting.pp_goal ppe)
+              Format.fprintf fbuf "%a@?"
+                (EcPrinting.pp_goal ppe (Pragma.get ()).pm_g_prpo)
                 ((EcEnv.LDecl.tohyps hyps, concl), `One (-1)))
             (fun () -> close_out output)
         with Sys_error _ -> wrerror ecfname)
@@ -592,6 +659,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
       | Goption      opt  -> `Fct   (fun scope -> process_option     scope  opt)
       | Gaddrw       hint -> `Fct   (fun scope -> process_addrw      scope hint)
+      | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
     with
@@ -608,8 +676,8 @@ and process_internal ld scope g =
 (* -------------------------------------------------------------------- *)
 let loader = Loader.create ()
 
-let addidir ?system ?recursive (idir : string) =
-  Loader.addidir ?system ?recursive idir loader
+let addidir ?namespace ?recursive (idir : string) =
+  Loader.addidir ?namespace ?recursive idir loader
 
 let loadpath () =
   List.map fst (Loader.aslist loader)
@@ -621,14 +689,12 @@ type checkmode = {
   cm_cpufactor : int;
   cm_nprovers  : int;
   cm_provers   : string list option;
-  cm_wrapper   : string option;
   cm_profile   : bool;
   cm_iterate   : bool;
 }
 
 let initial ~checkmode ~boot =
   let checkall  = checkmode.cm_checkall  in
-  let wrapper   = checkmode.cm_wrapper   in
   let profile   = checkmode.cm_profile   in
   let poptions  = { EcScope.Prover.empty_options with
     EcScope.Prover.po_timeout   = Some checkmode.cm_timeout;
@@ -638,9 +704,9 @@ let initial ~checkmode ~boot =
     EcScope.Prover.pl_iterate   = Some (checkmode.cm_iterate);
   } in
 
-  let perv    = (mk_loc _dummy EcCoreLib.i_Pervasive, Some `Export) in
-  let tactics = (mk_loc _dummy "Tactics", Some `Export) in
-  let prelude = (mk_loc _dummy "Logic", Some `Export) in
+  let perv    = (None, (mk_loc _dummy EcCoreLib.i_Pervasive, None), Some `Export) in
+  let tactics = (None, (mk_loc _dummy "Tactics", None), Some `Export) in
+  let prelude = (None, (mk_loc _dummy "Logic", None), Some `Export) in
   let loader  = Loader.forsys loader in
   let gstate  = EcGState.from_flags [("profile", profile)] in
   let scope   = EcScope.empty gstate in
@@ -649,7 +715,6 @@ let initial ~checkmode ~boot =
                   List.fold_left (process_th_require1 loader)
                                  scope [tactics; prelude] in
 
-  let scope = EcScope.Prover.set_wrapper scope wrapper in
   let scope = EcScope.Prover.set_default scope poptions in
   let scope = if checkall then EcScope.Prover.full_check scope else scope in
 
@@ -693,7 +758,7 @@ let push_context scope context =
 (* -------------------------------------------------------------------- *)
 let initialize ~restart ~undo ~boot ~checkmode =
   assert (restart || EcUtils.is_none !context);
-  if restart then pragma := dpragma;
+  if restart then Pragma.set dpragma;
   context := Some (rootctxt ~undo (initial ~checkmode ~boot))
 
 (* -------------------------------------------------------------------- *)
@@ -714,7 +779,7 @@ let uuid () : int =
 
 (* -------------------------------------------------------------------- *)
 let mode () : string =
-  match (!pragma).pm_check with
+  match (Pragma.get ()).pm_check with
   | `Check     -> "check"
   | `WeakCheck -> "weakcheck"
   | `Report    -> "report"
@@ -731,18 +796,18 @@ let reset () =
   context := Some (rootctxt (oget !context).ct_root)
 
 (* -------------------------------------------------------------------- *)
-let process ?(timed = false) (g : global_action located) : unit =
+let process ?(timed = false) (g : global_action located) : float option =
   let current = oget !context in
   let scope   = current.ct_current in
-  let timed   = if timed then EcUtils.timed else (fun f x -> (-1.0, f  x)) in
 
   try
-    let (tdelta, oscope) = timed (process loader scope) g in
+    let (tdelta, oscope) = EcUtils.timed (process loader scope) g in
     oscope |> oiter (fun scope -> context := Some (push_context scope current));
-    if tdelta >= 0. then
-      EcScope.notify scope `Info "time: %f" tdelta
+    if timed then
+      EcScope.notify scope `Info "time: %f" tdelta;
+    Some tdelta
   with
-  | Pragma `Reset   -> reset ()
+  | Pragma `Reset   -> reset (); None
   | Pragma `Restart -> raise Restart
 
 (* -------------------------------------------------------------------- *)
@@ -784,13 +849,15 @@ let pp_current_goal ?(all = false) stream =
                 let subgoals = EcCoreGoal.all_opened pf in
                 let subgoals = odfl [] (List.otail subgoals) in
                 let subgoals = List.map get_hc subgoals in
-                EcPrinting.pp_goal ppe stream (get_hc g, `All subgoals)
+                EcPrinting.pp_goal ppe (Pragma.get ()).pm_g_prpo
+                  stream (get_hc g, `All subgoals)
               else
-                EcPrinting.pp_goal ppe stream (get_hc g, `One n)
+                EcPrinting.pp_goal ppe (Pragma.get ()).pm_g_prpo
+                  stream (get_hc g, `One n)
       end
   end
 
 let pp_maybe_current_goal stream =
-  match (!pragma).pm_verbose with
-  | true  -> pp_current_goal ~all:(!pragma).pm_g_prall stream
+  match (Pragma.get ()).pm_verbose with
+  | true  -> pp_current_goal ~all:(Pragma.get ()).pm_g_prall stream
   | false -> ()

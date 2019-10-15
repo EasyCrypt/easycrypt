@@ -70,6 +70,10 @@ rewrite dlistS // supp_dmap /=;split => [[p]|].
 case xs => //= [/# | x xs [# Hs Hin Ha]];exists (x,xs);smt (supp_dprod).
 qed.
 
+lemma supp_dlist_size (d : 'a distr) n xs:
+  0 <= n => xs \in dlist d n => size xs = n.
+proof. by move=> ge0_n; case/(supp_dlist d n xs ge0_n). qed.
+
 lemma dlist1E (d : 'a distr) n xs:
   0 <= n =>
   mu1 (dlist d n) xs

@@ -1099,6 +1099,16 @@ let destr_int f =
 
   | _ -> destr_error "destr_int"
 
+let destr_pvar f =
+  match f.f_node with
+  | Fpvar(x,m) -> (x,m)
+  | _ -> destr_error "destr_pvar"
+
+let destr_glob f =
+  match f.f_node with
+  | Fglob(p,m) -> (p,m)
+  | _ -> destr_error "destr_glob"
+
 (* -------------------------------------------------------------------- *)
 let is_op_and_sym  p = EcPath.p_equal EcCoreLib.CI_Bool.p_and p
 let is_op_and_asym p = EcPath.p_equal EcCoreLib.CI_Bool.p_anda p
@@ -1441,6 +1451,23 @@ module Fsubst = struct
         (s, (x', gty'))
 
   let add_bindings = List.map_fold add_binding
+
+  (* ------------------------------------------------------------------ *)
+  let subst_xpath s f =
+    let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
+    m_subst f
+
+  let subst_stmt s c =
+    let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
+                s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
+    EcModules.s_subst es c
+
+  let subst_me s me =
+    EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty me
+
+  let subst_m s m = Mid.find_def m m s.fs_mem
+
+  let subst_ty s ty = s.fs_ty ty
 
   (* ------------------------------------------------------------------ *)
   let rec f_subst ~tx s fp =

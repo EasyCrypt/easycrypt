@@ -97,7 +97,7 @@ let process_change fp (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change fp tc)
 
 (* -------------------------------------------------------------------- *)
-let process_simplify ri (tc : tcenv1) =
+let process_simplify_info ri (tc : tcenv1) =
   let env, hyps, _ = FApi.tc1_eflat tc in
 
   let do1 (sop, sid) ps =
@@ -119,7 +119,7 @@ let process_simplify ri (tc : tcenv1) =
       |> odfl (predT, predT)
   in
 
-  let ri = {
+  {
     EcReduction.beta    = ri.pbeta;
     EcReduction.delta_p = delta_p;
     EcReduction.delta_h = delta_h;
@@ -128,9 +128,16 @@ let process_simplify ri (tc : tcenv1) =
     EcReduction.eta     = ri.peta;
     EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
-  } in
+    EcReduction.user    = ri.puser;
+  }
 
-    t_simplify_with_info ri tc
+(*-------------------------------------------------------------------- *)
+let process_simplify ri (tc : tcenv1) =
+  t_simplify_with_info (process_simplify_info ri tc) tc
+
+(* -------------------------------------------------------------------- *)
+let process_cbv ri (tc : tcenv1) =
+  t_cbv_with_info (process_simplify_info ri tc) tc
 
 (* -------------------------------------------------------------------- *)
 let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
@@ -1020,8 +1027,8 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
             | `Clear       -> Some (None      , EcIdent.create "_")
             | `Named s     -> Some (None      , EcIdent.create s)
             | `Anonymous a ->
-               if (a = Some None || a = Some (Some 0)) && kind = `None then
-                 None
+               if   (a = Some None && kind = `None) || a = Some (Some 0)
+               then None
                else Some (None, LDecl.fresh_id hyps name)
           else
             match unloc s with
@@ -1030,9 +1037,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
             | `Named s     -> Some (None      , EcIdent.create s)
             | `Anonymous a ->
                match a, kind with
-               | Some None    , `None -> None
-               | Some (Some 0), _     -> None
-
+               | Some None, `None ->
+                  None
+               | (Some (Some 0), _) ->
+                  None
                | _, `Named ->
                   Some (None, LDecl.fresh_id hyps ("`" ^ name))
                | _, _ ->
@@ -1055,7 +1063,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
               match unloc s with
               | `Anonymous (Some None) when kind <> `None ->
                  compile ((hyps, form), torev) newids [s]
-              | `Anonymous (Some (Some i)) when 0 < i ->
+              | `Anonymous (Some (Some i)) when 1 < i ->
                  let s = mk_loc (loc s) (`Anonymous (Some (Some (i-1)))) in
                  compile ((hyps, form), torev) newids [s]
               | _ -> ((hyps, form), torev), newids
@@ -1172,17 +1180,23 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     end
 
   and intro1_full_case (st : ST.state)
-    ((prind, delta), (cnt : icasemode_full option)) pis tc
+    ((prind, delta), withor, (cnt : icasemode_full option)) pis tc
   =
-    let module E = struct exception IterDone of tcenv1 end in
+    let module E = struct exception IterDone of tcenv end in
 
     let cnt = cnt |> odfl (`AtMost 1) in
     let red = if delta then `Full else `NoDelta in
 
-    let t_and =
-      if prind then
-        t_elim_iso_and ~reduce:red
-      else (fun tc -> (2, t_elim_and ~reduce:red tc))
+    let t_case =
+      let t_and, t_or =
+        if prind then
+          ((fun tc -> fst_map List.singleton (t_elim_iso_and ~reduce:red tc)),
+           (fun tc -> t_elim_iso_or ~reduce:red tc))
+        else
+          ((fun tc -> ([2]   , t_elim_and ~reduce:red tc)),
+           (fun tc -> ([1; 1], t_elim_or  ~reduce:red tc))) in
+      let ts = if withor then [t_and; t_or] else [t_and] in
+      fun tc -> FApi.t_or_map ts tc
     in
 
     let onsub gs =
@@ -1196,31 +1210,32 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     in
 
     let doit tc =
-      let togen = ref [] in
+      let rec aux imax tc =
+        if imax = Some 0 then t_id tc else
 
-      let rec aux isbnd tc =
         try
-          let ntop, tc = snd_map FApi.as_tcenv1 (t_and tc) in
-          EcUtils.iterop (aux isbnd) ntop tc
+          let ntop, tc = t_case tc in
+
+          FApi.t_sublasts
+            (List.map (fun i tc -> aux (omap ((+) (i-1)) imax) tc) ntop)
+            tc
         with InvalidGoalShape ->
           let id = EcIdent.create "_" in
           try
-            let tc = EcLowGoal.t_intros_i_1 [id] tc in
-            togen := id :: !togen;  tc
-          with EcCoreGoal.TcError _ ->
-            if isbnd then
-              tc_error !!tc "not enough top-assumptions";
-            raise (E.IterDone tc)
+            t_seq
+              (aux (omap ((+) (-1)) imax))
+              (t_generalize_hyps ~clear:`Yes [id])
+              (EcLowGoal.t_intros_i_1 [id] tc)
+          with
+          | EcCoreGoal.TcError _ when EcUtils.is_some imax ->
+              tc_error !!tc "not enough top-assumptions"
+          | EcCoreGoal.TcError _ ->
+              t_id tc
       in
 
-      let tc =
-        match cnt with
-        | `AtMost cnt ->
-           EcUtils.iterop (aux true) (max 0 cnt) tc
-        | `AsMuch ->
-           try EcUtils.iter (aux false) tc with E.IterDone tc -> tc
-
-      in t_generalize_hyps ~clear:`Yes ~missing:true (List.rev !togen) tc
+      match cnt with
+      | `AtMost cnt -> aux (Some (max 1 cnt)) tc
+      | `AsMuch     -> aux None tc
     in
 
     if List.is_empty pis then doit tc else onsub (doit tc)
@@ -1526,7 +1541,7 @@ let process_pose xsym bds o p (tc : tcenv1) =
     let ps  = ref Mid.empty in
     let ue  = TTC.unienv_of_hyps hyps in
     let (senv, bds) = EcTyping.trans_binding env ue bds in
-    let p = EcTyping.trans_pattern senv (ps, ue) p in
+    let p = EcTyping.trans_pattern senv ps ue p in
     let ev = MEV.of_idents (Mid.keys !ps) `Form in
     (ptenv !!tc hyps (ue, ev),
      f_lambda (List.map (snd_map gtty) bds) p)

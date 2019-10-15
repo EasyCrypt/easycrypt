@@ -665,4 +665,18 @@ have h: forall cp, 0 <= cp => intmul z cp = z * cp.
   by rewrite mulrS // ih mulrDr /= addrC.
 case: (c < 0); 1: rewrite -opprK mulrNz opprK; smt.
 qed.
+
+lemma poddX n x : 0 < n => odd (exp x n) = odd x.
+proof.
+rewrite ltz_def => - [] + ge0_n; elim: n ge0_n => // + + _ _.
+elim=> [|n ge0_n ih]; first by rewrite expr1.
+by rewrite exprS ?addz_ge0 // oddM ih andbb.
+qed.
+
+lemma oddX n x : 0 <= n => odd (exp x n) = (odd x \/ n = 0).
+proof.
+rewrite lez_eqVlt; case: (n = 0) => [->// _|+ h].
++ by rewrite expr0 odd1.
++ by case: h => [<-//|] /poddX ->.
+qed.
 end IntID.

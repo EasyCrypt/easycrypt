@@ -611,7 +611,6 @@ module Prover = struct
     let pr_timelimit = max 0 (odfl dft.pr_timelimit options.po_timeout) in
     let pr_cpufactor = max 0 (odfl dft.pr_cpufactor options.po_cpufactor) in
     let pr_verbose   = max 0 (odfl dft.pr_verbose options.po_verbose) in
-    let pr_wrapper   = dft.pr_wrapper in
     let pr_all       = odfl dft.pr_all options.pl_all in
     let pr_max       = odfl dft.pr_max options.pl_max in
     let pr_iterate   = odfl dft.pr_iterate options.pl_iterate in
@@ -627,16 +626,9 @@ module Prover = struct
         | `Include -> if List.exists ((=) p) l then l else p::l
       in List.fold_left do_ar l (snd options.po_provers) in
 
-    { pr_maxprocs; pr_provers; pr_timelimit; pr_cpufactor;
-      pr_wrapper ; pr_verbose; pr_all      ; pr_max      ;
-      pr_iterate ; pr_wanted ; pr_unwanted ; pr_selected ;
-      pr_quorum  ; }
-
-  (* -------------------------------------------------------------------- *)
-  let set_wrapper scope wrapper =
-    let pi = Prover_info.get scope.sc_options in
-    let pi = { pi with EcProvers.pr_wrapper = wrapper } in
-    { scope with sc_options = Prover_info.set scope.sc_options pi; }
+    { pr_maxprocs; pr_provers ; pr_timelimit; pr_cpufactor;
+      pr_verbose ; pr_all     ; pr_max      ; pr_iterate  ;
+      pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum  ; }
 
   (* -------------------------------------------------------------------- *)
   let do_prover_info scope ppr =
@@ -1997,7 +1989,7 @@ module Theory = struct
     let ((cth, required), section, (name, mode), scope) = cth in
     let scope = List.fold_right require_loaded required scope in
     let scope = cth |> ofold (fun cth scope ->
-      let scope = bind scope (name, (cth, mode)) in
+    let scope = bind scope (name, (cth, mode)) in
       { scope with sc_env =
           add_restr section
             (EcPath.pqname (path scope) name) (cth, mode) scope.sc_env })
@@ -2166,12 +2158,37 @@ module Section = struct
           | T.CTh_addrw (p, l) ->
               { scope with sc_env = EcEnv.BaseRw.addto p l scope.sc_env }
 
+          | T.CTh_reduction rule ->
+              { scope with sc_env = EcEnv.Reduction.add rule scope.sc_env }
+
           | T.CTh_auto (local, level, base, ps) ->
               { scope with sc_env =
                   EcEnv.Auto.add ~local ~level ?base ps scope.sc_env }
         in
 
         List.fold_left bind1 scope oitems
+end
+
+(* -------------------------------------------------------------------- *)
+module Reduction = struct
+  let add_reduction scope reds =
+    check_state `InTop "hint simplify" scope;
+    if EcSection.in_section scope.sc_section then
+      hierror "cannot add reduction rule in a section";
+
+    let rules =
+      let for1 idx name =
+        let idx      = odfl 0 idx in
+        let lemma    = fst (EcEnv.Ax.lookup (unloc name) (env scope)) in
+        let red_info = EcReduction.User.compile ~prio:idx (env scope) lemma in
+        (lemma, Some red_info) in
+
+      let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
+      List.flatten rules
+
+    in
+
+    { scope with sc_env = EcEnv.Reduction.add rules (env scope) }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2203,6 +2220,7 @@ module Cloning = struct
       R.haddrw   = onenv (curry EcEnv.BaseRw.addto);
       R.hauto    = onenv (fun (local, level, base, names) ->
                             EcEnv.Auto.add ~local ~level ?base names);
+      R.husered  = onenv EcEnv.Reduction.add;
       R.htycl    = onenv (curry EcEnv.TypeClass.bind);
       R.hinst    = onenv (curry EcEnv.TypeClass.add_instance);
       R.hthenter = thenter;
@@ -2318,7 +2336,7 @@ module Search = struct
         | _ ->
           let ps = ref Mid.empty in
           let ue = EcUnify.UniEnv.create None in
-          let fp = EcTyping.trans_pattern scope.sc_env (ps, ue) fp in
+          let fp = EcTyping.trans_pattern scope.sc_env ps ue fp in
           `ByPattern ((ps, ue), fp)
       in List.map do1 qs in
 
