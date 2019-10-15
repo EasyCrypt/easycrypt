@@ -218,6 +218,11 @@ module Auto : sig
   val add_hint : scope -> phint -> scope
 end
 
+(*-------------------------------------------------------------------- *)
+module Reduction : sig
+  val add_reduction : scope -> puserred -> scope
+end
+
 (* -------------------------------------------------------------------- *)
 module Cloning : sig
   val clone : scope -> Ax.mode -> theory_cloning -> scope

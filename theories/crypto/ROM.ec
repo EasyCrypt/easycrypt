@@ -382,7 +382,7 @@ theory LazyEager.
           have -> /= := m_x.
           move: upd_cond; rewrite domE.
           case: (IND_Eager.H.m{1}.[pick work{2}] <> None)=> //= m'_x /eq_exceptP @/pred1 eqe_m_m'.
-          rewrite -fmap_eqP=> x; rewrite get_setE; case: (x = pick work{2})=> [->|^ + /eqe_m_m' ->] //.
+          rewrite -fmap_eqP => x; rewrite get_setE; case: (x = pick work{2})=> [->|^ + /eqe_m_m' ->] //.
           by rewrite m_x.
         rewrite mem_set !get_setE !inE=> //= ^ pw_neq_x; rewrite eq_sym=> -> -> //=.
         rewrite m_x !eq_exceptP //=.

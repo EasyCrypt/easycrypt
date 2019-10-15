@@ -68,7 +68,7 @@ end
 
 (* --------------------------------------------------------------------- *)
 module LowInternal = struct
-  let inline tc me sp s =
+  let inline ~use_tuple tc me sp s =
     let hyps = FApi.tc1_hyps tc in
     let env  = LDecl.toenv hyps in
 
@@ -123,13 +123,30 @@ module LowInternal = struct
 
       let body = LowSubst.ssubst subst fdef.f_body in
 
-      let resasgn =
-        match fdef.f_ret with
-        | None -> None
-        | Some _ when is_none lv -> None
-        | Some r -> Some (i_asgn (oget lv, LowSubst.esubst subst r)) in
+      let me, resasgn =
+        match fdef.f_ret, lv with
+        | None, _ -> me , []
+        | Some _, None -> me, []
+        | Some r, Some (LvTuple lvs) when not use_tuple ->
+          let r = LowSubst.esubst subst r in
+          let me, auxs =
+            let doit me (x, ty) =
+              let v = {v_name = symbol_of_pv x; v_type = ty} in
+              let me, pv = fresh_pv me v in
+              let pv = pv_loc (EcMemory.xpath me) pv in
+              me, (pv, ty) in
+            List.map_fold doit me lvs in
+          let s1 =
+            let doit i auxi = i_asgn(LvVar auxi, e_proj_simpl r i (snd auxi)) in
+            List.mapi doit auxs in
+          let s2 =
+            List.map2 (fun lv (pv, ty) -> i_asgn(LvVar lv, e_var pv ty)) lvs auxs in
+          me, s1 @ s2
+        | Some r, Some lv ->
+          let r = LowSubst.esubst subst r in
+          me, [i_asgn (lv, r)] in
 
-      me, prelude @ body.s_node @ (otolist resasgn) in
+      me, prelude @ body.s_node @ resasgn in
 
     let rec inline_i me ip i =
       match ip, i.i_node with
@@ -165,40 +182,40 @@ module LowInternal = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let t_inline_hoare_r sp tc =
+let t_inline_hoare_r ~use_tuple sp tc =
   let hoare      = tc1_as_hoareS tc in
-  let (me, stmt) = LowInternal.inline tc hoare.hs_m sp hoare.hs_s in
+  let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.hs_m sp hoare.hs_s in
   let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
 
   FApi.xmutate1 tc `Inline [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_inline_bdhoare_r sp tc =
+let t_inline_bdhoare_r ~use_tuple sp tc =
   let hoare      = tc1_as_bdhoareS tc in
-  let (me, stmt) = LowInternal.inline tc hoare.bhs_m sp hoare.bhs_s in
+  let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.bhs_m sp hoare.bhs_s in
   let concl      = f_bdHoareS_r { hoare with bhs_m = me; bhs_s = stmt; } in
 
   FApi.xmutate1 tc `Inline [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_inline_equiv_r side sp tc =
+let t_inline_equiv_r ~use_tuple side sp tc =
   let equiv = tc1_as_equivS tc in
   let concl =
     match side with
     | `Left  ->
-        let (me, stmt) = LowInternal.inline tc equiv.es_ml sp equiv.es_sl in
+        let (me, stmt) = LowInternal.inline ~use_tuple tc equiv.es_ml sp equiv.es_sl in
           f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
     | `Right ->
-        let (me, stmt) = LowInternal.inline tc equiv.es_mr sp equiv.es_sr in
+        let (me, stmt) = LowInternal.inline ~use_tuple tc equiv.es_mr sp equiv.es_sr in
           f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
   in
 
   FApi.xmutate1 tc `Inline [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_inline_hoare   = FApi.t_low1 "hoare-inline"   t_inline_hoare_r
-let t_inline_bdhoare = FApi.t_low1 "bdhoare-inline" t_inline_bdhoare_r
-let t_inline_equiv   = FApi.t_low2 "equiv-inline"   t_inline_equiv_r
+let t_inline_hoare   ~use_tuple = FApi.t_low1 "hoare-inline"   (t_inline_hoare_r ~use_tuple)
+let t_inline_bdhoare ~use_tuple = FApi.t_low1 "bdhoare-inline" (t_inline_bdhoare_r ~use_tuple)
+let t_inline_equiv   ~use_tuple = FApi.t_low2 "equiv-inline"   (t_inline_equiv_r ~use_tuple)
 
 (* -------------------------------------------------------------------- *)
 module HiInternal = struct
@@ -321,14 +338,14 @@ module HiInternal = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let rec process_inline_all side fs tc =
+let rec process_inline_all ~use_tuple side fs tc =
   let env, _, concl = FApi.tc1_eflat tc in
 
   match concl.f_node, side with
   | FequivS _, None ->
       FApi.t_seq
-        (process_inline_all (Some `Left ) fs)
-        (process_inline_all (Some `Right) fs)
+        (process_inline_all ~use_tuple (Some `Left ) fs)
+        (process_inline_all ~use_tuple (Some `Right) fs)
         tc
 
   | FequivS es, Some b -> begin
@@ -336,8 +353,8 @@ let rec process_inline_all side fs tc =
       match HiInternal.pat_all env fs st with
       | [] -> t_id tc
       | sp -> FApi.t_seq
-                (t_inline_equiv b sp)
-                (process_inline_all side fs)
+                (t_inline_equiv ~use_tuple b sp)
+                (process_inline_all ~use_tuple  side fs)
                 tc
   end
 
@@ -345,8 +362,8 @@ let rec process_inline_all side fs tc =
       match HiInternal.pat_all env fs hs.hs_s with
       | [] -> t_id tc
       | sp -> FApi.t_seq
-                (t_inline_hoare sp)
-                (process_inline_all side fs)
+                (t_inline_hoare ~use_tuple sp)
+                (process_inline_all ~use_tuple side fs)
                 tc
   end
 
@@ -354,15 +371,15 @@ let rec process_inline_all side fs tc =
       match HiInternal.pat_all env fs bhs.bhs_s with
       | [] -> t_id tc
       | sp -> FApi.t_seq
-                (t_inline_bdhoare sp)
-                (process_inline_all side fs)
+                (t_inline_bdhoare ~use_tuple sp)
+                (process_inline_all ~use_tuple side fs)
                 tc
   end
 
   | _, _ -> tc_error !!tc "invalid arguments"
 
 (* -------------------------------------------------------------------- *)
-let process_inline_occs side fs occs tc =
+let process_inline_occs ~use_tuple side fs occs tc =
   let env = FApi.tc1_env tc in
   let cond =
     if   EcPath.Sx.is_empty fs
@@ -375,20 +392,20 @@ let process_inline_occs side fs occs tc =
   | FequivS es, Some b ->
       let st = sideif b es.es_sl es.es_sr in
       let sp = HiInternal.pat_of_occs cond occs st in
-        t_inline_equiv b sp tc
+        t_inline_equiv ~use_tuple b sp tc
 
   | FhoareS hs, None ->
       let sp = HiInternal.pat_of_occs cond occs hs.hs_s in
-        t_inline_hoare sp tc
+        t_inline_hoare ~use_tuple sp tc
 
   | FbdHoareS bhs, None ->
       let sp = HiInternal.pat_of_occs cond occs bhs.bhs_s in
-        t_inline_bdhoare sp tc
+        t_inline_bdhoare ~use_tuple sp tc
 
   | _, _ -> tc_error !!tc "invalid arguments"
 
 (* -------------------------------------------------------------------- *)
-let process_inline_codepos side pos tc =
+let process_inline_codepos ~use_tuple side pos tc =
   let concl = FApi.tc1_goal tc in
 
   try
@@ -396,15 +413,15 @@ let process_inline_codepos side pos tc =
     | FequivS es, Some b ->
         let st = sideif b es.es_sl es.es_sr in
         let sp = HiInternal.pat_of_codepos pos st in
-        t_inline_equiv b sp tc
+        t_inline_equiv ~use_tuple b sp tc
 
     | FhoareS hs, None ->
         let sp = HiInternal.pat_of_codepos pos hs.hs_s in
-        t_inline_hoare sp tc
+        t_inline_hoare ~use_tuple sp tc
 
     | FbdHoareS bhs, None ->
         let sp = HiInternal.pat_of_codepos pos bhs.bhs_s in
-        t_inline_bdhoare sp tc
+        t_inline_bdhoare ~use_tuple sp tc
 
     | _, _ -> tc_error !!tc "invalid arguments"
 
@@ -413,9 +430,13 @@ let process_inline_codepos side pos tc =
 
 (* -------------------------------------------------------------------- *)
 let process_inline infos tc =
+  let use_tuple use =
+    odfl true (omap (function `UseTuple b -> b) use) in
+
   match infos with
-  | `ByName (side, (fs, occs)) -> begin
+  | `ByName (side, use, (fs, occs)) -> begin
       let env = FApi.tc1_env tc in
+      let use_tuple = use_tuple use in
       let fs  =
         List.fold_left (fun fs f ->
           let f = EcTyping.trans_gamepath env f in
@@ -423,11 +444,11 @@ let process_inline infos tc =
           EcPath.Sx.empty fs
       in
         match occs with
-        | None      -> process_inline_all side (Some fs) tc
-        | Some occs -> process_inline_occs side fs occs tc
+        | None      -> process_inline_all ~use_tuple side (Some fs) tc
+        | Some occs -> process_inline_occs ~use_tuple side fs occs tc
     end
 
-  | `CodePos (side, pos) ->
-       process_inline_codepos side pos tc
+  | `CodePos (side, use, pos) ->
+       process_inline_codepos ~use_tuple:(use_tuple use) side pos tc
 
-  | `All side -> process_inline_all side None tc
+  | `All (side, use) -> process_inline_all ~use_tuple:(use_tuple use) side None tc

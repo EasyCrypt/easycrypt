@@ -39,7 +39,6 @@ abstract theory RealDomain.
 type t.
 
 clone import Ring.IDomain as Domain with type t <- t.
-clear [Domain.* Domain.AddMonoid.* Domain.MulMonoid.*].
 
 op "`|_|" : t -> t.
 op ( <= ) : t -> t -> bool.

@@ -102,7 +102,7 @@
       { pbeta  = true; pzeta  = true;
         piota  = true; peta   = true;
         plogic = true; pdelta = None;
-        pmodpath = true }
+        pmodpath = true; puser = true; }
     else
       let doarg acc = function
         | `Delta l ->
@@ -116,14 +116,15 @@
         | `Eta     -> { acc with peta     = true }
         | `Logic   -> { acc with plogic   = true }
         | `ModPath -> { acc with pmodpath = true }
+        | `User    -> { acc with puser    = true }
       in
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
             piota  = false; peta   = false;
             plogic = false; pdelta = Some [];
-            pmodpath = false } l
+            pmodpath = false; puser = false; } l
 
-  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath]
+  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
 
   let mk_pterm explicit head args =
     { fp_mode = if explicit then `Explicit else `Implicit;
@@ -353,6 +354,7 @@
 %token <EcSymbols.symbol> PBINOP
 
 %token <EcBigInt.zint> UINT
+%token <EcBigInt.zint * (int * EcBigInt.zint)> DECIMAL
 %token <string> STRING
 
 (* Tokens *)
@@ -388,6 +390,7 @@
 %token BYPR
 %token CALL
 %token CASE
+%token CBV
 %token CEQ
 %token CFOLD
 %token CHANGE
@@ -434,6 +437,7 @@
 %token FISSION
 %token FOR
 %token FORALL
+%token FROM
 %token FUN
 %token FUSION
 %token FWDS
@@ -453,6 +457,7 @@
 %token INCLUDE
 %token INDUCTIVE
 %token INLINE
+%token INTERLEAVE
 %token INSTANCE
 %token IOTA
 %token IS
@@ -530,6 +535,7 @@
 %token SEMICOLON
 %token SEQ
 %token SHARP
+%token SHARPPIPE
 %token SIM
 %token SIMPLIFY
 %token SKIP
@@ -623,21 +629,23 @@
 
 (* -------------------------------------------------------------------- *)
 _lident:
-| x=LIDENT { x }
-| ABORT    { "abort"    }
-| ADMITTED { "admitted" }
-| ASYNC    { "async"    }
-| DUMP     { "dump"     }
-| EXPECT   { "expect"   }
-| FIRST    { "first"    }
-| LAST     { "last"     }
-| LEFT     { "left"     }
-| RIGHT    { "right"    }
-| SOLVE    { "solve"    }
-| STRICT   { "strict"   }
-| WLOG     { "wlog"     }
-| EXLIM    { "exlim"    }
-| ECALL    { "ecall"    }
+| x=LIDENT   { x }
+| ABORT      { "abort"      }
+| ADMITTED   { "admitted"   }
+| ASYNC      { "async"      }
+| DUMP       { "dump"       }
+| EXPECT     { "expect"     }
+| FIRST      { "first"      }
+| INTERLEAVE { "interleave" }
+| LAST       { "last"       }
+| LEFT       { "left"       }
+| RIGHT      { "right"      }
+| SOLVE      { "solve"      }
+| STRICT     { "strict"     }
+| WLOG       { "wlog"       }
+| EXLIM      { "exlim"      }
+| ECALL      { "ecall"      }
+| FROM       { "from"       }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -864,6 +872,9 @@ sexpr_u:
 | n=uint
    { PEint n }
 
+| d=DECIMAL
+   { PEdecimal d }
+
 | x=qoident ti=tvars_app?
    { PEident (x, ti) }
 
@@ -1027,6 +1038,52 @@ qident_or_res_or_glob:
 | x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
 | GLOB mp=loc(mod_qident) { GVglob mp }
 
+pfpos:
+| i=sword
+    { `Index i }
+
+| f=bracket(form_h) off=pfoffset?
+    { `Match (f, off) }
+
+pfoffset:
+| PLUS  w=word {  w }
+| MINUS w=word { -w }
+
+pffilter:
+| LBRACKET flat=iboption(SLASH)
+    rg=plist0(
+      i=pfpos? COLON j=pfpos? { `Range (i, j) }
+    | i=pfpos { `Single i }, COMMA)
+  RBRACKET
+
+  { PFRange (flat, rg) }
+
+| LPBRACE flat=iboption(SLASH) x=ident IN h=form_h RPBRACE
+
+  { PFMatch (flat, x, h) }
+
+| LPBRACE flat=iboption(SLASH)
+    f=form FOR xs=plist1(ident, COMMA) IN h=form_h
+  RPBRACE
+
+  { PFMatchBuild (flat, xs, f, h) }
+
+| LBRACE
+    flat=iboption(SLASH)
+    exclude=iboption(TILD)
+    rooted=iboption(HAT)
+    h=pffilter_pattern
+  RBRACE
+
+  { PFKeep (flat, rooted, exclude, h) }
+
+pffilter_pattern:
+| f=form_h
+    { `Pattern f}
+
+| LBRACE xs=plist0(x=qoident s=loc(pside)? { (x, s) }, COMMA) RBRACE
+    { `VarSet xs }
+
 sform_u(P):
 | x=P
    { x }
@@ -1046,11 +1103,17 @@ sform_u(P):
        PFscope (pqsymb_of_symb p.pl_loc "<top>", f)
      end }
 
+| SHARP pf=pffilter* x=ident
+   { PFref (x, pf) }
+
 | LPAREN f=form_r(P) COLONTILD ty=loc(type_exp) RPAREN
    { PFcast (f, ty) }
 
 | n=uint
    { PFint n }
+
+| d=DECIMAL
+   { PFdecimal d }
 
 | x=loc(RES)
    { PFident (mk_loc x.pl_loc ([], "res"), None) }
@@ -1875,8 +1938,16 @@ import_flag:
 | IMPORT { `Import }
 | EXPORT { `Export }
 
-theory_require :
-| REQUIRE ip=import_flag? x=uident+ { (x, ip) }
+theory_require:
+| nm=prefix(FROM, uident)? REQUIRE ip=import_flag? x=theory_require_1+
+    { (nm, x, ip) }
+
+theory_require_1:
+| x=uident
+    { (x, None) }
+
+| LBRACKET x=uident AS y=uident RBRACKET
+    { (x, Some y) }
 
 theory_import: IMPORT xs=uqident* { xs }
 theory_export: EXPORT xs=uqident* { xs }
@@ -2033,18 +2104,22 @@ ipcore:
 | s=ipcore_name
    { `Named s }
 
+%inline sharp:
+| SHARP { false }
+| SHARPPIPE {true}
+
 %inline icasemode:
 | /* empty */
    { `One    }
 
-| opt=icasemode_full_opt SHARP
-   { `Full (opt, None) }
+| opt=icasemode_full_opt wb=sharp
+   { `Full (opt, wb, None) }
 
-| i=word NOT opt=icasemode_full_opt SHARP
-    { `Full (opt, Some (`AtMost i)) }
+| i=word NOT opt=icasemode_full_opt wb=sharp
+    { `Full (opt, wb, Some (`AtMost i)) }
 
-| NOT opt=icasemode_full_opt SHARP
-    { `Full (opt, Some (`AsMuch)) }
+| NOT opt=icasemode_full_opt wb=sharp
+    { `Full (opt, wb, Some (`AsMuch)) }
 
 %inline icasemode_full_opt:
 | h=iboption(TILD) d=iboption(SLASH) { (h, d) }
@@ -2313,6 +2388,11 @@ simplify:
 | SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
 | SIMPLIFY DELTA      { `Delta [] :: simplify_red }
 
+cbv:
+| CBV            { simplify_red }
+| CBV l=qoident+ { `Delta l  :: simplify_red  }
+| CBV DELTA      { `Delta [] :: simplify_red }
+
 conseq:
 | empty                           { None, None }
 | UNDERSCORE LONGARROW UNDERSCORE { None, None }
@@ -2573,6 +2653,9 @@ logtactic:
 | l=simplify
    { Psimplify (mk_simplify l) }
 
+| l=cbv
+   { Pcbv (mk_simplify l) }
+
 | CHANGE f=sform
    { Pchange f }
 
@@ -2667,6 +2750,24 @@ byequivopt:
           (Some ("invalid option: " ^ (unloc x)))
   }
 
+inlineopt:
+| LBRACKET b=boption(MINUS) x=lident RBRACKET {
+    match unloc x with
+    | "tuple" -> `UseTuple (not b)
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("invalid option: " ^ (unloc x)))
+
+  }
+
+interleavepos:
+| LBRACKET c=word COLON n=word RBRACKET
+  { c, n }
+
+interleave_info:
+| s=side? c1=interleavepos c2=interleavepos c3=interleavepos* k=word
+   { (s, c1, c2 :: c3, k) }
+
 phltactic:
 | PROC
    { Pfun `Def }
@@ -2724,6 +2825,9 @@ phltactic:
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }
 
+| INTERLEAVE info=loc(interleave_info)
+    { Pinterleave info }
+
 | CFOLD s=side? c=codepos NOT n=word
     { Pcfold (s, c, Some n) }
 
@@ -2733,14 +2837,14 @@ phltactic:
 | RND s=side? info=rnd_info
     { Prnd (s, info) }
 
-| INLINE s=side? o=occurences? f=plist1(loc(fident), empty)
-    { Pinline (`ByName (s, (f, o))) }
+| INLINE s=side? u=inlineopt? o=occurences? f=plist1(loc(fident), empty)
+    { Pinline (`ByName (s, u, (f, o))) }
 
-| INLINE s=side? p=codepos
-    { Pinline (`CodePos (s, p)) }
+| INLINE s=side? u=inlineopt? p=codepos
+    { Pinline (`CodePos (s, u, p)) }
 
-| INLINE s=side? STAR
-    { Pinline (`All s) }
+| INLINE s=side? u=inlineopt? STAR
+    { Pinline (`All (s, u)) }
 
 | KILL s=side? o=codepos
     { Pkill (s, o, Some 1) }
@@ -2848,10 +2952,16 @@ phltactic:
     { Psim (cm, info) }
 
 | REPLACE rk=repl_kind h1=repl_hyp h2=repl_hyp
-    { Ptrans_stmt (rk, fst h1, snd h1, fst h2, snd h2) }
+    { Ptrans_stmt (rk, TFform(fst h1, snd h1, fst h2, snd h2)) }
+
+| REPLACE STAR rk=repl_kind
+    { Ptrans_stmt (rk, TFeq) }
 
 | TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
-    { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
+    { Ptrans_stmt (tk, TFform(fst h1, snd h1, fst h2, snd h2)) }
+
+| TRANSITIVITY STAR tk=trans_kind
+    { Ptrans_stmt (tk, TFeq) }
 
 | SYMMETRY
     { Psymmetry }
@@ -2889,7 +2999,7 @@ bdhoare_split:
 
 %inline trans_kind:
 | s=side c=brace(stmt)
-    { TKstmt(Some s, c) }
+    { TKstmt(s, c) }
 
 | f=loc(fident)
     { TKfun (f) }
@@ -2899,7 +3009,7 @@ bdhoare_split:
 
 %inline repl_kind:
 | s=side p=im_block BY c=brace(stmt)
-    { TKparsedStmt (Some s, p, c) }
+    { TKparsedStmt (s, p, c) }
 
 %inline repl_hyp:
 | h=trans_hyp
@@ -3439,17 +3549,30 @@ gprover_info:
     { { empty_pprover with pprov_cpufactor = Some t; } }
 
 addrw:
-| local=boption(LOCAL) HINT REWRITE p=lqident COLON l=lqident*
+| local=iboption(LOCAL) HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
 hint:
-| local=boption(LOCAL) HINT EXACT base=lident? COLON l=qident*
+| local=iboption(LOCAL) HINT EXACT base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = 0;
         ht_base  = base ; ht_names = l; } }
 
-| local=boption(LOCAL) HINT SOLVE i=word base=lident? COLON l=qident*
+| local=iboption(LOCAL) HINT SOLVE i=word base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = i;
         ht_base  = base ; ht_names = l; } }
+
+(* -------------------------------------------------------------------- *)
+(* User reduction                                                       *)
+reduction:
+| HINT SIMPLIFY xs=plist1(user_red_info, COMMA)
+    { xs }
+
+user_red_info:
+| x=qident i=prefix(AT, word)?
+    { ([x], i) }
+
+| xs=paren(plist1(qident, COMMA)) i=prefix(AT, sword)?
+    { (xs, i) }
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)
@@ -3478,6 +3601,7 @@ global_action:
 | predicate        { Gpredicate   $1 }
 | notation         { Gnotation    $1 }
 | abbreviation     { Gabbrev      $1 }
+| reduction        { Greduction   $1 }
 | axiom            { Gaxiom       $1 }
 | tactics_or_prf   { Gtactics     $1 }
 | tactic_dump      { Gtcdump      $1 }
@@ -3497,11 +3621,11 @@ global_action:
 | PRAGMA x=pragma EQ i=sword { Goption (x, `Int i) }
 
 pragma_r:
-| x=_lident
-    { x }
+| x=plist1(_lident, COLON)
+    { String.concat ":" x }
 
-| u=_uident COLON x=_lident
-    { Printf.sprintf "%s:%s" u x }
+| u=_uident COLON x=plist1(_lident, COLON)
+    { String.concat ":" (u :: x) }
 
 pragma:
 | x=loc(pragma_r) { x }

@@ -49,12 +49,22 @@ val t_logic_trivial    : FApi.backward
 val t_trivial          : ?subtc:FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_simplify :
-     ?target:ident -> ?delta:bool -> ?logic:rlogic_info
-  -> FApi.backward
+type simplify_t =
+  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
 
-val t_simplify_with_info :
+type simplify_with_info_t =
   ?target:ident -> reduction_info -> FApi.backward
+
+type smode = [ `Cbv | `Cbn ]
+
+val t_cbv : simplify_t
+val t_cbn : simplify_t
+
+val t_cbv_with_info : simplify_with_info_t
+val t_cbn_with_info : simplify_with_info_t
+
+val t_simplify : ?mode:smode -> simplify_t
+val t_simplify_with_info : ?mode:smode -> simplify_with_info_t
 
 (* -------------------------------------------------------------------- *)
 val t_change : ?target:ident -> form -> tcenv1 -> tcenv1
@@ -158,6 +168,7 @@ val t_elim          : ?reduce:lazyred -> FApi.backward
 val t_elim_hyp      : EcIdent.t -> FApi.backward
 val t_elim_prind    : ?reduce:lazyred -> [ `Case | `Ind ] -> FApi.backward
 val t_elim_iso_and  : ?reduce:lazyred -> tcenv1 -> int * tcenv
+val t_elim_iso_or   : ?reduce:lazyred -> tcenv1 -> int list * tcenv
 
 (* Elimination using an custom elimination principle. *)
 val t_elimT_form : proofterm -> ?sk:int -> form -> FApi.backward

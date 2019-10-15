@@ -844,6 +844,15 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   let rec t_ors (tts : backward list) (tc : tcenv1) =
     t_ors_pmap (fun x -> Some x) tts tc
+
+  (* ------------------------------------------------------------------ *)
+  let t_or_map (tts : (tcenv1 -> 'a * tcenv) list) (tc : tcenv1) =
+    let r  = ref None in
+    let tc =
+      t_ors
+        (List.map (fun tt tc -> let (x, tc) = tt tc in r := Some x; tc) tts)
+        tc
+    in (oget !r, tc)
 end
 
 (* -------------------------------------------------------------------- *)

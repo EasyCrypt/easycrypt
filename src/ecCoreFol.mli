@@ -330,6 +330,7 @@ val destr_pvar      : form -> prog_var * memory
 val destr_proj      : form -> form * int
 val destr_tuple     : form -> form list
 val destr_app       : form -> form * form list
+val destr_op_app    : form -> (EcPath.path * ty list) * form list
 val destr_not       : form -> form
 val destr_nots      : form -> bool * form
 val destr_and       : form -> form * form
@@ -361,6 +362,9 @@ val destr_bdHoareS  : form -> bdHoareS
 val destr_pr        : form -> pr
 val destr_programS  : [`Left | `Right] option -> form -> memenv * stmt
 val destr_int       : form -> zint
+
+val destr_glob      : form -> EcPath.mpath     * memory
+val destr_pvar      : form -> EcTypes.prog_var * memory
 
 (* -------------------------------------------------------------------- *)
 val is_true      : form -> bool
@@ -442,6 +446,13 @@ module Fsubst : sig
   val add_bindings : f_subst -> bindings -> f_subst * bindings
 
   val subst_locals : form Mid.t -> form -> form
+
+  val subst_lpattern : f_subst -> lpattern -> f_subst * lpattern
+  val subst_xpath    : f_subst -> xpath -> xpath
+  val subst_stmt     : f_subst -> stmt  -> stmt
+  val subst_me       : f_subst -> EcMemory.memenv -> EcMemory.memenv
+  val subst_m        : f_subst -> EcIdent.t -> EcIdent.t
+  val subst_ty       : f_subst -> ty -> ty
 end
 
 (* -------------------------------------------------------------------- *)

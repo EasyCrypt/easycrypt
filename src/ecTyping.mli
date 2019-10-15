@@ -70,6 +70,10 @@ type fxerror =
 | FXE_CtorAmbiguous
 | FXE_CtorInvalidArity of (symbol * int * int)
 
+type filter_error =
+| FE_InvalidIndex of int
+| FE_NoMatch
+
 type tyerror =
 | UniVarNotAllowed
 | FreeTypeVariables
@@ -80,6 +84,8 @@ type tyerror =
 | UnknownTypeClass       of qsymbol
 | UnknownRecFieldName    of qsymbol
 | UnknownInstrMetaVar    of symbol
+| UnknownMetaVar         of symbol
+| UnknownProgVar         of qsymbol * EcMemory.memory
 | DuplicatedRecFieldName of symbol
 | MissingRecField        of symbol
 | MixingRecFields        of EcPath.path tuple2
@@ -112,11 +118,13 @@ type tyerror =
 | InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
 | InvalidMatch           of fxerror
+| InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
 | MemNotAllowed
 | UnknownScope           of qsymbol
+| FilterMatchFailure
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -171,12 +179,13 @@ val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref
+type metavs = EcFol.form Msym.t
 
 val transmem       : env -> EcSymbols.symbol located -> EcIdent.t
-val trans_form_opt : env -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
-val trans_form     : env -> EcUnify.unienv -> pformula -> ty -> EcFol.form
-val trans_prop     : env -> EcUnify.unienv -> pformula -> EcFol.form
-val trans_pattern  : env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol.form
+val trans_form_opt : env -> ?mv:metavs -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
+val trans_form     : env -> ?mv:metavs -> EcUnify.unienv -> pformula -> ty -> EcFol.form
+val trans_prop     : env -> ?mv:metavs -> EcUnify.unienv -> pformula -> EcFol.form
+val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
 val transmodsig  : env -> symbol -> pmodule_sig  -> module_sig

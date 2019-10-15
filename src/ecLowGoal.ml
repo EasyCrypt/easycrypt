@@ -279,15 +279,50 @@ let t_change ?target (fp : form) (tc : tcenv1) =
   in t_change_r ?target action tc
 
 (* -------------------------------------------------------------------- *)
-let t_simplify_with_info ?target (ri : reduction_info) (tc : tcenv1) =
-  let action (lazy hyps) fp = Some (EcReduction.simplify ri hyps fp) in
+type simplify_t =
+  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
+
+type simplify_with_info_t =
+  ?target:ident -> reduction_info -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+let t_cbv_with_info ?target (ri : reduction_info) (tc : tcenv1) =
+  let action (lazy hyps) fp = Some (EcCallbyValue.norm_cbv ri hyps fp) in
   FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let t_simplify ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
+let t_cbv ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
   let ri = if delta then full_red else nodelta in
   let ri = { ri with logic } in
-  t_simplify_with_info ?target ri tc
+  t_cbv_with_info ?target ri tc
+
+(* -------------------------------------------------------------------- *)
+let t_cbn_with_info ?target (ri : reduction_info) (tc : tcenv1) =
+  let action (lazy hyps) fp = Some (EcCallbyValue.norm_cbv ri hyps fp) in
+  FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
+
+(* -------------------------------------------------------------------- *)
+let t_cbn ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
+  let ri = if delta then full_red else nodelta in
+  let ri = { ri with logic } in
+  t_cbv_with_info ?target ri tc
+
+(* -------------------------------------------------------------------- *)
+type smode = [ `Cbv | `Cbn ]
+
+let dmode : smode = `Cbv
+
+(* -------------------------------------------------------------------- *)
+let t_simplify_with_info ?(mode = dmode) =
+  match mode with
+  | `Cbn -> t_cbn_with_info
+  | `Cbv -> t_cbv_with_info
+
+(* -------------------------------------------------------------------- *)
+let t_simplify ?(mode = dmode) =
+  match mode with
+  | `Cbn -> t_cbn
+  | `Cbv -> t_cbv
 
 (* -------------------------------------------------------------------- *)
 let t_clears1 ?(leniant = false) xs tc =
@@ -1209,7 +1244,7 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
           (tc, pt, 0)
 
       | None ->
-          match (EcEnv.Ty.hnorm ty env).ty_node with
+          match (EcEnv.ty_hnorm ty env).ty_node with
           | Ttuple tys ->
               let indtc  = pf_gen_tuple_elim ~witheq:false tys hyps in
               let tc, hd = FApi.bwd1_of_fwd indtc tc in
@@ -1309,14 +1344,28 @@ let t_elim_iso_and ?reduce tc =
   try
     (2, t_elim_and ?reduce tc)
   with InvalidGoalShape ->
-    let outgoals = ref (-1) in
+    let outgoals = ref None in
 
     let accept pri =
       match EcInductive.prind_is_iso_ands pri with
       | None -> false
-      | Some (_, ngoals) -> outgoals := ngoals; true in
+      | Some (_, ngoals) -> outgoals := Some ngoals; true in
 
-    let tc = t_elim_prind_r ?reduce ~accept `Case tc in (!outgoals, tc)
+    let tc = t_elim_prind_r ?reduce ~accept `Case tc in (oget !outgoals, tc)
+
+(* -------------------------------------------------------------------- *)
+let t_elim_iso_or ?reduce tc =
+  try
+    ([1; 1], t_elim_or ?reduce tc)
+  with InvalidGoalShape ->
+    let outgoals = ref None in
+
+    let accept pri =
+      match EcInductive.prind_is_iso_ors pri with
+      | None -> false
+      | Some ((_, n1), (_, n2)) -> outgoals := Some [n1; n2]; true in
+
+    let tc = t_elim_prind_r ?reduce ~accept `Case tc in (oget !outgoals, tc)
 
 (* -------------------------------------------------------------------- *)
 let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
@@ -2128,7 +2177,7 @@ let t_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
 
     try
       FApi.t_seqs
-        [Apply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
+        [Apply.t_apply_bwd_r ~mode:fmdelta ~canview:false pt;
          t_trivial; forall (ctn+1)]
         tc
 

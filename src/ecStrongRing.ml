@@ -157,16 +157,6 @@ let t_field_neq r g =
 let t_field r l (f1,f2) g =
   t_seq (t_field r l (f1,f2)) (t_field_neq r.EcDecl.f_ring) g
 
-let pp_concl fmt g =
-  let env, hyps, concl = tc1_eflat g in
-  let ppe = EcPrinting.PPEnv.ofenv env in
-  EcPrinting.pp_goal ppe fmt ((LDecl.tohyps hyps,concl), `One 1)
-
-let pp_form fmt (f,g) =
-  let env = tc1_env g in
-  let ppe = EcPrinting.PPEnv.ofenv env in
-  EcPrinting.pp_form ppe fmt f
-
 let autorewrite info f1 f2 g =
   let res = ref (f_true, f_true) in
   let t_get_res g =
@@ -361,7 +351,3 @@ let t_alg_eq g =
   let env = tc1_env g in
   let info = init_einfo env in
   t_alg_eq info g
-
-
-
-

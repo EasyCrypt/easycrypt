@@ -916,11 +916,17 @@ and trans_body (genv, lenv) wdom wcodom topbody =
   in (params, body)
 
 (* -------------------------------------------------------------------- *)
-and trans_fix (genv, lenv) o =
+and trans_fix (genv, lenv) (wdom, o) =
   let (lenv, vs) = trans_lvars genv lenv o.opf_args in
   let pterm   = List.map (List.nth vs) (fst o.opf_struct) in
   let ptermty = List.map (fun x -> x.WTerm.vs_ty) pterm in
   let ptermc  = List.length ptermty in
+
+  let eparams =
+    let preid = WIdent.id_fresh "x" in
+    List.map (WTerm.create_vsymbol preid) (List.drop (List.length vs) wdom) in
+
+  let eargs = List.map WTerm.t_var eparams in
 
   let ptns =
     let rec compile ptns (ctors, m) =
@@ -938,7 +944,7 @@ and trans_fix (genv, lenv) o =
           let lenv, cvs = List.map_fold (trans_lvars genv) lenv locals in
           let fe = EcCoreFol.form_of_expr EcCoreFol.mhr e in
 
-          let we = trans_form (genv, lenv) fe in
+          let we = trans_app (genv, lenv) fe eargs in
 
           let ptn =
             let for1 (cl, cvs) pty =
@@ -972,7 +978,7 @@ and trans_fix (genv, lenv) o =
 
   let body = WTerm.t_case mtch ptns in
 
-  (vs, body)
+  (vs @ eparams, body)
 
 (* -------------------------------------------------------------------- *)
 and create_op ?(body = false) (genv : tenv) p =
@@ -1020,7 +1026,7 @@ and create_op ?(body = false) (genv : tenv) p =
 
       | true, OB_oper (Some (OP_Fix body)) ->
         OneShot.now register;
-        let wparams, wbody = trans_fix (genv, lenv) body in
+        let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
         let wbody = Cast.arg wbody ls.WTerm.ls_value in
         WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
 

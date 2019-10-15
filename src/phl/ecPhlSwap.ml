@@ -163,3 +163,28 @@ let rec process_swap1 info tc =
 (* -------------------------------------------------------------------- *)
 let process_swap info tc =
   FApi.t_seqs (List.map process_swap1 info) tc
+
+(* -------------------------------------------------------------------- *)
+let rec process_interleave info tc =
+  let loc = info.pl_loc in
+  let (side, pos_n1, lpos2, k) = info.pl_desc in
+
+  let rec aux_list (pos1, n1) lpos2 tc =
+    match lpos2 with [] -> t_id tc | (pos2, n2) :: lpos2 ->
+
+    if not (pos1 + k * n1 <= pos2) then
+      tc_error !!tc
+        "invalide interleave range (%i + %i * %i <= %i)"
+        pos1 k n1 pos2;
+
+    let rec aux pos1 pos2 k tc =
+      if k <= 0 then t_id tc else
+        let data = SKmoveinter (pos2, pos2+n2-1, (pos1+n1) - pos2) in
+        FApi.t_seq
+          (process_swap1 (mk_loc loc (side, data)))
+          (aux (pos1+n1+n2) (pos2+n2) (k-1))
+        tc in
+
+    FApi.t_seq (aux pos1 pos2 k) (aux_list (pos1, n1 + n2) lpos2) tc
+
+  in aux_list pos_n1 lpos2 tc

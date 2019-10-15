@@ -94,6 +94,7 @@ val process_solve       : ?bases:symbol list -> ?depth:int -> backward
 val process_trivial     : backward
 val process_change      : pformula -> backward
 val process_simplify    : preduction -> backward
+val process_cbv         : preduction -> backward
 val process_pose        : psymbol -> ptybindings -> rwocc -> pformula -> backward
 val process_done        : backward
 val process_wlog        : psymbol list -> pformula -> backward
