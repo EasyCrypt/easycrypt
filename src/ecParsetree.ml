@@ -253,6 +253,7 @@ and pformula_r =
   | PFdecimal of (zint * (int * zint))
   | PFtuple   of pformula list
   | PFident   of pqsymbol * ptyannot option
+  | PFref     of psymbol * pffilter list
   | PFmem     of psymbol
   | PFside    of pformula * symbol located
   | PFapp     of pformula * pformula list

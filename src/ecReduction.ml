@@ -511,7 +511,7 @@ let rec h_red_x ri env hyps f =
       try
         let f' = reduce_match env (cf, bs, ty) in
         if f_equal f f' then raise NotReducible else f'
-      with NotReducible -> f_match (h_red ri env hyps cf) bs ty
+      with NotReducible -> f_match (h_red_x ri env hyps cf) bs ty
   end
 
     (* ι-reduction (match-fix) *)
