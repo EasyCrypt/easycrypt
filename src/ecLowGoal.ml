@@ -2156,7 +2156,7 @@ let t_smt ~(mode:smtmode) pi tc =
   else error ()
 
 (* -------------------------------------------------------------------- *)
-let t_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
+let t_auto ?(canfail = true) ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
   let module E = struct
       exception Done of tcenv
       exception Fail
@@ -2166,10 +2166,13 @@ let t_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
 
   let rec forall ctn tc =
     if ctn >= depth then t_fail tc else begin
-      List.iter
-        (fun p -> try raise (E.Done (for1 ctn p tc)) with E.Fail -> ())
-        bases;
-      t_id tc
+      try
+        List.iter
+          (fun p -> try raise (E.Done (for1 ctn p tc)) with E.Fail -> ())
+          bases;
+        t_fail tc
+      with E.Done tc -> tc
+
     end
 
   and for1 ctn (p : EcPath.path) tc =
@@ -2183,10 +2186,8 @@ let t_auto ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
 
     with Apply.NoInstance _ ->
       raise E.Fail
-  in
 
-  try forall 0 tc with E.Done tc -> tc
-
+  in if canfail then FApi.t_try (forall 0) tc else forall 0 tc
 
 (* --------------------------------------------------------------------- *)
 let t_crush_fwd ?(delta = true) nb_intros (tc : tcenv1) =
