@@ -102,7 +102,7 @@ end = struct
 
     | E_TyModCnv_MismatchVarRestr (x,true,`OEq (xl,xr)) ->
       let pp_sx_p fmt = function
-        | None -> Format.fprintf fmt "%aTop" EcPrinting.pp_restr_s true
+        | None -> Format.fprintf fmt "%aall mem" EcPrinting.pp_restr_s true
         | Some sx ->
           EcPrinting.pp_list " and@ " (pp_v true) fmt (Sx.ntr_elements sx) in
 
@@ -133,7 +133,7 @@ end = struct
 
     | E_TyModCnv_MismatchModRestr (x,true,`OEq (xl,xr)) ->
       let pp_sm_p fmt = function
-        | None -> Format.fprintf fmt "%aTop" EcPrinting.pp_restr_s true
+        | None -> Format.fprintf fmt "%aall mem" EcPrinting.pp_restr_s true
         | Some sm ->
           EcPrinting.pp_list " and@ " (pp_m true) fmt (Sm.ntr_elements sm) in
 
@@ -460,7 +460,7 @@ end = struct
 
       | RE_ModuleUnrestricted m ->
           Format.fprintf fmt
-            "%a should not be unrestricted"
+            "%a should have a positive restriction"
             pp_m m
 
     in Format.fprintf fmt "%a %a" pp_restriction_who w pp_restriction_err e

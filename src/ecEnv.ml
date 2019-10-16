@@ -1949,13 +1949,13 @@ module Mod = struct
     { (bind_local id modty env) with
         env_modlcs = Sid.add id env.env_modlcs; }
 
-  let add_restr_to_locals (restr : mod_restr) env =
+  let add_restr_to_locals (rx : Sx.t use_restr) (rm : Sm.t use_restr) env =
 
     let update_id id mods =
       let update me =
         match me.me_body with
         | ME_Decl mt ->
-          let mr = mr_union restr mt.mt_restr in
+          let mr = mr_add_restr mt.mt_restr rx rm in
           { me with me_body = ME_Decl { mt with mt_restr = mr } }
         | _ -> me
       in
@@ -2143,13 +2143,28 @@ module NormMp = struct
     { us_pv = Mx.union  (fun _ ty _ -> Some ty) us1.us_pv us2.us_pv;
       us_gl = Sid.union us1.us_gl us2.us_gl; }
 
-  let use_mem_xp xp us = Mx.mem xp us.us_pv
+  let mem_xp x us = Mx.mem x us.us_pv
 
-  let use_mem_gl mp us =
+  (* Return [true] if [x] is forbidden in [restr]. *)
+  let use_mem_xp x (restr : use use_restr) =
+    let bneg = mem_xp x restr.ur_neg
+    and bpos = match restr.ur_pos with
+      | None -> false
+      | Some sp -> not (mem_xp x sp) in
+    bneg || bpos
+
+  let mem_gl mp us =
     assert (mp.m_args = []);
     match mp.m_top with
     | `Local id -> Sid.mem id us.us_gl
     | _ -> assert false
+
+  let use_mem_gl m restr =
+    let bneg = mem_gl m restr.ur_neg
+    and bpos = match restr.ur_pos with
+      | None -> false
+      | Some sp -> not (mem_gl m sp) in
+    bneg || bpos
 
   let add_var env xp us =
     let xp = xp_glob xp in

@@ -194,7 +194,7 @@ module Mod : sig
 
   val declare_local : EcIdent.t -> module_type -> env -> env
 
-  val add_restr_to_locals : mod_restr -> env -> env
+  val add_restr_to_locals : Sx.t use_restr -> Sm.t use_restr -> env -> env
 
   (* Only bind module, ie no memory and no local variable *)
   val add_mod_binding : bindings -> env -> env
@@ -238,8 +238,11 @@ module NormMp : sig
   val equal_restr   : env -> mod_restr -> mod_restr -> bool
   val get_restr_use : env -> mpath -> use use_restr
   val get_oicalls   : env -> xpath -> oracle_info
-  val use_mem_xp    : xpath -> use -> bool
-  val use_mem_gl    : mpath -> use -> bool
+
+  (* Return [true] if [x] is forbidden in [restr]. *)
+  val use_mem_xp    : xpath -> use use_restr -> bool
+  val use_mem_gl    : mpath -> use use_restr -> bool
+
   val norm_glob     : env -> EcMemory.memory -> mpath -> form
   val norm_tglob    : env -> mpath -> EcTypes.ty
   val tglob_reducible : env -> mpath -> bool

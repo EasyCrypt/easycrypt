@@ -547,7 +547,7 @@ let pp_restr ppe fmt mr =
   let pp_ois fmt ois =
     pp_list ",@ " (pp_orclinfo ppe) fmt (Msym.bindings ois) in
   let pp_top fmt b =
-    if b then Format.fprintf fmt "+Top" else () in
+    if b then Format.fprintf fmt "+all mem" else () in
 
   let printed = ref @@ EcPath.Sx.is_empty mr.mr_xpaths.ur_neg in
   let pp_sep fmt b =

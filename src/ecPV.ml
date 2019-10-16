@@ -60,7 +60,7 @@ end
 module Mpv = struct
   type ('a, 'b) t =
     { s_pv : 'a Mnpv.t;
-      s_gl : (EcEnv.use * 'b) Mm.t;  (* only abstract module *)
+      s_gl : (use use_restr * 'b) Mm.t;  (* only abstract module *)
     }
 
   let empty = { s_pv = Mnpv.empty; s_gl = Mm.empty }
@@ -641,19 +641,18 @@ module Mpv2 = struct
         let x = pv.pv_name in
         let check_mp mp =
           let restr = NormMp.get_restr_use env mp in
-          not (EcPath.Mx.mem x restr.us_pv) in
+          not (NormMp.use_mem_xp x restr) in
         Sm.exists check_mp mod_.PV.s_gl
       else false
 
   let is_mod_mp env mp mod_ =
-    let id = EcPath.mget_ident mp in
     let restr = NormMp.get_restr_use env mp in
     let check_v pv _ty =
       let x = pv.pv_name in
-      not (EcPath.Mx.mem x restr.us_pv) in
+      not (NormMp.use_mem_xp x restr) in
     let check_mp mp' =
-      not (Sid.mem (EcPath.mget_ident mp') restr.us_gl ||
-           Sid.mem id (NormMp.get_restr_use env mp').us_gl) in
+      not (NormMp.use_mem_gl mp' restr ||
+           NormMp.use_mem_gl mp (NormMp.get_restr_use env mp')) in
     Mnpv.exists check_v mod_.PV.s_pv ||
     Sm.exists check_mp mod_.PV.s_gl
 

@@ -216,9 +216,11 @@ type restriction_error = restriction_who * restriction_err
 
 exception RestrictionError of EcEnv.env * restriction_error
 
+(* This only checks the variables restrictions, not the oracle calls. *)
 val check_restrictions_fun :
   env -> xpath -> mod_restr -> unit
 
+(* This only checks the variables restrictions, not the oracle calls. *)
 val check_modtype_with_restrictions :
   env -> mpath -> module_sig -> module_type -> unit
 

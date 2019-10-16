@@ -42,9 +42,11 @@ module Mpv : sig
 
   val empty : ('a,'b) t
 
-  val check_npv_mp : env -> prog_var -> mpath -> EcEnv.use -> unit
+  val check_npv_mp :
+    env -> prog_var -> mpath -> use use_restr -> unit
 
-  val check_mp_mp : env -> mpath -> EcEnv.use -> mpath -> EcEnv.use -> unit
+  val check_mp_mp :
+    env -> mpath -> use use_restr -> mpath -> use use_restr -> unit
 
   val check_npv : env -> prog_var -> ('a,'b) t -> unit
 

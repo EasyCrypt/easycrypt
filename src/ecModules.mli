@@ -126,6 +126,7 @@ type 'a use_restr = {
   ur_neg : 'a;          (* Cannot use element in this set. *)
 }
 
+val ur_empty : 'a -> 'a use_restr
 val ur_app   : ('a -> 'b) -> 'a use_restr -> 'b use_restr
 val ur_equal : ('a -> 'a -> bool) -> 'a use_restr -> 'a use_restr -> bool
 
@@ -158,8 +159,15 @@ type mod_restr = {
 
 val mr_empty : mod_restr
 val mr_hash  : mod_restr -> int
-val mr_union : mod_restr -> mod_restr -> mod_restr
 val mr_equal : mod_restr -> mod_restr -> bool
+
+val mr_add_restr :
+  mod_restr -> EcPath.Sx.t use_restr -> EcPath.Sm.t use_restr -> mod_restr
+
+(* [mr_union mr1 mr2]
+   This computes the union of [mr1] and [mr2], in the sense that the resulting
+   restriction is more restrictive that both [mr1] and [mr2]. *)
+val mr_union : mod_restr -> mod_restr -> mod_restr
 
 val add_oinfo      : mod_restr -> string -> xpath list -> bool -> mod_restr
 val change_oicalls : mod_restr -> string -> xpath list -> mod_restr

@@ -656,22 +656,15 @@ let check_sig_mt_cnv env sym_in sin tyout =
 
 (* -------------------------------------------------------------------- *)
 
-(* This only checks the variables restricitons, not the oracle calls. *)
+(* This only checks the variables restrictions, not the oracle calls. *)
 let check_restrictions env who use restr =
   let re_error = fun env x -> raise (RestrictionError (env, (who, x))) in
 
   let restr = NormMp.restr_use env restr in
 
-  let forbidden x restr =
-    let bneg = NormMp.use_mem_xp x restr.ur_neg
-    and bpos = match restr.ur_pos with
-      | None -> false
-      | Some sp -> not (NormMp.use_mem_xp x sp) in
-    bneg || bpos in
-
   let check_xp xp _ =
     (* We check that the variable is not forbidden in [restr]. *)
-    if forbidden xp restr then
+    if NormMp.use_mem_xp xp restr then
       re_error env (RE_UseVariable xp);
 
     (* We check that the variable is forbidden in all abstract modules forbidden
@@ -683,33 +676,26 @@ let check_restrictions env who use restr =
       let mp2 = EcPath.mident id2 in
       let r2  = NormMp.get_restr_use env mp2 in
 
-      if not (forbidden xp r2) then
+      if not (NormMp.use_mem_xp xp r2) then
         re_error env (RE_UseVariableViaModule (xp, mp2));
     in
       EcIdent.Sid.iter check restr.ur_neg.EcEnv.us_gl
   in
   EcPath.Mx.iter check_xp (use.EcEnv.us_pv);
 
-  let forbidden_m m restr =
-    let bneg = NormMp.use_mem_gl m restr.ur_neg
-    and bpos = match restr.ur_pos with
-      | None -> false
-      | Some sp -> not (NormMp.use_mem_gl m sp) in
-    bneg || bpos in
-
   (* We check that every abstract module [id] in [use.us_gl] satisfies the
      restrictions in [restr]. *)
   let check_gl id =
     let mp1 = EcPath.mident id in
 
-    if forbidden_m mp1 restr then
+    if NormMp.use_mem_gl mp1 restr then
       re_error env (RE_UseModule mp1);
 
     let r1 = NormMp.get_restr_use env mp1 in
 
     (* We check that everything forbidden in [restr] is forbidden in [id]. *)
     let n_check_v xp2 _ =
-      if not (forbidden xp2 r1) then
+      if not (NormMp.use_mem_xp xp2 r1) then
         re_error env (RE_VMissingRestriction (xp2, (xp2.x_top, mp1)))
     in
     Mx.iter n_check_v restr.ur_neg.EcEnv.us_pv;
@@ -723,7 +709,7 @@ let check_restrictions env who use restr =
           re_error env (RE_ModuleUnrestricted (mp1))
       | Some ur1 ->
         let p_check_v xp2 _ =
-          if not (forbidden xp2 restr) then
+          if not (NormMp.use_mem_xp xp2 restr) then
             re_error env (RE_UseVariableViaModule (xp2, mp1))
         in
         Mx.iter p_check_v ur1.EcEnv.us_pv
@@ -737,9 +723,9 @@ let check_restrictions env who use restr =
     let check_g id2 =
       let mp2 = EcPath.mident id2 in
 
-      if not (NormMp.use_mem_gl mp2 r1.ur_neg) then
+      if not (NormMp.use_mem_gl mp2 r1) then
         let r2 = NormMp.get_restr_use env mp2 in
-        if not (NormMp.use_mem_gl mp1 r2.ur_neg) then
+        if not (NormMp.use_mem_gl mp1 r2) then
           re_error env (RE_MMissingRestriction (mp1, (mp1, mp2)));
     in
     EcIdent.Sid.iter check_g restr.ur_neg.EcEnv.us_gl
@@ -747,6 +733,7 @@ let check_restrictions env who use restr =
   in
   EcIdent.Sid.iter check_gl use.EcEnv.us_gl
 
+(* This only checks the variables restrictions, not the oracle calls. *)
 let check_restrictions_fun env xp restr =
   let use = NormMp.fun_use env xp in
   check_restrictions env (RW_fun xp) use restr

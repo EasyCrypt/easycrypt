@@ -1364,7 +1364,10 @@ module Mod = struct
             Sx.add x rx
           else rx in
         Mx.fold add use.EcEnv.us_pv EcPath.Sx.empty in
-      EcEnv.Mod.add_restr_to_locals { mr_empty with mr_xpaths = rx } env
+      EcEnv.Mod.add_restr_to_locals
+        { (ur_empty Sx.empty) with ur_neg = rx }
+        (ur_empty Sm.empty)
+        env
 
   let bind (scope : scope) (local : bool) (m : module_expr) =
     assert (scope.sc_pr_uc = None);
@@ -1427,10 +1430,13 @@ module Mod = struct
     let modty = m.ptmd_modty in
     let tysig = fst (TT.transmodtype scope.sc_env (fst modty)) in
     let restr = List.map (TT.trans_topmsymbol scope.sc_env) (snd modty) in
+    let n_m_restr = { (ur_empty Sm.empty) with ur_neg = (Sm.of_list restr) } in
     let name  = EcIdent.create (unloc m.ptmd_name) in
 
-    let xps = Sx.empty
-    and mps = Sm.union tysig.mt_restr.mr_mpaths (Sm.of_list restr) in
+    let xps = ur_empty Sx.empty
+    and mps =
+      ur_union Sm.union Sm.inter
+        tysig.mt_restr.mr_mpaths n_m_restr in
     let tysig = { tysig with
                   mt_restr = { tysig.mt_restr with
                                mr_xpaths = xps;

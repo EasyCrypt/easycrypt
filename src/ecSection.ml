@@ -154,11 +154,19 @@ let on_mpath_memenv cb (m : EcMemory.memenv) =
   | None    -> ()
   | Some lm -> on_mpath_lcmem cb lm
 
+let on_mpath_restr cb restr =
+  Sx.iter (fun x -> cb x.x_top) restr.mr_xpaths.ur_neg;
+  oiter (Sx.iter (fun x -> cb x.x_top)) restr.mr_xpaths.ur_pos;
+  Sm.iter cb restr.mr_mpaths.ur_neg;
+  oiter (Sm.iter cb) restr.mr_mpaths.ur_pos;
+  Msym.iter (fun _ oi ->
+      List.iter (fun x -> cb x.x_top) oi.oi_calls
+    ) restr.mr_oinfos
+
 let rec on_mpath_modty cb mty =
   List.iter (fun (_, mty) -> on_mpath_modty cb mty) mty.mt_params;
   List.iter cb mty.mt_args;
-  Sx.iter (fun x -> cb x.x_top) mty.mt_restr.mr_xpaths;
-  Sm.iter cb mty.mt_restr.mr_mpaths
+  on_mpath_restr cb mty.mt_restr
 
 let on_mpath_gbinding cb b =
   match b with
@@ -259,8 +267,12 @@ let rec on_mpath_module cb (me : module_expr) =
   | ME_Alias (_, mp)  -> cb mp
   | ME_Structure st   ->
     on_mpath_mstruct cb st;
-    EcSymbols.Msym.iter (fun _ oi -> on_mpath_fun_oi cb oi)
-      me.me_sig.mis_restr.mr_oinfos
+    on_mpath_restr cb me.me_sig.mis_restr
+  (* TODO: (Adrien) is this what we want? *)
+  (* on_mpath_restr cb me.me_sig.mis_restr *)
+    (* EcSymbols.Msym.iter (fun _ oi -> on_mpath_fun_oi cb oi)
+     *   me.me_sig.mis_restr.mr_oinfos *)
+
   | ME_Decl mty -> on_mpath_mdecl cb mty
 
 and on_mpath_mdecl cb mty =

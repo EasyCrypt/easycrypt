@@ -31,10 +31,12 @@ module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 let check_oracle_use (_pf : proofenv) env adv o =
-  (* TODO: (Adrien) maybe do this differently? *)
-  EcTyping.check_restrictions_fun env o { mr_xpaths = Sx.empty;
-                                          mr_mpaths = Sm.singleton adv;
-                                          mr_oinfos = EcSymbols.Msym.empty; }
+  let restr = { mr_empty with
+                mr_mpaths = { mr_empty.mr_mpaths with
+                              ur_neg = Sm.singleton adv; }} in
+
+  (* This only checks the variables restrictions, not the oracle calls. *)
+  EcTyping.check_restrictions_fun env o restr
 
 let check_concrete pf env f =
   if NormMp.is_abstract_fun f env then
@@ -46,15 +48,17 @@ let check_concrete pf env f =
 
 (* -------------------------------------------------------------------- *)
 let lossless_hyps env top sub =
+  let clear_to_top restr =
+    let mr_mpaths = { (ur_empty Sm.empty) with ur_neg = Sm.singleton top } in
+    { restr with mr_xpaths = ur_empty Sx.empty;
+                 mr_mpaths = mr_mpaths } in
+
   let sig_ = (EcEnv.Mod.by_mpath top env).me_sig in
   let bd =
     List.map
-      (fun (id, mt) -> (id,
-                        GTmodty { mt with
-                                  mt_restr = { mt.mt_restr with
-                                               mr_xpaths = Sx.empty;
-                                               mr_mpaths = Sm.singleton top }}))
-      sig_.mis_params
+      (fun (id, mt) ->
+         (id, GTmodty { mt with mt_restr = clear_to_top mt.mt_restr } )
+      ) sig_.mis_params
   in
   (* WARN: this implies that the oracle do not have access to top *)
   let args  = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
