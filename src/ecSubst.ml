@@ -147,12 +147,12 @@ let subst_funsig (s : _subst) (funsig : funsig) =
 
 (* -------------------------------------------------------------------- *)
 let subst_mod_restr (s : _subst) (mr : mod_restr) =
-  let rx = EcPath.Sx.fold (fun x r ->
+  let rx = ur_app (fun set -> EcPath.Sx.fold (fun x r ->
       EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r
-    ) mr.mr_xpaths EcPath.Sx.empty in
-  let r = EcPath.Sm.fold (fun x r ->
+    ) set EcPath.Sx.empty) mr.mr_xpaths in
+  let r = ur_app (fun set -> EcPath.Sm.fold (fun x r ->
       EcPath.Sm.add (s.s_fmp x) r
-    ) mr.mr_mpaths EcPath.Sm.empty in
+    ) set EcPath.Sm.empty) mr.mr_mpaths in
   let ois = EcSymbols.Msym.map (fun oi ->
       subst_oracle_info s oi) mr.mr_oinfos in
   { mr_xpaths = rx; mr_mpaths = r; mr_oinfos = ois }

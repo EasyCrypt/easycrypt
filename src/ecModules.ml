@@ -534,6 +534,38 @@ type funsig = {
 }
 
 (* -------------------------------------------------------------------- *)
+type 'a use_restr = {
+  ur_pos : 'a option;   (* If not None, can use only element in this set. *)
+  ur_neg : 'a;          (* Cannot use element in this set. *)
+}
+
+let ur_app f a =
+  { ur_pos = (omap f) a.ur_pos;
+    ur_neg = f a.ur_neg; }
+
+let ur_empty emp = { ur_pos = None; ur_neg = emp; }
+
+let ur_pos_subset subset ur1 ur2 = match ur1,ur2 with
+  | _, None -> true             (* Indeed, [None] means everybody. *)
+  | None, Some _ -> false
+  | Some s1, Some s2 -> subset s1 s2
+
+let ur_equal (equal : 'a -> 'a -> bool) ur1 ur2 =
+  equal ur1.ur_neg ur2.ur_neg
+  && (opt_equal equal) ur1.ur_pos ur2.ur_pos
+
+(* Union for negative restrictions, intersection for positive ones.
+   [None] stands for everybody. *)
+let ur_union union inter ur1 ur2 =
+  let ur_pos = match ur1.ur_pos, ur2.ur_pos with
+    | None, None -> None
+    | None, Some s | Some s, None -> Some s
+    | Some s1, Some s2 -> some @@ inter s1 s2 in
+
+  { ur_pos = ur_pos;
+    ur_neg = union ur1.ur_neg ur2.ur_neg; }
+
+(* -------------------------------------------------------------------- *)
 type oracle_info = {
   oi_calls : xpath list;
   oi_in    : bool;
@@ -545,22 +577,32 @@ let oi_equal oi1 oi2 =
      oi1.oi_in = oi2.oi_in
   && List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
 
+(* -------------------------------------------------------------------- *)
 type mod_restr = {
-  mr_xpaths : EcPath.Sx.t;
-  mr_mpaths : EcPath.Sm.t;
+  mr_xpaths : EcPath.Sx.t use_restr;
+  mr_mpaths : EcPath.Sm.t use_restr;
   mr_oinfos : oracle_info Msym.t;
 }
 
 let mr_empty = {
-  mr_xpaths = EcPath.Sx.empty;
-  mr_mpaths = EcPath.Sm.empty;
+  mr_xpaths = ur_empty EcPath.Sx.empty;
+  mr_mpaths = ur_empty EcPath.Sm.empty;
   mr_oinfos = Msym.empty;
 }
 
 let mr_equal mr1 mr2 =
-     EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
-  && EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
+  ur_equal EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
+  && ur_equal EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
   && Msym.equal oi_equal mr1.mr_oinfos mr2.mr_oinfos
+
+let mr_union mr1 mr2 =
+  { mr_xpaths = ur_union Sx.union Sx.inter mr1.mr_xpaths mr2.mr_xpaths;
+    mr_mpaths = ur_union Sm.union Sm.inter mr1.mr_mpaths mr2.mr_mpaths;
+    mr_oinfos = Msym.union (fun _ oi1 oi2 ->
+        Some { oi_calls = List.sort_uniq
+                   EcPath.x_compare (oi1.oi_calls @ oi2.oi_calls);
+               oi_in = oi1.oi_in || oi2.oi_in; }
+      ) mr1.mr_oinfos mr2.mr_oinfos; }
 
 let add_oinfo restr f ocalls oin =
   { restr with
@@ -684,10 +726,10 @@ let oi_subst sx oi =
   }
 
 let mr_subst sx sm mr =
-  { mr_xpaths = Sx.fold (fun m rx ->
-        Sx.add (sx m) rx) mr.mr_xpaths Sx.empty;
-    mr_mpaths = Sm.fold (fun m r ->
-        Sm.add (sm m) r) mr.mr_mpaths Sm.empty;
+  { mr_xpaths = ur_app (fun s -> Sx.fold (fun m rx ->
+        Sx.add (sx m) rx) s Sx.empty) mr.mr_xpaths;
+    mr_mpaths = ur_app (fun s -> Sm.fold (fun m r ->
+        Sm.add (sm m) r) s Sm.empty) mr.mr_mpaths;
     mr_oinfos = Msym.map (fun oi -> oi_subst sx oi) mr.mr_oinfos;
   }
 
@@ -704,12 +746,18 @@ let oi_hash oi =
     (Why3.Hashcons.combine_list EcPath.x_hash 0
        (List.sort EcPath.x_compare oi.oi_calls))
 
+let ur_hash elems el_hash ur =
+  Why3.Hashcons.combine
+    (Why3.Hashcons.combine_option
+       (fun l -> Why3.Hashcons.combine_list el_hash 0 (elems l))
+       ur.ur_pos)
+    (Why3.Hashcons.combine_list el_hash 0
+       (elems ur.ur_neg))
+
 let mr_hash mr =
   Why3.Hashcons.combine2
-    (Why3.Hashcons.combine_list EcPath.x_hash 0
-       (EcPath.Sx.ntr_elements mr.mr_xpaths))
-    (Why3.Hashcons.combine_list EcPath.m_hash 0
-       (EcPath.Sm.ntr_elements mr.mr_mpaths))
+    (ur_hash EcPath.Sx.ntr_elements EcPath.x_hash mr.mr_xpaths)
+    (ur_hash EcPath.Sm.ntr_elements EcPath.m_hash mr.mr_mpaths)
     (Why3.Hashcons.combine_list
        (Why3.Hashcons.combine_pair Hashtbl.hash oi_hash) 0
        (EcSymbols.Msym.bindings mr.mr_oinfos

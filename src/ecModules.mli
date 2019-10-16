@@ -121,6 +121,22 @@ type funsig = {
 }
 
 (* -------------------------------------------------------------------- *)
+type 'a use_restr = {
+  ur_pos : 'a option;   (* If not None, can use only element in this set. *)
+  ur_neg : 'a;          (* Cannot use element in this set. *)
+}
+
+val ur_app   : ('a -> 'b) -> 'a use_restr -> 'b use_restr
+val ur_equal : ('a -> 'a -> bool) -> 'a use_restr -> 'a use_restr -> bool
+
+(* Correctly handles the [None] cases for subset comparison. *)
+val ur_pos_subset : ('a -> 'a -> bool) -> 'a option -> 'a option -> bool
+val ur_union :
+  ('a -> 'a -> 'a) ->
+  ('a -> 'a -> 'a) ->
+  'a use_restr -> 'a use_restr -> 'a use_restr
+
+(* -------------------------------------------------------------------- *)
 (* [oi_calls]: The list of oracle that can be called
  * [oi_in]: true if equality of globals is required to ensure
  * equality of result and globals
@@ -133,15 +149,18 @@ type oracle_info = {
 val oi_empty : oracle_info
 val oi_hash  : oracle_info -> int
 
+(* -------------------------------------------------------------------- *)
 type mod_restr = {
-  mr_xpaths : EcPath.Sx.t;
-  mr_mpaths : EcPath.Sm.t;
+  mr_xpaths : EcPath.Sx.t use_restr;
+  mr_mpaths : EcPath.Sm.t use_restr;
   mr_oinfos : oracle_info Msym.t;
 }
 
-val mr_equal       : mod_restr -> mod_restr -> bool
-val mr_hash        : mod_restr -> int
-val mr_empty       : mod_restr
+val mr_empty : mod_restr
+val mr_hash  : mod_restr -> int
+val mr_union : mod_restr -> mod_restr -> mod_restr
+val mr_equal : mod_restr -> mod_restr -> bool
+
 val add_oinfo      : mod_restr -> string -> xpath list -> bool -> mod_restr
 val change_oicalls : mod_restr -> string -> xpath list -> mod_restr
 val oicalls_filter :

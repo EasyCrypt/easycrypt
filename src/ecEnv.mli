@@ -232,10 +232,11 @@ module NormMp : sig
   val norm_pvar     : env -> EcTypes.prog_var -> EcTypes.prog_var
   val norm_form     : env -> form -> form
   val mod_use       : env -> mpath -> use
+  val item_use      : env -> mpath -> module_comps_item -> use
   val fun_use       : env -> xpath -> use
-  val restr_use     : env -> mod_restr  -> use
+  val restr_use     : env -> mod_restr -> use use_restr
   val equal_restr   : env -> mod_restr -> mod_restr -> bool
-  val get_restr_use : env -> mpath -> use
+  val get_restr_use : env -> mpath -> use use_restr
   val get_oicalls   : env -> xpath -> oracle_info
   val use_mem_xp    : xpath -> use -> bool
   val use_mem_gl    : mpath -> use -> bool

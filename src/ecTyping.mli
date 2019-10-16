@@ -32,14 +32,25 @@ type mismatch_funsig =
 | MF_tres  of ty * ty (* expected, got *)
 | MF_restr of EcEnv.env * Sx.t mismatch_sets
 
-type 'a mismatch_restr = [`Eq of 'a * 'a | `Sub of 'a ]
+type 'a mismatch_restr = [
+  | `Eq of 'a * 'a
+  | `OEq of 'a option * 'a option
+  | `Sub of 'a
+  | `RevSub of 'a
+]
+
 
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
-| E_TyModCnv_MismatchVarRestr  of symbol * Sx.t mismatch_sets
-| E_TyModCnv_MismatchModRestr  of symbol * Sm.t mismatch_sets
+
+(* [bool] is true iff the positive restriction failed *)
+| E_TyModCnv_MismatchVarRestr  of symbol * bool * Sx.t mismatch_restr
+
+(* [bool] is true iff the positive restriction failed *)
+| E_TyModCnv_MismatchModRestr  of symbol * bool * Sm.t mismatch_restr
+
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
 | E_TyModCnv_SubTypeArg        of
     EcIdent.t * module_type * module_type * tymod_cnv_failure
@@ -194,11 +205,12 @@ type restriction_who =
 | RW_fun of EcPath.xpath
 
 type restriction_err =
-| RE_UseVariable          of EcPath.xpath
-| RE_UseVariableViaModule of EcPath.xpath * EcPath.mpath
-| RE_UseModule            of EcPath.mpath
-| RE_VMissingRestriction  of EcPath.xpath * EcPath.mpath pair
-| RE_MMissingRestriction  of EcPath.mpath * EcPath.mpath pair
+| RE_UseVariable               of EcPath.xpath
+| RE_UseVariableViaModule      of EcPath.xpath * EcPath.mpath
+| RE_UseModule                 of EcPath.mpath
+| RE_VMissingRestriction       of EcPath.xpath * EcPath.mpath pair
+| RE_MMissingRestriction       of EcPath.mpath * EcPath.mpath pair
+| RE_ModuleUnrestricted        of EcPath.mpath
 
 type restriction_error = restriction_who * restriction_err
 

@@ -66,7 +66,14 @@ end = struct
     let msg x = Format.fprintf fmt x in
 
     let ppe = EcPrinting.PPEnv.ofenv env in
-    let pp_v fmt xp = EcPrinting.pp_pv ppe fmt (pv_glob xp) in
+    let pp_v b fmt xp =
+      Format.fprintf fmt "%a%a"
+        EcPrinting.pp_restr_s b
+        (EcPrinting.pp_pv ppe) (pv_glob xp) in
+    let pp_m b fmt m =
+      Format.fprintf fmt "%a%a"
+        EcPrinting.pp_restr_s b
+        (EcPrinting.pp_topmod ppe) m in
 
     match error with
     | E_TyModCnv_ParamCountMismatch ->
@@ -79,29 +86,63 @@ end = struct
     | E_TyModCnv_MissingComp x ->
         msg "procedure `%s' is missing" x
 
-    | E_TyModCnv_MismatchVarRestr (x,`Sub xs) ->
+    | E_TyModCnv_MismatchVarRestr (x,b,`Sub xs) ->
       msg "the module `%s' is not allowed to use the variable(s)@ %a"
-        x (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xs)
+        x (EcPrinting.pp_list " and@ " (pp_v b)) (Sx.ntr_elements xs)
 
-    | E_TyModCnv_MismatchVarRestr (x,`Eq (xl,xr)) ->
+    | E_TyModCnv_MismatchVarRestr (x,b,`RevSub xs) ->
+      msg "the module `%s' is only allowed to use the variable(s)@ %a"
+        x (EcPrinting.pp_list " and@ " (pp_v b)) (Sx.ntr_elements xs)
+
+    | E_TyModCnv_MismatchVarRestr (x,b,`Eq (xl,xr)) ->
       msg "the module `%s' variable restriction@ %a@ \
            is not compatible with the variable restriction@ %a" x
-        (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xl)
-        (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xr)
+        (EcPrinting.pp_list " and@ " (pp_v b)) (Sx.ntr_elements xl)
+        (EcPrinting.pp_list " and@ " (pp_v b)) (Sx.ntr_elements xr)
 
-    | E_TyModCnv_MismatchModRestr (x,`Sub ms) ->
-      let ppe = EcPrinting.PPEnv.ofenv env in
+    | E_TyModCnv_MismatchVarRestr (x,true,`OEq (xl,xr)) ->
+      let pp_sx_p fmt = function
+        | None -> Format.fprintf fmt "%aTop" EcPrinting.pp_restr_s true
+        | Some sx ->
+          EcPrinting.pp_list " and@ " (pp_v true) fmt (Sx.ntr_elements sx) in
+
+      msg "the module `%s' variable restriction@ %a@ \
+           is not compatible with the variable restriction@ %a" x
+        pp_sx_p xl
+        pp_sx_p xr
+
+    | E_TyModCnv_MismatchVarRestr (_,false,`OEq (_,_)) -> assert false
+
+    | E_TyModCnv_MismatchModRestr (x,b,`Sub ms) ->
       msg "the module `%s' is not allowed to use the modules(s)@ %a" x
-        (EcPrinting.pp_list " and@ " (EcPrinting.pp_topmod ppe))
+        (EcPrinting.pp_list " and@ " (pp_m b))
         (Sm.ntr_elements ms)
 
-    | E_TyModCnv_MismatchModRestr (x,`Eq (xl,xr)) ->
+    | E_TyModCnv_MismatchModRestr (x,b,`RevSub ms) ->
+      msg "the module `%s' is only allowed to use the modules(s)@ %a" x
+        (EcPrinting.pp_list " and@ " (pp_m b))
+        (Sm.ntr_elements ms)
+
+    | E_TyModCnv_MismatchModRestr (x,b,`Eq (xl,xr)) ->
       msg "the module `%s' module restriction@ %a@ \
            is not compatible with the module restriction@ %a" x
-        (EcPrinting.pp_list " and@ " (EcPrinting.pp_topmod ppe))
+        (EcPrinting.pp_list " and@ " (pp_m b))
         (Sm.ntr_elements xl)
-        (EcPrinting.pp_list " and@ " (EcPrinting.pp_topmod ppe))
+        (EcPrinting.pp_list " and@ " (pp_m b))
         (Sm.ntr_elements xr)
+
+    | E_TyModCnv_MismatchModRestr (x,true,`OEq (xl,xr)) ->
+      let pp_sm_p fmt = function
+        | None -> Format.fprintf fmt "%aTop" EcPrinting.pp_restr_s true
+        | Some sm ->
+          EcPrinting.pp_list " and@ " (pp_m true) fmt (Sm.ntr_elements sm) in
+
+      msg "the module `%s' module restriction@ %a@ \
+           is not compatible with the module restriction@ %a" x
+        pp_sm_p xl
+        pp_sm_p xr
+
+    | E_TyModCnv_MismatchModRestr (_,false,`OEq (_,_)) -> assert false
 
     | E_TyModCnv_MismatchFunSig (x,err) ->
         msg "procedure `%s' is not compatible: %a"
@@ -416,6 +457,11 @@ end = struct
           Format.fprintf fmt
             "should not be able to use %a, add restriction %a to %a or %a to %a"
             pp_m m pp_m m1 pp_m m2 pp_m m2 pp_m m1
+
+      | RE_ModuleUnrestricted m ->
+          Format.fprintf fmt
+            "%a should not be unrestricted"
+            pp_m m
 
     in Format.fprintf fmt "%a %a" pp_restriction_who w pp_restriction_err e
 end

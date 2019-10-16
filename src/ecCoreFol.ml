@@ -159,12 +159,17 @@ let gty_hash = function
 
 let mr_fv mr =
   EcPath.Sm.fold (fun mp fv ->
-      EcPath.m_fv fv mp
-    ) mr.mr_mpaths EcIdent.Mid.empty
+      EcPath.m_fv fv mp)
+    (Sm.union
+       mr.mr_mpaths.ur_neg
+       (EcUtils.odfl Sm.empty mr.mr_mpaths.ur_pos))
+    EcIdent.Mid.empty
 
   |> EcPath.Sx.fold (fun xp fv ->
-      EcPath.x_fv fv xp
-    ) mr.mr_xpaths
+      EcPath.x_fv fv xp)
+    (Sx.union
+       mr.mr_xpaths.ur_neg
+       (EcUtils.odfl Sx.empty mr.mr_xpaths.ur_pos))
 
   |> EcSymbols.Msym.fold (fun _ oi fv ->
       List.fold_left EcPath.x_fv fv oi.oi_calls

@@ -124,7 +124,7 @@ type env_norm = {
   norm_xpv      : EcPath.xpath Mx.t;   (* for global program variable *)
   norm_xfun     : EcPath.xpath Mx.t;   (* for fun and local program variable *)
   mod_use       : use Mm.t;
-  get_restr_use : use Mm.t;
+  get_restr_use : (use EcModules.use_restr) Mm.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1951,22 +1951,11 @@ module Mod = struct
 
   let add_restr_to_locals (restr : mod_restr) env =
 
-    let union_restr mr1 mr2 =
-      { mr_xpaths = Sx.union mr1.mr_xpaths mr2.mr_xpaths;
-        mr_mpaths = Sm.union mr1.mr_mpaths mr2.mr_mpaths;
-        mr_oinfos = Msym.union (fun _ oi1 oi2 ->
-            Some { oi_calls = List.sort_uniq
-                       EcPath.x_compare (oi1.oi_calls @ oi2.oi_calls);
-                   oi_in = oi1.oi_in || oi2.oi_in; }
-          ) mr1.mr_oinfos mr2.mr_oinfos;
-      }
-    in
-
     let update_id id mods =
       let update me =
         match me.me_body with
         | ME_Decl mt ->
-          let mr = union_restr restr mt.mt_restr in
+          let mr = mr_union restr mt.mt_restr in
           { me with me_body = ME_Decl { mt with mt_restr = mr } }
         | _ -> me
       in
@@ -2155,6 +2144,7 @@ module NormMp = struct
       us_gl = Sid.union us1.us_gl us2.us_gl; }
 
   let use_mem_xp xp us = Mx.mem xp us.us_pv
+
   let use_mem_gl mp us =
     assert (mp.m_args = []);
     match mp.m_top with
@@ -2202,7 +2192,33 @@ module NormMp = struct
   let fun_use env xp =
     gen_fun_use env (ref Sx.empty) Sid.empty use_empty xp
 
-  let mod_use env mp =
+  (* The four functions below are used in mod_use_top and item_use_top. *)
+  let rec mod_use env rm fdone us mp =
+    let mp = norm_mpath env mp in
+    let me = Mod.by_mpath mp env in
+    assert (me.me_sig.mis_params = []);
+    body_use env rm fdone mp us me.me_comps me.me_body
+
+  and item_use env rm fdone mp us item =
+    match item with
+    | MI_Module me -> mod_use env rm fdone us (EcPath.mqname mp me.me_name)
+    | MI_Variable v -> add_var env (xpath_fun mp v.v_name) us
+    | MI_Function f -> fun_use_aux env rm fdone us (xpath_fun mp f.f_name)
+
+  and body_use env rm fdone mp us comps body =
+    match body with
+    | ME_Alias _ -> assert false
+    | ME_Decl _ ->
+      let id = match mp.m_top with `Local id -> id | _ -> assert false in
+      let us = add_glob_except rm id us in
+      List.fold_left (item_use env rm fdone mp) us comps
+    | ME_Structure ms ->
+      List.fold_left (item_use env rm fdone mp) us ms.ms_body
+
+  and fun_use_aux env rm fdone us f =
+    gen_fun_use env fdone rm us f
+
+  let mod_use_top env mp =
     let mp = norm_mpath env mp in
     let me = Mod.by_mpath mp env in
     let params = me.me_sig.mis_params in
@@ -2213,44 +2229,33 @@ module NormMp = struct
     let mp' =
       EcPath.m_apply mp (List.map (fun (id,_) -> EcPath.mident id) params) in
 
-    let rec mod_use us mp =
-      let mp = norm_mpath env' mp in
-      let me = Mod.by_mpath mp env' in
-      assert (me.me_sig.mis_params = []);
-      body_use mp us me.me_comps me.me_body
+    let fdone = ref Sx.empty in
 
-    and body_use mp us comps body =
-      match body with
-      | ME_Alias _ -> assert false
-      | ME_Decl _ ->
-        let id = match mp.m_top with `Local id -> id | _ -> assert false in
-        let us = add_glob_except rm id us in
-        List.fold_left (item_use mp) us comps
-      | ME_Structure ms ->
-        List.fold_left (item_use mp) us ms.ms_body
-
-    and item_use mp us item =
-      match item with
-      | MI_Module me -> mod_use us (EcPath.mqname mp me.me_name)
-      | MI_Variable v -> add_var env' (xpath_fun mp v.v_name) us
-      | MI_Function f -> fun_use us (xpath_fun mp f.f_name)
-
-    and fun_use us f =
-      let fdone = ref Sx.empty in
-      gen_fun_use env' fdone rm us f in
-
-    mod_use use_empty mp'
+    mod_use env' rm fdone use_empty mp'
 
   let mod_use env mp =
     try Mm.find mp !(env.env_norm).mod_use with Not_found ->
-      let res = mod_use env mp in
+      let res = mod_use_top env mp in
       let en = !(env.env_norm) in
       env.env_norm := { en with mod_use = Mm.add mp res en.mod_use };
       res
 
+  let item_use env mp item =
+    item_use env Sid.empty (ref Sx.empty) mp use_empty item
+
   let restr_use env (mr : mod_restr) =
-    Sx.fold (fun xp r -> add_var env xp r) mr.mr_xpaths use_empty
-    |> Sm.fold (fun mp r -> use_union r (mod_use env mp)) mr.mr_mpaths
+    let get_use sx sm =
+      Sx.fold (fun xp r -> add_var env xp r) sx use_empty
+      |> Sm.fold (fun mp r -> use_union r (mod_use env mp)) sm in
+
+    (* If any of the two positive restrictions is [None], then anything is
+       allowed. *)
+    let ur_pos = match mr.mr_xpaths.ur_pos, mr.mr_mpaths.ur_pos with
+      | None, _ | _, None -> None
+      | Some sx, Some sm -> some @@ get_use sx sm in
+
+    { ur_pos = ur_pos;
+      ur_neg = get_use mr.mr_xpaths.ur_neg mr.mr_mpaths.ur_neg; }
 
   let get_restr_use env mp =
     try Mm.find mp !(env.env_norm).get_restr_use with Not_found ->
@@ -2264,7 +2269,8 @@ module NormMp = struct
       res
 
   let equal_restr env r1 r2 =
-    use_equal (restr_use env r1) (restr_use env r2)
+    let us1,us2 = restr_use env r1, restr_use env r2 in
+    ur_equal use_equal us1 us2
     && Msym.fold2_union (fun _ oi1 oi2 beq -> match oi1,oi2 with
         | None,_ | _,None -> false
         | Some oi1, Some oi2 ->

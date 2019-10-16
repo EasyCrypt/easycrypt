@@ -525,40 +525,52 @@ let get_e_projarg ppe e i =
 
 (* -------------------------------------------------------------------- *)
 let pp_orclinfo ppe fmt (sym, oi) =
-  Format.fprintf fmt "<%s%a : @[%a@]>"
+  Format.fprintf fmt "@[<h><%s%a : %a>@]"
     (if oi.oi_in then "" else " *")
     pp_symbol sym
     (pp_list "@ " (pp_funname ppe)) oi.oi_calls
 
 (* -------------------------------------------------------------------- *)
+let pp_restr_s fmt = function
+  | true -> Format.fprintf fmt "+"
+  | false -> Format.fprintf fmt "-"
+
 let pp_restr ppe fmt mr =
-  let pp_rx fmt rx =
-    let pp_x fmt x = pp_pv ppe fmt (pv_glob x) in
+  let pp_rx sign fmt rx =
+    let pp_x fmt x =
+      Format.fprintf fmt "%a%a" pp_restr_s sign (pp_pv ppe) (pv_glob x) in
     pp_list ",@ " pp_x fmt (EcPath.Sx.elements rx) in
-  let pp_r fmt r =
-    pp_list ",@ " (pp_topmod ppe) fmt (EcPath.Sm.elements r) in
+  let pp_r sign fmt r =
+    let pp_m fmt m =
+      Format.fprintf fmt "%a%a" pp_restr_s sign (pp_topmod ppe) m in
+    pp_list ",@ " pp_m fmt (EcPath.Sm.elements r) in
   let pp_ois fmt ois =
     pp_list ",@ " (pp_orclinfo ppe) fmt (Msym.bindings ois) in
+  let pp_top fmt b =
+    if b then Format.fprintf fmt "+Top" else () in
+
+  let printed = ref @@ EcPath.Sx.is_empty mr.mr_xpaths.ur_neg in
   let pp_sep fmt b =
-    if b then Format.fprintf fmt ",@ " else () in
+    let b' = (not b) && !printed in
+    printed := !printed || not b;
+    if b' then Format.fprintf fmt ",@ " else () in
 
-  let sep1,sep2 = match EcPath.Sx.is_empty mr.mr_xpaths,
-                        EcPath.Sm.is_empty mr.mr_mpaths,
-                        Msym.is_empty mr.mr_oinfos with
-  | true,true,true
-  | true,true,false
-  | false,true,true
-  | true,false,true   -> false, false
-  | false,false,false -> true, true
-  | false,true,false
-  | false,false,true  -> true, false
-  | true,false,false  -> false, true in
+  let xpos_emp =
+    EcPath.Sx.is_empty (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos) in
+  let mpos_emp =
+    (EcPath.Sm.is_empty (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)) in
 
-  Format.fprintf fmt "{@[%a%a%a%a%a@]}"
-    pp_rx mr.mr_xpaths
-    pp_sep sep1
-    pp_r mr.mr_mpaths
-    pp_sep sep2
+  Format.fprintf fmt "{@[%a%a%a%a%a%a%a%a%a%a@[<hv 2>@,%a@]@]}"
+    (pp_rx false) mr.mr_xpaths.ur_neg
+    pp_sep (EcPath.Sm.is_empty mr.mr_mpaths.ur_neg)
+    (pp_r false) mr.mr_mpaths.ur_neg
+    pp_sep xpos_emp
+    (pp_rx true) (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos)
+    pp_sep mpos_emp
+    (pp_r true) (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)
+    pp_sep (xpos_emp <> mpos_emp)
+    pp_top (xpos_emp <> mpos_emp)
+    pp_sep (Msym.is_empty mr.mr_oinfos)
     pp_ois mr.mr_oinfos
 
 (* -------------------------------------------------------------------- *)
