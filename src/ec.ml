@@ -238,8 +238,12 @@ let main () =
         let terminal =
           lazy (EcTerminal.from_channel ~name ~gcstats (open_in name))
         in
+        (* First we try to see if we have a corresponding .eco uptodate *)
+        if EcCommands.check_eco name then exit 0
+        else
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false)
+
     end
   in
 
@@ -249,6 +253,45 @@ let main () =
        match relocdir with
        | None     -> EcCommands.addidir Filename.current_dir_name
        | Some pwd -> EcCommands.addidir pwd);
+
+  let finalize_input input scope =
+    match input with
+    | Some input ->
+        let nameo = Filename.remove_extension input ^ ".eco" in
+        let kind =
+          try  EcLoader.get_kind input
+          with EcLoader.BadExtension s ->
+            Format.eprintf "Bad extention: %s@." s;
+            exit 1
+        in
+
+        let eco = EcEco.{
+            eco_root    = EcEco.{
+              eco_digest  = Digest.file input;
+              eco_kind    = kind;
+            };
+            eco_depends = EcMaps.Mstr.of_list (
+              List.map
+                (fun (x : EcScope.required_info) ->
+                   let ecr = EcEco.{
+                     eco_digest = x.rqd_digest;
+                     eco_kind   = x.rqd_kind;
+                   } in (x.rqd_name, ecr))
+                (EcScope.Theory.required scope));
+        } in
+
+        let out = open_out nameo in
+
+        EcUtils.try_finally
+          (fun () ->
+             Format.fprintf
+               (Format.formatter_of_out_channel out) "%a@."
+               EcEco.pp eco)
+          (fun () -> close_out out)
+
+    | None -> ()
+  in
+
 
   let tstats : EcLocation.t -> float option -> unit =
     match options.o_command with
@@ -351,7 +394,11 @@ let main () =
               EcCommands.undo i
         end;
         EcTerminal.finish `ST_Ok terminal;
-        if !terminate then (EcTerminal.finalize terminal; exit 0);
+        if !terminate then begin
+            EcTerminal.finalize terminal;
+            finalize_input input (EcCommands.current ());
+            exit 0
+          end;
       with
       | EcCommands.Restart ->
           first := `Restart

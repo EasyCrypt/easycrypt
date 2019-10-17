@@ -313,9 +313,18 @@ and pucflags = {
 }
 
 (* -------------------------------------------------------------------- *)
+type required_info = {
+  rqd_name      : symbol;
+  rqd_namespace : EcLoader.namespace option;
+  rqd_kind      : EcLoader.kind;
+  rqd_digest    : Digest.t;
+}
+
+type required = required_info list
+
 type prelude = {
   pr_env      : EcEnv.env;
-  pr_required : symbol list;
+  pr_required : required;
 }
 
 type thloaded = (EcTheory.ctheory * EcTheory.thmode)
@@ -325,8 +334,8 @@ type scope = {
   sc_env      : EcEnv.env;
   sc_top      : scope option;
   sc_prelude  : ([`Frozen | `InPrelude] * prelude);
-  sc_loaded   : (thloaded * symbol list) Msym.t;
-  sc_required : symbol list;
+  sc_loaded   : (thloaded * required) Msym.t;
+  sc_required : required;
   sc_clears   : path list;
   sc_pr_uc    : proof_uc option;
   sc_options  : GenOptions.options;
@@ -1893,9 +1902,14 @@ module Theory = struct
     in maybe_add_to_section scope (EcTheory.CTh_theory (x, (cth, mode)))
 
   (* ------------------------------------------------------------------ *)
-  let required (scope : scope) (name : symbol) =
+  let required (scope : scope) (name : required_info) =
     assert (scope.sc_pr_uc = None);
-    List.exists (fun x -> x = name) scope.sc_required
+    List.exists (fun x ->
+        if x.rqd_name = name.rqd_name then (
+(* PY: FIXME, should we ensure this, raise an error message ... *)
+          assert (x.rqd_digest = name.rqd_digest);
+          true)
+        else false) scope.sc_required
 
   (* ------------------------------------------------------------------ *)
   let enter (scope : scope) (mode : thmode) (name : symbol) =
@@ -1903,14 +1917,14 @@ module Theory = struct
     subscope scope mode name
 
   (* ------------------------------------------------------------------ *)
-  let rec require_loaded id scope =
+  let rec require_loaded (id:required_info) scope =
     if required scope id then
       scope
     else
-      match Msym.find_opt id scope.sc_loaded with
+      match Msym.find_opt id.rqd_name scope.sc_loaded with
       | Some ((rth, mode), ids) ->
           let scope = List.fold_right require_loaded ids scope in
-          let env   = EcEnv.Theory.require ~mode id rth scope.sc_env in
+          let env   = EcEnv.Theory.require ~mode id.rqd_name rth scope.sc_env in
             { scope with
                 sc_env      = env;
                 sc_required = id :: scope.sc_required; }
@@ -2050,18 +2064,18 @@ module Theory = struct
         "end-of-file while processing proof %s" (fst scope.sc_name)
 
   (* -------------------------------------------------------------------- *)
-  let require (scope : scope) ((name, mode) : symbol * thmode) loader =
+  let require (scope : scope) ((name, mode) : required_info * thmode) loader =
     assert (scope.sc_pr_uc = None);
 
     if required scope name then
       scope
     else
-      match Msym.find_opt name scope.sc_loaded with
+      match Msym.find_opt name.rqd_name scope.sc_loaded with
       | Some _ -> require_loaded name scope
 
       | None ->
         try
-          let imported = enter (for_loading scope) mode name in
+          let imported = enter (for_loading scope) mode name.rqd_name in
           let imported = { imported with sc_env = EcEnv.astop imported.sc_env } in
           let thname   = fst imported.sc_name in
           let imported = loader imported in
@@ -2069,19 +2083,23 @@ module Theory = struct
           check_end_required imported thname;
 
           let cth = exit_r ~pempty:`No imported in
-          let (cth, rqs), _, (name, _), imported = cth in
+          let (cth, rqs), _, (name1, _), imported = cth in
+          assert (name.rqd_name = name1);
           let scope = { scope with sc_loaded =
-            Msym.add name ((oget cth, mode), rqs) imported.sc_loaded; } in
+            Msym.add name.rqd_name ((oget cth, mode), rqs) imported.sc_loaded; } in
 
           bump_prelude (require_loaded name scope)
 
         with e -> begin
           match toperror_of_exn_r e with
           | Some (l, e) when not (EcLocation.isdummy l) ->
-              raise (ImportError (Some l, name, e))
+              raise (ImportError (Some l, name.rqd_name, e))
           | _ ->
-              raise (ImportError (None, name, e))
+              raise (ImportError (None, name.rqd_name, e))
         end
+
+  let required scope = scope.sc_required
+
 end
 
 (* -------------------------------------------------------------------- *)

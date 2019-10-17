@@ -19,6 +19,14 @@ type ecloader = {
 
 type kind = [`Ec | `EcA]
 
+exception BadExtension of string
+
+let get_kind filename =
+  match Filename.extension filename with
+  | ".ec"  -> `Ec
+  | ".eca" -> `EcA
+  | s      -> raise (BadExtension s)
+
 (* -------------------------------------------------------------------- *)
 let create () = { ecl_idirs = []; }
 

@@ -436,6 +436,13 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
       Loader.push    filename subld;
       Loader.addidir ?namespace:fnm dirname subld;
 
+      let name = EcScope.{
+        rqd_name      = thname;
+        rqd_kind      = kind;
+        rqd_namespace = fnm;
+        rqd_digest    = Digest.file filename;
+      } in
+
       let loader iscope =
         let i_pragma = Pragma.get () in
 
@@ -448,11 +455,11 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
 
       let kind = match kind with `Ec -> `Concrete | `EcA -> `Abstract in
 
-      let scope = EcScope.Theory.require scope (thname, kind) loader in
-        match io with
-        | None         -> scope
-        | Some `Export -> EcScope.Theory.export scope ([], thname)
-        | Some `Import -> EcScope.Theory.import scope ([], thname)
+      let scope = EcScope.Theory.require scope (name, kind) loader in
+          match io with
+          | None         -> scope
+          | Some `Export -> EcScope.Theory.export scope ([], name.rqd_name)
+          | Some `Import -> EcScope.Theory.import scope ([], name.rqd_name)
 
 (* -------------------------------------------------------------------- *)
 and process_th_require ld scope (nm, xs, io) =
@@ -809,6 +816,10 @@ let process ?(timed = false) (g : global_action located) : float option =
   with
   | Pragma `Reset   -> reset (); None
   | Pragma `Restart -> raise Restart
+
+(* -------------------------------------------------------------------- *)
+let check_eco =
+  EcEco.check_eco (fun name -> Loader.locate name loader)
 
 (* -------------------------------------------------------------------- *)
 module S = EcScope

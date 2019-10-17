@@ -12,6 +12,9 @@ type ecloader
 
 type kind = [`Ec | `EcA]
 
+exception BadExtension of string
+val get_kind : string -> kind
+
 (* -------------------------------------------------------------------- *)
 type namespace = [ `System | `Named of string ]
 
