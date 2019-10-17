@@ -47,6 +47,8 @@ val reset : unit -> unit
 val uuid  : unit -> int
 val mode  : unit -> string
 
+val check_eco : string -> bool
+
 (* -------------------------------------------------------------------- *)
 val pp_current_goal : ?all:bool -> Format.formatter -> unit
 val pp_maybe_current_goal : Format.formatter -> unit
