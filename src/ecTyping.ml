@@ -1722,52 +1722,53 @@ and transstruct
   let items = List.map snd items in
 
   (* Generate structure signature *)
-  let tymod =
-    let mparams =
-      List.fold_left (fun mparams (id,_) ->
+  let mparams =
+    List.fold_left (fun mparams (id,_) ->
         Sm.add (EcPath.mident id) mparams) Sm.empty stparams in
-    let tymod1 restr = function
-      | MI_Module   _ -> None,restr
-      | MI_Variable _ -> None,restr
-      | MI_Function f ->
-        let rec f_call c f =
-          let f = EcEnv.NormMp.norm_xfun envi f in
-          if EcPath.Sx.mem f c then c
-          else
-            let c = EcPath.Sx.add f c in
-            let fun_ = (EcEnv.Fun.by_xpath f envi) in
-            match fun_.f_def with
-            | FBalias _ -> assert false
-            | FBdef def -> List.fold_left f_call c def.f_uses.us_calls
-            | FBabs oi  ->
-              List.fold_left f_call c oi.oi_calls in
+  let tymod1 restr = function
+    | MI_Module  _ -> restr
+    | MI_Variable _ -> restr
+    | MI_Function f ->
+      let rec f_call c f =
+        let f = EcEnv.NormMp.norm_xfun envi f in
+        if EcPath.Sx.mem f c then c
+        else
+          let c = EcPath.Sx.add f c in
+          let fun_ = (EcEnv.Fun.by_xpath f envi) in
+          match fun_.f_def with
+          | FBalias _ -> assert false
+          | FBdef def -> List.fold_left f_call c def.f_uses.us_calls
+          | FBabs oi  ->
+            List.fold_left f_call c oi.oi_calls in
 
-        let all_calls =
-          match f.f_def with
-          | FBalias f -> f_call EcPath.Sx.empty f
-          | FBdef def ->
-            List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls
-          | FBabs _ -> assert false in
-        let filter f =
-          let ftop = EcPath.m_functor f.EcPath.x_top in
-          Sm.mem ftop mparams in
-        let calls = List.filter filter (EcPath.Sx.elements all_calls) in
-        let restr = { restr with
-                      mr_oinfos = Msym.add f.f_name
-                          { oi_calls = calls; oi_in = true; }
-                          restr.mr_oinfos } in
-        Some (Tys_function f.f_sig), restr in
+      let all_calls =
+        match f.f_def with
+        | FBalias f -> f_call EcPath.Sx.empty f
+        | FBdef def ->
+          List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls
+        | FBabs _ -> assert false in
+      let filter f =
+        let ftop = EcPath.m_functor f.EcPath.x_top in
+        Sm.mem ftop mparams in
+      let calls = List.filter filter (EcPath.Sx.elements all_calls) in
+      let restr = { restr with
+                    mr_oinfos = Msym.add f.f_name
+                        { oi_calls = calls; oi_in = true; }
+                        restr.mr_oinfos } in
+      restr in
 
-    let sigitems, restr = List.fold_left (fun (its, restr) it ->
-        match tymod1 restr it with
-        | None,restr -> its,restr
-        | Some x, restr -> x :: its, restr
-      ) ([],EcModules.mr_empty) items  in
+  let sigitems = List.filter_map (function
+      | MI_Module   _ | MI_Variable _ -> None
+      | MI_Function f -> Some (Tys_function f.f_sig)
+    ) items in
 
+  let restr = List.fold_left tymod1 EcModules.mr_empty items  in
+
+  let tymod =
     { mis_params = stparams;
       mis_body   = List.rev sigitems;
-      mis_restr = restr; };
-  in
+      mis_restr = restr; }; in
+
   (* Construct structure representation *)
   let me =
     { me_name  = x;

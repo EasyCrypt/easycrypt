@@ -2207,7 +2207,7 @@ module NormMp = struct
   let fun_use env xp =
     gen_fun_use env (ref Sx.empty) Sid.empty use_empty xp
 
-  (* The four functions below are used in mod_use_top and item_use_top. *)
+  (* The four functions below are used in mod_use_top and item_use. *)
   let rec mod_use env rm fdone us mp =
     let mp = norm_mpath env mp in
     let me = Mod.by_mpath mp env in
