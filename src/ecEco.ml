@@ -5,7 +5,7 @@ module Json = Yojson
 
 (* -------------------------------------------------------------------- *)
 module Version = struct
-  let current : int = 1
+  let current : int = 2
 end
 
 (* -------------------------------------------------------------------- *)
@@ -86,6 +86,7 @@ let to_json (eco : eco) : Json.t =
 
   `Assoc
     [ "version", `Int Version.current;
+      "echash" , `String EcVersion.hash;
       "root"   , ecoroot_to_json eco.eco_root;
       "depends", `Assoc depends ]
 
@@ -95,8 +96,12 @@ let of_json (data : Json.t) : eco =
   | `Assoc data ->
       let data    = Mstr.of_list data in
       let version = Mstr.find_exn InvalidEco "root" data in
+      let echash  = Mstr.find_exn InvalidEco "echash" data in
 
       if version <> `Int Version.current then
+        raise InvalidEco;
+
+      if echash <> `String EcVersion.hash then
         raise InvalidEco;
 
       let root    = ecoroot_of_json (Mstr.find_exn InvalidEco "root" data) in
