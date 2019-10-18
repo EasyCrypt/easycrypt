@@ -542,7 +542,8 @@ and trans_pterm_arg_mod pe { pl_desc = arg; pl_loc = loc; } =
   in
 
   let env  = LDecl.toenv pe.pte_hy in
-  let mod_ = (fun () -> EcTyping.trans_msymbol env mp) in
+  let mod_ = (fun () -> EcTyping.trans_msymbol env mp
+                        |> (fun mp -> mp, NormMp.sig_of_mp env mp)) in
   let mod_ = Exn.recast_pe pe.pte_pe pe.pte_hy mod_ in
 
     { ptea_env = pe; ptea_arg = PVAModule mod_; }

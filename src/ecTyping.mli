@@ -196,7 +196,7 @@ val transmodtype : env -> pmodule_type -> module_type * module_sig
 val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 
 val trans_topmsymbol : env -> pmsymbol located -> mpath
-val trans_msymbol    : env -> pmsymbol located -> mpath * module_sig
+val trans_msymbol    : env -> pmsymbol located -> mpath
 val trans_gamepath   : env -> pgamepath -> xpath
 
 (* -------------------------------------------------------------------- *)
