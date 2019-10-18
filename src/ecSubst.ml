@@ -272,10 +272,22 @@ and subst_module_comps (s : _subst) (comps : module_comps) =
 
 (* -------------------------------------------------------------------- *)
 and subst_module (s : _subst) (m : module_expr) =
-  let s, me_sig = subst_modsig s m.me_sig in
-  let me_body   = subst_module_body s m.me_body in
-  let me_comps  = subst_module_comps s m.me_comps in
-    { m with me_body; me_comps; me_sig; }
+  let sbody,me_params = match m.me_params with
+    | [] -> (s, [])
+    | _  ->
+      let aout =
+        List.map_fold
+        (fun (s : subst) (a, aty) ->
+          let a'   = EcIdent.fresh a in
+          let decl = (a', subst_modtype (_subst_of_subst s) aty) in
+           add_module s a (EcPath.mident a'), decl)
+        s.s_s m.me_params
+      in
+      fst_map _subst_of_subst aout in
+
+  let me_body   = subst_module_body sbody m.me_body in
+  let me_comps  = subst_module_comps sbody m.me_comps in
+    { m with me_body; me_comps; me_params; }
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =

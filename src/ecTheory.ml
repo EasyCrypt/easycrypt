@@ -87,7 +87,8 @@ let module_comps_of_module_sig_comps (comps : module_sig_body) restr =
 let module_expr_of_module_sig name mp tymod =
   let tycomps = module_comps_of_module_sig_comps tymod.mis_body mp.mt_restr in
 
-    { me_name  = EcIdent.name name;
-      me_body  = ME_Decl mp;
-      me_comps = tycomps;
-      me_sig   = tymod; }
+    { me_name     = EcIdent.name name;
+      me_body     = ME_Decl mp;
+      me_comps    = tycomps;
+      me_sig_body = tymod.mis_body;
+      me_params   = tymod.mis_params ; }

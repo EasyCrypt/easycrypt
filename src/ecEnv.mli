@@ -232,12 +232,13 @@ module NormMp : sig
   val norm_pvar     : env -> EcTypes.prog_var -> EcTypes.prog_var
   val norm_form     : env -> form -> form
   val mod_use       : env -> mpath -> use
-  val item_use      : env -> mpath -> module_comps_item -> use
   val fun_use       : env -> xpath -> use
   val restr_use     : env -> mod_restr -> use use_restr
   val equal_restr   : env -> mod_restr -> mod_restr -> bool
   val get_restr_use : env -> mpath -> use use_restr
-  val get_oicalls   : env -> xpath -> oracle_info
+  val get_restr     : env -> mpath -> mod_restr
+
+  val sig_of_mp     : env -> mpath -> module_sig
 
   (* Return [true] if [x] is forbidden in [restr]. *)
   val use_mem_xp    : xpath -> use use_restr -> bool

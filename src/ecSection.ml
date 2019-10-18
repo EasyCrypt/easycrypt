@@ -267,11 +267,6 @@ let rec on_mpath_module cb (me : module_expr) =
   | ME_Alias (_, mp)  -> cb mp
   | ME_Structure st   ->
     on_mpath_mstruct cb st;
-    on_mpath_restr cb me.me_sig.mis_restr
-  (* TODO: (Adrien) is this what we want? *)
-  (* on_mpath_restr cb me.me_sig.mis_restr *)
-    (* EcSymbols.Msym.iter (fun _ oi -> on_mpath_fun_oi cb oi)
-     *   me.me_sig.mis_restr.mr_oinfos *)
 
   | ME_Decl mty -> on_mpath_mdecl cb mty
 

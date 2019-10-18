@@ -543,7 +543,11 @@ let ur_app f a =
   { ur_pos = (omap f) a.ur_pos;
     ur_neg = f a.ur_neg; }
 
+(* Noting is restricted. *)
 let ur_empty emp = { ur_pos = None; ur_neg = emp; }
+
+(* Everything is restricted. *)
+let ur_full emp = { ur_pos = Some emp; ur_neg = emp; }
 
 let ur_pos_subset subset ur1 ur2 = match ur1,ur2 with
   | _, None -> true             (* Indeed, [None] means everybody. *)
@@ -564,6 +568,15 @@ let ur_union union inter ur1 ur2 =
 
   { ur_pos = ur_pos;
     ur_neg = union ur1.ur_neg ur2.ur_neg; }
+
+(* Converse of ur_union. *)
+let ur_inter union inter ur1 ur2 =
+  let ur_pos = match ur1.ur_pos, ur2.ur_pos with
+    | None, _ | _, None -> None
+    | Some s1, Some s2 -> some @@ union s1 s2 in
+
+  { ur_pos = ur_pos;
+    ur_neg = inter ur1.ur_neg ur2.ur_neg; }
 
 (* -------------------------------------------------------------------- *)
 type oracle_info = {
@@ -590,6 +603,12 @@ let mr_empty = {
   mr_oinfos = Msym.empty;
 }
 
+let mr_full = {
+  mr_xpaths = ur_full EcPath.Sx.empty;
+  mr_mpaths = ur_full EcPath.Sm.empty;
+  mr_oinfos = Msym.empty;
+}
+
 let mr_equal mr1 mr2 =
   ur_equal EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
   && ur_equal EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
@@ -601,7 +620,7 @@ let mr_add_restr mr (rx : Sx.t use_restr) (rm : Sm.t use_restr) =
     mr_oinfos = mr.mr_oinfos; }
 
 (* This computes the union of [mr1] and [mr2], in the sense that the resulting
-   restriction is more restrictive that both [mr1] and [mr2]. *)
+   restriction is more restrictive than both [mr1] and [mr2]. *)
 let mr_union mr1 mr2 =
   { mr_xpaths = ur_union Sx.union Sx.inter mr1.mr_xpaths mr2.mr_xpaths;
     mr_mpaths = ur_union Sm.union Sm.inter mr1.mr_mpaths mr2.mr_mpaths;
@@ -612,6 +631,20 @@ let mr_union mr1 mr2 =
             (Sx.of_list oi2.oi_calls) in
         Some { oi_calls = Sx.ntr_elements inter;
                oi_in = oi1.oi_in && oi2.oi_in; }
+      ) mr1.mr_oinfos mr2.mr_oinfos; }
+
+(* This computes the intersection of [mr1] and [mr2], in the sense that the
+ resulting restriction is less restrictive than both [mr1] and [mr2]. *)
+let mr_inter mr1 mr2 =
+  { mr_xpaths = ur_inter Sx.union Sx.inter mr1.mr_xpaths mr2.mr_xpaths;
+    mr_mpaths = ur_inter Sm.union Sm.inter mr1.mr_mpaths mr2.mr_mpaths;
+    mr_oinfos = Msym.inter (fun _ oi1 oi2 ->
+        let inter =
+          Sx.union
+            (Sx.of_list oi1.oi_calls)
+            (Sx.of_list oi2.oi_calls) in
+        Some { oi_calls = Sx.ntr_elements inter;
+               oi_in = oi1.oi_in || oi2.oi_in; }
       ) mr1.mr_oinfos mr2.mr_oinfos; }
 
 let add_oinfo restr f ocalls oin =
@@ -686,10 +719,11 @@ type abs_uses = {
 }
 
 type module_expr = {
-  me_name      : symbol;
-  me_body      : module_body;
-  me_comps     : module_comps;
-  me_sig       : module_sig;
+  me_name     : symbol;
+  me_body     : module_body;
+  me_comps    : module_comps;
+  me_sig_body : module_sig_body;
+  me_params   : (EcIdent.t * module_type) list;
 }
 
 and module_body =
@@ -838,7 +872,7 @@ let get_uninit_read_of_module (p : path) (me : module_expr) =
     let margs =
       List.map
         (fun (x, _) -> EcPath.mpath_abs x [])
-        me.me_sig.mis_params
+        me.me_params
     in EcPath.mpath_crt (EcPath.pqname p me.me_name) margs None
 
   in List.rev (doit_me [] (mp, me))

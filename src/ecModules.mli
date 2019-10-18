@@ -157,7 +157,10 @@ type mod_restr = {
   mr_oinfos : oracle_info Msym.t;
 }
 
+(* Careful, the avalaible oracle are empty in both [mr_empty] and [mr_full]. *)
 val mr_empty : mod_restr
+val mr_full  : mod_restr
+
 val mr_hash  : mod_restr -> int
 val mr_equal : mod_restr -> mod_restr -> bool
 
@@ -168,6 +171,10 @@ val mr_add_restr :
    This computes the union of [mr1] and [mr2], in the sense that the resulting
    restriction is more restrictive that both [mr1] and [mr2]. *)
 val mr_union : mod_restr -> mod_restr -> mod_restr
+
+(* This computes the intersection of [mr1] and [mr2], in the sense that the
+ resulting restriction is less restrictive than both [mr1] and [mr2]. *)
+val mr_inter : mod_restr -> mod_restr -> mod_restr
 
 val add_oinfo      : mod_restr -> string -> xpath list -> bool -> mod_restr
 val change_oicalls : mod_restr -> string -> xpath list -> mod_restr
@@ -235,10 +242,11 @@ type abs_uses = {
 
 (* -------------------------------------------------------------------- *)
 type module_expr = {
-  me_name  : symbol;
-  me_body  : module_body;
-  me_comps : module_comps;
-  me_sig   : module_sig;
+  me_name     : symbol;
+  me_body     : module_body;
+  me_comps    : module_comps;
+  me_sig_body : module_sig_body;
+  me_params   : (EcIdent.t * module_type) list;
 }
 
 and module_body =

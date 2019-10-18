@@ -685,7 +685,7 @@ let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =
         let x    = fresh id in
         let s    = Fsubst.f_bind_mod s id (EcPath.mident x) in
         let mp   = EcPath.mident id in
-        let sig_ = (EcEnv.Mod.by_mpath mp env).EcModules.me_sig in
+        let sig_ = EcEnv.NormMp.sig_of_mp env mp in
         let bds  = `Forall (x, GTmodty mt) :: bds in
         let args = PAModule (mp, sig_) :: args in
         (s, bds, args, cls)

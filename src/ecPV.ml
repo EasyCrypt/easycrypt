@@ -1053,9 +1053,8 @@ let check_module_in env mp mt =
       let f = EcPath.xpath_fun mp fs.fs_name in
       let eqi = eqobs_inF_refl env f global in
 
-      let m = EcEnv.Mod.by_mpath mp env in
-      let oi =
-        EcSymbols.Msym.find fs.fs_name m.me_sig.mis_restr.mr_oinfos in
+      let oinfos = (NormMp.get_restr env mp).mr_oinfos in
+      let oi = EcSymbols.Msym.find fs.fs_name oinfos in
 
       (* We remove the paramater not take into account *)
       let eqi =

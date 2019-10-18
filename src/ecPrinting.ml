@@ -2713,12 +2713,11 @@ and pp_stmt ppe fmt s =
 let rec pp_modexp ppe fmt (p, me) =
   let params =
     match me.me_body with
-    | ME_Alias (i,_) -> List.take i me.me_sig.mis_params
-    | _              -> me.me_sig.mis_params in
+    | ME_Alias (i,_) -> List.take i me.me_params
+    | _              -> me.me_params in
   let (ppe, pp) = pp_mod_params ppe params in
-  Format.fprintf fmt "@[<v>module %s%t%a = %a@]"
+  Format.fprintf fmt "@[<v>module %s%t = %a@]"
     me.me_name pp
-    (pp_restr ppe) me.me_sig.mis_restr
     (pp_modbody ppe) (p, me.me_body)
 
 and pp_modbody ppe fmt (p, body) =

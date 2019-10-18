@@ -53,7 +53,7 @@ let lossless_hyps env top sub =
     { restr with mr_xpaths = ur_empty Sx.empty;
                  mr_mpaths = mr_mpaths } in
 
-  let sig_ = (EcEnv.Mod.by_mpath top env).me_sig in
+  let sig_ = EcEnv.NormMp.sig_of_mp env top in
   let bd =
     List.map
       (fun (id, mt) ->
