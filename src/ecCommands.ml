@@ -149,7 +149,7 @@ let process_search scope qs =
 module HiPrinting = struct
   let pr_glob fmt env pm =
     let ppe = EcPrinting.PPEnv.ofenv env in
-    let p = EcTyping.trans_msymbol env pm in
+    let (p, _) = EcTyping.trans_msymbol env pm in
     let us = EcEnv.NormMp.mod_use env p in
 
     Format.fprintf fmt "Globals [# = %d]:@."

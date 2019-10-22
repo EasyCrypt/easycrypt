@@ -120,6 +120,7 @@ type funsig = {
   fs_ret    : EcTypes.ty;
 }
 
+val fs_equal : funsig -> funsig -> bool
 (* -------------------------------------------------------------------- *)
 type 'a use_restr = {
   ur_pos : 'a option;   (* If not None, can use only element in this set. *)
@@ -206,6 +207,13 @@ type module_sig = {
   mis_restr : mod_restr;
 }
 
+(* Simple module signature, without restrictions. *)
+type module_smpl_sig = {
+  miss_params : (EcIdent.t * module_type) list;
+  miss_body   : module_sig_body;
+}
+
+val sig_smpl_sig_coincide : module_sig -> module_smpl_sig -> bool
 (* -------------------------------------------------------------------- *)
 type uses = private {
   us_calls  : xpath list;

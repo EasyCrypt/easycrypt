@@ -542,8 +542,18 @@ and trans_pterm_arg_mod pe { pl_desc = arg; pl_loc = loc; } =
   in
 
   let env  = LDecl.toenv pe.pte_hy in
+
+  (* TODO: (Adrien) is this correct? *)
+  let comp_sig (mp, smpl_sig) =
+    let msig = NormMp.sig_of_mp env mp in
+
+    (* Sanity check. *)
+    assert (EcModules.sig_smpl_sig_coincide msig smpl_sig);
+
+    (mp, msig) in
+
   let mod_ = (fun () -> EcTyping.trans_msymbol env mp
-                        |> (fun mp -> mp, NormMp.sig_of_mp env mp)) in
+                        |> comp_sig) in
   let mod_ = Exn.recast_pe pe.pte_pe pe.pte_hy mod_ in
 
     { ptea_env = pe; ptea_arg = PVAModule mod_; }

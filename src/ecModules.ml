@@ -681,6 +681,11 @@ type module_sig = {
   mis_restr : mod_restr;
 }
 
+(* Simple module signature, without restrictions. *)
+type module_smpl_sig = {
+  miss_params : (EcIdent.t * module_type) list;
+  miss_body   : module_sig_body;
+}
 (* -------------------------------------------------------------------- *)
 type uses = {
   us_calls  : xpath list;
@@ -763,6 +768,30 @@ let fd_hash f =
     (Why3.Hashcons.combine_option EcTypes.e_hash f.f_ret)
     (Why3.Hashcons.combine_list vd_hash 0 f.f_locals)
 
+let fs_equal f1 f2 =
+    (EcUtils.opt_equal (List.all2 vd_equal) f1.fs_anames f2.fs_anames)
+    && (EcTypes.ty_equal f1.fs_ret f2.fs_ret)
+    && (EcTypes.ty_equal f1.fs_arg f2.fs_arg)
+    && (EcSymbols.sym_equal f1.fs_name f2.fs_name)
+(* -------------------------------------------------------------------- *)
+let sig_smpl_sig_coincide msig smpl_sig =
+  let eqparams =
+    List.for_all2 EcIdent.id_equal
+      (List.map fst msig.mis_params)
+      (List.map fst smpl_sig.miss_params) in
+
+  let ls =
+    List.map (fun (Tys_function fs) -> fs.fs_name, fs ) msig.mis_body
+    |> EcSymbols.Msym.of_list
+  and ls_smpl =
+    List.map (fun (Tys_function fs) -> fs.fs_name, fs ) smpl_sig.miss_body
+    |> EcSymbols.Msym.of_list in
+  let eqsig =
+    Msym.fold2_union (fun _ aopt bopt eqsig -> match aopt, bopt with
+        | Some fs1, Some fs2 -> (fs_equal fs1 fs2) && eqsig
+        | _ -> false)  ls_smpl ls true; in
+
+  eqparams && eqsig
 (* -------------------------------------------------------------------- *)
 let oi_subst sx oi =
   { oi_calls  = List.map sx oi.oi_calls;

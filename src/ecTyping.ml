@@ -824,8 +824,8 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     if not istop && params <> [] then
       tyerror loc env (InvalidModAppl MAE_AccesSubModFunctor);
 
-    (* TODO: Adrien temp ? *)
-    (top_path,loc)
+    ((top_path,loc), { miss_params = mod_expr.me_params;
+                       miss_body   = mod_expr.me_sig_body; } )
 
   | Some args ->
       let lena = List.length args in
@@ -833,22 +833,35 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
       if lena > lenp then
         tyerror loc env (InvalidModAppl (MAE_WrongArgCount(lenp, lena)));
 
-      let params, _ = List.takedrop lena params in
+      let params, remn = List.takedrop lena params in
 
       let args = List.map2
-        (fun (x,tp) (a,loc) ->
+        (fun (x,tp) ((a,loc),ta_smpl) ->
           try
             let ta = NormMp.sig_of_mp env a in
+            (* Sanity check *)
+            assert (sig_smpl_sig_coincide ta ta_smpl);
             let env = EcEnv.Mod.bind_local x tp env in
             check_sig_mt_cnv env x.EcIdent.id_symb ta tp; a
           with TymodCnvFailure error ->
             tyerror loc env (InvalidModAppl (MAE_InvalidArgType(a, error))))
         params args in
 
-      (EcPath.mpath top_path.EcPath.m_top args, loc)
+      let subst =
+          List.fold_left2
+            (fun s (x,_) a -> EcSubst.add_module s x a)
+            EcSubst.empty params args
+      in
+
+      let body = EcSubst.subst_modsig_body subst mod_expr.me_sig_body in
+
+      ((EcPath.mpath top_path.EcPath.m_top args, loc),
+       { miss_params = remn;
+         miss_body   = body; })
 
 let trans_msymbol env msymb =
-  fst @@ trans_msymbol env msymb
+  let ((m,_),mt) = trans_msymbol env msymb in
+  (m,mt)
 
 (* -------------------------------------------------------------------- *)
 let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
@@ -900,7 +913,7 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
       tconstr p tyargs
     end
   | PTglob gp ->
-    let m = trans_msymbol env gp in
+    let m,_ = trans_msymbol env gp in
     tglob m
 
 and transtys tp (env : EcEnv.env) ue tys =
@@ -1456,8 +1469,8 @@ let trans_gamepath (env : EcEnv.env) gp =
     match modsymb with
     | [] -> xp
     | _ ->
-      let mpath = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
-        if (EcEnv.Mod.by_mpath mpath env).me_params <> [] then
+      let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
+        if _sig.miss_params <> [] then
           tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
         EcPath.xpath_fun mpath funsymb
 
@@ -1609,10 +1622,11 @@ and transmod_header
     let n, me = transmod_header ~attop env mh params me in
     (* Compute the signature at the given position,
        i.e: remove the n first argument *)
-    let rm,_ = List.takedrop n me.me_params in
+    let rm,mis_params = List.takedrop n me.me_params in
 
-    (* TODO: (Adrien) is this correct? *)
-    (* let rm,mis_params = List.takedrop n me.me_params in *)
+    let args = List.map (fun (id,_) -> EcPath.mident id) rm in
+    let mp = mpath_crt (psymbol me.me_name) args None in
+
     (* let torm =
      *   List.fold_left (fun mparams (id,_) ->
      *     Sm.add (EcPath.mident id) mparams) Sm.empty rm in
@@ -1627,16 +1641,13 @@ and transmod_header
      * let mis_restr =
      *   List.fold_left clear
      *     me.me_sig.mis_restr
-     *     me.me_sig.mis_body in
-     *
-     * let mis_body = me.me_sig_body in
-     * let tymod = { mis_params;
-     *               mis_body;
-     *               mis_restr; } in *)
+     *     me.me_sig.mis_body in *)
 
-    let args = List.map (fun (id,_) -> EcPath.mident id) rm in
-    let mp = mpath_crt (psymbol me.me_name) args None in
-    let tymod = NormMp.sig_of_mp env mp in
+    (* TODO: (Adrien) really not sure about that. *)
+    let tymod = { mis_params = mis_params;
+                  mis_body   = me.me_sig_body;
+                  mis_restr = NormMp.get_restr env mp; } in
+
     (* Check that the signature is a subtype *)
     let check s =
       let (aty, _asig) = transmodtype env s in
@@ -1662,22 +1673,22 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
 
   match me.pl_desc with
   | Pm_ident m ->
-    let mp = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
-    let me' = EcEnv.Mod.by_mpath mp env in
-    let extraparams = me'.me_params in
+    let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
+    let extraparams = sig_.miss_params in
     let allparams = stparams @ extraparams in
     if allparams <> [] && not attop then
       tyerror me.pl_loc env
         (InvalidModAppl (MAE_WrongArgCount(0,List.length allparams)));
+    let me = EcEnv.Mod.by_mpath mp env in
     let arity = List.length stparams in
     let me =
-      { me' with
+      { me with
         me_name  = x.pl_desc;
         me_body  = ME_Alias (arity,mp);
         me_params = allparams;
 
         (* TODO: (Adrien) is this correct? *)
-        me_sig_body = me'.me_sig_body;
+        me_sig_body = me.me_sig_body;
       } in
     me
   | Pm_struct ps ->
@@ -1813,15 +1824,14 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
     [transstruct1_alias env name f]
 
   | Pst_maliases (m, xs) ->
-    let mo = trans_msymbol env m in
-    let ms = NormMp.sig_of_mp env mo in
-    if ms.mis_params <> [] then
+    let (mo,ms) = trans_msymbol env m in
+    if ms.miss_params <> [] then
       tyerror (loc m) env (InvalidModType MTE_InnerFunctor);
     let check_xs xs =
       List.iter (fun x ->
           let s = unloc x in
           if not (List.exists (fun (Tys_function fs) ->
-                    sym_equal fs.fs_name s) ms.mis_body) then
+                    sym_equal fs.fs_name s) ms.miss_body) then
             let modsymb = List.map (unloc -| fst) (unloc m)
             and funsymb = unloc x in
             tyerror (loc x) env (UnknownFunName (modsymb,funsymb))) xs in
@@ -1834,15 +1844,15 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
                      f_def  = FBalias (EcPath.xpath_fun mo fs.fs_name) }) in
     match xs with
     | None ->
-      List.map mk_fun ms.mis_body
+      List.map mk_fun ms.miss_body
     | Some (`Include_proc xs) ->
       check_xs xs;
       List.pmap (fun fs ->
-        if in_xs fs xs then Some (mk_fun fs) else None) ms.mis_body
+        if in_xs fs xs then Some (mk_fun fs) else None) ms.miss_body
     | Some (`Exclude_proc xs) ->
       check_xs xs;
       List.pmap (fun fs ->
-        if not (in_xs fs xs) then Some (mk_fun fs) else None) ms.mis_body
+        if not (in_xs fs xs) then Some (mk_fun fs) else None) ms.miss_body
 
 and transstruct1_alias env name f =
   let f = trans_gamepath env f in
@@ -2139,7 +2149,7 @@ let transpvar env side p =
 (* -------------------------------------------------------------------- *)
 let trans_topmsymbol env gp =
   (* FIXME *)
-  let mp = trans_msymbol env gp in
+  let (mp,_) = trans_msymbol env gp in
   let top = EcPath.m_functor mp in
   let mp = EcPath.m_apply top mp.EcPath.m_args in
   mp
@@ -2477,7 +2487,7 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
           transf_r (Some opsc) env f
 
     | PFglob gp ->
-        let mp = trans_msymbol env gp in
+        let mp = fst (trans_msymbol env gp) in
         let me =
           match EcEnv.Memory.current env with
           | None -> tyerror f.pl_loc env NoActiveMemory
@@ -2573,7 +2583,7 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                 f_eq x1 x2
 
           | GVglob gp ->
-            let mp = trans_msymbol env gp in
+              let (mp, _) = trans_msymbol env gp in
                 let x1 = f_glob mp EcFol.mleft in
                 let x2 = f_glob mp EcFol.mright in
                   unify_or_fail env ue gp.pl_loc ~expct:x1.f_ty x2.f_ty;
