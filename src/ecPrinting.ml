@@ -549,7 +549,7 @@ let pp_restr ppe fmt mr =
   let pp_top fmt b =
     if b then Format.fprintf fmt "+all mem" else () in
 
-  let printed = ref @@ EcPath.Sx.is_empty mr.mr_xpaths.ur_neg in
+  let printed = ref (not @@ EcPath.Sx.is_empty mr.mr_xpaths.ur_neg) in
   let pp_sep fmt b =
     let b' = (not b) && !printed in
     printed := !printed || not b;
@@ -568,7 +568,7 @@ let pp_restr ppe fmt mr =
     (pp_rx true) (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos)
     pp_sep mpos_emp
     (pp_r true) (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)
-    pp_sep (xpos_emp <> mpos_emp)
+    pp_sep (xpos_emp = mpos_emp)
     pp_top (xpos_emp <> mpos_emp)
     pp_sep (Msym.is_empty mr.mr_oinfos)
     pp_ois mr.mr_oinfos
@@ -2655,6 +2655,13 @@ let pp_modsig ppe fmt (p,ms) =
     (EcPath.basename p) pp
     (pp_restr ppe) ms.mis_restr
     (pp_list "@,@," (pp_sigitem ppe)) ms.mis_body
+
+(* Printing of a module signature with no restrictions. *)
+let pp_modsig_smpl ppe fmt (p,ms) =
+  let (ppe,pp) = pp_mod_params ppe ms.miss_params in
+  Format.fprintf fmt "@[<v>module type %s%t = {@,  @[<v>%a@]@,}@]"
+    (EcPath.basename p) pp
+    (pp_list "@,@," (pp_sigitem ppe)) ms.miss_body
 
 let rec pp_instr_r (ppe : PPEnv.t) fmt i =
   match i.i_node with
