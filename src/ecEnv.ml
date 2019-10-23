@@ -2262,9 +2262,7 @@ module NormMp = struct
                         get_restr_use = Mm.add mp res en.get_restr_use };
       res
 
-  let get_restr env mp =
-    let mp = norm_mpath env mp in
-    let me = Mod.by_mpath mp env in
+  let get_restr_me env me mp =
     match me.me_body with
     | EcModules.ME_Decl mt -> mt.mt_restr
     | _ ->
@@ -2324,6 +2322,11 @@ module NormMp = struct
         mr_mpaths = ur_mpaths;
         mr_oinfos = oi; }
 
+  let get_restr env mp =
+    let mp = norm_mpath env mp in
+    let me = Mod.by_mpath mp env in
+    get_restr_me env me mp
+
   let equal_restr env r1 r2 =
     let us1,us2 = restr_use env r1, restr_use env r2 in
     ur_equal use_equal us1 us2
@@ -2343,7 +2346,7 @@ module NormMp = struct
 
     { mis_params = me.me_params;
       mis_body = me.me_sig_body;
-      mis_restr = get_restr env mp }
+      mis_restr = get_restr_me env me mp }
 
   let norm_pvar env pv =
     let p =

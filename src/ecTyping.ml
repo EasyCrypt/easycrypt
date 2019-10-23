@@ -840,7 +840,9 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
           try
             let ta = NormMp.sig_of_mp env a in
             (* Sanity check *)
-            assert (sig_smpl_sig_coincide ta ta_smpl);
+            if List.length ta_smpl.miss_params <> List.length ta.mis_params then
+              assert false;
+
             let env = EcEnv.Mod.bind_local x tp env in
             check_sig_mt_cnv env x.EcIdent.id_symb ta tp; a
           with TymodCnvFailure error ->
