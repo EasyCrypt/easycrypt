@@ -559,6 +559,8 @@ let pp_restr ppe fmt mr =
     EcPath.Sx.is_empty (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos) in
   let mpos_emp =
     (EcPath.Sm.is_empty (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)) in
+  let all_mem =
+    mr.mr_xpaths.ur_pos = None || mr.mr_mpaths.ur_pos = None in
 
   Format.fprintf fmt "{@[%a%a%a%a%a%a%a%a%a%a@[<hv 2>@,%a@]@]}"
     (pp_rx false) mr.mr_xpaths.ur_neg
@@ -568,8 +570,8 @@ let pp_restr ppe fmt mr =
     (pp_rx true) (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos)
     pp_sep mpos_emp
     (pp_r true) (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)
-    pp_sep (xpos_emp = mpos_emp)
-    pp_top (xpos_emp <> mpos_emp)
+    pp_sep (not all_mem)
+    pp_top (all_mem)
     pp_sep (Msym.is_empty mr.mr_oinfos)
     pp_ois mr.mr_oinfos
 
