@@ -2295,7 +2295,8 @@ module NormMp = struct
             | FBalias f -> f_call EcPath.Sx.empty f
             | FBdef def ->
               List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls
-            | FBabs _ -> assert false in
+            | FBabs oi ->
+              List.fold_left f_call EcPath.Sx.empty oi.oi_calls in
           let filter f =
             let ftop = EcPath.m_functor f.EcPath.x_top in
             Sm.mem ftop mparams in
