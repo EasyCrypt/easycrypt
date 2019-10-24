@@ -1626,37 +1626,25 @@ and transmod_header
        i.e: remove the n first argument *)
     let rm,mis_params = List.takedrop n me.me_params in
 
+    let env = EcEnv.Mod.bind me.me_name me env in
+
+    let env = List.fold_left (fun env (id, mt) ->
+        EcEnv.Mod.bind_local id mt env) env rm in
     let args = List.map (fun (id,_) -> EcPath.mident id) rm in
-    let mp = mpath_crt (psymbol me.me_name) args None in
+    let mp =
+      EcPath.mpath_crt (EcPath.pqname (EcEnv.root env) me.me_name) args None in
 
-    (* let torm =
-     *   List.fold_left (fun mparams (id,_) ->
-     *     Sm.add (EcPath.mident id) mparams) Sm.empty rm in
-     *
-     * let filter f =
-     *   let ftop = EcPath.m_functor f.EcPath.x_top in
-     *   not (Sm.mem ftop torm) in
-     *
-     * let clear mr (Tys_function fsig) =
-     *   oicalls_filter mr fsig.fs_name filter in
-     *
-     * let mis_restr =
-     *   List.fold_left clear
-     *     me.me_sig.mis_restr
-     *     me.me_sig.mis_body in *)
-
-    (* TODO: (Adrien) really not sure about that. *)
     let tymod = { mis_params = mis_params;
                   mis_body   = me.me_sig_body;
-                  mis_restr = NormMp.get_restr env mp; } in
+                  mis_restr  = NormMp.get_restr env mp; } in
 
     (* Check that the signature is a subtype *)
     let check s =
       let (aty, _asig) = transmodtype env s in
       try  check_sig_mt_cnv env me.me_name tymod aty
       with TymodCnvFailure err ->
-        (* let args = List.map (fun (id,_) -> EcPath.mident id) rm in
-         * let mp = mpath_crt (psymbol me.me_name) args None in *)
+        let args = List.map (fun (id,_) -> EcPath.mident id) rm in
+        let mp = mpath_crt (psymbol me.me_name) args None in
         tyerror s.pl_loc env (TypeModMismatch(mp, aty, err)) in
     List.iter check mts;
 
