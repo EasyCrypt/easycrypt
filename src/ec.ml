@@ -233,7 +233,17 @@ let main () =
     end
 
     | `Compile cmpopts -> begin
-        let name     = cmpopts.cmpo_input in
+        let name = cmpopts.cmpo_input in
+
+        begin try
+          let ext = Filename.extension name in
+          ignore (EcLoader.getkind ext : EcLoader.kind)
+        with EcLoader.BadExtension ext ->
+          Format.eprintf "do not know what to do with %s@." ext;
+          exit 1
+        end;
+
+
         let gcstats  = cmpopts.cmpo_gcstats in
         let terminal =
           lazy (EcTerminal.from_channel ~name ~gcstats (open_in name))
@@ -257,13 +267,12 @@ let main () =
   let finalize_input input scope =
     match input with
     | Some input ->
-        let nameo = Filename.remove_extension input ^ ".eco" in
-        let kind =
-          try  EcLoader.get_kind input
-          with EcLoader.BadExtension s ->
-            Format.eprintf "Bad extention: %s@." s;
-            exit 1
-        in
+        let nameo = EcEco.get_eco_filename input in
+        let kind  =
+          try  EcLoader.getkind (Filename.extension input)
+          with EcLoader.BadExtension _ -> assert false in
+
+        assert (nameo <> input);
 
         let eco = EcEco.{
             eco_root    = EcEco.{

@@ -25,12 +25,12 @@ type eco = {
 exception InvalidEco
 
 (* -------------------------------------------------------------------- *)
-let kind_to_json (k:EcLoader.kind) =
+let kind_to_json (k : EcLoader.kind) =
   match k with
   | `Ec  -> `String "ec"
   | `EcA -> `String "eca"
 
-let kind_of_json (data:Json.t) =
+let kind_of_json (data : Json.t) =
   match data with
   | `String "ec"  -> `Ec
   | `String "eca" -> `EcA
@@ -95,7 +95,7 @@ let of_json (data : Json.t) : eco =
   match data with
   | `Assoc data ->
       let data    = Mstr.of_list data in
-      let version = Mstr.find_exn InvalidEco "root" data in
+      let version = Mstr.find_exn InvalidEco "version" data in
       let echash  = Mstr.find_exn InvalidEco "echash" data in
 
       if version <> `Int Version.current then
@@ -119,24 +119,47 @@ let of_file (filename : string) : eco =
   try  of_json ((Json.Basic.from_file filename :> Json.t))
   with Json.Json_error _ -> raise InvalidEco
 
+(* -------------------------------------------------------------------- *)
+let get_eco_filename filename =
+  Filename.remove_extension filename ^ ".eco"
+
 (* ---------------------------------------------------------------------- *)
+type loader = string ->
+  (EcLoader.namespace option * string * EcLoader.kind) option
+
 let check_eco loader filename =
   let module E = struct exception BadEco end in
 
   let check_digest filename ecor =
-    if EcLoader.get_kind filename <> ecor.eco_kind then
+    let ext = Filename.extension filename in
+
+    if EcLoader.getkind ext <> ecor.eco_kind then
       raise E.BadEco;
     if Digest.file filename <> ecor.eco_digest then
       raise E.BadEco
   in
 
-  let nameo = Filename.remove_extension filename ^ ".eco" in
-
   try
+    (try
+      ignore (EcLoader.getkind (Filename.extension filename))
+    with EcLoader.BadExtension _ -> raise E.BadEco);
+
+    let nameo = Filename.remove_extension filename ^ ".eco" in
+
+    if filename = nameo then
+      raise E.BadEco;
+
     if not (Sys.file_exists nameo) then
       raise E.BadEco;
 
-    let eco = of_file nameo in
+    let eco =
+      try
+        of_file nameo
+      with InvalidEco -> begin
+        (try Unix.unlink nameo with Unix.Unix_error _ -> ());
+        raise E.BadEco
+      end
+    in
 
     check_digest filename eco.eco_root;
 
