@@ -248,9 +248,6 @@ let main () =
         let terminal =
           lazy (EcTerminal.from_channel ~name ~gcstats (open_in name))
         in
-        (* First we try to see if we have a corresponding .eco uptodate *)
-        if EcCommands.check_eco name then exit 0
-        else
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false)
 
@@ -263,6 +260,11 @@ let main () =
        match relocdir with
        | None     -> EcCommands.addidir Filename.current_dir_name
        | Some pwd -> EcCommands.addidir pwd);
+
+  (* Check if the .eco is up-to-date and exit if so *)
+  oiter
+    (fun input -> if EcCommands.check_eco input then exit 0)
+    input;
 
   let finalize_input input scope =
     match input with
@@ -300,7 +302,6 @@ let main () =
 
     | None -> ()
   in
-
 
   let tstats : EcLocation.t -> float option -> unit =
     match options.o_command with
