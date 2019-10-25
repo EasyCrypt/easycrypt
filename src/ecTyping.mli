@@ -201,6 +201,7 @@ val trans_gamepath   : env -> pgamepath -> xpath
 
 (* -------------------------------------------------------------------- *)
 type restriction_who =
+| RW_type                         (* For (sub)typing *)
 | RW_mod of EcPath.mpath
 | RW_fun of EcPath.xpath
 

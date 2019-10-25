@@ -226,6 +226,9 @@ type use = {
   us_gl : EcIdent.Sid.t;
 }
 
+val use_empty : use
+val use_union : use -> use -> use
+
 module NormMp : sig
   val norm_mpath    : env -> mpath -> mpath
   val norm_xfun     : env -> xpath -> xpath

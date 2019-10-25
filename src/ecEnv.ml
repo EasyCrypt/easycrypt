@@ -119,6 +119,12 @@ type use = {
   us_gl : Sid.t;
 }
 
+let use_union us1 us2 =
+  { us_pv = Mx.union  (fun _ ty _ -> Some ty) us1.us_pv us2.us_pv;
+    us_gl = Sid.union us1.us_gl us2.us_gl; }
+
+let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty; }
+
 type env_norm = {
   norm_mp       : EcPath.mpath Mm.t;
   norm_xpv      : EcPath.xpath Mx.t;   (* for global program variable *)
@@ -2113,14 +2119,9 @@ module NormMp = struct
         env.env_norm := { en with norm_xpv = Mx.add p res en.norm_xpv };
         res
 
-  let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty; }
   let use_equal us1 us2 =
     Mx.equal (fun _ _ -> true) us1.us_pv us2.us_pv &&
       Sid.equal us1.us_gl us2.us_gl
-
-  let use_union us1 us2 =
-    { us_pv = Mx.union  (fun _ ty _ -> Some ty) us1.us_pv us2.us_pv;
-      us_gl = Sid.union us1.us_gl us2.us_gl; }
 
   let mem_xp x us = Mx.mem x us.us_pv
 

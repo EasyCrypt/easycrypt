@@ -128,6 +128,7 @@ type 'a use_restr = {
 }
 
 val ur_empty : 'a -> 'a use_restr
+val ur_full  : 'a -> 'a use_restr
 val ur_app   : ('a -> 'b) -> 'a use_restr -> 'b use_restr
 val ur_equal : ('a -> 'a -> bool) -> 'a use_restr -> 'a use_restr -> bool
 

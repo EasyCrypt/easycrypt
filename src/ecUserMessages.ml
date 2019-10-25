@@ -426,6 +426,9 @@ end = struct
     let pp_m fmt m  = EcPrinting.pp_topmod ppe fmt m in
 
     let pp_restriction_who fmt = function
+      (* TODO: (Adrien) temporary, there are no error messages for now. *)
+      | RW_type -> Format.fprintf fmt "restriction error in (sub)typing"
+
       | RW_mod mp ->
           Format.fprintf fmt "the module %a" pp_m mp
 

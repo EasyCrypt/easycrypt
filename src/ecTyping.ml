@@ -143,6 +143,7 @@ let tyerror loc env e = raise (TyError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
 type restriction_who =
+| RW_type                         (* For (sub)typing *)
 | RW_mod of EcPath.mpath
 | RW_fun of EcPath.xpath
 
@@ -493,80 +494,304 @@ let check_item_compatible env mode (fin,oin) (fout,oout) =
       tymod_cnv_failure
         (E_TyModCnv_MismatchFunSig(fin.fs_name,
                                    MF_restr(env, `Eq(ocalls, icalls))))
+(* -------------------------------------------------------------------- *)
+let re_error env who x = raise (RestrictionError (env, (who, x)))
+
+(* Is [x] allowed in a positive restriction [pr]. *)
+let rec p_allowed env who (x : EcPath.xpath) (pr : EcEnv.use option) =
+  match pr with
+  | None -> true
+  | Some pr ->
+    Mx.mem x pr.EcEnv.us_pv
+    || EcIdent.Sid.exists (allowed_m env who x) pr.EcEnv.us_gl
+
+(* Is [x] allowed in an abstract module [m] *)
+and allowed_m env who (x : EcPath.xpath) (m : EcIdent.t) =
+  let mp = EcPath.mident m in
+  let r  = NormMp.get_restr_use env mp in
+  allowed env who x r
+
+(* Is [x] allowed in a positive and negative restriction [r]. *)
+and allowed env who (x : EcPath.xpath) (r : EcEnv.use use_restr) =
+  (* [x] is allowed in [r] iff:
+     - [x] is directly allowed
+     - [x] is allowed in a module allowed in [r] *)
+  (p_allowed env who x r.ur_pos && not (p_allowed env who x (Some r.ur_neg)))
+
+(* Are all elements of [sx] allowed in the positive and negative
+   restriciton [r]. *)
+let all_allowed env who (sx : 'a EcPath.Mx.t) (r : EcEnv.use use_restr) =
+  Mx.for_all (fun x _ -> allowed env who x r) sx
+
+(* Are all elements of [sx] allowed in the union of the positive restriction [pr]
+   and the positive and negative restriction [r]. *)
+let all_allowed_gen env who (sx : 'a EcPath.Mx.t)
+    (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
+  Mx.for_all (fun x _ -> p_allowed env who x pr || allowed env who x r) sx
+
+(* Are all elements of [sx] allowed in the positive restriciton [pr]. *)
+let all_allowed_p env who (sx : 'a EcPath.Mx.t) (pr : EcEnv.use option) =
+  all_allowed env who sx { ur_pos = pr; ur_neg = EcEnv.use_empty }
+
+(* Are every variables allowed in the union of the positive restriction [pr]
+   and the positive and negative restriction [r].
+   I.e. is [pr] union [r] forbids nothing.
+   Remark: we cannot compute directly the union of [pr] and [r], because
+   A union (B \ C) <> (A union B) \ C *)
+let rec everything_allowed env who
+    (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
+  match pr, r.ur_pos with
+  | None, _ -> true
+  | Some _, Some _ -> false
+  | Some pr, None ->
+    (* In that case, we need [r.ur_neg] to forbid only variables that are
+       allowed in [pr], i.e. we require that:
+       [r.ur_neg] subset [pr] *)
+    all_allowed_p env who r.ur_neg.EcEnv.us_pv (Some pr)
+    &&
+    all_mod_allowed env who
+      r.ur_neg.EcEnv.us_gl (Some pr) (EcModules.ur_full EcEnv.use_empty)
+
+(* Are all elements of [sm] allowed the union of the positive restriction
+   [pr] and the positive and negative restriction [r]. *)
+and all_mod_allowed env who (sm : EcIdent.Sid.t)
+    (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
+  EcIdent.Sid.for_all (fun m -> mod_allowed env who m pr r) sm
+
+(* Is [m] allowed in the union of the positive restriction [pr] and the
+   positive and negative restriction [r]. *)
+and mod_allowed env who
+    (m : EcIdent.t)
+    (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
+  let mp = EcPath.mident m in
+  let rm  = NormMp.get_restr_use env mp in
+
+  ur_allowed env who rm pr r
+
+(* Is [ur] allowed in the union of the positive restriction [pr] and the
+   positive and negative restriction [r]. *)
+and ur_allowed env who
+    (ur : EcEnv.use use_restr)
+    (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
+  let pr' = match pr with
+    | None -> None
+    | Some pr -> some @@ EcEnv.use_union pr ur.ur_neg in
+
+  use_allowed env who ur.ur_pos pr' r
+
+(* Is [use] allowed in the union of the positive restriction [pr] and the
+   positive and negative restriction [r]. *)
+and use_allowed env who
+    (use : EcEnv.use option)
+    (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
+  (* We have two cases, depending on whether [rm.ur_pos] is everybody or not. *)
+  match use with
+  | None -> everything_allowed env who pr r
+
+  | Some urm ->
+    all_allowed_gen env who urm.EcEnv.us_pv pr r
+    && all_mod_allowed  env who urm.EcEnv.us_gl pr r
+
+(* This only checks the variables restrictions, not the oracle calls. *)
+let check_restr env who (use : EcEnv.use) (restr : mod_restr) =
+  let r : EcEnv.use use_restr = NormMp.restr_use env restr in
+  use_allowed env who (Some use) (Some EcEnv.use_empty) r
+
+(* This only checks the variables restrictions, not the oracle calls. *)
+let check_restrictions env who (use : EcEnv.use) (restr : mod_restr) =
+  (* TODO: (Adrien) temporary, there are no error messages for now. *)
+  if not @@ check_restr env who use restr
+  then raise @@ tymod_cnv_failure E_TyModCnv_ParamCountMismatch
+  else ()
 
 
+(* Check if [mr1] is a a subset of [mr2]. *)
+let check_restriction_sub env who (mr1 : mod_restr) (mr2 : mod_restr) =
+  let r1 = NormMp.restr_use env mr1 in
+  let r2 = NormMp.restr_use env mr2 in
+  ur_allowed env who r1 (Some EcEnv.use_empty) r2
+
+(* Check if [mr1] is equal to [mr2]. *)
+let check_restriction_eq env who (mr1 : mod_restr) (mr2 : mod_restr) =
+  let r1 = NormMp.restr_use env mr1 in
+  let r2 = NormMp.restr_use env mr2 in
+  ur_allowed env who r1 (Some EcEnv.use_empty) r2
+  && ur_allowed env who r2 (Some EcEnv.use_empty) r2
+
+let check_restriction_mode mode env who mr1 mr2 = match mode with
+  | `Sub ->
+  (* TODO: (Adrien) temporary, there are no error messages for now. *)
+    if not @@ check_restriction_sub env who mr1 mr2
+    then raise @@ tymod_cnv_failure E_TyModCnv_ParamCountMismatch;
+  | `Eq ->
+    (* TODO: (Adrien) temporary, there are no error messages for now. *)
+    if not @@ check_restriction_eq env who mr1 mr2
+    then raise @@ tymod_cnv_failure E_TyModCnv_ParamCountMismatch
+    else ()
+
+(* (\* TODO: (Adrien) this implementation is not sound. Change it. *\)
+ * (\* This only checks the variables restrictions, not the oracle calls. *\)
+ * let check_restrictions env who use restr =
+ *   let re_error = fun env x -> raise (RestrictionError (env, (who, x))) in
+ *
+ *   let restr = NormMp.restr_use env restr in
+ *
+ *   let check_xp xp _ =
+ *     (\* We check that the variable is not forbidden in [restr]. *\)
+ *     if NormMp.use_mem_xp xp restr then
+ *       re_error env (RE_UseVariable xp);
+ *
+ *     (\* We check that the variable is forbidden in all abstract modules forbidden
+ *        in [restr].
+ *        For abstract modules in the positive part of [restr], we do nothing,
+ *        since we only have upper-bounds on what they may use (and no
+ *        lower-bounds). *\)
+ *     let check id2 =
+ *       let mp2 = EcPath.mident id2 in
+ *       let r2  = NormMp.get_restr_use env mp2 in
+ *
+ *       if not (NormMp.use_mem_xp xp r2) then
+ *         re_error env (RE_UseVariableViaModule (xp, mp2));
+ *     in
+ *       EcIdent.Sid.iter check restr.ur_neg.EcEnv.us_gl
+ *   in
+ *   EcPath.Mx.iter check_xp (use.EcEnv.us_pv);
+ *
+ *   (\* We check that every abstract module [id] in [use.us_gl] satisfies the
+ *      restrictions in [restr]. *\)
+ *   let check_gl id =
+ *     let mp1 = EcPath.mident id in
+ *
+ *     if NormMp.use_mem_gl mp1 restr then
+ *       re_error env (RE_UseModule mp1);
+ *
+ *     let r1 = NormMp.get_restr_use env mp1 in
+ *
+ *     (\* We check that everything forbidden in [restr] is forbidden in [id]. *\)
+ *     let n_check_v xp2 _ =
+ *       if not (NormMp.use_mem_xp xp2 r1) then
+ *         re_error env (RE_VMissingRestriction (xp2, (xp2.x_top, mp1)))
+ *     in
+ *     Mx.iter n_check_v restr.ur_neg.EcEnv.us_pv;
+ *
+ *     (\* We check that the set of variables [id] is allowed to use is included
+ *        in the set of variables allowed in [restr]. *\)
+ *     let check_pos_v = function
+ *       | None ->
+ *         (\* If [id] can use everybody, then [restr] must allow everybody. *\)
+ *         if not (restr.ur_pos = None) then
+ *           re_error env (RE_ModuleUnrestricted (mp1))
+ *       | Some ur1 ->
+ *         let p_check_v xp2 _ =
+ *           if not (NormMp.use_mem_xp xp2 restr) then
+ *             re_error env (RE_UseVariableViaModule (xp2, mp1))
+ *         in
+ *         Mx.iter p_check_v ur1.EcEnv.us_pv
+ *     in
+ *     check_pos_v r1.ur_pos;
+ *
+ *     (\* We check that [id] memory is disjoint from the memory of all abstract
+ *        modules forbidden in [restr].
+ *        Again, nothing to do for positive restriction on abstract modules in
+ *        [restr]. *\)
+ *     let check_g id2 =
+ *       let mp2 = EcPath.mident id2 in
+ *
+ *       if not (NormMp.use_mem_gl mp2 r1) then
+ *         let r2 = NormMp.get_restr_use env mp2 in
+ *         if not (NormMp.use_mem_gl mp1 r2) then
+ *           re_error env (RE_MMissingRestriction (mp1, (mp1, mp2)));
+ *     in
+ *     EcIdent.Sid.iter check_g restr.ur_neg.EcEnv.us_gl
+ *
+ *   in
+ *   EcIdent.Sid.iter check_gl use.EcEnv.us_gl *)
+
+(* This only checks the variables restrictions, not the oracle calls. *)
+let check_restrictions_fun env xp restr =
+  let use = NormMp.fun_use env xp in
+  (* TODO: (Adrien) temporary, there are no error messages for now. *)
+  if not @@ check_restr env (RW_fun xp) use restr
+  then raise @@ tymod_cnv_failure E_TyModCnv_ParamCountMismatch
+  else ()
+
+
+
+(* -------------------------------------------------------------------- *)
+
+(* TODO: (Adrien) change this function, it is not sound. *)
 (* Check that the usage restriction are compatible w.r.t. [mode] *)
-let check_ur_compatible mode sym_in env urx1 urm1 urx2 urm2 =
-  let urx1 = ur_app (Sx.map (EcEnv.NormMp.norm_xfun env)) urx1
-  and urx2 = ur_app (Sx.map (EcEnv.NormMp.norm_xfun env)) urx2
-  and urm1 = ur_app (Sm.map (EcEnv.NormMp.norm_mpath env)) urm1
-  and urm2 = ur_app (Sm.map (EcEnv.NormMp.norm_mpath env)) urm2 in
-
-  (* We check variables restrictions compatibility. *)
-  let xcheck sl sr = match mode with
-    | `Sub ->
-      (* For negative restrictions, we check that sr is included in sl. *)
-      if not (Sx.subset sr.ur_neg sl.ur_neg) then begin
-        let sx = Sx.diff sr.ur_neg sl.ur_neg in
-        tymod_cnv_failure (E_TyModCnv_MismatchVarRestr(sym_in, false, `Sub sx))
-      end;
-      (* For positive restrictions, we check that sl is included in sr. *)
-      if not (ur_pos_subset Sx.subset sl.ur_pos sr.ur_pos) then begin
-        match sl.ur_pos, sr.ur_pos with
-        | Some sxl, Some sxr ->
-          let sx = Sx.diff sxl sxr in
-          tymod_cnv_failure (E_TyModCnv_MismatchVarRestr(sym_in, true, `Sub sx))
-        | None, Some sxr ->
-          tymod_cnv_failure
-            (E_TyModCnv_MismatchVarRestr(sym_in, true, `RevSub sxr))
-        | _, None -> assert false
-      end;
-
-  | `Eq  ->
-    if not (Sx.equal sl.ur_neg sr.ur_neg) then begin
-      tymod_cnv_failure
-        (E_TyModCnv_MismatchVarRestr(sym_in, false, `Eq(sl.ur_neg,sr.ur_neg)))
-    end;
-    if not (opt_equal Sx.equal sl.ur_pos sr.ur_pos) then begin
-      tymod_cnv_failure
-        (E_TyModCnv_MismatchVarRestr(sym_in, true, `OEq(sl.ur_pos,sr.ur_pos)))
-    end;
-  in
-
-  (* We check abstract modules restrictions compatibility. *)
-  let mcheck sl sr = match mode with
-    | `Sub ->
-      (* For negative restrictions, we check that sr is included in sl. *)
-      if not (Sm.subset sr.ur_neg sl.ur_neg) then begin
-        let sx = Sm.diff sr.ur_neg sl.ur_neg in
-        tymod_cnv_failure (E_TyModCnv_MismatchModRestr(sym_in, false, `Sub sx))
-      end;
-      (* For positive restrictions, we check that sl is included in sr. *)
-      if not (ur_pos_subset Sm.subset sl.ur_pos sr.ur_pos) then begin
-        match sl.ur_pos, sr.ur_pos with
-        | Some sml, Some smr ->
-          let sm = Sm.diff sml smr in
-          tymod_cnv_failure
-            (E_TyModCnv_MismatchModRestr(sym_in, true, `Sub sm))
-        | None, Some smr ->
-          tymod_cnv_failure
-            (E_TyModCnv_MismatchModRestr(sym_in, true, `RevSub smr))
-        | _, None -> assert false
-      end;
-
-    | `Eq  ->
-      if not (Sm.equal sl.ur_neg sr.ur_neg) then begin
-        tymod_cnv_failure
-          (E_TyModCnv_MismatchModRestr(sym_in, false, `Eq(sl.ur_neg,sr.ur_neg)))
-      end;
-      if not (opt_equal Sm.equal sl.ur_pos sr.ur_pos) then begin
-        tymod_cnv_failure
-          (E_TyModCnv_MismatchModRestr(sym_in, true, `OEq(sl.ur_pos,sr.ur_pos)))
-      end;
-  in
-
-  xcheck urx1 urx2;
-  mcheck urm1 urm2
+(* let check_ur_compatible mode sym_in env urx1 urm1 urx2 urm2 =
+ *   let urx1 = ur_app (Sx.map (EcEnv.NormMp.norm_xfun env)) urx1
+ *   and urx2 = ur_app (Sx.map (EcEnv.NormMp.norm_xfun env)) urx2
+ *   and urm1 = ur_app (Sm.map (EcEnv.NormMp.norm_mpath env)) urm1
+ *   and urm2 = ur_app (Sm.map (EcEnv.NormMp.norm_mpath env)) urm2 in
+ *
+ *   (\* We check variables restrictions compatibility. *\)
+ *   let xcheck sl sr = match mode with
+ *     | `Sub ->
+ *       (\* For negative restrictions, we check that sr is included in sl. *\)
+ *       if not (Sx.subset sr.ur_neg sl.ur_neg) then begin
+ *         let sx = Sx.diff sr.ur_neg sl.ur_neg in
+ *         tymod_cnv_failure (E_TyModCnv_MismatchVarRestr(sym_in, false, `Sub sx))
+ *       end;
+ *       (\* For positive restrictions, we check that sl is included in sr. *\)
+ *       if not (ur_pos_subset Sx.subset sl.ur_pos sr.ur_pos) then begin
+ *         match sl.ur_pos, sr.ur_pos with
+ *         | Some sxl, Some sxr ->
+ *           let sx = Sx.diff sxl sxr in
+ *           tymod_cnv_failure (E_TyModCnv_MismatchVarRestr(sym_in, true, `Sub sx))
+ *         | None, Some sxr ->
+ *           tymod_cnv_failure
+ *             (E_TyModCnv_MismatchVarRestr(sym_in, true, `RevSub sxr))
+ *         | _, None -> assert false
+ *       end;
+ *
+ *   | `Eq  ->
+ *     if not (Sx.equal sl.ur_neg sr.ur_neg) then begin
+ *       tymod_cnv_failure
+ *         (E_TyModCnv_MismatchVarRestr(sym_in, false, `Eq(sl.ur_neg,sr.ur_neg)))
+ *     end;
+ *     if not (opt_equal Sx.equal sl.ur_pos sr.ur_pos) then begin
+ *       tymod_cnv_failure
+ *         (E_TyModCnv_MismatchVarRestr(sym_in, true, `OEq(sl.ur_pos,sr.ur_pos)))
+ *     end;
+ *   in
+ *
+ *   (\* We check abstract modules restrictions compatibility. *\)
+ *   let mcheck sl sr = match mode with
+ *     | `Sub ->
+ *       (\* For negative restrictions, we check that sr is included in sl. *\)
+ *       if not (Sm.subset sr.ur_neg sl.ur_neg) then begin
+ *         let sx = Sm.diff sr.ur_neg sl.ur_neg in
+ *         tymod_cnv_failure (E_TyModCnv_MismatchModRestr(sym_in, false, `Sub sx))
+ *       end;
+ *       (\* For positive restrictions, we check that sl is included in sr. *\)
+ *       if not (ur_pos_subset Sm.subset sl.ur_pos sr.ur_pos) then begin
+ *         match sl.ur_pos, sr.ur_pos with
+ *         | Some sml, Some smr ->
+ *           let sm = Sm.diff sml smr in
+ *           tymod_cnv_failure
+ *             (E_TyModCnv_MismatchModRestr(sym_in, true, `Sub sm))
+ *         | None, Some smr ->
+ *           tymod_cnv_failure
+ *             (E_TyModCnv_MismatchModRestr(sym_in, true, `RevSub smr))
+ *         | _, None -> assert false
+ *       end;
+ *
+ *     | `Eq  ->
+ *       if not (Sm.equal sl.ur_neg sr.ur_neg) then begin
+ *         tymod_cnv_failure
+ *           (E_TyModCnv_MismatchModRestr(sym_in, false, `Eq(sl.ur_neg,sr.ur_neg)))
+ *       end;
+ *       if not (opt_equal Sm.equal sl.ur_pos sr.ur_pos) then begin
+ *         tymod_cnv_failure
+ *           (E_TyModCnv_MismatchModRestr(sym_in, true, `OEq(sl.ur_pos,sr.ur_pos)))
+ *       end;
+ *   in
+ *
+ *   xcheck urx1 urx2;
+ *   mcheck urm1 urm2 *)
 
 let rec check_sig_cnv mode env sym_in (sin:module_sig) (sout:module_sig) =
   (* Check parameters for compatibility. Parameters names may be
@@ -594,11 +819,15 @@ let rec check_sig_cnv mode env sym_in (sin:module_sig) (sout:module_sig) =
   and rout = EcSubst.subst_mod_restr bsubst sout.mis_restr in
 
   (* Check for restrictions inclusion. *)
-  check_ur_compatible mode sym_in env
-    sin.mis_restr.mr_xpaths
-    sin.mis_restr.mr_mpaths
-    rout.mr_xpaths
-    rout.mr_mpaths;
+  check_restriction_mode mode env RW_type sin.mis_restr sout.mis_restr;
+
+
+  (* REM *)
+  (* check_ur_compatible mode sym_in env
+   *   sin.mis_restr.mr_xpaths
+   *   sin.mis_restr.mr_mpaths
+   *   rout.mr_xpaths
+   *   rout.mr_mpaths; *)
 
   (* Check for body inclusion.
    * This includes:
@@ -653,90 +882,6 @@ and check_modtype_cnv
 let check_sig_mt_cnv env sym_in sin tyout =
   let sout = EcEnv.ModTy.sig_of_mt env tyout in
   check_sig_cnv `Sub env sym_in sin sout
-
-(* -------------------------------------------------------------------- *)
-
-(* This only checks the variables restrictions, not the oracle calls. *)
-let check_restrictions env who use restr =
-  let re_error = fun env x -> raise (RestrictionError (env, (who, x))) in
-
-  let restr = NormMp.restr_use env restr in
-
-  let check_xp xp _ =
-    (* We check that the variable is not forbidden in [restr]. *)
-    if NormMp.use_mem_xp xp restr then
-      re_error env (RE_UseVariable xp);
-
-    (* We check that the variable is forbidden in all abstract modules forbidden
-       in [restr].
-       For abstract modules in the positive part of [restr], we do nothing,
-       since we only have upper-bounds on what they may use (and no
-       lower-bounds). *)
-    let check id2 =
-      let mp2 = EcPath.mident id2 in
-      let r2  = NormMp.get_restr_use env mp2 in
-
-      if not (NormMp.use_mem_xp xp r2) then
-        re_error env (RE_UseVariableViaModule (xp, mp2));
-    in
-      EcIdent.Sid.iter check restr.ur_neg.EcEnv.us_gl
-  in
-  EcPath.Mx.iter check_xp (use.EcEnv.us_pv);
-
-  (* We check that every abstract module [id] in [use.us_gl] satisfies the
-     restrictions in [restr]. *)
-  let check_gl id =
-    let mp1 = EcPath.mident id in
-
-    if NormMp.use_mem_gl mp1 restr then
-      re_error env (RE_UseModule mp1);
-
-    let r1 = NormMp.get_restr_use env mp1 in
-
-    (* We check that everything forbidden in [restr] is forbidden in [id]. *)
-    let n_check_v xp2 _ =
-      if not (NormMp.use_mem_xp xp2 r1) then
-        re_error env (RE_VMissingRestriction (xp2, (xp2.x_top, mp1)))
-    in
-    Mx.iter n_check_v restr.ur_neg.EcEnv.us_pv;
-
-    (* We check that the set of variables [id] is allowed to use is included
-       in the set of variables allowed in [restr]. *)
-    let check_pos_v = function
-      | None ->
-        (* If [id] can use everybody, then [restr] must allow everybody. *)
-        if not (restr.ur_pos = None) then
-          re_error env (RE_ModuleUnrestricted (mp1))
-      | Some ur1 ->
-        let p_check_v xp2 _ =
-          if not (NormMp.use_mem_xp xp2 restr) then
-            re_error env (RE_UseVariableViaModule (xp2, mp1))
-        in
-        Mx.iter p_check_v ur1.EcEnv.us_pv
-    in
-    check_pos_v r1.ur_pos;
-
-    (* We check that [id] memory is disjoint from the memory of all abstract
-       modules forbidden in [restr].
-       Again, nothing to do for positive restriction on abstract modules in
-       [restr]. *)
-    let check_g id2 =
-      let mp2 = EcPath.mident id2 in
-
-      if not (NormMp.use_mem_gl mp2 r1) then
-        let r2 = NormMp.get_restr_use env mp2 in
-        if not (NormMp.use_mem_gl mp1 r2) then
-          re_error env (RE_MMissingRestriction (mp1, (mp1, mp2)));
-    in
-    EcIdent.Sid.iter check_g restr.ur_neg.EcEnv.us_gl
-
-  in
-  EcIdent.Sid.iter check_gl use.EcEnv.us_gl
-
-(* This only checks the variables restrictions, not the oracle calls. *)
-let check_restrictions_fun env xp restr =
-  let use = NormMp.fun_use env xp in
-  check_restrictions env (RW_fun xp) use restr
 
 (* -------------------------------------------------------------------- *)
 let check_modtype_with_restrictions env mp mt i =
