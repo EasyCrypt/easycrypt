@@ -168,15 +168,6 @@ val mr_equal : mod_restr -> mod_restr -> bool
 val mr_add_restr :
   mod_restr -> EcPath.Sx.t use_restr -> EcPath.Sm.t use_restr -> mod_restr
 
-(* [mr_union mr1 mr2]
-   This computes the union of [mr1] and [mr2], in the sense that the resulting
-   restriction is more restrictive that both [mr1] and [mr2]. *)
-val mr_union : mod_restr -> mod_restr -> mod_restr
-
-(* This computes the intersection of [mr1] and [mr2], in the sense that the
- resulting restriction is less restrictive than both [mr1] and [mr2]. *)
-val mr_inter : mod_restr -> mod_restr -> mod_restr
-
 val add_oinfo      : mod_restr -> string -> xpath list -> bool -> mod_restr
 val change_oicalls : mod_restr -> string -> xpath list -> mod_restr
 val oicalls_filter :

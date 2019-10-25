@@ -619,34 +619,6 @@ let mr_add_restr mr (rx : Sx.t use_restr) (rm : Sm.t use_restr) =
     mr_mpaths = ur_union Sm.union Sm.inter mr.mr_mpaths rm;
     mr_oinfos = mr.mr_oinfos; }
 
-(* This computes the union of [mr1] and [mr2], in the sense that the resulting
-   restriction is more restrictive than both [mr1] and [mr2]. *)
-let mr_union mr1 mr2 =
-  { mr_xpaths = ur_union Sx.union Sx.inter mr1.mr_xpaths mr2.mr_xpaths;
-    mr_mpaths = ur_union Sm.union Sm.inter mr1.mr_mpaths mr2.mr_mpaths;
-    mr_oinfos = Msym.inter (fun _ oi1 oi2 ->
-        let inter =
-          Sx.inter
-            (Sx.of_list oi1.oi_calls)
-            (Sx.of_list oi2.oi_calls) in
-        Some { oi_calls = Sx.ntr_elements inter;
-               oi_in = oi1.oi_in && oi2.oi_in; }
-      ) mr1.mr_oinfos mr2.mr_oinfos; }
-
-(* This computes the intersection of [mr1] and [mr2], in the sense that the
- resulting restriction is less restrictive than both [mr1] and [mr2]. *)
-let mr_inter mr1 mr2 =
-  { mr_xpaths = ur_inter Sx.union Sx.inter mr1.mr_xpaths mr2.mr_xpaths;
-    mr_mpaths = ur_inter Sm.union Sm.inter mr1.mr_mpaths mr2.mr_mpaths;
-    mr_oinfos = Msym.inter (fun _ oi1 oi2 ->
-        let inter =
-          Sx.union
-            (Sx.of_list oi1.oi_calls)
-            (Sx.of_list oi2.oi_calls) in
-        Some { oi_calls = Sx.ntr_elements inter;
-               oi_in = oi1.oi_in || oi2.oi_in; }
-      ) mr1.mr_oinfos mr2.mr_oinfos; }
-
 let add_oinfo restr f ocalls oin =
   { restr with
     mr_oinfos = Msym.add f { oi_calls = ocalls; oi_in = oin; } restr.mr_oinfos }
