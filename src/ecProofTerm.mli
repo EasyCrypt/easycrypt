@@ -23,7 +23,7 @@ type apperror =
   | AE_CannotInferMod
   | AE_NotFunctional
   | AE_InvalidArgForm     of invalid_arg_form
-  | AE_InvalidArgMod
+  | AE_InvalidArgMod      of EcTyping.tymod_cnv_failure
   | AE_InvalidArgProof    of (form * form)
   | AE_InvalidArgModRestr of EcTyping.restriction_error
 

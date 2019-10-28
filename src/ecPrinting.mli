@@ -100,3 +100,6 @@ module ObjectInfo : sig
   val pr_mty : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_any : Format.formatter -> EcEnv.env -> qsymbol -> unit
 end
+
+(* -------------------------------------------------------------------- *)
+val pp_use : Format.formatter -> EcEnv.env -> EcEnv.use -> unit

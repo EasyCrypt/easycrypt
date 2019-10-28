@@ -32,24 +32,42 @@ type mismatch_funsig =
 | MF_tres  of ty * ty (* expected, got *)
 | MF_restr of EcEnv.env * Sx.t mismatch_sets
 
-type 'a mismatch_restr = [
-  | `Eq of 'a * 'a
-  | `OEq of 'a option * 'a option
-  | `Sub of 'a
-  | `RevSub of 'a
+type restr_failure = Sx.t * Sm.t
+
+type restr_eq_failure = Sx.t * Sm.t * Sx.t * Sm.t
+
+type mismatch_restr = [
+  | `Sub of restr_failure             (* Should not be allowed *)
+  | `RevSub of restr_failure option   (* Should be allowed. None is everybody *)
+  | `Eq of restr_eq_failure           (* Should be equal *)
 ]
 
+type restriction_who =
+| RW_mod of EcPath.mpath
+| RW_fun of EcPath.xpath
+
+(* TODO: (Adrien) old errors *)
+type restriction_err =
+| RE_UseVariable               of EcPath.xpath
+| RE_UseVariableViaModule      of EcPath.xpath * EcPath.mpath
+| RE_UseModule                 of EcPath.mpath
+| RE_VMissingRestriction       of EcPath.xpath * EcPath.mpath pair
+| RE_MMissingRestriction       of EcPath.mpath * EcPath.mpath pair
+| RE_ModuleUnrestricted        of EcPath.mpath
+
+type restriction_error = restriction_who * [
+  | `Sub of restr_failure              (* Should not be allowed *)
+  | `RevSub of restr_failure option    (* Should be allowed *)
+]
+
+exception RestrictionError of EcEnv.env * restriction_error
 
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
 
-(* [bool] is true iff the positive restriction failed *)
-| E_TyModCnv_MismatchVarRestr  of symbol * bool * Sx.t mismatch_restr
-
-(* [bool] is true iff the positive restriction failed *)
-| E_TyModCnv_MismatchModRestr  of symbol * bool * Sm.t mismatch_restr
+| E_TyModCnv_MismatchRestr of symbol * mismatch_restr
 
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
 | E_TyModCnv_SubTypeArg        of
@@ -200,22 +218,6 @@ val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
 
 (* -------------------------------------------------------------------- *)
-type restriction_who =
-| RW_type                         (* For (sub)typing *)
-| RW_mod of EcPath.mpath
-| RW_fun of EcPath.xpath
-
-type restriction_err =
-| RE_UseVariable               of EcPath.xpath
-| RE_UseVariableViaModule      of EcPath.xpath * EcPath.mpath
-| RE_UseModule                 of EcPath.mpath
-| RE_VMissingRestriction       of EcPath.xpath * EcPath.mpath pair
-| RE_MMissingRestriction       of EcPath.mpath * EcPath.mpath pair
-| RE_ModuleUnrestricted        of EcPath.mpath
-
-type restriction_error = restriction_who * restriction_err
-
-exception RestrictionError of EcEnv.env * restriction_error
 
 (* This only checks the variables restrictions, not the oracle calls. *)
 val check_restrictions_fun :

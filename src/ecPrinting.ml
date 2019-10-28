@@ -3026,3 +3026,29 @@ module ObjectInfo = struct
     if !ok = 0 then
       Format.fprintf fmt "%s@." "no such object in any category"
 end
+
+(* ------------------------------------------------------------------ *)
+let pp_use fmt env us =
+  let open EcEnv in
+  let open EcPath in
+  let ppe = PPEnv.ofenv env in
+  let pp_v fmt xp =
+    Format.fprintf fmt "%a"
+      (pp_pv ppe) (pv_glob xp) in
+  let pp_m fmt m =
+    Format.fprintf fmt "%a"
+      (pp_topmod ppe) m in
+
+  let sm =
+    EcIdent.Mid.fold (fun x _ sm ->
+        Sm.add (EcPath.mident x) sm
+      ) us.us_gl Sm.empty in
+
+  Format.fprintf fmt "@[<v 0>Abstract modules [# = %d]:@ @[<h>%a@]@;"
+    (Sid.cardinal us.us_gl)
+    (pp_list "@ " pp_m)
+    (Sm.ntr_elements sm);
+  Format.fprintf fmt "Variables [# = %d]:@ @[<h>%a@]@;@]@."
+    (Mx.cardinal us.us_pv)
+    (pp_list "@ " pp_v)
+    (Sx.ntr_elements (Mx.map (fun _ -> ()) us.us_pv))

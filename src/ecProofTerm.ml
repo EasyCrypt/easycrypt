@@ -52,7 +52,7 @@ type apperror =
   | AE_CannotInferMod
   | AE_NotFunctional
   | AE_InvalidArgForm     of invalid_arg_form
-  | AE_InvalidArgMod
+  | AE_InvalidArgMod      of EcTyping.tymod_cnv_failure
   | AE_InvalidArgProof    of (form * form)
   | AE_InvalidArgModRestr of EcTyping.restriction_error
 
@@ -544,12 +544,8 @@ and trans_pterm_arg_mod pe { pl_desc = arg; pl_loc = loc; } =
   let env  = LDecl.toenv pe.pte_hy in
 
   (* TODO: (Adrien) is this correct? *)
-  let comp_sig (mp, smpl_sig) =
+  let comp_sig (mp, _) =
     let msig = NormMp.sig_of_mp env mp in
-
-    (* Sanity check. *)
-    assert (EcModules.sig_smpl_sig_coincide msig smpl_sig);
-
     (mp, msig) in
 
   let mod_ = (fun () -> EcTyping.trans_msymbol env mp
@@ -666,10 +662,10 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
           EcPV.check_module_in env mp emt;
           (Fsubst.f_subst_mod x mp f, PAModule (mp, mt))
         with
-        | EcTyping.TymodCnvFailure _ ->
-            tc_pterm_apperror ?loc pe AE_InvalidArgMod
         | EcTyping.RestrictionError (_, e) ->
-            tc_pterm_apperror ?loc pe (AE_InvalidArgModRestr e)
+          tc_pterm_apperror ?loc pe (AE_InvalidArgModRestr e)
+        | EcTyping.TymodCnvFailure e ->
+            tc_pterm_apperror ?loc pe (AE_InvalidArgMod e)
       end
       | arg ->
          let ak = argkind_of_ptarg arg in
