@@ -584,7 +584,7 @@ and ur_allowed env who
 and use_allowed env who
     (use : EcEnv.use option)
     (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
-  (* We have two cases, depending on whether [rm.ur_pos] is everybody or not. *)
+  (* We have two cases, depending on whether [use] is everybody or not. *)
   match use with
   | None -> everything_allowed env who pr r
 
