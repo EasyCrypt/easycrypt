@@ -102,4 +102,6 @@ module ObjectInfo : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val pp_use : Format.formatter -> EcEnv.env -> EcEnv.use -> unit
+val pp_use : PPEnv.t -> Format.formatter -> EcEnv.use -> unit
+val pp_use_restr :
+  PPEnv.t -> Format.formatter -> EcEnv.use EcModules.use_restr -> unit

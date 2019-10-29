@@ -531,6 +531,8 @@ let pp_orclinfo ppe fmt (sym, oi) =
     (pp_list "@ " (pp_funname ppe)) oi.oi_calls
 
 (* -------------------------------------------------------------------- *)
+let all_mem_sym = "+all mem"
+
 let pp_restr_s fmt = function
   | true -> Format.fprintf fmt "+"
   | false -> Format.fprintf fmt "-"
@@ -547,7 +549,7 @@ let pp_restr ppe fmt mr =
   let pp_ois fmt ois =
     pp_list ",@ " (pp_orclinfo ppe) fmt (Msym.bindings ois) in
   let pp_top fmt b =
-    if b then Format.fprintf fmt "+all mem" else () in
+    if b then Format.fprintf fmt "%s" all_mem_sym else () in
 
   let printed = ref (not @@ EcPath.Sx.is_empty mr.mr_xpaths.ur_neg) in
   let pp_sep fmt b =
@@ -3028,27 +3030,63 @@ module ObjectInfo = struct
 end
 
 (* ------------------------------------------------------------------ *)
-let pp_use fmt env us =
-  let open EcEnv in
-  let open EcPath in
-  let ppe = PPEnv.ofenv env in
-  let pp_v fmt xp =
-    Format.fprintf fmt "%a"
-      (pp_pv ppe) (pv_glob xp) in
-  let pp_m fmt m =
-    Format.fprintf fmt "%a"
-      (pp_topmod ppe) m in
+type ppsign = SNone | SPlus | SMinus
 
-  let sm =
-    EcIdent.Mid.fold (fun x _ sm ->
-        Sm.add (EcPath.mident x) sm
-      ) us.us_gl Sm.empty in
+let pp_sign fmt = function
+  | SNone  -> ()
+  | SPlus  -> pp_restr_s fmt true
+  | SMinus -> pp_restr_s fmt false
+
+let pp_v ~sign ppe fmt xp =
+  Format.fprintf fmt "%a%a"
+    pp_sign sign
+    (pp_pv ppe) (pv_glob xp)
+
+let pp_m ~sign ppe fmt m =
+  Format.fprintf fmt "%a%a"
+    pp_sign sign
+    (pp_topmod ppe) m
+
+let sm_of_mid mid =
+  EcIdent.Mid.fold (fun x _ sm ->
+      EcPath.Sm.add (EcPath.mident x) sm
+    ) mid EcPath.Sm.empty
+
+let pp_use ppe fmt us =
+  let open EcEnv in
+  let sm = sm_of_mid us.us_gl in
 
   Format.fprintf fmt "@[<v 0>Abstract modules [# = %d]:@ @[<h>%a@]@;"
     (Sid.cardinal us.us_gl)
-    (pp_list "@ " pp_m)
-    (Sm.ntr_elements sm);
-  Format.fprintf fmt "Variables [# = %d]:@ @[<h>%a@]@;@]@."
-    (Mx.cardinal us.us_pv)
-    (pp_list "@ " pp_v)
-    (Sx.ntr_elements (Mx.map (fun _ -> ()) us.us_pv))
+    (pp_list "@ " (pp_m ~sign:SNone ppe))
+    (EcPath.Sm.ntr_elements sm);
+  Format.fprintf fmt "Variables [# = %d]:@ @[<h>%a@]@;@]"
+    (EcPath.Mx.cardinal us.us_pv)
+    (pp_list "@ " (pp_v ~sign:SNone ppe))
+    (EcPath.Sx.ntr_elements (EcPath.Mx.map (fun _ -> ()) us.us_pv))
+
+let pp_use_restr ppe fmt ur =
+  let open EcEnv in
+
+  let sm_p = omap (fun x -> sm_of_mid x.us_gl) ur.EcModules.ur_pos
+  and sm_n = sm_of_mid ur.EcModules.ur_neg.us_gl in
+
+  let sx_p =
+    omap (fun x -> EcPath.Mx.map (fun _ -> ())x.us_pv) ur.EcModules.ur_pos
+  and sx_n =
+    EcPath.Mx.map (fun _ -> ()) ur.EcModules.ur_neg.us_pv in
+
+  Format.fprintf fmt "@[<v 0>Abstract modules:@ @[<h>%a@]@ @[<h>%a@]@;"
+    (fun fmt opt -> match opt with
+      | None      -> Format.fprintf fmt "%s" all_mem_sym
+      | Some sm_p -> pp_list "@ " (pp_m ~sign:SPlus ppe) fmt sm_p)
+    (omap EcPath.Sm.ntr_elements sm_p)
+    (pp_list "@ " (pp_m ~sign:SMinus ppe))
+    (EcPath.Sm.ntr_elements sm_n);
+  Format.fprintf fmt "Variables:@ @[<h>%a@]@ @[<h>%a@]@;@]"
+    (fun fmt opt -> match opt with
+      | None      -> Format.fprintf fmt "%s" all_mem_sym
+      | Some sm_p -> pp_list "@ " (pp_v ~sign:SPlus ppe) fmt sm_p)
+    (omap EcPath.Sx.ntr_elements sx_p)
+    (pp_list "@ " (pp_v ~sign:SMinus ppe))
+    (EcPath.Sx.ntr_elements sx_n);
