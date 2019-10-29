@@ -569,7 +569,7 @@ let pp_restr ppe fmt mr =
   let all_mem =
     mr.mr_xpaths.ur_pos = None || mr.mr_mpaths.ur_pos = None in
 
-  Format.fprintf fmt "{@[%a%a%a%a%a%a%a%a%a%a@[<hv 2>@,%a@]@]}"
+  Format.fprintf fmt "{@[%a%a%a%a%a%a%a%a%a%a%a@]}"
     (pp_rx false) mr.mr_xpaths.ur_neg
     pp_sep (EcPath.Sm.is_empty mr.mr_mpaths.ur_neg)
     (pp_r false) mr.mr_mpaths.ur_neg
