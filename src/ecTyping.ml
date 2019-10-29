@@ -572,7 +572,10 @@ let rec everything_allowed env
     (pr : EcEnv.use option) (r : EcEnv.use use_restr) : unit =
   match pr, r.ur_pos with
   | None, _ -> ()
-  | Some _, Some _ -> raise @@ RestrErr (`RevSub None)
+  | Some pr, Some rup when EcIdent.Sid.is_empty pr.EcEnv.us_gl
+                        && EcIdent.Sid.is_empty rup.EcEnv.us_gl ->
+    raise @@ RestrErr (`RevSub None)
+  | Some _, Some _ -> assert false (* FIXME: probably using some dummy variable *)
   | Some pr, None ->
     (* In that case, we need [r.ur_neg] to forbid only variables that are
        allowed in [pr], i.e. we require that:
@@ -594,15 +597,44 @@ and all_mod_allowed env (sm : EcIdent.Sid.t)
   if not @@ Sm.is_empty not_allowed then
     re_perror (Sx.empty, not_allowed)
 
+(* Is [m] directly allowed. This is sound but not complete (hence a negative
+   answer does not mean that [m] is forbidden). *)
+and direct_mod_allowed
+    (m : EcIdent.t) (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
+  match pr with
+  | None -> true
+  | Some pr ->
+    if EcIdent.Sid.mem m pr.EcEnv.us_gl
+    then true
+    else if EcIdent.Sid.is_empty r.ur_neg.EcEnv.us_gl
+         && Mx.is_empty r.ur_neg.EcEnv.us_pv
+    then match r.ur_pos with
+      | None -> true
+      | Some rur -> EcIdent.Sid.mem m rur.EcEnv.us_gl
+    else false
+
 (* Is [m] allowed in the union of the positive restriction [pr] and the
    positive and negative restriction [r]. *)
 and mod_allowed env
     (m : EcIdent.t) (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
-  let mp = EcPath.mident m in
-  let rm  = NormMp.get_restr_use env mp in
 
-  try ur_allowed env rm pr r; true with
-    RestrErr _ -> false
+  if direct_mod_allowed m pr r
+  then true
+  else
+    let mp = EcPath.mident m in
+    let rm  = NormMp.get_restr_use env mp in
+
+    (* (\* REM *\)
+     * let ppe = EcPrinting.PPEnv.ofenv env in
+     * Format.eprintf "@[<v>mod_allowed %a:@;%a@;Subtypes:@;%a@;%a@;@]%!"
+     *   EcPath.pp_m mp
+     *   (EcPrinting.pp_use_restr env ~print_abstract:true) rm
+     *   (EcPrinting.pp_opt (EcPrinting.pp_use ppe)) pr
+     *   (EcPrinting.pp_use_restr env ~print_abstract:true) r; *)
+
+
+    try ur_allowed env rm pr r; true with
+      RestrErr _ -> false
 
 (* Is [ur] allowed in the union of the positive restriction [pr] and the
    positive and negative restriction [r]. *)
