@@ -34,6 +34,7 @@ type 'a pp = Format.formatter -> 'a -> unit
 val pp_id    : 'a pp -> 'a pp
 val pp_if    : bool -> 'a pp -> 'a pp -> 'a pp
 val pp_maybe : bool -> ('a pp -> 'a pp) -> 'a pp -> 'a pp
+val pp_opt   : 'a pp -> 'a option pp
 
 val pp_enclose:
        pre:('a, 'b, 'c, 'd, 'd, 'a) format6
@@ -104,4 +105,5 @@ end
 (* -------------------------------------------------------------------- *)
 val pp_use : PPEnv.t -> Format.formatter -> EcEnv.use -> unit
 val pp_use_restr :
-  PPEnv.t -> Format.formatter -> EcEnv.use EcModules.use_restr -> unit
+  EcEnv.env -> print_abstract:bool ->
+  Format.formatter -> EcEnv.use EcModules.use_restr -> unit

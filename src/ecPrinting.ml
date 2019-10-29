@@ -381,6 +381,11 @@ let pp_maybe c tx pp fmt x =
   pp_if c (tx pp) pp fmt x
 
 (* -------------------------------------------------------------------- *)
+let pp_opt pp_el fmt = function
+  | None   -> Format.fprintf fmt "None"
+  | Some x -> Format.fprintf fmt "Some %a" pp_el x
+
+(* -------------------------------------------------------------------- *)
 let rec pp_list sep pp fmt xs =
   let pp_list = pp_list sep pp in
     match xs with
@@ -3047,6 +3052,15 @@ let pp_m ~sign ppe fmt m =
     pp_sign sign
     (pp_topmod ppe) m
 
+let pp_m_xt ~print_abstract ~sign env fmt m =
+  let ppe = PPEnv.ofenv env in
+  if print_abstract then
+    let r = EcEnv.NormMp.get_restr env m in
+    Format.fprintf fmt "%a%a"
+      (pp_m ~sign ppe) m
+      (pp_restr ppe) r
+  else pp_m ~sign ppe fmt m
+
 let sm_of_mid mid =
   EcIdent.Mid.fold (fun x _ sm ->
       EcPath.Sm.add (EcPath.mident x) sm
@@ -3065,8 +3079,9 @@ let pp_use ppe fmt us =
     (pp_list "@ " (pp_v ~sign:SNone ppe))
     (EcPath.Sx.ntr_elements (EcPath.Mx.map (fun _ -> ()) us.us_pv))
 
-let pp_use_restr ppe fmt ur =
+let pp_use_restr env ~print_abstract fmt ur =
   let open EcEnv in
+  let ppe = PPEnv.ofenv env in
 
   let sm_p = omap (fun x -> sm_of_mid x.us_gl) ur.EcModules.ur_pos
   and sm_n = sm_of_mid ur.EcModules.ur_neg.us_gl in
@@ -3078,11 +3093,14 @@ let pp_use_restr ppe fmt ur =
 
   Format.fprintf fmt "@[<v 0>Abstract modules:@ @[<h>%a@]@ @[<h>%a@]@;"
     (fun fmt opt -> match opt with
-      | None      -> Format.fprintf fmt "%s" all_mem_sym
-      | Some sm_p -> pp_list "@ " (pp_m ~sign:SPlus ppe) fmt sm_p)
+       | None      ->
+         Format.fprintf fmt "%s" all_mem_sym
+      | Some sm_p ->
+        pp_list "@ " (pp_m_xt ~print_abstract ~sign:SPlus env) fmt sm_p)
     (omap EcPath.Sm.ntr_elements sm_p)
-    (pp_list "@ " (pp_m ~sign:SMinus ppe))
+    (pp_list "@ " (pp_m_xt ~print_abstract ~sign:SMinus env))
     (EcPath.Sm.ntr_elements sm_n);
+
   Format.fprintf fmt "Variables:@ @[<h>%a@]@ @[<h>%a@]@;@]"
     (fun fmt opt -> match opt with
       | None      -> Format.fprintf fmt "%s" all_mem_sym
