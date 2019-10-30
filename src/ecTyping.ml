@@ -1542,6 +1542,7 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
   in
   let env  = EcEnv.Mod.enter name margs env in
   let body, mr = transmodsig_body env sa modty.pmsig_body in
+  assert (Msym.cardinal mr.mr_oinfos = List.length body);
   { mis_params = margs;
     mis_body   = body;
     mis_restr  = mr; }
@@ -1629,24 +1630,28 @@ and transmodsig_body
 
       let calls = mk_calls restr in
 
-      let add mr (Tys_function fs) =
+      let update_mr mr (Tys_function fs) =
         names := mk_loc (loc i) fs.fs_name :: !names;
         EcModules.change_oicalls mr fs.fs_name calls in
 
-      let mr = match proc with
-        | None -> List.fold_left add mr sig_.mis_body
+      let mr, body = match proc with
+        | None -> List.fold_left update_mr mr sig_.mis_body, sig_.mis_body
         | Some (`Include_proc xs) ->
           check_xs xs;
           List.fold_left
-            (fun mr fs -> if in_xs fs xs then add mr fs else mr)
-            mr sig_.mis_body
+            (fun (mr, body) fs ->
+               if in_xs fs xs then (update_mr mr fs,fs :: body)
+               else (mr, body))
+            (mr,[]) sig_.mis_body
         | Some (`Exclude_proc xs) ->
           check_xs xs;
           List.fold_left
-            (fun mr fs -> if not (in_xs fs xs) then add mr fs else mr)
-            mr sig_.mis_body in
+            (fun (mr, body) fs ->
+               if not (in_xs fs xs) then (update_mr mr fs, fs :: body)
+               else (mr, body))
+            (mr,[]) sig_.mis_body in
 
-      sig_.mis_body, mr in
+      body, mr in
 
   let items, mr = List.fold_left (fun (its,mr) i ->
       let l, mr = transsig1 mr i in
