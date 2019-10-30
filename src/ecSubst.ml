@@ -287,7 +287,8 @@ and subst_module (s : _subst) (m : module_expr) =
 
   let me_body   = subst_module_body sbody m.me_body in
   let me_comps  = subst_module_comps sbody m.me_comps in
-    { m with me_body; me_comps; me_params; }
+  let me_sig_body = subst_modsig_body sbody m.me_sig_body in
+  { me_name = m.me_name; me_body; me_comps; me_params; me_sig_body }
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =
