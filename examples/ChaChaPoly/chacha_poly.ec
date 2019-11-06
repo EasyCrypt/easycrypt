@@ -1154,7 +1154,7 @@ section PROOFS.
     move: hdec; rewrite in_ns /dec /genpoly1305 /test_poly /= /get nth_index 1://.
     case: (mk_rs (oget RO.m{2}.[(n, C.ofint 0)])) => r s /=.
     case: (t = poly1305 r s (topol a c)) => // heq _.
-    apply hasP; exists (topol a c, t) => /=;split; 2:by rewrite heq.
+    apply List.hasP; exists (topol a c, t) => /=;split; 2:by rewrite heq.
     by apply mapP; exists (n, a, c, t) => /=; apply mem_filter.
   qed.
 
@@ -2515,10 +2515,10 @@ section PROOFS.
     have -> := LP.list_partitioning UFCMA_l () E phi (iota_ 0 qdec) &m (iota_uniq 0 qdec).
     have -> /= : Pr[UFCMA_l.f() @ &m : E tt (glob UFCMA_l) res /\ ! (phi tt (glob UFCMA_l) res \in iota_ 0 qdec)] = 0%r.
     + byphoare => //. 
-      by hoare; conseq (:true) => // /> *; smt (has_find hasP mem_iota find_ge0).
+      by hoare; conseq (:true) => // /> *; smt (List.has_find List.hasP mem_iota find_ge0).
     apply StdBigop.Bigreal.ler_sum_seq => i /mem_iota hi _ /=.
     byequiv (:_ ==> ={UFCMA_l.lbad1})=> //; first by sim.
-    smt (nth_find hasP).
+    smt (nth_find List.hasP).
   qed.
 
   local module UFCMA_li = {
