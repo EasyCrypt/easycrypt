@@ -1849,7 +1849,7 @@ module Mod = struct
           lookup_error (`MPath p)
 
       | Some (params, o) ->
-          let ((spi, params), op) = MC._downpath_for_mod false env ip params in
+          let ((spi, params), op) = MC._downpath_for_mod true env ip params in
           let (params, istop) =
             match op.EcPath.m_top with
             | `Concrete (p, Some _) ->
