@@ -16,7 +16,7 @@ require import Distr DProd Mu_mem.
 require (*--*) FelTactic.
 
 (* Loading theories of security definitions *)
-require (*--*) PRF_ PRG_.
+require (*--*) PRF PRG.
 
 (** Ignore: This is now the preferred setup but is not yet the default **)
 pragma -oldip. pragma +implicits.
@@ -81,7 +81,7 @@ proof. by proc; auto. qed.
 
 (* -------------------------------------------------------------------- *)
 (* Defining the security of the PRF F by cloning *)
-clone import PRF_ as PRFa with
+clone import PRF as PRFa with
   type D   <- state,
   type R   <- state * output,
   type K   <- seed,
@@ -110,7 +110,7 @@ module PRFi = PRFa.PRFi.
 
 (* -------------------------------------------------------------------- *)
 (* Defining the security of a PRG by cloning *)
-clone import PRG_ as PRGa with
+clone import PRG as PRGa with
   type output <- output,
   op   dout   <- dout.
 
