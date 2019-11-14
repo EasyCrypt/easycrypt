@@ -824,7 +824,7 @@ let process_view1 pe tc =
     match TTC.destruct_product (tc1_hyps tc) (FApi.tc1_goal tc) with
     | None | Some (`Forall _) -> raise E.NoTopAssumption
 
-    | Some (`Imp (_, _)) when pe.fp_head = FPCut None ->
+    | Some (`Imp (f1, _)) when pe.fp_head = FPCut None ->
         let hyps = FApi.tc1_hyps tc in
         let hid  = LDecl.fresh_id hyps "h" in
         let hqs  = mk_loc _dummy ([], EcIdent.name hid) in
@@ -833,11 +833,64 @@ let process_view1 pe tc =
         t_intros_i_seq ~clear:true [hid]
           (fun tc ->
             let pe = PT.tc1_process_full_pterm tc pe in
+            let regen =
+              if PT.can_concretize pe.PT.ptev_env then [] else
+
+              snd (List.fold_left_map (fun f1 arg ->
+                let pre, f1 =
+                  match oget (TTC.destruct_product (tc1_hyps tc) f1) with
+                  | `Imp    (_, f1)      -> (None, f1)
+                  | `Forall (x, xty, f1) ->
+                    let aout =
+                      match xty with GTty ty -> Some (x, ty) | _ -> None
+                    in (aout, f1)
+                in
+
+                let module E = struct exception Bailout end in
+
+                try
+                  let v =
+                    match arg with
+                    | PAFormula { f_node = Flocal x } ->
+                        let meta =
+                          let env = !(pe.PT.ptev_env.pte_ev) in
+                          MEV.mem x `Form env && not (MEV.isset x `Form env) in
+
+                        if not meta then raise E.Bailout;
+
+                        let y, yty =
+                          let CPTEnv subst = PT.concretize_env pe.PT.ptev_env in
+                          snd_map subst.fs_ty (oget pre) in
+                        let fy = EcIdent.fresh y in
+
+                        pe.PT.ptev_env.pte_ev := MEV.set
+                          x (`Form (f_local fy yty)) !(pe.PT.ptev_env.pte_ev);
+                        (fy, yty)
+
+                    | _ ->
+                        raise E.Bailout
+                  in (f1, Some v)
+
+                with E.Bailout -> (f1, None)
+              ) f1 pe.PT.ptev_pt.pt_args)
+            in
+
+            let regen = List.pmap (fun x -> x) regen in
+            let bds   = List.map (fun (x, ty) -> (x, GTty ty)) regen in
 
             if not (PT.can_concretize pe.PT.ptev_env) then
               tc_error !!tc "cannot infer all placeholders";
-              let pt, ax = PT.concretize pe in t_cutdef pt ax tc)
-          tc
+
+            let pt, ax = snd_map (f_forall bds) (PT.concretize pe) in
+            t_first (fun subtc ->
+              let regen = List.fst regen in
+              let ttcut tc =
+                t_onall
+                  (EcLowGoal.t_generalize_hyps ~clear:`Yes regen)
+                  (EcLowGoal.t_apply pt tc) in
+              t_intros_i_seq regen ttcut subtc
+            ) (t_cut ax tc)
+          ) tc
 
     | Some (`Imp (f1, _)) ->
         let top    = LDecl.fresh_id (tc1_hyps tc) "h" in
