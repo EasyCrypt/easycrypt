@@ -156,10 +156,14 @@ type preenv = {
 
 and escope = {
   ec_path  : EcPath.path;
-  ec_scope : [ `Theory
-             | `Module of EcPath.mpath
-             | `Fun    of EcPath.xpath ];
+  ec_scope : scope;
 }
+
+and scope = [
+  | `Theory
+  | `Module of EcPath.mpath
+  | `Fun    of EcPath.xpath
+]
 
 and tcinstance = [
   | `Ring    of EcDecl.ring
@@ -186,6 +190,9 @@ let xroot (env : env) =
   match env.env_scope.ec_scope with
   | `Fun x -> Some x
   | _ -> None
+
+let scope (env : env) =
+  env.env_scope.ec_scope
 
 (* -------------------------------------------------------------------- *)
 let astop (env : env) =

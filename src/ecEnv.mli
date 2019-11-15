@@ -30,12 +30,18 @@ type varbind = {
 
 (* -------------------------------------------------------------------- *)
 type env
+type scope = [
+  | `Theory
+  | `Module of EcPath.mpath
+  | `Fun    of EcPath.xpath
+]
 
 val initial : EcGState.gstate -> env
 val root    : env -> EcPath.path
 val mroot   : env -> EcPath.mpath
 val xroot   : env -> EcPath.xpath option
 val astop   : env -> env
+val scope   : env -> scope
 
 (* -------------------------------------------------------------------- *)
 val gstate : env -> EcGState.gstate

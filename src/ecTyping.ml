@@ -1689,7 +1689,15 @@ and transmod_header
         EcEnv.Mod.bind_local id mt env) env rm in
     let args = List.map (fun (id,_) -> EcPath.mident id) rm in
     let mp =
-      EcPath.mpath_crt (EcPath.pqname (EcEnv.root env) me.me_name) args None in
+      match EcEnv.scope env with
+      | `Theory ->
+        EcPath.mpath_crt (EcPath.pqname (EcEnv.root env) me.me_name) args None
+      | `Module m ->
+        assert (List.is_empty args);
+        EcPath.mqname m me.me_name
+      | `Fun _ ->
+        assert false
+    in
 
     let tymod = { mis_params = mis_params;
                   mis_body   = me.me_sig_body;
