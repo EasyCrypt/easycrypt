@@ -249,19 +249,15 @@ type module_expr = {
   me_params   : (EcIdent.t * module_type) list;
 }
 
+(* Invariant:
+   In an abstract module [ME_Decl mt], [mt] must not be a functor, i.e. it must
+   be fully applied. Therefore, we must have:
+   [List.length mp.mt_params = List.length mp.mt_args]  *)
 and module_body =
   | ME_Alias       of int * EcPath.mpath
-                      (* The int represent the number of argument *)
-  | ME_Structure   of module_structure
-  | ME_Decl        of module_type
+  | ME_Structure   of module_structure       (* Concrete modules. *)
+  | ME_Decl        of module_type            (* Abstract modules. *)
 
-(* [ms_vars]: the set of global variables declared by the module and
- * all it submodules.
- *
- * [ms_uses]: the set of external top-level modules used by the module
- * We ensure that these paths lead to defined modules (i.e having
- * ME_structure as body)
- *)
 and module_structure = {
   ms_body : module_item list;
 }

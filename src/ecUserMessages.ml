@@ -425,9 +425,6 @@ end = struct
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
-    (* REM *)
-    (* let pp_v fmt xp = EcPrinting.pp_pv ppe fmt (pv_glob xp) in
-     * let pp_m fmt m  = EcPrinting.pp_topmod ppe fmt m in *)
 
     let pp_restriction_who fmt = function
       | RW_mod mp ->
@@ -435,39 +432,6 @@ end = struct
 
       | RW_fun xp ->
           Format.fprintf fmt "the procedure %a" (EcPrinting.pp_funname ppe) xp in
-
-    (* REM *)
-    (* let pp_restriction_err fmt = function
-     *   | RE_UseVariable x ->
-     *       Format.fprintf fmt
-     *         "should not be able to use the variable %a"
-     *         pp_v x
-     *
-     *   | RE_UseVariableViaModule (x, m) ->
-     *       Format.fprintf fmt
-     *         "should not be able to use %a (via %a)"
-     *         pp_v x pp_m m
-     *
-     *   | RE_UseModule m ->
-     *       Format.fprintf fmt
-     *         "should not be able to use the module %a"
-     *         pp_m m
-     *
-     *   | RE_VMissingRestriction (x, (m1, m2))->
-     *       Format.fprintf fmt
-     *         "should not be able to use %a, add restriction %a to %a"
-     *         pp_v x pp_m m1 pp_m m2
-     *
-     *   | RE_MMissingRestriction (m, (m1, m2))->
-     *       Format.fprintf fmt
-     *         "should not be able to use %a, add restriction %a to %a or %a to %a"
-     *         pp_m m pp_m m1 pp_m m2 pp_m m2 pp_m m1
-     *
-     *   | RE_ModuleUnrestricted m ->
-     *       Format.fprintf fmt
-     *         "%a should have a positive restriction"
-     *         pp_m m
-     * in *)
 
     Format.fprintf fmt "%a %a" pp_restriction_who w (pp_restr_err_aux env) e
 end

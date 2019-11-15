@@ -2272,7 +2272,22 @@ module NormMp = struct
 
   let get_restr_me env me mp =
     match me.me_body with
-    | EcModules.ME_Decl mt -> mt.mt_restr
+    | EcModules.ME_Decl mt ->
+      (* As an invariant, we have that [mt] is fully applied. *)
+      assert (List.length mt.mt_params = List.length mt.mt_args);
+
+      (* We need to clear the oracle restriction using [me] params *)
+      let keep =
+        List.fold_left (fun k (x,_) ->
+            EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty me.me_params in
+      let keep_info f =
+        EcPath.Sm.mem (f.EcPath.x_top) keep in
+      let do1 oi =
+        {oi_calls = List.filter keep_info oi.oi_calls;
+         oi_in = oi.oi_in} in
+      { mt.mt_restr with
+        mr_oinfos = Msym.map do1 mt.mt_restr.mr_oinfos }
+
     | _ ->
       (* We compute the oracle call information. *)
       let mparams =

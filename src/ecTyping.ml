@@ -624,15 +624,6 @@ and mod_allowed env
     let mp = EcPath.mident m in
     let rm  = NormMp.get_restr_use env mp in
 
-    (* (\* REM *\)
-     * let ppe = EcPrinting.PPEnv.ofenv env in
-     * Format.eprintf "@[<v>mod_allowed %a:@;%a@;Subtypes:@;%a@;%a@;@]%!"
-     *   EcPath.pp_m mp
-     *   (EcPrinting.pp_use_restr env ~print_abstract:true) rm
-     *   (EcPrinting.pp_opt (EcPrinting.pp_use ppe)) pr
-     *   (EcPrinting.pp_use_restr env ~print_abstract:true) r; *)
-
-
     try ur_allowed env rm pr r; true with
       RestrErr _ -> false
 
@@ -891,6 +882,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
         (fun (x,tp) ((a,loc),ta_smpl) ->
           try
             let ta = NormMp.sig_of_mp env a in
+
             (* Sanity check *)
             if List.length ta_smpl.miss_params <> List.length ta.mis_params then
               assert false;
