@@ -1673,7 +1673,7 @@ and transmod_header
     let n, me = transmod_header ~attop env mh params me in
     (* Compute the signature at the given position,
        i.e: remove the n first argument *)
-    let rm,mis_params = List.takedrop n me.me_params in
+    let rm,_ = List.takedrop n me.me_params in
 
     let env = EcEnv.Mod.bind me.me_name me env in
 
@@ -1691,13 +1691,12 @@ and transmod_header
         assert false
     in
 
-    let tymod = { mis_params = mis_params;
-                  mis_body   = me.me_sig_body;
-                  mis_restr  = NormMp.get_restr env mp; } in
+    let tymod = EcEnv.NormMp.sig_of_mp env mp in
 
     (* Check that the signature is a subtype *)
     let check s =
       let (aty, _asig) = transmodtype env s in
+
       try  check_sig_mt_cnv env me.me_name tymod aty
       with TymodCnvFailure err ->
         let args = List.map (fun (id,_) -> EcPath.mident id) rm in
