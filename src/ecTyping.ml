@@ -565,7 +565,7 @@ let all_allowed_p env (sx : 'a EcPath.Mx.t) (pr : EcEnv.use option) =
 
 (* Are all variables allowed in the union of the positive restriction [pr]
    and the positive and negative restriction [r].
-   I.e. is [pr] union [r] forbids nothing.
+   I.e. is [pr] union [r] forbidding nothing.
    Remark: we cannot compute directly the union of [pr] and [r], because
    A union (B \ C) <> (A union B) \ C *)
 let rec everything_allowed env
@@ -1662,7 +1662,7 @@ let rec transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
 
 (* -------------------------------------------------------------------- *)
 and transmod_header
-   ~attop (env : EcEnv.env) (mh:pmodule_header) params (me:pmodule_expr) =
+    ~attop (env : EcEnv.env) (mh:pmodule_header) params (me:pmodule_expr) =
   match mh with
   | Pmh_ident x ->
     0, transmod_body ~attop env x params me

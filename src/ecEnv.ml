@@ -2283,8 +2283,9 @@ module NormMp = struct
       let keep_info f =
         EcPath.Sm.mem (f.EcPath.x_top) keep in
       let do1 oi =
-        {oi_calls = List.filter keep_info oi.oi_calls;
-         oi_in = oi.oi_in} in
+        { oi_calls = List.filter keep_info oi.oi_calls;
+          oi_in = oi.oi_in } in
+
       { mt.mt_restr with
         mr_oinfos = Msym.map do1 mt.mt_restr.mr_oinfos }
 
