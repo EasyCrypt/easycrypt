@@ -1667,7 +1667,7 @@ and transmodsig_body
         EcModules.change_oicalls mr fs.fs_name calls in
 
       let mr, body = match proc with
-        | None -> List.fold_left update_mr mr sig_.mis_body, sig_.mis_body
+        | None -> List.fold_left update_mr mr sig_.mis_body, List.rev sig_.mis_body
         | Some (`Include_proc xs) ->
           check_xs xs;
           List.fold_left
