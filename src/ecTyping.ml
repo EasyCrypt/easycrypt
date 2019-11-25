@@ -519,6 +519,31 @@ let to_unit_map sx = Mx.map (fun _ -> ()) sx
 let to_sm sid =
   EcIdent.Sid.fold (fun m sm -> Sm.add (EcPath.mident m) sm) sid Sm.empty
 
+let support env (pr : EcEnv.use option) (r : EcEnv.use use_restr) =
+  let memo : Sx.t EcIdent.Hid.t = EcIdent.Hid.create 16 in
+
+  let rec ur_support (supp : Sx.t) ur =
+    let supp = EcUtils.omap_dfl (use_support supp) supp ur.ur_pos in
+    use_support supp ur.ur_neg
+
+  and use_support (supp : Sx.t) (use : EcEnv.use) =
+    let supp = Mx.fold (fun x _ supp -> Sx.add x supp) use.EcEnv.us_pv supp in
+    EcIdent.Sid.fold (fun m supp ->
+        mident_support supp m
+      ) use.EcEnv.us_gl supp
+
+  and mident_support (supp : Sx.t) m =
+    try EcIdent.Hid.find memo m with
+    | Not_found ->
+      let mp = EcPath.mident m in
+      let ur  = NormMp.get_restr_use env mp in
+      let supp = ur_support supp ur in
+      EcIdent.Hid.add memo m supp;
+      supp in
+
+  let supp = EcUtils.omap_dfl (use_support Sx.empty) Sx.empty pr in
+  ur_support supp r
+
 (* Is [x] allowed in a positive restriction [pr]. *)
 let rec p_allowed env (x : EcPath.xpath) (pr : EcEnv.use option) =
   match pr with
@@ -563,6 +588,7 @@ let all_allowed_gen env (sx : 'a EcPath.Mx.t)
 let all_allowed_p env (sx : 'a EcPath.Mx.t) (pr : EcEnv.use option) =
   all_allowed env sx { ur_pos = pr; ur_neg = EcEnv.use_empty }
 
+
 (* Are all variables allowed in the union of the positive restriction [pr]
    and the positive and negative restriction [r].
    I.e. is [pr] union [r] forbidding nothing.
@@ -575,7 +601,21 @@ let rec everything_allowed env
   | Some pr, Some rup when EcIdent.Sid.is_empty pr.EcEnv.us_gl
                         && EcIdent.Sid.is_empty rup.EcEnv.us_gl ->
     raise @@ RestrErr (`RevSub None)
-  | Some _, Some _ -> assert false (* FIXME: probably using some dummy variable *)
+
+  | Some _, Some _ ->
+    (* We check whether everybody in the support of [pr] and [r] is allowed,
+       and whether a dummy variable (which stands for everybody else) is
+       allowed. *)
+    let supp = support env pr r in
+    let dum =
+      let mdum = EcPath.mpath_abs (EcIdent.create "__dummy_ecTyping__") [] in
+      EcPath.xpath_fun mdum "__dummy_ecTyping_s__" in
+    (* Sanity check: [dum] must be fresh. *)
+    assert (not @@ Sx.mem dum supp);
+    let supp = Sx.add dum supp in
+
+    all_allowed_gen env supp pr r;
+
   | Some pr, None ->
     (* In that case, we need [r.ur_neg] to forbid only variables that are
        allowed in [pr], i.e. we require that:
