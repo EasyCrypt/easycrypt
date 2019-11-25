@@ -105,21 +105,6 @@ module SchnorrPKAlgorithms : SigmaAlgorithms = {
   }
 }.
 
-
-module Foo = {
-  proc foo() : bool = {
-    var a;
-    a =$ FDistr.dt;
-    return a = F.one;
-  }
-
-  proc bar() : bool = {
-    var b;
-    b =$ FDistr.dt;
-    return b = F.zero;
-  }
-}.
-
 section SchnorrPKSecurity.
   (* Completeness *)
   lemma schnorr_proof_of_knowledge_completeness_ll:
