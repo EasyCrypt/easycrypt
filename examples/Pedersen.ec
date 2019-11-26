@@ -75,9 +75,7 @@ section PedersenSecurity.
   (* Correctness *)
   lemma pedersen_correctness:
     hoare[Correctness(Pedersen).main: true ==> res].
-  proof.
-    proc; inline*; wp; rnd; wp; rnd; progress.
-  qed.
+  proof. proc; inline *;auto. qed.
 
   local module FakeCommit(U:Unhider) = {
     proc main() : bool = {
@@ -102,9 +100,7 @@ section PedersenSecurity.
     islossless U.guess =>
     islossless FakeCommit(U).main.
   proof.
-    move => uc_ll ug_ll; proc => //.
-    swap 4 1; call ug_ll; wp; rnd; rnd; call uc_ll; wp; rnd; skip; progress; last 2 by apply FDistr.dt_ll.
-    apply DBool.dbool_ll.
+    by move => uc_ll ug_ll; islossless; (apply FDistr.dt_ll || apply DBool.dbool_ll).
   qed.
 
   (* Perfect hiding *)
@@ -116,8 +112,8 @@ section PedersenSecurity.
     move => uc_ll ug_ll; byphoare => //.
     proc; wp.
     swap 4 3.
-    rnd (fun z, z = b'); call ug_ll; wp; rnd; call uc_ll; wp; rnd; skip; progress; last 2 by apply FDistr.dt_ll.
-    + rewrite DBool.dboolE /=; by case result => //=.
+    rnd (pred1 b'); call ug_ll; wp; rnd; call uc_ll; auto => />.
+    by rewrite FDistr.dt_ll /= => v _ _ result; rewrite DBool.dbool1E.
   qed.
 
   local lemma phi_hi (U<:Unhider) &m:
@@ -129,24 +125,20 @@ section PedersenSecurity.
     call (_:true); wp.
     rnd (fun d, (d + x * (b?m1:m0)){2})
         (fun d, (d - x * (b?m1:m0)){2}).
-    wp; rnd; call (_: true); wp; rnd; skip; progress.
-    * case (bL) => bLE.
-      + pose k := x0L * result_R.`2;
-        rewrite sub_def -addA (addC (-k) k) addfN addf0 //.
-      + pose k := x0L * result_R.`1;
-        rewrite sub_def -addA (addC (-k) k) addfN addf0 //.
-    * apply FDistr.dt_funi.
-    * apply FDistr.dt_fu.
-    * case (bL) => bLE; first 2 by rewrite sub_def -addA addfN addf0 //.
-    * case (bL) => bLE; first 2 by rewrite -mul_pow -pow_pow //.
+    wp; rnd; call (_: true); auto => /> x0L _ resR bL _.
+    split => [? _ | _];1: by ring.
+    split => [? _ | _ d0L _];1: by apply FDistr.dt_funi.
+    by rewrite FDistr.dt_fu /=; progress;algebra.
   qed.
 
   (* Perfect hiding - QED *)
   lemma pedersen_perfect_hiding (U<:Unhider) &m:
     islossless U.choose =>
     islossless U.guess =>
-    Pr[HidingExperiment(Pedersen,U).main() @ &m : res] = 1%r/2%r
-  by move => uc_ll ug_ll; rewrite (phi_hi U &m) (fakecommit_half U &m).
+    Pr[HidingExperiment(Pedersen,U).main() @ &m : res] = 1%r/2%r.
+  proof.
+    by move => uc_ll ug_ll; rewrite (phi_hi U &m) (fakecommit_half U &m).
+  qed.
 
   (* Computational binding - QED *)
   lemma pedersen_computational_binding (B<:Binder) &m:
@@ -155,31 +147,13 @@ section PedersenSecurity.
   proof.
     byequiv => //.
     proc; inline*.
-    wp; call (_: true); wp; rnd; skip; simplify; progress.
-    (* Human-friendly renaming *)
-    move : H1 H2 H3;
-      pose c := result_R.`1;
-      pose m := result_R.`2;
-      pose d := result_R.`3;
-      pose m':= result_R.`4;
-      pose d':= result_R.`5;
-      pose x := x0L;
-      move => comm comm' m_neq_m'.
-    have m'_neq_m: m' - m <> F.zero by move : m_neq_m'; apply absurd => /=; move => abhyp; rewrite -addf0 -abhyp addC sub_def -addA (addC (-m) m) addfN addf0 //.
+    wp; call (_: true); auto => /> x _ [ c m d m' d'] /= comm comm' m_neq_m'.
+    rewrite eq_sym eqT.
     have ->: (d - d') * inv (m' - m) = x <=> (d - d') = x * (m' - m).
-      split => lr.
-      + rewrite -lr -mulA (F.mulC (inv (m' - m)) (m' - m)) mulfV // mulf1 //.
-      + rewrite lr -mulA mulfV // mulf1 //.
-    rewrite 2!sub_def -mulfDl mulfN.
-    have ->: d + -d' = x * m' + - x * m <=> d + -d' + x * m = x * m'.
-      split => lr.
-      + rewrite lr -addA (addC (- x * m) (x * m)) addfN addf0 //.
-      + rewrite -lr -addA addfN addf0 //.
-    have ->: d + -d' + x * m = x * m' <=> d + x * m = d' + x * m'.
-      split => lr.
-      + rewrite -lr 2!addA (addC d' d) -2!addA (addA d' (-d') (x * m)) addfN (addC F.zero) addf0 //.
-      + rewrite (addC d (-d')) -addA lr addA (addC (-d') d') addfN (addC F.zero) addf0 //.
-    rewrite pow_bij -2!mul_pow -2!pow_pow -comm comm' //.
+    + by split => [<- | ->]; field; apply: contra m_neq_m' => heq;ring heq.
+    have -> : d - d' = x * (m' - m) <=> d + x * m = d' + x * m'.
+    + by split => heq; ring heq.
+    by rewrite pow_bij -!(mul_pow, pow_pow, comm, comm').
   qed.
 
   (*
@@ -193,10 +167,8 @@ section PedersenSecurity.
     byequiv => //.
     proc; wp; inline{2} StdRedAdversary(DLogAttacker(B)).guess; wp.
     seq 2 3: (x'{1} = lx{2} /\ x{1} = x{2}).
-      inline*; wp; call (_: true); wp; rnd; skip; progress.
-    if{2}.
-    + rnd{2}; skip; progress; first by apply FDistr.dt_ll.
-    wp; skip; progress.
+    + by inline*; wp; call (_: true); auto.
+    by if{2}; auto => />; apply FDistr.dt_ll.
   qed.
 
   lemma pedersen_std_computational_binding (B<:Binder) &m:

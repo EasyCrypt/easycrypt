@@ -40,16 +40,11 @@ theory DLog.
 
   module DLogExperiment(A:Adversary) = {
     proc main () : bool = {
-      var x, x', b;
+      var x, x';
 
       x =$ FDistr.dt;
       x' = A.guess(g^x);
-      if (x' = None) (* The adversary  *)
-        b = false;
-      else
-        b = (x'= Some x);
-
-      return b;
+      return (x' = Some x);
     }
   }.
   
@@ -82,9 +77,9 @@ section DLogSecurity.
   proof.
     byequiv => //; proc; inline*.
     wp; seq 2 3: (x'{1} = lx{2} /\ x{1} = x{2}).
-    + call (_: true); wp; rnd; skip; progress.
-    if{2} => //; last by wp; skip; progress.
-    + rnd{2}; skip; progress; apply (FDistr.dt_ll).
+    + by call (_: true); auto. 
+    if{2} => //; last by auto. 
+    auto => />; apply FDistr.dt_ll.
   qed.
 
 end section DLogSecurity.
