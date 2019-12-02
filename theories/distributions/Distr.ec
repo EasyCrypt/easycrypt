@@ -1199,8 +1199,8 @@ rewrite (@sum_swap (fun ab : _ * _ => G ab.`1 ab.`2)) // /G.
 apply: (@summable_le (fun ab : _ * _ => mass d1 ab.`1 * mass d2 ab.`2)) => /=.
 + have h := summable_mass (d1 `*` d2); apply: (@eqL_summable _ _ h).
   by case=> a b /=; rewrite !massE dprod1E.
-+ move=> ab; rewrite !ger0_norm; 1,2:smt(ge0_mass).
- by rewrite mulrCA !mulrA; smt(ge0_mass le1_mass).
++ move=> ab; rewrite !ger0_norm ?mulr_ge0 ?ge0_mass mulrCA !mulrA.
+  by rewrite ler_pimulr ?mulr_ge0 (ge0_mass, le1_mass).
 qed.
 
 lemma dprodC ['a 'b] (d1 : 'a distr) (d2 : 'b distr) :
