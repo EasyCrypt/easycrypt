@@ -1182,6 +1182,35 @@ by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma dlet_swap ['a 'b 'c] (d1 : 'a distr) (d2 : 'b distr) (F : 'a -> 'b -> 'c distr):
+    dlet d1 (fun x1 => dlet d2 (F x1))
+  = dlet d2 (fun x2 => (dlet d1 (fun x1 => F x1 x2))).
+proof.
+apply/eq_distr => c; rewrite !dletE &(eq_sum) => /= x @/pred1.
+case: (x = c) => [->> {x}|]; last by rewrite !sum0_eq.
+pose G a b := mass d2 b * (mass d1 a * (mass (F a b) c)).
+pose H1 a := sum (fun b => G a b).
+pose H2 b := sum (fun a => G a b).
+rewrite -(@eq_sum H1) => [@/H1 @/G /= a|].
++ by rewrite dlet_massE -sumZ /= &(eq_sum) => /= b; ring.
+rewrite eq_sym -(@eq_sum H2) => [@/H2 @/G /= b|].
++ by rewrite dlet_massE -sumZ /= &(eq_sum).
+rewrite (@sum_swap (fun ab : _ * _ => G ab.`1 ab.`2)) // /G.
+apply: (@summable_le (fun ab : _ * _ => mass d1 ab.`1 * mass d2 ab.`2)) => /=.
++ have h := summable_mass (d1 `*` d2); apply: (@eqL_summable _ _ h).
+  by case=> a b /=; rewrite !massE dprod1E.
++ move=> ab; rewrite !ger0_norm; 1,2:smt(ge0_mass).
+ by rewrite mulrCA !mulrA; smt(ge0_mass le1_mass).
+qed.
+
+lemma dprodC ['a 'b] (d1 : 'a distr) (d2 : 'b distr) :
+  d1 `*` d2 = dmap (d2 `*` d1) (fun (p : 'b * 'a) => (p.`2, p.`1)).
+proof.
+rewrite !dprod_dlet dlet_swap dlet_dlet &(eq_dlet) //= => b.
+by rewrite dlet_dlet &(eq_dlet) //= => a; rewrite dlet_unit.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op djoin (ds : 'a distr list) : 'a list distr =
  foldr
    (fun d1 dl => dapply (fun xy : _ * _ => xy.`1 :: xy.`2) (d1 `*` dl))
