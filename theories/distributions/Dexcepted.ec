@@ -61,4 +61,63 @@ move=> uni x y; rewrite !supp_dexcepted !dexcepted1E.
 by move=> [? ->] [? ->] /=; congr; apply uni.
 qed.
 
+abstract theory Sampling.
 
+type t.
+
+op dt: t distr.
+
+axiom dt_ll: is_lossless dt.
+axiom dt_fu: is_full dt.
+
+module S = {
+  proc direct(X : t -> bool) = {
+    var r;
+
+    r <$ dt \ X;
+    return r;
+  }
+
+  proc indirect(X : t -> bool) = {
+    var r;
+
+    r <$ dt;
+    if (X r) {
+      r <$ dt \ X;
+    }
+    return r;
+  }
+}.
+
+equiv direct_indirect_eq: S.direct ~ S.indirect: ={X} ==> ={res}.
+proof.
+bypr (res{1}) (res{2})=> /> &1 &2 a <-.
+have ->: Pr[S.direct(X{1}) @ &1: res = a] = mu1 (dt \ X{1}) a.
++ by byphoare (: X = X{1} ==> _)=> //=; proc; rnd; skip.
+byphoare (: X = X{1} ==> _)=> //=.
+case: (X{1} a)=> [a_in_X | a_notin_X].
++ conseq (: _ ==> _: 0%r); first smt.
+  proc; seq  1: (X r) _ 0%r _ 0%r (X = X{1})=> //=.
+  + by auto.
+  + by rcondt 1=> //=; rnd; skip=> />; rewrite dexcepted1E a_in_X.
+  by rcondf 1=> //=; hoare; skip=> /> &hr; apply/contra=> ->.
+proc. alias 2 r0 = r.
+phoare split (mu1 dt a) (mu dt X * mu1 (dt \ X) a): (r0 = a)=> />.
++ rewrite dexcepted1E a_notin_X /=.
+  rewrite -{1}(mulr1 (mu1 dt a)) -(@divrr (weight dt - mu dt X{1})).
+  + rewrite -mu_not; apply/StdOrder.RealOrder.ltr0_neq0.
+    by rewrite witness_support; exists a; rewrite /predC a_notin_X dt_fu.
+  by rewrite dt_ll /#.
++ seq  2: (a = r0) (mu1 dt a) 1%r _ 0%r (r0 = r /\ X = X{1})=> //=.
+  + by auto.
+  + by wp; rnd (pred1 a); auto=> @/pred1.
+  + by rcondf 1.
+  by hoare; conseq (: _ ==> true)=> // /#.
+seq  2: (!X r) _ 0%r (mu dt X) (mu1 (dt \ X) a) (r0 = r /\ X = X{1})=> //=.
++ by auto.
++ by hoare; rcondf 1=> //; skip=> /#.
++ by wp; rnd.
+by rcondt 1=> //; rnd (pred1 a); skip=> /#.
+qed.
+
+end Sampling.
