@@ -655,6 +655,83 @@ proof.
 by apply/fsetP=> x; rewrite mem_fdom mem_join in_fsetU !mem_fdom.
 qed.
 
+(* -------------------------------------------------------------------- *)
+op has (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
+  has (fun x=> P x (oget m.[x])) (elems (fdom m))
+axiomatized by hasE.
+
+(* -------------------------------------------------------------------- *)
+lemma hasP (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
+  has P m <=> exists x y, m.[x] = Some y /\ P x y.
+proof.
+rewrite hasE hasP; apply/exists_iff=> x /=.
+rewrite -memE mem_fdom domE; case: {-1}(m.[x]) (eq_refl m.[x])=> //= y.
+by rewrite oget_some=> mx; split=> [Pxy|/>]; exists y.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op find (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
+  onth (elems (fdom m)) (find (fun x=> P x (oget m.[x])) (elems (fdom m)))
+axiomatized by findE.
+
+(* -------------------------------------------------------------------- *)
+lemma find_some (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) x:
+  find P m = Some x => exists y, m.[x] = Some y /\ P x y.
+proof.
+rewrite findE; have: (forall x, x \in m <=> x \in elems (fdom m)).
++ by move=> x'; rewrite -memE mem_fdom.
+move: (uniq_elems (fdom m)).
+pose X := elems (fdom m).
+move: m X=> + X; elim: X=> //=.
+move=> x' X ih m [] x'_notin_X uniq_X dom_m_spec.
+move: (dom_m_spec x')=> /=; rewrite domE.
+case: {-1}m.[x'] (eq_refl m.[x'])=> //= y mx'.
+rewrite oget_some //=; case: (P x' y)=> />.
++ by move=> Pxy; exists y.
+move=> _; have -> /=: find (fun x=> P x (oget m.[x])) X + 1 <> 0.
++ smt(find_ge0).
+move=> find_some.
+move: (ih (rem m x') _ _)=> //=.
++ by move=> x0; rewrite mem_rem dom_m_spec; case: (x0 = x').
+rewrite (find_eq_in (fun x=> P x (oget m.[x]))).
++ by move=> x0 x0_in_X /=; rewrite remE; case: (x0 = x')=> />.
+move=> /(_ find_some) [y']; rewrite remE; case: (x = x')=> /> _ mx pxy'.
+by exists y'.
+qed.
+
+(* -------------------------------------------------------------------- *)
+inductive find_spec (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
+  | FindNotIn     of   (find P m = None)
+                     & (forall x, x \in m => !P x (oget m.[x]))
+  | FindIn    x y of   (find P m = Some x)
+                     & (m.[x] = Some y)
+                     & (P x y).
+
+lemma findP (P : 'a -> 'b -> bool) (m : ('a, 'b) fmap): find_spec P m.
+proof.
+case: {-1}(find P m) (eq_refl (find P m))=> [|x ^] findPm.
++ apply/FindNotIn=> //= x; rewrite domE.
+  case: {-1}(m.[x]) (eq_refl m.[x])=> //= y mx; rewrite oget_some -negP.
+  move=> Pxy; move: findPm; rewrite findE /=.
+  have i_in_list: find (fun x=> P x (oget m.[x])) (elems (fdom m))
+                  < size (elems (fdom m)).
+  + apply/has_find/List.hasP; exists x.
+    by rewrite /= -memE mem_fdom domE mx oget_some.
+  by rewrite (onth_nth witness) 1:find_ge0 //.
+move=> /find_some [y] [] mx pxy.
+exact/(FindIn _ _ x y).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma find_some_unique x0 x' P (m : ('a, 'b) fmap) :
+  (forall x y, m.[x] = Some y => P x y => x = x0)
+  => find P m = Some x'
+  => x' = x0.
+proof.
+move=> unique; case: (findP P m)=> [->|] />.
+by move=> x'' + -> - /> {x''}; exact/unique.
+qed.
+
 (* ==================================================================== *)
 op ofassoc ['a 'b] (xs : ('a * 'b) list) =
   ofmap (Map.offun (fun k => List.assoc xs k)).
