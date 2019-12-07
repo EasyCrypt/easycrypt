@@ -357,7 +357,7 @@ section Fact2.
     (* [F.f ~ F.f: I] when Bad does not hold *)
     proc=> //=; inline *; sp; if{1}=> //=.
       auto=> /> &1 &2 log uniq_log _ ih st_notin_m x x_in_stout st_notin_log.
-      rewrite get_set_sameE /= oget_some /=.
+      rewrite get_set_sameE /=.
       by case: ih=> ih; apply/invP=> s; rewrite mem_set ih orbC.
     auto=> /> &1 &2 log uniq_log _ ih st_in_m.
     rewrite uR_ll //= => str  _.

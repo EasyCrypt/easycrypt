@@ -117,7 +117,7 @@ equiv RO_FRO_get : RO.get ~ FRO.get :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> ={res} /\ RO.m{1} = noflags FRO.m{2}.
 proof.
   proc; auto=> &1 &2 [] 2!-> /= ? -> /=.
-  rewrite mem_map !map_set /fst /= get_set_sameE oget_some => |>; progress.
+  rewrite mem_map !map_set /fst /= get_set_sameE => |>; progress.
   + by rewrite mapE oget_omap_some 1:-domE.
   + by rewrite eq_sym set_get_eq 1:mapE /= 1:get_some.
 qed.
@@ -332,8 +332,7 @@ proof.
       by case (x{mr} = z)=> [<- | //]; rewrite Hget.
     move=> [#] _ Heq ? mr [#] -> Heq'.
     split=> [| _ r _]; first apply sampleto_ll.
-    by rewrite domE Heq' oget_some /= set_get_eq 1:Heq'
-               1:{1}(pairS (oget FRO.m{mr}.[x{mr}])) 1:Hget.
+    by rewrite domE Heq' /= set_get_eq 1:Heq' 1:{1}(pairS (oget FRO.m{mr}.[x{mr}])) 1:Hget.
   case ((dom FRO.m x){1}).
   + inline{1} RRO.resample=> /=; rnd{1}.
     transitivity{1} 
@@ -348,7 +347,7 @@ proof.
       move=> />; by rewrite -neqK_eqU.
     + move=> ? ? ?; rewrite domE=> [#] <*> [#] -> /eq_except_sym H Hxm Hx2.
       split=> [| _ r _]; first apply sampleto_ll.
-      rewrite /= Hxm oget_some /=; apply /eq_sym.
+      rewrite /= Hxm /=; apply /eq_sym.
       have /(congr1 oget) := Hx2 => <-; apply eq_except_set_getlr=> //.
       by rewrite domE Hx2.
     + symmetry; call (iter1_perm RRO.I iter_perm2).
@@ -361,8 +360,7 @@ proof.
                FRO.m{1}.[x{2}] = Some (result{2}, Unknown) /\
                FRO.m{2}.[x{2}] = Some (result{2}, Known)).
     + auto=> ? &mr [#] 2-> /= ^Hdom -> ^Hget -> ? -> /=.
-      by rewrite !get_setE /= oget_some !restr_set /= fdom_set
-                 eq_except_setlr //= fsetDK.
+      by rewrite !get_setE /= !restr_set /= fdom_set eq_except_setlr //= fsetDK.
     exists* x{1}, FRO.m{1}.[x{2}], FRO.m{2}.[x{2}]; elim*=> x1 mx1 mx2.
     call (iter_inv RRO.I (fun z => x1 <> z) 
            (fun o1 o2 =>
@@ -443,20 +441,19 @@ proof.
          (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1] = mx1 /\
                        o2.[x1] = mx2) 
          (I_f_eqex x1 mx1 mx2))=> /=; auto=> &1 &2 /> /negb_and x2_disj.
-    split=> [| _ _ _ m_L m_R eq_exc m_L_x2_eq m_R_x2_eq].
-    split.
-    congr; rewrite fsetP=> z; rewrite 2!mem_fdom 2!dom_restr /in_dom_with mem_set.
-    case (z = x{2})=> [-> /=| ne_z_x2 /=].
-    by rewrite get_set_sameE oget_some /= negb_and.
-    by rewrite get_setE ne_z_x2.
+    split=> [| _ _ _ m_L m_R eq_exc m_L_x2_eq m_R_x2_eq];1: split.
+    + congr; rewrite fsetP=> z; rewrite 2!mem_fdom 2!dom_restr /in_dom_with mem_set.
+      case (z = x{2})=> [-> /=| ne_z_x2 /=].
+      + by rewrite get_set_sameE /= negb_and.
+      by rewrite get_setE ne_z_x2.
     split=> [x0 |].
-    rewrite -memE mem_fdom dom_restr /in_dom_with.
-    case (x{2} = x0)=> [<- [#] | //]; by elim x2_disj.
-    rewrite get_set_sameE /mx2 /= eq_except_setr.
+    + rewrite -memE mem_fdom dom_restr /in_dom_with.
+      by case (x{2} = x0)=> [<- [#] | //]; by elim x2_disj.
+      by rewrite get_set_sameE /mx2 /= eq_except_setr.
     rewrite get_set_sameE in m_R_x2_eq.
     rewrite -fmap_eqP=> z; rewrite get_setE; case (z = x{2})=> [-> |].
-    by rewrite -m_R_x2_eq.
-    move=> ne_z_x2; rewrite eq_exceptP in eq_exc; by rewrite eq_exc /pred1.
+    + by rewrite -m_R_x2_eq.
+    by move=> ne_z_x2; rewrite eq_exceptP in eq_exc; rewrite eq_exc /pred1.
 qed.
 
 lemma eager_rem :
@@ -589,11 +586,11 @@ proof.
     by rewrite /in_dom_with in Hz; rewrite Hz.
     rewrite /in_dom_with mem_set get_setE.
     case (x{1} = head witness l{2})=> [-> /= | //].
-    rewrite oget_some /=; rewrite /in_dom_with in Hz.
+    rewrite /in_dom_with in Hz.
     have [# -> -> //] :
       (head witness l{2} \in FRO.m{2}) /\
       (oget FRO.m{2}.[head witness l{2}]).`2 = Unknown
-      by rewrite (Hz (head witness l{2}))
+    by rewrite (Hz (head witness l{2}))
          -(mem_head_behead witness l{2} l2_nonemp (head witness l{2})); left.
   by auto=> ? &mr /= [#] 3-> /=; split=>// z; rewrite -memE mem_fdom dom_restr. 
 qed.
@@ -607,8 +604,7 @@ proof.
          restr Known FRO.m{1} = result{2}).
   + auto=> &1 &2 [#] 2-> Hz <- l2_nonemp _ /= ? -> /=.
     split=>[z /mem_drop Hm |];1:rewrite /in_dom_with mem_set get_setE.
-    case (z = head witness l{2})=> [-> /= | ne /=];
-      [by rewrite oget_some | rewrite Hz Hm].
+    + by case (z = head witness l{2})=> [-> | ne] //=; rewrite Hz Hm.
     rewrite restr_set rem_id ?dom_restr //.
     by move: l2_nonemp=> /(mem_head_behead witness) /(_ (head witness l{2}))
                          /= /Hz @/in_dom_with />;
@@ -678,10 +674,9 @@ equiv LRO_RRO_get : LRO.get ~ RRO.get :
 proof. 
   proc; auto=> ? &ml [] -> -> /= ? -> /=.
   rewrite dom_restr orabP negb_and neqK_eqU.
-  rewrite !restr_set /= !get_set_sameE oget_some; progress.
+  rewrite !restr_set /= !get_set_sameE ; progress.
   move: H; rewrite negb_or /= restrP domE.
-  move=> [/some_oget -> /=]; rewrite oget_some -neqK_eqU /=; move=> -> /=;
-    by rewrite oget_some.
+  by move=> [/some_oget -> /=]; rewrite -neqK_eqU /= => ->.
 qed.
 
 equiv LRO_RRO_set : LRO.set ~ RRO.set :

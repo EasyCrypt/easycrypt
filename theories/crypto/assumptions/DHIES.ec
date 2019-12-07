@@ -643,27 +643,25 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
   + inline*; wp; rnd; wp.
     rnd{2}; rnd; wp; skip; rewrite /inv /=; clear inv; progress; last 18 by smt().
     + by apply dlist_ll; apply AEAD.gen_ll.
-    + move: H15; rewrite !H1 !Core.oget_some (*-!List.map_comp /(\o) /=*) /=.
+    + move: H15; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
       by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
-    + move: H15; rewrite !H1 !Core.oget_some /=.
-      rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
+    + move: H15; rewrite !H1 /= (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
       by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
-    + move: H15 H17; rewrite !H1 !Core.oget_some /=.
-      rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //=.
+    + move: H15 H17; rewrite !H1 /= (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //=.
        by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
       move=> ? ?.
       rewrite -map_comp /(\o) /= fdom_join; congr.
       by rewrite fdom_ofassoc -map_comp /(\o) /= .
     + smt().
-    + move: H15 H17 H18; rewrite !H1 !Core.oget_some (*-!List.map_comp /(\o)*) /=.
+    + move: H15 H17 H18; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
        by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
       move=> /= ? ?.
       rewrite joinE; pose E := (_ \in _)%SmtMap; case: E; rewrite /E; clear E; last smt().
       rewrite -map_comp /(\o) /= ofassoc_get mem_ofassoc -map_comp /(\o) /=.
       move=> /mapP [pk' [Hpk' /= [-> ->]]] _; smt (mem_fdom memE).
-    + move: H15 H17 H18; rewrite !H1 !Core.oget_some (*-!List.map_comp /(\o)*) /=.
+    + move: H15 H17 H18; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
        by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
       move=> /= ? ?.
@@ -671,12 +669,12 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
       rewrite -map_comp /(\o) /= ofassoc_get.
       move => ? ?; exists ephL.
       move: (assoc_some _ _ _ H20) => /mapP [v [? /= [[? ?] ?]]]; smt().
-    + move: H15 H17; rewrite !H1 !Core.oget_some (*-!List.map_comp /(\o)*) /=.
+    + move: H15 H17; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
        by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
       move=> /= ? ?; move: H18; rewrite mem_cat; move=> [?|]; first smt().
       move=> /pkmem_foldenc; smt (mem_fdom memE).
-    + move: H15 H17; rewrite !H1 !Core.oget_some (*-!List.map_comp /(\o)*) /=.
+    + move: H15 H17; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
        by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
       move=> /= ? ?; move: H18; rewrite mem_cat mem_join; move=> [?|?]; first left; smt().
@@ -686,10 +684,9 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
       rewrite (ephmem_foldenc _ _ _ _ _ _ _ _ T H17 H18) /=.
       have ? : 0 <= index pk (elems pks{2}) < size (elems pks{2}).
       + smt(index_ge0 index_mem map_comp mapP).
-      rewrite /assoc onth_nth_map -!map_comp /(\o) /= map_id Core.oget_omap_some
+      rewrite /assoc onth_nth_map -!map_comp /(\o) /= map_id 
               (nth_map witness) //=. 
-    + move: H15 H17 H19; rewrite !H1 !Core.oget_some (*-!List.map_comp /(\o)*) /=.
-      rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
+    + move: H15 H17 H19; rewrite !H1 /= (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
        by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
       move=> /= ? ?.
       rewrite joinE; pose E := (_ \in _)%SmtMap; case: E; rewrite /E; clear E; last smt().
@@ -708,7 +705,7 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
      rewrite /decrypt; congr.
      move: (eq_refl (MRPKE_lor.pklist{1}.[pk{2}])); case: {2}(MRPKE_lor.pklist{1}.[pk{2}]). 
       by smt(mem_fdom).
-     move=> sk Hpk; rewrite Hpk oget_some; smt (mem_fdom).
+     move=> sk Hpk; rewrite Hpk /=; smt (mem_fdom).
     rcondt {2} 1; first by auto => />.
     rcondt {2} 4.
      move => *;wp;skip; rewrite /inv /=; smt (mem_fdom).
@@ -858,15 +855,14 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
      rewrite -map_comp /(\o) H2 /=.
      by rewrite -(map_fst_zip _ _ ksL) // (supp_dlist_size _ _ _ _ H10) ?size_ge0.
   wp; rnd; wp; skip; rewrite /inv /=; clear inv; progress.
-  + by rewrite oget_some.
   + by smt().
   + by rewrite fdom_join fdom_ofassoc -map_comp /(\o).
-  + move: H11; rewrite mem_cat; move=> [?|]; first smt().
+  + move: H10; rewrite mem_cat; move=> [?|]; first smt().
     move=> /pkmem_foldenc; smt (memE mem_fdom).
-  + move: H11; rewrite mem_cat mem_join; move=> [?|?]; first smt().
-    right; rewrite mem_ofassoc -!map_comp /(\o) oget_some /=.
+  + move: H10; rewrite mem_cat mem_join; move=> [?|?]; first smt().
+    right; rewrite mem_ofassoc -!map_comp /(\o) /=.
     have T: pk \in map fst hs{2} by smt.
-    rewrite (ephmem_foldenc _ _ _ _ _ _ _ _ T H9 H11) /=. 
+    rewrite (ephmem_foldenc _ _ _ _ _ _ _ _ T H9 H10) /=. 
     have ?: (pk \in map fst hs{2})%List by smt.
     have ?: uniq (map fst hs{2}) by smt.
     apply/mapP => /=.
@@ -970,7 +966,7 @@ proof.
 rewrite /fold_encs => ? ?.
 have ->: (pk,tag,x)
          = (fun pk => (pk, tag, oget (SmtMap.ofassoc (zip (elems pks) l)).[pk])) pk.
- by rewrite /= ofassoc_get H0 oget_some.
+ by rewrite /= ofassoc_get H0.
 rewrite mem_map // => a b; smt().
 qed.
 
@@ -1156,14 +1152,13 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
      - rewrite H2. 
            move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap). 
   wp; skip; rewrite /inv /=; clear inv; progress.
-  + rewrite oget_some.
-    congr; congr.
+  + rewrite /=; congr; congr.
     have ->: (fun (cph : int * Cph) => (g ^ x{2}, cph.`2))
              = (fun k=>(g^x{2}, k)) \o snd by done.
     rewrite map_comp unzip2_zip //.
     rewrite size_iota. smt (size_ge0).
   + congr; congr.
-    rewrite !oget_some; congr; congr.
+    rewrite /=; congr; congr.
     have ->: (fun (cph : int * Cph) => (g ^ x{2}, cph.`2))
              = (fun k=>(g^x{2}, k)) \o snd by done.
     rewrite map_comp unzip2_zip //.
@@ -1175,23 +1170,22 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     by rewrite !zip_mapr -!map_comp /(\o) /=.
   + smt().
   + rewrite !fdom_join !fdom_ofassoc; congr; congr.
-    rewrite -!map_comp /(\o) /= !oget_some unzip1_zip //.
+    rewrite -!map_comp /(\o) /= unzip1_zip //.
     rewrite !size_map size_zip size_iota. smt (size_ge0).
   + smt (size_cat).
   + move: H12; rewrite mem_cat; move=> [? /#|].  
     move=> /mapP [[y1 y2] /=] /> /mem_zip_fst; smt (size_ge0 mem_iota). 
   + move: H12; rewrite mem_cat; move=> [?|]. smt (size_ge0).
     move=> /mapP [[y1 y2] /=] /> /mem_zip_fst; smt (size_ge0 mem_iota).
-  + move: H12; rewrite !oget_some joinE.
+  + move: H12; rewrite /= joinE.
     pose E:= ((pk, eph) \in _)%SmtMap; case: E => ?; last smt().
     rewrite ofassoc_get assoc_zip unzip1_zip; first 3 smt (size_map size_iota size_ge0).
     move=> ?; move: (onth_some_mem _ _ _ H13); smt (size_ge0 mem_iota).
-  + move: H12; rewrite !oget_some joinE.
+  + move: H12; rewrite joinE.
     pose E:= ((pk, eph) \in _)%SmtMap; case: E => ?; last smt(size_ge0).
     rewrite ofassoc_get assoc_zip unzip1_zip; first 3 smt (size_map size_iota size_ge0).
     move=> ?; move: (onth_some_mem _ _ _ H14). smt (size_ge0 mem_iota).
-  + move: H12; rewrite !oget_some.
-    rewrite joinE mem_cat.
+  + move: H12; rewrite /= joinE mem_cat.
     pose E:= ((pk, eph) \in _)%SmtMap; case: E => ? ?; last first.
      have T: (i, tag0, c) \in AEADmul_Oracles.lorlist{2}.
       move: H13; rewrite mem_cat; move=> [? /#|?].
@@ -1212,7 +1206,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     apply/onth_map_some; exists (size AEADmul_Oracles.keys{2} + idx', c')=> /=.
     apply onth_zip_some => /=; split; last smt().
     apply/onth_iota_some; smt(). 
-  + move: H12; rewrite !oget_some !joinE => ?.
+  + move: H12; rewrite /= !joinE => ?.
     pose L:= map _ (zip _ _).
     have ->: L = zip (map (fun pk=>(pk,g^x{2})) (elems (pks{2}))) new_keys{2}.
      rewrite /L -zip_map_proj /(\o) /=; congr.

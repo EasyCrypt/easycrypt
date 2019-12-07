@@ -261,7 +261,7 @@ section.
     proc; inline F.f. swap{2} 3 -2.
     auto=> /> &1 &2 _ [] m1_is_m2Ulog m2_le_m1 r1 _ r2 _.
     rewrite negBadE; case: (P.seed{2} \in F.m{1})=> [/#|//=].
-    rewrite !get_setE /= oget_some /=.
+    rewrite !get_setE /=.
     move=> seed_notin_m1 _; split.
       by move=> r; rewrite mem_set m1_is_m2Ulog /#.
     move=> r ^/m2_le_m1; rewrite !get_setE=> -> r_in_m2.
