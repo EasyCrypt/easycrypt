@@ -21,7 +21,7 @@ op verify : pkey * message * signature -> bool.
 axiom keygen_ll : is_lossless keygen.
 axiom sign_ll s m : is_lossless (sign (s,m)).
 
-hint solve 2 random : keygen_ll sign_ll.
+hint exact random : keygen_ll sign_ll.
 
 axiom verify_sign : forall pk sk m s, 
   (pk,sk) \in keygen =>
@@ -684,7 +684,7 @@ abstract theory UF1_UF.
         auto => />. 
         if => //. 
         seq 4 1 : (#[/3:]pre /\ ={pk} /\ (pk,sk){1} = (UF1.pk,UF1.sk){2}).
-        + conseq />; auto => />; smt(keygen_ll get_setE).
+        + conseq />; auto => />; smt (get_setE).
         swap {1} 2 -1. sp 1 1.
         if; 1: smt().
         + rcondt{1} 2;auto => />; smt (get_setE). 
