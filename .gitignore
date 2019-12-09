@@ -49,6 +49,7 @@ setup.log
 /attic
 
 /*.ec
+*.eco
 
 /*.smt
 /*.why

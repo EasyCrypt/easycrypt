@@ -171,13 +171,13 @@ let t_eager_if_r tc =
       (f_hoareS (mhr, snd es.es_ml) (f_and p eqb) s eqb) in
 
   let cT =
-    let pre = f_and es.es_pr (f_eq fe f_true) in
+    let pre = f_and es.es_pr (f_eq fel f_true) in
     let st  = stmt (s.s_node @ c1.s_node) in
     let st' = stmt (c1'.s_node @ s'.s_node) in
     f_equivS es.es_ml es.es_mr pre st st' es.es_po in
 
   let dT =
-    let pre = f_and es.es_pr (f_eq fe f_false) in
+    let pre = f_and es.es_pr (f_eq fel f_false) in
     let st  = stmt (s.s_node @ c2.s_node) in
     let st' = stmt (c2'.s_node @ s'.s_node) in
     f_equivS es.es_ml es.es_mr pre st st' es.es_po in

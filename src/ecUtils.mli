@@ -298,23 +298,23 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Parray : sig
-  type 'a t
+  type 'a parray
 
-  val empty : 'a t
-  val get : 'a t -> int -> 'a
-  val length : 'a t -> int
-  val of_list : 'a list -> 'a t
-  val to_list : 'a t -> 'a list
-  val of_array : 'a array -> 'a t
-  val init : int -> (int -> 'a) -> 'a t
-  val map : ('a -> 'b) -> 'a t -> 'b t
-  val fmap : ('a -> 'b) -> 'a list -> 'b t
-  val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
-  val fold_right : ('b -> 'a -> 'a) -> 'b t -> 'a -> 'a
-  val fold_left2 : ('a -> 'b -> 'c -> 'a) -> 'a -> 'b t -> 'c t -> 'a
-  val iter : ('a -> unit) -> 'a t -> unit
-  val iter2 : ('a -> 'b -> unit) -> 'a t -> 'b t -> unit
-  val split : ('a * 'b) t -> ('a t * 'b t)
-  val exists : ('a -> bool) -> 'a t -> bool
-  val for_all : ('a -> bool) -> 'a t -> bool
+  val empty : 'a parray
+  val get : 'a parray -> int -> 'a
+  val length : 'a parray -> int
+  val of_list : 'a list -> 'a parray
+  val to_list : 'a parray -> 'a list
+  val of_array : 'a array -> 'a parray
+  val init : int -> (int -> 'a) -> 'a parray
+  val map : ('a -> 'b) -> 'a parray -> 'b parray
+  val fmap : ('a -> 'b) -> 'a list -> 'b parray
+  val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b parray -> 'a
+  val fold_right : ('b -> 'a -> 'a) -> 'b parray -> 'a -> 'a
+  val fold_left2 : ('a -> 'b -> 'c -> 'a) -> 'a -> 'b parray -> 'c parray -> 'a
+  val iter : ('a -> unit) -> 'a parray -> unit
+  val iter2 : ('a -> 'b -> unit) -> 'a parray -> 'b parray -> unit
+  val split : ('a * 'b) parray -> ('a parray * 'b parray)
+  val exists : ('a -> bool) -> 'a parray -> bool
+  val for_all : ('a -> bool) -> 'a parray -> bool
 end
