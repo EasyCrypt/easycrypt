@@ -608,8 +608,7 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
    + rewrite /genDH dmap1E /(\o) /pred1 /=.
      by apply mu_eq => /= x /#. 
    + by move: H9; rewrite /genDH supp_dmap; move => [x [Hx ->]] /=.
-   + by move: H9; rewrite /genDH supp_dmap; move => [x [Hx ->]] /=.
-   + by rewrite {1}H11.
+   by move: H9; rewrite /genDH supp_dmap; move => [x [Hx ->]] /=.
   if; first by rewrite /inv.
   + by wp; skip; rewrite /inv /=; clear inv => />; smt (fdom_set get_setE mem_fdom).
     by wp; skip; rewrite /inv /=; clear inv => />; smt (fdom_set get_setE mem_fdom).
@@ -643,57 +642,57 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
   + inline*; wp; rnd; wp.
     rnd{2}; rnd; wp; skip; rewrite /inv /=; clear inv; progress; last 18 by smt().
     + by apply dlist_ll; apply AEAD.gen_ll.
-    + move: H15; rewrite !H1 /=.
+    + move: H14; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
-      by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
+      by apply/(supp_dlist_size _ _ _ _ H11)/size_ge0.
     + move: H15; rewrite !H1 /= (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
-      by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
-    + move: H15 H17; rewrite !H1 /= (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //=.
-       by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
+      by apply/(supp_dlist_size _ _ _ _ H11)/size_ge0.
+    + move: H15 H16; rewrite !H1 /= (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //=.
+       by apply/(supp_dlist_size _ _ _ _ H11)/size_ge0.
       move=> ? ?.
       rewrite -map_comp /(\o) /= fdom_join; congr.
       by rewrite fdom_ofassoc -map_comp /(\o) /= .
     + smt().
-    + move: H15 H17 H18; rewrite !H1 /=.
+    + move: H15 H16 H17; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
-       by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
+       by apply/(supp_dlist_size _ _ _ _ H11)/size_ge0.
       move=> /= ? ?.
       rewrite joinE; pose E := (_ \in _)%SmtMap; case: E; rewrite /E; clear E; last smt().
       rewrite -map_comp /(\o) /= ofassoc_get mem_ofassoc -map_comp /(\o) /=.
       move=> /mapP [pk' [Hpk' /= [-> ->]]] _; smt (mem_fdom memE).
-    + move: H15 H17 H18; rewrite !H1 /=.
+    + move: H15 H16 H17; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
-       by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
+       by apply/(supp_dlist_size _ _ _ _ H11)/size_ge0.
       move=> /= ? ?.
       rewrite joinE; pose E := (_ \in _)%SmtMap; case: E; rewrite /E; clear E; last smt().
       rewrite -map_comp /(\o) /= ofassoc_get.
       move => ? ?; exists ephL.
-      move: (assoc_some _ _ _ H20) => /mapP [v [? /= [[? ?] ?]]]; smt().
-    + move: H15 H17; rewrite !H1 /=.
+      move: (assoc_some _ _ _ H19) => /mapP [v [? /= [[? ?] ?]]]; smt().
+    + move: H15 H16; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
-       by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
-      move=> /= ? ?; move: H18; rewrite mem_cat; move=> [?|]; first smt().
+       by apply/(supp_dlist_size _ _ _ _ H11)/size_ge0.
+      move=> /= ? ?; move: H17; rewrite mem_cat; move=> [?|]; first smt().
       move=> /pkmem_foldenc; smt (mem_fdom memE).
-    + move: H15 H17; rewrite !H1 /=.
+    + move: H15 H16; rewrite !H1 /=.
       rewrite (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
-       by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
-      move=> /= ? ?; move: H18; rewrite mem_cat mem_join; move=> [?|?]; first left; smt().
+       by apply/(supp_dlist_size _ _ _ _ H11)/size_ge0.
+      move=> /= ? ?; move: H17; rewrite mem_cat mem_join; move=> [?|?]; first left; smt().
       right; rewrite mem_ofassoc -!map_comp /(\o) /=; apply/mapP; exists pk; split; first smt.
       have T: pk \in map fst (map (fun x => (x, (g^ephL, hash(x^ephL)))) (elems pks{2})).
        rewrite -map_comp /(\o) map_id; smt.
-      rewrite (ephmem_foldenc _ _ _ _ _ _ _ _ T H17 H18) /=.
+      rewrite (ephmem_foldenc _ _ _ _ _ _ _ _ T H16 H17) /=.
       have ? : 0 <= index pk (elems pks{2}) < size (elems pks{2}).
       + smt(index_ge0 index_mem map_comp mapP).
       rewrite /assoc onth_nth_map -!map_comp /(\o) /= map_id 
               (nth_map witness) //=. 
-    + move: H15 H17 H19; rewrite !H1 /= (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
-       by apply/(supp_dlist_size _ _ _ _ H12)/size_ge0.
+    + move: H15 H16 H18; rewrite !H1 /= (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
+       by apply/(supp_dlist_size _ _ _ _ H11)/size_ge0.
       move=> /= ? ?.
       rewrite joinE; pose E := (_ \in _)%SmtMap; case: E; rewrite /E; clear E; last smt().
       rewrite -map_comp /(\o) /= ofassoc_get => ? ?.
-      move: (assoc_some _ _ _ H20) => /mapP [v [? /= [[? ?] ?]]].
-      rewrite H24 H23 -H22.
-      move: (H6 _ _ H18) => ->; congr.
+      move: (assoc_some _ _ _ H19) => /mapP [v [? /= [[? ?] ?]]].
+      rewrite H23 H22 -H21.
+      move: (H6 _ _ H17) => ->; congr.
       by rewrite !pow_pow FD.F.mulC.
   by wp; skip; rewrite /inv /=; clear inv => />; smt().
 + proc; inline*.
@@ -803,7 +802,6 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
       by apply mu_eq => /= x /#. 
     + by move: H6; rewrite /genDH supp_dmap; move => [x [Hx ->]].
     + by move: H6; rewrite /genDH supp_dmap; move => [x [Hx ->]].
-    + by rewrite {1}H8.
    if; first by rewrite /inv. 
     wp; skip; rewrite /inv => />; smt (fdom_set mem_fdom in_fsetU).
    by wp; skip; rewrite /inv => />; smt (fdom_set mem_fdom in_fsetU).
@@ -851,9 +849,9 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
    + inline*; wp; rnd; rnd; wp; skip; rewrite /inv /=; clear inv; progress.
        by rewrite H2.
       rewrite H2 /map_assoc -map_comp /(\o) /= unzip1_zip //.
-      by rewrite (supp_dlist_size _ _ _ _ H10) ?size_ge0.
+      by rewrite (supp_dlist_size _ _ _ _ H9) ?size_ge0.
      rewrite -map_comp /(\o) H2 /=.
-     by rewrite -(map_fst_zip _ _ ksL) // (supp_dlist_size _ _ _ _ H10) ?size_ge0.
+     by rewrite -(map_fst_zip _ _ ksL) // (supp_dlist_size _ _ _ _ H9) ?size_ge0.
   wp; rnd; wp; skip; rewrite /inv /=; clear inv; progress.
   + by smt().
   + by rewrite fdom_join fdom_ofassoc -map_comp /(\o).
