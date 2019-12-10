@@ -93,11 +93,16 @@ val pp_goal : PPEnv.t -> prpo_display -> ppgoal pp
 
 (* -------------------------------------------------------------------- *)
 module ObjectInfo : sig
+  type db = [`Rewrite of qsymbol | `Solve of symbol]
+
   val pr_ty  : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_op  : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_th  : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_ax  : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_mod : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_mty : Format.formatter -> EcEnv.env -> qsymbol -> unit
+  val pr_rw  : Format.formatter -> EcEnv.env -> qsymbol -> unit
+  val pr_at  : Format.formatter -> EcEnv.env -> symbol -> unit
+  val pr_db  : Format.formatter -> EcEnv.env -> db -> unit
   val pr_any : Format.formatter -> EcEnv.env -> qsymbol -> unit
 end

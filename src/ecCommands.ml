@@ -262,14 +262,20 @@ let process_pr fmt scope p =
   let env = EcScope.env scope in
 
   match p with
-  | Pr_ty   qs -> EcPrinting.ObjectInfo.pr_ty   fmt env   qs.pl_desc
-  | Pr_op   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   qs.pl_desc
-  | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   qs.pl_desc
-  | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   qs.pl_desc
-  | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   qs.pl_desc
-  | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   qs.pl_desc
-  | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   qs.pl_desc
-  | Pr_any  qs -> EcPrinting.ObjectInfo.pr_any  fmt env   qs.pl_desc
+  | Pr_ty   qs -> EcPrinting.ObjectInfo.pr_ty   fmt env   (unloc qs)
+  | Pr_op   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
+  | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
+  | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   (unloc qs)
+  | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   (unloc qs)
+  | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   (unloc qs)
+  | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   (unloc qs)
+  | Pr_any  qs -> EcPrinting.ObjectInfo.pr_any  fmt env   (unloc qs)
+
+  | Pr_db (`Rewrite qs) ->
+      EcPrinting.ObjectInfo.pr_rw fmt env (unloc qs)
+
+  | Pr_db (`Solve q) ->
+      EcPrinting.ObjectInfo.pr_at fmt env (unloc q)
 
   | Pr_glob pm -> HiPrinting.pr_glob fmt env pm
   | Pr_goal n  -> HiPrinting.pr_goal fmt scope n
