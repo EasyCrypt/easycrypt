@@ -102,12 +102,7 @@ section Security.
   rnd (fun z, z + log (if b then m1 else m0){2})
       (fun z, z - log (if b then m1 else m0){2}).
   auto; call (_:true).
-  auto=> /> x _ y _ [m0 m1] b _; progress.
-  + by algebra.
-  + exact/FDistr.dt_funi.
-  + exact/FDistr.dt_fu.
-  + by algebra.
-  + by algebra.
+  by auto; progress; algebra.
   qed.
 
   local lemma Gb_half &m:
@@ -117,9 +112,7 @@ section Security.
   rnd  (pred1 b')=> //=.
   conseq (: _ ==> true).
   + by move=> /> b; rewrite dbool1E pred1E.
-  call Ag_ll.
-  auto; call Ac_ll.
-  by auto=> />; exact/dt_ll.
+  islossless;[ apply Ag_ll | apply Ac_ll].
   qed.
 
   lemma conclusion &m :

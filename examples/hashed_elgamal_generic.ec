@@ -1,6 +1,6 @@
 require import AllCore Int Real FSet.
 require (*--*) BitWord Distr DInterval.
-(*---*) import StdOrder.RealOrder.
+(*---*) import StdOrder.RealOrder StdRing.RField.
 require (*--*) DiffieHellman ROM PKE_CPA.
 
 (* The type of plaintexts: bitstrings of length k *)
@@ -296,9 +296,7 @@ section.
     + by move=> b'; rewrite DBool.dbool1E /pred1 => />.
     islossless.
     + by apply (guess_ll (Bound(RO))); islossless.
-    + by apply (choose_ll (Bound(RO))); islossless.
-    + by apply dt_ll.
-    by apply dt_ll.
+    by apply (choose_ll (Bound(RO))); islossless.
   qed.
 
   local module G2' = {
@@ -376,7 +374,7 @@ section.
     apply (ler_trans (Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res])).
     + smt(Reduction).
     have:= Self.SCDH.Reduction (SCDH_from_CPA(A,RO)) &m gt0_qH.    
-    smt(@Real gt0_qH).
+    by rewrite -mulrA mul1r mulrC ler_pdivr_mulr 1:lt_fromint 1:gt0_qH mulrC.
   qed.
 end section.
 
