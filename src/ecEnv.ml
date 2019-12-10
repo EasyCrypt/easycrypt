@@ -1448,6 +1448,10 @@ module Auto = struct
         Mint.union (fun _ sp1 sp2 -> Some (sp1 @ sp2)) db mi)
         Mint.empty dbs
     in flatten_db dbs
+
+  let getx (base : symbol) (env : env) =
+    let db = Msym.find_def Mint.empty base env.env_atbase in
+    Mint.bindings db
 end
 
 (* -------------------------------------------------------------------- *)

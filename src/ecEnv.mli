@@ -384,6 +384,7 @@ module Auto : sig
   val add    : local:bool -> level:int -> ?base:symbol -> path list -> env -> env
   val get    : ?base:symbol -> env -> path list
   val getall : symbol list -> env -> path list
+  val getx   : symbol -> env ->  (int * path list) list
 end
 
 (* -------------------------------------------------------------------- *)

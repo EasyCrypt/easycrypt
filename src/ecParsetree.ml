@@ -968,6 +968,7 @@ type pprint =
   | Pr_mty  of pqsymbol
   | Pr_glob of pmsymbol located
   | Pr_goal of int
+  | Pr_db   of [`Rewrite of pqsymbol | `Solve of psymbol]
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind =
