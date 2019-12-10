@@ -404,7 +404,6 @@
 %token CONSEQ
 %token CONST
 %token CUT
-%token DB
 %token DEBUG
 %token DECLARE
 %token DELTA
@@ -645,7 +644,6 @@ _lident:
 | EXLIM      { "exlim"      }
 | ECALL      { "ecall"      }
 | FROM       { "from"       }
-| DB         { "db"         }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -3459,23 +3457,21 @@ realize:
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
 print:
-|             qs=qoident         { Pr_any  qs }
-| STAR        qs=qoident         { Pr_any  qs }
-| TYPE        qs=qident          { Pr_ty   qs }
-| OP          qs=qoident         { Pr_op   qs }
-| THEORY      qs=qident          { Pr_th   qs }
-| PRED        qs=qoident         { Pr_pr   qs }
-| AXIOM       qs=qident          { Pr_ax   qs }
-| LEMMA       qs=qident          { Pr_ax   qs }
-| MODULE      qs=qident          { Pr_mod  qs }
-| MODULE TYPE qs=qident          { Pr_mty  qs }
-| GLOB        qs=loc(mod_qident) { Pr_glob qs }
-| GOAL        n=sword            { Pr_goal n  }
-| DB          db=print_db        { Pr_db   db }
+|             qs=qoident         { Pr_any  qs            }
+| STAR        qs=qoident         { Pr_any  qs            }
+| TYPE        qs=qident          { Pr_ty   qs            }
+| OP          qs=qoident         { Pr_op   qs            }
+| THEORY      qs=qident          { Pr_th   qs            }
+| PRED        qs=qoident         { Pr_pr   qs            }
+| AXIOM       qs=qident          { Pr_ax   qs            }
+| LEMMA       qs=qident          { Pr_ax   qs            }
+| MODULE      qs=qident          { Pr_mod  qs            }
+| MODULE TYPE qs=qident          { Pr_mty  qs            }
+| GLOB        qs=loc(mod_qident) { Pr_glob qs            }
+| GOAL        n=sword            { Pr_goal n             }
+| REWRITE     qs=qident          { Pr_db   (`Rewrite qs) }
+| SOLVE       qs=ident           { Pr_db   (`Solve   qs) }
 
-print_db:
-| REWRITE qs=qident { (`Rewrite qs) }
-| SOLVE   qs=ident  { (`Solve   qs) }
 
 smt_info:
 | li=smt_info1* { SMT.mk_smt_option li}
