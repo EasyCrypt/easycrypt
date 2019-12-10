@@ -14,7 +14,6 @@ open EcModules
 open EcFol
 open EcPV
 
-open EcCoreLib
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
@@ -322,7 +321,6 @@ let wp_equiv_disj_rnd_r side tc =
 
 (* -------------------------------------------------------------------- *)
 let wp_equiv_rnd_r bij tc =
-
   let tc = Core.wp_equiv_rnd_r bij tc in
   let es = tc1_as_equivS (FApi.as_tcenv1 tc) in
 
@@ -352,7 +350,6 @@ let wp_equiv_rnd_r bij tc =
   let h   = EcIdent.create "_" in
   let h1  = EcIdent.create "_" in
   let h2  = EcIdent.create "_" in
-  let h3  = EcIdent.create "_" in
   let x   = EcIdent.create "_" in
   let hin = EcIdent.create "_" in
 
@@ -361,44 +358,36 @@ let wp_equiv_rnd_r bij tc =
     | 1 ->
       let open EcProofTerm.Prept in
 
-     let proj1 pt =
-       uglob CI_Logic.p_anda_proj_l @ [h_; h_; asub pt] in
-
-     let proj2 pt h =
-       uglob CI_Logic.p_anda_proj_r @ [h_; h_; asub pt; ahyp h] in
-
-      let t_c1  = t_apply_prept (proj1 (hyp h)) in
-
       let t_c2 =
         let pt =
           match hdc2 with
-          | None -> proj1 (proj2 (hyp h) h1)
+          | None -> hyp h2
           | Some hd -> hdl hd @ [amem m1; amem m2] in
         t_apply_prept pt in
 
       let t_c3_c4 =
-        let pt =
-          match hdc2 with
-          | None   -> proj2 (proj2 (hyp h) h1) h2
-          | Some _ -> proj2 (hyp h) h1 in
         match hdc3 with
-        | None -> t_apply_prept pt
+        | None -> t_apply_prept (hyp h)
         | Some hd ->
           let fx = f_local x (gty_as_ty xty) in
-          (  t_intros_i [x; hin]
-          @! t_split
-          @+ [ t_apply_prept (hdl hd @ [amem m1; amem m2; aform fx; ahyp hin])
-             ; t_intros_i [h3]
-               @! t_apply_prept (pt @ [aform fx; ahyp hin])])
+          t_intros_i [x; hin] @! t_split
+          @+ [ t_apply_prept (hdl hd @ [amem m1; amem m2; aform fx; ahyp hin]);
+               t_intros_n 1 @!
+                t_apply_prept ((hyp h) @ [aform fx; ahyp hin])]
       in
 
-      (  t_intros_i [m1; m2; h]
-      @! t_split
-      @+ [ t_c1
-         ; t_intros_i [h1] @! t_split
-         @+ [ t_c2
-            ; t_intros_i [h2] @! t_c3_c4 ]])
+      let t_case_c2 =
+        match hdc2 with
+        | None -> t_elim_and @! t_intros_i [h2; h]
+        | Some _ -> t_intros_i [h] in
 
+      t_intros_i [m1; m2] @! t_elim_and @! t_intros_i [h1] @! t_case_c2 @! t_split @+
+        [ t_apply_prept (hyp h1);
+          t_intros_n 1 @! t_split @+
+            [ t_c2;
+              t_intros_n 1 @! t_c3_c4
+            ]
+         ]
 
     | _ -> EcLowGoal.t_id)
 
