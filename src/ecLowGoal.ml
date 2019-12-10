@@ -2164,30 +2164,22 @@ let t_auto ?(canfail = true) ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tc
 
   let bases = EcEnv.Auto.getall bases (FApi.tc1_env tc) in
 
-  let rec forall ctn tc =
-    if ctn >= depth then t_fail tc else begin
-      try
-        List.iter
-          (fun p -> try raise (E.Done (for1 ctn p tc)) with E.Fail -> ())
-          bases;
-        t_fail tc
-      with E.Done tc -> tc
-
-    end
-
-  and for1 ctn (p : EcPath.path) tc =
+  let t_apply1 p tc =
     let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
+    try Apply.t_apply_bwd_r ~mode:fmdelta ~canview:false pt tc
+    with Apply.NoInstance _ -> t_fail tc in
 
-    try
-      FApi.t_seqs
-        [Apply.t_apply_bwd_r ~mode:fmdelta ~canview:false pt;
-         t_trivial; forall (ctn+1)]
-        tc
+  let rec t_apply ctn p  =
+    if ctn > depth then t_fail
+    else t_apply1 p @! t_trivial @! t_solve (ctn + 1) bases
+  and t_solve ctn bases =
+    match bases with
+    | [] -> t_abort
+    | p::bases -> FApi.t_or (t_apply ctn p) (t_solve ctn bases) in
 
-    with Apply.NoInstance _ ->
-      raise E.Fail
-
-  in if canfail then FApi.t_try (forall 0) tc else forall 0 tc
+  let t = t_solve 0 bases in
+  let t = if canfail then FApi.t_try t else t in
+  t tc
 
 (* --------------------------------------------------------------------- *)
 let t_crush_fwd ?(delta = true) nb_intros (tc : tcenv1) =
