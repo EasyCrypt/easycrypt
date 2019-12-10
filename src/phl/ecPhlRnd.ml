@@ -266,7 +266,7 @@ let solve n f tc =
   let tt =
     FApi.t_seqs
       [EcLowGoal.t_intros_n n;
-       EcLowGoal.t_auto ~bases:["random"] ~depth:2;
+       EcLowGoal.t_solve ~bases:["random"] ~depth:2;
        EcLowGoal.t_fail] in
 
   let subtc, hd = FApi.newgoal tc f in

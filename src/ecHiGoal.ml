@@ -360,12 +360,8 @@ let t_rewrite_prept info pt tc =
   LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
-let process_auto ?canfail ?bases ?depth (tc : tcenv1) =
-  EcLowGoal.t_auto ?canfail ?bases ?depth tc
-
-(* -------------------------------------------------------------------- *)
 let process_solve ?bases ?depth (tc : tcenv1) =
-  match FApi.t_try_base (process_auto ~canfail:false ?bases ?depth) tc with
+  match FApi.t_try_base (EcLowGoal.t_solve ~canfail:false ?bases ?depth) tc with
   | `Failure _ ->
       tc_error (FApi.tc1_penv tc) "[solve]: cannot close goal"
   | `Success tc ->
