@@ -1,6 +1,6 @@
 require import AllCore Int Real FSet.
 require (*--*) BitWord Distr DInterval.
-(*---*) import StdOrder.RealOrder.
+(*---*) import StdOrder.RealOrder StdRing.RField.
 require (*--*) DiffieHellman ROM PKE_CPA.
 
 (* The type of plaintexts: bitstrings of length k *)
@@ -282,11 +282,7 @@ section.
     call (_: ={glob RO, glob Log}); first by sim.
     wp; rnd (fun h, h +^ if b then m1 else m0){1}; rnd.
     call (_: ={glob RO, glob Log}); first by sim.
-    inline H.init RO.init; auto=> /> x _ y _ [m0 m1] b _; progress.
-    + by algebra.
-    + exact/dbits_funi.
-    + exact/dbits_fu.
-    by algebra.
+    by inline H.init RO.init; auto=> /> *; split => *; algebra.
   qed.
 
   local lemma Pr_G1' &m: Pr[G1'.main() @ &m: res] = 1%r/2%r.
@@ -296,14 +292,11 @@ section.
     proc.
     swap 7 3.
     rnd (pred1 b').
-    call (_: true);
-      first by progress; apply (guess_ll O).
-      by proc; sp; if=> //; wp; call (Log_o_ll RO _).
-    auto.
-    call (_: true);
-      first by progress; apply (choose_ll O).
-      by proc; sp; if=> //; wp; call (Log_o_ll RO _).
-    by inline H.init RO.init; auto=> />; smt(dt_ll dbits_ll DBool.dbool1E).
+    conseq (_: true) => />.
+    + by move=> b'; rewrite DBool.dbool1E /pred1 => />.
+    islossless.
+    + by apply (guess_ll (Bound(RO))); islossless.
+    by apply (choose_ll (Bound(RO))); islossless.
   qed.
 
   local module G2' = {
@@ -334,11 +327,7 @@ section.
     call (_: ={glob RO, glob Log}); first by sim.
     wp; rnd (fun h, h +^ if b then m1 else m0){1}; rnd.
     call (_: ={glob RO, glob Log}); first by sim.
-    inline H.init RO.init; auto=> /> x _ y _ [m0 m1] b _; progress.
-    + by algebra.
-    + exact/dbits_funi.
-    + exact/dbits_fu.
-    + by algebra.
+    by inline H.init RO.init; auto=> /> *; split => *; algebra.
   qed.
 
   local equiv G2'_SCDH: G2'.main ~ SCDH(SCDH_from_CPA(A,RO)).main:
@@ -359,7 +348,7 @@ section.
     call (_: ={glob H} /\ card Log.qs{1} <= qH).
       proc; sp; if=> //; inline Bound(RO).LO.o RO.o; auto=> /> &2 _ szqs_lt_qH _ _.
       by rewrite fcardU fcard1; smt(fcard_ge0).
-    by auto=> />; smt(DBool.dbool_ll).
+    by auto => />.
   qed.
 
   local lemma Pr_G2'_SCDH &m :
@@ -385,7 +374,7 @@ section.
     apply (ler_trans (Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res])).
     + smt(Reduction).
     have:= Self.SCDH.Reduction (SCDH_from_CPA(A,RO)) &m gt0_qH.    
-    smt(@Real gt0_qH).
+    by rewrite -mulrA mul1r mulrC ler_pdivr_mulr 1:lt_fromint 1:gt0_qH mulrC.
   qed.
 end section.
 

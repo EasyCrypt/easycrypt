@@ -771,7 +771,7 @@ theory ROM_BadCall.
                eq_except (pred1 G1'.x{2}) RO.m{1} RO.m{2}).
       + by apply Da2L.
       + proc; inline RO.o; auto=> /> //= &1 &2 x2_notin_qs eq_qs_m eqe y _.
-        rewrite !inE !get_setE x2_notin_qs /= oget_some eq_except_set_eq //= eq_sym.
+        rewrite !inE !get_setE x2_notin_qs /= eq_except_set_eq //= eq_sym.
         split.
         + move=> x_notin_m2; split.
           + by move=> x_notin_m1 + x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
@@ -793,7 +793,7 @@ theory ROM_BadCall.
           by move=> ->; rewrite x_in_m.          
         inline Log(RO).init RO.init; auto=> />; split=> [x1|_ r qs m eq_qs_m y _].
         + by rewrite in_fset0 mem_empty.
-        by rewrite get_set_eqE // oget_some /= eq_except_setl /= eq_qs_m /#.
+        by rewrite get_set_eqE //= eq_except_setl /= eq_qs_m /#.
       by rewrite Pr [mu_or]; smt(mu_bounded).
       qed.
     end section.
@@ -883,7 +883,7 @@ theory ROM_BadCall.
                  eq_except (pred1 G1'.x{2}) RO.m{1} RO.m{2}).
         + by apply Da2L.
         + proc; inline *; sp; if=> //=; auto=> /> //= &1 &2 x2_notin_qs eq_qs_m eqe _ y _.
-          rewrite !inE !get_setE x2_notin_qs /= oget_some eq_except_set_eq //= eq_sym.
+          rewrite !inE !get_setE x2_notin_qs /= eq_except_set_eq //= eq_sym.
           split.
           + move=> x_notin_m2; split.
             + by move=> x_notin_m1 + x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
@@ -905,7 +905,7 @@ theory ROM_BadCall.
             by move=> ->; rewrite x_in_m.          
           inline Log(RO).init RO.init; auto=> />; split=> [x1|_ r qs m eq_qs_m y _].
           + by rewrite in_fset0 mem_empty.
-        by rewrite get_set_eqE // oget_some /= eq_except_setl /= eq_qs_m /#.
+        by rewrite get_set_eqE //= eq_except_setl /= eq_qs_m /#.
       by rewrite Pr [mu_or]; smt(mu_bounded).
       qed.
     end section.

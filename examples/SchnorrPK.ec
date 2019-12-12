@@ -153,11 +153,7 @@ section SchnorrPKSecurity.
     + swap{1} 15 -7; swap{2} 12 -5; swap{1} 11 -3; wp.
       (* Let's play with randomness... *)
       rnd (fun z, z - w{1}*e{1}) (fun r, r + w{1}*e{1}).
-      seq 2 2 : (#pre  /\ ={w0}); auto => /> &2; rewrite FDistr.dt_ll /de /=.
-      move=> r1 _ eL _ _.
-      split => [rR _ | _]; 1: by ring.
-      split => [rR _ | _ z1L _]; 1: by rewrite !FDistr.dt1E.
-      by rewrite FDistr.dt_fu /=; progress; algebra.
+      by seq 2 2 : (#pre  /\ ={w0}); auto => />; progress;algebra.
     by call (_:true); rcondf{1} 1; auto.
   qed.
   (* The above three theorems prove that the Schnorr proof of knowledge is a Sigma protocol *)

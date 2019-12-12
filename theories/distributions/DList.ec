@@ -53,6 +53,8 @@ elim n=> [|n le0_n ih];first by rewrite dlist0 //;apply dunit_ll.
 by rewrite dlistS //;apply/dmap_ll/dprod_ll.
 qed.
 
+hint exact random : dlist_ll.
+
 lemma supp_dlist0 (d : 'a distr) n xs:
   n <= 0 =>
   xs \in dlist d n <=> xs = [].

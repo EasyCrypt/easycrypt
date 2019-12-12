@@ -20,6 +20,7 @@ rename
 (** Some output type equipped with some lossless distribution **)
 type output.
 op dout: { output distr | is_lossless dout } as dout_ll.
+hint exact random: dout_ll.
 
 (* -------------------------------------------------------------------- *)
 (** We use a public RF that, on input a seed, produces a seed and
@@ -107,7 +108,7 @@ module F = {
 }.
 
 lemma FfL: islossless F.f.
-proof. by proc; auto; rewrite dseed_ll dout_ll. qed.
+proof. islossless. qed.
 
 (* And we are proving the security of the following PRG *)
 module P (F:RF) = {
@@ -148,7 +149,7 @@ module Psample = {
 }.
 
 lemma PsampleprgL: islossless Psample.prg.
-proof. by proc; auto; rewrite dseed_ll dout_ll. qed.
+proof. islossless. qed.
 
 (* -------------------------------------------------------------------- *)
 (* In preparation of the eager/lazy reasoning step                      *)
@@ -261,15 +262,15 @@ section.
     proc; inline F.f. swap{2} 3 -2.
     auto=> /> &1 &2 _ [] m1_is_m2Ulog m2_le_m1 r1 _ r2 _.
     rewrite negBadE; case: (P.seed{2} \in F.m{1})=> [/#|//=].
-    rewrite !get_setE /= oget_some /=.
+    rewrite !get_setE /=.
     move=> seed_notin_m1 _; split.
       by move=> r; rewrite mem_set m1_is_m2Ulog /#.
     move=> r ^/m2_le_m1; rewrite !get_setE=> -> r_in_m2.
     by move: (iffRL _ _ (m1_is_m2Ulog r)); rewrite r_in_m2 /#.
     (* Plog.prg is lossless when Bad holds *)
-    by move=> _ _; proc; inline F.f; auto=> />; rewrite dseed_ll dout_ll.
+    by move=> _ _; islossless.
     (* Psample.prg preserves bad *)
-    move=> _ //=; proc; auto=> />; rewrite dseed_ll dout_ll /=.
+    move=> *; proc; auto=> />; rewrite dseed_ll dout_ll /=.
     move=> &hr + v1 _ _ v2 _ _; case=> [h|r r_in_log r_in_m].
     + by apply/Cycle; rewrite /= h.
     by apply/(@Collision _ _ r)=> /=; [rewrite r_in_log|rewrite r_in_m].
@@ -353,7 +354,7 @@ section.
     seq 3 5: (={P.logP} /\ (size P.logP = n - 1){2}).
     + while (={P.logP} /\ n{2} = n{1} + 1 /\ size P.logP{1} <= n{1});
         first by auto=> /#.
-      by wp; rnd{2}; auto=> />; rewrite dseed_ll; smt w=size_ge0.
+      by wp; rnd{2}; auto=> />; smt (size_ge0).
     rcondt{2} 1; first by move=> &hr; auto=> /#.
     rcondf{2} 3; first by move=> &hr; auto=> /#.
   + by sim.

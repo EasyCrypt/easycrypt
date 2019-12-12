@@ -2493,6 +2493,32 @@ let pp_equivS (ppe : PPEnv.t) ?prpo fmt es =
   Format.fprintf fmt "%a%!" (pp_post ppe ?prpo) es.es_po
 
 (* -------------------------------------------------------------------- *)
+let pp_rwbase ppe fmt (p, rws) =
+  Format.fprintf fmt "%a = %a@\n%!"
+    (pp_rwname ppe) p (pp_list ", " (pp_axname ppe)) (Sp.elements rws)
+
+(* -------------------------------------------------------------------- *)
+let pp_solvedb ppe fmt db =
+  List.iter (fun (lvl, ps) ->
+    Format.fprintf fmt "[%3d] %a\n%!"
+      lvl (pp_list ", " (pp_axname ppe)) ps)
+  db;
+
+  let lemmas = List.flatten (List.map snd db) in
+  let lemmas = List.pmap (fun p ->
+      let ax = EcEnv.Ax.by_path_opt p ppe.PPEnv.ppe_env in
+      (omap (fun ax -> (p, ax)) ax))
+    lemmas
+  in
+
+  if not (List.is_empty lemmas) then begin
+    Format.fprintf fmt "\n%!";
+    List.iter
+      (fun ax -> Format.fprintf fmt "%a\n\n%!" (pp_axiom ppe) ax)
+      lemmas
+  end
+
+(* -------------------------------------------------------------------- *)
 type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [
   | `One of int
   | `All of (EcBaseLogic.hyps * EcFol.form) list
@@ -2979,10 +3005,12 @@ let pp_stmt ?(lineno = false) =
 module ObjectInfo = struct
   exception NoObject
 
+  type db = [`Rewrite of qsymbol | `Solve of symbol]
+
   (* ------------------------------------------------------------------ *)
   type 'a objdump = {
     od_name    : string;
-    od_lookup  : EcSymbols.qsymbol -> EcEnv.env -> 'a;
+    od_lookup  : qsymbol -> EcEnv.env -> 'a;
     od_printer : PPEnv.t -> Format.formatter -> 'a -> unit;
   }
 
@@ -3070,13 +3098,45 @@ module ObjectInfo = struct
   let pr_mty = pr_gen pr_mty_r
 
   (* ------------------------------------------------------------------ *)
+  let pr_rw_r =
+    { od_name    = "rewrite database";
+      od_lookup  = EcEnv.BaseRw.lookup;
+      od_printer = pp_rwbase; }
+
+  let pr_rw = pr_gen pr_rw_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_at_r =
+    let lookup q env =
+      match q with
+      | ([], q) -> begin
+          match EcEnv.Auto.getx q env with
+          | [] -> raise NoObject | reds -> reds
+        end
+      | _ -> raise NoObject in
+
+    { od_name    = "solve database";
+      od_lookup  = lookup;
+      od_printer = pp_solvedb; }
+
+  let pr_at fmt env x = pr_gen pr_at_r fmt env ([], x)
+
+  (* ------------------------------------------------------------------ *)
+  let pr_db fmt env db =
+    match db with
+    | `Rewrite name -> pr_rw fmt env name
+    | `Solve   name -> pr_at fmt env name
+
+  (* ------------------------------------------------------------------ *)
   let pr_any fmt env qs =
     let printers = [pr_gen_r ~prcat:true pr_ty_r ;
                     pr_gen_r ~prcat:true pr_op_r ;
                     pr_gen_r ~prcat:true pr_th_r ;
                     pr_gen_r ~prcat:true pr_ax_r ;
                     pr_gen_r ~prcat:true pr_mod_r;
-                    pr_gen_r ~prcat:true pr_mty_r; ] in
+                    pr_gen_r ~prcat:true pr_mty_r;
+                    pr_gen_r ~prcat:true pr_rw_r ;
+                    pr_gen_r ~prcat:true pr_at_r ; ] in
 
     let ok = ref (List.length printers) in
 

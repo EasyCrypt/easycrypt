@@ -577,7 +577,7 @@ split.
           by auto; smt (dD_ll).
         * rcondt{1} 2; 1:by auto=> /#.
           auto=> /> &1 &2 ih lt_i_szp /ih [#] !->> eq_qs h m _.
-          by rewrite !get_setE /= oget_some=> //= b; rewrite mem_set !inE eq_qs.
+          by rewrite !get_setE => //= b; rewrite mem_set !inE eq_qs.
       by auto; smt ml=0.
     + move=> &2 bad; proc.
       while (   DoubleQuery.bad = DoubleQuery.bad{2}

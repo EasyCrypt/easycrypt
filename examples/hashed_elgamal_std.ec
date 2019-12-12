@@ -27,6 +27,7 @@ theory EntropySmoothing.
   type hkey.
 
   op dhkey: { hkey distr | is_lossless dhkey } as dhkey_ll.
+  hint exact random : dhkey_ll.  
 
   op hash : hkey -> group -> bits.
 
@@ -170,11 +171,7 @@ section Security.
   auto; call (: true); wp.
   rnd (fun w, w +^ (b0{1} ? m1{1} : m0{1})).
   auto; call (: true).
-  auto=> /> hk _ x _ y _ [m0 m1] b _; progress.
-  + by algebra.
-  + exact/dbits_funi.
-  + exact/dbits_fu.
-  + by algebra.
+  by auto=> /> *; split => *; algebra.
   qed.
 
   local lemma Gb_half &m:

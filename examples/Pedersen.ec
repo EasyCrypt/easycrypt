@@ -125,10 +125,7 @@ section PedersenSecurity.
     call (_:true); wp.
     rnd (fun d, (d + x * (b?m1:m0)){2})
         (fun d, (d - x * (b?m1:m0)){2}).
-    wp; rnd; call (_: true); auto => /> x0L _ resR bL _.
-    split => [? _ | _];1: by ring.
-    split => [? _ | _ d0L _];1: by apply FDistr.dt_funi.
-    by rewrite FDistr.dt_fu /=; progress;algebra.
+    by wp; rnd; call (_: true); auto => />; progress; algebra.
   qed.
 
   (* Perfect hiding - QED *)
