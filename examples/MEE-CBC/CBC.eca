@@ -713,7 +713,7 @@ section Probability_RP_RF.
   lemma Bound_by_PRP_PRF &m:
     `|Pr[WeakPRP_IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
       - Pr[WeakPRP_IND(PRFi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]|
-    <= ((q * ell)^2)%r * mu dBlock (pred1 witness).
+    <= ((q * ell)^2 - q * ell)%r / 2%r * mu dBlock (pred1 witness).
   proof.
     have ->: Pr[WeakPRP_IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
              = Pr[RP_RFc.PRFi.IND(RP_RFc.PRPi.PRPi,RP_RFc.DBounder(PRPF_Adv(QueryBounder(A)))).main() @ &m: res].
@@ -812,7 +812,7 @@ section Probability_Collision.
 
   lemma Bound_by_Birthday &m:
     Pr[INDR_CPA_direct(Compute,QueryBounder(A)).main() @ &m: Compute.bad]
-    <= ((q * ell)^2)%r * mu dBlock (pred1 witness).
+    <= ((q * ell)^2 - q * ell)%r / 2%r * mu dBlock (pred1 witness).
   proof.
     apply/(ler_trans Pr[Exp(Bounder(Sample),Wrap(A)).main() @ &m: !(uniq Sample.l)]).
       byequiv=> //=.
@@ -866,7 +866,7 @@ lemma Conclusion (A <: RCPA_Adversary { RCPA_Wrap, WeakPRP_Wrap, PRPi, QueryBoun
        - Pr[INDR_CPA(Random,QueryBounder(A)).main() @ &m: res]|
   <=    `|Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr),PRPF_Adv(QueryBounder(A))).main() @ &m: res]
           - Pr[WeakPRP_IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]|
-      + 2%r * ((q * ell)^2)%r * mu dBlock (pred1 witness).
+      + 2%r * ((q * ell)^2 - q * ell)%r / 2%r * mu dBlock (pred1 witness).
 proof.
   move=> A_distinguish_ll.
   have BA_distinguish_ll: (forall (O <: RCPA_Oracles { QueryBounder(A) }), islossless O.enc => islossless QueryBounder(A,O).distinguish).
