@@ -72,13 +72,11 @@ section.
 
   lemma pr_Sample_le &m:
     Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l]
-    <= (q^2)%r * mu1 uT maxu.
+    <= (q^2 - q)%r / 2%r * mu1 uT maxu.
   proof.
-    fel 1 (size Sample.l) (fun x, q%r * mu1 uT maxu) q (!uniq Sample.l) []=> //.
-    + rewrite Bigreal.sumr_const count_predT size_range /=.
-      rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
-      have ->: q^2 = q * q by rewrite (_:2 = 1 + 1) // powS // pow1.
-      by rewrite -fromintM le_fromint ler_wpmul2r 1:ge0_q /#.
+    fel 1 (size Sample.l) (fun x=> x%r * mu1 uT maxu) q (!uniq Sample.l) []=> //.
+    + rewrite -Bigreal.BRA.mulr_suml Bigreal.sumidE 1:ge0_q.
+      by rewrite mulzDr IntID.mulrN1 (powS 1) 2:(powS 0) 3:pow0.
     + by inline*; auto.
     + proc;wp; rnd (mem Sample.l); skip=> // /> &hr ???.
       have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu1 uT maxu) _.
@@ -91,7 +89,7 @@ section.
 
   lemma pr_collision &m:
     Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu1 uT maxu.
+    <= (q^2 - q)%r / 2%r * mu1 uT maxu.
   proof.
     cut ->: Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l] =
             Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
@@ -158,7 +156,7 @@ section.
 
   lemma pr_collision_bounded_oracles &m:
     Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu1 uT maxu.
+    <= (q^2 - q)%r / 2%r * mu1 uT maxu.
   proof.
     cut ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l] =
             Pr[Exp(Sample,Bounded(A)).main() @ &m: !uniq Sample.l].

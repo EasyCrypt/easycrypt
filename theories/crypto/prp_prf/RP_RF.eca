@@ -143,7 +143,7 @@ qed.
 (* Some losslessness lemmas *)
 lemma excepted_lossless (m:(D,D) fmap):
   (exists x, x \notin m) =>
-  mu (uD \ (rng m)) predT = 1%r.
+  is_lossless (uD \ (rng m)).
 proof.
 move=> /endo_dom_rng [x h]; rewrite dexcepted_ll 1:uD_ll //.
 by rewrite -uD_ll; apply/notin_supportIP; exists x=> />; exact/uD_fu.
@@ -151,7 +151,7 @@ qed.
 
 lemma excepted_lossless_mem (m:(D,D) fmap):
   (exists x, x \notin m) =>
-  mu (uD \ (mem (frng m))) predT = 1%r.
+  is_lossless (uD \ (mem (frng m))).
 proof.
 have ->: mem (frng m) = rng m.
 + by apply/fun_ext=> a; rewrite mem_frng.
@@ -174,7 +174,7 @@ proc; if=> //=; wp; call Indirect_ll.
 auto=> /> &m _.
 have:= excepted_lossless (PRPi.m{m}) _.
 + by exists x{m}.
-rewrite weight_dexcepted.
+rewrite /is_lossless weight_dexcepted.
 case (weight uD = mu uD (rng PRPi.m{m}))=> //=.
 rewrite notin_supportIP /=.
 by rewrite StdOrder.RealOrder.ltr_def=> -> /=; exact/mu_sub.
@@ -257,8 +257,27 @@ section Upto.
       smt(@SmtMap).
     sp; if{1}.
     + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
-      auto=> /> &1 &2 x_notin_m coll_def rng_m_r; smt.
-    by auto; smt. (** FIXME: Investigate **)
+      auto=> /> &1 &2 x_notin_m coll_def rng_m_r.
+      rewrite excepted_lossless /=; first by exists x{2}.
+      by rewrite -coll_def rng_m_r.
+    auto=> /> &1 &2 x_notin_mi coll_def not_rng_m_r.
+    rewrite -coll_def=> /> x1 x2 x2_neq_x1.
+    rewrite !mem_set=> - [|] + [|]=> [x1_in_m x2_in_m|x1_in_m ->>|->> x2_in_m|->> ->>].
+    + rewrite !get_set_neqE 1,2:-negP=> [->> //|->> //|eq_m1_m2].
+      have: collision PRPi.m{1}.[x{2} <- r{1}].
+      + by apply/collision_stable=> // @/collision; exists x1 x2.
+      by rewrite -coll_def not_rng_m_r.
+    + rewrite get_set_sameE get_set_neqE 1:eq_sym=> // m_x1.
+      have: collision PRPi.m{1}.[x{2} <- r{1}].
+      + rewrite /collision; exists x1 x{2}.
+        by rewrite x2_neq_x1 !mem_set x1_in_m /= get_set_neqE 1:eq_sym // get_set_sameE.
+      by rewrite -coll_def not_rng_m_r.
+    + rewrite get_set_sameE get_set_neqE=> // m_x2.
+      have: collision PRPi.m{1}.[x{2} <- r{1}].
+      + rewrite /collision; exists x{2} x2.
+        by rewrite x2_neq_x1 !mem_set x2_in_m /= get_set_sameE get_set_neqE.
+      by rewrite -coll_def not_rng_m_r.
+    by move: x2_neq_x1.
     move=> &2 bad; conseq (_: true ==> true: =1%r) (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
     + by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.
@@ -394,7 +413,7 @@ section CollisionProbability.
 
   lemma pr_PRFi_collision &m:
     Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
-    <= (q^2)%r * mu1 uD witness.
+    <= (q^2 - q)%r / 2%r * mu1 uD witness.
   proof.
   rewrite (pr_PRFi_Exp_collision &m) (pr_collision A A_ll A_bounded &m).
   qed.
@@ -405,7 +424,7 @@ lemma PartialConclusion (D <: PRF_Distinguisher {PRPi, PRFi, DBounder}) &m:
   (forall (O <: PRF_Oracle {D}), islossless O.f => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi'(Indirect),DBounder(D)).main() @ &m: res]
     - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
-  <= (q^2)%r * mu1 uD witness.
+  <= (q^2 - q)%r / 2%r * mu1 uD witness.
 proof.
 move=> D_ll.
 have:= pr_PRFi_collision D D_ll &m.
@@ -511,7 +530,7 @@ lemma Conclusion (D <: PRF_Distinguisher {PRPi, PRFi, DBounder}) &m:
   (forall (O <: PRF_Oracle {D}), islossless O.f => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi,DBounder(D)).main() @ &m: res]
     - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
-  <= (q^2)%r * mu1 uD witness.
+  <= (q^2 - q)%r / 2%r * mu1 uD witness.
 proof.
 move=> D_ll.
 by rewrite (pr_PRPi_PRPi'_Indirect (DBounder(D)) &m) (PartialConclusion D &m D_ll).
