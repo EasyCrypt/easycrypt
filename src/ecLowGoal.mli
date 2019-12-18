@@ -35,11 +35,12 @@ val (@~)  : FApi.backward -> FApi.tactical -> FApi.backward
 val (@!+) : FApi.tactical -> FApi.backward -> FApi.tactical
 val (@~+) : FApi.tactical -> FApi.backward list -> FApi.tactical
 
-val t_admit : FApi.backward
-val t_true  : FApi.backward
-val t_fail  : FApi.backward
-val t_id    : FApi.backward
-val t_close : ?who:string -> FApi.backward -> FApi.backward
+val t_admit   : FApi.backward
+val t_true    : FApi.backward
+val t_fail    : FApi.backward
+val t_id      : FApi.backward
+val t_close   : ?who:string -> FApi.backward -> FApi.backward
+val t_shuffle : EcIdent.t list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val alpha_find_in_hyps : EcEnv.LDecl.hyps -> EcFol.form -> EcIdent.t

@@ -96,7 +96,7 @@ elim/fset_ind (oflist (to_seq (support d))).
     by rewrite imageU image1 cpOrs_add /predU /f.
   rewrite Pr[mu_disjoint].
   + move=> /> &hr; rewrite negb_and negb_and.
-    case: (x = res{hr}.`1)=> //= ->> {x}.
+    case: (x = res{hr}.`1)=> //= ->>. 
     case: (ev res{hr}.`1 (glob A){hr} res{hr}.`2)=> //= hev.
     move: Hx=> {Hrec}; elim/fset_ind: s.
     + by rewrite image0 cpOrs0.
@@ -119,6 +119,3 @@ proof.
   apply Mrplus.sum_eq => /= x.
   by rewrite mem_oflist mem_to_seq// /support=> Hin; rewrite Hd.
 qed.
-
-
-
