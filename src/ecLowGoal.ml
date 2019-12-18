@@ -2299,21 +2299,19 @@ let t_smt ~(mode:smtmode) pi tc =
 
 (* -------------------------------------------------------------------- *)
 let t_solve ?(canfail = true) ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : tcenv1) =
-  let module E = struct
-      exception Done of tcenv
-      exception Fail
-  end in
-
   let bases = EcEnv.Auto.getall bases (FApi.tc1_env tc) in
 
   let t_apply1 p tc =
     let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
-    try Apply.t_apply_bwd_r ~mode:fmdelta ~canview:false pt tc
+    try
+      Apply.t_apply_bwd_r ~mode:fmdelta ~canview:false pt tc
     with Apply.NoInstance _ -> t_fail tc in
 
   let rec t_apply ctn p  =
-    if ctn > depth then t_fail
+    if   ctn > depth
+    then t_fail
     else t_apply1 p @! t_trivial @! t_solve (ctn + 1) bases
+
   and t_solve ctn bases =
     match bases with
     | [] -> t_abort
@@ -2321,6 +2319,7 @@ let t_solve ?(canfail = true) ?(bases = [EcEnv.Auto.dname]) ?(depth = 1) (tc : t
 
   let t = t_solve 0 bases in
   let t = if canfail then FApi.t_try t else t in
+
   t tc
 
 (* --------------------------------------------------------------------- *)
