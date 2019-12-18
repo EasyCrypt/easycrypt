@@ -65,20 +65,18 @@ module Exp(S:Sampler,A:Adv) = {
 
 (** Forall adversary A that makes at most q queries to its s oracle,
     the probability that the same output is sampled twice is bounded
-    by q^2/|T|                                                        **)
+    by (q^2 - q)/|T|                                                  **)
 section.
   declare module A:Adv {Sample}.
   axiom A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
 
   lemma pr_Sample_le &m:
     Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l]
-    <= (q^2)%r * mu1 uT maxu.
+    <= (q^2 - q)%r / 2%r * mu1 uT maxu.
   proof.
-    fel 1 (size Sample.l) (fun x, q%r * mu1 uT maxu) q (!uniq Sample.l) []=> //.
-    + rewrite Bigreal.sumr_const count_predT size_range /=.
-      rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
-      have ->: q^2 = q * q by rewrite (_:2 = 1 + 1) // powS // pow1.
-      by rewrite -fromintM le_fromint ler_wpmul2r 1:ge0_q /#.
+    fel 1 (size Sample.l) (fun x=> x%r * mu1 uT maxu) q (!uniq Sample.l) []=> //.
+    + rewrite -Bigreal.BRA.mulr_suml Bigreal.sumidE 1:ge0_q.
+      by rewrite mulzDr IntID.mulrN1 (powS 1) 2:(powS 0) 3:pow0.
     + by inline*; auto.
     + proc;wp; rnd (mem Sample.l); skip=> // /> &hr ???.
       have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu1 uT maxu) _.
@@ -91,7 +89,7 @@ section.
 
   lemma pr_collision &m:
     Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu1 uT maxu.
+    <= (q^2 - q)%r / 2%r * mu1 uT maxu.
   proof.
     cut ->: Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l] =
             Pr[Exp(Sample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
@@ -99,6 +97,21 @@ section.
       conseq (_: _ ==> ={Sample.l}) _ (_: _ ==> size Sample.l <= q)=> //=;2:by sim.
       by proc;call A_bounded;inline *;auto.
     by apply (pr_Sample_le &m).
+  qed.
+
+  lemma pr_collision_coarse &m:
+    Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
+    <= (q^2)%r / 2%r * mu1 uT maxu.
+  proof.
+  by apply/(ler_trans _ _ _ (pr_collision &m)); smt(ge0_mu ge0_q).
+  qed.
+
+  lemma pr_collision_coarser &m:
+    Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
+    <= (q^2)%r * mu1 uT maxu.
+  proof.
+  apply/(ler_trans _ _ _ (pr_collision_coarse &m)).
+  by rewrite (powS 1) ?(powS 0) ?pow0 //=; smt(ge0_mu ge0_q).
   qed.
 
 end section.
@@ -158,7 +171,7 @@ section.
 
   lemma pr_collision_bounded_oracles &m:
     Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu1 uT maxu.
+    <= (q^2 - q)%r / 2%r * mu1 uT maxu.
   proof.
     cut ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l] =
             Pr[Exp(Sample,Bounded(A)).main() @ &m: !uniq Sample.l].
@@ -169,6 +182,22 @@ section.
     proc; call (_: size Sample.l <= Bounder.c <= q).
     + proc;sp;if=>//;inline *;auto=> /#.
     auto;smt w=ge0_q.
+  qed.
+
+  lemma pr_collision_bounded_oracles_coarse &m:
+    Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
+    <= (q^2)%r / 2%r * mu1 uT maxu.
+  proof.
+  apply/(ler_trans _ _ _ (pr_collision_bounded_oracles &m)).
+  smt(ge0_mu ge0_q).
+  qed.
+
+  lemma pr_collision_bounded_oracles_coarser &m:
+    Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
+    <= (q^2)%r * mu1 uT maxu.
+  proof.
+  apply/(ler_trans _ _ _ (pr_collision_bounded_oracles_coarse &m)).
+  by rewrite (powS 1) ?(powS 0) ?pow0 //=; smt(ge0_mu ge0_q).
   qed.
 
 end section.

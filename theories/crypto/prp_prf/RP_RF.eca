@@ -396,7 +396,7 @@ section CollisionProbability.
     Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
     <= (q^2)%r * mu1 uD witness.
   proof.
-  rewrite (pr_PRFi_Exp_collision &m) (pr_collision A A_ll A_bounded &m).
+  by rewrite (pr_PRFi_Exp_collision &m) (pr_collision_coarser A A_ll A_bounded &m).
   qed.
 end section CollisionProbability.
 

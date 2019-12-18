@@ -845,7 +845,7 @@ section Probability_Collision.
             by auto=> /> &1 &2; smt (in_fsetU in_fset1).
           by auto=> />; smt (size_ge0).
         by auto; smt (in_fset0 gt0_q).
-      have:= BBound.pr_collision_bounded_oracles (Wrap(A)) _ &m.
+      have:= BBound.pr_collision_bounded_oracles_coarser (Wrap(A)) _ &m.
         move=> S S_s_ll; proc.
         call (A_run_ll (<: Wrap(A,S).O) _).
           proc; sp; if=> //=.
