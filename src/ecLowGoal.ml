@@ -2241,7 +2241,8 @@ let t_trivial ?(subtc : FApi.backward option) (tc : tcenv1) =
   let tprogress = t_progress t_id in
   let subtc     = subtc |> odfl t_id in
   let seqs      =
-    [tryassum; tprogress; tryassum; subtc; t_logic_trivial; t_fail] in
+    [FApi.t_try (t_false ~conv:`Conv ?id:None);
+     tryassum; tprogress; tryassum; subtc; t_logic_trivial; t_fail] in
 
   FApi.t_internal (FApi.t_try (FApi.t_seqs seqs)) tc
 
