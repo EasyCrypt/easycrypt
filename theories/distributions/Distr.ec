@@ -1207,7 +1207,7 @@ lemma dlet_swap ['a 'b 'c] (d1 : 'a distr) (d2 : 'b distr) (F : 'a -> 'b -> 'c d
   = dlet d2 (fun x2 => (dlet d1 (fun x1 => F x1 x2))).
 proof.
 apply/eq_distr => c; rewrite !dletE &(eq_sum) => /= x @/pred1.
-case: (x = c) => [->> {x}|]; last by rewrite !sum0_eq.
+case: (x = c) => [->> |]; last by rewrite !sum0_eq.
 pose G a b := mass d2 b * (mass d1 a * (mass (F a b) c)).
 pose H1 a := sum (fun b => G a b).
 pose H2 b := sum (fun a => G a b).
