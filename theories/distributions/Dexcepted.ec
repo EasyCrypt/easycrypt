@@ -8,7 +8,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import AllCore Distr FSet Dfilter StdRing.
-(*---*) import RField.
+(*---*) import RField StdOrder.RealOrder.
 
 pragma -oldip. pragma +implicits.
 
@@ -65,8 +65,8 @@ qed.
 lemma dexcepted_dscale (dt : 'a distr) X: dt \ X = (dscale dt) \ X.
 proof.
 case: (weight dt = 0%r)=> [dt_is_null|dt_not_null].
-+ apply/eq_distr=> x; rewrite !dexcepted1E !dscaleE dt_is_null.
-  have:= StdOrder.RealOrder.ler_anti (mu1 dt x) 0%r.
++ apply/eq_distr=> x; rewrite !dexcepted1E !dscaleE dt_is_null /=.
+  rewrite (@ler_anti (mu1 dt x) 0%r _) //.
   by rewrite ge0_mu /= -{1}dt_is_null mu_sub /#.
 apply/eq_distr=> x; rewrite !dexcepted1E; case: (X x)=> // x_notin_X.
 rewrite dscale1E -mulrA -invfM !dscaleE; congr; congr.
@@ -98,6 +98,7 @@ module S = {
   }
 }.
 
+(* -------------------------------------------------------------------- *)
 lemma pr_direct &m x' X' P:
   Pr[S.direct(x',X') @ &m: P res] = mu (dt x' \ X' x') P.
 proof.
@@ -105,6 +106,11 @@ byphoare (: x = x' /\ X = X' ==> _)=> //=.
 by proc; rnd P; auto.
 qed.
 
+phoare phoare_direct x' X' P:
+  [ S.direct: x = x' /\ X = X' ==> P res ] = (mu (dt x' \ X' x') P).
+proof. by bypr=> &m [] -> ->; exact/(@pr_direct &m x' X' P). qed.
+
+(* -------------------------------------------------------------------- *)
 lemma pr_indirect &m x' X' P:
   Pr[S.indirect(x',X') @ &m: P res] = weight (dt x') * mu (dt x' \ X' x') P.
 proof.
@@ -130,7 +136,7 @@ phoare split (mu (dt x) (predI P (predC (X' x'))))
 + move=> /= &m' [] ->> ->> {&m'}; rewrite dexceptedE.
   rewrite -{1}(mulr1 (mu (dt x') (predI _ _))).
   rewrite -(@divrr (weight (dt x') - mu (dt x') (X' x'))).
-  + rewrite -mu_not; apply/StdOrder.RealOrder.ltr0_neq0.
+  + rewrite -mu_not; apply/ltr0_neq0.
     by rewrite witness_support; exists a; rewrite /predC a_in_dt a_notin_X.
   rewrite mulrA mulrA mulrA -mulrDl; congr.
   by rewrite mulrDr mulrC mulrN (mulrC (_ _ (X' x'))) subrK.
@@ -152,11 +158,25 @@ seq 2: (!X' x' r0)
 by rcondt 1=> //; rnd P; skip=> /#.
 qed.
 
+phoare phoare_indirect x' X' P:
+  [ S.indirect: x = x' /\ X = X' ==> P res ]
+  = (weight (dt x) * mu (dt x \ X x) P).
+proof. by bypr=> &m [] -> ->; rewrite (@pr_indirect &m x' X' P). qed.
+
+(* -------------------------------------------------------------------- *)
 lemma ll_pr_indirect &m x' X' P:
      is_lossless (dt x')
   => Pr[S.indirect(x',X') @ &m: P res] = mu (dt x' \ X' x') P.
 proof. by move=> dt_ll; rewrite (@pr_indirect &m x' X' P) dt_ll. qed.
 
+phoare ll_phoare_indirect x' X' P:
+  [ S.indirect: x = x' /\ X = X' /\ is_lossless (dt x') ==> P res ]
+  = (mu (dt x \ X x) P).
+proof.
+by bypr=> &m [] -> [] -> dt_ll; rewrite (@ll_pr_indirect &m x' X' P).
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma indirect_direct &m x X P:
     Pr[S.indirect(x,X) @ &m: P res]
   = weight (dt x) * Pr[S.direct(x,X) @ &m: P res].
@@ -167,12 +187,11 @@ lemma ll_direct_indirect &m x X P:
   => Pr[S.direct(x,X) @ &m: P res] = Pr[S.indirect(x,X) @ &m: P res].
 proof. by rewrite (@indirect_direct &m x X P)=> ->. qed.
 
-lemma ll_direct_indirect_eq x':
-     is_lossless (dt x')
-  => equiv [S.direct ~ S.indirect: ={x, X} /\ x{1} = x' ==> ={res}].
+(* -------------------------------------------------------------------- *)
+equiv ll_direct_indirect_eq: S.direct ~ S.indirect:
+  ={x, X} /\ is_lossless (dt x{1}) ==> ={res}.
 proof.
-move=> dt_ll; bypr (res{1}) (res{2})=> //=.
-move=> &1 &2 a [#] <<*> <- <-.
+bypr (res{1}) (res{2})=> //= &1 &2 a [#] <<*> <- <- dt_ll.
 rewrite (@indirect_direct &2 x{1} X{1} (pred1 a)) dt_ll /=.
 by byequiv (: ={arg} ==> ={res})=> //=; sim.
 qed.
@@ -231,6 +250,7 @@ module SampleW = {
   }
 }.
 
+(* -------------------------------------------------------------------- *)
 lemma pr_sampleE &m x X P :
   Pr[SampleE.sample(x, X) @ &m : P res] = mu (dt x \ X x) P.
 proof.
@@ -241,6 +261,7 @@ lemma phoare_sampleE P :
   phoare [SampleE.sample : true ==> P res ] = (mu (dt i \ test i) P).
 proof. by bypr=> &m; apply (@pr_sampleE &m i{m} test{m} P). qed.
 
+(* -------------------------------------------------------------------- *)
 section.
 local clone TwoStepSampling as TS with
   type i  <- input,
@@ -263,6 +284,7 @@ phoare phoare_sampleI P :
   [ SampleI.sample : is_lossless (dt i) ==> P res ] = (mu (dt i \ test i) P).
 proof. by bypr=> &m; apply (@pr_sampleI &m i{m} test{m} P). qed.
 
+(* -------------------------------------------------------------------- *)
 lemma pr_sampleWi &m x y X P :
   is_lossless (dt x) =>
     Pr[SampleWi.sample(x,y,X) @ &m : P res]
@@ -322,6 +344,7 @@ lemma phoare_sampleWi P :
   = (if test i r then mu (dt i \ test i) P else b2r (P r)).
 proof. by bypr=> &m'; exact/(@pr_sampleWi &m' i{m'} r{m'} test{m'} P). qed.
 
+(* -------------------------------------------------------------------- *)
 lemma pr_sampleW &m x X P :
   is_lossless (dt x) =>
   Pr[SampleW.sample(x, X) @ &m : P res] = mu (dt x \ X x) P.
@@ -371,6 +394,7 @@ phoare phoare_sampleW P :
   [ SampleW.sample: is_lossless (dt i) ==> P res ] = (mu (dt i \ test i) P).
 proof. by bypr=> &m; exact/(@pr_sampleW &m i{m} test{m} P). qed.
 
+(* -------------------------------------------------------------------- *)
 equiv sampleE_sampleI : SampleE.sample ~ SampleI.sample :
   ={i, test} /\ is_lossless (dt i{1}) ==> ={res}.
 proof.
@@ -465,12 +489,14 @@ module SampleW = {
   }
 }.
 
+(* -------------------------------------------------------------------- *)
 section.
 local clone WhileSampling as WS with
   type input <- input,
   type     t <- t,
     op    dt <- dt.
 
+(* -------------------------------------------------------------------- *)
 local lemma sampleE_fixed &m x P :
     Pr[SampleE.sample(x) @ &m : P res]
   = Pr[WS.SampleE.sample(x,test) @ &m : P res].
@@ -487,6 +513,7 @@ phoare phoare_sampleE P :
   [ SampleE.sample : true ==> P res ] = (mu (dt i \ test i) P).
 proof. by bypr=> &m; exact/(@pr_sampleE &m i{m} P). qed.
 
+(* -------------------------------------------------------------------- *)
 local lemma sampleI_fixed &m x P :
     Pr[SampleI.sample(x) @ &m : P res]
   = Pr[WS.SampleI.sample(x,test) @ &m : P res].
@@ -509,6 +536,7 @@ phoare phoare_sampleI P :
   [ SampleI.sample: is_lossless (dt i) ==> P res ] = (mu (dt i \ test i) P).
 proof. bypr=> &m; exact/(@pr_sampleI &m i{m} P). qed.
 
+(* -------------------------------------------------------------------- *)
 local lemma sampleWi_fixed &m x y P :
     Pr[SampleWi.sample(x,y) @ &m : P res]
   = Pr[WS.SampleWi.sample(x,y,test) @ &m : P res].
@@ -532,6 +560,7 @@ phoare phoare_sampleWi P :
   = (if test i r then mu (dt i \ test i) P else b2r (P r)).
 proof. by bypr=> &m; exact/(@pr_sampleWi &m i{m} r{m} P). qed.
 
+(* -------------------------------------------------------------------- *)
 local lemma sampleW_fixed &m x P :
     Pr[SampleW.sample(x) @ &m : P res]
   = Pr[WS.SampleW.sample(x,test) @ &m : P res].
@@ -554,6 +583,7 @@ phoare phoare_sampleW P :
   [ SampleW.sample: is_lossless (dt i) ==> P res ] = (mu (dt i \ test i) P).
 proof. by bypr=> &m; exact/(@pr_sampleW &m i{m} P). qed.
 
+(* -------------------------------------------------------------------- *)
 equiv sampleE_sampleI : SampleE.sample ~ SampleI.sample : 
   ={i} /\ is_lossless (dt i{1}) ==> ={res}.
 proof.

@@ -435,9 +435,9 @@ section PRPi_PRPi'_Indirect.
   transitivity S.direct (X{2} = fun _=> X{1} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
   + by move=> &2; exists ((),fun _=> X{2}).
   + by proc; rnd.
-  transitivity S.indirect (={X} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
+  transitivity S.indirect (={x,X} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
   + by move=> &1 &2 ->; exists ((),fun _=> X{2}).
-  + exact/(@ll_direct_indirect_eq () uD_ll).
+  + by conseq (@ll_direct_indirect_eq); rewrite uD_ll.
   proc. seq 1 1: (#pre /\ ={r}); auto.
   by if; auto.
   qed.
