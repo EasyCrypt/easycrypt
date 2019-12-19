@@ -9,7 +9,6 @@
 require import AllCore List Distr Dexcepted FelTactic.
 require import StdOrder StdBigop.
 import RealOrder Bigreal.
-require Dice_sampling.
 
 type input.
 type t.
@@ -43,12 +42,12 @@ module type AdvRndE (O:SAMPLE_ADV) = {
    proc main () : out 
 }.
 
-clone include Dice_sampling with
+clone include WhileSamplingFixedTest with
   type input <- input * t list,
   type t     <- t,
-  op   d     <- fun (x:input * t list) => d x.`1,
+  op   dt    <- fun (x:input * t list) => d x.`1,
   op   test  <- fun (x:input * t list) => mem x.`2
-  proof *.
+proof *.
 
 abstract theory Adversary.
    

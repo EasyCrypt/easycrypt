@@ -420,10 +420,11 @@ qed.
 (** This section proves the equivalence between the Ideal PRP and the
     module PRPi'(Indirect) used in section Upto. **)
 section PRPi_PRPi'_Indirect.
-  local clone include Dexcepted.Sampling with
-    type t  <- D,
-    op   dt <- uD
-  proof dt_ll by exact/uD_ll.
+  local clone include Dexcepted.TwoStepSampling with
+    type i    <- unit,
+    type t    <- D,
+    op   dt _ <- uD
+  proof *.
 
   (* The key is in proving that Direct.sample and Indirect.sample
      define the same distribution. We do this by extensional equality
@@ -431,13 +432,14 @@ section PRPi_PRPi'_Indirect.
        forall a, Pr[Direct.sample: res = a] = Pr[Indirect.sample: res = a]. *)
   equiv eq_Direct_Indirect: Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
   proof.
-  transitivity S.direct (={X} ==> ={res}) (={X} ==> ={res})=> //>.
-  + by move=> &2; exists X{2}.
-  + by sim.
-  transitivity S.indirect (={X} ==> ={res}) (={X} ==> ={res})=> //>.
-  + by move=> &2; exists X{2}.
-  + exact/direct_indirect_eq.
-  by sim.
+  transitivity S.direct (X{2} = fun _=> X{1} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
+  + by move=> &2; exists ((),fun _=> X{2}).
+  + by proc; rnd.
+  transitivity S.indirect (={X} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
+  + by move=> &1 &2 ->; exists ((),fun _=> X{2}).
+  + exact/(@ll_direct_indirect_eq () uD_ll).
+  proc. seq 1 1: (#pre /\ ={r}); auto.
+  by if; auto.
   qed.
 
   (* The rest is easy *)
