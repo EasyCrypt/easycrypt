@@ -46,15 +46,6 @@ type restriction_who =
 | RW_mod of EcPath.mpath
 | RW_fun of EcPath.xpath
 
-(* TODO: (Adrien) old errors *)
-type restriction_err =
-| RE_UseVariable               of EcPath.xpath
-| RE_UseVariableViaModule      of EcPath.xpath * EcPath.mpath
-| RE_UseModule                 of EcPath.mpath
-| RE_VMissingRestriction       of EcPath.xpath * EcPath.mpath pair
-| RE_MMissingRestriction       of EcPath.mpath * EcPath.mpath pair
-| RE_ModuleUnrestricted        of EcPath.mpath
-
 type restriction_error = restriction_who * [
   | `Sub of restr_failure              (* Should not be allowed *)
   | `RevSub of restr_failure option    (* Should be allowed *)

@@ -543,7 +543,6 @@ and trans_pterm_arg_mod pe { pl_desc = arg; pl_loc = loc; } =
 
   let env  = LDecl.toenv pe.pte_hy in
 
-  (* TODO: (Adrien) is this correct? *)
   let comp_sig (mp, _) =
     let msig = NormMp.sig_of_mp env mp in
     (mp, msig) in
