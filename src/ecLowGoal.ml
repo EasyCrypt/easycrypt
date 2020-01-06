@@ -2158,7 +2158,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
         | LD_var (_ty, Some body) -> f_let1 id body gG
         | LD_var (ty, None)       -> f_forall [id, GTty ty] gG
         | LD_mem mt               -> f_forall_mems [id, mt] gG
-        | LD_modty(mt,r)          -> f_forall [id, GTmodty(mt,r)] gG
+        | LD_modty mt          -> f_forall [id, GTmodty mt] gG
         | LD_hyp f                -> f_imp f gG
         | LD_abs_st _             -> raise InvalidGoalShape in
       List.fold_left do1 gG post in
