@@ -75,7 +75,7 @@ and opfix = {
 
 and opbranches =
 | OPB_Leaf   of ((EcIdent.t * EcTypes.ty) list) list * EcTypes.expr
-| OPB_Branch of opbranch Parray.t
+| OPB_Branch of opbranch Parray.parray
 
 and opbranch = {
   opb_ctor : EcPath.path * int;

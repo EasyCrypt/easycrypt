@@ -566,7 +566,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Parray = struct
-  type 'a t = 'a array
+  type 'a parray = 'a array
 
   include Array
 

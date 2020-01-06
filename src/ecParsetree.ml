@@ -71,20 +71,21 @@ type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
 
 and pexpr_r =
-  | PEcast   of pexpr * pty                       (* type cast          *)
-  | PEint    of zint                              (* int. literal       *)
-  | PEident  of pqsymbol * ptyannot option        (* symbol             *)
-  | PEapp    of pexpr * pexpr list                (* op. application    *)
-  | PElet    of plpattern * pexpr_wty * pexpr     (* let binding        *)
-  | PEtuple  of pexpr list                        (* tuple constructor  *)
-  | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
-  | PEforall of ptybindings * pexpr               (* forall quant.      *)
-  | PEexists of ptybindings * pexpr               (* exists quant.      *)
-  | PElambda of ptybindings * pexpr               (* lambda abstraction *)
-  | PErecord of pexpr option * pexpr rfield list  (* record             *)
-  | PEproj   of pexpr * pqsymbol                  (* projection         *)
-  | PEproji  of pexpr * int                       (* tuple projection   *)
-  | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
+  | PEcast    of pexpr * pty                       (* type cast          *)
+  | PEint     of zint                              (* int. literal       *)
+  | PEdecimal of (zint * (int * zint))             (* dec. literal       *)
+  | PEident   of pqsymbol * ptyannot option        (* symbol             *)
+  | PEapp     of pexpr * pexpr list                (* op. application    *)
+  | PElet     of plpattern * pexpr_wty * pexpr     (* let binding        *)
+  | PEtuple   of pexpr list                        (* tuple constructor  *)
+  | PEif      of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
+  | PEforall  of ptybindings * pexpr               (* forall quant.      *)
+  | PEexists  of ptybindings * pexpr               (* exists quant.      *)
+  | PElambda  of ptybindings * pexpr               (* lambda abstraction *)
+  | PErecord  of pexpr option * pexpr rfield list  (* record             *)
+  | PEproj    of pexpr * pqsymbol                  (* projection         *)
+  | PEproji   of pexpr * int                       (* tuple projection   *)
+  | PEscope   of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
 and pexpr_wty = pexpr * pty option
@@ -238,27 +239,28 @@ type pformula  = pformula_r located
 
 and pformula_r =
   | PFhole
-  | PFcast   of pformula * pty
-  | PFint    of zint
-  | PFtuple  of pformula list
-  | PFident  of pqsymbol * ptyannot option
-  | PFref    of psymbol * pffilter list
-  | PFmem    of psymbol
-  | PFside   of pformula * symbol located
-  | PFapp    of pformula * pformula list
-  | PFif     of pformula * pformula * pformula
-  | PFlet    of plpattern * (pformula * pty option) * pformula
-  | PFforall of pgtybindings * pformula
-  | PFexists of pgtybindings * pformula
-  | PFlambda of ptybindings * pformula
-  | PFrecord of pformula option * pformula rfield list
-  | PFproj   of pformula * pqsymbol
-  | PFproji  of pformula * int
-  | PFglob   of pmsymbol located
-  | PFeqveq  of glob_or_var list * (pmsymbol pair) option
-  | PFeqf    of pformula list
-  | PFlsless of pgamepath
-  | PFscope  of pqsymbol * pformula
+  | PFcast    of pformula * pty
+  | PFint     of zint
+  | PFdecimal of (zint * (int * zint))
+  | PFtuple   of pformula list
+  | PFident   of pqsymbol * ptyannot option
+  | PFref     of psymbol * pffilter list
+  | PFmem     of psymbol
+  | PFside    of pformula * symbol located
+  | PFapp     of pformula * pformula list
+  | PFif      of pformula * pformula * pformula
+  | PFlet     of plpattern * (pformula * pty option) * pformula
+  | PFforall  of pgtybindings * pformula
+  | PFexists  of pgtybindings * pformula
+  | PFlambda  of ptybindings * pformula
+  | PFrecord  of pformula option * pformula rfield list
+  | PFproj    of pformula * pqsymbol
+  | PFproji   of pformula * int
+  | PFglob    of pmsymbol located
+  | PFeqveq   of glob_or_var list * (pmsymbol pair) option
+  | PFeqf     of pformula list
+  | PFlsless  of pgamepath
+  | PFscope   of pqsymbol * pformula
 
   | PFhoareF   of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
@@ -414,6 +416,7 @@ type preduction = {
   peta     : bool;                      (* η-reduction *)
   plogic   : bool;                      (* logical simplification *)
   pmodpath : bool;                      (* modpath normalization *)
+  puser    : bool;                      (* user reduction *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -433,6 +436,8 @@ type swap_kind =
   | SKmove      of int
   | SKmovei     of int * int
   | SKmoveinter of int * int * int
+
+type interleave_info = oside * (int * int) * ((int * int) list) * int
 
 type pipattern =
   | PtAny
@@ -492,11 +497,15 @@ and pim_block = anchor pair * pim_regexp
 (* -------------------------------------------------------------------- *)
 type trans_kind =
   | TKfun        of pgamepath
-  | TKstmt       of oside * pstmt
-  | TKparsedStmt of oside * pim_block * pstmt
+  | TKstmt       of side * pstmt
+  | TKparsedStmt of side * pim_block * pstmt
+
+type trans_formula =
+  | TFform of pformula * pformula * pformula * pformula
+  | TFeq
 
 type trans_info =
-  trans_kind * pformula * pformula * pformula * pformula
+  trans_kind * trans_formula
 
 (* -------------------------------------------------------------------- *)
 type eager_info =
@@ -543,10 +552,12 @@ type async_while_info = {
 }
 
 (* -------------------------------------------------------------------- *)
+type inlineopt = [`UseTuple of bool] option
+
 type inline_info = [
-  | `ByName    of oside * (pgamepath list * int list option)
-  | `CodePos   of (oside * codepos)
-  | `All       of oside
+  | `ByName    of oside * inlineopt * (pgamepath list * int list option)
+  | `CodePos   of (oside * inlineopt * codepos)
+  | `All       of oside * inlineopt
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -597,6 +608,7 @@ type phltactic =
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
   | Pinline        of inline_info
+  | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
   | Prnd           of oside * (pformula, pformula option, pformula) rnd_tac_info
   | Palias         of (oside * codepos * osymbol_r)
@@ -746,9 +758,7 @@ and ipcore = [
 ]
 
 and icasemode =
-  [`One | `Full of (bool * bool) * icasemode_full option]
-
-
+  [`One | `Full of (bool * bool) * bool * icasemode_full option]
 
 and icasemode_full =
   [`AtMost of int | `AsMuch]
@@ -817,6 +827,7 @@ type logtactic =
   | Prwnormal   of pformula * pqsymbol list
   | Psubst      of pformula list
   | Psimplify   of preduction
+  | Pcbv        of preduction
   | Pchange     of pformula
   | Ppose       of (psymbol * ptybinding list * rwocc * pformula)
   | Pwlog       of (psymbol list * pformula)
@@ -957,6 +968,7 @@ type pprint =
   | Pr_mty  of pqsymbol
   | Pr_glob of pmsymbol located
   | Pr_goal of int
+  | Pr_db   of [`Rewrite of pqsymbol | `Solve of psymbol]
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind =
@@ -1057,6 +1069,12 @@ type phint = {
 }
 
 (* -------------------------------------------------------------------- *)
+type puserred = (pqsymbol list * int option) list
+
+type threquire =
+  psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gdeclare     of pdeclare
   | Gmodule      of pmodule_def
@@ -1070,13 +1088,14 @@ type global_action =
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gaddrw       of (bool * pqsymbol * pqsymbol list)
+  | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list
   | GthOpen      of (bool * psymbol)
   | GthClose     of (theory_clear * psymbol)
   | GthClear     of theory_clear
-  | GthRequire   of (psymbol list * [`Import|`Export] option)
+  | GthRequire   of threquire
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
   | GthClone     of theory_cloning

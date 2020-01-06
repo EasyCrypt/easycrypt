@@ -236,6 +236,12 @@ pred is_lossless (d : 'a distr) = weight d = 1%r.
 
 pred is_full (d : 'a distr) = forall x, x \in d.
 
+lemma is_losslessP (d : 'a distr) : is_lossless d => weight d = 1%r.
+proof. done. qed.
+
+lemma is_fullP (d : 'a distr) x : is_full d => x \in d.
+proof. by apply. qed.
+ 
 pred is_uniform (d : 'a distr) = forall (x y : 'a),
   x \in d => y \in d => mu1 d x = mu1 d y.
 
@@ -263,7 +269,7 @@ lemma rnd_funi ['a] (d : 'a distr) :
   is_funiform d => forall x y, mu1 d x = mu1 d y.
 proof. by apply. qed.
 
-hint solve 0 random : rnd_funi.
+hint solve 1 random : rnd_funi is_losslessP is_fullP.
 
 (* -------------------------------------------------------------------- *)
 lemma mu_le (d : 'a distr) (p q : 'a -> bool):
@@ -406,7 +412,8 @@ rewrite big_seq -(@eq_bigr _ (fun _ => mu1 d x)).
 rewrite -big_seq Bigreal.sumr_const count_predT negP -ltrNge.
 apply/(@ltr_le_trans (r%r * mu1 d x)); last first.
 + by apply/ler_wpmul2r/le_fromint => //; apply/ge0_mu1.
-by have: 0%r <> mu1 d x; [rewrite ltr_eqF | smt(ceil_bound)].
+have h: 0%r <> mu1 d x by rewrite ltr_eqF.
+apply (ltr_le_trans ((1%r + 1%r/mu1 d x) * mu1 d x)); smt (ceil_bound).
 qed.
 
 lemma mu1_uni ['a] (d : 'a distr) x : is_uniform d => mu1 d x =
@@ -701,6 +708,9 @@ lemma dunifin_funi : is_funiform dunifin.
 proof. 
 by apply is_full_funiform;[apply dunifin_fu|apply dunifin_uni].
 qed.
+
+hint exact random : dunifin_ll dunifin_fu dunifin_funi.
+
 end MFinite.
 
 (* -------------------------------------------------------------------- *)
@@ -908,16 +918,20 @@ lemma dmap_ll (d : 'a distr) (f : 'a -> 'b) :
   is_lossless d => is_lossless (dmap d f).
 proof. by rewrite /is_lossless weight_dmap. qed.
 
-lemma dmap_uni (d : 'a distr) (f : 'a -> 'b) : 
-  injective f => is_uniform d => is_uniform (dmap d f).
-proof. 
-  move=> finj duni x y /supp_dmap [a [ina ->]] /supp_dmap [b [inb ->]].
-  rewrite !dmap1E.
-  have Heq: forall z, pred1 (f z) \o f = pred1 z.
-  + move=> z;apply fun_ext => z' @/(\o) @/pred1 /=.
-    apply eq_iff => />; apply finj.
-  by rewrite !Heq;apply duni.
+lemma dmap_uni_in_inj (d : 'a distr) (f : 'a -> 'b) :
+     (forall (x, y : 'a), x \in d => y \in d => f x = f y => x = y)
+  => is_uniform d => is_uniform (dmap d f).
+proof.
+move=> finj_in duni x y /supp_dmap [a [ina ->]] /supp_dmap [b [inb ->]].
+have eq: forall z, z \in d => mu d (pred1 (f z) \o f) = mu d (pred1 z).
++ move=> z inz; rewrite (@mu_eq_support d (pred1 (f z) \o f) (pred1 z)) //.
+  move=> x0 inx0 @/(\o) @/pred1 /=; rewrite eq_iff=> />; exact/finj_in.
+by rewrite !dmap1E !eq //; apply/duni.
 qed.
+
+lemma dmap_uni (d : 'a distr) (f : 'a -> 'b) :
+  injective f => is_uniform d => is_uniform (dmap d f).
+proof. by move=> finj; apply dmap_uni_in_inj=> x y _ _; apply/finj. qed.
 
 lemma dmap_funi (d : 'a distr) (f : 'a -> 'b) : 
   bijective f => is_funiform d => is_funiform (dmap d f).
@@ -1130,6 +1144,10 @@ lemma dprod_ll (da : 'a distr) (db : 'b distr):
   is_lossless (da `*` db) <=> is_lossless da /\ is_lossless db.
 proof. by rewrite /is_lossless weight_dprod [smt(mu_bounded)]. qed.
 
+lemma dprod_ll_auto (da : 'a distr) (db : 'b distr):
+  is_lossless da => is_lossless db => is_lossless (da `*` db).
+proof. by rewrite dprod_ll. qed.
+
 lemma dprod_uni (da : 'a distr) (db : 'b distr):
   is_uniform da => is_uniform db => is_uniform (da `*` db).
 proof.
@@ -1153,6 +1171,12 @@ proof.
 + by rewrite supp_dprod !(ha, hb).
 qed.
 
+lemma dprod_fu_auto (da : 'a distr) (db : 'b distr):
+  is_full da => is_full db => is_full (da `*` db).
+proof. by rewrite dprod_fu. qed.
+
+hint solve 1 random : dprod_ll_auto dprod_funi dprod_fu_auto.
+
 lemma dprod_dlet ['a 'b] (da : 'a distr) (db : 'b distr):
   da `*` db = dlet da (fun a => dlet db (fun b => dunit (a, b))).
 proof.
@@ -1174,7 +1198,36 @@ lemma dmap_dprod ['a1 'a2 'b1 'b2]
   = dmap (d1 `*` d2) (fun xy : _ * _ => (f1 xy.`1, f2 xy.`2)).
 proof.
 apply/eq_distr=> -[b1 b2]; rewrite !dprod1E !dmap1E /(\o) /=.
-by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1 /=; rewrite andabP.
+by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dlet_swap ['a 'b 'c] (d1 : 'a distr) (d2 : 'b distr) (F : 'a -> 'b -> 'c distr):
+    dlet d1 (fun x1 => dlet d2 (F x1))
+  = dlet d2 (fun x2 => (dlet d1 (fun x1 => F x1 x2))).
+proof.
+apply/eq_distr => c; rewrite !dletE &(eq_sum) => /= x @/pred1.
+case: (x = c) => [->> |]; last by rewrite !sum0_eq.
+pose G a b := mass d2 b * (mass d1 a * (mass (F a b) c)).
+pose H1 a := sum (fun b => G a b).
+pose H2 b := sum (fun a => G a b).
+rewrite -(@eq_sum H1) => [@/H1 @/G /= a|].
++ by rewrite dlet_massE -sumZ /= &(eq_sum) => /= b; ring.
+rewrite eq_sym -(@eq_sum H2) => [@/H2 @/G /= b|].
++ by rewrite dlet_massE -sumZ /= &(eq_sum).
+rewrite (@sum_swap (fun ab : _ * _ => G ab.`1 ab.`2)) // /G.
+apply: (@summable_le (fun ab : _ * _ => mass d1 ab.`1 * mass d2 ab.`2)) => /=.
++ have h := summable_mass (d1 `*` d2); apply: (@eqL_summable _ _ h).
+  by case=> a b /=; rewrite !massE dprod1E.
++ move=> ab; rewrite !ger0_norm ?mulr_ge0 ?ge0_mass mulrCA !mulrA.
+  by rewrite ler_pimulr ?mulr_ge0 (ge0_mass, le1_mass).
+qed.
+
+lemma dprodC ['a 'b] (d1 : 'a distr) (d2 : 'b distr) :
+  d1 `*` d2 = dmap (d2 `*` d1) (fun (p : 'b * 'a) => (p.`2, p.`1)).
+proof.
+rewrite !dprod_dlet dlet_swap dlet_dlet &(eq_dlet) //= => b.
+by rewrite dlet_dlet &(eq_dlet) //= => a; rewrite dlet_unit.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1205,7 +1258,7 @@ elim: ds xs => [|d ds ih] xs /=; 1: rewrite djoin_nil dunitE.
 rewrite djoin_cons /= dmap1E /(\o) /=; case: xs => [|x xs] /=.
 + by rewrite add1z_neq0 1:size_ge0 /= mu0_false.
 rewrite -(@mu_eq _ (pred1 (x, xs))).
-+ by case=> y ys @/pred1 /=; rewrite andabP.
++ by case=> y ys @/pred1 /=.
 rewrite dprod1E ih BRM.big_cons /predT /=; pose B := BRM.big _ _ _.
 by rewrite (@fun_if (( * ) (mu1 d x))) /= /#.
 qed.
@@ -1287,7 +1340,7 @@ lemma djoin_uni (ds:'a distr list):
   (forall d, d \in ds => is_uniform d) => is_uniform (djoin ds).
 proof.
 elim: ds => [|d ds ih] h //=; rewrite !djoinE; 1: by apply/dunit_uni.
-rewrite dmap_uni => [[x xs] [y ys] /= [2!->//]|].
+rewrite dmap_uni => [[x xs] [y ys] //=|].
 apply: dprod_uni; [apply/h | apply/ih] => //.
 by move=> d' hd'; apply/h => /=; rewrite hd'.
 qed.

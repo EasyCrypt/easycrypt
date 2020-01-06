@@ -329,10 +329,8 @@ proof.
   + wp.
     rnd (fun b => b ^^ (j{1} \in x1) ^^ (j{1} \in x2)). 
     skip => &m1 &m2 /> H0j HjN Hrs1 Hrs2 Hs Hj; split.
-    + move=> b _;ring.
-    move=> _;split.
-    + by move=> b _;apply dbool_funi.
-    move=> _ b _;rewrite dbool_fu /=;split;1: by ring.
+    + by move=> b _;ring.
+    move=> _ b _;split;1: by ring.
     move=> _; rewrite !oflist_cons !restrS //. 
     smt (is_restr_addS is_restrS is_restr_diff is_restr_Ueq is_restr_restr  fset0U).
   auto; move => &m1 &m2 />.
@@ -353,10 +351,8 @@ proof.
     rnd (fun b => b ^^ (j{1} \in x1) ^^ (j{1} \in x2)). 
     skip => &m1 &m2 [#] 2!->> H0j HjN Hrs1 Hrs2 Hs Hj _; split.
     + move=> b _;ring.
-    move=> _;split.
-    + by move=> b _;apply dbool_funi.
-    move=> _ b _;rewrite dbool_fu /=;split;1: by ring.
-    move=> _; rewrite !oflist_cons !restrS //. 
+    move=> _ b _; split;1: by ring.
+    move=> _; rewrite /= !oflist_cons !restrS //. 
     smt (is_restr_addS is_restrS is_restr_diff is_restr_Ueq is_restr_restr fset0U).
   auto => &m1 &m2 />.
   rewrite !restr_0 -set0E /=;smt (is_restr_fset0).

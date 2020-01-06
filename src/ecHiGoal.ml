@@ -97,7 +97,7 @@ let process_change fp (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change fp tc)
 
 (* -------------------------------------------------------------------- *)
-let process_simplify ri (tc : tcenv1) =
+let process_simplify_info ri (tc : tcenv1) =
   let env, hyps, _ = FApi.tc1_eflat tc in
 
   let do1 (sop, sid) ps =
@@ -119,7 +119,7 @@ let process_simplify ri (tc : tcenv1) =
       |> odfl (predT, predT)
   in
 
-  let ri = {
+  {
     EcReduction.beta    = ri.pbeta;
     EcReduction.delta_p = delta_p;
     EcReduction.delta_h = delta_h;
@@ -128,9 +128,16 @@ let process_simplify ri (tc : tcenv1) =
     EcReduction.eta     = ri.peta;
     EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
-  } in
+    EcReduction.user    = ri.puser;
+  }
 
-    t_simplify_with_info ri tc
+(*-------------------------------------------------------------------- *)
+let process_simplify ri (tc : tcenv1) =
+  t_simplify_with_info (process_simplify_info ri tc) tc
+
+(* -------------------------------------------------------------------- *)
+let process_cbv ri (tc : tcenv1) =
+  t_cbv_with_info (process_simplify_info ri tc) tc
 
 (* -------------------------------------------------------------------- *)
 let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
@@ -353,12 +360,8 @@ let t_rewrite_prept info pt tc =
   LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
-let process_auto ?bases ?depth (tc : tcenv1) =
-  EcLowGoal.t_auto ?bases ?depth tc
-
-(* -------------------------------------------------------------------- *)
 let process_solve ?bases ?depth (tc : tcenv1) =
-  match FApi.t_try_base (process_auto ?bases ?depth) tc with
+  match FApi.t_try_base (EcLowGoal.t_solve ~canfail:false ?bases ?depth) tc with
   | `Failure _ ->
       tc_error (FApi.tc1_penv tc) "[solve]: cannot close goal"
   | `Success tc ->
@@ -817,7 +820,7 @@ let process_view1 pe tc =
     match TTC.destruct_product (tc1_hyps tc) (FApi.tc1_goal tc) with
     | None | Some (`Forall _) -> raise E.NoTopAssumption
 
-    | Some (`Imp (_, _)) when pe.fp_head = FPCut None ->
+    | Some (`Imp (f1, _)) when pe.fp_head = FPCut None ->
         let hyps = FApi.tc1_hyps tc in
         let hid  = LDecl.fresh_id hyps "h" in
         let hqs  = mk_loc _dummy ([], EcIdent.name hid) in
@@ -826,11 +829,64 @@ let process_view1 pe tc =
         t_intros_i_seq ~clear:true [hid]
           (fun tc ->
             let pe = PT.tc1_process_full_pterm tc pe in
+            let regen =
+              if PT.can_concretize pe.PT.ptev_env then [] else
+
+              snd (List.fold_left_map (fun f1 arg ->
+                let pre, f1 =
+                  match oget (TTC.destruct_product (tc1_hyps tc) f1) with
+                  | `Imp    (_, f1)      -> (None, f1)
+                  | `Forall (x, xty, f1) ->
+                    let aout =
+                      match xty with GTty ty -> Some (x, ty) | _ -> None
+                    in (aout, f1)
+                in
+
+                let module E = struct exception Bailout end in
+
+                try
+                  let v =
+                    match arg with
+                    | PAFormula { f_node = Flocal x } ->
+                        let meta =
+                          let env = !(pe.PT.ptev_env.pte_ev) in
+                          MEV.mem x `Form env && not (MEV.isset x `Form env) in
+
+                        if not meta then raise E.Bailout;
+
+                        let y, yty =
+                          let CPTEnv subst = PT.concretize_env pe.PT.ptev_env in
+                          snd_map subst.fs_ty (oget pre) in
+                        let fy = EcIdent.fresh y in
+
+                        pe.PT.ptev_env.pte_ev := MEV.set
+                          x (`Form (f_local fy yty)) !(pe.PT.ptev_env.pte_ev);
+                        (fy, yty)
+
+                    | _ ->
+                        raise E.Bailout
+                  in (f1, Some v)
+
+                with E.Bailout -> (f1, None)
+              ) f1 pe.PT.ptev_pt.pt_args)
+            in
+
+            let regen = List.pmap (fun x -> x) regen in
+            let bds   = List.map (fun (x, ty) -> (x, GTty ty)) regen in
 
             if not (PT.can_concretize pe.PT.ptev_env) then
               tc_error !!tc "cannot infer all placeholders";
-              let pt, ax = PT.concretize pe in t_cutdef pt ax tc)
-          tc
+
+            let pt, ax = snd_map (f_forall bds) (PT.concretize pe) in
+            t_first (fun subtc ->
+              let regen = List.fst regen in
+              let ttcut tc =
+                t_onall
+                  (EcLowGoal.t_generalize_hyps ~clear:`Yes regen)
+                  (EcLowGoal.t_apply pt tc) in
+              t_intros_i_seq regen ttcut subtc
+            ) (t_cut ax tc)
+          ) tc
 
     | Some (`Imp (f1, _)) ->
         let top    = LDecl.fresh_id (tc1_hyps tc) "h" in
@@ -1173,17 +1229,23 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     end
 
   and intro1_full_case (st : ST.state)
-    ((prind, delta), (cnt : icasemode_full option)) pis tc
+    ((prind, delta), withor, (cnt : icasemode_full option)) pis tc
   =
-    let module E = struct exception IterDone of tcenv1 end in
+    let module E = struct exception IterDone of tcenv end in
 
     let cnt = cnt |> odfl (`AtMost 1) in
     let red = if delta then `Full else `NoDelta in
 
-    let t_and =
-      if prind then
-        t_elim_iso_and ~reduce:red
-      else (fun tc -> (2, t_elim_and ~reduce:red tc))
+    let t_case =
+      let t_and, t_or =
+        if prind then
+          ((fun tc -> fst_map List.singleton (t_elim_iso_and ~reduce:red tc)),
+           (fun tc -> t_elim_iso_or ~reduce:red tc))
+        else
+          ((fun tc -> ([2]   , t_elim_and ~reduce:red tc)),
+           (fun tc -> ([1; 1], t_elim_or  ~reduce:red tc))) in
+      let ts = if withor then [t_and; t_or] else [t_and] in
+      fun tc -> FApi.t_or_map ts tc
     in
 
     let onsub gs =
@@ -1197,31 +1259,32 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     in
 
     let doit tc =
-      let togen = ref [] in
+      let rec aux imax tc =
+        if imax = Some 0 then t_id tc else
 
-      let rec aux isbnd tc =
         try
-          let ntop, tc = snd_map FApi.as_tcenv1 (t_and tc) in
-          EcUtils.iterop (aux isbnd) ntop tc
+          let ntop, tc = t_case tc in
+
+          FApi.t_sublasts
+            (List.map (fun i tc -> aux (omap ((+) (i-1)) imax) tc) ntop)
+            tc
         with InvalidGoalShape ->
           let id = EcIdent.create "_" in
           try
-            let tc = EcLowGoal.t_intros_i_1 [id] tc in
-            togen := id :: !togen;  tc
-          with EcCoreGoal.TcError _ ->
-            if isbnd then
-              tc_error !!tc "not enough top-assumptions";
-            raise (E.IterDone tc)
+            t_seq
+              (aux (omap ((+) (-1)) imax))
+              (t_generalize_hyps ~clear:`Yes [id])
+              (EcLowGoal.t_intros_i_1 [id] tc)
+          with
+          | EcCoreGoal.TcError _ when EcUtils.is_some imax ->
+              tc_error !!tc "not enough top-assumptions"
+          | EcCoreGoal.TcError _ ->
+              t_id tc
       in
 
-      let tc =
-        match cnt with
-        | `AtMost cnt ->
-           EcUtils.iterop (aux true) (max 0 cnt) tc
-        | `AsMuch ->
-           try EcUtils.iter (aux false) tc with E.IterDone tc -> tc
-
-      in t_generalize_hyps ~clear:`Yes ~missing:true (List.rev !togen) tc
+      match cnt with
+      | `AtMost cnt -> aux (Some (max 1 cnt)) tc
+      | `AsMuch     -> aux None tc
     in
 
     if List.is_empty pis then doit tc else onsub (doit tc)

@@ -23,6 +23,8 @@ proof. by done. qed.
 
 lemma nosmt oget_some (x : 'a): oget (Some x) = x.
 proof. by done. qed.
+hint simplify oget_some, oget_none.
+
 
 lemma nosmt some_oget (x : 'a option): x <> None => x = Some (oget x).
 proof. by case: x. qed.
@@ -231,10 +233,10 @@ lemma nosmt predIC (p1 p2 : 'a -> bool) : predI p1 p2 = predI p2 p1.
 proof. by apply fun_ext=> x; rewrite /predI andbC. qed.
 
 lemma nosmt predCI (p : 'a -> bool) : predI (predC p) p = pred0.
-proof. by apply/fun_ext=> x /=; case: (p x); delta=> ->. qed. (* delta *)
+proof. by apply/fun_ext=> x /=; delta => /=; rewrite andNb. qed.
 
 lemma nosmt predCU (p : 'a -> bool) : predU (predC p) p = predT.
-proof. by apply fun_ext=> x /=; case (p x); delta=> ->. qed. (* delta *)
+proof. by apply/fun_ext=> x /=; delta => /=; case: (p x). qed.
 
 lemma nosmt subpredUl (p1 p2 : 'a -> bool):
   p1 <= predU p1 p2

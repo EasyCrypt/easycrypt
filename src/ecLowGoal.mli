@@ -35,11 +35,12 @@ val (@~)  : FApi.backward -> FApi.tactical -> FApi.backward
 val (@!+) : FApi.tactical -> FApi.backward -> FApi.tactical
 val (@~+) : FApi.tactical -> FApi.backward list -> FApi.tactical
 
-val t_admit : FApi.backward
-val t_true  : FApi.backward
-val t_fail  : FApi.backward
-val t_id    : FApi.backward
-val t_close : ?who:string -> FApi.backward -> FApi.backward
+val t_admit   : FApi.backward
+val t_true    : FApi.backward
+val t_fail    : FApi.backward
+val t_id      : FApi.backward
+val t_close   : ?who:string -> FApi.backward -> FApi.backward
+val t_shuffle : EcIdent.t list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val alpha_find_in_hyps : EcEnv.LDecl.hyps -> EcFol.form -> EcIdent.t
@@ -49,12 +50,22 @@ val t_logic_trivial    : FApi.backward
 val t_trivial          : ?subtc:FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_simplify :
-     ?target:ident -> ?delta:bool -> ?logic:rlogic_info
-  -> FApi.backward
+type simplify_t =
+  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
 
-val t_simplify_with_info :
+type simplify_with_info_t =
   ?target:ident -> reduction_info -> FApi.backward
+
+type smode = [ `Cbv | `Cbn ]
+
+val t_cbv : simplify_t
+val t_cbn : simplify_t
+
+val t_cbv_with_info : simplify_with_info_t
+val t_cbn_with_info : simplify_with_info_t
+
+val t_simplify : ?mode:smode -> simplify_t
+val t_simplify_with_info : ?mode:smode -> simplify_with_info_t
 
 (* -------------------------------------------------------------------- *)
 val t_change : ?target:ident -> form -> tcenv1 -> tcenv1
@@ -158,6 +169,7 @@ val t_elim          : ?reduce:lazyred -> FApi.backward
 val t_elim_hyp      : EcIdent.t -> FApi.backward
 val t_elim_prind    : ?reduce:lazyred -> [ `Case | `Ind ] -> FApi.backward
 val t_elim_iso_and  : ?reduce:lazyred -> tcenv1 -> int * tcenv
+val t_elim_iso_or   : ?reduce:lazyred -> tcenv1 -> int list * tcenv
 
 (* Elimination using an custom elimination principle. *)
 val t_elimT_form : proofterm -> ?sk:int -> form -> FApi.backward
@@ -302,4 +314,4 @@ type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_auto : ?bases:symbol list -> ?depth:int -> FApi.backward
+val t_solve : ?canfail:bool -> ?bases:symbol list -> ?depth:int -> FApi.backward

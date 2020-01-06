@@ -598,7 +598,7 @@ lemma find_set (m:('a,'b) fmap) y x (p:'a -> 'b -> bool):
   find p m.[x <- y] = if p x y then Some x else None.
 proof.
   cut [[a []->[]] | []-> Hp Hnp]:= findP p (m.[x<-y]);1: rewrite getP dom_set !inE /#.
-  by case (p x y)=> //; cut := Hp x;rewrite getP dom_set !inE /= oget_some.
+  by case (p x y)=> //; cut := Hp x;rewrite getP dom_set !inE.
 qed.
 
 lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b):

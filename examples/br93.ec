@@ -414,7 +414,7 @@ conseq
 call (: ={glob Log, glob RO}); 1: by sim.
 swap{1} 6 -2.
 auto; call (: ={glob Log, glob RO}); 1: by sim.
-by auto=> /> [pk sk] ->; rewrite dbool_ll.
+by auto=> /> [pk sk] ->.
 qed.
 
 lemma Reduction &m:

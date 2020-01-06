@@ -34,7 +34,7 @@ setup.log
 *.toc
 *.synctex.gz
 *.kilepr
-
+*.eco
 /src/ecVersion.ml
 
 /doc/refman/easycrypt.pdf
@@ -49,6 +49,7 @@ setup.log
 /attic
 
 /*.ec
+*.eco
 
 /*.smt
 /*.why

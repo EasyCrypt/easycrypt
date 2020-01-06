@@ -139,6 +139,7 @@ type validation =
 | VLConv   of (handle * ident)       (* hypothesis conversion *)
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
+| VShuffle of ident list             (* goal shuffling *)
 
   (* external (hl/phl/prhl/...) proof-node *)
 | VExtern  : 'a * handle list -> validation
@@ -353,6 +354,7 @@ module FApi : sig
   val t_repeat : backward -> backward
 
   val t_or       : backward -> backward -> backward
+  val t_or_map   : (tcenv1 -> 'a * tcenv) list -> tcenv1 -> 'a * tcenv
   val t_ors_pmap : ('a -> backward option) -> 'a list -> backward
   val t_ors_map  : ('a -> backward) -> 'a list -> backward
   val t_ors      : backward list -> backward

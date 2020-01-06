@@ -209,6 +209,12 @@ proof. by rewrite iter0. qed.
 lemma nseq0_le n (x : 'a) : n <= 0 => nseq n x = [].
 proof. by move=> le0_n; rewrite iter0. qed.
 
+lemma nseq_max0 n (x : 'a) : nseq (max 0 n) x = nseq n x.
+proof.
+rewrite /max; case: (0 < n) => // /lezNgt.
+by rewrite nseq0 => /nseq0_le<:'a> ->.
+qed.
+
 lemma nseq1 (x : 'a) : nseq 1 x = [x].
 proof. by rewrite iter1. qed.
 
@@ -219,6 +225,14 @@ lemma nseqSr n (x : 'a): 0 <= n => nseq (n+1) x = rcons (nseq n x) x.
 proof.
 elim: n=> /= [|i ge0_i ih]; first by rewrite nseq0 nseq1.
 by rewrite (@nseqS (i+1)) ?addz_ge0 // {1}ih nseqS.
+qed.
+
+lemma cat_nseq n1 n2 (x : 'a) : 0 <= n1 => 0 <= n2 =>
+  nseq n1 x ++ nseq n2 x = nseq (n1 + n2) x.
+proof.
+move=> ge0_n1 ge0_n2; elim: n1 ge0_n1 => [|n1 ge0_n1 ih].
++ by rewrite nseq0.
++ by rewrite -addzAC !nseqS // 1:addz_ge0.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -2178,7 +2192,7 @@ case=> a b; split => [ab_in_s|].
 + apply/flatten_mapP; exists a; rewrite mem_undup /= ?mem_filter //=.
   by rewrite ab_in_s /= &(mapP); exists (a, b).
 case/flatten_mapP=> a'; rewrite mem_undup => -[] /mapP[].
-by case=> a2 b2 /= [_ ->>] {a'}; rewrite mem_filter /= => -[].
+by case=> a2 b2 /= [_ ->>]; rewrite mem_filter /=.
 qed.
 
 (* -------------------------------------------------------------------- *)

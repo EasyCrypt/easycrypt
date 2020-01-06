@@ -45,7 +45,7 @@ proof. by apply/(big_endo oppr0 opprD). qed.
 (* -------------------------------------------------------------------- *)
 lemma sumrB P F1 F2 (r : 'a list):
   (big P F1 r) - (big P F2 r) = big P (fun x => F1 x - F2 x) r.
-proof. by rewrite sumrN sumrD; apply/eq_bigr=> /= x. qed.
+proof. by rewrite sumrN sumrD; apply/eq_bigr => /=. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt sumr_const (P : 'a -> bool) x s:

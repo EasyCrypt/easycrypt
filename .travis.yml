@@ -4,6 +4,7 @@ language: ocaml
 branches:
   only:
   - 1.0
+  - 1.0-preview
   - /^deploy-.*$/
 services:
 - docker

@@ -269,8 +269,7 @@ section Upto.
     by proc; if; auto=> />; rewrite uD_ll //=; smt(domE get_setE).
   inline *; auto=> />; split=> [|_].
   + by rewrite no_collision=> x x'; rewrite mem_empty.
-  move=> rL rR DL b mL DR mR [-> //|^ /no_collision + -> [#] -> _ _ ^ + {1}-> /= x x'].
-  by move=> /(_ x x') [->|[->|[->|->]]].
+  move=> /> rL rR DL b mL DR mR [-> //| /#].
   qed.
 end section Upto.
 

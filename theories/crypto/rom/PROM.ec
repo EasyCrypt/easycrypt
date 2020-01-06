@@ -1,92 +1,22 @@
-(* -------------------------- Eager Sampling -------------------------- *)
-
-prover [""].
+(* ==================== Programmable Random Oracle ==================== *)
 
 require import Core List SmtMap FSet Distr.
 require IterProc.
 
+(* flag type for use with flagged maps of SmtMap: ('from, 'to * 'flag) fmap *)
 type flag = [ Unknown | Known ].  (* map setting known by distinguisher? *)
 
 lemma neqK_eqU f : f <> Known <=> f = Unknown.
 proof. by case: f. qed.
 
-op noflags (m : ('from, 'to * 'flag) fmap) : ('from, 'to) fmap =
-  map (fun _ (p : 'to * 'flag) => p.`1) m.
-
-op in_dom_with (m : ('from, 'to * 'flag) fmap) (x : 'from) (f : 'flag) = 
-   dom m x /\ (oget (m.[x])).`2 = f.
-
-op restr f (m : ('from, 'to * 'flag) fmap) = 
-  let m = filter (fun _ (p : 'to * 'flag) => p.`2 = f) m in
-  map (fun _ (p : 'to * 'flag) => p.`1) m.
-
-lemma restrP (m : ('from, 'to * 'flag) fmap) f x :
-  (restr f m).[x] = 
-  obind (fun (p : 'to * 'flag) => if p.`2 = f then Some p.`1 else None) m.[x].
-proof.
-  rewrite /restr /= mapE filterE /=.
-  by case (m.[x])=> //= -[x1 f'] /=; case (f' = f).
-qed.
-
-lemma dom_restr (m : ('from, 'to * 'flag) fmap) f x :
-  dom (restr f m) x <=> in_dom_with m x f. 
-proof. 
-  rewrite /in_dom_with !domE; case: (m.[x]) (restrP m f x)=> //= -[t f'] /=.
-  by rewrite oget_some /=; case (f' = f)=> [_ -> |].
-qed.
-
-lemma restr_set (m : ('from, 'to * 'flag) fmap) f1 f2 x y :
-  restr f1 m.[x <- (y, f2)] =
-  if f1 = f2 then (restr f1 m).[x <- y] else rem (restr f1 m) x.
-proof.
-  rewrite -fmap_eqP.
-  case (f1 = f2)=> [-> | Hneq] x0; rewrite !(restrP, get_setE);
-    1: by case (x = x0)=> [-> // |]; 1: rewrite (eq_sym x0);
-    1: move=> ->//.
-  case (x0 = x)=> [-> /= /= | Hnx]; 1: by rewrite (eq_sym f2) Hneq remE.
-  by rewrite remE Hnx restrP.
-qed.
-
-lemma restr_set_eq (m : ('from, 'to * 'flag) fmap) f x y :
-  restr f m.[x <- (y, f)] = (restr f m).[x <- y].
-proof. by rewrite restr_set. qed.
-
-lemma restr0 f : restr f empty<:'from, 'to * 'flag> = empty.
-proof. by apply fmap_eqP=> x; rewrite restrP !emptyE. qed.
-
-lemma restr_set_neq f2 f1 (m : ('from, 'to * 'flag) fmap) x y :
-  ! dom m x =>
-  f2 <> f1 => restr f1 m.[x <- (y, f2)] = restr f1 m.
-proof.
-  by move=> Hm Hneq;
-    rewrite restr_set (eq_sym f1) Hneq rem_id // dom_restr /in_dom_with Hm.
-qed.
-
-lemma restr_rem (m : ('from, 'to * 'flag) fmap) (x:'from) f :
-  restr f (rem m x) =
-  (if in_dom_with m x f then rem (restr f m) x else restr f m).
-proof.
-  rewrite -fmap_eqP=>z; rewrite restrP; case (in_dom_with m x f);
-  rewrite !(restrP, remE); rewrite /in_dom_with.
-  case (z = x)=> //.
-  case (z = x)=> // ->.
-  rewrite negb_and; elim=> [x_not_in_m | ne_get_m_x_2_f].
-  by rewrite (get_none m x).
-  case (m.[x] = None)=> [get_x_none | get_x_some];
-    [by rewrite get_x_none |
-     rewrite -domE in get_x_some; by rewrite get_some //= ne_get_m_x_2_f].
-qed.
-
-(* ------------------Random Oracles and Flag Random Oracles------------------ *)
+(* -------------------------------------------------------------------- *)
+(* Random Oracles and Flag Random Oracles                               *)
 
 abstract theory Ideal.
 
-type from, to.
+type from, to, input, output.
 
 op sampleto : from -> to distr.
-
-type input.
-type output.
 
 module type RO = {
   proc init  ()                  : unit
@@ -112,7 +42,7 @@ module type FRO = {
 }.
 
 module type FRO_Distinguisher(G : FRO) = {
-  proc distinguish(_:input): output
+  proc distinguish(_ : input): output
 }.
 
 module RO : RO = {
@@ -161,7 +91,7 @@ module FRO : FRO = {
     m.[x] <- (y, Known);
   }
 
-  proc rem(x : from) = {
+   proc rem(x : from) = {
     m <- rem m x;
   }
 
@@ -187,7 +117,7 @@ equiv RO_FRO_get : RO.get ~ FRO.get :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> ={res} /\ RO.m{1} = noflags FRO.m{2}.
 proof.
   proc; auto=> &1 &2 [] 2!-> /= ? -> /=.
-  rewrite mem_map !map_set /fst /= get_set_sameE oget_some => |>; progress.
+  rewrite mem_map !map_set /fst /= get_set_sameE => |>; progress.
   + by rewrite mapE oget_omap_some 1:-domE.
   + by rewrite eq_sym set_get_eq 1:mapE /= 1:get_some.
 qed.
@@ -208,12 +138,15 @@ qed.
 
 lemma RO_FRO_D (D <: RO_Distinguisher{RO, FRO}) :
   equiv [D(RO).distinguish ~ D(FRO).distinguish : 
-         ={glob D, arg} /\ RO.m{1} = noflags FRO.m{2} ==>
+         ={arg, glob D} /\ RO.m{1} = noflags FRO.m{2} ==>
          ={res, glob D} /\ RO.m{1} = noflags FRO.m{2}].
 proof.
   proc (RO.m{1} = noflags FRO.m{2})=> //.
-  + by conseq RO_FRO_init. + by conseq RO_FRO_get. + by conseq RO_FRO_set. 
-  + by conseq RO_FRO_rem. + by conseq RO_FRO_sample.
+  + by conseq RO_FRO_init.
+  + by conseq RO_FRO_get.
+  + by conseq RO_FRO_set. 
+  + by conseq RO_FRO_rem.
+  + by conseq RO_FRO_sample.
 qed.
 
 section LL. 
@@ -254,8 +187,7 @@ end section LL.
  
 end Ideal.
 
-(* -------------------------------------------------------------------------- *)
-
+(* -------------------------------------------------------------------- *)
 abstract theory GenEager.
 
 clone include Ideal. 
@@ -265,10 +197,11 @@ axiom sampleto_ll : forall x, Distr.weight (sampleto x) = 1%r.
 clone include IterProc with type t <- from.
 
 (* RRO is an FRO that resamples a query if the associated value is
-   unknown; it also has a resample procedure that resamples all
-   queries whose results are unknown
-
-   uses the map of FRO *)
+ * unknown; it also has a resample procedure that resamples all
+ * queries whose results are unknown.
+ *
+ * Uses the map of FRO
+ *)
 
 module RRO : FRO = {
   proc init = FRO.init
@@ -305,9 +238,10 @@ module RRO : FRO = {
   }
 }.
 
-(* LRO is an RO whose sample procedure is lazy, i.e., does nothing
-
-   uses the map of RO *)
+(* LRO is an RO whose sample procedure is lazy, i.e., does nothing.
+ *
+ * Uses the map of RO.
+ *)
 
 module LRO : RO = {
   proc init = RO.init
@@ -323,8 +257,8 @@ module LRO : RO = {
 
 lemma RRO_resample_ll : islossless RRO.resample.
 proof. 
-  proc; call (iter_ll RRO.I _)=> //; proc; auto=> /= ?;
-    by split; first apply sampleto_ll. 
+  proc; call (iter_ll RRO.I _)=> //; proc; auto=> /= ?.
+  by split; first apply sampleto_ll. 
 qed.
 
 (* now we use the eager tactics to show a series of lemmas
@@ -350,8 +284,8 @@ lemma iter_perm2 (i1 i2 : from) :
          ={glob RRO.I, t1, t2} ==> ={glob RRO.I}].
 proof.
   proc; inline *; case ((t1 = t2){1}); 1:by auto.
-  * by swap{2} [4..5] -3; auto=> &ml &mr [#] 3-> neq /= ? -> ? ->;
-    rewrite set_setE (eq_sym t2{mr}) neq.
+  * swap{2} [4..5] -3; auto=> &ml &mr [#] 3-> neq /= ? -> ? ->.
+    by rewrite set_setE (eq_sym t2{mr}) neq.
 qed.
 
 equiv I_f_neq x1 mx1 : RRO.I.f ~ RRO.I.f :
@@ -367,8 +301,8 @@ equiv I_f_eqex x1 mx1 mx2 : RRO.I.f ~ RRO.I.f :
     eq_except (pred1 x1) FRO.m{1} FRO.m{2} /\
     FRO.m{1}.[x1] = mx1 /\ FRO.m{2}.[x1] = mx2.
 proof.
-  by proc; auto=> ? &mr [#] -> Hneq Heq /= Heq1 Heq2 ? -> /=;
-    rewrite !get_setE Hneq eq_except_set_eq.
+  proc; auto=> ? &mr [#] -> Hneq Heq /= Heq1 Heq2 ? -> /=.
+  by rewrite !get_setE Hneq eq_except_set_eq.
 qed.
 
 equiv I_f_set x1 r1 : RRO.I.f ~ RRO.I.f :
@@ -376,8 +310,8 @@ equiv I_f_set x1 r1 : RRO.I.f ~ RRO.I.f :
   FRO.m{2} = FRO.m{1}.[x1 <- (r1, Known)] ==>
   FRO.m{1}.[x1] = None /\ FRO.m{2} = FRO.m{1}.[x1 <- (r1, Known)].
 proof.
-  by proc; auto=> ? &mr [#] -> Hneq H1 -> /= ? ->;
-    rewrite get_setE Hneq/= set_setE (eq_sym _ x1) Hneq.
+  proc; auto=> ? &mr [#] -> Hneq H1 -> /= ? ->.
+  by rewrite get_setE Hneq/= set_setE (eq_sym _ x1) Hneq.
 qed.
 
 lemma eager_get :
@@ -393,13 +327,12 @@ proof.
     + by conseq (I_f_neq x1 (Some mx))=> //.
     auto=> ? &mr [#] 4-> Hd Hget; split; first apply sampleto_ll.
     move=> /= _ ? _; split.
-    + rewrite get_some // oget_some /= => z; rewrite -memE mem_fdom dom_restr
-              /in_dom_with;
-        case (x{mr} = z)=> [<- | //]; by rewrite Hget.
+    + rewrite -some_oget // /= => z.
+      rewrite -memE mem_fdom dom_restr /in_dom_with.
+      by case (x{mr} = z)=> [<- | //]; rewrite Hget.
     move=> [#] _ Heq ? mr [#] -> Heq'.
     split=> [| _ r _]; first apply sampleto_ll.
-    by rewrite domE Heq' oget_some /= set_get_eq 1:Heq'
-               1:{1}(pairS (oget FRO.m{mr}.[x{mr}])) 1:Hget.
+    by rewrite domE Heq' /= set_get_eq 1:Heq' 1:{1}(pairS (oget FRO.m{mr}.[x{mr}])) 1:Hget.
   case ((dom FRO.m x){1}).
   + inline{1} RRO.resample=> /=; rnd{1}.
     transitivity{1} 
@@ -414,7 +347,7 @@ proof.
       move=> />; by rewrite -neqK_eqU.
     + move=> ? ? ?; rewrite domE=> [#] <*> [#] -> /eq_except_sym H Hxm Hx2.
       split=> [| _ r _]; first apply sampleto_ll.
-      rewrite /= Hxm oget_some /=; apply /eq_sym.
+      rewrite /= Hxm /=; apply /eq_sym.
       have /(congr1 oget) := Hx2 => <-; apply eq_except_set_getlr=> //.
       by rewrite domE Hx2.
     + symmetry; call (iter1_perm RRO.I iter_perm2).
@@ -427,8 +360,7 @@ proof.
                FRO.m{1}.[x{2}] = Some (result{2}, Unknown) /\
                FRO.m{2}.[x{2}] = Some (result{2}, Known)).
     + auto=> ? &mr [#] 2-> /= ^Hdom -> ^Hget -> ? -> /=.
-      rewrite !get_setE /= oget_some !restr_set /= fdom_set fsetDK /=.
-      by apply eq_except_setlr.
+      by rewrite !get_setE /= !restr_set /= fdom_set eq_except_setlr //= fsetDK.
     exists* x{1}, FRO.m{1}.[x{2}], FRO.m{2}.[x{2}]; elim*=> x1 mx1 mx2.
     call (iter_inv RRO.I (fun z => x1 <> z) 
            (fun o1 o2 =>
@@ -490,9 +422,8 @@ proof.
        (FRO.m.[x] = Some (y, Known)){2}).
     + inline *; auto=> ? &mr [#] 3-> /= Hmem Hget.
       split=> [|_ c _]; first apply sampleto_ll.
-      (* PY: why we need to provide arguments ? *)
-      by rewrite (eq_except_setlr _ FRO.m{mr} x{mr} (c, Unknown) (y{mr}, Known)) // 
-           get_set_sameE restr_set /= fdom_rem /= -memE in_fsetD1.
+      by rewrite (eq_except_setlr _ _ _ (c, Unknown)) //=
+                 get_set_sameE restr_set /= fdom_rem /= -memE in_fsetD1.
     exists* x{1}, y{1}, (FRO.m.[x]{1}); elim*=> x1 y1 mx1;
       pose mx2 := Some (y1, Known).
     call (iter_inv RRO.I (fun z=> x1<>z) 
@@ -510,20 +441,19 @@ proof.
          (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1] = mx1 /\
                        o2.[x1] = mx2) 
          (I_f_eqex x1 mx1 mx2))=> /=; auto=> &1 &2 /> /negb_and x2_disj.
-    split=> [| _ _ _ m_L m_R eq_exc m_L_x2_eq m_R_x2_eq].
-    split.
-    congr; rewrite fsetP=> z; rewrite 2!mem_fdom 2!dom_restr /in_dom_with mem_set.
-    case (z = x{2})=> [-> /=| ne_z_x2 /=].
-    by rewrite get_set_sameE oget_some /= negb_and.
-    by rewrite get_setE ne_z_x2.
+    split=> [| _ _ _ m_L m_R eq_exc m_L_x2_eq m_R_x2_eq];1: split.
+    + congr; rewrite fsetP=> z; rewrite 2!mem_fdom 2!dom_restr /in_dom_with mem_set.
+      case (z = x{2})=> [-> /=| ne_z_x2 /=].
+      + by rewrite get_set_sameE /= negb_and.
+      by rewrite get_setE ne_z_x2.
     split=> [x0 |].
-    rewrite -memE mem_fdom dom_restr /in_dom_with.
-    case (x{2} = x0)=> [<- [#] | //]; by elim x2_disj.
-    rewrite get_set_sameE /mx2 /= eq_except_setr.
+    + rewrite -memE mem_fdom dom_restr /in_dom_with.
+      by case (x{2} = x0)=> [<- [#] | //]; by elim x2_disj.
+      by rewrite get_set_sameE /mx2 /= eq_except_setr.
     rewrite get_set_sameE in m_R_x2_eq.
     rewrite -fmap_eqP=> z; rewrite get_setE; case (z = x{2})=> [-> |].
-    by rewrite -m_R_x2_eq.
-    move=> ne_z_x2; rewrite eq_exceptP in eq_exc; by rewrite eq_exc /pred1.
+    + by rewrite -m_R_x2_eq.
+    by move=> ne_z_x2; rewrite eq_exceptP in eq_exc; rewrite eq_exc /pred1.
 qed.
 
 lemma eager_rem :
@@ -548,8 +478,8 @@ proof.
     + inline *; auto=> &1 &2 [#] 2-> Hidm /=.
       split=> [| _ c _]; first apply sampleto_ll.
       rewrite (eq_except_remr (pred1 x{2}) _ FRO.m{2} x{2}) /pred1 //
-              1:eq_except_setl /= remE -memE in_fsetD1 negb_and /=
-              restr_rem Hidm /=.
+              1:eq_except_setl /=.
+      rewrite remE -memE in_fsetD1 negb_and /= restr_rem Hidm /=.
       congr; by rewrite fdom_rem.
     exists* x{1}, (FRO.m.[x]{1}); elim*=> x1 mx1.
     call (iter_inv RRO.I (fun z=> x1<>z) 
@@ -656,11 +586,11 @@ proof.
     by rewrite /in_dom_with in Hz; rewrite Hz.
     rewrite /in_dom_with mem_set get_setE.
     case (x{1} = head witness l{2})=> [-> /= | //].
-    rewrite oget_some /=; rewrite /in_dom_with in Hz.
+    rewrite /in_dom_with in Hz.
     have [# -> -> //] :
       (head witness l{2} \in FRO.m{2}) /\
       (oget FRO.m{2}.[head witness l{2}]).`2 = Unknown
-      by rewrite (Hz (head witness l{2}))
+    by rewrite (Hz (head witness l{2}))
          -(mem_head_behead witness l{2} l2_nonemp (head witness l{2})); left.
   by auto=> ? &mr /= [#] 3-> /=; split=>// z; rewrite -memE mem_fdom dom_restr. 
 qed.
@@ -674,8 +604,7 @@ proof.
          restr Known FRO.m{1} = result{2}).
   + auto=> &1 &2 [#] 2-> Hz <- l2_nonemp _ /= ? -> /=.
     split=>[z /mem_drop Hm |];1:rewrite /in_dom_with mem_set get_setE.
-    case (z = head witness l{2})=> [-> /= | ne /=];
-      [by rewrite oget_some | rewrite Hz Hm].
+    + by case (z = head witness l{2})=> [-> | ne] //=; rewrite Hz Hm.
     rewrite restr_set rem_id ?dom_restr //.
     by move: l2_nonemp=> /(mem_head_behead witness) /(_ (head witness l{2}))
                          /= /Hz @/in_dom_with />;
@@ -745,10 +674,9 @@ equiv LRO_RRO_get : LRO.get ~ RRO.get :
 proof. 
   proc; auto=> ? &ml [] -> -> /= ? -> /=.
   rewrite dom_restr orabP negb_and neqK_eqU.
-  rewrite !restr_set /= !get_set_sameE oget_some; progress.
+  rewrite !restr_set /= !get_set_sameE ; progress.
   move: H; rewrite negb_or /= restrP domE.
-  move=> [/some_oget -> /=]; rewrite oget_some -neqK_eqU /=; move=> -> /=;
-    by rewrite oget_some.
+  by move=> [/some_oget -> /=]; rewrite -neqK_eqU /= => ->.
 qed.
 
 equiv LRO_RRO_set : LRO.set ~ RRO.set :
@@ -816,7 +744,7 @@ proof.
     + move=> &mr [] _ ->; apply mem_eq0=> z;
         rewrite -memE mem_fdom dom_restr /in_dom_with mapE mem_map domE.
       by case (RO.m{m}.[_]).
-     by move=> ? &mr [] 2!-> /=; rewrite map_comp /fst /= map_id.
+  + by move=> /> &1; rewrite map_comp /fst /= map_id.
   transitivity M.main2
      (={glob D, FRO.m, arg} ==> ={res, glob D})
      (={glob D, arg} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>

@@ -68,8 +68,7 @@ rewrite supp_dexcepted rngE /= negb_exists=>- [] _ /= m__neq_yL.
 split=> [x'|y']; rewrite !get_setE !mem_set.
 + case: (x' = x{2})=> //= x'_neq_x.
   have [] mmi mim ^ /mmi mimx':= is_perm.
-  rewrite mimx' domE; elim: (RandomPermutation.m{2}.[x']) (m__neq_yL x')=> //= x0.
-  by rewrite oget_some=> ->.
+  by rewrite mimx' domE; elim: (RandomPermutation.m{2}.[x']) (m__neq_yL x')=> //= x0 ->.
 by case: (y' = yL)=> //=; smt(domE).
 qed.
 
@@ -86,8 +85,7 @@ split=> [x'|y']; rewrite !get_setE !mem_set.
 + case: (x' = xL)=> //=; smt(domE).
 case: (y' = y{2})=> //= y'_neq_y.
 have [] mmi mim ^ /mim mmiy':= is_perm.
-rewrite mmiy' domE; elim: (RandomPermutation.mi{2}.[y']) (mi__neq_xL y')=> //= y0.
-by rewrite oget_some=> ->.
+by rewrite mmiy' domE; elim: (RandomPermutation.mi{2}.[y']) (mi__neq_xL y')=> //= y0 ->.
 qed.
 
 (* -------------------------------------------------------------------- *)

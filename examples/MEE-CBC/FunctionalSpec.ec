@@ -214,7 +214,7 @@ lemma cbc_enc_cbc_fold P k iv p:
   cbc_enc P k iv p = cbc_enc_fold P k iv p.
 proof.
   rewrite /cbc_enc_fold /= -(cat0s (cbc_enc P k iv p)).
-  elim p iv []=> //= [iv acc|pi p ih iv acc].
+  elim: p iv []=> //= [iv|pi p ih iv acc].
     by rewrite cats0.
   by rewrite -cat_rcons ih.
 qed.
@@ -231,7 +231,7 @@ lemma cbc_dec_cbc_fold Pi k iv c:
   cbc_dec Pi k iv c = cbc_dec_fold Pi k iv c.
 proof.
   rewrite /cbc_dec_fold /= -(cat0s (cbc_dec Pi k iv c)).
-  elim c iv []=> //= [iv acc|ci c ih iv acc].
+  elim: c iv []=> //= [iv|ci c ih iv acc].
     by rewrite cats0.
   by rewrite -cat_rcons ih.
 qed.
@@ -262,7 +262,7 @@ proof.
   elim c st=> //= ci c ih st //=.
   rewrite -lez_add1r /= ler_addl size_ge0 /=.
   rewrite addzC -ih /=.
-  by rewrite ltzNge lez_eqVlt negb_or ltzNge size_ge0 /= if_neg.
+  by rewrite ltzNge lez_eqVlt negb_or ltzNge size_ge0 /= if_neg addzC.
 qed.
 
 lemma size_cbc_enc P k iv p: size (cbc_enc P k iv p) = size p.
@@ -524,8 +524,8 @@ conseq (_: true ==> true) (_: _ ==> _)=> //=.
   move=> p /lezNgt le_szc_p _ ge_szc_p.
   rewrite (ler_asym (size p) (size (behead c{hr})) _) ?ge_szc_p ?le_szc_p take_size=> p_def.
   split.
-  + case: {-1}(unpad p) (eq_refl (unpad p))=> //= @/mee_cbc - [] m t; rewrite !oget_some /=.
-    by rewrite /mee_dec /= -p_def=> -> /=; rewrite oget_some.
+  + case: {-1}(unpad p) (eq_refl (unpad p))=> //= @/mee_cbc - [] m t.
+    by rewrite /mee_dec /= -p_def=> -> /=.
   by rewrite /mee_dec -p_def /= => ->.
 by proc; inline *; wp; while true (size c - i); auto=> &hr /#.
 qed.

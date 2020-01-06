@@ -25,6 +25,15 @@ exception TopError of EcLocation.t * exn
 val toperror_of_exn : ?gloc:EcLocation.t -> exn -> exn
 
 (* -------------------------------------------------------------------- *)
+type required_info = {
+  rqd_name      : symbol;
+  rqd_namespace : EcLoader.namespace option;
+  rqd_kind      : EcLoader.kind;
+  rqd_digest    : Digest.t;
+}
+
+type required = required_info list
+
 type scope
 
 type proof_uc = {
@@ -159,9 +168,11 @@ module Theory : sig
    * loader [loader] in scope [scope]. [loader] is called on
    * the initial scope and is in charge of processing the required
    * theory. *)
-  val require : scope -> (symbol * thmode) -> (scope -> scope) -> scope
+  val require : scope -> (required_info * thmode) -> (scope -> scope) -> scope
 
   val add_clears : (pqsymbol option) list -> scope -> scope
+
+  val required : scope -> required
 end
 
 (* -------------------------------------------------------------------- *)
@@ -216,6 +227,11 @@ end
 module Auto : sig
   val add_rw   : scope -> local:bool -> base:pqsymbol -> pqsymbol list -> scope
   val add_hint : scope -> phint -> scope
+end
+
+(*-------------------------------------------------------------------- *)
+module Reduction : sig
+  val add_reduction : scope -> puserred -> scope
 end
 
 (* -------------------------------------------------------------------- *)

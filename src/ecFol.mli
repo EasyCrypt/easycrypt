@@ -56,6 +56,12 @@ val f_real_mul : form -> form -> form
 val f_real_inv : form -> form
 val f_real_div : form -> form -> form
 val f_real_abs : form -> form
+val f_decimal  : zint * (int * zint) -> form
+
+(* soft-constructor - map *)
+val f_map_cst : EcTypes.ty -> form -> form
+val f_map_get : form -> form -> EcTypes.ty -> form
+val f_map_set : form -> form -> form -> form
 
 (* soft constructors - distributions *)
 val fop_support : EcTypes.ty -> form
@@ -91,17 +97,18 @@ val f_exists_simpl : bindings -> form -> form
 val f_quant_simpl  : quantif -> bindings -> form -> form
 val f_app_simpl    : form -> form list -> EcTypes.ty -> form
 
-val f_not_simpl  : form -> form
-val f_and_simpl  : form -> form -> form
-val f_ands_simpl : form list -> form -> form
-val f_anda_simpl : form -> form -> form
-val f_or_simpl   : form -> form -> form
-val f_ora_simpl  : form -> form -> form
-val f_imp_simpl  : form -> form -> form
-val f_imps       : form list -> form -> form
-val f_imps_simpl : form list -> form -> form
-val f_iff_simpl  : form -> form -> form
-val f_eq_simpl   : form -> form -> form
+val f_not_simpl   : form -> form
+val f_and_simpl   : form -> form -> form
+val f_ands_simpl  : form list -> form -> form
+val f_ands0_simpl : form list -> form
+val f_anda_simpl  : form -> form -> form
+val f_or_simpl    : form -> form -> form
+val f_ora_simpl   : form -> form -> form
+val f_imp_simpl   : form -> form -> form
+val f_imps        : form list -> form -> form
+val f_imps_simpl  : form list -> form -> form
+val f_iff_simpl   : form -> form -> form
+val f_eq_simpl    : form -> form -> form
 
 val f_int_le_simpl  : form -> form -> form
 val f_int_lt_simpl  : form -> form -> form
@@ -123,6 +130,7 @@ val f_real_inv_simpl : form -> form
 
 (* -------------------------------------------------------------------- *)
 val destr_exists_prenex : form -> bindings * form
+val destr_ands : deep:bool -> form -> form list
 
 (* -------------------------------------------------------------------- *)
 (* projects 'a Distr type into 'a *)
@@ -151,6 +159,9 @@ type op_kind = [
   | `Real_opp
   | `Real_mul
   | `Real_inv
+  | `Map_get
+  | `Map_set
+  | `Map_cst
 ]
 
 val op_kind       : path -> op_kind option

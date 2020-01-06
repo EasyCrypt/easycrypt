@@ -39,7 +39,7 @@ let why3dflconf = Filename.concat XDG.home "why3.conf"
 (* -------------------------------------------------------------------- *)
 type pconfig = {
   pc_why3     : string option;
-  pc_loadpath : (bool * string) list;
+  pc_loadpath : (EcLoader.namespace option * string) list;
 }
 
 let print_config config =
@@ -47,12 +47,17 @@ let print_config config =
   Format.eprintf "git-hash: %s@\n%!" EcVersion.hash;
 
   (* Print load path *)
-  Format.eprintf "load-path:@\n%!";
-  List.iter
-    (fun (sys, dir) ->
-       Format.eprintf "  <%.6s>@@%s@\n%!"
-         (if sys then "system" else "user") dir)
-    (EcCommands.loadpath ());
+  begin
+    let string_of_namespace = function
+      | None            -> "<none>"
+      | Some `System    -> "<system>"
+      | Some (`Named x) -> x in
+    Format.eprintf "load-path:@\n%!";
+    List.iter
+      (fun (nm, dir) ->
+         Format.eprintf "  %.10s@@%s@\n%!" (string_of_namespace nm) dir)
+      (EcCommands.loadpath ());
+  end;
 
   (* Print why3 configuration file location *)
   Format.eprintf "why3 configuration file@\n%!";
@@ -176,10 +181,12 @@ let main () =
   begin
     let theories = resource ["theories"] in
 
-    EcCommands.addidir ~system:true (Filename.concat theories "prelude");
+    EcCommands.addidir ~namespace:`System (Filename.concat theories "prelude");
     if not ldropts.ldro_boot then
-      EcCommands.addidir ~system:true ~recursive:true theories;
-    List.iter EcCommands.addidir ldropts.ldro_idirs;
+      EcCommands.addidir ~namespace:`System ~recursive:true theories;
+    List.iter (fun (onm, x) ->
+        EcCommands.addidir ?namespace:(omap (fun nm -> `Named nm) onm) x)
+      ldropts.ldro_idirs;
   end;
 
   (* Register user messages printers *)
@@ -226,13 +233,24 @@ let main () =
     end
 
     | `Compile cmpopts -> begin
-        let name     = cmpopts.cmpo_input in
+        let name = cmpopts.cmpo_input in
+
+        begin try
+          let ext = Filename.extension name in
+          ignore (EcLoader.getkind ext : EcLoader.kind)
+        with EcLoader.BadExtension ext ->
+          Format.eprintf "do not know what to do with %s@." ext;
+          exit 1
+        end;
+
+
         let gcstats  = cmpopts.cmpo_gcstats in
         let terminal =
           lazy (EcTerminal.from_channel ~name ~gcstats (open_in name))
         in
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false)
+
     end
   in
 
@@ -242,6 +260,48 @@ let main () =
        match relocdir with
        | None     -> EcCommands.addidir Filename.current_dir_name
        | Some pwd -> EcCommands.addidir pwd);
+
+  (* Check if the .eco is up-to-date and exit if so *)
+  oiter
+    (fun input -> if EcCommands.check_eco input then exit 0)
+    input;
+
+  let finalize_input input scope =
+    match input with
+    | Some input ->
+        let nameo = EcEco.get_eco_filename input in
+        let kind  =
+          try  EcLoader.getkind (Filename.extension input)
+          with EcLoader.BadExtension _ -> assert false in
+
+        assert (nameo <> input);
+
+        let eco = EcEco.{
+            eco_root    = EcEco.{
+              eco_digest  = Digest.file input;
+              eco_kind    = kind;
+            };
+            eco_depends = EcMaps.Mstr.of_list (
+              List.map
+                (fun (x : EcScope.required_info) ->
+                   let ecr = EcEco.{
+                     eco_digest = x.rqd_digest;
+                     eco_kind   = x.rqd_kind;
+                   } in (x.rqd_name, ecr))
+                (EcScope.Theory.required scope));
+        } in
+
+        let out = open_out nameo in
+
+        EcUtils.try_finally
+          (fun () ->
+             Format.fprintf
+               (Format.formatter_of_out_channel out) "%a@."
+               EcEco.pp eco)
+          (fun () -> close_out out)
+
+    | None -> ()
+  in
 
   let tstats : EcLocation.t -> float option -> unit =
     match options.o_command with
@@ -344,7 +404,11 @@ let main () =
               EcCommands.undo i
         end;
         EcTerminal.finish `ST_Ok terminal;
-        if !terminate then (EcTerminal.finalize terminal; exit 0);
+        if !terminate then begin
+            EcTerminal.finalize terminal;
+            finalize_input input (EcCommands.current ());
+            exit 0
+          end;
       with
       | EcCommands.Restart ->
           first := `Restart
