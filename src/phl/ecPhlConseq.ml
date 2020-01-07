@@ -26,6 +26,9 @@ module TTC = EcProofTyping
 let conseq_cond pre post spre spost =
   f_imp pre spre, f_imp spost post
 
+let c_conseq_cond pre post cost spre spost scost =
+  f_imp pre spre, f_imp spost post, f_eint_le scost cost
+
 let bd_goal_r fcmp fbd cmp bd =
   match fcmp, cmp with
   | FHle, (FHle | FHeq) -> Some (f_real_le bd fbd)

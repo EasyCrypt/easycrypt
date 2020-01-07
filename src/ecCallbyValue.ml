@@ -183,7 +183,9 @@ and norm_lambda (st : state) (f : form) =
 
   | Fquant  _ | Fif     _ | Fmatch    _ | Flet _ | Fint _ | Flocal _
   | Fglob   _ | Fpvar   _ | Fop       _
-  | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _
+  | FsHoareF _ | FsHoareS _
+  | FcHoareF _ | FcHoareS _
+  | FbdHoareF _ | FbdHoareS _
   | FequivF _ | FequivS _ | FeagerF   _ | Fpr _
 
     -> f
@@ -462,23 +464,41 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
       | _ -> f_proj (norm_lambda st f1) i f.f_ty in
     app_red st f1 args
 
-  | FhoareF hf ->
+  | FsHoareF hf ->
     assert (is_Aempty args);
     assert (not (Subst.has_mem s mhr));
-    assert (not (Subst.has_mem s mhr));
-    let hf_pr = norm st s hf.hf_pr in
-    let hf_po = norm st s hf.hf_po in
-    let hf_f  = norm_xfun st s hf.hf_f in
-    f_hoareF_r { hf_pr; hf_f; hf_po }
+    let shf_pr = norm st s hf.shf_pr in
+    let shf_po = norm st s hf.shf_po in
+    let shf_f  = norm_xfun st s hf.shf_f in
+    f_hoareF_r { shf_pr; shf_f; shf_po }
 
-  | FhoareS hs ->
+  | FsHoareS hs ->
     assert (is_Aempty args);
-    assert (not (Subst.has_mem s (fst hs.hs_m)));
-    let hs_pr = norm st s hs.hs_pr in
-    let hs_po = norm st s hs.hs_po in
-    let hs_s  = norm_stmt s hs.hs_s in
-    let hs_m  = norm_me s hs.hs_m in
-    f_hoareS_r { hs_pr; hs_po; hs_s; hs_m }
+    assert (not (Subst.has_mem s (fst hs.shs_m)));
+    let shs_pr = norm st s hs.shs_pr in
+    let shs_po = norm st s hs.shs_po in
+    let shs_s  = norm_stmt s hs.shs_s in
+    let shs_m  = norm_me s hs.shs_m in
+    f_hoareS_r { shs_pr; shs_po; shs_s; shs_m }
+
+  | FcHoareF chf ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s mhr));
+    let chf_pr = norm st s chf.chf_pr in
+    let chf_po = norm st s chf.chf_po in
+    let chf_f  = norm_xfun st s chf.chf_f in
+    let chf_c  = norm st s chf.chf_c in
+    f_cHoareF_r { chf_pr; chf_f; chf_po; chf_c; }
+
+  | FcHoareS chs ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s (fst chs.chs_m)));
+    let chs_pr = norm st s chs.chs_pr in
+    let chs_po = norm st s chs.chs_po in
+    let chs_s  = norm_stmt s chs.chs_s in
+    let chs_m  = norm_me s chs.chs_m in
+    let chs_c  = norm st s chs.chs_c in
+    f_cHoareS_r { chs_pr; chs_po; chs_s; chs_m; chs_c; }
 
   | FbdHoareF hf ->
     assert (is_Aempty args);

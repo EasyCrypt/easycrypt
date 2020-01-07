@@ -1660,20 +1660,20 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         pp_proji ppe pp_form_r (fst outer) fmt (e1,i)
     end
 
-  | FhoareF hf ->
+  | FsHoareF hf ->
       let ppe =
-        PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.hf_f) in
+        PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.shf_f) in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
-        (pp_funname ppe) hf.hf_f
-        (pp_form ppe) hf.hf_pr
-        (pp_form ppe) hf.hf_po
+        (pp_funname ppe) hf.shf_f
+        (pp_form ppe) hf.shf_pr
+        (pp_form ppe) hf.shf_po
 
-  | FhoareS hs ->
-      let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
+  | FsHoareS hs ->
+      let ppe = PPEnv.push_mem ppe ~active:true hs.shs_m in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
-        (pp_stmt_for_form ppe) hs.hs_s
-        (pp_form ppe) hs.hs_pr
-        (pp_form ppe) hs.hs_po
+        (pp_stmt_for_form ppe) hs.shs_s
+        (pp_form ppe) hs.shs_pr
+        (pp_form ppe) hs.shs_po
 
   | FequivF eqv ->
       let ppe =
@@ -1707,6 +1707,23 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
         (pp_form ppe) eg.eg_pr
         (pp_form ppe) eg.eg_po
+
+  | FcHoareF chf ->
+      let ppe =
+        PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, chf.chf_f) in
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time <= %a"
+        (pp_funname ppe) chf.chf_f
+        (pp_form ppe) chf.chf_pr
+        (pp_form ppe) chf.chf_po
+        (pp_form ppe) chf.chf_c
+
+  | FcHoareS chs ->
+      let ppe = PPEnv.push_mem ppe ~active:true chs.chs_m in
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time <= %a"
+        (pp_stmt_for_form ppe) chs.chs_s
+        (pp_form ppe) chs.chs_pr
+        (pp_form ppe) chs.chs_po
+        (pp_form ppe) chs.chs_c
 
   | FbdHoareF hf ->
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.bhf_f) in
@@ -2356,25 +2373,50 @@ let pp_post (ppe : PPEnv.t) ?prpo fmt post =
 
 (* -------------------------------------------------------------------- *)
 let pp_hoareF (ppe : PPEnv.t) ?prpo fmt hf =
-  let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.hf_f) in
+  let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.shf_f) in
 
-  Format.fprintf fmt "%a@\n%!" (pp_pre ppe ?prpo) hf.hf_pr;
-  Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.hf_f;
-  Format.fprintf fmt "@\n%a%!" (pp_post ppe ?prpo) hf.hf_po
+  Format.fprintf fmt "%a@\n%!" (pp_pre ppe ?prpo) hf.shf_pr;
+  Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) hf.shf_f;
+  Format.fprintf fmt "@\n%a%!" (pp_post ppe ?prpo) hf.shf_po
 
 (* -------------------------------------------------------------------- *)
 let pp_hoareS (ppe : PPEnv.t) ?prpo fmt hs =
-  let ppe = PPEnv.push_mem ppe ~active:true hs.hs_m in
-  let ppnode = collect2_s hs.hs_s.s_node [] in
+  let ppe = PPEnv.push_mem ppe ~active:true hs.shs_m in
+  let ppnode = collect2_s hs.shs_s.s_node [] in
   let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppe ppnode
   in
-    Format.fprintf fmt "Context : %a@\n%!" (pp_funname ppe) (EcMemory.xpath hs.hs_m);
+    Format.fprintf fmt "Context : %a@\n%!" (pp_funname ppe) (EcMemory.xpath hs.shs_m);
     Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_pre ppe ?prpo) hs.hs_pr;
+    Format.fprintf fmt "%a%!" (pp_pre ppe ?prpo) hs.shs_pr;
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a" (pp_node `Left) ppnode;
     Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_post ppe ?prpo) hs.hs_po
+    Format.fprintf fmt "%a%!" (pp_post ppe ?prpo) hs.shs_po
+
+(* -------------------------------------------------------------------- *)
+let pp_choareF (ppe : PPEnv.t) ?prpo fmt chf =
+  let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, chf.chf_f) in
+
+  Format.fprintf fmt "%a@\n%!" (pp_pre ppe ?prpo) chf.chf_pr;
+  Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) chf.chf_f;
+  Format.fprintf fmt "    time <= @[<hov 2>%a@]@\n%!" (pp_form ppe) chf.chf_c;
+  Format.fprintf fmt "@\n%a%!" (pp_post ppe ?prpo) chf.chf_po
+
+(* -------------------------------------------------------------------- *)
+let pp_choareS (ppe : PPEnv.t) ?prpo fmt chs =
+  let ppe = PPEnv.push_mem ppe ~active:true chs.chs_m in
+  let ppnode = collect2_s chs.chs_s.s_node [] in
+  let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppe ppnode in
+
+
+  Format.fprintf fmt "Context : %a@\n%!" (pp_funname ppe) (EcMemory.xpath chs.chs_m);
+  Format.fprintf fmt "Time <= : @[<hov 2>%a@]@\n%!" (pp_form ppe) chs.chs_c;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_pre ppe ?prpo) chs.chs_pr;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a" (pp_node `Left) ppnode;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_post ppe ?prpo) chs.chs_po
 
 (* -------------------------------------------------------------------- *)
 let string_of_hrcmp = function
@@ -2586,8 +2628,10 @@ module PPGoal = struct
     match concl.f_node with
     | FbdHoareF hf -> pp_bdhoareF ppe fmt hf
     | FbdHoareS hs -> pp_bdhoareS ?prpo ppe fmt hs
-    | FhoareF hf   -> pp_hoareF   ppe fmt hf
-    | FhoareS hs   -> pp_hoareS   ?prpo ppe fmt hs
+    | FcHoareF hf  -> pp_choareF   ppe fmt hf
+    | FcHoareS hs  -> pp_choareS  ?prpo ppe fmt hs
+    | FsHoareF hf  -> pp_hoareF   ppe fmt hf
+    | FsHoareS hs  -> pp_hoareS   ?prpo ppe fmt hs
     | FequivF ef   -> pp_equivF   ppe fmt ef
     | FequivS es   -> pp_equivS   ?prpo ppe fmt es
     | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl

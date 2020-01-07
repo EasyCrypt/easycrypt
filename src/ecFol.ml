@@ -74,6 +74,7 @@ let destr_rint f =
 
   | _ -> destr_error "destr_rint"
 
+
 (* -------------------------------------------------------------------- *)
 let fop_int_le     = f_op CI.CI_Int .p_int_le    [] (toarrow [tint ; tint ] tbool)
 let fop_int_lt     = f_op CI.CI_Int .p_int_lt    [] (toarrow [tint ; tint ] tbool)
@@ -87,6 +88,21 @@ let fop_real_abs   = f_op CI.CI_Real.p_real_abs  [] (toarrow [treal]        trea
 
 let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
 let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
+
+(* -------------------------------------------------------------------- *)
+(* TODO: (Adrien) add integer with infinity *)
+exception TODO
+
+let f_eint_is_int f = raise TODO
+let f_eint_of_int f = raise TODO
+let f_int_of_eint f = raise TODO
+
+let f_eint_le f1 f2 = raise TODO
+let f_eint_lt f1 f2 = raise TODO
+
+let f_eint_infty = raise TODO
+let f_eint_0 = raise TODO
+let f_eint_r1 = raise TODO
 
 (* -------------------------------------------------------------------- *)
 let f_real_le  f1 f2 = f_app fop_real_le  [f1; f2] tbool
@@ -312,6 +328,18 @@ let f_int_edivz_simpl f1 f2 =
       else if f_equal f2 f_i1 then f_tuple [f1; f_i0]
       else if f_equal f2 f_im1 then f_tuple [f_int_opp_simpl f1; f_i0]
       else f_int_edivz f1 f2
+
+(* -------------------------------------------------------------------- *)
+(* TODO: (Adrien) add integer with infinity *)
+let f_eint_opp_simpl f = raise TODO
+
+let f_eint_add_simpl f1 f2 = raise TODO
+
+let f_eint_sub_simpl f1 f2 = raise TODO
+
+let f_eint_mul_simpl f1 f2 = raise TODO
+
+let f_eint_edivz_simpl f1 f2 = raise TODO
 
 (* -------------------------------------------------------------------- *)
 let destr_rdivint =
@@ -791,8 +819,10 @@ type sform =
   | SFeq    of form * form
   | SFop    of (EcPath.path * ty list) * (form list)
 
-  | SFhoareF   of hoareF
-  | SFhoareS   of hoareS
+  | SFsHoareF  of sHoareF
+  | SFsHoareS  of sHoareS
+  | SFcHoareF  of cHoareF
+  | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
@@ -831,8 +861,10 @@ let rec sform_of_form fp =
   | Fquant (q, [b]  , f) -> SFquant (q, b, lazy f)
   | Fquant (q, b::bs, f) -> SFquant (q, b, lazy (f_quant q bs f))
 
-  | FhoareF   hf -> SFhoareF   hf
-  | FhoareS   hs -> SFhoareS   hs
+  | FsHoareF  hf -> SFsHoareF  hf
+  | FsHoareS  hs -> SFsHoareS  hs
+  | FcHoareF  hf -> SFcHoareF  hf
+  | FcHoareS  hs -> SFcHoareS  hs
   | FbdHoareF hf -> SFbdHoareF hf
   | FbdHoareS hs -> SFbdHoareS hs
   | FequivF   ef -> SFequivF   ef
@@ -893,6 +925,11 @@ let f_int_lt_simpl f1 f2 =
   match opair int_of_form f1 f2 with
   | Some (x1, x2) -> f_bool (BI.compare x1 x2 < 0)
   | None -> f_int_lt f1 f2
+
+(* TODO: (Adrien) add integer with infinity *)
+let f_eint_le_simpl f1 f2 = raise TODO
+
+let f_eint_lt_simpl f1 f2 = raise TODO
 
 let f_real_le_simpl f1 f2 =
   if f_equal f1 f2 then f_true else

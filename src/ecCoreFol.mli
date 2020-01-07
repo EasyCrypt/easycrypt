@@ -63,8 +63,11 @@ and f_node =
   | Ftuple  of form list
   | Fproj   of form * int
 
-  | FhoareF of hoareF (* $hr / $hr *)
-  | FhoareS of hoareS (* $hr  / $hr   *)
+  | FsHoareF of sHoareF (* $hr / $hr *)
+  | FsHoareS of sHoareS
+
+  | FcHoareF of cHoareF (* $hr / $hr *)
+  | FcHoareS of cHoareS
 
   | FbdHoareF of bdHoareF (* $hr / $hr *)
   | FbdHoareS of bdHoareS (* $hr  / $hr   *)
@@ -101,18 +104,31 @@ and equivS = {
   es_po : form;
 }
 
-and hoareF = {
-  hf_pr  : form;
-  hf_f   : xpath;
-  hf_po  : form;
+and sHoareF = {
+  shf_pr : form;
+  shf_f  : EcPath.xpath;
+  shf_po : form;
 }
 
-and hoareS = {
-  hs_m   : EcMemory.memenv;
-  hs_pr  : form;
-  hs_s   : stmt;
-  hs_po  : form;
+and sHoareS = {
+  shs_m  : EcMemory.memenv;
+  shs_pr : form;
+  shs_s  : stmt;
+  shs_po : form; }
+
+and cHoareF = {
+  chf_pr : form;
+  chf_f  : EcPath.xpath;
+  chf_po : form;
+  chf_c  : form;
 }
+
+and cHoareS = {
+  chs_m  : EcMemory.memenv;
+  chs_pr : form;
+  chs_s  : stmt;
+  chs_po : form;
+  chs_c  : form; }
 
 and bdHoareF = {
   bhf_pr  : form;
@@ -190,11 +206,18 @@ val f_lambda : bindings -> form -> form
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
 (* soft-constructors - hoare *)
-val f_hoareF_r : hoareF -> form
-val f_hoareS_r : hoareS -> form
+val f_hoareF_r : sHoareF -> form
+val f_hoareS_r : sHoareS -> form
 
 val f_hoareF : form -> xpath -> form -> form
 val f_hoareS : memenv -> form -> EcModules.stmt -> form -> form
+
+(* soft-constructors - cost hoare *)
+val f_cHoareF_r : cHoareF -> form
+val f_cHoareS_r : cHoareS -> form
+
+val f_cHoareF : form -> xpath -> form -> form -> form
+val f_cHoareS : memenv -> form -> EcModules.stmt -> form -> form -> form
 
 (* soft-constructors - bd hoare *)
 val hoarecmp_opp : hoarecmp -> hoarecmp
@@ -297,8 +320,10 @@ module FSmart : sig
   val f_app      : (form * a_app    ) -> a_app     -> form
   val f_proj     : (form * a_proj   ) -> a_proj    -> int -> form
   val f_glob     : (form * a_glob   ) -> a_glob    -> form
-  val f_hoareF   : (form * hoareF   ) -> hoareF    -> form
-  val f_hoareS   : (form * hoareS   ) -> hoareS    -> form
+  val f_hoareF   : (form * sHoareF  ) -> sHoareF    -> form
+  val f_hoareS   : (form * sHoareS  ) -> sHoareS    -> form
+  val f_cHoareF  : (form * cHoareF  ) -> cHoareF    -> form
+  val f_cHoareS  : (form * cHoareS  ) -> cHoareS    -> form
   val f_bdHoareF : (form * bdHoareF ) -> bdHoareF  -> form
   val f_bdHoareS : (form * bdHoareS ) -> bdHoareS  -> form
   val f_equivF   : (form * equivF   ) -> equivF    -> form
@@ -350,8 +375,10 @@ val destr_exists    : form -> bindings * form
 val destr_equivF    : form -> equivF
 val destr_equivS    : form -> equivS
 val destr_eagerF    : form -> eagerF
-val destr_hoareF    : form -> hoareF
-val destr_hoareS    : form -> hoareS
+val destr_hoareF    : form -> sHoareF
+val destr_hoareS    : form -> sHoareS
+val destr_cHoareF   : form -> cHoareF
+val destr_cHoareS   : form -> cHoareS
 val destr_bdHoareF  : form -> bdHoareF
 val destr_bdHoareS  : form -> bdHoareS
 val destr_pr        : form -> pr
@@ -383,6 +410,8 @@ val is_equivS    : form -> bool
 val is_eagerF    : form -> bool
 val is_hoareF    : form -> bool
 val is_hoareS    : form -> bool
+val is_cHoareF   : form -> bool
+val is_cHoareS   : form -> bool
 val is_bdHoareF  : form -> bool
 val is_bdHoareS  : form -> bool
 val is_pr        : form -> bool

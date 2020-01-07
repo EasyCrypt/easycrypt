@@ -27,6 +27,7 @@ type hlform = [`Any | `Pred | `Stmt]
 
 type hlkind = [
   | `Hoare  of hlform
+  | `CHoare of hlform
   | `PHoare of hlform
   | `Equiv  of hlform
   | `Eager
@@ -51,6 +52,7 @@ let tc_error_noXhl ?(kinds : hlkinds option) pf =
     let kind, fm =
       match kind with
       | `Hoare  fm -> ("hoare" , fm)
+      | `CHoare fm -> ("choare", fm)
       | `PHoare fm -> ("phoare", fm)
       | `Equiv  fm -> ("equiv" , fm)
       | `Eager     -> ("eager" , `Any)
@@ -150,6 +152,8 @@ let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s
 (* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe
 let pf_as_hoareS   pe c = as_phl (`Hoare  `Stmt) (fun () -> destr_hoareS   c) pe
+let pf_as_choareF  pe c = as_phl (`Hoare  `Pred) (fun () -> destr_cHoareF  c) pe
+let pf_as_choareS  pe c = as_phl (`Hoare  `Stmt) (fun () -> destr_cHoareS  c) pe
 let pf_as_bdhoareF pe c = as_phl (`PHoare `Pred) (fun () -> destr_bdHoareF c) pe
 let pf_as_bdhoareS pe c = as_phl (`PHoare `Stmt) (fun () -> destr_bdHoareS c) pe
 let pf_as_equivF   pe c = as_phl (`Equiv  `Pred) (fun () -> destr_equivF   c) pe
@@ -159,6 +163,8 @@ let pf_as_eagerF   pe c = as_phl `Eager          (fun () -> destr_eagerF   c) pe
 (* -------------------------------------------------------------------- *)
 let tc1_as_hoareF   tc = pf_as_hoareF   !!tc (FApi.tc1_goal tc)
 let tc1_as_hoareS   tc = pf_as_hoareS   !!tc (FApi.tc1_goal tc)
+let tc1_as_choareF  tc = pf_as_choareF  !!tc (FApi.tc1_goal tc)
+let tc1_as_choareS  tc = pf_as_choareS  !!tc (FApi.tc1_goal tc)
 let tc1_as_bdhoareF tc = pf_as_bdhoareF !!tc (FApi.tc1_goal tc)
 let tc1_as_bdhoareS tc = pf_as_bdhoareS !!tc (FApi.tc1_goal tc)
 let tc1_as_equivF   tc = pf_as_equivF   !!tc (FApi.tc1_goal tc)
@@ -169,9 +175,10 @@ let tc1_as_eagerF   tc = pf_as_eagerF   !!tc (FApi.tc1_goal tc)
 let tc1_get_stmt side tc =
   let concl = FApi.tc1_goal tc in
   match side, concl.f_node with
-  | None, FhoareS hs -> hs.hs_s
+  | None, FsHoareS hs -> hs.shs_s
+  | None, FcHoareS hs -> hs.chs_s
   | None, FbdHoareS hs -> hs.bhs_s
-  | Some _ , (FhoareS _ | FbdHoareS _) ->
+  | Some _ , (FsHoareS _ | FcHoareS _ | FbdHoareS _) ->
       tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
   | Some `Left, FequivS es   -> es.es_sl
   | Some `Right, FequivS es  -> es.es_sr
@@ -183,8 +190,10 @@ let tc1_get_stmt side tc =
 (* -------------------------------------------------------------------- *)
 let get_pre f =
   match f.f_node with
-  | FhoareF hf   -> Some (hf.hf_pr )
-  | FhoareS hs   -> Some (hs.hs_pr )
+  | FsHoareF hf  -> Some (hf.shf_pr)
+  | FsHoareS hs  -> Some (hs.shs_pr)
+  | FcHoareF hf  -> Some (hf.chf_pr)
+  | FcHoareS hs  -> Some (hs.chs_pr)
   | FbdHoareF hf -> Some (hf.bhf_pr)
   | FbdHoareS hs -> Some (hs.bhs_pr)
   | FequivF ef   -> Some (ef.ef_pr )
@@ -199,8 +208,10 @@ let tc1_get_pre tc =
 (* -------------------------------------------------------------------- *)
 let get_post f =
   match f.f_node with
-  | FhoareF hf   -> Some (hf.hf_po )
-  | FhoareS hs   -> Some (hs.hs_po )
+  | FsHoareF hf  -> Some (hf.shf_po )
+  | FsHoareS hs  -> Some (hs.shs_po )
+  | FcHoareF hf  -> Some (hf.chf_po )
+  | FcHoareS hs  -> Some (hs.chs_po )
   | FbdHoareF hf -> Some (hf.bhf_po)
   | FbdHoareS hs -> Some (hs.bhs_po)
   | FequivF ef   -> Some (ef.ef_po )
@@ -215,8 +226,10 @@ let tc1_get_post tc =
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
   match f.f_node with
- | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
- | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre }
+ | FsHoareF hf  -> f_hoareF pre hf.shf_f hf.shf_po
+ | FsHoareS hs  -> f_hoareS_r { hs with shs_pr = pre }
+ | FcHoareF hf  -> f_cHoareF pre hf.chf_f hf.chf_po hf.chf_c
+ | FcHoareS hs  -> f_cHoareS_r { hs with chs_pr = pre }
  | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
  | FbdHoareS hs -> f_bdHoareS_r { hs with bhs_pr = pre }
  | FequivF ef   -> f_equivF pre ef.ef_fl ef.ef_fr ef.ef_po
@@ -242,23 +255,26 @@ let o_split ?rev i s =
   with Zpr.InvalidCPos -> raise (InvalidSplit (oget i))
 
 (* -------------------------------------------------------------------- *)
-let t_hS_or_bhS_or_eS ?th ?tbh ?te tc =
+let t_hS_or_chS_or_bhS_or_eS ?th ?tch ?tbh ?te tc =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareS   _ when EcUtils.is_some th  -> (oget th ) tc
+  | FsHoareS  _ when EcUtils.is_some th  -> (oget th ) tc
+  | FcHoareS  _ when EcUtils.is_some tch -> (oget tch) tc
   | FbdHoareS _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivS   _ when EcUtils.is_some te  -> (oget te ) tc
 
   | _ ->
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
+         if EcUtils.is_some tch then [`CHoare `Stmt] else [];
          if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
          if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
 
     in tc_error_noXhl ~kinds !!tc
 
-let t_hF_or_bhF_or_eF ?th ?tbh ?te ?teg tc =
+let t_hF_or_chF_or_bhF_or_eF ?th ?tch ?tbh ?te ?teg tc =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareF   _ when EcUtils.is_some th  -> (oget th ) tc
+  | FsHoareF  _ when EcUtils.is_some th  -> (oget th ) tc
+  | FcHoareF  _ when EcUtils.is_some tch -> (oget tch) tc
   | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
   | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
@@ -266,6 +282,7 @@ let t_hF_or_bhF_or_eF ?th ?tbh ?te ?teg tc =
   | _ ->
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Pred] else [];
+         if EcUtils.is_some tch then [`CHoare `Pred] else [];
          if EcUtils.is_some tbh then [`PHoare `Pred] else [];
          if EcUtils.is_some te  then [`Equiv  `Pred] else [];
          if EcUtils.is_some teg then [`Eager       ] else []]
@@ -552,7 +569,8 @@ let t_zip f (cenv : code_txenv) (cpos : codepos) (prpo : form * form) (state, s)
       ((me, Zpr.zip zpr, gs) : memenv * _ * form list)
   with Zpr.InvalidCPos -> tc_error (fst cenv) "invalid code position"
 
-let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
+let t_code_transform
+    (side : oside) ?(bdhoare = false) ?(choare = false) cpos tr tx tc =
   let pf = FApi.tc1_penv tc in
 
   match side with
@@ -560,22 +578,34 @@ let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
       let (hyps, concl) = FApi.tc1_flat tc in
 
       match concl.f_node with
-      | FhoareS hoare ->
-          let pr, po = hoare.hs_pr, hoare.hs_po in
-          let (me, stmt, cs) = tx (pf, hyps) cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
-          let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+      | FsHoareS hoare ->
+          let pr, po = hoare.shs_pr, hoare.shs_po in
+          let (me, stmt, cs) =
+            tx (pf, hyps) cpos (pr, po) (hoare.shs_m, hoare.shs_s) in
+          let concl = f_hoareS_r { hoare with shs_m = me; shs_s = stmt; } in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
+
+      | FcHoareS chs when choare ->
+        let pr, po = chs.chs_pr, chs.chs_po in
+        let (me, stmt, cs) =
+          tx (pf, hyps) cpos (pr, po) (chs.chs_m, chs.chs_s) in
+        let concl = f_cHoareS_r { chs with chs_m = me; chs_s = stmt; } in
+        FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | FbdHoareS bhs when bdhoare ->
           let pr, po = bhs.bhs_pr, bhs.bhs_po in
-          let (me, stmt, cs) = tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
+          let (me, stmt, cs) =
+            tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
           let concl = f_bdHoareS_r { bhs with bhs_m = me; bhs_s = stmt; } in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | _ ->
-        match bdhoare with
-        | true  -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] pf
-        | false -> tc_error_noXhl ~kinds:[`Hoare `Stmt] pf
+        let kinds =
+            (if bdhoare then [`PHoare `Stmt] else [])
+          @ (if choare  then [`CHoare `Stmt] else [])
+          @ [`Hoare `Stmt] in
+
+        tc_error_noXhl ~kinds:kinds pf
   end
 
   | Some side ->

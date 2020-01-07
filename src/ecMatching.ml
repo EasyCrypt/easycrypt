@@ -823,8 +823,16 @@ module FPosition = struct
               let subctxt = Sid.add pr.pr_mem ctxt in
               doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event)])
 
-          | FhoareF hs ->
-              doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
+          | FsHoareF hs ->
+              doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.shf_pr; hs.shf_po]))
+
+          (* TODO: (Adrien)
+             not clear if [EcFol.mhr] should be in the contex for [chs.chf_c]. *)
+          | FcHoareF chs ->
+            let subctxt = Sid.add EcFol.mhr ctxt in
+            doit pos (`WithSubCtxt ([(subctxt, chs.chf_pr);
+                                     (subctxt, chs.chf_po);
+                                     (   ctxt, chs.chf_c)]))
 
           | FbdHoareF hs ->
               let subctxt = Sid.add EcFol.mhr ctxt in
@@ -948,9 +956,14 @@ module FPosition = struct
               let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in
               f_pr pr.pr_mem pr.pr_fun args' event'
 
-          | FhoareF hf ->
-              let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
-              f_hoareF_r { hf with hf_pr; hf_po; }
+          | FsHoareF hf ->
+              let (shf_pr, shf_po) = as_seq2 (doit p [hf.shf_pr; hf.shf_po]) in
+              f_hoareF_r { hf with shf_pr; shf_po; }
+
+          | FcHoareF chf ->
+            let sub = doit p [chf.chf_pr; chf.chf_po; chf.chf_c] in
+            let (chf_pr, chf_po, chf_c) = as_seq3 sub in
+            f_cHoareF_r { chf with chf_pr; chf_po; chf_c }
 
           | FbdHoareF hf ->
               let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
@@ -961,7 +974,8 @@ module FPosition = struct
               let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
               f_equivF_r { ef with ef_pr; ef_po; }
 
-          | FhoareS   _ -> raise InvalidPosition
+          | FsHoareS  _ -> raise InvalidPosition
+          | FcHoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
           | FeagerF   _ -> raise InvalidPosition

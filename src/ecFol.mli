@@ -38,6 +38,18 @@ val f_eqglob:
 val f_int_le  : form -> form -> form
 val f_int_lt  : form -> form -> form
 
+(* soft-constructors - extended ints *)
+val f_eint_is_int : form -> form
+val f_eint_of_int : form -> form
+val f_int_of_eint : form -> form
+
+val f_eint_le  : form -> form -> form
+val f_eint_lt  : form -> form -> form
+
+val f_eint_infty : form
+val f_eint_0 : form
+val f_eint_r1 : form
+
 (* soft-constructors - reals *)
 val f_rint : zint -> form
 val f_real_of_int : form -> form
@@ -112,6 +124,10 @@ val f_eq_simpl    : form -> form -> form
 
 val f_int_le_simpl  : form -> form -> form
 val f_int_lt_simpl  : form -> form -> form
+
+val f_eint_le_simpl  : form -> form -> form
+val f_eint_lt_simpl  : form -> form -> form
+
 val f_real_le_simpl : form -> form -> form
 val f_real_lt_simpl : form -> form -> form
 
@@ -120,6 +136,12 @@ val f_int_opp_simpl   : form -> form
 val f_int_sub_simpl   : form -> form -> form
 val f_int_mul_simpl   : form -> form -> form
 val f_int_edivz_simpl : form -> form -> form
+
+val f_eint_add_simpl   : form -> form -> form
+val f_eint_opp_simpl   : form -> form
+val f_eint_sub_simpl   : form -> form -> form
+val f_eint_mul_simpl   : form -> form -> form
+val f_eint_edivz_simpl : form -> form -> form
 
 val f_real_add_simpl : form -> form -> form
 val f_real_opp_simpl : form -> form
@@ -194,8 +216,10 @@ type sform =
   | SFeq    of form * form
   | SFop    of (path * ty list) * (form list)
 
-  | SFhoareF   of hoareF
-  | SFhoareS   of hoareS
+  | SFsHoareF  of sHoareF
+  | SFsHoareS  of sHoareS
+  | SFcHoareF  of cHoareF
+  | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF

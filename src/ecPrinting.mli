@@ -78,7 +78,8 @@ val pp_modsig      : PPEnv.t -> (path * module_sig            ) pp
 val pp_modsig_smpl : PPEnv.t -> (path * module_smpl_sig       ) pp
 
 (* -------------------------------------------------------------------- *)
-val pp_hoareS   : PPEnv.t -> ?prpo:prpo_display -> hoareS  pp
+val pp_hoareS   : PPEnv.t -> ?prpo:prpo_display -> sHoareS  pp
+val pp_choareS  : PPEnv.t -> ?prpo:prpo_display -> cHoareS  pp
 val pp_bdhoareS : PPEnv.t -> ?prpo:prpo_display -> bdHoareS pp
 val pp_equivS   : PPEnv.t -> ?prpo:prpo_display -> equivS  pp
 
