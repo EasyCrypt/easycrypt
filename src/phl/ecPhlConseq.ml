@@ -26,8 +26,7 @@ module TTC = EcProofTyping
 let conseq_cond pre post spre spost =
   f_imp pre spre, f_imp spost post
 
-let c_conseq_cond pre post cost spre spost scost =
-  f_imp pre spre, f_imp spost post, f_eint_le scost cost
+let conseq_cost cost scost = f_eint_le scost cost
 
 let bd_goal_r fcmp fbd cmp bd =
   match fcmp, cmp with
@@ -52,21 +51,59 @@ let bd_goal tc fcmp fbd cmp bd =
 let t_hoareF_conseq pre post tc =
   let env = FApi.tc1_env tc in
   let hf  = tc1_as_hoareF tc in
-  let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
-  let cond1, cond2 = conseq_cond hf.hf_pr hf.hf_po pre post in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv hf.shf_f env in
+  let cond1, cond2 = conseq_cond hf.shf_pr hf.shf_po pre post in
   let concl1 = f_forall_mems [mpr] cond1 in
   let concl2 = f_forall_mems [mpo] cond2 in
-  let concl3 = f_hoareF pre hf.hf_f post in
+  let concl3 = f_hoareF pre hf.shf_f post in
   FApi.xmutate1 tc `Conseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
 let t_hoareS_conseq pre post tc =
   let hs = tc1_as_hoareS tc in
-  let cond1, cond2 = conseq_cond hs.hs_pr hs.hs_po pre post in
-  let concl1 = f_forall_mems [hs.hs_m] cond1 in
-  let concl2 = f_forall_mems [hs.hs_m] cond2 in
-  let concl3 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
+  let cond1, cond2 = conseq_cond hs.shs_pr hs.shs_po pre post in
+  let concl1 = f_forall_mems [hs.shs_m] cond1 in
+  let concl2 = f_forall_mems [hs.shs_m] cond2 in
+  let concl3 = f_hoareS_r { hs with shs_pr = pre; shs_po = post } in
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
+
+(* -------------------------------------------------------------------- *)
+let t_cHoareF_conseq pre post tc =
+  let env = FApi.tc1_env tc in
+  let chf  = tc1_as_choareF tc in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv chf.chf_f env in
+  let cond1, cond2 = conseq_cond chf.chf_pr chf.chf_po pre post in
+  let concl1 = f_forall_mems [mpr] cond1 in
+  let concl2 = f_forall_mems [mpo] cond2 in
+  let concl3 = f_cHoareF pre chf.chf_f post chf.chf_c in
+  FApi.xmutate1 tc `Conseq [concl1; concl2; concl3]
+
+(* -------------------------------------------------------------------- *)
+let t_cHoareS_conseq pre post tc =
+  let chs = tc1_as_choareS tc in
+  let cond1, cond2 = conseq_cond chs.chs_pr chs.chs_po pre post in
+  let concl1 = f_forall_mems [chs.chs_m] cond1 in
+  let concl2 = f_forall_mems [chs.chs_m] cond2 in
+  let concl3 = f_cHoareS_r { chs with chs_pr = pre; chs_po = post; } in
+  FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
+
+(* -------------------------------------------------------------------- *)
+let t_cHoareF_conseq_c cost tc =
+  let env = FApi.tc1_env tc in
+  let chf  = tc1_as_choareF tc in
+  let mpr,_ = EcEnv.Fun.hoareF_memenv chf.chf_f env in
+  let cond = conseq_cost chf.chf_c cost in
+  let concl1 = f_forall_mems [mpr] cond in
+  let concl2 = f_cHoareF chf.chf_pr chf.chf_f chf.chf_po cost in
+  FApi.xmutate1 tc `Conseq [concl1; concl2]
+
+(* -------------------------------------------------------------------- *)
+let t_cHoareS_conseq_c cost tc =
+  let chs = tc1_as_choareS tc in
+  let cond = conseq_cost chs.chs_c cost in
+  let concl1 = f_forall_mems [chs.chs_m] cond in
+  let concl2 = f_cHoareS_r { chs with chs_c = cost } in
+  FApi.xmutate1 tc `HlConseq [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
 let bdHoare_conseq_conds cmp pr po new_pr new_po =
@@ -153,8 +190,10 @@ let t_equivS_conseq pre post tc =
 (* -------------------------------------------------------------------- *)
 let t_conseq pre post tc =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareF _   -> t_hoareF_conseq pre post tc
-  | FhoareS _   -> t_hoareS_conseq pre post tc
+  | FsHoareF _  -> t_hoareF_conseq pre post tc
+  | FsHoareS _  -> t_hoareS_conseq pre post tc
+  | FcHoareF _  -> t_cHoareF_conseq pre post tc
+  | FcHoareS _  -> t_cHoareS_conseq pre post tc
   | FbdHoareF _ -> t_bdHoareF_conseq pre post tc
   | FbdHoareS _ -> t_bdHoareS_conseq pre post tc
   | FequivF _   -> t_equivF_conseq pre post tc
@@ -370,14 +409,26 @@ let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
 (* -------------------------------------------------------------------- *)
 let t_hoareS_conseq_bdhoare tc =
   let hs = tc1_as_hoareS tc in
-  let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s hs.hs_po FHeq f_r1 in
+  let concl1 = f_bdHoareS hs.shs_m hs.shs_pr hs.shs_s hs.shs_po FHeq f_r1 in
   FApi.xmutate1 tc `HlConseqBd [concl1]
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_conseq_bdhoare tc =
   let hf = tc1_as_hoareF tc in
-  let concl1 = f_bdHoareF hf.hf_pr hf.hf_f hf.hf_po FHeq f_r1 in
+  let concl1 = f_bdHoareF hf.shf_pr hf.shf_f hf.shf_po FHeq f_r1 in
   FApi.xmutate1 tc `HlConseqBd [concl1]
+
+(* -------------------------------------------------------------------- *)
+let t_hoareS_conseq_choare tc =
+  let hs = tc1_as_hoareS tc in
+  let concl = f_cHoareS hs.shs_m hs.shs_pr hs.shs_s hs.shs_po f_eint_infty in
+  FApi.xmutate1 tc `HlConseqCost [concl]
+
+(* -------------------------------------------------------------------- *)
+let t_hoareF_conseq_choare tc =
+  let hf = tc1_as_hoareF tc in
+  let concl = f_cHoareF hf.shf_pr hf.shf_f hf.shf_po f_eint_infty in
+  FApi.xmutate1 tc `HlConseqCost [concl]
 
 (* -------------------------------------------------------------------- *)
 let t_hoareS_conseq_conj pre post pre' post' tc =

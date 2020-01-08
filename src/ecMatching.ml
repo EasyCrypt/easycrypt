@@ -827,12 +827,13 @@ module FPosition = struct
               doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.shf_pr; hs.shf_po]))
 
           (* TODO: (Adrien)
-             not clear if [EcFol.mhr] should be in the contex for [chs.chf_c]. *)
+             not clear if [EcFol.mhr] should be in the contex for [chs.chf_c].
+             I decided to put it there. *)
           | FcHoareF chs ->
             let subctxt = Sid.add EcFol.mhr ctxt in
             doit pos (`WithSubCtxt ([(subctxt, chs.chf_pr);
                                      (subctxt, chs.chf_po);
-                                     (   ctxt, chs.chf_c)]))
+                                     (subctxt, chs.chf_c)]))
 
           | FbdHoareF hs ->
               let subctxt = Sid.add EcFol.mhr ctxt in

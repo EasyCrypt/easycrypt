@@ -21,8 +21,13 @@ val t_equivS_conseq      : form -> form -> FApi.backward
 val t_eagerF_conseq      : form -> form -> FApi.backward
 val t_hoareF_conseq      : form -> form -> FApi.backward
 val t_hoareS_conseq      : form -> form -> FApi.backward
+val t_choareF_conseq     : form -> form -> FApi.backward
+val t_choareS_conseq     : form -> form -> FApi.backward
 val t_bdHoareF_conseq    : form -> form -> FApi.backward
 val t_bdHoareS_conseq    : form -> form -> FApi.backward
+
+val t_choareF_conseq_c   : form -> FApi.backward
+val t_choareS_conseq_c   : form -> FApi.backward
 val t_bdHoareS_conseq_bd : hoarecmp -> form -> FApi.backward
 val t_bdHoareF_conseq_bd : hoarecmp -> form -> FApi.backward
 
