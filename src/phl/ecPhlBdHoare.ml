@@ -42,8 +42,8 @@ let t_hoare_bd_hoare tc =
         [FApi.t_try EcPhlAuto.t_pl_trivial; t_hoare_of_bdhoareS]
         tc
 
-  | FhoareF _ -> t_bdhoare_of_hoareF tc
-  | FhoareS _ -> t_bdhoare_of_hoareS tc
+  | FsHoareF _ -> t_bdhoare_of_hoareF tc
+  | FsHoareS _ -> t_bdhoare_of_hoareS tc
 
   | _ -> tc_error !!tc "a hoare or phoare judgment was expected"
 

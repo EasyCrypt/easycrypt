@@ -176,10 +176,18 @@ end
 (* -------------------------------------------------------------------- *)
 let t_inline_hoare_r ~use_tuple sp tc =
   let hoare      = tc1_as_hoareS tc in
-  let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.hs_m sp hoare.hs_s in
-  let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
+  let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.shs_m sp hoare.shs_s in
+  let concl      = f_hoareS_r { hoare with shs_m = me; shs_s = stmt; } in
 
   FApi.xmutate1 tc `Inline [concl]
+
+(* -------------------------------------------------------------------- *)
+let t_inline_choare_r ~use_tuple sp tc =
+  assert false
+(* TODO:(Adrien) we could do it, by relating the cost before and after inlining.
+   This requires to carefully count the cost added by inline.
+   Would this be useful?  *)
+  (* tc_error !!tc "cannot inline choare judgements (cost is not preserved)" *)
 
 (* -------------------------------------------------------------------- *)
 let t_inline_bdhoare_r ~use_tuple sp tc =
@@ -205,9 +213,14 @@ let t_inline_equiv_r ~use_tuple side sp tc =
   FApi.xmutate1 tc `Inline [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_inline_hoare   ~use_tuple = FApi.t_low1 "hoare-inline"   (t_inline_hoare_r ~use_tuple)
-let t_inline_bdhoare ~use_tuple = FApi.t_low1 "bdhoare-inline" (t_inline_bdhoare_r ~use_tuple)
-let t_inline_equiv   ~use_tuple = FApi.t_low2 "equiv-inline"   (t_inline_equiv_r ~use_tuple)
+let t_inline_hoare ~use_tuple =
+  FApi.t_low1 "hoare-inline"   (t_inline_hoare_r ~use_tuple)
+let t_inline_choare ~use_tuple =
+  FApi.t_low1 "choare-inline" (t_inline_choare_r ~use_tuple)
+let t_inline_bdhoare ~use_tuple =
+  FApi.t_low1 "bdhoare-inline" (t_inline_bdhoare_r ~use_tuple)
+let t_inline_equiv ~use_tuple =
+  FApi.t_low2 "equiv-inline"   (t_inline_equiv_r ~use_tuple)
 
 (* -------------------------------------------------------------------- *)
 module HiInternal = struct
@@ -344,11 +357,20 @@ let rec process_inline_all ~use_tuple side fs tc =
                 tc
   end
 
-  | FhoareS hs, None -> begin
-      match HiInternal.pat_all env fs hs.hs_s with
+  | FsHoareS hs, None -> begin
+      match HiInternal.pat_all env fs hs.shs_s with
       | [] -> t_id tc
       | sp -> FApi.t_seq
                 (t_inline_hoare ~use_tuple sp)
+                (process_inline_all ~use_tuple side fs)
+                tc
+  end
+
+  | FcHoareS chs, None -> begin
+      match HiInternal.pat_all env fs chs.chs_s with
+      | [] -> t_id tc
+      | sp -> FApi.t_seq
+                (t_inline_choare ~use_tuple sp)
                 (process_inline_all ~use_tuple side fs)
                 tc
   end
@@ -380,9 +402,13 @@ let process_inline_occs ~use_tuple side fs occs tc =
       let sp = HiInternal.pat_of_occs cond occs st in
         t_inline_equiv ~use_tuple b sp tc
 
-  | FhoareS hs, None ->
-      let sp = HiInternal.pat_of_occs cond occs hs.hs_s in
+  | FsHoareS hs, None ->
+      let sp = HiInternal.pat_of_occs cond occs hs.shs_s in
         t_inline_hoare ~use_tuple sp tc
+
+  | FcHoareS chs, None ->
+      let sp = HiInternal.pat_of_occs cond occs chs.chs_s in
+        t_inline_choare ~use_tuple sp tc
 
   | FbdHoareS bhs, None ->
       let sp = HiInternal.pat_of_occs cond occs bhs.bhs_s in
@@ -401,9 +427,13 @@ let process_inline_codepos ~use_tuple side pos tc =
         let sp = HiInternal.pat_of_codepos pos st in
         t_inline_equiv ~use_tuple b sp tc
 
-    | FhoareS hs, None ->
-        let sp = HiInternal.pat_of_codepos pos hs.hs_s in
+    | FsHoareS hs, None ->
+        let sp = HiInternal.pat_of_codepos pos hs.shs_s in
         t_inline_hoare ~use_tuple sp tc
+
+    | FcHoareS chs, None ->
+        let sp = HiInternal.pat_of_codepos pos chs.chs_s in
+        t_inline_choare ~use_tuple sp tc
 
     | FbdHoareS bhs, None ->
         let sp = HiInternal.pat_of_codepos pos bhs.bhs_s in

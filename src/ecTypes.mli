@@ -51,6 +51,7 @@ val tpred   : ty -> ty
 val tunit   : ty
 val tbool   : ty
 val tint    : ty
+val teint   : ty
 val treal   : ty
 val tdistr  : ty -> ty
 val tcpred  : ty -> ty

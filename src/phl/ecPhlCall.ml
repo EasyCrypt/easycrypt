@@ -66,8 +66,8 @@ let wp2_call
 let t_hoare_call fpre fpost tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
-  let (lp,f,args),s = tc1_last_call tc hs.hs_s in
-  let m = EcMemory.memory hs.hs_m in
+  let (lp,f,args),s = tc1_last_call tc hs.shs_s in
+  let m = EcMemory.memory hs.shs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
   let f_concl = f_hoareF fpre f fpost in
@@ -75,14 +75,48 @@ let t_hoare_call fpre fpost tc =
   let pvres = pv_res f in
   let vres = EcIdent.create "result" in
   let fres = f_local vres fsig.fs_ret in
-  let post = wp_asgn_call env m lp fres hs.hs_po in
+  let post = wp_asgn_call env m lp fres hs.shs_po in
   let fpost = PVM.subst1 env pvres m fres fpost in
   let modi = f_write env f in
   let post = generalize_mod env m modi (f_imp_simpl fpost post) in
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre = subst_args_call env m f (e_tuple args) PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
-  let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
+  let concl = f_hoareS_r { hs with shs_s = s; shs_po=post} in
+
+  FApi.xmutate1 tc `HlCall [f_concl; concl]
+
+(* -------------------------------------------------------------------- *)
+let t_choare_call fpre fpost fcost tc =
+  let env = FApi.tc1_env tc in
+  let chs = tc1_as_choareS tc in
+  let (lp,f,args),s = tc1_last_call tc chs.chs_s in
+  let m = EcMemory.memory chs.chs_m in
+  let fsig = (Fun.by_xpath f env).f_sig in
+  (* The function satisfies the specification *)
+  let f_concl = f_cHoareF fpre f fpost fcost in
+  (* The wp *)
+  let pvres = pv_res f in
+  let vres = EcIdent.create "result" in
+  let fres = f_local vres fsig.fs_ret in
+  let post = wp_asgn_call env m lp fres chs.chs_po in
+  let fpost = PVM.subst1 env pvres m fres fpost in
+  let modi = f_write env f in
+  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
+  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
+  let spre = subst_args_call env m f (e_tuple args) PVM.empty in
+  let post = f_anda_simpl (PVM.subst env spre fpre) post in
+
+  (* The cost of the remaining code must be bounded by the cost of the
+     conclusion `chs.chs_c`, minus the cost of the call `fcost`, and minus
+     the cost of the arguments' evaluation. *)
+  let args_cost = List.fold_left (fun cost e ->
+      EcFol.f_eint_add cost (EcFol.cost_of_expr e)) EcFol.f_eint_0 args in
+  let cost = EcFol.f_eint_sub (EcFol.f_eint_sub chs.chs_c fcost) args_cost in
+
+  let concl = f_cHoareS_r { chs with chs_s = s;
+                                     chs_po = post;
+                                     chs_c = cost } in
 
   FApi.xmutate1 tc `HlCall [f_concl; concl]
 
@@ -220,33 +254,36 @@ let t_equiv_call1 side fpre fpost tc =
   FApi.xmutate1 tc `HlCall [fconcl; concl]
 
 (* -------------------------------------------------------------------- *)
+let call_error env tc f1 f2 =
+  tc_error_lazy !!tc (fun fmt ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      Format.fprintf fmt
+        "call cannot be used with a lemma referring to `%a': \
+         the last statement is a call to `%a'"
+        (EcPrinting.pp_funname ppe) f1
+        (EcPrinting.pp_funname ppe) f2)
+
 let t_call side ax tc =
   let env   = FApi.tc1_env  tc in
   let concl = FApi.tc1_goal tc in
 
   match ax.f_node, concl.f_node with
-  | FhoareF hf, FhoareS hs ->
-      let (_, f, _), _ = tc1_last_call tc hs.hs_s in
-      if not (EcEnv.NormMp.x_equal env hf.hf_f f) then
-        tc_error_lazy !!tc (fun fmt ->
-          let ppe = EcPrinting.PPEnv.ofenv env in
-            Format.fprintf fmt
-              "call cannot be used with a lemma referring to `%a': \
-               the last statement is a call to `%a'"
-              (EcPrinting.pp_funname ppe) hf.hf_f
-              (EcPrinting.pp_funname ppe) f);
-      t_hoare_call hf.hf_pr hf.hf_po tc
+  | FsHoareF hf, FsHoareS hs ->
+      let (_, f, _), _ = tc1_last_call tc hs.shs_s in
+      if not (EcEnv.NormMp.x_equal env hf.shf_f f) then
+        call_error env tc hf.shf_f f;
+      t_hoare_call hf.shf_pr hf.shf_po tc
+
+  | FcHoareF chf, FcHoareS chs ->
+      let (_, f, _), _ = tc1_last_call tc chs.chs_s in
+      if not (EcEnv.NormMp.x_equal env chf.chf_f f) then
+        call_error env tc chf.chf_f f;
+      t_choare_call chf.chf_pr chf.chf_po chf.chf_c tc
 
   | FbdHoareF hf, FbdHoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.bhs_s in
       if not (EcEnv.NormMp.x_equal env hf.bhf_f f) then
-        tc_error_lazy !!tc (fun fmt ->
-          let ppe = EcPrinting.PPEnv.ofenv env in
-            Format.fprintf fmt
-              "call cannot be used with a lemma referring to `%a': \
-               the last statement is a call to `%a'"
-              (EcPrinting.pp_funname ppe) hf.bhf_f
-              (EcPrinting.pp_funname ppe) f);
+        call_error env tc hf.bhf_f f;
       t_bdhoare_call hf.bhf_pr hf.bhf_po None tc
 
   | FequivF ef, FequivS es ->
@@ -312,36 +349,59 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
         f_equivF pre fl fr post
 
 let process_call side info tc =
-  let process_spec tc side =
+  let process_spec tc side cost =
     let (hyps, concl) = FApi.tc1_flat tc in
-      match concl.f_node, side with
-      | FhoareS hs, None ->
-          let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
+      match concl.f_node, side, cost with
+      | FsHoareS hs, None, None ->
+          let (_,f,_) = fst (tc1_last_call tc hs.shs_s) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, fun pre post -> f_hoareF pre f post)
 
-      | FbdHoareS bhs, None ->
+      | FcHoareS chs, None, Some cost ->
+          let (_,f,_) = fst (tc1_last_call tc chs.chs_s) in
+          let penv, qenv = LDecl.hoareF f hyps in
+          (* TODO: (Adrien) check that this is correct *)
+          (* We check that the cost does not use the memory, which would
+             be unsound. *)
+          let cost  = TTC.pf_process_form !!tc penv teint cost in
+          let cmem = oget (EcEnv.Memory.get_active (EcEnv.LDecl.toenv penv)) in
+          if EcIdent.Mid.mem cmem cost.f_fv then
+            tc_error !!tc "cost cannot use the memory %a" EcIdent.pp_ident cmem;
+
+          (penv, qenv, fun pre post -> f_cHoareF pre f post cost)
+
+      | FbdHoareS bhs, None, None ->
           let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, fun pre post ->
             bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None)
 
-      | FbdHoareS _, Some _ | FhoareS _, Some _ ->
+      | FbdHoareS _, Some _, _
+      | FsHoareS  _, Some _, _
+      | FcHoareS  _, Some _, _ ->
           tc_error !!tc "side can only be given for prhl judgements"
 
-      | FequivS es, None ->
+      | FbdHoareS _, _, Some _
+      | FsHoareS  _, _, Some _
+      | FequivS   _, _, Some _->
+          tc_error !!tc "cost can only be given for choare judgements"
+
+      | FcHoareS _, None, None ->
+            tc_error !!tc "a cost must be given for choare judgements"
+
+      | FequivS es, None, None ->
           let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
           let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
           let penv, qenv = LDecl.equivF fl fr hyps in
           (penv, qenv, fun pre post -> f_equivF pre fl fr post)
 
-      | FequivS es, Some side ->
+      | FequivS es, Some side, None ->
           let fstmt = sideif side es.es_sl es.es_sr in
           let (_,f,_) = fst (tc1_last_call tc fstmt) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, fun pre post -> f_bdHoareF pre f post FHeq f_r1)
 
-      | _ -> tc_error !!tc "the conclusion is not a hoare or a equiv" in
+      | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
   let process_inv tc side =
     if not (is_none side) then
@@ -349,10 +409,13 @@ let process_call side info tc =
 
     let hyps, concl = FApi.tc1_flat tc in
     match concl.f_node with
-    | FhoareS hs ->
-        let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
+    | FsHoareS hs ->
+        let (_,f,_) = fst (tc1_last_call tc hs.shs_s) in
         let penv = LDecl.inv_memenv1 hyps in
         (penv, fun inv -> f_hoareF inv f inv)
+
+    | FcHoareS _ ->
+      assert false (* TODO:(Adrien) we need to add the cost invariants here.*)
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
@@ -397,8 +460,8 @@ let process_call side info tc =
 
   let process_cut tc info =
     match info with
-    | CI_spec (pre, post) ->
-      let penv,qenv,fmake = process_spec tc side in
+    | CI_spec (pre, post, ocost) ->
+      let penv,qenv,fmake = process_spec tc side ocost in
       let pre  = TTC.pf_process_form !!tc penv tbool pre  in
       let post = TTC.pf_process_form !!tc qenv tbool post in
       fmake pre post

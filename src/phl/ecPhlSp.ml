@@ -237,24 +237,37 @@ let t_sp_side pos tc =
           (List.length stmt) side)
   in
 
+  let check_form_indep stmt mem form =
+    let write_set = EcPV.s_write env (EcModules.stmt stmt) in
+    let read_set  = EcPV.PV.fv env (EcMemory.memory mem) form in
+    if not (EcPV.PV.indep env write_set read_set) then
+      tc_error !!tc "the bound should not be modified by the statement \
+                     targeted by [sp]"
+  in
+
   match concl.f_node, pos with
-  | FhoareS hs, (None | Some (Single _)) ->
+  | FsHoareS hs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
-      let stmt1, stmt2 = o_split ~rev:true pos hs.hs_s in
-      let stmt1, hs_pr = LI.sp_stmt (EcMemory.memory hs.hs_m) env stmt1 hs.hs_pr in
+      let stmt1, stmt2 = o_split ~rev:true pos hs.shs_s in
+      let stmt1, shs_pr = LI.sp_stmt (EcMemory.memory hs.shs_m) env stmt1 hs.shs_pr in
       check_sp_progress pos stmt1;
-      let subgoal = f_hoareS_r { hs with hs_s = stmt (stmt1@stmt2); hs_pr } in
+      let subgoal = f_hoareS_r { hs with shs_s = stmt (stmt1@stmt2); shs_pr } in
       FApi.xmutate1 tc `Sp [subgoal]
+
+  | FcHoareS chs, (None | Some (Single _)) ->
+    let pos = pos |> omap as_single in
+    let stmt1, stmt2 = o_split ~rev:true pos chs.chs_s in
+    check_form_indep stmt1 chs.chs_m chs.chs_c;
+    let stmt1, chs_pr =
+      LI.sp_stmt (EcMemory.memory chs.chs_m) env stmt1 chs.chs_pr in
+    check_sp_progress pos stmt1;
+    let subgoal = f_cHoareS_r {chs with chs_s = stmt (stmt1@stmt2); chs_pr; } in
+    FApi.xmutate1 tc `Sp [subgoal]
 
   | FbdHoareS bhs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
       let stmt1, stmt2 = o_split ~rev:true pos bhs.bhs_s in
-      begin
-        let write_set = EcPV.s_write env (EcModules.stmt stmt1) in
-        let read_set  = EcPV.PV.fv env (EcMemory.memory bhs.bhs_m) bhs.bhs_bd in
-        if not (EcPV.PV.indep env write_set read_set) then
-          tc_error !!tc "the bound should not be modified by the statement targeted by [sp]"
-      end;
+      check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;
       let stmt1, bhs_pr = LI.sp_stmt (EcMemory.memory bhs.bhs_m) env stmt1 bhs.bhs_pr in
       check_sp_progress pos stmt1;
       let subgoal = f_bdHoareS_r {bhs with bhs_s = stmt (stmt1@stmt2); bhs_pr; } in

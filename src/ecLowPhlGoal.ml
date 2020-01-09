@@ -569,30 +569,36 @@ let t_zip f (cenv : code_txenv) (cpos : codepos) (prpo : form * form) (state, s)
       ((me, Zpr.zip zpr, gs) : memenv * _ * form list)
   with Zpr.InvalidCPos -> tc_error (fst cenv) "invalid code position"
 
+(* Does not apply to cost statements if [choare] is None.
+   If [choare] is [Some c], then [c] is the cost that must be **removed** in
+   the premise to compensate for the difference in cost due to the inlining. *)
 let t_code_transform
-    (side : oside) ?(bdhoare = false) ?(choare = false) cpos tr tx tc =
+    (side : oside) ?(bdhoare = false) ?(choare = None) cpos tr tx tc =
   let pf = FApi.tc1_penv tc in
 
   match side with
   | None -> begin
       let (hyps, concl) = FApi.tc1_flat tc in
 
-      match concl.f_node with
-      | FsHoareS hoare ->
+      match concl.f_node, choare with
+      | FsHoareS hoare, _ ->
           let pr, po = hoare.shs_pr, hoare.shs_po in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr, po) (hoare.shs_m, hoare.shs_s) in
           let concl = f_hoareS_r { hoare with shs_m = me; shs_s = stmt; } in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
-      | FcHoareS chs when choare ->
+      | FcHoareS chs, Some c ->
         let pr, po = chs.chs_pr, chs.chs_po in
         let (me, stmt, cs) =
           tx (pf, hyps) cpos (pr, po) (chs.chs_m, chs.chs_s) in
-        let concl = f_cHoareS_r { chs with chs_m = me; chs_s = stmt; } in
+        let cost = EcFol.f_eint_sub chs.chs_c c in
+        let concl = f_cHoareS_r { chs with chs_m = me;
+                                           chs_s = stmt;
+                                           chs_c = cost; } in
         FApi.xmutate1 tc (tr None) (cs @ [concl])
 
-      | FbdHoareS bhs when bdhoare ->
+      | FbdHoareS bhs, _ when bdhoare ->
           let pr, po = bhs.bhs_pr, bhs.bhs_po in
           let (me, stmt, cs) =
             tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
@@ -601,8 +607,8 @@ let t_code_transform
 
       | _ ->
         let kinds =
-            (if bdhoare then [`PHoare `Stmt] else [])
-          @ (if choare  then [`CHoare `Stmt] else [])
+            (if bdhoare        then [`PHoare `Stmt] else [])
+          @ (if choare <> None then [`CHoare `Stmt] else [])
           @ [`Hoare `Stmt] in
 
         tc_error_noXhl ~kinds:kinds pf

@@ -72,6 +72,30 @@ module CI_Int = struct
   let p_int_le    = _Int "<="
   let p_int_lt    = _Int "<"
   let p_int_edivz = _IntDiv "edivz"
+  let p_int_max   = _IntDiv "max"
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_Eint = struct
+  let i_Eint = "Eint"
+  let p_Eint = EcPath.pqname p_top i_Eint
+  let p_eint = _Pervasive "eint"
+
+  let i_EintDiv = "EintDiv"
+  let p_EintDiv = EcPath.pqname p_top i_EintDiv
+
+  let _Eint    = fun x -> EcPath.pqname p_Eint x
+  let _EintDiv = fun x -> EcPath.pqname p_EintDiv x
+
+  let p_eint_pinfty = _Eint "+infty"
+  let p_eint_minfty = _Eint "-infty"
+  let p_eint_opp    = _Eint "[-]"
+  let p_eint_add    = _Eint "+"
+  let p_eint_mul    = _Eint "*"
+  let p_eint_pow    = _Eint "^"
+  let p_eint_le     = _Eint "<="
+  let p_eint_lt     = _Eint "<"
+  let p_eint_edivz  = _EintDiv "edivz"
 end
 
 (* -------------------------------------------------------------------- *)

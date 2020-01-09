@@ -2383,11 +2383,18 @@ conseq_bd:
 | c=conseq   COLON cmp=hoare_bd_cmp? bd=sform { c, Some (cmp, bd) }
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform { (None, None), Some(cmp, bd) }
 
+orcl_time:
+ | o=qident SEMICOLON c=form                   { o, c }
+
 call_info:
- | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
- | f=form                                { CI_inv  f }
- | bad=form COMMA p=form                 { CI_upto (bad,p,None) }
- | bad=form COMMA p=form COMMA q=form    { CI_upto (bad,p,Some q) }
+ | f1=form LONGARROW f2=form                   { CI_spec (f1, f2, None) }
+ /* TODO:(Adrien) Add cost information for calls. */
+ /* | f1=form LONGARROW f2=form TIME cost=form { CI_spec (f1, f2, Some cost) } */
+ | f=form                                      { CI_inv  f }
+ /* | f=form TIME t_inv = rlist1(orcl_time, COMMA) */
+ /*                                               { CI_inv  (f,t_inv) } */
+ | bad=form COMMA p=form                       { CI_upto (bad,p,None) }
+ | bad=form COMMA p=form COMMA q=form          { CI_upto (bad,p,Some q) }
 
 tac_dir:
 | BACKS { Backs }

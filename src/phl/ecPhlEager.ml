@@ -653,7 +653,7 @@ let process_fun_abs info eqI tc =
 let process_call info tc =
   let process_cut info =
     match info with
-    | EcParsetree.CI_spec (fpre, fpost) ->
+    | EcParsetree.CI_spec (fpre, fpost, None) ->
         let env, hyps, _ = FApi.tc1_eflat tc in
         let es  = tc1_as_equivS tc in
 

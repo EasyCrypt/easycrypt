@@ -200,8 +200,10 @@ let rec on_mpath_form cb (f : EcFol.form) =
     | EcFol.Fproj     (f, _)       -> cbrec f
     | EcFol.Fpvar     (pv, _)      -> on_mpath_pv  cb pv
     | EcFol.Fglob     (mp, _)      -> cb mp
-    | EcFol.FhoareF   hf           -> on_mpath_hf  cb hf
-    | EcFol.FhoareS   hs           -> on_mpath_hs  cb hs
+    | EcFol.FsHoareF   hf           -> on_mpath_hf  cb hf
+    | EcFol.FsHoareS   hs           -> on_mpath_hs  cb hs
+    | EcFol.FcHoareF  chf          -> on_mpath_chf cb chf
+    | EcFol.FcHoareS  chs          -> on_mpath_chs cb chs
     | EcFol.FequivF   ef           -> on_mpath_ef  cb ef
     | EcFol.FequivS   es           -> on_mpath_es  cb es
     | EcFol.FeagerF   eg           -> on_mpath_eg  cb eg
@@ -210,15 +212,15 @@ let rec on_mpath_form cb (f : EcFol.form) =
     | EcFol.Fpr       pr           -> on_mpath_pr  cb pr
 
   and on_mpath_hf cb hf =
-    on_mpath_form cb hf.EcFol.hf_pr;
-    on_mpath_form cb hf.EcFol.hf_po;
-    cb hf.EcFol.hf_f.x_top
+    on_mpath_form cb hf.EcFol.shf_pr;
+    on_mpath_form cb hf.EcFol.shf_po;
+    cb hf.EcFol.shf_f.x_top
 
   and on_mpath_hs cb hs =
-    on_mpath_form cb hs.EcFol.hs_pr;
-    on_mpath_form cb hs.EcFol.hs_po;
-    on_mpath_stmt cb hs.EcFol.hs_s;
-    on_mpath_memenv cb hs.EcFol.hs_m
+    on_mpath_form cb hs.EcFol.shs_pr;
+    on_mpath_form cb hs.EcFol.shs_po;
+    on_mpath_stmt cb hs.EcFol.shs_s;
+    on_mpath_memenv cb hs.EcFol.shs_m
 
   and on_mpath_ef cb ef =
     on_mpath_form cb ef.EcFol.ef_pr;
@@ -241,6 +243,19 @@ let rec on_mpath_form cb (f : EcFol.form) =
     cb eg.EcFol.eg_fr.x_top;
     on_mpath_stmt cb eg.EcFol.eg_sl;
     on_mpath_stmt cb eg.EcFol.eg_sr;
+
+  and on_mpath_chf cb chf =
+    on_mpath_form cb chf.EcFol.chf_pr;
+    on_mpath_form cb chf.EcFol.chf_po;
+    on_mpath_form cb chf.EcFol.chf_c;
+    cb chf.EcFol.chf_f.x_top
+
+  and on_mpath_chs cb chs =
+    on_mpath_form cb chs.EcFol.chs_pr;
+    on_mpath_form cb chs.EcFol.chs_po;
+    on_mpath_form cb chs.EcFol.chs_c;
+    on_mpath_stmt cb chs.EcFol.chs_s;
+    on_mpath_memenv cb chs.EcFol.chs_m
 
   and on_mpath_bhf cb bhf =
     on_mpath_form cb bhf.EcFol.bhf_pr;

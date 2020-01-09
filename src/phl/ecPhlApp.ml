@@ -23,12 +23,18 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 let t_hoare_app_r i phi tc =
   let hs = tc1_as_hoareS tc in
-  let s1, s2 = s_split i hs.hs_s in
-  let a = f_hoareS_r { hs with hs_s = stmt s1; hs_po = phi }  in
-  let b = f_hoareS_r { hs with hs_pr = phi; hs_s = stmt s2 } in
+  let s1, s2 = s_split i hs.shs_s in
+  let a = f_hoareS_r { hs with shs_s = stmt s1; shs_po = phi }  in
+  let b = f_hoareS_r { hs with shs_pr = phi; shs_s = stmt s2 } in
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
+
+(* -------------------------------------------------------------------- *)
+let t_choare_app_r i phi info tc =
+  assert false      (* TODO: (Adrien) *)
+
+let t_choare_app = FApi.t_low3 "choare-app" t_choare_app_r
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
@@ -81,7 +87,7 @@ let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
 let t_bdhoare_app_r i info tc =
   let tactic tc =
     let hs  = tc1_as_hoareS tc in
-    let tt1 = EcPhlConseq.t_hoareS_conseq_nm hs.hs_pr f_true in
+    let tt1 = EcPhlConseq.t_hoareS_conseq_nm hs.shs_pr f_true in
     let tt2 = EcPhlAuto.t_pl_trivial in
     FApi.t_seqs [tt1; tt2; t_fail] tc
   in
@@ -214,6 +220,12 @@ let process_app (side, dir, k, phi, bd_info) tc =
       | None -> tc_error !!tc "seq onsided: side information expected"
       | Some side -> side in
     t_equiv_app_onesided side i pre post tc
+
+  | Single i, _ when is_cHoareS concl ->
+    check_side side;
+    let phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+    let info = assert false     (* TODO:(Adrien) *) in
+    t_choare_app i phi info tc
 
   | Single i, _ when is_bdHoareS concl ->
       let pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in

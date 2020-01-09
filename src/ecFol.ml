@@ -90,12 +90,15 @@ let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
 let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
 
 (* -------------------------------------------------------------------- *)
-let f_eint_is_int f = assert false (* TODO: (Adrien) *)
-let f_eint_of_int f = assert false (* TODO: (Adrien) *)
-let f_int_of_eint f = assert false (* TODO: (Adrien) *)
+let fop_eint_le    = f_op CI.CI_Eint.p_eint_le   [] (toarrow [teint; teint] tbool)
+let fop_eint_lt    = f_op CI.CI_Eint.p_eint_lt   [] (toarrow [teint; teint] tbool)
+let fop_eint_add   = f_op CI.CI_Eint.p_eint_add  [] (toarrow [teint; teint] teint)
+let fop_eint_opp   = f_op CI.CI_Eint.p_eint_opp  [] (toarrow [teint] teint)
+let fop_eint_mul   = f_op CI.CI_Eint.p_eint_mul  [] (toarrow [teint; teint] teint)
+let fop_eint_max   = f_op CI.CI_Eint.p_eint_mul  [] (toarrow [teint; teint] teint)
 
-let f_eint_le f1 f2 = assert false (* TODO: (Adrien) *)
-let f_eint_lt f1 f2 = assert false (* TODO: (Adrien) *)
+let f_eint_le f1 f2 = f_app fop_eint_le [f1; f2] tbool
+let f_eint_lt f1 f2 = f_app fop_eint_lt [f1; f2] tbool
 
 let f_eint_infty = assert false (* TODO: (Adrien) *)
 let f_eint_0 = assert false (* TODO: (Adrien) *)
@@ -112,6 +115,8 @@ let f_eint_sub f1 f2 = assert false (* TODO: (Adrien) *)
 let f_eint_mul f1 f2 = assert false (* TODO: (Adrien) *)
 
 let f_eint_edivz f1 f2 = assert false (* TODO: (Adrien) *)
+
+let f_eint_max f1 f2 = assert false (* TODO: (Adrien) *)
 
 (* -------------------------------------------------------------------- *)
 let f_real_le  f1 f2 = f_app fop_real_le  [f1; f2] tbool
@@ -349,6 +354,8 @@ let f_eint_sub_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 let f_eint_mul_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
 let f_eint_edivz_simpl f1 f2 = assert false (* TODO: (Adrien) *)
+
+let f_eint_max_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
 (* -------------------------------------------------------------------- *)
 let destr_rdivint =

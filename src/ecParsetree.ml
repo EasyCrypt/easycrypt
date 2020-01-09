@@ -448,8 +448,11 @@ type pipattern =
 and pspattern = unit
 
 type call_info =
-  | CI_spec of (pformula * pformula)
+  | CI_spec of (pformula * pformula * pformula option)
   | CI_inv  of pformula
+  (* TODO: (Adrien) the list is of elements of the form (G.o : cost)
+     We need to somehow add the step counter parameter.*)
+  (* | CI_inv  of pformula * (pqsymbol * form) list *)
   | CI_upto of (pformula * pformula * pformula option)
 
 type p_app_bd_info =

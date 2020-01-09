@@ -46,8 +46,14 @@ end
 (* -------------------------------------------------------------------- *)
 let t_hoare_cond tc =
   let hs = tc1_as_hoareS tc in
-  let (e,_,_) = fst (tc1_first_if tc hs.hs_s) in
-  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) tc
+  let (e,_,_) = fst (tc1_first_if tc hs.shs_s) in
+  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory hs.shs_m) e) tc
+
+(* -------------------------------------------------------------------- *)
+let t_choare_cond tc =
+  let chs = tc1_as_choareS tc in
+  let (e,_,_) = fst (tc1_first_if tc chs.chs_s) in
+  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory chs.chs_m) e) tc
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_cond tc =

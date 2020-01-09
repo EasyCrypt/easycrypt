@@ -14,8 +14,17 @@ open EcLowPhlGoal
 (* --------------------------------------------------------------------- *)
 let t_hoare_case_r f tc =
   let hs = tc1_as_hoareS tc in
-  let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
-  let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
+  let concl1 = f_hoareS_r { hs with shs_pr = f_and_simpl hs.shs_pr f } in
+  let concl2 = f_hoareS_r { hs with shs_pr = f_and_simpl hs.shs_pr (f_not f) } in
+  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
+
+(* --------------------------------------------------------------------- *)
+let t_choare_case_r f tc =
+  let chs = tc1_as_choareS tc in
+  let concl1 = f_cHoareS_r
+    { chs with chs_pr = f_and_simpl chs.chs_pr f } in
+  let concl2 = f_cHoareS_r
+    { chs with chs_pr = f_and_simpl chs.chs_pr (f_not f) } in
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
 (* --------------------------------------------------------------------- *)
@@ -36,13 +45,15 @@ let t_equiv_case_r f tc =
 
 (* --------------------------------------------------------------------- *)
 let t_hoare_case   = FApi.t_low1 "hoare-case"   t_hoare_case_r
+let t_choare_case  = FApi.t_low1 "choare-case"  t_choare_case_r
 let t_bdhoare_case = FApi.t_low1 "bdhoare-case" t_bdhoare_case_r
 let t_equiv_case   = FApi.t_low1 "equiv-case"   t_equiv_case_r
 
 (* --------------------------------------------------------------------- *)
 let t_hl_case_r f tc =
-  t_hS_or_bhS_or_eS
+  t_hS_or_chS_or_bhS_or_eS
     ~th:(t_hoare_case f)
+    ~tch:(t_choare_case f)
     ~tbh:(t_bdhoare_case f)
     ~te:(t_equiv_case f)
     tc
