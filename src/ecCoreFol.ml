@@ -1403,6 +1403,13 @@ let rec form_of_expr mem (e : expr) =
      f_quant (quantif_of_equantif qt) b e
 
 (* -------------------------------------------------------------------- *)
+(* The cost of an expression evaluation in any memory. *)
+let cost_of_expr expr = assert false (* TODO: (Adrien) *)
+
+(* The cost of an expression evaluation in a specific memory. *)
+let cost_of_expr_w_mem mem expr = assert false (* TODO: (Adrien) *)
+
+(* -------------------------------------------------------------------- *)
 type f_subst = {
   fs_freshen : bool; (* true means freshen locals *)
   fs_mp      : EcPath.mpath Mid.t;

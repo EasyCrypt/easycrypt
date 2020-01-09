@@ -82,14 +82,34 @@ let subst_pre env f fs m s =
 let t_hoareF_fun_def_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
-  let f = NormMp.norm_xfun env hf.hf_f in
+  let f = NormMp.norm_xfun env hf.shf_f in
   check_concrete !!tc env f;
   let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
   let m = EcMemory.memory memenv in
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
-  let post = PVM.subst1 env (pv_res f) m fres hf.hf_po in
-  let pre  = PVM.subst env (subst_pre env f fsig m PVM.empty) hf.hf_pr in
+  let post = PVM.subst1 env (pv_res f) m fres hf.shf_po in
+  let pre  = PVM.subst env (subst_pre env f fsig m PVM.empty) hf.shf_pr in
   let concl' = f_hoareS memenv pre fdef.f_body post in
+  FApi.xmutate1 tc `FunDef [concl']
+
+(* ------------------------------------------------------------------ *)
+let t_choareF_fun_def_r tc =
+  let env = FApi.tc1_env tc in
+  let chf = tc1_as_choareF tc in
+  let f = NormMp.norm_xfun env chf.chf_f in
+  check_concrete !!tc env f;
+  let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
+  let m = EcMemory.memory memenv in
+  let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
+  let post = PVM.subst1 env (pv_res f) m fres chf.chf_po in
+  let spre = subst_pre env f fsig m PVM.empty in
+  let pre = PVM.subst env spre chf.chf_pr in
+  (* TODO: (Adrien) check that this indeed compute the correct initial cost. *)
+  let c = PVM.subst env spre chf.chf_c in
+  let c = match fdef.f_ret with
+    | None -> c
+    | Some ret -> EcFol.f_eint_sub c (EcFol.cost_of_expr ret) in
+  let concl' = f_cHoareS memenv pre fdef.f_body post c in
   FApi.xmutate1 tc `FunDef [concl']
 
 (* ------------------------------------------------------------------ *)
@@ -133,16 +153,18 @@ let t_equivF_fun_def_r tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_fun_def   = FApi.t_low0 "hoare-fun-def"   t_hoareF_fun_def_r
+let t_choareF_fun_def  = FApi.t_low0 "choare-fun-def"  t_choareF_fun_def_r
 let t_bdhoareF_fun_def = FApi.t_low0 "bdhoare-fun-def" t_bdhoareF_fun_def_r
 let t_equivF_fun_def   = FApi.t_low0 "equiv-fun-def"   t_equivF_fun_def_r
 
 (* -------------------------------------------------------------------- *)
 let t_fun_def_r tc =
   let th  = t_hoareF_fun_def
+  and tch = t_choareF_fun_def
   and tbh = t_bdhoareF_fun_def
   and te  = t_equivF_fun_def in
 
-  t_hF_or_bhF_or_eF ~th ~tbh ~te tc
+  t_hF_or_chF_or_bhF_or_eF ~th ~tch ~tbh ~te tc
 
 let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 
@@ -156,6 +178,9 @@ module FunAbsLow = struct
     let ospec o = f_hoareF inv o inv in
     let sg = List.map ospec oi.oi_calls in
     (inv, inv, sg)
+
+  (* ------------------------------------------------------------------ *)
+  let choareF_abs_spec _pf env f inv = assert false (* TODO: (Adrien) *)
 
   (* ------------------------------------------------------------------ *)
   let bdhoareF_abs_spec pf env f inv =
@@ -229,10 +254,13 @@ end
 let t_hoareF_abs_r inv tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
-  let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.hf_f inv in
+  let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.shf_f inv in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
   FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post tc)
+
+(* ------------------------------------------------------------------ *)
+let t_choareF_abs_r inv tc = assert false (* TODO: (Adrien) *)
 
 (* ------------------------------------------------------------------ *)
 let t_bdhoareF_abs_r inv tc =
@@ -262,6 +290,7 @@ let t_equivF_abs_r inv tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_abs   = FApi.t_low1 "hoare-fun-abs"   t_hoareF_abs_r
+let t_choareF_abs  = FApi.t_low1 "choare-fun-abs"  t_choareF_abs_r
 let t_bdhoareF_abs = FApi.t_low1 "bdhoare-fun-abs" t_bdhoareF_abs_r
 let t_equivF_abs   = FApi.t_low1 "equiv-fun-abs"   t_equivF_abs_r
 
@@ -366,19 +395,40 @@ module ToCodeLow = struct
     let r = pv_loc f res in
     let i = i_call (Some(LvVar(r,fd.f_sig.fs_ret)), f, args) in
     let s = stmt [i] in
-    (m, s, r, fd.f_sig.fs_ret)
+    (m, s, r, fd.f_sig.fs_ret, args)
 end
 
 (* -------------------------------------------------------------------- *)
 let t_fun_to_code_hoare_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
-  let f = hf.hf_f in
+  let f = hf.shf_f in
   let m, _ = Fun.hoareF_memenv f env in
-  let m, st, r, ty = ToCodeLow.to_code env f m in
+  let m, st, r, ty,_ = ToCodeLow.to_code env f m in
   let s = PVM.add env (pv_res f) (fst m) (f_pvar r ty (fst m)) PVM.empty in
-  let post = PVM.subst env s hf.hf_po in
-  let concl = f_hoareS m hf.hf_pr st post in
+  let post = PVM.subst env s hf.shf_po in
+  let concl = f_hoareS m hf.shf_pr st post in
+
+  FApi.xmutate1 tc `FunToCode [concl]
+
+(* -------------------------------------------------------------------- *)
+(* This is for the proc* tactic, which replaces a statement about `G.f` by
+   a statement about `x <$ G.f(args)`.
+   By consequence, we are adding an assignment, whose cost is the cost of `G.f`
+   plus the cost of the arguments `agrs` computation. Hence we need to add it
+   to the allowed cost. *)
+let t_fun_to_code_choare_r tc =
+  let env = FApi.tc1_env tc in
+  let chf = tc1_as_choareF tc in
+  let f = chf.chf_f in
+  let m, _ = Fun.hoareF_memenv f env in
+  let m, st, r, ty, args = ToCodeLow.to_code env f m in
+  let s = PVM.add env (pv_res f) (fst m) (f_pvar r ty (fst m)) PVM.empty in
+  let post = PVM.subst env s chf.chf_po in
+  let cost = List.fold_left (fun cost e ->
+      EcFol.f_eint_add cost (EcFol.cost_of_expr e)
+    ) chf.chf_c args in
+  let concl = f_cHoareS m chf.chf_pr st post cost in
 
   FApi.xmutate1 tc `FunToCode [concl]
 
@@ -388,7 +438,7 @@ let t_fun_to_code_bdhoare_r tc =
   let hf = tc1_as_bdhoareF tc in
   let f = hf.bhf_f in
   let m, _ = Fun.hoareF_memenv f env in
-  let m, st, r, ty = ToCodeLow.to_code env f m in
+  let m, st, r, ty, _ = ToCodeLow.to_code env f m in
   let s = PVM.add env (pv_res f) (fst m) (f_pvar r ty (fst m)) PVM.empty in
   let post = PVM.subst env s hf.bhf_po in
   let concl = f_bdHoareS m hf.bhf_pr st post hf.bhf_cmp hf.bhf_bd in
@@ -401,8 +451,8 @@ let t_fun_to_code_equiv_r tc =
   let ef = tc1_as_equivF tc in
   let (fl,fr) = ef.ef_fl, ef.ef_fr in
   let (ml,mr), _ = Fun.equivF_memenv fl fr env in
-  let ml, sl, rl, tyl = ToCodeLow.to_code env fl ml in
-  let mr, sr, rr, tyr = ToCodeLow.to_code env fr mr in
+  let ml, sl, rl, tyl, _ = ToCodeLow.to_code env fl ml in
+  let mr, sr, rr, tyr, _ = ToCodeLow.to_code env fr mr in
   let s = PVM.empty in
   let s = PVM.add env (pv_res fl) (fst ml) (f_pvar rl tyl (fst ml)) s in
   let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
@@ -416,8 +466,8 @@ let t_fun_to_code_eager_r tc =
   let eg = tc1_as_eagerF tc in
   let (fl,fr) = eg.eg_fl, eg.eg_fr in
   let (ml,mr), _ = Fun.equivF_memenv fl fr env in
-  let ml, sl, rl, tyl = ToCodeLow.to_code env fl ml in
-  let mr, sr, rr, tyr = ToCodeLow.to_code env fr mr in
+  let ml, sl, rl, tyl, _ = ToCodeLow.to_code env fl ml in
+  let mr, sr, rr, tyr, _ = ToCodeLow.to_code env fr mr in
   let s = PVM.empty in
   let s = PVM.add env (pv_res fl) (fst ml) (f_pvar rl tyl (fst ml)) s in
   let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
@@ -428,6 +478,7 @@ let t_fun_to_code_eager_r tc =
 
 (* -------------------------------------------------------------------- *)
 let t_fun_to_code_hoare   = FApi.t_low0 "hoare-fun-to-code"   t_fun_to_code_hoare_r
+let t_fun_to_code_choare  = FApi.t_low0 "choare-fun-to-code"  t_fun_to_code_choare_r
 let t_fun_to_code_bdhoare = FApi.t_low0 "bdhoare-fun-to-code" t_fun_to_code_bdhoare_r
 let t_fun_to_code_equiv   = FApi.t_low0 "equiv-fun-to-code"   t_fun_to_code_equiv_r
 let t_fun_to_code_eager   = FApi.t_low0 "eager-fun-to-code"   t_fun_to_code_eager_r
@@ -436,10 +487,11 @@ let t_fun_to_code_eager   = FApi.t_low0 "eager-fun-to-code"   t_fun_to_code_eage
 (* -------------------------------------------------------------------- *)
 let t_fun_to_code_r tc =
   let th  = t_fun_to_code_hoare in
+  let tch = t_fun_to_code_choare in
   let tbh = t_fun_to_code_bdhoare in
   let te  = t_fun_to_code_equiv in
   let teg = t_fun_to_code_eager in
-  t_hF_or_bhF_or_eF ~th ~tbh ~te ~teg tc
+  t_hF_or_chF_or_bhF_or_eF ~th ~tch ~tbh ~te ~teg tc
 
 let t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
 
@@ -448,9 +500,15 @@ let t_fun_r inv tc =
   let th tc =
     let env = FApi.tc1_env tc in
     let h   = destr_hoareF (FApi.tc1_goal tc) in
-      if   NormMp.is_abstract_fun h.hf_f env
+      if   NormMp.is_abstract_fun h.shf_f env
       then t_hoareF_abs inv tc
       else t_hoareF_fun_def tc
+  and tch tc =
+    let env = FApi.tc1_env tc in
+    let h   = destr_cHoareF (FApi.tc1_goal tc) in
+    if   NormMp.is_abstract_fun h.chf_f env
+    then t_choareF_abs inv tc
+    else t_choareF_fun_def tc
   and tbh tc =
     let env = FApi.tc1_env tc in
     let h   = destr_bdHoareF (FApi.tc1_goal tc) in
@@ -464,7 +522,7 @@ let t_fun_r inv tc =
       then t_equivF_abs inv tc
       else t_equivF_fun_def tc
   in
-    t_hF_or_bhF_or_eF ~th ~tbh ~te tc
+    t_hF_or_chF_or_bhF_or_eF ~th ~tch ~tbh ~te tc
 
 let t_fun = FApi.t_low1 "fun" t_fun_r
 
@@ -504,6 +562,12 @@ let process_fun_abs inv tc =
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
     t_hoareF_abs inv tc
 
+  and t_choare tc =
+    let hyps = FApi.tc1_hyps tc in
+    let env' = LDecl.inv_memenv1 hyps in
+    let inv  = TTC.pf_process_form !!tc env' tbool inv in
+    t_choareF_abs inv tc
+
   and t_bdhoare tc =
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv1 hyps in
@@ -517,4 +581,5 @@ let process_fun_abs inv tc =
     t_equivF_abs inv tc
 
   in
-    t_hF_or_bhF_or_eF ~th:t_hoare ~tbh:t_bdhoare ~te:t_equiv tc
+  t_hF_or_chF_or_bhF_or_eF
+    ~th:t_hoare ~tch:t_choare ~tbh:t_bdhoare ~te:t_equiv tc

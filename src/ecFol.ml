@@ -90,19 +90,28 @@ let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
 let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
 
 (* -------------------------------------------------------------------- *)
+let f_eint_is_int f = assert false (* TODO: (Adrien) *)
+let f_eint_of_int f = assert false (* TODO: (Adrien) *)
+let f_int_of_eint f = assert false (* TODO: (Adrien) *)
+
+let f_eint_le f1 f2 = assert false (* TODO: (Adrien) *)
+let f_eint_lt f1 f2 = assert false (* TODO: (Adrien) *)
+
+let f_eint_infty = assert false (* TODO: (Adrien) *)
+let f_eint_0 = assert false (* TODO: (Adrien) *)
+let f_eint_r1 = assert false (* TODO: (Adrien) *)
+
+(* -------------------------------------------------------------------- *)
 (* TODO: (Adrien) add integer with infinity *)
-exception TODO
+let f_eint_opp f = assert false (* TODO: (Adrien) *)
 
-let f_eint_is_int f = raise TODO
-let f_eint_of_int f = raise TODO
-let f_int_of_eint f = raise TODO
+let f_eint_add f1 f2 = assert false (* TODO: (Adrien) *)
 
-let f_eint_le f1 f2 = raise TODO
-let f_eint_lt f1 f2 = raise TODO
+let f_eint_sub f1 f2 = assert false (* TODO: (Adrien) *)
 
-let f_eint_infty = raise TODO
-let f_eint_0 = raise TODO
-let f_eint_r1 = raise TODO
+let f_eint_mul f1 f2 = assert false (* TODO: (Adrien) *)
+
+let f_eint_edivz f1 f2 = assert false (* TODO: (Adrien) *)
 
 (* -------------------------------------------------------------------- *)
 let f_real_le  f1 f2 = f_app fop_real_le  [f1; f2] tbool
@@ -331,15 +340,15 @@ let f_int_edivz_simpl f1 f2 =
 
 (* -------------------------------------------------------------------- *)
 (* TODO: (Adrien) add integer with infinity *)
-let f_eint_opp_simpl f = raise TODO
+let f_eint_opp_simpl f = assert false (* TODO: (Adrien) *)
 
-let f_eint_add_simpl f1 f2 = raise TODO
+let f_eint_add_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
-let f_eint_sub_simpl f1 f2 = raise TODO
+let f_eint_sub_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
-let f_eint_mul_simpl f1 f2 = raise TODO
+let f_eint_mul_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
-let f_eint_edivz_simpl f1 f2 = raise TODO
+let f_eint_edivz_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
 (* -------------------------------------------------------------------- *)
 let destr_rdivint =
@@ -927,9 +936,9 @@ let f_int_lt_simpl f1 f2 =
   | None -> f_int_lt f1 f2
 
 (* TODO: (Adrien) add integer with infinity *)
-let f_eint_le_simpl f1 f2 = raise TODO
+let f_eint_le_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
-let f_eint_lt_simpl f1 f2 = raise TODO
+let f_eint_lt_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
 let f_real_le_simpl f1 f2 =
   if f_equal f1 f2 then f_true else

@@ -32,15 +32,35 @@ module Core = struct
   let t_hoare_rnd_r tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
-    let (lv, distr), s = tc1_last_rnd tc hs.hs_s in
+    let (lv, distr), s = tc1_last_rnd tc hs.shs_s in
     let ty_distr = proj_distr_ty env (e_ty distr) in
     let x_id = EcIdent.create (symbol_of_lv lv) in
     let x = f_local x_id ty_distr in
-    let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
-    let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
+    let distr = EcFol.form_of_expr (EcMemory.memory hs.shs_m) distr in
+    let post = subst_form_lv env (EcMemory.memory hs.shs_m) lv x hs.shs_po in
     let post = f_imp (f_in_supp x distr) post in
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
-    let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
+    let concl = f_hoareS_r {hs with shs_s=s; shs_po=post} in
+    FApi.xmutate1 tc `Rnd [concl]
+
+  (* -------------------------------------------------------------------- *)
+  let t_choare_rnd_r tc =
+    let env = FApi.tc1_env tc in
+    let chs = tc1_as_choareS tc in
+    let (lv, distr_e), s = tc1_last_rnd tc chs.chs_s in
+    let ty_distr = proj_distr_ty env (e_ty distr_e) in
+    let x_id = EcIdent.create (symbol_of_lv lv) in
+    let x = f_local x_id ty_distr in
+    let distr = EcFol.form_of_expr (EcMemory.memory chs.chs_m) distr_e in
+    (* TODO: (Adrien) if we allow the cost to speak about the final memory, then
+       we also need to substitute in [chs_c] here. Update if necessary. *)
+    let post = subst_form_lv env (EcMemory.memory chs.chs_m) lv x chs.chs_po in
+    let post = f_imp (f_in_supp x distr) post in
+    let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+    let cost = EcFol.f_eint_sub chs.chs_c (cost_of_expr distr_e) in
+    let concl = f_cHoareS_r { chs with chs_s = s;
+                                       chs_po = post;
+                                       chs_c = cost} in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
@@ -415,6 +435,7 @@ let wp_equiv_rnd      = FApi.t_low1 "wp-equiv-rnd"      wp_equiv_rnd_r
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_rnd   = FApi.t_low0 "hoare-rnd"   Core.t_hoare_rnd_r
+let t_choare_rnd  = FApi.t_low0 "choare-rnd"  Core.t_choare_rnd_r
 let t_bdhoare_rnd = FApi.t_low1 "bdhoare-rnd" Core.t_bdhoare_rnd_r
 let t_equiv_rnd   = FApi.t_low2 "equiv-rnd"   t_equiv_rnd_r
 
@@ -425,6 +446,9 @@ let process_rnd side tac_info tc =
   match side, tac_info with
   | None, PNoRndParams when is_hoareS concl ->
       t_hoare_rnd tc
+
+  | None, PNoRndParams when is_cHoareS concl ->
+      t_choare_rnd tc
 
   | None, _ when is_bdHoareS concl ->
     let tac_info =

@@ -46,6 +46,12 @@ val f_int_of_eint : form -> form
 val f_eint_le  : form -> form -> form
 val f_eint_lt  : form -> form -> form
 
+val f_eint_add   : form -> form -> form
+val f_eint_opp   : form -> form
+val f_eint_sub   : form -> form -> form
+val f_eint_mul   : form -> form -> form
+val f_eint_edivz : form -> form -> form
+
 val f_eint_infty : form
 val f_eint_0 : form
 val f_eint_r1 : form

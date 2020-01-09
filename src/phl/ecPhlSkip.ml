@@ -21,15 +21,32 @@ module LowInternal = struct
   let t_hoare_skip_r tc =
     let hs = tc1_as_hoareS tc in
 
-    if not (List.is_empty hs.hs_s.s_node) then
+    if not (List.is_empty hs.shs_s.s_node) then
       tc_error !!tc "instruction list is not empty";
 
-    let concl = f_imp hs.hs_pr hs.hs_po in
-    let concl = f_forall_mems [hs.hs_m] concl in
+    let concl = f_imp hs.shs_pr hs.shs_po in
+    let concl = f_forall_mems [hs.shs_m] concl in
 
     FApi.xmutate1 tc `Skip [concl]
 
   let t_hoare_skip = FApi.t_low0 "hoare-skip" t_hoare_skip_r
+
+  let t_choare_skip_r tc =
+    let chs = tc1_as_choareS tc in
+
+    if not (List.is_empty chs.chs_s.s_node) then
+      tc_error !!tc "instruction list is not empty";
+
+    (* TODO: (Adrien) if we allow the final memory in [chs_c], we probably
+       need something more here. *)
+    let cost_cond = f_eint_le (f_eint_0) chs.chs_c in
+    let post = f_and chs.chs_po cost_cond in
+    let concl = f_imp chs.chs_pr post in
+    let concl = f_forall_mems [chs.chs_m] concl in
+
+    FApi.xmutate1 tc `Skip [concl]
+
+  let t_choare_skip = FApi.t_low0 "choare-skip" t_choare_skip_r
 
   (* ------------------------------------------------------------------ *)
   let t_bdhoare_skip_r_low tc =
@@ -79,7 +96,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 let t_skip =
-  t_hS_or_bhS_or_eS
+  t_hS_or_chS_or_bhS_or_eS
     ~th: LowInternal.t_hoare_skip
+    ~tch:LowInternal.t_choare_skip
     ~tbh:LowInternal.t_bdhoare_skip
     ~te: LowInternal.t_equiv_skip
