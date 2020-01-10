@@ -38,11 +38,10 @@ module LowInternal = struct
       wp_asgn_aux m lv e letsf, cost_of_expr e
 
     | Sif (e,s1,s2) ->
-        let z = f_int (EcBigInt.zero) in
         let (r1,letsf1),cost_1 =
-          wp_stmt onesided env m (List.rev s1.s_node) letsf z in
+          wp_stmt onesided env m (List.rev s1.s_node) letsf f_i0 in
         let (r2,letsf2),cost_2 =
-          wp_stmt onesided env m (List.rev s2.s_node) letsf z in
+          wp_stmt onesided env m (List.rev s2.s_node) letsf f_i0 in
         if List.is_empty r1 && List.is_empty r2 then begin
           let post1 = mk_let_of_lv_substs env letsf1 in
           let post2 = mk_let_of_lv_substs env letsf2 in
@@ -62,7 +61,7 @@ let wp ?(uselet=true) ?(onesided=false) env m s post =
   let (r,letsf),cost =
     LowInternal.wp_stmt
       onesided env m (List.rev s.s_node)
-      ([],post) (f_int (EcBigInt.zero))
+      ([],post) f_i0
   in
   let pre = mk_let_of_lv_substs ~uselet env letsf in
   List.rev r, pre, cost

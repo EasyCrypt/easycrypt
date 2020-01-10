@@ -204,11 +204,10 @@ module LowInternal = struct
         let e_form = EcFol.form_of_expr m e in
         let pre_t  = build_sp m bds assoc (f_and_simpl e_form pre) in
         let pre_f  = build_sp m bds assoc (f_and_simpl (f_not e_form) pre) in
-        let z = EcFol.f_int (EcBigInt.zero) in
         let stmt_t, (bds_t, assoc_t, pre_t, cost_t) =
-          sp_stmt m env (bds, assoc, pre_t, z) s1.s_node in
+          sp_stmt m env (bds, assoc, pre_t, f_i0) s1.s_node in
         let stmt_f, (bds_f, assoc_f, pre_f, cost_f) =
-          sp_stmt m env (bds, assoc, pre_f, z) s2.s_node in
+          sp_stmt m env (bds, assoc, pre_f, f_i0) s2.s_node in
         if not (List.is_empty stmt_t && List.is_empty stmt_f) then raise No_sp;
         let sp_t = build_sp m bds_t assoc_t pre_t in
         let sp_f = build_sp m bds_f assoc_f pre_f in
@@ -221,8 +220,7 @@ module LowInternal = struct
     | _ -> raise No_sp
 
   let sp_stmt m env stmt f =
-    let z = EcFol.f_int (EcBigInt.zero) in
-    let stmt, (bds, assoc, pre, cost) = sp_stmt m env ([], [], f, z) stmt in
+    let stmt, (bds, assoc, pre, cost) = sp_stmt m env ([], [], f, f_i0) stmt in
     let pre = build_sp m bds assoc pre in
     stmt, pre, cost
 end

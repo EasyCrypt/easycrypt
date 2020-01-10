@@ -39,7 +39,7 @@ module LowInternal = struct
 
     (* TODO: (Adrien) if we allow the final memory in [chs_c], we probably
        need something more here. *)
-    let cost_cond = f_int_le_simpl (f_int EcBigInt.zero) chs.chs_c in
+    let cost_cond = f_int_le_simpl f_i0 chs.chs_c in
     let post = f_and chs.chs_po cost_cond in
     let concl = f_imp chs.chs_pr post in
     let concl = f_forall_mems [chs.chs_m] concl in
