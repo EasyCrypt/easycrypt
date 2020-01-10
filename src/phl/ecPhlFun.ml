@@ -104,7 +104,6 @@ let t_choareF_fun_def_r tc =
   let post = PVM.subst1 env (pv_res f) m fres chf.chf_po in
   let spre = subst_pre env f fsig m PVM.empty in
   let pre = PVM.subst env spre chf.chf_pr in
-  (* TODO: (Adrien) check that this indeed compute the correct initial cost. *)
   let c = PVM.subst env spre chf.chf_c in
   let c = match fdef.f_ret with
     | None -> c

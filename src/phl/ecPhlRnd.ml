@@ -52,8 +52,6 @@ module Core = struct
     let x_id = EcIdent.create (symbol_of_lv lv) in
     let x = f_local x_id ty_distr in
     let distr = EcFol.form_of_expr (EcMemory.memory chs.chs_m) distr_e in
-    (* TODO: (Adrien) if we allow the cost to speak about the final memory, then
-       we also need to substitute in [chs_c] here. Update if necessary. *)
     let post = subst_form_lv env (EcMemory.memory chs.chs_m) lv x chs.chs_po in
     let post = f_imp (f_in_supp x distr) post in
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
