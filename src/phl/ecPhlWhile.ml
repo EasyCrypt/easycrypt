@@ -21,6 +21,41 @@ module TTC = EcProofTyping
 module EP  = EcParsetree
 module Mid = EcIdent.Mid
 
+(* TODO:(Adrien) this is modeled after the IFEL module, for the fel tactic.
+   I am not understanding where the ICHOARE module is declared. *)
+module ICHOARE : sig
+  val loaded : EcEnv.env -> bool
+  val choare_sum : form -> (form * form) -> form
+end = struct
+  open EcCoreLib
+  open EcEnv
+
+  let i_CHoare  = "CHoareTactic"
+  let p_CHoare  = EcPath.pqname EcCoreLib.p_top i_CHoare
+  let p_List    = [i_top; "List"]
+  let p_BIA     = [i_top; "StdBigop"; "Bigint"; "BIA"]
+
+  let tlist =
+    let tlist = EcPath.fromqsymbol (p_List, "list") in
+    fun ty -> EcTypes.tconstr tlist [ty]
+
+  let range =
+    let rg = EcPath.fromqsymbol (p_List @ ["Range"], "range") in
+    let rg = f_op rg [] (toarrow [tint; tint] (tlist tint)) in
+    fun m n -> f_app rg [m; n] (tlist tint)
+
+  let choare_sum =
+    let bgty = [tpred tint; tfun tint treal; tlist tint] in
+    let bg   = EcPath.fromqsymbol (p_BIA, "bigi") in
+    let bg   = f_op bg [tint] (toarrow bgty tint) in
+    let prT  = EcPath.fromqsymbol ([i_top; "Logic"], "predT") in
+    let prT  = f_op prT [tint] (tpred tint) in
+    fun f (m, n) -> f_app bg [prT; f; range m n] tint
+
+  let loaded (env : env) =
+    is_some (EcEnv.Theory.by_path_opt p_CHoare env)
+end
+
 (* -------------------------------------------------------------------- *)
 let while_info env e s =
   let rec i_info (w,r,c) i =
@@ -82,8 +117,65 @@ let t_hoare_while_r inv tc =
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
-let t_choare_while_r inv tc =
-  assert false                  (* TODO: (Adrien) *)
+(* - [inv] is the loop invariant.
+   - [qinc] the strictly increasing quantity at each iteration.
+   - [n + 1] is the maximum number of iterations.
+   - [lam_cost] is the cost of one iteration (of the form [λ k. cost(k)]) *)
+let t_choare_while_r inv qinc n lam_cost tc =
+  let env = FApi.tc1_env tc in
+  if not (ICHOARE.loaded env) then
+    tacuerror "fel: load the `CHoareTactic' theory first";
+
+  let chs = tc1_as_choareS tc in
+  let (expr_e, c), s = tc1_last_while tc chs.chs_s in
+  let m = EcMemory.memory chs.chs_m in
+  let e = form_of_expr m expr_e in
+
+  (* The [k]-th iteration preserves the invariant, and costs [lam_cost k]. *)
+  let k_id = EcIdent.create "z" in
+  let k = f_local k_id tint in
+  let qinc_eq_k = f_eq qinc k in
+  let k_lt_qinc = f_int_lt k qinc in
+  let c_pre  = f_and_simpl (f_and_simpl inv e) qinc_eq_k in
+  let c_post = f_and_simpl inv k_lt_qinc in
+  let c_cost = f_app lam_cost [k] tint in
+  let c_concl = f_cHoareS_r { chs with chs_pr = c_pre;
+                                       chs_s  = c;
+                                       chs_po = c_post;
+                                       chs_c  = c_cost; } in
+  let c_concl = f_forall_simpl [(k_id,GTty tint)] c_concl in
+
+  (* The loop terminates in at most [n] steps *)
+  let n_term = f_imp_simpl (f_and_simpl inv e) (f_int_le qinc n) in
+  let n_term = f_forall_mems [chs.chs_m] n_term in
+
+  (* We compute the final cost. Since we have at most [n+1] iterations, we have:
+     - at most [n+2] evaluations of the loop condition [e].
+     - at most [n+1] evaluations of the loop body. *)
+  let e_cost = f_int_mul_simpl
+      (f_int_add_simpl n (f_i1))
+      (cost_of_expr expr_e) in
+  let body_cost = ICHOARE.choare_sum lam_cost (f_i0, n) in
+  let cost = f_int_sub_simpl chs.chs_c (f_int_add_simpl body_cost e_cost) in
+  (* We check that the cost [lam_cost] of one iteration is not modified by
+     the statements before the while loop. *)
+  let write_set = EcPV.s_write env s in
+  let read_set  = EcPV.PV.fv env (EcMemory.memory chs.chs_m) lam_cost in
+  if not (EcPV.PV.indep env write_set read_set) then
+    tc_error !!tc "the cost of the loop body should not be modified by the \
+                   statement preceding the loop";
+
+  (* The wp of the while. *)
+  let post = f_imps_simpl [f_not_simpl e; inv] chs.chs_po in
+  let modi = s_write env c in
+  let post = generalize_mod env m modi post in
+  let post = f_and_simpl inv post in
+  let concl = f_cHoareS_r { chs with chs_s  = s;
+                                     chs_po = post;
+                                     chs_c  = cost; } in
+
+  FApi.xmutate1 tc `While [c_concl; n_term; concl]
+
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_while_r inv vrnt tc =
@@ -329,7 +421,7 @@ let t_equiv_while_r inv tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_while           = FApi.t_low1 "hoare-while"   t_hoare_while_r
-let t_choare_while          = FApi.t_low1 "choare-while"  t_choare_while_r
+let t_choare_while          = FApi.t_low4 "choare-while"  t_choare_while_r
 let t_bdhoare_while         = FApi.t_low2 "bdhoare-while" t_bdhoare_while_r
 let t_bdhoare_while_rev_geq = FApi.t_low4 "bdhoare-while" t_bdhoare_while_rev_geq_r
 let t_bdhoare_while_rev     = FApi.t_low1 "bdhoare-while" t_bdhoare_while_rev_r
@@ -350,9 +442,20 @@ let process_while side winfos tc =
     end
 
   | FcHoareS _ -> begin
-      match vrnt with
-      | None -> t_choare_while (TTC.tc1_process_Xhl_formula tc phi) tc
-      | _    -> tc_error !!tc "invalid arguments"
+      match vrnt, bds with
+      | Some vrnt, Some (n, cost) ->
+        t_choare_while
+          (TTC.tc1_process_Xhl_formula tc phi                   )
+          (TTC.tc1_process_Xhl_form    tc tint                  vrnt)
+          (TTC.tc1_process_Xhl_form    tc tint                  n)
+          (TTC.tc1_process_Xhl_form    tc (toarrow [tint] tint) cost)
+          tc
+
+      | _    -> tc_error !!tc "@[<v 2>invalid arguments, you must supply :@;\
+                               I (invariant),@ \
+                               c (increasing quantity),@ \
+                               n (loop bound),@ \
+                               cost (iteration cost)@]"
     end
 
   | FbdHoareS _ -> begin
