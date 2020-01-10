@@ -24,6 +24,6 @@ open EcCoreGoal.FApi
 
 val wp :
       ?uselet:bool -> ?onesided:bool
-   -> env -> memory -> stmt -> form -> instr list * form
+   -> env -> memory -> stmt -> form -> instr list * form * form
 
 val t_wp : ?uselet:bool -> (codepos1 doption) option -> backward
