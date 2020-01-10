@@ -285,9 +285,9 @@ let main () =
               List.map
                 (fun (x : EcScope.required_info) ->
                    let ecr = EcEco.{
-                     eco_digest = x.rqd_digest;
-                     eco_kind   = x.rqd_kind;
-                   } in (x.rqd_name, ecr))
+                     eco_digest = x.EcScope.rqd_digest;
+                     eco_kind   = x.EcScope.rqd_kind;
+                   } in (x.EcScope.rqd_name, ecr))
                 (EcScope.Theory.required scope));
         } in
 
