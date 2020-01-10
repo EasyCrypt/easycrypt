@@ -360,15 +360,16 @@ let process_call side info tc =
           (penv, qenv, fun pre post -> f_hoareF pre f post)
 
       | FcHoareS chs, None, Some cost ->
-          let (_,f,_) = fst (tc1_last_call tc chs.chs_s) in
+          let (_,f,_),stmt = tc1_last_call tc chs.chs_s in
           let penv, qenv = LDecl.hoareF f hyps in
-          (* TODO: (Adrien) check that this is correct *)
-          (* We check that the cost does not use the memory, which would
-             be unsound. *)
-          let cost  = TTC.pf_process_form !!tc penv tint cost in
-          let cmem = oget (EcEnv.Memory.get_active (EcEnv.LDecl.toenv penv)) in
-          if EcIdent.Mid.mem cmem cost.f_fv then
-            tc_error !!tc "cost cannot use the memory %a" EcIdent.pp_ident cmem;
+
+          let env = FApi.tc1_env tc in
+          let cost  = TTC.tc1_process_Xhl_form tc tint cost in
+          let write_set = EcPV.s_write env stmt in
+          let read_set  = EcPV.PV.fv env (EcMemory.memory chs.chs_m) cost in
+          if not (EcPV.PV.indep env write_set read_set) then
+            tc_error !!tc "the cost should not be modified by the statement \
+                           preceding the targeted call";
 
           (penv, qenv, fun pre post -> f_cHoareF pre f post cost)
 

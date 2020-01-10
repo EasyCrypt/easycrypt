@@ -2388,8 +2388,7 @@ orcl_time:
 
 call_info:
  | f1=form LONGARROW f2=form                   { CI_spec (f1, f2, None) }
- /* TODO:(Adrien) Add cost information for calls. */
- /* | f1=form LONGARROW f2=form TIME cost=form { CI_spec (f1, f2, Some cost) } */
+ | f1=form LONGARROW f2=form TIME cost=form    { CI_spec (f1, f2, Some cost) }
  | f=form                                      { CI_inv  f }
  /* | f=form TIME t_inv = rlist1(orcl_time, COMMA) */
  /*                                               { CI_inv  (f,t_inv) } */
