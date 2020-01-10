@@ -31,8 +31,27 @@ let t_hoare_app_r i phi tc =
 let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
 
 (* -------------------------------------------------------------------- *)
-let t_choare_app_r i phi info tc =
-  assert false      (* TODO: (Adrien) *)
+let t_choare_app_r i phi cost tc =
+  let chs = tc1_as_choareS tc in
+  let s1, s2 = s_split i chs.chs_s in
+  let cost1 = EcFol.f_and_simpl chs.chs_c cost in
+
+  (* We check that [cost] is not modified by [s1]. *)
+  let env, _, _ = FApi.tc1_eflat tc in
+  let write_set = EcPV.s_write env (EcModules.stmt s1) in
+  let read_set  = EcPV.PV.fv env (EcMemory.memory chs.chs_m) cost in
+  if not (EcPV.PV.indep env write_set read_set) then
+    tc_error !!tc "seq: the cost should not be modified by the first part of \
+                   the statement";
+
+  let a = f_cHoareS_r { chs with chs_s  = stmt s1;
+                                 chs_po = phi;
+                                 chs_c  = cost1; }  in
+  let b = f_cHoareS_r { chs with chs_pr = phi;
+                                 chs_s  = stmt s2;
+                                 chs_c  = cost; } in
+  FApi.xmutate1 tc `HlApp [a; b]
+
 
 let t_choare_app = FApi.t_low3 "choare-app" t_choare_app_r
 
@@ -136,6 +155,18 @@ let t_equiv_app_onesided side i pre post tc =
     ] tc
 
 (* -------------------------------------------------------------------- *)
+let process_phl_c_info app_c_info tc =
+  match app_c_info with
+
+  | PAppSingle f -> TTC.tc1_process_Xhl_form tc tint f
+
+  | PAppNone   ->
+    tc_error !!tc "seq choare: a cost must be supplied"
+
+  | PAppMult _ ->
+    tc_error !!tc "seq choare: too many arguments, only a cost must be supplied"
+
+(* -------------------------------------------------------------------- *)
 let process_phl_bd_info dir bd_info tc =
   match bd_info with
   | PAppNone ->
@@ -224,8 +255,8 @@ let process_app (side, dir, k, phi, bd_info) tc =
   | Single i, _ when is_cHoareS concl ->
     check_side side;
     let phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
-    let info = assert false     (* TODO:(Adrien) *) in
-    t_choare_app i phi info tc
+    let cost = process_phl_c_info bd_info tc in
+    t_choare_app i phi cost tc
 
   | Single i, _ when is_bdHoareS concl ->
       let pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in

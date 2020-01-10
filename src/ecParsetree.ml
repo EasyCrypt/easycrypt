@@ -455,7 +455,7 @@ type call_info =
   (* | CI_inv  of pformula * (pqsymbol * form) list *)
   | CI_upto of (pformula * pformula * pformula option)
 
-type p_app_bd_info =
+type p_app_xt_info =
   | PAppNone
   | PAppSingle of pformula
   | PAppMult   of (pformula option) tuple5
@@ -531,7 +531,7 @@ type fun_info = [
 
 (* -------------------------------------------------------------------- *)
 type app_info =
-  oside * tac_dir * codepos1 doption * pformula doption * p_app_bd_info
+  oside * tac_dir * codepos1 doption * pformula doption * p_app_xt_info
 
 (* -------------------------------------------------------------------- *)
 type pcond_info = [
