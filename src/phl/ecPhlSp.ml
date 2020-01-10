@@ -17,17 +17,19 @@ open EcCoreGoal
 open EcLowPhlGoal
 
 (*
- * SP carries three elements,
+ * SP carries four elements,
  *   - bds: a set of existential binders
  *   - assoc: a set of pairs (x,e) such that x=e holds
  *            for instance after an assignment x <- e
  *   - pre: the actual precondition (progressively weakened)
+ *   - cost: the cost of evaluating the statements up-to the current point.
  *
- * After an assignment of the form x <- e the three elements are updated:
+ * After an assignment of the form x <- e the four elements are updated:
  *   1) a new fresh local x' is added to the list of existential binders
  *   2) (x, e) is added to the assoc list, and every other (y,d) is replaced
  *      by (y[x->x'], d[x->x'])
  *   3) pre is replaced by pre[x->x']
+ *   4) cost is replaced by cost + expr_cost(e)
  *
  *  The simplification of this version comes from two tricks:
  *
@@ -179,39 +181,50 @@ module LowInternal = struct
     EcFol.f_exists_simpl (List.map (snd_map (fun t -> GTty t)) bds) pre
 
   (* ------------------------------------------------------------------ *)
-  let rec sp_stmt m env (bds, assoc, pre) stmt =
+  let rec sp_stmt m env (bds, assoc, pre, cost) stmt =
     match stmt with
     | [] ->
-        ([], (bds, assoc, pre))
+        ([], (bds, assoc, pre, cost))
 
     | i :: is ->
         try
-          let (bds, assoc, pre) = sp_instr m env (bds, assoc, pre) i in
-          sp_stmt m env (bds,assoc,pre) is
+          let bds, assoc, pre, cost =
+            sp_instr m env (bds, assoc, pre) cost i in
+          sp_stmt m env (bds,assoc,pre,cost) is
         with No_sp ->
-          (stmt, (bds, assoc, pre))
+          (stmt, (bds, assoc, pre, cost))
 
-  and sp_instr m env (bds,assoc,pre) instr = match instr.i_node with
+  and sp_instr m env (bds,assoc,pre) cost instr = match instr.i_node with
     | Sasgn (lv, e) ->
-        sp_asgn m env lv e (bds, assoc, pre)
+      let bds, assoc, pre = sp_asgn m env lv e (bds, assoc, pre) in
+      let cost = EcFol.f_int_add_simpl cost (EcFol.cost_of_expr e) in
+      bds, assoc, pre, cost
 
     | Sif (e, s1, s2) ->
         let e_form = EcFol.form_of_expr m e in
         let pre_t  = build_sp m bds assoc (f_and_simpl e_form pre) in
         let pre_f  = build_sp m bds assoc (f_and_simpl (f_not e_form) pre) in
-        let stmt_t, (bds_t, assoc_t, pre_t) = sp_stmt m env (bds, assoc, pre_t) s1.s_node in
-        let stmt_f, (bds_f, assoc_f, pre_f) = sp_stmt m env (bds, assoc, pre_f) s2.s_node in
+        let z = EcFol.f_int (EcBigInt.zero) in
+        let stmt_t, (bds_t, assoc_t, pre_t, cost_t) =
+          sp_stmt m env (bds, assoc, pre_t, z) s1.s_node in
+        let stmt_f, (bds_f, assoc_f, pre_f, cost_f) =
+          sp_stmt m env (bds, assoc, pre_f, z) s2.s_node in
         if not (List.is_empty stmt_t && List.is_empty stmt_f) then raise No_sp;
         let sp_t = build_sp m bds_t assoc_t pre_t in
         let sp_f = build_sp m bds_f assoc_f pre_f in
-        ([], [], f_or_simpl sp_t sp_f)
+        let cost =
+          EcFol.f_int_add_simpl cost
+            (EcFol.f_int_add_simpl (EcFol.cost_of_expr e)
+               (EcFol.f_int_add_simpl cost_t cost_f)) in
+        ([], [], f_or_simpl sp_t sp_f, cost)
 
     | _ -> raise No_sp
 
   let sp_stmt m env stmt f =
-    let stmt, (bds, assoc, pre) = sp_stmt m env ([], [], f) stmt in
+    let z = EcFol.f_int (EcBigInt.zero) in
+    let stmt, (bds, assoc, pre, cost) = sp_stmt m env ([], [], f, z) stmt in
     let pre = build_sp m bds assoc pre in
-    stmt, pre
+    stmt, pre, cost
 end
 
 (* -------------------------------------------------------------------- *)
@@ -249,7 +262,8 @@ let t_sp_side pos tc =
   | FsHoareS hs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
       let stmt1, stmt2 = o_split ~rev:true pos hs.shs_s in
-      let stmt1, shs_pr = LI.sp_stmt (EcMemory.memory hs.shs_m) env stmt1 hs.shs_pr in
+      let stmt1, shs_pr, _ =
+        LI.sp_stmt (EcMemory.memory hs.shs_m) env stmt1 hs.shs_pr in
       check_sp_progress pos stmt1;
       let subgoal = f_hoareS_r { hs with shs_s = stmt (stmt1@stmt2); shs_pr } in
       FApi.xmutate1 tc `Sp [subgoal]
@@ -258,17 +272,21 @@ let t_sp_side pos tc =
     let pos = pos |> omap as_single in
     let stmt1, stmt2 = o_split ~rev:true pos chs.chs_s in
     check_form_indep stmt1 chs.chs_m chs.chs_c;
-    let stmt1, chs_pr =
+    let stmt1, chs_pr, sp_cost =
       LI.sp_stmt (EcMemory.memory chs.chs_m) env stmt1 chs.chs_pr in
     check_sp_progress pos stmt1;
-    let subgoal = f_cHoareS_r {chs with chs_s = stmt (stmt1@stmt2); chs_pr; } in
+    let cost = EcFol.f_int_sub_simpl chs.chs_c sp_cost in
+    let subgoal = f_cHoareS_r {chs with chs_s = stmt (stmt1@stmt2);
+                                        chs_pr;
+                                        chs_c = cost } in
     FApi.xmutate1 tc `Sp [subgoal]
 
   | FbdHoareS bhs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
       let stmt1, stmt2 = o_split ~rev:true pos bhs.bhs_s in
       check_form_indep stmt1 bhs.bhs_m bhs.bhs_bd;
-      let stmt1, bhs_pr = LI.sp_stmt (EcMemory.memory bhs.bhs_m) env stmt1 bhs.bhs_pr in
+      let stmt1, bhs_pr, _ =
+        LI.sp_stmt (EcMemory.memory bhs.bhs_m) env stmt1 bhs.bhs_pr in
       check_sp_progress pos stmt1;
       let subgoal = f_bdHoareS_r {bhs with bhs_s = stmt (stmt1@stmt2); bhs_pr; } in
       FApi.xmutate1 tc `Sp [subgoal]
@@ -282,8 +300,10 @@ let t_sp_side pos tc =
       let stmtR1, stmtR2 = o_split ~rev:true posR es.es_sr in
 
       let         es_pr = es.es_pr in
-      let stmtL1, es_pr = LI.sp_stmt (EcMemory.memory es.es_ml) env stmtL1 es_pr in
-      let stmtR1, es_pr = LI.sp_stmt (EcMemory.memory es.es_mr) env stmtR1 es_pr in
+      let stmtL1, es_pr, _ =
+        LI.sp_stmt (EcMemory.memory es.es_ml) env stmtL1 es_pr in
+      let stmtR1, es_pr, _ =
+        LI.sp_stmt (EcMemory.memory es.es_mr) env stmtR1 es_pr in
 
       check_sp_progress ~side:`Left  pos stmtL1;
       check_sp_progress ~side:`Right pos stmtR1;
@@ -296,7 +316,9 @@ let t_sp_side pos tc =
 
       FApi.xmutate1 tc `Sp [subgoal]
 
-  | _, Some (Single _) -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
+  | _, Some (Single _) -> tc_error_noXhl ~kinds:[`Hoare `Stmt;
+                                                 `CHoare `Stmt;
+                                                 `PHoare `Stmt] !!tc
   | _, Some (Double _) -> tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
   | _, None            -> tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
 
