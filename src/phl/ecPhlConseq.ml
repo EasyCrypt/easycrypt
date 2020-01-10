@@ -26,7 +26,7 @@ module TTC = EcProofTyping
 let conseq_cond pre post spre spost =
   f_imp pre spre, f_imp spost post
 
-let conseq_cost cost scost = f_eint_le scost cost
+let conseq_cost cost scost = f_int_le_simpl scost cost
 
 let bd_goal_r fcmp fbd cmp bd =
   match fcmp, cmp with
@@ -477,18 +477,6 @@ let t_hoareF_conseq_bdhoare tc =
   let hf = tc1_as_hoareF tc in
   let concl1 = f_bdHoareF hf.shf_pr hf.shf_f hf.shf_po FHeq f_r1 in
   FApi.xmutate1 tc `HlConseqBd [concl1]
-
-(* -------------------------------------------------------------------- *)
-let t_hoareS_conseq_choare tc =
-  let hs = tc1_as_hoareS tc in
-  let concl = f_cHoareS hs.shs_m hs.shs_pr hs.shs_s hs.shs_po f_eint_infty in
-  FApi.xmutate1 tc `HlConseqCost [concl]
-
-(* -------------------------------------------------------------------- *)
-let t_hoareF_conseq_choare tc =
-  let hf = tc1_as_hoareF tc in
-  let concl = f_cHoareF hf.shf_pr hf.shf_f hf.shf_po f_eint_infty in
-  FApi.xmutate1 tc `HlConseqCost [concl]
 
 (* -------------------------------------------------------------------- *)
 let t_hoareS_conseq_conj pre post pre' post' tc =

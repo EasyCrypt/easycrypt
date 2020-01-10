@@ -128,7 +128,6 @@ let tglob m      = mk_ty (Tglob m)
 let tunit      = tconstr EcCoreLib.CI_Unit .p_unit  []
 let tbool      = tconstr EcCoreLib.CI_Bool .p_bool  []
 let tint       = tconstr EcCoreLib.CI_Int  .p_int   []
-let teint      = tconstr EcCoreLib.CI_Eint .p_eint   []
 let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr [ty]
 let treal      = tconstr EcCoreLib.CI_Real .p_real  []
 let tcpred ty  = tfun ty tbool

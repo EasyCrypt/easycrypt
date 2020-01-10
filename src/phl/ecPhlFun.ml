@@ -108,7 +108,7 @@ let t_choareF_fun_def_r tc =
   let c = PVM.subst env spre chf.chf_c in
   let c = match fdef.f_ret with
     | None -> c
-    | Some ret -> EcFol.f_eint_sub c (EcFol.cost_of_expr ret) in
+    | Some ret -> EcFol.f_int_sub_simpl c (EcFol.cost_of_expr ret) in
   let concl' = f_cHoareS memenv pre fdef.f_body post c in
   FApi.xmutate1 tc `FunDef [concl']
 
@@ -426,7 +426,7 @@ let t_fun_to_code_choare_r tc =
   let s = PVM.add env (pv_res f) (fst m) (f_pvar r ty (fst m)) PVM.empty in
   let post = PVM.subst env s chf.chf_po in
   let cost = List.fold_left (fun cost e ->
-      EcFol.f_eint_add cost (EcFol.cost_of_expr e)
+      EcFol.f_int_add_simpl cost (EcFol.cost_of_expr e)
     ) chf.chf_c args in
   let concl = f_cHoareS m chf.chf_pr st post cost in
 

@@ -592,7 +592,7 @@ let t_code_transform
         let pr, po = chs.chs_pr, chs.chs_po in
         let (me, stmt, cs) =
           tx (pf, hyps) cpos (pr, po) (chs.chs_m, chs.chs_s) in
-        let cost = EcFol.f_eint_sub chs.chs_c c in
+        let cost = EcFol.f_int_sub_simpl chs.chs_c c in
         let concl = f_cHoareS_r { chs with chs_m = me;
                                            chs_s = stmt;
                                            chs_c = cost; } in

@@ -90,35 +90,6 @@ let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
 let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
 
 (* -------------------------------------------------------------------- *)
-let fop_eint_le    = f_op CI.CI_Eint.p_eint_le   [] (toarrow [teint; teint] tbool)
-let fop_eint_lt    = f_op CI.CI_Eint.p_eint_lt   [] (toarrow [teint; teint] tbool)
-let fop_eint_add   = f_op CI.CI_Eint.p_eint_add  [] (toarrow [teint; teint] teint)
-let fop_eint_opp   = f_op CI.CI_Eint.p_eint_opp  [] (toarrow [teint] teint)
-let fop_eint_mul   = f_op CI.CI_Eint.p_eint_mul  [] (toarrow [teint; teint] teint)
-let fop_eint_max   = f_op CI.CI_Eint.p_eint_mul  [] (toarrow [teint; teint] teint)
-
-let f_eint_le f1 f2 = f_app fop_eint_le [f1; f2] tbool
-let f_eint_lt f1 f2 = f_app fop_eint_lt [f1; f2] tbool
-
-let f_eint_infty = assert false (* TODO: (Adrien) *)
-let f_eint_0 = assert false (* TODO: (Adrien) *)
-let f_eint_r1 = assert false (* TODO: (Adrien) *)
-
-(* -------------------------------------------------------------------- *)
-(* TODO: (Adrien) add integer with infinity *)
-let f_eint_opp f = assert false (* TODO: (Adrien) *)
-
-let f_eint_add f1 f2 = assert false (* TODO: (Adrien) *)
-
-let f_eint_sub f1 f2 = assert false (* TODO: (Adrien) *)
-
-let f_eint_mul f1 f2 = assert false (* TODO: (Adrien) *)
-
-let f_eint_edivz f1 f2 = assert false (* TODO: (Adrien) *)
-
-let f_eint_max f1 f2 = assert false (* TODO: (Adrien) *)
-
-(* -------------------------------------------------------------------- *)
 let f_real_le  f1 f2 = f_app fop_real_le  [f1; f2] tbool
 let f_real_lt  f1 f2 = f_app fop_real_lt  [f1; f2] tbool
 let f_real_add f1 f2 = f_app fop_real_add [f1; f2] treal
@@ -342,20 +313,6 @@ let f_int_edivz_simpl f1 f2 =
       else if f_equal f2 f_i1 then f_tuple [f1; f_i0]
       else if f_equal f2 f_im1 then f_tuple [f_int_opp_simpl f1; f_i0]
       else f_int_edivz f1 f2
-
-(* -------------------------------------------------------------------- *)
-(* TODO: (Adrien) add integer with infinity *)
-let f_eint_opp_simpl f = assert false (* TODO: (Adrien) *)
-
-let f_eint_add_simpl f1 f2 = assert false (* TODO: (Adrien) *)
-
-let f_eint_sub_simpl f1 f2 = assert false (* TODO: (Adrien) *)
-
-let f_eint_mul_simpl f1 f2 = assert false (* TODO: (Adrien) *)
-
-let f_eint_edivz_simpl f1 f2 = assert false (* TODO: (Adrien) *)
-
-let f_eint_max_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
 (* -------------------------------------------------------------------- *)
 let destr_rdivint =
@@ -941,11 +898,6 @@ let f_int_lt_simpl f1 f2 =
   match opair int_of_form f1 f2 with
   | Some (x1, x2) -> f_bool (BI.compare x1 x2 < 0)
   | None -> f_int_lt f1 f2
-
-(* TODO: (Adrien) add integer with infinity *)
-let f_eint_le_simpl f1 f2 = assert false (* TODO: (Adrien) *)
-
-let f_eint_lt_simpl f1 f2 = assert false (* TODO: (Adrien) *)
 
 let f_real_le_simpl f1 f2 =
   if f_equal f1 f2 then f_true else

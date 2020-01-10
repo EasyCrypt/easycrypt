@@ -111,8 +111,10 @@ let t_choare_call fpre fpost fcost tc =
      conclusion `chs.chs_c`, minus the cost of the call `fcost`, and minus
      the cost of the arguments' evaluation. *)
   let args_cost = List.fold_left (fun cost e ->
-      EcFol.f_eint_add cost (EcFol.cost_of_expr e)) EcFol.f_eint_0 args in
-  let cost = EcFol.f_eint_sub (EcFol.f_eint_sub chs.chs_c fcost) args_cost in
+      EcFol.f_int_add_simpl cost (EcFol.cost_of_expr e)
+    ) (EcFol.f_int EcBigInt.zero) args in
+  let cost =
+    EcFol.f_int_sub_simpl (EcFol.f_int_sub_simpl chs.chs_c fcost) args_cost in
 
   let concl = f_cHoareS_r { chs with chs_s = s;
                                      chs_po = post;
@@ -363,7 +365,7 @@ let process_call side info tc =
           (* TODO: (Adrien) check that this is correct *)
           (* We check that the cost does not use the memory, which would
              be unsound. *)
-          let cost  = TTC.pf_process_form !!tc penv teint cost in
+          let cost  = TTC.pf_process_form !!tc penv tint cost in
           let cmem = oget (EcEnv.Memory.get_active (EcEnv.LDecl.toenv penv)) in
           if EcIdent.Mid.mem cmem cost.f_fv then
             tc_error !!tc "cost cannot use the memory %a" EcIdent.pp_ident cmem;

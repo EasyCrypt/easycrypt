@@ -46,7 +46,7 @@ module Low = struct
     let chs = tc1_as_choareS tc in
     let m  = EcMemory.memory chs.chs_m in
     let hd,e_expr,e,s = gen_rcond !!tc b m at_pos chs.chs_s in
-    let cost = EcFol.f_eint_sub chs.chs_c (EcFol.cost_of_expr e_expr) in
+    let cost = EcFol.f_int_sub_simpl chs.chs_c (EcFol.cost_of_expr e_expr) in
     let concl1  = f_hoareS chs.chs_m chs.chs_pr hd e in
     let concl2  = f_cHoareS_r { chs with chs_s = s;
                                          chs_c = cost; } in

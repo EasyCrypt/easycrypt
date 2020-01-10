@@ -82,24 +82,6 @@ module CI_Int : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module CI_Eint : sig
-  val i_Eint : symbol
-  val p_Eint : path
-  val p_eint : path
-
-  val p_eint_pinfty : path
-  val p_eint_minfty : path
-  val p_eint_opp    : path
-  val p_eint_add    : path
-  val p_eint_mul    : path
-  val p_eint_pow    : path
-  val p_eint_le     : path
-  val p_eint_lt     : path
-  val p_eint_edivz  : path
-  val p_eint_max    : path
-end
-
-(* -------------------------------------------------------------------- *)
 module CI_Real : sig
   val i_Real : symbol
   val p_Real : path
