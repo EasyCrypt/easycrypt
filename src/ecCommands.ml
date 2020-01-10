@@ -464,8 +464,8 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
       let scope = EcScope.Theory.require scope (name, kind) loader in
           match io with
           | None         -> scope
-          | Some `Export -> EcScope.Theory.export scope ([], name.rqd_name)
-          | Some `Import -> EcScope.Theory.import scope ([], name.rqd_name)
+          | Some `Export -> EcScope.Theory.export scope ([], name.EcScope.rqd_name)
+          | Some `Import -> EcScope.Theory.import scope ([], name.EcScope.rqd_name)
 
 (* -------------------------------------------------------------------- *)
 and process_th_require ld scope (nm, xs, io) =
