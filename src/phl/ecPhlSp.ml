@@ -254,7 +254,7 @@ let t_sp_side pos tc =
     let write_set = EcPV.s_write env (EcModules.stmt stmt) in
     let read_set  = EcPV.PV.fv env (EcMemory.memory mem) form in
     if not (EcPV.PV.indep env write_set read_set) then
-      tc_error !!tc "the bound should not be modified by the statement \
+      tc_error !!tc "the bound/cost should not be modified by the statement \
                      targeted by [sp]"
   in
 
