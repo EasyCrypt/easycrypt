@@ -21,8 +21,6 @@ module TTC = EcProofTyping
 module EP  = EcParsetree
 module Mid = EcIdent.Mid
 
-(* TODO:(Adrien) this is modeled after the IFEL module, for the fel tactic.
-   I am not understanding where the ICHOARE module is declared. *)
 module ICHOARE : sig
   val loaded : EcEnv.env -> bool
   val choare_sum : form -> (form * form) -> form

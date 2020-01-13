@@ -449,7 +449,7 @@ and pspattern = unit
 
 type call_info =
   | CI_spec of (pformula * pformula * pformula option)
-  | CI_inv  of pformula
+  | CI_inv  of pformula * pformula option
   (* TODO: (Adrien) the list is of elements of the form (G.o : cost)
      We need to somehow add the step counter parameter.*)
   (* | CI_inv  of pformula * (pqsymbol * form) list *)

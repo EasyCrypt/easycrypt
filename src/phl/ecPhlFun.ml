@@ -502,6 +502,8 @@ let t_fun_r inv tc =
       if   NormMp.is_abstract_fun h.shf_f env
       then t_hoareF_abs inv tc
       else t_hoareF_fun_def tc
+
+  (* TODO: (Adrien) should specify a cost here *)
   and tch tc =
     let env = FApi.tc1_env tc in
     let h   = destr_cHoareF (FApi.tc1_goal tc) in

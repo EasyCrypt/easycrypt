@@ -410,27 +410,45 @@ let process_call side info tc =
     if not (is_none side) then
       tc_error !!tc "cannot specify side for call with invariants";
 
+    let check_none c =
+      if not (is_none c) then
+        tc_error !!tc "cannot specify cost for call with invariants if \
+                       the conclusion is not a choare" in
+
     let hyps, concl = FApi.tc1_flat tc in
     match concl.f_node with
     | FsHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.shs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, fun inv -> f_hoareF inv f inv)
+        (penv, fun inv c ->
+            check_none c;
+            f_hoareF inv f inv)
 
-    | FcHoareS _ ->
-      assert false (* TODO:(Adrien) we need to add the cost invariants here.*)
+    | FcHoareS chs ->
+      let (_,f,_) = fst (tc1_last_call tc chs.chs_s) in
+      let penv = LDecl.inv_memenv1 hyps in
+      (penv, fun inv c ->
+          if c = None then
+            tc_error !!tc "must specify a cost for call with invariants if \
+                           the conclusion is a choare";
+          let c = oget c in
+          f_cHoareF inv f inv c)
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
       let penv = LDecl.inv_memenv1 hyps in
-      (penv, fun inv -> bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None)
+      (penv, fun inv c ->
+          check_none c;
+         bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None)
 
     | FequivS es ->
       let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
       let penv = LDecl.inv_memenv hyps in
       let env  = LDecl.toenv hyps in
-      (penv, fun inv -> mk_inv_spec !!tc env inv fl fr)
+      (penv, fun inv c ->
+          check_none c;
+          mk_inv_spec !!tc env inv fl fr)
 
     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
@@ -469,12 +487,16 @@ let process_call side info tc =
       let post = TTC.pf_process_form !!tc qenv tbool post in
       fmake pre post
 
-    | CI_inv inv ->
+    | CI_inv (inv, c_opt) ->
       let env, fmake = process_inv tc side in
       let inv = TTC.pf_process_form !!tc env tbool inv in
+      let c   = c_opt |> omap (TTC.pf_process_form !!tc env tint) in
       subtactic := (fun tc ->
+          (* TODO: (Adrien) should specify a cost here, it should probably
+             something like:
+             ... (EcPhlFun.t_fun inv c tc)); *)
         FApi.t_firsts t_logic_trivial 2 (EcPhlFun.t_fun inv tc));
-      fmake inv
+      fmake inv c
 
     | CI_upto info ->
       let bad, p, q, form = process_upto tc side info in

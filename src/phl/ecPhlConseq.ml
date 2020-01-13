@@ -328,61 +328,59 @@ let t_hoareS_notmod post tc =
 
 (* -------------------------------------------------------------------- *)
 let cond_cHoareF_notmod ?(mk_other=false) tc cond =
-  assert false (* TODO: (Adrien) *)
-  (* let (env, hyps, _) = FApi.tc1_eflat tc in
-   * let hf = tc1_as_hoareF tc in
-   * let f = hf.hf_f in
-   * let mpr,mpo = Fun.hoareF_memenv f env in
-   * let fsig = (Fun.by_xpath f env).f_sig in
-   * let pvres = pv_res f in
-   * let vres = LDecl.fresh_id hyps "result" in
-   * let fres = f_local vres fsig.fs_ret in
-   * let m    = fst mpo in
-   * let s = PVM.add env pvres m fres PVM.empty in
-   * let cond = PVM.subst env s cond in
-   * let modi = f_write env f in
-   * let cond,bdg,bde = generalize_mod_ env m modi cond in
-   * let cond = f_forall_simpl [(vres, GTty fsig.fs_ret)] cond in
-   * assert (fst mpr = m);
-   * let cond = f_forall_mems [mpr] (f_imp hf.hf_pr cond) in
-   * let bmem = [m] in
-   * let bother =
-   *   if mk_other then
-   *     mk_bind_pvar m (vres,()) (pvres, fsig.fs_ret) ::
-   *     List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
-   *   else [] in
-   * cond, bmem, bother *)
+  let (env, hyps, _) = FApi.tc1_eflat tc in
+  let chf = tc1_as_choareF tc in
+  let f = chf.chf_f in
+  let mpr,mpo = Fun.hoareF_memenv f env in
+  let fsig = (Fun.by_xpath f env).f_sig in
+  let pvres = pv_res f in
+  let vres = LDecl.fresh_id hyps "result" in
+  let fres = f_local vres fsig.fs_ret in
+  let m    = fst mpo in
+  let s = PVM.add env pvres m fres PVM.empty in
+  let cond = PVM.subst env s cond in
+  let modi = f_write env f in
+  let cond,bdg,bde = generalize_mod_ env m modi cond in
+  let cond = f_forall_simpl [(vres, GTty fsig.fs_ret)] cond in
+  assert (fst mpr = m);
+  let cond = f_forall_mems [mpr] (f_imp chf.chf_pr cond) in
+  let bmem = [m] in
+  let bother =
+    if mk_other then
+      mk_bind_pvar m (vres,()) (pvres, fsig.fs_ret) ::
+      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+    else [] in
+  cond, bmem, bother
 
 let t_cHoareF_notmod post tc =
-  assert false (* TODO: (Adrien) *)
-  (* let hf = tc1_as_hoareF tc in
-   * let cond1, _, _ = cond_hoareF_notmod tc (f_imp post hf.hf_po) in
-   * let cond2 = f_hoareF_r { hf with hf_po = post } in
-   * FApi.xmutate1 tc `HlNotmod [cond1; cond2] *)
+  let chf = tc1_as_choareF tc in
+  let cond1, _, _ = cond_cHoareF_notmod tc (f_imp post chf.chf_po) in
+  let cond2 = f_cHoareF_r { chf with chf_po = post } in
+  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
 let cond_cHoareS_notmod ?(mk_other=false) tc cond =
-  assert false (* TODO: (Adrien) *)
-  (* let env = FApi.tc1_env tc in
-   * let hs = tc1_as_hoareS tc in
-   * let s = hs.hs_s in
-   * let m = fst hs.hs_m in
-   * let modi = s_write env s in
-   * let cond, bdg, bde = generalize_mod_ env m modi cond in
-   * let cond = f_forall_mems [hs.hs_m] (f_imp hs.hs_pr cond) in
-   * let bmem = [m] in
-   * let bother =
-   *   if mk_other then
-   *     List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
-   *   else [] in
-   * cond, bmem, bother *)
+  let env = FApi.tc1_env tc in
+  let chs = tc1_as_choareS tc in
+  let s = chs.chs_s in
+  let m = fst chs.chs_m in
+  let modi = s_write env s in
+  let cond, bdg, bde = generalize_mod_ env m modi cond in
+  let cond = f_forall_mems [chs.chs_m] (f_imp chs.chs_pr cond) in
+  let bmem = [m] in
+  let bother =
+    if mk_other then
+      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+    else [] in
+  cond, bmem, bother
 
 let t_cHoareS_notmod post tc =
-  assert false (* TODO: (Adrien) *)
-  (* let hs = tc1_as_hoareS tc in
-   * let cond1, _, _ = cond_hoareS_notmod tc (f_imp post hs.hs_po) in
-   * let cond2 = f_hoareS_r {hs with hs_po = post} in
-   * FApi.xmutate1 tc `HlNotmod [cond1; cond2] *)
+  let chs = tc1_as_choareS tc in
+  let cond1, _, _ = cond_cHoareS_notmod tc (f_imp post chs.chs_po) in
+  (* There is no need to check anything on the cost, as we do not modify the
+     pre-condition.  *)
+  let cond2 = f_cHoareS_r {chs with chs_po = post} in
+  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
 let cond_bdHoareF_notmod ?(mk_other=false) tc cond =
@@ -457,8 +455,8 @@ let t_hoareF_conseq_nm   = gen_conseq_nm t_hoareF_notmod   t_hoareF_conseq
 let t_hoareS_conseq_nm   = gen_conseq_nm t_hoareS_notmod   t_hoareS_conseq
 let t_equivF_conseq_nm   = gen_conseq_nm t_equivF_notmod   t_equivF_conseq
 let t_equivS_conseq_nm   = gen_conseq_nm t_equivS_notmod   t_equivS_conseq
-let t_cHoareF_conseq_nm  = gen_conseq_nm t_cHoareF_notmod t_cHoareF_conseq
-let t_cHoareS_conseq_nm  = gen_conseq_nm t_cHoareS_notmod t_cHoareS_conseq
+let t_cHoareF_conseq_nm  = gen_conseq_nm t_cHoareF_notmod  t_cHoareF_conseq
+let t_cHoareS_conseq_nm  = gen_conseq_nm t_cHoareS_notmod  t_cHoareS_conseq
 let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq
 let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
 
@@ -657,10 +655,25 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       tc
 
   (* ------------------------------------------------------------------ *)
-  (* FcHoareS / FcHoareS / ⊥ / ⊥                                        *)
-  | FcHoareS _, Some ((_, {f_node = FcHoareS hs}) as nf1), None, None ->
+  (* cHoareS / cHoareS / ⊥ / ⊥                                        *)
+  | FcHoareS _, Some ((_, {f_node = FcHoareS chs}) as nf1), None, None ->
+    let tac = if notmod then t_cHoareS_conseq_nm else t_cHoareS_conseq in
+
+    (* TODO: (Adrien) check what this does *)
+    t_on1seq 1
+      (t_cHoareS_conseq_c chs.chs_c)
+      (t_on1seq 2 (tac chs.chs_pr chs.chs_po) (t_apply_r nf1))
+      tc
+
+
+  (* ------------------------------------------------------------------ *)
+  (* cHoareS / cHoareS / cHoareS / ⊥                                       *)
+  | FcHoareS _,
+      Some ((_, { f_node = FcHoareS hs }) as nf1),
+      Some ((_, f2) as nf2),
+      None
+    ->
     assert false (* TODO: (Adrien) *)
-  (* TODO: (Adrien) multiple other cases to do here I guess. *)
 
   (* ------------------------------------------------------------------ *)
   (* hoareS / bdhoareS / ⊥ / ⊥                                          *)
@@ -1022,47 +1035,56 @@ let process_conseq notmod (info1, info2, info3) tc =
   let hyps, concl = FApi.tc1_flat tc in
 
   let ensure_none o =
-    if not (is_none o) then tc_error !!tc "cannot give a bound here" in
+    if not (is_none o) then tc_error !!tc "cannot give a bound or cost here" in
 
-  let process_cut1 ((pre, post), bd) =
+  let ensure_none_cmp o =
+    if not (is_none o)
+    then tc_error !!tc "cannot give a comparison operator here" in
+
+  let app_ty bd ty : (EcFol.hoarecmp option * form) option =
+    omap (fun f -> f ty) bd in
+
+  let process_cut1 ((pre, post), c_or_bd) =
      let penv, qenv, gpre, gpost, fmake =
       match concl.f_node with
       | FsHoareS hs ->
         let env = LDecl.push_active hs.shs_m hyps in
-        let fmake pre post bd =
-          match bd with
+        let fmake pre post c_or_bd =
+          match app_ty c_or_bd treal with
           | None -> f_hoareS_r { hs with shs_pr = pre; shs_po = post; }
           | Some (cmp, bd) -> f_bdHoareS hs.shs_m pre hs.shs_s post (oget cmp) bd
         in (env, env, hs.shs_pr, hs.shs_po, fmake)
 
       | FsHoareF hf ->
         let penv, qenv = LDecl.hoareF hf.shf_f hyps in
-        let fmake pre post bd =
-          match bd with
+        let fmake pre post c_or_bd =
+          match app_ty c_or_bd treal with
           | None -> f_hoareF pre hf.shf_f post
           | Some (cmp, bd) -> f_bdHoareF pre hf.shf_f post (oget cmp) bd
         in (penv, qenv, hf.shf_pr, hf.shf_po, fmake)
 
-      | FcHoareS chs -> assert false (* TODO: (Adrien) *)
-        (* let env = LDecl.push_active hs.hs_m hyps in
-         * let fmake pre post bd =
-         *   match bd with
-         *   | None -> f_hoareS_r { hs with hs_pr = pre; hs_po = post; }
-         *   | Some (cmp, bd) -> f_bdHoareS hs.hs_m pre hs.hs_s post (oget cmp) bd
-         * in (env, env, hs.hs_pr, hs.hs_po, fmake) *)
+      | FcHoareS chs ->
+        let env = LDecl.push_active chs.chs_m hyps in
+        let fmake pre post c_or_bd =
+          let cmp, c = odfl (None, chs.chs_c) (app_ty c_or_bd tint) in
+          ensure_none_cmp cmp;
+          f_cHoareS_r { chs with chs_pr = pre;
+                                 chs_po = post;
+                                 chs_c = c; }
+        in (env, env, chs.chs_pr, chs.chs_po, fmake)
 
-      | FcHoareF chf -> assert false (* TODO: (Adrien) *)
-        (* let penv, qenv = LDecl.hoareF hf.hf_f hyps in
-         * let fmake pre post bd =
-         *   match bd with
-         *   | None -> f_hoareF pre hf.hf_f post
-         *   | Some (cmp, bd) -> f_bdHoareF pre hf.hf_f post (oget cmp) bd
-         * in (penv, qenv, hf.hf_pr, hf.hf_po, fmake) *)
+      | FcHoareF chf ->
+        let penv, qenv = LDecl.hoareF chf.chf_f hyps in
+        let fmake pre post c_or_bd =
+          let cmp, c = odfl (None, chf.chf_c) (app_ty c_or_bd tint) in
+          ensure_none_cmp cmp;
+          f_cHoareF pre chf.chf_f post c
+        in (penv, qenv, chf.chf_pr, chf.chf_po, fmake)
 
       | FbdHoareS bhs ->
         let env = LDecl.push_active bhs.bhs_m hyps in
-        let fmake pre post bd =
-          let cmp,bd = odfl (None, bhs.bhs_bd) bd in
+        let fmake pre post c_or_bd =
+          let cmp,bd = odfl (None, bhs.bhs_bd) (app_ty c_or_bd treal) in
           let cmp = odfl bhs.bhs_cmp cmp in
           f_bdHoareS_r { bhs with
             bhs_pr = pre; bhs_po = post; bhs_cmp = cmp; bhs_bd = bd; }
@@ -1070,32 +1092,34 @@ let process_conseq notmod (info1, info2, info3) tc =
 
       | FbdHoareF hf ->
         let penv, qenv = LDecl.hoareF hf.bhf_f hyps in
-        let fmake pre post bd =
-          let cmp, bd = bd |> odfl (None, hf.bhf_bd) in
+        let fmake pre post c_or_bd =
+          let cmp, bd = odfl (None, hf.bhf_bd) (app_ty c_or_bd treal) in
           let cmp = cmp |> odfl hf.bhf_cmp in
           f_bdHoareF pre hf.bhf_f post cmp bd
         in (penv, qenv, hf.bhf_pr, hf.bhf_po, fmake)
 
       | FequivF ef ->
         let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
-        let fmake pre post bd =
-          ensure_none bd; f_equivF pre ef.ef_fl ef.ef_fr post
+        let fmake pre post c_or_bd =
+          ensure_none c_or_bd; f_equivF pre ef.ef_fl ef.ef_fr post
         in (penv, qenv, ef.ef_pr, ef.ef_po, fmake)
 
       | FequivS es ->
         let env = LDecl.push_all [es.es_ml; es.es_mr] hyps in
-        let fmake pre post bd =
-          ensure_none bd; f_equivS_r { es with es_pr = pre; es_po = post; }
+        let fmake pre post c_or_bd =
+          ensure_none c_or_bd; f_equivS_r { es with es_pr = pre; es_po = post; }
         in (env, env, es.es_pr, es.es_po, fmake)
 
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
 
-    let pre  = pre  |> omap (TTC.pf_process_formula !!tc penv) |> odfl gpre  in
-    let post = post |> omap (TTC.pf_process_formula !!tc qenv) |> odfl gpost in
-    let bd   = bd   |> omap (snd_map (TTC.pf_process_form !!tc penv treal)) in
+    let pre   = pre  |> omap (TTC.pf_process_formula !!tc penv) |> odfl gpre  in
+    let post  = post |> omap (TTC.pf_process_formula !!tc qenv) |> odfl gpost in
+    let c_or_bd =
+      c_or_bd |> omap (fun c_or_bd ty ->
+          snd_map (TTC.pf_process_form !!tc penv ty) c_or_bd) in
 
-    fmake pre post bd
+    fmake pre post c_or_bd
 
   in
 
@@ -1113,16 +1137,9 @@ let process_conseq notmod (info1, info2, info3) tc =
         let fmake pre post bd = ensure_none bd; f_hoareF pre hf.shf_f post in
         (penv, qenv, hf.shf_pr, hf.shf_po, fmake)
 
-      | FcHoareS hs -> assert false (* TODO: (Adrien) *)
-        (* let env = LDecl.push_active hs.hs_m hyps in
-         * let fmake pre post bd =
-         *   ensure_none bd; f_hoareS_r { hs with hs_pr = pre; hs_po = post; }
-         * in (env, env, hs.hs_pr, hs.hs_po, fmake) *)
-
-      | FcHoareF hf -> assert false (* TODO: (Adrien) *)
-        (* let penv, qenv = LDecl.hoareF hf.hf_f hyps in
-         * let fmake pre post bd = ensure_none bd; f_hoareF pre hf.hf_f post in
-         * (penv, qenv, hf.hf_pr, hf.hf_po, fmake) *)
+      | FcHoareS _ | FcHoareF _ ->
+        tc_error !!tc "conseq: cannot give a cost judgement in \
+                       2nd or 3rd position.";
 
       | FbdHoareS bhs ->
         let env = LDecl.push_active bhs.bhs_m hyps in

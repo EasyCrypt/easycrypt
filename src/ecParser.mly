@@ -579,6 +579,7 @@
 %token WLOG
 %token WP
 %token ZETA
+%token COST
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 
@@ -2378,8 +2379,8 @@ conseq:
 | f1=form LONGARROW f2=form       { Some f1, Some f2 }
 
 
-conseq_bd:
-| c=conseq                                   { c, None }
+conseq_xt:
+| c=conseq                                    { c, None }
 | c=conseq   COLON cmp=hoare_bd_cmp? bd=sform { c, Some (cmp, bd) }
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform { (None, None), Some(cmp, bd) }
 
@@ -2388,9 +2389,10 @@ orcl_time:
 
 call_info:
  | f1=form LONGARROW f2=form                   { CI_spec (f1, f2, None) }
- | f1=form LONGARROW f2=form TIME cost=form    { CI_spec (f1, f2, Some cost) }
- | f=form                                      { CI_inv  f }
- /* | f=form TIME t_inv = rlist1(orcl_time, COMMA) */
+ | f1=form LONGARROW f2=form COST cost=form    { CI_spec (f1, f2, Some cost) }
+ | f=form                                      { CI_inv  (f, None) }
+ | f=form COST cost=form                       { CI_inv  (f, Some cost) }
+ /* | f=form COST t_inv = rlist1(orcl_time, COMMA) */
  /*                                               { CI_inv  (f,t_inv) } */
  | bad=form COMMA p=form                       { CI_upto (bad,p,None) }
  | bad=form COMMA p=form COMMA q=form          { CI_upto (bad,p,Some q) }
@@ -2863,25 +2865,25 @@ phltactic:
 | CONSEQ cq=cqoptions?
     { Pconseq (odfl [] cq, (None, None, None)) }
 
-| CONSEQ cq=cqoptions? info1=gpterm(conseq_bd)
+| CONSEQ cq=cqoptions? info1=gpterm(conseq_xt)
     { Pconseq (odfl [] cq, (Some info1, None, None)) }
 
-| CONSEQ cq=cqoptions? info1=gpterm(conseq_bd) info2=gpterm(conseq_bd) UNDERSCORE?
+| CONSEQ cq=cqoptions? info1=gpterm(conseq_xt) info2=gpterm(conseq_xt) UNDERSCORE?
     { Pconseq (odfl [] cq, (Some info1, Some info2, None)) }
 
-| CONSEQ cq=cqoptions? info1=gpterm(conseq_bd) UNDERSCORE info3=gpterm(conseq_bd)
+| CONSEQ cq=cqoptions? info1=gpterm(conseq_xt) UNDERSCORE info3=gpterm(conseq_xt)
     { Pconseq (odfl [] cq, (Some info1, None, Some info3)) }
 
 | CONSEQ cq=cqoptions?
-    info1=gpterm(conseq_bd)
-    info2=gpterm(conseq_bd)
-    info3=gpterm(conseq_bd)
+    info1=gpterm(conseq_xt)
+    info2=gpterm(conseq_xt)
+    info3=gpterm(conseq_xt)
       { Pconseq (odfl [] cq, (Some info1,Some info2,Some info3)) }
 
-| CONSEQ cq=cqoptions? UNDERSCORE info2=gpterm(conseq_bd) UNDERSCORE?
+| CONSEQ cq=cqoptions? UNDERSCORE info2=gpterm(conseq_xt) UNDERSCORE?
     { Pconseq (odfl [] cq, (None,Some info2, None)) }
 
-| CONSEQ cq=cqoptions? UNDERSCORE UNDERSCORE info3=gpterm(conseq_bd)
+| CONSEQ cq=cqoptions? UNDERSCORE UNDERSCORE info3=gpterm(conseq_xt)
     { Pconseq (odfl [] cq, (None,None,Some info3)) }
 
 | CONSEQ cm=crushmode { Pconseqauto cm }
