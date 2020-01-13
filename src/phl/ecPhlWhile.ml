@@ -124,7 +124,7 @@ let t_hoare_while_r inv tc =
 let t_choare_while_r inv qinc n lam_cost tc =
   let env = FApi.tc1_env tc in
   if not (ICHOARE.loaded env) then
-    tacuerror "fel: load the `CHoareTactic' theory first";
+    tacuerror "while: load the `CHoareTactic' theory first";
 
   let chs = tc1_as_choareS tc in
   let (expr_e, c), s = tc1_last_while tc chs.chs_s in
@@ -153,7 +153,7 @@ let t_choare_while_r inv qinc n lam_cost tc =
      - at most [n+2] evaluations of the loop condition [e].
      - at most [n+1] evaluations of the loop body. *)
   let e_cost = f_int_mul_simpl
-      (f_int_add_simpl n (f_i1))
+      (f_int_add_simpl n (f_int @@ EcBigInt.of_int 2))
       (cost_of_expr expr_e) in
   let body_cost = ICHOARE.choare_sum lam_cost (f_i0, n) in
   let cost = f_int_sub_simpl chs.chs_c (f_int_add_simpl body_cost e_cost) in
