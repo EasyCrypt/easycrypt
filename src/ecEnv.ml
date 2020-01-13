@@ -2535,7 +2535,7 @@ module NormMp = struct
              && chf.chf_po == post' && chf.chf_c == c' then f else
             f_cHoareF pre' p' post' c'
 
-        (* TODO: (Adrien) why is there no case for FbdHoareF here? *)
+        (* TODO: why is there no case for FbdHoareF and every F*HoareS ? *)
 
         | FequivF ef ->
           let pre' = aux ef.ef_pr and l' = norm_xfun env ef.ef_fl
