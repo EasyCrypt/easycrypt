@@ -472,7 +472,7 @@ let check_item_compatible env mode (fin,oin) (fout,oout) =
   let norm oi =
     List.fold_left (fun s f ->
         EcPath.Sx.add (EcEnv.NormMp.norm_xfun env f) s)
-      EcPath.Sx.empty oi.oi_calls
+      EcPath.Sx.empty (OI.allowed oi)
   in
   let icalls = norm oin in
   let ocalls = norm oout in

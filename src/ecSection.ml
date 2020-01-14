@@ -160,7 +160,7 @@ let on_mpath_restr cb restr =
   Sm.iter cb restr.mr_mpaths.ur_neg;
   oiter (Sm.iter cb) restr.mr_mpaths.ur_pos;
   Msym.iter (fun _ oi ->
-      List.iter (fun x -> cb x.x_top) oi.oi_calls
+      List.iter (fun x -> cb x.x_top) (OI.allowed oi)
     ) restr.mr_oinfos
 
 let rec on_mpath_modty cb mty =
@@ -323,7 +323,7 @@ and on_mpath_uses cb uses =
   Sx.iter   (fun x -> cb x.x_top) uses.us_writes
 
 and on_mpath_fun_oi cb oi =
-  List.iter (fun x -> cb x.x_top) oi.oi_calls
+  List.iter (fun x -> cb x.x_top) (OI.allowed oi)
 
 (* -------------------------------------------------------------------- *)
 

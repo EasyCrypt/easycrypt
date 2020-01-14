@@ -579,22 +579,65 @@ let ur_inter union inter ur1 ur2 =
     ur_neg = inter ur1.ur_neg ur2.ur_neg; }
 
 (* -------------------------------------------------------------------- *)
-type oracle_info = {
-  oi_calls : xpath list;
-  oi_in    : bool;
-}
+(* Oracle Information *)
+module OI : sig
+  type t
 
-let oi_empty = { oi_calls = []; oi_in = true; }
+  val hash : t -> int
+  val equal : t -> t -> bool
+  val subst : (xpath -> xpath) -> t -> t
 
-let oi_equal oi1 oi2 =
-     oi1.oi_in = oi2.oi_in
-  && List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
+  val empty : t
+
+  (* Return true if equality of globals is required to ensure equality of
+   * result and globals (in the post). *)
+  val is_in : t -> bool
+
+  val allowed : t -> xpath list
+  val allowed_s : t -> Sx.t
+
+  val mk : xpath list -> bool -> t
+  val filter : (xpath -> bool) -> t -> t
+end = struct
+
+  type t = {
+    oi_calls : xpath list;
+    oi_in    : bool;
+  }
+
+  let empty = { oi_calls = []; oi_in = true; }
+
+  let is_in t = t.oi_in
+
+  let allowed oi = oi.oi_calls
+
+  let allowed_s oi = allowed oi |> Sx.of_list
+
+  let mk oi_calls oi_in = { oi_calls; oi_in; }
+
+  let filter f oi = mk (List.filter f oi.oi_calls) oi.oi_in
+
+  let subst sx oi =
+  { oi_calls  = List.map sx oi.oi_calls;
+    oi_in     = oi.oi_in; }
+
+  let equal oi1 oi2 =
+    oi1.oi_in = oi2.oi_in
+    && List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
+
+  let hash oi =
+  Why3.Hashcons.combine
+    (if oi.oi_in then 0 else 1)
+    (Why3.Hashcons.combine_list EcPath.x_hash 0
+       (List.sort EcPath.x_compare oi.oi_calls))
+
+end
 
 (* -------------------------------------------------------------------- *)
 type mod_restr = {
   mr_xpaths : EcPath.Sx.t use_restr;
   mr_mpaths : EcPath.Sm.t use_restr;
-  mr_oinfos : oracle_info Msym.t;
+  mr_oinfos : OI.t Msym.t;
 }
 
 let mr_empty = {
@@ -612,26 +655,27 @@ let mr_full = {
 let mr_equal mr1 mr2 =
   ur_equal EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
   && ur_equal EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
-  && Msym.equal oi_equal mr1.mr_oinfos mr2.mr_oinfos
+  && Msym.equal OI.equal mr1.mr_oinfos mr2.mr_oinfos
 
 let mr_add_restr mr (rx : Sx.t use_restr) (rm : Sm.t use_restr) =
   { mr_xpaths = ur_union Sx.union Sx.inter mr.mr_xpaths rx;
     mr_mpaths = ur_union Sm.union Sm.inter mr.mr_mpaths rm;
     mr_oinfos = mr.mr_oinfos; }
 
-let add_oinfo restr f ocalls oin =
-  { restr with
-    mr_oinfos = Msym.add f { oi_calls = ocalls; oi_in = oin; } restr.mr_oinfos }
+let change_oinfo restr f oi =
+  { restr with mr_oinfos = Msym.add f oi restr.mr_oinfos }
+
+let add_oinfo restr f ocalls oin = change_oinfo restr f (OI.mk ocalls oin)
 
 let change_oicalls restr f ocalls =
   let oi_in = match Msym.find f restr.mr_oinfos with
-    | oi -> oi.oi_in
+    | oi -> OI.is_in oi
     | exception Not_found -> true in
   add_oinfo restr f ocalls oi_in
 
 let oicalls_filter restr f filter =
   match Msym.find f restr.mr_oinfos with
-  | oi -> add_oinfo restr f (List.filter filter oi.oi_calls) oi.oi_in
+  | oi -> change_oinfo restr f (OI.filter filter oi)
   | exception Not_found -> restr
 
 (* -------------------------------------------------------------------- *)
@@ -680,7 +724,7 @@ type function_def = {
 type function_body =
 | FBdef   of function_def
 | FBalias of xpath
-| FBabs   of oracle_info
+| FBabs   of OI.t
 
 type function_ = {
   f_name   : symbol;
@@ -749,6 +793,7 @@ let fs_equal f1 f2 =
     && (EcTypes.ty_equal f1.fs_ret f2.fs_ret)
     && (EcTypes.ty_equal f1.fs_arg f2.fs_arg)
     && (EcSymbols.sym_equal f1.fs_name f2.fs_name)
+
 (* -------------------------------------------------------------------- *)
 let sig_smpl_sig_coincide msig smpl_sig =
   let eqparams =
@@ -768,18 +813,14 @@ let sig_smpl_sig_coincide msig smpl_sig =
         | _ -> false)  ls_smpl ls true; in
 
   eqparams && eqsig
-(* -------------------------------------------------------------------- *)
-let oi_subst sx oi =
-  { oi_calls  = List.map sx oi.oi_calls;
-    oi_in     = oi.oi_in;
-  }
 
+(* -------------------------------------------------------------------- *)
 let mr_subst sx sm mr =
   { mr_xpaths = ur_app (fun s -> Sx.fold (fun m rx ->
         Sx.add (sx m) rx) s Sx.empty) mr.mr_xpaths;
     mr_mpaths = ur_app (fun s -> Sm.fold (fun m r ->
         Sm.add (sm m) r) s Sm.empty) mr.mr_mpaths;
-    mr_oinfos = Msym.map (fun oi -> oi_subst sx oi) mr.mr_oinfos;
+    mr_oinfos = Msym.map (fun oi -> OI.subst sx oi) mr.mr_oinfos;
   }
 
 let rec mty_subst sp sm sx mty =
@@ -788,12 +829,6 @@ let rec mty_subst sp sm sx mty =
   let mt_args   = List.map sm mty.mt_args in
   let mt_restr   = mr_subst sx sm mty.mt_restr in
   { mt_params; mt_name; mt_args; mt_restr; }
-
-let oi_hash oi =
-  Why3.Hashcons.combine
-    (if oi.oi_in then 0 else 1)
-    (Why3.Hashcons.combine_list EcPath.x_hash 0
-       (List.sort EcPath.x_compare oi.oi_calls))
 
 let ur_hash elems el_hash ur =
   Why3.Hashcons.combine
@@ -808,7 +843,7 @@ let mr_hash mr =
     (ur_hash EcPath.Sx.ntr_elements EcPath.x_hash mr.mr_xpaths)
     (ur_hash EcPath.Sm.ntr_elements EcPath.m_hash mr.mr_mpaths)
     (Why3.Hashcons.combine_list
-       (Why3.Hashcons.combine_pair Hashtbl.hash oi_hash) 0
+       (Why3.Hashcons.combine_pair Hashtbl.hash OI.hash) 0
        (EcSymbols.Msym.bindings mr.mr_oinfos
         |> List.sort (fun (s,_) (s',_) -> EcSymbols.sym_compare s s')))
 

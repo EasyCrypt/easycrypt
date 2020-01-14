@@ -65,7 +65,7 @@ let lossless_hyps env top sub =
   let concl = f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub) in
   let calls =
     let name = EcPath.basename sub in
-    (EcSymbols.Msym.find name sig_.mis_restr.mr_oinfos).oi_calls
+    (EcSymbols.Msym.find name sig_.mis_restr.mr_oinfos) |> OI.allowed
   in
   let hyps = List.map f_losslessF calls in
     f_forall bd (f_imps hyps concl)
@@ -175,7 +175,7 @@ module FunAbsLow = struct
     let fv = PV.fv env mhr inv in
     PV.check_depend env fv top;
     let ospec o = f_hoareF inv o inv in
-    let sg = List.map ospec oi.oi_calls in
+    let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
   (* ------------------------------------------------------------------ *)
@@ -191,7 +191,7 @@ module FunAbsLow = struct
       check_oracle_use pf env top o;
       f_bdHoareF inv o inv FHeq f_r1 in
 
-    let sg = List.map ospec oi.oi_calls in
+    let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, lossless_hyps env top f.x_sub :: sg)
 
   (* ------------------------------------------------------------------ *)
@@ -214,7 +214,7 @@ module FunAbsLow = struct
           if   EcPath.x_equal o_l o_r
           then check_oracle_use pf env topl o_r;
           false
-        with _ when oil.oi_in -> true
+        with _ when OI.is_in oil -> true
       in
 
       let fo_l = EcEnv.Fun.by_xpath o_l env in
@@ -234,7 +234,7 @@ module FunAbsLow = struct
       f_equivF pre o_l o_r post
     in
 
-    let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
+    let sg = List.map2 ospec (OI.allowed oil) (OI.allowed oir) in
 
     let eq_params =
       f_eqparams
@@ -242,7 +242,7 @@ module FunAbsLow = struct
         fr sigr.fs_arg sigr.fs_anames mr in
 
     let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
-    let lpre   = if oil.oi_in then [eqglob;inv] else [inv] in
+    let lpre   = if OI.is_in oil then [eqglob;inv] else [inv] in
     let pre    = f_ands (eq_params::lpre) in
     let post   = f_ands [eq_res; eqglob; inv] in
 
@@ -344,7 +344,7 @@ module UpToLow = struct
       [cond1; cond2; cond3]
     in
 
-    let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
+    let sg = List.map2 ospec (OI.allowed oil) (OI.allowed oir) in
     let sg = List.flatten sg in
     let lossless_a = lossless_hyps env topl fl.x_sub in
     let sg = lossless_a :: sg in
@@ -356,7 +356,7 @@ module UpToLow = struct
 
     let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
 
-    let pre  = if oil.oi_in then [eqglob;invP] else [invP] in
+    let pre  = if OI.is_in oil then [eqglob;invP] else [invP] in
     let pre  = f_if_simpl bad2 invQ (f_ands (eq_params::pre)) in
     let post = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
 

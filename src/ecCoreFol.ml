@@ -192,7 +192,7 @@ let mr_fv mr =
        (EcUtils.odfl Sx.empty mr.mr_xpaths.ur_pos))
 
   |> EcSymbols.Msym.fold (fun _ oi fv ->
-      List.fold_left EcPath.x_fv fv oi.oi_calls
+      List.fold_left EcPath.x_fv fv (OI.allowed oi)
     ) mr.mr_oinfos
 
 let gty_fv = function

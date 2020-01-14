@@ -2259,7 +2259,7 @@ module NormMp = struct
               | `Local id -> id
               | _ -> assert false in
             let us = add_glob_except rm id us in
-            List.fold_left fun_use us oi.oi_calls
+            List.fold_left fun_use us (OI.allowed oi)
 
         | FBalias _ -> assert false in
     fun_use
@@ -2355,9 +2355,7 @@ module NormMp = struct
             EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty me.me_params in
       let keep_info f =
         EcPath.Sm.mem (f.EcPath.x_top) keep in
-      let do1 oi =
-        { oi_calls = List.filter keep_info oi.oi_calls;
-          oi_in = oi.oi_in } in
+      let do1 oi = OI.filter keep_info oi in
 
       { mt.mt_restr with
         mr_oinfos = Msym.map do1 mt.mt_restr.mr_oinfos }
@@ -2385,7 +2383,7 @@ module NormMp = struct
               | FBalias _ -> assert false
               | FBdef def -> List.fold_left f_call c def.f_uses.us_calls
               | FBabs oi  ->
-                List.fold_left f_call c oi.oi_calls in
+                List.fold_left f_call c (OI.allowed oi) in
 
           let all_calls =
             match f.f_def with
@@ -2393,13 +2391,13 @@ module NormMp = struct
             | FBdef def ->
               List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls
             | FBabs oi ->
-              List.fold_left f_call EcPath.Sx.empty oi.oi_calls in
+              List.fold_left f_call EcPath.Sx.empty (OI.allowed oi) in
           let filter f =
             let ftop = EcPath.m_functor f.EcPath.x_top in
             Sm.mem ftop mparams in
           let calls = List.filter filter (EcPath.Sx.elements all_calls) in
 
-          Msym.add f.f_name { oi_calls = calls; oi_in = true; } oi in
+          Msym.add f.f_name (OI.mk calls true) oi in
 
       let oi = List.fold_left comp_oi Msym.empty me.me_comps in
 
@@ -2432,8 +2430,8 @@ module NormMp = struct
         | None,_ | _,None -> false
         | Some oi1, Some oi2 ->
           let oi_eq = EcPath.Sx.equal
-              (EcPath.Sx.of_list oi1.oi_calls)
-              (EcPath.Sx.of_list oi2.oi_calls) in
+              (OI.allowed_s oi1)
+              (OI.allowed_s oi2) in
           beq && oi_eq
       ) r1.mr_oinfos r2.mr_oinfos true
 
@@ -2682,9 +2680,7 @@ module ModTy = struct
         EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
     let keep_info f =
       EcPath.Sm.mem (f.EcPath.x_top) keep in
-    let do1 oi =
-      {oi_calls = List.filter keep_info oi.oi_calls;
-       oi_in = oi.oi_in} in
+    let do1 oi = OI.filter keep_info oi in
     let restr = { mt.mt_restr with
                   mr_oinfos = Msym.map do1 mt.mt_restr.mr_oinfos } in
 

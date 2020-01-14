@@ -140,23 +140,32 @@ val ur_union :
   'a use_restr -> 'a use_restr -> 'a use_restr
 
 (* -------------------------------------------------------------------- *)
-(* [oi_calls]: The list of oracle that can be called
- * [oi_in]: true if equality of globals is required to ensure
- * equality of result and globals
-*)
-type oracle_info = {
-  oi_calls : xpath list;
-  oi_in    : bool;
-}
+(* Oracle Information *)
+module OI : sig
+  type t
 
-val oi_empty : oracle_info
-val oi_hash  : oracle_info -> int
+  val hash : t -> int
+  val equal : t -> t -> bool
+  val subst : (xpath -> xpath) -> t -> t
+
+  val empty : t
+
+  (* Return true if equality of globals is required to ensure equality of
+   * result and globals (in the post). *)
+  val is_in : t -> bool
+
+  val allowed : t -> xpath list
+  val allowed_s : t -> Sx.t
+
+  val mk : xpath list -> bool -> t
+  val filter : (xpath -> bool) -> t -> t
+end
 
 (* -------------------------------------------------------------------- *)
 type mod_restr = {
   mr_xpaths : EcPath.Sx.t use_restr;
   mr_mpaths : EcPath.Sm.t use_restr;
-  mr_oinfos : oracle_info Msym.t;
+  mr_oinfos : OI.t Msym.t;
 }
 
 (* Careful, the avalaible oracle are empty in both [mr_empty] and [mr_full]. *)
@@ -225,7 +234,7 @@ type function_def = {
 type function_body =
   | FBdef   of function_def
   | FBalias of xpath
-  | FBabs   of oracle_info
+  | FBabs   of OI.t
 
 type function_ = {
   f_name   : symbol;

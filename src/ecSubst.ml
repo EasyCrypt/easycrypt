@@ -129,10 +129,9 @@ let subst_fun_uses (s : _subst) (u : uses) =
   EcModules.mk_uses calls reads writes
 
 (* -------------------------------------------------------------------- *)
-let subst_oracle_info (s:_subst) (x:oracle_info) =
+let subst_oracle_info (s:_subst) (x:OI.t) =
   let x_subst = EcPath.x_subst s.s_fmp in
-    { oi_calls  = List.map x_subst x.oi_calls;
-      oi_in     = x.oi_in; }
+  OI.subst x_subst x
 
 (* -------------------------------------------------------------------- *)
 let subst_funsig (s : _subst) (funsig : funsig) =

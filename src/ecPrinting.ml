@@ -534,9 +534,9 @@ let get_e_projarg ppe e i =
 (* -------------------------------------------------------------------- *)
 let pp_orclinfo ppe fmt (sym, oi) =
   Format.fprintf fmt "@[<h><%s%a : %a>@]"
-    (if oi.oi_in then "" else " *")
+    (if OI.is_in oi then "" else " *")
     pp_symbol sym
-    (pp_list "@ " (pp_funname ppe)) oi.oi_calls
+    (pp_list "@ " (pp_funname ppe)) (OI.allowed oi)
 
 (* -------------------------------------------------------------------- *)
 let all_mem_sym = "+all mem"
@@ -2743,11 +2743,11 @@ let pp_funsig ppe fmt fs =
 
 let pp_orclinfo ppe fmt oi =
   Format.fprintf fmt "{%a}"
-    (pp_list "@ " (pp_funname ppe)) oi.oi_calls
+    (pp_list "@ " (pp_funname ppe)) (OI.allowed oi)
 
 (* let pp_sigitem ppe fmt (Tys_function(fs,oi)) =
  *   Format.fprintf fmt "@[<hov 2>%a@ %a@]"
- *     (pp_funsig ppe) (oi.oi_in, fs) (pp_orclinfo ppe) oi *)
+ *     (pp_funsig ppe) (OI.is_in oi, fs) (pp_orclinfo ppe) oi *)
 
 let pp_sigitem ppe fmt (Tys_function fs) =
   Format.fprintf fmt "@[<hov 2>%a@]"

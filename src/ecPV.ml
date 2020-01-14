@@ -453,7 +453,7 @@ let rec f_write_r ?(except=Sx.empty) env w f =
 
   | FBabs oi ->
     let mp = get_abs_functor f in
-    List.fold_left folder (PV.add_glob env mp w) oi.oi_calls
+    List.fold_left folder (PV.add_glob env mp w) (OI.allowed oi)
 
   | FBdef fdef ->
       let add x w =
@@ -504,8 +504,8 @@ let rec f_read_r env r f =
 
   | FBabs oi ->
     let mp = get_abs_functor f in
-    let r = if oi.oi_in then (PV.add_glob env mp r) else r in
-    List.fold_left (f_read_r env) r oi.oi_calls
+    let r = if OI.is_in oi then (PV.add_glob env mp r) else r in
+    List.fold_left (f_read_r env) r (OI.allowed oi)
 
   | FBdef fdef ->
       let add x r =
@@ -1030,10 +1030,10 @@ and eqobs_inF_refl env f' eqo =
     let do1 eqo o = PV.union (eqobs_inF_refl env o eqo) eqo in
     let top = EcPath.m_functor f.x_top in
     let rec aux eqo =
-      let eqi = List.fold_left do1 eqo oi.oi_calls in
+      let eqi = List.fold_left do1 eqo (OI.allowed oi) in
       if PV.subset eqi eqo then eqo
       else aux eqi in
-    if oi.oi_in then aux (PV.add_glob env top eqo)
+    if OI.is_in oi then aux (PV.add_glob env top eqo)
     else
       let eqi = aux (PV.remove_glob top eqo) in
       if PV.mem_glob env top eqi then begin
@@ -1064,7 +1064,7 @@ let check_module_in env mp mt =
       (* We remove the paramater not take into account *)
       let eqi =
         List.fold_left (fun eqi mp -> PV.remove_glob mp eqi) eqi extra in
-      if not (oi.oi_in) && not (PV.is_empty eqi) then
+      if not (OI.is_in oi) && not (PV.is_empty eqi) then
         let ppe = EcPrinting.PPEnv.ofenv env in
         EcCoreGoal.tacuerror "The function %a should initialize %a"
           (EcPrinting.pp_funname ppe) f (PV.pp env) eqi in

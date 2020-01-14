@@ -69,7 +69,7 @@ let rec callable_oracles_f env modv os f =
            if   PV.indep env modv (f_write env o)
            then s
            else EcPath.Sx.add o s)
-        EcPath.Sx.empty oi.oi_calls
+        EcPath.Sx.empty (OI.allowed oi)
     in
 
     List.fold_left
