@@ -172,47 +172,47 @@ module PreOI : sig
 end
 
 (* -------------------------------------------------------------------- *)
-type 'a pre_mod_restr = {
+type 'a p_mod_restr = {
   mr_xpaths : EcPath.Sx.t use_restr;
   mr_mpaths : EcPath.Sm.t use_restr;
   mr_oinfos : 'a PreOI.t Msym.t;
 }
 
-val pre_mr_equal :
+val p_mr_equal :
   ('a -> 'a -> bool) ->
-  'a pre_mod_restr ->
-  'a pre_mod_restr ->
+  'a p_mod_restr ->
+  'a p_mod_restr ->
   bool
 
-val pre_mr_hash : ('a -> int) -> 'a pre_mod_restr -> int
+val p_mr_hash : ('a -> int) -> 'a p_mod_restr -> int
 
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)
-type 'a pre_module_type = {          (* Always in eta-normal form *)
-  mt_params : (EcIdent.t * 'a pre_module_type) list;
+type 'a p_module_type = {          (* Always in eta-normal form *)
+  mt_params : (EcIdent.t * 'a p_module_type) list;
   mt_name   : EcPath.path;
   mt_args   : EcPath.mpath list;
-  mt_restr  : 'a pre_mod_restr;
+  mt_restr  : 'a p_mod_restr;
 }
 
 type module_sig_body_item = Tys_function of funsig
 
 type module_sig_body = module_sig_body_item list
 
-type 'a pre_module_sig = {
-  mis_params : (EcIdent.t * 'a pre_module_type) list;
+type 'a p_module_sig = {
+  mis_params : (EcIdent.t * 'a p_module_type) list;
   mis_body   : module_sig_body;
-  mis_restr  : 'a pre_mod_restr;
+  mis_restr  : 'a p_mod_restr;
 }
 
 (* -------------------------------------------------------------------- *)
 (* Simple module signature, without restrictions. *)
-type 'a pre_module_smpl_sig = {
-  miss_params : (EcIdent.t * 'a pre_module_type) list;
+type 'a p_module_smpl_sig = {
+  miss_params : (EcIdent.t * 'a p_module_type) list;
   miss_body   : module_sig_body;
 }
 
-val sig_smpl_sig_coincide : 'a pre_module_sig -> 'b pre_module_smpl_sig -> bool
+val sig_smpl_sig_coincide : 'a p_module_sig -> 'b p_module_smpl_sig -> bool
 
 (* -------------------------------------------------------------------- *)
 type uses = {
@@ -234,15 +234,15 @@ val fd_equal : function_def -> function_def -> bool
 val fd_hash  : function_def -> int
 
 (* -------------------------------------------------------------------- *)
-type 'a pre_function_body =
+type 'a p_function_body =
 | FBdef   of function_def
 | FBalias of xpath
 | FBabs   of 'a PreOI.t
 
-type 'a pre_function_ = {
+type 'a p_function_ = {
   f_name   : symbol;
   f_sig    : funsig;
-  f_def    : 'a pre_function_body;
+  f_def    : 'a p_function_body;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -252,45 +252,45 @@ type abs_uses = {
   aus_writes : (EcTypes.prog_var * EcTypes.ty) list;
 }
 
-type 'a pre_module_expr = {
+type 'a p_module_expr = {
   me_name     : symbol;
-  me_body     : 'a pre_module_body;
-  me_comps    : 'a pre_module_comps;
+  me_body     : 'a p_module_body;
+  me_comps    : 'a p_module_comps;
   me_sig_body : module_sig_body;
-  me_params   : (EcIdent.t * 'a pre_module_type) list;
+  me_params   : (EcIdent.t * 'a p_module_type) list;
 }
 
 (* Invariant:
    In an abstract module [ME_Decl mt], [mt] must not be a functor, i.e. it must
    be fully applied. Therefore, we must have:
    [List.length mp.mt_params = List.length mp.mt_args]  *)
-and 'a pre_module_body =
+and 'a p_module_body =
   | ME_Alias       of int * EcPath.mpath
-  | ME_Structure   of 'a pre_module_structure       (* Concrete modules. *)
-  | ME_Decl        of 'a pre_module_type         (* Abstract modules. *)
+  | ME_Structure   of 'a p_module_structure       (* Concrete modules. *)
+  | ME_Decl        of 'a p_module_type         (* Abstract modules. *)
 
-and 'a pre_module_structure = {
-  ms_body      : 'a pre_module_item list;
+and 'a p_module_structure = {
+  ms_body      : 'a p_module_item list;
 }
 
-and 'a pre_module_item =
-  | MI_Module   of 'a pre_module_expr
+and 'a p_module_item =
+  | MI_Module   of 'a p_module_expr
   | MI_Variable of variable
-  | MI_Function of 'a pre_function_
+  | MI_Function of 'a p_function_
 
-and 'a pre_module_comps = 'a pre_module_comps_item list
+and 'a p_module_comps = 'a p_module_comps_item list
 
-and 'a pre_module_comps_item = 'a pre_module_item
+and 'a p_module_comps_item = 'a p_module_item
 
 (* -------------------------------------------------------------------- *)
-val pre_mty_equal :
+val p_mty_equal :
   ('a -> 'a -> bool) ->
-  'a pre_module_type ->
-  'a pre_module_type ->
+  'a p_module_type ->
+  'a p_module_type ->
   bool
 
-val pre_mty_hash : ('a -> int) -> 'a pre_module_type -> int
+val p_mty_hash : ('a -> int) -> 'a p_module_type -> int
 
 (* -------------------------------------------------------------------- *)
-val get_uninit_read_of_fun : xpath -> _ pre_function_ -> Sx.t
-val get_uninit_read_of_module : path -> _ pre_module_expr -> (xpath * Sx.t) list
+val get_uninit_read_of_fun : xpath -> _ p_function_ -> Sx.t
+val get_uninit_read_of_module : path -> _ p_module_expr -> (xpath * Sx.t) list

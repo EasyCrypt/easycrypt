@@ -150,9 +150,9 @@ and pr = {
   pr_event : form;
 }
 
-and module_type = form pre_module_type
+and module_type = form p_module_type
 
-type mod_restr = form pre_mod_restr
+type mod_restr = form p_mod_restr
 
 (*-------------------------------------------------------------------- *)
 let mhr    = EcIdent.create "&hr"
@@ -171,11 +171,11 @@ let f_hash f = f.f_tag
 let f_fv f = f.f_fv
 let f_ty f = f.f_ty
 
-let mty_equal = EcCoreModules.pre_mty_equal f_equal
-let mty_hash  = EcCoreModules.pre_mty_hash f_hash
+let mty_equal = EcCoreModules.p_mty_equal f_equal
+let mty_hash  = EcCoreModules.p_mty_hash f_hash
 
-let mr_equal = EcCoreModules.pre_mr_equal f_equal
-let mr_hash  = EcCoreModules.pre_mr_hash f_hash
+let mr_equal = EcCoreModules.p_mr_equal f_equal
+let mr_hash  = EcCoreModules.p_mr_hash f_hash
 
 (*-------------------------------------------------------------------- *)
 let gty_equal ty1 ty2 =
@@ -1805,7 +1805,7 @@ module Fsubst = struct
          ) (PreOI.costs oi) EcPath.Mx.empty)
       (omap (f_subst ~tx s) (PreOI.cost_self oi))
 
-  and mr_subst ~tx s mr : form pre_mod_restr =
+  and mr_subst ~tx s mr : form p_mod_restr =
     let sx = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
     let sm = s.fs_sty.ts_mp in
     { mr_xpaths = ur_app (fun s -> Sx.fold (fun m rx ->

@@ -33,6 +33,7 @@ module OI : sig
 
   val cost : t -> xpath -> form option
   val cost_self : t -> form option
+  val costs : t -> form Mx.t
 
   val allowed : t -> xpath list
   val allowed_s : t -> Sx.t
@@ -43,32 +44,33 @@ module OI : sig
 end = struct
   type t = EcCoreFol.form PreOI.t
 
-  let empty = PreOI.empty
-  let is_in = PreOI.is_in
-  let allowed = PreOI.allowed
-  let allowed_s = PreOI.allowed_s
-  let cost = PreOI.cost
-  let cost_self = PreOI.cost_self
-  let mk = PreOI.mk
+  let empty        = PreOI.empty
+  let is_in        = PreOI.is_in
+  let allowed      = PreOI.allowed
+  let allowed_s    = PreOI.allowed_s
+  let cost         = PreOI.cost
+  let costs        = PreOI.costs
+  let cost_self    = PreOI.cost_self
+  let mk           = PreOI.mk
   let change_calls = PreOI.change_calls
-  let filter = PreOI.filter
-  let equal = PreOI.equal EcCoreFol.f_equal
-  let hash = PreOI.hash EcCoreFol.f_hash
+  let filter       = PreOI.filter
+  let equal        = PreOI.equal EcCoreFol.f_equal
+  let hash         = PreOI.hash EcCoreFol.f_hash
 end
 
 (* -------------------------------------------------------------------- *)
 type module_type       = EcCoreFol.module_type
 type mod_restr         = EcCoreFol.mod_restr
-type module_sig        = form pre_module_sig
-type module_smpl_sig   = form pre_module_smpl_sig
-type function_body     = form pre_function_body
-type function_         = form pre_function_
-type module_expr       = form pre_module_expr
-type module_body       = form pre_module_body
-type module_structure  = form pre_module_structure
-type module_item       = form pre_module_item
-type module_comps      = form pre_module_comps
-type module_comps_item = form pre_module_comps_item
+type module_sig        = form p_module_sig
+type module_smpl_sig   = form p_module_smpl_sig
+type function_body     = form p_function_body
+type function_         = form p_function_
+type module_expr       = form p_module_expr
+type module_body       = form p_module_body
+type module_structure  = form p_module_structure
+type module_item       = form p_module_item
+type module_comps      = form p_module_comps
+type module_comps_item = form p_module_comps_item
 
 let mr_empty = {
   mr_xpaths = ur_empty EcPath.Sx.empty;

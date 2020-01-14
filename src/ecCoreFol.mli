@@ -149,9 +149,9 @@ and pr = {
   pr_event : form;
 }
 
-and module_type = form pre_module_type
+and module_type = form p_module_type
 
-type mod_restr = form pre_mod_restr
+type mod_restr = form p_mod_restr
 
 (* -------------------------------------------------------------------- *)
 val gtty    : EcTypes.ty -> gty

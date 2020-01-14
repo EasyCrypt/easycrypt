@@ -673,13 +673,13 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type 'a pre_mod_restr = {
+type 'a p_mod_restr = {
   mr_xpaths : EcPath.Sx.t use_restr;
   mr_mpaths : EcPath.Sm.t use_restr;
   mr_oinfos : 'a PreOI.t Msym.t;
 }
 
-let pre_mr_equal a_equal mr1 mr2 =
+let p_mr_equal a_equal mr1 mr2 =
   ur_equal EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
   && ur_equal EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
   && Msym.equal (PreOI.equal a_equal) mr1.mr_oinfos mr2.mr_oinfos
@@ -700,27 +700,27 @@ let fs_equal f1 f2 =
     && (EcSymbols.sym_equal f1.fs_name f2.fs_name)
 
 (* -------------------------------------------------------------------- *)
-type 'a pre_module_type = {
-  mt_params : (EcIdent.t * 'a pre_module_type) list;
+type 'a p_module_type = {
+  mt_params : (EcIdent.t * 'a p_module_type) list;
   mt_name   : EcPath.path;
   mt_args   : EcPath.mpath list;
-  mt_restr  : 'a pre_mod_restr;
+  mt_restr  : 'a p_mod_restr;
 }
 
 type module_sig_body_item = Tys_function of funsig
 
 type module_sig_body = module_sig_body_item list
 
-type 'a pre_module_sig = {
-  mis_params : (EcIdent.t * 'a pre_module_type) list;
+type 'a p_module_sig = {
+  mis_params : (EcIdent.t * 'a p_module_type) list;
   mis_body   : module_sig_body;
-  mis_restr  : 'a pre_mod_restr;
+  mis_restr  : 'a p_mod_restr;
 }
 
 (* -------------------------------------------------------------------- *)
 (* Simple module signature, without restrictions. *)
-type 'a pre_module_smpl_sig = {
-  miss_params : (EcIdent.t * 'a pre_module_type) list;
+type 'a p_module_smpl_sig = {
+  miss_params : (EcIdent.t * 'a p_module_type) list;
   miss_body   : module_sig_body;
 }
 
@@ -774,15 +774,15 @@ let fd_hash f =
     (Why3.Hashcons.combine_list vd_hash 0 f.f_locals)
 
 (* -------------------------------------------------------------------- *)
-type 'a pre_function_body =
+type 'a p_function_body =
 | FBdef   of function_def
 | FBalias of xpath
 | FBabs   of 'a PreOI.t
 
-type 'a pre_function_ = {
+type 'a p_function_ = {
   f_name   : symbol;
   f_sig    : funsig;
-  f_def    : 'a pre_function_body;
+  f_def    : 'a p_function_body;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -792,35 +792,35 @@ type abs_uses = {
   aus_writes : (EcTypes.prog_var * EcTypes.ty) list;
 }
 
-type 'a pre_module_expr = {
+type 'a p_module_expr = {
   me_name     : symbol;
-  me_body     : 'a pre_module_body;
-  me_comps    : 'a pre_module_comps;
+  me_body     : 'a p_module_body;
+  me_comps    : 'a p_module_comps;
   me_sig_body : module_sig_body;
-  me_params   : (EcIdent.t * 'a pre_module_type) list;
+  me_params   : (EcIdent.t * 'a p_module_type) list;
 }
 
 (* Invariant:
    In an abstract module [ME_Decl mt], [mt] must not be a functor, i.e. it must
    be fully applied. Therefore, we must have:
    [List.length mp.mt_params = List.length mp.mt_args]  *)
-and 'a pre_module_body =
+and 'a p_module_body =
   | ME_Alias       of int * EcPath.mpath
-  | ME_Structure   of 'a pre_module_structure       (* Concrete modules. *)
-  | ME_Decl        of 'a pre_module_type         (* Abstract modules. *)
+  | ME_Structure   of 'a p_module_structure       (* Concrete modules. *)
+  | ME_Decl        of 'a p_module_type         (* Abstract modules. *)
 
-and 'a pre_module_structure = {
-  ms_body      : 'a pre_module_item list;
+and 'a p_module_structure = {
+  ms_body      : 'a p_module_item list;
 }
 
-and 'a pre_module_item =
-  | MI_Module   of 'a pre_module_expr
+and 'a p_module_item =
+  | MI_Module   of 'a p_module_expr
   | MI_Variable of variable
-  | MI_Function of 'a pre_function_
+  | MI_Function of 'a p_function_
 
-and 'a pre_module_comps = 'a pre_module_comps_item list
+and 'a p_module_comps = 'a p_module_comps_item list
 
-and 'a pre_module_comps_item = 'a pre_module_item
+and 'a p_module_comps_item = 'a p_module_item
 
 (* -------------------------------------------------------------------- *)
 let ur_hash elems el_hash ur =
@@ -831,7 +831,7 @@ let ur_hash elems el_hash ur =
     (Why3.Hashcons.combine_list el_hash 0
        (elems ur.ur_neg))
 
-let pre_mr_hash a_hash mr =
+let p_mr_hash a_hash mr =
   Why3.Hashcons.combine2
     (ur_hash EcPath.Sx.ntr_elements EcPath.x_hash mr.mr_xpaths)
     (ur_hash EcPath.Sm.ntr_elements EcPath.m_hash mr.mr_mpaths)
@@ -840,24 +840,24 @@ let pre_mr_hash a_hash mr =
        (EcSymbols.Msym.bindings mr.mr_oinfos
         |> List.sort (fun (s,_) (s',_) -> EcSymbols.sym_compare s s')))
 
-let pre_mty_hash a_hash mty =
+let p_mty_hash a_hash mty =
   Why3.Hashcons.combine3
     (EcPath.p_hash mty.mt_name)
     (Why3.Hashcons.combine_list
        (fun (x, _) -> EcIdent.id_hash x)
        0 mty.mt_params)
     (Why3.Hashcons.combine_list EcPath.m_hash 0 mty.mt_args)
-    (pre_mr_hash a_hash mty.mt_restr)
+    (p_mr_hash a_hash mty.mt_restr)
 
-let rec pre_mty_equal a_equal mty1 mty2 =
+let rec p_mty_equal a_equal mty1 mty2 =
      (EcPath.p_equal mty1.mt_name mty2.mt_name)
   && (List.all2 EcPath.m_equal mty1.mt_args mty2.mt_args)
-  && (List.all2 (pair_equal EcIdent.id_equal (pre_mty_equal a_equal))
+  && (List.all2 (pair_equal EcIdent.id_equal (p_mty_equal a_equal))
         mty1.mt_params mty2.mt_params)
-  && (pre_mr_equal a_equal mty1.mt_restr mty1.mt_restr)
+  && (p_mr_equal a_equal mty1.mt_restr mty1.mt_restr)
 
 (* -------------------------------------------------------------------- *)
-let get_uninit_read_of_fun (fp : xpath) (f : _ pre_function_) =
+let get_uninit_read_of_fun (fp : xpath) (f : _ p_function_) =
   match f.f_def with
   | FBalias _ | FBabs _ -> Sx.empty
 
@@ -874,7 +874,7 @@ let get_uninit_read_of_fun (fp : xpath) (f : _ pre_function_) =
       Sx.union r raout
 
 (* -------------------------------------------------------------------- *)
-let get_uninit_read_of_module (p : path) (me : _ pre_module_expr) =
+let get_uninit_read_of_module (p : path) (me : _ p_module_expr) =
   let rec doit_me acc (mp, me) =
     match me.me_body with
     | ME_Alias     _  -> acc

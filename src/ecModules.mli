@@ -20,17 +20,18 @@ include module type of struct include EcCoreModules end
 module OI : sig
   type t = EcCoreFol.form PreOI.t
 
-  val hash : t -> int
+  val hash  : t -> int
   val equal : t -> t -> bool
 
   val empty : t
 
   val is_in : t -> bool
 
-  val cost : t -> xpath -> EcCoreFol.form option
+  val cost      : t -> xpath -> EcCoreFol.form option
   val cost_self : t -> EcCoreFol.form option
+  val costs     : t -> EcCoreFol.form Mx.t
 
-  val allowed : t -> xpath list
+  val allowed   : t -> xpath list
   val allowed_s : t -> Sx.t
 
   val mk :
@@ -44,18 +45,18 @@ module OI : sig
 end
 
 (* -------------------------------------------------------------------- *)
-type mod_restr         = form pre_mod_restr
-type module_type       = form pre_module_type
-type module_sig        = form pre_module_sig
-type module_smpl_sig   = form pre_module_smpl_sig
-type function_body     = form pre_function_body
-type function_         = form pre_function_
-type module_expr       = form pre_module_expr
-type module_body       = form pre_module_body
-type module_structure  = form pre_module_structure
-type module_item       = form pre_module_item
-type module_comps      = form pre_module_comps
-type module_comps_item = form pre_module_comps_item
+type mod_restr         = form p_mod_restr
+type module_type       = form p_module_type
+type module_sig        = form p_module_sig
+type module_smpl_sig   = form p_module_smpl_sig
+type function_body     = form p_function_body
+type function_         = form p_function_
+type module_expr       = form p_module_expr
+type module_body       = form p_module_body
+type module_structure  = form p_module_structure
+type module_item       = form p_module_item
+type module_comps      = form p_module_comps
+type module_comps_item = form p_module_comps_item
 
 (* Careful, the avalaible oracle are empty in both [mr_empty] and [mr_full]. *)
 val mr_empty : mod_restr
