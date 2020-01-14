@@ -717,11 +717,32 @@ type 'a pre_module_sig = {
   mis_restr  : 'a pre_mod_restr;
 }
 
+(* -------------------------------------------------------------------- *)
 (* Simple module signature, without restrictions. *)
 type 'a pre_module_smpl_sig = {
   miss_params : (EcIdent.t * 'a pre_module_type) list;
   miss_body   : module_sig_body;
 }
+
+let sig_smpl_sig_coincide msig smpl_sig =
+  let eqparams =
+    List.for_all2 EcIdent.id_equal
+      (List.map fst msig.mis_params)
+      (List.map fst smpl_sig.miss_params) in
+
+  let ls =
+    List.map (fun (Tys_function fs) -> fs.fs_name, fs ) msig.mis_body
+    |> EcSymbols.Msym.of_list
+  and ls_smpl =
+    List.map (fun (Tys_function fs) -> fs.fs_name, fs ) smpl_sig.miss_body
+    |> EcSymbols.Msym.of_list in
+  let eqsig =
+    Msym.fold2_union (fun _ aopt bopt eqsig -> match aopt, bopt with
+        | Some fs1, Some fs2 -> (fs_equal fs1 fs2) && eqsig
+        | _ -> false)  ls_smpl ls true; in
+
+  eqparams && eqsig
+
 (* -------------------------------------------------------------------- *)
 type uses = {
   us_calls  : xpath list;

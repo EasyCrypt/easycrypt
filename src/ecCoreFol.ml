@@ -171,12 +171,11 @@ let f_hash f = f.f_tag
 let f_fv f = f.f_fv
 let f_ty f = f.f_ty
 
-(* TODO: (Adrien) memoization *)
 let mty_equal = EcCoreModules.pre_mty_equal f_equal
-let mty_hash = EcCoreModules.pre_mty_hash f_hash
+let mty_hash  = EcCoreModules.pre_mty_hash f_hash
 
 let mr_equal = EcCoreModules.pre_mr_equal f_equal
-let mr_hash = EcCoreModules.pre_mr_hash f_hash
+let mr_hash  = EcCoreModules.pre_mr_hash f_hash
 
 (*-------------------------------------------------------------------- *)
 let gty_equal ty1 ty2 =

@@ -76,8 +76,5 @@ val oicalls_filter :
   mod_restr
 
 (* -------------------------------------------------------------------- *)
-val sig_smpl_sig_coincide : module_sig -> module_smpl_sig -> bool
-
-(* -------------------------------------------------------------------- *)
 val mty_equal : module_type -> module_type -> bool
 val mty_hash  : module_type -> int

@@ -121,6 +121,7 @@ type funsig = {
 }
 
 val fs_equal : funsig -> funsig -> bool
+
 (* -------------------------------------------------------------------- *)
 type 'a use_restr = {
   ur_pos : 'a option;   (* If not None, can use only element in this set. *)
@@ -204,11 +205,14 @@ type 'a pre_module_sig = {
   mis_restr  : 'a pre_mod_restr;
 }
 
+(* -------------------------------------------------------------------- *)
 (* Simple module signature, without restrictions. *)
 type 'a pre_module_smpl_sig = {
   miss_params : (EcIdent.t * 'a pre_module_type) list;
   miss_body   : module_sig_body;
 }
+
+val sig_smpl_sig_coincide : 'a pre_module_sig -> 'b pre_module_smpl_sig -> bool
 
 (* -------------------------------------------------------------------- *)
 type uses = {
