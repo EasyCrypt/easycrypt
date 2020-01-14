@@ -2397,7 +2397,7 @@ module NormMp = struct
             Sm.mem ftop mparams in
           let calls = List.filter filter (EcPath.Sx.elements all_calls) in
 
-          Msym.add f.f_name (OI.mk calls true) oi in
+          Msym.add f.f_name (OI.mk calls true Mx.empty None) oi in
 
       let oi = List.fold_left comp_oi Msym.empty me.me_comps in
 
@@ -3325,7 +3325,7 @@ module LDecl = struct
         in LD_mem mt
 
     | LD_modty p ->
-        let p = gty_as_mod (Fsubst.gty_subst s (GTmodty p))
+        let p = gty_as_mod (Fsubst.subst_gty s (GTmodty p))
         in LD_modty p
 
     | LD_hyp f ->

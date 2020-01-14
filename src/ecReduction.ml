@@ -804,7 +804,7 @@ and check_alpha_equal ri hyps f1 f2 =
 
   (* TODO all declaration in env, do it also in add local *)
   let check_binding (env, subst) (x1,gty1) (x2,gty2) =
-    let gty2 = Fsubst.gty_subst subst gty2 in
+    let gty2 = Fsubst.subst_gty subst gty2 in
     match gty1, gty2 with
     | GTty ty1, GTty ty2 ->
       ensure (EqTest.for_type env ty1 ty2);

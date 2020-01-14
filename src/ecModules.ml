@@ -26,7 +26,6 @@ module OI : sig
 
   val hash : t -> int
   val equal : t -> t -> bool
-  val subst : (xpath -> xpath) -> t -> t
 
   val empty : t
 
@@ -38,39 +37,28 @@ module OI : sig
   val allowed : t -> xpath list
   val allowed_s : t -> Sx.t
 
-  val mk :
-    xpath list ->
-    bool ->
-    EcCoreFol.form Mx.t ->
-    EcCoreFol.form option ->
-    t
+  val mk : xpath list -> bool -> form Mx.t -> form option -> t
+  val change_calls : t -> xpath list -> t
   val filter : (xpath -> bool) -> t -> t
 end = struct
   type t = EcCoreFol.form PreOI.t
 
   let empty = PreOI.empty
   let is_in = PreOI.is_in
-
   let allowed = PreOI.allowed
-
   let allowed_s = PreOI.allowed_s
-
   let cost = PreOI.cost
   let cost_self = PreOI.cost_self
-
   let mk = PreOI.mk
-
+  let change_calls = PreOI.change_calls
   let filter = PreOI.filter
-  let subst = PreOI.subst EcCoreFol.Fsubst.f_subst
-
   let equal = PreOI.equal EcCoreFol.f_equal
-
   let hash = PreOI.hash EcCoreFol.f_hash
 end
 
 (* -------------------------------------------------------------------- *)
 type module_type       = EcCoreFol.module_type
-type mod_restr         = form pre_mod_restr
+type mod_restr         = EcCoreFol.mod_restr
 type module_sig        = form pre_module_sig
 type module_smpl_sig   = form pre_module_smpl_sig
 type function_body     = form pre_function_body
@@ -103,13 +91,13 @@ let mr_add_restr mr (rx : Sx.t use_restr) (rm : Sm.t use_restr) =
 let change_oinfo restr f oi =
   { restr with mr_oinfos = Msym.add f oi restr.mr_oinfos }
 
-let add_oinfo restr f ocalls oin = change_oinfo restr f (OI.mk ocalls oin)
+let add_oinfo restr f oi = change_oinfo restr f oi
 
 let change_oicalls restr f ocalls =
-  let oi_in = match Msym.find f restr.mr_oinfos with
-    | oi -> OI.is_in oi
-    | exception Not_found -> true in
-  add_oinfo restr f ocalls oi_in
+  let oi = match Msym.find f restr.mr_oinfos with
+    | oi -> OI.change_calls oi ocalls
+    | exception Not_found -> OI.mk ocalls true Mx.empty None in
+  add_oinfo restr f oi
 
 let oicalls_filter restr f filter =
   match Msym.find f restr.mr_oinfos with
@@ -137,60 +125,8 @@ let sig_smpl_sig_coincide msig smpl_sig =
   eqparams && eqsig
 
 (* -------------------------------------------------------------------- *)
-let get_uninit_read_of_fun (fp : xpath) (f : function_) =
-  match f.f_def with
-  | FBalias _ | FBabs _ -> Sx.empty
-
-  | FBdef fd ->
-      let w =
-        let toloc { v_name = x } = (EcTypes.pv_loc fp x).pv_name in
-        let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
-        Sx.of_list (List.map xastrip w)
-      in
-
-      let w, r  = s_get_uninit_read w fd.f_body in
-      let raout = fd.f_ret |> omap (Uninit.e_pv is_loc) in
-      let raout = Sx.diff (raout |> odfl Sx.empty) w in
-      Sx.union r raout
-
-(* -------------------------------------------------------------------- *)
-let get_uninit_read_of_module (p : path) (me : module_expr) =
-  let rec doit_me acc (mp, me) =
-    match me.me_body with
-    | ME_Alias     _  -> acc
-    | ME_Decl      _  -> acc
-    | ME_Structure mb -> doit_mb acc (mp, mb)
-
-  and doit_mb acc (mp, mb) =
-    List.fold_left
-      (fun acc item -> doit_mb1 acc (mp, item))
-      acc mb.ms_body
-
-  and doit_mb1 acc (mp, item) =
-    match item with
-    | MI_Module subme ->
-        doit_me acc (EcPath.mqname mp subme.me_name, subme)
-
-    | MI_Variable _ ->
-        acc
-
-    | MI_Function f ->
-        let xp = xpath_fun mp f.f_name in
-        let r  = get_uninit_read_of_fun xp f in
-        if Sx.is_empty r then acc else (xp, r) :: acc
-
-  in
-
-  let mp =
-    let margs =
-      List.map
-        (fun (x, _) -> EcPath.mpath_abs x [])
-        me.me_params
-    in EcPath.mpath_crt (EcPath.pqname p me.me_name) margs None
-
-  in List.rev (doit_me [] (mp, me))
-
-(* -------------------------------------------------------------------- *)
-let mty_subst = EcCoreFol.Fsubst mty_subst
-let mty_hash = EcCoreFol.mty_hash
+let mty_hash  = EcCoreFol.mty_hash
 let mty_equal = EcCoreFol.mty_equal
+
+let mr_equal  = EcCoreFol.mr_equal
+let mr_hash   = EcCoreFol.mr_hash

@@ -638,7 +638,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
   and doit_bindings env (subst, mxs) q1 q2 =
     let doit_binding (env, subst, mxs) (x1, gty1) (x2, gty2) =
-      let gty2 = Fsubst.gty_subst subst gty2 in
+      let gty2 = Fsubst.subst_gty subst gty2 in
 
       assert (not (Mid.mem x1 mxs) && not (Mid.mem x2 mxs));
 

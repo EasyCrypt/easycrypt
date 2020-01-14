@@ -1627,15 +1627,14 @@ and transmodsig_body
 
       let resty = transty_for_decl env f.pfd_tyresult in
 
-      let (uin, calls) =
-        (fst f.pfd_uses, mk_calls (snd f.pfd_uses))
-      in
+      let (uin, calls) = (fst f.pfd_uses, mk_calls (snd f.pfd_uses)) in
+      let oi = OI.mk calls uin Mx.empty None in
 
       let sig_ = { fs_name   = name.pl_desc;
                    fs_arg    = tyarg;
                    fs_anames = tyargs;
                    fs_ret    = resty; }
-      and mr = EcModules.add_oinfo mr name.pl_desc calls uin in
+      and mr = EcModules.add_oinfo mr name.pl_desc oi in
       [Tys_function sig_], mr
 
     | `Include (i,proc,restr) ->

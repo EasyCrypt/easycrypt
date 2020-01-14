@@ -146,7 +146,6 @@ module PreOI : sig
 
   val hash : ('a -> int) -> 'a t -> int
   val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
-  val subst : ('a -> 'a) -> (xpath -> xpath) -> 'a t -> 'a t
 
   val empty : 'a t
 
@@ -160,12 +159,14 @@ module PreOI : sig
   (* Intrinsic cost of [M.f] (i.e. excluding oracles). The procedure
    * [M.f]'s cost is not restricted if [None]. *)
   val cost_self : 'a t -> 'a option
+  val costs : 'a t -> 'a Mx.t
 
   (* List of oracles that can be called by [M.f].*)
   val allowed : 'a t -> xpath list
   val allowed_s : 'a t -> Sx.t
 
   val mk : xpath list -> bool -> 'a Mx.t -> 'a option -> 'a t
+  val change_calls : 'a t -> xpath list -> 'a t
   val filter : (xpath -> bool) -> 'a t -> 'a t
 end
 
@@ -175,6 +176,14 @@ type 'a pre_mod_restr = {
   mr_mpaths : EcPath.Sm.t use_restr;
   mr_oinfos : 'a PreOI.t Msym.t;
 }
+
+val pre_mr_equal :
+  ('a -> 'a -> bool) ->
+  'a pre_mod_restr ->
+  'a pre_mod_restr ->
+  bool
+
+val pre_mr_hash : ('a -> int) -> 'a pre_mod_restr -> int
 
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)
@@ -270,14 +279,6 @@ and 'a pre_module_comps = 'a pre_module_comps_item list
 and 'a pre_module_comps_item = 'a pre_module_item
 
 (* -------------------------------------------------------------------- *)
-val pre_mty_subst :
-  ( 'a -> 'a) ->
-  (path -> path) ->
-  (mpath -> mpath) ->
-  (xpath -> xpath) ->
-  'a pre_module_type ->
-  'a pre_module_type
-
 val pre_mty_equal :
   ('a -> 'a -> bool) ->
   'a pre_module_type ->
@@ -285,3 +286,7 @@ val pre_mty_equal :
   bool
 
 val pre_mty_hash : ('a -> int) -> 'a pre_module_type -> int
+
+(* -------------------------------------------------------------------- *)
+val get_uninit_read_of_fun : xpath -> _ pre_function_ -> Sx.t
+val get_uninit_read_of_module : path -> _ pre_module_expr -> (xpath * Sx.t) list

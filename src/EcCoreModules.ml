@@ -584,7 +584,6 @@ module PreOI : sig
 
   val hash : ('a -> int) -> 'a t -> int
   val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
-  val subst : ('a -> 'a) -> (xpath -> xpath) -> 'a t -> 'a t
 
   val empty : 'a t
 
@@ -592,11 +591,13 @@ module PreOI : sig
 
   val cost : 'a t -> xpath -> 'a option
   val cost_self : 'a t -> 'a option
+  val costs : 'a t -> 'a Mx.t
 
   val allowed : 'a t -> xpath list
   val allowed_s : 'a t -> Sx.t
 
   val mk : xpath list -> bool -> 'a Mx.t -> 'a option -> 'a t
+  val change_calls : 'a t -> xpath list -> 'a t
   val filter : (xpath -> bool) -> 'a t -> 'a t
 end = struct
   (* Oracle information of a procedure [M.f]:
@@ -629,21 +630,21 @@ end = struct
 
   let cost oi x = Mx.find_opt x oi.oi_costs
   let cost_self oi = oi.oi_self
+  let costs oi = oi.oi_costs
 
   let mk oi_calls oi_in oi_costs oi_self =
     { oi_calls; oi_in; oi_costs; oi_self; }
 
-  let filter f oi = mk
+  let change_calls oi calls =
+    mk calls oi.oi_in
+      (Mx.filter (fun x _ -> List.mem x calls) oi.oi_costs)
+      oi.oi_self
+
+  let filter f oi =
+    mk
       (List.filter f oi.oi_calls) oi.oi_in
       (Mx.filter (fun x _ -> f x) oi.oi_costs)
       oi.oi_self
-
-  let subst asubst sx oi =
-  { oi_calls  = List.map sx oi.oi_calls;
-    oi_in     = oi.oi_in;
-    oi_costs  = Mx.fold (fun x a costs ->
-        Mx.add (sx x) (asubst a) costs ) oi.oi_costs Mx.empty;
-    oi_self      = omap asubst oi.oi_self; }
 
   let equal a_equal oi1 oi2 =
     let check_costs_eq c1 c2 =
@@ -801,21 +802,6 @@ and 'a pre_module_comps = 'a pre_module_comps_item list
 and 'a pre_module_comps_item = 'a pre_module_item
 
 (* -------------------------------------------------------------------- *)
-let mr_subst sa sx sm mr =
-  { mr_xpaths = ur_app (fun s -> Sx.fold (fun m rx ->
-        Sx.add (sx m) rx) s Sx.empty) mr.mr_xpaths;
-    mr_mpaths = ur_app (fun s -> Sm.fold (fun m r ->
-        Sm.add (sm m) r) s Sm.empty) mr.mr_mpaths;
-    mr_oinfos = Msym.map (fun oi -> PreOI.subst sa sx oi) mr.mr_oinfos;
-  }
-
-let rec pre_mty_subst sa sp sm sx mty =
-  let mt_params = List.map (snd_map (pre_mty_subst sa sp sm sx)) mty.mt_params in
-  let mt_name   = sp mty.mt_name in
-  let mt_args   = List.map sm mty.mt_args in
-  let mt_restr   = mr_subst sa sx sm mty.mt_restr in
-  { mt_params; mt_name; mt_args; mt_restr; }
-
 let ur_hash elems el_hash ur =
   Why3.Hashcons.combine
     (Why3.Hashcons.combine_option
@@ -848,3 +834,57 @@ let rec pre_mty_equal a_equal mty1 mty2 =
   && (List.all2 (pair_equal EcIdent.id_equal (pre_mty_equal a_equal))
         mty1.mt_params mty2.mt_params)
   && (pre_mr_equal a_equal mty1.mt_restr mty1.mt_restr)
+
+(* -------------------------------------------------------------------- *)
+let get_uninit_read_of_fun (fp : xpath) (f : _ pre_function_) =
+  match f.f_def with
+  | FBalias _ | FBabs _ -> Sx.empty
+
+  | FBdef fd ->
+      let w =
+        let toloc { v_name = x } = (EcTypes.pv_loc fp x).pv_name in
+        let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
+        Sx.of_list (List.map xastrip w)
+      in
+
+      let w, r  = s_get_uninit_read w fd.f_body in
+      let raout = fd.f_ret |> omap (Uninit.e_pv is_loc) in
+      let raout = Sx.diff (raout |> odfl Sx.empty) w in
+      Sx.union r raout
+
+(* -------------------------------------------------------------------- *)
+let get_uninit_read_of_module (p : path) (me : _ pre_module_expr) =
+  let rec doit_me acc (mp, me) =
+    match me.me_body with
+    | ME_Alias     _  -> acc
+    | ME_Decl      _  -> acc
+    | ME_Structure mb -> doit_mb acc (mp, mb)
+
+  and doit_mb acc (mp, mb) =
+    List.fold_left
+      (fun acc item -> doit_mb1 acc (mp, item))
+      acc mb.ms_body
+
+  and doit_mb1 acc (mp, item) =
+    match item with
+    | MI_Module subme ->
+        doit_me acc (EcPath.mqname mp subme.me_name, subme)
+
+    | MI_Variable _ ->
+        acc
+
+    | MI_Function f ->
+        let xp = xpath_fun mp f.f_name in
+        let r  = get_uninit_read_of_fun xp f in
+        if Sx.is_empty r then acc else (xp, r) :: acc
+
+  in
+
+  let mp =
+    let margs =
+      List.map
+        (fun (x, _) -> EcPath.mpath_abs x [])
+        me.me_params
+    in EcPath.mpath_crt (EcPath.pqname p me.me_name) margs None
+
+  in List.rev (doit_me [] (mp, me))

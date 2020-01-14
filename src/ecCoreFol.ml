@@ -152,6 +152,8 @@ and pr = {
 
 and module_type = form pre_module_type
 
+type mod_restr = form pre_mod_restr
+
 (*-------------------------------------------------------------------- *)
 let mhr    = EcIdent.create "&hr"
 let mleft  = EcIdent.create "&1"
@@ -172,6 +174,9 @@ let f_ty f = f.f_ty
 (* TODO: (Adrien) memoization *)
 let mty_equal = EcCoreModules.pre_mty_equal f_equal
 let mty_hash = EcCoreModules.pre_mty_hash f_hash
+
+let mr_equal = EcCoreModules.pre_mr_equal f_equal
+let mr_hash = EcCoreModules.pre_mr_hash f_hash
 
 (*-------------------------------------------------------------------- *)
 let gty_equal ty1 ty2 =
@@ -1542,49 +1547,6 @@ module Fsubst = struct
         in
           if xs == xs' then (s, lp) else (s, LRecord (p, xs'))
 
-  let gty_subst s gty =
-    if is_subst_id s then gty else
-
-    match gty with
-    | GTty ty ->
-        let ty' = s.fs_ty ty in
-        if ty == ty' then gty else GTty ty'
-
-    | GTmodty p ->
-        let sub  = s.fs_sty.ts_mp in
-        let xsub = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
-        let p'   = mty_subst s.fs_sty.ts_p sub xsub p in
-
-        if   p == p'
-        then gty
-        else GTmodty p'
-
-    | GTmem mt ->
-        let mt' = EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt in
-        if mt == mt' then gty else GTmem mt'
-
-  (* ------------------------------------------------------------------ *)
-  let add_binding s (x, gty as xt) =
-    let gty' = gty_subst s gty in
-    let x'   = if s.fs_freshen then EcIdent.fresh x else x in
-
-    if   x == x' && gty == gty'
-    then
-      let s = match gty with
-        | GTty    _ -> f_rem_local s x
-        | GTmodty _ -> f_rem_mod   s x
-        | GTmem   _ -> f_rem_mem   s x
-      in
-        (s, xt)
-    else
-      let s = match gty' with
-        | GTty   ty -> f_bind_rename s x x' ty
-        | GTmodty _ -> f_bind_mod s x (EcPath.mident x')
-        | GTmem   _ -> f_bind_mem s x x'
-      in
-        (s, (x', gty'))
-
-  let add_bindings = List.map_fold add_binding
 
   (* ------------------------------------------------------------------ *)
   let subst_xpath s f =
@@ -1607,7 +1569,7 @@ module Fsubst = struct
   let rec f_subst ~tx s fp =
     tx fp (match fp.f_node with
     | Fquant (q, b, f) ->
-        let s, b' = add_bindings s b in
+        let s, b' = add_bindings ~tx s b in
         let f'    = f_subst ~tx s f in
           FSmart.f_quant (fp, (q, b, f)) (q, b', f')
 
@@ -1834,10 +1796,87 @@ module Fsubst = struct
     let sag = { f_subst_id with fs_loc = sag } in
     f_app (f_subst ~tx sag f) args fty
 
-  and mty_subst = EcCoreModules.pre_mty_subst f_subst
+  and subst_oi ~(tx : form -> form -> form) (s : f_subst) (oi : form PreOI.t) =
+    let sx = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
+    PreOI.mk
+      (List.map sx (PreOI.allowed oi))
+      (PreOI.is_in oi)
+      (EcPath.Mx.fold (fun x a costs ->
+           EcPath.Mx.add (sx x) (f_subst ~tx s a) costs
+         ) (PreOI.costs oi) EcPath.Mx.empty)
+      (omap (f_subst ~tx s) (PreOI.cost_self oi))
+
+  and mr_subst ~tx s mr : form pre_mod_restr =
+    let sx = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
+    let sm = s.fs_sty.ts_mp in
+    { mr_xpaths = ur_app (fun s -> Sx.fold (fun m rx ->
+          Sx.add (sx m) rx) s Sx.empty) mr.mr_xpaths;
+      mr_mpaths = ur_app (fun s -> Sm.fold (fun m r ->
+          Sm.add (sm m) r) s Sm.empty) mr.mr_mpaths;
+      mr_oinfos = EcSymbols.Msym.map (subst_oi ~tx s) mr.mr_oinfos;
+    }
+
+  and subst_mty ~tx s mty =
+    let sm = s.fs_sty.ts_mp in
+
+    let mt_params = List.map (snd_map (subst_mty ~tx s)) mty.mt_params in
+    let mt_name   = s.fs_sty.ts_p mty.mt_name in
+    let mt_args   = List.map sm mty.mt_args in
+    let mt_restr  = mr_subst ~tx s mty.mt_restr in
+    { mt_params; mt_name; mt_args; mt_restr; }
+
+  and subst_gty ~tx s gty =
+    if is_subst_id s then gty else
+
+    match gty with
+    | GTty ty ->
+        let ty' = s.fs_ty ty in
+        if ty == ty' then gty else GTty ty'
+
+    | GTmodty p ->
+        let p'   = subst_mty ~tx s p in
+
+        if   p == p'
+        then gty
+        else GTmodty p'
+
+    | GTmem mt ->
+        let mt' = EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt in
+        if mt == mt' then gty else GTmem mt'
+
+  and add_binding ~tx s (x, gty as xt) =
+    let gty' = subst_gty ~tx s gty in
+    let x'   = if s.fs_freshen then EcIdent.fresh x else x in
+
+    if   x == x' && gty == gty'
+    then
+      let s = match gty with
+        | GTty    _ -> f_rem_local s x
+        | GTmodty _ -> f_rem_mod   s x
+        | GTmem   _ -> f_rem_mem   s x
+      in
+        (s, xt)
+    else
+      let s = match gty' with
+        | GTty   ty -> f_bind_rename s x x' ty
+        | GTmodty _ -> f_bind_mod s x (EcPath.mident x')
+        | GTmem   _ -> f_bind_mem s x x'
+      in
+        (s, (x', gty'))
+
+  and add_bindings ~tx = List.map_fold (add_binding ~tx)
+
+  (* ------------------------------------------------------------------ *)
+  let add_binding  = add_binding ~tx:(fun _ f -> f)
+  let add_bindings = add_bindings ~tx:(fun _ f -> f)
+
   (* ------------------------------------------------------------------ *)
   let f_subst ?(tx = fun _ f -> f) s =
     if is_subst_id s then identity else f_subst ~tx s
+
+  let subst_gty = subst_gty ~tx:(fun _ f -> f)
+  let subst_mty = subst_mty ~tx:(fun _ f -> f)
+  let subst_oi  = subst_oi ~tx:(fun _ f -> f)
 
   let f_subst_local x t =
     let s = f_bind_local f_subst_id x t in

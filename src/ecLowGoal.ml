@@ -157,7 +157,7 @@ module LowApply = struct
 
     and check_arg (sbt, ax) arg =
       let check_binder (x, xty) f =
-        let xty = Fsubst.gty_subst sbt xty in
+        let xty = Fsubst.subst_gty sbt xty in
 
         match xty, arg with
         | GTty xty, PAFormula arg ->
@@ -433,7 +433,7 @@ end
 (* -------------------------------------------------------------------- *)
 let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
   let add_local hyps id sbt x gty =
-    let gty = Fsubst.gty_subst sbt gty in
+    let gty = Fsubst.subst_gty sbt gty in
     let id  = tg_map (function
       | Some id -> id
       | None    -> EcEnv.LDecl.fresh_id hyps (EcIdent.name x)) id

@@ -151,6 +151,8 @@ and pr = {
 
 and module_type = form pre_module_type
 
+type mod_restr = form pre_mod_restr
+
 (* -------------------------------------------------------------------- *)
 val gtty    : EcTypes.ty -> gty
 val gtmodty : module_type -> gty
@@ -163,6 +165,9 @@ val gty_fv    : gty -> int Mid.t
 (* -------------------------------------------------------------------- *)
 val mty_equal : module_type -> module_type -> bool
 val mty_hash  : module_type -> int
+
+val mr_equal : mod_restr -> mod_restr -> bool
+val mr_hash  : mod_restr -> int
 
 (* -------------------------------------------------------------------- *)
 val f_equal   : form -> form -> bool
@@ -469,7 +474,6 @@ module Fsubst : sig
   val f_bind_mod    : f_subst -> EcIdent.t -> mpath -> f_subst
   val f_bind_rename : f_subst -> EcIdent.t -> EcIdent.t -> ty -> f_subst
 
-  val gty_subst : f_subst -> gty -> gty
   val f_subst   : ?tx:(form -> form -> form) -> f_subst -> form -> form
 
   val f_subst_local : EcIdent.t -> form -> form -> form
@@ -491,14 +495,9 @@ module Fsubst : sig
   val subst_me       : f_subst -> EcMemory.memenv -> EcMemory.memenv
   val subst_m        : f_subst -> EcIdent.t -> EcIdent.t
   val subst_ty       : f_subst -> ty -> ty
-
-  (* TODO: (Adrien) do something there *)
-  val mty_subst :
-  (path -> path) ->
-  (mpath -> mpath) ->
-  (xpath -> xpath) ->
-  module_type ->
-  module_type
+  val subst_mty      : f_subst -> module_type -> module_type
+  val subst_oi       : f_subst -> form PreOI.t -> form PreOI.t
+  val subst_gty      : f_subst -> gty -> gty
 end
 
 (* -------------------------------------------------------------------- *)
