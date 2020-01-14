@@ -13,7 +13,7 @@ open EcPath
 open EcMaps
 open EcIdent
 open EcTypes
-open EcModules
+open EcCoreModules
 open EcMemory
 
 (* -------------------------------------------------------------------- *)
@@ -21,28 +21,23 @@ val mhr    : memory
 val mleft  : memory
 val mright : memory
 
-type gty =
-  | GTty    of EcTypes.ty
-  | GTmodty of module_type
-  | GTmem   of EcMemory.memtype
-
-val gtty    : EcTypes.ty -> gty
-val gtmodty : module_type -> gty
-val gtmem   : EcMemory.memtype -> gty
-
-val gty_equal : gty  -> gty -> bool
-val gty_fv    : gty -> int Mid.t
-
+(* -------------------------------------------------------------------- *)
 type quantif =
   | Lforall
   | Lexists
   | Llambda
 
-type binding  = (EcIdent.t * gty)
-type bindings = binding list
 type hoarecmp = FHle | FHeq | FHge
 
-type form = private {
+type gty =
+  | GTty    of EcTypes.ty
+  | GTmodty of module_type
+  | GTmem   of EcMemory.memtype
+
+and binding  = (EcIdent.t * gty)
+and bindings = binding list
+
+and form = private {
   f_node : f_node;
   f_ty   : ty;
   f_fv   : int Mid.t;
@@ -154,6 +149,21 @@ and pr = {
   pr_event : form;
 }
 
+and module_type = form pre_module_type
+
+(* -------------------------------------------------------------------- *)
+val gtty    : EcTypes.ty -> gty
+val gtmodty : module_type -> gty
+val gtmem   : EcMemory.memtype -> gty
+
+(* -------------------------------------------------------------------- *)
+val gty_equal : gty  -> gty -> bool
+val gty_fv    : gty -> int Mid.t
+
+(* -------------------------------------------------------------------- *)
+val mty_equal : module_type -> module_type -> bool
+val mty_hash  : module_type -> int
+
 (* -------------------------------------------------------------------- *)
 val f_equal   : form -> form -> bool
 val f_compare : form -> form -> int
@@ -187,7 +197,7 @@ val kind_of_gty: gty -> [`Form | `Mem | `Mod]
 val f_local : EcIdent.t -> EcTypes.ty -> form
 val f_pvar  : EcTypes.prog_var -> EcTypes.ty -> memory -> form
 val f_pvarg : xpath -> EcTypes.ty -> memory -> form
-val f_pvloc : xpath -> EcModules.variable -> memory -> form
+val f_pvloc : xpath -> variable -> memory -> form
 val f_glob  : mpath -> memory -> form
 
 (* soft-constructors - common formulas constructors *)
@@ -210,14 +220,14 @@ val f_hoareF_r : sHoareF -> form
 val f_hoareS_r : sHoareS -> form
 
 val f_hoareF : form -> xpath -> form -> form
-val f_hoareS : memenv -> form -> EcModules.stmt -> form -> form
+val f_hoareS : memenv -> form -> stmt -> form -> form
 
 (* soft-constructors - cost hoare *)
 val f_cHoareF_r : cHoareF -> form
 val f_cHoareS_r : cHoareS -> form
 
 val f_cHoareF : form -> xpath -> form -> form -> form
-val f_cHoareS : memenv -> form -> EcModules.stmt -> form -> form -> form
+val f_cHoareS : memenv -> form -> stmt -> form -> form -> form
 
 (* soft-constructors - bd hoare *)
 val hoarecmp_opp : hoarecmp -> hoarecmp
@@ -226,7 +236,7 @@ val f_bdHoareF_r : bdHoareF -> form
 val f_bdHoareS_r : bdHoareS -> form
 
 val f_bdHoareF : form -> xpath -> form -> hoarecmp -> form -> form
-val f_bdHoareS : memenv -> form -> EcModules.stmt -> form -> hoarecmp -> form -> form
+val f_bdHoareS : memenv -> form -> stmt -> form -> hoarecmp -> form -> form
 
 (* soft-constructors - equiv *)
 val f_equivS : memenv -> memenv -> form -> stmt -> stmt -> form -> form
@@ -481,6 +491,14 @@ module Fsubst : sig
   val subst_me       : f_subst -> EcMemory.memenv -> EcMemory.memenv
   val subst_m        : f_subst -> EcIdent.t -> EcIdent.t
   val subst_ty       : f_subst -> ty -> ty
+
+  (* TODO: (Adrien) do something there *)
+  val mty_subst :
+  (path -> path) ->
+  (mpath -> mpath) ->
+  (xpath -> xpath) ->
+  module_type ->
+  module_type
 end
 
 (* -------------------------------------------------------------------- *)
