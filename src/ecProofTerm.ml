@@ -657,7 +657,7 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
       match dfl_arg_for_mod pe arg with
       | PVAModule (mp, mt) -> begin
         try
-          EcTyping.check_modtype_with_restrictions env mp mt emt;
+          EcTyping.check_modtype_with_mem_restr env mp mt emt;
           EcPV.check_module_in env mp emt;
           (Fsubst.f_subst_mod x mp f, PAModule (mp, mt))
         with

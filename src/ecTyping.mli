@@ -210,12 +210,12 @@ val trans_gamepath   : env -> pgamepath -> xpath
 
 (* -------------------------------------------------------------------- *)
 
-(* This only checks the variables restrictions, not the oracle calls. *)
-val check_restrictions_fun :
+(* This only checks the memory restrictions. *)
+val check_mem_restr_fun :
   env -> xpath -> mod_restr -> unit
 
-(* This only checks the variables restrictions, not the oracle calls. *)
-val check_modtype_with_restrictions :
+(* This only checks the memory restrictions. *)
+val check_modtype_with_mem_restr :
   env -> mpath -> module_sig -> module_type -> unit
 
 (* -------------------------------------------------------------------- *)

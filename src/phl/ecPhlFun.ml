@@ -36,7 +36,7 @@ let check_oracle_use (_pf : proofenv) env adv o =
                               ur_neg = Sm.singleton adv; }} in
 
   (* This only checks the variables restrictions, not the oracle calls. *)
-  EcTyping.check_restrictions_fun env o restr
+  EcTyping.check_mem_restr_fun env o restr
 
 let check_concrete pf env f =
   if NormMp.is_abstract_fun f env then

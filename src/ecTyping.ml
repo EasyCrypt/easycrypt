@@ -682,19 +682,19 @@ and use_allowed env
     all_allowed_gen env urm.EcEnv.us_pv pr r;
     all_mod_allowed env urm.EcEnv.us_gl pr r
 
-(* This only checks the variables restrictions, not the oracle calls. *)
-let _check_restr env (use : EcEnv.use) (restr : mod_restr) =
+(* This only checks the memory restrictions. *)
+let _check_mem_restr env (use : EcEnv.use) (restr : mod_restr) =
   let r : EcEnv.use use_restr = NormMp.restr_use env restr in
   use_allowed env (Some use) (Some EcEnv.use_empty) r
 
 (* Check if [mr1] is a a subset of [mr2]. *)
-let _check_restriction_sub env (mr1 : mod_restr) (mr2 : mod_restr) =
+let _check_mem_restr_sub env (mr1 : mod_restr) (mr2 : mod_restr) =
   let r1 = NormMp.restr_use env mr1 in
   let r2 = NormMp.restr_use env mr2 in
   ur_allowed env r1 (Some EcEnv.use_empty) r2
 
 (* Check if [mr1] is equal to [mr2]. *)
-let _check_restriction_eq env (mr1 : mod_restr) (mr2 : mod_restr) =
+let _check_mem_restr_eq env (mr1 : mod_restr) (mr2 : mod_restr) =
   let r1 = NormMp.restr_use env mr1 in
   let r2 = NormMp.restr_use env mr2 in
 
@@ -707,10 +707,10 @@ let _check_restriction_eq env (mr1 : mod_restr) (mr2 : mod_restr) =
 
     to_eq_error e1 e2
 
-let check_restriction_mode mode env sym mr1 mr2 =
+let check_mem_restr_mode mode env sym mr1 mr2 =
   try match mode with
-    | `Sub -> _check_restriction_sub env mr1 mr2
-    | `Eq  -> _check_restriction_eq  env mr1 mr2
+    | `Sub -> _check_mem_restr_sub env mr1 mr2
+    | `Eq  -> _check_mem_restr_eq  env mr1 mr2
   with RestrErr err -> tymod_cnv_failure (E_TyModCnv_MismatchRestr (sym,err))
 
 let recast env who f =
@@ -720,14 +720,14 @@ let recast env who f =
   | RestrErr (`Sub e) -> re (`Sub e)
   | RestrErr (`RevSub e) -> re (`RevSub e)
 
-(* This only checks the variables restrictions, not the oracle calls. *)
-let check_restrictions env mp (use : EcEnv.use) (restr : mod_restr) =
-  recast env (RW_mod mp) (fun () -> _check_restr env use restr)
+(* This only checks the memory restrictions. *)
+let check_mem_restr env mp (use : EcEnv.use) (restr : mod_restr) =
+  recast env (RW_mod mp) (fun () -> _check_mem_restr env use restr)
 
-(* This only checks the variables restrictions, not the oracle calls. *)
-let check_restrictions_fun env xp restr =
+(* This only checks the memory restrictions. *)
+let check_mem_restr_fun env xp restr =
   let use = NormMp.fun_use env xp in
-  recast env (RW_fun xp) (fun () ->_check_restr env use restr)
+  recast env (RW_fun xp) (fun () ->_check_mem_restr env use restr)
 
 (* -------------------------------------------------------------------- *)
 let rec check_sig_cnv mode env sym_in (sin:module_sig) (sout:module_sig) =
@@ -741,30 +741,28 @@ let rec check_sig_cnv mode env sym_in (sin:module_sig) (sout:module_sig) =
   let bsubst =
     List.fold_left2
       (fun subst (xin, tyin) (xout, tyout) ->
-        let tyout = EcSubst.subst_modtype subst tyout in
-        begin
-          try check_modtype_cnv
-                ~mode env tyout tyin
-          with TymodCnvFailure err ->
-            tymod_cnv_failure
-              (E_TyModCnv_SubTypeArg(xin, tyout, tyin, err))
-        end;
-        EcSubst.add_module subst xout (EcPath.mident xin))
+         let tyout = EcSubst.subst_modtype subst tyout in
+         begin
+           try check_modtype_cnv
+                 ~mode env tyout tyin
+           with TymodCnvFailure err ->
+             tymod_cnv_failure
+               (E_TyModCnv_SubTypeArg(xin, tyout, tyin, err))
+         end;
+         EcSubst.add_module subst xout (EcPath.mident xin))
       EcSubst.empty sin.mis_params sout.mis_params
   in
   let bout = EcSubst.subst_modsig_body bsubst sout.mis_body
   and rout = EcSubst.subst_mod_restr bsubst sout.mis_restr in
 
-  (* Check for restrictions inclusion. *)
-  check_restriction_mode mode env sym_in sin.mis_restr sout.mis_restr;
+  (* Check for memory restrictions inclusion. *)
+  check_mem_restr_mode mode env sym_in sin.mis_restr sout.mis_restr;
 
-  (* Check for body inclusion.
-   * This includes:
-   * - functions inclusion with equal signatures + included use modifiers.
-   *)
+  (* Check for body inclusion:
+   * - functions inclusion with equal signatures + included oracles. *)
   let env =
     List.fold_left (fun env (xin,tyin) ->
-      EcEnv.Mod.bind_local xin tyin env)
+        EcEnv.Mod.bind_local xin tyin env)
       env sin.mis_params in
 
   let check_for_item (Tys_function fout : module_sig_body_item) =
@@ -773,33 +771,33 @@ let rec check_sig_cnv mode env sym_in (sin:module_sig) (sout:module_sig) =
     let i_item =
       List.ofind
         (fun i_item ->
-             (tysig_item_name i_item) = o_name)
+           (tysig_item_name i_item) = o_name)
         sin.mis_body
     in
-      match i_item with
-      | None -> tymod_cnv_failure (E_TyModCnv_MissingComp o_name)
-      | Some (Tys_function fin) ->
-        let oin = EcSymbols.Msym.find fin.fs_name sin.mis_restr.mr_oinfos in
-        let oout =
-          EcSymbols.Msym.find fout.fs_name rout.mr_oinfos in
-        check_item_compatible env mode (fin,oin) (fout,oout)
+    match i_item with
+    | None -> tymod_cnv_failure (E_TyModCnv_MissingComp o_name)
+    | Some (Tys_function fin) ->
+      let oin = EcSymbols.Msym.find fin.fs_name sin.mis_restr.mr_oinfos in
+      let oout =
+        EcSymbols.Msym.find fout.fs_name rout.mr_oinfos in
+      check_item_compatible env mode (fin,oin) (fout,oout)
   in
-    List.iter check_for_item bout;
+  List.iter check_for_item bout;
 
-    if mode = `Eq then begin
-      List.iter
-        (fun i_item ->
-          let i_name = tysig_item_name i_item in
-          let b =
-            List.exists
-              (fun o_item ->
-                   (tysig_item_name o_item) = i_name)
-              bout
-          in
-            if not b then
-              tymod_cnv_failure (E_TyModCnv_MissingComp i_name))
-        sin.mis_body
-    end
+  if mode = `Eq then begin
+    List.iter
+      (fun i_item ->
+         let i_name = tysig_item_name i_item in
+         let b =
+           List.exists
+             (fun o_item ->
+                (tysig_item_name o_item) = i_name)
+             bout
+         in
+         if not b then
+           tymod_cnv_failure (E_TyModCnv_MissingComp i_name))
+      sin.mis_body
+  end
 
 and check_modtype_cnv
   ?(mode = `Eq) env (tyin:module_type) (tyout:module_type)
@@ -813,7 +811,8 @@ let check_sig_mt_cnv env sym_in sin tyout =
   check_sig_cnv `Sub env sym_in sin sout
 
 (* -------------------------------------------------------------------- *)
-let check_modtype_with_restrictions env mp mt i =
+(* This only checks the memory restrictions. *)
+let check_modtype_with_mem_restr env mp mt i =
   let sym = match mp.m_top with
     | `Local id -> id.EcIdent.id_symb
     | `Concrete (p,_) -> EcPath.basename p in
@@ -821,7 +820,7 @@ let check_modtype_with_restrictions env mp mt i =
 
   let restr = i.mt_restr in
   let use = NormMp.mod_use env mp in
-  check_restrictions env mp use restr
+  check_mem_restr env mp use restr
 
 (* -------------------------------------------------------------------- *)
 let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
