@@ -171,7 +171,7 @@ module LowApply = struct
         | GTmodty emt, PAModule (mp, mt) -> begin
           (* FIXME: poor API ==> poor error recovery *)
           try
-            EcTyping.check_modtype_with_mem_restr env mp mt emt;
+            EcTyping.check_modtype env mp mt emt;
             EcPV.check_module_in env mp emt;
             (Fsubst.f_bind_mod sbt x mp, f)
           with _ -> raise InvalidProofTerm

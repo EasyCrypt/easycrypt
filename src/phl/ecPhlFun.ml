@@ -35,7 +35,7 @@ let check_oracle_use (_pf : proofenv) env adv o =
                 mr_mpaths = { mr_empty.mr_mpaths with
                               ur_neg = Sm.singleton adv; }} in
 
-  (* This only checks the variables restrictions, not the oracle calls. *)
+  (* This only checks the memory restrictions. *)
   EcTyping.check_mem_restr_fun env o restr
 
 let check_concrete pf env f =

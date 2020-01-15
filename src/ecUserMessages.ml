@@ -36,10 +36,21 @@ module TypingError : sig
 end = struct
   open EcTyping
 
-  let pp_mismatch_funsig env fmt error =
-    let ppe = EcPrinting.PPEnv.ofenv env in
+  let pp_mismatch_funsig env0 fmt error =
+    let ppe0 = EcPrinting.PPEnv.ofenv env0 in
     let msg x = Format.fprintf fmt x in
-    let pp_type fmt ty = EcPrinting.pp_type ppe fmt ty in
+    let pp_type fmt ty = EcPrinting.pp_type ppe0 fmt ty in
+    let pp_cost ppe fmt = function
+      | None -> Format.fprintf fmt "+infinity"
+      | Some c -> EcPrinting.pp_form ppe fmt c in
+    let pp_diff ppe mode fmt (f,(ic,oc)) =
+      Format.fprintf fmt
+        "@[<v>the maximal number of calls to %a:@;  @[%a@]@; cannot be shown \
+         to be %s:@;  @[%a@]@]"
+        (EcPrinting.pp_funname ppe) f
+        (pp_cost ppe) ic
+        (match mode with `Eq -> "equal to" | `Sub -> "upper-bounded by")
+        (pp_cost ppe) oc in
 
     match error with
     | MF_targs (ex, got) ->
@@ -71,6 +82,33 @@ end = struct
             (if has_allowed then ",@ " else "")
             (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname ppe))
             (Sx.ntr_elements notallowed)
+
+    | MF_scompl (env, `Sub (iself,oself)) ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      msg "@[<v>the function's complexity:@;  @[%a@]@; cannot be shown \
+           to be upper-bounded by:@;  @[%a@]@]"
+        (pp_cost ppe) iself
+        (pp_cost ppe) oself
+
+    | MF_scompl (env, `Eq (iself,oself)) ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      msg "@[<v>the function's complexity:@;  @[%a@]@; cannot be shown \
+           to be equal to:@;  @[%a@]@]"
+        (pp_cost ppe) iself
+        (pp_cost ppe) oself
+
+    | MF_compl (env, `Sub (diffs)) ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      Format.fprintf fmt "@[<v>%a@]"
+        (EcPrinting.pp_list "@;" (pp_diff ppe `Sub))
+        (Mx.bindings diffs)
+
+    | MF_compl (env, `Eq (diffs)) ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      Format.fprintf fmt "@[<v>%a@]"
+        (EcPrinting.pp_list "@;" (pp_diff ppe `Eq))
+        (Mx.bindings diffs)
+
 
   let pp_restr_err_aux env fmt error =
     let msg x = Format.fprintf fmt x in
@@ -118,22 +156,22 @@ end = struct
         (EcPrinting.pp_list " and@ " pp_m) (Sm.ntr_elements ms)
 
     | `Eq (xl,ml,xr,mr) when Sm.is_empty ml && Sm.is_empty mr ->
-      msg "variable restriction@ %a@ \
-           is not compatible with the variable restriction@ %a"
+      msg "the memory restriction@ %a@ \
+           is not compatible with the memory restriction@ %a"
         (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xl)
         (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xr)
 
     | `Eq (xl,ml,xr,mr) when Sx.is_empty xl && Sx.is_empty xr ->
-      msg "module restriction@ %a@ \
-           is not compatible with the module restriction@ %a"
+      msg "the memory module restriction@ %a@ \
+           is not compatible with the memory module restriction@ %a"
         (EcPrinting.pp_list " and@ " pp_m)
         (Sm.ntr_elements ml)
         (EcPrinting.pp_list " and@ " pp_m)
         (Sm.ntr_elements mr)
 
     | `Eq (xl,ml,xr,mr) ->
-      msg "restriction@ %a@ %a@ \
-           is not compatible with the restriction@ %a@ %a"
+      msg "the memory restriction@ %a@ %a@ \
+           is not compatible with the memory restriction@ %a@ %a"
         (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xl)
         (EcPrinting.pp_list " and@ " pp_m) (Sm.ntr_elements ml)
         (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xr)

@@ -16,6 +16,7 @@ open EcLocation
 open EcParsetree
 open EcTypes
 open EcModules
+open EcFol
 
 (* -------------------------------------------------------------------- *)
 type opmatch = [
@@ -27,10 +28,15 @@ type opmatch = [
 
 type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
 
+
+type 'a suboreq       = [`Eq of 'a | `Sub of 'a ]
+
 type mismatch_funsig =
-| MF_targs of ty * ty (* expected, got *)
-| MF_tres  of ty * ty (* expected, got *)
-| MF_restr of EcEnv.env * Sx.t mismatch_sets
+| MF_targs  of ty * ty                               (* expected, got *)
+| MF_tres   of ty * ty                               (* expected, got *)
+| MF_restr  of EcEnv.env * Sx.t mismatch_sets
+| MF_compl  of EcEnv.env * (form option * form option) Mx.t suboreq
+| MF_scompl of EcEnv.env * (form option * form option) suboreq
 
 type restr_failure = Sx.t * Sm.t
 
@@ -214,8 +220,7 @@ val trans_gamepath   : env -> pgamepath -> xpath
 val check_mem_restr_fun :
   env -> xpath -> mod_restr -> unit
 
-(* This only checks the memory restrictions. *)
-val check_modtype_with_mem_restr :
+val check_modtype :
   env -> mpath -> module_sig -> module_type -> unit
 
 (* -------------------------------------------------------------------- *)

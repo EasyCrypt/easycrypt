@@ -36,10 +36,14 @@ type opmatch = [
 
 type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
 
+type 'a suboreq       = [`Eq of 'a | `Sub of 'a ]
+
 type mismatch_funsig =
-| MF_targs of ty * ty (* expected, got *)
-| MF_tres  of ty * ty (* expected, got *)
-| MF_restr of EcEnv.env * Sx.t mismatch_sets
+| MF_targs  of ty * ty                               (* expected, got *)
+| MF_tres   of ty * ty                               (* expected, got *)
+| MF_restr  of EcEnv.env * Sx.t mismatch_sets
+| MF_compl  of EcEnv.env * (form option * form option) Mx.t suboreq
+| MF_scompl of EcEnv.env * (form option * form option) suboreq
 
 type restr_failure = Sx.t * Sm.t
 
@@ -455,38 +459,91 @@ let tymod_cnv_failure e =
 let tysig_item_name = function
   | Tys_function f -> f.fs_name
 
+(* Check that the oracle information of two procedures are compatible. *)
 let check_item_compatible env mode (fin,oin) (fout,oout) =
   assert (fin.fs_name = fout.fs_name);
+
+  let check_item_err err =
+    tymod_cnv_failure (E_TyModCnv_MismatchFunSig(fin.fs_name,err)) in
 
   let (iargs, oargs) = (fin.fs_arg, fout.fs_arg) in
   let (ires , ores ) = (fin.fs_ret, fout.fs_ret) in
 
+  (* We check signatures compatibility. *)
   if not (EqTest.for_type env iargs oargs) then
-    tymod_cnv_failure
-      (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_targs(oargs,iargs)));
+    check_item_err (MF_targs(oargs,iargs));
 
   if not (EqTest.for_type env ires ores) then
-    tymod_cnv_failure
-      (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_tres(ores,ires)));
+    check_item_err (MF_tres(ores,ires));
 
-  let norm oi =
+  (* We check allowed oracle compatibility. *)
+  let norm_allowed oi =
     List.fold_left (fun s f ->
         EcPath.Sx.add (EcEnv.NormMp.norm_xfun env f) s)
-      EcPath.Sx.empty (OI.allowed oi)
-  in
-  let icalls = norm oin in
-  let ocalls = norm oout in
+      EcPath.Sx.empty (OI.allowed oi) in
+
+  let icalls = norm_allowed oin in
+  let ocalls = norm_allowed oout in
+  let () = match mode with
+    | `Sub ->
+      if not (Sx.subset icalls ocalls) then
+        let sx = Sx.diff icalls ocalls in
+        check_item_err (MF_restr(env, `Sub sx))
+    | `Eq  ->
+      if not (Sx.equal icalls ocalls) then
+        check_item_err (MF_restr(env, `Eq(ocalls, icalls))) in
+
+  (* We check complexity compatibility. *)
+  let iself, oself = omap (EcEnv.NormMp.norm_form env) (OI.cost_self oin),
+                     omap (EcEnv.NormMp.norm_form env) (OI.cost_self oout) in
+  let icosts, ocosts = Mx.map (EcEnv.NormMp.norm_form env) (OI.costs oin),
+                       Mx.map (EcEnv.NormMp.norm_form env) (OI.costs oout) in
+
   match mode with
   | `Sub ->
-    if not (Sx.subset icalls ocalls) then
-      let sx = Sx.diff icalls ocalls in
-      tymod_cnv_failure
-        (E_TyModCnv_MismatchFunSig(fin.fs_name, MF_restr(env, `Sub sx)))
+    (* We cannot do much here, since to check that [iself] is always smaller
+       than [oself], we need to a judgement:
+       [forall mem. iself{mem} <= oself{mem}]
+       which we cannot do statically when type-checking, except in some
+       simple cases.*)
+
+    (* We check self cost. *)
+    let () = match iself, oself with
+      | Some _, None -> ()
+      | None, None -> ()
+      | Some ix, Some ox ->
+        if not @@ EcFol.f_equal ix ox then
+          check_item_err (MF_scompl(env, `Sub(iself, oself)));
+      | None, Some _ -> check_item_err (MF_scompl(env, `Sub(iself, oself))) in
+
+    (* We check costs for other procedures. *)
+    let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
+        | None, Some _ -> Mx.add f (ic,oc) acc
+        | Some _, None | None, None -> acc
+        | Some ic, Some oc ->
+          if EcFol.f_equal ic oc then acc
+          else Mx.add f (Some ic, Some oc) acc
+      ) icosts ocosts Mx.empty in
+    if not (Mx.is_empty diff) then
+      check_item_err (MF_compl(env, `Sub(diff)));
+
   | `Eq  ->
-    if not (Sx.equal icalls ocalls) then
-      tymod_cnv_failure
-        (E_TyModCnv_MismatchFunSig(fin.fs_name,
-                                   MF_restr(env, `Eq(ocalls, icalls))))
+    (* We check self cost. *)
+    if not (opt_equal EcFol.f_equal iself oself) then
+      check_item_err (MF_scompl(env, `Eq(iself, oself)));
+
+    (* We check costs for other procedures. *)
+    let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
+        | None, Some _ | Some _, None -> Mx.add f (ic,oc) acc
+        | None, None -> acc
+        | Some ic, Some oc ->
+          if EcFol.f_equal ic oc then acc
+          else Mx.add f (Some ic, Some oc) acc
+      ) icosts ocosts Mx.empty in
+    if not (Mx.is_empty diff) then
+      check_item_err (MF_compl(env, `Eq(diff)))
+
+
 (* -------------------------------------------------------------------- *)
 exception RestrErr of mismatch_restr
 
@@ -811,8 +868,7 @@ let check_sig_mt_cnv env sym_in sin tyout =
   check_sig_cnv `Sub env sym_in sin sout
 
 (* -------------------------------------------------------------------- *)
-(* This only checks the memory restrictions. *)
-let check_modtype_with_mem_restr env mp mt i =
+let check_modtype env mp mt i =
   let sym = match mp.m_top with
     | `Local id -> id.EcIdent.id_symb
     | `Concrete (p,_) -> EcPath.basename p in
