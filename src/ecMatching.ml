@@ -828,9 +828,13 @@ module FPosition = struct
 
           | FcHoareF chs ->
             let subctxt = Sid.add EcFol.mhr ctxt in
-            doit pos (`WithSubCtxt ([(subctxt, chs.chf_pr);
-                                     (subctxt, chs.chf_po);
-                                     (subctxt, chs.chf_c)]))
+            let calls =
+              List.map (fun (_,c) -> subctxt,c)
+                (EcPath.Mx.bindings chs.chf_co.c_calls) in
+            doit pos (`WithSubCtxt ((subctxt, chs.chf_pr) ::
+                                    (subctxt, chs.chf_po) ::
+                                    (subctxt, chs.chf_co.c_self) ::
+                                    calls))
 
           | FbdHoareF hs ->
               let subctxt = Sid.add EcFol.mhr ctxt in
@@ -959,9 +963,20 @@ module FPosition = struct
               f_hoareF_r { hf with shf_pr; shf_po; }
 
           | FcHoareF chf ->
-            let sub = doit p [chf.chf_pr; chf.chf_po; chf.chf_c] in
-            let (chf_pr, chf_po, chf_c) = as_seq3 sub in
-            f_cHoareF_r { chf with chf_pr; chf_po; chf_c }
+            let fkeys, calls = EcPath.Mx.bindings chf.chf_co.c_calls
+                               |> List.split in
+            let sub = doit p (chf.chf_pr ::
+                              chf.chf_po ::
+                              chf.chf_co.c_self ::
+                              calls) in
+            begin match sub with
+              | chf_pr :: chf_po :: c_self :: calls ->
+                let c_calls = List.fold_left2 (fun acc f c ->
+                    EcPath.Mx.add f c acc
+                  ) EcPath.Mx.empty fkeys calls in
+                f_cHoareF_r { chf with chf_pr; chf_po;
+                                       chf_co = { c_self; c_calls }; }
+              | _ -> assert false end
 
           | FbdHoareF hf ->
               let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in

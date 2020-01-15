@@ -447,6 +447,7 @@
 %token HAVE
 %token HINT
 %token HOARE
+%token CHOARE
 %token IDTAC
 %token IF
 %token IFF
@@ -1027,6 +1028,14 @@ ptybindings_decl:
 %inline hole: UNDERSCORE { PFhole }
 %inline none: IMPOSSIBLE { assert false }
 
+orcl_time(P):
+ | o=qident COLON c=form_r(P) { (o, c) }
+
+costs(P):
+| c=form_r(P)                                                 {PC_costs(c,[])}
+/* TODO: (Adrien) there is a problem with this entry, but I don't know what */
+/* | c=form_r(P) SEMICOLON calls=rlist1(orcl_time(P), SEMICOLON) {PC_costs(c,calls)} */
+
 qident_or_res_or_glob:
 | x=qident   { GVvar x }
 | x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
@@ -1223,6 +1232,8 @@ form_u(P):
 
 | PHOARE pb=phoare_body(P) { pb }
 
+| CHOARE pb=choare_body(P) { pb }
+
 | LOSSLESS mp=loc(fident)
     { PFlsless mp }
 
@@ -1263,6 +1274,14 @@ phoare_body(P):
   RBRACKET
     cmp=hoare_bd_cmp bd=sform_r(P)
   { PFBDhoareF (pre, mp, post, cmp, bd) }
+
+choare_body(P):
+  LBRACKET mp=loc(fident) COLON
+    pre=form_r(P) LONGARROW post=form_r(P)
+  RBRACKET
+  TIME
+  LT c=costs(P) GT
+  { PFChoareF (pre, mp, post, c) }
 
 equiv_body(P):
   mp1=loc(fident) TILD mp2=loc(fident)
@@ -2378,14 +2397,13 @@ conseq:
 | UNDERSCORE LONGARROW f2=form    { None, Some f2 }
 | f1=form LONGARROW f2=form       { Some f1, Some f2 }
 
-
 conseq_xt:
-| c=conseq                                    { c, None }
-| c=conseq   COLON cmp=hoare_bd_cmp? bd=sform { c, Some (cmp, bd) }
-| UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform { (None, None), Some(cmp, bd) }
-
-orcl_time:
- | o=qident SEMICOLON c=form                   { o, c }
+| c=conseq                                     { c, None }
+| c=conseq   COLON cmp=hoare_bd_cmp? bd=sform  { c, Some (CQI_bd (cmp, bd)) }
+| UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
+                                    { (None, None), Some (CQI_bd (cmp, bd)) }
+| c=conseq   COLON LT co=costs(none) GT           { c, Some (CQI_c co) }
+| UNDERSCORE COLON LT co=costs(none) GT           { (None, None), Some (CQI_c co) }
 
 call_info:
  | f1=form LONGARROW f2=form                   { CI_spec (f1, f2, None) }

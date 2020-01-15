@@ -115,7 +115,7 @@ and cHoareF = {
   chf_pr : form;
   chf_f  : EcPath.xpath;
   chf_po : form;
-  chf_c  : form;
+  chf_co : cost;
 }
 
 and cHoareS = {
@@ -123,7 +123,7 @@ and cHoareS = {
   chs_pr : form;
   chs_s  : stmt;
   chs_po : form;
-  chs_c  : form; }
+  chs_co : cost; }
 
 and bdHoareF = {
   bhf_pr  : form;
@@ -147,6 +147,11 @@ and pr = {
   pr_fun   : xpath;
   pr_args  : form;
   pr_event : form;
+}
+
+and cost = {
+  c_self  : form;
+  c_calls : form EcPath.Mx.t;
 }
 
 and module_type = form p_module_type
@@ -231,8 +236,8 @@ val f_hoareS : memenv -> form -> stmt -> form -> form
 val f_cHoareF_r : cHoareF -> form
 val f_cHoareS_r : cHoareS -> form
 
-val f_cHoareF : form -> xpath -> form -> form -> form
-val f_cHoareS : memenv -> form -> stmt -> form -> form -> form
+val f_cHoareF : form -> xpath -> form -> cost -> form
+val f_cHoareS : memenv -> form -> stmt -> form -> cost -> form
 
 (* soft-constructors - bd hoare *)
 val hoarecmp_opp : hoarecmp -> hoarecmp

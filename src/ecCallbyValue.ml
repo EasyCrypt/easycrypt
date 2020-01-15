@@ -167,6 +167,17 @@ let rec norm st s f =
  let f = cbv st s f (Aempty (Subst.subst_ty s f.f_ty)) in
  norm_lambda st f
 
+and norm_cost st s c =
+  let self'  = norm st s c.c_self
+  and calls' =
+    EcPath.Mx.fold (fun f c calls ->
+        let f' = norm_xfun st s f
+        and c' = norm st s c in
+        EcPath.Mx.add f' c' calls
+      ) EcPath.Mx.empty c.c_calls in
+  { c_self = self'; c_calls = calls' }
+
+
 and norm_lambda (st : state) (f : form) =
   match f.f_node with
   | Fquant (Llambda, b, f) ->
@@ -487,8 +498,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let chf_pr = norm st s chf.chf_pr in
     let chf_po = norm st s chf.chf_po in
     let chf_f  = norm_xfun st s chf.chf_f in
-    let chf_c  = norm st s chf.chf_c in
-    f_cHoareF_r { chf_pr; chf_f; chf_po; chf_c; }
+    let chf_c  = norm_cost st s chf.chf_co in
+    f_cHoareF_r { chf_pr; chf_f; chf_po; chf_co = chf_c; }
 
   | FcHoareS chs ->
     assert (is_Aempty args);
@@ -497,8 +508,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let chs_po = norm st s chs.chs_po in
     let chs_s  = norm_stmt s chs.chs_s in
     let chs_m  = norm_me s chs.chs_m in
-    let chs_c  = norm st s chs.chs_c in
-    f_cHoareS_r { chs_pr; chs_po; chs_s; chs_m; chs_c; }
+    let chs_c  = norm_cost st s chs.chs_co in
+    f_cHoareS_r { chs_pr; chs_po; chs_s; chs_m; chs_co = chs_c; }
 
   | FbdHoareF hf ->
     assert (is_Aempty args);

@@ -267,6 +267,7 @@ and pformula_r =
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
+  | PFChoareF  of pformula * pgamepath * pformula * pcosts
 
 and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list
@@ -293,6 +294,8 @@ and pfrange = [
 ]
 
 and pfindex = [ `Index of int | `Match of pformula * int option]
+
+and pcosts  = PC_costs of pformula * (pgamepath * pformula) list
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =
@@ -575,7 +578,11 @@ type fel_info = {
 
 (* -------------------------------------------------------------------- *)
 type deno_ppterm   = (pformula option pair) gppterm
-type conseq_ppterm = ((pformula option pair) * (phoarecmp option * pformula) option) gppterm
+type conseq_info =
+  | CQI_bd of phoarecmp option * pformula
+  | CQI_c  of pcosts
+
+type conseq_ppterm = ((pformula option pair) * (conseq_info) option) gppterm
 
 (* -------------------------------------------------------------------- *)
 type sim_info = {

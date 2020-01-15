@@ -2527,11 +2527,18 @@ module NormMp = struct
 
         | FcHoareF chf ->
           let pre' = aux chf.chf_pr and p' = norm_xfun env chf.chf_f
-          and post' = aux chf.chf_po
-          and c' = aux chf.chf_c in
-          if chf.chf_pr == pre' && chf.chf_f == p'
-             && chf.chf_po == post' && chf.chf_c == c' then f else
-            f_cHoareF pre' p' post' c'
+          and post' = aux chf.chf_po in
+          let c_self' = aux chf.chf_co.c_self in
+          let c_calls' = Mx.fold (fun f c calls ->
+              let f' = norm_xfun env f
+              and c' = aux c in
+              Mx.add f' c' calls
+            ) chf.chf_co.c_calls Mx.empty in
+          if chf.chf_pr == pre' && chf.chf_f == p' &&
+             chf.chf_po == post' && chf.chf_co.c_self == c_self' &&
+             Mx.equal (fun a b -> a == b) chf.chf_co.c_calls c_calls'
+          then f else
+            f_cHoareF pre' p' post' {c_self = c_self'; c_calls = c_calls' }
 
         (* TODO: why is there no case for FbdHoareF and every F*HoareS ? *)
 

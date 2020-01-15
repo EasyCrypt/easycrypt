@@ -26,7 +26,14 @@ module TTC = EcProofTyping
 let conseq_cond pre post spre spost =
   f_imp pre spre, f_imp spost post
 
-let conseq_cost cost scost = f_int_le_simpl scost cost
+let conseq_cost cost scost =
+  EcPath.Mx.fold2_union (fun _ sc c acc -> match sc, c with
+      | None, None -> assert false
+      | Some sc, Some c -> f_int_le_simpl sc c :: acc
+      | Some sc, None -> f_int_le_simpl sc f_i0 :: acc
+      | None, Some s -> f_int_le_simpl f_i0 s :: acc )
+    scost.c_calls cost.c_calls
+    [  f_int_le_simpl scost.c_self cost.c_self]
 
 let bd_goal_r fcmp fbd cmp bd =
   match fcmp, cmp with
@@ -75,7 +82,7 @@ let t_cHoareF_conseq pre post tc =
   let cond1, cond2 = conseq_cond chf.chf_pr chf.chf_po pre post in
   let concl1 = f_forall_mems [mpr] cond1 in
   let concl2 = f_forall_mems [mpo] cond2 in
-  let concl3 = f_cHoareF pre chf.chf_f post chf.chf_c in
+  let concl3 = f_cHoareF pre chf.chf_f post chf.chf_co in
   FApi.xmutate1 tc `Conseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
@@ -92,18 +99,18 @@ let t_cHoareF_conseq_c cost tc =
   let env = FApi.tc1_env tc in
   let chf  = tc1_as_choareF tc in
   let mpr,_ = EcEnv.Fun.hoareF_memenv chf.chf_f env in
-  let cond = conseq_cost chf.chf_c cost in
-  let concl1 = f_forall_mems [mpr] cond in
+  let conds = conseq_cost chf.chf_co cost in
+  let concls = List.map (fun cond -> f_forall_mems [mpr] cond) conds in
   let concl2 = f_cHoareF chf.chf_pr chf.chf_f chf.chf_po cost in
-  FApi.xmutate1 tc `HlConseq [concl1; concl2]
+  FApi.xmutate1 tc `HlConseq (concls @ [concl2])
 
 (* -------------------------------------------------------------------- *)
 let t_cHoareS_conseq_c cost tc =
   let chs = tc1_as_choareS tc in
-  let cond = conseq_cost chs.chs_c cost in
-  let concl1 = f_forall_mems [chs.chs_m] cond in
-  let concl2 = f_cHoareS_r { chs with chs_c = cost } in
-  FApi.xmutate1 tc `HlConseq [concl1; concl2]
+  let conds = conseq_cost chs.chs_co cost in
+  let concls = List.map (fun cond -> f_forall_mems [chs.chs_m] cond) conds in
+  let concl2 = f_cHoareS_r { chs with chs_co = cost } in
+  FApi.xmutate1 tc `HlConseq (concls @ [concl2])
 
 (* -------------------------------------------------------------------- *)
 let bdHoare_conseq_conds cmp pr po new_pr new_po =
@@ -499,8 +506,8 @@ let t_hoareF_conseq_conj pre post pre' post' tc =
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
-let t_cHoareS_conseq_conj pre post pre' post' tc =
-  assert false (* TODO: (Adrien) *)
+(* let t_cHoareS_conseq_conj pre post pre' post' tc =
+ *   assert false (\* TODO: (Adrien) *\) *)
   (* let hs = tc1_as_hoareS tc in
    * if not (f_equal hs.hs_pr (f_and pre' pre)) then
    *   tc_error !!tc "invalid pre-condition";
@@ -511,8 +518,8 @@ let t_cHoareS_conseq_conj pre post pre' post' tc =
    * FApi.xmutate1 tc `HlConseqBd [concl1; concl2] *)
 
 (* -------------------------------------------------------------------- *)
-let t_cHoareF_conseq_conj pre post pre' post' tc =
-  assert false (* TODO: (Adrien) *)
+(* let t_cHoareF_conseq_conj pre post pre' post' tc =
+ *   assert false (\* TODO: (Adrien) *\) *)
   (* let hf = tc1_as_hoareF tc in
    * if not (f_equal hf.hf_pr (f_and pre' pre)) then
    *   tc_error !!tc "invalid pre-condition";
@@ -659,21 +666,20 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   | FcHoareS _, Some ((_, {f_node = FcHoareS chs}) as nf1), None, None ->
     let tac = if notmod then t_cHoareS_conseq_nm else t_cHoareS_conseq in
 
-    (* TODO: (Adrien) check what this does *)
     t_on1seq 1
-      (t_cHoareS_conseq_c chs.chs_c)
+      (t_cHoareS_conseq_c chs.chs_co)
       (t_on1seq 2 (tac chs.chs_pr chs.chs_po) (t_apply_r nf1))
       tc
 
 
-  (* ------------------------------------------------------------------ *)
-  (* cHoareS / cHoareS / cHoareS / ⊥                                       *)
-  | FcHoareS _,
-      Some ((_, { f_node = FcHoareS hs }) as nf1),
-      Some ((_, f2) as nf2),
-      None
-    ->
-    assert false (* TODO: (Adrien) *)
+  (* (\* ------------------------------------------------------------------ *\)
+   * (\* cHoareS / cHoareS / cHoareS / ⊥                                       *\)
+   * | FcHoareS _,
+   *     Some ((_, { f_node = FcHoareS hs }) as nf1),
+   *     Some ((_, f2) as nf2),
+   *     None
+   *   ->
+   *   assert false (\* TODO: (Adrien) *\) *)
 
   (* ------------------------------------------------------------------ *)
   (* hoareS / bdhoareS / ⊥ / ⊥                                          *)
@@ -1031,7 +1037,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
         (pp_o f1) (pp_o f2) (pp_o f3) (pp_f concl))
 
 (* -------------------------------------------------------------------- *)
-let process_conseq notmod (info1, info2, info3) tc =
+let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
   let hyps, concl = FApi.tc1_flat tc in
 
   let ensure_none o =

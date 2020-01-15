@@ -228,7 +228,7 @@ let set_pre ~pre f =
   match f.f_node with
  | FsHoareF hf  -> f_hoareF pre hf.shf_f hf.shf_po
  | FsHoareS hs  -> f_hoareS_r { hs with shs_pr = pre }
- | FcHoareF hf  -> f_cHoareF pre hf.chf_f hf.chf_po hf.chf_c
+ | FcHoareF hf  -> f_cHoareF pre hf.chf_f hf.chf_po hf.chf_co
  | FcHoareS hs  -> f_cHoareS_r { hs with chs_pr = pre }
  | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
  | FbdHoareS hs -> f_bdHoareS_r { hs with bhs_pr = pre }
@@ -589,14 +589,15 @@ let t_code_transform
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | FcHoareS chs, Some c ->
-        let pr, po = chs.chs_pr, chs.chs_po in
-        let (me, stmt, cs) =
-          tx (pf, hyps) cpos (pr, po) (chs.chs_m, chs.chs_s) in
-        let cost = EcFol.f_int_sub_simpl chs.chs_c c in
-        let concl = f_cHoareS_r { chs with chs_m = me;
-                                           chs_s = stmt;
-                                           chs_c = cost; } in
-        FApi.xmutate1 tc (tr None) (cs @ [concl])
+        assert false            (* TODO: (Adrien) *)
+        (* let pr, po = chs.chs_pr, chs.chs_po in
+         * let (me, stmt, cs) =
+         *   tx (pf, hyps) cpos (pr, po) (chs.chs_m, chs.chs_s) in
+         * let cost = EcFol.f_int_sub_simpl chs.chs_c c in
+         * let concl = f_cHoareS_r { chs with chs_m = me;
+         *                                    chs_s = stmt;
+         *                                    chs_c = cost; } in
+         * FApi.xmutate1 tc (tr None) (cs @ [concl]) *)
 
       | FbdHoareS bhs, _ when bdhoare ->
           let pr, po = bhs.bhs_pr, bhs.bhs_po in

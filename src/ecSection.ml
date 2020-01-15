@@ -247,13 +247,13 @@ let rec on_mpath_form cb (f : EcFol.form) =
   and on_mpath_chf cb chf =
     on_mpath_form cb chf.EcFol.chf_pr;
     on_mpath_form cb chf.EcFol.chf_po;
-    on_mpath_form cb chf.EcFol.chf_c;
+    on_mpath_cost cb chf.EcFol.chf_co;
     cb chf.EcFol.chf_f.x_top
 
   and on_mpath_chs cb chs =
     on_mpath_form cb chs.EcFol.chs_pr;
     on_mpath_form cb chs.EcFol.chs_po;
-    on_mpath_form cb chs.EcFol.chs_c;
+    on_mpath_cost cb chs.EcFol.chs_co;
     on_mpath_stmt cb chs.EcFol.chs_s;
     on_mpath_memenv cb chs.EcFol.chs_m
 
@@ -273,6 +273,10 @@ let rec on_mpath_form cb (f : EcFol.form) =
   and on_mpath_pr cb pr =
     cb pr.EcFol.pr_fun.x_top;
     List.iter (on_mpath_form cb) [pr.EcFol.pr_event; pr.EcFol.pr_args]
+
+  and on_mpath_cost cb cost =
+    on_mpath_form cb cost.EcFol.c_self;
+    Mx.iter (fun f c -> cb f.x_top; on_mpath_form cb c) cost.EcFol.c_calls
 
   in
     on_mpath_ty cb f.EcFol.f_ty; fornode ()

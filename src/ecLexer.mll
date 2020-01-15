@@ -63,6 +63,7 @@
     "res"         , RES        ;        (* KW: prog *)
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
+    "choare"      , CHOARE     ;        (* KW: prog *)
     "phoare"      , PHOARE     ;        (* KW: prog *)
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
     "async"       , ASYNC      ;        (* KW: prog *)

@@ -116,7 +116,7 @@ and cHoareF = {
   chf_pr : form;
   chf_f  : EcPath.xpath;
   chf_po : form;
-  chf_c  : form;
+  chf_co : cost;
 }
 
 and cHoareS = {
@@ -124,7 +124,7 @@ and cHoareS = {
   chs_pr : form;
   chs_s  : stmt;
   chs_po : form;
-  chs_c  : form; }
+  chs_co : cost; }
 
 and bdHoareF = {
   bhf_pr  : form;
@@ -148,6 +148,11 @@ and pr = {
   pr_fun   : EcPath.xpath;
   pr_args  : form;
   pr_event : form;
+}
+
+and cost = {
+  c_self  : form;
+  c_calls : form EcPath.Mx.t;
 }
 
 and module_type = form p_module_type
@@ -255,6 +260,10 @@ module Mf = MSHf.M
 module Sf = MSHf.S
 module Hf = MSHf.H
 
+let cost_equal c1 c2 =
+     f_equal c1.c_self c2.c_self
+  && EcPath.Mx.equal f_equal c1.c_calls c2.c_calls
+
 let hf_equal hf1 hf2 =
      f_equal hf1.shf_pr hf2.shf_pr
   && f_equal hf1.shf_po hf2.shf_po
@@ -269,13 +278,13 @@ let hs_equal hs1 hs2 =
 let chf_equal chf1 chf2 =
      f_equal chf1.chf_pr chf2.chf_pr
   && f_equal chf1.chf_po chf2.chf_po
-  && f_equal chf1.chf_c chf2.chf_c
+  && cost_equal chf1.chf_co chf2.chf_co
   && EcPath.x_equal chf1.chf_f chf2.chf_f
 
 let chs_equal chs1 chs2 =
      f_equal chs1.chs_pr chs2.chs_pr
   && f_equal chs1.chs_po chs2.chs_po
-  && f_equal chs1.chs_c chs2.chs_c
+  && cost_equal chs1.chs_co chs2.chs_co
   && s_equal chs1.chs_s chs2.chs_s
   && EcMemory.me_equal chs1.chs_m chs2.chs_m
 
@@ -331,13 +340,29 @@ let hs_hash hs =
   Why3.Hashcons.combine2
     (f_hash hs.shs_pr) (f_hash hs.shs_po) (EcCoreModules.s_hash hs.shs_s)
 
+let cost_hash cost =
+  Why3.Hashcons.combine
+    (f_hash cost.c_self)
+    (Why3.Hashcons.combine_list
+       (fun (f,c) ->
+          Why3.Hashcons.combine
+            (EcPath.x_hash f)
+            (f_hash c))
+       0 (EcPath.Mx.bindings cost.c_calls))
+
 let chf_hash chf =
   Why3.Hashcons.combine3
-    (f_hash chf.chf_pr) (f_hash chf.chf_po) (f_hash chf.chf_c) (EcPath.x_hash chf.chf_f)
+    (f_hash chf.chf_pr)
+    (f_hash chf.chf_po)
+    (cost_hash chf.chf_co)
+    (EcPath.x_hash chf.chf_f)
 
 let chs_hash chs =
   Why3.Hashcons.combine3
-    (f_hash chs.chs_pr) (f_hash chs.chs_po) (f_hash chs.chs_c) (EcCoreModules.s_hash chs.chs_s)
+    (f_hash chs.chs_pr)
+    (f_hash chs.chs_po)
+    (cost_hash chs.chs_co)
+    (EcCoreModules.s_hash chs.chs_s)
 
 let bhf_hash bhf =
   Why3.Hashcons.combine_list f_hash
@@ -483,6 +508,12 @@ module Hsform = Why3.Hashcons.Make (struct
 
   let fv_mlr = Sid.add mleft (Sid.singleton mright)
 
+  let cost_fv cost =
+    let self_fv = f_fv cost.c_self in
+    EcPath.Mx.fold (fun f c fv ->
+        EcPath.x_fv (fv_union (f_fv c) fv) f
+      ) cost.c_calls self_fv
+
   let fv_node f =
     let union ex nodes =
       List.fold_left (fun s a -> fv_union s (ex a)) Mid.empty nodes
@@ -518,12 +549,12 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | FcHoareF chf ->
       let fv = fv_union (f_fv chf.chf_pr)
-          (fv_union (f_fv chf.chf_po) (f_fv chf.chf_c)) in
+          (fv_union (f_fv chf.chf_po) (cost_fv chf.chf_co)) in
       EcPath.x_fv (Mid.remove mhr fv) chf.chf_f
 
     | FcHoareS chs ->
       let fv = fv_union (f_fv chs.chs_pr)
-          (fv_union (f_fv chs.chs_po) (f_fv chs.chs_c)) in
+          (fv_union (f_fv chs.chs_po) (cost_fv chs.chs_co)) in
       fv_union (EcCoreModules.s_fv chs.chs_s) (Mid.remove (fst chs.chs_m) fv)
 
     | FbdHoareF bhf ->
@@ -725,11 +756,11 @@ let f_hoareF shf_pr shf_f shf_po =
 let f_cHoareS_r chs = mk_form (FcHoareS chs) tbool
 let f_cHoareF_r chf = mk_form (FcHoareF chf) tbool
 
-let f_cHoareS chs_m chs_pr chs_s chs_po chs_c =
-  f_cHoareS_r { chs_m; chs_pr; chs_s; chs_po; chs_c }
+let f_cHoareS chs_m chs_pr chs_s chs_po chs_co =
+  f_cHoareS_r { chs_m; chs_pr; chs_s; chs_po; chs_co }
 
-let f_cHoareF chf_pr chf_f chf_po chf_c =
-  f_cHoareF_r { chf_pr; chf_f; chf_po; chf_c }
+let f_cHoareF chf_pr chf_f chf_po chf_co =
+  f_cHoareF_r { chf_pr; chf_f; chf_po; chf_co }
 
 (* -------------------------------------------------------------------- *)
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) tbool
@@ -892,6 +923,10 @@ module FSmart = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let cost_map g cost =
+  { c_self = g cost.c_self;
+    c_calls = EcPath.Mx.map g cost.c_calls; }
+
 let f_map gt g fp =
   match fp.f_node with
   | Fquant(q, b, f) ->
@@ -965,16 +1000,16 @@ let f_map gt g fp =
   | FcHoareF chf ->
       let pr' = g chf.chf_pr in
       let po' = g chf.chf_po in
-      let c'  = g chf.chf_c in
+      let c'  = cost_map g chf.chf_co in
         FSmart.f_cHoareF (fp, chf)
-          { chf with chf_pr = pr'; chf_po = po'; chf_c = c' }
+          { chf with chf_pr = pr'; chf_po = po'; chf_co = c' }
 
   | FcHoareS chs ->
       let pr' = g chs.chs_pr in
       let po' = g chs.chs_po in
-      let c'  = g chs.chs_c in
+      let c'  = cost_map g chs.chs_co in
         FSmart.f_cHoareS (fp, chs)
-          { chs with chs_pr = pr'; chs_po = po'; chs_c = c' }
+          { chs with chs_pr = pr'; chs_po = po'; chs_co = c' }
 
   | FbdHoareF bhf ->
       let pr' = g bhf.bhf_pr in
@@ -1650,8 +1685,9 @@ module Fsubst = struct
       let pr' = f_subst ~tx s chf.chf_pr in
       let po' = f_subst ~tx s chf.chf_po in
       let mp' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp chf.chf_f in
-      let c'  = f_subst ~tx s chf.chf_c in
-      FSmart.f_cHoareF (fp, chf) { chf_pr = pr'; chf_po = po'; chf_f = mp'; chf_c = c'; }
+      let c'  = cost_subst ~tx s chf.chf_co in
+      FSmart.f_cHoareF (fp, chf)
+        { chf_pr = pr'; chf_po = po'; chf_f = mp'; chf_co = c'; }
 
     | FcHoareS chs ->
       assert (not (Mid.mem (fst chs.chs_m) s.fs_mem));
@@ -1660,10 +1696,11 @@ module Fsubst = struct
       let pr' = f_subst ~tx s chs.chs_pr in
       let po' = f_subst ~tx s chs.chs_po in
       let st' = EcCoreModules.s_subst es chs.chs_s in
-      let me' = EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty chs.chs_m in
-      let c'  = f_subst ~tx s chs.chs_c in
+      let me' =
+        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty chs.chs_m in
+      let c'  = cost_subst ~tx s chs.chs_co in
       FSmart.f_cHoareS (fp, chs)
-        { chs_pr = pr'; chs_po = po'; chs_s = st'; chs_m = me'; chs_c = c'; }
+        { chs_pr = pr'; chs_po = po'; chs_s = st'; chs_m = me'; chs_co = c'; }
 
     | FbdHoareF bhf ->
       assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
@@ -1864,6 +1901,15 @@ module Fsubst = struct
         (s, (x', gty'))
 
   and add_bindings ~tx = List.map_fold (add_binding ~tx)
+
+  and cost_subst ~tx s cost =
+    { c_self = f_subst ~tx s cost.c_self;
+      c_calls = EcPath.Mx.fold (fun x f calls ->
+          let x' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp x in
+          let f' = f_subst ~tx s f in
+          EcPath.Mx.add x' f' calls
+        ) cost.c_calls EcPath.Mx.empty
+    }
 
   (* ------------------------------------------------------------------ *)
   let add_binding  = add_binding ~tx:(fun _ f -> f)

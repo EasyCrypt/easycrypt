@@ -1596,7 +1596,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_funname ppe) chf.chf_f
         (pp_form ppe) chf.chf_pr
         (pp_form ppe) chf.chf_po
-        (pp_form ppe) chf.chf_c
+        (pp_cost ppe) chf.chf_co
 
   | FcHoareS chs ->
       let ppe = PPEnv.push_mem ppe ~active:true chs.chs_m in
@@ -1604,7 +1604,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_stmt_for_form ppe) chs.chs_s
         (pp_form ppe) chs.chs_pr
         (pp_form ppe) chs.chs_po
-        (pp_form ppe) chs.chs_c
+        (pp_cost ppe) chs.chs_co
 
   | FbdHoareF hf ->
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.bhf_f) in
@@ -1656,6 +1656,22 @@ and pp_form ppe fmt f =
 and pp_expr ppe fmt e =
   let mr = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
   pp_form ppe fmt (form_of_expr mr e)
+
+(* -------------------------------------------------------------------- *)
+and pp_cost ppe fmt c =
+  let pp_el fmt (f,c) = match f with
+    | None ->
+      pp_form ppe fmt c
+    | Some f ->
+      Format.fprintf fmt "%a : %a"
+        (pp_funname ppe) f
+        (pp_form ppe) c in
+
+  Format.fprintf fmt "@[<hv><%a>@]"
+    (pp_list ";@ " pp_el)
+    (   (None,c.c_self)
+     :: (EcPath.Mx.bindings c.c_calls
+         |> List.map (fun (x,y) -> (Some x, y))))
 
 (* -------------------------------------------------------------------- *)
 and pp_allowed_orcl ppe fmt orcls =
@@ -2435,7 +2451,7 @@ let pp_choareF (ppe : PPEnv.t) ?prpo fmt chf =
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppe ?prpo) chf.chf_pr;
   Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) chf.chf_f;
-  Format.fprintf fmt "    time <= @[<hov 2>%a@]@\n%!" (pp_form ppe) chf.chf_c;
+  Format.fprintf fmt "    time <= %a@\n%!" (pp_cost ppe) chf.chf_co;
   Format.fprintf fmt "@\n%a%!" (pp_post ppe ?prpo) chf.chf_po
 
 (* -------------------------------------------------------------------- *)
@@ -2446,7 +2462,7 @@ let pp_choareS (ppe : PPEnv.t) ?prpo fmt chs =
 
 
   Format.fprintf fmt "Context : %a@\n%!" (pp_funname ppe) (EcMemory.xpath chs.chs_m);
-  Format.fprintf fmt "Time <= : @[<hov 2>%a@]@\n%!" (pp_form ppe) chs.chs_c;
+  Format.fprintf fmt "Time <= : %a@\n%!" (pp_cost ppe) chs.chs_co;
   Format.fprintf fmt "@\n%!";
   Format.fprintf fmt "%a%!" (pp_pre ppe ?prpo) chs.chs_pr;
   Format.fprintf fmt "@\n%!";

@@ -911,14 +911,14 @@ and check_alpha_equal ri hyps f1 f2 =
       check_xp env subst chf1.chf_f chf2.chf_f;
       aux env subst chf1.chf_pr chf2.chf_pr;
       aux env subst chf1.chf_po chf2.chf_po;
-      aux env subst chf1.chf_c  chf2.chf_c
+      aux_cost env subst chf1.chf_co chf2.chf_co
 
     | FcHoareS chs1, FcHoareS chs2 ->
       check_s env subst chs1.chs_s chs2.chs_s;
       (* FIXME should check the memenv *)
       aux env subst chs1.chs_pr chs2.chs_pr;
       aux env subst chs1.chs_po chs2.chs_po;
-      aux env subst chs1.chs_c chs2.chs_c
+      aux_cost env subst chs1.chs_co chs2.chs_co
 
     | FbdHoareF hf1, FbdHoareF hf2 ->
       ensure (hf1.bhf_cmp = hf2.bhf_cmp);
@@ -988,6 +988,26 @@ and check_alpha_equal ri hyps f1 f2 =
               aux env subst f1 f2
         end
         | _ -> raise e
+
+  and aux_cost env subst co1 co2 =
+    let calls1 =
+      EcPath.Mx.fold (fun f c calls ->
+          let f' = NormMp.norm_xfun env f in
+          EcPath.Mx.add f' c calls
+        ) co1.c_calls EcPath.Mx.empty
+    and calls2 =
+      EcPath.Mx.fold (fun f c calls ->
+          let f' = EcPath.x_substm subst.fs_sty.ts_p subst.fs_mp f in
+          let f' = NormMp.norm_xfun env f' in
+          EcPath.Mx.add f' c calls
+        ) co2.c_calls EcPath.Mx.empty in
+
+    aux env subst co1.c_self  co2.c_self;
+    EcPath.Mx.fold2_union (fun _ a1 a2 _ -> match a1,a2 with
+        | None, None -> assert false
+        | None, Some _ | Some _, None -> error ()
+        | Some c1, Some c2 -> aux env subst c1 c2
+      ) calls1 calls2 ()
 
   in aux env Fsubst.f_subst_id f1 f2
 
