@@ -1659,13 +1659,14 @@ and pp_expr ppe fmt e =
 
 (* -------------------------------------------------------------------- *)
 and pp_allowed_orcl ppe fmt orcls =
-  if orcls = [] then ()
+  if orcls = [] then Format.fprintf fmt ""
   else
-    Format.fprintf fmt "oracles : @[<hv>%a@];@ "
+    Format.fprintf fmt "oracles : @[<hov>%a@];@ "
       (pp_list ",@ " (pp_funname ppe)) orcls
 
 and pp_costs ppe fmt (costs,self) =
-  if EcPath.Mx.is_empty costs && is_none self then ()
+  if EcPath.Mx.is_empty costs && is_none self
+  then Format.fprintf fmt ""
   else
     let pp_self fmt = function
       | None -> ()
@@ -1676,24 +1677,24 @@ and pp_costs ppe fmt (costs,self) =
         (pp_funname ppe) f
         (pp_form ppe) c in
 
-    Format.fprintf fmt "compl : @[<hov>{@, @[<v>%a%a;@ @]@,}@];@ "
+    Format.fprintf fmt "compl : @[<hv>{@, @[<v>%a%a;@ @]@,}@];@ "
       pp_self self
       (pp_list ";@ " pp_cost) (EcPath.Mx.bindings costs)
 
 and pp_orclinfo ppe fmt (sym, oi) =
   let orcls = OI.allowed oi
   and costs, self = OI.costs oi, OI.cost_self oi in
-  if orcls = [] && EcPath.Mx.is_empty costs && is_none self then ()
+  if orcls = [] && EcPath.Mx.is_empty costs && is_none self
+  then Format.fprintf fmt ""
   else
-    Format.fprintf fmt "@[<hov>%s%a : {@,  \
-                        @[<v>%a%a@]@,}@]"
+    Format.fprintf fmt "@[<hv>%s%a : {@,  %a%a@,}@]"
       (if OI.is_in oi then "" else " *")
       pp_symbol sym
       (pp_allowed_orcl ppe) orcls
       (pp_costs ppe) (costs, self)
 
 and pp_orclinfos ppe fmt ois =
-  pp_list "@ " (pp_orclinfo ppe) fmt (Msym.bindings ois)
+  pp_list "@;" (pp_orclinfo ppe) fmt (Msym.bindings ois)
 
 (* -------------------------------------------------------------------- *)
 and pp_mem_restr ppe fmt mr =
@@ -1721,7 +1722,7 @@ and pp_mem_restr ppe fmt mr =
   let all_mem =
     mr.mr_xpaths.ur_pos = None || mr.mr_mpaths.ur_pos = None in
 
-  Format.fprintf fmt "@[<hv>%a%a%a%a%a%a%a%a%a@];@ "
+  Format.fprintf fmt "@[<h>%a%a%a%a%a%a%a%a%a@];@ "
     (pp_rx false) mr.mr_xpaths.ur_neg
     pp_sep (EcPath.Sm.is_empty mr.mr_mpaths.ur_neg)
     (pp_r false) mr.mr_mpaths.ur_neg
@@ -1734,13 +1735,14 @@ and pp_mem_restr ppe fmt mr =
 
 (* -------------------------------------------------------------------- *)
 and pp_restr ppe fmt mr =
-  Format.fprintf fmt "@[<hov>%a%a@]"
+  Format.fprintf fmt "@[<v>%a%a@]"
     (pp_mem_restr ppe) mr
     (pp_orclinfos ppe) mr.mr_oinfos
 
 (* -------------------------------------------------------------------- *)
 and pp_modtype (ppe : PPEnv.t) fmt (mty : module_type) =
-  Format.fprintf fmt "%a{%a}" (pp_modtype1 ppe) mty (pp_restr ppe) mty.mt_restr
+  Format.fprintf fmt "@[<v 2>%a@,{%a@,}@]"
+    (pp_modtype1 ppe) mty (pp_restr ppe) mty.mt_restr
 
 (* -------------------------------------------------------------------- *)
 and pp_binding ?(break = true) ?fv (ppe : PPEnv.t) (xs, ty) =
@@ -2768,7 +2770,7 @@ let pp_sigitem ppe fmt (Tys_function fs) =
 
 let pp_modsig ppe fmt (p,ms) =
   let (ppe,pp) = pp_mod_params ppe ms.mis_params in
-  Format.fprintf fmt "@[<v>module type %s%t%a = {@,  @[<v>%a@]@,}@]"
+  Format.fprintf fmt "@[<v>module type %s%t {@,  %a@,} = {@,  @[<v>%a@]@,}@]"
     (EcPath.basename p) pp
     (pp_restr ppe) ms.mis_restr
     (pp_list "@,@," (pp_sigitem ppe)) ms.mis_body
@@ -3201,7 +3203,7 @@ let pp_m_xt ~print_abstract ~sign env fmt m =
   let ppe = PPEnv.ofenv env in
   if print_abstract then
     let r = EcEnv.NormMp.get_restr env m in
-    Format.fprintf fmt "%a%a"
+    Format.fprintf fmt "@[<v 2>%a@,{%a@,}@]"
       (pp_m ~sign ppe) m
       (pp_restr ppe) r
   else pp_m ~sign ppe fmt m
