@@ -167,6 +167,11 @@ let t_fun_def_r tc =
 
 let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 
+let split4 l =
+  List.fold_right (fun (a,b,c,d) (l1,l2,l3,l4) ->
+      a :: l1, b :: l2, c :: l3, d :: l4
+    ) l ([],[],[],[])
+
 (* -------------------------------------------------------------------- *)
 module FunAbsLow = struct
   (* ------------------------------------------------------------------ *)
@@ -179,7 +184,84 @@ module FunAbsLow = struct
     (inv, inv, sg)
 
   (* ------------------------------------------------------------------ *)
-  let choareF_abs_spec _pf env f inv = assert false (* TODO: (Adrien) *)
+  let choareF_abs_spec _pf env f inv
+      (xv : (xpath * form) list)
+      (xc : (xpath * cost) list) =
+    let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
+
+    (* We check that the invariant, variants and costs variables cannot be
+       modified by the adversary. *)
+    let fv_inv   = PV.fv env mhr inv in
+    let fv_costs = List.map (fun (_,c) -> PV.fv_cost env mhr c) xc in
+    let fv_vrnts = List.map (fun (_,v) -> PV.fv      env mhr v) xv in
+    PV.check_depend env fv_inv top;
+    List.iter (fun fv_cost -> PV.check_depend env fv_cost top) fv_costs;
+    List.iter (fun fv_cost -> PV.check_depend env fv_cost top) fv_vrnts;
+
+    (* TODO: (Adrien) why are we checking this for bdhoareF_abs_spec, and is
+       it needed here?*)
+    (* check_oracle_use pf env top o; *)
+
+    (* We create the oracles invariants *)
+    let oi_costs = OI.costs oi in
+    (* If [f] can call [o] at most zero times, we remove it. *)
+    let ois = OI.allowed oi
+              |> List.filter (fun o ->
+                  not @@ opt_equal f_equal
+                    (Mx.find_opt o oi_costs)
+                    (Some f_i0)) in
+
+    let ospec o_called =
+      let eqs =
+        List.map (fun o ->
+            let k_id = EcIdent.create ("z" ^ EcPath.xbasename o) in
+            let k = f_local k_id tint in
+
+            let o_vrnt = List.find_opt (fun (x,_) -> x_equal x o) xv in
+            let pre_eq, post_eq = match o_vrnt with
+              | None -> f_true, f_true
+              | Some (_,vrnt) ->
+                f_eq vrnt k,
+                if x_equal o o_called
+                then f_eq vrnt (f_int_add k f_i1)
+                else f_eq vrnt k in
+
+            let call_bound = match OI.cost oi o with
+              | Some cbd ->
+                if x_equal o o_called
+                then f_int_lt k cbd
+                else f_int_le k cbd
+              | None -> f_true in
+
+            k_id, call_bound, pre_eq, post_eq) ois in
+
+      (* forall ks. call_bounds =>
+         hoare [{ inv /\ pre_eqs } o_called {inv /\ post_eqs }] *)
+      let ks, call_bounds, pre_eqs, post_eqs = split4 eqs in
+      let ks = List.map (fun k_id -> (k_id,GTty tint)) ks in
+      let call_bounds, pre_eqs, post_eqs = f_ands0_simpl call_bounds,
+                                           f_ands0_simpl pre_eqs,
+                                           f_ands0_simpl post_eqs in
+
+      let pre_inv  = f_and_simpl pre_eqs inv
+      and post_inv = f_and_simpl post_eqs inv in
+
+      (* We now compute the cost of the call to [o_called]. *)
+      let cost = List.find_opt (fun (x,_) -> x_equal x o_called) xc in
+      let cost = match cost with
+        | None ->
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          tc_error _pf "no cost has been supplied for %a"
+            (EcPrinting.pp_funname ppe) o_called
+        | Some (_,cost) -> cost in
+
+      let form = f_cHoareF pre_inv o_called post_inv cost in
+      f_forall_simpl ks (f_imp_simpl call_bounds form) in
+
+
+    let sg = List.map ospec ois in
+    (inv_todo, inv_todo, sg)
+
 
   (* ------------------------------------------------------------------ *)
   let bdhoareF_abs_spec pf env f inv =
