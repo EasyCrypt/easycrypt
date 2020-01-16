@@ -79,9 +79,11 @@ module PVM : sig
 
   val find : env -> prog_var -> memory -> subst -> form
 
-  val subst   : env -> subst -> form  -> form
+  val subst      : env -> subst -> form  -> form
 
-  val subst1  : env -> prog_var -> EcIdent.t -> form -> form -> form
+  val subst_cost : env -> subst -> cost  -> cost
+
+  val subst1     : env -> prog_var -> EcIdent.t -> form -> form -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -110,7 +112,8 @@ module PV : sig
   val mem_pv   : env -> prog_var -> t -> bool
   val mem_glob : env -> mpath -> t -> bool
 
-  val fv : env -> EcIdent.t -> form -> t
+  val fv      : env -> EcIdent.t -> form -> t
+  val fv_cost : env -> EcIdent.t -> cost -> t
 
   val pp : env -> Format.formatter -> t -> unit
 

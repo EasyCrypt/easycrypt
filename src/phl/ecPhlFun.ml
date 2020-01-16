@@ -104,10 +104,10 @@ let t_choareF_fun_def_r tc =
   let post = PVM.subst1 env (pv_res f) m fres chf.chf_po in
   let spre = subst_pre env f fsig m PVM.empty in
   let pre = PVM.subst env spre chf.chf_pr in
-  let c = PVM.subst env spre chf.chf_c in
+  let c   = PVM.subst_cost env spre chf.chf_co in
   let c = match fdef.f_ret with
     | None -> c
-    | Some ret -> EcFol.f_int_sub_simpl c (EcFol.cost_of_expr ret) in
+    | Some ret -> EcFol.cost_sub_self c (EcFol.cost_of_expr ret) in
   let concl' = f_cHoareS memenv pre fdef.f_body post c in
   FApi.xmutate1 tc `FunDef [concl']
 
@@ -416,6 +416,8 @@ let t_fun_to_code_hoare_r tc =
    By consequence, we are adding an assignment, whose cost is the cost of `G.f`
    plus the cost of the arguments `agrs` computation. Hence we need to add it
    to the allowed cost. *)
+(* TODO: (Adrien) this is sound only if the cost of evaluating the arguments is
+   **exactly** what we are adding. I am not certain this is the case here. *)
 let t_fun_to_code_choare_r tc =
   let env = FApi.tc1_env tc in
   let chf = tc1_as_choareF tc in
@@ -425,8 +427,8 @@ let t_fun_to_code_choare_r tc =
   let s = PVM.add env (pv_res f) (fst m) (f_pvar r ty (fst m)) PVM.empty in
   let post = PVM.subst env s chf.chf_po in
   let cost = List.fold_left (fun cost e ->
-      EcFol.f_int_add_simpl cost (EcFol.cost_of_expr e)
-    ) chf.chf_c args in
+      EcFol.cost_add_self cost (EcFol.cost_of_expr e)
+    ) chf.chf_co args in
   let concl = f_cHoareS m chf.chf_pr st post cost in
 
   FApi.xmutate1 tc `FunToCode [concl]

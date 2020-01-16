@@ -216,6 +216,12 @@ module PVM = struct
 
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
 
+  let subst_cost env s c =
+    (* TODO: (Adrien) check that not substituting in the procedure names of
+       c_calls is correct.*)
+    { c_self  = subst env s c.c_self;
+      c_calls = Mx.map (subst env s) c.c_calls; }
+
   let subst1 env pv m f =
     let s = add env pv m f empty in
     subst env s
@@ -293,42 +299,45 @@ module PV = struct
     (List.ksort ~key:fst ~cmp:pv_ntr_compare xs,
      List.ksort ~key:identity ~cmp:m_ntr_compare gs)
 
-  let fv env m f =
+  let remove_aux b fv =
+    let do1 fv (id,gty) =
+      match gty with
+      | GTmodty _ -> { fv with s_gl = Sm.remove (EcPath.mident id) fv.s_gl }
+      | _ -> fv in
+    List.fold_left do1 fv b
 
-    let remove b fv =
-      let do1 fv (id,gty) =
-        match gty with
-        | GTmodty _ -> { fv with s_gl = Sm.remove (EcPath.mident id) fv.s_gl }
-        | _ -> fv in
-      List.fold_left do1 fv b in
+  let rec aux env m fv f =
+    match f.f_node with
+    | Fquant(_,b,f1) ->
+      let env = Mod.add_mod_binding b env in
+      let fv1 = aux env m fv f1 in
+      remove_aux b fv1
+    | Fif(f1,f2,f3) -> List.fold_left (aux env m) fv [f1;f2;f3]
+    | Fmatch(b,bs,_) -> List.fold_left (aux env m) fv (b::bs)
+    | Flet(_,f1,f2) -> aux env m (aux env m fv f1) f2
+    | Fpvar(x,m') ->
+      if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
+    | Fglob (mp,m') ->
+      if EcIdent.id_equal m m' then
+        let f' = NormMp.norm_glob env m mp in
+        if f_equal f f' then add_glob env mp fv
+        else aux env m fv f'
+      else fv
+    | Fint _ | Flocal _ | Fop _ -> fv
+    | Fapp(e, es) -> List.fold_left (aux env m) (aux env m fv e) es
+    | Ftuple es   -> List.fold_left (aux env m) fv es
+    | Fproj(e,_)  -> aux env m fv e
+    | FsHoareF _  | FsHoareS _
+    | FcHoareF _  | FcHoareS _
+    | FbdHoareF _  | FbdHoareS _
+    | FequivF _ | FequivS _ | FeagerF _ | Fpr _ -> assert false
 
-    let rec aux env fv f =
-      match f.f_node with
-      | Fquant(_,b,f1) ->
-        let env = Mod.add_mod_binding b env in
-        let fv1 = aux env fv f1 in
-        remove b fv1
-      | Fif(f1,f2,f3) -> List.fold_left (aux env) fv [f1;f2;f3]
-      | Fmatch(b,bs,_) -> List.fold_left (aux env) fv (b::bs)
-      | Flet(_,f1,f2) -> aux env (aux env fv f1) f2
-      | Fpvar(x,m') ->
-        if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
-      | Fglob (mp,m') ->
-        if EcIdent.id_equal m m' then
-          let f' = NormMp.norm_glob env m mp in
-          if f_equal f f' then add_glob env mp fv
-          else aux env fv f'
-        else fv
-      | Fint _ | Flocal _ | Fop _ -> fv
-      | Fapp(e, es) -> List.fold_left (aux env) (aux env fv e) es
-      | Ftuple es   -> List.fold_left (aux env) fv es
-      | Fproj(e,_)  -> aux env fv e
-      | FsHoareF _  | FsHoareS _
-      | FcHoareF _  | FcHoareS _
-      | FbdHoareF _  | FbdHoareS _
-      | FequivF _ | FequivS _ | FeagerF _ | Fpr _ -> assert false
-    in
-    aux env empty f
+  let fv env m f = aux env m empty f
+
+  let fv_cost env m cost =
+    Mx.fold (fun _ form fv -> aux env m fv form)
+      cost.c_calls (aux env m empty cost.c_self)
+
 
   let pp env fmt fv =
     let ppe = EcPrinting.PPEnv.ofenv env in

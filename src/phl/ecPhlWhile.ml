@@ -23,7 +23,7 @@ module Mid = EcIdent.Mid
 
 module ICHOARE : sig
   val loaded : EcEnv.env -> bool
-  val choare_sum : form -> (form * form) -> form
+  val choare_sum : cost -> (form * form) -> cost
 end = struct
   open EcCoreLib
   open EcEnv
@@ -48,7 +48,8 @@ end = struct
     let bg   = f_op bg [tint] (toarrow bgty tint) in
     let prT  = EcPath.fromqsymbol ([i_top; "Logic"], "predT") in
     let prT  = f_op prT [tint] (tpred tint) in
-    fun f (m, n) -> f_app bg [prT; f; range m n] tint
+    fun cost (m, n) ->
+      cost_map (fun f -> f_app bg [prT; f; range m n] tint) cost
 
   let loaded (env : env) =
     is_some (EcEnv.Theory.by_path_opt p_CHoare env)
@@ -119,7 +120,7 @@ let t_hoare_while_r inv tc =
    - [qinc] the strictly increasing quantity at each iteration.
    - [n + 1] is the maximum number of iterations.
    - [lam_cost] is the cost of one iteration (of the form [λ k. cost(k)]) *)
-let t_choare_while_r inv qinc n lam_cost tc =
+let t_choare_while_r inv qinc n (lam_cost : cost) tc =
   let env = FApi.tc1_env tc in
   if not (ICHOARE.loaded env) then
     tacuerror "while: load the `CHoareTactic' theory first";
@@ -136,11 +137,11 @@ let t_choare_while_r inv qinc n lam_cost tc =
   let k_lt_qinc = f_int_lt k qinc in
   let c_pre  = f_and_simpl (f_and_simpl inv e) qinc_eq_k in
   let c_post = f_and_simpl inv k_lt_qinc in
-  let c_cost = f_app lam_cost [k] tint in
+  let c_cost = cost_app lam_cost [k] in
   let c_concl = f_cHoareS_r { chs with chs_pr = c_pre;
                                        chs_s  = c;
                                        chs_po = c_post;
-                                       chs_c  = c_cost; } in
+                                       chs_co  = c_cost; } in
   let c_concl = f_forall_simpl [(k_id,GTty tint)] c_concl in
 
   (* The loop terminates in at most [n] steps *)
@@ -150,15 +151,17 @@ let t_choare_while_r inv qinc n lam_cost tc =
   (* We compute the final cost. Since we have at most [n+1] iterations, we have:
      - at most [n+2] evaluations of the loop condition [e].
      - at most [n+1] evaluations of the loop body. *)
-  let e_cost = f_int_mul_simpl
+  let e_cost_self = f_int_mul_simpl
       (f_int_add_simpl n (f_int @@ EcBigInt.of_int 2))
       (cost_of_expr expr_e) in
   let body_cost = ICHOARE.choare_sum lam_cost (f_i0, n) in
-  let cost = f_int_sub_simpl chs.chs_c (f_int_add_simpl body_cost e_cost) in
+  let cost =
+    cost_op f_int_sub_simpl chs.chs_co (cost_add_self body_cost e_cost_self) in
+
   (* We check that the cost [lam_cost] of one iteration is not modified by
      the statements before the while loop. *)
   let write_set = EcPV.s_write env s in
-  let read_set  = EcPV.PV.fv env (EcMemory.memory chs.chs_m) lam_cost in
+  let read_set  = EcPV.PV.fv_cost env (EcMemory.memory chs.chs_m) lam_cost in
   if not (EcPV.PV.indep env write_set read_set) then
     tc_error !!tc "the cost of the loop body should not be modified by the \
                    statement preceding the loop";
@@ -170,7 +173,7 @@ let t_choare_while_r inv qinc n lam_cost tc =
   let post = f_and_simpl inv post in
   let concl = f_cHoareS_r { chs with chs_s  = s;
                                      chs_po = post;
-                                     chs_c  = cost; } in
+                                     chs_co  = cost; } in
 
   FApi.xmutate1 tc `While [c_concl; n_term; concl]
 
@@ -441,12 +444,12 @@ let process_while side winfos tc =
 
   | FcHoareS _ -> begin
       match vrnt, bds with
-      | Some vrnt, Some (n, cost) ->
+      | Some vrnt, Some (`Cost (n, cost)) ->
         t_choare_while
-          (TTC.tc1_process_Xhl_formula tc phi                   )
-          (TTC.tc1_process_Xhl_form    tc tint                  vrnt)
-          (TTC.tc1_process_Xhl_form    tc tint                  n)
-          (TTC.tc1_process_Xhl_form    tc (toarrow [tint] tint) cost)
+          (TTC.tc1_process_Xhl_formula tc                           phi)
+          (TTC.tc1_process_Xhl_form    tc tint                      vrnt)
+          (TTC.tc1_process_Xhl_form    tc tint                      n)
+          (TTC.tc1_process_cost        tc (toarrow [tint] tint)     cost)
           tc
 
       | _    -> tc_error !!tc "@[<v 2>invalid arguments, you must supply :@;\
@@ -464,7 +467,7 @@ let process_while side winfos tc =
             (TTC.tc1_process_Xhl_form tc tint vrnt)
             tc
 
-      | Some vrnt, Some (k, eps) ->
+      | Some vrnt, Some (`Bd (k, eps)) ->
         t_bdhoare_while_rev_geq
           (TTC.tc1_process_Xhl_formula tc phi)
           (TTC.tc1_process_Xhl_form    tc tint vrnt)
@@ -475,7 +478,8 @@ let process_while side winfos tc =
       | None, None ->
           t_bdhoare_while_rev (TTC.tc1_process_Xhl_formula tc phi) tc
 
-      | None, Some _ -> tc_error !!tc "invalid arguments"
+      | Some _, Some (`Cost _) | None, Some _ ->
+        tc_error !!tc "invalid arguments"
   end
 
   | FequivS _ -> begin

@@ -1032,9 +1032,10 @@ orcl_time(P):
  | o=qident COLON c=form_r(P) { (o, c) }
 
 costs(P):
-| c=form_r(P)                                                 {PC_costs(c,[])}
+| LBRACKET c=form_r(P) RBRACKET     {PC_costs(c,[])}
 /* TODO: (Adrien) there is a problem with this entry, but I don't know what */
-/* | c=form_r(P) SEMICOLON calls=rlist1(orcl_time(P), SEMICOLON) {PC_costs(c,calls)} */
+/* | LBRACKET c=form_r(P) SEMICOLON calls=rlist1(orcl_time(P), SEMICOLON) RBRACKET */
+/*                                       {PC_costs(c,calls)} */
 
 qident_or_res_or_glob:
 | x=qident   { GVvar x }
@@ -1280,7 +1281,7 @@ choare_body(P):
     pre=form_r(P) LONGARROW post=form_r(P)
   RBRACKET
   TIME
-  LT c=costs(P) GT
+  c=costs(P)
   { PFChoareF (pre, mp, post, c) }
 
 equiv_body(P):
@@ -2402,16 +2403,15 @@ conseq_xt:
 | c=conseq   COLON cmp=hoare_bd_cmp? bd=sform  { c, Some (CQI_bd (cmp, bd)) }
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
                                     { (None, None), Some (CQI_bd (cmp, bd)) }
-| c=conseq   COLON LT co=costs(none) GT           { c, Some (CQI_c co) }
-| UNDERSCORE COLON LT co=costs(none) GT           { (None, None), Some (CQI_c co) }
+| c=conseq   COLON co=costs(none)                 { c, Some (CQI_c co) }
+| UNDERSCORE COLON co=costs(none)                 { (None, None), Some (CQI_c co) }
 
 call_info:
  | f1=form LONGARROW f2=form                   { CI_spec (f1, f2, None) }
- | f1=form LONGARROW f2=form COST cost=form    { CI_spec (f1, f2, Some cost) }
+  | f1=form LONGARROW f2=form COST co=costs(none)
+                                               { CI_spec (f1, f2, Some co) }
  | f=form                                      { CI_inv  (f, None) }
- | f=form COST cost=form                       { CI_inv  (f, Some cost) }
- /* | f=form COST t_inv = rlist1(orcl_time, COMMA) */
- /*                                               { CI_inv  (f,t_inv) } */
+ | f=form COST co=costs(none)                  { CI_inv  (f, Some co) }
  | bad=form COMMA p=form                       { CI_upto (bad,p,None) }
  | bad=form COMMA p=form COMMA q=form          { CI_upto (bad,p,Some q) }
 
@@ -2470,7 +2470,10 @@ while_tac_info:
     { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = None; } }
 
 | inv=sform vrnt=sform k=sform eps=sform
-    { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (k, eps); } }
+    { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (`Bd (k, eps)); } }
+
+| inv=sform vrnt=sform k=sform co=costs(none)
+    { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (`Cost (k, co)); } }
 
 async_while_tac_info:
 | LBRACKET t1=expr COMMA f1=form RBRACKET
@@ -2556,6 +2559,9 @@ app_bd_info:
 
 | f=sform
     { PAppSingle f }
+
+| co=costs(none)
+    { PAppCost co }
 
 | f=prod_form g=prod_form s=sform?
     { PAppMult (s, fst f, snd f, fst g, snd g) }

@@ -93,10 +93,10 @@ module TacInternal = struct
     let s_wp, post, cost_wp = wp ~uselet ~onesided:true env m s_wp chs.chs_po in
     check_wp_progress tc i chs.chs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
-    let cost = f_int_sub_simpl chs.chs_c cost_wp in
+    let cost = cost_sub_self chs.chs_co cost_wp in
     let concl = f_cHoareS_r { chs with chs_s = s;
                                        chs_po = post;
-                                       chs_c = cost } in
+                                       chs_co = cost } in
     FApi.xmutate1 tc `Wp [concl]
 
   let t_bdhoare_wp ?(uselet=true) i tc =

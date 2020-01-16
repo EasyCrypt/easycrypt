@@ -108,17 +108,19 @@ let t_choare_call fpre fpost fcost tc =
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
 
   (* The cost of the remaining code must be bounded by the cost of the
-     conclusion `chs.chs_c`, minus the cost of the call `fcost`, and minus
+     conclusion `chs.chs_co`, minus the cost of the call `fcost`, and minus
      the cost of the arguments' evaluation. *)
   let args_cost = List.fold_left (fun cost e ->
       EcFol.f_int_add_simpl cost (EcFol.cost_of_expr e)
     ) f_i0 args in
   let cost =
-    EcFol.f_int_sub_simpl (EcFol.f_int_sub_simpl chs.chs_c fcost) args_cost in
+    EcFol.cost_sub_self
+      (EcFol.cost_op EcFol.f_int_sub_simpl chs.chs_co fcost)
+      args_cost in
 
   let concl = f_cHoareS_r { chs with chs_s = s;
                                      chs_po = post;
-                                     chs_c = cost } in
+                                     chs_co = cost } in
 
   FApi.xmutate1 tc `HlCall [f_concl; concl]
 
@@ -280,7 +282,7 @@ let t_call side ax tc =
       let (_, f, _), _ = tc1_last_call tc chs.chs_s in
       if not (EcEnv.NormMp.x_equal env chf.chf_f f) then
         call_error env tc chf.chf_f f;
-      t_choare_call chf.chf_pr chf.chf_po chf.chf_c tc
+      t_choare_call chf.chf_pr chf.chf_po chf.chf_co tc
 
   | FbdHoareF hf, FbdHoareS hs ->
       let (_, f, _), _ = tc1_last_call tc hs.bhs_s in
@@ -364,9 +366,9 @@ let process_call side info tc =
           let penv, qenv = LDecl.hoareF f hyps in
 
           let env = FApi.tc1_env tc in
-          let cost  = TTC.tc1_process_Xhl_form tc tint cost in
+          let cost  = TTC.tc1_process_cost tc tint cost in
           let write_set = EcPV.s_write env stmt in
-          let read_set  = EcPV.PV.fv env (EcMemory.memory chs.chs_m) cost in
+          let read_set  = EcPV.PV.fv_cost env (EcMemory.memory chs.chs_m) cost in
           if not (EcPV.PV.indep env write_set read_set) then
             tc_error !!tc "the cost should not be modified by the statement \
                            preceding the targeted call";
@@ -490,7 +492,7 @@ let process_call side info tc =
     | CI_inv (inv, c_opt) ->
       let env, fmake = process_inv tc side in
       let inv = TTC.pf_process_form !!tc env tbool inv in
-      let c   = c_opt |> omap (TTC.pf_process_form !!tc env tint) in
+      let c   = c_opt |> omap (TTC.pf_process_cost !!tc env tint) in
       subtactic := (fun tc ->
           (* TODO: (Adrien) should specify a cost here, it should probably
              something like:

@@ -252,9 +252,16 @@ let t_sp_side pos tc =
     let write_set = EcPV.s_write env (EcModules.stmt stmt) in
     let read_set  = EcPV.PV.fv env (EcMemory.memory mem) form in
     if not (EcPV.PV.indep env write_set read_set) then
-      tc_error !!tc "the bound/cost should not be modified by the statement \
-                     targeted by [sp]"
-  in
+      tc_error !!tc "the bound should not be modified by the statement \
+                     targeted by [sp]" in
+
+  let check_cost_indep stmt mem cost =
+    let write_set = EcPV.s_write env (EcModules.stmt stmt) in
+    let read_set  = EcPV.PV.fv_cost env (EcMemory.memory mem) cost in
+    if not (EcPV.PV.indep env write_set read_set) then
+      tc_error !!tc "the cost should not be modified by the statement \
+                     targeted by [sp]" in
+
 
   match concl.f_node, pos with
   | FsHoareS hs, (None | Some (Single _)) ->
@@ -269,14 +276,14 @@ let t_sp_side pos tc =
   | FcHoareS chs, (None | Some (Single _)) ->
     let pos = pos |> omap as_single in
     let stmt1, stmt2 = o_split ~rev:true pos chs.chs_s in
-    check_form_indep stmt1 chs.chs_m chs.chs_c;
+    check_cost_indep stmt1 chs.chs_m chs.chs_co;
     let stmt1, chs_pr, sp_cost =
       LI.sp_stmt (EcMemory.memory chs.chs_m) env stmt1 chs.chs_pr in
     check_sp_progress pos stmt1;
-    let cost = EcFol.f_int_sub_simpl chs.chs_c sp_cost in
+    let cost = EcFol.cost_sub_self chs.chs_co sp_cost in
     let subgoal = f_cHoareS_r {chs with chs_s = stmt (stmt1@stmt2);
                                         chs_pr;
-                                        chs_c = cost } in
+                                        chs_co = cost } in
     FApi.xmutate1 tc `Sp [subgoal]
 
   | FbdHoareS bhs, (None | Some (Single _)) ->

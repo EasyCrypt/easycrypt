@@ -267,7 +267,7 @@ and pformula_r =
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
-  | PFChoareF  of pformula * pgamepath * pformula * pcosts
+  | PFChoareF  of pformula * pgamepath * pformula * pcost
 
 and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list
@@ -295,7 +295,7 @@ and pfrange = [
 
 and pfindex = [ `Index of int | `Match of pformula * int option]
 
-and pcosts  = PC_costs of pformula * (pgamepath * pformula) list
+and pcost  = PC_costs of pformula * (pgamepath * pformula) list
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =
@@ -451,8 +451,8 @@ type pipattern =
 and pspattern = unit
 
 type call_info =
-  | CI_spec of (pformula * pformula * pformula option)
-  | CI_inv  of pformula * pformula option
+  | CI_spec of (pformula * pformula * pcost option)
+  | CI_inv  of pformula * pcost option
   (* TODO: (Adrien) the list is of elements of the form (G.o : cost)
      We need to somehow add the step counter parameter.*)
   (* | CI_inv  of pformula * (pqsymbol * form) list *)
@@ -461,6 +461,7 @@ type call_info =
 type p_app_xt_info =
   | PAppNone
   | PAppSingle of pformula
+  | PAppCost   of pcost
   | PAppMult   of (pformula option) tuple5
 
 type ('a, 'b, 'c) rnd_tac_info =
@@ -547,7 +548,7 @@ type pcond_info = [
 type while_info = {
   wh_inv  : pformula;
   wh_vrnt : pformula option;
-  wh_bds  : pformula pair option;
+  wh_bds  : [`Bd of pformula pair | `Cost of pformula * pcost ] option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -580,7 +581,7 @@ type fel_info = {
 type deno_ppterm   = (pformula option pair) gppterm
 type conseq_info =
   | CQI_bd of phoarecmp option * pformula
-  | CQI_c  of pcosts
+  | CQI_c  of pcost
 
 type conseq_ppterm = ((pformula option pair) * (conseq_info) option) gppterm
 
