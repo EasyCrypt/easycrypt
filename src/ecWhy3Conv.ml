@@ -54,8 +54,8 @@ module Talpha = struct
 
   let w3_int_compare (i1 : Number.integer_constant) (i2 : Number.integer_constant) =
     compare2
-      (lazy (Pervasives.compare i1.ic_negative i2.ic_negative))
-      (lazy (w3_intlit_compare  i1.ic_abs      i2.ic_abs     ))
+      Why3.Number.(lazy (Pervasives.compare i1.ic_negative i2.ic_negative))
+      Why3.Number.(lazy (w3_intlit_compare  i1.ic_abs      i2.ic_abs     ))
 
   let w3_constant_compare c1 c2 =
     match c1, c2 with
