@@ -1452,11 +1452,8 @@ let rec form_of_expr mem (e : expr) =
 
 (* -------------------------------------------------------------------- *)
 (* The cost of an expression evaluation in any memory. *)
-let cost_of_expr expr = f_i1
+let cost_of_expr _ = f_i1
   (* assert false (\* TODO: (Adrien) *\) *)
-
-(* The cost of an expression evaluation in a specific memory. *)
-let cost_of_expr_w_mem mem expr = assert false (* TODO: (Adrien) *)
 
 (* -------------------------------------------------------------------- *)
 type f_subst = {

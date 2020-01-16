@@ -2917,6 +2917,26 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
           unify_or_fail env  ue bd  .pl_loc ~expct:treal bd'  .f_ty;
           f_bdHoareF pre' fpath post' hcmp bd'
 
+    | PFChoareF (pre, gp, post, PC_costs (self, calls)) ->
+        let fpath = trans_gamepath env gp in
+        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let pre'   = transf penv pre in
+        let post'  = transf qenv post in
+        let self'  = transf penv self in
+        let calls' = List.map (fun (f,c) ->
+            trans_gamepath env f,
+            transf penv c) calls in
+        (* TODO: (Adrien) is there anything to check in self and calls? *)
+          unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
+          unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
+          unify_or_fail env  ue self.pl_loc ~expct:tint  self'.f_ty;
+          List.iter2 (fun (_,c') (_,c) ->
+              unify_or_fail env ue c.pl_loc ~expct:tint c'.f_ty
+            ) calls' calls;
+          let cost' = { c_self = self';
+                        c_calls = Mx.of_list calls'; } in
+          f_cHoareF pre' fpath post' cost'
+
     | PFlsless gp ->
         let fpath = trans_gamepath env gp in
           f_losslessF fpath

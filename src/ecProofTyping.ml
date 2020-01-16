@@ -42,7 +42,16 @@ let process_form ?mv hyps pf ty =
 let process_formula ?mv hyps pf =
   process_form hyps ?mv pf tbool
 
-let process_cost ?mv hyps pf ty = assert false (* TODO: (Adrien) *)
+let process_cost ?mv hyps (EcParsetree.PC_costs (self, calls)) ty =
+  let env = LDecl.toenv hyps in
+  let self = process_form_opt ?mv hyps self (Some ty) in
+  let calls = List.map (fun (f,c) ->
+      (* TODO: (Adrien) do we need to do something here with [mv] for
+         trans_gamepath? *)
+      EcTyping.trans_gamepath env f,
+      process_form_opt ?mv hyps c (Some ty)
+    ) calls in
+  { c_self = self; c_calls = EcPath.Mx.of_list calls }
 
 let process_exp hyps mode oty e =
   let env = LDecl.toenv hyps in

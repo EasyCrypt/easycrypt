@@ -445,7 +445,6 @@ val split_args : form -> form * form list
 val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 
 (* -------------------------------------------------------------------- *)
-val cost_of_expr_w_mem : EcMemory.memory -> EcTypes.expr -> form
 val cost_of_expr       : EcTypes.expr -> form
 
 (* -------------------------------------------------------------------- *)
