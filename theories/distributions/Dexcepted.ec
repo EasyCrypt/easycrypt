@@ -57,7 +57,7 @@ qed.
 lemma dexcepted_uni (d : 'a distr) P:
   is_uniform d => is_uniform (d \ P).
 proof.
-move=> uni x y; rewrite !supp_dexcepted !dexcepted1E. 
+move=> uni x y; rewrite !supp_dexcepted !dexcepted1E.
 by move=> [? ->] [? ->] /=; congr; apply uni.
 qed.
 
@@ -257,7 +257,7 @@ proof.
 by byphoare (_ : i = x /\ test = X ==> P res) => //; proc; rnd P; skip.
 qed.
 
-lemma phoare_sampleE P : 
+lemma phoare_sampleE P :
   phoare [SampleE.sample : true ==> P res ] = (mu (dt i \ test i) P).
 proof. by bypr=> &m; apply (@pr_sampleE &m i{m} test{m} P). qed.
 
@@ -280,7 +280,7 @@ by if=> //=; auto.
 qed.
 end section.
 
-phoare phoare_sampleI P : 
+phoare phoare_sampleI P :
   [ SampleI.sample : is_lossless (dt i) ==> P res ] = (mu (dt i \ test i) P).
 proof. by bypr=> &m; apply (@pr_sampleI &m i{m} test{m} P). qed.
 
@@ -584,7 +584,7 @@ phoare phoare_sampleW P :
 proof. by bypr=> &m; exact/(@pr_sampleW &m i{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
-equiv sampleE_sampleI : SampleE.sample ~ SampleI.sample : 
+equiv sampleE_sampleI : SampleE.sample ~ SampleI.sample :
   ={i} /\ is_lossless (dt i{1}) ==> ={res}.
 proof.
 bypr (res{1}) (res{2})=> /> &m1 &m2 a <- dt_ll.
@@ -596,8 +596,8 @@ lemma sampleE_sampleI_pr &m x P:
   => Pr[SampleE.sample(x) @ &m: P res] = Pr[SampleI.sample(x) @ &m: P res].
 proof. by move=> dt_ll; byequiv sampleE_sampleI. qed.
 
-equiv sampleE_sampleWi : SampleE.sample ~ SampleWi.sample : 
-  ={i} /\ is_lossless (dt i{1}) /\ test i{2} r{2} ==> ={res}. 
+equiv sampleE_sampleWi : SampleE.sample ~ SampleWi.sample :
+  ={i} /\ is_lossless (dt i{1}) /\ test i{2} r{2} ==> ={res}.
 proof.
 bypr (res{1}) (res{2})=> /> &m1 &m2 a <- dt_ll Htr.
 rewrite (@pr_sampleE &m1 i{m1} (pred1 a)).
