@@ -75,13 +75,13 @@ module TacInternal = struct
   let t_hoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
-    let (s_hd, s_wp) = o_split i hs.shs_s in
-    let m = EcMemory.memory hs.shs_m in
+    let (s_hd, s_wp) = o_split i hs.hs_s in
+    let m = EcMemory.memory hs.hs_m in
     let s_wp = EcModules.stmt s_wp in
-    let s_wp, post, _ = wp ~uselet ~onesided:true env m s_wp hs.shs_po in
-    check_wp_progress tc i hs.shs_s s_wp;
+    let s_wp, post, _ = wp ~uselet ~onesided:true env m s_wp hs.hs_po in
+    check_wp_progress tc i hs.hs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
-    let concl = f_hoareS_r { hs with shs_s = s; shs_po = post} in
+    let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
     FApi.xmutate1 tc `Wp [concl]
 
   let t_choare_wp ?(uselet=true) i tc =

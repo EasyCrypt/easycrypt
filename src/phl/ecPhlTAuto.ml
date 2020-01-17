@@ -15,10 +15,10 @@ open EcLowPhlGoal
 (* -------------------------------------------------------------------- *)
 let t_hoare_true_r tc =
   match (FApi.tc1_goal tc).f_node with
-  | FsHoareF hf when f_equal hf.shf_po f_true ->
+  | FhoareF hf when f_equal hf.hf_po f_true ->
       FApi.xmutate1 tc `HoareTrue []
 
-  | FsHoareS hs when f_equal hs.shs_po f_true ->
+  | FhoareS hs when f_equal hs.hs_po f_true ->
       FApi.xmutate1 tc `HoareTrue []
 
   | _ ->

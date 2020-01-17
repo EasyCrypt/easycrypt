@@ -32,15 +32,15 @@ module Core = struct
   let t_hoare_rnd_r tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
-    let (lv, distr), s = tc1_last_rnd tc hs.shs_s in
+    let (lv, distr), s = tc1_last_rnd tc hs.hs_s in
     let ty_distr = proj_distr_ty env (e_ty distr) in
     let x_id = EcIdent.create (symbol_of_lv lv) in
     let x = f_local x_id ty_distr in
-    let distr = EcFol.form_of_expr (EcMemory.memory hs.shs_m) distr in
-    let post = subst_form_lv env (EcMemory.memory hs.shs_m) lv x hs.shs_po in
+    let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
+    let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
     let post = f_imp (f_in_supp x distr) post in
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
-    let concl = f_hoareS_r {hs with shs_s=s; shs_po=post} in
+    let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)

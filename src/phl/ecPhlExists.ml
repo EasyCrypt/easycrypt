@@ -106,8 +106,8 @@ let process_exists_intro ~(elim : bool) fs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
   let penv =
     match concl.f_node with
-    | FsHoareF hf -> fst (LDecl.hoareF hf.shf_f hyps)
-    | FsHoareS hs -> LDecl.push_active hs.shs_m hyps
+    | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
+    | FhoareS hs -> LDecl.push_active hs.hs_m hyps
     | FcHoareF hf -> fst (LDecl.hoareF hf.chf_f hyps)
     | FcHoareS hs -> LDecl.push_active hs.chs_m hyps
     | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_f hyps)
@@ -135,8 +135,8 @@ let process_ecall oside (l, tvi, fs) tc =
 
   let hyps, kind =
     match concl.f_node with
-    | FsHoareS hs when is_none oside ->
-        (LDecl.push_active hs.shs_m hyps, `Hoare (List.length hs.shs_s.s_node))
+    | FhoareS hs when is_none oside ->
+        (LDecl.push_active hs.hs_m hyps, `Hoare (List.length hs.hs_s.s_node))
     | FequivS es ->
         let n1 = List.length es.es_sl.s_node in
         let n2 = List.length es.es_sr.s_node in

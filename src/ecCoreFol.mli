@@ -58,8 +58,8 @@ and f_node =
   | Ftuple  of form list
   | Fproj   of form * int
 
-  | FsHoareF of sHoareF (* $hr / $hr *)
-  | FsHoareS of sHoareS
+  | FhoareF of sHoareF (* $hr / $hr *)
+  | FhoareS of sHoareS
 
   | FcHoareF of cHoareF (* $hr / $hr *)
   | FcHoareS of cHoareS
@@ -100,16 +100,16 @@ and equivS = {
 }
 
 and sHoareF = {
-  shf_pr : form;
-  shf_f  : EcPath.xpath;
-  shf_po : form;
+  hf_pr : form;
+  hf_f  : EcPath.xpath;
+  hf_po : form;
 }
 
 and sHoareS = {
-  shs_m  : EcMemory.memenv;
-  shs_pr : form;
-  shs_s  : stmt;
-  shs_po : form; }
+  hs_m  : EcMemory.memenv;
+  hs_pr : form;
+  hs_s  : stmt;
+  hs_po : form; }
 
 and cHoareF = {
   chf_pr : form;

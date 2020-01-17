@@ -667,7 +667,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
 
   | Fpr pr        -> trans_pr env pr
   | FeagerF _
-  | FsHoareF  _ | FsHoareS   _
+  | FhoareF  _ | FhoareS   _
   | FcHoareF  _ | FcHoareS   _
   | FbdHoareF _ | FbdHoareS _
   | FequivF   _ | FequivS   _
@@ -1296,7 +1296,7 @@ module Frequency = struct
       | Ftuple   es           -> List.iter doit es
       | Fproj    (e, _)       -> doit e
 
-      | FsHoareF _ | FsHoareS _
+      | FhoareF _ | FhoareS _
       | FcHoareF _ | FcHoareS _
       | FbdHoareF _ | FbdHoareS _
       | FequivF _ | FequivS _ | FeagerF _  -> ()

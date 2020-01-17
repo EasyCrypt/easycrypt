@@ -93,7 +93,7 @@ and process1_case (_ : ttenv) (doeq, opts, gp) (tc : tcenv1) =
     | _ -> tc_error !!tc "must give exactly one boolean formula"
   in
     match (FApi.tc1_goal tc).f_node with
-    | FbdHoareS _ | FcHoareS _ | FsHoareS _ when not opts.cod_ambient ->
+    | FbdHoareS _ | FcHoareS _ | FhoareS _ when not opts.cod_ambient ->
         let fp = TTC.tc1_process_Xhl_formula tc (form_of_gp ()) in
         EcPhlCase.t_hl_case fp tc
 

@@ -2519,10 +2519,10 @@ module NormMp = struct
 
         | Fglob(p,m) -> norm_glob env m p
 
-        | FsHoareF hf ->
-          let pre' = aux hf.shf_pr and p' = norm_xfun env hf.shf_f
-          and post' = aux hf.shf_po in
-          if hf.shf_pr == pre' && hf.shf_f == p' && hf.shf_po == post' then f else
+        | FhoareF hf ->
+          let pre' = aux hf.hf_pr and p' = norm_xfun env hf.hf_f
+          and post' = aux hf.hf_po in
+          if hf.hf_pr == pre' && hf.hf_f == p' && hf.hf_po == post' then f else
           f_hoareF pre' p' post'
 
         | FcHoareF chf ->

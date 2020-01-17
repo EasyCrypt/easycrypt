@@ -792,8 +792,8 @@ type sform =
   | SFeq    of form * form
   | SFop    of (EcPath.path * ty list) * (form list)
 
-  | SFsHoareF  of sHoareF
-  | SFsHoareS  of sHoareS
+  | SFhoareF  of sHoareF
+  | SFhoareS  of sHoareS
   | SFcHoareF  of cHoareF
   | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF
@@ -834,8 +834,8 @@ let rec sform_of_form fp =
   | Fquant (q, [b]  , f) -> SFquant (q, b, lazy f)
   | Fquant (q, b::bs, f) -> SFquant (q, b, lazy (f_quant q bs f))
 
-  | FsHoareF  hf -> SFsHoareF  hf
-  | FsHoareS  hs -> SFsHoareS  hs
+  | FhoareF  hf -> SFhoareF  hf
+  | FhoareS  hs -> SFhoareS  hs
   | FcHoareF  hf -> SFcHoareF  hf
   | FcHoareS  hs -> SFcHoareS  hs
   | FbdHoareF hf -> SFbdHoareF hf

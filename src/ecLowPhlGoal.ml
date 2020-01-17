@@ -175,10 +175,10 @@ let tc1_as_eagerF   tc = pf_as_eagerF   !!tc (FApi.tc1_goal tc)
 let tc1_get_stmt side tc =
   let concl = FApi.tc1_goal tc in
   match side, concl.f_node with
-  | None, FsHoareS hs -> hs.shs_s
+  | None, FhoareS hs -> hs.hs_s
   | None, FcHoareS hs -> hs.chs_s
   | None, FbdHoareS hs -> hs.bhs_s
-  | Some _ , (FsHoareS _ | FcHoareS _ | FbdHoareS _) ->
+  | Some _ , (FhoareS _ | FcHoareS _ | FbdHoareS _) ->
       tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
   | Some `Left, FequivS es   -> es.es_sl
   | Some `Right, FequivS es  -> es.es_sr
@@ -190,8 +190,8 @@ let tc1_get_stmt side tc =
 (* -------------------------------------------------------------------- *)
 let get_pre f =
   match f.f_node with
-  | FsHoareF hf  -> Some (hf.shf_pr)
-  | FsHoareS hs  -> Some (hs.shs_pr)
+  | FhoareF hf  -> Some (hf.hf_pr)
+  | FhoareS hs  -> Some (hs.hs_pr)
   | FcHoareF hf  -> Some (hf.chf_pr)
   | FcHoareS hs  -> Some (hs.chs_pr)
   | FbdHoareF hf -> Some (hf.bhf_pr)
@@ -208,8 +208,8 @@ let tc1_get_pre tc =
 (* -------------------------------------------------------------------- *)
 let get_post f =
   match f.f_node with
-  | FsHoareF hf  -> Some (hf.shf_po )
-  | FsHoareS hs  -> Some (hs.shs_po )
+  | FhoareF hf  -> Some (hf.hf_po )
+  | FhoareS hs  -> Some (hs.hs_po )
   | FcHoareF hf  -> Some (hf.chf_po )
   | FcHoareS hs  -> Some (hs.chs_po )
   | FbdHoareF hf -> Some (hf.bhf_po)
@@ -226,8 +226,8 @@ let tc1_get_post tc =
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
   match f.f_node with
- | FsHoareF hf  -> f_hoareF pre hf.shf_f hf.shf_po
- | FsHoareS hs  -> f_hoareS_r { hs with shs_pr = pre }
+ | FhoareF hf  -> f_hoareF pre hf.hf_f hf.hf_po
+ | FhoareS hs  -> f_hoareS_r { hs with hs_pr = pre }
  | FcHoareF hf  -> f_cHoareF pre hf.chf_f hf.chf_po hf.chf_co
  | FcHoareS hs  -> f_cHoareS_r { hs with chs_pr = pre }
  | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
@@ -257,7 +257,7 @@ let o_split ?rev i s =
 (* -------------------------------------------------------------------- *)
 let t_hS_or_chS_or_bhS_or_eS ?th ?tch ?tbh ?te tc =
   match (FApi.tc1_goal tc).f_node with
-  | FsHoareS  _ when EcUtils.is_some th  -> (oget th ) tc
+  | FhoareS  _ when EcUtils.is_some th  -> (oget th ) tc
   | FcHoareS  _ when EcUtils.is_some tch -> (oget tch) tc
   | FbdHoareS _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivS   _ when EcUtils.is_some te  -> (oget te ) tc
@@ -273,7 +273,7 @@ let t_hS_or_chS_or_bhS_or_eS ?th ?tch ?tbh ?te tc =
 
 let t_hF_or_chF_or_bhF_or_eF ?th ?tch ?tbh ?te ?teg tc =
   match (FApi.tc1_goal tc).f_node with
-  | FsHoareF  _ when EcUtils.is_some th  -> (oget th ) tc
+  | FhoareF  _ when EcUtils.is_some th  -> (oget th ) tc
   | FcHoareF  _ when EcUtils.is_some tch -> (oget tch) tc
   | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
@@ -581,11 +581,11 @@ let t_code_transform
       let (hyps, concl) = FApi.tc1_flat tc in
 
       match concl.f_node, choare with
-      | FsHoareS hoare, _ ->
-          let pr, po = hoare.shs_pr, hoare.shs_po in
+      | FhoareS hoare, _ ->
+          let pr, po = hoare.hs_pr, hoare.hs_po in
           let (me, stmt, cs) =
-            tx (pf, hyps) cpos (pr, po) (hoare.shs_m, hoare.shs_s) in
-          let concl = f_hoareS_r { hoare with shs_m = me; shs_s = stmt; } in
+            tx (pf, hyps) cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
+          let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | FcHoareS chs, Some c ->

@@ -35,10 +35,10 @@ module Low = struct
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond_r b at_pos tc =
     let hs = tc1_as_hoareS tc in
-    let m  = EcMemory.memory hs.shs_m in
-    let hd,_,e,s = gen_rcond !!tc b m at_pos hs.shs_s in
-    let concl1  = f_hoareS_r { hs with shs_s = hd; shs_po = e } in
-    let concl2  = f_hoareS_r { hs with shs_s = s } in
+    let m  = EcMemory.memory hs.hs_m in
+    let hd,_,e,s = gen_rcond !!tc b m at_pos hs.hs_s in
+    let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = e } in
+    let concl2  = f_hoareS_r { hs with hs_s = s } in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)

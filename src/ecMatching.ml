@@ -823,8 +823,8 @@ module FPosition = struct
               let subctxt = Sid.add pr.pr_mem ctxt in
               doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event)])
 
-          | FsHoareF hs ->
-              doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.shf_pr; hs.shf_po]))
+          | FhoareF hs ->
+              doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
 
           | FcHoareF chs ->
             let subctxt = Sid.add EcFol.mhr ctxt in
@@ -958,9 +958,9 @@ module FPosition = struct
               let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in
               f_pr pr.pr_mem pr.pr_fun args' event'
 
-          | FsHoareF hf ->
-              let (shf_pr, shf_po) = as_seq2 (doit p [hf.shf_pr; hf.shf_po]) in
-              f_hoareF_r { hf with shf_pr; shf_po; }
+          | FhoareF hf ->
+              let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
+              f_hoareF_r { hf with hf_pr; hf_po; }
 
           | FcHoareF chf ->
             let fkeys, calls = EcPath.Mx.bindings chf.chf_co.c_calls
@@ -987,7 +987,7 @@ module FPosition = struct
               let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
               f_equivF_r { ef with ef_pr; ef_po; }
 
-          | FsHoareS  _ -> raise InvalidPosition
+          | FhoareS  _ -> raise InvalidPosition
           | FcHoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition

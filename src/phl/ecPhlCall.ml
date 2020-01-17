@@ -66,8 +66,8 @@ let wp2_call
 let t_hoare_call fpre fpost tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
-  let (lp,f,args),s = tc1_last_call tc hs.shs_s in
-  let m = EcMemory.memory hs.shs_m in
+  let (lp,f,args),s = tc1_last_call tc hs.hs_s in
+  let m = EcMemory.memory hs.hs_m in
   let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
   let f_concl = f_hoareF fpre f fpost in
@@ -75,14 +75,14 @@ let t_hoare_call fpre fpost tc =
   let pvres = pv_res f in
   let vres = EcIdent.create "result" in
   let fres = f_local vres fsig.fs_ret in
-  let post = wp_asgn_call env m lp fres hs.shs_po in
+  let post = wp_asgn_call env m lp fres hs.hs_po in
   let fpost = PVM.subst1 env pvres m fres fpost in
   let modi = f_write env f in
   let post = generalize_mod env m modi (f_imp_simpl fpost post) in
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre = subst_args_call env m f (e_tuple args) PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
-  let concl = f_hoareS_r { hs with shs_s = s; shs_po=post} in
+  let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
 
   FApi.xmutate1 tc `HlCall [f_concl; concl]
 
@@ -272,11 +272,11 @@ let t_call side ax tc =
   let concl = FApi.tc1_goal tc in
 
   match ax.f_node, concl.f_node with
-  | FsHoareF hf, FsHoareS hs ->
-      let (_, f, _), _ = tc1_last_call tc hs.shs_s in
-      if not (EcEnv.NormMp.x_equal env hf.shf_f f) then
-        call_error env tc hf.shf_f f;
-      t_hoare_call hf.shf_pr hf.shf_po tc
+  | FhoareF hf, FhoareS hs ->
+      let (_, f, _), _ = tc1_last_call tc hs.hs_s in
+      if not (EcEnv.NormMp.x_equal env hf.hf_f f) then
+        call_error env tc hf.hf_f f;
+      t_hoare_call hf.hf_pr hf.hf_po tc
 
   | FcHoareF chf, FcHoareS chs ->
       let (_, f, _), _ = tc1_last_call tc chs.chs_s in
@@ -356,8 +356,8 @@ let process_call side info tc =
   let process_spec tc side cost =
     let (hyps, concl) = FApi.tc1_flat tc in
       match concl.f_node, side, cost with
-      | FsHoareS hs, None, None ->
-          let (_,f,_) = fst (tc1_last_call tc hs.shs_s) in
+      | FhoareS hs, None, None ->
+          let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, fun pre post -> f_hoareF pre f post)
 
@@ -382,12 +382,12 @@ let process_call side info tc =
             bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None)
 
       | FbdHoareS _, Some _, _
-      | FsHoareS  _, Some _, _
+      | FhoareS  _, Some _, _
       | FcHoareS  _, Some _, _ ->
           tc_error !!tc "side can only be given for prhl judgements"
 
       | FbdHoareS _, _, Some _
-      | FsHoareS  _, _, Some _
+      | FhoareS  _, _, Some _
       | FequivS   _, _, Some _->
           tc_error !!tc "cost can only be given for choare judgements"
 
@@ -419,8 +419,8 @@ let process_call side info tc =
 
     let hyps, concl = FApi.tc1_flat tc in
     match concl.f_node with
-    | FsHoareS hs ->
-        let (_,f,_) = fst (tc1_last_call tc hs.shs_s) in
+    | FhoareS hs ->
+        let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
         let penv = LDecl.inv_memenv1 hyps in
         (penv, fun inv inv_info ->
             check_none inv_info;

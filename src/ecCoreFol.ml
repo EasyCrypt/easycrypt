@@ -60,8 +60,8 @@ and f_node =
   | Ftuple  of form list
   | Fproj   of form * int
 
-  | FsHoareF of sHoareF (* $hr / $hr *)
-  | FsHoareS of sHoareS
+  | FhoareF of sHoareF (* $hr / $hr *)
+  | FhoareS of sHoareS
 
   | FcHoareF of cHoareF (* $hr / $hr *)
   | FcHoareS of cHoareS
@@ -101,16 +101,16 @@ and equivS = {
   es_po  : form; }
 
 and sHoareF = {
-  shf_pr : form;
-  shf_f  : EcPath.xpath;
-  shf_po : form;
+  hf_pr : form;
+  hf_f  : EcPath.xpath;
+  hf_po : form;
 }
 
 and sHoareS = {
-  shs_m  : EcMemory.memenv;
-  shs_pr : form;
-  shs_s  : stmt;
-  shs_po : form; }
+  hs_m  : EcMemory.memenv;
+  hs_pr : form;
+  hs_s  : stmt;
+  hs_po : form; }
 
 and cHoareF = {
   chf_pr : form;
@@ -265,15 +265,15 @@ let cost_equal c1 c2 =
   && EcPath.Mx.equal f_equal c1.c_calls c2.c_calls
 
 let hf_equal hf1 hf2 =
-     f_equal hf1.shf_pr hf2.shf_pr
-  && f_equal hf1.shf_po hf2.shf_po
-  && EcPath.x_equal hf1.shf_f hf2.shf_f
+     f_equal hf1.hf_pr hf2.hf_pr
+  && f_equal hf1.hf_po hf2.hf_po
+  && EcPath.x_equal hf1.hf_f hf2.hf_f
 
 let hs_equal hs1 hs2 =
-     f_equal hs1.shs_pr hs2.shs_pr
-  && f_equal hs1.shs_po hs2.shs_po
-  && s_equal hs1.shs_s hs2.shs_s
-  && EcMemory.me_equal hs1.shs_m hs2.shs_m
+     f_equal hs1.hs_pr hs2.hs_pr
+  && f_equal hs1.hs_po hs2.hs_po
+  && s_equal hs1.hs_s hs2.hs_s
+  && EcMemory.me_equal hs1.hs_m hs2.hs_m
 
 let chf_equal chf1 chf2 =
      f_equal chf1.chf_pr chf2.chf_pr
@@ -334,11 +334,11 @@ let pr_equal pr1 pr2 =
 (* -------------------------------------------------------------------- *)
 let hf_hash hf =
   Why3.Hashcons.combine2
-    (f_hash hf.shf_pr) (f_hash hf.shf_po) (EcPath.x_hash hf.shf_f)
+    (f_hash hf.hf_pr) (f_hash hf.hf_po) (EcPath.x_hash hf.hf_f)
 
 let hs_hash hs =
   Why3.Hashcons.combine2
-    (f_hash hs.shs_pr) (f_hash hs.shs_po) (EcCoreModules.s_hash hs.shs_s)
+    (f_hash hs.hs_pr) (f_hash hs.hs_po) (EcCoreModules.s_hash hs.hs_s)
 
 let cost_hash cost =
   Why3.Hashcons.combine
@@ -441,8 +441,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fproj(f1,i1), Fproj(f2,i2) ->
       i1 = i2 && f_equal f1 f2
 
-    | FsHoareF  hf1 , FsHoareF  hf2  -> hf_equal hf1 hf2
-    | FsHoareS  hs1 , FsHoareS  hs2  -> hs_equal hs1 hs2
+    | FhoareF  hf1 , FhoareF  hf2  -> hf_equal hf1 hf2
+    | FhoareS  hs1 , FhoareS  hs2  -> hs_equal hs1 hs2
     | FcHoareF hf1 , FcHoareF hf2  -> chf_equal hf1 hf2
     | FcHoareS hs1 , FcHoareS hs2  -> chs_equal hs1 hs2
     | FbdHoareF   bhf1, FbdHoareF   bhf2 -> bhf_equal bhf1 bhf2
@@ -495,8 +495,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fproj(f,i) ->
         Why3.Hashcons.combine (f_hash f) i
 
-    | FsHoareF  hf   -> hf_hash hf
-    | FsHoareS  hs   -> hs_hash hs
+    | FhoareF  hf   -> hf_hash hf
+    | FhoareS  hs   -> hs_hash hs
     | FcHoareF chf  -> chf_hash chf
     | FcHoareS chs  -> chs_hash chs
     | FbdHoareF   bhf  -> bhf_hash bhf
@@ -539,13 +539,13 @@ module Hsform = Why3.Hashcons.Make (struct
       let fv2 = fv_diff (f_fv f2) (lp_fv lp) in
       fv_union (f_fv f1) fv2
 
-    | FsHoareF hf ->
-      let fv = fv_union (f_fv hf.shf_pr) (f_fv hf.shf_po) in
-      EcPath.x_fv (Mid.remove mhr fv) hf.shf_f
+    | FhoareF hf ->
+      let fv = fv_union (f_fv hf.hf_pr) (f_fv hf.hf_po) in
+      EcPath.x_fv (Mid.remove mhr fv) hf.hf_f
 
-    | FsHoareS hs ->
-      let fv = fv_union (f_fv hs.shs_pr) (f_fv hs.shs_po) in
-      fv_union (EcCoreModules.s_fv hs.shs_s) (Mid.remove (fst hs.shs_m) fv)
+    | FhoareS hs ->
+      let fv = fv_union (f_fv hs.hs_pr) (f_fv hs.hs_po) in
+      fv_union (EcCoreModules.s_fv hs.hs_s) (Mid.remove (fst hs.hs_m) fv)
 
     | FcHoareF chf ->
       let fv = fv_union (f_fv chf.chf_pr)
@@ -743,14 +743,14 @@ let f_eqs fs1 fs2 =
   f_ands (List.map2 f_eq fs1 fs2)
 
 (* -------------------------------------------------------------------- *)
-let f_hoareS_r hs = mk_form (FsHoareS hs) tbool
-let f_hoareF_r hf = mk_form (FsHoareF hf) tbool
+let f_hoareS_r hs = mk_form (FhoareS hs) tbool
+let f_hoareF_r hf = mk_form (FhoareF hf) tbool
 
-let f_hoareS shs_m shs_pr shs_s shs_po =
-  f_hoareS_r { shs_m; shs_pr; shs_s; shs_po; }
+let f_hoareS hs_m hs_pr hs_s hs_po =
+  f_hoareS_r { hs_m; hs_pr; hs_s; hs_po; }
 
-let f_hoareF shf_pr shf_f shf_po =
-  f_hoareF_r { shf_pr; shf_f; shf_po; }
+let f_hoareF hf_pr hf_f hf_po =
+  f_hoareF_r { hf_pr; hf_f; hf_po; }
 
 (* -------------------------------------------------------------------- *)
 let f_cHoareS_r chs = mk_form (FcHoareS chs) tbool
@@ -901,7 +901,7 @@ module FSmart = struct
     if egf_equal eg eg' then fp else mk_form (FeagerF eg') fp.f_ty
 
   let f_hoareF (fp, hf) hf' =
-    if hf_equal hf hf' then fp else mk_form (FsHoareF hf') fp.f_ty
+    if hf_equal hf hf' then fp else mk_form (FhoareF hf') fp.f_ty
 
   let f_cHoareF (fp, chf) chf' =
     if chf_equal chf chf' then fp else mk_form (FcHoareF chf') fp.f_ty
@@ -985,17 +985,17 @@ let f_map gt g fp =
       let ty' = gt fp.f_ty in
         FSmart.f_proj (fp, (f, fp.f_ty)) (f', ty') i
 
-  | FsHoareF hf ->
-      let pr' = g hf.shf_pr in
-      let po' = g hf.shf_po in
+  | FhoareF hf ->
+      let pr' = g hf.hf_pr in
+      let po' = g hf.hf_po in
         FSmart.f_hoareF (fp, hf)
-          { hf with shf_pr = pr'; shf_po = po'; }
+          { hf with hf_pr = pr'; hf_po = po'; }
 
-  | FsHoareS hs ->
-      let pr' = g hs.shs_pr in
-      let po' = g hs.shs_po in
+  | FhoareS hs ->
+      let pr' = g hs.hs_pr in
+      let po' = g hs.hs_po in
         FSmart.f_hoareS (fp, hs)
-          { hs with shs_pr = pr'; shs_po = po'; }
+          { hs with hs_pr = pr'; hs_po = po'; }
 
   | FcHoareF chf ->
       let pr' = g chf.chf_pr in
@@ -1066,8 +1066,8 @@ let f_iter g f =
   | Ftuple   es           -> List.iter g es
   | Fproj    (e, _)       -> g e
 
-  | FsHoareF  hf  -> g hf.shf_pr; g hf.shf_po
-  | FsHoareS  hs  -> g hs.shs_pr; g hs.shs_po
+  | FhoareF  hf  -> g hf.hf_pr; g hf.hf_po
+  | FhoareS  hs  -> g hs.hs_pr; g hs.hs_po
   | FcHoareF  chf -> g chf.chf_pr; g chf.chf_po
   | FcHoareS  chs -> g chs.chs_pr; g chs.chs_po
   | FbdHoareF bhf -> g bhf.bhf_pr; g bhf.bhf_po
@@ -1094,8 +1094,8 @@ let form_exists g f =
   | Ftuple   es           -> List.exists g es
   | Fproj    (e, _)       -> g e
 
-  | FsHoareF   hf -> g hf.shf_pr   || g hf.shf_po
-  | FsHoareS   hs -> g hs.shs_pr   || g hs.shs_po
+  | FhoareF   hf -> g hf.hf_pr   || g hf.hf_po
+  | FhoareS   hs -> g hs.hs_pr   || g hs.hs_po
   | FcHoareF  chf -> g chf.chf_pr  || g chf.chf_po
   | FcHoareS  chs -> g chs.chs_pr  || g chs.chs_po
   | FbdHoareF bhf -> g bhf.bhf_pr  || g bhf.bhf_po
@@ -1122,8 +1122,8 @@ let form_forall g f =
   | Ftuple   es           -> List.for_all g es
   | Fproj    (e, _)       -> g e
 
-  | FsHoareF  hf  -> g hf.shf_pr  && g hf.shf_po
-  | FsHoareS  hs  -> g hs.shs_pr  && g hs.shs_po
+  | FhoareF  hf  -> g hf.hf_pr  && g hf.hf_po
+  | FhoareS  hs  -> g hs.hs_pr  && g hs.hs_po
   | FcHoareF  chf -> g chf.chf_pr && g chf.chf_po
   | FcHoareS  chs -> g chs.chs_pr && g chs.chs_po
   | FbdHoareF bhf -> g bhf.bhf_pr && g bhf.bhf_po
@@ -1210,12 +1210,12 @@ let destr_eagerF f =
 
 let destr_hoareS f =
   match f.f_node with
-  | FsHoareS es -> es
+  | FhoareS es -> es
   | _ -> destr_error "hoareS"
 
 let destr_hoareF f =
   match f.f_node with
-  | FsHoareF es -> es
+  | FhoareF es -> es
   | _ -> destr_error "hoareF"
 
 let destr_cHoareS f =
@@ -1245,7 +1245,7 @@ let destr_pr f =
 
 let destr_programS side f =
   match side, f.f_node with
-  | None  , FsHoareS   hs -> (hs.shs_m, hs.shs_s)
+  | None  , FhoareS   hs -> (hs.hs_m, hs.hs_s)
   | None  , FcHoareS  chs -> (chs.chs_m, chs.chs_s)
   | None  , FbdHoareS bhs -> (bhs.bhs_m, bhs.bhs_s)
   | Some b, FequivS   es  -> begin
@@ -1659,23 +1659,23 @@ module Fsubst = struct
         let mp' = s.fs_sty.ts_mp mp in
         FSmart.f_glob (fp, (mp, m)) (mp', m')
 
-    | FsHoareF hf ->
+    | FhoareF hf ->
       assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
-        let pr' = f_subst ~tx s hf.shf_pr in
-        let po' = f_subst ~tx s hf.shf_po in
-        let mp' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp hf.shf_f in
-        FSmart.f_hoareF (fp, hf) { shf_pr = pr'; shf_po = po'; shf_f = mp'; }
+        let pr' = f_subst ~tx s hf.hf_pr in
+        let po' = f_subst ~tx s hf.hf_po in
+        let mp' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp hf.hf_f in
+        FSmart.f_hoareF (fp, hf) { hf_pr = pr'; hf_po = po'; hf_f = mp'; }
 
-    | FsHoareS hs ->
-        assert (not (Mid.mem (fst hs.shs_m) s.fs_mem));
+    | FhoareS hs ->
+        assert (not (Mid.mem (fst hs.hs_m) s.fs_mem));
         let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
                                s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
-        let pr' = f_subst ~tx s hs.shs_pr in
-        let po' = f_subst ~tx s hs.shs_po in
-        let st' = EcCoreModules.s_subst es hs.shs_s in
-        let me' = EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty hs.shs_m in
+        let pr' = f_subst ~tx s hs.hs_pr in
+        let po' = f_subst ~tx s hs.hs_po in
+        let st' = EcCoreModules.s_subst es hs.hs_s in
+        let me' = EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty hs.hs_m in
         FSmart.f_hoareS (fp, hs)
-          { shs_pr = pr'; shs_po = po'; shs_s = st'; shs_m = me'; }
+          { hs_pr = pr'; hs_po = po'; hs_s = st'; hs_m = me'; }
 
     | FcHoareF chf ->
       assert (not (Mid.mem mhr s.fs_mem));

@@ -896,16 +896,16 @@ and check_alpha_equal ri hyps f1 f2 =
     | Fproj(f1,i1), Fproj(f2,i2) when i1 = i2 ->
       aux env subst f1 f2
 
-    | FsHoareF hf1, FsHoareF hf2 ->
-      check_xp env subst hf1.shf_f hf2.shf_f;
-      aux env subst hf1.shf_pr hf2.shf_pr;
-      aux env subst hf1.shf_po hf2.shf_po
+    | FhoareF hf1, FhoareF hf2 ->
+      check_xp env subst hf1.hf_f hf2.hf_f;
+      aux env subst hf1.hf_pr hf2.hf_pr;
+      aux env subst hf1.hf_po hf2.hf_po
 
-    | FsHoareS hs1, FsHoareS hs2 ->
-      check_s env subst hs1.shs_s hs2.shs_s;
+    | FhoareS hs1, FhoareS hs2 ->
+      check_s env subst hs1.hs_s hs2.hs_s;
       (* FIXME should check the memenv *)
-      aux env subst hs1.shs_pr hs2.shs_pr;
-      aux env subst hs1.shs_po hs2.shs_po
+      aux env subst hs1.hs_pr hs2.hs_pr;
+      aux env subst hs1.hs_po hs2.hs_po
 
     | FcHoareF chf1, FcHoareF chf2 ->
       check_xp env subst chf1.chf_f chf2.chf_f;
@@ -1034,9 +1034,9 @@ and simplify_rec ri env hyps f =
       let f'    =  EcFol.FSmart.f_app (f, app1) app2 in
       (try h_red_x ri env hyps f' with NotReducible -> f')
 
-  | FsHoareF hf when ri.modpath ->
-      let shf_f = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) hf.shf_f in
-      f_map (fun ty -> ty) (simplify ri env hyps) (f_hoareF_r { hf with shf_f })
+  | FhoareF hf when ri.modpath ->
+      let hf_f = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) hf.hf_f in
+      f_map (fun ty -> ty) (simplify ri env hyps) (f_hoareF_r { hf with hf_f })
 
   | FcHoareF hf when ri.modpath ->
       let chf_f = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) hf.chf_f in

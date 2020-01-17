@@ -100,19 +100,19 @@ let while_info env e s =
 let t_hoare_while_r inv tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
-  let (e, c), s = tc1_last_while tc hs.shs_s in
-  let m = EcMemory.memory hs.shs_m in
+  let (e, c), s = tc1_last_while tc hs.hs_s in
+  let m = EcMemory.memory hs.hs_m in
   let e = form_of_expr m e in
   (* the body preserves the invariant *)
   let b_pre  = f_and_simpl inv e in
   let b_post = inv in
-  let b_concl = f_hoareS hs.shs_m b_pre c b_post in
+  let b_concl = f_hoareS hs.hs_m b_pre c b_post in
   (* the wp of the while *)
-  let post = f_imps_simpl [f_not_simpl e; inv] hs.shs_po in
+  let post = f_imps_simpl [f_not_simpl e; inv] hs.hs_po in
   let modi = s_write env c in
   let post = generalize_mod env m modi post in
   let post = f_and_simpl inv post in
-  let concl = f_hoareS_r { hs with shs_s = s; shs_po=post} in
+  let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
 
   FApi.xmutate1 tc `While [b_concl; concl]
 
@@ -436,7 +436,7 @@ let process_while side winfos tc =
         EP.wh_bds  = bds ; } = winfos in
 
   match (FApi.tc1_goal tc).f_node with
-  | FsHoareS _ -> begin
+  | FhoareS _ -> begin
       match vrnt with
       | None -> t_hoare_while (TTC.tc1_process_Xhl_formula tc phi) tc
       | _    -> tc_error !!tc "invalid arguments"
@@ -546,7 +546,7 @@ module ASyncWhile = struct
            in e_local idx fp.f_ty
 
       | Fglob     _
-      | FsHoareF   _ | FsHoareS   _
+      | FhoareF   _ | FhoareS   _
       | FcHoareF  _ | FcHoareS   _
       | FbdHoareF _ | FbdHoareS _
       | FequivF   _ | FequivS   _

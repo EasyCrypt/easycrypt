@@ -82,13 +82,13 @@ let subst_pre env f fs m s =
 let t_hoareF_fun_def_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
-  let f = NormMp.norm_xfun env hf.shf_f in
+  let f = NormMp.norm_xfun env hf.hf_f in
   check_concrete !!tc env f;
   let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
   let m = EcMemory.memory memenv in
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
-  let post = PVM.subst1 env (pv_res f) m fres hf.shf_po in
-  let pre  = PVM.subst env (subst_pre env f fsig m PVM.empty) hf.shf_pr in
+  let post = PVM.subst1 env (pv_res f) m fres hf.hf_po in
+  let pre  = PVM.subst env (subst_pre env f fsig m PVM.empty) hf.hf_pr in
   let concl' = f_hoareS memenv pre fdef.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 
@@ -413,7 +413,7 @@ end
 let t_hoareF_abs_r inv tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
-  let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.shf_f inv in
+  let pre, post, sg = FunAbsLow.hoareF_abs_spec !!tc env hf.hf_f inv in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
   FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post tc)
@@ -423,7 +423,7 @@ let t_choareF_abs_r inv inv_inf tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
   let pre, post, cost, sg =
-    FunAbsLow.choareF_abs_spec !!tc env hf.shf_f inv inv_inf in
+    FunAbsLow.choareF_abs_spec !!tc env hf.hf_f inv inv_inf in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
   FApi.t_last tactic (EcPhlConseq.t_cHoareF_conseq_full pre post cost tc)
@@ -569,12 +569,12 @@ end
 let t_fun_to_code_hoare_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
-  let f = hf.shf_f in
+  let f = hf.hf_f in
   let m, _ = Fun.hoareF_memenv f env in
   let m, st, r, ty,_ = ToCodeLow.to_code env f m in
   let s = PVM.add env (pv_res f) (fst m) (f_pvar r ty (fst m)) PVM.empty in
-  let post = PVM.subst env s hf.shf_po in
-  let concl = f_hoareS m hf.shf_pr st post in
+  let post = PVM.subst env s hf.hf_po in
+  let concl = f_hoareS m hf.hf_pr st post in
 
   FApi.xmutate1 tc `FunToCode [concl]
 
@@ -678,7 +678,7 @@ let t_fun_r inv inv_inf tc =
     assert (inv_inf = None);
     let env = FApi.tc1_env tc in
     let h   = destr_hoareF (FApi.tc1_goal tc) in
-      if   NormMp.is_abstract_fun h.shf_f env
+      if   NormMp.is_abstract_fun h.hf_f env
       then t_hoareF_abs inv tc
       else t_hoareF_fun_def tc
 

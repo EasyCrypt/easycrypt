@@ -195,8 +195,8 @@ type sform =
   | SFeq    of form * form
   | SFop    of (path * ty list) * (form list)
 
-  | SFsHoareF  of sHoareF
-  | SFsHoareS  of sHoareS
+  | SFhoareF  of sHoareF
+  | SFhoareS  of sHoareS
   | SFcHoareF  of cHoareF
   | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF

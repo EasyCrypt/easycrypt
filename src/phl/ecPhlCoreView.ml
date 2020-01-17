@@ -31,13 +31,13 @@ let t_hoare_of_bdhoareF_r tc =
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_of_hoareS_r tc =
   let hs = tc1_as_hoareS tc in
-  let concl = f_bdHoareS hs.shs_m hs.shs_pr hs.shs_s (f_not hs.shs_po) FHeq f_r0 in
+  let concl = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in
   FApi.xmutate1 tc `ViewBdHoare [concl]
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_of_hoareF_r tc =
   let hf = tc1_as_hoareF tc in
-  let concl = f_bdHoareF hf.shf_pr hf.shf_f (f_not hf.shf_po) FHeq f_r0 in
+  let concl = f_bdHoareF hf.hf_pr hf.hf_f (f_not hf.hf_po) FHeq f_r0 in
   FApi.xmutate1 tc `ViewBdHoare [concl]
 
 (* -------------------------------------------------------------------- *)

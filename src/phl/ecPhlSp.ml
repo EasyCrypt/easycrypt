@@ -264,13 +264,13 @@ let t_sp_side pos tc =
 
 
   match concl.f_node, pos with
-  | FsHoareS hs, (None | Some (Single _)) ->
+  | FhoareS hs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
-      let stmt1, stmt2 = o_split ~rev:true pos hs.shs_s in
-      let stmt1, shs_pr, _ =
-        LI.sp_stmt (EcMemory.memory hs.shs_m) env stmt1 hs.shs_pr in
+      let stmt1, stmt2 = o_split ~rev:true pos hs.hs_s in
+      let stmt1, hs_pr, _ =
+        LI.sp_stmt (EcMemory.memory hs.hs_m) env stmt1 hs.hs_pr in
       check_sp_progress pos stmt1;
-      let subgoal = f_hoareS_r { hs with shs_s = stmt (stmt1@stmt2); shs_pr } in
+      let subgoal = f_hoareS_r { hs with hs_s = stmt (stmt1@stmt2); hs_pr } in
       FApi.xmutate1 tc `Sp [subgoal]
 
   | FcHoareS chs, (None | Some (Single _)) ->

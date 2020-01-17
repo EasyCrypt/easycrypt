@@ -67,8 +67,8 @@ end
 (* -------------------------------------------------------------------- *)
 let t_hoare_swap_r p1 p2 p3 tc =
   let hs    = tc1_as_hoareS tc in
-  let s     = LowInternal.swap_stmt tc p1 p2 p3 hs.shs_s in
-  let concl = f_hoareS_r { hs with shs_s = s } in
+  let s     = LowInternal.swap_stmt tc p1 p2 p3 hs.hs_s in
+  let concl = f_hoareS_r { hs with hs_s = s } in
   FApi.xmutate1 tc `Swap [concl]
 
 (* -------------------------------------------------------------------- *)
@@ -106,7 +106,7 @@ let t_equiv_swap   = FApi.t_low4 "equiv-swap"   t_equiv_swap_r
 module HiInternal = struct
   let stmt_length side tc =
     match (FApi.tc1_goal tc).f_node, side with
-    | FsHoareS hs   , None -> List.length hs.shs_s.s_node
+    | FhoareS hs   , None -> List.length hs.hs_s.s_node
     | FcHoareS  chs, None -> List.length chs.chs_s.s_node
     | FbdHoareS bhs, None -> List.length bhs.bhs_s.s_node
 

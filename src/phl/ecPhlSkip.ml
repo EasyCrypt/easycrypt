@@ -21,11 +21,11 @@ module LowInternal = struct
   let t_hoare_skip_r tc =
     let hs = tc1_as_hoareS tc in
 
-    if not (List.is_empty hs.shs_s.s_node) then
+    if not (List.is_empty hs.hs_s.s_node) then
       tc_error !!tc "instruction list is not empty";
 
-    let concl = f_imp hs.shs_pr hs.shs_po in
-    let concl = f_forall_mems [hs.shs_m] concl in
+    let concl = f_imp hs.hs_pr hs.hs_po in
+    let concl = f_forall_mems [hs.hs_m] concl in
 
     FApi.xmutate1 tc `Skip [concl]
 

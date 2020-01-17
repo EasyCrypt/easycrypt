@@ -176,8 +176,8 @@ end
 (* -------------------------------------------------------------------- *)
 let t_inline_hoare_r ~use_tuple sp tc =
   let hoare      = tc1_as_hoareS tc in
-  let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.shs_m sp hoare.shs_s in
-  let concl      = f_hoareS_r { hoare with shs_m = me; shs_s = stmt; } in
+  let (me, stmt) = LowInternal.inline ~use_tuple tc hoare.hs_m sp hoare.hs_s in
+  let concl      = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
 
   FApi.xmutate1 tc `Inline [concl]
 
@@ -347,8 +347,8 @@ let rec process_inline_all ~use_tuple side fs tc =
                 tc
   end
 
-  | FsHoareS hs, None -> begin
-      match HiInternal.pat_all env fs hs.shs_s with
+  | FhoareS hs, None -> begin
+      match HiInternal.pat_all env fs hs.hs_s with
       | [] -> t_id tc
       | sp -> FApi.t_seq
                 (t_inline_hoare ~use_tuple sp)
@@ -388,8 +388,8 @@ let process_inline_occs ~use_tuple side fs occs tc =
       let sp = HiInternal.pat_of_occs cond occs st in
         t_inline_equiv ~use_tuple b sp tc
 
-  | FsHoareS hs, None ->
-      let sp = HiInternal.pat_of_occs cond occs hs.shs_s in
+  | FhoareS hs, None ->
+      let sp = HiInternal.pat_of_occs cond occs hs.hs_s in
         t_inline_hoare ~use_tuple sp tc
 
   | FcHoareS _, None ->
@@ -414,8 +414,8 @@ let process_inline_codepos ~use_tuple side pos tc =
         let sp = HiInternal.pat_of_codepos pos st in
         t_inline_equiv ~use_tuple b sp tc
 
-    | FsHoareS hs, None ->
-        let sp = HiInternal.pat_of_codepos pos hs.shs_s in
+    | FhoareS hs, None ->
+        let sp = HiInternal.pat_of_codepos pos hs.hs_s in
         t_inline_hoare ~use_tuple sp tc
 
     | FcHoareS _, None ->

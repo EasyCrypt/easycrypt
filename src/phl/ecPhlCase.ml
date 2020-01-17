@@ -14,8 +14,8 @@ open EcLowPhlGoal
 (* --------------------------------------------------------------------- *)
 let t_hoare_case_r f tc =
   let hs = tc1_as_hoareS tc in
-  let concl1 = f_hoareS_r { hs with shs_pr = f_and_simpl hs.shs_pr f } in
-  let concl2 = f_hoareS_r { hs with shs_pr = f_and_simpl hs.shs_pr (f_not f) } in
+  let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
+  let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
 (* --------------------------------------------------------------------- *)
