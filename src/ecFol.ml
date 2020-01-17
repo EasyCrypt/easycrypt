@@ -1013,15 +1013,15 @@ let cost_app c args = cost_map (fun c -> f_app c args tint) c
 
 let cost_le c1 c2 =
   let conds =
-    f_int_le_simpl c1.c_self c2.c_self ::
+    f_int_le c1.c_self c2.c_self ::
     EcPath.Mx.fold2_union (fun _ c1 c2 acc ->
         let c1, c2 = odfl f_i0 c1, odfl f_i0 c2 in
-        f_int_le_simpl c1 c2 :: acc) c1.c_calls c2.c_calls [] in
+        f_int_le c1 c2 :: acc) c1.c_calls c2.c_calls [] in
   f_ands0_simpl conds
 
 let form_le_cost f c =
   let conds =
-    f_int_le_simpl f c.c_self ::
+    f_int_le f c.c_self ::
     EcPath.Mx.fold (fun _ c acc ->
-        f_int_le_simpl f c :: acc) c.c_calls [] in
+        f_int_le f c :: acc) c.c_calls [] in
   f_ands0_simpl conds

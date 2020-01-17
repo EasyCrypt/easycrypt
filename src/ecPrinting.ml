@@ -1592,7 +1592,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | FcHoareF chf ->
       let ppe =
         PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, chf.chf_f) in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time <= %a"
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time %a"
         (pp_funname ppe) chf.chf_f
         (pp_form ppe) chf.chf_pr
         (pp_form ppe) chf.chf_po
@@ -1600,7 +1600,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | FcHoareS chs ->
       let ppe = PPEnv.push_mem ppe ~active:true chs.chs_m in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time <= %a"
+      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time %a"
         (pp_stmt_for_form ppe) chs.chs_s
         (pp_form ppe) chs.chs_pr
         (pp_form ppe) chs.chs_po
@@ -1667,7 +1667,7 @@ and pp_cost ppe fmt c =
         (pp_funname ppe) f
         (pp_form ppe) c in
 
-  Format.fprintf fmt "@[<hv><%a>@]"
+  Format.fprintf fmt "@[<hv>[%a]@]"
     (pp_list ";@ " pp_el)
     (   (None,c.c_self)
      :: (EcPath.Mx.bindings c.c_calls
@@ -2451,7 +2451,7 @@ let pp_choareF (ppe : PPEnv.t) ?prpo fmt chf =
 
   Format.fprintf fmt "%a@\n%!" (pp_pre ppe ?prpo) chf.chf_pr;
   Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) chf.chf_f;
-  Format.fprintf fmt "    time <= %a@\n%!" (pp_cost ppe) chf.chf_co;
+  Format.fprintf fmt "    time %a@\n%!" (pp_cost ppe) chf.chf_co;
   Format.fprintf fmt "@\n%a%!" (pp_post ppe ?prpo) chf.chf_po
 
 (* -------------------------------------------------------------------- *)
@@ -2462,7 +2462,7 @@ let pp_choareS (ppe : PPEnv.t) ?prpo fmt chs =
 
 
   Format.fprintf fmt "Context : %a@\n%!" (pp_funname ppe) (EcMemory.xpath chs.chs_m);
-  Format.fprintf fmt "Time <= : %a@\n%!" (pp_cost ppe) chs.chs_co;
+  Format.fprintf fmt "Time : %a@\n%!" (pp_cost ppe) chs.chs_co;
   Format.fprintf fmt "@\n%!";
   Format.fprintf fmt "%a%!" (pp_pre ppe ?prpo) chs.chs_pr;
   Format.fprintf fmt "@\n%!";

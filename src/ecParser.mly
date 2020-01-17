@@ -580,7 +580,6 @@
 %token WLOG
 %token WP
 %token ZETA
-%token COST
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 
@@ -2414,16 +2413,16 @@ ci_vrnt_el:
 | o=loc(fident) COLON f=form {o,f}
 
 abs_call_info:
-| xv=rlist0(ci_vrnt_el, SEMICOLON) COST xc=rlist0(ci_cost_el, SEMICOLON) 
+| xv=rlist0(ci_vrnt_el, SEMICOLON) TIME xc=rlist0(ci_cost_el, SEMICOLON) 
                                      { { ci_oracles = xc;
 					 ci_vrnts   = xv; } }
 
 call_info:
 | f1=form LONGARROW f2=form          { CI_spec (f1, f2, None) }
-| f1=form LONGARROW f2=form COST co=costs(none)
+| f1=form LONGARROW f2=form TIME co=costs(none)
                                      { CI_spec (f1, f2, Some co) }
 | f=form                             { CI_inv  (f, None) }
-| f=form COST co=costs(none)         { CI_inv  (f, Some (`Std co)) }
+| f=form TIME co=costs(none)         { CI_inv  (f, Some (`Std co)) }
 | f=form COLON inf=abs_call_info     { let info = `CostAbs inf in
                                        CI_inv  (f, Some info) }
 | bad=form COMMA p=form              { CI_upto (bad,p,None) }
