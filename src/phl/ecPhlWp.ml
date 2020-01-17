@@ -46,7 +46,9 @@ module LowInternal = struct
           let post1 = mk_let_of_lv_substs env letsf1 in
           let post2 = mk_let_of_lv_substs env letsf2 in
           let post  = f_if (form_of_expr m e) post1 post2 in
-          ([], post), f_int_add_simpl cost_1 cost_2
+          ([], post),
+          f_int_add_simpl cost_1
+            (f_int_add_simpl cost_2 (cost_of_expr e))
         end else raise No_wp
 
     | Sassert e when onesided ->
