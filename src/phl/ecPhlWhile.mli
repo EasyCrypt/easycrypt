@@ -11,6 +11,11 @@ open EcParsetree
 open EcFol
 open EcCoreGoal.FApi
 
+module ICHOARE : sig
+  val loaded : EcEnv.env -> bool
+  val choare_sum : cost -> (form * form) -> cost
+end
+
 (* -------------------------------------------------------------------- *)
 val t_hoare_while      : form -> backward
 val t_choare_while     : form -> form -> form -> cost -> backward

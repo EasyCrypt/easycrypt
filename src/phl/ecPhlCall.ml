@@ -412,35 +412,55 @@ let process_call side info tc =
     if not (is_none side) then
       tc_error !!tc "cannot specify side for call with invariants";
 
-    let check_none c =
-      if not (is_none c) then
-        tc_error !!tc "cannot specify cost for call with invariants if \
-                       the conclusion is not a choare" in
+    let check_none inv_info =
+      if not (is_none inv_info) then
+        tc_error !!tc "can supply additional information for call with an \
+                       invariant only if the conclusion is a choare" in
 
     let hyps, concl = FApi.tc1_flat tc in
     match concl.f_node with
     | FsHoareS hs ->
         let (_,f,_) = fst (tc1_last_call tc hs.shs_s) in
         let penv = LDecl.inv_memenv1 hyps in
-        (penv, fun inv c ->
-            check_none c;
+        (penv, fun inv inv_info ->
+            check_none inv_info;
             f_hoareF inv f inv)
 
     | FcHoareS chs ->
       let (_,f,_) = fst (tc1_last_call tc chs.chs_s) in
       let penv = LDecl.inv_memenv1 hyps in
-      (penv, fun inv c ->
-          if c = None then
-            tc_error !!tc "must specify a cost for call with invariants if \
-                           the conclusion is a choare";
-          let c = oget c in
-          f_cHoareF inv f inv c)
+      (penv, fun inv inv_info ->
+          match inv_info with
+          | None ->
+            tc_error !!tc "must supply additional information for call with \
+                           an invariant if the conclusion is a choare"
+
+          | Some (`Std c) ->
+            let env = FApi.tc1_env tc in
+            if NormMp.is_abstract_fun f env then
+              tc_error !!tc "the procedure %a is abstract: costs information \
+                             must be supplied for its oracles (and optionally, \
+                             variants)."
+                (EcPrinting.pp_funname (EcPrinting.PPEnv.ofenv env)) f;
+
+            f_cHoareF inv f inv c
+
+          | Some (`CostAbs inv_inf) ->
+            let env = FApi.tc1_env tc in
+            if not @@ NormMp.is_abstract_fun f env then
+              tc_error !!tc "the procedure %a is not abstract: only a cost must \
+                             be supplied."
+                (EcPrinting.pp_funname (EcPrinting.PPEnv.ofenv env)) f;
+
+            let pre, post, cost, _ =
+              EcPhlFun.FunAbsLow.choareF_abs_spec !!tc env f inv inv_inf in
+            f_cHoareF pre f post cost)       (* TODO:(Adrien) *)
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
       let penv = LDecl.inv_memenv1 hyps in
-      (penv, fun inv c ->
-          check_none c;
+      (penv, fun inv inv_info ->
+          check_none inv_info;
          bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None)
 
     | FequivS es ->
@@ -448,8 +468,8 @@ let process_call side info tc =
       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
       let penv = LDecl.inv_memenv hyps in
       let env  = LDecl.toenv hyps in
-      (penv, fun inv c ->
-          check_none c;
+      (penv, fun inv inv_info ->
+          check_none inv_info;
           mk_inv_spec !!tc env inv fl fr)
 
     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
@@ -481,6 +501,14 @@ let process_call side info tc =
 
   let subtactic = ref t_id in
 
+  let process_inv_inf tc hyps inv_inf = match inv_inf with
+    | None -> None
+    | Some (`Std c) ->
+      Some (`Std (TTC.pf_process_cost !!tc hyps tint c))
+    | Some (`CostAbs aii) ->
+      let abs_inv_inf = EcPhlFun.process_p_abs_inv_inf tc hyps aii in
+      Some (`CostAbs abs_inv_inf) in
+
   let process_cut tc info =
     match info with
     | CI_spec (pre, post, ocost) ->
@@ -489,16 +517,15 @@ let process_call side info tc =
       let post = TTC.pf_process_form !!tc qenv tbool post in
       fmake pre post
 
-    | CI_inv (inv, c_opt) ->
+    | CI_inv (inv, inv_inf) ->
       let env, fmake = process_inv tc side in
       let inv = TTC.pf_process_form !!tc env tbool inv in
-      let c   = c_opt |> omap (TTC.pf_process_cost !!tc env tint) in
+      let inv_inf = process_inv_inf tc env inv_inf in
       subtactic := (fun tc ->
-          (* TODO: (Adrien) should specify a cost here, it should probably
-             something like:
-             ... (EcPhlFun.t_fun inv c tc)); *)
-        FApi.t_firsts t_logic_trivial 2 (EcPhlFun.t_fun inv tc));
-      fmake inv c
+          (* TODO: (Adrien) What does this subtactic do? It needs to be
+             modified, since I create more premises for choare judgement. *)
+        FApi.t_firsts t_logic_trivial 2 (EcPhlFun.t_fun inv inv_inf tc));
+      fmake inv inv_inf
 
     | CI_upto info ->
       let bad, p, q, form = process_upto tc side info in

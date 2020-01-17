@@ -450,12 +450,18 @@ type pipattern =
 
 and pspattern = unit
 
+(* For cost judgement with abstract calls.
+   ci_oracles : list of pairs of oracles and their costs.
+   ci_vrnts   : list of pairs of oracles and their increasing quantity. *)
+type p_abs_inv_inf =
+  { ci_oracles : (pgamepath * pcost) list;
+    ci_vrnts   : (pgamepath * pformula) list; }
+
+type p_call_inv_info = [` Std of pcost | `CostAbs of p_abs_inv_inf ]
+
 type call_info =
   | CI_spec of (pformula * pformula * pcost option)
-  | CI_inv  of pformula * pcost option
-  (* TODO: (Adrien) the list is of elements of the form (G.o : cost)
-     We need to somehow add the step counter parameter.*)
-  (* | CI_inv  of pformula * (pqsymbol * form) list *)
+  | CI_inv of pformula * p_call_inv_info option
   | CI_upto of (pformula * pformula * pformula option)
 
 type p_app_xt_info =
@@ -529,7 +535,7 @@ type bdh_split =
 type fun_info = [
   | `Def
   | `Code
-  | `Abs  of pformula
+  | `Abs  of pformula * p_abs_inv_inf option
   | `Upto of pformula * pformula * pformula option
 ]
 

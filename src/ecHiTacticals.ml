@@ -179,7 +179,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   let (tx : tcenv1 -> tcenv) =
     match unloc t with
     | Pfun `Def                 -> EcPhlFun.process_fun_def
-    | Pfun (`Abs f)             -> EcPhlFun.process_fun_abs f
+    | Pfun (`Abs (f,p_inv_inf)) -> EcPhlFun.process_fun_abs f p_inv_inf
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip

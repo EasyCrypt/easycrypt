@@ -1029,13 +1029,13 @@ ptybindings_decl:
 %inline none: IMPOSSIBLE { assert false }
 
 orcl_time(P):
- | o=qident COLON c=form_r(P) { (o, c) }
+ | o=loc(fident) COLON c=form_r(P) { (o, c) }
 
 costs(P):
 | LBRACKET c=form_r(P) RBRACKET     {PC_costs(c,[])}
 /* TODO: (Adrien) there is a problem with this entry, but I don't know what */
-/* | LBRACKET c=form_r(P) SEMICOLON calls=rlist1(orcl_time(P), SEMICOLON) RBRACKET */
-/*                                       {PC_costs(c,calls)} */
+| LBRACKET c=form_r(P) SEMICOLON calls=rlist1(orcl_time(P), SEMICOLON) RBRACKET
+                                      {PC_costs(c,calls)}
 
 qident_or_res_or_glob:
 | x=qident   { GVvar x }
@@ -2402,18 +2402,32 @@ conseq_xt:
 | c=conseq                                     { c, None }
 | c=conseq   COLON cmp=hoare_bd_cmp? bd=sform  { c, Some (CQI_bd (cmp, bd)) }
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
-                                    { (None, None), Some (CQI_bd (cmp, bd)) }
-| c=conseq   COLON co=costs(none)                 { c, Some (CQI_c co) }
-| UNDERSCORE COLON co=costs(none)                 { (None, None), Some (CQI_c co) }
+                                               { (None, None), 
+						 Some (CQI_bd (cmp, bd)) }
+| c=conseq   COLON co=costs(none)              { c, Some (CQI_c co) }
+| UNDERSCORE COLON co=costs(none)              { (None, None), Some (CQI_c co) }
+
+ci_cost_el:
+| o=loc(fident) COLON co=costs(none) {o,co}
+
+ci_vrnt_el:
+| o=loc(fident) COLON f=form {o,f}
+
+abs_call_info:
+| xv=rlist0(ci_vrnt_el, SEMICOLON) COST xc=rlist0(ci_cost_el, SEMICOLON) 
+                                     { { ci_oracles = xc;
+					 ci_vrnts   = xv; } }
 
 call_info:
- | f1=form LONGARROW f2=form                   { CI_spec (f1, f2, None) }
-  | f1=form LONGARROW f2=form COST co=costs(none)
-                                               { CI_spec (f1, f2, Some co) }
- | f=form                                      { CI_inv  (f, None) }
- | f=form COST co=costs(none)                  { CI_inv  (f, Some co) }
- | bad=form COMMA p=form                       { CI_upto (bad,p,None) }
- | bad=form COMMA p=form COMMA q=form          { CI_upto (bad,p,Some q) }
+| f1=form LONGARROW f2=form          { CI_spec (f1, f2, None) }
+| f1=form LONGARROW f2=form COST co=costs(none)
+                                     { CI_spec (f1, f2, Some co) }
+| f=form                             { CI_inv  (f, None) }
+| f=form COST co=costs(none)         { CI_inv  (f, Some (`Std co)) }
+| f=form COLON inf=abs_call_info     { let info = `CostAbs inf in
+                                       CI_inv  (f, Some info) }
+| bad=form COMMA p=form              { CI_upto (bad,p,None) }
+| bad=form COMMA p=form COMMA q=form { CI_upto (bad,p,Some q) }
 
 tac_dir:
 | BACKS { Backs }
@@ -2779,7 +2793,10 @@ phltactic:
    { Pfun `Def }
 
 | PROC f=sform
-   { Pfun (`Abs f) }
+   { Pfun (`Abs (f, None)) }
+
+| PROC f=sform COLON inf=abs_call_info
+   { Pfun (`Abs (f, Some inf)) }
 
 | PROC bad=sform p=sform q=sform?
    { Pfun (`Upto (bad, p, q)) }

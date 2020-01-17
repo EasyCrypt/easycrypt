@@ -173,6 +173,29 @@ let split4 l =
     ) l ([],[],[],[])
 
 (* -------------------------------------------------------------------- *)
+type abs_inv_inf = (xpath * form) list * (xpath * cost) list
+
+let process_p_abs_inv_inf tc hyps p_abs_inv_inf =
+  let env = LDecl.toenv hyps in
+  let xv = List.map (fun (f,v) ->
+      EcTyping.trans_gamepath env f,
+      TTC.pf_process_form !!tc hyps tint v
+    ) p_abs_inv_inf.ci_vrnts
+
+  and xc = List.map (fun (f,c) ->
+      EcTyping.trans_gamepath env f,
+      TTC.pf_process_cost !!tc hyps tint c
+    ) p_abs_inv_inf.ci_oracles in
+
+  (xv, xc)
+
+
+type inv_inf =  [
+  | `Std     of cost
+  | `CostAbs of (xpath * form) list * (xpath * cost) list
+]
+
+(* -------------------------------------------------------------------- *)
 module FunAbsLow = struct
   (* ------------------------------------------------------------------ *)
   let hoareF_abs_spec _pf env f inv =
@@ -184,10 +207,9 @@ module FunAbsLow = struct
     (inv, inv, sg)
 
   (* ------------------------------------------------------------------ *)
-  let choareF_abs_spec _pf env f inv
-      (xv : (xpath * form) list)
-      (xc : (xpath * cost) list) =
+  let choareF_abs_spec _pf env f inv (xv, xc : abs_inv_inf) =
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
+    let ppe = EcPrinting.PPEnv.ofenv env in
 
     (* We check that the invariant, variants and costs variables cannot be
        modified by the adversary. *)
@@ -202,6 +224,12 @@ module FunAbsLow = struct
        it needed here?*)
     (* check_oracle_use pf env top o; *)
 
+    let cost_self = match OI.cost_self oi with
+      | Some c -> c
+      | None   ->
+        tc_error _pf "%a intrinsic complexity is unbounded"
+          (EcPrinting.pp_funname ppe) f in
+
     (* We create the oracles invariants *)
     let oi_costs = OI.costs oi in
     (* If [f] can call [o] at most zero times, we remove it. *)
@@ -212,10 +240,13 @@ module FunAbsLow = struct
                     (Some f_i0)) in
 
     let ospec o_called =
+      let k_called = ref None in
       let eqs =
         List.map (fun o ->
             let k_id = EcIdent.create ("z" ^ EcPath.xbasename o) in
             let k = f_local k_id tint in
+
+            if x_equal o o_called then k_called := Some k;
 
             let o_vrnt = List.find_opt (fun (x,_) -> x_equal x o) xv in
             let pre_eq, post_eq = match o_vrnt with
@@ -226,12 +257,13 @@ module FunAbsLow = struct
                 then f_eq vrnt (f_int_add k f_i1)
                 else f_eq vrnt k in
 
-            let call_bound = match OI.cost oi o with
-              | Some cbd ->
-                if x_equal o o_called
-                then f_int_lt k cbd
-                else f_int_le k cbd
-              | None -> f_true in
+            let cbd = match OI.cost oi o with
+              | Some cbd -> cbd
+              | None     -> cost_self in
+            let call_bound =
+              if x_equal o o_called
+              then f_and (f_int_lt k cbd) (f_int_le f_i0 k)
+              else f_and (f_int_le k cbd) (f_int_le f_i0 k) in
 
             k_id, call_bound, pre_eq, post_eq) ois in
 
@@ -250,17 +282,63 @@ module FunAbsLow = struct
       let cost = List.find_opt (fun (x,_) -> x_equal x o_called) xc in
       let cost = match cost with
         | None ->
-          let ppe = EcPrinting.PPEnv.ofenv env in
           tc_error _pf "no cost has been supplied for %a"
             (EcPrinting.pp_funname ppe) o_called
         | Some (_,cost) -> cost in
+      let k_cost = cost_app cost [oget !k_called] in
 
-      let form = f_cHoareF pre_inv o_called post_inv cost in
+      let form = f_cHoareF pre_inv o_called post_inv k_cost in
       f_forall_simpl ks (f_imp_simpl call_bounds form) in
 
-
+    (* We have the conditions for the oracles. *)
     let sg = List.map ospec ois in
-    (inv_todo, inv_todo, sg)
+
+    (* Finally, we compute the conclusion. *)
+    let eqs =
+      List.map (fun o ->
+          let o_vrnt = List.find_opt (fun (x,_) -> x_equal x o) xv in
+          let pre_eq = match o_vrnt with
+            | None          -> f_true
+            | Some (_,vrnt) -> f_eq vrnt f_i0 in
+
+
+          let cbd = match OI.cost oi o with
+            | Some cbd -> cbd
+            | None     -> cost_self in
+          let post_eq = match o_vrnt with
+            | None          ->
+              f_true
+            | Some (_,vrnt) ->
+              f_and (f_int_lt vrnt cbd) (f_int_le f_i0 vrnt) in
+
+          pre_eq, post_eq) ois in
+
+    (* hoare [{ inv /\ pre_eqs } f {inv /\ post_eqs }] *)
+    let pre_eqs, post_eqs = List.split eqs in
+    let pre_eqs, post_eqs = f_ands0_simpl pre_eqs,
+                            f_ands0_simpl post_eqs in
+
+    let pre_inv  = f_and_simpl pre_eqs inv
+    and post_inv = f_and_simpl post_eqs inv in
+
+    let f_cost = { c_self = f_i0;
+                   c_calls = Mx.singleton f f_i1 } in
+
+    let orcls_cost = List.map (fun o ->
+        (* Maximal number of calls to [o]. *)
+        let cbd = match OI.cost oi o with
+          | Some cbd -> cbd
+          | None     -> cost_self in
+        (* Cost of a call to [o]. *)
+        let o_cost = snd @@ List.find (fun (x,_) -> x_equal x o) xc in
+
+        (* Upper-bound on the costs of [o]'s calls. *)
+        EcPhlWhile.ICHOARE.choare_sum o_cost (f_i0, f_int_sub_simpl cbd f_i1)
+      ) ois in
+    let total_cost =
+      List.fold_left (cost_op f_int_add_simpl) f_cost orcls_cost in
+
+    (pre_inv, post_inv, total_cost, sg)
 
 
   (* ------------------------------------------------------------------ *)
@@ -341,7 +419,15 @@ let t_hoareF_abs_r inv tc =
   FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post tc)
 
 (* ------------------------------------------------------------------ *)
-let t_choareF_abs_r inv tc = assert false (* TODO: (Adrien) *)
+let t_choareF_abs_r inv inv_inf tc =
+  let env = FApi.tc1_env tc in
+  let hf = tc1_as_hoareF tc in
+  let pre, post, cost, sg =
+    FunAbsLow.choareF_abs_spec !!tc env hf.shf_f inv inv_inf in
+
+  let tactic tc = FApi.xmutate1 tc `FunAbs sg in
+  FApi.t_last tactic (EcPhlConseq.t_cHoareF_conseq_full pre post cost tc)
+
 
 (* ------------------------------------------------------------------ *)
 let t_bdhoareF_abs_r inv tc =
@@ -371,7 +457,7 @@ let t_equivF_abs_r inv tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_abs   = FApi.t_low1 "hoare-fun-abs"   t_hoareF_abs_r
-let t_choareF_abs  = FApi.t_low1 "choare-fun-abs"  t_choareF_abs_r
+let t_choareF_abs  = FApi.t_low2 "choare-fun-abs"  t_choareF_abs_r
 let t_bdhoareF_abs = FApi.t_low1 "bdhoare-fun-abs" t_bdhoareF_abs_r
 let t_equivF_abs   = FApi.t_low1 "equiv-fun-abs"   t_equivF_abs_r
 
@@ -579,37 +665,51 @@ let t_fun_to_code_r tc =
 let t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
 
 (* -------------------------------------------------------------------- *)
-let t_fun_r inv tc =
+let proj_std a = match a with
+  | `Std b -> b
+  | _ -> assert false
+
+let proj_costabs a = match a with
+  | `CostAbs b -> b
+  | _ -> assert false
+
+let t_fun_r inv inv_inf tc =
   let th tc =
+    assert (inv_inf = None);
     let env = FApi.tc1_env tc in
     let h   = destr_hoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.shf_f env
       then t_hoareF_abs inv tc
       else t_hoareF_fun_def tc
 
-  (* TODO: (Adrien) should specify a cost here, C.f. ecPhlCall.ml *)
   and tch tc =
     let env = FApi.tc1_env tc in
     let h   = destr_cHoareF (FApi.tc1_goal tc) in
     if   NormMp.is_abstract_fun h.chf_f env
-    then t_choareF_abs inv tc
-    else t_choareF_fun_def tc
+    then t_choareF_abs inv (proj_costabs (oget inv_inf)) tc
+    else begin
+      t_choareF_fun_def tc end
+
   and tbh tc =
+    assert (inv_inf = None);
     let env = FApi.tc1_env tc in
     let h   = destr_bdHoareF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun h.bhf_f env
       then t_bdhoareF_abs inv tc
       else t_bdhoareF_fun_def tc
+
   and te tc =
+    assert (inv_inf = None);
     let env = FApi.tc1_env tc in
     let e   = destr_equivF (FApi.tc1_goal tc) in
       if   NormMp.is_abstract_fun e.ef_fl env
       then t_equivF_abs inv tc
       else t_equivF_fun_def tc
+
   in
     t_hF_or_chF_or_bhF_or_eF ~th ~tch ~tbh ~te tc
 
-let t_fun = FApi.t_low1 "fun" t_fun_r
+let t_fun = FApi.t_low2 "fun" t_fun_r
 
 (* -------------------------------------------------------------------- *)
 type p_upto_info = pformula * pformula * (pformula option)
@@ -640,26 +740,38 @@ let process_fun_upto info g =
     t_equivF_abs_upto bad p q g
 
 (* -------------------------------------------------------------------- *)
-let process_fun_abs inv tc =
+let ensure_none tc = function
+  | None -> ()
+  | Some _ ->
+    tc_error !!tc "this is not a choare judgement"
+
+let process_fun_abs inv p_abs_inv_inf tc =
   let t_hoare tc =
+    ensure_none tc p_abs_inv_inf;
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv1 hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
     t_hoareF_abs inv tc
 
   and t_choare tc =
+    if p_abs_inv_inf = None then
+      tc_error !!tc "for calls to abstract procedures in choare judgements, \
+                     additional information must be provided";
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv1 hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
-    t_choareF_abs inv tc
+    let abs_inv_info = process_p_abs_inv_inf tc hyps (oget p_abs_inv_inf) in
+    t_choareF_abs inv abs_inv_info tc
 
   and t_bdhoare tc =
+    ensure_none tc p_abs_inv_inf;
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv1 hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
     t_bdhoareF_abs inv tc
 
   and t_equiv tc =
+    ensure_none tc p_abs_inv_inf;
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in

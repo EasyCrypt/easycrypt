@@ -113,6 +113,42 @@ let t_cHoareS_conseq_c cost tc =
   FApi.xmutate1 tc `HlConseq (concls @ [concl2])
 
 (* -------------------------------------------------------------------- *)
+let t_cHoareF_conseq_full pre post cost tc =
+  let env = FApi.tc1_env tc in
+  let chf  = tc1_as_choareF tc in
+  let mpr,mpo = EcEnv.Fun.hoareF_memenv chf.chf_f env in
+
+  let cond_pre, cond_post = conseq_cond chf.chf_pr chf.chf_po pre post
+  and conds_cost = conseq_cost chf.chf_co cost in
+
+  let concl1 = f_forall_mems [mpr] cond_pre in
+  let concl2 = f_forall_mems [mpo] cond_post in
+  let concls_cost = List.map (fun cond ->
+      f_forall_mems [mpr] cond
+    ) conds_cost in
+
+  let concl3 = f_cHoareF pre chf.chf_f post cost in
+  FApi.xmutate1 tc `HlConseq (concls_cost @ [concl1; concl2; concl3])
+
+(* -------------------------------------------------------------------- *)
+let t_cHoareS_conseq_full pre post cost tc =
+  let chs = tc1_as_choareS tc in
+
+  let conds_cost = conseq_cost chs.chs_co cost
+  and cond_pre, cond_post = conseq_cond chs.chs_pr chs.chs_po pre post in
+
+  let concl1 = f_forall_mems [chs.chs_m] cond_pre in
+  let concl2 = f_forall_mems [chs.chs_m] cond_post in
+  let concls_cost = List.map (fun cond ->
+      f_forall_mems [chs.chs_m] cond
+    ) conds_cost in
+
+  let concl3 = f_cHoareS_r { chs with chs_pr = pre;
+                                      chs_po = post;
+                                      chs_co  = cost; } in
+  FApi.xmutate1 tc `HlConseq (concls_cost @ [concl1; concl2; concl3])
+
+(* -------------------------------------------------------------------- *)
 let bdHoare_conseq_conds cmp pr po new_pr new_po =
   let cond1, cond2 = conseq_cond pr po new_pr new_po in
   let cond2 = match cmp with
