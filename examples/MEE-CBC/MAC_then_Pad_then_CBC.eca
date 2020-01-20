@@ -1,6 +1,6 @@
 require import AllCore Int Real List Distr.
 require import DList.
-require (*..*) WeakPRP MACs RCPA_CMA CBC RCPA_pad.
+require (*..*) PRP MACs RCPA_CMA CBC RCPA_pad.
 
 (** Assume a permutation (P,Pinv) on block indexed by eK **)
 type eK, block.
@@ -21,27 +21,23 @@ axiom bijectiveP k:
      /\ cancel (Pi k) (P k).
 
 (* Import definitions to consider (P,Pinv) as a weak PRP *)
-clone import WeakPRP as PRPt with
+clone import PRP as PRPt with
   type K    <- eK,
   type D    <- block,
   op   dK   <- d_eK
 proof * by smt (d_eK_uffu).
 
-clone import ConcretePRP as PRPc with
-  type K    <- eK,
-  type D    <- block,
-  op   dK   <- d_eK,
-  op   P    <- P,
-  op   Pi   <- Pi
-proof * by smt (d_eK_uffu bijectiveP).
+clone import WeakPRP as PRPSec.
 
-clone import IdealPRP as PRPi with
-  type K    <- eK,
-  type D    <- block,
-  op   dK   <- d_eK,
+clone import PseudoRP as PRPc with
+  op   p    <- P,
+  op   pi   <- Pi
+proof * by smt (bijectiveP).
+
+clone import RP as PRPi with
   op   dD   <- d_block
-rename "RandomPermutation" as "PRPi"
-proof * by smt (d_eK_uffu d_block_uffu).
+rename "RP" as "PRPi"
+proof * by smt (d_block_uffu).
 
 (** Assume a zmodule structure on block (for generality... we will instantiate it with {0,1}^k later on) *)
 op zeros: block.
@@ -216,7 +212,7 @@ module RCPA_QueryBounder (A : RCPA_Adversary, O : RCPA_Oracles) = {
 }.
 
 (* From the MAC and a CPA adversary against MtE, we construct an adversary against the PRP *)
-module Weak_PRPa (M : MAC_Scheme, A : RCPA_Adversary, P : WeakPRP_Oracles) = {
+module Weak_PRPa (M : MAC_Scheme, A : RCPA_Adversary, P : PRP_Oracles) = {
   var qC: int
   var mk: mK
 
@@ -261,7 +257,7 @@ module Weak_PRPa (M : MAC_Scheme, A : RCPA_Adversary, P : WeakPRP_Oracles) = {
 }.
 
 section RCPA.
-  declare module A : RCPA_Adversary { PRPi, WeakPRP_Wrap, RCPA_Wrap, RCPA_QueryBounder, Weak_PRPa }.
+  declare module A : RCPA_Adversary { PRPi, PRP_Wrapped, RCPA_Wrap, RCPA_QueryBounder, Weak_PRPa }.
   axiom A_distinguish_ll (O <: RCPA_Oracles { A }):
     islossless O.enc => islossless A(O).distinguish.
 
@@ -318,8 +314,8 @@ section RCPA.
   proof * by smt (dlist_ll d_block_uffu can_unpad leak_pad pad_tag).
 
   local lemma MEE_unfold &m:
-    Pr[INDR_CPA(MEE(PRPr,MAC),RCPA_QueryBounder(A)).main() @ &m: res]
-    = Pr[INDR_CPA(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRPr))),MAC),RCPA_QueryBounder(A)).main () @ &m: res].
+    Pr[INDR_CPA(MEE(PRP,MAC),RCPA_QueryBounder(A)).main() @ &m: res]
+    = Pr[INDR_CPA(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRP))),MAC),RCPA_QueryBounder(A)).main () @ &m: res].
   proof.
     byequiv (_: ={glob A} ==> ={res})=> //=; proc; inline *.
     wp; call (_: ={glob RCPA_QueryBounder, glob RCPA_Wrap})=> //=.
@@ -330,15 +326,15 @@ section RCPA.
 
   (** We bound the RCPA advantage of A against MEE(P,M) **)
   local lemma MtE_security &m:
-    `|Pr[INDR_CPA(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRPr))),MAC),RCPA_QueryBounder(A)).main() @ &m: res]
+    `|Pr[INDR_CPA(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRP))),MAC),RCPA_QueryBounder(A)).main() @ &m: res]
       - Pr[INDR_CPA(Ideal,RCPA_QueryBounder(A)).main() @ &m: res]|
-    = `|Pr[SKEa.RCPA.INDR_CPA(PadThenEncrypt(IV_Wrap(CBC(PRPr))),RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))).main() @ &m: res]
+    = `|Pr[SKEa.RCPA.INDR_CPA(PadThenEncrypt(IV_Wrap(CBC(PRP))),RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))).main() @ &m: res]
         - Pr[SKEa.RCPA.INDR_CPA(SKEa.RCPA.Ideal,RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))).main() @ &m: res]|.
   proof.
     (* Unfortunately, we have several copies of the modules and
        alpha conversion does not work at module level, so we need
        to prove that it implies semantic equality. This is easy. *)
-    rewrite -(RCPA_WUF_RCPA.RCPA_preservation (<: PadThenEncrypt(IV_Wrap(CBC(PRPr)))) MAC (<: RCPA_QueryBounder(A)) &m _ _).
+    rewrite -(RCPA_WUF_RCPA.RCPA_preservation (<: PadThenEncrypt(IV_Wrap(CBC(PRP)))) MAC (<: RCPA_QueryBounder(A)) &m _ _).
       by proc; rnd predT; auto=> />; smt (d_mK_uffu).
       by proc.
     do !congr.
@@ -349,11 +345,11 @@ section RCPA.
   qed.
 
   local lemma PtE_security &m:
-    `|Pr[SKEa.RCPA.INDR_CPA(PadThenEncrypt(IV_Wrap(CBC(PRPr))),RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))).main() @ &m: res] - Pr[SKEa.RCPA.INDR_CPA(SKEa.RCPA.Ideal,RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))).main() @ &m: res]|
-    = `|Pr[CoreDefs.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res] - Pr[CoreDefs.RCPA.INDR_CPA(CoreDefs.RCPA.Ideal,RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res]|.
+    `|Pr[SKEa.RCPA.INDR_CPA(PadThenEncrypt(IV_Wrap(CBC(PRP))),RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))).main() @ &m: res] - Pr[SKEa.RCPA.INDR_CPA(SKEa.RCPA.Ideal,RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))).main() @ &m: res]|
+    = `|Pr[CoreDefs.RCPA.INDR_CPA(IV_Wrap(CBC(PRP)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res] - Pr[CoreDefs.RCPA.INDR_CPA(CoreDefs.RCPA.Ideal,RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res]|.
   proof.
     (* The same issue arises here *)
-    rewrite -(RCPA_preservation (<: IV_Wrap(CBC(PRPr))) (<: RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))) &m).
+    rewrite -(RCPA_preservation (<: IV_Wrap(CBC(PRP))) (<: RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A))) &m).
     do !congr.
       by byequiv=> //=; sim.
     byequiv=> //=; proc; inline *.
@@ -363,9 +359,9 @@ section RCPA.
   qed.
 
   local lemma CBC_security &m:
-    `|Pr[CoreDefs.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main () @ &m: res]
+    `|Pr[CoreDefs.RCPA.INDR_CPA(IV_Wrap(CBC(PRP)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main () @ &m: res]
       - Pr[CoreDefs.RCPA.INDR_CPA(CoreDefs.RCPA.Ideal,RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main () @ &m: res]|
-    = `|Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
+    = `|Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRP)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
               - Pr[CBCa.SKEa.RCPA.INDR_CPA(CBCa.SKEa.RCPA.Ideal,QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]|.
   proof.
     (* We have the same issue PLUS we need to move the QueryBounder around.
@@ -394,10 +390,10 @@ section RCPA.
             by auto; smt (pad_tag).
           by auto; smt (max_pad_n pad_tag).
         by auto.
-      have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
-               = Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res].
+      have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRP)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
+               = Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRP)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res].
         byequiv=> //=; proc.
-        call (PushQueryBounder (CBCa.SKEa.RCPA.RCPA_Wrap(IV_Wrap(CBC(PRPr))))).
+        call (PushQueryBounder (CBCa.SKEa.RCPA.RCPA_Wrap(IV_Wrap(CBC(PRP))))).
         by call (_: true); auto.
       have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(CBCa.SKEa.RCPA.Ideal,QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
                = Pr[CBCa.SKEa.RCPA.INDR_CPA(CBCa.SKEa.RCPA.Ideal,RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res].
@@ -415,10 +411,10 @@ section RCPA.
   qed.
 
   local lemma local_conclusion &m:
-    `|Pr[INDR_CPA(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRPr))),MAC),RCPA_QueryBounder(A)).main () @ &m: res]
+    `|Pr[INDR_CPA(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRP))),MAC),RCPA_QueryBounder(A)).main () @ &m: res]
       - Pr[INDR_CPA(Ideal,RCPA_QueryBounder(A)).main() @ &m: res]|
-    <= `|Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr), PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res]
-         - Pr[WeakPRP_IND(PRPi, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res]|
+    <= `|Pr[IND(PRP_Wrapped, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res]
+         - Pr[IND(PRPi, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res]|
        + 2%r * ((q * n) ^ 2)%r * mu d_block (pred1 witness).
   proof.
     have := Conclusion (<: RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))) &m _.
@@ -429,17 +425,14 @@ section RCPA.
       by wp; rnd predT; auto; smt (d_mK_uffu).
     rewrite (MtE_security &m) (PtE_security &m) (CBC_security &m).
     (* Here again, we have to tell EasyCrypt that alpha equality implies semantic equality *)
-    have ->: Pr[PRPt.WeakPRP_IND(PRPt.WeakPRP_Wrap(PRPr.PRPr), PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res]
-             = Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr),PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res].
+    have ->: Pr[PRFt.IND(PRPr.PRP_Wrapped, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res]
+             = Pr[IND(PRP_Wrapped,PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res].
       by byequiv=> //=; sim.
-    have ->: Pr[PRPt.WeakPRP_IND(PRPi.PRPi, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res]
-             = Pr[WeakPRP_IND(PRPi,PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res].
+    have ->: Pr[PRFt.IND(PRPi.PRPi, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res]
+             = Pr[IND(PRPi,PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res].
       by byequiv=> //=; sim.
-    have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr.PRPr)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
-             = Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res].
-      by byequiv=> //=; sim.
-    have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(Random,QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
-             = Pr[CBCa.SKEa.RCPA.INDR_CPA(Random,QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res].
+    have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr.PRP)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
+             = Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRP)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res].
       by byequiv=> //=; sim.
     (* And we conclude by proving the equivalence of the Random module and the Ideal module used in IND$-CPA *)
     have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(Random,QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
@@ -458,9 +451,9 @@ section RCPA.
     done.
   qed.
 
-  local lemma CleanupAdversary (P <: WeakPRP { A, Weak_PRPa, OracleBounder, RCPA_WUF_RCPA.RCPAa }) &m:
-    Pr[WeakPRP_IND(P,Weak_PRPa(MAC,A)).main() @ &m: res]
-    = Pr[WeakPRP_IND(P, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res].
+  local lemma CleanupAdversary (P <: PRP_Wrapped { A, Weak_PRPa, OracleBounder, RCPA_WUF_RCPA.RCPAa }) &m:
+    Pr[IND(P,Weak_PRPa(MAC,A)).main() @ &m: res]
+    = Pr[IND(P, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res].
   proof.
     byequiv (_: ={glob P, glob A} ==> ={res})=> //=; proc; inline *; wp.
     call (_:    ={glob P}
@@ -478,13 +471,13 @@ section RCPA.
   qed.
 
   lemma RCPA_security &m:
-    `|Pr[INDR_CPA(MEE(PRPr,MAC),RCPA_QueryBounder(A)).main() @ &m: res]
+    `|Pr[INDR_CPA(MEE(PRP,MAC),RCPA_QueryBounder(A)).main() @ &m: res]
       - Pr[INDR_CPA(Ideal,RCPA_QueryBounder(A)).main() @ &m: res]|
-    <= `|Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr), Weak_PRPa(MAC,A)).main() @ &m : res]
-         - Pr[WeakPRP_IND(PRPi, Weak_PRPa(MAC,A)).main() @ &m: res]|
+    <= `|Pr[IND(PRP_Wrapped, Weak_PRPa(MAC,A)).main() @ &m : res]
+         - Pr[IND(PRPi, Weak_PRPa(MAC,A)).main() @ &m: res]|
        + 2%r * ((q * n) ^ 2)%r * mu d_block (pred1 witness).
   proof.
-    rewrite (MEE_unfold &m) (CleanupAdversary (<: WeakPRP_Wrap(PRPr)) &m) (CleanupAdversary PRPi &m).
+    rewrite (MEE_unfold &m) (CleanupAdversary (<: PRP_Wrapped) &m) (CleanupAdversary PRPi &m).
     exact/(local_conclusion &m).
   qed.
 end section RCPA.
@@ -603,8 +596,8 @@ section PTXT.
   import MtEb.MtE.
 
   local lemma MEE_unfold &m:
-    Pr[INT_PTXT(MEE(PRPr,MAC),A).main() @ &m: res]
-    = Pr[INT_PTXT(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRPr))),MAC),A).main () @ &m: res].
+    Pr[INT_PTXT(MEE(PRP,MAC),A).main() @ &m: res]
+    = Pr[INT_PTXT(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRP))),MAC),A).main () @ &m: res].
   proof.
     byequiv (_: ={glob A} ==> ={res})=> //=; proc; inline *.
     wp; call (_: ={glob PTXT_Wrap})=> //=.
@@ -616,13 +609,13 @@ section PTXT.
 
   (** We bound the PTXT advantage of A against MEE(P,M) **)
   local lemma local_conclusion &m:
-    Pr[INT_PTXT(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRPr))),MAC),A).main () @ &m: res]
-    <= Pr[MACa.WUF_CMA.WUF_CMA(MAC,RCPA_WUF_PTXT.CMAa(PadThenEncrypt(IV_Wrap(CBC(PRPr))),A)).main() @ &m: res].
+    Pr[INT_PTXT(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRP))),MAC),A).main () @ &m: res]
+    <= Pr[MACa.WUF_CMA.WUF_CMA(MAC,RCPA_WUF_PTXT.CMAa(PadThenEncrypt(IV_Wrap(CBC(PRP))),A)).main() @ &m: res].
   proof.
-    have ->: Pr[INT_PTXT(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRPr))),MAC),A).main() @ &m: res]
-             = Pr[Sec.PTXT.INT_PTXT(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRPr))),MAC),A).main() @ &m: res].
+    have ->: Pr[INT_PTXT(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRP))),MAC),A).main() @ &m: res]
+             = Pr[Sec.PTXT.INT_PTXT(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRP))),MAC),A).main() @ &m: res].
       by byequiv=> //=; proc; inline *; sim.
-    apply/(RCPA_WUF_PTXT.PTXT_security (<: PadThenEncrypt(IV_Wrap(CBC(PRPr)))) MAC A _ _ _ _ _ _ _ &m).
+    apply/(RCPA_WUF_PTXT.PTXT_security (<: PadThenEncrypt(IV_Wrap(CBC(PRP)))) MAC A _ _ _ _ _ _ _ &m).
       by proc; wp; rnd predT; auto; smt (d_eK_uffu).
       proc; inline *; wp; while (0 <= i <= size p0) (size p0 - i).
         by move=> z; auto=> /#.
@@ -637,8 +630,8 @@ section PTXT.
   qed.
 
   local lemma CleanupAdversary &m:
-    Pr[MACa.WUF_CMA.WUF_CMA(MAC,RCPA_WUF_PTXT.CMAa(PadThenEncrypt(IV_Wrap(CBC(PRPr))),A)).main() @ &m: res]
-    = Pr[WUF_CMA(MAC,CMAa(PRPr,A)).main() @ &m: res].
+    Pr[MACa.WUF_CMA.WUF_CMA(MAC,RCPA_WUF_PTXT.CMAa(PadThenEncrypt(IV_Wrap(CBC(PRP))),A)).main() @ &m: res]
+    = Pr[WUF_CMA(MAC,CMAa(PRP,A)).main() @ &m: res].
   proof.
     byequiv=> //=; proc; inline *; wp.
     call (_:    ={ek}(RCPA_WUF_PTXT.CMAa,CMAa)
@@ -659,8 +652,8 @@ section PTXT.
   qed.
 
   lemma PTXT_security &m:
-    Pr[INT_PTXT(MEE(PRPr,MAC),A).main () @ &m: res]
-    <= Pr[WUF_CMA(MAC,CMAa(PRPr,A)).main() @ &m: res].
+    Pr[INT_PTXT(MEE(PRP,MAC),A).main () @ &m: res]
+    <= Pr[WUF_CMA(MAC,CMAa(PRP,A)).main() @ &m: res].
   proof.
     rewrite (MEE_unfold &m) -(CleanupAdversary &m).
     exact/(local_conclusion &m).

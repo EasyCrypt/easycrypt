@@ -8,9 +8,7 @@
 
 require import AllCore List FSet SmtMap Real Distr.
 require import Dexcepted.
-require (*--*) NewPRP WeakPRP IdealPRP.
-require (*--*) NewPRF IdealPRF.
-require (*--*) Birthday.
+require (*--*) PRP PRF Birthday.
 
 (** We assume a finite domain D, equipped with its uniform
     distribution. **)
@@ -25,31 +23,37 @@ lemma uD_fu:  is_full uD by smt(uD_uf_fu).
 type K.
 op dK: { K distr | is_lossless dK } as dK_ll.
 
-clone import WeakPRP as PRPt with
+(** Instantiating the real and ideal PRP **)
+clone import PRP as PRPt with
   type K  <- K,
     op dK <- dK,
   type D  <- D
 proof * by smt(dK_ll).
 
-clone import IdealPRP as PRPi with
-  type K  <- K,
-    op dK <- dK,
-  type D  <- D,
+clone import PRPt.WeakPRP as PRPSec.
+
+clone import PRPt.RP as PRPi with
     op dD <- uD
-proof * by smt(dK_ll uD_ll)
-rename "RandomPermutation" as "PRPi".
+proof * by smt(uD_ll)
+rename "RP" as "PRPi".
 
-clone import IdealPRF as PRFi with
+(** Instantiating the ideal PRF (the real one will be the PRP) **)
+clone import PRF as PRFt with
   type K  <- K,
-  type D  <- D,
-  type R  <- D,
   op   dK <- dK,
-  op   dR <- uD
-proof * by smt(dK_ll uD_ll)
-rename "RandomFunction" as "PRFi".
+  type D  <- D,
+  type R  <- D
+proof * by smt(dK_ll).
 
+clone import PRFt.RF as PRFi with
+  op   dR <- uD
+proof * by smt(uD_ll)
+rename "RF" as "PRFi".
+
+(** A bound on the number of oracle queries **)
 op q : { int | 0 <= q } as ge0_q.
 
+(** The proof starts with some useful definitions and lemmas **)
 (* In the proof, we consider the following bad event (applied to the
     PRF's internal map):
       "A collision occurs in map m whenever there exist distinct x and
@@ -104,7 +108,7 @@ module Direct = {
   proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD \ X;
+    r <$ uD \ X;
     return r;
   }
 }.
@@ -113,9 +117,9 @@ module Indirect = {
   proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD;
+    r <$ uD;
     if (X r) {
-      r = $uD \ X;
+      r <$ uD \ X;
     }
     return r;
   }
@@ -192,13 +196,10 @@ qed.
       - We conclude by proving (difficult!)
          Pr[IND(PRPi,D).main() @ &m: res]
          = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
-
-     Purists are then invited to turn the security statement about
-     restricted oracles into a security statement about restricted
-     adversaries. **)
+ **)
 section Upto.
-  declare module D:PRF_Distinguisher {PRPi, PRFi}.
-  axiom D_ll (O <: PRF_Oracle {D}): islossless O.f => islossless D(O).distinguish.
+  declare module D:PRFt.Distinguisher {PRPi, PRFi}.
+  axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
 
   local module PRP_indirect_bad = {
     var bad : bool
@@ -280,7 +281,7 @@ end section Upto.
 
     where DBounder prevents the distinguisher from calling the
     f-oracle more than q times. **)
-module DBounder (D:PRF_Distinguisher,F:PRF_Oracle) = {
+module DBounder (D : Distinguisher) (F : PRF_Oracles) = {
   module FBounder = {
     var c:int
 
@@ -288,27 +289,25 @@ module DBounder (D:PRF_Distinguisher,F:PRF_Oracle) = {
       var r = witness;
 
       if (c < q) {
-        r = F.f(x);
-        c = c + 1;
+        r <@ F.f(x);
+        c <- c + 1;
       }
       return r;
     }
   }
 
-  module D = D(FBounder)
-
   proc distinguish(): bool = {
     var b;
 
-    FBounder.c = 0;
-    b = D.distinguish();
+    FBounder.c <- 0;
+    b <@ D(FBounder).distinguish();
     return b;
   }
 }.
 
 section CollisionProbability.
-  declare module D:PRF_Distinguisher {PRFi, DBounder}.
-  axiom D_ll (O <: PRF_Oracle {D}): islossless O.f => islossless D(O).distinguish.
+  declare module D : Distinguisher {PRFi, DBounder}.
+  axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
 
   local clone import Birthday as BBound with
     op   q <- q,
@@ -400,8 +399,8 @@ section CollisionProbability.
 end section CollisionProbability.
 
 (* We pull together the results of the first two sections *)
-lemma PartialConclusion (D <: PRF_Distinguisher {PRPi, PRFi, DBounder}) &m:
-  (forall (O <: PRF_Oracle {D}), islossless O.f => islossless D(O).distinguish) =>
+lemma PartialConclusion (D <: Distinguisher {PRPi, PRFi, DBounder}) &m:
+  (forall (O <: PRF_Oracles {D}), islossless O.f => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi'(Indirect),DBounder(D)).main() @ &m: res]
     - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
   <= (q^2)%r * mu1 uD witness.
@@ -452,7 +451,7 @@ section PRPi_PRPi'_Indirect.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
   qed.
 
-  declare module D:PRF_Distinguisher {PRPi}.
+  declare module D : Distinguisher { PRPi }.
 
   lemma pr_PRPi_PRPi'_Indirect &m:
     Pr[IND(PRPi,D).main() @ &m: res] = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
@@ -465,8 +464,8 @@ section PRPi_PRPi'_Indirect.
   qed.
 end section PRPi_PRPi'_Indirect.
 
-lemma Conclusion (D <: PRF_Distinguisher {PRPi, PRFi, DBounder}) &m:
-  (forall (O <: PRF_Oracle {D}), islossless O.f => islossless D(O).distinguish) =>
+lemma Conclusion (D <: Distinguisher {PRPi, PRFi, DBounder}) &m:
+  (forall (O <: PRF_Oracles {D}), islossless O.f => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi,DBounder(D)).main() @ &m: res]
     - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
   <= (q^2)%r * mu1 uD witness.
