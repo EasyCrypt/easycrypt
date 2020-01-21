@@ -158,14 +158,6 @@ let t_choare_while_r inv qinc n (lam_cost : cost) tc =
   let cost =
     cost_op f_int_sub_simpl chs.chs_co (cost_add_self body_cost e_cost_self) in
 
-  (* We check that the cost [lam_cost] of one iteration is not modified by
-     the statements before the while loop. *)
-  let write_set = EcPV.s_write env s in
-  let read_set  = EcPV.PV.fv_cost env (EcMemory.memory chs.chs_m) lam_cost in
-  if not (EcPV.PV.indep env write_set read_set) then
-    tc_error !!tc "the cost of the loop body should not be modified by the \
-                   statement preceding the loop";
-
   (* The wp of the while. *)
   let post = f_imps_simpl [f_not_simpl e; inv] chs.chs_po in
   let modi = s_write env c in

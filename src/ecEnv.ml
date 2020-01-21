@@ -2549,6 +2549,14 @@ module NormMp = struct
             ef.ef_fr == r' && ef.ef_po == post' then f else
           f_equivF pre' l' r' post'
 
+        | Fcoe coe ->
+          (* TODO: (Adrien) normalize the expression? *)
+          let coe' = {
+            coe_mem  = coe.coe_mem;
+            coe_pre  = aux coe.coe_pre;
+            coe_e    = assert false;
+          } in FSmart.f_coe (f, coe) coe'
+
         | Fpr pr ->
           let pr' = {
             pr_mem   = pr.pr_mem;
@@ -2557,7 +2565,8 @@ module NormMp = struct
             pr_event = aux pr.pr_event;
           } in FSmart.f_pr (f, pr) pr'
 
-        | _ -> EcCoreFol.f_map norm_ty1 aux f) in
+        | _ ->
+          EcCoreFol.f_map norm_ty1 aux f) in
     norm_form
 
   let norm_op env op =

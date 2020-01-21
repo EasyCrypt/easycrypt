@@ -255,14 +255,6 @@ let t_sp_side pos tc =
       tc_error !!tc "the bound should not be modified by the statement \
                      targeted by [sp]" in
 
-  let check_cost_indep stmt mem cost =
-    let write_set = EcPV.s_write env (EcModules.stmt stmt) in
-    let read_set  = EcPV.PV.fv_cost env (EcMemory.memory mem) cost in
-    if not (EcPV.PV.indep env write_set read_set) then
-      tc_error !!tc "the cost should not be modified by the statement \
-                     targeted by [sp]" in
-
-
   match concl.f_node, pos with
   | FhoareS hs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in
@@ -276,7 +268,6 @@ let t_sp_side pos tc =
   | FcHoareS chs, (None | Some (Single _)) ->
     let pos = pos |> omap as_single in
     let stmt1, stmt2 = o_split ~rev:true pos chs.chs_s in
-    check_cost_indep stmt1 chs.chs_m chs.chs_co;
     let stmt1, chs_pr, sp_cost =
       LI.sp_stmt (EcMemory.memory chs.chs_m) env stmt1 chs.chs_pr in
     check_sp_progress pos stmt1;

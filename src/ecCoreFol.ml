@@ -74,6 +74,8 @@ and f_node =
 
   | FeagerF of eagerF
 
+  | Fcoe of coe
+
   | Fpr of pr (* hr *)
 
 and eagerF = {
@@ -148,6 +150,12 @@ and pr = {
   pr_fun   : EcPath.xpath;
   pr_args  : form;
   pr_event : form;
+}
+
+and coe = {
+  coe_pre : form;
+  coe_mem : EcMemory.memenv;
+  coe_e   : expr;
 }
 
 and cost = {
@@ -325,6 +333,11 @@ let egf_equal eg1 eg2 =
   && EcPath.x_equal eg1.eg_fr eg2.eg_fr
   && EcCoreModules.s_equal eg1.eg_sr eg2.eg_sr
 
+let coe_equal coe1 coe2 =
+     EcTypes.e_equal   coe1.coe_e coe2.coe_e
+  && f_equal           coe1.coe_pre coe2.coe_pre
+  && EcMemory.me_equal coe1.coe_mem coe2.coe_mem
+
 let pr_equal pr1 pr2 =
      EcIdent.id_equal pr1.pr_mem pr2.pr_mem
   && EcPath.x_equal   pr1.pr_fun pr2.pr_fun
@@ -337,8 +350,16 @@ let hf_hash hf =
     (f_hash hf.hf_pr) (f_hash hf.hf_po) (EcPath.x_hash hf.hf_f)
 
 let hs_hash hs =
+  Why3.Hashcons.combine3
+    (f_hash hs.hs_pr) (f_hash hs.hs_po)
+    (EcCoreModules.s_hash hs.hs_s)
+    (EcMemory.mem_hash hs.hs_m)
+
+let coe_hash coe =
   Why3.Hashcons.combine2
-    (f_hash hs.hs_pr) (f_hash hs.hs_po) (EcCoreModules.s_hash hs.hs_s)
+    (f_hash coe.coe_pre)
+    (EcTypes.e_hash coe.coe_e)
+    (EcMemory.mem_hash coe.coe_mem)
 
 let cost_hash cost =
   Why3.Hashcons.combine
@@ -460,6 +481,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | FequivS     eqs1, FequivS     eqs2 -> eqs_equal eqs1 eqs2
     | FeagerF     eg1 , FeagerF     eg2  -> egf_equal eg1 eg2
     | Fpr         pr1 , Fpr         pr2  -> pr_equal pr1 pr2
+    | Fcoe        coe1, Fcoe        coe2 -> coe_equal coe1 coe2
 
     | _, _ -> false
 
@@ -513,6 +535,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | FequivF     ef   -> ef_hash ef
     | FequivS     es   -> es_hash es
     | FeagerF     eg   -> eg_hash eg
+    | Fcoe        coe  -> coe_hash coe
     | Fpr         pr   -> pr_hash pr
 
   let fv_mlr = Sid.add mleft (Sid.singleton mright)
@@ -596,6 +619,10 @@ module Hsform = Why3.Hashcons.Make (struct
         let fv = EcPath.x_fv (EcPath.x_fv fv eg.eg_fl) eg.eg_fr in
         fv_union fv
           (fv_union (EcCoreModules.s_fv eg.eg_sl) (EcCoreModules.s_fv eg.eg_sr))
+
+    | Fcoe coe ->
+      let fv = fv_union (f_fv coe.coe_pre) (EcTypes.e_fv coe.coe_e) in
+      (Mid.remove (fst coe.coe_mem) fv)
 
     | Fpr pr ->
         let fve = Mid.remove mhr (f_fv pr.pr_event) in
@@ -799,6 +826,11 @@ let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
   f_eagerF_r { eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po; }
 
 (* -------------------------------------------------------------------- *)
+let f_coe_r coe = mk_form (Fcoe coe) tint
+
+let f_coe coe_pre coe_mem coe_e = f_coe_r { coe_pre; coe_mem; coe_e; }
+
+(* -------------------------------------------------------------------- *)
 let f_pr_r pr = mk_form (Fpr pr) treal
 
 let f_pr pr_mem pr_fun pr_args pr_event =
@@ -927,6 +959,9 @@ module FSmart = struct
   let f_bdHoareS (fp, bhs) bhs' =
     if bhs_equal bhs bhs' then fp else f_bdHoareS_r bhs'
 
+  let f_coe (fp, coe) coe' =
+    if coe_equal coe coe' then fp else f_coe_r coe'
+
   let f_pr (fp, pr) pr' =
     if pr_equal pr pr' then fp else f_pr_r pr'
 end
@@ -1052,6 +1087,11 @@ let f_map gt g fp =
         FSmart.f_eagerF (fp, eg)
           { eg with eg_pr = pr'; eg_po = po'; }
 
+  | Fcoe coe ->
+    let pre' = g coe.coe_pre in
+    FSmart.f_coe (fp, coe)
+      { coe with coe_pre = pre'; }
+
   | Fpr pr ->
       let args' = g pr.pr_args in
       let ev'   = g pr.pr_event in
@@ -1084,6 +1124,7 @@ let f_iter g f =
   | FequivF   ef  -> g ef.ef_pr; g ef.ef_po
   | FequivS   es  -> g es.es_pr; g es.es_po
   | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
+  | Fcoe      coe -> g coe.coe_pre;
   | Fpr       pr  -> g pr.pr_args; g pr.pr_event
 
 (* -------------------------------------------------------------------- *)
@@ -1112,6 +1153,7 @@ let form_exists g f =
   | FequivF   ef  -> g ef.ef_pr    || g ef.ef_po
   | FequivS   es  -> g es.es_pr    || g es.es_po
   | FeagerF   eg  -> g eg.eg_pr    || g eg.eg_po
+  | Fcoe      coe -> g coe.coe_pre
   | Fpr       pr  -> g pr.pr_args  || g pr.pr_event
 
 (* -------------------------------------------------------------------- *)
@@ -1140,16 +1182,8 @@ let form_forall g f =
   | FequivF   ef  -> g ef.ef_pr   && g ef.ef_po
   | FequivS   es  -> g es.es_pr   && g es.es_po
   | FeagerF   eg  -> g eg.eg_pr   && g eg.eg_po
+  | Fcoe      coe -> g coe.coe_pre
   | Fpr       pr  -> g pr.pr_args && g pr.pr_event
-
-(* -------------------------------------------------------------------- *)
-let f_ops f =
-  let aout = ref EcPath.Sp.empty in
-  let rec doit f =
-    match f.f_node with
-    | Fop (p, _) -> aout := Sp.add p !aout
-    | _ -> f_iter doit f
-  in doit f; !aout
 
 (* -------------------------------------------------------------------- *)
 exception DestrError of string
@@ -1246,6 +1280,11 @@ let destr_bdHoareF f =
   match f.f_node with
   | FbdHoareF es -> es
   | _ -> destr_error "bdHoareF"
+
+let destr_coe f =
+  match f.f_node with
+  | Fcoe coe -> coe
+  | _ -> destr_error "coe"
 
 let destr_pr f =
   match f.f_node with
@@ -1394,6 +1433,7 @@ let is_cHoareS   f = is_from_destr destr_cHoareS   f
 let is_cHoareF   f = is_from_destr destr_cHoareF   f
 let is_bdHoareS  f = is_from_destr destr_bdHoareS  f
 let is_bdHoareF  f = is_from_destr destr_bdHoareF  f
+let is_coe       f = is_from_destr destr_coe       f
 let is_pr        f = is_from_destr destr_pr        f
 let is_eq_or_iff f = (is_eq f) || (is_iff f)
 
@@ -1460,9 +1500,12 @@ let rec form_of_expr mem (e : expr) =
      f_quant (quantif_of_equantif qt) b e
 
 (* -------------------------------------------------------------------- *)
-(* The cost of an expression evaluation in any memory. *)
-let cost_of_expr _ = f_i1
-  (* assert false (\* TODO: (Adrien) *\) *)
+(* The cost of an expression evaluation in any memory of type [menv]
+   satisfying [pre]. *)
+let cost_of_expr pre menv e = f_coe pre menv e
+
+(* The cost of an expression evaluation in any memory of type [menv]. *)
+let cost_of_expr_any menv e = f_coe f_true menv e
 
 (* -------------------------------------------------------------------- *)
 type f_subst = {
@@ -1597,6 +1640,11 @@ module Fsubst = struct
     let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
                 s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
     EcCoreModules.s_subst es c
+
+  let subst_e s e =
+    let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
+                s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
+    EcTypes.e_subst es e
 
   let subst_me s me =
     EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty me
@@ -1777,6 +1825,17 @@ module Fsubst = struct
         { eg_pr = pr'; eg_sl = sl';eg_fl = fl';
           eg_fr = fr'; eg_sr = sr'; eg_po = po'; }
 
+    | Fcoe coe ->
+      assert (not (Mid.mem (fst coe.coe_mem) s.fs_mem));
+      let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
+          s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
+      let pr' = f_subst ~tx s coe.coe_pre in
+      let me' =
+        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty coe.coe_mem in
+      let e' = EcTypes.e_subst es coe.coe_e in
+      FSmart.f_coe (fp, coe)
+        { coe_pre = pr'; coe_mem = me'; coe_e = e'; }
+
     | Fpr pr ->
       assert (not (Mid.mem mhr s.fs_mem));
       let pr_mem   = Mid.find_def pr.pr_mem pr.pr_mem s.fs_mem in
@@ -1786,7 +1845,8 @@ module Fsubst = struct
 
       FSmart.f_pr (fp, pr) { pr_mem; pr_fun; pr_args; pr_event; }
 
-    | _ -> f_map s.fs_ty (f_subst ~tx s) fp)
+    | _ ->
+      f_map s.fs_ty (f_subst ~tx s) fp)
 
   and f_subst_op ~tx freshen fty tys args (tyids, e) =
     (* FIXME: factor this out *)
@@ -1960,7 +2020,9 @@ module Fsubst = struct
       match f.f_node with
       | Flocal id ->
           (try Mid.find id s with Not_found -> f)
-      | _ -> f_map (fun ty -> ty) aux f)
+      | _ ->
+        (* TODO: (Adrien) is thit ok? *)
+        f_map (fun ty -> ty) aux f)
 
   let subst_local id f1 f2 =
     subst_locals (Mid.singleton id f1) f2

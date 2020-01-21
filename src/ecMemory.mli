@@ -19,6 +19,7 @@ type local_memtype
 
 type memtype = local_memtype option
 
+val lmem_hash    : local_memtype -> int
 val lmt_equal    : local_memtype -> local_memtype -> bool
 val lmt_xpath    : local_memtype -> EcPath.xpath
 val lmt_bindings : local_memtype -> ((int*int) option * EcTypes.ty) Msym.t
@@ -33,6 +34,7 @@ val mt_fv       : memtype -> int EcIdent.Mid.t
 (* -------------------------------------------------------------------- *)
 type memenv = memory * memtype
 
+val mem_hash : memenv -> int
 val me_equal : memenv -> memenv -> bool
 
 (* -------------------------------------------------------------------- *)

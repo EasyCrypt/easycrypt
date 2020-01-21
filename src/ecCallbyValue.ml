@@ -28,6 +28,7 @@ module Subst : sig
   val subst_me       : subst -> EcMemory.memenv -> EcMemory.memenv
   val subst_lpattern : subst -> lpattern -> subst * lpattern
   val subst_stmt     : subst -> EcModules.stmt -> EcModules.stmt
+  val subst_e        : subst -> expr -> expr
 
   val bind_local   : subst -> ident -> form -> subst
   val bind_locals  : subst -> (ident * form) list -> subst
@@ -46,6 +47,7 @@ end = struct
   let subst_me       = Fsubst.subst_me
   let subst_lpattern = Fsubst.subst_lpattern
   let subst_stmt     = Fsubst.subst_stmt
+  let subst_e        = Fsubst.subst_e
   let bind_local     = Fsubst.f_bind_local
   let add_binding    = Fsubst.add_binding
   let add_bindings   = Fsubst.add_bindings
@@ -160,6 +162,7 @@ let norm_xfun st s f =
 
 let norm_stmt s c  = Subst.subst_stmt s c
 let norm_me   s me = Subst.subst_me s me
+let norm_e    s e  = Subst.subst_e s e
 
 (* -------------------------------------------------------------------- *)
 let rec norm st s f =
@@ -194,10 +197,11 @@ and norm_lambda (st : state) (f : form) =
 
   | Fquant  _ | Fif     _ | Fmatch    _ | Flet _ | Fint _ | Flocal _
   | Fglob   _ | Fpvar   _ | Fop       _
-  | FhoareF _ | FhoareS _
-  | FcHoareF _ | FcHoareS _
+  | FhoareF _   | FhoareS _
+  | FcHoareF _  | FcHoareS _
   | FbdHoareF _ | FbdHoareS _
-  | FequivF _ | FequivS _ | FeagerF   _ | Fpr _
+  | FequivF _   | FequivS _
+  | FeagerF   _ | Fpr _ | Fcoe _
 
     -> f
 
@@ -563,6 +567,14 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let eg_sl = norm_stmt s eg.eg_sl in
     let eg_sr = norm_stmt s eg.eg_sr in
     f_eagerF_r {eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po }
+
+  | Fcoe coe ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s (fst coe.coe_mem)));
+    let coe_pre = norm st s coe.coe_pre in
+    let coe_e   = norm_e s coe.coe_e in
+    let coe_mem = norm_me s coe.coe_mem in
+    f_coe_r { coe_pre; coe_e; coe_mem }
 
   | Fpr pr ->
     assert (is_Aempty args);

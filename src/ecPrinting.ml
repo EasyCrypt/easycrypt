@@ -1624,6 +1624,12 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (string_of_hcmp hs.bhs_cmp)
         (pp_form_r ppe (fst outer, (max_op_prec,`NonAssoc))) hs.bhs_bd
 
+  | Fcoe coe ->
+      let ppe = PPEnv.push_mem ppe ~active:true coe.coe_mem in
+      Format.fprintf fmt "coe[@[<hov 2>@ %a :@ @[%a@]@]]"
+        (pp_expr ppe) coe.coe_e
+        (pp_form ppe) coe.coe_pre
+
   | Fpr pr->
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, pr.pr_fun) in
       Format.fprintf fmt "Pr[@[%a@[%t@] @@ %a :@ %a@]]"

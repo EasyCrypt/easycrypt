@@ -666,8 +666,10 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   | Fglob (m,mem) -> trans_glob env m mem
 
   | Fpr pr        -> trans_pr env pr
+
+  | Fcoe _
   | FeagerF _
-  | FhoareF  _ | FhoareS   _
+  | FhoareF  _  | FhoareS   _
   | FcHoareF  _ | FcHoareS   _
   | FbdHoareF _ | FbdHoareS _
   | FequivF   _ | FequivS   _
@@ -1296,10 +1298,13 @@ module Frequency = struct
       | Ftuple   es           -> List.iter doit es
       | Fproj    (e, _)       -> doit e
 
-      | FhoareF _ | FhoareS _
-      | FcHoareF _ | FcHoareS _
+      | FhoareF _   | FhoareS _
+      | FcHoareF _  | FcHoareS _
       | FbdHoareF _ | FbdHoareS _
-      | FequivF _ | FequivS _ | FeagerF _  -> ()
+      | FequivF _   | FequivS _
+      | FeagerF _
+      | Fcoe _ -> ()
+
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;
         doit pr.pr_event; doit pr.pr_args in

@@ -72,6 +72,8 @@ and f_node =
 
   | FeagerF of eagerF
 
+  | Fcoe of coe
+
   | Fpr of pr (* hr *)
 
 and eagerF = {
@@ -142,6 +144,12 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
+and coe = {
+  coe_pre : form;
+  coe_mem : EcMemory.memenv;
+  coe_e   : expr;
+}
+
 and pr = {
   pr_mem   : memory;
   pr_fun   : xpath;
@@ -180,7 +188,6 @@ val f_compare : form -> form -> int
 val f_hash    : form -> int
 val f_fv      : form -> int Mid.t
 val f_ty      : form -> EcTypes.ty
-val f_ops     : form -> Sp.t
 
 module Mf : Map.S with type key = form
 module Sf : Set.S with module M = Map.MakeBase(Mf)
@@ -192,8 +199,8 @@ val f_node  : form -> f_node
 
 (* -------------------------------------------------------------------- *)
 (* not recursive *)
-val f_map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
-val f_iter: (form -> unit) -> form -> unit
+val f_map  : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
+val f_iter : (form -> unit) -> form -> unit
 val form_exists: (form -> bool) -> form -> bool
 val form_forall: (form -> bool) -> form -> bool
 
@@ -258,6 +265,10 @@ val f_equivF_r : equivF -> form
 (* soft-constructors - eager *)
 val f_eagerF_r : eagerF -> form
 val f_eagerF   : form -> stmt -> xpath -> xpath -> stmt -> form -> form
+
+(* soft-constructors - Coe *)
+val f_coe_r : coe -> form
+val f_coe   : form -> memenv -> expr -> form
 
 (* soft-constructors - Pr *)
 val f_pr_r : pr -> form
@@ -349,7 +360,8 @@ module FSmart : sig
   val f_equivF   : (form * equivF   ) -> equivF    -> form
   val f_equivS   : (form * equivS   ) -> equivS    -> form
   val f_eagerF   : (form * eagerF   ) -> eagerF    -> form
-  val f_pr       : (form * pr       ) -> pr       -> form
+  val f_coe       : (form * coe      ) -> coe       -> form
+  val f_pr       : (form * pr       ) -> pr        -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -401,6 +413,7 @@ val destr_cHoareF   : form -> cHoareF
 val destr_cHoareS   : form -> cHoareS
 val destr_bdHoareF  : form -> bdHoareF
 val destr_bdHoareS  : form -> bdHoareS
+val destr_coe       : form -> coe
 val destr_pr        : form -> pr
 val destr_programS  : [`Left | `Right] option -> form -> memenv * stmt
 val destr_int       : form -> zint
@@ -434,6 +447,7 @@ val is_cHoareF   : form -> bool
 val is_cHoareS   : form -> bool
 val is_bdHoareF  : form -> bool
 val is_bdHoareS  : form -> bool
+val is_coe       : form -> bool
 val is_pr        : form -> bool
 val is_eq_or_iff : form -> bool
 
@@ -445,7 +459,12 @@ val split_args : form -> form * form list
 val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 
 (* -------------------------------------------------------------------- *)
-val cost_of_expr       : EcTypes.expr -> form
+(* The cost of an expression evaluation in any memory of a given type
+   satisfying some pre-condition. *)
+val cost_of_expr : form -> EcMemory.memenv -> EcTypes.expr -> form
+
+(* The cost of an expression evaluation in any memory of a given type. *)
+val cost_of_expr_any : EcMemory.memenv -> EcTypes.expr -> form
 
 (* -------------------------------------------------------------------- *)
 type f_subst = private {
@@ -496,6 +515,7 @@ module Fsubst : sig
   val subst_lpattern : f_subst -> lpattern -> f_subst * lpattern
   val subst_xpath    : f_subst -> xpath -> xpath
   val subst_stmt     : f_subst -> stmt  -> stmt
+  val subst_e        : f_subst -> expr  -> expr
   val subst_me       : f_subst -> EcMemory.memenv -> EcMemory.memenv
   val subst_m        : f_subst -> EcIdent.t -> EcIdent.t
   val subst_ty       : f_subst -> ty -> ty

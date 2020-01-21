@@ -211,14 +211,12 @@ module FunAbsLow = struct
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let ppe = EcPrinting.PPEnv.ofenv env in
 
-    (* We check that the invariant, variants and costs variables cannot be
-       modified by the adversary. *)
+    (* We check that the invariant and variants variables cannot be modified
+       by the adversary. *)
     let fv_inv   = PV.fv env mhr inv in
-    let fv_costs = List.map (fun (_,c) -> PV.fv_cost env mhr c) xc in
     let fv_vrnts = List.map (fun (_,v) -> PV.fv      env mhr v) xv in
     PV.check_depend env fv_inv top;
-    List.iter (fun fv_cost -> PV.check_depend env fv_cost top) fv_costs;
-    List.iter (fun fv_cost -> PV.check_depend env fv_cost top) fv_vrnts;
+    List.iter (fun fv -> PV.check_depend env fv top) fv_vrnts;
 
     (* TODO: (Adrien) why are we checking this for bdhoareF_abs_spec, and is
        it needed here?*)
