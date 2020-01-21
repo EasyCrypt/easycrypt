@@ -12,16 +12,9 @@ pragma +implicits. pragma -oldip.
 
 (** A PRF is a family of functions F from domain D to finite range R
     indexed by a keyspace K equipped with a (lossless) distribution dK. *)
-type D, R, K.
-
-op dK: { K distr | is_lossless dK } as dK_ll.
+type D, R.
 
 module type PRF = {
-  proc keygen(): K
-  proc f(_: K * D): R
-}.
-
-module type PRF_Wrapped = {
   proc init(): unit
   proc f(_ : D): R
 }.
@@ -34,7 +27,7 @@ module type Distinguisher (F : PRF_Oracles) = {
   proc distinguish(): bool
 }.
 
-module IND (F : PRF_Wrapped) (D : Distinguisher) = {
+module IND (F : PRF) (D : Distinguisher) = {
   proc main(): bool = {
     var b;
 
@@ -67,25 +60,33 @@ module RF = {
 end RF.
 
 (* -------------------------------------------------------------------- *)
-abstract theory PRF.
+abstract theory PseudoRF.
+type K.
+
+op dK: { K distr | is_lossless dK } as dK_ll.
 
 op F : K -> D -> R.
 
-module PRF : PRF = {
-  proc keygen(): K = {
+module type PseudoRF = {
+  proc keygen(): K
+  proc f(_ : K * D): D
+}.
+
+module PseudoRF = {
+  proc keygen() = {
     var k;
 
     k <$ dK;
     return k;
   }
 
-  proc f(k:K, x:D) : R = { return F k x; }
+  proc f(k, x) = { return F k x; }
 }.
 
-module PRF_Wrapped = {
+module PRF = {
   var k : K
 
   proc init() = { k <$ dK; }
   proc f(x: D) = { return F k x; }
 }.
-end PRF.
+end PseudoRF.

@@ -12,20 +12,12 @@ pragma +implicits. pragma -oldip.
 
 (** A PRP is a family of permutations F on domain D indexed by a
     keyspace K equipped with a (lossless) distribution dK. **)
-type D, K.
-
-op dK: { K distr | is_lossless dK } as dK_ll.
-
-module type PRP = {
-  proc keygen(): K
-  proc f(_ : K * D): D
-  proc fi(_: K * D): D
-}.
+type D.
 
 (** Security notions **)
 (* -------------------------------------------------------------------- *)
 abstract theory WeakPRP.
-module type PRP_Wrapped = {
+module type PRP = {
   proc init(): unit
   proc f(_ : D): D
 }.
@@ -38,7 +30,7 @@ module type Distinguisher (P : PRP_Oracles) = {
   proc distinguish(): bool
 }.
 
-module IND (P : PRP_Wrapped) (D:Distinguisher) = {
+module IND (P : PRP) (D:Distinguisher) = {
   proc main(): bool = {
     var b;
 
@@ -51,7 +43,7 @@ end WeakPRP.
 
 (* -------------------------------------------------------------------- *)
 abstract theory StrongPRP.
-module type PRP_Wrapped = {
+module type PRP = {
   proc init(): unit
   proc f(_ : D): D
   proc fi(_ : D): D
@@ -66,7 +58,7 @@ module type Distinguisher (P : SPRP_Oracles) = {
   proc distinguish(): bool
 }.
 
-module IND (P : PRP_Wrapped) (D:Distinguisher) = {
+module IND (P : PRP) (D:Distinguisher) = {
   proc main(): bool = {
     var b;
 
@@ -246,6 +238,9 @@ end RP.
 
 (* -------------------------------------------------------------------- *)
 abstract theory PseudoRP.
+type K.
+op dK: { K distr | is_lossless dK } as dK_ll.
+
 op p : K -> D -> D.
 op pi: K -> D -> D.
 
@@ -254,20 +249,26 @@ axiom pK k:
      cancel (p k) (pi k)
   /\ cancel (pi k) (p k).
 
-module PRP = {
-  proc keygen(): K = {
+module type PseudoRP = {
+  proc keygen(): K
+  proc f(_ : K * D): D
+  proc fi(_ : K * D): D
+}.
+
+module PseudoRP = {
+  proc keygen() = {
     var k;
 
     k <$ dK;
     return k;
   }
 
-  proc f(k:K, x:D) : D = { return p k x; }
+  proc f(k, x) = { return p k x; }
 
-  proc fi(k:K, x:D): D = { return pi k x; }
+  proc fi(k, x) = { return pi k x; }
 }.
 
-module PRP_Wrapped = {
+module PRP = {
   var k : K
 
   proc init() = { k <$ dK; }
@@ -276,4 +277,3 @@ module PRP_Wrapped = {
 }.
 
 end PseudoRP.
-

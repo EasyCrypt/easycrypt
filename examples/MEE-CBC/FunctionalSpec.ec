@@ -457,14 +457,14 @@ realize max_pad_n    by move=> m t szm /=; rewrite size_pad -addrA ltr_add2r.
     specs for the C code... **)
 
 phoare mee_encrypt_correct _mk _ek _p _c:
-  [MEEt.MEE(MEEt.PRPc.PRP,MEEt.MAC).enc: key = (_ek,_mk) /\ p = _p
+  [MEEt.MEE(MEEt.PRPc.PseudoRP,MEEt.MAC).enc: key = (_ek,_mk) /\ p = _p
                                       ==> res = _c]
   =(mu (dapply (fun iv => iv :: mee_enc AES hmac_sha256 _ek _mk iv _p) dblock) (pred1 _c)).
 proof.
   have->: mu1 (dapply (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p) dblock) _c
           = mu1 (dmap dblock (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)) _c by move.
   rewrite dmap1E /preim /pred1 /=.
-  proc; inline MAC.tag PRPc.PRP.f.
+  proc; inline MAC.tag PRPc.PseudoRP.f.
   swap 6 -5 => //=; alias 2 iv = s.
   while (   0 <= i <= size (pad _p (hmac_sha256 _mk _p))
          /\ ek = _ek
@@ -502,12 +502,12 @@ proof.
 qed.
 
 phoare mee_decrypt_correct _mk _ek _c:
-  [MEEt.MEE(MEEt.PRPc.PRP,MEEt.MAC).dec: key = (_ek,_mk) /\ c = _c
+  [MEEt.MEE(MEEt.PRPc.PseudoRP,MEEt.MAC).dec: key = (_ek,_mk) /\ c = _c
                                       ==> res = mee_dec AESi hmac_sha256 _ek _mk (head witness _c) (behead _c)]
   =1%r.
 proof.
 conseq (_: true ==> true) (_: _ ==> _)=> //=.
-+ proc; inline MAC.verify PRPc.PRP.fi; wp.
++ proc; inline MAC.verify PRPc.PseudoRP.fi; wp.
   while (   0 <= i <= size c
          /\ ek = _ek
          /\ s  = (if 0 < i then nth witness c (i - 1) else head witness _c)

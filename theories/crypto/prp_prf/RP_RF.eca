@@ -25,10 +25,7 @@ op dK: { K distr | is_lossless dK } as dK_ll.
 
 (** Instantiating the real and ideal PRP **)
 clone import PRP as PRPt with
-  type K  <- K,
-    op dK <- dK,
-  type D  <- D
-proof * by smt(dK_ll).
+  type D  <- D.
 
 clone import PRPt.WeakPRP as PRPSec.
 
@@ -39,11 +36,8 @@ rename "RP" as "PRPi".
 
 (** Instantiating the ideal PRF (the real one will be the PRP) **)
 clone import PRF as PRFt with
-  type K  <- K,
-  op   dK <- dK,
   type D  <- D,
-  type R  <- D
-proof * by smt(dK_ll).
+  type R  <- D.
 
 clone import PRFt.RF as PRFi with
   op   dR <- uD
