@@ -217,8 +217,6 @@ module PVM = struct
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
 
   let subst_cost env s c =
-    (* TODO: (Adrien) check that not substituting in the procedure names of
-       c_calls is correct.*)
     { c_self  = subst env s c.c_self;
       c_calls = Mx.map (subst env s) c.c_calls; }
 
