@@ -37,11 +37,11 @@ module PIR = {
 
   proc main (i:int) = {
     var r, r' : word;
-    var j = 0;
+    var j <- 0;
 
     var b;
 
-    (s, s') = ([], []);
+    (s, s') <- ([], []);
     while (j < N) {
       b <$ {0,1};
       if (j = i) {

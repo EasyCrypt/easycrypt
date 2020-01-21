@@ -22,8 +22,8 @@ module Guess (G:Game) = {
   proc main(x:tin): tval * tres = {
     var i, o;
 
-    o = G.main(x);
-    i = $duniform indices;
+    o <@ G.main(x);
+    i <$ duniform indices;
     return (i,o);
   }
 }.

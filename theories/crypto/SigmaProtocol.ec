@@ -51,10 +51,10 @@ theory SigmaProtocol.
     proc main(x: statement, w: witness) : bool = {
       var e, m, s, z, b;
 
-      (m, s) = S.commit(x, w);
-      e      = S.test(x, m);
-      z      = S.respond((x, w), (m, s), e);
-      b      = S.verify(x, m, e, z);
+      (m, s) <@ S.commit(x, w);
+      e      <@ S.test(x, m);
+      z      <@ S.respond((x, w), (m, s), e);
+      b      <@ S.verify(x, m, e, z);
 
       return b;
     }
@@ -64,10 +64,10 @@ theory SigmaProtocol.
     proc main() : statement * message * challenge * response = {
       var x, w, m, s, e, z;
 
-      (x, w) = S.gen();
-      (m, s) = S.commit(x, w);
-      e      = S.test(x, m);
-      z      = S.respond((x, w), (m, s), e);
+      (x, w) <@ S.gen();
+      (m, s) <@ S.commit(x, w);
+      e      <@ S.test(x, m);
+      z      <@ S.respond((x, w), (m, s), e);
 
       return (x, m, e, z);
     }
@@ -83,17 +83,17 @@ theory SigmaProtocol.
 
       sto <@ A.soundness(x, m, e, z, e', z');
       if (e <> e' /\ sto <> None) {
-        w = oget sto;
-        r = R x w;
-        v  = S.verify(x, m, e , z  );
-        v' = S.verify(x, m, e', z' );
+        w  <- oget sto;
+        r  <- R x w;
+        v  <@ S.verify(x, m, e , z  );
+        v' <@ S.verify(x, m, e', z' );
         if (r /\ v /\ v') {
-          s = Some(w);
+          s <- Some(w);
         } else {
-          s = None;
+          s <- None;
         }
       } else {
-        s = None;
+        s <- None;
       }
 
       return s;
@@ -112,11 +112,11 @@ theory SigmaProtocol.
       var m, z, v, to;
 
       (m, e, z) <@ A.simulate(x, e);
-      v = S.verify(x, m, e, z);
+      v <@ S.verify(x, m, e, z);
       if (v) {
-        to = Some(m, e, z);
+        to <- Some(m, e, z);
       } else {
-        to = None;
+        to <- None;
       }
 
       return to;
@@ -136,16 +136,16 @@ theory SigmaProtocol.
     proc gameIdeal() : bool = {
       var b, e, i, m, s, t, to, x, w;
 
-      (x, w) = S.gen();
-      (m, s) = S.commit(x, w);
-      e      =$ de;
+      (x, w) <@ S.gen();
+      (m, s) <@ S.commit(x, w);
+      e      <$ de;
       to     <@ SpecialHVZKExperiment(S, A).main(x, e);
-      i      = 0; (* rubbish to circumvent some limits of the while/unroll tactic. *)
+      i      <- 0; (* rubbish to circumvent some limits of the while/unroll tactic. *)
       while (to = None) {
         to <@ SpecialHVZKExperiment(S, A).main(x, e);
-        i = i + 1;
+        i  <- i + 1;
       }
-      t = oget to;
+      t <- oget to;
       b <@ D.distinguish(x, t);
 
       return b;
@@ -155,7 +155,7 @@ theory SigmaProtocol.
       var b, t, m, e, z, x;
 
       (x, m, e, z) <@ Run(S).main();
-      t = (m, e, z);
+      t <- (m, e, z);
       b <@ D.distinguish(x, t);
 
       return b;
@@ -164,7 +164,7 @@ theory SigmaProtocol.
     proc main() : bool = {
       var b, b';
       
-      b =$ {0,1};
+      b <$ {0,1};
       if (b) {
         b' <@ gameIdeal();
       } else {

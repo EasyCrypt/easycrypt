@@ -32,11 +32,11 @@ module CPA (S:Scheme, A:Adversary) = {
     var c : ciphertext;
     var b, b' : bool;
 
-    (pk, sk) = S.kg();
-    (m0, m1) = A.choose(pk);
-    b        = ${0,1};
-    c        = S.enc(pk, b ? m1 : m0);
-    b'       = A.guess(c);
+    (pk, sk) <@ S.kg();
+    (m0, m1) <@ A.choose(pk);
+    b        <$ {0,1};
+    c        <@ S.enc(pk, b ? m1 : m0);
+    b'       <@ A.guess(c);
     return (b' = b);
   }
 }.
@@ -49,10 +49,10 @@ module CPA_L (S:Scheme, A:Adversary) = {
     var c : ciphertext;
     var b' : bool;
 
-    (pk, sk) = S.kg();
-    (m0, m1) = A.choose(pk);
-    c        = S.enc(pk, m0);
-    b'       = A.guess(c);
+    (pk, sk) <@ S.kg();
+    (m0, m1) <@ A.choose(pk);
+    c        <@ S.enc(pk, m0);
+    b'       <@ A.guess(c);
     return b';
   }
 }.
@@ -65,10 +65,10 @@ module CPA_R (S:Scheme, A:Adversary) = {
     var c : ciphertext;
     var b' : bool;
 
-    (pk, sk) = S.kg();
-    (m0, m1) = A.choose(pk);
-    c        = S.enc(pk, m1);
-    b'       = A.guess(c);
+    (pk, sk) <@ S.kg();
+    (m0, m1) <@ A.choose(pk);
+    c        <@ S.enc(pk, m1);
+    b'       <@ A.guess(c);
     return b';
   }
 }.
@@ -126,10 +126,10 @@ module CCA (S:Scheme, A:CCA_ADV) = {
       var m : plaintext option;
 
       if (size log < qD && (Some c <> cstar)) {
-        log = c :: log;
-        m = S.dec(sk, c);
+        log <- c :: log;
+        m   <@ S.dec(sk, c);
       }
-      else m = None;
+      else m <- None;
       return m;
     }
   }
@@ -142,14 +142,14 @@ module CCA (S:Scheme, A:CCA_ADV) = {
     var c : ciphertext;
     var b, b' : bool;
 
-    log      = [];
-    cstar    = None;
-    (pk, sk) = S.kg();
-    (m0, m1) = A.choose(pk);
-    b        = ${0,1};
-    c        = S.enc(pk, b ? m1 : m0);
-    cstar    = Some c;
-    b'       = A.guess(c);
+    log      <- [];
+    cstar    <- None;
+    (pk, sk) <@ S.kg();
+    (m0, m1) <@ A.choose(pk);
+    b        <$ {0,1};
+    c        <@ S.enc(pk, b ? m1 : m0);
+    cstar    <- Some c;
+    b'       <@ A.guess(c);
     return (b' = b);
   }
 }.
@@ -161,9 +161,9 @@ module Correctness (S:Scheme) = {
     var c  : ciphertext;
     var m' : plaintext option;
 
-    (pk, sk) = S.kg();
-    c        = S.enc(pk, m);
-    m'       = S.dec(sk, c);
+    (pk, sk) <@ S.kg();
+    c        <@ S.enc(pk, m);
+    m'       <@ S.dec(sk, c);
     return (m' = Some m);
   }
 }.

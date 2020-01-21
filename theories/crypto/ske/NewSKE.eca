@@ -21,13 +21,13 @@ module type SKE = {
 module Correctness (S : SKE) = {
   proc main(p: plain): bool = {
     var k, c, p';
-    var b = false;
+    var b <- false;
 
-    k = S.keygen();
-    c = S.enc(k, p);
+    k <@ S.keygen();
+    c <@ S.enc(k, p);
     if (c <> None) {
-      p' = S.dec(k, oget c);
-      b  = (p' = Some p);
+      p' <@ S.dec(k, oget c);
+      b  <- (p' = Some p);
     }
     return b;
   }
@@ -38,24 +38,24 @@ module Wrap (S : SKE) = {
   var dqs: cipher fset
   var log: (cipher, plain) fmap
 
-  proc init(): unit = { k = S.keygen(); }
+  proc init(): unit = { k <@ S.keygen(); }
 
   proc enc(p: plain): cipher option = {
     var c;
 
-    c = S.enc(k, p);
+    c <@ S.enc(k, p);
     if (c <> None)
-      log.[oget c] = p;
+      log.[oget c] <- p;
     return c;
   }
 
   proc dec(c: cipher): plain option = {
     var p;
 
-    p = S.dec(k, c);
-    dqs = dqs `|` (fset1 c);
+    p <@ S.dec(k, c);
+    dqs <- dqs `|` (fset1 c);
     if (p <> None)
-      log.[c] = oget p;
+      log.[c] <- oget p;
     return p;
   }
 }.

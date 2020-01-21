@@ -34,14 +34,14 @@ module IND(G:RG,D:Distinguisher) = {
     var b;
 
     G.init();
-    b = D.distinguish();
+    b <@ D.distinguish();
     return b;
   }
 }.
 
 module PRGi:RG,RGA = {
   proc init(): unit = { }
-  proc next(): output = { var r; r = $dout; return r; }
+  proc next(): output = { var r; r <$ dout; return r; }
 }.
 
 (** Advantage of a distinguisher against a PRG G:

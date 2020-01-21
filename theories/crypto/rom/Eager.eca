@@ -21,13 +21,13 @@ module RO: Oracle = {
     var work : from list;
     var f : from;
 
-    m = empty;
-    work = enum;
+    m <- empty;
+    work <- enum;
     while (work <> []) {
-      f = head witness work;
-      y = $dsample f;
-      m.[f] = y;
-      work = behead work;
+      f <- head witness work;
+      y <$ dsample f;
+      m.[f] <- y;
+      work <- behead work;
     }
   }
 

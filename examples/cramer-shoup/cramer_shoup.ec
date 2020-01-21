@@ -33,9 +33,9 @@ theory DDH_ex.
   module DDH0_ex (A:Adversary) = {
     proc main() : bool = {
       var b, x, y;
-      x = $FDistr.dt \ (pred1 F.zero);
-      y = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ (x*y));
+      x <$ FDistr.dt \ (pred1 F.zero);
+      y <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ (x*y));
       return b;
     }
   }.
@@ -44,10 +44,10 @@ theory DDH_ex.
     proc main() : bool = {
       var b, x, y, z;
 
-      x = $FDistr.dt \ (pred1 F.zero);
-      y = $FDistr.dt;
-      z = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ z);
+      x <$ FDistr.dt \ (pred1 F.zero);
+      y <$ FDistr.dt;
+      z <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ z);
       return b;
     }
   }.
@@ -62,8 +62,8 @@ theory DDH_ex.
     proc a1 () = { return ((), F.zero); }
     proc a2 (x:t) = {
       var b, y;
-      y = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ (x*y));
+      y <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ (x*y));
       return b;
     }
   }.
@@ -72,9 +72,9 @@ theory DDH_ex.
     proc a1 = Addh0.a1
     proc a2 (x:t) = {
       var b, y, z;
-      y = $FDistr.dt;
-      z = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ z);
+      y <$ FDistr.dt;
+      z <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ z);
       return b;
     }
   }.
@@ -143,7 +143,7 @@ module CramerShoup : Scheme = {
 
   proc enc(pk:pkey, m:plaintext) : ciphertext = {
     var k,g,g_,e,f,h,u,a,a_,c,v,d;
-    (k,g,g_,e,f,h) = pk;
+    (k,g,g_,e,f,h) <- pk;
     u <$ FDistr.dt;
     a <- g^u; a_ <- g_^u;
     c <- h^u * m;
@@ -233,7 +233,7 @@ module B_DDH (A:CCA_ADV) = {
           (a,a_,c,d) <- ci;
           v <- H k (a, a_, c);
           if (a_ <> a^w /\ v = v' /\ (a,a_,c) <> (B_TCR.a, B_TCR.a_,B_TCR.c)) g3 <- Some (a,a_,c);
-          m = if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
+          m <- if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
               else None;
         }
         return m;
@@ -326,7 +326,7 @@ section Security_Aux.
           (a,a_,c,d) <- ci;
           v <- H k (a, a_, c);
           bad <- bad \/ (a_ <> a^w /\ d = a ^ (x1 + v*y1) * a_ ^ (x2 + v * y2));
-          m = if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
+          m <- if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
               else None;
         }
         return m;
@@ -632,7 +632,7 @@ section Security_Aux.
               y2log <-  y2' :: y2log;
             }
           }
-          m = if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
+          m <- if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
               else None;
         }
         return m;
@@ -808,7 +808,7 @@ section Security_Aux.
           G1.log <- ci :: G1.log;
           (a,a_,c,d) <- ci;
           v <- H G1.k (a, a_, c);
-          m = if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
+          m <- if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
               else None;
         }
         return m;
