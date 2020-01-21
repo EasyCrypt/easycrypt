@@ -212,17 +212,17 @@ section Upto.
     proc sample(X:D -> bool): D = {
       var r;
 
-      r = $uD;
+      r <$ uD;
       if (X r) {
         bad <- true;
-        r = $uD \ X;
+        r <$ uD \ X;
       }
       return r;
     }
 
     proc f(x:D): D = {
       if (x \notin PRPi.m)
-        PRPi.m.[x] = sample(rng PRPi.m);
+        PRPi.m.[x] <@ sample(rng PRPi.m);
       return oget PRPi.m.[x];
     }
   }.
@@ -324,14 +324,14 @@ section CollisionProbability.
 
   (* We construct a Birthday Bound adversary from the IND
      experiment. *)
-  local module (A:Adv)(S:ASampler) = {
+  local module (A:Adv) (S:ASampler) = {
     (* We simulate an f-oracle using the s-oracle *)
     module F = {
       proc init = PRFi.init
 
       proc f(x:D): D = {
         if (x \notin PRFi.m) {
-          PRFi.m.[x] = S.s();
+          PRFi.m.[x] <@ S.s();
         }
         return oget PRFi.m.[x];
       }
@@ -343,7 +343,7 @@ section CollisionProbability.
 
     proc a(): unit = {
       var b:bool;
-      b = IND.main();
+      b <@ IND.main();
     }
   }.
 
@@ -385,7 +385,6 @@ section CollisionProbability.
       by exists x'; rewrite get_setE /#.
     by rewrite negb_and /= collision_add // -mem_frng H H0 orbC.
   auto=> />; split=> [x|].
-  search rng empty.
   + by rewrite mem_frng mem_rng_empty.
   smt.
   qed.
@@ -394,7 +393,7 @@ section CollisionProbability.
     Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
     <= (q^2)%r * mu1 uD witness.
   proof.
-  rewrite (pr_PRFi_Exp_collision &m) (pr_collision A A_ll A_bounded &m).
+  by rewrite (pr_PRFi_Exp_collision &m) (pr_collision A A_ll A_bounded &m).
   qed.
 end section CollisionProbability.
 
@@ -412,7 +411,7 @@ have:= pr_PRPi'_Indirect_PRFi (DBounder(D)) _ &m.
   call (D_ll (<: DBounder(D,O).FBounder) _).
     by proc; sp; if=> //=; wp; call O_ll.
   by auto.
-smt.
+smt().
 qed.
 
 (** This section proves the equivalence between the Ideal PRP and the
