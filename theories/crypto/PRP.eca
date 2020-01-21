@@ -234,6 +234,452 @@ apply/(ltr_le_trans (mu dD (pred1 y0))).
 by apply/mu_sub=> y ->.
 qed.
 
+abstract theory RP_RF.
+require import List.
+require (*--*) PRF Birthday.
+op q : { int | 0 <= q } as ge0_q.
+
+axiom dD_funi: is_funiform dD.
+
+lemma dD_fu: is_full dD.
+proof.
+apply: funi_ll_full.
++ exact/dD_funi.
+exact/dD_ll.
+qed.
+
+lemma dD_uni: is_uniform dD.
+proof. exact/funi_uni/dD_funi. qed.
+
+clone import PRF as PRFt with
+  type D <- D,
+  type R <- D.
+
+clone import RF as PRFi with
+  op   dR <- dD
+proof * by smt(dD_ll)
+rename "RF" as "PRFi".
+
+(** The proof starts with some useful definitions and lemmas **)
+(* In the proof, we consider the following bad event (applied to the
+    PRF's internal map):
+      "A collision occurs in map m whenever there exist distinct x and
+      x' that are both in m's domain and have the same image by m." *)
+pred collision (m:(D,D) fmap) = exists x x',
+  x' <> x /\
+  x \in m /\ x' \in m /\ m.[x] = m.[x'].
+
+(* Some useful facts about the bad event *)
+lemma no_collision (m:(D,D) fmap):
+  !collision m <=>
+  forall x x',
+    x' = x \/
+    !x \in m  \/
+    !x' \in m \/
+    m.[x] <> m.[x'].
+proof.
+rewrite /collision negb_exists /=; apply/forall_iff=> /= x.
+by rewrite negb_exists /=; apply/forall_iff=> /= x'; rewrite !negb_and.
+qed.
+
+lemma collision_add (m:(D,D) fmap) x y:
+  !x \in m =>
+  collision m.[x <- y] <=> collision m \/ rng m y.
+proof.
+move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
++ rewrite mem_set=> -[z_in_m] [z'_in_m] mz_eq_mz'.
+  case (rng m y)=> //= y_notin_rngm.
+  by exists z z'; smt(@SmtMap).
+move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|].
++ exists z z'; rewrite z'_neq_z !mem_set !get_setE mz_eq_mz' z_in_m z'_in_m /=.
+  move/contra: (congr1 (dom m) z x); rewrite x_notin_m z_in_m=> -> //=.
+  by move/contra: (congr1 (dom m) z' x); rewrite x_notin_m z'_in_m=> -> //=.
+rewrite rngE=> - /= [x'] mx'_y.
+by exists x x'; smt(@SmtMap).
+qed.
+
+lemma collision_stable (m:(D,D) fmap) y y':
+  collision m =>
+  y \notin m =>
+  collision m.[y <- y']
+by [].
+
+(** To factor out the difficult step, we parameterize the PRP by a
+    procedure that samples its output, and provide two instantiations
+    of it. **)
+module type Sample_t = {
+  proc sample(X:D -> bool): D
+}.
+
+module Direct = {
+  proc sample(X:D -> bool): D = {
+    var r;
+
+    r <$ dD \ X;
+    return r;
+  }
+}.
+
+module Indirect = {
+  proc sample(X:D -> bool): D = {
+    var r;
+
+    r <$ dD;
+    if (X r) {
+      r <$ dD \ X;
+    }
+    return r;
+  }
+}.
+
+module PRPi'(S:Sample_t) = {
+  proc init =  RP.init
+
+  proc f(x:D): D = {
+    if (x \notin RP.m)
+      RP.m.[x] = S.sample(rng RP.m);
+    return oget RP.m.[x];
+  }
+}.
+
+lemma nosmt notin_supportIP (P : 'a -> bool) (d : 'a distr):
+  (exists a, support d a /\ !P a) <=> mu d P < mu d predT.
+proof.
+rewrite (@mu_split _ predT P) /predI /predT /predC /=.
+rewrite (@exists_eq (fun a => support d a /\ !P a) (fun a => !P a /\ a \in d)) /=.
++ by move=> a /=; rewrite andbC.
+by rewrite -(@witness_support (predC P)) -/(predC _) /#.
+qed.
+
+(* Some losslessness lemmas *)
+lemma excepted_lossless (m:(D,D) fmap):
+  (exists x, x \notin m) =>
+  mu (dD \ (rng m)) predT = 1%r.
+proof.
+move=> /endo_dom_rng [x h]; rewrite dexcepted_ll 1:dD_ll //.
+by rewrite -dD_ll; apply/notin_supportIP; exists x=> />; exact/dD_fu.
+qed.
+
+lemma excepted_lossless_mem (m:(D,D) fmap):
+  (exists x, x \notin m) =>
+  is_lossless (dD \ (mem (frng m))).
+proof.
+have ->: mem (frng m) = rng m.
++ by apply/fun_ext=> a; rewrite mem_frng.
+exact/excepted_lossless.
+qed.
+
+phoare Indirect_ll: [Indirect.sample: exists x, support dD x /\ !X x ==> true] = 1%r.
+proof.
+proc; seq  1: (exists x, support dD x /\ !X x)=> //=.
++ by rnd (predT); auto; rewrite dD_ll /#.
+if=> //=.
++ rnd (predT); auto=> /> &m x _ x_notin_X _.
+  rewrite dexcepted_ll 1:dD_ll // -dD_ll; apply/notin_supportIP; exists x.
+  by rewrite dD_fu.
+by hoare; auto=> />.
+qed.
+
+lemma PRPi'_Indirect_ll: islossless PRPi'(Indirect).f.
+proof.
+proc; if=> //=; wp; call Indirect_ll.
+auto=> /> &m x_notin_m.
+have:= excepted_lossless (RP.m{m}) _.
++ by exists x{m}.
+rewrite weight_dexcepted.
+case (weight dD = mu dD (rng RP.m{m}))=> //=.
+rewrite notin_supportIP /=.
+by rewrite StdOrder.RealOrder.ltr_def=> -> /=; exact/mu_sub.
+qed.
+
+(** The proof is cut into 3 parts (sections):
+      - We first focus on proving
+         Pr[IND(PRPi'(Indirect),D).main() @ &m: res]
+         <= Pr[IND(PRFi,D).main() @ &m: res]
+          + Pr[IND(PRFi,D).main() @ &m: collision PRFi.m].
+      - Second, we concretely bound (when the PRF oracle stops
+        answering queries after the q-th):
+          Pr[IND(PRFi,D).main() @ &m: collision PRFi.m]
+          <= q^2 * Pr[x = $uD: x = witness]
+      - We conclude by proving (difficult!)
+         Pr[IND(PRPi,D).main() @ &m: res]
+         = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
+ **)
+section Upto.
+  declare module D:PRFt.Distinguisher {RP, PRFi}.
+  axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+
+  local module PRP_indirect_bad = {
+    var bad : bool
+
+    proc init(): unit = {
+             RP.init();
+      bad <- false;
+    }
+
+    proc sample(X:D -> bool): D = {
+      var r;
+
+      r <$ dD;
+      if (X r) {
+        bad <- true;
+        r <$ dD \ X;
+      }
+      return r;
+    }
+
+    proc f(x:D): D = {
+      if (x \notin RP.m)
+        RP.m.[x] <@ sample(rng RP.m);
+      return oget RP.m.[x];
+    }
+  }.
+
+  local lemma PRPi'_Indirect_eq &m:
+    Pr[IND(PRPi'(Indirect),D).main() @ &m: res]
+    = Pr[IND(PRP_indirect_bad,D).main() @ &m: res].
+  proof. by byequiv=> //=; proc; inline *; sim. qed.
+
+  (** Upto failure: if a collision does not occur in PRFi.m, then the
+      programs are equivalent **)
+  lemma pr_PRPi'_Indirect_PRFi &m:
+    `|Pr[IND(PRPi'(Indirect),D).main() @ &m: res] - Pr[IND(PRFi,D).main() @ &m: res]|
+    <= Pr[IND(PRFi,D).main() @ &m: collision PRFi.m].
+  proof.
+  rewrite (PRPi'_Indirect_eq &m).
+  byequiv: PRP_indirect_bad.bad=> //=; 2:by smt().
+  proc.
+  call (_: collision PRFi.m,
+           ={m}(RP,PRFi) /\ (PRP_indirect_bad.bad{1} <=> collision PRFi.m{2}),
+           PRP_indirect_bad.bad{1} <=> collision PRFi.m{2}).
+  + exact D_ll.
+  + proc.
+    if=> //=; inline *.
+    swap{1} 1.
+    seq  1  1: (={x} /\
+                x{1} \notin RP.m{1} /\
+                PRFi.m{2} = RP.m.[x <- r]{1} /\
+                ((PRP_indirect_bad.bad \/ rng RP.m r){1} <=> collision PRFi.m{2})).
+    + auto => /> &1 &2 coll _ x_notin_m r _; split=> [|x0 x'].
+      + rewrite rngE /= /collision=> - [x'] mx'; exists x{2} x'; smt(domE get_setE).
+      smt(@SmtMap).
+    sp; if{1}.
+    + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
+      auto=> /> &1 &2 x_notin_m coll_def rng_m_r; smt.
+    by auto; smt. (** FIXME: Investigate **)
+    move=> &2 bad; conseq (_: true ==> true: =1%r) (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
+    + by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
+    proc; if=> //=; inline *.
+    seq  2: (X = rng RP.m /\ x \notin RP.m) 1%r 1%r 0%r _=> //=;
+         [auto|if=> //=; auto|hoare; auto]=> />;rewrite ?dD_ll //.
+    by move=> &hr x_notin_m r_in_rng_m; apply excepted_lossless; exists x{hr}.
+    move=> &1; conseq (_: collision PRFi.m ==> collision PRFi.m: =1%r)=> //=.
+    by proc; if; auto=> />; rewrite dD_ll //=; smt(domE get_setE).
+  inline *; auto=> />; split=> [|_].
+  + by rewrite no_collision=> x x'; rewrite mem_empty.
+  move=> /> rL rR DL b mL DR mR [-> //| /#].
+  qed.
+end section Upto.
+
+(** We now bound the probability of collisions by instantiating a
+    generic Birthday Bound result:
+      Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
+      <= q^2 * Pr[x = $uD: x = witness],
+
+    where DBounder prevents the distinguisher from calling the
+    f-oracle more than q times. **)
+module DBounder (D : Distinguisher) (F : PRF_Oracles) = {
+  module FBounder = {
+    var c:int
+
+    proc f(x:D): D = {
+      var r = witness;
+
+      if (c < q) {
+        r <@ F.f(x);
+        c <- c + 1;
+      }
+      return r;
+    }
+  }
+
+  proc distinguish(): bool = {
+    var b;
+
+    FBounder.c <- 0;
+    b <@ D(FBounder).distinguish();
+    return b;
+  }
+}.
+
+section CollisionProbability.
+  declare module D : Distinguisher {PRFi, DBounder}.
+  axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+
+  local clone import Birthday as BBound with
+    op   q <- q,
+    type T <- D,
+    op   uT <- dD,
+    op maxu <- witness
+  proof *.
+  realize ge0_q by apply ge0_q.
+  realize maxuP. 
+  proof.
+  by move=> x; exact/StdOrder.RealOrder.lerr_eq/dD_funi.
+  qed.
+
+  (* We construct a Birthday Bound adversary from the IND
+     experiment. *)
+  local module (A:Adv) (S:ASampler) = {
+    (* We simulate an f-oracle using the s-oracle *)
+    module F = {
+      proc init = PRFi.init
+
+      proc f(x:D): D = {
+        if (x \notin PRFi.m) {
+          PRFi.m.[x] <@ S.s();
+        }
+        return oget PRFi.m.[x];
+      }
+    }
+
+    (* Recall from the Birthday clone that Birthday Bound adversaries
+       are restricted to make at most q oracle queries. *)
+    module IND = IND(F,DBounder(D))
+
+    proc a(): unit = {
+      var b:bool;
+      b <@ IND.main();
+    }
+  }.
+
+  local lemma A_ll (S <: ASampler {A}) &m: islossless S.s => islossless A(S).a.
+  proof.
+  move=> S_ll; proc; inline*; wp.
+  call (_: true).
+  + exact D_ll.
+  + by proc; inline*; do!(sp; if=> //=; auto); wp; call S_ll.
+  by inline*; auto.
+  qed.
+
+  local hoare A_bounded: A(Sample).a: size Sample.l = 0 ==> size Sample.l <= q.
+  proof.
+  proc; inline *; wp.
+  call (_: size Sample.l <= DBounder.FBounder.c /\ DBounder.FBounder.c <= q).
+  + by proc; inline *; do !(sp; if=> //=); auto=> /#.
+  by auto; smt w=ge0_q.
+  qed.
+
+  local lemma pr_PRFi_Exp_collision &m:
+    Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
+    = Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l].
+  proof.
+  byequiv (_: ={glob D} ==> collision PRFi.m{1} <=> !uniq Sample.l{2})=> //=.
+  proc; inline*; wp.
+  call (_: ={PRFi.m,DBounder.FBounder.c} /\
+           (forall x, mem (frng PRFi.m) x <=> mem Sample.l x){2} /\
+           (collision PRFi.m{1} <=> !uniq Sample.l{2})).
+    proc; inline*.
+    sp; if=> //=.
+    sp; if=> //=; auto.
+    progress [-split].
+    rewrite H3 //=; split.
+    + move=> x0; rewrite -H !mem_frng !rngE /=; split=> [[x]|].
+      + by rewrite get_setE /#.
+      case=> [<<-|[x'] mx'].
+      + by exists x{2}; rewrite get_setE.
+      by exists x'; rewrite get_setE /#.
+    by rewrite negb_and /= collision_add // -mem_frng H H0 orbC.
+  auto=> />; split=> [x|].
+  + by rewrite mem_frng mem_rng_empty.
+  smt.
+  qed.
+
+  lemma pr_PRFi_collision &m:
+    Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
+    <= (q^2)%r * mu1 dD witness.
+  proof.
+  by rewrite (pr_PRFi_Exp_collision &m) (pr_collision A A_ll A_bounded &m).
+  qed.
+end section CollisionProbability.
+
+(* We pull together the results of the first two sections *)
+lemma PartialConclusion (D <: Distinguisher {RP, PRFi, DBounder}) &m:
+  (forall (O <: PRF_Oracles {D}), islossless O.f => islossless D(O).distinguish) =>
+  `|Pr[IND(PRPi'(Indirect),DBounder(D)).main() @ &m: res]
+    - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
+  <= (q^2)%r * mu1 dD witness.
+proof.
+move=> D_ll.
+have:= pr_PRFi_collision D D_ll &m.
+have:= pr_PRPi'_Indirect_PRFi (DBounder(D)) _ &m.
+  move=> O O_ll; proc.
+  call (D_ll (<: DBounder(D,O).FBounder) _).
+    by proc; sp; if=> //=; wp; call O_ll.
+  by auto.
+smt().
+qed.
+
+(** This section proves the equivalence between the Ideal PRP and the
+    module PRPi'(Indirect) used in section Upto. **)
+section PRPi_PRPi'_Indirect.
+  local clone include Dexcepted.TwoStepSampling with
+    type i    <- unit,
+    type t    <- D,
+    op   dt _ <- dD
+  proof *.
+
+  (* The key is in proving that Direct.sample and Indirect.sample
+     define the same distribution. We do this by extensional equality
+     of distributions:
+       forall a, Pr[Direct.sample: res = a] = Pr[Indirect.sample: res = a]. *)
+  equiv eq_Direct_Indirect: Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
+  proof.
+  transitivity S.direct (X{2} = fun _=> X{1} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
+  + by move=> &2; exists ((),fun _=> X{2}).
+  + by proc; rnd.
+  transitivity S.indirect (={x,X} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
+  + by move=> &1 &2 ->; exists ((),fun _=> X{2}).
+  + by conseq (@ll_direct_indirect_eq); rewrite dD_ll.
+  proc. seq 1 1: (#pre /\ ={r}); auto.
+  by if; auto.
+  qed.
+
+  (* The rest is easy *)
+  local equiv eq_PRPi_PRPi'_Indirect: RP.f ~ PRPi'(Indirect).f:
+    ={x, RP.m} ==> ={res, RP.m}.
+  proof.
+  transitivity PRPi'(Direct).f (={RP.m,x} ==> ={RP.m,res}) (={RP.m,x} ==> ={RP.m,res}).
+  + by move=> &1 &2 [->> ->>]; exists RP.m{2} x{2}.
+  + done.
+  + by proc; inline *; if=> //=; auto.
+  + by proc; if=> //=; wp; call eq_Direct_Indirect.
+  qed.
+
+  declare module D : Distinguisher { RP }.
+
+  lemma pr_PRPi_PRPi'_Indirect &m:
+    Pr[IND(RP,D).main() @ &m: res] = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
+  proof.
+  byequiv=> //=.
+  proc.
+  call (_: ={RP.m}).
+    by apply eq_PRPi_PRPi'_Indirect.
+  by inline*; auto.
+  qed.
+end section PRPi_PRPi'_Indirect.
+
+lemma Conclusion (D <: Distinguisher {RP, PRFi, DBounder}) &m:
+  (forall (O <: PRF_Oracles {D}), islossless O.f => islossless D(O).distinguish) =>
+  `|Pr[IND(RP,DBounder(D)).main() @ &m: res]
+    - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
+  <= (q^2)%r * mu1 dD witness.
+proof.
+move=> D_ll.
+by rewrite (pr_PRPi_PRPi'_Indirect (DBounder(D)) &m) (PartialConclusion D &m D_ll).
+qed.
+
+end RP_RF.
 end RP.
 
 (* -------------------------------------------------------------------- *)

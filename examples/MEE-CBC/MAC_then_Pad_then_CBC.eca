@@ -316,11 +316,14 @@ section RCPA.
     Pr[INDR_CPA(MEE(PseudoRP,MAC),RCPA_QueryBounder(A)).main() @ &m: res]
     = Pr[INDR_CPA(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PseudoRP))),MAC),RCPA_QueryBounder(A)).main () @ &m: res].
   proof.
-    byequiv (_: ={glob A} ==> ={res})=> //=; proc; inline *.
-    wp; call (_: ={glob RCPA_QueryBounder, glob RCPA_Wrap})=> //=.
-      proc; inline*; sp; if=> //=; sim.
-      by auto.
+  byequiv (: ={glob A} ==> ={res}); first last.
+  + done.
+  + done.
+  proc; inline *.
+  wp; call (: ={glob RCPA_QueryBounder, glob RCPA_Wrap}).
+  + proc; inline*; sp; if; auto; sim.
     by auto.
+  by auto.
   qed.
 
   (** We bound the RCPA advantage of A against MEE(P,M) **)
