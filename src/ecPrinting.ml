@@ -72,7 +72,7 @@ module PPEnv = struct
       | false -> ppe
 
   let create_and_push_mem ppe ?active (id, xp) =
-    let m = EcMemory.empty_local id xp in
+    let m = EcMemory.empty_local id in
       push_mem ppe ?active m
 
   let push_mems ppe ids =
@@ -446,13 +446,12 @@ let pp_axname ppe fmt p =
 
 (* -------------------------------------------------------------------- *)
 let pp_funname (ppe : PPEnv.t) fmt p =
-  Format.fprintf fmt "%a.%a"
-    (pp_topmod ppe) p.P.x_top pp_path p.P.x_sub
+  Format.fprintf fmt "%a.%s"
+    (pp_topmod ppe) p.P.x_top p.P.x_sub
 
 (* -------------------------------------------------------------------- *)
 let msymbol_of_pv (ppe : PPEnv.t) p =
-  let k = p.pv_kind in
-  let p = p.pv_name in
+  let k = pv_kind p in
 
   let inscope =
     let mem =

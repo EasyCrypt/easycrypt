@@ -78,10 +78,10 @@ module EqTest = struct
 
   (* ------------------------------------------------------------------ *)
   let for_pv env ~norm p1 p2 =
-    pv_equal p1 p2 || (norm && (p1.pv_kind = p2.pv_kind) &&
+    pv_equal p1 p2 || (norm && (pv_kind p1 = pv_kind p2) &&
       let p1 = NormMp.norm_pvar env p1 in
       let p2 = NormMp.norm_pvar env p2 in
-      EcPath.x_equal p1.pv_name p2.pv_name)
+      pv_equal p1 p2)
 
   (* ------------------------------------------------------------------ *)
   let for_xp env ~norm p1 p2 =
@@ -794,12 +794,12 @@ and check_alpha_equal ri hyps f1 f2 =
     match mt1, mt2 with
     | None, None -> ()
     | Some lmt1, Some lmt2 ->
-      let xp1, xp2 = EcMemory.lmt_xpath lmt1, EcMemory.lmt_xpath lmt2 in
-      ensure (EqTest.for_xp env xp1 xp2);
       let m1, m2 = EcMemory.lmt_bindings lmt1, EcMemory.lmt_bindings lmt2 in
       ensure (EcSymbols.Msym.equal
-                (fun (p1,ty1) (p2,ty2) ->
-                  p1 = p2 && EqTest.for_type env ty1 ty2) m1 m2)
+                (fun (p1,ty1, id1) (p2,ty2, id2) ->
+                      p1 = p2
+                   && EqTest.for_type env ty1 ty2
+                   && EcIdent.id_equal id1 id2) m1 m2)
     | _, _ -> error () in
 
   (* TODO all declaration in env, do it also in add local *)

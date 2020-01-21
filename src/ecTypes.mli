@@ -130,17 +130,18 @@ val lp_fv    : lpattern -> EcIdent.Sid.t
 
 (* -------------------------------------------------------------------- *)
 type pvar_kind =
-  | PVglob
-  | PVloc
+  | PVKglob
+  | PVKloc
 
-type prog_var = private {
-  pv_name : EcPath.xpath;
-  pv_kind : pvar_kind;
-}
+type prog_var =
+  | PVglob of EcPath.xpath
+  | PVloc of EcIdent.t
 
 val pv_equal       : prog_var -> prog_var -> bool
 val pv_compare     : prog_var -> prog_var -> int
 val pv_ntr_compare : prog_var -> prog_var -> int
+
+val pv_kind : prog_var -> pvar_kind
 
 (* work only if the prog_var has been normalized *)
 val pv_compare_p : prog_var -> prog_var -> int
@@ -154,12 +155,11 @@ val string_of_pvar : prog_var -> string
 
 val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var
 
-val pv_loc  : EcPath.xpath -> symbol -> prog_var
+val pv_loc  : EcIdent.t -> prog_var
 val pv_glob : EcPath.xpath -> prog_var
 val xp_glob : EcPath.xpath -> EcPath.xpath
 val pv_res  : EcPath.xpath -> prog_var
 val pv_arg  : EcPath.xpath -> prog_var
-val pv      : EcPath.xpath -> pvar_kind -> prog_var
 
 (* -------------------------------------------------------------------- *)
 type expr = private {

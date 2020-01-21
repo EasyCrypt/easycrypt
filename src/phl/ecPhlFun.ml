@@ -66,7 +66,7 @@ let lossless_hyps env top sub =
     f_forall bd (f_imps hyps concl)
 
 (* -------------------------------------------------------------------- *)
-let subst_pre env f fs m s =
+let subst_pre env f fs (m : memenv) s =
   match fs.fs_anames with
   | Some lv ->
       let v = List.map (fun v -> f_pvloc f v m) lv in

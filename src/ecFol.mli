@@ -20,8 +20,8 @@ include module type of struct include EcCoreFol end
 val f_losslessF: xpath -> form
 
 val f_eqparams:
-     xpath -> EcTypes.ty -> variable list option -> memory
-  -> xpath -> EcTypes.ty -> variable list option -> memory
+     xpath -> EcTypes.ty -> variable list option -> memenv
+  -> xpath -> EcTypes.ty -> variable list option -> memenv
   -> form
 
 val f_eqres:

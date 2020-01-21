@@ -92,13 +92,11 @@ val pp_m : Format.formatter -> mpath -> unit
 (* -------------------------------------------------------------------- *)
 type xpath = private {
   x_top : mpath;
-  x_sub : path;
+  x_sub : symbol;
   x_tag : int;
 }
 
-val xpath     : mpath -> path -> xpath
-val xpath_fun : mpath -> symbol -> xpath
-val xqname    : xpath -> symbol -> xpath
+val xpath     : mpath -> symbol -> xpath
 val xastrip   : xpath -> xpath
 
 val x_equal       : xpath -> xpath -> bool

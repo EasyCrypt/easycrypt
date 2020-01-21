@@ -415,16 +415,17 @@ module Hsform = Why3.Hashcons.Make (struct
     in
 
     match f with
-    | Fint _             -> Mid.empty
-    | Fop (_, tys)       -> union (fun a -> a.ty_fv) tys
-    | Fpvar (pv,m)       -> EcPath.x_fv (fv_add m Mid.empty) pv.pv_name
-    | Fglob (mp,m)       -> EcPath.m_fv (fv_add m Mid.empty) mp
-    | Flocal id          -> fv_singleton id
-    | Fapp (f, args)     -> union f_fv (f :: args)
-    | Ftuple args        -> union f_fv args
-    | Fproj(e, _)        -> f_fv e
-    | Fif (f1, f2, f3)   -> union f_fv [f1; f2; f3]
-    | Fmatch (b, fs, ty) -> fv_union ty.ty_fv (union f_fv (b :: fs))
+    | Fint _              -> Mid.empty
+    | Fop (_, tys)        -> union (fun a -> a.ty_fv) tys
+    | Fpvar (PVglob pv,m) -> EcPath.x_fv (fv_add m Mid.empty) pv
+    | Fpvar (PVloc _,m)   -> fv_add m Mid.empty (* TODO: A: correct? *)
+    | Fglob (mp,m)        -> EcPath.m_fv (fv_add m Mid.empty) mp
+    | Flocal id           -> fv_singleton id
+    | Fapp (f, args)      -> union f_fv (f :: args)
+    | Ftuple args         -> union f_fv args
+    | Fproj(e, _)         -> f_fv e
+    | Fif (f1, f2, f3)    -> union f_fv [f1; f2; f3]
+    | Fmatch (b, fs, ty)  -> fv_union ty.ty_fv (union f_fv (b :: fs))
 
     | Fquant(_, b, f) ->
       let do1 (id, ty) fv = fv_union (gty_fv ty) (Mid.remove id fv) in
@@ -534,9 +535,12 @@ let f_app f args ty =
 (* -------------------------------------------------------------------- *)
 let f_local  x ty   = mk_form (Flocal x) ty
 let f_pvar   x ty m = mk_form (Fpvar(x, m)) ty
-let f_pvarg  f ty m = f_pvar (pv_arg f) ty m
-let f_pvloc  f v  m = f_pvar (EcTypes.pv_loc f v.v_name) v.v_type m
-let f_pvlocs f vs m = List.map (fun v -> f_pvloc f v m) vs
+let f_pvarg  f ty menv = f_pvar (pv_arg f) ty (EcMemory.memory menv)
+let f_pvloc  v  menv = match EcMemory.lookup v.v_name menv with
+| None -> assert false          (* FIXME: error message?*)
+| Some (_,_,id) -> f_pvar (EcTypes.pv_loc id) v.v_type (EcMemory.memory menv)
+
+let f_pvlocs vs menv = List.map (fun v -> f_pvloc v menv) vs
 let f_glob   mp m   = mk_form (Fglob (mp, m)) (tglob mp)
 
 (* -------------------------------------------------------------------- *)

@@ -101,7 +101,7 @@ val is_while  : instr -> bool
 val is_assert : instr -> bool
 
 (* -------------------------------------------------------------------- *)
-val get_uninit_read : stmt -> Sx.t
+val get_uninit_read : stmt -> EcIdent.Sid.t
 
 (* -------------------------------------------------------------------- *)
 type variable = {
@@ -232,5 +232,6 @@ val mty_equal : module_type -> module_type -> bool
 val mty_hash  : module_type -> int
 
 (* -------------------------------------------------------------------- *)
-val get_uninit_read_of_fun : xpath -> function_ -> Sx.t
-val get_uninit_read_of_module : path -> module_expr -> (xpath * Sx.t) list
+val get_uninit_read_of_fun : xpath -> function_ -> EcIdent.Sid.t
+val get_uninit_read_of_module :
+  path -> module_expr -> (xpath * EcIdent.Sid.t) list

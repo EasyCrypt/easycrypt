@@ -448,73 +448,74 @@ let s_subst (s : EcTypes.e_subst) =
 
 (* -------------------------------------------------------------------- *)
 module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
-  let e_pv =
-    let rec e_pv tx sx e =
+  let e_pv e =
+    let rec e_pv sid e =
       match e.e_node with
-      | Evar pv ->
-          if tx pv then Sx.add (xastrip pv.pv_name) sx else sx
-      | _ ->
-          e_fold (e_pv tx) sx e
-    in fun tx e -> e_pv tx Sx.empty e
+      | Evar (PVglob _) -> sid
+      | Evar (PVloc id) -> Sid.add id sid
+      | _               -> e_fold e_pv sid e in
+
+    e_pv Sid.empty e
 end
 
-let rec lv_get_uninit_read (w : Sx.t) (lv : lvalue) =
-  let sx_of_pv pv =
-    if is_loc pv then Sx.singleton (xastrip pv.pv_name) else Sx.empty
+let rec lv_get_uninit_read (w : Sid.t) (lv : lvalue) =
+  let sx_of_pv pv = match pv with
+    | PVloc v -> Sid.singleton v
+    | PVglob _ -> Sid.empty
   in
 
   match lv with
   | LvVar (x, _) ->
-      let w = Sx.union (sx_of_pv x) w in
-      (w, Sx.empty)
+      let w = Sid.union (sx_of_pv x) w in
+      (w, Sid.empty)
 
   | LvTuple xs ->
       let w' = List.map (sx_of_pv |- fst) xs in
-      (Sx.big_union (w :: w'), Sx.empty)
+      (Sid.big_union (w :: w'), Sid.empty)
 
   | LvMap (_, x, e, _) ->
-      let r = Sx.diff (Uninit.e_pv is_loc e) w in
-      let w = Sx.union (sx_of_pv x) w in
+      let r = Sid.diff (Uninit.e_pv e) w in
+      let w = Sid.union (sx_of_pv x) w in
       (w, r)
 
-and s_get_uninit_read (w : Sx.t) (s : stmt) =
+and s_get_uninit_read (w : Sid.t) (s : stmt) =
   let do1 (w, r) i =
     let w, r' = i_get_uninit_read w i in
-    (w, Sx.union r r')
+    (w, Sid.union r r')
 
-  in List.fold_left do1 (w, Sx.empty) s.s_node
+  in List.fold_left do1 (w, Sid.empty) s.s_node
 
-and i_get_uninit_read (w : Sx.t) (i : instr) =
+and i_get_uninit_read (w : Sid.t) (i : instr) =
   match i.i_node with
   | Sasgn (lv, e) | Srnd (lv, e) ->
-      let     r1 = Sx.diff (Uninit.e_pv is_loc e) w in
+      let     r1 = Sid.diff (Uninit.e_pv e) w in
       let w2, r2 = lv_get_uninit_read w lv in
-      (Sx.union w w2, Sx.union r1 r2)
+      (Sid.union w w2, Sid.union r1 r2)
 
   | Scall (olv, _, args) ->
-      let r1    = Sx.diff (Sx.big_union (List.map (Uninit.e_pv is_loc) args)) w in
-      let w, r2 = olv |> omap (lv_get_uninit_read w) |> odfl (w, Sx.empty) in
-      (w, Sx.union r1 r2)
+      let r1    = Sid.diff (Sid.big_union (List.map (Uninit.e_pv) args)) w in
+      let w, r2 = olv |> omap (lv_get_uninit_read w) |> odfl (w, Sid.empty) in
+      (w, Sid.union r1 r2)
 
   | Sif (e, s1, s2) ->
-      let r = Sx.diff (Uninit.e_pv is_loc e) w in
+      let r = Sid.diff (Uninit.e_pv e) w in
       let w1, r1 = s_get_uninit_read w s1 in
       let w2, r2 = s_get_uninit_read w s2 in
-      (Sx.union w (Sx.inter w1 w2), Sx.big_union [r; r1; r2])
+      (Sid.union w (Sid.inter w1 w2), Sid.big_union [r; r1; r2])
 
   | Swhile (e, s) ->
-      let r  = Sx.diff (Uninit.e_pv is_loc e) w in
+      let r  = Sid.diff (Uninit.e_pv e) w in
       let rs = snd (s_get_uninit_read w s) in
-      (w, Sx.union r rs)
+      (w, Sid.union r rs)
 
   | Sassert e ->
-      (w, Sx.diff (Uninit.e_pv is_loc e) w)
+      (w, Sid.diff (Uninit.e_pv e) w)
 
   | Sabstract (_ : EcIdent.t) ->
-      (w, Sx.empty)
+      (w, Sid.empty)
 
 let get_uninit_read (s : stmt) =
-  snd (s_get_uninit_read Sx.empty s)
+  snd (s_get_uninit_read Sid.empty s)
 
 (* -------------------------------------------------------------------- *)
 type variable = {
@@ -665,19 +666,20 @@ let rec mty_equal mty1 mty2 =
 (* -------------------------------------------------------------------- *)
 let get_uninit_read_of_fun (fp : xpath) (f : function_) =
   match f.f_def with
-  | FBalias _ | FBabs _ -> Sx.empty
+  | FBalias _ | FBabs _ -> Sid.empty
 
   | FBdef fd ->
-      let w =
-        let toloc { v_name = x } = (EcTypes.pv_loc fp x).pv_name in
-        let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
-        Sx.of_list (List.map xastrip w)
+      let w = assert false      (* TODO: A: how do we get the prog_var from the
+                                   function xpath? *)
+        (* let toloc { v_name = x } = (EcTypes.pv_loc fp x).pv_name in
+         * let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
+         * Sid.of_list (List.map xastrip w) *)
       in
 
       let w, r  = s_get_uninit_read w fd.f_body in
-      let raout = fd.f_ret |> omap (Uninit.e_pv is_loc) in
-      let raout = Sx.diff (raout |> odfl Sx.empty) w in
-      Sx.union r raout
+      let raout = fd.f_ret |> omap (Uninit.e_pv) in
+      let raout = Sid.diff (raout |> odfl Sid.empty) w in
+      Sid.union r raout
 
 (* -------------------------------------------------------------------- *)
 let get_uninit_read_of_module (p : path) (me : module_expr) =
@@ -701,9 +703,9 @@ let get_uninit_read_of_module (p : path) (me : module_expr) =
         acc
 
     | MI_Function f ->
-        let xp = xpath_fun mp f.f_name in
+        let xp = xpath mp f.f_name in
         let r  = get_uninit_read_of_fun xp f in
-        if Sx.is_empty r then acc else (xp, r) :: acc
+        if Sid.is_empty r then acc else (xp, r) :: acc
 
   in
 

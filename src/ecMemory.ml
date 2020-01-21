@@ -19,9 +19,10 @@ type memory = EcIdent.t
 let mem_equal = EcIdent.id_equal
 
 (* -------------------------------------------------------------------- *)
+(* The [EcIdent.t] is the ident corresponding to the symbol in the current
+   context. *)
 type local_memtype = {
-  mt_path : EcPath.xpath;
-  mt_vars : ((int*int) option * ty) Msym.t
+  mt_vars : ((int*int) option * ty * EcIdent.t) Msym.t
 }
 
 type memtype = local_memtype option
@@ -29,15 +30,14 @@ type memtype = local_memtype option
 let mt_fv = function
   | None -> EcIdent.Mid.empty
   | Some lmt ->
-    let fv = EcPath.x_fv EcIdent.Mid.empty lmt.mt_path in
-    Msym.fold (fun _ (_,ty) fv -> EcIdent.fv_union fv ty.ty_fv) lmt.mt_vars fv
+    let fv = EcIdent.Mid.empty in
+    Msym.fold (fun _ (_,ty,_) fv -> EcIdent.fv_union fv ty.ty_fv) lmt.mt_vars fv
 
 let lmt_equal mt1 mt2 =
-  EcPath.x_equal mt1.mt_path mt2.mt_path &&
-    Msym.equal (fun (p1,ty1) (p2,ty2) -> p1 = p2 && ty_equal ty1 ty2)
-      mt1.mt_vars mt2.mt_vars
+  Msym.equal (fun (p1,ty1,id1) (p2,ty2,id2) ->
+      p1 = p2 && ty_equal ty1 ty2 && EcIdent.id_equal id1 id2)
+    mt1.mt_vars mt2.mt_vars
 
-let lmt_xpath mt = mt.mt_path
 let lmt_bindings mt = mt.mt_vars
 
 let mt_equal mt1 mt2 =
@@ -45,10 +45,6 @@ let mt_equal mt1 mt2 =
   | Some mt1, Some mt2 -> lmt_equal mt1 mt2
   | None, None         -> true
   | _   , _            -> false
-
-let mt_xpath = function
-  | None -> assert false
-  | Some mt -> lmt_xpath mt
 
 let mt_bindings = function
   | None -> assert false
@@ -63,31 +59,33 @@ let me_equal (m1,mt1) (m2,mt2) =
 (* -------------------------------------------------------------------- *)
 let memory   (m,_) = m
 let memtype  (_,mt) = mt
-let xpath    (_,mt) = mt_xpath mt
 let bindings (_,mt) = mt_bindings mt
 
 (* -------------------------------------------------------------------- *)
 exception DuplicatedMemoryBinding of symbol
 
 (* -------------------------------------------------------------------- *)
-let empty_local (me : memory) mp =
-  (me, Some {mt_path   = mp; mt_vars   = Msym.empty; } )
+let empty_local (me : memory) =
+  (me, Some { mt_vars   = Msym.empty; } )
 
 let abstract (me:memory) = (me,None)
 
 (* -------------------------------------------------------------------- *)
-let bindp (x : symbol) pr (ty : EcTypes.ty) ((m,mt) : memenv) =
+let bindp (x : symbol) pr (ty : EcTypes.ty) (id : EcIdent.t) ((m,mt) : memenv) =
   let mt = match mt with
     | None -> assert false
     | Some mt -> mt in
   let merger = function
     | Some _ -> raise (DuplicatedMemoryBinding x)
-    | None   -> Some (pr,ty)
+    | None   -> Some (pr,ty,id)
   in
-    (m, Some { mt with mt_vars = Msym.change merger x mt.mt_vars })
+    (m, Some { mt_vars = Msym.change merger x mt.mt_vars })
 
-let bind_proj i n x ty me = bindp x (Some (i,n)) ty me
-let bind x ty me = bindp x None ty me
+let bindp_new (x : symbol) pr (ty : EcTypes.ty) (memenv : memenv) =
+  bindp x pr ty (EcIdent.create x) (memenv)
+
+let bind_proj_new i n x ty me = bindp_new x (Some (i,n)) ty me
+let bind_new x ty me = bindp_new x None ty me
 
 (* -------------------------------------------------------------------- *)
 let lookup (x : symbol) ((_,mt) : memenv) =
@@ -97,20 +95,23 @@ let lookup (x : symbol) ((_,mt) : memenv) =
 
 let is_bound x me = lookup x me <> None
 
-let is_bound_pv pv me =
-  is_loc pv && is_bound (EcPath.xbasename pv.pv_name) me
+let is_bound_pv pv me = match pv with
+  | PVglob _ -> false
+  | PVloc id -> is_bound (EcIdent.name id) me
+
 (* -------------------------------------------------------------------- *)
+
+(* TODO: A: Do we need to substitute idents by idents? *)
 let mt_subst sx st o =
   match o with
   | None -> o
   | Some mt ->
-    let p' = sx mt.mt_path in
     let vars' =
       if st == identity then mt.mt_vars else
-        Msym.map (fun (p,ty) -> p, st ty) mt.mt_vars in
+        Msym.map (fun (p,ty,id) -> p, st ty, id) mt.mt_vars in
            (* FIXME could be greate to use smart_map *)
-    if p' == mt.mt_path && vars' == mt.mt_vars then o else
-      Some { mt_path   = p'; mt_vars   = vars' }
+    if vars' == mt.mt_vars then o else
+      Some { mt_vars   = vars' }
 
 let mt_substm sp smp st o =
   mt_subst (EcPath.x_substm sp smp) st o
@@ -123,6 +124,3 @@ let me_subst sx sm st (m,mt as me) =
 
 let me_substm sp smp sm st me =
   me_subst (EcPath.x_substm sp smp) sm st me
-
-
-

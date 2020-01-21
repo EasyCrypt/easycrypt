@@ -20,7 +20,7 @@ open EcCoreGoal
 val check_concrete : proofenv -> EcEnv.env -> EcPath.xpath -> unit
 
 val subst_pre :
-     EcEnv.env -> xpath -> funsig -> memory
+     EcEnv.env -> xpath -> funsig -> memenv
   -> EcPV.PVM.subst
   -> EcPV.PVM.subst
 
