@@ -26,6 +26,8 @@ type local_memtype = {
 
 type memtype = local_memtype option
 
+let lmem_hash lmem = assert false (* TODO: (Adrien) *)
+
 let mt_fv = function
   | None -> EcIdent.Mid.empty
   | Some lmt ->
@@ -56,6 +58,8 @@ let mt_bindings = function
 
 (* -------------------------------------------------------------------- *)
 type memenv = memory * memtype
+
+let mem_hash mem = assert false (* TODO: (Adrien) *)
 
 let me_equal (m1,mt1) (m2,mt2) =
   mem_equal m1 m2 && mt_equal mt1 mt2
@@ -123,6 +127,3 @@ let me_subst sx sm st (m,mt as me) =
 
 let me_substm sp smp sm st me =
   me_subst (EcPath.x_substm sp smp) sm st me
-
-
-

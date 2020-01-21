@@ -362,7 +362,9 @@ let chs_hash chs =
     (f_hash chs.chs_pr)
     (f_hash chs.chs_po)
     (cost_hash chs.chs_co)
-    (EcCoreModules.s_hash chs.chs_s)
+    (Why3.Hashcons.combine
+       (EcCoreModules.s_hash chs.chs_s)
+       (EcMemory.mem_hash chs.chs_m))
 
 let bhf_hash bhf =
   Why3.Hashcons.combine_list f_hash
@@ -371,7 +373,10 @@ let bhf_hash bhf =
 
 let bhs_hash bhs =
   Why3.Hashcons.combine_list f_hash
-    (Why3.Hashcons.combine (hcmp_hash bhs.bhs_cmp) (EcCoreModules.s_hash bhs.bhs_s))
+    (Why3.Hashcons.combine2
+       (hcmp_hash bhs.bhs_cmp)
+       (EcCoreModules.s_hash bhs.bhs_s)
+       (EcMemory.mem_hash bhs.bhs_m))
     [bhs.bhs_pr;bhs.bhs_po;bhs.bhs_bd]
 
 let ef_hash ef =
@@ -382,7 +387,11 @@ let ef_hash ef =
 let es_hash es =
   Why3.Hashcons.combine3
     (f_hash es.es_pr) (f_hash es.es_po)
-    (EcCoreModules.s_hash es.es_sl) (EcCoreModules.s_hash es.es_sr)
+    (EcCoreModules.s_hash es.es_sl)
+    (Why3.Hashcons.combine2
+       (EcMemory.mem_hash es.es_mr)
+       (EcMemory.mem_hash es.es_ml)
+       (EcCoreModules.s_hash es.es_sr))
 
 let eg_hash eg =
   Why3.Hashcons.combine3
