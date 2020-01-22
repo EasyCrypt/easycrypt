@@ -26,7 +26,17 @@ type local_memtype = {
 
 type memtype = local_memtype option
 
-let lmem_hash lmem = assert false (* TODO: (Adrien) *)
+let lmem_hash lmem =
+  let el_hash (s,(opt,ty)) =
+    Why3.Hashcons.combine2
+      (Hashtbl.hash s)
+      (match opt with
+       | Some (i,n) -> Why3.Hashcons.combine2 1 i n
+       | None -> 0 )
+      (EcTypes.ty_hash ty) in
+
+  Why3.Hashcons.combine_list el_hash (EcPath.x_hash lmem.mt_path)
+    (Msym.bindings lmem.mt_vars)
 
 let mt_fv = function
   | None -> EcIdent.Mid.empty
@@ -59,7 +69,12 @@ let mt_bindings = function
 (* -------------------------------------------------------------------- *)
 type memenv = memory * memtype
 
-let mem_hash mem = assert false (* TODO: (Adrien) *)
+let mem_hash (mem,mt) =
+  Why3.Hashcons.combine
+    (EcIdent.id_hash mem)
+    (match mt with
+     | None -> 0
+     | Some mt -> Why3.Hashcons.combine 1 (lmem_hash mt))
 
 let me_equal (m1,mt1) (m2,mt2) =
   mem_equal m1 m2 && mt_equal mt1 mt2

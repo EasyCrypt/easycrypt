@@ -19,42 +19,44 @@ open EcLowPhlGoal
 module LowInternal = struct
   exception No_wp
 
-  let wp_asgn_aux m lv e (lets, f) =
+  let wp_asgn_aux memenv lv e (lets, f) =
+    let m = EcMemory.memory memenv in
     let let1 = lv_subst m lv (form_of_expr m e) in
       (let1::lets, f)
 
-  let rec wp_stmt onesided env m (stmt: EcModules.instr list) letsf cost =
+  let rec wp_stmt onesided env memenv (stmt: EcModules.instr list) letsf cost =
     match stmt with
     | [] -> (stmt, letsf), cost
     | i :: stmt' ->
         try
-          let letsf, i_cost = wp_instr onesided env m i letsf in
-          wp_stmt onesided env m stmt' letsf (f_int_add_simpl cost i_cost)
+          let letsf, i_cost = wp_instr onesided env memenv i letsf in
+          wp_stmt onesided env memenv stmt' letsf (f_int_add_simpl cost i_cost)
         with No_wp -> (stmt, letsf), cost
 
-  and wp_instr onesided env m i letsf =
+  and wp_instr onesided env memenv i letsf =
     match i.i_node with
     | Sasgn (lv,e) ->
-      wp_asgn_aux m lv e letsf, cost_of_expr e
+      wp_asgn_aux memenv lv e letsf, cost_of_expr_any memenv e
 
     | Sif (e,s1,s2) ->
         let (r1,letsf1),cost_1 =
-          wp_stmt onesided env m (List.rev s1.s_node) letsf f_i0 in
+          wp_stmt onesided env memenv (List.rev s1.s_node) letsf f_i0 in
         let (r2,letsf2),cost_2 =
-          wp_stmt onesided env m (List.rev s2.s_node) letsf f_i0 in
+          wp_stmt onesided env memenv (List.rev s2.s_node) letsf f_i0 in
         if List.is_empty r1 && List.is_empty r2 then begin
           let post1 = mk_let_of_lv_substs env letsf1 in
           let post2 = mk_let_of_lv_substs env letsf2 in
+          let m = EcMemory.memory memenv in
           let post  = f_if (form_of_expr m e) post1 post2 in
           ([], post),
           f_int_add_simpl cost_1
-            (f_int_add_simpl cost_2 (cost_of_expr e))
+            (f_int_add_simpl cost_2 (cost_of_expr_any memenv e))
         end else raise No_wp
 
     | Sassert e when onesided ->
-        let phi = form_of_expr m e in
+        let phi = form_of_expr (EcMemory.memory memenv) e in
         let lets,f = letsf in
-        (lets, EcFol.f_and_simpl phi f), cost_of_expr e
+        (lets, EcFol.f_and_simpl phi f), cost_of_expr_any memenv e
 
     | _ -> raise No_wp
 end
@@ -78,9 +80,9 @@ module TacInternal = struct
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
     let (s_hd, s_wp) = o_split i hs.hs_s in
-    let m = EcMemory.memory hs.hs_m in
     let s_wp = EcModules.stmt s_wp in
-    let s_wp, post, _ = wp ~uselet ~onesided:true env m s_wp hs.hs_po in
+    let s_wp, post, _ =
+      wp ~uselet ~onesided:true env hs.hs_m s_wp hs.hs_po in
     check_wp_progress tc i hs.hs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
@@ -90,9 +92,9 @@ module TacInternal = struct
     let env = FApi.tc1_env tc in
     let chs = tc1_as_choareS tc in
     let (s_hd, s_wp) = o_split i chs.chs_s in
-    let m = EcMemory.memory chs.chs_m in
     let s_wp = EcModules.stmt s_wp in
-    let s_wp, post, cost_wp = wp ~uselet ~onesided:true env m s_wp chs.chs_po in
+    let s_wp, post, cost_wp =
+      wp ~uselet ~onesided:true env chs.chs_m s_wp chs.chs_po in
     check_wp_progress tc i chs.chs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let cost = cost_sub_self chs.chs_co cost_wp in
@@ -106,8 +108,7 @@ module TacInternal = struct
     let bhs = tc1_as_bdhoareS tc in
     let (s_hd, s_wp) = o_split i bhs.bhs_s in
     let s_wp = EcModules.stmt s_wp in
-    let m = EcMemory.memory bhs.bhs_m in
-    let s_wp,post,_ = wp ~uselet env m s_wp bhs.bhs_po in
+    let s_wp,post,_ = wp ~uselet env bhs.bhs_m s_wp bhs.bhs_po in
     check_wp_progress tc i bhs.bhs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
     let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
@@ -119,8 +120,8 @@ module TacInternal = struct
     let i = omap fst ij and j = omap snd ij in
     let s_hdl,s_wpl = o_split i es.es_sl in
     let s_hdr,s_wpr = o_split j es.es_sr in
-    let meml, s_wpl = EcMemory.memory es.es_ml, EcModules.stmt s_wpl in
-    let memr, s_wpr = EcMemory.memory es.es_mr, EcModules.stmt s_wpr in
+    let meml, s_wpl = es.es_ml, EcModules.stmt s_wpl in
+    let memr, s_wpr = es.es_mr, EcModules.stmt s_wpr in
     let post = es.es_po in
     let s_wpl, post, _ = wp ~uselet env meml s_wpl post in
     let s_wpr, post, _ = wp ~uselet env memr s_wpr post in

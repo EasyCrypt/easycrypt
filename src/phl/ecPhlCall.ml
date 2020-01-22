@@ -108,10 +108,14 @@ let t_choare_call fpre fpost fcost tc =
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
 
   (* The cost of the remaining code must be bounded by the cost of the
-     conclusion `chs.chs_co`, minus the cost of the call `fcost`, and minus
-     the cost of the arguments' evaluation. *)
+     conclusion [chs.chs_co], minus the cost of the call [fcost], and minus
+     the cost of the arguments' evaluation.
+     Remark: the cost of the evaluation of the return is accounted for in
+     [fcost]. *)
   let args_cost = List.fold_left (fun cost e ->
-      EcFol.f_int_add_simpl cost (EcFol.cost_of_expr e)
+      EcFol.f_int_add_simpl
+        cost
+        (EcFol.cost_of_expr_any chs.chs_m e)
     ) f_i0 args in
   let cost =
     EcFol.cost_sub_self
@@ -448,7 +452,7 @@ let process_call side info tc =
 
             let pre, post, cost, _ =
               EcPhlFun.FunAbsLow.choareF_abs_spec !!tc env f inv inv_inf in
-            f_cHoareF pre f post cost)       (* TODO:(Adrien) *)
+            f_cHoareF pre f post cost)
 
     | FbdHoareS bhs ->
       let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in

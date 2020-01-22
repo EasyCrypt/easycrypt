@@ -1186,6 +1186,15 @@ let form_forall g f =
   | Fpr       pr  -> g pr.pr_args && g pr.pr_event
 
 (* -------------------------------------------------------------------- *)
+let f_ops f =
+  let aout = ref EcPath.Sp.empty in
+  let rec doit f =
+    match f.f_node with
+    | Fop (p, _) -> aout := Sp.add p !aout
+    | _ -> f_iter doit f
+  in doit f; !aout
+
+(* -------------------------------------------------------------------- *)
 exception DestrError of string
 
 let destr_error e = raise (DestrError e)

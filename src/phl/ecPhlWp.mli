@@ -8,10 +8,6 @@
 
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcEnv
-open EcMemory
-open EcModules
-open EcFol
 
 open EcCoreGoal.FApi
 
@@ -21,9 +17,5 @@ open EcCoreGoal.FApi
  * statements.  Any weakening of this restriction may break the
  * soundness of the bounded hoare logic.
  *)
-
-val wp :
-      ?uselet:bool -> ?onesided:bool
-   -> env -> memory -> stmt -> form -> instr list * form * form
 
 val t_wp : ?uselet:bool -> (codepos1 doption) option -> backward

@@ -107,7 +107,9 @@ let t_choareF_fun_def_r tc =
   let c   = PVM.subst_cost env spre chf.chf_co in
   let c = match fdef.f_ret with
     | None -> c
-    | Some ret -> EcFol.cost_sub_self c (EcFol.cost_of_expr ret) in
+    | Some ret ->
+      EcFol.cost_sub_self
+        c (EcFol.cost_of_expr_any memenv ret) in
   let concl' = f_cHoareS memenv pre fdef.f_body post c in
   FApi.xmutate1 tc `FunDef [concl']
 
@@ -578,24 +580,16 @@ let t_fun_to_code_hoare_r tc =
 
 (* -------------------------------------------------------------------- *)
 (* This is for the proc* tactic, which replaces a statement about `G.f` by
-   a statement about `x <$ G.f(args)`.
-   By consequence, we are adding an assignment, whose cost is the cost of `G.f`
-   plus the cost of the arguments `agrs` computation. Hence we need to add it
-   to the allowed cost. *)
-(* TODO: (Adrien) this is sound only if the cost of evaluating the arguments is
-   **exactly** what we are adding. I am not certain this is the case here. *)
+   a statement about `x <$ G.f(args)`. *)
 let t_fun_to_code_choare_r tc =
   let env = FApi.tc1_env tc in
   let chf = tc1_as_choareF tc in
   let f = chf.chf_f in
   let m, _ = Fun.hoareF_memenv f env in
-  let m, st, r, ty, args = ToCodeLow.to_code env f m in
+  let m, st, r, ty, _ = ToCodeLow.to_code env f m in
   let s = PVM.add env (pv_res f) (fst m) (f_pvar r ty (fst m)) PVM.empty in
   let post = PVM.subst env s chf.chf_po in
-  let cost = List.fold_left (fun cost e ->
-      EcFol.cost_add_self cost (EcFol.cost_of_expr e)
-    ) chf.chf_co args in
-  let concl = f_cHoareS m chf.chf_pr st post cost in
+  let concl = f_cHoareS m chf.chf_pr st post chf.chf_co in
 
   FApi.xmutate1 tc `FunToCode [concl]
 

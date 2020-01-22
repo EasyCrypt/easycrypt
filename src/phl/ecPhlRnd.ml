@@ -55,7 +55,10 @@ module Core = struct
     let post = subst_form_lv env (EcMemory.memory chs.chs_m) lv x chs.chs_po in
     let post = f_imp (f_in_supp x distr) post in
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
-    let cost = EcFol.cost_sub_self chs.chs_co (cost_of_expr distr_e) in
+    let cost =
+      EcFol.cost_sub_self
+        chs.chs_co
+        (cost_of_expr_any chs.chs_m distr_e) in
     let concl = f_cHoareS_r { chs with chs_s = s;
                                        chs_po = post;
                                        chs_co = cost} in

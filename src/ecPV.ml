@@ -325,6 +325,7 @@ module PV = struct
     | Fapp(e, es) -> List.fold_left (aux env m) (aux env m fv e) es
     | Ftuple es   -> List.fold_left (aux env m) fv es
     | Fproj(e,_)  -> aux env m fv e
+    | Fcoe _                    (* TODO: (Adrien) we may need to implement this *)
     | FhoareF _  | FhoareS _
     | FcHoareF _  | FcHoareS _
     | FbdHoareF _  | FbdHoareS _

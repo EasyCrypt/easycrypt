@@ -188,6 +188,7 @@ val f_compare : form -> form -> int
 val f_hash    : form -> int
 val f_fv      : form -> int Mid.t
 val f_ty      : form -> EcTypes.ty
+val f_ops     : form -> Sp.t
 
 module Mf : Map.S with type key = form
 module Sf : Set.S with module M = Map.MakeBase(Mf)
