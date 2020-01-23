@@ -118,93 +118,9 @@ and pinstr = pinstr_r located
 and pstmt  = pinstr list
 
 (* -------------------------------------------------------------------- *)
-type pmodule_type = pqsymbol
+(* TODO: A: old module restr. get rid of them? *)
 type pmodule_type_restr = pqsymbol * pmsymbol located list
 
-type pmodule_sig =
-  | Pmty_struct of pmodule_sig_struct
-
-and pmodule_sig_struct = {
-  pmsig_params : (psymbol * pmodule_type) list;
-  pmsig_body   : pmodule_sig_struct_body;
-}
-
-and pmodule_sig_struct_body = pmodule_sig_item list
-
-and include_proc = [
-  | `Include_proc of psymbol list
-  | `Exclude_proc of psymbol list
-]
-
-and pmodule_sig_item = [
-  | `Include      of pmodule_type * include_proc option * pqsymbol list option
-  | `FunctionDecl of pfunction_decl
-]
-
-and pvariable_decl = {
-  pvd_name : psymbol;
-  pvd_type : pty;
-}
-
-and fun_params =
- | Fparams_exp of (psymbol * pty) list
- | Fparams_imp of pty
-
-and pfunction_decl = {
-  pfd_name     : psymbol;
-  pfd_tyargs   : fun_params;
-  pfd_tyresult : pty;
-  pfd_uses     : bool * pqsymbol list option;
-}
-
-(* -------------------------------------------------------------------- *)
-
-and pmodule_def = {
-  ptm_header : pmodule_header;
-  ptm_body   : pmodule_expr;
-  ptm_local  : bool;
-}
-
-and pmodule_header =
-  | Pmh_ident  of psymbol
-  | Pmh_params of (pmodule_header * pmodule_params) located
-  | Pmh_cast   of pmodule_header * pqsymbol list
-
-and pmodule_params = (psymbol * pmodule_type) list
-
-and pmodule_expr_r =
-  | Pm_ident  of pmsymbol
-  | Pm_struct of pstructure
-
-and pmodule_expr = pmodule_expr_r located
-
-and pstructure = pstructure_item located list
-
-and pstructure_item =
-  | Pst_mod      of (psymbol * pqsymbol list * pmodule_expr)
-  | Pst_var      of (psymbol list * pty)
-  | Pst_fun      of (pfunction_decl * pfunction_body)
-  | Pst_alias    of (psymbol * pgamepath)
-  | Pst_maliases of (pmsymbol located * include_proc option)
-
-
-and pfunction_body = {
-  pfb_locals : pfunction_local list;
-  pfb_body   : pstmt;
-  pfb_return : pexpr option;
-}
-
-and pfunction_local = {
-  pfl_names : ([`Single|`Tuple] * (psymbol list)) located;
-  pfl_type  : pty   option;
-  pfl_init  : pexpr option;
-}
-
-
-type pmodule_decl = {
-  ptmd_name  : psymbol;
-  ptmd_modty : pmodule_type_restr;
-}
 
 (* -------------------------------------------------------------------- *)
 type ptyparams = (psymbol * pqsymbol list) list
@@ -297,6 +213,29 @@ and pfindex = [ `Index of int | `Match of pformula * int option]
 
 and pcost  = PC_costs of pformula * (pgamepath * pformula) list
 
+
+(* -------------------------------------------------------------------- *)
+type pmod_restr_mem_el = [
+  | `Plus of pqsymbol
+  | `Minus of pqsymbol
+]
+
+type pmod_restr_mem = pmod_restr_mem_el list
+
+type poracles = pgamepath list
+
+type pcompl = PCompl of pcost
+
+type pmod_restr_el = {
+  pmre_star  : bool;
+	pmre_name  : psymbol;
+  pmre_orcls : poracles option;
+  pmre_compl : pcompl option; }
+
+type pmod_restr = {
+  pmr_mem   : pmod_restr_mem option;
+	pmr_procs : pmod_restr_el list; }
+
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =
   match unloc f with
@@ -381,6 +320,95 @@ type pabbrev = {
 }
 
 (* -------------------------------------------------------------------- *)
+type pmodule_type = pqsymbol
+
+type pmodule_sig =
+  | Pmty_struct of pmodule_sig_struct
+
+and pmodule_sig_struct = {
+  pmsig_params : (psymbol * pmodule_type) list;
+  pmsig_body   : pmodule_sig_struct_body;
+  pmsig_restr  : pmod_restr option;
+}
+
+and pmodule_sig_struct_body = pmodule_sig_item list
+
+and include_proc = [
+  | `Include_proc of psymbol list
+  | `Exclude_proc of psymbol list
+]
+
+and pmodule_sig_item = [
+  | `Include      of pmodule_type * include_proc option * pqsymbol list option
+  | `FunctionDecl of pfunction_decl
+]
+
+and pvariable_decl = {
+  pvd_name : psymbol;
+  pvd_type : pty;
+}
+
+and fun_params =
+ | Fparams_exp of (psymbol * pty) list
+ | Fparams_imp of pty
+
+and pfunction_decl = {
+  pfd_name     : psymbol;
+  pfd_tyargs   : fun_params;
+  pfd_tyresult : pty;
+  pfd_uses     : bool * pqsymbol list option;
+}
+
+(* -------------------------------------------------------------------- *)
+
+and pmodule_def = {
+  ptm_header : pmodule_header;
+  ptm_body   : pmodule_expr;
+  ptm_local  : bool;
+}
+
+and pmodule_header =
+  | Pmh_ident  of psymbol
+  | Pmh_params of (pmodule_header * pmodule_params) located
+  | Pmh_cast   of pmodule_header * pqsymbol list
+
+and pmodule_params = (psymbol * pmodule_type) list
+
+and pmodule_expr_r =
+  | Pm_ident  of pmsymbol
+  | Pm_struct of pstructure
+
+and pmodule_expr = pmodule_expr_r located
+
+and pstructure = pstructure_item located list
+
+and pstructure_item =
+  | Pst_mod      of (psymbol * pqsymbol list * pmodule_expr)
+  | Pst_var      of (psymbol list * pty)
+  | Pst_fun      of (pfunction_decl * pfunction_body)
+  | Pst_alias    of (psymbol * pgamepath)
+  | Pst_maliases of (pmsymbol located * include_proc option)
+
+
+and pfunction_body = {
+  pfb_locals : pfunction_local list;
+  pfb_body   : pstmt;
+  pfb_return : pexpr option;
+}
+
+and pfunction_local = {
+  pfl_names : ([`Single|`Tuple] * (psymbol list)) located;
+  pfl_type  : pty   option;
+  pfl_init  : pexpr option;
+}
+
+
+type pmodule_decl = {
+  ptmd_name  : psymbol;
+  ptmd_modty : pmodule_type_restr;
+}
+
+(* -------------------------------------------------------------------- *)
 type pdeclare =
 | PDCL_Module of pmodule_decl
 
@@ -450,11 +478,13 @@ type pipattern =
 
 and pspattern = unit
 
+type poracles_cost = (pgamepath * pcost) list
+
 (* For cost judgement with abstract calls.
    ci_oracles : list of pairs of oracles and their costs.
    ci_vrnts   : list of pairs of oracles and their increasing quantity. *)
 type p_abs_inv_inf =
-  { ci_oracles : (pgamepath * pcost) list;
+  { ci_oracles : poracles_cost;
     ci_vrnts   : (pgamepath * pformula) list; }
 
 type p_call_inv_info = [` Std of pcost | `CostAbs of p_abs_inv_inf ]

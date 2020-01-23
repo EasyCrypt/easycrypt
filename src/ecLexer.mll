@@ -208,6 +208,9 @@
     "dump"        , DUMP       ;        (* KW: global *)
     "remove"      , REMOVE     ;        (* KW: global *)
 
+    "oracles"     , ORACLES    ;        (* KW: global *)
+    "compl"       , COMPL      ;        (* KW: global *)
+
     "time"        , TIME       ;        (* KW: internal *)
     "undo"        , UNDO       ;        (* KW: internal *)
     "debug"       , DEBUG      ;        (* KW: internal *)

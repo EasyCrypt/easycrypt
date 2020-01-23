@@ -400,6 +400,7 @@
 %token COLON
 %token COLONTILD
 %token COMMA
+%token COMPL
 %token CONGR
 %token CONSEQ
 %token CONST
@@ -488,6 +489,7 @@
 %token NOTATION
 %token OF
 %token OP
+%token ORACLES
 %token PCENT
 %token PHOARE
 %token PIPE
@@ -1296,7 +1298,7 @@ pgtybinding1:
 | x=ptybinding1
     { List.map (fun (xs, ty) -> (xs, PGTY_Type ty)) x }
 
-| LPAREN x=uident LTCOLON mi=mod_type_restr RPAREN
+| LPAREN x=uident LTCOLON mi=short_mod_type_restr RPAREN
     { [[mk_loc (loc x) (Some x)], PGTY_ModTy mi] }
 
 | pn=mident
@@ -1520,11 +1522,71 @@ top_mod_def:
 | /*-*/ x=mod_def { mk_topmod ~local:false x }
 
 top_mod_decl:
-| DECLARE MODULE x=uident COLON t=mod_type_restr
+| DECLARE MODULE x=uident COLON t=short_mod_type_restr
     { { ptmd_name = x; ptmd_modty = t; } }
 
 mod_params:
 | LPAREN a=plist1(sig_param, COMMA) RPAREN  { a }
+
+(* -------------------------------------------------------------------- *)
+(* Memory restrictions *)
+
+mem_restr_el:
+  | PLUS  el=qident { `Plus el }
+  | MINUS el=qident { `Minus el }
+  | el=qident       { `Minus el }
+
+mem_restr:
+  | ol=rlist0(mem_restr_el,COMMA) RBRACE { ol }
+
+(* -------------------------------------------------------------------- *)
+(* Oracle restrictions *)
+
+oracle_restr:
+  | ORACLES ol=rlist0(loc(fident),COMMA) RBRACE { ol }
+
+(* -------------------------------------------------------------------- *)
+(* Complexity restrictions *)
+
+compl_restr:
+  | COMPL c=costs(none) { PCompl c }
+
+(* -------------------------------------------------------------------- *)
+(* Module restrictions *)
+
+mod_restr_el:
+  | PROC i=iboption(STAR) f=lident
+    LBRACE orcl=oracle_restr SEMICOLON cl=compl_restr RBRACE
+    { { pmre_star = not i;
+	pmre_name = f;
+	pmre_orcls = Some orcl;
+	pmre_compl = Some cl; } }
+
+  | PROC i=iboption(STAR) f=lident COLON
+    LBRACE orcl=oracle_restr RBRACE
+    { { pmre_star = not i;
+	pmre_name = f;
+	pmre_orcls = Some orcl;
+	pmre_compl = None; } }
+
+  | PROC i=iboption(STAR) f=lident COLON
+    LBRACE cl=compl_restr RBRACE
+    { { pmre_star = not i;
+	pmre_name = f;
+	pmre_orcls = None;
+	pmre_compl = Some cl; } }
+
+mod_restr:
+  | LBRACE mr=mem_restr RBRACE
+    { { pmr_mem = Some mr;
+	pmr_procs = [] } }
+  | LBRACE l=rlist1(mod_restr_el,empty) RBRACE
+    { { pmr_mem = None;
+	pmr_procs = l } }
+  | LBRACE mr=mem_restr SEMICOLON l=rlist1(mod_restr_el,empty) RBRACE
+    { { pmr_mem = Some mr;
+	pmr_procs = l } }
+
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
@@ -1532,7 +1594,8 @@ mod_params:
 %inline mod_type:
 | x = qident { x }
 
-%inline mod_type_restr:
+/* TODO: A: update this to more complexe restrictions */
+%inline short_mod_type_restr:
 | x = qident
     { (x, []) }
 
@@ -1540,9 +1603,10 @@ mod_params:
     { (x, restr) }
 
 sig_def:
-| MODULE TYPE x=uident args=sig_params* EQ i=sig_body
+| MODULE TYPE x=uident args=sig_params* mr=mod_restr? EQ i=sig_body
     { (x, Pmty_struct { pmsig_params = List.flatten args;
-                        pmsig_body   = i; }) }
+                        pmsig_body   = i;
+			pmsig_restr  = mr; }) }
 
 sig_body:
 | body=sig_struct_body { body }

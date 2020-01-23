@@ -1624,6 +1624,9 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
   in
   let env  = EcEnv.Mod.enter name margs env in
   let body, mr = transmodsig_body env sa modty.pmsig_body in
+
+  (* TODO: A: parse and do something with the module restriction in pmsig_restr. *)
+
   assert (Msym.cardinal mr.mr_oinfos = List.length body);
   { mis_params = margs;
     mis_body   = body;
