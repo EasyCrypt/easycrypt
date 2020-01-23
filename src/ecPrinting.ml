@@ -561,6 +561,9 @@ let pp_mem (ppe : PPEnv.t) fmt x =
   in
     Format.fprintf fmt "%s" x
 
+let pp_memtype fmt mt = Format.fprintf fmt "TODO"
+   (* TODO: A: use the correct function there, after merging deploy-simpler-xpaths branch. *)
+
 (* -------------------------------------------------------------------- *)
 type assoc  = [`Left | `Right | `NonAssoc]
 type iassoc = [`ILeft | `IRight | assoc]
@@ -1592,7 +1595,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | FcHoareF chf ->
       let ppe =
         PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, chf.chf_f) in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time %a"
+      Format.fprintf fmt "choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]@ time %a"
         (pp_funname ppe) chf.chf_f
         (pp_form ppe) chf.chf_pr
         (pp_form ppe) chf.chf_po
@@ -1600,7 +1603,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | FcHoareS chs ->
       let ppe = PPEnv.push_mem ppe ~active:true chs.chs_m in
-      Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time %a"
+      Format.fprintf fmt "choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]@ time %a"
         (pp_stmt_for_form ppe) chs.chs_s
         (pp_form ppe) chs.chs_pr
         (pp_form ppe) chs.chs_po
@@ -1625,9 +1628,10 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form_r ppe (fst outer, (max_op_prec,`NonAssoc))) hs.bhs_bd
 
   | Fcoe coe ->
-      let ppe_e = PPEnv.push_mem ppe ~active:true coe.coe_mem in
-      Format.fprintf fmt "coe[@[<hov 2>@ %a :@ @[%a@]@]]"
-        (pp_expr ppe_e) coe.coe_e
+      let ppe = PPEnv.push_mem ppe ~active:true coe.coe_mem in
+      Format.fprintf fmt "coe{%a}[@[<hov 2>@ %a :@ @[%a@]@]]"
+        pp_memtype coe.coe_mem
+        (pp_expr ppe) coe.coe_e
         (pp_form ppe) coe.coe_pre
 
   | Fpr pr->

@@ -1032,7 +1032,6 @@ orcl_time(P):
 
 costs(P):
 | LBRACKET c=form_r(P) RBRACKET     {PC_costs(c,[])}
-/* TODO: (Adrien) there is a problem with this entry, but I don't know what */
 | LBRACKET c=form_r(P) SEMICOLON calls=rlist1(orcl_time(P), SEMICOLON) RBRACKET
                                       {PC_costs(c,calls)}
 

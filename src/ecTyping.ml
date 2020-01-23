@@ -2922,6 +2922,8 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
         let pre'   = transf penv pre in
         let post'  = transf qenv post in
+
+        (* TODO: A: we need to change the typing environement there. *)
         let self'  = transf penv self in
         let calls' = List.map (fun (f,c) ->
             trans_gamepath env f,
