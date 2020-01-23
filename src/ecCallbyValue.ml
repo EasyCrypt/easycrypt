@@ -25,7 +25,6 @@ module Subst : sig
   val subst_ty       : subst -> ty -> ty
   val subst_xpath    : subst -> EcPath.xpath -> EcPath.xpath
   val subst_m        : subst -> ident -> ident
-  val subst_mt       : subst -> EcMemory.memtype -> EcMemory.memtype
   val subst_me       : subst -> EcMemory.memenv -> EcMemory.memenv
   val subst_lpattern : subst -> lpattern -> subst * lpattern
   val subst_stmt     : subst -> EcModules.stmt -> EcModules.stmt
@@ -46,7 +45,6 @@ end = struct
   let subst_xpath    = Fsubst.subst_xpath
   let subst_m        = Fsubst.subst_m
   let subst_me       = Fsubst.subst_me
-  let subst_mt       = Fsubst.subst_mt
   let subst_lpattern = Fsubst.subst_lpattern
   let subst_stmt     = Fsubst.subst_stmt
   let subst_e        = Fsubst.subst_e
@@ -163,7 +161,6 @@ let norm_xfun st s f =
   if st.st_ri.modpath then EcEnv.NormMp.norm_xfun st.st_env f else f
 
 let norm_stmt s c  = Subst.subst_stmt s c
-let norm_mt   s me = Subst.subst_mt s me
 let norm_me   s me = Subst.subst_me s me
 let norm_e    s e  = Subst.subst_e s e
 
@@ -573,9 +570,10 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | Fcoe coe ->
     assert (is_Aempty args);
-    let coe_pre     = norm st s coe.coe_pre in
-    let coe_e       = norm_e s coe.coe_e in
-    let coe_mem = norm_mt s coe.coe_mem in
+    assert (not (Subst.has_mem s (fst coe.coe_mem)));
+    let coe_pre = norm st s coe.coe_pre in
+    let coe_e   = norm_e s coe.coe_e in
+    let coe_mem = norm_me s coe.coe_mem in
     f_coe_r { coe_pre; coe_e; coe_mem }
 
   | Fpr pr ->

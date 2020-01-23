@@ -49,7 +49,7 @@ module Low = struct
     let cost =
       EcFol.cost_sub_self
         chs.chs_co
-        (EcFol.cost_of_expr_any (snd chs.chs_m) e_expr) in
+        (EcFol.cost_of_expr_any chs.chs_m e_expr) in
     let concl1  = f_hoareS chs.chs_m chs.chs_pr hd e in
     let concl2  = f_cHoareS_r { chs with chs_s = s;
                                          chs_co = cost; } in

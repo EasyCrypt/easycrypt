@@ -36,7 +36,7 @@ module LowInternal = struct
   and wp_instr onesided env memenv i letsf =
     match i.i_node with
     | Sasgn (lv,e) ->
-      wp_asgn_aux memenv lv e letsf, cost_of_expr_any (snd memenv) e
+      wp_asgn_aux memenv lv e letsf, cost_of_expr_any memenv e
 
     | Sif (e,s1,s2) ->
         let (r1,letsf1),cost_1 =
@@ -50,13 +50,13 @@ module LowInternal = struct
           let post  = f_if (form_of_expr m e) post1 post2 in
           ([], post),
           f_int_add_simpl cost_1
-            (f_int_add_simpl cost_2 (cost_of_expr_any (snd memenv) e))
+            (f_int_add_simpl cost_2 (cost_of_expr_any memenv e))
         end else raise No_wp
 
     | Sassert e when onesided ->
         let phi = form_of_expr (EcMemory.memory memenv) e in
         let lets,f = letsf in
-        (lets, EcFol.f_and_simpl phi f), cost_of_expr_any (snd memenv) e
+        (lets, EcFol.f_and_simpl phi f), cost_of_expr_any memenv e
 
     | _ -> raise No_wp
 end

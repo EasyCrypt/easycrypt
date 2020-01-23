@@ -115,7 +115,7 @@ let t_choare_call fpre fpost fcost tc =
   let args_cost = List.fold_left (fun cost e ->
       EcFol.f_int_add_simpl
         cost
-        (EcFol.cost_of_expr_any (snd chs.chs_m) e)
+        (EcFol.cost_of_expr_any chs.chs_m e)
     ) f_i0 args in
   let cost =
     EcFol.cost_sub_self

@@ -153,7 +153,7 @@ let t_choare_while_r inv qinc n (lam_cost : cost) tc =
      - at most [n+1] evaluations of the loop body. *)
   let e_cost_self = f_int_mul_simpl
       (f_int_add_simpl n (f_int @@ EcBigInt.of_int 2))
-      (cost_of_expr_any (snd chs.chs_m) expr_e) in
+      (cost_of_expr_any chs.chs_m expr_e) in
   (* We could use [cost_of_expr inv chs.chs_m expr_e] *)
 
   let body_cost = ICHOARE.choare_sum lam_cost (f_i0, n) in

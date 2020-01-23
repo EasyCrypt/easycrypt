@@ -58,7 +58,7 @@ module Core = struct
     let cost =
       EcFol.cost_sub_self
         chs.chs_co
-        (cost_of_expr_any (snd chs.chs_m) distr_e) in
+        (cost_of_expr_any chs.chs_m distr_e) in
     let concl = f_cHoareS_r { chs with chs_s = s;
                                        chs_po = post;
                                        chs_co = cost} in

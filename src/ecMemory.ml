@@ -24,6 +24,8 @@ type local_memtype = {
   mt_vars : ((int*int) option * ty) Msym.t
 }
 
+type memtype = local_memtype option
+
 let lmem_hash lmem =
   let el_hash (s,(opt,ty)) =
     Why3.Hashcons.combine2
@@ -35,12 +37,6 @@ let lmem_hash lmem =
 
   Why3.Hashcons.combine_list el_hash (EcPath.x_hash lmem.mt_path)
     (Msym.bindings lmem.mt_vars)
-
-type memtype = local_memtype option
-
-let mt_hash = function
-  | None -> 0
-  | Some mt -> Why3.Hashcons.combine 1 (lmem_hash mt)
 
 let mt_fv = function
   | None -> EcIdent.Mid.empty
@@ -76,7 +72,9 @@ type memenv = memory * memtype
 let mem_hash (mem,mt) =
   Why3.Hashcons.combine
     (EcIdent.id_hash mem)
-    (mt_hash mt)
+    (match mt with
+     | None -> 0
+     | Some mt -> Why3.Hashcons.combine 1 (lmem_hash mt))
 
 let me_equal (m1,mt1) (m2,mt2) =
   mem_equal m1 m2 && mt_equal mt1 mt2
