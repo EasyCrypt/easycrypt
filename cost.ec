@@ -1,5 +1,5 @@
 require import Int.
-(* require import CHoareTactic. *)
+require import CHoareTactic.
 
 module A = { 
   proc g (x, y) : int = {
@@ -21,6 +21,7 @@ lemma silly : choare[A.g : true ==> true] time [3].
 proof.
 proc.
 wp =>//.
+admit.
 qed.
 
 lemma silly2 : choare[A.g : true ==> true] time [2].
@@ -40,6 +41,7 @@ call silly.
 (* call (_: true ==> true time [3]). *)
 (* apply silly. *)
 wp =>//.
+admit.
 qed.
 
 module B = { 
@@ -61,6 +63,7 @@ lemma silly4 : choare[B.f : true ==> true] time [6].
 proof.
 proc.
 wp=>//.
+admit.
 qed.
 
 module C = { 
@@ -78,3 +81,7 @@ proof.
 move => x y.
 proc.
 while (x <= y) x (x - y) [fun _ => 1].
+move => z.
+wp.
+simplify.
+trivial.

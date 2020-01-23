@@ -109,7 +109,7 @@ let t_choareF_fun_def_r tc =
     | None -> c
     | Some ret ->
       EcFol.cost_sub_self
-        c (EcFol.cost_of_expr_any memenv ret) in
+        c (EcFol.cost_of_expr_any (snd memenv) ret) in
   let concl' = f_cHoareS memenv pre fdef.f_body post c in
   FApi.xmutate1 tc `FunDef [concl']
 

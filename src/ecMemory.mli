@@ -17,9 +17,12 @@ val mem_equal : memory -> memory -> bool
 (* -------------------------------------------------------------------- *)
 type local_memtype
 
+val lmem_hash : local_memtype -> int
+
 type memtype = local_memtype option
 
-val lmem_hash    : local_memtype -> int
+val mt_hash : memtype -> int
+
 val lmt_equal    : local_memtype -> local_memtype -> bool
 val lmt_xpath    : local_memtype -> EcPath.xpath
 val lmt_bindings : local_memtype -> ((int*int) option * EcTypes.ty) Msym.t

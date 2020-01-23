@@ -202,7 +202,7 @@ module LowInternal = struct
       let cost =
         EcFol.f_int_add_simpl
           cost
-          (EcFol.cost_of_expr_any memenv e) in
+          (EcFol.cost_of_expr_any (snd memenv) e) in
 
       bds, assoc, pre, cost
 
@@ -222,7 +222,7 @@ module LowInternal = struct
       let cost =
         EcFol.f_int_add_simpl cost
           (EcFol.f_int_add_simpl
-             (EcFol.cost_of_expr_any memenv e)
+             (EcFol.cost_of_expr_any (snd memenv) e)
              (EcFol.f_int_add_simpl cost_t cost_f)) in
       ([], [], f_or_simpl sp_t sp_f, cost)
 

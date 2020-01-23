@@ -154,7 +154,7 @@ and pr = {
 
 and coe = {
   coe_pre : form;
-  coe_mem : EcMemory.memenv;
+  coe_mem : EcMemory.memtype;
   coe_e   : expr;
 }
 
@@ -336,7 +336,7 @@ let egf_equal eg1 eg2 =
 let coe_equal coe1 coe2 =
      EcTypes.e_equal   coe1.coe_e coe2.coe_e
   && f_equal           coe1.coe_pre coe2.coe_pre
-  && EcMemory.me_equal coe1.coe_mem coe2.coe_mem
+  && EcMemory.mt_equal coe1.coe_mem coe2.coe_mem
 
 let pr_equal pr1 pr2 =
      EcIdent.id_equal pr1.pr_mem pr2.pr_mem
@@ -359,7 +359,7 @@ let coe_hash coe =
   Why3.Hashcons.combine2
     (f_hash coe.coe_pre)
     (EcTypes.e_hash coe.coe_e)
-    (EcMemory.mem_hash coe.coe_mem)
+    (EcMemory.mt_hash coe.coe_mem)
 
 let cost_hash cost =
   Why3.Hashcons.combine
@@ -621,8 +621,8 @@ module Hsform = Why3.Hashcons.Make (struct
           (fv_union (EcCoreModules.s_fv eg.eg_sl) (EcCoreModules.s_fv eg.eg_sr))
 
     | Fcoe coe ->
-      let fv = fv_union (f_fv coe.coe_pre) (EcTypes.e_fv coe.coe_e) in
-      (Mid.remove (fst coe.coe_mem) fv)
+      let fv = f_fv coe.coe_pre in
+      fv_union (EcTypes.e_fv coe.coe_e) fv
 
     | Fpr pr ->
         let fve = Mid.remove mhr (f_fv pr.pr_event) in
@@ -1655,6 +1655,9 @@ module Fsubst = struct
                 s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
     EcTypes.e_subst es e
 
+  let subst_mt s me =
+    EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty me
+
   let subst_me s me =
     EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty me
 
@@ -1835,12 +1838,11 @@ module Fsubst = struct
           eg_fr = fr'; eg_sr = sr'; eg_po = po'; }
 
     | Fcoe coe ->
-      assert (not (Mid.mem (fst coe.coe_mem) s.fs_mem));
       let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
           s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
       let pr' = f_subst ~tx s coe.coe_pre in
       let me' =
-        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty coe.coe_mem in
+        EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty coe.coe_mem in
       let e' = EcTypes.e_subst es coe.coe_e in
       FSmart.f_coe (fp, coe)
         { coe_pre = pr'; coe_mem = me'; coe_e = e'; }

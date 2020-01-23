@@ -149,10 +149,13 @@ let on_mpath_lcmem cb m =
     cb (EcMemory.lmt_xpath m).x_top;
     Msym.iter (fun _ (_,ty) -> on_mpath_ty cb ty) (EcMemory.lmt_bindings m)
 
-let on_mpath_memenv cb (m : EcMemory.memenv) =
-  match snd m with
+let on_mpath_memtype cb (m : EcMemory.memtype) =
+  match m with
   | None    -> ()
   | Some lm -> on_mpath_lcmem cb lm
+
+let on_mpath_memenv cb (m : EcMemory.memenv) =
+  on_mpath_memtype cb (snd m)
 
 let on_mpath_restr cb restr =
   Sx.iter (fun x -> cb x.x_top) restr.mr_xpaths.ur_neg;
@@ -274,7 +277,7 @@ let rec on_mpath_form cb (f : EcFol.form) =
   and on_mpath_coe cb coe =
     on_mpath_form cb coe.EcFol.coe_pre;
     on_mpath_expr cb coe.EcFol.coe_e;
-    on_mpath_memenv cb coe.EcFol.coe_mem;
+    on_mpath_memtype cb coe.EcFol.coe_mem;
 
   and on_mpath_pr cb pr =
     cb pr.EcFol.pr_fun.x_top;

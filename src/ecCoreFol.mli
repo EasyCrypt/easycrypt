@@ -146,7 +146,7 @@ and bdHoareS = {
 
 and coe = {
   coe_pre : form;
-  coe_mem : EcMemory.memenv;
+  coe_mem : EcMemory.memtype;
   coe_e   : expr;
 }
 
@@ -269,7 +269,7 @@ val f_eagerF   : form -> stmt -> xpath -> xpath -> stmt -> form -> form
 
 (* soft-constructors - Coe *)
 val f_coe_r : coe -> form
-val f_coe   : form -> memenv -> expr -> form
+val f_coe   : form -> memtype -> expr -> form
 
 (* soft-constructors - Pr *)
 val f_pr_r : pr -> form
@@ -462,10 +462,10 @@ val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 (* -------------------------------------------------------------------- *)
 (* The cost of an expression evaluation in any memory of a given type
    satisfying some pre-condition. *)
-val cost_of_expr : form -> EcMemory.memenv -> EcTypes.expr -> form
+val cost_of_expr : form -> EcMemory.memtype -> EcTypes.expr -> form
 
 (* The cost of an expression evaluation in any memory of a given type. *)
-val cost_of_expr_any : EcMemory.memenv -> EcTypes.expr -> form
+val cost_of_expr_any : EcMemory.memtype -> EcTypes.expr -> form
 
 (* -------------------------------------------------------------------- *)
 type f_subst = private {
@@ -517,6 +517,7 @@ module Fsubst : sig
   val subst_xpath    : f_subst -> xpath -> xpath
   val subst_stmt     : f_subst -> stmt  -> stmt
   val subst_e        : f_subst -> expr  -> expr
+  val subst_mt       : f_subst -> EcMemory.memtype -> EcMemory.memtype
   val subst_me       : f_subst -> EcMemory.memenv -> EcMemory.memenv
   val subst_m        : f_subst -> EcIdent.t -> EcIdent.t
   val subst_ty       : f_subst -> ty -> ty
