@@ -1835,7 +1835,12 @@ module Fsubst = struct
           eg_fr = fr'; eg_sr = sr'; eg_po = po'; }
 
     | Fcoe coe ->
-      assert (not (Mid.mem (fst coe.coe_mem) s.fs_mem));
+      (* We freshen the binded memory. *)
+      let m = fst coe.coe_mem in
+      let m' = EcIdent.fresh m in
+      let s = f_bind_mem s m m' in
+
+      (* Then we substitute *)
       let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
           s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
       let pr' = f_subst ~tx s coe.coe_pre in
