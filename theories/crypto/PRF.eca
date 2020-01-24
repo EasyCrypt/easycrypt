@@ -41,7 +41,7 @@ module IND (F : PRF) (D : Distinguisher) = {
 abstract theory RF.
 require import SmtMap.
 
-op dR: { R distr | is_lossless dR } as dR_ll.
+op dR: { D -> R distr | forall x, is_lossless (dR x) } as dR_ll.
 
 module RF = {
   var m : (D,R) fmap
@@ -52,7 +52,7 @@ module RF = {
 
   proc f(x:D): R = {
     if (x \notin m) {
-      m.[x]  <$ dR;
+      m.[x]  <$ dR x;
     }
     return (oget m.[x]);
   }
@@ -69,7 +69,7 @@ op F : K -> D -> R.
 
 module type PseudoRF = {
   proc keygen(): K
-  proc f(_ : K * D): D
+  proc f(_ : K * D): R
 }.
 
 module PseudoRF = {

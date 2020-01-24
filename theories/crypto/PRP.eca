@@ -256,7 +256,7 @@ clone import PRF as PRFt with
   type R <- D.
 
 clone import RF as PRFi with
-  op   dR <- dD
+  op   dR _ <- dD
 proof * by smt(dD_ll)
 rename "RF" as "PRFi".
 
@@ -337,7 +337,7 @@ module PRPi'(S:Sample_t) = {
 
   proc f(x:D): D = {
     if (x \notin RP.m)
-      RP.m.[x] = S.sample(rng RP.m);
+      RP.m.[x] <@ S.sample(rng RP.m);
     return oget RP.m.[x];
   }
 }.
@@ -493,7 +493,7 @@ module DBounder (D : Distinguisher) (F : PRF_Oracles) = {
     var c:int
 
     proc f(x:D): D = {
-      var r = witness;
+      var r <- witness;
 
       if (c < q) {
         r <@ F.f(x);

@@ -208,7 +208,7 @@ clone import PRF as PRFt with
   type R  <- block.
 
 clone import RF as PRFi with
-  op   dR <- dBlock
+  op   dR _ <- dBlock
 rename "RF" as "PRFi"
 proof * by smt (dBlock_uffu).
 
