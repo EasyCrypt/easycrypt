@@ -133,7 +133,7 @@ type pvar_kind =
   | PVKglob
   | PVKloc
 
-type prog_var =
+type prog_var = private
   | PVglob of EcPath.xpath
   | PVloc of EcIdent.t
 
@@ -150,6 +150,9 @@ val pv_fv      : prog_var -> int EcIdent.Mid.t
 val is_loc     : prog_var -> bool
 val is_glob    : prog_var -> bool
 
+val get_loc     : prog_var -> EcIdent.t
+val get_glob    : prog_var -> EcPath.xpath
+
 val symbol_of_pv   : prog_var -> symbol
 val string_of_pvar : prog_var -> string
 
@@ -158,8 +161,13 @@ val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var
 val pv_loc  : EcIdent.t -> prog_var
 val pv_glob : EcPath.xpath -> prog_var
 val xp_glob : EcPath.xpath -> EcPath.xpath
-val pv_res  : EcPath.xpath -> prog_var
-val pv_arg  : EcPath.xpath -> prog_var
+
+val arg_symbol : symbol
+val res_symbol : symbol
+val id_res  : EcIdent.t
+val id_arg  : EcIdent.t
+val pv_res  : prog_var
+val pv_arg  : prog_var
 
 (* -------------------------------------------------------------------- *)
 type expr = private {

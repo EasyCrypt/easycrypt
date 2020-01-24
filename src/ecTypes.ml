@@ -402,6 +402,9 @@ let pv_ntr_compare v1 v2 =
 let is_loc  = function PVloc _ -> true  | PVglob _ -> false
 let is_glob = function PVloc _ -> false | PVglob _ -> true
 
+let get_loc = function PVloc id -> id | PVglob _ -> assert false
+let get_glob = function PVloc _ -> assert false | PVglob xp -> xp
+
 let symbol_of_pv = function
   | PVglob x -> x.EcPath.x_sub
   | PVloc id -> EcIdent.name id
@@ -420,13 +423,12 @@ let string_of_pvar (p : prog_var) =
 
 let pv_loc id = PVloc id
 
-(* TODO: A: what should be done there? probably need to take a memenv as input,
-   instead of the xpath of the function.*)
-let pv_arg (f : EcPath.xpath) = assert false
-let pv_res (f : EcPath.xpath) = assert false
-
-(* let pv_arg (f : EcPath.xpath) = pv_loc f "arg"
- * let pv_res (f : EcPath.xpath) = pv_loc f "res" *)
+let arg_symbol = "arg"
+let res_symbol = "res"
+let id_arg = EcIdent.create arg_symbol
+let pv_arg = PVloc id_arg
+let id_res = EcIdent.create res_symbol
+let pv_res =  PVloc id_res
 
 let xp_glob x =
   let top = x.EcPath.x_top in
@@ -437,7 +439,6 @@ let xp_glob x =
 
 let pv_glob x = PVglob (xp_glob x)
 
-(* TODO: A: should we substitute ident by ident there? *)
 let pv_subst m_subst px = match px with
   | PVglob x ->
     let mp' = m_subst x in

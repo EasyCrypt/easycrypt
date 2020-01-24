@@ -104,19 +104,22 @@ val is_assert : instr -> bool
 val get_uninit_read : stmt -> EcIdent.Sid.t
 
 (* -------------------------------------------------------------------- *)
-type variable = {
-  v_name : symbol;
+type 'a variable = {
+  v_name : 'a;
   v_type : EcTypes.ty;
 }
 
-val v_name : variable -> symbol
-val v_type : variable -> EcTypes.ty
+type lvariable = EcIdent.t variable
+type gvariable = EcSymbols.symbol variable
+
+val v_name : 'a variable -> 'a
+val v_type : 'a variable -> EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
-  fs_anames : variable list option;
+  fs_anames : lvariable list option;
   fs_ret    : EcTypes.ty;
 }
 
@@ -159,7 +162,7 @@ type uses = private {
 val mk_uses : xpath list -> Sx.t -> Sx.t -> uses
 
 type function_def = {
-  f_locals : variable list;
+  f_locals : lvariable list;
   f_body   : stmt;
   f_ret    : EcTypes.expr option;
   f_uses   : uses;
@@ -215,7 +218,7 @@ and module_structure = {
 
 and module_item =
 | MI_Module   of module_expr
-| MI_Variable of variable
+| MI_Variable of gvariable
 | MI_Function of function_
 
 and module_comps = module_comps_item list
@@ -232,6 +235,6 @@ val mty_equal : module_type -> module_type -> bool
 val mty_hash  : module_type -> int
 
 (* -------------------------------------------------------------------- *)
-val get_uninit_read_of_fun : xpath -> function_ -> EcIdent.Sid.t
+val get_uninit_read_of_fun : function_ -> EcIdent.Sid.t
 val get_uninit_read_of_module :
   path -> module_expr -> (xpath * EcIdent.Sid.t) list

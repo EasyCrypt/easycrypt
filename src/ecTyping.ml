@@ -15,6 +15,7 @@ open EcLocation
 open EcParsetree
 open EcTypes
 open EcDecl
+open EcMemory
 open EcModules
 open EcFol
 
@@ -31,7 +32,7 @@ type opmatch = [
   | `Op   of EcPath.path * EcTypes.ty list
   | `Lc   of EcIdent.t
   | `Var  of EcTypes.prog_var
-  | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
+  | `Proj of EcTypes.prog_var * EcMemory.proj_arg
 ]
 
 type mismatch_funsig =
@@ -164,14 +165,13 @@ let unify_or_fail (env : EcEnv.env) ue loc ~expct:ty1 ty2 =
         tyerror loc env TypeClassMismatch
 
 (* -------------------------------------------------------------------- *)
+let add_glob (m:Sx.t) (x:prog_var) : Sx.t =
+  if is_glob x then Sx.add (get_glob x) m else m
+
 let e_inuse =
   let rec inuse (map : Sx.t) (e : expr) =
     match e.e_node with
-    | Evar p -> begin
-        match p.pv_kind with
-        | PVglob -> Sx.add p.pv_name map
-        | _      -> map
-      end
+    | Evar x -> add_glob map x
     | _ -> e_fold inuse map e
   in
     fun e -> inuse Sx.empty e
@@ -184,12 +184,12 @@ let add_call (u : uses) p : uses =
 
 let add_read (u : uses) p : uses =
   if is_glob p then
-    mk_uses u.us_calls (Sx.add p.pv_name u.us_reads) u.us_writes
+    mk_uses u.us_calls (Sx.add (get_glob p) u.us_reads) u.us_writes
   else u
 
 let add_write (u : uses) p : uses =
   if is_glob p then
-    mk_uses u.us_calls u.us_reads (Sx.add p.pv_name u.us_writes)
+    mk_uses u.us_calls u.us_reads (Sx.add (get_glob p) u.us_writes)
   else u
 
 let (_i_inuse, s_inuse, se_inuse) =
@@ -281,7 +281,7 @@ let select_pv env side name ue tvi psig =
 (* -------------------------------------------------------------------- *)
 module OpSelect = struct
   type pvsel = [
-    | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
+    | `Proj of EcTypes.prog_var * EcMemory.proj_arg
     | `Var  of EcTypes.prog_var
   ]
 
@@ -1058,6 +1058,14 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
     (ctor, fields, (rtvi, reccty))
 
 (*-------------------------------------------------------------------- *)
+
+let var_or_proj fvar fproj pv ty =
+  match pv with
+  | `Var pv -> fvar pv ty
+  | `Proj(pv, ap) ->
+    if ap.arg_pos = 0 && ap.arg_len = 1 then fvar pv ty
+    else fproj (fvar pv ap.arg_ty) ap.arg_pos ty
+
 let expr_of_opselect
   (env, ue) loc ((sel, ty, subue, _) : OpSelect.gopsel) args
 =
@@ -1090,10 +1098,7 @@ let expr_of_opselect
       | `Op (p, tys) -> e_op p tys ty
       | `Lc id       -> e_local id ty
 
-      | `Pv (_me, `Var   pv)               -> e_var pv ty
-      | `Pv (_me, `Proj (pv, _  , (0, 1))) -> e_var pv ty
-      | `Pv (_me, `Proj (pv, ty', (i, _))) -> e_proj (e_var pv ty') i ty
-
+      | `Pv (_me, pv) -> var_or_proj e_var e_proj pv ty
     in (op, args)
 
   in (e_app op args codom, codom)
@@ -1360,7 +1365,7 @@ let trans_gamepath (env : EcEnv.env) gp =
       let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
         if _sig.mis_params <> [] then
           tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
-        EcPath.xpath_fun mpath funsymb
+        EcPath.xpath mpath funsymb
 
 (* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
@@ -1393,7 +1398,7 @@ and transmodsig_body
         if sig_.mis_params <> [] then calls
         else
           let fs = List.map (fun (Tys_function (fsig, _)) ->
-                       EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body
+                       EcPath.xpath mp fsig.fs_name) sig_.mis_body
           in
           fs@calls
       in
@@ -1417,7 +1422,7 @@ and transmodsig_body
           let tyargs =
             List.map              (* FIXME: continuation *)
               (fun (x, ty) -> {
-                   v_name = x.pl_desc;
+                   v_name = EcIdent.create x.pl_desc;
                    v_type = transty_for_decl env ty}) args
           in
 
@@ -1563,7 +1568,7 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure lo
     let tydecl1 (x, obj) =
       match obj with
       | MI_Module   m -> (x, `Module   m)
-      | MI_Variable v -> (x, `Variable (EcTypes.PVglob, v.v_type))
+      | MI_Variable v -> (x, `Variable v.v_type)
       | MI_Function f -> (x, `Function f)
     in
     List.fold_left
@@ -1642,7 +1647,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       let ue  = UE.create (Some []) in
       let env = EcEnv.Fun.enter decl.pfd_name.pl_desc env in
 
-      let symbols = ref Sstr.empty
+      let memenv = EcMemory.empty_local mhr
       and env     = ref env in
 
       (* Type-check function parameters / check for dups *)
@@ -1650,23 +1655,22 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
         match decl.pfd_tyargs with
         | Fparams_imp _ -> assert false
         | Fparams_exp l -> l in
-      let params =
+      let memenv, params =
         let params = ref [] in
-        let add_param (x, pty) =
+        let add_param memenv (x, pty) =
           let ty = transty tp_uni !env ue pty in
-          let pr = (unloc x, `Variable (PVloc, ty)) in
-            fundef_add_symbol !env symbols x;
-            params  := ({ v_name = unloc x; v_type = ty }, pty.pl_loc) :: !params;
-            env     := EcEnv.bindall [pr] !env
+          let memenv, id = fundef_add_symbol !env memenv x ty in
+          params  := ({ v_name = id; v_type = ty }, pty.pl_loc) :: !params;
+          memenv
         in
-          List.iter add_param dtyargs;
-          List.rev !params
+        let memenv = List.fold_left add_param memenv dtyargs in
+        memenv, List.rev !params
       in
 
       (* Type-check body *)
       let retty = transty tp_uni !env ue decl.pfd_tyresult in
       let (env, stmt, result, prelude, locals) =
-        transbody ue symbols !env retty (mk_loc st.pl_loc body)
+        transbody ue memenv !env retty (mk_loc st.pl_loc body)
       in
       (* Close all types *)
       let su      = Tuni.offun (UE.assubst ue) in
@@ -1726,7 +1730,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       (fs.fs_name,
        MI_Function { f_name = fs.fs_name;
                      f_sig  = fs;
-                     f_def  = FBalias (EcPath.xpath_fun mo fs.fs_name) }) in
+                     f_def  = FBalias (EcPath.xpath mo fs.fs_name) }) in
     match xs with
     | None ->
       List.map mk_fun ms.mis_body
@@ -1751,24 +1755,17 @@ and transstruct1_alias env name f =
 
 
 (* -------------------------------------------------------------------- *)
-and transbody ue symbols (env : EcEnv.env) retty pbody =
+and transbody ue memenv (env : EcEnv.env) retty pbody =
   let { pl_loc = loc; pl_desc = pbody; } = pbody in
 
-  let env     = ref env
-  and prelude = ref []
+  let prelude = ref []
   and locals  = ref [] in
 
-  let mpath = oget (EcEnv.xroot !env) in
-
   (* Type-check local variables / check for dups *)
-  let add_local local =
-    List.iter (fundef_add_symbol !env symbols) (snd (unloc local.pfl_names));
-
-    let xs     = snd (unloc local.pfl_names) in
-    let mode   = fst (unloc local.pfl_names) in
-    let init   = local.pfl_init |> omap (fst -| transexp !env `InProc ue) in
-    let ty     = local.pfl_type |> omap (transty tp_uni !env ue) in
-
+  let add_local memenv local =
+    let env   = EcEnv.Memory.push_active memenv env in
+    let ty     = local.pfl_type |> omap (transty tp_uni env ue) in
+    let init   = local.pfl_init |> omap (fst -| transexp env `InProc ue) in
     let ty =
       match ty, init with
       | None   , None   -> None
@@ -1776,67 +1773,64 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
       | None   , Some e -> Some e.e_ty
       | Some ty, Some e -> begin
           let loc =  (oget local.pfl_init).pl_loc in
-            unify_or_fail !env ue loc ~expct:ty e.e_ty; Some ty
+            unify_or_fail env ue loc ~expct:ty e.e_ty; Some ty
       end
     in
 
-    let xsvars = List.map (fun _ -> UE.fresh ue) xs in
+    let xs     = snd (unloc local.pfl_names) in
+    let mode   = fst (unloc local.pfl_names) in
 
+    let xsvars = List.map (fun _ -> UE.fresh ue) xs in
     begin
       ty |> oiter (fun ty ->
         match mode with
-        | `Single -> List.iter (fun a -> EcUnify.unify !env ue a ty) xsvars
-        | `Tuple  -> unify_or_fail !env ue local.pfl_names.pl_loc ~expct:ty (ttuple xsvars))
+        | `Single -> List.iter (fun a -> EcUnify.unify env ue a ty) xsvars
+        | `Tuple  -> unify_or_fail env ue local.pfl_names.pl_loc ~expct:ty (ttuple xsvars))
     end;
 
-    env := begin
-      let topr = fun x xty -> (unloc x, `Variable (PVloc, xty)) in
-        EcEnv.bindall (List.map2 topr xs xsvars) !env
-    end;
-
-    let mylocals =
-      List.map2
-        (fun { pl_desc = x; pl_loc = loc; } xty ->
-          ({ v_name = x; v_type = xty }, pv_loc mpath x, xty, loc))
-        xs xsvars
-    in
-
-    locals :=
-       List.rev_append
-        (List.map (fun (v, _, _, pl) -> (v, pl)) mylocals)
-        !locals;
+    (* building the list of locals *)
+    let doit me x ty =
+      let me, id = fundef_add_symbol env me x ty in
+      locals := ({v_name = id; v_type = ty}, x.pl_loc) :: !locals;
+      me in
+    let memenv = List.fold_left2 doit  memenv xs xsvars in
 
     init |> oiter
-      (fun init ->
-        let iasgn = List.map (fun (_, v, xty, _) -> (v, xty)) mylocals in
-          prelude := ((mode, iasgn), init, _dummy) :: !prelude)
-  in
+     (fun init ->
+       let doit x =
+         let (_, ty, id) = oget (EcMemory.lookup (unloc x) memenv) in
+         pv_loc id, ty in
+       let iasgn = List.map doit xs in
+       prelude := ((mode, iasgn), init, _dummy) :: !prelude);
+    memenv in
 
-  List.iter add_local pbody.pfb_locals;
+  let memenv = List.fold_left add_local memenv pbody.pfb_locals in
+  let env = EcEnv.Memory.push_active memenv env in
 
-  let body   = transstmt  !env ue pbody.pfb_body in
+  let body   = transstmt env ue pbody.pfb_body in
   let result =
     match pbody.pfb_return with
     | None ->
         begin
-          try  EcUnify.unify !env ue tunit retty
+          try  EcUnify.unify env ue tunit retty
           with EcUnify.UnificationFailure _ ->
-            tyerror loc !env NonUnitFunWithoutReturn
+            tyerror loc env NonUnitFunWithoutReturn
         end;
         None
 
     | Some pe ->
-        let (e, ety) = transexp !env `InProc ue pe in
-        unify_or_fail !env ue pe.pl_loc ~expct:retty ety;
+        let (e, ety) = transexp env `InProc ue pe in
+        unify_or_fail env ue pe.pl_loc ~expct:retty ety;
         Some e
   in
-    (!env, body, result, List.rev !prelude, List.rev !locals)
+    (env, body, result, List.rev !prelude, List.rev !locals)
 
 (* -------------------------------------------------------------------- *)
-and fundef_add_symbol env symbols x =  (* for locals dup check *)
-  if Sstr.mem x.pl_desc !symbols then
-    tyerror x.pl_loc env (DuplicatedLocal x.pl_desc);
-  symbols := Sstr.add x.pl_desc !symbols
+and fundef_add_symbol env memenv x ty =  (* for locals dup check *)
+  try
+    EcMemory.bind_new x.pl_desc ty memenv
+  with EcMemory.DuplicatedMemoryBinding _ ->
+    tyerror x.pl_loc env (DuplicatedLocal x.pl_desc)
 
 and fundef_check_type subst_uni env os (ty, loc) =
   let ty = subst_uni ty in
@@ -1847,7 +1841,7 @@ and fundef_check_type subst_uni env os (ty, loc) =
 and fundef_check_decl subst_uni env (decl, loc) =
   { decl with
       v_type =
-      fundef_check_type subst_uni env (Some decl.v_name) (decl.v_type, loc) }
+      fundef_check_type subst_uni env (Some (EcIdent.name decl.v_name)) (decl.v_type, loc) }
 
 and fundef_check_iasgn subst_uni env ((mode, pl), init, loc) =
   let pl =
@@ -2102,10 +2096,8 @@ let form_of_opselect
     | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
       | `Op (p, tys) -> f_op p tys ty
       | `Lc id       -> f_local id ty
-
-      | `Pv (me, `Var   pv)               -> f_pvar pv ty (oget me)
-      | `Pv (me, `Proj (pv, _  , (0, 1))) -> f_pvar pv ty (oget me)
-      | `Pv (me, `Proj (pv, ty', (i, _))) -> f_proj (f_pvar pv ty' (oget me)) i ty
+      | `Pv (me, pv) ->
+        var_or_proj (fun x ty -> f_pvar x ty (oget me)) f_proj pv ty
 
     in (op, args)
 
@@ -2434,12 +2426,7 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
           match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
           | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
           | Some (x, ty) ->
-              match x with
-              | `Var x -> f_pvar x ty me
-              | `Proj (x, ty', (i, n)) ->
-                  if   i = 0 && n = 1
-                  then f_pvar x ty me
-                  else f_proj (f_pvar x ty' me) i ty
+            var_or_proj (fun x ty -> f_pvar x ty me) f_proj x ty
         in
 
         let check_mem loc me =

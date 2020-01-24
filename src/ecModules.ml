@@ -518,10 +518,13 @@ let get_uninit_read (s : stmt) =
   snd (s_get_uninit_read Sid.empty s)
 
 (* -------------------------------------------------------------------- *)
-type variable = {
-  v_name : symbol;
+type 'a variable = {
+  v_name : 'a;
   v_type : EcTypes.ty;
 }
+
+type lvariable = EcIdent.t variable
+type gvariable = EcSymbols.symbol variable
 
 let v_name { v_name = x } = x
 let v_type { v_type = x } = x
@@ -530,7 +533,7 @@ let v_type { v_type = x } = x
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
-  fs_anames : variable list option;
+  fs_anames : lvariable list option;
   fs_ret    : EcTypes.ty;
 }
 
@@ -569,7 +572,7 @@ let mk_uses c r w =
 
 
 type function_def = {
-  f_locals : variable list;
+  f_locals : lvariable list;
   f_body   : stmt;
   f_ret    : EcTypes.expr option;
   f_uses   : uses;
@@ -617,7 +620,7 @@ and module_structure = {
 
 and module_item =
   | MI_Module   of module_expr
-  | MI_Variable of variable
+  | MI_Variable of gvariable
   | MI_Function of function_
 
 and module_comps = module_comps_item list
@@ -664,16 +667,15 @@ let rec mty_equal mty1 mty2 =
   && (List.all2 (pair_equal EcIdent.id_equal mty_equal) mty1.mt_params mty2.mt_params)
 
 (* -------------------------------------------------------------------- *)
-let get_uninit_read_of_fun (fp : xpath) (f : function_) =
+let get_uninit_read_of_fun (f : function_) =
   match f.f_def with
   | FBalias _ | FBabs _ -> Sid.empty
 
   | FBdef fd ->
-      let w = assert false      (* TODO: A: how do we get the prog_var from the
-                                   function xpath? *)
-        (* let toloc { v_name = x } = (EcTypes.pv_loc fp x).pv_name in
-         * let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
-         * Sid.of_list (List.map xastrip w) *)
+      let w =
+        let toloc { v_name = x } = x in
+        let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
+        Sid.of_list w
       in
 
       let w, r  = s_get_uninit_read w fd.f_body in
@@ -704,7 +706,7 @@ let get_uninit_read_of_module (p : path) (me : module_expr) =
 
     | MI_Function f ->
         let xp = xpath mp f.f_name in
-        let r  = get_uninit_read_of_fun xp f in
+        let r  = get_uninit_read_of_fun f in
         if Sid.is_empty r then acc else (xp, r) :: acc
 
   in

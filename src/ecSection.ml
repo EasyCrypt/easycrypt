@@ -12,6 +12,7 @@ open EcSymbols
 open EcPath
 open EcTypes
 open EcDecl
+open EcMemory
 open EcModules
 
 module Sid  = EcIdent.Sid
@@ -72,7 +73,9 @@ let rec on_mpath_ty cb (ty : ty) =
   | Tfun (ty1, ty2)  -> List.iter (on_mpath_ty cb) [ty1; ty2]
 
 let on_mpath_pv cb (pv : prog_var)=
-  cb pv.pv_name.x_top
+  match pv with
+  | PVglob xp -> cb xp.x_top
+  | _         -> ()
 
 let on_mpath_lp cb (lp : lpattern) =
   match lp with
@@ -146,8 +149,10 @@ and on_mpath_stmt cb (s : stmt) =
   List.iter (on_mpath_instr cb) s.s_node
 
 let on_mpath_lcmem cb m =
-    cb (EcMemory.lmt_xpath m).x_top;
-    Msym.iter (fun _ (_,ty) -> on_mpath_ty cb ty) (EcMemory.lmt_bindings m)
+  let on_decl _ (pa,ty,_) =
+    oiter (fun pa -> on_mpath_ty cb pa.arg_ty) pa;
+    on_mpath_ty cb ty in
+  Msym.iter on_decl (EcMemory.lmt_bindings m)
 
 let on_mpath_memenv cb (m : EcMemory.memenv) =
   match snd m with

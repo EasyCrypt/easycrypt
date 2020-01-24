@@ -82,8 +82,9 @@ type tenv = {
   (*---*) te_lc         : w3op Hid.t;
   mutable te_lam        : WTerm.term Mta.t;
   (*---*) te_gen        : WTerm.term Hf.t;
-  (*---*) te_xpath      : WTerm.lsymbol Hx.t; (* proc and var *)
-  (*---*) te_absmod     : w3absmod Hid.t;     (* abstract module *)
+  (*---*) te_xpath      : WTerm.lsymbol Hx.t;  (* proc and global var *)
+  (*---*) te_lpvar      : WTerm.lsymbol Hid.t; (* local var           *)
+  (*---*) te_absmod     : w3absmod Hid.t;      (* abstract module     *)
 }
 
 let empty_tenv env task (kwty, kw, kwk) =
@@ -98,6 +99,7 @@ let empty_tenv env task (kwty, kw, kwk) =
     te_lam        = Mta.empty;
     te_gen        = Hf.create 0;
     te_xpath      = Hx.create 0;
+    te_lpvar      = Hid.create 0;
     te_absmod     = Hid.create 0;
   }
 
@@ -443,14 +445,6 @@ and trans_tydecl genv (p, tydecl) =
   ts
 
 (* -------------------------------------------------------------------- *)
-let rm_mp_args mp =
-  EcPath.mpath mp.EcPath.m_top []
-
-let rm_xp_args xp =
-  let mp = rm_mp_args xp.EcPath.x_top in
-  EcPath.xpath mp xp.EcPath.x_sub
-
-(* -------------------------------------------------------------------- *)
 exception CanNotTranslate
 let trans_binding genv lenv (x, xty) =
   let wty =
@@ -766,20 +760,28 @@ and trans_op (genv:tenv) p =
 (* -------------------------------------------------------------------- *)
 and trans_pvar ((genv, _) as env) pv ty mem =
   let pv = NormMp.norm_pvar genv.te_env pv in
-  let xp =
-    if   is_loc pv
-    then pv.pv_name
-    else rm_xp_args pv.pv_name in
-
   let ls =
-    match Hx.find_opt genv.te_xpath xp with
-    | Some ls -> ls
-    | None ->
+    match pv with
+    | PVloc x ->
+      begin match Hid.find_opt genv.te_lpvar x with
+      | Some ls -> ls
+      | None ->
+        let ty = Some (trans_ty env ty) in
+        let pid = preid x in
+        let ls = WTerm.create_lsymbol pid [ty_mem] ty in
+        genv.te_task <- WTask.add_param_decl genv.te_task ls;
+        Hid.add genv.te_lpvar x ls; ls
+      end
+    | PVglob xp ->
+      begin match Hx.find_opt genv.te_xpath xp with
+      | Some ls -> ls
+      | None ->
         let ty = Some (trans_ty env ty) in
         let pid = preid_xp xp in
         let ls = WTerm.create_lsymbol pid [ty_mem] ty in
         genv.te_task <- WTask.add_param_decl genv.te_task ls;
         Hx.add genv.te_xpath xp ls; ls
+      end
 
   in WTerm.t_app_infer ls [trans_mem env mem]
 

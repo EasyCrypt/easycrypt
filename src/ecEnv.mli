@@ -23,12 +23,6 @@ type 'a suspension = {
 }
 
 (* -------------------------------------------------------------------- *)
-type varbind = {
-  vb_type  : EcTypes.ty;
-  vb_kind  :  [ `Proj of int | `Var of EcTypes.pvar_kind ];
-}
-
-(* -------------------------------------------------------------------- *)
 type env
 
 val initial : EcGState.gstate -> env
@@ -97,7 +91,6 @@ module Fun : sig
   val add   : xpath -> env -> env
 
   (* ------------------------------------------------------------------ *)
-  (* FIXME: what are these functions for? *)
   val prF_memenv : EcMemory.memory -> xpath -> env -> memenv
 
   val prF : xpath -> env -> env
@@ -125,7 +118,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Var : sig
-  type t = varbind
+  type t = EcTypes.ty
 
   val by_xpath     : xpath -> env -> t
   val by_xpath_opt : xpath -> env -> t option
@@ -136,10 +129,10 @@ module Var : sig
   val lookup_local_opt : symbol -> env -> (EcIdent.t * EcTypes.ty) option
 
   val lookup_progvar     : ?side:memory -> qsymbol -> env ->
-    ([`Proj of EcTypes.prog_var * EcTypes.ty * (int*int) | `Var of EcTypes.prog_var ] *
+    ([`Proj of EcTypes.prog_var * proj_arg | `Var of EcTypes.prog_var ] *
      EcTypes.ty)
   val lookup_progvar_opt : ?side:memory -> qsymbol -> env ->
-    ([`Proj of EcTypes.prog_var * EcTypes.ty * (int*int) | `Var of EcTypes.prog_var ] *
+    ([`Proj of EcTypes.prog_var * proj_arg | `Var of EcTypes.prog_var ] *
      EcTypes.ty) option
 
   (* Locals binding *)
@@ -147,10 +140,10 @@ module Var : sig
   val bind_locals : (EcIdent.t * EcTypes.ty) list -> env -> env
 
   (* Program variables binding *)
-  val bind    : symbol -> pvar_kind -> EcTypes.ty -> env -> env
-  val bindall : (symbol * EcTypes.ty) list -> pvar_kind -> env -> env
+  val bind_pvglob    : symbol -> EcTypes.ty -> env -> env
+  val bindall_pvglob : (EcSymbols.symbol * EcTypes.ty) list -> env -> env
+  val bindall_pvloc  : (EcIdent.t * EcTypes.ty) list -> env -> env
 
-  val add : xpath -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -396,7 +389,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 type ebinding = [
-  | `Variable  of EcTypes.pvar_kind * EcTypes.ty
+  | `Variable  of EcTypes.ty
   | `Function  of function_
   | `Module    of module_expr
   | `ModType   of module_sig

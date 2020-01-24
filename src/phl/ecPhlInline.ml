@@ -86,18 +86,15 @@ module LowInternal = struct
       in
       let params =
         match f.f_sig.fs_anames with
-        | None -> [{ v_name = "arg"; v_type = f.f_sig.fs_arg; }]
+        | None -> [{ v_name = id_arg; v_type = f.f_sig.fs_arg; }]
         | Some lv -> lv in
       let me, anames =
-        List.map_fold fresh_pv me params in
+        List.map_fold fresh_pv_id me params in
       let me, lnames =
-        List.map_fold fresh_pv me fdef.f_locals in
+        List.map_fold fresh_pv_id me fdef.f_locals in
       let subst =
         let for1 mx v x =
-          PVMap.add
-            (pv_loc p v.v_name)
-            (pv_loc (EcMemory.xpath me) x)
-            mx
+          PVMap.add (pv_loc v.v_name) (pv_loc x) mx
         in
         let mx = PVMap.create env in
         let mx = List.fold_left2 for1 mx params anames in
@@ -109,7 +106,7 @@ module LowInternal = struct
       let prelude =
         let newpv =
           List.map2
-            (fun v newx -> pv_loc (EcMemory.xpath me) newx, v.v_type)
+            (fun v newx -> pv_loc newx, v.v_type)
             params anames in
         if List.length newpv = List.length args then
           List.map2 (fun npv e -> i_asgn (LvVar npv, e)) newpv args
@@ -130,8 +127,8 @@ module LowInternal = struct
           let me, auxs =
             let doit me (x, ty) =
               let v = {v_name = symbol_of_pv x; v_type = ty} in
-              let me, pv = fresh_pv me v in
-              let pv = pv_loc (EcMemory.xpath me) pv in
+              let me, pv = fresh_pv_s me v in
+              let pv = pv_loc pv in
               me, (pv, ty) in
             List.map_fold doit me lvs in
           let s1 =

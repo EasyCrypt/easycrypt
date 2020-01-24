@@ -172,7 +172,7 @@ let cond_equivF_notmod ?(mk_other=false) tc cond =
   let (mprl,mprr),(mpol,mpor) = Fun.equivF_memenv fl fr env in
   let fsigl = (Fun.by_xpath fl env).f_sig in
   let fsigr = (Fun.by_xpath fr env).f_sig in
-  let pvresl = pv_res fl and pvresr = pv_res fr in
+  let pvresl = pv_res and pvresr = pv_res in
   let vresl = LDecl.fresh_id hyps "result_L" in
   let vresr = LDecl.fresh_id hyps "result_R" in
   let fresl = f_local vresl fsigl.fs_ret in
@@ -237,7 +237,7 @@ let cond_hoareF_notmod ?(mk_other=false) tc cond =
   let f = hf.hf_f in
   let mpr,mpo = Fun.hoareF_memenv f env in
   let fsig = (Fun.by_xpath f env).f_sig in
-  let pvres = pv_res f in
+  let pvres = pv_res in
   let vres = LDecl.fresh_id hyps "result" in
   let fres = f_local vres fsig.fs_ret in
   let m    = fst mpo in
@@ -291,7 +291,7 @@ let cond_bdHoareF_notmod ?(mk_other=false) tc cond =
   let f = hf.bhf_f in
   let mpr,mpo = Fun.hoareF_memenv f env in
   let fsig = (Fun.by_xpath f env).f_sig in
-  let pvres = pv_res f in
+  let pvres = pv_res in
   let vres = LDecl.fresh_id hyps "result" in
   let fres = f_local vres fsig.fs_ret in
   let m    = fst mpo in

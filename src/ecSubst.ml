@@ -117,7 +117,7 @@ let subst_form (s : _subst) =
     fun f -> Fsubst.f_subst s f
 
 (* -------------------------------------------------------------------- *)
-let subst_variable (s : _subst) (x : variable) =
+let subst_variable (s : _subst) (x : 'a variable) =
   { x with v_type = s.s_ty x.v_type; }
 
 (* -------------------------------------------------------------------- *)

@@ -12,6 +12,7 @@ open EcParsetree
 open EcPath
 open EcTypes
 open EcFol
+open EcMemory
 open EcModules
 open EcEnv
 open EcPV
@@ -54,7 +55,7 @@ let lossless_hyps env top sub =
   let args  = List.map (fun (id,_) -> EcPath.mident id) sig_.mis_params in
   let concl = f_losslessF (EcPath.xpath (EcPath.m_apply top args) sub) in
   let calls =
-    let name = EcPath.basename sub in
+    let name = sub in
     let Tys_function (_, oi) =
       oget (List.ofind
         (fun (Tys_function(fs,_)) -> fs.fs_name = name)
@@ -66,11 +67,11 @@ let lossless_hyps env top sub =
     f_forall bd (f_imps hyps concl)
 
 (* -------------------------------------------------------------------- *)
-let subst_pre env f fs (m : memenv) s =
+let subst_pre env fs (m : memory) s =
   match fs.fs_anames with
   | Some lv ->
-      let v = List.map (fun v -> f_pvloc f v m) lv in
-        PVM.add env (pv_arg f) m (f_tuple v) s
+      let v = List.map (fun v -> f_pvloc v m) lv in
+        PVM.add env pv_arg m (f_tuple v) s
   | None -> s
 
 (* ------------------------------------------------------------------ *)
@@ -82,8 +83,8 @@ let t_hoareF_fun_def_r tc =
   let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
   let m = EcMemory.memory memenv in
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
-  let post = PVM.subst1 env (pv_res f) m fres hf.hf_po in
-  let pre  = PVM.subst env (subst_pre env f fsig m PVM.empty) hf.hf_pr in
+  let post = PVM.subst1 env pv_res m fres hf.hf_po in
+  let pre  = PVM.subst env (subst_pre env fsig m PVM.empty) hf.hf_pr in
   let concl' = f_hoareS memenv pre fdef.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 
@@ -96,8 +97,8 @@ let t_bdhoareF_fun_def_r tc =
   let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
   let m = EcMemory.memory memenv in
   let fres = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
-  let post = PVM.subst1 env (pv_res f) m fres bhf.bhf_po in
-  let spre = subst_pre env f fsig m PVM.empty in
+  let post = PVM.subst1 env pv_res m fres bhf.bhf_po in
+  let spre = subst_pre env fsig m PVM.empty in
   let pre = PVM.subst env spre bhf.bhf_pr in
   let bd  = PVM.subst env spre bhf.bhf_bd in
   let concl' = f_bdHoareS memenv pre fdef.f_body post bhf.bhf_cmp bd in
@@ -117,11 +118,11 @@ let t_equivF_fun_def_r tc =
   let mr = EcMemory.memory menvr in
   let fresl = odfl f_tt (omap (form_of_expr ml) fdefl.f_ret) in
   let fresr = odfl f_tt (omap (form_of_expr mr) fdefr.f_ret) in
-  let s = PVM.add env (pv_res fl) ml fresl PVM.empty in
-  let s = PVM.add env (pv_res fr) mr fresr s in
+  let s = PVM.add env pv_res ml fresl PVM.empty in
+  let s = PVM.add env pv_res mr fresr s in
   let post = PVM.subst env s ef.ef_po in
-  let s = subst_pre env fl fsigl ml PVM.empty in
-  let s = subst_pre env fr fsigr mr s in
+  let s = subst_pre env fsigl ml PVM.empty in
+  let s = subst_pre env fsigr mr s in
   let pre = PVM.subst env s ef.ef_pr in
   let concl' = f_equivS menvl menvr pre fdefl.f_body fdefr.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
@@ -167,7 +168,7 @@ module FunAbsLow = struct
 
   (* ------------------------------------------------------------------ *)
   let equivF_abs_spec pf env fl fr inv =
-    let (topl, fl, oil, sigl), (topr, fr, oir, sigr) =
+    let (topl, _fl, oil, sigl), (topr, _fr, oir, sigr) =
       EcLowPhlGoal.abstract_info2 env fl fr
     in
 
@@ -193,11 +194,11 @@ module FunAbsLow = struct
 
       let eq_params =
         f_eqparams
-          o_l fo_l.f_sig.fs_arg fo_l.f_sig.fs_anames ml
-          o_r fo_r.f_sig.fs_arg fo_r.f_sig.fs_anames mr in
+          fo_l.f_sig.fs_arg fo_l.f_sig.fs_anames ml
+          fo_r.f_sig.fs_arg fo_r.f_sig.fs_anames mr in
 
       let eq_res =
-        f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
+        f_eqres fo_l.f_sig.fs_ret ml fo_r.f_sig.fs_ret mr in
 
       let invs = if use then [eqglob; inv] else [inv] in
       let pre  = EcFol.f_ands (eq_params :: invs) in
@@ -209,10 +210,10 @@ module FunAbsLow = struct
 
     let eq_params =
       f_eqparams
-        fl sigl.fs_arg sigl.fs_anames ml
-        fr sigr.fs_arg sigr.fs_anames mr in
+        sigl.fs_arg sigl.fs_anames ml
+        sigr.fs_arg sigr.fs_anames mr in
 
-    let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
+    let eq_res = f_eqres sigl.fs_ret ml sigr.fs_ret mr in
     let lpre   = if oil.oi_in then [eqglob;inv] else [inv] in
     let pre    = f_ands (eq_params::lpre) in
     let post   = f_ands [eq_res; eqglob; inv] in
@@ -264,7 +265,7 @@ let t_equivF_abs   = FApi.t_low1 "equiv-fun-abs"   t_equivF_abs_r
 module UpToLow = struct
   (* ------------------------------------------------------------------ *)
   let equivF_abs_upto pf env fl fr bad invP invQ =
-    let (topl, fl, oil, sigl), (topr, fr, oir, sigr) =
+    let (topl, _fl, oil, sigl), (topr, _fr, oir, sigr) =
       EcLowPhlGoal.abstract_info2 env fl fr
     in
 
@@ -289,11 +290,11 @@ module UpToLow = struct
       let fo_r = EcEnv.Fun.by_xpath o_r env in
       let eq_params =
         f_eqparams
-          o_l fo_l.f_sig.fs_arg fo_l.f_sig.fs_anames
-          ml o_r fo_r.f_sig.fs_arg fo_r.f_sig.fs_anames mr in
+          fo_l.f_sig.fs_arg fo_l.f_sig.fs_anames ml
+          fo_r.f_sig.fs_arg fo_r.f_sig.fs_anames mr in
 
       let eq_res =
-        f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
+        f_eqres fo_l.f_sig.fs_ret ml fo_r.f_sig.fs_ret mr in
 
       let pre   = EcFol.f_ands [EcFol.f_not bad2; eq_params; invP] in
       let post  = EcFol.f_if_simpl bad2 invQ (f_and eq_res invP) in
@@ -318,10 +319,10 @@ module UpToLow = struct
 
     let eq_params =
       f_eqparams
-        fl sigl.fs_arg sigl.fs_anames ml
-        fr sigr.fs_arg sigr.fs_anames mr in
+        sigl.fs_arg sigl.fs_anames ml
+        sigr.fs_arg sigr.fs_anames mr in
 
-    let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
+    let eq_res = f_eqres sigl.fs_ret ml sigr.fs_ret mr in
 
     let pre  = if oil.oi_in then [eqglob;invP] else [invP] in
     let pre  = f_if_simpl bad2 invQ (f_ands (eq_params::pre)) in
@@ -350,15 +351,16 @@ module ToCodeLow = struct
     let fd = Fun.by_xpath f env in
 
     let args =
-      let arg = e_var (pv_arg f) fd.f_sig.fs_arg  in
+      let arg = e_var pv_arg fd.f_sig.fs_arg  in
       match fd.f_sig.fs_anames with
       | None -> [arg]
       | Some [_] -> [arg]
       | Some params -> List.mapi (fun i v -> e_proj arg i v.v_type) params
     in
 
-    let m, res = fresh_pv m {v_name = "r"; v_type = fd.f_sig.fs_ret} in
-    let r = pv_loc f res in
+    let m, res = fresh_pv_s m
+                   {v_name = "r"; v_type = fd.f_sig.fs_ret} in
+    let r = pv_loc res in
     let i = i_call (Some(LvVar(r,fd.f_sig.fs_ret)), f, args) in
     let s = stmt [i] in
     (m, s, r, fd.f_sig.fs_ret)
@@ -371,7 +373,7 @@ let t_fun_to_code_hoare_r tc =
   let f = hf.hf_f in
   let m, _ = Fun.hoareF_memenv f env in
   let m, st, r, ty = ToCodeLow.to_code env f m in
-  let s = PVM.add env (pv_res f) (fst m) (f_pvar r ty (fst m)) PVM.empty in
+  let s = PVM.add env pv_res (fst m) (f_pvar r ty (fst m)) PVM.empty in
   let post = PVM.subst env s hf.hf_po in
   let concl = f_hoareS m hf.hf_pr st post in
 
@@ -384,7 +386,7 @@ let t_fun_to_code_bdhoare_r tc =
   let f = hf.bhf_f in
   let m, _ = Fun.hoareF_memenv f env in
   let m, st, r, ty = ToCodeLow.to_code env f m in
-  let s = PVM.add env (pv_res f) (fst m) (f_pvar r ty (fst m)) PVM.empty in
+  let s = PVM.add env pv_res (fst m) (f_pvar r ty (fst m)) PVM.empty in
   let post = PVM.subst env s hf.bhf_po in
   let concl = f_bdHoareS m hf.bhf_pr st post hf.bhf_cmp hf.bhf_bd in
 
@@ -399,8 +401,8 @@ let t_fun_to_code_equiv_r tc =
   let ml, sl, rl, tyl = ToCodeLow.to_code env fl ml in
   let mr, sr, rr, tyr = ToCodeLow.to_code env fr mr in
   let s = PVM.empty in
-  let s = PVM.add env (pv_res fl) (fst ml) (f_pvar rl tyl (fst ml)) s in
-  let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
+  let s = PVM.add env pv_res (fst ml) (f_pvar rl tyl (fst ml)) s in
+  let s = PVM.add env pv_res (fst mr) (f_pvar rr tyr (fst mr)) s in
   let post  = PVM.subst env s ef.ef_po in
   let concl = f_equivS ml mr ef.ef_pr sl sr post in
 
@@ -414,8 +416,8 @@ let t_fun_to_code_eager_r tc =
   let ml, sl, rl, tyl = ToCodeLow.to_code env fl ml in
   let mr, sr, rr, tyr = ToCodeLow.to_code env fr mr in
   let s = PVM.empty in
-  let s = PVM.add env (pv_res fl) (fst ml) (f_pvar rl tyl (fst ml)) s in
-  let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
+  let s = PVM.add env pv_res (fst ml) (f_pvar rl tyl (fst ml)) s in
+  let s = PVM.add env pv_res (fst mr) (f_pvar rr tyr (fst mr)) s in
   let post  = PVM.subst env s eg.eg_po in
   let concl =
     f_equivS ml mr eg.eg_pr (s_seq eg.eg_sl sl) (s_seq sr eg.eg_sr) post in

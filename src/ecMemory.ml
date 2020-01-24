@@ -19,10 +19,15 @@ type memory = EcIdent.t
 let mem_equal = EcIdent.id_equal
 
 (* -------------------------------------------------------------------- *)
-(* The [EcIdent.t] is the ident corresponding to the symbol in the current
-   context. *)
+type proj_arg =
+  { arg_ty : EcTypes.ty; (* type of the procedure argument "arg" *)
+    arg_pos : int;       (* projection *)
+    arg_len : int;       (* number of arguments *)
+  }
+
+(* The [EcIdent.t] is the ident corresponding to the symbol in local memory *)
 type local_memtype = {
-  mt_vars : ((int*int) option * ty * EcIdent.t) Msym.t
+  mt_vars : (proj_arg option * ty * EcIdent.t) Msym.t
 }
 
 type memtype = local_memtype option
@@ -71,20 +76,29 @@ let empty_local (me : memory) =
 let abstract (me:memory) = (me,None)
 
 (* -------------------------------------------------------------------- *)
-let bindp (x : symbol) pr (ty : EcTypes.ty) (id : EcIdent.t) ((m,mt) : memenv) =
+let bindp pr (ty : EcTypes.ty) (id : EcIdent.t) ((m,mt) : memenv) =
   let mt = match mt with
     | None -> assert false
     | Some mt -> mt in
+  let x = id.id_symb in
   let merger = function
     | Some _ -> raise (DuplicatedMemoryBinding x)
     | None   -> Some (pr,ty,id)
   in
     (m, Some { mt_vars = Msym.change merger x mt.mt_vars })
 
-let bindp_new (x : symbol) pr (ty : EcTypes.ty) (memenv : memenv) =
-  bindp x pr ty (EcIdent.create x) (memenv)
+let bind_proj arg_ty i n ty x me =
+  let arg = { arg_ty; arg_pos = i; arg_len = n } in
+  bindp (Some arg) ty x me
 
-let bind_proj_new i n x ty me = bindp_new x (Some (i,n)) ty me
+let bindp_new (x : symbol) pr (ty : EcTypes.ty) (memenv : memenv) =
+  let id = EcIdent.create x in
+  bindp pr ty id (memenv), id
+
+let bind_proj_new arg_ty i n x ty me =
+  let arg = { arg_ty; arg_pos = i; arg_len = n } in
+  bindp_new x (Some arg) ty me
+
 let bind_new x ty me = bindp_new x None ty me
 
 (* -------------------------------------------------------------------- *)
@@ -101,26 +115,29 @@ let is_bound_pv pv me = match pv with
 
 (* -------------------------------------------------------------------- *)
 
-(* TODO: A: Do we need to substitute idents by idents? *)
-let mt_subst sx st o =
+let proj_arg_subst st = function
+  | None -> None
+  | Some a -> Some ({a with arg_ty = st a.arg_ty })
+
+let mt_subst st o =
   match o with
   | None -> o
   | Some mt ->
     let vars' =
       if st == identity then mt.mt_vars else
-        Msym.map (fun (p,ty,id) -> p, st ty, id) mt.mt_vars in
+        Msym.map (fun (p,ty,id) -> proj_arg_subst st p, st ty, id) mt.mt_vars in
            (* FIXME could be greate to use smart_map *)
     if vars' == mt.mt_vars then o else
       Some { mt_vars   = vars' }
 
-let mt_substm sp smp st o =
-  mt_subst (EcPath.x_substm sp smp) st o
+let mt_substm st o =
+  mt_subst st o
 
-let me_subst sx sm st (m,mt as me) =
+let me_subst sm st (m,mt as me) =
   let m' = EcIdent.Mid.find_def m m sm in
-  let mt' = mt_subst sx st mt in
+  let mt' = mt_subst st mt in
   if m' == m && mt' == mt then me else
     (m', mt')
 
-let me_substm sp smp sm st me =
-  me_subst (EcPath.x_substm sp smp) sm st me
+let me_substm sm st me =
+  me_subst sm st me

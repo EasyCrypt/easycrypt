@@ -222,7 +222,7 @@ module HiPrinting = struct
       let ty = EcEnv.Var.by_xpath xp env in
       Format.fprintf fmt "  @[%a : %a@]@."
         (EcPrinting.pp_pv ppe) pv
-        (EcPrinting.pp_type ppe) ty.EcEnv.vb_type)
+        (EcPrinting.pp_type ppe) ty)
       (List.rev (Mx.bindings us.EcEnv.us_pv))
 
 

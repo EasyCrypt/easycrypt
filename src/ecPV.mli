@@ -17,7 +17,7 @@ open EcFol
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
- | AC_concrete_abstract of mpath * prog_var
+ | AC_concrete_abstract of mpath * xpath
  | AC_abstract_abstract of mpath * mpath
 
 exception AliasClash of env * alias_clash
@@ -42,7 +42,7 @@ module Mpv : sig
 
   val empty : ('a,'b) t
 
-  val check_npv_mp : env -> prog_var -> mpath -> EcEnv.use -> unit
+  val check_npv_mp : env -> xpath -> mpath -> EcEnv.use -> unit
 
   val check_mp_mp : env -> mpath -> EcEnv.use -> mpath -> EcEnv.use -> unit
 
