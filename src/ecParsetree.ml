@@ -215,26 +215,34 @@ and pcost  = PC_costs of pformula * (pgamepath * pformula) list
 
 
 (* -------------------------------------------------------------------- *)
-type pmod_restr_mem_el = [
-  | `Plus of pqsymbol
-  | `Minus of pqsymbol
-]
+type f_or_mod_ident =
+  | FM_FunOrVar of pgamepath
+  | FM_Mod of pmsymbol located
 
+
+type pmod_restr_mem_el =
+  | PMPlus  of f_or_mod_ident
+  | PMMinus of f_or_mod_ident
+
+(* A memory restricition. *)
 type pmod_restr_mem = pmod_restr_mem_el list
 
+(* -------------------------------------------------------------------- *)
 type poracles = pgamepath list
 
 type pcompl = PCompl of pcost
 
 type pmod_restr_el = {
-  pmre_star  : bool;
+  pmre_in    : bool;
 	pmre_name  : psymbol;
-  pmre_orcls : poracles option;
-  pmre_compl : pcompl option; }
+  pmre_orcls : poracles option;  (* None means no restriction *)
+  pmre_compl : pcompl option;    (* None means no restriction *)
+}
 
 type pmod_restr = {
   pmr_mem   : pmod_restr_mem option;
-	pmr_procs : pmod_restr_el list; }
+	pmr_procs : pmod_restr_el list;
+ }
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =

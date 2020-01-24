@@ -138,6 +138,7 @@ type tyerror =
 | InvalidMem             of symbol * mem_error
 | InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
+| InvalidVar
 | NoActiveMemory
 | PatternNotAllowed
 | MemNotAllowed

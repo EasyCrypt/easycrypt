@@ -146,6 +146,7 @@ type tyerror =
 | InvalidMem             of symbol * mem_error
 | InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
+| InvalidVar
 | NoActiveMemory
 | PatternNotAllowed
 | MemNotAllowed
@@ -1611,6 +1612,98 @@ let trans_gamepath (env : EcEnv.env) gp =
         EcPath.xpath_fun mpath funsymb
 
 (* -------------------------------------------------------------------- *)
+let trans_topmsymbol env gp =
+  (* FIXME *)
+  let (mp,_) = trans_msymbol env gp in
+  let top = EcPath.m_functor mp in
+  let mp = EcPath.m_apply top mp.EcPath.m_args in
+  mp
+
+(* -------------------------------------------------------------------- *)
+(* Check that a gamepath can be seen as a qsymbol, by verifying that there
+   is no applied functor in the path. *)
+let pgamepath_to_pqsymbol (v : pgamepath) : pqsymbol option =
+  let exception NotAQSymbol in
+  let rec pmsymbol_to_qsymbol (m : pmsymbol) =
+    match m with
+    | [] -> []
+    | (a, None) :: m -> (unloc a) :: pmsymbol_to_qsymbol m
+    | (_, Some _) :: _ -> raise NotAQSymbol in
+
+  let m,s = unloc v in
+  try mk_loc (loc v) (pmsymbol_to_qsymbol m, unloc s)
+        |> some
+  with NotAQSymbol -> None
+
+
+let trans_restr_mem env (r_mem : pmod_restr_mem option) =
+  let r_empty = ur_empty Sx.empty, ur_empty Sm.empty in
+
+  let m_add_pos ur x = match ur.ur_pos with
+    | None    -> { ur with ur_pos = Sm.singleton x |> some }
+    | Some sm -> { ur with ur_pos = Sm.add x sm    |> some } in
+  let x_add_pos ur x = match ur.ur_pos with
+    | None    -> { ur with ur_pos = Sx.singleton x |> some }
+    | Some sm -> { ur with ur_pos = Sx.add x sm    |> some } in
+  let m_add_neg ur x = { ur with ur_neg = Sm.add x ur.ur_neg } in
+  let x_add_neg ur x = { ur with ur_neg = Sx.add x ur.ur_neg } in
+
+  match r_mem with
+  | None -> r_empty
+  | Some r_mem ->
+    List.fold_left (fun (mem_x, mem_m) el ->
+        let sign,el = match el with
+          | PMPlus x -> `Plus, x
+          | PMMinus x -> `Minus, x in
+
+        match el with
+        | FM_Mod m ->
+          let m = trans_topmsymbol env m in
+          if sign = `Plus
+          then (mem_x, m_add_pos mem_m m)
+          else (mem_x, m_add_neg mem_m m)
+
+        | FM_FunOrVar vf ->
+          match pgamepath_to_pqsymbol vf with
+          | None -> tyerror (loc vf) env InvalidVar
+          | Some v ->
+            let xp = match EcEnv.Var.lookup_progvar_opt (unloc v) env with
+              | None -> tyerror (loc vf) env (UnknownModVar (unloc v))
+              | Some (`Var pv,_) when pv.pv_kind = PVglob -> pv.pv_name
+              | Some _ -> assert false in
+            if sign = `Plus
+            then (x_add_pos mem_x xp, mem_m)
+            else (x_add_neg mem_x xp, mem_m))
+      r_empty
+      r_mem
+
+
+let trans_restr_orcls_calls
+    env (name : symbol)
+    (params_oracles : Sm.t)
+    (r_orcls : poracles option) =
+  (* TODO: A: I may need to change the oracle restrictions, since for now there
+     is no way to give no restriction. *)
+  assert false
+
+let trans_restr_compl env (name : symbol) (r_compl : pcompl option) =
+  assert false
+
+let transmod_restr (env : EcEnv.env) (mr : pmod_restr) =
+  let r_mem = trans_restr_mem env mr.pmr_mem in
+  let r_procs = List.fold_left (fun r_procs r_elem ->
+      let name = unloc r_elem.pmre_name in
+      let c_calls, c_self = trans_restr_compl env name r_elem.pmre_compl in
+      let r_orcls = trans_restr_orcls_calls env name r_elem.pmre_orcls in
+      let r_in =  r_elem.pmre_in in
+      Msym.add name (OI.mk r_orcls r_in c_calls c_self) r_procs
+    ) Msym.empty mr.pmr_procs in
+
+  { mr_xpaths = fst r_mem;
+    mr_mpaths = snd r_mem;
+    mr_oinfos = r_procs; }
+
+(* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
   let Pmty_struct modty = modty in
 
@@ -2283,14 +2376,6 @@ let transpvar env side p =
   | _ -> tyerror p.pl_loc env (UnknownProgVar (unloc p, side))
 
 (* -------------------------------------------------------------------- *)
-let trans_topmsymbol env gp =
-  (* FIXME *)
-  let (mp,_) = trans_msymbol env gp in
-  let top = EcPath.m_functor mp in
-  let mp = EcPath.m_apply top mp.EcPath.m_args in
-  mp
-
-(* -------------------------------------------------------------------- *)
 module PFS : sig
   type pfstate
 
@@ -2376,6 +2461,7 @@ let trans_gbinding env ue decl =
       | PGTY_ModTy (mi, restr) ->
         let mi = fst (transmodtype env mi) in
         (* For now, we only allow negative module restrictions. *)
+        (* TODO: A: update this to allow for more restrictions. *)
         let restr = Sm.of_list (List.map (trans_topmsymbol env) restr) in
         let ur_m = { mi.mt_restr.mr_mpaths with
                      ur_neg = Sm.union

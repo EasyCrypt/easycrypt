@@ -766,6 +766,11 @@ fident:
 | nm=mod_qident DOT x=lident { (nm, x) }
 | x=lident { ([], x) }
 
+f_or_mod_ident:
+  | nm=mod_qident DOT x=lident  { FM_FunOrVar (nm, x) }
+| x=lident			{ FM_FunOrVar ([], x) }
+| m=loc(mod_qident)			{ FM_Mod m }
+
 (* -------------------------------------------------------------------- *)
 %inline ordering_op:
 | GT { ">"  }
@@ -1532,9 +1537,10 @@ mod_params:
 (* Memory restrictions *)
 
 mem_restr_el:
-  | PLUS  el=qident { `Plus el }
-  | MINUS el=qident { `Minus el }
-  | el=qident       { `Minus el }
+  | el=f_or_mod_ident       { PMPlus el }
+  | PLUS  el=f_or_mod_ident { PMPlus el }
+  | MINUS el=f_or_mod_ident { PMMinus el }
+
 
 mem_restr:
   | ol=rlist0(mem_restr_el,COMMA) RBRACE { ol }
@@ -1557,21 +1563,21 @@ compl_restr:
 mod_restr_el:
   | PROC i=iboption(STAR) f=lident
     LBRACE orcl=oracle_restr SEMICOLON cl=compl_restr RBRACE
-    { { pmre_star = not i;
+    { { pmre_in = not i;
 	pmre_name = f;
 	pmre_orcls = Some orcl;
 	pmre_compl = Some cl; } }
 
   | PROC i=iboption(STAR) f=lident COLON
     LBRACE orcl=oracle_restr RBRACE
-    { { pmre_star = not i;
+    { { pmre_in = not i;
 	pmre_name = f;
 	pmre_orcls = Some orcl;
 	pmre_compl = None; } }
 
   | PROC i=iboption(STAR) f=lident COLON
     LBRACE cl=compl_restr RBRACE
-    { { pmre_star = not i;
+    { { pmre_in = not i;
 	pmre_name = f;
 	pmre_orcls = None;
 	pmre_compl = Some cl; } }
