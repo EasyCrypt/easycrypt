@@ -11,7 +11,7 @@ open EcUtils
 open EcModules
 open EcFol
 open EcEnv
-
+open EcTypes
 open EcCoreGoal
 open EcLowPhlGoal
 

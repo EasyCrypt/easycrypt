@@ -86,28 +86,22 @@ module LowInternal = struct
       in
       let params =
         match f.f_sig.fs_anames with
-        | None -> [{ v_name = id_arg; v_type = f.f_sig.fs_arg; }]
+        | None -> [{ v_name = arg_symbol; v_type = f.f_sig.fs_arg; }]
         | Some lv -> lv in
-      let me, anames =
-        List.map_fold fresh_pv_id me params in
-      let me, lnames =
-        List.map_fold fresh_pv_id me fdef.f_locals in
+      let me, anames = EcMemory.bindall_fresh params me in
+      let me, lnames = EcMemory.bindall_fresh fdef.f_locals me in
       let subst =
         let for1 mx v x =
-          PVMap.add (pv_loc v.v_name) (pv_loc x) mx
+          PVMap.add (pv_loc v.v_name) (pv_loc x.v_name) mx
         in
         let mx = PVMap.create env in
         let mx = List.fold_left2 for1 mx params anames in
         let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
-
         mx
       in
 
       let prelude =
-        let newpv =
-          List.map2
-            (fun v newx -> pv_loc newx, v.v_type)
-            params anames in
+        let newpv = List.map (fun x -> pv_loc x.v_name, x.v_type) anames in
         if List.length newpv = List.length args then
           List.map2 (fun npv e -> i_asgn (LvVar npv, e)) newpv args
         else
@@ -124,19 +118,17 @@ module LowInternal = struct
         | Some _, None -> me, []
         | Some r, Some (LvTuple lvs) when not use_tuple ->
           let r = LowSubst.esubst subst r in
-          let me, auxs =
-            let doit me (x, ty) =
-              let v = {v_name = symbol_of_pv x; v_type = ty} in
-              let me, pv = fresh_pv_s me v in
-              let pv = pv_loc pv in
-              me, (pv, ty) in
-            List.map_fold doit me lvs in
+          let vlvs =
+            List.map (fun (x,ty) -> {v_name = symbol_of_pv x; v_type = ty}) lvs in
+          let me, auxs = EcMemory.bindall_fresh vlvs me in
+          let auxs = List.map (fun v -> pv_loc v.v_name, v.v_type) auxs in
           let s1 =
             let doit i auxi = i_asgn(LvVar auxi, e_proj_simpl r i (snd auxi)) in
             List.mapi doit auxs in
           let s2 =
             List.map2 (fun lv (pv, ty) -> i_asgn(LvVar lv, e_var pv ty)) lvs auxs in
           me, s1 @ s2
+
         | Some r, Some lv ->
           let r = LowSubst.esubst subst r in
           me, [i_asgn (lv, r)] in

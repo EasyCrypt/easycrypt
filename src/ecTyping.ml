@@ -1062,9 +1062,7 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
 let var_or_proj fvar fproj pv ty =
   match pv with
   | `Var pv -> fvar pv ty
-  | `Proj(pv, ap) ->
-    if ap.arg_pos = 0 && ap.arg_len = 1 then fvar pv ty
-    else fproj (fvar pv ap.arg_ty) ap.arg_pos ty
+  | `Proj(pv, ap) -> fproj (fvar pv ap.arg_ty) ap.arg_pos ty
 
 let expr_of_opselect
   (env, ue) loc ((sel, ty, subue, _) : OpSelect.gopsel) args
@@ -1422,7 +1420,7 @@ and transmodsig_body
           let tyargs =
             List.map              (* FIXME: continuation *)
               (fun (x, ty) -> {
-                   v_name = EcIdent.create x.pl_desc;
+                   v_name = x.pl_desc;
                    v_type = transty_for_decl env ty}) args
           in
 
@@ -1647,30 +1645,21 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       let ue  = UE.create (Some []) in
       let env = EcEnv.Fun.enter decl.pfd_name.pl_desc env in
 
-      let memenv = EcMemory.empty_local mhr
-      and env     = ref env in
-
       (* Type-check function parameters / check for dups *)
       let dtyargs =
         match decl.pfd_tyargs with
         | Fparams_imp _ -> assert false
         | Fparams_exp l -> l in
-      let memenv, params =
-        let params = ref [] in
-        let add_param memenv (x, pty) =
-          let ty = transty tp_uni !env ue pty in
-          let memenv, id = fundef_add_symbol !env memenv x ty in
-          params  := ({ v_name = id; v_type = ty }, pty.pl_loc) :: !params;
-          memenv
-        in
-        let memenv = List.fold_left add_param memenv dtyargs in
-        memenv, List.rev !params
-      in
+
+      let params =
+        List.map (fun (s,pty) -> {v_name = unloc s; v_type = transty tp_uni env ue pty}, s.pl_loc) dtyargs in
+      let memenv = EcMemory.empty_local ~witharg:false mhr in
+      let memenv = fundef_add_symbol env memenv params in
 
       (* Type-check body *)
-      let retty = transty tp_uni !env ue decl.pfd_tyresult in
+      let retty = transty tp_uni env ue decl.pfd_tyresult in
       let (env, stmt, result, prelude, locals) =
-        transbody ue memenv !env retty (mk_loc st.pl_loc body)
+        transbody ue memenv env retty (mk_loc st.pl_loc body)
       in
       (* Close all types *)
       let su      = Tuni.offun (UE.assubst ue) in
@@ -1789,17 +1778,12 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
     end;
 
     (* building the list of locals *)
-    let doit me x ty =
-      let me, id = fundef_add_symbol env me x ty in
-      locals := ({v_name = id; v_type = ty}, x.pl_loc) :: !locals;
-      me in
-    let memenv = List.fold_left2 doit  memenv xs xsvars in
-
+    let xs = List.map2 (fun x ty -> {v_name = x.pl_desc; v_type = ty}, x.pl_loc) xs xsvars in
+    let memenv = fundef_add_symbol env memenv xs in
+    locals := xs :: !locals;
     init |> oiter
      (fun init ->
-       let doit x =
-         let (_, ty, id) = oget (EcMemory.lookup (unloc x) memenv) in
-         pv_loc id, ty in
+       let doit (v,_) = pv_loc v.v_name, v.v_type in
        let iasgn = List.map doit xs in
        prelude := ((mode, iasgn), init, _dummy) :: !prelude);
     memenv in
@@ -1823,14 +1807,14 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
         unify_or_fail env ue pe.pl_loc ~expct:retty ety;
         Some e
   in
-    (env, body, result, List.rev !prelude, List.rev !locals)
+    (env, body, result, List.rev !prelude, List.flatten (List.rev !locals))
 
 (* -------------------------------------------------------------------- *)
-and fundef_add_symbol env memenv x ty =  (* for locals dup check *)
-  try
-    EcMemory.bind_new x.pl_desc ty memenv
-  with EcMemory.DuplicatedMemoryBinding _ ->
-    tyerror x.pl_loc env (DuplicatedLocal x.pl_desc)
+and fundef_add_symbol env memenv xtys =  (* for locals dup check *)
+  try EcMemory.bindall (List.map fst xtys) memenv
+  with EcMemory.DuplicatedMemoryBinding s ->
+    let (_, loc) = List.find (fun (v,_l) -> s = v.v_name) xtys in
+    tyerror loc env (DuplicatedLocal s)
 
 and fundef_check_type subst_uni env os (ty, loc) =
   let ty = subst_uni ty in
@@ -1841,7 +1825,7 @@ and fundef_check_type subst_uni env os (ty, loc) =
 and fundef_check_decl subst_uni env (decl, loc) =
   { decl with
       v_type =
-      fundef_check_type subst_uni env (Some (EcIdent.name decl.v_name)) (decl.v_type, loc) }
+      fundef_check_type subst_uni env (Some decl.v_name) (decl.v_type, loc) }
 
 and fundef_check_iasgn subst_uni env ((mode, pl), init, loc) =
   let pl =
@@ -2131,7 +2115,7 @@ let trans_gbinding env ue decl =
         let add1 env x =
           let x   = ident_of_osymbol (unloc x) in
           let env = EcEnv.Memory.push (EcMemory.abstract x) env in
-          (env, (x, GTmem None))
+          (env, (x, GTmem abstract_mt))
 
         in List.map_fold add1 env xs
 

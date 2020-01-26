@@ -10,7 +10,6 @@
 open EcIdent
 open EcUtils
 open EcTypes
-open EcModules
 open EcMemory
 open EcBigInt.Notations
 

@@ -10,7 +10,6 @@
 open EcBigInt
 open EcPath
 open EcTypes
-open EcModules
 open EcMemory
 
 (* -------------------------------------------------------------------- *)
@@ -20,8 +19,8 @@ include module type of struct include EcCoreFol end
 val f_losslessF: xpath -> form
 
 val f_eqparams:
-     EcTypes.ty -> lvariable list option -> memory
-  -> EcTypes.ty -> lvariable list option -> memory
+     EcTypes.ty -> variable list option -> memory
+  -> EcTypes.ty -> variable list option -> memory
   -> form
 
 val f_eqres:

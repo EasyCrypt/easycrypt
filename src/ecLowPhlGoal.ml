@@ -294,22 +294,6 @@ let id_of_mp mp m =
     EcIdent.create (tag_sym_with_side name m)
 
 (* -------------------------------------------------------------------- *)
-let fresh_pv_s me v =
-  let name = v.v_name in
-  let rec for_idx idx =
-    let x = Printf.sprintf "%s%d" name idx in
-      if EcMemory.is_bound x me then
-        for_idx (idx+1)
-      else
-        EcMemory.bind_new x v.v_type me
-  in
-    if EcMemory.is_bound name me then for_idx 0
-    else
-      EcMemory.bind_new name v.v_type me
-
-let fresh_pv_id me v = fresh_pv_s me {v with v_name = EcIdent.name v.v_name}
-
-(* -------------------------------------------------------------------- *)
 let lv_subst m lv f =
   match lv with
   | LvVar _ -> lv,m,f

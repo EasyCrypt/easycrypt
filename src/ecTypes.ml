@@ -355,18 +355,25 @@ module Tvar = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type variable = {
+    v_name : EcSymbols.symbol;   (* can be "_" *)
+    v_type : ty;
+  }
+let v_name { v_name = x } = x
+let v_type { v_type = x } = x
+
 type pvar_kind =
   | PVKglob
   | PVKloc
 
 type prog_var =
   | PVglob of EcPath.xpath
-  | PVloc of EcIdent.t
+  | PVloc of EcSymbols.symbol
 
 let pv_equal v1 v2 = match v1, v2 with
   | PVglob x1, PVglob x2 ->
     EcPath.x_equal x1 x2
-  | PVloc i1, PVloc i2 -> EcIdent.id_equal i1 i2
+  | PVloc i1, PVloc i2 -> EcSymbols.sym_equal i1 i2
   | PVloc _, PVglob _ | PVglob _, PVloc _ -> false
 
 let pv_kind = function
@@ -376,26 +383,26 @@ let pv_kind = function
 let pv_hash v =
   let h = match v with
     | PVglob x -> EcPath.x_hash x
-    | PVloc i -> EcIdent.id_hash i in
+    | PVloc i -> Hashtbl.hash i in
 
   Why3.Hashcons.combine
     h (if pv_kind v = PVKglob then 1 else 0)
 
 let pv_compare v1 v2 =
   match v1, v2 with
-  | PVloc i1,  PVloc i2  -> EcIdent.id_compare i1 i2
+  | PVloc i1,  PVloc i2  -> EcSymbols.sym_compare i1 i2
   | PVglob x1, PVglob x2 -> EcPath.x_compare x1 x2
   | _, _ -> Pervasives.compare (pv_kind v1) (pv_kind v2)
 
 let pv_compare_p v1 v2 =
   match v1, v2 with
-  | PVloc i1,  PVloc i2  -> EcIdent.id_compare i1 i2
+  | PVloc i1,  PVloc i2  -> EcSymbols.sym_compare i1 i2
   | PVglob x1, PVglob x2 -> EcPath.x_compare_na x1 x2
   | _, _ -> Pervasives.compare (pv_kind v1) (pv_kind v2)
 
 let pv_ntr_compare v1 v2 =
   match v1, v2 with
-  | PVloc i1,  PVloc i2  -> EcIdent.id_ntr_compare i1 i2
+  | PVloc i1,  PVloc i2  -> EcSymbols.sym_compare i1 i2
   | PVglob x1, PVglob x2 -> EcPath.x_ntr_compare x1 x2
   | _, _ -> Pervasives.compare (pv_kind v1) (pv_kind v2)
 
@@ -407,7 +414,7 @@ let get_glob = function PVloc _ -> assert false | PVglob xp -> xp
 
 let symbol_of_pv = function
   | PVglob x -> x.EcPath.x_sub
-  | PVloc id -> EcIdent.name id
+  | PVloc id -> id
 
 let string_of_pvar_kind = function
   | PVKglob -> "PVKglob"
@@ -416,7 +423,7 @@ let string_of_pvar_kind = function
 let string_of_pvar (p : prog_var) =
   let sp = match p with
     | PVglob x -> EcPath.x_tostring x
-    | PVloc id -> EcIdent.tostring id in
+    | PVloc id -> id in
 
   Printf.sprintf "%s[%s]"
     sp (string_of_pvar_kind (pv_kind p))
@@ -425,10 +432,8 @@ let pv_loc id = PVloc id
 
 let arg_symbol = "arg"
 let res_symbol = "res"
-let id_arg = EcIdent.create arg_symbol
-let pv_arg = PVloc id_arg
-let id_res = EcIdent.create res_symbol
-let pv_res =  PVloc id_res
+let pv_arg = PVloc arg_symbol
+let pv_res =  PVloc res_symbol
 
 let xp_glob x =
   let top = x.EcPath.x_top in

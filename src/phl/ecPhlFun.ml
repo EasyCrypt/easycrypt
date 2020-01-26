@@ -301,12 +301,12 @@ module UpToLow = struct
       let cond1 = f_equivF pre o_l o_r post in
       let cond2 =
         let q = Fsubst.f_subst_mem ml EcFol.mhr invQ in
-          f_forall[(mr, GTmem None)]
+          f_forall[(mr, GTmem abstract_mt)]
             (f_imp bad2 (f_bdHoareF q o_l q FHeq f_r1)) in
       let cond3 =
         let q  = Fsubst.f_subst_mem mr EcFol.mhr invQ in
         let bq = f_and bad q in
-          f_forall [(ml, GTmem None)]
+          f_forall [(ml, GTmem abstract_mt)]
             (f_bdHoareF bq o_r bq FHeq f_r1) in
 
       [cond1; cond2; cond3]
@@ -358,9 +358,8 @@ module ToCodeLow = struct
       | Some params -> List.mapi (fun i v -> e_proj arg i v.v_type) params
     in
 
-    let m, res = fresh_pv_s m
-                   {v_name = "r"; v_type = fd.f_sig.fs_ret} in
-    let r = pv_loc res in
+    let m, res = EcMemory.bind_fresh {v_name = "r"; v_type = fd.f_sig.fs_ret} m in
+    let r = pv_loc res.v_name in
     let i = i_call (Some(LvVar(r,fd.f_sig.fs_ret)), f, args) in
     let s = stmt [i] in
     (m, s, r, fd.f_sig.fs_ret)
@@ -483,7 +482,7 @@ let process_fun_upto_info (bad, p, q) tc =
   let p    = TTC.pf_process_form !!tc env' tbool p in
   let q    = q |> omap (TTC.pf_process_form !!tc env' tbool) |> odfl f_true in
   let bad  =
-    let env' = LDecl.push_active (EcFol.mhr, None) hyps in
+    let env' = LDecl.push_active (EcMemory.abstract EcFol.mhr) hyps in
     TTC.pf_process_form !!tc env' tbool bad
   in
     (bad, p, q)

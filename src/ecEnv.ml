@@ -1625,47 +1625,41 @@ module Fun = struct
     let ip = fst (oget (ipath_of_xpath path)) in
       MC.import_fun ip obj env
 
-  let add_in_memenv memenv vd =
-    EcMemory.bindp None vd.v_type vd.v_name memenv
+  let adds_in_memenv memenv vd = EcMemory.bindall vd memenv
+  let add_in_memenv memenv vd = adds_in_memenv memenv [vd]
 
-  let adds_in_memenv = List.fold_left add_in_memenv
-
-  let addproj_in_memenv ty mem l =
-    let n = List.length l in
-    List.fold_lefti
-      (fun mem i vd -> EcMemory.bind_proj ty i n vd.v_type vd.v_name mem) mem l
+  let add_params mem fun_ =
+    let ty = fun_.f_sig.fs_arg in
+    match fun_.f_sig.fs_anames with
+    | None   -> add_in_memenv mem {v_name = "_"; v_type = ty}
+    | Some l -> adds_in_memenv mem l
 
   let actmem_pre me fun_ =
-    let mem = EcMemory.empty_local me in
-    let ty = fun_.f_sig.fs_arg in
-    let mem = add_in_memenv mem {v_name = id_arg; v_type = ty} in
-    match fun_.f_sig.fs_anames with
-    | None -> mem
-    | Some l -> addproj_in_memenv ty mem l
+    let mem = EcMemory.empty_local ~witharg:true me in
+    add_params mem fun_
 
   let actmem_post me fun_ =
-    let mem = EcMemory.empty_local me in
-    add_in_memenv mem {v_name = id_res; v_type = fun_.f_sig.fs_ret}
+    let mem = EcMemory.empty_local ~witharg:false me in
+    add_in_memenv mem {v_name = res_symbol; v_type = fun_.f_sig.fs_ret}
 
   let actmem_body me fun_ =
     match fun_.f_def with
     | FBabs _   -> assert false (* FIXME error message *)
     | FBalias _ -> assert false (* FIXME error message *)
     | FBdef fd   ->
-      let mem = actmem_pre me fun_ in
+      let mem = EcMemory.empty_local ~witharg:false me in
+      let mem = add_params mem fun_ in
       (fun_.f_sig,fd), adds_in_memenv mem fd.f_locals
 
   let inv_memory side =
     let id    = if side = `Left then EcCoreFol.mleft else EcCoreFol.mright in
-    EcMemory.empty_local id
+    EcMemory.abstract id
 
   let inv_memenv env =
-    let meml  = EcMemory.empty_local EcCoreFol.mleft in
-    let memr  = EcMemory.empty_local EcCoreFol.mright in
-    Memory.push_all [meml;memr] env
+    Memory.push_all [inv_memory `Left; inv_memory `Rigth] env
 
   let inv_memenv1 env =
-    let mem  = EcMemory.empty_local EcCoreFol.mhr in
+    let mem  = EcMemory.abstract EcCoreFol.mhr in
     Memory.push_active mem env
 
   let prF_memenv m path env =
@@ -1756,22 +1750,15 @@ module Var = struct
       match fst qname with
       | [] ->
           let memenv = oget (Memory.byid side env) in
-          if EcMemory.memtype memenv = None then None
-          else
-            begin match EcMemory.lookup (snd qname) memenv with
-            | None    -> None
-            | Some (None,ty,id) ->
-              let pv = pv_loc id in
-              Some (`Var pv, ty)
-            | Some (Some i, ty, _id) ->
-              Some (`Proj (pv_arg, i), ty)
-            end
-
+          begin match EcMemory.lookup_me (snd qname) memenv with
+          | Some (v, Some pa, _) -> Some (`Proj(pv_arg, pa), v.v_type)
+          | Some (v, None, _)    -> Some (`Var (pv_loc v.v_name), v.v_type)
+          | None                 -> None
+          end
       | _ -> None
     in
     match obind inmem side with
     | None ->
-        (* TODO FIXME, suspended for local program variable *)
       let (((_, _), p), ty) = MC.lookup_var qname env in
       (`Var (pv_glob p), ty)
 
@@ -1779,15 +1766,6 @@ module Var = struct
 
   let lookup_progvar_opt ?side name env =
     try_lf (fun () -> lookup_progvar ?side name env)
-
-  let bindall_pvloc idtys env =
-    match Memory.current env with
-    | None -> assert false
-    | Some memenv ->
-      let memenv =
-        List.fold_left (fun memenv (id,ty) -> EcMemory.bindp None ty id memenv)
-          memenv idtys in
-      Memory.update memenv env
 
   let bind_pvglob name ty env =
     MC.bind_var name ty env
@@ -2306,16 +2284,7 @@ module NormMp = struct
         match gty with
         | GTty ty -> GTty (norm_ty env ty)
         | GTmodty _ -> gty
-        | GTmem None -> gty
-        | GTmem (Some mt) ->
-          let me = EcMemory.empty_local id in
-          let me = Msym.fold (fun _id (p,ty,v) me ->
-            let p =
-              omap (fun p ->
-                  { p with arg_ty = norm_ty env p.arg_ty }) p  in
-            EcMemory.bindp p (norm_ty env ty) v me)
-              (EcMemory.lmt_bindings mt) me  in
-          GTmem (snd me) in
+        | GTmem mt -> GTmem (mt_subst (norm_ty env) mt) in
       id,gty in
 
     let has_mod b =
@@ -3128,7 +3097,7 @@ module LDecl = struct
         LD_var (s.fs_ty ty, body |> omap (Fsubst.f_subst s))
 
     | LD_mem mt ->
-        let mt = EcMemory.mt_substm s.fs_ty mt
+        let mt = EcMemory.mt_subst s.fs_ty mt
         in LD_mem mt
 
     | LD_modty (p, r) ->
@@ -3205,7 +3174,7 @@ module LDecl = struct
     with LdeclError (LookupError _) -> false
 
   let has_inld s = function
-    | LD_mem (Some lmt) -> Msym.mem s (lmt_bindings lmt)
+    | LD_mem mt -> is_bound s mt
     | _ -> false
 
   let has_name ?(dep = false) s hyps =

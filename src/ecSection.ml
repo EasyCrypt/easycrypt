@@ -12,7 +12,6 @@ open EcSymbols
 open EcPath
 open EcTypes
 open EcDecl
-open EcMemory
 open EcModules
 
 module Sid  = EcIdent.Sid
@@ -148,16 +147,11 @@ let rec on_mpath_instr cb (i : instr)=
 and on_mpath_stmt cb (s : stmt) =
   List.iter (on_mpath_instr cb) s.s_node
 
-let on_mpath_lcmem cb m =
-  let on_decl _ (pa,ty,_) =
-    oiter (fun pa -> on_mpath_ty cb pa.arg_ty) pa;
-    on_mpath_ty cb ty in
-  Msym.iter on_decl (EcMemory.lmt_bindings m)
+let on_mpath_memtype cb mt =
+  EcMemory.mt_iter_ty (on_mpath_ty cb) mt
 
 let on_mpath_memenv cb (m : EcMemory.memenv) =
-  match snd m with
-  | None    -> ()
-  | Some lm -> on_mpath_lcmem cb lm
+  on_mpath_memtype cb (snd m)
 
 let rec on_mpath_modty cb mty =
   List.iter (fun (_, mty) -> on_mpath_modty cb mty) mty.mt_params;
@@ -171,10 +165,8 @@ let on_mpath_gbinding cb b =
       on_mpath_modty cb mty;
       Sx.iter (fun x -> cb x.x_top) rx;
       Sm.iter cb r
-  | EcFol.GTmem None->
-      ()
-  | EcFol.GTmem (Some m) ->
-      on_mpath_lcmem cb m
+  | EcFol.GTmem mt ->
+    on_mpath_memtype cb mt
 
 let on_mpath_gbindings cb b =
   List.iter (fun (_, b) -> on_mpath_gbinding cb b) b

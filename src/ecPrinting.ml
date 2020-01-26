@@ -57,13 +57,9 @@ module PPEnv = struct
   let enter_by_memid ppe id =
     match EcEnv.Memory.byid id ppe.ppe_env with
     | None   -> ppe
-    | Some m -> begin
-      match snd m with
-      | None   -> ppe
-      | Some _ ->
-          { ppe with ppe_env =
-              EcEnv.Memory.set_active (fst m) ppe.ppe_env }
-    end
+    | Some m ->
+      { ppe with
+        ppe_env = EcEnv.Memory.set_active (fst m) ppe.ppe_env }
 
   let push_mem ppe ?(active = false) m =
     let ppe = { ppe with ppe_env = EcEnv.Memory.push m ppe.ppe_env } in
@@ -85,7 +81,7 @@ module PPEnv = struct
 
     let in_memories name =
       let env = ppe.ppe_env in
-      let check mem = EcMemory.lookup name mem <> None in
+      let check mem = EcMemory.is_bound name (snd mem) in
       List.exists check (EcEnv.Memory.all env)
 
     in
@@ -455,19 +451,14 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
     let x = xp.P.x_sub in
     (PPEnv.mod_symb ppe xp.P.x_top)
     @ [(x, [])]
-  | PVloc id ->
-    let name = id.id_symb in
-    let inscope =
-      let mem = EcEnv.Memory.current ppe.PPEnv.ppe_env in
-      match mem  with
-      | None | Some (_, None) -> false
-      | Some (_, Some lcmem) ->
-        let _,_,id' = Msym.find name (EcMemory.lmt_bindings lcmem) in
-        EcIdent.id_equal id id' in
-    let s =
-      if inscope then name
-      else EcIdent.tostring id in
-    [(s, [])]
+  | PVloc name ->
+    let name =
+      match EcEnv.Memory.current ppe.PPEnv.ppe_env with
+      | None -> assert false
+      | Some mem ->
+        oget (EcMemory.get_name name None mem) in
+    [(name,[])]
+
 
 (* -------------------------------------------------------------------- *)
 let pp_pv ppe fmt p =
@@ -476,36 +467,17 @@ let pp_pv ppe fmt p =
 (* -------------------------------------------------------------------- *)
 exception NoProjArg
 
-let get_projarg_for_var mkvar ppe x i =
-  if not (is_loc x) || x <> pv_arg then
-    raise NoProjArg;
+let get_projarg_for_var ppe x i =
   let m = oget ~exn:NoProjArg (EcEnv.Memory.current ppe.PPEnv.ppe_env) in
-  let (_, (_,ty, y)) =
-      List.find_exn (fun (_, (a, _ty, _id)) ->
-          match a with
-          | None -> false
-          | Some a -> i = a.EcMemory.arg_pos)
-        NoProjArg
-        (Msym.bindings (EcMemory.bindings m)) in
-  mkvar y ty
+  if is_glob x then raise NoProjArg;
+  oget ~exn:NoProjArg (EcMemory.get_name (get_loc x) (Some i) m)
 
-let get_f_projarg ppe e i =
+let get_f_projarg ppe e i ty =
   match e.f_node with
   | Fpvar (x, m) ->
     let ppe = PPEnv.enter_by_memid ppe m in
-    get_projarg_for_var
-       (fun y ty-> f_pvar (pv_loc y) ty m)
-        ppe x i
-
-  | _ -> raise NoProjArg
-
-let get_e_projarg ppe e i =
-  match e.e_node with
-  | Evar x ->
-      get_projarg_for_var
-        (fun y ty -> e_var (pv_loc y) ty)
-        ppe x i
-
+    let s = get_projarg_for_var ppe x i in
+    f_pvar (pv_loc s) ty m
   | _ -> raise NoProjArg
 
 (* -------------------------------------------------------------------- *)
@@ -1138,18 +1110,24 @@ let rec pp_locbinds ppe ?fv vs =
 
 (* -------------------------------------------------------------------- *)
 let pp_memtype ppe fmt mt =
-  let add ty id mty =
-    let ids = Mty.find_def [] ty mty in
-    Mty.add ty (id::ids) mty in
-  let mty =
-    Msym.fold (fun _ (_, ty, id) mty -> add ty id mty)
-      (EcMemory.mt_bindings mt) Mty.empty in
-  let pp_bind fmt (ty, ids) =
-    Format.fprintf fmt "@[%a :@ %a@]"
-      (pp_list "@ " EcIdent.pp_ident) ids (pp_type ppe) ty in
-  let lty = Mty.bindings mty in
-  Format.fprintf fmt "@[{%a}@]"
-    (pp_list ",@ " pp_bind) lty
+  match EcMemory.for_printing mt with
+  | None -> assert false
+  | Some (arg, decl) ->
+    match arg with
+    | Some arg ->
+      let pp_vd fmt v =
+        Format.fprintf fmt "@[%s: %a@]" v.v_name (pp_type ppe) v.v_type in
+      Format.fprintf fmt "@[{%s: {@[%a@]}}@]" arg (pp_list ",@ " pp_vd) decl
+    | None ->
+      let add mty v =
+        let ids = Mty.find_def [] v.v_type mty in
+        Mty.add v.v_type (v.v_name::ids) mty in
+      let mty = List.fold_left add Mty.empty decl in
+      let pp_bind fmt (ty, ids) =
+        Format.fprintf fmt "@[%a :@ %a@]"
+          (pp_list "@ " (fun fmt s -> Format.fprintf fmt "%s" s)) (List.rev ids) (pp_type ppe) ty in
+      let lty = Mty.bindings mty in
+      Format.fprintf fmt "@[{%a}@]" (pp_list ",@ " pp_bind) lty
 
 let pp_binding ?(break = true) ?fv (ppe : PPEnv.t) (xs, ty) =
   let pp_local = pp_local ?fv in
@@ -1169,8 +1147,8 @@ let pp_binding ?(break = true) ?fv (ppe : PPEnv.t) (xs, ty) =
       let tenv1 =
         PPEnv.create_and_push_mems tenv1 (List.map (fun x -> (x,m)) xs) in
       let pp fmt =
-        if m = None then
-           Format.fprintf fmt "%a" (pp_list pp_sep (pp_local tenv1)) xs
+        if EcMemory.for_printing m = None then
+          Format.fprintf fmt "%a" (pp_list pp_sep (pp_local tenv1)) xs
         else
           Format.fprintf fmt "(%a: %a)" (pp_list pp_sep (pp_local tenv1)) xs
             (pp_memtype ppe) m
@@ -1352,11 +1330,11 @@ and try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
 
       if pv1 = pv2 then Some (`Glob pv1) else None
 
-    | SFeq ({ f_node = Fproj (f1, i1) },
-            { f_node = Fproj (f2, i2) }) -> begin
+    | SFeq ({ f_node = Fproj (f1, i1); f_ty = ty1 },
+            { f_node = Fproj (f2, i2); f_ty = ty2 }) -> begin
       try
-        let x1 = get_f_projarg ppe f1 i1 in
-        let x2 = get_f_projarg ppe f2 i2 in
+        let x1 = get_f_projarg ppe f1 i1 ty1 in
+        let x2 = get_f_projarg ppe f2 i2 ty2 in
         collect1 (f_eq x1 x2)
        with NoProjArg -> None
     end
@@ -1599,7 +1577,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | Fproj (e1, i) -> begin
       try
-        let v = get_f_projarg ppe e1 i in
+        let v = get_f_projarg ppe e1 i f.f_ty in
         pp_form_core_r ppe outer fmt v
       with NoProjArg ->
         pp_proji ppe pp_form_r (fst outer) fmt (e1,i)
@@ -2623,12 +2601,8 @@ let pp_mod_params ppe bms =
     if not (List.is_empty bms) then Format.fprintf fmt "@[(%t)@]" pp
   in (ppe, pp)
 
-let pp_pvdecl ppe ppv fmt v =
-  Format.fprintf fmt "%a : %a" ppv v.v_name (pp_type ppe) v.v_type
-
-let pp_pvldecl ppe = pp_pvdecl ppe EcIdent.pp_ident
-
-let pp_pvgdecl ppe = pp_pvdecl ppe (fun fmt s -> Format.fprintf fmt "%s" s)
+let pp_pvdecl ppe fmt v =
+  Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type
 
 let pp_funsig ppe fmt (oi_in, fs) =
   match fs.fs_anames with
@@ -2640,7 +2614,7 @@ let pp_funsig ppe fmt (oi_in, fs) =
   | Some params ->
       Format.fprintf fmt "@[<hov 2>proc%s %s(%a) :@ %a@]"
         (if oi_in then "" else " *") fs.fs_name
-        (pp_list ", " (pp_pvldecl ppe)) params
+        (pp_list ", " (pp_pvdecl ppe)) params
         (pp_type ppe) fs.fs_ret
 
 let pp_orclinfo ppe fmt oi =
@@ -2739,22 +2713,22 @@ and pp_moditem ppe fmt (p, i) =
       pp_modexp ppe fmt (EcPath.mqname p me.me_name, me)
 
   | MI_Variable v ->
-      Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvgdecl ppe) v
+      Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe) v
 
   | MI_Function f ->
     let pp_item ppe fmt = function
       | `Var pv ->
-          Format.fprintf fmt "@[<hov 2>var %a;@]" (pp_pvldecl ppe) pv
+          Format.fprintf fmt "@[<hov 2>var %a;@]" (pp_pvdecl ppe) pv
       | `Instr i ->
           Format.fprintf fmt "%a" (pp_instr ppe) i
       | `Return e ->
           Format.fprintf fmt "@[<hov 2>return@ @[%a@];@]" (pp_expr ppe) e
     in
 
-    let pp_fundef ppe fmt = function
-      | FBdef def ->
-        let xp   = EcPath.xpath p f.f_name in
-        let (me,_,_) = EcEnv.Fun.hoareS xp ppe.PPEnv.ppe_env in
+    let pp_fundef ppe fmt fun_ =
+      match fun_.f_def with
+      | (FBdef def) ->
+        let _, me = EcEnv.Fun.actmem_body mhr fun_ in
         let ppe  = PPEnv.push_mem ppe ~active:true me in
         let vars = List.map (fun x -> `Var    x) def.f_locals in
         let stmt = List.map (fun x -> `Instr  x) def.f_body.s_node in
@@ -2774,7 +2748,7 @@ and pp_moditem ppe fmt (p, i) =
 
     Format.fprintf fmt "@[<v>%a = %a@]"
       (pp_funsig ppe) (true, f.f_sig)
-      (pp_fundef ppe) f.f_def
+      (pp_fundef ppe) f
 
 let pp_modexp ppe fmt (mp, me) =
   Format.fprintf fmt "%a." (pp_modexp ppe) (mp, me)

@@ -452,88 +452,76 @@ module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
     let rec e_pv sid e =
       match e.e_node with
       | Evar (PVglob _) -> sid
-      | Evar (PVloc id) -> Sid.add id sid
+      | Evar (PVloc id) -> Ssym.add id sid
       | _               -> e_fold e_pv sid e in
 
-    e_pv Sid.empty e
+    e_pv Ssym.empty e
 end
 
-let rec lv_get_uninit_read (w : Sid.t) (lv : lvalue) =
+let rec lv_get_uninit_read (w : Ssym.t) (lv : lvalue) =
   let sx_of_pv pv = match pv with
-    | PVloc v -> Sid.singleton v
-    | PVglob _ -> Sid.empty
+    | PVloc v -> Ssym.singleton v
+    | PVglob _ -> Ssym.empty
   in
 
   match lv with
   | LvVar (x, _) ->
-      let w = Sid.union (sx_of_pv x) w in
-      (w, Sid.empty)
+      let w = Ssym.union (sx_of_pv x) w in
+      (w, Ssym.empty)
 
   | LvTuple xs ->
       let w' = List.map (sx_of_pv |- fst) xs in
-      (Sid.big_union (w :: w'), Sid.empty)
+      (Ssym.big_union (w :: w'), Ssym.empty)
 
   | LvMap (_, x, e, _) ->
-      let r = Sid.diff (Uninit.e_pv e) w in
-      let w = Sid.union (sx_of_pv x) w in
+      let r = Ssym.diff (Uninit.e_pv e) w in
+      let w = Ssym.union (sx_of_pv x) w in
       (w, r)
 
-and s_get_uninit_read (w : Sid.t) (s : stmt) =
+and s_get_uninit_read (w : Ssym.t) (s : stmt) =
   let do1 (w, r) i =
     let w, r' = i_get_uninit_read w i in
-    (w, Sid.union r r')
+    (w, Ssym.union r r')
 
-  in List.fold_left do1 (w, Sid.empty) s.s_node
+  in List.fold_left do1 (w, Ssym.empty) s.s_node
 
-and i_get_uninit_read (w : Sid.t) (i : instr) =
+and i_get_uninit_read (w : Ssym.t) (i : instr) =
   match i.i_node with
   | Sasgn (lv, e) | Srnd (lv, e) ->
-      let     r1 = Sid.diff (Uninit.e_pv e) w in
+      let     r1 = Ssym.diff (Uninit.e_pv e) w in
       let w2, r2 = lv_get_uninit_read w lv in
-      (Sid.union w w2, Sid.union r1 r2)
+      (Ssym.union w w2, Ssym.union r1 r2)
 
   | Scall (olv, _, args) ->
-      let r1    = Sid.diff (Sid.big_union (List.map (Uninit.e_pv) args)) w in
-      let w, r2 = olv |> omap (lv_get_uninit_read w) |> odfl (w, Sid.empty) in
-      (w, Sid.union r1 r2)
+      let r1    = Ssym.diff (Ssym.big_union (List.map (Uninit.e_pv) args)) w in
+      let w, r2 = olv |> omap (lv_get_uninit_read w) |> odfl (w, Ssym.empty) in
+      (w, Ssym.union r1 r2)
 
   | Sif (e, s1, s2) ->
-      let r = Sid.diff (Uninit.e_pv e) w in
+      let r = Ssym.diff (Uninit.e_pv e) w in
       let w1, r1 = s_get_uninit_read w s1 in
       let w2, r2 = s_get_uninit_read w s2 in
-      (Sid.union w (Sid.inter w1 w2), Sid.big_union [r; r1; r2])
+      (Ssym.union w (Ssym.inter w1 w2), Ssym.big_union [r; r1; r2])
 
   | Swhile (e, s) ->
-      let r  = Sid.diff (Uninit.e_pv e) w in
+      let r  = Ssym.diff (Uninit.e_pv e) w in
       let rs = snd (s_get_uninit_read w s) in
-      (w, Sid.union r rs)
+      (w, Ssym.union r rs)
 
   | Sassert e ->
-      (w, Sid.diff (Uninit.e_pv e) w)
+      (w, Ssym.diff (Uninit.e_pv e) w)
 
   | Sabstract (_ : EcIdent.t) ->
-      (w, Sid.empty)
+      (w, Ssym.empty)
 
 let get_uninit_read (s : stmt) =
-  snd (s_get_uninit_read Sid.empty s)
-
-(* -------------------------------------------------------------------- *)
-type 'a variable = {
-  v_name : 'a;
-  v_type : EcTypes.ty;
-}
-
-type lvariable = EcIdent.t variable
-type gvariable = EcSymbols.symbol variable
-
-let v_name { v_name = x } = x
-let v_type { v_type = x } = x
+  snd (s_get_uninit_read Ssym.empty s)
 
 (* -------------------------------------------------------------------- *)
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
-  fs_anames : lvariable list option;
+  fs_anames : variable list option;
   fs_ret    : EcTypes.ty;
 }
 
@@ -572,7 +560,7 @@ let mk_uses c r w =
 
 
 type function_def = {
-  f_locals : lvariable list;
+  f_locals : variable list;
   f_body   : stmt;
   f_ret    : EcTypes.expr option;
   f_uses   : uses;
@@ -620,7 +608,7 @@ and module_structure = {
 
 and module_item =
   | MI_Module   of module_expr
-  | MI_Variable of gvariable
+  | MI_Variable of variable
   | MI_Function of function_
 
 and module_comps = module_comps_item list
@@ -669,19 +657,19 @@ let rec mty_equal mty1 mty2 =
 (* -------------------------------------------------------------------- *)
 let get_uninit_read_of_fun (f : function_) =
   match f.f_def with
-  | FBalias _ | FBabs _ -> Sid.empty
+  | FBalias _ | FBabs _ -> Ssym.empty
 
   | FBdef fd ->
       let w =
         let toloc { v_name = x } = x in
         let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
-        Sid.of_list w
+        Ssym.of_list w
       in
 
       let w, r  = s_get_uninit_read w fd.f_body in
       let raout = fd.f_ret |> omap (Uninit.e_pv) in
-      let raout = Sid.diff (raout |> odfl Sid.empty) w in
-      Sid.union r raout
+      let raout = Ssym.diff (raout |> odfl Ssym.empty) w in
+      Ssym.union r raout
 
 (* -------------------------------------------------------------------- *)
 let get_uninit_read_of_module (p : path) (me : module_expr) =
@@ -707,7 +695,7 @@ let get_uninit_read_of_module (p : path) (me : module_expr) =
     | MI_Function f ->
         let xp = xpath mp f.f_name in
         let r  = get_uninit_read_of_fun f in
-        if Sid.is_empty r then acc else (xp, r) :: acc
+        if Ssym.is_empty r then acc else (xp, r) :: acc
 
   in
 

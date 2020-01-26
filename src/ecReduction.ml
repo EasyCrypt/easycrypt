@@ -791,16 +791,7 @@ and check_alpha_equal ri hyps f1 f2 =
     | _, _ -> error() in
 
   let check_memtype env mt1 mt2 =
-    match mt1, mt2 with
-    | None, None -> ()
-    | Some lmt1, Some lmt2 ->
-      let m1, m2 = EcMemory.lmt_bindings lmt1, EcMemory.lmt_bindings lmt2 in
-      ensure (EcSymbols.Msym.equal
-                (fun (p1,ty1, id1) (p2,ty2, id2) ->
-                      p1 = p2
-                   && EqTest.for_type env ty1 ty2
-                   && EcIdent.id_equal id1 id2) m1 m2)
-    | _, _ -> error () in
+    ensure (EcMemory.mt_equal_gen (EqTest.for_type env) mt1 mt2) in
 
   (* TODO all declaration in env, do it also in add local *)
   let check_binding (env, subst) (x1,gty1) (x2,gty2) =

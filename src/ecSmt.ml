@@ -83,7 +83,6 @@ type tenv = {
   mutable te_lam        : WTerm.term Mta.t;
   (*---*) te_gen        : WTerm.term Hf.t;
   (*---*) te_xpath      : WTerm.lsymbol Hx.t;  (* proc and global var *)
-  (*---*) te_lpvar      : WTerm.lsymbol Hid.t; (* local var           *)
   (*---*) te_absmod     : w3absmod Hid.t;      (* abstract module     *)
 }
 
@@ -99,7 +98,6 @@ let empty_tenv env task (kwty, kw, kwk) =
     te_lam        = Mta.empty;
     te_gen        = Hf.create 0;
     te_xpath      = Hx.create 0;
-    te_lpvar      = Hid.create 0;
     te_absmod     = Hid.create 0;
   }
 
@@ -107,10 +105,11 @@ let empty_tenv env task (kwty, kw, kwk) =
 type lenv = {
   le_lv : WTerm.vsymbol Mid.t;
   le_tv : WTy.ty Mid.t;
+  le_mt : EcMemory.memtype Mid.t;
 }
 
 let empty_lenv : lenv =
-  { le_tv = Mid.empty; le_lv = Mid.empty; }
+  { le_tv = Mid.empty; le_lv = Mid.empty; le_mt = Mid.empty }
 
 (* -------------------------------------------------------------------- *)
 let str_p p =
@@ -245,6 +244,9 @@ let wproj_tuple genv arg i =
   load_tuple genv n;
   let fs = Tuples.proj (n,i) in
   WTerm.t_app_infer fs [arg]
+
+let wfst genv arg = wproj_tuple genv arg 0
+let wsnd genv arg = wproj_tuple genv arg 1
 
 (* -------------------------------------------------------------------- *)
 let trans_tv lenv id = oget (Mid.find_opt id lenv.le_tv)
@@ -445,13 +447,25 @@ and trans_tydecl genv (p, tydecl) =
   ts
 
 (* -------------------------------------------------------------------- *)
+let trans_memtype ((genv, _) as env) mt =
+  match EcMemory.local_type mt with
+  | None -> ty_mem
+  | Some ty ->
+    let ty = trans_ty env ty in
+    wty_tuple genv [ty; ty_mem]
+
+(* -------------------------------------------------------------------- *)
 exception CanNotTranslate
 let trans_binding genv lenv (x, xty) =
-  let wty =
+  let lenv, wty =
     match xty with
-    | GTty ty -> trans_ty (genv, lenv) ty
-    | GTmem _ -> ty_mem
-    | _ -> raise CanNotTranslate in
+    | GTty ty ->
+      lenv, trans_ty (genv, lenv) ty
+    | GTmem mt ->
+      { lenv with le_mt = Mid.add x mt lenv.le_mt }, trans_memtype (genv, lenv) mt
+
+    | _ -> raise CanNotTranslate
+  in
   let wvs = WTerm.create_vsymbol (preid x) wty in
   ({ lenv with le_lv = Mid.add x wvs lenv.le_lv }, wvs)
 
@@ -758,22 +772,21 @@ and trans_op (genv:tenv) p =
   try Hp.find genv.te_op p with Not_found -> create_op ~body:true genv p
 
 (* -------------------------------------------------------------------- *)
-and trans_pvar ((genv, _) as env) pv ty mem =
+and trans_pvar ((genv, lenv) as env) pv ty mem =
   let pv = NormMp.norm_pvar genv.te_env pv in
-  let ls =
-    match pv with
-    | PVloc x ->
-      begin match Hid.find_opt genv.te_lpvar x with
-      | Some ls -> ls
-      | None ->
-        let ty = Some (trans_ty env ty) in
-        let pid = preid x in
-        let ls = WTerm.create_lsymbol pid [ty_mem] ty in
-        genv.te_task <- WTask.add_param_decl genv.te_task ls;
-        Hid.add genv.te_lpvar x ls; ls
-      end
-    | PVglob xp ->
-      begin match Hx.find_opt genv.te_xpath xp with
+  let m = trans_mem env mem in
+  let mt = try Mid.find mem lenv.le_mt with Not_found -> assert false in
+  match pv with
+  | PVloc x ->
+    let m = wfst genv m in
+    begin match EcMemory.lookup x mt with
+    | Some (_,_,Some i) -> wproj_tuple genv m i
+    | Some (_,_,None)   -> m
+    | None              -> assert false
+    end
+  | PVglob xp ->
+    let ls =
+      match Hx.find_opt genv.te_xpath xp with
       | Some ls -> ls
       | None ->
         let ty = Some (trans_ty env ty) in
@@ -781,9 +794,8 @@ and trans_pvar ((genv, _) as env) pv ty mem =
         let ls = WTerm.create_lsymbol pid [ty_mem] ty in
         genv.te_task <- WTask.add_param_decl genv.te_task ls;
         Hx.add genv.te_xpath xp ls; ls
-      end
-
-  in WTerm.t_app_infer ls [trans_mem env mem]
+    in
+    WTerm.t_app_infer ls [wsnd genv m]
 
 (* -------------------------------------------------------------------- *)
 and trans_glob ((genv, _) as env) mp mem =
@@ -838,8 +850,9 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
   in
 
   let d = WTerm.t_app ls [warg; wmem] (Some ty_mem_distr) in
+  let _, mt = EcEnv.Fun.prF_memenv mhr pr_fun genv.te_env in
   let wev =
-    let lenv, wbd = trans_binding genv lenv (mhr, GTmem None) in
+    let lenv, wbd = trans_binding genv lenv (mhr, GTmem mt) in
     let wbody = trans_form_b (genv,lenv) pr_event in
     trans_lambda genv [wbd] wbody
 
@@ -1024,7 +1037,7 @@ let add_axiom ((genv, _) as env) preid form =
   genv.te_task <- WTask.add_decl genv.te_task decl
 
 (* -------------------------------------------------------------------- *)
-let trans_hyp ((genv, _) as env) (x, ty) =
+let trans_hyp ((genv, lenv) as env) (x, ty) =
   match ty with
   | LD_var (ty, body) ->
     let dom, codom = EcEnv.Ty.signature genv.te_env ty in
@@ -1050,15 +1063,19 @@ let trans_hyp ((genv, _) as env) (x, ty) =
         WDecl.create_logic_decl [ld]
 
     in
-      genv.te_task <- WTask.add_decl genv.te_task decl;
-      Hid.add genv.te_lc x w3op
+    genv.te_task <- WTask.add_decl genv.te_task decl;
+    Hid.add genv.te_lc x w3op;
+    env
 
   | LD_hyp f ->
       (* FIXME: Selection of hypothesis *)
-      add_axiom env (preid x) f
+    add_axiom env (preid x) f;
+    env
 
-  | LD_mem    _ ->
-      let wcodom = Some ty_mem in
+  | LD_mem    mt ->
+    let wty = trans_memtype env mt in
+    let lenv = { lenv with le_mt = Mid.add x mt lenv.le_mt } in
+    let wcodom = Some wty in
       let ls =  WTerm.create_lsymbol (preid x) [] wcodom in
       let w3op = {
         w3op_fo = `LDecl ls;
@@ -1067,16 +1084,17 @@ let trans_hyp ((genv, _) as env) (x, ty) =
       } in
 
       genv.te_task <- WTask.add_param_decl genv.te_task ls;
-      Hid.add genv.te_lc x w3op
+      Hid.add genv.te_lc x w3op;
+      (genv, lenv)
 
-  | LD_modty  _ -> ()
+  | LD_modty  _ -> env
 
-  | LD_abs_st _ -> ()
+  | LD_abs_st _ -> env
 
 (* -------------------------------------------------------------------- *)
 let lenv_of_hyps genv (hyps : hyps) : lenv =
   let lenv = fst (lenv_of_tparams_for_hyp genv hyps.h_tvar) in
-  List.iter (trans_hyp (genv, lenv)) (List.rev hyps.h_local); lenv
+  snd (List.fold_left trans_hyp (genv, lenv) (List.rev hyps.h_local))
 
 (* -------------------------------------------------------------------- *)
 let trans_axiom genv (p, ax) =

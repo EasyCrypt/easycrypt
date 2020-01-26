@@ -1429,7 +1429,7 @@ module Fsubst = struct
         else GTmodty (p', (rx', r'))
 
     | GTmem mt ->
-        let mt' = EcMemory.mt_substm s.fs_ty mt in
+        let mt' = EcMemory.mt_subst s.fs_ty mt in
         if mt == mt' then gty else GTmem mt'
 
   (* ------------------------------------------------------------------ *)
@@ -1466,7 +1466,7 @@ module Fsubst = struct
     EcModules.s_subst es c
 
   let subst_me s me =
-    EcMemory.me_substm s.fs_mem s.fs_ty me
+    EcMemory.me_subst s.fs_mem s.fs_ty me
 
   let subst_m s m = Mid.find_def m m s.fs_mem
 
@@ -1549,7 +1549,7 @@ module Fsubst = struct
         let pr' = f_subst ~tx s hs.hs_pr in
         let po' = f_subst ~tx s hs.hs_po in
         let st' = EcModules.s_subst es hs.hs_s in
-        let me' = EcMemory.me_substm s.fs_mem s.fs_ty hs.hs_m in
+        let me' = EcMemory.me_subst s.fs_mem s.fs_ty hs.hs_m in
         FSmart.f_hoareS (fp, hs)
           { hs_pr = pr'; hs_po = po'; hs_s = st'; hs_m = me'; }
 
@@ -1570,7 +1570,7 @@ module Fsubst = struct
       let pr' = f_subst ~tx s bhs.bhs_pr in
       let po' = f_subst ~tx s bhs.bhs_po in
       let st' = EcModules.s_subst es bhs.bhs_s in
-      let me' = EcMemory.me_substm s.fs_mem s.fs_ty bhs.bhs_m in
+      let me' = EcMemory.me_subst s.fs_mem s.fs_ty bhs.bhs_m in
       let bd' = f_subst ~tx s bhs.bhs_bd in
       FSmart.f_bdHoareS (fp, bhs)
         { bhs with bhs_pr = pr'; bhs_po = po'; bhs_s = st';
@@ -1596,8 +1596,8 @@ module Fsubst = struct
       let po' = f_subst ~tx s eqs.es_po in
       let sl' = s_subst eqs.es_sl in
       let sr' = s_subst eqs.es_sr in
-      let ml' = EcMemory.me_substm s.fs_mem s.fs_ty eqs.es_ml in
-      let mr' = EcMemory.me_substm s.fs_mem s.fs_ty eqs.es_mr in
+      let ml' = EcMemory.me_subst s.fs_mem s.fs_ty eqs.es_ml in
+      let mr' = EcMemory.me_subst s.fs_mem s.fs_ty eqs.es_mr in
 
       FSmart.f_equivS (fp, eqs)
         { es_ml = ml'; es_mr = mr';

@@ -101,6 +101,7 @@ module Fun : sig
 
   val hoareS : xpath -> env -> memenv * (funsig * function_def) * env
 
+  val actmem_body :  memory -> function_ -> (funsig * function_def) * memenv
   val actmem_post :  memory -> function_ -> memenv
 
   val inv_memory : [`Left|`Right] -> memenv
@@ -142,7 +143,6 @@ module Var : sig
   (* Program variables binding *)
   val bind_pvglob    : symbol -> EcTypes.ty -> env -> env
   val bindall_pvglob : (EcSymbols.symbol * EcTypes.ty) list -> env -> env
-  val bindall_pvloc  : (EcIdent.t * EcTypes.ty) list -> env -> env
 
 end
 

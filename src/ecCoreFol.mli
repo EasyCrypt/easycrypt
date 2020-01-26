@@ -171,7 +171,7 @@ val kind_of_gty: gty -> [`Form | `Mem | `Mod]
 val f_local : EcIdent.t -> EcTypes.ty -> form
 val f_pvar  : EcTypes.prog_var -> EcTypes.ty -> memory -> form
 val f_pvarg : EcTypes.ty -> memory -> form
-val f_pvloc : EcModules.lvariable -> memory -> form
+val f_pvloc : variable -> memory -> form
 val f_glob  : mpath -> memory -> form
 
 (* soft-constructors - common formulas constructors *)
