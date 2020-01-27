@@ -452,11 +452,14 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
     (PPEnv.mod_symb ppe xp.P.x_top)
     @ [(x, [])]
   | PVloc name ->
-    let name =
+    (*let name =
       match EcEnv.Memory.current ppe.PPEnv.ppe_env with
       | None -> assert false
       | Some mem ->
-        oget (EcMemory.get_name name None mem) in
+        Format.eprintf "name = %s@." name;
+        match EcMemory.get_name name None mem with
+        | None -> assert false
+        | Some name -> name in*)
     [(name,[])]
 
 
@@ -1111,7 +1114,7 @@ let rec pp_locbinds ppe ?fv vs =
 (* -------------------------------------------------------------------- *)
 let pp_memtype ppe fmt mt =
   match EcMemory.for_printing mt with
-  | None -> assert false
+  | None -> ()
   | Some (arg, decl) ->
     match arg with
     | Some arg ->
@@ -1600,7 +1603,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form ppe) hs.hs_po
 
   | FequivF eqv ->
-      let (meprl, mepol), (meprr,mepor) =
+      let (meprl, meprr), (mepol,mepor) =
         EcEnv.Fun.equivF_memenv eqv.ef_fl eqv.ef_fr ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
       let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
@@ -1621,7 +1624,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form ppef) es.es_po
 
   | FeagerF eg ->
-      let (meprl, mepol), (meprr,mepor) =
+      let (meprl, meprr), (mepol,mepor) =
         EcEnv.Fun.equivF_memenv eg.eg_fl eg.eg_fr ppe.PPEnv.ppe_env in
       let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
       let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
@@ -2349,11 +2352,10 @@ let pp_bdhoareS (ppe : PPEnv.t) ?prpo fmt hs =
 
 (* -------------------------------------------------------------------- *)
 let pp_equivF (ppe : PPEnv.t) ?prpo fmt ef =
-  let (meprl, mepol), (meprr,mepor) =
+  let (meprl, meprr), (mepol,mepor) =
     EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr ppe.PPEnv.ppe_env in
   let ppepr = PPEnv.create_and_push_mems ppe [meprl; meprr] in
   let ppepo = PPEnv.create_and_push_mems ppe [mepol; mepor] in
-
   Format.fprintf fmt "%a@\n%!" (pp_pre ppepr ?prpo) ef.ef_pr;
   Format.fprintf fmt "    %a ~ %a@\n%!"
     (pp_funname ppe) ef.ef_fl

@@ -71,3 +71,4 @@ val for_printing : memtype -> (symbol option * variable list) option
 
 (* -------------------------------------------------------------------- *)
 val local_type : memtype -> ty option
+val has_locals : memtype -> bool

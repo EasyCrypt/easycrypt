@@ -221,3 +221,5 @@ let local_type mt =
   match mt with
   | None -> None
   | Some mt -> Some (ttuple (List.map v_type mt.mt_decl))
+
+let has_locals mt = mt <> None

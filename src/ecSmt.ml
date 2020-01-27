@@ -111,6 +111,8 @@ type lenv = {
 let empty_lenv : lenv =
   { le_tv = Mid.empty; le_lv = Mid.empty; le_mt = Mid.empty }
 
+let get_memtype lenv m =
+  try Mid.find m lenv.le_mt with Not_found -> assert false
 (* -------------------------------------------------------------------- *)
 let str_p p =
   WIdent.id_fresh (String.map (function '.' -> '_' | c -> c) p)
@@ -190,7 +192,7 @@ module Tuples = struct
     WTy.create_tysymbol (WIdent.id_fresh ("tuple" ^ string_of_int n)) !vl WTy.NoDef)
 
   let proj = Hdint.memo 17 (fun (n, k) ->
-    assert (0 <= k && k < n);
+    if not (0 <= k && k < n) then (Format.eprintf " k = %i; n = %i@." k n; assert false);
     let ts = ts n in
     let tl = List.map WTy.ty_var ts.WTy.ts_args in
     let ta = WTy.ty_app ts tl in
@@ -239,7 +241,10 @@ let wproj_tuple genv arg i =
   let wty  = oget (arg.WTerm.t_ty) in
   let n =
     match wty.WTy.ty_node with
-    | WTy.Tyapp (_, targs) -> List.length targs
+    | WTy.Tyapp (s, targs) ->
+      let n = List.length targs in
+      assert (Why3.Ty.ts_equal s (Tuples.ts n));
+      n
     | _ -> assert false in
   load_tuple genv n;
   let fs = Tuples.proj (n,i) in
@@ -323,8 +328,6 @@ let ts_distr, fs_mu, distr_theory =
   tdistr, mu, WTheory.close_theory th
 
 let ty_distr t = WTy.ty_app ts_distr [t]
-
-let ty_mem_distr = ty_distr ty_mem
 
 (* -------------------------------------------------------------------- *)
 let mk_tglob genv mp =
@@ -774,17 +777,17 @@ and trans_op (genv:tenv) p =
 (* -------------------------------------------------------------------- *)
 and trans_pvar ((genv, lenv) as env) pv ty mem =
   let pv = NormMp.norm_pvar genv.te_env pv in
-  let m = trans_mem env mem in
-  let mt = try Mid.find mem lenv.le_mt with Not_found -> assert false in
+  let mt = get_memtype lenv mem in
   match pv with
   | PVloc x ->
-    let m = wfst genv m in
+    let m = trans_mem env ~forglobal:false mem in
     begin match EcMemory.lookup x mt with
     | Some (_,_,Some i) -> wproj_tuple genv m i
     | Some (_,_,None)   -> m
     | None              -> assert false
     end
   | PVglob xp ->
+    let m =  trans_mem env ~forglobal:true mem in
     let ls =
       match Hx.find_opt genv.te_xpath xp with
       | Some ls -> ls
@@ -795,7 +798,7 @@ and trans_pvar ((genv, lenv) as env) pv ty mem =
         genv.te_task <- WTask.add_param_decl genv.te_task ls;
         Hx.add genv.te_xpath xp ls; ls
     in
-    WTerm.t_app_infer ls [wsnd genv m]
+    WTerm.t_app_infer ls [m]
 
 (* -------------------------------------------------------------------- *)
 and trans_glob ((genv, _) as env) mp mem =
@@ -805,7 +808,7 @@ and trans_glob ((genv, _) as env) mp mem =
       assert (mp.EcPath.m_args = []);
 
       let id   = EcPath.mget_ident mp in
-      let wmem = trans_mem env mem in
+      let wmem = trans_mem env ~forglobal:true mem in
       let w3op =
         match Hid.find_opt genv.te_lc id with
         | Some w3op -> w3op
@@ -825,22 +828,33 @@ and trans_glob ((genv, _) as env) mp mem =
   | _ -> trans_form env f
 
 (* -------------------------------------------------------------------- *)
-and trans_mem (genv,lenv) mem =
-  match Hid.find_opt genv.te_lc mem with
-  | Some w3op -> apply_wop genv w3op [] []
-  | None -> WTerm.t_var (oget (Mid.find_opt mem lenv.le_lv))
+and trans_mem (genv,lenv) ~forglobal mem =
+  let wmem =
+    match Hid.find_opt genv.te_lc mem with
+    | Some w3op -> apply_wop genv w3op [] []
+    | None -> WTerm.t_var (oget (Mid.find_opt mem lenv.le_lv)) in
+  let mt = get_memtype lenv mem in
+  let has_locals = EcMemory.has_locals mt in
+  if forglobal then
+    if has_locals then wsnd genv wmem
+    else wmem
+  else
+    (assert has_locals; wfst genv wmem)
 
 (* -------------------------------------------------------------------- *)
 and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
-  let wmem = trans_mem env pr_mem in
+  let wmem = trans_mem env ~forglobal:true pr_mem in
   let warg = trans_form_b env pr_args in
 
   (* Translate the procedure *)
   let xp = NormMp.norm_xfun genv.te_env pr_fun in
+  let _, mt = EcEnv.Fun.prF_memenv mhr pr_fun genv.te_env in
+  let mty = trans_memtype env mt in
+  let tyr = ty_distr mty in
   let ls =
     let trans () =
       let tya = oget warg.WTerm.t_ty in
-      let tyr = Some ty_mem_distr in
+      let tyr = Some tyr in
       let pid = preid_xp xp in
       let ls  = WTerm.create_lsymbol pid [tya; ty_mem] tyr in
       genv.te_task <- WTask.add_param_decl genv.te_task ls;
@@ -849,8 +863,8 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
     in Hx.find_opt genv.te_xpath xp |> ofdfl trans
   in
 
-  let d = WTerm.t_app ls [warg; wmem] (Some ty_mem_distr) in
-  let _, mt = EcEnv.Fun.prF_memenv mhr pr_fun genv.te_env in
+  let d = WTerm.t_app ls [warg; wmem] (Some tyr) in
+
   let wev =
     let lenv, wbd = trans_binding genv lenv (mhr, GTmem mt) in
     let wbody = trans_form_b (genv,lenv) pr_event in
