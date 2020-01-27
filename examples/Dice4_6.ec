@@ -1,17 +1,15 @@
 require import Int Real Distr List FSet.
 require import DInterval Dexcepted.
 
-require (*--*) Dice_sampling.
-
 pragma +implicits.
 pragma -oldip.
 
-clone Dice_sampling as D4_6 with
+clone WhileSamplingFixedTest as D4_6 with
   type t             <- int,
   type input         <- unit,
-  op   d    (i:unit) <- [1..6],
+  op   dt   (i:unit) <- [1..6],
   op   test (i:unit) <- fun r=> !1 <= r <= 4
-  proof * by done.
+proof *.
 
 module D4 = {
   proc sample () : int = {
