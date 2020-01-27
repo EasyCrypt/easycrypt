@@ -526,7 +526,6 @@
 %token RPBRACE
 %token RRARROW
 %token RWNORMAL
-%token SAMPLE
 %token SEARCH
 %token SECTION
 %token SELF
