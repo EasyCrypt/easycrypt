@@ -1,0 +1,108 @@
+#! /usr/bin/env python3
+
+# --------------------------------------------------------------------
+import sys, os, docker, multiprocessing as mp
+import coloredlogs, logging
+
+# --------------------------------------------------------------------
+ROOT    = os.path.dirname(__file__)
+ECBUILD = 'easycryptpa/ec-build-box'
+
+# --------------------------------------------------------------------
+class Object(object):
+    def __init__(self, **kw):
+        super(Object, self).__init__()
+        self.__dict__.update(kw)
+
+# --------------------------------------------------------------------
+def _main():
+    coloredlogs.install()
+    logging.basicConfig(level = logging.INFO)
+
+    if len(sys.argv)-1 != 2:
+        print('Usage: %s [ECROOT] [CONFIG]' % (sys.argv[0],))
+        exit(1)
+
+    ecpath, pfilename = sys.argv[1:]
+
+    with open(pfilename, 'r') as stream:
+        projects = [x.strip() for x in stream.readlines()]
+        projects = [x for x in projects if x]
+        projects = [x.split(None, 2) for x in projects]
+        projects = [x for x in projects if len(x) == 2]
+        projects = [Object(name = x[0], url = x[1]) for x in projects]
+
+    core = mp.cpu_count()
+    core = max(core-2, 1)
+    dck  = docker.from_env()
+
+    logging.info('pulling EasyCrypt build-box...')
+    img = dck.images.pull(ECBUILD)[0]
+    logging.info('...done')
+
+    logging.info('running container...')
+    config = dict(
+        init        = True,
+        detach      = True,
+        stdin_open  = True,
+        auto_remove = False,
+        cpu_count   = core,
+        working_dir = '/home/ci',
+        volumes     = {
+            os.path.realpath(ecpath): dict(bind='/home/ci/ecgit', mode='ro'),
+        },
+    )
+    ctn = dck.containers.run(img, **config)
+    logging.info('...done (%s)', ctn.name)
+
+    def _run(command, **kw):
+        logging.info('docker: %s' % (command,))
+
+        handle = dck.api.exec_create(ctn.id, command, tty=True, **kw)
+        stream = dck.api.exec_start(handle, stream=True)
+
+        for output in stream:
+            sys.stdout.write(output.decode('ascii'))
+
+        return dck.api.exec_inspect(handle['Id']).get('ExitCode') 
+
+    errors = 0
+
+    try:
+        logging.info('compiling EasyCrypt...')
+        _run('git clone --depth=1 file:///home/ci/ecgit easycrypt')
+        _run('opam config exec -- make -C easycrypt')
+        _run('ln -s ec.native easycrypt/easycrypt')
+        logging.info('...done')
+
+        _run('mkdir -p projects/_outputs')
+
+        for project in projects:
+            logging.info('checking project [%s]...' % (project.name,))
+            env = dict(
+                ECROOT   = '/home/ci/easycrypt',
+                ECJOBS   = core,
+                XUNITOUT = '/home/ci/projects/_output/%s.yml' % (project.name,))
+            _run('git clone --depth=1 --recurse-submodules %s projects/%s' % \
+                 (project.url, project.name))
+            status = _run(
+                'make -C projects/%s check' % (project.name,), environment = env)
+            if status != 0:
+                logging.error('project %s failed' % (project.name,))
+                errors += 1
+            logging.info('...done')
+
+    finally:
+        ctn.stop()
+        if errors == 0:
+            ctn.remove()
+
+    if errors != 0:
+        logging.error('# of failed projects: %d' % (errors,))
+        logging.error('run the following commands to inspect:')
+        logging.error('  - docker start %s' % (ctn.name,))
+        logging.error('  - docker exec -ti %s /bin/bash' % (ctn.name,))
+
+# --------------------------------------------------------------------
+if __name__ == '__main__':
+    _main()
