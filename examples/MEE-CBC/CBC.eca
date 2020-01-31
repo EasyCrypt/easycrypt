@@ -2,8 +2,7 @@
      symmetric encryption scheme **when used with random IVs**  ***)
 require import AllCore Int Real Distr List FSet SmtMap.
 require import StdRing StdOrder DList.
-require (*ab*) NewPRP ConcretePRP NewPRF SKE_INDR. (* Definitions and Security Notions *)
-require (*ab*) RP_RF.            (* Generic Arguments *)
+require (*ab*) PRP PRF SKE_INDR. (* Definitions and Security Notions *)
 (*---*) import RField RealOrder.
 
 pragma -oldip.
@@ -56,31 +55,26 @@ axiom bijective_P (k : key):
   /\ cancel (Pi k) (P k).
 
 (** We instantiate library definitions for brevity **)
-clone import WeakPRP as PRPt with
-  type D    <- block,
-  type K    <- key,
-  op   dK   <- dKey
-proof * by smt (dKey_uffu).
+clone import PRP as PRPt with
+  type D <- block.
 
-clone import ConcretePRP as PRPr with
-  type D    <- block,
+clone import WeakPRP as PRPSec.
+
+clone import PseudoRP as PRPr with
   type K    <- key,
   op   dK   <- dKey,
-  op   P    <- P,
-  op   Pi   <- Pi
-proof * by smt (dKey_uffu bijective_P).
+  op   p    <- P,
+  op   pi   <- Pi
+proof * by smt(dKey_uffu bijective_P).
 
-clone import IdealPRP as PRPi with
-  type D    <- block,
-  type K    <- key,
-  op   dK   <- dKey,
+clone import RP as PRPi with
   op   dD   <- dBlock
-rename "RandomPermutation" as "PRPi"
-proof * by smt (dKey_uffu dBlock_uffu).
+rename "RP" as "PRPi"
+proof * by smt(dBlock_uffu).
 
 (*-------------------------------------------------------------------- *)
 (** The CBC construction turning a PRP into an explicit-IV SKE scheme **)
-module CBC(P:PRP) = {
+module CBC(P : PseudoRP) = {
   proc keygen = P.keygen
 
   proc enc(key:key,iv:block,p:block list): block list = {
@@ -209,23 +203,16 @@ end section Random_Ideal.
     longer need the inverse permutation for decryption... We will never
     make use of a concrete PRF (only use the ideal one), so we don't
     instantiate F **)
-clone import NewPRF as PRFt with
-  type K  <- key,
+clone import PRF as PRFt with
   type D  <- block,
-  type R  <- block,
-  op   dK <- dKey
-proof * by smt (dKey_uffu).
+  type R  <- block.
 
-clone import IdealPRF as PRFi with
-  type K  <- key,
-  type D  <- block,
-  type R  <- block,
-  op   dK <- dKey,
-  op   dR <- dBlock
-rename "RandomFunction" as "PRFi"
-proof * by smt (dKey_uffu dBlock_uffu).
+clone import RF as PRFi with
+  op   dR _ <- dBlock
+rename "RF" as "PRFi"
+proof * by smt (dBlock_uffu).
 
-module CBC_Oracle(P:PRF_Oracles) = {
+module CBC_Oracle (P:PRF) = {
   proc init = P.init
 
   proc enc(p:block list): block list = {
@@ -275,8 +262,8 @@ module INDR_CPA_direct(O:RCPA_full,A:RCPA_Adversary) = {
  **
  ** This is currently not very useful because of the treatment of glob
  **)
-lemma CBC_Oracle_enc_eq (P  <: PRF_Oracles)
-                        (P' <: PRF_Oracles)
+lemma CBC_Oracle_enc_eq (P  <: PRF)
+                        (P' <: PRF)
                         (I: (glob P) -> (glob P') -> bool):
   equiv [P.f ~ P'.f: ={arg} /\ I (glob P){1} (glob P'){2}
                  ==> ={res} /\ I (glob P){1} (glob P'){2}] =>
@@ -291,8 +278,8 @@ proof.
   by auto.
 qed.
 
-lemma CPA_direct_eq (P  <: PRF_Oracles)
-                    (P' <: PRF_Oracles)
+lemma CPA_direct_eq (P  <: PRF)
+                    (P' <: PRF)
                     (I: (glob P) -> (glob P') -> bool):
   equiv [P.init ~ P'.init: true ==> I (glob P){1} (glob P'){2}] =>
   equiv [P.f ~ P'.f: ={arg} /\ I (glob P){1} (glob P'){2}
@@ -309,32 +296,32 @@ proof.
 qed.
 
 section Cleanup.
-  declare module A : RCPA_Adversary { RCPA_Wrap, WeakPRP_Wrap }.
+  declare module A : RCPA_Adversary { RCPA_Wrap, PRP }.
 
   local module M : Enc_Scheme = {
-    proc keygen = IV_Wrap(CBC(PRPr)).keygen
-    proc enc    = IV_Wrap(CBC(PRPr)).enc
-    proc dec    = IV_Wrap(CBC(PRPr)).dec
+    proc keygen = IV_Wrap(CBC(PseudoRP)).keygen
+    proc enc    = IV_Wrap(CBC(PseudoRP)).enc
+    proc dec    = IV_Wrap(CBC(PseudoRP)).dec
   }.
 
   local equiv enc_eq:
-    RCPA_Wrap(IV_Wrap(CBC(PRPr))).enc ~ CBC_Oracle(WeakPRP_Wrap(PRPr)).enc:
-      ={arg} /\ ={k}(RCPA_Wrap,WeakPRP_Wrap) ==> ={res} /\ ={k}(RCPA_Wrap,WeakPRP_Wrap).
+    RCPA_Wrap(IV_Wrap(CBC(PseudoRP))).enc ~ CBC_Oracle(PRP).enc:
+      ={arg} /\ ={k}(RCPA_Wrap,PRP) ==> ={res} /\ ={k}(RCPA_Wrap,PRP).
   proof.
     proc; inline *; wp.
     while (   ={i, s}
-           /\ key0{1} = WeakPRP_Wrap.k{2}
+           /\ key0{1} = PRP.k{2}
            /\ p1{1} = p{2}
            /\ c1{1} = c{2});
       by auto.
   qed.
 
   local lemma success_eq &m:
-    Pr[INDR_CPA(IV_Wrap(CBC(PRPr)),A).main() @ &m: res]
-    = Pr[INDR_CPA_direct(CBC_Oracle(WeakPRP_Wrap(PRPr)),A).main() @ &m: res].
+    Pr[INDR_CPA(IV_Wrap(CBC(PseudoRP)),A).main() @ &m: res]
+    = Pr[INDR_CPA_direct(CBC_Oracle(PRP),A).main() @ &m: res].
   proof.
     byequiv=> //=; proc.
-    call (_: ={k}(RCPA_Wrap,WeakPRP_Wrap));
+    call (_: ={k}(RCPA_Wrap,PRP));
       1:by conseq enc_eq.
     by inline *; auto.
   qed.
@@ -363,9 +350,9 @@ section Cleanup.
   qed.
 
   lemma cleanup &m:
-    `|Pr[INDR_CPA(IV_Wrap(CBC(PRPr)),A).main() @ &m: res]
+    `|Pr[INDR_CPA(IV_Wrap(CBC(PseudoRP)),A).main() @ &m: res]
       - Pr[INDR_CPA(Random,A).main() @ &m: res]|
-    = `|Pr[INDR_CPA_direct(CBC_Oracle(WeakPRP_Wrap(PRPr)),A).main() @ &m: res]
+    = `|Pr[INDR_CPA_direct(CBC_Oracle(PRP),A).main() @ &m: res]
         - Pr[INDR_CPA_direct(CBC_Oracle(Sample),A).main() @ &m: res]|.
   proof. by rewrite (success_eq &m) (success_eq_random &m). qed.
 end section Cleanup.
@@ -373,7 +360,7 @@ end section Cleanup.
 (** Step 1: Decompose the advantage into manageable sub-problems **)
 (* We push the CBC construction out and into an adversary against the
    PRP/RP/RF *)
-module PRPF_Adv(A:RCPA_Adversary, F:PRF_Oracle) = {
+module PRPF_Adv(A:RCPA_Adversary, F:PRF_Oracles) = {
   module O = {
     proc enc(p:block list): block list = {
       var s, c, i, pi;
@@ -395,27 +382,27 @@ module PRPF_Adv(A:RCPA_Adversary, F:PRF_Oracle) = {
 }.
 
 section Decomposition.
-  declare module A : RCPA_Adversary { RCPA_Wrap, WeakPRP_Wrap, PRPi, PRFi }.
+  declare module A : RCPA_Adversary { RCPA_Wrap, PRP, PRPi, PRFi }.
 
-  local lemma refactor_abstract (O <: WeakPRP {A}) &m:
+  local lemma refactor_abstract (O <: PRP {A}) &m:
     Pr[INDR_CPA_direct(CBC_Oracle(O),A).main() @ &m: res]
-    = Pr[WeakPRP_IND(O,PRPF_Adv(A)).main() @ &m: res].
+    = Pr[IND(O,PRPF_Adv(A)).main() @ &m: res].
   proof. by byequiv=> //=; proc; inline *; sim. qed.
 
   lemma CBC_PRP_RF &m:
-    `|Pr[INDR_CPA_direct(CBC_Oracle(WeakPRP_Wrap(PRPr)),A).main() @ &m: res]
+    `|Pr[INDR_CPA_direct(CBC_Oracle(PRP),A).main() @ &m: res]
       - Pr[INDR_CPA_direct(CBC_Oracle(Sample),A).main() @ &m: res]|
     <= `|Pr[INDR_CPA_direct(CBC_Oracle(PRFi),A).main() @ &m: res]
          - Pr[INDR_CPA_direct(CBC_Oracle(Sample),A).main() @ &m: res]|
-       + `|Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr),PRPF_Adv(A)).main() @ &m: res]
-           - Pr[WeakPRP_IND(PRPi,PRPF_Adv(A)).main() @ &m: res]| (* Adv^{prp}_{P}(PRP_Adv(A)) *)
-       + `|Pr[WeakPRP_IND(PRPi,PRPF_Adv(A)).main() @ &m: res]
-           - Pr[WeakPRP_IND(PRFi,PRPF_Adv(A)).main() @ &m: res]|.
+       + `|Pr[IND(PRP,PRPF_Adv(A)).main() @ &m: res]
+           - Pr[IND(PRPi,PRPF_Adv(A)).main() @ &m: res]| (* Adv^{prp}_{P}(PRP_Adv(A)) *)
+       + `|Pr[IND(PRPi,PRPF_Adv(A)).main() @ &m: res]
+           - Pr[IND(PRFi,PRPF_Adv(A)).main() @ &m: res]|.
   proof.
-    rewrite (refactor_abstract (WeakPRP_Wrap(PRPr)) &m).
-    rewrite (refactor_abstract PRFi                 &m).
-    rewrite (refactor_abstract Sample               &m).
-    smt ml=0. (* triangular inequality *)
+    rewrite (refactor_abstract PRP    &m).
+    rewrite (refactor_abstract PRFi   &m).
+    rewrite (refactor_abstract Sample &m).
+    smt(). (* triangular inequality *)
   qed.
 end section Decomposition.
 
@@ -460,7 +447,7 @@ section Reduce.
   declare module A : RCPA_Adversary { RCPA_Wrap, PRFi, Compute }.
   axiom A_distinguish_ll (O <: RCPA_Oracles {A}): islossless O.enc => islossless A(O).distinguish.
 
-  local module DoubleQuery(F:PRF_Oracles) = {
+  local module DoubleQuery (F : PRF) = {
     var qs : block fset
     var bad: bool
 
@@ -480,7 +467,7 @@ section Reduce.
     }
   }.
 
-  local lemma doublequery_eq (F <: PRF_Oracles {A, DoubleQuery}) &m:
+  local lemma doublequery_eq (F <: PRF {A, DoubleQuery}) &m:
     Pr[INDR_CPA_direct(CBC_Oracle(F),A).main() @ &m: res]
     = Pr[INDR_CPA_direct(CBC_Oracle(DoubleQuery(F)),A).main() @ &m: res].
   proof.
@@ -609,14 +596,14 @@ end section Reduce.
  **          - Pr[IND(PRFa.PRFi,PRPF_Adv(A)).main() @ &m: res]|
  **      + Pr[INDR_CPA_direct(Compute,A).main() @ &m: Compute.bad]
  **)
-lemma reduction (A <: RCPA_Adversary { RCPA_Wrap, WeakPRP_Wrap, PRPi, PRFi, Compute }) &m:
+lemma reduction (A <: RCPA_Adversary { RCPA_Wrap, PRP, PRPi, PRFi, Compute }) &m:
   (forall (O <: RCPA_Oracles {A}), islossless O.enc => islossless A(O).distinguish) =>
-     `|Pr[INDR_CPA(IV_Wrap(CBC(PRPr)),A).main() @ &m: res]
+     `|Pr[INDR_CPA(IV_Wrap(CBC(PseudoRP)),A).main() @ &m: res]
        - Pr[INDR_CPA(Random,A).main() @ &m: res]|
-  <=    `|Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr),PRPF_Adv(A)).main() @ &m: res]
-          - Pr[WeakPRP_IND(PRPi,PRPF_Adv(A)).main() @ &m: res]|
-      + `|Pr[WeakPRP_IND(PRPi,PRPF_Adv(A)).main() @ &m: res]
-          - Pr[WeakPRP_IND(PRFi,PRPF_Adv(A)).main() @ &m: res]|
+  <=    `|Pr[IND(PRP,PRPF_Adv(A)).main() @ &m: res]
+          - Pr[IND(PRPi,PRPF_Adv(A)).main() @ &m: res]|
+      + `|Pr[IND(PRPi,PRPF_Adv(A)).main() @ &m: res]
+          - Pr[IND(PRFi,PRPF_Adv(A)).main() @ &m: res]|
       + Pr[INDR_CPA_direct(Compute,A).main() @ &m: Compute.bad].
 proof.
   move=> A_run_ll.
@@ -702,30 +689,24 @@ section Probability_RP_RF.
   declare module A : RCPA_Adversary { PRPi, PRFi, QueryBounder }.
   axiom A_run_ll (O <: RCPA_Oracles { A }): islossless O.enc => islossless A(O).distinguish.
 
-  local clone RP_RF as RP_RFc with
-    type K    <- key,
-    type D    <- block,
-    op   dK   <- dKey,
-    op   uD   <- dBlock,
+  local clone PRPi_RF as RP_RFc with
     op   q    <- q * ell
-  proof * by smt (dKey_uffu dBlock_uffu IntOrder.divr_ge0 gt0_q gt0_ell).
+  proof * by smt (dBlock_uffu IntOrder.divr_ge0 gt0_q gt0_ell).
 
   lemma Bound_by_PRP_PRF &m:
-    `|Pr[WeakPRP_IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
-      - Pr[WeakPRP_IND(PRFi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]|
+    `|Pr[IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
+      - Pr[IND(PRFi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]|
     <= ((q * ell)^2)%r * mu dBlock (pred1 witness).
   proof.
-    have ->: Pr[WeakPRP_IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
-             = Pr[RP_RFc.PRFi.IND(RP_RFc.PRPi.PRPi,RP_RFc.DBounder(PRPF_Adv(QueryBounder(A)))).main() @ &m: res].
+    have ->: Pr[IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
+             = Pr[RP_RFc.PRFt.IND(PRPi,RP_RFc.DBounder(PRPF_Adv(QueryBounder(A)))).main() @ &m: res].
       byequiv=> //=.
       proc; inline *; auto.
-      call (_:   ={OracleBounder.qC}
-              /\ ={m}(PRPi,RP_RFc.PRPi.PRPi)
+      call (_:   ={PRPi.m, OracleBounder.qC}
               /\ 0 <= OracleBounder.qC{2} <= q
               /\ 0 <= RP_RFc.DBounder.FBounder.c{2} <= OracleBounder.qC{2} * ell).
         proc; inline *; sp; if=> //=; 2:by while (={i, p, r}); auto.
-          wp; while (   ={i0, p0, r, s, c}
-                     /\ ={m}(PRPi,RP_RFc.PRPi.PRPi)
+          wp; while (   ={i0, p0, r, s, c, PRPi.m}
                      /\ 0 <= OracleBounder.qC{2} < q
                      /\ 0 <= i0{2} <= size p0{2} <= ell
                      /\ 0 <= RP_RFc.DBounder.FBounder.c{2} <= OracleBounder.qC{2} * ell + i0{2}).
@@ -734,8 +715,8 @@ section Probability_RP_RF.
             by sp; if=> //=; auto=> /#.
           by auto=> />; smt (size_ge0).
       by auto=> />; smt (gt0_q).
-    have ->: Pr[WeakPRP_IND(PRFi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
-             = Pr[RP_RFc.PRFi.IND(RP_RFc.PRFi.PRFi,RP_RFc.DBounder(PRPF_Adv(QueryBounder(A)))).main() @ &m: res].
+    have ->: Pr[IND(PRFi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
+             = Pr[RP_RFc.PRFt.IND(RP_RFc.PRFi.PRFi,RP_RFc.DBounder(PRPF_Adv(QueryBounder(A)))).main() @ &m: res].
       byequiv=> //=.
       proc; inline *; auto.
       call (_:   ={OracleBounder.qC}
@@ -753,15 +734,15 @@ section Probability_RP_RF.
             by sp; if=> //=; auto=> /#.
           by auto; smt (size_ge0).
       by auto; smt (gt0_q).
-    apply/(RP_RFc.Conclusion (PRPF_Adv(QueryBounder(A))) &m).
-    move=> O O_f_ll.
-    proc. call (A_run_ll (<: QueryBounder(A,PRPF_Adv(QueryBounder(A),O).O).O') _).
-      proc; inline *; sp; if=> //=.
-        wp; while true (size p0 - i0).
-          by auto; call O_f_ll; auto=> /#.
-          by auto; rewrite -/predT; smt (dBlock_uffu).
-        by while true (size p + 1 - i); auto=> /#.
-    by auto.
+  apply/(RP_RFc.Conclusion (PRPF_Adv(QueryBounder(A))) &m).
+  move=> O O_f_ll.
+  proc. call (A_run_ll (<: QueryBounder(A,PRPF_Adv(QueryBounder(A),O).O).O') _).
+  + proc; inline *; sp; if=> //=.
+    + wp; while true (size p0 - i0).
+      + by auto; call O_f_ll; auto=> /#.
+      by auto; rewrite -/predT; smt (dBlock_uffu).
+    by while true (size p + 1 - i); auto=> /#.
+  by auto.
   qed.
 end section Probability_RP_RF.
 
@@ -810,73 +791,74 @@ section Probability_Collision.
     }
   }.
 
+  local lemma pr_PushBound_list p &m:
+      Pr[Exp(Bounder(Sample),Wrap(A)).main() @ &m: p Sample.l]
+    = Pr[Exp(Sample,Bounded(Wrap(A))).main() @ &m: p Sample.l].
+  proof.
+  byequiv (: ={glob Wrap(A), glob Sample} ==> ={glob Wrap(A), glob Sample})=> //=.
+  by conseq (PushBound Sample (Wrap(A))).
+  qed.
+
   lemma Bound_by_Birthday &m:
     Pr[INDR_CPA_direct(Compute,QueryBounder(A)).main() @ &m: Compute.bad]
     <= ((q * ell)^2)%r * mu dBlock (pred1 witness).
   proof.
-    apply/(ler_trans Pr[Exp(Bounder(Sample),Wrap(A)).main() @ &m: !(uniq Sample.l)]).
-      byequiv=> //=.
-      symmetry.
-      transitivity Exp(Sample,Bounded(Wrap(A))).main
-                   (={glob Wrap(A), glob Sample} ==> ={glob A, glob Sample})
-                   (={glob A} ==> Compute.bad{2} => !uniq Sample.l{1})=> //=.
-        smt ml=0.
-        by conseq (PushBound Sample (Wrap(A))).
-      symmetry.
-      proc; inline *; wp.
-      call (_:    OracleBounder.qC{1} = Wrap.qC{2}
-               /\ 0 <= Wrap.qC{2} <= q
-               /\ 0 <= Bounder.c{2} <= Wrap.qC{2} * ell
+  apply/(ler_trans Pr[Exp(Bounder(Sample),Wrap(A)).main() @ &m: !(uniq Sample.l)]).
+  + rewrite (pr_PushBound_list (fun l=> !uniq l) &m)=> /=.
+    byequiv (: ={glob A} ==> Compute.bad{1} => !uniq Sample.l{2})=> //.
+    proc; inline *; wp.
+    call (_:    OracleBounder.qC{1} = Wrap.qC{2}
+             /\ 0 <= Wrap.qC{2} <= q
+             /\ 0 <= Bounder.c{2} <= Wrap.qC{2} * ell
+             /\ (Compute.bad{1} <=> !List.uniq Sample.l{2})
+             /\ (forall x, mem Compute.qs{1} x <=> mem Sample.l{2} x)).
+    + proc; sp; if=> //.
+      + inline *; auto.
+        while (   ={c}
+               /\ p0{1} = p{2}
+               /\ i0{1} = i{2}
+               /\ 0 <= Wrap.qC{2} < q
+               /\ 0 <= i{2} <= size p{2} <= ell
+               /\ 0 <= Bounder.c{2} <= Wrap.qC{2} * ell + i{2}
                /\ (Compute.bad{1} <=> !List.uniq Sample.l{2})
                /\ (forall x, mem Compute.qs{1} x <=> mem Sample.l{2} x)).
-        proc; sp; if=> //=; 2:by while (={i, p} /\ r{1} = c{2}); auto.
-          inline *; auto.
-          while (   ={c}
-                 /\ p0{1} = p{2}
-                 /\ i0{1} = i{2}
-                 /\ 0 <= Wrap.qC{2} < q
-                 /\ 0 <= i{2} <= size p{2} <= ell
-                 /\ 0 <= Bounder.c{2} <= Wrap.qC{2} * ell + i{2}
-                 /\ (Compute.bad{1} <=> !List.uniq Sample.l{2})
-                 /\ (forall x, mem Compute.qs{1} x <=> mem Sample.l{2} x)).
-            rcondt{2} 3.
-              auto=> /> &hr; progress.
-              by apply/(IntOrder.ler_lt_trans ((q - 1) * ell + i{hr}))=> /#.
-            by auto=> /> &1 &2; smt (in_fsetU in_fset1).
-          by auto=> />; smt (size_ge0).
-        by auto; smt (in_fset0 gt0_q).
-      have:= BBound.pr_collision_bounded_oracles (Wrap(A)) _ &m.
-        move=> S S_s_ll; proc.
-        call (A_run_ll (<: Wrap(A,S).O) _).
-          proc; sp; if=> //=.
-            auto; while (true) (size p - i).
-              by move=> z; wp; call S_s_ll; auto=> /#.
-            by auto; rewrite -/predT; smt (dBlock_uffu).
-          while (true) (size p + 1 - i);
-            by auto=> /#.
-        by auto.
-      have [] + [] _ dBlock_fu:= dBlock_uffu.
-      by rewrite /is_uniform=> /(_ _ _ (dBlock_fu maxu) (dBlock_fu witness)) ->.
-    qed.
+        + rcondt{2} 3; first by auto=> /#.
+          by auto=> /> &1 &2; smt(in_fsetU in_fset1).
+        by auto=> />; smt(size_ge0).
+      by while (={i, p} /\ r{1} = c{2}); auto.
+    by auto; smt (in_fset0 gt0_q).
+  have:= BBound.pr_collision_bounded_oracles (Wrap(A)) _ &m.
+  + move=> S S_s_ll; proc.
+    call (A_run_ll (<: Wrap(A,S).O) _).
+    + proc; sp; if.
+      + auto; while (true) (size p - i).
+        + by move=> z; wp; call S_s_ll; auto=> /#.
+        by auto; rewrite -/predT; smt (dBlock_uffu).
+      by while (true) (size p + 1 - i); auto=> /#.
+    by auto.
+  have [] + [] _ dBlock_fu:= dBlock_uffu.
+  by rewrite /is_uniform=> /(_ _ _ (dBlock_fu maxu) (dBlock_fu witness)) ->.
+  qed.
 end section Probability_Collision.
 
-lemma Conclusion (A <: RCPA_Adversary { RCPA_Wrap, WeakPRP_Wrap, PRPi, QueryBounder, PRFi (* pollution *), Compute (* pollution *) }) &m:
+lemma Conclusion (A <: RCPA_Adversary { RCPA_Wrap, PRP, PRPi, QueryBounder, PRFi (* pollution *), Compute (* pollution *) }) &m:
   (forall (O <: RCPA_Oracles {A}), islossless O.enc => islossless A(O).distinguish) =>
-     `|Pr[INDR_CPA(IV_Wrap(CBC(PRPr)),QueryBounder(A)).main() @ &m: res]
+     `|Pr[INDR_CPA(IV_Wrap(CBC(PseudoRP)),QueryBounder(A)).main() @ &m: res]
        - Pr[INDR_CPA(Random,QueryBounder(A)).main() @ &m: res]|
-  <=    `|Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr),PRPF_Adv(QueryBounder(A))).main() @ &m: res]
-          - Pr[WeakPRP_IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]|
+  <=    `|Pr[IND(PRP,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
+          - Pr[IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]|
       + 2%r * ((q * ell)^2)%r * mu dBlock (pred1 witness).
 proof.
-  move=> A_distinguish_ll.
-  have BA_distinguish_ll: (forall (O <: RCPA_Oracles { QueryBounder(A) }), islossless O.enc => islossless QueryBounder(A,O).distinguish).
-    move=> O O_enc_ll; proc.
-    call (A_distinguish_ll (<: QueryBounder(A,O).O') _).
-      by proc; sp; if=> //=;
-        [wp; call O_enc_ll|while (true) (size p + 1 - i); auto=> /#].
-    by auto.
-  have:= reduction (QueryBounder(A)) &m BA_distinguish_ll.
-  have:= Bound_by_Birthday A A_distinguish_ll &m.
-  have:= Bound_by_PRP_PRF A A_distinguish_ll &m.
-  smt ml=0.
+move=> A_distinguish_ll.
+have BA_distinguish_ll: (forall (O <: RCPA_Oracles { QueryBounder(A) }), islossless O.enc => islossless QueryBounder(A,O).distinguish).
++ move=> O O_enc_ll; proc.
+  call (A_distinguish_ll (<: QueryBounder(A,O).O') _).
+  + proc; sp; if.
+    + by wp; call O_enc_ll; auto.
+    by while (true) (size p + 1 - i); auto=> /#.
+  by auto.
+have:= reduction (QueryBounder(A)) &m BA_distinguish_ll.
+have:= Bound_by_Birthday A A_distinguish_ll &m.
+have:= Bound_by_PRP_PRF A A_distinguish_ll &m.
+smt().
 qed.
