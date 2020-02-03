@@ -1437,19 +1437,18 @@ module Mod = struct
       hierror "cannot declare an abstract module outside of a section";
 
     let modty = m.ptmd_modty in
-    let tysig = fst (TT.transmodtype scope.sc_env (fst modty)) in
-    let restr = List.map (TT.trans_topmsymbol scope.sc_env) (snd modty) in
-    let n_m_restr = { (ur_empty Sm.empty) with ur_neg = (Sm.of_list restr) } in
     let name  = EcIdent.create (unloc m.ptmd_name) in
+    let tysig = fst (TT.transmodtype scope.sc_env modty.pmty_pq) in
+    (* If the memory restriction is not [None], it replaces the previous
+       memory restriction. *)
+    let tysig = match modty.pmty_rmem with
+      | None -> tysig
+      | Some mrestr ->
+        let usex, usem = TT.trans_restr_mem scope.sc_env mrestr in
+        let tyrestr = { tysig.mt_restr with mr_xpaths = usex;
+                                            mr_mpaths = usem; } in
+        { tysig with mt_restr = tyrestr} in
 
-    let xps = ur_empty Sx.empty
-    and mps =
-      ur_union Sm.union Sm.inter
-        tysig.mt_restr.mr_mpaths n_m_restr in
-    let tysig = { tysig with
-                  mt_restr = { tysig.mt_restr with
-                               mr_xpaths = xps;
-                               mr_mpaths = mps }} in
     { scope with
       sc_env = EcEnv.Mod.declare_local name tysig scope.sc_env;
       sc_section = EcSection.add_abstract name tysig scope.sc_section }

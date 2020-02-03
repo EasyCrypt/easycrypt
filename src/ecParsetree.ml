@@ -117,10 +117,6 @@ and pscond = pexpr * pstmt
 and pinstr = pinstr_r located
 and pstmt  = pinstr list
 
-(* -------------------------------------------------------------------- *)
-(* TODO: A: old module restr. get rid of them? *)
-type pmodule_type_restr = pqsymbol * pmsymbol located list
-
 
 (* -------------------------------------------------------------------- *)
 type ptyparams = (psymbol * pqsymbol list) list
@@ -141,6 +137,19 @@ and ptydbody =
 and pdatatype = (psymbol * pty list) list
 
 and precord = (psymbol * pty) list
+
+(* -------------------------------------------------------------------- *)
+type f_or_mod_ident =
+  | FM_FunOrVar of pgamepath
+  | FM_Mod of pmsymbol located
+
+
+type pmod_restr_mem_el =
+  | PMPlus  of f_or_mod_ident
+  | PMMinus of f_or_mod_ident
+
+(* A memory restricition. *)
+type pmod_restr_mem = pmod_restr_mem_el list
 
 (* -------------------------------------------------------------------- *)
 type pmemory   = psymbol
@@ -211,26 +220,24 @@ and pfrange = [
 
 and pfindex = [ `Index of int | `Match of pformula * int option]
 
-and pcost  = PC_costs of pformula * (pgamepath * pformula) list
+and pcost_calls  = (pgamepath * pformula) list
 
+and pcost  = PC_costs of pformula * pcost_calls
 
-(* -------------------------------------------------------------------- *)
-type f_or_mod_ident =
-  | FM_FunOrVar of pgamepath
-  | FM_Mod of pmsymbol located
+(* if [pmty_rmem] is [None], there are no user-supplied restriction, which is
+   different from the user supplying an empty restriction.
+   In the former case, we keep the restriction we obtain by type-checking,
+   while in the latter case, we replace the type-checking restriction by an
+   empty restriction.  *)
+and pmodule_type_restr =
+  { pmty_pq   : pqsymbol;
+    pmty_rmem : pmod_restr_mem option; }
 
-
-type pmod_restr_mem_el =
-  | PMPlus  of f_or_mod_ident
-  | PMMinus of f_or_mod_ident
-
-(* A memory restricition. *)
-type pmod_restr_mem = pmod_restr_mem_el list
 
 (* -------------------------------------------------------------------- *)
 type poracles = pgamepath list
 
-type pcompl = PCompl of pcost
+type pcompl = PCompl of pcost_calls
 
 type pmod_restr_el = {
   pmre_in    : bool;
@@ -240,7 +247,7 @@ type pmod_restr_el = {
 }
 
 type pmod_restr = {
-  pmr_mem   : pmod_restr_mem option;
+  pmr_mem   : pmod_restr_mem;
 	pmr_procs : pmod_restr_el list;
  }
 

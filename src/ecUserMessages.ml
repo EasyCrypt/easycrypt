@@ -456,8 +456,8 @@ end = struct
         msg "the function %a is not provided by a module parameter"
           pp_qsymbol name
 
-  | InvalidVar
-      msg "cannot have applied functors in a variable path"
+    | InvalidVar ->
+        msg "cannot have applied functors in a variable path"
 
     | NoActiveMemory ->
         msg "no active memory at this point"

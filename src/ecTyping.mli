@@ -215,6 +215,8 @@ val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
 
+val trans_restr_mem : env -> pmod_restr_mem -> Sx.t use_restr * Sm.t use_restr
+
 (* -------------------------------------------------------------------- *)
 
 (* This only checks the memory restrictions. *)

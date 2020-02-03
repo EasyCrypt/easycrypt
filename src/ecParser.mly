@@ -767,9 +767,13 @@ fident:
 | x=lident { ([], x) }
 
 f_or_mod_ident:
-  | nm=mod_qident DOT x=lident  { FM_FunOrVar (nm, x) }
-| x=lident			{ FM_FunOrVar ([], x) }
-| m=loc(mod_qident)			{ FM_Mod m }
+| nm=mod_qident DOT x=lident      
+    { let fv = mk_loc (EcLocation.make $startpos(nm) $endpos(x)) (nm, x) in
+      FM_FunOrVar fv }
+| x=lident			  
+    { let fv = mk_loc (EcLocation.make $startpos(x) $endpos(x)) ([], x) in
+      FM_FunOrVar fv}
+| m=loc(mod_qident) { FM_Mod m }
 
 (* -------------------------------------------------------------------- *)
 %inline ordering_op:
@@ -1037,9 +1041,12 @@ ptybindings_decl:
 orcl_time(P):
  | o=loc(fident) COLON c=form_r(P) { (o, c) }
 
+cost_calls(P):
+| calls=rlist1(orcl_time(P), SEMICOLON) { calls }
+
 costs(P):
 | LBRACKET c=form_r(P) RBRACKET     {PC_costs(c,[])}
-| LBRACKET c=form_r(P) SEMICOLON calls=rlist1(orcl_time(P), SEMICOLON) RBRACKET
+| LBRACKET c=form_r(P) SEMICOLON calls=cost_calls(P) RBRACKET
                                       {PC_costs(c,calls)}
 
 qident_or_res_or_glob:
@@ -1303,7 +1310,7 @@ pgtybinding1:
 | x=ptybinding1
     { List.map (fun (xs, ty) -> (xs, PGTY_Type ty)) x }
 
-| LPAREN x=uident LTCOLON mi=short_mod_type_restr RPAREN
+| LPAREN x=uident LTCOLON mi=mod_type_with_mem_restr RPAREN
     { [[mk_loc (loc x) (Some x)], PGTY_ModTy mi] }
 
 | pn=mident
@@ -1527,7 +1534,7 @@ top_mod_def:
 | /*-*/ x=mod_def { mk_topmod ~local:false x }
 
 top_mod_decl:
-| DECLARE MODULE x=uident COLON t=short_mod_type_restr
+| DECLARE MODULE x=uident COLON t=mod_type_with_mem_restr
     { { ptmd_name = x; ptmd_modty = t; } }
 
 mod_params:
@@ -1543,19 +1550,19 @@ mem_restr_el:
 
 
 mem_restr:
-  | ol=rlist0(mem_restr_el,COMMA) RBRACE { ol }
+  | ol=rlist0(mem_restr_el,COMMA) { ol }
 
 (* -------------------------------------------------------------------- *)
 (* Oracle restrictions *)
 
 oracle_restr:
-  | ORACLES ol=rlist0(loc(fident),COMMA) RBRACE { ol }
+  | ORACLES ol=rlist0(loc(fident),COMMA) { ol }
 
 (* -------------------------------------------------------------------- *)
 (* Complexity restrictions *)
 
 compl_restr:
-  | COMPL c=costs(none) { PCompl c }
+  | COMPL c=cost_calls(none) { PCompl c }
 
 (* -------------------------------------------------------------------- *)
 (* Module restrictions *)
@@ -1584,13 +1591,13 @@ mod_restr_el:
 
 mod_restr:
   | LBRACE mr=mem_restr RBRACE
-    { { pmr_mem = Some mr;
+    { { pmr_mem = mr;
 	pmr_procs = [] } }
   | LBRACE l=rlist1(mod_restr_el,empty) RBRACE
-    { { pmr_mem = None;
+    { { pmr_mem = [];
 	pmr_procs = l } }
   | LBRACE mr=mem_restr SEMICOLON l=rlist1(mod_restr_el,empty) RBRACE
-    { { pmr_mem = Some mr;
+    { { pmr_mem = mr;
 	pmr_procs = l } }
 
 
@@ -1600,13 +1607,10 @@ mod_restr:
 %inline mod_type:
 | x = qident { x }
 
-/* TODO: A: update this to more complexe restrictions */
-%inline short_mod_type_restr:
-| x = qident
-    { (x, []) }
-
-| x = qident LBRACE restr=plist1(loc(mod_qident), COMMA) RBRACE
-    { (x, restr) }
+%inline mod_type_with_mem_restr:
+| x = qident { { pmty_pq = x; pmty_rmem = None; } }
+| x = qident LBRACE mr=mem_restr RBRACE { { pmty_pq = x;
+					    pmty_rmem = Some mr; } }
 
 sig_def:
 | MODULE TYPE x=uident args=sig_params* mr=mod_restr? EQ i=sig_body
