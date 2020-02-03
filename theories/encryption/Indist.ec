@@ -114,8 +114,8 @@ module HybGame2(A:Adv, O:Orcl, LR:LR) = {
 
 section.
 
-  declare module O:Orcl {Count, HybOrcl}.
-  declare module A:Adv  {Count, O, HybOrcl}.
+  declare module O:Orcl {-Count, -HybOrcl}.
+  declare module A:Adv  {-Count, -O, -HybOrcl}.
 
   local module A' (Ob : Orclb, LR : H.Orcl) = {
     module O = {
@@ -144,7 +144,7 @@ section.
 
   axiom losslessL: islossless O.leaks.
   axiom losslessO: islossless O.orcl.
-  axiom losslessA (O <: Orcl{A}) (LR <: LR{A}):
+  axiom losslessA (O <: Orcl{-A}) (LR <: LR{-A}):
     islossless LR.orcl =>
     islossless O.leaks => islossless O.orcl =>
     islossless A(O, LR).main.
@@ -270,8 +270,8 @@ module INDb(O:Orcl,A:Adv) = {
 }.
 
 section.
-  declare module O:Orcl {Count, Orclb}.
-  declare module A:Adv  {Count, O, Orclb}.
+  declare module O:Orcl {-Count, -Orclb}.
+  declare module A:Adv  {-Count, -O, -Orclb}.
 
   local module WA = {
     module A = A(O,Orclb(O))

@@ -136,7 +136,7 @@ proof.
   by proc; inline *; auto=> &1 &2 [] 2!-> /= ? ->; rewrite mem_map map_set.
 qed.
 
-lemma RO_FRO_D (D <: RO_Distinguisher{RO, FRO}) :
+lemma RO_FRO_D (D <: RO_Distinguisher{-RO, -FRO}) :
   equiv [D(RO).distinguish ~ D(FRO).distinguish : 
          ={arg, glob D} /\ RO.m{1} = noflags FRO.m{2} ==>
          ={res, glob D} /\ RO.m{1} = noflags FRO.m{2}].
@@ -614,7 +614,7 @@ qed.
 
 section.
 
-declare module D : FRO_Distinguisher {FRO}.
+declare module D : FRO_Distinguisher {-FRO}.
 
 lemma eager_D :
   eager [RRO.resample();, D(FRO).distinguish ~ 
@@ -700,7 +700,7 @@ proof.
   by rewrite rem_id // dom_restr /in_dom_with Hnd.
 qed.
 
-lemma LRO_RRO_D (D <: RO_Distinguisher{RO, FRO}) :
+lemma LRO_RRO_D (D <: RO_Distinguisher{-RO, -FRO}) :
   equiv [D(LRO).distinguish ~ D(RRO).distinguish : 
          ={glob D, arg} /\ RO.m{1} = restr Known FRO.m{2} ==>
          ={res, glob D} /\ RO.m{1} = restr Known FRO.m{2}].
@@ -712,7 +712,7 @@ qed.
 
 section.
 
-declare module D : RO_Distinguisher{RO, FRO}.
+declare module D : RO_Distinguisher{-RO, -FRO}.
 
 local module M = {
   proc main1(x:input) = {

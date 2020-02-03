@@ -188,8 +188,8 @@ qed.
      restricted oracles into a security statement about restricted
      adversaries. **)
 section Upto.
-  declare module D:Distinguisher {PRPi, ARP}.
-  axiom D_ll (O <: Oracles {D}): islossless O.f => islossless O.fi => islossless D(O).distinguish.
+  declare module D:Distinguisher {-PRPi, -ARP}.
+  axiom D_ll (O <: Oracles {-D}): islossless O.f => islossless O.fi => islossless D(O).distinguish.
 
   local module PRP_indirect_bad = {
     var bad : bool
@@ -345,8 +345,8 @@ section CollisionProbability.
   (*---*) import StdBigop StdRing StdOrder IntExtra.
   (*---*) import Bigreal.BRA RField RField.AddMonoid IntOrder.
 
-  declare module D:Distinguisher {ARP, DBounder}.
-  axiom D_ll (O <: Oracles {D}): islossless O.f => islossless O.fi => islossless D(O).distinguish.
+  declare module D:Distinguisher {-ARP, -DBounder}.
+  axiom D_ll (O <: Oracles {-D}): islossless O.f => islossless O.fi => islossless D(O).distinguish.
 
   local module FEL (D : Distinguisher) = {
     var c : int
@@ -489,8 +489,8 @@ section CollisionProbability.
 end section CollisionProbability.
 
 (* We pull together the results of the first two sections *)
-lemma PartialConclusion (D <: Distinguisher {PRPi, ARP, DBounder}) &m:
-  (forall (O <: Oracles {D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
+lemma PartialConclusion (D <: Distinguisher {-PRPi, -ARP, -DBounder}) &m:
+  (forall (O <: Oracles {-D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi'(Indirect),DBounder(D)).main() @ &m: res]
     - Pr[IND(ARP,DBounder(D)).main() @ &m: res]|
   <= (q^2 - q)%r / 2%r * mu uD (pred1 witness).
@@ -593,7 +593,7 @@ section PRPi_PRPi'_Indirect.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
   qed.
 
-  declare module D:Distinguisher {PRPi}.
+  declare module D:Distinguisher {-PRPi}.
 
   lemma pr_PRPi_PRPi'_Indirect &m:
     Pr[IND(PRPi,D).main() @ &m: res] = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
@@ -607,8 +607,8 @@ section PRPi_PRPi'_Indirect.
   qed.
 end section PRPi_PRPi'_Indirect.
 
-lemma Conclusion (D <: Distinguisher {PRPi, ARP, DBounder}) &m:
-  (forall (O <: Oracles {D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
+lemma Conclusion (D <: Distinguisher {-PRPi, -ARP, -DBounder}) &m:
+  (forall (O <: Oracles {-D}), islossless O.f => islossless O.fi => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi,DBounder(D)).main() @ &m: res]
     - Pr[IND(ARP,DBounder(D)).main() @ &m: res]|
   <= (q^2 - q)%r / 2%r * mu uD (pred1 witness).

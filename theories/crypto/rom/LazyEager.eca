@@ -23,7 +23,7 @@ clone export Eager as EagerRO with
   op dsample <- dsample.
 
 section.
-  declare module D:Dist {LazyRO.RO,EagerRO.RO}.
+  declare module D:Dist {-LazyRO.RO,-EagerRO.RO}.
 
   local module IND_Lazy = {
     module H:Oracle = {

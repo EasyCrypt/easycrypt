@@ -212,7 +212,7 @@ theory LazyEager.
     op dsample <- dsample.
 
   section.
-    declare module D:Dist {Lazy.RO,Eager.RO}.
+    declare module D:Dist {-Lazy.RO,-Eager.RO}.
 
     local module IND_Lazy = {
       module H:Oracle = {
@@ -535,7 +535,7 @@ theory ListLog.
   lemma Log_o_ll (O <: Oracle): islossless O.o => islossless Log(O).o.
   proof. by move=> O_oL; proc; call O_oL; wp. qed.
 
-  lemma Log_o_stable (O <: Oracle {Log}) q:
+  lemma Log_o_stable (O <: Oracle {-Log}) q:
     islossless O.o => phoare[Log(O).o: mem Log.qs q ==> mem Log.qs q] = 1%r.
   proof. by move=> O_o_ll; proc; call O_o_ll; auto; progress; right. qed.
 
@@ -594,7 +594,7 @@ theory SetLog.
   lemma Log_o_ll (O <: Oracle): islossless O.o => islossless Log(O).o.
   proof. by move=> O_o_ll; proc; wp; call O_o_ll; wp. qed.
 
-  hoare Log_o_stable (O <: Oracle {Log}) x: Log(O).o: mem Log.qs x ==> mem Log.qs x.
+  hoare Log_o_stable (O <: Oracle {-Log}) x: Log(O).o: mem Log.qs x ==> mem Log.qs x.
   proof. by proc; wp; call (_: true); skip=> &m; rewrite in_fsetU in_fset1=> ->. qed.
 
   hoare Log_o_Dom: Log(RO).o:
@@ -625,13 +625,13 @@ theory SetLog.
   lemma Bound_init_ll (O <: Oracle): islossless O.init => islossless Bound(O).init.
   proof. by move=> O_init_ll; proc; wp; call O_init_ll. qed.
 
-  lemma Bound_o_ll (O <: Oracle {Log}): islossless O.o => islossless Bound(O).o.
+  lemma Bound_o_ll (O <: Oracle {-Log}): islossless O.o => islossless Bound(O).o.
   proof. by move=> O_o_ll; proc; sp; if=> //; wp; call (Log_o_ll O _). qed.
 
-  hoare Bound_o_stable (O <: Oracle {Log}) x: Bound(O).o: mem Log.qs x ==> mem Log.qs x.
+  hoare Bound_o_stable (O <: Oracle {-Log}) x: Bound(O).o: mem Log.qs x ==> mem Log.qs x.
   proof. by proc; sp; if=> //; wp; call (Log_o_stable O x). qed.
 
-  equiv Log_Bound (O <: Oracle {Log}) (D <: Dist {O,Log}):
+  equiv Log_Bound (O <: Oracle {-Log}) (D <: Dist {-O,-Log}):
     IND(Bound(O),D).main ~ IND(Log(Bound(O)),D).main: ={glob O, glob D} ==> ={res}.
   proof.
   proc.
@@ -731,9 +731,9 @@ theory ROM_BadCall.
     }.
 
     section.
-      declare module D : Dist {Log, RO}.
-      axiom Da1L (H <: Types.ARO {D}): islossless H.o => islossless D(H).a1.
-      axiom Da2L (H <: Types.ARO {D}): islossless H.o => islossless D(H).a2.
+      declare module D : Dist {-Log, -RO}.
+      axiom Da1L (H <: Types.ARO {-D}): islossless H.o => islossless D(H).a1.
+      axiom Da2L (H <: Types.ARO {-D}): islossless H.o => islossless D(H).a2.
 
       local module G1'(D:Dist, H:Oracle) = {
         module D = D(Log(H))
@@ -843,9 +843,9 @@ theory ROM_BadCall.
     }.
 
     section.
-      declare module D : Dist {Log, RO}.
-      axiom Da1L (H <: Types.ARO {D}): islossless H.o => islossless D(H).a1.
-      axiom Da2L (H <: Types.ARO {D}): islossless H.o => islossless D(H).a2.
+      declare module D : Dist {-Log, -RO}.
+      axiom Da1L (H <: Types.ARO {-D}): islossless H.o => islossless D(H).a1.
+      axiom Da2L (H <: Types.ARO {-D}): islossless H.o => islossless D(H).a2.
 
       local module G1'(D:Dist, H:Oracle) = {
         module D = D(Bound(H))
@@ -952,14 +952,14 @@ theory ROM_Bad.
         are random oracles. This argument could (and should) be generalized to
         any two oracles whose probability of behaving differently on a single
         query is bounded. *)
-    declare module O1 : Oracle {Bound}.
+    declare module O1 : Oracle {-Bound}.
     axiom O1_o_ll: islossless O1.o.
 
-    declare module O2 : Oracle {O1,Bound}.
+    declare module O2 : Oracle {-O1,-Bound}.
     axiom O2_o_ll: islossless O2.o.
 
-    declare module D : Dist {O1,O2,Bound}.
-    axiom D_distinguish_ll (O <: Oracle {D}): islossless O.o => islossless D(O).distinguish.
+    declare module D : Dist {-O1,-O2,-Bound}.
+    axiom D_distinguish_ll (O <: Oracle {-D}): islossless O.o => islossless D(O).distinguish.
 
     lemma FEL_ROM (bad: (glob O2) -> bool)
                   (Phi: (glob O1) -> (glob O2) -> bool) eps &m:

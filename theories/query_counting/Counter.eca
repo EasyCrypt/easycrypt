@@ -43,7 +43,7 @@ module Counter(S : System) = {
 
 section.
   declare module S : System.
-  declare module D : Distinguisher { S }.
+  declare module D : Distinguisher { -S }.
 
   lemma ind_counting (E : (glob S) -> bool) &m:
       Pr[D(S).distinguish() @ &m: E (glob S)]
@@ -61,14 +61,14 @@ end section.
 op q : { int | 0 <= q } as ge0_q.
 
 section.
-  declare module D : Distinguisher { Counter }.
+  declare module D : Distinguisher { -Counter }.
 
-  axiom D_bounded (S <: System { Counter, D }) c0 &m:
+  axiom D_bounded (S <: System { -Counter, -D }) c0 &m:
     islossless S.oracle =>
     Counter.c{m} = c0 =>
     Pr[D(Counter(S)).distinguish() @ &m : Counter.c <= c0 + q] = 1%r.
 
-  lemma D_ll (S <: System { Counter, D }):
+  lemma D_ll (S <: System { -Counter, -D }):
     islossless S.oracle => islossless D(Counter(S)).distinguish.
   proof.
   move=> S_ll.
@@ -78,7 +78,7 @@ section.
   by rewrite -pr_E1 Pr [mu_sub].
   qed.
 
-  lemma D_bounded_hoare (S <: System { Counter, D }) c0:
+  lemma D_bounded_hoare (S <: System { -Counter, -D }) c0:
     islossless S.oracle =>
     hoare [D(Counter(S)).distinguish: Counter.c = c0 ==> Counter.c <= c0 + q].
   proof.

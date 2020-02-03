@@ -42,7 +42,7 @@ module Strengthen(D : WeakPRP_Distinguisher, O : StrongPRP_Oracles) = {
 
 section.
   declare module P : StrongPRP.
-  declare module D : WeakPRP_Distinguisher { P }.
+  declare module D : WeakPRP_Distinguisher { -P }.
 
   equiv eq_Strong_Weak:
     WeakPRP_IND(P,D).main ~ StrongPRP_IND(P,Strengthen(D)).main:
@@ -51,8 +51,8 @@ section.
 end section.
 
 section.
-  declare module P : PRP                   { StrongPRP_Wrap, WeakPRP_Wrap }.
-  declare module D : WeakPRP_Distinguisher { StrongPRP_Wrap, WeakPRP_Wrap, RandomPermutation, P }.
+  declare module P : PRP                   { -StrongPRP_Wrap, -WeakPRP_Wrap }.
+  declare module D : WeakPRP_Distinguisher { -StrongPRP_Wrap, -WeakPRP_Wrap, -RandomPermutation, -P }.
 
   local lemma Weak_as_Strong &m:
     Pr[WeakPRP_IND(WeakPRP_Wrap(P), D).main() @ &m: res]

@@ -186,7 +186,7 @@ theory Strong_Weak.
   }.
 
   lemma Strong_Weak (P <: Strong_PRP.Strong_PRP)
-                    (D <: Weak_PRP.Distinguisher { P }) &m:
+                    (D <: Weak_PRP.Distinguisher { -P }) &m:
     Pr[Weak_PRP.IND(P,D).main() @ &m: res]
     = Pr[Strong_PRP.IND(P,Strong_Distinguisher(D)).main() @ &m: res].
   proof. by byequiv=> //=; sim. qed.

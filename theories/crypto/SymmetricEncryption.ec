@@ -109,7 +109,7 @@ module INDCCA (S:Scheme, A:Adv_INDCCA) = {
 
 module ToCCA (A:Adv_INDCPA, O:CCA_Oracles) = A(O).
 
-lemma CCA_implies_CPA (S <: Scheme {INDCPA}) (A <: Adv_INDCPA {S, INDCPA}) &m:
+lemma CCA_implies_CPA (S <: Scheme {-INDCPA}) (A <: Adv_INDCPA {-S, -INDCPA}) &m:
   Pr[INDCPA(S,A).main() @ &m: res] = Pr[INDCCA(S,ToCCA(A)).main() @ &m: res].
 proof strict.
 byequiv (_: ={glob A} ==> ={res})=> //; proc.
