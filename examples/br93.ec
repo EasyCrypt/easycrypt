@@ -232,10 +232,10 @@ module I(A:Adv): Inverter = {
 (* We now prove the result using a sequence of games                    *)
 section.
 (* All lemmas in this section hold for all (valid) CPA adversary A      *)
-declare module A : Adv { RO, Log }.
+declare module A : Adv { -RO, -Log }.
 
-axiom A_a1_ll (O <: ARO {A}): islossless O.o => islossless A(O).a1.
-axiom A_a2_ll (O <: ARO {A}): islossless O.o => islossless A(O).a2.
+axiom A_a1_ll (O <: ARO {-A}): islossless O.o => islossless A(O).a1.
+axiom A_a2_ll (O <: ARO {-A}): islossless O.o => islossless A(O).a2.
 
 (* Step 1: replace RO call with random sampling                         *)
 local module Game1 = {
@@ -388,7 +388,7 @@ local module OWr (I : Inverter) = {
 }.
 
 (* We can easily prove that it is strictly equivalent to OW              *)
-local lemma OW_OWr &m (I <: Inverter {OWr}):
+local lemma OW_OWr &m (I <: Inverter {-OWr}):
   Pr[OW(I).main() @ &m: res]
   = Pr[OWr(I).main() @ &m: res].
 proof. by byequiv=> //=; sim. qed.
@@ -605,10 +605,10 @@ module A_CPA (A : Adv) (H : ARO) = {
 }.
 
 section.
-declare module A : Adv { RO, I }.
+declare module A : Adv { -RO, -I }.
 
-axiom A_a1_ll (O <: ARO {A}): islossless O.o => islossless A(O).a1.
-axiom A_a2_ll (O <: ARO {A}): islossless O.o => islossless A(O).a2.
+axiom A_a1_ll (O <: ARO {-A}): islossless O.o => islossless A(O).a1.
+axiom A_a2_ll (O <: ARO {-A}): islossless O.o => islossless A(O).a2.
 
 local clone import BR93 as Instance with
   type pkey  <- pkey,

@@ -277,9 +277,9 @@ proof. islossless. qed.
 
 section Security_Aux.
 
-  declare module A : CCA_ADV {CCA, B_TCR}.
-  axiom guess_ll : forall (O <: CCA_ORC{A}), islossless O.dec => islossless A(O).guess.
-  axiom choose_ll : forall (O <: CCA_ORC{A}), islossless O.dec => islossless A(O).choose.
+  declare module A : CCA_ADV {-CCA, -B_TCR}.
+  axiom guess_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).guess.
+  axiom choose_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).choose.
 
   equiv CCA_DDH0 : CCA(CramerShoup, A).main ~ DDH0_ex(B_DDH(A)).main : ={glob A} ==> ={res}.
   proof.   
@@ -971,9 +971,9 @@ end section Security_Aux.
 
 section Security.
 
-  declare module A : CCA_ADV {CCA, B_TCR}.
-  axiom guess_ll : forall (O <: CCA_ORC{A}), islossless O.dec => islossless A(O).guess.
-  axiom choose_ll : forall (O <: CCA_ORC{A}), islossless O.dec => islossless A(O).choose.
+  declare module A : CCA_ADV {-CCA, -B_TCR}.
+  axiom guess_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).guess.
+  axiom choose_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).choose.
 
   local module NA (O:CCA_ORC) = {
     module A = A(O)

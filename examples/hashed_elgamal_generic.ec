@@ -106,10 +106,10 @@ module SCDH_from_CPA(A:Adversary,O:Oracle): Top.SCDH.Adversary = {
 (* We want to bound the probability of A winning CPA(Bounder(A,RO),S) in terms of
    the probability of B = CDH_from_CPA(SCDH_from_CPA(A,RO)) winning CDH(B) *)
 section.
-  declare module A: Adversary {RO, Log, OnBound.G1, OnBound.G2}.
+  declare module A: Adversary {-RO, -Log, -OnBound.G1, -OnBound.G2}.
 
-  axiom choose_ll (O <: ARO {A}): islossless O.o => islossless A(O).choose.
-  axiom guess_ll (O <: ARO {A}) : islossless O.o => islossless A(O).guess.
+  axiom choose_ll (O <: ARO {-A}): islossless O.o => islossless A(O).choose.
+  axiom guess_ll (O <: ARO {-A}) : islossless O.o => islossless A(O).guess.
 
   local module BA = A(Bound(RO)).
 
