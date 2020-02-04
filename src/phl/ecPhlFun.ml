@@ -225,11 +225,11 @@ module FunAbsLow = struct
        it needed here?*)
     (* check_oracle_use pf env top o; *)
 
-    let cost_self = match OI.cost_self oi with
-      | Some c -> c
-      | None   ->
-        tc_error _pf "%a intrinsic complexity is unbounded"
-          (EcPrinting.pp_funname ppe) f in
+    let cost_orcl oi o = match OI.cost oi o with
+      | Some cbd -> cbd
+      | None     ->
+        tc_error _pf "the number of calls to %a is unbounded"
+          (EcPrinting.pp_funname ppe) o in
 
     (* We create the oracles invariants *)
     let oi_costs = OI.costs oi in
@@ -258,9 +258,7 @@ module FunAbsLow = struct
                 then f_eq vrnt (f_int_add k f_i1)
                 else f_eq vrnt k in
 
-            let cbd = match OI.cost oi o with
-              | Some cbd -> cbd
-              | None     -> cost_self in
+            let cbd = cost_orcl oi o in
             let call_bound =
               if x_equal o o_called
               then f_and (f_int_lt k cbd) (f_int_le f_i0 k)
@@ -303,9 +301,7 @@ module FunAbsLow = struct
             | Some (_,vrnt) -> f_eq vrnt f_i0 in
 
 
-          let cbd = match OI.cost oi o with
-            | Some cbd -> cbd
-            | None     -> cost_self in
+          let cbd = cost_orcl oi o in
           let post_eq = match o_vrnt with
             | None          ->
               f_true
@@ -326,10 +322,7 @@ module FunAbsLow = struct
                    c_calls = Mx.singleton f f_i1 } in
 
     let orcls_cost = List.map (fun o ->
-        (* Maximal number of calls to [o]. *)
-        let cbd = match OI.cost oi o with
-          | Some cbd -> cbd
-          | None     -> cost_self in
+        let cbd = cost_orcl oi o in
         (* Cost of a call to [o]. *)
         let o_cost = snd @@ List.find (fun (x,_) -> x_equal x o) xc in
 

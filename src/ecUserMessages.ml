@@ -83,20 +83,6 @@ end = struct
             (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname ppe))
             (Sx.ntr_elements notallowed)
 
-    | MF_scompl (env, `Sub (iself,oself)) ->
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      msg "@[<v>the function's complexity:@;  @[%a@]@; cannot be shown \
-           to be upper-bounded by:@;  @[%a@]@]"
-        (pp_cost ppe) iself
-        (pp_cost ppe) oself
-
-    | MF_scompl (env, `Eq (iself,oself)) ->
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      msg "@[<v>the function's complexity:@;  @[%a@]@; cannot be shown \
-           to be equal to:@;  @[%a@]@]"
-        (pp_cost ppe) iself
-        (pp_cost ppe) oself
-
     | MF_compl (env, `Sub (diffs)) ->
       let ppe = EcPrinting.PPEnv.ofenv env in
       Format.fprintf fmt "@[<v>%a@]"

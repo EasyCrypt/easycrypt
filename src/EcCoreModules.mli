@@ -148,16 +148,13 @@ module PreOI : sig
   (* Number of time that a procedure can be called by [M.f].
      No restriction if [None]. *)
   val cost : 'a t -> xpath -> 'a option
-  (* Intrinsic cost of [M.f] (i.e. excluding oracles). The procedure
-   * [M.f]'s cost is not restricted if [None]. *)
-  val cost_self : 'a t -> 'a option
   val costs : 'a t -> 'a Mx.t
 
   (* List of oracles that can be called by [M.f].*)
   val allowed : 'a t -> xpath list
   val allowed_s : 'a t -> Sx.t
 
-  val mk : xpath list -> bool -> 'a Mx.t -> 'a option -> 'a t
+  val mk : xpath list -> bool -> 'a Mx.t -> 'a t
   val change_calls : 'a t -> xpath list -> 'a t
   val filter : (xpath -> bool) -> 'a t -> 'a t
 end

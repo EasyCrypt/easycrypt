@@ -1920,7 +1920,6 @@ module Fsubst = struct
       (EcPath.Mx.fold (fun x a costs ->
            EcPath.Mx.add (sx x) (f_subst ~tx s a) costs
          ) (PreOI.costs oi) EcPath.Mx.empty)
-      (omap (f_subst ~tx s) (PreOI.cost_self oi))
 
   and mr_subst ~tx s mr : form p_mod_restr =
     let sx = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in

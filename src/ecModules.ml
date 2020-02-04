@@ -30,13 +30,12 @@ module OI : sig
   val is_in : t -> bool
 
   val cost : t -> xpath -> form option
-  val cost_self : t -> form option
   val costs : t -> form Mx.t
 
   val allowed : t -> xpath list
   val allowed_s : t -> Sx.t
 
-  val mk : xpath list -> bool -> form Mx.t -> form option -> t
+  val mk : xpath list -> bool -> form Mx.t -> t
   val change_calls : t -> xpath list -> t
   val filter : (xpath -> bool) -> t -> t
 end = struct
@@ -48,7 +47,6 @@ end = struct
   let allowed_s    = PreOI.allowed_s
   let cost         = PreOI.cost
   let costs        = PreOI.costs
-  let cost_self    = PreOI.cost_self
   let mk           = PreOI.mk
   let change_calls = PreOI.change_calls
   let filter       = PreOI.filter
@@ -96,7 +94,7 @@ let add_oinfo restr f oi = change_oinfo restr f oi
 let change_oicalls restr f ocalls =
   let oi = match Msym.find f restr.mr_oinfos with
     | oi -> OI.change_calls oi ocalls
-    | exception Not_found -> OI.mk ocalls true Mx.empty None in
+    | exception Not_found -> OI.mk ocalls true Mx.empty in
   add_oinfo restr f oi
 
 let oicalls_filter restr f filter =

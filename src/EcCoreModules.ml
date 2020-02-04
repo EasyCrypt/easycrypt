@@ -575,13 +575,12 @@ module PreOI : sig
   val is_in : 'a t -> bool
 
   val cost : 'a t -> xpath -> 'a option
-  val cost_self : 'a t -> 'a option
   val costs : 'a t -> 'a Mx.t
 
   val allowed : 'a t -> xpath list
   val allowed_s : 'a t -> Sx.t
 
-  val mk : xpath list -> bool -> 'a Mx.t -> 'a option -> 'a t
+  val mk : xpath list -> bool -> 'a Mx.t -> 'a t
   val change_calls : 'a t -> xpath list -> 'a t
   val filter : (xpath -> bool) -> 'a t -> 'a t
 end = struct
@@ -591,21 +590,17 @@ end = struct
    * equality of result and globals (in the post).
    * - oi_costs : mapping from oracles to the number of time that they can be
    * called by [M.f]. Missing entries are not restricted.
-   * - oi_self  : intrinsic cost of [M.f] (i.e. excluding oracles). The procedure
-   * [M.f]'s cost is not restricted if [None].
    *
    * Remark: there is redundancy between oi_calls and oi_costs. *)
   type 'a t = {
     oi_calls : xpath list;
     oi_in    : bool;
     oi_costs : 'a Mx.t;
-    oi_self  : 'a option;
   }
 
   let empty = { oi_calls = [];
                 oi_in = true;
-                oi_costs = Mx.empty;
-                oi_self = None; }
+                oi_costs = Mx.empty; }
 
   let is_in t = t.oi_in
 
@@ -614,22 +609,19 @@ end = struct
   let allowed_s oi = allowed oi |> Sx.of_list
 
   let cost oi x = Mx.find_opt x oi.oi_costs
-  let cost_self oi = oi.oi_self
   let costs oi = oi.oi_costs
 
-  let mk oi_calls oi_in oi_costs oi_self =
-    { oi_calls; oi_in; oi_costs; oi_self; }
+  let mk oi_calls oi_in oi_costs =
+    { oi_calls; oi_in; oi_costs; }
 
   let change_calls oi calls =
     mk calls oi.oi_in
       (Mx.filter (fun x _ -> List.mem x calls) oi.oi_costs)
-      oi.oi_self
 
   let filter f oi =
     mk
       (List.filter f oi.oi_calls) oi.oi_in
       (Mx.filter (fun x _ -> f x) oi.oi_costs)
-      oi.oi_self
 
   let equal a_equal oi1 oi2 =
     let check_costs_eq c1 c2 =
@@ -644,17 +636,15 @@ end = struct
        oi1.oi_in = oi2.oi_in
     && List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
     && check_costs_eq oi1.oi_costs oi2.oi_costs
-    && oeq a_equal oi1.oi_self oi2.oi_self
 
   let hash ahash oi =
-    Why3.Hashcons.combine3
+    Why3.Hashcons.combine2
       (if oi.oi_in then 0 else 1)
       (Why3.Hashcons.combine_list EcPath.x_hash 0
          (List.sort EcPath.x_compare oi.oi_calls))
       (Why3.Hashcons.combine_list
          (Why3.Hashcons.combine_pair EcPath.x_hash ahash)
          0 (Mx.bindings oi.oi_costs))
-      (Why3.Hashcons.combine_option ahash oi.oi_self)
 end
 
 (* -------------------------------------------------------------------- *)

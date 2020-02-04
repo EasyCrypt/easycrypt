@@ -1673,34 +1673,29 @@ and pp_allowed_orcl ppe fmt orcls =
     Format.fprintf fmt "oracles : @[<hov>%a@];@ "
       (pp_list ",@ " (pp_funname ppe)) orcls
 
-and pp_costs ppe fmt (costs,self) =
-  if EcPath.Mx.is_empty costs && is_none self
+and pp_costs ppe fmt costs =
+  if EcPath.Mx.is_empty costs
   then Format.fprintf fmt ""
   else
-    let pp_self fmt = function
-      | None -> ()
-      | Some c -> Format.fprintf fmt "@[self : %a@];@ " (pp_form ppe) c in
-
     let pp_cost fmt (f,c) =
       Format.fprintf fmt "@[%a : %a@]"
         (pp_funname ppe) f
         (pp_form ppe) c in
 
-    Format.fprintf fmt "compl : @[<hv>{@, @[<v>%a%a;@ @]@,}@];@ "
-      pp_self self
+    Format.fprintf fmt "compl : @[<hv>{@, @[<v>%a;@ @]@,}@];@ "
       (pp_list ";@ " pp_cost) (EcPath.Mx.bindings costs)
 
 and pp_orclinfo ppe fmt (sym, oi) =
   let orcls = OI.allowed oi
-  and costs, self = OI.costs oi, OI.cost_self oi in
-  if orcls = [] && EcPath.Mx.is_empty costs && is_none self
+  and costs = OI.costs oi in
+  if orcls = [] && EcPath.Mx.is_empty costs
   then Format.fprintf fmt ""
   else
     Format.fprintf fmt "@[<hv>%s%a : {@,  %a%a@,}@]"
       (if OI.is_in oi then "" else " *")
       pp_symbol sym
       (pp_allowed_orcl ppe) orcls
-      (pp_costs ppe) (costs, self)
+      (pp_costs ppe) costs
 
 and pp_orclinfos ppe fmt ois =
   pp_list "@;" (pp_orclinfo ppe) fmt (Msym.bindings ois)

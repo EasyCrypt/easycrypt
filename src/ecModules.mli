@@ -26,7 +26,6 @@ module OI : sig
   val is_in : t -> bool
 
   val cost      : t -> xpath -> EcCoreFol.form option
-  val cost_self : t -> EcCoreFol.form option
   val costs     : t -> EcCoreFol.form Mx.t
 
   val allowed   : t -> xpath list
@@ -36,7 +35,6 @@ module OI : sig
     xpath list ->
     bool ->
     EcCoreFol.form Mx.t ->
-    EcCoreFol.form option ->
     t
 
   val filter : (xpath -> bool) -> t -> t

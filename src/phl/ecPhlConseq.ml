@@ -542,30 +542,6 @@ let t_hoareF_conseq_conj pre post pre' post' tc =
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
-(* let t_cHoareS_conseq_conj pre post pre' post' tc =
- *   assert false (\* TODO: (Adrien) *\) *)
-  (* let hs = tc1_as_hoareS tc in
-   * if not (f_equal hs.hs_pr (f_and pre' pre)) then
-   *   tc_error !!tc "invalid pre-condition";
-   * if not (f_equal hs.hs_po (f_and post' post)) then
-   *   tc_error !!tc "invalid post-condition";
-   * let concl1 = f_hoareS_r { hs with hs_pr = pre; hs_po = post } in
-   * let concl2 = f_hoareS_r { hs with hs_pr = pre'; hs_po = post' } in
-   * FApi.xmutate1 tc `HlConseqBd [concl1; concl2] *)
-
-(* -------------------------------------------------------------------- *)
-(* let t_cHoareF_conseq_conj pre post pre' post' tc =
- *   assert false (\* TODO: (Adrien) *\) *)
-  (* let hf = tc1_as_hoareF tc in
-   * if not (f_equal hf.hf_pr (f_and pre' pre)) then
-   *   tc_error !!tc "invalid pre-condition";
-   * if not (f_equal hf.hf_po (f_and post' post)) then
-   *   tc_error !!tc "invalid post-condition";
-   * let concl1 = f_hoareF pre hf.hf_f post in
-   * let concl2 = f_hoareF pre' hf.hf_f post' in
-   * FApi.xmutate1 tc `HlConseqBd [concl1; concl2] *)
-
-(* -------------------------------------------------------------------- *)
 let t_bdHoareS_conseq_conj ~add post post' tc =
   let hs = tc1_as_bdhoareS tc in
   let postc = if add then f_and post' post else post' in
@@ -706,16 +682,6 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       (t_cHoareS_conseq_c chs.chs_co)
       (t_on1seq 2 (tac chs.chs_pr chs.chs_po) (t_apply_r nf1))
       tc
-
-
-  (* (\* ------------------------------------------------------------------ *\)
-   * (\* cHoareS / cHoareS / cHoareS / ⊥                                       *\)
-   * | FcHoareS _,
-   *     Some ((_, { f_node = FcHoareS hs }) as nf1),
-   *     Some ((_, f2) as nf2),
-   *     None
-   *   ->
-   *   assert false (\* TODO: (Adrien) *\) *)
 
   (* ------------------------------------------------------------------ *)
   (* hoareS / bdhoareS / ⊥ / ⊥                                          *)

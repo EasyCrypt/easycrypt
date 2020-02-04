@@ -36,7 +36,6 @@ type mismatch_funsig =
 | MF_tres   of ty * ty                               (* expected, got *)
 | MF_restr  of EcEnv.env * Sx.t mismatch_sets
 | MF_compl  of EcEnv.env * (form option * form option) Mx.t suboreq
-| MF_scompl of EcEnv.env * (form option * form option) suboreq
 
 type restr_failure = Sx.t * Sm.t
 

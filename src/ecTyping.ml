@@ -44,7 +44,6 @@ type mismatch_funsig =
 | MF_tres   of ty * ty                               (* expected, got *)
 | MF_restr  of EcEnv.env * Sx.t mismatch_sets
 | MF_compl  of EcEnv.env * (form option * form option) Mx.t suboreq
-| MF_scompl of EcEnv.env * (form option * form option) suboreq
 
 type restr_failure = Sx.t * Sm.t
 
@@ -495,27 +494,16 @@ let check_item_compatible env mode (fin,oin) (fout,oout) =
         check_item_err (MF_restr(env, `Eq(ocalls, icalls))) in
 
   (* We check complexity compatibility. *)
-  let iself, oself = omap (EcEnv.NormMp.norm_form env) (OI.cost_self oin),
-                     omap (EcEnv.NormMp.norm_form env) (OI.cost_self oout) in
   let icosts, ocosts = Mx.map (EcEnv.NormMp.norm_form env) (OI.costs oin),
                        Mx.map (EcEnv.NormMp.norm_form env) (OI.costs oout) in
 
   match mode with
   | `Sub ->
-    (* We cannot do much here, since to check that [iself] is always smaller
-       than [oself], we need to a judgement:
-       [forall mem. iself{mem} <= oself{mem}]
+    (* We cannot do much here, since to check that [ic] is always smaller
+       than [oc], we need to a judgement:
+       [ic <= oc]
        which we cannot do statically when type-checking, except in some
        simple cases.*)
-
-    (* We check self cost. *)
-    let () = match iself, oself with
-      | Some _, None -> ()
-      | None, None -> ()
-      | Some ix, Some ox ->
-        if not @@ EcFol.f_equal ix ox then
-          check_item_err (MF_scompl(env, `Sub(iself, oself)));
-      | None, Some _ -> check_item_err (MF_scompl(env, `Sub(iself, oself))) in
 
     (* We check costs for other procedures. *)
     let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
@@ -529,10 +517,6 @@ let check_item_compatible env mode (fin,oin) (fout,oout) =
       check_item_err (MF_compl(env, `Sub(diff)));
 
   | `Eq  ->
-    (* We check self cost. *)
-    if not (opt_equal EcFol.f_equal iself oself) then
-      check_item_err (MF_scompl(env, `Eq(iself, oself)));
-
     (* We check costs for other procedures. *)
     let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
         | None, Some _ | Some _, None -> Mx.add f (ic,oc) acc
@@ -1696,7 +1680,7 @@ let trans_restr_mem env (r_mem : pmod_restr_mem) =
  *       let c_calls, c_self = trans_restr_compl env name r_elem.pmre_compl in
  *       let r_orcls = trans_restr_orcls_calls env name r_elem.pmre_orcls in
  *       let r_in =  r_elem.pmre_in in
- *       Msym.add name (OI.mk r_orcls r_in c_calls c_self) r_procs
+ *       Msym.add name (OI.mk r_orcls r_in c_calls) r_procs
  *     ) Msym.empty mr.pmr_procs in
  *
  *   { mr_xpaths = fst r_mem;
@@ -1779,7 +1763,7 @@ and transmodsig_body
       let resty = transty_for_decl env f.pfd_tyresult in
 
       let (uin, calls) = (fst f.pfd_uses, mk_calls (snd f.pfd_uses)) in
-      let oi = OI.mk calls uin Mx.empty None in
+      let oi = OI.mk calls uin Mx.empty in
 
       let sig_ = { fs_name   = name.pl_desc;
                    fs_arg    = tyarg;
