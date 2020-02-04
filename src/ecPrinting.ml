@@ -1687,7 +1687,7 @@ and pp_costs ppe fmt costs =
         (pp_form ppe) c in
 
     Format.fprintf fmt "@[<hv>%a@]@ "
-      (pp_list ";@ " pp_cost) (EcPath.Mx.bindings costs)
+      (pp_list ",@ " pp_cost) (EcPath.Mx.bindings costs)
 
 and pp_orclinfo ppe fmt (sym, oi) =
   let orcls = OI.allowed oi

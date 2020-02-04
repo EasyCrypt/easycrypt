@@ -400,7 +400,6 @@
 %token COLON
 %token COLONTILD
 %token COMMA
-%token COMPL
 %token CONGR
 %token CONSEQ
 %token CONST
@@ -489,7 +488,6 @@
 %token NOTATION
 %token OF
 %token OP
-%token ORACLES
 %token PCENT
 %token PHOARE
 %token PIPE
@@ -1041,12 +1039,12 @@ ptybindings_decl:
 orcl_time(P):
  | o=loc(fident) COLON c=form_r(P) { (o, c) }
 
-cost_calls(P):
-| calls=rlist1(orcl_time(P), SEMICOLON) { calls }
+cost_calls(P,S):
+| calls=rlist1(orcl_time(P), S) { calls }
 
 costs(P):
 | LBRACKET c=form_r(P) RBRACKET     {PC_costs(c,[])}
-| LBRACKET c=form_r(P) SEMICOLON calls=cost_calls(P) RBRACKET
+| LBRACKET c=form_r(P) SEMICOLON calls=cost_calls(P,SEMICOLON) RBRACKET
                                       {PC_costs(c,calls)}
 
 qident_or_res_or_glob:
@@ -1556,13 +1554,13 @@ mem_restr:
 (* Oracle restrictions *)
 
 oracle_restr:
-  | ORACLES ol=rlist0(loc(fident),COMMA) { ol }
+  | ol=rlist0(loc(fident),COMMA) { ol }
 
 (* -------------------------------------------------------------------- *)
 (* Complexity restrictions *)
 
 compl_restr:
-  | COMPL c=cost_calls(none) { PCompl c }
+  | c=cost_calls(none,COMMA) { PCompl c }
 
 (* -------------------------------------------------------------------- *)
 (* Module restrictions *)
