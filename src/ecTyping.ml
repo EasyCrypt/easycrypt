@@ -1661,31 +1661,57 @@ let trans_restr_mem env (r_mem : pmod_restr_mem) =
     r_empty
     r_mem
 
+(* [sa] must be the set of parameters on the module being typed.
+   Remark: the parameters must be binded in the environment. *)
+let trans_restr_oracle_calls (env : EcEnv.env) (sa : Sm.t) = function
+    | None ->
+      let do_one mp calls =
+        let me = EcEnv.Mod.by_mpath mp env in
+        if me.me_params <> [] then calls
+        else
+          let fs = List.map (fun (Tys_function fsig) ->
+              EcPath.xpath mp fsig.fs_name) me.me_sig_body
+          in
+          fs@calls
+      in
+      Sm.fold do_one sa []
+    | Some pfd_uses ->
+      List.map (fun name ->
+          let f = fst (lookup_fun env name) in
+          let p = f.EcPath.x_top in
+          if not (Sm.mem p sa) then
+            tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
+          f)
+        pfd_uses
 
-(* let trans_restr_orcls_calls
- *     env (name : symbol)
- *     (params_oracles : Sm.t)
- *     (r_orcls : poracles option) =
- *   (\* TODO: A: I may need to change the oracle restrictions, since for now there
- *      is no way to give no restriction. *\)
- *   assert false
- *
- * let trans_restr_compl env (name : symbol) (r_compl : pcompl option) =
- *   assert false
- *
- * let transmod_restr (env : EcEnv.env) (mr : pmod_restr) =
- *   let r_mem = trans_restr_mem env mr.pmr_mem in
- *   let r_procs = List.fold_left (fun r_procs r_elem ->
- *       let name = unloc r_elem.pmre_name in
- *       let c_calls, c_self = trans_restr_compl env name r_elem.pmre_compl in
- *       let r_orcls = trans_restr_orcls_calls env name r_elem.pmre_orcls in
- *       let r_in =  r_elem.pmre_in in
- *       Msym.add name (OI.mk r_orcls r_in c_calls) r_procs
- *     ) Msym.empty mr.pmr_procs in
- *
- *   { mr_xpaths = fst r_mem;
- *     mr_mpaths = snd r_mem;
- *     mr_oinfos = r_procs; } *)
+
+let trans_restr_compl env (r_compl : pcompl option) = match r_compl with
+  | None -> Mx.empty
+  | Some _ ->
+    assert false
+
+(* Oracles and complexity restrictions for a function.
+ * [params] must be the set of parameters on the module being typed.
+ * Remark: the parameters must be binded in the environment. *)
+let trans_restr_fun env (params : Sm.t) (r_el : pmod_restr_el) =
+  let name = unloc r_el.pmre_name in
+  let c_calls = trans_restr_compl env r_el.pmre_compl in
+  let r_orcls = trans_restr_oracle_calls env params r_el.pmre_orcls in
+  let r_in =  r_el.pmre_in in
+  ( r_in, name, c_calls, r_orcls )
+
+(* [params] must be the set of parameters on the module being typed.
+   Remark: the parameters must be binded in the environment. *)
+let transmod_restr (env : EcEnv.env) (params : Sm.t) (mr : pmod_restr) =
+  let r_mem = trans_restr_mem env mr.pmr_mem in
+  let r_procs = List.fold_left (fun r_procs r_elem ->
+      let r_in, name, c_calls, r_orcls = trans_restr_fun env params r_elem in
+      Msym.add name (OI.mk r_orcls r_in c_calls) r_procs
+    ) Msym.empty mr.pmr_procs in
+
+  { mr_xpaths = fst r_mem;
+    mr_mpaths = snd r_mem;
+    mr_oinfos = r_procs; }
 
 (* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
@@ -1716,27 +1742,6 @@ and transmodsig_body
 
   let names = ref [] in
 
-  let mk_calls = function
-    | None ->
-      let do_one mp calls =
-        let me = EcEnv.Mod.by_mpath mp env in
-        if me.me_params <> [] then calls
-        else
-          let fs = List.map (fun (Tys_function fsig) ->
-              EcPath.xpath mp fsig.fs_name) me.me_sig_body
-          in
-          fs@calls
-      in
-      Sm.fold do_one sa []
-    | Some pfd_uses ->
-      List.map (fun name ->
-          let f = fst (lookup_fun env name) in
-          let p = f.EcPath.x_top in
-          if not (Sm.mem p sa) then
-            tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
-          f)
-        pfd_uses in
-
   let transsig1 mr = function
     | `FunctionDecl f ->
       let name = f.pfd_name in
@@ -1762,8 +1767,13 @@ and transmodsig_body
 
       let resty = transty_for_decl env f.pfd_tyresult in
 
-      let (uin, calls) = (fst f.pfd_uses, mk_calls (snd f.pfd_uses)) in
-      let oi = OI.mk calls uin Mx.empty in
+      (* TODO: A: allow for more restrictions there: add complexity. *)
+      let uin, rname, compl, calls = trans_restr_fun env sa f.pfd_uses in
+
+      (* TODO: A: probably remove pmre_name from pmod_restr_el *)
+      assert (rname = name.pl_desc);
+
+      let oi = OI.mk calls uin compl in
 
       let sig_ = { fs_name   = name.pl_desc;
                    fs_arg    = tyarg;
@@ -1789,7 +1799,9 @@ and transmodsig_body
       let in_xs (Tys_function fs) xs =
         List.exists (fun x -> sym_equal fs.fs_name (unloc x)) xs in
 
-      let calls = mk_calls restr in
+      (* TODO: A: the [restr] value comes from the signature_item INCLUDE entry
+         in the parser. Should it be extended to more complex restrictions?*)
+      let calls = trans_restr_oracle_calls env sa restr in
 
       let update_mr mr (Tys_function fs) =
         names := mk_loc (loc i) fs.fs_name :: !names;

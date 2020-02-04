@@ -1469,10 +1469,15 @@ fun_def_body:
 
 fun_decl:
 | x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
-    { { pfd_name     = x;
+    { let frestr = { pmre_in    = true;
+		     pmre_name  = x;
+		     pmre_orcls = None;
+		     pmre_compl = None;	} in
+
+      { pfd_name     = x;
         pfd_tyargs   = pd;
         pfd_tyresult = odfl (mk_loc x.pl_loc PTunivar) ty;
-        pfd_uses     = (true, None); }
+        pfd_uses     = frestr; }
     }
 
 include_proc:
@@ -1554,38 +1559,36 @@ mem_restr:
 (* Oracle restrictions *)
 
 oracle_restr:
-  | ol=rlist0(loc(fident),COMMA) { ol }
+  | ol=rlist0(qident,COMMA) { ol }
 
 (* -------------------------------------------------------------------- *)
 (* Complexity restrictions *)
+compl_el:
+ | o=qident COLON c=form_r(none) { (o, c) }
 
 compl_restr:
-  | c=cost_calls(none,COMMA) { PCompl c }
+  | c=rlist1(compl_el,COMMA) { PCompl c }
 
 (* -------------------------------------------------------------------- *)
 (* Module restrictions *)
 
+fun_restr:
+  | LBRACE orcl=oracle_restr SEMICOLON cl=compl_restr RBRACE
+    { (Some orcl, Some cl) }
+
+  | LBRACE orcl=oracle_restr RBRACE
+    { (Some orcl, None) }
+
+  | LBRACE cl=compl_restr RBRACE
+    { (None, Some cl) }
+
 mod_restr_el:
-  | PROC i=iboption(STAR) f=lident
-    LBRACE orcl=oracle_restr SEMICOLON cl=compl_restr RBRACE
-    { { pmre_in = not i;
+  | PROC i=iboption(STAR) f=lident COLON fr=fun_restr
+    { let orcl, cmpl = fr in
+      { pmre_in = not i;
 	pmre_name = f;
-	pmre_orcls = Some orcl;
-	pmre_compl = Some cl; } }
-
-  | PROC i=iboption(STAR) f=lident COLON
-    LBRACE orcl=oracle_restr RBRACE
-    { { pmre_in = not i;
-	pmre_name = f;
-	pmre_orcls = Some orcl;
-	pmre_compl = None; } }
-
-  | PROC i=iboption(STAR) f=lident COLON
-    LBRACE cl=compl_restr RBRACE
-    { { pmre_in = not i;
-	pmre_name = f;
-	pmre_orcls = None;
-	pmre_compl = Some cl; } }
+	pmre_orcls = orcl;
+	pmre_compl = cmpl; } }
 
 mod_restr:
   | LBRACE mr=mem_restr RBRACE
@@ -1633,12 +1636,18 @@ sig_param:
 signature_item:
 | INCLUDE i=mod_type xs=bracket(include_proc)? qs=brace(qident*)?
    { `Include (i, xs, qs) }
-| PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) qs=brace(qident*)?
-    { `FunctionDecl
+| PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
+    { let orcl, compl = odfl (None,None) fr in
+      let frestr = { pmre_in    = not i;
+		     pmre_name  = x;
+		     pmre_orcls = orcl;
+		     pmre_compl = compl; } in
+
+      `FunctionDecl
           { pfd_name     = x;
             pfd_tyargs   = pd;
             pfd_tyresult = ty;
-            pfd_uses     = (not i, qs); } }
+            pfd_uses     = frestr; } }
 
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions                                   *)
