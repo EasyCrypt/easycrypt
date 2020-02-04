@@ -17,7 +17,7 @@ open EcEnv
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
- | AC_concrete_abstract of mpath * prog_var
+ | AC_concrete_abstract of mpath * xpath (* path to the global variable *)
  | AC_abstract_abstract of mpath * mpath
 
 exception AliasClash of env * alias_clash
@@ -66,12 +66,12 @@ module Mpv = struct
   let empty = { s_pv = Mnpv.empty; s_gl = Mm.empty }
 
   let check_npv_mp env npv mp restr =
-    if not (NormMp.use_mem_xp npv.pv_name restr) then
+    if not (NormMp.use_mem_xp npv restr) then
       raise (AliasClash (env,AC_concrete_abstract(mp,npv)))
 
   let check_npv env npv m =
     if is_glob npv then
-      let check1 mp (restr,_) =  check_npv_mp env npv mp restr in
+      let check1 mp (restr,_) =  check_npv_mp env (get_glob npv) mp restr in
       Mm.iter check1 m.s_gl
 
   let add env pv f m =
@@ -94,7 +94,7 @@ module Mpv = struct
     let restr = NormMp.get_restr_use env mp in
     let check npv _ =
       if is_glob npv then
-        check_npv_mp env npv mp restr in
+        check_npv_mp env (get_glob npv) mp restr in
     Mnpv.iter check m.s_pv;
     let check mp' (restr',_) = check_mp_mp env mp restr mp' restr' in
     Mm.iter check m.s_gl
@@ -361,13 +361,14 @@ module PV = struct
     try
       let restr = NormMp.get_restr_use env mp in
       let check_v v _ =
-        if is_loc v then begin
+        if is_glob v then
+          Mpv.check_npv_mp env (get_glob v) mp restr
+        else
           let ppe = EcPrinting.PPEnv.ofenv env in
           EcCoreGoal.tacuerror
             "only global variable can be used in inv, %a is local"
             (EcPrinting.pp_pv ppe) v
-        end;
-        Mpv.check_npv_mp env v mp restr in
+        in
       Mnpv.iter check_v fv.s_pv;
       let check_m mp' =
         if not (NormMp.use_mem_gl mp' restr) then
@@ -388,13 +389,13 @@ module PV = struct
         (is_glob pv &&
            let check1 mp =
              let restr = NormMp.get_restr_use env mp in
-             not (NormMp.use_mem_xp pv.pv_name restr) in
+             not (NormMp.use_mem_xp (get_glob pv) restr) in
            Sm.exists check1 fv2.s_gl) in
     let test_mp mp =
       let restr = NormMp.get_restr_use env mp in
       let test_pv pv _ =
         is_glob pv &&
-          not (NormMp.use_mem_xp pv.pv_name restr) in
+          not (NormMp.use_mem_xp (get_glob pv) restr) in
       let test_mp mp' =
         not (NormMp.use_mem_gl mp' restr ||
              NormMp.use_mem_gl mp (NormMp.get_restr_use env mp')) in
@@ -418,7 +419,7 @@ module PV = struct
           let pv = EcEnv.NormMp.norm_pvar env pv in
           let check1 mp =
             let restr = NormMp.get_restr_use env mp in
-            Mpv.check_npv_mp env pv mp restr in
+            Mpv.check_npv_mp env (get_glob pv) mp restr in
           Sm.iter check1 fv.s_gl
         end;
         true
@@ -465,8 +466,8 @@ let rec f_write_r ?(except=Sx.empty) env w f =
 
   | FBdef fdef ->
       let add x w =
-        let vb = Var.by_xpath x env in
-        PV.add env (pv_glob x) vb.vb_type w in
+        let ty = Var.by_xpath x env in
+        PV.add env (pv_glob x) ty w in
       List.fold_left folder
         (EcPath.Sx.fold add fdef.f_uses.us_writes w )
         fdef.f_uses.us_calls
@@ -517,8 +518,8 @@ let rec f_read_r env r f =
 
   | FBdef fdef ->
       let add x r =
-        let vb = Var.by_xpath x env in
-        PV.add env (pv_glob x) vb.vb_type r in
+        let ty = Var.by_xpath x env in
+        PV.add env (pv_glob x) ty r in
       let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
       List.fold_left (f_read_r env) r fdef.f_uses.us_calls
 
@@ -651,7 +652,7 @@ module Mpv2 = struct
     if Mnpv.mem pv mod_.PV.s_pv then true
     else
       if is_glob pv then
-        let x = pv.pv_name in
+        let x = get_glob pv in
         let check_mp mp =
           let restr = NormMp.get_restr_use env mp in
           not (NormMp.use_mem_xp x restr) in
@@ -661,8 +662,7 @@ module Mpv2 = struct
   let is_mod_mp env mp mod_ =
     let restr = NormMp.get_restr_use env mp in
     let check_v pv _ty =
-      let x = pv.pv_name in
-      not (NormMp.use_mem_xp x restr) in
+      not (is_glob pv) || not (NormMp.use_mem_xp (get_glob pv) restr) in
     let check_mp mp' =
       not (NormMp.use_mem_gl mp' restr ||
            NormMp.use_mem_gl mp (NormMp.get_restr_use env mp')) in
@@ -1023,9 +1023,9 @@ and eqobs_inF_refl env f' eqo =
     let local = PV.local eqi in
     let params =
       match ffun.f_sig.fs_anames with
-      | None -> PV.add env (pv_arg f) ffun.f_sig.fs_arg PV.empty
+      | None -> PV.add env pv_arg ffun.f_sig.fs_arg PV.empty
       | Some lv ->
-        List.fold_left (fun fv v -> PV.add env (pv_loc f v.v_name) v.v_type fv)
+        List.fold_left (fun fv v -> PV.add env (pv_loc v.v_name) v.v_type fv)
           PV.empty lv in
     if PV.subset local params then PV.global eqi
     else
@@ -1063,7 +1063,7 @@ let check_module_in env mp mt =
   let mp = EcPath.mpath mp.m_top (mp.m_args @ extra) in
   let check = function
     | Tys_function fs ->
-      let f = EcPath.xpath_fun mp fs.fs_name in
+      let f = EcPath.xpath mp fs.fs_name in
       let eqi = eqobs_inF_refl env f global in
 
       let oinfos = (NormMp.get_restr env mp).mr_oinfos in

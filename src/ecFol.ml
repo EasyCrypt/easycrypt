@@ -10,7 +10,6 @@
 open EcIdent
 open EcUtils
 open EcTypes
-open EcModules
 open EcMemory
 open EcBigInt.Notations
 
@@ -21,9 +20,9 @@ module CI = EcCoreLib
 include EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-let f_eqparams f1 ty1 vs1 m1 f2 ty2 vs2 m2 =
-  let f_pvlocs f ty vs m =
-    let arg = f_pvarg f ty m in
+let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
+  let f_pvlocs ty vs m =
+    let arg = f_pvarg ty m in
     if List.length vs = 1 then [arg]
     else
       let t = Array.of_list vs in
@@ -34,21 +33,21 @@ let f_eqparams f1 ty1 vs1 m1 f2 ty2 vs2 m2 =
   match vs1, vs2 with
   | Some vs1, Some vs2 ->
       if   List.length vs1 = List.length vs2
-      then f_eqs (f_pvlocs f1 ty1 vs1 m1) (f_pvlocs f2 ty2 vs2 m2)
-      else f_eq  (f_tuple (f_pvlocs f1 ty1 vs1 m1))
-                 (f_tuple (f_pvlocs f2 ty2 vs2 m2))
+      then f_eqs (f_pvlocs ty1 vs1 m1) (f_pvlocs ty2 vs2 m2)
+      else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
+                 (f_tuple (f_pvlocs ty2 vs2 m2))
 
   | Some vs1, None ->
-      f_eq (f_tuple (f_pvlocs f1 ty1 vs1 m1)) (f_pvarg f2 ty2 m2)
+      f_eq (f_tuple (f_pvlocs ty1 vs1 m1)) (f_pvarg ty2 m2)
 
   | None, Some vs2 ->
-      f_eq (f_pvarg f1 ty1 m1) (f_tuple (f_pvlocs f2 ty2 vs2 m2))
+      f_eq (f_pvarg ty1 m1) (f_tuple (f_pvlocs ty2 vs2 m2))
 
   | None, None ->
-      f_eq (f_pvarg f1 ty1 m1) (f_pvarg f2 ty2 m2)
+      f_eq (f_pvarg ty1 m1) (f_pvarg ty2 m2)
 
-let f_eqres f1 ty1 m1 f2 ty2 m2 =
-  f_eq (f_pvar (pv_res f1) ty1 m1) (f_pvar (pv_res f2) ty2 m2)
+let f_eqres ty1 m1 ty2 m2 =
+  f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
 
 let f_eqglob mp1 m1 mp2 m2 =
   f_eq (f_glob mp1 m1) (f_glob mp2 m2)

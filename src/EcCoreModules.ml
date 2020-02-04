@@ -448,89 +448,74 @@ let s_subst (s : EcTypes.e_subst) =
 
 (* -------------------------------------------------------------------- *)
 module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
-  let e_pv =
-    let rec e_pv tx sx e =
+  let e_pv e =
+    let rec e_pv sid e =
       match e.e_node with
-      | Evar pv ->
-          if tx pv then Sx.add (xastrip pv.pv_name) sx else sx
-      | _ ->
-          e_fold (e_pv tx) sx e
-    in fun tx e -> e_pv tx Sx.empty e
+      | Evar (PVglob _) -> sid
+      | Evar (PVloc id) -> Ssym.add id sid
+      | _               -> e_fold e_pv sid e in
+
+    e_pv Ssym.empty e
 end
 
-let rec lv_get_uninit_read (w : Sx.t) (lv : lvalue) =
-  let sx_of_pv pv =
-    if is_loc pv then Sx.singleton (xastrip pv.pv_name) else Sx.empty
+let rec lv_get_uninit_read (w : Ssym.t) (lv : lvalue) =
+  let sx_of_pv pv = match pv with
+    | PVloc v -> Ssym.singleton v
+    | PVglob _ -> Ssym.empty
   in
 
   match lv with
   | LvVar (x, _) ->
-      let w = Sx.union (sx_of_pv x) w in
-      (w, Sx.empty)
+      let w = Ssym.union (sx_of_pv x) w in
+      (w, Ssym.empty)
 
   | LvTuple xs ->
       let w' = List.map (sx_of_pv |- fst) xs in
-      (Sx.big_union (w :: w'), Sx.empty)
+      (Ssym.big_union (w :: w'), Ssym.empty)
 
   | LvMap (_, x, e, _) ->
-      let r = Sx.diff (Uninit.e_pv is_loc e) w in
-      let w = Sx.union (sx_of_pv x) w in
+      let r = Ssym.diff (Uninit.e_pv e) w in
+      let w = Ssym.union (sx_of_pv x) w in
       (w, r)
 
-and s_get_uninit_read (w : Sx.t) (s : stmt) =
+and s_get_uninit_read (w : Ssym.t) (s : stmt) =
   let do1 (w, r) i =
     let w, r' = i_get_uninit_read w i in
-    (w, Sx.union r r')
+    (w, Ssym.union r r')
 
-  in List.fold_left do1 (w, Sx.empty) s.s_node
+  in List.fold_left do1 (w, Ssym.empty) s.s_node
 
-and i_get_uninit_read (w : Sx.t) (i : instr) =
+and i_get_uninit_read (w : Ssym.t) (i : instr) =
   match i.i_node with
   | Sasgn (lv, e) | Srnd (lv, e) ->
-      let     r1 = Sx.diff (Uninit.e_pv is_loc e) w in
+      let     r1 = Ssym.diff (Uninit.e_pv e) w in
       let w2, r2 = lv_get_uninit_read w lv in
-      (Sx.union w w2, Sx.union r1 r2)
+      (Ssym.union w w2, Ssym.union r1 r2)
 
   | Scall (olv, _, args) ->
-      let r1    = Sx.diff (Sx.big_union (List.map (Uninit.e_pv is_loc) args)) w in
-      let w, r2 = olv |> omap (lv_get_uninit_read w) |> odfl (w, Sx.empty) in
-      (w, Sx.union r1 r2)
+      let r1    = Ssym.diff (Ssym.big_union (List.map (Uninit.e_pv) args)) w in
+      let w, r2 = olv |> omap (lv_get_uninit_read w) |> odfl (w, Ssym.empty) in
+      (w, Ssym.union r1 r2)
 
   | Sif (e, s1, s2) ->
-      let r = Sx.diff (Uninit.e_pv is_loc e) w in
+      let r = Ssym.diff (Uninit.e_pv e) w in
       let w1, r1 = s_get_uninit_read w s1 in
       let w2, r2 = s_get_uninit_read w s2 in
-      (Sx.union w (Sx.inter w1 w2), Sx.big_union [r; r1; r2])
+      (Ssym.union w (Ssym.inter w1 w2), Ssym.big_union [r; r1; r2])
 
   | Swhile (e, s) ->
-      let r  = Sx.diff (Uninit.e_pv is_loc e) w in
+      let r  = Ssym.diff (Uninit.e_pv e) w in
       let rs = snd (s_get_uninit_read w s) in
-      (w, Sx.union r rs)
+      (w, Ssym.union r rs)
 
   | Sassert e ->
-      (w, Sx.diff (Uninit.e_pv is_loc e) w)
+      (w, Ssym.diff (Uninit.e_pv e) w)
 
   | Sabstract (_ : EcIdent.t) ->
-      (w, Sx.empty)
+      (w, Ssym.empty)
 
 let get_uninit_read (s : stmt) =
-  snd (s_get_uninit_read Sx.empty s)
-
-(* -------------------------------------------------------------------- *)
-type variable = {
-  v_name : symbol;
-  v_type : EcTypes.ty;
-}
-
-let v_name { v_name = x } = x
-let v_type { v_type = x } = x
-
-let vd_equal vd1 vd2 =
-  vd1.v_name = vd2.v_name &&
-  EcTypes.ty_equal vd1.v_type vd2.v_type
-
-let vd_hash vd =
-  Why3.Hashcons.combine (Hashtbl.hash vd.v_name) (EcTypes.ty_hash vd.v_type)
+  snd (s_get_uninit_read Ssym.empty s)
 
 (* -------------------------------------------------------------------- *)
 type 'a use_restr = {
@@ -694,7 +679,7 @@ type funsig = {
 }
 
 let fs_equal f1 f2 =
-    (EcUtils.opt_equal (List.all2 vd_equal) f1.fs_anames f2.fs_anames)
+    (EcUtils.opt_equal (List.all2 EcTypes.v_equal) f1.fs_anames f2.fs_anames)
     && (EcTypes.ty_equal f1.fs_ret f2.fs_ret)
     && (EcTypes.ty_equal f1.fs_arg f2.fs_arg)
     && (EcSymbols.sym_equal f1.fs_name f2.fs_name)
@@ -765,13 +750,13 @@ type function_def = {
 let fd_equal f1 f2 =
      (s_equal f1.f_body f2.f_body)
   && (EcUtils.opt_equal EcTypes.e_equal f1.f_ret f2.f_ret)
-  && (List.all2 vd_equal f1.f_locals f2.f_locals)
+  && (List.all2 EcTypes.v_equal f1.f_locals f2.f_locals)
 
 let fd_hash f =
   Why3.Hashcons.combine2
     (s_hash f.f_body)
     (Why3.Hashcons.combine_option EcTypes.e_hash f.f_ret)
-    (Why3.Hashcons.combine_list vd_hash 0 f.f_locals)
+    (Why3.Hashcons.combine_list EcTypes.v_hash 0 f.f_locals)
 
 (* -------------------------------------------------------------------- *)
 type 'a p_function_body =
@@ -857,21 +842,21 @@ let rec p_mty_equal a_equal mty1 mty2 =
   && (p_mr_equal a_equal mty1.mt_restr mty1.mt_restr)
 
 (* -------------------------------------------------------------------- *)
-let get_uninit_read_of_fun (fp : xpath) (f : _ p_function_) =
+let get_uninit_read_of_fun (f : _ p_function_) =
   match f.f_def with
-  | FBalias _ | FBabs _ -> Sx.empty
+  | FBalias _ | FBabs _ -> Ssym.empty
 
   | FBdef fd ->
       let w =
-        let toloc { v_name = x } = (EcTypes.pv_loc fp x).pv_name in
+        let toloc { v_name = x } = x in
         let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
-        Sx.of_list (List.map xastrip w)
+        Ssym.of_list w
       in
 
       let w, r  = s_get_uninit_read w fd.f_body in
-      let raout = fd.f_ret |> omap (Uninit.e_pv is_loc) in
-      let raout = Sx.diff (raout |> odfl Sx.empty) w in
-      Sx.union r raout
+      let raout = fd.f_ret |> omap (Uninit.e_pv) in
+      let raout = Ssym.diff (raout |> odfl Ssym.empty) w in
+      Ssym.union r raout
 
 (* -------------------------------------------------------------------- *)
 let get_uninit_read_of_module (p : path) (me : _ p_module_expr) =
@@ -895,9 +880,9 @@ let get_uninit_read_of_module (p : path) (me : _ p_module_expr) =
         acc
 
     | MI_Function f ->
-        let xp = xpath_fun mp f.f_name in
-        let r  = get_uninit_read_of_fun xp f in
-        if Sx.is_empty r then acc else (xp, r) :: acc
+        let xp = xpath mp f.f_name in
+        let r  = get_uninit_read_of_fun f in
+        if Ssym.is_empty r then acc else (xp, r) :: acc
 
   in
 

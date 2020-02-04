@@ -297,7 +297,7 @@ let tag_sym_with_side name m =
 
 (* -------------------------------------------------------------------- *)
 let id_of_pv pv m =
-  let id = EcPath.basename pv.pv_name.EcPath.x_sub in
+  let id = symbol_of_pv pv in
   let id = tag_sym_with_side id m in
     EcIdent.create id
 
@@ -309,20 +309,6 @@ let id_of_mp mp m =
     | _ -> assert false
   in
     EcIdent.create (tag_sym_with_side name m)
-
-(* -------------------------------------------------------------------- *)
-let fresh_pv me v =
-  let rec for_idx idx =
-    let x = Printf.sprintf "%s%d" v.v_name idx in
-      if EcMemory.is_bound x me then
-        for_idx (idx+1)
-      else
-        (EcMemory.bind x v.v_type me, x)
-  in
-    if EcMemory.is_bound v.v_name me then
-      for_idx 0
-    else
-      (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
 (* -------------------------------------------------------------------- *)
 let lv_subst m lv f =
@@ -480,13 +466,13 @@ let generalize_mod_ env m modi f =
       EcPath.Mm.add mp restr r) EcPath.Mm.empty mglob in
   List.iter (fun (npv,_) ->
     if is_glob npv then
-      let check1 mp restr =  Mpv.check_npv_mp env npv mp restr in
+      let check1 mp restr =  Mpv.check_npv_mp env (get_glob npv) mp restr in
       EcPath.Mm.iter check1 restrs) nelts;
   List.iter (fun mp ->
     let restr = NormMp.get_restr_use env mp in
     let check (npv,_) =
       if is_glob npv then
-        Mpv.check_npv_mp env npv mp restr in
+        Mpv.check_npv_mp env (get_glob npv) mp restr in
     List.iter check melts;
     let check mp' restr' = Mpv.check_mp_mp env mp restr mp' restr' in
     EcPath.Mm.iter check restrs) nglob;

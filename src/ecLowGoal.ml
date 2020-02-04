@@ -90,7 +90,7 @@ module LowApply = struct
              && oeq (is_alpha_eq hyps) f1 f2
 
           | LD_mem m1, LD_mem m2 ->
-             oeq EcMemory.lmt_equal m1 m2
+             EcMemory.mt_equal m1 m2
 
           | LD_modty mt1, LD_modty mt2 ->
             mt1 == mt2

@@ -659,28 +659,11 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
             (env, subst)
 
-        | GTmem None, GTmem None ->
-            (env, subst)
-
-        | GTmem (Some m1), GTmem (Some m2) ->
-            let xp1 = EcMemory.lmt_xpath m1 in
-            let xp2 = EcMemory.lmt_xpath m2 in
-            let m1  = EcMemory.lmt_bindings m1 in
-            let m2  = EcMemory.lmt_bindings m2 in
-
-            if not (EcPath.x_equal xp1 xp2) then
-              raise MatchFailure;
-            if not (
-              try
-                EcSymbols.Msym.equal
-                  (fun (p1,ty1) (p2,ty2) ->
-                    if p1 <> p2 then raise MatchFailure;
-                    EcUnify.unify env ue ty1 ty2; true)
-                  m1 m2
-              with EcUnify.UnificationFailure _ -> raise MatchFailure)
-            then
-              raise MatchFailure;
-
+        | GTmem mt1, GTmem mt2 ->
+            let on_ty ty1 ty2 =
+              try EcUnify.unify env ue ty1 ty2; true
+              with EcUnify.UnificationFailure _ -> false in
+            if not (EcMemory.mt_equal_gen on_ty mt1 mt2) then raise MatchFailure;
             let subst =
               if   id_equal x1 x2
               then subst

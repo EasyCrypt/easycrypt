@@ -552,16 +552,17 @@ module Hsform = Why3.Hashcons.Make (struct
     in
 
     match f with
-    | Fint _             -> Mid.empty
-    | Fop (_, tys)       -> union (fun a -> a.ty_fv) tys
-    | Fpvar (pv,m)       -> EcPath.x_fv (fv_add m Mid.empty) pv.pv_name
-    | Fglob (mp,m)       -> EcPath.m_fv (fv_add m Mid.empty) mp
-    | Flocal id          -> fv_singleton id
-    | Fapp (f, args)     -> union f_fv (f :: args)
-    | Ftuple args        -> union f_fv args
-    | Fproj(e, _)        -> f_fv e
-    | Fif (f1, f2, f3)   -> union f_fv [f1; f2; f3]
-    | Fmatch (b, fs, ty) -> fv_union ty.ty_fv (union f_fv (b :: fs))
+    | Fint _              -> Mid.empty
+    | Fop (_, tys)        -> union (fun a -> a.ty_fv) tys
+    | Fpvar (PVglob pv,m) -> EcPath.x_fv (fv_add m Mid.empty) pv
+    | Fpvar (PVloc _,m)   -> fv_add m Mid.empty (* TODO: A: correct? *)
+    | Fglob (mp,m)        -> EcPath.m_fv (fv_add m Mid.empty) mp
+    | Flocal id           -> fv_singleton id
+    | Fapp (f, args)      -> union f_fv (f :: args)
+    | Ftuple args         -> union f_fv args
+    | Fproj(e, _)         -> f_fv e
+    | Fif (f1, f2, f3)    -> union f_fv [f1; f2; f3]
+    | Fmatch (b, fs, ty)  -> fv_union ty.ty_fv (union f_fv (b :: fs))
 
     | Fquant(_, b, f) ->
       let do1 (id, ty) fv = fv_union (gty_fv ty) (Mid.remove id fv) in
@@ -684,9 +685,11 @@ let f_app f args ty =
 (* -------------------------------------------------------------------- *)
 let f_local  x ty   = mk_form (Flocal x) ty
 let f_pvar   x ty m = mk_form (Fpvar(x, m)) ty
-let f_pvarg  f ty m = f_pvar (pv_arg f) ty m
-let f_pvloc  f v  m = f_pvar (EcTypes.pv_loc f v.v_name) v.v_type m
-let f_pvlocs f vs m = List.map (fun v -> f_pvloc f v m) vs
+let f_pvloc  v  m = f_pvar (pv_loc v.v_name) v.v_type m
+
+let f_pvarg  ty m = f_pvar pv_arg ty m
+
+let f_pvlocs vs menv = List.map (fun v -> f_pvloc v menv) vs
 let f_glob   mp m   = mk_form (Fglob (mp, m)) (tglob mp)
 
 (* -------------------------------------------------------------------- *)
@@ -1639,7 +1642,6 @@ module Fsubst = struct
         in
           if xs == xs' then (s, lp) else (s, LRecord (p, xs'))
 
-
   (* ------------------------------------------------------------------ *)
   let subst_xpath s f =
     let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
@@ -1656,7 +1658,7 @@ module Fsubst = struct
     EcTypes.e_subst es e
 
   let subst_me s me =
-    EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty me
+    EcMemory.me_subst s.fs_mem s.fs_ty me
 
   let subst_m s m = Mid.find_def m m s.fs_mem
 
@@ -1739,7 +1741,7 @@ module Fsubst = struct
         let pr' = f_subst ~tx s hs.hs_pr in
         let po' = f_subst ~tx s hs.hs_po in
         let st' = EcCoreModules.s_subst es hs.hs_s in
-        let me' = EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty hs.hs_m in
+        let me' = EcMemory.me_subst s.fs_mem s.fs_ty hs.hs_m in
         FSmart.f_hoareS (fp, hs)
           { hs_pr = pr'; hs_po = po'; hs_s = st'; hs_m = me'; }
 
@@ -1759,8 +1761,7 @@ module Fsubst = struct
       let pr' = f_subst ~tx s chs.chs_pr in
       let po' = f_subst ~tx s chs.chs_po in
       let st' = EcCoreModules.s_subst es chs.chs_s in
-      let me' =
-        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty chs.chs_m in
+      let me' = EcMemory.me_subst s.fs_mem s.fs_ty chs.chs_m in
       let c'  = cost_subst ~tx s chs.chs_co in
       FSmart.f_cHoareS (fp, chs)
         { chs_pr = pr'; chs_po = po'; chs_s = st'; chs_m = me'; chs_co = c'; }
@@ -1782,7 +1783,7 @@ module Fsubst = struct
       let pr' = f_subst ~tx s bhs.bhs_pr in
       let po' = f_subst ~tx s bhs.bhs_po in
       let st' = EcCoreModules.s_subst es bhs.bhs_s in
-      let me' = EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty bhs.bhs_m in
+      let me' = EcMemory.me_subst s.fs_mem s.fs_ty bhs.bhs_m in
       let bd' = f_subst ~tx s bhs.bhs_bd in
       FSmart.f_bdHoareS (fp, bhs)
         { bhs with bhs_pr = pr'; bhs_po = po'; bhs_s = st';
@@ -1808,8 +1809,8 @@ module Fsubst = struct
       let po' = f_subst ~tx s eqs.es_po in
       let sl' = s_subst eqs.es_sl in
       let sr' = s_subst eqs.es_sr in
-      let ml' = EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty eqs.es_ml in
-      let mr' = EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty eqs.es_mr in
+      let ml' = EcMemory.me_subst s.fs_mem s.fs_ty eqs.es_ml in
+      let mr' = EcMemory.me_subst s.fs_mem s.fs_ty eqs.es_mr in
 
       FSmart.f_equivS (fp, eqs)
         { es_ml = ml'; es_mr = mr';
@@ -1844,8 +1845,7 @@ module Fsubst = struct
       let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
           s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
       let pr' = f_subst ~tx s coe.coe_pre in
-      let me' =
-        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty coe.coe_mem in
+      let me' = EcMemory.me_subst s.fs_mem s.fs_ty coe.coe_mem in
       let e' = EcTypes.e_subst es coe.coe_e in
       FSmart.f_coe (fp, coe)
         { coe_pre = pr'; coe_mem = me'; coe_e = e'; }
@@ -1957,7 +1957,7 @@ module Fsubst = struct
         else GTmodty p'
 
     | GTmem mt ->
-        let mt' = EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt in
+        let mt' = EcMemory.mt_subst s.fs_ty mt in
         if mt == mt' then gty else GTmem mt'
 
   and add_binding ~tx s (x, gty as xt) =

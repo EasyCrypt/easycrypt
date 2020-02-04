@@ -531,7 +531,7 @@ module ASyncWhile = struct
              | None ->
                  let pfx = EcIdent.name m in
                  let pfx = String.sub pfx  1 (String.length pfx - 1) in
-                 let x   = EcPath.basename pv.pv_name.EcPath.x_sub in
+                 let x   = symbol_of_pv pv in
                  let x   = EcIdent.create (x ^ "_" ^ pfx) in
                  let bds = EcPV.PVMap.add pv (x, fp.f_ty) bds in
                  map := Mid.add m bds !map; x

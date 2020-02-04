@@ -82,14 +82,10 @@ module Sip = EcMaps.Set.MakeOfMap(Mip)
 let ippath_as_path (ip : ipath) =
   match ip with IPPath p -> p | _ -> assert false
 
-(* -------------------------------------------------------------------- *)
-type varbind = {
-  vb_type  : EcTypes.ty;
-  vb_kind  : [`Var of EcTypes.pvar_kind | `Proj of int];
-}
+type glob_var_bind = EcTypes.ty
 
 type obj = [
-  | `Variable of varbind
+  | `Variable of glob_var_bind
   | `Function of function_
   | `Module   of module_expr
   | `ModSig   of module_sig
@@ -101,7 +97,7 @@ type obj = [
 
 type mc = {
   mc_parameters : ((EcIdent.t * module_type) list) option;
-  mc_variables  : (ipath * varbind) MMsym.t;
+  mc_variables  : (ipath * glob_var_bind) MMsym.t;
   mc_functions  : (ipath * function_) MMsym.t;
   mc_modules    : (ipath * module_expr) MMsym.t;
   mc_modsigs    : (ipath * module_sig) MMsym.t;
@@ -148,6 +144,43 @@ module Mrd = EcMaps.Map.Make(struct
 end)
 
 (* -------------------------------------------------------------------- *)
+
+module Mmem : sig
+  type 'a t
+  val empty : 'a t
+  val all   : 'a t -> (EcIdent.t * 'a) list
+  val byid  : EcIdent.t -> 'a t -> 'a
+  val bysym : EcSymbols.symbol -> 'a t -> EcIdent.t * 'a
+  val add   : EcIdent.t -> 'a -> 'a t -> 'a t
+end = struct
+
+  type 'a t = {
+      m_s : memory Msym.t;
+      m_id : 'a Mid.t;
+    }
+
+  let empty = {
+      m_s = Msym.empty;
+      m_id = Mid.empty;
+    }
+
+  let all m = Mid.bindings m.m_id
+
+  let byid id m = Mid.find id m.m_id
+
+  let bysym s m =
+    let id = Msym.find s m.m_s in
+    id, byid id m
+
+  let add id a m = {
+      m_s = Msym.add (EcIdent.name id) id m.m_s;
+      m_id = Mid.add id a m.m_id
+    }
+end
+
+
+(* -------------------------------------------------------------------- *)
+
 type preenv = {
   env_top      : EcPath.path option;
   env_gstate   : EcGState.gstate;
@@ -155,7 +188,7 @@ type preenv = {
   env_current  : mc;
   env_comps    : mc Mip.t;
   env_locals   : (EcIdent.t * EcTypes.ty) MMsym.t;
-  env_memories : EcMemory.memenv MMsym.t;
+  env_memories : EcMemory.memtype Mmem.t;
   env_actmem   : EcMemory.memory option;
   env_abs_st   : EcModules.abs_uses Mid.t;
   env_tci      : ((ty_params * ty) * tcinstance) list;
@@ -272,7 +305,7 @@ let empty gstate =
     env_current  = env_current;
     env_comps    = Mip.singleton (IPPath path) (empty_mc None);
     env_locals   = MMsym.empty;
-    env_memories = MMsym.empty;
+    env_memories = Mmem.empty;
     env_actmem   = None;
     env_abs_st   = Mid.empty;
     env_tci      = [];
@@ -359,7 +392,7 @@ module MC = struct
       | (p, `Dn q) -> (p, Some q)
 
   (* ------------------------------------------------------------------ *)
-  let _downpath_for_modcp isvar ~local ~spsc env p args =
+  let _downpath_for_modcp isvar ~spsc env p args =
     let prefix =
       let prefix_of_mtop = function
         | `Concrete (p1, _) -> Some p1
@@ -389,21 +422,10 @@ module MC = struct
                 | None -> assert false
                 | Some q -> begin
                     let ap =
-                      if local then
-                        let vname = EcPath.basename q in
-                        let fpath = oget (EcPath.prefix q) in
-                        let fname = EcPath.basename fpath in
-                          EcPath.xpath
-                            (EcPath.mpath_crt
-                               p (if isvar && not local then [] else List.map EcPath.mident n)
-                               (EcPath.prefix fpath))
-                            (EcPath.pqname (EcPath.psymbol fname) vname)
-                      else
                         EcPath.xpath
-                          (EcPath.mpath_crt
-                             p (if isvar && not local then [] else List.map EcPath.mident n)
+                          (EcPath.mpath_crt p (if isvar then [] else List.map EcPath.mident n)
                              (EcPath.prefix q))
-                          (EcPath.psymbol (EcPath.basename q))
+                          (EcPath.basename q)
                     in
                       (ap, odfl false (prefix |> omap (EcPath.p_equal p)))
                 end
@@ -418,7 +440,7 @@ module MC = struct
                     EcPath.xpath
                       (EcPath.mpath_abs m
                          (if isvar then [] else List.map EcPath.mident n))
-                      (EcPath.psymbol x)
+                      x
                   in
                     (ap, false)
 
@@ -431,7 +453,7 @@ module MC = struct
       assert false
 
   let _downpath_for_var = _downpath_for_modcp true
-  let _downpath_for_fun = _downpath_for_modcp false ~local:false
+  let _downpath_for_fun = _downpath_for_modcp false
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_mod spsc env p args =
@@ -620,12 +642,8 @@ module MC = struct
   let lookup_var qnx env =
     match lookup (fun mc -> mc.mc_variables) qnx env with
     | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) ->
-      let local =
-        match obj.vb_kind with
-        | `Var EcTypes.PVglob -> false
-        | `Var EcTypes.PVloc | `Proj _ -> true in
-      (_downpath_for_var local false env p args, obj)
+    | Some (p, (args, ty)) ->
+      (_downpath_for_var false env p args, ty)
 
   let _up_var candup mc x obj =
     if not candup && MMsym.last x mc.mc_variables <> None then
@@ -969,10 +987,7 @@ module MC = struct
 
       | MI_Variable v ->
           let (_subp2, mep) = subp2 v.v_name in
-          let vty  =
-            { vb_type = v.v_type;
-              vb_kind = `Var PVglob; }
-          in
+          let vty  = v.v_type in
             (_up_var false mc v.v_name (IPPath mep, vty), None)
 
       | MI_Function f ->
@@ -1016,11 +1031,7 @@ module MC = struct
       | MI_Module _ -> assert false
 
       | MI_Variable v ->
-          let vty =
-            { vb_type = v.v_type;
-              vb_kind = `Var PVglob; }
-          in
-            _up_var false mc v.v_name (xpath v.v_name, vty)
+          _up_var false mc v.v_name (xpath v.v_name, v.v_type)
 
 
       | MI_Function f ->
@@ -1187,7 +1198,7 @@ let enter mode (name : symbol) (env : env) =
             env_item  = []; }
 
   | `Fun, `Module mpath ->
-      let xpath = EcPath.xpath_fun mpath name in
+      let xpath = EcPath.xpath mpath name in
       let env   = MC.bind_mc name (empty_mc None) env in (* FIXME: remove *)
         { env with
             env_scope = { ec_path = path; ec_scope = `Fun xpath; };
@@ -1204,22 +1215,15 @@ exception MEError of meerror
 
 (* -------------------------------------------------------------------- *)
 module Memory = struct
-  let all env =
-    MMsym.fold (fun _ l all -> List.rev_append l all) env.env_memories []
+  let all env = Mmem.all env.env_memories
 
   let byid (me : memory) (env : env) =
-    let memories = MMsym.all (EcIdent.name me) env.env_memories in
-    let memories =
-      List.filter
-        (fun me' -> EcIdent.id_equal me (EcMemory.memory me'))
-        memories
-    in
-      match memories with
-      | []     -> None
-      | m :: _ -> Some m
+    try Some (me, Mmem.byid me env.env_memories)
+    with Not_found -> None
 
   let lookup (me : symbol) (env : env) =
-    MMsym.last me env.env_memories
+    try Some (Mmem.bysym me env.env_memories)
+    with Not_found -> None
 
   let set_active (me : memory) (env : env) =
     match byid me env with
@@ -1232,16 +1236,15 @@ module Memory = struct
   let current (env : env) =
     match env.env_actmem with
     | None    -> None
-    | Some me -> Some (oget (byid me env))
+    | Some me -> byid me env
+
+  let update (me: EcMemory.memenv) (env : env) =
+    { env with env_memories = Mmem.add (fst me) (snd me) env.env_memories; }
 
   let push (me : EcMemory.memenv) (env : env) =
+    (* TODO A: *)
     (* FIXME: assert (byid (EcMemory.memory me) env = None); *)
-
-    let id = EcMemory.memory me in
-    let maps =
-      MMsym.add (EcIdent.name id) me env.env_memories
-    in
-      { env with env_memories = maps }
+    update me env
 
   let push_all memenvs env =
     List.fold_left
@@ -1251,6 +1254,7 @@ module Memory = struct
   let push_active memenv env =
     set_active (EcMemory.memory memenv)
       (push memenv env)
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1264,19 +1268,17 @@ let ipath_of_mpath (p : mpath) =
         (IPPath pr, ((EcPath.p_size p1)-1, p.EcPath.m_args))
 
 let ipath_of_xpath (p : xpath) =
-  match p.EcPath.x_sub.EcPath.p_node with
-  | EcPath.Psymbol x ->
-      let xt p =
-        match p with
-        | IPPath p -> Some (IPPath (EcPath.pqname p x))
-        | IPIdent (m, None) -> Some (IPIdent (m, Some (EcPath.psymbol x)))
-        | _ -> None
-      in
+  let x = p.EcPath.x_sub in
 
-      let (p, (i, a)) = ipath_of_mpath p.EcPath.x_top in
-        (xt p) |> omap (fun p -> (p, (i+1, a)))
+  let xt p =
+    match p with
+    | IPPath p -> Some (IPPath (EcPath.pqname p x))
+    | IPIdent (m, None) -> Some (IPIdent (m, Some (EcPath.psymbol x)))
+    | _ -> None
+  in
 
-  | _ -> None
+  let (p, (i, a)) = ipath_of_mpath p.EcPath.x_top in
+  (xt p) |> omap (fun p -> (p, (i+1, a)))
 
 (* -------------------------------------------------------------------- *)
 let try_lf f =
@@ -1637,63 +1639,46 @@ module Fun = struct
     let ip = fst (oget (ipath_of_xpath path)) in
       MC.import_fun ip obj env
 
-  let add_in_memenv memenv vd =
-    EcMemory.bind vd.v_name vd.v_type memenv
+  let adds_in_memenv memenv vd = EcMemory.bindall vd memenv
+  let add_in_memenv memenv vd = adds_in_memenv memenv [vd]
 
-  let adds_in_memenv = List.fold_left add_in_memenv
-
-  let addproj_in_memenv mem l =
-    let n = List.length l in
-    List.fold_lefti
-      (fun mem i vd -> EcMemory.bind_proj i n vd.v_name vd.v_type mem) mem l
-
-  let actmem_pre me path fun_ =
-    let mem = EcMemory.empty_local me path in
-    let mem = add_in_memenv mem {v_name = "arg"; v_type = fun_.f_sig.fs_arg } in
+  let add_params mem fun_ =
+    let ty = fun_.f_sig.fs_arg in
     match fun_.f_sig.fs_anames with
-    | None -> mem
-    | Some l -> addproj_in_memenv mem l
+    | None   -> add_in_memenv mem {v_name = "_"; v_type = ty}
+    | Some l -> adds_in_memenv mem l
 
+  let actmem_pre me fun_ =
+    let mem = EcMemory.empty_local ~witharg:true me in
+    add_params mem fun_
 
-  let actmem_post me path fun_ =
-    let mem = EcMemory.empty_local me path in
-    add_in_memenv mem {v_name = "res"; v_type = fun_.f_sig.fs_ret}
+  let actmem_post me fun_ =
+    let mem = EcMemory.empty_local ~witharg:false me in
+    add_in_memenv mem {v_name = res_symbol; v_type = fun_.f_sig.fs_ret}
 
-  let actmem_body me path fun_ =
+  let actmem_body me fun_ =
     match fun_.f_def with
-    | FBabs _ -> assert false (* FIXME error message *)
+    | FBabs _   -> assert false (* FIXME error message *)
     | FBalias _ -> assert false (* FIXME error message *)
-    | FBdef fd ->
-      let mem = EcMemory.empty_local me path in
-      let mem = add_in_memenv mem {v_name="arg"; v_type=fun_.f_sig.fs_arg} in
-      let mem =
-        match fun_.f_sig.fs_anames with
-        | None -> mem
-        | Some l -> adds_in_memenv mem l in
+    | FBdef fd   ->
+      let mem = EcMemory.empty_local ~witharg:false me in
+      let mem = add_params mem fun_ in
       (fun_.f_sig,fd), adds_in_memenv mem fd.f_locals
 
-  let inv_memory side env =
-    let path  = mroot env in
-    let xpath = EcPath.xpath_fun path "" in (* dummy value *)
+  let inv_memory side =
     let id    = if side = `Left then EcCoreFol.mleft else EcCoreFol.mright in
-    EcMemory.empty_local id xpath
+    EcMemory.abstract id
 
   let inv_memenv env =
-    let path  = mroot env in
-    let xpath = EcPath.xpath_fun path "" in (* dummy value *)
-    let meml  = EcMemory.empty_local EcCoreFol.mleft xpath in
-    let memr  = EcMemory.empty_local EcCoreFol.mright xpath in
-    Memory.push_all [meml;memr] env
+    Memory.push_all [inv_memory `Left; inv_memory `Rigth] env
 
   let inv_memenv1 env =
-    let path  = mroot env in
-    let xpath = EcPath.xpath_fun path "" in (* dummy value *)
-    let mem  = EcMemory.empty_local EcCoreFol.mhr xpath in
+    let mem  = EcMemory.abstract EcCoreFol.mhr in
     Memory.push_active mem env
 
   let prF_memenv m path env =
     let fun_ = by_xpath path env in
-    actmem_post m path fun_
+    actmem_post m fun_
 
   let prF path env =
     let post = prF_memenv EcCoreFol.mhr path env in
@@ -1702,8 +1687,8 @@ module Fun = struct
   let hoareF_memenv path env =
     let (ip, _) = oget (ipath_of_xpath path) in
     let fun_ = snd (oget (by_ipath ip env)) in
-    let pre  = actmem_pre EcCoreFol.mhr path fun_ in
-    let post = actmem_post EcCoreFol.mhr path fun_ in
+    let pre  = actmem_pre EcCoreFol.mhr fun_ in
+    let post = actmem_post EcCoreFol.mhr fun_ in
     pre, post
 
   let hoareF path env =
@@ -1712,7 +1697,7 @@ module Fun = struct
 
   let hoareS path env =
     let fun_ = by_xpath path env in
-    let fd, memenv = actmem_body EcCoreFol.mhr path fun_ in
+    let fd, memenv = actmem_body EcCoreFol.mhr fun_ in
     memenv, fd, Memory.push_active memenv env
 
   let equivF_memenv path1 path2 env =
@@ -1721,10 +1706,10 @@ module Fun = struct
 
     let fun1 = snd (oget (by_ipath ip1 env)) in
     let fun2 = snd (oget (by_ipath ip2 env)) in
-    let pre1 = actmem_pre EcCoreFol.mleft path1 fun1 in
-    let pre2 = actmem_pre EcCoreFol.mright path2 fun2 in
-    let post1 = actmem_post EcCoreFol.mleft path1 fun1 in
-    let post2 = actmem_post EcCoreFol.mright path2 fun2 in
+    let pre1 = actmem_pre EcCoreFol.mleft fun1 in
+    let pre2 = actmem_pre EcCoreFol.mright fun2 in
+    let post1 = actmem_post EcCoreFol.mleft fun1 in
+    let post2 = actmem_post EcCoreFol.mright fun2 in
     (pre1,pre2), (post1,post2)
 
   let equivF path1 path2 env =
@@ -1735,71 +1720,33 @@ module Fun = struct
   let equivS path1 path2 env =
     let fun1 = by_xpath path1 env in
     let fun2 = by_xpath path2 env in
-    let fd1, mem1 = actmem_body EcCoreFol.mleft path1 fun1 in
-    let fd2, mem2 = actmem_body EcCoreFol.mright path2 fun2 in
+    let fd1, mem1 = actmem_body EcCoreFol.mleft fun1 in
+    let fd2, mem2 = actmem_body EcCoreFol.mright fun2 in
     mem1, fd1, mem2, fd2, Memory.push_all [mem1; mem2] env
 end
 
 (* -------------------------------------------------------------------- *)
 module Var = struct
-  type t = varbind
+  type t = glob_var_bind
 
-  let by_xpath_r (spsc : bool) (p : xpath) (env : env) =
+    let by_xpath_r (spsc : bool) (p : xpath) (env : env) =
     match ipath_of_xpath p with
-    | None -> begin
-      match p.EcPath.x_sub.EcPath.p_node with
-      | EcPath.Pqname ({ p_node = EcPath.Psymbol f }, x) -> begin
-        let mp = EcPath.mpath p.EcPath.x_top.EcPath.m_top [] in
-        let fp = EcPath.xpath_fun mp f in
-        let f  = Fun.by_xpath_r ~susp:true ~spsc fp env in
-        if x = "arg" then {vb_type = f.f_sig.fs_arg; vb_kind = `Var PVloc }
-        else
-          try
-            begin match f.f_sig.fs_anames with
-            | None -> raise Not_found
-            | Some l ->
-              let v = List.find (fun v -> v.v_name = x) l in
-              { vb_type = v.v_type; vb_kind = `Var PVloc; }
-            end
-          with Not_found -> begin
-            match f.f_def with
-            | FBdef def -> begin
-              try
-                let v = List.find (fun v -> v.v_name = x) def.f_locals in
-                { vb_type = v.v_type; vb_kind = `Var PVloc; }
-              with Not_found -> lookup_error (`XPath p)
-            end
-            | FBabs _ | FBalias _ -> lookup_error (`XPath p)
-          end
-      end
-      | _ -> lookup_error (`XPath p)
-    end
-
-    | Some (ip, (i, _args)) -> begin
-        match MC.by_path (fun mc -> mc.mc_variables) ip env with
-        | None -> lookup_error (`XPath p)
-        | Some (params, o) ->
-           let local =
-             match o.vb_kind with
-             | `Var EcTypes.PVglob -> false
-             | `Var EcTypes.PVloc | `Proj _ -> true in
-           let ((spi, _params), _) =
-             MC._downpath_for_var local spsc env ip params in
-           if i <> spi then
-             assert false;
-           o
-    end
+    | None -> lookup_error (`XPath p)
+    | Some (ip, (i, _args)) ->
+      match MC.by_path (fun mc -> mc.mc_variables) ip env with
+      | None -> lookup_error (`XPath p)
+      | Some (params, ty) ->
+        let ((spi, _params), _) =
+          MC._downpath_for_var spsc env ip params in
+        if i <> spi then
+          assert false;
+        ty
 
   let by_xpath (p : xpath) (env : env) =
     by_xpath_r true p env
 
   let by_xpath_opt (p : xpath) (env : env) =
     try_lf (fun () -> by_xpath p env)
-
-  let add (path : EcPath.xpath) (env : env) =
-    let obj = by_xpath path env in
-    let ip = fst (oget (ipath_of_xpath path)) in
-      MC.import_var ip obj env
 
   let lookup_locals name env =
     MMsym.all name env.env_locals
@@ -1817,44 +1764,29 @@ module Var = struct
       match fst qname with
       | [] ->
           let memenv = oget (Memory.byid side env) in
-          if EcMemory.memtype memenv = None then None
-          else
-            let mp = EcMemory.xpath memenv in
-            begin match EcMemory.lookup (snd qname) memenv with
-            | None    -> None
-            | Some (None,ty) ->
-              let pv = pv_loc mp (snd qname) in
-              Some (`Var pv, ty)
-            | Some (Some i, ty) ->
-              let pv = pv_arg mp in
-              let fdef = Fun.by_xpath mp env in
-              Some (`Proj (pv,fdef.f_sig.fs_arg, i), ty)
-            end
-
+          begin match EcMemory.lookup_me (snd qname) memenv with
+          | Some (v, Some pa, _) -> Some (`Proj(pv_arg, pa), v.v_type)
+          | Some (v, None, _)    -> Some (`Var (pv_loc v.v_name), v.v_type)
+          | None                 -> None
+          end
       | _ -> None
     in
     match obind inmem side with
     | None ->
-        (* TODO FIXME, suspended for local program variable *)
-      let (((_, _), p), x) = MC.lookup_var qname env in
-      let k =
-        match x.vb_kind with
-        | `Var k -> k
-        | _ -> assert false (* PY : FIXME *) in
-      (`Var (pv p k), x.vb_type)
+      let (((_, _), p), ty) = MC.lookup_var qname env in
+      (`Var (pv_glob p), ty)
 
     | Some pvt -> pvt
 
   let lookup_progvar_opt ?side name env =
     try_lf (fun () -> lookup_progvar ?side name env)
 
-  let bind name pvkind ty env =
-    let vb = { vb_type = ty; vb_kind = `Var pvkind; } in
-    MC.bind_var name vb env
+  let bind_pvglob name ty env =
+    MC.bind_var name ty env
 
-  let bindall bindings pvkind env =
+  let bindall_pvglob bindings env =
     List.fold_left
-      (fun env (name, ty) -> bind name pvkind ty env)
+      (fun env (name, ty) -> bind_pvglob name ty env)
       env bindings
 
    let bind_local name ty env =
@@ -2160,16 +2092,11 @@ module NormMp = struct
   let rec norm_xfun env p =
     try Mx.find p !(env.env_norm).norm_xfun with Not_found ->
       let res =
-        match p.x_sub.p_node with
-        | Pqname(pf,x) ->
-          let pf = norm_xfun env (EcPath.xpath p.x_top pf) in
-          EcPath.xpath pf.x_top (EcPath.pqname pf.x_sub x)
-        | _ ->
-          let mp = norm_mpath env p.x_top in
-          let pf = EcPath.xpath mp p.x_sub in
-          match Fun.by_xpath_opt pf env with (* TODO B:use by_xpath_r *)
-          | Some {f_def = FBalias xp} -> norm_xfun env xp
-          | _ -> pf in
+        let mp = norm_mpath env p.x_top in
+        let pf = EcPath.xpath mp p.x_sub in
+        match Fun.by_xpath_opt pf env with (* TODO B:use by_xpath_r *)
+        | Some {f_def = FBalias xp} -> norm_xfun env xp
+        | _ -> pf in
       let en = !(env.env_norm) in
       env.env_norm := { en with norm_xfun = Mx.add p res en.norm_xfun };
       res
@@ -2194,7 +2121,7 @@ module NormMp = struct
             EcPath.m_apply mp (List.map (fun (id,_)->EcPath.mident id) params)in
         let mp = norm_mpath env' mp in
         let xp = EcPath.xpath mp p.x_sub in
-        let res = (pv_glob xp).pv_name in
+        let res = xp_glob xp in
         let en = !(env.env_norm) in
         env.env_norm := { en with norm_xpv = Mx.add p res en.norm_xpv };
         res
@@ -2229,9 +2156,8 @@ module NormMp = struct
   let add_var env xp us =
     let xp = xp_glob xp in
     let xp = norm_xpv env xp in
-    let vb = Var.by_xpath xp env in
-    let pv = EcTypes.pv_glob xp in
-    { us with us_pv = Mx.add pv.pv_name vb.vb_type us.us_pv }
+    let ty = Var.by_xpath xp env in
+    { us with us_pv = Mx.add xp ty us.us_pv }
 
   let add_glob id us =
     { us with us_gl = Sid.add id us.us_gl }
@@ -2277,8 +2203,8 @@ module NormMp = struct
   and item_use env rm fdone mp us item =
     match item with
     | MI_Module me -> mod_use env rm fdone us (EcPath.mqname mp me.me_name)
-    | MI_Variable v -> add_var env (xpath_fun mp v.v_name) us
-    | MI_Function f -> fun_use_aux env rm fdone us (xpath_fun mp f.f_name)
+    | MI_Variable v -> add_var env (xpath mp v.v_name) us
+    | MI_Function f -> fun_use_aux env rm fdone us (xpath mp f.f_name)
 
   and body_use env rm fdone mp us comps body =
     match body with
@@ -2445,11 +2371,12 @@ module NormMp = struct
       mis_restr = get_restr_me env me mp }
 
   let norm_pvar env pv =
-    let p =
-      if pv.pv_kind = PVglob then norm_xpv env pv.pv_name
-      else norm_xfun env pv.pv_name in
-    if   x_equal p pv.pv_name then pv
-    else EcTypes.pv p pv.pv_kind
+    match pv with
+    | PVloc _ -> pv
+    | PVglob xp ->
+      let p = norm_xpv env xp in
+      if   x_equal p xp then pv
+      else EcTypes.pv_glob p
 
   let globals env m mp =
     let us = mod_use env mp in
@@ -2486,14 +2413,7 @@ module NormMp = struct
         match gty with
         | GTty ty -> GTty (norm_ty env ty)
         | GTmodty _ -> gty
-        | GTmem None -> gty
-        | GTmem (Some mt) ->
-          let me =
-            EcMemory.empty_local id (norm_xfun env (EcMemory.lmt_xpath mt)) in
-          let me = Msym.fold (fun id (p,ty) me ->
-            EcMemory.bindp id p (norm_ty env ty) me)
-              (EcMemory.lmt_bindings mt) me  in
-          GTmem (snd me) in
+        | GTmem mt -> GTmem (mt_subst (norm_ty env) mt) in
       id,gty in
 
     let has_mod b =
@@ -3270,7 +3190,7 @@ let initial gstate = empty gstate
 
 (* -------------------------------------------------------------------- *)
 type ebinding = [
-  | `Variable  of EcTypes.pvar_kind * EcTypes.ty
+  | `Variable  of EcTypes.ty
   | `Function  of function_
   | `Module    of module_expr
   | `ModType   of module_sig
@@ -3278,10 +3198,10 @@ type ebinding = [
 
 let bind1 ((x, eb) : symbol * ebinding) (env : env) =
   match eb with
-  | `Variable v -> Var   .bind x (fst v) (snd v) env
-  | `Function f -> Fun   .bind x f env
-  | `Module   m -> Mod   .bind x m env
-  | `ModType  i -> ModTy .bind x i env
+  | `Variable ty -> Var.bind_pvglob x ty env
+  | `Function f  -> Fun.bind x f env
+  | `Module   m  -> Mod.bind x m env
+  | `ModType  i  -> ModTy.bind x i env
 
 let bindall (items : (symbol * ebinding) list) (env : env) =
   List.fold_left ((^~) bind1) env items
@@ -3337,7 +3257,7 @@ module LDecl = struct
         LD_var (s.fs_ty ty, body |> omap (Fsubst.f_subst s))
 
     | LD_mem mt ->
-        let mt = EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt
+        let mt = EcMemory.mt_subst s.fs_ty mt
         in LD_mem mt
 
     | LD_modty p ->
@@ -3363,11 +3283,14 @@ module LDecl = struct
   | LD_modty p ->
       gty_fv (GTmodty p)
   | LD_abs_st us ->
-      let add fv (x,_) =  EcPath.x_fv fv x.pv_name in
-      let fv = Mid.empty in
-      let fv = List.fold_left add fv us.aus_reads in
-      let fv = List.fold_left add fv us.aus_writes in
-      List.fold_left EcPath.x_fv fv us.aus_calls
+    let add fv (x,_) = match x with
+      | PVglob x -> EcPath.x_fv fv x
+      | PVloc _ -> fv in
+
+    let fv = Mid.empty in
+    let fv = List.fold_left add fv us.aus_reads in
+    let fv = List.fold_left add fv us.aus_writes in
+    List.fold_left EcPath.x_fv fv us.aus_calls
 
   (* ------------------------------------------------------------------ *)
   let by_name s hyps =
@@ -3411,7 +3334,7 @@ module LDecl = struct
     with LdeclError (LookupError _) -> false
 
   let has_inld s = function
-    | LD_mem (Some lmt) -> Msym.mem s (lmt_bindings lmt)
+    | LD_mem mt -> is_bound s mt
     | _ -> false
 
   let has_name ?(dep = false) s hyps =

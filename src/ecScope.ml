@@ -1422,7 +1422,7 @@ module Mod = struct
         Format.fprintf fmt "  - %a -> [%a]"
           (EcPrinting.pp_funname ppe) (xastrip xp)
           (EcPrinting.pp_list ", " pp_symbol)
-          (List.map EcPath.xbasename (Sx.ntr_elements names))
+          (Ssym.elements names)
       in
 
       notify scope `Warning

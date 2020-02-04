@@ -104,15 +104,6 @@ val is_assert : instr -> bool
 val get_uninit_read : stmt -> Sx.t
 
 (* -------------------------------------------------------------------- *)
-type variable = {
-  v_name : symbol;
-  v_type : EcTypes.ty;
-}
-
-val v_name : variable -> symbol
-val v_type : variable -> EcTypes.ty
-
-(* -------------------------------------------------------------------- *)
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
@@ -292,5 +283,6 @@ val p_mty_equal :
 val p_mty_hash : ('a -> int) -> 'a p_module_type -> int
 
 (* -------------------------------------------------------------------- *)
-val get_uninit_read_of_fun : xpath -> _ p_function_ -> Sx.t
-val get_uninit_read_of_module : path -> _ p_module_expr -> (xpath * Sx.t) list
+val get_uninit_read : stmt -> Ssym.t
+val get_uninit_read_of_fun : _ p_function_ -> Ssym.t
+val get_uninit_read_of_module : path -> _ p_module_expr -> (xpath * Ssym.t) list

@@ -185,7 +185,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     let eqgs = List.map (fun m -> f_eqglob m mh m mi) gs in
     let eqparams =
       let vs = oget fsig.fs_anames in
-      let f_x x = f_pvloc f x mh in
+      let f_x x = f_pvloc x mh in
       f_eq (f_tuple (List.map f_x vs)) pr.pr_args in
     let pre = f_ands (eqparams :: (eqxs@eqgs)) in
     let p = f_and (f_not f_event) (f_eq cntr f_i0) in
@@ -264,7 +264,7 @@ let process_fel at_pos (infos : fel_info) tc =
   let hyps    = LDecl.inv_memenv1 hyps1 in
   let cntr    = TTC.pf_process_form !!tc hyps tint infos.pfel_cntr in
   let ash     = TTC.pf_process_form !!tc hyps (tfun tint treal) infos.pfel_asg in
-  let hypsq   = LDecl.push_active (pr.pr_mem, None) hyps1 in
+  let hypsq   = LDecl.push_active (EcMemory.abstract pr.pr_mem) hyps1 in
   let q       = TTC.pf_process_form !!tc hypsq tint infos.pfel_q in
   let f_event = TTC.pf_process_form !!tc hyps tbool infos.pfel_event in
   let inv     =

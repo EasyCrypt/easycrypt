@@ -400,7 +400,7 @@ end = struct
                ("prog. variable", Cb (pv, EcPrinting.pp_pv env))
             | `Lc id ->
                ("local variable", Cb (id, EcPrinting.pp_local env))
-            | `Proj (pv, _, _) ->
+            | `Proj (pv, _) ->
                ("variable proj.", Cb (pv, EcPrinting.pp_pv env))
             | `Op op ->
                ("operator", Cb ((op, ue), pp_op))
@@ -770,12 +770,12 @@ let pp_parse_error fmt msg =
 (* -------------------------------------------------------------------- *)
 let pp_alias_clash env fmt = function
   | EcPV.AC_concrete_abstract (mp, npv) ->
-      let top = m_functor npv.pv_name.x_top in
+      let top = m_functor npv.x_top in
       let ppe = EcPrinting.PPEnv.ofenv env in
       Format.fprintf fmt
         "The module %a can write %a (maybe add restriction %a)"
         (EcPrinting.pp_topmod ppe) mp
-        (EcPrinting.pp_pv ppe) npv
+        (EcPrinting.pp_pv ppe) (pv_glob npv)
         (EcPrinting.pp_topmod ppe) top
 
   | EcPV.AC_abstract_abstract (mp, mp') ->
