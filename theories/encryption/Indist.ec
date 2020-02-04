@@ -48,7 +48,7 @@ module OrclR (O:Orcl) = {
 }.
 
 module type Adv (O:Orcl, LR:LR) = {
-  proc main():bool { O.leaks O.orcl LR.orcl }
+  proc main():bool { O.leaks, O.orcl, LR.orcl }
 }.
 
 module INDL (O:Orcl, A:Adv) = {
