@@ -1667,10 +1667,14 @@ and pp_cost ppe fmt c =
          |> List.map (fun (x,y) -> (Some x, y))))
 
 (* -------------------------------------------------------------------- *)
+
+(* TODO: A: when this gets more stable, we should probably change the printing so
+   that we print an allowed oracle only if there is no cost restriction for it,
+   and a cost only for allowed oracles. *)
 and pp_allowed_orcl ppe fmt orcls =
   if orcls = [] then Format.fprintf fmt ""
   else
-    Format.fprintf fmt "oracles : @[<hov>%a@];@ "
+    Format.fprintf fmt "@[<hov>%a@];@ "
       (pp_list ",@ " (pp_funname ppe)) orcls
 
 and pp_costs ppe fmt costs =
@@ -1682,7 +1686,7 @@ and pp_costs ppe fmt costs =
         (pp_funname ppe) f
         (pp_form ppe) c in
 
-    Format.fprintf fmt "compl : @[<hv>{@, @[<v>%a;@ @]@,}@];@ "
+    Format.fprintf fmt "@[<hv>%a@]@ "
       (pp_list ";@ " pp_cost) (EcPath.Mx.bindings costs)
 
 and pp_orclinfo ppe fmt (sym, oi) =
@@ -1691,7 +1695,7 @@ and pp_orclinfo ppe fmt (sym, oi) =
   if orcls = [] && EcPath.Mx.is_empty costs
   then Format.fprintf fmt ""
   else
-    Format.fprintf fmt "@[<hv>%s%a : {@,  %a%a@,}@]"
+    Format.fprintf fmt "@[<hv>%s%a : {@,%a%a@,}@]"
       (if OI.is_in oi then "" else " *")
       pp_symbol sym
       (pp_allowed_orcl ppe) orcls
@@ -1739,13 +1743,13 @@ and pp_mem_restr ppe fmt mr =
 
 (* -------------------------------------------------------------------- *)
 and pp_restr ppe fmt mr =
-  Format.fprintf fmt "@[<v>%a%a@]"
+  Format.fprintf fmt "@[<hv>%a%a@]"
     (pp_mem_restr ppe) mr
     (pp_orclinfos ppe) mr.mr_oinfos
 
 (* -------------------------------------------------------------------- *)
 and pp_modtype (ppe : PPEnv.t) fmt (mty : module_type) =
-  Format.fprintf fmt "@[<v 2>%a@,{%a@,}@]"
+  Format.fprintf fmt "@[<hv>%a{@;<0 2>%a@,}@]"
     (pp_modtype1 ppe) mty (pp_restr ppe) mty.mt_restr
 
 (* -------------------------------------------------------------------- *)
@@ -1778,10 +1782,38 @@ and pp_binding ?(break = true) ?fv (ppe : PPEnv.t) (xs, ty) =
   | GTmodty mt ->
       let tenv1  = PPEnv.add_mods ppe xs mt in
       let pp fmt =
-        Format.fprintf fmt "(%a <: %a)"
-          (pp_list pp_sep (pp_local tenv1)) xs (pp_modtype ppe) mt
+        let (ppe, pp_params) = pp_mod_params ppe mt.mt_params in
+        Format.fprintf fmt "@[<hv>(%a%t <:@;<1 2>%a)@]"
+          (pp_list pp_sep (pp_local tenv1)) xs
+          pp_params
+          (pp_modtype ppe) mt
       in
         (tenv1, pp)
+
+(* -------------------------------------------------------------------- *)
+and pp_mod_params ppe bms =
+  let pp_mp ppe (id,mt) =
+    let ppe1 = PPEnv.add_local ppe id in
+    let pp fmt =
+      Format.fprintf fmt "%a : %a" (pp_local ppe1) id
+        EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mt) in
+    ppe1, pp
+  in
+  let rec aux ppe bms =
+    match bms with
+    | [] -> (ppe, fun _ -> ())
+    | [bm] ->
+      let ppe, pp = pp_mp ppe bm in
+      (ppe, fun fmt -> Format.fprintf fmt "%t" pp)
+    | bm::bms ->
+      let ppe, pp1 = pp_mp ppe bm in
+      let ppe, pp2 = aux ppe bms in
+      (ppe, fun fmt -> Format.fprintf fmt "%t,@, %t" pp1 pp2) in
+
+  let (ppe, pp) = aux ppe bms in
+  let pp fmt =
+    if not (List.is_empty bms) then Format.fprintf fmt "@[(%t)@]" pp
+  in (ppe, pp)
 
 (* -------------------------------------------------------------------- *)
 and pp_bindings_blocks ppe ?(break = true) ?fv bds =
@@ -2625,7 +2657,8 @@ module PPGoal = struct
             (None, fun fmt -> pp_memtype ppe fmt m)
 
         | EcBaseLogic.LD_modty p ->
-            (None, fun fmt -> pp_modtype ppe fmt p)
+          let (ppe, pp) = pp_mod_params ppe p.mt_params in
+          (Some pp, fun fmt -> pp_modtype ppe fmt p)
 
         | EcBaseLogic.LD_hyp f ->
             (None, fun fmt -> pp_form ppe fmt f)
@@ -2655,8 +2688,10 @@ module PPGoal = struct
           | None    -> ()
           | Some pk -> Format.fprintf fmt "%t " pk in
 
+        (* TODO: A: old printing:
+           "%-.2s%t: @[<hov 2>%t@]@\n%!" *)
         Format.fprintf fmt
-          "%-.2s%t: @[<hov 2>%t@]@\n%!"
+          "@[<hv>@[%-.2s%t:@]@;<1 2>@[<hov 2>%t@]@]@\n%!"
           (PPEnv.local_symb ppe id) pk dk)
         pps
     end;
@@ -2671,8 +2706,8 @@ module PPGoal = struct
     | FbdHoareS hs -> pp_bdhoareS ?prpo ppe fmt hs
     | FcHoareF hf  -> pp_choareF   ppe fmt hf
     | FcHoareS hs  -> pp_choareS  ?prpo ppe fmt hs
-    | FhoareF hf  -> pp_hoareF   ppe fmt hf
-    | FhoareS hs  -> pp_hoareS   ?prpo ppe fmt hs
+    | FhoareF hf   -> pp_hoareF   ppe fmt hf
+    | FhoareS hs   -> pp_hoareS   ?prpo ppe fmt hs
     | FequivF ef   -> pp_equivF   ppe fmt ef
     | FequivS es   -> pp_equivS   ?prpo ppe fmt es
     | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
@@ -2730,29 +2765,6 @@ let pp_goal (ppe : PPEnv.t) (prpo : prpo_display) fmt (g, extra) =
         gs
 
 (* -------------------------------------------------------------------- *)
-let pp_mod_params ppe bms =
-  let pp_mp ppe (id,mt) =
-    let ppe1 = PPEnv.add_local ppe id in
-    let pp fmt =
-      Format.fprintf fmt "%a : %a" (pp_local ppe1) id
-        EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mt) in
-    ppe1, pp
-  in
-  let rec aux ppe bms =
-    match bms with
-    | [] -> (ppe, fun _ -> ())
-    | [bm] ->
-      let ppe, pp = pp_mp ppe bm in
-      (ppe, fun fmt -> Format.fprintf fmt "%t" pp)
-    | bm::bms ->
-      let ppe, pp1 = pp_mp ppe bm in
-      let ppe, pp2 = aux ppe bms in
-      (ppe, fun fmt -> Format.fprintf fmt "%t,@, %t" pp1 pp2) in
-
-  let (ppe, pp) = aux ppe bms in
-  let pp fmt =
-    if not (List.is_empty bms) then Format.fprintf fmt "@[(%t)@]" pp
-  in (ppe, pp)
 
 let pp_pvdecl ppe fmt v =
   Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type
@@ -2775,7 +2787,8 @@ let pp_sigitem ppe fmt (Tys_function fs) =
 
 let pp_modsig ppe fmt (p,ms) =
   let (ppe,pp) = pp_mod_params ppe ms.mis_params in
-  Format.fprintf fmt "@[<v>module type %s%t {@,  %a@,} = {@,  @[<v>%a@]@,}@]"
+  Format.fprintf fmt "@[<v>@[<hv>module type %s%t {@;<0 2>%a@,}@] = \
+                      {@,  @[<v>%a@]@,}@]"
     (EcPath.basename p) pp
     (pp_restr ppe) ms.mis_restr
     (pp_list "@,@," (pp_sigitem ppe)) ms.mis_body
@@ -2861,7 +2874,7 @@ and pp_modbody ppe fmt (p, body) =
         (pp_list "@,@," (fun fmt i -> pp_moditem ppe fmt (p, i))) ms.ms_body
 
   | ME_Decl mt ->
-      Format.fprintf fmt "[Abstract : %a]" (pp_modtype ppe) mt
+      Format.fprintf fmt "[Abstract :@;<1 2> %a@,]" (pp_modtype ppe) mt
 
 and pp_moditem ppe fmt (p, i) =
   match i with
