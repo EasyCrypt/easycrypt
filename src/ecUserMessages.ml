@@ -442,6 +442,10 @@ end = struct
         msg "the function %a is not provided by a module parameter"
           pp_qsymbol name
 
+    | FunNotInSignature name ->
+      msg "the function %a is not in the signature"
+          pp_symbol name
+
     | InvalidVar ->
         msg "cannot have applied functors in a variable path"
 

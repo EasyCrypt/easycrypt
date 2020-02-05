@@ -137,6 +137,7 @@ type tyerror =
 | InvalidMem             of symbol * mem_error
 | InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
+| FunNotInSignature      of symbol
 | InvalidVar
 | NoActiveMemory
 | PatternNotAllowed
@@ -205,6 +206,8 @@ val trans_form     : env -> ?mv:metavs -> EcUnify.unienv -> pformula -> ty -> Ec
 val trans_prop     : env -> ?mv:metavs -> EcUnify.unienv -> pformula -> EcFol.form
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
+(* -------------------------------------------------------------------- *)
+val transmod_restr  : env -> Sm.t -> pmod_restr -> mod_restr
 (* -------------------------------------------------------------------- *)
 val transmodsig  : env -> symbol -> pmodule_sig  -> module_sig
 val transmodtype : env -> pmodule_type -> module_type * module_sig

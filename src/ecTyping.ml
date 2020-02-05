@@ -146,6 +146,7 @@ type tyerror =
 | InvalidMem             of symbol * mem_error
 | InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
+| FunNotInSignature      of symbol
 | InvalidVar
 | NoActiveMemory
 | PatternNotAllowed
@@ -1661,9 +1662,9 @@ let trans_restr_mem env (r_mem : pmod_restr_mem) =
     r_empty
     r_mem
 
-(* [sa] must be the set of parameters on the module being typed.
+(* [params] must be the set of parameters on the module being typed.
    Remark: the parameters must be binded in the environment. *)
-let trans_restr_oracle_calls (env : EcEnv.env) (sa : Sm.t) = function
+let trans_restr_oracle_calls (env : EcEnv.env) (params : Sm.t) = function
     | None ->
       let do_one mp calls =
         let me = EcEnv.Mod.by_mpath mp env in
@@ -1674,28 +1675,37 @@ let trans_restr_oracle_calls (env : EcEnv.env) (sa : Sm.t) = function
           in
           fs@calls
       in
-      Sm.fold do_one sa []
+      Sm.fold do_one params []
     | Some pfd_uses ->
       List.map (fun name ->
           let f = fst (lookup_fun env name) in
           let p = f.EcPath.x_top in
-          if not (Sm.mem p sa) then
+          if not (Sm.mem p params) then
             tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
           f)
         pfd_uses
 
-
-let trans_restr_compl env (r_compl : pcompl option) = match r_compl with
+(* [params] must be the set of parameters on the module being typed.
+   Remark: the parameters must be binded in the environment. *)
+let trans_restr_compl env (params : Sm.t) (r_compl : pcompl option) =
+  match r_compl with
   | None -> Mx.empty
-  | Some _ ->
-    assert false
+  | Some (PCompl l) ->
+    List.map (fun (name, form) ->
+        let f = fst (lookup_fun env name) in
+        let p = f.EcPath.x_top in
+        if not (Sm.mem p params) then
+          tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
+        f, assert false         (* TODO: A: *)
+        (* trans_form env from *)) l
+    |> Mx.of_list
 
 (* Oracles and complexity restrictions for a function.
  * [params] must be the set of parameters on the module being typed.
  * Remark: the parameters must be binded in the environment. *)
 let trans_restr_fun env (params : Sm.t) (r_el : pmod_restr_el) =
   let name = unloc r_el.pmre_name in
-  let c_calls = trans_restr_compl env r_el.pmre_compl in
+  let c_calls = trans_restr_compl env params r_el.pmre_compl in
   let r_orcls = trans_restr_oracle_calls env params r_el.pmre_orcls in
   let r_in =  r_el.pmre_in in
   ( r_in, name, c_calls, r_orcls )
@@ -1704,6 +1714,7 @@ let trans_restr_fun env (params : Sm.t) (r_el : pmod_restr_el) =
    Remark: the parameters must be binded in the environment. *)
 let transmod_restr (env : EcEnv.env) (params : Sm.t) (mr : pmod_restr) =
   let r_mem = trans_restr_mem env mr.pmr_mem in
+
   let r_procs = List.fold_left (fun r_procs r_elem ->
       let r_in, name, c_calls, r_orcls = trans_restr_fun env params r_elem in
       Msym.add name (OI.mk r_orcls r_in c_calls) r_procs
@@ -1712,6 +1723,36 @@ let transmod_restr (env : EcEnv.env) (params : Sm.t) (mr : pmod_restr) =
   { mr_xpaths = fst r_mem;
     mr_mpaths = snd r_mem;
     mr_oinfos = r_procs; }
+
+(* We unify both restriction, by replacing fields in [mr] by the fields in
+   [mr'] that have been provided in [pmr]. This is a bit messy. *)
+let replace_if_provided env mr mr' pmr = match pmr with
+  | None -> mr
+  | Some pmr ->
+    let mr' = oget mr' in     (* If [pmr] is not [None], then so is [mr']. *)
+    let mr_xpaths, mr_mpaths =
+      if pmr.pmr_mem = []
+      then mr.mr_xpaths, mr.mr_mpaths
+      else mr'.mr_xpaths, mr'.mr_mpaths
+    and mr_oinfos =
+      Msym.fold2_union (fun s oi oi' mr_oinfos -> match oi,oi' with
+          | None, None -> assert false
+          | None, Some _ ->
+            (* This is the case where we provided a restriction for a function
+               that does not appear in the signature. *)
+            let el = List.find (fun el ->
+                unloc el.pmre_name = s
+              ) pmr.pmr_procs in
+            let loc = loc (el.pmre_name) in
+            tyerror loc env (FunNotInSignature s)
+
+          | Some a, None
+          | Some _, Some a -> Msym.add s a mr_oinfos
+        ) mr.mr_oinfos mr'.mr_oinfos Msym.empty in
+
+    {  mr_xpaths = mr_xpaths;
+       mr_mpaths = mr_mpaths;
+       mr_oinfos = mr_oinfos; }
 
 (* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
@@ -1722,13 +1763,18 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
       (EcIdent.create (unloc x), fst (transmodtype env i)))
       modty.pmsig_params
   in
-  let sa =
+  let params =
     List.fold_left (fun sa (x,_) -> Sm.add (EcPath.mident x) sa) Sm.empty margs
   in
   let env  = EcEnv.Mod.enter name margs env in
-  let body, mr = transmodsig_body env sa modty.pmsig_body in
 
-  (* TODO: A: parse and do something with the module restriction in pmsig_restr. *)
+  (* We compute the body of the signature, and the restrictions given at
+     function declarations. *)
+  let body, mr = transmodsig_body env params modty.pmsig_body in
+  (* We translate the additional restrictions that may have been given. *)
+  let mr' = omap (transmod_restr env params) modty.pmsig_restr in
+
+  let mr = replace_if_provided env mr mr' modty.pmsig_restr in
 
   assert (Msym.cardinal mr.mr_oinfos = List.length body);
   { mis_params = margs;
@@ -1767,10 +1813,8 @@ and transmodsig_body
 
       let resty = transty_for_decl env f.pfd_tyresult in
 
-      (* TODO: A: allow for more restrictions there: add complexity. *)
       let uin, rname, compl, calls = trans_restr_fun env sa f.pfd_uses in
 
-      (* TODO: A: probably remove pmre_name from pmod_restr_el *)
       assert (rname = name.pl_desc);
 
       let oi = OI.mk calls uin compl in
@@ -2430,11 +2474,11 @@ let trans_gbinding env ue decl =
       | PGTY_ModTy { pmty_pq = mi; pmty_rmem = restr } ->
         let mi = fst (transmodtype env mi) in
         let mr = mi.mt_restr in
-        (* TODO: A: update this to allow for more restrictions. *)
-
-        (* For each possible type of restriction, we update the corresponding
-           field in [mr] if a new restriction is provided. *)
-        (* Memory restrictions *)
+        (* We update the memory restriction in [mr] if a new restriction
+           is provided. *)
+        (* Remark: we only allow memory restriction there, because the
+           fonctors parameters are implicit and cannot be refered to (there are
+           shadowing issues otherwise). *)
         let mr = match restr with
           | None -> mr
           | Some restr ->
