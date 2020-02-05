@@ -1623,7 +1623,94 @@ let pgamepath_to_pqsymbol (v : pgamepath) : pqsymbol option =
         |> some
   with NotAQSymbol -> None
 
+(* -------------------------------------------------------------------- *)
+let transmem env m =
+  match EcEnv.Memory.lookup (unloc m) env with
+  | None ->
+      tyerror m.pl_loc env (UnknownMemName (unloc m))
 
+  | Some me ->
+(*      if (EcMemory.memtype me) <> None then
+        tyerror m.pl_loc env (InvalidMem (unloc m, MAE_IsConcrete)); *)
+      (fst me)
+
+(* -------------------------------------------------------------------- *)
+let transpvar env side p =
+  match EcEnv.Var.lookup_progvar_opt ~side (unloc p) env with
+  | Some (`Var p, _) -> p
+  | _ -> tyerror p.pl_loc env (UnknownProgVar (unloc p, side))
+
+(* -------------------------------------------------------------------- *)
+module PFS : sig
+  type pfstate
+
+  val create : unit -> pfstate
+
+  val set_memused : pfstate -> unit
+  val get_memused : pfstate -> bool
+  val new_memused : ('a -> 'b) -> pfstate -> 'a -> bool * 'b
+end = struct
+  type pfstate = { mutable pfa_memused : bool; }
+
+  let create () = { pfa_memused = true; }
+
+  let set_memused state =
+    state.pfa_memused <- true
+
+  let get_memused state =
+    state.pfa_memused
+
+  let new_memused f state x =
+    let old  = state.pfa_memused in
+    let aout = (state.pfa_memused <- false; f x) in
+    let new_ = state.pfa_memused in
+    state.pfa_memused <- old; (new_, aout)
+end
+
+(* -------------------------------------------------------------------- *)
+let form_of_opselect
+  (env, ue) loc ((sel, ty, subue, _) : OpSelect.gopsel) args
+=
+  EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+
+  let esig  = List.map (lmap f_ty) args in
+  let args  = List.map unloc args in
+  let codom = ty_fun_app loc env ue ty esig in
+
+  let op, args =
+    match sel with
+    | `Nt (lazy (bds, body)) ->
+         let nbds  = List.length bds in
+         let nargs = List.length args in
+
+         let ((tosub, args), flam) =
+           if nbds <= nargs then
+             (List.split_at nbds args, [])
+           else
+             let xs = snd (List.split_at nargs bds) in
+             let xs = List.map (fst_map EcIdent.fresh) xs in
+             ((args @ List.map (curry f_local) xs, []), xs) in
+
+         let flam  = List.map (snd_map gtty) flam in
+         let me    = odfl mhr (EcEnv.Memory.get_active env) in
+         let body  = form_of_expr me body in
+         let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
+         let subst = Fsubst.f_subst_init ~freshen:true () in
+         let subst =
+           List.fold_left (fun s -> curry (Fsubst.f_bind_local s)) subst lcmap
+         in (f_lambda flam (Fsubst.f_subst subst body), args)
+
+    | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
+      | `Op (p, tys) -> f_op p tys ty
+      | `Lc id       -> f_local id ty
+      | `Pv (me, pv) ->
+        var_or_proj (fun x ty -> f_pvar x ty (oget me)) f_proj pv ty
+
+    in (op, args)
+
+  in f_app op args codom
+
+(* -------------------------------------------------------------------- *)
 let trans_restr_mem env (r_mem : pmod_restr_mem) =
   let r_empty = ur_empty Sx.empty, ur_empty Sm.empty in
 
@@ -1685,53 +1772,6 @@ let trans_restr_oracle_calls (env : EcEnv.env) (params : Sm.t) = function
           f)
         pfd_uses
 
-(* [params] must be the set of parameters on the module being typed.
-   Remark: the parameters must be binded in the environment. *)
-let trans_restr_compl env (params : Sm.t) (r_compl : pcompl option) =
-  match r_compl with
-  | None -> Mx.empty
-  | Some (PCompl restr_elems) ->
-    List.map (fun (name, form) ->
-        let f = fst (lookup_fun env name) in
-        let p = f.EcPath.x_top in
-        if not (Sm.mem p params) then
-          tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
-
-        let ue = EcUnify.UniEnv.create None in
-        let tform = trans_form env ue form EcTypes.tint in
-        let subs = try EcUnify.UniEnv.close ue with
-          | EcUnify.UninstanciateUni ->
-            tyerror (loc form) env FreeTypeVariables in
-        let tform = EcFol.Fsubst.uni subs tform in
-
-        (f, tform)
-      ) restr_elems
-    |> Mx.of_list
-
-(* Oracles and complexity restrictions for a function.
- * [params] must be the set of parameters on the module being typed.
- * Remark: the parameters must be binded in the environment. *)
-let trans_restr_fun env (params : Sm.t) (r_el : pmod_restr_el) =
-  let name = unloc r_el.pmre_name in
-  let c_calls = trans_restr_compl env params r_el.pmre_compl in
-  let r_orcls = trans_restr_oracle_calls env params r_el.pmre_orcls in
-  let r_in =  r_el.pmre_in in
-  ( r_in, name, c_calls, r_orcls )
-
-(* [params] must be the set of parameters on the module being typed.
-   Remark: the parameters must be binded in the environment. *)
-let transmod_restr (env : EcEnv.env) (params : Sm.t) (mr : pmod_restr) =
-  let r_mem = trans_restr_mem env mr.pmr_mem in
-
-  let r_procs = List.fold_left (fun r_procs r_elem ->
-      let r_in, name, c_calls, r_orcls = trans_restr_fun env params r_elem in
-      Msym.add name (OI.mk r_orcls r_in c_calls) r_procs
-    ) Msym.empty mr.pmr_procs in
-
-  { mr_xpaths = fst r_mem;
-    mr_mpaths = snd r_mem;
-    mr_oinfos = r_procs; }
-
 (* We unify both restriction, by replacing fields in [mr] by the fields in
    [mr'] that have been provided in [pmr]. This is a bit messy. *)
 let replace_if_provided env mr mr' pmr = match pmr with
@@ -1763,7 +1803,55 @@ let replace_if_provided env mr mr' pmr = match pmr with
        mr_oinfos = mr_oinfos; }
 
 (* -------------------------------------------------------------------- *)
-let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
+(* [params] must be the set of parameters on the module being typed.
+   Remark: the parameters must be binded in the environment. *)
+let rec trans_restr_compl env (params : Sm.t) (r_compl : pcompl option) =
+  match r_compl with
+  | None -> Mx.empty
+  | Some (PCompl restr_elems) ->
+    List.map (fun (name, form) ->
+        let f = fst (lookup_fun env name) in
+        let p = f.EcPath.x_top in
+        if not (Sm.mem p params) then
+          tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
+
+        let ue = EcUnify.UniEnv.create None in
+        let tform = trans_form env ue form EcTypes.tint in
+        let subs = try EcUnify.UniEnv.close ue with
+          | EcUnify.UninstanciateUni ->
+            tyerror (loc form) env FreeTypeVariables in
+        let tform = EcFol.Fsubst.uni subs tform in
+
+        (f, tform)
+      ) restr_elems
+    |> Mx.of_list
+
+(* Oracles and complexity restrictions for a function.
+ * [params] must be the set of parameters on the module being typed.
+ * Remark: the parameters must be binded in the environment. *)
+and trans_restr_fun env (params : Sm.t) (r_el : pmod_restr_el) =
+  let name = unloc r_el.pmre_name in
+  let c_calls = trans_restr_compl env params r_el.pmre_compl in
+  let r_orcls = trans_restr_oracle_calls env params r_el.pmre_orcls in
+  let r_in =  r_el.pmre_in in
+  ( r_in, name, c_calls, r_orcls )
+
+(* [params] must be the set of parameters on the module being typed.
+   Remark: the parameters must be binded in the environment. *)
+and transmod_restr (env : EcEnv.env) (params : Sm.t) (mr : pmod_restr) =
+  let r_mem = trans_restr_mem env mr.pmr_mem in
+
+  let r_procs = List.fold_left (fun r_procs r_elem ->
+      let r_in, name, c_calls, r_orcls = trans_restr_fun env params r_elem in
+      Msym.add name (OI.mk r_orcls r_in c_calls) r_procs
+    ) Msym.empty mr.pmr_procs in
+
+  { mr_xpaths = fst r_mem;
+    mr_mpaths = snd r_mem;
+    mr_oinfos = r_procs; }
+
+(* -------------------------------------------------------------------- *)
+and transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
   let Pmty_struct modty = modty in
 
   let margs =
@@ -1890,7 +1978,7 @@ and transmodsig_body
   items, mr
 
 (* -------------------------------------------------------------------- *)
-let rec transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
+and transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
   snd (transmod_header ~attop env me.ptm_header [] me.ptm_body)
 
 (* -------------------------------------------------------------------- *)
@@ -2382,94 +2470,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
           tyerror x.pl_loc env (MultipleOpMatch (name, esig, matches))
 
 (* -------------------------------------------------------------------- *)
-let transmem env m =
-  match EcEnv.Memory.lookup (unloc m) env with
-  | None ->
-      tyerror m.pl_loc env (UnknownMemName (unloc m))
-
-  | Some me ->
-(*      if (EcMemory.memtype me) <> None then
-        tyerror m.pl_loc env (InvalidMem (unloc m, MAE_IsConcrete)); *)
-      (fst me)
-
-(* -------------------------------------------------------------------- *)
-let transpvar env side p =
-  match EcEnv.Var.lookup_progvar_opt ~side (unloc p) env with
-  | Some (`Var p, _) -> p
-  | _ -> tyerror p.pl_loc env (UnknownProgVar (unloc p, side))
-
-(* -------------------------------------------------------------------- *)
-module PFS : sig
-  type pfstate
-
-  val create : unit -> pfstate
-
-  val set_memused : pfstate -> unit
-  val get_memused : pfstate -> bool
-  val new_memused : ('a -> 'b) -> pfstate -> 'a -> bool * 'b
-end = struct
-  type pfstate = { mutable pfa_memused : bool; }
-
-  let create () = { pfa_memused = true; }
-
-  let set_memused state =
-    state.pfa_memused <- true
-
-  let get_memused state =
-    state.pfa_memused
-
-  let new_memused f state x =
-    let old  = state.pfa_memused in
-    let aout = (state.pfa_memused <- false; f x) in
-    let new_ = state.pfa_memused in
-    state.pfa_memused <- old; (new_, aout)
-end
-
-(* -------------------------------------------------------------------- *)
-let form_of_opselect
-  (env, ue) loc ((sel, ty, subue, _) : OpSelect.gopsel) args
-=
-  EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-
-  let esig  = List.map (lmap f_ty) args in
-  let args  = List.map unloc args in
-  let codom = ty_fun_app loc env ue ty esig in
-
-  let op, args =
-    match sel with
-    | `Nt (lazy (bds, body)) ->
-         let nbds  = List.length bds in
-         let nargs = List.length args in
-
-         let ((tosub, args), flam) =
-           if nbds <= nargs then
-             (List.split_at nbds args, [])
-           else
-             let xs = snd (List.split_at nargs bds) in
-             let xs = List.map (fst_map EcIdent.fresh) xs in
-             ((args @ List.map (curry f_local) xs, []), xs) in
-
-         let flam  = List.map (snd_map gtty) flam in
-         let me    = odfl mhr (EcEnv.Memory.get_active env) in
-         let body  = form_of_expr me body in
-         let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
-         let subst = Fsubst.f_subst_init ~freshen:true () in
-         let subst =
-           List.fold_left (fun s -> curry (Fsubst.f_bind_local s)) subst lcmap
-         in (f_lambda flam (Fsubst.f_subst subst body), args)
-
-    | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
-      | `Op (p, tys) -> f_op p tys ty
-      | `Lc id       -> f_local id ty
-      | `Pv (me, pv) ->
-        var_or_proj (fun x ty -> f_pvar x ty (oget me)) f_proj pv ty
-
-    in (op, args)
-
-  in f_app op args codom
-
-(* -------------------------------------------------------------------- *)
-let trans_gbinding env ue decl =
+and trans_gbinding env ue decl =
   let trans1 env (xs, pgty) =
       match pgty with
       | PGTY_Type ty ->
@@ -2515,7 +2516,7 @@ let trans_gbinding env ue decl =
   in snd_map List.flatten (List.map_fold trans1 env decl)
 
 (* -------------------------------------------------------------------- *)
-let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
+and trans_form_or_pattern env ?mv ?ps ue pf tt =
   let state = PFS.create () in
 
   let rec transf_r opsc env f =
