@@ -1690,14 +1690,22 @@ let trans_restr_oracle_calls (env : EcEnv.env) (params : Sm.t) = function
 let trans_restr_compl env (params : Sm.t) (r_compl : pcompl option) =
   match r_compl with
   | None -> Mx.empty
-  | Some (PCompl l) ->
+  | Some (PCompl restr_elems) ->
     List.map (fun (name, form) ->
         let f = fst (lookup_fun env name) in
         let p = f.EcPath.x_top in
         if not (Sm.mem p params) then
           tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
-        f, assert false         (* TODO: A: *)
-        (* trans_form env from *)) l
+
+        let ue = EcUnify.UniEnv.create None in
+        let tform = trans_form env ue form EcTypes.tint in
+        let subs = try EcUnify.UniEnv.close ue with
+          | EcUnify.UninstanciateUni ->
+            tyerror (loc form) env FreeTypeVariables in
+        let tform = EcFol.Fsubst.uni subs tform in
+
+        (f, tform)
+      ) restr_elems
     |> Mx.of_list
 
 (* Oracles and complexity restrictions for a function.
