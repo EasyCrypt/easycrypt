@@ -1583,7 +1583,7 @@ fun_restr:
     { (None, Some cl) }
 
 mod_restr_el:
-  | PROC i=iboption(STAR) f=lident COLON fr=fun_restr
+  | i=iboption(STAR) f=lident COLON fr=fun_restr
     { let orcl, cmpl = fr in
       { pmre_in = not i;
 	pmre_name = f;
@@ -1610,8 +1610,15 @@ mod_restr:
 
 %inline mod_type_with_mem_restr:
 | x = qident { { pmty_pq = x; pmty_rmem = None; } }
-| x = qident LBRACE mr=mem_restr RBRACE { { pmty_pq = x;
-					    pmty_rmem = Some mr; } }
+| x = qident mr=mod_restr
+    { if mr.pmr_procs <> [] then
+	let loc = EcLocation.make $startpos(mr) $endpos(mr) in
+	parse_error loc (Some "Cannot supply oracle restrictions here \
+	                       (the functor parameters are implicit). \
+			       Define a new module type instead.")
+      else
+	{ pmty_pq = x;
+	  pmty_rmem = Some mr.pmr_mem; } }
 
 sig_def:
 | MODULE TYPE x=uident args=sig_params* mr=mod_restr? EQ i=sig_body
