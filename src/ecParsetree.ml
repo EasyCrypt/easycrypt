@@ -235,8 +235,8 @@ and pmodule_type_restr =
 
 (* -------------------------------------------------------------------- *)
 (* qident optionally taken in a (implicit) module parameters. *)
-and qident_inparam = { inp_top    : psymbol option;
-	                      inp_qident : pqsymbol; }
+and qident_inparam = { inp_in_params : bool;
+	                     inp_qident    : pqsymbol; }
 
 and poracles = qident_inparam list
 

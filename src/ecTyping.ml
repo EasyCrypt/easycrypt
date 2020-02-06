@@ -1796,9 +1796,7 @@ let trans_restr_oracle_calls env env_in (params : Sm.t) = function
       Sm.fold do_one params []
     | Some pfd_uses ->
       List.map (fun name ->
-          let s_env = match name.inp_top with
-            | None -> env
-            | Some _ -> env_in in
+          let s_env = if name.inp_in_params then env_in else env in
           let qname = name.inp_qident in
 
           let f = fst (lookup_fun s_env qname) in
@@ -1815,9 +1813,7 @@ let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
   | None -> Mx.empty
   | Some (PCompl restr_elems) ->
     List.map (fun (name, form) ->
-        let s_env = match name.inp_top with
-          | None -> env
-          | Some _ -> env_in in
+        let s_env = if name.inp_in_params then env_in else env in
         let qname = name.inp_qident in
 
         let f = fst (lookup_fun s_env qname) in

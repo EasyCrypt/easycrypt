@@ -1557,12 +1557,10 @@ mem_restr:
 (* -------------------------------------------------------------------- *)
 (* qident optionally taken in a (implicit) module parameters. *)
 qident_inparam:
-| t=uident SHARP q=qident { { inp_top    = Some t;
-			      inp_qident = q; } }
-| a=loc(empty) SHARP q=qident { { inp_top    = Some (mk_loc (loc a) "");
-				  inp_qident = q; } }
-| q=qident { { inp_top    = None;
-	       inp_qident = q; } }
+| SHARP q=qident { { inp_in_params = true;
+		     inp_qident    = q; } }
+| q=qident { { inp_in_params = false;
+	       inp_qident    = q; } }
 
 (* -------------------------------------------------------------------- *)
 (* Oracle restrictions *)
@@ -1644,8 +1642,8 @@ sig_param:
 
 signature_item:
 | INCLUDE i=mod_type xs=bracket(include_proc)? qs=brace(qident*)?
-    { let qs = omap (List.map (fun x -> { inp_top = None;
-					  inp_qident  = x; })) qs in
+    { let qs = omap (List.map (fun x -> { inp_in_params = false;
+					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
 | PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
