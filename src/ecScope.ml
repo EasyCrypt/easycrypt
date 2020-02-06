@@ -1439,15 +1439,8 @@ module Mod = struct
     let modty = m.ptmd_modty in
     let name  = EcIdent.create (unloc m.ptmd_name) in
     let tysig = fst (TT.transmodtype scope.sc_env modty.pmty_pq) in
-    (* If the memory restriction is not [None], it replaces the previous
-       memory restriction. *)
-    let tysig = match modty.pmty_rmem with
-      | None -> tysig
-      | Some mrestr ->
-        let usex, usem = TT.trans_restr_mem scope.sc_env mrestr in
-        let tyrestr = { tysig.mt_restr with mr_xpaths = usex;
-                                            mr_mpaths = usem; } in
-        { tysig with mt_restr = tyrestr} in
+    (* We modify tysig restrictions according if necessary. *)
+    let tysig = trans_restr_for_modty scope.sc_env tysig modty.pmty_mem in
 
     { scope with
       sc_env = EcEnv.Mod.declare_local name tysig scope.sc_env;

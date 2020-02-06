@@ -224,29 +224,32 @@ and pcost_calls  = (pgamepath * pformula) list
 
 and pcost  = PC_costs of pformula * pcost_calls
 
-(* if [pmty_rmem] is [None], there are no user-supplied restriction, which is
+(* if [pmty_mem] is [None], there are no user-supplied restriction, which is
    different from the user supplying an empty restriction.
    In the former case, we keep the restriction we obtain by type-checking,
    while in the latter case, we replace the type-checking restriction by an
    empty restriction.  *)
 and pmodule_type_restr =
-  { pmty_pq   : pqsymbol;
-    pmty_rmem : pmod_restr_mem option; }
-
+  { pmty_pq  : pqsymbol;
+    pmty_mem : pmod_restr option; }
 
 (* -------------------------------------------------------------------- *)
-type poracles = pqsymbol list
+(* qident optionally taken in a (implicit) module parameters. *)
+and qident_inparam = { inp_top    : psymbol option;
+	                      inp_qident : pqsymbol; }
 
-type pcompl = PCompl of (pqsymbol * pformula) list
+and poracles = qident_inparam list
 
-type pmod_restr_el = {
+and pcompl = PCompl of (qident_inparam * pformula) list
+
+and pmod_restr_el = {
   pmre_in    : bool;
 	pmre_name  : psymbol;
   pmre_orcls : poracles option;  (* None means no restriction *)
   pmre_compl : pcompl option;    (* None means no restriction *)
 }
 
-type pmod_restr = {
+and pmod_restr = {
   pmr_mem   : pmod_restr_mem;
 	pmr_procs : pmod_restr_el list;
  }
@@ -354,7 +357,7 @@ and include_proc = [
 ]
 
 and pmodule_sig_item = [
-  | `Include      of pmodule_type * include_proc option * pqsymbol list option
+  | `Include      of pmodule_type * include_proc option * qident_inparam list option
   | `FunctionDecl of pfunction_decl
 ]
 

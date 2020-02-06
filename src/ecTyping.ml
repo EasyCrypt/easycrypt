@@ -1711,6 +1711,37 @@ let form_of_opselect
   in f_app op args codom
 
 (* -------------------------------------------------------------------- *)
+(* We unify both restriction, by replacing fields in [mr] by the fields in
+   [mr'] that have been provided in [pmr]. This is a bit messy. *)
+let replace_if_provided env mr mr' pmr = match pmr with
+  | None -> mr
+  | Some pmr ->
+    let mr' = oget mr' in     (* If [pmr] is not [None], then so is [mr']. *)
+    let mr_xpaths, mr_mpaths =
+      if pmr.pmr_mem = []
+      then mr.mr_xpaths, mr.mr_mpaths
+      else mr'.mr_xpaths, mr'.mr_mpaths
+    and mr_oinfos =
+      Msym.fold2_union (fun s oi oi' mr_oinfos -> match oi,oi' with
+          | None, None -> assert false
+          | None, Some _ ->
+            (* This is the case where we provided a restriction for a function
+               that does not appear in the signature. *)
+            let el = List.find (fun el ->
+                unloc el.pmre_name = s
+              ) pmr.pmr_procs in
+            let loc = loc (el.pmre_name) in
+            tyerror loc env (FunNotInSignature s)
+
+          | Some a, None
+          | Some _, Some a -> Msym.add s a mr_oinfos
+        ) mr.mr_oinfos mr'.mr_oinfos Msym.empty in
+
+    {  mr_xpaths = mr_xpaths;
+       mr_mpaths = mr_mpaths;
+       mr_oinfos = mr_oinfos; }
+
+(* -------------------------------------------------------------------- *)
 let trans_restr_mem env (r_mem : pmod_restr_mem) =
   let r_empty = ur_empty Sx.empty, ur_empty Sm.empty in
 
@@ -1749,9 +1780,9 @@ let trans_restr_mem env (r_mem : pmod_restr_mem) =
     r_empty
     r_mem
 
-(* [params] must be the set of parameters on the module being typed.
-   Remark: the parameters must be binded in the environment. *)
-let trans_restr_oracle_calls (env : EcEnv.env) (params : Sm.t) = function
+(* -------------------------------------------------------------------- *)
+(* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
+let trans_restr_oracle_calls env env_in (params : Sm.t) = function
     | None ->
       let do_one mp calls =
         let me = EcEnv.Mod.by_mpath mp env in
@@ -1765,55 +1796,34 @@ let trans_restr_oracle_calls (env : EcEnv.env) (params : Sm.t) = function
       Sm.fold do_one params []
     | Some pfd_uses ->
       List.map (fun name ->
-          let f = fst (lookup_fun env name) in
+          let s_env = match name.inp_top with
+            | None -> env
+            | Some _ -> env_in in
+          let qname = name.inp_qident in
+
+          let f = fst (lookup_fun s_env qname) in
           let p = f.EcPath.x_top in
           if not (Sm.mem p params) then
-            tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
+            tyerror qname.pl_loc env (FunNotInModParam qname.pl_desc);
           f)
         pfd_uses
 
-(* We unify both restriction, by replacing fields in [mr] by the fields in
-   [mr'] that have been provided in [pmr]. This is a bit messy. *)
-let replace_if_provided env mr mr' pmr = match pmr with
-  | None -> mr
-  | Some pmr ->
-    let mr' = oget mr' in     (* If [pmr] is not [None], then so is [mr']. *)
-    let mr_xpaths, mr_mpaths =
-      if pmr.pmr_mem = []
-      then mr.mr_xpaths, mr.mr_mpaths
-      else mr'.mr_xpaths, mr'.mr_mpaths
-    and mr_oinfos =
-      Msym.fold2_union (fun s oi oi' mr_oinfos -> match oi,oi' with
-          | None, None -> assert false
-          | None, Some _ ->
-            (* This is the case where we provided a restriction for a function
-               that does not appear in the signature. *)
-            let el = List.find (fun el ->
-                unloc el.pmre_name = s
-              ) pmr.pmr_procs in
-            let loc = loc (el.pmre_name) in
-            tyerror loc env (FunNotInSignature s)
-
-          | Some a, None
-          | Some _, Some a -> Msym.add s a mr_oinfos
-        ) mr.mr_oinfos mr'.mr_oinfos Msym.empty in
-
-    {  mr_xpaths = mr_xpaths;
-       mr_mpaths = mr_mpaths;
-       mr_oinfos = mr_oinfos; }
-
 (* -------------------------------------------------------------------- *)
-(* [params] must be the set of parameters on the module being typed.
-   Remark: the parameters must be binded in the environment. *)
-let rec trans_restr_compl env (params : Sm.t) (r_compl : pcompl option) =
+(* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
+let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
   match r_compl with
   | None -> Mx.empty
   | Some (PCompl restr_elems) ->
     List.map (fun (name, form) ->
-        let f = fst (lookup_fun env name) in
+        let s_env = match name.inp_top with
+          | None -> env
+          | Some _ -> env_in in
+        let qname = name.inp_qident in
+
+        let f = fst (lookup_fun s_env qname) in
         let p = f.EcPath.x_top in
         if not (Sm.mem p params) then
-          tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
+          tyerror qname.pl_loc env (FunNotInModParam qname.pl_desc);
 
         let ue = EcUnify.UniEnv.create None in
         let tform = trans_form env ue form EcTypes.tint in
@@ -1827,28 +1837,59 @@ let rec trans_restr_compl env (params : Sm.t) (r_compl : pcompl option) =
     |> Mx.of_list
 
 (* Oracles and complexity restrictions for a function.
- * [params] must be the set of parameters on the module being typed.
- * Remark: the parameters must be binded in the environment. *)
-and trans_restr_fun env (params : Sm.t) (r_el : pmod_restr_el) =
+ * - [params] must be the set of parameters on the module being typed.
+ * - [env] is the environment the restriction is being typed on.
+ * - [env_in] is [env] where the module parameters [params] are binded.
+ * Remark: [env] and [env_in] can be the same, e.g. in:
+ * 'module type A (B : T) {some restriction} = { ... }'
+ * And they can be different, e.g. in:
+ * 'forall (A <: T) (B <: S {some restriction)), ...'
+ * Here, the parameter of the functor [S] are not binded in [env], but must be
+ * binded in [env_in]. *)
+and trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
   let name = unloc r_el.pmre_name in
-  let c_calls = trans_restr_compl env params r_el.pmre_compl in
-  let r_orcls = trans_restr_oracle_calls env params r_el.pmre_orcls in
+  let c_calls = trans_restr_compl env env_in params r_el.pmre_compl in
+  let r_orcls = trans_restr_oracle_calls env env_in params r_el.pmre_orcls in
   let r_in =  r_el.pmre_in in
   ( r_in, name, c_calls, r_orcls )
 
-(* [params] must be the set of parameters on the module being typed.
-   Remark: the parameters must be binded in the environment. *)
-and transmod_restr (env : EcEnv.env) (params : Sm.t) (mr : pmod_restr) =
+(* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
+and transmod_restr env env_in (params : Sm.t) (mr : pmod_restr) =
   let r_mem = trans_restr_mem env mr.pmr_mem in
 
   let r_procs = List.fold_left (fun r_procs r_elem ->
-      let r_in, name, c_calls, r_orcls = trans_restr_fun env params r_elem in
+      let r_in, name, c_calls, r_orcls =
+        trans_restr_fun env env_in params r_elem in
       Msym.add name (OI.mk r_orcls r_in c_calls) r_procs
     ) Msym.empty mr.pmr_procs in
 
   { mr_xpaths = fst r_mem;
     mr_mpaths = snd r_mem;
     mr_oinfos = r_procs; }
+
+(* -------------------------------------------------------------------- *)
+(* Return the module type updated with some restriction.
+ * Remark: the module type has not been entered. *)
+and trans_restr_for_modty env modty (pmr : pmod_restr option) =
+  let mr = modty.mt_restr in
+
+  let mr' = match pmr with
+    | None -> None
+    | Some restr ->
+      (* We build the environment where [modty]'s parameters are binded. *)
+      let mi_params = modty.mt_params in
+      let s_params = List.fold_left (fun sa (x,_) ->
+          Sm.add (EcPath.mident x) sa) Sm.empty mi_params in
+      let env_in  = EcEnv.Mod.enter (basename modty.mt_name) mi_params env in
+
+      (* We type the restricion. *)
+      transmod_restr env env_in s_params restr |> some in
+
+  (* We update the memory restriction in [mr] if a new restriction
+     is provided. *)
+  let new_mr = replace_if_provided env mr mr' pmr in
+
+  { modty with mt_restr = new_mr }
 
 (* -------------------------------------------------------------------- *)
 and transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
@@ -1868,7 +1909,7 @@ and transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
      function declarations. *)
   let body, mr = transmodsig_body env params modty.pmsig_body in
   (* We translate the additional restrictions that may have been given. *)
-  let mr' = omap (transmod_restr env params) modty.pmsig_restr in
+  let mr' = omap (transmod_restr env env params) modty.pmsig_restr in
 
   let mr = replace_if_provided env mr mr' modty.pmsig_restr in
 
@@ -1909,7 +1950,7 @@ and transmodsig_body
 
       let resty = transty_for_decl env f.pfd_tyresult in
 
-      let uin, rname, compl, calls = trans_restr_fun env sa f.pfd_uses in
+      let uin, rname, compl, calls = trans_restr_fun env env sa f.pfd_uses in
 
       assert (rname = name.pl_desc);
 
@@ -1941,7 +1982,7 @@ and transmodsig_body
 
       (* TODO: A: the [restr] value comes from the signature_item INCLUDE entry
          in the parser. Should it be extended to more complex restrictions?*)
-      let calls = trans_restr_oracle_calls env sa restr in
+      let calls = trans_restr_oracle_calls env env sa restr in
 
       let update_mr mr (Tys_function fs) =
         names := mk_loc (loc i) fs.fs_name :: !names;
@@ -2480,22 +2521,10 @@ and trans_gbinding env ue decl =
         let xs  = List.map (fun (x,ty) -> x,GTty ty) xs in
         (env, xs)
 
-      | PGTY_ModTy { pmty_pq = mi; pmty_rmem = restr } ->
+      | PGTY_ModTy { pmty_pq = mi; pmty_mem = restr } ->
         let mi = fst (transmodtype env mi) in
-        let mr = mi.mt_restr in
-        (* We update the memory restriction in [mr] if a new restriction
-           is provided. *)
-        (* Remark: we only allow memory restriction there, because the
-           fonctors parameters are implicit and cannot be refered to (there are
-           shadowing issues otherwise). *)
-        let mr = match restr with
-          | None -> mr
-          | Some restr ->
-            let mem_x, mem_m = trans_restr_mem env restr in
-            { mr with mr_xpaths = mem_x;
-                      mr_mpaths = mem_m; } in
+        let mi = trans_restr_for_modty env mi restr in
 
-        let mi = { mi with mt_restr = mr } in
         let ty = GTmodty mi in
 
         let add1 env x =

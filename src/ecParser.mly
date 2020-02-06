@@ -1308,7 +1308,7 @@ pgtybinding1:
 | x=ptybinding1
     { List.map (fun (xs, ty) -> (xs, PGTY_Type ty)) x }
 
-| LPAREN x=uident LTCOLON mi=mod_type_with_mem_restr RPAREN
+| LPAREN x=uident LTCOLON mi=mod_type_with_restr RPAREN
     { [[mk_loc (loc x) (Some x)], PGTY_ModTy mi] }
 
 | pn=mident
@@ -1537,7 +1537,7 @@ top_mod_def:
 | /*-*/ x=mod_def { mk_topmod ~local:false x }
 
 top_mod_decl:
-| DECLARE MODULE x=uident COLON t=mod_type_with_mem_restr
+| DECLARE MODULE x=uident COLON t=mod_type_with_restr
     { { ptmd_name = x; ptmd_modty = t; } }
 
 mod_params:
@@ -1551,20 +1551,28 @@ mem_restr_el:
   | PLUS  el=f_or_mod_ident { PMPlus el }
   | MINUS el=f_or_mod_ident { PMMinus el }
 
-
 mem_restr:
   | ol=rlist0(mem_restr_el,COMMA) { ol }
 
 (* -------------------------------------------------------------------- *)
-(* Oracle restrictions *)
+(* qident optionally taken in a (implicit) module parameters. *)
+qident_inparam:
+| t=uident SHARP q=qident { { inp_top    = Some t;
+			      inp_qident = q; } }
+| a=loc(empty) SHARP q=qident { { inp_top    = Some (mk_loc (loc a) "");
+				  inp_qident = q; } }
+| q=qident { { inp_top    = None;
+	       inp_qident = q; } }
 
+(* -------------------------------------------------------------------- *)
+(* Oracle restrictions *)
 oracle_restr:
-  | ol=rlist0(qident,COMMA) { ol }
+  | ol=rlist0(qident_inparam,COMMA) { ol }
 
 (* -------------------------------------------------------------------- *)
 (* Complexity restrictions *)
 compl_el:
- | o=qident COLON c=form_r(none) { (o, c) }
+ | o=qident_inparam COLON c=form_r(none) { (o, c) }
 
 compl_restr:
   | c=rlist1(compl_el,COMMA) { PCompl c }
@@ -1608,17 +1616,11 @@ mod_restr:
 %inline mod_type:
 | x = qident { x }
 
-%inline mod_type_with_mem_restr:
-| x = qident { { pmty_pq = x; pmty_rmem = None; } }
+%inline mod_type_with_restr:
+| x = qident { { pmty_pq = x; pmty_mem = None; } }
 | x = qident mr=mod_restr
-    { if mr.pmr_procs <> [] then
-	let loc = EcLocation.make $startpos(mr) $endpos(mr) in
-	parse_error loc (Some "Cannot supply oracle restrictions here \
-	                       (the functor parameters are implicit). \
-			       Define a new module type instead.")
-      else
-	{ pmty_pq = x;
-	  pmty_rmem = Some mr.pmr_mem; } }
+    { { pmty_pq = x;
+	pmty_mem = Some mr; } }
 
 sig_def:
 | MODULE TYPE x=uident args=sig_params* mr=mod_restr? EQ i=sig_body
@@ -1642,7 +1644,9 @@ sig_param:
 
 signature_item:
 | INCLUDE i=mod_type xs=bracket(include_proc)? qs=brace(qident*)?
-   { `Include (i, xs, qs) }
+    { let qs = omap (List.map (fun x -> { inp_top = None;
+					  inp_qident  = x; })) qs in
+      `Include (i, xs, qs) }
 | PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
       let frestr = { pmre_in    = not i;

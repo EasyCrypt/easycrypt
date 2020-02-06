@@ -439,7 +439,8 @@ end = struct
         msg "invalid filter pattern (no match)"
 
     | FunNotInModParam name ->
-        msg "the function %a is not provided by a module parameter"
+        msg "the function %a is not provided by a module parameter. \
+             Maybe you forgot a #?"
           pp_qsymbol name
 
     | FunNotInSignature name ->
