@@ -1610,10 +1610,13 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | Fcoe coe ->
       let ppe = PPEnv.push_mem ppe ~active:true coe.coe_mem in
-      Format.fprintf fmt "coe{%a}[@[<hov 2>@ %a :@ @[%a@]@]]"
-        (pp_memtype ppe) (snd coe.coe_mem)
-        (pp_expr ppe) coe.coe_e
-        (pp_form ppe) coe.coe_pre
+      let m, mt = coe.coe_mem in
+      let (subppe, pp) = pp_bindings ppe ~fv:f.f_fv [m, GTmem mt] in
+      Format.fprintf fmt "coe%t[@[<hov 2>@ %a :@ @[%a@]@]]"
+        pp
+        (pp_expr subppe) coe.coe_e
+        (pp_form subppe) coe.coe_pre
+
 
   | Fpr pr->
       let me = EcEnv.Fun.prF_memenv EcFol.mhr pr.pr_fun ppe.PPEnv.ppe_env in

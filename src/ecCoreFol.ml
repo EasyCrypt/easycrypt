@@ -622,8 +622,9 @@ module Hsform = Why3.Hashcons.Make (struct
           (fv_union (EcCoreModules.s_fv eg.eg_sl) (EcCoreModules.s_fv eg.eg_sr))
 
     | Fcoe coe ->
-      let fv = fv_union (f_fv coe.coe_pre) (EcTypes.e_fv coe.coe_e) in
-      (Mid.remove (fst coe.coe_mem) fv)
+      fv_union
+        (Mid.remove (fst coe.coe_mem) (f_fv coe.coe_pre))
+        (EcTypes.e_fv coe.coe_e)
 
     | Fpr pr ->
         let fve = Mid.remove mhr (f_fv pr.pr_event) in
