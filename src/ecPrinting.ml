@@ -700,7 +700,7 @@ let pp_memtype ppe fmt mt =
       let mty = List.fold_left add Mty.empty decl in
       let pp_bind fmt (ty, ids) =
         Format.fprintf fmt "@[%a :@ %a@]"
-          (pp_list "@ " (fun fmt s -> Format.fprintf fmt "%s" s)) (List.rev ids) (pp_type ppe) ty in
+          (pp_list ",@ " (fun fmt s -> Format.fprintf fmt "%s" s)) (List.rev ids) (pp_type ppe) ty in
       let lty = Mty.bindings mty in
       Format.fprintf fmt "@[{%a}@]" (pp_list ",@ " pp_bind) lty
 
@@ -2484,7 +2484,7 @@ let pp_choareF (ppe : PPEnv.t) ?prpo fmt chf =
 let pp_choareS (ppe : PPEnv.t) ?prpo fmt chs =
   let ppef = PPEnv.push_mem ppe ~active:true chs.chs_m in
   let ppnode = collect2_s chs.chs_s.s_node [] in
-  let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppe ppnode in
+  let ppnode = c_ppnode ~width:ppe.PPEnv.ppe_width ppef ppnode in
 
 
   Format.fprintf fmt "Context : %a@\n%!"
