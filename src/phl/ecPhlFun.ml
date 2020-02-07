@@ -415,9 +415,9 @@ let t_hoareF_abs_r inv tc =
 (* ------------------------------------------------------------------ *)
 let t_choareF_abs_r inv inv_inf tc =
   let env = FApi.tc1_env tc in
-  let hf = tc1_as_hoareF tc in
+  let hf = tc1_as_choareF tc in
   let pre, post, cost, sg =
-    FunAbsLow.choareF_abs_spec !!tc env hf.hf_f inv inv_inf in
+    FunAbsLow.choareF_abs_spec !!tc env hf.chf_f inv inv_inf in
 
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
   FApi.t_last tactic (EcPhlConseq.t_cHoareF_conseq_full pre post cost tc)
