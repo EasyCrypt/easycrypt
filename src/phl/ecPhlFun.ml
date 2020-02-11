@@ -187,7 +187,7 @@ let process_p_abs_inv_inf tc hyps p_abs_inv_inf =
 
   and xc = List.map (fun (f,c) ->
       EcTyping.trans_gamepath env f,
-      TTC.pf_process_cost !!tc hyps tint c
+      TTC.pf_process_cost !!tc hyps (tfun tint tint) c
     ) p_abs_inv_inf.ci_oracles in
 
   (xv, xc)
