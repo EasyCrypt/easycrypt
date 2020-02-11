@@ -128,7 +128,7 @@ module ABounder(S:ASampler) = {
     var r <- witness;
 
     if (Bounder.c < q) {
-      r <@ S.s();
+      r         <@ S.s();
       Bounder.c <- Bounder.c + 1;
     }
     return r;

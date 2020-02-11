@@ -61,7 +61,7 @@ theory MtE.
 
     proc dec(k:eK * mK, c:ctxt): ptxt option = {
       var ek, mk, t, b, pt, p';
-      var p = None;
+      var p <- None;
 
       (ek,mk) <- k;
       pt      <@ E.dec(ek,c);
@@ -203,7 +203,7 @@ theory MtE.
 
         proc verify(c:ctxt): bool = {
           var t, pt, p;
-          var b = false;
+          var b <- false;
 
           pt <@ E.dec(ek,c);
           if (pt <> None) {
@@ -359,7 +359,7 @@ theory EtM.
 
     proc dec(k:eK * mK, ct:ctxt * tag): ptxt option = {
       var ek, mk, c, t, b;
-      var p = None;
+      var p <- None;
 
       (ek,mk) <- k;
       (c ,t)  <- ct;

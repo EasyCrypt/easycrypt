@@ -79,13 +79,13 @@ module Orcl2(O:Orcl) = {
 
   proc orclL(m : input * input) : output = {
     var r;
-    r = O.orcl(fst m);
+    r <@ O.orcl(fst m);
     return r;
   }
 
   proc orclR(m : input * input) : output = {
     var r;
-    r = O.orcl(snd m);
+    r <@ O.orcl(snd m);
     return r;
   }
 }.
@@ -96,7 +96,7 @@ module HybOrcl2 (O:Orcl,LR:LR) = {
     if   (HybOrcl.l0 < HybOrcl.l) r <@ O.orcl(m0);
     elif (HybOrcl.l0 = HybOrcl.l) r <@ LR.orcl(m0,m1);
     else                          r <@ O.orcl(m1);
-    HybOrcl.l = HybOrcl.l + 1;
+    HybOrcl.l <- HybOrcl.l + 1;
     return r;
   }
 }.
@@ -105,9 +105,9 @@ module HybGame2(A:Adv, O:Orcl, LR:LR) = {
   module A = A(O,HybOrcl2(O,LR))
   proc main():bool = {
     var b':bool;
-    HybOrcl.l0 = $[0..q-1];
-    HybOrcl.l  = 0;
-    b' = A.main();
+    HybOrcl.l0 <$ [0..q-1];
+    HybOrcl.l  <- 0;
+    b'         <@ A.main();
     return b';
   }
 }.
@@ -123,21 +123,21 @@ section.
 
       proc orcl(m:input) : output = {
         var r : output;
-        r = Ob.orclL((m,m));
+        r <@ Ob.orclL((m,m));
         return r;
       }
     }
     module LR' = {
       proc orcl (m0 m1:input) : output = {
         var r : output;
-        r = LR.orcl((m0,m1));
+        r <@ LR.orcl((m0,m1));
         return r;
       }
     }
     module A = A(O,LR')
     proc main() : bool = {
       var b' : bool;
-      b' = A.main();
+      b' <@ A.main();
       return b';
     }
   }.

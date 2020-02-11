@@ -15,14 +15,14 @@ module RO:Oracle = {
   var m:(from, to) fmap
 
   proc init():unit = {
-    m = empty;
+    m <- empty;
   }
 
   proc o(x:from):to = {
     var y;
 
-    y = $dsample x;
-    if (x \notin m) m.[x] = y;
+    y <$ dsample x;
+    if (x \notin m) m.[x] <- y;
     return oget (m.[x]);
   }
 }.

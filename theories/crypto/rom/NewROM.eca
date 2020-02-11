@@ -37,7 +37,7 @@ module IND(H:Oracle,D:Dist) = { module D = D(H)
     var b:bool;
 
     H.init();
-    b = D.distinguish();
+    b <@ D.distinguish();
     return b;
   }
 }.

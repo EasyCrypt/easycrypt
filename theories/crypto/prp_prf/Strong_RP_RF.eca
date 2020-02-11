@@ -82,7 +82,7 @@ module Direct = {
   proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD \ X;
+    r <$ uD \ X;
     return r;
   }
 }.
@@ -91,9 +91,9 @@ module Indirect = {
   proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD;
+    r <$ uD;
     if (X r) {
-      r = $uD \ X;
+      r <$ uD \ X;
     }
     return r;
   }
@@ -104,7 +104,7 @@ module PRPi'(S:Sample_t) = {
 
   proc f(x:D): D = {
     if (x \notin PRPi.m) {
-      PRPi.m.[x] = S.sample(rng PRPi.m);
+      PRPi.m.[x] <@ S.sample(rng PRPi.m);
       PRPi.mi.[oget PRPi.m.[x]] <- x;
     }
     return oget PRPi.m.[x];
@@ -112,7 +112,7 @@ module PRPi'(S:Sample_t) = {
 
   proc fi(x:D): D = {
     if (x \notin PRPi.mi) {
-      PRPi.mi.[x] = S.sample(rng PRPi.mi);
+      PRPi.mi.[x] <@ S.sample(rng PRPi.mi);
       PRPi.m.[oget PRPi.mi.[x]] <- x;
     }
     return oget PRPi.mi.[x];
@@ -199,17 +199,17 @@ section Upto.
     proc sample(X:D -> bool): D = {
       var r;
 
-      r = $uD;
+      r <$ uD;
       if (X r) {
         bad <- true;
-        r = $uD \ X;
+        r <$ uD \ X;
       }
       return r;
     }
 
     proc f(x:D): D = {
       if (x \notin PRPi.m) {
-        PRPi.m.[x] = sample(rng PRPi.m);
+        PRPi.m.[x] <@ sample(rng PRPi.m);
         PRPi.mi.[oget PRPi.m.[x]] <- x;
       }
       return oget PRPi.m.[x];
@@ -217,7 +217,7 @@ section Upto.
 
     proc fi(y:D): D = {
      if (y \notin PRPi.mi) {
-        PRPi.mi.[y] = sample(rng PRPi.mi);
+        PRPi.mi.[y] <@ sample(rng PRPi.mi);
         PRPi.m.[oget PRPi.mi.[y]] <- y;
       }
       return oget PRPi.mi.[y];
@@ -350,25 +350,25 @@ section CollisionProbability.
 
     module FBounder = {
       proc f(x:D): D = {
-        var r = witness;
+        var r <- witness;
 
         if (c < q) {
           if (card (frng ARP.m) < q) {
-            r = ARP.f(x);
+            r <@ ARP.f(x);
           }
-          c = c + 1;
+          c <- c + 1;
         }
         return r;
       }
 
       proc fi(x:D): D = {
-        var r = witness;
+        var r <- witness;
 
         if (c < q) {
           if (card (frng ARP.mi) < q) {
-            r = ARP.fi(x);
+            r <@ ARP.fi(x);
           }
-          c = c + 1;
+          c <- c + 1;
         }
         return r;
       }
