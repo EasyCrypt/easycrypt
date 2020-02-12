@@ -678,7 +678,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   | FcHoareS _, Some ((_, {f_node = FcHoareS chs}) as nf1), None, None ->
     let tac = if notmod then t_cHoareS_conseq_nm else t_cHoareS_conseq in
 
-    t_on1seq 1
+    t_on1seq (-1)
       (t_cHoareS_conseq_c chs.chs_co)
       (t_on1seq 2 (tac chs.chs_pr chs.chs_po) (t_apply_r nf1))
       tc

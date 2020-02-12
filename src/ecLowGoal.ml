@@ -2032,17 +2032,18 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
   in entry tc
 
 (* -------------------------------------------------------------------- *)
-(*let pp_tc tc =
-  let pr = proofenv_of_proof (proof_of_tcenv tc) in
-  let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in
-  let cl = List.map (fun x -> (EcEnv.LDecl.tohyps x.g_hyps, x.g_concl)) cl in
+(* let pp_tc tc =
+ *   let pr = proofenv_of_proof (proof_of_tcenv tc) in
+ *   let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in
+ *   let cl = List.map (fun x -> (EcEnv.LDecl.tohyps x.g_hyps, x.g_concl)) cl in
+ *
+ *   match cl with [] -> () | hd :: tl ->
+ *
+ *   Format.eprintf "%a@."
+ *     (EcPrinting.pp_goal (EcPrinting.PPEnv.ofenv (FApi.tc_env tc))
+ *        EcPrinting.{ prpo_pr = true; prpo_po = true; })
+ *     (hd, `All tl) *)
 
-  match cl with [] -> () | hd :: tl ->
-
-  Format.eprintf "%a@."
-    (EcPrinting.pp_goal (EcPrinting.PPEnv.ofenv (FApi.tc_env tc)))
-    (hd, `All tl)
- *)
 type cstate = {
   cs_undosubst : Sid.t;
   cs_sbeq : Sid.t;
