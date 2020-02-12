@@ -44,7 +44,7 @@ end = struct
 
   let choare_sum =
     let bgty = [tpred tint; tfun tint treal; tlist tint] in
-    let bg   = EcPath.fromqsymbol (p_BIA, "bigi") in
+    let bg   = EcPath.fromqsymbol (p_BIA, "big") in
     let bg   = f_op bg [tint] (toarrow bgty tint) in
     let prT  = EcPath.fromqsymbol ([i_top; "Logic"], "predT") in
     let prT  = f_op prT [tint] (tpred tint) in
