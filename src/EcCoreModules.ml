@@ -726,7 +726,10 @@ type uses = {
 }
 
 let mk_uses c r w =
-  let map s = Sx.fold (fun x s -> Sx.add (EcTypes.xp_glob x) s) s Sx.empty in
+  let map s = Sx.fold (fun x s ->
+      Sx.change
+        (fun b -> assert (not b); true)
+        (EcTypes.xp_glob x) s) s Sx.empty in
   {us_calls = c; us_reads = map r; us_writes = map w }
 
 (* -------------------------------------------------------------------- *)

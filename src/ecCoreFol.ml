@@ -1919,7 +1919,10 @@ module Fsubst = struct
       (List.map sx (PreOI.allowed oi))
       (PreOI.is_in oi)
       (EcPath.Mx.fold (fun x a costs ->
-           EcPath.Mx.add (sx x) (f_subst ~tx s a) costs
+           EcPath.Mx.change
+             (fun old -> assert (old = None); Some (f_subst ~tx s a))
+             (sx x)
+             costs
          ) (PreOI.costs oi) EcPath.Mx.empty)
 
   and mr_subst ~tx s mr : form p_mod_restr =
@@ -1987,7 +1990,7 @@ module Fsubst = struct
       c_calls = EcPath.Mx.fold (fun x f calls ->
           let x' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp x in
           let f' = f_subst ~tx s f in
-          EcPath.Mx.add x' f' calls
+          EcPath.Mx.change (fun old -> assert (old  = None); Some f') x' calls
         ) cost.c_calls EcPath.Mx.empty
     }
 

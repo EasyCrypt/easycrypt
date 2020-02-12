@@ -984,13 +984,13 @@ and check_alpha_equal ri hyps f1 f2 =
     let calls1 =
       EcPath.Mx.fold (fun f c calls ->
           let f' = NormMp.norm_xfun env f in
-          EcPath.Mx.add f' c calls
+          EcPath.Mx.change (fun old -> assert (old = None); Some c) f' calls
         ) co1.c_calls EcPath.Mx.empty
     and calls2 =
       EcPath.Mx.fold (fun f c calls ->
           let f' = EcPath.x_substm subst.fs_sty.ts_p subst.fs_mp f in
           let f' = NormMp.norm_xfun env f' in
-          EcPath.Mx.add f' c calls
+          EcPath.Mx.change (fun old -> assert (old = None); Some c) f' calls
         ) co2.c_calls EcPath.Mx.empty in
 
     aux env subst co1.c_self  co2.c_self;

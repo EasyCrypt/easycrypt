@@ -2452,7 +2452,7 @@ module NormMp = struct
           let c_calls' = Mx.fold (fun f c calls ->
               let f' = norm_xfun env f
               and c' = aux c in
-              Mx.add f' c' calls
+              Mx.change (fun old -> assert (old = None); Some c') f' calls
             ) chf.chf_co.c_calls Mx.empty in
           if chf.chf_pr == pre' && chf.chf_f == p' &&
              chf.chf_po == post' && chf.chf_co.c_self == c_self' &&

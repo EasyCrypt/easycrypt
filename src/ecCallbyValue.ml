@@ -176,7 +176,7 @@ and norm_cost st s c =
     EcPath.Mx.fold (fun f c calls ->
         let f' = norm_xfun st s f
         and c' = norm st s c in
-        EcPath.Mx.add f' c' calls
+        EcPath.Mx.change (fun old -> assert (old = None); Some c') f' calls
       ) c.c_calls EcPath.Mx.empty in
   { c_self = self'; c_calls = calls' }
 

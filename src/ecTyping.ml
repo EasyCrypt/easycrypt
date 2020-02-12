@@ -508,7 +508,8 @@ let check_item_compatible env mode (fin,oin) (fout,oout) =
 
     (* We check costs for other procedures. *)
     let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
-        | None, Some _ -> Mx.add f (ic,oc) acc
+        | None, Some _ ->
+          Mx.change (fun old -> assert (old = None); Some (ic,oc)) f acc
         | Some _, None | None, None -> acc
         | Some ic, Some oc ->
           if EcFol.f_equal ic oc then acc
@@ -1812,25 +1813,30 @@ let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
   match r_compl with
   | None -> Mx.empty
   | Some (PCompl restr_elems) ->
-    List.map (fun (name, form) ->
-        let s_env = if name.inp_in_params then env_in else env in
-        let qname = name.inp_qident in
+    let calls =
+      List.map (fun (name, form) ->
+          let s_env = if name.inp_in_params then env_in else env in
+          let qname = name.inp_qident in
 
-        let f = fst (lookup_fun s_env qname) in
-        let p = f.EcPath.x_top in
-        if not (Sm.mem p params) then
-          tyerror qname.pl_loc env (FunNotInModParam qname.pl_desc);
+          let f = fst (lookup_fun s_env qname)
+                  |> NormMp.norm_xfun env in
+          let p = f.EcPath.x_top in
+          if not (Sm.mem p params) then
+            tyerror qname.pl_loc env (FunNotInModParam qname.pl_desc);
 
-        let ue = EcUnify.UniEnv.create None in
-        let tform = trans_form env ue form EcTypes.tint in
-        let subs = try EcUnify.UniEnv.close ue with
-          | EcUnify.UninstanciateUni ->
-            tyerror (loc form) env FreeTypeVariables in
-        let tform = EcFol.Fsubst.uni subs tform in
+          let ue = EcUnify.UniEnv.create None in
+          let tform = trans_form env ue form EcTypes.tint in
+          let subs = try EcUnify.UniEnv.close ue with
+            | EcUnify.UninstanciateUni ->
+              tyerror (loc form) env FreeTypeVariables in
+          let tform = EcFol.Fsubst.uni subs tform in
 
-        (f, tform)
-      ) restr_elems
-    |> Mx.of_list
+          (f, tform)
+        ) restr_elems in
+    let m_calls = Mx.of_list calls in
+    (* Sanity check *)
+    assert (List.length calls = Mx.cardinal m_calls);
+    m_calls
 
 (* Oracles and complexity restrictions for a function.
  * - [params] must be the set of parameters on the module being typed.
@@ -3061,8 +3067,11 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
         (* TODO: A: we need to change the typing environement there. *)
         let self'  = transf penv self in
         let calls' = List.map (fun (f,c) ->
-            trans_gamepath env f,
-            transf penv c) calls in
+            let f = trans_gamepath env f
+                    |> EcEnv.NormMp.norm_xfun env
+            and f_c = transf penv c in
+            f, f_c
+          ) calls in
         (* TODO: (Adrien) is there anything to check in self and calls? *)
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
@@ -3072,6 +3081,8 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
             ) calls' calls;
           let cost' = { c_self = self';
                         c_calls = Mx.of_list calls'; } in
+          (* Sanity check *)
+          assert (List.length calls' = Mx.cardinal cost'.c_calls);
           f_cHoareF pre' fpath post' cost'
 
     | PFlsless gp ->

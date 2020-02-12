@@ -955,7 +955,8 @@ module FPosition = struct
             begin match sub with
               | chf_pr :: chf_po :: c_self :: calls ->
                 let c_calls = List.fold_left2 (fun acc f c ->
-                    EcPath.Mx.add f c acc
+                    EcPath.Mx.change
+                      (fun old -> assert (old = None); Some c) f acc
                   ) EcPath.Mx.empty fkeys calls in
                 f_cHoareF_r { chf with chf_pr; chf_po;
                                        chf_co = { c_self; c_calls }; }
