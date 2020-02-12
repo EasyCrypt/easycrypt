@@ -249,8 +249,8 @@ module FunAbsLow = struct
             let cbd = cost_orcl oi o in
             let call_bound =
               if x_equal o o_called
-              then f_and (f_int_lt k cbd) (f_int_le f_i0 k)
-              else f_and (f_int_le k cbd) (f_int_le f_i0 k) in
+              then f_and (f_int_le f_i0 k) (f_int_lt k cbd)
+              else f_and (f_int_le f_i0 k) (f_int_le k cbd) in
 
             match List.find_opt (fun (x,_) -> x_equal x o) xv with
             | None ->
@@ -308,7 +308,7 @@ module FunAbsLow = struct
             | None          ->
               f_true
             | Some (_,vrnt) ->
-              f_and (f_int_lt vrnt cbd) (f_int_le f_i0 vrnt) in
+              f_and (f_int_le f_i0 vrnt) (f_int_le vrnt cbd)  in
 
           pre_eq, post_eq) ois in
 
@@ -330,7 +330,7 @@ module FunAbsLow = struct
         let o_cost = snd @@ List.find (fun (x,_) -> x_equal x o) xc in
 
         (* Upper-bound on the costs of [o]'s calls. *)
-        EcPhlWhile.ICHOARE.choare_sum o_cost (f_i0, f_int_sub_simpl cbd f_i1)
+        EcPhlWhile.ICHOARE.choare_sum o_cost (f_i0, cbd)
       ) ois in
     let total_cost =
       List.fold_left (cost_op f_int_add_simpl) f_cost orcls_cost in
