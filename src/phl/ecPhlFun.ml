@@ -300,7 +300,7 @@ module FunAbsLow = struct
           let o_vrnt = List.find_opt (fun (x,_) -> x_equal x o) xv in
           let pre_eq = match o_vrnt with
             | None          -> f_true
-            | Some (_,vrnt) -> f_eq vrnt f_i0 in
+            | Some (_,vrnt) -> f_int_le vrnt f_i0 in
 
 
           let cbd = cost_orcl oi o in
