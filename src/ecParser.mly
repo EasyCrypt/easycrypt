@@ -2496,13 +2496,13 @@ conseq_xt:
 | UNDERSCORE COLON co=costs(none)              { (None, None), Some (CQI_c co) }
 
 ci_cost_el:
-| o=loc(fident) COLON co=costs(none) {o,co}
+| LPAREN o=loc(fident) COLON co=costs(none) RPAREN   {o,co}
 
 ci_vrnt_el:
-| o=loc(fident) COLON f=form {o,f}
+| LPAREN o=loc(fident) COLON f=form RPAREN           {o,f} 
 
 abs_call_info:
-| xv=rlist0(ci_vrnt_el, SEMICOLON) TIME xc=rlist0(ci_cost_el, SEMICOLON) 
+| xv=rlist0(ci_vrnt_el, COMMA) TIME xc=rlist0(ci_cost_el, COMMA) 
                                      { { ci_oracles = xc;
 					 ci_vrnts   = xv; } }
 
@@ -2512,7 +2512,7 @@ call_info:
                                      { CI_spec (f1, f2, Some co) }
 | f=form                             { CI_inv  (f, None) }
 | f=form TIME co=costs(none)         { CI_inv  (f, Some (`Std co)) }
-| f=form COLON inf=abs_call_info     { let info = `CostAbs inf in
+| f=form SEMICOLON inf=abs_call_info     { let info = `CostAbs inf in
                                        CI_inv  (f, Some info) }
 | bad=form COMMA p=form              { CI_upto (bad,p,None) }
 | bad=form COMMA p=form COMMA q=form { CI_upto (bad,p,Some q) }
