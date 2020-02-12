@@ -1576,6 +1576,10 @@ module Fsubst = struct
     let merger o = assert (o = None); Some m2 in
       { s with fs_mem = Mid.change merger m1 s.fs_mem }
 
+  let f_rebind_mem s m1 m2 =
+    let merger _ = Some m2 in
+    { s with fs_mem = Mid.change merger m1 s.fs_mem }
+
   let f_bind_mod s x mp =
     let merger o = assert (o = None); Some mp in
     let smp = Mid.change merger x s.fs_mp in
@@ -1840,7 +1844,8 @@ module Fsubst = struct
       (* We freshen the binded memory. *)
       let m = fst coe.coe_mem in
       let m' = EcIdent.fresh m in
-      let s = f_bind_mem s m m' in
+      (* TODO: A: here, I am erasing previous binding.*)
+      let s = f_rebind_mem s m m' in
 
       (* Then we substitute *)
       let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
