@@ -1,5 +1,79 @@
-require import Int.
-(* require import CHoareTactic. *)
+require import Int List CHoareTactic StdBigop.
+import Bigint BIA.
+
+module type Oracle = {
+  proc o (x : int) : int
+}.
+
+op k1 : int.
+op k2 : int.
+module type Adv (H : Oracle) = {
+  proc a1(x : int) : int * int
+  proc a2(x : int) : int
+}.
+
+module type Adv2 (H1 : Oracle) (H : Oracle) = {
+  proc a1(x : int) : int * int {H.o : k1, H1.o : k2} 
+  proc a2(x : int) : int {H.o : k2} 
+}.
+
+module type DAdv (H1 : Oracle) (H : Oracle) = {
+  proc a1(x : int) : int * int {H.o : k1, H1.o : 1} 
+  proc a2(x : int) : int       {H.o : k2, H1.o : 3} 
+}.
+
+module I (A : Adv) (H : Oracle) = {
+  var qs : int list
+
+  module QRO = {
+    proc o (x : int) = {
+      var r : int;
+      qs <- x :: qs;
+      r <- H.o(x);
+      return r;
+    }
+  }
+  module A0 = A(QRO)
+
+  proc invert(pk : int, y : int) : int = {
+    var m0,m1,b,x : int;
+
+    qs <- [];
+    (m0,m1) <- A0.a1(pk);    
+    b <- A0.a2(y);
+    (* x <- nth witness qs (find (fun _ => true) qs); *)
+    return  0;
+  }
+}.
+
+section.
+  print Adv2.
+  declare module H : Oracle.
+  declare module A : Adv { -H; a1 : {#H.o; #H.o : k1} a2 : {#H.o; #H.o : k2}}.
+  print A.
+
+  local module I0 = I(A,H).
+  local lemma bound_i : 
+    forall (a : int),
+    choare[I0.invert: y = a ==> true] 
+    time [3; I(A,H).A0.a1 : 1; I(A,H).A0.a2 : 1; H.o : k1 + k2].
+  proof.
+  move => a.
+  proc.
+  call (_: true;
+    time
+    (I(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
+  => * /=.
+  admit.
+  call (_: true;
+    time
+    (I(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
+  => * /=.
+  admit.
+  wp; skip.
+  move => * /=.
+  admit.
+qed.
 
 module A = { 
   proc g (x, y) : int = {
@@ -21,6 +95,7 @@ lemma silly : choare[A.g : true ==> true] time [3].
 proof.
 proc.
 wp =>//.
+admit.
 qed.
 
 lemma silly2 : choare[A.g : true ==> true] time [2].
@@ -40,6 +115,7 @@ call silly.
 (* call (_: true ==> true time [3]). *)
 (* apply silly. *)
 wp =>//.
+admit.
 qed.
 
 module B = { 
@@ -61,6 +137,7 @@ lemma silly4 : choare[B.f : true ==> true] time [6].
 proof.
 proc.
 wp=>//.
+admit.
 qed.
 
 module C = { 
@@ -87,8 +164,7 @@ proc.
 while (x <= y /\ y = b) (x - a) (b - a) [fun _ => 1]. 
 
 (* prove that the loop body preserves the invariant, and cost what was stated. *)
-move => z; wp; skip => //.
-move => &hr=> hyp => //.
+move => z; wp; skip => * /=.
 split => /=. by smt.
 admit.
 
