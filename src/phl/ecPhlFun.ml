@@ -170,11 +170,6 @@ let t_fun_def_r tc =
 
 let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 
-let split4 l =
-  List.fold_right (fun (a,b,c,d) (l1,l2,l3,l4) ->
-      a :: l1, b :: l2, c :: l3, d :: l4
-    ) l ([],[],[],[])
-
 (* -------------------------------------------------------------------- *)
 type abs_inv_inf = (xpath * form) list * (xpath * cost) list
 
@@ -242,21 +237,14 @@ module FunAbsLow = struct
 
     let ospec o_called =
       let k_called = ref None in
-      let eqs =
-        List.map (fun o ->
+      (* forall ks. call_bounds =>
+         hoare [{ inv /\ pre_eqs } o_called {inv /\ post_eqs }] *)
+      let ks, call_bounds, pre_eqs, post_eqs =
+        List.fold_left (fun (ks, call_bounds, pre_eqs, post_eqs) o ->
             let k_id = EcIdent.create ("z" ^ EcPath.xbasename o) in
             let k = f_local k_id tint in
 
             if x_equal o o_called then k_called := Some k;
-
-            let o_vrnt = List.find_opt (fun (x,_) -> x_equal x o) xv in
-            let pre_eq, post_eq = match o_vrnt with
-              | None -> f_true, f_true
-              | Some (_,vrnt) ->
-                f_eq vrnt k,
-                if x_equal o o_called
-                then f_eq vrnt (f_int_add k f_i1)
-                else f_eq vrnt k in
 
             let cbd = cost_orcl oi o in
             let call_bound =
@@ -264,11 +252,25 @@ module FunAbsLow = struct
               then f_and (f_int_lt k cbd) (f_int_le f_i0 k)
               else f_and (f_int_le k cbd) (f_int_le f_i0 k) in
 
-            k_id, call_bound, pre_eq, post_eq) ois in
+            match List.find_opt (fun (x,_) -> x_equal x o) xv with
+            | None ->
+              if x_equal o o_called
+              then k_id :: ks, call_bound :: call_bounds, pre_eqs, post_eqs
+              else         ks,               call_bounds, pre_eqs, post_eqs
+            | Some (_,vrnt) ->
+              let pre_eq  =
+                f_eq vrnt k
+              and post_eq =
+                if x_equal o o_called
+                then f_eq vrnt (f_int_add k f_i1)
+                else f_eq vrnt k in
 
-      (* forall ks. call_bounds =>
-         hoare [{ inv /\ pre_eqs } o_called {inv /\ post_eqs }] *)
-      let ks, call_bounds, pre_eqs, post_eqs = split4 eqs in
+              k_id :: ks,
+              call_bound :: call_bounds,
+              pre_eq :: pre_eqs,
+              post_eq :: post_eqs
+          ) ([],[],[],[]) ois in
+
       let ks = List.map (fun k_id -> (k_id,GTty tint)) ks in
       let call_bounds, pre_eqs, post_eqs = f_ands0_simpl call_bounds,
                                            f_ands0_simpl pre_eqs,
