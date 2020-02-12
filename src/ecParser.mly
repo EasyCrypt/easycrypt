@@ -1564,28 +1564,37 @@ qident_inparam:
 
 (* -------------------------------------------------------------------- *)
 (* Oracle restrictions *)
-oracle_restr:
+oracle_restr0:
   | ol=rlist0(qident_inparam,COMMA) { ol }
+
+oracle_restr1:
+  | ol=rlist1(qident_inparam,COMMA) { ol }
 
 (* -------------------------------------------------------------------- *)
 (* Complexity restrictions *)
 compl_el:
  | o=qident_inparam COLON c=form_r(none) { (o, c) }
 
-compl_restr:
+compl_restr0:
+  | c=rlist0(compl_el,COMMA) { PCompl c }
+
+compl_restr1:
   | c=rlist1(compl_el,COMMA) { PCompl c }
 
 (* -------------------------------------------------------------------- *)
 (* Module restrictions *)
 
 fun_restr:
-  | LBRACE orcl=oracle_restr SEMICOLON cl=compl_restr RBRACE
+  | LBRACE RBRACE
+    { (None, None) }
+
+  | LBRACE orcl=oracle_restr0 SEMICOLON cl=compl_restr1 RBRACE
     { (Some orcl, Some cl) }
 
-  | LBRACE orcl=oracle_restr RBRACE
+  | LBRACE orcl=oracle_restr1 RBRACE
     { (Some orcl, None) }
 
-  | LBRACE cl=compl_restr RBRACE
+  | LBRACE cl=compl_restr1 RBRACE
     { (None, Some cl) }
 
 mod_restr_el:
@@ -1600,10 +1609,13 @@ mod_restr:
   | LBRACE mr=mem_restr RBRACE
     { { pmr_mem = mr;
 	pmr_procs = [] } }
-  | LBRACE l=rlist1(mod_restr_el,empty) RBRACE
+  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
     { { pmr_mem = [];
 	pmr_procs = l } }
-  | LBRACE mr=mem_restr SEMICOLON l=rlist1(mod_restr_el,empty) RBRACE
+  | LBRACE mr=mem_restr RBRACE LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
+    { { pmr_mem = mr;
+	pmr_procs = l } }
+  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET LBRACE mr=mem_restr RBRACE 
     { { pmr_mem = mr;
 	pmr_procs = l } }
 

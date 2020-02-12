@@ -1,6 +1,9 @@
 require import Int List CHoareTactic StdBigop.
 import Bigint BIA.
 
+(*****************)
+(* Example BR93: *)
+(*****************)
 module type Oracle = {
   proc o (x : int) : int
 }.
@@ -16,16 +19,30 @@ module type Adv (H : Oracle) = {
   proc a2(x : int) : int
 }.
 
-module type Adv2 (H1 : Oracle) (H : Oracle) = {
-  proc a1(x : int) : int * int {H.o : k1, H1.o : k2} 
-  proc a2(x : int) : int {H.o : k2} 
-}.
+(***********************)
+(* START Other example *)
 
+(* Remark that we have two possibility to give module restrictions. *)
+(* We can give the restrictions function by function, e.g.: *)
 module type DAdv (H1 : Oracle) (H : Oracle) = {
   proc a1(x : int) : int * int {H.o : k1, H1.o : 1} 
   proc a2(x : int) : int       {H.o : k2, H1.o : 3} 
 }.
 
+(* Or we can  give the restrictions at the top-level, e.g.: *)
+module type DAdvBis (H1 : Oracle, H : Oracle) 
+  [a1 : {H.o, H1.o; H.o : k1, H1.o : 1 },
+   a2 : {H.o, H1.o; H.o : k2, H1.o : 3 }]
+ = {
+  proc a1(x : int) : int * int
+  
+  proc a2(x : int) : int
+}.
+
+(*         END         *)
+(***********************)
+
+(* Inverter *)
 module I (A : Adv) (H : Oracle) = {
   var qs : int list
 
@@ -51,14 +68,11 @@ module I (A : Adv) (H : Oracle) = {
 }.
 
 section.
-  print Adv2.
-  declare module H : Oracle {-I}.
-  
-  (* declare module A : Adv {-I, -H} [a1 : {#H.o : k1}, a2 : {#H.o : k2}]. *)
-  declare module A : Adv { -I, -H; a1 : {#H.o; #H.o : k1} a2 : {#H.o; #H.o : k2}}.
-  print A.
+  declare module H : Oracle {-I}. 
+  declare module A : Adv {-I, -H} [a1 : {#H.o : k1}, a2 : {#H.o : k2}].
 
   local module I0 = I(A,H).
+
   local lemma bound_i :     
     choare[I0.invert: true ==> true] 
     time [3 + k1 + k2; I(A,H).A0.a1 : 1; I(A,H).A0.a2 : 1; H.o : k1 + k2].

@@ -1705,7 +1705,8 @@ and pp_orclinfo ppe fmt (sym, oi) =
       (pp_costs ppe) costs
 
 and pp_orclinfos ppe fmt ois =
-  pp_list "@;" (pp_orclinfo ppe) fmt (Msym.bindings ois)
+  Format.fprintf fmt "[@[<hv>%a@]]"
+    (pp_list ",@ " (pp_orclinfo ppe)) (Msym.bindings ois)
 
 (* -------------------------------------------------------------------- *)
 and pp_mem_restr ppe fmt mr =
@@ -1733,7 +1734,7 @@ and pp_mem_restr ppe fmt mr =
   let all_mem =
     mr.mr_xpaths.ur_pos = None || mr.mr_mpaths.ur_pos = None in
 
-  Format.fprintf fmt "@[<h>%a%a%a%a%a%a%a%a%a@];@ "
+  Format.fprintf fmt "@[<h>{%a%a%a%a%a%a%a%a%a}@]"
     (pp_rx false) mr.mr_xpaths.ur_neg
     pp_sep (EcPath.Sm.is_empty mr.mr_mpaths.ur_neg)
     (pp_r false) mr.mr_mpaths.ur_neg
@@ -1745,14 +1746,15 @@ and pp_mem_restr ppe fmt mr =
     pp_top (all_mem)
 
 (* -------------------------------------------------------------------- *)
+(* Use in an hv box. *)
 and pp_restr ppe fmt mr =
-  Format.fprintf fmt "@[<hv>%a%a@]"
+  Format.fprintf fmt "%a@ %a"
     (pp_mem_restr ppe) mr
     (pp_orclinfos ppe) mr.mr_oinfos
 
 (* -------------------------------------------------------------------- *)
 and pp_modtype (ppe : PPEnv.t) fmt (mty : module_type) =
-  Format.fprintf fmt "@[<hv>%a{@;<0 2>%a@,}@]"
+  Format.fprintf fmt "@[<hv 2>%a%a@]"
     (pp_modtype1 ppe) mty (pp_restr ppe) mty.mt_restr
 
 (* -------------------------------------------------------------------- *)
@@ -2790,7 +2792,7 @@ let pp_sigitem ppe fmt (Tys_function fs) =
 
 let pp_modsig ppe fmt (p,ms) =
   let (ppe,pp) = pp_mod_params ppe ms.mis_params in
-  Format.fprintf fmt "@[<v>@[<hv>module type %s%t {@;<0 2>%a@,}@] = \
+  Format.fprintf fmt "@[<v>@[<hv 2>module type %s%t @,%a@;<0 -2>@] = \
                       {@,  @[<v>%a@]@,}@]"
     (EcPath.basename p) pp
     (pp_restr ppe) ms.mis_restr
@@ -3225,7 +3227,7 @@ let pp_m_xt ~print_abstract ~sign env fmt m =
   let ppe = PPEnv.ofenv env in
   if print_abstract then
     let r = EcEnv.NormMp.get_restr env m in
-    Format.fprintf fmt "@[<v 2>%a@,{%a@,}@]"
+    Format.fprintf fmt "@[<hv>%a{@;<0 2>%a@,}@]"
       (pp_m ~sign ppe) m
       (pp_restr ppe) r
   else pp_m ~sign ppe fmt m

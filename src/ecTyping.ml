@@ -1786,7 +1786,7 @@ let trans_restr_mem env (r_mem : pmod_restr_mem) =
 let trans_restr_oracle_calls env env_in (params : Sm.t) = function
     | None ->
       let do_one mp calls =
-        let me = EcEnv.Mod.by_mpath mp env in
+        let me = EcEnv.Mod.by_mpath mp env_in in
         if me.me_params <> [] then calls
         else
           let fs = List.map (fun (Tys_function fsig) ->
@@ -1852,6 +1852,13 @@ and trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
   let name = unloc r_el.pmre_name in
   let c_calls = trans_restr_compl env env_in params r_el.pmre_compl in
   let r_orcls = trans_restr_oracle_calls env env_in params r_el.pmre_orcls in
+
+  (* We add to [r_orcls] elements of [c_calls], if necessary. *)
+  let r_orcls = r_orcls @
+                (Mx.bindings c_calls
+                  |> List.filter_map (fun (f,_) ->
+                     if List.mem f r_orcls then None else Some f)) in
+
   let r_in =  r_el.pmre_in in
   ( r_in, name, c_calls, r_orcls )
 
