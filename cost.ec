@@ -7,6 +7,10 @@ module type Oracle = {
 
 op k1 : int.
 op k2 : int.
+
+axiom k1p : 0 <= k1.
+axiom k2p : 0 <= k2.
+
 module type Adv (H : Oracle) = {
   proc a1(x : int) : int * int
   proc a2(x : int) : int
@@ -41,37 +45,54 @@ module I (A : Adv) (H : Oracle) = {
     qs <- [];
     (m0,m1) <- A0.a1(pk);    
     b <- A0.a2(y);
-    (* x <- nth witness qs (find (fun _ => true) qs); *)
-    return  0;
+    x <- nth witness qs (find (fun _ => true) qs);
+    return  x;
   }
 }.
 
 section.
   print Adv2.
-  declare module H : Oracle.
-  declare module A : Adv { -H; a1 : {#H.o; #H.o : k1} a2 : {#H.o; #H.o : k2}}.
+  declare module H : Oracle {-I}.
+  
+  (* declare module A : Adv {-I, -H} [a1 : {#H.o : k1}, a2 : {#H.o : k2}]. *)
+  declare module A : Adv { -I, -H; a1 : {#H.o; #H.o : k1} a2 : {#H.o; #H.o : k2}}.
   print A.
 
   local module I0 = I(A,H).
-  local lemma bound_i : 
-    forall (a : int),
-    choare[I0.invert: y = a ==> true] 
-    time [3; I(A,H).A0.a1 : 1; I(A,H).A0.a2 : 1; H.o : k1 + k2].
+  local lemma bound_i :     
+    choare[I0.invert: true ==> true] 
+    time [3 + k1 + k2; I(A,H).A0.a1 : 1; I(A,H).A0.a2 : 1; H.o : k1 + k2].
   proof.
-  move => a.
   proc.
-  call (_: true;
+  seq 3 : (size I.qs <= k1 + k2) [k1 + k2].
+  call (_: true ;
+    (I(A, H).QRO.o : size I.qs - k1)
     time
     (I(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
   => * /=.
+  (* We prove that the invariant is preserved by calls to the oracle QRO. *)
+  proc.
+  call (_: true; time).
+  wp; skip => *. 
+  split => /=. 
+  by smt.
   admit.
   call (_: true;
+    (I(A, H).QRO.o : size I.qs)
     time
     (I(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
   => * /=.
+  (* We prove that the invariant is preserved by calls to the oracle QRO. *)
+  proc; call (_: true; time); wp; skip => *.
+  split. by smt.
   admit.
-  wp; skip.
-  move => * /=.
+  wp; skip => *.
+  split => * /=. by smt. 
+  split.
+  admit.
+  search (big _ _ _).
+  rewrite !big_constz !count_predT !size_range [smt (k1p k2p)].
+  (* wp (size I.qs <= k1 + k2). *)
   admit.
 qed.
 
@@ -155,22 +176,22 @@ module C = {
 lemma silly5 : forall (a : int) (b : int), 
 choare[C.f : x = a /\ y = b /\ x < y ==> true] time [2 * (a - b) + 1].
 proof.
-move => a b.
+move => a b => /=.
 proc.
 (* - invariant, 
    - increasing quantity starting from zero
    - number of loop iterations
    - cost of one loop body. *)
-while (x <= y /\ y = b) (x - a) (b - a) [fun _ => 1]. 
+while (x <= y /\ y = b) (x - a) (b - a) [fun _ => 1] => *.
 
 (* prove that the loop body preserves the invariant, and cost what was stated. *)
-move => z; wp; skip => * /=.
+wp; skip => * /=.
 split => /=. by smt.
 admit.
 
 (* prove that the invariant and loop condition implies that we have not reached 
   the maximal number of steps.  *)
-move => &hr.  by smt.
+by smt.
 
 (* we prove that the invariant implies the post, and that the cost of all
  iterations is smaller than the final cost. *)
