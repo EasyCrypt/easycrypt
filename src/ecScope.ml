@@ -2189,17 +2189,22 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Reduction = struct
-  let add_reduction scope reds =
+  let add_reduction scope (opts, reds) =
     check_state `InTop "hint simplify" scope;
     if EcSection.in_section scope.sc_section then
       hierror "cannot add reduction rule in a section";
+
+    let opts = EcTheory.{
+      ur_delta  = List.mem `Delta  opts;
+      ur_eqtrue = List.mem `EqTrue opts;
+    } in
 
     let rules =
       let for1 idx name =
         let idx      = odfl 0 idx in
         let lemma    = fst (EcEnv.Ax.lookup (unloc name) (env scope)) in
-        let red_info = EcReduction.User.compile ~prio:idx (env scope) lemma in
-        (lemma, Some red_info) in
+        let red_info = EcReduction.User.compile ~opts ~prio:idx (env scope) lemma in
+        (lemma, opts, Some red_info) in
 
       let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
       List.flatten rules

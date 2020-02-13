@@ -3530,8 +3530,8 @@ hint:
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
 reduction:
-| HINT SIMPLIFY xs=plist1(user_red_info, COMMA)
-    { xs }
+| HINT SIMPLIFY opt=bracket(user_red_option*)? xs=plist1(user_red_info, COMMA)
+    { (odfl [] opt, xs) }
 
 user_red_info:
 | x=qident i=prefix(AT, word)?
@@ -3539,6 +3539,16 @@ user_red_info:
 
 | xs=paren(plist1(qident, COMMA)) i=prefix(AT, sword)?
     { (xs, i) }
+
+user_red_option:
+| x=lident {
+    match unloc x with
+    | "reduce" -> `Delta
+    | "eqtrue" -> `EqTrue
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("invalid option: " ^ (unloc x)))
+  }
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)

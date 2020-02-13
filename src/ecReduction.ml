@@ -236,102 +236,6 @@ module EqTest = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module User = struct
-  type error =
-    | MissingVarInLhs   of EcIdent.t
-    | MissingTyVarInLhs of EcIdent.t
-    | NotAnEq
-    | NotFirstOrder
-    | RuleDependsOnMemOrModule
-    | HeadedByVar
-
-  exception InvalidUserRule of error
-
-  module R = EcTheory
-
-  type rule = EcEnv.Reduction.rule
-
-  let compile ~prio (env : EcEnv.env) (p : EcPath.path) =
-    let ax = EcEnv.Ax.by_path p env in
-    let bds, rl = EcFol.decompose_forall ax.EcDecl.ax_spec in
-
-    let bds =
-      let filter = function
-        | (x, GTty ty) -> (x, ty)
-        | _ -> raise (InvalidUserRule RuleDependsOnMemOrModule)
-      in List.map filter bds in
-
-    let lhs, rhs, conds =
-      let rec doit conds f =
-        match sform_of_form f with
-        | SFimp (f1, f2) -> doit (f1 :: conds) f2
-        | SFeq  (f1, f2) -> (f1, f2, List.rev conds)
-        | _ when ty_equal tbool (EcEnv.ty_hnorm f.f_ty env) ->
-            (f, f_true, List.rev conds)
-        | _ -> raise (InvalidUserRule NotAnEq)
-      in doit [] rl
-    in
-
-    let rule =
-      let rec rule (f : form) : EcTheory.rule_pattern =
-        match EcFol.destr_app f with
-        | { f_node = Fop (p, tys) }, args ->
-            R.Rule (`Op (p, tys), List.map rule args)
-        | { f_node = Ftuple args }, [] ->
-            R.Rule (`Tuple, List.map rule args)
-        | { f_node = Fint i }, [] ->
-            R.Int i
-        | { f_node = Flocal x }, [] ->
-            R.Var x
-        | _ -> raise (InvalidUserRule NotFirstOrder)
-      in rule lhs in
-
-    let lvars, ltyvars =
-      let rec doit (lvars, ltyvars) = function
-        | R.Var x ->
-            (Sid.add x lvars, ltyvars)
-
-        | R.Int _ ->
-            (lvars, ltyvars)
-
-        | R.Rule (op, args) ->
-            let ltyvars =
-              match op with
-              | `Op (_, tys) ->
-                List.fold_left (
-                    let rec doit ltyvars = function
-                      | { ty_node = Tvar a } -> Sid.add a ltyvars
-                      | _ as ty -> ty_fold doit ltyvars ty in doit)
-                  ltyvars tys
-              | `Tuple -> ltyvars in
-            List.fold_left doit (lvars, ltyvars) args
-
-      in doit (Sid.empty, Sid.empty) rule in
-
-    let mvars   =
-      Sid.diff (Sid.of_list (List.map fst bds)) lvars in
-    let mtyvars =
-      Sid.diff (Sid.of_list (List.map fst ax.EcDecl.ax_tparams)) ltyvars in
-
-    if not (Sid.is_empty mvars) then
-      raise (InvalidUserRule (MissingVarInLhs (Sid.choose mvars)));
-    if not (Sid.is_empty mtyvars) then
-      raise (InvalidUserRule (MissingTyVarInLhs (Sid.choose mtyvars)));
-
-    begin match rule with
-    | R.Var _ -> raise (InvalidUserRule (HeadedByVar));
-    | _       -> () end;
-
-    R.{ rl_tyd  = ax.EcDecl.ax_tparams;
-        rl_vars = bds;
-        rl_cond = conds;
-        rl_ptn  = rule;
-        rl_tg   = rhs;
-        rl_prio = prio; }
-
-end
-
-(* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
   delta_p : (path  -> bool);
@@ -378,6 +282,8 @@ let nodelta =
   { full_red with
       delta_h = EcUtils.pred0;
       delta_p = EcUtils.pred0; }
+
+let delta = { no_red with delta_p = EcUtils.predT; }
 
 let reduce_local ri hyps x  =
   if   ri.delta_h x
@@ -1047,3 +953,107 @@ let xconv (mode : xconv) hyps =
   | `Eq      -> f_equal
   | `AlphaEq -> is_alpha_eq hyps
   | `Conv    -> is_conv hyps
+
+(* -------------------------------------------------------------------- *)
+module User = struct
+  type options = EcTheory.rule_option
+
+  type error =
+    | MissingVarInLhs   of EcIdent.t
+    | MissingTyVarInLhs of EcIdent.t
+    | NotAnEq
+    | NotFirstOrder
+    | RuleDependsOnMemOrModule
+    | HeadedByVar
+
+  exception InvalidUserRule of error
+
+  module R = EcTheory
+
+  type rule = EcEnv.Reduction.rule
+
+  let compile ~opts ~prio (env : EcEnv.env) (p : EcPath.path) =
+    let ax = EcEnv.Ax.by_path p env in
+    let bds, rl = EcFol.decompose_forall ax.EcDecl.ax_spec in
+
+    let bds =
+      let filter = function
+        | (x, GTty ty) -> (x, ty)
+        | _ -> raise (InvalidUserRule RuleDependsOnMemOrModule)
+      in List.map filter bds in
+
+    let lhs, rhs, conds =
+      let rec doit conds f =
+        let f = if opts.EcTheory.ur_delta then
+            let hyps = EcEnv.LDecl.init env [] in
+            h_red delta hyps f
+          else f in
+
+        match sform_of_form f with
+        | SFimp (f1, f2) -> doit (f1 :: conds) f2
+        | SFeq  (f1, f2) -> (f1, f2, List.rev conds)
+        | _ when opts.EcTheory.ur_eqtrue &&
+                 ty_equal tbool (EcEnv.ty_hnorm f.f_ty env) ->
+            (f, f_true, List.rev conds)
+        | _ -> raise (InvalidUserRule NotAnEq)
+      in doit [] rl
+    in
+
+    let rule =
+      let rec rule (f : form) : EcTheory.rule_pattern =
+        match EcFol.destr_app f with
+        | { f_node = Fop (p, tys) }, args ->
+            R.Rule (`Op (p, tys), List.map rule args)
+        | { f_node = Ftuple args }, [] ->
+            R.Rule (`Tuple, List.map rule args)
+        | { f_node = Fint i }, [] ->
+            R.Int i
+        | { f_node = Flocal x }, [] ->
+            R.Var x
+        | _ -> raise (InvalidUserRule NotFirstOrder)
+      in rule lhs in
+
+    let lvars, ltyvars =
+      let rec doit (lvars, ltyvars) = function
+        | R.Var x ->
+            (Sid.add x lvars, ltyvars)
+
+        | R.Int _ ->
+            (lvars, ltyvars)
+
+        | R.Rule (op, args) ->
+            let ltyvars =
+              match op with
+              | `Op (_, tys) ->
+                List.fold_left (
+                    let rec doit ltyvars = function
+                      | { ty_node = Tvar a } -> Sid.add a ltyvars
+                      | _ as ty -> ty_fold doit ltyvars ty in doit)
+                  ltyvars tys
+              | `Tuple -> ltyvars in
+            List.fold_left doit (lvars, ltyvars) args
+
+      in doit (Sid.empty, Sid.empty) rule in
+
+    let mvars   =
+      Sid.diff (Sid.of_list (List.map fst bds)) lvars in
+    let mtyvars =
+      Sid.diff (Sid.of_list (List.map fst ax.EcDecl.ax_tparams)) ltyvars in
+
+    if not (Sid.is_empty mvars) then
+      raise (InvalidUserRule (MissingVarInLhs (Sid.choose mvars)));
+    if not (Sid.is_empty mtyvars) then
+      raise (InvalidUserRule (MissingTyVarInLhs (Sid.choose mtyvars)));
+
+    begin match rule with
+    | R.Var _ -> raise (InvalidUserRule (HeadedByVar));
+    | _       -> () end;
+
+    R.{ rl_tyd  = ax.EcDecl.ax_tparams;
+        rl_vars = bds;
+        rl_cond = conds;
+        rl_ptn  = rule;
+        rl_tg   = rhs;
+        rl_prio = prio; }
+
+end
