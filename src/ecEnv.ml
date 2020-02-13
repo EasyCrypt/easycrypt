@@ -2470,7 +2470,6 @@ module NormMp = struct
           f_equivF pre' l' r' post'
 
         | Fcoe coe ->
-          (* TODO: (Adrien) normalize the expression? *)
           let coe' = {
             coe_mem  = coe.coe_mem;
             coe_pre  = aux coe.coe_pre;

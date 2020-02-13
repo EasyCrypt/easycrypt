@@ -465,6 +465,9 @@ end = struct
     | FilterMatchFailure ->
         msg "filter pattern does not match"
 
+    | MissingMemType ->
+        msg "memory type missing"
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 

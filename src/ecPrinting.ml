@@ -1612,11 +1612,10 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       let ppe = PPEnv.push_mem ppe ~active:true coe.coe_mem in
       let m, mt = coe.coe_mem in
       let (subppe, pp) = pp_bindings ppe ~fv:f.f_fv [m, GTmem mt] in
-      Format.fprintf fmt "coe%t[@[<hov 2>@ %a :@ @[%a@]@]]"
+      Format.fprintf fmt "coe%t[@[<hov 2>@[%a@] |-@ @[%a@]@]]"
         pp
-        (pp_expr subppe) coe.coe_e
         (pp_form subppe) coe.coe_pre
-
+        (pp_expr subppe) coe.coe_e
 
   | Fpr pr->
       let me = EcEnv.Fun.prF_memenv EcFol.mhr pr.pr_fun ppe.PPEnv.ppe_env in
@@ -1671,9 +1670,6 @@ and pp_cost ppe fmt c =
 
 (* -------------------------------------------------------------------- *)
 
-(* TODO: A: when this gets more stable, we should probably change the printing so
-   that we print an allowed oracle only if there is no cost restriction for it,
-   and a cost only for allowed oracles. *)
 and pp_allowed_orcl ppe fmt orcls =
   if orcls = [] then Format.fprintf fmt ""
   else

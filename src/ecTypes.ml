@@ -547,7 +547,7 @@ let lp_fv = function
 
 let pv_fv = function
   | PVglob x -> EcPath.x_fv Mid.empty x
-  | PVloc _ -> Mid.empty        (* TODO: A: check*)
+  | PVloc _ -> Mid.empty
 
 let fv_node e =
   let union ex =

@@ -3071,15 +3071,13 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
         let pre'   = transf penv pre in
         let post'  = transf qenv post in
 
-        (* TODO: A: we need to change the typing environement there. *)
-        let self'  = transf penv self in
+        let self'  = transf env self in
         let calls' = List.map (fun (f,c) ->
             let f = trans_gamepath env f
                     |> EcEnv.NormMp.norm_xfun env
-            and f_c = transf penv c in
+            and f_c = transf env c in
             f, f_c
           ) calls in
-        (* TODO: (Adrien) is there anything to check in self and calls? *)
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           unify_or_fail env  ue self.pl_loc ~expct:tint  self'.f_ty;

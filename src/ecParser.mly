@@ -1575,9 +1575,6 @@ oracle_restr1:
 compl_el:
  | o=qident_inparam COLON c=form_r(none) { (o, c) }
 
-compl_restr0:
-  | c=rlist0(compl_el,COMMA) { PCompl c }
-
 compl_restr1:
   | c=rlist1(compl_el,COMMA) { PCompl c }
 
@@ -1994,6 +1991,7 @@ axiom:
 | l=local  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
 | l=local  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
 | l=local PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
+| l=local CHOARE x=ident pd=pgtybindings? COLON p=loc(choare_body(none)) ao=axiom_tc
     { mk_axiom ~local:l (x, None, pd, p) ao }
 
 proofend:

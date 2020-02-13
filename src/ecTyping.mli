@@ -144,6 +144,7 @@ type tyerror =
 | MemNotAllowed
 | UnknownScope           of qsymbol
 | FilterMatchFailure
+| MissingMemType
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror

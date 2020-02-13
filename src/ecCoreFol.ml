@@ -555,7 +555,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fint _              -> Mid.empty
     | Fop (_, tys)        -> union (fun a -> a.ty_fv) tys
     | Fpvar (PVglob pv,m) -> EcPath.x_fv (fv_add m Mid.empty) pv
-    | Fpvar (PVloc _,m)   -> fv_add m Mid.empty (* TODO: A: correct? *)
+    | Fpvar (PVloc _,m)   -> fv_add m Mid.empty
     | Fglob (mp,m)        -> EcPath.m_fv (fv_add m Mid.empty) mp
     | Flocal id           -> fv_singleton id
     | Fapp (f, args)      -> union f_fv (f :: args)
