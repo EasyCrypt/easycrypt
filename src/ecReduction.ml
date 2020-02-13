@@ -973,8 +973,14 @@ module User = struct
   type rule = EcEnv.Reduction.rule
 
   let compile ~opts ~prio (env : EcEnv.env) (p : EcPath.path) =
+    let simp =
+      if opts.EcTheory.ur_delta then
+        let hyps = EcEnv.LDecl.init env [] in
+        fun f -> odfl f (h_red_opt delta hyps f)
+      else fun f -> f in
+
     let ax = EcEnv.Ax.by_path p env in
-    let bds, rl = EcFol.decompose_forall ax.EcDecl.ax_spec in
+    let bds, rl = EcFol.decompose_forall (simp ax.EcDecl.ax_spec) in
 
     let bds =
       let filter = function
@@ -983,20 +989,19 @@ module User = struct
       in List.map filter bds in
 
     let lhs, rhs, conds =
-      let rec doit conds f =
-        let f = if opts.EcTheory.ur_delta then
-            let hyps = EcEnv.LDecl.init env [] in
-            h_red delta hyps f
-          else f in
+      try
+        let rec doit conds f =
+          match sform_of_form (simp f) with
+          | SFimp (f1, f2) -> doit (f1 :: conds) f2
+          | SFeq  (f1, f2) -> (f1, f2, List.rev conds)
+          | _ -> raise (InvalidUserRule NotAnEq)
+        in doit [] rl
 
-        match sform_of_form f with
-        | SFimp (f1, f2) -> doit (f1 :: conds) f2
-        | SFeq  (f1, f2) -> (f1, f2, List.rev conds)
-        | _ when opts.EcTheory.ur_eqtrue &&
-                 ty_equal tbool (EcEnv.ty_hnorm f.f_ty env) ->
-            (f, f_true, List.rev conds)
-        | _ -> raise (InvalidUserRule NotAnEq)
-      in doit [] rl
+      with InvalidUserRule NotAnEq
+             when opts.EcTheory.ur_eqtrue &&
+                  ty_equal tbool (EcEnv.ty_hnorm rl.f_ty env)
+           -> (rl, f_true, List.rev [])
+
     in
 
     let rule =
