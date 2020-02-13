@@ -1513,12 +1513,26 @@ let rec form_of_expr mem (e : expr) =
      f_quant (quantif_of_equantif qt) b e
 
 (* -------------------------------------------------------------------- *)
+let rec free_expr e = match e.e_node with
+  | Elocal _ | Evar _ | Eint _ -> true
+  | Eproj (e,_) -> free_expr e
+  | Etuple es -> List.for_all free_expr es
+
+  (* TODO: A: is this operation free?*)
+  | Eop _ -> true
+
+  | Eapp _ | Equant _ | Elet _ | Eif _ | Ematch _ -> false
+
+
+
 (* The cost of an expression evaluation in any memory of type [menv]
    satisfying [pre]. *)
-let cost_of_expr pre menv e = f_coe pre menv e
+let cost_of_expr pre menv e =
+  if free_expr e then f_i0 else f_coe pre menv e
 
 (* The cost of an expression evaluation in any memory of type [menv]. *)
-let cost_of_expr_any menv e = f_coe f_true menv e
+let cost_of_expr_any menv e =
+  if free_expr e then f_i0 else f_coe f_true menv e
 
 (* -------------------------------------------------------------------- *)
 type f_subst = {

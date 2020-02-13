@@ -19,18 +19,18 @@ module type Adv (H : Oracle) = {
   proc a2(x : int) : int
 }.
 
-(***********************)
-(* START Other example *)
+(*****************)
+(* Other example *)
 
-(* Remark that we have two possibility to give module restrictions. *)
+(* We have two possibility to give module restrictions. *)
 (* We can give the restrictions function by function, e.g.: *)
-module type DAdv (H1 : Oracle) (H : Oracle) = {
+module type OAdv (H1 : Oracle) (H : Oracle) = {
   proc a1(x : int) : int * int {H.o : k1, H1.o : 1} 
   proc a2(x : int) : int       {H.o : k2, H1.o : 3} 
 }.
 
 (* Or we can  give the restrictions at the top-level, e.g.: *)
-module type DAdvBis (H1 : Oracle, H : Oracle) 
+module type OAdvBis (H1 : Oracle, H : Oracle) 
   [a1 : {H.o, H1.o; H.o : k1, H1.o : 1 },
    a2 : {H.o, H1.o; H.o : k2, H1.o : 3 }]
  = {
@@ -38,9 +38,7 @@ module type DAdvBis (H1 : Oracle, H : Oracle)
   
   proc a2(x : int) : int
 }.
-
-(*         END         *)
-(***********************)
+(*****************)
 
 (* Inverter *)
 module I (A : Adv) (H : Oracle) = {
@@ -75,7 +73,7 @@ section.
 
   local lemma bound_i :     
     choare[I0.invert: true ==> true] 
-    time [3 + k1 + k2; I(A,H).A0.a1 : 1; I(A,H).A0.a2 : 1; H.o : k1 + k2].
+    time [3 + 2 * k1 + 2 * k2; I(A,H).A0.a1 : 1; I(A,H).A0.a2 : 1; H.o : k1 + k2].
   proof.
   proc.
   seq 3 : (size I.qs <= k1 + k2) [k1 + k2].
@@ -88,8 +86,7 @@ section.
   proc.
   call (_: true; time).
   wp; skip => *. 
-  split => /=. 
-  by smt.
+  split => /=; [1: by smt].
   admit.
   call (_: true;
     (I(A, H).QRO.o : size I.qs)
@@ -98,15 +95,14 @@ section.
   => * /=.
   (* We prove that the invariant is preserved by calls to the oracle QRO. *)
   proc; call (_: true; time); wp; skip => *.
-  split. by smt.
+  split; [1: by smt].
+  split; [2: by smt].
   admit.
   wp; skip => *.
-  split => * /=. by smt. 
-  split.
-  admit.
-  search (big _ _ _).
+  split => * /=; [1: by smt].
+  split;
   rewrite !big_constz !count_predT !size_range [smt (k1p k2p)].
-  (* wp (size I.qs <= k1 + k2). *)
+  (* wp (size I.qs <= k1 + k2). *)  
   admit.
 qed.
 
@@ -129,27 +125,18 @@ module A = {
 lemma silly : choare[A.g : true ==> true] time [3].
 proof.
 proc.
-wp =>//.
+wp; skip => *; split => //.
 admit.
 qed.
 
-lemma silly2 : choare[A.g : true ==> true] time [2].
-proof.
-proc.
-wp.
-skip.
-(* We ran out of time. *)
-admit. 
-qed.
-
-lemma silly3 : choare[A.f : true ==> true] time [7].
+lemma silly3 : choare[A.f : true ==> true] time [4].
 proof.
 proc.
 call silly.
 (* Alternatively, we can do: *)
-(* call (_: true ==> true time [3]). *)
+(* call (_: true ==> true time [1]). *)
 (* apply silly. *)
-wp =>//.
+wp; skip => *; split =>//.
 admit.
 qed.
 
@@ -157,26 +144,25 @@ module B = {
   proc f (x, y) : int = {
     var r : int;
     if (y < x) {
-      r <- 1;
-      r <- 1;
+      r <- 1 + 1;
+      r <- 1 + 1;
      } else {
-      r <- 2;
-      r <- 2;
+      r <- 2 + 1;
+      r <- 2 + 1;
     }
     return r;
   }
 }.
 
 (* For if statements, we add the cost of both branches. *)
-lemma silly4 : choare[B.f : true ==> true] time [6].
+lemma silly4 : choare[B.f : true ==> true] time [5].
 proof.
 proc.
-wp=>//.
+wp; skip => *; split => //.
 admit.
 qed.
 
 module C = { 
-
   var g : int
 
   proc f (x, y) : int = {
@@ -188,9 +174,10 @@ module C = {
 }.
 
 lemma silly5 : forall (a : int) (b : int), 
+0 <= a /\ 0 <= b =>
 choare[C.f : x = a /\ y = b /\ x < y ==> true] time [2 * (a - b) + 1].
 proof.
-move => a b => /=.
+move => a b p => /=.
 proc.
 (* - invariant, 
    - increasing quantity starting from zero
@@ -200,7 +187,7 @@ while (x <= y /\ y = b) (x - a) (b - a) [fun _ => 1] => *.
 
 (* prove that the loop body preserves the invariant, and cost what was stated. *)
 wp; skip => * /=.
-split => /=. by smt.
+split; [1: by smt].
 admit.
 
 (* prove that the invariant and loop condition implies that we have not reached 
@@ -209,7 +196,7 @@ by smt.
 
 (* we prove that the invariant implies the post, and that the cost of all
  iterations is smaller than the final cost. *)
-skip => &hr hyp => /=.
-split. by smt.
+skip => * => //; split; [1: by smt].
+rewrite !big_constz !count_predT !size_range. 
 admit.
 qed.
