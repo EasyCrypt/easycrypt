@@ -193,13 +193,16 @@ and pformula_r =
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
   | PFChoareF  of pformula * pgamepath * pformula * pcost
-  | PFCoe      of psymbol option * pmemtype option * pformula * pexpr
+  | PFCoe      of osymbol * pmemtype option * pformula * pexpr
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = pmemtype_el list
 
 and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list
+
+and pgscbinding  = psymbol list * pty
+and pgscbindings = pgscbinding list
 
 and pgty =
 | PGTY_Type  of pty
@@ -955,12 +958,14 @@ and pcut =
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind =
+| PSchema
 | PAxiom of psymbol list
 | PLemma of ptactics option
 | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
+  pa_scvars  : pgscbindings option;
   pa_tyvars  : (psymbol * pqsymbol list) list option;
   pa_vars    : pgtybindings option;
   pa_formula : pformula;

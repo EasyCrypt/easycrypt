@@ -60,6 +60,7 @@ val pp_tyname  : PPEnv.t -> path pp
 val pp_axname : PPEnv.t -> path pp
 
 val pp_mem      : PPEnv.t -> EcIdent.t pp
+val pp_memtype  : PPEnv.t -> EcMemory.memtype pp
 val pp_tyvar    : PPEnv.t -> ident pp
 val pp_tyunivar : PPEnv.t -> EcUid.uid pp
 val pp_path     : path pp

@@ -1,5 +1,21 @@
 require import Int List CHoareTactic StdBigop.
-import Bigint BIA.
+import Bigint IntExtra.
+
+schema plus_cost ['a] {e e' : int}: 
+cost[true : e + e'] = 
+cost[true : e] + cost[true : e'] + 1 .
+print plus_cost.
+
+lemma foo : cost(_:{})[true : 1 + 2] = 1.
+proof.
+admit.
+qed.
+
+lemma bar : 
+cost(_ : {z : int})[z = 1 : z + 2] = 1.
+proof.
+
+
 
 (*****************)
 (* Example BR93: *)
@@ -198,5 +214,6 @@ by smt.
  iterations is smaller than the final cost. *)
 skip => * => //; split; [1: by smt].
 rewrite !big_constz !count_predT !size_range. 
+print list_ind.
 admit.
 qed.

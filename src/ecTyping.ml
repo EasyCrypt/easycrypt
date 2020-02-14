@@ -153,6 +153,8 @@ type tyerror =
 | MemNotAllowed
 | UnknownScope           of qsymbol
 | FilterMatchFailure
+| MissingMemType
+| SchemaVariableReBinded of EcIdent.t
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -2554,7 +2556,9 @@ and trans_gbinding env ue decl =
   in snd_map List.flatten (List.map_fold trans1 env decl)
 
 (* -------------------------------------------------------------------- *)
-and trans_form_or_pattern env ?mv ?ps ue pf tt =
+(* [imp_mt] is an optional implicit memtype, used in schemas. *)
+and trans_form_or_pattern
+    env ?mv ?ps ~(schema_mt:sc_params option) ue pf tt =
   let state = PFS.create () in
 
   let rec transf_r opsc env f =
@@ -3116,27 +3120,87 @@ and trans_form_or_pattern env ?mv ?ps ue pf tt =
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
         f_eagerF pre' s1 fpath1 fpath2 s2 post'
 
+    | PFCoe (mem, pmemtype, form, expr) ->
+      let mem = omap_dfl (fun m ->
+          EcIdent.create (unloc m)) EcCoreFol.mhr (unloc mem) in
+
+      match pmemtype, schema_mt with
+      | None, None ->
+        tyerror f.pl_loc env MissingMemType
+
+      | None, Some schema_mt ->        (* Schema local memtype case *)
+        let env =
+          try EcEnv.Var.bind_locals ~uniq:true schema_mt env with
+          | EcEnv.Var.DuplicatedLocalBinding n ->
+            tyerror f.pl_loc env (SchemaVariableReBinded n) in
+        let memenv = EcMemory.schema mem in
+
+        let fenv = EcEnv.Memory.push_active memenv env in
+        let form' = transf fenv form in
+        unify_or_fail fenv ue form.pl_loc ~expct:tbool form'.f_ty;
+
+        let expr' = transexpcast fenv `InOp ue tint expr in
+
+        f_coe form' memenv expr'
+
+      | Some mt, _ ->           (* Concrete local memtype case *)
+        let memenv = trans_memtype env ue mem mt in
+
+        let fenv = EcEnv.Memory.push_active memenv env in
+        let form' = transf fenv form in
+        unify_or_fail fenv ue form.pl_loc ~expct:tbool form'.f_ty;
+
+        let expr' = transexpcast fenv `InProc ue tint expr in
+
+        f_coe form' memenv expr'
   in
 
   let f = transf_r None env pf in
   tt |> oiter (fun tt -> unify_or_fail env ue pf.pl_loc ~expct:tt f.f_ty);
   f
 
-(* -------------------------------------------------------------------- *)
-and trans_form_opt env ?mv ue pf oty =
-  trans_form_or_pattern env ?mv ue pf oty
+(* Type-check a memtype. *)
+and trans_memtype env ue mem pmemtype =
+  let mt = EcMemory.empty_local ~witharg:false mem in
+
+  let add_decl memenv (vars, pty) =
+    let env   = EcEnv.Memory.push_active memenv env in
+    (* TODO: A: check that we want tp_uni *)
+    let ty = transty tp_uni env ue pty in
+
+    let xs     = snd (unloc vars) in
+    let mode   = fst (unloc vars) in
+
+    let xsvars = List.map (fun _ -> UE.fresh ue) xs in
+    let () = match mode with
+      | `Single ->
+        List.iter (fun a -> EcUnify.unify env ue a ty) xsvars
+      | `Tuple  ->
+        unify_or_fail env ue (loc vars) ~expct:ty (ttuple xsvars) in
+
+    (* building the list of locals *)
+    let xs = List.map2 (fun x ty ->
+        {v_name = x.pl_desc; v_type = ty}, x.pl_loc) xs xsvars in
+
+    fundef_add_symbol env memenv xs in
+
+  List.fold_left add_decl mt pmemtype
 
 (* -------------------------------------------------------------------- *)
-and trans_form env ?mv ue pf ty =
-  trans_form_opt env ?mv ue pf (Some ty)
+and trans_form_opt env ?mv ?(schema_mt:sc_params option) ue pf oty =
+  trans_form_or_pattern env ?mv ~schema_mt:schema_mt ue pf oty
 
 (* -------------------------------------------------------------------- *)
-and trans_prop env ?mv ue pf =
-  trans_form env ?mv ue pf tbool
+and trans_form env ?mv ?(schema_mt:sc_params option) ue pf ty =
+  trans_form_opt env ?mv ?schema_mt:schema_mt ue pf (Some ty)
+
+(* -------------------------------------------------------------------- *)
+and trans_prop env ?mv ?(schema_mt:sc_params option) ue pf =
+  trans_form env ?mv ?schema_mt:schema_mt ue pf tbool
 
 (* -------------------------------------------------------------------- *)
 and trans_pattern env ps ue pf =
-  trans_form_or_pattern env ~ps ue pf None
+  trans_form_or_pattern env ~ps ~schema_mt:None ue pf None
 
 (* -------------------------------------------------------------------- *)
 let get_instances (tvi, bty) env =

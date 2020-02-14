@@ -40,7 +40,12 @@ let mk_lmt mt_name mt_decl mt_proj =
     mt_n  = List.length mt_decl;
   }
 
-type memtype = local_memtype option
+(* [Lmt_schema] if for an axiom schema, and is instantiated to a concrete
+   memory type when the axiom schema is.  *)
+(* TODO: A: check what to do with Lmt_schema in this module (cf assert false)*)
+type memtype =
+  | Lmt_concrete of local_memtype option
+  | Lmt_schema
 
 let lmem_hash lmem =
   let el_hash (s,(i,ty)) =
@@ -60,29 +65,44 @@ let lmem_hash lmem =
       mt_proj_hash; ]
 
 let mt_fv = function
-  | None -> EcIdent.Mid.empty
-  | Some lmt ->
-    List.fold_left (fun fv v -> EcIdent.fv_union fv v.v_type.ty_fv) EcIdent.Mid.empty lmt.mt_decl
+  | Lmt_schema              -> EcIdent.Mid.empty
+  | Lmt_concrete None       -> EcIdent.Mid.empty
+  | Lmt_concrete (Some lmt) ->
+    List.fold_left (fun fv v ->
+        EcIdent.fv_union fv v.v_type.ty_fv
+      ) EcIdent.Mid.empty lmt.mt_decl
 
 let lmt_equal ty_equal mt1 mt2 =
   mt1.mt_name = mt2.mt_name &&
-    List.all2 (fun v1 v2 -> v1.v_name = v2.v_name && ty_equal v1.v_type v2.v_type)
-      mt1.mt_decl mt2.mt_decl
+  List.all2 (fun v1 v2 -> v1.v_name = v2.v_name && ty_equal v1.v_type v2.v_type)
+    mt1.mt_decl mt2.mt_decl
 
-let mt_equal_gen ty_equal mt1 mt2 = oeq (lmt_equal ty_equal) mt1 mt2
+let mt_equal_gen ty_equal mt1 mt2 =
+  match mt1, mt2 with
+  | Lmt_schema,     Lmt_schema -> true
+
+  | Lmt_schema,     Lmt_concrete _
+  | Lmt_concrete _,   Lmt_schema -> false
+
+  | Lmt_concrete mt1, Lmt_concrete mt2 ->
+    oeq (lmt_equal ty_equal) mt1 mt2
 
 let mt_equal = mt_equal_gen ty_equal
 
-let mt_iter_ty f mt =
-  oiter (fun lmt -> List.iter (fun v -> f v.v_type) lmt.mt_decl) mt
+let mt_iter_ty f mt = match mt with
+  | Lmt_schema -> ()
+  | Lmt_concrete mt ->
+    oiter (fun lmt -> List.iter (fun v -> f v.v_type) lmt.mt_decl) mt
 
 (* -------------------------------------------------------------------- *)
 type memenv = memory * memtype
 
-let mem_hash (mem,mt) =
-  Why3.Hashcons.combine
-    (EcIdent.id_hash mem)
-    (Why3.Hashcons.combine_option lmem_hash mt)
+let mem_hash (mem,mt) = match mt with
+  | Lmt_schema -> 0
+  | Lmt_concrete mt ->
+    Why3.Hashcons.combine
+      (EcIdent.id_hash mem)
+      (Why3.Hashcons.combine_option lmem_hash mt)
 
 let me_equal_gen ty_equal (m1,mt1) (m2,mt2) =
   mem_equal m1 m2 && mt_equal_gen ty_equal mt1 mt2
@@ -98,10 +118,16 @@ exception DuplicatedMemoryBinding of symbol
 
 (* -------------------------------------------------------------------- *)
 let empty_local ~witharg (me : memory) =
-  (me, Some (mk_lmt (if witharg then Some arg_symbol else None) [] Msym.empty))
+  let lmt = mk_lmt (if witharg then Some arg_symbol else None) [] Msym.empty in
+  (me, Lmt_concrete (Some lmt))
 
-let abstract_mt = None
+let schema_mt = Lmt_schema
+let schema (me:memory) = me, schema_mt
+
+let abstract_mt = Lmt_concrete None
 let abstract (me:memory) = me, abstract_mt
+
+let is_schema = function Lmt_schema -> true | _ -> false
 
 (* -------------------------------------------------------------------- *)
 
@@ -110,13 +136,15 @@ let is_bound_lmt x lmt =
 
 let is_bound x mt =
   match mt with
-  | None -> false
-  | Some lmt -> is_bound_lmt x lmt
+  | Lmt_schema -> false
+  | Lmt_concrete None -> false
+  | Lmt_concrete (Some lmt) -> is_bound_lmt x lmt
 
 let lookup (x : symbol) (mt : memtype) : (variable * proj_arg option * int option) option =
   match mt with
-  | None -> None
-  | Some lmt ->
+  | Lmt_schema        -> None
+  | Lmt_concrete None -> None
+  | Lmt_concrete (Some lmt) ->
     if lmt.mt_name = Some x then
       Some ({v_name = x; v_type = lmt.mt_ty}, None, None)
     else
@@ -157,13 +185,13 @@ let bindall_lmt (vs:variable list) lmt =
 
 let bindall (vs:variable list) ((m,mt) : memenv) =
   match mt with
-  | None -> assert false
-  | Some lmt -> m, Some (bindall_lmt vs lmt)
+  | Lmt_schema | Lmt_concrete None -> assert false
+  | Lmt_concrete (Some lmt) -> m, Lmt_concrete (Some (bindall_lmt vs lmt))
 
 let bindall_fresh (vs:variable list) ((m,mt) : memenv) =
   match mt with
-  | None -> assert false
-  | Some lmt ->
+  | Lmt_schema | Lmt_concrete None -> assert false
+  | Lmt_concrete (Some lmt) ->
     let is_bound x m = Some x = lmt.mt_name || Msym.mem x m in
     let fresh_pv m v =
       let name = v.v_name in
@@ -180,7 +208,7 @@ let bindall_fresh (vs:variable list) ((m,mt) : memenv) =
         Msym.add name (-1,v.v_type) m, {v with v_name = name } in
     let _, vs = List.map_fold fresh_pv lmt.mt_proj vs in
     let lmt = bindall_lmt vs lmt in
-    (m,Some lmt), vs
+    (m, Lmt_concrete (Some lmt)), vs
 
 let bind_fresh v me =
   let me, vs = bindall_fresh [v] me in
@@ -190,8 +218,9 @@ let bind_fresh v me =
 
 let mt_subst st o =
   match o with
-  | None -> o
-  | Some mt ->
+  | Lmt_schema -> o
+  | Lmt_concrete None -> o
+  | Lmt_concrete (Some mt) ->
     let decl = mt.mt_decl in
     let decl' =
       if st == identity then decl
@@ -201,7 +230,9 @@ let mt_subst st o =
             if ty_equal vty.v_type ty' then vty else {vty with v_type = ty'}) decl in
     if decl == decl' then o
     else
-      Some (mk_lmt mt.mt_name decl' (Msym.map (fun (i,ty) -> i, st ty) mt.mt_proj))
+      let lmt = mk_lmt
+          mt.mt_name decl' (Msym.map (fun (i,ty) -> i, st ty) mt.mt_proj) in
+      Lmt_concrete (Some lmt)
 
 let me_subst sm st (m,mt as me) =
   let m' = EcIdent.Mid.find_def m m sm in
@@ -212,13 +243,15 @@ let me_subst sm st (m,mt as me) =
 (* -------------------------------------------------------------------- *)
 let for_printing mt =
   match mt with
-  | None -> None
-  | Some mt -> Some (mt.mt_name, mt.mt_decl)
+  | Lmt_schema -> None
+  | Lmt_concrete None -> None
+  | Lmt_concrete (Some mt) -> Some (mt.mt_name, mt.mt_decl)
 
 let get_name s p (_,mt) =
   match mt with
-  | None -> None
-  | Some mt ->
+  | Lmt_schema        -> None
+  | Lmt_concrete None -> None
+  | Lmt_concrete (Some mt) ->
     match p with
     | None ->
       if Some s = mt.mt_name then
@@ -240,7 +273,11 @@ let get_name s p (_,mt) =
 
 let local_type mt =
   match mt with
-  | None -> None
-  | Some mt -> Some (ttuple (List.map v_type mt.mt_decl))
+  | Lmt_schema -> assert false
+  | Lmt_concrete None -> None
+  | Lmt_concrete (Some mt) -> Some (ttuple (List.map v_type mt.mt_decl))
 
-let has_locals mt = mt <> None
+let has_locals mt = match mt with
+  | Lmt_concrete (Some _) -> true
+  | Lmt_concrete None -> false
+  | Lmt_schema -> assert false

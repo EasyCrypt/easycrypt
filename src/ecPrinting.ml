@@ -1611,8 +1611,11 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Fcoe coe ->
       let ppe = PPEnv.push_mem ppe ~active:true coe.coe_mem in
       let m, mt = coe.coe_mem in
-      let (subppe, pp) = pp_bindings ppe ~fv:f.f_fv [m, GTmem mt] in
-      Format.fprintf fmt "coe%t[@[<hov 2>@[%a@] |-@ @[%a@]@]]"
+      let (subppe, pp) =
+        if EcMemory.is_schema mt
+        then (ppe, fun _ -> ())
+        else pp_bindings ppe ~fv:f.f_fv [m, GTmem mt] in
+      Format.fprintf fmt "cost%t[@[<hov 2>@[%a@] :@ @[%a@]@]]"
         pp
         (pp_form subppe) coe.coe_pre
         (pp_expr subppe) coe.coe_e
@@ -1909,6 +1912,24 @@ let pp_tyvarannot (ppe : PPEnv.t) fmt ids =
   | []  -> ()
   | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar_ctt ppe)) ids
 
+let pp_scvar ppe fmt vs =
+  let rec grp_vs acc l = match l, acc with
+    | [],_ -> List.rev_map (fun (l,ty) -> List.rev l, ty) acc
+    | (a,ty) :: l, (l',cty) :: acc ->
+      if EcTypes.ty_equal ty cty
+      then grp_vs ((a :: l', cty) :: acc) l
+      else grp_vs (([a],ty) :: (l', cty) :: acc) l
+    | (a,ty) :: l, [] -> grp_vs [[a],ty] l in
+
+  let vs = grp_vs [] vs in
+
+  (* TODO: A: not sure we want pp_tyvar there *)
+  let pp_grp fmt (l,ty) =
+    Format.fprintf fmt "{%a :@ %a}"
+      (pp_list "@ " (pp_tyvar ppe)) l (pp_type ppe) ty in
+
+  pp_list "@ " pp_grp fmt vs
+
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in
@@ -2107,22 +2128,29 @@ let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
 let string_of_axkind = function
   | `Axiom _ -> "axiom"
   | `Lemma   -> "lemma"
+  | `Schema  -> "schema"
 
 let tags_of_axkind = function
   | `Axiom (x, _) -> List.sort sym_compare (Ssym.elements x)
   | `Lemma -> []
+  | `Schema -> []
 
 let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
   let ppe = PPEnv.add_locals ppe (List.map fst ax.ax_tparams) in
+  let ppe = PPEnv.add_locals ppe (List.map fst ax.ax_scparams) in
   let basename = P.basename x in
 
   let pp_spec fmt =
     pp_form ppe fmt ax.ax_spec
 
   and pp_name fmt =
-    match ax.ax_tparams with
-    | [] -> Format.fprintf fmt "%s"    basename
-    | ts -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
+    match ax.ax_tparams, ax.ax_scparams with
+    | [],[] -> Format.fprintf fmt "%s"    basename
+    | ts,[] -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
+    | [],sc -> Format.fprintf fmt "%s %a" basename (pp_scvar ppe) sc
+    | ts,sc ->
+      Format.fprintf fmt "%s %a %a" basename
+        (pp_tyvarannot ppe) ts (pp_scvar ppe) sc
 
   and pp_tags fmt =
     let tags = tags_of_axkind ax.ax_kind in

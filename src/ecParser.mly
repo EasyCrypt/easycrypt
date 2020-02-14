@@ -88,8 +88,9 @@
   let pflist loc ti (es : pformula    list) : pformula    =
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ?(local = false) ?(nosmt = false) (x, ty, vd, f) k =
+  let mk_axiom ?(local = false) ?(nosmt = false) (x, scv, ty, vd, f) k =
     { pa_name    = x;
+      pa_scvars  = scv;
       pa_tyvars  = ty;
       pa_vars    = vd;
       pa_formula = f;
@@ -394,6 +395,7 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
+%token CHOARE
 %token CLASS
 %token CLEAR
 %token CLONE
@@ -403,6 +405,7 @@
 %token CONGR
 %token CONSEQ
 %token CONST
+%token COST
 %token CUT
 %token DEBUG
 %token DECLARE
@@ -447,7 +450,6 @@
 %token HAVE
 %token HINT
 %token HOARE
-%token CHOARE
 %token IDTAC
 %token IF
 %token IFF
@@ -528,6 +530,7 @@
 %token RRARROW
 %token RWNORMAL
 %token SAMPLE
+%token SCHEMA
 %token SEARCH
 %token SECTION
 %token SELF
@@ -1022,6 +1025,19 @@ ptybindings_decl:
     { List.flatten x }
 
 (* -------------------------------------------------------------------- *)
+sc_var_ty:
+| x=ident+ COLON ty=loc(type_exp)
+    { (x,ty) }
+
+sc_ptybinding1:
+| LBRACE bds=plist1(sc_var_ty, COMMA) RBRACE
+    { bds }
+
+sc_ptybindings_decl:
+| x=sc_ptybinding1+
+    { List.flatten x }
+
+(* -------------------------------------------------------------------- *)
 (* Formulas                                                             *)
 
 %inline sform_r(P): x=loc(sform_u(P)) { x }
@@ -1245,6 +1261,8 @@ form_u(P):
 
 | CHOARE pb=choare_body(P) { pb }
 
+| COST pb=coe_body(P)      { pb }
+
 | LOSSLESS mp=loc(fident)
     { PFlsless mp }
 
@@ -1293,6 +1311,13 @@ choare_body(P):
   TIME
   c=costs(P)
   { PFChoareF (pre, mp, post, c) }
+
+coe_body(P):
+| LBRACKET o=loc(empty) f=form_r(P) COLON e=expr RBRACKET
+    { PFCoe (mk_loc (loc o) None, None, f, e) }
+| LPAREN m=bdident COLON mt=memtype RPAREN LBRACKET f=form_r(P)
+  COLON e=expr RBRACKET
+    { PFCoe (m, Some mt, f, e) }
 
 equiv_body(P):
   mp1=loc(fident) TILD mp2=loc(fident)
@@ -1452,6 +1477,13 @@ loc_decl_r:
 
 loc_decl:
 | x=loc_decl_r SEMICOLON { x }
+
+memtype_decl:
+| x=loc(loc_decl_names) COLON ty=loc(type_exp)
+    { x,ty }
+
+memtype:
+| LBRACE m=rlist0(memtype_decl,SEMICOLON) RBRACE {m}
 
 ret_stmt:
 | RETURN e=expr SEMICOLON
@@ -1965,8 +1997,11 @@ top_decl:
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
-lemma_decl :
-| x=ident tyvars=tyvars_decl? pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
+lemma_decl:
+| x=ident
+  tyvars=tyvars_decl? scvars=sc_ptybindings_decl? pd=pgtybindings?
+  COLON f=form
+    { x,scvars,tyvars,pd,f }
 
 nosmt:
 | NOSMT { true  }
@@ -1985,6 +2020,9 @@ axiom:
 | l=local AXIOM ids=bracket(ident+)? o=nosmt d=lemma_decl
     { mk_axiom ~local:l ~nosmt:o d (PAxiom (odfl [] ids)) }
 
+| l=local SCHEMA o=nosmt d=lemma_decl
+    { mk_axiom ~local:l ~nosmt:o d PSchema }
+
 | l=local LEMMA o=nosmt d=lemma_decl ao=axiom_tc
     { mk_axiom ~local:l ~nosmt:o d ao }
 
@@ -1992,7 +2030,7 @@ axiom:
 | l=local  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
 | l=local PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
 | l=local CHOARE x=ident pd=pgtybindings? COLON p=loc(choare_body(none)) ao=axiom_tc
-    { mk_axiom ~local:l (x, None, pd, p) ao }
+    { mk_axiom ~local:l (x, None, None, pd, p) ao }
 
 proofend:
 | QED      { `Qed   }

@@ -870,6 +870,9 @@ module Ax = struct
     let loc = ax.pl_loc and ax = ax.pl_desc in
     let ue  = TT.transtyvars scope.sc_env (loc, ax.pa_tyvars) in
 
+    if ax.pa_kind <> PSchema && ax.pa_scvars <> None then
+      hierror "can only have schema variables in schema";
+
     if ax.pa_local && not (EcSection.in_section scope.sc_section) then
       hierror "cannot declare a local lemma outside of a section";
 
@@ -888,7 +891,19 @@ module Ax = struct
     let tintro = mk_loc loc (Plogic (Pmove prevertv0)) in
     let tintro = { pt_core = tintro; pt_intros = [`Ip ip]; } in
 
-    let concl = TT.trans_prop scope.sc_env ue pconcl in
+    let scparams =
+      match ax.pa_scvars with
+      | None -> None
+      | Some scv ->
+        List.map (fun (vs,pty) ->
+            (* TODO: A: check the typing policy there. *)
+            let ty = TT.transty tp_tydecl scope.sc_env ue pty in
+            List.map (fun v -> EcIdent.create (unloc v), ty) vs
+          ) scv
+        |> List.flatten
+        |> some in
+
+    let concl = TT.trans_prop scope.sc_env ?schema_mt:scparams ue pconcl in
 
     if not (EcUnify.UniEnv.closed ue) then
       hierror "the formula contains free type variables";
@@ -900,12 +915,14 @@ module Ax = struct
       let kind =
         match ax.pa_kind with
         | PAxiom tags -> `Axiom (Ssym.of_list (List.map unloc tags), false)
-        | _ -> `Lemma
+        | PLemma _ | PILemma -> `Lemma
+        | PSchema -> `Schema
 
-      in { ax_tparams = tparams;
-           ax_spec    = concl;
-           ax_kind    = kind;
-           ax_nosmt   = ax.pa_nosmt; }
+      in { ax_tparams  = tparams;
+           ax_scparams = odfl [] scparams;
+           ax_spec     = concl;
+           ax_kind     = kind;
+           ax_nosmt    = ax.pa_nosmt; }
     in
 
     let check    = Check_mode.check scope.sc_options in
@@ -925,6 +942,8 @@ module Ax = struct
 
     if ax.pa_local && EcDecl.is_axiom axd.ax_kind then
       hierror "an axiom cannot be local";
+    if ax.pa_local && EcDecl.is_schema axd.ax_kind then
+      hierror "a schema cannot be local";
 
     match ax.pa_kind with
     | PILemma ->
@@ -942,6 +961,12 @@ module Ax = struct
     | PAxiom _ ->
         Some (unloc ax.pa_name),
         bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
+
+    | PSchema ->
+      (* TODO: A: do this with Benjamin *)
+      Some (unloc ax.pa_name),
+      bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
+
 
   (* ------------------------------------------------------------------ *)
   and add_defer (scope : scope) proofs =
@@ -1239,6 +1264,7 @@ module Op = struct
                List.combine axpm (List.map snd tparams)) in
           let ax =
             { ax_tparams = axpm;
+              ax_scparams = [];
               ax_spec    = ax;
               ax_kind    = `Axiom (Ssym.empty, false);
               ax_nosmt   = false; }
@@ -1291,6 +1317,7 @@ module Op = struct
 
       let ax =
         { ax_tparams = List.map (fun ty -> (ty, Sp.empty)) nparams;
+          ax_scparams = [];
           ax_spec    = ax;
           ax_kind    = `Axiom (Ssym.empty, false);
           ax_nosmt   = false; } in
@@ -1665,6 +1692,7 @@ module Ty = struct
            if not (Mstr.mem x symbs) then
              let ax = {
                ax_tparams = [];
+               ax_scparams = [];
                ax_spec    = req;
                ax_kind    = `Lemma;
                ax_nosmt   = true;
@@ -1678,6 +1706,7 @@ module Ty = struct
           let t  = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]) } in
           let t  = { pt_core = t; pt_intros = []; } in
           let ax = { ax_tparams = [];
+                     ax_scparams = [];
                      ax_spec    = f;
                      ax_kind    = `Axiom (Ssym.empty, false);
                      ax_nosmt   = true; } in
@@ -2152,6 +2181,7 @@ module Section = struct
                               EcSection.generalize scenv locals ax.ax_spec })
                   else
                     scope
+            | `Schema -> assert false   (* TODO: A: Benjamin, this is for you *)
           end
 
           | T.CTh_export p ->

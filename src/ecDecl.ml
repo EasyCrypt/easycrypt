@@ -132,16 +132,20 @@ type operator = {
 }
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
+type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma | `Schema]
+
+type sc_params = (EcIdent.t * ty) list
 
 type axiom = {
-  ax_tparams : ty_params;
-  ax_spec    : EcCoreFol.form;
-  ax_kind    : axiom_kind;
-  ax_nosmt   : bool; }
+  ax_tparams  : ty_params;
+  ax_scparams : sc_params;
+  ax_spec     : EcCoreFol.form;
+  ax_kind     : axiom_kind;
+  ax_nosmt    : bool; }
 
-let is_axiom (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
-let is_lemma (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
+let is_axiom  (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
+let is_lemma  (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
+let is_schema (x : axiom_kind) = match x with `Schema  -> true | _ -> false
 
 (* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
@@ -261,10 +265,11 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 
-  { ax_tparams = axpm;
-    ax_spec    = axspec;
-    ax_kind    = `Axiom (Ssym.empty, false);
-    ax_nosmt   = nosmt; }
+  { ax_tparams  = axpm;
+    ax_scparams = [];
+    ax_spec     = axspec;
+    ax_kind     = `Axiom (Ssym.empty, false);
+    ax_nosmt    = nosmt; }
 
 (* -------------------------------------------------------------------- *)
 type typeclass = {

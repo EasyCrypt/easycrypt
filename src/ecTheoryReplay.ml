@@ -355,7 +355,8 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, ax) =
                      Some (pt, axclear)
                    else None)
                 ove.ovre_glproof
-      end
+        end
+      | `Schema -> assert false   (* TODO: A: Benjamin, this is for you *)
     in
       match doproof with
       | None -> (ax, proofs, false)

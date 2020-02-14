@@ -41,8 +41,12 @@ val memtype  : memenv -> memtype
 (* -------------------------------------------------------------------- *)
 (* [empty_local witharg id] if witharg then allows to use symbol "arg"  *)
 val empty_local : witharg:bool -> memory -> memenv
+val schema    : memory -> memenv
+val schema_mt : memtype
 val abstract    : memory -> memenv
 val abstract_mt : memtype
+
+val is_schema : memtype -> bool
 
 exception DuplicatedMemoryBinding of symbol
 val bindall : variable list -> memenv -> memenv

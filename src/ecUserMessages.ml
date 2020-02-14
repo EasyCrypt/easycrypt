@@ -468,6 +468,10 @@ end = struct
     | MissingMemType ->
         msg "memory type missing"
 
+    | SchemaVariableReBinded id ->
+        msg "the schema variable %a has been rebinded"
+            EcIdent.pp_ident id
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 

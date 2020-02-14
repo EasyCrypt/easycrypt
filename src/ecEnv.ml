@@ -738,10 +738,11 @@ module MC = struct
       let axp  = EcPath.prefix (Lazy.force mypath) in
       let axp  = IPPath (EcPath.pqoname axp name) in
       let ax   =
-        { ax_kind    = `Axiom (Ssym.empty, false);
-          ax_tparams = tv;
-          ax_spec    = cl;
-          ax_nosmt   = false; } in
+        { ax_kind     = `Axiom (Ssym.empty, false);
+          ax_scparams = [];
+          ax_tparams  = tv;
+          ax_spec     = cl;
+          ax_nosmt    = false; } in
       (name, (axp, ax))) ax in
 
     List.fold_left (fun mc -> curry (_up_axiom candup mc)) mc ax
@@ -786,6 +787,7 @@ module MC = struct
             let do1 scheme name =
               let scname = Printf.sprintf "%s_%s" x name in
                 (scname, { ax_tparams = tyd.tyd_params;
+                           ax_scparams = [];
                            ax_spec    = scheme;
                            ax_kind    = `Axiom (Ssym.empty, false);
                            ax_nosmt   = true; })
@@ -821,6 +823,7 @@ module MC = struct
           let scheme =
             let scname = Printf.sprintf "%s_ind" x in
               (scname, { ax_tparams = tyd.tyd_params;
+                         ax_scparams = [];
                          ax_spec    = scheme;
                          ax_kind    = `Axiom (Ssym.empty, false);
                          ax_nosmt   = true; })
@@ -906,6 +909,7 @@ module MC = struct
           (fun (x, ax) ->
             let ax = Fsubst.f_subst fsubst ax in
               (x, { ax_tparams = [(self, Sp.singleton mypath)];
+                    ax_scparams = [];
                     ax_spec    = ax;
                     ax_kind    = `Axiom (Ssym.empty, false);
                     ax_nosmt   = true; }))
@@ -1789,14 +1793,18 @@ module Var = struct
       (fun env (name, ty) -> bind_pvglob name ty env)
       env bindings
 
-   let bind_local name ty env =
-     let s = EcIdent.name name in
-       { env with
-           env_locals = MMsym.add s (name, ty) env.env_locals }
+  exception DuplicatedLocalBinding of EcIdent.t
 
-   let bind_locals bindings env =
+   let bind_local ?uniq:(uniq=false) name ty env =
+     let s = EcIdent.name name in
+     if uniq && MMsym.all s env.env_locals <> [] then
+       raise (DuplicatedLocalBinding name);
+     { env with
+       env_locals = MMsym.add s (name, ty) env.env_locals }
+
+   let bind_locals ?uniq:(uniq=false) bindings env =
      List.fold_left
-       (fun env (name, ty) -> bind_local name ty env)
+       (fun env (name, ty) -> bind_local ~uniq:uniq name ty env)
        env bindings
 
 end
@@ -2460,7 +2468,7 @@ module NormMp = struct
           then f else
             f_cHoareF pre' p' post' {c_self = c_self'; c_calls = c_calls' }
 
-        (* TODO: why is there no case for FbdHoareF and every F*HoareS ? *)
+        (* TODO: A: why is there no case for FbdHoareF and every F*HoareS ? *)
 
         | FequivF ef ->
           let pre' = aux ef.ef_pr and l' = norm_xfun env ef.ef_fl
@@ -2473,7 +2481,10 @@ module NormMp = struct
           let coe' = {
             coe_mem  = coe.coe_mem;
             coe_pre  = aux coe.coe_pre;
-            coe_e    = assert false;
+            coe_e    = coe.coe_e; (* TODO: A:
+                                     if we decide to normalize statements
+                                     in F*HoareS judgement, then we should
+                                     normalize this expression too. *)
           } in FSmart.f_coe (f, coe) coe'
 
         | Fpr pr ->

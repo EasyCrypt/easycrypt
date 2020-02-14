@@ -64,6 +64,7 @@
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
     "choare"      , CHOARE     ;        (* KW: prog *)
+    "cost"        , COST       ;        (* KW: prog *)
     "phoare"      , PHOARE     ;        (* KW: prog *)
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
     "async"       , ASYNC      ;        (* KW: prog *)
@@ -164,6 +165,7 @@
     "eager"       , EAGER      ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
+    "schema"      , SCHEMA     ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "realize"     , REALIZE    ;        (* KW: global *)

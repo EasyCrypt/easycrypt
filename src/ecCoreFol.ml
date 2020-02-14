@@ -1514,15 +1514,10 @@ let rec form_of_expr mem (e : expr) =
 
 (* -------------------------------------------------------------------- *)
 let rec free_expr e = match e.e_node with
-  | Elocal _ | Evar _ | Eint _ -> true
-  | Eproj (e,_) -> free_expr e
-  | Etuple es -> List.for_all free_expr es
+  | Eop _ | Elocal _ | Evar _ | Eint _ -> true
 
-  (* TODO: A: is this operation free?*)
-  | Eop _ -> true
-
-  | Eapp _ | Equant _ | Elet _ | Eif _ | Ematch _ -> false
-
+  | Eproj _ | Etuple _ | Eapp _
+  | Equant _ | Elet _ | Eif _ | Ematch _ -> false
 
 
 (* The cost of an expression evaluation in any memory of type [menv]

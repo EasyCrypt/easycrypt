@@ -142,9 +142,11 @@ module Var : sig
     ([`Proj of EcTypes.prog_var * proj_arg | `Var of EcTypes.prog_var ] *
      EcTypes.ty) option
 
+  exception DuplicatedLocalBinding of EcIdent.t
+
   (* Locals binding *)
-  val bind_local  : EcIdent.t -> EcTypes.ty -> env -> env
-  val bind_locals : (EcIdent.t * EcTypes.ty) list -> env -> env
+  val bind_local  : ?uniq:bool -> EcIdent.t -> EcTypes.ty -> env -> env
+  val bind_locals : ?uniq:bool -> (EcIdent.t * EcTypes.ty) list -> env -> env
 
   (* Program variables binding *)
   val bind_pvglob    : symbol -> EcTypes.ty -> env -> env

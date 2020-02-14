@@ -130,18 +130,21 @@ val operator_as_fix   : operator -> opfix
 val operator_as_prind : operator -> prind
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
+type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma | `Schema]
+
+type sc_params = (EcIdent.t * ty) list
 
 type axiom = {
-  ax_tparams : ty_params;
-  ax_spec    : form;
-  ax_kind    : axiom_kind;
-  ax_nosmt   : bool;
-}
+  ax_tparams  : ty_params;
+  ax_scparams : sc_params;
+  ax_spec     : EcCoreFol.form;
+  ax_kind     : axiom_kind;
+  ax_nosmt    : bool; }
 
 (* -------------------------------------------------------------------- *)
-val is_axiom : axiom_kind -> bool
-val is_lemma : axiom_kind -> bool
+val is_axiom  : axiom_kind -> bool
+val is_lemma  : axiom_kind -> bool
+val is_schema : axiom_kind -> bool
 
 (* -------------------------------------------------------------------- *)
 val axiomatized_op :
