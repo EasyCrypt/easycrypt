@@ -68,7 +68,7 @@ val t_simplify : ?mode:smode -> simplify_t
 val t_simplify_with_info : ?mode:smode -> simplify_with_info_t
 
 (* -------------------------------------------------------------------- *)
-val t_change : ?target:ident -> form -> tcenv1 -> tcenv1
+val t_change : ?redinfo: reduction_info -> ?target:ident -> form -> tcenv1 -> tcenv1
 
 (* -------------------------------------------------------------------- *)
 val t_reflex       : ?reduce:lazyred -> FApi.backward

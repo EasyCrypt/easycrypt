@@ -18,6 +18,8 @@ module Map = struct
 
     val odup : ('a -> key) -> 'a list -> ('a * 'a) option
     val to_stream : 'a t -> (key * 'a) Stream.t
+
+    val find_map : (key -> 'a -> 'b option) -> 'a t -> 'b option
   end
 
   module Make(O : OrderedType) : S with type key = O.t = struct
@@ -45,6 +47,16 @@ module Map = struct
               aout
       in
         Stream.from next
+
+    let find_map (type b) (f:key -> 'a -> b option) (m: 'a t) =
+      let module E = struct exception Found of b option end in
+      let f k a =
+        let r = f k a in
+        if r <> None then raise (E.Found r) in
+      try iter f m; None
+      with E.Found r -> r
+
+
   end
 
   module MakeBase(M : S) : Why3.Extmap.S

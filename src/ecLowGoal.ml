@@ -308,9 +308,9 @@ let t_change_r ?target action (tc : tcenv1) =
   end
 
 (* -------------------------------------------------------------------- *)
-let t_change ?target (fp : form) (tc : tcenv1) =
+let t_change ?redinfo ?target (fp : form) (tc : tcenv1) =
   let action (lazy hyps) tgfp =
-    if not (EcReduction.is_conv hyps fp tgfp) then
+    if not (EcReduction.is_conv ?redinfo hyps fp tgfp) then
       raise InvalidGoalShape;
     if fp == tgfp then None else Some fp
 
