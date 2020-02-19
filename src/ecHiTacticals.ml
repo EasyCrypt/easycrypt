@@ -156,6 +156,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Papply pe           -> process_apply ~implicits:ttenv.tt_implicits pe
     | Pcut (m, ip, f, t)  -> process_cut ~mode:m engine ttenv (ip, f, t)
     | Pcutdef (ip, f)     -> process_cutdef ttenv (ip, f)
+    | Pcutdef_sc (ip, f)  -> process_cutdef_sc ttenv (ip, f)
     | Pmove pr            -> process_move pr.pr_view pr.pr_rev
     | Pclear l            -> process_clear l
     | Prewrite (ri, x)    -> process_rewrite ttenv ?target:x ri

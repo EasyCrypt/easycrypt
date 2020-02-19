@@ -219,6 +219,10 @@ val trans_prop     :
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
+val trans_memtype :
+  env -> EcUnify.unienv -> EcIdent.t -> pmemtype -> EcMemory.memenv
+
+(* -------------------------------------------------------------------- *)
 val trans_restr_for_modty :
   env -> module_type -> pmod_restr option -> module_type
 

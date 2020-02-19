@@ -176,6 +176,30 @@ module Ax : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Schema : sig
+  type t = ax_schema
+
+  val by_path     : path -> env -> t
+  val by_path_opt : path -> env -> t option
+  val lookup      : qsymbol -> env -> path * t
+  val lookup_opt  : qsymbol -> env -> (path * t) option
+  val lookup_path : qsymbol -> env -> path
+
+  val add  : path -> env -> env
+  val bind : symbol -> ax_schema -> env -> env
+
+  val iter : ?name:qsymbol -> (path -> ax_schema -> unit) -> env -> unit
+
+  val all :
+    ?check:(path -> ax_schema -> bool) -> ?name:qsymbol -> env -> (path * t) list
+
+  val instanciate :
+    path ->
+    EcTypes.ty list -> EcMemory.memtype -> EcTypes.expr list ->
+    env -> form
+end
+
+(* -------------------------------------------------------------------- *)
 module Mod : sig
   type t = module_expr
 

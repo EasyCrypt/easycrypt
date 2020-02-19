@@ -439,11 +439,7 @@ let subst_ax (s : _subst) (ax : axiom) =
   let params = List.map (subst_typaram s) ax.ax_tparams in
   let s      = init_tparams s ax.ax_tparams params in
   let spec   = Fsubst.f_subst (f_subst_of_subst s) ax.ax_spec in
-  let scparams =
-    if ax.ax_scparams = [] then []
-    else assert false (* TODO: A: see with Benjamin*) in
   { ax_tparams  = params;
-    ax_scparams = scparams;
     ax_spec     = spec;
     ax_kind     = ax.ax_kind;
     ax_nosmt    = ax.ax_nosmt; }

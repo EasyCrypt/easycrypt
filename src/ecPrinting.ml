@@ -232,6 +232,13 @@ module PPEnv = struct
     in
       p_shorten exists p
 
+  let sc_symb (ppe : t) p =
+    let exists sm =
+      try  EcPath.p_equal (EcEnv.Schema.lookup_path sm ppe.ppe_env) p
+      with EcEnv.LookupFailure _ -> false
+    in
+    p_shorten exists p
+
   let th_symb (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.Theory.lookup_path sm ppe.ppe_env) p
@@ -443,6 +450,10 @@ let pp_rwname ppe fmt p =
 (* -------------------------------------------------------------------- *)
 let pp_axname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.ax_symb ppe p)
+
+(* -------------------------------------------------------------------- *)
+let pp_scname ppe fmt p =
+  Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.sc_symb ppe p)
 
 (* -------------------------------------------------------------------- *)
 let pp_funname (ppe : PPEnv.t) fmt p =
@@ -2128,29 +2139,22 @@ let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
 let string_of_axkind = function
   | `Axiom _ -> "axiom"
   | `Lemma   -> "lemma"
-  | `Schema  -> "schema"
 
 let tags_of_axkind = function
   | `Axiom (x, _) -> List.sort sym_compare (Ssym.elements x)
   | `Lemma -> []
-  | `Schema -> []
 
 let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
   let ppe = PPEnv.add_locals ppe (List.map fst ax.ax_tparams) in
-  let ppe = PPEnv.add_locals ppe (List.map fst ax.ax_scparams) in
   let basename = P.basename x in
 
   let pp_spec fmt =
     pp_form ppe fmt ax.ax_spec
 
   and pp_name fmt =
-    match ax.ax_tparams, ax.ax_scparams with
-    | [],[] -> Format.fprintf fmt "%s"    basename
-    | ts,[] -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
-    | [],sc -> Format.fprintf fmt "%s %a" basename (pp_scvar ppe) sc
-    | ts,sc ->
-      Format.fprintf fmt "%s %a %a" basename
-        (pp_tyvarannot ppe) ts (pp_scvar ppe) sc
+    match ax.ax_tparams with
+    | [] -> Format.fprintf fmt "%s"    basename
+    | ts -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
 
   and pp_tags fmt =
     let tags = tags_of_axkind ax.ax_kind in
@@ -2170,6 +2174,35 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
       (  [string_of_axkind ax.ax_kind]
        @ (if ax.ax_nosmt then ["nosmt"] else []))
       pp_tags pp_name pp_spec in
+
+  Format.fprintf fmt "@[<v>%a%a@]" pp_long x pp_decl ()
+
+let pp_schema ?(long=false) (ppe : PPEnv.t) fmt (x, sc) =
+  let ppe = PPEnv.add_locals ppe (List.map fst sc.as_tparams) in
+  let ppe = PPEnv.add_locals ppe (List.map fst sc.as_params) in
+  let basename = P.basename x in
+
+  let pp_spec fmt =
+    pp_form ppe fmt sc.as_spec
+
+  and pp_name fmt =
+    match sc.as_tparams, sc.as_params with
+    | [],[] -> Format.fprintf fmt "%s"    basename
+    | ts,[] -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
+    | [],sc -> Format.fprintf fmt "%s %a" basename (pp_scvar ppe) sc
+    | ts,sc ->
+      Format.fprintf fmt "%s %a %a" basename
+        (pp_tyvarannot ppe) ts (pp_scvar ppe) sc in
+
+  let pp_long fmt x =
+    if long then
+      let qs = PPEnv.sc_symb ppe x in
+      if fst qs <> [] then
+        Format.fprintf fmt "(* %a *)@ " EcSymbols.pp_qsymbol qs in
+
+  let pp_decl fmt () =
+    Format.fprintf fmt "@[<hov 2>schema %t:@ %t.@]"
+      pp_name pp_spec in
 
   Format.fprintf fmt "@[<v>%a%a@]" pp_long x pp_decl ()
 
@@ -3164,6 +3197,21 @@ module ObjectInfo = struct
   let pr_ax = pr_gen pr_ax_r
 
   (* ------------------------------------------------------------------ *)
+  let pr_sc_r =
+    let get_scs qs env =
+      let l = EcEnv.Schema.all ~name:qs env in
+      if l = [] then raise NoObject;
+      l in
+    { od_name    = "schemas";
+      od_lookup  = get_scs;
+      od_printer =
+        fun ppe fmt l ->
+          Format.fprintf fmt "@[<v>%a@]"
+            (pp_list "@ " (pp_schema ~long:true ppe)) l; }
+
+  let pr_sc = pr_gen pr_sc_r
+
+  (* ------------------------------------------------------------------ *)
   let pr_mod_r =
     { od_name    = "modules";
       od_lookup  = EcEnv.Mod.lookup;
@@ -3215,6 +3263,7 @@ module ObjectInfo = struct
                     pr_gen_r ~prcat:true pr_op_r ;
                     pr_gen_r ~prcat:true pr_th_r ;
                     pr_gen_r ~prcat:true pr_ax_r ;
+                    pr_gen_r ~prcat:true pr_sc_r ;
                     pr_gen_r ~prcat:true pr_mod_r;
                     pr_gen_r ~prcat:true pr_mty_r;
                     pr_gen_r ~prcat:true pr_rw_r ;

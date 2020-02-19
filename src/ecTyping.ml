@@ -3139,7 +3139,8 @@ and trans_form_or_pattern
         let form' = transf fenv form in
         unify_or_fail fenv ue form.pl_loc ~expct:tbool form'.f_ty;
 
-        let expr' = transexpcast fenv `InOp ue tint expr in
+        (* `InProc, because we want to look for variables declared in [memenv] *)
+        let expr' = transexpcast fenv `InProc ue tint expr in
 
         f_coe form' memenv expr'
 
@@ -3150,6 +3151,7 @@ and trans_form_or_pattern
         let form' = transf fenv form in
         unify_or_fail fenv ue form.pl_loc ~expct:tbool form'.f_ty;
 
+        (* `InProc, because we want to look for variables declared in [memenv] *)
         let expr' = transexpcast fenv `InProc ue tint expr in
 
         f_coe form' memenv expr'

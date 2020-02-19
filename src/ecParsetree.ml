@@ -463,6 +463,14 @@ type pcutdef = {
   ptcd_args : ppt_arg located list;
 }
 
+type pcutdef_schema = {
+  ptcds_name  : pqsymbol;
+  ptcds_tys   : ptyannot option;
+  ptcds_mt    : pmemtype;
+  (* ptcds_mt    : [`Explicit of pmemtype option | `FromMemory of pmemory ]; *)
+  ptcds_exprs : pexpr list located;
+}
+
 (* -------------------------------------------------------------------- *)
 type preduction = {
   pbeta    : bool;                      (* β-reduction *)
@@ -893,6 +901,7 @@ type logtactic =
   | Papply      of (apply_info * prevert option)
   | Pcut        of pcut
   | Pcutdef     of (intropattern * pcutdef)
+  | Pcutdef_sc  of (intropattern * pcutdef_schema)
   | Pmove       of prevertv
   | Pclear      of psymbol list
   | Prewrite    of (rwarg list * osymbol_r)
@@ -1038,6 +1047,7 @@ type pprint =
   | Pr_th   of pqsymbol
   | Pr_pr   of pqsymbol
   | Pr_ax   of pqsymbol
+  | Pr_sc   of pqsymbol
   | Pr_mod  of pqsymbol
   | Pr_mty  of pqsymbol
   | Pr_glob of pmsymbol located

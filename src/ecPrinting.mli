@@ -57,7 +57,7 @@ val pp_topmod  : PPEnv.t -> mpath pp
 val pp_form    : PPEnv.t -> form pp
 val pp_type    : PPEnv.t -> ty pp
 val pp_tyname  : PPEnv.t -> path pp
-val pp_axname : PPEnv.t -> path pp
+val pp_axname  : PPEnv.t -> path pp
 
 val pp_mem      : PPEnv.t -> EcIdent.t pp
 val pp_memtype  : PPEnv.t -> EcMemory.memtype pp
@@ -66,17 +66,18 @@ val pp_tyunivar : PPEnv.t -> EcUid.uid pp
 val pp_path     : path pp
 
 (* -------------------------------------------------------------------- *)
-val pp_typedecl    : PPEnv.t -> (path * tydecl                ) pp
-val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator) pp
+val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
+val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
 val pp_added_op    : PPEnv.t -> operator pp
-val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom   ) pp
-val pp_theory      : PPEnv.t -> (path * (ctheory * thmode)    ) pp
-val pp_restr_s     :            (bool                         ) pp
-val pp_restr       : PPEnv.t -> (mod_restr                    ) pp
-val pp_modtype     : PPEnv.t -> (module_type                  ) pp
-val pp_modexp      : PPEnv.t -> (mpath * module_expr          ) pp
-val pp_modsig      : PPEnv.t -> (path * module_sig            ) pp
-val pp_modsig_smpl : PPEnv.t -> (path * module_smpl_sig       ) pp
+val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom     ) pp
+val pp_schema      : ?long:bool -> PPEnv.t -> (path * ax_schema ) pp
+val pp_theory      : PPEnv.t -> (path * (ctheory * thmode)      ) pp
+val pp_restr_s     :            (bool                           ) pp
+val pp_restr       : PPEnv.t -> (mod_restr                      ) pp
+val pp_modtype     : PPEnv.t -> (module_type                    ) pp
+val pp_modexp      : PPEnv.t -> (mpath * module_expr            ) pp
+val pp_modsig      : PPEnv.t -> (path * module_sig              ) pp
+val pp_modsig_smpl : PPEnv.t -> (path * module_smpl_sig         ) pp
 
 (* -------------------------------------------------------------------- *)
 val pp_hoareS   : PPEnv.t -> ?prpo:prpo_display -> sHoareS  pp
@@ -105,6 +106,7 @@ module ObjectInfo : sig
   val pr_op  : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_th  : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_ax  : Format.formatter -> EcEnv.env -> qsymbol -> unit
+  val pr_sc  : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_mod : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_mty : Format.formatter -> EcEnv.env -> qsymbol -> unit
   val pr_rw  : Format.formatter -> EcEnv.env -> qsymbol -> unit

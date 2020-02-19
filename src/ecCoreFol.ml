@@ -1540,6 +1540,7 @@ type f_subst = {
   fs_opdef   : (EcIdent.t list * expr) Mp.t;
   fs_pddef   : (EcIdent.t list * form) Mp.t;
   fs_esloc   : expr Mid.t;
+  fs_memtype : EcMemory.memtype option; (* Only substituted in Fcoe *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1554,6 +1555,7 @@ module Fsubst = struct
     fs_opdef   = Mp.empty;
     fs_pddef   = Mp.empty;
     fs_esloc   = Mid.empty;
+    fs_memtype = None;
   }
 
   let is_subst_id s =
@@ -1565,7 +1567,7 @@ module Fsubst = struct
     && Mp.is_empty    s.fs_pddef
     && Mid.is_empty   s.fs_esloc
 
-  let f_subst_init ?freshen ?mods ?sty ?opdef ?prdef () =
+  let f_subst_init ?freshen ?mods ?sty ?opdef ?prdef ?esloc ?mt () =
     let sty = odfl ty_subst_id sty in
     { f_subst_id
         with fs_freshen = odfl false freshen;
@@ -1574,7 +1576,8 @@ module Fsubst = struct
              fs_ty      = ty_subst sty;
              fs_opdef   = odfl Mp.empty opdef;
              fs_pddef   = odfl Mp.empty prdef;
-             fs_esloc   = Mid.empty; }
+             fs_esloc   = odfl Mid.empty esloc;
+             fs_memtype = mt; }
 
   (* ------------------------------------------------------------------ *)
   let f_bind_local s x t =
@@ -1853,7 +1856,7 @@ module Fsubst = struct
       (* We freshen the binded memory. *)
       let m = fst coe.coe_mem in
       let m' = EcIdent.fresh m in
-      (* TODO: A: here, I am erasing previous binding.*)
+      (* TODO: A: here, I am erasing the previous binding.*)
       let s = f_rebind_mem s m m' in
 
       (* Then we substitute *)
@@ -1862,6 +1865,13 @@ module Fsubst = struct
       let pr' = f_subst ~tx s coe.coe_pre in
       let me' = EcMemory.me_subst s.fs_mem s.fs_ty coe.coe_mem in
       let e' = EcTypes.e_subst es coe.coe_e in
+
+      (* If necessary, we substitute the memtype. *)
+      let me' =
+        if EcMemory.is_schema (snd me') && s.fs_memtype <> None
+        then (fst me', oget s.fs_memtype)
+        else me' in
+
       FSmart.f_coe (fp, coe)
         { coe_pre = pr'; coe_mem = me'; coe_e = e'; }
 
@@ -2059,13 +2069,16 @@ module Fsubst = struct
     subst_locals (Mid.singleton id f1) f2
 
   (* ------------------------------------------------------------------ *)
-  let init_subst_tvar s =
+  let init_subst_tvar ?es_loc s =
     let sty = { ty_subst_id with ts_v = Mid.find_opt^~ s } in
     { f_subst_id with
-        fs_freshen = true; fs_sty = sty; fs_ty = ty_subst sty }
+      fs_freshen = true;
+      fs_sty = sty;
+      fs_ty = ty_subst sty;
+      fs_esloc = odfl Mid.empty es_loc; }
 
-  let subst_tvar s =
-    f_subst (init_subst_tvar s)
+  let subst_tvar ?es_loc s =
+    f_subst (init_subst_tvar ?es_loc s)
 end
 
 (* -------------------------------------------------------------------- *)

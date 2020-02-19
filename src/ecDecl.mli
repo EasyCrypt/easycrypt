@@ -130,13 +130,10 @@ val operator_as_fix   : operator -> opfix
 val operator_as_prind : operator -> prind
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma | `Schema]
-
-type sc_params = (EcIdent.t * ty) list
+type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
   ax_tparams  : ty_params;
-  ax_scparams : sc_params;
   ax_spec     : EcCoreFol.form;
   ax_kind     : axiom_kind;
   ax_nosmt    : bool; }
@@ -144,7 +141,18 @@ type axiom = {
 (* -------------------------------------------------------------------- *)
 val is_axiom  : axiom_kind -> bool
 val is_lemma  : axiom_kind -> bool
-val is_schema : axiom_kind -> bool
+
+(* -------------------------------------------------------------------- *)
+type sc_params = (EcIdent.t * ty) list
+
+(* [as_params] are the free variables in [as_spec] expressions, i.e. in
+   [EcTypes.expr]. They must not be confused with standard formula free
+   variables. *)
+type ax_schema = {
+  as_tparams : ty_params;
+  as_params  : sc_params;
+  as_spec    : EcCoreFol.form;
+}
 
 (* -------------------------------------------------------------------- *)
 val axiomatized_op :

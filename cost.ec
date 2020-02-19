@@ -8,6 +8,8 @@ print plus_cost.
 
 lemma foo : cost(_:{})[true : 1 + 2] = 1.
 proof.
+instantiate := (plus_cost {} 1 : 2) => H; rewrite H.
+have := a.
 admit.
 qed.
 

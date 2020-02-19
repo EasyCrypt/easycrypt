@@ -1391,7 +1391,7 @@ module Frequency = struct
     f_tabf : int Hx.t;
   }
 
-  let add fr ax =
+  let add fr form =
     let addp p =
       if not (Sp.mem p fr.f_unwanted_op) then
         let n = Hp.find_def fr.f_tabp 0 p in
@@ -1413,7 +1413,7 @@ module Frequency = struct
       | Fproj    (e, _)       -> add e
       | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event;add pr.pr_args
       | _ -> () in
-    add ax.ax_spec
+    add form
 
   let create unwanted_op : frequency =
     { f_unwanted_op = unwanted_op;
@@ -1465,7 +1465,7 @@ let init_relevant env pi rs =
   let do1 p ax =
     let wanted = wanted_ax p in
     if wanted || (not ax.ax_nosmt && not (unwanted_ax p)) then begin
-      Frequency.add fr ax;
+      Frequency.add fr ax.ax_spec;
       let used = Frequency.f_ops unwanted_ops ax.ax_spec in
       let paxu = (p,ax), used in
       if wanted then push paxu rel else push paxu other

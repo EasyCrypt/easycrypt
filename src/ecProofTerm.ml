@@ -138,6 +138,7 @@ and concretize_e_head (CPTEnv subst) head =
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
   | PTGlobal (p, tys) -> PTGlobal (p, List.map subst.fs_ty tys)
+  | PTSchema _ -> assert false
 
 and concretize_e_pt cptenv { pt_head; pt_args } =
   { pt_head = concretize_e_head cptenv pt_head;
@@ -456,6 +457,70 @@ let process_named_pterm pe (tvi, fp) =
   let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
 
   (p, (typ, ax))
+
+(* -------------------------------------------------------------------- *)
+let process_named_schema pe (tvi, sn) =
+  let env = LDecl.toenv pe.pte_hy in
+
+  let p, sc =
+    match EcEnv.Schema.lookup_opt (unloc sn) (LDecl.toenv pe.pte_hy) with
+    | Some (p,sc) -> p, sc
+    | None -> tc_lookup_error pe.pte_pe `Schema (unloc sn) in
+
+  let typ = sc.EcDecl.as_tparams in
+
+  (* TODO: A: check that type variables typing is ok. *)
+  let tvi =
+    Exn.recast_pe pe.pte_pe pe.pte_hy
+      (fun () -> omap (EcTyping.transtvi env pe.pte_ue) tvi) in
+
+  PT.pf_check_tvi pe.pte_pe typ tvi;
+
+  (* FIXME: TC HOOK *)
+  let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
+  (* When substituting in a schema's formula, we have to rebind the schema's
+     expression variables. *)
+  let rebind =
+    List.map (fun (id,ty) ->
+        id, EcTypes.e_local id ty
+      ) sc.EcDecl.as_params
+    |> Mid.of_list in
+  let sc_i =
+    Fsubst.subst_tvar
+      ~es_loc:rebind
+      fs sc.EcDecl.as_spec in
+  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
+
+  let sty = { ty_subst_id with ts_v = Mid.find_opt^~ fs } in
+  let e_params = List.map (fun (id, ty) ->
+      id, EcTypes.ty_subst sty ty) sc.EcDecl.as_params in
+  (p, typ, e_params, sc_i)
+
+(* -------------------------------------------------------------------- *)
+let process_sc_instantiation pe inst =
+  let env = LDecl.toenv pe.pte_hy in
+
+  let p, typ, e_params, sc_i =
+    process_named_schema pe (inst.ptcds_tys, inst.ptcds_name) in
+  let pexprs = inst.ptcds_exprs in
+
+  if List.length e_params <> List.length (unloc pexprs) then
+    tc_error pe.pte_pe ~loc:(loc pexprs)
+      "wrong number of arguments: expected %d, got %d"
+      (List.length e_params)
+      (List.length (unloc pexprs));
+
+  let memenv =
+    EcTyping.trans_memtype env pe.pte_ue EcCoreFol.mhr inst.ptcds_mt in
+  let memtype = snd memenv in
+  let e_env = EcEnv.Memory.push_active memenv env in
+  let exprs = List.map2 (fun pexpr (id, ty_expected) ->
+      (* `InProc, because we want to look for variables declared in [memenv] *)
+      id, EcTyping.transexpcast e_env `InProc pe.pte_ue ty_expected pexpr
+    ) (unloc pexprs) e_params in
+
+  let fs = Fsubst.f_subst_init ~esloc:(Mid.of_list exprs) ~mt:memtype () in
+  (p, typ, memtype, exprs, Fsubst.f_subst fs sc_i)
 
 (* ------------------------------------------------------------------ *)
 let process_pterm_cut ~prcut pe pt =
@@ -808,6 +873,16 @@ let tc1_process_full_pterm ?implicits (tc : tcenv1) (ff : ppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
   process_full_pterm ?implicits (ptenv_of_penv hyps pe) ff
+
+(* -------------------------------------------------------------------- *)
+let tc1_process_sc_instantiation (tc : tcenv1) (inst : pcutdef_schema) =
+  let pe   = FApi.tc1_penv tc in
+  let hyps = FApi.tc1_hyps tc in
+  let p, types, memtype, exprs, f =
+    process_sc_instantiation (ptenv_of_penv hyps pe) inst in
+  let pt = { pt_head = PTSchema (p, types, memtype, List.map snd exprs);
+             pt_args = []; } in
+  pt, f
 
 (* -------------------------------------------------------------------- *)
 let tc1_process_full_closed_pterm_cut ~prcut (tc : tcenv1) (ff : 'a gppterm) =

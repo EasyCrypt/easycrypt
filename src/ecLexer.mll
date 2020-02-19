@@ -197,6 +197,7 @@
     "type"        , TYPE       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
+    "instantiate" , INSTANTIATE;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "search"      , SEARCH     ;        (* KW: global *)
     "as"          , AS         ;        (* KW: global *)

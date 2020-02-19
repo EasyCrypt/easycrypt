@@ -821,6 +821,14 @@ module Ax = struct
   type mode = [`WeakCheck | `Check | `Report]
 
   (* ------------------------------------------------------------------ *)
+  let bind_schema (scope : scope) local ((x, sc) : _ * ax_schema) =
+    assert (scope.sc_pr_uc = None);
+    let scope = { scope with sc_env = EcEnv.Schema.bind x sc scope.sc_env; } in
+    (* TODO: A: can we allow schemas in theories? *)
+    if EcSection.opath scope.sc_section <> None then
+      hierror "schemas cannot be declared in sections";
+    scope
+
   let bind (scope : scope) local ((x, ax) : _ * axiom) =
     assert (scope.sc_pr_uc = None);
     let scope = { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; } in
@@ -911,20 +919,6 @@ module Ax = struct
     let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
 
-    let axd  =
-      let kind =
-        match ax.pa_kind with
-        | PAxiom tags -> `Axiom (Ssym.of_list (List.map unloc tags), false)
-        | PLemma _ | PILemma -> `Lemma
-        | PSchema -> `Schema
-
-      in { ax_tparams  = tparams;
-           ax_scparams = odfl [] scparams;
-           ax_spec     = concl;
-           ax_kind     = kind;
-           ax_nosmt    = ax.pa_nosmt; }
-    in
-
     let check    = Check_mode.check scope.sc_options in
     let pucflags = { puc_nosmt = ax.pa_nosmt; puc_local = ax.pa_local; } in
     let pucflags = (([], None), pucflags) in
@@ -940,33 +934,51 @@ module Ax = struct
         | None -> ()
       end;
 
-    if ax.pa_local && EcDecl.is_axiom axd.ax_kind then
+    let pa_is_axiom ax = match ax.pa_kind with PAxiom _ -> true | _ -> false in
+    if ax.pa_local && pa_is_axiom ax then
       hierror "an axiom cannot be local";
-    if ax.pa_local && EcDecl.is_schema axd.ax_kind then
+
+    if ax.pa_local && ax.pa_kind = PSchema then
       hierror "a schema cannot be local";
 
-    match ax.pa_kind with
-    | PILemma ->
+    if ax.pa_kind <> PSchema then
+      let axd  =
+        let kind =
+          match ax.pa_kind with
+          | PAxiom tags -> `Axiom (Ssym.of_list (List.map unloc tags), false)
+          | PLemma _ | PILemma -> `Lemma
+          | PSchema -> assert false
+        in { ax_tparams  = tparams;
+             ax_spec     = concl;
+             ax_kind     = kind;
+             ax_nosmt    = ax.pa_nosmt; }
+      in
+      match ax.pa_kind with
+      | PILemma ->
         let scope =
           start_lemma scope ~name:(unloc ax.pa_name)
             pucflags check (axd, None) in
         let scope = snd (Tactics.process1_r false `Check scope tintro) in
         None, scope
 
-    | PLemma tc ->
+      | PLemma tc ->
         start_lemma_with_proof scope
           (Some tintro) pucflags (mode, mk_loc loc tc) check
           ~name:(unloc ax.pa_name) axd
 
-    | PAxiom _ ->
+      | PAxiom _ ->
         Some (unloc ax.pa_name),
         bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
+      | PSchema -> assert false
 
-    | PSchema ->
-      (* TODO: A: do this with Benjamin *)
+    else
+      let sc = { as_tparams = tparams;
+                 as_params  = odfl [] scparams;
+                 as_spec    = concl; } in
+
+      (* TODO: A: check this. *)
       Some (unloc ax.pa_name),
-      bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
-
+      bind_schema scope (snd pucflags).puc_local (unloc ax.pa_name, sc)
 
   (* ------------------------------------------------------------------ *)
   and add_defer (scope : scope) proofs =
@@ -1264,7 +1276,6 @@ module Op = struct
                List.combine axpm (List.map snd tparams)) in
           let ax =
             { ax_tparams = axpm;
-              ax_scparams = [];
               ax_spec    = ax;
               ax_kind    = `Axiom (Ssym.empty, false);
               ax_nosmt   = false; }
@@ -1317,7 +1328,6 @@ module Op = struct
 
       let ax =
         { ax_tparams = List.map (fun ty -> (ty, Sp.empty)) nparams;
-          ax_scparams = [];
           ax_spec    = ax;
           ax_kind    = `Axiom (Ssym.empty, false);
           ax_nosmt   = false; } in
@@ -1692,7 +1702,6 @@ module Ty = struct
            if not (Mstr.mem x symbs) then
              let ax = {
                ax_tparams = [];
-               ax_scparams = [];
                ax_spec    = req;
                ax_kind    = `Lemma;
                ax_nosmt   = true;
@@ -1706,7 +1715,6 @@ module Ty = struct
           let t  = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]) } in
           let t  = { pt_core = t; pt_intros = []; } in
           let ax = { ax_tparams = [];
-                     ax_scparams = [];
                      ax_spec    = f;
                      ax_kind    = `Axiom (Ssym.empty, false);
                      ax_nosmt   = true; } in
@@ -2181,7 +2189,6 @@ module Section = struct
                               EcSection.generalize scenv locals ax.ax_spec })
                   else
                     scope
-            | `Schema -> assert false   (* TODO: A: Benjamin, this is for you *)
           end
 
           | T.CTh_export p ->
@@ -2391,15 +2398,18 @@ module Search = struct
       let get_path r = function `ByPath s -> Sp.union r s | _ -> r in
       List.fold_left get_path Sp.empty paths in
 
-    let axioms = EcSearch.search scope.sc_env paths in
-    let axioms = EcSearch.sort relevant axioms in
+    let search_res = EcSearch.search scope.sc_env paths in
+    let search_res = EcSearch.sort relevant search_res in
 
     let buffer = Buffer.create 0 in
     let fmt    = Format.formatter_of_buffer buffer in
     let ppe    = EcPrinting.PPEnv.ofenv scope.sc_env in
 
-    List.iter (fun ax ->
-      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ~long:true ppe) ax)
-      axioms;
+    List.iter (fun r -> match r with
+        | p,`Axiom ax ->
+          Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ~long:true ppe) (p,ax)
+        | p,`Schema sc ->
+          Format.fprintf fmt "%a@." (EcPrinting.pp_schema ~long:true ppe) (p,sc)
+      ) search_res;
     notify scope `Info "%s" (Buffer.contents buffer)
 end

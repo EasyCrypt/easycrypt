@@ -104,6 +104,7 @@ type mc = {
   mc_tydecls    : (ipath * EcDecl.tydecl) MMsym.t;
   mc_operators  : (ipath * EcDecl.operator) MMsym.t;
   mc_axioms     : (ipath * EcDecl.axiom) MMsym.t;
+  mc_schemas    : (ipath * EcDecl.ax_schema) MMsym.t;
   mc_theories   : (ipath * (ctheory * thmode)) MMsym.t;
   mc_typeclasses: (ipath * typeclass) MMsym.t;
   mc_rwbase     : (ipath * path) MMsym.t;
@@ -274,6 +275,7 @@ let empty_mc params = {
   mc_tydecls    = MMsym.empty;
   mc_operators  = MMsym.empty;
   mc_axioms     = MMsym.empty;
+  mc_schemas    = MMsym.empty;
   mc_theories   = MMsym.empty;
   mc_variables  = MMsym.empty;
   mc_functions  = MMsym.empty;
@@ -510,6 +512,7 @@ module MC = struct
   let _downpath_for_modsig    = _downpath_for_th
   let _downpath_for_operator  = _downpath_for_th
   let _downpath_for_axiom     = _downpath_for_th
+  let _downpath_for_schema    = _downpath_for_th
   let _downpath_for_typeclass = _downpath_for_th
   let _downpath_for_rwbase    = _downpath_for_th
 
@@ -702,6 +705,24 @@ module MC = struct
   let import_axiom p ax env =
     import (_up_axiom true) (IPPath p) ax env
 
+  (* -------------------------------------------------------------------- *)
+  let lookup_schema qnx env =
+    match lookup (fun mc -> mc.mc_schemas) qnx env with
+    | None -> lookup_error (`QSymbol qnx)
+    | Some (p, (args, obj)) -> (_downpath_for_schema env p args, obj)
+
+  let lookup_schemas qnx env =
+    List.map
+      (fun (p, (args, obj)) -> (_downpath_for_schema env p args, obj))
+      (lookup_all (fun mc -> mc.mc_schemas) qnx env)
+
+  let _up_schema candup mc x obj =
+    if not candup && MMsym.last x mc.mc_schemas <> None then
+      raise (DuplicatedBinding x);
+    { mc with mc_schemas = MMsym.add x obj mc.mc_schemas }
+
+  let import_schema p sc env =
+    import (_up_schema true) (IPPath p) sc env
 
   (* -------------------------------------------------------------------- *)
   let lookup_operator qnx env =
@@ -739,7 +760,6 @@ module MC = struct
       let axp  = IPPath (EcPath.pqoname axp name) in
       let ax   =
         { ax_kind     = `Axiom (Ssym.empty, false);
-          ax_scparams = [];
           ax_tparams  = tv;
           ax_spec     = cl;
           ax_nosmt    = false; } in
@@ -787,7 +807,6 @@ module MC = struct
             let do1 scheme name =
               let scname = Printf.sprintf "%s_%s" x name in
                 (scname, { ax_tparams = tyd.tyd_params;
-                           ax_scparams = [];
                            ax_spec    = scheme;
                            ax_kind    = `Axiom (Ssym.empty, false);
                            ax_nosmt   = true; })
@@ -823,7 +842,6 @@ module MC = struct
           let scheme =
             let scname = Printf.sprintf "%s_ind" x in
               (scname, { ax_tparams = tyd.tyd_params;
-                         ax_scparams = [];
                          ax_spec    = scheme;
                          ax_kind    = `Axiom (Ssym.empty, false);
                          ax_nosmt   = true; })
@@ -909,7 +927,6 @@ module MC = struct
           (fun (x, ax) ->
             let ax = Fsubst.f_subst fsubst ax in
               (x, { ax_tparams = [(self, Sp.singleton mypath)];
-                    ax_scparams = [];
                     ax_spec    = ax;
                     ax_kind    = `Axiom (Ssym.empty, false);
                     ax_nosmt   = true; }))
@@ -1153,6 +1170,9 @@ module MC = struct
 
   and bind_axiom x ax env =
     bind _up_axiom x ax env
+
+  and bind_schema x ax env =
+    bind _up_schema x ax env
 
   and bind_operator x op env =
     bind _up_operator x op env
@@ -2521,6 +2541,9 @@ module NormMp = struct
   let norm_ax env ax =
     { ax with ax_spec = norm_form env ax.ax_spec }
 
+  let norm_sc env sc =
+    { sc with as_spec = norm_form env sc.as_spec }
+
   let is_abstract_fun f env =
     let f = norm_xfun env f in
     match (Fun.by_xpath f env).f_def with
@@ -2823,6 +2846,105 @@ module Ax = struct
               | _ -> aout)
               axioms aout)
             mc.mc_axioms aout)
+          env.env_comps []
+end
+
+
+(* -------------------------------------------------------------------- *)
+module Schema = struct
+  type t = ax_schema
+
+  let by_path_opt (p : EcPath.path) (env : env) =
+    omap
+      check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_schemas) (IPPath p) env)
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_schema p obj env
+
+  let lookup qname (env : env) =
+    MC.lookup_schema qname env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path name env =
+    fst (lookup name env)
+
+  let bind name ax env =
+    let ax = NormMp.norm_sc env ax in
+    let env = MC.bind_schema name ax env in
+    env
+    (* TODO: A: what about theories and schemas? *)
+    (* { env with env_item = CTh_schema (name, ax) :: env.env_item } *)
+
+  let rebind name ax env =
+    MC.bind_schema name ax env
+
+  let instanciate p tys (mt : EcMemory.memtype) es env =
+    match by_path_opt p env with
+    | Some ({ as_spec = f } as sc) ->
+      (* When substituting in a schema's formula, we have to rebind the schema's
+         expression variables. *)
+      let rebind =
+        List.map (fun (id,ty) ->
+            id, EcTypes.e_local id ty
+          ) sc.EcDecl.as_params
+        |> Mid.of_list in
+
+      (* We instantiate the type variables. *)
+      let f = Fsubst.subst_tvar ~es_loc:rebind
+          (EcTypes.Tvar.init (List.map fst sc.as_tparams) tys) f in
+
+      (* We check that expressions [es] have the correct type. *)
+      assert (List.for_all2 (fun e (_,ty) ->
+          EcTypes.ty_equal e.e_ty ty
+        ) es sc.as_params);
+
+      (* We instantiate the expression variables. *)
+      let mexpr = List.map2 (fun e (id,_) -> id,e) es sc.as_params
+                  |> Mid.of_list in
+      let fs = Fsubst.f_subst_init ~esloc:mexpr ~mt:mt () in
+
+      Fsubst.f_subst fs f
+
+    | _ -> raise (LookupFailure (`Path p))
+
+  let iter ?name f (env : env) =
+    match name with
+    | Some name ->
+      let scs = MC.lookup_schemas name env in
+      List.iter (fun (p,sc) -> f p sc) scs
+
+    | None ->
+        Mip.iter
+          (fun _ mc -> MMsym.iter
+            (fun _ (ip, sc) ->
+              match ip with IPPath p -> f p sc | _ -> ())
+            mc.mc_schemas)
+          env.env_comps
+
+  let all ?(check = fun _ _ -> true) ?name (env : env) =
+    match name with
+    | Some name ->
+        let scs = MC.lookup_schemas name env in
+        List.filter (fun (p, sc) -> check p sc) scs
+
+    | None ->
+        Mip.fold (fun _ mc aout ->
+          MMsym.fold (fun _ schemas aout ->
+            List.fold_right (fun (ip, sc) aout ->
+              match ip with
+              | IPPath p -> if check p sc then (p, sc) :: aout else aout
+              | _ -> aout)
+              schemas aout)
+            mc.mc_schemas aout)
           env.env_comps []
 end
 

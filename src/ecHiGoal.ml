@@ -1722,6 +1722,16 @@ let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
     (t_cut ax tc)
 
 (* -------------------------------------------------------------------- *)
+type cutdef_sc_t = intropattern * pcutdef_schema
+
+let process_cutdef_sc ttenv (ip, inst) (tc : tcenv1) =
+  let pt,sc_i = PT.tc1_process_sc_instantiation tc inst in
+
+  FApi.t_sub
+    [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
+    (t_cut sc_i tc)
+
+(* -------------------------------------------------------------------- *)
 let process_left (tc : tcenv1) =
   try
     t_ors [EcLowGoal.t_left; EcLowGoal.t_or_intro_prind `Left] tc

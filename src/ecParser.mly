@@ -462,6 +462,7 @@
 %token INLINE
 %token INTERLEAVE
 %token INSTANCE
+%token INSTANTIATE
 %token IOTA
 %token KILL
 %token LARROW
@@ -2388,6 +2389,7 @@ gpoterm(F):
 %inline pterm:
 | pt=gpoterm(form) { pt }
 
+(* ------------------------------------------------------------------ *)
 pcutdef1:
 | p=qident tvi=tvars_app? args=loc(gpterm_arg)*
     { { ptcd_name = p; ptcd_tys = tvi; ptcd_args = args; } }
@@ -2396,6 +2398,19 @@ pcutdef:
 | cd=pcutdef1               { cd }
 | LPAREN cd=pcutdef1 RPAREN { cd }
 
+(* ------------------------------------------------------------------ *)
+pcutdef_schema1:
+| p=qident tvi=tvars_app? mt=memtype
+  exprs=loc(rlist0(expr,COLON))
+    { { ptcds_name = p;
+	ptcds_tys = tvi;
+	ptcds_mt = mt;
+	ptcds_exprs = exprs; } }
+
+pcutdef_schema:
+| LPAREN cd=pcutdef_schema1 RPAREN { cd }
+
+(* ------------------------------------------------------------------ *)
 %inline rwside:
 | MINUS { `RtoL }
 | empty { `LtoR }
@@ -2835,6 +2850,9 @@ logtactic:
 
 | ior_(CUT, HAVE) ip=loc(intro_pattern)* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
+
+| INSTANTIATE ip=loc(intro_pattern)* CEQ fp=pcutdef_schema
+   { Pcutdef_sc (ip, fp) }
 
 | POSE o=rwocc? x=ident xs=ptybindings? CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, odfl [] xs, o, p) }
@@ -3650,6 +3668,7 @@ print:
 | PRED        qs=qoident         { Pr_pr   qs            }
 | AXIOM       qs=qident          { Pr_ax   qs            }
 | LEMMA       qs=qident          { Pr_ax   qs            }
+| SCHEMA      qs=qident          { Pr_sc   qs            }
 | MODULE      qs=qident          { Pr_mod  qs            }
 | MODULE TYPE qs=qident          { Pr_mty  qs            }
 | GLOB        qs=loc(mod_qident) { Pr_glob qs            }

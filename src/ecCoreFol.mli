@@ -478,6 +478,7 @@ type f_subst = private {
   fs_opdef   : (EcIdent.t list * expr) Mp.t;
   fs_pddef   : (EcIdent.t list * form) Mp.t;
   fs_esloc   : expr Mid.t;
+  fs_memtype : EcMemory.memtype option; (* Only substituted in Fcoe *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -491,6 +492,8 @@ module Fsubst : sig
     -> ?sty:ty_subst
     -> ?opdef:(EcIdent.t list * expr) Mp.t
     -> ?prdef:(EcIdent.t list * form) Mp.t
+    -> ?esloc:expr Mid.t
+    -> ?mt:EcMemory.memtype
     -> unit -> f_subst
 
   val f_bind_local  : f_subst -> EcIdent.t -> form -> f_subst
@@ -506,7 +509,10 @@ module Fsubst : sig
 
   val uni_subst : (EcUid.uid -> ty option) -> f_subst
   val uni : (EcUid.uid -> ty option) -> form -> form
-  val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
+  val subst_tvar :
+    ?es_loc:(EcTypes.expr EcIdent.Mid.t) ->
+    EcTypes.ty EcIdent.Mid.t ->
+    form -> form
 
   val add_binding  : f_subst -> binding  -> f_subst * binding
   val add_bindings : f_subst -> bindings -> f_subst * bindings
