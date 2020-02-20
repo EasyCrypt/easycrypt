@@ -3120,7 +3120,7 @@ and trans_form_or_pattern
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
         f_eagerF pre' s1 fpath1 fpath2 s2 post'
 
-    | PFCoe (mem, pmemtype, form, expr) ->
+    | PFCoe (mem, pmemtype, form, expr, oty) ->
       let mem = omap_dfl (fun m ->
           EcIdent.create (unloc m)) EcCoreFol.mhr (unloc mem) in
 
@@ -3140,7 +3140,15 @@ and trans_form_or_pattern
         unify_or_fail fenv ue form.pl_loc ~expct:tbool form'.f_ty;
 
         (* `InProc, because we want to look for variables declared in [memenv] *)
-        let expr',_ = transexp fenv `InProc ue expr in
+        let expr', ety = transexp fenv `InProc ue expr in
+
+        begin match oty with
+          | None -> ()
+          | Some pty ->
+            (* TODO: A: check that we want tp_uni *)
+            let ty = transty tp_relax fenv ue pty in
+            unify_or_fail fenv ue (loc pty) ~expct:ty ety;
+        end;
 
         f_coe form' memenv expr'
 
@@ -3152,7 +3160,15 @@ and trans_form_or_pattern
         unify_or_fail fenv ue form.pl_loc ~expct:tbool form'.f_ty;
 
         (* `InProc, because we want to look for variables declared in [memenv] *)
-        let expr',_ = transexp fenv `InProc ue expr in
+        let expr',ety = transexp fenv `InProc ue expr in
+
+        begin match oty with
+          | None -> ()
+          | Some pty ->
+            (* TODO: A: check that we want tp_uni *)
+            let ty = transty tp_relax fenv ue pty in
+            unify_or_fail fenv ue (loc pty) ~expct:ty ety;
+        end;
 
         f_coe form' memenv expr'
   in

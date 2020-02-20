@@ -1320,12 +1320,15 @@ choare_body(P):
   c=costs(P)
   { PFChoareF (pre, mp, post, c) }
 
+coe_ty:
+| COLON ty=loc(type_exp) { ty}
+
 coe_body(P):
-| LBRACKET o=loc(empty) f=form_r(P) COLON e=expr RBRACKET
-    { PFCoe (mk_loc (loc o) None, None, f, e) }
+| LBRACKET o=loc(empty) f=form_r(P) COLON e=expr ty=coe_ty? RBRACKET
+    { PFCoe (mk_loc (loc o) None, None, f, e, ty) }
 | LPAREN m=bdmident COLON mt=memtype RPAREN LBRACKET f=form_r(P)
-  COLON e=expr RBRACKET
-    { PFCoe (m, Some mt, f, e) }
+  COLON e=expr ty=coe_ty? RBRACKET
+    { PFCoe (m, Some mt, f, e, ty) }
 
 equiv_body(P):
   mp1=loc(fident) TILD mp2=loc(fident)
@@ -1491,7 +1494,7 @@ memtype_decl:
     { x,ty }
 
 memtype:
-| LBRACE m=rlist0(memtype_decl,SEMICOLON) RBRACE {m}
+| LBRACE m=rlist0(memtype_decl,COMMA) RBRACE {m}
 
 ret_stmt:
 | RETURN e=expr SEMICOLON
