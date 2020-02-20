@@ -676,6 +676,13 @@ _lident:
 
 %inline uint: n=UINT { n }
 
+bdmident_:
+| x=mident   { Some x }
+| UNDERSCORE { None }
+
+%inline bdmident:
+| x=loc(bdmident_) { x }
+
 %inline word:
 | n=loc(UINT) {
     try  BI.to_int (unloc n)
@@ -1316,7 +1323,7 @@ choare_body(P):
 coe_body(P):
 | LBRACKET o=loc(empty) f=form_r(P) COLON e=expr RBRACKET
     { PFCoe (mk_loc (loc o) None, None, f, e) }
-| LPAREN m=bdident COLON mt=memtype RPAREN LBRACKET f=form_r(P)
+| LPAREN m=bdmident COLON mt=memtype RPAREN LBRACKET f=form_r(P)
   COLON e=expr RBRACKET
     { PFCoe (m, Some mt, f, e) }
 
