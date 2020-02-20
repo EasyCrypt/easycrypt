@@ -1626,7 +1626,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         if EcMemory.is_schema mt
         then (ppe, fun _ -> ())
         else pp_bindings ppe ~fv:f.f_fv [m, GTmem mt] in
-      Format.fprintf fmt "cost%t[@[<hov 2>@[%a@] :@ @[%a@]@]]"
+      Format.fprintf fmt "@[<hv 2>cost@[%t@]@,[@[<hov 2>@[%a@] :@ @[%a@]@]]@]"
         pp
         (pp_form subppe) coe.coe_pre
         (pp_expr subppe) coe.coe_e
@@ -1676,7 +1676,7 @@ and pp_cost ppe fmt c =
         (pp_funname ppe) f
         (pp_form ppe) c in
 
-  Format.fprintf fmt "@[<hv>[%a]@]"
+  Format.fprintf fmt "@[<hv 1>[%a]@]"
     (pp_list ";@ " pp_el)
     (   (None,c.c_self)
      :: (EcPath.Mx.bindings c.c_calls
@@ -1715,8 +1715,15 @@ and pp_orclinfo ppe fmt (sym, oi) =
       (pp_costs ppe) costs
 
 and pp_orclinfos ppe fmt ois =
-  Format.fprintf fmt "[@[<hv>%a@]]"
-    (pp_list ",@ " (pp_orclinfo ppe)) (Msym.bindings ois)
+  let nothing_to_print =
+    Msym.for_all (fun _ oi ->
+        OI.allowed oi = [] && EcPath.Mx.is_empty (OI.costs oi)
+      ) ois in
+  if nothing_to_print
+  then Format.fprintf fmt ""
+  else
+    Format.fprintf fmt "[@[<hv>%a@]]"
+      (pp_list ",@ " (pp_orclinfo ppe)) (Msym.bindings ois)
 
 (* -------------------------------------------------------------------- *)
 and pp_mem_restr ppe fmt mr =
