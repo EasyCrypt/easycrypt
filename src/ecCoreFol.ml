@@ -1566,6 +1566,7 @@ module Fsubst = struct
     && Mp.is_empty    s.fs_opdef
     && Mp.is_empty    s.fs_pddef
     && Mid.is_empty   s.fs_esloc
+    && s.fs_memtype = None
 
   let f_subst_init ?freshen ?mods ?sty ?opdef ?prdef ?esloc ?mt () =
     let sty = odfl ty_subst_id sty in

@@ -900,16 +900,17 @@ module Ax = struct
     let tintro = { pt_core = tintro; pt_intros = [`Ip ip]; } in
 
     let scparams =
-      match ax.pa_scvars with
-      | None -> None
-      | Some scv ->
-        List.map (fun (vs,pty) ->
-            (* TODO: A: check the typing policy there. *)
-            let ty = TT.transty tp_tydecl scope.sc_env ue pty in
-            List.map (fun v -> EcIdent.create (unloc v), ty) vs
-          ) scv
-        |> List.flatten
-        |> some in
+      if ax.pa_kind <> PSchema then None
+      else match ax.pa_scvars with
+        | None -> Some []
+        | Some scv ->
+          List.map (fun (vs,pty) ->
+              (* TODO: A: check the typing policy there. *)
+              let ty = TT.transty tp_tydecl scope.sc_env ue pty in
+              List.map (fun v -> EcIdent.create (unloc v), ty) vs
+            ) scv
+          |> List.flatten
+          |> some in
 
     let concl = TT.trans_prop scope.sc_env ?schema_mt:scparams ue pconcl in
 
