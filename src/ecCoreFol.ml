@@ -1514,8 +1514,9 @@ let rec form_of_expr mem (e : expr) =
 
 (* -------------------------------------------------------------------- *)
 let rec free_expr e = match e.e_node with
-  | Eop _ | Elocal _ | Evar _ | Eint _ -> true
+  | Elocal _ | Evar _ | Eint _ -> true
 
+  | Eop _
   | Eproj _ | Etuple _ | Eapp _
   | Equant _ | Elet _ | Eif _ | Ematch _ -> false
 
