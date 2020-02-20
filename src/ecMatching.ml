@@ -812,13 +812,19 @@ module FPosition = struct
           | FcHoareF chs ->
             let subctxt = Sid.add EcFol.mhr ctxt in
             let calls =
-              List.map (fun (_,c) -> subctxt,c)
+              List.map (fun (_,c) -> ctxt,c)
                 (EcPath.Mx.bindings chs.chf_co.c_calls) in
             doit pos (`WithSubCtxt ((subctxt, chs.chf_pr) ::
                                     (subctxt, chs.chf_po) ::
-                                    (subctxt, chs.chf_co.c_self) ::
+                                    (ctxt, chs.chf_co.c_self) ::
                                     calls))
 
+          | Fcoe coe ->
+            let subctxt = Sid.add (fst coe.coe_mem) ctxt in
+            doit pos (`WithSubCtxt [subctxt, coe.coe_pre])
+
+          (* TODO: A: From what I undertand, there is an error there:
+             it should be  (subctxt, hs.bhf_bd) *)
           | FbdHoareF hs ->
               let subctxt = Sid.add EcFol.mhr ctxt in
               doit pos (`WithSubCtxt ([(subctxt, hs.bhf_pr);
@@ -971,7 +977,11 @@ module FPosition = struct
               let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
               f_equivF_r { ef with ef_pr; ef_po; }
 
-          | Fcoe      _ -> raise InvalidPosition
+          | Fcoe coe ->
+              let sub = doit p [coe.coe_pre] in
+              let pre = as_seq1 sub in
+              f_coe_r { coe with coe_pre = pre }
+
           | FhoareS   _ -> raise InvalidPosition
           | FcHoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition

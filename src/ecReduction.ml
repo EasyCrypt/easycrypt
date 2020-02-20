@@ -844,6 +844,12 @@ and check_alpha_equal ri hyps f1 f2 =
     let s2 = EcModules.s_subst es s2 in
     ensure (EqTest.for_stmt env s1 s2) in
 
+  let check_e env s e1 e2 =
+    let es = e_subst_init s.fs_freshen s.fs_sty.ts_p
+        s.fs_ty Mp.empty s.fs_mp s.fs_esloc in
+    let e2 = EcTypes.e_subst es e2 in
+    ensure (EqTest.for_expr env e1 e2) in
+
   let rec aux1 env subst f1 f2 =
     if Fsubst.is_subst_id subst && f_equal f1 f2 then ()
     else match f1.f_node, f2.f_node with
@@ -952,6 +958,13 @@ and check_alpha_equal ri hyps f1 f2 =
       check_xp env subst pr1.pr_fun pr2.pr_fun;
       aux env subst pr1.pr_args pr2.pr_args;
       aux env subst pr1.pr_event pr2.pr_event
+
+    | Fcoe coe1, Fcoe coe2 ->
+      check_e env subst coe1.coe_e coe2.coe_e;
+      let bd1 = fst coe1.coe_mem, GTmem (snd coe1.coe_mem) in
+      let bd2 = fst coe2.coe_mem, GTmem (snd coe2.coe_mem) in
+      let env, subst = check_bindings env subst [bd1] [bd2] in
+      aux env subst coe1.coe_pre coe2.coe_pre;
 
     | _, _ -> error ()
 
