@@ -87,6 +87,9 @@ schema cost_pp {r : rand} {p : ptxt} :
 
 schema cost_dptxt : cost[true : dptxt] = 1.
 
+schema cost_pos ['a] {e : 'a} : 0 <= cost[true : e].
+(* schema cost_pos ['a] {e : 'a} `{P} (y : int) : 0 <= cost[P : e]. *)
+print cost_pos.
 
 (************************************************************************)
 module type Oracle = {
@@ -182,11 +185,7 @@ section.
   call (_: true; time).
   wp; skip => *. 
   split => /=; [1: by smt].
-  print cost_cons.
-  instantiate H1 := (cost_cons {r : ptxt, x : rand} x : I.qs).
-  rewrite H1.
-  admit.
-  print dptxt.
+  instantiate -> := (cost_cons {r : ptxt, x : rand} x : I.qs) => //.
   rnd.
   call (_: true;
     (I(A, H).QRO.o : size I.qs)
@@ -197,7 +196,7 @@ section.
   proc; call (_: true; time); wp; skip => *.
   split; [1: by smt].
   split; [2: by smt].
-  admit.
+  instantiate -> := (cost_cons {r : ptxt, x : rand} x : I.qs) => //.
   call (_: true; time); wp; skip => *.
   split => * /=; [1: by smt].
   split;

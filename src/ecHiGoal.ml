@@ -129,6 +129,7 @@ let process_simplify_info ri (tc : tcenv1) =
     EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
     EcReduction.user    = ri.puser;
+    EcReduction.cost    = ri.pcost;
   }
 
 (*-------------------------------------------------------------------- *)

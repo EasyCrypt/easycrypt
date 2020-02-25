@@ -467,6 +467,8 @@ val cost_of_expr : form -> EcMemory.memenv -> EcTypes.expr -> form
 (* The cost of an expression evaluation in any memory of a given type. *)
 val cost_of_expr_any : EcMemory.memenv -> EcTypes.expr -> form
 
+val free_expr : EcTypes.expr -> bool
+
 (* -------------------------------------------------------------------- *)
 type f_subst = private {
   fs_freshen : bool; (* true means realloc local *)

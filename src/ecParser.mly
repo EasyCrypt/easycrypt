@@ -103,7 +103,8 @@
       { pbeta  = true; pzeta  = true;
         piota  = true; peta   = true;
         plogic = true; pdelta = None;
-        pmodpath = true; puser = true; }
+        pmodpath = true; puser = true;
+	pcost = false; }
     else
       let doarg acc = function
         | `Delta l ->
@@ -118,14 +119,16 @@
         | `Logic   -> { acc with plogic   = true }
         | `ModPath -> { acc with pmodpath = true }
         | `User    -> { acc with puser    = true }
+	| `Cost    -> { acc with pcost    = true }
       in
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
             piota  = false; peta   = false;
             plogic = false; pdelta = Some [];
-            pmodpath = false; puser = false; } l
+            pmodpath = false; puser = false;
+	    pcost = false; } l
 
-  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User]
+  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User; `Cost]
 
   let mk_pterm explicit head args =
     { fp_mode = if explicit then `Explicit else `Implicit;
@@ -1472,7 +1475,7 @@ loc_decl_names:
 | x=plist1(lident, COMMA) { (`Single, x) }
 
 | LPAREN x=plist2(lident, COMMA) RPAREN { (`Tuple, x) }
-
+ 
 loc_decl_r:
 | VAR x=loc(loc_decl_names)
     { { pfl_names = x; pfl_type = None; pfl_init = None; } }
@@ -2537,6 +2540,7 @@ simplify_arg:
 | ETA              { `Eta }
 | LOGIC            { `Logic }
 | MODPATH          { `ModPath }
+| COST             { `ModPath }
 
 simplify:
 | l=simplify_arg+     { l }

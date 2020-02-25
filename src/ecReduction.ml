@@ -342,6 +342,7 @@ type reduction_info = {
   logic   : rlogic_info;
   modpath : bool;
   user    : bool;
+  cost    : bool;
 }
 
 and rlogic_info = [`Full | `ProductCompat] option
@@ -357,6 +358,7 @@ let full_red = {
   logic   = Some `Full;
   modpath = true;
   user    = true;
+  cost    = true;
 }
 
 let no_red = {
@@ -369,6 +371,7 @@ let no_red = {
   logic   = None;
   modpath = false;
   user    = false;
+  cost    = false;
 }
 
 let beta_red     = { no_red with beta = true; }

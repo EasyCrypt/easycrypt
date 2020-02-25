@@ -574,7 +574,10 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let coe_pre = norm st s coe.coe_pre in
     let coe_e   = norm_e s coe.coe_e in
     let coe_mem = norm_me s coe.coe_mem in
-    f_coe_r { coe_pre; coe_e; coe_mem }
+
+    if EcFol.free_expr coe_e
+    then f_i0
+    else f_coe_r { coe_pre; coe_e; coe_mem }
 
   | Fpr pr ->
     assert (is_Aempty args);

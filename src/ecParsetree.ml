@@ -481,6 +481,7 @@ type preduction = {
   plogic   : bool;                      (* logical simplification *)
   pmodpath : bool;                      (* modpath normalization *)
   puser    : bool;                      (* user reduction *)
+  pcost    : bool;                      (* reduce trivial cost statements *)
 }
 
 (* -------------------------------------------------------------------- *)
