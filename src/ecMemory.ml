@@ -73,16 +73,25 @@ let mt_fv = function
       ) EcIdent.Mid.empty lmt.mt_decl
 
 let lmt_equal ty_equal mt1 mt2 =
-  mt1.mt_name = mt2.mt_name &&
-  List.all2 (fun v1 v2 -> v1.v_name = v2.v_name && ty_equal v1.v_type v2.v_type)
-    mt1.mt_decl mt2.mt_decl
+  mt1.mt_name = mt2.mt_name
+  &&
+    if mt1.mt_name = None
+    then
+      Msym.equal (fun (_,ty1) (_,ty2) ->
+          ty_equal ty1 ty2
+        ) mt1.mt_proj mt2.mt_proj
+    else
+      List.all2 (fun v1 v2 ->
+          v1.v_name = v2.v_name
+          && ty_equal v1.v_type v2.v_type)
+        mt1.mt_decl mt2.mt_decl
 
 let mt_equal_gen ty_equal mt1 mt2 =
   match mt1, mt2 with
   | Lmt_schema,     Lmt_schema -> true
 
   | Lmt_schema,     Lmt_concrete _
-  | Lmt_concrete _,   Lmt_schema -> false
+  | Lmt_concrete _, Lmt_schema -> false
 
   | Lmt_concrete mt1, Lmt_concrete mt2 ->
     oeq (lmt_equal ty_equal) mt1 mt2

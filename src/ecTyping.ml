@@ -421,7 +421,7 @@ let lookup_scope env popsc =
 
 (* -------------------------------------------------------------------- *)
 type typolicy = {
-  tp_uni  : bool;   (* "_" (Tuniar) allowed  *)
+  tp_uni  : bool;   (* "_" (Tunivar) allowed  *)
   tp_tvar : bool;   (* type variable allowed *)
 }
 
@@ -3182,9 +3182,7 @@ and trans_memtype env ue mem pmemtype =
   let mt = EcMemory.empty_local ~witharg:false mem in
 
   let add_decl memenv (vars, pty) =
-    let env   = EcEnv.Memory.push_active memenv env in
-    (* TODO: A: check that we want tp_uni *)
-    let ty = transty tp_uni env ue pty in
+    let ty = transty tp_tydecl env ue pty in
 
     let xs     = snd (unloc vars) in
     let mode   = fst (unloc vars) in

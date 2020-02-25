@@ -478,27 +478,34 @@ let process_named_schema pe (tvi, sn) =
 
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
+  let sty = { ty_subst_id with ts_v = Mid.find_opt^~ fs } in
+
+  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
+
+  let e_params =
+    List.map (fun (id, ty) ->
+        id, EcTypes.ty_subst sty ty) sc.EcDecl.as_params in
+
   (* When substituting in a schema's formula, we have to rebind the schema's
      expression variables. *)
   let rebind =
     List.map (fun (id,ty) ->
         id, EcTypes.e_local id ty
-      ) sc.EcDecl.as_params
+      ) e_params
     |> Mid.of_list in
   let sc_i =
     Fsubst.subst_tvar
       ~es_loc:rebind
       fs sc.EcDecl.as_spec in
-  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
 
-  let sty = { ty_subst_id with ts_v = Mid.find_opt^~ fs } in
-  let e_params = List.map (fun (id, ty) ->
-      id, EcTypes.ty_subst sty ty) sc.EcDecl.as_params in
   (p, typ, e_params, sc_i)
 
 (* -------------------------------------------------------------------- *)
 let process_sc_instantiation pe inst =
   let env = LDecl.toenv pe.pte_hy in
+
+  let ue = EcUnify.UniEnv.create None in
+  let pe = { pe with pte_ue = ue } in
 
   let p, typ, e_params, sc_i =
     process_named_schema pe (inst.ptcds_tys, inst.ptcds_name) in
@@ -519,7 +526,19 @@ let process_sc_instantiation pe inst =
       id, EcTyping.transexpcast e_env `InProc pe.pte_ue ty_expected pexpr
     ) (unloc pexprs) e_params in
 
-  let fs = Fsubst.f_subst_init ~esloc:(Mid.of_list exprs) ~mt:memtype () in
+  if not (EcUnify.UniEnv.closed pe.pte_ue) then
+    assert false;
+
+  let eus = EcUnify.UniEnv.close pe.pte_ue in
+  let sty = { ty_subst_id with ts_u = eus } in
+  let se = EcTypes.e_uni eus in
+
+  let typ = List.map (EcTypes.ty_subst sty) typ in
+  let exprs = List.map (fun (id, e) -> id, se e) exprs in
+  let memtype = EcMemory.mt_subst (EcTypes.ty_subst sty) memtype in
+
+  let fs = Fsubst.f_subst_init ~sty ~esloc:(Mid.of_list exprs) ~mt:memtype () in
+
   (p, typ, memtype, exprs, Fsubst.f_subst fs sc_i)
 
 (* ------------------------------------------------------------------ *)

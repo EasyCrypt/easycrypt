@@ -33,6 +33,7 @@ type 'a suspension = {
   sp_params : int * (EcIdent.t * module_type) list;
 }
 
+
 (* -------------------------------------------------------------------- *)
 let check_not_suspended (params, obj) =
   if not (List.for_all (fun x -> x = None) params) then
@@ -2892,25 +2893,20 @@ module Schema = struct
     | Some ({ as_spec = f } as sc) ->
       (* When substituting in a schema's formula, we have to rebind the schema's
          expression variables. *)
-      let rebind =
-        List.map (fun (id,ty) ->
-            id, EcTypes.e_local id ty
-          ) sc.EcDecl.as_params
+       let fs = EcTypes.Tvar.init (List.map fst sc.as_tparams) tys in
+       let sty = { ty_subst_id with ts_v = Mid.find_opt^~ fs } in
+
+      let mexpr =
+        List.map2 (fun e (id,ty) ->
+            let ty = EcTypes.ty_subst sty ty in
+            (* We check that expressions [es] have the correct type. *)
+            assert (EcTypes.ty_equal e.e_ty ty);
+            id, e
+          ) es sc.EcDecl.as_params
         |> Mid.of_list in
 
       (* We instantiate the type variables. *)
-      let f = Fsubst.subst_tvar ~es_loc:rebind
-          (EcTypes.Tvar.init (List.map fst sc.as_tparams) tys) f in
-
-      (* We check that expressions [es] have the correct type. *)
-      assert (List.for_all2 (fun e (_,ty) ->
-          EcTypes.ty_equal e.e_ty ty
-        ) es sc.as_params);
-
-      (* We instantiate the expression variables. *)
-      let mexpr = List.map2 (fun e (id,_) -> id,e) es sc.as_params
-                  |> Mid.of_list in
-      let fs = Fsubst.f_subst_init ~esloc:mexpr ~mt:mt () in
+      let fs = Fsubst.f_subst_init ~sty ~esloc:mexpr ~mt () in
 
       Fsubst.f_subst fs f
 

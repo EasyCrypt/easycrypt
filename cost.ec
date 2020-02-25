@@ -183,7 +183,8 @@ section.
   wp; skip => *. 
   split => /=; [1: by smt].
   print cost_cons.
-  instantiate := (cost_cons {r : ptxt, x : rand} x : I.qs).
+  instantiate H1 := (cost_cons {r : ptxt, x : rand} x : I.qs).
+  rewrite H1.
   admit.
   print dptxt.
   rnd.
