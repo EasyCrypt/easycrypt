@@ -132,17 +132,27 @@ type env_norm = {
 }
 
 (* -------------------------------------------------------------------- *)
-type red_topsym = [ `Path of path | `Tuple ]
+type red_topsym = [
+  | `Path of path
+  | `Tuple
+  | `Cost of [`Path of path | `Tuple]
+]
 
 module Mrd = EcMaps.Map.Make(struct
   type t = red_topsym
 
-  let compare (p1 : t) (p2 : t) =
+  let rec compare (p1 : t) (p2 : t) =
     match p1, p2 with
     | `Path p1, `Path p2 ->  EcPath.p_compare p1 p2
     | `Tuple  , `Tuple   ->  0
-    | `Tuple  , `Path _  -> -1
-    | `Path _ , `Tuple   ->  1
+    | `Cost p1, `Cost p2 ->
+      compare (p1 :> red_topsym) (p2 :> red_topsym)
+    | `Tuple  , `Path _
+    | `Cost _ , `Path _
+    | `Cost _ , `Tuple   -> -1
+    | `Path _ , `Tuple
+    | `Path _ , `Cost _
+    | `Tuple  , `Cost _  ->  1
 end)
 
 (* -------------------------------------------------------------------- *)
@@ -1417,9 +1427,11 @@ module Reduction = struct
 
     let p =
       match rule.rl_ptn with
-      | Rule (`Op p , _) -> `Path (fst p)
-      | Rule (`Tuple, _) -> `Tuple
-      | Var _ | Int _ -> assert false in
+      | Rule (`Op p, _)               -> `Path (fst p)
+      | Rule (`Tuple, _)              -> `Tuple
+      | Cost (_, _, Rule (`Op p, _))  -> `Cost (`Path (fst p))
+      | Cost (_, _, Rule (`Tuple, _)) -> `Cost `Tuple
+      | Cost _ | Var _ | Int _        -> assert false in
 
     Mrd.change (fun rls ->
       let { ri_priomap } =
@@ -2891,40 +2903,7 @@ module Schema = struct
   let instanciate p tys (mt : EcMemory.memtype) es env =
     match by_path_opt p env with
     | Some ({ as_spec = f } as sc) ->
-      (* When substituting in a schema's formula, we have to rebind the schema's
-         expression variables. *)
-       let fs = EcTypes.Tvar.init (List.map fst sc.as_tparams) tys in
-       let sty = { ty_subst_id with ts_v = Mid.find_opt^~ fs } in
-
-      let exprs =
-        List.map2 (fun e (id,ty) ->
-            let ty = EcTypes.ty_subst sty ty in
-            (* We check that expressions [es] have the correct type. *)
-            assert (EcTypes.ty_equal e.e_ty ty);
-            id, e
-          ) es sc.EcDecl.as_params in
-       let mexpr = Mid.of_list exprs in
-
-       (* We instantiate the variables. *)
-       (* FIXME: instantiating and substituting in schema is ugly. *)
-       (* For cost judgement, we also need to substitue the expression variables
-          in the precondition. *)
-       let tx f_old f_new = match f_old.f_node, f_new.f_node with
-         | Fcoe coe_old, Fcoe coe_new
-           when EcMemory.is_schema (snd coe_old.coe_mem) ->
-           let fs =
-             List.fold_left (fun s (id,e) ->
-                 let f = EcCoreFol.form_of_expr (fst coe_new.coe_mem) e in
-                 Fsubst.f_bind_local s id f)
-               (Fsubst.f_subst_init ()) exprs in
-
-           EcCoreFol.f_coe_r { coe_new with
-                               coe_pre = Fsubst.f_subst fs coe_new.coe_pre }
-         | _ -> f_new in
-
-      let fs = Fsubst.f_subst_init ~sty ~esloc:mexpr ~mt () in
-
-      Fsubst.f_subst ~tx fs f
+      EcDecl.sc_instantiate sc.as_tparams sc.as_params tys mt es f
 
     | _ -> raise (LookupFailure (`Path p))
 

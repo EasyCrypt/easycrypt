@@ -434,11 +434,14 @@ and replay_reduction
   let for1 (p, rule) =
     let p = EcSubst.subst_path subst p in
 
+    (* TODO: A: schema are not replayed for now, but reduction rules can use a
+       schema. Fix this. *)
+    let mode = `Ax in           (* TODO: A: fixme*)
     let rule =
       obind (fun rule ->
         try
           Some (EcReduction.User.compile
-                  ~prio:rule.rl_prio (ove.ovre_hooks.henv scope) p)
+                  ~prio:rule.rl_prio (ove.ovre_hooks.henv scope) mode p)
         with EcReduction.User.InvalidUserRule _ -> None) rule
 
     in (p, rule) in

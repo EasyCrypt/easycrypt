@@ -569,8 +569,13 @@ let tt_apply (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
   let tc, (pt, ax)  =
     RApi.to_pure (fun tc -> LowApply.check `Elim pt (`Tc (tc, None))) tc in
-  if not (EcReduction.is_conv hyps ax concl) then
-    raise InvalidGoalShape;
+  if not (EcReduction.is_conv hyps ax concl) then begin
+    let env = FApi.tc_env tc in
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    Format.eprintf "%a@.should be convertible to:@.%a@.but is not@."
+      (EcPrinting.pp_form ppe) ax
+      (EcPrinting.pp_form ppe) concl;
+    raise InvalidGoalShape; end;
   FApi.close tc (VApply pt)
 
 

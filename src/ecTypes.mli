@@ -241,6 +241,7 @@ val is_tuple_var : expr -> bool
 
 val destr_local     : expr -> EcIdent.t
 val destr_var       : expr -> prog_var
+val destr_app       : expr -> expr * expr list
 val destr_tuple_var : expr -> prog_var list
 
 (* -------------------------------------------------------------------- *)

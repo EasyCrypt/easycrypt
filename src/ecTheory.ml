@@ -38,20 +38,22 @@ and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
 and thmode     = [ `Abstract | `Concrete ]
 
 and rule_pattern =
-  | Rule  of top_rule_pattern * rule_pattern list
-  | Int   of EcBigInt.zint
-  | Var   of EcIdent.t
+  | Rule of top_rule_pattern * rule_pattern list
+  | Cost of EcMemory.memenv * EcCoreFol.form * rule_pattern
+  | Int  of EcBigInt.zint
+  | Var  of EcIdent.t
 
 and top_rule_pattern =
   [`Op of (EcPath.path * EcTypes.ty list) | `Tuple]
 
 and rule = {
-  rl_tyd  : EcDecl.ty_params;
-  rl_vars : (EcIdent.t * EcTypes.ty) list;
-  rl_cond : EcCoreFol.form list;
-  rl_ptn  : rule_pattern;
-  rl_tg   : EcCoreFol.form;
-  rl_prio : int;
+  rl_tyd   : EcDecl.ty_params;
+  rl_vars  : (EcIdent.t * EcTypes.ty) list;
+  rl_evars : (EcIdent.t * EcTypes.ty) list;
+  rl_cond  : EcCoreFol.form list;
+  rl_ptn   : rule_pattern;
+  rl_tg    : EcCoreFol.form;
+  rl_prio  : int;
 }
 
 (* -------------------------------------------------------------------- *)

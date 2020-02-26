@@ -154,6 +154,11 @@ type ax_schema = {
   as_spec    : EcCoreFol.form;
 }
 
+val sc_instantiate :
+  ty_params -> sc_params ->
+  ty list -> EcMemory.memtype -> expr list ->
+  EcCoreFol.form -> EcCoreFol.form
+
 (* -------------------------------------------------------------------- *)
 val axiomatized_op :
      ?nargs: int

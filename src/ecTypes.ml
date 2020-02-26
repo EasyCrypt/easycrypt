@@ -1105,6 +1105,10 @@ let destr_tuple_var e =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
+let destr_app = function
+    { e_node = Eapp (e, es) } -> (e, es) | e -> (e, [])
+
+(* -------------------------------------------------------------------- *)
 let split_args e =
   match e.e_node with
   | Eapp (e, args) -> (e, args)

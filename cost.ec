@@ -89,7 +89,8 @@ schema cost_dptxt : cost[true : dptxt] = 1.
 
 schema cost_pos ['a] {e : 'a} : 0 <= cost[true : e].
 (* schema cost_pos ['a] {e : 'a} `{P} (y : int) : 0 <= cost[P : e]. *)
-print cost_pos.
+
+hint simplify cost_cons.
 
 (************************************************************************)
 module type Oracle = {
@@ -112,8 +113,8 @@ module type Adv (H : AOracle) = {
   proc a2(c:ctxt): bool         
 }.
 
-(*********************************************)
-(* Other example, to the the accepted syntax *)
+(*****************************************)
+(* Other example, of the accepted syntax *)
 
 (* We have two possibility to give module restrictions. *)
 (* We can give the restrictions function by function, e.g.: *)
@@ -130,7 +131,7 @@ module type OAdvBis (H1 : Oracle, H : AOracle)
   proc a1(p:pkey): (ptxt * ptxt)
   proc a2(c:ctxt): bool
 }.
-(*********************************************)
+(*****************************************)
 
 (* Inverter *)
 module I (A : Adv) (H : Oracle) = {
@@ -183,6 +184,8 @@ section.
   (* We prove that the invariant is preserved by calls to the oracle QRO. *)
   proc.
   call (_: true; time).
+  wp.
+  skip.
   wp; skip => *. 
   split => /=; [1: by smt].
   instantiate -> := (cost_cons {r : ptxt, x : rand} x : I.qs) => //.

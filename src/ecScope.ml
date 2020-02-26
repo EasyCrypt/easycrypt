@@ -2234,9 +2234,13 @@ module Reduction = struct
     let rules =
       let for1 idx name =
         let idx      = odfl 0 idx in
-        let lemma    = fst (EcEnv.Ax.lookup (unloc name) (env scope)) in
-        let red_info = EcReduction.User.compile ~prio:idx (env scope) lemma in
-        (lemma, Some red_info) in
+        let mode, ax_sc_p =
+          match EcEnv.Ax.lookup_opt (unloc name) (env scope) with
+          | Some (p,_) -> `Ax, p
+          | None -> `Sc, EcEnv.Schema.lookup_path (unloc name) (env scope) in
+        let red_info =
+          EcReduction.User.compile ~prio:idx (env scope) mode ax_sc_p in
+        (ax_sc_p, Some red_info) in
 
       let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
       List.flatten rules

@@ -17,6 +17,7 @@ open EcEnv
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
+exception IncompatibleExpr of env * (expr * expr)
 
 (* -------------------------------------------------------------------- *)
 type 'a eqtest = env -> 'a -> 'a -> bool
@@ -44,6 +45,7 @@ val is_alpha_eq : LDecl.hyps -> form -> form -> bool
 module User : sig
   type error =
     | MissingVarInLhs   of EcIdent.t
+    | MissingEVarInLhs   of EcIdent.t
     | MissingTyVarInLhs of EcIdent.t
     | NotAnEq
     | NotFirstOrder
@@ -54,7 +56,7 @@ module User : sig
 
   type rule = EcEnv.Reduction.rule
 
-  val compile : prio:int -> EcEnv.env -> EcPath.path -> rule
+  val compile : prio:int -> EcEnv.env -> [`Ax | `Sc] -> EcPath.path -> rule
 end
 
 (* -------------------------------------------------------------------- *)
