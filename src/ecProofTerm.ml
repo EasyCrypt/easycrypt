@@ -537,9 +537,24 @@ let process_sc_instantiation pe inst =
   let exprs = List.map (fun (id, e) -> id, se e) exprs in
   let memtype = EcMemory.mt_subst (EcTypes.ty_subst sty) memtype in
 
+  (* FIXME: instantiating and substituting in schema is ugly. *)
+  (* For cost judgement, we also need to substitue the expression variables
+     in the precondition. *)
+  let tx f_old f_new = match f_old.f_node, f_new.f_node with
+    | Fcoe coe_old, Fcoe coe_new when EcMemory.is_schema (snd coe_old.coe_mem) ->
+      let fs =
+        List.fold_left (fun s (id,e) ->
+            let f = EcCoreFol.form_of_expr (fst coe_new.coe_mem) e in
+            Fsubst.f_bind_local s id f)
+          (Fsubst.f_subst_init ()) exprs in
+
+      EcCoreFol.f_coe_r { coe_new with
+                          coe_pre = Fsubst.f_subst fs coe_new.coe_pre }
+    | _ -> f_new in
+
   let fs = Fsubst.f_subst_init ~sty ~esloc:(Mid.of_list exprs) ~mt:memtype () in
 
-  (p, typ, memtype, exprs, Fsubst.f_subst fs sc_i)
+  (p, typ, memtype, exprs, Fsubst.f_subst ~tx fs sc_i)
 
 (* ------------------------------------------------------------------ *)
 let process_pterm_cut ~prcut pe pt =

@@ -361,7 +361,7 @@ module FSmart : sig
   val f_equivF   : (form * equivF   ) -> equivF    -> form
   val f_equivS   : (form * equivS   ) -> equivS    -> form
   val f_eagerF   : (form * eagerF   ) -> eagerF    -> form
-  val f_coe       : (form * coe      ) -> coe       -> form
+  val f_coe      : (form * coe      ) -> coe       -> form
   val f_pr       : (form * pr       ) -> pr        -> form
 end
 
