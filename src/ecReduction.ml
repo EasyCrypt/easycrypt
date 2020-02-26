@@ -781,6 +781,9 @@ and reduce_user_gen mode simplify ri env hyps f
             ()
 
         | ({ f_node = Fcoe coe} , []), R.Cost (menv, _pre, inner_r)  ->
+          if not ri.cost then
+            raise NotReducible;
+
           if EcMemory.is_schema (snd menv) then begin
             if !sc_mt = None then
               sc_mt := Some (snd coe.coe_mem)
