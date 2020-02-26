@@ -1622,14 +1622,21 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Fcoe coe ->
       let ppe = PPEnv.push_mem ppe ~active:true coe.coe_mem in
       let m, mt = coe.coe_mem in
-      let (subppe, pp) =
+      let ppe = PPEnv.add_local ppe m in
+      let pp fmt =
         if EcMemory.is_schema mt
-        then (ppe, fun _ -> ())
-        else pp_bindings ppe ~fv:f.f_fv [m, GTmem mt] in
+        then ()
+        else if EcMemory.for_printing mt = None
+        then Format.fprintf fmt "%a" (pp_local ppe) m
+        else
+          Format.fprintf fmt "(%a: %a)"
+            (pp_local ~fv:coe.coe_pre.f_fv ppe) m
+            (pp_memtype ppe) mt in
+
       Format.fprintf fmt "@[<hv 2>cost@[%t@]@,[@[<hov 2>@[%a@] :@ @[%a@]@]]@]"
         pp
-        (pp_form subppe) coe.coe_pre
-        (pp_expr subppe) coe.coe_e
+        (pp_form ppe) coe.coe_pre
+        (pp_expr ppe) coe.coe_e
 
   | Fpr pr->
       let me = EcEnv.Fun.prF_memenv EcFol.mhr pr.pr_fun ppe.PPEnv.ppe_env in
