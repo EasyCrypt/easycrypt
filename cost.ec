@@ -1,5 +1,5 @@
-require import Distr DBool Int List CHoareTactic StdBigop.
-import Bigint IntExtra.
+require import StdOrder Distr DBool Int List CHoareTactic StdBigop.
+import Bigint IntExtra IntOrder.
 require BitWord ROM.
 
 (*****************)
@@ -74,10 +74,12 @@ clone import ROM.Lazy as H with
 
 (************************************************************************)
 (* Costs of various operators. *)
-schema cost_cons ['a] {e : 'a} {l : 'a list} : 
+schema cost_cons ['a] {e : 'a} {l : 'a list}: 
     cost[true : e :: l] =   
     cost[true : e] + cost[true : l] + 1.
 
+(* schema list_cost ['a] {l : 'a list} (len : int): *)
+(*   cost[size l <= len : find f l] <= len *)
 
 schema cost_nil ['a] : cost[true : [] : 'a list] = 1.
 
@@ -184,10 +186,23 @@ section.
   (* We prove that the invariant is preserved by calls to the oracle QRO. *)
   proc.
   call (_: true; time).
-  wp.
+    wp.
   skip.
-  wp; skip => *. 
+  move => ? ?. 
+    rewrite /=.
+  have : oget (Some 0) = 0.
+  rewrite /=.
+  rewrite /=.
+  split. admit.
+  move => *.
+    split. admit.
+  rewrite subr_ge0 => /=.
+  move => //.
+  split => /=. admit.
+  move => //.
+  (* wp; skip => *.  *)
   split => /=; [1: by smt].
+  move => //.
   instantiate -> := (cost_cons {r : ptxt, x : rand} x : I.qs) => //.
   rnd.
   call (_: true;

@@ -336,7 +336,7 @@ let t_cbv_with_info ?target (ri : reduction_info) (tc : tcenv1) =
 let t_cbv ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
   let ri = if delta then full_red else nodelta in
   let ri = { ri with logic } in
-  t_cbv_with_info ?target ri tc
+  t_cbv_with_info ?target full_red tc
 
 (* -------------------------------------------------------------------- *)
 let t_cbn_with_info ?target (ri : reduction_info) (tc : tcenv1) =

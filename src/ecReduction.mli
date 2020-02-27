@@ -14,6 +14,8 @@ open EcFol
 open EcModules
 open EcEnv
 
+val pp_form : (EcEnv.env -> Format.formatter -> form -> unit) ref
+
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
