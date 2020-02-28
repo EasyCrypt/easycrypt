@@ -196,7 +196,7 @@ move=> gt0_r dvd_d_bs; apply/(eq_from_nth witness)=> [|i].
 rewrite size_flatten_chunk ?divzK // => -[ge0_i lt_ibs].
 rewrite (@nth_flatten witness r); 1: apply/allP=> s.
 by move/(@in_chunk_size _ _ _ gt0_r).
-rewrite nth_mkseq /= 1:divz_ge0 ?ge0_i ?ltz_divRL ?gt0_r //.
+rewrite nth_mkseq /= 1:divz_ge0 ?ge0_i ?ltz_divRL ?gt0_r //=.
   by apply/(@ler_lt_trans i)=> //; rewrite lez_floor gtr_eqF ?gt0_r.
 rewrite nth_take ?ltz_pmod 1:ltrW ?gt0_r nth_drop; last 2 first.
   by rewrite modz_ge0 ?gtr_eqF ?gt0_r. by rewrite (@mulrC r) -divz_eq.

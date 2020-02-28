@@ -312,11 +312,11 @@ module LowRewrite = struct
 
       let pt   = fst (PT.concretize pt) in
       let cpos =
-        try  FPosition.select_form hyps o fp tgfp
+        try  FPosition.select_form ~keyed:ky hyps o fp tgfp
         with InvalidOccurence -> raise (RewriteError (LRW_InvalidOccurence))
       in
 
-      EcLowGoal.t_rewrite ?target ~mode pt (s, Some cpos) tc in
+      EcLowGoal.t_rewrite ~keyed:ky ?target ~mode pt (s, Some cpos) tc in
 
     let rec do_first = function
       | [] -> raise (RewriteError LRW_NothingToRewrite)
