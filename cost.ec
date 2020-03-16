@@ -176,8 +176,8 @@ module IW (A : Adv) (H : Oracle) = {
   module A0 = A(QRO)
 
   proc invert(pk : pkey, y : rand) : rand = {
-    var x, m0, m1, h, b;
-    var qs0, p;
+    var r, x, m0, m1, h, b;
+    var qs0;
 
     qs <- [];
     H.init();
@@ -185,17 +185,17 @@ module IW (A : Adv) (H : Oracle) = {
     h <$ dptxt;
     b <- A0.a2(y || h);
 
-    x <- witness; 
-    qs0 = qs;
+    r <- witness; 
+    qs0 <- qs;
     while (qs0 <> []){
-      x = head witness qs;
-      if (f pk p = y) {
-        qs0 = [];  
+      x = head witness qs0; 
+      if (f pk x = y) {
+        r <- x; qs0 <- [];
       } else {
-        qs0 = drop 1 qs0;
+        qs0 <- drop 1 qs0;
       }
     }
-    return  x;
+    return  r;
   }
 }.
 
@@ -210,11 +210,38 @@ section.
     ={arg} /\ ={glob H, glob A} ==> ={res}.
   proof.
     proc.  
-    seq 5 5 : (={glob H, glob A, b,h} /\ I.qs{1} = IW.qs{2}); first by sim. 
-    wp. 
-    admit.
+    seq 5 5 : (={glob H, glob A, b,h, pk, y} /\ I.qs{1} = IW.qs{2}); first by sim. 
+    while {2} (
+      if qs0 = [] then 
+         r = nth witness IW.qs (find (fun (p0 : rand) => f pk p0 = y) IW.qs)
+      else 
+       exists i, r = witness /\ 0 <= i < size IW.qs /\ qs0 = drop i IW.qs /\ !has (fun x => f pk x = y) (take i IW.qs)){2}
+     (size qs0{2}).
+    + move=> &1 z; auto => &2 />.
+      case: (qs0{2}) => //= hd qs0 [i />] h0i hi hdr hhas.
+      have heq : IW.qs{2} = take i IW.qs{2} ++ hd :: qs0.
+      + by rewrite hdr cat_take_drop.
+      rewrite heq; move: hhas; (pose tk := take i IW.qs{2}) => hhas.
+      have heq1 : 
+       nth witness (tk ++ hd :: qs0) (find (fun (p0 : rand) => f pk{2} p0 = y{2}) (tk ++ hd :: qs0)) =
+       nth witness (hd :: qs0) (find (fun (p0 : rand) => f pk{2} p0 = y{2}) (hd :: qs0)).
+      + by rewrite find_cat hhas /= nth_cat; smt (find_ge0).
+      split. 
+      + by move=> heq2;rewrite heq2 heq1 /= heq2 /=; smt (size_ge0).  
+      rewrite heq1 drop0 => hy; split;2:smt().
+      split.
+      + by move=> />;rewrite hy.
+      move=> hqs; exists (i + 1).
+      rewrite size_cat /= -cat_rcons.
+      have -> : i + 1 = size (rcons tk hd).
+      + by rewrite size_rcons size_take // hi.
+      rewrite drop_size_cat // take_size_cat // size_rcons -cats1 has_cat /=.
+      smt (size_ge0).
+    auto => /> &2;split.
+    + move=> ?;exists 0;rewrite drop0 take0 /=.
+      smt (size_eq0 size_ge0).
+    smt (size_eq0 size_ge0).
   qed.
-
 
   local lemma bound_i :     
     choare[I0.invert: true ==> true] 
