@@ -78,7 +78,7 @@ schema cost_cons ['a] {e : 'a} {l : 'a list} :
     cost[true : e :: l] =   
     cost[true : e] + cost[true : l] + 1.
 
-schema cost_nil ['a] : cost[true : [] : 'a list] = 1.
+schema cost_nil ['a] : cost[true : [<:'a>]] = 1.
 
 schema cost_pp {r : rand} {p : ptxt} :
   cost[true : r || p] = 
@@ -87,14 +87,11 @@ schema cost_pp {r : rand} {p : ptxt} :
 schema cost_dptxt : cost[true : dptxt] = 1.
 
 schema cost_pos ['a] {e : 'a} : 0 <= cost[true : e].
-(* schema cost_pos ['a] {e : 'a} `{P} (y : int) : 0 <= cost[P : e]. *)
 
 hint simplify cost_cons.
 hint simplify cost_nil.
 hint simplify cost_pp.
 hint simplify cost_dptxt.
-
-(* schema myschema ['a] {'P} {e : 'a} : cost[P : e] = 1. *)
 
 (************************************************************************)
 module type Oracle = {
@@ -164,11 +161,60 @@ module I (A : Adv) (H : Oracle) = {
   }
 }.
 
-section.
-  declare module H : Oracle {-I}. 
-  declare module A : Adv {-I, -H} [a1 : {#H.o : k1}, a2 : {#H.o : k2}].
+(* Same as I, but using a while-loop to find the element in the list. *)
+module IW (A : Adv) (H : Oracle) = {
+  var qs : rand list
 
-  local module I0 = I(A,H).
+  module QRO = {
+    proc o (x : rand) = {
+      var r;
+      qs <- x :: qs;
+      r <- H.o(x);
+      return r;
+    }
+  }
+  module A0 = A(QRO)
+
+  proc invert(pk : pkey, y : rand) : rand = {
+    var x, m0, m1, h, b;
+    var qs0, p;
+
+    qs <- [];
+    H.init();
+    (m0,m1) <- A0.a1(pk);  
+    h <$ dptxt;
+    b <- A0.a2(y || h);
+
+    x <- witness; 
+    qs0 = qs;
+    while (qs0 <> []){
+      x = head witness qs;
+      if (f pk p = y) {
+        qs0 = [];  
+      } else {
+        qs0 = drop 1 qs0;
+      }
+    }
+    return  x;
+  }
+}.
+
+section.
+  declare module H : Oracle {-I, -IW}. 
+  declare module A : Adv {-I, -IW, -H} [a1 : {#H.o : k1}, a2 : {#H.o : k2}].
+
+  local module I0  = I(A,H).
+  local module IW0 = IW(A,H).
+
+  local equiv eq_I_IW: I0.invert ~ IW0.invert:
+    ={arg} /\ ={glob H, glob A} ==> ={res}.
+  proof.
+    proc.  
+    seq 5 5 : (={glob H, glob A, b,h} /\ I.qs{1} = IW.qs{2}); first by sim. 
+    wp. 
+    admit.
+  qed.
+
 
   local lemma bound_i :     
     choare[I0.invert: true ==> true] 
