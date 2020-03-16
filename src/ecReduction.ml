@@ -17,8 +17,6 @@ open EcEnv
 
 module BI = EcBigInt
 
-let pp_form = ref (fun _ _ _ -> assert false)
-
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
@@ -596,24 +594,7 @@ let rec h_red_x ri env hyps f =
       when ri.eta && can_eta x (fn, args)
     -> f_app fn (List.take (List.length args - 1) args) f.f_ty
 
-  | Fcoe c when ri.cost && EcFol.free_expr c.coe_e ->
-    Format.eprintf "done: %a@." (!pp_form env) f;
-    f_i0
-
-  | Fcoe _ ->
-    Format.eprintf "here: %a@." (!pp_form env) f;
-    let strategies =
-        [ reduce_logic;
-          reduce_user ~mode:`BeforeDelta;
-          reduce_delta;
-          reduce_user ~mode:`AfterDelta ;
-          reduce_context]
-      in
-
-       oget ~exn:NotReducible (List.Exceptionless.find_map
-         (fun strategy ->
-            try Some (strategy ri env hyps f) with NotReducible -> None)
-         strategies)
+  | Fcoe c when ri.cost && EcFol.free_expr c.coe_e -> f_i0
 
   | _ ->
       let strategies =
@@ -800,8 +781,8 @@ and reduce_user_gen mode simplify ri env hyps f
             ()
 
         | ({ f_node = Fcoe coe} , []), R.Cost (menv, _pre, inner_r)  ->
-          (* if not ri.cost then
-           *   raise NotReducible; *)
+          if not ri.cost then
+            raise NotReducible;
 
           if EcMemory.is_schema (snd menv) then begin
             if !sc_mt = None then

@@ -3365,9 +3365,4 @@ let pp_use_restr env ~print_abstract fmt ur =
       | Some sm_p -> pp_list "@ " (pp_v ~sign:SPlus ppe) fmt sm_p)
     (omap EcPath.Sx.ntr_elements sx_p)
     (pp_list "@ " (pp_v ~sign:SMinus ppe))
-    (EcPath.Sx.ntr_elements sx_n)
-
-
-let () =  EcReduction.pp_form := fun env fmt f ->
-    let ppe = PPEnv.ofenv env in
-    pp_form ppe fmt f
+    (EcPath.Sx.ntr_elements sx_n);
