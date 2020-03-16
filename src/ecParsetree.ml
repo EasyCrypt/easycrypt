@@ -675,7 +675,7 @@ type phltactic =
   | Prepl_stmt     of trans_info
   | Pfun           of fun_info
   | Papp           of app_info
-  | Pwp            of codepos1 doption option
+  | Pwp            of codepos1 doption option * pformula option
   | Psp            of codepos1 doption option
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info

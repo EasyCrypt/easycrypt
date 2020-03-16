@@ -245,7 +245,7 @@ end = struct
         msg "unknown (record) field name: %a" pp_qsymbol qs
 
     | UnknownInstrMetaVar x ->
-        msg "unkown instruction meta-variable: %a" pp_symbol x
+        msg "unknown instruction meta-variable: %a" pp_symbol x
 
     | UnknownMetaVar x ->
         msg "unknown meta-variable: %a" pp_symbol x

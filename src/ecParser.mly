@@ -2975,8 +2975,11 @@ phltactic:
 | SEQ s=side? d=tac_dir pos=s_codepos1 COLON p=form_or_double_form f=app_bd_info
    { Papp (s, d, pos, p, f) }
 
-| WP n=s_codepos1?
-   { Pwp n }
+| WP n=s_codepos1? 
+   { Pwp (n, None) }
+
+| WP n=s_codepos1? COLON f=sform
+   { Pwp (n, Some f) }
 
 | SP n=s_codepos1?
     { Psp n }

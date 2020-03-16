@@ -577,7 +577,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
     if EcFol.free_expr coe_e
     then f_i0
-    else f_coe_r { coe_pre; coe_e; coe_mem }
+    else
+      reduce_user st (f_coe_r { coe_pre; coe_e; coe_mem })
 
   | Fpr pr ->
     assert (is_Aempty args);

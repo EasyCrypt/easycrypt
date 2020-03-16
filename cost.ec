@@ -78,7 +78,6 @@ schema cost_cons ['a] {e : 'a} {l : 'a list} :
     cost[true : e :: l] =   
     cost[true : e] + cost[true : l] + 1.
 
-
 schema cost_nil ['a] : cost[true : [] : 'a list] = 1.
 
 schema cost_pp {r : rand} {p : ptxt} :
@@ -91,6 +90,11 @@ schema cost_pos ['a] {e : 'a} : 0 <= cost[true : e].
 (* schema cost_pos ['a] {e : 'a} `{P} (y : int) : 0 <= cost[P : e]. *)
 
 hint simplify cost_cons.
+hint simplify cost_nil.
+hint simplify cost_pp.
+hint simplify cost_dptxt.
+
+(* schema myschema ['a] {'P} {e : 'a} : cost[P : e] = 1. *)
 
 (************************************************************************)
 module type Oracle = {
@@ -181,42 +185,33 @@ section.
     time
     (I(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
   => * /=.
-  (* We prove that the invariant is preserved by calls to the oracle QRO. *)
-  proc.
-  call (_: true; time).
-  wp.
-  skip.
-  wp; skip => *. 
-  split => /=; [1: by smt].
-  instantiate -> := (cost_cons {r : ptxt, x : rand} x : I.qs) => //.
-  rnd.
+
+  (* The invariant is preserved by calls to the oracle QRO. *)
+  proc; call (_: true; time); wp; skip => * /=; first by smt.
+
+  rnd. 
   call (_: true;
     (I(A, H).QRO.o : size I.qs)
     time
     (I(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
   => * /=.
-  (* We prove that the invariant is preserved by calls to the oracle QRO. *)
-  proc; call (_: true; time); wp; skip => *.
-  split; [1: by smt].
-  split; [2: by smt].
-  instantiate -> := (cost_cons {r : ptxt, x : rand} x : I.qs) => //.
-  call (_: true; time); wp; skip => *.
-  split => * /=; [1: by smt].
-  split;
-  rewrite !big_constz !count_predT !size_range. 
-  admit. (* [smt (k1p k2p)]. *)
-  by smt (k1p k2p).
-  (* wp (size I.qs <= k1 + k2). *)  
+
+  (* The invariant is preserved by calls to the oracle QRO. *)
+  proc; call (_: true; time); wp; skip => * => /=; [1: by smt].
+
+  call (_: true; time); wp; skip; move => /=.
+
+  split; move => * /=; first by smt.
+  
+  (* We have enough time *)
+  split; rewrite !big_constz !count_predT !size_range.  
+    by smt (k1p k2p).
+    by smt (k1p k2p).
+
+  (* finally, we bound the list lookup time. *)
+  wp : (size I.qs <= k1 + k2) => //; skip => */=.  
   admit.
 qed.
-
-(* lemma foo: *)
-(* forall l, *)
-(* cost(_:{pk, y, m0, m1, b, x : bool})[I.qs = l :  *)
-(*     nth witness I.qs        *)
-(*     (find (fun (_ : int) => true) I.qs)] <= size l. *)
-(* proof. *)
-(* apply list_ind => /= => *. *)
 
 module A = { 
   proc g (x, y) : int = {
