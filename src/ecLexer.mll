@@ -399,6 +399,7 @@ rule main = parse
   | "{|"  { [LPBRACE   ] }
   | "|}"  { [RPBRACE   ] }
   | "`|"  { [TICKPIPE  ] }
+  | "`{"  { [TICKBRACE ] }
   | "<$"  { [LESAMPLE  ] }
   | "<@"  { [LEAT      ] }
   | ":~"  { [COLONTILD ] }

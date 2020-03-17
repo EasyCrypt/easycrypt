@@ -973,9 +973,12 @@ type paxiom_kind =
 | PLemma of ptactics option
 | PILemma
 
+type mempred_binding = PT_MemPred of psymbol list
+
 type paxiom = {
   pa_name    : psymbol;
   pa_scvars  : pgscbindings option;
+  pa_pvars   : mempred_binding option;
   pa_tyvars  : (psymbol * pqsymbol list) list option;
   pa_vars    : pgtybindings option;
   pa_formula : pformula;

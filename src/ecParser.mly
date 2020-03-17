@@ -88,10 +88,11 @@
   let pflist loc ti (es : pformula    list) : pformula    =
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ?(local = false) ?(nosmt = false) (x, scv, ty, vd, f) k =
+  let mk_axiom ?(local = false) ?(nosmt = false) (x, ty, pv, scv, vd, f) k =
     { pa_name    = x;
-      pa_scvars  = scv;
       pa_tyvars  = ty;
+      pa_pvars   = pv;
+      pa_scvars  = scv;
       pa_vars    = vd;
       pa_formula = f;
       pa_kind    = k;
@@ -568,6 +569,7 @@
 %token SYMMETRY
 %token THEN
 %token THEORY
+%token TICKBRACE
 %token TICKPIPE
 %token TILD
 %token TIME
@@ -2009,13 +2011,20 @@ top_decl:
 | x=top_mod_decl { PDCL_Module x }
 
 (* -------------------------------------------------------------------- *)
+mempred_binding:
+  | TICKBRACE u=uident+ RBRACE { PT_MemPred u }
+
+(* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
 lemma_decl:
 | x=ident
-  tyvars=tyvars_decl? scvars=sc_ptybindings_decl? pd=pgtybindings?
+  tyvars=tyvars_decl?
+  predvars=mempred_binding?
+  scvars=sc_ptybindings_decl?
+  pd=pgtybindings?
   COLON f=form
-    { x,scvars,tyvars,pd,f }
+    { x,tyvars,predvars,scvars,pd,f }
 
 nosmt:
 | NOSMT { true  }
@@ -2044,7 +2053,7 @@ axiom:
 | l=local  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
 | l=local PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
 | l=local CHOARE x=ident pd=pgtybindings? COLON p=loc(choare_body(none)) ao=axiom_tc
-    { mk_axiom ~local:l (x, None, None, pd, p) ao }
+    { mk_axiom ~local:l (x, None, None, None, pd, p) ao }
 
 proofend:
 | QED      { `Qed   }

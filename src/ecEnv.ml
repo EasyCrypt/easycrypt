@@ -2555,7 +2555,7 @@ module NormMp = struct
     { ax with ax_spec = norm_form env ax.ax_spec }
 
   let norm_sc env sc =
-    { sc with as_spec = norm_form env sc.as_spec }
+    { sc with axs_spec = norm_form env sc.axs_spec }
 
   let is_abstract_fun f env =
     let f = norm_xfun env f in
@@ -2900,10 +2900,12 @@ module Schema = struct
   let rebind name ax env =
     MC.bind_schema name ax env
 
-  let instanciate p tys (mt : EcMemory.memtype) es env =
+  let instanciate p tys (mt : EcMemory.memtype) ps es env =
     match by_path_opt p env with
-    | Some ({ as_spec = f } as sc) ->
-      EcDecl.sc_instantiate sc.as_tparams sc.as_params tys mt es f
+    | Some ({ axs_spec = f } as sc) ->
+      EcDecl.sc_instantiate
+        sc.axs_tparams sc.axs_pparams sc.axs_params
+        tys mt ps es f
 
     | _ -> raise (LookupFailure (`Path p))
 

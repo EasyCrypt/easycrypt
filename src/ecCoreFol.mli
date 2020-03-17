@@ -460,6 +460,11 @@ val split_args : form -> form * form list
 val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 
 (* -------------------------------------------------------------------- *)
+exception CannotTranslate
+
+val expr_of_form : EcMemory.memory -> form -> EcTypes.expr
+
+(* -------------------------------------------------------------------- *)
 (* The cost of an expression evaluation in any memory of a given type
    satisfying some pre-condition. *)
 val cost_of_expr : form -> EcMemory.memenv -> EcTypes.expr -> form
@@ -468,6 +473,10 @@ val cost_of_expr : form -> EcMemory.memenv -> EcTypes.expr -> form
 val cost_of_expr_any : EcMemory.memenv -> EcTypes.expr -> form
 
 val free_expr : EcTypes.expr -> bool
+
+(* -------------------------------------------------------------------- *)
+(* A predicate on memory: λ mem. -> pred *)
+type mem_pr = EcMemory.memory * form
 
 (* -------------------------------------------------------------------- *)
 type f_subst = private {
@@ -481,6 +490,8 @@ type f_subst = private {
   fs_pddef   : (EcIdent.t list * form) Mp.t;
   fs_esloc   : expr Mid.t;
   fs_memtype : EcMemory.memtype option; (* Only substituted in Fcoe *)
+  fs_mempred : mem_pr Mid.t;  (* For predicates over memories,
+                                 only substituted in Fcoe *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -496,6 +507,7 @@ module Fsubst : sig
     -> ?prdef:(EcIdent.t list * form) Mp.t
     -> ?esloc:expr Mid.t
     -> ?mt:EcMemory.memtype
+    -> ?mempred:(mem_pr Mid.t)
     -> unit -> f_subst
 
   val f_bind_local  : f_subst -> EcIdent.t -> form -> f_subst

@@ -45,8 +45,9 @@ val is_alpha_eq : LDecl.hyps -> form -> form -> bool
 module User : sig
   type error =
     | MissingVarInLhs   of EcIdent.t
-    | MissingEVarInLhs   of EcIdent.t
+    | MissingEVarInLhs  of EcIdent.t
     | MissingTyVarInLhs of EcIdent.t
+    | MissingPVarInLhs  of EcIdent.t
     | NotAnEq
     | NotFirstOrder
     | RuleDependsOnMemOrModule

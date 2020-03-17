@@ -240,8 +240,9 @@ end
 module User = struct
   type error =
     | MissingVarInLhs   of EcIdent.t
-    | MissingEVarInLhs   of EcIdent.t
+    | MissingEVarInLhs  of EcIdent.t
     | MissingTyVarInLhs of EcIdent.t
+    | MissingPVarInLhs  of EcIdent.t
     | NotAnEq
     | NotFirstOrder
     | RuleDependsOnMemOrModule
@@ -255,11 +256,26 @@ module User = struct
 
   let get_spec = function
     | `Ax ax -> ax.EcDecl.ax_spec
-    | `Sc sc -> sc.EcDecl.as_spec
+    | `Sc sc -> sc.EcDecl.axs_spec
 
   let get_typ = function
     | `Ax ax -> ax.EcDecl.ax_tparams
-    | `Sc sc -> sc.EcDecl.as_tparams
+    | `Sc sc -> sc.EcDecl.axs_tparams
+
+  type mode =
+    | UR_Form
+    | UR_CostPre of EcMemory.memory
+    | UR_CostExpr
+
+  type compile_st = { cst_ty_vs        : Sid.t;
+                      cst_f_vs         : Sid.t;
+                      cst_cost_pre_vs  : Sid.t;
+                      cst_cost_expr_vs : Sid.t; }
+
+  let empty_cst = { cst_ty_vs        = Sid.empty;
+                    cst_f_vs         = Sid.empty;
+                    cst_cost_pre_vs  = Sid.empty;
+                    cst_cost_expr_vs = Sid.empty; }
 
   let compile ~prio (env : EcEnv.env) mode p =
     let ax_sc = match mode with
@@ -273,9 +289,9 @@ module User = struct
         | _ -> raise (InvalidUserRule RuleDependsOnMemOrModule)
       in List.map filter bds in
 
-    let ebds = match ax_sc with
-      | `Ax _  -> []
-      | `Sc sc -> sc.EcDecl.as_params in
+    let pbds, ebds = match ax_sc with
+      | `Ax _  -> [],[]
+      | `Sc sc -> sc.EcDecl.axs_pparams, sc.EcDecl.axs_params in
 
     let lhs, rhs, conds =
       let rec doit conds f =
@@ -300,34 +316,30 @@ module User = struct
         | { f_node = Flocal x }, [] ->
             R.Var x
         | { f_node = Fcoe coe }, [] ->
-            let inner = e_rule coe.coe_e in
-            R.Cost (coe.coe_mem, coe.coe_pre, inner)
+            let inner_e = e_rule coe.coe_e in
+            let inner_pre = rule coe.coe_pre in
+            R.Cost (coe.coe_mem, inner_pre, inner_e)
         | _ -> raise (InvalidUserRule NotFirstOrder)
 
-      and e_rule (e : expr) = match EcTypes.destr_app e with
-        | { e_node = Eop (p, tys) }, args ->
-            R.Rule (`Op (p, tys), List.map e_rule args)
-        | { e_node = Etuple args }, [] ->
-            R.Rule (`Tuple, List.map e_rule args)
-        | { e_node = Eint i }, [] ->
-            R.Int i
-        | { e_node = Elocal x }, [] ->
-            R.Var x
-        | _ -> raise (InvalidUserRule NotFirstOrder)
+      and e_rule (e : expr) =
+        (* The chosen memory does not matter here (we pick [mhr] by default). *)
+        rule (form_of_expr mhr e)
 
       in rule lhs in
 
-    let lvars, levars, ltyvars =
-      let rec doit ~in_cost (lvars, levars, ltyvars) = function
+    let cst =
+      let rec doit ~cmode cst = function
         | R.Var x ->
-          (* If we are below a cost statement, this is an expression variable.
-             Otherwise, this is a formula variable. *)
-          if in_cost
-          then (lvars, Sid.add x levars, ltyvars)
-          else (Sid.add x lvars, levars, ltyvars)
+          (* Depending on the mode, we add the variable to the corresp. set. *)
+          begin match cmode with
+            | UR_Form ->
+              { cst with cst_f_vs = Sid.add x cst.cst_f_vs }
+            | UR_CostPre _ ->
+              { cst with cst_cost_pre_vs = Sid.add x cst.cst_cost_pre_vs }
+            | UR_CostExpr ->
+              { cst with cst_cost_expr_vs = Sid.add x cst.cst_cost_expr_vs } end
 
-        | R.Int _ ->
-            (lvars, levars, ltyvars)
+        | R.Int _ -> cst
 
         | R.Rule (op, args) ->
             let ltyvars =
@@ -337,19 +349,46 @@ module User = struct
                     let rec doit ltyvars = function
                       | { ty_node = Tvar a } -> Sid.add a ltyvars
                       | _ as ty -> ty_fold doit ltyvars ty in doit)
-                  ltyvars tys
-              | `Tuple -> ltyvars in
-            List.fold_left (doit ~in_cost) (lvars, levars, ltyvars) args
+                  cst.cst_ty_vs tys
+              | `Tuple -> cst.cst_ty_vs in
+            let cst = {cst with cst_ty_vs = ltyvars } in
+            List.fold_left (doit ~cmode) cst args
 
-        | R.Cost (_, _, rule) ->
-          doit ~in_cost:true (lvars, levars, ltyvars) rule
+        | R.Cost (menv, pre, expr) ->
+          let cst = doit ~cmode:UR_CostExpr cst expr in
+          doit ~cmode:(UR_CostPre (fst menv)) cst pre
 
-      in doit ~in_cost:false (Sid.empty, Sid.empty, Sid.empty) rule in
+      in doit ~cmode:UR_Form empty_cst rule in
 
 
     let s_bds   = Sid.of_list (List.map fst bds)
     and s_ebds  = Sid.of_list (List.map fst ebds)
+    and s_pbds  = Sid.of_list pbds
     and s_tybds = Sid.of_list (List.map fst (get_typ ax_sc)) in
+
+    (* Variables appearing in types, cost expressions and formulas are
+       always, respectively, type, expression and formula variables. *)
+    let lvars = cst.cst_f_vs
+    and ltyvars = cst.cst_ty_vs
+    and levars = cst.cst_cost_expr_vs
+    and lpvars = Sid.empty in
+    (* Variables appearing in cost preconditions can be anything. *)
+    let lvars, levars, lpvars =
+      Sid.fold (fun id (lvars, levars, lpvars) ->
+          if Sid.mem id s_ebds
+          then (lvars, Sid.add id levars, lpvars)
+          else if Sid.mem id s_pbds
+          then (lvars, levars, Sid.add id lpvars)
+          else (Sid.add id lvars, levars, lpvars) (* default to formula a var *)
+        ) cst.cst_cost_pre_vs (lvars, levars, lpvars) in
+
+    (* Sanity check *)
+    assert (Sid.disjoint lvars   ltyvars &&
+            Sid.disjoint lvars   levars &&
+            Sid.disjoint lvars   lpvars &&
+            Sid.disjoint ltyvars levars &&
+            Sid.disjoint ltyvars lpvars &&
+            Sid.disjoint levars  lpvars );
 
     (* We check that the binded variables all appear in the lhs.
        This ensures that, when applying the rule, we can infer how to
@@ -357,6 +396,7 @@ module User = struct
     let mvars   = Sid.diff s_bds lvars in
     let mevars  = Sid.diff s_ebds levars in
     let mtyvars = Sid.diff s_tybds ltyvars in
+    let mpvars  = Sid.diff s_pbds lpvars in
 
     if not (Sid.is_empty mvars) then
       raise (InvalidUserRule (MissingVarInLhs (Sid.choose mvars)));
@@ -364,6 +404,8 @@ module User = struct
       raise (InvalidUserRule (MissingEVarInLhs (Sid.choose mevars)));
     if not (Sid.is_empty mtyvars) then
       raise (InvalidUserRule (MissingTyVarInLhs (Sid.choose mtyvars)));
+    if not (Sid.is_empty mpvars) then
+      raise (InvalidUserRule (MissingPVarInLhs (Sid.choose mpvars)));
 
     begin match rule with
     | R.Var _ -> raise (InvalidUserRule (HeadedByVar));
@@ -372,6 +414,7 @@ module User = struct
     R.{ rl_tyd   = get_typ ax_sc;
         rl_vars  = bds;
         rl_evars = ebds;
+        rl_pvars = pbds;
         rl_cond  = conds;
         rl_ptn   = rule;
         rl_tg    = rhs;
@@ -754,12 +797,43 @@ and reduce_user_gen mode simplify ri env hyps f
 
     let ue    = EcUnify.UniEnv.create None in
     let tvi   = EcUnify.UniEnv.opentvi ue rule.R.rl_tyd None in
-    let pv    = ref Mid.empty in
-    let e_pv  = ref Mid.empty in (* for expression variables in schemas *)
-    let sc_mt = ref None in      (* infered memtype, for schema application *)
+
+    (* for formula varibales *)
+    let pv    = ref (Mid.empty : form Mid.t) in
+    let check_pv x f =
+      match Mid.find_opt x !pv with
+      | None    -> pv := Mid.add x f !pv
+      | Some f' -> check_alpha_equal ri hyps f f' in
+
+    (* for expression variables in schemata *)
+    let e_pv  = ref (Mid.empty : expr Mid.t) in
+    let check_e_pv x f =
+      match Mid.find_opt x !e_pv with
+      | None    -> e_pv := Mid.add x (expr_of_form mhr f) !e_pv
+      (* must use mhr, c.f. caller of check_e_pv *)
+
+      | Some f' -> check_alpha_equal_e hyps (expr_of_form mhr f) f' in (* idem *)
+
+    (* for memory pred. variables in schemata *)
+    let p_pv  = ref (Mid.empty : mem_pr Mid.t) in
+    let check_p_pv m x f =
+      match Mid.find_opt x !p_pv with
+      | None    -> p_pv := Mid.add x (m,f) !p_pv
+      | Some (m',f') ->
+        (* We freschen the memory. *)
+        (* FIXME: use inner function of check_alpha_equal *)
+        let mf = EcIdent.fresh m in
+        let fs  = Fsubst.f_bind_mem Fsubst.f_subst_id m  mf in
+        let fs' = Fsubst.f_bind_mem Fsubst.f_subst_id m' mf in
+        let f  = Fsubst.f_subst fs  f
+        and f' = Fsubst.f_subst fs' f' in
+        check_alpha_equal ri hyps f f' in
+
+    (* infered memtype, for schema application *)
+    let sc_mt = ref None in
 
     try
-      let rec doit f ptn =
+      let rec doit (mode : User.mode) f ptn =
         match destr_app f, ptn with
         | ({ f_node = Fop (p, tys) }, args), R.Rule (`Op (p', tys'), args')
               when EcPath.p_equal p p' && List.length args = List.length args' ->
@@ -770,23 +844,21 @@ and reduce_user_gen mode simplify ri env hyps f
             try  List.iter2 (EcUnify.unify env ue) tys tys'
             with EcUnify.UnificationFailure _ -> raise NotReducible end;
 
-          List.iter2 doit args args'
+          List.iter2 (doit mode) args args'
 
         | ({ f_node = Ftuple args} , []), R.Rule (`Tuple, args')
             when List.length args = List.length args' ->
 
-          List.iter2 doit args args'
+          List.iter2 (doit mode) args args'
 
         | ({ f_node = Fint i }, []), R.Int j when EcBigInt.equal i j ->
             ()
 
-        | ({ f_node = Fcoe coe} , []), R.Cost (menv, pre, inner_r)  ->
+        | ({ f_node = Fcoe coe} , []), R.Cost (menv, inner_pre, inner_r)  ->
           if not ri.cost then
             raise NotReducible;
 
-          if not (EcFol.f_equal coe.coe_pre pre) then
-            raise NotReducible;
-
+          (* Check memtype compatibility. *)
           if EcMemory.is_schema (snd menv) then begin
             if !sc_mt = None then
               sc_mt := Some (snd coe.coe_mem)
@@ -805,50 +877,36 @@ and reduce_user_gen mode simplify ri env hyps f
               | exception (EcUnify.UnificationFailure _) -> raise NotReducible
             end;
 
-          (* Remark that we do not try to unify [coe.coe_pre] with [_pre],
-             because we are doing a very simple matching here.
-             Nonetheless, we will check that they are convertible later, once
-             all the variables have been infered (this ensures soundness). *)
-          e_doit coe.coe_e inner_r;
+          doit (User.UR_CostPre (fst coe.coe_mem)) coe.coe_pre inner_pre;
 
-        | _, R.Var x -> begin
-            match Mid.find_opt x !pv with
-            | None    -> pv := Mid.add x f !pv
-            | Some f' -> check_alpha_equal ri hyps f f'
-          end
+          (* use mhr, to be consistent with check_e_pv *)
+          let e = form_of_expr mhr coe.coe_e in
 
-        | _ -> raise NotReducible
+          doit User.UR_CostExpr e inner_r;
 
-     and e_doit e ptn =
-        match EcTypes.destr_app e, ptn with
-        | ({ e_node = Eop (p, tys) }, args), R.Rule (`Op (p', tys'), args')
-              when EcPath.p_equal p p' && List.length args = List.length args' ->
+        | _, R.Var x when mode = User.UR_Form ->
+          check_pv x f
 
-          let tys' = List.map (EcTypes.Tvar.subst tvi) tys' in
+        | _, R.Var x when mode = User.UR_CostExpr ->
+          check_e_pv x f
 
-          begin
-            try  List.iter2 (EcUnify.unify env ue) tys tys'
-            with EcUnify.UnificationFailure _ -> raise NotReducible end;
+        | _, R.Var x ->
+          let m = match mode with
+            | User.UR_CostPre m -> m
+            | _ -> assert false in
 
-          List.iter2 e_doit args args'
-
-        | ({ e_node = Etuple args} , []), R.Rule (`Tuple, args')
-            when List.length args = List.length args' ->
-
-          List.iter2 e_doit args args'
-
-        | ({ e_node = Eint i }, []), R.Int j when EcBigInt.equal i j ->
-            ()
-
-        | _, R.Var x -> begin
-            match Mid.find_opt x !e_pv with
-            | None    -> e_pv := Mid.add x e !e_pv
-            | Some e' -> check_alpha_equal_e hyps e e'
-          end
+            (* This case is more annoying. *)
+          if List.mem_assoc x rule.rl_vars
+          then check_pv x f
+          else if List.mem_assoc x rule.rl_evars
+          then check_e_pv x f
+          else begin
+            assert (List.mem x rule.rl_pvars);
+            check_p_pv m x f end
 
         | _ -> raise NotReducible in
 
-      doit f rule.R.rl_ptn;
+      doit User.UR_Form f rule.R.rl_ptn;
 
       if not (EcUnify.UniEnv.closed ue) then
         raise NotReducible;
@@ -857,7 +915,7 @@ and reduce_user_gen mode simplify ri env hyps f
         let eus = EcUnify.UniEnv.assubst ue in
         let tysubst = { ty_subst_id with ts_u = eus } in
 
-        if Mid.is_empty !e_pv
+        if (Mid.is_empty !e_pv) && (Mid.is_empty !p_pv)
         then   (* axiom case *)
           let subst   = Fsubst.f_subst_init ~sty:tysubst () in
           let subst   =
@@ -880,10 +938,14 @@ and reduce_user_gen mode simplify ri env hyps f
 
           let mt = oget ~exn:NotReducible !sc_mt in
 
+          let ps = List.map (fun id ->
+              Mid.find id !p_pv
+            ) rule.R.rl_pvars in
+
           let f =
             EcDecl.sc_instantiate
-              rule.R.rl_tyd rule.R.rl_evars
-              typ mt es f in
+              rule.R.rl_tyd rule.R.rl_pvars rule.R.rl_evars
+              typ mt ps es f in
 
           let subst =
             Mid.fold (fun x f s ->

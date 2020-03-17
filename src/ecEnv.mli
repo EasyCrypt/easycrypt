@@ -195,7 +195,8 @@ module Schema : sig
 
   val instanciate :
     path ->
-    EcTypes.ty list -> EcMemory.memtype -> EcTypes.expr list ->
+    EcTypes.ty list -> EcMemory.memtype ->
+    mem_pr list -> EcTypes.expr list ->
     env -> form
 end
 

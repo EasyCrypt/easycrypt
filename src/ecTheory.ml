@@ -39,7 +39,7 @@ and thmode     = [ `Abstract | `Concrete ]
 
 and rule_pattern =
   | Rule of top_rule_pattern * rule_pattern list
-  | Cost of EcMemory.memenv * EcCoreFol.form * rule_pattern
+  | Cost of EcMemory.memenv * rule_pattern * rule_pattern (* memenv, pre, expr *)
   | Int  of EcBigInt.zint
   | Var  of EcIdent.t
 
@@ -50,6 +50,7 @@ and rule = {
   rl_tyd   : EcDecl.ty_params;
   rl_vars  : (EcIdent.t * EcTypes.ty) list;
   rl_evars : (EcIdent.t * EcTypes.ty) list;
+  rl_pvars : EcIdent.t list;
   rl_cond  : EcCoreFol.form list;
   rl_ptn   : rule_pattern;
   rl_tg    : EcCoreFol.form;

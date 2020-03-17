@@ -1470,6 +1470,13 @@ let quantif_of_equantif (qt : equantif) =
   | `EExists -> Lexists
 
 (* -------------------------------------------------------------------- *)
+let equantif_of_quantif (qt : quantif) : equantif =
+  match qt with
+  | Llambda -> `ELambda
+  | Lforall -> `EForall
+  | Lexists -> `EExists
+
+(* -------------------------------------------------------------------- *)
 let rec form_of_expr mem (e : expr) =
   match e.e_node with
   | Eint n ->
@@ -1512,6 +1519,53 @@ let rec form_of_expr mem (e : expr) =
      let e = form_of_expr mem e in
      f_quant (quantif_of_equantif qt) b e
 
+
+(* -------------------------------------------------------------------- *)
+exception CannotTranslate
+
+let expr_of_form mh f =
+  let rec aux fp =
+    match fp.f_node with
+    | Fint   z -> e_int z
+    | Flocal x -> e_local x fp.f_ty
+
+    | Fop  (p, tys) -> e_op p tys fp.f_ty
+    | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
+    | Ftuple fs     -> e_tuple (List.map aux fs)
+    | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
+
+    | Fif (c, f1, f2) ->
+      e_if (aux c) (aux f1) (aux f2)
+
+    | Fmatch (c, bs, ty) ->
+      e_match (aux c) (List.map aux bs) ty
+
+    | Flet (lp, f1, f2) ->
+      e_let lp (aux f1) (aux f2)
+
+    | Fquant (kd, bds, f) ->
+      e_quantif (equantif_of_quantif kd) (List.map auxbd bds) (aux f)
+
+    | Fpvar (pv, m) ->
+      if EcIdent.id_equal m mh
+      then e_var pv fp.f_ty
+      else raise CannotTranslate
+
+    | Fcoe      _
+    | Fglob     _
+    | FhoareF   _ | FhoareS   _
+    | FcHoareF  _ | FcHoareS  _
+    | FbdHoareF _ | FbdHoareS _
+    | FequivF   _ | FequivS   _
+    | FeagerF   _ | Fpr       _ -> raise CannotTranslate
+
+  and auxbd ((x, bd) : binding) =
+    match bd with
+    | GTty ty -> (x, ty)
+    | _ -> raise CannotTranslate
+
+  in aux f
+
 (* -------------------------------------------------------------------- *)
 let rec free_expr e = match e.e_node with
   | Elocal _ | Evar _ | Eint _ -> true
@@ -1531,6 +1585,10 @@ let cost_of_expr_any menv e =
   if free_expr e then f_i0 else f_coe f_true menv e
 
 (* -------------------------------------------------------------------- *)
+(* A predicate on memory: λ mem. -> pred *)
+type mem_pr = EcMemory.memory * form
+
+(* -------------------------------------------------------------------- *)
 type f_subst = {
   fs_freshen : bool; (* true means freshen locals *)
   fs_mp      : EcPath.mpath Mid.t;
@@ -1542,6 +1600,8 @@ type f_subst = {
   fs_pddef   : (EcIdent.t list * form) Mp.t;
   fs_esloc   : expr Mid.t;
   fs_memtype : EcMemory.memtype option; (* Only substituted in Fcoe *)
+  fs_mempred : mem_pr Mid.t;  (* For predicates over memories,
+                                 only substituted in Fcoe *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1557,6 +1617,7 @@ module Fsubst = struct
     fs_pddef   = Mp.empty;
     fs_esloc   = Mid.empty;
     fs_memtype = None;
+    fs_mempred = Mid.empty;
   }
 
   let is_subst_id s =
@@ -1569,7 +1630,7 @@ module Fsubst = struct
     && Mid.is_empty   s.fs_esloc
     && s.fs_memtype = None
 
-  let f_subst_init ?freshen ?mods ?sty ?opdef ?prdef ?esloc ?mt () =
+  let f_subst_init ?freshen ?mods ?sty ?opdef ?prdef ?esloc ?mt ?mempred () =
     let sty = odfl ty_subst_id sty in
     { f_subst_id
         with fs_freshen = odfl false freshen;
@@ -1579,6 +1640,7 @@ module Fsubst = struct
              fs_opdef   = odfl Mp.empty opdef;
              fs_pddef   = odfl Mp.empty prdef;
              fs_esloc   = odfl Mid.empty esloc;
+             fs_mempred = odfl Mid.empty mempred;
              fs_memtype = mt; }
 
   (* ------------------------------------------------------------------ *)
@@ -1860,6 +1922,15 @@ module Fsubst = struct
       let m' = EcIdent.fresh m in
       (* TODO: A: here, I am erasing the previous binding.*)
       let s = f_rebind_mem s m m' in
+
+      (* We bind the memory of all memory predicates with the fresh memory
+         we just created, and add them as local variable substitutions. *)
+      let s = Mid.fold (fun id (pmem,p) s ->
+          let fs_mem = f_bind_mem f_subst_id pmem m' in
+          let p = f_subst ~tx:(fun _ f -> f) fs_mem p in
+          f_bind_local s id p
+        ) s.fs_mempred { s with fs_mempred = Mid.empty; } in
+
 
       (* Then we substitute *)
       let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p

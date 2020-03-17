@@ -145,18 +145,20 @@ val is_lemma  : axiom_kind -> bool
 (* -------------------------------------------------------------------- *)
 type sc_params = (EcIdent.t * ty) list
 
-(* [as_params] are the free variables in [as_spec] expressions, i.e. in
-   [EcTypes.expr]. They must not be confused with standard formula free
-   variables. *)
+type pr_params = EcIdent.t list (* type bool *)
+
+(* [axs_params] are the free variables in [as_spec] expressions, i.e. in
+   [EcTypes.expr]. *)
 type ax_schema = {
-  as_tparams : ty_params;
-  as_params  : sc_params;
-  as_spec    : EcCoreFol.form;
+  axs_tparams : ty_params;
+  axs_pparams : pr_params;
+  axs_params  : sc_params;
+  axs_spec    : EcCoreFol.form;
 }
 
 val sc_instantiate :
-  ty_params -> sc_params ->
-  ty list -> EcMemory.memtype -> expr list ->
+  ty_params -> pr_params -> sc_params ->
+  ty list -> EcMemory.memtype -> mem_pr list -> expr list ->
   EcCoreFol.form -> EcCoreFol.form
 
 (* -------------------------------------------------------------------- *)
