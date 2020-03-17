@@ -74,11 +74,26 @@ clone import ROM.Lazy as H with
 
 (************************************************************************)
 (* Costs of various operators. *)
+schema cost_witness ['a] : cost[true: witness<:'a>] = 1.
+
+schema cost_eq ['a] {a b : 'a} : 
+    cost[true : a = b] = cost[true : a] + cost[true : b] + 1.
+
+schema cost_deq ['a] {a b : 'a} : 
+    cost[true : a <> b] = cost[true : a] + cost[true : b] + 1.
+
 schema cost_cons ['a] {e : 'a} {l : 'a list} : 
     cost[true : e :: l] =   
     cost[true : e] + cost[true : l] + 1.
 
 schema cost_nil ['a] : cost[true : [<:'a>]] = 1.
+
+schema cost_head ['a] {w : 'a} {l : 'a list} :
+  cost[l <> [<:'a>] : head w l] = 
+  cost[l <> [<:'a>] : l] + 1.
+
+schema cost_drop ['a] {l : 'a list} :
+  cost[true: drop 1 l] = cost[true: l] + 1.
 
 schema cost_pp {r : rand} {p : ptxt} :
   cost[true : r || p] = 
@@ -88,10 +103,20 @@ schema cost_dptxt : cost[true : dptxt] = 1.
 
 schema cost_pos ['a] {e : 'a} : 0 <= cost[true : e].
 
+op kf : int.
+axiom kfp : 0 <= kf.
+schema cost_f {pk : pkey} {r : rand} : cost[true : f pk r] = kf.
+
+hint simplify cost_witness.
+hint simplify cost_eq.
+hint simplify cost_deq.
 hint simplify cost_cons.
 hint simplify cost_nil.
+hint simplify cost_head.
+hint simplify cost_drop.
 hint simplify cost_pp.
 hint simplify cost_dptxt.
+hint simplify cost_f.
 
 (************************************************************************)
 module type Oracle = {
@@ -243,141 +268,48 @@ section.
     smt (size_eq0 size_ge0).
   qed.
 
+  op kloop = (4 + kf) * (k1 + k2) + 2 * (k1 + k2 + 1) + 1.
+
   local lemma bound_i :     
-    choare[I0.invert: true ==> true] 
-    time [3 + 2 * k1 + 2 * k2; 
-          I0.A0.a1 : 1; 
-          I0.A0.a2 : 1; 
+    choare[IW0.invert: true ==> true] 
+    time [4 + 2 * (k1 + k2) + kloop; 
+          IW0.A0.a1 : 1; 
+          IW0.A0.a2 : 1; 
           H.o : k1 + k2;
           H.init : 1].
   proof.
   proc.
-  seq 5 : (size I.qs <= k1 + k2) [k1 + k2].
+  seq 5 : (size IW.qs <= k1 + k2) [(4 + kf) * (k1 + k2) + 2 * (k1 + k2 + 1) + 1].
   call (_: true ;
-    (I(A, H).QRO.o : size I.qs - k1)
+    (IW(A, H).QRO.o : size IW.qs - k1)
     time
-    (I(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
+    (IW(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
   => * /=.
 
   (* The invariant is preserved by calls to the oracle QRO. *)
-  proc; call (_: true; time); wp; skip => * /=; first by smt.
+  proc; call (_: true; time); auto => * /=; first by smt ().
 
   rnd. 
   call (_: true;
-    (I(A, H).QRO.o : size I.qs)
+    (IW(A, H).QRO.o : size IW.qs)
     time
-    (I(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
+    (IW(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
   => * /=.
 
   (* The invariant is preserved by calls to the oracle QRO. *)
-  proc; call (_: true; time); wp; skip => * => /=; [1: by smt].
+  proc; call (_: true; time); auto => * => /=; [1: by smt ()].
 
-  call (_: true; time); wp; skip; move => /=.
+  call (_: true; time); auto ; move => * /=.
+  split; move => * /=; first smt ().  
+  rewrite !big_constz !count_predT !size_range; by smt (k1p k2p kfp).
 
-  split; move => * /=; first by smt.
-  
-  (* We have enough time *)
-  split; rewrite !big_constz !count_predT !size_range.  
-    by smt (k1p k2p).
-    by smt (k1p k2p).
-
-  (* finally, we bound the list lookup time. *)
-  wp : (size I.qs <= k1 + k2) => //; skip => */=.  
-  admit.
-qed.
-
-module A = { 
-  proc g (x, y) : int = {
-    var r : int;
-    r <- x + y;
-    r <- r * x;
-    return r * r;
-  }
-
-  proc f (x : int) : int = {
-    var a : int;
-    a <- x + 1;
-    a <@ g(a,x);
-  return a;
-  }
-}.
-
-lemma foo : choare[A.g : true ==> true] time [3].
-proof.
-proc.
-wp; skip => *; split => //.
-admit.
-qed.
-
-lemma foo3 : choare[A.f : true ==> true] time [4].
-proof.
-proc.
-call foo.
-(* Alternatively, we can do: *)
-(* call (_: true ==> true time [1]). *)
-(* apply foo. *)
-wp; skip => *; split =>//.
-admit.
-qed.
-
-module B = { 
-  proc f (x, y) : int = {
-    var r : int;
-    if (y < x) {
-      r <- 1 + 1;
-      r <- 1 + 1;
-     } else {
-      r <- 2 + 1;
-      r <- 2 + 1;
-    }
-    return r;
-  }
-}.
-
-(* For if statements, we add the cost of both branches. *)
-lemma foo4 : choare[B.f : true ==> true] time [5].
-proof.
-proc.
-wp; skip => *; split => //.
-admit.
-qed.
-
-module C = { 
-  var g : int
-
-  proc f (x, y) : int = {
-    while (x < y) {
-      x <- x + 1;
-    }
-    return x;
-  }
-}.
-
-lemma foo5 : forall (a : int) (b : int), 
-0 <= a /\ 0 <= b =>
-choare[C.f : x = a /\ y = b /\ x < y ==> true] time [2 * (a - b) + 1].
-proof.
-move => a b p => /=.
-proc.
-(* - invariant, 
-   - increasing quantity starting from zero
-   - number of loop iterations
-   - cost of one loop body. *)
-while (x <= y /\ y = b) (x - a) (b - a) [fun _ => 1] => *.
-
-(* prove that the loop body preserves the invariant, and cost what was stated. *)
-wp; skip => * /=.
-split; [1: by smt].
-admit.
-
-(* prove that the invariant and loop condition implies that we have not reached 
-  the maximal number of steps.  *)
-by smt.
-
-(* We prove that the invariant implies the post, and that the cost of all
-  iterations is smaller than the final cost. *)
-skip => * => //; split; [1: by smt].
-rewrite !big_constz !count_predT !size_range. 
-print list_ind.
-admit.
+  (* we bound the list lookup time. *)
+  (* wp : (size I.qs <= k1 + k2). *)
+  while (true) (k1 + k2 - size qs0) (k1 + k2) [fun _ => 4 + kf].
+  + move => z /=; auto => * /=; split; [2 : by smt (kfp)]. 
+    move: H; case: (qs0{hr}); first by smt (). 
+    move => x0 l; have := size_ge0 l; by smt (k1p k2p).
+  + move => &hr; have := size_ge0 qs0{hr}; by smt (k1p k2p).
+  auto; move => &hr /=; rewrite !big_constz !count_predT !size_range. 
+  smt (k1p k2p kfp).
 qed.

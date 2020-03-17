@@ -118,7 +118,7 @@ let t_hoare_while_r inv tc =
 
 (* - [inv] is the loop invariant.
    - [qinc] the strictly increasing quantity at each iteration.
-   - [n + 1] is the maximum number of iterations.
+   - [n] is the maximum number of iterations.
    - [lam_cost] is the cost of one iteration (of the form [λ k. cost(k)]) *)
 let t_choare_while_r inv qinc n (lam_cost : cost) tc =
   let env = FApi.tc1_env tc in
@@ -148,11 +148,11 @@ let t_choare_while_r inv qinc n (lam_cost : cost) tc =
   let n_term = f_imp_simpl (f_and_simpl inv e) (f_int_le qinc n) in
   let n_term = f_forall_mems [chs.chs_m] n_term in
 
-  (* We compute the final cost. Since we have at most [n+1] iterations, we have:
-     - at most [n+2] evaluations of the loop condition [e].
-     - at most [n+1] evaluations of the loop body. *)
+  (* We compute the final cost. Since we have at most [n] iterations, we have:
+     - at most [n+1] evaluations of the loop condition [e].
+     - at most [n] evaluations of the loop body. *)
   let e_cost_self = f_int_mul_simpl
-      (f_int_add_simpl n (f_int @@ EcBigInt.of_int 2))
+      (f_int_add_simpl n (f_int @@ EcBigInt.of_int 1))
       (cost_of_expr_any chs.chs_m expr_e) in
   (* We could use [cost_of_expr inv chs.chs_m expr_e] *)
 
