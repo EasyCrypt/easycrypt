@@ -88,9 +88,9 @@ schema cost_cons ['a] {e : 'a} {l : 'a list} :
 
 schema cost_nil ['a] : cost[true : [<:'a>]] = 1.
 
-schema cost_head ['a] {w : 'a} {l : 'a list} :
-  cost[l <> [<:'a>] : head w l] = 
-  cost[l <> [<:'a>] : l] + 1.
+schema cost_head ['a] {l : 'a list} :
+  cost[true : head witness l] = 
+  cost[true : l] + 1.
 
 schema cost_drop ['a] {l : 'a list} :
   cost[true: drop 1 l] = cost[true: l] + 1.

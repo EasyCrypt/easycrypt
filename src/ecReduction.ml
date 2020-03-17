@@ -780,8 +780,11 @@ and reduce_user_gen mode simplify ri env hyps f
         | ({ f_node = Fint i }, []), R.Int j when EcBigInt.equal i j ->
             ()
 
-        | ({ f_node = Fcoe coe} , []), R.Cost (menv, _pre, inner_r)  ->
+        | ({ f_node = Fcoe coe} , []), R.Cost (menv, pre, inner_r)  ->
           if not ri.cost then
+            raise NotReducible;
+
+          if not (EcFol.f_equal coe.coe_pre pre) then
             raise NotReducible;
 
           if EcMemory.is_schema (snd menv) then begin
