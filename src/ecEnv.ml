@@ -1277,7 +1277,7 @@ module Memory = struct
     { env with env_memories = Mmem.add (fst me) (snd me) env.env_memories; }
 
   let push (me : EcMemory.memenv) (env : env) =
-    (* TODO A: *)
+    (* TODO : A: *)
     (* FIXME: assert (byid (EcMemory.memory me) env = None); *)
     update me env
 

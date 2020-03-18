@@ -2423,7 +2423,8 @@ pcutdef:
 
 (* ------------------------------------------------------------------ *)
 pmempred_arg:
-| TICKPAREN m=bdident COLON f=form RPAREN { (m,f) }
+| TICKPAREN m=bdmident COLON f=form RPAREN { (m,f) }
+| TICKPAREN m=loc(empty) f=form RPAREN { (mk_loc (loc m) None,f) }
 
 pmempred_args:
 | l=pmempred_arg* { l }

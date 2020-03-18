@@ -31,15 +31,19 @@ schema cost_times `{P} {e e' : int}:
   cost[P : e * e'] = cost[P : e] + cost[P : e'] + 1.
 
 (* It can be instantiated manually with the [instantiate] tactic. *)
-(* Syntax, where for every i, Pi has can use memory m:
+(* Syntax, where for every i, Pi can use memory mhm:
    instantiate intro_pat := 
-   (sc_name memtype '(m: P1) ... '(m: Pn) expr1 ... exprm) *)
+   (sc_name memtype '(P1) ... '(Pn) expr1 ... exprm) *)
 lemma foo_cost : cost(_:{})[true : 1 + 2] = 1.
 proof.
 instantiate H := (cost_plus_true {} 1 2).
+instantiate H0 := (cost_plus {} `(true) 1 2).
 instantiate H2 := (cost_plus {} `(_:true) 1 2).
-instantiate H3 := (cost_plus {} `(mem: V.v = 2) 1 2). 
-(* instantiate H4 := (cost_plus {} `(mem: V.v{mem} = 2) 1 2). (* TODO: this should work *) *)
+
+(* We can also explicitely give the memory name, as follows: *)
+instantiate H3 := (cost_plus {} `(&mem: V.v = 2) 1 2). 
+instantiate H4 := (cost_plus {} `(&mem: V.v{mem} = 2) 1 2).
+
 instantiate -> := (cost_plus {} `(_:true) 1 2).
 auto.
 qed.
