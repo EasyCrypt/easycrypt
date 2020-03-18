@@ -2430,7 +2430,7 @@ pmempred_args:
 
 pcutdef_schema1:
 | p=qident tvi=tvars_app? mt=memtype pargs=loc(pmempred_args)
-  exprs=loc(rlist0(sexpr,none))
+  exprs=loc(sexpr*)
     { { ptcds_name  = p;
         ptcds_tys   = tvi;
         ptcds_mt    = mt;

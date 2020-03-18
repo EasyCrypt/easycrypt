@@ -1,6 +1,7 @@
 require import Int CHoareTactic StdBigop.
 import Bigint IntExtra.
 
+module V = { var v : int }.
 (*********************)
 (* Expression's cost *)
 (*********************)
@@ -24,7 +25,7 @@ schema cost_plus `{P} {e e' : int}:
   cost[P : e + e'] = cost[P : e] + cost[P : e'] + 1.
 
 schema cost_plus_true {e e' : int}: 
-  cost[true : e * e'] = cost[true : e] + cost[true : e'] + 1.
+  cost[true : e + e'] = cost[true : e] + cost[true : e'] + 1.
 
 schema cost_times `{P} {e e' : int}: 
   cost[P : e * e'] = cost[P : e] + cost[P : e'] + 1.
@@ -35,7 +36,10 @@ schema cost_times `{P} {e e' : int}:
    (sc_name memtype '(m: P1) ... '(m: Pn) expr1 ... exprm) *)
 lemma foo_cost : cost(_:{})[true : 1 + 2] = 1.
 proof.
-instantiate -> := (cost_plus_true {} 1 2).
+instantiate H := (cost_plus_true {} 1 2).
+instantiate H2 := (cost_plus {} `(_:true) 1 2).
+instantiate H3 := (cost_plus {} `(mem: V.v = 2) 1 2). 
+(* instantiate H4 := (cost_plus {} `(mem: V.v{mem} = 2) 1 2). (* TODO: this should work *) *)
 instantiate -> := (cost_plus {} `(_:true) 1 2).
 auto.
 qed.
@@ -180,8 +184,8 @@ schema free_beta ['a, 'b] {f : 'a -> 'b} {k : 'a} :
 
 lemma foo_p_f : cost(_:{})[true : 1 + 2] = 1.
 proof.
-instantiate -> := (plus_cost_e {} 1 : 2).
-instantiate -> := (plus_cost_f {} 1 : 2) => //.
+instantiate -> := (plus_cost_e {} 1 2).
+instantiate -> := (plus_cost_f {} 1 2) => //.
 qed.
 
 (* Remark: we cannot use hints there, because plus_cost_e is not terminating. *)
