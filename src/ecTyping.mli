@@ -146,6 +146,7 @@ type tyerror =
 | FilterMatchFailure
 | MissingMemType
 | SchemaVariableReBinded of EcIdent.t
+| SchemaMemBinderBelowCost
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -205,15 +206,21 @@ type metavs = EcFol.form Msym.t
 val transmem       : env -> EcSymbols.symbol located -> EcIdent.t
 
 val trans_form_opt :
-  env -> ?mv:metavs -> ?schema_mt:sc_params ->
+  env -> ?mv:metavs ->
+  ?schema_mpreds:(EcIdent.t list) ->
+  ?schema_mt:sc_params ->
   EcUnify.unienv -> pformula -> ty option -> EcFol.form
 
 val trans_form     :
-  env -> ?mv:metavs -> ?schema_mt:sc_params ->
+  env -> ?mv:metavs ->
+  ?schema_mpreds:(EcIdent.t list) ->
+  ?schema_mt:sc_params ->
   EcUnify.unienv -> pformula -> ty -> EcFol.form
 
 val trans_prop     :
-  env -> ?mv:metavs -> ?schema_mt:sc_params ->
+  env -> ?mv:metavs ->
+  ?schema_mpreds:(EcIdent.t list) ->
+  ?schema_mt:sc_params ->
   EcUnify.unienv -> pformula -> EcFol.form
 
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form

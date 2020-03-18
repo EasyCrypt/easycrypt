@@ -155,6 +155,7 @@ type tyerror =
 | FilterMatchFailure
 | MissingMemType
 | SchemaVariableReBinded of EcIdent.t
+| SchemaMemBinderBelowCost
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -1714,6 +1715,43 @@ let form_of_opselect
   in f_app op args codom
 
 (* -------------------------------------------------------------------- *)
+let top_is_mem_binding pf = match pf with
+  | PFforall (bds,_)  | PFexists (bds,_) ->
+    List.exists (fun (_,bd) -> bd = PGTY_Mem) bds
+
+  | PFhoareF   _
+  | PFequivF   _
+  | PFeagerF   _
+  | PFprob     _
+  | PFBDhoareF _
+  | PFChoareF  _
+  | PFCoe      _ -> true
+
+  | PFhole -> true
+
+  | PFcast    _
+  | PFint     _
+  | PFdecimal _
+  | PFtuple   _
+  | PFident   _
+  | PFref     _
+  | PFmem     _
+  | PFside    _
+  | PFapp     _
+  | PFif      _
+  | PFlet     _
+  | PFlambda  _
+  | PFrecord  _
+  | PFproj    _
+  | PFproji   _
+  | PFglob    _
+  | PFeqveq   _
+  | PFeqf     _
+  | PFlsless  _
+  | PFscope   _ -> false
+
+
+(* -------------------------------------------------------------------- *)
 (* We unify both restriction, by replacing fields in [mr] by the fields in
    [mr'] that have been provided in [pmr]. This is a bit messy. *)
 let replace_if_provided env mr mr' pmr = match pmr with
@@ -2556,13 +2594,23 @@ and trans_gbinding env ue decl =
   in snd_map List.flatten (List.map_fold trans1 env decl)
 
 (* -------------------------------------------------------------------- *)
-(* [imp_mt] is an optional implicit memtype, used in schemas. *)
 and trans_form_or_pattern
-    env ?mv ?ps ~(schema_mt:sc_params option) ue pf tt =
+    env ?mv ?ps
+    ~(schema_mpreds:EcIdent.t list option)
+    ~(schema_mt:sc_params option)
+    ue pf tt =
   let state = PFS.create () in
 
-  let rec transf_r opsc env f =
-    let transf = transf_r opsc in
+  let rec transf_r opsc incost env f =
+    let transf = transf_r opsc incost in
+
+    (* If we are below a cost statement, are typing a memory binder, and
+       have memory predicates, we return an error to avoid shadowing issues
+       when substituting the memory predicates later. *)
+    if incost &&
+       top_is_mem_binding f.pl_desc &&
+       (schema_mpreds <> None || schema_mpreds <> Some []) then
+      tyerror f.pl_loc env SchemaMemBinderBelowCost;
 
     match f.pl_desc with
     | PFhole -> begin
@@ -2774,7 +2822,7 @@ and trans_form_or_pattern
 
     | PFscope (popsc, f) ->
         let opsc = lookup_scope env popsc in
-          transf_r (Some opsc) env f
+          transf_r (Some opsc) incost env f
 
     | PFglob gp ->
         let mp = fst (trans_msymbol env gp) in
@@ -3130,13 +3178,24 @@ and trans_form_or_pattern
 
       | None, Some schema_mt ->        (* Schema local memtype case *)
         let env =
-          try EcEnv.Var.bind_locals ~uniq:true schema_mt env with
-          | EcEnv.Var.DuplicatedLocalBinding n ->
-            tyerror f.pl_loc env (SchemaVariableReBinded n) in
+          if incost then env    (* already binded *)
+          else try
+              let env = match schema_mpreds with
+                | Some mpreds ->
+                  let mpreds =
+                    List.map (fun id -> id, tbool) mpreds in
+                  EcEnv.Var.bind_locals ~uniq:true mpreds env
+                | None -> env in
+
+              EcEnv.Var.bind_locals ~uniq:true schema_mt env
+            with
+            | EcEnv.Var.DuplicatedLocalBinding n ->
+              tyerror f.pl_loc env (SchemaVariableReBinded n) in
+
         let memenv = EcMemory.schema mem in
 
         let fenv = EcEnv.Memory.push_active memenv env in
-        let form' = transf fenv form in
+        let form' = transf_r opsc true fenv form in
         unify_or_fail fenv ue form.pl_loc ~expct:tbool form'.f_ty;
 
         (* `InProc, because we want to look for variables declared in [memenv] *)
@@ -3173,7 +3232,7 @@ and trans_form_or_pattern
         f_coe form' memenv expr'
   in
 
-  let f = transf_r None env pf in
+  let f = transf_r None false env pf in
   tt |> oiter (fun tt -> unify_or_fail env ue pf.pl_loc ~expct:tt f.f_ty);
   f
 
@@ -3203,20 +3262,22 @@ and trans_memtype env ue mem pmemtype =
   List.fold_left add_decl mt pmemtype
 
 (* -------------------------------------------------------------------- *)
-and trans_form_opt env ?mv ?(schema_mt:sc_params option) ue pf oty =
-  trans_form_or_pattern env ?mv ~schema_mt:schema_mt ue pf oty
+and trans_form_opt env ?mv ?schema_mpreds ?schema_mt ue pf oty =
+  trans_form_or_pattern env ?mv ~schema_mpreds ~schema_mt ue pf oty
 
 (* -------------------------------------------------------------------- *)
-and trans_form env ?mv ?(schema_mt:sc_params option) ue pf ty =
-  trans_form_opt env ?mv ?schema_mt:schema_mt ue pf (Some ty)
+and trans_form env ?mv ?schema_mpreds ?schema_mt ue pf ty =
+  trans_form_opt
+    env ?mv ?schema_mpreds ?schema_mt
+    ue pf (Some ty)
 
 (* -------------------------------------------------------------------- *)
-and trans_prop env ?mv ?(schema_mt:sc_params option) ue pf =
-  trans_form env ?mv ?schema_mt:schema_mt ue pf tbool
+and trans_prop env ?mv ?schema_mpreds ?schema_mt ue pf =
+  trans_form env ?mv ?schema_mpreds ?schema_mt ue pf tbool
 
 (* -------------------------------------------------------------------- *)
 and trans_pattern env ps ue pf =
-  trans_form_or_pattern env ~ps ~schema_mt:None ue pf None
+  trans_form_or_pattern env ~ps ~schema_mpreds:None ~schema_mt:None ue pf None
 
 (* -------------------------------------------------------------------- *)
 let get_instances (tvi, bty) env =

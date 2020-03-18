@@ -463,11 +463,14 @@ type pcutdef = {
   ptcd_args : ppt_arg located list;
 }
 
+(* λ mem → formula *)
+type pmpred_args = (osymbol * pformula) list
+
 type pcutdef_schema = {
   ptcds_name  : pqsymbol;
   ptcds_tys   : ptyannot option;
   ptcds_mt    : pmemtype;
-  (* ptcds_mt    : [`Explicit of pmemtype option | `FromMemory of pmemory ]; *)
+  ptcds_mps   : pmpred_args located;
   ptcds_exprs : pexpr list located;
 }
 

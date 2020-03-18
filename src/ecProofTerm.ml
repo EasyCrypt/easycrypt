@@ -467,7 +467,7 @@ let process_named_schema pe (tvi, sn) =
     | Some (p,sc) -> p, sc
     | None -> tc_lookup_error pe.pte_pe `Schema (unloc sn) in
 
-  let typ = sc.EcDecl.as_tparams in
+  let typ = sc.EcDecl.axs_tparams in
 
   (* TODO: A: check that type variables typing is ok. *)
   let tvi =
@@ -484,7 +484,7 @@ let process_named_schema pe (tvi, sn) =
 
   let e_params =
     List.map (fun (id, ty) ->
-        id, EcTypes.ty_subst sty ty) sc.EcDecl.as_params in
+        id, EcTypes.ty_subst sty ty) sc.EcDecl.axs_params in
 
   (* When substituting in a schema's formula, we have to rebind the schema's
      expression variables. *)
@@ -496,9 +496,9 @@ let process_named_schema pe (tvi, sn) =
   let sc_i =
     Fsubst.subst_tvar
       ~es_loc:rebind
-      fs sc.EcDecl.as_spec in
+      fs sc.EcDecl.axs_spec in
 
-  (p, typ, e_params, sc_i)
+  (p, typ, sc.EcDecl.axs_pparams, e_params, sc_i)
 
 (* -------------------------------------------------------------------- *)
 let process_sc_instantiation pe inst =
@@ -507,25 +507,43 @@ let process_sc_instantiation pe inst =
   let ue = EcUnify.UniEnv.create None in
   let pe = { pe with pte_ue = ue } in
 
-  let p, typ, e_params, sc_i =
+  let p, typ, p_params, e_params, sc_i =
     process_named_schema pe (inst.ptcds_tys, inst.ptcds_name) in
+  let ppargs = inst.ptcds_mps in
   let pexprs = inst.ptcds_exprs in
 
-  if List.length e_params <> List.length (unloc pexprs) then
-    tc_error pe.pte_pe ~loc:(loc pexprs)
-      "wrong number of arguments: expected %d, got %d"
-      (List.length e_params)
-      (List.length (unloc pexprs));
+  let check_length s params args =
+    if List.length params <> List.length (unloc args) then
+      tc_error pe.pte_pe ~loc:(loc args)
+        "wrong number of %s arguments: expected %d, got %d" s
+        (List.length params)
+        (List.length (unloc args)) in
 
+  check_length "predicate" p_params ppargs;
+  check_length "expression" e_params pexprs;
+
+  (* We type, in order, the memtype, memory predicates and expressions *)
   let memenv =
     EcTyping.trans_memtype env pe.pte_ue EcCoreFol.mhr inst.ptcds_mt in
   let memtype = snd memenv in
+  (* The environment for expression arguments typing. *)
   let e_env = EcEnv.Memory.push_active memenv env in
+
+  let mpreds = List.map2 (fun (mem, pform) id ->
+      (* default to mhr if no memory is given *)
+      let mem = omap_dfl (fun m -> EcIdent.create (unloc m)) mhr (unloc mem) in
+      let memenv = mem, memtype in
+      let env = EcEnv.Memory.push_active memenv env in
+      let f = EcTyping.trans_form env pe.pte_ue pform tbool in
+      id, (mem, f)
+    ) (unloc ppargs) p_params in
+
   let exprs = List.map2 (fun pexpr (id, ty_expected) ->
       (* `InProc, because we want to look for variables declared in [memenv] *)
       id, EcTyping.transexpcast e_env `InProc pe.pte_ue ty_expected pexpr
     ) (unloc pexprs) e_params in
 
+  (* We close the unification environment, and substitute in all infered args. *)
   if not (EcUnify.UniEnv.closed pe.pte_ue) then
     assert false;
 
@@ -534,9 +552,14 @@ let process_sc_instantiation pe inst =
   let se = EcTypes.e_uni eus in
 
   let typ = List.map (EcTypes.ty_subst sty) typ in
-  let exprs = List.map (fun (id, e) -> id, se e) exprs in
   let memtype = EcMemory.mt_subst (EcTypes.ty_subst sty) memtype in
+  let mpreds = List.map (fun (id, (m,p)) ->
+      let fs = Fsubst.f_subst_init ~sty () in
+      let p = Fsubst.f_subst fs p in
+      id, (m,p)) mpreds in
+  let exprs = List.map (fun (id, e) -> id, se e) exprs in
 
+  (* We instantiate the schema. *)
   (* FIXME: instantiating and substituting in schema is ugly. *)
   (* For cost judgement, we also need to substitue the expression variables
      in the precondition. *)
@@ -552,9 +575,13 @@ let process_sc_instantiation pe inst =
                           coe_pre = Fsubst.f_subst fs coe_new.coe_pre }
     | _ -> f_new in
 
-  let fs = Fsubst.f_subst_init ~sty ~esloc:(Mid.of_list exprs) ~mt:memtype () in
+  let fs =
+    Fsubst.f_subst_init ~sty
+      ~esloc:(Mid.of_list exprs)
+      ~mempred:(Mid.of_list mpreds)
+      ~mt:memtype () in
 
-  (p, typ, memtype, exprs, Fsubst.f_subst ~tx fs sc_i)
+  (p, typ, memtype, mpreds, exprs, Fsubst.f_subst ~tx fs sc_i)
 
 (* ------------------------------------------------------------------ *)
 let process_pterm_cut ~prcut pe pt =
@@ -912,9 +939,11 @@ let tc1_process_full_pterm ?implicits (tc : tcenv1) (ff : ppterm) =
 let tc1_process_sc_instantiation (tc : tcenv1) (inst : pcutdef_schema) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
-  let p, types, memtype, exprs, f =
+  let p, types, memtype, mpreds, exprs, f =
     process_sc_instantiation (ptenv_of_penv hyps pe) inst in
-  let pt = { pt_head = PTSchema (p, types, memtype, List.map snd exprs);
+  let pt = { pt_head = PTSchema (p, types, memtype,
+                                 List.map snd mpreds,
+                                 List.map snd exprs);
              pt_args = []; } in
   pt, f
 

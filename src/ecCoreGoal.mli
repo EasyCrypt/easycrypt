@@ -58,7 +58,8 @@ and pt_head =
 | PTHandle of handle
 | PTLocal  of EcIdent.t
 | PTGlobal of EcPath.path * (ty list)
-| PTSchema of EcPath.path * (ty list) * EcMemory.memtype * (expr list)
+| PTSchema of
+    EcPath.path * (ty list) * EcMemory.memtype * mem_pr list * (expr list)
 
 and pt_arg =
 | PAFormula of EcFol.form

@@ -400,6 +400,7 @@ rule main = parse
   | "|}"  { [RPBRACE   ] }
   | "`|"  { [TICKPIPE  ] }
   | "`{"  { [TICKBRACE ] }
+  | "`("  { [TICKPAREN ] }
   | "<$"  { [LESAMPLE  ] }
   | "<@"  { [LEAT      ] }
   | ":~"  { [COLONTILD ] }

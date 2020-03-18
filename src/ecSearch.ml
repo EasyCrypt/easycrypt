@@ -76,7 +76,7 @@ type search_result =
 
 let search (env : EcEnv.env) (search : search list) =
   let check_ax _ ax = match_ env search ax.EcDecl.ax_spec in
-  let check_sc _ sc = match_ env search sc.EcDecl.as_spec in
+  let check_sc _ sc = match_ env search sc.EcDecl.axs_spec in
   let axs = EcEnv.Ax.all ~check:check_ax env
             |> List.map (fun (p,x) -> p, `Axiom x)
   and scs = EcEnv.Schema.all ~check:check_sc env
@@ -97,8 +97,8 @@ let sort (relevant:Sp.t) (res : search_result) =
       let used = Frequency.f_ops unwanted_ops ax.ax_spec in
       (p,`Axiom ax), used
     | `Schema sc ->
-      Frequency.add fr sc.as_spec;
-      let used = Frequency.f_ops unwanted_ops sc.as_spec in
+      Frequency.add fr sc.axs_spec;
+      let used = Frequency.f_ops unwanted_ops sc.axs_spec in
       (p,`Schema sc), used in
   let res = List.map do1 res in
 

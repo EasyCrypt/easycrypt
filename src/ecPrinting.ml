@@ -1937,6 +1937,11 @@ let pp_tyvarannot (ppe : PPEnv.t) fmt ids =
   | []  -> ()
   | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar_ctt ppe)) ids
 
+let pp_pvar (ppe : PPEnv.t) fmt ids =
+  match ids with
+  | []  -> ()
+  | ids -> Format.fprintf fmt "'{%a}" (pp_list "@ " (pp_tyvar ppe)) ids
+
 let pp_scvar ppe fmt vs =
   let rec grp_vs acc l = match l, acc with
     | [],_ -> List.rev_map (fun (l,ty) -> List.rev l, ty) acc
@@ -1948,7 +1953,6 @@ let pp_scvar ppe fmt vs =
 
   let vs = grp_vs [] vs in
 
-  (* TODO: A: not sure we want pp_tyvar there *)
   let pp_grp fmt (l,ty) =
     Format.fprintf fmt "{%a :@ %a}"
       (pp_list "@ " (pp_tyvar ppe)) l (pp_type ppe) ty in
@@ -2192,21 +2196,23 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
   Format.fprintf fmt "@[<v>%a%a@]" pp_long x pp_decl ()
 
 let pp_schema ?(long=false) (ppe : PPEnv.t) fmt (x, sc) =
-  let ppe = PPEnv.add_locals ppe (List.map fst sc.as_tparams) in
-  let ppe = PPEnv.add_locals ppe (List.map fst sc.as_params) in
+  let ppe = PPEnv.add_locals ppe (List.map fst sc.axs_tparams) in
+  let ppe = PPEnv.add_locals ppe sc.axs_pparams in
+  let ppe = PPEnv.add_locals ppe (List.map fst sc.axs_params) in
   let basename = P.basename x in
 
   let pp_spec fmt =
-    pp_form ppe fmt sc.as_spec
+    pp_form ppe fmt sc.axs_spec in
 
-  and pp_name fmt =
-    match sc.as_tparams, sc.as_params with
-    | [],[] -> Format.fprintf fmt "%s"    basename
-    | ts,[] -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
-    | [],sc -> Format.fprintf fmt "%s %a" basename (pp_scvar ppe) sc
-    | ts,sc ->
-      Format.fprintf fmt "%s %a %a" basename
-        (pp_tyvarannot ppe) ts (pp_scvar ppe) sc in
+  let pp_w_space pp fmt args = match args with
+    | [] -> ()
+    | _ -> Format.fprintf fmt " %a" pp args in
+
+  let pp_name fmt =
+    Format.fprintf fmt "%s%a%a%a" basename
+      (pp_w_space @@ pp_tyvarannot ppe) sc.axs_tparams
+      (pp_w_space @@ pp_pvar ppe) sc.axs_pparams
+      (pp_w_space @@ pp_scvar ppe) sc.axs_params  in
 
   let pp_long fmt x =
     if long then

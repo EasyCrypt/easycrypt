@@ -20,18 +20,23 @@ lemma free_var_logical (a : int) : cost(_:{})[true : a] = 0 by auto.
 
 (* Everything else has a cost, that must be given by the user through 
    schemata. A schema allow to quantify over *expressions*, as in: *)
-schema cost_plus {e e' : int}: 
-  cost[true : e + e'] = cost[true : e] + cost[true : e'] + 1.
+schema cost_plus `{P} {e e' : int}: 
+  cost[P : e + e'] = cost[P : e] + cost[P : e'] + 1.
 
-schema cost_times {e e' : int}: 
+schema cost_plus_true {e e' : int}: 
   cost[true : e * e'] = cost[true : e] + cost[true : e'] + 1.
 
+schema cost_times `{P} {e e' : int}: 
+  cost[P : e * e'] = cost[P : e] + cost[P : e'] + 1.
+
 (* It can be instantiated manually with the [instantiate] tactic. *)
-(* Syntax: 
-   instantiate intro_pat := (schema_name memorytype expr1 : expr2 : ...) *)
+(* Syntax, where for every i, Pi has can use memory m:
+   instantiate intro_pat := 
+   (sc_name memtype '(m: P1) ... '(m: Pn) expr1 ... exprm) *)
 lemma foo_cost : cost(_:{})[true : 1 + 2] = 1.
 proof.
-instantiate -> := (cost_plus {} 1 : 2).
+instantiate -> := (cost_plus_true {} 1 2).
+instantiate -> := (cost_plus {} `(_:true) 1 2).
 auto.
 qed.
 

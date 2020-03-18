@@ -899,8 +899,21 @@ module Ax = struct
     let tintro = mk_loc loc (Plogic (Pmove prevertv0)) in
     let tintro = { pt_core = tintro; pt_intros = [`Ip ip]; } in
 
+    let pparams =
+      if ax.pa_kind <> PSchema
+      then begin
+        assert (ax.pa_pvars = None);
+        None end
+      else omap_dfl (fun (PT_MemPred l) ->
+          List.map (fun v -> EcIdent.create (unloc v)) l
+          |> some
+        ) (Some []) ax.pa_pvars in
+
     let scparams =
-      if ax.pa_kind <> PSchema then None
+      if ax.pa_kind <> PSchema
+      then begin
+        assert (ax.pa_scvars = None);
+        None end
       else match ax.pa_scvars with
         | None -> Some []
         | Some scv ->
@@ -912,7 +925,9 @@ module Ax = struct
           |> List.flatten
           |> some in
 
-    let concl = TT.trans_prop scope.sc_env ?schema_mt:scparams ue pconcl in
+    let concl =
+      TT.trans_prop scope.sc_env
+        ?schema_mpreds:pparams ?schema_mt:scparams ue pconcl in
 
     if not (EcUnify.UniEnv.closed ue) then
       hierror "the formula contains free type variables";
@@ -973,9 +988,10 @@ module Ax = struct
       | PSchema -> assert false
 
     else
-      let sc = { as_tparams = tparams;
-                 as_params  = odfl [] scparams;
-                 as_spec    = concl; } in
+      let sc = { axs_tparams = tparams;
+                 axs_pparams = odfl [] pparams;
+                 axs_params  = odfl [] scparams;
+                 axs_spec    = concl; } in
 
       (* TODO: A: check this. *)
       Some (unloc ax.pa_name),

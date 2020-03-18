@@ -472,6 +472,10 @@ end = struct
         msg "the schema variable %a has been rebinded"
             EcIdent.pp_ident id
 
+    | SchemaMemBinderBelowCost ->
+      msg "predicates binding memories are not allowed below a cost statement \
+           in a schema."
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 

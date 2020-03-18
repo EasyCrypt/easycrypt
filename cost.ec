@@ -74,38 +74,38 @@ clone import ROM.Lazy as H with
 
 (************************************************************************)
 (* Costs of various operators. *)
-schema cost_witness ['a] : cost[true: witness<:'a>] = 1.
+schema cost_witness ['a] `{P} : cost[P: witness<:'a>] = 1.
 
-schema cost_eq ['a] {a b : 'a} : 
-    cost[true : a = b] = cost[true : a] + cost[true : b] + 1.
+schema cost_eq ['a] `{P} {a b : 'a} : 
+    cost[P : a = b] = cost[P : a] + cost[P : b] + 1.
 
-schema cost_deq ['a] {a b : 'a} : 
-    cost[true : a <> b] = cost[true : a] + cost[true : b] + 1.
+schema cost_deq ['a] `{P} {a b : 'a} : 
+    cost[P : a <> b] = cost[P : a] + cost[P : b] + 1.
 
-schema cost_cons ['a] {e : 'a} {l : 'a list} : 
-    cost[true : e :: l] =   
-    cost[true : e] + cost[true : l] + 1.
+schema cost_cons ['a] `{P} {e : 'a} {l : 'a list} : 
+    cost[P : e :: l] =   
+    cost[P : e] + cost[P : l] + 1.
 
-schema cost_nil ['a] : cost[true : [<:'a>]] = 1.
+schema cost_nil ['a] `{P} : cost[P : [<:'a>]] = 1.
 
-schema cost_head ['a] {l : 'a list} :
-  cost[true : head witness l] = 
-  cost[true : l] + 1.
+schema cost_head ['a] `{P} {l : 'a list} :
+  cost[P : head witness l] = 
+  cost[P : l] + 1.
 
-schema cost_drop ['a] {l : 'a list} :
-  cost[true: drop 1 l] = cost[true: l] + 1.
+schema cost_drop ['a] `{P} {l : 'a list} :
+  cost[P: drop 1 l] = cost[P: l] + 1.
 
-schema cost_pp {r : rand} {p : ptxt} :
-  cost[true : r || p] = 
-  cost[true : r] + cost[true : p] + 1.
+schema cost_pp `{P} {r : rand} {p : ptxt} :
+  cost[P : r || p] = 
+  cost[P : r] + cost[P : p] + 1.
 
-schema cost_dptxt : cost[true : dptxt] = 1.
+schema cost_dptxt `{P} : cost[P : dptxt] = 1.
 
-schema cost_pos ['a] {e : 'a} : 0 <= cost[true : e].
+schema cost_pos ['a] `{P} {e : 'a} : 0 <= cost[P : e].
 
 op kf : int.
 axiom kfp : 0 <= kf.
-schema cost_f {pk : pkey} {r : rand} : cost[true : f pk r] = kf.
+schema cost_f `{P} {pk : pkey} {r : rand} : cost[P : f pk r] = kf.
 
 hint simplify cost_witness.
 hint simplify cost_eq.

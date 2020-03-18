@@ -142,9 +142,9 @@ module LowApply = struct
         let env = LDecl.toenv (hyps_of_ckenv tc) in
         (pt, EcEnv.Ax.instanciate p tys env)
 
-    | PTSchema (p, tys, mt, es) ->
+    | PTSchema (p, tys, mt, mps, es) ->
       let env = LDecl.toenv (hyps_of_ckenv tc) in
-      (pt, EcEnv.Schema.instanciate p tys mt es env)
+      (pt, EcEnv.Schema.instanciate p tys mt mps es env)
 
   (* ------------------------------------------------------------------ *)
   and check (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =

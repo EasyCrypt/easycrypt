@@ -570,6 +570,7 @@
 %token THEN
 %token THEORY
 %token TICKBRACE
+%token TICKPAREN
 %token TICKPIPE
 %token TILD
 %token TIME
@@ -2421,13 +2422,20 @@ pcutdef:
 | LPAREN cd=pcutdef1 RPAREN { cd }
 
 (* ------------------------------------------------------------------ *)
+pmempred_arg:
+| TICKPAREN m=bdident COLON f=form RPAREN { (m,f) }
+
+pmempred_args:
+| l=pmempred_arg* { l }
+
 pcutdef_schema1:
-| p=qident tvi=tvars_app? mt=memtype
-  exprs=loc(rlist0(expr,COLON))
-    { { ptcds_name = p;
-	ptcds_tys = tvi;
-	ptcds_mt = mt;
-	ptcds_exprs = exprs; } }
+| p=qident tvi=tvars_app? mt=memtype pargs=loc(pmempred_args)
+  exprs=loc(rlist0(sexpr,none))
+    { { ptcds_name  = p;
+        ptcds_tys   = tvi;
+        ptcds_mt    = mt;
+        ptcds_mps   = pargs;
+        ptcds_exprs = exprs; } }
 
 pcutdef_schema:
 | LPAREN cd=pcutdef_schema1 RPAREN { cd }
