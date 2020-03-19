@@ -1616,9 +1616,6 @@ qident_inparam:
 oracle_restr0:
   | ol=rlist0(qident_inparam,COMMA) { ol }
 
-oracle_restr1:
-  | ol=rlist1(qident_inparam,COMMA) { ol }
-
 (* -------------------------------------------------------------------- *)
 (* Complexity restrictions *)
 compl_el:
@@ -1631,14 +1628,11 @@ compl_restr1:
 (* Module restrictions *)
 
 fun_restr:
-  | LBRACE RBRACE
-    { (None, None) }
-
+  | LBRACE orcl=oracle_restr0 RBRACE
+    { (Some orcl, None) }
+ 
   | LBRACE orcl=oracle_restr0 SEMICOLON cl=compl_restr1 RBRACE
     { (Some orcl, Some cl) }
-
-  | LBRACE orcl=oracle_restr1 RBRACE
-    { (Some orcl, None) }
 
   | LBRACE cl=compl_restr1 RBRACE
     { (None, Some cl) }

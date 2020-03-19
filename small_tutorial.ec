@@ -275,20 +275,6 @@ section.
  }.
    
  print E.
-
-(**************************************************)
- module type NAB (H1 : H) = {
-   proc a () : unit {}
- }.
-
- print NAB.
-
- (* TODO: A: bug, this should be rejected, because H1.o should not be allowed.*)
- local module (NAB0 : NAB) (H1 : H) = {
-   proc a () = {
-     H1.o();
-   }
- }.
  
 (**************************************************)
  module type MAB (H1 : H) (H2 : H)  = {
