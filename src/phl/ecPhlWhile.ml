@@ -125,10 +125,10 @@ let t_hoare_while_r inv tc =
   FApi.xmutate1 tc `While [b_concl; concl]
 
 (* - [inv] is the loop invariant.
-   - [qinc] the strictly increasing quantity at each iteration.
+   - [qdec] the strictly decreasing quantity at each iteration.
    - [n] is the maximum number of iterations.
    - [lam_cost] is the cost of one iteration (of the form [λ k. cost(k)]) *)
-let t_choare_while_r inv qinc n (lam_cost : cost) tc =
+let t_choare_while_r inv qdec n (lam_cost : cost) tc =
   let env = FApi.tc1_env tc in
   if not (ICHOARE.loaded env) then
     tacuerror "while: load the `CHoareTactic' theory first";
@@ -141,8 +141,8 @@ let t_choare_while_r inv qinc n (lam_cost : cost) tc =
   (* The [k]-th iteration preserves the invariant, and costs [lam_cost k]. *)
   let k_id = EcIdent.create "z" in
   let k = f_local k_id tint in
-  let qinc_eq_k = f_eq qinc k in
-  let k_lt_qinc = f_int_lt k qinc in
+  let qinc_eq_k = f_eq qdec k in
+  let k_lt_qinc = f_int_lt qdec k in
   let c_pre  = f_and_simpl (f_and_simpl inv e) qinc_eq_k in
   let c_post = f_and_simpl inv k_lt_qinc in
   let c_cost = cost_app lam_cost [k] in
@@ -152,8 +152,8 @@ let t_choare_while_r inv qinc n (lam_cost : cost) tc =
                                        chs_co  = c_cost; } in
   let c_concl = f_forall_simpl [(k_id,GTty tint)] c_concl in
 
-  (* The loop terminates in at most [n] steps *)
-  let n_term = f_imp_simpl (f_and_simpl inv e) (f_int_le qinc n) in
+  (* When the decreasing quantity is less than zero, the loop exists *)
+  let n_term = f_imp_simpl (f_and_simpl inv (f_int_le qdec f_i0)) (f_not e) in
   let n_term = f_forall_mems [chs.chs_m] n_term in
 
   (* We compute the final cost. Since we have at most [n] iterations, we have:
@@ -162,7 +162,6 @@ let t_choare_while_r inv qinc n (lam_cost : cost) tc =
   let e_cost_self = f_int_mul_simpl
       (f_int_add_simpl n (f_int @@ EcBigInt.of_int 1))
       (cost_of_expr inv chs.chs_m expr_e) in
-  (* We could use [cost_of_expr inv chs.chs_m expr_e] *)
 
   let body_cost = ICHOARE.choare_sum lam_cost (f_i0, n) in
   let cost =
@@ -172,7 +171,8 @@ let t_choare_while_r inv qinc n (lam_cost : cost) tc =
   let post = f_imps_simpl [f_not_simpl e; inv] chs.chs_po in
   let modi = s_write env c in
   let post = generalize_mod env m modi post in
-  let post = f_and_simpl inv post in
+  let inv_bd_loop = f_and_simpl inv (f_int_le qdec n) in
+  let post = f_and_simpl inv_bd_loop post in
   let concl = f_cHoareS_r { chs with chs_s  = s;
                                      chs_po = post;
                                      chs_co  = cost; } in

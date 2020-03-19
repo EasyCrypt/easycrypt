@@ -116,8 +116,8 @@ module C = {
   }
 }.
 
-schema cost_lt {e e' : int}: 
-  cost[true : e < e'] = cost[true : e] + cost[true : e'] + 1.
+schema cost_lt `{P} {e e' : int}: 
+  cost[P : e < e'] = cost[P : e] + cost[P : e'] + 1.
 hint simplify cost_lt.
 
 (* For if statements, to keep cost expressions simpler, we do not use
@@ -146,20 +146,21 @@ move => *.
 proc => /=.
 (* The [while] tactic takes the following parameters:
    - invariant, 
-   - increasing quantity starting from zero
+   - deacreasing quantity qdec
    - number of loop iterations
-   - cost of one loop body, given using a lambda. *)
-while (x <= y /\ y = b) (x - a) (b - a) [fun _ => 1] => *.
+   - cost of one loop body, when (qdec = k), given using a lambda. *)
+while (x <= y /\ y = b) (b - x) (b - a) [fun _ => 1].
 
 (* prove that the loop body preserves the invariant, and cost what was stated. *)
-auto => * /=; by smt ().
+move => z; auto => * /=; by smt ().
 
-(* prove that the invariant and loop condition implies that we have not reached 
-  the maximal number of steps.  *)
-by smt ().
+(* prove that the if the invariant holds, and if the decreasing quantity is less 
+   or equal to zero, then we exit the loop. *)
+move => &hr; by smt ().
 
-(* We prove that the invariant implies the post, and that the cost of all
-  iterations is smaller than the final cost. *)
+(* We prove that the invariant implies the post, that the decreasing quantity
+   is initially smaller than the number of loop iterations, and that the cost
+   of all iterations is smaller than the final cost. *)
 skip => * => /=; split; [1: by smt].
 rewrite !big_constz !count_predT !size_range; by smt ().
 qed.
