@@ -300,7 +300,7 @@ section.
   proc; call (_: true; time); auto => * => /=; [1: by smt ()].
 
   call (_: true; time); auto ; move => * /=.
-  split; move => * /=; first smt ().  
+  split; move => * /=; first by smt (dptxt_ll).  
   rewrite !big_constz !count_predT !size_range; by smt (k1p k2p kfp).
 
   (* we bound the list lookup time. *)

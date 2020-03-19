@@ -55,6 +55,7 @@ module Core = struct
     let post = subst_form_lv env (EcMemory.memory chs.chs_m) lv x chs.chs_po in
     let post = f_imp (f_in_supp x distr) post in
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+    let post  = f_anda (f_lossless ty_distr distr) post in
     let cost =
       EcFol.cost_sub_self
         chs.chs_co
