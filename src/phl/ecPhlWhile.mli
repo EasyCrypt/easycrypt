@@ -14,6 +14,7 @@ open EcCoreGoal.FApi
 module ICHOARE : sig
   val loaded : EcEnv.env -> bool
   val choare_sum : cost -> (form * form) -> cost
+  val choare_max : form -> form -> form
 end
 
 (* -------------------------------------------------------------------- *)

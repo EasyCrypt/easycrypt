@@ -310,6 +310,7 @@ section.
  local module MAB2 = MAB0(H0, H0).
  print MAB2.                    
 
+end section.
 (**************************************************)
 (* Bonus: expression's cost using a free operator *)
 (**************************************************)

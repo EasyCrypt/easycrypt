@@ -55,8 +55,9 @@ module LowInternal = struct
           let m = EcMemory.memory memenv in
           let post  = f_if (form_of_expr m e) post1 post2 in
           ([], post),
-          f_int_add_simpl cost_1
-            (f_int_add_simpl cost_2 (cost_of_expr_w_pre memenv e c_pre))
+          f_int_add_simpl
+            (EcPhlWhile.ICHOARE.choare_max cost_1 cost_2)
+            (cost_of_expr_w_pre memenv e c_pre)
         end else raise No_wp
 
     | Sassert e when onesided ->
@@ -96,6 +97,9 @@ module TacInternal = struct
 
   let t_choare_wp ?(uselet=true) i c_pre tc =
     let env = FApi.tc1_env tc in
+    if not (EcPhlWhile.ICHOARE.loaded env) then
+      tacuerror "wp: load the `CHoareTactic' theory first";
+
     let chs = tc1_as_choareS tc in
 
     (* We check that the cost precondition, if any, is unchanged chs.chs_s,

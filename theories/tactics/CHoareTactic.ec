@@ -7,5 +7,5 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import FSet StdBigop.
+require import FSet StdBigop Int IntExtra.
 (*---*) import Bigint.

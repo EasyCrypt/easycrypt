@@ -24,6 +24,7 @@ module Mid = EcIdent.Mid
 module ICHOARE : sig
   val loaded : EcEnv.env -> bool
   val choare_sum : cost -> (form * form) -> cost
+  val choare_max : form -> form -> form
 end = struct
   open EcCoreLib
   open EcEnv
@@ -32,6 +33,7 @@ end = struct
   let p_CHoare  = EcPath.pqname EcCoreLib.p_top i_CHoare
   let p_List    = [i_top; "List"]
   let p_BIA     = [i_top; "StdBigop"; "Bigint"; "BIA"]
+  let p_Max     = [i_top; "IntExtra"; "Extrema"]
 
   let tlist =
     let tlist = EcPath.fromqsymbol (p_List, "list") in
@@ -50,6 +52,12 @@ end = struct
     let prT  = f_op prT [tint] (tpred tint) in
     fun cost (m, n) ->
       cost_map (fun f -> f_app bg [prT; f; range m n] tint) cost
+
+  let choare_max =
+    let maxty = [tint; tint] in
+    let max   = EcPath.fromqsymbol (p_Max, "max") in
+    let max   = f_op max [] (toarrow maxty tint) in
+    fun f f' -> f_app max [f;f'] tint
 
   let loaded (env : env) =
     is_some (EcEnv.Theory.by_path_opt p_CHoare env)
