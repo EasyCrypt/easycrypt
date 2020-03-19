@@ -2,6 +2,7 @@ require import Int CHoareTactic StdBigop.
 import Bigint IntExtra.
 
 module V = { var v : int }.
+
 (*********************)
 (* Expression's cost *)
 (*********************)
@@ -18,6 +19,7 @@ lemma free_var_g : cost(_:{})[true : A.x] = 0 by auto.
 
 (* And logical variables. *)
 lemma free_var_logical (a : int) : cost(_:{})[true : a] = 0 by auto.
+
 
 (* Everything else has a cost, that must be given by the user through 
    schemata. A schema allow to quantify over *expressions*, as in: *)
@@ -36,15 +38,15 @@ schema cost_times `{P} {e e' : int}:
    (sc_name memtype '(P1) ... '(Pn) expr1 ... exprm) *)
 lemma foo_cost : cost(_:{})[true : 1 + 2] = 1.
 proof.
-instantiate H := (cost_plus_true {} 1 2).
-instantiate H0 := (cost_plus {} `(true) 1 2).
-instantiate H2 := (cost_plus {} `(_:true) 1 2).
+instantiate H  := (cost_plus_true {} 1 2).
+instantiate H0 := (cost_plus      {} `(true) 1 2).
+instantiate H2 := (cost_plus      {} `(_:true) 1 2).
 
 (* We can also explicitely give the memory name, as follows: *)
-instantiate H3 := (cost_plus {} `(&mem: V.v = 2) 1 2). 
-instantiate H4 := (cost_plus {} `(&mem: V.v{mem} = 2) 1 2).
+instantiate H3 := (cost_plus      {} `(&mem: V.v = 2) 1 2). 
+instantiate H4 := (cost_plus      {} `(&mem: V.v{mem} = 2) 1 2).
 
-instantiate -> := (cost_plus {} `(_:true) 1 2).
+instantiate -> := (cost_plus      {} `(_:true) 1 2).
 auto.
 qed.
 
@@ -163,6 +165,150 @@ rewrite !big_constz !count_predT !size_range; by smt ().
 qed.
 
 
+(*********************)
+(* Lemma application *)
+(*********************)
+
+module type H = { proc o () : unit }.
+
+module type Adv (H0 : H) = { proc a () : unit }.
+
+module (MyAdv : Adv) (H0 : H) = {
+  proc a () = {
+    var y;
+    y <- 1 + 1 + 1;
+    H0.o();
+    H0.o();
+  }
+}.
+
+lemma advcompl
+    (H0   <: H) : 
+    choare[MyAdv(H0).a : true ==> true] 
+      time [2; H0.o : 2 ].
+proof.
+  proc; do !(call(_: true; time)); auto => /=.
+qed.
+
+module (MyH : H) = { 
+  proc o () = {
+    var z;
+    z <- 1+1;
+  }
+}.
+
+lemma advcompl_inst :
+    choare[MyAdv(MyH).a : true ==> true] 
+      time [4].
+proof.
+  have h := (advcompl MyH).
+  (* apply h. *)
+  admit.
+qed.
+
+
+module Inv (Adv0 : Adv) (H0 : H) = {
+  module Adv1 = Adv0(H0)
+
+  proc i () = {
+    var z;
+    z <- 1 + 1;
+    Adv1.a();
+  }
+}.
+
+
+lemma invcompl
+    (k : int)
+    (Adv0 <: Adv [a : {#H0.o : k}]) 
+    (H0   <: H) : 
+    0 <= k =>
+    choare[Inv(Adv0, H0).i : true ==> true] 
+      time [1; Inv(Adv0, H0).Adv1.a : 1; H0.o : k ].
+proof.    
+  move => hk; proc. 
+  call(_: true; time (H0.o : [fun _ => 0; H0.o : fun _ => 1])).
+  move => * /=; proc*; call(_: true; time); auto => /=.
+  auto => /=.
+  rewrite !big_constz !count_predT !size_range. by smt ().
+qed.
+
+lemma incompl_inst
+    (H0   <: H) : 
+    choare[Inv(MyAdv, H0).i : true ==> true] 
+      time [1; H0.o : 2 ].
+proof.
+  (* have h := (invcompl 2 MyAdv H0). *)
+  admit.
+qed.
+
+lemma invcompl2
+    (H0   <: H)
+    (Adv1 <: Adv [a : {#H0.o : 2}]) :
+    choare[Inv(Adv1, H0).i : true ==> true]
+      time [1; H0.o : 2 ].
+proof.
+  have h := (invcompl 2 Adv1 H0).
+  admit.
+qed.
+
+(**************************************************)
+
+module type AB (H0 : H) = {
+  proc a () : unit { H0.o : 1 }
+}.
+
+print AB.
+section.
+ declare module H0 : H.
+ declare module AB0 : AB.
+
+ print AB0.
+ local module AB1 = AB0(H0).
+ print AB1.
+
+ local module E = { 
+   proc e () = {
+     AB1.a();
+   }
+ }.
+   
+ print E.
+
+(**************************************************)
+ module type NAB (H1 : H) = {
+   proc a () : unit {}
+ }.
+
+ print NAB.
+
+ (* TODO: A: bug, this should be rejected, because H1.o should not be allowed.*)
+ local module (NAB0 : NAB) (H1 : H) = {
+   proc a () = {
+     H1.o();
+   }
+ }.
+ 
+(**************************************************)
+ module type MAB (H1 : H) (H2 : H)  = {
+   proc a () : unit {H2.o}
+ }.
+
+ print MAB.
+
+ local module (MAB0 : MAB) (H1 : H) (H2 : H) = {
+   proc a () = {
+     H2.o();
+     H0.o();
+   }
+ }.
+
+ (* (* TODO: A: bug there*) *)
+ (* local module MAB1 = MAB0(H0). *)
+ (* print MAB1.                     *)
+
+ local module MAB2 = MAB0(H0, H0).
+ print MAB2.                    
 
 (**************************************************)
 (* Bonus: expression's cost using a free operator *)
