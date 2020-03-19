@@ -275,7 +275,12 @@ section.
  }.
    
  print E.
- 
+
+
+ (**************************************************)
+ declare module AB2 : AB {}.
+ print AB2.
+
 (**************************************************)
  module type MAB (H1 : H) (H2 : H)  = {
    proc a () : unit {H2.o}
@@ -290,14 +295,14 @@ section.
    }
  }.
 
- (* (* TODO: A: bug there*) *)
- (* local module MAB1 = MAB0(H0). *)
- (* print MAB1.                     *)
+ local module MAB1 = MAB0(H0).
+ print MAB1.
 
  local module MAB2 = MAB0(H0, H0).
  print MAB2.                    
 
 end section.
+
 (**************************************************)
 (* Bonus: expression's cost using a free operator *)
 (**************************************************)

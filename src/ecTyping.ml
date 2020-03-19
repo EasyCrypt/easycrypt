@@ -1786,12 +1786,25 @@ let replace_if_provided env mr mr' pmr = match pmr with
 let trans_restr_mem env (r_mem : pmod_restr_mem) =
   let r_empty = ur_empty Sx.empty, ur_empty Sm.empty in
 
-  let m_add_pos ur x = match ur.ur_pos with
-    | None    -> { ur with ur_pos = Sm.singleton x |> some }
-    | Some sm -> { ur with ur_pos = Sm.add x sm    |> some } in
-  let x_add_pos ur x = match ur.ur_pos with
-    | None    -> { ur with ur_pos = Sx.singleton x |> some }
-    | Some sm -> { ur with ur_pos = Sx.add x sm    |> some } in
+  (* If there is one positive restriction, then we do not have +all mem *)
+  let m_add_pos urx urm x = match urm.ur_pos with
+    | None    ->
+      assert (urx.ur_pos = None);
+      { urx with ur_pos = Sx.empty |> some },
+      { urm with ur_pos = Sm.singleton x |> some }
+    | Some sm ->
+      assert (urx.ur_pos <> None);
+      urx, { urm with ur_pos = Sm.add x sm    |> some } in
+
+  let x_add_pos urx urm x = match urx.ur_pos with
+    | None    ->
+      assert (urm.ur_pos = None);
+      { urx with ur_pos = Sx.singleton x |> some },
+      { urm with ur_pos = Sm.empty |> some }
+    | Some sm ->
+      assert (urm.ur_pos <> None);
+      { urx with ur_pos = Sx.add x sm    |> some }, urm in
+
   let m_add_neg ur x = { ur with ur_neg = Sm.add x ur.ur_neg } in
   let x_add_neg ur x = { ur with ur_neg = Sx.add x ur.ur_neg } in
 
@@ -1804,7 +1817,7 @@ let trans_restr_mem env (r_mem : pmod_restr_mem) =
       | FM_Mod m ->
         let m = trans_topmsymbol env m in
         if sign = `Plus
-        then (mem_x, m_add_pos mem_m m)
+        then m_add_pos mem_x mem_m m
         else (mem_x, m_add_neg mem_m m)
 
       | FM_FunOrVar vf ->
@@ -1816,7 +1829,7 @@ let trans_restr_mem env (r_mem : pmod_restr_mem) =
             | Some (`Var pv,_) when is_glob pv -> get_glob pv
             | Some _ -> assert false in
           if sign = `Plus
-          then (x_add_pos mem_x xp, mem_m)
+          then x_add_pos mem_x mem_m xp
           else (x_add_neg mem_x xp, mem_m))
     r_empty
     r_mem
