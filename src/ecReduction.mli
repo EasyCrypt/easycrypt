@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -40,6 +41,28 @@ end
 val is_alpha_eq : LDecl.hyps -> form -> form -> bool
 
 (* -------------------------------------------------------------------- *)
+module User : sig
+  type options = EcTheory.rule_option
+
+  type error =
+    | MissingVarInLhs   of EcIdent.t
+    | MissingTyVarInLhs of EcIdent.t
+    | NotAnEq
+    | NotFirstOrder
+    | RuleDependsOnMemOrModule
+    | HeadedByVar
+
+  exception InvalidUserRule of error
+
+  type rule = EcEnv.Reduction.rule
+
+  val compile : opts:options -> prio:int -> EcEnv.env -> EcPath.path -> rule
+end
+
+(* -------------------------------------------------------------------- *)
+val can_eta : ident -> form * form list -> bool
+
+(* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
   delta_p : (path  -> bool); (* None means all *)
@@ -49,6 +72,7 @@ type reduction_info = {
   eta     : bool;            (* reduce eta-expansion *)
   logic   : rlogic_info;     (* perform logical simplification *)
   modpath : bool;            (* reduce module path *)
+  user    : bool             (* reduce user defined rules *)
 }
 
 and rlogic_info = [`Full | `ProductCompat] option
@@ -58,14 +82,21 @@ val no_red       : reduction_info
 val beta_red     : reduction_info
 val betaiota_red : reduction_info
 val nodelta      : reduction_info
+val delta        : reduction_info
 
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form
 
+val reduce_user_gen :
+  [`BeforeFix | `AfterFix] ->
+  (EcFol.form -> EcFol.form) ->
+  reduction_info ->
+  EcEnv.env -> EcEnv.LDecl.hyps -> EcFol.form -> EcFol.form
+
 val simplify : reduction_info -> LDecl.hyps -> form -> form
 
-val is_conv    : LDecl.hyps -> form -> form -> bool
-val check_conv : LDecl.hyps -> form -> form -> unit
+val is_conv    : ?redinfo:reduction_info -> LDecl.hyps -> form -> form -> bool
+val check_conv : ?redinfo:reduction_info -> LDecl.hyps -> form -> form -> unit
 
 (* -------------------------------------------------------------------- *)
 type xconv = [`Eq | `AlphaEq | `Conv]

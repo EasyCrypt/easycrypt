@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -60,6 +61,10 @@ val tytuple_flat : ty -> ty list
 val tyfun_flat   : ty -> (dom * ty)
 
 (* -------------------------------------------------------------------- *)
+val is_tdistr : ty -> bool
+val as_tdistr : ty -> ty option
+
+(* -------------------------------------------------------------------- *)
 exception FoundUnivar
 
 val ty_check_uni : ty -> unit
@@ -104,6 +109,9 @@ val ty_map : (ty -> ty) -> ty -> ty
 
 (* [sub_exists f t] true if one of the strict-subterm of [t] valid [f] *)
 val ty_sub_exists : (ty -> bool) -> ty -> bool
+
+val ty_fold : ('a -> ty -> 'a) -> 'a -> ty -> 'a
+val ty_iter : (ty -> unit) -> ty -> unit
 
 (* -------------------------------------------------------------------- *)
 val symbol_of_ty   : ty -> string
@@ -194,6 +202,7 @@ val e_ty      : expr -> ty
 (* -------------------------------------------------------------------- *)
 val e_tt       : expr
 val e_int      : zint -> expr
+val e_decimal  : zint * (int * zint) -> expr
 val e_local    : EcIdent.t -> ty -> expr
 val e_var      : prog_var -> ty -> expr
 val e_op       : EcPath.path -> ty list -> ty -> expr
@@ -208,6 +217,9 @@ val e_forall   : ebindings -> expr -> expr
 val e_exists   : ebindings -> expr -> expr
 val e_proj     : expr -> int -> ty -> expr
 
+val e_proj_simpl : expr -> int -> ty -> expr
+
+(* -------------------------------------------------------------------- *)
 val is_local     : expr -> bool
 val is_var       : expr -> bool
 val is_tuple_var : expr -> bool

@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -12,6 +13,16 @@ open EcPath
 open EcUtils
 open EcTypes
 open EcEnv
+
+(* -------------------------------------------------------------------- *)
+type pp_options = {
+  ppo_prpo : EcPrinting.prpo_display;
+}
+
+let ppo : (pp_options option) ref = ref None
+
+let set_ppo (newppo : pp_options) =
+  ppo := Some newppo
 
 (* -------------------------------------------------------------------- *)
 module TypingError : sig
@@ -96,10 +107,10 @@ end = struct
         msg "wrong number of arguments (expected %i, got %i)" ex got
 
     | MAE_InvalidArgType (mp,error) ->
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      msg "argument %a does not match required interface, %a"
-        (EcPrinting.pp_topmod ppe) mp
-        (pp_cnv_failure env) error
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        msg "argument %a does not match required interface, %a"
+          (EcPrinting.pp_topmod ppe) mp
+          (pp_cnv_failure env) error
 
     | MAE_AccesSubModFunctor ->
         msg "cannot access a sub-module of a partially applied functor"
@@ -140,6 +151,9 @@ end = struct
 
     | UnknownInstrMetaVar x ->
         msg "unkown instruction meta-variable: %a" pp_symbol x
+
+    | UnknownMetaVar x ->
+        msg "unknown meta-variable: %a" pp_symbol x
 
     | DuplicatedRecFieldName qs ->
         msg "duplicated (record) field name: %s" qs
@@ -203,6 +217,10 @@ end = struct
 
     | AbbrevLowArgs ->
         msg "this abbreviation is not applied enough"
+
+    | UnknownProgVar (p, mem) ->
+        msg "unknown program variable (in %a): `%a'"
+          (EcPrinting.pp_mem env) mem pp_qsymbol p
 
     | UnknownVarOrOp (name, []) ->
         msg "unknown variable or constant: `%a'" pp_qsymbol name
@@ -301,6 +319,9 @@ end = struct
     | InvalidModAppl err ->
         msg "invalid module application:@ %a" (pp_modappl_error env1) err
 
+    | InvalidModType MTE_IncludeFunctor ->
+        msg "cannot include functors"
+
     | InvalidModType MTE_InnerFunctor ->
         msg "functors must be top-level modules"
 
@@ -315,6 +336,12 @@ end = struct
 
     | InvalidMem (name, MAE_IsConcrete) ->
         msg "the memory %s must be abstract" name
+
+    | InvalidFilter (FE_InvalidIndex i) ->
+        msg "invalid filter index: %d" i
+
+    | InvalidFilter FE_NoMatch ->
+        msg "invalid filter pattern (no match)"
 
     | FunNotInModParam name ->
         msg "the function %a is not provided by a module parameter"
@@ -331,6 +358,9 @@ end = struct
 
     | UnknownScope sc ->
         msg "unknown scope: `%a'" pp_qsymbol sc
+
+    | FilterMatchFailure ->
+        msg "filter pattern does not match"
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
@@ -454,8 +484,11 @@ end = struct
     | FXE_CtorAmbiguous ->
         msg "ambiguous constructor name"
 
-    | FXE_CtorInvalidArity _ ->
-        ()
+    | FXE_CtorInvalidArity (cname, i, j) ->
+        msg
+          "the constructor %s expects %d argument(s) (%d argument(s) given)"
+          cname i j
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -709,7 +742,7 @@ let pp_tc_error fmt error =
 
     Format.fprintf fmt "\nInitial goal was:\n\n%!";
     Format.fprintf fmt "%a\n%!"
-      (EcPrinting.pp_goal ppe)
+      (EcPrinting.pp_goal ppe (oget !ppo).ppo_prpo)
       ((LDecl.tohyps goal.G.g_hyps, goal.G.g_concl), `One (-1))
 
   in
@@ -737,51 +770,51 @@ let pp_error_clear fmt err =
 
 (* -------------------------------------------------------------------- *)
 let pp fmt exn =
-match exn with
-| EcHiInductive.RcError (_, env, e) -> InductiveError.pp_rcerror env fmt e
-| EcHiInductive.DtError (_, env, e) -> InductiveError.pp_dterror env fmt e
-| EcHiInductive.FxError (_, env, e) -> InductiveError.pp_fxerror env fmt e
+  match exn with
+  | EcHiInductive.RcError (_, env, e) -> InductiveError.pp_rcerror env fmt e
+  | EcHiInductive.DtError (_, env, e) -> InductiveError.pp_dterror env fmt e
+  | EcHiInductive.FxError (_, env, e) -> InductiveError.pp_fxerror env fmt e
 
-| EcHiPredicates.TransPredError (_, env, e) ->
-   PredError.pp_tperror env fmt e
+  | EcHiPredicates.TransPredError (_, env, e) ->
+     PredError.pp_tperror env fmt e
 
-| EcHiNotations.NotationError (_, env, e) ->
-   NotationsError.pp_nterror env fmt e
+  | EcHiNotations.NotationError (_, env, e) ->
+     NotationsError.pp_nterror env fmt e
 
-| EcPV.AliasClash (env, ac) ->
-    pp_alias_clash env fmt ac
+  | EcPV.AliasClash (env, ac) ->
+      pp_alias_clash env fmt ac
 
-| EcThCloning.CloneError (env, e) ->
-    CloneError.pp_clone_error env fmt e
+  | EcThCloning.CloneError (env, e) ->
+      CloneError.pp_clone_error env fmt e
 
-| EcCoreGoal.TcError error ->
-    pp_tc_error fmt error
+  | EcCoreGoal.TcError error ->
+      pp_tc_error fmt error
 
-| EcParsetree.ParseError (_loc, msg) ->
-    pp_parse_error fmt msg
+  | EcParsetree.ParseError (_loc, msg) ->
+      pp_parse_error fmt msg
 
-| EcReduction.IncompatibleForm (env, (f1, f2)) ->
-    RedError.pp_incompatible_form fmt env (f1, f2)
+  | EcReduction.IncompatibleForm (env, (f1, f2)) ->
+      RedError.pp_incompatible_form fmt env (f1, f2)
 
-| EcReduction.IncompatibleType (env, (t1, t2)) ->
-    RedError.pp_incompatible_type fmt env (t1, t2)
+  | EcReduction.IncompatibleType (env, (t1, t2)) ->
+      RedError.pp_incompatible_type fmt env (t1, t2)
 
-| EcTyping.TyError (_, env, e) ->
-    TypingError.pp_tyerror env fmt e
+  | EcTyping.TyError (_, env, e) ->
+      TypingError.pp_tyerror env fmt e
 
-| EcTyping.RestrictionError (env, e) ->
-    TypingError.pp_restr_error env fmt e
+  | EcTyping.RestrictionError (env, e) ->
+      TypingError.pp_restr_error env fmt e
 
-| EcProofTerm.ProofTermError e ->
-    PTermError.pp_pterm_apperror fmt e
+  | EcProofTerm.ProofTermError e ->
+      PTermError.pp_pterm_apperror fmt e
 
-| EcCoreGoal.ClearError e ->
-    pp_error_clear fmt e
+  | EcCoreGoal.ClearError e ->
+      pp_error_clear fmt e
 
-| EcLowGoal.Apply.NoInstance e ->
-    pp_apply_error fmt e
+  | EcLowGoal.Apply.NoInstance e ->
+      pp_apply_error fmt e
 
-| _ -> raise exn
+  | _ -> raise exn
 
 (* -------------------------------------------------------------------- *)
 let register =

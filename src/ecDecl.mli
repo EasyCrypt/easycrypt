@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -74,7 +75,7 @@ and opfix = {
 
 and opbranches =
 | OPB_Leaf   of ((EcIdent.t * EcTypes.ty) list) list * EcTypes.expr
-| OPB_Branch of opbranch Parray.t
+| OPB_Branch of opbranch Parray.parray
 
 and opbranch = {
   opb_ctor : EcPath.path * int;

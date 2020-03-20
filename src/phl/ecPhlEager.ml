@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -40,8 +41,8 @@ let pf_hSS pf hyps h =
 let tc1_destr_eagerS tc s s' =
   let es = tc1_as_equivS tc in
   let c , c' = es.es_sl, es.es_sr in
-  let s1, c  = s_split (List.length s.s_node) c in
-  let c',s1' = s_split (List.length c'.s_node - List.length s'.s_node) c' in
+  let s1, c  = s_split (Zpr.cpos (List.length s.s_node)) c in
+  let c',s1' = s_split (Zpr.cpos (List.length c'.s_node - List.length s'.s_node)) c' in
 
   if not (List.all2 i_equal s1 s.s_node) then begin
     let ppe  = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
@@ -170,13 +171,13 @@ let t_eager_if_r tc =
       (f_hoareS (mhr, snd es.es_ml) (f_and p eqb) s eqb) in
 
   let cT =
-    let pre = f_and es.es_pr (f_eq fe f_true) in
+    let pre = f_and es.es_pr (f_eq fel f_true) in
     let st  = stmt (s.s_node @ c1.s_node) in
     let st' = stmt (c1'.s_node @ s'.s_node) in
     f_equivS es.es_ml es.es_mr pre st st' es.es_po in
 
   let dT =
-    let pre = f_and es.es_pr (f_eq fe f_false) in
+    let pre = f_and es.es_pr (f_eq fel f_false) in
     let st  = stmt (s.s_node @ c2.s_node) in
     let st' = stmt (c2'.s_node @ s'.s_node) in
     f_equivS es.es_ml es.es_mr pre st st' es.es_po in

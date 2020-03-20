@@ -1,15 +1,17 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 require import AllCore.
-require (*--*) Ring.
+require (*--*) Ring StdRing.
 
 pragma +implicits.
+pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 pred homo2 ['a 'b] (op_ : 'a -> 'b) (aR : 'a rel) (rR : 'b rel) =
@@ -37,7 +39,6 @@ abstract theory RealDomain.
 type t.
 
 clone import Ring.IDomain as Domain with type t <- t.
-clear [Domain.* Domain.AddMonoid.* Domain.MulMonoid.*].
 
 op "`|_|" : t -> t.
 op ( <= ) : t -> t -> bool.
@@ -101,6 +102,8 @@ qed.
 
 lemma ltr01: zeror < oner.
 proof. by rewrite ltr_def oner_neq0 ler01. qed.
+
+hint exact : ler01 ltr01.
 
 lemma ltrW (x y : t): x < y => x <= y.
 proof. by rewrite ltr_def. qed.
@@ -170,7 +173,7 @@ qed.
 lemma ltr0Sn n : 0 <= n => zeror < ofint (n + 1).
 proof.
 elim: n=> /= [|n ge0n ih]; first by rewrite ofint1 ltr01.
-by rewrite ofintS // ?(addz_ge0, addr_gt0) // ltr01.
+by rewrite (@ofintS (n+1)) // ?(addz_ge0, addr_gt0) // ltr01.
 qed.
 
 lemma ltr0n n : 0 <= n => (zeror < ofint n) = (0 < n).
@@ -992,6 +995,147 @@ proof. by move=> ux hx; rewrite -invr_gt1 ?invr_gt0 ?unitrV // invrK. qed.
 
 hint rewrite invr_lte1 : invr_le1 invr_lt1.
 hint rewrite invr_cp1  : invr_le1 invr_lt1.
+
+(* -------------------------------------------------------------------- *)
+lemma exprz_ge0 n x : zeror <= x => zeror <= exp x n.
+proof.
+move=> ge0_x; elim/intwlog: n.
++ by move=> n; rewrite exprN invr_ge0.
++ by rewrite expr0 ler01.
++ by move=> n ge0_n ge0_e; rewrite exprS // mulr_ge0.
+qed.
+
+lemma exprz_gt0 n x : zeror < x => zeror < exp x n.
+proof. by rewrite !lt0r expf_eq0 => -[->/=]; apply/exprz_ge0. qed.
+
+hint rewrite exprz_gte0 : exprz_ge0 exprz_gt0.
+
+lemma nosmt exprn_ile1 n x : 0 <= n => zeror <= x <= oner => exp x n <= oner.
+proof.
+move=> nge0 [xge0 xle1]; elim: n nge0; 1: by rewrite expr0.
+by move=> n ge0_n ih; rewrite exprS // mulr_ile1 ?exprz_ge0.
+qed.
+
+lemma nosmt exprn_ilt1 n x :
+  0 <= n => zeror <= x < oner => (exp x n < oner) <=> (n <> 0).
+proof.
+move=> nge0 [xge0 xlt1]; case: n nge0; 1: by rewrite expr0 ltrr.
+move=> n nge0 _; rewrite addz_neq0 //=; elim: n nge0; 1: by rewrite expr1.
+by move=> n nge0 ih; rewrite exprS 1:addz_ge0 // mulr_ilt1 ?exprz_ge0.
+qed.
+
+hint rewrite exprn_ilte1 : exprn_ile1 exprn_ilt1.
+hint rewrite exprn_cp1   : exprn_ile1 exprn_ilt1.
+
+lemma nosmt exprn_ege1 n x : 0 <= n => oner <= x => oner <= exp x n.
+proof.
+move=> nge0 xge1; elim: n nge0 => [|n nge0 ih]; 1: by rewrite expr0.
+by rewrite exprS // mulr_ege1.
+qed.
+
+lemma nosmt exprn_egt1 n x : 0 <= n => oner < x => (oner < exp x n) <=> (n <> 0).
+proof.
+move=> nge0 xgt1; case: n nge0 => [|n nge0 _]; 1: by rewrite expr0 ltrr.
+elim: n nge0 => [|n ge0n]; 1: by rewrite expr1.
+rewrite !addz1_neq0 ?addz_ge0 //= => ih.
+by rewrite (@exprS _ (n+1)) 1:addz_ge0 // mulr_egt1.
+qed.
+
+hint rewrite exprn_egte1 : exprn_ege1 exprn_egt1.
+hint rewrite exprn_cp1   : exprn_ege1 exprn_egt1.
+
+lemma nosmt ler_iexpr x n : 0 < n => zeror <= x <= oner => exp x n <= x.
+proof.
+rewrite ltz_def => -[nz_n ge0_n]; case: n ge0_n nz_n => // n ge0_n _ _.
+by case=> xge0 xlt1; rewrite exprS // ler_pimulr // exprn_ile1.
+qed.
+
+lemma nosmt ltr_iexpr x n : 0 <= n => zeror < x < oner => (exp x n < x <=> 1 < n).
+proof.
+move=> nge0 [xgt0 xlt1]; case: n nge0 => /= [|n nge0 _].
++ by rewrite expr0 ltrNge ltrW.
+case: n nge0 => /= [|n nge0 _]; first by rewrite expr1 ltrr.
+rewrite (@ltz_add2r 1 0 (n+1)) -lez_add1r /= lez_addr nge0 /=.
+rewrite (@exprS _ (n+1)) 1:addz_ge0 // gtr_pmulr //.
+by rewrite exprn_ilt1 ?(addz_neq0, addz_ge0) // ltrW.
+qed.
+
+hint rewrite lter_iexpr : ler_iexpr ltr_iexpr.
+hint rewrite lter_expr  : ler_iexpr ltr_iexpr.
+
+lemma nosmt ler_eexpr x n : 0 < n => oner <= x => x <= exp x n.
+proof.
+rewrite ltz_def => -[nz_n ge0_n]; case: n ge0_n nz_n => //=.
+move=> n ge0_n _ _ ge1_x; rewrite exprS //.
+by rewrite ler_pemulr 2:exprn_ege1 // &(@ler_trans oner) ?ler01.
+qed.
+
+lemma nosmt ltr_eexpr x n : 0 <= n => oner < x => (x < exp x n <=> 1 < n).
+proof.
+move=> ge0_n lt1_x; case: n ge0_n; 1: by rewrite expr0 ltrNge ltrW.
+move=> + + _; case=> /= [|n ge0_n _]; first by rewrite expr1 ltrr.
+rewrite (@ltz_add2r 1 0 (n+1)) -lez_add1r /= lez_addr ge0_n /=.
+rewrite (@exprS _ (n+1)) 1:addz_ge0 // ltr_pmulr 1:&(@ltr_trans oner) //.
+by rewrite exprn_egt1 // ?(addz_neq0, addz_ge0).
+qed.
+
+hint rewrite lter_eexpr : ler_eexpr  ltr_eexpr.
+hint rewrite lter_expr  : ler_eexpr  ltr_eexpr.
+
+lemma nosmt ler_wiexpn2l x : zeror <= x <= oner =>
+  forall m n, 0 <= n <= m => exp x m <= exp x n.
+proof.
+move=> [xge0 xle1] m n [ge0_n le_nm]; have ->: m = (m - n) + n by ring.
+by rewrite exprD 1:subz_ge0 // ler_pimull ?(exprz_ge0, exprn_ile1) ?subz_ge0.
+qed.
+
+lemma nosmt ler_weexpn2l x : oner <= x =>
+  forall m n, 0 <= m <= n => exp x m <= exp x n.
+proof.
+move=> ge1_x m n [ge0_m le_mn]; have ->: n = (n - m) + m by ring.
+rewrite exprD 1:subz_ge0 // ler_pemull ?(exprz_ge0, exprn_ege1) //.
++ by rewrite (@ler_trans oner). + by rewrite subz_ge0.
+qed.
+
+lemma nosmt ieexprn_weq1 x n : 0 <= n => zeror <= x =>
+  (exp x n = oner) <=> (n = 0 || x = oner).
+proof.
+case: n => [|n ge0_n _] ge0_x; first by rewrite expr0.
+rewrite !addz_neq0 //=; split=> [|->]; last by rewrite expr1z.
+case: (x = oner) => [->//|/ltr_total [] hx] /=.
++ by rewrite ltr_eqF // exprn_ilt1 // (addz_ge0, addz_neq0).
++ by rewrite gtr_eqF // exprn_egt1 // (addz_ge0, addz_neq0).
+qed.
+
+lemma nosmt ieexprIn x : zeror < x => x <> oner =>
+  forall m n, 0 <= m => 0 <= n => exp x m = exp x n => m = n.
+proof.
+(* FIXME: wlog *)
+move=> gt0_x neq1_x m n; pose P := fun m n => 0 <= m => 0 <= n =>
+  exp x m = exp x n => m = n; rewrite -/(P m n).
+have: (forall m n, (m <= n)%Int => P m n) => P m n.
++ move=> ih; case: (lez_total m n); first by apply/ih.
+  by move/ih=> @/P h *; rewrite -h // eq_sym.
+apply=> {m n} m n le_mn ge0_m ge0_n {P}.
+have ->: n = m + (n - m) by ring.
+rewrite exprD 2:subz_ge0 // -{1}(mulr1 (exp x m)).
+have h/h{h} := mulfI (exp x m) _; first by rewrite expf_eq0 gtr_eqF.
+by rewrite eq_sym ieexprn_weq1 1?(subz_ge0, ltrW) //#.
+qed.
+
+lemma nosmt ler_pexp n x y :
+  0 <= n => zeror <= x <= y => exp x n <= exp y n.
+proof.
+move=> h; elim/intind: n h x y => [|n ge0_n ih] x y [ge0_x le_xy].
++ by rewrite !expr0.
++ by rewrite !exprS // ler_pmul // ?exprz_ge0 ?ih.
+qed.
+
+lemma nosmt ge0_sqr x : zeror <= exp x 2.
+proof.
+rewrite expr2; case: (zeror <= x); first by move=> h; apply/mulr_ge0.
+by rewrite lerNgt /= => /ltrW le0_x; apply/mulr_le0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt ler_norm_sub (x y : t):

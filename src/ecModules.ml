@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -255,8 +256,6 @@ let s_if       arg = stmt [i_if arg]
 let s_while    arg = stmt [i_while arg]
 let s_assert   arg = stmt [i_assert arg]
 let s_abstract arg = stmt [i_abstract arg]
-
-let s_split n s = List.takedrop n s.s_node
 
 (* -------------------------------------------------------------------- *)
 let get_asgn = function

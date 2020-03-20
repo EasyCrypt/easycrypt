@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -44,6 +45,11 @@ let rec process1_debug (_ttenv : ttenv) (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 and process1_by (ttenv : ttenv) (t : ptactic list option) (tc : tcenv1) =
   t_onall process_done (process1_seq ttenv (odfl [] t) tc)
+
+(* -------------------------------------------------------------------- *)
+and process1_solve (_ttenv : ttenv) (i, t) (tc : tcenv1) =
+  let bases = omap (fun t -> List.map unloc t) t in
+  process_solve ?bases ?depth:i tc
 
 (* -------------------------------------------------------------------- *)
 and process1_do (ttenv : ttenv) (b, n) (t : ptactic_core) (tc : tcenv1) =
@@ -126,38 +132,51 @@ and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =
   aux ts (tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
+and process1_nstrict (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
+  if ttenv.tt_smtmode <> `Strict then
+    tc_error !!tc "try! can only be used in strict proof mode";
+  let ttenv = { ttenv with tt_smtmode = `Standard } in
+  process1_try ttenv t tc
+
+(* -------------------------------------------------------------------- *)
 and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
   let engine = process1_core ttenv in
 
   let tx =
     match unloc t with
-    | Preflexivity      -> process_reflexivity
-    | Passumption       -> process_assumption
-    | Psmt pi           -> process_smt ~loc:(loc t) ttenv pi
-    | Psplit            -> process_split
-    | Pfield st         -> process_algebra `Solve `Field st
-    | Pring st          -> process_algebra `Solve `Ring  st
-    | Palg_norm         -> EcStrongRing.t_alg_eq
-    | Pexists fs        -> process_exists fs
-    | Pleft             -> process_left
-    | Pright            -> process_right
-    | Pcongr            -> process_congr
-    | Ptrivial          -> process_trivial
-    | Pelim pe          -> process_elim pe
-    | Papply pe         -> process_apply ~implicits:ttenv.tt_implicits pe
-    | Pcut (m, ip, f, t)-> process_cut ~mode:m engine ttenv (ip, f, t)
-    | Pcutdef (ip, f)   -> process_cutdef ttenv (ip, f)
-    | Pmove pr          -> process_move pr.pr_view pr.pr_rev
-    | Pclear l          -> process_clear l
-    | Prewrite (ri, x)  -> process_rewrite ttenv ?target:x ri
-    | Psubst   ri       -> process_subst ri
-    | Psimplify ri      -> process_simplify ri
-    | Pchange pf        -> process_change pf
-    | Ppose (x, o, p)   -> process_pose x o p
-
-    | _ -> assert false
+    | Preflexivity        -> process_reflexivity
+    | Passumption         -> process_assumption
+    | Psmt pi             -> process_smt ~loc:(loc t) ttenv pi
+    | Psplit              -> process_split
+    | Pfield st           -> process_algebra `Solve `Field st
+    | Pring st            -> process_algebra `Solve `Ring  st
+    | Palg_norm           -> EcStrongRing.t_alg_eq
+    | Pexists fs          -> process_exists fs
+    | Pleft               -> process_left
+    | Pright              -> process_right
+    | Pcongr              -> process_congr
+    | Ptrivial            -> process_trivial
+    | Pelim pe            -> process_elim pe
+    | Papply pe           -> process_apply ~implicits:ttenv.tt_implicits pe
+    | Pcut (m, ip, f, t)  -> process_cut ~mode:m engine ttenv (ip, f, t)
+    | Pcutdef (ip, f)     -> process_cutdef ttenv (ip, f)
+    | Pmove pr            -> process_move pr.pr_view pr.pr_rev
+    | Pclear l            -> process_clear l
+    | Prewrite (ri, x)    -> process_rewrite ttenv ?target:x ri
+    | Psubst   ri         -> process_subst ri
+    | Psimplify ri        -> process_simplify ri
+    | Pcbv ri             -> process_cbv ri
+    | Pchange pf          -> process_change pf
+    | Ppose (x, xs, o, p) -> process_pose x xs o p
+    | Pwlog (ids, f)      -> process_wlog ids f
+    | Prwnormal _         -> assert false
   in
     tx tc
+
+(* -------------------------------------------------------------------- *)
+and process_conseqauto cm tc =
+  let delta, tsolve = process_crushmode cm in
+  EcPhlConseq.t_conseqauto ~delta ?tsolve tc
 
 (* -------------------------------------------------------------------- *)
 and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
@@ -172,7 +191,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pwp wp                    -> EcPhlWp.t_wp wp
     | Psp sp                    -> EcPhlSp.t_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
-    | Pcond side                -> EcPhlCond.process_cond side
+    | Pcond side                -> EcPhlHiCond.process_cond side
     | Pwhile (side, info)       -> EcPhlWhile.process_while side info
     | Pasyncwhile info          -> EcPhlWhile.process_async_while info
     | Pfission info             -> EcPhlLoopTx.process_fission info
@@ -182,23 +201,26 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pcall (side, info)        -> EcPhlCall.process_call side info
     | Pswap sw                  -> EcPhlSwap.process_swap sw
     | Pinline info              -> EcPhlInline.process_inline info
+    | Pinterleave info          -> EcPhlSwap.process_interleave info
     | Pcfold info               -> EcPhlCodeTx.process_cfold info
     | Pkill info                -> EcPhlCodeTx.process_kill info
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
+    | Pconseqauto cm            -> process_conseqauto cm
     | Pconseq_aprhl (e,d)       -> EcPhlConseq.process_conseq_aprhl (e, d)
     | Phrex_elim                -> EcPhlExists.t_hr_exists_elim
-    | Phrex_intro fs            -> EcPhlExists.process_exists_intro fs
+    | Phrex_intro (fs, b)       -> EcPhlExists.process_exists_intro ~elim:b fs
+    | Phecall (oside, x)        -> EcPhlExists.process_ecall oside x
     | Pexfalso                  -> EcPhlAuto.t_exfalso
     | Pbydeno (mode, info)      -> EcPhlDeno.process_deno mode info
     | PPr pr                    -> EcPhlPr.process_ppr pr
     | Pfel (pos, info)          -> EcPhlFel.process_fel pos info
     | Phoare                    -> EcPhlBdHoare.t_hoare_bd_hoare
-    | Pbdhoare_split i          -> EcPhlBdHoare.process_bdhoare_split i
+    | Pbdhoare_split i          -> EcPhlHiBdHoare.process_bdhoare_split i
     | Pprbounded                -> EcPhlPr.t_prbounded true
-    | Psim info                 -> EcPhlEqobs.process_eqobs_in info
+    | Psim (cm, info)           -> EcPhlEqobs.process_eqobs_in cm info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
     | Psymmetry                 -> EcPhlSym.t_equiv_sym
     | Peager_seq infos          -> curry3 EcPhlEager.process_seq infos
@@ -210,6 +232,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Peager infos              -> curry EcPhlEager.process_eager infos
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto
+    | Plossless                 -> EcPhlHiAuto.t_lossless
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
     | Paprhl Atoequiv           -> EcPhlAequiv.t_toequiv
     | Paprhl Aofequiv           -> EcPhlAequiv.t_ofequiv
@@ -225,11 +248,10 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
 
   try  tx tc
   with (* PHL Specific low errors *)
-  | EcLowPhlGoal.InvalidSplit (i, lo, hi) ->
+  | EcLowPhlGoal.InvalidSplit cpos1 ->
       tc_error_lazy !!tc (fun fmt ->
-        Format.fprintf fmt
-          "invalid split index: %d is not in the interval [%d..%d]"
-          i lo hi)
+        Format.fprintf fmt "invalid split index: %s"
+          (EcPrinting.string_of_cpos1 cpos1))
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =
@@ -303,6 +325,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Plogic    t           -> `One (process1_logic    ttenv (mk_loc loc t))
     | PPhl      t           -> `One (process1_phl      ttenv (mk_loc loc t))
     | Pby       t           -> `One (process1_by       ttenv t)
+    | Psolve    t           -> `One (process1_solve    ttenv t)
     | Pdo       ((b, n), t) -> `One (process1_do       ttenv (b, n) t)
     | Ptry      t           -> `One (process1_try      ttenv t)
     | Por       (t1, t2)    -> `One (process1_or       ttenv t1 t2)
@@ -311,6 +334,7 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Pprogress (o, t)      -> `One (process1_progress ttenv o t)
     | Pdebug                -> `One (process1_debug    ttenv)
     | Psubgoal  tt          -> `All (process_chain     ttenv tt)
+    | Pnstrict  t           -> `One (process1_nstrict  ttenv t)
   in
   (match tactic with `One t -> t_onall t | `All t -> t) tc
 

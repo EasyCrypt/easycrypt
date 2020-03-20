@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -78,6 +79,9 @@ module ZImpl : EcBigIntCore.TheInterface = struct
     with Failure _ -> raise InvalidString
 
   let pp_print  = (Z.pp_print : Format.formatter -> zint -> unit)
+
+  let to_why3 (x : zint) =
+    Why3.BigInt.of_string (to_string x)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -151,6 +155,9 @@ module BigNumImpl : EcBigIntCore.TheInterface = struct
 
   let pp_print fmt x =
     Format.fprintf fmt "%s" (B.string_of_big_int x)
+
+  let to_why3 (x : zint) =
+    Why3.BigInt.of_string (to_string x)
 end
 
 (* -------------------------------------------------------------------- *)

@@ -107,6 +107,6 @@ seq 1: b p (1%r - p) (1%r - p) p=> //.
 + by rnd; skip=> />; rewrite dbiasedE.
 + by rnd; skip=> />; rewrite dbiasedE.
 + by rnd; skip=> />; rewrite dbiasedE.
-+ by rnd; skip=> /> &hr ->; rewrite dbiasedE.
++ by rnd; skip=> /> &hr _; rewrite dbiasedE.
 smt(in01_p).
 qed.

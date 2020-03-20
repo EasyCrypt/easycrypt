@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -119,3 +120,11 @@ let t_phl_trivial_r tc =
 
 (* -------------------------------------------------------------------- *)
 let t_phl_trivial = FApi.t_low0 "phl-trivial" t_phl_trivial_r
+
+let t_pl_trivial_r ?bases tc =
+  let subtc =
+    FApi.t_seqs [t_phl_trivial; EcLowGoal.t_solve ?bases]
+  in EcLowGoal.t_trivial ~subtc tc
+
+(* -------------------------------------------------------------------- *)
+let t_pl_trivial ?bases = FApi.t_low0 "pl-trivial" (t_pl_trivial_r ?bases)

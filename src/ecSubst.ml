@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -314,13 +315,13 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
         let sty   = init_tparams s tyd.tyd_params params' in
         let dtype =
           { tydt_ctors   = List.map (snd_map (List.map sty.s_ty)) dtype.tydt_ctors;
-            tydt_schelim = Fsubst.f_subst (f_subst_of_subst s) dtype.tydt_schelim;
-            tydt_schcase = Fsubst.f_subst (f_subst_of_subst s) dtype.tydt_schcase; }
+            tydt_schelim = Fsubst.f_subst (f_subst_of_subst sty) dtype.tydt_schelim;
+            tydt_schcase = Fsubst.f_subst (f_subst_of_subst sty) dtype.tydt_schcase; }
         in
           `Datatype dtype
     | `Record (scheme, fields) ->
       let sty = init_tparams s tyd.tyd_params params' in
-        `Record (Fsubst.f_subst (f_subst_of_subst s) scheme,
+        `Record (Fsubst.f_subst (f_subst_of_subst sty) scheme,
                  List.map (snd_map sty.s_ty) fields)
   in
     { tyd_params = params'; tyd_type = body; }
@@ -501,8 +502,13 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
   | Th_addrw (b, ls) ->
       Th_addrw (s.s_p b, List.map s.s_p ls)
 
-  | Th_auto (lc, ps) ->
-      Th_auto (lc, Sp.translate s.s_p ps)
+  | Th_reduction rules ->
+      let rules =
+        List.map (fun (p, opts, _) -> (s.s_p p, opts, None)) rules
+      in Th_reduction rules
+
+  | Th_auto (lc, lvl, base, ps) ->
+      Th_auto (lc, lvl, base, List.map s.s_p ps)
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : _subst) (items : theory) =
@@ -544,8 +550,13 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
   | CTh_addrw (b, ls) ->
       CTh_addrw (s.s_p b, List.map s.s_p ls)
 
-  | CTh_auto (lc, ps) ->
-      CTh_auto (lc, Sp.translate s.s_p ps)
+  | CTh_reduction rules ->
+      let rules =
+        List.map (fun (p, opts, _) -> (s.s_p p, opts, None)) rules
+      in CTh_reduction rules
+
+  | CTh_auto (lc, lvl, base, ps) ->
+      CTh_auto (lc, lvl, base, List.map s.s_p ps)
 
 (* -------------------------------------------------------------------- *)
 and subst_ctheory_struct (s : _subst) (th : ctheory_struct) =

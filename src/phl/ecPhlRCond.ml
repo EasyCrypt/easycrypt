@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -24,7 +25,7 @@ module Low = struct
       | _ ->
           tc_error_lazy pf (fun fmt ->
             Format.fprintf fmt
-              "the %ith instruction is not a conditionnal" at_pos)
+              "the targetted instruction is not a conditionnal")
     in
     let e = form_of_expr m e in
     let e = if b then e else f_not e in

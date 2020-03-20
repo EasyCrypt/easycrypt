@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -24,6 +25,7 @@ val t_hoare_call   : form -> form -> backward
 val t_bdhoare_call : form -> form -> form option -> backward
 val t_equiv_call   : form -> form -> backward
 val t_equiv_call1  : side -> form -> form -> backward
+val t_call         : oside -> form -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_call : oside -> call_info gppterm -> backward

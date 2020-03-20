@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -24,6 +25,7 @@ module Mp   = EcPath.Mp
 module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
 module TC   = EcTypeClass
+module Mint = EcMaps.Mint
 
 (* -------------------------------------------------------------------- *)
 type 'a suspension = {
@@ -126,6 +128,20 @@ type env_norm = {
 }
 
 (* -------------------------------------------------------------------- *)
+type red_topsym = [ `Path of path | `Tuple ]
+
+module Mrd = EcMaps.Map.Make(struct
+  type t = red_topsym
+
+  let compare (p1 : t) (p2 : t) =
+    match p1, p2 with
+    | `Path p1, `Path p2 ->  EcPath.p_compare p1 p2
+    | `Tuple  , `Tuple   ->  0
+    | `Tuple  , `Path _  -> -1
+    | `Path _ , `Tuple   ->  1
+end)
+
+(* -------------------------------------------------------------------- *)
 type preenv = {
   env_top      : EcPath.path option;
   env_gstate   : EcGState.gstate;
@@ -139,7 +155,8 @@ type preenv = {
   env_tci      : ((ty_params * ty) * tcinstance) list;
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
-  env_atbase   : Sp.t;
+  env_atbase   : (path list Mint.t) Msym.t;
+  env_redbase  : mredinfo;
   env_ntbase   : (path * env_notation) list;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : ctheory_item list;     (* in reverse order *)
@@ -158,6 +175,12 @@ and tcinstance = [
   | `Field   of EcDecl.field
   | `General of EcPath.path
 ]
+
+and redinfo =
+  { ri_before_fix : (EcTheory.rule list) Mint.t;
+    ri_after_fix  : (EcTheory.rule list) Mint.t; }
+
+and mredinfo = redinfo Mrd.t
 
 and env_notation = ty_params * EcDecl.notation
 
@@ -242,7 +265,8 @@ let empty gstate =
     env_tci      = [];
     env_tc       = TC.Graph.empty;
     env_rwbase   = Mip.empty;
-    env_atbase   = Sp.empty;
+    env_atbase   = Msym.empty;
+    env_redbase  = Mrd.empty;
     env_ntbase   = [];
     env_modlcs   = Sid.empty;
     env_item     = [];
@@ -1033,7 +1057,8 @@ module MC = struct
       | CTh_baserw x ->
           (add2mc _up_rwbase x (expath x) mc, None)
 
-      | CTh_export _ | CTh_addrw _ | CTh_instance _ | CTh_auto _ ->
+      | CTh_export _ | CTh_addrw _ | CTh_instance _
+      | CTh_auto   _ | CTh_reduction _ ->
           (mc, None)
     in
 
@@ -1342,17 +1367,92 @@ module BaseRw = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Auto = struct
-  let add ~local (ps : Sp.t) (env : env) =
+module Reduction = struct
+  type rule   = EcTheory.rule
+  type topsym = red_topsym
+
+  let empty = { ri_before_fix = Mint.empty; ri_after_fix = Mint.empty }
+
+  let add_rule ((_, rule) : path * rule option) (db : mredinfo) =
+    match rule with None -> db | Some rule ->
+
+    let p =
+      match rule.rl_ptn with
+      | Rule (`Op p , _) -> `Path (fst p)
+      | Rule (`Tuple, _) -> `Tuple
+      | Var _ | Int _ -> assert false in
+
+    Mrd.change (fun rls ->
+      let { ri_before_fix; ri_after_fix } =
+        match rls with
+        | None   -> empty
+        | Some x -> x in
+
+      let m = if rule.rl_prio < 0 then ri_after_fix else ri_before_fix in
+      let m =
+        let change prules = Some (odfl [] prules @ [rule]) in
+        Mint.change change (abs rule.rl_prio) m in
+      let ri_before_fix, ri_after_fix =
+        if rule.rl_prio < 0 then ri_before_fix, m else m, ri_after_fix in
+      Some {ri_before_fix; ri_after_fix}) p db
+
+  let add_rules (rules : (path * rule option) list) (db : mredinfo) =
+    List.fold_left ((^~) add_rule) db rules
+
+  let add (rules : (path * rule_option * rule option) list) (env : env) =
+    let rstrip = List.map (fun (x, _, y) -> (x, y)) rules in
     { env with
-        env_atbase = Sp.union env.env_atbase ps;
-        env_item   = CTh_auto (local, ps) :: env.env_item; }
+        env_redbase = add_rules rstrip env.env_redbase;
+        env_item    = CTh_reduction rules :: env.env_item; }
 
-  let add1 ~local (p : path) (env : env) =
-    add ~local (Sp.singleton p) env
+  let add1 (prule : path * rule_option * rule option) (env : env) =
+    add [prule] env
 
-  let get (env : env) =
-    env.env_atbase
+  let get (p : topsym) (env : env) =
+    Mrd.find_opt p env.env_redbase
+    |> odfl empty
+end
+
+(* -------------------------------------------------------------------- *)
+module Auto = struct
+  let dname : symbol = ""
+
+  let updatedb ~level ?base (ps : path list) (db : (path list Mint.t) Msym.t) =
+    let nbase = (odfl dname base) in
+    let ps' = Msym.find_def Mint.empty nbase db in
+    let ps' =
+      let doit x = Some (ofold (fun x ps -> ps @ x) ps x) in
+      Mint.change doit level ps' in
+    Msym.add nbase ps' db
+
+  let add ~local ~level ?base (ps : path list) (env : env) =
+    { env with
+        env_atbase = updatedb ?base ~level ps env.env_atbase;
+        env_item   = CTh_auto (local, level, base, ps) :: env.env_item; }
+
+  let add1 ~local ~level ?base (p : path) (env : env) =
+    add ~local ?base ~level [p] env
+
+  let get_core ?base (env : env) =
+    Msym.find_def Mint.empty (odfl dname base) env.env_atbase
+
+  let flatten_db (db : path list Mint.t) =
+    Mint.fold_left (fun ps _ ps' -> ps @ ps') [] db
+
+  let get ?base (env : env) =
+    flatten_db (get_core ?base env)
+
+  let getall (bases : symbol list) (env : env) =
+    let dbs = List.map (fun base -> get_core ~base env) bases in
+    let dbs =
+      List.fold_left (fun db mi ->
+        Mint.union (fun _ sp1 sp2 -> Some (sp1 @ sp2)) db mi)
+        Mint.empty dbs
+    in flatten_db dbs
+
+  let getx (base : symbol) (env : env) =
+    let db = Msym.find_def Mint.empty base env.env_atbase in
+    Mint.bindings db
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1399,6 +1499,12 @@ module Ty = struct
     match ty.ty_node with
     | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
     | _ -> ty
+
+  let rec decompose_fun (ty : ty) (env : env) : dom * ty =
+    match (hnorm ty env).ty_node with
+    | Tfun (ty1, ty2) ->
+        fst_map (fun tys -> ty1 :: tys) (decompose_fun ty2 env)
+    | _ -> ([], ty)
 
   let signature env =
     let rec doit acc ty =
@@ -2354,6 +2460,12 @@ module NormMp = struct
     EcTypes.pv_equal (norm_pvar env pv1) (norm_pvar env pv2)
 end
 
+let rec ty_hnorm (ty : ty) (env : env) =
+    match ty.ty_node with
+    | Tconstr (p, tys) when Ty.defined p env -> ty_hnorm (Ty.unfold p tys env) env
+    | Tglob p -> NormMp.norm_tglob env p
+    | _ -> ty
+
 (* -------------------------------------------------------------------- *)
 module ModTy = struct
   type t = module_sig
@@ -2443,6 +2555,7 @@ module ModTy = struct
     { mis_params = params;
       mis_body   = List.map do1 items }
 end
+
 
 (* -------------------------------------------------------------------- *)
 module Op = struct
@@ -2588,6 +2701,7 @@ module Ax = struct
     fst (lookup name env)
 
   let bind name ax env =
+    let ax = NormMp.norm_ax env ax in
     let env = MC.bind_axiom name ax env in
     { env with env_item = CTh_axiom (name, ax) :: env.env_item }
 
@@ -2671,6 +2785,7 @@ module Theory = struct
     | Th_instance  (ty, cr) -> CTh_instance  (ty, cr)
     | Th_baserw    x        -> CTh_baserw x
     | Th_addrw     (b, l)   -> CTh_addrw     (b, l)
+    | Th_reduction rule     -> CTh_reduction rule
     | Th_auto      ps       -> CTh_auto      ps
 
     | Th_theory (x, (th, md)) ->
@@ -2787,9 +2902,9 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let bind_at_cth =
-    let for1 _path base = function
-      | CTh_auto (false, ps) ->
-         Some (Sp.union base ps)
+    let for1 _path db = function
+      | CTh_auto (false, level, base, ps) ->
+         Some (Auto.updatedb ?base ~level ps db)
       | _ -> None
 
     in bind_base_cth for1
@@ -2804,6 +2919,16 @@ module Theory = struct
     in bind_base_cth for1
 
   (* ------------------------------------------------------------------ *)
+  let bind_rd_cth =
+    let for1 _path db = function
+      | CTh_reduction rules ->
+         let rules = List.map (fun (x, _, y) -> (x, y)) rules in
+         Some (Reduction.add_rules rules db)
+      | _ -> None
+
+    in bind_base_cth for1
+
+  (* ------------------------------------------------------------------ *)
   let bind ?(mode = `Concrete) name cth env =
     let th = (cth, mode) in
 
@@ -2812,13 +2937,14 @@ module Theory = struct
 
     match mode with
     | `Concrete ->
-        let thname     = EcPath.pqname (root env) name in
-        let env_tci    = bind_instance_cth thname env.env_tci cth in
-        let env_tc     = bind_tc_cth thname env.env_tc cth in
-        let env_rwbase = bind_br_cth thname env.env_rwbase cth in
-        let env_atbase = bind_at_cth thname env.env_atbase cth in
-        let env_ntbase = bind_nt_cth thname env.env_ntbase cth in
-        { env with env_tci; env_tc; env_rwbase; env_atbase; env_ntbase; }
+        let thname      = EcPath.pqname (root env) name in
+        let env_tci     = bind_instance_cth thname env.env_tci cth in
+        let env_tc      = bind_tc_cth thname env.env_tc cth in
+        let env_rwbase  = bind_br_cth thname env.env_rwbase cth in
+        let env_atbase  = bind_at_cth thname env.env_atbase cth in
+        let env_ntbase  = bind_nt_cth thname env.env_ntbase cth in
+        let env_redbase = bind_rd_cth thname env.env_redbase cth in
+        { env with env_tci; env_tc; env_rwbase; env_atbase; env_ntbase; env_redbase; }
 
     | `Abstract ->
         env
@@ -2866,7 +2992,7 @@ module Theory = struct
         | CTh_baserw x ->
             MC.import_rwbase (xpath x) env
 
-        | CTh_addrw _ | CTh_instance _ | CTh_auto _ ->
+        | CTh_addrw _ | CTh_instance _ | CTh_auto _ | CTh_reduction _ ->
             env
 
       in
@@ -2920,9 +3046,9 @@ module Theory = struct
           let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
           if List.is_empty ps then None else Some (CTh_addrw (p, ps))
 
-      | CTh_auto (lc, ps) ->
-          let ps = Sp.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
-          if Sp.is_empty ps then None else Some (CTh_auto (lc, ps))
+      | CTh_auto (lc, lvl, base, ps) ->
+          let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
+          if List.is_empty ps then None else Some (CTh_auto (lc, lvl, base, ps))
 
       | (CTh_export p) as item ->
           if Sp.mem p cleared then None else Some item
@@ -2978,12 +3104,17 @@ module Theory = struct
 
     let env = { env with env_current = current; env_comps = comps; } in
 
-    { env with
-        env_tci    = bind_instance_cth thpath env.env_tci cth;
-        env_tc     = bind_tc_cth thpath env.env_tc cth;
-        env_rwbase = bind_br_cth thpath env.env_rwbase cth;
-        env_atbase = bind_at_cth thpath env.env_atbase cth;
-        env_ntbase = bind_nt_cth thpath env.env_ntbase cth; }
+    match mode with
+    | `Abstract -> env
+
+    | `Concrete ->
+      { env with
+          env_tci     = bind_instance_cth thpath env.env_tci cth;
+          env_tc      = bind_tc_cth thpath env.env_tc cth;
+          env_rwbase  = bind_br_cth thpath env.env_rwbase cth;
+          env_atbase  = bind_at_cth thpath env.env_atbase cth;
+          env_ntbase  = bind_nt_cth thpath env.env_ntbase cth;
+          env_redbase = bind_rd_cth thpath env.env_redbase cth; }
 end
 
 (* -------------------------------------------------------------------- *)

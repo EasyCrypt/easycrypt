@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -80,6 +81,7 @@ val pamemory  : EcMemory.memory -> pt_arg
 val pamodule  : EcPath.mpath * EcModules.module_sig -> pt_arg
 val paglobal  : EcPath.path -> ty list -> pt_arg
 val palocal   : EcIdent.t -> pt_arg
+val pahandle  : handle -> pt_arg
 
 (* -------------------------------------------------------------------- *)
 (* EasyCrypt rewrite proof-term:                                        *)
@@ -137,6 +139,7 @@ type validation =
 | VLConv   of (handle * ident)       (* hypothesis conversion *)
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
+| VShuffle of ident list             (* goal shuffling *)
 
   (* external (hl/phl/prhl/...) proof-node *)
 | VExtern  : 'a * handle list -> validation
@@ -344,12 +347,14 @@ module FApi : sig
   val t_try_base : backward -> tcenv1 -> [`Failure of exn | `Success of tcenv]
 
   val t_try    : backward -> backward
+  val t_xswitch: ?on:[`All|`Focus] -> (tcenv1 -> tcenv * backward) -> iffail:backward -> backward
   val t_switch : ?on:[`All|`Focus] -> backward -> ifok:backward -> iffail:backward -> backward
   val t_do_r   : ?focus:int -> [`All | `Maybe] -> int option -> backward -> tcenv -> tcenv
   val t_do     : [`All | `Maybe] -> int option -> backward -> backward
   val t_repeat : backward -> backward
 
   val t_or       : backward -> backward -> backward
+  val t_or_map   : (tcenv1 -> 'a * tcenv) list -> tcenv1 -> 'a * tcenv
   val t_ors_pmap : ('a -> backward option) -> 'a list -> backward
   val t_ors_map  : ('a -> backward) -> 'a list -> backward
   val t_ors      : backward list -> backward

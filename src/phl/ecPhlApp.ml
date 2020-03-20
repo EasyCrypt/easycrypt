@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -103,7 +104,7 @@ let t_bdhoare_app_r i info tc =
   let tactic tc =
     let hs  = tc1_as_hoareS tc in
     let tt1 = EcPhlConseq.t_hoareS_conseq_nm hs.hs_pr f_true in
-    let tt2 = EcHiGoal.process_trivial in
+    let tt2 = EcPhlAuto.t_pl_trivial in
     FApi.t_seqs [tt1; tt2; t_fail] tc
   in
 
@@ -133,8 +134,8 @@ let t_equiv_app_onesided side i pre post tc =
   in
   let ij =
     match side with
-    | `Left  -> (i, List.length s'. s_node)
-    | `Right -> (List.length s'. s_node, i) in
+    | `Left  -> (i, Zpr.cpos (List.length s'. s_node))
+    | `Right -> (Zpr.cpos (List.length s'. s_node), i) in
   let _s1, s2 = s_split i s in
 
   let modi = EcPV.s_write env (EcModules.stmt s2) in

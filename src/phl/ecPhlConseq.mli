@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -50,3 +51,6 @@ val process_conseq_opt :
 
 (* -------------------------------------------------------------------- *)
 val process_conseq_aprhl : pformula pair -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_conseqauto : ?delta:bool -> ?tsolve:FApi.backward -> FApi.backward

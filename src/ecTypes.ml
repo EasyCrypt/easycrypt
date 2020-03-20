@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -153,6 +154,17 @@ let rec tyfun_flat (ty : ty) =
       let dom, codom = tyfun_flat t2 in (t1 :: dom, codom)
   | _ ->
       ([], ty)
+
+(* -------------------------------------------------------------------- *)
+let as_tdistr (ty : ty) =
+  match ty.ty_node with
+  | Tconstr (p, [sty])
+      when EcPath.p_equal p EcCoreLib.CI_Distr.p_distr
+    -> Some sty
+
+  | _ -> None
+
+let is_tdistr (ty : ty) = as_tdistr ty <> None
 
 (* -------------------------------------------------------------------- *)
 module TySmart = struct
@@ -642,6 +654,11 @@ let e_if    = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
 let e_match = fun e es ty -> mk_expr (Ematch (e, es, ty)) ty
 let e_proj  = fun e i ty -> mk_expr (Eproj(e,i)) ty
 
+let e_proj_simpl e i ty =
+  match e.e_node with
+  | Etuple es -> List.nth es i
+  | _ -> e_proj e i ty
+
 let e_quantif q b e =
   if List.is_empty b then e else
 
@@ -667,6 +684,45 @@ let e_app x args ty =
     match x.e_node with
     | Eapp(x', args') -> mk_expr (Eapp (x', (args'@args))) ty
     | _ -> mk_expr (Eapp (x, args)) ty
+
+let e_app_op ?(tyargs=[]) op args ty =
+  e_app (e_op op tyargs (toarrow (List.map e_ty args) ty)) args ty
+
+(* -------------------------------------------------------------------- *)
+module Reals : sig
+  val of_lit : EcBigInt.zint -> expr
+  val of_int : expr -> expr
+  val add    : expr -> expr -> expr
+  val opp    : expr -> expr
+  val sub    : expr -> expr -> expr
+  val mul    : expr -> expr -> expr
+  val inv    : expr -> expr
+  val div    : expr -> expr -> expr
+end = struct
+  module CIR = EcCoreLib.CI_Real
+
+  let of_int f = e_app_op CIR.p_real_of_int [f] treal
+  let of_lit n = of_int (e_int n)
+
+  let add f1 f2 = e_app_op CIR.p_real_add [f1; f2] treal
+  let opp f     = e_app_op CIR.p_real_opp [f] treal
+  let sub f1 f2 = add f1 (opp f2)
+  let mul f1 f2 = e_app_op CIR.p_real_mul [f1; f2] treal
+  let inv f     = e_app_op CIR.p_real_inv [f] treal
+  let div f1 f2 = mul f1 (inv f2)
+end
+
+(* -------------------------------------------------------------------- *)
+let e_decimal (n, (l, f)) =
+  let nv = Reals.of_lit n in
+
+  if EcBigInt.equal f EcBigInt.zero then nv else
+
+  let f = Reals.of_lit f in
+  let u = Reals.of_lit (EcBigInt.pow (EcBigInt.of_int 10) l) in
+  let d = Reals.div f u in
+
+  if EcBigInt.equal n EcBigInt.zero then d else Reals.add nv d
 
 (* -------------------------------------------------------------------- *)
 module ExprSmart = struct

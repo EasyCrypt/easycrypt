@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -28,16 +29,18 @@ type lazyred = EcProofTyping.lazyred
 (* -------------------------------------------------------------------- *)
 val (@!) : FApi.backward -> FApi.backward -> FApi.backward
 val (@+) : FApi.backward -> FApi.backward list -> FApi.backward
+val (@>) : FApi.backward -> FApi.backward -> FApi.backward
 
 val (@~)  : FApi.backward -> FApi.tactical -> FApi.backward
 val (@!+) : FApi.tactical -> FApi.backward -> FApi.tactical
 val (@~+) : FApi.tactical -> FApi.backward list -> FApi.tactical
 
-val t_admit : FApi.backward
-val t_true  : FApi.backward
-val t_fail  : FApi.backward
-val t_id    : FApi.backward
-val t_close : ?who:string -> FApi.backward -> FApi.backward
+val t_admit   : FApi.backward
+val t_true    : FApi.backward
+val t_fail    : FApi.backward
+val t_id      : FApi.backward
+val t_close   : ?who:string -> FApi.backward -> FApi.backward
+val t_shuffle : EcIdent.t list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val alpha_find_in_hyps : EcEnv.LDecl.hyps -> EcFol.form -> EcIdent.t
@@ -47,15 +50,25 @@ val t_logic_trivial    : FApi.backward
 val t_trivial          : ?subtc:FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_simplify :
-     ?target:ident -> ?delta:bool -> ?logic:rlogic_info
-  -> FApi.backward
+type simplify_t =
+  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
 
-val t_simplify_with_info :
+type simplify_with_info_t =
   ?target:ident -> reduction_info -> FApi.backward
 
+type smode = [ `Cbv | `Cbn ]
+
+val t_cbv : simplify_t
+val t_cbn : simplify_t
+
+val t_cbv_with_info : simplify_with_info_t
+val t_cbn_with_info : simplify_with_info_t
+
+val t_simplify : ?mode:smode -> simplify_t
+val t_simplify_with_info : ?mode:smode -> simplify_with_info_t
+
 (* -------------------------------------------------------------------- *)
-val t_change : ?target:ident -> form -> tcenv1 -> tcenv1
+val t_change : ?redinfo: reduction_info -> ?target:ident -> form -> tcenv1 -> tcenv1
 
 (* -------------------------------------------------------------------- *)
 val t_reflex       : ?reduce:lazyred -> FApi.backward
@@ -156,6 +169,7 @@ val t_elim          : ?reduce:lazyred -> FApi.backward
 val t_elim_hyp      : EcIdent.t -> FApi.backward
 val t_elim_prind    : ?reduce:lazyred -> [ `Case | `Ind ] -> FApi.backward
 val t_elim_iso_and  : ?reduce:lazyred -> tcenv1 -> int * tcenv
+val t_elim_iso_or   : ?reduce:lazyred -> tcenv1 -> int list * tcenv
 
 (* Elimination using an custom elimination principle. *)
 val t_elimT_form : proofterm -> ?sk:int -> form -> FApi.backward
@@ -193,11 +207,11 @@ type rwspec = [`LtoR|`RtoL] * ptnpos option
 type rwmode = [`Bool | `Eq]
 
 val t_rewrite :
-     ?xconv:xconv -> ?target:ident -> ?mode:rwmode
+     ?xconv:xconv -> ?keyed:bool -> ?target:ident -> ?mode:rwmode -> ?donot:bool
   -> proofterm -> rwspec -> FApi.backward
 
 val t_rewrite_hyp :
-     ?xconv:xconv -> ?mode:rwmode -> EcIdent.t
+     ?xconv:xconv -> ?mode:rwmode -> ?donot:bool -> EcIdent.t
   -> rwspec -> FApi.backward
 
 type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
@@ -240,17 +254,20 @@ type genclear = [`Clear | `TryClear | `NoClear]
 val t_generalize_hyps_x :
      ?missing:bool
   -> ?naming:(ident -> symbol option)
+  -> ?letin:bool
   -> (genclear * EcIdent.t) list
   -> FApi.backward
 
 val t_generalize_hyps :
      ?clear:[`Yes|`No|`Try] -> ?missing:bool
   -> ?naming:(ident -> symbol option)
+  -> ?letin:bool
   -> EcIdent.t list -> FApi.backward
 
 val t_generalize_hyp  :
      ?clear:[`Yes|`No|`Try] -> ?missing:bool
   -> ?naming:(ident -> symbol option)
+  -> ?letin:bool
   -> EcIdent.t -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
@@ -284,7 +301,9 @@ val t_progress :
      ?ti:(EcIdent.t -> EcCoreGoal.FApi.backward) ->
      FApi.backward -> FApi.backward
 
-val t_crush : ?delta:bool -> FApi.backward
+(* -------------------------------------------------------------------- *)
+val t_crush     : ?delta:bool -> ?tsolve:FApi.backward -> FApi.backward
+val t_crush_fwd : ?delta:bool -> int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_congr : form pair -> form pair list * ty -> FApi.backward
@@ -293,3 +312,6 @@ val t_congr : form pair -> form pair list * ty -> FApi.backward
 type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
 
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_solve : ?canfail:bool -> ?bases:symbol list -> ?depth:int -> FApi.backward

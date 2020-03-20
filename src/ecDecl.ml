@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -99,7 +100,7 @@ and opfix = {
 
 and opbranches =
 | OPB_Leaf   of ((EcIdent.t * EcTypes.ty) list) list * EcTypes.expr
-| OPB_Branch of opbranch Parray.t
+| OPB_Branch of opbranch Parray.parray
 
 and opbranch = {
   opb_ctor : EcPath.path * int;
@@ -256,7 +257,7 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
 
   let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
   let tyargs = List.map (EcTypes.tvar |- fst) axpm in
-  let op     = f_op path tyargs axbd.EcCoreFol.f_ty in
+  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcCoreFol.f_ty) in
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 

@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -28,7 +29,7 @@ lemma nosmt allperms_rP n (s t : 'a list) : size s = size n =>
   (mem (allperms_r n s) t) <=> (perm_eq s t).
 proof.
 elim: n s t => [s t /size_eq0 ->|_ n ih s t] //=; rewrite ?ap_r /=.
-  split=> [->|]; first by apply/perm_eq_refl.
+  split => [->|]; first by apply/perm_eq_refl.
   by move/perm_eq_sym; apply/perm_eq_small.
 case: s=> [|x s]; first by rewrite addz_neq0 ?size_ge0.
 (pose s' := undup _)=> /=; move/addrI=> eq_sz; split.
@@ -97,9 +98,7 @@ rewrite size_map /= mulrDl /= addrC; congr.
 have: forall y, mem s y => F y = size (allperms_r n s).
   move=> y sy @/F @/(\o); rewrite size_map; case: (x = y)=> //.
   move=> ne_xy; rewrite !ih //= ?size_rem //.
-    by rewrite addrCA.
     by rewrite rem_uniq //=; apply/negP=> /mem_rem.
-  by rewrite addrC -addrA.
 move/eq_in_map=> ->; rewrite big_map predT_comp /(\o) /=.
 by rewrite sumr_const intmulz count_predT mulrC.
 qed.

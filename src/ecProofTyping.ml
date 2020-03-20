@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -17,6 +18,7 @@ module Msym = EcSymbols.Msym
 
 (* -------------------------------------------------------------------- *)
 type ptnenv = ty Mid.t * EcUnify.unienv
+type metavs = EcFol.form EcSymbols.Msym.t
 
 (* ------------------------------------------------------------------ *)
 let unienv_of_hyps hyps =
@@ -24,21 +26,21 @@ let unienv_of_hyps hyps =
    EcUnify.UniEnv.create (Some tv)
 
 (* ------------------------------------------------------------------ *)
-let process_form_opt hyps pf oty =
+let process_form_opt ?mv hyps pf oty =
   try
     let ue  = unienv_of_hyps hyps in
-    let ff  = EcTyping.trans_form_opt (LDecl.toenv hyps) ue pf oty in
+    let ff  = EcTyping.trans_form_opt ?mv (LDecl.toenv hyps) ue pf oty in
     EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
 
   with EcUnify.UninstanciateUni ->
     EcTyping.tyerror pf.EcLocation.pl_loc
       (LDecl.toenv hyps) EcTyping.FreeTypeVariables
 
-let process_form hyps pf ty =
-  process_form_opt hyps pf (Some ty)
+let process_form ?mv hyps pf ty =
+  process_form_opt ?mv hyps pf (Some ty)
 
-let process_formula hyps pf =
-  process_form hyps pf tbool
+let process_formula ?mv hyps pf =
+  process_form hyps ?mv pf tbool
 
 let process_exp hyps mode oty e =
   let env = LDecl.toenv hyps in
@@ -49,18 +51,18 @@ let process_exp hyps mode oty e =
 let process_pattern hyps fp =
   let ps = ref Mid.empty in
   let ue = unienv_of_hyps hyps in
-  let fp = EcTyping.trans_pattern (LDecl.toenv hyps) (ps, ue) fp in
+  let fp = EcTyping.trans_pattern (LDecl.toenv hyps) ps ue fp in
   ((!ps, ue), fp)
 
 (* ------------------------------------------------------------------ *)
-let pf_process_form_opt pe hyps oty pf =
-  Exn.recast_pe pe hyps (fun () -> process_form_opt hyps pf oty)
+let pf_process_form_opt pe ?mv hyps oty pf =
+  Exn.recast_pe pe hyps (fun () -> process_form_opt ?mv hyps pf oty)
 
-let pf_process_form pe hyps ty pf =
-  Exn.recast_pe pe hyps (fun () -> process_form hyps pf ty)
+let pf_process_form pe ?mv hyps ty pf =
+  Exn.recast_pe pe hyps (fun () -> process_form ?mv hyps pf ty)
 
-let pf_process_formula pe hyps pf =
-  Exn.recast_pe pe hyps (fun () -> process_formula hyps pf)
+let pf_process_formula pe ?mv hyps pf =
+  Exn.recast_pe pe hyps (fun () -> process_formula ?mv hyps pf)
 
 let pf_process_exp pe hyps mode oty e =
   Exn.recast_pe pe hyps (fun () -> process_exp hyps mode oty e)
@@ -69,14 +71,14 @@ let pf_process_pattern pe hyps fp =
   Exn.recast_pe pe hyps (fun () -> process_pattern hyps fp)
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_form_opt tc oty pf =
-  Exn.recast_tc1 tc (fun hyps -> process_form_opt hyps pf oty)
+let tc1_process_form_opt ?mv tc oty pf =
+  Exn.recast_tc1 tc (fun hyps -> process_form_opt ?mv hyps pf oty)
 
-let tc1_process_form tc ty pf =
-  Exn.recast_tc1 tc (fun hyps -> process_form hyps pf ty)
+let tc1_process_form ?mv tc ty pf =
+  Exn.recast_tc1 tc (fun hyps -> process_form ?mv hyps pf ty)
 
-let tc1_process_formula tc pf =
-  Exn.recast_tc1 tc (fun hyps -> process_formula hyps pf)
+let tc1_process_formula ?mv tc pf =
+  Exn.recast_tc1 tc (fun hyps -> process_formula ?mv hyps pf)
 
 let tc1_process_exp tc mode oty e =
   Exn.recast_tc1 tc (fun hyps -> process_exp hyps mode oty e)
@@ -87,14 +89,15 @@ let tc1_process_pattern tc fp =
 (* ------------------------------------------------------------------ *)
 let tc1_process_prhl_form_opt tc oty pf =
   let hyps, concl = FApi.tc1_flat tc in
-  let ml, mr =
+  let ml, mr, (pr, po) =
     match concl.f_node with
-    | FequivS es -> (es.es_ml, es.es_mr)
+    | FequivS es -> (es.es_ml, es.es_mr, (es.es_pr, es.es_po))
     | _ -> assert false
   in
 
   let hyps = LDecl.push_all [ml; mr] hyps in
-  pf_process_form_opt !!tc hyps oty pf
+  let mv = Msym.of_list [("pre", pr); ("post", po)] in
+  pf_process_form_opt ~mv !!tc hyps oty pf
 
 let tc1_process_prhl_form tc ty pf = tc1_process_prhl_form_opt tc (Some ty) pf
 
@@ -148,21 +151,23 @@ let tc1_process_Xhl_exp tc side ty e =
 let tc1_process_Xhl_form ?side tc ty pf =
   let hyps, concl = FApi.tc1_flat tc in
 
-  let memory =
+  let memory, mv =
     match concl.f_node, side with
-    | FhoareS   hs , None        -> hs.hs_m
-    | FahoareS  ahs, None        -> ahs.ahs_m
-    | FbdHoareS hs , None        -> hs.bhs_m
-    | FequivS   es , Some `Left  -> (mhr, snd es.es_ml)
-    | FequivS   es , Some `Right -> (mhr, snd es.es_mr)
-    | FaequivS  aes, Some `Left  -> (mhr, snd aes.aes_ml)
-    | FaequivS  aes, Some `Right -> (mhr, snd aes.aes_mr)
+    | FhoareS   hs, None         -> (hs.hs_m , Some (hs.hs_pr , hs.hs_po ))
+    | FbdHoareS hs, None         -> (hs.bhs_m, Some (hs.bhs_pr, hs.bhs_po))
+    | FequivS   es, Some `Left   -> ((mhr, snd es.es_ml), None)
+    | FequivS   es, Some `Right  -> ((mhr, snd es.es_mr), None)
+    | FaequivS  aes, Some `Left  -> ((mhr, snd aes.aes_ml), None)
+    | FaequivS  aes, Some `Right -> ((mhr, snd aes.aes_mr), None)
 
     | _, _ -> raise (DestrError "destr_programS")
   in
 
   let hyps = LDecl.push_active memory hyps in
-  pf_process_form !!tc hyps ty pf
+  let mv = mv |> omap
+   (fun (pr, po) -> Msym.of_list [("pre", pr); ("post", po)]) in
+
+  pf_process_form ?mv !!tc hyps ty pf
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_formula ?side tc pf =

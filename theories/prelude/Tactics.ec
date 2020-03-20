@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -94,3 +95,10 @@ lemma nosmt if_congr ['a] (e e' : bool) (c1 c2 c1' c2': 'a) :
      e = e' => c1 = c1' => c2 = c2'
   => (if e then c1 else c2) = (if e' then c1' else c2')
 by [].
+
+lemma nosmt eq_ind ['a] x y (f:'a -> bool) : x = y => f x => f y by [].
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt and3_s1 b1 b2 b3 : b1 => b2 && b3 => b1 && b2 && b3 by [].
+lemma nosmt and3_s2 b1 b2 b3 : b2 => b1 && b3 => b1 && b2 && b3 by [].
+lemma nosmt and3_s3 b1 b2 b3 : b3 => b1 && b2 => b1 && b2 && b3 by [].

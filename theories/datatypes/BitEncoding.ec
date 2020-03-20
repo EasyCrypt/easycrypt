@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -122,8 +123,8 @@ op chunk r (bs : 'a list) =
 
 lemma nosmt chunk_le0 r (s : 'a list) : r <= 0 => chunk r s = [].
 proof.
-move/ler_eqVlt=> [->|gt0_r] @/chunk; 1: by rewrite divz0 mkseq0.
-rewrite /chunk mkseq0_le // -opprK divzN oppr_le0.
+move/ler_eqVlt=> [->|gt0_r] @/chunk; 1: by rewrite mkseq0.
+rewrite /chunk mkseq0_le // -oppr_ge0 -divzN.
 by rewrite divz_ge0 ?size_ge0 oppr_gt0.
 qed.
 
@@ -152,7 +153,7 @@ case: (i < n) => [lt_in|/lerNgt le_ni]; 2: rewrite ih ?subr_ge0 //.
 + by move=> x bx; have := eqz x; apply; rewrite /= bx.
 rewrite -mulN1r modzMDr; congr.
 case: (n = 0)=> [^zn ->/=|nz_n]; 2: by rewrite divzMDr 1?addrC.
-rewrite divz0 /= eq_sym nth_neg ?oppr_lt0 // => {ih}; move: eqz.
+rewrite eq_sym nth_neg ?oppr_lt0 // => {ih}; move: eqz.
 by case: bs => // c bs /(_ c) /=; rewrite zn size_eq0 => ->.
 qed.
 
@@ -183,7 +184,8 @@ proof.
 move=> gt0_r; rewrite size_flatten sumzE big_map.
 pose F := fun (x : 'a list) => r; rewrite predT_comp /(\o) /= big_seq.
 rewrite (@eq_bigr _ _ F) /F /=; first by move=> i; apply/in_chunk_size.
-by rewrite -big_seq big_constz count_predT size_chunk // mulrC.
+rewrite -(@big_seq _ (chunk r bs)) big_constz count_predT.
+by rewrite size_chunk // mulrC.
 qed.
 
 lemma chunkK r (bs : 'a list) : 0 < r =>
@@ -194,7 +196,7 @@ move=> gt0_r dvd_d_bs; apply/(eq_from_nth witness)=> [|i].
 rewrite size_flatten_chunk ?divzK // => -[ge0_i lt_ibs].
 rewrite (@nth_flatten witness r); 1: apply/allP=> s.
 by move/(@in_chunk_size _ _ _ gt0_r).
-rewrite nth_mkseq /= 1:divz_ge0 ?ge0_i ?ltz_divRL ?gt0_r //.
+rewrite nth_mkseq /= 1:divz_ge0 ?ge0_i ?ltz_divRL ?gt0_r //=.
   by apply/(@ler_lt_trans i)=> //; rewrite lez_floor gtr_eqF ?gt0_r.
 rewrite nth_take ?ltz_pmod 1:ltrW ?gt0_r nth_drop; last 2 first.
   by rewrite modz_ge0 ?gtr_eqF ?gt0_r. by rewrite (@mulrC r) -divz_eq.

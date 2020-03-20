@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -17,6 +18,8 @@ module Map = struct
 
     val odup : ('a -> key) -> 'a list -> ('a * 'a) option
     val to_stream : 'a t -> (key * 'a) Stream.t
+
+    val find_map : (key -> 'a -> 'b option) -> 'a t -> 'b option
   end
 
   module Make(O : OrderedType) : S with type key = O.t = struct
@@ -44,6 +47,16 @@ module Map = struct
               aout
       in
         Stream.from next
+
+    let find_map (type b) (f:key -> 'a -> b option) (m: 'a t) =
+      let module E = struct exception Found of b option end in
+      let f k a =
+        let r = f k a in
+        if r <> None then raise (E.Found r) in
+      try iter f m; None
+      with E.Found r -> r
+
+
   end
 
   module MakeBase(M : S) : Why3.Extmap.S
@@ -95,7 +108,7 @@ module EHashtbl = struct
     val memo_rec : int -> ((key -> 'a) -> key -> 'a) -> key -> 'a
   end
 
-  module Make(T : Why3.Stdlib.OrderedHashedType) = struct
+  module Make(T : Why3.Wstdlib.OrderedHashedType) = struct
     include Why3.Exthtbl.Make(T)
 
     let memo_rec size f =
@@ -107,12 +120,12 @@ module EHashtbl = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module MakeMSH (X : Why3.Stdlib.TaggedType) : sig
+module MakeMSH (X : Why3.Wstdlib.TaggedType) : sig
   module M : Map.S with type key = X.t
   module S : Set.S with module M = Map.MakeBase(M)
   module H : EHashtbl.S with type key = X.t
 end = struct
-  module T = Why3.Stdlib.OrderedHashed(X)
+  module T = Why3.Wstdlib.OrderedHashed(X)
   module M = Map.Make(T)
   module S = Set.MakeOfMap(M)
   module H = EHashtbl.Make(T)

@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -17,3 +18,6 @@ val t_equiv_swap   : side -> int -> int -> int -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_swap : (oside * swap_kind) located list -> backward
+
+(* -------------------------------------------------------------------- *)
+val process_interleave : interleave_info located -> backward

@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -21,6 +22,8 @@ open EcCoreGoal.FApi
  * soundness of the bounded hoare logic.
  *)
 
-val wp : ?uselet:bool -> ?onesided:bool -> env -> memory -> stmt -> form -> instr list * form
+val wp :
+      ?uselet:bool -> ?onesided:bool
+   -> env -> memory -> stmt -> form -> instr list * form
 
-val t_wp : ?uselet:bool -> (int doption) option -> backward
+val t_wp : ?uselet:bool -> (codepos1 doption) option -> backward

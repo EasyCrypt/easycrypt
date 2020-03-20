@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -38,7 +39,7 @@ type prover_infos = {
   pr_provers   : string list;
   pr_timelimit : int;
   pr_cpufactor : int;
-  pr_wrapper   : string option;
+  pr_quorum    : int;
   pr_verbose   : int;
   pr_all       : bool;
   pr_max       : int;

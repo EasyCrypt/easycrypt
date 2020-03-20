@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -339,9 +340,30 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt big_reindex (P : 'a -> bool) (F : 'a -> t) (f f' : 'a -> 'a) s:
+lemma bigU ['a] (P Q : 'a -> bool) F s : (forall x, !(P x /\ Q x)) =>
+  big (predU P Q) F s = big P F s + big Q F s.
+proof.
+move=> dj_PQ; rewrite (@bigID (predU _ _) _ P).
+by congr; apply: eq_bigl => /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma bigEM ['a] (P : 'a -> bool) (F : 'a -> t) s :
+  big predT F s = big P F s + big (predC P) F s.
+proof. by rewrite -bigU 1:/#; apply: eq_bigl => /#. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_reindex ['a 'b]
+  (P : 'a -> bool) (F : 'a -> t) (f : 'b -> 'a) (f' : 'a -> 'b) s
+:
   cancel f' f => big P F s = big (P \o f) (F \o f) (map f' s).
 proof. by move=> bij_ff'; rewrite -big_map -map_comp id_map. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_pair_pswap ['a 'b] p f s :
+    big<:'a * 'b> p f s
+  = big<:'b * 'a> (p \o pswap) (f \o pswap) (map pswap s).
+proof. by apply/big_reindex; case. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt eq_big_seq (F1 F2 : 'a -> t) s:
@@ -379,11 +401,51 @@ lemma big1_seq (P : 'a -> bool) F s:
 proof. by move=> eqF1; rewrite big_seq_cond big_andbC big1. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma big_eq_idm_filter ['a] (P : 'a -> bool) (F : 'a -> t) s :
+  (forall (x : 'a), !P x => F x = idm) => big predT F s = big P F s.
+proof.
+by move=> eq1; rewrite (@bigEM P) (@big1 (predC _)) // addm0.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma big_flatten (P : 'a -> bool) F rr :
   big P F (flatten rr) = big predT (fun s => big P F s) rr.
 proof.
 elim: rr => /= [|r rr ih]; first by rewrite big_nil.
 by rewrite flatten_cons big_cat big_cons -ih.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_pair ['a 'b] F (s : ('a * 'b) list) : uniq s =>
+  big predT F s =
+    big predT (fun a =>
+        big predT F (filter (fun xy : _ * _ => xy.`1 = a) s))
+      (undup (map fst s)).
+proof.
+move=> /perm_eq_pair /eq_big_perm /(_ predT F) ->.
+by rewrite big_flatten big_map.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_nseq_cond (P : 'a -> bool) F n x :
+  big P F (nseq n x) = if P x then iter n ((+) (F x)) idm else idm.
+proof.
+elim/natind: n => [n le0_n|n ge0_n ih]; first by rewrite ?(nseq0_le, iter0).
+by rewrite nseqS // big_cons ih; case: (P x) => //; rewrite iterS.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_nseq (F : 'a -> t) n x :
+  big predT F (nseq n x) = iter n ((+) (F x)) idm.
+proof. by apply/big_nseq_cond. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_undup ['a] (P : 'a -> bool) F s :
+  big P F s = big P (fun a => iter (count (pred1 a) s) ((+) (F a)) idm) (undup s).
+proof.
+have <- := eq_big_perm P F _ _ (perm_undup_count s).
+rewrite big_flatten big_map (@big_mkcond P); apply/eq_big => //=.
+by move=> @/(\o) /= x _; apply/big_nseq_cond.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -421,7 +483,7 @@ lemma nosmt big_allpairs f F s t:
     big predT F (allpairs<:'a, 'b, 'c> f s t)
   = big predT (fun x => big predT (fun y => F (f x y)) t) s.
 proof.
-elim: s t => [|x s ih] t //=; first by rewrite big_nil.
+elim: s t => [|x s ih] t //=.
 by rewrite allpairs_consl big_cat ih big_consT big_map.
 qed.
 
@@ -490,7 +552,7 @@ proof. by move=> lemn lenp; rewrite -big_cat -range_cat. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recl (n m : int) F: m <= n =>
   bigi predT F m (n+1) = F m + bigi predT (fun i => F (i+1)) m n.
-proof. by move=> lemn; rewrite big_ltn 1?big_addn /= 1:smt addrK. qed.
+proof. by move=> lemn; rewrite big_ltn 1?big_addn /= 1:smt. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recr (n m : int) F: m <= n =>

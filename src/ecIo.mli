@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -23,6 +24,7 @@ val lexbuf   : ecreader -> Lexing.lexbuf
 (* -------------------------------------------------------------------- *)
 val lex_single_token : string -> EcParser.token option
 val is_sym_ident : string -> bool
+val is_op_ident  : string -> bool
 val is_mem_ident : string -> bool
 val is_mod_ident : string -> bool
 

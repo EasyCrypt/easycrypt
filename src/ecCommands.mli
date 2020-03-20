@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -12,8 +13,8 @@ open EcLocation
 exception Restart
 
 (* -------------------------------------------------------------------- *)
-val addidir  : ?system:bool -> ?recursive:bool -> string -> unit
-val loadpath : unit -> (bool * string) list
+val addidir  : ?namespace:EcLoader.namespace -> ?recursive:bool -> string -> unit
+val loadpath : unit -> (EcLoader.namespace option * string) list
 
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit
@@ -24,7 +25,6 @@ type checkmode = {
   cm_cpufactor: int;
   cm_nprovers : int;
   cm_provers  : string list option;
-  cm_wrapper  : string option;
   cm_profile  : bool;
   cm_iterate  : bool;
 }
@@ -40,12 +40,14 @@ val current     : unit -> EcScope.scope
 val addnotifier : notifier -> unit
 
 (* -------------------------------------------------------------------- *)
-val process : ?timed:bool -> EcParsetree.global_action located -> unit
+val process : ?timed:bool -> EcParsetree.global_action located -> float option
 
 val undo  : int  -> unit
 val reset : unit -> unit
 val uuid  : unit -> int
 val mode  : unit -> string
+
+val check_eco : string -> bool
 
 (* -------------------------------------------------------------------- *)
 val pp_current_goal : ?all:bool -> Format.formatter -> unit

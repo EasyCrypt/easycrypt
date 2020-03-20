@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -23,8 +24,7 @@ lemma dlistS (d : 'a distr) n:
 proof.
 elim n=> [|n le0_n ih].
 + by rewrite !dlist_def /= -foldpos // fold0.
-rewrite dlist_def -foldpos 1:/# -dlist_def /=.
-by have <-: n + 1 = n + 1 + 1 - 1 by ring.
+by rewrite dlist_def -foldpos 1:/# -dlist_def /=.
 qed.
 
 lemma dlist01E (d : 'a distr) n x:
@@ -53,6 +53,8 @@ elim n=> [|n le0_n ih];first by rewrite dlist0 //;apply dunit_ll.
 by rewrite dlistS //;apply/dmap_ll/dprod_ll.
 qed.
 
+hint exact random : dlist_ll.
+
 lemma supp_dlist0 (d : 'a distr) n xs:
   n <= 0 =>
   xs \in dlist d n <=> xs = [].
@@ -69,6 +71,10 @@ rewrite dlistS // supp_dmap /=;split => [[p]|].
   by rewrite Hp Ha addzC. 
 case xs => //= [/# | x xs [# Hs Hin Ha]];exists (x,xs);smt (supp_dprod).
 qed.
+
+lemma supp_dlist_size (d : 'a distr) n xs:
+  0 <= n => xs \in dlist d n => size xs = n.
+proof. by move=> ge0_n; case/(supp_dlist d n xs ge0_n). qed.
 
 lemma dlist1E (d : 'a distr) n xs:
   0 <= n =>

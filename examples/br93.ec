@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List FSet NewFMap.
+require import AllCore List FSet SmtMap.
 require import Distr DBool.
 require (*--*) BitWord OW ROM.
 
@@ -12,8 +12,11 @@ pragma +implicits.
 (* on abstract datatypes with minimal structure. We then instantiate to *)
 (* semi-concrete fixed-length bitstrings (with abstract lengths).       *)
 (* -------------------------------------------------------------------- *)
-
 abstract theory BR93.
+(* -------------------------------------------------------------------- *)
+(* Let us consider the following abstract scenario construction. Given: *)
+(* -------------------------------------------------------------------- *)
+
 (* A set `ptxt` of plaintexts, equipped with an nilpotent addition (+^) *)
 type ptxt.
 
@@ -25,7 +28,7 @@ axiom addKp p1 p2: (p1 +^ p1) +^ p2 = p2.
 lemma addpK p1 p2: p1 +^ p2 +^ p2 = p1.
 proof. by rewrite addC -addA addC -addA addKp. qed.
 
-(* and a lossless, full, uniform distribution dptxt                     *)
+(*                    and a lossless, full, uniform distribution dptxt; *)
 op dptxt: { ptxt distr |    is_lossless dptxt
                          /\ is_full dptxt
                          /\ is_uniform dptxt } as dptxt_llfuuni.
@@ -36,7 +39,7 @@ lemma dptxt_funi: is_funiform dptxt
 by exact/(is_full_funiform dptxt_fu dptxt_uni).
 
 (* A set `rand` of nonces, equipped with                                *)
-(*                               a lossless, uniform distribution drand *)
+(*                              a lossless, uniform distribution drand; *)
 type rand.
 op drand: { rand distr |    is_lossless drand
                          /\ is_uniform drand } as drand_lluni.
@@ -44,11 +47,11 @@ lemma drand_ll: is_lossless drand by exact/(andWl _ drand_lluni).
 lemma drand_uni: is_uniform drand by exact/(andWr _ drand_lluni).
 
 (* A set `ctxt` of ciphertexts defined as                               *)
-(*                           the cartesian product of `rand` and `ptxt` *)
+(*                          the cartesian product of `rand` and `ptxt`; *)
 type ctxt = rand * ptxt.
 
 (* A set `pkey * skey` of keypairs, equipped with                       *)
-(*                         a lossless, full, uniform distribution dkeys *)
+(*                        a lossless, full, uniform distribution dkeys; *)
 type pkey, skey.
 op dkeys: { (pkey * skey) distr |    is_lossless dkeys
                                   /\ is_funiform dkeys } as dkeys_llfuni.
@@ -56,7 +59,7 @@ lemma dkeys_ll: is_lossless dkeys by exact/(andWl _ dkeys_llfuni).
 lemma dkeys_funi: is_funiform dkeys by exact/(andWr _ dkeys_llfuni).
 
 (* A family `f` of trapdoor permutations over `rand`,                   *)
-(*        indexed by `pkey`, with inverse family `fi` indexed by `skey` *)
+(*       indexed by `pkey`, with inverse family `fi` indexed by `skey`; *)
 op f : pkey -> rand -> rand.
 op fi: skey -> rand -> rand.
 axiom fK pk sk x: (pk,sk) \in dkeys => fi sk (f pk x) = x.
@@ -65,15 +68,23 @@ lemma fI pk x y: (exists sk, (pk,sk) \in dkeys) =>
   f pk x = f pk y => x = y.
 proof. by move=> [sk] + fx_eq_fy - /fK ^ /(_ x) <- /(_ y) <-; congr. qed.
 
-(* A random oracle from `rand` to `ptxt`, modelling a hash function H   *)
+(* A random oracle from `rand` to `ptxt`, modelling a hash function H;  *)
+(* (we simply instantiate the generic theory of Random Oracles with     *)
+(*    the types and output distribution declared above, discharging all *)
+(*          assumptions on the instantiated parameters--there are none) *)
 clone import ROM.Lazy as H with
   type from  <- rand,
   type to    <- ptxt,
-  op dsample <- fun _ => dptxt.
+  op dsample <- fun _ => dptxt
+proof *.
 import Types.
 
-(* We can define the Bellare-Rogaway 93 PKE Scheme                      *)
-module BR93(H:Oracle) = {
+(* We can define the Bellare-Rogaway 93 PKE Scheme.                     *)
+(* BR93 is a module that, given access to an oracle H from type         *)
+(*   `from` to type `rand` (see `print Oracle.`), implements procedures *)
+(*   `keygen`, `enc` and `dec` as follows described below.              *)
+module BR93 (H:Oracle) = {
+  (* `keygen` simply samples a key pair in `dkeys` *)
   proc keygen() = {
     var kp;
 
@@ -81,6 +92,10 @@ module BR93(H:Oracle) = {
     return kp;
   }
 
+  (* `enc` samples a random string `r` in `drand` and uses it to       *)
+  (*   produce a random mask `h` using the hash function, then returns *)
+  (*      the image of `r` by permutation `f` and the plaintext masked *)
+  (*                                                         with `h`. *)
   proc enc(pk, m) = {
     var r, h;
 
@@ -89,6 +104,11 @@ module BR93(H:Oracle) = {
     return (f pk r,h +^ m);
   }
 
+  (* `dec` parses its input as a nonce `r` and a masked plaintext `m` *)
+  (*  before recovering the original random string from `r` using the *)
+  (*      inverse permutation `fi` and computing its image `h` by the *)
+  (*  random oracle. The original plaintext is recovered by unmasking *)
+  (*                                                    `m` with `h`. *)
   proc dec(sk, c) = {
     var r, h, m;
 
@@ -99,7 +119,7 @@ module BR93(H:Oracle) = {
   }
 }.
 
-(* And we can quickly prove it correct                                  *)
+(* We can quickly prove it correct as a sanity check.                 *)
 section Correctness.
 local module Correctness = {
   proc main(m) = {
@@ -119,11 +139,11 @@ byphoare=> //; conseq (: _ ==> true) (: _ ==> res)=> //.
   rcondf 17.
   + auto=> /> &hr [pk sk] kp_in_dkeys r _ y _ /=.
     rewrite fK //; split=> [_ _ _|-> //].
-    by rewrite in_dom getP_eq.
+    by rewrite mem_set.
   auto=> /> &hr [pk sk] kp_in_dkeys r _ y _ /=.
   rewrite fK //; split=> [_ y' _|].
-  + by rewrite getP_eq -addA addKp.
-  rewrite in_dom; case: (RO.m{hr}.[r])=> [|p] //= _ _.
+  + by rewrite get_set_sameE -addA addKp.
+  rewrite domE; case: (RO.m{hr}.[r])=> [|p] //= _ _.
   by rewrite -addA addKp.
 by proc; inline *; auto=> />; rewrite dkeys_ll drand_ll dptxt_ll.
 qed.
@@ -250,12 +270,12 @@ seq  8  5: (   ={glob A, glob RO, glob Log, pk, sk, b}
             /\ pk0{1} = pk{2}
             /\ m{1} = (b?m0:m1){2}
             /\ r{1} = Game1.r{2}
-            /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
+            /\ (forall x, x \in Log.qs{1} <=> x \in RO.m{1})).
 + auto; call (:   ={glob Log, glob RO}
-               /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
+               /\ (forall x, x \in Log.qs{1} <=> x \in RO.m{1})).
   + proc; inline RO.o.
-    by auto=> /> &2 log_is_dom y _; smt(@NewFMap).
-  by inline *; auto=> />; rewrite dom0=> _ _ x; rewrite in_fset0.
+    by auto=> /> &2 log_is_dom y _; smt(@SmtMap).
+  by inline *; auto=> /> _ _ x; rewrite mem_empty.
 (* We now deal with everything that happens after the programs differ: *)
 (*   - until r gets queried to the random oracle by the adversary      *)
 (*     (and if it wasn't already queried by a1), we guarantee that the *)
@@ -265,31 +285,31 @@ seq  8  5: (   ={glob A, glob RO, glob Log, pk, sk, b}
 (* Because we reason up to bad, we need to prove that bad is stable    *)
 (* and that the adversary and its oracles are lossless                 *)
 call (_: Game1.r \in Log.qs,
-         eq_except RO.m{1} RO.m{2} (pred1 Game1.r{2})).
+         eq_except (pred1 Game1.r{2}) RO.m{1} RO.m{2}).
 + exact/A_a2_ll.
 + proc; inline RO.o.
-  auto=> /> &1 &2 -> /= m1_eqe_m2 yL y_in_dptxt; split.
+  auto=> /> &1 &2 _ m1_eqe_m2 yL y_in_dptxt; split.
   + move=> x_notin_m; split.
-    + by rewrite !getP_eq eq_except_set.
+    + by rewrite !get_set_sameE eq_except_set_eq.
     move: m1_eqe_m2 x_notin_m=> + + + r_neq_x.
-    by rewrite eq_exceptP pred1E !in_dom=> /(_ x{2} r_neq_x) ->.
+    by rewrite eq_exceptP pred1E !domE=> /(_ x{2} r_neq_x) ->.
   move=> x_in_m; split.
   + move: m1_eqe_m2 x_in_m=> + + + r_neq_x.
-    by rewrite eq_exceptP pred1E !in_dom=> /(_ x{2} r_neq_x) ->.
+    by rewrite eq_exceptP pred1E !domE=> /(_ x{2} r_neq_x) ->.
   by move: m1_eqe_m2=> + _ r_neq_x- /eq_exceptP /(_ x{2}); rewrite pred1E=> /(_ r_neq_x) ->.
 + by move=> &2 _; proc; call (RO_o_ll dptxt_ll); auto.
 + move=> _ /=; proc; inline *.
   conseq (: true ==> true: =1%r) (: Game1.r \in Log.qs ==> Game1.r \in Log.qs)=> //=.
   + by auto=> />.
   by auto=> />; exact/dptxt_ll.
-inline RO.o; case: ((r \in (dom RO.m)){1}).
+inline RO.o; case: ((r \in RO.m){1}).
 + conseq (: _ ==> ={b} /\ Game1.r{2} \in Log.qs{2})=> //=.
   + by move=> /> &1 &2 _ _ rR _ _ _ _ _ h /h [] -> //.
   by auto=> /> &2 <- ->.
 rcondt{1} 3; 1:by auto.
-auto=> /> &2 log_is_dom r_notin_m y _; rewrite !getP_eq oget_some /=.
+auto=> /> &2 log_is_dom r_notin_m y _; rewrite !get_set_sameE oget_some /=.
 split.
-+ by move=> _; rewrite eq_exceptP /pred1=> x; rewrite getP=> ->.
++ by move=> _; rewrite eq_exceptP /pred1=> x; rewrite get_setE eq_sym=> ->.
 by move=> _ rR aL mL aR qsR mR h /h [] ->.
 qed.
 
@@ -394,7 +414,7 @@ conseq
 call (: ={glob Log, glob RO}); 1: by sim.
 swap{1} 6 -2.
 auto; call (: ={glob Log, glob RO}); 1: by sim.
-by auto=> /> [pk sk] ->; rewrite dbool_ll.
+by auto=> /> [pk sk] ->.
 qed.
 
 lemma Reduction &m:
@@ -450,7 +470,7 @@ op parse (c:ctxt): rand * ptxt =
 lemma parseK r p: parse (r || p) = (r,p).
 proof.
 rewrite /parse /(||) ofctxtK 1:size_cat 1:size_rand 1:size_ptxt //=.
-by rewrite take_cat drop_cat size_rand take0 drop0 cats0 mkrandK mkptxtK.
+by rewrite take_cat drop_cat size_rand take0 drop0 cats0 /= mkrandK mkptxtK.
 qed.
 
 lemma formatI (r : rand) (p : ptxt) r' p':

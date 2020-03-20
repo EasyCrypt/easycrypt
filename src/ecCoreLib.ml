@@ -1,9 +1,17 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+let s_get  = "_.[_]"
+let s_set  = "_.[_<-_]"
+let s_nil  = "[]"
+let s_cons = "::"
+let s_abs  = "`|_|"
 
 (* -------------------------------------------------------------------- *)
 let i_top  = "Top"
@@ -14,6 +22,10 @@ let p_top  = EcPath.psymbol i_top
 let i_Pervasive = "Pervasive"
 let p_Pervasive = EcPath.pqname p_top i_Pervasive
 let _Pervasive  = fun x -> EcPath.pqname p_Pervasive x
+
+(* -------------------------------------------------------------------- *)
+let base_rnd = "random"
+let base_ll  = "lossless"
 
 (*-------------------------------------------------------------------- *)
 module CI_Unit = struct
@@ -46,16 +58,21 @@ module CI_Int = struct
   let p_Int = EcPath.pqname p_top i_Int
   let p_int = _Pervasive "int"
 
-  let _Int = fun x -> EcPath.pqname p_Int x
+  let i_IntDiv = "IntDiv"
+  let p_IntDiv = EcPath.pqname p_top i_IntDiv
 
-  let p_int_abs  = _Int "`|_|"
-  let p_int_elim = _Int "intind"
-  let p_int_opp  = _Int "[-]"
-  let p_int_add  = _Int "+"
-  let p_int_mul  = _Int "*"
-  let p_int_pow  = _Int "^"
-  let p_int_le   = _Int "<="
-  let p_int_lt   = _Int "<"
+  let _Int    = fun x -> EcPath.pqname p_Int x
+  let _IntDiv = fun x -> EcPath.pqname p_IntDiv x
+
+  let p_int_elim  = _Int "intind"
+  let p_int_abs   = _Int "`|_|"
+  let p_int_opp   = _Int "[-]"
+  let p_int_add   = _Int "+"
+  let p_int_mul   = _Int "*"
+  let p_int_pow   = _Int "^"
+  let p_int_le    = _Int "<="
+  let p_int_lt    = _Int "<"
+  let p_int_edivz = _IntDiv "edivz"
 end
 
 (* -------------------------------------------------------------------- *)
@@ -102,19 +119,31 @@ end
 (* -------------------------------------------------------------------- *)
 module CI_Distr = struct
   let i_Distr = "Distr"
-  let p_Distr  = EcPath.pqname p_top i_Distr
+  let p_Distr = EcPath.pqname p_top i_Distr
   let p_distr = _Pervasive "distr"
+  let _Distr  = fun x -> EcPath.pqname p_Distr x
 
-  let _Distr   = fun x -> EcPath.pqname p_Distr x
+  let p_dbool      = EcPath.extend p_top ["DBool"; "dbool"]
+  let p_dbitstring = EcPath.extend p_Distr ["Dbitstring"; "dbitstring"]
+  let p_dinter     = EcPath.extend p_top ["DInterval"; "dinter"]
 
-  let p_dbool = List.fold_left EcPath.pqname p_top ["DBool"; "dbool"]
-  let p_dbitstring = List.fold_left EcPath.pqname p_Distr ["Dbitstring"; "dbitstring"]
-  let p_dinter     = List.fold_left EcPath.pqname p_top ["DInterval"; "dinter"]
-
-  let p_support = _Distr "support"
-  let p_mu      = _Pervasive "mu"
+  let p_support  = _Distr "support"
+  let p_mu       = _Pervasive "mu"
   let p_lossless = _Distr "is_lossless"
+  let p_uniform  = _Distr "is_uniform"
+  let p_full     = _Distr "is_full"
+end
 
+(* -------------------------------------------------------------------- *)
+module CI_Map = struct
+  let i_Map = "CoreMap"
+  let p_Map = EcPath.pqname p_top i_Map
+  let _Map  = fun x -> EcPath.pqname p_Map x
+
+  let p_map = _Map "map"
+  let p_get = _Map s_get
+  let p_set = _Map s_set
+  let p_cst = _Map "cst"
 end
 
 (* -------------------------------------------------------------------- *)
@@ -143,6 +172,8 @@ module CI_Logic = struct
   let p_anda_elim     = _Logic "andaW"
   let p_and_proj_l    = _Logic "andWl"
   let p_and_proj_r    = _Logic "andWr"
+  let p_anda_proj_l   = _Logic "andaWl"
+  let p_anda_proj_r   = _Logic "andaWr"
   let p_or_elim       = _Logic "orW"
   let p_ora_elim      = _Logic "oraW"
   let p_iff_elim      = _Logic "iffW"
@@ -162,6 +193,7 @@ module CI_Logic = struct
   let p_eq_trans      = _Logic "eq_trans"
   let p_eq_iff        = _Logic "eq_iff"
   let p_fcongr        = _Logic "congr1"
+  let p_eq_ind        = _Logic "eq_ind"
   let p_eq_sym        = _Logic "eq_sym"
   let p_eq_sym_imp    = _Logic "eq_sym_imp"
   let p_negbTE        = _Logic "negbTE"
@@ -185,13 +217,6 @@ module CI_Aprhl = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let s_get  = "_.[_]"
-let s_set  = "_.[_<-_]"
-let s_nil  = "[]"
-let s_cons = "::"
-let s_abs  = "`|_|"
-
-(* -------------------------------------------------------------------- *)
 let is_mixfix_op =
   let ops = [s_get; s_set; s_nil; s_abs] in
   fun op -> List.mem op ops
@@ -201,15 +226,3 @@ let s_real_of_int = EcPath.toqsymbol CI_Real.p_real_of_int
 let s_dbool       = EcPath.toqsymbol CI_Distr.p_dbool
 let s_dbitstring  = EcPath.toqsymbol CI_Distr.p_dbitstring
 let s_dinter      = EcPath.toqsymbol CI_Distr.p_dinter
-
-
-(* -------------------------------------------------------------------- *)
-module CI_Map = struct
-  let i_Map = "NewMap"
-  let p_Map = EcPath.pqname p_top i_Map
-  let _Map = fun x -> EcPath.pqname p_Map x
-  let p_map = _Map "map"
-  let p_get = _Map s_get
-  let p_set = _Map s_set
-  let p_cnst = _Map "cnst"
-end

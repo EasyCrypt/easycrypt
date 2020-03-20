@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -76,7 +77,8 @@ section.
   proof.
   transitivity Fold(O).fold_12
     (={glob O,t1,t2} /\ s{2} = O'.s{1} ==> ={glob O} /\ res{2} = O'.s{1})
-    (={glob O,t1,t2} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2})=> [/#|//||].
+    (={glob O,t1,t2} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2})=> //.
+  + by move=> /> &1 &2 <- <-; exists ((glob O){2}) (O'.s{2},t1{1},t2{1}).
   + by proc;inline *;sim.
   transitivity Fold(O).fold_21
     (={glob O,s,t1,t2} ==> ={glob O, res})

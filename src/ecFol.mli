@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -59,6 +60,12 @@ val f_real_mul : form -> form -> form
 val f_real_inv : form -> form
 val f_real_div : form -> form -> form
 val f_real_abs : form -> form
+val f_decimal  : zint * (int * zint) -> form
+
+(* soft-constructor - map *)
+val f_map_cst : EcTypes.ty -> form -> form
+val f_map_get : form -> form -> EcTypes.ty -> form
+val f_map_set : form -> form -> form -> form
 
 (* soft constructors - distributions *)
 val fop_support : EcTypes.ty -> form
@@ -81,6 +88,10 @@ val f_real_rpow : form -> form -> form
 val f_real_sqrt : form -> form
 
 (* -------------------------------------------------------------------- *)
+(* "typed" soft-constructors                                            *)
+val f_ty_app : EcEnv.env -> form -> form list -> form
+
+(* -------------------------------------------------------------------- *)
 (* WARNING : this function should be use only in a context ensuring
  * that the quantified variables can be instanciated *)
 
@@ -96,27 +107,29 @@ val f_exists_simpl : bindings -> form -> form
 val f_quant_simpl  : quantif -> bindings -> form -> form
 val f_app_simpl    : form -> form list -> EcTypes.ty -> form
 
-val f_not_simpl  : form -> form
-val f_and_simpl  : form -> form -> form
-val f_ands_simpl : form list -> form -> form
-val f_anda_simpl : form -> form -> form
-val f_or_simpl   : form -> form -> form
-val f_ora_simpl  : form -> form -> form
-val f_imp_simpl  : form -> form -> form
-val f_imps       : form list -> form -> form
-val f_imps_simpl : form list -> form -> form
-val f_iff_simpl  : form -> form -> form
-val f_eq_simpl   : form -> form -> form
+val f_not_simpl   : form -> form
+val f_and_simpl   : form -> form -> form
+val f_ands_simpl  : form list -> form -> form
+val f_ands0_simpl : form list -> form
+val f_anda_simpl  : form -> form -> form
+val f_or_simpl    : form -> form -> form
+val f_ora_simpl   : form -> form -> form
+val f_imp_simpl   : form -> form -> form
+val f_imps        : form list -> form -> form
+val f_imps_simpl  : form list -> form -> form
+val f_iff_simpl   : form -> form -> form
+val f_eq_simpl    : form -> form -> form
 
 val f_int_le_simpl  : form -> form -> form
 val f_int_lt_simpl  : form -> form -> form
 val f_real_le_simpl : form -> form -> form
 val f_real_lt_simpl : form -> form -> form
 
-val f_int_add_simpl : form -> form -> form
-val f_int_opp_simpl : form -> form
-val f_int_sub_simpl : form -> form -> form
-val f_int_mul_simpl : form -> form -> form
+val f_int_add_simpl   : form -> form -> form
+val f_int_opp_simpl   : form -> form
+val f_int_sub_simpl   : form -> form -> form
+val f_int_mul_simpl   : form -> form -> form
+val f_int_edivz_simpl : form -> form -> form
 
 val f_real_add_simpl : form -> form -> form
 val f_real_opp_simpl : form -> form
@@ -133,6 +146,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 val destr_exists_prenex : form -> bindings * form
+val destr_ands : deep:bool -> form -> form list
 
 (* -------------------------------------------------------------------- *)
 (* projects 'a Distr type into 'a *)
@@ -156,10 +170,14 @@ type op_kind = [
   | `Int_mul
   | `Int_pow
   | `Int_opp
+  | `Int_edivz
   | `Real_add
   | `Real_opp
   | `Real_mul
   | `Real_inv
+  | `Map_get
+  | `Map_set
+  | `Map_cst
 ]
 
 val op_kind       : path -> op_kind option

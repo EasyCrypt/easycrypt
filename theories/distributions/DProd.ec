@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -12,106 +13,19 @@ require import AllCore List StdOrder Distr StdOrder.
 pragma +implicits.
 pragma -oldip.
 
-(* -------------------------------------------------------------------- *)
-op mprod ['a,'b] (ma : 'a -> real) (mb : 'b -> real) (ab : 'a * 'b) =
-  (ma ab.`1) * (mb ab.`2).
-
-(* -------------------------------------------------------------------- *)
-lemma isdistr_mprod ['a 'b] ma mb :
-  isdistr<:'a> ma => isdistr<:'b> mb => isdistr (mprod ma mb).
-proof.
-move=> isa isb; split=> [x|s uqs].
-+ by apply/mulr_ge0; apply/ge0_isdistr.
-(* FIXME: This instance should be in bigops *)
-rewrite (@partition_big ofst _ predT _ _ (undup (unzip1 s))).
-+ by apply/undup_uniq.
-+ by case=> a b ab_in_s _; rewrite mem_undup map_f /mprod.
-pose P := fun x ab => ofst<:'a, 'b> ab = x.
-pose F := fun (ab : 'a * 'b) => mb ab.`2.
-rewrite -(@eq_bigr _ (fun x => ma x * big (P x) F s)) => /= [x _|].
-+ by rewrite mulr_sumr; apply/eq_bigr=> -[a b] /= @/P <-.
-pose s' := undup _; apply/(@ler_trans (big predT (fun x => ma x) s')).
-+ apply/ler_sum=> a _ /=; apply/ler_pimulr; first by apply/ge0_isdistr.
-  rewrite -big_filter -(@big_map snd predT) le1_sum_isdistr //.
-  rewrite map_inj_in_uniq ?filter_uniq //; case=> [a1 b1] [a2 b2].
-  by rewrite !mem_filter => @/P @/ofst @/osnd |>.
-by apply/le1_sum_isdistr/undup_uniq.
-qed.
-
-(* -------------------------------------------------------------------- *)
-op (`*`) (da : 'a distr) (db : 'b distr) =
-  mk (mprod (mu1 da) (mu1 db))
-axiomatized by dprod_def.
-
-(* -------------------------------------------------------------------- *)
-lemma dprod1E (da : 'a distr) (db : 'b distr) a b:
-  mu1 (da `*` db) (a,b) = mu1 da a * mu1 db b.
-proof. rewrite dprod_def -massE muK // isdistr_mprod isdistr_mu1. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma dprodE Pa Pb (da : 'a distr) (db : 'b distr):
-    mu (da `*` db) (fun (ab : 'a * 'b) => Pa ab.`1 /\ Pb ab.`2)
-  = mu da Pa * mu db Pb.
-proof. admitted.
-
-(* -------------------------------------------------------------------- *)
-lemma supp_dprod (da : 'a distr) (db : 'b distr) ab:
-  ab \in da `*` db <=> ab.`1 \in da /\ ab.`2 \in db.
-proof.
-by case: ab => a b /=; rewrite !supportP dprod1E; smt(mu_bounded).
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma weight_dprod (da : 'a distr) (db : 'b distr):
-  weight (da `*` db) = weight da * weight db.
-proof.
-pose F := fun ab : 'a * 'b => predT ab.`1 /\ predT ab.`2.
-by rewrite (@mu_eq _ _ F) // dprodE.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma dprod_ll (da : 'a distr) (db : 'b distr):
-  is_lossless (da `*` db) <=> is_lossless da /\ is_lossless db.
-proof. by rewrite /is_lossless weight_dprod [smt(mu_bounded)]. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma dprod_uni (da : 'a distr) (db : 'b distr):
-  is_uniform da => is_uniform db => is_uniform (da `*` db).
-proof.
-move=> da_uni db_uni [a b] [a' b']; rewrite !supp_dprod !dprod1E /=.
-by case=> /da_uni ha /db_uni hb [/ha-> /hb->].
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma dprod_funi (da : 'a distr) (db : 'b distr):
-  is_funiform da => is_funiform db => is_funiform (da `*` db).
-proof.
-move=> da_uni db_uni [a b] [a' b']; rewrite !dprod1E.
-by congr; [apply da_uni | apply db_uni].
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma dprod_fu (da : 'a distr) (db : 'b distr):
-  is_full (da `*` db) <=> (is_full da /\ is_full db).
-proof. smt (supp_dprod). qed.
-
-(* -------------------------------------------------------------------- *)
-(* TODO : generalize this to parametric distribution *)
+(* ==================================================================== *)
 abstract theory ProdSampling.
 type t1, t2.
 
-op d1 : t1 distr.
-op d2 : t2 distr.
-
 module S = {
-  proc sample () : t1 * t2 = {
+  proc sample(d1 : t1 distr, d2 : t2 distr) : t1 * t2 = {
     var r;
 
     r <$ d1 `*` d2;
     return r;
   }
 
-  proc sample2 () : t1 * t2 = {
+  proc sample2(d1 : t1 distr, d2 : t2 distr) : t1 * t2 = {
     var r1, r2;
 
     r1 = $ d1;
@@ -120,16 +34,121 @@ module S = {
   }
 }.
 
-equiv sample_sample2 : S.sample ~ S.sample2 : true ==> ={res}.
+(* -------------------------------------------------------------------- *)
+equiv sample_sample2 : S.sample ~ S.sample2 : ={d1, d2} ==> ={res}.
 proof.
-bypr (res{1}) (res{2}) => // &m1 &m2 a.
-have ->: Pr[S.sample() @ &m1 : res = a] = mu1 (d1 `*` d2) a.
-+ by byphoare=> //=; proc; rnd; skip. 
-elim: a=> a1 a2; have -> := dprod1E d1 d2 a1 a2.
-byphoare=> //=.
+bypr (res{1}) (res{2}) => // &m1 &m2 a [<- <-].
+have ->: Pr[S.sample(d1{m1}, d2{m1}) @ &m1 : res = a] = mu1 (d1{m1} `*` d2{m1}) a.
++ by byphoare (_ : d1{m1} = d1 /\ d2{m1} = d2 ==> _) => //=; proc; rnd; skip.
+case: a => a1 a2; rewrite dprod1E.
+byphoare (_ : d1{m1} = d1 /\ d2{m1} = d2 ==> _) => //=.
 proc; seq  1: (r1 = a1) (mu1 d1 a1) (mu1 d2 a2) _ 0%r true=> //=.
-+ by rnd.  
-+ by rnd.
-by hoare; auto=> /> ? ->.
++ by rnd. + by rnd. + by hoare; auto=> /> ? ->.
 qed.
 end ProdSampling.
+
+(* ==================================================================== *)
+abstract theory DLetSampling.
+type t, u.
+
+module SampleDep = {
+  proc sample2(dt : t distr, du : t -> u distr) : t * u = {
+    var t, u;
+
+    t <$ dt;
+    u <$ du t;
+    return (t, u);
+  }
+
+  proc sample(dt : t distr, du : t -> u distr) : u = {
+    var t, u;
+
+    t <$ dt;
+    u <$ du t;
+    return u;
+  }
+}.
+
+module SampleDLet = {
+  proc sample2(dt : t distr, du : t -> u distr) : t * u = {
+    var tu;
+
+    tu <$ dlet dt (fun t => dunit t `*` du t);
+    return tu;
+  }
+
+  proc sample(dt : t distr, du : t -> u distr) : u = {
+    var u;
+
+    u <$ dlet dt du;
+    return u;
+  }
+}.
+
+(* -------------------------------------------------------------------- *)
+equiv SampleDepDLet2 :
+  SampleDep.sample2 ~ SampleDLet.sample2 : ={dt, du} ==> ={res}.
+proof.
+pose F dt du := mu1 (dlet<:t, t * u> dt (fun t => dunit t `*` du t)).
+bypr (res{1}) (res{2}) => // &m1 &m2 x [<- <-].
+have ->: Pr[SampleDLet.sample2(dt{m1}, du{m1}) @ &m2 : res = x] = F dt{m1} du{m1} x.
++ by byphoare (_ : dt{m1} = dt /\ du{m1} = du ==> _) => //=; proc; rnd; skip. 
+case: x => x1 x2; have -> :
+  F dt{m1} du{m1} (x1, x2) = mu1 dt{m1} x1 * mu1 (du{m1} x1) x2.
++ rewrite /F dlet1E /= 1?(@sumD1 _ x1) /=.
+  * apply: (@summable_le (mu1 dt{m1})) => /=; first by apply: summable_mu1.
+    by move=> x; rewrite normrM ler_pimulr ?normr_ge0 ?ger0_norm.
+  rewrite dprod1E dunit1E /= sum0_eq //= => x; case: (x = x1) => //=.
+  by move=> ne_x_x1; rewrite dprod1E dunit1E ne_x_x1.
+byphoare(_ : dt{m1} = dt /\ du{m1} = du ==> _) => //=; proc; seq 1:
+  (t = x1) (mu1 dt x1) (mu1 (du x1) x2) _ 0%r true=> //=.
++ by rnd.  
++ by rnd.
++ by hoare; auto=> /> ? ->.
+qed.
+
+(* --------------------------------------------------------------------- *)
+equiv SampleDep :
+  SampleDep.sample ~ SampleDep.sample2 : ={dt, du} ==> res{1} = res{2}.`2.
+proof. by proc=> /=; sim. qed.
+
+(* -------------------------------------------------------------------- *)
+equiv SampleDLet :
+  SampleDLet.sample ~ SampleDLet.sample2 : ={dt, du} ==> res{1} = res{2}.`2.
+proof.
+bypr (res{1}) (res{2}.`2) => //= &m1 &m2 x [<- <-].
+have ->:   Pr[SampleDLet.sample(dt{m1}, du{m1}) @ &m1 : res = x]
+         = mu1 (dlet dt{m1} du{m1}) x.
++ by byphoare(_ : dt{m1} = dt /\ du{m1} = du ==> _) => //=; proc; rnd; skip.
+suff ->//:   Pr[SampleDLet.sample2(dt{m1}, du{m1}) @ &m2 : res.`2 = x]
+           = mu1 (dlet dt{m1} du{m1}) x.
+byphoare(_ : dt{m1} = dt /\ du{m1} = du ==> _) => //=.
+proc; rnd; skip => /=; rewrite dlet1E dletE_swap /=.
+move=> &hr [-> ->]; apply: eq_sum => y /=; rewrite (@sumD1 _ (y, x)) /=.
++ by apply/summable_cond/summableZ/summable_mass. 
+rewrite !massE dprod1E dunit1E sum0_eq //=.
+case=> y' x' /=; case: (x' = x) => //= ->>.
+case: (y' = y) => //= ne_y'y; rewrite !massE dprod1E.
+by rewrite dunit1E (@eq_sym y) ne_y'y.
+qed.
+
+(* -------------------------------------------------------------------- *)
+equiv SampleDepDLet :
+  SampleDep.sample ~ SampleDLet.sample : ={dt, du} ==> ={res}.
+proof.
+transitivity SampleDep.sample2
+  (={dt, du} ==> res{1} = res{2}.`2)
+  (={dt, du} ==> res{2} = res{1}.`2) => //.
++ by move=> &1 &2 [<- <-]; exists (dt{1}, du{1}).
++ exact SampleDep.
+transitivity SampleDLet.sample2
+  (={dt, du} ==> ={res})
+  (={dt, du} ==> res{2} = res{1}.`2) => //.
++ by move=> &1 &2 [<- <-]; exists (dt{1}, du{1}).
++ exact SampleDepDLet2.
++ symmetry.
+conseq (_ : ={dt, du} ==> _); 1: by move=> ?? [<- <-].
+exact SampleDLet.
+qed.
+
+end DLetSampling.

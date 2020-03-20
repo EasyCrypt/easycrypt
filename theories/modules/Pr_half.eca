@@ -1,0 +1,21 @@
+require import AllCore Distr.
+
+type input.
+type output.
+
+module type Adv = {
+  proc main(_:input) : output 
+}.
+
+lemma equiv_not_pr_half (A<:Adv) (Pre: input -> glob A -> bool) (E: glob A -> output -> bool): 
+  equiv [A.main ~ A.main : ={arg, glob A} /\ Pre arg{1} (glob A){1} ==> E (glob A){1} res{1} = !E (glob A){2} res{2}] =>
+  forall a &m, 
+  Pre a (glob A){m} =>
+  Pr[A.main(a) @ &m : true] = 1%r =>
+  Pr[A.main(a) @ &m : E (glob A) res] = 1%r/2%r.
+proof.
+  move => he a &m hpre hll.
+  have : Pr[A.main(a) @ &m : E (glob A) res] = Pr[A.main(a) @ &m : !E (glob A) res].
+  + by byequiv he => // /#.
+  by rewrite Pr [mu_not] hll /#. 
+qed.

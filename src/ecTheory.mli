@@ -1,11 +1,13 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcPath
 open EcSymbols
 open EcDecl
 open EcModules
@@ -25,10 +27,33 @@ and theory_item =
   | Th_typeclass of (symbol * typeclass)
   | Th_baserw    of symbol
   | Th_addrw     of EcPath.path * EcPath.path list
-  | Th_auto      of (bool * EcPath.Sp.t)
+  | Th_reduction of (EcPath.path * rule_option * rule option) list
+  | Th_auto      of (bool * int * symbol option * path list)
 
 and tcinstance = [ `Ring of ring | `Field of field | `General of EcPath.path ]
 and thmode     = [ `Abstract | `Concrete ]
+
+and rule_pattern =
+  | Rule  of top_rule_pattern * rule_pattern list
+  | Int   of EcBigInt.zint
+  | Var   of EcIdent.t
+
+and top_rule_pattern =
+  [`Op of (EcPath.path * EcTypes.ty list) | `Tuple]
+
+and rule = {
+  rl_tyd  : EcDecl.ty_params;
+  rl_vars : (EcIdent.t * EcTypes.ty) list;
+  rl_cond : EcCoreFol.form list;
+  rl_ptn  : rule_pattern;
+  rl_tg   : EcCoreFol.form;
+  rl_prio : int;
+}
+
+and rule_option = {
+  ur_delta  : bool;
+  ur_eqtrue : bool;
+}
 
 (* -------------------------------------------------------------------- *)
 type ctheory = {
@@ -54,7 +79,8 @@ and ctheory_item =
   | CTh_typeclass of (symbol * typeclass)
   | CTh_baserw    of symbol
   | CTh_addrw     of EcPath.path * EcPath.path list
-  | CTh_auto      of (bool * EcPath.Sp.t)
+  | CTh_reduction of (EcPath.path * rule_option * rule option) list
+  | CTh_auto      of (bool * int * symbol option * path list)
 
 and ctheory_clone = {
   cthc_base : EcPath.path;

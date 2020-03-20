@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -22,13 +23,14 @@ type t = {
 type 'a mloc = ('a, t) tagged
 
 (* -------------------------------------------------------------------- *)
-val _dummy    : t
-val make      : position -> position -> t
-val of_lexbuf : lexbuf -> t
-val tostring  : t -> string
-val merge     : t -> t -> t
-val mergeall  : t list -> t
-val isdummy   : t -> bool
+val _dummy        : t
+val make          : position -> position -> t
+val of_lexbuf     : lexbuf -> t
+val tostring      : t -> string
+val tostring_raw  : ?with_fname:bool -> t -> string
+val merge         : t -> t -> t
+val mergeall      : t list -> t
+val isdummy       : t -> bool
 
 (* -------------------------------------------------------------------- *)
 type 'a located = {

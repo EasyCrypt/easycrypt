@@ -1,0 +1,8 @@
+*.rcc
+*rcc.py
+/.project
+/.pydevproject
+/.settings
+/build/
+/dist/
+/MANIFEST

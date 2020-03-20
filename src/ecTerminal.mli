@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -21,6 +22,7 @@ val next        : terminal -> EcParsetree.prog
 val notice      : immediate:bool -> loglevel -> string -> terminal -> unit
 val finish      : status -> terminal -> unit
 val finalize    : terminal -> unit
+val setwidth    : terminal -> int -> unit
 
 (* -------------------------------------------------------------------- *)
 val from_channel : ?gcstats:bool -> name:string -> in_channel -> terminal

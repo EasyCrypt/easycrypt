@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -40,6 +41,12 @@ let of_lexbuf (lb : lexbuf) =
   let p1 = Lexing.lexeme_start_p lb in
   let p2 = Lexing.lexeme_end_p lb in
   make p1 p2
+
+let tostring_raw ?(with_fname = true) (p : t) =
+  let aout =
+    Printf.sprintf "%d:%d %d:%d"
+      (fst p.loc_start) (snd p.loc_start) (fst p.loc_end) (snd p.loc_end) in
+  if with_fname then Printf.sprintf "%s %s" p.loc_fname aout else aout
 
 let tostring (p : t) =
   let spos =

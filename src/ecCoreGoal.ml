@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -87,6 +88,9 @@ let paglobal p tys =
 let palocal x =
   PASub (Some { pt_head = PTLocal x; pt_args = []; })
 
+let pahandle x =
+  PASub (Some { pt_head = PTHandle x; pt_args = []; })
+
 (* -------------------------------------------------------------------- *)
 type rwproofterm = {
   rpt_proof : proofterm;
@@ -125,6 +129,7 @@ and validation =
 | VLConv   of (handle * ident)       (* hypothesis conversion *)
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
+| VShuffle of ident list             (* goal shuffling *)
 
   (* external (hl/phl/prhl/...) proof-node *)
 | VExtern  : 'a * handle list -> validation
@@ -679,6 +684,8 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let t_on1 idx ?ttout tt (tc : tcenv) =
+    let idx = idx mod tc_count tc in
+    let idx = if idx < 0 then idx + tc_count tc else idx in
     t_onselect ((=) idx) ?ttout tt tc
 
   (* ------------------------------------------------------------------ *)
@@ -752,6 +759,13 @@ module FApi = struct
     match t_try_base tt tc with
     | `Failure _  -> tcenv_of_tcenv1 tc
     | `Success tc -> tc
+
+  (* ------------------------------------------------------------------ *)
+  let t_xswitch ?(on = `Focus) tt ~iffail tc =
+    match on, t_try_base tt tc with
+    | _     , `Failure _  -> iffail tc
+    | `All  , `Success (tc, cont) -> t_onall cont tc
+    | `Focus, `Success (tc, cont) -> t_focus cont tc
 
   (* ------------------------------------------------------------------ *)
   let t_switch ?(on = `Focus) tt ~ifok ~iffail tc =
@@ -831,6 +845,15 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   let rec t_ors (tts : backward list) (tc : tcenv1) =
     t_ors_pmap (fun x -> Some x) tts tc
+
+  (* ------------------------------------------------------------------ *)
+  let t_or_map (tts : (tcenv1 -> 'a * tcenv) list) (tc : tcenv1) =
+    let r  = ref None in
+    let tc =
+      t_ors
+        (List.map (fun tt tc -> let (x, tc) = tt tc in r := Some x; tc) tts)
+        tc
+    in (oget !r, tc)
 end
 
 (* -------------------------------------------------------------------- *)

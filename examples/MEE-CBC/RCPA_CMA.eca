@@ -279,8 +279,8 @@ theory MtE.
                       /\ (ek,mk){1} = k{1}).
             by call (_: true); auto.
           if=> //=.
-            auto; call (_: true); auto=> /> &1 &2 -> /> eq_qs -> /> _.
-            by case: (pt{2})=> //= -[p t] r; case: r=> //= _; rewrite !oget_some /= eq_qs.
+            auto; call (_: true); auto=> /> &1 &2 _ /> eq_qs _ /> _.
+            by case: (pt{2})=> //= -[p t] r; case: r=> //= _; rewrite eq_qs.
           by auto; smt.
         (* lossless after win *)
         by move=> &2 bad; proc; wp; call (MtE_dec_ll E M E_dec_ll M_verify_ll).

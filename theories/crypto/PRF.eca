@@ -1,101 +1,92 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-(*** A formalization of pseudo-random functions **)
-require import AllCore Distr FSet NewFMap.
+require import AllCore Distr FSet.
+
+pragma +implicits. pragma -oldip.
 
 (** A PRF is a family of functions F from domain D to finite range R
-    indexed by a keyspace K equipped with a distribution dK. *)
-type D.
-
-type R.
-
-type K.
-
-op dK: K distr.
-axiom dK_ll: is_lossless dK.
-
-op F:K -> D -> R.
+    indexed by a keyspace K equipped with a (lossless) distribution dK. *)
+type D, R.
 
 module type PRF = {
-  proc keygen()   : K
-  proc f(k:K,x:D) : R
+  proc init(): unit
+  proc f(_ : D): R
 }.
 
-(** The Real PRF is defined as follows *)
-module PRFr = {
-  proc keygen(): K = {
+module type PRF_Oracles = {
+  proc f(_: D): R
+}.
+
+module type Distinguisher (F : PRF_Oracles) = {
+  proc distinguish(): bool
+}.
+
+module IND (F : PRF) (D : Distinguisher) = {
+  proc main(): bool = {
+    var b;
+
+         F.init();
+    b <@ D(F).distinguish();
+    return b;
+  }
+}.
+
+(* -------------------------------------------------------------------- *)
+abstract theory RF.
+require import SmtMap.
+
+op dR: { D -> R distr | forall x, is_lossless (dR x) } as dR_ll.
+
+module RF = {
+  var m : (D,R) fmap
+
+  proc init(): unit = {
+    m  <- empty;
+  }
+
+  proc f(x:D): R = {
+    if (x \notin m) {
+      m.[x]  <$ dR x;
+    }
+    return (oget m.[x]);
+  }
+}.
+end RF.
+
+(* -------------------------------------------------------------------- *)
+abstract theory PseudoRF.
+type K.
+
+op dK: { K distr | is_lossless dK } as dK_ll.
+
+op F : K -> D -> R.
+
+module type PseudoRF = {
+  proc keygen(): K
+  proc f(_ : K * D): R
+}.
+
+module PseudoRF = {
+  proc keygen() = {
     var k;
 
     k <$ dK;
     return k;
   }
 
-  proc f(k:K,x:D): R = { return F k x; }
+  proc f(k, x) = { return F k x; }
 }.
 
-(** PRF-security is expressed as indistinguishability from a truly
-    random function (defined by some distribution dR) when the key is
-    sampled from dK **)
-op dR:R distr.
-axiom dR_ll: is_lossless dR.
+module PRF = {
+  var k : K
 
-module type PRF_Oracles = {
-  proc f(x:D): R
+  proc init() = { k <$ dK; }
+  proc f(x: D) = { return F k x; }
 }.
-
-module type Distinguisher(F:PRF_Oracles) = {
-  proc distinguish(): bool
-}.
-
-module type PRF_Hiding = {
-  proc init(): unit
-  proc f(x:D): R
-}.
-
-module PRF_Wrap (F:PRF) = {
-  var k:K
-
-  proc init(): unit = { k <$ dK; }
-  proc f(x:D): R    = { return F k x; }
-}.
-
-module IND (F:PRF_Hiding,D:Distinguisher) = {
-  module D = D(F)
-
-  proc main(): bool = {
-    var b;
-
-    F.init();
-    b = D.distinguish();
-    return b;
-  }
-}.
-
-module PRFi = {
-  var m:(D,R) fmap
-
-  proc init(): unit = { m = map0; }
-
-  proc f (x:D): R = {
-    if (!mem (dom m) x) m.[x] = $dR;
-    return (oget m.[x]);
-  }
-}.
-
-(* TODO: define notations *)
-(** Advantage of a distinguisher against a PRF F:
-      Adv^PRF_F(&m,D) = `|Pr[IND(Wrap_PRF(F),D) @ &m: res] - Pr[IND(PRFi,D) @ &m: res]| **)
-(** Advantage of a distinguisher against **the** PRF operator F:
-      Adv^PRF_F(&m,D) = `|Pr[IND(Wrap_PRF(PRFr),D) @ &m: res] - Pr[IND(PRFi,D) @ &m: res]| **)
-
-(** Useful lemmas **)
-lemma PRFr_keygen_ll: islossless PRFr.keygen.
-proof. by proc; auto; smt. qed.
-
-lemma PRFr_f_ll: islossless PRFr.f.
-proof. by proc. qed.
+end PseudoRF.

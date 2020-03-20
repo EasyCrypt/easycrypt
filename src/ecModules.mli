@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -83,8 +84,6 @@ val s_empty    : stmt
 
 val stmt  : instr list -> stmt
 val rstmt : instr list -> stmt
-
-val s_split : int -> stmt -> instr list * instr list
 
 (* the following functions raise Not_found if the argument does not match *)
 val destr_asgn   : instr -> lvalue * expr

@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -14,6 +15,7 @@ type command = [
 | `Compile of cmp_option
 | `Cli     of cli_option
 | `Config
+| `Why3Config
 ]
 
 and options = {
@@ -25,6 +27,7 @@ and cmp_option = {
   cmpo_input   : string;
   cmpo_provers : prv_options;
   cmpo_gcstats : bool;
+  cmpo_tstats  : string option;
 }
 
 and cli_option = {
@@ -38,14 +41,14 @@ and prv_options = {
   prvo_cpufactor : int;
   prvo_provers   : string list option;
   prvo_pragmas   : string list;
+  prvo_ppwidth   : int option;
   prvo_checkall  : bool;
   prvo_profile   : bool;
   prvo_iterate   : bool;
 }
 
 and ldr_options = {
-  ldro_idirs : string list;
-  ldro_rdirs : string list;
+  ldro_idirs : (string option * string) list;
   ldro_boot  : bool;
 }
 
@@ -58,11 +61,11 @@ and glb_options = {
 
 (* -------------------------------------------------------------------- *)
 type ini_options = {
+  ini_ppwidth  : int option;
   ini_why3     : string option;
   ini_ovrevict : string list;
   ini_provers  : string list;
-  ini_idirs    : string list;
-  ini_rdirs    : string list;
+  ini_idirs    : (string option * string) list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -230,14 +233,17 @@ let specs = {
     ("compile", "Check an EasyCrypt file", [
       `Group "loader";
       `Group "provers";
-      `Spec  ("gcstats", `Flag, "Display GC statistics")]);
+      `Spec  ("gcstats", `Flag, "Display GC statistics");
+      `Spec  ("tstats", `String, "Save timing statistics to <file>")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
       `Group "provers";
       `Spec  ("emacs", `Flag, "Output format set to <emacs>")]);
 
-    ("config", "Print EasyCrypt configuration", [])
+    ("config", "Print EasyCrypt configuration", []);
+
+    ("why3config", "Configure why3", []);
   ];
 
   xp_groups = [
@@ -248,6 +254,7 @@ let specs = {
       `Spec ("cpu-factor" , `Int   , "Set the timeout CPU factor");
       `Spec ("check-all"  , `Flag  , "Force checking all files");
       `Spec ("pragmas"    , `String, "Comma-separated list of pragmas");
+      `Spec ("pp-width"   , `Int   , "pretty-printing width");
       `Spec ("profile"    , `Flag  , "Collect some profiling informations");
       `Spec ("iterate"    , `Flag  , "Force to iterate smt call");
     ]);
@@ -294,15 +301,23 @@ let get_strings name values =
   let xs = List.map (function `String x -> x | _ -> assert false) xs in
     List.rev xs
 
+let expand (x : string) =
+  EcRegexp.sub
+    (`C (EcRegexp.regexp "^~"))
+    (`S XDG.home) x
+
+let parse_idir s =
+  match String.Exceptionless.split ~by:":" s with
+  | None -> (None, expand s)
+  | Some (nm, s) -> (Some (expand nm), expand s)
+
 (* -------------------------------------------------------------------- *)
 let ldr_options_of_values ?ini values =
   if get_flag "boot" values then
-    { ldro_idirs = []; ldro_rdirs = []; ldro_boot = true; }
+    { ldro_idirs = []; ldro_boot = true; }
   else
     let idirs = omap_dfl (fun x -> x.ini_idirs) [] ini in
-    let rdirs = omap_dfl (fun x -> x.ini_idirs) [] ini in
-    { ldro_idirs = idirs @ (get_strings "I" values);
-      ldro_rdirs = rdirs @ (get_strings "R" values);
+    { ldro_idirs = idirs @ List.map parse_idir (get_strings "I" values);
       ldro_boot  = false; }
 
 let glb_options_of_values ?ini values =
@@ -330,6 +345,11 @@ let prv_options_of_values ?ini values =
       prvo_cpufactor = odfl 1 (get_int "cpu-factor" values);
       prvo_provers   = provers;
       prvo_pragmas   = get_string_list "pragmas" values;
+      prvo_ppwidth   = begin
+        match get_int "pp-width" values with
+        | None -> obind (fun x -> x.ini_ppwidth) ini
+        | Some i -> Some i
+      end;
       prvo_checkall  = get_flag "check-all" values;
       prvo_profile   = get_flag "profile" values;
       prvo_iterate   = get_flag "iterate" values;
@@ -342,7 +362,8 @@ let cli_options_of_values ?ini values =
 let cmp_options_of_values ?ini values input =
   { cmpo_input   = input;
     cmpo_provers = prv_options_of_values ?ini values;
-    cmpo_gcstats = get_flag "gcstats" values; }
+    cmpo_gcstats = get_flag "gcstats" values;
+    cmpo_tstats  = get_string "tstats" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse ?ini argv =
@@ -364,6 +385,11 @@ let parse ?ini argv =
         if anons != [] then
           raise (Arg.Bad "this command does not take arguments");
         `Config
+
+    | "why3config" ->
+        if anons != [] then
+          raise (Arg.Bad "this command does not take arguments");
+        `Why3Config
 
     | _ -> assert false
   in
@@ -423,26 +449,28 @@ let read_ini_file (filename : string) =
     | Inifiles.Invalid_section _
     | Inifiles.Invalid_element _ -> None
 
+  and tryint name =
+    try  Some (int_of_string (ini#getval sec name))
+    with
+    | Inifiles.Invalid_section _
+    | Inifiles.Invalid_element _
+    | Failure _ -> None
+
   and trylist name =
     try  ini#getaval sec name
     with
     | Inifiles.Invalid_section _
     | Inifiles.Invalid_element _ -> [] in
 
-  let expand (x : string) =
-    EcRegexp.sub
-      (`C (EcRegexp.regexp "^~"))
-      (`S XDG.home) x in
-
   let ini =
-    { ini_why3     = tryget  "why3conf";
+    { ini_ppwidth  = tryint  "pp-width";
+      ini_why3     = tryget  "why3conf";
       ini_ovrevict = trylist "no-evict";
       ini_provers  = trylist "provers" ;
-      ini_idirs    = trylist "idirs"   ;
-      ini_rdirs    = trylist "rdirs"   ; } in
+      ini_idirs    = List.map parse_idir (trylist "idirs"); } in
 
-  { ini_why3     = omap expand ini.ini_why3;
+  { ini_ppwidth  = ini.ini_ppwidth;
+    ini_why3     = omap expand ini.ini_why3;
     ini_ovrevict = ini.ini_ovrevict;
     ini_provers  = ini.ini_provers;
-    ini_idirs    = List.map expand ini.ini_idirs;
-    ini_rdirs    = List.map expand ini.ini_rdirs; }
+    ini_idirs    = ini.ini_idirs; }

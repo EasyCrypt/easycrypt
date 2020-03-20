@@ -1,5 +1,5 @@
 require import AllCore Int IntExtra IntDiv List.
-require import Ring StdRing StdOrder StdBigop ABitstring Distr.
+require import Ring StdRing StdOrder StdBigop Distr.
 require import BitEncoding.
 require (*--*) BitWord MAC_then_Pad_then_CBC.
 (*---*) import BS2Int BitChunking IntID IntOrder Bigint BIA.
@@ -140,8 +140,7 @@ op os2bs (os : octet list) : block list =
 lemma size_bs2os (bs : block list):
   size (bs2os bs) = 16 * size bs.
 proof.
-elim: bs=> //= [|x xs ih].
-+ by rewrite /bs2os /flatten.
+elim: bs=> //= x xs ih.
 rewrite /bs2os /= flatten_cons size_cat size_block ih.
 by algebra.
 qed.
@@ -214,7 +213,7 @@ lemma cbc_enc_cbc_fold P k iv p:
   cbc_enc P k iv p = cbc_enc_fold P k iv p.
 proof.
   rewrite /cbc_enc_fold /= -(cat0s (cbc_enc P k iv p)).
-  elim p iv []=> //= [iv acc|pi p ih iv acc].
+  elim: p iv []=> //= [iv|pi p ih iv acc].
     by rewrite cats0.
   by rewrite -cat_rcons ih.
 qed.
@@ -231,7 +230,7 @@ lemma cbc_dec_cbc_fold Pi k iv c:
   cbc_dec Pi k iv c = cbc_dec_fold Pi k iv c.
 proof.
   rewrite /cbc_dec_fold /= -(cat0s (cbc_dec Pi k iv c)).
-  elim c iv []=> //= [iv acc|ci c ih iv acc].
+  elim: c iv []=> //= [iv|ci c ih iv acc].
     by rewrite cats0.
   by rewrite -cat_rcons ih.
 qed.
@@ -252,7 +251,7 @@ lemma cbc_enc_rcons (P : block -> block -> block) k st (p:block list) pn:
   = cbc_enc P k st (rcons p pn).
 proof.
   elim p st=> //= pi p ih st /=.
-  by rewrite add1z_neq0 1:size_ge0 /= -addzA addzC -addzA (addzC (-1)) -ih.
+  by rewrite add1z_neq0 1:size_ge0 /= addzC (addzC (-1)) -ih.
 qed.
 
 lemma cbc_dec_rcons (Pi : block -> block -> block) k st (c:block list) cn:
@@ -261,8 +260,8 @@ lemma cbc_dec_rcons (Pi : block -> block -> block) k st (c:block list) cn:
 proof.
   elim c st=> //= ci c ih st //=.
   rewrite -lez_add1r /= ler_addl size_ge0 /=.
-  rewrite -addzA addzC -addzA (addzC (-1)) -ih /=.
-  by rewrite ltzNge lez_eqVlt negb_or ltzNge size_ge0 /= if_neg.
+  rewrite addzC -ih /=.
+  by rewrite ltzNge lez_eqVlt negb_or ltzNge size_ge0 /= if_neg addzC.
 qed.
 
 lemma size_cbc_enc P k iv p: size (cbc_enc P k iv p) = size p.
@@ -352,7 +351,7 @@ rewrite max_ler.
 + case: (size m < 16)=> [|/lezNgt] szm_16.
   + by rewrite modz_small 1:size_ge0.
   smt (@IntDiv).
-by congr; ringeq; rewrite -divzE modzMl.
+by do 2! congr; ringeq; rewrite -divzE modzMl.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -457,14 +456,14 @@ realize max_pad_n    by move=> m t szm /=; rewrite size_pad -addrA ltr_add2r.
     specs for the C code... **)
 
 phoare mee_encrypt_correct _mk _ek _p _c:
-  [MEEt.MEE(MEEt.PRPc.PRPr,MEEt.MAC).enc: key = (_ek,_mk) /\ p = _p
+  [MEEt.MEE(MEEt.PRPc.PseudoRP,MEEt.MAC).enc: key = (_ek,_mk) /\ p = _p
                                       ==> res = _c]
   =(mu (dapply (fun iv => iv :: mee_enc AES hmac_sha256 _ek _mk iv _p) dblock) (pred1 _c)).
 proof.
   have->: mu1 (dapply (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p) dblock) _c
           = mu1 (dmap dblock (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)) _c by move.
   rewrite dmap1E /preim /pred1 /=.
-  proc; inline MAC.tag PRPc.PRPr.f.
+  proc; inline MAC.tag PRPc.PseudoRP.f.
   swap 6 -5 => //=; alias 2 iv = s.
   while (   0 <= i <= size (pad _p (hmac_sha256 _mk _p))
          /\ ek = _ek
@@ -481,7 +480,7 @@ proof.
       rewrite (take_nth witness) //= -cbc_enc_rcons -cats1 /=.
       by rewrite size_take // lti_szpadded.
     have -> /=: i{hr} + 1 <> 0 by smt ().
-    by rewrite cats1 nth_rcons size_cbc_enc size_take // lti_szpadded /= -addzA.
+    by rewrite cats1 nth_rcons size_cbc_enc size_take // lti_szpadded /=.
   wp=> //=.
   conseq (_: _ ==> s :: mee_enc AES hmac_sha256 _ek _mk s _p = _c)=> //=.
     move=> &m [->>] ->> iv //=; split=> [[[le0_size _] h]|<<-].
@@ -502,12 +501,12 @@ proof.
 qed.
 
 phoare mee_decrypt_correct _mk _ek _c:
-  [MEEt.MEE(MEEt.PRPc.PRPr,MEEt.MAC).dec: key = (_ek,_mk) /\ c = _c
+  [MEEt.MEE(MEEt.PRPc.PseudoRP,MEEt.MAC).dec: key = (_ek,_mk) /\ c = _c
                                       ==> res = mee_dec AESi hmac_sha256 _ek _mk (head witness _c) (behead _c)]
   =1%r.
 proof.
 conseq (_: true ==> true) (_: _ ==> _)=> //=.
-+ proc; inline MAC.verify PRPc.PRPr.fi; wp.
++ proc; inline MAC.verify PRPc.PseudoRP.fi; wp.
   while (   0 <= i <= size c
          /\ ek = _ek
          /\ s  = (if 0 < i then nth witness c (i - 1) else head witness _c)
@@ -522,10 +521,11 @@ conseq (_: true ==> true) (_: _ ==> _)=> //=.
   auto=> /> &hr; split.
   + by rewrite size_ge0 take0.
   move=> p /lezNgt le_szc_p _ ge_szc_p.
-  rewrite (ler_asym (size p) (size (behead c{hr})) _) ?ge_szc_p ?le_szc_p take_size=> p_def.
+  rewrite (ler_asym (size p) (size (behead c{hr})) _);
+    rewrite ?ge_szc_p ?le_szc_p // take_size => p_def.
   split.
-  + case: {-1}(unpad p) (eq_refl (unpad p))=> //= @/mee_cbc - [] m t; rewrite !oget_some /=.
-    by rewrite /mee_dec /= -p_def=> -> /=; rewrite oget_some.
+  + case: {-1}(unpad p) (eq_refl (unpad p))=> //= @/mee_cbc - [] m t.
+    by rewrite /mee_dec /= -p_def=> -> /=.
   by rewrite /mee_dec -p_def /= => ->.
 by proc; inline *; wp; while true (size c - i); auto=> &hr /#.
 qed.

@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -816,15 +817,20 @@ let f_pr pr_mem pr_fun pr_args pr_event =
   f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
 
 (* -------------------------------------------------------------------- *)
-let fop_int_opp = f_op EcCoreLib.CI_Int.p_int_opp [] (toarrow [tint]       tint)
-let fop_int_add = f_op EcCoreLib.CI_Int.p_int_add [] (toarrow [tint; tint] tint)
-let fop_int_mul = f_op EcCoreLib.CI_Int.p_int_mul [] (toarrow [tint; tint] tint)
-let fop_int_pow = f_op EcCoreLib.CI_Int.p_int_pow [] (toarrow [tint; tint] tint)
+let fop_int_opp   = f_op EcCoreLib.CI_Int.p_int_opp [] (toarrow [tint]       tint)
+let fop_int_add   = f_op EcCoreLib.CI_Int.p_int_add [] (toarrow [tint; tint] tint)
+let fop_int_mul   = f_op EcCoreLib.CI_Int.p_int_mul [] (toarrow [tint; tint] tint)
+let fop_int_pow   = f_op EcCoreLib.CI_Int.p_int_pow [] (toarrow [tint; tint] tint)
 
-let f_int_opp f     = f_app fop_int_opp [f]      tint
-let f_int_add f1 f2 = f_app fop_int_add [f1; f2] tint
-let f_int_mul f1 f2 = f_app fop_int_mul [f1; f2] tint
-let f_int_pow f1 f2 = f_app fop_int_pow [f1; f2] tint
+let fop_int_edivz =
+  f_op EcCoreLib.CI_Int.p_int_edivz []
+       (toarrow [tint; tint] (ttuple [tint; tint]))
+
+let f_int_opp   f     = f_app fop_int_opp [f]      tint
+let f_int_add   f1 f2 = f_app fop_int_add [f1; f2] tint
+let f_int_mul   f1 f2 = f_app fop_int_mul [f1; f2] tint
+let f_int_pow   f1 f2 = f_app fop_int_pow [f1; f2] tint
+let f_int_edivz f1 f2 = f_app fop_int_edivz [f1; f2] tint
 
 let f_int_sub f1 f2 =
   f_int_add f1 (f_int_opp f2)
@@ -834,8 +840,10 @@ let rec f_int (n : BI.zint) =
   | s when 0 <= s -> mk_form (Fint n) tint
   | _             -> f_int_opp (f_int (~^ n))
 
-let f_i0 = f_int BI.zero
-let f_i1 = f_int BI.one
+(* -------------------------------------------------------------------- *)
+let f_i0  = f_int BI.zero
+let f_i1  = f_int BI.one
+let f_im1 = f_int_opp f_i1
 
 (* -------------------------------------------------------------------- *)
 module FSmart = struct
@@ -1321,6 +1329,16 @@ let destr_int f =
 
   | _ -> destr_error "destr_int"
 
+let destr_pvar f =
+  match f.f_node with
+  | Fpvar(x,m) -> (x,m)
+  | _ -> destr_error "destr_pvar"
+
+let destr_glob f =
+  match f.f_node with
+  | Fglob(p,m) -> (p,m)
+  | _ -> destr_error "destr_glob"
+
 (* -------------------------------------------------------------------- *)
 let is_op_and_sym  p = EcPath.p_equal EcCoreLib.CI_Bool.p_and p
 let is_op_and_asym p = EcPath.p_equal EcCoreLib.CI_Bool.p_anda p
@@ -1374,6 +1392,12 @@ let destr_or  = destr_app2 ~name:"or"  is_op_or_any
 let destr_imp = destr_app2 ~name:"imp" is_op_imp
 let destr_iff = destr_app2 ~name:"iff" is_op_iff
 let destr_eq  = destr_app2 ~name:"eq"  is_op_eq
+
+let destr_and3 f =
+  try
+    let c1, (c2, c3) = snd_map destr_and (destr_and f)
+    in  (c1, c2, c3)
+  with DestrError _ -> raise (DestrError "and3")
 
 let destr_eq_or_iff =
   destr_app2 ~name:"eq-or-iff" (fun p -> is_op_eq p || is_op_iff p)
@@ -1436,6 +1460,12 @@ let split_args f =
   match f_node f with
   | Fapp (f, args) -> (f, args)
   | _ -> (f, [])
+
+(* -------------------------------------------------------------------- *)
+let split_fun f =
+  match f_node f with
+  | Fquant (Llambda, bds, body) -> (bds, body)
+  | _ -> ([], f)
 
 (* -------------------------------------------------------------------- *)
 let quantif_of_equantif (qt : equantif) =
@@ -1655,6 +1685,23 @@ module Fsubst = struct
         (s, (x', gty'))
 
   let add_bindings = List.map_fold add_binding
+
+  (* ------------------------------------------------------------------ *)
+  let subst_xpath s f =
+    let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
+    m_subst f
+
+  let subst_stmt s c =
+    let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p
+                s.fs_ty s.fs_opdef s.fs_mp s.fs_esloc in
+    EcModules.s_subst es c
+
+  let subst_me s me =
+    EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty me
+
+  let subst_m s m = Mid.find_def m m s.fs_mem
+
+  let subst_ty s ty = s.fs_ty ty
 
   (* ------------------------------------------------------------------ *)
   let rec f_subst ~tx s fp =

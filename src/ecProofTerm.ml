@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -101,6 +102,16 @@ let ptenv_of_penv (hyps : LDecl.hyps) (pe : proofenv) =
     pte_ev = ref EcMatching.MEV.empty; }
 
 (* -------------------------------------------------------------------- *)
+let rec get_head_symbol (pt : pt_env) (f : form) =
+  match f_node f with
+  | Flocal x -> begin
+      match MEV.get x `Form !(pt.pte_ev) with
+      | Some (`Set (`Form f)) -> get_head_symbol pt f
+      | _ -> f
+    end
+  | _ -> f
+
+(* -------------------------------------------------------------------- *)
 let can_concretize (pt : pt_env) =
   EcMatching.can_concretize !(pt.pte_ev) pt.pte_ue
 
@@ -158,6 +169,14 @@ let pt_of_hyp pf hyps x =
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
+let pt_of_hyp_r ptenv x =
+  let ax = LDecl.hyp_by_id x ptenv.pte_hy in
+
+  { ptev_env = ptenv;
+    ptev_pt  = { pt_head = PTLocal x; pt_args = []; };
+    ptev_ax  = ax; }
+
+(* -------------------------------------------------------------------- *)
 let pt_of_global pf hyps p tys =
   let ptenv = ptenv_of_penv hyps pf in
   let ax    = EcEnv.Ax.instanciate p tys (LDecl.toenv hyps) in
@@ -170,9 +189,18 @@ let pt_of_global pf hyps p tys =
 let pt_of_global_r ptenv p tys =
   let env = LDecl.toenv ptenv.pte_hy in
   let ax  = EcEnv.Ax.instanciate p tys env in
+
   { ptev_env = ptenv;
     ptev_pt  = { pt_head = PTGlobal (p, tys); pt_args = []; };
     ptev_ax  = ax; }
+
+(* -------------------------------------------------------------------- *)
+let pt_of_handle_r ptenv hd =
+  let g = FApi.get_pregoal_by_id hd ptenv.pte_pe in
+
+  { ptev_env = ptenv;
+    ptev_pt  = { pt_head = PTHandle hd; pt_args = []; };
+    ptev_ax  = g.g_concl; }
 
 (* -------------------------------------------------------------------- *)
 let pt_of_uglobal pf hyps p =
@@ -403,6 +431,7 @@ let ffpattern_of_genpattern hyps (ge : genpattern) =
   | `ProofTerm pe     -> Some pe
   | `Form (Some _, _) -> None
   | `Form (None, fp)  -> ffpattern_of_form hyps fp
+  | `LetIn _          -> None
 
 (* -------------------------------------------------------------------- *)
 let process_named_pterm pe (tvi, fp) =
@@ -482,7 +511,7 @@ and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
       let ptn = ref Mid.empty in
       let fp  =
 
-      try  EcTyping.trans_pattern env (ptn, pe.pte_ue) fp
+      try  EcTyping.trans_pattern env ptn pe.pte_ue fp
       with EcTyping.TyError (loc, env, err) ->
         tc_pterm_apperror ~loc pe (AE_InvalidArgForm (IAF_TyError (env, err)))
       in
@@ -545,7 +574,7 @@ and trans_pterm_arg_mem pe ?name { pl_desc = arg; pl_loc = loc; } =
 and process_pterm_arg
     ?implicits ({ ptev_env = pe } as pt) ({ pl_loc = loc; } as arg)
 =
-  match PT.destruct_product pe.pte_hy pt.ptev_ax with
+  match PT.destruct_product pe.pte_hy (get_head_symbol pe pt.ptev_ax) with
   | None -> tc_pterm_apperror ~loc pe AE_NotFunctional
 
   | Some (`Imp (f, _)) -> begin
@@ -646,7 +675,8 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
 
   let oarg = oarg |> omap (fun arg -> arg.ptea_arg) in
 
-  match PT.destruct_product pe.pte_hy pt.ptev_ax with
+
+  match PT.destruct_product pe.pte_hy (get_head_symbol pe pt.ptev_ax) with
   | None   -> tc_pterm_apperror ?loc pe AE_NotFunctional
   | Some t ->
       let (newax, newarg) =
@@ -790,6 +820,7 @@ type prept = [
   | `Hy   of EcIdent.t
   | `G    of EcPath.path * ty list
   | `UG   of EcPath.path
+  | `HD   of handle
   | `App  of prept * prept_arg list
 ]
 
@@ -802,13 +833,14 @@ and prept_arg =  [
 ]
 
 (* -------------------------------------------------------------------- *)
-let pt_of_prept tc pt =
-  let hyps, pe = FApi.tc1_hyps tc, !!tc in
+let pt_of_prept tc (pt : prept) =
+  let ptenv = ptenv_of_penv (FApi.tc1_hyps tc) !!tc in
 
   let rec build_pt = function
-    | `Hy  id         -> pt_of_hyp pe hyps id
-    | `G   (p, tys)   -> pt_of_global pe hyps p tys
-    | `UG  p          -> pt_of_global pe hyps p []
+    | `Hy  id         -> pt_of_hyp_r ptenv id
+    | `G   (p, tys)   -> pt_of_global_r ptenv p tys
+    | `UG  p          -> pt_of_global_r ptenv p []
+    | `HD  hd         -> pt_of_handle_r ptenv hd
     | `App (pt, args) -> List.fold_left app_pt_ev (build_pt pt) args
 
   and app_pt_ev pt_ev = function
@@ -819,3 +851,21 @@ let pt_of_prept tc pt =
     | `H_     -> apply_pterm_to_hole pt_ev
 
   in build_pt pt
+
+(* -------------------------------------------------------------------- *)
+module Prept = struct
+  let (@) f args = `App (f, args)
+
+  let hyp   h     = `Hy h
+  let glob  g tys = `G (g, tys)
+  let uglob g     = `UG g
+  let hdl   h     = `HD h
+
+  let aform f   = `F f
+  let amem m    = `Mem m
+  let amod mp s = `Mod(mp,s)
+  let asub pt   = `Sub pt
+  let h_        = `H_
+  let ahyp h    = asub (hyp h)
+  let ahdl h    = asub (hdl h)
+end

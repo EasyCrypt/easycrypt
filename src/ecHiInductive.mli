@@ -1,6 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2017 - Inria
+ * Copyright (c) - 2012--2018 - Inria
+ * Copyright (c) - 2012--2018 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -37,7 +38,7 @@ type fxerror =
 | FXE_MatchPartial
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
-| FXE_CtorInvalidArity of (int * int)
+| FXE_CtorInvalidArity of (symbol * int * int)
 
 (* -------------------------------------------------------------------- *)
 exception RcError of EcLocation.t * EcEnv.env * rcerror
