@@ -6,6 +6,7 @@ branches:
   - 1.0
   - 1.0-preview
   - /^deploy-.*$/
+  - aprhl
 services:
 - docker
 env:
