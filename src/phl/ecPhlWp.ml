@@ -114,15 +114,15 @@ module TacInternal = struct
     let env = FApi.tc1_env tc in
     let es = tc1_as_aequivS tc in
     let i = omap fst ij and j = omap snd ij in
-    let s_hdl,s_wpl = s_split_o i es.aes_sl in
-    let s_hdr,s_wpr = s_split_o j es.aes_sr in
+    let s_hdl,s_wpl = o_split i es.aes_sl in
+    let s_hdr,s_wpr = o_split j es.aes_sr in
     let meml, s_wpl = EcMemory.memory es.aes_ml, EcModules.stmt s_wpl in
     let memr, s_wpr = EcMemory.memory es.aes_mr, EcModules.stmt s_wpr in
     let post = es.aes_po in
     let s_wpl, post = wp ~uselet env meml s_wpl post in
     let s_wpr, post = wp ~uselet env memr s_wpr post in
-    ignore (check_wp_progress tc i es.aes_sl s_wpl : int);
-    ignore (check_wp_progress tc j es.aes_sr s_wpr : int);
+    check_wp_progress tc i es.aes_sl s_wpl;
+    check_wp_progress tc j es.aes_sr s_wpr;
     let sl = EcModules.stmt (s_hdl @ s_wpl) in
     let sr = EcModules.stmt (s_hdr @ s_wpr) in
     let concl = f_aequivS_r {es with aes_sl = sl; aes_sr=sr; aes_po = post} in
@@ -148,8 +148,8 @@ let t_wp_r ?(uselet=true) k g =
        None (* ------------------- *))
 
     | Some (Double (i, j)) ->
-      (None, 
-       None, 
+      (None,
+       None,
        Some (T.t_equiv_wp ~uselet (Some (i, j))),
        Some (T.t_aequiv_wp  ~uselet None))
 

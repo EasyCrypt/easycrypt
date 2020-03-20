@@ -190,7 +190,8 @@ and norm_lambda (st : state) (f : form) =
   | Fquant  _ | Fif     _ | Fmatch    _ | Flet _ | Fint _ | Flocal _
   | Fglob   _ | Fpvar   _ | Fop       _
   | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _
-  | FequivF _ | FequivS _ | FeagerF   _ | Fpr _
+  | FequivF _ | FequivS _ | FahoareF  _ | FahoareS  _
+  | FaequivF  _ | FaequivS  _ | FeagerF   _ | Fpr _
 
     -> f
 
@@ -496,6 +497,16 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hf_f  = norm_xfun st s hf.hf_f in
     f_hoareF_r { hf_pr; hf_f; hf_po }
 
+  | FahoareF hf ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s mhr));
+    assert (not (Subst.has_mem s mhr));
+    let ahf_pr = norm st s hf.ahf_pr in
+    let ahf_po = norm st s hf.ahf_po in
+    let ahf_f  = norm_xfun st s hf.ahf_f in
+    let ahf_b  = norm st s hf.ahf_b in
+    f_ahoareF_r { ahf_pr; ahf_f; ahf_po; ahf_b; }
+
   | FhoareS hs ->
     assert (is_Aempty args);
     assert (not (Subst.has_mem s (fst hs.hs_m)));
@@ -504,6 +515,16 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
     f_hoareS_r { hs_pr; hs_po; hs_s; hs_m }
+
+  | FahoareS hs ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s (fst hs.ahs_m)));
+    let ahs_pr = norm st s hs.ahs_pr in
+    let ahs_po = norm st s hs.ahs_po in
+    let ahs_s  = norm_stmt s hs.ahs_s in
+    let ahs_b = norm st s hs.ahs_b in
+    let ahs_m  = norm_me s hs.ahs_m in
+    f_ahoareS_r { ahs_pr; ahs_po; ahs_s; ahs_b; ahs_m }
 
   | FbdHoareF hf ->
     assert (is_Aempty args);
@@ -545,6 +566,32 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let es_ml  = norm_me s es.es_ml in
     let es_mr  = norm_me s es.es_mr in
     f_equivS_r {es_ml; es_mr; es_pr; es_sl; es_sr; es_po }
+
+  | FaequivF ef ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s mleft));
+    assert (not (Subst.has_mem s mright));
+    let aef_pr = norm st s ef.aef_pr in
+    let aef_po = norm st s ef.aef_po in
+    let aef_fl = norm_xfun st s ef.aef_fl in
+    let aef_fr = norm_xfun st s ef.aef_fr in
+    let aef_ep = norm st s ef.aef_ep in
+    let aef_dp = norm st s ef.aef_dp in
+    f_aequivF_r { aef_pr; aef_fl; aef_fr; aef_po; aef_ep; aef_dp }
+
+  | FaequivS es ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s (fst es.aes_ml)));
+    assert (not (Subst.has_mem s (fst es.aes_mr)));
+    let aes_pr = norm st s es.aes_pr in
+    let aes_po = norm st s es.aes_po in
+    let aes_sl = norm_stmt s es.aes_sl in
+    let aes_sr = norm_stmt s es.aes_sr in
+    let aes_ml  = norm_me s es.aes_ml in
+    let aes_mr  = norm_me s es.aes_mr in
+    let aes_ep  = norm st s es.aes_ep in
+    let aes_dp  = norm st s es.aes_dp in
+    f_aequivS_r { aes_ml; aes_mr; aes_pr; aes_sl; aes_sr; aes_po; aes_ep; aes_dp }
 
   | FeagerF eg ->
     assert (is_Aempty args);

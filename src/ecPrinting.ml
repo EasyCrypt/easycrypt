@@ -2372,17 +2372,17 @@ let pp_hoareS (ppe : PPEnv.t) ?prpo fmt hs =
     Format.fprintf fmt "%a%!" (pp_post ppe ?prpo) hs.hs_po
 
 (* -------------------------------------------------------------------- *)
-let pp_ahoareF (ppe : PPEnv.t) fmt ahf =
+let pp_ahoareF (ppe : PPEnv.t) ?prpo fmt ahf =
   let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, ahf.ahf_f) in
 
   Format.fprintf fmt "b = %a\n%!" (pp_form ppe) ahf.ahf_b;
   Format.fprintf fmt "@\n%!";
-  Format.fprintf fmt "%a@\n%!" (pp_pre ppe) ahf.ahf_pr;
+  Format.fprintf fmt "%a@\n%!" (pp_pre ppe ?prpo) ahf.ahf_pr;
   Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) ahf.ahf_f;
-  Format.fprintf fmt "@\n%a%!" (pp_post ppe) ahf.ahf_po
+  Format.fprintf fmt "@\n%a%!" (pp_post ppe ?prpo) ahf.ahf_po
 
 (* -------------------------------------------------------------------- *)
-let pp_ahoareS (ppe : PPEnv.t) fmt ahs =
+let pp_ahoareS (ppe : PPEnv.t) ?prpo fmt ahs =
   let ppe = PPEnv.push_mem ppe ~active:true ahs.ahs_m in
   let ppnode = collect2_s ahs.ahs_s.s_node [] in
   let ppnode = c_ppnode ~width:80 ppe ppnode
@@ -2391,11 +2391,11 @@ let pp_ahoareS (ppe : PPEnv.t) fmt ahs =
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "b = %a\n%!" (pp_form ppe) ahs.ahs_b;
     Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_pre ppe) ahs.ahs_pr;
+    Format.fprintf fmt "%a%!" (pp_pre ppe ?prpo) ahs.ahs_pr;
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a" (pp_node `Left) ppnode;
     Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_post ppe) ahs.ahs_po
+    Format.fprintf fmt "%a%!" (pp_post ppe ?prpo) ahs.ahs_po
 
 (* -------------------------------------------------------------------- *)
 let string_of_hrcmp = function
@@ -2508,7 +2508,7 @@ let pp_solvedb ppe fmt db =
   end
 
 (* -------------------------------------------------------------------- *)
-let pp_aequivF (ppe : PPEnv.t) fmt aef =
+let pp_aequivF (ppe : PPEnv.t) ?prpo fmt aef =
   let subppe =
     PPEnv.create_and_push_mems
       ppe [(EcFol.mleft, aef.aef_fl); (EcFol.mright, aef.aef_fr)]
@@ -2517,14 +2517,14 @@ let pp_aequivF (ppe : PPEnv.t) fmt aef =
   Format.fprintf fmt "e = %a@\n%!" (pp_form ppe) aef.aef_ep;
   Format.fprintf fmt "d = %a@\n%!" (pp_form ppe) aef.aef_dp;
   Format.fprintf fmt "@\n%!";
-  Format.fprintf fmt "%a@\n%!" (pp_pre subppe) aef.aef_pr;
+  Format.fprintf fmt "%a@\n%!" (pp_pre subppe ?prpo) aef.aef_pr;
   Format.fprintf fmt "    %a ~ %a@\n%!"
     (pp_funname subppe) aef.aef_fl
     (pp_funname subppe) aef.aef_fr;
-  Format.fprintf fmt "@\n%a%!" (pp_post subppe) aef.aef_po
+  Format.fprintf fmt "@\n%a%!" (pp_post subppe ?prpo) aef.aef_po
 
 (* -------------------------------------------------------------------- *)
-let pp_aequivS (ppe : PPEnv.t) fmt aes =
+let pp_aequivS (ppe : PPEnv.t) ?prpo fmt aes =
   let ppe = PPEnv.push_mems ppe [aes.aes_ml; aes.aes_mr] in
   let ppnode = collect2_s aes.aes_sl.s_node aes.aes_sr.s_node in
   let ppnode = c_ppnode ~width:40 ~mem:(fst aes.aes_ml, fst aes.aes_mr) ppe ppnode in
@@ -2535,11 +2535,11 @@ let pp_aequivS (ppe : PPEnv.t) fmt aes =
     Format.fprintf fmt "e = %a@\n%!" (pp_form ppe) aes.aes_ep;
     Format.fprintf fmt "d = %a@\n%!" (pp_form ppe) aes.aes_dp;
     Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_pre ppe) aes.aes_pr;
+    Format.fprintf fmt "%a%!" (pp_pre ppe ?prpo) aes.aes_pr;
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a" (pp_node `Both) ppnode;
     Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_post ppe) aes.aes_po
+    Format.fprintf fmt "%a%!" (pp_post ppe ?prpo) aes.aes_po
 
 (* -------------------------------------------------------------------- *)
 type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [

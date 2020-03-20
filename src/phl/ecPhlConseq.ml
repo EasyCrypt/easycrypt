@@ -216,18 +216,6 @@ let t_equivF_notmod post tc =
   let cond2 = f_equivF_r {ef with ef_po = post } in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
-(* -------------------------------------------------------------------- *)
-let cond_equivS_notmod ?(mk_other=false) tc cond =
-  let env = FApi.tc1_env tc in
-  let es = tc1_as_equivS tc in
-  let sl, sr = es.es_sl, es.es_sr in
-  let ml, mr = fst es.es_ml, fst es.es_mr in
-  let modil, modir = s_write env sl, s_write env sr in
-  let cond = generalize_mod env mr modir cond in
-  let cond = generalize_mod env ml modil cond in
-  let cond1 = f_forall_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
-  let cond2 = f_equivS_r { es with es_po = post; } in
-  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
 let t_aequivS_notmod post tc =
@@ -241,6 +229,15 @@ let t_aequivS_notmod post tc =
   let cond = generalize_mod env ml modil cond in
   let cond1 = f_forall_mems [aes.aes_ml; aes.aes_mr] (f_imp aes.aes_pr cond) in
   let cond2 = f_aequivS_r { aes with aes_po = post; } in
+  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
+
+(* -------------------------------------------------------------------- *)
+let cond_equivS_notmod ?(mk_other=false) tc cond =
+  let env = FApi.tc1_env tc in
+  let es = tc1_as_equivS tc in
+  let sl, sr = es.es_sl, es.es_sr in
+  let ml, mr = fst es.es_ml, fst es.es_mr in
+  let modil, modir = s_write env sl, s_write env sr in
   let cond, bdgr, bder = generalize_mod_ env mr modir cond in
   let cond, bdgl, bdel = generalize_mod_ env ml modil cond in
   let cond = f_forall_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
@@ -252,7 +249,6 @@ let t_aequivS_notmod post tc =
     else [] in
   cond, bmem, bother
 
-(* --------------------------------------------------------------------- *)
 let t_equivS_notmod post tc =
   let es = tc1_as_equivS tc in
   let cond1,_,_ = cond_equivS_notmod tc (f_imp post es.es_po) in

@@ -160,9 +160,9 @@ let rec t_aequiv_cond side tc =
              (FApi.t_seqsub
                 (t_equiv_cond (Some `Left))
                 [FApi.t_seqsub
-                   (EcPhlRCond.Low.t_equiv_rcond `Right true  1)
+                   (EcPhlRCond.Low.t_equiv_rcond `Right true  (Zpr.cpos 1))
                    [t_aux; t_clear hiff];
                  FApi.t_seqsub
-                   (EcPhlRCond.Low.t_equiv_rcond `Right false 1)
+                   (EcPhlRCond.Low.t_equiv_rcond `Right false (Zpr.cpos 1))
                    [t_aux; t_clear hiff]]))
           tc
