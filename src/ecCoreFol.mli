@@ -200,6 +200,8 @@ val f_node  : form -> f_node
 
 (* -------------------------------------------------------------------- *)
 (* not recursive *)
+val cost_map  : (form -> form) -> cost -> cost
+val cost_iter : (form -> unit) -> cost -> unit
 val f_map  : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 val f_iter : (form -> unit) -> form -> unit
 val form_exists: (form -> bool) -> form -> bool

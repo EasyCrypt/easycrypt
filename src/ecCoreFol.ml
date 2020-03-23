@@ -986,6 +986,10 @@ end
 let cost_map g cost =
   cost_r (g cost.c_self) (EcPath.Mx.map g cost.c_calls)
 
+let cost_iter g cost =
+  g cost.c_self;
+  EcPath.Mx.iter (fun _ f -> g f) cost.c_calls
+
 let f_map gt g fp =
   match fp.f_node with
   | Fquant(q, b, f) ->
@@ -1132,10 +1136,10 @@ let f_iter g f =
 
   | FhoareF  hf  -> g hf.hf_pr; g hf.hf_po
   | FhoareS  hs  -> g hs.hs_pr; g hs.hs_po
-  | FcHoareF  chf -> g chf.chf_pr; g chf.chf_po
-  | FcHoareS  chs -> g chs.chs_pr; g chs.chs_po
-  | FbdHoareF bhf -> g bhf.bhf_pr; g bhf.bhf_po
-  | FbdHoareS bhs -> g bhs.bhs_pr; g bhs.bhs_po
+  | FcHoareF  chf -> g chf.chf_pr; g chf.chf_po; cost_iter g chf.chf_co
+  | FcHoareS  chs -> g chs.chs_pr; g chs.chs_po; cost_iter g chs.chs_co
+  | FbdHoareF bhf -> g bhf.bhf_pr; g bhf.bhf_po; g bhf.bhf_bd
+  | FbdHoareS bhs -> g bhs.bhs_pr; g bhs.bhs_po; g bhs.bhs_bd
   | FequivF   ef  -> g ef.ef_pr; g ef.ef_po
   | FequivS   es  -> g es.es_pr; g es.es_po
   | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
