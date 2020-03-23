@@ -279,7 +279,7 @@ section.
           H.init : 1].
   proof.
   proc.
-  seq 5 : (size IW.qs <= k1 + k2) [(4 + kf) * (k1 + k2) + 2 * (k1 + k2 + 1) + 1].
+  seq 5 : (size IW.qs <= k1 + k2) [kloop].
   call (_: true ;
     (IW(A, H).QRO.o : size IW.qs - k1)
     time
@@ -305,11 +305,11 @@ section.
 
   (* we bound the list lookup time. *)
   (* wp : (size I.qs <= k1 + k2). *)
-  while (true) (k1 + k2 - size qs0) (k1 + k2) [fun _ => 4 + kf].
+  while (true) (size qs0) (k1 + k2) [fun _ => 4 + kf].
   + move => z /=; auto => * /=; split; [2 : by smt (kfp)]. 
     move: H; case: (qs0{hr}); first by smt (). 
-    move => x0 l; have := size_ge0 l; by smt (k1p k2p).
-  + move => &hr; have := size_ge0 qs0{hr}; by smt (k1p k2p).
+    move => x0 l; have := size_ge0 l; by smt (). 
+  + move => &hr; case: (qs0{hr}) => * //; have := size_ge0 l; by smt ().  
   auto; move => &hr /=; rewrite !big_constz !count_predT !size_range. 
   smt (k1p k2p kfp).
 qed.
