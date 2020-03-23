@@ -157,7 +157,7 @@ and pr = {
   pr_event : form;
 }
 
-and cost = {
+and cost = private {
   c_self  : form;
   c_calls : form EcPath.Mx.t;
 }
@@ -241,6 +241,8 @@ val f_hoareF : form -> xpath -> form -> form
 val f_hoareS : memenv -> form -> stmt -> form -> form
 
 (* soft-constructors - cost hoare *)
+val cost_r : form -> form EcPath.Mx.t -> cost
+
 val f_cHoareF_r : cHoareF -> form
 val f_cHoareS_r : cHoareS -> form
 

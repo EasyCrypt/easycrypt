@@ -964,8 +964,9 @@ module FPosition = struct
                     EcPath.Mx.change
                       (fun old -> assert (old = None); Some c) f acc
                   ) EcPath.Mx.empty fkeys calls in
+                let cost = cost_r c_self c_calls in
                 f_cHoareF_r { chf with chf_pr; chf_po;
-                                       chf_co = { c_self; c_calls }; }
+                                       chf_co = cost; }
               | _ -> assert false end
 
           | FbdHoareF hf ->

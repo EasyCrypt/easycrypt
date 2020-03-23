@@ -227,7 +227,8 @@ and pfrange = [
 
 and pfindex = [ `Index of int | `Match of pformula * int option]
 
-and pcost_calls  = (pgamepath * pformula) list
+and pcost_call  = psymbol * psymbol * pformula
+and pcost_calls = pcost_call list
 
 and pcost  = PC_costs of pformula * pcost_calls
 

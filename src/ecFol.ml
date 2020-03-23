@@ -978,35 +978,46 @@ let destr_ands ~deep =
 
 (* -------------------------------------------------------------------- *)
 let cost_sub_self c a =
-  { c with c_self = f_int_sub_simpl c.c_self a }
+  let c_self = f_int_sub_simpl c.c_self a in
+
+  cost_r c_self c.c_calls
 
 let cost_add_self c a =
-  { c with c_self = f_int_add_simpl c.c_self a }
+  let c_self = f_int_add_simpl c.c_self a in
+
+  cost_r c_self c.c_calls
 
 let cost_sub_call c f a =
-  { c with c_calls = EcPath.Mx.change (fun b ->
-        let b = odfl f_i0 b in
-        f_int_sub_simpl b a |> some
-      ) f c.c_calls }
+  let c_calls = EcPath.Mx.change (fun b ->
+      let b = odfl f_i0 b in
+      f_int_sub_simpl b a |> some
+    ) f c.c_calls in
+
+  cost_r c.c_self c_calls
 
 let cost_add_call c f a =
-  { c with c_calls = EcPath.Mx.change (fun b ->
-        let b = odfl f_i0 b in
-        f_int_add_simpl b a |> some
-      ) f c.c_calls }
+  let c_calls = EcPath.Mx.change (fun b ->
+      let b = odfl f_i0 b in
+      f_int_add_simpl b a |> some
+    ) f c.c_calls in
+
+  cost_r c.c_self c_calls
 
 let cost_op op c1 c2 =
   EcPath.Mx.fold2_union (fun f c1 c2 c ->
       let c1, c2 = odfl f_i0 c1, odfl f_i0 c2 in
-      { c with c_calls = EcPath.Mx.add f (op c1 c2) c.c_calls}
+      let c_calls = EcPath.Mx.add f (op c1 c2) c.c_calls in
+      cost_r c.c_self c_calls
     ) c1.c_calls c2.c_calls
-    { c_self = op c1.c_self c2.c_self; c_calls = EcPath.Mx.empty }
+
+    (cost_r (op c1.c_self c2.c_self) EcPath.Mx.empty)
 
 let cost_map f_map c =
   EcPath.Mx.fold (fun f c res ->
-      { res with c_calls = EcPath.Mx.add f (f_map c) res.c_calls}
+      let c_calls = EcPath.Mx.add f (f_map c) res.c_calls in
+      cost_r res.c_self c_calls
     ) c.c_calls
-    { c_self = f_map c.c_self; c_calls = EcPath.Mx.empty }
+    (cost_r (f_map c.c_self) EcPath.Mx.empty)
 
 let cost_app c args = cost_map (fun c -> f_app c args tint) c
 

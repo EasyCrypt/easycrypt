@@ -273,8 +273,8 @@ section.
   local lemma bound_i :     
     choare[IW0.invert: true ==> true] 
     time [4 + 2 * (k1 + k2) + kloop; 
-          IW0.A0.a1 : 1; 
-          IW0.A0.a2 : 1; 
+          A.a1 : 1; 
+          A.a2 : 1; 
           H.o : k1 + k2;
           H.init : 1].
   proof.

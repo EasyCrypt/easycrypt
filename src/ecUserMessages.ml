@@ -474,7 +474,10 @@ end = struct
 
     | SchemaMemBinderBelowCost ->
       msg "predicates binding memories are not allowed below a cost statement \
-           in a schema."
+           in a schema"
+
+    | ModuleNotAbstract m ->
+      msg "the module %s is not abstract" m
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

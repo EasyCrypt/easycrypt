@@ -320,9 +320,7 @@ module FunAbsLow = struct
     let pre_inv  = f_and_simpl pre_eqs inv
     and post_inv = f_and_simpl post_eqs inv in
 
-    let f_cost = { c_self = f_i0;
-                   c_calls =
-                     Mx.singleton (EcEnv.NormMp.norm_xfun env f) f_i1 } in
+    let f_cost = cost_r f_i0 (Mx.singleton (EcEnv.NormMp.norm_xfun env f) f_i1)  in
 
     let orcls_cost = List.map (fun o ->
         let cbd = cost_orcl oi o in

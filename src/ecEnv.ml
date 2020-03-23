@@ -2499,7 +2499,8 @@ module NormMp = struct
              chf.chf_po == post' && chf.chf_co.c_self == c_self' &&
              Mx.equal (fun a b -> a == b) chf.chf_co.c_calls c_calls'
           then f else
-            f_cHoareF pre' p' post' {c_self = c_self'; c_calls = c_calls' }
+            let calls' = cost_r c_self' c_calls' in
+            f_cHoareF pre' p' post' calls'
 
         (* TODO: A: why is there no case for FbdHoareF and every F*HoareS ? *)
 

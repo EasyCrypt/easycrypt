@@ -1067,7 +1067,7 @@ sc_ptybindings_decl:
 %inline none: IMPOSSIBLE { assert false }
 
 orcl_time(P):
- | o=loc(fident) COLON c=form_r(P) { (o, c) }
+ | m=uident DOT f=lident COLON c=form_r(P) { (m,f, c) }
 
 cost_calls(P,S):
 | calls=rlist1(orcl_time(P), S) { calls }

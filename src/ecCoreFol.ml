@@ -158,6 +158,8 @@ and coe = {
   coe_e   : expr;
 }
 
+(* Invariant: keys of c_calls are functions of local modules,
+   with no arguments. *)
 and cost = {
   c_self  : form;
   c_calls : form EcPath.Mx.t;
@@ -793,6 +795,16 @@ let f_hoareF hf_pr hf_f hf_po =
   f_hoareF_r { hf_pr; hf_f; hf_po; }
 
 (* -------------------------------------------------------------------- *)
+let cost_r c_self c_calls =
+  (* Invariant: keys of c_calls are functions of local modules,
+     with no arguments. *)
+  assert (EcPath.Mx.for_all (fun x _ ->
+      match x.x_top.m_top with
+      | `Local _ -> x.x_top.m_args = []
+      | _ -> false
+    ) c_calls);
+  { c_self; c_calls; }
+
 let f_cHoareS_r chs = mk_form (FcHoareS chs) tbool
 let f_cHoareF_r chf = mk_form (FcHoareF chf) tbool
 
@@ -972,8 +984,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 let cost_map g cost =
-  { c_self = g cost.c_self;
-    c_calls = EcPath.Mx.map g cost.c_calls; }
+  cost_r (g cost.c_self) (EcPath.Mx.map g cost.c_calls)
 
 let f_map gt g fp =
   match fp.f_node with
@@ -2083,13 +2094,14 @@ module Fsubst = struct
   and add_bindings ~tx = List.map_fold (add_binding ~tx)
 
   and cost_subst ~tx s cost =
-    { c_self = f_subst ~tx s cost.c_self;
-      c_calls = EcPath.Mx.fold (fun x f calls ->
-          let x' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp x in
-          let f' = f_subst ~tx s f in
-          EcPath.Mx.change (fun old -> assert (old  = None); Some f') x' calls
-        ) cost.c_calls EcPath.Mx.empty
-    }
+    let c_self = f_subst ~tx s cost.c_self
+    and c_calls = EcPath.Mx.fold (fun x f calls ->
+        let x' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp x in
+        let f' = f_subst ~tx s f in
+        EcPath.Mx.change (fun old -> assert (old  = None); Some f') x' calls
+      ) cost.c_calls EcPath.Mx.empty in
+
+    cost_r c_self c_calls
 
   (* ------------------------------------------------------------------ *)
   let add_binding  = add_binding ~tx:(fun _ f -> f)

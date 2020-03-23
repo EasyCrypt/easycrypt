@@ -178,7 +178,7 @@ and norm_cost st s c =
         and c' = norm st s c in
         EcPath.Mx.change (fun old -> assert (old = None); Some c') f' calls
       ) c.c_calls EcPath.Mx.empty in
-  { c_self = self'; c_calls = calls' }
+  cost_r self' calls'
 
 
 and norm_lambda (st : state) (f : form) =

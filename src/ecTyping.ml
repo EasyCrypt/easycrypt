@@ -156,6 +156,7 @@ type tyerror =
 | MissingMemType
 | SchemaVariableReBinded of EcIdent.t
 | SchemaMemBinderBelowCost
+| ModuleNotAbstract      of symbol
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -1602,6 +1603,23 @@ let trans_gamepath (env : EcEnv.env) gp =
         if _sig.miss_params <> [] then
           tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
         EcPath.xpath mpath funsymb
+
+(* -------------------------------------------------------------------- *)
+let trans_oracle (env : EcEnv.env) (m,f) =
+  let msymbol = mk_loc (loc m) [m,None] in
+  let (mpath, sig_) = trans_msymbol env msymbol in
+
+  let () = match mpath.m_top with
+    | `Local _ -> ()
+    | `Concrete _ ->
+      tyerror (loc m) env (ModuleNotAbstract (unloc m)) in
+
+  let fmem = List.exists (fun (Tys_function fs) ->
+      fs.fs_name = unloc f) sig_.miss_body in
+  if not fmem then
+    tyerror (loc f) env (UnknownFunName ([unloc m],unloc f));
+
+  EcPath.xpath mpath (unloc f)
 
 (* -------------------------------------------------------------------- *)
 let trans_topmsymbol env gp =
@@ -3135,20 +3153,18 @@ and trans_form_or_pattern
         let post'  = transf qenv post in
 
         let self'  = transf env self in
-        let calls' = List.map (fun (f,c) ->
-            let f = trans_gamepath env f
-                    |> EcEnv.NormMp.norm_xfun env
-            and f_c = transf env c in
-            f, f_c
+        let calls' = List.map (fun (m,fn,c) ->
+            let fn = trans_oracle env (m,fn) in
+            let f_c = transf env c in
+            fn, f_c
           ) calls in
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           unify_or_fail env  ue self.pl_loc ~expct:tint  self'.f_ty;
-          List.iter2 (fun (_,c') (_,c) ->
+          List.iter2 (fun (_,c') (_,_,c) ->
               unify_or_fail env ue c.pl_loc ~expct:tint c'.f_ty
             ) calls' calls;
-          let cost' = { c_self = self';
-                        c_calls = Mx.of_list calls'; } in
+          let cost' = cost_r self' (Mx.of_list calls') in
           (* Sanity check *)
           assert (List.length calls' = Mx.cardinal cost'.c_calls);
           f_cHoareF pre' fpath post' cost'
