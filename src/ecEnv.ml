@@ -2491,7 +2491,7 @@ module NormMp = struct
           and post' = aux chf.chf_po in
           let c_self' = aux chf.chf_co.c_self in
           let c_calls' = Mx.fold (fun f c calls ->
-              let f' = norm_xfun env f
+              let f' = f        (* not normalized. *)
               and c' = aux c in
               Mx.change (fun old -> assert (old = None); Some c') f' calls
             ) chf.chf_co.c_calls Mx.empty in

@@ -205,7 +205,7 @@ module FunAbsLow = struct
     (inv, inv, sg)
 
   (* ------------------------------------------------------------------ *)
-  let choareF_abs_spec _pf env f inv (xv, xc : abs_inv_inf) =
+  let choareF_abs_spec pf_ env f inv (xv, xc : abs_inv_inf) =
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let ppe = EcPrinting.PPEnv.ofenv env in
 
@@ -223,7 +223,7 @@ module FunAbsLow = struct
     let cost_orcl oi o = match OI.cost oi o with
       | Some cbd -> cbd
       | None     ->
-        tc_error _pf "the number of calls to %a is unbounded"
+        tc_error pf_ "the number of calls to %a is unbounded"
           (EcPrinting.pp_funname ppe) o in
 
     (* We create the oracles invariants *)
@@ -283,7 +283,7 @@ module FunAbsLow = struct
       let cost = List.find_opt (fun (x,_) -> x_equal x o_called) xc in
       let cost = match cost with
         | None ->
-          tc_error _pf "no cost has been supplied for %a"
+          tc_error pf_ "no cost has been supplied for %a"
             (EcPrinting.pp_funname ppe) o_called
         | Some (_,cost) -> cost in
       let k_cost = cost_app cost [oget !k_called] in
@@ -320,7 +320,8 @@ module FunAbsLow = struct
     let pre_inv  = f_and_simpl pre_eqs inv
     and post_inv = f_and_simpl post_eqs inv in
 
-    let f_cost = cost_r f_i0 (Mx.singleton (EcEnv.NormMp.norm_xfun env f) f_i1)  in
+    let fn_orcl = EcPath.xpath top f.x_sub in
+    let f_cost = cost_r f_i0 (Mx.singleton fn_orcl f_i1)  in
 
     let orcls_cost = List.map (fun o ->
         let cbd = cost_orcl oi o in

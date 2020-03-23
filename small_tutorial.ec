@@ -202,7 +202,8 @@ lemma advcompl_inst :
     choare[MyAdv(MyH).a : true ==> true] 
       time [4].
 proof.
-  have h := (advcompl MyH).
+  (* Next two tactics should fail, as lemma application to choare judgement is not yet implemented. *)
+  (* have h := (advcompl MyH). *)
   (* apply h. *)
   admit.
 qed.
@@ -225,7 +226,7 @@ lemma invcompl
     (H0   <: H) : 
     0 <= k =>
     choare[Inv(Adv0, H0).i : true ==> true] 
-      time [1; Inv(Adv0, H0).Adv1.a : 1; H0.o : k ].
+      time [1; Adv0.a : 1; H0.o : k ].
 proof.    
   move => hk; proc. 
   call(_: true; time (H0.o : [fun _ => 0; H0.o : fun _ => 1])).

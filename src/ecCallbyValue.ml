@@ -174,7 +174,8 @@ and norm_cost st s c =
   let self'  = norm st s c.c_self
   and calls' =
     EcPath.Mx.fold (fun f c calls ->
-        let f' = norm_xfun st s f
+        (* We do not normalize the xpath, as it is not a valid xpath. *)
+        let f' = Subst.subst_xpath s f
         and c' = norm st s c in
         EcPath.Mx.change (fun old -> assert (old = None); Some c') f' calls
       ) c.c_calls EcPath.Mx.empty in
