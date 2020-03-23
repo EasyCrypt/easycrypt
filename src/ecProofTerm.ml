@@ -469,7 +469,6 @@ let process_named_schema pe (tvi, sn) =
 
   let typ = sc.EcDecl.axs_tparams in
 
-  (* TODO: A: check that type variables typing is ok. *)
   let tvi =
     Exn.recast_pe pe.pte_pe pe.pte_hy
       (fun () -> omap (EcTyping.transtvi env pe.pte_ue) tvi) in

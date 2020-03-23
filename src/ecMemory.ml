@@ -42,7 +42,6 @@ let mk_lmt mt_name mt_decl mt_proj =
 
 (* [Lmt_schema] if for an axiom schema, and is instantiated to a concrete
    memory type when the axiom schema is.  *)
-(* TODO: A: check what to do with Lmt_schema in this module (cf assert false)*)
 type memtype =
   | Lmt_concrete of local_memtype option
   | Lmt_schema

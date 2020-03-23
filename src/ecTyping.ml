@@ -2042,8 +2042,6 @@ and transmodsig_body
       let in_xs (Tys_function fs) xs =
         List.exists (fun x -> sym_equal fs.fs_name (unloc x)) xs in
 
-      (* TODO: A: the [restr] value comes from the signature_item INCLUDE entry
-         in the parser. Should it be extended to more complex restrictions?*)
       let calls = trans_restr_oracle_calls env env sa restr in
 
       let update_mr mr (Tys_function fs) =
@@ -3217,7 +3215,7 @@ and trans_form_or_pattern
         begin match oty with
           | None -> ()
           | Some pty ->
-            (* TODO: A: check that we want tp_uni *)
+            (* TODO: A: check that we want tp_relax *)
             let ty = transty tp_relax fenv ue pty in
             unify_or_fail fenv ue (loc pty) ~expct:ty ety;
         end;
@@ -3237,7 +3235,7 @@ and trans_form_or_pattern
         begin match oty with
           | None -> ()
           | Some pty ->
-            (* TODO: A: check that we want tp_uni *)
+            (* TODO: A: check that we want tp_relax *)
             let ty = transty tp_relax fenv ue pty in
             unify_or_fail fenv ue (loc pty) ~expct:ty ety;
         end;
