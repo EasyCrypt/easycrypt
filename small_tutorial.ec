@@ -186,7 +186,7 @@ module (MyAdv : Adv) (H0 : H) = {
 lemma advcompl
     (H0   <: H) : 
     choare[MyAdv(H0).a : true ==> true] 
-      time [2; H0.o : 2 ].
+      time [2; H0.o : 2].
 proof.
   proc; do !(call(_: true; time)); auto => /=.
 qed.

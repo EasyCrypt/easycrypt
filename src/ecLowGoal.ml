@@ -106,58 +106,6 @@ module LowApply = struct
    in List.for_all h_eqs ld1.h_local
 
   (* ------------------------------------------------------------------ *)
-  let choare_modapply_args x f =
-    (* We look for procedures of x used in f. *)
-    let all_procs = ref EcMaps.Sstr.empty in
-
-    let is_instantiated fn =
-      (* Sanity check *)
-      assert (fn.x_top.m_args = []);
-      let id = EcPath.mget_ident fn.x_top in
-      EcIdent.id_equal id x in
-
-    let add_el fn _ =
-      if is_instantiated fn then
-        all_procs := EcMaps.Sstr.add fn.x_sub !all_procs in
-
-    let rec doit f =
-      let () = match f.f_node with
-        | FcHoareF choare ->
-          Mx.iter add_el choare.chf_co.c_calls
-        | FcHoareS choare ->
-          Mx.iter add_el choare.chs_co.c_calls
-        | _ -> () in
-      f_iter doit f in
-
-    doit f;
-
-    (* All procedures for which a choare must be provided in the mod
-       application. *)
-    let all_procs = EcMaps.Sstr.elements !all_procs in
-
-    let apply cost cost_insts =
-      let procs_to_inst = Mx.fold (fun fn _ procs ->
-          if is_instantiated fn then fn :: procs else procs
-        ) cost.c_calls [] in
-
-      (* We remove from cost the oracle calls we instantiate. *)
-      let c_calls = Mx.filter (fun fn _ ->
-          not (is_instantiated fn)) cost.c_calls in
-      let inst_cost = cost_r cost.c_self c_calls in
-
-      (* We compute the new cost. *)
-      List.fold_left (fun inst_cost fn_to_inst ->
-          let proc_cost = List.assoc fn_to_inst cost_insts in
-          cost_op (fun f1 f2 ->
-              let nb_calls = Mx.find fn_to_inst cost.c_calls in
-              f_int_add_simpl f1 (f_int_mul_simpl nb_calls f2)
-            ) inst_cost proc_cost
-        ) inst_cost procs_to_inst in
-
-    (all_procs, apply)
-
-
-  (* ------------------------------------------------------------------ *)
   let rec check_pthead (pt : pt_head) (tc : ckenv) =
     let hyps = hyps_of_ckenv tc in
 
