@@ -1,16 +1,54 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 
-# (c) Pierre-Yves Strub - 2014--2015
+# (c) Pierre-Yves Strub - 2014--2020
 
 # --------------------------------------------------------------------
-import sys, os, re, yaml, yamltypes, cStringIO as sio
+import sys, os, re, yaml, yaml.loader as yloader, schema
 import tempfile, fnmatch
 
 # --------------------------------------------------------------------
-META = 'COPYRIGHT.meta.yaml'
+META = schema.Schema(dict(
+    entities   = schema.Schema({}, ignore_extra_keys = True),
+    copyrights = [dict(
+        pattern    = [str],
+        style      = str,
+        license    = str,
+        copyrights = [dict(who = str, date = str)],
+    )],
+))
 
 # --------------------------------------------------------------------
-class Object(object):
+class AttrDict(dict):
+   def __getattr__(self, name):
+       return self[name]
+
+class AttrDictSafeConstructor(yloader.SafeConstructor):
+   def construct_yaml_map(self, node):
+       data = AttrDict()
+       yield data
+       value = self.construct_mapping(node)
+       data.update(value)
+
+AttrDictSafeConstructor.add_constructor(
+  u'tag:yaml.org,2002:map', AttrDictSafeConstructor.construct_yaml_map)
+
+class AttrDictSafeLoader(yloader.Reader         ,
+                         yloader.Scanner        ,
+                         yloader.Parser         ,
+                         yloader.Composer       ,
+                         AttrDictSafeConstructor,
+                         yloader.Resolver       ):
+
+    def __init__(self, stream):
+        yloader.Reader.__init__(self, stream)
+        yloader.Scanner.__init__(self)
+        yloader.Parser.__init__(self)
+        yloader.Composer.__init__(self)
+        AttrDictSafeConstructor.__init__(self)
+        yloader.Resolver.__init__(self)
+
+# --------------------------------------------------------------------
+class Object:
     def __init__(self, **kw):
         self.__dict__.update(kw)
 
@@ -19,7 +57,7 @@ class CopyrightError(Exception):
     pass
 
 # --------------------------------------------------------------------
-class Copyright(object):
+class Copyright:
     COPYRIGHT = 'Copyright (c) - %s - %s'
     LICENSE   = 'Distributed under the terms of the %s license'
 
@@ -74,7 +112,7 @@ class Copyright(object):
         return aout
 
 # --------------------------------------------------------------------
-class CopyrightStyle(object):
+class CopyrightStyle:
     STYLES = dict()
 
     def strip(self, contents):
@@ -134,15 +172,16 @@ CopyrightStyle.STYLES['elisp'] = ELispCopyrightStyle
 def _main():
     # ----------------------------------------------------------------
     if len(sys.argv)-1 < 2:
-        print >>sys.stderr, "Usage: %s [CONFIG] [FILES...]" % (sys.argv[0],)
+        print("Usage: %s [CONFIG] [FILES...]" % (sys.argv[0],), file=sys.stderr)
         exit(1)
     inifile  = sys.argv[1]
     srcfiles = sys.argv[2:]
 
     # ----------------------------------------------------------------
-    meta = os.path.join(os.path.dirname(__file__), META)
-    ini  = yamltypes.YamlConfig(inifile, specfn = meta)
-    ini  = Copyright(ini)
+    with open(inifile, 'r') as stream:
+        ini = yaml.load(stream, Loader = AttrDictSafeLoader)
+    META.validate(ini)
+    ini = Copyright(ini)
 
     # ----------------------------------------------------------------
     for filename in srcfiles:

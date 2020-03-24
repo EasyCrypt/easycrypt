@@ -312,9 +312,9 @@ let t_change_r ?target action (tc : tcenv1) =
   end
 
 (* -------------------------------------------------------------------- *)
-let t_change ?target (fp : form) (tc : tcenv1) =
+let t_change ?redinfo ?target (fp : form) (tc : tcenv1) =
   let action (lazy hyps) tgfp =
-    if not (EcReduction.is_conv hyps fp tgfp) then
+    if not (EcReduction.is_conv ?redinfo hyps fp tgfp) then
       raise InvalidGoalShape;
     if fp == tgfp then None else Some fp
 
@@ -1490,8 +1490,8 @@ type rwmode = [`Bool | `Eq]
 
 (* -------------------------------------------------------------------- *)
 let t_rewrite
-  ?xconv ?target ?(mode : rwmode option) ?(donot=false)(pt : proofterm)
-    (s, pos) (tc : tcenv1)
+   ?xconv ?keyed ?target ?(mode : rwmode option) ?(donot=false)
+   (pt : proofterm) (s, pos) (tc : tcenv1)
 =
   let tc           = RApi.rtcenv_of_tcenv1 tc in
   let (hyps, tgfp) = RApi.tc_flat ?target tc in
@@ -1534,7 +1534,7 @@ let t_rewrite
 
   let npos  =
     match pos with
-    | None     -> FPosition.select_form ?xconv hyps None left tgfp
+    | None     -> FPosition.select_form ?keyed ?xconv hyps None left tgfp
     | Some pos -> pos in
 
   let tgfp =

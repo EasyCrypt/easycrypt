@@ -404,6 +404,11 @@ module BaseRw : sig
 end
 
 (* -------------------------------------------------------------------- *)
+
+type redinfo =
+  { ri_before_fix : (EcTheory.rule list) EcMaps.Mint.t;
+    ri_after_fix  : (EcTheory.rule list) EcMaps.Mint.t; }
+
 module Reduction : sig
   type rule   = EcTheory.rule
   type topsym = [
@@ -412,9 +417,9 @@ module Reduction : sig
     | `Cost of [`Path of path | `Tuple]
   ]
 
-  val add1 : path * rule option -> env -> env
-  val add  : (path * rule option) list -> env -> env
-  val get  : topsym -> env -> rule list
+  val add1 : path * rule_option * rule option -> env -> env
+  val add  : (path * rule_option * rule option) list -> env -> env
+  val get  : topsym -> env -> redinfo
 end
 
 (* -------------------------------------------------------------------- *)

@@ -1,7 +1,7 @@
-#! /usr/bin/env python2
+#! /usr/bin/env python3
 
 # --------------------------------------------------------------------
-import sys, os, re, time, errno, itertools as it, StringIO as sio
+import sys, os, re, time, errno, itertools as it, io
 
 # --------------------------------------------------------------------
 MODES = dict(
@@ -33,7 +33,7 @@ def _options():
     options.mode     = options.mode[0]
 
     if options.mode not in MODES:
-        parser.error("invalid mode: `%s'" % (options.mode[0],))
+        parser.error("invalid mode: `%s'" % (options.mode,))
 
     if MODES[options.mode] is not (options.template is not None):
         if MODES[options.mode]:
@@ -49,26 +49,26 @@ def _options():
 # --------------------------------------------------------------------
 def _do_raw(keywords, options):
     for k in sorted(keywords.keys()):
-        print "%s: %s" % (k, ", ".join(sorted(keywords[k])))
+        print("%s: %s" % (k, ", ".join(sorted(keywords[k]))))
 
 # --------------------------------------------------------------------
 def _do_emacs(keywords, options):
-    print "; Generated on %s" % (time.ctime(),)
+    print("; Generated on %s" % (time.ctime(),))
     print
     for k in sorted(keywords.keys()):
-        print "(defvar easycrypt-%s-keywords '(" % (k,)
+        print("(defvar easycrypt-%s-keywords '(" % (k,))
         for v in keywords[k]:
-            print "  \"%s\"" % (v,)
-        print "))"
-        print
-    print "(provide 'easycrypt-keywords)"
+            print("  \"%s\"" % (v,))
+        print("))")
+        print()
+    print("(provide 'easycrypt-keywords)")
 
 # --------------------------------------------------------------------
 def _do_javascript(keywords, options):
-    print "// Generated on %s" % (time.ctime(),)
-    print 'var cKeywords = "%s"' % \
-            (' '.join(sorted(set(it.chain(*keywords.values())))))
-    print "// END"
+    print("// Generated on %s" % (time.ctime(),))
+    print('var cKeywords = "%s"' % \
+            (' '.join(sorted(set(it.chain(*keywords.values()))))))
+    print("// END")
 
 # --------------------------------------------------------------------
 def _do_template(keywords, options, template):
@@ -83,11 +83,11 @@ def _do_template(keywords, options, template):
 
 # --------------------------------------------------------------------
 def _do_latex(keywords, options):
-    buffer = sio.StringIO()
+    buffer = io.StringIO()
 
-    print >>buffer, "%% Generated on %s" % (time.ctime(),)
-    print >>buffer
-    print >>buffer, """\
+    print("%% Generated on %s" % (time.ctime(),), file=buffer)
+    print(file=buffer)
+    print("""\
 \\lstdefinelanguage{easycrypt-kw}{
   morekeywords=[1]{%s},
   morekeywords=[2]{%s},
@@ -103,26 +103,27 @@ def _do_latex(keywords, options):
     ','.join(keywords.get('tactical' , [])),
     ','.join(keywords.get('bytac'    , [])),
     ','.join(keywords.get('dangerous', [])),
-)
+    ), file=buffer)
 
     NOCMD = ['beta', 'delta', 'iota', 'gamma', 'zeta']
 
     for v in it.chain(*keywords.values()):
         if v in NOCMD:
             continue
-        print >>buffer, \
+        print(
             '\\def\\%(macro)s{\\ensuretext{\\ls[language=easycrypt]"%(name)s"}}' % \
-            dict(macro = v.capitalize().replace('_', ''), name = v)
+            dict(macro = v.capitalize().replace('_', ''), name = v),
+            file=buffer)
 
     sys.stdout.write(buffer.getvalue())
 
 # --------------------------------------------------------------------
 def _do_python(keywords, options):
     wd = max(*[len(x) for x in keywords.keys()])
-    print "keywords = dict("
+    print("keywords = dict(")
     for k in sorted(keywords.keys()):
-        print "    %-*s = [%s]," % (wd, k, ', '.join(["'%s'" % x for x in keywords[k]]))
-    print ")"
+        print("    %-*s = [%s]," % (wd, k, ', '.join(["'%s'" % x for x in keywords[k]])))
+    print(")")
 
 # --------------------------------------------------------------------
 def process():

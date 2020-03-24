@@ -165,6 +165,12 @@ let norm_me   s me = Subst.subst_me s me
 let norm_e    s e  = Subst.subst_e s e
 
 (* -------------------------------------------------------------------- *)
+
+type continuation =
+  | Cbv of state * subst * form * args
+  | Cbv_init of state * subst * form
+
+(* -------------------------------------------------------------------- *)
 let rec norm st s f =
 (* FIXME : I think substitution in type is wrong *)
  let f = cbv st s f (Aempty (Subst.subst_ty s f.f_ty)) in
@@ -245,123 +251,148 @@ and app_red st f1 args =
     | _ ->
       let args, ty = flatten_args args in
       f_app f1 args ty
-  end
+    end
 
-  (* ι-reduction (fix-def reduction) *)
-  | Fop (p, tys)
-      when st.st_ri.iota && EcEnv.Op.is_fix_def st.st_env p
-    -> begin
-    let module E = struct exception NoCtor end in
-
+  | Fop _ ->
     let args, ty = flatten_args args in
-
-    try
-      let op  = oget (EcEnv.Op.by_path_opt p st.st_env) in
-      let fix = EcDecl.operator_as_fix op in
-
-      if List.length args < snd (fix.EcDecl.opf_struct) then
-        raise E.NoCtor;
-
-      let args, eargs = List.split_at (snd (fix.EcDecl.opf_struct)) args in
-
-      let vargs = Array.of_list args in
-      let pargs = List.fold_left (fun (opb, acc) v ->
-          let v = vargs.(v) in
-
-            match fst_map (fun x -> x.f_node) (EcFol.destr_app v) with
-            | (Fop (p, _), cargs) when EcEnv.Op.is_dtype_ctor st.st_env p -> begin
-                let idx = EcEnv.Op.by_path p st.st_env in
-                let idx = snd (EcDecl.operator_as_ctor idx) in
-                  match opb with
-                  | EcDecl.OPB_Leaf   _  -> assert false
-                  | EcDecl.OPB_Branch bs ->
-                     ((Parray.get bs idx).EcDecl.opb_sub, cargs :: acc)
-              end
-            | _ -> raise E.NoCtor)
-        (fix.EcDecl.opf_branches, []) (fst fix.EcDecl.opf_struct)
-      in
-
-      let pargs, (bds, body) =
-        match pargs with
-        | EcDecl.OPB_Leaf (bds, body), cargs -> (List.rev cargs, (bds, body))
-        | _ -> assert false
-      in
-
-      let subst =
-        List.fold_left2
-          (fun subst (x, _) fa -> Subst.bind_local subst x fa)
-          Subst.subst_id fix.EcDecl.opf_args args in
-
-      let subst =
-        List.fold_left2
-          (fun subst bds cargs ->
-            List.fold_left2
-              (fun subst (x, _) fa -> Subst.bind_local subst x fa)
-              subst bds cargs)
-          subst bds pargs in
-
-      let body = EcFol.form_of_expr EcFol.mhr body in
-      let body =
-        EcFol.Fsubst.subst_tvar
-          (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
-
-      cbv st subst body (mk_args eargs (Aempty ty))
-    with E.NoCtor -> reduce_user st (f_app f1 args ty)
-  end
+    let f = f_app f1 args ty in
+    let strategies =
+      [ reduce_logic;
+        reduce_user ~mode:`BeforeFix;
+        reduce_fix;
+        reduce_user ~mode:`AfterFix ;
+        reduce_delta ]
+    in
+    let cont : continuation option =
+      List.Exceptionless.find_map
+        (fun strategy ->
+          try Some (strategy st f) with NotReducible -> None)
+        strategies in
+    begin match cont with
+    | None -> f
+    | Some (Cbv(st,s,f,args)) -> cbv st s f args
+    | Some (Cbv_init(st,s,f)) -> cbv_init st s f
+    end
 
   | _ ->
     let args, ty = flatten_args args in
-    reduce_user st (f_app f1 args ty)
+    f_app f1 args ty
+
+(* -------------------------------------------------------------------- *)
+(* ι-reduction (fix-def reduction) *)
+and reduce_fix st f =
+  if not st.st_ri.iota then raise NotReducible;
+  let (p, tys), args =
+    try destr_op_app f with DestrError _ -> raise NotReducible in
+  if not (EcEnv.Op.is_fix_def st.st_env p) then raise NotReducible;
+  let ty = f.f_ty in
+
+  let op  = oget (EcEnv.Op.by_path_opt p st.st_env) in
+  let fix = EcDecl.operator_as_fix op in
+
+  if List.length args < snd (fix.EcDecl.opf_struct) then
+    raise NotReducible;
+
+  let args, eargs = List.split_at (snd (fix.EcDecl.opf_struct)) args in
+
+  let vargs = Array.of_list args in
+  let pargs = List.fold_left (fun (opb, acc) v ->
+    let v = vargs.(v) in
+
+    match fst_map (fun x -> x.f_node) (EcFol.destr_app v) with
+    | (Fop (p, _), cargs) when EcEnv.Op.is_dtype_ctor st.st_env p -> begin
+        let idx = EcEnv.Op.by_path p st.st_env in
+        let idx = snd (EcDecl.operator_as_ctor idx) in
+        match opb with
+        | EcDecl.OPB_Leaf   _  -> assert false
+        | EcDecl.OPB_Branch bs ->
+          ((Parray.get bs idx).EcDecl.opb_sub, cargs :: acc)
+      end
+    | _ -> raise NotReducible)
+       (fix.EcDecl.opf_branches, []) (fst fix.EcDecl.opf_struct)
+  in
+
+  let pargs, (bds, body) =
+    match pargs with
+    | EcDecl.OPB_Leaf (bds, body), cargs -> (List.rev cargs, (bds, body))
+    | _ -> assert false
+  in
+
+  let subst =
+    List.fold_left2
+      (fun subst (x, _) fa -> Subst.bind_local subst x fa)
+      Subst.subst_id fix.EcDecl.opf_args args in
+
+  let subst =
+    List.fold_left2
+      (fun subst bds cargs ->
+        List.fold_left2
+          (fun subst (x, _) fa -> Subst.bind_local subst x fa)
+          subst bds cargs)
+      subst bds pargs in
+
+  let body = EcFol.form_of_expr EcFol.mhr body in
+  let body =
+    EcFol.Fsubst.subst_tvar
+      (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
+
+  Cbv(st, subst, body, mk_args eargs (Aempty ty))
+
+(* -------------------------------------------------------------------- *)
+(* δ-reduction *)
+and reduce_delta st f =
+  let (p, tys), args =
+    try destr_op_app f with DestrError _ -> raise NotReducible in
+  if not (st.st_ri.delta_p p && Op.reducible st.st_env p) then
+    raise NotReducible;
+  let ty = f.f_ty in
+  let f = Op.reduce st.st_env p tys in
+  Cbv(st, Subst.subst_id, f, mk_args args (Aempty ty))
 
 (* -------------------------------------------------------------------- *)
 and reduce_logic st f =
-  if is_some st.st_ri.logic then
-    let (p, tys), args =
-      try destr_op_app f with DestrError _ -> raise NotReducible in
-    if is_logical_op p then
-      let pcompat =
-        match st.st_ri.logic with Some `Full -> true | _ -> false
-      in
-      let f' =
-        match op_kind p, args with
-        | Some (`Not), [f1]    when pcompat -> f_not_simpl f1
-        | Some (`Imp), [f1;f2] when pcompat -> f_imp_simpl f1 f2
-        | Some (`Iff), [f1;f2] when pcompat -> f_iff_simpl f1 f2
+  if st.st_ri.logic = None then raise NotReducible;
+  let (p, tys), args =
+    try destr_op_app f with DestrError _ -> raise NotReducible in
+  if not (is_logical_op p) then raise NotReducible;
 
-        | Some (`And `Asym), [f1;f2] -> f_anda_simpl f1 f2
-        | Some (`Or  `Asym), [f1;f2] -> f_ora_simpl f1 f2
-        | Some (`And `Sym ), [f1;f2] -> f_and_simpl f1 f2
-        | Some (`Or  `Sym ), [f1;f2] -> f_or_simpl f1 f2
-        | Some (`Int_le   ), [f1;f2] -> f_int_le_simpl f1 f2
-        | Some (`Int_lt   ), [f1;f2] -> f_int_lt_simpl f1 f2
-        | Some (`Real_le  ), [f1;f2] -> f_real_le_simpl f1 f2
-        | Some (`Real_lt  ), [f1;f2] -> f_real_lt_simpl f1 f2
-        | Some (`Int_add  ), [f1;f2] -> f_int_add_simpl f1 f2
-        | Some (`Int_opp  ), [f]     -> f_int_opp_simpl f
-        | Some (`Int_mul  ), [f1;f2] -> f_int_mul_simpl f1 f2
-        | Some (`Int_edivz), [f1;f2] -> f_int_edivz_simpl f1 f2
-        | Some (`Real_add ), [f1;f2] -> f_real_add_simpl f1 f2
-        | Some (`Real_opp ), [f]     -> f_real_opp_simpl f
-        | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
-        | Some (`Real_inv ), [f]     -> f_real_inv_simpl f
-        | Some (`Eq       ), [f1;f2] -> f_eq_simpl st f1 f2
-        | Some (`Map_get  ), [f1;f2] -> f_map_get_simpl st f1 f2 (snd (as_seq2 tys))
+  let pcompat = match st.st_ri.logic with Some `Full -> true | _ -> false in
+  let f' =
+    match op_kind p, args with
+    (* FIXME: replace logical rules by user reduction *)
+    | Some (`Not), [f1]    when pcompat -> f_not_simpl f1
+    | Some (`Imp), [f1;f2] when pcompat -> f_imp_simpl f1 f2
+    | Some (`Iff), [f1;f2] when pcompat -> f_iff_simpl f1 f2
+    | Some (`And `Asym), [f1;f2] -> f_anda_simpl f1 f2
+    | Some (`Or  `Asym), [f1;f2] -> f_ora_simpl f1 f2
+    | Some (`And `Sym ), [f1;f2] -> f_and_simpl f1 f2
+    | Some (`Or  `Sym ), [f1;f2] -> f_or_simpl f1 f2
+    | Some (`Int_le   ), [f1;f2] -> f_int_le_simpl f1 f2
+    | Some (`Int_lt   ), [f1;f2] -> f_int_lt_simpl f1 f2
+    | Some (`Real_le  ), [f1;f2] -> f_real_le_simpl f1 f2
+    | Some (`Real_lt  ), [f1;f2] -> f_real_lt_simpl f1 f2
+    | Some (`Int_add  ), [f1;f2] -> f_int_add_simpl f1 f2
+    | Some (`Int_opp  ), [f]     -> f_int_opp_simpl f
+    | Some (`Int_mul  ), [f1;f2] -> f_int_mul_simpl f1 f2
+    | Some (`Int_edivz), [f1;f2] -> f_int_edivz_simpl f1 f2
+    | Some (`Real_add ), [f1;f2] -> f_real_add_simpl f1 f2
+    | Some (`Real_opp ), [f]     -> f_real_opp_simpl f
+    | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
+    | Some (`Real_inv ), [f]     -> f_real_inv_simpl f
+    | Some (`Eq       ), [f1;f2] -> f_eq_simpl st f1 f2
+    (* FIXME want is `Map_get ? *)
+    | Some (`Map_get  ), [f1;f2] -> f_map_get_simpl st f1 f2 (snd (as_seq2 tys))
 
-        | _, _ -> f in
-        if f_equal f f' then raise NotReducible
-        else f'
-    else raise NotReducible
-  else raise NotReducible
+    | _, _ -> f in
+  if f_equal f f' then raise NotReducible;
+  Cbv_init(st, Subst.subst_id, f')
 
-and reduce_user st f =
-  match reduce_logic st f with
-  | f -> cbv_init st Subst.subst_id f
-  | exception NotReducible ->
-    (* Try user reduction *)
-    let cbv = cbv_init st Subst.subst_id in
-    match reduce_user_gen `All cbv st.st_ri st.st_env st.st_hyps f with
-    | f -> cbv_init st Subst.subst_id f
-    | exception NotReducible -> f
+(* -------------------------------------------------------------------- *)
+(* User reduction *)
+and reduce_user ~mode st f =
+  let cbv = cbv_init st Subst.subst_id in
+  let f = reduce_user_gen mode cbv st.st_ri st.st_env st.st_hyps f in
+  Cbv_init(st, Subst.subst_id, f)
 
 (* -------------------------------------------------------------------- *)
 and cbv_init st s f =
@@ -454,15 +485,9 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
       else pv in
     app_red st (f_pvar pv f.f_ty m) args
 
-  (* δ-reduction *)
-  | Fop _ -> (* FIXME: maybe this should be done in app_red *)
+  | Fop _ ->
     let f = Subst.subst s f in
-    let p, tys = destr_op f in
-
-    if st.st_ri.delta_p p && Op.reducible st.st_env p then
-      let f = Op.reduce st.st_env p tys in
-      cbv st Subst.subst_id f args
-    else app_red st f args
+    app_red st f args
 
   | Fapp (f1, args1) ->
     let args1 = List.map (cbv_init st s) args1 in
@@ -579,7 +604,9 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     if EcFol.free_expr coe_e
     then f_i0
     else
-      reduce_user st (f_coe_r { coe_pre; coe_e; coe_mem })
+      (* TODO: A: *)
+      (* reduce_user st (f_coe_r { coe_pre; coe_e; coe_mem }) *)
+      assert false
 
   | Fpr pr ->
     assert (is_Aempty args);

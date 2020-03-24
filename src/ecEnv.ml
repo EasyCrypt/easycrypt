@@ -232,8 +232,8 @@ and tcinstance = [
 ]
 
 and redinfo =
-  { ri_priomap : (EcTheory.rule list) Mint.t;
-    ri_list    : (EcTheory.rule list) Lazy.t; }
+  { ri_before_fix : (EcTheory.rule list) Mint.t;
+    ri_after_fix  : (EcTheory.rule list) Mint.t; }
 
 and mredinfo = redinfo Mrd.t
 
@@ -1422,6 +1422,8 @@ module Reduction = struct
   type rule   = EcTheory.rule
   type topsym = red_topsym
 
+  let empty = { ri_before_fix = Mint.empty; ri_after_fix = Mint.empty }
+
   let add_rule ((_, rule) : path * rule option) (db : mredinfo) =
     match rule with None -> db | Some rule ->
 
@@ -1434,35 +1436,34 @@ module Reduction = struct
       | Cost _ | Var _ | Int _        -> assert false in
 
     Mrd.change (fun rls ->
-      let { ri_priomap } =
+      let { ri_before_fix; ri_after_fix } =
         match rls with
-        | None   -> { ri_priomap = Mint.empty; ri_list = Lazy.from_val [] }
+        | None   -> empty
         | Some x -> x in
 
-      let ri_priomap =
+      let m = if rule.rl_prio < 0 then ri_after_fix else ri_before_fix in
+      let m =
         let change prules = Some (odfl [] prules @ [rule]) in
-        Mint.change change (abs rule.rl_prio) ri_priomap in
-
-      let ri_list =
-        Lazy.from_fun (fun () -> List.flatten (Mint.values ri_priomap)) in
-
-      Some { ri_priomap; ri_list }) p db
+        Mint.change change (abs rule.rl_prio) m in
+      let ri_before_fix, ri_after_fix =
+        if rule.rl_prio < 0 then ri_before_fix, m else m, ri_after_fix in
+      Some {ri_before_fix; ri_after_fix}) p db
 
   let add_rules (rules : (path * rule option) list) (db : mredinfo) =
     List.fold_left ((^~) add_rule) db rules
 
-  let add (rules : (path * rule option) list) (env : env) =
+  let add (rules : (path * rule_option * rule option) list) (env : env) =
+    let rstrip = List.map (fun (x, _, y) -> (x, y)) rules in
     { env with
-        env_redbase = add_rules rules env.env_redbase;
+        env_redbase = add_rules rstrip env.env_redbase;
         env_item    = CTh_reduction rules :: env.env_item; }
 
-  let add1 (prule : path * rule option) (env : env) =
+  let add1 (prule : path * rule_option * rule option) (env : env) =
     add [prule] env
 
   let get (p : topsym) (env : env) =
     Mrd.find_opt p env.env_redbase
-    |> omap (fun x -> Lazy.force x.ri_list)
-    |> odfl []
+    |> odfl empty
 end
 
 (* -------------------------------------------------------------------- *)
@@ -3116,8 +3117,9 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_rd_cth =
     let for1 _path db = function
-      | CTh_reduction x ->
-         Some (Reduction.add_rules x db)
+      | CTh_reduction rules ->
+         let rules = List.map (fun (x, _, y) -> (x, y)) rules in
+         Some (Reduction.add_rules rules db)
       | _ -> None
 
     in bind_base_cth for1

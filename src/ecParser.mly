@@ -357,6 +357,7 @@
 %token <EcSymbols.symbol> MIDENT
 %token <EcSymbols.symbol> PUNIOP
 %token <EcSymbols.symbol> PBINOP
+%token <EcSymbols.symbol> PNUMOP
 
 %token <EcBigInt.zint> UINT
 %token <EcBigInt.zint * (int * EcBigInt.zint)> DECIMAL
@@ -590,7 +591,7 @@
 %token WLOG
 %token WP
 %token ZETA
-%token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4
+%token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4 NUMOP
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 
 %nonassoc prec_below_comma
@@ -632,8 +633,9 @@
 
 %type <unit> is_uniop
 %type <unit> is_binop
+%type <unit> is_numop
 
-%start prog global is_uniop is_binop
+%start prog global is_uniop is_binop is_numop
 %%
 
 (* -------------------------------------------------------------------- *)
@@ -730,6 +732,7 @@ genqident(X):
 | x=_uident { x }
 | x=PUNIOP  { x }
 | x=PBINOP  { x }
+| x=PNUMOP  { x }
 
 | x=loc(STRING)   {
     if not (EcCoreLib.is_mixfix_op (unloc x)) then
@@ -827,9 +830,13 @@ f_or_mod_ident:
 | IMPL      { "=>"  }
 | IFF       { "<=>" }
 
+%inline numop:
+| op=NUMOP { op }
+
 (* -------------------------------------------------------------------- *)
 is_binop: binop EOF {}
 is_uniop: uniop EOF {}
+is_numop: numop EOF {}
 
 (* -------------------------------------------------------------------- *)
 pside_:
@@ -903,6 +910,9 @@ sexpr_u:
 | x=qoident ti=tvars_app?
    { PEident (x, ti) }
 
+| op=loc(numop) ti=tvars_app?
+    { peapp_symb op.pl_loc op.pl_desc ti [] }
+
 | se=sexpr DLBRACKET ti=tvars_app? e=expr RBRACKET
    { peget (EcLocation.make $startpos $endpos) ti se e }
 
@@ -951,7 +961,7 @@ expr_u:
     { peapp_symb op.pl_loc op.pl_desc ti [e] }
 
 | e=expr_chained_orderings %prec prec_below_order
-   { fst e }
+    { fst e }
 
 | e1=expr op=loc(NE) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc "[!]" None
@@ -1176,6 +1186,9 @@ sform_u(P):
 
 | x=sform_r(P) s=loc(pside)
    { PFside (x, s) }
+
+| op=loc(numop) ti=tvars_app?
+    { pfapp_symb op.pl_loc op.pl_desc ti [] }
 
 | TICKPIPE ti=tvars_app? e =form_r(P) PIPE
    { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
@@ -1894,6 +1907,9 @@ opptn(BOP):
     let loc = EcLocation.make $startpos $endpos in
     PPApp ((pqsymb_of_symb loc EcCoreLib.s_nil, tvi), [])
   }
+
+| op=loc(uniop) tvi=tvars_app?
+    { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), []) }
 
 | op=loc(uniop) tvi=tvars_app? x=bdident
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x]) }
@@ -3763,8 +3779,8 @@ hint:
 (* -------------------------------------------------------------------- *)
 (* User reduction                                                       *)
 reduction:
-| HINT SIMPLIFY xs=plist1(user_red_info, COMMA)
-    { xs }
+| HINT SIMPLIFY opt=bracket(user_red_option*)? xs=plist1(user_red_info, COMMA)
+    { (odfl [] opt, xs) }
 
 user_red_info:
 | x=qident i=prefix(AT, word)?
@@ -3772,6 +3788,16 @@ user_red_info:
 
 | xs=paren(plist1(qident, COMMA)) i=prefix(AT, sword)?
     { (xs, i) }
+
+user_red_option:
+| x=lident {
+    match unloc x with
+    | "reduce" -> `Delta
+    | "eqtrue" -> `EqTrue
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("invalid option: " ^ (unloc x)))
+  }
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)

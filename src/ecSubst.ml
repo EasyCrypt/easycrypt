@@ -522,7 +522,7 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
 
   | Th_reduction rules ->
       let rules =
-        List.map (fun (p, _) -> (s.s_p p, None)) rules
+        List.map (fun (p, opts, _) -> (s.s_p p, opts, None)) rules
       in Th_reduction rules
 
   | Th_auto (lc, lvl, base, ps) ->
@@ -570,7 +570,7 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
 
   | CTh_reduction rules ->
       let rules =
-        List.map (fun (p, _) -> (s.s_p p, None)) rules
+        List.map (fun (p, opts, _) -> (s.s_p p, opts, None)) rules
       in CTh_reduction rules
 
   | CTh_auto (lc, lvl, base, ps) ->

@@ -877,17 +877,38 @@ module FPosition = struct
             filter o cpos
 
   (* ------------------------------------------------------------------ *)
-  let select_form ?(xconv = `Conv) hyps o p target =
+  let select_form ?(xconv = `Conv) ?(keyed = false) hyps o p target =
     let na = List.length (snd (EcFol.destr_app p)) in
+
+    let kmatch key tp =
+      match key, (fst (destr_app tp)).f_node with
+      | `NoKey , _           -> true
+      | `Path p, Fop (p', _) -> EcPath.p_equal p p'
+      | `Path _, _           -> false
+      | `Var  x, Flocal x'   -> id_equal x x'
+      | `Var  _, _           -> false
+    in
+
+    let keycheck tp key = not keyed || kmatch key tp in
+
+    let key =
+      match (fst (destr_app p)).f_node with
+      | Fop (p, _) -> `Path p
+      | Flocal x   -> `Var x
+      | _          -> `NoKey
+    in
+
     let test _ tp =
-      let (tp, ti) =
-        match tp.f_node with
-        | Fapp (h, hargs) when List.length hargs > na ->
-            let (a1, a2) = List.takedrop na hargs in
-              (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
-        | _ -> (tp, -1)
-      in
-      if EcReduction.xconv xconv hyps p tp then `Accept ti else `Continue
+      if not (keycheck tp key) then `Continue else begin
+        let (tp, ti) =
+          match tp.f_node with
+          | Fapp (h, hargs) when List.length hargs > na ->
+              let (a1, a2) = List.takedrop na hargs in
+                (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
+          | _ -> (tp, -1)
+        in
+        if EcReduction.xconv xconv hyps p tp then `Accept ti else `Continue
+      end
 
     in select ?o test target
 

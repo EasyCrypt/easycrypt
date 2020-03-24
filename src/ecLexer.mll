@@ -344,6 +344,7 @@ let nop = '\\' ichar+
 
 let uniop = nop | ['-' '+']+ | '!'
 let binop = sop | nop
+let numop = '\'' digit+
 
 (* -------------------------------------------------------------------- *)
 rule main = parse
@@ -362,6 +363,7 @@ rule main = parse
 
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { [PBINOP s] }
+  | '(' blank* (numop as s) blank* ')' { [PNUMOP s] }
 
   | '[' blank* (uniop as s) blank* ']' {
       let name = Printf.sprintf "[%s]" s in
@@ -418,6 +420,10 @@ rule main = parse
   | opchar as op {
       let op = operator (Buffer.from_char op) lexbuf in
       lex_operators (Buffer.contents op)
+    }
+
+  | numop as op {
+      [NUMOP op]
     }
 
   (* end of sentence / stream *)

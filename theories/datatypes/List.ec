@@ -2422,7 +2422,7 @@ proof. by move=> eq_sz; rewrite -!cats1 zip_cat //= eq_sz. qed.
 lemma rev_zip ['a 'b] (s1 : 'a list) (s2 : 'b list) :
   size s1 = size s2 => rev (zip s1 s2) = zip (rev s1) (rev s2).
 proof.
-elim: s1 s2 => [|x s1 ih] [|y s2] //=; 1,2,3: smt(size_ge0).
+elim: s1 s2 => [|x s1 ih] [|y s2] //=; 1,2: smt(size_ge0).
 by move/addzI=> eq_sz; rewrite !(rev_cons, zip_rcons) ?size_rev // ih.
 qed.
 

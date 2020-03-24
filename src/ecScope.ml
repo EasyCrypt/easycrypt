@@ -2242,10 +2242,15 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Reduction = struct
-  let add_reduction scope reds =
+  let add_reduction scope (opts, reds) =
     check_state `InTop "hint simplify" scope;
     if EcSection.in_section scope.sc_section then
       hierror "cannot add reduction rule in a section";
+
+    let opts = EcTheory.{
+      ur_delta  = List.mem `Delta  opts;
+      ur_eqtrue = List.mem `EqTrue opts;
+    } in
 
     let rules =
       let for1 idx name =
@@ -2255,8 +2260,8 @@ module Reduction = struct
           | Some (p,_) -> `Ax, p
           | None -> `Sc, EcEnv.Schema.lookup_path (unloc name) (env scope) in
         let red_info =
-          EcReduction.User.compile ~prio:idx (env scope) mode ax_sc_p in
-        (ax_sc_p, Some red_info) in
+          EcReduction.User.compile ~opts ~prio:idx (env scope) mode ax_sc_p in
+        (ax_sc_p, opts, Some red_info) in
 
       let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
       List.flatten rules

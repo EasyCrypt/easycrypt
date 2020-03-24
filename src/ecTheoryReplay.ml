@@ -51,7 +51,7 @@ and 'a ovrhooks = {
   hauto    : 'a -> bool * int * string option * EcPath.path list -> 'a;
   htycl    : 'a -> symbol * typeclass -> 'a;
   hinst    : 'a -> (ty_params * ty) * tcinstance -> 'a;
-  husered  : 'a -> (EcPath.path * EcTheory.rule option) list -> 'a;
+  husered  : 'a -> (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list -> 'a;
   hthenter : 'a -> thmode -> symbol -> 'a;
   hthexit  : 'a -> [`Full | `ClearOnly | `No] -> 'a;
   herr     : 'b . ?loc:EcLocation.t -> string -> 'b;
@@ -429,9 +429,9 @@ and replay_auto
 (* -------------------------------------------------------------------- *)
 and replay_reduction
   (ove : _ ovrenv) (subst, ops, proofs, scope)
-  (rules : (EcPath.path * EcTheory.rule option) list)
+  (rules : (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list)
 =
-  let for1 (p, rule) =
+  let for1 (p, opts, rule) =
     let p = EcSubst.subst_path subst p in
 
     (* TODO: A: schema are not replayed for now, but reduction rules can use a
@@ -441,10 +441,10 @@ and replay_reduction
       obind (fun rule ->
         try
           Some (EcReduction.User.compile
-                  ~prio:rule.rl_prio (ove.ovre_hooks.henv scope) mode p)
+                 ~opts ~prio:rule.rl_prio (ove.ovre_hooks.henv scope) mode p)
         with EcReduction.User.InvalidUserRule _ -> None) rule
 
-    in (p, rule) in
+    in (p, opts, rule) in
 
   let rules = List.map for1 rules in
   let scope = ove.ovre_hooks.husered scope rules in
@@ -569,8 +569,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   | CTh_addrw (p, l) ->
      replay_addrw ove (subst, ops, proofs, scope) (p, l)
 
-  | CTh_reduction rule ->
-     replay_reduction ove (subst, ops, proofs, scope) rule
+  | CTh_reduction rules ->
+     replay_reduction ove (subst, ops, proofs, scope) rules
 
   | CTh_auto (lc, lvl, base, ps) ->
      replay_auto ove (subst, ops, proofs, scope) (lc, lvl, base, ps)
