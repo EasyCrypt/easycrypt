@@ -406,8 +406,8 @@ qed.
          = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
  **)
 section Upto.
-  declare module D:PRFt.Distinguisher {RP, PRFi}.
-  axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+  declare module D:PRFt.Distinguisher {-RP, -PRFi}.
+  axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
 
   local module PRP_indirect_bad = {
     var bad : bool
@@ -513,8 +513,8 @@ module DBounder (D : Distinguisher) (F : PRF_Oracles) = {
 }.
 
 section CollisionProbability.
-  declare module D : Distinguisher {PRFi, DBounder}.
-  axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+  declare module D : Distinguisher {-PRFi, -DBounder}.
+  axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
 
   local clone import Birthday as BBound with
     op   q <- q,
@@ -553,7 +553,7 @@ section CollisionProbability.
     }
   }.
 
-  local lemma A_ll (S <: ASampler {A}) &m: islossless S.s => islossless A(S).a.
+  local lemma A_ll (S <: ASampler {-A}) &m: islossless S.s => islossless A(S).a.
   proof.
   move=> S_ll; proc; inline*; wp.
   call (_: true).
@@ -604,8 +604,8 @@ section CollisionProbability.
 end section CollisionProbability.
 
 (* We pull together the results of the first two sections *)
-lemma PartialConclusion (D <: Distinguisher {RP, PRFi, DBounder}) &m:
-  (forall (O <: PRF_Oracles {D}), islossless O.f => islossless D(O).distinguish) =>
+lemma PartialConclusion (D <: Distinguisher {-RP, -PRFi, -DBounder}) &m:
+  (forall (O <: PRF_Oracles {-D}), islossless O.f => islossless D(O).distinguish) =>
   `|Pr[IND(PRPi'(Indirect),DBounder(D)).main() @ &m: res]
     - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
   <= (q^2)%r * mu1 dD witness.
@@ -656,7 +656,7 @@ section PRPi_PRPi'_Indirect.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
   qed.
 
-  declare module D : Distinguisher { RP }.
+  declare module D : Distinguisher { -RP }.
 
   lemma pr_PRPi_PRPi'_Indirect &m:
     Pr[IND(RP,D).main() @ &m: res] = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
@@ -669,8 +669,8 @@ section PRPi_PRPi'_Indirect.
   qed.
 end section PRPi_PRPi'_Indirect.
 
-lemma Conclusion (D <: Distinguisher {RP, PRFi, DBounder}) &m:
-  (forall (O <: PRF_Oracles {D}), islossless O.f => islossless D(O).distinguish) =>
+lemma Conclusion (D <: Distinguisher {-RP, -PRFi, -DBounder}) &m:
+  (forall (O <: PRF_Oracles {-D}), islossless O.f => islossless D(O).distinguish) =>
   `|Pr[IND(RP,DBounder(D)).main() @ &m: res]
     - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
   <= (q^2)%r * mu1 dD witness.
