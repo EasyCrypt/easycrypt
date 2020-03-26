@@ -515,15 +515,15 @@ abstract theory UF1_UF.
       rewrite /phi /psi /=; smt (lt0_q_gen).
     qed.
 
-    local clone import PROM.GenEager as Eager with 
-      type from <- unit,
-      type to <- pkey * skey,
-      op sampleto <- fun (_:unit) => keygen,
-      type input <- unit,
-      type output <- bool
-      proof *. 
-      realize sampleto_ll. 
-      proof. by solve (random). qed.
+    local clone import PROM as PRO with
+      type in_t    <- unit,
+      type out_t   <- pkey * skey,
+      op   dout    <- fun _=> keygen,
+      type d_in_t  <- unit,
+      type d_out_t <- bool.
+    local clone import FullRO as FRO.
+    local clone import FullEager as Eager
+    proof * by solve (random).
 
     local module Aux1(RO:RO) = {
       module WO = {
