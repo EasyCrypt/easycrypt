@@ -16,14 +16,10 @@ module Sid = EcIdent.Sid
 module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
-type lvmap =
-    (EcPath.path * EcTypes.ty list)
-  *  EcTypes.prog_var * EcTypes.expr * EcTypes.ty
 
 type lvalue =
   | LvVar   of (EcTypes.prog_var * EcTypes.ty)
   | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
-  | LvMap   of lvmap
 
 let lv_equal lv1 lv2 =
   match lv1, lv2 with
@@ -38,15 +34,6 @@ let lv_equal lv1 lv2 =
           && (EcTypes.ty_equal ty1 ty2))
         tu1 tu2
 
-  | LvMap ((p1, tys1), pv1, e1, ty1),
-    LvMap ((p2, tys2), pv2, e2, ty2) ->
-
-         (EcPath.p_equal   p1  p2 )
-      && (EcTypes.pv_equal pv1 pv2)
-      && (EcTypes.e_equal  e1  e2 )
-      && (EcTypes.ty_equal ty1 ty2)
-      && (List.all2 EcTypes.ty_equal tys1 tys2)
-
   | _, _ -> false
 
 (* -------------------------------------------------------------------- *)
@@ -58,9 +45,6 @@ let lv_fv = function
       let add s (pv, _) = EcIdent.fv_union s (EcTypes.pv_fv pv) in
       List.fold_left add Mid.empty pvs
 
-  | LvMap (_, pv, e, _) ->
-      EcIdent.fv_union (EcTypes.pv_fv pv) (EcTypes.e_fv e)
-
 let symbol_of_lv = function
   | LvVar (pv, _) ->
       EcTypes.symbol_of_pv pv
@@ -68,13 +52,9 @@ let symbol_of_lv = function
   | LvTuple pvs ->
       String.concat "" (List.map (EcTypes.symbol_of_pv |- fst) pvs)
 
-  | LvMap (_, pv, _, _) ->
-      EcTypes.symbol_of_pv pv
-
 let ty_of_lv = function
   | LvVar   (_, ty)       -> ty
   | LvTuple tys           -> EcTypes.ttuple (List.map snd tys)
-  | LvMap   (_, _, _, ty) -> ty
 
 (* -------------------------------------------------------------------- *)
 type instr = {
@@ -308,11 +288,9 @@ let is_assert = _is_of_get get_assert
 module ISmart : sig
   type lv_var   = EcTypes.prog_var * EcTypes.ty
   type lv_tuple = lv_var list
-  type lv_map   = lvmap
 
   val lv_var   : lvalue * lv_var   -> lv_var   -> lvalue
   val lv_tuple : lvalue * lv_tuple -> lv_tuple -> lvalue
-  val lv_map   : lvalue * lv_map   -> lv_map   -> lvalue
 
   type i_asgn     = lvalue * EcTypes.expr
   type i_rnd      = lvalue * EcTypes.expr
@@ -334,7 +312,6 @@ module ISmart : sig
 end = struct
   type lv_var   = EcTypes.prog_var * EcTypes.ty
   type lv_tuple = lv_var list
-  type lv_map   = lvmap
 
   type i_asgn     = lvalue * EcTypes.expr
   type i_rnd      = lvalue * EcTypes.expr
@@ -350,10 +327,6 @@ end = struct
 
   let lv_tuple (lv, pvs) pvs' =
     if pvs == pvs' then lv else LvTuple pvs'
-
-  let lv_map (lv, ((p, tys), pv, e, ty)) ((p', tys'), pv', e', ty') =
-    if   p == p' && tys == tys' && pv == pv' && e == e' && ty == ty'
-    then lv else LvMap ((p', tys'), pv', e', ty')
 
   let i_asgn (i, (lv, e)) (lv', e') =
     if lv == lv' && e == e' then i else i_asgn (lv', e')
@@ -403,14 +376,6 @@ let s_subst (s : EcTypes.e_subst) =
         let pvs' = List.Smart.map pvt_subst pvs in
         ISmart.lv_tuple (lv, pvs) pvs'
 
-    | LvMap (((p, tys), pv, e, ty) as lvmap) ->
-        let p'   = s.EcTypes.es_p p in
-        let tys' = List.Smart.map s.EcTypes.es_ty tys in
-        let pv'  = EcTypes.pv_subst s.EcTypes.es_xp pv in
-        let e'   = e_subst e in
-        let ty'  = s.EcTypes.es_ty ty in
-
-        ISmart.lv_map (lv, lvmap) ((p', tys'), pv', e', ty')
   in
 
   let rec i_subst i =
@@ -465,17 +430,11 @@ let rec lv_get_uninit_read (w : Sx.t) (lv : lvalue) =
 
   match lv with
   | LvVar (x, _) ->
-      let w = Sx.union (sx_of_pv x) w in
-      (w, Sx.empty)
+      Sx.union (sx_of_pv x) w
 
   | LvTuple xs ->
       let w' = List.map (sx_of_pv |- fst) xs in
-      (Sx.big_union (w :: w'), Sx.empty)
-
-  | LvMap (_, x, e, _) ->
-      let r = Sx.diff (Uninit.e_pv is_loc e) w in
-      let w = Sx.union (sx_of_pv x) w in
-      (w, r)
+      Sx.big_union (w :: w')
 
 and s_get_uninit_read (w : Sx.t) (s : stmt) =
   let do1 (w, r) i =
@@ -487,14 +446,14 @@ and s_get_uninit_read (w : Sx.t) (s : stmt) =
 and i_get_uninit_read (w : Sx.t) (i : instr) =
   match i.i_node with
   | Sasgn (lv, e) | Srnd (lv, e) ->
-      let     r1 = Sx.diff (Uninit.e_pv is_loc e) w in
-      let w2, r2 = lv_get_uninit_read w lv in
-      (Sx.union w w2, Sx.union r1 r2)
+      let r1 = Sx.diff (Uninit.e_pv is_loc e) w in
+      let w2 = lv_get_uninit_read w lv in
+      (Sx.union w w2, r1)
 
   | Scall (olv, _, args) ->
       let r1    = Sx.diff (Sx.big_union (List.map (Uninit.e_pv is_loc) args)) w in
-      let w, r2 = olv |> omap (lv_get_uninit_read w) |> odfl (w, Sx.empty) in
-      (w, Sx.union r1 r2)
+      let w = olv |> omap (lv_get_uninit_read w) |> odfl w in
+      (w, r1)
 
   | Sif (e, s1, s2) ->
       let r = Sx.diff (Uninit.e_pv is_loc e) w in

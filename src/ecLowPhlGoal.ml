@@ -308,14 +308,7 @@ let fresh_pv me v =
       (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
 (* -------------------------------------------------------------------- *)
-let lv_subst m lv f =
-  match lv with
-  | LvVar _ -> lv,m,f
-  | LvTuple _ -> lv,m,f
-  | LvMap((p,tys),pv,e,ty) ->
-    let set = f_op p tys (toarrow [ty; e.e_ty; f.f_ty] ty) in
-    let f   = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
-    LvVar(pv,ty), m, f
+let lv_subst m lv f = lv, m, f
 
 (* -------------------------------------------------------------------- *)
 let mk_let_of_lv_substs_nolet env (lets, f) =
@@ -332,7 +325,7 @@ let mk_let_of_lv_substs_nolet env (lets, f) =
           List.fold_lefti
             (fun s i (pv,ty) -> PVM.add env pv m (f_proj f i ty) s)
             s vs
-        | LvMap _, _ -> assert false)  PVM.empty lets in
+        )  PVM.empty lets in
     PVM.subst env s f
 
 let add_lv_subst env lv m s =
@@ -349,8 +342,6 @@ let add_lv_subst env lv m s =
         let s = PVM.add env pv m (f_local id t) s in
         s, (id,t)) s pvs in
     LTuple ids, s
-
-  | _ -> assert false
 
 let mk_let_of_lv_substs_let env (lets, f) =
   if List.is_empty lets then f

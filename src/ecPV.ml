@@ -116,20 +116,14 @@ module Mpv = struct
     | Evar pv -> (try find env pv s with Not_found -> e)
     | _ -> EcTypes.e_map (fun ty -> ty) (esubst env s) e
 
-  let lvsubst env (s : esubst) lv =
-    match lv with
-    | LvVar   _ -> lv
-    | LvTuple _ -> lv
-    | LvMap (m, pv, e, ty) -> LvMap (m, pv, esubst env s e, ty)
-
   let rec isubst env (s : esubst) (i : instr) =
     let esubst = esubst env s in
     let ssubst = ssubst env s in
 
     match i.i_node with
-    | Sasgn  (lv, e)     -> i_asgn   (lvsubst env s lv, esubst e)
-    | Srnd   (lv, e)     -> i_rnd    (lvsubst env s lv, esubst e)
-    | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst env s), f, List.map esubst es)
+    | Sasgn  (lv, e)     -> i_asgn   (lv, esubst e)
+    | Srnd   (lv, e)     -> i_rnd    (lv, esubst e)
+    | Scall  (lv, f, es) -> i_call   (lv, f, List.map esubst es)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Sassert e          -> i_assert (esubst e)
@@ -430,8 +424,6 @@ let lp_write_r env w lp =
       add w pv
   | LvTuple pvs ->
       List.fold_left add w pvs
-  | LvMap (_, pv, _, ty) ->
-      add w (pv, ty)
 
 let rec f_write_r ?(except=Sx.empty) env w f =
   let f    = NormMp.norm_xfun env f in
@@ -513,14 +505,6 @@ let rec e_read_r env r e =
   | Evar pv -> PV.add env pv e.e_ty r
   | _ -> e_fold (e_read_r env) r e
 
-let lp_read_r env r lp =
-  match lp with
-  | LvVar _ | LvTuple _ ->
-      r
-
-  | LvMap (_, pv, e, ty) ->
-      e_read_r env (PV.add env pv ty r) e
-
 let rec is_read_r env w s =
   List.fold_left (i_read_r env) w s
 
@@ -529,13 +513,12 @@ and s_read_r env w s =
 
 and i_read_r env r i =
   match i.i_node with
-  | Sasgn   (lp, e) -> e_read_r env (lp_read_r env r lp) e
-  | Srnd    (lp, e) -> e_read_r env (lp_read_r env r lp) e
+  | Sasgn   (_lp, e) -> e_read_r env r e
+  | Srnd    (_lp, e) -> e_read_r env r e
   | Sassert e       -> e_read_r env r e
 
-  | Scall (lp, f, es) ->
+  | Scall (_lp, f, es) ->
       let r = List.fold_left (e_read_r env) r es in
-      let r = match lp with None -> r | Some lp -> lp_read_r env r lp in
       f_read_r env r f
 
   | Sif (e, s1, s2) ->
@@ -937,7 +920,7 @@ end
 
 let is_in_refl env lv eqo =
   match lv with
-  | LvVar (pv,_) | LvMap(_, pv, _, _) -> PV.mem_pv env pv eqo
+  | LvVar (pv,_) -> PV.mem_pv env pv eqo
   | LvTuple lr -> List.exists (fun (pv,_) -> PV.mem_pv env pv eqo) lr
 
 let add_eqs_refl env eqo e =
@@ -947,7 +930,7 @@ let add_eqs_refl env eqo e =
 
 let remove_refl env lv eqo =
   match lv with
-  | LvVar (pv,_) | LvMap(_, pv, _, _) -> PV.remove env pv eqo
+  | LvVar (pv,_) -> PV.remove env pv eqo
   | LvTuple lr -> List.fold_left (fun eqo (pv,_) -> PV.remove env pv eqo) eqo lr
 
 let rec s_eqobs_in_refl env c eqo =

@@ -434,12 +434,6 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
       ->
         List.fold_left2 aux eqs ll lr
 
-    | LvMap ((pl, tysl), pvl, el, tyl), LvMap ((pr, tysr), pvr, er,tyr)
-        when EcPath.p_equal pl pr
-          && List.all2 (ER.EqTest.for_type env) (tyl::tysl) (tyr::tysr)
-      ->
-        Mpv2.add_eqs env el er (Mpv2.remove env pvl pvr eqs)
-
     | _, _ -> raise EqObsInError in
 
   let oremove lvl lvr eqs =

@@ -161,7 +161,6 @@ module Core = struct
       | LvVar (x,_) -> not (EcPV.PV.mem_pv env x fv)
       | LvTuple pvs ->
         List.for_all (fun (x,_) -> not (EcPV.PV.mem_pv env x fv)) pvs
-      | LvMap(_, x,_,_) -> not (EcPV.PV.mem_pv env x fv)
     in
     let is_bd_indep =
       let fv_bd = PV.fv env mhr bhs.bhs_bd in

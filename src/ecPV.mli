@@ -126,7 +126,6 @@ val is_write_r : ?except:Sx.t -> instr list pvaccess
 val s_write_r  : ?except:Sx.t -> stmt       pvaccess
 val f_write_r  : ?except:Sx.t -> xpath      pvaccess
 
-val lp_read_r  : lvalue     pvaccess
 val e_read_r   : expr       pvaccess
 val i_read_r   : instr      pvaccess
 val is_read_r  : instr list pvaccess

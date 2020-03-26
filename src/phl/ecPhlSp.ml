@@ -77,7 +77,6 @@ module LowInternal = struct
                 ALocal (new_id, ty)
               with Not_found -> var
             end
-          | _, _ -> assert false
         end
         | _ -> var
 
@@ -135,12 +134,6 @@ module LowInternal = struct
     match lv with
     | LvVar   v  -> for_lvars [v]
     | LvTuple vs -> for_lvars vs
-
-    | LvMap ((p, tys), pv, e', ty) ->
-        let mtype = toarrow [ty; e'.e_ty; e.e_ty] ty in
-        let set   = e_op p tys mtype in
-        let e     = e_app set [e_var pv ty; e'; e] ty in
-        sp_asgn mem env (LvVar (pv, ty)) e (bds, assoc, pre)
 
   (* ------------------------------------------------------------------ *)
   let build_sp mem bds assoc pre =

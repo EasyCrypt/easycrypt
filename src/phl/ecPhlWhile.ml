@@ -26,7 +26,7 @@ let while_info env e s =
   let rec i_info (w,r,c) i =
     match i.i_node with
     | Sasgn(lp, e) | Srnd(lp, e) ->
-        let r = e_read_r env (EcPV.lp_read_r env r lp) e in
+        let r = e_read_r env r e in
         let w = lp_write_r env w lp in
         (w, r, c)
 
@@ -38,7 +38,6 @@ let while_info env e s =
 
     | Scall(lp,f,es) ->
         let r = List.fold_left (e_read_r env) r es in
-        let r = match lp with None -> r | Some lp -> lp_read_r  env r lp in
         let w = match lp with None -> w | Some lp -> lp_write_r env w lp in
         let f = EcEnv.NormMp.norm_xfun env f in
         (w, r, Sx.add f c)
