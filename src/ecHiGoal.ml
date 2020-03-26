@@ -504,15 +504,16 @@ let process_delta ?target (s, o, p) tc =
   match unloc p with
   | PFident ({ pl_desc = ([], x) }, None)
       when s = `LtoR && EcUtils.is_none o ->
+
     let check_op = fun p -> sym_equal (EcPath.basename p) x in
     let check_id = fun y -> sym_equal (EcIdent.name y) x in
-    let ri =
+    let target = EcReduction.simplify
       { EcReduction.no_red with
-        EcReduction.delta_p = check_op;
-        EcReduction.delta_h = check_id; } in
-    let target = EcReduction.simplify ri hyps target in
+          EcReduction.delta_p = check_op;
+          EcReduction.delta_h = check_id; }
+      hyps target
 
-    FApi.tcenv_of_tcenv1 (t_change ~redinfo:ri ?target:idtg target tc)
+    in FApi.tcenv_of_tcenv1 (t_change ?target:idtg target tc)
 
   | _ ->
 
@@ -523,38 +524,30 @@ let process_delta ?target (s, o, p) tc =
       (ptenv !!tc hyps (ue, ev), p)
   in
 
-  let (tvi, tparams, body, args, delta) =
+  let (tvi, tparams, body, args) =
     match sform_of_form p with
     | SFop (p, args) -> begin
         let op = EcEnv.Op.by_path (fst p) env in
-        let delta = `Path (fst p) in
+
         match op.EcDecl.op_kind with
         | EcDecl.OB_oper (Some (EcDecl.OP_Plain e)) ->
-            (snd p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args, delta)
+            (snd p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args)
         | EcDecl.OB_pred (Some (EcDecl.PR_Plain f)) ->
-            (snd p, op.EcDecl.op_tparams, f, args, delta)
+            (snd p, op.EcDecl.op_tparams, f, args)
         | _ ->
             tc_error !!tc "the operator cannot be unfolded"
     end
 
     | SFlocal x when LDecl.can_unfold x hyps ->
-        ([], [], LDecl.unfold x hyps, [], `Ident x)
+        ([], [], LDecl.unfold x hyps, [])
 
     | SFother { f_node = Fapp ({ f_node = Flocal x }, args) }
         when LDecl.can_unfold x hyps ->
-        ([], [], LDecl.unfold x hyps, args, `Ident x)
+        ([], [], LDecl.unfold x hyps, args)
 
     | _ -> tc_error !!tc "not headed by an operator/predicate"
 
   in
-
-  let delta_p, delta_h =
-    match delta with
-    | `Path p -> EcPath.p_equal p, pred0
-    | `Ident x -> pred0, EcIdent.id_equal x in
-  let redinfo = {
-      EcReduction.beta_red with
-      delta_p; delta_h } in
 
   let na = List.length args in
 
@@ -610,7 +603,7 @@ let process_delta ?target (s, o, p) tc =
             | _ -> assert false)
           target
       in
-        FApi.tcenv_of_tcenv1 (t_change ~redinfo ?target:idtg target tc)
+        FApi.tcenv_of_tcenv1 (t_change ?target:idtg target tc)
     end else t_id tc
   end
 
@@ -639,7 +632,7 @@ let process_delta ?target (s, o, p) tc =
       in
 
       let target = FPosition.map cpos (fun _ -> p) target in
-        FApi.tcenv_of_tcenv1 (t_change ~redinfo ?target:idtg target tc)
+        FApi.tcenv_of_tcenv1 (t_change ?target:idtg target tc)
     end else t_id tc
 
 (* -------------------------------------------------------------------- *)
