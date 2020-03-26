@@ -22,12 +22,12 @@ yaml.add_representer(folded_unicode , folded_unicode_representer)
 yaml.add_representer(literal_unicode, literal_unicode_representer)
 
 # --------------------------------------------------------------------
-class Object(object):
+class Object:
     def __init__(self, **kw):
         self.__dict__.update(kw)
 
 # --------------------------------------------------------------------
-class ANSIColor(object):
+class ANSIColor:
     BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 
     @staticmethod

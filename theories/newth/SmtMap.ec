@@ -503,7 +503,7 @@ lemma filter_valE ['a 'b] (p : 'a -> 'b -> bool) m :
 proof.
 rewrite /filter ofmapK //; pose P z := (tomap m).[z] <> None.
 apply/(finite_leq P)/isfmap_offmap => y @/P.
-by rewrite !Map.getE Map.offunK /= getE; case: (tomap m).[y].
+by rewrite !Map.getE Map.offunK -Map.getE /= getE; case: (tomap m).[y].
 qed.
 
 (* -------------------------------------------------------------------- *)

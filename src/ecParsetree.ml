@@ -1085,7 +1085,11 @@ type phint = {
 }
 
 (* -------------------------------------------------------------------- *)
-type puserred = (pqsymbol list * int option) list
+type puseroption =
+  [`Delta | `EqTrue]
+
+type puserred =
+  puseroption list * (pqsymbol list * int option) list
 
 type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option

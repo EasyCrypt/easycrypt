@@ -522,7 +522,8 @@ conseq (_: true ==> true) (_: _ ==> _)=> //=.
   auto=> /> &hr; split.
   + by rewrite size_ge0 take0.
   move=> p /lezNgt le_szc_p _ ge_szc_p.
-  rewrite (ler_asym (size p) (size (behead c{hr})) _) ?ge_szc_p ?le_szc_p take_size=> p_def.
+  rewrite (ler_asym (size p) (size (behead c{hr})) _);
+    rewrite ?ge_szc_p ?le_szc_p // take_size => p_def.
   split.
   + case: {-1}(unpad p) (eq_refl (unpad p))=> //= @/mee_cbc - [] m t.
     by rewrite /mee_dec /= -p_def=> -> /=.

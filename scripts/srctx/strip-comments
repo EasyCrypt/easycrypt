@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # --------------------------------------------------------------------
 import sys, os, re, StringIO as sio
@@ -37,7 +37,7 @@ def _main():
                 output.pop(i+1)
         i += 1
 
-    print '\n'.join(output) + '\n'
+    print('\n'.join(output) + '\n')
 
 # --------------------------------------------------------------------
 if __name__ == '__main__':

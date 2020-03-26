@@ -459,7 +459,7 @@ section Security_Aux.
     + by rewrite log_bij !(log_g, log_pow, log_mul);field.
     split.
     + move=> /Hbad [#] !->> /= <- <-.
-      by split;rewrite log_bij !(log_g, log_pow, log_mul);ring.
+      by split; rewrite log_bij !(log_g, log_pow, log_mul) /=.
     by move=> _ {H Hbad} ??????? Hbad /Hbad.
   qed.
 

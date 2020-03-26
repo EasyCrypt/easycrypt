@@ -1405,12 +1405,13 @@ module Reduction = struct
   let add_rules (rules : (path * rule option) list) (db : mredinfo) =
     List.fold_left ((^~) add_rule) db rules
 
-  let add (rules : (path * rule option) list) (env : env) =
+  let add (rules : (path * rule_option * rule option) list) (env : env) =
+    let rstrip = List.map (fun (x, _, y) -> (x, y)) rules in
     { env with
-        env_redbase = add_rules rules env.env_redbase;
+        env_redbase = add_rules rstrip env.env_redbase;
         env_item    = CTh_reduction rules :: env.env_item; }
 
-  let add1 (prule : path * rule option) (env : env) =
+  let add1 (prule : path * rule_option * rule option) (env : env) =
     add [prule] env
 
   let get (p : topsym) (env : env) =
@@ -2922,8 +2923,9 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_rd_cth =
     let for1 _path db = function
-      | CTh_reduction x ->
-         Some (Reduction.add_rules x db)
+      | CTh_reduction rules ->
+         let rules = List.map (fun (x, _, y) -> (x, y)) rules in
+         Some (Reduction.add_rules rules db)
       | _ -> None
 
     in bind_base_cth for1
