@@ -180,12 +180,6 @@ module EqTest = struct
           (fun (p1, _) (p2, _) -> for_pv env ~norm p1 p2)
           p1 p2
 
-    | LvMap ((m1, ty1), p1, e1, _), LvMap ((m2, ty2), p2, e2, _) ->
-        p_equal m1 m2
-          && List.all2 (for_type env) ty1 ty2
-          && for_pv env ~norm p1 p2
-          && for_expr env alpha ~norm e1 e2
-
     | _, _ -> false
 
   (* ------------------------------------------------------------------ *)

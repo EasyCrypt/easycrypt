@@ -336,8 +336,11 @@ module PRPi'(S:Sample_t) = {
   proc init =  RP.init
 
   proc f(x:D): D = {
-    if (x \notin RP.m)
-      RP.m.[x] <@ S.sample(rng RP.m);
+    var r;
+    if (x \notin RP.m) {
+      r <@ S.sample(rng RP.m);
+      RP.m.[x] <- r;
+    }
     return oget RP.m.[x];
   }
 }.
@@ -429,8 +432,11 @@ section Upto.
     }
 
     proc f(x:D): D = {
-      if (x \notin RP.m)
-        RP.m.[x] <@ sample(rng RP.m);
+      var r;
+      if (x \notin RP.m) {
+        r <@ sample(rng RP.m);
+        RP.m.[x] <- r;
+      }
       return oget RP.m.[x];
     }
   }.
@@ -456,10 +462,10 @@ section Upto.
   + proc.
     if=> //=; inline *.
     swap{1} 1.
-    seq  1  1: (={x} /\
+    seq  1  2: (={x} /\
                 x{1} \notin RP.m{1} /\
-                PRFi.m{2} = RP.m.[x <- r]{1} /\
-                ((PRP_indirect_bad.bad \/ rng RP.m r){1} <=> collision PRFi.m{2})).
+                PRFi.m{2} = RP.m.[x <- r0]{1} /\
+                ((PRP_indirect_bad.bad \/ rng RP.m r0){1} <=> collision PRFi.m{2})).
     + auto => /> &1 &2 coll _ x_notin_m r _; split=> [|x0 x'].
       + rewrite rngE /= /collision=> - [x'] mx'; exists x{2} x'; smt(domE get_setE).
       smt(@SmtMap).
@@ -536,8 +542,10 @@ section CollisionProbability.
       proc init = PRFi.init
 
       proc f(x:D): D = {
+        var r;
         if (x \notin PRFi.m) {
-          PRFi.m.[x] <@ S.s();
+          r <@ S.s();
+          PRFi.m.[x] <- r;
         }
         return oget PRFi.m.[x];
       }

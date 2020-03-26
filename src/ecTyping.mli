@@ -175,9 +175,6 @@ val transexpcast_opt :
   env -> [`InProc|`InOp] -> EcUnify.unienv -> ty option -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
-val translvalue : EcUnify.unienv -> env -> plvalue -> lvalue * ty
-
-(* -------------------------------------------------------------------- *)
 type ismap = (instr list) EcMaps.Mstr.t
 
 val transstmt : ?map:ismap -> env -> EcUnify.unienv -> pstmt -> stmt

@@ -51,8 +51,10 @@ module RF = {
   }
 
   proc f(x:D): R = {
+    var r;
     if (x \notin m) {
-      m.[x]  <$ dR x;
+      r <$ dR x;
+      m.[x]  <- r;
     }
     return (oget m.[x]);
   }

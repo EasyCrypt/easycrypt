@@ -112,12 +112,6 @@ let on_mpath_lv cb (lv : lvalue) =
     | LvVar   pv  -> for1 pv
     | LvTuple pvs -> List.iter for1 pvs
 
-    | LvMap ((_, pty), pv, e, ty) ->
-        List.iter (on_mpath_ty cb) pty;
-        on_mpath_ty   cb ty;
-        on_mpath_pv   cb pv;
-        on_mpath_expr cb e
-
 let rec on_mpath_instr cb (i : instr)=
   match i.i_node with
   | Srnd (lv, e) | Sasgn (lv, e) ->

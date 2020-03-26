@@ -1319,16 +1319,21 @@ let rec pp_lvalue (ppe : PPEnv.t) fmt lv =
       Format.fprintf fmt "@[<hov 2>%a@]"
         (pp_paren (pp_list ",@ " (pp_pv ppe))) (List.map fst ps)
 
-  | LvMap (_, x, e, _) ->
-      Format.fprintf fmt "%a.[%a]"
-        (pp_pv ppe) x (pp_expr ppe) e
-
 (* -------------------------------------------------------------------- *)
 and pp_instr_for_form (ppe : PPEnv.t) fmt i =
   match i.i_node with
-  | Sasgn (lv, e) ->
-      Format.fprintf fmt "%a <-@;<1 2>%a"
-        (pp_lvalue ppe) lv (pp_expr ppe) e
+  | Sasgn (lv, e) -> begin
+      match lv, EcTypes.split_args e with
+      | LvVar (x, _), ({ e_node = Eop (op, _) }, [ { e_node = Evar y }; k; v])
+          when (EcPath.basename op = EcCoreLib.s_set) && (EcTypes.pv_equal x y) ->
+
+        Format.fprintf fmt "%a.[%a] <-@;<1 2>%a"
+          (pp_pv ppe) x (pp_expr ppe) k (pp_expr ppe) v
+
+      | _, _ ->
+        Format.fprintf fmt "%a <-@;<1 2>%a"
+          (pp_lvalue ppe) lv (pp_expr ppe) e
+    end
 
   | Srnd (lv, e) ->
       Format.fprintf fmt "%a <$@;<1 2>$%a"
@@ -2733,9 +2738,18 @@ let pp_modsig ppe fmt (p,ms) =
 
 let rec pp_instr_r (ppe : PPEnv.t) fmt i =
   match i.i_node with
-  | Sasgn (lv, e) ->
-    Format.fprintf fmt "@[<hov 2>%a <-@ @[%a@]@];"
-      (pp_lvalue ppe) lv (pp_expr ppe) e
+  | Sasgn (lv, e) -> begin
+      match lv, EcTypes.split_args e with
+      | LvVar (x, _), ({ e_node = Eop (op, _) }, [ { e_node = Evar y }; k; v])
+          when (EcPath.basename op = EcCoreLib.s_set) && (EcTypes.pv_equal x y) ->
+
+        Format.fprintf fmt "@[<hov 2>%a.[%a] <-@ @[%a@]@];"
+          (pp_pv ppe) x (pp_expr ppe) k (pp_expr ppe) v
+
+      | _, _ ->
+        Format.fprintf fmt "@[<hov 2>%a <-@ @[%a@]@];"
+          (pp_lvalue ppe) lv (pp_expr ppe) e
+    end
 
   | Srnd (lv, e) ->
     Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@];"

@@ -38,12 +38,14 @@ theory MultiUser.
 
     proc initKeys(): unit = {
       var i:int;
+      var k;
 
       i <- 0;
       while (i < users)
       {
-        ks.[i] <@ S.kg();
-        i      <- i + 1;
+        k <@  S.kg();
+        ks.[i] <- k;
+        i = i + 1;
       }
     }
 
