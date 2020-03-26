@@ -498,9 +498,15 @@ let check_item_compatible env mode (fin,oin) (fout,oout) =
       if not (Sx.equal icalls ocalls) then
         check_item_err (MF_restr(env, `Eq(ocalls, icalls))) in
 
+  let norm_costs = function
+    | `Unbounded -> `Unbounded
+    | `Concrete costs ->
+      let costs = Mx.map (EcEnv.NormMp.norm_form env) costs in
+      `Concrete costs in
+
   (* We check complexity compatibility. *)
-  let icosts, ocosts = Mx.map (EcEnv.NormMp.norm_form env) (OI.costs oin),
-                       Mx.map (EcEnv.NormMp.norm_form env) (OI.costs oout) in
+  let icosts, ocosts = norm_costs (OI.costs oin),
+                       norm_costs (OI.costs oout) in
 
   match mode with
   | `Sub ->
@@ -510,29 +516,42 @@ let check_item_compatible env mode (fin,oin) (fout,oout) =
        which we cannot do statically when type-checking, except in some
        simple cases.*)
 
-    (* We check costs for other procedures. *)
-    let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
-        | None, Some _ ->
-          Mx.change (fun old -> assert (old = None); Some (ic,oc)) f acc
-        | Some _, None | None, None -> acc
-        | Some ic, Some oc ->
-          if EcFol.f_equal ic oc then acc
-          else Mx.add f (Some ic, Some oc) acc
-      ) icosts ocosts Mx.empty in
-    if not (Mx.is_empty diff) then
-      check_item_err (MF_compl(env, `Sub(diff)));
+    begin match icosts, ocosts with
+      | `Unbounded, `Unbounded | `Concrete _, `Unbounded -> ()
+      | `Unbounded, `Concrete _ ->
+        assert false            (* TODO: A: error message*)
+      | `Concrete icosts, `Concrete ocosts ->
+
+        (* We check costs for other procedures. *)
+        let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
+            | None, Some _ ->
+              Mx.change (fun old -> assert (old = None); Some (ic,oc)) f acc
+            | Some _, None | None, None -> acc
+            | Some ic, Some oc ->
+              if EcFol.f_equal ic oc then acc
+              else Mx.add f (Some ic, Some oc) acc
+          ) icosts ocosts Mx.empty in
+        if not (Mx.is_empty diff) then
+          check_item_err (MF_compl(env, `Sub(diff))) end
 
   | `Eq  ->
-    (* We check costs for other procedures. *)
-    let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
-        | None, Some _ | Some _, None -> Mx.add f (ic,oc) acc
-        | None, None -> acc
-        | Some ic, Some oc ->
-          if EcFol.f_equal ic oc then acc
-          else Mx.add f (Some ic, Some oc) acc
-      ) icosts ocosts Mx.empty in
-    if not (Mx.is_empty diff) then
-      check_item_err (MF_compl(env, `Eq(diff)))
+    begin match icosts, ocosts with
+      | `Unbounded, `Unbounded -> ()
+      | `Concrete _, `Unbounded
+      | `Unbounded, `Concrete _ ->
+        assert false            (* TODO: A: error message*)
+      | `Concrete icosts, `Concrete ocosts ->
+
+        (* We check costs for other procedures. *)
+        let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
+            | None, Some _ | Some _, None -> Mx.add f (ic,oc) acc
+            | None, None -> acc
+            | Some ic, Some oc ->
+              if EcFol.f_equal ic oc then acc
+              else Mx.add f (Some ic, Some oc) acc
+          ) icosts ocosts Mx.empty in
+        if not (Mx.is_empty diff) then
+          check_item_err (MF_compl(env, `Eq(diff))) end
 
 
 (* -------------------------------------------------------------------- *)
@@ -1880,9 +1899,10 @@ let trans_restr_oracle_calls env env_in (params : Sm.t) = function
 
 (* -------------------------------------------------------------------- *)
 (* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
+(* If [r_compl] is None, there are no restrictions *)
 let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
   match r_compl with
-  | None -> Mx.empty
+  | None -> `Unbounded
   | Some (PCompl restr_elems) ->
     let calls =
       List.map (fun (name, form) ->
@@ -1907,7 +1927,7 @@ let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
     let m_calls = Mx.of_list calls in
     (* Sanity check *)
     assert (List.length calls = Mx.cardinal m_calls);
-    m_calls
+    `Concrete m_calls
 
 (* Oracles and complexity restrictions for a function.
  * - [params] must be the set of parameters on the module being typed.
@@ -1924,9 +1944,13 @@ and trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
   let c_calls = trans_restr_compl env env_in params r_el.pmre_compl in
   let r_orcls = trans_restr_oracle_calls env env_in params r_el.pmre_orcls in
 
+  let get_calls = function
+    | `Concrete calls -> Mx.bindings calls
+    | `Unbounded -> [] in
+
   (* We add to [r_orcls] elements of [c_calls], if necessary. *)
   let r_orcls = r_orcls @
-                (Mx.bindings c_calls
+                (get_calls c_calls
                   |> List.filter_map (fun (f,_) ->
                      if List.mem f r_orcls then None else Some f)) in
 
@@ -2064,7 +2088,8 @@ and transmodsig_body
 
       let update_mr mr (Tys_function fs) =
         names := mk_loc (loc i) fs.fs_name :: !names;
-        EcModules.change_oicalls mr fs.fs_name calls in
+        EcModules.change_oicalls mr fs.fs_name calls
+      in
 
       let mr, body = match proc with
         | None -> List.fold_left update_mr mr sig_.mis_body, List.rev sig_.mis_body
@@ -3346,3 +3371,103 @@ let get_field (typ, ty) env =
         (get_instances (typ, ty) env);
       None
     with E.Found cr -> Some cr
+
+
+(* (\* -------------------------------------------------------------------- *\)
+ * (\* Sub-typing proof obligation for oracle complexity restrictions,
+ *    where [mp_in] must verify [mt].
+ *    Precondition: [mp_in] and [mt] types must be compatible. *\)
+ * let restr_proof_obligation env (mp_in : mpath) (mt : module_type)  =
+ *   let mt_sig = EcEnv.ModTy.sig_of_mt env mt in
+ *
+ *   (\* All procedures for which a proof obligation must be checked. *\)
+ *   let mt_procs =
+ *     List.map (fun (Tys_function fs) -> fs.fs_name) mt_sig.mis_body in
+ *
+ *   (\* We compute the module parameters, in case [mp_in] is a functor. *\)
+ *   let me_in = EcEnv.Mod.by_mpath mp_in env in
+ *   let restr_in = EcEnv.NormMp.get_restr_me env me_in mp_in in
+ *
+ *   let s_params = List.map (fun (id, mt) ->
+ *       id, (EcIdent.fresh id, mt)
+ *     ) me_in.me_params in
+ *   let bindings = List.map (fun (_, (fid, mt)) ->
+ *       fid, GTmodty mt
+ *     ) s_params in
+ *
+ *   (\* Application of the argument [mp_arg] on its parameters. *\)
+ *   let mp_arg_app =
+ *     EcPath.m_apply mp_arg (List.map (fun id -> EcPath.mident (fst id)) bindings) in
+ *
+ *   (\* Compute the choare hypothesis for [marg_app]'s procedure [fn]. *\)
+ *   let mk_hyp fn info =
+ *     (\* xpath of the function after substitution. *\)
+ *     let xfn = EcPath.xpath mp_arg_app fn in
+ *     (\* oracle path (i.e. with empty module arguments) of [fn] in [mi]. *\)
+ *     let xfn_in_mi = EcPath.xpath mp fn in
+ *     (\* Oracle restriction on [fn] in [mi]. *\)
+ *     let oi = EcSymbols.Msym.find fn restr.mr_oinfos in
+ *
+ *     (\* We process info, which let the user provide:
+ *        - the self cost.
+ *        - the number of calls to oracles that are not in [me_arg] params. *\)
+ *     let cost = EcProofTyping.tc1_process_cost tc EcTypes.tint info in
+ *     let c_self  = cost.c_self in
+ *     let c_calls = cost.c_calls in
+ *
+ *     (\* For oracles that are in params, we use corresponding entry in [restr]. *\)
+ *     let c_calls = Mx.fold (fun o obd c_calls ->
+ *         (\* We compute the name of the procedure, seen as an oracle of [mp_arg] *\)
+ *         let omod, ofun = EcPath.mget_ident o.x_top, o.x_sub in
+ *         let omod = fst (List.assoc omod s_params) in
+ *         let o = EcPath.xpath (EcPath.mident omod) ofun in
+ *         Mx.add o obd c_calls
+ *       ) (OI.costs oi) c_calls in
+ *
+ *     let cost = cost_r c_self c_calls in
+ *     let choare = f_cHoareF f_true xfn f_true cost in
+ *     (xfn_in_mi, choare) in
+ *
+ *   let procs_todo, hyps_assoc = List.fold_left (fun (procs_todo, hyps) (fn, info) ->
+ *       if not (Sstr.mem fn mi_procs) then
+ *         tc_error !!tc "choare apply: procedure %s is provided, but is not \
+ *                        used" fn;
+ *
+ *       if not (Sstr.mem fn procs_todo) then
+ *         tc_error !!tc "choare apply: procedure %s is provided twice" fn;
+ *       let procs_todo = Sstr.remove fn procs_todo in
+ *
+ *       let new_hyp = mk_hyp fn info in
+ *
+ *       (procs_todo, new_hyp :: hyps)
+ *     ) (mi_procs, [])  apply_info in
+ *
+ *   if not (Sstr.is_empty procs_todo) then begin
+ *     let l = Sstr.elements procs_todo in
+ *     tc_error !!tc "@[<v 2>choare_apply: no costs have been provided for %s's \
+ *                    procedures:@;\
+ *                    %a@]"
+ *       (EcIdent.name mi)
+ *       (EcPrinting.pp_list ", " Format.pp_print_string) l end;
+ *
+ *   let hyps = List.map snd hyps_assoc in
+ *
+ *   (\* We update all costs in [f], by removing [mi]'s procedures. *\)
+ *   let mi_procs = List.map (fun (x,ch) -> match ch.f_node with
+ *       | FcHoareF ch -> x, ch.chf_co
+ *       | _ -> assert false ) hyps_assoc in
+ *   let tx _ f_new = match f_new.f_node with
+ *     | FcHoareF ch ->
+ *       let ch = { ch with chf_co = comp_cost mi_procs ch.chf_co } in
+ *       f_cHoareF_r ch
+ *     | FcHoareS ch ->
+ *       let ch = { ch with chs_co = comp_cost mi_procs ch.chs_co } in
+ *       f_cHoareS_r ch
+ *     | _ -> f_new in
+ *
+ *   let f = Fsubst.f_subst ~tx Fsubst.f_subst_id f in
+ *
+ *   let fs = Fsubst.f_bind_mod Fsubst.f_subst_id mi mp_arg_app in
+ *   let f = Fsubst.f_subst fs f in
+ *
+ *   f_forall bindings (f_imps hyps f) *)

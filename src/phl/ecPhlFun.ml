@@ -221,13 +221,18 @@ module FunAbsLow = struct
     (* check_oracle_use pf env top o; *)
 
     let cost_orcl oi o = match OI.cost oi o with
-      | Some cbd -> cbd
-      | None     ->
+      | PreOI.Bound cbd -> cbd
+      | PreOI.Zero -> f_i0
+      | PreOI.Unbounded ->
         tc_error pf_ "the number of calls to %a is unbounded"
           (EcPrinting.pp_funname ppe) o in
 
     (* We create the oracles invariants *)
-    let oi_costs = OI.costs oi in
+    let oi_costs = match OI.costs oi with
+      | `Unbounded ->
+        tc_error pf_ "%a is unbounded" (EcPrinting.pp_funname ppe) f
+      | `Concrete costs -> costs in
+
     (* If [f] can call [o] at most zero times, we remove it. *)
     let ois = OI.allowed oi
               |> List.filter (fun o ->

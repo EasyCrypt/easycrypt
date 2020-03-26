@@ -16,27 +16,23 @@ include module type of struct include EcCoreModules end
 (* -------------------------------------------------------------------- *)
 (* Instantiation of EcCoreModules.PreOI on EcCoreFol.form. *)
 module OI : sig
-  type t = EcCoreFol.form PreOI.t
+  type t = form PreOI.t
 
-  val hash  : t -> int
+  type compl = form PreOI.compl
+
+  val hash : t -> int
   val equal : t -> t -> bool
-
-  val empty : t
 
   val is_in : t -> bool
 
-  val cost      : t -> xpath -> EcCoreFol.form option
-  val costs     : t -> EcCoreFol.form Mx.t
+  val cost : t -> xpath -> compl
+  val costs : t -> [`Concrete of form Mx.t | `Unbounded]
 
-  val allowed   : t -> xpath list
+  val allowed : t -> xpath list
   val allowed_s : t -> Sx.t
 
-  val mk :
-    xpath list ->
-    bool ->
-    EcCoreFol.form Mx.t ->
-    t
-
+  val mk : xpath list -> bool -> [`Concrete of form Mx.t | `Unbounded] -> t
+  (* val change_calls : t -> xpath list -> t *)
   val filter : (xpath -> bool) -> t -> t
 end
 

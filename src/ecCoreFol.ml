@@ -2027,15 +2027,22 @@ module Fsubst = struct
 
   and subst_oi ~(tx : form -> form -> form) (s : f_subst) (oi : form PreOI.t) =
     let sx = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
+
+    let costs = match PreOI.costs oi with
+      | `Unbounded -> `Unbounded
+      | `Concrete costs ->
+        let costs = EcPath.Mx.fold (fun x a costs ->
+            EcPath.Mx.change
+              (fun old -> assert (old = None); Some (f_subst ~tx s a))
+              (sx x)
+              costs
+          ) costs EcPath.Mx.empty in
+        `Concrete costs in
+
     PreOI.mk
       (List.map sx (PreOI.allowed oi))
       (PreOI.is_in oi)
-      (EcPath.Mx.fold (fun x a costs ->
-           EcPath.Mx.change
-             (fun old -> assert (old = None); Some (f_subst ~tx s a))
-             (sx x)
-             costs
-         ) (PreOI.costs oi) EcPath.Mx.empty)
+      (costs)
 
   and mr_subst ~tx s mr : form p_mod_restr =
     let sx = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in

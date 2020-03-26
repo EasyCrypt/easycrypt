@@ -1697,10 +1697,10 @@ and pp_allowed_orcl ppe fmt orcls =
     Format.fprintf fmt "@[<hov>%a@];@ "
       (pp_list ",@ " (pp_funname ppe)) orcls
 
-and pp_costs ppe fmt costs =
-  if EcPath.Mx.is_empty costs
-  then Format.fprintf fmt ""
-  else
+and pp_costs ppe fmt costs = match costs with
+  | `Unbounded ->
+    Format.fprintf fmt ""
+  | `Concrete costs ->
     let pp_cost fmt (f,c) =
       Format.fprintf fmt "@[%a : %a@]"
         (pp_funname ppe) f
@@ -1712,7 +1712,7 @@ and pp_costs ppe fmt costs =
 and pp_orclinfo ppe fmt (sym, oi) =
   let orcls = OI.allowed oi
   and costs = OI.costs oi in
-  if orcls = [] && EcPath.Mx.is_empty costs
+  if orcls = [] && costs = `Unbounded
   then Format.fprintf fmt ""
   else
     Format.fprintf fmt "@[<hv>%s%a : {@,%a%a@,}@]"
@@ -1724,7 +1724,7 @@ and pp_orclinfo ppe fmt (sym, oi) =
 and pp_orclinfos ppe fmt ois =
   let nothing_to_print =
     Msym.for_all (fun _ oi ->
-        OI.allowed oi = [] && EcPath.Mx.is_empty (OI.costs oi)
+        OI.allowed oi = [] && (OI.costs oi) = `Unbounded
       ) ois in
   if nothing_to_print
   then Format.fprintf fmt ""

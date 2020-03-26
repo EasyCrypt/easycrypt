@@ -22,33 +22,32 @@ include EcCoreModules
 module OI : sig
   type t = form PreOI.t
 
+  type compl = form PreOI.compl
+
   val hash : t -> int
   val equal : t -> t -> bool
 
-  val empty : t
-
   val is_in : t -> bool
 
-  val cost : t -> xpath -> form option
-  val costs : t -> form Mx.t
+  val cost : t -> xpath -> compl
+  val costs : t -> [`Concrete of form Mx.t | `Unbounded]
 
   val allowed : t -> xpath list
   val allowed_s : t -> Sx.t
 
-  val mk : xpath list -> bool -> form Mx.t -> t
-  val change_calls : t -> xpath list -> t
+  val mk : xpath list -> bool -> [`Concrete of form Mx.t | `Unbounded] -> t
+  (* val change_calls : t -> xpath list -> t *)
   val filter : (xpath -> bool) -> t -> t
 end = struct
   type t = EcCoreFol.form PreOI.t
+  type compl = EcCoreFol.form PreOI.compl
 
-  let empty        = PreOI.empty
   let is_in        = PreOI.is_in
   let allowed      = PreOI.allowed
   let allowed_s    = PreOI.allowed_s
   let cost         = PreOI.cost
   let costs        = PreOI.costs
   let mk           = PreOI.mk
-  let change_calls = PreOI.change_calls
   let filter       = PreOI.filter
   let equal        = PreOI.equal EcCoreFol.f_equal
   let hash         = PreOI.hash EcCoreFol.f_hash
@@ -91,16 +90,18 @@ let change_oinfo restr f oi =
 
 let add_oinfo restr f oi = change_oinfo restr f oi
 
-let change_oicalls restr f ocalls =
-  let oi = match Msym.find f restr.mr_oinfos with
-    | oi -> OI.change_calls oi ocalls
-    | exception Not_found -> OI.mk ocalls true Mx.empty in
-  add_oinfo restr f oi
-
 let oicalls_filter restr f filter =
   match Msym.find f restr.mr_oinfos with
   | oi -> change_oinfo restr f (OI.filter filter oi)
   | exception Not_found -> restr
+
+let change_oicalls restr f ocalls =
+  let oi = match Msym.find f restr.mr_oinfos with
+    | oi ->
+      let filter x = List.mem x ocalls in
+      OI.filter filter oi
+    | exception Not_found -> OI.mk ocalls true `Unbounded in
+  add_oinfo restr f oi
 
 (* -------------------------------------------------------------------- *)
 let mty_hash  = EcCoreFol.mty_hash

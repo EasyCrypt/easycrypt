@@ -136,26 +136,23 @@ val ur_union :
 module PreOI : sig
   type 'a t
 
+  type 'a compl = | Bound of 'a
+                  | Zero
+                  | Unbounded
+
   val hash : ('a -> int) -> 'a t -> int
   val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
-  val empty : 'a t
-
-  (* Return true if equality of globals is required to ensure equality of
-   * result and globals (in the post). *)
   val is_in : 'a t -> bool
 
-  (* Number of time that a procedure can be called by [M.f].
-     No restriction if [None]. *)
-  val cost : 'a t -> xpath -> 'a option
-  val costs : 'a t -> 'a Mx.t
+  val cost : 'a t -> xpath -> 'a compl
+  val costs : 'a t -> [`Concrete of 'a Mx.t | `Unbounded]
 
-  (* List of oracles that can be called by [M.f].*)
   val allowed : 'a t -> xpath list
   val allowed_s : 'a t -> Sx.t
 
-  val mk : xpath list -> bool -> 'a Mx.t -> 'a t
-  val change_calls : 'a t -> xpath list -> 'a t
+  val mk : xpath list -> bool -> [`Concrete of 'a Mx.t | `Unbounded] -> 'a t
+  (* val change_calls : 'a t -> xpath list -> 'a t *)
   val filter : (xpath -> bool) -> 'a t -> 'a t
 end
 
