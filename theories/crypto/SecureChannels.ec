@@ -45,7 +45,7 @@ theory MultiUser.
       {
         k <@  S.kg();
         ks.[i] <- k;
-        i = i + 1;
+        i <- i + 1;
       }
     }
 
