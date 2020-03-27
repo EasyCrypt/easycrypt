@@ -35,37 +35,28 @@ module Game (D : Distinguisher) (O : Oracles) = {
   }
 }.
 
-clone PROM as PROa with
+clone PROM.FullRO as ROa with
   type in_t    <- t_in,
   type out_t   <- a,
   type d_in_t  <- d_input,
   type d_out_t <- d_output,
-  op   dout    <- fun _ => da.
-clone PROa.FullRO as FROa. (** TODO: We probably want one less layer of abstract **)
-clone FROa.FullEager as ROa
-proof * by exact/da_ll.
+  op   dout  _ <- da.
 
-clone PROM as PROb with
+clone PROM.FullRO as ROb with
   type in_t    <- t_in,
   type out_t   <- b,
   type d_in_t  <- d_input,
   type d_out_t <- d_output,
-  op   dout    <- fun _ => db.
-clone PROb.FullRO as FROb. (** TODO: We probably want one less layer of abstract **)
-clone FROb.FullEager as ROb
-proof * by exact/db_ll.
+  op   dout  _ <- db.
 
-clone PROM as PROab with
+clone PROM.FullRO as ROab with
   type in_t    <- t_in,
   type out_t   <- a * b,
   type d_in_t  <- d_input,
   type d_out_t <- d_output,
-  op   dout    <- fun _ => dab.
-clone PROab.FullRO as FROab. (** TODO: We probably want one less layer of abstract **)
-clone FROab.FullEager as ROab
-proof * by rewrite dprod_ll da_ll db_ll.
+  op   dout  _ <- dab.
 
-module O1 (O : PROab.RO) : Oracles = {
+module O1 (O : ROab.RO) : Oracles = {
   proc init () = {
     O.init();
   }
@@ -82,7 +73,7 @@ module O1 (O : PROab.RO) : Oracles = {
   }
 }.
 
-module O2 (Oa : PROa.RO) (Ob : PROb.RO) = {
+module O2 (Oa : ROa.RO) (Ob : ROb.RO) = {
   proc init () = {
     Oa.init();
     Ob.init();
@@ -97,30 +88,30 @@ module O2 (Oa : PROa.RO) (Ob : PROb.RO) = {
   proc fb = Ob.get
 }.
 
-
-
 section.
 declare module D : 
-  Distinguisher { FROa.RO, FROa.FRO, FROb.RO, FROb.FRO, FROab.RO, FROab.FRO }.
+  Distinguisher { ROa.RO, ROa.FRO, ROb.RO, ROb.FRO, ROab.RO, ROab.FRO }.
 
-
-local module O3 (Oa : PROa.RO) (Ob : PROb.RO) = {
+local module O3 (Oa : ROa.RO) (Ob : ROb.RO) = {
   proc init () = {
     Oa.init();
     Ob.init();
   }
+
   proc f (m : t_in) = {
     var xa, xb;
     xa <@ Oa.get(m);
     xb <@ Ob.get(m);
     return (xa,xb);
   }
+
   proc fa (m : t_in) = {
     var xa;
     xa <@ Oa.get(m);
     Ob.sample(m);
     return xa;
   }
+
   proc fb (m : t_in) = {
     var xb;
     xb <@ Ob.get(m);
@@ -140,12 +131,12 @@ local clone import DProd.ProdSampling as PS with
 proof *.
 
 local equiv eq_1 :
-  Game(D,O1(FROab.RO)).main ~ Game(D,O3(FROa.RO,FROb.RO)).main :
+  Game(D,O1(ROab.RO)).main ~ Game(D,O3(ROa.RO,ROb.RO)).main :
   ={arg, glob D} ==>
-  ={res, glob D} /\ map_prod FROab.RO.m{1} FROa.RO.m{2} FROb.RO.m{2}.
+  ={res, glob D} /\ map_prod ROab.RO.m{1} ROa.RO.m{2} ROb.RO.m{2}.
 proof.
 proc; inline*.
-call(: map_prod FROab.RO.m{1} FROa.RO.m{2} FROb.RO.m{2}); auto.
+call(: map_prod ROab.RO.m{1} ROa.RO.m{2} ROb.RO.m{2}); auto.
 + by proc; inline*; auto; smt(mem_empty fdom0).
 + proc; inline*.
   sp; swap{2} 5 -3.
@@ -209,38 +200,38 @@ smt(mem_empty fdom0).
 qed.
 
 local equiv eq_2 :
-  D(O3(ROa.LRO,ROb.LRO)).distinguish ~ D(O2(FROa.RO,FROb.RO)).distinguish :
-  ={arg, glob D, FROa.RO.m, FROb.RO.m} ==>
-  ={res, glob D, FROa.RO.m, FROb.RO.m}.
+  D(O3(ROa.FullEager.LRO,ROb.FullEager.LRO)).distinguish ~ D(O2(ROa.RO,ROb.RO)).distinguish :
+  ={arg, glob D, ROa.RO.m, ROb.RO.m} ==>
+  ={res, glob D, ROa.RO.m, ROb.RO.m}.
 proof.
-proc( ={FROa.RO.m, FROb.RO.m})=> //=.
+proc( ={ROa.RO.m, ROb.RO.m})=> //=.
 + by proc; inline*; auto.
 + by proc; inline*; sim.
 + by proc; inline*; sp; wp 2 2; sim.
 by proc; inline*; sp; wp 2 2; sim.
 qed.
 
-local module D1 (Ob : PROb.RO) (Oa : PROa.RO) = D(O3(Oa,Ob)).
-local module D2 (Oa : PROa.RO) (Ob : PROb.RO) = D(O3(Oa,Ob)).
+local module D1 (Ob : ROb.RO) (Oa : ROa.RO) = D(O3(Oa,Ob)).
+local module D2 (Oa : ROa.RO) (Ob : ROb.RO) = D(O3(Oa,Ob)).
 
 equiv prod_split :
-  Game(D,O1(FROab.RO)).main ~ Game(D,O2(FROa.RO,FROb.RO)).main :
+  Game(D,O1(ROab.RO)).main ~ Game(D,O2(ROa.RO,ROb.RO)).main :
   ={arg, glob D} ==> ={res, glob D}.
 proof.
-transitivity Game(D, O3(FROa.RO, FROb.RO)).main
+transitivity Game(D, O3(ROa.RO, ROb.RO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + by conseq eq_1=> />.
-transitivity Game(D, O3(ROa.LRO, FROb.RO)).main
+transitivity Game(D, O3(ROa.FullEager.LRO, ROb.RO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + proc; inline*. 
-  by call(ROa.RO_LRO_D (D1(FROb.RO))); auto.
-transitivity Game(D, O3(ROa.LRO, ROb.LRO)).main
+  by call(ROa.FullEager.RO_LRO_D (D1(ROb.RO)) da_ll); auto.
+transitivity Game(D, O3(ROa.FullEager.LRO, ROb.FullEager.LRO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + proc; inline*. 
-  by call(ROb.RO_LRO_D (D2(ROa.LRO))); auto.
+  by call(ROb.FullEager.RO_LRO_D (D2(ROa.FullEager.LRO)) db_ll); auto.
 by proc; inline*; call eq_2; auto.
 qed.
 

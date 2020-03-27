@@ -515,15 +515,13 @@ abstract theory UF1_UF.
       rewrite /phi /psi /=; smt (lt0_q_gen).
     qed.
 
-    local clone import PROM as PRO with
+    local clone import PROM.FullRO as RO with
       type in_t    <- unit,
       type out_t   <- pkey * skey,
-      op   dout    <- fun _=> keygen,
+      op   dout  _ <- keygen,
       type d_in_t  <- unit,
       type d_out_t <- bool.
-    local clone import FullRO as FRO.
-    local clone import FullEager as Eager
-    proof * by solve (random).
+    import FullEager.
 
     local module Aux1(RO:RO) = {
       module WO = {
@@ -600,7 +598,7 @@ abstract theory UF1_UF.
     local lemma Aux1_EAux1 &m: 
       Pr[Aux1(LRO).distinguish() @ &m : UF1.forged] =
       Pr[Aux1( RO).distinguish() @ &m : UF1.forged].
-    proof. apply eq_sym; byequiv (RO_LRO_D Aux1) => //. qed.
+    proof. apply eq_sym; byequiv (RO_LRO_D Aux1 keygen_ll) => //. qed.
  
     local lemma EAux1_MkAdvUF1 &m:
       Pr[Aux1( RO).distinguish() @ &m : UF1.forged] <=

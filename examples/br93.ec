@@ -72,12 +72,13 @@ proof. by move=> [sk] + fx_eq_fy - /fK ^ /(_ x) <- /(_ y) <-; congr. qed.
 (* (we simply instantiate the generic theory of Random Oracles with     *)
 (*    the types and output distribution declared above, discharging all *)
 (*          assumptions on the instantiated parameters--there are none) *)
-clone import ROM.Lazy as H with
-  type from  <- rand,
-  type to    <- ptxt,
-  op dsample <- fun _ => dptxt
-proof *.
-import Types.
+clone import ROM as H with
+  type in_t    <- rand,
+  type out_t   <- ptxt,
+  type d_in_t  <- unit,
+  type d_out_t <- bool,
+  op   dout _  <- dptxt.
+import H.Lazy.
 
 (* We can define the Bellare-Rogaway 93 PKE Scheme.                     *)
 (* BR93 is a module that, given access to an oracle H from type         *)
@@ -125,9 +126,9 @@ local module Correctness = {
   proc main(m) = {
     var pk, sk, c, m';
 
-    (pk,sk) <@ BR93(RO).keygen();
-    c       <@ BR93(RO).enc(pk,m);
-    m'      <@ BR93(RO).dec(sk,c);
+    (pk,sk) <@ BR93(LRO).keygen();
+    c       <@ BR93(LRO).enc(pk,m);
+    m'      <@ BR93(LRO).dec(sk,c);
     return (m = m');
   }
 }.
@@ -143,7 +144,7 @@ byphoare=> //; conseq (: _ ==> true) (: _ ==> res)=> //.
   auto=> /> &hr [pk sk] kp_in_dkeys r _ y _ /=.
   rewrite fK //; split=> [_ y' _|].
   + by rewrite get_set_sameE -addA addKp.
-  rewrite domE; case: (RO.m{hr}.[r])=> [|p] //= _ _.
+  rewrite domE; case: (LRO.m{hr}.[r])=> [|p] //= _ _.
   by rewrite -addA addKp.
 by proc; inline *; auto=> />; rewrite dkeys_ll drand_ll dptxt_ll.
 qed.
@@ -170,7 +171,7 @@ realize finvof by move=> pk sk x /fK ->.
 
 (* But we can't do it (yet) for IND-CPA because of the random oracle    *)
 (*             Instead, we define CPA for BR93 with that particular RO. *)
-module type Adv (ARO: ARO)  = {
+module type Adv (ARO: POracle)  = {
   proc a1(p:pkey): (ptxt * ptxt)
   proc a2(c:ctxt): bool
 }.
@@ -198,12 +199,12 @@ module BR93_CPA(A:Adv) = {
   proc main(): bool = {
     var pk, sk, m0, m1, c, b, b';
 
-                Log(RO).init();
-    (pk,sk)  <@ BR93(RO).keygen();
-    (m0,m1)  <@ A(Log(RO)).a1(pk);
+                Log(LRO).init();
+    (pk,sk)  <@ BR93(LRO).keygen();
+    (m0,m1)  <@ A(Log(LRO)).a1(pk);
     b        <$ {0,1};
-    c        <@ BR93(RO).enc(pk,b?m0:m1);
-    b'       <@ A(Log(RO)).a2(c);
+    c        <@ BR93(LRO).enc(pk,b?m0:m1);
+    b'       <@ A(Log(LRO)).a2(c);
     return b' = b;
   }
 }.
@@ -219,10 +220,10 @@ module I(A:Adv): Inverter = {
   proc invert(pk:pkey,y:rand): rand = {
     var m0, m1, h, b;
 
-               Log(RO).init();
-    (m0,m1) <@ A(Log(RO)).a1(pk);
+               Log(LRO).init();
+    (m0,m1) <@ A(Log(LRO)).a1(pk);
     h       <$ dptxt;
-    b       <@ A(Log(RO)).a2(y,h);
+    b       <@ A(Log(LRO)).a2(y,h);
     x       <- nth witness Log.qs (find (fun p => f pk p = y) Log.qs);
 
     return x;
@@ -232,10 +233,10 @@ module I(A:Adv): Inverter = {
 (* We now prove the result using a sequence of games                    *)
 section.
 (* All lemmas in this section hold for all (valid) CPA adversary A      *)
-declare module A : Adv { RO, Log }.
+declare module A : Adv { LRO, Log }.
 
-axiom A_a1_ll (O <: ARO {A}): islossless O.o => islossless A(O).a1.
-axiom A_a2_ll (O <: ARO {A}): islossless O.o => islossless A(O).a2.
+axiom A_a1_ll (O <: POracle {A}): islossless O.o => islossless A(O).a1.
+axiom A_a2_ll (O <: POracle {A}): islossless O.o => islossless A(O).a2.
 
 (* Step 1: replace RO call with random sampling                         *)
 local module Game1 = {
@@ -243,16 +244,16 @@ local module Game1 = {
 
   proc main() = {
     var pk, sk, m0, m1, b, h, c, b';
-                Log(RO).init();
+                Log(LRO).init();
     (pk,sk)  <$ dkeys;
-    (m0,m1)  <@ A(Log(RO)).a1(pk);
+    (m0,m1)  <@ A(Log(LRO)).a1(pk);
     b        <$ {0,1};
 
     r        <$ drand;
     h        <$ dptxt;
     c        <- ((f pk r),h +^ (b?m0:m1));
 
-    b'       <@ A(Log(RO)).a2(c);
+    b'       <@ A(Log(LRO)).a2(c);
     return b' = b;
   }
 }.
@@ -263,17 +264,17 @@ local lemma pr_Game0_Game1 &m:
      + Pr[Game1.main() @ &m: Game1.r \in Log.qs].
 proof.
 byequiv=> //; proc.
-inline BR93(RO).enc BR93(RO).keygen.
+inline BR93(LRO).enc BR93(LRO).keygen.
 (* Until the replaced RO call, the two games are in sync.               *)
 (*        In addition, the log's contents coincide with the RO queries. *)
-seq  8  5: (   ={glob A, glob RO, glob Log, pk, sk, b}
+seq  8  5: (   ={glob A, glob LRO, glob Log, pk, sk, b}
             /\ pk0{1} = pk{2}
             /\ m{1} = (b?m0:m1){2}
             /\ r{1} = Game1.r{2}
-            /\ (forall x, x \in Log.qs{1} <=> x \in RO.m{1})).
-+ auto; call (:   ={glob Log, glob RO}
-               /\ (forall x, x \in Log.qs{1} <=> x \in RO.m{1})).
-  + proc; inline RO.o.
+            /\ (forall x, x \in Log.qs{1} <=> x \in LRO.m{1})).
++ auto; call (:   ={glob Log, glob LRO}
+               /\ (forall x, x \in Log.qs{1} <=> x \in LRO.m{1})).
+  + proc; inline LRO.o.
     by auto=> /> &2 log_is_dom y _; smt(@SmtMap).
   by inline *; auto=> /> _ _ x; rewrite mem_empty.
 (* We now deal with everything that happens after the programs differ: *)
@@ -285,9 +286,9 @@ seq  8  5: (   ={glob A, glob RO, glob Log, pk, sk, b}
 (* Because we reason up to bad, we need to prove that bad is stable    *)
 (* and that the adversary and its oracles are lossless                 *)
 call (_: Game1.r \in Log.qs,
-         eq_except (pred1 Game1.r{2}) RO.m{1} RO.m{2}).
+         eq_except (pred1 Game1.r{2}) LRO.m{1} LRO.m{2}).
 + exact/A_a2_ll.
-+ proc; inline RO.o.
++ proc; inline LRO.o.
   auto=> /> &1 &2 _ m1_eqe_m2 yL y_in_dptxt; split.
   + move=> x_notin_m; split.
     + by rewrite !get_set_sameE eq_except_set_eq.
@@ -297,12 +298,12 @@ call (_: Game1.r \in Log.qs,
   + move: m1_eqe_m2 x_in_m=> + + + r_neq_x.
     by rewrite eq_exceptP pred1E !domE=> /(_ x{2} r_neq_x) ->.
   by move: m1_eqe_m2=> + _ r_neq_x- /eq_exceptP /(_ x{2}); rewrite pred1E=> /(_ r_neq_x) ->.
-+ by move=> &2 _; proc; call (RO_o_ll dptxt_ll); auto.
++ by move=> &2 _; proc; call (LRO_o_ll dptxt_ll); auto.
 + move=> _ /=; proc; inline *.
   conseq (: true ==> true: =1%r) (: Game1.r \in Log.qs ==> Game1.r \in Log.qs)=> //=.
   + by auto=> />.
   by auto=> />; exact/dptxt_ll.
-inline RO.o; case: ((r \in RO.m){1}).
+inline LRO.o; case: ((r \in LRO.m){1}).
 + conseq (: _ ==> ={b} /\ Game1.r{2} \in Log.qs{2})=> //=.
   + by move=> /> &1 &2 _ _ rR _ _ _ _ _ h /h [] -> //.
   by auto=> /> &2 <- ->.
@@ -319,16 +320,16 @@ local module Game2 = {
 
   proc main() = {
     var pk, sk, m0, m1, b, h, c, b';
-                Log(RO).init();
+                Log(LRO).init();
     (pk,sk)  <$ dkeys;
-    (m0,m1)  <@ A(Log(RO)).a1(pk);
+    (m0,m1)  <@ A(Log(LRO)).a1(pk);
     b        <$ {0,1};
 
     r        <$ drand;
     h        <$ dptxt;
     c        <- ((f pk r),h);
 
-    b'       <@ A(Log(RO)).a2(c);
+    b'       <@ A(Log(LRO)).a2(c);
     return b' = b;
   }
 }.
@@ -337,9 +338,9 @@ local equiv eq_Game1_Game2: Game1.main ~ Game2.main:
   ={glob A} ==> ={glob Log, res} /\ Game1.r{1} = Game2.r{2}.
 proof.
 proc.
-call (: ={glob Log, glob RO}); 1: by sim.
+call (: ={glob Log, glob LRO}); 1: by sim.
 wp; rnd (fun x=> x +^ (b?m0:m1){2}).
-auto; call (: ={glob Log, glob RO}); 1: by sim.
+auto; call (: ={glob Log, glob LRO}); 1: by sim.
 inline *; auto=> /> _ _ rR b _ rL _; split=> [|_].
 + by move=> hR _; rewrite addpK.
 split=> [|_].
@@ -363,10 +364,10 @@ swap 4 4.
 wp; rnd (pred1 b')=> //=.
 inline *; call (_: true).
 + exact A_a2_ll. (* adversary *)
-+ by proc; call (RO_o_ll dptxt_ll); auto. (* oracle *)
++ by proc; call (LRO_o_ll dptxt_ll); auto. (* oracle *)
 auto; call (_: true).
 + exact A_a1_ll. (* adversary *)
-+ by proc; call (RO_o_ll dptxt_ll); auto. (* oracle *)
++ by proc; call (LRO_o_ll dptxt_ll); auto. (* oracle *)
 auto=> />; rewrite dkeys_ll drand_ll dptxt_ll /predT /=.
 by move=> _ _ _ _ _ _ r; rewrite dbool1E pred1E.
 qed.
@@ -411,9 +412,9 @@ conseq
   + by exists sk.
   by rewrite h.
 (* rest of proof *)
-call (: ={glob Log, glob RO}); 1: by sim.
+call (: ={glob Log, glob LRO}); 1: by sim.
 swap{1} 6 -2.
-auto; call (: ={glob Log, glob RO}); 1: by sim.
+auto; call (: ={glob Log, glob LRO}); 1: by sim.
 by auto=> /> [pk sk] ->.
 qed.
 
@@ -490,10 +491,13 @@ op fi: skey -> rand -> rand.
 axiom fK pk sk x: (pk,sk) \in dkeys => fi sk (f pk x) = x.
 
 (* Random Oracle                                                        *)
-clone import ROM.Lazy as H with
-  type from      <- rand,
-  type to        <- ptxt,
-  op   dsample _ <- dptxt.
+clone import ROM as H with
+  type in_t    <- rand,
+  type out_t   <- ptxt,
+  type d_in_t  <- unit,
+  type d_out_t <- bool,
+  op   dout _  <- dptxt.
+import Lazy.
 
 (* A Definition for OWTP Security                                       *)
 module type Inverter = {
@@ -517,7 +521,7 @@ module type Scheme (RO : Oracle) = {
   proc enc(pk:pkey, m:ptxt): ctxt
 }.
 
-module type Adv (ARO : ARO)  = {
+module type Adv (ARO : POracle)  = {
   proc a1(p:pkey): (ptxt * ptxt)
   proc a2(c:ctxt): bool
 }.
@@ -593,7 +597,7 @@ module I (A:Adv) (H : Oracle) = {
 
 (* We will need to turn a concrete CPA adversary into an abstract one.  *)
 (*      We do not need to do it for the inverter as the types coincide. *)
-module A_CPA (A : Adv) (H : ARO) = {
+module A_CPA (A : Adv) (H : POracle) = {
   proc a1 = A(H).a1
 
   proc a2(c:rand * ptxt): bool = {
@@ -605,10 +609,10 @@ module A_CPA (A : Adv) (H : ARO) = {
 }.
 
 section.
-declare module A : Adv { RO, I }.
+declare module A : Adv { LRO, I }.
 
-axiom A_a1_ll (O <: ARO {A}): islossless O.o => islossless A(O).a1.
-axiom A_a2_ll (O <: ARO {A}): islossless O.o => islossless A(O).a2.
+axiom A_a1_ll (O <: POracle {A}): islossless O.o => islossless A(O).a1.
+axiom A_a2_ll (O <: POracle {A}): islossless O.o => islossless A(O).a2.
 
 local clone import BR93 as Instance with
   type pkey  <- pkey,
@@ -631,26 +635,26 @@ realize dkeys_llfuni  by exact/dkeys_llfuni.
 realize fK            by exact/fK.
 
 lemma Reduction &m:
-     Pr[CPA(RO, BR, A).main() @ &m : res] - 1%r / 2%r
-  <= Pr[Exp_OW(Self.I(A, RO)).main() @ &m : res].
+     Pr[CPA(LRO, BR, A).main() @ &m : res] - 1%r / 2%r
+  <= Pr[Exp_OW(Self.I(A, LRO)).main() @ &m : res].
 proof.
 have <-:   Pr[BR93_CPA(A_CPA(A)).main() @ &m: res]
-         = Pr[CPA(RO,BR,A).main() @ &m: res].
+         = Pr[CPA(LRO,BR,A).main() @ &m: res].
 + byequiv=> //=; proc.
-  inline A_CPA(A,Log(H.RO)).a2.
-  wp; call (: H.RO.m{1} = RO.m{2}).
+  inline A_CPA(A,Log(H.Lazy.LRO)).a2.
+  wp; call (: H.Lazy.LRO.m{1} = LRO.m{2}).
   + by proc; inline *; auto.
-  inline BR93(H.RO).enc BR(RO).enc H.RO.o RO.o; auto.
-  call (: H.RO.m{1} = RO.m{2}).
+  inline BR93(H.Lazy.LRO).enc BR(LRO).enc H.Lazy.LRO.o LRO.o; auto.
+  call (: H.Lazy.LRO.m{1} = LRO.m{2}).
   + by proc; inline *; auto.
   inline *; auto=> /> [pk sk] _ [m0 m1] c b _ r _ h _ /=.
   by rewrite addC /= addC.
 have <-:   Pr[OW_rand.OW(I(A_CPA(A))).main() @ &m: res]
-         = Pr[Exp_OW(Self.I(A,RO)).main() @ &m: res].
+         = Pr[Exp_OW(Self.I(A,LRO)).main() @ &m: res].
 + byequiv=> //=; proc.
-  inline *; auto; call (: H.RO.m{1} = RO.m{2} /\ ={qs}(Log,Self.I)).
+  inline *; auto; call (: H.Lazy.LRO.m{1} = LRO.m{2} /\ ={qs}(Log,Self.I)).
   + by sim.
-  auto; call (: H.RO.m{1} = RO.m{2} /\ ={qs}(Log,Self.I)).
+  auto; call (: H.Lazy.LRO.m{1} = LRO.m{2} /\ ={qs}(Log,Self.I)).
   + by sim.
   by auto.
 apply/(Reduction (A_CPA(A)) _ _ &m).

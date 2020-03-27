@@ -12,8 +12,18 @@ pragma -oldip.
 (* -------------------------------------------------------------------- *)
 require import AllCore SmtMap Distr.
 
-type in_t, out_t.
+(* -------------------------------------------------------------------- *)
+type flag = [ Unknown | Known ].
+abbrev (\is) (fv : ('a * flag) option) (f : flag) = (oget fv).`2 = f.
 
+(* -------------------------------------------------------------------- *)
+abstract theory FullRO.
+type in_t, out_t.
+op dout: in_t -> out_t distr.
+
+type d_in_t, d_out_t.
+
+(* -------------------------------------------------------------------- *)
 module type RO = {
   proc init  ()                    : unit
   proc get   (x : in_t)            : out_t
@@ -22,19 +32,11 @@ module type RO = {
   proc sample(x : in_t)            : unit
 }.
 
-type d_in_t, d_out_t.
-
 module type RO_Distinguisher (G : RO) = {
   proc distinguish(_ : d_in_t): d_out_t
 }.
 
-op dout: in_t -> out_t distr.
-
-abstract theory FullRO.
-type flag = [ Unknown | Known ].
-
-abbrev (\is) (fv : ('a * flag) option) (f : flag) = (oget fv).`2 = f.
-
+(* -------------------------------------------------------------------- *)
 module type FRO = {
   proc init    ()                    : unit
   proc get     (x : in_t)            : out_t
@@ -50,13 +52,17 @@ module type FRO_Distinguisher (G : FRO) = {
   proc distinguish(_ : d_in_t): d_out_t
 }.
 
+(* -------------------------------------------------------------------- *)
 module RO : RO = {
   var m : (in_t, out_t) fmap
 
-  proc init () = { m <- empty; }
+  proc init () = {
+    m <- empty;
+  }
 
   proc get(x : in_t) = {
     var r;
+
     r <$ dout x;
     if (x \notin m) {
       m.[x] <- r;
@@ -81,13 +87,17 @@ module RO : RO = {
   }
 }.
 
+(* -------------------------------------------------------------------- *)
 module FRO : FRO = {
   var m : (in_t, out_t * flag) fmap
 
-  proc init() = { m <- empty; }
+  proc init() = {
+    m <- empty;
+  }
 
   proc get(x : in_t) = {
     var r;
+
     r <$ dout x;
     if (x \in m) {
       r <- (oget m.[x]).`1;
@@ -106,6 +116,7 @@ module FRO : FRO = {
 
   proc sample(x : in_t) = {
     var c;
+
     c <$ dout x;
     if (x \notin m) {
       m.[x] <- (c, Unknown);
@@ -121,6 +132,7 @@ module FRO : FRO = {
   }
 }.
 
+(* -------------------------------------------------------------------- *)
 equiv RO_FRO_init : RO.init ~ FRO.init :
   true ==> RO.m{1} = noflags FRO.m{2}.
 proof. by proc; auto=> /=; by rewrite map_empty. qed.
@@ -204,10 +216,25 @@ end section ConditionalLL.
 end section LL.
 
 (* -------------------------------------------------------------------- *)
-abstract theory FullEager.
+theory FullEager.
 require import List FSet.
 require (*--*) IterProc.
 
+module LRO : RO = {
+  proc init = RO.init
+
+  proc get = RO.get
+
+  proc set = RO.set 
+
+  proc rem = RO.rem
+
+  proc sample(x : in_t) = { }
+}.
+
+(* -------------------------------------------------------------------- *)
+(** Hides internals in normal usage while allowing use where needed    **)
+abstract theory EagerCore.
 axiom dout_ll x: is_lossless (dout x).
 
 clone include IterProc with
@@ -250,24 +277,14 @@ module RRO : FRO = {
   }
 }.
 
-module LRO : RO = {
-  proc init = RO.init
-
-  proc get = RO.get
-
-  proc set = RO.set 
-
-  proc rem = RO.rem
-
-  proc sample(x : in_t) = { }
-}.
-
+(* -------------------------------------------------------------------- *)
 lemma RRO_resample_ll : islossless RRO.resample.
 proof.
 proc; call (iter_ll RRO.I _)=> //.
 by proc; auto=> /> &m'; exact/dout_ll.
 qed.
 
+(* -------------------------------------------------------------------- *)
 lemma eager_init :
   eager [RRO.resample();, FRO.init ~ RRO.init, RRO.resample(); :
          ={FRO.m} ==> ={FRO.m}].
@@ -590,8 +607,8 @@ while (   ={l, FRO.m}
 by auto=> ? &mr /= -> /=; split=> // z; rewrite -memE mem_fdom dom_restr. 
 qed.
 
+(* -------------------------------------------------------------------- *)
 section.
-
 declare module D : FRO_Distinguisher {FRO}.
 
 lemma eager_D :
@@ -609,7 +626,9 @@ eager proc (H_: RRO.resample(); ~ RRO.resample();: ={FRO.m} ==> ={FRO.m})
 + by apply eager_queried.
 by apply eager_allKnown.
 qed.
+end section.
 
+(* -------------------------------------------------------------------- *)
 module Eager (D : FRO_Distinguisher) = {
   proc main1(x : d_in_t) = {
     var b;
@@ -629,6 +648,10 @@ module Eager (D : FRO_Distinguisher) = {
   }
 }.
 
+(* -------------------------------------------------------------------- *)
+section.
+declare module D : FRO_Distinguisher {FRO}.
+
 equiv Eager_1_2 : Eager(D).main1 ~ Eager(D).main2 :
   ={glob D, arg} ==> ={res, glob FRO, glob D}.
 proof.
@@ -641,11 +664,11 @@ transitivity{1}
 + inline *; rcondf{2} 3; 2:by sim.
   by auto=> ?; rewrite restr0 fdom0 elems_fset0.
 seq 1 1 : (={glob D, FRO.m, x}); 1:by inline *; auto.
-by eager call eager_D.
+by eager call (eager_D D).
 qed.
-
 end section.
 
+(* -------------------------------------------------------------------- *)
 equiv LRO_RRO_init : LRO.init ~ RRO.init : true ==> RO.m{1} = restr Known FRO.m{2}.
 proof. by proc; auto=> /=; rewrite restr0. qed.
 
@@ -690,10 +713,15 @@ proc (RO.m{1} = restr Known FRO.m{2})=> //.
 + by conseq LRO_RRO_rem.
 by conseq LRO_RRO_sample. 
 qed.
+end EagerCore.
 
+(* -------------------------------------------------------------------- *)
 section.
+declare module D : RO_Distinguisher { RO, FRO }.
+axiom dout_ll x: is_lossless (dout x).
 
-declare module D : RO_Distinguisher{RO, FRO}.
+local clone import EagerCore as InnerProof
+proof dout_ll by exact/dout_ll.
 
 local module M = {
   proc main1(x : d_in_t) = {
