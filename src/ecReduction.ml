@@ -170,7 +170,7 @@ module EqTest = struct
     in fun alpha e1 e2 -> aux alpha e1 e2
 
   (* ------------------------------------------------------------------ *)
-  let for_lv env alpha ~norm lv1 lv2 =
+  let for_lv env ~norm lv1 lv2 =
     match lv1, lv2 with
     | LvVar(p1, _), LvVar(p2, _) ->
         for_pv env ~norm p1 p2
@@ -194,15 +194,15 @@ module EqTest = struct
   and for_instr_r env alpha ~norm i1 i2 =
     match i1.i_node, i2.i_node with
     | Sasgn (lv1, e1), Sasgn (lv2, e2) ->
-           for_lv env alpha ~norm lv1 lv2
+           for_lv env ~norm lv1 lv2
         && for_expr env alpha ~norm e1 e2
 
     | Srnd (lv1, e1), Srnd (lv2, e2) ->
-           for_lv env alpha ~norm lv1 lv2
+           for_lv env ~norm lv1 lv2
         && for_expr env alpha ~norm e1 e2
 
     | Scall (lv1, f1, e1), Scall (lv2, f2, e2) ->
-        oall2 (for_lv env alpha ~norm) lv1 lv2
+        oall2 (for_lv env ~norm) lv1 lv2
           && for_xp env ~norm f1 f2
           && List.all2 (for_expr env alpha ~norm) e1 e2
 

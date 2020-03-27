@@ -122,7 +122,7 @@ let check_not_r sim lvr eqo =
   check_lvalue aux lvr
 
 (* -------------------------------------------------------------------- *)
-let remove sim local lvl lvr eqs =
+let remove sim lvl lvr eqs =
   let env = sim.sim_env in
   let aux eqs (pvl,tyl) (pvr,tyr) =
     if EcReduction.EqTest.for_type env tyl tyr then begin
@@ -139,10 +139,10 @@ let remove sim local lvl lvr eqs =
   | _, _ -> raise EqObsInError
 
 (* -------------------------------------------------------------------- *)
-let oremove sim local lvl lvr eqs =
+let oremove sim lvl lvr eqs =
   match lvl, lvr with
   | None, None -> eqs
-  | Some lvl, Some lvr -> remove sim local lvl lvr eqs
+  | Some lvl, Some lvr -> remove sim lvl lvr eqs
   | _, _ -> raise EqObsInError
 
 (* -------------------------------------------------------------------- *)
@@ -199,11 +199,11 @@ let rec s_eqobs_in_rev rsl rsr sim local (eqo:Mpv2.t) =
 and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
   match il.i_node, ir.i_node with
   | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
-    sim, add_eqs sim local (remove sim local lvl lvr eqo) el er
+    sim, add_eqs sim local (remove sim lvl lvr eqo) el er
 
   | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr)
     when List.length argsl = List.length argsr ->
-    let eqo = oremove sim local lvl lvr eqo in
+    let eqo = oremove sim lvl lvr eqo in
     let env = sim.sim_env in
     let modl, modr = f_write env fl, f_write env fr in
     let eqnm = Mpv2.split_nmod env modl modr eqo in
