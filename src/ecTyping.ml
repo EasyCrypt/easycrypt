@@ -120,6 +120,7 @@ type tyerror =
 | MemNotAllowed
 | UnknownScope           of qsymbol
 | FilterMatchFailure
+| LvMapOnNonAssign
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -1487,22 +1488,22 @@ type lVAl =
   | Lval  of lvalue
   | LvMap of lvmap
 
-let i_asgn_lv lv e =
+let i_asgn_lv (_loc : EcLocation.t) (_env : EcEnv.env) lv e =
   match lv with
   | Lval lv -> i_asgn (lv, e)
   | LvMap ((op,tys), x, ei, ty) ->
     let op = e_op op tys (toarrow [ty; ei.e_ty; e.e_ty] ty) in
     i_asgn (LvVar (x,ty), e_app op [e_var x ty; ei; e] ty)
 
-let i_rnd_lv lv e =
+let i_rnd_lv loc env lv e =
   match lv with
   | Lval lv -> i_rnd (lv, e)
-  | LvMap _ -> assert false (* FIXME *)
+  | LvMap _ -> tyerror loc env LvMapOnNonAssign
 
-let i_call_lv lv f args =
+let i_call_lv loc env lv f args =
   match lv with
   | Lval lv -> i_call (Some lv, f, args)
-  | LvMap _ -> assert false (* FIXME *)
+  | LvMap _ -> tyerror loc env LvMapOnNonAssign
 
 (* -------------------------------------------------------------------- *)
 let rec transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
@@ -1940,14 +1941,14 @@ and transinstr
         let lvalue, lty = translvalue ue env plvalue in
         let rvalue, rty = transexp env `InProc ue prvalue in
           unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
-          [ i_asgn_lv lvalue rvalue ]
+          [ i_asgn_lv i.pl_loc env lvalue rvalue ]
     end
 
   | PSrnd (plvalue, prvalue) ->
       let lvalue, lty = translvalue ue env plvalue in
       let rvalue, rty = transexp env `InProc ue prvalue in
       unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr lty) rty;
-      [ i_rnd_lv lvalue rvalue ]
+      [ i_rnd_lv i.pl_loc env lvalue rvalue ]
 
   | PScall (None, name, args) ->
       let (fpath, args, _rty) = transcall name (unloc args) in
@@ -1957,7 +1958,7 @@ and transinstr
       let lvalue, lty = translvalue ue env lvalue in
       let (fpath, args, rty) = transcall name (unloc args) in
       unify_or_fail env ue name.pl_loc ~expct:lty rty;
-      [ i_call_lv lvalue fpath args ]
+      [ i_call_lv i.pl_loc env lvalue fpath args ]
 
   | PSif ((pe, s), cs, sel) -> begin
       let rec for1_i (pe, s) sel =
