@@ -104,7 +104,7 @@ let test_if_evict_prover tests prover =
 module Evictions = struct
   let alt_ergo_le_0_99_1 = {
     pe_cause = `Inconsistent;
-    pe_test  = `ByVersion ("Alt-Ergo", (`Lt, VP.of_tuple (2, 2, 0)));
+    pe_test  = `ByVersion ("Alt-Ergo", (`Le, VP.of_tuple (2, 3, 0)));
   }
 end
 

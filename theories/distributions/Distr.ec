@@ -207,6 +207,7 @@ have gt0_mux: 0%r < mu1 d x.
 pose d' := fun y => if x = y then mu1 d x else 0%r.
 apply (@ltr_le_trans (sum d')); first rewrite (@sumE_fin _ [x]) //.
 + by move=> y @/d'; case: (x = y) => [->|].
++ by rewrite big_seq1.
 apply/RealSeries.ler_sum.
 + by move=> y; rewrite massE /d'; case: (x = y) => // _; apply/ge0_mu1.
 + (* factor out - finite support stuffs are summable *)

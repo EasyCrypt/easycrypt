@@ -157,6 +157,7 @@ type tyerror =
 | SchemaVariableReBinded of EcIdent.t
 | SchemaMemBinderBelowCost
 | ModuleNotAbstract      of symbol
+| LvMapOnNonAssign
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -222,14 +223,6 @@ let (_i_inuse, s_inuse, se_inuse) =
         List.fold_left
           (fun map (p, _) -> add_write map p)
           map ps
-
-    | LvMap (_, p, e, _) ->
-      (* Maps are not modified in place but feed to a mutator
-         operator that returns the augmented map and assigning the
-         result to [p]. Hence the [`Read | `Write] flag. *)
-      let map = add_write (add_read map p) p in
-      let map = se_inuse map e in
-        map
 
   and i_inuse (map : uses) (i : instr) =
     match i.i_node with
@@ -1752,6 +1745,37 @@ let form_of_opselect
   in f_app op args codom
 
 (* -------------------------------------------------------------------- *)
+
+(* LvMap (op, x, e, ty)
+ * - op is the map-set operator
+ * - x  is the map to be updated
+ * - e  is the index to update
+ * - ty is the type of the value [x] *)
+
+type lvmap = (path * ty list) *  prog_var * expr * ty
+
+type lVAl =
+  | Lval  of lvalue
+  | LvMap of lvmap
+
+let i_asgn_lv (_loc : EcLocation.t) (_env : EcEnv.env) lv e =
+  match lv with
+  | Lval lv -> i_asgn (lv, e)
+  | LvMap ((op,tys), x, ei, ty) ->
+    let op = e_op op tys (toarrow [ty; ei.e_ty; e.e_ty] ty) in
+    i_asgn (LvVar (x,ty), e_app op [e_var x ty; ei; e] ty)
+
+let i_rnd_lv loc env lv e =
+  match lv with
+  | Lval lv -> i_rnd (lv, e)
+  | LvMap _ -> tyerror loc env LvMapOnNonAssign
+
+let i_call_lv loc env lv f args =
+  match lv with
+  | Lval lv -> i_call (Some lv, f, args)
+  | LvMap _ -> tyerror loc env LvMapOnNonAssign
+
+(* -------------------------------------------------------------------- *)
 let top_is_mem_binding pf = match pf with
   | PFforall (bds,_)  | PFexists (bds,_) ->
     List.exists (fun (_,bd) -> bd = PGTY_Mem) bds
@@ -2119,6 +2143,7 @@ and transmodsig_body
 
   Msym.odup unloc names |> oiter (fun (_, x) ->
     tyerror (loc x) env (InvalidModSig (MTS_DupProcName (unloc x))));
+
   items, mr
 
 (* -------------------------------------------------------------------- *)
@@ -2517,14 +2542,14 @@ and transinstr
         let lvalue, lty = translvalue ue env plvalue in
         let rvalue, rty = transexp env `InProc ue prvalue in
           unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
-          [ i_asgn (lvalue, rvalue) ]
+          [ i_asgn_lv i.pl_loc env lvalue rvalue ]
     end
 
   | PSrnd (plvalue, prvalue) ->
       let lvalue, lty = translvalue ue env plvalue in
       let rvalue, rty = transexp env `InProc ue prvalue in
       unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr lty) rty;
-      [ i_rnd (lvalue, rvalue) ]
+      [ i_rnd_lv i.pl_loc env lvalue rvalue ]
 
   | PScall (None, name, args) ->
       let (fpath, args, _rty) = transcall name (unloc args) in
@@ -2534,7 +2559,7 @@ and transinstr
       let lvalue, lty = translvalue ue env lvalue in
       let (fpath, args, rty) = transcall name (unloc args) in
       unify_or_fail env ue name.pl_loc ~expct:lty rty;
-      [ i_call (Some lvalue, fpath, args) ]
+      [ i_call_lv i.pl_loc env lvalue fpath args ]
 
   | PSif ((pe, s), cs, sel) -> begin
       let rec for1_i (pe, s) sel =
@@ -2574,14 +2599,14 @@ and translvalue ue (env : EcEnv.env) lvalue =
   match lvalue.pl_desc with
   | PLvSymbol x ->
       let pty = trans_pv env x in
-      LvVar pty, snd pty
+      Lval (LvVar pty), snd pty
 
   | PLvTuple xs ->
       let xs = List.map (trans_pv env) xs in
       if not (List.is_unique ~eq:(EqTest.for_pv env) (List.map fst xs)) then
         tyerror lvalue.pl_loc env LvNonLinear;
       let ty = ttuple (List.map snd xs) in
-      (LvTuple xs, ty)
+      Lval (LvTuple xs), ty
 
   | PLvMap (x, tvi, e) ->
       let tvi = tvi |> omap (transtvi env ue) in
@@ -2602,7 +2627,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
           let esig = toarrow esig xty in
           unify_or_fail env ue lvalue.pl_loc ~expct:esig opty;
-          (LvMap ((p, tys), pv, e, xty), codomty)
+          LvMap ((p, tys), pv, e, xty), codomty
 
       | [_] ->
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in

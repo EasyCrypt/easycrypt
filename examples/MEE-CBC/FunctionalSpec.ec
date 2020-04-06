@@ -140,7 +140,8 @@ op os2bs (os : octet list) : block list =
 lemma size_bs2os (bs : block list):
   size (bs2os bs) = 16 * size bs.
 proof.
-elim: bs=> //= x xs ih.
+elim: bs=> //= [|x xs ih].
++ by rewrite /bs2os /flatten.
 rewrite /bs2os /= flatten_cons size_cat size_block ih.
 by algebra.
 qed.

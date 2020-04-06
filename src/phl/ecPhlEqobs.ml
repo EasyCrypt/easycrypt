@@ -105,11 +105,9 @@ let check sim pv fv = PV.check_notmod sim.sim_env pv fv
 let checks sim pvs fv = List.for_all (fun (pv,_) -> check sim pv fv) pvs
 
 let check_lvalue aux lv =
-   match lv with
+  match lv with
   | LvVar (xl,_)   -> aux xl
-
   | LvTuple ll -> List.for_all (fun (x,_) -> aux x)  ll
-  | LvMap(_, pvl, _, _) -> aux pvl
 
 let check_not_l sim lvl eqo =
   let aux pv =
@@ -136,13 +134,8 @@ let remove sim lvl lvr eqs =
 
   match lvl, lvr with
   | LvVar xl, LvVar xr -> aux eqs xl xr
-  | LvTuple ll, LvTuple lr when List.length ll = List.length lr->
+  | LvTuple ll, LvTuple lr when List.length ll = List.length lr ->
     List.fold_left2 aux eqs ll lr
-  | LvMap((pl,tysl), pvl, el, tyl), LvMap((pr,tysr), pvr, er,tyr) when
-      EcPath.p_equal pl pr &&
-        List.all2  (EcReduction.EqTest.for_type env) (tyl::tysl) (tyr::tysr) &&
-        check sim pvl sim.sim_ifvl && check sim pvr sim.sim_ifvr ->
-    add_eqs sim (Mpv2.remove env pvl pvr eqs) el er
   | _, _ -> raise EqObsInError
 
 (* -------------------------------------------------------------------- *)

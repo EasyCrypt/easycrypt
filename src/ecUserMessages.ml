@@ -479,6 +479,9 @@ end = struct
     | ModuleNotAbstract m ->
       msg "the module %s is not abstract" m
 
+    | LvMapOnNonAssign ->
+        msg "map-style left-value cannot be used with assignments"
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 

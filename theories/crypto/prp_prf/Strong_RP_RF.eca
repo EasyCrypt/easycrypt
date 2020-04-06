@@ -103,16 +103,20 @@ module PRPi'(S:Sample_t) = {
   proc init =  PRPi.init
 
   proc f(x:D): D = {
+    var r;
     if (x \notin PRPi.m) {
-      PRPi.m.[x] = S.sample(rng PRPi.m);
+      r <@ S.sample(rng PRPi.m);
+      PRPi.m.[x] <- r;
       PRPi.mi.[oget PRPi.m.[x]] <- x;
     }
     return oget PRPi.m.[x];
   }
 
   proc fi(x:D): D = {
+    var r;
     if (x \notin PRPi.mi) {
-      PRPi.mi.[x] = S.sample(rng PRPi.mi);
+      r <@ S.sample(rng PRPi.mi);
+      PRPi.mi.[x] <- r;
       PRPi.m.[oget PRPi.mi.[x]] <- x;
     }
     return oget PRPi.mi.[x];
@@ -202,22 +206,26 @@ section Upto.
       r = $uD;
       if (X r) {
         bad <- true;
-        r = $uD \ X;
+        r <$ uD \ X;
       }
       return r;
     }
 
     proc f(x:D): D = {
+      var r;
       if (x \notin PRPi.m) {
-        PRPi.m.[x] = sample(rng PRPi.m);
+        r <@ sample(rng PRPi.m);
+        PRPi.m.[x] <- r;
         PRPi.mi.[oget PRPi.m.[x]] <- x;
       }
       return oget PRPi.m.[x];
     }
 
     proc fi(y:D): D = {
+     var r;
      if (y \notin PRPi.mi) {
-        PRPi.mi.[y] = sample(rng PRPi.mi);
+        r <@ sample(rng PRPi.mi);
+        PRPi.mi.[y] <- r;
         PRPi.m.[oget PRPi.mi.[y]] <- y;
       }
       return oget PRPi.mi.[y];
@@ -247,9 +255,9 @@ section Upto.
     swap{1} 1.
     seq  1  4: (={x} /\
                 x{1} \notin PRPi.m{1} /\
-                ARP.m{2} = PRPi.m.[x <- r]{1} /\
-                ARP.mi{2} = PRPi.mi.[r <- x]{1} /\
-                ((PRP_indirect_bad.bad \/ rng PRPi.m r){1} <=> ARP.coll{2})).
+                ARP.m{2} = PRPi.m.[x <- r0]{1} /\
+                ARP.mi{2} = PRPi.mi.[r0 <- x]{1} /\
+                ((PRP_indirect_bad.bad \/ rng PRPi.m r0){1} <=> ARP.coll{2})).
       by auto=> /#.
     sp; if{1}.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
@@ -271,9 +279,9 @@ section Upto.
     swap{1} 1.
     seq  1  4: (={y} /\
                 y{1} \notin PRPi.mi{1} /\
-                ARP.m{2} = PRPi.m.[r <- y]{1} /\
-                ARP.mi{2} = PRPi.mi.[y <- r]{1} /\
-                ((PRP_indirect_bad.bad \/ rng PRPi.mi r){1} <=> ARP.coll{2})).
+                ARP.m{2} = PRPi.m.[r0 <- y]{1} /\
+                ARP.mi{2} = PRPi.mi.[y <- r0]{1} /\
+                ((PRP_indirect_bad.bad \/ rng PRPi.mi r0){1} <=> ARP.coll{2})).
       by auto=> /#.
     sp; if{1}.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
