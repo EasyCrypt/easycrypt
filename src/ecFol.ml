@@ -987,51 +987,78 @@ let cost_add_self c a =
 
   cost_r c_self c.c_calls
 
-let cost_sub_call c f a =
-  let c_calls = EcPath.Mx.change (fun b ->
-      let b = odfl f_i0 b in
-      f_int_sub_simpl b a |> some
+(* Add an entry for a oracle to [c.c_calls], if necessary. *)
+let cost_add_oracle env c f =
+  if EcPath.Mx.mem f c.c_calls
+  then c
+  else begin
+    let m = f.EcPath.x_top in
+    assert ( m.m_args = [] &&
+             match m.EcPath.m_top with `Local _ -> true | _ -> false);
+
+    let restr = EcEnv.NormMp.get_restr env m in
+    let oi = EcSymbols.Msym.find f.EcPath.x_sub restr.mr_oinfos in
+
+    let self = match EcCoreModules.PreOI.cost_self oi with
+      | `Unbounded -> assert false
+      | `Bounded self -> self in
+
+    let cb = { cb_cost   = self;
+               cb_called = f_i0; } in
+
+    cost_r c.c_self (EcPath.Mx.add f cb c.c_calls)
+  end
+
+let cost_sub_call env c f a =
+  let c = cost_add_oracle env c f in
+
+  let c_calls = EcPath.Mx.change (fun cb ->
+      let cb = oget cb in
+      { cb with cb_called = f_int_sub_simpl cb.cb_called a }
+      |> some
     ) f c.c_calls in
 
   cost_r c.c_self c_calls
 
-let cost_add_call c f a =
-  let c_calls = EcPath.Mx.change (fun b ->
-      let b = odfl f_i0 b in
-      f_int_add_simpl b a |> some
+let cost_add_call env c f a =
+  let c = cost_add_oracle env c f in
+
+  let c_calls = EcPath.Mx.change (fun cb ->
+      let cb = oget cb in
+      { cb with cb_called = f_int_add_simpl cb.cb_called a }
+      |> some
     ) f c.c_calls in
 
   cost_r c.c_self c_calls
 
-let cost_op op c1 c2 =
-  EcPath.Mx.fold2_union (fun f c1 c2 c ->
-      let c1, c2 = odfl f_i0 c1, odfl f_i0 c2 in
-      let c_calls = EcPath.Mx.add f (op c1 c2) c.c_calls in
+let cost_op env op c1 c2 =
+  (* Ensure that [c1] and [c2] have the same support. *)
+  let c2 = List.fold_left (cost_add_oracle env) c2 (EcPath.Mx.keys c1.c_calls)
+  and c1 = List.fold_left (cost_add_oracle env) c1 (EcPath.Mx.keys c2.c_calls) in
+
+  EcPath.Mx.fold2_union (fun f cb1 cb2 c ->
+      let cb1, cb2 = oget cb1, oget cb2 in
+      assert (f_equal cb1.cb_cost cb2.cb_cost);
+      let cb = { cb1 with cb_called = op cb1.cb_called cb2.cb_called } in
+      let c_calls = EcPath.Mx.add f cb c.c_calls in
       cost_r c.c_self c_calls
     ) c1.c_calls c2.c_calls
 
     (cost_r (op c1.c_self c2.c_self) EcPath.Mx.empty)
 
 let cost_map f_map c =
-  EcPath.Mx.fold (fun f c res ->
-      let c_calls = EcPath.Mx.add f (f_map c) res.c_calls in
+  EcPath.Mx.fold (fun f cb res ->
+      let c_calls =
+        EcPath.Mx.add f
+          { cb with cb_called = f_map cb.cb_called }
+          res.c_calls in
       cost_r res.c_self c_calls
     ) c.c_calls
     (cost_r (f_map c.c_self) EcPath.Mx.empty)
 
 let cost_app c args = cost_map (fun c -> f_app c args tint) c
 
-let cost_le c1 c2 =
-  let conds =
-    f_int_le c1.c_self c2.c_self ::
-    EcPath.Mx.fold2_union (fun _ c1 c2 acc ->
-        let c1, c2 = odfl f_i0 c1, odfl f_i0 c2 in
-        f_int_le c1 c2 :: acc) c1.c_calls c2.c_calls [] in
-  f_ands0_simpl conds
-
-let form_le_cost f c =
-  let conds =
-    f_int_le f c.c_self ::
-    EcPath.Mx.fold (fun _ c acc ->
-        f_int_le f c :: acc) c.c_calls [] in
-  f_ands0_simpl conds
+let cost_flatten cost =
+  EcPath.Mx.fold (fun _ cb cflat ->
+      f_int_add_simpl cflat (f_int_mul_simpl cb.cb_called cb.cb_cost))
+    cost.c_calls cost.c_self

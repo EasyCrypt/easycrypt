@@ -221,17 +221,17 @@ module FunAbsLow = struct
     (* check_oracle_use pf env top o; *)
 
     let cost_orcl oi o = match OI.cost oi o with
-      | PreOI.Bound cbd -> cbd
-      | PreOI.Zero -> f_i0
-      | PreOI.Unbounded ->
+      | `Bounded cbd -> cbd
+      | `Zero -> f_i0
+      | `Unbounded ->
         tc_error pf_ "the number of calls to %a is unbounded"
           (EcPrinting.pp_funname ppe) o in
 
     (* We create the oracles invariants *)
-    let oi_costs = match OI.costs oi with
+    let oi_self, oi_costs = match OI.costs oi with
       | `Unbounded ->
         tc_error pf_ "%a is unbounded" (EcPrinting.pp_funname ppe) f
-      | `Concrete costs -> costs in
+      | `Bounded (self,costs) -> self, costs in
 
     (* If [f] can call [o] at most zero times, we remove it. *)
     let ois = OI.allowed oi
@@ -326,7 +326,9 @@ module FunAbsLow = struct
     and post_inv = f_and_simpl post_eqs inv in
 
     let fn_orcl = EcPath.xpath top f.x_sub in
-    let f_cost = cost_r f_i0 (Mx.singleton fn_orcl f_i1)  in
+    let f_cb = { cb_cost   = oi_self;
+                 cb_called = f_i1; } in
+    let f_cost = cost_r f_i0 (Mx.singleton fn_orcl f_cb)  in
 
     let orcls_cost = List.map (fun o ->
         let cbd = cost_orcl oi o in
@@ -337,7 +339,7 @@ module FunAbsLow = struct
         EcPhlWhile.ICHOARE.choare_sum o_cost (f_i0, cbd)
       ) ois in
     let total_cost =
-      List.fold_left (cost_op f_int_add_simpl) f_cost orcls_cost in
+      List.fold_left (cost_op env f_int_add_simpl) f_cost orcls_cost in
 
     (pre_inv, post_inv, total_cost, sg)
 

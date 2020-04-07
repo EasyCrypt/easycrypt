@@ -273,7 +273,10 @@ let rec on_mpath_form cb (f : EcFol.form) =
 
   and on_mpath_cost cb cost =
     on_mpath_form cb cost.EcFol.c_self;
-    Mx.iter (fun f c -> cb f.x_top; on_mpath_form cb c) cost.EcFol.c_calls
+    Mx.iter (fun f c ->
+        cb f.x_top;
+        on_mpath_form cb c.EcFol.cb_called;
+        on_mpath_form cb c.EcFol.cb_cost) cost.EcFol.c_calls
 
   in
     on_mpath_ty cb f.EcFol.f_ty; fornode ()

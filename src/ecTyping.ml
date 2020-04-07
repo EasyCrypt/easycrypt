@@ -43,7 +43,9 @@ type mismatch_funsig =
 | MF_targs     of ty * ty                               (* expected, got *)
 | MF_tres      of ty * ty                               (* expected, got *)
 | MF_restr     of EcEnv.env * Sx.t mismatch_sets
-| MF_compl     of EcEnv.env * (form option * form option) Mx.t suboreq
+| MF_compl     of EcEnv.env *
+                  ((form * form) option
+                   * (form * form) Mx.t) suboreq
 | MF_unbounded
 
 type restr_failure = Sx.t * Sm.t
@@ -158,6 +160,7 @@ type tyerror =
 | SchemaVariableReBinded of EcIdent.t
 | SchemaMemBinderBelowCost
 | ModuleNotAbstract      of symbol
+| ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -494,9 +497,10 @@ let check_item_compatible ~proof_obl env mode (fin,oin) (fout,oout) =
 
   let norm_costs = function
     | `Unbounded -> `Unbounded
-    | `Concrete costs ->
-      let costs = Mx.map (EcEnv.NormMp.norm_form env) costs in
-      `Concrete costs in
+    | `Bounded (self,calls) ->
+      let calls = Mx.map (EcEnv.NormMp.norm_form env) calls in
+      let self  = EcEnv.NormMp.norm_form env self in
+      `Bounded (self,calls) in
 
   (* We check complexity compatibility. *)
   let icosts, ocosts = norm_costs (OI.costs oin),
@@ -505,45 +509,52 @@ let check_item_compatible ~proof_obl env mode (fin,oin) (fout,oout) =
   match mode with
   | `Sub ->
     begin match icosts, ocosts with
-      | `Unbounded, `Unbounded | `Concrete _, `Unbounded -> ()
-      | `Unbounded, `Concrete _ ->
+      | `Unbounded, `Unbounded | `Bounded _, `Unbounded -> ()
+      | `Unbounded, `Bounded _ ->
         if proof_obl then ()
         else check_item_err MF_unbounded
 
-      | `Concrete icosts, `Concrete ocosts ->
+      | `Bounded (iself,icalls), `Bounded (oself,ocalls) ->
 
         (* We check costs for other procedures. *)
-        let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
-            | None, Some _ ->
-              Mx.change (fun old -> assert (old = None); Some (ic,oc)) f acc
-            | Some _, None | None, None -> acc
-            | Some ic, Some oc ->
-              if EcFol.f_equal ic oc then acc
-              else Mx.add f (Some ic, Some oc) acc
-          ) icosts ocosts Mx.empty in
-        if not (Mx.is_empty diff) then
-          check_item_err (MF_compl(env, `Sub(diff))) end
+        let diff = Mx.fold2_union (fun f ic oc acc ->
+            let ic = odfl f_i0 ic in
+            let oc = odfl f_i0 oc in
+            if EcFol.f_equal ic oc then acc
+            else Mx.add f (ic, oc) acc
+          ) icalls ocalls Mx.empty in
+
+        let self_sub =
+          if EcFol.f_equal iself oself then None
+          else Some (iself, oself) in
+
+        if not (Mx.is_empty diff) || self_sub <> None then
+          check_item_err (MF_compl(env, `Sub(self_sub, diff))) end
 
   | `Eq  ->
     begin match icosts, ocosts with
       | `Unbounded, `Unbounded -> ()
 
-      | `Concrete _, `Unbounded
-      | `Unbounded, `Concrete _ ->
+      | `Bounded _, `Unbounded
+      | `Unbounded, `Bounded _ ->
         check_item_err MF_unbounded
 
-      | `Concrete icosts, `Concrete ocosts ->
+      | `Bounded (iself,icalls), `Bounded (oself,ocalls) ->
 
         (* We check costs for other procedures. *)
-        let diff = Mx.fold2_union (fun f ic oc acc -> match ic, oc with
-            | None, Some _ | Some _, None -> Mx.add f (ic,oc) acc
-            | None, None -> acc
-            | Some ic, Some oc ->
-              if EcFol.f_equal ic oc then acc
-              else Mx.add f (Some ic, Some oc) acc
-          ) icosts ocosts Mx.empty in
-        if not (Mx.is_empty diff) then
-          check_item_err (MF_compl(env, `Eq(diff))) end
+        let diff = Mx.fold2_union (fun f ic oc acc ->
+            let ic = odfl f_i0 ic in
+            let oc = odfl f_i0 oc in
+            if EcFol.f_equal ic oc then acc
+            else Mx.add f (ic, oc) acc
+          ) icalls ocalls Mx.empty in
+
+        let self_sub =
+          if EcFol.f_equal iself oself then None
+          else Some (iself, oself) in
+
+        if not (Mx.is_empty diff) || self_sub <> None then
+          check_item_err (MF_compl(env, `Eq(self_sub, diff))) end
 
 
 (* -------------------------------------------------------------------- *)
@@ -1632,7 +1643,15 @@ let trans_oracle (env : EcEnv.env) (m,f) =
   if not fmem then
     tyerror (loc f) env (UnknownFunName ([unloc m],unloc f));
 
-  EcPath.xpath mpath (unloc f)
+  let restr = EcEnv.NormMp.get_restr env mpath in
+  let oi = Msym.find (unloc f) restr.mr_oinfos in
+  let self = match OI.cost_self oi with
+    | `Unbounded ->
+      let loc = EcLocation.merge (loc m) (loc f) in
+      tyerror loc env (ProcedureUnbounded (unloc m, unloc f))
+    | `Bounded self -> self in
+
+  EcPath.xpath mpath (unloc f), self
 
 (* -------------------------------------------------------------------- *)
 let trans_topmsymbol env gp =
@@ -1926,9 +1945,17 @@ let trans_restr_oracle_calls env env_in (params : Sm.t) = function
 (* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
 (* If [r_compl] is None, there are no restrictions *)
 let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
+  let trans_closed_form form =
+    let ue = EcUnify.UniEnv.create None in
+    let tform = trans_form env ue form EcTypes.tint in
+    let subs = try EcUnify.UniEnv.close ue with
+      | EcUnify.UninstanciateUni ->
+        tyerror (loc form) env FreeTypeVariables in
+    EcFol.Fsubst.uni subs tform in
+
   match r_compl with
   | None -> `Unbounded
-  | Some (PCompl restr_elems) ->
+  | Some (PCompl (self, restr_elems)) ->
     let calls =
       List.map (fun (name, form) ->
           let s_env = if name.inp_in_params then env_in else env in
@@ -1940,19 +1967,16 @@ let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
           if not (Sm.mem p params) then
             tyerror qname.pl_loc env (FunNotInModParam qname.pl_desc);
 
-          let ue = EcUnify.UniEnv.create None in
-          let tform = trans_form env ue form EcTypes.tint in
-          let subs = try EcUnify.UniEnv.close ue with
-            | EcUnify.UninstanciateUni ->
-              tyerror (loc form) env FreeTypeVariables in
-          let tform = EcFol.Fsubst.uni subs tform in
+          let tform = trans_closed_form form in
 
           (f, tform)
         ) restr_elems in
     let m_calls = Mx.of_list calls in
     (* Sanity check *)
     assert (List.length calls = Mx.cardinal m_calls);
-    `Concrete m_calls
+
+    let self = trans_closed_form self in
+    `Bounded (self,m_calls)
 
 (* Oracles and complexity restrictions for a function.
  * - [params] must be the set of parameters on the module being typed.
@@ -1966,30 +1990,30 @@ let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
  * binded in [env_in]. *)
 and trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
   let name = unloc r_el.pmre_name in
-  let c_calls = trans_restr_compl env env_in params r_el.pmre_compl in
+  let c_compl = trans_restr_compl env env_in params r_el.pmre_compl in
   let r_orcls = trans_restr_oracle_calls env env_in params r_el.pmre_orcls in
 
   let get_calls = function
-    | `Concrete calls -> Mx.bindings calls
+    | `Bounded (_,calls) -> Mx.bindings calls
     | `Unbounded -> [] in
 
   (* We add to [r_orcls] elements of [c_calls], if necessary. *)
   let r_orcls = r_orcls @
-                (get_calls c_calls
+                (get_calls c_compl
                   |> List.filter_map (fun (f,_) ->
                      if List.mem f r_orcls then None else Some f)) in
 
   let r_in =  r_el.pmre_in in
-  ( r_in, name, c_calls, r_orcls )
+  ( r_in, name, c_compl, r_orcls )
 
 (* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
 and transmod_restr env env_in (params : Sm.t) (mr : pmod_restr) =
   let r_mem = trans_restr_mem env mr.pmr_mem in
 
   let r_procs = List.fold_left (fun r_procs r_elem ->
-      let r_in, name, c_calls, r_orcls =
+      let r_in, name, c_compl, r_orcls =
         trans_restr_fun env env_in params r_elem in
-      Msym.add name (OI.mk r_orcls r_in c_calls) r_procs
+      Msym.add name (OI.mk r_orcls r_in c_compl) r_procs
     ) Msym.empty mr.pmr_procs in
 
   { mr_xpaths = fst r_mem;
@@ -3205,15 +3229,15 @@ and trans_form_or_pattern
 
         let self'  = transf env self in
         let calls' = List.map (fun (m,fn,c) ->
-            let fn = trans_oracle env (m,fn) in
+            let fn, fn_self = trans_oracle env (m,fn) in
             let f_c = transf env c in
-            fn, f_c
+            fn, { cb_cost = fn_self; cb_called = f_c }
           ) calls in
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           unify_or_fail env  ue self.pl_loc ~expct:tint  self'.f_ty;
-          List.iter2 (fun (_,c') (_,_,c) ->
-              unify_or_fail env ue c.pl_loc ~expct:tint c'.f_ty
+          List.iter2 (fun (_,cb') (_,_,c) ->
+              unify_or_fail env ue c.pl_loc ~expct:tint cb'.cb_called.f_ty
             ) calls' calls;
           let cost' = cost_r self' (Mx.of_list calls') in
           (* Sanity check *)
@@ -3436,22 +3460,32 @@ let restr_proof_obligation env (mp_in : mpath) (mt : module_type) : form =
 
     match OI.costs oi with
     | `Unbounded -> (xfn_in_mi, f_true)
-    | `Concrete costs ->
-      let c_self =
-        (* TODO: A: Add self cost there *)
-        (* let self_cost = OI.cost_self oi in *)
-        f_int (EcBigInt.of_int 42) in
+    | `Bounded (c_self,costs) ->
 
       let c_calls = Mx.fold (fun o obd c_calls ->
           (* We compute the name of the procedure, seen as an oracle of
              [mp_in_app]. That is, if [o] is a parameter of [mp_in], then
              we use the fresh mident. *)
           let omod, ofun = EcPath.mget_ident o.x_top, o.x_sub in
-          let omod = match List.assoc_opt omod s_params with
-            | None -> omod
-            | Some m -> fst m in
+          let omod, orestr = match List.assoc_opt omod s_params with
+            | None ->
+              let orestr = EcEnv.NormMp.get_restr env (EcPath.mident omod) in
+              omod, orestr
+            | Some (m,mt) -> m, mt.mt_restr in
           let o = EcPath.xpath (EcPath.mident omod) ofun in
-          Mx.add o obd c_calls
+
+          let oself = match OI.cost_self (Msym.find ofun orestr.mr_oinfos) with
+            | `Bounded self -> self
+            | `Unbounded ->
+              (* TODO: A: error message*)
+              (* let ppe = EcPrinting.PPEnv.ofenv env in
+               * "proof obligation cannot be met, because procedure %s of %s can call oracle %a, which has an unbounded self complexity."
+               *   fn me_in.me_name
+               *   (EcPrinting.pp_funname ppe) o *)
+              assert false in
+          let cb = { cb_cost = oself; cb_called = obd; } in
+
+          Mx.add o cb c_calls
         ) costs Mx.empty in
 
       let cost = cost_r c_self c_calls in

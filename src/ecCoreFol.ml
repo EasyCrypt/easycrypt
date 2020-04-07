@@ -162,7 +162,15 @@ and coe = {
    with no arguments. *)
 and cost = {
   c_self  : form;
-  c_calls : form EcPath.Mx.t;
+  c_calls : call_bound EcPath.Mx.t;
+}
+
+(* Call with cost at most [cb_cost], called at mist [cb_called].
+   [cb_cost] is here to properly handle substsitution when instantiating an
+   abstract module by a concrete one. *)
+and call_bound = {
+  cb_cost  : form;
+  cb_called : form;
 }
 
 and module_type = form p_module_type
@@ -270,9 +278,13 @@ module Mf = MSHf.M
 module Sf = MSHf.S
 module Hf = MSHf.H
 
+let call_bound_equal cb1 cb2 =
+     f_equal cb1.cb_cost cb2.cb_cost
+  && f_equal cb1.cb_called cb2.cb_called
+
 let cost_equal c1 c2 =
      f_equal c1.c_self c2.c_self
-  && EcPath.Mx.equal f_equal c1.c_calls c2.c_calls
+  && EcPath.Mx.equal call_bound_equal c1.c_calls c2.c_calls
 
 let hf_equal hf1 hf2 =
      f_equal hf1.hf_pr hf2.hf_pr
@@ -363,6 +375,11 @@ let coe_hash coe =
     (EcTypes.e_hash coe.coe_e)
     (EcMemory.mem_hash coe.coe_mem)
 
+let call_bound_hash cb =
+  Why3.Hashcons.combine
+    (f_hash cb.cb_cost)
+    (f_hash cb.cb_called)
+
 let cost_hash cost =
   Why3.Hashcons.combine
     (f_hash cost.c_self)
@@ -370,7 +387,7 @@ let cost_hash cost =
        (fun (f,c) ->
           Why3.Hashcons.combine
             (EcPath.x_hash f)
-            (f_hash c))
+            (call_bound_hash c))
        0 (EcPath.Mx.bindings cost.c_calls))
 
 let chf_hash chf =
@@ -545,7 +562,11 @@ module Hsform = Why3.Hashcons.Make (struct
   let cost_fv cost =
     let self_fv = f_fv cost.c_self in
     EcPath.Mx.fold (fun f c fv ->
-        EcPath.x_fv (fv_union (f_fv c) fv) f
+        let c_fv =
+          fv_union
+            (fv_union (f_fv c.cb_cost) fv)
+            (f_fv c.cb_called) in
+        EcPath.x_fv c_fv f
       ) cost.c_calls self_fv
 
   let fv_node f =
@@ -882,6 +903,16 @@ let f_i1  = f_int BI.one
 let f_im1 = f_int_opp f_i1
 
 (* -------------------------------------------------------------------- *)
+let f_int_add_simpl_z f1 f2 =
+  if f_equal f1 f_i0 then f2
+  else if f_equal f2 f_i0 then f1
+  else f_int_add f1 f2
+
+let f_int_mul_simpl_z f1 f2 =
+  if f_equal f1 f_i0 || f_equal f2 f_i0 then f_i0
+  else f_int_mul f1 f2
+
+(* -------------------------------------------------------------------- *)
 module FSmart = struct
   type a_local = EcIdent.t * ty
   type a_pvar  = prog_var * ty * memory
@@ -984,11 +1015,17 @@ end
 
 (* -------------------------------------------------------------------- *)
 let cost_map g cost =
-  cost_r (g cost.c_self) (EcPath.Mx.map g cost.c_calls)
+  let calls =
+    EcPath.Mx.map (fun cb ->
+        { cb_cost  = g cb.cb_cost;
+          cb_called = g cb.cb_called }
+      ) cost.c_calls in
+
+  cost_r (g cost.c_self) calls
 
 let cost_iter g cost =
   g cost.c_self;
-  EcPath.Mx.iter (fun _ f -> g f) cost.c_calls
+  EcPath.Mx.iter (fun _ cb -> g cb.cb_cost; g cb.cb_called; ) cost.c_calls
 
 let f_map gt g fp =
   match fp.f_node with
@@ -2030,19 +2067,20 @@ module Fsubst = struct
 
     let costs = match PreOI.costs oi with
       | `Unbounded -> `Unbounded
-      | `Concrete costs ->
-        let costs = EcPath.Mx.fold (fun x a costs ->
+      | `Bounded (self,calls) ->
+        let calls = EcPath.Mx.fold (fun x a calls ->
             EcPath.Mx.change
               (fun old -> assert (old = None); Some (f_subst ~tx s a))
               (sx x)
-              costs
-          ) costs EcPath.Mx.empty in
-        `Concrete costs in
+              calls
+          ) calls EcPath.Mx.empty in
+        let self = f_subst ~tx s self in
+        `Bounded (self,calls) in
 
     PreOI.mk
       (List.map sx (PreOI.allowed oi))
       (PreOI.is_in oi)
-      (costs)
+      costs
 
   and mr_subst ~tx s mr : form p_mod_restr =
     let sx = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
@@ -2104,14 +2142,29 @@ module Fsubst = struct
 
   and add_bindings ~tx = List.map_fold (add_binding ~tx)
 
+  (* When substituting a abstract module (i.e. a mident) by a concrete one,
+     we move the module cost from [c_calls] to [c_self]. *)
   and cost_subst ~tx s cost =
     let c_self = f_subst ~tx s cost.c_self
-    and c_calls = EcPath.Mx.fold (fun x f calls ->
+    and self', c_calls = EcPath.Mx.fold (fun x cb (self',calls) ->
         let x' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp x in
-        let f' = f_subst ~tx s f in
-        EcPath.Mx.change (fun old -> assert (old  = None); Some f') x' calls
-      ) cost.c_calls EcPath.Mx.empty in
+        let cb_cost'   = f_subst ~tx s cb.cb_cost in
+        let cb_called' = f_subst ~tx s cb.cb_called in
+        match x'.x_top.m_top with
+        | `Local _ ->
+          let cb' = { cb_cost   = cb_cost';
+                      cb_called = cb_called'; } in
+          ( self',
+            EcPath.Mx.change
+              (fun old -> assert (old  = None); Some cb')
+              x' calls )
+        | `Concrete _ ->
+          (* TODO: A: better simplification*)
+          ( f_int_add_simpl_z self' (f_int_mul_simpl_z cb_called' cb_cost'),
+            calls)
+      ) cost.c_calls (f_i0, EcPath.Mx.empty) in
 
+    let c_self = f_int_add_simpl_z c_self self' in
     cost_r c_self c_calls
 
   (* ------------------------------------------------------------------ *)

@@ -1632,10 +1632,13 @@ oracle_restr:
 (* -------------------------------------------------------------------- *)
 (* Complexity restrictions *)
 compl_el:
- | o=qident_inparam COLON c=form_r(none) { (o, c) }
+| o=qident_inparam COLON c=form_r(none) { (o, c) }
 
 compl_restr:
-  | TICKBRACE c=rlist0(compl_el,COMMA) RBRACE { PCompl c }
+| TICKBRACE self=form_r(none) RBRACE
+    { PCompl (self,[]) }
+| TICKBRACE self=form_r(none) COMMA c=rlist1(compl_el,COMMA) RBRACE
+    { PCompl (self,c) }
 
 (* -------------------------------------------------------------------- *)
 (* Module restrictions *)

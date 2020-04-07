@@ -211,8 +211,12 @@ module PVM = struct
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
 
   let subst_cost env s c =
+    let cb_subst cb =
+      { cb_cost = subst env s cb.cb_cost;
+        cb_called = subst env s cb.cb_called; } in
+
     let c_self  = subst env s c.c_self
-    and c_calls = Mx.map (subst env s) c.c_calls in
+    and c_calls = Mx.map cb_subst c.c_calls in
     cost_r c_self c_calls
 
   let subst1 env pv m f =
@@ -329,7 +333,9 @@ module PV = struct
   let fv env m f = aux env m empty f
 
   let fv_cost env m cost =
-    Mx.fold (fun _ form fv -> aux env m fv form)
+    Mx.fold (fun _ cb fv ->
+        let fv = aux env m fv cb.cb_cost in
+        aux env m fv cb.cb_called)
       cost.c_calls (aux env m empty cost.c_self)
 
 

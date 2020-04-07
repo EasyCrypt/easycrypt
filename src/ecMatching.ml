@@ -812,7 +812,7 @@ module FPosition = struct
           | FcHoareF chs ->
             let subctxt = Sid.add EcFol.mhr ctxt in
             let calls =
-              List.map (fun (_,c) -> ctxt,c)
+              List.map (fun (_,cb) -> ctxt,cb.cb_called)
                 (EcPath.Mx.bindings chs.chf_co.c_calls) in
             doit pos (`WithSubCtxt ((subctxt, chs.chf_pr) ::
                                     (subctxt, chs.chf_po) ::
@@ -974,6 +974,8 @@ module FPosition = struct
 
           | FcHoareF chf ->
             let fkeys, calls = EcPath.Mx.bindings chf.chf_co.c_calls
+                               |> List.map (fun (f,cb) -> ((f,cb.cb_cost),
+                                                           cb.cb_called))
                                |> List.split in
             let sub = doit p (chf.chf_pr ::
                               chf.chf_po ::
@@ -981,9 +983,11 @@ module FPosition = struct
                               calls) in
             begin match sub with
               | chf_pr :: chf_po :: c_self :: calls ->
-                let c_calls = List.fold_left2 (fun acc f c ->
+                let c_calls = List.fold_left2 (fun acc (f,cb_cost) cb_called ->
                     EcPath.Mx.change
-                      (fun old -> assert (old = None); Some c) f acc
+                      (fun old ->
+                         assert (old = None);
+                         Some { cb_cost; cb_called; }) f acc
                   ) EcPath.Mx.empty fkeys calls in
                 let cost = cost_r c_self c_calls in
                 f_cHoareF_r { chf with chf_pr; chf_po;

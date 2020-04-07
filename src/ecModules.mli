@@ -18,20 +18,20 @@ include module type of struct include EcCoreModules end
 module OI : sig
   type t = form PreOI.t
 
-  type compl = form PreOI.compl
-
   val hash : t -> int
   val equal : t -> t -> bool
 
   val is_in : t -> bool
 
-  val cost : t -> xpath -> compl
-  val costs : t -> [`Concrete of form Mx.t | `Unbounded]
+  val cost_self : t -> [`Bounded of form | `Unbounded]
+  val cost : t -> xpath -> [`Bounded of form | `Zero | `Unbounded]
+  val cost_calls : t -> [`Bounded of form Mx.t | `Unbounded]
+  val costs : t -> [`Bounded of form * form Mx.t | `Unbounded]
 
   val allowed : t -> xpath list
   val allowed_s : t -> Sx.t
 
-  val mk : xpath list -> bool -> [`Concrete of form Mx.t | `Unbounded] -> t
+  val mk : xpath list -> bool -> [`Bounded of form * form Mx.t | `Unbounded] -> t
   (* val change_calls : t -> xpath list -> t *)
   val filter : (xpath -> bool) -> t -> t
 end

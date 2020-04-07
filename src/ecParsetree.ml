@@ -248,7 +248,7 @@ and qident_inparam = { inp_in_params : bool;
 
 and poracles = qident_inparam list
 
-and pcompl = PCompl of (qident_inparam * pformula) list
+and pcompl = PCompl of pformula * (qident_inparam * pformula) list
 
 and pmod_restr_el = {
   pmre_in    : bool;

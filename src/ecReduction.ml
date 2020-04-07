@@ -1045,11 +1045,13 @@ and check_alpha_equal ri hyps f1 f2 =
           EcPath.Mx.change (fun old -> assert (old = None); Some c) f' calls
         ) co2.c_calls EcPath.Mx.empty in
 
-    aux env subst co1.c_self  co2.c_self;
+    aux env subst co1.c_self co2.c_self;
     EcPath.Mx.fold2_union (fun _ a1 a2 _ -> match a1,a2 with
         | None, None -> assert false
         | None, Some _ | Some _, None -> error ()
-        | Some c1, Some c2 -> aux env subst c1 c2
+        | Some cb1, Some cb2 ->
+          aux env subst cb1.cb_cost cb2.cb_cost;
+          aux env subst cb1.cb_called cb2.cb_called
       ) calls1 calls2 ()
 
   in aux env Fsubst.f_subst_id f1 f2

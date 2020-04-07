@@ -35,7 +35,9 @@ type mismatch_funsig =
 | MF_targs  of ty * ty                               (* expected, got *)
 | MF_tres   of ty * ty                               (* expected, got *)
 | MF_restr  of EcEnv.env * Sx.t mismatch_sets
-| MF_compl  of EcEnv.env * (form option * form option) Mx.t suboreq
+| MF_compl     of EcEnv.env *
+                  ((form * form) option
+                   * (form * form) Mx.t) suboreq
 | MF_unbounded
 
 type restr_failure = Sx.t * Sm.t
@@ -149,6 +151,7 @@ type tyerror =
 | SchemaVariableReBinded of EcIdent.t
 | SchemaMemBinderBelowCost
 | ModuleNotAbstract      of symbol
+| ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
 
 exception TymodCnvFailure of tymod_cnv_failure
@@ -241,7 +244,7 @@ val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
-val trans_oracle     : env -> psymbol * psymbol -> xpath
+val trans_oracle     : env -> psymbol * psymbol -> xpath * form
 val trans_restr_mem : env -> pmod_restr_mem -> Sx.t use_restr * Sm.t use_restr
 
 (* -------------------------------------------------------------------- *)

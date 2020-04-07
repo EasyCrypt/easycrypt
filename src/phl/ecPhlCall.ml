@@ -119,7 +119,7 @@ let t_choare_call fpre fpost fcost tc =
     ) f_i0 args in
   let cost =
     EcFol.cost_sub_self
-      (EcFol.cost_op EcFol.f_int_sub_simpl chs.chs_co fcost)
+      (EcFol.cost_op env EcFol.f_int_sub_simpl chs.chs_co fcost)
       args_cost in
 
   let concl = f_cHoareS_r { chs with chs_s = s;

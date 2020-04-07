@@ -46,9 +46,9 @@ let process_cost ?mv hyps (EcParsetree.PC_costs (self, calls)) ty =
   let env = LDecl.toenv hyps in
   let self = process_form_opt ?mv hyps self (Some ty) in
   let calls = List.map (fun (m,f,c) ->
-      let f = EcTyping.trans_oracle env (m,f) in
+      let f, self = EcTyping.trans_oracle env (m,f) in
       let f_c = process_form_opt ?mv hyps c (Some ty) in
-      f, f_c
+      f, { cb_cost = self; cb_called = f_c; }
     ) calls in
   cost_r self (EcPath.Mx.of_list calls)
 

@@ -157,9 +157,20 @@ and pr = {
   pr_event : form;
 }
 
+
+(* Invariant: keys of c_calls are functions of local modules,
+   with no arguments. *)
 and cost = private {
   c_self  : form;
-  c_calls : form EcPath.Mx.t;
+  c_calls : call_bound EcPath.Mx.t;
+}
+
+(* Call with cost at most [cb_cost], called at mist [cb_called].
+   [cb_cost] is here to properly handle substsitution when instantiating an
+   abstract module by a concrete one. *)
+and call_bound = {
+  cb_cost  : form;
+  cb_called : form;
 }
 
 and module_type = form p_module_type
@@ -200,8 +211,6 @@ val f_node  : form -> f_node
 
 (* -------------------------------------------------------------------- *)
 (* not recursive *)
-val cost_map  : (form -> form) -> cost -> cost
-val cost_iter : (form -> unit) -> cost -> unit
 val f_map  : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 val f_iter : (form -> unit) -> form -> unit
 val form_exists: (form -> bool) -> form -> bool
@@ -243,7 +252,7 @@ val f_hoareF : form -> xpath -> form -> form
 val f_hoareS : memenv -> form -> stmt -> form -> form
 
 (* soft-constructors - cost hoare *)
-val cost_r : form -> form EcPath.Mx.t -> cost
+val cost_r : form -> call_bound EcPath.Mx.t -> cost
 
 val f_cHoareF_r : cHoareF -> form
 val f_cHoareS_r : cHoareS -> form

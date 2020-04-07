@@ -174,6 +174,8 @@ module type H = { proc o () : unit }.
 
 module type Adv (H0 : H) = { proc a () : unit }.
 
+(* TODO: A: Allow the following syntax *)
+(* module (MyAdv : Adv) (H0 : H [o : `{}]) = { *)
 module (MyAdv : Adv) (H0 : H) = {
   proc a () = {
     var y;
@@ -183,8 +185,7 @@ module (MyAdv : Adv) (H0 : H) = {
   }
 }.
 
-lemma advcompl
-    (H0   <: H) : 
+lemma MyAdv_compl (k : int)(H0   <: H [o : `{k}]) : 
     choare[MyAdv(H0).a : true ==> true] 
       time [2; H0.o : 2].
 proof.
@@ -198,14 +199,13 @@ module (MyH : H) = {
   }
 }.
 
+lemma MyH_compl : choare[MyH.o : true ==> true] time [1] by proc; auto.
+
 lemma advcompl_inst :
     choare[MyAdv(MyH).a : true ==> true] 
       time [4].
 proof.
-  (* Next two tactics should fail, as lemma application to choare judgement is not yet implemented. *)
-  (* have h := (advcompl MyH). *)
-  (* apply h. *)
-  admit.
+  apply (MyAdv_compl 1 MyH MyH_compl). 
 qed.
 
 
@@ -220,10 +220,10 @@ module Inv (Adv0 : Adv) (H0 : H) = {
 }.
 
 
-lemma invcompl
-    (k : int)
-    (Adv0 <: Adv [a : {#H0.o : k}]) 
-    (H0   <: H) : 
+lemma Inv_compl
+    (j k h : int)
+    (Adv0 <: Adv [a : `{j, #H0.o : k}]) 
+    (H0   <: H [o : `{h}]) : 
     0 <= k =>
     choare[Inv(Adv0, H0).i : true ==> true] 
       time [1; Adv0.a : 1; H0.o : k ].
@@ -232,16 +232,17 @@ proof.
   call(_: true; time (H0.o : [fun _ => 0; H0.o : fun _ => 1])).
   move => * /=; proc*; call(_: true; time); auto => /=.
   auto => /=.
-  rewrite !big_constz !count_predT !size_range. by smt ().
+  rewrite !big_constz !count_predT !size_range; by smt ().
 qed.
 
-lemma incompl_inst
-    (H0   <: H) : 
+lemma Inv_compl_inst
+    (h : int)
+    (H0   <: H [o : `{h}]) : 
     choare[Inv(MyAdv, H0).i : true ==> true] 
       time [1; H0.o : 2 ].
 proof.
-  (* have h := (invcompl 2 MyAdv H0). *)
-  admit.
+  apply (Inv_compl 2 2 1 MyAdv _ H0 _).
+
 qed.
 
 lemma invcompl2

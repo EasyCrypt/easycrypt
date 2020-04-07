@@ -1692,7 +1692,7 @@ and pp_cost ppe fmt c =
     (pp_list ";@ " pp_el)
     (   (None,c.c_self)
      :: (EcPath.Mx.bindings c.c_calls
-         |> List.map (fun (x,y) -> (Some x, y))))
+         |> List.map (fun (x,y) -> (Some x, y.cb_called))))
 
 (* -------------------------------------------------------------------- *)
 
@@ -1705,14 +1705,15 @@ and pp_allowed_orcl ppe fmt orcls =
 and pp_costs ppe fmt costs = match costs with
   | `Unbounded ->
     Format.fprintf fmt ""
-  | `Concrete costs ->
+  | `Bounded (self,calls) ->
     let pp_cost fmt (f,c) =
       Format.fprintf fmt "@[%a : %a@]"
         (pp_funname ppe) f
         (pp_form ppe) c in
 
-    Format.fprintf fmt "@[<hv>%a@]@ "
-      (pp_list ",@ " pp_cost) (EcPath.Mx.bindings costs)
+    Format.fprintf fmt "@[<hv>%a, %a@]@ "
+      (pp_form ppe) self
+      (pp_list ",@ " pp_cost) (EcPath.Mx.bindings calls)
 
 and pp_orclinfo ppe fmt (sym, oi) =
   let orcls = OI.allowed oi
