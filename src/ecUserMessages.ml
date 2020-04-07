@@ -95,6 +95,9 @@ end = struct
         (EcPrinting.pp_list "@;" (pp_diff ppe `Eq))
         (Mx.bindings diffs)
 
+    | MF_unbounded ->
+      msg "the function does not satisfy the required complexity restriction \
+          (at least, it cannot be infered from its type)"
 
   let pp_restr_err_aux env fmt error =
     let msg x = Format.fprintf fmt x in

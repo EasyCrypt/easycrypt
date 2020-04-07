@@ -646,6 +646,10 @@ let p_mr_equal a_equal mr1 mr2 =
   && ur_equal EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
   && Msym.equal (PreOI.equal a_equal) mr1.mr_oinfos mr2.mr_oinfos
 
+let has_compl_restriction mr =
+  Msym.exists (fun _ oi ->
+      (PreOI.costs oi) <> `Unbounded
+    ) mr.mr_oinfos
 
 (* -------------------------------------------------------------------- *)
 type funsig = {

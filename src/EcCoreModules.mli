@@ -163,6 +163,8 @@ val p_mr_equal :
 
 val p_mr_hash : ('a -> int) -> 'a p_mod_restr -> int
 
+val has_compl_restriction : 'a p_mod_restr -> bool
+
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)
 type 'a p_module_type = {          (* Always in eta-normal form *)

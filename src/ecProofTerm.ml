@@ -782,9 +782,18 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
       match dfl_arg_for_mod pe arg with
       | PVAModule (mp, mt) -> begin
         try
-          EcTyping.check_modtype env mp mt emt;
+          EcTyping.check_modtype ~proof_obl:true env mp mt emt;
           EcPV.check_module_in env mp emt;
-          (Fsubst.f_subst_mod x mp f, PAModule (mp, mt))
+
+          let f = Fsubst.f_subst_mod x mp f in
+          let f =
+            if EcModules.has_compl_restriction emt.mt_restr
+            then
+              let obl = EcTyping.restr_proof_obligation env mp emt in
+              f_imp obl f
+            else f in
+
+          (f, PAModule (mp, mt))
         with
         | EcTyping.RestrictionError (_, e) ->
           tc_pterm_apperror ?loc pe (AE_InvalidArgModRestr e)

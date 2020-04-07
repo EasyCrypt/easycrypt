@@ -175,8 +175,16 @@ module LowApply = struct
         | GTmodty emt, PAModule (mp, mt) -> begin
           (* FIXME: poor API ==> poor error recovery *)
           try
-            EcTyping.check_modtype env mp mt emt;
+            EcTyping.check_modtype ~proof_obl:true env mp mt emt;
             EcPV.check_module_in env mp emt;
+
+            let f =
+              if EcModules.has_compl_restriction emt.mt_restr
+              then
+                let obl = EcTyping.restr_proof_obligation env mp emt in
+                f_imp obl f
+              else f in
+
             (Fsubst.f_bind_mod sbt x mp, f)
           with _ -> raise InvalidProofTerm
         end

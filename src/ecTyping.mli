@@ -36,6 +36,7 @@ type mismatch_funsig =
 | MF_tres   of ty * ty                               (* expected, got *)
 | MF_restr  of EcEnv.env * Sx.t mismatch_sets
 | MF_compl  of EcEnv.env * (form option * form option) Mx.t suboreq
+| MF_unbounded
 
 type restr_failure = Sx.t * Sm.t
 
@@ -250,8 +251,11 @@ val check_mem_restr_fun :
   env -> xpath -> mod_restr -> unit
 
 val check_modtype :
-  env -> mpath -> module_sig -> module_type -> unit
+  proof_obl:bool -> env -> mpath -> module_sig -> module_type -> unit
 
 (* -------------------------------------------------------------------- *)
 val get_ring  : (ty_params * ty) -> env -> EcDecl.ring  option
 val get_field : (ty_params * ty) -> env -> EcDecl.field option
+
+(* -------------------------------------------------------------------- *)
+val restr_proof_obligation : env -> mpath -> module_type -> form

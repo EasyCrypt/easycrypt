@@ -72,8 +72,6 @@ val process_pterm_cut
   : prcut:('a -> form) -> pt_env -> 'a ppt_head -> pt_ev
 val process_pterm
   : pt_env -> (pformula option) ppt_head -> pt_ev
-val process_pterm_arg
-   : ?implicits:bool -> pt_ev  -> ppt_arg located -> pt_ev_arg
 val process_pterm_args_app
   :  ?implicits:bool -> ?ip:(bool list) -> pt_ev  -> ppt_arg located list
   -> pt_ev * bool list
