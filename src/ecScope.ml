@@ -918,7 +918,6 @@ module Ax = struct
         | None -> Some []
         | Some scv ->
           List.map (fun (vs,pty) ->
-              (* TODO: A: check the typing policy there. *)
               let ty = TT.transty tp_tydecl scope.sc_env ue pty in
               List.map (fun v -> EcIdent.create (unloc v), ty) vs
             ) scv

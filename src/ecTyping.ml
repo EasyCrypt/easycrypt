@@ -3318,7 +3318,6 @@ and trans_form_or_pattern
         begin match oty with
           | None -> ()
           | Some pty ->
-            (* TODO: A: check that we want tp_relax *)
             let ty = transty tp_relax fenv ue pty in
             unify_or_fail fenv ue (loc pty) ~expct:ty ety;
         end;
@@ -3338,7 +3337,6 @@ and trans_form_or_pattern
         begin match oty with
           | None -> ()
           | Some pty ->
-            (* TODO: A: check that we want tp_relax *)
             let ty = transty tp_relax fenv ue pty in
             unify_or_fail fenv ue (loc pty) ~expct:ty ety;
         end;
