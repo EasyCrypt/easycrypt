@@ -129,12 +129,6 @@ module type AOracle = {
   proc o (x : rand) : ptxt
 }.
 
-op k1 : int.
-op k2 : int.
-
-axiom k1p : 0 <= k1.
-axiom k2p : 0 <= k2.
-
 module type Adv (H : AOracle) = {
   proc a1(p:pkey): (ptxt * ptxt)
   proc a2(c:ctxt): bool         
@@ -142,6 +136,10 @@ module type Adv (H : AOracle) = {
 
 (*****************************************)
 (* Other example, of the accepted syntax *)
+
+
+op k1 : int.
+op k2 : int.
 
 (* We have two possibility to give module restrictions. *)
 (* We can give the restrictions function by function, e.g.: *)
@@ -226,66 +224,59 @@ module IW (A : Adv) (H : Oracle) = {
   }
 }.
 
-op kh : int.
-op kinit : int.
-
-section.
-  declare module H : Oracle {-I, -IW} [init : `{kinit}, o : `{kh}]. 
-  declare module A : Adv
-  {-I, -IW, -H} 
-  [a1 : `{ka1, #H.o : k1}, a2 : `{ka2, #H.o : k2}].
-
-  local module I0  = I(A,H).
-  local module IW0 = IW(A,H).
-
-  local equiv eq_I_IW: I0.invert ~ IW0.invert:
-    ={arg} /\ ={glob H, glob A} ==> ={res}.
-  proof.
-    proc.  
-    seq 5 5 : (={glob H, glob A, b,h, pk, y} /\ I.qs{1} = IW.qs{2}); first by sim. 
-    while {2} (
-      if qs0 = [] then 
-         r = nth witness IW.qs (find (fun (p0 : rand) => f pk p0 = y) IW.qs)
-      else 
-       exists i, r = witness /\ 0 <= i < size IW.qs /\ qs0 = drop i IW.qs /\ !has (fun x => f pk x = y) (take i IW.qs)){2}
-     (size qs0{2}).
-    + move=> &1 z; auto => &2 />.
-      case: (qs0{2}) => //= hd qs0 [i />] h0i hi hdr hhas.
-      have heq : IW.qs{2} = take i IW.qs{2} ++ hd :: qs0.
-      + by rewrite hdr cat_take_drop.
-      rewrite heq; move: hhas; (pose tk := take i IW.qs{2}) => hhas.
-      have heq1 : 
-       nth witness (tk ++ hd :: qs0) (find (fun (p0 : rand) => f pk{2} p0 = y{2}) (tk ++ hd :: qs0)) =
-       nth witness (hd :: qs0) (find (fun (p0 : rand) => f pk{2} p0 = y{2}) (hd :: qs0)).
-      + by rewrite find_cat hhas /= nth_cat; smt (find_ge0).
-      split. 
-      + by move=> heq2;rewrite heq2 heq1 /= heq2 /=; smt (size_ge0).  
-      rewrite heq1 drop0 => hy; split;2:smt().
-      split.
-      + by move=> />;rewrite hy.
-      move=> hqs; exists (i + 1).
-      rewrite size_cat /= -cat_rcons.
-      have -> : i + 1 = size (rcons tk hd).
-      + by rewrite size_rcons size_take // hi.
-      rewrite drop_size_cat // take_size_cat // size_rcons -cats1 has_cat /=.
-      smt (size_ge0).
-    auto => /> &2;split.
-    + move=> ?;exists 0;rewrite drop0 take0 /=.
-      smt (size_eq0 size_ge0).
+equiv eq_I_IW (H <: Oracle{-I, -IW}) (A <: Adv{-I, -IW, -H}):  I(A,H).invert ~ IW(A,H).invert:
+  ={arg} /\ ={glob H, glob A} ==> ={res}.
+proof.
+  proc.  
+  seq 5 5 : (={glob H, glob A, b,h, pk, y} /\ I.qs{1} = IW.qs{2}); first by sim. 
+  while {2} (
+    if qs0 = [] then 
+       r = nth witness IW.qs (find (fun (p0 : rand) => f pk p0 = y) IW.qs)
+    else 
+     exists i, r = witness /\ 0 <= i < size IW.qs /\ qs0 = drop i IW.qs /\ !has (fun x => f pk x = y) (take i IW.qs)){2}
+   (size qs0{2}).
+  + move=> &1 z; auto => &2 />.
+    case: (qs0{2}) => //= hd qs0 [i />] h0i hi hdr hhas.
+    have heq : IW.qs{2} = take i IW.qs{2} ++ hd :: qs0.
+    + by rewrite hdr cat_take_drop.
+    rewrite heq; move: hhas; (pose tk := take i IW.qs{2}) => hhas.
+    have heq1 : 
+     nth witness (tk ++ hd :: qs0) (find (fun (p0 : rand) => f pk{2} p0 = y{2}) (tk ++ hd :: qs0)) =
+     nth witness (hd :: qs0) (find (fun (p0 : rand) => f pk{2} p0 = y{2}) (hd :: qs0)).
+    + by rewrite find_cat hhas /= nth_cat; smt (find_ge0).
+    split. 
+    + by move=> heq2;rewrite heq2 heq1 /= heq2 /=; smt (size_ge0).  
+    rewrite heq1 drop0 => hy; split;2:smt().
+    split.
+    + by move=> />;rewrite hy.
+    move=> hqs; exists (i + 1).
+    rewrite size_cat /= -cat_rcons.
+    have -> : i + 1 = size (rcons tk hd).
+    + by rewrite size_rcons size_take // hi.
+    rewrite drop_size_cat // take_size_cat // size_rcons -cats1 has_cat /=.
+    smt (size_ge0).
+  auto => /> &2;split.
+  + move=> ?;exists 0;rewrite drop0 take0 /=.
     smt (size_eq0 size_ge0).
-  qed.
+  smt (size_eq0 size_ge0).
+qed.
 
-  op kloop = (4 + kf) * (k1 + k2) + 2 * (k1 + k2 + 1) + 1.
+op kloop = (4 + kf) * (k1 + k2) + 2 * (k1 + k2 + 1) + 1.
 
-  local lemma bound_i :     
-    choare[IW0.invert: true ==> true] 
+lemma bound_i 
+      (kinit kh ka1 k1 ka2 k2 : int)
+      (H <: Oracle {-I, -IW} [init : `{kinit}, o : `{kh}])
+      (A <: Adv {-I, -IW, -H} 
+        [a1 : `{ka1, #H.o : k1}, a2 : `{ka2, #H.o : k2}]) :
+    0 <= k1 => 0 <= k2 => 
+    choare[IW(A,H).invert: true ==> true] 
     time [4 + 2 * (k1 + k2) + kloop; 
           A.a1 : 1; 
           A.a2 : 1; 
           H.o : k1 + k2;
           H.init : 1].
   proof.
-  proc.
+  move => hk1 hk2; proc.
   seq 5 : (size IW.qs <= k1 + k2) [kloop].
   call (_: true ;
     (IW(A, H).QRO.o : size IW.qs - k1)
@@ -308,7 +299,7 @@ section.
 
   call (_: true; time); auto ; move => * /=.
   split; move => * /=; first by smt (dptxt_ll).  
-  rewrite !big_constz !count_predT !size_range; by smt (k1p k2p kfp).
+  rewrite !big_constz !count_predT !size_range; by smt (kfp).
 
   (* we bound the list lookup time. *)
   (* wp : (size I.qs <= k1 + k2). *)
@@ -318,5 +309,5 @@ section.
     move => x0 l; have := size_ge0 l; by smt (). 
   + move => &hr; case: (qs0{hr}) => * //; have := size_ge0 l; by smt ().  
   auto; move => &hr /=; rewrite !big_constz !count_predT !size_range. 
-  smt (k1p k2p kfp).
+  smt (hk1 hk2 kfp).
 qed.

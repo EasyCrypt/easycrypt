@@ -172,21 +172,19 @@ qed.
 
 module type H = { proc o () : unit }.
 
-module type Adv (HA : H) = { proc a () : unit }.
+module type Adv (H0 : H) = { proc a () : unit }.
 
-(* TODO: A: Allow the following syntax *)
-(* module (MyAdv : Adv) (H0 : H [o : `{}]) = { *)
-module (MyAdv : Adv) (HA : H) = {
+module (MyAdv : Adv) (H0 : H) = {
   proc a () = {
     var y;
     y <- 1 + 1 + 1 + 1;
-    HA.o();
-    HA.o();
+    H0.o();
+    H0.o();
   }
 }.
 
 lemma MyAdv_compl (k : int) (H0   <: H [o : `{k}]) : 
-    choare[MyAdv(H0).a : true ==> true] 
+    choare[MyAdv(H0).a] 
       time [3; H0.o : 2].
 proof.
   proc; do !(call(_: true; time)); auto => /=.
@@ -199,11 +197,9 @@ module (MyH : H) = {
   }
 }.
 
-lemma MyH_compl : choare[MyH.o : true ==> true] time [1] by proc; auto.
+lemma MyH_compl : choare[MyH.o] time [1] by proc; auto.
 
-lemma advcompl_inst :
-    choare[MyAdv(MyH).a : true ==> true] 
-      time [5].
+lemma advcompl_inst : choare[MyAdv(MyH).a] time [5].
 proof.
   apply (MyAdv_compl 1 MyH MyH_compl). 
 qed.
@@ -219,17 +215,15 @@ module Inv (Adv0 : Adv) (HI : H) = {
   }
 }.
 
-
 lemma Inv_compl
     (j k h : int)
-    (Adv0 <: Adv [a : `{j, #HA.o : k}]) 
-    (HIc   <: H [o : `{h}]) : 
+    (Adv0 <: Adv [a : `{j, #H0.o : k}]) 
+    (H0   <: H [o : `{h}]) : 
     0 <= k =>
-    choare[Inv(Adv0, HIc).i : true ==> true] 
-      time [1; Adv0.a : 1; HIc.o : k ].
+    choare[Inv(Adv0, H0).i] time [1; Adv0.a : 1; H0.o : k ].
 proof.    
   move => hk; proc. 
-  call(_: true; time (HIc.o : [fun _ => 0; HIc.o : fun _ => 1])).
+  call(_: true; time (H0.o : [fun _ => 0; H0.o : fun _ => 1])).
   move => * /=; proc*; call(_: true; time); auto => /=.
   auto => /=.
   rewrite !big_constz !count_predT !size_range; by smt ().
@@ -238,7 +232,7 @@ qed.
 lemma Inv_compl_inst
     (h : int)
     (H1   <: H [o : `{h}]) : 
-    choare[Inv(MyAdv, H1).i : true ==> true] 
+    choare[Inv(MyAdv, H1).i] 
       time [4; H1.o : 2 ].
 proof.
   apply (Inv_compl 3 2 h MyAdv _ H1 _).
@@ -246,6 +240,7 @@ proof.
   - proc*; call(_: true; time (H1.o : [fun _ => 0; H1.o : fun _ => 1])).
     auto; by smt(). 
 qed.
+
 
 (**************************************************)
 
