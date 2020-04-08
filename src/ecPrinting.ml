@@ -1699,7 +1699,7 @@ and pp_cost ppe fmt c =
 and pp_allowed_orcl ppe fmt orcls =
   if orcls = [] then Format.fprintf fmt ""
   else
-    Format.fprintf fmt "@[<hov>%a@];@ "
+    Format.fprintf fmt "{@[<hov>%a@]}@ "
       (pp_list ",@ " (pp_funname ppe)) orcls
 
 and pp_costs ppe fmt costs = match costs with
@@ -1711,9 +1711,11 @@ and pp_costs ppe fmt costs = match costs with
         (pp_funname ppe) f
         (pp_form ppe) c in
 
-    Format.fprintf fmt "@[<hv>%a, %a@]@ "
+    let bindings = (EcPath.Mx.bindings calls) in
+    Format.fprintf fmt "`{@[<hv>%a%s%a@]}@ "
       (pp_form ppe) self
-      (pp_list ",@ " pp_cost) (EcPath.Mx.bindings calls)
+      (if bindings = [] then "" else ",@ ")
+      (pp_list ",@ " pp_cost) bindings
 
 and pp_orclinfo ppe fmt (sym, oi) =
   let orcls = OI.allowed oi
@@ -1721,7 +1723,7 @@ and pp_orclinfo ppe fmt (sym, oi) =
   if orcls = [] && costs = `Unbounded
   then Format.fprintf fmt ""
   else
-    Format.fprintf fmt "@[<hv>%s%a : {@,%a%a@,}@]"
+    Format.fprintf fmt "@[<hv>%s%a : %a%a@]"
       (if OI.is_in oi then "" else " *")
       pp_symbol sym
       (pp_allowed_orcl ppe) orcls

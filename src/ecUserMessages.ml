@@ -213,7 +213,7 @@ end = struct
         x (pp_restr_err_aux env) restr_err
 
     | E_TyModCnv_MismatchFunSig (x,err) ->
-      msg "procedure `%s' is not compatible: %a"
+      msg "@[<hov 2>procedure `%s' is not compatible:@ %a@]"
         x (pp_mismatch_funsig env) err
 
     | E_TyModCnv_SubTypeArg(x,t1,t2,err) ->
