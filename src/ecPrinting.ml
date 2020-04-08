@@ -1590,6 +1590,11 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
     let mepr, mepo = EcEnv.Fun.hoareF_memenv chf.chf_f ppe.PPEnv.ppe_env in
     let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
     let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
+    if f_equal chf.chf_pr f_true && f_equal chf.chf_po f_true then
+      Format.fprintf fmt "choare[@[<hov 2>%a@]]@ time %a"
+        (pp_funname ppe) chf.chf_f
+        (pp_cost ppe) chf.chf_co
+    else
       Format.fprintf fmt "choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]@ time %a"
         (pp_funname ppe) chf.chf_f
         (pp_form ppepr) chf.chf_pr
@@ -1714,9 +1719,9 @@ and pp_costs ppe fmt costs = match costs with
         (pp_form ppe) c in
 
     let bindings = (EcPath.Mx.bindings calls) in
-    Format.fprintf fmt "`{@[<hv>%a%s%a@]}@ "
+    Format.fprintf fmt "`{@[<hv>%a%t%a@]}@ "
       (pp_form ppe) self
-      (if bindings = [] then "" else ",@ ")
+      (fun fmt -> Format.fprintf fmt (if bindings = [] then "" else ",@ "))
       (pp_list ",@ " pp_cost) bindings
 
 and pp_orclinfo ppe fmt (sym, oi) =

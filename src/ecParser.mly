@@ -1332,12 +1332,16 @@ phoare_body(P):
   { PFBDhoareF (pre, mp, post, cmp, bd) }
 
 choare_body(P):
-  LBRACKET mp=loc(fident) COLON
+| LBRACKET mp=loc(fident) COLON
     pre=form_r(P) LONGARROW post=form_r(P)
   RBRACKET
   TIME
   c=costs(P)
   { PFChoareF (pre, mp, post, c) }
+| LBRACKET mp=loc(fident) RBRACKET
+  TIME
+  c=costs(P)
+  { PFChoareFT (mp, c) }
 
 coe_ty:
 | COLON ty=loc(type_exp) { ty}

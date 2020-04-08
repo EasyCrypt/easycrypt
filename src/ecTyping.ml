@@ -1810,6 +1810,8 @@ let top_is_mem_binding pf = match pf with
 
   | PFhole -> true
 
+  | PFChoareFT _ -> false
+
   | PFcast    _
   | PFint     _
   | PFdecimal _
@@ -3221,28 +3223,38 @@ and trans_form_or_pattern
           unify_or_fail env  ue bd  .pl_loc ~expct:treal bd'  .f_ty;
           f_bdHoareF pre' fpath post' hcmp bd'
 
-    | PFChoareF (pre, gp, post, PC_costs (self, calls)) ->
-        let fpath = trans_gamepath env gp in
-        let penv, qenv = EcEnv.Fun.hoareF fpath env in
-        let pre'   = transf penv pre in
-        let post'  = transf qenv post in
-
+    | PFChoareF _ | PFChoareFT _ ->
+      let trans_choaref pre' post' fpath self calls =
         let self'  = transf env self in
         let calls' = List.map (fun (m,fn,c) ->
             let fn, fn_self = trans_oracle env (m,fn) in
             let f_c = transf env c in
             fn, { cb_cost = fn_self; cb_called = f_c }
           ) calls in
+        unify_or_fail env  ue self.pl_loc ~expct:tint  self'.f_ty;
+        List.iter2 (fun (_,cb') (_,_,c) ->
+            unify_or_fail env ue c.pl_loc ~expct:tint cb'.cb_called.f_ty
+          ) calls' calls;
+        let cost' = cost_r self' (Mx.of_list calls') in
+        (* Sanity check *)
+        assert (List.length calls' = Mx.cardinal cost'.c_calls);
+        f_cHoareF pre' fpath post' cost' in
+
+      begin match f.pl_desc with
+        | PFChoareFT (gp, PC_costs (self, calls)) ->
+          let fpath = trans_gamepath env gp in
+          trans_choaref f_true f_true fpath self calls
+
+        | PFChoareF (pre, gp, post, PC_costs (self, calls)) ->
+          let fpath = trans_gamepath env gp in
+          let penv, qenv = EcEnv.Fun.hoareF fpath env in
+          let pre'   = transf penv pre in
+          let post'  = transf qenv post in
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
-          unify_or_fail env  ue self.pl_loc ~expct:tint  self'.f_ty;
-          List.iter2 (fun (_,cb') (_,_,c) ->
-              unify_or_fail env ue c.pl_loc ~expct:tint cb'.cb_called.f_ty
-            ) calls' calls;
-          let cost' = cost_r self' (Mx.of_list calls') in
-          (* Sanity check *)
-          assert (List.length calls' = Mx.cardinal cost'.c_calls);
-          f_cHoareF pre' fpath post' cost'
+
+          trans_choaref pre' post' fpath self calls
+        | _ -> assert false end
 
     | PFlsless gp ->
         let fpath = trans_gamepath env gp in

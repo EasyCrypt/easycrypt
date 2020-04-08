@@ -193,6 +193,7 @@ and pformula_r =
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
   | PFChoareF  of pformula * pgamepath * pformula * pcost
+  | PFChoareFT of pgamepath * pcost
   | PFCoe      of osymbol * pmemtype option * pformula * pexpr * pty option
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
