@@ -1683,16 +1683,18 @@ and pp_cost ppe fmt c =
   let pp_el fmt (f,c) = match f with
     | None ->
       pp_form ppe fmt c
-    | Some f ->
-      Format.fprintf fmt "%a : %a"
+    | Some (f, _f_cost) ->      (* _f_cost here to help debugging *)
+      (* Format.fprintf fmt "%a : %a" *)
+      Format.fprintf fmt "%a `{%a} : %a"
         (pp_funname ppe) f
+        (pp_form ppe) _f_cost
         (pp_form ppe) c in
 
   Format.fprintf fmt "@[<hv 1>[%a]@]"
     (pp_list ";@ " pp_el)
     (   (None,c.c_self)
      :: (EcPath.Mx.bindings c.c_calls
-         |> List.map (fun (x,y) -> (Some x, y.cb_called))))
+         |> List.map (fun (x,y) -> (Some (x, y.cb_cost), y.cb_called))))
 
 (* -------------------------------------------------------------------- *)
 

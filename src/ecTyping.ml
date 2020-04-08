@@ -3434,19 +3434,55 @@ let restr_proof_obligation env (mp_in : mpath) (mt : module_type) : form =
   let mt_procs =
     List.map (fun (Tys_function fs) -> fs.fs_name) mt_sig.mis_body in
 
-  (* We compute the module parameters, in case [mp_in] is a functor. *)
-  let me_in = EcEnv.Mod.by_mpath mp_in env in
+  (* Environement where [mt]'s parameters are binded. *)
+  let env_mt = List.fold_left (fun env (id, mt_param) ->
+      EcEnv.Mod.bind_local id mt_param env
+    ) env mt.mt_params in
 
-  let s_params = List.map (fun (id, mt) ->
-      id, (EcIdent.fresh id, mt)
-    ) me_in.me_params in
-  let bindings = List.map (fun (_, (fid, mt)) ->
-      fid, GTmodty mt
+  let ints, s_params = List.map_fold (fun ints (id, param_mt) ->
+      let param_restr = param_mt.mt_restr in
+      let param_ms = EcEnv.ModTy.sig_of_mt env_mt param_mt in
+
+      let mk_ident () =
+        let name = "k" ^ String.sub (EcPath.basename param_mt.mt_name) 0 1 in
+        EcIdent.create name in
+
+      (* If [mt] has parameters with no self complexity, quantify over the
+         parameters' complexity. *)
+      let param_restr', ints =
+        List.fold_left (fun (param_restr', ints) (Tys_function fn) ->
+            let oi = Msym.find fn.fs_name param_restr.mr_oinfos in
+            match OI.cost_self oi with
+            | `Bounded _ -> (param_restr', ints)
+            | `Unbounded ->
+              let k_id = mk_ident () in
+              let k = f_local k_id tint in
+              let oi' =
+                OI.mk (OI.allowed oi) (OI.is_in oi)
+                  (`Bounded (k,Mx.empty)) in
+              let param_restr' = add_oinfo param_restr' fn.fs_name oi' in
+              (param_restr', k_id :: ints)
+          ) (param_restr,ints) param_ms.mis_body in
+
+      let param_mt = { param_mt with mt_restr = param_restr' } in
+
+      ints, (id, (EcIdent.fresh id, param_mt))
+    ) [] mt.mt_params in
+
+  (* Bindings for the proof obligation formula. *)
+  let mbindings =
+    List.map (fun (_, (fid, param_mt)) ->
+      fid, GTmodty param_mt
     ) s_params in
+  let ibindings =
+    List.map (fun k ->
+      k, GTty tint
+      ) ints in
+  let bindings = ibindings @ mbindings in
 
   (* Application of [mp_in] to fresh module idents. *)
   let mp_in_app =
-    EcPath.m_apply mp_in (List.map (fun (id,_) -> EcPath.mident id) bindings) in
+    EcPath.m_apply mp_in (List.map (fun (id,_) -> EcPath.mident id) mbindings) in
 
   (* Compute the choare hypothesis for [mp_in_app]'s procedure [fn]. *)
   let mk_hyp fn =
@@ -3477,11 +3513,13 @@ let restr_proof_obligation env (mp_in : mpath) (mt : module_type) : form =
           let oself = match OI.cost_self (Msym.find ofun orestr.mr_oinfos) with
             | `Bounded self -> self
             | `Unbounded ->
-              (* TODO: A: error message*)
-              (* let ppe = EcPrinting.PPEnv.ofenv env in
-               * "proof obligation cannot be met, because procedure %s of %s can call oracle %a, which has an unbounded self complexity."
-               *   fn me_in.me_name
-               *   (EcPrinting.pp_funname ppe) o *)
+              (* TODO: A: proper error. *)
+              let ppe = EcPrinting.PPEnv.ofenv env in
+              Format.eprintf "proof obligation cannot be met, because procedure \
+                              %s of %a can call oracle %a, which has an \
+                              unbounded self complexity.@."
+                fn EcPath.pp_m mp_in
+                (EcPrinting.pp_funname ppe) o;
               assert false in
           let cb = { cb_cost = oself; cb_called = obd; } in
 

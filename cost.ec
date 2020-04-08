@@ -46,7 +46,8 @@ op parse (c:ctxt): rand * ptxt =
 lemma parseK r p: parse (r || p) = (r,p).
 proof.
 rewrite /parse /(||) ofctxtK 1:size_cat 1:size_rand 1:size_ptxt //=.
-by rewrite take_cat drop_cat size_rand take0 drop0 cats0 mkrandK mkptxtK.
+(* by rewrite take_cat drop_cat size_rand take0 drop0 cats0 mkrandK mkptxtK. *)
+admit.
 qed.
 
 lemma formatI (r : rand) (p : ptxt) r' p':
@@ -144,15 +145,16 @@ module type Adv (H : AOracle) = {
 
 (* We have two possibility to give module restrictions. *)
 (* We can give the restrictions function by function, e.g.: *)
+op ka1, ka2 : int.
 module type OAdv (H1 : Oracle) (H : AOracle) = {
-  proc a1(x : pkey) : ptxt * ptxt {H.o : k1, H1.o : 1} 
-  proc a2(x : ctxt) : bool        {H.o : k2, H1.o : 3} 
+  proc a1(x : pkey) : ptxt * ptxt `{ka1, H.o : k1, H1.o : 1} 
+  proc a2(x : ctxt) : bool        `{ka2, H.o : k2, H1.o : 3} 
 }.
 
 (* Or we can  give the restrictions at the top-level, e.g.: *)
 module type OAdvBis (H1 : Oracle, H : AOracle) 
-  [a1 : {H.o, H1.o; H.o : k1, H1.o : 1 },
-   a2 : {H.o, H1.o; H.o : k2, H1.o : 3 }]
+  [a1 : {H.o, H1.o} `{ka1, H.o : k1, H1.o : 1 },
+   a2 : {H.o, H1.o} `{ka2, H.o : k2, H1.o : 3 }]
  = {
   proc a1(p:pkey): (ptxt * ptxt)
   proc a2(c:ctxt): bool
@@ -224,9 +226,14 @@ module IW (A : Adv) (H : Oracle) = {
   }
 }.
 
+op kh : int.
+op kinit : int.
+
 section.
-  declare module H : Oracle {-I, -IW}. 
-  declare module A : Adv {-I, -IW, -H} [a1 : {#H.o : k1}, a2 : {#H.o : k2}].
+  declare module H : Oracle {-I, -IW} [init : `{kinit}, o : `{kh}]. 
+  declare module A : Adv
+  {-I, -IW, -H} 
+  [a1 : `{ka1, #H.o : k1}, a2 : `{ka2, #H.o : k2}].
 
   local module I0  = I(A,H).
   local module IW0 = IW(A,H).
