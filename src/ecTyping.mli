@@ -130,6 +130,7 @@ type tyerror =
 | UnknownScope           of qsymbol
 | NoWP
 | FilterMatchFailure
+| LvMapOnNonAssign
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
