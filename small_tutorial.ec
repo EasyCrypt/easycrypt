@@ -235,10 +235,16 @@ lemma Inv_compl_inst
     choare[Inv(MyAdv, H1).i] 
       time [4; H1.o : 2 ].
 proof.
-  apply (Inv_compl 3 2 h MyAdv _ H1 _).
-  - apply MyAdv_compl.
-  - proc*; call(_: true; time (H1.o : [fun _ => 0; H1.o : fun _ => 1])).
-    auto; by smt(). 
+  print Inv_compl.
+  (* Le apply suivant marche:  *)
+  (* apply (Inv_compl 3 2 h MyAdv MyAdv_compl H1 _) => //. *)
+  (* Mais il n'arrive pas à inferrer les arguments.
+     Par exemple, ça échoue à trouver seulement "h" *)
+  (* apply (Inv_compl 3 2 _ MyAdv MyAdv_compl H1 _) => //. *)
+  (* Ça échoue à trouver 3 et 2: *)
+  (* apply (Inv_compl _ _ h MyAdv MyAdv_compl H1 _) => //. *)
+  (* Et bien sur, ça échoue à trouver les deux *)
+  (* apply (Inv_compl _ _ _ MyAdv MyAdv_compl H1 _) => //. *)
 qed.
 
 

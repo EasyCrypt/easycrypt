@@ -241,7 +241,8 @@ module ModTy : sig
   val add  : path -> env -> env
   val bind : symbol -> t -> env -> env
 
-  val mod_type_equiv : env -> module_type -> module_type -> bool
+  val mod_type_equiv :
+    (form -> form -> bool) -> env -> module_type -> module_type -> bool
   val has_mod_type : env -> module_type list -> module_type -> bool
   val sig_of_mt :  env -> module_type -> module_sig
 end
@@ -263,7 +264,6 @@ module NormMp : sig
   val mod_use       : env -> mpath -> use
   val fun_use       : env -> xpath -> use
   val restr_use     : env -> mod_restr -> use use_restr
-  val equal_restr   : env -> mod_restr -> mod_restr -> bool
   val get_restr_use : env -> mpath -> use use_restr
   val get_restr_me  : env -> module_expr -> mpath -> mod_restr
   val get_restr     : env -> mpath -> mod_restr
@@ -509,3 +509,5 @@ module LDecl : sig
   val inv_memenv  : hyps -> hyps
   val inv_memenv1 : hyps -> hyps
 end
+
+val pp_debug_form : (env -> Format.formatter -> form -> unit) ref

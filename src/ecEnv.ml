@@ -2391,17 +2391,10 @@ module NormMp = struct
     let me = Mod.by_mpath mp env in
     get_restr_me env me mp
 
-  let equal_restr env r1 r2 =
+  let equal_restr (f_equiv : form -> form -> bool) env r1 r2 =
     let us1,us2 = restr_use env r1, restr_use env r2 in
     ur_equal use_equal us1 us2
-    && Msym.fold2_union (fun _ oi1 oi2 beq -> match oi1,oi2 with
-        | None,_ | _,None -> false
-        | Some oi1, Some oi2 ->
-          let oi_eq = EcPath.Sx.equal
-              (OI.allowed_s oi1)
-              (OI.allowed_s oi2) in
-          beq && oi_eq
-      ) r1.mr_oinfos r2.mr_oinfos true
+    && Msym.equal (PreOI.equal f_equiv) r1.mr_oinfos r2.mr_oinfos
 
 
   let sig_of_mp env mp =
@@ -2614,7 +2607,7 @@ module ModTy = struct
 
   exception ModTypeNotEquiv
 
-  let rec mod_type_equiv (env : env) (mty1 : module_type) (mty2 : module_type) =
+  let rec mod_type_equiv (f_equiv : form -> form -> bool) env mty1 mty2 =
     if not (EcPath.p_equal mty1.mt_name mty2.mt_name) then
       raise ModTypeNotEquiv;
 
@@ -2623,7 +2616,7 @@ module ModTy = struct
     if List.length mty1.mt_args <> List.length mty2.mt_args then
       raise ModTypeNotEquiv;
 
-    if not (NormMp.equal_restr env mty1.mt_restr mty2.mt_restr) then
+    if not (NormMp.equal_restr f_equiv env mty1.mt_restr mty2.mt_restr) then
       raise ModTypeNotEquiv;
 
     let subst =
@@ -2631,7 +2624,7 @@ module ModTy = struct
         (fun subst (x1, p1) (x2, p2) ->
           let p1 = EcSubst.subst_modtype subst p1 in
           let p2 = EcSubst.subst_modtype subst p2 in
-            mod_type_equiv env p1 p2;
+            mod_type_equiv f_equiv env p1 p2;
             EcSubst.add_module subst x1 (EcPath.mident x2))
         EcSubst.empty mty1.mt_params mty2.mt_params
     in
@@ -2645,12 +2638,12 @@ module ModTy = struct
             mty1.mt_args mty2.mt_args) then
       raise ModTypeNotEquiv
 
-  let mod_type_equiv env mty1 mty2 =
-    try  mod_type_equiv env mty1 mty2; true
+  let mod_type_equiv (f_equiv : form -> form -> bool) env mty1 mty2 =
+    try  mod_type_equiv f_equiv env mty1 mty2; true
     with ModTypeNotEquiv -> false
 
   let has_mod_type (env : env) (dst : module_type list) (src : module_type) =
-    List.exists (mod_type_equiv env src) dst
+    List.exists (mod_type_equiv f_equal env src) dst
 
   let sig_of_mt env (mt:module_type) =
     let sig_ = by_path mt.mt_name env in
@@ -3650,3 +3643,6 @@ module LDecl = struct
   let inv_memenv1 lenv =
     { lenv with le_env = Fun.inv_memenv1 lenv.le_env }
 end
+
+
+let pp_debug_form = ref (fun _env _fmt _f -> assert false)

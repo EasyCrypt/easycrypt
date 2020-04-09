@@ -426,12 +426,14 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       | Flocal x, _ -> begin
           match EV.get x !ev.evm_form with
           | None ->
+            (* TODO: A: bug? why not failure ()?*)
               raise MatchFailure
 
           | Some `Unset ->
               let ssbj = Fsubst.f_subst subst subject in
               let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) ssbj in
               if not (Mid.set_disjoint mxs ssbj.f_fv) then
+                (* TODO: A: bug? why not failure ()?*)
                 raise MatchFailure;
               begin
                 try  EcUnify.unify env ue ptn.f_ty subject.f_ty
@@ -586,9 +588,14 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       end
 
       | FcHoareF hf1, FcHoareF hf2 -> begin
-          if not (EcReduction.EqTest.for_xp env hf1.chf_f hf2.chf_f) then
+          let x2 = EcFol.Fsubst.subst_xpath subst hf2.chf_f in
+
+          if not (EcReduction.EqTest.for_xp env hf1.chf_f x2) then
             failure ();
           let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
+
+          let calls2 = EcPath.Mx.translate (EcFol.Fsubst.subst_xpath subst) hf2.chf_co.c_calls in
+
           EcPath.Mx.fold2_union (fun _ cb1 cb2 () ->
               match cb1, cb2 with
               | None, None -> assert false
@@ -597,7 +604,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
                 List.iter2 (doit env (subst, mxs))
                   [cb1.cb_cost; cb1.cb_called]
                   [cb2.cb_cost; cb2.cb_called]
-            ) hf1.chf_co.c_calls hf2.chf_co.c_calls ();
+            ) hf1.chf_co.c_calls calls2 ();
           List.iter2 (doit env (subst, mxs))
             [hf1.chf_pr; hf1.chf_po; hf1.chf_co.c_self]
             [hf2.chf_pr; hf2.chf_po; hf2.chf_co.c_self];
@@ -730,7 +737,15 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             in (env, subst)
 
         | GTmodty p1, GTmodty p2 ->
-            if not (ModTy.mod_type_equiv env p1 p2) then
+          let f_equiv f1 f2 =
+            try doit env (subst, mxs) f1 f2; true with
+            | MatchFailure ->
+                Format.eprintf "match failure:@\n%a@\n%a@."
+                  (!EcEnv.pp_debug_form env) f1
+                  (!EcEnv.pp_debug_form env) f2;
+                false in
+
+            if not (ModTy.mod_type_equiv f_equiv env p1 p2) then
               raise MatchFailure;
 
             let subst =
