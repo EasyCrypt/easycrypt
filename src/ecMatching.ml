@@ -585,6 +585,24 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             [hf2.bhf_pr; hf2.bhf_po; hf2.bhf_bd]
       end
 
+      | FcHoareF hf1, FcHoareF hf2 -> begin
+          if not (EcReduction.EqTest.for_xp env hf1.chf_f hf2.chf_f) then
+            failure ();
+          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
+          EcPath.Mx.fold2_union (fun _ cb1 cb2 () ->
+              match cb1, cb2 with
+              | None, None -> assert false
+              | None, Some _ | Some _, None -> failure ()
+              | Some cb1, Some cb2 ->
+                List.iter2 (doit env (subst, mxs))
+                  [cb1.cb_cost; cb1.cb_called]
+                  [cb2.cb_cost; cb2.cb_called]
+            ) hf1.chf_co.c_calls hf2.chf_co.c_calls ();
+          List.iter2 (doit env (subst, mxs))
+            [hf1.chf_pr; hf1.chf_po; hf1.chf_co.c_self]
+            [hf2.chf_pr; hf2.chf_po; hf2.chf_co.c_self];
+        end
+
       | FequivF hf1, FequivF hf2 -> begin
           if not (EcReduction.EqTest.for_xp env hf1.ef_fl hf2.ef_fl) then
             failure ();
