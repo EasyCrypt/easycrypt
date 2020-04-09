@@ -814,7 +814,7 @@ let rec p_mty_equal a_equal mty1 mty2 =
   && (List.all2 EcPath.m_equal mty1.mt_args mty2.mt_args)
   && (List.all2 (pair_equal EcIdent.id_equal (p_mty_equal a_equal))
         mty1.mt_params mty2.mt_params)
-  && (p_mr_equal a_equal mty1.mt_restr mty1.mt_restr)
+  && (p_mr_equal a_equal mty1.mt_restr mty2.mt_restr)
 
 (* -------------------------------------------------------------------- *)
 let get_uninit_read_of_fun (f : _ p_function_) =
