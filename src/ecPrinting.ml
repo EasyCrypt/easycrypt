@@ -1860,18 +1860,18 @@ and pp_mod_params ppe bms =
   in (ppe, pp)
 
 (* -------------------------------------------------------------------- *)
-and pp_bindings_blocks ppe ?(break = true) ?fv bds =
+and pp_bindings_blocks ppe ?(break = true) bds =
   let pp_sep : _ format6 = if break then "@ " else " " in
 
   match bds with
   | [] ->
       (ppe, fun _ -> ())
-  | [bd] ->
-      let ppe, pp = pp_binding ppe ~break ?fv bd in
+  | [(fv,xs,gty)] ->
+      let ppe, pp = pp_binding ppe ~break ?fv (xs,gty) in
       (ppe, fun fmt -> Format.fprintf fmt "%t" pp)
-  | bd :: bds ->
-      let ppe, pp1 = pp_binding ppe ~break ?fv bd  in
-      let ppe, pp2 = pp_bindings_blocks ppe ?fv bds in
+  | (fv,xs,gty) :: bds ->
+      let ppe, pp1 = pp_binding ppe ~break ?fv (xs,gty) in
+      let ppe, pp2 = pp_bindings_blocks ppe bds in
       (ppe, fun fmt -> Format.fprintf fmt "%t%(%)%t" pp1 pp_sep pp2)
 
 and pp_bindings ppe ?break ?fv bds =
@@ -1887,7 +1887,16 @@ and pp_bindings ppe ?break ?fv bds =
   and merge =
     function [] -> [] | (x, gty) :: bds -> merge_r ([x], gty) bds in
 
-  pp_bindings_blocks ppe ?break ?fv (merge bds)
+  let bds = merge bds in
+
+  (* Variables appearing in the quantified types are free, and must be added
+     when printing. *)
+  let _, bds = List.fold_right (fun (xs, gty) (fv, bds) ->
+      let fv = omap (fun fv -> EcIdent.fv_union (EcFol.gty_fv gty) fv) fv in
+      (fv, (fv, xs, gty) :: bds)
+    ) bds (fv, []) in
+
+  pp_bindings_blocks ppe ?break bds
 
 (* -------------------------------------------------------------------- *)
 let pp_sform ppe fmt f =

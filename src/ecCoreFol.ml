@@ -234,7 +234,14 @@ let mr_fv mr =
        (EcUtils.odfl Sx.empty mr.mr_xpaths.ur_pos))
 
   |> EcSymbols.Msym.fold (fun _ oi fv ->
-      List.fold_left EcPath.x_fv fv (PreOI.allowed oi)
+      let fv = List.fold_left EcPath.x_fv fv (PreOI.allowed oi) in
+      match PreOI.costs oi with
+      | `Unbounded -> fv
+      | `Bounded (self,calls) ->
+        EcPath.Mx.fold (fun xp call fv ->
+            let fv = EcPath.x_fv fv xp in
+            fv_union fv (f_fv call)
+          ) calls (fv_union fv (f_fv self))
     ) mr.mr_oinfos
 
 let gty_fv = function
