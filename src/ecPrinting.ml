@@ -1591,11 +1591,11 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
     let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
     let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
     if f_equal chf.chf_pr f_true && f_equal chf.chf_po f_true then
-      Format.fprintf fmt "choare[@[<hov 2>%a@]]@ time %a"
+      Format.fprintf fmt "choare[@[<hov 2>%a@]] time %a"
         (pp_funname ppe) chf.chf_f
         (pp_cost ppe) chf.chf_co
     else
-      Format.fprintf fmt "choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]@ time %a"
+      Format.fprintf fmt "choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time %a"
         (pp_funname ppe) chf.chf_f
         (pp_form ppepr) chf.chf_pr
         (pp_form ppepo) chf.chf_po
@@ -1603,7 +1603,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | FcHoareS chs ->
       let ppe = PPEnv.push_mem ppe ~active:true chs.chs_m in
-      Format.fprintf fmt "choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]@ time %a"
+      Format.fprintf fmt "choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time %a"
         (pp_stmt_for_form ppe) chs.chs_s
         (pp_form ppe) chs.chs_pr
         (pp_form ppe) chs.chs_po
