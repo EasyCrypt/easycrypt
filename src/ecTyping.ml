@@ -3437,7 +3437,7 @@ let get_field (typ, ty) env =
 (* Sub-typing proof obligation for oracle complexity restrictions,
    where [mp_in] must verify [mt].
    Precondition: [mp_in] and [mt] types must be compatible. *)
-let restr_proof_obligation env (mp_in : mpath) (mt : module_type) : form =
+let restr_proof_obligation env (mp_in : mpath) (mt : module_type) : form list =
   let mt_sig = EcEnv.ModTy.sig_of_mt env mt in
 
   (* All procedures for which a proof obligation must be checked. *)
@@ -3544,4 +3544,4 @@ let restr_proof_obligation env (mp_in : mpath) (mt : module_type) : form =
 
   let hyps = List.map snd hyps_assoc in
 
-  f_forall bindings (f_ands0_simpl hyps)
+  List.map (f_forall bindings) hyps

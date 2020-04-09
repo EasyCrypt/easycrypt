@@ -261,4 +261,4 @@ val get_ring  : (ty_params * ty) -> env -> EcDecl.ring  option
 val get_field : (ty_params * ty) -> env -> EcDecl.field option
 
 (* -------------------------------------------------------------------- *)
-val restr_proof_obligation : env -> mpath -> module_type -> form
+val restr_proof_obligation : env -> mpath -> module_type -> form list

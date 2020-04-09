@@ -181,8 +181,8 @@ module LowApply = struct
             let f =
               if EcModules.has_compl_restriction emt.mt_restr
               then
-                let obl = EcTyping.restr_proof_obligation env mp emt in
-                f_imp obl f
+                let obls = EcTyping.restr_proof_obligation env mp emt in
+                f_imps obls f
               else f in
 
             (Fsubst.f_bind_mod sbt x mp, f)

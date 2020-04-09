@@ -789,8 +789,8 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
           let f =
             if EcModules.has_compl_restriction emt.mt_restr
             then
-              let obl = EcTyping.restr_proof_obligation env mp emt in
-              f_imp obl f
+              let obls = EcTyping.restr_proof_obligation env mp emt in
+              f_imps obls f
             else f in
 
           (f, PAModule (mp, mt))
