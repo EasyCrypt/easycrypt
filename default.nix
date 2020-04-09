@@ -6,4 +6,5 @@ stdenv.mkDerivation {
   buildInputs = [ ]
     ++ (with ocamlPackages; [ ocaml findlib ocamlbuild batteries menhir merlin zarith inifiles why3 yojson])
     ;
+  installFlags = [ "PREFIX=$(out)" ];
 }
