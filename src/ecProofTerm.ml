@@ -781,17 +781,14 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
   | GTmodty emt -> begin
       match dfl_arg_for_mod pe arg with
       | PVAModule (mp, mt) -> begin
-        try
-          EcTyping.check_modtype ~proof_obl:true env mp mt emt;
-          EcPV.check_module_in env mp emt;
+          try
+            let obl = EcTyping.check_modtype env mp mt emt in
+            EcPV.check_module_in env mp emt;
 
-          let f = Fsubst.f_subst_mod x mp f in
-          let f =
-            if EcModules.has_compl_restriction emt.mt_restr
-            then
-              let obls = EcTyping.restr_proof_obligation env mp emt in
-              f_imps obls f
-            else f in
+            let f = Fsubst.f_subst_mod x mp f in
+            let f = match obl with
+              | `Ok ->  f
+              | `ProofObligation obl -> f_imps obl f in
 
           (f, PAModule (mp, mt))
         with

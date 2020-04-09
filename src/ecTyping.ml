@@ -53,9 +53,10 @@ type restr_failure = Sx.t * Sm.t
 type restr_eq_failure = Sx.t * Sm.t * Sx.t * Sm.t
 
 type mismatch_restr = [
-  | `Sub of restr_failure             (* Should not be allowed *)
+  | `Sub    of restr_failure          (* Should not be allowed *)
   | `RevSub of restr_failure option   (* Should be allowed. None is everybody *)
-  | `Eq of restr_eq_failure           (* Should be equal *)
+  | `Eq     of restr_eq_failure       (* Should be equal *)
+  | `FunCanCallUnboundedOracle of symbol * EcPath.xpath
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -883,15 +884,127 @@ let check_sig_mt_cnv ?(proof_obl=false) env sym_in sin tyout =
   check_sig_cnv ~proof_obl `Sub env sym_in sin sout
 
 (* -------------------------------------------------------------------- *)
-let check_modtype ~proof_obl env mp mt i =
+(* Sub-typing proof obligation for oracle complexity restrictions,
+   where [mp_in] must verify [mt].
+   Precondition: [mp_in] and [mt] types must be compatible. *)
+let restr_proof_obligation env (mp_in : mpath) sym (mt : module_type) : form list =
+  let mt_sig = EcEnv.ModTy.sig_of_mt env mt in
+
+  (* All procedures for which a proof obligation must be checked. *)
+  let mt_procs =
+    List.map (fun (Tys_function fs) -> fs.fs_name) mt_sig.mis_body in
+
+  (* Environement where [mt]'s parameters are binded. *)
+  let env_mt = List.fold_left (fun env (id, mt_param) ->
+      EcEnv.Mod.bind_local id mt_param env
+    ) env mt.mt_params in
+
+  let ints, s_params = List.map_fold (fun ints (id, param_mt) ->
+      let param_restr = param_mt.mt_restr in
+      let param_ms = EcEnv.ModTy.sig_of_mt env_mt param_mt in
+
+      let mk_ident () =
+        let name = "k" ^ String.sub (EcPath.basename param_mt.mt_name) 0 1 in
+        EcIdent.create name in
+
+      (* If [mt] has parameters with no self complexity, quantify over the
+         parameters' complexity. *)
+      let param_restr', ints =
+        List.fold_left (fun (param_restr', ints) (Tys_function fn) ->
+            let oi = Msym.find fn.fs_name param_restr.mr_oinfos in
+            match OI.cost_self oi with
+            | `Bounded _ -> (param_restr', ints)
+            | `Unbounded ->
+              let k_id = mk_ident () in
+              let k = f_local k_id tint in
+              let oi' =
+                OI.mk (OI.allowed oi) (OI.is_in oi)
+                  (`Bounded (k,Mx.empty)) in
+              let param_restr' = add_oinfo param_restr' fn.fs_name oi' in
+              (param_restr', k_id :: ints)
+          ) (param_restr,ints) param_ms.mis_body in
+
+      let param_mt = { param_mt with mt_restr = param_restr' } in
+
+      ints, (id, (EcIdent.fresh id, param_mt))
+    ) [] mt.mt_params in
+
+  (* Bindings for the proof obligation formula. *)
+  let mbindings =
+    List.map (fun (_, (fid, param_mt)) ->
+      fid, GTmodty param_mt
+    ) s_params in
+  let ibindings =
+    List.map (fun k ->
+      k, GTty tint
+      ) ints in
+  let bindings = ibindings @ mbindings in
+
+  (* Application of [mp_in] to fresh module idents. *)
+  let mp_in_app =
+    EcPath.m_apply mp_in (List.map (fun (id,_) -> EcPath.mident id) mbindings) in
+
+  (* Compute the choare hypothesis for [mp_in_app]'s procedure [fn]. *)
+  let mk_hyp fn =
+    (* xpath of the function after substitution. *)
+    let xfn = EcPath.xpath mp_in_app fn in
+    (* oracle path (i.e. with empty module arguments) of [fn] in [mp_in]. *)
+    let xfn_in_mi = EcPath.xpath mp_in fn in
+
+    (* Oracle restriction on [fn] in [mt]. *)
+    let oi = EcSymbols.Msym.find fn mt.mt_restr.mr_oinfos in
+
+    match OI.costs oi with
+    | `Unbounded -> (xfn_in_mi, f_true)
+    | `Bounded (c_self,costs) ->
+
+      let c_calls = Mx.fold (fun o obd c_calls ->
+          (* We compute the name of the procedure, seen as an oracle of
+             [mp_in_app]. That is, if [o] is a parameter of [mp_in], then
+             we use the fresh mident. *)
+          let omod, ofun = EcPath.mget_ident o.x_top, o.x_sub in
+          let omod, orestr = match List.assoc_opt omod s_params with
+            | None ->
+              let orestr = EcEnv.NormMp.get_restr env (EcPath.mident omod) in
+              omod, orestr
+            | Some (m,mt) -> m, mt.mt_restr in
+          let o = EcPath.xpath (EcPath.mident omod) ofun in
+
+          let oself = match OI.cost_self (Msym.find ofun orestr.mr_oinfos) with
+            | `Bounded self -> self
+            | `Unbounded ->
+              let err = `FunCanCallUnboundedOracle (fn, o) in
+              tymod_cnv_failure (E_TyModCnv_MismatchRestr (sym,err)) in
+          let cb = { cb_cost = oself; cb_called = obd; } in
+
+          Mx.add o cb c_calls
+        ) costs Mx.empty in
+
+      let cost = cost_r c_self c_calls in
+      let choare = f_cHoareF f_true xfn f_true cost in
+      (xfn_in_mi, choare) in
+
+  let hyps_assoc = List.map mk_hyp mt_procs in
+
+  let hyps = List.map snd hyps_assoc in
+
+  List.map (f_forall bindings) hyps
+
+(* -------------------------------------------------------------------- *)
+let check_modtype env mp mt i =
+  let restr = i.mt_restr in
+  let use = NormMp.mod_use env mp in
+  check_mem_restr env mp use restr;
+
   let sym = match mp.m_top with
     | `Local id -> id.EcIdent.id_symb
     | `Concrete (p,_) -> EcPath.basename p in
-  check_sig_mt_cnv ~proof_obl env sym mt i;
 
-  let restr = i.mt_restr in
-  let use = NormMp.mod_use env mp in
-  check_mem_restr env mp use restr
+  try check_sig_mt_cnv ~proof_obl:false env sym mt i; `Ok with
+  | TymodCnvFailure _ when EcModules.has_compl_restriction i.mt_restr ->
+    check_sig_mt_cnv ~proof_obl:true env sym mt i;
+    let obl = restr_proof_obligation env mp sym i in
+    `ProofObligation obl
 
 (* -------------------------------------------------------------------- *)
 let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
@@ -3431,117 +3544,3 @@ let get_field (typ, ty) env =
         (get_instances (typ, ty) env);
       None
     with E.Found cr -> Some cr
-
-
-(* -------------------------------------------------------------------- *)
-(* Sub-typing proof obligation for oracle complexity restrictions,
-   where [mp_in] must verify [mt].
-   Precondition: [mp_in] and [mt] types must be compatible. *)
-let restr_proof_obligation env (mp_in : mpath) (mt : module_type) : form list =
-  let mt_sig = EcEnv.ModTy.sig_of_mt env mt in
-
-  (* All procedures for which a proof obligation must be checked. *)
-  let mt_procs =
-    List.map (fun (Tys_function fs) -> fs.fs_name) mt_sig.mis_body in
-
-  (* Environement where [mt]'s parameters are binded. *)
-  let env_mt = List.fold_left (fun env (id, mt_param) ->
-      EcEnv.Mod.bind_local id mt_param env
-    ) env mt.mt_params in
-
-  let ints, s_params = List.map_fold (fun ints (id, param_mt) ->
-      let param_restr = param_mt.mt_restr in
-      let param_ms = EcEnv.ModTy.sig_of_mt env_mt param_mt in
-
-      let mk_ident () =
-        let name = "k" ^ String.sub (EcPath.basename param_mt.mt_name) 0 1 in
-        EcIdent.create name in
-
-      (* If [mt] has parameters with no self complexity, quantify over the
-         parameters' complexity. *)
-      let param_restr', ints =
-        List.fold_left (fun (param_restr', ints) (Tys_function fn) ->
-            let oi = Msym.find fn.fs_name param_restr.mr_oinfos in
-            match OI.cost_self oi with
-            | `Bounded _ -> (param_restr', ints)
-            | `Unbounded ->
-              let k_id = mk_ident () in
-              let k = f_local k_id tint in
-              let oi' =
-                OI.mk (OI.allowed oi) (OI.is_in oi)
-                  (`Bounded (k,Mx.empty)) in
-              let param_restr' = add_oinfo param_restr' fn.fs_name oi' in
-              (param_restr', k_id :: ints)
-          ) (param_restr,ints) param_ms.mis_body in
-
-      let param_mt = { param_mt with mt_restr = param_restr' } in
-
-      ints, (id, (EcIdent.fresh id, param_mt))
-    ) [] mt.mt_params in
-
-  (* Bindings for the proof obligation formula. *)
-  let mbindings =
-    List.map (fun (_, (fid, param_mt)) ->
-      fid, GTmodty param_mt
-    ) s_params in
-  let ibindings =
-    List.map (fun k ->
-      k, GTty tint
-      ) ints in
-  let bindings = ibindings @ mbindings in
-
-  (* Application of [mp_in] to fresh module idents. *)
-  let mp_in_app =
-    EcPath.m_apply mp_in (List.map (fun (id,_) -> EcPath.mident id) mbindings) in
-
-  (* Compute the choare hypothesis for [mp_in_app]'s procedure [fn]. *)
-  let mk_hyp fn =
-    (* xpath of the function after substitution. *)
-    let xfn = EcPath.xpath mp_in_app fn in
-    (* oracle path (i.e. with empty module arguments) of [fn] in [mp_in]. *)
-    let xfn_in_mi = EcPath.xpath mp_in fn in
-
-    (* Oracle restriction on [fn] in [mt]. *)
-    let oi = EcSymbols.Msym.find fn mt.mt_restr.mr_oinfos in
-
-    match OI.costs oi with
-    | `Unbounded -> (xfn_in_mi, f_true)
-    | `Bounded (c_self,costs) ->
-
-      let c_calls = Mx.fold (fun o obd c_calls ->
-          (* We compute the name of the procedure, seen as an oracle of
-             [mp_in_app]. That is, if [o] is a parameter of [mp_in], then
-             we use the fresh mident. *)
-          let omod, ofun = EcPath.mget_ident o.x_top, o.x_sub in
-          let omod, orestr = match List.assoc_opt omod s_params with
-            | None ->
-              let orestr = EcEnv.NormMp.get_restr env (EcPath.mident omod) in
-              omod, orestr
-            | Some (m,mt) -> m, mt.mt_restr in
-          let o = EcPath.xpath (EcPath.mident omod) ofun in
-
-          let oself = match OI.cost_self (Msym.find ofun orestr.mr_oinfos) with
-            | `Bounded self -> self
-            | `Unbounded ->
-              (* TODO: A: proper error. *)
-              let ppe = EcPrinting.PPEnv.ofenv env in
-              Format.eprintf "proof obligation cannot be met, because procedure \
-                              %s of %a can call oracle %a, which has an \
-                              unbounded self complexity.@."
-                fn EcPath.pp_m mp_in
-                (EcPrinting.pp_funname ppe) o;
-              assert false in
-          let cb = { cb_cost = oself; cb_called = obd; } in
-
-          Mx.add o cb c_calls
-        ) costs Mx.empty in
-
-      let cost = cost_r c_self c_calls in
-      let choare = f_cHoareF f_true xfn f_true cost in
-      (xfn_in_mi, choare) in
-
-  let hyps_assoc = List.map mk_hyp mt_procs in
-
-  let hyps = List.map snd hyps_assoc in
-
-  List.map (f_forall bindings) hyps

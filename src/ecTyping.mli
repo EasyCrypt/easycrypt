@@ -45,9 +45,10 @@ type restr_failure = Sx.t * Sm.t
 type restr_eq_failure = Sx.t * Sm.t * Sx.t * Sm.t
 
 type mismatch_restr = [
-  | `Sub of restr_failure             (* Should not be allowed *)
+  | `Sub    of restr_failure          (* Should not be allowed *)
   | `RevSub of restr_failure option   (* Should be allowed. None is everybody *)
-  | `Eq of restr_eq_failure           (* Should be equal *)
+  | `Eq     of restr_eq_failure       (* Should be equal *)
+  | `FunCanCallUnboundedOracle of symbol * EcPath.xpath
 ]
 
 type restriction_who =
@@ -254,11 +255,9 @@ val check_mem_restr_fun :
   env -> xpath -> mod_restr -> unit
 
 val check_modtype :
-  proof_obl:bool -> env -> mpath -> module_sig -> module_type -> unit
+  env -> mpath -> module_sig -> module_type ->
+  [> `Ok | `ProofObligation of EcFol.form list ]
 
 (* -------------------------------------------------------------------- *)
 val get_ring  : (ty_params * ty) -> env -> EcDecl.ring  option
 val get_field : (ty_params * ty) -> env -> EcDecl.field option
-
-(* -------------------------------------------------------------------- *)
-val restr_proof_obligation : env -> mpath -> module_type -> form list

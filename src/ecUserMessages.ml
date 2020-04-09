@@ -194,6 +194,12 @@ end = struct
         (EcPrinting.pp_list " and@ " pp_v) (Sx.ntr_elements xr)
         (EcPrinting.pp_list " and@ " pp_m) (Sm.ntr_elements mr)
 
+    | `FunCanCallUnboundedOracle (fn,o) ->
+      msg "proof obligation cannot be met, because procedure \
+           %s can call oracle %a, which has an \
+           unbounded self complexity.@."
+        fn (EcPrinting.pp_funname ppe) o
+
   let rec pp_cnv_failure env fmt error =
     let msg x = Format.fprintf fmt x in
 
