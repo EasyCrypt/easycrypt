@@ -224,7 +224,8 @@ module IW (A : Adv) (H : Oracle) = {
   }
 }.
 
-equiv eq_I_IW (H <: Oracle{-I, -IW}) (A <: Adv{-I, -IW, -H}):  I(A,H).invert ~ IW(A,H).invert:
+equiv eq_I_IW (H <: Oracle{-I, -IW}) (A <: Adv{-I, -IW, -H}): 
+    I(A,H).invert ~ IW(A,H).invert:
   ={arg} /\ ={glob H, glob A} ==> ={res}.
 proof.
   proc.  
@@ -261,7 +262,7 @@ proof.
   smt (size_eq0 size_ge0).
 qed.
 
-op kloop = (4 + kf) * (k1 + k2) + 2 * (k1 + k2 + 1) + 1.
+op kloop k1 k2 = (4 + kf) * (k1 + k2) + 2 * (k1 + k2 + 1) + 1.
 
 lemma bound_i 
       (kinit kh ka1 k1 ka2 k2 : int)
@@ -270,14 +271,14 @@ lemma bound_i
         [a1 : `{ka1, #H.o : k1}, a2 : `{ka2, #H.o : k2}]) :
     0 <= k1 => 0 <= k2 => 
     choare[IW(A,H).invert: true ==> true] 
-    time [4 + 2 * (k1 + k2) + kloop; 
+    time [4 + 2 * (k1 + k2) + kloop k1 k2; 
           A.a1 : 1; 
           A.a2 : 1; 
           H.o : k1 + k2;
           H.init : 1].
   proof.
   move => hk1 hk2; proc.
-  seq 5 : (size IW.qs <= k1 + k2) [kloop].
+  seq 5 : (size IW.qs <= k1 + k2) [kloop k1 k2].
   call (_: true ;
     (IW(A, H).QRO.o : size IW.qs - k1)
     time
@@ -305,9 +306,9 @@ lemma bound_i
   (* wp : (size I.qs <= k1 + k2). *)
   while (true) (size qs0) (k1 + k2) [fun _ => 4 + kf].
   + move => z /=; auto => * /=; split; [2 : by smt (kfp)]. 
-    move: H; case: (qs0{hr}); first by smt (). 
+    move : H0; case: (qs0{hr}); first by smt (). 
     move => x0 l; have := size_ge0 l; by smt (). 
   + move => &hr; case: (qs0{hr}) => * //; have := size_ge0 l; by smt ().  
-  auto; move => &hr /=; rewrite !big_constz !count_predT !size_range. 
-  smt (hk1 hk2 kfp).
+    auto; move => &hr /=; rewrite !big_constz !count_predT !size_range. 
+    move: hk1 hk2.  smt (kfp). 
 qed.
