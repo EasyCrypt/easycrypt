@@ -173,6 +173,29 @@ abstract theory ZModule.
   + by rewrite !mulr0z oppr0.
   + by rewrite !mulrS // ih opprD.
   qed.
+
+  lemma mulNrNz x (n : int) : intmul (-x) (-n) = intmul x n.
+  proof. by rewrite mulNrz mulrNz opprK. qed.
+
+  lemma mulrSz x n : intmul x (n + 1) = x + intmul x n.
+  proof.
+  case: (0 <= n) => [/mulrS ->//|]; rewrite -ltzNge => gt0_n.
+  case: (n = -1) => [->/=|]; 1: by rewrite mulrNz mulr1z mulr0z subrr.
+  move=> neq_n_N1; rewrite -!(@mulNrNz x).
+  rewrite (_ : -n = -(n+1) + 1) 1:/# mulrS 1:/#.
+  by rewrite addrA subrr add0r.
+  qed.
+
+  lemma mulrDz (x : t) (n m : int) : intmul x (n + m) = intmul x n + intmul x m.
+  proof.
+  wlog: n m / 0 <= m => [wlog|].
+  + case: (0 <= m) => [/wlog|]; first by apply.
+    rewrite -ltzNge => lt0_m; rewrite (_ : n + m = -(-m - n)) 1:/#.
+    by rewrite mulrNz addzC wlog 1:/# !mulrNz -opprD opprK.
+  elim: m => /= [|m ge0_m ih]; first by rewrite mulr0z addr0.
+  by rewrite addzA !mulrSz ih addrCA.
+qed.
+
 end ZModule.
 
 (* -------------------------------------------------------------------- *)
