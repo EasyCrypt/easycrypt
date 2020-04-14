@@ -2672,7 +2672,7 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
     end
 
   | Srnd (lv, e) ->
-    Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@];"
+    Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@]@];"
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
