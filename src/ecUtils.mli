@@ -287,6 +287,7 @@ module List : sig
   val pmap       : ('a -> 'b option) -> 'a list -> 'b list
   val rev_pmap   : ('a -> 'b option) -> 'a list -> 'b list
   val rotate     : [`Left|`Right] -> int -> 'a list -> int * 'a list
+  val reduce1    : ('a list -> 'a) -> 'a list -> 'a
 
   (* ------------------------------------------------------------------ *)
   val ksort:

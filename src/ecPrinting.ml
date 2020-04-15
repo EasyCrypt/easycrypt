@@ -879,6 +879,7 @@ let pp_opapp
     ((dt_sub  : 'a -> (EcPath.path * _ * 'a list) option),
      (pp_sub  : PPEnv.t -> _ * (opprec * iassoc) -> _ -> 'a -> unit),
      (is_trm  : 'a -> bool),
+     (is_tuple: 'a -> 'a list option),
      (is_proj : EcPath.path -> 'a -> (EcIdent.t * int) option))
      (outer   : symbol list * ((_ * fixity) * iassoc))
      (fmt     : Format.formatter)
@@ -891,6 +892,11 @@ let pp_opapp
     PPEnv.op_symb ppe op (Some (pred, tvi, List.map t_ty es)) in
 
   let inm = if nm = [] then fst outer else nm in
+
+  let pp_tuple_sub ppe prec fmt e =
+    match is_tuple e with
+    | None    -> pp_sub ppe prec fmt e
+    | Some es -> pp_list ", " (pp_sub ppe prec) fmt es in
 
   let pp_as_std_op fmt =
     let module E = struct exception PrintAsPlain end in
@@ -911,17 +917,17 @@ let pp_opapp
         | x, [e1; e2] when x = EcCoreLib.s_get ->
             let pp fmt =
               Format.fprintf fmt "@[%a.[%a]@]"
-                (pp_sub ppe (inm, (e_get_prio , `Left    ))) e1
-                (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
+                (pp_sub       ppe (inm, (e_get_prio , `Left    ))) e1
+                (pp_tuple_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
             in
               (pp, e_get_prio)
 
         | x, [e1; e2; e3] when x = EcCoreLib.s_set ->
             let pp fmt =
               Format.fprintf fmt "@[<hov 2>%a.[%a <-@ %a]@]"
-                (pp_sub ppe (inm, (e_get_prio , `Left    ))) e1
-                (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
-                (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e3
+                (pp_sub       ppe (inm, (e_get_prio , `Left    ))) e1
+                (pp_tuple_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
+                (pp_sub       ppe (inm, (min_op_prec, `NonAssoc))) e3
             in
               (pp, e_get_prio)
 
@@ -1328,7 +1334,7 @@ and pp_instr_for_form (ppe : PPEnv.t) fmt i =
           when (EcPath.basename op = EcCoreLib.s_set) && (EcTypes.pv_equal x y) ->
 
         Format.fprintf fmt "%a.[%a] <-@;<1 2>%a"
-          (pp_pv ppe) x (pp_expr ppe) k (pp_expr ppe) v
+          (pp_pv ppe) x (pp_tuple_expr ppe) k (pp_expr ppe) v
 
       | _, _ ->
         Format.fprintf fmt "%a <-@;<1 2>%a"
@@ -1577,6 +1583,11 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       | Fint _ | Flocal _ | Fpvar _ | Fop _ | Ftuple _ -> true
       | _ -> false
 
+    and is_tuple f =
+      match f.f_node with
+      | Ftuple ((_ :: _ :: _) as xs) -> Some xs
+      | _ -> None
+
     and is_proj (rc : EcPath.path) (f : form) =
       match f.f_node with
       | Fapp ({ f_node = Fop (p, _) }, [{ f_node = Flocal x }]) -> begin
@@ -1589,7 +1600,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
     in
       pp_opapp ppe f_ty
-        (dt_sub, pp_form_r, is_trm, is_proj)
+        (dt_sub, pp_form_r, is_trm, is_tuple, is_proj)
         outer fmt (`Form, op, tys, es)
   in
 
@@ -1767,6 +1778,12 @@ and pp_form ppe fmt f =
 and pp_expr ppe fmt e =
   let mr = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
   pp_form ppe fmt (form_of_expr mr e)
+
+and pp_tuple_expr ppe fmt e =
+  match e.e_node with
+  | Etuple ((_ :: _ :: _) as es) ->
+    pp_list ", " (pp_expr ppe) fmt es
+  | _ -> pp_expr ppe fmt e
 
 (* -------------------------------------------------------------------- *)
 let pp_sform ppe fmt f =
@@ -2744,7 +2761,7 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
           when (EcPath.basename op = EcCoreLib.s_set) && (EcTypes.pv_equal x y) ->
 
         Format.fprintf fmt "@[<hov 2>%a.[%a] <-@ @[%a@]@];"
-          (pp_pv ppe) x (pp_expr ppe) k (pp_expr ppe) v
+          (pp_pv ppe) x (pp_tuple_expr ppe) k (pp_expr ppe) v
 
       | _, _ ->
         Format.fprintf fmt "@[<hov 2>%a <-@ @[%a@]@];"
@@ -2752,7 +2769,7 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
     end
 
   | Srnd (lv, e) ->
-    Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@];"
+    Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@]@];"
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
