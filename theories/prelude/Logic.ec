@@ -65,6 +65,12 @@ pred (===) (f g : 'a -> 'b -> 'c) = forall x y, f x y = g x y.
 (* -------------------------------------------------------------------- *)
 axiom fun_ext ['a 'b] (f g:'a -> 'b): f = g <=> f == g.
 
+lemma fun_ext2 ['a 'b 'c] (f g : 'a -> 'b -> 'c) :
+  f = g <=> (forall x y, f x y = g x y).
+proof.
+by split=> [->//|eq]; apply/fun_ext=> x; apply/fun_ext=> y; apply/eq.
+qed.
+
 (* -------------------------------------------------------------------- *)
 pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
 
