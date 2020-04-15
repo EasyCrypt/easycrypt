@@ -1748,8 +1748,8 @@ let process_elimT qs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
 
   let (pf, pfty, _concl) =
-    match sform_of_form concl with
-    | SFquant (Lforall, (x, GTty xty), concl) -> (x, xty, concl)
+    match TTC.destruct_product hyps concl with
+    | Some (`Forall (x, GTty xty, concl)) -> (x, xty, concl)
     | _ -> noelim ()
   in
 
