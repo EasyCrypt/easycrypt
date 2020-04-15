@@ -1,6 +1,8 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List.
-require (*--*) Subtype Monoid Ring Subtype Bigalg.
+require import AllCore List Distr.
+require (*--*) Subtype Monoid Ring Subtype Bigalg StdBigop.
+
+import StdBigop.Bigreal.
 
 pragma -oldip.
 
@@ -352,6 +354,18 @@ apply: (@eq_trans _ E); rewrite offunM.
 + rewrite /E exchange_big &(eq_bigr) => /= l _.
   by rewrite mulr_suml &(eq_bigr) => /= k _.
 qed.
+
+op dmatrix (d : R distr) =
+  dmap
+    (djoin (nseq size (djoin (nseq size d))))
+    (fun xs : R list list => offunm (fun i j =>
+      nth witness (nth witness xs i) j
+    )).
+
+lemma dmatrix1E (d : R distr) (m : matrix) : mu1 (dmatrix d) m =
+  BRM.bigi predT (fun i => BRM.bigi predT (fun j => mu1 d m.[i, j]) 0 size) 0 size.
+proof. admitted.
+
 end Matrix.
 
 export Matrix.
