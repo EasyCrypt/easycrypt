@@ -886,11 +886,13 @@ sexpr_u:
 | op=loc(numop) ti=tvars_app?
     { peapp_symb op.pl_loc op.pl_desc ti [] }
 
-| se=sexpr DLBRACKET ti=tvars_app? e=expr RBRACKET
-   { peget (EcLocation.make $startpos $endpos) ti se e }
+| se=sexpr DLBRACKET ti=tvars_app? e=loc(plist1(expr, COMMA)) RBRACKET
+   { let e = List.reduce1 (fun _ -> lmap (fun x -> PEtuple x) e) (unloc e) in
+     peget (EcLocation.make $startpos $endpos) ti se e }
 
-| se=sexpr DLBRACKET ti=tvars_app? e1=expr LARROW e2=expr RBRACKET
-   { peset (EcLocation.make $startpos $endpos) ti se e1 e2 }
+| se=sexpr DLBRACKET ti=tvars_app? e1=loc(plist1(expr, COMMA)) LARROW e2=expr RBRACKET
+   { let e1 = List.reduce1 (fun _ -> lmap (fun x -> PEtuple x) e1) (unloc e1) in
+     peset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
 | TICKPIPE ti=tvars_app? e=expr PIPE
    { peapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
@@ -1127,11 +1129,15 @@ sform_u(P):
 | x=mident
    { PFmem x }
 
-| se=sform_r(P) DLBRACKET ti=tvars_app? e=form_r(P) RBRACKET
-   { pfget (EcLocation.make $startpos $endpos) ti se e }
+| se=sform_r(P) DLBRACKET ti=tvars_app? e=loc(plist1(form_r(P), COMMA)) RBRACKET
+   { let e = List.reduce1 (fun _ -> lmap (fun x -> PFtuple x) e) (unloc e) in
+     pfget (EcLocation.make $startpos $endpos) ti se e }
 
-| se=sform_r(P) DLBRACKET ti=tvars_app? e1=form_r(P) LARROW e2=form_r(P) RBRACKET
-   { pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
+| se=sform_r(P) DLBRACKET
+    ti=tvars_app? e1=loc(plist1(form_r(P), COMMA))LARROW e2=form_r(P)
+  RBRACKET
+   { let e1 = List.reduce1 (fun _ -> lmap (fun x -> PFtuple x) e1) (unloc e1) in
+     pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
 | x=sform_r(P) s=loc(pside)
    { PFside (x, s) }
