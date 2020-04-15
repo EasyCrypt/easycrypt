@@ -1,0 +1,357 @@
+(* -------------------------------------------------------------------- *)
+require import AllCore List.
+require (*--*) Subtype Monoid Ring Subtype Bigalg.
+
+pragma -oldip.
+
+(* -------------------------------------------------------------------- *)
+type R.
+
+clone import Ring.IDomain as ZR with type t <- R.
+clear [ZR.* ZR.AddMonoid.* ZR.MulMonoid.*].
+
+(* -------------------------------------------------------------------- *)
+clone import Bigalg.BigComRing as Big with
+  type t <- R,
+  pred CR.unit   <- ZR.unit,
+    op CR.zeror  <- ZR.zeror,
+    op CR.oner   <- ZR.oner,
+    op CR.( + )  <- ZR.( + ),
+    op CR.([-])  <- ZR.([-]),
+    op CR.( * )  <- ZR.( * ),
+    op CR.invr   <- ZR.invr,
+    op CR.intmul <- ZR.intmul,
+    op CR.ofint  <- ZR.ofint,
+    op CR.exp    <- ZR.exp.
+
+import BAdd.
+
+(* -------------------------------------------------------------------- *)
+op size : { int | 0 <= size } as ge0_size.
+
+(* -------------------------------------------------------------------- *)
+type vector.
+
+theory Vector.
+op tofunv : vector -> (int -> R).
+op offunv : (int -> R) -> vector.
+
+op prevector (f : int -> R) =
+  forall i, !(0 <= i < size) => f i = zeror.
+
+op vclamp (v : int -> R) : int -> R =
+  fun i => if 0 <= i < size then v i else zeror.
+
+axiom tofunv_prevector (v : vector) : prevector (tofunv v).
+axiom tofunvK : cancel tofunv offunv.
+axiom offunvK : forall v, tofunv (offunv v) = vclamp v.
+
+op "_.[_]" (v : vector) (i : int) = tofunv v i.
+
+lemma offunvE (v : int -> R) (i : int) : 0 <= i < size =>
+  (offunv v).[i] = v i.
+proof. by rewrite offunvK /vclamp => ->. qed.
+
+lemma getv_out (v : vector) (i : int) :
+  !(0 <= i < size) => v.[i] = zeror.
+proof. by move/(tofunv_prevector v). qed.
+
+lemma eq_vectorP (v1 v2 : vector) :
+  (v1 = v2) <=> (forall i, 0 <= i < size => v1.[i] = v2.[i]).
+proof. split=> [->//|eq_vi].
+have: vclamp (tofunv v1) = vclamp (tofunv v2).
++ by apply/fun_ext=> j @/vclamp; case: (0 <= j < size); try apply: eq_vi.
+by rewrite -!offunvK !tofunvK => /(congr1 offunv); rewrite !tofunvK.
+qed.
+
+lemma vectorW (P : vector -> bool) :
+  (forall f, prevector f => P (offunv f)) =>
+    forall v, P v.
+proof. by move=> ih v; rewrite -(tofunvK v) &(ih) tofunv_prevector. qed.
+
+op vectc c = offunv (fun _ => c).
+
+abbrev zerov = vectc zeror.
+
+lemma offunCE c i : 0 <= i < size => (vectc c).[i] = c.
+proof. by move=> ?; rewrite offunvE. qed.
+
+lemma offun0E i : zerov.[i] = zeror.
+proof. by rewrite /vectc offunvK /vclamp if_same. qed.
+
+hint simplify offun0E, offunCE.
+
+op (+) (v1 v2 : vector) = offunv (fun i => v1.[i] + v2.[i]).
+op [-] (v     : vector) = offunv (fun i => -v.[i]).
+
+lemma offunD (v1 v2 : vector) i :
+  (v1 + v2).[i] = v1.[i] + v2.[i].
+proof.
+case: (0 <= i < size) => [|/getv_out vi_eq0].
++ by move=> rg_i; rewrite offunvE.
++ by rewrite !vi_eq0 add0r.
+qed.
+
+hint simplify offunD.
+
+lemma offunN (v : vector) i : (-v).[i] = - v.[i].
+proof.
+case: (0 <= i < size) => [|/getv_out vi_eq0]; last by rewrite !vi_eq0 oppr0.
+by move=> rg_i; rewrite offunvE.
+qed.
+
+hint simplify offunN.
+
+clone import Ring.ZModule with type t <- vector,
+  op zeror <- Vector.zerov,
+  op (+)   <- Vector.( + ),
+  op [-]   <- Vector.([-])
+proof *.
+
+realize addrA. proof.
+move=> /vectorW v1 h1 /vectorW v2 h2 /vectorW v3 h3.
+by apply/eq_vectorP=> i hi; do! rewrite offunvE //=; rewrite addrA.
+qed.
+
+realize addrC. proof.
+move=> /vectorW v1 h1 /vectorW v2 h2; apply/eq_vectorP.
+by move=> i hi /=; rewrite addrC.
+qed.
+
+realize add0r. proof.
+by move=> /vectorW f hf; apply/eq_vectorP=> i hi /=; rewrite add0r.
+qed.
+
+realize addNr. proof.
+by move=> /vectorW f hf; apply/eq_vectorP=> i hi /=; rewrite addNr.
+qed.
+
+lemma offunB (v1 v2 : vector) i : (v1 - v2).[i] = v1.[i] - v2.[i].
+proof. done. qed.
+
+op dotp (v1 v2 : vector) =
+  bigi predT (fun i => v1.[i] * v2.[i]) 0 size.
+
+lemma dotpC : commutative dotp.
+proof.
+by move=> v1 v2; apply: eq_bigr=> i _ /=; rewrite mulrC.
+qed.
+
+lemma dotpDr v1 v2 v3 : dotp v1 (v2 + v3) = dotp v1 v2 + dotp v1 v3.
+proof.
+by rewrite /dotp -big_split &(eq_bigr) => i _ /=; rewrite mulrDr.
+qed.
+
+lemma dotpDl v1 v2 v3 : dotp (v1 + v2) v3 = dotp v1 v3 + dotp v2 v3.
+proof. by rewrite dotpC dotpDr !(dotpC v3). qed.
+end Vector.
+
+export Vector.
+
+(* -------------------------------------------------------------------- *)
+theory Matrix.
+type matrix.
+
+op tofunm : matrix -> (int -> int -> R).
+op offunm : (int -> int -> R) -> matrix.
+
+abbrev mrange (i j : int) =
+  0 <= i < size /\ 0 <= j < size.
+
+lemma nosmt mrangeL i j : mrange i j => 0 <= i < size.
+proof. by case. qed.
+
+lemma nosmt mrangeR i j : mrange i j => 0 <= j < size.
+proof. by case. qed.
+
+lemma nosmt mrangeC i j : mrange i j = mrange j i.
+proof. by apply: andbC. qed.
+
+op prematrix (f : int -> int -> R) =
+  forall i j, !mrange i j => f i j = zeror.
+
+op mclamp (m : int -> int -> R) : int -> int -> R =
+  fun i j : int => if mrange i j  then m i j else zeror.
+
+axiom tofunm_prematrix (m : matrix) : prematrix (tofunm m).
+axiom tofunmK : cancel tofunm offunm.
+axiom offunmK : forall m, tofunm (offunm m) = mclamp m.
+
+op "_.[_]" (m : matrix) (ij : int * int) = tofunm m ij.`1 ij.`2.
+
+lemma offunmE (m : int -> int -> R) (i j : int) :
+  mrange i j => (offunm m).[i, j] = m i j.
+proof. by rewrite /"_.[_]" offunmK /mclamp => -[-> ->]. qed.
+
+lemma getm_out (m : matrix) (i j : int) :
+  !mrange i j => m.[i, j] = zeror.
+proof. by move/(tofunm_prematrix m). qed.
+
+lemma getm_outL (m : matrix) (i j : int) :
+  !(0 <= i < size) => m.[i, j] = zeror.
+proof. by move=> Nrg; rewrite getm_out // negb_and Nrg. qed.
+
+lemma getm_outR (m : matrix) (i j : int) :
+  !(0 <= j < size) => m.[i, j] = zeror.
+proof. by move=> Nrg; rewrite getm_out // negb_and Nrg. qed.
+
+lemma eq_matrixP (m1 m2 : matrix) :
+  (m1 = m2) <=> (forall i j, mrange i j => m1.[i, j] = m2.[i, j]).
+proof. split=> [->//|eq_mi].
+have: mclamp (tofunm m1) = mclamp (tofunm m2).
++ by apply/fun_ext2 => i j @/mclamp; case _: (mrange _ _) => //= /eq_mi.
+by rewrite -!offunmK !tofunmK => /(congr1 offunm); rewrite !tofunmK.
+qed.
+
+lemma matrixW (P : matrix -> bool) :
+  (forall f, prematrix f => P (offunm f)) =>
+    forall v, P v.
+proof. by move=> ih m; rewrite -(tofunmK m) &(ih) tofunm_prematrix. qed.
+
+op matrixc (c : R) = offunm (fun _ _ => c).
+op diagc   (c : R) = offunm (fun i j => if i = j then c else zeror).
+
+abbrev zerom = matrixc zeror.
+abbrev onem  = diagc   oner .
+
+lemma offunCE c i j : mrange i j => (matrixc c).[i, j] = c.
+proof. by move=> -[??]; rewrite offunmE. qed.
+
+lemma offun0E i j : zerom.[i, j] = zeror.
+proof. by rewrite /matrixc /"_.[_]" offunmK /mclamp if_same. qed.
+
+lemma offun1E i j : mrange i j => onem.[i, j] =
+  if i = j then oner else zeror.
+proof. by move=> rg; rewrite offunmE. qed.
+
+lemma offun1_neqE i j : i <> j => onem.[i, j] = zeror.
+proof.
+move=> ne_ij; case: (mrange i j) => [rg|/getm_out ->//].
+by rewrite offun1E // ne_ij.
+qed.
+
+hint simplify offun0E, offunCE.
+
+op (+) (m1 m2 : matrix) = offunm (fun i j => m1.[i, j] + m2.[i, j]).
+op [-] (m     : matrix) = offunm (fun i j => -m.[i, j]).
+
+lemma offunD (m1 m2 : matrix) i j :
+  (m1 + m2).[i, j] = m1.[i, j] + m2.[i, j].
+proof.
+case: (mrange i j) => [|/getm_out mi_eq0].
++ by move=> rg_i; rewrite offunmE.
++ by rewrite !mi_eq0 addr0.
+qed.
+
+hint simplify offunD.
+
+lemma offunN (m : matrix) i j : (-m).[i, j] = - m.[i, j].
+proof.
+case: (mrange i j) => [|/getm_out mi_eq0].
++ by move=> rg_i; rewrite offunmE.
++ by rewrite !mi_eq0 oppr0.
+qed.
+
+hint simplify offunN.
+
+clone import Ring.ZModule with type t <- matrix,
+  op zeror <- Matrix.zerom,
+  op (+)   <- Matrix.( + ),
+  op [-]   <- Matrix.([-])
+proof *.
+
+realize addrA. proof.
+move=> /matrixW v1 h1 /matrixW v2 h2 /matrixW v3 h3.
+by apply/eq_matrixP=> i j hij; do! rewrite offunmE //=; rewrite addrA.
+qed.
+
+realize addrC. proof.
+move=> /matrixW v1 h1 /matrixW v2 h2; apply/eq_matrixP.
+by move=> i j hij /=; rewrite addrC.
+qed.
+
+realize add0r. proof.
+by move=> /matrixW f hf; apply/eq_matrixP=> i j hij /=; rewrite add0r.
+qed.
+
+realize addNr. proof.
+by move=> /matrixW f hf; apply/eq_matrixP=> i j hij /=; rewrite addNr.
+qed.
+
+lemma offunB (m1 m2 : matrix) i j : (m1 - m2).[i, j] = m1.[i, j] - m2.[i, j].
+proof. done. qed.
+
+op trace (m : matrix) =
+  bigi predT (fun i => m.[i, i]) 0 size.
+
+op trmx (m : matrix) =
+  offunm (fun i j => m.[j, i]).
+
+lemma trmxE (m : matrix) i j : (trmx m).[i, j] = m.[j, i].
+proof.
+case: (mrange i j) => [rg_ij|]; first by rewrite offunmE.
+by move=> h; rewrite !getm_out // mrangeC.
+qed.
+
+lemma trmxK (m : matrix) : trmx (trmx m) = m.
+proof.
+by apply/eq_matrixP => i j rg_ij; do! rewrite offunmE ?(mrangeC j) //=.
+qed.
+
+op ( * ) (m1 m2 : matrix) =
+  offunm (fun i j => bigi predT (fun k => m1.[i, k] * m2.[k, j]) 0 size).
+
+lemma offunM (m1 m2 : matrix) i j :
+  (m1 * m2).[i, j] = bigi predT (fun k => m1.[i, k] * m2.[k, j]) 0 size.
+proof.
+case: (mrange i j) => [rg_ij|Nrg_ij]; first by rewrite offunmE.
+rewrite getm_out // big1 // => /= k _; move: Nrg_ij.
+by rewrite negb_and => -[/getm_outL|/getm_outR] ->; rewrite ?(mulr0, mul0r).
+qed.
+
+hint simplify offunM.
+
+lemma mulmx1 : right_id onem Matrix.( * ).
+proof.
+move=> m; apply/eq_matrixP=> i j [rg_i rg_j] /=.
+rewrite (bigD1 _ _ j) ?(mem_range, range_uniq) //=.
+rewrite offun1E //= mulr1 big1 ?addr0 //= => k @/predC1 ne_kj.
+by rewrite offun1_neqE // mulr0.
+qed.
+
+lemma mul1mx : left_id onem Matrix.( * ).
+proof.
+move=> m; apply/eq_matrixP=> i j [rg_i rg_j] /=.
+rewrite (bigD1 _ _ i) ?(mem_range, range_uniq) //=.
+rewrite offun1E //= mul1r big1 ?addr0 //= => k @/predC1 ne_kj.
+by rewrite offun1_neqE 1:eq_sym // mul0r.
+qed.
+
+lemma mulmxDl (m1 m2 m : matrix) :
+  (m1 + m2) * m = (m1 * m) + (m2 * m).
+proof.
+apply/eq_matrixP=> i j rg_ij /=; rewrite -big_split /=.
+by apply/eq_bigr => k _ /=; rewrite mulrDl.
+qed.
+
+lemma mulmxDr (m1 m2 m : matrix) :
+  m * (m1 + m2) = (m * m1) + (m * m2).
+proof.
+apply/eq_matrixP=> i j rg_ij /=; rewrite -big_split /=.
+by apply/eq_bigr => k _ /=; rewrite mulrDr.
+qed.
+
+lemma mulmxA : associative Matrix.( * ).
+proof.
+move=> m1 m2 m3; apply/eq_matrixP=> i j rg_ij.
+pose M k l := m1.[i, k] * m2.[k, l] * m3.[l, j].
+pose E := bigi predT (fun k => bigi predT (M k) 0 size) 0 size.
+apply: (@eq_trans _ E); rewrite offunM.
++ apply: eq_bigr=> /= k _; rewrite mulr_sumr &(eq_bigr) /=.
+  by move=> l _; rewrite mulrA.
++ rewrite /E exchange_big &(eq_bigr) => /= l _.
+  by rewrite mulr_suml &(eq_bigr) => /= k _.
+qed.
+end Matrix.
+
+export Matrix.
