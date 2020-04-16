@@ -894,6 +894,16 @@ rewrite dlet1E muE; apply/eq_sum=> x /=.
 by rewrite massE MUnit.dunit1E /preim /pred1 /(\o); case: (f x = b).
 qed.
 
+lemma dmap1E_can ['a 'b] (d : 'a distr) (f : 'a -> 'b) (g : 'b -> 'a) (b : 'b) :
+     cancel g f
+  => (forall a, a \in d => g (f a) = a)
+  => mu1 (dmap d f) b = mu1 d (g b).
+proof.
+move=> can_fg can_gf; rewrite dmap1E &(mu_eq_support).
+move=> a ad @/(\o) @/pred1; apply/eq_iff; split; last exact: canLR.
+by move=> faE; move/can_gf: ad; rewrite faE.
+qed.
+
 lemma dmapE (d : 'a distr) (f : 'a -> 'b) (P : 'b -> bool):
   mu (dmap d f) P = mu d (P \o f).
 proof.
