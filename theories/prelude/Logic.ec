@@ -613,3 +613,11 @@ axiom nosmt eq_choice ['a] (P Q : 'a -> bool) (x0 : 'a):
 axiom nosmt funchoice ['a 'b] (P : 'a -> 'b -> bool):
      (forall x, exists y, P x y)
   => (exists f, forall x, P x (f x)).
+
+(* -------------------------------------------------------------------- *)
+op sempty ['a] (E : 'a -> bool) =
+  forall x, !E x.
+
+lemma semptyNP ['a] (E : 'a -> bool) :
+  !sempty E <=> exists x, E x.
+proof. by rewrite /sempty -negb_exists. qed.

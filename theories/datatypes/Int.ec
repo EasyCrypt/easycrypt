@@ -166,6 +166,17 @@ move=> {ih0 ihS} ih i; case: (lezWP 0 i); 1: by apply/ih.
 by move=> _ le0_i; apply/wlog/ih; rewrite oppz_ge0.
 qed.
 
+lemma nosmt intswlog (p:int -> bool):
+  ((forall i, 0 <= i => p i) => (forall i, i < 0 => p i)) =>
+  (p 0) =>
+  (forall i, 0 <= i => p i => p (i + 1)) =>
+  (forall i, p i).
+proof.
+move=> wlog ih0 ihS; have: forall i, 0 <= i => p i by elim/intind.
+move=> {ih0 ihS} ih i; case: (0 <= i); 1: by apply/ih.
+by rewrite lezNgt /=; apply/wlog/ih.
+qed.
+
 lemma nosmt sintind (p : int -> bool):
   (forall i, 0 <= i => (forall j, 0 <= j < i => p j) => p i) =>
   (forall i, 0 <= i => p i).
