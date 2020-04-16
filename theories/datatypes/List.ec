@@ -266,6 +266,13 @@ elim: s n => //= x s ih n; case: (n = 0) => [->|_ _].
   by smt w=(size_ge0). by rewrite ih /#.
 qed.
 
+lemma nth_change_dfl ['a] (x0 x1 : 'a) xs i :
+  0 <= i < size xs => nth x1 xs i = nth x0 xs i.
+proof.
+elim: xs i => /= [|x xs ih] i rgi; first by smt().
+case: (i = 0) => //= nz_i; apply: ih => /#.
+qed.
+
 lemma nth_neg (x0 : 'a) s n: n < 0 => nth x0 s n = x0.
 proof. by elim: s n => //= /#. qed.
 
