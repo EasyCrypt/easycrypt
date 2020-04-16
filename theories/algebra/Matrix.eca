@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List Distr.
+require import AllCore List Distr Perms.
 require (*--*) Subtype Monoid Ring Subtype Bigalg StdBigop.
 
 import StdBigop.Bigreal.
@@ -300,6 +300,18 @@ proof.
 by apply/eq_matrixP => i j rg_ij; do! rewrite offunmE ?(mrangeC j) //=.
 qed.
 
+lemma trmx1 : trmx onem = onem.
+proof.
+apply/eq_matrixP=> i j rgi; rewrite trmxE.
+by rewrite !offunmE ?(mrangeC j) //= (eq_sym j i).
+qed.
+
+lemma trmxD (m1 m2 : matrix) : trmx (m1 + m2) = trmx m1 + trmx m2.
+proof. by apply/eq_matrixP=> i j rg; rewrite /= !trmxE. qed.
+
+lemma trace_trmx m : trace (trmx m) = trace m.
+proof. by apply: eq_bigr=> /= i _; rewrite trmxE. qed.
+
 op ( * ) (m1 m2 : matrix) =
   offunm (fun i j => bigi predT (fun k => m1.[i, k] * m2.[k, j]) 0 size).
 
@@ -355,12 +367,99 @@ apply: (@eq_trans _ E); rewrite offunM.
   by rewrite mulr_suml &(eq_bigr) => /= k _.
 qed.
 
+lemma trmxM (m1 m2 : matrix) : trmx (m1 * m2) = trmx m2 * trmx m1.
+proof.
+apply/eq_matrixP=> i j rg; rewrite trmxE /=.
+by apply: eq_bigr => /= k _; rewrite !trmxE mulrC.
+qed.
+
+op ( *^ ) (m : matrix) (v : vector) : vector =
+  offunv (fun i => bigi predT (fun j => m.[i, j] * v.[j]) 0 size).
+
+op ( ^* ) (v : vector) (m : matrix) : vector =
+  offunv (fun j => bigi predT (fun i => v.[i] * m.[i, j]) 0 size).
+
+lemma mulmxTv (m : matrix) (v : vector) : (trmx m) *^ v = v ^* m.
+proof.
+apply/eq_vectorP=> i rgi; rewrite !offunvE //= &(eq_bigr) /=.
+by move=> j _; rewrite mulrC trmxE.
+qed.
+
+lemma mulmxv0 (m : matrix) : m *^ zerov = zerov.
+proof.
+apply/eq_vectorP => i rgi; rewrite !offunvE //=.
+by rewrite big1 // => /= j _; rewrite mulr0.
+qed.
+
+lemma mulmx1v (v : vector) : onem *^ v = v.
+proof.
+apply/eq_vectorP => i rgi; rewrite !offunvE //=.
+rewrite (bigD1 _ _ i) ?(mem_range, range_uniq) //=.
+rewrite offun1E //= mul1r big1 ?addr0 //= => j @/predC1.
+by move=> ne_ji; rewrite offun1_neqE // ?mul0r // eq_sym.
+qed.
+
+lemma mulmxvDl (m1 m2 : matrix) (v : vector) :
+  (m1 + m2) *^ v = m1 *^ v + m2 *^ v.
+proof.
+apply/eq_vectorP=> i rgi /=; rewrite !offunvE //=.
+by rewrite -big_split &(eq_bigr) => /= j _; rewrite mulrDl.
+qed.
+
+lemma mulmxvDr (m : matrix) (v1 v2 : vector) :
+  m *^ (v1 + v2) = m *^ v1 + m *^ v2.
+proof.
+apply/eq_vectorP=> i rgi /=; rewrite !offunvE //=.
+by rewrite -big_split &(eq_bigr) => /= j _; rewrite mulrDr.
+qed.
+
+lemma mulmxvA (m1 m2 : matrix) (v : vector) :
+  (m1 * m2) *^ v = m1 *^ (m2 *^ v).
+proof.
+apply/eq_vectorP=> i rgi; rewrite !offunvE //=.
+pose F j k := m1.[i,k] * m2.[k,j] * v.[j].
+pose E := bigi predT (fun j => bigi predT (F j) 0 size) 0 size.
+apply: (@eq_trans _ E).
++ by rewrite /E /F &(eq_bigr) => /= j _; rewrite mulr_suml.
+rewrite /E /F exchange_big !big_seq &(eq_bigr) /= => j.
+move/mem_range => rgj; rewrite offunvE //= mulr_sumr. 
+by apply: eq_bigr => /= k _; rewrite mulrA.
+qed.
+
+lemma mulvmxT (v : vector) (m : matrix) : v ^* (trmx m) = m *^ v.
+proof. by rewrite -{2}(trmxK m) eq_sym &(mulmxTv). qed.
+
+lemma mulv0mx (m : matrix) : zerov ^* m = zerov.
+proof. by rewrite -mulmxTv mulmxv0. qed.
+
+lemma mulvmx1 (v : vector) : v ^* onem = v.
+proof. by rewrite -mulmxTv trmx1 mulmx1v. qed.
+
+lemma mulvmxDr (v : vector) (m1 m2 : matrix) :
+  v ^* (m1 + m2) = v ^* m1 + v ^* m2.
+proof. by rewrite -mulmxTv trmxD mulmxvDl !mulmxTv. qed.
+
+lemma mulvmxDl (v1 v2 : vector) (m : matrix) :
+  (v1 + v2) ^* m = v1 ^* m + v2 ^* m.
+proof. by rewrite -mulmxTv mulmxvDr !mulmxTv. qed.
+
+lemma mulvmxA (v : vector) (m1 m2 : matrix) :
+  (v ^* m1) ^* m2 = v ^* (m1 * m2).
+proof. by rewrite -!mulmxTv trmxM mulmxvA. qed.
+
+op dvector (d : R distr) =
+  dmap (djoin (nseq size d)) (fun xs => offunv (nth witness xs)).
+
 op dmatrix (d : R distr) =
   dmap
     (djoin (nseq size (djoin (nseq size d))))
     (fun xs : R list list => offunm (fun i j =>
       nth witness (nth witness xs i) j
     )).
+
+lemma dvector1E (d : R distr) (v : vector) : mu1 (dvector d) v =
+  BRM.bigi predT (fun i => mu1 d v.[i]) 0 size.
+proof. admitted.
 
 lemma dmatrix1E (d : R distr) (m : matrix) : mu1 (dmatrix d) m =
   BRM.bigi predT (fun i => BRM.bigi predT (fun j => mu1 d m.[i, j]) 0 size) 0 size.
