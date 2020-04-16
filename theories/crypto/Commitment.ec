@@ -23,9 +23,9 @@ theory CommitmentProtocol.
     proc main(m: message) : bool = {
       var x, c, d, b;
 
-      x = S.gen();
-      (c, d) = S.commit(x, m);
-      b = S.verify(x, m, c, d);
+      x      <@ S.gen();
+      (c, d) <@ S.commit(x, m);
+      b      <@ S.verify(x, m, c, d);
 
       return b;
     }
@@ -43,11 +43,11 @@ theory CommitmentProtocol.
     proc main() : bool = {
       var b, b', m0, m1, x, c, d;
 
-      x = S.gen();
-      (m0, m1) = U.choose(x);
-      b =$ {0,1};
-      (c, d) = S.commit(x, b ? m1 : m0);
-      b' = U.guess(c);
+      x        <@ S.gen();
+      (m0, m1) <@ U.choose(x);
+      b        <$ {0,1};
+      (c, d)   <@ S.commit(x, b ? m1 : m0);
+      b'       <@ U.guess(c);
 
       return (b = b');
     }
@@ -67,10 +67,10 @@ theory CommitmentProtocol.
     proc main() : bool = {
       var x, c, m, m', d, d', v, v';
 
-      x = S.gen();
-      (c, m, d, m', d') = B.bind(x);
-      v  = S.verify(x, m , c, d );
-      v' = S.verify(x, m', c, d');
+      x                 <@ S.gen();
+      (c, m, d, m', d') <@ B.bind(x);
+      v                 <@ S.verify(x, m , c, d );
+      v'                <@ S.verify(x, m', c, d');
 
       return v /\ v' /\ (m <> m');
     }

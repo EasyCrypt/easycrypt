@@ -82,7 +82,7 @@ module Direct = {
   proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD \ X;
+    r <$ uD \ X;
     return r;
   }
 }.
@@ -91,9 +91,9 @@ module Indirect = {
   proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD;
+    r <$ uD;
     if (X r) {
-      r = $uD \ X;
+      r <$ uD \ X;
     }
     return r;
   }
@@ -203,7 +203,7 @@ section Upto.
     proc sample(X:D -> bool): D = {
       var r;
 
-      r = $uD;
+      r <$ uD;
       if (X r) {
         bad <- true;
         r <$ uD \ X;
@@ -358,25 +358,25 @@ section CollisionProbability.
 
     module FBounder = {
       proc f(x:D): D = {
-        var r = witness;
+        var r <- witness;
 
         if (c < q) {
           if (card (frng ARP.m) < q) {
-            r = ARP.f(x);
+            r <@ ARP.f(x);
           }
-          c = c + 1;
+          c <- c + 1;
         }
         return r;
       }
 
       proc fi(x:D): D = {
-        var r = witness;
+        var r <- witness;
 
         if (c < q) {
           if (card (frng ARP.mi) < q) {
-            r = ARP.fi(x);
+            r <@ ARP.fi(x);
           }
-          c = c + 1;
+          c <- c + 1;
         }
         return r;
       }

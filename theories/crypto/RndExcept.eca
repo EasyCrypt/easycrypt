@@ -58,8 +58,8 @@ abstract theory Adversary.
 
     proc sample (i:input, X:t list) = {
       var r: t;
-      r = witness;
-      if (test i X) r = O.sample(i,X);
+      r <- witness;
+      if (test i X) r <@ O.sample(i,X);
       return r;
     }
   }.
@@ -242,10 +242,10 @@ abstract theory AdversaryN.
 
      proc sample(i:input, X:t list) = {
       var r;
-      r = witness;
+      r <- witness;
       if (c < q) {
         r <@ O.sample(i,X);
-        c = c + 1;
+        c <- c + 1;
       }
       return r;
     }

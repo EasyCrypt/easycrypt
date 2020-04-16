@@ -278,7 +278,6 @@ section.
 
 end section.
 
-
 (* ------------------------------------------------------------------------- *)
 (* We show that UF reduce to UF1                                             *)
 (* ------------------------------------------------------------------------- *)
@@ -338,7 +337,7 @@ abstract theory UF1_UF.
     var c: int
     module WO : OrclUF = {
       proc keygen() = {
-        var pk = witness;
+        var pk <- witness;
         if (c < q_gen) {
           pk <@ O.keygen();
           c <- c + 1;
@@ -365,7 +364,7 @@ abstract theory UF1_UF.
 
      module WO = {
        proc keygen () = {
-         var pk = witness;
+         var pk <- witness;
          if (WAkg.c < q_gen) {
            if (WAkg.c = i) {
               if (RealSigServ.count_pk < q_gen) {
@@ -381,7 +380,7 @@ abstract theory UF1_UF.
        }
 
        proc sign(pk : pkey, m : message) : signature option = {
-         var so : signature option = None;
+         var so : signature option <- None;
          var s : signature;
          if (count_sig < q_sig) {
             if (mpki.[pk] = Some i) {
@@ -429,7 +428,7 @@ abstract theory UF1_UF.
 
       module WO = {
         proc keygen () = {
-          var pk = witness;
+          var pk <- witness;
           if (WAkg.c < q_gen) {
             pk <@ O.keygen();
             if (! pk \in MkAdvUF1.mpki) MkAdvUF1.mpki.[pk] <- WAkg.c;
@@ -530,7 +529,7 @@ abstract theory UF1_UF.
       module WO = {
         proc keygen () = {
           var sk;
-          var pk = witness;
+          var pk <- witness;
           if (WAkg.c < q_gen) {
             if (WAkg.c = MkAdvUF1.i) {
               if (RealSigServ.count_pk < q_gen) {

@@ -80,9 +80,9 @@ module OW(I :Inverter) ={
     var pk:pkey;
     var sk:skey;
 
-    (pk,sk) = $dkeys;
-    x       = $challenge pk;
-    x'      = I.invert(pk,f pk x);
+    (pk,sk) <$ dkeys;
+    x       <$ challenge pk;
+    x'      <@ I.invert(pk,f pk x);
     return (x = x');
   }
 }.
