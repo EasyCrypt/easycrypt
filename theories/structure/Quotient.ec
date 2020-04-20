@@ -95,4 +95,34 @@ realize reprK. proof.
 by move=> q; rewrite /pi /repr /insubd canon_iscanon 1:valP valK.
 qed.
 
+lemma eqv_pi : forall x y , eqv x y <=> pi x = pi y.
+proof.
+move => x y.
+split.
++ move => eqvxy.
+  rewrite /pi.
+  congr.
+  by apply eqv_canon_eq.
++ rewrite /pi /insubd.
+  case (insubP (canon x)) => [[ux [cx [sx vx]]] | [cx sx]] ; case (insubP (canon y)) => [[uy [cy [sy vy]]] | [cy sy] | [uy [cy [sy vy]]] | [cy sy]] ; rewrite sx sy //=.
+  - move => equ.
+    apply (eqv_trans (canon x)) ; [apply eqv_canon|].
+    apply (eqv_trans (canon y)) ; [|apply eqv_sym;apply eqv_canon].
+    rewrite - vx -vy equ.
+    by apply eqv_refl.
+  - by rewrite /iscanon canonK //= in cy.
+  - by rewrite /iscanon canonK //= in cx.
+  - by rewrite /iscanon canonK //= in cy.
+qed.
+
+lemma eqvP : forall x, eqv x (repr (pi x)).
+proof.
+move => x.
+rewrite /pi /repr.
+case (insubP (canon x)) => [[ux [cx [sx vx]]] | [cx sx]].
++ rewrite - vx valKd vx.
+  by apply eqv_canon.
++ by rewrite /iscanon canonK //= in cx.
+qed.
+
 end EquivQuotient.
