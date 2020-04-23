@@ -35,31 +35,26 @@ module Game (D : Distinguisher) (O : Oracles) = {
   }
 }.
 
+clone PROM.FullRO as ROa with
+  type in_t    <- t_in,
+  type out_t   <- a,
+  type d_in_t  <- d_input,
+  type d_out_t <- d_output,
+  op   dout  _ <- da.
 
-clone PROM.GenEager as ROa with
-  type from <- t_in,
-  type to   <- a,
-  type input <- d_input,
-  type output <- d_output,
-  op sampleto <- fun _ => da
-proof * by smt(da_ll).
+clone PROM.FullRO as ROb with
+  type in_t    <- t_in,
+  type out_t   <- b,
+  type d_in_t  <- d_input,
+  type d_out_t <- d_output,
+  op   dout  _ <- db.
 
-clone PROM.GenEager as ROb with
-  type from <- t_in,
-  type to   <- b,
-  type input <- d_input,
-  type output <- d_output,
-  op sampleto <- fun _ => db
-proof * by smt(db_ll).
-
-clone PROM.GenEager as ROab with
-  type from <- t_in,
-  type to   <- a * b,
-  type input <- d_input,
-  type output <- d_output,
-  op sampleto <- fun _ => dab
-proof * by smt(weight_dprod da_ll db_ll). 
-
+clone PROM.FullRO as ROab with
+  type in_t    <- t_in,
+  type out_t   <- a * b,
+  type d_in_t  <- d_input,
+  type d_out_t <- d_output,
+  op   dout  _ <- dab.
 
 module O1 (O : ROab.RO) : Oracles = {
   proc init () = {
@@ -93,30 +88,30 @@ module O2 (Oa : ROa.RO) (Ob : ROb.RO) = {
   proc fb = Ob.get
 }.
 
-
-
 section.
 declare module D : 
   Distinguisher { ROa.RO, ROa.FRO, ROb.RO, ROb.FRO, ROab.RO, ROab.FRO }.
-
 
 local module O3 (Oa : ROa.RO) (Ob : ROb.RO) = {
   proc init () = {
     Oa.init();
     Ob.init();
   }
+
   proc f (m : t_in) = {
     var xa, xb;
     xa <@ Oa.get(m);
     xb <@ Ob.get(m);
     return (xa,xb);
   }
+
   proc fa (m : t_in) = {
     var xa;
     xa <@ Oa.get(m);
     Ob.sample(m);
     return xa;
   }
+
   proc fb (m : t_in) = {
     var xb;
     xb <@ Ob.get(m);
@@ -205,7 +200,7 @@ smt(mem_empty fdom0).
 qed.
 
 local equiv eq_2 :
-  D(O3(ROa.LRO,ROb.LRO)).distinguish ~ D(O2(ROa.RO,ROb.RO)).distinguish :
+  D(O3(ROa.FullEager.LRO,ROb.FullEager.LRO)).distinguish ~ D(O2(ROa.RO,ROb.RO)).distinguish :
   ={arg, glob D, ROa.RO.m, ROb.RO.m} ==>
   ={res, glob D, ROa.RO.m, ROb.RO.m}.
 proof.
@@ -227,16 +222,16 @@ transitivity Game(D, O3(ROa.RO, ROb.RO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + by conseq eq_1=> />.
-transitivity Game(D, O3(ROa.LRO, ROb.RO)).main
+transitivity Game(D, O3(ROa.FullEager.LRO, ROb.RO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + proc; inline*. 
-  by call(ROa.RO_LRO_D (D1(ROb.RO))); auto.
-transitivity Game(D, O3(ROa.LRO, ROb.LRO)).main
+  by call(ROa.FullEager.RO_LRO_D (D1(ROb.RO)) da_ll); auto.
+transitivity Game(D, O3(ROa.FullEager.LRO, ROb.FullEager.LRO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + proc; inline*. 
-  by call(ROb.RO_LRO_D (D2(ROa.LRO))); auto.
+  by call(ROb.FullEager.RO_LRO_D (D2(ROa.FullEager.LRO)) db_ll); auto.
 by proc; inline*; call eq_2; auto.
 qed.
 
