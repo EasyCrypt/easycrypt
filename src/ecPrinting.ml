@@ -1707,12 +1707,16 @@ and pp_cost ppe fmt c =
   let pp_el fmt (f,c) = match f with
     | None ->
       pp_form ppe fmt c
-    | Some (f, _f_cost) ->      (* _f_cost here to help debugging *)
-      (* Format.fprintf fmt "%a : %a" *)
-      Format.fprintf fmt "%a `{%a} : %a"
+    | Some (f, _f_cost) ->
+      Format.fprintf fmt "%a : %a"
         (pp_funname ppe) f
-        (pp_form ppe) _f_cost
-        (pp_form ppe) c in
+        (pp_form ppe) c
+      (* We can print_f_cost here, for debugging purposes. *)
+      (* Format.fprintf fmt "%a `{%a} : %a"
+       *   (pp_funname ppe) f
+       *   (pp_form ppe) _f_cost
+       *   (pp_form ppe) c  *)
+  in
 
   Format.fprintf fmt "@[<hv 1>[%a]@]"
     (pp_list ";@ " pp_el)

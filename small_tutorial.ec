@@ -183,12 +183,27 @@ module (MyAdv : Adv) (H0 : H) = {
   }
 }.
 
+
 lemma MyAdv_compl (k : int) (H0   <: H [o : `{k}]) : 
     choare[MyAdv(H0).a] 
       time [3; H0.o : 2].
 proof.
   proc; do !(call(_: true; time [])); auto => /=.
 qed.
+
+(* The same lemma, but in a section. *)
+section.
+op mk : int.
+declare module H0 : H [ o : `{mk}].
+
+lemma MyAdv_compl_loc : 
+    choare[MyAdv(H0).a] 
+    time [3; H0.o : 2].
+    proof.
+      proc; do !(call(_: true; time [])); auto => /=.
+  qed.
+  end section.
+  print MyAdv_compl_loc.
 
 module (MyH : H) = { 
   proc o () = {
