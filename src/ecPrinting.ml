@@ -1779,12 +1779,6 @@ and pp_mem_restr ppe fmt mr =
   let pp_top fmt b =
     if b then Format.fprintf fmt "%s" all_mem_sym else () in
 
-  let printed = ref (not @@ EcPath.Sx.is_empty mr.mr_xpaths.ur_neg) in
-  let pp_sep fmt b =
-    let b' = (not b) && !printed in
-    printed := !printed || not b;
-    if b' then Format.fprintf fmt ",@ " else () in
-
   let xpos_emp =
     EcPath.Sx.is_empty (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos) in
   let mpos_emp =
@@ -1792,20 +1786,26 @@ and pp_mem_restr ppe fmt mr =
   let all_mem =
     mr.mr_xpaths.ur_pos = None || mr.mr_mpaths.ur_pos = None in
 
+  let printed = ref (all_mem) in
+  let pp_sep fmt b =
+    let b' = (not b) && !printed in
+    printed := !printed || not b;
+    if b' then Format.fprintf fmt ",@ " else () in
+
   if all_mem &&
      EcPath.Sm.is_empty mr.mr_mpaths.ur_neg &&
      EcPath.Sx.is_empty mr.mr_xpaths.ur_neg
   then ()
   else Format.fprintf fmt "@[<h>{%a%a%a%a%a%a%a%a%a}@]@ "
-      (pp_rx false) mr.mr_xpaths.ur_neg
-      pp_sep (EcPath.Sm.is_empty mr.mr_mpaths.ur_neg)
-      (pp_r false) mr.mr_mpaths.ur_neg
+      pp_top (all_mem)
       pp_sep xpos_emp
       (pp_rx true) (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos)
       pp_sep mpos_emp
       (pp_r true) (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)
-      pp_sep (not all_mem)
-      pp_top (all_mem)
+      pp_sep (EcPath.Sx.is_empty mr.mr_xpaths.ur_neg)
+      (pp_rx false) mr.mr_xpaths.ur_neg
+      pp_sep (EcPath.Sm.is_empty mr.mr_mpaths.ur_neg)
+      (pp_r false) mr.mr_mpaths.ur_neg
 
 (* -------------------------------------------------------------------- *)
 (* Use in an hv box. *)
