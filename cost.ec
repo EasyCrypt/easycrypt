@@ -213,7 +213,7 @@ module IW (A : Adv) (H : Oracle) = {
     r <- witness; 
     qs0 <- qs;
     while (qs0 <> []){
-      x = head witness qs0; 
+      x <- head witness qs0; 
       if (f pk x = y) {
         r <- x; qs0 <- [];
       } else {
@@ -278,33 +278,33 @@ lemma bound_i
           H.init : 1].
   proof.
   move => hk1 hk2; proc.
-  seq 5 : (size IW.qs <= k1 + k2) [kloop k1 k2].
+  seq 5 : (size IW.qs <= k1 + k2) time [kloop k1 k2].
   call (_: true ;
     (IW(A, H).QRO.o : size IW.qs - k1)
     time
-    (IW(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
+    [(IW(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1])])
   => * /=.
 
   (* The invariant is preserved by calls to the oracle QRO. *)
-  proc; call (_: true; time); auto => * /=; first by smt ().
+  proc; call (_: true; time []); auto => * /=; first by smt ().
 
   rnd. 
   call (_: true;
     (IW(A, H).QRO.o : size IW.qs)
     time
-    (IW(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1]))
+    [(IW(A, H).QRO.o : [fun _ => 1; H.o : fun _ => 1])])
   => * /=.
 
   (* The invariant is preserved by calls to the oracle QRO. *)
-  proc; call (_: true; time); auto => * => /=; [1: by smt ()].
+  proc; call (_: true; time []); auto => * => /=; [1: by smt ()].
 
-  call (_: true; time); auto ; move => * /=.
+  call (_: true; time []); auto ; move => * /=.
   split; move => * /=; first by smt (dptxt_ll).  
   rewrite !big_constz !count_predT !size_range; by smt (kfp).
 
   (* we bound the list lookup time. *)
   (* wp : (size I.qs <= k1 + k2). *)
-  while (true) (size qs0) (k1 + k2) [fun _ => 4 + kf].
+  while (true) (size qs0) (k1 + k2) time [fun _ => 4 + kf].
   + move => z /=; auto => * /=; split; [2 : by smt (kfp)]. 
     move : H0; case: (qs0{hr}); first by smt (). 
     move => x0 l; have := size_ge0 l; by smt (). 

@@ -149,7 +149,7 @@ proc => /=.
    - deacreasing quantity qdec
    - number of loop iterations
    - cost of one loop body, when (qdec = k), given using a lambda. *)
-while (x <= y /\ y = b) (b - x) (b - a) [fun _ => 1].
+while (x <= y /\ y = b) (b - x) (b - a) time [fun _ => 1].
 
 (* prove that the loop body preserves the invariant, and cost what was stated. *)
 move => z; auto => * /=; by smt ().
@@ -187,7 +187,7 @@ lemma MyAdv_compl (k : int) (H0   <: H [o : `{k}]) :
     choare[MyAdv(H0).a] 
       time [3; H0.o : 2].
 proof.
-  proc; do !(call(_: true; time)); auto => /=.
+  proc; do !(call(_: true; time [])); auto => /=.
 qed.
 
 module (MyH : H) = { 
@@ -223,8 +223,8 @@ lemma Inv_compl
     choare[Inv(Adv0, H0).i] time [1; Adv0.a : 1; H0.o : k ].
 proof.    
   move => hk; proc. 
-  call(_: true; time (H0.o : [fun _ => 0; H0.o : fun _ => 1])).
-  move => * /=; proc*; call(_: true; time); auto => /=.
+  call(_: true; time [(H0.o : [fun _ => 0; H0.o : fun _ => 1])]).
+  move => * /=; proc*; call(_: true; time []); auto => /=.
   auto => /=.
   rewrite !big_constz !count_predT !size_range; by smt ().
 qed.

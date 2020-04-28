@@ -2610,8 +2610,8 @@ conseq_xt:
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
                                                { (None, None), 
 						 Some (CQI_bd (cmp, bd)) }
-| c=conseq   COLON co=costs(none)              { c, Some (CQI_c co) }
-| UNDERSCORE COLON co=costs(none)              { (None, None), Some (CQI_c co) }
+| c=conseq   COLON TIME co=costs(none)         { c, Some (CQI_c co) }
+| UNDERSCORE COLON TIME co=costs(none)         { (None, None), Some (CQI_c co) }
 
 ci_cost_el:
 | LPAREN o=loc(fident) COLON co=costs(none) RPAREN   {o,co}
@@ -2620,7 +2620,7 @@ ci_vrnt_el:
 | LPAREN o=loc(fident) COLON f=form RPAREN           {o,f} 
 
 abs_call_info:
-| xv=rlist0(ci_vrnt_el, COMMA) TIME xc=rlist0(ci_cost_el, COMMA) 
+| xv=rlist0(ci_vrnt_el, COMMA) TIME LBRACKET xc=rlist0(ci_cost_el, COMMA) RBRACKET
                                      { { ci_oracles = xc;
 					 ci_vrnts   = xv; } }
 
@@ -2692,7 +2692,7 @@ while_tac_info:
 | inv=sform vrnt=sform k=sform eps=sform
     { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (`Bd (k, eps)); } }
 
-| inv=sform vrnt=sform k=sform co=costs(none)
+| inv=sform vrnt=sform k=sform TIME co=costs(none)
     { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (`Cost (k, co)); } }
 
 async_while_tac_info:
@@ -2780,7 +2780,7 @@ app_bd_info:
 | f=sform
     { PAppSingle f }
 
-| co=costs(none)
+| TIME co=costs(none)
     { PAppCost co }
 
 | f=prod_form g=prod_form s=sform?
