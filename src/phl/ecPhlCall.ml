@@ -428,12 +428,9 @@ let process_call side info tc =
       let (_,f,_) = fst (tc1_last_call tc chs.chs_s) in
       let penv = LDecl.inv_memenv1 hyps in
       (penv, fun inv inv_info ->
+          let inv_info = odfl (`CostAbs ([],[])) inv_info in
           match inv_info with
-          | None ->
-            tc_error !!tc "must supply additional information for call with \
-                           an invariant if the conclusion is a choare"
-
-          | Some (`Std c) ->
+          | `Std c ->
             let env = FApi.tc1_env tc in
             if NormMp.is_abstract_fun f env then
               tc_error !!tc "the procedure %a is abstract: costs information \
@@ -443,7 +440,7 @@ let process_call side info tc =
 
             f_cHoareF inv f inv c
 
-          | Some (`CostAbs inv_inf) ->
+          | `CostAbs inv_inf ->
             let env = FApi.tc1_env tc in
             if not @@ NormMp.is_abstract_fun f env then
               tc_error !!tc "the procedure %a is not abstract: only a cost must \
@@ -521,7 +518,8 @@ let process_call side info tc =
       let inv_inf = process_inv_inf tc env inv_inf in
       subtactic := (fun tc ->
           (* TODO: (Adrien) What does this subtactic do? It needs to be
-             modified, since I create more premises for choare judgement. *)
+             modified, since I create more premises for choare judgement.
+             FApi.tcenv_of_tcenv1 tc *)
         FApi.t_firsts t_logic_trivial 2 (EcPhlFun.t_fun inv inv_inf tc));
       fmake inv inv_inf
 

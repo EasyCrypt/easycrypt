@@ -286,7 +286,7 @@ lemma bound_i
   => * /=.
 
   (* The invariant is preserved by calls to the oracle QRO. *)
-  proc; call (_: true; time []); auto => * /=; first by smt ().
+  proc; call (_: true); auto => * /=; first by smt ().
 
   rnd. 
   call (_: true;
@@ -296,9 +296,9 @@ lemma bound_i
   => * /=.
 
   (* The invariant is preserved by calls to the oracle QRO. *)
-  proc; call (_: true; time []); auto => * => /=; [1: by smt ()].
+  proc; call (_: true); auto => * => /=; [1: by smt ()].
 
-  call (_: true; time []); auto ; move => * /=.
+  call (_: true); auto ; move => * /=.
   split; move => * /=; first by smt (dptxt_ll).  
   rewrite !big_constz !count_predT !size_range; by smt (kfp).
 

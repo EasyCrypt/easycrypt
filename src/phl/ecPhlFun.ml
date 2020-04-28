@@ -685,7 +685,8 @@ let proj_std a = match a with
   | _ -> assert false
 
 let proj_costabs a = match a with
-  | `CostAbs b -> b
+  | None -> ([],[])
+  | Some (`CostAbs b) -> b
   | _ -> assert false
 
 let t_fun_r inv inv_inf tc =
@@ -701,7 +702,7 @@ let t_fun_r inv inv_inf tc =
     let env = FApi.tc1_env tc in
     let h   = destr_cHoareF (FApi.tc1_goal tc) in
     if   NormMp.is_abstract_fun h.chf_f env
-    then t_choareF_abs inv (proj_costabs (oget inv_inf)) tc
+    then t_choareF_abs inv (proj_costabs inv_inf) tc
     else begin
       t_choareF_fun_def tc end
 
