@@ -1,5 +1,5 @@
 require import Distr DBool Int List CHoareTactic StdBigop.
-import Bigint IntExtra.
+import Bigint IntExtra BIA.
 require BitWord ROM.
 
 (*****************)
@@ -108,16 +108,9 @@ op kf : int.
 axiom kfp : 0 <= kf.
 schema cost_f `{P} {pk : pkey} {r : rand} : cost[P : f pk r] = kf.
 
-hint simplify cost_witness.
-hint simplify cost_eq.
-hint simplify cost_deq.
-hint simplify cost_cons.
-hint simplify cost_nil.
-hint simplify cost_head.
-hint simplify cost_drop.
-hint simplify cost_pp.
-hint simplify cost_dptxt.
-hint simplify cost_f.
+hint simplify
+  cost_witness, cost_eq, cost_deq, cost_cons, cost_nil, 
+  cost_head, cost_drop, cost_pp, cost_dptxt, cost_f.
 
 (************************************************************************)
 module type Oracle = {
@@ -157,6 +150,7 @@ module type OAdvBis (H1 : Oracle, H : AOracle)
   proc a1(p:pkey): (ptxt * ptxt)
   proc a2(c:ctxt): bool
 }.
+
 (*****************************************)
 
 (* Inverter *)
