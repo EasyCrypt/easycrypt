@@ -122,7 +122,7 @@ hint simplify cost_lt.
 
 (* For if statements, to keep cost expressions simpler, we do not use
     a max. Instead, we add the cost of both branches. *)
-lemma foo4 : choare[C.f : true ==> true] time [5].
+lemma foo4 : choare[C.f] time [5].
 proof.
 proc; auto.
 qed.

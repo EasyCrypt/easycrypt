@@ -1602,11 +1602,12 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
     let ppepr = PPEnv.create_and_push_mem ppe ~active:true mepr in
     let ppepo = PPEnv.create_and_push_mem ppe ~active:true mepo in
     if f_equal chf.chf_pr f_true && f_equal chf.chf_po f_true then
-      Format.fprintf fmt "choare[@[<hov 2>%a@]] time %a"
+      Format.fprintf fmt "@[<hov 2>choare[@[<hov 2>%a@]]@ time %a@]"
         (pp_funname ppe) chf.chf_f
         (pp_cost ppe) chf.chf_co
     else
-      Format.fprintf fmt "choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time %a"
+      Format.fprintf fmt "@[<hov 2>choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]\
+                          @ time %a@]"
         (pp_funname ppe) chf.chf_f
         (pp_form ppepr) chf.chf_pr
         (pp_form ppepo) chf.chf_po
@@ -1614,7 +1615,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | FcHoareS chs ->
       let ppe = PPEnv.push_mem ppe ~active:true chs.chs_m in
-      Format.fprintf fmt "choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] time %a"
+      Format.fprintf fmt "@[<hov 2>choare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]\
+                          @ time %a@]"
         (pp_stmt_for_form ppe) chs.chs_s
         (pp_form ppe) chs.chs_pr
         (pp_form ppe) chs.chs_po
@@ -1790,21 +1792,25 @@ and pp_mem_restr ppe fmt mr =
   let all_mem =
     mr.mr_xpaths.ur_pos = None || mr.mr_mpaths.ur_pos = None in
 
-  Format.fprintf fmt "@[<h>{%a%a%a%a%a%a%a%a%a}@]"
-    (pp_rx false) mr.mr_xpaths.ur_neg
-    pp_sep (EcPath.Sm.is_empty mr.mr_mpaths.ur_neg)
-    (pp_r false) mr.mr_mpaths.ur_neg
-    pp_sep xpos_emp
-    (pp_rx true) (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos)
-    pp_sep mpos_emp
-    (pp_r true) (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)
-    pp_sep (not all_mem)
-    pp_top (all_mem)
+  if all_mem &&
+     EcPath.Sm.is_empty mr.mr_mpaths.ur_neg &&
+     EcPath.Sx.is_empty mr.mr_xpaths.ur_neg
+  then ()
+  else Format.fprintf fmt "@[<h>{%a%a%a%a%a%a%a%a%a}@]@ "
+      (pp_rx false) mr.mr_xpaths.ur_neg
+      pp_sep (EcPath.Sm.is_empty mr.mr_mpaths.ur_neg)
+      (pp_r false) mr.mr_mpaths.ur_neg
+      pp_sep xpos_emp
+      (pp_rx true) (odfl EcPath.Sx.empty mr.mr_xpaths.ur_pos)
+      pp_sep mpos_emp
+      (pp_r true) (odfl EcPath.Sm.empty mr.mr_mpaths.ur_pos)
+      pp_sep (not all_mem)
+      pp_top (all_mem)
 
 (* -------------------------------------------------------------------- *)
 (* Use in an hv box. *)
 and pp_restr ppe fmt mr =
-  Format.fprintf fmt "%a@ %a"
+  Format.fprintf fmt "%a%a"
     (pp_mem_restr ppe) mr
     (pp_orclinfos ppe) mr.mr_oinfos
 
