@@ -772,6 +772,74 @@ let process_rewrite ttenv ?target ri tc =
   List.fold_lefti do1 (tcenv_of_tcenv1 tc) ri
 
 (* -------------------------------------------------------------------- *)
+let process_elimT qs tc =
+  let noelim () = tc_error !!tc "cannot recognize elimination principle" in
+
+  let (hyps, concl) = FApi.tc1_flat tc in
+
+  let (pf, pfty, _concl) =
+    match TTC.destruct_product hyps concl with
+    | Some (`Forall (x, GTty xty, concl)) -> (x, xty, concl)
+    | _ -> noelim ()
+  in
+
+  let pf = LDecl.fresh_id hyps (EcIdent.name pf) in
+  let tc = t_intros_i_1 [pf] tc in
+
+  let (hyps, concl) = FApi.tc1_flat tc in
+
+  let pt = PT.tc1_process_full_pterm tc qs in
+
+  let (_xp, xpty, ax) =
+    match TTC.destruct_product hyps pt.ptev_ax with
+    | Some (`Forall (xp, GTty xpty, f)) -> (xp, xpty, f)
+    | _ -> noelim ()
+  in
+
+  begin
+    let ue = pt.ptev_env.pte_ue in
+    try  EcUnify.unify (LDecl.toenv hyps) ue (tfun pfty tbool) xpty
+    with EcUnify.UnificationFailure _ -> noelim ()
+  end;
+
+  if not (PT.can_concretize pt.ptev_env) then noelim ();
+
+  let ax = PT.concretize_form pt.ptev_env ax in
+
+  let rec skip ax =
+    match TTC.destruct_product hyps ax with
+    | Some (`Imp (_f1, f2)) -> skip f2
+    | Some (`Forall (x, GTty xty, f)) -> ((x, xty), f)
+    | _ -> noelim ()
+  in
+
+  let ((x, _xty), ax) = skip ax in
+
+  let fpf  = f_local pf pfty in
+
+  let ptnpos = FPosition.select_form hyps None fpf concl in
+  let (_xabs, body) = FPosition.topattern ~x:x ptnpos concl in
+
+  let rec skipmatch ax body sk =
+    match TTC.destruct_product hyps ax, TTC.destruct_product hyps body with
+    | Some (`Imp (i1, f1)), Some (`Imp (i2, f2)) ->
+        if   EcReduction.is_alpha_eq hyps i1 i2
+        then skipmatch f1 f2 (sk+1)
+        else sk
+    | _ -> sk
+  in
+
+  let sk = skipmatch ax body 0 in
+
+  t_seqs
+    [t_elimT_form (fst (PT.concretize pt)) ~sk fpf;
+     t_or
+       (t_clear pf)
+       (t_seq (t_generalize_hyp pf) (t_clear pf));
+     t_simplify_with_info EcReduction.beta_red]
+    tc
+
+(* -------------------------------------------------------------------- *)
 let process_view1 pe tc =
   let module E = struct
     exception NoInstance
@@ -819,7 +887,10 @@ let process_view1 pe tc =
 
   try
     match TTC.destruct_product (tc1_hyps tc) (FApi.tc1_goal tc) with
-    | None | Some (`Forall _) -> raise E.NoTopAssumption
+    | None -> raise E.NoTopAssumption
+
+    | Some (`Forall _) ->
+      process_elimT pe tc
 
     | Some (`Imp (f1, _)) when pe.fp_head = FPCut None ->
         let hyps = FApi.tc1_hyps tc in
@@ -1223,7 +1294,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
           tc_error !!g "invalid intro-pattern: nothing to eliminate"
     in
 
-    if nointro && not cf then  onsub gs else begin
+    if nointro && not cf then onsub gs else begin
       match pis with
       | [] -> t_onall tc gs
       | _  -> t_onall (fun gs -> onsub (tc gs)) gs
@@ -1751,74 +1822,6 @@ let process_split (tc : tcenv1) =
   try  t_ors [EcLowGoal.t_split; EcLowGoal.t_split_prind] tc
   with InvalidGoalShape ->
     tc_error !!tc "cannot apply `split` on that goal"
-
-(* -------------------------------------------------------------------- *)
-let process_elimT qs tc =
-  let noelim () = tc_error !!tc "cannot recognize elimination principle" in
-
-  let (hyps, concl) = FApi.tc1_flat tc in
-
-  let (pf, pfty, _concl) =
-    match sform_of_form concl with
-    | SFquant (Lforall, (x, GTty xty), concl) -> (x, xty, concl)
-    | _ -> noelim ()
-  in
-
-  let pf = LDecl.fresh_id hyps (EcIdent.name pf) in
-  let tc = t_intros_i_1 [pf] tc in
-
-  let (hyps, concl) = FApi.tc1_flat tc in
-
-  let pt = PT.tc1_process_full_pterm tc qs in
-
-  let (_xp, xpty, ax) =
-    match TTC.destruct_product hyps pt.ptev_ax with
-    | Some (`Forall (xp, GTty xpty, f)) -> (xp, xpty, f)
-    | _ -> noelim ()
-  in
-
-  begin
-    let ue = pt.ptev_env.pte_ue in
-    try  EcUnify.unify (LDecl.toenv hyps) ue (tfun pfty tbool) xpty
-    with EcUnify.UnificationFailure _ -> noelim ()
-  end;
-
-  if not (PT.can_concretize pt.ptev_env) then noelim ();
-
-  let ax = PT.concretize_form pt.ptev_env ax in
-
-  let rec skip ax =
-    match TTC.destruct_product hyps ax with
-    | Some (`Imp (_f1, f2)) -> skip f2
-    | Some (`Forall (x, GTty xty, f)) -> ((x, xty), f)
-    | _ -> noelim ()
-  in
-
-  let ((x, _xty), ax) = skip ax in
-
-  let fpf  = f_local pf pfty in
-
-  let ptnpos = FPosition.select_form hyps None fpf concl in
-  let (_xabs, body) = FPosition.topattern ~x:x ptnpos concl in
-
-  let rec skipmatch ax body sk =
-    match TTC.destruct_product hyps ax, TTC.destruct_product hyps body with
-    | Some (`Imp (i1, f1)), Some (`Imp (i2, f2)) ->
-        if   EcReduction.is_alpha_eq hyps i1 i2
-        then skipmatch f1 f2 (sk+1)
-        else sk
-    | _ -> sk
-  in
-
-  let sk = skipmatch ax body 0 in
-
-  t_seqs
-    [t_elimT_form (fst (PT.concretize pt)) ~sk fpf;
-     t_or
-       (t_clear pf)
-       (t_seq (t_generalize_hyp pf) (t_clear pf));
-     t_simplify_with_info EcReduction.beta_red]
-    tc
 
 (* -------------------------------------------------------------------- *)
 let process_elim (pe, qs) tc =

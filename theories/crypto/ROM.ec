@@ -69,7 +69,7 @@ theory Lazy.
     proc o(x:from):to = {
       var y:to;
       y <$ dsample x;
-      if (x \notin m) m.[x] = y;
+      if (x \notin m) m.[x] <- y;
       return oget (m.[x]);
     }
   }.
@@ -225,7 +225,7 @@ theory LazyEager.
         proc o(x:from):to = {
           var y:to;
           y <$ dsample x;
-          if (x \notin m) m.[x] = y;
+          if (x \notin m) m.[x] <- y;
           return oget (m.[x]);
         }
       }
@@ -240,7 +240,7 @@ theory LazyEager.
         {
           f <- pick work;
           y <$ dsample f;
-          if (f \notin H.m) H.m.[f] = y;
+          if (f \notin H.m) H.m.[f] <- y;
           work <- work `\` fset1 f;
         }
       }
@@ -291,8 +291,8 @@ theory LazyEager.
         {
           f <- pick work;
           y <$ dsample f;
-          if (f \notin H.m) H.m.[f] = y;
-          work = work `\` fset1 f;
+          if (f \notin H.m) H.m.[f] <- y;
+          work <- work `\` fset1 f;
         }
       }
 
@@ -358,7 +358,7 @@ theory LazyEager.
         + by move=> &1 &2 H; exists IND_Eager.H.m{2} work{2} x{2}; move: H.
         + by sim; rnd{2}; sim: (={x,IND_Eager.H.m})=> /> ?;apply dsampleL.
         wp; symmetry; eager
-          while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //;
+          while (H:y0 <$ dsample x; ~ y0 <$ dsample x; : ={x} ==> ={y0})=> //;
           first by rnd.
         + swap{2} 5 -4; swap [2..3] -1; case ((x = pick work){1}).
           + by wp; rnd{2}; rnd; rnd{1}; wp; skip=> /#.
@@ -517,14 +517,14 @@ theory ListLog.
 
     proc init(): unit = {
       O.init();
-      qs = [];
+      qs <- [];
     }
 
     proc o(x:from): to = {
       var r:to;
 
-      qs = x::qs;
-      r = O.o(x);
+      qs <- x::qs;
+      r  <@ O.o(x);
       return r;
     }
   }.
@@ -547,10 +547,10 @@ theory ListLog.
     }
 
     proc o(x:from): to = {
-      var r = witness;
+      var r <- witness;
 
       if (size Log.qs < qH) {
-        r = O.o(x);
+        r <@ O.o(x);
       }
       return r;
     }
@@ -576,14 +576,14 @@ theory SetLog.
 
     proc init(): unit = {
       O.init();
-      qs = fset0;
+      qs <- fset0;
     }
 
     proc o(x:from): to = {
       var r;
 
-      r  = O.o(x);
-      qs = qs `|` fset1 x;
+      r  <@ O.o(x);
+      qs <- qs `|` fset1 x;
       return r;
     }
   }.
@@ -613,10 +613,10 @@ theory SetLog.
     proc init = Log(O).init
 
     proc o(x:from): to = {
-      var r = witness;
+      var r <- witness;
 
       if (card Log.qs < qH) {
-        r = LO.o(x);
+        r <@ LO.o(x);
       }
       return r;
     }
@@ -695,9 +695,9 @@ theory ROM_BadCall.
         var x, y, b;
 
         Log(H).init();
-        x = D.a1();
-        y = H.o(x);
-        b = D.a2(y);
+        x <@ D.a1();
+        y <@ H.o(x);
+        b <@ D.a2(y);
         return b;
       }
     }.
@@ -709,9 +709,9 @@ theory ROM_BadCall.
         var x, y, b;
 
         Log(H).init();
-        x = D.a1();
-        y = $dsample x;
-        b = D.a2(y);
+        x <@ D.a1();
+        y <$ dsample x;
+        b <@ D.a2(y);
         return b;
       }
     }.
@@ -723,9 +723,9 @@ theory ROM_BadCall.
         var x, y, b;
 
         Log(H).init();
-        x = D.a1();
-        y = $dsample x;
-        b = D.a2(y);
+        x <@ D.a1();
+        y <$ dsample x;
+        b <@ D.a2(y);
         return mem Log.qs x;
       }
     }.
@@ -744,9 +744,9 @@ theory ROM_BadCall.
           var y, b;
 
           Log(H).init();
-          x = D.a1();
-          y = $dsample x;
-          b = D.a2(y);
+          x <@ D.a1();
+          y <$ dsample x;
+          b <@ D.a2(y);
           return b;
         }
       }.
@@ -807,9 +807,9 @@ theory ROM_BadCall.
         var x, y, b;
 
         Bound(H).init();
-        x = D.a1();
-        y = H.o(x);
-        b = D.a2(y);
+        x <@ D.a1();
+        y <@ H.o(x);
+        b <@ D.a2(y);
         return b;
       }
     }.
@@ -821,9 +821,9 @@ theory ROM_BadCall.
         var x, y, b;
 
         Bound(H).init();
-        x = D.a1();
-        y = $dsample x;
-        b = D.a2(y);
+        x <@ D.a1();
+        y <$ dsample x;
+        b <@ D.a2(y);
         return b;
       }
     }.
@@ -835,9 +835,9 @@ theory ROM_BadCall.
         var x, y, b;
 
         Bound(H).init();
-        x = D.a1();
-        y = $dsample x;
-        b = D.a2(y);
+        x <@ D.a1();
+        y <$ dsample x;
+        b <@ D.a2(y);
         return mem Log.qs x;
       }
     }.
@@ -856,9 +856,9 @@ theory ROM_BadCall.
           var y, b;
 
           Log(H).init();
-          x = D.a1();
-          y = $dsample x;
-          b = D.a2(y);
+          x <@ D.a1();
+          y <$ dsample x;
+          b <@ D.a2(y);
           return b;
         }
       }.
@@ -942,7 +942,7 @@ theory ROM_Bad.
       var b;
 
       Bound(H).init();
-      b = D.distinguish();
+      b <@ D.distinguish();
       return b;
     }
   }.

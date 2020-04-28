@@ -65,6 +65,12 @@ pred (===) (f g : 'a -> 'b -> 'c) = forall x y, f x y = g x y.
 (* -------------------------------------------------------------------- *)
 axiom fun_ext ['a 'b] (f g:'a -> 'b): f = g <=> f == g.
 
+lemma fun_ext2 ['a 'b 'c] (f g : 'a -> 'b -> 'c) :
+  f = g <=> (forall x y, f x y = g x y).
+proof.
+by split=> [->//|eq]; apply/fun_ext=> x; apply/fun_ext=> y; apply/eq.
+qed.
+
 (* -------------------------------------------------------------------- *)
 pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
 
@@ -603,7 +609,18 @@ axiom choiceb_dfl ['a] (P : 'a -> bool) (x0 : 'a):
 axiom nosmt eq_choice ['a] (P Q : 'a -> bool) (x0 : 'a):
   (forall x, P x <=> Q x) => choiceb P x0 = choiceb Q x0.
 
+axiom nosmt choice_dfl_irrelevant ['a] (P : 'a -> bool) (x0 x1 : 'a):
+  (exists x, P x) => choiceb P x0 = choiceb P x1.
+
 (* -------------------------------------------------------------------- *)
 axiom nosmt funchoice ['a 'b] (P : 'a -> 'b -> bool):
      (forall x, exists y, P x y)
   => (exists f, forall x, P x (f x)).
+
+(* -------------------------------------------------------------------- *)
+op sempty ['a] (E : 'a -> bool) =
+  forall x, !E x.
+
+lemma semptyNP ['a] (E : 'a -> bool) :
+  !sempty E <=> exists x, E x.
+proof. by rewrite /sempty -negb_exists. qed.

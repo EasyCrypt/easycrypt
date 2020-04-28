@@ -42,39 +42,39 @@ export SigmaProtocol.
 module SchnorrPK : SigmaScheme = {
   proc gen() : statement * witness = {
     var h, w;
-    w =$ FDistr.dt;
+    w <$ FDistr.dt;
     if (w = F.zero) { (* A loop would be better, however the support for while loops is poor *)
-      w = -F.one;
+      w <- -F.one;
     }
-    h = g^w;
+    h <- g^w;
     return (h, w);
   }
 
   proc commit(h: statement, w: witness) : message * secret = {
     var r, a;
-    r =$ FDistr.dt;
-    a = g^r;
+    r <$ FDistr.dt;
+    a <- g^r;
     return (a, r);
   }
 
   proc test(h: statement, a: message) : challenge = {
     var e;
-    e =$ FDistr.dt;
+    e <$ FDistr.dt;
     return e;
   }
 
   proc respond(sw: statement * witness, ms: message * secret, e: challenge) : response = {
     var z, w, r;
-    w = snd sw;
-    r = snd ms;
-    z = r + e*w;
+    w <- snd sw;
+    r <- snd ms;
+    z <- r + e*w;
     return z;
   }
 
   proc verify(h: statement, a: message, e: challenge, z: response) : bool = {
     var v, v';
-    v = a*(h^e);
-    v' = g^z;
+    v <- a*(h^e);
+    v' <- g^z;
     return (v = v');
   }
 }.
@@ -83,13 +83,13 @@ module SchnorrPKAlgorithms : SigmaAlgorithms = {
   proc soundness(h: statement, a: message, e: challenge, z: response, e': challenge, z': response) : witness option = {
     var sto, w, v, v';
 
-    v  = (g^z  = a*(h^e ));
-    v' = (g^z' = a*(h^e'));
+    v  <- (g^z  = a*(h^e ));
+    v' <- (g^z' = a*(h^e'));
     if (e <> e' /\ v /\ v') {
-      w = (z - z') / (e - e');
-      sto = Some(w);
+      w <- (z - z') / (e - e');
+      sto <- Some(w);
     } else {
-      sto = None;
+      sto <- None;
     }
 
     return sto;
@@ -98,8 +98,8 @@ module SchnorrPKAlgorithms : SigmaAlgorithms = {
   proc simulate(h: statement, e: challenge) : message * challenge * response = {
     var a, z;
 
-    z  =$ FDistr.dt;
-    a  = (g^z) * (h^(-e));
+    z  <$ FDistr.dt;
+    a  <- (g^z) * (h^(-e));
 
     return (a, e, z);
   }

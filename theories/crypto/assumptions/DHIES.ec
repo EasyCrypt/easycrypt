@@ -74,21 +74,21 @@ theory DHIES.
     proc gen () : (Sk * Pk) = {
       var y, gy;
 
-      y = $FDistr.dt;
-      gy = g ^ y;
+      y  <$ FDistr.dt;
+      gy <- g ^ y;
       return (y,gy);
     }
 
     proc mencrypt (mpk : MPk, tag : Tag, ptxt : PTxt) : MCTxt = {
       var cphList,scph,x,gx,pkl,i;
 
-      x = $FDistr.dt;
-      gx = g ^ x;
-      pkl = map (fun pk => (pk,(gx, hash(pk^x)))) (elems mpk);
-      i <- size pkl-1;
+      x       <$ FDistr.dt;
+      gx      <- g ^ x;
+      pkl     <- map (fun pk => (pk,(gx, hash(pk^x)))) (elems mpk);
+      i       <- size pkl-1;
       cphList <- [];
       while (0 <= i){
-        scph <$ enc (nth witness pkl i).`2.`2 tag ptxt;
+        scph    <$ enc (nth witness pkl i).`2.`2 tag ptxt;
         cphList <- ((nth witness pkl i).`1, ((nth witness pkl i).`2.`1, scph)) :: cphList;
         i <- i-1;
       }
@@ -461,7 +461,7 @@ module Adv1_Procs (ODHOrcl : ODH_OrclT) : MRPKE_OrclT = {
       if (MRPKE_lor.count_gen < q_gen) {
          pk <@ ODH_Orcl.gen();
          if( pk \notin MRPKE_lor.pklist) { 
-               MRPKE_lor.pklist.[pk] = witness;
+               MRPKE_lor.pklist.[pk] <- witness;
          }
          MRPKE_lor.count_gen <- MRPKE_lor.count_gen + 1;
       }
@@ -501,7 +501,7 @@ module Adv1_Procs (ODHOrcl : ODH_OrclT) : MRPKE_OrclT = {
                 key <- oget okey;
            } 
            else { 
-                key = oget skeys.[(pk,ctxt.`1)]; 
+                key <- oget skeys.[(pk,ctxt.`1)]; 
            }
            msg <- dec key tag (snd ctxt);  
        }

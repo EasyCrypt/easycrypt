@@ -216,7 +216,7 @@ module C_PRG(G:PRGa.RG) = {
   }
 
   proc next(): output = {
-    var r = witness;
+    var r <- witness;
 
     r <@ G.next();
     c <- c + 1;
@@ -227,10 +227,10 @@ module C_PRG(G:PRGa.RG) = {
 module C_D_PRG(D:PRGa.Distinguisher,G:PRGa.RGA) = {
   module G' = {
     proc next(): output = {
-      var r = witness;
+      var r <- witness;
 
-      r = G.next();
-      C_PRG.c = C_PRG.c + 1;
+      r <@ G.next();
+      C_PRG.c <- C_PRG.c + 1;
       return r;
     }
   }
@@ -239,8 +239,8 @@ module C_D_PRG(D:PRGa.Distinguisher,G:PRGa.RGA) = {
 
   proc distinguish(): bool = {
     var b;
-    C_PRG.c = 0;
-    b = D'.distinguish();
+    C_PRG.c <- 0;
+    b <@ D'.distinguish();
     return b;
   }
 }.
@@ -282,10 +282,10 @@ module C_PRF(F:PRFa.PRF) = {
 module C_D_PRF(D:PRFa.Distinguisher,F:PRFa.PRFA) = {
   module F' = {
     proc f(x:state): state * output = {
-      var r = witness;
+      var r <- witness;
 
-      r = F.f(x);
-      C_PRF.c = C_PRF.c + 1;
+      r <@ F.f(x);
+      C_PRF.c <- C_PRF.c + 1;
       return r;
     }
   }
@@ -294,8 +294,8 @@ module C_D_PRF(D:PRFa.Distinguisher,F:PRFa.PRFA) = {
 
   proc distinguish(): bool = {
     var b;
-    C_PRF.c = 0;
-    b = D'.distinguish();
+    C_PRF.c <- 0;
+    b <@ D'.distinguish();
     return b;
   }  
 }.

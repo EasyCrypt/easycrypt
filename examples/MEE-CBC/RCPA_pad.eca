@@ -50,14 +50,14 @@ module PadThenEncrypt (S:CoreDefs.Enc_Scheme): Enc_Scheme = {
   proc enc(k:key,m:msg): ctxt = {
     var c;
 
-    c = S.enc(k,pad m);
+    c <@ S.enc(k,pad m);
     return c;
   }
 
   proc dec(k:key,c:ctxt): msg option = {
     var p;
 
-    p = S.dec(k,c);
+    p <@ S.dec(k,c);
     return obind unpad p;
   }
 }.

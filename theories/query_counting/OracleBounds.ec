@@ -26,8 +26,8 @@ module type Counter = {
 module Counter = {
   var c:int
 
-  proc init(): unit = { c = 0; }
-  proc incr(): unit = { c = c + 1; }
+  proc init(): unit = { c <- 0; }
+  proc incr(): unit = { c <- c + 1; }
 }.
 
 type from.
@@ -44,7 +44,7 @@ module Count (O:Oracle) = {
     var r:to;
 
     Counter.incr();
-    r = O.f(x);
+    r <@ O.f(x);
     return r;
   }
 }.
@@ -96,7 +96,7 @@ module IND (O:Oracle, A:Adv) = {
     var b:bool;
 
     Counter.init();
-    b = A.distinguish();
+    b <@ A.distinguish();
     return b;
   }
 }.
@@ -130,10 +130,10 @@ theory EnfPen.
 
   module Enforce(O:Oracle) = {
     proc f(x:from): to = {
-      var r:to = default;
+      var r:to <- default;
 
       if (Counter.c < bound)
-        r = O.f(x);
+        r <@ O.f(x);
       return r;
     }
   }.
@@ -215,10 +215,10 @@ theory BndPen.
 
   module Enforce(O:Oracle) = {
     proc f(x:from): to = {
-      var r:to = default;
+      var r:to <- default;
 
       if (Counter.c < bound)
-        r = O.f(x);
+        r <@ O.f(x);
       return r;
     }
   }.

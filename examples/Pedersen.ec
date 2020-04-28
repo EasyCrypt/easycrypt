@@ -36,21 +36,21 @@ export CommitmentProtocol.
 module Pedersen : CommitmentScheme = {
   proc gen() : value = {
     var x, h;
-    x =$ FDistr.dt;
-    h = g^x;
+    x <$ FDistr.dt;
+    h <- g^x;
     return h;
   }
 
   proc commit(h: value, m: message) : commitment * openingkey = {
     var c, d;
-    d =$ FDistr.dt;
-    c = (g^d) * (h^m);
+    d <$ FDistr.dt;
+    c <- (g^d) * (h^m);
     return (c, d);
   }
 
   proc verify(h: value, m: message, c: commitment, d: openingkey) : bool = {
     var c';
-    c' = (g^d) * (h^m);
+    c' <- (g^d) * (h^m);
     return (c = c');
   }
 }.
@@ -60,11 +60,11 @@ module DLogAttacker(B:Binder) : DLog.Adversary = {
   proc guess(h: group) : F.t option = {
 
     var x, c, m, m', d, d';
-    (c, m, d, m', d') = B.bind(h);
+    (c, m, d, m', d') <@ B.bind(h);
     if ((c = g^d * h^m) /\ (c = g^d' * h^m') /\ (m <> m'))
-      x = Some((d - d') * inv (m' - m));
+      x <- Some((d - d') * inv (m' - m));
     else
-      x = None;
+      x <- None;
 
     return x;
   }
@@ -83,13 +83,13 @@ section PedersenSecurity.
       var m0, m1 : F.t;
 
       (* Clearly, there are many useless lines, but their presence helps for the proofs *)
-      x =$ FDistr.dt;
-      h = g^x;
-      (m0, m1) = U.choose(h);
-      b =$ {0,1};
-      d =$ FDistr.dt;
-      c = g^d; (* message independent - fake commitment *)
-      b' = U.guess(c);
+      x <$ FDistr.dt;
+      h <- g^x;
+      (m0, m1) <@ U.choose(h);
+      b <$ {0,1};
+      d <$ FDistr.dt;
+      c <- g^d; (* message independent - fake commitment *)
+      b' <@ U.guess(c);
 
       return (b = b');
     }

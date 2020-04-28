@@ -452,17 +452,17 @@ section Reduce.
     var bad: bool
 
     proc init(): unit = {
-      qs = fset0;
-      bad = false;
+      qs <- fset0;
+      bad <- false;
       F.init();
     }
 
     proc f(x:block): block = {
       var r;
 
-      if (mem qs x) { bad = true; }
+      if (mem qs x) { bad <- true; }
       r <@ F.f(x);
-      qs = qs `|` (fset1 x);
+      qs <- qs `|` (fset1 x);
       return r;
     }
   }.
@@ -640,7 +640,7 @@ module OracleBounder(O:RCPA_full) = {
 
   proc enc(p:block list): block list = {
     var i;
-    var r = [];
+    var r <- [];
 
     if (qC < q /\ size p <= ell) {
       r  <@ O.enc(p);
@@ -660,7 +660,7 @@ module QueryBounder(A:RCPA_Adversary, O:RCPA_Oracles) = {
   module O' = {
     proc enc(p:block list): block list = {
       var i;
-      var r = [];
+      var r <- [];
 
       if (OracleBounder.qC < q /\ size p <= ell) {
         r                <@ O.enc(p);
