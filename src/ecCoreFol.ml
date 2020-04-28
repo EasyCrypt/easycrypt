@@ -1979,7 +1979,6 @@ module Fsubst = struct
       (* We freshen the binded memory. *)
       let m = fst coe.coe_mem in
       let m' = EcIdent.fresh m in
-      (* TODO: A: here, I am erasing the previous binding.*)
       let s = f_rebind_mem s m m' in
 
       (* We bind the memory of all memory predicates with the fresh memory

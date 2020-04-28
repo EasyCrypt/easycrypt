@@ -2817,8 +2817,6 @@ module PPGoal = struct
           | None    -> ()
           | Some pk -> Format.fprintf fmt "%t " pk in
 
-        (* TODO: A: old printing:
-           "%-.2s%t: @[<hov 2>%t@]@\n%!" *)
         Format.fprintf fmt
           "@[<hv>@[%-.2s%t:@]@;<1 2>@[<hov 2>%t@]@]@\n%!"
           (PPEnv.local_symb ppe id) pk dk)

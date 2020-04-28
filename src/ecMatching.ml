@@ -426,14 +426,14 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       | Flocal x, _ -> begin
           match EV.get x !ev.evm_form with
           | None ->
-            (* TODO: A: bug? why not failure ()?*)
+            (* TODO: bug? why not failure ()?*)
               raise MatchFailure
 
           | Some `Unset ->
               let ssbj = Fsubst.f_subst subst subject in
               let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) ssbj in
               if not (Mid.set_disjoint mxs ssbj.f_fv) then
-                (* TODO: A: bug? why not failure ()?*)
+                (* TODO: bug? why not failure ()?*)
                 raise MatchFailure;
               begin
                 try  EcUnify.unify env ue ptn.f_ty subject.f_ty

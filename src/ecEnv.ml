@@ -2498,7 +2498,7 @@ module NormMp = struct
             let calls' = cost_r c_self' c_calls' in
             f_cHoareF pre' p' post' calls'
 
-        (* TODO: A: why is there no case for FbdHoareF and every F*HoareS ? *)
+        (* TODO: missing cases: FbdHoareF and every F*HoareS *)
 
         | FequivF ef ->
           let pre' = aux ef.ef_pr and l' = norm_xfun env ef.ef_fl
@@ -2511,10 +2511,7 @@ module NormMp = struct
           let coe' = {
             coe_mem  = coe.coe_mem;
             coe_pre  = aux coe.coe_pre;
-            coe_e    = coe.coe_e; (* TODO: A:
-                                     if we decide to normalize statements
-                                     in F*HoareS judgement, then we should
-                                     normalize this expression too. *)
+            coe_e    = coe.coe_e;
           } in FSmart.f_coe (f, coe) coe'
 
         | Fpr pr ->
