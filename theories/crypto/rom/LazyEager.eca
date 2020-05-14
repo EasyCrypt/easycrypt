@@ -30,14 +30,14 @@ section.
       var m:(from, to) fmap
 
       proc init():unit = {
-        m = empty;
+        m <- empty;
       }
 
       proc o(x:from):to = {
         var y;
 
-        y = $dsample x;
-        if (x \notin m) m.[x] = y;
+        y <$ dsample x;
+        if (x \notin m) m.[x] <- y;
         return oget (m.[x]);
       }
     }
@@ -46,13 +46,13 @@ section.
       var work, f, y;
       var y0 : to; (* for the proof *)
 
-      work = enum;
+      work <- enum;
       while (work <> [])
       {
-        f = head witness work;
-        y = $dsample f;
-        if (f \notin H.m) H.m.[f] = y;
-        work = behead work;
+        f <- head witness work;
+        y <$ dsample f;
+        if (f \notin H.m) H.m.[f] <- y;
+        work <- behead work;
       }
     }
 
@@ -62,7 +62,7 @@ section.
       var b;
 
       H.init();
-      b = D.distinguish();
+      b <@ D.distinguish();
       resample();
       return b;
     }
@@ -93,13 +93,13 @@ section.
       var work, f, y;
       var y0 : to; (* for the proof *)
 
-      work = enum;
+      work <- enum;
       while (work <> [])
       {
-        f = head witness work;
-        y = $dsample f;
-        if (f \notin H.m) H.m.[f] = y;
-        work = behead work;
+        f <- head witness work;
+        y <$ dsample f;
+        if (f \notin H.m) H.m.[f] <- y;
+        work <- behead work;
       }
     }
 
@@ -108,9 +108,9 @@ section.
     proc main(): bool = {
       var b;
 
-      H.m = empty;
+      H.m <- empty;
       resample();
-      b = D.distinguish();
+      b <@ D.distinguish();
 
       return b;
     }
@@ -132,15 +132,15 @@ section.
       by auto; progress; apply enumP.
     case (x{2} \notin IND_Lazy.H.m{2}); [rcondt{2} 2; first by auto |
                                          rcondf{2} 2; first by auto].
-      transitivity{1} {y0 = $dsample x;
+      transitivity{1} {y0 <$ dsample x;
                        while (work <> []) {
-                         f = head witness work;
-                         y = $dsample f;
+                         f <- head witness work;
+                         y <$ dsample f;
                          if (f \notin IND_Eager.H.m)
-                           IND_Eager.H.m.[f] = if f = x then y0 else y;
-                         work = behead work;
+                           IND_Eager.H.m.[f] <- if f = x then y0 else y;
+                         work <- behead work;
                        }
-                       result = oget IND_Eager.H.m.[x]; }
+                       result <- oget IND_Eager.H.m.[x]; }
                        (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
                        ((={x,work} /\
                         IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
@@ -149,21 +149,21 @@ section.
                         ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
         by move=> &1 &2 H; exists IND_Lazy.H.m{2} work{2} x{2}; move: H.
       transitivity{1} {while (work <> []) {
-                         f = head witness work;
-                         y = $dsample f;
+                         f <- head witness work;
+                         y <$ dsample f;
                          if (f \notin IND_Eager.H.m)
-                           IND_Eager.H.m.[f] = y;
-                         work = behead work;
+                           IND_Eager.H.m.[f] <- y;
+                         work <- behead work;
                        }
-                       y0 = $dsample x;
-                       result = oget IND_Eager.H.m.[x]; }
+                       y0 <$ dsample x;
+                       result <- oget IND_Eager.H.m.[x]; }
                        (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
                        (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
         by move=> &1 &2 H; exists IND_Eager.H.m{2} work{2} x{2}; move: H.
       by sim; rnd{2}; sim :(={x,IND_Eager.H.m}); progress; apply dsampleL.
 
       wp; symmetry.
-      eager while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //; first by rnd.
+      eager while (H:y0 <$ dsample x; ~ y0 <$ dsample x; : ={x} ==> ={y0})=> //; first by rnd.
         swap{2} 5 -4; swap [2..3] -1; case ((x = head witness work){1}).
           wp; rnd{2}; rnd; rnd{1}; auto; progress=> //=.
           by apply dsampleL.

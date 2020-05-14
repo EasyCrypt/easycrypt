@@ -34,9 +34,9 @@ module AEAD_Oracles : AEAD_OraclesT = {
 
   proc init() : unit = {
      b <$ {0,1};
-     keycount = 0;
-     cphlist = fset0;
-     keylist = empty;
+     keycount <- 0;
+     cphlist  <- fset0;
+     keylist  <- empty;
   }
 
   proc newkey() : unit = {
@@ -100,9 +100,9 @@ module AEAD_OraclesCondProb : AEAD_OraclesT = {
 
   proc init(bval:bool) : unit = {
      AEAD_Oracles.b <- bval;
-     AEAD_Oracles.keycount = 0;
-     AEAD_Oracles.cphlist = fset0;
-     AEAD_Oracles.keylist = empty;
+     AEAD_Oracles.keycount <- 0;
+     AEAD_Oracles.cphlist  <- fset0;
+     AEAD_Oracles.keylist  <- empty;
   }
 }.
 
@@ -209,7 +209,7 @@ section AEADmul.
     proc dec (id : int, tag : AData, ctxt : Cph) : Msg option = {
       var ptxt : Msg option;
 
-      ptxt = None;
+      ptxt <- None;
       if (deccount < q_dec && 0 <= id < n_keys && !(id,tag,ctxt) \in lorlist){
         ptxt <- dec (nth witness keys id) tag ctxt;
         deccount <- deccount + 1;

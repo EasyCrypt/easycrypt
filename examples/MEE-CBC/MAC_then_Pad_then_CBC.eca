@@ -221,8 +221,8 @@ module Weak_PRPa (M : MAC_Scheme, A : RCPA_Adversary, P : PRP_Oracles) = {
       var c <- witness;
 
       if (qC < q /\ size (pad (p,witness)) <= n) {
-        t = M.tag(mk,p);
-        padded = pad(p,t);
+        t <@ M.tag(mk,p);
+        padded <- pad(p,t);
         s <$ d_block;
         c <- [s];
         i <- 0;
@@ -494,7 +494,7 @@ module CMAa (P : PseudoRP) (A : PTXT_Adversary) (M : CMA_Oracles) = {
       var c <- witness;
 
       t <@ M.tag(m);
-      padded = pad(m,t);
+      padded <- pad(m,t);
       s <$ d_block;
       c <- [s];
       i <- 0;

@@ -20,8 +20,8 @@ theory DLog.
     proc main () : bool = {
       var x, x';
 
-      x =$ FDistr.dt;
-      x' = A.guess(g^x);
+      x  <$ FDistr.dt;
+      x' <@ A.guess(g^x);
 
       return (x' = x);
     }
@@ -42,8 +42,8 @@ theory DLog.
     proc main () : bool = {
       var x, x';
 
-      x =$ FDistr.dt;
-      x' = A.guess(g^x);
+      x  <$ FDistr.dt;
+      x' <@ A.guess(g^x);
       return (x' = Some x);
     }
   }.
@@ -61,11 +61,11 @@ section DLogSecurity.
     proc guess(h: group) : F.t = {
       var lx, x;
 
-      lx = L.guess(h);
+      lx <@ L.guess(h);
       if (lx = None)
-        x =$ FDistr.dt; (* the best if L gave up *)
+        x <$ FDistr.dt; (* the best if L gave up *)
       else
-        x = oget lx;
+        x <- oget lx;
 
       return x;
     }

@@ -333,7 +333,7 @@ let uident = upper ichar*
 let tident = '\'' lident
 let mident = '&'  (lident | uint)
 
-let opchar = ['=' '<' '>' '+' '-' '*' '/' '\\' '%' '&' '^' '|' ':' '#']
+let opchar = ['=' '<' '>' '+' '-' '*' '/' '\\' '%' '&' '^' '|' ':' '#' '$']
 
 let sop = opchar+ | '`' opchar+ '`'
 let nop = '\\' ichar+
@@ -390,7 +390,6 @@ rule main = parse
   | ','   { [COMMA     ] }
   | ';'   { [SEMICOLON ] }
   | '?'   { [QUESTION  ] }
-  | "$"   { [SAMPLE    ] }
   | "~"   { [TILD      ] }
   | "!"   { [NOT       ] }
   | "@"   { [AT        ] }

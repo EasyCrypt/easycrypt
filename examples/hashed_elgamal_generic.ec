@@ -213,8 +213,8 @@ section.
     proc a2(x:bits): bool = {
       var c, b';
 
-      c  = (g ^ y, x +^ (b ? m1 : m0));
-      b' = A.guess(c);
+      c  <- (g ^ y, x +^ (b ? m1 : m0));
+      b' <@ A.guess(c);
       return (b' = b);
     }
   }.
