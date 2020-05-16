@@ -213,7 +213,11 @@ lemma matrixW (P : matrix -> bool) :
 proof. by move=> ih m; rewrite -(tofunmK m) &(ih) tofunm_prematrix. qed.
 
 op matrixc (c : R) = offunm (fun _ _ => c).
-op diagc   (c : R) = offunm (fun i j => if i = j then c else zeror).
+
+op diagmx (v : vector) =
+  offunm (fun i j => if i = j then v.[i] else zeror).
+
+abbrev diagc (c : R) = diagmx (vectc c).
 
 abbrev zerom = matrixc zeror.
 abbrev onem  = diagc   oner .
@@ -221,12 +225,21 @@ abbrev onem  = diagc   oner .
 lemma offunCE c i j : mrange i j => (matrixc c).[i, j] = c.
 proof. by move=> -[??]; rewrite offunmE. qed.
 
+lemma diagmxE v i j : (diagmx v).[i, j] = if i = j then v.[i] else zeror.
+proof.
+case: (mrange i j) => [/offunmE ->|rgN_ij] //=.
+rewrite getm_out //; case: (i = j) => // ->>.
+by rewrite getv_out //; apply: contra rgN_ij.
+qed.
+
 lemma offun0E i j : zerom.[i, j] = zeror.
 proof. by rewrite /matrixc /"_.[_]" offunmK /mclamp if_same. qed.
 
 lemma offun1E i j : mrange i j => onem.[i, j] =
   if i = j then oner else zeror.
-proof. by move=> rg; rewrite offunmE. qed.
+proof.
+by move=> rg; rewrite diagmxE offunvE // (mrangeL _ _ rg).
+qed.
 
 lemma offun1_neqE i j : i <> j => onem.[i, j] = zeror.
 proof.
@@ -304,8 +317,8 @@ qed.
 
 lemma trmx1 : trmx onem = onem.
 proof.
-apply/eq_matrixP=> i j rgi; rewrite trmxE.
-by rewrite !offunmE ?(mrangeC j) //= (eq_sym j i).
+apply/eq_matrixP=> i j rgi; rewrite trmxE !offun1E 1:mrangeC //.
+by rewrite (eq_sym j i).
 qed.
 
 lemma trmxD (m1 m2 : matrix) : trmx (m1 + m2) = trmx m1 + trmx m2.
@@ -449,6 +462,82 @@ lemma mulvmxA (v : vector) (m1 m2 : matrix) :
   (v ^* m1) ^* m2 = v ^* (m1 * m2).
 proof. by rewrite -!mulmxTv trmxM mulmxvA. qed.
 
+lemma mulmxvE (m : matrix) (v : vector) i :
+  (m *^ v).[i] = bigi predT (fun j => m.[i, j] * v.[j]) 0 size.
+proof.
+case: (0 <= i < size) => [rg_i|rgN_i]; first by rewrite offunvE.
+by rewrite getv_out // big1 //= => j _; rewrite getm_outL // mul0r.
+qed.
+
+lemma mulvmxE (m : matrix) (v : vector) j :
+  (v ^* m).[j] = bigi predT (fun i => v.[i] * m.[i, j]) 0 size.
+proof.
+by rewrite -mulmxTv mulmxvE; apply: eq_bigr => /= i _; rewrite trmxE mulrC.
+qed.
+
+op colmx (v : vector) : matrix = offunm (fun i _ => v.[i]).
+op rowmx (v : vector) : matrix = offunm (fun _ j => v.[j]).
+
+lemma colmxT (v : vector) : trmx (colmx v) = rowmx v.
+proof.
+apply: eq_matrixP => i j rg_ij; rewrite trmxE.
+by rewrite !offunmE ?(mrangeC j i).
+qed.
+
+lemma rowmxT (v : vector) : trmx (rowmx v) = colmx v.
+proof. by rewrite -colmxT trmxK. qed.
+
+lemma colmxE (v : vector) i j : 0 <= j < size => (colmx v).[i, j] = v.[i].
+proof.
+move=> rg_j; case: (0 <= i < size) => [rg_i|rgN_i]; last first.
++ by rewrite getv_out // getm_outL.
++ by rewrite offunmE.
+qed.
+
+lemma rowmxE (v : vector) i j : 0 <= i < size => (rowmx v).[i, j] = v.[j].
+proof. by move=> rg_i; rewrite -colmxT trmxE colmxE. qed.
+
+lemma colmx_mulmxv (m : matrix) (v : vector) : colmx (m *^ v) = m * colmx v.
+proof.
+apply/eq_matrixP=> i j [rg_i rg_j]; rewrite colmxE // offunM.
+by rewrite mulmxvE; apply: eq_bigr => /= k _; rewrite colmxE.
+qed.
+
+lemma rowmx_mulvmx (v : vector) (m : matrix) : rowmx (v ^* m) = rowmx v * m.
+proof. by rewrite -colmxT -mulmxTv colmx_mulmxv trmxM trmxK colmxT. qed.
+
+lemma mulmx_diag (v1 v2 : vector) :
+  diagmx v1 * diagmx v2 = diagmx (offunv (fun i => v1.[i] * v2.[i])).
+proof.
+apply: eq_matrixP=> i j [rg_i rg_j]; rewrite diagmxE /=.
+case: (i = j) => [<-|ne_ij]; last first.
++ rewrite big1 // => /= k _; rewrite !diagmxE.
+  case: (i = k) => [->>|]; last by rewrite mul0r.
+  by case: (k = j) => [<<-|]; last by rewrite mulr0.
+rewrite offunvE //= (bigD1 _ _ i) ?(mem_range, range_uniq) //=.
+rewrite !diagmxE /= big1 -1:addr0 //= => k @/predC1.
+by rewrite !diagmxE => -> /=; rewrite mulr0.
+qed.
+
+lemma dotp_tr v1 v2 : dotp v1 v2 = trace (diagmx v1 * diagmx v2).
+proof.
+rewrite !big_seq &(eq_bigr) => /= i /mem_range rg_i.
+rewrite (bigD1 _ _ i) ?(mem_range, range_uniq) //=.
+rewrite !diagmxE /= big1 -1:addr0 //= => @/predC1 j ne_ji.
+by rewrite diagmxE (eq_sym i j) ne_ji mul0r.
+qed.
+
+lemma dotp_mulmxv m v1 v2 : dotp (m *^ v1) v2 = dotp v1 (v2 ^* m).
+proof.
+pose F i j := m.[i, j] * v1.[j] * v2.[i].
+rewrite /dotp -(eq_bigr _ (fun i => bigi predT (F i) 0 size)) /=.
++ by move=> i _ @/F; rewrite -mulr_suml mulmxvE.
+rewrite exchange_big &(eq_bigr) => /= i _ @/F.
+rewrite mulvmxE mulr_sumr &(eq_bigr) => /= j _.
+by rewrite mulrA (mulrC _ m.[_]) mulrA.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op dvector (d : R distr) =
   dmap (djoin (nseq size d)) (fun xs => offunv (nth witness xs)).
 
