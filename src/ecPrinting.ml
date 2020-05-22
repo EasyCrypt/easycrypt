@@ -1856,23 +1856,35 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
 let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in
 
+  let pp_nosmt fmt =
+    let b =
+      match op with
+      | None -> false
+      | Some (OP_Plain (_, b)) -> b
+      | Some (OP_Fix { opf_nosmt = b }) -> b
+      | _ -> false
+    in if b then Format.fprintf fmt "@ nosmt" else () in
+
   let pp_body fmt =
     match op with
     | None ->
         Format.fprintf fmt ": %a" (pp_type ppe) ty
 
-    | Some (OP_Plain e) ->
-        let ((subppe, pp_vds), e) =
+    | Some (OP_Plain (e, _)) ->
+        let ((subppe, pp_vds), e, has_vds) =
           let (vds, e) =
             match e.e_node with
             | Equant (`ELambda, vds, e) -> (vds, e)
             | _ -> ([], e) in
-
-          (pp_locbinds ppe ~fv:e.e_fv vds, e)
+          (pp_locbinds ppe ~fv:e.e_fv vds, e,
+           match vds with [] -> false | _ -> true)
         in
-          Format.fprintf fmt "%t :@ %a =@ %a" pp_vds
-            (pp_type ppe) e.e_ty (pp_expr subppe) e
-
+          if has_vds then
+            Format.fprintf fmt "%t :@ %a =@ %a" pp_vds
+              (pp_type ppe) e.e_ty (pp_expr subppe) e
+          else
+            Format.fprintf fmt ":@ %a =@ %a"
+              (pp_type ppe) e.e_ty (pp_expr subppe) e
     | Some (OP_Constr (indp, i)) ->
         Format.fprintf fmt
           ": %a =@ < %d-th constructor of %a >"
@@ -1929,11 +1941,11 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   in
 
   match ts with
-  | [] -> Format.fprintf fmt "@[<hov 2>op %a %t.@]"
-      pp_opname ([], basename) pp_body
+  | [] -> Format.fprintf fmt "@[<hov 2>op%t %a %t.@]"
+      pp_nosmt pp_opname ([], basename) pp_body
   | _  ->
-      Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
-        pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+      Format.fprintf fmt "@[<hov 2>op%t %a %a %t.@]"
+        pp_nosmt pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_nt (ppe : PPEnv.t) fmt (basename, ts, _ty, nt) =

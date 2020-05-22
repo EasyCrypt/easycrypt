@@ -2618,7 +2618,7 @@ module Op = struct
     let op = oget (by_path_opt p env) in
     let f  =
       match op.op_kind with
-      | OB_oper (Some (OP_Plain e)) ->
+      | OB_oper (Some (OP_Plain (e, _))) ->
           form_of_expr EcCoreFol.mhr e
       | OB_pred (Some (PR_Plain f)) ->
           f

@@ -3417,8 +3417,9 @@ clone_override:
 | TYPE ps=cltyparams x=qident LARROW t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Inline)) }
 
-| OP x=qoident tyvars=bracket(tident*)? COLON sty=loc(type_exp) mode=opclmode e=expr
+| OP st=nosmt x=qoident tyvars=bracket(tident*)? COLON sty=loc(type_exp) mode=opclmode e=expr
    { let ov = {
+       opov_nosmt  = st;
        opov_tyvars = tyvars;
        opov_args   = [];
        opov_retty  = sty;
@@ -3426,8 +3427,9 @@ clone_override:
      } in
        (x, PTHO_Op (ov, mode)) }
 
-| OP x=qoident tyvars=bracket(tident*)? mode=loc(opclmode) e=expr
+| OP st=nosmt x=qoident tyvars=bracket(tident*)? mode=loc(opclmode) e=expr
    { let ov = {
+       opov_nosmt  = st;
        opov_tyvars = tyvars;
        opov_args   = [];
        opov_retty  = mk_loc mode.pl_loc PTunivar;
@@ -3435,8 +3437,9 @@ clone_override:
      } in
        (x, PTHO_Op (ov, unloc mode)) }
 
-| OP x=qoident tyvars=bracket(tident*)? p=ptybindings mode=loc(opclmode) e=expr
+| OP st=nosmt x=qoident tyvars=bracket(tident*)? p=ptybindings mode=loc(opclmode) e=expr
    { let ov = {
+       opov_nosmt  = st;
        opov_tyvars = tyvars;
        opov_args   = p;
        opov_retty  = mk_loc mode.pl_loc PTunivar;
