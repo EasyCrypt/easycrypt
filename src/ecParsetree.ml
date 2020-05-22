@@ -1046,6 +1046,7 @@ and pr_override = pr_override_def * [`Alias | `Inline]
 and th_override = pqsymbol
 
 and op_override_def = {
+  opov_nosmt  : bool;
   opov_tyvars : psymbol list option;
   opov_args   : ptybinding list;
   opov_retty  : pty;
