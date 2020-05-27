@@ -507,55 +507,56 @@ let check_item_compatible ~proof_obl env mode (fin,oin) (fout,oout) =
   let icosts, ocosts = norm_costs (OI.costs oin),
                        norm_costs (OI.costs oout) in
 
-  match mode with
-  | `Sub ->
-    begin match icosts, ocosts with
-      | `Unbounded, `Unbounded | `Bounded _, `Unbounded -> ()
-      | `Unbounded, `Bounded _ ->
-        if proof_obl then ()
-        else check_item_err MF_unbounded
+  if proof_obl then ()
+  else match mode with
+   | `Sub ->
+     begin match icosts, ocosts with
+     | `Unbounded, `Unbounded | `Bounded _, `Unbounded -> ()
+     | `Unbounded, `Bounded _ ->
 
-      | `Bounded (iself,icalls), `Bounded (oself,ocalls) ->
+       check_item_err MF_unbounded
 
-        (* We check costs for other procedures. *)
-        let diff = Mx.fold2_union (fun f ic oc acc ->
-            let ic = odfl f_i0 ic in
-            let oc = odfl f_i0 oc in
-            if EcFol.f_equal ic oc then acc
-            else Mx.add f (ic, oc) acc
-          ) icalls ocalls Mx.empty in
+     | `Bounded (iself,icalls), `Bounded (oself,ocalls) ->
 
-        let self_sub =
-          if EcFol.f_equal iself oself then None
-          else Some (iself, oself) in
+       (* We check costs for other procedures. *)
+       let diff = Mx.fold2_union (fun f ic oc acc ->
+         let ic = odfl f_i0 ic in
+         let oc = odfl f_i0 oc in
+         if EcFol.f_equal ic oc then acc
+         else Mx.add f (ic, oc) acc
+       ) icalls ocalls Mx.empty in
 
-        if not (Mx.is_empty diff) || self_sub <> None then
-          check_item_err (MF_compl(env, `Sub(self_sub, diff))) end
+       let self_sub =
+         if EcFol.f_equal iself oself then None
+         else Some (iself, oself) in
 
-  | `Eq  ->
-    begin match icosts, ocosts with
-      | `Unbounded, `Unbounded -> ()
+       if not (Mx.is_empty diff) || self_sub <> None then
+         check_item_err (MF_compl(env, `Sub(self_sub, diff))) end
 
-      | `Bounded _, `Unbounded
-      | `Unbounded, `Bounded _ ->
-        check_item_err MF_unbounded
+   | `Eq  ->
+     begin match icosts, ocosts with
+     | `Unbounded, `Unbounded -> ()
 
-      | `Bounded (iself,icalls), `Bounded (oself,ocalls) ->
+     | `Bounded _, `Unbounded
+       | `Unbounded, `Bounded _ ->
+       check_item_err MF_unbounded
 
-        (* We check costs for other procedures. *)
-        let diff = Mx.fold2_union (fun f ic oc acc ->
-            let ic = odfl f_i0 ic in
-            let oc = odfl f_i0 oc in
-            if EcFol.f_equal ic oc then acc
-            else Mx.add f (ic, oc) acc
-          ) icalls ocalls Mx.empty in
+     | `Bounded (iself,icalls), `Bounded (oself,ocalls) ->
 
-        let self_sub =
-          if EcFol.f_equal iself oself then None
-          else Some (iself, oself) in
+       (* We check costs for other procedures. *)
+       let diff = Mx.fold2_union (fun f ic oc acc ->
+         let ic = odfl f_i0 ic in
+         let oc = odfl f_i0 oc in
+         if EcFol.f_equal ic oc then acc
+         else Mx.add f (ic, oc) acc
+       ) icalls ocalls Mx.empty in
 
-        if not (Mx.is_empty diff) || self_sub <> None then
-          check_item_err (MF_compl(env, `Eq(self_sub, diff))) end
+       let self_sub =
+         if EcFol.f_equal iself oself then None
+         else Some (iself, oself) in
+
+       if not (Mx.is_empty diff) || self_sub <> None then
+         check_item_err (MF_compl(env, `Eq(self_sub, diff))) end
 
 
 (* -------------------------------------------------------------------- *)
