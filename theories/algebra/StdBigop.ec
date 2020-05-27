@@ -45,6 +45,11 @@ lemma nosmt big_constz (P : 'a -> bool) x s:
   BIA.big P (fun i => x) s = x * (count P s).
 proof. by rewrite BIA.sumr_const -IntID.intmulz. qed.
 
+lemma nosmt bigi_constz x (n m:int):
+  n <= m =>
+  BIA.bigi predT (fun i => x) n m = x * (m - n).
+proof. by move=> ?; rewrite BIA.sumri_const // -IntID.intmulz. qed.
+
 lemma nosmt big_count (P : 'a -> bool) s:
     BIA.big P (fun (x : 'a) => count (pred1 x) s) (undup s)
   = size (filter P s).
@@ -121,6 +126,11 @@ qed.
 lemma sumr_const (P : 'a -> bool) (x : real) (s : 'a list):
   BRA.big P (fun (i : 'a) => x) s = (count P s)%r * x.
 proof. by rewrite sumr_const RField.intmulr RField.mulrC. qed.
+
+lemma sumri_const (x : real) (n m : int):
+  n <= m => 
+  BRA.bigi predT (fun _ => x) n m = (m - n)%r * x.
+proof. by move=> ?; rewrite sumri_const // RField.intmulr RField.mulrC. qed.
 
 lemma sumr1 (s : 'a list) :
   BRA.big predT (fun i => 1%r) s = (size s)%r.
