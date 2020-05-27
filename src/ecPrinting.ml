@@ -1747,28 +1747,22 @@ and pp_costs ppe fmt costs = match costs with
       (fun fmt -> Format.fprintf fmt (if bindings = [] then "" else ",@ "))
       (pp_list ",@ " pp_cost) bindings
 
-and pp_orclinfo ppe fmt (sym, oi) =
+and pp_orclinfo_bare ppe fmt oi =
   let orcls = OI.allowed oi
   and costs = OI.costs oi in
-  if orcls = [] && costs = `Unbounded
-  then Format.fprintf fmt ""
-  else
-    Format.fprintf fmt "@[<hv>%s%a : %a%a@]"
-      (if OI.is_in oi then "" else " *")
-      pp_symbol sym
-      (pp_allowed_orcl ppe) orcls
-      (pp_costs ppe) costs
+  Format.fprintf fmt "%a%a"
+    (pp_allowed_orcl ppe) orcls
+    (pp_costs ppe) costs
+
+and pp_orclinfo ppe fmt (sym, oi) =
+  Format.fprintf fmt "@[<hv>%s%a : %a@]"
+    (if OI.is_in oi then "" else " *")
+    pp_symbol sym
+    (pp_orclinfo_bare ppe) oi
 
 and pp_orclinfos ppe fmt ois =
-  let nothing_to_print =
-    Msym.for_all (fun _ oi ->
-        OI.allowed oi = [] && (OI.costs oi) = `Unbounded
-      ) ois in
-  if nothing_to_print
-  then Format.fprintf fmt ""
-  else
-    Format.fprintf fmt "[@[<hv>%a@]]"
-      (pp_list ",@ " (pp_orclinfo ppe)) (Msym.bindings ois)
+  Format.fprintf fmt "[@[<hv>%a@]]"
+    (pp_list ",@ " (pp_orclinfo ppe)) (Msym.bindings ois)
 
 (* -------------------------------------------------------------------- *)
 and pp_mem_restr ppe fmt mr =
@@ -2912,24 +2906,30 @@ let pp_funsig ppe fmt fs =
       (pp_list ", " (pp_pvdecl ppe)) params
       (pp_type ppe) fs.fs_ret
 
-let pp_sigitem ppe fmt (Tys_function fs) =
-  Format.fprintf fmt "@[<hov 2>%a@]"
+let pp_sigitem moi_opt ppe fmt (Tys_function fs) =
+  Format.fprintf fmt "@[<hov 2>%a@ %t@]"
     (pp_funsig ppe) fs
+    (fun fmt -> match moi_opt with
+       | None ->
+         Format.fprintf fmt ""
+       | Some moi ->
+         let oi = Msym.find fs.fs_name moi in
+         pp_orclinfo_bare ppe fmt oi)
 
 let pp_modsig ppe fmt (p,ms) =
   let (ppe,pp) = pp_mod_params ppe ms.mis_params in
   Format.fprintf fmt "@[<v>@[<hv 2>module type %s%t @,%a@;<0 -2>@] = \
                       {@,  @[<v>%a@]@,}@]"
     (EcPath.basename p) pp
-    (pp_restr ppe) ms.mis_restr
-    (pp_list "@,@," (pp_sigitem ppe)) ms.mis_body
+    (pp_mem_restr ppe) ms.mis_restr
+    (pp_list "@,@," (pp_sigitem (Some ms.mis_restr.mr_oinfos) ppe)) ms.mis_body
 
 (* Printing of a module signature with no restrictions. *)
 let pp_modsig_smpl ppe fmt (p,ms) =
   let (ppe,pp) = pp_mod_params ppe ms.miss_params in
   Format.fprintf fmt "@[<v>module type %s%t = {@,  @[<v>%a@]@,}@]"
     (EcPath.basename p) pp
-    (pp_list "@,@," (pp_sigitem ppe)) ms.miss_body
+    (pp_list "@,@," (pp_sigitem None ppe)) ms.miss_body
 
 let rec pp_instr_r (ppe : PPEnv.t) fmt i =
   match i.i_node with
