@@ -129,6 +129,7 @@ and validation =
 | VLConv   of (handle * ident)       (* hypothesis conversion *)
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
+| VShuffle of ident list             (* goal shuffling *)
 
   (* external (hl/phl/prhl/...) proof-node *)
 | VExtern  : 'a * handle list -> validation

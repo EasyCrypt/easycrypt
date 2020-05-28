@@ -266,6 +266,13 @@ elim: s n => //= x s ih n; case: (n = 0) => [->|_ _].
   by smt w=(size_ge0). by rewrite ih /#.
 qed.
 
+lemma nth_change_dfl ['a] (x0 x1 : 'a) xs i :
+  0 <= i < size xs => nth x1 xs i = nth x0 xs i.
+proof.
+elim: xs i => /= [|x xs ih] i rgi; first by smt().
+case: (i = 0) => //= nz_i; apply: ih => /#.
+qed.
+
 lemma nth_neg (x0 : 'a) s n: n < 0 => nth x0 s n = x0.
 proof. by elim: s n => //= /#. qed.
 
@@ -2192,7 +2199,7 @@ case=> a b; split => [ab_in_s|].
 + apply/flatten_mapP; exists a; rewrite mem_undup /= ?mem_filter //=.
   by rewrite ab_in_s /= &(mapP); exists (a, b).
 case/flatten_mapP=> a'; rewrite mem_undup => -[] /mapP[].
-by case=> a2 b2 /= [_ ->>] {a'}; rewrite mem_filter /= => -[].
+by case=> a2 b2 /= [_ ->>]; rewrite mem_filter /=.
 qed.
 
 (* -------------------------------------------------------------------- *)

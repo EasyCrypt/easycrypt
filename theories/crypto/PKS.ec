@@ -45,21 +45,21 @@ theory EF_CMA.
 
     proc init(): pkey = {
       S.init();
-      qs = fset0;
-      (pk,sk) = S.keygen();
+      qs      <- fset0;
+      (pk,sk) <@ S.keygen();
       return pk;
     }
 
     proc sign(m:message): signature = {
       var s:signature;
-      qs = qs `|` fset1 m;
-      s = S.sign(sk,m);
+      qs <- qs `|` fset1 m;
+      s  <@ S.sign(sk,m);
       return s;
     }
 
     proc verify(m:message,s:signature): bool = {
       var b:bool;
-      b = S.verify(pk,m,s);
+      b <@ S.verify(pk,m,s);
       return b;
     }
 
@@ -81,10 +81,10 @@ theory EF_CMA.
       var s:signature;
       var forged, fresh:bool;
 
-      pk = O.init();
-      (m,s) = A.forge(pk);
-      forged = O.verify(m,s);
-      fresh = O.fresh(m);
+      pk     <@ O.init();
+      (m,s)  <@ A.forge(pk);
+      forged <@ O.verify(m,s);
+      fresh  <@ O.fresh(m);
       return forged /\ fresh;
     }
   }.
@@ -108,21 +108,21 @@ theory NM_CMA.
 
     proc init(): pkey = {
       S.init();
-      qs = fset0;
-      (pk,sk) = S.keygen();
+      qs      <- fset0;
+      (pk,sk) <@ S.keygen();
       return pk;
     }
 
     proc sign(m:message): signature = {
       var s:signature;
-      s = S.sign(sk,m);
-      qs = qs `|` fset1 (m,s);
+      s  <@ S.sign(sk,m);
+      qs <- qs `|` fset1 (m,s);
       return s;
     }
 
     proc verify(m:message,s:signature): bool = {
       var b:bool;
-      b = S.verify(pk,m,s);
+      b <@ S.verify(pk,m,s);
       return b;
     }
 
@@ -144,10 +144,10 @@ theory NM_CMA.
       var s:signature;
       var forged, fresh:bool;
 
-      pk = O.init();
-      (m,s) = A.forge(pk);
-      forged = O.verify(m,s);
-      fresh = O.fresh(m,s);
+      pk     <@ O.init();
+      (m,s)  <@ A.forge(pk);
+      forged <@ O.verify(m,s);
+      fresh  <@ O.fresh(m,s);
       return forged /\ fresh;
     }
   }.

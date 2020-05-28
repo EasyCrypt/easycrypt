@@ -135,6 +135,7 @@ clean:
 	$(OCAMLBUILD) -clean
 	rm -f ec.native ec.byte
 	rm -f ec.native.exe ec.byte.exe
+	find theories examples -name '*.eco' -exec rm '{}' ';'
 
 # --------------------------------------------------------------------
 dist:

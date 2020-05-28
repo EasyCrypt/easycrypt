@@ -350,9 +350,9 @@ and subst_notation (s : _subst) (nott : notation) =
 
 and subst_op_body (s : _subst) (bd : opbody) =
   match bd with
-  | OP_Plain body ->
+  | OP_Plain (body, nosmt) ->
       let s = e_subst_of_subst s in
-        OP_Plain (EcTypes.e_subst s body)
+        OP_Plain (EcTypes.e_subst s body, nosmt)
 
   | OP_Constr (p, i)  -> OP_Constr (s.s_p p, i)
   | OP_Record p       -> OP_Record (s.s_p p)
@@ -365,7 +365,8 @@ and subst_op_body (s : _subst) (bd : opbody) =
         OP_Fix { opf_args     = args;
                  opf_resty    = s.s_ty opfix.opf_resty;
                  opf_struct   = opfix.opf_struct;
-                 opf_branches = subst_branches es opfix.opf_branches; }
+                 opf_branches = subst_branches es opfix.opf_branches;
+                 opf_nosmt    = opfix.opf_nosmt; }
 
   | OP_TC -> OP_TC
 
@@ -504,7 +505,7 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
 
   | Th_reduction rules ->
       let rules =
-        List.map (fun (p, _) -> (s.s_p p, None)) rules
+        List.map (fun (p, opts, _) -> (s.s_p p, opts, None)) rules
       in Th_reduction rules
 
   | Th_auto (lc, lvl, base, ps) ->
@@ -552,7 +553,7 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
 
   | CTh_reduction rules ->
       let rules =
-        List.map (fun (p, _) -> (s.s_p p, None)) rules
+        List.map (fun (p, opts, _) -> (s.s_p p, opts, None)) rules
       in CTh_reduction rules
 
   | CTh_auto (lc, lvl, base, ps) ->

@@ -35,11 +35,12 @@ val (@~)  : FApi.backward -> FApi.tactical -> FApi.backward
 val (@!+) : FApi.tactical -> FApi.backward -> FApi.tactical
 val (@~+) : FApi.tactical -> FApi.backward list -> FApi.tactical
 
-val t_admit : FApi.backward
-val t_true  : FApi.backward
-val t_fail  : FApi.backward
-val t_id    : FApi.backward
-val t_close : ?who:string -> FApi.backward -> FApi.backward
+val t_admit   : FApi.backward
+val t_true    : FApi.backward
+val t_fail    : FApi.backward
+val t_id      : FApi.backward
+val t_close   : ?who:string -> FApi.backward -> FApi.backward
+val t_shuffle : EcIdent.t list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val alpha_find_in_hyps : EcEnv.LDecl.hyps -> EcFol.form -> EcIdent.t
@@ -206,7 +207,7 @@ type rwspec = [`LtoR|`RtoL] * ptnpos option
 type rwmode = [`Bool | `Eq]
 
 val t_rewrite :
-     ?xconv:xconv -> ?target:ident -> ?mode:rwmode -> ?donot:bool
+     ?xconv:xconv -> ?keyed:bool -> ?target:ident -> ?mode:rwmode -> ?donot:bool
   -> proofterm -> rwspec -> FApi.backward
 
 val t_rewrite_hyp :
@@ -313,4 +314,4 @@ type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_auto : ?bases:symbol list -> ?depth:int -> FApi.backward
+val t_solve : ?canfail:bool -> ?bases:symbol list -> ?depth:int -> FApi.backward

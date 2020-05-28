@@ -8,8 +8,7 @@ RUN \
 	apt-get -q -y update && \
 	apt-get -q -y dist-upgrade && \
 	apt-get -q -y install sudo m4 rsync git curl wget && \
-	apt-get -q -y install python python-pip python3 python3-pip && \
-	pip  install --no-cache-dir pyyaml && \
+	apt-get -q -y install python3 python3-pip && \
 	pip3 install --no-cache-dir pyyaml && \
 	apt-get -q -y --no-install-recommends install mccs ocaml-nox opam aspcud && \
 	apt-get -q -y clean

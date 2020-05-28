@@ -1405,12 +1405,13 @@ module Reduction = struct
   let add_rules (rules : (path * rule option) list) (db : mredinfo) =
     List.fold_left ((^~) add_rule) db rules
 
-  let add (rules : (path * rule option) list) (env : env) =
+  let add (rules : (path * rule_option * rule option) list) (env : env) =
+    let rstrip = List.map (fun (x, _, y) -> (x, y)) rules in
     { env with
-        env_redbase = add_rules rules env.env_redbase;
+        env_redbase = add_rules rstrip env.env_redbase;
         env_item    = CTh_reduction rules :: env.env_item; }
 
-  let add1 (prule : path * rule option) (env : env) =
+  let add1 (prule : path * rule_option * rule option) (env : env) =
     add [prule] env
 
   let get (p : topsym) (env : env) =
@@ -1455,6 +1456,10 @@ module Auto = struct
         Mint.union (fun _ sp1 sp2 -> Some (sp1 @ sp2)) db mi)
         Mint.empty dbs
     in flatten_db dbs
+
+  let getx (base : symbol) (env : env) =
+    let db = Msym.find_def Mint.empty base env.env_atbase in
+    Mint.bindings db
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2625,7 +2630,7 @@ module Op = struct
     let op = oget (by_path_opt p env) in
     let f  =
       match op.op_kind with
-      | OB_oper (Some (OP_Plain e)) ->
+      | OB_oper (Some (OP_Plain (e, _))) ->
           form_of_expr EcCoreFol.mhr e
       | OB_pred (Some (PR_Plain f)) ->
           f
@@ -2918,8 +2923,9 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_rd_cth =
     let for1 _path db = function
-      | CTh_reduction x ->
-         Some (Reduction.add_rules x db)
+      | CTh_reduction rules ->
+         let rules = List.map (fun (x, _, y) -> (x, y)) rules in
+         Some (Reduction.add_rules rules db)
       | _ -> None
 
     in bind_base_cth for1

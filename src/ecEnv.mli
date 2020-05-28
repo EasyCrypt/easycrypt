@@ -375,8 +375,8 @@ module Reduction : sig
   type rule   = EcTheory.rule
   type topsym = [ `Path of path | `Tuple ]
 
-  val add1 : path * rule option -> env -> env
-  val add  : (path * rule option) list -> env -> env
+  val add1 : path * rule_option * rule option -> env -> env
+  val add  : (path * rule_option * rule option) list -> env -> env
   val get  : topsym -> env -> rule list
 end
 
@@ -387,6 +387,7 @@ module Auto : sig
   val add    : local:bool -> level:int -> ?base:symbol -> path list -> env -> env
   val get    : ?base:symbol -> env -> path list
   val getall : symbol list -> env -> path list
+  val getx   : symbol -> env ->  (int * path list) list
 end
 
 (* -------------------------------------------------------------------- *)

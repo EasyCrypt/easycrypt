@@ -28,8 +28,8 @@ module S = {
   proc sample2(d1 : t1 distr, d2 : t2 distr) : t1 * t2 = {
     var r1, r2;
 
-    r1 = $ d1;
-    r2 = $ d2;
+    r1 <$ d1;
+    r2 <$ d2;
     return (r1,r2);
   }
 }.

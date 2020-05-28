@@ -194,5 +194,8 @@ theory FDistr.
 
   lemma dt_funi: is_funiform dt.
   proof. by move=> ??;rewrite !dt1E. qed.
+
+  hint exact random : dt_fu dt_ll dt_funi.
+
 end FDistr.
 

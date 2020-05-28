@@ -563,7 +563,48 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           if not (EcPath.p_equal op1 op2) then
             failure ();
           try  List.iter2 (EcUnify.unify env ue) tys1 tys2
-          with EcUnify.UnificationFailure _ -> failure ();
+          with EcUnify.UnificationFailure _ -> failure ()
+      end
+
+      | FhoareF hf1, FhoareF hf2 -> begin
+          if not (EcReduction.EqTest.for_xp env hf1.hf_f hf2.hf_f) then
+            failure ();
+          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
+          List.iter2 (doit env (subst, mxs))
+            [hf1.hf_pr; hf1.hf_po] [hf2.hf_pr; hf2.hf_po]
+      end
+
+      | FbdHoareF hf1, FbdHoareF hf2 -> begin
+          if not (EcReduction.EqTest.for_xp env hf1.bhf_f hf2.bhf_f) then
+            failure ();
+          if hf1.bhf_cmp <> hf2.bhf_cmp then
+            failure ();
+          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
+          List.iter2 (doit env (subst, mxs))
+            [hf1.bhf_pr; hf1.bhf_po; hf1.bhf_bd]
+            [hf2.bhf_pr; hf2.bhf_po; hf2.bhf_bd]
+      end
+
+      | FequivF hf1, FequivF hf2 -> begin
+          if not (EcReduction.EqTest.for_xp env hf1.ef_fl hf2.ef_fl) then
+            failure ();
+          if not (EcReduction.EqTest.for_xp env hf1.ef_fr hf2.ef_fr) then
+            failure();
+          let mxs = Mid.add EcFol.mleft  EcFol.mleft  mxs in
+          let mxs = Mid.add EcFol.mright EcFol.mright mxs in
+          List.iter2
+            (doit env (subst, mxs))
+            [hf1.ef_pr; hf1.ef_po] [hf2.ef_pr; hf2.ef_po]
+      end
+
+      | Fpr pr1, Fpr pr2 -> begin
+          if not (EcReduction.EqTest.for_xp env pr1.pr_fun pr2.pr_fun) then
+            failure ();
+          doit_mem env mxs pr1.pr_mem pr2.pr_mem;
+          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
+          List.iter2
+            (doit env (subst, mxs))
+            [pr1.pr_args; pr1.pr_event] [pr2.pr_args; pr2.pr_event]
       end
 
       | _, _ -> default ()
@@ -880,17 +921,38 @@ module FPosition = struct
             filter o cpos
 
   (* ------------------------------------------------------------------ *)
-  let select_form ?(xconv = `Conv) hyps o p target =
+  let select_form ?(xconv = `Conv) ?(keyed = false) hyps o p target =
     let na = List.length (snd (EcFol.destr_app p)) in
+
+    let kmatch key tp =
+      match key, (fst (destr_app tp)).f_node with
+      | `NoKey , _           -> true
+      | `Path p, Fop (p', _) -> EcPath.p_equal p p'
+      | `Path _, _           -> false
+      | `Var  x, Flocal x'   -> id_equal x x'
+      | `Var  _, _           -> false
+    in
+
+    let keycheck tp key = not keyed || kmatch key tp in
+
+    let key =
+      match (fst (destr_app p)).f_node with
+      | Fop (p, _) -> `Path p
+      | Flocal x   -> `Var x
+      | _          -> `NoKey
+    in
+
     let test _ tp =
-      let (tp, ti) =
-        match tp.f_node with
-        | Fapp (h, hargs) when List.length hargs > na ->
-            let (a1, a2) = List.takedrop na hargs in
-              (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
-        | _ -> (tp, -1)
-      in
-      if EcReduction.xconv xconv hyps p tp then `Accept ti else `Continue
+      if not (keycheck tp key) then `Continue else begin
+        let (tp, ti) =
+          match tp.f_node with
+          | Fapp (h, hargs) when List.length hargs > na ->
+              let (a1, a2) = List.takedrop na hargs in
+                (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
+          | _ -> (tp, -1)
+        in
+        if EcReduction.xconv xconv hyps p tp then `Accept ti else `Continue
+      end
 
     in select ?o test target
 

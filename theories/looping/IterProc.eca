@@ -73,7 +73,7 @@ while (={glob O} /\ l{1} = l0{2}).
 wp; while (={glob O} /\ l{1} = l{2}++_l2).
 + auto; call (_: true); auto.
   move=> ? &ml [#] 2!->; case: (l{ml})=> //= x l'.
-  rewrite !drop0=> /= _ Ol Or ->> /= - {Ol Or}; split=> [[] _|].
+  rewrite !drop0=> /= _ Ol Or ->> /= - {Or}; split=> [[] _|].
   + by apply/contraLR=> /= ->.
   rewrite -size_eq0=> size_l'.
   by split; rewrite -negP=> /(congr1 size); rewrite size_cat [smt(size_ge0)].

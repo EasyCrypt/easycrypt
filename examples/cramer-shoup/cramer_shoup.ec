@@ -33,9 +33,9 @@ theory DDH_ex.
   module DDH0_ex (A:Adversary) = {
     proc main() : bool = {
       var b, x, y;
-      x = $FDistr.dt \ (pred1 F.zero);
-      y = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ (x*y));
+      x <$ FDistr.dt \ (pred1 F.zero);
+      y <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ (x*y));
       return b;
     }
   }.
@@ -44,10 +44,10 @@ theory DDH_ex.
     proc main() : bool = {
       var b, x, y, z;
 
-      x = $FDistr.dt \ (pred1 F.zero);
-      y = $FDistr.dt;
-      z = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ z);
+      x <$ FDistr.dt \ (pred1 F.zero);
+      y <$ FDistr.dt;
+      z <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ z);
       return b;
     }
   }.
@@ -62,8 +62,8 @@ theory DDH_ex.
     proc a1 () = { return ((), F.zero); }
     proc a2 (x:t) = {
       var b, y;
-      y = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ (x*y));
+      y <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ (x*y));
       return b;
     }
   }.
@@ -72,9 +72,9 @@ theory DDH_ex.
     proc a1 = Addh0.a1
     proc a2 (x:t) = {
       var b, y, z;
-      y = $FDistr.dt;
-      z = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ z);
+      y <$ FDistr.dt;
+      z <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ z);
       return b;
     }
   }.
@@ -114,6 +114,7 @@ clone import TCR as TCR_H with
   type t_to   <- F.t.
 
 axiom dk_ll : is_lossless dk.
+hint exact random : dk_ll.
 
 (** Cramer Shoup Encryption *)
 
@@ -142,7 +143,7 @@ module CramerShoup : Scheme = {
 
   proc enc(pk:pkey, m:plaintext) : ciphertext = {
     var k,g,g_,e,f,h,u,a,a_,c,v,d;
-    (k,g,g_,e,f,h) = pk;
+    (k,g,g_,e,f,h) <- pk;
     u <$ FDistr.dt;
     a <- g^u; a_ <- g_^u;
     c <- h^u * m;
@@ -232,7 +233,7 @@ module B_DDH (A:CCA_ADV) = {
           (a,a_,c,d) <- ci;
           v <- H k (a, a_, c);
           if (a_ <> a^w /\ v = v' /\ (a,a_,c) <> (B_TCR.a, B_TCR.a_,B_TCR.c)) g3 <- Some (a,a_,c);
-          m = if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
+          m <- if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
               else None;
         }
         return m;
@@ -272,7 +273,7 @@ module B_DDH (A:CCA_ADV) = {
   }.
 
 lemma CCA_dec_ll (A<:CCA_ADV) : islossless CCA(CramerShoup, A).O.dec.
-proof. by proc;inline *;auto. qed.
+proof. islossless. qed.
 
 section Security_Aux.
 
@@ -325,7 +326,7 @@ section Security_Aux.
           (a,a_,c,d) <- ci;
           v <- H k (a, a_, c);
           bad <- bad \/ (a_ <> a^w /\ d = a ^ (x1 + v*y1) * a_ ^ (x2 + v * y2));
-          m = if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
+          m <- if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
               else None;
         }
         return m;
@@ -435,23 +436,16 @@ section Security_Aux.
     rnd;wp;rnd;wp.
     rnd (fun z => z / x{1}) (fun z => z * x{1}) => /=.
     auto => &m1 &m2 /= -> xL H;rewrite H /=;move: H => /supp_dexcepted. 
-    rewrite /pred1 -ofint0 => -[] InxL HxL yL -> /=.
+    rewrite /pred1 -ofint0 => -[] InxL HxL yL _.
     split => [ ? _ | eqxL]; 1:by field. 
-    split => [ ? _ | _]; 1:by apply FDistr.dt_funi.
-    move=> zL InzL_;split => [ | H{H}]; 1: by apply FDistr.dt_fu.
-    split => [ | _]; 1:by field. 
-    move=> kL -> x2L -> /=.
+    move=> zL InzL_; split => [ | _]; 1:by field. 
+    move=> kL -> /= x2L _.
     split => [ ? _ | Eqx2L]; 1: by ring.
-    split => [ ? _ | H {H}]; 1: by apply FDistr.dt_funi.
-    move=> x1L Inx1L;split => [ | Eqx1L]; 1: by apply FDistr.dt_fu.
-    split => [ | H{H}]; 1: by ring.
-    move=> y2L -> /=;split => [ ? _ | Eqy2L]; 1: by ring.
-    split => [ ? _ | H {H}]; 1: by apply FDistr.dt_funi.
-    move=> y1L Iny1L;split => [ | H{H}]; 1: by apply FDistr.dt_fu.
-    split => [ | H{H}]; 1: by ring.
-    move=> z2L -> /=;split => [ ? _ | Eqz2L]; 1: by ring.
-    split => [ ? _ | H {H}]; 1: by apply FDistr.dt_funi.
-    move=> z1L Inz1L;split => [ | H{H}]; 1: by apply FDistr.dt_fu.
+    move=> x1L Inx1L;split; 1: by ring.
+    move=> _ y2L _ /=;split => [ ? _ | Eqy2L]; 1: by ring.
+    move=> y1L Iny1L; split => [ | H{H}]; 1: by ring.
+    move=> z2L _ /=;split => [ ? _ | Eqz2L]; 1: by ring.
+    move=> z1L Inz1L. 
     have <- /= : z1L = z1L + xL * z2L - xL * z2L by ring. 
     have H1 : forall x1L x2L, g ^ x1L * g ^ xL ^ x2L = g ^ (x1L + xL * x2L).
     + by move=> ??;rewrite log_bij !(log_g, log_pow, log_mul);ring.
@@ -460,13 +454,13 @@ section Security_Aux.
     +  by move=> ??;ring.
     rewrite -!H2 /=;split=> [ | _].
     + by split ;ring.
-    move=> ??????? Hbad ? -> /=.
+    move=> ??????? Hbad ? ? /=.
     have <- /= : g ^ zL = g ^ xL ^ (zL / xL).
     + by rewrite log_bij !(log_g, log_pow, log_mul);field.
     split.
     + move=> /Hbad [#] !->> /= <- <-.
-      by split;rewrite log_bij !(log_g, log_pow, log_mul);ring.
-    by move=> H{H Hbad} ??????? Hbad /Hbad.
+      by split; rewrite log_bij !(log_g, log_pow, log_mul) /=.
+    by move=> _ {H Hbad} ??????? Hbad /Hbad.
   qed.
 
   lemma dt_r_ll x : is_lossless (FDistr.dt \ pred1 x).
@@ -577,9 +571,7 @@ section Security_Aux.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
-    split => [? _ | _ z2L _]; 1: by apply FDistr.dt_funi.
-    split;1: by apply FDistr.dt_fu.
-    move=> _;split => [ | _]; 1: by field.
+    move=> z2L _; split => [ | _]; 1: by field.
     pose HH1 := H _ _; pose HH2 := H _ _.    
     have -> : HH1 = HH2.
     + rewrite /HH1 /HH2;do 2!congr.
@@ -608,9 +600,7 @@ section Security_Aux.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
-    split => [? _ | _ z2L _]; 1: by apply FDistr.dt_funi.
-    split;1: by apply FDistr.dt_fu.
-    move=> _;split => [ | _]; 1: by field.
+    move=> z2L _; split => [ | _]; 1: by field.
     by progress;2..3:rewrite log_bij !(log_g, log_pow, log_mul);field.
   qed.
 
@@ -642,7 +632,7 @@ section Security_Aux.
               y2log <-  y2' :: y2log;
             }
           }
-          m = if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
+          m <- if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
               else None;
         }
         return m;
@@ -757,7 +747,7 @@ section Security_Aux.
       by move: HuL;apply: contra => H;ring H.
     split => [ | _].
     + by rewrite log_bij !(log_g, log_pow, log_mul);field.
-    by rewrite DBool.dbool_ll /= /#.
+    smt(). 
   qed.
 
   local lemma pr_G3_y2log &m : 
@@ -818,7 +808,7 @@ section Security_Aux.
           G1.log <- ci :: G1.log;
           (a,a_,c,d) <- ci;
           v <- H G1.k (a, a_, c);
-          m = if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
+          m <- if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
               else None;
         }
         return m;
@@ -1005,10 +995,9 @@ section Security.
       by conseq (_ : _ ==> ={b} /\ b'{2} = b0{1});[ smt() | sim].
     rewrite Pr [mu_not].
     have -> : Pr[CCA(CramerShoup, A).main() @ &m : true] = 1%r;last by ring.
-    byphoare=> //;proc;inline *;auto.
-    call (guess_ll (<:CCA(CramerShoup,A).O) (CCA_dec_ll A));auto.
-    call (choose_ll (<:CCA(CramerShoup,A).O) (CCA_dec_ll A));auto.
-    auto => />;rewrite FDistr.dt_ll dk_ll DBool.dbool_ll /= => *.
+    byphoare=> //;proc; islossless.
+    + by apply (guess_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
+    + by apply (choose_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
     apply dexcepted_ll; 1: by apply FDistr.dt_ll.
     rewrite FDistr.dt1E;smt (le_fromint gt1_q).  
   qed.
@@ -1022,9 +1011,9 @@ section Security.
       by conseq (_ : _ ==> ={b0} /\ b'{2} = b1{1});[ smt() | sim].   
     rewrite Pr [mu_not];congr.
     byphoare=> //;proc;inline *;auto.
-    call (guess_ll (<:CCA(CramerShoup,A).O) (CCA_dec_ll A));auto.
-    call (choose_ll (<:CCA(CramerShoup,A).O) (CCA_dec_ll A));auto.
-    by auto => />;rewrite FDistr.dt_ll dk_ll DBool.dbool_ll.
+    islossless.
+    + by apply (guess_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
+    by apply (choose_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
   qed.
 
   local lemma DDH1_NA &m : Pr[DDH1(B_DDH(NA)).main() @ &m : res] = 
@@ -1035,12 +1024,10 @@ section Security.
     + byequiv=> //;proc;inline *;wp.
       by conseq (_ : _ ==> ={b0} /\ b'{2} = b1{1});[ smt() | sim].   
     rewrite Pr [mu_not];congr.
-    byphoare=> //;proc;inline *;auto.
-    call (guess_ll (<:CCA(CramerShoup,A).O) (CCA_dec_ll A));auto.
-    call (choose_ll (<:CCA(CramerShoup,A).O) (CCA_dec_ll A));auto.
-    by auto => />;rewrite FDistr.dt_ll dk_ll DBool.dbool_ll.
+    byphoare=> //; islossless.
+    + by apply (guess_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
+    by apply (choose_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
   qed.
-
 
   local lemma TCR_NA &m : Pr[TCR(B_TCR(NA)).main() @ &m : res] = 
                           Pr[TCR(B_TCR(A)).main() @ &m : res].

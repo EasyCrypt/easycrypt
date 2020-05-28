@@ -25,11 +25,11 @@ module CPA (S:Scheme) (A:Adversary) = {
   proc main() : bool = {
     var pk, sk, m0, m1, c, b, b';
 
-    (pk, sk) = S.kg();
-    (m0, m1) = A.choose(pk);
-    b        = ${0,1};
-    c        = S.enc(pk, b ? m1 : m0);
-    b'       = A.guess(c);
+    (pk, sk) <@ S.kg();
+    (m0, m1) <@ A.choose(pk);
+    b        <$ {0,1};
+    c        <@ S.enc(pk, b ? m1 : m0);
+    b'       <@ A.guess(c);
     return (b' = b);
   }
 }.

@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # --------------------------------------------------------------------
 import sys, os
@@ -34,7 +34,7 @@ def _main():
     args.extend(['-l', resource('share/easycrypt/pg/emacs.rc')])
     args.extend(['--no-init-file', '--no-site-file', '--debug-init'])
 
-    print >>sys.stderr, 'running: %s' % (' '.join([emacs] + args))
+    print('running: %s' % (' '.join([emacs] + args)), file=sys.stderr)
 
     os.chdir(mydir)
     os.putenv('PATH', '%s%s%s' % (os.path.join(mydir, 'bin'), \
@@ -45,7 +45,7 @@ def _main():
     try:
         os.execvp(emacs, [emacs] + args)
     except OSError as e:
-        print >>sys.stderr, 'cannot run Emacs: %s' % (repr(e,))
+        print('cannot run Emacs: %s' % (repr(e,)), file=sys.stderr)
         sys.exit(1)
 
 # --------------------------------------------------------------------

@@ -18,8 +18,8 @@ env:
   - TARGETS=check
   - TARGETS=examples
 notifications:
-  email:
-  - tracker@easycrypt.info
+  slack:
+    secure: K1KAbR0W0Ljep3lnPlB9151oGxJcSS6/tR3dZ0GoYOSOybBReEf6DvCMcCfq4QeqQr32tASDpEH6ACEFI1/tdV4Nk3lhAHnz/mg6hmzDZN/jDdTJPg4RKOQWYs6nKO64weof4QKHkFh/XkG0djEQzJPVu6LxaKSQfO1usv1qvBKmzWpbJdvJKoYqo/HwRWauIxNTmin4rsvP8tYBOB7I2W5chaqujZMKpzTk9uI1si1QU0FPAFjNLltBxBZXC8N02cZAIkCvKW1pORu1asMUXxaAcIKKVm4TBwzvI+xUNFZnnlLpUR6e3GLftCdqvmwtfnqP+AbuC+xQSVF09hotqJ0G3f1Ltj7uelusYdyhsppa6c1EDmFPPvk2lkeEbWkfSa+DfMecRNT0SkDAHTM0WnK2H0W8y5EYleBQGKZY8WjS0jMV3yhKWLFGYr8Imt4cpcjZ/8dWkJ62ZTuzuhlmL3Kv31HA+0qrzYP4qbRe/qUmAQesxKajzGB70VmO0bNbVvNZakJ9lrdq09pzgMoLCxc5B1jP39DQZbnXcVcDDlIKRH5oPlRr647/RdszpJ6vBh2G/NB/vpUBdDq0SNWSBtwUX73SIGpcRFRXmgUiXt6eHljR2gPvkYB0yCkTLqSutjE8zktZXFWFUXYLdx2y7hCrvZCwxEyjsxf8/9y+Hsw=
 before_install:
 - docker pull easycryptpa/ec-build-box
 after_failure:

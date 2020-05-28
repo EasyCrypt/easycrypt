@@ -29,23 +29,23 @@ module Wrap(S:Scheme) = {
   var k:key
 
   proc init(): unit = {
-    qs = fset0;
+    qs <- fset0;
     S.init();
-    k = S.keygen();
+    k  <@ S.keygen();
   }
 
   proc mac(m:message): tag = {
     var r:tag;
 
-    qs = qs `|` fset1 m;
-    r = S.mac(k,m);
+    qs <- qs `|` fset1 m;
+    r  <@ S.mac(k,m);
     return r;
   }
 
   proc verify(m:message,t:tag): bool = {
     var r:bool;
 
-    r = S.verify(k,m,t);
+    r <@ S.verify(k,m,t);
     return r;
   }
 
@@ -68,9 +68,9 @@ module CMA(S:Scheme,A:Adv_CMA) = {
     var forged,fresh:bool;
 
     O.init();
-    (m,t) = A.forge();
-    forged = O.verify(m,t);
-    fresh = O.fresh(m);
+    (m,t)  <@ A.forge();
+    forged <@ O.verify(m,t);
+    fresh  <@ O.fresh(m);
     return forged /\ fresh;
   }
 }.

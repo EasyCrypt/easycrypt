@@ -503,7 +503,7 @@ lemma filter_valE ['a 'b] (p : 'a -> 'b -> bool) m :
 proof.
 rewrite /filter ofmapK //; pose P z := (tomap m).[z] <> None.
 apply/(finite_leq P)/isfmap_offmap => y @/P.
-by rewrite !Map.getE Map.offunK /= getE; case: (tomap m).[y].
+by rewrite !Map.getE Map.offunK -Map.getE /= getE; case: (tomap m).[y].
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -704,7 +704,7 @@ lemma dom_restr ['k, 'v, 'f] (m : ('k, 'v * 'f) fmap) f x :
   dom (restr f m) x <=> in_dom_with m x f. 
 proof. 
 rewrite /in_dom_with !domE; case: (m.[x]) (restrP m f x)=> //= -[t f'] /=.
-by rewrite oget_some /=; case (f' = f)=> [_ -> |].
+by case (f' = f)=> [_ -> |].
 qed.
 
 lemma restr_set ['k, 'v, 'f] (m : ('k, 'v * 'f) fmap) f1 f2 x y :

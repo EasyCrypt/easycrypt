@@ -51,7 +51,7 @@ and 'a ovrhooks = {
   hauto    : 'a -> bool * int * string option * EcPath.path list -> 'a;
   htycl    : 'a -> symbol * typeclass -> 'a;
   hinst    : 'a -> (ty_params * ty) * tcinstance -> 'a;
-  husered  : 'a -> (EcPath.path * EcTheory.rule option) list -> 'a;
+  husered  : 'a -> (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list -> 'a;
   hthenter : 'a -> thmode -> symbol -> 'a;
   hthexit  : 'a -> [`Full | `ClearOnly | `No] -> 'a;
   herr     : 'b . ?loc:EcLocation.t -> string -> 'b;
@@ -203,6 +203,12 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopd) =
       (subst, ops, proofs, ove.ovre_hooks.hop scope (x, oopd))
 
   | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
+      let nosmt = opov.opov_nosmt in
+
+      if nosmt && opmode = `Inline then
+          ove.ovre_hooks.herr ~loc
+          ("operator overriding with nosmt only makes sense with alias mode");
+
       let (reftyvars, refty) =
         let refop = EcSubst.subst_op subst oopd in
         (refop.op_tparams, refop.op_ty)
@@ -218,10 +224,8 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopd) =
           let env, xs = EcTyping.trans_binding env ue opov.opov_args in
           let body    = EcTyping.transexpcast env `InOp ue codom opov.opov_body in
           let lam     = EcTypes.e_lam xs body in
-
           (lam.EcTypes.e_ty, lam)
         in
-
         begin
           try ty_compatible scenv ue
               (List.map fst reftyvars, refty)
@@ -238,7 +242,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopd) =
         let body    = body |> EcTypes.e_mapty uni in
         let ty      = uni ty in
         let tparams = EcUnify.UniEnv.tparams ue in
-        let newop   = mk_op tparams ty (Some (OP_Plain body)) in
+        let newop   = mk_op tparams ty (Some (OP_Plain (body, nosmt))) in
           match opmode with
           | `Alias ->
               let subst, x = rename ove subst (`Op, x) in
@@ -429,19 +433,19 @@ and replay_auto
 (* -------------------------------------------------------------------- *)
 and replay_reduction
   (ove : _ ovrenv) (subst, ops, proofs, scope)
-  (rules : (EcPath.path * EcTheory.rule option) list)
+  (rules : (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list)
 =
-  let for1 (p, rule) =
+  let for1 (p, opts, rule) =
     let p = EcSubst.subst_path subst p in
 
     let rule =
       obind (fun rule ->
         try
           Some (EcReduction.User.compile
-                  ~prio:rule.rl_prio (ove.ovre_hooks.henv scope) p)
+                 ~opts ~prio:rule.rl_prio (ove.ovre_hooks.henv scope) p)
         with EcReduction.User.InvalidUserRule _ -> None) rule
 
-    in (p, rule) in
+    in (p, opts, rule) in
 
   let rules = List.map for1 rules in
   let scope = ove.ovre_hooks.husered scope rules in
@@ -488,7 +492,7 @@ and replay_instance
                 | OB_oper (Some (OP_Fix    _))
                 | OB_oper (Some (OP_TC      )) ->
                     Some (EcPath.pappend npath q)
-                | OB_oper (Some (OP_Plain e)) ->
+                | OB_oper (Some (OP_Plain (e, _))) ->
                     match e.EcTypes.e_node with
                     | EcTypes.Eop (r, _) -> Some r
                     | _ -> raise E.InvInstPath
@@ -566,8 +570,8 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
   | CTh_addrw (p, l) ->
      replay_addrw ove (subst, ops, proofs, scope) (p, l)
 
-  | CTh_reduction rule ->
-     replay_reduction ove (subst, ops, proofs, scope) rule
+  | CTh_reduction rules ->
+     replay_reduction ove (subst, ops, proofs, scope) rules
 
   | CTh_auto (lc, lvl, base, ps) ->
      replay_auto ove (subst, ops, proofs, scope) (lc, lvl, base, ps)

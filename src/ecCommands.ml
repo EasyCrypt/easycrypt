@@ -262,14 +262,20 @@ let process_pr fmt scope p =
   let env = EcScope.env scope in
 
   match p with
-  | Pr_ty   qs -> EcPrinting.ObjectInfo.pr_ty   fmt env   qs.pl_desc
-  | Pr_op   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   qs.pl_desc
-  | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   qs.pl_desc
-  | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   qs.pl_desc
-  | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   qs.pl_desc
-  | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   qs.pl_desc
-  | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   qs.pl_desc
-  | Pr_any  qs -> EcPrinting.ObjectInfo.pr_any  fmt env   qs.pl_desc
+  | Pr_ty   qs -> EcPrinting.ObjectInfo.pr_ty   fmt env   (unloc qs)
+  | Pr_op   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
+  | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
+  | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   (unloc qs)
+  | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   (unloc qs)
+  | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   (unloc qs)
+  | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   (unloc qs)
+  | Pr_any  qs -> EcPrinting.ObjectInfo.pr_any  fmt env   (unloc qs)
+
+  | Pr_db (`Rewrite qs) ->
+      EcPrinting.ObjectInfo.pr_rw fmt env (unloc qs)
+
+  | Pr_db (`Solve q) ->
+      EcPrinting.ObjectInfo.pr_at fmt env (unloc q)
 
   | Pr_glob pm -> HiPrinting.pr_glob fmt env pm
   | Pr_goal n  -> HiPrinting.pr_goal fmt scope n
@@ -436,6 +442,13 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
       Loader.push    filename subld;
       Loader.addidir ?namespace:fnm dirname subld;
 
+      let name = EcScope.{
+        rqd_name      = thname;
+        rqd_kind      = kind;
+        rqd_namespace = fnm;
+        rqd_digest    = Digest.file filename;
+      } in
+
       let loader iscope =
         let i_pragma = Pragma.get () in
 
@@ -448,11 +461,11 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
 
       let kind = match kind with `Ec -> `Concrete | `EcA -> `Abstract in
 
-      let scope = EcScope.Theory.require scope (thname, kind) loader in
-        match io with
-        | None         -> scope
-        | Some `Export -> EcScope.Theory.export scope ([], thname)
-        | Some `Import -> EcScope.Theory.import scope ([], thname)
+      let scope = EcScope.Theory.require scope (name, kind) loader in
+          match io with
+          | None         -> scope
+          | Some `Export -> EcScope.Theory.export scope ([], name.rqd_name)
+          | Some `Import -> EcScope.Theory.import scope ([], name.rqd_name)
 
 (* -------------------------------------------------------------------- *)
 and process_th_require ld scope (nm, xs, io) =
@@ -809,6 +822,10 @@ let process ?(timed = false) (g : global_action located) : float option =
   with
   | Pragma `Reset   -> reset (); None
   | Pragma `Restart -> raise Restart
+
+(* -------------------------------------------------------------------- *)
+let check_eco =
+  EcEco.check_eco (fun name -> Loader.locate name loader)
 
 (* -------------------------------------------------------------------- *)
 module S = EcScope

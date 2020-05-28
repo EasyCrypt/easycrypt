@@ -23,6 +23,8 @@ proof. by done. qed.
 
 lemma nosmt oget_some (x : 'a): oget (Some x) = x.
 proof. by done. qed.
+hint simplify oget_some, oget_none.
+
 
 lemma nosmt some_oget (x : 'a option): x <> None => x = Some (oget x).
 proof. by case: x. qed.

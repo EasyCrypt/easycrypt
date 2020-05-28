@@ -17,7 +17,22 @@ type ecloader = {
   mutable ecl_idirs : ((namespace option * string) * idx_t) list;
 }
 
+(* -------------------------------------------------------------------- *)
 type kind = [`Ec | `EcA]
+
+exception BadExtension of string
+
+let getkind ext =
+  let ext =
+    if   String.starts_with ext "."
+    then String.chop ~l:1 ~r:0 ext
+    else ext
+  in
+
+  match ext with
+  | "ec"  -> `Ec
+  | "eca" -> `EcA
+  | _     -> raise (BadExtension ("." ^ ext))
 
 (* -------------------------------------------------------------------- *)
 let create () = { ecl_idirs = []; }

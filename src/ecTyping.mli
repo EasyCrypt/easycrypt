@@ -125,6 +125,7 @@ type tyerror =
 | MemNotAllowed
 | UnknownScope           of qsymbol
 | FilterMatchFailure
+| LvMapOnNonAssign
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -168,9 +169,6 @@ val transexpcast :
 
 val transexpcast_opt :
   env -> [`InProc|`InOp] -> EcUnify.unienv -> ty option -> pexpr -> expr
-
-(* -------------------------------------------------------------------- *)
-val translvalue : EcUnify.unienv -> env -> plvalue -> lvalue * ty
 
 (* -------------------------------------------------------------------- *)
 type ismap = (instr list) EcMaps.Mstr.t

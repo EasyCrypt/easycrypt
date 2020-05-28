@@ -29,11 +29,11 @@ module IND_CCA ( S : SKE, A : Adv_CCA) = {
     var b, b', c, p0, p1, p;
 
     O.init();
-    (p0,p1) = A.choose();
-    b = ${0,1};
-    p = b ? p1 : p0; (* FIXME: need to check whether plaintexts are both valid or both invalid *)
-    c = O.enc(p);
-    b' = A.guess(oget c);
+    (p0,p1) <@ A.choose();
+    b       <$ {0,1};
+    p       <- b ? p1 : p0; (* FIXME: need to check whether plaintexts are both valid or both invalid *)
+    c       <@ O.enc(p);
+    b'      <@ A.guess(oget c);
     return (b = b' /\ !mem Wrap.dqs (oget c)); (* Penalty-style *)
   }
 }.

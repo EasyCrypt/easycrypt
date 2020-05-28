@@ -10,7 +10,12 @@
 type idx_t
 type ecloader
 
+(* -------------------------------------------------------------------- *)
 type kind = [`Ec | `EcA]
+
+exception BadExtension of string
+
+val getkind : string -> kind
 
 (* -------------------------------------------------------------------- *)
 type namespace = [ `System | `Named of string ]

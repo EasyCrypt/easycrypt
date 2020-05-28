@@ -879,6 +879,7 @@ let pp_opapp
     ((dt_sub  : 'a -> (EcPath.path * _ * 'a list) option),
      (pp_sub  : PPEnv.t -> _ * (opprec * iassoc) -> _ -> 'a -> unit),
      (is_trm  : 'a -> bool),
+     (is_tuple: 'a -> 'a list option),
      (is_proj : EcPath.path -> 'a -> (EcIdent.t * int) option))
      (outer   : symbol list * ((_ * fixity) * iassoc))
      (fmt     : Format.formatter)
@@ -891,6 +892,11 @@ let pp_opapp
     PPEnv.op_symb ppe op (Some (pred, tvi, List.map t_ty es)) in
 
   let inm = if nm = [] then fst outer else nm in
+
+  let pp_tuple_sub ppe prec fmt e =
+    match is_tuple e with
+    | None    -> pp_sub ppe prec fmt e
+    | Some es -> pp_list ", " (pp_sub ppe prec) fmt es in
 
   let pp_as_std_op fmt =
     let module E = struct exception PrintAsPlain end in
@@ -911,17 +917,17 @@ let pp_opapp
         | x, [e1; e2] when x = EcCoreLib.s_get ->
             let pp fmt =
               Format.fprintf fmt "@[%a.[%a]@]"
-                (pp_sub ppe (inm, (e_get_prio , `Left    ))) e1
-                (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
+                (pp_sub       ppe (inm, (e_get_prio , `Left    ))) e1
+                (pp_tuple_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
             in
               (pp, e_get_prio)
 
         | x, [e1; e2; e3] when x = EcCoreLib.s_set ->
             let pp fmt =
               Format.fprintf fmt "@[<hov 2>%a.[%a <-@ %a]@]"
-                (pp_sub ppe (inm, (e_get_prio , `Left    ))) e1
-                (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
-                (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e3
+                (pp_sub       ppe (inm, (e_get_prio , `Left    ))) e1
+                (pp_tuple_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
+                (pp_sub       ppe (inm, (min_op_prec, `NonAssoc))) e3
             in
               (pp, e_get_prio)
 
@@ -1319,16 +1325,21 @@ let rec pp_lvalue (ppe : PPEnv.t) fmt lv =
       Format.fprintf fmt "@[<hov 2>%a@]"
         (pp_paren (pp_list ",@ " (pp_pv ppe))) (List.map fst ps)
 
-  | LvMap (_, x, e, _) ->
-      Format.fprintf fmt "%a.[%a]"
-        (pp_pv ppe) x (pp_expr ppe) e
-
 (* -------------------------------------------------------------------- *)
 and pp_instr_for_form (ppe : PPEnv.t) fmt i =
   match i.i_node with
-  | Sasgn (lv, e) ->
-      Format.fprintf fmt "%a <-@;<1 2>%a"
-        (pp_lvalue ppe) lv (pp_expr ppe) e
+  | Sasgn (lv, e) -> begin
+      match lv, EcTypes.split_args e with
+      | LvVar (x, _), ({ e_node = Eop (op, _) }, [ { e_node = Evar y }; k; v])
+          when (EcPath.basename op = EcCoreLib.s_set) && (EcTypes.pv_equal x y) ->
+
+        Format.fprintf fmt "%a.[%a] <-@;<1 2>%a"
+          (pp_pv ppe) x (pp_tuple_expr ppe) k (pp_expr ppe) v
+
+      | _, _ ->
+        Format.fprintf fmt "%a <-@;<1 2>%a"
+          (pp_lvalue ppe) lv (pp_expr ppe) e
+    end
 
   | Srnd (lv, e) ->
       Format.fprintf fmt "%a <$@;<1 2>$%a"
@@ -1572,6 +1583,11 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       | Fint _ | Flocal _ | Fpvar _ | Fop _ | Ftuple _ -> true
       | _ -> false
 
+    and is_tuple f =
+      match f.f_node with
+      | Ftuple ((_ :: _ :: _) as xs) -> Some xs
+      | _ -> None
+
     and is_proj (rc : EcPath.path) (f : form) =
       match f.f_node with
       | Fapp ({ f_node = Fop (p, _) }, [{ f_node = Flocal x }]) -> begin
@@ -1584,7 +1600,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
     in
       pp_opapp ppe f_ty
-        (dt_sub, pp_form_r, is_trm, is_proj)
+        (dt_sub, pp_form_r, is_trm, is_tuple, is_proj)
         outer fmt (`Form, op, tys, es)
   in
 
@@ -1763,6 +1779,12 @@ and pp_expr ppe fmt e =
   let mr = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
   pp_form ppe fmt (form_of_expr mr e)
 
+and pp_tuple_expr ppe fmt e =
+  match e.e_node with
+  | Etuple ((_ :: _ :: _) as es) ->
+    pp_list ", " (pp_expr ppe) fmt es
+  | _ -> pp_expr ppe fmt e
+
 (* -------------------------------------------------------------------- *)
 let pp_sform ppe fmt f =
   pp_form_r ppe ([], ((100, `Infix `NonAssoc), `NonAssoc)) fmt f
@@ -1886,23 +1908,35 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
 let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in
 
+  let pp_nosmt fmt =
+    let b =
+      match op with
+      | None -> false
+      | Some (OP_Plain (_, b)) -> b
+      | Some (OP_Fix { opf_nosmt = b }) -> b
+      | _ -> false
+    in if b then Format.fprintf fmt "@ nosmt" else () in
+
   let pp_body fmt =
     match op with
     | None ->
         Format.fprintf fmt ": %a" (pp_type ppe) ty
 
-    | Some (OP_Plain e) ->
-        let ((subppe, pp_vds), e) =
+    | Some (OP_Plain (e, _)) ->
+        let ((subppe, pp_vds), e, has_vds) =
           let (vds, e) =
             match e.e_node with
             | Equant (`ELambda, vds, e) -> (vds, e)
             | _ -> ([], e) in
-
-          (pp_locbinds ppe ~fv:e.e_fv vds, e)
+          (pp_locbinds ppe ~fv:e.e_fv vds, e,
+           match vds with [] -> false | _ -> true)
         in
-          Format.fprintf fmt "%t :@ %a =@ %a" pp_vds
-            (pp_type ppe) e.e_ty (pp_expr subppe) e
-
+          if has_vds then
+            Format.fprintf fmt "%t :@ %a =@ %a" pp_vds
+              (pp_type ppe) e.e_ty (pp_expr subppe) e
+          else
+            Format.fprintf fmt ":@ %a =@ %a"
+              (pp_type ppe) e.e_ty (pp_expr subppe) e
     | Some (OP_Constr (indp, i)) ->
         Format.fprintf fmt
           ": %a =@ < %d-th constructor of %a >"
@@ -1959,11 +1993,11 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   in
 
   match ts with
-  | [] -> Format.fprintf fmt "@[<hov 2>op %a %t.@]"
-      pp_opname ([], basename) pp_body
+  | [] -> Format.fprintf fmt "@[<hov 2>op%t %a %t.@]"
+      pp_nosmt pp_opname ([], basename) pp_body
   | _  ->
-      Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
-        pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+      Format.fprintf fmt "@[<hov 2>op%t %a %a %t.@]"
+        pp_nosmt pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_nt (ppe : PPEnv.t) fmt (basename, ts, _ty, nt) =
@@ -2493,6 +2527,32 @@ let pp_equivS (ppe : PPEnv.t) ?prpo fmt es =
   Format.fprintf fmt "%a%!" (pp_post ppe ?prpo) es.es_po
 
 (* -------------------------------------------------------------------- *)
+let pp_rwbase ppe fmt (p, rws) =
+  Format.fprintf fmt "%a = %a@\n%!"
+    (pp_rwname ppe) p (pp_list ", " (pp_axname ppe)) (Sp.elements rws)
+
+(* -------------------------------------------------------------------- *)
+let pp_solvedb ppe fmt db =
+  List.iter (fun (lvl, ps) ->
+    Format.fprintf fmt "[%3d] %a\n%!"
+      lvl (pp_list ", " (pp_axname ppe)) ps)
+  db;
+
+  let lemmas = List.flatten (List.map snd db) in
+  let lemmas = List.pmap (fun p ->
+      let ax = EcEnv.Ax.by_path_opt p ppe.PPEnv.ppe_env in
+      (omap (fun ax -> (p, ax)) ax))
+    lemmas
+  in
+
+  if not (List.is_empty lemmas) then begin
+    Format.fprintf fmt "\n%!";
+    List.iter
+      (fun ax -> Format.fprintf fmt "%a\n\n%!" (pp_axiom ppe) ax)
+      lemmas
+  end
+
+(* -------------------------------------------------------------------- *)
 type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [
   | `One of int
   | `All of (EcBaseLogic.hyps * EcFol.form) list
@@ -2707,12 +2767,21 @@ let pp_modsig ppe fmt (p,ms) =
 
 let rec pp_instr_r (ppe : PPEnv.t) fmt i =
   match i.i_node with
-  | Sasgn (lv, e) ->
-    Format.fprintf fmt "@[<hov 2>%a <-@ @[%a@]@];"
-      (pp_lvalue ppe) lv (pp_expr ppe) e
+  | Sasgn (lv, e) -> begin
+      match lv, EcTypes.split_args e with
+      | LvVar (x, _), ({ e_node = Eop (op, _) }, [ { e_node = Evar y }; k; v])
+          when (EcPath.basename op = EcCoreLib.s_set) && (EcTypes.pv_equal x y) ->
+
+        Format.fprintf fmt "@[<hov 2>%a.[%a] <-@ @[%a@]@];"
+          (pp_pv ppe) x (pp_tuple_expr ppe) k (pp_expr ppe) v
+
+      | _, _ ->
+        Format.fprintf fmt "@[<hov 2>%a <-@ @[%a@]@];"
+          (pp_lvalue ppe) lv (pp_expr ppe) e
+    end
 
   | Srnd (lv, e) ->
-    Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@];"
+    Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@]@];"
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
@@ -2979,10 +3048,12 @@ let pp_stmt ?(lineno = false) =
 module ObjectInfo = struct
   exception NoObject
 
+  type db = [`Rewrite of qsymbol | `Solve of symbol]
+
   (* ------------------------------------------------------------------ *)
   type 'a objdump = {
     od_name    : string;
-    od_lookup  : EcSymbols.qsymbol -> EcEnv.env -> 'a;
+    od_lookup  : qsymbol -> EcEnv.env -> 'a;
     od_printer : PPEnv.t -> Format.formatter -> 'a -> unit;
   }
 
@@ -3070,13 +3141,45 @@ module ObjectInfo = struct
   let pr_mty = pr_gen pr_mty_r
 
   (* ------------------------------------------------------------------ *)
+  let pr_rw_r =
+    { od_name    = "rewrite database";
+      od_lookup  = EcEnv.BaseRw.lookup;
+      od_printer = pp_rwbase; }
+
+  let pr_rw = pr_gen pr_rw_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_at_r =
+    let lookup q env =
+      match q with
+      | ([], q) -> begin
+          match EcEnv.Auto.getx q env with
+          | [] -> raise NoObject | reds -> reds
+        end
+      | _ -> raise NoObject in
+
+    { od_name    = "solve database";
+      od_lookup  = lookup;
+      od_printer = pp_solvedb; }
+
+  let pr_at fmt env x = pr_gen pr_at_r fmt env ([], x)
+
+  (* ------------------------------------------------------------------ *)
+  let pr_db fmt env db =
+    match db with
+    | `Rewrite name -> pr_rw fmt env name
+    | `Solve   name -> pr_at fmt env name
+
+  (* ------------------------------------------------------------------ *)
   let pr_any fmt env qs =
     let printers = [pr_gen_r ~prcat:true pr_ty_r ;
                     pr_gen_r ~prcat:true pr_op_r ;
                     pr_gen_r ~prcat:true pr_th_r ;
                     pr_gen_r ~prcat:true pr_ax_r ;
                     pr_gen_r ~prcat:true pr_mod_r;
-                    pr_gen_r ~prcat:true pr_mty_r; ] in
+                    pr_gen_r ~prcat:true pr_mty_r;
+                    pr_gen_r ~prcat:true pr_rw_r ;
+                    pr_gen_r ~prcat:true pr_at_r ; ] in
 
     let ok = ref (List.length printers) in
 

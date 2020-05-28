@@ -1,5 +1,5 @@
 require import AllCore Distr DInterval FSet List SmtMap.
-require PROM.
+require PROM PlugAndPray.
 
 (***************************************)
 (* Definitions for Public-Key Signatures 
@@ -21,7 +21,7 @@ op verify : pkey * message * signature -> bool.
 axiom keygen_ll : is_lossless keygen.
 axiom sign_ll s m : is_lossless (sign (s,m)).
 
-hint solve 2 random : keygen_ll sign_ll.
+hint exact random : keygen_ll sign_ll.
 
 axiom verify_sign : forall pk sk m s, 
   (pk,sk) \in keygen =>
@@ -279,63 +279,6 @@ section.
 end section.
 
 (* ------------------------------------------------------------------------- *)
-(* Plug and Pray                                                             *)
-(* ------------------------------------------------------------------------- *)
-
-(* TODO move this elsewere *)                          
-abstract theory PlugAndPray.
-
-type tval.
-op indices : { tval list | indices <> [] } as indices_not_nil.
-abbrev card = size (undup indices).
-
-type tin, tres.
-
-module type Game = {
-  proc main(x:tin): tres
-}.
-
-module Guess (G:Game) = {
-  proc main(x:tin): tval * tres = {
-    var o,i;
-    o = G.main(x);
-    i = $duniform indices;
-    return (i,o);
-  }
-}.
-
-lemma PBound (G <: Game )
-             (phi : (glob G) -> tres -> bool)
-             (psi : (glob G) -> tres -> tval)
-             x0 &m:
-  (forall gG o, phi gG o => psi gG o \in indices) =>
-  (1%r/card%r) * Pr[G.main(x0) @ &m: phi (glob G) res]
-  = Pr[Guess(G).main(x0) @ &m:
-         phi (glob G) res.`2 /\
-         res.`1 = psi (glob G) res.`2].
-proof.
-move=> psi_in_indices.
-byphoare (_: (glob G) = (glob G){m} /\ x0 = x ==>
-             phi (glob G) (snd res) /\
-             res.`1 = psi (glob G) res.`2)=> //.
-pose p:= Pr[G.main(x0) @ &m: phi (glob G) res].
-proc.
-seq  1: (phi (glob G) o)
-        (p) (1%r/card%r)
-        _ 0%r => //.
-  (* FIXME: This is more verbose than it should be! *)
-+ call (: (glob G) = (glob G){m} /\ x = x0 ==> phi (glob G) res) => //.
-  bypr=> &m0 @/p [#] eq_globs ->.
-  byequiv (: ={glob G, x} ==> ={glob G, res})=> //=.
-  by proc true.
-+ rnd (pred1 (psi (glob G) o)); skip=> /> &m0 hphi.
-  by rewrite duniform1E psi_in_indices.
-by hoare; auto=> /> &m0 ->.
-qed.
-
-end PlugAndPray.
-
-(* ------------------------------------------------------------------------- *)
 (* We show that UF reduce to UF1                                             *)
 (* ------------------------------------------------------------------------- *)
 
@@ -394,7 +337,7 @@ abstract theory UF1_UF.
     var c: int
     module WO : OrclUF = {
       proc keygen() = {
-        var pk = witness;
+        var pk <- witness;
         if (c < q_gen) {
           pk <@ O.keygen();
           c <- c + 1;
@@ -421,7 +364,7 @@ abstract theory UF1_UF.
 
      module WO = {
        proc keygen () = {
-         var pk = witness;
+         var pk <- witness;
          if (WAkg.c < q_gen) {
            if (WAkg.c = i) {
               if (RealSigServ.count_pk < q_gen) {
@@ -437,7 +380,7 @@ abstract theory UF1_UF.
        }
 
        proc sign(pk : pkey, m : message) : signature option = {
-         var so : signature option = None;
+         var so : signature option <- None;
          var s : signature;
          if (count_sig < q_sig) {
             if (mpki.[pk] = Some i) {
@@ -485,7 +428,7 @@ abstract theory UF1_UF.
 
       module WO = {
         proc keygen () = {
-          var pk = witness;
+          var pk <- witness;
           if (WAkg.c < q_gen) {
             pk <@ O.keygen();
             if (! pk \in MkAdvUF1.mpki) MkAdvUF1.mpki.[pk] <- WAkg.c;
@@ -586,7 +529,7 @@ abstract theory UF1_UF.
       module WO = {
         proc keygen () = {
           var sk;
-          var pk = witness;
+          var pk <- witness;
           if (WAkg.c < q_gen) {
             if (WAkg.c = MkAdvUF1.i) {
               if (RealSigServ.count_pk < q_gen) {
@@ -684,7 +627,7 @@ abstract theory UF1_UF.
         auto => />. 
         if => //. 
         seq 4 1 : (#[/3:]pre /\ ={pk} /\ (pk,sk){1} = (UF1.pk,UF1.sk){2}).
-        + conseq />; auto => />; smt(keygen_ll get_setE).
+        + conseq />; auto => />; smt (get_setE).
         swap {1} 2 -1. sp 1 1.
         if; 1: smt().
         + rcondt{1} 2;auto => />; smt (get_setE). 

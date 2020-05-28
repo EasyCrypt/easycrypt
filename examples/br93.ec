@@ -414,7 +414,7 @@ conseq
 call (: ={glob Log, glob RO}); 1: by sim.
 swap{1} 6 -2.
 auto; call (: ={glob Log, glob RO}); 1: by sim.
-by auto=> /> [pk sk] ->; rewrite dbool_ll.
+by auto=> /> [pk sk] ->.
 qed.
 
 lemma Reduction &m:
@@ -470,7 +470,7 @@ op parse (c:ctxt): rand * ptxt =
 lemma parseK r p: parse (r || p) = (r,p).
 proof.
 rewrite /parse /(||) ofctxtK 1:size_cat 1:size_rand 1:size_ptxt //=.
-by rewrite take_cat drop_cat size_rand take0 drop0 cats0 mkrandK mkptxtK.
+by rewrite take_cat drop_cat size_rand take0 drop0 cats0 /= mkrandK mkptxtK.
 qed.
 
 lemma formatI (r : rand) (p : ptxt) r' p':

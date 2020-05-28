@@ -171,13 +171,13 @@ let t_eager_if_r tc =
       (f_hoareS (mhr, snd es.es_ml) (f_and p eqb) s eqb) in
 
   let cT =
-    let pre = f_and es.es_pr (f_eq fe f_true) in
+    let pre = f_and es.es_pr (f_eq fel f_true) in
     let st  = stmt (s.s_node @ c1.s_node) in
     let st' = stmt (c1'.s_node @ s'.s_node) in
     f_equivS es.es_ml es.es_mr pre st st' es.es_po in
 
   let dT =
-    let pre = f_and es.es_pr (f_eq fe f_false) in
+    let pre = f_and es.es_pr (f_eq fel f_false) in
     let st  = stmt (s.s_node @ c2.s_node) in
     let st' = stmt (c2'.s_node @ s'.s_node) in
     f_equivS es.es_ml es.es_mr pre st st' es.es_po in
@@ -433,12 +433,6 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         when List.length ll = List.length lr
       ->
         List.fold_left2 aux eqs ll lr
-
-    | LvMap ((pl, tysl), pvl, el, tyl), LvMap ((pr, tysr), pvr, er,tyr)
-        when EcPath.p_equal pl pr
-          && List.all2 (ER.EqTest.for_type env) (tyl::tysl) (tyr::tysr)
-      ->
-        Mpv2.add_eqs env el er (Mpv2.remove env pvl pvr eqs)
 
     | _, _ -> raise EqObsInError in
 

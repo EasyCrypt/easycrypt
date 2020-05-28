@@ -983,6 +983,7 @@ type pprint =
   | Pr_mty  of pqsymbol
   | Pr_glob of pmsymbol located
   | Pr_goal of int
+  | Pr_db   of [`Rewrite of pqsymbol | `Solve of psymbol]
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind =
@@ -1044,6 +1045,7 @@ and pr_override = pr_override_def * [`Alias | `Inline]
 and th_override = pqsymbol
 
 and op_override_def = {
+  opov_nosmt  : bool;
   opov_tyvars : psymbol list option;
   opov_args   : ptybinding list;
   opov_retty  : pty;
@@ -1083,7 +1085,11 @@ type phint = {
 }
 
 (* -------------------------------------------------------------------- *)
-type puserred = (pqsymbol list * int option) list
+type puseroption =
+  [`Delta | `EqTrue]
+
+type puserred =
+  puseroption list * (pqsymbol list * int option) list
 
 type threquire =
   psymbol option * (psymbol * psymbol option) list * [`Import|`Export] option

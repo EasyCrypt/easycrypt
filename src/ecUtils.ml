@@ -562,11 +562,15 @@ module List = struct
   (* ------------------------------------------------------------------ *)
   let fst xs = List.map fst xs
   let snd xs = List.map snd xs
+
+  (* ------------------------------------------------------------------ *)
+  let reduce1 (f : 'a list -> 'a) : 'a list -> 'a =
+    function [x] -> x | xs  -> f xs
 end
 
 (* -------------------------------------------------------------------- *)
 module Parray = struct
-  type 'a t = 'a array
+  type 'a parray = 'a array
 
   include Array
 
