@@ -203,6 +203,12 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopd) =
       (subst, ops, proofs, ove.ovre_hooks.hop scope (x, oopd))
 
   | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
+      let nosmt = opov.opov_nosmt in
+
+      if nosmt && opmode = `Inline then
+          ove.ovre_hooks.herr ~loc
+          ("operator overriding with nosmt only makes sense with alias mode");
+
       let (reftyvars, refty) =
         let refop = EcSubst.subst_op subst oopd in
         (refop.op_tparams, refop.op_ty)
@@ -218,10 +224,8 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopd) =
           let env, xs = EcTyping.trans_binding env ue opov.opov_args in
           let body    = EcTyping.transexpcast env `InOp ue codom opov.opov_body in
           let lam     = EcTypes.e_lam xs body in
-
           (lam.EcTypes.e_ty, lam)
         in
-
         begin
           try ty_compatible scenv ue
               (List.map fst reftyvars, refty)
@@ -238,7 +242,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopd) =
         let body    = body |> EcTypes.e_mapty uni in
         let ty      = uni ty in
         let tparams = EcUnify.UniEnv.tparams ue in
-        let newop   = mk_op tparams ty (Some (OP_Plain body)) in
+        let newop   = mk_op tparams ty (Some (OP_Plain (body, nosmt))) in
           match opmode with
           | `Alias ->
               let subst, x = rename ove subst (`Op, x) in
@@ -491,7 +495,7 @@ and replay_instance
                 | OB_oper (Some (OP_Fix    _))
                 | OB_oper (Some (OP_TC      )) ->
                     Some (EcPath.pappend npath q)
-                | OB_oper (Some (OP_Plain e)) ->
+                | OB_oper (Some (OP_Plain (e, _))) ->
                     match e.EcTypes.e_node with
                     | EcTypes.Eop (r, _) -> Some r
                     | _ -> raise E.InvInstPath

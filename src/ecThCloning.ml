@@ -342,6 +342,7 @@ end = struct
          let params = List.map (EcIdent.name |- fst) oopd.op_tparams in
          let params = List.map (mk_loc lc) params in
          let ovrd   = {
+             opov_nosmt = false;  (* because inline mode *)
              opov_tyvars = Some params;
              opov_args   = [];
              opov_retty  = loced PTunivar;
