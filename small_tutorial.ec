@@ -1,4 +1,4 @@
-require import Int CHoareTactic StdBigop.
+require import Int List CHoareTactic StdBigop.
 import Bigint IntExtra.
 
 module V = { var v : int }.
@@ -165,6 +165,26 @@ skip => * => /=; split; [1: by smt].
 rewrite !big_constz !count_predT !size_range; by smt ().
 qed.
 
+(* Match example *)
+
+
+module ExMatch = {
+  proc gethead (l : int list) = {
+    var x : int;
+    match 1 :: 2 :: l with
+    | [] => x <- 0;
+    | a :: tail => x <- a + 1;
+    end;
+  }
+}.
+
+lemma test_match : choare[ExMatch.gethead] time [4].
+proof.
+  proc.
+  match (::) 0. 
+  admit.
+  auto => * /=.
+qed.
 
 (*********************)
 (* Lemma application *)
