@@ -250,6 +250,7 @@ let gty_fv = function
 
   | GTmem mt -> EcMemory.mt_fv mt
 
+(* -------------------------------------------------------------------- *)
 let gtty (ty : EcTypes.ty) =
   GTty ty
 

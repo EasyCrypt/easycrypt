@@ -16,6 +16,7 @@ type i_pat =
   | IPpat
   | IPif    of s_pat pair
   | IPwhile of s_pat
+  | IPmatch of s_pat list
 
 and s_pat = (int * i_pat) list
 

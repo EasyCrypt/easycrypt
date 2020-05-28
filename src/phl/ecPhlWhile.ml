@@ -75,10 +75,14 @@ let while_info env e s =
     | Sif (e, s1, s2) ->
         let r = e_read_r env r e in s_info (s_info (w, r, c) s1) s2
 
-    | Swhile(e,s) ->
+    | Swhile (e, s) ->
         let r = e_read_r env r e in s_info (w, r, c) s
 
-    | Scall(lp,f,es) ->
+    | Smatch (e, bs) ->
+        let r = e_read_r env r e in
+        List.fold_left (fun st (_, b) -> s_info st b) (w, r, c) bs
+
+    | Scall (lp, f, es) ->
         let r = List.fold_left (e_read_r env) r es in
         let w = match lp with None -> w | Some lp -> lp_write_r env w lp in
         let f = EcEnv.NormMp.norm_xfun env f in
@@ -88,12 +92,12 @@ let while_info env e s =
         (w, e_read_r env r e, c)
 
     | Sabstract id ->
-      let add_pv x (pv,ty) = PV.add env pv ty x in
-      let us = EcEnv.AbsStmt.byid id env in
-      let w = List.fold_left add_pv w us.EcModules.aus_writes in
-      let r = List.fold_left add_pv r us.EcModules.aus_reads in
-      let c = List.fold_left (fun c f -> Sx.add f c) c us.EcModules.aus_calls in
-      (w, r, c)
+        let add_pv x (pv,ty) = PV.add env pv ty x in
+        let us = EcEnv.AbsStmt.byid id env in
+        let w = List.fold_left add_pv w us.EcModules.aus_writes in
+        let r = List.fold_left add_pv r us.EcModules.aus_reads in
+        let c = List.fold_left (fun c f -> Sx.add f c) c us.EcModules.aus_calls in
+        (w, r, c)
 
   and s_info info s = List.fold_left i_info info s.s_node in
 

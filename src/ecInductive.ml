@@ -26,8 +26,9 @@ type record = {
 }
 
 (* -------------------------------------------------------------------- *)
-let record_ctor_name (x : symbol) = Printf.sprintf "mk_%s"  x
-let record_ind_name  (x : symbol) = Printf.sprintf "%s_ind" x
+let record_ctor_name   (x : symbol) = Printf.sprintf "mk_%s"  x
+let record_ind_name    (x : symbol) = Printf.sprintf "%s_ind" x
+let datatype_proj_name (x : symbol) = Printf.sprintf "get_as_%s" x
 
 (* -------------------------------------------------------------------- *)
 let record_ctor_path (p : EP.path) =
@@ -36,6 +37,10 @@ let record_ctor_path (p : EP.path) =
 (* -------------------------------------------------------------------- *)
 let record_ind_path (p : EP.path) =
   EcPath.pqoname (EcPath.prefix p) (record_ind_name (EcPath.basename p))
+
+(* -------------------------------------------------------------------- *)
+let datatype_proj_path (p : EP.path) (x : symbol) =
+  EcPath.pqoname (EcPath.prefix p) (datatype_proj_name x)
 
 (* -------------------------------------------------------------------- *)
 let indsc_of_record (rc : record) =
@@ -159,6 +164,34 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
     | _ -> EcTypes.ty_sub_exists (occurs p) t
 
   in scheme mode (List.map fst dt.dt_tparams, tpath) dt.dt_ctors
+
+(* -------------------------------------------------------------------- *)
+let datatype_projectors (tpath, tparams, { tydt_ctors = ctors }) =
+  let thety = tconstr tpath (List.map (tvar |- fst) tparams) in
+
+  let do1 i (cname, cty) =
+    let thv = EcIdent.create "the" in
+    let the = e_local thv thety in
+    let rty = ttuple cty in
+
+    let do1 j (_, cty2) =
+      let lvars =
+        List.map
+          (fun ty -> (EcIdent.create (symbol_of_ty ty), ty))
+          cty2 in
+
+      e_lam lvars
+        (if   i = j
+         then e_some (e_tuple (List.map (curry e_local) lvars))
+         else e_none rty) in
+
+
+    let body = e_match the (List.mapi do1 ctors) (toption rty) in
+    let body = e_lam [thv, thety] body in
+
+    (cname, mk_op tparams body.e_ty (Some (OP_Plain (body, false)))) in
+
+  List.mapi do1 ctors
 
 (* -------------------------------------------------------------------- *)
 type case1 = {

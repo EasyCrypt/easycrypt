@@ -235,6 +235,7 @@ val f_app    : form -> form list -> EcTypes.ty -> form
 val f_tuple  : form list -> form
 val f_proj   : form -> int -> EcTypes.ty -> form
 val f_if     : form -> form -> form -> form
+val f_match  : form -> form list -> EcTypes.ty -> form
 val f_let    : EcTypes.lpattern -> form -> form -> form
 val f_let1   : EcIdent.t -> form -> form -> form
 val f_quant  : quantif -> bindings -> form -> form

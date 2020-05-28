@@ -175,7 +175,6 @@ let is_bound_pv pv me = match pv with
   | PVloc id -> is_bound id me
 
 (* -------------------------------------------------------------------- *)
-
 let bindall_lmt (vs:variable list) lmt =
   let n = List.length lmt.mt_decl in
   let add_proj mt_proj i v =

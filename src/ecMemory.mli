@@ -27,6 +27,7 @@ val mt_equal    : memtype -> memtype -> bool
 val mt_fv       : memtype -> int EcIdent.Mid.t
 
 val mt_iter_ty : (ty -> unit) -> memtype -> unit
+
 (* -------------------------------------------------------------------- *)
 type memenv = memory * memtype
 

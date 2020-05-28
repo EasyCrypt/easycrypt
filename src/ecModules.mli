@@ -50,7 +50,7 @@ type module_item       = form p_module_item
 type module_comps      = form p_module_comps
 type module_comps_item = form p_module_comps_item
 
-(* Careful, the avalaible oracle are empty in both [mr_empty] and [mr_full]. *)
+(* Careful, the available oracles are empty in both [mr_empty] and [mr_full]. *)
 val mr_empty : mod_restr
 val mr_full  : mod_restr
 

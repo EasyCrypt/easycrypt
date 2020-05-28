@@ -80,7 +80,6 @@ let mr_full = {
   mr_oinfos = Msym.empty;
 }
 
-
 let mr_add_restr mr (rx : Sx.t use_restr) (rm : Sm.t use_restr) =
   { mr_xpaths = ur_union Sx.union Sx.inter mr.mr_xpaths rx;
     mr_mpaths = ur_union Sm.union Sm.inter mr.mr_mpaths rm;

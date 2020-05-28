@@ -821,7 +821,7 @@ module Ax = struct
   type mode = [`WeakCheck | `Check | `Report]
 
   (* ------------------------------------------------------------------ *)
-  let bind_schema (scope : scope) local ((x, sc) : _ * ax_schema) =
+  let bind_schema (scope : scope) _local ((x, sc) : _ * ax_schema) =
     assert (scope.sc_pr_uc = None);
     let scope = { scope with sc_env = EcEnv.Schema.bind x sc scope.sc_env; } in
     (* TODO: A: can we allow schemas in theories? *)
