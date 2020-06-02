@@ -2890,9 +2890,7 @@ module Schema = struct
   let bind name ax env =
     let ax = NormMp.norm_sc env ax in
     let env = MC.bind_schema name ax env in
-    env
-    (* TODO: A: what about theories and schemas? *)
-    (* { env with env_item = CTh_schema (name, ax) :: env.env_item } *)
+    { env with env_item = CTh_schema (name, ax) :: env.env_item }
 
   let rebind name ax env =
     MC.bind_schema name ax env

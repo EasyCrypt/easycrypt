@@ -981,7 +981,8 @@ let rec e_subst (s: e_subst) e =
       match Mid.find_opt id s.es_loc with
       | Some e' -> e'
       | None    ->
-        assert (not s.es_freshen);
+(* FIXME schema *)
+(*        assert (not s.es_freshen); *)
         ExprSmart.e_local (e, (id, e.e_ty)) (id, s.es_ty e.e_ty)
   end
 
