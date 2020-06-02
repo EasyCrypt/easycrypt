@@ -790,12 +790,8 @@ and reduce_user_gen mode simplify ri env hyps f
             List.map (fun (a, _) -> Mid.find a tvi) rule.R.rl_tyd in
           let typ = List.map (EcTypes.ty_subst tysubst) typ in
 
-          let es = List.map (fun (a,ty) ->
+          let es = List.map (fun (a,_ty) ->
               let e = Mid.find a !e_pv in
-              (* We check that the types are equal. *)
-              let ty = Tvar.subst tvi ty in
-              let ty = EcTypes.ty_subst tysubst ty in
-              assert (ty_equal e.e_ty ty);
               e
             ) rule.R.rl_evars in
 
