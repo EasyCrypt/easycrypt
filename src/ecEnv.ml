@@ -1092,6 +1092,9 @@ module MC = struct
       | CTh_axiom (xax, ax) ->
           (add2mc _up_axiom xax ax mc, None)
 
+      | CTh_schema (x, schema) ->
+          (add2mc _up_schema x schema mc, None)
+
       | CTh_modtype (xmodty, modty) ->
           (add2mc _up_modty xmodty modty mc, None)
 
@@ -2966,6 +2969,7 @@ module Theory = struct
     | Th_type      (x, ty)  -> CTh_type      (x, ty)
     | Th_operator  (x, op)  -> CTh_operator  (x, op)
     | Th_axiom     (x, ax)  -> CTh_axiom     (x, ax)
+    | Th_schema    (x, sc)  -> CTh_schema    (x, sc)
     | Th_modtype   (x, mt)  -> CTh_modtype   (x, mt)
     | Th_module    m        -> CTh_module    m
     | Th_export    name     -> CTh_export    name
@@ -3154,6 +3158,9 @@ module Theory = struct
 
         | CTh_axiom (x, ax) ->
             MC.import_axiom (xpath x) ax env
+
+        | CTh_schema (x, schema) ->
+            MC.import_schema (xpath x) schema env
 
         | CTh_modtype (x, ty) ->
             MC.import_modty (xpath x) ty env

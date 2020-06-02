@@ -45,6 +45,7 @@ and 'a ovrhooks = {
   hmodty   : 'a -> (symbol * module_sig) -> 'a;
   hmod     : 'a -> bool -> module_expr -> 'a;
   hax      : 'a -> bool -> (symbol * axiom) -> 'a;
+  hschema  : 'a -> bool -> (symbol * ax_schema) -> 'a;
   hexport  : 'a -> EcPath.path -> 'a;
   hbaserw  : 'a -> symbol -> 'a;
   haddrw   : 'a -> EcPath.path * EcPath.path list -> 'a;
@@ -377,6 +378,13 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, ax) =
   in (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
+and replay_scd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, sc) =
+  let subst, x = rename ove subst (`Lemma, x) in
+  let sc = EcSubst.subst_schema subst sc in
+  let scope = ove.ovre_hooks.hschema scope ove.ovre_local (x, sc) in
+  (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
 and replay_modtype
   (ove : _ ovrenv) (subst, ops, proofs, scope) (x, modty)
 =
@@ -557,6 +565,9 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
   | CTh_axiom (x, ax) ->
      replay_axd ove (subst, ops, proofs, scope) (x, ax)
+
+  | CTh_schema (x, schema) ->
+     replay_scd ove (subst, ops, proofs, scope) (x, schema)
 
   | CTh_modtype (x, modty) ->
      replay_modtype ove (subst, ops, proofs, scope) (x, modty)

@@ -2217,6 +2217,8 @@ module Section = struct
                     scope
           end
 
+          | T.CTh_schema _ -> scope (* FIXME: SCHEMA *)
+
           | T.CTh_export p ->
               { scope with sc_env = EcEnv.Theory.export p scope.sc_env }
 
@@ -2304,6 +2306,7 @@ module Cloning = struct
       R.hmodty   = ModType.bind;
       R.hmod     = Mod    .bind;
       R.hax      = Ax     .bind;
+      R.hschema  = Ax     .bind_schema;
       R.hexport  = onenv EcEnv.Theory.export;
       R.hbaserw  = onenv EcEnv.BaseRw.add;
       R.haddrw   = onenv (curry EcEnv.BaseRw.addto);

@@ -19,6 +19,7 @@ and theory_item =
   | Th_type      of (symbol * tydecl)
   | Th_operator  of (symbol * operator)
   | Th_axiom     of (symbol * axiom)
+  | Th_schema    of (symbol * ax_schema)
   | Th_modtype   of (symbol * module_sig)
   | Th_module    of module_expr
   | Th_theory    of (symbol * (theory * thmode))
@@ -75,6 +76,7 @@ and ctheory_item =
   | CTh_type      of (symbol * tydecl)
   | CTh_operator  of (symbol * operator)
   | CTh_axiom     of (symbol * axiom)
+  | CTh_schema    of (symbol * ax_schema)
   | CTh_modtype   of (symbol * module_sig)
   | CTh_module    of module_expr
   | CTh_theory    of (symbol * (ctheory * thmode))
