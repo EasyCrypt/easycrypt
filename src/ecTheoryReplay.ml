@@ -448,12 +448,11 @@ and replay_reduction
 
     (* TODO: A: schema are not replayed for now, but reduction rules can use a
        schema. Fix this. *)
-    let mode = `Ax in           (* TODO: A: fixme*)
     let rule =
       obind (fun rule ->
         try
           Some (EcReduction.User.compile
-                 ~opts ~prio:rule.rl_prio (ove.ovre_hooks.henv scope) mode p)
+                 ~opts ~prio:rule.rl_prio (ove.ovre_hooks.henv scope) opts.ur_mode p)
         with EcReduction.User.InvalidUserRule _ -> None) rule
 
     in (p, opts, rule) in

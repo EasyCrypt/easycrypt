@@ -2258,11 +2258,6 @@ module Reduction = struct
     if EcSection.in_section scope.sc_section then
       hierror "cannot add reduction rule in a section";
 
-    let opts = EcTheory.{
-      ur_delta  = List.mem `Delta  opts;
-      ur_eqtrue = List.mem `EqTrue opts;
-    } in
-
     let rules =
       let for1 idx name =
         let idx      = odfl 0 idx in
@@ -2270,6 +2265,13 @@ module Reduction = struct
           match EcEnv.Ax.lookup_opt (unloc name) (env scope) with
           | Some (p,_) -> `Ax, p
           | None -> `Sc, EcEnv.Schema.lookup_path (unloc name) (env scope) in
+
+        let opts = EcTheory.{
+          ur_delta  = List.mem `Delta  opts;
+          ur_eqtrue = List.mem `EqTrue opts;
+          ur_mode   = mode;
+        } in
+
         let red_info =
           EcReduction.User.compile ~opts ~prio:idx (env scope) mode ax_sc_p in
         (ax_sc_p, opts, Some red_info) in

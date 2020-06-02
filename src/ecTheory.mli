@@ -58,6 +58,7 @@ and rule = {
 and rule_option = {
   ur_delta  : bool;
   ur_eqtrue : bool;
+  ur_mode   : [`Ax | `Sc];
 }
 
 (* -------------------------------------------------------------------- *)
