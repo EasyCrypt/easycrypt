@@ -939,7 +939,6 @@ let restr_proof_obligation env (mp_in : mpath) sym (mt : module_type) : form lis
     List.map (fun k ->
       k, GTty tint
       ) ints in
-  let bindings = ibindings @ mbindings in
 
   (* Application of [mp_in] to fresh module idents. *)
   let mp_in_app =
@@ -989,7 +988,13 @@ let restr_proof_obligation env (mp_in : mpath) sym (mt : module_type) : form lis
 
   let hyps = List.map snd hyps_assoc in
 
-  List.map (f_forall bindings) hyps
+  let bindings = ibindings @ mbindings in
+  let doit hyp =
+    let pos (id,_) = f_int_le f_i0 (f_local id tint) in
+    f_forall bindings
+      (f_imps (List.map pos ibindings) hyp) in
+
+  List.map doit hyps
 
 (* -------------------------------------------------------------------- *)
 let check_modtype env mp mt i =

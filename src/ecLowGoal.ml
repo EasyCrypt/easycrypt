@@ -180,7 +180,10 @@ module LowApply = struct
 
             let f = match obl with
               | `Ok ->  f
-              | `ProofObligation obl -> f_imps obl f in
+              | `ProofObligation obl ->
+                if mode = `Elim then f_imps obl f
+                else f_and (f_ands obl) f
+            in
 
             (Fsubst.f_bind_mod sbt x mp, f)
           with _ -> raise InvalidProofTerm

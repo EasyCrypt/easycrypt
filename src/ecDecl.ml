@@ -151,8 +151,8 @@ type pr_params = EcIdent.t list (* type bool *)
 
 type ax_schema = {
   axs_tparams : ty_params;
-  axs_pparams : pr_params;
-  axs_params  : sc_params;
+  axs_pparams : pr_params; (* variables for predicate *)
+  axs_params  : sc_params; (* variables representing expression *)
   axs_spec    : EcCoreFol.form;
 }
 
@@ -165,16 +165,11 @@ let sc_instantiate
 
   (* We substitute the predicate variables. *)
   let preds = List.map2 (fun (mem,p) id ->
-      (* We check that the predicate params are of type bool. *)
-      assert (EcTypes.ty_equal p.f_ty EcTypes.tbool);
       id, (mem,p)) pr_args pr_params in
   let mpreds = EcIdent.Mid.of_list preds in
 
   let exprs =
-    List.map2 (fun e (id,ty) ->
-        let ty = EcTypes.ty_subst sty ty in
-        (* We check that expressions [es] have the correct type. *)
-        assert (EcTypes.ty_equal e.e_ty ty);
+    List.map2 (fun e (id,_ty) ->
         id, e
       ) sc_args sc_params in
   let mexpr = EcIdent.Mid.of_list exprs in
