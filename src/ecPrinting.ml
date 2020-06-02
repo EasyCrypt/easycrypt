@@ -3205,6 +3205,9 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
   | EcTheory.CTh_axiom (id, ax) ->
       pp_axiom ppe fmt (EcPath.pqname p id, ax)
 
+  | EcTheory.CTh_schema (id, schema) ->
+      pp_schema ppe fmt (EcPath.pqname p id, schema)
+
   | EcTheory.CTh_modtype (id, ms) ->
       pp_modsig ppe fmt (EcPath.pqname p id, ms)
 

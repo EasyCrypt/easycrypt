@@ -446,6 +446,18 @@ let subst_ax (s : _subst) (ax : axiom) =
     ax_nosmt    = ax.ax_nosmt; }
 
 (* -------------------------------------------------------------------- *)
+let subst_schema (s : _subst) (ax : ax_schema) =
+  (* FIXME: SCHEMA *)
+  let params = List.map (subst_typaram s) ax.axs_tparams in
+  let s      = init_tparams s ax.axs_tparams params in
+  let spec   = Fsubst.f_subst (f_subst_of_subst s) ax.axs_spec in
+
+  { axs_tparams = params;
+    axs_pparams = ax.axs_pparams;
+    axs_params  = List.map (snd_map s.s_ty) ax.axs_params;
+    axs_spec    = spec; }
+
+(* -------------------------------------------------------------------- *)
 let subst_ring (s : _subst) cr =
   { r_type  = s.s_ty cr.r_type;
     r_zero  = s.s_p  cr.r_zero;
@@ -497,6 +509,9 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
   | Th_axiom (x, ax) ->
       Th_axiom (x, subst_ax s ax)
 
+  | Th_schema (x, schema) ->
+      Th_schema (x, subst_schema s schema)
+
   | Th_modtype (x, tymod) ->
       Th_modtype (x, snd (subst_modsig s tymod))
 
@@ -544,6 +559,9 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
 
   | CTh_axiom (x, ax) ->
       CTh_axiom (x, subst_ax s ax)
+
+  | CTh_schema (x, schema) ->
+      CTh_schema (x, subst_schema s schema)
 
   | CTh_modtype (x, modty) ->
       CTh_modtype (x, snd (subst_modsig s modty))
@@ -610,6 +628,7 @@ and subst_ctheory (s : _subst) (cth : ctheory) =
 
 (* -------------------------------------------------------------------- *)
 let subst_ax           s = subst_ax (_subst_of_subst s)
+let subst_schema       s = subst_schema (_subst_of_subst s)
 let subst_op           s = subst_op (_subst_of_subst s)
 let subst_tydecl       s = subst_tydecl (_subst_of_subst s)
 let subst_tc           s = subst_tc (_subst_of_subst s)
