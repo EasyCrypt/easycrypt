@@ -148,7 +148,7 @@ theory IntPair.
   + move=> ih; case: (lez_total n1 n2); first by apply: ih.
     by move=> h @/P *; rewrite eq_sym &(ih) 1?eq_sym.
   move=> le_n; have lt_n: n1 < n2 by rewrite ltr_neqAle le_n.
-  rewrite (_ : n2 = n1 + (n2 - n1)) 1:#ring exprD ?subr_ge0 //.
+  rewrite (_ : n2 = n1 + (n2 - n1)) 1:#ring exprDn ?subr_ge0 //.
   apply/negP; rewrite -mulrA; have h/h := mulfI (exp 2 n1) _.
   + by rewrite expf_eq0.
   by move/(congr1 odd); rewrite oddM poddX ?subr_gt0 // odd2 !(o1, o2).
