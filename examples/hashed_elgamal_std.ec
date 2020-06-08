@@ -197,3 +197,27 @@ section Security.
 end section Security.
 
 print conclusion.
+
+abstract theory Complexity.
+
+op kc : int.
+op kg : int.
+axiom k_pos : 0 <= kc /\ 0 <= kg.
+
+lemma ex_conclusion (A <: Adversary[choose : `{kc} , guess : `{kg} ]) &m :
+  exists (Dddh <: DDH.Adversary [guess : `{kc + kg}]) 
+         (Des <: AdvES[guess: `{kc + kg}]),
+   `|Pr[CPA(Hashed_ElGamal, A).main() @ &m : res] - 1%r / 2%r| <=
+     `|Pr[DDH0(Dddh).main() @ &m : res] - Pr[DDH1(Dddh).main() @ &m : res]| +
+     `|Pr[ES0(Des).main() @ &m : res] - Pr[ES1(Des).main() @ &m : res]|.
+proof.
+  exists (DDHAdv(A)); split; last first.
+  exists (ESAdv(A)); split; last first.
+  apply (conclusion A _ _ &m).
+
+  admit.
+
+  admit.
+
+
+end theory.
