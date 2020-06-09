@@ -1,8 +1,8 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List Distr Perms.
-require (*--*) Subtype Monoid Ring Subtype Bigalg StdBigop.
+require (*--*) Subtype Monoid Ring Subtype Bigalg StdOrder StdBigop.
 
-import StdBigop.Bigreal.
+import StdOrder.IntOrder StdBigop.Bigreal.
 
 pragma -oldip.
 
@@ -557,10 +557,10 @@ pose g v := mkseq (tofunv v) size; rewrite (@dmap1E_can _ _ g).
 + move=> xs xs_d @/g; rewrite offunvK -(eq_in_mkseq (nth witness xs)).
   * by move=> i rgi @/vclamp; rewrite rgi.
   rewrite (_ : size = size xs) -1:mkseq_nth //.
-  by have := supp_djoin_size _ _ xs_d; rewrite size_nseq max_ler // eq_sym.
+  by have := supp_djoin_size _ _ xs_d; rewrite size_nseq ler_maxr // eq_sym.
 rewrite djoin1E size_nseq size_mkseq /= (BRM.big_nth witness) predTofV.
 pose sz := size _; have szE: size = sz; first rewrite /sz.
-+ by rewrite size_zip size_nseq size_mkseq min_ler // max_ler.
++ by rewrite size_zip size_nseq size_mkseq minrE /= ler_maxr.
 rewrite szE !BRM.big_seq &(BRM.eq_bigr) => /= i /mem_range rgi @/(\o); congr.
 + rewrite (nth_change_dfl (witness, witness)) // -szE //.
   by rewrite nth_zip ?(size_nseq, size_mkseq) //= nth_nseq // szE.
@@ -576,7 +576,7 @@ pose g m := mkseq (fun i => mkseq (tofunm m i) size) size; rewrite (@dmap1E_can 
   rewrite offunmE //= nth_mkseq 1:(mrangeL _ _ rg) /=.
   by rewrite nth_mkseq 1:(mrangeR _ _ rg).
 + move=> xs xs_d @/g; rewrite offunmK; have szE: size = size xs.
-  * by rewrite (supp_djoin_size _ _ xs_d) size_nseq max_ler.
+  * by rewrite (supp_djoin_size _ _ xs_d) size_nseq ler_maxr.
   rewrite szE -(eq_in_mkseq (nth witness xs)) -1:mkseq_nth //=.
   move=> i rgi; rewrite -(eq_in_mkseq (nth witness (nth witness xs i))).
   * by move=> j rgj; rewrite /mclamp szE rgi rgj.
@@ -584,22 +584,22 @@ pose g m := mkseq (fun i => mkseq (tofunm m i) size) size; rewrite (@dmap1E_can 
   congr => @/s; rewrite -szE; move/supp_djoin: xs_d.
   case=> _ /allP /(_ (djoin (nseq size d), s) _) /=.
   * pose r := zip _ _; pose x := (_, _); have szrE: size r = size xs.
-    - by rewrite size_zip size_nseq max_ler // szE min_ler.
+    - by rewrite size_zip size_nseq ler_maxr // szE minrE.
     suff ->: x = nth witness r i by apply: mem_nth; rewrite szrE.
     rewrite (nth_change_dfl (witness, witness)) 1:szrE //.
-    rewrite nth_zip;first by rewrite size_nseq max_ler.
+    rewrite nth_zip;first by rewrite size_nseq ler_maxr.
     by rewrite nth_nseq 1:szE.
-  by move/supp_djoin_size => ->; rewrite size_nseq max_ler.
+  by move/supp_djoin_size => ->; rewrite size_nseq ler_maxr.
 rewrite djoin1E size_nseq size_mkseq /= (BRM.big_nth witness) predTofV.
 pose sz := size _; have szE: size = sz; first rewrite /sz.
-+ by rewrite size_zip size_nseq size_mkseq min_ler // max_ler.
++ by rewrite size_zip size_nseq size_mkseq minrE /= ler_maxr.
 rewrite !szE !BRM.big_seq &(BRM.eq_bigr) => /= i /mem_range rgi @/(\o).
 rewrite (nth_change_dfl (witness, witness)) // -szE //.
 rewrite nth_zip /= ?(size_nseq, size_mkseq) //=.
 rewrite nth_nseq 1:szE // nth_mkseq 1:szE //=.
 rewrite djoin1E size_nseq size_mkseq /= (BRM.big_nth witness) predTofV.
 pose sz' := size _; have sz'E: size = sz'; first rewrite /sz'.
-+ by rewrite size_zip size_nseq size_mkseq min_ler // max_ler.
++ by rewrite size_zip size_nseq size_mkseq minrE //= ler_maxr.
 rewrite !sz'E !BRM.big_seq &(BRM.eq_bigr) => /= j /mem_range rgj @/(\o).
 rewrite (nth_change_dfl (witness, witness)) // -sz'E //.
 rewrite nth_zip ?(size_nseq, size_mkseq) //= nth_nseq 1:sz'E //.
