@@ -503,7 +503,7 @@ abstract theory ComRing.
   proof.
   wlog: i / (0 <= i) => [wlog|]; first by smt(exprN).
   elim: i => /= [|i ge0_i ih]; first by rewrite !expr0.
-  case: (i = 0) => [->|] /=; first by rewrite exprN1 expr1.
+  case: (i = 0) => [->|] /=; first by rewrite exprN1.
   move=> nz_i; rewrite exprS // ih !exprN.
   case: (unit x) => [invx|invNx].
   + by rewrite -invrM ?unitrX // exprS // mulrC.
@@ -783,7 +783,6 @@ qed.
 lemma oddX n x : 0 <= n => odd (exp x n) = (odd x \/ n = 0).
 proof.
 rewrite lez_eqVlt; case: (n = 0) => [->// _|+ h].
-+ by rewrite expr0 odd1.
-+ by case: h => [<-//|] /poddX ->.
+by case: h => [<-//|] /poddX ->.
 qed.
 end IntID.
