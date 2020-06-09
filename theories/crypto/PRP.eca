@@ -74,7 +74,7 @@ end StrongPRP.
 abstract theory RP.
 require import SmtMap FSet.
 require import Dexcepted.
-(*---*) import StdOrder.RealOrder StdRing.RField.
+(*---*) import StdOrder.RealOrder RField.
 
 op dD: { D distr | is_lossless dD } as dD_ll.
 
@@ -468,7 +468,7 @@ section Upto.
                 ((PRP_indirect_bad.bad \/ rng RP.m r0){1} <=> collision PRFi.m{2})).
     + auto => /> &1 &2 coll _ x_notin_m r _; split=> [|x0 x'].
       + rewrite rngE /= /collision=> - [x'] mx'; exists x{2} x'; smt(domE get_setE).
-      smt(@SmtMap).
+      smt (rngE get_setE).
     sp; if{1}.
     + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
       auto=> /> &1 &2 x_notin_m coll_def rng_m_r; smt.

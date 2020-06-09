@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int Real RealExtra List FSet Distr.
+require import AllCore List FSet Distr.
 require import Ring Number StdRing StdOrder.
 (*---*) import RField RealOrder.
 

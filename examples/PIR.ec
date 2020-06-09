@@ -182,7 +182,7 @@ qed.
 
 axiom N_pos : 0 <= N.
 
-import StdRing.RField StdOrder.RealOrder.
+import RField StdOrder.RealOrder.
 
 lemma Pr_PIR_s i0 &m x :
   Pr[PIR.main(i0) @ &m : oflist PIR.s = x] = 
@@ -231,7 +231,7 @@ proof.
         + by rewrite (eq_sym (oflist s0)) (is_restr_diff j0 (restr x j0) _ His). 
         by rewrite fset0U oflist_cons -Hof (is_restr_diff j0 (oflist s0) _ His).
       smt (is_restrS is_restr_addS oflist_cons).
-    by move=> &hr /> ?????;rewrite mulrC -powrS 1:/#;congr;congr;ring.
+    move=> &hr /> ?????; rewrite -exprS 1:/#; congr;congr;ring.
   + wp;rnd predT;skip => /> &hr.
     smt (dbool_ll oflist_cons is_restrS is_restr_addS).
   move=> z;auto=> />;smt (dbool_ll).
@@ -294,7 +294,7 @@ proof.
         + by rewrite (eq_sym (oflist s0)) (is_restr_diff j0 (restr x j0) _ His). 
         by rewrite fset0U oflist_cons -Hof (is_restr_diff j0 (oflist s0) _ His).
       smt (is_restrS is_restr_addS oflist_cons).
-    by move=> &hr /> ?????;rewrite mulrC -powrS 1:/#;congr;congr;ring.
+    by move=> &hr /> ?????;rewrite -exprS 1:/#;congr;congr;ring.
   + wp;rnd predT;skip => &hr.
     smt (dbool_ll oflist_cons is_restrS is_restr_addS).
   move=> z;auto=> />;smt (dbool_ll).

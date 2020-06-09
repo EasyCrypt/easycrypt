@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Core Int IntExtra List Ring StdBigop StdOrder.
+require import AllCore List Ring StdBigop StdOrder.
 (*---*) import Bigint IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -35,7 +35,7 @@ op bin (n k : int) : int =
 (* -------------------------------------------------------------------- *)
 lemma size_bin1 (s : int list) : size (bin1 s) = 1 + size s.
 proof.
-by rewrite /bin1 /= size_map size_range subz0 max_ler ?size_ge0.
+by rewrite /bin1 /= size_map size_range subz0 ler_maxr ?size_ge0.
 qed.
 
 lemma size_bin (s : int list) n : 0 <= n =>
@@ -87,9 +87,9 @@ move=> ge0_n ge0_m; rewrite binp 1,2:/# iterS //.
 pose s := iter n bin1 [1]; rewrite /bin1 -nth_behead //=.
 case: (m < size s) => [lt_m_s|/lerNgt gt_m_s]; last first.
 + rewrite nth_default.
-  * by rewrite size_map size_range /= max_ler ?size_ge0.
+  * by rewrite size_map size_range /= ler_maxr ?size_ge0.
   by rewrite !binp // ~-1:/# !nth_default ~-1://#.
-rewrite (nth_map 0) 1:size_range /= 1:max_ler // 1:size_ge0.
+rewrite (nth_map 0) 1:size_range /= 1:ler_maxr // 1:size_ge0.
 by rewrite !nth_range //= !binp //#.
 qed.
 

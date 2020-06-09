@@ -1,6 +1,6 @@
-require import AllCore Int Real FSet.
+require import AllCore Int Real FSet StdOrder.
 require (*--*) BitWord Distr DInterval.
-(*---*) import StdOrder.RealOrder StdRing.RField.
+(*---*) import RealOrder RField.
 require (*--*) DiffieHellman ROM PKE_CPA.
 
 (* The type of plaintexts: bitstrings of length k *)

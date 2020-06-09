@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List IntExtra IntMin IntDiv.
+require import AllCore List IntMin IntDiv.
 require (*--*) FinType Ring Number StdOrder ZModP.
 
 import Ring.IntID StdOrder.IntOrder.
@@ -149,7 +149,7 @@ qed.
 lemma exppcV x k : (inv x) ^+ k = inv (x ^+ k).
 proof.
 rewrite -!(expp_abs _ k); elim: `|k| (normr_ge0 k) => {k} [|k ge0_k ih].
-+ by rewrite !iter0 // invc1.
++ by rewrite // invc1.
 + by rewrite !exppS // invM ih comVr // com_sym comVr comXr.
 qed.
 
@@ -321,7 +321,7 @@ have nz: forall k, 1 <= k < order => g ^ k <> e.
     by case: (mg x)=> l mg_x; exists l; rewrite mem_range.
   move/perm_eq_size; rewrite -/order => orderE.
   rewrite -(@ltrr order) {1}orderE (ler_lt_trans _ _ _ (size_undup _)).
-  by rewrite size_map size_range /= max_ler 1:ltrW /=; case: rg_k.
+  by rewrite size_map size_range /= ler_maxr 1:ltrW /=; case: rg_k.
 rewrite map_inj_in_uniq 2:range_uniq => /= i j.
 wlog: i j / i <= j => [wlog rgi rgj|le_ij].
 + case: (leVge i j) => [le_ij|le_ji]; first by apply: wlog.
@@ -351,7 +351,7 @@ have: perm_eq (filter (mem s) elems) (filter (mem elems) s).
   by move=> x; rewrite !mem_filter andbC.
 rewrite -/order eq_sym size_cat => /perm_eq_size ->.
 rewrite eq_in_filter_predT => [x _|]; 1: by rewrite elemsP.
-rewrite size_map size_range /= max_ler 1:ge0_order.
+rewrite size_map size_range /= ler_maxr 1:ge0_order.
 rewrite -{1}(addr0 order) eq_sym => /addrI.
 rewrite size_eq0 => /(congr1 (fun s => g ^ order \in s)) /=.
 rewrite neqF mem_filter elemsP /predC /=.

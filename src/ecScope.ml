@@ -1161,28 +1161,38 @@ module Op = struct
     if not (EcUnify.UniEnv.closed ue) then
       hierror ~loc "this operator type contains free type variables";
 
+    let nosmt = op.po_nosmt in
+
+    if nosmt &&
+       (match body with
+        | `Plain _  -> false
+        | `Fix _    -> false
+        | `Abstract ->
+            match refts with
+            | [] -> true
+            | _  -> false) then
+      hierror ~loc ("[nosmt] is not supported for pure abstract operators");
+
     let uni     = Tuni.offun (EcUnify.UniEnv.close ue) in
     let ty      = uni ty in
     let tparams = EcUnify.UniEnv.tparams ue in
     let body    =
       match body with
       | `Abstract -> None
-      | `Plain e  -> Some (OP_Plain (e_mapty uni e))
+      | `Plain e  -> Some (OP_Plain (e_mapty uni e, nosmt))
       | `Fix opfx ->
           Some (OP_Fix {
             opf_args     = opfx.EHI.mf_args;
             opf_resty    = opfx.EHI.mf_codom;
             opf_struct   = (opfx.EHI.mf_recs, List.length opfx.EHI.mf_args);
             opf_branches = opfx.EHI.mf_branches;
+            opf_nosmt    = nosmt;
           })
 
     in
 
     let tyop   = EcDecl.mk_op tparams ty body in
     let opname = EcPath.pqname (EcEnv.root (env scope)) (unloc op.po_name) in
-
-    if op.po_nosmt && (is_none op.po_ax) then
-      hierror ~loc "[nosmt] is only supported for axiomatized operators";
 
     if op.po_kind = `Const then begin
       let tue   = EcUnify.UniEnv.copy ue in
@@ -1203,7 +1213,7 @@ module Op = struct
       | None    -> bind scope (unloc op.po_name, tyop)
       | Some ax -> begin
           match tyop.op_kind with
-          | OB_oper (Some (OP_Plain bd)) ->
+          | OB_oper (Some (OP_Plain (bd, _))) ->
               let path  = EcPath.pqname (path scope) (unloc op.po_name) in
               let axop  =
                 let nosmt = op.po_nosmt in
@@ -1213,7 +1223,7 @@ module Op = struct
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope false (unloc ax, axop)
 
-          | _ -> hierror ~loc "cannot axiomatized non-plain operators"
+          | _ -> hierror ~loc "cannot axiomatize non-plain operators"
       end
     in
 
@@ -1241,7 +1251,7 @@ module Op = struct
             { ax_tparams = axpm;
               ax_spec    = ax;
               ax_kind    = `Axiom (Ssym.empty, false);
-              ax_nosmt   = false; }
+              ax_nosmt   = nosmt; }
           in Ax.bind scope false (unloc rname, ax))
         scope refts
     in

@@ -348,7 +348,7 @@ let opdecl_use_local_or_abs opdecl lc =
          | OP_Record _ -> ()
          | OP_Proj   _ -> ()
          | OP_TC       -> ()
-         | OP_Plain  e -> on_mpath_expr cb e
+         | OP_Plain  (e, _) -> on_mpath_expr cb e
          | OP_Fix    f ->
            let rec on_mpath_branches br =
              match br with

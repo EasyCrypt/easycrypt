@@ -1,6 +1,6 @@
 require import AllCore List Distr Dexcepted PKE.
 require import StdOrder StdBigop.
-import RealOrder Bigreal.
+import RField RealOrder Bigreal.
 
 require TCR RndExcept.
 
@@ -567,7 +567,7 @@ section Security_Aux.
     move=> wL /supp_dexcepted [] _ /= HwL uL _ u'L /supp_dexcepted [] _ /= Hu'L .
     move=> kL _ xL _ x2L _ yL _ y2L _ zL _ resu bL _.
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
-    have H2 : (-uL) * wL + u'L * wL <> ofint 0.
+    have H2 : (-uL) * wL + u'L * wL <> F.ofint 0.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
@@ -596,7 +596,7 @@ section Security_Aux.
     move=> wL /supp_dexcepted [] _ /= HwL uL _ u'L /supp_dexcepted [] _ /= Hu'L .
     move=> kL _ yL _ y2L _ zL _ r'L _ xL _.  
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
-    have H2 : (-uL) * wL + u'L * wL <> ofint 0.
+    have H2 : (-uL) * wL + u'L * wL <> F.ofint 0.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
@@ -742,7 +742,7 @@ section Security_Aux.
     move=> uL _ u'L /supp_dexcepted [] _ /= HuL kL _.
     move=> yL _ y2L _ zL _ r'L _ xL _ rL _.
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
-    have H2 : (-uL) * wL + u'L * wL <> ofint 0.
+    have H2 : (-uL) * wL + u'L * wL <> F.ofint 0.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL0 /=.
       by move: HuL;apply: contra => H;ring H.
     split => [ | _].
@@ -865,8 +865,6 @@ section Security_Aux.
     by apply le_fromint.
   qed.
 
-import StdRing.RField.
-
   local lemma pr_G4 &m:
     Pr[G4.main() @ &m : (G3.a, G3.a_,G3.c, G3.d) \in G3.cilog] <=
       (PKE_.qD%r/q%r)^3 * (PKE_.qD%r/(q-1)%r).
@@ -915,14 +913,11 @@ import StdRing.RField.
       case: (x = G1.u{hr}) => _.
       + apply invr_ge0;smt (le_fromint gt1_q).
       rewrite FDistr.dt_ll !FDistr.dt1E;apply lerr_eq.
-      field;smt (gt1_q le_fromint). 
+      field;smt (gt1_q le_fromint).
     seq 1 : (r' \in map (fun (g4 : ciphertext) => log g4.`3) G3.cilog)
             (PKE_.qD%r / q%r) (PKE_.qD%r / q%r) _ 0%r 
-            (size G3.cilog <= PKE_.qD) => //;last 2 first.
-    + hoare;conseq (_ : _ ==> true) => // /#.
-    + move=> &hr _;apply lerr_eq;field.
-      + rewrite (_: 2 = (0 + 1) + 1) // !powrS // powr0;smt (le_fromint gt1_q). 
-      smt (le_fromint gt1_q). 
+            (size G3.cilog <= PKE_.qD) => //; last first.
+    + hoare; conseq (_ : _ ==> true) => // /#.
     + by auto.
     + rnd;skip => /> &hr Hsize _;pose m' := map _ _.
       apply (mu_mem_le_mu1_size FDistr.dt m') => //.
@@ -1056,4 +1051,3 @@ section Security.
   qed.
 
 end section Security.
-

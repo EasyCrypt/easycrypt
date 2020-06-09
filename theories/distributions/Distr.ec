@@ -502,7 +502,7 @@ lemma ratl_mem (s1 s2 : 'a list) :
 proof.
 case=> eqvnil /perm_eq_mem h x; move/(_ x): h.
 rewrite -!has_pred1 !has_count !count_flatten_nseq.
-rewrite !max_ler ?size_ge0; case: (s1 = []) => [^/eqvnil -> ->//|nz_s1].
+rewrite !ler_maxr ?size_ge0; case: (s1 = []) => [^/eqvnil -> ->//|nz_s1].
 rewrite !IntOrder.pmulr_rgt0 ?lt0n ?size_ge0 ?size_eq0 -?eqvnil //.
 by rewrite count_ge0. by rewrite count_ge0.
 qed.
@@ -565,7 +565,7 @@ proof.
 split=> [[]|eq_d].
   move=> eqvnil eq_s12; apply/eq_distr=> x; rewrite !dratE.
   move/perm_eqP/(_ (pred1 x)): eq_s12; rewrite !count_flatten_nseq.
-  rewrite !max_ler ?size_ge0; case: (s1 = []).
+  rewrite !ler_maxr ?size_ge0; case: (s1 = []).
     by move=> ^/eqvnil -> ->.
   move=> ^nz_s1; rewrite eqvnil => nz_s2.
   rewrite eqf_div ?eq_fromint ?size_eq0 // -!fromintM.
@@ -580,7 +580,7 @@ case: s1 s2 eq_d => [|x1 s1] [|x2 s2] //=.
   by apply/perm_eq_refl.
 move=> eq_d; apply/perm_eqP=> p; rewrite !count_flatten_nseq.
 move/(congr1 (fun d => mu d p)): eq_d => /=; rewrite !prratE /=.
-rewrite !max_ler ?addr_ge0 ?size_ge0 // eqf_div;
+rewrite !ler_maxr ?addr_ge0 ?size_ge0 // eqf_div;
   try by rewrite eq_fromint add1z_neq0 ?size_ge0.
 by rewrite -!fromintM eq_fromint !(@mulzC (1 + _)).
 qed.
@@ -590,7 +590,7 @@ lemma eq_sz_dratP ['a] (s1 s2 : 'a list) : size s1 = size s2 =>
 proof.
 move=> eq_sz; rewrite -eq_dratP /eq_ratl -!size_eq0 -!eq_sz /=.
 split=> /perm_eqP eq; apply/perm_eqP=> p; rewrite ?count_flatten_nseq ?eq //.
-move/(_ p): eq; rewrite !count_flatten_nseq max_ler ?size_ge0.
+move/(_ p): eq; rewrite !count_flatten_nseq ler_maxr ?size_ge0.
 case: (s1 = []) => [->>|] /=.
   suff ->//: s2 = []; by rewrite -size_eq0 eq_sz.
 by rewrite -size_eq0 => nz_s1 /(IntID.mulfI _ nz_s1).
@@ -722,7 +722,7 @@ lemma drange1E (m n x : int):
 proof.
 rewrite MUniform.duniform1E mem_range undup_id 1:range_uniq //.
 rewrite size_range; case: (m <= x < n) => // -[le_mx lt_xn].
-rewrite max_ler // IntOrder.subr_ge0 IntOrder.ltrW //.
+rewrite ler_maxr // IntOrder.subr_ge0 IntOrder.ltrW //.
 by apply (IntOrder.ler_lt_trans _ le_mx).
 qed.
 
@@ -731,8 +731,8 @@ lemma drangeE (E : int -> bool) (m n : int) :
 proof.
 rewrite MUniform.duniformE undup_id 1:range_uniq //.
 rewrite size_range; case: (lezWP n m) => [le_nm|le_mn].
-  by rewrite max_lel // 1:subr_le0 // range_geq //.
-by rewrite max_ler // subr_ge0 ltrW // ltzNge.
+  by rewrite ler_maxl // 1:subr_le0 // range_geq //.
+by rewrite ler_maxr // subr_ge0 ltrW // ltzNge.
 qed.
 
 lemma supp_drange (m n i : int): i \in drange m n <=> m <= i < n.

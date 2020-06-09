@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore Int List Real Distr FSet SmtMap.
-require import IntExtra IntDiv RealExtra Mu_mem StdRing StdOrder StdBigop.
+require import AllCore List Distr FSet SmtMap.
+require import IntDiv Mu_mem StdRing StdOrder StdBigop.
 (*---*) import Bigint Ring.IntID RField IntOrder RealOrder BIA.
 require (*--*) FinType.
 
@@ -494,7 +494,7 @@ section.
     apply/ler_wpmul2r; first smt w=Support.card_gt0. apply/le_fromint.
     rewrite -{1}(@add0z qF) big_addn /= /predT -/predT.
     rewrite (@addzC qF) !addrK big_split big_constz.
-    rewrite count_predT size_range /= max_ler ?size_ge0 addrC.
+    rewrite count_predT size_range /= ler_maxr ?size_ge0 addrC.
     rewrite ler_add 1:mulrC ?ler_wpmul2r // ?ge0_qF.
     rewrite sumidE ?size_ge0 leq_div2r // mulrC.
     move: (size_ge0 logP) szlog_le_qP => /IntOrder.ler_eqVlt [<- /#|gt0_sz le].

@@ -530,7 +530,7 @@ let process_delta ?target (s, o, p) tc =
         let op = EcEnv.Op.by_path (fst p) env in
 
         match op.EcDecl.op_kind with
-        | EcDecl.OB_oper (Some (EcDecl.OP_Plain e)) ->
+        | EcDecl.OB_oper (Some (EcDecl.OP_Plain (e, _))) ->
             (snd p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args)
         | EcDecl.OB_pred (Some (EcDecl.PR_Plain f)) ->
             (snd p, op.EcDecl.op_tparams, f, args)
@@ -1920,6 +1920,7 @@ let process_congr tc =
           (PT.pt_of_uglobal !!tc hyps LG.p_eq_iff) tc) in
       let tt1 = t_congr (o1, o2) ((List.combine a1 a2), f1.f_ty) in
       let tt2 = t_logic_trivial in
+
       FApi.t_seqs [tt0; tt1; tt2] tc
 
   | Fif (_, { f_ty = cty }, _), Fif _ ->
