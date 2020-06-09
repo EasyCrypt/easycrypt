@@ -203,7 +203,7 @@ elim/natind: n => [n le0n|n ge0n ih] @/nseq.
 qed.
 
 lemma nseq0 (x : 'a): nseq 0 x = [].
-proof. by rewrite iter0. qed.
+proof. by []. qed.
 
 lemma nseq0_le n (x : 'a) : n <= 0 => nseq n x = [].
 proof. by move=> le0_n; rewrite iter0. qed.
@@ -215,7 +215,7 @@ by rewrite nseq0 => /nseq0_le<:'a> ->.
 qed.
 
 lemma nseq1 (x : 'a) : nseq 1 x = [x].
-proof. by rewrite iter1. qed.
+proof. by []. qed.
 
 lemma nseqS n (x : 'a) : 0 <= n => nseq (n+1) x = x :: nseq n x.
 proof. by move=> le0_n; rewrite iterS. qed.
@@ -645,8 +645,7 @@ proof. by rewrite -has_pred1 has_nseq. qed.
 lemma all_pred1P (x : 'a) s :
   (s = nseq (size s) x) <=> (all (pred1 x) s).
 proof.
-elim: s => [|y s ih] //=; first by rewrite nseq0.
-by rewrite addzC nseqS //= ih.
+by elim: s => [|y s ih] //=; rewrite addzC nseqS //= ih.
 qed.
 
 lemma all_nthP (p : 'a -> bool) s x0 :
