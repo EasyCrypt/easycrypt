@@ -44,6 +44,9 @@ op "`|_|" : t -> t.
 op ( <= ) : t -> t -> bool.
 op ( <  ) : t -> t -> bool.
 
+op minr : t -> t -> t.
+op maxr : t -> t -> t.
+
 theory Axioms.
   axiom nosmt ler_norm_add (x y : t): `|x + y| <= `|x| + `|y|.
   axiom nosmt addr_gt0     (x y : t): zeror < x => zeror < y => zeror < (x + y).
@@ -53,12 +56,11 @@ theory Axioms.
   axiom nosmt ler_def      (x y : t): x <= y <=> `|y - x| = y - x.
   axiom nosmt ltr_def      (x y : t): x < y <=> (y <> x) /\ x <= y.
   axiom nosmt real_axiom   (x   : t): zeror <= x \/ x <= zeror.
+  axiom nosmt minrE        (x y : t): minr x y = if x <= y then x else y.
+  axiom nosmt maxrE        (x y : t): maxr x y = if y <= x then x else y.
 end Axioms.
 
 clear [Axioms.*].
-
-op minr (x y : t) = if x <= y then x else y.
-op maxr (x y : t) = if y <= x then x else y.
 
 lemma nosmt ler_norm_add (x y : t): `|x + y| <= `|x| + `|y|.
 proof. by apply/Axioms.ler_norm_add. qed.
@@ -84,6 +86,12 @@ proof. by apply/Axioms.ltr_def. qed.
 
 lemma real_axiom (x : t): (zeror <= x) \/ (x <= zeror).
 proof. by apply/Axioms.real_axiom. qed.
+
+lemma minrE (x y : t): minr x y = if x <= y then x else y.
+proof. by apply/Axioms.minrE. qed.
+
+lemma maxrE (x y : t): maxr x y = if y <= x then x else y.
+proof. by apply/Axioms.maxrE. qed.
 
 lemma ger0_def (x : t): (zeror <= x) <=> (`|x| = x).
 proof. by rewrite ler_def subr0. qed.
@@ -232,7 +240,7 @@ move=>x ux; apply/(@mulrI `|x|); first by apply/normr_unit.
 by rewrite -normrM !mulrV ?normr_unit // normr1.
 qed.
 
-lemma nosmt normrX_nat n x : 0 <= n => `|exp x n| = exp `|x| n.
+lemma nosmt normrX_nat n (x : t) : 0 <= n => `|exp x n| = exp `|x| n.
 proof.
 elim: n=> [|n ge0_n ih]; first by rewrite !expr0 normr1.
 by rewrite !exprS //= normrM ih.
@@ -997,7 +1005,7 @@ hint rewrite invr_lte1 : invr_le1 invr_lt1.
 hint rewrite invr_cp1  : invr_le1 invr_lt1.
 
 (* -------------------------------------------------------------------- *)
-lemma exprz_ge0 n x : zeror <= x => zeror <= exp x n.
+lemma expr_ge0 n x : zeror <= x => zeror <= exp x n.
 proof.
 move=> ge0_x; elim/intwlog: n.
 + by move=> n; rewrite exprN invr_ge0.
@@ -1005,15 +1013,15 @@ move=> ge0_x; elim/intwlog: n.
 + by move=> n ge0_n ge0_e; rewrite exprS // mulr_ge0.
 qed.
 
-lemma exprz_gt0 n x : zeror < x => zeror < exp x n.
-proof. by rewrite !lt0r expf_eq0 => -[->/=]; apply/exprz_ge0. qed.
+lemma expr_gt0 n x : zeror < x => zeror < exp x n.
+proof. by rewrite !lt0r expf_eq0 => -[->/=]; apply/expr_ge0. qed.
 
-hint rewrite exprz_gte0 : exprz_ge0 exprz_gt0.
+hint rewrite expr_gte0 : expr_ge0 expr_gt0.
 
 lemma nosmt exprn_ile1 n x : 0 <= n => zeror <= x <= oner => exp x n <= oner.
 proof.
 move=> nge0 [xge0 xle1]; elim: n nge0; 1: by rewrite expr0.
-by move=> n ge0_n ih; rewrite exprS // mulr_ile1 ?exprz_ge0.
+by move=> n ge0_n ih; rewrite exprS // mulr_ile1 ?expr_ge0.
 qed.
 
 lemma nosmt exprn_ilt1 n x :
@@ -1021,7 +1029,7 @@ lemma nosmt exprn_ilt1 n x :
 proof.
 move=> nge0 [xge0 xlt1]; case: n nge0; 1: by rewrite expr0 ltrr.
 move=> n nge0 _; rewrite addz_neq0 //=; elim: n nge0; 1: by rewrite expr1.
-by move=> n nge0 ih; rewrite exprS 1:addz_ge0 // mulr_ilt1 ?exprz_ge0.
+by move=> n nge0 ih; rewrite exprS 1:addz_ge0 // mulr_ilt1 ?expr_ge0.
 qed.
 
 hint rewrite exprn_ilte1 : exprn_ile1 exprn_ilt1.
@@ -1086,14 +1094,14 @@ lemma nosmt ler_wiexpn2l x : zeror <= x <= oner =>
   forall m n, 0 <= n <= m => exp x m <= exp x n.
 proof.
 move=> [xge0 xle1] m n [ge0_n le_nm]; have ->: m = (m - n) + n by ring.
-by rewrite exprDn 1:subz_ge0 // ler_pimull ?(exprz_ge0, exprn_ile1) ?subz_ge0.
+by rewrite exprDn 1:subz_ge0 // ler_pimull ?(expr_ge0, exprn_ile1) ?subz_ge0.
 qed.
 
 lemma nosmt ler_weexpn2l x : oner <= x =>
   forall m n, 0 <= m <= n => exp x m <= exp x n.
 proof.
 move=> ge1_x m n [ge0_m le_mn]; have ->: n = (n - m) + m by ring.
-rewrite exprDn 1:subz_ge0 // ler_pemull ?(exprz_ge0, exprn_ege1) //.
+rewrite exprDn 1:subz_ge0 // ler_pemull ?(expr_ge0, exprn_ege1) //.
 + by rewrite (@ler_trans oner). + by rewrite subz_ge0.
 qed.
 
@@ -1128,10 +1136,10 @@ lemma nosmt ler_pexp n x y :
 proof.
 move=> h; elim/intind: n h x y => [|n ge0_n ih] x y [ge0_x le_xy].
 + by rewrite !expr0.
-+ by rewrite !exprS // ler_pmul // ?exprz_ge0 ?ih.
++ by rewrite !exprS // ler_pmul // ?expr_ge0 ?ih.
 qed.
 
-lemma nosmt ge0_sqr x : zeror <= exp x 2.
+lemma nosmt ge0_sqr (x : t) : zeror <= exp x 2.
 proof.
 rewrite expr2; case: (zeror <= x); first by move=> h; apply/mulr_ge0.
 by rewrite lerNgt /= => /ltrW le0_x; apply/mulr_le0.
@@ -1236,13 +1244,40 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma maxrC (x y : t) : maxr x y = maxr y x.
-proof. by rewrite /maxr lerNgt ler_eqVlt; case: (x = y); case: (x < y). qed.
+proof. by rewrite !maxrE lerNgt ler_eqVlt; case: (x = y); case: (x < y). qed.
 
 lemma maxrl (x y : t) : x <= maxr x y.
-proof. by rewrite /maxr; case: (y <= x) => [_|/ltrNge/ltrW]. qed.
+proof. by rewrite maxrE; case: (y <= x) => [_|/ltrNge/ltrW]. qed.
 
 lemma maxrr (x y : t) : y <= maxr x y.
 proof. by rewrite maxrC maxrl. qed.
+
+lemma ler_maxr (x y : t) : x <= y => maxr x y = y.
+proof. by rewrite maxrE lerNgt ler_eqVlt => -> /#. qed.
+
+lemma ler_maxl (x y : t) : y <= x => maxr x y = x.
+proof. by rewrite maxrC &(ler_maxr). qed.
+
+lemma maxr_ub (x y : t) : x <= maxr x y /\ y <= maxr x y.
+proof. by rewrite maxrl maxrr. qed.
+
+lemma ler_maxrP m n1 n2 : (maxr n1 n2 <= m) <=> (n1 <= m) /\ (n2 <= m).
+proof. 
+split; last by case=> le1 le2; rewrite maxrE; case: (n2 <= n1).
+rewrite maxrE; case: (n2 <= n1).
+* by move=> le_21 le_n1m; rewrite (ler_trans _ le_21 le_n1m).
+* rewrite lerNgt /= => /ltrW le_12 le_n1m.
+  by rewrite (ler_trans _ le_12 le_n1m).
+qed.
+
+lemma ltr_maxrP m n1 n2 : (maxr n1 n2 < m) <=> (n1 < m) /\ (n2 < m).
+proof.
+split; last by case=> le1 le2; rewrite maxrE; case: (n2 <= n1).
+rewrite maxrE; case: (n2 <= n1).
+* by move=> le_21 lt_n1m; rewrite (ler_lt_trans _ le_21 lt_n1m).
+* rewrite lerNgt /= => lt_12 lt_n1m.
+  by rewrite (ltr_trans _ lt_12 lt_n1m).
+qed.
 end RealDomain.
 
 (* -------------------------------------------------------------------- *)

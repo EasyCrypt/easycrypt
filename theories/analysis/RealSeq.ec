@@ -73,7 +73,7 @@ pose e := `|x - y| / 2%r; have gt0e: 0%r < e.
   by rewrite /e divr_gt0 ?(normr_gt0, subr_eq0).
 case: (lim_sx _ gt0e) => {lim_sx} Nx lim_sx.
 case: (lim_sy _ gt0e) => {lim_sy} Ny lim_sy.
-case: (max_is_ub Nx Ny); (pose N := max _ _).
+case: (IntOrder.maxr_ub Nx Ny); (pose N := max _ _).
 move=> /lim_sx {lim_sx} lim_sx /lim_sy {lim_sy} lim_sy.
 have := ltr_add _ _ _ _ lim_sx lim_sy; rewrite ltrNge.
 by rewrite /e double_half (@distrC (s N)) ler_dist_add.
@@ -85,7 +85,7 @@ lemma eq_cnvto_from N s1 s2 l:
   => convergeto s1 l => convergeto s2 l.
 proof.
 move=> eq_s lim_s1 e gt0_e; case: (lim_s1 _ gt0_e).
-move=> Ns lim_s1N; exists (max N Ns)=> n /geq_max [leN leNs].
+move=> Ns lim_s1N; exists (max N Ns)=> n /IntOrder.ler_maxrP [leN leNs].
 by rewrite -eq_s // lim_s1N.
 qed.
 
@@ -120,7 +120,7 @@ lemma cnvtoD s1 s2 l1 l2: convergeto s1 l1 => convergeto s2 l2 =>
 proof.
 move=> cnv1 cnv2 e gt0e; have gt0e2: 0%r < e/2%r by rewrite divr_gt0.
 case: (cnv1 _ gt0e2)=> N1 c1; case: (cnv2 _ gt0e2)=> N2 c2.
-exists (max N1 N2) => n /geq_max [le_N1n le_N2n].
+exists (max N1 N2) => n /IntOrder.ler_maxrP [le_N1n le_N2n].
 pose x := `|s1 n - l1| + `|s2 n - l2|.
 apply (@ler_lt_trans x); rewrite /x => {x}.
   by rewrite subrACA; apply/ler_norm_add.
@@ -168,7 +168,7 @@ proof.
 move=> c1 /boundedP [M] [ge0_M] [N leM] e gt0_e.
 have /= [N' lee] := c1 (e / (M + 1%r)) _.
   by rewrite divr_gt0 ?ltr_spaddr // (ler_trans `|s2 N|).
-exists (max N N')=> n /= /geq_max [leNn leN'n]; rewrite normrM.
+exists (max N N')=> n /= /IntOrder.ler_maxrP [leNn leN'n]; rewrite normrM.
 apply/(ler_lt_trans (M * (e / (M + 1%r)))); last first.
   rewrite mulrCA gtr_pmulr // ltr_pdivr_mulr.
   by rewrite ltr_spaddr. by rewrite mul1r ltr_addl.
@@ -206,8 +206,8 @@ have cvF: convergeto F (l1 - l2) by move=> @/F; apply/cnvtoB.
 apply/lerNgt/negP=> lt_l21; pose e := (l1 - l2) / 2%r.
 have gt0_e: 0%r < e by rewrite /e divr_gt0 ?subr_gt0.
 have [N' lte] := cvF _ gt0_e; pose n := max N N'.
-have /subr_le0 le0_s12:= le_s12 n _; first by rewrite /n leq_maxl.
-have := lte n _; first by rewrite /n leq_maxr.
+have /subr_le0 le0_s12 := le_s12 n _; first by rewrite /n maxrl.
+have := lte n _; first by rewrite /n maxrr.
 rewrite ltr_norml => -[+ _] @/F; rewrite ltr_subr_addl /F.
 move/ltr_le_trans/(_ _ le0_s12); rewrite -(@mulr1 (l1-l2)) /e.
 rewrite -mulrBr pmulr_llt0 1:subr_gt0 1:invr_lt1 //.
@@ -327,4 +327,3 @@ lemma limB (s1 s2 : int -> real) :
   converge s1 => converge s2 =>
     lim (fun x => s1 x - s2 x) = lim s1 - lim s2.
 proof. by move=> h1 h2; rewrite limD // 1:cnvN // limN. qed.
-

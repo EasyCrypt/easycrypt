@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int Real RealExtra StdRing StdOrder Distr List FSet.
+require import AllCore StdRing StdOrder Distr List FSet.
 (*---*) import RField RealOrder.
 require (*  *) CyclicGroup.
 

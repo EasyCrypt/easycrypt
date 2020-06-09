@@ -9,7 +9,7 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Core Int IntExtra.
+require import Core Int.
 require (*--*) Monoid.
 
 (* -------------------------------------------------------------------- *)
@@ -759,7 +759,10 @@ clone include IDomain with
   op   invr  <- (fun (z : int) => z)
   proof * by smt
   remove abbrev (-)
-  remove abbrev (/).
+  remove abbrev (/)
+  rename "ofint" as "ofint_id".
+
+abbrev (^) = exp.
 
 lemma intmulz z c : intmul z c = z * c.
 proof.

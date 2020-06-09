@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int IntDiv IntExtra.
+require import Int IntDiv.
 require (*--*) Subtype Ring StdOrder.
 (*---*) import Ring.IntID StdOrder.IntOrder.
 

@@ -1,4 +1,4 @@
-require import AllCore Int IntExtra IntDiv List.
+require import AllCore IntDiv List.
 require import Ring StdRing StdOrder StdBigop Distr.
 require import BitEncoding.
 require (*--*) BitWord MAC_then_Pad_then_CBC.
@@ -331,7 +331,7 @@ have -> /=: bs2os (pad m t)
 + by rewrite /pad /= os2bsK // size_padded [smt (@IntDiv)].
 rewrite !last_cat last_padding int2oK.
 + split=> [|_]; first by smt (size_ge0 @IntDiv).
-  by apply/(ler_lt_trans 16); [smt (size_ge0 @IntDiv)|smt (powS pow0)].
+  by apply/(ler_lt_trans 16); [smt (size_ge0 @IntDiv)|smt (exprS expr0)].
 rewrite drop_size_cat.
 + by rewrite !size_cat size_padding /#.
 rewrite {1}/pad_length /=.
@@ -347,8 +347,7 @@ lemma leak_pad m t:
   size (pad m t)
   = size (pad (mkseq (fun (i : int) => zerow) (size m - size m %% 16)) t).
 proof.
-rewrite /pad /= !size_os2bs !size_padded size_mkseq.
-rewrite max_ler.
+rewrite /pad /= !size_os2bs !size_padded size_mkseq ler_maxr.
 + case: (size m < 16)=> [|/lezNgt] szm_16.
   + by rewrite modz_small 1:size_ge0.
   smt (@IntDiv).

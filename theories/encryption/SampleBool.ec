@@ -47,7 +47,7 @@ lemma Sample_bool (A<:Worker) &m (p:glob A -> bool):
                Pr[A.work(false) @ &m : res /\ p (glob A)]).
 proof strict.
   cut := Mean A &m (fun b (gA:glob A) (b':bool), b = b' /\ p gA) => /= ->.
-  cut Hd: 2%r <> Real.zero by smt.
+  cut Hd: 2%r <> 0%r by smt.
   cut -> : Pr[A.work(true) @ &m : true = res /\ p (glob A)] =
            Pr[A.work(true) @ &m : res /\ p (glob A)].
     by rewrite Pr[mu_eq];smt.
@@ -58,7 +58,7 @@ proof strict.
            Pr[A.work(false) @ &m : (!res /\ p (glob A)) \/ (res /\ p (glob A))].
     by rewrite Pr[mu_eq];smt.
   rewrite Pr[mu_disjoint];first smt.
-  by fieldeq.
+  by field.
 qed.
 
 lemma Sample_bool_lossless (A<:Worker) &m:

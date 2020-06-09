@@ -74,7 +74,7 @@ end StrongPRP.
 abstract theory RP.
 require import SmtMap FSet.
 require import Dexcepted.
-(*---*) import StdOrder.RealOrder StdRing.RField.
+(*---*) import StdOrder.RealOrder RField.
 
 op dD: { D distr | is_lossless dD } as dD_ll.
 

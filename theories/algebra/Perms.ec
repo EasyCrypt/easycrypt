@@ -7,8 +7,8 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import AllCore List IntDiv Binomial Ring.
-(*---*) import IntID.
+require import AllCore List IntDiv Binomial Ring StdOrder.
+(*---*) import IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
 op allperms_r (n : unit list) (s : 'a list) : 'a list list.
@@ -68,7 +68,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma allpermsP (s t : 'a list) : mem (allperms s) t <=> perm_eq s t.
-proof. by apply/allperms_rP; rewrite size_nseq max_ler ?size_ge0. qed.
+proof. by apply/allperms_rP; rewrite size_nseq ler_maxr ?size_ge0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma uniq_allperms (s : 'a list) : uniq (allperms s).
@@ -106,4 +106,4 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma size_allperms_uniq (s : 'a list) :
   uniq s => size (allperms s) = fact (size s).
-proof. by apply/size_allperms_uniq_r; rewrite size_nseq max_ler ?size_ge0. qed.
+proof. by apply/size_allperms_uniq_r; rewrite size_nseq ler_maxr ?size_ge0. qed.
