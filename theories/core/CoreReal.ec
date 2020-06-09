@@ -7,26 +7,16 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require export Int IntExtra.
-require import Ring AlgTactic.
+op from_int: int -> real.
+op zero = from_int 0.
+op one  = from_int 1.
+op add  : real -> real -> real.
+op opp  : real -> real.
+op mul  : real -> real -> real.
+op inv  : real -> real.
+
+op lt : real -> real -> bool.
+op le = fun x y => lt x y \/ x = y.
 
 (* -------------------------------------------------------------------- *)
-instance ring with int
-  op rzero = zero
-  op rone  = one
-  op add   = (+)
-  op opp   = [-]
-  op mul   = ( * )
-  op expr  = IntExtra.( ^ )
 
-  proof oner_neq0 by smt
-  proof addr0     by smt
-  proof addrA     by smt
-  proof addrC     by smt
-  proof addrN     by smt
-  proof mulr1     by smt
-  proof mulrA     by smt
-  proof mulrC     by smt
-  proof mulrDl    by smt
-  proof expr0     by smt
-  proof exprS     by smt.

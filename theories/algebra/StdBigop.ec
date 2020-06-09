@@ -23,12 +23,14 @@ clone include Bigalg.BigOrder with
     op Num.Domain.( * )  <- Int.( * ),
     op Num.Domain.invr   <- (fun (z : int) => z),
     op Num.Domain.intmul <- IntID.intmul,
-    op Num.Domain.ofint  <- IntID.ofint,
+    op Num.Domain.ofint  <- IntID.ofint_id,
     op Num.Domain.exp    <- IntID.exp,
 
     op Num."`|_|" <- Int."`|_|",
     op Num.( <= ) <- Int.(<=),
-    op Num.( <  ) <- Int.(< )
+    op Num.( <  ) <- Int.(< ),
+    op Num.minr   <- Int.min,
+    op Num.maxr   <- Int.max
 
     proof Num.Domain.* by smt(), Num.Axioms.* by smt()
 
@@ -97,7 +99,9 @@ clone include Bigalg.BigOrder with
 
     op Num."`|_|" <- Real."`|_|",
     op Num.( <= ) <- Real.(<=),
-    op Num.( <  ) <- Real.(< )
+    op Num.( <  ) <- Real.(< ),
+    op Num.minr    = fun (x y : real), if x <= y then x else y,
+    op Num.maxr    = fun (x y : real), if y <= x then x else y
 
     proof Num.Domain.* by smt, Num.Axioms.* by smt
 
@@ -138,7 +142,7 @@ proof. by rewrite sumr_const count_predT RField.mulr1. qed.
 
 lemma sumr1_int (n : int) : 0 <= n =>
   BRA.bigi predT (fun i => 1%r) 0 n = n%r.
-proof. by move=> ge0_n; rewrite sumr1 size_range max_ler. qed.
+proof. by move=> ge0_n; rewrite sumr1 size_range ler_maxr. qed.
 
 lemma sumidE n : 0 <= n =>
   BRA.bigi predT (fun i => i%r) 0 n = (n * (n - 1))%r / 2%r.

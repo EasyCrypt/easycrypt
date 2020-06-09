@@ -9,7 +9,7 @@
 require import AllCore Distr List FSet SmtMap.
 require import Dexcepted.
 require (*--*) PRP.
-(*---*) import StdRing.RField StdOrder.RealOrder.
+(*---*) import RField StdOrder.RealOrder.
 
 require (*--*) FelTactic.
 
@@ -347,7 +347,7 @@ module DBounder (D : Distinguisher) (F : SPRP_Oracles) = {
 
 section CollisionProbability.
   require import Mu_mem.
-  (*---*) import StdBigop StdRing StdOrder IntExtra.
+  (*---*) import StdBigop StdRing StdOrder.
   (*---*) import Bigreal.BRA RField RField.AddMonoid IntOrder.
 
   declare module D:Distinguisher {ARP, DBounder}.
@@ -442,7 +442,7 @@ section CollisionProbability.
            [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]
            (card (fdom ARP.m) <= FEL.c /\ card (fdom ARP.mi) <= FEL.c)=> //.
   + rewrite -mulr_suml Bigreal.sumidE 1:ge0_q. 
-    by rewrite (powS 1) // pow1;smt(mu_bounded ge0_q).
+    by rewrite expr2;smt(mu_bounded ge0_q).
   + by inline*; auto=> />; rewrite fdom0 fcards0.
   + exists*FEL.c;elim*=> c.
     conseq(:_==>_ : (c%r * mu1 uD witness))=> />.

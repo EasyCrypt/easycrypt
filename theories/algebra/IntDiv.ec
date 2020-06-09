@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Core Int IntExtra IntMin Ring StdOrder.
+require import Core Int IntMin Ring StdOrder.
 (*---*) import Ring.IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -440,7 +440,7 @@ proof. by rewrite dvdzE modzE subr_eq0 eq_sym. qed.
 lemma nosmt dvdz_exp2l p m n : 0 <= m <= n => (p ^ m %| p ^ n).
 proof.
 move=> [ge0_m le_mn]; rewrite dvdzE; rewrite -(subrK n m).
-by rewrite -pow_add // ?subr_ge0 // modzMl.
+by rewrite exprDn ?subr_ge0 // modzMl.
 qed.
 
 (* -------------------------------------------------------------------- *)

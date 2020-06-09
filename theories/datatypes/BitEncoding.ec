@@ -45,7 +45,7 @@ proof. by apply/mkseq0_le. qed.
 lemma int2bs0 N : int2bs N 0 = nseq N false.
 proof.
 apply/(eq_from_nth false); rewrite size_int2bs ?size_nseq //.
-case: (N <= 0) => [le0_N i|]; 1: by rewrite max_lel ?ler_lt_asym.
+case: (N <= 0) => [le0_N i|]; 1: by rewrite ler_maxl ?ler_lt_asym.
 move/ltrNge => @/max ^gt0_N ->/= i lt_in.
 by rewrite nth_nseq ?nth_mkseq //= div0z mod0z.
 qed.
@@ -63,56 +63,56 @@ have ge0_N: 0 <= N by apply/(ler_trans _ ge0_k)/ltrW.
 rewrite !modz_pow2_div // ?ge0_k ?ltrW //.
 move/(congr1 (fun z => z %% 2^1))=> /=; rewrite !modz_dvd_pow /=;
   first 2 by (rewrite ler_subr_addr lez_add1r).
-by rewrite !pow1 => ->.
+by rewrite !expr1 => ->.
 qed.
 
 lemma nosmt bs2int_mod N i : 0 <= i => int2bs N (i %% 2^N) = int2bs N i.
 proof.
 move=> ge0_i; apply/bs2int_eq=> //; last by rewrite modz_mod.
-by rewrite modz_ge0 // -lt0n ?ltrW // powPos.
+by rewrite modz_ge0 // -lt0n ?ltrW // expr_gt0.
 qed.
 
 lemma bs2int_ge0 s : 0 <= bs2int s.
 proof.
 elim/last_ind: s => /= [|s b ih]; 1: by rewrite bs2int_nil.
-by rewrite bs2int_rcons addr_ge0 ?ih mulr_ge0 ?b2i_ge0 ltrW powPos.
+by rewrite bs2int_rcons addr_ge0 ?ih mulr_ge0 ?b2i_ge0 ltrW expr_gt0.
 qed.
 
 lemma bs2int_le2Xs s : bs2int s < 2^(size s).
 proof.
-elim/last_ind: s=> /= [|s b ih]; first by rewrite bs2int_nil pow0.
-rewrite bs2int_rcons size_rcons powS ?size_ge0.
+elim/last_ind: s=> /= [|s b ih]; first by rewrite bs2int_nil expr0.
+rewrite bs2int_rcons size_rcons exprS ?size_ge0.
 (have {2}->: 2=1+1 by done); rewrite mulrDl mul1r ltr_le_add //.
-by rewrite ler_pimulr ?b2i_le1 ltrW powPos.
+by rewrite ler_pimulr ?b2i_le1 ltrW expr_gt0.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma bs2intK s : int2bs (size s) (bs2int s) = s.
 proof.
 elim/last_ind: s=> /= [|s b ih]; 1: by rewrite bs2int_nil int2bs0s.
-rewrite bs2int_rcons size_rcons int2bsS ?size_ge0; congr.
-  rewrite -(@bs2int_mod (size s)) 1:-bs2int_rcons ?bs2int_ge0.
-  by rewrite mulrC modzMDr bs2int_mod 1:bs2int_ge0.
-have gt0_2Xs: 0 < 2  ^ (size s) by rewrite powPos.
-rewrite mulrC divzMDr 1:gtr_eqF // divz_small /=.
+rewrite bs2int_rcons size_rcons int2bsS ?size_ge0.
+rewrite -(@bs2int_mod (size s)) 1:-bs2int_rcons ?bs2int_ge0.
+rewrite mulrC modzMDr bs2int_mod 1:bs2int_ge0 ih; congr.
+have gt0_2Xs: 0 < 2  ^ (size s) by rewrite expr_gt0.
+rewrite divzMDr 1:gtr_eqF // divz_small /=.
   by rewrite bs2int_ge0 gtr0_norm ?bs2int_le2Xs.
 by rewrite mod2_b2i b2i_eq0.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma int2bsK N i : 0 <= i < 2^N => bs2int (int2bs N i) = i.
+lemma int2bsK N i : 0 <= N => 0 <= i < 2^N => bs2int (int2bs N i) = i.
 proof.
-elim/natind: N i=> [n le0_n|n ge0_n ih] i.
-  rewrite powNeg // ltz1 -eqr_le => <-; rewrite int2bs0.
+move=> ge0N; elim: N ge0N i=> /= [|n ge0_n ih] i.
+  rewrite expr0 ltz1 -eqr_le => <-; rewrite int2bs0.
   by rewrite nseq0_le // bs2int_nil.
 case=> [ge0_i lt_i2XSn]; rewrite int2bsS // bs2int_rcons.
-rewrite -{1}bs2int_mod // ih 1:ltz_pmod ?powPos //=.
-  by rewrite modz_ge0 gtr_eqF ?powPos.
-rewrite size_int2bs max_ler // eq_sym {1}(@divz_eq i (2^n)).
+rewrite -{1}bs2int_mod // ih 1:ltz_pmod ?expr_gt0 //=.
+  by rewrite modz_ge0 gtr_eqF ?expr_gt0.
+rewrite size_int2bs ler_maxr // eq_sym {1}(@divz_eq i (2^n)).
 rewrite addrC mulrC; do 2! congr; move: lt_i2XSn.
-rewrite powS // -ltz_divLR ?powPos // => lt.
+rewrite exprS // -ltz_divLR ?expr_gt0 // => lt.
 rewrite -{1}(@modz_small (i %/ 2^n) 2) ?ger0_norm ?b2i_mod2 //.
-by rewrite lt /= divz_ge0 ?powPos.
+by rewrite lt /= divz_ge0 ?expr_gt0.
 qed.
 end BS2Int.
 
@@ -160,7 +160,7 @@ qed.
 lemma size_chunk r (bs : 'a list) : 0 < r =>
   size (chunk r bs) = size bs %/ r.
 proof.
-move=> gt0_r; rewrite size_mkseq max_ler //.
+move=> gt0_r; rewrite size_mkseq ler_maxr //.
 by rewrite divz_ge0 ?gt0_r ?size_ge0.
 qed.
 
@@ -174,7 +174,7 @@ rewrite -ler_subr_addr addrAC => /ler_trans/(_ (size bs - r) _).
 rewrite (mulrC i) ler_subr_addl -ler_subr_addr => ler.
 have ge0_r: 0 <= r by apply/ltrW/gt0_r.
 rewrite size_take ?ge0_r size_drop // 1:mulr_ge0 ?ge0_r //.
-rewrite max_ler 1:subr_ge0 1:-subr_ge0 1:(ler_trans r) ?ge0_r //.
+rewrite ler_maxr 1:subr_ge0 1:-subr_ge0 1:(ler_trans r) ?ge0_r //.
 by move/ler_eqVlt: ler=> [<-|->].
 qed.
 
@@ -233,7 +233,7 @@ rewrite ltr_pmul2r ?lt_iq //= take_cat; pose s := drop _ _.
 suff /ler_eqVlt[->|->//]: r <= size s; 1: rewrite ltrr /=.
   by rewrite take0 take_size cats0.
 rewrite size_drop ?mulr_ge0 // 1:ltrW // szxs -mulrBl.
-rewrite max_ler ?mulr_ge0 1,2:ltrW ?subr_gt0 ?ler_pmull //.
+rewrite ler_maxr ?mulr_ge0 1,2:ltrW ?subr_gt0 ?ler_pmull //.
 by rewrite ler_subr_addl -ltzE.
 qed.
 end BitChunking.

@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int IntExtra.
+require import Int.
 
 (* -------------------------------------------------------------------- *)
 type t.

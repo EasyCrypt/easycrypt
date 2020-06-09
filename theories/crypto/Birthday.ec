@@ -76,8 +76,8 @@ section.
   proof.
     fel 1 (size Sample.l) (fun x, q%r * mu1 uT maxu) q (!uniq Sample.l) []=> //.
     + rewrite Bigreal.sumr_const count_predT size_range /=.
-      rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
-      have ->: q^2 = q * q by rewrite (_:2 = 1 + 1) // powS // pow1.
+      rewrite ler_maxr 1:smt mulrA ler_wpmul2r 1:smt //.
+      have ->: q^2 = q * q by rewrite (_:2 = 1 + 1) // exprS // expr1.
       by rewrite -fromintM le_fromint ler_wpmul2r 1:ge0_q /#.
     + by inline*; auto.
     + proc;wp; rnd (mem Sample.l); skip=> // /> &hr ???.

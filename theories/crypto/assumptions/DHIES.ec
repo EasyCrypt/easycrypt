@@ -1,8 +1,9 @@
 require import AllCore FSet CoreMap SmtMap CyclicGroup List.
-require import Distr DList DJoin DMap Int.
+require import Distr DList DJoin DMap StdOrder.
 require import AEAD.
-require MRPKE.
-require ODH.
+require (*--*) MRPKE.
+require (*--*) ODH.
+(*---*) import IntOrder.
 
 pragma -implicits.
 pragma +oldip.
@@ -1144,7 +1145,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
            move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap).
           rewrite H2. 
            move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap). 
-       rewrite size_map /range /= size_iota max_ler 1:size_ge0. 
+       rewrite size_map /range /= size_iota ler_maxr 1:size_ge0. 
        apply eq_in_map => y /mem_iota /= [? ?] /=.
        by rewrite (nth_map witness) /= 1:[smt (size_iota)] nth_iota.
      - rewrite H2. 
