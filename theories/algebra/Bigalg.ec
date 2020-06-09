@@ -49,8 +49,11 @@ proof. by rewrite sumrN sumrD; apply/eq_bigr => /=. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt sumr_const (P : 'a -> bool) x s:
-  big P (fun i => x) s = intmul x (count P s).
+  big P (fun _ => x) s = intmul x (count P s).
 proof. by rewrite big_const intmulpE 1:count_ge0 // -ZM.AddMonoid.iteropE. qed.
+
+lemma sumri_const k (n m:int) : n <= m => bigi predT (fun _ => k) n m = intmul k (m - n).
+proof. by move=> h; rewrite sumr_const count_predT size_range /#. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma sumr_undup ['a] (P : 'a -> bool) F s :
