@@ -288,14 +288,19 @@ module LowRewrite = struct
 
   let find_rewrite_patterns = find_rewrite_patterns ~inpred:false
 
-  let t_rewrite_r ?target (s, o) pt tc =
+  let t_rewrite_r ?(mode = `Full) ?target (s, o) pt tc =
     let hyps, tgfp = FApi.tc1_flat ?target tc in
+
+    let modes =
+      match mode with
+      | `Full  -> None
+      | `Light -> Some [{ k_keyed = true; k_conv = false }] in
 
     let for1 (pt, mode, (f1, f2)) =
       let fp, tp = match s with `LtoR -> f1, f2 | `RtoL -> f2, f1 in
       let subf, occmode =
         (try
-           PT.pf_find_occurence_lazy pt.PT.ptev_env ~ptn:fp tgfp
+           PT.pf_find_occurence_lazy pt.PT.ptev_env ?modes ~ptn:fp tgfp
          with
          | PT.FindOccFailure `MatchFailure ->
              raise (RewriteError LRW_NothingToRewrite)
@@ -467,11 +472,11 @@ let process_apply_top tc =
   | _ -> tc_error !!tc "no top assumption"
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite1_core ?(close = true) ?target (s, o) pt tc =
+let process_rewrite1_core ?mode ?(close = true) ?target (s, o) pt tc =
   let o = norm_rwocc o in
 
   try
-    let tc = LowRewrite.t_rewrite_r ?target (s, o) pt tc in
+    let tc = LowRewrite.t_rewrite_r ?mode ?target (s, o) pt tc in
     let cl = fun tc ->
       if EcFol.f_equal f_true (FApi.tc1_goal tc) then
         t_true tc
@@ -663,7 +668,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
   end
 
   | RWRw (((s : rwside), r, o), pts) -> begin
-      let do1 ((subs : rwside), pt) tc =
+      let do1 (mode : [`Full | `Light]) ((subs : rwside), pt) tc =
         let hyps   = FApi.tc1_hyps tc in
         let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
         let hyps   = FApi.tc1_hyps ?target tc in
@@ -709,20 +714,27 @@ let rec process_rewrite1_r ttenv ?target ri tc =
                 process_rewrite1_core ?target (theside, o) pt tc in
               t_ors (List.map do1 ls) tc
           end else
-            process_rewrite1_core ?target (theside, o) pt tc
+            process_rewrite1_core ~mode ?target (theside, o) pt tc
 
         | _ ->
           let pt =
             PT.process_full_pterm ~implicits
               (PT.ptenv_of_penv hyps !!tc) pt
-          in process_rewrite1_core ?target (theside, o) pt tc
+          in process_rewrite1_core ~mode ?target (theside, o) pt tc
         in
 
-      let doall tc = t_ors (List.map do1 pts) tc in
+      let doall mode tc = t_ors (List.map (do1 mode) pts) tc in
 
       match r with
-      | None -> doall tc
-      | Some (b, n) -> t_do b n doall tc
+      | None ->
+          doall `Full tc
+      | Some (b, None) ->
+          t_seq
+            (t_do b (Some 1) (doall `Full))
+            (t_do b None (doall `Light))
+            tc
+      | Some (b, n) ->
+          t_do b n (doall `Full) tc
   end
 
   | RWPr (x, f) -> begin

@@ -344,7 +344,13 @@ let rec pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
      subf
 
 (* -------------------------------------------------------------------- *)
-let pf_find_occurence_lazy (pt : pt_env) ~ptn subject =
+let default_modes = [
+  { k_keyed =  true; k_conv = false; };
+  { k_keyed =  true; k_conv =  true; };
+  { k_keyed = false; k_conv =  true; };
+]
+
+let pf_find_occurence_lazy (pt : pt_env) ?(modes = default_modes) ~ptn subject =
   let rec doit (modes : occmode list) =
     match modes with
     | [] ->
@@ -355,11 +361,7 @@ let pf_find_occurence_lazy (pt : pt_env) ~ptn subject =
       try  (pf_find_occurence pt ~occmode ~ptn subject, occmode)
       with FindOccFailure _ -> doit modes in
 
-  doit [
-    { k_keyed =  true; k_conv = false; };
-    { k_keyed =  true; k_conv =  true; };
-    { k_keyed = false; k_conv =  true; };
-  ]
+  doit modes
 
 (* --------------------------------------------------------------------- *)
 let pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =

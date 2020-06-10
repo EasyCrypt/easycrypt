@@ -130,7 +130,7 @@ val pf_find_occurence :
   pt_env -> ?occmode:occmode -> ptn:form -> form -> form * occmode
 
 val pf_find_occurence_lazy :
-  pt_env -> ptn:form -> form -> form * occmode
+  pt_env -> ?modes:occmode list -> ptn:form -> form -> form * occmode
 
 (* -------------------------------------------------------------------- *)
 val pattern_form :
