@@ -913,11 +913,14 @@ section Security_Aux.
       case: (x = G1.u{hr}) => _.
       + apply invr_ge0;smt (le_fromint gt1_q).
       rewrite FDistr.dt_ll !FDistr.dt1E;apply lerr_eq.
-      field;smt (gt1_q le_fromint).
+      field;smt (gt1_q le_fromint). 
     seq 1 : (r' \in map (fun (g4 : ciphertext) => log g4.`3) G3.cilog)
             (PKE_.qD%r / q%r) (PKE_.qD%r / q%r) _ 0%r 
-            (size G3.cilog <= PKE_.qD) => //; last first.
-    + hoare; conseq (_ : _ ==> true) => // /#.
+            (size G3.cilog <= PKE_.qD) => //;last 2 first.
+    + hoare;conseq (_ : _ ==> true) => // /#.
+    + move=> &hr _;apply lerr_eq;field.
+      + rewrite expr2; smt (gt1_q). 
+      + smt (gt1_q). 
     + by auto.
     + rnd;skip => /> &hr Hsize _;pose m' := map _ _.
       apply (mu_mem_le_mu1_size FDistr.dt m') => //.
@@ -1051,3 +1054,4 @@ section Security.
   qed.
 
 end section Security.
+
