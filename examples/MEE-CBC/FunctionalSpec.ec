@@ -110,8 +110,8 @@ instance bring with block
   proof addrA     by apply/xorbA
   proof addrC     by apply/xorbC
   proof addrK     by apply/xorbK
-  proof mulr1     by apply andb1
-  proof mulrA     by rewrite andbA
+  proof mulr1     by apply/andb1
+  proof mulrA     by apply/andbA
   proof mulrC     by apply/andbC
   proof mulrDl    by apply/andbDl
   proof mulrK     by apply/andbK
@@ -299,8 +299,8 @@ proof. by rewrite /padding /= size_mkseq [smt (size_ge0 @IntDiv)]. qed.
 lemma last_padding x m: last x (padding (pad_length m)) = int2o (16 - size m %% 16).
 proof.
 rewrite /padding /mkseq /= -(last_nonempty ((fun x => int2o (16 - size m %% 16)) witness<:int>)).
-+ case {-1}(iota_ 0 (16 - size m %% 16)) (eq_refl (iota_ 0 (16 - size m %% 16)))=> //=;
-  by have:= size_iota 0 (16 - size m %% 16); smt (@IntDiv).
++ have h: 0 < 16 - size m %% 16 by rewrite subr_gt0 &(ltz_pmod).
+  by apply/negP => /(congr1 size); rewrite size_map /= size_iota /#.
 by rewrite last_map.
 qed.
 

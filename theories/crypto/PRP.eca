@@ -212,7 +212,7 @@ rewrite eqT -subr_eq0 ltr0_neq0 //.
 rewrite (@mu_split _ _ (rng RP.m{m})) /predI /predT /predC /=.
 rewrite addrC addrA (addrC (-_)%Real) addrN add0r.
 apply/(ltr_le_trans (mu dD (pred1 x0))).
-+ by rewrite dD_fu.
++ by apply: dD_fu.
 by apply/mu_sub=> x ->.
 qed.
 
@@ -230,7 +230,7 @@ rewrite eqT -subr_eq0 ltr0_neq0 //.
 rewrite (@mu_split _ _ (rng RP.mi{m})) /predI /predT /predC /=.
 rewrite addrC addrA (addrC (-_)%Real) addrN add0r.
 apply/(ltr_le_trans (mu dD (pred1 y0))).
-+ by rewrite dD_fu.
++ by apply: dD_fu.
 by apply/mu_sub=> y ->.
 qed.
 
