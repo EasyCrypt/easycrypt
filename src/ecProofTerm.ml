@@ -263,7 +263,7 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
       pt.pte_ev := ev
   with EcMatching.MatchFailure as exn ->
     (* FIXME: should we check for empty inters. with ecmap? *)
-    if not (EcReduction.is_conv pt.pte_hy ptn subject) then
+    if not mode.fm_conv || not (EcReduction.is_conv pt.pte_hy ptn subject) then
       raise exn
 
 (* -------------------------------------------------------------------- *)
@@ -299,9 +299,10 @@ let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
   let mode =
     if   key = `NoKey
     then EcMatching.fmrigid
-    else EcMatching.fmdelta in
+    else EcMatching.fmdelta
+  in
 
-  let trymatch bds tp =
+  let trymatch mode bds tp =
     if not (keycheck tp key) then `Continue else
 
     let tp =
@@ -324,14 +325,24 @@ let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
 
   let (ue, pe) = (EcUnify.UniEnv.copy pt.pte_ue, !(pt.pte_ev)) in
 
-  try
-    ignore (EcMatching.FPosition.select trymatch subject);
-    raise (FindOccFailure `MatchFailure)
-  with E.MatchFound ->
-    if not (can_concretize pt) then begin
-      EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue; pt.pte_ev := pe;
-      raise (FindOccFailure `IncompleteMatch)
-    end
+  let doit mode =
+    try
+      ignore (EcMatching.FPosition.select (trymatch mode) subject);
+      raise (FindOccFailure `MatchFailure)
+    with E.MatchFound ->
+         if not (can_concretize pt) then begin
+             EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue; pt.pte_ev := pe;
+             raise (FindOccFailure `IncompleteMatch)
+           end in
+  let mode_noconv = { mode with fm_conv = false } in
+
+  try doit mode_noconv
+  with (FindOccFailure _) ->
+    doit mode
+
+
+
+
 
 (* -------------------------------------------------------------------- *)
 type keyed = [`Yes | `No | `Lazy]
