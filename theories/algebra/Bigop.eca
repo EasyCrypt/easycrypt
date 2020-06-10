@@ -411,7 +411,7 @@ qed.
 lemma big_flatten (P : 'a -> bool) F rr :
   big P F (flatten rr) = big predT (fun s => big P F s) rr.
 proof.
-elim: rr => /= [|r rr ih]; first by rewrite big_nil.
+elim: rr => /= [|r rr ih]; first by rewrite !big_nil.
 by rewrite flatten_cons big_cat big_cons -ih.
 qed.
 
@@ -470,7 +470,7 @@ rewrite big_cons; case: (P x) => /= [Px|PxN]; last first.
   rewrite ih //; 1: by move=> y y_xs; apply/hm; rewrite y_xs.
   by apply/eq_bigr=> i _ /=; rewrite big_cons /= PxN.
 have := hm x; rewrite Px /= => -[s'_px Qpx]; apply/eq_sym.
-rewrite (@bigD1_cond _ _ _ (px x)) //= big_cons Px /=.
+rewrite (@bigD1_cond _ _ _ (px x)) //= big_cons /= Px /=.
 rewrite -addmA; congr; apply/eq_sym; rewrite ih.
   by move=> y y_xs; apply/hm; rewrite y_xs.
 rewrite (@bigD1_cond _ _ _ (px x)) //=; congr.
@@ -483,7 +483,7 @@ lemma nosmt big_allpairs f F s t:
     big predT F (allpairs<:'a, 'b, 'c> f s t)
   = big predT (fun x => big predT (fun y => F (f x y)) t) s.
 proof.
-elim: s t => [|x s ih] t //=; first by rewrite big_nil.
+elim: s t => [|x s ih] t //=; first by rewrite !big_nil.
 by rewrite allpairs_consl big_cat ih big_consT big_map.
 qed.
 

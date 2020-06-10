@@ -149,7 +149,7 @@ qed.
 lemma exppcV x k : (inv x) ^+ k = inv (x ^+ k).
 proof.
 rewrite -!(expp_abs _ k); elim: `|k| (normr_ge0 k) => {k} [|k ge0_k ih].
-+ by rewrite !iter0 // invc1.
++ by rewrite /(^+) !iter0 // invc1.
 + by rewrite !exppS // invM ih comVr // com_sym comVr comXr.
 qed.
 

@@ -111,29 +111,29 @@ module FRO : FRO = {
 }.
 
 equiv RO_FRO_init : RO.init ~ FRO.init : true ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> /=; by rewrite map_empty. qed.
+proof. by proc; auto=> /=; rewrite /noflags map_empty. qed.
 
 equiv RO_FRO_get : RO.get ~ FRO.get :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> ={res} /\ RO.m{1} = noflags FRO.m{2}.
 proof.
   proc; auto=> &1 &2 [] 2!-> /= ? -> /=.
-  rewrite mem_map !map_set /fst /= get_set_sameE => |>; progress.
+  rewrite mem_map /noflags !map_set /fst /= get_set_sameE => |>; progress.
   + by rewrite mapE oget_omap_some 1:-domE.
   + by rewrite eq_sym set_get_eq 1:mapE /= 1:get_some.
 qed.
 
 equiv RO_FRO_set : RO.set ~ FRO.set :
    ={x, y} /\ RO.m{1} = noflags FRO.m{2} ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> &1 &2 [#] 3->; rewrite map_set. qed.
+proof. by proc; auto=> &1 &2 [#] 3->; rewrite /noflags map_set. qed.
 
 equiv RO_FRO_rem : RO.rem ~ FRO.rem :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> ? ?; rewrite map_rem. qed.
+proof. by proc; auto=> ? ?; rewrite /noflags map_rem. qed.
 
 equiv RO_FRO_sample : RO.sample ~ FRO.sample :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> RO.m{1} = noflags FRO.m{2}.
 proof. 
-  by proc; inline *; auto=> &1 &2 [] 2!-> /= ? ->; rewrite mem_map map_set.
+  by proc; inline *; auto=> &1 &2 [] 2!-> /= ? ->; rewrite mem_map /noflags map_set.
 qed.
 
 lemma RO_FRO_D (D <: RO_Distinguisher{RO, FRO}) :
@@ -348,7 +348,7 @@ proof.
     + move=> ? ? ?; rewrite domE=> [#] <*> [#] -> /eq_except_sym H Hxm Hx2.
       split=> [| _ r _]; first apply sampleto_ll.
       rewrite /= Hxm /=; apply /eq_sym.
-      have /(congr1 oget) := Hx2 => <-; apply eq_except_set_getlr=> //.
+      have /(congr1 oget) /= <- := Hx2; apply eq_except_set_getlr=> //.
       by rewrite domE Hx2.
     + symmetry; call (iter1_perm RRO.I iter_perm2).
       skip=> &1 &2 [[->> ->>]] [Hdom Hm]; split=> //=.
@@ -604,7 +604,7 @@ proof.
          restr Known FRO.m{1} = result{2}).
   + auto=> &1 &2 [#] 2-> Hz <- l2_nonemp _ /= ? -> /=.
     split=>[z /mem_drop Hm |];1:rewrite /in_dom_with mem_set get_setE.
-    + by case (z = head witness l{2})=> [-> | ne] //=; rewrite Hz Hm.
+    + by case (z = head witness l{2})=> [-> | ne] //=; apply/Hz/Hm.
     rewrite restr_set rem_id ?dom_restr //.
     by move: l2_nonemp=> /(mem_head_behead witness) /(_ (head witness l{2}))
                          /= /Hz @/in_dom_with />;
@@ -744,7 +744,7 @@ proof.
     + move=> &mr [] _ ->; apply mem_eq0=> z;
         rewrite -memE mem_fdom dom_restr /in_dom_with mapE mem_map domE.
       by case (RO.m{m}.[_]).
-  + by move=> /> &1; rewrite map_comp /fst /= map_id.
+  + by move=> /> &1; rewrite /noflags map_comp /fst /= map_id.
   transitivity M.main2
      (={glob D, FRO.m, arg} ==> ={res, glob D})
      (={glob D, arg} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>

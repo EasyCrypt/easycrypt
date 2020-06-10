@@ -14,11 +14,11 @@ require import AllCore List Ring StdBigop StdOrder.
 op fact (n : int) = BIM.bigi predT idfun 1 (n+1).
 
 lemma fact0 (n : int) : n <= 0 => fact n = 1.
-proof. by move=> le0n; rewrite BIM.big_geq // ler_naddl. qed.
+proof. by move=> le0n; rewrite /fact BIM.big_geq // ler_naddl. qed.
 
 lemma factS (n : int) : 0 <= n => fact (n+1) = (n+1) * (fact n).
 proof.
-move=> ge1n; rewrite BIM.big_int_recr //=.
+move=> ge1n; rewrite /fact BIM.big_int_recr //=.
 by apply/ler_addr. by rewrite IntID.mulrC.
 qed.
 

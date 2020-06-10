@@ -26,7 +26,7 @@ lemma size_int2bs N n : size (int2bs N n) = max 0 N.
 proof. by apply/size_mkseq. qed.
 
 lemma bs2int_nil : bs2int [] = 0.
-proof. by rewrite BIA.big_geq. qed.
+proof. by rewrite /bs2int BIA.big_geq. qed.
 
 lemma nosmt bs2int_rcons b (s : bool list):
   bs2int (rcons s b) = (bs2int s) + 2^(size s) * (b2i b).

@@ -188,7 +188,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma word_card: card = Alphabet.card^n.
-proof. by rewrite size_map Enum.size_wordn ler_maxr ?ge0_n. qed.
+proof. by rewrite /card size_map Enum.size_wordn ler_maxr ?ge0_n. qed.
 
 (* -------------------------------------------------------------------- *)
 clone MFinite as DWord with

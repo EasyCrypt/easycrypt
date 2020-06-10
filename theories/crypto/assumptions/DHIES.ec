@@ -1217,9 +1217,10 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     move: H12; pose E:= ((pk, eph) \in _)%SmtMap; case: E => ? ?; last first.
      pose E':= ((pk, eph) \in _)%SmtMap; case: E' => ?; last first. 
       rewrite (H6 pk eph i) //; smt (nth_cat).
-     move: H12 H14; rewrite !mem_ofassoc !unzip1_zip; smt (size_iota size_ge0 size_map).
+     move: H12 H14; rewrite /E /E' !mem_ofassoc !unzip1_zip;
+       smt (size_iota size_ge0 size_map).
     pose E':= ((pk, eph) \in _)%SmtMap; case: E' => ?; last first.
-     move: H12 H14; rewrite !mem_ofassoc !unzip1_zip; smt (size_iota size_ge0 size_map).
+     move: H12 H14; rewrite /E /E' !mem_ofassoc !unzip1_zip; smt (size_iota size_ge0 size_map).
     move: H13; rewrite !ofassoc_get.
     move=> /assoc_some_onth_mem => [[idx]] /onth_zip_some /= [].
     move=> /onth_map_some => [[pk']]; progress.

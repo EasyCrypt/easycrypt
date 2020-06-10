@@ -311,9 +311,9 @@ export IterOp.
 (* -------------------------------------------------------------------- *)
 op odd (z : int) = iter `|z| [!] false.
 
-lemma odd0 : !odd 0. proof. by rewrite iter0. qed.
-lemma odd1 :  odd 1. proof. by rewrite iter1. qed.
-lemma odd2 : !odd 2. proof. by rewrite iter2. qed.
+lemma odd0 : !odd 0. proof. by rewrite /odd iter0. qed.
+lemma odd1 :  odd 1. proof. by rewrite /odd iter1. qed.
+lemma odd2 : !odd 2. proof. by rewrite /odd iter2. qed.
 
 lemma oddN z : odd (-z) = odd z by [].
 lemma odd_abs z : odd `|z| = odd z by [].
@@ -336,7 +336,7 @@ op argmin (f : int -> 'a) (p : 'a -> bool) =
   choiceb (fun j => 0 <= j /\ p (f j) /\ forall i, 0 <= i < j => !p (f i)) 0.
 
 lemma argmin_out (f : int -> 'a) p: (forall i, !p (f i)) => argmin f p = 0.
-proof. by move=> pN; rewrite choiceb_dfl => //= x; rewrite pN. qed.
+proof. by move=> pN; rewrite /argmin choiceb_dfl => //= x; rewrite pN. qed.
 
 lemma nosmt argminP_r (f : int -> 'a) p i: 0 <= i => p (f i) =>
      0 <= argmin f p
@@ -359,14 +359,14 @@ proof. by move=> ge0_i/(argminP_r _ _ _ ge0_i). qed.
 lemma ge0_argmin (f : int -> 'a) p: 0 <= argmin f p.
 proof.                          (* FIXME: choice_spec *)
 case: (exists i, 0 <= i /\ p (f i)); first by case=> i [] /(argminP_r f p) h /h.
-move=> h; rewrite choiceb_dfl ?lez_lt_asym //=.
+move=> h; rewrite /argmin choiceb_dfl ?lez_lt_asym //=.
 by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
 qed.
 
 lemma argmin_min (f : int -> 'a) p: forall j, 0 <= j < argmin f p => !p (f j).
 proof.                          (* FIXME: choice_spec *)
 case: (exists i, 0 <= i /\ p (f i)); first by case=> i [] /(argminP_r f p) h /h.
-move=> h j; rewrite choiceb_dfl ?lez_lt_asym //=.
+move=> h j; rewrite /argmin choiceb_dfl ?lez_lt_asym //=.
 by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
 qed.
 

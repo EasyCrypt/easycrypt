@@ -203,10 +203,10 @@ elim/natind: n => [n le0n|n ge0n ih] @/nseq.
 qed.
 
 lemma nseq0 (x : 'a): nseq 0 x = [].
-proof. by rewrite iter0. qed.
+proof. by rewrite /nseq iter0. qed.
 
 lemma nseq0_le n (x : 'a) : n <= 0 => nseq n x = [].
-proof. by move=> le0_n; rewrite iter0. qed.
+proof. by move=> le0_n; rewrite /nseq iter0. qed.
 
 lemma nseq_max0 n (x : 'a) : nseq (max 0 n) x = nseq n x.
 proof.
@@ -215,10 +215,10 @@ by rewrite nseq0 => /nseq0_le<:'a> ->.
 qed.
 
 lemma nseq1 (x : 'a) : nseq 1 x = [x].
-proof. by rewrite iter1. qed.
+proof. by rewrite /nseq iter1. qed.
 
 lemma nseqS n (x : 'a) : 0 <= n => nseq (n+1) x = x :: nseq n x.
-proof. by move=> le0_n; rewrite iterS. qed.
+proof. by move=> le0_n; rewrite /nseq iterS. qed.
 
 lemma nseqSr n (x : 'a): 0 <= n => nseq (n+1) x = rcons (nseq n x) x.
 proof.
@@ -316,7 +316,7 @@ proof.                        (* BUG: PROOF IS TOO LONG *)
 case=> ge0_i ^lt_in /ltzW le_in; have/lez_trans/(_ _ le_in) := ge0_i.
 move=> {le_in} ge0_n; elim: n ge0_n i ge0_i lt_in => [|n ge0_n ih].
   by move=> i ge0_i; rewrite ltz_def eqz_leq ge0_i /= => -[].
-move=> i; rewrite iterS //; elim/natcase: i.
+move=> i; rewrite /nseq iterS //; elim/natcase: i.
   move=> i le0_i ge0_i; have ->//: i = 0 by rewrite eqz_leq.
 move=> i ge0_i _; rewrite ltz_add2r /= => /(ih _ ge0_i).
 by rewrite addz_neq0 //= -addzA /= => ->.
