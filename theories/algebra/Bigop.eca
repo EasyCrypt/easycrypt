@@ -470,7 +470,7 @@ rewrite big_cons; case: (P x) => /= [Px|PxN]; last first.
   rewrite ih //; 1: by move=> y y_xs; apply/hm; rewrite y_xs.
   by apply/eq_bigr=> i _ /=; rewrite big_cons /= PxN.
 have := hm x; rewrite Px /= => -[s'_px Qpx]; apply/eq_sym.
-rewrite (@bigD1_cond _ _ _ (px x)) //= big_cons Px /=.
+rewrite (@bigD1_cond _ _ _ (px x)) //= big_cons /= Px /=.
 rewrite -addmA; congr; apply/eq_sym; rewrite ih.
   by move=> y y_xs; apply/hm; rewrite y_xs.
 rewrite (@bigD1_cond _ _ _ (px x)) //=; congr.

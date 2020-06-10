@@ -174,7 +174,7 @@ proof. by rewrite eq_sym=> /gtr_eqF ->. qed.
 
 lemma ler0n n : 0 <= n => zeror <= ofint n.
 proof.
-elim: n => [|n ih h]; first by rewrite mulr0z lerr.
+elim: n => [|n ih h]; first by rewrite ofint0 lerr.
 by rewrite ofintS // addr_ge0 // ?ler01.
 qed.
 
@@ -186,14 +186,14 @@ qed.
 
 lemma ltr0n n : 0 <= n => (zeror < ofint n) = (0 < n).
 proof.
-elim: n => [|n ge0n _]; first by rewrite mulr0z ltrr.
+elim: n => [|n ge0n _]; first by rewrite ofint0 ltrr.
 by rewrite ltr0Sn // ltz_def addz_ge0 ?addz1_neq0.
 qed.
 
 lemma pnatr_eq0 n : 0 <= n => (ofint n = zeror) <=> (n = 0).
 proof.
-elim: n => [|n ge0n _]; rewrite ?mulr0z // gtr_eqF.
-  by rewrite ltr0Sn. by rewrite addz1_neq0.
+elim: n => [|n ge0n _]; rewrite ?ofint0 // gtr_eqF.
+  by apply: ltr0Sn. by rewrite addz1_neq0.
 qed.
 
 lemma nosmt pmulr_rgt0 (x y : t):

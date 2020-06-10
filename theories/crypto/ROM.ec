@@ -372,7 +372,7 @@ theory LazyEager.
                  else eq_except (pred1 x{1}) IND_Eager.H.m{1} IND_Lazy.H.m{2}).
       + auto=> /> &1 &2 Hpart m_x upd_cond work_neq_nil y _.
         case: (mem work{2} x{2})=> [|^x_in_work /Hpart x_in_Em]; last first.
-        + move: upd_cond=> /= <*>. rewrite 2!x_in_Em=> /= <*>. (* ?? why do I need to do this twice? *)
+        + move: upd_cond=> /= <*>; rewrite x_in_Em => /= <*>.
           case: (pick work{2} = x{2})=> //= ^pkwork_neq_x.
           rewrite in_fsetD1 eq_sym mem_set !get_setE=> -> /=.
           rewrite eq_exceptP /pred1 /=.
@@ -385,7 +385,7 @@ theory LazyEager.
           rewrite -fmap_eqP => x; rewrite get_setE; case: (x = pick work{2})=> [->|^ + /eqe_m_m' ->] //.
           by rewrite m_x.
         rewrite mem_set !get_setE !inE=> //= ^ pw_neq_x; rewrite eq_sym=> -> -> //=.
-        rewrite m_x !eq_exceptP //=.
+        rewrite m_x !eq_exceptP /=.
         move: upd_cond; case: (x{2} \in IND_Eager.H.m{1})=> [_ ->|/=] //.
         rewrite eq_exceptP=> _ h; split.
         + move=> pw_notin_Lm; split.

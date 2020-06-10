@@ -54,7 +54,7 @@ op "_.[_]" (v : vector) (i : int) = tofunv v i.
 
 lemma offunvE (v : int -> R) (i : int) : 0 <= i < size =>
   (offunv v).[i] = v i.
-proof. by rewrite offunvK /vclamp => ->. qed.
+proof. by rewrite /("_.[_]") offunvK /vclamp => ->. qed.
 
 lemma getv_out (v : vector) (i : int) :
   !(0 <= i < size) => v.[i] = zeror.
@@ -81,7 +81,7 @@ lemma offunCE c i : 0 <= i < size => (vectc c).[i] = c.
 proof. by move=> ?; rewrite offunvE. qed.
 
 lemma offun0E i : zerov.[i] = zeror.
-proof. by rewrite /vectc offunvK /vclamp if_same. qed.
+proof. by rewrite /("_.[_]") offunvK /vclamp if_same. qed.
 
 hint simplify offun0E, offunCE.
 
@@ -521,7 +521,7 @@ qed.
 
 lemma dotp_tr v1 v2 : dotp v1 v2 = trace (diagmx v1 * diagmx v2).
 proof.
-rewrite !big_seq &(eq_bigr) => /= i /mem_range rg_i.
+rewrite /trace /dotp !big_seq &(eq_bigr) => /= i /mem_range rg_i.
 rewrite (bigD1 _ _ i) ?(mem_range, range_uniq) //=.
 rewrite !diagmxE /= big1 -1:addr0 //= => @/predC1 j ne_ji.
 by rewrite diagmxE (eq_sym i j) ne_ji mul0r.

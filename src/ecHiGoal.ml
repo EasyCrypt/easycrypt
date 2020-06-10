@@ -293,14 +293,15 @@ module LowRewrite = struct
 
     let modes =
       match mode with
-      | `Full  -> None
-      | `Light -> Some [{ k_keyed = true; k_conv = false }] in
+      | `Full  -> [{ k_keyed = true; k_conv = false };
+                   { k_keyed = true; k_conv =  true };]
+      | `Light -> [{ k_keyed = true; k_conv = false }] in
 
     let for1 (pt, mode, (f1, f2)) =
       let fp, tp = match s with `LtoR -> f1, f2 | `RtoL -> f2, f1 in
       let subf, occmode =
         (try
-           PT.pf_find_occurence_lazy pt.PT.ptev_env ?modes ~ptn:fp tgfp
+           PT.pf_find_occurence_lazy pt.PT.ptev_env ~modes ~ptn:fp tgfp
          with
          | PT.FindOccFailure `MatchFailure ->
              raise (RewriteError LRW_NothingToRewrite)

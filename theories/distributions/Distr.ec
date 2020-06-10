@@ -592,7 +592,7 @@ move=> eq_sz; rewrite -eq_dratP /eq_ratl -!size_eq0 -!eq_sz /=.
 split=> /perm_eqP eq; apply/perm_eqP=> p; rewrite ?count_flatten_nseq ?eq //.
 move/(_ p): eq; rewrite !count_flatten_nseq ler_maxr ?size_ge0.
 case: (s1 = []) => [->>|] /=.
-  suff ->//: s2 = []; by rewrite -size_eq0 eq_sz.
+  suff ->//: s2 = []; by rewrite -size_eq0 -eq_sz.
 by rewrite -size_eq0 => nz_s1 /(IntID.mulfI _ nz_s1).
 qed.
 
@@ -783,7 +783,7 @@ lemma dletE (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
       sum<:'a> (fun a =>
         if P b then mass d a * mass (f a) b else 0%r)).
 proof.
-rewrite muE; have:= dlet_massE d f; rewrite -(@fun_ext (mass _)) => -> /=.
+rewrite muE; have:= dlet_massE d f => /fun_ext /= -> /=.
 by apply/eq_sum=> /= b; case: (P b)=> //=; rewrite sum0.
 qed.
 
@@ -851,7 +851,7 @@ lemma dlet_dlet (d1:'a distr) (F1:'a -> 'b distr) (F2: 'b -> 'c distr):
   dlet (dlet d1 F1) F2 = dlet d1 (fun x1 => dlet (F1 x1) F2).
 proof.
 apply: eq_distr => c; rewrite !dletE; apply eq_sum=> c' /=.
-case: (c' = c) => -> @/pred1 /= {c'}; last by rewrite !sum0.
+case: (c' = c) => @/pred1 -> /= {c'}; last by rewrite !sum0.
 pose F a b := mass d1 a * mass (F1 a) b * mass (F2 b) c.
 have smF: summable (fun ab : _ * _ => F ab.`1 ab.`2).
 + pose G a b := mass d1 a * mass (F1 a) b.
@@ -1132,7 +1132,7 @@ rewrite muE sum_pair /=; first by apply/summable_cond/summable_mass.
 pose Fa := fun a => if Pa a then mass da a else 0%r.
 pose Fb := fun b => if Pb b then mass db b else 0%r.
 pose F  := fun a => Fa a * sum Fb; rewrite (@eq_sum _ F) /= => [a|].
-+ rewrite -sumZ; apply: eq_sum => /= b @/Fa @/Fb => {Fa Fb F}.
++ rewrite /F -sumZ; apply: eq_sum => /= b @/Fa @/Fb => {Fa Fb F}.
   by case: (Pa a); case: (Pb b) => //= _ _; rewrite !massE dprod1E.
 by rewrite /F sumZr !muE.
 qed.
@@ -1236,7 +1236,7 @@ qed.
 lemma dprodC ['a 'b] (d1 : 'a distr) (d2 : 'b distr) :
   d1 `*` d2 = dmap (d2 `*` d1) (fun (p : 'b * 'a) => (p.`2, p.`1)).
 proof.
-rewrite !dprod_dlet dlet_swap dlet_dlet &(eq_dlet) //= => b.
+rewrite !dprod_dlet dlet_swap /dmap dlet_dlet &(eq_dlet) //= => b.
 by rewrite dlet_dlet &(eq_dlet) //= => a; rewrite dlet_unit.
 qed.
 
@@ -1343,7 +1343,7 @@ proof.
 move=> eq_sz hfu; rewrite supportP djoin1E eq_sz /=.
 rewrite RealOrder.gtr_eqF // Bigreal.prodr_gt0_seq.
 case=> d x /= /mem_zip [d_ds x_xs] _.
-by rewrite supportP -supportPn /=; apply: hfu.
+by rewrite -/(_ \in _) supportP -supportPn /=; apply: hfu.
 qed.
 
 lemma djoin_uni (ds:'a distr list): 
@@ -1358,7 +1358,7 @@ qed.
 lemma djoin_dmap ['a 'b 'c] (d : 'a -> 'b distr) (xs : 'a list) (f : 'b -> 'c):
   dmap (djoin (map d xs)) (map f) = djoin (map (fun x => dmap (d x) f) xs).
 proof.
-elim: xs => [|x xs ih]; rewrite ?djoinE ?dmap_dunit //=.
+elim: xs => /= [|x xs ih]; first by rewrite !djoinE ?dmap_dunit.
 by rewrite !djoin_cons -ih /= dmap_dprod /= !dmap_comp.
 qed.
 
