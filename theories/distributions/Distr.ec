@@ -873,7 +873,7 @@ by rewrite dnull1E.
 qed.
 
 lemma dlet_d_dnull (d : 'a distr): dlet d (fun a => dnull<:'b>) = dnull.
-proof. by apply/eq_distr=> x; rewrite dlet1E dnull1E /= (@sumE_fin _ []). qed.
+proof. by apply/eq_distr=> x; rewrite dlet1E /= dnull1E /= (@sumE_fin _ []). qed.
 
 lemma eq_dlet ['a 'b] (F1 F2 : 'a -> 'b distr) d1 d2 :
   d1 = d2 => F1 == F2 => dlet d1 F1 = dlet d2 F2.
