@@ -692,7 +692,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
 
           let do1 lemma tc =
             let pt = PT.pt_of_uglobal !!tc hyps lemma in
-              process_rewrite1_core ?target (theside, o) pt tc in
+              process_rewrite1_core ~mode ?target (theside, o) pt tc in
             t_ors (List.map do1 ls) tc
 
         | { fp_head = FPNamed (p, None); fp_args = []; }
@@ -711,7 +711,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
 
             let do1 (lemma, _) tc =
               let pt = PT.pt_of_uglobal !!tc hyps lemma in
-                process_rewrite1_core ?target (theside, o) pt tc in
+                process_rewrite1_core ~mode ?target (theside, o) pt tc in
               t_ors (List.map do1 ls) tc
           end else
             process_rewrite1_core ~mode ?target (theside, o) pt tc
@@ -731,7 +731,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       | Some (b, None) ->
           t_seq
             (t_do b (Some 1) (doall `Full))
-            (t_do b None (doall `Light))
+            (t_do `Maybe None (doall `Light))
             tc
       | Some (b, n) ->
           t_do b n (doall `Full) tc
