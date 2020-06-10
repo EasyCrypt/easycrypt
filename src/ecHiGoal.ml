@@ -293,7 +293,7 @@ module LowRewrite = struct
 
     let for1 (pt, mode, (f1, f2)) =
       let fp, tp = match s with `LtoR -> f1, f2 | `RtoL -> f2, f1 in
-      let ky =
+      let subf, occmode =
         (try
            PT.pf_find_occurence_lazy pt.PT.ptev_env ~ptn:fp tgfp
          with
@@ -302,9 +302,7 @@ module LowRewrite = struct
          | PT.FindOccFailure `IncompleteMatch ->
              raise (RewriteError LRW_CannotInfer)) in
 
-      let fp = PT.concretize_form pt.PT.ptev_env fp in
-
-      if not ky then begin
+      if not occmode.k_keyed then begin
         let tp = PT.concretize_form pt.PT.ptev_env tp in
         if EcReduction.is_conv hyps fp tp then
           raise (RewriteError LRW_IdRewriting);
@@ -312,11 +310,14 @@ module LowRewrite = struct
 
       let pt   = fst (PT.concretize pt) in
       let cpos =
-        try  FPosition.select_form ~keyed:ky hyps o fp tgfp
+        try  FPosition.select_form
+               ~xconv:`AlphaEq ~keyed:occmode.k_keyed
+               hyps o subf tgfp
         with InvalidOccurence -> raise (RewriteError (LRW_InvalidOccurence))
       in
 
-      EcLowGoal.t_rewrite ~keyed:ky ?target ~mode pt (s, Some cpos) tc in
+      EcLowGoal.t_rewrite
+        ~keyed:occmode.k_keyed ?target ~mode pt (s, Some cpos) tc in
 
     let rec do_first = function
       | [] -> raise (RewriteError LRW_NothingToRewrite)
@@ -554,7 +555,7 @@ let process_delta ?target (s, o, p) tc =
   match s with
   | `LtoR -> begin
     let matches =
-      try  PT.pf_find_occurence ptenv ~ptn:p target; true
+      try  ignore (PT.pf_find_occurence ptenv ~ptn:p target); true
       with PT.FindOccFailure _ -> false
     in
 
@@ -618,7 +619,7 @@ let process_delta ?target (s, o, p) tc =
     in
 
     let matches =
-      try  PT.pf_find_occurence ptenv ~ptn:fp target; true
+      try  ignore (PT.pf_find_occurence ptenv ~ptn:fp target); true
       with PT.FindOccFailure _ -> false
     in
 
@@ -1542,7 +1543,7 @@ let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
               (ptenv !!tc hyps (ue, ev), p)
           in
 
-          (try  PT.pf_find_occurence ptenv ~ptn:p concl
+          (try  ignore (PT.pf_find_occurence ptenv ~ptn:p concl)
            with PT.FindOccFailure _ -> tc_error !!tc "cannot find an occurence");
 
           let p    = PT.concretize_form ptenv p in
@@ -1668,7 +1669,7 @@ let process_pose xsym bds o p (tc : tcenv1) =
   in
 
   let dopat =
-    try  PT.pf_find_occurence ptenv ~keyed:`Lazy ~ptn:p concl; true
+    try  ignore (PT.pf_find_occurence ptenv ~ptn:p concl); true
     with PT.FindOccFailure _ ->
       if not (PT.can_concretize ptenv) then
         if not (EcMatching.MEV.filled !(ptenv.PT.pte_ev)) then

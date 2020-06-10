@@ -954,10 +954,7 @@ module FPosition = struct
         if EcReduction.xconv xconv hyps p tp then `Accept ti else `Continue
       end
 
-    in
-    let m = select ?o (test `AlphaEq) target in
-    if EcMaps.Mint.is_empty m then select ?o (test xconv) target
-    else m
+    in select ?o (test xconv) target
 
   (* ------------------------------------------------------------------ *)
   let map (p : ptnpos) (tx : form -> form) (f : form) =
