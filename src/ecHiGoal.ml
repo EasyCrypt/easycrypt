@@ -728,9 +728,9 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       match r with
       | None ->
           doall `Full tc
-      | Some (b, None) ->
+      | Some (`Maybe, None) ->
           t_seq
-            (t_do b (Some 1) (doall `Full))
+            (t_do `Maybe (Some 1) (doall `Full))
             (t_do `Maybe None (doall `Light))
             tc
       | Some (b, n) ->
