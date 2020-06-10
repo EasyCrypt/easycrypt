@@ -2363,7 +2363,30 @@ module Search = struct
             | [] ->
                 hierror ~loc:q.pl_loc "unknown operator: `%s'"
                   (EcSymbols.string_of_qsymbol q.pl_desc)
-            | paths -> `ByPath (Sp.of_list (List.map fst paths))
+            | paths -> begin
+                let for1 (paths, pts) (p, decl) =
+                  match decl.op_kind with
+                  | OB_nott nt -> begin
+                    let ps  = ref Mid.empty in
+                    let ue  = EcUnify.UniEnv.create None in
+                    let tip = EcUnify.UniEnv.opentvi ue decl.op_tparams None in
+                    let tip = Tvar.subst tip in
+                    let xs  = List.map (snd_map tip) nt.ont_args in
+                    let bd  = EcFol.form_of_expr EcFol.mhr (EcTypes.e_mapty tip nt.ont_body) in
+                    let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
+
+                    match fp.f_node with
+                    | Fop (pf, _) -> (pf :: paths, pts)
+                    | _ -> (paths, (ps, ue, fp) ::pts)
+                  end
+
+                  | _ -> (p :: paths, pts) in
+
+                let paths, pts = List.fold_left for1 ([], []) paths in
+                let pts = List.map (fun (ps, ue, fp) -> `ByPattern ((ps, ue), fp)) pts in
+
+                `ByOr (`ByPath (Sp.of_list paths) :: pts)
+              end
         end
 
         | _ ->
