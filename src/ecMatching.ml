@@ -942,7 +942,7 @@ module FPosition = struct
       | _          -> `NoKey
     in
 
-    let test _ tp =
+    let test xconv _ tp =
       if not (keycheck tp key) then `Continue else begin
         let (tp, ti) =
           match tp.f_node with
@@ -954,7 +954,10 @@ module FPosition = struct
         if EcReduction.xconv xconv hyps p tp then `Accept ti else `Continue
       end
 
-    in select ?o test target
+    in
+    let m = select ?o (test `AlphaEq) target in
+    if EcMaps.Mint.is_empty m then select ?o (test xconv) target
+    else m
 
   (* ------------------------------------------------------------------ *)
   let map (p : ptnpos) (tx : form -> form) (f : form) =

@@ -670,11 +670,18 @@ let rec f_eq_simpl f1 f2 =
   else match f1.f_node, f2.f_node with
   | Fint _ , Fint _ -> f_false
 
+  | Fapp(op, [{f_node = Fint i1}]), Fint i2
+      when f_equal op fop_int_opp ->
+    f_bool (EcBigInt.equal (EcBigInt.neg i1) i2)
+
+  | Fint i1, Fapp(op, [{f_node = Fint i2}])
+      when f_equal op fop_int_opp ->
+     f_bool (EcBigInt.equal i1 (EcBigInt.neg i2))
+
   | Fapp (op1, [{f_node = Fint _}]), Fapp (op2, [{f_node = Fint _}])
       when f_equal op1 f_op_real_of_int &&
            f_equal op2 f_op_real_of_int
     -> f_false
-
   | Fop (op1, []), Fop (op2, []) when
          (EcPath.p_equal op1 CI.CI_Bool.p_true  &&
           EcPath.p_equal op2 CI.CI_Bool.p_false  )
