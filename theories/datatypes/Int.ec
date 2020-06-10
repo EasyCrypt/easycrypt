@@ -255,12 +255,6 @@ theory IterOp.
   axiom iteriS ['a] n opr (x : 'a):
     0 <= n => iteri (n+1) opr x = opr n (iteri n opr x).
 
-  lemma nosmt _iteriS_red ['a] n opr (x : 'a):
-    0 < n => iteri n opr x = opr (n-1) (iteri (n-1) opr x).
-  proof. smt(iteriS). qed.
-
-  hint simplify iteri0, _iteriS_red.
-
   lemma eq_iteri (f1 f2 : int -> 'a -> 'a) k a:
        (forall i a, 0 <= i < k => f1 i a = f2 i a)
     => iteri k f1 a = iteri k f2 a.
@@ -301,7 +295,7 @@ theory IterOp.
   proof. by move=> le0_n; rewrite /iterop /= iteri0. qed.
 
   lemma iterop1 ['a] opr (x z : 'a): iterop 1 opr x z = x.
-  proof. by rewrite /iterop. qed.
+  proof. by rewrite /iterop /= (iteriS 0). qed.
 
   lemma iteropS ['a] (n : int) opr (x z : 'a): 0 <= n =>
     iterop (n+1) opr x z = iter n (opr x) x.
@@ -317,9 +311,9 @@ export IterOp.
 (* -------------------------------------------------------------------- *)
 op odd (z : int) = iter `|z| [!] false.
 
-lemma odd0 : !odd 0. proof. by []. qed.
-lemma odd1 :  odd 1. proof. by []. qed.
-lemma odd2 : !odd 2. proof. by []. qed.
+lemma odd0 : !odd 0. proof. by rewrite iter0. qed.
+lemma odd1 :  odd 1. proof. by rewrite iter1. qed.
+lemma odd2 : !odd 2. proof. by rewrite iter2. qed.
 
 lemma oddN z : odd (-z) = odd z by [].
 lemma odd_abs z : odd `|z| = odd z by [].
