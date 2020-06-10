@@ -598,7 +598,7 @@ abstract theory ComRing.
 
   lemma signr_odd n : 0 <= n => exp (-oner) (b2i (odd n)) = exp (-oner) n.
   proof.
-    elim: n => [|n ge0_nih]; first by rewrite odd0 expr0.
+    elim: n => [|n ge0_nih]; first by rewrite odd0 expr0 expr0.
     rewrite !(iterS, oddS) // exprS // -/(odd _) => <-.
     by case: (odd _); rewrite /b2i /= !(expr0, expr1) mulN1r ?opprK.
   qed.
