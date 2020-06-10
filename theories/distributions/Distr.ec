@@ -30,7 +30,7 @@
  *)
 
 (* -------------------------------------------------------------------- *)
-require import AllCore List.
+require import AllCore List Binomial.
 require import Ring StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
 (*---*) import IterOp Bigint Bigreal Bigreal.BRA.
 (*---*) import IntOrder RealOrder RField.
@@ -1368,6 +1368,47 @@ lemma supp_djoinmap ['a 'b] (d : 'a -> 'b distr) xs ys:
 proof.
 rewrite supp_djoin size_map; congr; apply/eq_iff.
 by rewrite zip_mapl all_map &(eq_all).
+qed.
+
+(* -------------------------------------------------------------------- *)
+op mbin (p : real) (n : int) = fun k =>
+  (bin n k)%r * (p ^ k * (1%r - p) ^ (n - k)).
+
+lemma mbin_support p n k : mbin p n k <> 0%r => 0 <= k <= n.
+proof.
+apply: contraR; rewrite andaE negb_and -!ltrNge.
+by case=> ? @/mbin; [rewrite bin_lt0r | rewrite bin_gt].
+qed.
+
+lemma isdistr_mbin p n : 0%r <= p <= 1%r => isdistr (mbin p n).
+proof.
+move=> rg_p; rewrite (@isdistr_finP (range 0 (n+1))).
++ apply: range_uniq.
++ by move=> k /mbin_support; rewrite mem_range ltzS.
++ move=> k @/mbin; rewrite mulr_ge0.
+  * by rewrite le_fromint ge0_bin.
+  by rewrite mulr_ge0 expr_ge0 /#.
+case: (n < 0) => [lt0_n|/lezNgt ge0_n]; first by rewrite big_geq //#.
+by rewrite -(@BCR.binomial p (1%r - p) n ge0_n) addrC subrK expr1z.
+qed.
+
+op dbin (p : real) (n : int) = mk (mbin p n).
+
+lemma dbin1E (p : real) (n k : int) : 0%r <= p <= 1%r =>
+  mu1 (dbin p n) k = (bin n k)%r * (p ^ k * (1%r - p) ^ (n - k)).
+proof. by move=> rg_p; rewrite -massE muK //; apply/isdistr_mbin. qed.
+
+lemma ll_dbin p n : 0 <= n => 0%r <= p <= 1%r => is_lossless (dbin p n).
+proof.
+move=> ge0_n rg_p; rewrite /is_lossless weightE muK 1:&(isdistr_mbin) //.
+rewrite (@sumE_fin _ (range 0 (n+1))) 1:range_uniq.
++ by move=> k /mbin_support; rewrite mem_range ltzS.
++ by rewrite -BCR.binomial // addrC subrK expr1z.
+qed.
+
+lemma supp_dbin p n k : 0%r <= p <= 1%r => k \in dbin p n => 0 <= k <= n.
+proof.
+by move=> rg_p /supportP; rewrite dbin1E // => /mbin_support.
 qed.
 
 (* -------------------------------------------------------------------- *)
