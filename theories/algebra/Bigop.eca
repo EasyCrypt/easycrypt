@@ -411,7 +411,7 @@ qed.
 lemma big_flatten (P : 'a -> bool) F rr :
   big P F (flatten rr) = big predT (fun s => big P F s) rr.
 proof.
-elim: rr => /= [|r rr ih]; first by rewrite big_nil.
+elim: rr => /= [|r rr ih]; first by rewrite !big_nil.
 by rewrite flatten_cons big_cat big_cons -ih.
 qed.
 

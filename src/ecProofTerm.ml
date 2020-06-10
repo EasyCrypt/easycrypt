@@ -269,8 +269,15 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
 (* -------------------------------------------------------------------- *)
 exception FindOccFailure of [`MatchFailure | `IncompleteMatch]
 
-let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
-  let module E = struct exception MatchFound end in
+type occmode = {
+  k_keyed : bool;
+  k_conv  : bool;
+}
+
+let rec pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
+  let module E = struct exception MatchFound of form end in
+
+  let occmode = odfl { k_keyed = false; k_conv = true; } occmode in
 
   let na = List.length (snd (EcFol.destr_app ptn)) in
 
@@ -283,7 +290,7 @@ let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
     | `Var  _, _           -> false
   in
 
-  let keycheck tp key = not keyed || kmatch key tp in
+  let keycheck tp key = not occmode.k_keyed || kmatch key tp in
 
   (* Extract key from pattern *)
   let key =
@@ -299,8 +306,9 @@ let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
   let mode =
     if   key = `NoKey
     then EcMatching.fmrigid
-    else EcMatching.fmdelta
-  in
+    else EcMatching.fmdelta in
+
+  let mode = { mode with fm_conv = occmode.k_conv } in
 
   let trymatch mode bds tp =
     if not (keycheck tp key) then `Continue else
@@ -318,46 +326,46 @@ let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
         `Continue
       else begin
         pf_form_match ~mode pt ~ptn tp;
-        raise E.MatchFound
+        raise (E.MatchFound tp)
       end
     with EcMatching.MatchFailure -> `Continue
   in
 
   let (ue, pe) = (EcUnify.UniEnv.copy pt.pte_ue, !(pt.pte_ev)) in
 
-  let doit mode =
-    try
-      ignore (EcMatching.FPosition.select (trymatch mode) subject);
-      raise (FindOccFailure `MatchFailure)
-    with E.MatchFound ->
-         if not (can_concretize pt) then begin
-             EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue; pt.pte_ev := pe;
-             raise (FindOccFailure `IncompleteMatch)
-           end in
-  let mode_noconv = { mode with fm_conv = false } in
-
-  try doit mode_noconv
-  with (FindOccFailure _) ->
-    doit mode
-
-
-
-
+  try
+    ignore (EcMatching.FPosition.select (trymatch mode) subject);
+    raise (FindOccFailure `MatchFailure)
+  with E.MatchFound subf ->
+     if not (can_concretize pt) then begin
+       EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue; pt.pte_ev := pe;
+       raise (FindOccFailure `IncompleteMatch)
+     end;
+     subf
 
 (* -------------------------------------------------------------------- *)
-type keyed = [`Yes | `No | `Lazy]
-
 let pf_find_occurence_lazy (pt : pt_env) ~ptn subject =
-  try  pf_find_occurence pt ~keyed:true ~ptn subject; true
-  with FindOccFailure _ ->
-    pf_find_occurence pt ~keyed:false ~ptn subject; false
+  let rec doit (modes : occmode list) =
+    match modes with
+    | [] ->
+        assert false
+    | [occmode] ->
+        (pf_find_occurence pt ~occmode ~ptn subject, occmode)
+    | occmode :: modes ->
+      try  (pf_find_occurence pt ~occmode ~ptn subject, occmode)
+      with FindOccFailure _ -> doit modes in
 
+  doit [
+    { k_keyed =  true; k_conv = false; };
+    { k_keyed =  true; k_conv =  true; };
+    { k_keyed = false; k_conv =  true; };
+  ]
 
-let pf_find_occurence (pt : pt_env) ?(keyed = `No) ~ptn subject =
-  match keyed with
-  | `Yes  -> pf_find_occurence pt ~keyed:true  ~ptn subject
-  | `No   -> pf_find_occurence pt ~keyed:false ~ptn subject
-  | `Lazy -> ignore (pf_find_occurence_lazy pt ~ptn subject)
+(* --------------------------------------------------------------------- *)
+let pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
+  match occmode with
+  | Some occmode -> (pf_find_occurence pt ~occmode ~ptn subject, occmode)
+  | None         -> pf_find_occurence_lazy pt ~ptn subject
 
 (* -------------------------------------------------------------------- *)
 let pf_unify (pt : pt_env) ty1 ty2 =
