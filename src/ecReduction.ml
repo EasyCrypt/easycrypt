@@ -548,6 +548,15 @@ and reduce_logic ri env hyps f =
         f_int_add_simpl acc (cost_of_expr coe.coe_pre coe.coe_mem e))
       f_i1 es
 
+  | Fcoe ({ coe_e = { e_node = Eif (c,l,r) }} as coe) when ri.cost ->
+    (* Max upper-bounded by the sum. *)
+    List.fold_left (fun acc e ->
+        f_int_add_simpl acc (cost_of_expr coe.coe_pre coe.coe_mem e))
+      f_i1 [c; l; r]
+
+  | Fcoe ({ coe_e = { e_node = Eproj (e,_) }} as coe) when ri.cost ->
+    f_int_add_simpl f_i1 (cost_of_expr coe.coe_pre coe.coe_mem e)
+
   | _ -> raise NotReducible
 
 and reduce_delta ri env _hyps f =
