@@ -584,6 +584,26 @@ and reduce_logic ri env hyps f =
         then f_app fo (h_red_args ri env hyps args) f.f_ty
         else f'
 
+  | Fcoe ({ coe_e = { e_node = Etuple es } } as coe) when ri.cost ->
+    List.fold_left (fun acc e ->
+        f_int_add_simpl acc (cost_of_expr coe.coe_pre coe.coe_mem e))
+      f_i1 es
+
+  | Fcoe ({ coe_e = { e_node = Eapp ({e_node = Eop (p, _); }, es) }} as coe)
+    when EcEnv.Op.is_dtype_ctor env p && ri.cost ->
+    List.fold_left (fun acc e ->
+        f_int_add_simpl acc (cost_of_expr coe.coe_pre coe.coe_mem e))
+      f_i1 es
+
+  | Fcoe ({ coe_e = { e_node = Eif (c,l,r) }} as coe) when ri.cost ->
+    (* Max upper-bounded by the sum. *)
+    List.fold_left (fun acc e ->
+        f_int_add_simpl acc (cost_of_expr coe.coe_pre coe.coe_mem e))
+      f_i1 [c; l; r]
+
+  | Fcoe ({ coe_e = { e_node = Eproj (e,_) }} as coe) when ri.cost ->
+    f_int_add_simpl f_i1 (cost_of_expr coe.coe_pre coe.coe_mem e)
+
   | _ -> raise NotReducible
 
 and reduce_delta ri env _hyps f =
@@ -711,7 +731,6 @@ and reduce_user_gen mode simplify ri env hyps f
 
         | ({ f_node = Ftuple args} , []), R.Rule (`Tuple, args')
             when List.length args = List.length args' ->
-
           List.iter2 (doit mode) args args'
 
         | ({ f_node = Fint i }, []), R.Int j when EcBigInt.equal i j ->
