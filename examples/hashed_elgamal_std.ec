@@ -229,22 +229,42 @@ schema cost_hash `{P} {k:hkey, g:group} : cost [P:hash k g] = cost [P: k] + cost
 
 hint simplify cost_dbool, cost_eqbool, cost_pow, cost_gen, cost_dt, cost_xor, cost_hash, cost_dhkey.
 
-lemma ex_conclusion (A <: Adversary[choose : `{kc} , guess : `{kg} ]) &m :
-  exists (Dddh <: DDH.Adversary [guess : `{3 + cxor + chash + cdbool + cdhkey + kg + kc}]) 
-         (Des <: AdvES[guess: `{3 + 2*cgpow + cxor + cdbool + 2 * cdt + kg + kc }]),
-   `|Pr[CPA(Hashed_ElGamal, A).main() @ &m : res] - 1%r / 2%r| <=
+section.
+
+  declare module A : Adversary[choose : `{kc} , guess : `{kg}].
+
+  lemma cES_guess : choare [ESAdv(A).guess : true ==> true]
+                     time [3 + 2 * cgpow + cxor + cdbool + 2 * cdt + kg + kc].
+  proof.
+    proc; call (:true; time []); rnd; call(:true; time []); do 2!rnd; skip => />.
+    rewrite dt_ll dbool_ll /=. smt.
+  qed.
+
+  lemma cDDH_guess : choare [DDHAdv(A).guess : true ==> true]
+                      time [3 + cxor + chash + cdbool + cdhkey + kg + kc].
+  proof.
+    proc; call (:true; time []); wp; rnd; call(:true; time []); rnd; skip => />.
+    rewrite dhkey_ll dbool_ll /=. smt.
+  qed.
+
+  lemma ex_conclusion &m :
+    exists (Dddh <: DDH.Adversary [guess : `{3 + cxor + chash + cdbool + cdhkey + kg + kc}]) 
+           (Des <: AdvES[guess: `{3 + 2*cgpow + cxor + cdbool + 2 * cdt + kg + kc }]),
+     `|Pr[CPA(Hashed_ElGamal, A).main() @ &m : res] - 1%r / 2%r| <=
      `|Pr[DDH0(Dddh).main() @ &m : res] - Pr[DDH1(Dddh).main() @ &m : res]| +
      `|Pr[ES0(Des).main() @ &m : res] - Pr[ES1(Des).main() @ &m : res]|.
-proof.
-  exists (DDHAdv(A)); split; last first.
-  exists (ESAdv(A)); split; last first.
-  apply (conclusion A _ _ &m).
-  admit.
-  admit.
-  + proc; call (:true; time []); rnd; call(:true; time []); do 2!rnd; skip => />.
-    rewrite dt_ll dbool_ll /=. smt.
-  + proc; call (:true; time []); wp; rnd; call(:true; time []); rnd; skip => />.
-    rewrite dhkey_ll dbool_ll /=. smt.
-qed.
+  proof.
+    exists (DDHAdv(A)); split; last first.
+    exists (ESAdv(A)); split; last first.
+    apply (conclusion A _ _ &m).
+    + conseq (_ : _ : time [kc]).
+      by proc true : time[].
+    + conseq (_ : true ==> true : time [kg]).
+      by proc true : time[].
+    + by apply cES_guess.
+    by apply cDDH_guess. 
+  qed.
 
-end theory.
+end section.
+
+end Complexity.
