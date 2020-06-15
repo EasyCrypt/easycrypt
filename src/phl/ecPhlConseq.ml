@@ -512,6 +512,60 @@ let t_hoareF_conseq_bdhoare tc =
   FApi.xmutate1 tc `HlConseqBd [concl1]
 
 (* -------------------------------------------------------------------- *)
+let t_choareS_conseq_hoare bound tc =
+  let hs = tc1_as_hoareS tc in
+  let chs = {
+      chs_m  = hs.hs_m;
+      chs_pr = hs.hs_pr;
+      chs_s  = hs.hs_s;
+      chs_po = hs.hs_po;
+      chs_co = bound;
+    } in
+  let concl = f_cHoareS_r chs in
+  FApi.xmutate1 tc `CHoareSConseqHoareS [concl]
+
+(* -------------------------------------------------------------------- *)
+let t_choareF_conseq_hoare bound tc =
+  let hf = tc1_as_hoareF tc in
+  let chs = {
+      chf_pr = hf.hf_pr;
+      chf_f  = hf.hf_f;
+      chf_po = hf.hf_po;
+      chf_co = bound;
+    } in
+  let concl = f_cHoareF_r chs in
+  FApi.xmutate1 tc `CHoareFConseqHoareF [concl]
+
+(* -------------------------------------------------------------------- *)
+let t_choareS_conseq_bdhoare bound tc =
+  let hs = tc1_as_bdhoareS tc in
+  if not (f_equal hs.bhs_bd f_r1) then
+    tc_error !!tc "invalid bound";
+  let chs = {
+      chs_m  = hs.bhs_m;
+      chs_pr = hs.bhs_pr;
+      chs_s  = hs.bhs_s;
+      chs_po = hs.bhs_po;
+      chs_co = bound;
+    } in
+  let concl = f_cHoareS_r chs in
+  FApi.xmutate1 tc `CHoareSConseqbdHoareS [concl]
+
+(* -------------------------------------------------------------------- *)
+let t_choareF_conseq_bdhoare bound tc =
+  let hf = tc1_as_bdhoareF tc in
+  if not (f_equal hf.bhf_bd f_r1) then
+    tc_error !!tc "invalid bound";
+  let chs = {
+      chf_pr = hf.bhf_pr;
+      chf_f  = hf.bhf_f;
+      chf_po = hf.bhf_po;
+      chf_co = bound;
+    } in
+  let concl = f_cHoareF_r chs in
+  FApi.xmutate1 tc `CHoareFConseqbdHoareF [concl]
+
+(* -------------------------------------------------------------------- *)
 let t_hoareS_conseq_conj pre post pre' post' tc =
   let hs = tc1_as_hoareS tc in
   if not (f_equal hs.hs_pr (f_and pre' pre)) then
@@ -688,6 +742,42 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
          (t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd)
          (t_on1seq 2 (tac hs.bhs_pr hs.bhs_po) (t_apply_r nf1)))
       tc
+
+  (* ------------------------------------------------------------------ *)
+  (* hoareS / cHoareS / ⊥ / ⊥                                           *)
+  | FhoareS _, Some (_, { f_node = FcHoareS chs} as nf1), None, None ->
+    (FApi.t_seq (t_choareS_conseq_hoare chs.chs_co)
+          (t_on1seq 2 (t_cHoareS_conseq chs.chs_pr chs.chs_po)
+             (t_apply_r nf1)))
+        tc
+
+  (* ------------------------------------------------------------------ *)
+  (* hoareF / cHoareF / ⊥ / ⊥                                           *)
+  | FhoareF _, Some (_, { f_node = FcHoareF chf} as nf1), None, None ->
+    (FApi.t_seq (t_choareF_conseq_hoare chf.chf_co)
+          (t_on1seq 2 (t_cHoareF_conseq chf.chf_pr chf.chf_po)
+             (t_apply_r nf1)))
+        tc
+
+  (* ------------------------------------------------------------------ *)
+  (* bdhoareS / cHoareS / ⊥ / ⊥                                         *)
+  | FbdHoareS _, Some (_, { f_node = FcHoareS chs} as nf1), None, None ->
+    t_on1seq 1
+       (t_bdHoareS_conseq_bd FHeq f_r1)
+       (FApi.t_seq (t_choareS_conseq_bdhoare chs.chs_co)
+          (t_on1seq 2 (t_cHoareS_conseq chs.chs_pr chs.chs_po)
+             (t_apply_r nf1)))
+        tc
+
+  (* ------------------------------------------------------------------ *)
+  (* bdhoareF / cHoareF / ⊥ / ⊥                                         *)
+  | FbdHoareF _, Some (_, { f_node = FcHoareF chf} as nf1), None, None ->
+     t_on1seq 1
+       (t_bdHoareF_conseq_bd FHeq f_r1)
+       (FApi.t_seq (t_choareF_conseq_bdhoare chf.chf_co)
+          (t_on1seq 2 (t_cHoareF_conseq chf.chf_pr chf.chf_po)
+             (t_apply_r nf1)))
+        tc
 
   (* ------------------------------------------------------------------ *)
   (* hoareF / hoareF / ⊥ / ⊥                                            *)
@@ -1056,7 +1146,8 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
             f_hoareS_r { hs with hs_pr = pre; hs_po = post; }
           | Some (PCI_bd (cmp, bd)) ->
             f_bdHoareS hs.hs_m pre hs.hs_s post (oget cmp) bd
-          | Some (PCI_c _) -> tc_error !!tc "cannot give a cost here"
+          | Some (PCI_c co) ->
+            f_cHoareS hs.hs_m pre hs.hs_s post co
         in (env, env, hs.hs_pr, hs.hs_po, fmake)
 
       | FhoareF hf ->
@@ -1068,9 +1159,10 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
             f_hoareF pre hf.hf_f post
           | Some (PCI_bd (cmp, bd)) ->
             f_bdHoareF pre hf.hf_f post (oget cmp) bd
-          | Some (PCI_c _) -> tc_error !!tc "cannot give a cost here" in
+          | Some (PCI_c co) ->
+            f_cHoareF pre hf.hf_f post co
 
-        (penv, qenv, hf.hf_pr, hf.hf_po, fmake)
+        in (penv, qenv, hf.hf_pr, hf.hf_po, fmake)
 
       | FcHoareS chs ->
         let env = LDecl.push_active chs.chs_m hyps in
@@ -1111,7 +1203,8 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
                                     bhs_po = post;
                                     bhs_cmp = cmp;
                                     bhs_bd = bd; }
-          | Some (PCI_c _)  -> tc_error !!tc "cannot give a cost here" in
+          | Some (PCI_c co)  ->
+            f_cHoareS bhs.bhs_m pre bhs.bhs_s post co in
 
         (env, env, bhs.bhs_pr, bhs.bhs_po, fmake)
 
@@ -1125,7 +1218,8 @@ let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) 
           | Some (PCI_bd (cmp,bd)) ->
             let cmp = odfl hf.bhf_cmp cmp in
             f_bdHoareF pre hf.bhf_f post cmp bd
-          | Some (PCI_c _)  -> tc_error !!tc "cannot give a cost here" in
+          | Some (PCI_c co)  ->
+            f_cHoareF pre hf.bhf_f post co in
 
         (penv, qenv, hf.bhf_pr, hf.bhf_po, fmake)
 
