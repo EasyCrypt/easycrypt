@@ -200,9 +200,31 @@ print conclusion.
 
 abstract theory Complexity.
 
+require CHoareTactic.
 op kc : int.
 op kg : int.
 axiom k_pos : 0 <= kc /\ 0 <= kg.
+
+op cdbool : { int | 0 <= cdbool } as ge0_cdbool.
+schema cost_dbool `{P}: cost[P : {0,1}] = cdbool.
+
+op cdt : {int | 0 <= cdt } as ge0_cdt.
+schema cost_dt `{P}: cost [P: dt] = cdt.
+
+op cxor : {int | 0 <= cxor } as ge0_cxor.
+schema cost_xor `{P} {w1 w2: bits} : cost [P: w1 +^ w2] = cost[P:w1] + cost[P:w2] + cxor.
+
+schema cost_eqbool `{P} {b1 b2:bool} : cost [P: b1 = b2] = cost[P:b1] + cost[P:b2] + 1.
+
+op cgpow : { int | 0 <= cdbool } as ge0_cgpow.
+schema cost_pow `{P} {g:group, x:t} : cost[P: g ^ x] = cost[P:g] + cost[P:x] + cgpow.
+schema cost_gen `{P} : cost [P:g] = 0.
+
+op chash : {int | 0 <= chash } as ge0_chash.
+print hash.
+schema cost_hash `{P} {k:hkey, g:group} : cost [P:hash k g] = cost [P: k] + cost[P:g] + chash.
+
+hint simplify cost_dbool, cost_eqbool, cost_pow, cost_gen, cost_dt, cost_xor, cost_hash.
 
 lemma ex_conclusion (A <: Adversary[choose : `{kc} , guess : `{kg} ]) &m :
   exists (Dddh <: DDH.Adversary [guess : `{kc + kg}]) 
@@ -214,10 +236,17 @@ proof.
   exists (DDHAdv(A)); split; last first.
   exists (ESAdv(A)); split; last first.
   apply (conclusion A _ _ &m).
-
   admit.
-
   admit.
+  + proc; call (:true; time []); rnd; call(:true; time []); do 2!rnd; skip => />.
+    rewrite dt_ll dbool_ll.
+    admit.
+  + proc; call (:true; time []); wp; rnd; call(:true; time []); rnd; skip => />.
+    rewrite dhkey_ll dbool_ll /=.
 
+
+op cdbool : 
+
+search is_lossless {0,1}.
 
 end theory.
