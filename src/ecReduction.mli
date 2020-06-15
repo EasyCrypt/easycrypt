@@ -20,6 +20,7 @@ exception IncompatibleForm of env * (form * form)
 exception IncompatibleExpr of env * (expr * expr)
 
 (* -------------------------------------------------------------------- *)
+
 type 'a eqtest = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 
@@ -87,6 +88,8 @@ val beta_red     : reduction_info
 val betaiota_red : reduction_info
 val nodelta      : reduction_info
 val delta        : reduction_info
+
+val reduce_logic : reduction_info -> env -> LDecl.hyps -> form -> form
 
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form

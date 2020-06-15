@@ -316,43 +316,7 @@ and app_red st f1 args =
 
 (* -------------------------------------------------------------------- *)
 and reduce_logic st f =
-  if is_some st.st_ri.logic then
-    let (p, tys), args =
-      try destr_op_app f with DestrError _ -> raise NotReducible in
-    if is_logical_op p then
-      let pcompat =
-        match st.st_ri.logic with Some `Full -> true | _ -> false
-      in
-      let f' =
-        match op_kind p, args with
-        | Some (`Not), [f1]    when pcompat -> f_not_simpl f1
-        | Some (`Imp), [f1;f2] when pcompat -> f_imp_simpl f1 f2
-        | Some (`Iff), [f1;f2] when pcompat -> f_iff_simpl f1 f2
-
-        | Some (`And `Asym), [f1;f2] -> f_anda_simpl f1 f2
-        | Some (`Or  `Asym), [f1;f2] -> f_ora_simpl f1 f2
-        | Some (`And `Sym ), [f1;f2] -> f_and_simpl f1 f2
-        | Some (`Or  `Sym ), [f1;f2] -> f_or_simpl f1 f2
-        | Some (`Int_le   ), [f1;f2] -> f_int_le_simpl f1 f2
-        | Some (`Int_lt   ), [f1;f2] -> f_int_lt_simpl f1 f2
-        | Some (`Real_le  ), [f1;f2] -> f_real_le_simpl f1 f2
-        | Some (`Real_lt  ), [f1;f2] -> f_real_lt_simpl f1 f2
-        | Some (`Int_add  ), [f1;f2] -> f_int_add_simpl f1 f2
-        | Some (`Int_opp  ), [f]     -> f_int_opp_simpl f
-        | Some (`Int_mul  ), [f1;f2] -> f_int_mul_simpl f1 f2
-        | Some (`Int_edivz), [f1;f2] -> f_int_edivz_simpl f1 f2
-        | Some (`Real_add ), [f1;f2] -> f_real_add_simpl f1 f2
-        | Some (`Real_opp ), [f]     -> f_real_opp_simpl f
-        | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
-        | Some (`Real_inv ), [f]     -> f_real_inv_simpl f
-        | Some (`Eq       ), [f1;f2] -> f_eq_simpl st f1 f2
-        | Some (`Map_get  ), [f1;f2] -> f_map_get_simpl st f1 f2 (snd (as_seq2 tys))
-
-        | _, _ -> f in
-        if f_equal f f' then raise NotReducible
-        else f'
-    else raise NotReducible
-  else raise NotReducible
+  EcReduction.reduce_logic st.st_ri st.st_env st.st_hyps f
 
 and reduce_user st f =
   match reduce_logic st f with
