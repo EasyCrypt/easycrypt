@@ -135,14 +135,14 @@ module FRO : FRO = {
 (* -------------------------------------------------------------------- *)
 equiv RO_FRO_init : RO.init ~ FRO.init :
   true ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> /=; by rewrite map_empty. qed.
+proof. by proc; auto=> /=; rewrite /noflags map_empty. qed.
 
 equiv RO_FRO_get : RO.get ~ FRO.get :
   ={x} /\ RO.m{1} = noflags FRO.m{2}
   ==> ={res} /\ RO.m{1} = noflags FRO.m{2}.
 proof.
 proc; auto=> /> &2 r _.
-rewrite !mem_map=> />; rewrite !domE get_set_sameE !map_set !mapE.
+rewrite !mem_map=> />; rewrite !domE get_set_sameE /noflags !map_set !mapE.
 case: {-1}(FRO.m.[x]{2}) (eq_refl (FRO.m.[x]{2}))=> [|y m_x] />.
 apply: fmap_eqP=> x'; rewrite mapE get_setE; case: (x' = x{2})=> [->>|].
 + by rewrite m_x.
@@ -152,18 +152,18 @@ qed.
 equiv RO_FRO_set : RO.set ~ FRO.set :
   ={x, y} /\ RO.m{1} = noflags FRO.m{2}
   ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> &1 &2 [#] 3->; rewrite map_set. qed.
+proof. by proc; auto=> &1 &2 [#] 3->; rewrite /noflags map_set. qed.
 
 equiv RO_FRO_rem : RO.rem ~ FRO.rem :
   ={x} /\ RO.m{1} = noflags FRO.m{2}
   ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> /> &m'; rewrite map_rem. qed.
+proof. by proc; auto=> /> &m'; rewrite /noflags map_rem. qed.
 
 equiv RO_FRO_sample : RO.sample ~ FRO.sample :
   ={x} /\ RO.m{1} = noflags FRO.m{2}
   ==> RO.m{1} = noflags FRO.m{2}.
 proof. 
-by proc; inline *; auto=> /> &2 r _; rewrite mem_map map_set.
+by proc; inline *; auto=> /> &2 r _; rewrite mem_map /noflags map_set.
 qed.
 
 equiv RO_FRO_D (D <: RO_Distinguisher { RO, FRO }) :
@@ -755,7 +755,7 @@ transitivity M.main1
   rcondf{2} 3.
   + auto=> />; apply/mem_eq0=> z; rewrite -memE mem_fdom dom_restr.
     by rewrite /in_dom_with domE mapE //=; case: (RO.m.[z]{m}).
-+ by auto=> /> &1; rewrite map_comp /fst /= map_id.
++ by auto=> /> &1; rewrite /noflags map_comp /fst /= map_id.
 transitivity M.main2
    (={glob D, FRO.m, arg} ==> ={res, glob D})
    (={glob D, arg} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>
