@@ -211,6 +211,9 @@ schema cost_dbool `{P}: cost[P : {0,1}] = cdbool.
 op cdt : {int | 0 <= cdt } as ge0_cdt.
 schema cost_dt `{P}: cost [P: dt] = cdt.
 
+op cdhkey : { int | 0 <= cdhkey} as ge0_cdhkey.
+schema cost_dhkey `{P} : cost[P: dhkey] = cdhkey.
+
 op cxor : {int | 0 <= cxor } as ge0_cxor.
 schema cost_xor `{P} {w1 w2: bits} : cost [P: w1 +^ w2] = cost[P:w1] + cost[P:w2] + cxor.
 
@@ -221,14 +224,14 @@ schema cost_pow `{P} {g:group, x:t} : cost[P: g ^ x] = cost[P:g] + cost[P:x] + c
 schema cost_gen `{P} : cost [P:g] = 0.
 
 op chash : {int | 0 <= chash } as ge0_chash.
-print hash.
+
 schema cost_hash `{P} {k:hkey, g:group} : cost [P:hash k g] = cost [P: k] + cost[P:g] + chash.
 
-hint simplify cost_dbool, cost_eqbool, cost_pow, cost_gen, cost_dt, cost_xor, cost_hash.
+hint simplify cost_dbool, cost_eqbool, cost_pow, cost_gen, cost_dt, cost_xor, cost_hash, cost_dhkey.
 
 lemma ex_conclusion (A <: Adversary[choose : `{kc} , guess : `{kg} ]) &m :
-  exists (Dddh <: DDH.Adversary [guess : `{kc + kg}]) 
-         (Des <: AdvES[guess: `{kc + kg}]),
+  exists (Dddh <: DDH.Adversary [guess : `{3 + cxor + chash + cdbool + cdhkey + kg + kc}]) 
+         (Des <: AdvES[guess: `{3 + 2*cgpow + cxor + cdbool + 2 * cdt + kg + kc }]),
    `|Pr[CPA(Hashed_ElGamal, A).main() @ &m : res] - 1%r / 2%r| <=
      `|Pr[DDH0(Dddh).main() @ &m : res] - Pr[DDH1(Dddh).main() @ &m : res]| +
      `|Pr[ES0(Des).main() @ &m : res] - Pr[ES1(Des).main() @ &m : res]|.
@@ -239,14 +242,9 @@ proof.
   admit.
   admit.
   + proc; call (:true; time []); rnd; call(:true; time []); do 2!rnd; skip => />.
-    rewrite dt_ll dbool_ll.
-    admit.
+    rewrite dt_ll dbool_ll /=. smt.
   + proc; call (:true; time []); wp; rnd; call(:true; time []); rnd; skip => />.
-    rewrite dhkey_ll dbool_ll /=.
-
-
-op cdbool : 
-
-search is_lossless {0,1}.
+    rewrite dhkey_ll dbool_ll /=. smt.
+qed.
 
 end theory.
