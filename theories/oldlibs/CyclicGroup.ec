@@ -5,7 +5,7 @@
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
-
+require import Int.
 require PrimeField.
 
 clone export PrimeField as FD.
@@ -20,10 +20,15 @@ op ( ^ ): group -> t -> group.       (* exponentiation *)
 op log  : group -> t.                (* discrete logarithm *)
 op g1 = g ^ F.zero.
 
+op cgpow : { int | 0 <= cgpow } as ge0_cgpow.
+schema cost_pow `{P} {g:group, x:t} : cost[P: g ^ x] = cost[P:g] + cost[P:x] + cgpow.
+schema cost_gen `{P} : cost [P:g] = 0.
+hint simplify cost_pow, cost_gen.
+
 axiom gpow_log (a:group): g ^ (log a) = a.
 axiom log_gpow x : log (g ^ x) = x.
 
-lemma nosmt log_bij x y: x = y <=> log x = log y by smt full.
+lemma nosmt log_bij x y: x = y <=> log x = log y by smt (gpow_log).
 lemma nosmt pow_bij (x y:F.t): x = y <=> g^x =g^y by [].
 
 

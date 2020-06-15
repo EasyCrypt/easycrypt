@@ -7,6 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+require import Int.
 require FinType.
 
 op (^^) (b1 b2:bool) = b1 = !b2.
@@ -28,6 +29,9 @@ by [].
 
 clone FinType as BoolFin with
   type t    <- bool,
-    op enum <- List.(::) true (List.(::) false List."[]"),
-    op card <- 2
+  op enum <- List.(::) true (List.(::) false List."[]"),
+  op card <- 2
 proof enum_spec by case.
+
+schema cost_eqbool `{P} {b1 b2:bool} : cost [P: b1 = b2] = cost[P:b1] + cost[P:b2] + 1.
+hint simplify cost_eqbool.

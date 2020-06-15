@@ -185,6 +185,9 @@ theory FDistr.
   require import Real.
   (* distrinution *)
   op dt: t distr.
+  op cdt : {int | 0 <= cdt } as ge0_cdt.
+  schema cost_dt `{P}: cost [P: dt] = cdt.
+  hint simplify cost_dt.
 
   axiom dt_fu: is_full dt.
 
@@ -196,6 +199,7 @@ theory FDistr.
   proof. by move=> ??;rewrite !dt1E. qed.
 
   hint exact random : dt_fu dt_ll dt_funi.
+
 
 end FDistr.
 

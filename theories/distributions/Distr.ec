@@ -680,6 +680,11 @@ clone import FinType as Support with type t <- t.
 
 op dunifin : t distr = MUniform.duniform enum.
 
+op cunifin : { int | 0 <= cunifin } as ge0_cunifin.
+
+schema cost_cunifin `{P} : cost [P: dunifin] = cunifin.
+hint simplify cost_cunifin.
+
 lemma dunifin1E (x : t) : mu1 dunifin x = 1%r / card%r.
 proof. by rewrite MUniform.duniform1E enumP /= undup_id // enum_uniq. qed.
 
