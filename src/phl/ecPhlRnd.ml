@@ -21,6 +21,7 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
+type chl_infos_t = (form, form option, form) rnd_tac_info
 type bhl_infos_t = (form, ty -> form option, ty -> form) rnd_tac_info
 type rnd_infos_t = (pformula, pformula option, pformula) rnd_tac_info
 type mkbij_t     = EcTypes.ty -> EcTypes.ty -> EcFol.form
@@ -44,7 +45,7 @@ module Core = struct
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
-  let t_choare_rnd_r tac_info tc =
+  let t_choare_rnd_r (tac_info : chl_infos_t) tc =
     let env = FApi.tc1_env tc in
     let chs = tc1_as_choareS tc in
     let (lv, distr_e), s = tc1_last_rnd tc chs.chs_s in

@@ -43,7 +43,7 @@ let t_auto_rnd_hoare_r tc =
 
 (* -------------------------------------------------------------------- *)
 let t_auto_rnd_choare_r tc =
-  EcPhlRnd.t_choare_rnd tc
+  EcPhlRnd.t_choare_rnd EcParsetree.PNoRndParams tc
 
 (* -------------------------------------------------------------------- *)
 let t_auto_rnd_bdhoare_r tc =
