@@ -589,8 +589,14 @@ and reduce_logic ri env hyps f =
         f_int_add_simpl acc (cost_of_expr coe.coe_pre coe.coe_mem e))
       f_i1 es
 
+  | Fcoe ({ coe_e = {e_node = Eop (p, _)}} )
+    when EcEnv.Op.is_dtype_ctor env p && ri.cost ->
+    (* FIXME: check the number of arguments *)
+    f_i1
+
   | Fcoe ({ coe_e = { e_node = Eapp ({e_node = Eop (p, _); }, es) }} as coe)
     when EcEnv.Op.is_dtype_ctor env p && ri.cost ->
+    (* FIXME: check the number of arguments *)
     List.fold_left (fun acc e ->
         f_int_add_simpl acc (cost_of_expr coe.coe_pre coe.coe_mem e))
       f_i1 es

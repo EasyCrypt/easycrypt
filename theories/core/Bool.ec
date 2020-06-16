@@ -34,4 +34,11 @@ clone FinType as BoolFin with
 proof enum_spec by case.
 
 schema cost_eqbool `{P} {b1 b2:bool} : cost [P: b1 = b2] = cost[P:b1] + cost[P:b2] + 1.
-hint simplify cost_eqbool.
+schema cost_and  `{P} {b1 b2:bool} : cost [P: b1 /\ b2] = cost[P:b1] + cost[P:b2] + 1.
+schema cost_anda `{P} {b1 b2:bool} : cost [P: b1 && b2] = cost[P:b1] + cost[P:b2] + 1.
+schema cost_or   `{P} {b1 b2:bool} : cost [P: b1 \/ b2] = cost[P:b1] + cost[P:b2] + 1.
+schema cost_ora  `{P} {b1 b2:bool} : cost [P: b1 || b2] = cost[P:b1] + cost[P:b2] + 1.
+schema cost_xor  `{P} {b1 b2:bool} : cost [P: b1 ^^ b2] = cost[P:b1] + cost[P:b2] + 1.
+
+hint simplify cost_eqbool, cost_and, cost_anda, cost_or, cost_ora, cost_xor.
+

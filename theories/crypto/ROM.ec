@@ -732,7 +732,6 @@ theory ROM_BadCall.
 
     section.
       declare module D : Dist {-Log, -RO}.
-      axiom Da1L (H <: Types.ARO {-D}): islossless H.o => islossless D(H).a1.
       axiom Da2L (H <: Types.ARO {-D}): islossless H.o => islossless D(H).a2.
 
       local module G1'(D:Dist, H:Oracle) = {
@@ -844,8 +843,7 @@ theory ROM_BadCall.
 
     section.
       declare module D : Dist {-Log, -RO}.
-      axiom Da1L (H <: Types.ARO {-D}): islossless H.o => islossless D(H).a1.
-      axiom Da2L (H <: Types.ARO {-D}): islossless H.o => islossless D(H).a2.
+      axiom Da2L (H <: Types.ARO {-D}): islossless H.o => islossless D(H).a2. 
 
       local module G1'(D:Dist, H:Oracle) = {
         module D = D(Bound(H))
