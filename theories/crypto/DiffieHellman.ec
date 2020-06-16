@@ -64,7 +64,7 @@ end CDH.
 theory List_CDH.
 
   const n: int.
-  axiom gt0_n :  0 < n.
+  axiom gt0_n :  0 < n. 
 
   module type Adversary = {
     proc solve(gx:group, gy:group): group list
@@ -81,24 +81,15 @@ theory List_CDH.
     }
   }.
 
-  op build_list (s: group list) = 
-    if s = [] || n < size s then [g] else s 
-  axiomatized by build_listE.
-
-  schema cost_build_list `{P} {s:group list} : 
-     cost [P:build_list s] = cost [P:s] + n.
-  hint simplify cost_build_list.
-   
   module CDH_from_LCDH (A:Adversary): CDH.Adversary = {
     proc solve(gx:group, gy:group): group = {
       var s, x;
 
       s <@ A.solve(gx, gy);
-      x <$ MUniform.duniform (build_list s);
+      x <$ MUniform.duniform s;
       return x;
     }
   }.
-
 
   (** Naive reduction to CDH **)
   section.
@@ -120,7 +111,7 @@ theory List_CDH.
         var z, s;
 
         s <@ aux();
-        z <$ MUniform.duniform (build_list s);
+        z <$ MUniform.duniform s;
         return z = g ^ (x * y);
       }
     }.
@@ -159,10 +150,8 @@ theory List_CDH.
         by proc *; inline *; wp; call (_: true); auto.
       (* The second part is just arithmetic, but smt needs some help. *)
       rnd (pred1 (g^(LCDH'.x * LCDH'.y))).
-      wp; skip=> /> ?; rewrite build_listE => Hin ^ Hle /lezNgt -> /=.
-      rewrite /pred1 MUniform.duniform1E. 
-      have -> /=: s{hr} <> [] by case: (s{hr}) Hin.
-      rewrite Hin /= lef_pinv 2:[smt (gt0_n)].
+      wp; skip=> /> ? Hin Hle /=.
+      rewrite /pred1 MUniform.duniform1E Hin /= lef_pinv 2:[smt (gt0_n)].
       + by move: Hin;rewrite -mem_undup -index_mem;smt (index_ge0).
       smt (size_undup).
     qed.
@@ -173,26 +162,23 @@ theory List_CDH.
     op cduniform_n : { int | 0 <= cduniform_n } as ge0_cduniform_n.
 
     schema cost_duniform `{P} {s : group list} : 
-       cost [P : duniform (build_list s)] = cost [P : s] + cduniform_n.
-    hint simplify cost_duniform.
-(*
-FIXME: 
-    lemma ex_reduction cs (A<:Adversary [solve : `{cs}]) &m :
-  (*    0 <= cs =>  *)
-      (* FIXME : pas de verification que les couts sont positifs *)
-      exists (B <:CDH.Adversary [solve : `{cduniform_n + cs} ] {+A}),
-      Pr[LCDH(A).main() @ &m: res] <= n%r * Pr[CDH.CDH(B).main() @ &m: res]. *)
-    lemma ex_reduction (cs:int) (A<:Adversary [solve : `{cs}]) &m :
-      (* FIXME : pas de verification que les couts sont positifs *)
+       cost [P /\ size s <= n : duniform s] <= cost [P : s] + cduniform_n.
+
+    lemma ex_reduction (cs:int) (A<:Adversary) &m :
+      choare[A.solve : true ==> 0 < size res <= n] time [cs] =>
       exists (B <:CDH.Adversary [solve : `{cduniform_n + cs} ] {+A}),
       Pr[LCDH(A).main() @ &m: res] <= n%r * Pr[CDH.CDH(B).main() @ &m: res]. 
     proof.
-      exists (CDH_from_LCDH(A));split; last first.
+      move=> hcA;exists (CDH_from_LCDH(A));split; last first.
       + have /= h1 := Reduction A &m.  
         rewrite -ler_pdivr_mull; smt(lt_fromint gt0_n).
       proc.
-      rnd; call (:true; time []); skip => />; split.
-      + move=> ?; apply duniform_ll; rewrite build_listE /#.
+      rnd (size s <= n).
+      call hcA; skip => />; split.
+      + move=> *; apply duniform_ll;rewrite -size_eq0 /#.
+      instantiate /= := (cost_duniform {gx, gy, x : group, s : group list} 
+                        `(true) s).
+      pose t :=  cost(_: {gx, gy, x : group, s : group list})[size s <= n : duniform s].
       smt().
     qed.
 
@@ -224,16 +210,13 @@ theory Set_CDH.
   clone List_CDH as LCDH with 
     op n <- n
     proof gt0_n by apply gt0_n.
-
-  op choose_n (s:group fset) = 
-    take n (elems s) axiomatized by choose_nE.
   
   module CDH_from_SCDH (A:Adversary): CDH.Adversary = {
     module AL = {
       proc solve(gx:group, gy:group): group list = {
         var s;
         s <@ A.solve(gx, gy);
-        return (choose_n s);
+        return elems s;
       }
     }
     proc solve = LCDH.CDH_from_LCDH(AL).solve
@@ -254,7 +237,7 @@ theory Set_CDH.
       have h1 : Pr[SCDH(A).main() @ &m : res] <= 
                 Pr[LCDH.LCDH(CDH_from_SCDH(A).AL).main() @ &m : res].
       + byequiv=> //;proc;inline *;wp;call (_:true);auto => /> ?????. 
-        by rewrite memE cardE choose_nE => hin hc; rewrite take_oversize.
+        by rewrite memE cardE.
       have -> : Pr[CDH.CDH(CDH_from_SCDH(A)).main() @ &m : res] =
                 Pr[CDH.CDH(LCDH.CDH_from_LCDH(CDH_from_SCDH(A).AL)).main() @ &m : res].
       + by byequiv=> //;proc;inline *;auto=> /=;call (_:true);auto.
@@ -263,30 +246,5 @@ theory Set_CDH.
     qed.
   
   end section.
-
-  abstract theory C.
-
-    clone include LCDH.C.
-
-    schema cost_choose_n `{P} {s:group fset} :
-       cost[P: choose_n s] = n.
-    hint simplify cost_choose_n.
-
-    lemma ex_reduction_s (cs:int) (A<:Adversary [solve : `{cs}]) &m :
-      
-      exists (B <:CDH.Adversary [solve : `{cduniform_n + n + cs} ] {+A}),
-      Pr[SCDH(A).main() @ &m: res] <= n%r * Pr[CDH.CDH(B).main() @ &m: res].
-    proof.
-      have := ex_reduction (n + cs) (<:CDH_from_SCDH(A).AL) _ &m.
-      + proc; call (:true; time []); skip => /> /#.
-      move=> [B hB]; exists B;split.
-      + proc true : time [] => // /#.
-      have /# : Pr[SCDH(A).main() @ &m : res] <= 
-                Pr[LCDH.LCDH(CDH_from_SCDH(A).AL).main() @ &m : res].
-      byequiv=> //;proc;inline *;wp;call (_:true);auto => /> ?????. 
-      by rewrite memE cardE choose_nE => hin hc; rewrite take_oversize.
-    qed.
-
-  end C.
 
 end Set_CDH.
