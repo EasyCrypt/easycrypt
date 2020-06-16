@@ -44,7 +44,7 @@ module Core = struct
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
-  let t_choare_rnd_r tc =
+  let t_choare_rnd_r tac_info tc =
     let env = FApi.tc1_env tc in
     let chs = tc1_as_choareS tc in
     let (lv, distr_e), s = tc1_last_rnd tc chs.chs_s in
@@ -55,13 +55,18 @@ module Core = struct
     let post = subst_form_lv env (EcMemory.memory chs.chs_m) lv x chs.chs_po in
     let post = f_imp (f_in_supp x distr) post in
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
-    let post  = f_anda (f_lossless ty_distr distr) post in
+    let post = f_anda (f_lossless ty_distr distr) post in
+
+    let cost_pre = match tac_info with
+      | PNoRndParams -> f_true
+      | PSingleRndParam p -> p
+      | _ -> assert false in
     let cost =
       EcFol.cost_sub_self
         chs.chs_co
-        (cost_of_expr_any chs.chs_m distr_e) in
+        (cost_of_expr cost_pre chs.chs_m distr_e) in
     let concl = f_cHoareS_r { chs with chs_s = s;
-                                       chs_po = post;
+                                       chs_po = f_and_simpl cost_pre post;
                                        chs_co = cost} in
     FApi.xmutate1 tc `Rnd [concl]
 
@@ -436,7 +441,7 @@ let wp_equiv_rnd      = FApi.t_low1 "wp-equiv-rnd"      wp_equiv_rnd_r
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_rnd   = FApi.t_low0 "hoare-rnd"   Core.t_hoare_rnd_r
-let t_choare_rnd  = FApi.t_low0 "choare-rnd"  Core.t_choare_rnd_r
+let t_choare_rnd  = FApi.t_low1 "choare-rnd"  Core.t_choare_rnd_r
 let t_bdhoare_rnd = FApi.t_low1 "bdhoare-rnd" Core.t_bdhoare_rnd_r
 let t_equiv_rnd   = FApi.t_low2 "equiv-rnd"   t_equiv_rnd_r
 
@@ -448,8 +453,19 @@ let process_rnd side tac_info tc =
   | None, PNoRndParams when is_hoareS concl ->
       t_hoare_rnd tc
 
-  | None, PNoRndParams when is_cHoareS concl ->
-      t_choare_rnd tc
+  | None, _ when is_cHoareS concl ->
+    let tac_info =
+      match tac_info with
+      | PNoRndParams ->
+        PNoRndParams
+
+      | PSingleRndParam fp ->
+        PSingleRndParam
+          (TTC.tc1_process_Xhl_form tc tbool fp)
+
+      | _ -> tc_error !!tc "invalid arguments" in
+
+      t_choare_rnd tac_info tc
 
   | None, _ when is_bdHoareS concl ->
     let tac_info =
