@@ -23,9 +23,9 @@ module LowInternal = struct
     | None -> cost_of_expr_any menv e
     | Some pre -> cost_of_expr pre menv e
 
-  let wp_asgn_aux memenv lv e (lets, f) =
+  let wp_asgn_aux c_pre memenv lv e (lets, f) =
     let m = EcMemory.memory memenv in
-    let let1 = lv_subst m lv (form_of_expr m e) in
+    let let1 = lv_subst ?c_pre m lv (form_of_expr m e) in
       (let1::lets, f)
 
   let rec wp_stmt
@@ -42,7 +42,7 @@ module LowInternal = struct
   and wp_instr onesided c_pre env memenv i letsf =
     match i.i_node with
     | Sasgn (lv,e) ->
-      wp_asgn_aux memenv lv e letsf, cost_of_expr_w_pre memenv e c_pre
+      wp_asgn_aux c_pre memenv lv e letsf, cost_of_expr_w_pre memenv e c_pre
 
     | Sif (e,s1,s2) ->
         let (r1,letsf1),cost_1 =
@@ -120,19 +120,6 @@ module TacInternal = struct
 
     let chs = tc1_as_choareS tc in
 
-    (* We check that the cost precondition, if any, is unchanged chs.chs_s,
-       minus its last element. *)
-    let is = chs.chs_s.s_node in
-    if c_pre <> None && is <> [] then begin
-      let is_m_last, _ = List.split_at ((List.length is) - 1) is in
-      let stmt_m_last = EcModules.stmt is_m_last in
-      let write_set = EcPV.s_write env stmt_m_last in
-      let read_set  = EcPV.PV.fv env (EcMemory.memory chs.chs_m) (oget c_pre) in
-      if not (EcPV.PV.indep env write_set read_set) then
-        tc_error !!tc "wp: the cost pre-condition must not be modified by any \
-                       but the last instruction of the statement";
-    end;
-
     let (s_hd, s_wp) = o_split i chs.chs_s in
     let s_wp = EcModules.stmt s_wp in
 
@@ -144,12 +131,7 @@ module TacInternal = struct
     let concl = f_cHoareS_r { chs with chs_s = s;
                                        chs_po = post;
                                        chs_co = cost } in
-
-    (* We have an extra side-condition if a cost precondition is provided *)
-    let concl = match c_pre with
-      | None -> [concl]
-      | Some c_pre -> [EcFol.f_imp_simpl chs.chs_pr c_pre; concl] in
-    FApi.xmutate1 tc `Wp concl
+    FApi.xmutate1 tc `Wp [concl]
 
   let t_bdhoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
