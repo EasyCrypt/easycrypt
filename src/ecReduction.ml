@@ -340,7 +340,10 @@ let reduce_match env (f, bs, ty) =
 type mode =
   | UR_Form
   | UR_CostPre of EcMemory.memory
-  | UR_CostExpr
+  | UR_CostExpr of EcMemory.memory
+
+let is_UR_CostExpr = function UR_CostExpr _ -> true | _ -> false
+let get_UR_CostExpr = function UR_CostExpr m -> m | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let rec h_red_x ri env hyps f =
@@ -697,12 +700,17 @@ and reduce_user_gen mode simplify ri env hyps f
 
       (* for expression variables in schemata *)
       let e_pv  = ref (Mid.empty : expr Mid.t) in
-      let check_e_pv x f =
-        match Mid.find_opt x !e_pv with
-        | None    -> e_pv := Mid.add x (expr_of_form mhr f) !e_pv
-        (* must use mhr, c.f. caller of check_e_pv *)
+      let check_e_pv mhr x f =
+        try
+          match Mid.find_opt x !e_pv with
+          | None    -> e_pv := Mid.add x (expr_of_form mhr f) !e_pv
+          (* must use mhr, c.f. caller of check_e_pv *)
 
-        | Some f' -> check_alpha_equal_e hyps (expr_of_form mhr f) f' in (* idem *)
+          | Some f' -> check_alpha_equal_e hyps (expr_of_form mhr f) f'
+        with CannotTranslate ->
+          Format.eprintf "[W]%a@."
+             (!EcEnv.pp_debug_form env) f;
+          raise CannotTranslate in (* idem *)
 
       (* for memory pred. variables in schemata *)
       let p_pv  = ref (Mid.empty : mem_pr Mid.t) in
@@ -768,15 +776,17 @@ and reduce_user_gen mode simplify ri env hyps f
           doit (UR_CostPre (fst coe.coe_mem)) coe.coe_pre inner_pre;
 
           (* use mhr, to be consistent with check_e_pv *)
+          let mhr = fst coe.coe_mem in
           let e = form_of_expr mhr coe.coe_e in
 
-          doit UR_CostExpr e inner_r;
+          doit (UR_CostExpr mhr) e inner_r;
 
         | _, R.Var x when mode = UR_Form ->
           check_pv x f
 
-        | _, R.Var x when mode = UR_CostExpr ->
-          check_e_pv x f
+        | _, R.Var x when is_UR_CostExpr mode ->
+          let mhr = get_UR_CostExpr mode in
+          check_e_pv mhr x f
 
         | _, R.Var x ->
           let m = match mode with
@@ -787,7 +797,7 @@ and reduce_user_gen mode simplify ri env hyps f
           if List.mem_assoc x rule.rl_vars
           then check_pv x f
           else if List.mem_assoc x rule.rl_evars
-          then check_e_pv x f
+          then check_e_pv m x f
           else begin
             assert (List.mem x rule.rl_pvars);
             check_p_pv m x f end
@@ -1314,7 +1324,7 @@ module User = struct
               { cst with cst_f_vs = Sid.add x cst.cst_f_vs }
             | UR_CostPre _ ->
               { cst with cst_cost_pre_vs = Sid.add x cst.cst_cost_pre_vs }
-            | UR_CostExpr ->
+            | UR_CostExpr _ ->
               { cst with cst_cost_expr_vs = Sid.add x cst.cst_cost_expr_vs } end
 
         | R.Int _ -> cst
@@ -1333,8 +1343,9 @@ module User = struct
             List.fold_left (doit ~cmode) cst args
 
         | R.Cost (menv, pre, expr) ->
-          let cst = doit ~cmode:UR_CostExpr cst expr in
-          doit ~cmode:(UR_CostPre (fst menv)) cst pre
+          let mhr = fst menv in
+          let cst = doit ~cmode:(UR_CostExpr mhr) cst expr in
+          doit ~cmode:(UR_CostPre mhr) cst pre
 
       in doit ~cmode:UR_Form empty_cst rule in
 
