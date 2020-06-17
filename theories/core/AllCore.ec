@@ -8,3 +8,8 @@
 
 (* -------------------------------------------------------------------- *)
 require export Core Int IntExtra Real RealExtra.
+
+(* -------------------------------------------------------------------- *)
+schema cost_oget ['a] `{P} {o: 'a option} : 
+  cost [P : oget o] = cost [P:o] + 1.
+hint simplify cost_oget.

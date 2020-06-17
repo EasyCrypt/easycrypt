@@ -179,7 +179,7 @@ op empty ['a 'b] : ('a, 'b) fmap = ofmap (cst None).
 
 lemma nosmt empty_valE ['a, 'b] : tomap empty<:'a, 'b> = cst None.
 proof.
-by rewrite /empty ofmapK //; exists [] => /=.
+by rewrite /empty ofmapK //; exists [] => /= *; rewrite Map.cstE.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -741,3 +741,57 @@ rewrite !(restrP, remE); rewrite /in_dom_with; case (z = x)=> // ->.
 rewrite negb_and => -[Nxm|]; first by rewrite (iffLR _ _ (domNE m x)).
 by case: m.[x] => //= x' ->.
 qed.
+
+(* --------------------------------------------------------------------------- *)
+(* Some definitions for cost of operations in fmap                             *)
+(* --------------------------------------------------------------------------- *)
+
+schema cost_empty ['a 'b] `{P} :
+  cost [P: empty<:'a, 'b>] = 1.
+hint simplify cost_empty.
+
+op bounded ['from 'to] (m : ('from, 'to)fmap) (size:int) = 
+   card (fdom m) <= size.
+
+lemma bounded_set ['from 'to] (m : ('from, 'to)fmap) (size:int) x e : 
+  bounded m size => bounded (m.[x<-e]) (size + 1).
+proof. by rewrite /bounded fdom_set fcardU fcard1; smt (fcard_ge0). qed.
+
+lemma bounded_empty ['from 'to] : bounded empty<:'from, 'to> 0.
+proof. by rewrite /bounded fdom0 fcards0. qed.
+
+(* This theory assume that the type of key for map is finite *)
+abstract theory FMapCost.
+  type from.
+  op cget : int -> int.
+  op cset : int -> int.
+  op cin  : int -> int.
+
+  axiom cget_pos (x:int) : 0 <= cget x.
+  axiom cset_pos (x:int) : 0 <= cset x.
+  axiom cin_pos (x:int) : 0 <= cin x.
+
+  schema cost_get_P ['b] `{P} {m:(from, 'b) fmap, x:from} (max_size: int):
+    cost [P /\ bounded m max_size : m.[x]] = cost[P:m] + cost[P:x] + cget max_size.
+  hint simplify cost_get_P.
+
+  schema cost_set_P ['b] `{P} {m:(from, 'b) fmap, x:from, e:'b} (max_size : int) :
+    cost [P /\ bounded m max_size : m.[x<-e]] = cost[P:m] + cost[P:x] + cost[P:e] + cset max_size.
+
+  schema cost_in_P ['b] `{P} {m:(from, 'b) fmap, x:from} (max_size : int) :
+    cost [P /\ bounded m max_size: x \in m] = cost[P:m] + cost[P:x] + cin max_size.
+
+  hint simplify cost_get_P, cost_set_P, cost_in_P.
+
+  schema cost_get ['b] {m:(from, 'b) fmap, x:from} (max_size:int) :
+    cost [bounded m max_size : m.[x]] = cost[true:m] + cost[true:x] + cget max_size.
+
+  schema cost_set ['b] {m:(from, 'b) fmap, x:from, e:'b} (max_size:int) :
+    cost [bounded m max_size : m.[x<-e]] = cost[true:m] + cost[true:x] + cost[true:e] + cset max_size.
+
+  schema cost_in ['b] {m:(from, 'b) fmap, x:from} (max_size:int):
+    cost [bounded m max_size: x \in m] = cost[true:m] + cost[true:x] + cin max_size.
+
+  hint simplify cost_get, cost_set, cost_in.
+
+end FMapCost.
