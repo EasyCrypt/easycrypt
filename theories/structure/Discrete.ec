@@ -136,7 +136,7 @@ theory IntPair.
        0 <= n1 => 0 <= p1
     => 0 <= n2 => 0 <= p2
     => exp 2 n1 * exp 3 p1 = exp 2 n2 * exp 3 p2
-    => n1 = n2 /\ p1 = p2.
+    => n1 = n2 && p1 = p2.
   proof.
   move=> ge0_n1 ge0_p1 ge0_n2 ge0_p2; case: (n1 = n2) => /= [<-|neq_n].
   (* FIXME: move/ieexprIn fails *)
