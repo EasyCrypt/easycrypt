@@ -122,26 +122,73 @@ module SCDH_from_CPA(A:Adversary,O:Oracle): SCDHT.Adversary = {
 (* We want to bound the probability of A winning CPA(Bounder(A,RO),S) in terms of
    the probability of B = CDH_from_CPA(SCDH_from_CPA(A,RO)) winning CDH(B) *)
 
+(* FIXME: move this *)
 schema cost_eqnil ['a] `{P} {l:'a list} : cost [P: l = []] = cost [P:l] + 1.
-
-schema cost_empty ['a 'b] `{P} :
-  cost [P: empty<:'a, 'b>] = 1.
-
-(* FIXME *)
-schema cost_get ['a 'b] `{P} {m:('a, 'b) fmap, x:'a} :
-  cost [P: m.[x]] = cost[P:m] + cost[P:x] + 1.
-
-(* FIXME *)
-schema cost_set ['a 'b] `{P} {m:('a, 'b) fmap, x:'a, e:'b} :
-  cost [P: m.[x<-e]] = cost[P:m] + cost[P:x] + cost[P:e] + 1.
-
-(* FIXME *)
-schema cost_notin ['a 'b] `{P} {m:('a, 'b) fmap, x:'a} :
-  cost [P: x \notin m] = cost[P:m] + cost[P:x] + 1.
+hint simplify cost_eqnil.
 
 schema cost_oget ['a] `{P} {o: 'a option} : 
   cost [P : oget o] = cost [P:o] + 1.
-hint simplify cost_get, cost_set, cost_notin, cost_oget, cost_empty, cost_eqnil.
+hint simplify cost_oget.
+
+schema cost_empty ['a 'b] `{P} :
+  cost [P: empty<:'a, 'b>] = 1.
+hint simplify cost_empty.
+
+op bounded ['from 'to] (m : ('from, 'to)fmap) (size:int) = 
+   card (fdom m) <= size.
+
+lemma bounded_set ['from 'to] (m : ('from, 'to)fmap) (size:int) x e : 
+  bounded m size => bounded (m.[x<-e]) (size + 1).
+proof. by rewrite /bounded fdom_set fcardU fcard1; smt (fcard_ge0). qed.
+
+lemma bounded_empty ['from 'to] : bounded empty<:'from, 'to> 0.
+proof. by rewrite /bounded fdom0 fcards0. qed.
+
+abstract theory FMapCost.
+  type from.
+  type to.
+
+  op cget : int -> int.
+  op cset : int -> int.
+  op cin  : int -> int.
+
+  axiom cget_pos (x:int) : 0 <= cget x.
+  axiom cset_pos (x:int) : 0 <= cset x.
+  axiom cin_pos (x:int) : 0 <= cin x.
+
+ 
+  (* Fixme, this need to be generalized in the schema *)
+  (* maximal size of the map *)
+  op max_size : int.
+
+  schema cost_get_P ['a 'b] `{P} {m:('a, 'b) fmap, x:'a} :
+    cost [P /\ bounded m max_size : m.[x]] = cost[P:m] + cost[P:x] + cget max_size.
+
+  schema cost_set_P ['a 'b] `{P} {m:('a, 'b) fmap, x:'a, e:'b} :
+    cost [P /\ bounded m max_size : m.[x<-e]] = cost[P:m] + cost[P:x] + cost[P:e] + cset max_size.
+
+  schema cost_in_P ['a 'b] `{P} {m:('a, 'b) fmap, x:'a} :
+    cost [P /\ bounded m max_size: x \in m] = cost[P:m] + cost[P:x] + cin max_size.
+
+  hint simplify cost_get_P, cost_set_P, cost_in_P.
+
+  schema cost_get ['a 'b] {m:('a, 'b) fmap, x:'a} :
+    cost [bounded m max_size : m.[x]] = cost[true:m] + cost[true:x] + cget max_size.
+
+  schema cost_set ['a 'b] {m:('a, 'b) fmap, x:'a, e:'b} :
+    cost [bounded m max_size : m.[x<-e]] = cost[true:m] + cost[true:x] + cost[true:e] + cset max_size.
+
+  schema cost_in ['a 'b] {m:('a, 'b) fmap, x:'a} :
+    cost [bounded m max_size: x \in m] = cost[true:m] + cost[true:x] + cin max_size.
+
+  hint simplify cost_get, cost_set, cost_in.
+
+end FMapCost.
+
+clone import FMapCost as FMC with
+  type from  <- group,
+  type to    <- bits,
+  op max_size <- qH.
 
 section.
 
@@ -216,25 +263,29 @@ section.
     }
   }. 
 
+  op foo : int.
+
   local lemma cost_ALCDH : 
-     choare [ALCDH.solve : true ==> 0 < size res <= cA.`ochoose + cA.`oguess] 
-     time [6 + cunifin + (5 + cunifin) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose].
+    choare [ALCDH.solve : true ==> 0 < size res <= cA.`ochoose + cA.`oguess] 
+    time [6 + cunifin + (3 + cunifin + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose].
   proof.
     proc; wp.
-    call (_: true;
+    call (_: bounded RO.m (size H.qs);
            (H.o : size H.qs- cA.`ochoose)
            time
-           [(H.o : [fun _ => 5 + cunifin])]).
+           [(H.o : [fun _ => 3 + cunifin + cget qH + cset qH + cin qH])]).
     + move=> zo hzo; proc; inline *.
-      by auto => &hr />; rewrite dbits_ll /=; smt().
-    auto; call (_: true;
+      wp : (bounded RO.m qH).
+      by auto => &hr />; rewrite dbits_ll /=; smt (cset_pos bounded_set).
+    auto; call (_: bounded RO.m (size H.qs);
            (H.o : size H.qs)
-           time [(H.o : [fun _ => 5 + cunifin])]).
+           time [(H.o : [fun _ => 3 + cunifin + cget qH + cset qH + cin qH])]).
     + move=> zo hzo; proc; inline *.
-      by auto => &hr />; rewrite dbits_ll /=; smt().
+      wp : (bounded RO.m qH).
+      auto => &hr />; rewrite dbits_ll /=; smt(cset_pos bounded_set cA_pos).
     inline *; auto => />.
     split => *.
-    + smt (dbits_ll size_ge0 size_eq0 cA_pos).
+    + smt (bounded_empty dbits_ll size_ge0 size_eq0 cA_pos).
     rewrite !bigi_constz /=; smt(cA_pos).
   qed.
 
@@ -255,7 +306,10 @@ section.
 
   lemma ex_reduction &m : 
     exists (B<:CDH.Adversary 
-      [solve : `{ C1.cduniform_n + 6 + cunifin + (5 + cunifin) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose}] {+A, +H}),
+      [solve : `{ C1.cduniform_n + 
+                  6 + cunifin + 
+                  (3 + cunifin + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose}]
+               {+A, +H}),
     Pr[CPA(S,A(RO)).main() @ &m: res] - 1%r/2%r <= 
     qH%r * Pr[CDH.CDH(B).main() @ &m: res].
   proof.
