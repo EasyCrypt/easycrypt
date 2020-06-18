@@ -2284,7 +2284,8 @@ and trans_restr_for_modty env modty (pmr : pmod_restr option) =
       let mi_params = modty.mt_params in
       let s_params = List.fold_left (fun sa (x,_) ->
           Sm.add (EcPath.mident x) sa) Sm.empty mi_params in
-      let env_in  = EcEnv.Mod.enter (basename modty.mt_name) mi_params env in
+
+      let env_in  = EcEnv.Mod.bind_locals mi_params env in
 
       (* We type the restricion. *)
       transmod_restr env env_in s_params restr |> some in

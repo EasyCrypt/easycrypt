@@ -217,6 +217,7 @@ module Mod : sig
 
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
   val bind_local : EcIdent.t -> module_type -> env -> env
+  val bind_locals : (EcIdent.t * module_type) list -> env -> env
 
   val declare_local : EcIdent.t -> module_type -> env -> env
 
