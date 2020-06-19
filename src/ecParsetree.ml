@@ -702,7 +702,7 @@ type phltactic =
   | Punroll        of (oside * codepos * bool)
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
-  | Prcond         of (oside * bool * codepos1)
+  | Prcond         of (oside * bool * codepos1 * pformula option)
   | Prmatch        of (oside * symbol * codepos1)
   | Pcond          of pcond_info
   | Pmatch         of matchmode

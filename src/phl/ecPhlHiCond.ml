@@ -21,20 +21,27 @@ let process_cond info tc =
     ofdfl (fun _ -> Zpr.cpos (tc1_pos_last_if tc s)) i in
 
   match info with
-  | `Head side ->
+  | `Head (side) ->
     t_hS_or_chS_or_bhS_or_eS
       ~th:t_hoare_cond
-      ~tch:t_choare_cond
+      ~tch:(t_choare_cond None)
       ~tbh:t_bdhoare_cond
       ~te:(t_equiv_cond side) tc
 
   | `Seq (side, (i1, i2), f) ->
-    let es = tc1_as_equivS tc in
-    let f  = EcProofTyping.tc1_process_prhl_formula tc f in
-    let n1 = default_if i1 es.es_sl in
-    let n2 = default_if i2 es.es_sr in
-    FApi.t_seqsub (EcPhlApp.t_equiv_app (n1, n2) f)
-      [ t_id; t_equiv_cond side ] tc
+    if is_cHoareS (FApi.tc1_goal tc) then
+      if side <> None || i1 <> None || i2 <> None then
+        tc_error !!tc "cannot supply side or code position when goal is a choare"
+      else
+        let f = EcProofTyping.tc1_process_Xhl_formula tc f in
+        t_choare_cond (Some f) tc
+    else
+      let es = tc1_as_equivS tc in
+      let f  = EcProofTyping.tc1_process_prhl_formula tc f in
+      let n1 = default_if i1 es.es_sl in
+      let n2 = default_if i2 es.es_sr in
+      FApi.t_seqsub (EcPhlApp.t_equiv_app (n1, n2) f)
+        [ t_id; t_equiv_cond side ] tc
 
   | `SeqOne (s, i, f1, f2) ->
     let es = tc1_as_equivS tc in

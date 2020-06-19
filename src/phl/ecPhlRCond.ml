@@ -47,15 +47,18 @@ module Low = struct
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
-  let t_choare_rcond_r b at_pos tc =
+  let t_choare_rcond_r b at_pos c tc =
+    let c = EcUtils.odfl f_true c in
+
     let chs = tc1_as_choareS tc in
     let m  = EcMemory.memory chs.chs_m in
     let hd,e_expr,e,s = gen_rcond !!tc b m at_pos chs.chs_s in
     let cost =
       EcFol.cost_sub_self
         chs.chs_co
-        (EcFol.cost_of_expr_any chs.chs_m e_expr) in
-    let concl1  = f_hoareS chs.chs_m chs.chs_pr hd e in
+        (EcFol.cost_of_expr c chs.chs_m e_expr) in
+    let concl1  =
+      f_hoareS chs.chs_m chs.chs_pr hd (f_and_simpl c e) in
     let concl2  = f_cHoareS_r { chs with chs_s = s;
                                          chs_co = cost; } in
     FApi.xmutate1 tc `RCond [concl1; concl2]
@@ -91,20 +94,32 @@ module Low = struct
 
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond   = FApi.t_low2 "hoare-rcond"   t_hoare_rcond_r
-  let t_choare_rcond  = FApi.t_low2 "choare-rcond"  t_choare_rcond_r
+  let t_choare_rcond  = FApi.t_low3 "choare-rcond"  t_choare_rcond_r
   let t_bdhoare_rcond = FApi.t_low2 "bdhoare-rcond" t_bdhoare_rcond_r
   let t_equiv_rcond   = FApi.t_low3 "equiv-rcond"   t_equiv_rcond_r
 end
 
 (* -------------------------------------------------------------------- *)
-let t_rcond side b at_pos tc =
+let t_rcond side b at_pos c tc =
   let concl = FApi.tc1_goal tc in
 
+  let check_none () = if c <> None then
+      tc_error !!tc "optional cost is only for choare judgements" in
+
   match side with
-  | None when is_bdHoareS concl -> Low.t_bdhoare_rcond b at_pos tc
-  | None when is_cHoareS concl  -> Low.t_choare_rcond  b at_pos tc
-  | None -> Low.t_hoare_rcond b at_pos tc
-  | Some side -> Low.t_equiv_rcond side b at_pos tc
+  | None when is_bdHoareS concl ->
+    check_none (); Low.t_bdhoare_rcond b at_pos tc
+  | None when is_cHoareS concl  -> Low.t_choare_rcond b at_pos c tc
+  | None ->
+    check_none (); Low.t_hoare_rcond b at_pos tc
+  | Some side ->
+    check_none (); Low.t_equiv_rcond side b at_pos tc
+
+let process_rcond side b at_pos c tc =
+  let c = EcUtils.omap (fun c ->
+      EcProofTyping.tc1_process_Xhl_formula tc c) c in
+
+  t_rcond side b at_pos c tc
 
 (* -------------------------------------------------------------------- *)
 module LowMatch = struct

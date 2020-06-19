@@ -22,7 +22,7 @@ module Sid = EcIdent.Sid
 
 (* -------------------------------------------------------------------- *)
 module LowInternal = struct
- let t_gen_cond side e tc =
+ let t_gen_cond side e c tc =
    let hyps  = FApi.tc1_hyps tc in
    let fresh = ["&m"; "&m"; "_"; "_"; "_"] in
    let fresh = LDecl.fresh_ids hyps fresh in
@@ -32,7 +32,7 @@ module LowInternal = struct
 
    let t_sub b tc =
      FApi.t_on1seq 0
-       (EcPhlRCond.t_rcond side b (Zpr.cpos 1))
+       (EcPhlRCond.t_rcond side b (Zpr.cpos 1) c)
        (FApi.t_seqs
            [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h];
             FApi.t_or
@@ -50,19 +50,19 @@ end
 let t_hoare_cond tc =
   let hs = tc1_as_hoareS tc in
   let (e,_,_) = fst (tc1_first_if tc hs.hs_s) in
-  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) tc
+  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory hs.hs_m) e) None tc
 
 (* -------------------------------------------------------------------- *)
-let t_choare_cond tc =
+let t_choare_cond c tc =
   let chs = tc1_as_choareS tc in
   let (e,_,_) = fst (tc1_first_if tc chs.chs_s) in
-  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory chs.chs_m) e) tc
+  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory chs.chs_m) e) c tc
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_cond tc =
   let bhs = tc1_as_bdhoareS tc in
   let (e,_,_) = fst (tc1_first_if tc bhs.bhs_s) in
-  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) tc
+  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory bhs.bhs_m) e) None tc
 
 (* -------------------------------------------------------------------- *)
 let rec t_equiv_cond side tc =
@@ -79,7 +79,7 @@ let rec t_equiv_cond side tc =
         | `Right ->
           let (e,_,_) = fst (tc1_first_if tc es.es_sr) in
           form_of_expr (EcMemory.memory es.es_mr) e
-      in LowInternal.t_gen_cond side e tc
+      in LowInternal.t_gen_cond side e None tc
 
   | None ->
       let el,_,_ = fst (tc1_first_if tc es.es_sl) in

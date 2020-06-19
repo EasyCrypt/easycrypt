@@ -280,7 +280,7 @@ let process_unroll_for side cpos tc =
     match zs with
     | [] -> t_id tc
     | z :: zs ->
-      ((t_rcond side (zs <> []) (Zpr.cpos pos)) @+
+      ((t_rcond side (zs <> []) (Zpr.cpos pos) None) @+
       [FApi.t_try (t_intro_i m) @!
        t_conseq (f_eq x (f_int z)) @!
        t_set i pos z;

@@ -2977,9 +2977,12 @@ form_or_double_form:
 | LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
     { Double (f1, f2) }
 
+%inline if_cost_option:
+| COLON f=sform    {f}
+
 %inline if_option:
 | s=option(side)
-   { `Head s }
+   { `Head (s) }
 
 | s=option(side) i1=o_codepos1 i2=o_codepos1 COLON f=sform
    { `Seq (s, (i1, i2), f) }
@@ -3063,11 +3066,11 @@ phltactic:
 | CALL s=side? info=gpterm(call_info)
     { Pcall (s, info) }
 
-| RCONDT s=side? i=codepos1
-    { Prcond (s, true, i) }
+| RCONDT s=side? i=codepos1 cost=option(if_cost_option)
+    { Prcond (s, true, i, cost) }
 
-| RCONDF s=side? i=codepos1
-    { Prcond (s, false, i) }
+| RCONDF s=side? i=codepos1 cost=option(if_cost_option)
+    { Prcond (s, false, i, cost) }
 
 | MATCH c=oident s=side? i=codepos1
     { Prmatch (s, unloc c, i) }
