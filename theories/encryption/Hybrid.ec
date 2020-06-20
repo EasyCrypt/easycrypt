@@ -124,7 +124,7 @@ clone import Means as M with
   op d <- [0..q-1].
 
 (* -------------------------------------------------------------------- *)
-(* Prove that it is equivalent to consider n or 1 calls to the oracle *)
+(* Proof that it is equivalent to consider n or 1 calls to the oracle *)
 section.
 
   declare module Ob : Orclb    {-Count,-HybOrcl}.
