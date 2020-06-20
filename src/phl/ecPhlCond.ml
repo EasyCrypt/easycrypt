@@ -24,22 +24,37 @@ module Sid = EcIdent.Sid
 module LowInternal = struct
  let t_gen_cond side e c tc =
    let hyps  = FApi.tc1_hyps tc in
-   let fresh = ["&m"; "&m"; "_"; "_"; "_"] in
+   let fresh = ["&m"; "&m"; "_"; "_"; "_";"_";"_"] in
    let fresh = LDecl.fresh_ids hyps fresh in
 
-   let m1,m2,h,h1,h2 = as_seq5 fresh in
+   let m1,m2,h,h1,h2,h3,h4 = as_seq7 fresh in
+
    let t_introm = if is_none side then t_id else t_intros_i [m1] in
+
+   let t1 =
+     FApi.t_or
+       (FApi.t_seqs [t_elim_hyp h;
+                     t_intros_i [h1;h2];
+                     t_apply_hyp h2])
+       (t_apply_hyp h) in
+
+   let t2 =
+     FApi.t_seqs [t_elim_hyp h;
+                  t_intros_i [h1; h2];
+                  t_elim_hyp h1;
+                  t_intros_i [h3; h4];
+                  FApi.t_seqsub t_split
+                    [t_apply_hyp h4; t_apply_hyp h2]] in
+   let t3 =
+     match c with
+     | None -> t1
+     | Some _ -> FApi.t_or t2 t1 in
 
    let t_sub b tc =
      FApi.t_on1seq 0
        (EcPhlRCond.t_rcond side b (Zpr.cpos 1) c)
        (FApi.t_seqs
-           [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h];
-            FApi.t_or
-              (FApi.t_seqs [t_elim_hyp h;
-                            t_intros_i [h1;h2];
-                            t_apply_hyp h2])
-              (t_apply_hyp h)])
+          [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h]; t3])
        tc
    in
 
@@ -56,7 +71,16 @@ let t_hoare_cond tc =
 let t_choare_cond c tc =
   let chs = tc1_as_choareS tc in
   let (e,_,_) = fst (tc1_first_if tc chs.chs_s) in
-  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory chs.chs_m) e) c tc
+  let t =
+    LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory chs.chs_m) e) c
+  in
+  match c with
+  | None -> t tc
+  | Some pr ->
+    FApi.t_seqsub
+      (EcPhlConseq.t_cHoareS_conseq_nm (f_and chs.chs_pr pr) chs.chs_po)
+      [t_id; t_trivial; t] tc
+
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_cond tc =
