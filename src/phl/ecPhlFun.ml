@@ -776,7 +776,7 @@ let process_fun_abs inv p_abs_inv_inf tc =
     let hyps = FApi.tc1_hyps tc in
     let env' = LDecl.inv_memenv1 hyps in
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
-    let abs_inv_info = process_p_abs_inv_inf tc hyps (oget p_abs_inv_inf) in
+    let abs_inv_info = process_p_abs_inv_inf tc env' (oget p_abs_inv_inf) in
     t_choareF_abs inv abs_inv_info tc
 
   and t_bdhoare tc =
