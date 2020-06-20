@@ -786,10 +786,10 @@ fident:
 | x=lident { ([], x) }
 
 f_or_mod_ident:
-| nm=mod_qident DOT x=lident      
+| nm=mod_qident DOT x=lident
     { let fv = mk_loc (EcLocation.make $startpos(nm) $endpos(x)) (nm, x) in
       FM_FunOrVar fv }
-| x=lident			  
+| x=lident
     { let fv = mk_loc (EcLocation.make $startpos(x) $endpos(x)) ([], x) in
       FM_FunOrVar fv}
 | m=loc(mod_qident) { FM_Mod m }
@@ -1520,7 +1520,7 @@ loc_decl_names:
 | x=plist1(lident, COMMA) { (`Single, x) }
 
 | LPAREN x=plist2(lident, COMMA) RPAREN { (`Tuple, x) }
- 
+
 loc_decl_r:
 | VAR x=loc(loc_decl_names)
     { { pfl_names = x; pfl_type = None; pfl_init = None; } }
@@ -1703,7 +1703,7 @@ mod_restr:
   | LBRACE mr=mem_restr RBRACE LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET
     { { pmr_mem = mr;
 	pmr_procs = l } }
-  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET LBRACE mr=mem_restr RBRACE 
+  | LBRACKET l=rlist1(mod_restr_el,COMMA) RBRACKET LBRACE mr=mem_restr RBRACE
     { { pmr_mem = mr;
 	pmr_procs = l } }
 
@@ -2634,7 +2634,7 @@ conseq_xt:
 | c=conseq                                     { c, None }
 | c=conseq   COLON cmp=hoare_bd_cmp? bd=sform  { c, Some (CQI_bd (cmp, bd)) }
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform
-                                               { (None, None), 
+                                               { (None, None),
 						 Some (CQI_bd (cmp, bd)) }
 | c=conseq   COLON TIME co=costs(none)         { c, Some (CQI_c co) }
 | UNDERSCORE COLON TIME co=costs(none)         { (None, None), Some (CQI_c co) }
@@ -2643,7 +2643,7 @@ ci_cost_el:
 | LPAREN o=loc(fident) COLON co=costs(none) RPAREN   {o,co}
 
 ci_vrnt_el:
-| LPAREN o=loc(fident) COLON f=form RPAREN           {o,f} 
+| LPAREN o=loc(fident) COLON f=form RPAREN           {o,f}
 
 abs_call_info:
 | xv=rlist0(ci_vrnt_el, COMMA) TIME LBRACKET xc=rlist0(ci_cost_el, COMMA) RBRACKET
@@ -2731,6 +2731,9 @@ async_while_tac_info:
 rnd_info:
 | empty
     { PNoRndParams }
+
+| CEQ f=sform
+    { PSingleRndParam f }
 
 | f=sform
     { PSingleRndParam f }
@@ -2978,7 +2981,7 @@ form_or_double_form:
     { Double (f1, f2) }
 
 %inline if_cost_option:
-| COLON f=sform    {f}
+| CEQ f=sform    {f}
 
 %inline if_option:
 | s=option(side)
@@ -2986,6 +2989,9 @@ form_or_double_form:
 
 | s=option(side) i1=o_codepos1 i2=o_codepos1 COLON f=sform
    { `Seq (s, (i1, i2), f) }
+
+| CEQ f=sform
+   { `Seq (None, (None, None), f) }
 
 | s=option(side) i=codepos1? COLON LPAREN
     UNDERSCORE COLON f1=form LONGARROW f2=form
@@ -3045,10 +3051,10 @@ phltactic:
 | SEQ s=side? d=tac_dir pos=s_codepos1 COLON p=form_or_double_form f=app_bd_info
    { Papp (s, d, pos, p, f) }
 
-| WP n=s_codepos1? 
+| WP n=s_codepos1?
    { Pwp (n, None) }
 
-| WP n=s_codepos1? COLON f=sform
+| WP n=s_codepos1? CEQ f=sform
    { Pwp (n, Some f) }
 
 | SP n=s_codepos1?
