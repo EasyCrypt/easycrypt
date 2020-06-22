@@ -338,10 +338,10 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   | Fquant ((Lforall | Lexists) as q, b, f) -> begin
     assert (is_Aempty args);
 
-    let f =
+    let b, f =
       let s, b = Subst.add_bindings s b in
       let st = { st with st_env = Mod.add_mod_binding b st.st_env } in
-      norm st s f in
+      b, norm st s f in
 
     match q, st.st_ri.logic with
     | Lforall, Some `Full -> f_forall_simpl b f

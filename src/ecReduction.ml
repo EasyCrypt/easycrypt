@@ -362,7 +362,7 @@ let rec h_red_x ri env hyps f =
     (* ζ-reduction *)
   | Flet (LSymbol(x,_), e1, e2) when ri.zeta ->
       let s = Fsubst.f_bind_local Fsubst.f_subst_id x e1 in
-        Fsubst.f_subst s e2
+      Fsubst.f_subst s e2
 
     (* ι-reduction (let-tuple) *)
   | Flet (LTuple ids, { f_node = Ftuple es }, e2) when ri.iota ->
@@ -648,6 +648,7 @@ and reduce_context ri env hyps f =
         | Llambda, _          -> assert false in
 
       try
+
         let env = Mod.add_mod_binding b env in
           ctor b (h_red_x ri env hyps f1)
       with NotReducible ->
