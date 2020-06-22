@@ -78,9 +78,8 @@ let t_choare_cond c tc =
   | None -> t tc
   | Some pr ->
     FApi.t_seqsub
-      (EcPhlConseq.t_cHoareS_conseq_nm (f_and chs.chs_pr pr) chs.chs_po)
+      (EcPhlConseq.t_cHoareS_conseq (f_and chs.chs_pr pr) chs.chs_po)
       [t_id; t_trivial; t] tc
-
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_cond tc =
