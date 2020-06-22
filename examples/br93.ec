@@ -408,13 +408,13 @@ proof.
            time
            [(Hash.o : [fun _ => 3 + cdptxt + cget qH + cset qH + cin qH])]).
       + move=> zo hzo; proc; inline *.
-        wp : (bounded RO.m qH).
+        wp := (bounded RO.m qH).
         by auto => &hr />; rewrite dptxt_ll /=; smt (cset_pos bounded_set).
       auto; call (_: bounded RO.m (size Hash.qs);
            (Hash.o : size Hash.qs)
            time [(Hash.o : [fun _ => 3 + cdptxt + cget qH + cset qH + cin qH])]).
       + move=> zo hzo; proc; inline *.
-        wp : (bounded RO.m qH).
+        wp := (bounded RO.m qH).
         by auto => &hr />; rewrite dptxt_ll /=; smt(cset_pos bounded_set).
       inline *; auto => />; split => *.
       + smt (bounded_empty dptxt_ll size_ge0 size_eq0).

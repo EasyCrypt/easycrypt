@@ -192,13 +192,13 @@ section.
            time
            [(H.o : [fun _ => 3 + cunifin + cget qH + cset qH + cin qH])]).
     + move=> zo hzo; proc; inline *.
-      wp : (bounded RO.m qH).
+      wp := (bounded RO.m qH).
       by auto => &hr />; rewrite dbits_ll /=; smt (cset_pos bounded_set).
     auto; call (_: bounded RO.m (size H.qs);
            (H.o : size H.qs)
            time [(H.o : [fun _ => 3 + cunifin + cget qH + cset qH + cin qH])]).
     + move=> zo hzo; proc; inline *.
-      wp : (bounded RO.m qH).
+      wp := (bounded RO.m qH).
       auto => &hr />; rewrite dbits_ll /=; smt(cset_pos bounded_set cA_pos).
     inline *; auto => />.
     split => *.
