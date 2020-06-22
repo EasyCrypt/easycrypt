@@ -916,30 +916,6 @@ and check_alpha_equal ri hyps f1 f2 =
   let check_memtype env mt1 mt2 =
     ensure (EcMemory.mt_equal_gen (EqTest.for_type env) mt1 mt2) in
 
-  (* TODO all declaration in env, do it also in add local *)
-  let check_binding (env, subst) (x1,gty1) (x2,gty2) =
-    let gty2 = Fsubst.subst_gty subst gty2 in
-    match gty1, gty2 with
-    | GTty ty1, GTty ty2 ->
-      ensure (EqTest.for_type env ty1 ty2);
-      env,
-      if id_equal x1 x2 then subst else
-        Fsubst.f_bind_rename subst x2 x1 ty1
-    | GTmodty p1 , GTmodty p2 ->
-      ensure (ModTy.mod_type_equiv f_equal env p1 p2);
-      Mod.bind_local x1 p1 env,
-      if id_equal x1 x2 then subst
-      else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
-    | GTmem   me1, GTmem me2  ->
-      check_memtype env me1 me2;
-      env,
-      if id_equal x1 x2 then subst
-      else Fsubst.f_bind_mem subst x2 x1
-    | _, _ -> error () in
-
-  let check_bindings env subst bd1 bd2 =
-    try  List.fold_left2 check_binding (env,subst) bd1 bd2
-    with Invalid_argument _ -> error () in
 
   let check_local subst id1 f2 id2 =
     match (Mid.find_def f2 id2 subst.fs_loc).f_node with
@@ -968,7 +944,33 @@ and check_alpha_equal ri hyps f1 f2 =
     let s2 = EcModules.s_subst es s2 in
     ensure (EqTest.for_stmt env s1 s2) in
 
-  let rec aux1 env subst f1 f2 =
+ (* TODO all declaration in env, do it also in add local *)
+  let rec check_binding (env, subst) (x1,gty1) (x2,gty2) =
+    let gty2 = Fsubst.subst_gty subst gty2 in
+    match gty1, gty2 with
+    | GTty ty1, GTty ty2 ->
+      ensure (EqTest.for_type env ty1 ty2);
+      env,
+      if id_equal x1 x2 then subst else
+        Fsubst.f_bind_rename subst x2 x1 ty1
+    | GTmodty p1 , GTmodty p2 ->
+      let test f1 f2 = aux env subst f1 f2; true in
+      ensure (ModTy.mod_type_equiv test env p1 p2);
+      Mod.bind_local x1 p1 env,
+      if id_equal x1 x2 then subst
+      else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
+    | GTmem   me1, GTmem me2  ->
+      check_memtype env me1 me2;
+      env,
+      if id_equal x1 x2 then subst
+      else Fsubst.f_bind_mem subst x2 x1
+    | _, _ -> error ()
+
+  and check_bindings env subst bd1 bd2 =
+    try  List.fold_left2 check_binding (env,subst) bd1 bd2
+    with Invalid_argument _ -> error ()
+
+  and aux1 env subst f1 f2 =
     if Fsubst.is_subst_id subst && f_equal f1 f2 then ()
     else match f1.f_node, f2.f_node with
 
