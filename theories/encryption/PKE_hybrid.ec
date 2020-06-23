@@ -40,7 +40,7 @@ module type LR = {
   proc orcl (m0 m1:plaintext) : ciphertext
 }.
 
-module type AdvCPA(LR:LR) = {
+module type AdvCPA (S)(LR:LR) = {
   proc main(pk:pkey) : bool
 }.
 
@@ -77,7 +77,7 @@ module LRb (S:Scheme) = {
   }
 }.
 
-module CPAL (S:Scheme,A:AdvCPA) = {
+module CPAL (S:Scheme,A: fun (LR{+L(S)) => sig include AdvCPA(LR) end) = {
   module A = A(L(S))
   proc main():bool = {
     var b':bool;
@@ -98,6 +98,9 @@ module CPAR (S:Scheme,A:AdvCPA) = {
 }.
 
 module CPA (S:Scheme,A:AdvCPA) = {
+  module LRb = {
+    var b : bool
+  }
   module A = A(LRb(S))
   proc main():bool = {
     var b':bool;
@@ -406,15 +409,18 @@ section.
     by move=> h; apply big1_seq => i [] hP /mem_range hin; apply h.
   qed.
 
+
   lemma ex_CPA1_CPAn &m : 
-    exists (B <: AdvCPA [main : `{(cincr H.q + ceqint H.q + cltint H.q) * H.q + cdinterval H.q + (H.q - 1) * cs.`cenc + cA, 
-                                  #LR.orcl: 1}] 
-           {+A,+H.HybOrcl, +K, +S}),
-      (Pr[CPAL(S,A).main() @ &m : res] - Pr[CPAR(S,A).main() @ &m : res]) =
+    exists (B <: AdvCPA [main : `{ (cincr H.q + ceqint H.q + cltint H.q) * H.q + cdinterval H.q +
+                                    (H.q - 1) * cs.`cenc + cA,
+                                    #LR.orcl : 1}
+                                 ]
+                         {+A,+H.HybOrcl, +K, +S}),
+      Pr[CPAL(S,A).main() @ &m : res] - Pr[CPAR(S,A).main() @ &m : res] =
       H.q%r * (Pr[CPAL(S,B).main() @ &m : res] - Pr[CPAR(S,B).main() @ &m : res]).
   proof.
     exists (B(S,A)); split; last by have -> := CPA1_CPAn &m; field; smt (H.q_pos).
-    move=> cLR MLR hcLR.
+    move=> clr MLR hclr.
     proc. 
     seq 2 : (H.HybOrcl.l =0 /\ 0 <= H.HybOrcl.l0 < H.q) time [ (cincr H.q + ceqint H.q + cltint H.q) * H.q;
                                                                S.enc : (H.q - 1);
@@ -424,27 +430,64 @@ section.
       instantiate /(_ H.q) /= -> := (cost_dinterval {b' : bool, pk : pkey} 0 H.q).     
       smt (DInterval.supp_dinter DInterval.dinter_ll H.q_pos).
     exlim H.HybOrcl.l0 => l0. 
-    call (_: (0 <= H.HybOrcl.l /\ 0 <= H.HybOrcl.l0 <= H.q); 
+    call (_: (0 <= H.HybOrcl.l /\ 0 <= H.HybOrcl.l0 <= H.q /\ l0 = H.HybOrcl.l0); 
        (HybOrcl2(ToOrcl(S), MLR).orcl : H.HybOrcl.l) time
-      [ (HybOrcl2(ToOrcl(S), MLR).orcl : [fun _ => cincr H.q + ceqint H.q + cltint H.q ; S.enc : fun k => b2i (k <> l0); MLR.orcl : fun k => b2i(k=l0)]) ]) => //=.
+      [ (HybOrcl2(ToOrcl(S), MLR).orcl : [fun _ => cincr H.q + ceqint H.q + cltint H.q ; 
+                                          S.enc : fun k => b2i (k <> l0); MLR.orcl : fun k => b2i(k=l0)]) ]) => //=.
     + move=> zo hzo; proc; inline *; wp := (`|H.HybOrcl.l| <= H.q).
-      admit.
-      (* if := (`|H.HybOrcl.l| <= H.q). *)
+      if := (`|H.HybOrcl.l0| <= H.q /\ `|H.HybOrcl.l| <= H.q); 1: smt().
+      + wp; call (:true; time []); auto => &hr />; smt (ge0_ceqint). 
+      if := (`|H.HybOrcl.l0| <= H.q /\ `|H.HybOrcl.l| <= H.q); 1: smt().
+      + admit.
+      by wp; call (:true; time []); auto => &hr /> /#. 
+p : fun(x:M') => M
+fun (x:M'') : fun(x:M'') => M => p(x) 
+
     skip => &hr />; move: (H.HybOrcl.l0{hr}) => {l0}l0 h0 hq .
     rewrite bigi_constz 1:[smt (H.q_pos)] /=.
     rewrite !big_b2i !(bigi_b2i_split l0 0 H.q) 1,2:// /b2i /=.
     rewrite !(bigi_inP _ _ (fun (k : int) => k <> l0)) 1,2:/# !bigi_constz 1:// 1:/#.
     by rewrite !bigi1 /= /#.
   qed.
-  
-(* doute sur les borne  *)
 
-
-
-A(HybOrcl2(ToOrcl(S0), LR)
-print B.
-search (_ / _ = _)%Real.
-    
-    1%r/H.q%r * 
-
+  lemma ex_CPA1_CPAn &m : 
+    exists (B <: AdvCPA {+A,+H.HybOrcl, +K, +S}),
+      (forall (clr:int) (MLR<:LR [orcl: `{clr}] {-H.HybOrcl}), 
+         
+         choare[B(MLR).main : true ==> true] time
+                  [ (cincr H.q + ceqint H.q + cltint H.q) * H.q + cdinterval H.q;
+                    S.enc: (H.q - 1);
+                    A.main : 1;
+                    MLR.orcl : 1]) /\
+      Pr[CPAL(S,A).main() @ &m : res] - Pr[CPAR(S,A).main() @ &m : res] =
+      H.q%r * (Pr[CPAL(S,B).main() @ &m : res] - Pr[CPAR(S,B).main() @ &m : res]).
+  proof.
+    exists (B(S,A)); split; last by have -> := CPA1_CPAn &m; field; smt (H.q_pos).
+    move=> clr MLR.
+    proc. 
+    seq 2 : (H.HybOrcl.l =0 /\ 0 <= H.HybOrcl.l0 < H.q) time [ (cincr H.q + ceqint H.q + cltint H.q) * H.q;
+                                                               S.enc : (H.q - 1);
+                                                               A.main : 1;
+                                                               MLR.orcl : 1].
+    + wp; rnd (0 <= H.q <= H.q - 0); skip => &hr />.
+      instantiate /(_ H.q) /= -> := (cost_dinterval {b' : bool, pk : pkey} 0 H.q).     
+      smt (DInterval.supp_dinter DInterval.dinter_ll H.q_pos).
+    exlim H.HybOrcl.l0 => l0. 
+    call (_: (0 <= H.HybOrcl.l /\ 0 <= H.HybOrcl.l0 <= H.q /\ l0 = H.HybOrcl.l0); 
+       (HybOrcl2(ToOrcl(S), MLR).orcl : H.HybOrcl.l) time
+      [ (HybOrcl2(ToOrcl(S), MLR).orcl : [fun _ => cincr H.q + ceqint H.q + cltint H.q ; 
+                                          S.enc : fun k => b2i (k <> l0); MLR.orcl : fun k => b2i(k=l0)]) ]) => //=.
+    + move=> zo hzo; proc; inline *; wp := (`|H.HybOrcl.l| <= H.q).
+      if := (`|H.HybOrcl.l0| <= H.q /\ `|H.HybOrcl.l| <= H.q); 1: smt().
+      + by wp; call (:true; time []); auto => &hr />; smt (ge0_ceqint). 
+      if := (`|H.HybOrcl.l0| <= H.q /\ `|H.HybOrcl.l| <= H.q); 1: smt().
+      + by wp; call(:true; time []); auto => &hr /> /#.
+      by wp; call (:true; time []); auto => &hr /> /#. 
+    skip => &hr />; move: (H.HybOrcl.l0{hr}) => {l0}l0 h0 hq .
+    rewrite bigi_constz 1:[smt (H.q_pos)] /=.
+    rewrite !big_b2i !(bigi_b2i_split l0 0 H.q) 1,2:// /b2i /=.
+    rewrite !(bigi_inP _ _ (fun (k : int) => k <> l0)) 1,2:/# !bigi_constz 1:// 1:/#.
+    by rewrite !bigi1 /= /#.
+  qed.
+   
 end section.
