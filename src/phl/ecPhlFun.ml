@@ -264,11 +264,11 @@ module FunAbsLow = struct
               else         ks,               call_bounds, pre_eqs, post_eqs
             | Some (_,vrnt) ->
               let pre_eq  =
-                f_eq vrnt k
+                f_int_le vrnt k
               and post_eq =
                 if x_equal o o_called
-                then f_eq vrnt (f_int_add k f_i1)
-                else f_eq vrnt k in
+                then f_int_le vrnt (f_int_add k f_i1)
+                else f_int_le vrnt k in
 
               k_id :: ks,
               call_bound :: call_bounds,
@@ -312,8 +312,7 @@ module FunAbsLow = struct
           let post_eq = match o_vrnt with
             | None          ->
               f_true
-            | Some (_,vrnt) ->
-              f_and (f_int_le f_i0 vrnt) (f_int_le vrnt cbd)  in
+            | Some (_,vrnt) -> f_int_le vrnt cbd  in
 
           pre_eq, post_eq) ois in
 
