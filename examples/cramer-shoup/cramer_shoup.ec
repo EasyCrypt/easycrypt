@@ -194,26 +194,6 @@ proof.
 qed.
 
 (** IND-CCA Security of the scheme *)
-op cgmul: int.
-op cgdiv: int.
-op cgeq : int.
-schema cost_gmul `{P} {g1 g2:group} : cost[P:g1 * g2] = cost[P:g1] + cost[P:g2] + cgmul.
-schema cost_geq  `{P} {g1 g2:group} : cost[P:g1 = g2] = cost[P:g1] + cost[P:g2] + cgeq.
-schema cost_gdiv `{P} {g1 g2:group} : cost[P:g1 / g2] = cost[P:g1] + cost[P:g2] + cgdiv.
-
-axiom ge0_cg : 0 <= cgpow /\ 0 <= cgmul /\ 0 <= cgdiv /\ 0 <= cgeq.
-
-hint simplify cost_gmul, cost_gdiv, cost_geq.
-
-op cfadd: int.
-op cfmul: int.
-schema cost_F0 `{P} : cost[P:F.zero] = 0.
-schema cost_fadd `{P} {x1 x2:F.t} : cost[P:x1 + x2] = cost[P:x1] + cost[P:x2] + cfadd.
-schema cost_fmul `{P} {x1 x2:F.t} : cost[P:x1 * x2] = cost[P:x1] + cost[P:x2] + cfmul.
-
-axiom ge0_cf : 0 <= cfadd /\ 0 <= cfmul /\ 0 <= FDistr.cdt.
-
-hint simplify cost_F0, cost_fadd, cost_fmul.
 
 op cH : int.
 schema cost_H `{P} {k:K, t: group * group * group} : cost[P:H k t] = cost[P:k] + cost[P:t] + cH.
@@ -489,24 +469,6 @@ hint simplify cost_eqtuple3.
 schema cost_eqtuple3g `{P} {x1 x2: group * group * group}:
   cost [P: x1 = x2] = cost [P: x1] + cost [P: x2] + 3 * cgeq.
 hint simplify cost_eqtuple3g.
-
-op cfeq : int.
-axiom ge0_cfeq : 0 <= cfeq.
-
-schema cost_feq `{P} {x y : t} : cost [P: x = y] = cost[P:x] + cost[P:y] + cfeq.
-hint simplify cost_feq.
-
-op cfdiv : int.
-axiom ge0_cfdiv : 0 <= cfdiv.
-
-schema cost_fdiv `{P} {x y: t} : cost [P:x / y] = cost[P:x] + cost[P:y] + cfdiv.
-
-op cfsub : int.
-axiom ge0_cfsub : 0 <= cfsub.
-
-schema cost_fsub `{P} {x y: t} : cost [P:x - y] = cost[P:x] + cost[P:y] + cfsub.
-
-hint simplify cost_fdiv, cost_fsub.
 
 section Security_Aux.
 
@@ -1277,10 +1239,10 @@ import StdRing.RField.
     proc; inline *; auto.
     call(:size B_TCR.log - cA.`qD_choose <= k; time
          [(B_TCRl(A).O.dec k : [15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher])]).
-    + move=> k hk; proc; auto => /> &hr *; smt (ge0_cH ge0_cg ge0_cf ge0_cfeq).
+    + move=> k hk; proc; auto => /> &hr *; smt (ge0_cH ge0_cg ge0_cf).
     wp; call(:size B_TCR.log <= k; time
          [(B_TCRl(A).O.dec k : [15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher])]).
-    + move=> k hk; proc; auto => /> &hr *; smt (ge0_cH ge0_cg ge0_cf ge0_cfeq).
+    + move=> k hk; proc; auto => /> &hr *; smt (ge0_cH ge0_cg ge0_cf).
     auto => />.
     rewrite dt_r_ll FDistr.dt_ll dk_ll /=; split; 1:smt (dt_r_ll).
     rewrite !bigi_constz; smt (ge0_cA).
@@ -1459,10 +1421,10 @@ section Security.
       proc.
       call(:true ; time
          [(B_TCR(A).O.dec k : [14 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher])]).
-      + move=> k hk; proc; auto => />; smt (ge0_cH ge0_cg ge0_cf ge0_cfeq).
+      + move=> k hk; proc; auto => />; smt (ge0_cH ge0_cg ge0_cf).
       wp; call(:true; time
          [(B_TCR(A).O.dec k : [14 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher])]).
-      + move=> k hk; proc; auto => /> ; smt (ge0_cH ge0_cg ge0_cf ge0_cfeq).
+      + move=> k hk; proc; auto => /> ; smt (ge0_cH ge0_cg ge0_cf).
       by auto => />; rewrite FDistr.dt_ll /= !bigi_constz /=; smt (ge0_cA).      
     by apply (conclusion &m).
   qed.
