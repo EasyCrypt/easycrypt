@@ -311,24 +311,22 @@ lemma CCAl_cbound : choare [CCAl(S,A).main : true ==> size CCA.log <= qD] time
                             A.choose : 1; A.guess  : 1].
 proof.
   proc.
-  call (:true; 
-         (CCAl(S,A).O.dec : size CCA.log - cA.`qD_choose) 
+  call (: size CCA.log - cA.`qD_choose <= k; 
            time
-           [(CCAl(S,A).O.dec : [fun _ => 3 + ceqocipher; S.dec: fun _ => 1])]).
+           [(CCAl(S,A).O.dec k : [3 + ceqocipher; S.dec: 1])]).
   + move=> zdec hzdec; proc.
     if. 
-    + by call (:true; time []); auto => &hr /> * /#.
+    + by call (:true); auto => &hr /> * /#.
     by auto => &hr />; smt(ge0_cS).
-  wp; call (:true; time []); rnd.
-  call (:true; 
-         (CCAl(S,A).O.dec : size CCA.log) 
+  wp; call (:true); rnd.
+  call (:size CCA.log <= k; 
            time
-           [(CCAl(S,A).O.dec : [fun _ => 3 + ceqocipher; S.dec: fun _ => 1])]).
+           [(CCAl(S,A).O.dec k : [3 + ceqocipher; S.dec: 1])]).
   + move=> zdec hzdec; proc.
     if. 
-    + by call (:true; time []); auto => &hr /> * /#.
+    + by call (:true); auto => &hr /> * /#.
     by auto => &hr />; smt(ge0_cS).
-  call(:true; time[]); auto => />. rewrite dbool_ll /=; split. smt().
+  call(:true); auto => />. rewrite dbool_ll /=; split. smt().
   by rewrite !bigi_constz; smt(ge0_cA).
 qed.
 
@@ -373,4 +371,9 @@ proof.
   + by sim.
   by symmetry; conseq CCAq_CCAl.
 qed.
+
+end section.
+
+end CCA_q.
+
 

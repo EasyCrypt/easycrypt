@@ -38,3 +38,8 @@ proof. move=> Hij;apply /drange_ll => /#. qed.
 lemma dinter_uni (i j : int): is_uniform (dinter i j).
 proof. apply drange_uni. qed.
 
+op cdinterval : int -> int.
+axiom ge0_cdinterval m : 0 <= cdinterval m.
+
+schema cost_dinterval {i j : int} (k:int) : cost [ i <= j <= k - i : dinter i (j - 1)] = cost [true : i] + cost [true : j] + cdinterval k.
+hint simplify cost_dinterval.

@@ -524,14 +524,12 @@ type pipattern =
 
 and pspattern = unit
 
-type poracles_cost = (pgamepath * pcost) list
+type poracles_cost = (pgamepath * psymbol option * pcost) list
 
 (* For cost judgement with abstract calls.
    ci_oracles : list of pairs of oracles and their costs.
    ci_vrnts   : list of pairs of oracles and their increasing quantity. *)
-type p_abs_inv_inf =
-  { ci_oracles : poracles_cost;
-    ci_vrnts   : (pgamepath * pformula) list; }
+type p_abs_inv_inf = poracles_cost
 
 type p_call_inv_info = [` Std of pcost | `CostAbs of p_abs_inv_inf ]
 

@@ -1056,7 +1056,7 @@ let cost_map f_map c =
     ) c.c_calls
     (cost_r (f_map c.c_self) EcPath.Mx.empty)
 
-let cost_app c args = cost_map (fun c -> f_app c args tint) c
+let cost_app c args = cost_map (fun c -> f_app_simpl c args tint) c
 
 let cost_flatten cost =
   EcPath.Mx.fold (fun _ cb cflat ->

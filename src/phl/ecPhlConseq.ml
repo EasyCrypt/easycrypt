@@ -759,6 +759,14 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
              (t_apply_r nf1)))
         tc
 
+  (* cHoareF / cHoareF / ⊥ / ⊥                                        *)
+  | FcHoareF _, Some ((_, {f_node = FcHoareF chs}) as nf1), None, None ->
+    let tac = if notmod then t_cHoareF_conseq_nm else t_cHoareF_conseq in
+    t_on1seq (-1)
+      (t_cHoareF_conseq_c chs.chf_co)
+      (t_on1seq 2 (tac chs.chf_pr chs.chf_po) (t_apply_r nf1))
+      tc
+
   (* ------------------------------------------------------------------ *)
   (* bdhoareS / cHoareS / ⊥ / ⊥                                         *)
   | FbdHoareS _, Some (_, { f_node = FcHoareS chs} as nf1), None, None ->

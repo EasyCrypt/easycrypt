@@ -171,26 +171,47 @@ let t_fun_def_r tc =
 let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 
 (* -------------------------------------------------------------------- *)
-type abs_inv_inf = (xpath * form) list * (xpath * cost) list
+type abs_inv_inf = (xpath * ptybinding * cost) list
 
 let process_p_abs_inv_inf tc hyps p_abs_inv_inf =
+  let open EcLocation in
+  let open EcParsetree in
+  let l = ref [] in
+  let check_uniq (_,x,_) =
+    match x with
+    | None -> ()
+    | Some y ->
+      let s = EcLocation.unloc y in
+      if List.mem s !l then
+        tc_error !!tc ~catchable:false ~loc:(loc y)
+          "duplicate name %s" s
+      else l := s :: !l in
+  List.iter check_uniq p_abs_inv_inf;
+
   let env = LDecl.toenv hyps in
-  let xv = List.map (fun (f,v) ->
-      EcTyping.trans_gamepath env f,
-      TTC.pf_process_form !!tc hyps tint v
-    ) p_abs_inv_inf.ci_vrnts
 
-  and xc = List.map (fun (f,c) ->
-      EcTyping.trans_gamepath env f,
-      TTC.pf_process_cost !!tc hyps (tfun tint tint) c
-    ) p_abs_inv_inf.ci_oracles in
+  let doit (f, x, (PC_costs(ci,co))) =
+    let lo =
+      match x with
+      | Some y -> loc y
+      | None   -> loc f in
+    let x = mk_loc lo x in
+    let f = EcTyping.trans_gamepath env f in
+    let bd = [x], mk_loc lo PTunivar in
+    let doc c =
+      let loc = loc c in
+      mk_loc loc (PFlambda([bd], c)) in
+    let ci = doc ci in
+    let doco (m,f,c) = (m,f,doc c) in
+    let co = List.map doco co in
+    let c = TTC.pf_process_cost !!tc hyps (tfun tint tint) (PC_costs(ci,co)) in
+    f, bd, c in
 
-  (xv, xc)
-
+  List.map doit p_abs_inv_inf
 
 type inv_inf =  [
   | `Std     of cost
-  | `CostAbs of (xpath * form) list * (xpath * cost) list
+  | `CostAbs of abs_inv_inf
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -205,16 +226,13 @@ module FunAbsLow = struct
     (inv, inv, sg)
 
   (* ------------------------------------------------------------------ *)
-  let choareF_abs_spec pf_ env f inv (xv, xc : abs_inv_inf) =
+  let choareF_abs_spec pf_ env f inv (xc : abs_inv_inf) =
     let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
     let ppe = EcPrinting.PPEnv.ofenv env in
 
-    (* We check that the invariant and variants variables cannot be modified
-       by the adversary. *)
+    (* We check that the invariant cannot be modified by the adversary. *)
     let fv_inv   = PV.fv env mhr inv in
-    let fv_vrnts = List.map (fun (_,v) -> PV.fv      env mhr v) xv in
     PV.check_depend env fv_inv top;
-    List.iter (fun fv -> PV.check_depend env fv top) fv_vrnts;
 
     (* TODO: (Adrien) why are we checking this for bdhoareF_abs_spec, and is
        it needed here?*)
@@ -233,6 +251,12 @@ module FunAbsLow = struct
         tc_error pf_ "%a is unbounded" (EcPrinting.pp_funname ppe) f
       | `Bounded (self,costs) -> self, costs in
 
+    let bds, _ = decompose_lambda inv in
+    assert (List.length bds = List.length xc);
+    let mks =
+      List.fold_left2 (fun mks (k,_) (f, _, _) ->
+          Mx.add f k mks) Mx.empty bds xc in
+
     (* If [f] can call [o] at most zero times, we remove it. *)
     let ois = OI.allowed oi
               |> List.filter (fun o ->
@@ -240,89 +264,60 @@ module FunAbsLow = struct
                     (Mx.find_opt o oi_costs)
                     (Some f_i0)) in
 
+
+    let kargs_pr = List.map (fun (x,_) -> f_local x tint) bds in
+    let pr = f_app_simpl inv kargs_pr tbool in
+
     let ospec o_called =
-      let k_called = ref None in
-      (* forall ks. call_bounds =>
-         hoare [{ inv /\ pre_eqs } o_called {inv /\ post_eqs }] *)
-      let ks, call_bounds, pre_eqs, post_eqs =
-        List.fold_left (fun (ks, call_bounds, pre_eqs, post_eqs) o ->
-            let k_id = EcIdent.create ("z" ^ EcPath.xbasename o) in
-            let k = f_local k_id tint in
-
-            if x_equal o o_called then k_called := Some k;
-
+      let k_called = Mx.find o_called mks in
+      let kargs_po =
+        List.map (fun (x,_) ->
+            let f = f_local x tint in
+            if EcIdent.id_equal x k_called then f_int_add f f_i1
+            else f) bds in
+      let po = f_app_simpl inv kargs_po tbool in
+      let call_bounds =
+        List.map2 (fun (o,_,_) (x,_) ->
+            let f = f_local x tint in
+            let ge0 = f_int_le f_i0 f in
             let cbd = cost_orcl oi o in
-            let call_bound =
-              if x_equal o o_called
-              then f_and (f_int_le f_i0 k) (f_int_lt k cbd)
-              else f_and (f_int_le f_i0 k) (f_int_le k cbd) in
-
-            match List.find_opt (fun (x,_) -> x_equal x o) xv with
-            | None ->
-              if x_equal o o_called
-              then k_id :: ks, call_bound :: call_bounds, pre_eqs, post_eqs
-              else         ks,               call_bounds, pre_eqs, post_eqs
-            | Some (_,vrnt) ->
-              let pre_eq  =
-                f_int_le vrnt k
-              and post_eq =
-                if x_equal o o_called
-                then f_int_le vrnt (f_int_add k f_i1)
-                else f_int_le vrnt k in
-
-              k_id :: ks,
-              call_bound :: call_bounds,
-              pre_eq :: pre_eqs,
-              post_eq :: post_eqs
-          ) ([],[],[],[]) ois in
-
-      let ks = List.map (fun k_id -> (k_id,GTty tint)) ks in
-      let call_bounds, pre_eqs, post_eqs = f_ands0_simpl call_bounds,
-                                           f_ands0_simpl pre_eqs,
-                                           f_ands0_simpl post_eqs in
-
-      let pre_inv  = f_and_simpl pre_eqs inv
-      and post_inv = f_and_simpl post_eqs inv in
+            let max =
+              if EcIdent.id_equal x k_called then f_int_lt f cbd
+              else f_int_le f cbd in
+            f_anda ge0 max) xc bds in
+      let call_bounds = f_ands0_simpl call_bounds in
 
       (* We now compute the cost of the call to [o_called]. *)
-      let cost = List.find_opt (fun (x,_) -> x_equal x o_called) xc in
+      let cost = List.find_opt (fun (x,_,_) -> x_equal x o_called) xc in
       let cost = match cost with
         | None ->
           tc_error pf_ "no cost has been supplied for %a"
             (EcPrinting.pp_funname ppe) o_called
-        | Some (_,cost) -> cost in
-      let k_cost = cost_app cost [oget !k_called] in
+        | Some (_,_,cost) -> cost in
+      let k_cost = cost_app cost [f_local k_called tint] in
 
-      let form = f_cHoareF pre_inv o_called post_inv k_cost in
-      f_forall_simpl ks (f_imp_simpl call_bounds form) in
+      let form = f_cHoareF pr o_called po k_cost in
+      f_forall_simpl bds (f_imp_simpl call_bounds form) in
 
     (* We have the conditions for the oracles. *)
     let sg = List.map ospec ois in
 
     (* Finally, we compute the conclusion. *)
-    let eqs =
-      List.map (fun o ->
-          let o_vrnt = List.find_opt (fun (x,_) -> x_equal x o) xv in
-          let pre_eq = match o_vrnt with
-            | None          -> f_true
-            | Some (_,vrnt) -> f_int_le vrnt f_i0 in
-
-
-          let cbd = cost_orcl oi o in
-          let post_eq = match o_vrnt with
-            | None          ->
-              f_true
-            | Some (_,vrnt) -> f_int_le vrnt cbd  in
-
-          pre_eq, post_eq) ois in
-
-    (* hoare [{ inv /\ pre_eqs } f {inv /\ post_eqs }] *)
-    let pre_eqs, post_eqs = List.split eqs in
-    let pre_eqs, post_eqs = f_ands0_simpl pre_eqs,
-                            f_ands0_simpl post_eqs in
-
-    let pre_inv  = f_and_simpl pre_eqs inv
-    and post_inv = f_and_simpl post_eqs inv in
+    (* choare [{ inv 0 } f {exists ks, 0 <= ks <= cbd /\ inv ks }]
+              time sum_cost] *)
+    let pre_inv =
+      let ks0 = List.map (fun _ -> f_i0) bds in
+      f_app_simpl inv ks0 tbool in
+    let post_inv =
+      let call_bounds =
+        List.map2 (fun (o,_,_) (x,_) ->
+            let f = f_local x tint in
+            let ge0 = f_int_le f_i0 f in
+            let cbd = cost_orcl oi o in
+            let max = f_int_le f cbd in
+            f_anda ge0 max) xc bds in
+      let call_bounds = f_ands0_simpl call_bounds in
+      f_exists bds (f_and call_bounds pr) in
 
     let fn_orcl = EcPath.xpath top f.x_sub in
     let f_cb = { cb_cost   = oi_self;
@@ -332,7 +327,7 @@ module FunAbsLow = struct
     let orcls_cost = List.map (fun o ->
         let cbd = cost_orcl oi o in
         (* Cost of a call to [o]. *)
-        let o_cost = snd @@ List.find (fun (x,_) -> x_equal x o) xc in
+        let (_,_,o_cost) = List.find (fun (x,_, _) -> x_equal x o) xc in
 
         (* Upper-bound on the costs of [o]'s calls. *)
         EcPhlWhile.ICHOARE.choare_sum o_cost (f_i0, cbd)
@@ -684,7 +679,7 @@ let proj_std a = match a with
   | _ -> assert false
 
 let proj_costabs a = match a with
-  | None -> ([],[])
+  | None -> ([])
   | Some (`CostAbs b) -> b
   | _ -> assert false
 
@@ -760,6 +755,18 @@ let ensure_none tc = function
   | Some _ ->
     tc_error !!tc "this is not a choare judgement"
 
+let process_inv_pabs_inv_finfo tc inv p_abs_inv_inf =
+  let hyps = FApi.tc1_hyps tc in
+  let env' = LDecl.inv_memenv1 hyps in
+  let abs_inv_info = process_p_abs_inv_inf tc env' p_abs_inv_inf in
+  let bds = List.map (fun (_,bd,_) -> bd) abs_inv_info in
+  let inv =
+    EcLocation.mk_loc (EcLocation.loc inv) (EcParsetree.PFlambda(bds, inv)) in
+  let tints = List.map (fun _ -> tint) bds in
+  let tinv  = toarrow tints tbool in
+  let inv  = TTC.pf_process_form !!tc env' tinv inv in
+  inv, abs_inv_info
+
 let process_fun_abs inv p_abs_inv_inf tc =
   let t_hoare tc =
     ensure_none tc p_abs_inv_inf;
@@ -772,10 +779,8 @@ let process_fun_abs inv p_abs_inv_inf tc =
     if p_abs_inv_inf = None then
       tc_error !!tc "for calls to abstract procedures in choare judgements, \
                      additional information must be provided";
-    let hyps = FApi.tc1_hyps tc in
-    let env' = LDecl.inv_memenv1 hyps in
-    let inv  = TTC.pf_process_form !!tc env' tbool inv in
-    let abs_inv_info = process_p_abs_inv_inf tc env' (oget p_abs_inv_inf) in
+    let inv, abs_inv_info =
+      process_inv_pabs_inv_finfo tc inv (oget p_abs_inv_inf) in
     t_choareF_abs inv abs_inv_info tc
 
   and t_bdhoare tc =

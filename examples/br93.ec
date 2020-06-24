@@ -403,16 +403,14 @@ proof.
   + proc.
     seq 5 : (size Hash.qs <= cA.`ochoose + cA.`oguess) time [(4 + cf + ceqrand) * (cA.`ochoose + cA.`oguess) + 2].
     + wp.
-      call (_: bounded RO.m (size Hash.qs);
-           (Hash.o : size Hash.qs- cA.`ochoose) 
+      call (_: size Hash.qs- cA.`ochoose <= k /\ bounded RO.m (size Hash.qs);
            time
-           [(Hash.o : [fun _ => 3 + cdptxt + cget qH + cset qH + cin qH])]).
+           [(Hash.o k : [3 + cdptxt + cget qH + cset qH + cin qH])]).
       + move=> zo hzo; proc; inline *.
         wp := (bounded RO.m qH).
         by auto => &hr />; rewrite dptxt_ll /=; smt (cset_pos bounded_set).
-      auto; call (_: bounded RO.m (size Hash.qs);
-           (Hash.o : size Hash.qs)
-           time [(Hash.o : [fun _ => 3 + cdptxt + cget qH + cset qH + cin qH])]).
+      auto; call (_: size Hash.qs = k /\ bounded RO.m (size Hash.qs);
+           time [(Hash.o k : [3 + cdptxt + cget qH + cset qH + cin qH])]).
       + move=> zo hzo; proc; inline *.
         wp := (bounded RO.m qH).
         by auto => &hr />; rewrite dptxt_ll /=; smt(cset_pos bounded_set).

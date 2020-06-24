@@ -428,7 +428,7 @@ let process_call side info tc =
       let (_,f,_) = fst (tc1_last_call tc chs.chs_s) in
       let penv = LDecl.inv_memenv1 hyps in
       (penv, fun inv inv_info ->
-          let inv_info = odfl (`CostAbs ([],[])) inv_info in
+          let inv_info = odfl (`CostAbs []) inv_info in
           match inv_info with
           | `Std c ->
             let env = FApi.tc1_env tc in
@@ -496,13 +496,17 @@ let process_call side info tc =
 
   let subtactic = ref t_id in
 
-  let process_inv_inf tc hyps inv_inf = match inv_inf with
-    | None -> None
+  let process_inv_inf tc hyps inv inv_inf = match inv_inf with
+    | None ->
+      let inv = TTC.pf_process_form !!tc hyps tbool inv in
+      inv, None
     | Some (`Std c) ->
-      Some (`Std (TTC.pf_process_cost !!tc hyps tint c))
+      let inv = TTC.pf_process_form !!tc hyps tbool inv in
+      inv, Some (`Std (TTC.pf_process_cost !!tc hyps tint c))
     | Some (`CostAbs aii) ->
-      let abs_inv_inf = EcPhlFun.process_p_abs_inv_inf tc hyps aii in
-      Some (`CostAbs abs_inv_inf) in
+      let inv, abs_inv_inf =
+        EcPhlFun.process_inv_pabs_inv_finfo tc inv aii in
+      inv, Some (`CostAbs abs_inv_inf) in
 
   let process_cut tc info =
     match info with
@@ -514,8 +518,7 @@ let process_call side info tc =
 
     | CI_inv (inv, inv_inf) ->
       let env, fmake = process_inv tc side in
-      let inv = TTC.pf_process_form !!tc env tbool inv in
-      let inv_inf = process_inv_inf tc env inv_inf in
+      let inv, inv_inf = process_inv_inf tc env inv inv_inf in
       subtactic := (fun tc ->
           (* TODO: (Adrien) What does this subtactic do? It needs to be
              modified, since I create more premises for choare judgement.

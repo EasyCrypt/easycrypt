@@ -2640,15 +2640,10 @@ conseq_xt:
 | UNDERSCORE COLON TIME co=costs(none)         { (None, None), Some (CQI_c co) }
 
 ci_cost_el:
-| LPAREN o=loc(fident) COLON co=costs(none) RPAREN   {o,co}
-
-ci_vrnt_el:
-| LPAREN o=loc(fident) COLON f=form RPAREN           {o,f}
+| LPAREN o=loc(fident) x=ident? COLON co=costs(none) RPAREN   {o, x, co}
 
 abs_call_info:
-| xv=rlist0(ci_vrnt_el, COMMA) TIME LBRACKET xc=rlist0(ci_cost_el, COMMA) RBRACKET
-                                     { { ci_oracles = xc;
-					 ci_vrnts   = xv; } }
+| TIME LBRACKET xc=rlist0(ci_cost_el, COMMA) RBRACKET { xc }
 
 call_info:
 | f1=form LONGARROW f2=form          { CI_spec (f1, f2, None) }
