@@ -99,4 +99,12 @@ proof.
 elim: s => [|x s ih] //=.
 by rewrite !(big_cons, BIA.big_cons) ih /=; case: (P x).
 qed.
+
+lemma nosmt big_const_Nx (P : 'a -> bool) x s:
+  big P (fun _ => N x) s = (count P s) ** N x.
+proof. by rewrite big_morph_N /= big_constz mulrC. qed.
+
+lemma nosmt big_constx (P : 'a -> bool) x s: x <> Inf =>
+  big P (fun _ => x) s = (count P s) ** x.
+proof. by case: x => //= x; apply: big_const_Nx. qed.
 end Bigxint.
