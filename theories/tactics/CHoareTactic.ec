@@ -78,8 +78,18 @@ proof. by case: x y => [x|] [y|] //=; apply: ler_anti. qed.
 lemma lex_trans : transitive (<=).
 proof. by case=> [x|] [y|] [z|] //=; apply: ler_trans. qed.
 
-lemma lexInf (x : xint) : x <= Inf.
+lemma lex_inf (x : xint) : x <= Inf.
 proof. by case: x. qed.
+
+lemma lex_add2r (x1 x2 y : xint) :
+  x1 <= x2 => x1 + y <= x2 + y.
+proof.
+by case: x1 x2 y => [x1|] [x2|] [y|] //=; apply: ler_add2r.
+qed.
+
+lemma lex_add2l (x1 x2 y : xint) :
+  x1 <= x2 => y + x1 <= y + x2.
+proof. by rewrite !(@addxC y) &(lex_add2r). qed.
 
 (* -------------------------------------------------------------------- *)
 theory Bigxint.
