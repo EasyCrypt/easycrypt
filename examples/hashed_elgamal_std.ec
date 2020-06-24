@@ -228,10 +228,11 @@ proof.
   + conseq (_ : true ==> true : time [kg]).
     by proc true : time[].
   + proc; call (:true; time []); rnd; call(:true; time []); do 2!rnd; skip => />.
-    rewrite dt_ll dbool_ll /=. smt (ge0_cgpow ge0_cxor ge0_cdbool ge0_cdt).
+    rewrite dt_ll dbool_ll /=. smt (ge0_cg ge0_cxor ge0_cdbool ge0_cdt).
   proc; call (:true; time []); wp; rnd; call(:true; time []); rnd; skip => />.
   rewrite dhkey_ll dbool_ll /=. smt (ge0_cxor ge0_cdbool ge0_chash ge0_cdhkey).
 qed.
 
+print ge0_cdt.
 end Complexity.
 
