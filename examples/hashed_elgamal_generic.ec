@@ -1,4 +1,4 @@
-require import AllCore FSet List SmtMap.
+require import AllCore FSet List SmtMap CHoareTactic.
 require (*--*) BitWord Distr DInterval.
 (*---*) import StdOrder.RealOrder StdRing.RField StdBigop.Bigint BIA.
 require (*--*) DiffieHellman ROM PKE_CPA.
@@ -111,8 +111,8 @@ module S = Hashed_ElGamal(H).
 
 section.
 
-  declare module A: Adversary [choose : `{cA.`cchoose, #O.o : cA.`ochoose},
-                               guess  : `{cA.`cguess,  #O.o : cA.`oguess}] {-H}.
+  declare module A: Adversary [choose : `{N cA.`cchoose, #O.o : cA.`ochoose},
+                               guess  : `{N cA.`cguess,  #O.o : cA.`oguess}] {-H}.
 
   axiom guess_ll (O <: ARO {-A}) : islossless O.o => islossless A(O).guess.
 
@@ -184,20 +184,20 @@ section.
 
   local lemma cost_ALCDH : 
     choare [ALCDH.solve : true ==> 0 < size res <= cA.`ochoose + cA.`oguess] 
-    time [6 + cunifin + (3 + cunifin + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose].
+    time [N (6 + cunifin + (3 + cunifin + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose)].
   proof.
     proc; wp.
     call (_: size H.qs- cA.`ochoose <= k /\ bounded RO.m (size H.qs);
            time
-           [(H.o k : [3 + cunifin + cget qH + cset qH + cin qH])]).
+           [(H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)])]).
     + move=> zo hzo; proc; inline *.
       wp := (bounded RO.m qH).
-      by auto => &hr />; rewrite dbits_ll /=; smt (cset_pos bounded_set).
-    auto; call (_: size H.qs = k /\ bounded RO.m (size H.qs);
-           time [(H.o k : [3 + cunifin + cget qH + cset qH + cin qH])]).
+      by rnd; auto => &hr />; rewrite dbits_ll /=; smt (cset_pos bounded_set).
+    wp; rnd; call (_: size H.qs = k /\ bounded RO.m (size H.qs);
+           time [(H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)])]).
     + move=> zo hzo; proc; inline *.
       wp := (bounded RO.m qH).
-      auto => &hr />; rewrite dbits_ll /=; smt(cset_pos bounded_set cA_pos).
+      rnd;auto => &hr />; rewrite dbits_ll /=; smt(cset_pos bounded_set cA_pos).
     inline *; auto => />.
     split => *.
     + smt (bounded_empty dbits_ll size_ge0 size_eq0 cA_pos).
@@ -221,9 +221,9 @@ section.
 
   lemma ex_reduction &m : 
     exists (B<:CDH.Adversary 
-      [solve : `{ C1.cduniform_n + 
+      [solve : `{ N(C1.cduniform_n + 
                   6 + cunifin + 
-                  (3 + cunifin + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose}]
+                  (3 + cunifin + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose)}]
                {+A, +H}),
     Pr[CPA(S,A(RO)).main() @ &m: res] - 1%r/2%r <= 
     qH%r * Pr[CDH.CDH(B).main() @ &m: res].
@@ -237,5 +237,3 @@ section.
 end section.
 
 print ex_reduction.
-
-

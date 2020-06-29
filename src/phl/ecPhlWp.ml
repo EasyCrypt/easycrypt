@@ -20,8 +20,8 @@ module LowInternal = struct
   exception No_wp
 
   let cost_of_expr_w_pre menv e c_pre = match c_pre with
-    | None -> cost_of_expr_any menv e
-    | Some pre -> cost_of_expr pre menv e
+    | None -> EcCHoare.cost_of_expr_any menv e
+    | Some pre -> EcCHoare.cost_of_expr pre menv e
 
   let wp_asgn_aux c_pre memenv lv e (lets, f) =
     let m = EcMemory.memory memenv in
@@ -36,7 +36,7 @@ module LowInternal = struct
         try
           let letsf, i_cost = wp_instr onesided c_pre env memenv i letsf in
           wp_stmt
-            onesided c_pre env memenv stmt' letsf (f_int_add_simpl cost i_cost)
+            onesided c_pre env memenv stmt' letsf (EcCHoare.f_xadd cost i_cost)
         with No_wp -> (stmt, letsf), cost
 
   and wp_instr onesided c_pre env memenv i letsf =
@@ -46,17 +46,17 @@ module LowInternal = struct
 
     | Sif (e,s1,s2) ->
         let (r1,letsf1),cost_1 =
-          wp_stmt onesided c_pre env memenv (List.rev s1.s_node) letsf f_i0 in
+          wp_stmt onesided c_pre env memenv (List.rev s1.s_node) letsf EcCHoare.f_x0 in
         let (r2,letsf2),cost_2 =
-          wp_stmt onesided c_pre env memenv (List.rev s2.s_node) letsf f_i0 in
+          wp_stmt onesided c_pre env memenv (List.rev s2.s_node) letsf EcCHoare.f_x0 in
         if List.is_empty r1 && List.is_empty r2 then begin
           let post1 = mk_let_of_lv_substs env letsf1 in
           let post2 = mk_let_of_lv_substs env letsf2 in
           let m = EcMemory.memory memenv in
           let post  = f_if (form_of_expr m e) post1 post2 in
           ([], post),
-          f_int_add_simpl
-            (EcPhlWhile.ICHOARE.choare_max cost_1 cost_2)
+          EcCHoare.f_xadd
+            (EcCHoare.f_xmax cost_1 cost_2)
             (cost_of_expr_w_pre memenv e c_pre)
         end else raise No_wp
 
@@ -90,7 +90,7 @@ let wp ?(uselet=true) ?(onesided=false) ?c_pre env m s post =
   let (r,letsf), cost =
     LowInternal.wp_stmt
       onesided c_pre env m (List.rev s.s_node)
-      ([],post) f_i0
+      ([],post) EcCHoare.f_x0
   in
   let pre = mk_let_of_lv_substs ~uselet env letsf in
   List.rev r, pre, cost
@@ -115,9 +115,7 @@ module TacInternal = struct
 
   let t_choare_wp ?(uselet=true) i c_pre tc =
     let env = FApi.tc1_env tc in
-    if not (EcPhlWhile.ICHOARE.loaded env) then
-      tacuerror "wp: load the `CHoareTactic' theory first";
-
+    EcCHoare.check_loaded env;
     let chs = tc1_as_choareS tc in
 
     let (s_hd, s_wp) = o_split i chs.chs_s in
@@ -127,11 +125,11 @@ module TacInternal = struct
       wp ~uselet ~onesided:true ?c_pre env chs.chs_m s_wp chs.chs_po in
     check_wp_progress tc i chs.chs_s s_wp;
     let s = EcModules.stmt (s_hd @ s_wp) in
-    let cost = cost_sub_self chs.chs_co cost_wp in
+    let cond, cost = EcCHoare.cost_sub_self chs.chs_co cost_wp in
     let concl = f_cHoareS_r { chs with chs_s = s;
                                        chs_po = post;
                                        chs_co = cost } in
-    FApi.xmutate1 tc `Wp [concl]
+    FApi.xmutate1 tc `Wp [cond; concl]
 
   let t_bdhoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
@@ -200,4 +198,8 @@ let process_wp k cost_pre tc =
   let cost_pre  = match cost_pre with
     | Some pre -> Some (EcProofTyping.tc1_process_Xhl_formula tc pre)
     | None -> None in
-  t_wp ?cost_pre k tc
+  let t_after =
+    match (FApi.tc1_goal tc).f_node with
+    | FcHoareS _ -> [EcLowGoal.t_logic_trivial; EcLowGoal.t_id]
+    | _          -> [ EcLowGoal.t_id] in
+  FApi.t_seqsub (t_wp ?cost_pre k) t_after tc

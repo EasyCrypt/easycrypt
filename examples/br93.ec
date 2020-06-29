@@ -1,7 +1,7 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List FSet SmtMap.
-require import Distr DBool.
-require (*--*) BitWord OW ROM PKE_CPA CHoareTactic.
+require import Distr DBool CHoareTactic.
+require (*--*) BitWord OW ROM PKE_CPA.
 (*---*) import StdBigop.Bigint BIA.
 (* ---------------- Sane Default Behaviours --------------------------- *)
 pragma -oldip.
@@ -41,7 +41,7 @@ hint exact random : dptxt_ll dptxt_fu dptxt_funi.
 
 (* Complexity of sampling in dptxt *)
 op cdptxt : int.
-schema cost_dptxt `{P} : cost [P: dptxt] = cdptxt.
+schema cost_dptxt `{P} : cost [P: dptxt] = N cdptxt.
 hint simplify cost_dptxt.
 
 (* A set `rand` of nonces, equipped with                                *)
@@ -55,10 +55,10 @@ hint exact random : drand_ll drand_uni.
 
 (* Complexity of testing equality on rand *)
 op ceqrand : int.
-schema cost_eqrand `{P} {r1 r2:rand} : cost[P: r1 = r2] = cost[P:r1] + cost[P:r2] + ceqrand.
+schema cost_eqrand `{P} {r1 r2:rand} : cost[P: r1 = r2] = cost[P:r1] + cost[P:r2] + N ceqrand.
 hint simplify cost_eqrand.
 
-schema cost_witness_rand `{P} : cost [P: witness<:rand>] = 0. 
+schema cost_witness_rand `{P} : cost [P: witness<:rand>] = '0. 
 hint simplify cost_witness_rand.
 
 
@@ -86,7 +86,7 @@ proof. by move=> [sk] + fx_eq_fy - /fK ^ /(_ x) <- /(_ y) <-; congr. qed.
 
 (* Complexity of f *)
 op cf : int.
-schema cost_f `{P} {pk:pkey, r:rand} : cost [P: f pk r] = cost[P:pk] + cost[P:r] + cf.
+schema cost_f `{P} {pk:pkey, r:rand} : cost [P: f pk r] = cost[P:pk] + cost[P:r] + N cf.
 hint simplify cost_f.
 
 (* A random oracle from `rand` to `ptxt`, modelling a hash function H;  *)
@@ -385,8 +385,8 @@ module Ifind(A:Adv) = {
   }
 }.
 
-lemma ex_Reduction (cA:adv_cost) (A<:Adv [choose : `{cA.`cchoose, #ARO.o : cA.`ochoose},
-                                          guess  : `{cA.`cguess,  #ARO.o : cA.`oguess}] {-Hash}) &m:
+lemma ex_Reduction (cA:adv_cost) (A<:Adv [choose : `{N cA.`cchoose, #ARO.o : cA.`ochoose},
+                                          guess  : `{N cA.`cguess,  #ARO.o : cA.`oguess}] {-Hash}) &m:
   (0 <= cA.`cchoose /\ 0 <= cA.`ochoose /\ 0 <= cA.`cguess /\ 0 <= cA.`oguess) =>
   (forall (O <: ARO{-A}), islossless O.o => islossless A(O).guess) =>
   let qH = cA.`ochoose + cA.`oguess in
@@ -394,32 +394,33 @@ lemma ex_Reduction (cA:adv_cost) (A<:Adv [choose : `{cA.`cchoose, #ARO.o : cA.`o
     4 + (4 + cf + ceqrand) * (cA.`ochoose + cA.`oguess) + cdptxt + 
     (3 + cdptxt + cget qH + cset qH + cin qH) * (cA.`ochoose + cA.`oguess) +
     cA.`cguess + cA.`cchoose in
-  exists (B <: Inverter [invert : `{cB} ]),
+  exists (B <: Inverter [invert : `{N cB} ]),
     Pr[CPA(BR93(Hash), A(Hash)).main() @ &m : res] - 1%r/2%r <= Pr[OW(B).main() @ &m: res].  
 proof.
   move=> cA_pos A_choose_ll qH.
   exists (Ifind(A)); split.  
   (* Proof of the complexity *)
   + proc.
-    seq 5 : (size Hash.qs <= cA.`ochoose + cA.`oguess) time [(4 + cf + ceqrand) * (cA.`ochoose + cA.`oguess) + 2].
+    seq 5 : (size Hash.qs <= cA.`ochoose + cA.`oguess) time [N((4 + cf + ceqrand) * (cA.`ochoose + cA.`oguess) + 2)] => //.
     + wp.
       call (_: size Hash.qs- cA.`ochoose <= k /\ bounded RO.m (size Hash.qs);
            time
-           [(Hash.o k : [3 + cdptxt + cget qH + cset qH + cin qH])]).
+           [(Hash.o k : [N(3 + cdptxt + cget qH + cset qH + cin qH)])]).
       + move=> zo hzo; proc; inline *.
         wp := (bounded RO.m qH).
-        by auto => &hr />; rewrite dptxt_ll /=; smt (cset_pos bounded_set).
-      auto; call (_: size Hash.qs = k /\ bounded RO.m (size Hash.qs);
-           time [(Hash.o k : [3 + cdptxt + cget qH + cset qH + cin qH])]).
+        rnd; auto => &hr />; rewrite dptxt_ll /=; smt (cset_pos bounded_set).
+      rnd; call (_: size Hash.qs = k /\ bounded RO.m (size Hash.qs);
+           time [(Hash.o k : [N(3 + cdptxt + cget qH + cset qH + cin qH)])]).
       + move=> zo hzo; proc; inline *.
         wp := (bounded RO.m qH).
-        by auto => &hr />; rewrite dptxt_ll /=; smt(cset_pos bounded_set).
+        by rnd;auto => &hr />; rewrite dptxt_ll /=; smt(cset_pos bounded_set).
       inline *; auto => />; split => *.
       + smt (bounded_empty dptxt_ll size_ge0 size_eq0).
       rewrite !bigi_constz /= /#.
-    while (true) (size Hash.qs) (cA.`ochoose + cA.`oguess) time [fun _ => 2 + cf + ceqrand].
+    while (true) (size Hash.qs) (cA.`ochoose + cA.`oguess) time [fun _ => N(2 + cf + ceqrand)].
     + move => z /=; auto => &hr H /=; smt (size_ge0).
     + move => &hr; smt (size_ge0 size_eq0). 
+    + done.
     by auto => /> &hr; rewrite bigi_constz /#.
   (* Proof of the bound *)
   have := Reduction A A_choose_ll &m.
@@ -460,4 +461,3 @@ proof.
 qed.
 
 end BR93.
-

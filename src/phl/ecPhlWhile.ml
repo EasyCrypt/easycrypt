@@ -21,47 +21,6 @@ module TTC = EcProofTyping
 module EP  = EcParsetree
 module Mid = EcIdent.Mid
 
-module ICHOARE : sig
-  val loaded : EcEnv.env -> bool
-  val choare_sum : cost -> (form * form) -> cost
-  val choare_max : form -> form -> form
-end = struct
-  open EcCoreLib
-  open EcEnv
-
-  let i_CHoare  = "CHoareTactic"
-  let p_CHoare  = EcPath.pqname EcCoreLib.p_top i_CHoare
-  let p_List    = [i_top; "List"]
-  let p_BIA     = [i_top; "StdBigop"; "Bigint"; "BIA"]
-  let p_Max     = [i_top; "IntExtra"; "Extrema"]
-
-  let tlist =
-    let tlist = EcPath.fromqsymbol (p_List, "list") in
-    fun ty -> EcTypes.tconstr tlist [ty]
-
-  let range =
-    let rg = EcPath.fromqsymbol (p_List @ ["Range"], "range") in
-    let rg = f_op rg [] (toarrow [tint; tint] (tlist tint)) in
-    fun m n -> f_app rg [m; n] (tlist tint)
-
-  let choare_sum =
-    let bgty = [tpred tint; tfun tint treal; tlist tint] in
-    let bg   = EcPath.fromqsymbol (p_BIA, "big") in
-    let bg   = f_op bg [tint] (toarrow bgty tint) in
-    let prT  = EcPath.fromqsymbol ([i_top; "Logic"], "predT") in
-    let prT  = f_op prT [tint] (tpred tint) in
-    fun cost (m, n) ->
-      cost_map (fun f -> f_app bg [prT; f; range m n] tint) cost
-
-  let choare_max =
-    let maxty = [tint; tint] in
-    let max   = EcPath.fromqsymbol (p_Max, "max") in
-    let max   = f_op max [] (toarrow maxty tint) in
-    fun f f' -> f_app max [f;f'] tint
-
-  let loaded (env : env) =
-    is_some (EcEnv.Theory.by_path_opt p_CHoare env)
-end
 
 (* -------------------------------------------------------------------- *)
 let while_info env e s =
@@ -133,8 +92,6 @@ let t_hoare_while_r inv tc =
    - [lam_cost] is the cost of one iteration (of the form [λ k. cost(k)]) *)
 let t_choare_while_r inv qdec n (lam_cost : cost) tc =
   let env = FApi.tc1_env tc in
-  if not (ICHOARE.loaded env) then
-    tacuerror "while: load the `CHoareTactic' theory first";
 
   let chs = tc1_as_choareS tc in
   let (expr_e, c), s = tc1_last_while tc chs.chs_s in
@@ -148,7 +105,7 @@ let t_choare_while_r inv qdec n (lam_cost : cost) tc =
   let k_lt_qinc = f_int_lt qdec k in
   let c_pre  = f_and_simpl (f_and_simpl inv e) qinc_eq_k in
   let c_post = f_and_simpl inv k_lt_qinc in
-  let c_cost = cost_app lam_cost [k] in
+  let c_cost = EcCHoare.cost_app lam_cost [k] in
   let c_concl = f_cHoareS_r { chs with chs_pr = c_pre;
                                        chs_s  = c;
                                        chs_po = c_post;
@@ -162,15 +119,16 @@ let t_choare_while_r inv qdec n (lam_cost : cost) tc =
   (* We compute the final cost. Since we have at most [n] iterations, we have:
      - at most [n+1] evaluations of the loop condition [e].
      - at most [n] evaluations of the loop body. *)
-  let e_cost_self = f_int_mul_simpl
+  let e_cost_self =
+    EcCHoare.f_xmuli
       (f_int_add_simpl n (f_int @@ EcBigInt.of_int 1))
-      (cost_of_expr inv chs.chs_m expr_e) in
+      (EcCHoare.cost_of_expr inv chs.chs_m expr_e) in
 
-  let body_cost = ICHOARE.choare_sum lam_cost (f_i0, n) in
-  let cost =
-    cost_op env f_int_sub_simpl
+  let body_cost = EcCHoare.choare_sum lam_cost (f_i0, n) in
+  let cond, cost =
+    EcCHoare.cost_sub env
       chs.chs_co
-      (cost_add_self body_cost e_cost_self) in
+      (EcCHoare.cost_add_self body_cost e_cost_self) in
 
   (* The wp of the while. *)
   let post = f_imps_simpl [f_not_simpl e; inv] chs.chs_po in
@@ -182,7 +140,7 @@ let t_choare_while_r inv qdec n (lam_cost : cost) tc =
                                      chs_po = post;
                                      chs_co  = cost; } in
 
-  FApi.xmutate1 tc `While [c_concl; n_term; concl]
+  FApi.xmutate1 tc `While [c_concl; n_term; cond; concl]
 
 
 (* -------------------------------------------------------------------- *)
@@ -453,10 +411,10 @@ let process_while side winfos tc =
       match vrnt, bds with
       | Some vrnt, Some (`Cost (n, cost)) ->
         t_choare_while
-          (TTC.tc1_process_Xhl_formula tc                           phi)
-          (TTC.tc1_process_Xhl_form    tc tint                      vrnt)
-          (TTC.tc1_process_Xhl_form    tc tint                      n)
-          (TTC.tc1_process_cost        tc (toarrow [tint] tint)     cost)
+          (TTC.tc1_process_Xhl_formula tc         phi)
+          (TTC.tc1_process_Xhl_form    tc tint    vrnt)
+          (TTC.tc1_process_Xhl_form    tc tint    n)
+          (TTC.tc1_process_cost        tc [tint]  cost)
           tc
 
       | _    -> tc_error !!tc "@[<v 2>invalid arguments, you must supply :@;\

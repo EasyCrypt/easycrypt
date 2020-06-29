@@ -27,9 +27,9 @@ let conseq_cond pre post spre spost =
   f_imp pre spre, f_imp spost post
 
 let conseq_cost cost scost =
-  let cflat  = cost_flatten cost
-  and scflat =  cost_flatten scost in
-  f_int_le_simpl scflat cflat
+  let cflat  = EcCHoare.cost_flatten cost
+  and scflat =  EcCHoare.cost_flatten scost in
+  EcCHoare.f_xle scflat cflat
 
 let bd_goal_r fcmp fbd cmp bd =
   match fcmp, cmp with
@@ -1135,7 +1135,7 @@ type processed_conseq_info =
 
 let process_info pe hyps = function
   | CQI_bd (cmp, bd) -> PCI_bd (cmp, TTC.pf_process_form pe hyps treal bd)
-  | CQI_c c -> PCI_c (TTC.pf_process_cost pe hyps tint c)
+  | CQI_c c -> PCI_c (TTC.pf_process_cost pe hyps [] c)
 
 let process_conseq notmod ((info1, info2, info3) : conseq_ppterm option tuple3) tc =
   let hyps, concl = FApi.tc1_flat tc in

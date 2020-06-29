@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore Int Real Distr DBool.
-require (*--*) DiffieHellman BitWord PKE_CPA CHoareTactic.
+require import AllCore Int Real Distr DBool CHoareTactic.
+require (*--*) DiffieHellman BitWord PKE_CPA.
 
 
 (* ---------------- Sane Default Behaviours --------------------------- *)
@@ -31,12 +31,12 @@ theory EntropySmoothing.
   hint exact random : dhkey_ll.  
 
   op cdhkey : { int | 0 <= cdhkey} as ge0_cdhkey.
-  schema cost_dhkey `{P} : cost[P: dhkey] = cdhkey.
+  schema cost_dhkey `{P} : cost[P: dhkey] = N cdhkey.
   hint simplify cost_dhkey.
 
   op hash : hkey -> group -> bits.
   op chash : {int | 0 <= chash } as ge0_chash.
-  schema cost_hash `{P} {k:hkey, g:group} : cost [P:hash k g] = cost [P: k] + cost[P:g] + chash.
+  schema cost_hash `{P} {k:hkey, g:group} : cost [P:hash k g] = cost [P: k] + cost[P:g] + N chash.
   hint simplify  cost_hash.
 
   module type AdvES = {
@@ -211,10 +211,10 @@ abstract theory Complexity.
 op cddh = 3 + cxor + chash + cdbool + cdhkey.
 op cguess = 3 + 2*cgpow + cxor + cdbool + 2 * cdt.
 
-lemma ex_conclusion (kc kg: int) (A <: Adversary[choose : `{kc} , guess : `{kg}]) &m :
+lemma ex_conclusion (kc kg: int) (A <: Adversary[choose : `{N kc} , guess : `{N kg}]) &m :
   0 <= kc => 0 <= kg =>
-  exists (Dddh <: DDH.Adversary [guess : `{cddh + kg + kc}]) 
-         (Des <: AdvES[guess: `{cguess + kg + kc }]),
+  exists (Dddh <: DDH.Adversary [guess : `{N (cddh + kg + kc)}]) 
+         (Des <: AdvES[guess: `{N (cguess + kg + kc) }]),
    `|Pr[CPA(Hashed_ElGamal, A).main() @ &m : res] - 1%r / 2%r| <=
    `|Pr[DDH0(Dddh).main() @ &m : res] - Pr[DDH1(Dddh).main() @ &m : res]| +
    `|Pr[ES0(Des).main() @ &m : res] - Pr[ES1(Des).main() @ &m : res]|.
@@ -223,9 +223,9 @@ proof.
   exists (DDHAdv(A)); split; last first.
   exists (ESAdv(A)); split; last first.
   apply (conclusion A _ _ &m).
-  + conseq (_ : _ : time [kc]).
+  + conseq (_ : _ : time [N kc]).
     by proc true : time[].
-  + conseq (_ : true ==> true : time [kg]).
+  + conseq (_ : true ==> true : time [N kg]).
     by proc true : time[].
   + proc; call (:true; time []); rnd; call(:true; time []); do 2!rnd; skip => />.
     rewrite dt_ll dbool_ll /=. smt (ge0_cg ge0_cxor ge0_cdbool ge0_cdt).

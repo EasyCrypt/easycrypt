@@ -62,14 +62,14 @@ module Core = struct
       | PNoRndParams -> f_true
       | PSingleRndParam p -> p
       | _ -> assert false in
-    let cost =
-      EcFol.cost_sub_self
+    let cond, cost =
+      EcCHoare.cost_sub_self
         chs.chs_co
-        (cost_of_expr cost_pre chs.chs_m distr_e) in
+        (EcCHoare.cost_of_expr cost_pre chs.chs_m distr_e) in
     let concl = f_cHoareS_r { chs with chs_s = s;
                                        chs_po = f_and_simpl cost_pre post;
                                        chs_co = cost} in
-    FApi.xmutate1 tc `Rnd [concl]
+    FApi.xmutate1 tc `Rnd [cond; concl]
 
   (* -------------------------------------------------------------------- *)
   let wp_equiv_disj_rnd_r side tc =
@@ -466,7 +466,9 @@ let process_rnd side tac_info tc =
 
       | _ -> tc_error !!tc "invalid arguments" in
 
-      t_choare_rnd tac_info tc
+      FApi.t_seqsub (t_choare_rnd tac_info)
+                    [EcLowGoal.t_logic_trivial; EcLowGoal.t_id]
+        tc
 
   | None, _ when is_bdHoareS concl ->
     let tac_info =

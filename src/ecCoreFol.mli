@@ -168,7 +168,7 @@ and cost = private {
 (* Call with cost at most [cb_cost], called at mist [cb_called].
    [cb_cost] is here to properly handle substsitution when instantiating an
    abstract module by a concrete one. *)
-and call_bound = {
+and call_bound = private {
   cb_cost  : form;
   cb_called : form;
 }
@@ -254,6 +254,7 @@ val f_hoareS : memenv -> form -> stmt -> form -> form
 
 (* soft-constructors - cost hoare *)
 val cost_r : form -> call_bound EcPath.Mx.t -> cost
+val call_bound_r : form -> form -> call_bound
 
 val f_cHoareF_r : cHoareF -> form
 val f_cHoareS_r : cHoareS -> form
@@ -477,16 +478,6 @@ val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 exception CannotTranslate
 
 val expr_of_form : EcMemory.memory -> form -> EcTypes.expr
-
-(* -------------------------------------------------------------------- *)
-(* The cost of an expression evaluation in any memory of a given type
-   satisfying some pre-condition. *)
-val cost_of_expr : form -> EcMemory.memenv -> EcTypes.expr -> form
-
-(* The cost of an expression evaluation in any memory of a given type. *)
-val cost_of_expr_any : EcMemory.memenv -> EcTypes.expr -> form
-
-val free_expr : EcTypes.expr -> bool
 
 (* -------------------------------------------------------------------- *)
 (* A predicate on memory: λ mem. -> pred *)

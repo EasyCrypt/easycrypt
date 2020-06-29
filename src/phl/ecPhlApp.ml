@@ -35,7 +35,7 @@ let t_choare_app_r i phi cost tc =
   let chs = tc1_as_choareS tc in
   let env = FApi.tc1_env tc in
   let s1, s2 = s_split i chs.chs_s in
-  let cost1 = EcFol.cost_op env EcFol.f_int_sub_simpl chs.chs_co cost in
+  let cond, cost1 = EcCHoare.cost_sub env chs.chs_co cost in
 
   let a = f_cHoareS_r { chs with chs_s  = stmt s1;
                                  chs_po = phi;
@@ -43,7 +43,7 @@ let t_choare_app_r i phi cost tc =
   let b = f_cHoareS_r { chs with chs_pr = phi;
                                  chs_s  = stmt s2;
                                  chs_co  = cost; } in
-  FApi.xmutate1 tc `HlApp [a; b]
+  FApi.xmutate1 tc `HlApp [cond; a; b]
 
 
 let t_choare_app = FApi.t_low3 "choare-app" t_choare_app_r
@@ -151,7 +151,7 @@ let t_equiv_app_onesided side i pre post tc =
 let process_phl_c_info app_c_info tc =
   match app_c_info with
 
-  | PAppCost c   -> TTC.tc1_process_cost tc tint c
+  | PAppCost c   -> TTC.tc1_process_cost tc [] c
 
   | PAppSingle _ ->
     tc_error !!tc "seq choare: a cost must be supplied, not a bound"

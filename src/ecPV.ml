@@ -213,8 +213,7 @@ module PVM = struct
 
   let subst_cost env s c =
     let cb_subst cb =
-      { cb_cost = subst env s cb.cb_cost;
-        cb_called = subst env s cb.cb_called; } in
+      call_bound_r (subst env s cb.cb_cost) (subst env s cb.cb_called) in
 
     let c_self  = subst env s c.c_self
     and c_calls = Mx.map cb_subst c.c_calls in

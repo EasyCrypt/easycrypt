@@ -588,11 +588,11 @@ let t_code_transform
         let pr, po = chs.chs_pr, chs.chs_po in
         let (me, stmt, cs) =
           tx (pf, hyps) cpos (pr, po) (chs.chs_m, chs.chs_s) in
-        let cost = EcFol.cost_sub_self chs.chs_co c in
+        let cond, cost = EcCHoare.cost_sub_self chs.chs_co c in
         let concl = f_cHoareS_r { chs with chs_m = me;
                                            chs_s = stmt;
                                            chs_co = cost; } in
-        FApi.xmutate1 tc (tr None) (cs @ [concl])
+        FApi.xmutate1 tc (tr None) (cs @ [concl; cond])
 
       | FbdHoareS bhs, _ when bdhoare ->
           let pr, po = bhs.bhs_pr, bhs.bhs_po in

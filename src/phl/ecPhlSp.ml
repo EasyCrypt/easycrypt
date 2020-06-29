@@ -193,9 +193,9 @@ module LowInternal = struct
     | Sasgn (lv, e) ->
       let bds, assoc, pre = sp_asgn memenv env lv e (bds, assoc, pre) in
       let cost =
-        EcFol.f_int_add_simpl
+        EcCHoare.f_xadd
           cost
-          (EcFol.cost_of_expr_any memenv e) in
+          (EcCHoare.cost_of_expr_any memenv e) in
 
       bds, assoc, pre, cost
 
@@ -213,10 +213,10 @@ module LowInternal = struct
       let sp_t = build_sp memenv bds_t assoc_t pre_t in
       let sp_f = build_sp memenv bds_f assoc_f pre_f in
       let cost =
-        EcFol.f_int_add_simpl cost
-          (EcFol.f_int_add_simpl
-             (EcFol.cost_of_expr_any memenv e)
-             (EcFol.f_int_add_simpl cost_t cost_f)) in
+        EcCHoare.f_xadd cost
+          (EcCHoare.f_xadd
+             (EcCHoare.cost_of_expr_any memenv e)
+             (EcCHoare.f_xadd cost_t cost_f)) in
       ([], [], f_or_simpl sp_t sp_f, cost)
 
     | _ -> raise No_sp
@@ -274,11 +274,11 @@ let t_sp_side pos tc =
     let stmt1, chs_pr, sp_cost =
       LI.sp_stmt chs.chs_m env stmt1 chs.chs_pr in
     check_sp_progress pos stmt1;
-    let cost = EcFol.cost_sub_self chs.chs_co sp_cost in
+    let cond, cost = EcCHoare.cost_sub_self chs.chs_co sp_cost in
     let subgoal = f_cHoareS_r {chs with chs_s = stmt (stmt1@stmt2);
                                         chs_pr;
                                         chs_co = cost } in
-    FApi.xmutate1 tc `Sp [subgoal]
+    FApi.xmutate1 tc `Sp [cond; subgoal]
 
   | FbdHoareS bhs, (None | Some (Single _)) ->
       let pos = pos |> omap as_single in

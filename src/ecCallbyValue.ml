@@ -176,8 +176,8 @@ and norm_cost st s c =
     EcPath.Mx.fold (fun f cb calls ->
         (* We do not normalize the xpath, as it is not a valid xpath. *)
         let f' = Subst.subst_xpath s f
-        and cb' = { cb_cost   = norm st s cb.cb_cost;
-                    cb_called = norm st s cb.cb_called; } in
+        and cb' = call_bound_r (norm st s cb.cb_cost)
+                               (norm st s cb.cb_called) in
         EcPath.Mx.change (fun old -> assert (old = None); Some cb') f' calls
       ) c.c_calls EcPath.Mx.empty in
   cost_r self' calls'
@@ -557,8 +557,8 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let coe_e   = norm_e s coe.coe_e in
     let coe_mem = norm_me s coe.coe_mem in
 
-    if EcFol.free_expr coe_e
-    then f_i0
+    if EcCHoare.free_expr coe_e
+    then EcCHoare.f_x0
     else
       reduce_user st (f_coe_r { coe_pre; coe_e; coe_mem })
 

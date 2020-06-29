@@ -939,7 +939,7 @@ let restr_proof_obligation env (mp_in : mpath) sym (mt : module_type) : form lis
             | `Bounded _ -> (param_restr', ints)
             | `Unbounded ->
               let k_id = mk_ident () in
-              let k = f_local k_id tint in
+              let k = EcCHoare.f_N (f_local k_id tint) in
               let oi' =
                 OI.mk (OI.allowed oi) (OI.is_in oi)
                   (`Bounded (k,Mx.empty)) in
@@ -997,7 +997,7 @@ let restr_proof_obligation env (mp_in : mpath) sym (mt : module_type) : form lis
             | `Unbounded ->
               let err = `FunCanCallUnboundedOracle (fn, o) in
               tymod_cnv_failure (E_TyModCnv_MismatchRestr (sym,err)) in
-          let cb = { cb_cost = oself; cb_called = obd; } in
+          let cb = call_bound_r oself obd in
 
           Mx.add o cb c_calls
         ) costs Mx.empty in
@@ -2196,9 +2196,9 @@ let trans_restr_oracle_calls env env_in (params : Sm.t) = function
 (* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
 (* If [r_compl] is None, there are no restrictions *)
 let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
-  let trans_closed_form form =
+  let trans_closed_form form ty =
     let ue = EcUnify.UniEnv.create None in
-    let tform = trans_form env ue form EcTypes.tint in
+    let tform = trans_form env ue form ty in
     let subs = try EcUnify.UniEnv.close ue with
       | EcUnify.UninstanciateUni ->
         tyerror (loc form) env FreeTypeVariables in
@@ -2218,7 +2218,7 @@ let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
           if not (Sm.mem p params) then
             tyerror qname.pl_loc env (FunNotInModParam qname.pl_desc);
 
-          let tform = trans_closed_form form in
+          let tform = trans_closed_form form EcTypes.tint in
 
           (f, tform)
         ) restr_elems in
@@ -2226,7 +2226,7 @@ let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
     (* Sanity check *)
     assert (List.length calls = Mx.cardinal m_calls);
 
-    let self = trans_closed_form self in
+    let self = trans_closed_form self EcTypes.txint in
     `Bounded (self,m_calls)
 
 (* Oracles and complexity restrictions for a function.
@@ -3543,14 +3543,15 @@ and trans_form_or_pattern
           f_bdHoareF pre' fpath post' hcmp bd'
 
     | PFChoareF _ | PFChoareFT _ ->
+      EcCHoare.check_loaded env;
       let trans_choaref pre' post' fpath self calls =
         let self'  = transf env self in
         let calls' = List.map (fun (m,fn,c) ->
             let fn, fn_self = trans_oracle env (m,fn) in
             let f_c = transf env c in
-            fn, { cb_cost = fn_self; cb_called = f_c }
+            fn, call_bound_r fn_self f_c
           ) calls in
-        unify_or_fail env  ue self.pl_loc ~expct:tint  self'.f_ty;
+        unify_or_fail env  ue self.pl_loc ~expct:txint  self'.f_ty;
         List.iter2 (fun (_,cb') (_,_,c) ->
             unify_or_fail env ue c.pl_loc ~expct:tint cb'.cb_called.f_ty
           ) calls' calls;

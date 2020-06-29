@@ -113,20 +113,17 @@ let t_choare_call fpre fpost fcost tc =
      Remark: the cost of the evaluation of the return is accounted for in
      [fcost]. *)
   let args_cost = List.fold_left (fun cost e ->
-      EcFol.f_int_add_simpl
+      EcCHoare.f_xadd
         cost
-        (EcFol.cost_of_expr_any chs.chs_m e)
-    ) f_i0 args in
-  let cost =
-    EcFol.cost_sub_self
-      (EcFol.cost_op env EcFol.f_int_sub_simpl chs.chs_co fcost)
-      args_cost in
-
+        (EcCHoare.cost_of_expr_any chs.chs_m e)
+    ) EcCHoare.f_x0 args in
+  let cond1, cost = EcCHoare.cost_sub env chs.chs_co fcost in
+  let cond2, cost = EcCHoare.cost_sub_self cost args_cost in
   let concl = f_cHoareS_r { chs with chs_s = s;
                                      chs_po = post;
                                      chs_co = cost } in
 
-  FApi.xmutate1 tc `HlCall [f_concl; concl]
+  FApi.xmutate1 tc `HlCall [f_concl; cond1; cond2; concl]
 
 (* -------------------------------------------------------------------- *)
 let bdhoare_call_spec pf fpre fpost f cmp bd opt_bd =
@@ -369,7 +366,7 @@ let process_call side info tc =
           let (_,f,_),_ = tc1_last_call tc chs.chs_s in
           let penv, qenv = LDecl.hoareF f hyps in
 
-          let cost  = TTC.tc1_process_cost tc tint cost in
+          let cost  = TTC.tc1_process_cost tc [] cost in
 
           (penv, qenv, fun pre post -> f_cHoareF pre f post cost)
 
@@ -502,7 +499,7 @@ let process_call side info tc =
       inv, None
     | Some (`Std c) ->
       let inv = TTC.pf_process_form !!tc hyps tbool inv in
-      inv, Some (`Std (TTC.pf_process_cost !!tc hyps tint c))
+      inv, Some (`Std (TTC.pf_process_cost !!tc hyps [] c))
     | Some (`CostAbs aii) ->
       let inv, abs_inv_inf =
         EcPhlFun.process_inv_pabs_inv_finfo tc inv aii in
@@ -549,10 +546,16 @@ let process_call side info tc =
       tc_error !!tc "cannot infer all placeholders";
     PT.concretize pt in
 
+  let ts =
+    match (FApi.tc1_goal tc).f_node with
+    | FcHoareS _ ->
+      [ t_logic_trivial; t_logic_trivial; t_id]
+    | _ -> [t_id]
+  in
+
   FApi.t_seqsub
     (t_call side ax)
-    [FApi.t_seqs
-       [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
-        !subtactic; t_logic_trivial];
-     t_id]
+    ( FApi.t_seqs
+        [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
+         !subtactic; t_logic_trivial] :: ts)
     tc

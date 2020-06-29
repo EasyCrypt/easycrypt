@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int IntExtra Real List Distr RealExtra.
+require import Int Xint IntExtra Real List Distr RealExtra.
 (*---*) import MUniform Range.
 
 (* -------------------------------------------------------------------- *)
@@ -41,5 +41,5 @@ proof. apply drange_uni. qed.
 op cdinterval : int -> int.
 axiom ge0_cdinterval m : 0 <= cdinterval m.
 
-schema cost_dinterval {i j : int} (k:int) : cost [ i <= j <= k - i : dinter i (j - 1)] = cost [true : i] + cost [true : j] + cdinterval k.
+schema cost_dinterval {i j : int} (k:int) : cost [ i <= j <= k - i : dinter i (j - 1)] = cost [true : i] + cost [true : j] + N (cdinterval k).
 hint simplify cost_dinterval.

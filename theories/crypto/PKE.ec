@@ -6,8 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore List Distr DBool LorR.
-require (*--*) CHoareTactic.
+require import AllCore List Distr DBool LorR CHoareTactic.
 (*---*) import StdBigop.Bigint BIA.
 
 type pkey.
@@ -239,7 +238,7 @@ axiom ge0_cS : 0 <= cS.`ckg /\ 0 <= cS.`cenc /\ 0 <= cS.`cdec.
 
 op ceqocipher : int.
 
-schema cost_eqcipher `{P} {c1 c2 : ciphertext option} : cost [P : c1 = c2] = cost[P:c1] + cost[P:c2] + ceqocipher .
+schema cost_eqcipher `{P} {c1 c2 : ciphertext option} : cost [P : c1 = c2] = cost[P:c1] + cost[P:c2] + N ceqocipher .
 hint simplify cost_eqcipher.
 
 module CCAq (S:Scheme, A:CCA_ADV) = {
@@ -279,55 +278,56 @@ module CCAq (S:Scheme, A:CCA_ADV) = {
 
 section.
 
-declare module S: Scheme [kg  : `{cS.`ckg},
-                          enc : `{cS.`cenc}, 
-                          dec : `{cS.`cdec} ]
+declare module S: Scheme [kg  : `{N cS.`ckg},
+                          enc : `{N cS.`cenc}, 
+                          dec : `{N cS.`cdec} ]
                          {-CCA}.
 
 lemma Sdec_ll : islossless S.dec.
 proof.
-have h : choare [S.dec : true ==> true] time [cS.`cdec].
+have h : choare [S.dec : true ==> true] time [N cS.`cdec].
 + by proc true : time [].
 conseq h.
 qed.
 
 lemma Senc_ll : islossless S.enc.
 proof.
-have h : choare [S.enc : true ==> true] time [cS.`cenc].
+have h : choare [S.enc : true ==> true] time [N cS.`cenc].
 + by proc true : time [].
 conseq h.
 qed.
 
-declare module A : CCA_ADV [choose : `{cA.`cchoose, #O.dec : cA.`qD_choose},
-                            guess  : `{cA.`cguess, #O.dec : cA.`qD_guess}]
+declare module A : CCA_ADV [choose : `{N cA.`cchoose, #O.dec : cA.`qD_choose},
+                            guess  : `{N cA.`cguess, #O.dec : cA.`qD_guess}]
                            {-CCA, -S}.
 
 axiom Achoose_ll : forall (O <: CCA_ORC {-A}), islossless O.dec => islossless A(O).choose.
 axiom Aguess_ll : forall (O <: CCA_ORC {-A}), islossless O.dec => islossless A(O).guess.
 
+
 lemma CCAl_cbound : choare [CCAl(S,A).main : true ==> size CCA.log <= qD] time 
-                          [ 5 + cdbool + (3 + ceqocipher) * cA.`qD_guess +  (3 + ceqocipher) * cA.`qD_choose;
+                          [N (5 + cdbool + (3 + ceqocipher) * cA.`qD_guess +  (3 + ceqocipher) * cA.`qD_choose);
                             S.kg  : 1; S.enc : 1; S.dec : qD;
                             A.choose : 1; A.guess  : 1].
 proof.
   proc.
   call (: size CCA.log - cA.`qD_choose <= k; 
            time
-           [(CCAl(S,A).O.dec k : [3 + ceqocipher; S.dec: 1])]).
-  + move=> zdec hzdec; proc.
-    if. 
-    + by call (:true); auto => &hr /> * /#.
+           [(CCAl(S,A).O.dec k : [N (3 + ceqocipher); S.dec: 1])]).
+  + move=> zdec hzdec; proc => //.
+    if => //.
+    + call (:true);auto => &hr /> /#.
     by auto => &hr />; smt(ge0_cS).
   wp; call (:true); rnd.
   call (:size CCA.log <= k; 
            time
-           [(CCAl(S,A).O.dec k : [3 + ceqocipher; S.dec: 1])]).
+           [(CCAl(S,A).O.dec k : [N (3 + ceqocipher); S.dec: 1])]).
   + move=> zdec hzdec; proc.
-    if. 
-    + by call (:true); auto => &hr /> * /#.
+    if => //.
+    + call (:true); auto => &hr /> /#.
     by auto => &hr />; smt(ge0_cS).
   call(:true); auto => />. rewrite dbool_ll /=; split. smt().
-  by rewrite !bigi_constz; smt(ge0_cA).
+  rewrite !bigi_constz /= smt(ge0_cA). 
 qed.
 
 lemma CCAl_bound : hoare [CCAl(S,A).main : true ==> size CCA.log <= qD].

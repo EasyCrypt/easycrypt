@@ -195,3 +195,21 @@ module CI_Logic : sig
 
   val p_negbTE        : path
 end
+
+(* -------------------------------------------------------------------- *)
+module CI_xint : sig
+  val p_Xint    : path
+  val p_xint    : path
+  val p_N       : path
+  val p_inf     : path
+  val p_xopp    : path
+  val p_xadd    : path
+  val p_xmul    : path
+  val p_xle     : path
+  val p_xmax    : path
+  val p_is_int  : path
+  val p_is_inf  : path
+  val p_choaretac : path
+  val p_bigxint : path
+  val p_big     : path
+end

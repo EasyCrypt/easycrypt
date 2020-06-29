@@ -161,7 +161,7 @@ and coe = {
 (* Invariant: keys of c_calls are functions of local modules,
    with no arguments. *)
 and cost = {
-  c_self  : form;
+  c_self  : form;    (* of type xint *)
   c_calls : call_bound EcPath.Mx.t;
 }
 
@@ -169,8 +169,8 @@ and cost = {
    [cb_cost] is here to properly handle substsitution when instantiating an
    abstract module by a concrete one. *)
 and call_bound = {
-  cb_cost  : form;
-  cb_called : form;
+  cb_cost  : form;   (* of type xint *)
+  cb_called : form;  (* of type int  *)
 }
 
 and module_type = form p_module_type
@@ -824,6 +824,9 @@ let f_hoareF hf_pr hf_f hf_po =
   f_hoareF_r { hf_pr; hf_f; hf_po; }
 
 (* -------------------------------------------------------------------- *)
+let call_bound_r cb_cost cb_called =
+  { cb_cost; cb_called }
+
 let cost_r c_self c_calls =
   (* Invariant: keys of c_calls are functions of local modules,
      with no arguments. *)
@@ -832,7 +835,8 @@ let cost_r c_self c_calls =
       | `Local _ -> x.x_top.m_args = []
       | _ -> false
     ) c_calls);
-  { c_self; c_calls; }
+  let c = { c_self; c_calls; } in
+  c
 
 let f_cHoareS_r chs = mk_form (FcHoareS chs) tbool
 let f_cHoareF_r chf = mk_form (FcHoareF chf) tbool
@@ -871,7 +875,7 @@ let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
   f_eagerF_r { eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po; }
 
 (* -------------------------------------------------------------------- *)
-let f_coe_r coe = mk_form (Fcoe coe) tint
+let f_coe_r coe = mk_form (Fcoe coe) txint
 
 let f_coe coe_pre coe_mem coe_e = f_coe_r { coe_pre; coe_mem; coe_e; }
 
@@ -1625,24 +1629,6 @@ let expr_of_form mh f =
     | _ -> raise CannotTranslate
 
   in aux f
-
-(* -------------------------------------------------------------------- *)
-let rec free_expr e = match e.e_node with
-  | Elocal _ | Evar _ | Eint _ -> true
-
-  | Eop _
-  | Eproj _ | Etuple _ | Eapp _
-  | Equant _ | Elet _ | Eif _ | Ematch _ -> false
-
-
-(* The cost of an expression evaluation in any memory of type [menv]
-   satisfying [pre]. *)
-let cost_of_expr pre menv e =
-  if free_expr e then f_i0 else f_coe pre menv e
-
-(* The cost of an expression evaluation in any memory of type [menv]. *)
-let cost_of_expr_any menv e =
-  if free_expr e then f_i0 else f_coe f_true menv e
 
 (* -------------------------------------------------------------------- *)
 (* A predicate on memory: λ mem. -> pred *)

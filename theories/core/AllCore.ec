@@ -7,11 +7,11 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require export Core Int IntExtra Real RealExtra.
+require export Core Int IntExtra Real RealExtra Xint.
 
 (* -------------------------------------------------------------------- *)
 schema cost_oget ['a] `{P} {o: 'a option} : 
-  cost [P : oget o] = cost [P:o] + 1.
+  cost [P : oget o] = cost [P:o] + N 1.
 hint simplify cost_oget.
 
 (* Cost on integer operations *)
@@ -25,16 +25,16 @@ axiom ge0_ceqint m : 0 <= ceqint m.
 axiom ge0_cltint m : 0 <= cltint m.
 axiom ge0_cleint m : 0 <= cleint m.
 
-schema cost_incr {n:int} (m:int) : cost[`|n| <= m : n + 1] = cost[true:n] + cincr m.
+schema cost_incr {n:int} (m:int) : cost[`|n| <= m : n + 1] = cost[true:n] + N (cincr m).
 
 schema cost_eqint {n1 n2:int} (m:int) : 
-  cost[`|n1| <= m /\ `|n2| <= m : n1 = n2] = cost[true:n1] + cost[true:n2] + ceqint m.
+  cost[`|n1| <= m /\ `|n2| <= m : n1 = n2] = cost[true:n1] + cost[true:n2] + N (ceqint m).
 
 schema cost_ltint {n1 n2:int} (m:int) : 
-  cost[`|n1| <= m /\ `|n2| <= m : n1 < n2] = cost[true:n1] + cost[true:n2] + cltint m.
+  cost[`|n1| <= m /\ `|n2| <= m : n1 < n2] = cost[true:n1] + cost[true:n2] + N (cltint m).
 
 schema cost_leint {n1 n2:int} (m:int) : 
-  cost[`|n1| <= m /\ `|n2| <= m : n1 < n2] = cost[true:n1] + cost[true:n2] + cleint m.
+  cost[`|n1| <= m /\ `|n2| <= m : n1 < n2] = cost[true:n1] + cost[true:n2] + N (cleint m).
 
 
 hint simplify cost_incr, cost_eqint, cost_ltint, cost_leint.

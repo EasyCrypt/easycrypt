@@ -5,7 +5,7 @@
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
-require import Int.
+require import Int Xint.
 require PrimeField.
 
 clone export PrimeField as FD.
@@ -26,11 +26,11 @@ op cgdiv: int.
 op cgeq : int.
 axiom ge0_cg : 0 <= cgpow /\ 0 <= cgmul /\ 0 <= cgdiv /\ 0 <= cgeq.
 
-schema cost_gen `{P} : cost [P:g] = 0.
-schema cost_pow `{P} {g:group, x:t} : cost[P: g ^ x] = cost[P:g] + cost[P:x] + cgpow.
-schema cost_gmul `{P} {g1 g2:group} : cost[P:g1 * g2] = cost[P:g1] + cost[P:g2] + cgmul.
-schema cost_geq  `{P} {g1 g2:group} : cost[P:g1 = g2] = cost[P:g1] + cost[P:g2] + cgeq.
-schema cost_gdiv `{P} {g1 g2:group} : cost[P:g1 / g2] = cost[P:g1] + cost[P:g2] + cgdiv.
+schema cost_gen `{P} : cost [P:g] = '0.
+schema cost_pow `{P} {g:group, x:t} : cost[P: g ^ x] = cost[P:g] + cost[P:x] + N cgpow.
+schema cost_gmul `{P} {g1 g2:group} : cost[P:g1 * g2] = cost[P:g1] + cost[P:g2] + N cgmul.
+schema cost_geq  `{P} {g1 g2:group} : cost[P:g1 = g2] = cost[P:g1] + cost[P:g2] + N cgeq.
+schema cost_gdiv `{P} {g1 g2:group} : cost[P:g1 / g2] = cost[P:g1] + cost[P:g2] + N cgdiv.
 
 hint simplify cost_gen, cost_pow, cost_gmul, cost_gdiv, cost_geq.
 

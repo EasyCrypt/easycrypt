@@ -2501,9 +2501,7 @@ module NormMp = struct
           let c_self' = aux chf.chf_co.c_self in
           let c_calls' = Mx.fold (fun f c calls ->
               let f' = f        (* not normalized. *)
-              and c' =
-                { cb_called = aux c.cb_called;
-                  cb_cost   = aux c.cb_cost } in
+              and c' = call_bound_r (aux c.cb_cost) (aux c.cb_called) in
               Mx.change (fun old -> assert (old = None); Some c') f' calls
             ) chf.chf_co.c_calls Mx.empty in
           if chf.chf_pr == pre' && chf.chf_f == p' &&

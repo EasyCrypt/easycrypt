@@ -53,15 +53,15 @@ module Low = struct
     let chs = tc1_as_choareS tc in
     let m  = EcMemory.memory chs.chs_m in
     let hd,e_expr,e,s = gen_rcond !!tc b m at_pos chs.chs_s in
-    let cost =
-      EcFol.cost_sub_self
+    let cond, cost =
+      EcCHoare.cost_sub_self
         chs.chs_co
-        (EcFol.cost_of_expr c chs.chs_m e_expr) in
+        (EcCHoare.cost_of_expr c chs.chs_m e_expr) in
     let concl1  =
       f_hoareS chs.chs_m chs.chs_pr hd (f_and_simpl c e) in
     let concl2  = f_cHoareS_r { chs with chs_s = s;
                                          chs_co = cost; } in
-    FApi.xmutate1 tc `RCond [concl1; concl2]
+    FApi.xmutate1 tc `RCond [concl1; cond; concl2]
 
   (* ------------------------------------------------------------------ *)
   let t_bdhoare_rcond_r b at_pos tc =
@@ -206,7 +206,8 @@ module LowMatch = struct
 
       Some (f_eq f epr),
       [],
-      Some (fun pre -> f_int_add_simpl (cost_of_expr pre me e) f_i1)
+      Some (fun pre -> EcCHoare.f_xadd (EcCHoare.cost_of_expr pre me e)
+                                       EcCHoare.f_x1)
 
     end else begin
       let asgn =
@@ -261,7 +262,8 @@ module LowMatch = struct
       tc_error !!tc "choare match: the matched expression must be \
                      independent of the head statement (maybe use sp first?)."
     | Some lam_cost ->
-      let cost = cost_sub_self chs.chs_co (lam_cost chs.chs_pr) in
+      let cond, cost =
+        EcCHoare.cost_sub_self chs.chs_co (lam_cost chs.chs_pr) in
 
       let pr = ofold f_and chs.chs_pr epr in
 
@@ -272,7 +274,7 @@ module LowMatch = struct
                                           chs_s = full;
                                           chs_co = cost} in
 
-      FApi.xmutate1 tc `RCondMatch [concl1; concl2]
+      FApi.xmutate1 tc `RCondMatch [concl1; cond; concl2]
 
   (* ------------------------------------------------------------------ *)
   let t_equiv_rcond_match_r side c at_pos tc =

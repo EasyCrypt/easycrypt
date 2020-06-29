@@ -106,13 +106,16 @@ let t_choareF_fun_def_r tc =
   let spre = subst_pre env fsig m PVM.empty in
   let pre = PVM.subst env spre chf.chf_pr in
   let c   = PVM.subst_cost env spre chf.chf_co in
-  let c = match fdef.f_ret with
-    | None -> c
+  let cond, c = match fdef.f_ret with
+    | None -> None, c
     | Some ret ->
-      EcFol.cost_sub_self
-        c (EcFol.cost_of_expr_any memenv ret) in
+      let cond, c =
+        EcCHoare.cost_sub_self
+          c (EcCHoare.cost_of_expr_any memenv ret) in
+      Some cond, c in
   let concl' = f_cHoareS memenv pre fdef.f_body post c in
-  FApi.xmutate1 tc `FunDef [concl']
+  let goals = ofold (fun f fs -> f :: fs) [concl'] cond in
+  FApi.xmutate1 tc `FunDef goals
 
 (* ------------------------------------------------------------------ *)
 let t_bdhoareF_fun_def_r tc =
@@ -204,7 +207,7 @@ let process_p_abs_inv_inf tc hyps p_abs_inv_inf =
     let ci = doc ci in
     let doco (m,f,c) = (m,f,doc c) in
     let co = List.map doco co in
-    let c = TTC.pf_process_cost !!tc hyps (tfun tint tint) (PC_costs(ci,co)) in
+    let c = TTC.pf_process_cost !!tc hyps [tint] (PC_costs(ci,co)) in
     f, bd, c in
 
   List.map doit p_abs_inv_inf
@@ -233,7 +236,6 @@ module FunAbsLow = struct
     (* We check that the invariant cannot be modified by the adversary. *)
     let fv_inv   = PV.fv env mhr inv in
     PV.check_depend env fv_inv top;
-
     (* TODO: (Adrien) why are we checking this for bdhoareF_abs_spec, and is
        it needed here?*)
     (* check_oracle_use pf env top o; *)
@@ -250,7 +252,6 @@ module FunAbsLow = struct
       | `Unbounded ->
         tc_error pf_ "%a is unbounded" (EcPrinting.pp_funname ppe) f
       | `Bounded (self,costs) -> self, costs in
-
     let bds, _ = decompose_lambda inv in
     assert (List.length bds = List.length xc);
     let mks =
@@ -262,9 +263,7 @@ module FunAbsLow = struct
               |> List.filter (fun o ->
                   not @@ opt_equal f_equal
                     (Mx.find_opt o oi_costs)
-                    (Some f_i0)) in
-
-
+                    (Some EcCHoare.f_x0)) in
     let kargs_pr = List.map (fun (x,_) -> f_local x tint) bds in
     let pr = f_app_simpl inv kargs_pr tbool in
 
@@ -286,7 +285,6 @@ module FunAbsLow = struct
               else f_int_le f cbd in
             f_anda ge0 max) xc bds in
       let call_bounds = f_ands0_simpl call_bounds in
-
       (* We now compute the cost of the call to [o_called]. *)
       let cost = List.find_opt (fun (x,_,_) -> x_equal x o_called) xc in
       let cost = match cost with
@@ -294,11 +292,9 @@ module FunAbsLow = struct
           tc_error pf_ "no cost has been supplied for %a"
             (EcPrinting.pp_funname ppe) o_called
         | Some (_,_,cost) -> cost in
-      let k_cost = cost_app cost [f_local k_called tint] in
-
+      let k_cost = EcCHoare.cost_app cost [f_local k_called tint] in
       let form = f_cHoareF pr o_called po k_cost in
       f_forall_simpl bds (f_imp_simpl call_bounds form) in
-
     (* We have the conditions for the oracles. *)
     let sg = List.map ospec ois in
 
@@ -318,22 +314,21 @@ module FunAbsLow = struct
             f_anda ge0 max) xc bds in
       let call_bounds = f_ands0_simpl call_bounds in
       f_exists bds (f_and call_bounds pr) in
-
     let fn_orcl = EcPath.xpath top f.x_sub in
-    let f_cb = { cb_cost   = oi_self;
-                 cb_called = f_i1; } in
-    let f_cost = cost_r f_i0 (Mx.singleton fn_orcl f_cb)  in
-
+    let f_cb = call_bound_r oi_self f_i1 in
+    let f_cost = cost_r EcCHoare.f_x0 (Mx.singleton fn_orcl f_cb)  in
     let orcls_cost = List.map (fun o ->
         let cbd = cost_orcl oi o in
         (* Cost of a call to [o]. *)
         let (_,_,o_cost) = List.find (fun (x,_, _) -> x_equal x o) xc in
 
         (* Upper-bound on the costs of [o]'s calls. *)
-        EcPhlWhile.ICHOARE.choare_sum o_cost (f_i0, cbd)
+        EcCHoare.choare_sum o_cost (f_i0, cbd)
       ) ois in
     let total_cost =
-      List.fold_left (cost_op env f_int_add_simpl) f_cost orcls_cost in
+      List.fold_left
+        (EcCHoare.cost_add env)
+        f_cost orcls_cost in
 
     (pre_inv, post_inv, total_cost, sg)
 
@@ -726,7 +721,11 @@ type p_upto_info = pformula * pformula * (pformula option)
 
 (* -------------------------------------------------------------------- *)
 let process_fun_def tc =
-  t_fun_def tc
+  let t_cont tcenv =
+    if FApi.tc_count tcenv = 2 then
+      FApi.t_sub [EcLowGoal.t_logic_trivial; EcLowGoal.t_id] tcenv
+    else tcenv in
+  t_cont (t_fun_def tc)
 
 (* -------------------------------------------------------------------- *)
 let process_fun_to_code tc =

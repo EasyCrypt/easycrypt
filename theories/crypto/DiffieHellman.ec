@@ -6,9 +6,9 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int Real RealExtra StdRing StdOrder Distr List FSet.
+require import Int Xint Real RealExtra StdRing StdOrder Distr List FSet CHoareTactic.
 (*---*) import RField RealOrder.
-require (*  *) CyclicGroup CHoareTactic.
+require (*  *) CyclicGroup.
 
 clone export CyclicGroup as G.
 
@@ -162,23 +162,24 @@ theory List_CDH.
     op cduniform_n : { int | 0 <= cduniform_n } as ge0_cduniform_n.
 
     schema cost_duniform `{P} {s : group list} : 
-       cost [P /\ size s <= n : duniform s] <= cost [P : s] + cduniform_n.
+       cost [P /\ size s <= n : duniform s] <= cost [P : s] + N cduniform_n.
 
     lemma ex_reduction (cs:int) (A<:Adversary) &m :
-      choare[A.solve : true ==> 0 < size res <= n] time [cs] =>
-      exists (B <:CDH.Adversary [solve : `{cduniform_n + cs} ] {+A}),
+      choare[A.solve : true ==> 0 < size res <= n] time [N cs] =>
+      exists (B <:CDH.Adversary [solve : `{N(cduniform_n + cs)} ] {+A}),
       Pr[LCDH(A).main() @ &m: res] <= n%r * Pr[CDH.CDH(B).main() @ &m: res]. 
     proof.
       move=> hcA;exists (CDH_from_LCDH(A));split; last first.
       + have /= h1 := Reduction A &m.  
         rewrite -ler_pdivr_mull; smt(lt_fromint gt0_n).
-      proc.
+      proc => //.
+      instantiate /= h := (cost_duniform {gx, gy, x : group, s : group list} 
+                        `(true) s).
       rnd (size s <= n).
+      + by move=> /=; apply: is_int_le h.
       call hcA; skip => />; split.
       + move=> *; apply duniform_ll;rewrite -size_eq0 /#.
-      instantiate /= := (cost_duniform {gx, gy, x : group, s : group list} 
-                        `(true) s).
-      pose t :=  cost(_: {gx, gy, x : group, s : group list})[size s <= n : duniform s].
+      move: h; pose t := cost(&hr: {gx, gy, x : group, s : group list})[size s <= n : duniform s].
       smt().
     qed.
 
