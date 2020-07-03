@@ -544,12 +544,12 @@ let check_item_compatible ~proof_obl env mode (fin,oin) (fout,oout) =
        let diff = Mx.fold2_union (fun f ic oc acc ->
          let ic = odfl f_i0 ic in
          let oc = odfl f_i0 oc in
-         if EcFol.f_equal ic oc then acc
+         if EcReduction.is_conv (EcEnv.LDecl.init env []) ic oc then acc
          else Mx.add f (ic, oc) acc
        ) icalls ocalls Mx.empty in
 
        let self_sub =
-         if EcFol.f_equal iself oself then None
+         if  EcReduction.is_conv (EcEnv.LDecl.init env []) iself oself then None
          else Some (iself, oself) in
 
        if not (Mx.is_empty diff) || self_sub <> None then
@@ -569,12 +569,12 @@ let check_item_compatible ~proof_obl env mode (fin,oin) (fout,oout) =
        let diff = Mx.fold2_union (fun f ic oc acc ->
          let ic = odfl f_i0 ic in
          let oc = odfl f_i0 oc in
-         if EcFol.f_equal ic oc then acc
+         if  EcReduction.is_conv (EcEnv.LDecl.init env []) ic oc then acc
          else Mx.add f (ic, oc) acc
        ) icalls ocalls Mx.empty in
 
        let self_sub =
-         if EcFol.f_equal iself oself then None
+         if  EcReduction.is_conv (EcEnv.LDecl.init env []) iself oself then None
          else Some (iself, oself) in
 
        if not (Mx.is_empty diff) || self_sub <> None then
