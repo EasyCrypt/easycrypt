@@ -121,7 +121,7 @@ let t_choare_while_r inv qdec n (lam_cost : cost) tc =
      - at most [n] evaluations of the loop body. *)
   let e_cost_self =
     EcCHoare.f_xmuli
-      (f_int_add_simpl n (f_int @@ EcBigInt.of_int 1))
+      (f_int_add_simpl n f_i1)
       (EcCHoare.cost_of_expr inv chs.chs_m expr_e) in
 
   let body_cost = EcCHoare.choare_sum lam_cost (f_i0, n) in
