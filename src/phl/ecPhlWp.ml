@@ -54,29 +54,37 @@ module LowInternal = struct
           let post2 = mk_let_of_lv_substs env letsf2 in
           let m = EcMemory.memory memenv in
           let post  = f_if (form_of_expr m e) post1 post2 in
+          let post  = f_and_simpl (odfl f_true c_pre) post in
           ([], post),
           EcCHoare.f_xadd
             (EcCHoare.f_xmax cost_1 cost_2)
             (cost_of_expr_w_pre memenv e c_pre)
         end else raise No_wp
 
-(*
-    | Smatch (c, bs) -> begin
+    | Smatch (e, bs) -> begin
         let wps =
-          let do1 (_, s) = wp_stmt onesided env m (List.rev s.s_node) letsf in
+          let do1 (_, s) = wp_stmt onesided c_pre env memenv (List.rev s.s_node) letsf EcCHoare.f_x0 in
           List.map do1 bs in
 
-        if not (List.for_all (fun (r, _) -> List.is_empty r) wps) then
+        if not (List.for_all (fun ((r, _),_) -> List.is_empty r) wps) then
           raise No_wp;
         let pbs =
           List.map2
-            (fun (bds, _) (_, letsf) ->
+            (fun (bds, _) ((_, letsf),_) ->
               let post = mk_let_of_lv_substs env letsf in
               f_lambda (List.map (snd_map gtty) bds) post)
             bs wps
-        in ([], f_match (form_of_expr m c) pbs EcTypes.tbool)
+        in
+        let c =
+          match wps with
+          | [] -> EcCHoare.f_x0
+          | (_,c1) :: cs -> List.fold_left (fun c (_, c1) -> EcCHoare.f_xmax c c1) c1 cs in
+        let c = EcCHoare.f_xadd c (cost_of_expr_w_pre memenv e c_pre) in
+        let m = EcMemory.memory memenv in
+        let post =
+          f_and_simpl (odfl f_true c_pre) (f_match (form_of_expr m e) pbs EcTypes.tbool) in
+        (([],post), c)
       end
-*)
 
     | Sassert e when onesided ->
         let phi = form_of_expr (EcMemory.memory memenv) e in

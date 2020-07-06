@@ -86,6 +86,13 @@ op xmax (x y : xint) =
   with x = Inf, y = N _ => Inf
   with x = Inf, y = Inf => Inf.
 
+lemma sub_completness (t1 t2 t:xint) : 
+   t1 + t2 <= t <=>
+   t1 <= t - t2 /\ (is_int t2 \/ is_inf t).
+proof.
+  case: t t1 t2 => [i | ] [i1 | ] [i2 | ] //=; smt().
+qed.
+
 (* -------------------------------------------------------------------- *)
 theory Bigxint.
 clone include Bigop
@@ -150,8 +157,3 @@ proof.
 qed.
 
 hint simplify is_int_big.
-
-
-
-
-
