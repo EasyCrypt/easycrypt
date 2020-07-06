@@ -589,29 +589,29 @@ and reduce_logic ri env hyps f =
 
   | Fcoe ({ coe_e = { e_node = Etuple es } } as coe) when ri.cost ->
     List.fold_left (fun acc e ->
-        EcCHoare.f_xadd acc (EcCHoare.cost_of_expr coe.coe_pre coe.coe_mem e))
-      EcCHoare.f_x1 es
+        f_xadd acc (EcCHoare.cost_of_expr coe.coe_pre coe.coe_mem e))
+      f_x1 es
 
   | Fcoe ({ coe_e = {e_node = Eop (p, _)}} )
     when EcEnv.Op.is_dtype_ctor env p && ri.cost ->
     (* FIXME: check the number of arguments *)
-    EcCHoare.f_x1
+    f_x1
 
   | Fcoe ({ coe_e = { e_node = Eapp ({e_node = Eop (p, _); }, es) }} as coe)
     when EcEnv.Op.is_dtype_ctor env p && ri.cost ->
     (* FIXME: check the number of arguments *)
     List.fold_left (fun acc e ->
-        EcCHoare.f_xadd acc (EcCHoare.cost_of_expr coe.coe_pre coe.coe_mem e))
-      EcCHoare.f_x1 es
+        f_xadd acc (EcCHoare.cost_of_expr coe.coe_pre coe.coe_mem e))
+      f_x1 es
 
   | Fcoe ({ coe_e = { e_node = Eif (c,l,r) }} as coe) when ri.cost ->
     (* Max upper-bounded by the sum. *)
     List.fold_left (fun acc e ->
-        EcCHoare.f_xadd acc (EcCHoare.cost_of_expr coe.coe_pre coe.coe_mem e))
-      EcCHoare.f_x1 [c; l; r]
+        f_xadd acc (EcCHoare.cost_of_expr coe.coe_pre coe.coe_mem e))
+      f_x1 [c; l; r]
 
   | Fcoe ({ coe_e = { e_node = Eproj (e,_) }} as coe) when ri.cost ->
-    EcCHoare.f_xadd EcCHoare.f_x1 (EcCHoare.cost_of_expr coe.coe_pre coe.coe_mem e)
+    f_xadd f_x1 (EcCHoare.cost_of_expr coe.coe_pre coe.coe_mem e)
 
   | _ -> raise NotReducible
 

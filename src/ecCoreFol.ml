@@ -915,14 +915,43 @@ let f_i1  = f_int BI.one
 let f_im1 = f_int_opp f_i1
 
 (* -------------------------------------------------------------------- *)
-let f_int_add_simpl_z f1 f2 =
-  if f_equal f1 f_i0 then f2
-  else if f_equal f2 f_i0 then f1
-  else f_int_add f1 f2
+let f_op_xopp   = f_op EcCoreLib.CI_xint.p_xopp  [] (toarrow [txint        ] txint)
+let f_op_xadd   = f_op EcCoreLib.CI_xint.p_xadd  [] (toarrow [txint; txint ] txint)
+let f_op_xmul   = f_op EcCoreLib.CI_xint.p_xmul  [] (toarrow [txint; txint ] txint)
+let f_op_xle    = f_op EcCoreLib.CI_xint.p_xle   [] (toarrow [txint; txint ] tbool)
+let f_op_xmax   = f_op EcCoreLib.CI_xint.p_xmax  [] (toarrow [txint;  txint] txint)
 
-let f_int_mul_simpl_z f1 f2 =
-  if f_equal f1 f_i0 || f_equal f2 f_i0 then f_i0
-  else f_int_mul f1 f2
+let f_op_inf    = f_op EcCoreLib.CI_xint.p_inf    [] txint
+let f_op_N      = f_op EcCoreLib.CI_xint.p_N      [] (toarrow [tint ] txint)
+let f_op_is_inf = f_op EcCoreLib.CI_xint.p_is_inf [] (toarrow [txint] tbool)
+let f_op_is_int = f_op EcCoreLib.CI_xint.p_is_int [] (toarrow [txint] tbool)
+
+let f_is_inf f  = f_app f_op_is_inf [f] tbool
+let f_is_int f  = f_app f_op_is_int [f] tbool
+
+let f_Inf         = f_app f_op_inf  []       txint
+let f_N     f     = f_app f_op_N    [f]      txint
+let f_xopp  f     = f_app f_op_xopp [f]      txint
+let f_xadd  f1 f2 = f_app f_op_xadd [f1; f2] txint
+let f_xmul  f1 f2 = f_app f_op_xmul [f1; f2] txint
+let f_xmuli fi f  = f_xmul (f_N fi) f
+let f_xle   f1 f2 = f_app f_op_xle  [f1; f2] tbool
+let f_xmax  f1 f2 = f_app f_op_xmax [f1; f2] txint
+
+let f_x0 = f_N f_i0
+let f_x1 = f_N f_i1
+
+let f_xadd_simpl f1 f2 =
+  if f_equal f1 f_x0 then f2 else
+  if f_equal f2 f_x0 then f1 else f_xadd f1 f2
+
+let f_xmul_simpl f1 f2 =
+  if   f_equal f1 f_x0 || f_equal f2 f_x0
+  then f_x0
+  else f_xmul f1 f2
+
+let f_xmuli_simpl f1 f2 =
+  f_xmul_simpl (f_N f1) f2
 
 (* -------------------------------------------------------------------- *)
 module FSmart = struct
@@ -2153,11 +2182,10 @@ module Fsubst = struct
               x' calls )
         | `Concrete _ ->
           (* TODO: A: better simplification*)
-          ( f_int_add_simpl_z self' (f_int_mul_simpl_z cb_called' cb_cost'),
-            calls)
-      ) cost.c_calls (f_i0, EcPath.Mx.empty) in
+          ( f_xadd_simpl self' (f_xmuli_simpl cb_called' cb_cost'), calls)
+      ) cost.c_calls (f_x0, EcPath.Mx.empty) in
 
-    let c_self = f_int_add_simpl_z c_self self' in
+    let c_self = f_xadd_simpl c_self self' in
     cost_r c_self c_calls
 
   (* ------------------------------------------------------------------ *)

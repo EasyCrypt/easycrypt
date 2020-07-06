@@ -263,7 +263,7 @@ module FunAbsLow = struct
               |> List.filter (fun o ->
                   not @@ opt_equal f_equal
                     (Mx.find_opt o oi_costs)
-                    (Some EcCHoare.f_x0)) in
+                    (Some f_x0)) in
     let kargs_pr = List.map (fun (x,_) -> f_local x tint) bds in
     let pr = f_app_simpl inv kargs_pr tbool in
 
@@ -316,7 +316,7 @@ module FunAbsLow = struct
       f_exists bds (f_and call_bounds pr) in
     let fn_orcl = EcPath.xpath top f.x_sub in
     let f_cb = call_bound_r oi_self f_i1 in
-    let f_cost = cost_r EcCHoare.f_x0 (Mx.singleton fn_orcl f_cb)  in
+    let f_cost = cost_r f_x0 (Mx.singleton fn_orcl f_cb)  in
     let orcls_cost = List.map (fun o ->
         let cbd = cost_orcl oi o in
         (* Cost of a call to [o]. *)

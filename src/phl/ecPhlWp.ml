@@ -36,7 +36,7 @@ module LowInternal = struct
         try
           let letsf, i_cost = wp_instr onesided c_pre env memenv i letsf in
           wp_stmt
-            onesided c_pre env memenv stmt' letsf (EcCHoare.f_xadd cost i_cost)
+            onesided c_pre env memenv stmt' letsf (f_xadd cost i_cost)
         with No_wp -> (stmt, letsf), cost
 
   and wp_instr onesided c_pre env memenv i letsf =
@@ -46,9 +46,9 @@ module LowInternal = struct
 
     | Sif (e,s1,s2) ->
         let (r1,letsf1),cost_1 =
-          wp_stmt onesided c_pre env memenv (List.rev s1.s_node) letsf EcCHoare.f_x0 in
+          wp_stmt onesided c_pre env memenv (List.rev s1.s_node) letsf f_x0 in
         let (r2,letsf2),cost_2 =
-          wp_stmt onesided c_pre env memenv (List.rev s2.s_node) letsf EcCHoare.f_x0 in
+          wp_stmt onesided c_pre env memenv (List.rev s2.s_node) letsf f_x0 in
         if List.is_empty r1 && List.is_empty r2 then begin
           let post1 = mk_let_of_lv_substs env letsf1 in
           let post2 = mk_let_of_lv_substs env letsf2 in
@@ -56,14 +56,14 @@ module LowInternal = struct
           let post  = f_if (form_of_expr m e) post1 post2 in
           let post  = f_and_simpl (odfl f_true c_pre) post in
           ([], post),
-          EcCHoare.f_xadd
-            (EcCHoare.f_xmax cost_1 cost_2)
+          f_xadd
+            (f_xmax cost_1 cost_2)
             (cost_of_expr_w_pre memenv e c_pre)
         end else raise No_wp
 
     | Smatch (e, bs) -> begin
         let wps =
-          let do1 (_, s) = wp_stmt onesided c_pre env memenv (List.rev s.s_node) letsf EcCHoare.f_x0 in
+          let do1 (_, s) = wp_stmt onesided c_pre env memenv (List.rev s.s_node) letsf f_x0 in
           List.map do1 bs in
 
         if not (List.for_all (fun ((r, _),_) -> List.is_empty r) wps) then
@@ -77,9 +77,9 @@ module LowInternal = struct
         in
         let c =
           match wps with
-          | [] -> EcCHoare.f_x0
-          | (_,c1) :: cs -> List.fold_left (fun c (_, c1) -> EcCHoare.f_xmax c c1) c1 cs in
-        let c = EcCHoare.f_xadd c (cost_of_expr_w_pre memenv e c_pre) in
+          | [] -> f_x0
+          | (_,c1) :: cs -> List.fold_left (fun c (_, c1) -> f_xmax c c1) c1 cs in
+        let c = f_xadd c (cost_of_expr_w_pre memenv e c_pre) in
         let m = EcMemory.memory memenv in
         let post =
           f_and_simpl (odfl f_true c_pre) (f_match (form_of_expr m e) pbs EcTypes.tbool) in
@@ -98,7 +98,7 @@ let wp ?(uselet=true) ?(onesided=false) ?c_pre env m s post =
   let (r,letsf), cost =
     LowInternal.wp_stmt
       onesided c_pre env m (List.rev s.s_node)
-      ([],post) EcCHoare.f_x0
+      ([],post) f_x0
   in
   let pre = mk_let_of_lv_substs ~uselet env letsf in
   List.rev r, pre, cost

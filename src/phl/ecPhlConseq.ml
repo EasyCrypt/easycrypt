@@ -29,7 +29,7 @@ let conseq_cond pre post spre spost =
 let conseq_cost cost scost =
   let cflat  = EcCHoare.cost_flatten cost
   and scflat =  EcCHoare.cost_flatten scost in
-  EcCHoare.f_xle scflat cflat
+  f_xle scflat cflat
 
 let bd_goal_r fcmp fbd cmp bd =
   match fcmp, cmp with

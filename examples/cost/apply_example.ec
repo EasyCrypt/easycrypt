@@ -65,4 +65,3 @@ proof.
               MyH MyH_compl1 MyH_compl2
               MyH MyH_compl1 MyH_compl2). 
 qed.
-

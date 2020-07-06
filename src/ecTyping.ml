@@ -939,7 +939,7 @@ let restr_proof_obligation env (mp_in : mpath) sym (mt : module_type) : form lis
             | `Bounded _ -> (param_restr', ints)
             | `Unbounded ->
               let k_id = mk_ident () in
-              let k = EcCHoare.f_N (f_local k_id tint) in
+              let k = f_N (f_local k_id tint) in
               let oi' =
                 OI.mk (OI.allowed oi) (OI.is_in oi)
                   (`Bounded (k,Mx.empty)) in

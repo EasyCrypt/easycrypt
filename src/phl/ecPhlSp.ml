@@ -192,10 +192,7 @@ module LowInternal = struct
     match instr.i_node with
     | Sasgn (lv, e) ->
       let bds, assoc, pre = sp_asgn memenv env lv e (bds, assoc, pre) in
-      let cost =
-        EcCHoare.f_xadd
-          cost
-          (EcCHoare.cost_of_expr_any memenv e) in
+      let cost = f_xadd cost (EcCHoare.cost_of_expr_any memenv e) in
 
       bds, assoc, pre, cost
 
@@ -213,10 +210,10 @@ module LowInternal = struct
       let sp_t = build_sp memenv bds_t assoc_t pre_t in
       let sp_f = build_sp memenv bds_f assoc_f pre_f in
       let cost =
-        EcCHoare.f_xadd cost
-          (EcCHoare.f_xadd
+        f_xadd cost
+          (f_xadd
              (EcCHoare.cost_of_expr_any memenv e)
-             (EcCHoare.f_xadd cost_t cost_f)) in
+             (f_xadd cost_t cost_f)) in
       ([], [], f_or_simpl sp_t sp_f, cost)
 
     | _ -> raise No_sp

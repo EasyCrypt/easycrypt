@@ -113,10 +113,8 @@ let t_choare_call fpre fpost fcost tc =
      Remark: the cost of the evaluation of the return is accounted for in
      [fcost]. *)
   let args_cost = List.fold_left (fun cost e ->
-      EcCHoare.f_xadd
-        cost
-        (EcCHoare.cost_of_expr_any chs.chs_m e)
-    ) EcCHoare.f_x0 args in
+      f_xadd cost (EcCHoare.cost_of_expr_any chs.chs_m e)
+    ) f_x0 args in
   let cond1, cost = EcCHoare.cost_sub env chs.chs_co fcost in
   let cond2, cost = EcCHoare.cost_sub_self cost args_cost in
   let concl = f_cHoareS_r { chs with chs_s = s;

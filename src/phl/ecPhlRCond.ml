@@ -206,8 +206,7 @@ module LowMatch = struct
 
       Some (f_eq f epr),
       [],
-      Some (fun pre -> EcCHoare.f_xadd (EcCHoare.cost_of_expr pre me e)
-                                       EcCHoare.f_x1)
+      Some (fun pre -> f_xadd (EcCHoare.cost_of_expr pre me e) f_x1)
 
     end else begin
       let asgn =

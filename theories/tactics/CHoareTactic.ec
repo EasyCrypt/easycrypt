@@ -22,6 +22,8 @@ proof. by case. qed.
 lemma addx0 : right_id '0 xadd.
 proof. by case. qed.
 
+hint simplify [reduce] add0x, addx0.
+
 lemma addxA : associative xadd.
 proof. by case=> [x|] [y|] [z|] => //=; rewrite addrA. qed.
 

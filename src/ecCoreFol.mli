@@ -343,6 +343,22 @@ val f_int_pow   : form -> form -> form
 val f_int_edivz : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
+val f_is_inf : form -> form
+val f_is_int : form -> form
+
+val f_Inf   : form
+val f_N     : form -> form
+val f_xopp  : form -> form
+val f_xadd  : form -> form -> form
+val f_xmul  : form -> form -> form
+val f_xmuli : form -> form -> form
+val f_xle   : form -> form -> form
+val f_xmax  : form -> form -> form
+
+val f_x0 : form
+val f_x1 : form
+
+(* -------------------------------------------------------------------- *)
 module FSmart : sig
   type a_local  = EcIdent.t * ty
   type a_pvar   = prog_var * ty * memory

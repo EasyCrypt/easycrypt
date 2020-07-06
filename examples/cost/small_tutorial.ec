@@ -1,4 +1,4 @@
-require import AllCore Int List CHoareTactic StdBigop.
+require import AllCore Xint Int List CHoareTactic StdBigop.
 import Bigint IntExtra.
 
 module V = { var v : int }.
@@ -92,9 +92,7 @@ module B = {
 
 (* Assignements are free, only the variable evaluation has a cost. *)
 lemma foo : choare[B.g : true ==> true] time [N 3].
-proof.
-  proc; auto => * /=.
-qed.
+proof. by proc; auto. qed.
 
 (* Procedure calls are also free. *)
 lemma foo3 : choare[B.f : true ==> true] time [N 4].
@@ -165,13 +163,11 @@ right; auto.
 (* prove that the invariant implies the post, that the decreasing quantity
    is initially smaller than the number of loop iterations, and that the cost
    of all iterations is smaller than the final cost. *)
-skip => * => /=; split; [1: by smt].
-admit.
-(* rewrite !big_constz !count_predT !size_range; by smt (). *)
+skip => * => /=; split; 1: by smt().
+by rewrite big_constNz /= !size_range /= /#.
 qed.
 
 (* Match example *)
-
 
 module ExMatch = {
   proc gethead (l : int list) = {
@@ -185,11 +181,9 @@ module ExMatch = {
 
 lemma test_match : choare[ExMatch.gethead] time [N 4].
 proof.
-  proc.
-  match (::) 0. 
-  admit.
-  right; auto.
-  auto => * /=.
+proc; match (::) 0 => //=.
++ by skip=> /#.
++ by auto.
 qed.
 
 (*********************)
@@ -211,10 +205,9 @@ module (MyAdv : Adv) (H0 : H) = {
 
 
 lemma MyAdv_compl (k : int) (H0   <: H [o : `{N k}]) : 
-    choare[MyAdv(H0).a] 
-      time [N 3; H0.o : 2].
+  0 <= k => choare[MyAdv(H0).a] time [N 3; H0.o : 2].
 proof.
-  proc; do !(call(_: true; time [])); auto => /=.
+by move=> _; proc; do !(call(_: true; time [])); auto => /=.
 qed.
 
 (* The same lemma, but in a section. *)
@@ -222,14 +215,9 @@ section.
 op mk : int.
 declare module H0 : H [ o : `{N mk}].
 
-lemma MyAdv_compl_loc : 
-    choare[MyAdv(H0).a] 
-    time [N 3; H0.o : 2].
-    proof.
-      proc; do !(call(_: true; time [])); auto => /=.
-  qed.
-  end section.
-  print MyAdv_compl_loc.
+lemma MyAdv_compl_loc : choare[MyAdv(H0).a] time [N 3; H0.o : 2].
+proof. by proc; do !(call(_: true; time [])); auto. qed.
+end section.
 
 module (MyH : H) = { 
   proc o () = {
@@ -242,10 +230,8 @@ lemma MyH_compl : choare[MyH.o] time [N 1] by proc; auto.
 
 lemma advcompl_inst : choare[MyAdv(MyH).a] time [N 5].
 proof.
-  admit.
-  (* apply (MyAdv_compl 1 MyH MyH_compl).  *)
+by apply (MyAdv_compl 1 MyH MyH_compl).
 qed.
-
 
 module Inv (Adv0 : Adv) (HI : H) = {
   module Adv1 = Adv0(HI)
@@ -264,65 +250,41 @@ lemma Inv_compl
     0 <= k =>
     choare[Inv(Adv0, H0).i] time [N 1; Adv0.a : 1; H0.o : k ].
 proof.    
-  move => hk; proc. 
-  call(_: true; time [(H0.o : [N 0; H0.o : 1])]).
-  move => * /=; proc*; call(_: true; time []); auto => /=.
-  auto => /=.
-  admit.
-  (* rewrite !big_constz !count_predT !size_range; by smt (). *)
+move => hk; proc.
+call (_: true; time [(H0.o : [N 0; H0.o : 1])]).
+move=> * /=; proc*; call(_: true; time []); auto => /=.
+by auto => /=; rewrite big_constz count_predT big_constNz !size_range /#.
 qed.
 
-lemma Inv_compl_inst
-    (h : int)
-    (H1   <: H [o : `{N h}]) : 
-    choare[Inv(MyAdv, H1).i] 
-      time [N 4; H1.o : 2 ].
+lemma Inv_compl_inst (h : int) (H1   <: H [o : `{N h}]) : 
+  choare[Inv(MyAdv, H1).i] time [N 4; H1.o : 2 ].
 proof.
-  print Inv_compl.
-  (* Le apply suivant marche:  *)
-  (* apply (Inv_compl 3 2 h MyAdv MyAdv_compl H1 _) => //. *)
-  (* Mais il n'arrive pas à inferrer les arguments.
-     Par exemple, ça échoue à trouver seulement "h" *)
-  (* apply (Inv_compl 3 2 _ MyAdv MyAdv_compl H1 _) => //. *)
-  (* Ça échoue à trouver 3 et 2: *)
-  (* apply (Inv_compl _ _ h MyAdv MyAdv_compl H1 _) => //. *)
-  (* Et bien sur, ça échoue à trouver les deux *)
-  (* apply (Inv_compl _ _ _ MyAdv MyAdv_compl H1 _) => //. *)
-  admit.
+by apply (Inv_compl _ _ h MyAdv MyAdv_compl H1 _).
 qed.
-
 
 (**************************************************)
-
 op kab : int.
+
 module type AB (H0 : H) = {
   proc a () : unit `{ N kab, H0.o : 1 }
 }.
 
-print AB.
 section.
  declare module H0 : H.
  declare module AB0 : AB.
 
- print AB0.
  local module AB1 = AB0(H0).
- print AB1.
 
  local module E = { 
    proc e () = {
      AB1.a();
    }
  }.
-   
- print E.
-
 
 (**************************************************)
  module type MAB (H1 : H) (H2 : H)  = {
    proc a () : unit {H2.o}
  }.
-
- print MAB.
 
  local module (MAB0 : MAB) (H1 : H) (H2 : H) = {
    proc a () = {
@@ -332,10 +294,8 @@ section.
  }.
 
  local module MAB1 = MAB0(H0).
- print MAB1.
 
  local module MAB2 = MAB0(H0, H0).
- print MAB2.                    
 
 end section.
 
