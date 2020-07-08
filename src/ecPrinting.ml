@@ -3006,10 +3006,18 @@ let pp_sigitem moi_opt ppe fmt (Tys_function fs) =
          let oi = Msym.find fs.fs_name moi in
          pp_orclinfo_bare ppe fmt oi)
 
-let pp_modsig ppe fmt (p,ms) =
+let pp_modsig ?(long=false) ppe fmt (p,ms) =
   let (ppe,pp) = pp_mod_params ppe ms.mis_params in
-  Format.fprintf fmt "@[<v>@[<hv 2>module type %s%t @,%a@;<0 -2>@] = \
+
+  let pp_long fmt p =
+    if long then
+      let qs = EcPath.toqsymbol p in
+      if fst qs <> [] then
+        Format.fprintf fmt "(* %a *)@ " EcSymbols.pp_qsymbol qs in
+
+  Format.fprintf fmt "@[<v>@[<hv 2>%amodule type %s%t @,%a@;<0 -2>@] = \
                       {@,  @[<v>%a@]@,}@]"
+    pp_long p
     (EcPath.basename p) pp
     (pp_mem_restr ppe) ms.mis_restr
     (pp_list "@,@," (pp_sigitem (Some ms.mis_restr.mr_oinfos) ppe)) ms.mis_body
@@ -3411,7 +3419,7 @@ module ObjectInfo = struct
   let pr_mty_r =
     { od_name    = "module types";
       od_lookup  = EcEnv.ModTy.lookup;
-      od_printer = pp_modsig; }
+      od_printer = pp_modsig ~long:true; }
 
   let pr_mty = pr_gen pr_mty_r
 

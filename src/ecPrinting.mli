@@ -76,7 +76,7 @@ val pp_restr_s     :            (bool                           ) pp
 val pp_restr       : PPEnv.t -> (mod_restr                      ) pp
 val pp_modtype     : PPEnv.t -> (module_type                    ) pp
 val pp_modexp      : PPEnv.t -> (mpath * module_expr            ) pp
-val pp_modsig      : PPEnv.t -> (path * module_sig              ) pp
+val pp_modsig      : ?long:bool -> PPEnv.t -> (path * module_sig) pp
 val pp_modsig_smpl : PPEnv.t -> (path * module_smpl_sig         ) pp
 
 (* -------------------------------------------------------------------- *)
