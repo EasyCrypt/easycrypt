@@ -203,9 +203,9 @@ module LowInternal = struct
       let pre_f  =
         build_sp memenv bds assoc (f_and_simpl (f_not e_form) pre) in
       let stmt_t, (bds_t, assoc_t, pre_t, cost_t) =
-        sp_stmt memenv env (bds, assoc, pre_t, EcCHoare.f_x0) s1.s_node in
+        sp_stmt memenv env (bds, assoc, pre_t, f_x0) s1.s_node in
       let stmt_f, (bds_f, assoc_f, pre_f, cost_f) =
-        sp_stmt memenv env (bds, assoc, pre_f, EcCHoare.f_x0) s2.s_node in
+        sp_stmt memenv env (bds, assoc, pre_f, f_x0) s2.s_node in
       if not (List.is_empty stmt_t && List.is_empty stmt_f) then raise No_sp;
       let sp_t = build_sp memenv bds_t assoc_t pre_t in
       let sp_f = build_sp memenv bds_f assoc_f pre_f in
@@ -220,7 +220,7 @@ module LowInternal = struct
 
   let sp_stmt (memenv : EcMemory.memenv) env stmt f =
     let stmt, (bds, assoc, pre, cost) =
-      sp_stmt memenv env ([], [], f, EcCHoare.f_x0) stmt in
+      sp_stmt memenv env ([], [], f, f_x0) stmt in
     let pre = build_sp memenv bds assoc pre in
     stmt, pre, cost
 end
