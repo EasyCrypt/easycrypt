@@ -38,35 +38,14 @@ module Talpha = struct
   let w3_ty_compare t1 t2 = Ty.ty_hash   t1 - Ty.ty_hash   t2
   let w3_ls_compare l1 l2 = Term.ls_hash l1 - Term.ls_hash l2
 
-  let w3_intlit_compare i1 i2 =
-    match i1, i2 with
-    | Number.IConstRaw i1, Number.IConstRaw i2 ->
-        Why3.BigInt.compare i1 i2
-
-    | Number.IConstBin i1, Number.IConstBin i2
-    | Number.IConstDec i1, Number.IConstDec i2
-    | Number.IConstHex i1, Number.IConstHex i2
-    | Number.IConstOct i1, Number.IConstOct i2 ->
-        String.compare i1 i2
-
-    | _, _ ->
-        Pervasives.compare i1 i2
-
-  let w3_int_compare (i1 : Number.integer_constant) (i2 : Number.integer_constant) =
+  let w3_int_compare i1 i2 =
     compare2
-      (lazy (Pervasives.compare i1.ic_negative i2.ic_negative))
-      (lazy (w3_intlit_compare  i1.ic_abs      i2.ic_abs     ))
+      (lazy Number.(compare i1.il_kind i2.il_kind))
+      (lazy (BigInt.compare i1.il_int i2.il_int))
 
-  let w3_constant_compare c1 c2 =
-    match c1, c2 with
-    | Number.ConstInt i1, Number.ConstInt i2 ->
-        w3_int_compare i1 i2
+  let w3_real_compare = Number.compare_real
 
-    | Number.ConstReal r1, Number.ConstReal r2 ->
-        Pervasives.compare r1 r2
-
-    | _, _ ->
-        Pervasives.compare c1 c2
+  let w3_constant_compare = Constant.compare_const
 
   let rec pat_compare_alpha m1 m2 p1 p2 =
     let ct = w3_ty_compare p1.Term.pat_ty p2.Term.pat_ty in
@@ -176,12 +155,12 @@ module Talpha = struct
                            t_compare_alpha m1 m2 e1 e2))
             in
               compare2
-                (lazy (Pervasives.compare q1 q2))
+                (lazy (compare q1 q2))
                 (lazy (compare_body b1 b2))
 
         | Term.Tbinop (o1, f1, g1), Term.Tbinop (o2, f2, g2) ->
             compare3
-              (lazy (Pervasives.compare o1 o2))
+              (lazy (compare o1 o2))
               (lazy (t_compare_alpha m1 m2 f1 f2))
               (lazy (t_compare_alpha m1 m2 g1 g2))
 
