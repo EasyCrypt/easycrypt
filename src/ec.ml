@@ -212,7 +212,7 @@ let main () =
         in
 
         let pid =
-          let args = ["why3"; "config"; "--detect"] in
+          let args = ["why3"; "config"; "--detect"; "--full-config"] in
           let args = args @ (conf |> omap (fun x -> ["-C"; x])|> odfl []) in
 
           Printf.eprintf "Executing: %s\n%!" (String.concat " " args);
