@@ -2,6 +2,8 @@ opam-version: "2.0"
 maintainer: "pierre-yves@strub.nu"
 homepage: "https://www.easycrypt.info/"
 bug-reports: "https://www.easycrypt.info/trac/newticket"
+dev-repo: "git+https://github.com/EasyCrypt/easycrypt.git"
+authors: "EasyCrypt Development Team <team@easycrypt.info>"
 license: "CeCILL-C"
 build: [
   [make "OCAMLBUILD_ECJOBS=%{jobs}%"]
