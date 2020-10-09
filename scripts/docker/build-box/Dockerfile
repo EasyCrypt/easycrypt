@@ -27,8 +27,8 @@ ENV OPAMYES=true OPAMVERBOSE=0 OPAMJOBS=4 OPAMEXTERNALSOLVER=mccs
 RUN \
 	opam init --disable-sandboxing -a && \
 	opam switch create -v easycrypt ocaml-base-compiler.4.07.1 && \
-	opam remote add easycrypt https://github.com/EasyCrypt/opam.git && \
-	opam install depext && opam depext easycrypt ec-provers && \
+	opam pin add -n easycrypt https://github.com/EasyCrypt/easycrypt.git && \
+	opam install depext && opam depext easycrypt && \
 	opam clean
 
 RUN \
@@ -37,7 +37,7 @@ RUN \
 ENV CVC4V=1.6 Z3V=4.8.6
 
 RUN \
-	opam install alt-ergo && \
+	opam depext alt-ergo && opam install alt-ergo && \
 	wget -O cvc4 https://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-${CVC4V}-x86_64-linux-opt && \
         wget https://github.com/Z3Prover/z3/releases/download/z3-${Z3V}/z3-${Z3V}-x64-ubuntu-16.04.zip && \
         unzip -j z3-${Z3V}-x64-ubuntu-16.04.zip z3-${Z3V}-x64-ubuntu-16.04/bin/z3 && \
