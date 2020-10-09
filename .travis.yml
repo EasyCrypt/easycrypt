@@ -20,13 +20,16 @@ env:
 notifications:
   slack:
     secure: K1KAbR0W0Ljep3lnPlB9151oGxJcSS6/tR3dZ0GoYOSOybBReEf6DvCMcCfq4QeqQr32tASDpEH6ACEFI1/tdV4Nk3lhAHnz/mg6hmzDZN/jDdTJPg4RKOQWYs6nKO64weof4QKHkFh/XkG0djEQzJPVu6LxaKSQfO1usv1qvBKmzWpbJdvJKoYqo/HwRWauIxNTmin4rsvP8tYBOB7I2W5chaqujZMKpzTk9uI1si1QU0FPAFjNLltBxBZXC8N02cZAIkCvKW1pORu1asMUXxaAcIKKVm4TBwzvI+xUNFZnnlLpUR6e3GLftCdqvmwtfnqP+AbuC+xQSVF09hotqJ0G3f1Ltj7uelusYdyhsppa6c1EDmFPPvk2lkeEbWkfSa+DfMecRNT0SkDAHTM0WnK2H0W8y5EYleBQGKZY8WjS0jMV3yhKWLFGYr8Imt4cpcjZ/8dWkJ62ZTuzuhlmL3Kv31HA+0qrzYP4qbRe/qUmAQesxKajzGB70VmO0bNbVvNZakJ9lrdq09pzgMoLCxc5B1jP39DQZbnXcVcDDlIKRH5oPlRr647/RdszpJ6vBh2G/NB/vpUBdDq0SNWSBtwUX73SIGpcRFRXmgUiXt6eHljR2gPvkYB0yCkTLqSutjE8zktZXFWFUXYLdx2y7hCrvZCwxEyjsxf8/9y+Hsw=
-before_install:
+install:
 - docker pull easycryptpa/ec-build-box
+- docker tag  easycryptpa/ec-build-box ci:current
+- docker run  --env=OPAMYES=true --init -id --name=CI -v ${TRAVIS_BUILD_DIR}:/home/ci/easycrypt -w /home/ci/easycrypt ci:current
+- docker exec CI /bin/bash --login -c "opam update"
+- docker exec CI /bin/bash --login -c "opam pin add -n easycrypt ."
+- docker exec CI /bin/bash --login -c "opam install --deps-only easycrypt"
 after_failure:
 - >-
   [ -f report.log ] && curl --digest -u ${DAV_USER}:${DAV_PASSWORD} -sT report.log
   https://www.easycrypt.info/reports/report-${TARGETS}-${TIMESTAMP}.log
 script:
-- >-
-  docker run -v $PWD:/home/ci/easycrypt:rw easycryptpa/ec-build-box
-  sh -c "cd easycrypt && opam config exec -- make ${TARGETS}"
+- docker exec CI /bin/bash --login -c "make ${TARGETS}"
