@@ -46,4 +46,4 @@ RUN \
 	rm -f z3 cvc4
 
 RUN \
-	opam config exec -- why3 config --detect
+	opam config exec -- why3 config --detect --full-config
