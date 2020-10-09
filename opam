@@ -28,7 +28,8 @@ depends: [
   "yojson"
 ]
 post-messages: [
-"EasyCrypt supports external provers contained in the virtual package ec-provers.
+"EasyCrypt needs external provers to be installed. From opam, you
+can install AltErgo (package: alt-ergo).
 
 The required steps for configuring the provers are listed on:
   https://github.com/EasyCrypt/easycrypt#configuring-why3"
