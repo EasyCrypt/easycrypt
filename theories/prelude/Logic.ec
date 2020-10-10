@@ -394,11 +394,11 @@ lemma nosmt andFb : left_zero false (/\)    by [].
 lemma nosmt andbT : right_id true (/\)      by [].
 lemma nosmt andbF : right_zero false (/\)   by [].
 lemma nosmt andbb : idempotent (/\)         by [].
-lemma nosmt andbC : commutative (/\)        by [].
-lemma nosmt andbA : associative (/\)        by [].
-lemma nosmt andbCA : left_commutative (/\)  by [].
-lemma nosmt andbAC : right_commutative (/\) by [].
-lemma nosmt andbACA : interchange (/\) (/\) by [].
+lemma nosmt andbC : commutative (/\)        by move=> [] /#.
+lemma nosmt andbA : associative (/\)        by move=> [] /#.
+lemma nosmt andbCA : left_commutative (/\)  by move=> [] /#.
+lemma nosmt andbAC : right_commutative (/\) by move=> [] /#.
+lemma nosmt andbACA : interchange (/\) (/\) by move=> [] /#.
 
 lemma nosmt orTb : forall b, true \/ b     by [].
 lemma nosmt orFb : left_id false (\/)      by [].
@@ -416,10 +416,10 @@ lemma nosmt andNb b : (!b /\ b) <=> false by [].
 lemma nosmt orbN b  : (b \/ !b) <=> true  by [].
 lemma nosmt orNb b  : (!b \/ b) <=> true  by [].
 
-lemma nosmt andb_orl : left_distributive  (/\) (\/)  by [].
-lemma nosmt andb_orr : right_distributive (/\) (\/) by [].
-lemma nosmt orb_andl : left_distributive  (\/) (/\)  by [].
-lemma nosmt orb_andr : right_distributive (\/) (/\) by [].
+lemma nosmt andb_orl : left_distributive  (/\) (\/) by move=> [] /#.
+lemma nosmt andb_orr : right_distributive (/\) (\/) by move=> [] /#.
+lemma nosmt orb_andl : left_distributive  (\/) (/\) by move=> [] /#.
+lemma nosmt orb_andr : right_distributive (\/) (/\) by move=> [] /#.
 
 lemma nosmt andb_idl a b : (b => a) => a /\ b <=> b by [].
 lemma nosmt andb_idr a b : (a => b) => a /\ b <=> a by [].
