@@ -34,7 +34,7 @@ EasyCrypt uses the following third-party tools/libraries:
 
  * OCamlbuild
 
- * Why3 (>= 1.0)
+ * Why3 (>= 1.3)
 
      Available at <http://why3.lri.fr/>
 
@@ -114,52 +114,37 @@ packages manager.
 
       where `$OVERSION` is a valid OCaml version (e.g. ocaml-base-compiler.4.07.0)
 
-  1. Add the EasyCrypt repository:
+  1. Add the EasyCrypt package from repository:
 
       ```
-      $> opam repository add easycrypt git://github.com/EasyCrypt/opam.git
-      $> opam update
+      $> opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git
       ```
 
-  2. Optionally, select the EasyCrypt (git) branch you want to use:
-
-      ```
-      $> opam pin -n add easycrypt https://github.com/EasyCrypt/easycrypt.git#branch
-      ```
-
-     where `branch` is the branch name you want to use (e.g. `aprhl`).
-
-     In that case, we advise you to create a dedicated opam switch
-     (see first step above).
-
-  3. Optionally, use opam to install the system dependencies:
+  2. Optionally, use opam to install the system dependencies:
 
       ```
       $> opam install depext
       $> opam depext easycrypt
       ```
 
-  4. Add the EasyCrypt meta-packages:
+  3. Install EasyCrypt's dependencies:
 
       ```
       $> opam install --deps-only easycrypt
-      $> opam install ec-provers
+      $> opam install alt-ergo
       ```
 
-      Provers may require external dependencies. You can install then
-      directly using opam:
-
-      ```
-      $> opam install depext       # if not already done
-      $> opam depext ec-provers
-      ```
-
-      If you get errors about ocamlbuild failing because it's already installed, the
-      check can be skipped with the following:
+     If you get errors about ocamlbuild failing because it's already
+     installed, the check can be skipped with the following:
 
       ```
       CHECK_IF_PREINSTALLED=false opam install --deps-only easycrypt
       ```
+
+  4. You can download extra provers at the following URLs:
+
+     * Z3: [https://github.com/Z3Prover/z3]
+     * CVC4: [https://cvc4.github.io/]
 
 Installing requirements using OPAM (non-POSIX systems)
 --------------------------------------------------------------------
@@ -170,39 +155,30 @@ You can install all the needed dependencies via the opam OCaml packages manager.
 
      https://fdopen.github.io/opam-repository-mingw/installation/
 
-  2. Add the EasyCrypt repository:
+  2. Add the EasyCrypt package from repository:
 
       ```
-      $> opam repository add easycrypt git://github.com/EasyCrypt/opam.git
-      $> opam update
+      $> opam pin -yn add easycrypt https://github.com/EasyCrypt/easycrypt.git
       ```
 
-  3. Optionally, select the EasyCrypt (git) branch you want to use:
-
-      ```
-      $> opam pin -n add easycrypt https://github.com/EasyCrypt/easycrypt.git#branch
-      ```
-
-     where `branch` is the branch name you want to use (e.g. `aprhl`).
-
-  4. Use opam to install the system dependencies:
+  3. Use opam to install the system dependencies:
 
       ```
       $> opam install depext depext-cygwinports
       $> opam depext easycrypt
       ```
 
-  5. Add the EasyCrypt meta-packages:
+  4. Install EasyCrypt's dependencies:
 
       ```
       $> opam install --deps-only easycrypt
       $> opam install alt-ergo
       ```
 
-  6. You can download extra provers at the following URLs:
+  5. You can download extra provers at the following URLs:
 
      * Z3: [https://github.com/Z3Prover/z3]
-     * EProver: [http://wwwlehre.dhbw-stuttgart.de/~sschulz/E/E.html]
+     * CVC4: [https://cvc4.github.io/]
 
 
 Configuring Why3
@@ -212,7 +188,7 @@ Before running EasyCrypt and after the installation/removal/update
 of an SMT prover, you need to (re)configure Why3.
 
 ```
-$> why3 config --detect
+$> why3 config --detect --full-config
 ```
 
 EasyCrypt is using the default Why3 location, i.e. ~/.why3.conf.
@@ -263,40 +239,6 @@ EasyCrypt binary is named `easycrypt`.
 
 Proof General Front-End
 ====================================================================
-
-Installing using opam
---------------------------------------------------------------------
-
-If you installed the EasyCrypt dependencies using opam, you can
-install ProofGeneral via opam too. Running
-
-```
-$> opam install proofgeneral
-```
-
-installs ProofGeneral along with its EasyCrypt mode. You still have to
-tweak your emacs configuration file (~/.emacs) to load
-ProofGeneral by adding the following line to it
-
-```
-(load-file "$proof-general-home/generic/proof-site.el")
-```
-
-where `$proof-general-home` should be replaced by
-
-```
-$prefix/share/proofgeneral
-```
-
-with `$prefix` being set to the output of
-
-```
-$> opam config var prefix
-```
-
-
-Installing from sources
---------------------------------------------------------------------
 
 EasyCrypt mode has been integrated upstream. Please, go
 to <https://github.com/ProofGeneral/PG> and follow the instructions.

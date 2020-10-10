@@ -1,0 +1,40 @@
+opam-version: "2.0"
+maintainer: "pierre-yves@strub.nu"
+homepage: "https://www.easycrypt.info/"
+bug-reports: "https://www.easycrypt.info/trac/newticket"
+dev-repo: "git+https://github.com/EasyCrypt/easycrypt.git"
+authors: "EasyCrypt Development Team <team@easycrypt.info>"
+license: "CeCILL-C"
+build: [
+  [make "OCAMLBUILD_ECJOBS=%{jobs}%"]
+]
+install: [
+  [make "PREFIX=%{prefix}%" "install"]
+]
+remove: [
+  [make "PREFIX=%{prefix}%" "uninstall-purge"]
+]
+depends: [
+  "ocaml"
+  "batteries" {>= "2.3"}
+  "camlzip"
+  "menhir" {>= "20150921"}
+  "pcre" {>= "7"}
+  "why3" {>= "1.3.0" & < "1.4"}
+  "ocaml-inifiles" {>= "1.2"}
+  "zarith"
+  "ocamlbuild"
+  "ocamlfind"
+  "yojson"
+]
+post-messages: [
+"EasyCrypt needs external provers to be installed. From opam, you
+can install AltErgo (package: alt-ergo).
+
+The required steps for configuring the provers are listed on:
+  https://github.com/EasyCrypt/easycrypt#configuring-why3"
+]
+synopsis: "EasyCrypt: Computer-Aided Cryptographic Proofs"
+url {
+  src: "git+https://github.com/EasyCrypt/easycrypt.git"
+}
