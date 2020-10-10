@@ -321,7 +321,7 @@ by have := cnvtoD _ _ _ _ h1 h2 => /lim_cnvto ->.
 qed.
 
 lemma limN (s : int -> real) : lim (fun x => - s x) = - lim s.
-proof. by rewrite -mulN1r -limZ /#. qed.
+proof. by rewrite -mulN1r -limZ; congr=> /#. qed.
 
 lemma limB (s1 s2 : int -> real) :
   converge s1 => converge s2 =>
