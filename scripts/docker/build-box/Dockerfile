@@ -34,7 +34,7 @@ RUN \
 RUN \
 	opam install --deps-only easycrypt && opam clean
 
-ENV CVC4V=1.6 Z3V=4.8.6
+ENV CVC4V=1.8 Z3V=4.8.9
 
 RUN \
 	opam depext alt-ergo && opam install alt-ergo && \
