@@ -251,7 +251,7 @@ let main () =
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false)
 
-    end
+      end
   in
 
   (match input with
