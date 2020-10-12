@@ -405,18 +405,18 @@ lemma mean (d:'a distr) (p:'a -> bool):
 proof strict.
   move=> fin_supp_d.
   pose sup := oflist (to_seq (support d)).
-  pose is  := image (fun x y, p x /\ x = y) sup.
-  rewrite mu_support (mu_eq d _ (cpOrs is)).
-    move=> y;rewrite /predI /is /cpOrs /= or_exists eq_iff;split.
+  pose is_  := image (fun x y, p x /\ x = y) sup.
+  rewrite mu_support (mu_eq d _ (cpOrs is_)).
+    move=> y;rewrite /predI /is_ /cpOrs /= or_exists eq_iff;split.
       move=> [H1 H2];exists ((fun x0 y0, p x0 /\ x0 = y0) y);split => //.
       by apply/imageP; exists y; rewrite /sup mem_oflist mem_to_seq.
     move=> [p' []].
     by rewrite imageP; progress => //;smt.
   rewrite mu_ors.
-    rewrite /is => x1 x2 Hx; rewrite !imageP => -[y1 [Hm1 Heq1]] [y2 [Hm2 Heq2]].
+    rewrite /is_ => x1 x2 Hx; rewrite !imageP => -[y1 [Hm1 Heq1]] [y2 [Hm2 Heq2]].
     subst; move: Hx => /= Hx a [Hpa1 Heq1];rewrite -not_def => -[Hpa2 Heq2].
     by subst; move: Hx;rewrite not_def.
-  rewrite /is => {is};elim/fset_ind sup.
+  rewrite /is_ => {is_};elim/fset_ind sup.
     by rewrite image0 !Mrplus.sum_empty.
   move=> x s Hnm Hrec;rewrite FSet.imageU FSet.image1 Mrplus.sum_add0.
     rewrite imageP /= => -[x0 [H1 H2]].

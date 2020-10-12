@@ -125,11 +125,12 @@ let tfun t1 t2   = mk_ty (Tfun (t1, t2))
 let tglob m      = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)
-let tunit      = tconstr EcCoreLib.CI_Unit .p_unit  []
-let tbool      = tconstr EcCoreLib.CI_Bool .p_bool  []
-let tint       = tconstr EcCoreLib.CI_Int  .p_int   []
-let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr [ty]
-let treal      = tconstr EcCoreLib.CI_Real .p_real  []
+let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
+let tbool      = tconstr EcCoreLib.CI_Bool .p_bool    []
+let tint       = tconstr EcCoreLib.CI_Int  .p_int     []
+let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr   [ty]
+let toption ty = tconstr EcCoreLib.CI_Option.p_option [ty]
+let treal      = tconstr EcCoreLib.CI_Real .p_real    []
 let tcpred ty  = tfun ty tbool
 
 let ttuple lt    =
@@ -724,6 +725,18 @@ let e_decimal (n, (l, f)) =
   if EcBigInt.equal n EcBigInt.zero then d else Reals.add nv d
 
 (* -------------------------------------------------------------------- *)
+let e_none (ty : ty) : expr =
+  e_op EcCoreLib.CI_Option.p_none [ty] (toption ty)
+
+let e_some ({ e_ty = ty } as e : expr) : expr =
+  let op = e_op EcCoreLib.CI_Option.p_some [ty] (tfun ty (toption ty)) in
+  e_app op [e] (toption ty)
+
+let e_oget (e : expr) (ty : ty) : expr =
+  let op = e_op EcCoreLib.CI_Option.p_oget [ty] (tfun (toption ty) ty) in
+  e_app op [e] ty
+
+(* -------------------------------------------------------------------- *)
 module ExprSmart = struct
   let l_symbol (lp, x) x' =
     if x == x' then lp else LSymbol x'
@@ -775,7 +788,7 @@ module ExprSmart = struct
   let e_match (e, (b, es, ty)) (b', es', ty') =
     if   b == b' && es == es' && ty == ty'
     then e
-    else e_match b es ty
+    else e_match b' es' ty'
 
   let e_lam (e, (b, body)) (b', body') =
     if   b == b' && body == body'

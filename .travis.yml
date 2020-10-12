@@ -1,6 +1,6 @@
-sudo: required
 dist: trusty
-language: ocaml
+os: linux
+language: shell
 branches:
   only:
   - 1.0
@@ -13,20 +13,23 @@ env:
   - secure: "eRyc2bjGlUEZ9CUuu7B6cEzV1kneAUflxaFSMNRvtAAaIjubRsoeC7XxaS5cziHLyOZeQF1KibNR/PHWkXk9R2TxxaqLhlh4FAUpGkmzF7fNCsAhnImx19yAO7p1BAkMAizbmAZK9YuNrBatBz4YC0tW7w0qhgx2BwnuYropLWiX2rAkhmrA7HxhF+FTJM84AHEFRgch4V6xrnwGmhf9FsIVsXGdJBpdBcz9s3OAmXeA5eo45x4UFmWLKejjLfnYlAeAKvSjknZbBiQwv+RtUbMBwoiPHhP7hWSVBecyMe8UWlydjUilmvw36yx4Dm/t3vj2acwqb+4EPvcpCWeYbZyug8aR+W84grDZNBI7OZVgmaacj70hrfZ35k38n5CM9mXWtWHWRW8x2nMIEapT+pGhyW09YdKtcdty+cQpwwK3yLbtZulhJ+zAdskrBzst/bOgv6+dYCd/lOiQAh3U7dFPW3h7P/uCehUZbk9ofq6iFTQsl2a0lrDBLhGBp2iZZTRz6S/7AOspK0upp988xkqsw+pE/tRndSF/b2tU0wfOARuqpuzcMl/RIhuFLmlopKC40RR3/c3Jr6RWMwia0FWheVng923SQzyxKoyTcRnJJxg5HYrg8X50b0kDzTt2cnkPbBbETtO7Ilppg7QQq9ELeuFMNyDuto9t+K2WD7M="
   - secure: "shtTydyWLlFJnIu9yiRYOrpCxiJP1VaNw+6ByNBQdMb3rGJ4PHCRVmuWMN0RKy3ebFbZ1/+FNH3zd2qZn/5RKw2/X02AgqWSCR1HyO3GPOwzg6OUzIFxNHXBCBa1Zeq/kA2xlbSjuxGWWX6/SF5TS6/jeYA7jibrAf5GbjUGD3gVlOjaIgOS3R0Jw3ReA8uPE2aQhcaW36jUXKckxLbgArueubt18TzTqWRH7TysgrtgIw+YYNUP0BAeYZdlI5bFtmNmDNXOWS2UKAlLutGXgjM515Twq1plCBDZlncMTbgfFsNTNd56/T33W/GiNFNAh8sEu2AAqryu/c+SxYAgdr4eyDM1zUI+NWmKu7OEUsXHGrb0hlWYoln0lwSUyr0VoIJ0rBvTGFyi+xvkxZAGYtc/3gN86qjZ3MctoX/mckY0b7n7P6vY1FSdwNYqjP5VA9XjVXXex3gWEyhqUjWK+M2gPREVnS2mxMx8fcv9D5TJ3aoetrclro1nTrSHfPveidkGRjqTgJ01tL0U7yQePGGOhvWQhQM1E0LSGZKx/uwAKkPkOC+MiHipM8I2dQ/I2nAeJPNFqT7R66YAQi2nhjIpLTC1O1/K0YiIT92GJ39UH4+s/6tau0DvGPMX3xJNeKqaECK7cXp6Xj3I51xPgSk15BpIcOjSMieIGXpkEkE="
   - TIMESTAMP=$(date -Ins)
-  matrix:
+  jobs:
   - TARGETS=build
   - TARGETS=check
   - TARGETS=examples
 notifications:
   slack:
     secure: K1KAbR0W0Ljep3lnPlB9151oGxJcSS6/tR3dZ0GoYOSOybBReEf6DvCMcCfq4QeqQr32tASDpEH6ACEFI1/tdV4Nk3lhAHnz/mg6hmzDZN/jDdTJPg4RKOQWYs6nKO64weof4QKHkFh/XkG0djEQzJPVu6LxaKSQfO1usv1qvBKmzWpbJdvJKoYqo/HwRWauIxNTmin4rsvP8tYBOB7I2W5chaqujZMKpzTk9uI1si1QU0FPAFjNLltBxBZXC8N02cZAIkCvKW1pORu1asMUXxaAcIKKVm4TBwzvI+xUNFZnnlLpUR6e3GLftCdqvmwtfnqP+AbuC+xQSVF09hotqJ0G3f1Ltj7uelusYdyhsppa6c1EDmFPPvk2lkeEbWkfSa+DfMecRNT0SkDAHTM0WnK2H0W8y5EYleBQGKZY8WjS0jMV3yhKWLFGYr8Imt4cpcjZ/8dWkJ62ZTuzuhlmL3Kv31HA+0qrzYP4qbRe/qUmAQesxKajzGB70VmO0bNbVvNZakJ9lrdq09pzgMoLCxc5B1jP39DQZbnXcVcDDlIKRH5oPlRr647/RdszpJ6vBh2G/NB/vpUBdDq0SNWSBtwUX73SIGpcRFRXmgUiXt6eHljR2gPvkYB0yCkTLqSutjE8zktZXFWFUXYLdx2y7hCrvZCwxEyjsxf8/9y+Hsw=
-before_install:
+install:
 - docker pull easycryptpa/ec-build-box
+- docker tag  easycryptpa/ec-build-box ci:current
+- docker run  --env=OPAMYES=true --init -id --name=CI -v ${TRAVIS_BUILD_DIR}:/home/ci/easycrypt -w /home/ci/easycrypt ci:current
+- docker exec CI /bin/bash --login -c "opam update"
+- docker exec CI /bin/bash --login -c "opam pin add -n easycrypt ."
+- docker exec CI /bin/bash --login -c "opam install --deps-only easycrypt"
 after_failure:
 - >-
   [ -f report.log ] && curl --digest -u ${DAV_USER}:${DAV_PASSWORD} -sT report.log
   https://www.easycrypt.info/reports/report-${TARGETS}-${TIMESTAMP}.log
 script:
-- >-
-  docker run -v $PWD:/home/ci/easycrypt:rw easycryptpa/ec-build-box
-  sh -c "cd easycrypt && opam config exec -- make ${TARGETS}"
+- docker exec CI /bin/bash --login -c "make ${TARGETS}"

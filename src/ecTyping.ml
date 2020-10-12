@@ -27,6 +27,10 @@ module NormMp = EcEnv.NormMp
 module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
+type wp = EcEnv.env -> EcMemory.memory -> stmt -> form -> form option
+let  wp = (ref (None : wp option))
+
+(* -------------------------------------------------------------------- *)
 type opmatch = [
   | `Op   of EcPath.path * EcTypes.ty list
   | `Lc   of EcIdent.t
@@ -67,6 +71,18 @@ type funapp_error =
 type mem_error =
 | MAE_IsConcrete
 
+type fxerror =
+| FXE_EmptyMatch
+| FXE_MatchParamsMixed
+| FXE_MatchParamsDup
+| FXE_MatchParamsUnk
+| FXE_MatchNonLinear
+| FXE_MatchDupBranches
+| FXE_MatchPartial
+| FXE_CtorUnk
+| FXE_CtorAmbiguous
+| FXE_CtorInvalidArity of (symbol * int * int)
+
 type filter_error =
 | FE_InvalidIndex of int
 | FE_NoMatch
@@ -100,6 +116,7 @@ type tyerror =
 | TypeClassMismatch
 | TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
+| NotAnInductive
 | AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
@@ -113,15 +130,18 @@ type tyerror =
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
+| InvalidMatch           of fxerror
 | InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
 | MemNotAllowed
 | UnknownScope           of qsymbol
+| NoWP
 | FilterMatchFailure
 | LvMapOnNonAssign
 
+(* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
 let tyerror loc env e = raise (TyError (loc, env, e))
@@ -234,9 +254,16 @@ let (_i_inuse, s_inuse, se_inuse) =
       let map = s_inuse map s in
         map
 
+    | Smatch (e, bs) ->
+      let map = se_inuse map e in
+      let map = List.fold_left (fun map -> s_inuse map |- snd) map bs in
+        map
+
     | Sassert e ->
       se_inuse map e
-    | Sabstract _ -> assert false (* FIXME *)
+
+    | Sabstract _ ->
+      assert false (* FIXME *)
 
   and s_inuse (map : uses) (s : stmt) =
     List.fold_left i_inuse map s.s_node
@@ -849,7 +876,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
       in
 
       let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
-      let rec_   = snd (EcDecl.tydecl_as_record recty) in
+      let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
       let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
       let reccty, rectvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
       let fields =
@@ -989,7 +1016,7 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
   in
 
   let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
-  let rec_   = snd (EcDecl.tydecl_as_record recty) in
+  let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
   let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
   let reccty, rtvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
   let tysopn = Tvar.init (List.map fst recty.tyd_params) rtvi in
@@ -1049,6 +1076,84 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
       (Printf.sprintf "mk_%s" (EcPath.basename recp))
   in
     (ctor, fields, (rtvi, reccty))
+
+(* -------------------------------------------------------------------- *)
+let trans_branch ~loc env ue gindty ((pb, body) : ppattern * _) =
+  let filter = fun op -> EcDecl.is_ctor op in
+  let PPApp ((cname, tvi), cargs) = pb in
+  let tvi = tvi |> omap (transtvi env ue) in
+  let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+
+  match cts with
+  | [] ->
+      tyerror cname.pl_loc env (InvalidMatch FXE_CtorUnk)
+
+  | _ :: _ :: _ ->
+      tyerror cname.pl_loc env (InvalidMatch FXE_CtorAmbiguous)
+
+  | [(cp, tvi), opty, subue, _] ->
+      let ctor = oget (EcEnv.Op.by_path_opt cp env) in
+      let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
+      let indty = oget (EcEnv.Ty.by_path_opt indp env) in
+      let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
+      let ctorsym, ctorty = List.nth ind ctoridx in
+
+      let args_exp = List.length ctorty in
+      let args_got = List.length cargs in
+
+      if args_exp <> args_got then begin
+        tyerror cname.pl_loc env (InvalidMatch
+          (FXE_CtorInvalidArity (snd (unloc cname), args_exp, args_got)))
+      end;
+
+      let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
+
+      if not (List.is_unique cargs_lin) then
+        tyerror cname.pl_loc env (InvalidMatch FXE_MatchNonLinear);
+
+      EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+
+      let ctorty =
+        let tvi = Some (EcUnify.TVIunamed tvi) in
+          fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
+      let pty = EcUnify.UniEnv.fresh ue in
+
+      (try  EcUnify.unify env ue (toarrow ctorty pty) opty
+       with EcUnify.UnificationFailure _ -> assert false);
+      unify_or_fail env ue loc pty gindty;
+
+      let create o = EcIdent.create (omap_dfl unloc "_" o) in
+      let pvars = List.map (create |- unloc) cargs in
+      let pvars = List.combine pvars ctorty in
+
+      (ctorsym, (pvars, body))
+
+(* -------------------------------------------------------------------- *)
+let trans_match ~loc env ue (gindty, gind) pbs =
+  let pbs = List.map (trans_branch ~loc env ue gindty) pbs in
+
+  if List.length pbs < List.length gind.tydt_ctors then
+    tyerror loc env (InvalidMatch FXE_MatchPartial);
+
+  if List.length pbs > List.length gind.tydt_ctors then
+    tyerror loc env (InvalidMatch FXE_MatchDupBranches);
+
+  let pbs = Msym.of_list pbs in
+
+  List.map
+    (fun (x, _) -> oget (Msym.find_opt x pbs))
+    gind.tydt_ctors
+
+(* -------------------------------------------------------------------- *)
+let trans_if_match ~loc env ue (gindty, gind) (c, b1, b2) =
+  let (c, (cargs, b1)) = trans_branch ~loc env ue gindty (c, b1) in
+
+  List.map
+    (fun (x, xargs) ->
+      if   sym_equal c x
+      then (cargs, Some b1)
+      else (List.map (fun ty -> (EcIdent.create "_", ty)) xargs), b2)
+    gind.tydt_ctors
 
 (*-------------------------------------------------------------------- *)
 let expr_of_opselect
@@ -1177,12 +1282,42 @@ let transexp (env : EcEnv.env) mode ue e =
     end
 
     | PEif (pc, pe1, pe2) ->
-      let c, tyc = transexp env pc in
-      let e1, ty1 = transexp env pe1 in
-      let e2, ty2 = transexp env pe2 in
+        let c, tyc = transexp env pc in
+        let e1, ty1 = transexp env pe1 in
+        let e2, ty2 = transexp env pe2 in
         unify_or_fail env ue pc .pl_loc ~expct:tbool tyc;
         unify_or_fail env ue pe2.pl_loc ~expct:ty1   ty2;
         (e_if c e1 e2, ty1)
+
+    | PEmatch (pce, pb) ->
+        let ce, ety = transexp env pce in
+        let inddecl =
+          match (EcEnv.ty_hnorm ety env).ty_node with
+          | Tconstr (indp, _) -> begin
+              match EcEnv.Ty.by_path indp env with
+              | { tyd_type = `Datatype dt } ->
+                    Some (indp, dt)
+              | _ -> None
+            end
+          | _ -> None in
+
+        let (_indp, inddecl) =
+          match inddecl with
+          | None   -> tyerror pce.pl_loc env NotAnInductive
+          | Some x -> x in
+
+        let branches =
+          trans_match ~loc:e.pl_loc env ue (ety, inddecl) pb in
+
+        let branches, bty = List.split (List.map (fun (lcs, s) ->
+          let env  = EcEnv.Var.bind_locals lcs env in
+          let bdy  = transexp env s in
+          e_lam lcs (fst bdy), (snd bdy, s.pl_loc)) branches) in
+
+        let rty = EcUnify.UniEnv.fresh ue in
+
+        List.iter (fun (ty, loc) -> unify_or_fail env ue loc ~expct:ty rty) bty;
+        e_match ce branches rty, rty
 
     | PEforall (xs, pe) ->
         let env, xs = trans_binding env ue xs in
@@ -1979,6 +2114,43 @@ and transinstr
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       [ i_while (e, body) ]
 
+  | PSmatch (pe, pbranches) -> begin
+      let e, ety = transexp env `InProc ue pe in
+      let ety = Tuni.offun (EcUnify.UniEnv.assubst ue) ety in
+
+      let inddecl =
+        match (EcEnv.ty_hnorm ety env).ty_node with
+        | Tconstr (indp, _) -> begin
+            match EcEnv.Ty.by_path indp env with
+            | { tyd_type = `Datatype dt } ->
+                Some (indp, dt)
+            | _ -> None
+          end
+        | _ -> None in
+
+      let (_indp, inddecl) =
+        match inddecl with
+        | None   -> tyerror pe.pl_loc env NotAnInductive
+        | Some x -> x in
+
+      let branches =
+        match pbranches with
+        | `Full pbranches ->
+            let aout = trans_match ~loc:i.pl_loc env ue (ety, inddecl) pbranches in
+            List.map (snd_map some) aout
+
+        | `If ((c, b1), b2) ->
+            trans_if_match ~loc:i.pl_loc env ue (ety, inddecl) (c, b1, b2)
+
+      in
+
+      let branches = List.map (fun (lcs, s) ->
+        let env = EcEnv.Var.bind_locals lcs env in
+        (lcs, omap (transstmt env ue) s |> odfl (stmt []))) branches in
+
+      [ i_match (e, branches) ]
+    end
+
   | PSassert pe ->
       let e, ety = transexp env `InProc ue pe in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
@@ -2381,6 +2553,64 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
         let aout = transf env pf in
         unify_or_fail env ue pf.pl_loc ~expct:ty aout.f_ty; aout
 
+    | PFWP (fn, args, phi) ->
+        let fpath   = EcEnv.NormMp.norm_xfun env (trans_gamepath env fn) in
+        let fun_    = EcEnv.Fun.by_xpath fpath env in
+        let args, argsty =
+          transcall (transexp env `InProc ue)
+            env ue f.pl_loc fun_.f_sig args in
+
+        let body, ret =
+          let init =
+            match fun_.f_sig.fs_anames with
+            | None ->
+                [i_asgn (LvVar (pv_arg fpath, argsty), e_tuple args)]
+            | Some anames ->
+                List.map2 (fun x e ->
+                    i_asgn (LvVar (pv_loc fpath x.v_name, e.e_ty), e))
+                  anames args
+          in
+
+          let def =
+            match fun_.f_def with
+            | FBdef def -> def
+            | _ -> tyerror f.pl_loc env NoWP in
+
+          (stmt (init @ def.f_body.s_node), def.f_ret) in
+
+        let mem = EcIdent.create "wp" in
+        let ret = form_of_expr mem (odfl e_tt ret) in
+        let env =
+          let menv = EcEnv.Fun.prF_memenv mem fpath env in
+          EcEnv.Memory.push_active menv env in
+        let phi = transf env phi in
+        let phi =
+          let rec subst f =
+            match f.f_node with
+            | Fpvar (pv, m) when
+                   EcMemory.mem_equal m mem
+                && pv_equal (pv_res fpath) (EcEnv.NormMp.norm_pvar env pv)
+              -> ret
+
+            | _ -> EcFol.f_map (fun ty -> ty) subst f
+          in subst phi in
+
+        let phi =
+          match oget !wp env mem body phi with
+          | None -> tyerror f.pl_loc env NoWP
+          | Some phi -> phi in
+
+        let () =
+          let rec check subf =
+            match subf.f_node with
+            | Fpvar (pv, m) when EcMemory.mem_equal mem m ->
+                Format.eprintf "[W]%s@." (EcPath.x_tostring pv.pv_name);
+                tyerror f.pl_loc env NoWP
+            | _ -> EcFol.f_iter check subf
+          in check phi in
+
+        phi
+
     | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
 
     | PFscope (popsc, f) ->
@@ -2554,6 +2784,38 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
           unify_or_fail env ue pf1.pl_loc ~expct:tbool   f1.f_ty;
           unify_or_fail env ue pf3.pl_loc ~expct:f2.f_ty f3.f_ty;
           f_if f1 f2 f3
+
+    | PFmatch (pcf, pb) ->
+        let cf = transf env pcf in
+        let cfty = Tuni.offun (EcUnify.UniEnv.assubst ue) cf.f_ty in
+
+        let inddecl =
+          match (EcEnv.ty_hnorm cfty env).ty_node with
+          | Tconstr (indp, _) -> begin
+              match EcEnv.Ty.by_path indp env with
+              | { tyd_type = `Datatype dt } ->
+                  Some (indp, dt)
+              | _ -> None
+            end
+          | _ -> None in
+
+        let (_indp, inddecl) =
+          match inddecl with
+          | None   -> tyerror pcf.pl_loc env NotAnInductive
+          | Some x -> x in
+
+        let branches =
+          trans_match ~loc:f.pl_loc env ue (cf.f_ty, inddecl) pb in
+
+        let branches, bty = List.split (List.map (fun (lcs, s) ->
+          let env  = EcEnv.Var.bind_locals lcs env in
+          let bdy  = transf env s in
+          f_lambda (List.map (snd_map gtty) lcs) bdy, (bdy.f_ty, s.pl_loc)) branches) in
+
+        let rty = EcUnify.UniEnv.fresh ue in
+
+        List.iter (fun (ty, loc) -> unify_or_fail env ue loc ~expct:rty ty) bty;
+        f_match cf branches rty
 
     | PFlet (lp, (pf1, paty), f2) ->
         let (penv, p, pty) = transpattern env ue lp in

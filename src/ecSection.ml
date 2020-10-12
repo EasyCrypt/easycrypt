@@ -134,6 +134,12 @@ let rec on_mpath_instr cb (i : instr)=
       on_mpath_expr cb e;
       on_mpath_stmt cb s
 
+  | Smatch (e, b) ->
+      let forb (bs, s) =
+        List.iter (on_mpath_ty cb |- snd) bs;
+        on_mpath_stmt cb s
+      in on_mpath_expr cb e; List.iter forb b
+
   | Sabstract _ -> ()
 
 and on_mpath_stmt cb (s : stmt) =

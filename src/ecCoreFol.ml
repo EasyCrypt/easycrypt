@@ -165,6 +165,7 @@ let gty_fv = function
     EcPath.Sx.fold (fun xp fv -> EcPath.x_fv fv xp) rx fv
   | GTmem mt -> EcMemory.mt_fv mt
 
+(* -------------------------------------------------------------------- *)
 let gtty (ty : EcTypes.ty) =
   GTty ty
 
@@ -173,6 +174,11 @@ let gtmodty (mt : module_type) (mr : mod_restr) =
 
 let gtmem (mt : EcMemory.memtype) =
   GTmem mt
+
+(* -------------------------------------------------------------------- *)
+let as_gtty  = function GTty ty  -> ty  | _ -> assert false
+let as_modty = function GTmodty (mty, r) -> (mty, r) | _ -> assert false
+let as_mem   = function GTmem m -> m | _ -> assert false
 
 (*-------------------------------------------------------------------- *)
 let b_equal (b1 : bindings) (b2 : bindings) =
