@@ -1779,9 +1779,8 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
     in [], items
   end
 
-  | Pst_import m ->
-    let (mo, _) = trans_msymbol env m in
-    [mo], []
+  | Pst_import ms ->
+    (List.map (fst |- trans_msymbol env) ms), []
 
 and transstruct1_alias env name f =
   let f = trans_gamepath env f in
