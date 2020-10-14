@@ -1872,7 +1872,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   | Pst_alias ({pl_desc = name},f) ->
     [], [transstruct1_alias env name f]
 
-  | Pst_include (m, procs) -> begin
+  | Pst_include (m, imp, procs) -> begin
     let (mo, ms) = trans_msymbol env m in
 
     if ms.mis_params <> [] then
@@ -1911,7 +1911,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
         List.pmap (fun fs ->
           if not (in_procs fs procs) then Some (mk_fun fs) else None) ms.mis_body
 
-    in [], items
+    in (if imp then [mo] else []), items
   end
 
   | Pst_import ms ->
