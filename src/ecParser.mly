@@ -1487,9 +1487,10 @@ fun_decl:
         pfd_uses     = (true, None); }
     }
 
-include_proc:
-| PLUS? xs=plist1(lident,COMMA) { `Include_proc xs }
-| MINUS xs=plist1(lident,COMMA) { `Exclude_proc xs }
+minclude_proc:
+| PLUS? xs=plist1(lident,COMMA) { `MInclude xs }
+| MINUS xs=plist1(lident,COMMA) { `MExclude xs }
+
 mod_item:
 | v=var_decl
     { Pst_var v }
@@ -1509,9 +1510,11 @@ mod_item:
 | PROC x=lident EQ f=loc(fident)
     { Pst_alias (x, f) }
 
-| INCLUDE m=loc(mod_qident) xs=bracket(include_proc)?
-    { Pst_maliases (m,xs) }
+| INCLUDE m=loc(mod_qident) xs=bracket(minclude_proc)?
+    { Pst_include (m, xs) }
 
+| IMPORT VAR m=loc(mod_qident)
+    { Pst_import m }
 
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
@@ -1583,8 +1586,9 @@ sig_param:
 | x=uident COLON i=mod_type { (x, i) }
 
 signature_item:
-| INCLUDE i=mod_type xs=bracket(include_proc)? qs=brace(qident*)?
+| INCLUDE i=mod_type xs=bracket(minclude_proc)? qs=brace(qident*)?
    { `Include (i, xs, qs) }
+
 | PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) qs=brace(qident*)?
     { `FunctionDecl
           { pfd_name     = x;

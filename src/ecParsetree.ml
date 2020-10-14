@@ -141,13 +141,13 @@ and pmodule_sig_struct = {
 
 and pmodule_sig_struct_body = pmodule_sig_item list
 
-and include_proc = [
-  | `Include_proc of psymbol list
-  | `Exclude_proc of psymbol list
+and minclude_proc = [
+  | `MInclude of psymbol list
+  | `MExclude of psymbol list
 ]
 
 and pmodule_sig_item = [
-  | `Include      of pmodule_type * include_proc option * pqsymbol list option
+  | `Include      of pmodule_type * minclude_proc option * pqsymbol list option
   | `FunctionDecl of pfunction_decl
 ]
 
@@ -168,7 +168,6 @@ and pfunction_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
-
 and pmodule_def = {
   ptm_header : pmodule_header;
   ptm_body   : pmodule_expr;
@@ -195,8 +194,8 @@ and pstructure_item =
   | Pst_var      of (psymbol list * pty)
   | Pst_fun      of (pfunction_decl * pfunction_body)
   | Pst_alias    of (psymbol * pgamepath)
-  | Pst_maliases of (pmsymbol located * include_proc option)
-
+  | Pst_include  of (pmsymbol located * minclude_proc option)
+  | Pst_import   of pmsymbol located
 
 and pfunction_body = {
   pfb_locals : pfunction_local list;

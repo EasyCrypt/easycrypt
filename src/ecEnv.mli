@@ -187,14 +187,15 @@ module Mod : sig
   val sp_lookup     : qsymbol -> env -> mpath * (module_expr suspension)
   val sp_lookup_opt : qsymbol -> env -> (mpath * (module_expr suspension)) option
 
-  val bind : symbol -> module_expr -> env -> env
-
+  val bind  : symbol -> module_expr -> env -> env
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
-  val bind_local : EcIdent.t -> module_type -> mod_restr -> env -> env
 
+  val bind_local    : EcIdent.t -> module_type -> mod_restr -> env -> env
   val declare_local : EcIdent.t -> module_type -> mod_restr -> env -> env
 
   val add_restr_to_locals : mod_restr -> env -> env
+
+  val import_vars : env -> mpath -> env
 
   (* Only bind module, ie no memory and no local variable *)
   val add_mod_binding : bindings -> env -> env
