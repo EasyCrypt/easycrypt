@@ -1456,6 +1456,10 @@ module Mod = struct
             name (tysig, restr) scope.sc_section }
     in
       scope
+
+  let import (scope : scope) (m : pmsymbol located) : scope =
+    let m, _ = EcTyping.trans_msymbol (env scope) m in
+    { scope with sc_env = EcEnv.Mod.import_vars (env scope) m }
 end
 
 (* -------------------------------------------------------------------- *)

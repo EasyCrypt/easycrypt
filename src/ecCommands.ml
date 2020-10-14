@@ -489,6 +489,11 @@ and process_th_clone (scope : EcScope.scope) thcl =
   EcScope.Cloning.clone scope (Pragma.get ()).pm_check thcl
 
 (* -------------------------------------------------------------------- *)
+and process_mod_import (scope : EcScope.scope) mods =
+  EcScope.check_state `InTop "module var import" scope;
+  List.fold_left EcScope.Mod.import scope mods
+
+(* -------------------------------------------------------------------- *)
 and process_sct_open (scope : EcScope.scope) name =
   EcScope.check_state `InTop "section opening" scope;
   EcScope.Section.enter scope name
@@ -660,6 +665,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | GthImport    name -> `Fct   (fun scope -> process_th_import  scope  name)
       | GthExport    name -> `Fct   (fun scope -> process_th_export  scope  name)
       | GthClone     thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
+      | GModImport   mods -> `Fct   (fun scope -> process_mod_import scope  mods)
       | GsctOpen     name -> `Fct   (fun scope -> process_sct_open   scope  name)
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
