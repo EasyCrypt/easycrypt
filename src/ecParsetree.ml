@@ -184,7 +184,7 @@ and pstructure_item =
   | Pst_var      of (psymbol list * pty)
   | Pst_fun      of (pfunction_decl * pfunction_body)
   | Pst_alias    of (psymbol * pgamepath)
-  | Pst_include  of (pmsymbol located * minclude_proc option)
+  | Pst_include  of (pmsymbol located * bool * minclude_proc option)
   | Pst_import   of (pmsymbol located) list
 
 and pfunction_body = {

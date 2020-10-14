@@ -1483,8 +1483,8 @@ mod_item:
 | PROC x=lident EQ f=loc(fident)
     { Pst_alias (x, f) }
 
-| INCLUDE m=loc(mod_qident) xs=bracket(minclude_proc)?
-    { Pst_include (m, xs) }
+| INCLUDE v=boption(VAR) m=loc(mod_qident) xs=bracket(minclude_proc)?
+    { Pst_include (m, v, xs) }
 
 | IMPORT VAR ms=loc(mod_qident)+
     { Pst_import ms }
