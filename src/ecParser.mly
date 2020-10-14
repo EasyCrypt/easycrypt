@@ -1949,6 +1949,9 @@ theory_require_1:
 theory_import: IMPORT xs=uqident* { xs }
 theory_export: EXPORT xs=uqident* { xs }
 
+module_import:
+| IMPORT VAR xs=loc(mod_qident)+ { xs }
+
 (* -------------------------------------------------------------------- *)
 (* Instruction matching                                                 *)
 
@@ -3591,6 +3594,7 @@ global_action:
 | theory_export    { GthExport    $1 }
 | theory_clone     { GthClone     $1 }
 | theory_clear     { GthClear     $1 }
+| module_import    { GModImport   $1 }
 | section_open     { GsctOpen     $1 }
 | section_close    { GsctClose    $1 }
 | top_decl         { Gdeclare     $1 }

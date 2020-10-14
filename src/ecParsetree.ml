@@ -1103,6 +1103,7 @@ type global_action =
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
   | GthClone     of theory_cloning
+  | GModImport   of pmsymbol located list
   | GsctOpen     of osymbol_r
   | GsctClose    of osymbol_r
   | Grealize     of prealize located
