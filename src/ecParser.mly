@@ -1513,8 +1513,8 @@ mod_item:
 | INCLUDE m=loc(mod_qident) xs=bracket(minclude_proc)?
     { Pst_include (m, xs) }
 
-| IMPORT VAR m=loc(mod_qident)
-    { Pst_import m }
+| IMPORT VAR ms=loc(mod_qident)+
+    { Pst_import ms }
 
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
