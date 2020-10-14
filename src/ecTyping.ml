@@ -1456,12 +1456,14 @@ and transmodsig_body
         Tys_function( fs, {oi with oi_calls = calls} ) in
       match proc with
       | None -> List.map add sig_.mis_body
-      | Some (`Include_proc xs) ->
+
+      | Some (`MInclude xs) ->
         check_xs xs;
         List.pmap
           (fun fs -> if in_xs fs xs then Some (add fs) else None)
           sig_.mis_body
-      | Some (`Exclude_proc xs) ->
+
+      | Some (`MExclude xs) ->
         check_xs xs;
         List.pmap
           (fun fs -> if not (in_xs fs xs) then Some (add fs) else None)
@@ -1591,8 +1593,9 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure lo
     in
     List.fold_left
       (fun (env, acc) item ->
-        let newitems = transstruct1 env item in
+        let imports, newitems = transstruct1 env item in
         let env = EcEnv.bindall (List.map tydecl1 newitems) env in
+        let env = List.fold_left EcEnv.Mod.import_vars env imports in
         (env, acc @ newitems))
       (env, []) st
   in
@@ -1647,19 +1650,22 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   match unloc st with
   | Pst_mod  (x,cast, me) ->
     let pe = {
-      ptm_header = if cast=[] then Pmh_ident x else Pmh_cast(Pmh_ident x, cast);
+      ptm_header = if List.is_empty cast then Pmh_ident x else Pmh_cast(Pmh_ident x, cast);
       ptm_body   = me;
       ptm_local  = true } in
 
     let me = transmod ~attop:false env pe in
-    [me.me_name, MI_Module me]
+    [], [me.me_name, MI_Module me]
 
   | Pst_var (xs, ty) ->
-      let ty = transty_for_decl env ty in
+      let ty    = transty_for_decl env ty in
+      let items =
         List.map
           (fun { pl_desc = x } ->
             (x, MI_Variable { v_name = x; v_type = ty; }))
-          xs
+          xs in
+
+      [], items
 
   | Pst_fun (decl, body) -> begin
       let ue  = UE.create (Some []) in
@@ -1725,42 +1731,57 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
           };
         }
       in
-        [(decl.pfd_name.pl_desc, MI_Function fun_)]
+        [], [(decl.pfd_name.pl_desc, MI_Function fun_)]
     end
 
   | Pst_alias ({pl_desc = name},f) ->
-    [transstruct1_alias env name f]
+    [], [transstruct1_alias env name f]
 
-  | Pst_maliases (m, xs) ->
-    let (mo,ms) = trans_msymbol env m in
+  | Pst_include (m, procs) -> begin
+    let (mo, ms) = trans_msymbol env m in
+
     if ms.mis_params <> [] then
       tyerror (loc m) env (InvalidModType MTE_InnerFunctor);
-    let check_xs xs =
-      List.iter (fun x ->
-          let s = unloc x in
-          if not (List.exists (fun (Tys_function(fs,_)) ->
-                    sym_equal fs.fs_name s) ms.mis_body) then
-            let modsymb = List.map (unloc -| fst) (unloc m)
-            and funsymb = unloc x in
-            tyerror (loc x) env (UnknownFunName (modsymb,funsymb))) xs in
-    let in_xs (Tys_function(fs,_)) xs =
-      List.exists (fun x -> sym_equal fs.fs_name (unloc x)) xs in
-    let mk_fun (Tys_function(fs,_)) =
+
+    let check_procs =
+      let check_proc { pl_loc = ploc; pl_desc = name; } =
+        let check (Tys_function (fs, _)) = sym_equal fs.fs_name name in
+          if not (List.exists check ms.mis_body) then begin
+            let modsymb = List.map (unloc -| fst) (unloc m) in
+            tyerror ploc env (UnknownFunName (modsymb, name))
+          end
+      in List.iter check_proc in
+
+    let in_procs (Tys_function (fs, _)) procs =
+      List.exists (fun x -> sym_equal fs.fs_name (unloc x)) procs in
+
+    let mk_fun (Tys_function (fs, _)) =
       (fs.fs_name,
        MI_Function { f_name = fs.fs_name;
                      f_sig  = fs;
                      f_def  = FBalias (EcPath.xpath_fun mo fs.fs_name) }) in
-    match xs with
-    | None ->
-      List.map mk_fun ms.mis_body
-    | Some (`Include_proc xs) ->
-      check_xs xs;
-      List.pmap (fun fs ->
-        if in_xs fs xs then Some (mk_fun fs) else None) ms.mis_body
-    | Some (`Exclude_proc xs) ->
-      check_xs xs;
-      List.pmap (fun fs ->
-        if not (in_xs fs xs) then Some (mk_fun fs) else None) ms.mis_body
+
+    let items =
+      match procs with
+      | None ->
+        List.map mk_fun ms.mis_body
+
+      | Some (`MInclude procs) ->
+        check_procs procs;
+        List.pmap (fun fs ->
+          if in_procs fs procs then Some (mk_fun fs) else None) ms.mis_body
+
+      | Some (`MExclude procs) ->
+        check_procs procs;
+        List.pmap (fun fs ->
+          if not (in_procs fs procs) then Some (mk_fun fs) else None) ms.mis_body
+
+    in [], items
+  end
+
+  | Pst_import m ->
+    let (mo, _) = trans_msymbol env m in
+    [mo], []
 
 and transstruct1_alias env name f =
   let f = trans_gamepath env f in
@@ -1771,7 +1792,6 @@ and transstruct1_alias env name f =
       f_def = FBalias f;
     } in
   (name, MI_Function fun_)
-
 
 (* -------------------------------------------------------------------- *)
 and transbody ue symbols (env : EcEnv.env) retty pbody =

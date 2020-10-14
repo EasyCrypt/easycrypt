@@ -1786,7 +1786,7 @@ module Var = struct
   let add (path : EcPath.xpath) (env : env) =
     let obj = by_xpath path env in
     let ip = fst (oget (ipath_of_xpath path)) in
-      MC.import_var ip obj env
+    MC.import_var ip obj env
 
   let lookup_locals name env =
     MMsym.all name env.env_locals
@@ -1950,7 +1950,7 @@ module Mod = struct
 
   let add (p : EcPath.mpath) (env : env) =
     let obj = by_mpath p env in
-      MC.import_mod (fst (ipath_of_mpath p)) obj env
+    MC.import_mod (fst (ipath_of_mpath p)) obj env
 
   let lookup qname (env : env) =
     let (((_, _a), p), x) = MC.lookup_mod qname env in
@@ -2064,6 +2064,19 @@ module Mod = struct
       | _ -> env
     in
       List.fold_left do1 env bd
+
+  let import_vars env p =
+    let do1 env = function
+      | MI_Variable v ->
+        let vp  = EcPath.xpath p (EcPath.psymbol v.v_name) in
+        let ip  = fst (oget (ipath_of_xpath vp)) in
+        let obj = { vb_type = v.v_type; vb_kind = `Var PVglob; } in
+        MC.import_var ip obj env
+
+      | _ -> env
+    in
+
+    List.fold_left do1 env (by_mpath p env).me_comps
 end
 
 (* -------------------------------------------------------------------- *)
