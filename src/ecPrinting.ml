@@ -450,14 +450,15 @@ let pp_funname (ppe : PPEnv.t) fmt p =
     (pp_topmod ppe) p.P.x_top pp_path p.P.x_sub
 
 (* -------------------------------------------------------------------- *)
-let msymbol_of_pv (ppe : PPEnv.t) p =
-  let k = p.pv_kind in
-  let p = p.pv_name in
+let msymbol_of_pv (ppe : PPEnv.t) pv =
+  let k = pv.pv_kind in
+  let p = pv.pv_name in
+
+  let mem =
+    let env = ppe.PPEnv.ppe_env in
+    obind (EcEnv.Memory.byid^~ env) (EcEnv.Memory.get_active env) in
 
   let inscope =
-    let mem =
-      let env = ppe.PPEnv.ppe_env in
-      obind (EcEnv.Memory.byid^~ env) (EcEnv.Memory.get_active env) in
     match mem  with
     | None | Some (_, None) -> false
     | Some (_, Some lcmem) ->
@@ -477,6 +478,26 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
     else [(P.basename p.P.x_sub, [])]
 
   | _ ->
+    let module E = struct exception Default end in
+
+    let (nm, x) = EcPath.toqsymbol p.P.x_sub in
+
+    try
+      if k <> PVglob || not (List.is_empty nm) then
+        raise E.Default;
+
+      let pv' =
+        EcEnv.Var.lookup_progvar_opt
+          ?side:(omap fst mem) ([], x) ppe.PPEnv.ppe_env in
+
+      match omap fst pv' with
+      | Some (`Var pv') when EcEnv.NormMp.pv_equal ppe.PPEnv.ppe_env pv pv'  ->
+          [(x, [])]
+
+      | _ ->
+          raise E.Default
+
+    with E.Default ->
       let (nm, x) = EcPath.toqsymbol p.P.x_sub in
           (PPEnv.mod_symb ppe p.P.x_top)
         @ (List.map (fun nm1 -> (nm1, [])) nm)
