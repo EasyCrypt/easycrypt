@@ -231,7 +231,7 @@ type pmemory   = psymbol
 type phoarecmp = EcFol.hoarecmp
 
 type glob_or_var =
-  | GVglob of pmsymbol located
+  | GVglob of pmsymbol located * pqsymbol list
   | GVvar  of pqsymbol
 
 type pformula  = pformula_r located

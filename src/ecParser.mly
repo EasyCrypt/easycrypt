@@ -384,6 +384,7 @@
 %token AXIOM
 %token AXIOMATIZED
 %token BACKS
+%token BACKSLASH
 %token BETA
 %token BY
 %token BYEQUIV
@@ -607,7 +608,7 @@
 %right RARROW
 %left  LOP3 STAR SLASH
 %right ROP3
-%left  LOP4 AT AMP HAT
+%left  LOP4 AT AMP HAT BACKSLASH
 %right ROP4
 
 %nonassoc LBRACE
@@ -779,18 +780,19 @@ fident:
 | MINUS { "[-]" }
 
 %inline sbinop:
-| EQ    { "="   }
-| PLUS  { "+"   }
-| MINUS { "-"   }
-| STAR  { "*"   }
-| SLASH { "/"   }
-| AT    { "@"   }
-| OR    { "\\/" }
-| ORA   { "||"  }
-| AND   { "/\\" }
-| ANDA  { "&&"  }
-| AMP   { "&"   }
-| HAT   { "^"   }
+| EQ        { "="   }
+| PLUS      { "+"   }
+| MINUS     { "-"   }
+| STAR      { "*"   }
+| SLASH     { "/"   }
+| AT        { "@"   }
+| OR        { "\\/" }
+| ORA       { "||"  }
+| AND       { "/\\" }
+| ANDA      { "&&"  }
+| AMP       { "&"   }
+| HAT       { "^"   }
+| BACKSLASH { "\\"  }
 
 | x=LOP1 | x=LOP2 | x=LOP3 | x=LOP4
 | x=ROP1 | x=ROP2 | x=ROP3 | x=ROP4
@@ -1038,9 +1040,17 @@ ptybindings_decl:
 %inline none: IMPOSSIBLE { assert false }
 
 qident_or_res_or_glob:
-| x=qident   { GVvar x }
-| x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
-| GLOB mp=loc(mod_qident) { GVglob mp }
+| x=qident
+    { GVvar x }
+
+| x=loc(RES)
+    { GVvar (mk_loc x.pl_loc ([], "res")) }
+
+| GLOB mp=loc(mod_qident)
+    { GVglob (mp, []) }
+
+| GLOB mp=loc(mod_qident) BACKSLASH ex=brace(plist1(qident, COMMA))
+    { GVglob (mp, ex) }
 
 pfpos:
 | i=sword
