@@ -237,6 +237,7 @@
     ("|"   , (PIPE             , true ));
     (":="  , (CEQ              , true ));
     ("/"   , (SLASH            , true ));
+    ("\\"  , (BACKSLASH        , true ));
     ("<-"  , (LARROW           , true ));
     ("->"  , (RARROW           , true ));
     ("<<-" , (LLARROW          , true ));

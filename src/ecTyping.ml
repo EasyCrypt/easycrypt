@@ -19,6 +19,7 @@ open EcModules
 open EcFol
 
 module MMsym = EcSymbols.MMsym
+module Sid   = EcIdent.Sid
 module Mid   = EcIdent.Mid
 
 module EqTest = EcReduction.EqTest
@@ -2735,12 +2736,32 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                 unify_or_fail env ue x.pl_loc ~expct:x1.f_ty x2.f_ty;
                 f_eq x1 x2
 
-          | GVglob gp ->
-              let (mp, _) = trans_msymbol env gp in
-                let x1 = f_glob mp EcFol.mleft in
-                let x2 = f_glob mp EcFol.mright in
-                  unify_or_fail env ue gp.pl_loc ~expct:x1.f_ty x2.f_ty;
-                  f_eq x1 x2
+          | GVglob (gp, ex) ->
+              let (m, _) = trans_msymbol env gp in
+              let ex = List.map (trans_pv env) ex in
+
+              let filter_pv (xp, _) =
+                let xp = pv_glob xp in
+                let for1 (ex1, _) = not (EcEnv.NormMp.pv_equal env xp ex1) in
+                List.for_all for1 ex in
+
+              let create mem =
+                if List.is_empty ex then f_glob m mem else
+
+                let use = EcEnv.NormMp.mod_use env m in
+                let gl  = Sid.elements use.us_gl in
+                let pv  = List.filter filter_pv (Mx.bindings use.us_pv) in
+                let res =
+                    List.map (fun mid -> f_glob (EcPath.mident mid) mem) gl
+                  @ List.map (fun (xp, ty) -> f_pvar (EcTypes.pv_glob xp) ty mem) pv in
+
+                f_tuple res in
+
+              let x1 = create EcFol.mleft  in
+              let x2 = create EcFol.mright in
+
+              unify_or_fail env ue gp.pl_loc ~expct:x1.f_ty x2.f_ty;
+              f_eq x1 x2
         in
           check_mem f.pl_loc EcFol.mleft;
           check_mem f.pl_loc EcFol.mright;
