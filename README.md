@@ -13,9 +13,10 @@ Table of Contents
 
  * [EasyCrypt: Computer-Aided Cryptographic Proofs](#easycrypt-computer-aided-cryptographic-proofs)
     - [Installation requirements](#installation-requirements)
-    - [Installing OPAM (POSIX systems)](#installing-opam-posix-systems)
-    - [Installing requirements using OPAM (POSIX systems)](#installing-requirements-using-opam-posix-systems)
-    - [Installing requirements using OPAM (non-POSIX systems)](#installing-requirements-using-opam-non-posix-systems)
+    - [Via OPAM](#via-opam)
+      - [Installing requirements using OPAM (POSIX systems)](#installing-requirements-using-opam-posix-systems)
+      - [Installing requirements using OPAM (non-POSIX systems)](#installing-requirements-using-opam-non-posix-systems)
+    - [Via NIX](#via-nix)
  * [Configuring Why3](#configuring-why3)
  * [Installing/Compiling EasyCrypt](#installingcompiling-easycrypt)
  * [Proof General Front-End](#proof-general-front-end)
@@ -56,9 +57,10 @@ EasyCrypt uses the following third-party tools/libraries:
 On POSIX/Win32 systems (GNU/Linux, *BSD, OS-X), we recommend that users
 install EasyCrypt and all its dependencies via `opam`.
 
-
-Installing OPAM (POSIX systems)
+Via OPAM
 --------------------------------------------------------------------
+
+### Installing requirements using OPAM 2 (POSIX systems)
 
 Opam can be easily installed from source or via your packages manager:
 
@@ -96,14 +98,7 @@ For any issues encountered installing `opam` see:
 
   * [https://opam.ocaml.org/doc/Usage.html] for how to initialize opam.
 
-To install `opam` on non-POSIX systems
-[see the section below](#installing-requirements-using-opam-non-posix-systems).
-
-
-Installing requirements using OPAM 2 (POSIX systems)
---------------------------------------------------------------------
-
-You can install all the needed dependencies via the opam OCaml
+You can then install all the needed dependencies via the opam OCaml
 packages manager.
 
   0. Optionally, switch to a dedicated compiler for EasyCrypt:
@@ -146,8 +141,7 @@ packages manager.
      * Z3: [https://github.com/Z3Prover/z3]
      * CVC4: [https://cvc4.github.io/]
 
-Installing requirements using OPAM (non-POSIX systems)
---------------------------------------------------------------------
+### Installing requirements using OPAM (non-POSIX systems)
 
 You can install all the needed dependencies via the opam OCaml packages manager.
 
@@ -180,6 +174,27 @@ You can install all the needed dependencies via the opam OCaml packages manager.
      * Z3: [https://github.com/Z3Prover/z3]
      * CVC4: [https://cvc4.github.io/]
 
+
+Via NIX
+--------------------------------------------------------------------
+
+First, install the [Nix package manager](https://nixos.org/) by
+following [these instructions](https://nixos.org/manual/nix/stable/#chap-installation).
+
+Then, at the root of the EasyCrypt source tree, type:
+
+    ```
+    $> nix-shell
+    ```
+    
+These should install all the required dependencies. From there, simply
+run:
+
+    ```
+    $> make
+    ```
+    
+to compile EasyCrypt.
 
 Configuring Why3
 ====================================================================
