@@ -880,15 +880,15 @@ lemma eq_dlet ['a 'b] (F1 F2 : 'a -> 'b distr) d1 d2 :
 proof. by move=> -> eq_F; congr; apply/fun_ext. qed.
 
 (* -------------------------------------------------------------------- *)
-op dfold ['a] (f : 'a -> 'a distr) (x : 'a) (i : int) =
-  fold (fun d => dlet d f) (dunit x) i.
+op dfold ['a] (f : int -> 'a -> 'a distr) (x : 'a) (i : int) =
+  iteri i (fun k d => dlet d (f k)) (dunit x).
 
 lemma dfold0 ['a] f x : dfold<:'a> f x 0 = dunit x.
-proof. by apply: fold0. qed.
+proof. by apply: iteri0. qed.
 
 lemma dfoldS ['a] f x i : 0 <= i =>
-  dfold<:'a> f x (i + 1) = dlet (dfold f x i) f.
-proof. by apply: foldS. qed.
+  dfold<:'a> f x (i + 1) = dlet (dfold f x i) (f i).
+proof. by apply: iteriS. qed.
 
 (* -------------------------------------------------------------------- *)
 abbrev dlift (F: 'a -> 'b distr) : 'a distr -> 'b distr =
