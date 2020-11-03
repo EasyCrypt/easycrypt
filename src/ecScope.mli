@@ -207,6 +207,7 @@ module Prover : sig
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
     pl_selected   : bool option;
+    gn_debug      : bool option;
   }
 
   val empty_options : smt_options

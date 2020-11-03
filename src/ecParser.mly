@@ -171,6 +171,7 @@
     | `VERBOSE        of int option
     | `VERSION        of [ `Full | `Lazy ]
     | `SELECTED
+    | `DEBUG
   ]
 
   module SMT : sig
@@ -204,7 +205,8 @@
            "lazy"          ;
            "full"          ;
            "iterate"       ;
-           "selected"      ]
+           "selected"      ;
+           "debug"         ]
 
     let as_int = function
       | None          -> `None
@@ -263,6 +265,7 @@
       | "all"            -> get_as_none s o; (`ALL)
       | "iterate"        -> get_as_none s o; (`ITERATE)
       | "selected"       -> get_as_none s o; (`SELECTED)
+      | "debug"          -> get_as_none s o; (`DEBUG)
       | _                ->  assert false
 
     let mk_smt_option (os : smt list) =
@@ -278,6 +281,7 @@
       let version  = ref None in
       let iterate  = ref None in
       let selected = ref None in
+      let debug    = ref None in
 
       let is_universal p = unloc p = "" || unloc p = "!" in
 
@@ -321,6 +325,7 @@
         | `ITERATE          -> iterate  := Some true
         | `PROVER         p -> List.iter add_prover p
         | `SELECTED         -> selected := Some true
+        | `DEBUG            -> debug    := Some true
       in
 
       List.iter do1 os;
@@ -342,6 +347,7 @@
         plem_wanted     = !wanted;
         plem_unwanted   = !unwanted;
         plem_selected   = !selected;
+        psmt_debug      = !debug;
       }
   end
 %}
@@ -633,6 +639,7 @@ _lident:
 | ABORT      { "abort"      }
 | ADMITTED   { "admitted"   }
 | ASYNC      { "async"      }
+| DEBUG      { "debug"      }
 | DUMP       { "dump"       }
 | EXPECT     { "expect"     }
 | FIRST      { "first"      }

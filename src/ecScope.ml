@@ -554,6 +554,7 @@ module Prover = struct
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
     pl_selected   : bool option;
+    gn_debug      : bool option;
   }
 
   (* -------------------------------------------------------------------- *)
@@ -570,6 +571,7 @@ module Prover = struct
     pl_wanted    = None;
     pl_unwanted  = None;
     pl_selected  = None;
+    gn_debug     = None;
   }
 
   (* -------------------------------------------------------------------- *)
@@ -609,13 +611,15 @@ module Prover = struct
       pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
       pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
       pl_selected  = ppr.plem_selected;
+      gn_debug     = ppr.psmt_debug;
     }
 
   (* -------------------------------------------------------------------- *)
-  let mk_prover_info scope options =
+  let mk_prover_info scope (options : smt_options) =
     let open EcProvers in
 
     let dft          = Prover_info.get scope.sc_options in
+    let gn_debug     = odfl dft.gn_debug options.gn_debug in
     let pr_maxprocs  = odfl dft.pr_maxprocs options.po_nprovers in
     let pr_timelimit = max 0 (odfl dft.pr_timelimit options.po_timeout) in
     let pr_cpufactor = max 0 (odfl dft.pr_cpufactor options.po_cpufactor) in
@@ -637,7 +641,8 @@ module Prover = struct
 
     { pr_maxprocs; pr_provers ; pr_timelimit; pr_cpufactor;
       pr_verbose ; pr_all     ; pr_max      ; pr_iterate  ;
-      pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum  ; }
+      pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum   ;
+      gn_debug   ; }
 
   (* -------------------------------------------------------------------- *)
   let do_prover_info scope ppr =
