@@ -577,8 +577,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     FApi.t_seq
       t_hoareF_conseq_bdhoare
       (t_on1seq 1
-         (t_on1seq 2 (tac hs.bhf_pr hs.bhf_po) (t_apply_r nf1))
-         (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd))
+         (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd)
+         (t_on1seq 2 (tac hs.bhf_pr hs.bhf_po) (t_apply_r nf1)))
       tc
 
   (* ------------------------------------------------------------------ *)
