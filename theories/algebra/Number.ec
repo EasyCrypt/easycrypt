@@ -1278,6 +1278,25 @@ rewrite maxrE; case: (n2 <= n1).
 * rewrite lerNgt /= => lt_12 lt_n1m.
   by rewrite (ltr_trans _ lt_12 lt_n1m).
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma minrC (x y : t) : minr x y = minr y x.
+proof. by rewrite !minrE lerNgt ler_eqVlt; case: (y = x); case: (y < x). qed.
+
+lemma minrl (x y : t) : minr x y <= x.
+proof. by rewrite minrE; case: (x <= y) => [_|/ltrNge/ltrW]. qed.
+
+lemma minrr (x y : t) : minr x y <= y.
+proof. by rewrite minrC minrl. qed.
+
+lemma ler_minl (x y : t) : x <= y => minr x y = x.
+proof. by rewrite minrE lerNgt => ->. qed.
+
+lemma ler_minr (x y : t) : y <= x => minr x y = y.
+proof. by rewrite minrC &(ler_minl). qed.
+
+lemma minr_lb (x y : t) : minr x y <= x /\ minr x y <= y.
+proof. by rewrite minrl minrr. qed.
 end RealDomain.
 
 (* -------------------------------------------------------------------- *)
