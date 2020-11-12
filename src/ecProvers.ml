@@ -448,11 +448,13 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
 
               let handle_answer = function
                 | CP.Valid   ->
-                    notify |> oiter (fun notify -> notify `Warning (lazy (
-                      let buf = Buffer.create 0 in
-                      let fmt = Format.formatter_of_buffer buf in
-                      Format.fprintf fmt "success: %s%!" prover;
-                      Buffer.contents buf)));
+                    if pi.gn_debug then begin
+                      notify |> oiter (fun notify -> notify `Warning (lazy (
+                        let buf = Buffer.create 0 in
+                        let fmt = Format.formatter_of_buffer buf in
+                        Format.fprintf fmt "success: %s%!" prover;
+                      Buffer.contents buf)))
+                    end;
                     incr status
 
 
