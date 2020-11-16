@@ -487,147 +487,6 @@ section Upto.
   qed.
 end section Upto.
 
-(** We now bound the probability of collisions by instantiating a
-    generic Birthday Bound result:
-      Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
-      <= q^2 * Pr[x = $uD: x = witness],
-
-    where DBounder prevents the distinguisher from calling the
-    f-oracle more than q times. **)
-module DBounder (D : Distinguisher) (F : PRF_Oracles) = {
-  module FBounder = {
-    var c:int
-
-    proc f(x:D): D = {
-      var r <- witness;
-
-      if (c < q) {
-        r <@ F.f(x);
-        c <- c + 1;
-      }
-      return r;
-    }
-  }
-
-  proc distinguish(): bool = {
-    var b;
-
-    FBounder.c <- 0;
-    b <@ D(FBounder).distinguish();
-    return b;
-  }
-}.
-
-section CollisionProbability.
-  declare module D : Distinguisher {PRFi, DBounder}.
-  axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
-
-  local clone import Birthday as BBound with
-    op   q <- q,
-    type T <- D,
-    op   uT <- dD,
-    op maxu <- witness
-  proof *.
-  realize ge0_q by apply ge0_q.
-  realize maxuP. 
-  proof.
-  by move=> x; exact/StdOrder.RealOrder.lerr_eq/dD_funi.
-  qed.
-
-  (* We construct a Birthday Bound adversary from the IND
-     experiment. *)
-  local module (A:Adv) (S:ASampler) = {
-    (* We simulate an f-oracle using the s-oracle *)
-    module F = {
-      proc init = PRFi.init
-
-      proc f(x:D): D = {
-        var r;
-        if (x \notin PRFi.m) {
-          r <@ S.s();
-          PRFi.m.[x] <- r;
-        }
-        return oget PRFi.m.[x];
-      }
-    }
-
-    (* Recall from the Birthday clone that Birthday Bound adversaries
-       are restricted to make at most q oracle queries. *)
-    module IND = IND(F,DBounder(D))
-
-    proc a(): unit = {
-      var b:bool;
-      b <@ IND.main();
-    }
-  }.
-
-  local lemma A_ll (S <: ASampler {A}) &m: islossless S.s => islossless A(S).a.
-  proof.
-  move=> S_ll; proc; inline*; wp.
-  call (_: true).
-  + exact D_ll.
-  + by proc; inline*; do!(sp; if=> //=; auto); wp; call S_ll.
-  by inline*; auto.
-  qed.
-
-  local hoare A_bounded: A(Sample).a: size Sample.l = 0 ==> size Sample.l <= q.
-  proof.
-  proc; inline *; wp.
-  call (_: size Sample.l <= DBounder.FBounder.c /\ DBounder.FBounder.c <= q).
-  + by proc; inline *; do !(sp; if=> //=); auto=> /#.
-  by auto; smt w=ge0_q.
-  qed.
-
-  local lemma pr_PRFi_Exp_collision &m:
-    Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
-    = Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l].
-  proof.
-  byequiv (_: ={glob D} ==> collision PRFi.m{1} <=> !uniq Sample.l{2})=> //=.
-  proc; inline*; wp.
-  call (_: ={PRFi.m,DBounder.FBounder.c} /\
-           (forall x, mem (frng PRFi.m) x <=> mem Sample.l x){2} /\
-           (collision PRFi.m{1} <=> !uniq Sample.l{2})).
-    proc; inline*.
-    sp; if=> //=.
-    sp; if=> //=; auto.
-    progress [-split].
-    rewrite H3 //=; split.
-    + move=> x0; rewrite -H !mem_frng !rngE /=; split=> [[x]|].
-      + by rewrite get_setE /#.
-      case=> [<<-|[x'] mx'].
-      + by exists x{2}; rewrite get_setE.
-      by exists x'; rewrite get_setE /#.
-    by rewrite negb_and /= collision_add // -mem_frng H H0 orbC.
-  auto=> />; split=> [x|].
-  + by rewrite mem_frng mem_rng_empty.
-  smt.
-  qed.
-
-  lemma pr_PRFi_collision &m:
-    Pr[IND(PRFi,DBounder(D)).main() @ &m: collision PRFi.m]
-    <= (q^2)%r * mu1 dD witness.
-  proof.
-  by rewrite (pr_PRFi_Exp_collision &m) (pr_collision A A_ll A_bounded &m).
-  qed.
-end section CollisionProbability.
-
-(* We pull together the results of the first two sections *)
-lemma PartialConclusion (D <: Distinguisher {RP, PRFi, DBounder}) &m:
-  (forall (O <: PRF_Oracles {D}), islossless O.f => islossless D(O).distinguish) =>
-  `|Pr[IND(PRPi'(Indirect),DBounder(D)).main() @ &m: res]
-    - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
-  <= (q^2)%r * mu1 dD witness.
-proof.
-move=> D_ll.
-have:= pr_PRFi_collision D D_ll &m.
-have:= pr_PRPi'_Indirect_PRFi (DBounder(D)) _ &m.
-  move=> O O_ll; proc.
-  call (D_ll (<: DBounder(D,O).FBounder) _).
-    by proc; sp; if=> //=; wp; call O_ll.
-  by auto.
-smt().
-qed.
-
 (** This section proves the equivalence between the Ideal PRP and the
     module PRPi'(Indirect) used in section Upto. **)
 section PRPi_PRPi'_Indirect.
@@ -677,15 +536,153 @@ section PRPi_PRPi'_Indirect.
   qed.
 end section PRPi_PRPi'_Indirect.
 
-lemma Conclusion (D <: Distinguisher {RP, PRFi, DBounder}) &m:
-  (forall (O <: PRF_Oracles {D}), islossless O.f => islossless D(O).distinguish) =>
-  `|Pr[IND(RP,DBounder(D)).main() @ &m: res]
-    - Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
-  <= (q^2)%r * mu1 dD witness.
+section CollisionProbability.
+  declare module D : Distinguisher {RP, PRFi}.
+
+  axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+  axiom D_bounded  : hoare [D(PRFi).distinguish : PRFi.m = empty ==> card (fdom PRFi.m) <= q].
+
+  local clone import Birthday as BBound with
+    op   q <- q,
+    type T <- D,
+    op   uT <- dD,
+    op maxu <- witness
+  proof *.
+  realize ge0_q by apply ge0_q.
+  realize maxuP. 
+  proof.
+  by move=> x; exact/StdOrder.RealOrder.lerr_eq/dD_funi.
+  qed.
+
+  (* We construct a Birthday Bound adversary from the IND
+     experiment. *)
+  local module (A:Adv) (S:ASampler) = {
+    (* We simulate an f-oracle using the s-oracle *)
+    module F = {
+      proc init = PRFi.init
+
+      proc f(x:D): D = {
+        var r;
+        if (x \notin PRFi.m) {
+          r <@ S.s();
+          PRFi.m.[x] <- r;
+        }
+        return oget PRFi.m.[x];
+      }
+    }
+
+    (* Recall from the Birthday clone that Birthday Bound adversaries
+       are restricted to make at most q oracle queries. *)
+    module IND = IND(F,D)
+
+    proc a(): unit = {
+      var b:bool;
+      b <@ IND.main();
+    }
+  }.
+
+  local lemma A_ll (S <: ASampler {A}) &m: islossless S.s => islossless A(S).a.
+  proof.
+  move=> S_ll; proc; inline*; wp.
+  call (_: true).
+  + exact D_ll.
+  + by proc; inline*; do!(sp; if=> //=; auto); wp; call S_ll.
+  by inline*; auto.
+  qed.
+
+  local equiv IND_Exp : 
+     A(Sample).a ~ IND(PRFi,D).main : ={glob D} /\ size Sample.l{1} = 0 ==>
+         (collision PRFi.m{2} <=> !uniq Sample.l{1}) /\
+         size Sample.l{1} = card (fdom PRFi.m){2}.
+  proof.
+  proc; inline*; wp.
+  call (_: ={PRFi.m} /\
+           size Sample.l{1} = card (fdom PRFi.m){2} /\
+           (forall x, mem (frng PRFi.m) x <=> mem Sample.l x){1} /\
+           (collision PRFi.m{2} <=> !uniq Sample.l{1})).
+  + proc; inline*.
+    if => //=.
+    auto => /> &1 &2 h1 h2 h3 h4 r _.
+    rewrite fdom_set fcardUI_indep 2:fcard1; 1: by rewrite fsetI1 mem_fdom h4. 
+    smt (get_setE mem_frng rngE collision_add).
+  auto; smt (size_eq0 fdom0 fcards0 frng0 in_fset0 mem_empty).
+  qed.
+
+  local hoare IND_bounded : IND(PRFi,D).main : true ==> card (fdom PRFi.m) <= q.
+  proof. proc; call D_bounded; inline *;auto. qed.
+
+  lemma pr_PRFi_collision &m:
+    Pr[IND(PRFi,D).main() @ &m: collision PRFi.m]
+    <= (q*(q-1))%r/2%r * mu1 dD witness.
+  proof.
+  apply (ler_trans (Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l])).
+  + byequiv => //.
+    symmetry; proc *; inline Exp(Sample, A).main.
+    by call IND_Exp; inline *; auto => /#.
+  apply (pr_collision A A_ll _ &m).
+  conseq IND_Exp IND_bounded => /#.
+  qed.
+
+  lemma Conclusion &m:
+    `|Pr[IND(RP, D).main() @ &m: res]- Pr[IND(PRFi,D).main() @ &m: res]|
+      <= (q*(q-1))%r/2%r * mu1 dD witness.
+  proof.
+    move: (pr_PRPi_PRPi'_Indirect D &m) (pr_PRPi'_Indirect_PRFi D D_ll &m) (pr_PRFi_collision &m) => /#.
+  qed.
+
+end section CollisionProbability.
+
+module FBounder (F : PRF_Oracles) = {
+  var c:int
+
+  proc f(x:D): D = {
+   var r <- witness;
+
+   if (c < q) {
+     r <@ F.f(x);
+     c <- c + 1;
+   }
+   return r;
+ }
+}.
+
+module DBounder (D : Distinguisher) (F : PRF_Oracles) = {
+ 
+  proc distinguish(): bool = {
+    var b;
+    FBounder.c <- 0;
+    b <@ D(FBounder(F)).distinguish();
+    return b;
+  }
+}.
+
+section BOUNDER.
+
+declare module D : Distinguisher {RP, PRFi, DBounder}.
+axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+
+lemma DBounder_ll (O <: PRF_Oracles{DBounder(D)}): 
+  islossless O.f => islossless DBounder(D, O).distinguish.
 proof.
-move=> D_ll.
-by rewrite (pr_PRPi_PRPi'_Indirect (DBounder(D)) &m) (PartialConclusion D &m D_ll).
+  move=> hll; islossless.
+  by apply (D_ll (FBounder(O))); islossless.
 qed.
+
+hoare DBounder_card : DBounder(D, PRFi).distinguish : PRFi.m = empty ==> card (fdom PRFi.m) <= q.
+proof.
+  proc.
+  call (: card (fdom PRFi.m) <= FBounder.c /\ FBounder.c <= q).
+  + proc; sp; if => //.
+    inline *; sp; wp; if; auto; smt(fdom_set fcardU fcard1 fcard_ge0).
+  auto; smt(fdom0 fcards0 ge0_q).
+qed.
+
+lemma Conclusion_DBounder &m:
+  `|Pr[IND(RP, DBounder(D)).main() @ &m: res]- Pr[IND(PRFi,DBounder(D)).main() @ &m: res]|
+     <= (q*(q-1))%r/2%r * mu1 dD witness.
+proof. apply (Conclusion (DBounder(D)) DBounder_ll DBounder_card &m). qed.
+
+end section BOUNDER.
 
 end RP_RF.
 end RP.
