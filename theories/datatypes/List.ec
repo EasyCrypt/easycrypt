@@ -1095,6 +1095,21 @@ exists c'; rewrite pc' /=; have: c' \in c :: rem c s.
 + by rewrite /= ne.
 qed.
 
+lemma mem_rem_neq ['a] (x : 'a) (s : 'a list) y :
+  x <> y => y \in rem x s = y \in s.
+proof.
+move=> ne_xy; elim: s => //= z s ih; case: (z = x) => [->|_].
+- by rewrite (@eq_sym y x) ne_xy.
+- by rewrite ih.
+qed.
+
+lemma remC ['a] (x y : 'a) (s : 'a list) :
+  rem x (rem y s) = rem y (rem x s).
+proof.
+elim: s => //= z s ih; rewrite (@fun_if (rem x)) (@fun_if (rem y)) /= ih.
+by case: (z = x); case: (z = y).
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                        Element insertion                             *)
 (* -------------------------------------------------------------------- *)
@@ -1532,6 +1547,23 @@ qed.
 lemma map_rev (f : 'a -> 'b) s:
   map f (rev s) = rev (map f s).
 proof. elim: s; first by rewrite rev_nil. smt. qed.
+
+lemma in_undup_map ['a 'b] (f : 'a -> 'b) (s : 'a list) :
+     (forall x y, x \in s => y \in s => f x = f y => x = y)
+  => undup (map f s) = map f (undup s).
+proof.
+elim: s => //= x s ih inj_f; rewrite ih 1:/#.
+case: (x \in s) => [/(map_f f)->//|xNs].
+case: (f x \in map f s) => // /mapP[y [ys]].
+by move/(_ x y): inj_f; rewrite ys /= => h/h ->>.
+qed.
+
+lemma undup_map ['a 'b] (f : 'a -> 'b) s : injective f =>
+  undup (map f s) = map f (undup s).
+proof.
+move=> inj_f; elim: s => //= x s ih.
+by rewrite mem_map // ih; case: (_ \in _).
+qed.
 
 lemma perm_eq_map (f : 'a -> 'b) (s1 s2 : 'a list):
   perm_eq s1 s2 => perm_eq (map f s1) (map f s2).

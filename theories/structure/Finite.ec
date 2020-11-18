@@ -19,6 +19,15 @@ axiom to_seq_finite (P : 'a -> bool):
   is_finite P => uniq (to_seq P) /\ (forall x, x \in to_seq P <=> P x).
 
 (* -------------------------------------------------------------------- *)
+lemma mkfinite ['a] (p : 'a -> bool) :
+  (exists (s : 'a list), forall x, p x => x \in s) => is_finite p.
+proof.
+case=> s fin_p; exists (filter p (undup s)); split.
++ by apply/filter_uniq/undup_uniq.
++ by move=> a; rewrite mem_filter mem_undup /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma uniq_to_seq (P : 'a -> bool):
   is_finite P => uniq (to_seq P).
 proof. by move=>/to_seq_finite [-> _]. qed.
