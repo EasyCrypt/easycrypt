@@ -566,6 +566,16 @@ module List = struct
   (* ------------------------------------------------------------------ *)
   let reduce1 (f : 'a list -> 'a) : 'a list -> 'a =
     function [x] -> x | xs  -> f xs
+
+  (* ------------------------------------------------------------------ *)
+  let rec find_dup ?(cmp = Pervasives.compare) (xs : 'a list ) =
+    match xs with
+    | []      -> None
+    | x :: xs ->
+        if BatList.mem_cmp cmp x xs then Some x else find_dup ~cmp xs
+
+  let has_dup ?(cmp = Pervasives.compare) (xs : 'a list) =
+    Option.is_some (find_dup ~cmp xs)
 end
 
 (* -------------------------------------------------------------------- *)
