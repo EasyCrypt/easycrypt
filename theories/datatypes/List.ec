@@ -715,6 +715,13 @@ lemma before_index (x0 : 'a) x s i :
   0 <= i < index x s => nth x0 s i <> x.
 proof. by move/(@before_find x0). qed.
 
+lemma index_nth ['a] (x0 : 'a) s i : 0 <= i < size s =>
+  index (nth x0 s i) s <= i.
+proof.
+case=> ge0_i; apply: contraLR; rewrite -lezNgt -ltzNge.
+by move=> lt; have // := before_index x0 (nth x0 s i) s i _ => /#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                            drop, take                                *)
 (* -------------------------------------------------------------------- *)

@@ -295,4 +295,14 @@ proof.
 rewrite BMul.big_const -MulMonoid.iteropE /exp.
 by rewrite IntOrder.ltrNge size_ge0 /= count_predT.
 qed.
+
+lemma big_normr ['a] P F s :
+  `|BAdd.big<:'a> P F s| <= BAdd.big P (fun x => `|F x|) s.
+proof.
+elim: s => [|x s ih]; first by rewrite !BAdd.big_nil normr0.
+rewrite !BAdd.big_cons /=; case: (P x) => // Px.
+have /ler_trans := ler_norm_add (F x) (BAdd.big P F s); apply.
+by rewrite ler_add2l.
+qed.
+
 end BigOrder.

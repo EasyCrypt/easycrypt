@@ -29,7 +29,7 @@ axiom nosmt le_ln_dw (x : real): 1%r < x => (x - 1%r) / x < ln x.
 
 axiom nosmt le1Dx_exp (x : real): 0%r <= x => 1%r+x <= exp x.
 
-axiom nosmt convexe_exp a b: convexe exp a b.
+axiom nosmt convex_exp a b: convex exp a b.
 
 op log (a : real) = fun x => ln x / ln a.
 
