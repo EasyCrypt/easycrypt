@@ -1765,6 +1765,10 @@ move=> Edf @/hasE; rewrite -(@eq_summable F) /=.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma eq_expL ['a] (d1 d2 : 'a distr) f : d1 = d2 => E d1 f = E d2 f.
+proof. by move=> ->. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma eq_exp (d : 'a distr) (f g : 'a -> real) :
      (forall x, x \in d => f x = g x)
   => E d f = E d g.
