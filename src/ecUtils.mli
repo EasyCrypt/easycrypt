@@ -288,6 +288,8 @@ module List : sig
   val rev_pmap   : ('a -> 'b option) -> 'a list -> 'b list
   val rotate     : [`Left|`Right] -> int -> 'a list -> int * 'a list
   val reduce1    : ('a list -> 'a) -> 'a list -> 'a
+  val find_dup   : ?cmp:('a -> 'a -> int) -> 'a list -> 'a option
+  val has_dup    : ?cmp:('a -> 'a -> int) -> 'a list -> bool
 
   (* ------------------------------------------------------------------ *)
   val ksort:
