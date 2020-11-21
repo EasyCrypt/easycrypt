@@ -34,5 +34,6 @@ find:examples:*.eca
 # Build scripts
 scripts/install/install-sh
 scripts/install/distribution
+scripts/install/get-commit
 scripts/testing/runtest
 scripts/srctx/keywords
