@@ -1094,14 +1094,14 @@ lemma nosmt ler_wiexpn2l x : zeror <= x <= oner =>
   forall m n, 0 <= n <= m => exp x m <= exp x n.
 proof.
 move=> [xge0 xle1] m n [ge0_n le_nm]; have ->: m = (m - n) + n by ring.
-by rewrite exprDn 1:subz_ge0 // ler_pimull ?(expr_ge0, exprn_ile1) ?subz_ge0.
+by rewrite exprD_nneg 1:subz_ge0 // ler_pimull ?(expr_ge0, exprn_ile1) ?subz_ge0.
 qed.
 
 lemma nosmt ler_weexpn2l x : oner <= x =>
   forall m n, 0 <= m <= n => exp x m <= exp x n.
 proof.
 move=> ge1_x m n [ge0_m le_mn]; have ->: n = (n - m) + m by ring.
-rewrite exprDn 1:subz_ge0 // ler_pemull ?(expr_ge0, exprn_ege1) //.
+rewrite exprD_nneg 1:subz_ge0 // ler_pemull ?(expr_ge0, exprn_ege1) //.
 + by rewrite (@ler_trans oner). + by rewrite subz_ge0.
 qed.
 
@@ -1126,7 +1126,7 @@ have: (forall m n, (m <= n)%Int => P m n) => P m n.
   by move/ih=> @/P h *; rewrite -h // eq_sym.
 apply=> {m n} m n le_mn ge0_m ge0_n {P}.
 have ->: n = m + (n - m) by ring.
-rewrite exprDn 2:subz_ge0 // -{1}(mulr1 (exp x m)).
+rewrite exprD_nneg 2:subz_ge0 // -{1}(mulr1 (exp x m)).
 have h/h{h} := mulfI (exp x m) _; first by rewrite expf_eq0 gtr_eqF.
 by rewrite eq_sym ieexprn_weq1 1?(subz_ge0, ltrW) //#.
 qed.

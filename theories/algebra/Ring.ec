@@ -469,6 +469,9 @@ abstract theory ComRing.
     by rewrite !MulMonoid.iteropE iterS.
   qed.
 
+  lemma exprSr (x : t) i: 0 <= i => exp x (i+1) = (exp x i) * x.
+  proof. by move=> ge0_i; rewrite exprS // mulrC. qed.
+
   lemma expr2 x: exp x 2 = x * x.
   proof. by rewrite (@exprS _ 1) // expr1. qed.
 
@@ -512,19 +515,26 @@ abstract theory ComRing.
   + by apply: contra invNx; apply: unitrX_neq0 => /#.
   qed.
 
-  lemma exprDn x (m n : int) : 0 <= m => 0 <= n =>
+  lemma exprVn (x : t) (n : int) : 0 <= n => exp (invr x) n = invr (exp x n).
+  proof.
+  elim: n => [|n ge0_n ih]; first by rewrite !expr0 invr1.
+  case: (unit x) => ux.
+  - by rewrite exprSr -1:exprS // invrM ?unitrX // ih -invrM // unitrX.
+  - by rewrite !invr_out //; apply: contra ux; apply: unitrX_neq0 => /#.
+  qed.
+
+  lemma exprMn (x y : t) (n : int) : 0 <= n => exp (x * y) n = exp x n * exp y n.
+  proof.
+  elim: n => [|n ge0_n ih]; first by rewrite !expr0 mulr1.
+  by rewrite !exprS // mulrACA ih.
+  qed.
+
+  lemma exprD_nneg x (m n : int) : 0 <= m => 0 <= n =>
     exp x (m + n) = exp x m * exp x n.
   proof.
     move=> ge0_m ge0_n; elim: m ge0_m => [|m ge0_m ih].
       by rewrite expr0 mul1r.    
     by rewrite addzAC !exprS ?addz_ge0 // ih mulrA.
-  qed.
-
-  lemma exprDNz x (m n : int) : m <= 0 => n <= 0 =>
-    exp x (m + n) = exp x m * exp x n.
-  proof.
-    move=> ge0_m ge0_n; rewrite -{2}(@oppzK m) -{2}(@oppzK n).
-    by rewrite -!(@exprV _ (- _)%Int) -exprDn 1?exprV //#.
   qed.
 
   lemma exprD x (m n : int) : unit x => exp x (m + n) = exp x m * exp x n.
@@ -542,7 +552,7 @@ abstract theory ComRing.
   rewrite lez_eqVlt => -[?|]; first have->: n+1 = -m by move=> /#.
   + by rewrite subzz exprN expr0 divrr // unitrX.
   move=> gt0_mDSn; move: le_m_Sn; rewrite lez_eqVlt.
-  case=> [->>|lt_m_Sn]; first by rewrite exprDn //#.
+  case=> [->>|lt_m_Sn]; first by rewrite exprD_nneg //#.
   by rewrite addzA exprS 1:/# ih 1,2:/# exprS // mulrCA.
   qed.
 
@@ -557,8 +567,8 @@ abstract theory ComRing.
   + move=> h; case: (0 <= m) => hm hn; 1: by apply h.
     rewrite -{1}(@oppzK m) (_: (- -m) * n = - (-m) * n) 1:/#.
     by rewrite exprN h 1:/# // exprN exprV exprN invrK.
-  elim /natind: n; 1: smt (expr0).
-  by move=> n hn ih hm _; rewrite mulzDr exprS //= mulrC exprDn 1:/# 1:// ih.
+  elim/natind: n => [|n hn ih hm _]; 1: smt (expr0).
+  by rewrite mulzDr exprS //= mulrC exprD_nneg 1:/# 1:// ih.
   qed.
 
   lemma expr0n n : 0 <= n => exp zeror n = if n = 0 then oner else zeror.

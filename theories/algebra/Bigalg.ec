@@ -149,6 +149,19 @@ elim: r s => [|x r ih] s; first by rewrite BAdd.big_nil mul0r.
 rewrite !BAdd.big_cons; case: (P x) => Px; last by rewrite ih.
 by rewrite mulrDl -ih BAdd.mulr_sumr.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma subrXX (x y : t) n : 0 <= n =>
+  exp x n - exp y n = (x - y) * (BAdd.bigi predT (fun i => exp x (n - 1 - i) * exp y i) 0 n).
+proof.
+case: n => [|n ge0_n _]; first by rewrite !expr0 BAdd.big_geq // subrr mulr0.
+rewrite mulrBl !(BAdd.big_distrr mulr0 mulrDr).
+rewrite BAdd.big_int_recl // BAdd.big_int_recr //= !expr0 /=.
+rewrite !(mulr1, mul1r) -!exprS // opprD !addrA; congr.
+rewrite -addrA BAdd.sumrB /= BAdd.big_seq BAdd.big1 ?addr0 //=.
+move=> i /mem_range rg_i; rewrite mulrA -exprS 1:/# mulrCA. 
+by rewrite -exprS 1:/# subr_eq0; do 2! congr => /#.
+qed.
 end BigComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -294,6 +307,19 @@ lemma nosmt mulr_const s c:
 proof.
 rewrite BMul.big_const -MulMonoid.iteropE /exp.
 by rewrite IntOrder.ltrNge size_ge0 /= count_predT.
+qed.
+
+lemma ler_pexpn2r n x y :
+  0 < n => zeror <= x => zeror <= y => (exp x n <= exp y n) <=> (x <= y).
+proof.
+move=> gt0_n ge0_x ge0_y; split => [|h]; last first.
+- by apply/ler_pexp=> //; apply/ltzW.
+case: (x = zeror) => [->>|nz_x].
+- by rewrite expr0n 1:ltzW.
+rewrite -subr_ge0 subrXX 1:ltzW // pmulr_lge0 ?subr_ge0 //=.
+rewrite {2}(_ : n = n - 1 + 1) 1:#ring BAdd.big_int_recr /= 1:/#.
+rewrite expr0 /= ltr_spaddr ?mul1r; 1: by rewrite expr_gt0 ltr_neqAle /#.
+by rewrite sumr_ge0 => /= i _; rewrite mulr_ge0 ?expr_ge0.
 qed.
 
 lemma big_normr ['a] P F s :
