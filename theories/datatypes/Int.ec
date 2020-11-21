@@ -370,6 +370,14 @@ move=> h j; rewrite /argmin choiceb_dfl ?lez_lt_asym //=.
 by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
 qed.
 
+lemma argmin_eq ['a] f p i :
+  0 <= i => p (f i) => (forall j, 0 <= j < i => !p (f j)) => argmin<:'a> f p = i.
+proof.
+move=> ge0_i pfi Npfj @/argmin.
+pose Q j := 0 <= j /\ p (f j) /\ forall i, 0 <= i < j => !p (f i).
+have /# := choicebP Q 0 _; first by exists i.
+qed.
+
 (* -------------------------------------------------------------------- *)
 abbrev minz = argmin (fun (i : int) => i).
 

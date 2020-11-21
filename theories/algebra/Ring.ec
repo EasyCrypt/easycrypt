@@ -135,6 +135,7 @@ abstract theory ZModule.
   proof. by rewrite opprD addrACA addrN addr0. qed.
 
   op intmul (x : t) (n : int) =
+    (* (signz n) * (iterop `|n| ZModule.(+) x zeror) *)
     if n < 0
     then -(iterop (-n) ZModule.(+) x zeror)
     else  (iterop   n  ZModule.(+) x zeror).
