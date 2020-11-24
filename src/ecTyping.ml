@@ -1296,6 +1296,7 @@ let transexp (env : EcEnv.env) mode ue e =
 
     | PEmatch (pce, pb) ->
         let ce, ety = transexp env pce in
+        let ety = Tuni.offun (EcUnify.UniEnv.assubst ue) ety in
         let inddecl =
           match (EcEnv.ty_hnorm ety env).ty_node with
           | Tconstr (indp, _) -> begin
