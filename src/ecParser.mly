@@ -3583,7 +3583,7 @@ user_red_info:
 | x=qident i=prefix(AT, word)?
     { ([x], i) }
 
-| xs=paren(plist1(qident, COMMA)) i=prefix(AT, sword)?
+| xs=paren(plist1(qident, COMMA)) i=prefix(AT, word)?
     { (xs, i) }
 
 user_red_option:

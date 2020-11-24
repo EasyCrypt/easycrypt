@@ -446,9 +446,8 @@ let rec h_red_x ri env hyps f =
   | _ ->
       let strategies =
         [ reduce_logic;
-          reduce_user ~mode:`BeforeDelta;
+          reduce_user;
           reduce_delta;
-          reduce_user ~mode:`AfterDelta ;
           reduce_context]
       in
 
@@ -569,7 +568,7 @@ and reduce_context ri env hyps f =
 
   | _ -> raise NotReducible
 
-and reduce_user_gen mode simplify ri env hyps f
+and reduce_user_gen simplify ri env hyps f
 =
   if not ri.user then raise NotReducible;
 
@@ -584,12 +583,6 @@ and reduce_user_gen mode simplify ri env hyps f
   let module R = EcTheory in
 
   oget ~exn:NotReducible (List.Exceptionless.find_map (fun rule ->
-    begin
-      match mode, rule.R.rl_prio with
-      | `AfterDelta , n when n <  0 -> raise NotReducible
-      | `BeforeDelta, n when n >= 0 -> raise NotReducible
-      | ((`All | `BeforeDelta | `AfterDelta), _) -> ()
-    end;
 
     let ue  = EcUnify.UniEnv.create None in
     let tvi = EcUnify.UniEnv.opentvi ue rule.R.rl_tyd None in
@@ -647,8 +640,8 @@ and reduce_user_gen mode simplify ri env hyps f
     with NotReducible -> None)
   rules)
 
-and reduce_user ~mode ri env hyps f =
-  reduce_user_gen mode (simplify ri env hyps) ri env hyps f
+and reduce_user ri env hyps f =
+  reduce_user_gen (simplify ri env hyps) ri env hyps f
 
 and can_eta x (f, args) =
   match List.rev args with

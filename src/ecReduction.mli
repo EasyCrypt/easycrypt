@@ -88,7 +88,6 @@ val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form
 
 val reduce_user_gen :
-  [`All | `AfterDelta | `BeforeDelta] ->
   (EcFol.form -> EcFol.form) ->
   reduction_info ->
   EcEnv.env -> EcEnv.LDecl.hyps -> EcFol.form -> EcFol.form

@@ -235,9 +235,8 @@ and app_red st f1 args =
     -> begin
     let module E = struct exception NoCtor end in
 
-    let args, ty = flatten_args args in
-
     try
+      let args, ty = flatten_args args in
       let op  = oget (EcEnv.Op.by_path_opt p st.st_env) in
       let fix = EcDecl.operator_as_fix op in
 
@@ -288,12 +287,27 @@ and app_red st f1 args =
           (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
 
       cbv st subst body (mk_args eargs (Aempty ty))
-    with E.NoCtor -> reduce_user st (f_app f1 args ty)
+    with E.NoCtor ->
+      reduce_user_delta st f1 p tys args
   end
+
+  | Fop(p, tys) ->
+    reduce_user_delta st f1 p tys args
 
   | _ ->
     let args, ty = flatten_args args in
-    reduce_user st (f_app f1 args ty)
+    f_app f1 args ty
+
+and reduce_user_delta st f1 p tys args =
+  let f2 =
+    let args, ty = flatten_args args in
+    f_app f1 args ty in
+  try reduce_user st f2
+  with NotReducible ->
+    if st.st_ri.delta_p p && Op.reducible st.st_env p then
+      let f = Op.reduce st.st_env p tys in
+      cbv st Subst.subst_id f args
+    else f2
 
 (* -------------------------------------------------------------------- *)
 and reduce_logic st f =
@@ -340,10 +354,9 @@ and reduce_user st f =
   | f -> cbv_init st Subst.subst_id f
   | exception NotReducible ->
     (* Try user reduction *)
-    let cbv = cbv_init st Subst.subst_id in
-    match reduce_user_gen `All cbv st.st_ri st.st_env st.st_hyps f with
-    | f -> cbv_init st Subst.subst_id f
-    | exception NotReducible -> f
+    let simplify = cbv_init st Subst.subst_id in
+    let f = reduce_user_gen simplify st.st_ri st.st_env st.st_hyps f in
+    cbv_init st Subst.subst_id f
 
 (* -------------------------------------------------------------------- *)
 and cbv_init st s f =
@@ -436,15 +449,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
       else pv in
     app_red st (f_pvar pv f.f_ty m) args
 
-  (* δ-reduction *)
-  | Fop _ -> (* FIXME: maybe this should be done in app_red *)
-    let f = Subst.subst s f in
-    let p, tys = destr_op f in
-
-    if st.st_ri.delta_p p && Op.reducible st.st_env p then
-      let f = Op.reduce st.st_env p tys in
-      cbv st Subst.subst_id f args
-    else app_red st f args
+  | Fop _ -> app_red st (Subst.subst s f) args
 
   | Fapp (f1, args1) ->
     let args1 = List.map (cbv_init st s) args1 in
