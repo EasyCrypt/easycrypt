@@ -302,8 +302,9 @@ and reduce_user_delta st f1 p tys args =
   let f2 =
     let args, ty = flatten_args args in
     f_app f1 args ty in
-  try reduce_user st f2
-  with NotReducible ->
+  match reduce_user st f2 with
+  | f -> cbv_init st Subst.subst_id f
+  | exception NotReducible ->
     if st.st_ri.delta_p p && Op.reducible st.st_env p then
       let f = Op.reduce st.st_env p tys in
       cbv st Subst.subst_id f args
