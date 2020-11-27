@@ -1923,36 +1923,40 @@ let process_congr tc =
     then (EcFol.destr_eq  concl, true )
     else (EcFol.destr_iff concl, false) in
 
+  let t_ensure_eq =
+    if iseq then t_id
+    else
+      (fun tc ->
+        let hyps = FApi.tc1_hyps tc in
+        EcLowGoal.Apply.t_apply_bwd_r
+          (PT.pt_of_uglobal !!tc hyps LG.p_eq_iff) tc) in
+
+  let t_subgoal = t_ors [t_reflex ~mode:`Alpha; t_assumption `Alpha; t_id] in
+
   match f1.f_node, f2.f_node with
+  | _, _ when EcReduction.is_alpha_eq hyps f1 f2 ->
+      FApi.t_seq t_ensure_eq EcLowGoal.t_reflex tc
+
   | Fapp (o1, a1), Fapp (o2, a2)
       when    EcReduction.is_alpha_eq hyps o1 o2
            && List.length a1 = List.length a2 ->
 
-      let tt0 = if iseq then t_id else (fun tc ->
-        let hyps = FApi.tc1_hyps tc in
-        EcLowGoal.Apply.t_apply_bwd_r
-          (PT.pt_of_uglobal !!tc hyps LG.p_eq_iff) tc) in
       let tt1 = t_congr (o1, o2) ((List.combine a1 a2), f1.f_ty) in
-      let tt2 = t_logic_trivial in
-
-      FApi.t_seqs [tt0; tt1; tt2] tc
+      FApi.t_seqs [t_ensure_eq; tt1; t_subgoal] tc
 
   | Fif (_, { f_ty = cty }, _), Fif _ ->
      let tt0 tc =
        let hyps = FApi.tc1_hyps tc in
        EcLowGoal.Apply.t_apply_bwd_r
          (PT.pt_of_global !!tc hyps LG.p_if_congr [cty]) tc
-     in FApi.t_seqs [tt0; t_logic_trivial] tc
+     in FApi.t_seqs [tt0; t_subgoal] tc
 
   | Ftuple _, Ftuple _ when iseq ->
-      FApi.t_seqs [t_split; t_logic_trivial] tc
+      FApi.t_seqs [t_split; t_subgoal] tc
 
   | Fproj (f1, i1), Fproj (f2, i2)
       when i1 = i2 && EcReduction.EqTest.for_type env f1.f_ty f2.f_ty
     -> EcCoreGoal.FApi.xmutate1 tc `CongrProj [f_eq f1 f2]
-
-  | _, _ when iseq && EcReduction.is_alpha_eq hyps f1 f2 ->
-      EcLowGoal.t_reflex tc
 
   | _, _ -> tacuerror "not a congruence"
 

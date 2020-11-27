@@ -865,10 +865,14 @@ let t_true (tc : tcenv1) =
 let t_reflex_s (f : form) (tc : tcenv1) =
   t_apply_s LG.p_eq_refl [f.f_ty] ~args:[f] tc
 
-let t_reflex ?reduce (tc : tcenv1) =
+let t_reflex ?(mode=`Conv) ?reduce (tc : tcenv1) =
   let t_reflex_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
-    | SFeq (f1, _f2) -> t_reflex_s f1 tc
+    | SFeq (f1, f2) ->
+      if mode = `Conv || EcReduction.is_alpha_eq (FApi.tc1_hyps tc) f1 f2 then
+        t_reflex_s f1 tc
+      else
+        raise InvalidGoalShape
     | _ -> raise TTC.NoMatch
   in
     TTC.t_lazy_match ?reduce t_reflex_r tc

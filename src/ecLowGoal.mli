@@ -70,8 +70,9 @@ val t_simplify_with_info : ?mode:smode -> simplify_with_info_t
 (* -------------------------------------------------------------------- *)
 val t_change : ?target:ident -> form -> tcenv1 -> tcenv1
 
+
 (* -------------------------------------------------------------------- *)
-val t_reflex       : ?reduce:lazyred -> FApi.backward
+val t_reflex       : ?mode:[`Alpha | `Conv] -> ?reduce:lazyred -> FApi.backward
 val t_transitivity : ?reduce:lazyred -> form -> FApi.backward
 val t_symmetry     : ?reduce:lazyred -> FApi.backward
 

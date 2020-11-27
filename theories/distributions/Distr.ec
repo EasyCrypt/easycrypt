@@ -2118,7 +2118,7 @@ rewrite BRA.big_pair //=; pose K := undup (unzip1 J).
 apply: Bigreal.ler_sum => a _ /=; rewrite BRA.big_seq.
 rewrite -(@BRA.eq_bigr _ (fun i : _ * _ => `|f a| * mass d i)) /=.
   case=> a' b'; rewrite mem_filter /= => -[<- _].
-  by rewrite normrM; congr; rewrite ger0_norm.
+  by rewrite normrM; congr => //; rewrite ger0_norm.
 rewrite -BRA.mulr_sumr normrM ler_wpmul2l 1:normr_ge0.
 pose s := List.filter _ J; rewrite -(@BRA.big_seq _ s).
 rewrite BRA.big_filter BRA.big_mkcond /=.
