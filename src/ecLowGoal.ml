@@ -1407,7 +1407,7 @@ let t_elim_iso_or ?reduce tc =
 (* -------------------------------------------------------------------- *)
 let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
   let t_split_r (fp : form) (tc : tcenv1) =
-    let hyps, concl = FApi.tc1_flat tc in
+    let concl = FApi.tc1_goal tc in
 
     match sform_of_form fp with
     | SFtrue ->
@@ -1416,11 +1416,11 @@ let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
         t_and_intro_s b (f1, f2) tc
     | SFiff (f1, f2) when not closeonly ->
         t_iff_intro_s (f1, f2) tc
-    | SFeq (f1, f2) when EcReduction.is_conv hyps f1 f2 ->
-        t_reflex_s f1 tc
     | SFeq (f1, f2) when not closeonly && (is_tuple f1 && is_tuple f2) ->
         let fs = List.combine (destr_tuple f1) (destr_tuple f2) in
         t_tuple_intro_s fs tc
+    | SFeq (f1, _f2) ->
+        t_reflex_s f1 tc
     | SFif (cond, _, _) when not closeonly ->
         (* FIXME: simplify goal *)
         let tc = if f_equal concl fp then tc else t_change fp tc in
