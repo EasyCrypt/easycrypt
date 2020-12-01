@@ -126,6 +126,8 @@ type occmode = {
   k_conv  : bool;
 }
 
+val om_rigid : occmode
+
 val pf_find_occurence :
   pt_env -> ?occmode:occmode -> ptn:form -> form -> form * occmode
 

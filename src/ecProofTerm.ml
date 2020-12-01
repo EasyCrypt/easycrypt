@@ -274,6 +274,8 @@ type occmode = {
   k_conv  : bool;
 }
 
+let om_rigid = { k_keyed = true; k_conv = false; }
+
 let rec pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
   let module E = struct exception MatchFound of form end in
 

@@ -123,8 +123,8 @@ let t_equiv_app_onesided side i pre post tc =
   FApi.t_seqsub (t_equiv_app ij r)
     [t_id; (* s1 ~ s' : pr ==> r *)
      FApi.t_seqsub (EcPhlConseq.t_equivS_conseq_nm p' q')
-       [(* r => forall mod, post => post' *) t_logic_trivial;
-        (* r => p' *) t_logic_trivial;
+       [(* r => forall mod, post => post' *) t_trivial;
+        (* r => p' *) t_trivial;
         (* s1 ~ [] : p' ==> q' *) EcPhlConseq.t_equivS_conseq_bd side pre post
        ]
     ] tc

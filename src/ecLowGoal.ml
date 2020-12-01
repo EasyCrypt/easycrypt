@@ -2228,25 +2228,17 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
 
 
 (* -------------------------------------------------------------------- *)
-let t_logic_trivial (tc : tcenv1) =
-  let seqs = [
-    FApi.t_try (t_assumption `Conv);
-    t_progress t_id;
-    FApi.t_try (t_assumption `Conv);
-    FApi.t_try (t_absurd_hyp ~conv:`AlphaEq);
-    t_fail;
-  ]
+let t_trivial
+  ?(subtc : FApi.backward option) ?(keep = false) ?(conv = `Alpha) (tc : tcenv1)
+=
+  let core  = FApi.t_or (t_assumption conv) (t_absurd_hyp ~conv:`AlphaEq) in
+  let core  = FApi.t_try core in
+  let core  = FApi.t_seqs [core; t_progress t_id; core] in
 
-  in FApi.t_internal (FApi.t_try (FApi.t_seqs seqs)) tc
-
-(* -------------------------------------------------------------------- *)
-let t_trivial ?(subtc : FApi.backward option) (tc : tcenv1) =
-  let tryassum  = FApi.t_try (t_assumption `Conv) in
-  let tprogress = t_progress t_id in
-  let subtc     = subtc |> odfl t_id in
-  let seqs      =
-    [FApi.t_try (t_false ~conv:`Conv ?id:None);
-     tryassum; tprogress; tryassum; subtc; t_logic_trivial; t_fail] in
+  let subtc = omap (fun tc -> FApi.t_seq tc (FApi.t_try (FApi.t_seq core t_fail))) subtc in
+  let subtc = odfl t_id subtc in
+  let seqs  = [FApi.t_try (t_false ~conv:`Conv ?id:None); core; subtc] in
+  let seqs  = if keep then seqs else seqs @ [t_fail] in
 
   FApi.t_internal (FApi.t_try (FApi.t_seqs seqs)) tc
 

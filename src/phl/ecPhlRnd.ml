@@ -301,7 +301,7 @@ let wp_equiv_disj_rnd_r side tc =
   | Some hd ->
     let po = c2 in
     FApi.t_onalli (function
-    | 0 -> EcLowGoal.t_trivial ?subtc:None
+    | 0 -> fun tc -> EcLowGoal.t_trivial tc
     | 1 ->
       let open EcProofTerm.Prept in
       let m1  = EcIdent.create "_" in
@@ -353,7 +353,7 @@ let wp_equiv_rnd_r bij tc =
   let hin = EcIdent.create "_" in
 
   FApi.t_onalli (function
-    | 0 -> EcLowGoal.t_trivial ?subtc:None
+    | 0 -> fun tc -> EcLowGoal.t_trivial tc
     | 1 ->
       let open EcProofTerm.Prept in
 

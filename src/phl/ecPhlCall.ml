@@ -407,12 +407,12 @@ let process_call side info tc =
       let env, fmake = process_inv tc side in
       let inv = TTC.pf_process_form !!tc env tbool inv in
       subtactic := (fun tc ->
-        FApi.t_firsts t_logic_trivial 2 (EcPhlFun.t_fun inv tc));
+        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv tc));
       fmake inv
 
     | CI_upto info ->
       let bad, p, q, form = process_upto tc side info in
-      let t_tr = FApi.t_or (t_assumption `Conv) t_logic_trivial in
+      let t_tr = FApi.t_or (t_assumption `Conv) t_trivial in
       subtactic := (fun tc ->
         FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto bad p q tc));
       form
@@ -437,6 +437,6 @@ let process_call side info tc =
     (t_call side ax)
     [FApi.t_seqs
        [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
-        !subtactic; t_logic_trivial];
+        !subtactic; t_trivial];
      t_id]
     tc

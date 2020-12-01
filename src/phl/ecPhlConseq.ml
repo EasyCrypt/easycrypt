@@ -349,7 +349,7 @@ let gen_conseq_nm tnm tc pre post =
     let gs =
       (tnm post @+
         [ t_id;
-          tc pre post @+ [t_id; t_logic_trivial; t_id] ]) g in
+          tc pre post @+ [t_id; t_trivial; t_id] ]) g in
     FApi.t_swap_goals 0 1 gs
   )
 
@@ -526,11 +526,11 @@ let t_bdHoareF_conseq_equiv f2 p q p2 q2 tc =
 
 (* -------------------------------------------------------------------- *)
 let rec t_hi_conseq notmod f1 f2 f3 tc =
-  let t_trivial = fun tc -> t_simplify ?target:None ~delta:false tc in
-  let t_trivial = t_trivial :: [t_split; t_fail] in
-  let t_trivial = FApi.t_try (FApi.t_seqs t_trivial) in
-  let t_on1     = FApi.t_on1 ~ttout:t_trivial in
-  let t_on1seq  = FApi.t_on1seq ~ttout:t_trivial in
+  let t_mytrivial = fun tc -> t_simplify ?target:None ~delta:false tc in
+  let t_mytrivial = [t_mytrivial; t_split; t_fail] in
+  let t_mytrivial = FApi.t_try (FApi.t_seqs t_mytrivial) in
+  let t_on1       = FApi.t_on1 ~ttout:t_mytrivial in
+  let t_on1seq    = FApi.t_on1seq ~ttout:t_mytrivial in
 
   let check_is_detbound who bound =
     if not (EcFol.f_equal bound f_r1) then
@@ -673,9 +673,9 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
           t_intro_i hi @!
           t_cut (f_hoareS_r {hs2 with hs_pr = pre}) @+ [
             t_hoareS_conseq hs2.hs_pr hs2.hs_po @+
-                [ t_logic_trivial;
-                  t_trivial;
-                   t_clear hi (* subgoal 2 : hs2 *)];
+                [ EcLowGoal.t_trivial;
+                  t_mytrivial;
+                  t_clear hi (* subgoal 2 : hs2 *)];
             t_intro_i hh @!
             (t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd @+ [
               t_id; (* subgoal 3 : bound *)
@@ -683,8 +683,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                 t_hoareS_conseq pre hs2.hs_po @+ [
                   t_intros_i [m;h0] @! t_cutdef
                     {pt_head = PTLocal hi;pt_args = [pamemory m; palocal h0]}
-                    mpre @! t_logic_trivial;
-                  t_trivial;
+                    mpre @! EcLowGoal.t_trivial;
+                  t_mytrivial;
                   t_apply_hyp hh];
                 tac pre posta @+ [
                   t_apply_hyp hi;
@@ -692,8 +692,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_bdHoareS_conseq_conj ~add:true hs2.hs_po post @+ [
                     t_apply_hyp hh;
                     t_bdHoareS_conseq hs.bhs_pr post @+ [
-                      t_logic_trivial;
-                      t_trivial;
+                      EcLowGoal.t_trivial;
+                      t_mytrivial;
                       t_id (* subgoal 5 : bdhoare *)
                     ]
                   ]
@@ -706,7 +706,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tc = FApi.t_swap_goals 1 1 (FApi.t_swap_goals 1 2 tc) in
 
     FApi.t_sub
-      [t_trivial; t_trivial; t_trivial; t_apply_r nf2; t_apply_r nf1]
+      [t_mytrivial; t_mytrivial; t_mytrivial; t_apply_r nf2; t_apply_r nf1]
       tc
 
   (* ------------------------------------------------------------------ *)
@@ -744,9 +744,9 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
           t_intro_i hi @!
           t_cut (f_hoareF_r {hs2 with hf_pr = pre}) @+ [
             t_hoareF_conseq hs2.hf_pr hs2.hf_po @+
-                [ t_logic_trivial;
-                  t_trivial;
-                   t_clear hi (* subgoal 2 : hs2 *)];
+                [ EcLowGoal.t_trivial;
+                  t_mytrivial;
+                  t_clear hi (* subgoal 2 : hs2 *)];
             t_intro_i hh @!
             (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd @+ [
               t_id; (* subgoal 3 : bound *)
@@ -754,8 +754,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                 t_hoareF_conseq pre hs2.hf_po @+ [
                   t_intros_i [m;h0] @! t_cutdef
                     {pt_head = PTLocal hi;pt_args = [pamemory m; palocal h0]}
-                    mpre @! t_logic_trivial;
-                  t_trivial;
+                    mpre @! EcLowGoal.t_trivial;
+                  t_mytrivial;
                   t_apply_hyp hh];
                 tac pre posta @+ [
                   t_apply_hyp hi;
@@ -763,8 +763,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_bdHoareF_conseq_conj ~add:true hs2.hf_po post @+ [
                     t_apply_hyp hh;
                     t_bdHoareF_conseq hs.bhf_pr post @+ [
-                      t_logic_trivial;
-                      t_trivial;
+                      EcLowGoal.t_trivial;
+                      t_mytrivial;
                       t_id (* subgoal 5 : bdhoare *)
                     ]
                   ]
@@ -775,8 +775,11 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
         ]) tc in
 
     let tc = FApi.t_swap_goals 1 1 (FApi.t_swap_goals 1 2 tc) in
+
+    Format.eprintf "%d@." (FApi.tc_count tc);
+
     FApi.t_sub
-      [t_trivial; t_trivial; t_trivial; t_apply_r nf2; t_apply_r nf1]
+      [t_mytrivial; t_mytrivial; t_mytrivial; t_apply_r nf2; t_apply_r nf1]
       tc
 
   (* ------------------------------------------------------------------ *)

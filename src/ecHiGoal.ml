@@ -376,7 +376,7 @@ let process_solve ?bases ?depth (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process_trivial (tc : tcenv1) =
-  EcPhlAuto.t_pl_trivial tc
+  EcPhlAuto.t_pl_trivial ~conv:`Conv tc
 
 (* -------------------------------------------------------------------- *)
 let process_crushmode d =
@@ -1682,7 +1682,9 @@ let process_pose xsym bds o p (tc : tcenv1) =
   in
 
   let dopat =
-    try  ignore (PT.pf_find_occurence ptenv ~ptn:p concl); true
+    try
+      ignore (PT.pf_find_occurence ~occmode:PT.om_rigid ptenv ~ptn:p concl);
+      true
     with PT.FindOccFailure _ ->
       if not (PT.can_concretize ptenv) then
         if not (EcMatching.MEV.filled !(ptenv.PT.pte_ev)) then
@@ -1702,7 +1704,7 @@ let process_pose xsym bds o p (tc : tcenv1) =
     | false -> (EcIdent.create (unloc xsym), concl)
     | true  -> begin
         let cpos =
-          try  FPosition.select_form hyps o p concl
+          try  FPosition.select_form ~xconv:`AlphaEq hyps o p concl
           with InvalidOccurence -> tacuerror "invalid occurence selector"
         in
           FPosition.topattern ~x:(EcIdent.create (unloc xsym)) cpos concl
