@@ -121,6 +121,7 @@ proof.
 move=> cnv1 cnv2 e gt0e; have gt0e2: 0%r < e/2%r by rewrite divr_gt0.
 case: (cnv1 _ gt0e2)=> N1 c1; case: (cnv2 _ gt0e2)=> N2 c2.
 exists (max N1 N2) => n /IntOrder.ler_maxrP [le_N1n le_N2n].
+(* FIXME ICI `|s1 n + s2 n - (l1 + l2)| < e --> `|s1 n + s2 n - (l1 + l2)| < e *)
 pose x := `|s1 n - l1| + `|s2 n - l2|.
 apply (@ler_lt_trans x); rewrite /x => {x}.
   by rewrite subrACA; apply/ler_norm_add.

@@ -137,6 +137,9 @@ clean:
 	rm -f ec.native.exe ec.byte.exe
 	find theories examples -name '*.eco' -exec rm '{}' ';'
 
+clean_eco:
+	find theories examples -name '*.eco' -exec rm '{}' ';'
+
 # --------------------------------------------------------------------
 dist:
 	if [ -e $(DISTDIR) ]; then rm -rf $(DISTDIR); fi

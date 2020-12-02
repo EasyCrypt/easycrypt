@@ -86,9 +86,3 @@ type dexists = [
 
 val destruct_product: ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dproduct option
 val destruct_exists : ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dexists  option
-
-(* -------------------------------------------------------------------- *)
-type lazyred = [`Full | `NoDelta | `None]
-
-val t_lazy_match:
-  ?reduce:lazyred -> (form -> FApi.backward)-> FApi.backward

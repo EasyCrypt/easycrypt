@@ -50,7 +50,7 @@ let (@~+) (tt : FApi.tactical) (ts : FApi.backward list) =
 exception InvalidProofTerm
 
 type side    = [`Left|`Right]
-type lazyred = EcProofTyping.lazyred
+type lazyred = [`Full | `NoDelta | `None]
 
 (* -------------------------------------------------------------------- *)
 module LowApply = struct
@@ -288,12 +288,12 @@ let t_shuffle (ids : EcIdent.t list) (tc : tcenv1) =
     tc_error !!tc "invalid shuffle"
 
 (* -------------------------------------------------------------------- *)
-let t_change_r ?target action (tc : tcenv1) =
+let t_change_r ?(fail=false) ?target action (tc : tcenv1) =
   match target with
   | None -> begin
       let hyps, concl = FApi.tc1_flat tc in
       match action (lazy hyps) concl with
-      | None -> tc
+      | None -> if fail then raise InvalidGoalShape else tc
       | Some fp when fp == concl -> tc
       | Some fp -> FApi.mutate1 tc (fun hd -> VConv (hd, Sid.empty)) fp
   end
@@ -344,6 +344,24 @@ let t_cbn ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
   let ri = if delta then full_red else nodelta in
   let ri = { ri with logic } in
   t_cbv_with_info ?target ri tc
+
+(* -------------------------------------------------------------------- *)
+let t_hred_with_info ?target (ri : reduction_info) (tc : tcenv1) =
+  let action (lazy hyps) fp = EcReduction.h_red_opt ri hyps fp in
+  FApi.tcenv_of_tcenv1 (t_change_r ~fail:true ?target action tc)
+
+(* -------------------------------------------------------------------- *)
+let rec t_lazy_match ?(reduce = `Full) (tx : form -> FApi.backward)
+  (tc : tcenv1) =
+  let concl = FApi.tc1_goal tc in
+  try tx concl tc
+  with TTC.NoMatch ->
+    let strategy =
+      match reduce with
+      | `None    -> raise InvalidGoalShape
+      | `Full    -> EcReduction.full_red
+      | `NoDelta -> EcReduction.nodelta in
+    FApi.t_seq (t_hred_with_info strategy) (t_lazy_match ~reduce tx) tc
 
 (* -------------------------------------------------------------------- *)
 type smode = [ `Cbv | `Cbn ]
@@ -875,7 +893,7 @@ let t_reflex ?(mode=`Conv) ?reduce (tc : tcenv1) =
         raise InvalidGoalShape
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_reflex_r tc
+    t_lazy_match ?reduce t_reflex_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_symmetry_s f1 f2 tc =
@@ -887,7 +905,7 @@ let t_symmetry ?reduce (tc : tcenv1) =
     | SFeq (f1, f2) -> t_symmetry_s f1 f2 tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_symmetry_r tc
+    t_lazy_match ?reduce t_symmetry_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_transitivity_s f1 f2 f3 tc =
@@ -899,7 +917,7 @@ let t_transitivity ?reduce f2 (tc : tcenv1) =
     | SFeq (f1, f3) -> t_transitivity_s f1 f2 f3 tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_transitivity_r tc
+    t_lazy_match ?reduce t_transitivity_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_exists_intro_s (args : pt_arg list) (tc : tcenv1) =
@@ -926,7 +944,7 @@ let t_or_intro ?reduce (side : side) (tc : tcenv1) =
     | SFor (b, (left, right)) -> t_or_intro_s b side (left, right) tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_or_intro_r tc
+    t_lazy_match ?reduce t_or_intro_r tc
 
 let t_left  ?reduce tc = t_or_intro ?reduce `Left  tc
 let t_right ?reduce tc = t_or_intro ?reduce `Right tc
@@ -947,7 +965,7 @@ let t_and_intro ?reduce (tc : tcenv1) =
     | SFand (b, (left, right)) -> t_and_intro_s b (left, right) tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_and_intro_r tc
+    t_lazy_match ?reduce t_and_intro_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_iff_intro_s (f1, f2 : form pair) (tc : tcenv1) =
@@ -959,7 +977,7 @@ let t_iff_intro ?reduce (tc : tcenv1) =
     | SFiff (f1, f2) -> t_iff_intro_s (f1, f2) tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_iff_intro_r tc
+    t_lazy_match ?reduce t_iff_intro_r tc
 
 (* -------------------------------------------------------------------- *)
 let gen_tuple_intro tys =
@@ -1009,7 +1027,7 @@ let t_tuple_intro ?reduce (tc : tcenv1) =
         t_tuple_intro_s fs tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_tuple_intro_r tc
+    t_lazy_match ?reduce t_tuple_intro_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
@@ -1326,7 +1344,7 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
 
     | _ -> raise TTC.NoMatch
 
-  in TTC.t_lazy_match ?reduce doit tc
+  in t_lazy_match ?reduce doit tc
 
 (* -------------------------------------------------------------------- *)
 let t_elim_default_r = [
@@ -1375,7 +1393,7 @@ let t_elim_prind_r ?reduce ?accept (_mode : [`Case | `Ind]) tc =
 
     | _ -> raise TTC.NoMatch
 
-  in TTC.t_lazy_match ?reduce doit tc
+  in t_lazy_match ?reduce doit tc
 
 (* -------------------------------------------------------------------- *)
 let t_elim_prind = t_elim_prind_r ?accept:None
@@ -1432,7 +1450,7 @@ let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
           tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_split_r tc
+    t_lazy_match ?reduce t_split_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_split_prind ?reduce (tc : tcenv1) =
@@ -1453,7 +1471,7 @@ let t_split_prind ?reduce (tc : tcenv1) =
        let p = EcInductive.prind_introsc_path p x in
        t_apply_s p tv ~args ~sk tc
 
-  in TTC.t_lazy_match ?reduce t_split_r tc
+  in t_lazy_match ?reduce t_split_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
@@ -1477,7 +1495,7 @@ let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
        t_apply_s p tv ~args ~sk tc
     | _  -> raise InvalidGoalShape
 
-  in TTC.t_lazy_match ?reduce t_split_r tc
+  in t_lazy_match ?reduce t_split_r tc
 
 (* -------------------------------------------------------------------- *)
 type rwspec = [`LtoR|`RtoL] * ptnpos option
@@ -1640,7 +1658,7 @@ module LowSubst = struct
     let cmp x y =
       let x = match x with `High -> 1 | `Low -> 0 in
       let y = match y with `High -> 1 | `Low -> 0 in
-      Pervasives.compare x y in
+      Stdlib.compare x y in
 
     let var = List.ksort ~stable:true ~rev:true ~key:fst ~cmp var in
     let var = List.ohead var |> omap snd in

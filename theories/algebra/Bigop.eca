@@ -483,7 +483,7 @@ lemma nosmt big_allpairs f F s t:
     big predT F (allpairs<:'a, 'b, 'c> f s t)
   = big predT (fun x => big predT (fun y => F (f x y)) t) s.
 proof.
-elim: s t => [|x s ih] t //=; first by rewrite !big_nil.
+elim: s t => [|x s ih] t //=. 
 by rewrite allpairs_consl big_cat ih big_consT big_map.
 qed.
 

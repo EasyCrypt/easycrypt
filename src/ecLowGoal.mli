@@ -24,7 +24,8 @@ open EcCoreGoal
 exception InvalidProofTerm         (* invalid proof term *)
 
 type side    = [`Left|`Right]
-type lazyred = EcProofTyping.lazyred
+type lazyred = [`Full | `NoDelta | `None]
+
 
 (* -------------------------------------------------------------------- *)
 val (@!) : FApi.backward -> FApi.backward -> FApi.backward
@@ -63,6 +64,7 @@ val t_cbn : simplify_t
 
 val t_cbv_with_info : simplify_with_info_t
 val t_cbn_with_info : simplify_with_info_t
+val t_hred_with_info : simplify_with_info_t
 
 val t_simplify : ?mode:smode -> simplify_t
 val t_simplify_with_info : ?mode:smode -> simplify_with_info_t
@@ -70,6 +72,11 @@ val t_simplify_with_info : ?mode:smode -> simplify_with_info_t
 (* -------------------------------------------------------------------- *)
 val t_change : ?target:ident -> form -> tcenv1 -> tcenv1
 
+
+(* -------------------------------------------------------------------- *)
+
+val t_lazy_match:
+  ?reduce:lazyred -> (form -> FApi.backward)-> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_reflex       : ?mode:[`Alpha | `Conv] -> ?reduce:lazyred -> FApi.backward

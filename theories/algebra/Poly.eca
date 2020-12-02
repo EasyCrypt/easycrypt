@@ -59,6 +59,7 @@ clone include Subtype
   rename "insub" as "to_poly"
   rename "val"   as "of_poly".
 
+(* FIXME: pourquoi un operateur et pas une abbrev *)
 op "_.[_]" (p : poly) (i : int) = (of_poly p) i.
 
 lemma lt0_coeff p c : c < 0 => p.[c] = zeror.
