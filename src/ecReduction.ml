@@ -230,64 +230,67 @@ module EqTest = struct
 end
 
 (* -------------------------------------------------------------------- *)
+exception NotConv
+
+let ensure b = if b then () else raise NotConv
+
+let check_ty env subst ty1 ty2 =
+  ensure (EqTest.for_type env ty1 (subst.fs_ty ty2))
+
+let add_local (env, subst) (x1, ty1) (x2, ty2) =
+  check_ty env subst ty1 ty2;
+  env,
+  if id_equal x1 x2 then subst
+  else Fsubst.f_bind_rename subst x2 x1 ty1
+
+let check_lpattern env subst lp1 lp2 =
+    match lp1, lp2 with
+    | LSymbol xt1, LSymbol xt2 -> add_local (env, subst) xt1 xt2
+    | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
+      List.fold_left2 add_local (env,subst) lid1 lid2
+    | _, _ -> raise NotConv
+
+let check_memtype env mt1 mt2 =
+  match mt1, mt2 with
+  | None, None -> ()
+  | Some lmt1, Some lmt2 ->
+    let xp1, xp2 = EcMemory.lmt_xpath lmt1, EcMemory.lmt_xpath lmt2 in
+    ensure (EqTest.for_xp env xp1 xp2);
+    let m1, m2 = EcMemory.lmt_bindings lmt1, EcMemory.lmt_bindings lmt2 in
+    ensure (EcSymbols.Msym.equal
+              (fun (p1,ty1) (p2,ty2) ->
+                p1 = p2 && EqTest.for_type env ty1 ty2) m1 m2)
+  | _, _ -> raise NotConv
+
+let check_binding (env, subst) (x1, gty1) (x2, gty2) =
+  let gty2 = Fsubst.gty_subst subst gty2 in
+  match gty1, gty2 with
+  | GTty ty1, GTty ty2 ->
+    add_local (env, subst) (x1,ty1) (x2,ty2)
+
+  | GTmodty (p1, r1) , GTmodty(p2, r2) ->
+    ensure (ModTy.mod_type_equiv env p1 p2 && NormMp.equal_restr env r1 r2);
+    Mod.bind_local x1 p1 r1 env,
+    if id_equal x1 x2 then subst
+    else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
+
+  | GTmem   me1, GTmem me2  ->
+    check_memtype env me1 me2;
+    env,
+    if id_equal x1 x2 then subst
+    else Fsubst.f_bind_mem subst x2 x1
+  | _, _ -> raise NotConv
+
+
+let check_bindings env subst bd1 bd2 =
+    List.fold_left2 check_binding (env,subst) bd1 bd2
+
+(* -------------------------------------------------------------------- *)
 let check_alpha_eq hyps f1 f2 =
   let env = LDecl.toenv hyps in
   let exn = IncompatibleForm (env, (f1, f2)) in
   let error () = raise exn in
   let ensure t = if not t then error () in
-
-  let check_ty env subst ty1 ty2 =
-    ensure (EqTest.for_type env ty1 (subst.fs_ty ty2)) in
-
-  let add_local (env, subst) (x1,ty1) (x2,ty2) =
-    check_ty env subst ty1 ty2;
-    env,
-    if id_equal x1 x2 then subst
-    else Fsubst.f_bind_rename subst x2 x1 ty1 in
-
-  let check_lpattern env subst lp1 lp2 =
-    match lp1, lp2 with
-    | LSymbol xt1, LSymbol xt2 -> add_local (env, subst) xt1 xt2
-    | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
-      List.fold_left2 add_local (env,subst) lid1 lid2
-    | _, _ -> error() in
-
-  let check_memtype env mt1 mt2 =
-    match mt1, mt2 with
-    | None, None -> ()
-    | Some lmt1, Some lmt2 ->
-      let xp1, xp2 = EcMemory.lmt_xpath lmt1, EcMemory.lmt_xpath lmt2 in
-      ensure (EqTest.for_xp env xp1 xp2);
-      let m1, m2 = EcMemory.lmt_bindings lmt1, EcMemory.lmt_bindings lmt2 in
-      ensure (EcSymbols.Msym.equal
-                (fun (p1,ty1) (p2,ty2) ->
-                  p1 = p2 && EqTest.for_type env ty1 ty2) m1 m2)
-    | _, _ -> error () in
-
-  (* TODO all declaration in env, do it also in add local *)
-  let check_binding (env, subst) (x1,gty1) (x2,gty2) =
-    let gty2 = Fsubst.gty_subst subst gty2 in
-    match gty1, gty2 with
-    | GTty ty1, GTty ty2 ->
-      ensure (EqTest.for_type env ty1 ty2);
-      env,
-      if id_equal x1 x2 then subst else
-        Fsubst.f_bind_rename subst x2 x1 ty1
-    | GTmodty (p1, r1) , GTmodty(p2, r2) ->
-      ensure (ModTy.mod_type_equiv env p1 p2 &&
-                NormMp.equal_restr env r1 r2);
-      Mod.bind_local x1 p1 r1 env,
-      if id_equal x1 x2 then subst
-      else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
-    | GTmem   me1, GTmem me2  ->
-      check_memtype env me1 me2;
-      env,
-      if id_equal x1 x2 then subst
-      else Fsubst.f_bind_mem subst x2 x1
-    | _, _ -> error () in
-
-  let check_bindings env subst bd1 bd2 =
-    List.fold_left2 check_binding (env,subst) bd1 bd2 in
 
   let check_local subst id1 f2 id2 =
     match (Mid.find_def f2 id2 subst.fs_loc).f_node with
@@ -415,7 +418,8 @@ let check_alpha_eq hyps f1 f2 =
     | _, _ -> error ()
 
   in
-   aux env Fsubst.f_subst_id f1 f2
+  try aux env Fsubst.f_subst_id f1 f2
+  with NotConv -> raise exn
 
 (* -------------------------------------------------------------------- *)
 let is_alpha_eq hyps f1 f2 =
@@ -1005,73 +1009,20 @@ let simplify ri hyps f =
   let ri, env = init_redinfo ri hyps in
   simplify ri env f
 
-(* ------------------------------------------------------------------------------- *)
-(* Checking convertibility                                                         *)
+(* ----------------------------------------------------------------- *)
+(* Checking convertibility                                           *)
 
-exception NotConv
-
-let ensure b = if b then () else raise NotConv
-
-let check_memtype env mt1 mt2 =
-  match mt1, mt2 with
-  | None, None -> ()
-  | Some lmt1, Some lmt2 ->
-    let xp1, xp2 = EcMemory.lmt_xpath lmt1, EcMemory.lmt_xpath lmt2 in
-    ensure (EqTest.for_xp env xp1 xp2);
-    let m1, m2 = EcMemory.lmt_bindings lmt1, EcMemory.lmt_bindings lmt2 in
-    ensure (EcSymbols.Msym.equal
-              (fun (p1,ty1) (p2,ty2) ->
-                p1 = p2 && EqTest.for_type env ty1 ty2) m1 m2)
-  | _, _ -> raise NotConv
-
-let check_ty env subst ty1 ty2 =
-  ensure (EqTest.for_type env ty1 (subst.fs_ty ty2))
-
-let add_local (env, subst) (x1, ty1) (x2, ty2) =
-  check_ty env subst ty1 ty2;
-  env,
-  if id_equal x1 x2 then subst
-  else Fsubst.f_bind_rename subst x2 x1 ty1
-
-let check_binding env subst (x1, gty1) (x2, gty2) =
-  let gty2 = Fsubst.gty_subst subst gty2 in
-  match gty1, gty2 with
-  | GTty ty1, GTty ty2 ->
-    add_local (env, subst) (x1,ty1) (x2,ty2)
-
-  | GTmodty (p1, r1) , GTmodty(p2, r2) ->
-    ensure (ModTy.mod_type_equiv env p1 p2 && NormMp.equal_restr env r1 r2);
-    Mod.bind_local x1 p1 r1 env,
-    if id_equal x1 x2 then subst
-    else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
-
-  | GTmem   me1, GTmem me2  ->
-    check_memtype env me1 me2;
-    env,
-    if id_equal x1 x2 then subst
-    else Fsubst.f_bind_mem subst x2 x1
-  | _, _ -> raise NotConv
-
-let check_bindings env q bd1 bd2 f1 f2 =
-  let rec aux env subst bd bd1 bd2 =
+let check_bindings_conv env q bd1 bd2 f1 f2 =
+  let rec aux es bd bd1 bd2 =
     match bd1, bd2 with
     | b1::bd1', b2::bd2' ->
-      begin match check_binding env subst b1 b2 with
-      | env, subst -> aux env subst (b1::bd) bd1' bd2'
-      | exception NotConv -> env, subst, bd, bd1, bd2
+      begin match check_binding es b1 b2 with
+      | es -> aux es (b1::bd) bd1' bd2'
+      | exception NotConv -> es, bd, bd1, bd2
       end
-    | _, _ -> env, subst, bd, bd1, bd2 in
-  let env, subst, bd, bd1, bd2 = aux env Fsubst.f_subst_id [] bd1 bd2 in
+    | _, _ -> es, bd, bd1, bd2 in
+  let (env, subst), bd, bd1, bd2 = aux (env, Fsubst.f_subst_id) [] bd1 bd2 in
   env, bd, f_quant q bd1 f1, f_quant q bd2 (Fsubst.f_subst subst f2)
-
-
-let check_lpattern env lp1 lp2 =
-  let subst = Fsubst.f_subst_id in
-  match lp1, lp2 with
-  | LSymbol xt1, LSymbol xt2 -> add_local (env, subst) xt1 xt2
-  | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
-    List.fold_left2 add_local (env,subst) lid1 lid2
-  | _, _ -> raise NotConv
 
 let check_memenv env (x1,mt1) (x2,mt2) =
   EcMemory.mem_equal x1 x2 &&
@@ -1156,9 +1107,9 @@ let rec conv ri env f1 f2 stk =
   | Fquant (q1, bd1, f1'), Fquant(q2,bd2,f2') ->
     if q1 <> q2 then force_head_sub ri env f1 f2 stk
     else
-      let env, bd, f1', f2' = check_bindings env q1 bd1 bd2 f1' f2' in
+      let env, bd, f1', f2' = check_bindings_conv env q1 bd1 bd2 f1' f2' in
       if bd = [] then force_head ri env f1 f2 stk
-      else conv ri env f1' f2' (zquant q1 bd f1.f_ty stk)
+      else conv ri env f1' f2' (zquant q1 (List.rev bd) f1.f_ty stk)
 
   | Fquant(Llambda, bd, f), _ -> begin
     match stk with
@@ -1188,7 +1139,7 @@ let rec conv ri env f1 f2 stk =
     conv ri env f11 f21 (zif [f12;f13] [f22;f23] f1.f_ty stk)
 
   | Flet(lp1,f11,f12), Flet(lp2,f21,f22) -> begin
-    match check_lpattern env lp1 lp2 with
+    match check_lpattern env Fsubst.f_subst_id lp1 lp2 with
     | env, subst ->
       let f21, f22 = Fsubst.f_subst subst f21, Fsubst.f_subst subst f22 in
       conv ri env f11 f21 (zlet lp1 f12 f22 stk)
