@@ -776,8 +776,6 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
 
     let tc = FApi.t_swap_goals 1 1 (FApi.t_swap_goals 1 2 tc) in
 
-    Format.eprintf "%d@." (FApi.tc_count tc);
-
     FApi.t_sub
       [t_mytrivial; t_mytrivial; t_mytrivial; t_apply_r nf2; t_apply_r nf1]
       tc
