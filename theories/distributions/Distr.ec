@@ -700,6 +700,11 @@ proof. by move=> nz_s; apply/MRat.drat_ll; rewrite undup_nilp. qed.
 lemma duniform_uni (s : 'a list) : is_uniform (duniform s).
 proof. by move=> x y; rewrite !duniform1E !supp_duniform => !->. qed.
 
+lemma duniform_fu (s: 'a list) : 
+  (forall x, x \in s) => 
+  is_full (duniform s).
+proof. by move=> hin x; rewrite supp_duniform hin. qed.
+
 lemma finite_duniform ['a] (s : 'a list) : is_finite (support (duniform s)).
 proof. by apply/uniform_finite/duniform_uni. qed.
 end MUniform.
