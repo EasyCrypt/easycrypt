@@ -298,7 +298,7 @@ call (_: Game1.r \in Log.qs,
   + move: m1_eqe_m2 x_in_m=> + + + r_neq_x.
     by rewrite eq_exceptP pred1E !domE=> /(_ x{2} r_neq_x) ->.
   by move: m1_eqe_m2=> + _ r_neq_x- /eq_exceptP /(_ x{2}); rewrite pred1E=> /(_ r_neq_x) ->.
-+ by move=> &2 _; proc; call (LRO_o_ll dptxt_ll); auto.
++ by move=> &2 _; proc; call (LRO_o_ll _); auto=> /=; apply: dptxt_ll.
 + move=> _ /=; proc; inline *.
   conseq (: true ==> true: =1%r) (: Game1.r \in Log.qs ==> Game1.r \in Log.qs)=> //=.
   + by auto=> />.
@@ -364,10 +364,10 @@ swap 4 4.
 wp; rnd (pred1 b')=> //=.
 inline *; call (_: true).
 + exact A_a2_ll. (* adversary *)
-+ by proc; call (LRO_o_ll dptxt_ll); auto. (* oracle *)
++ by proc; call (LRO_o_ll _); auto=> /=; apply: dptxt_ll. (* oracle *)
 auto; call (_: true).
 + exact A_a1_ll. (* adversary *)
-+ by proc; call (LRO_o_ll dptxt_ll); auto. (* oracle *)
++ by proc; call (LRO_o_ll _); auto=> /=; apply: dptxt_ll. (* oracle *)
 auto=> />; rewrite dkeys_ll drand_ll dptxt_ll /predT /=.
 by move=> _ _ _ _ _ _ r; rewrite dbool1E pred1E.
 qed.

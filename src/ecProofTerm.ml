@@ -263,7 +263,8 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
       pt.pte_ev := ev
   with EcMatching.MatchFailure as exn ->
     (* FIXME: should we check for empty inters. with ecmap? *)
-    if not mode.fm_conv || not (EcReduction.is_conv pt.pte_hy ptn subject) then
+    if not mode.fm_conv ||
+       not (EcReduction.is_conv ~ri:EcReduction.full_compat pt.pte_hy ptn subject) then
       raise exn
 
 (* -------------------------------------------------------------------- *)

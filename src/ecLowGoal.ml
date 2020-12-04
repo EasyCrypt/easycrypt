@@ -648,7 +648,7 @@ module Apply = struct
       match istop && PT.can_concretize pt.PT.ptev_env with
       | true ->
           let ax = PT.concretize_form pt.PT.ptev_env pt.PT.ptev_ax in
-          if   EcReduction.is_conv hyps ax concl
+          if   EcReduction.is_conv ~ri:EcReduction.full_compat hyps ax concl
           then pt
           else instantiate canview false pt
 

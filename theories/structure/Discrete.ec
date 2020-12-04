@@ -122,7 +122,7 @@ lemma nosmt inj_condL_countable ['a 'b] (f : 'a -> 'b) p :
      countableT<:'b>
   => (forall x y, p x => p y => f x = f y => x = y)
   => countable<:'a> p.
-proof. by apply/inj_cond_countable. qed.
+proof. by move=> ??; apply: (@inj_cond_countable f predT). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt inj_countable ['a] (f : 'a -> int) (p : 'a -> bool) :

@@ -388,7 +388,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
   let conv =
     match opts.fm_conv with
-    | true  -> EcReduction.is_conv hyps
+    | true  -> EcReduction.is_conv ~ri:EcReduction.full_compat hyps
     | false -> EcReduction.is_alpha_eq hyps
   in
 

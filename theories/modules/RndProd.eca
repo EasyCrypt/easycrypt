@@ -226,12 +226,13 @@ transitivity Game(D, O3(ROa.FullEager.LRO, ROb.RO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + proc; inline*. 
-  by call(ROa.FullEager.RO_LRO_D (D1(ROb.RO)) da_ll); auto.
+  by call(ROa.FullEager.RO_LRO_D (D1(ROb.RO)) _); auto=> /=; apply: da_ll.
 transitivity Game(D, O3(ROa.FullEager.LRO, ROb.FullEager.LRO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + proc; inline*. 
-  by call(ROb.FullEager.RO_LRO_D (D2(ROa.FullEager.LRO)) db_ll); auto.
+  by call(ROb.FullEager.RO_LRO_D (D2(ROa.FullEager.LRO)) _);
+    auto=> /=; apply: db_ll.
 by proc; inline*; call eq_2; auto.
 qed.
 

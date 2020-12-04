@@ -476,6 +476,8 @@ let nodelta =
 
 let delta = { no_red with delta_p = EcUtils.predT; }
 
+let full_compat = { full_red with logic = Some `ProductCompat; }
+
 (* -------------------------------------------------------------------- *)
 type not_reducible = NoHead | NeedSubTerm
 
@@ -618,11 +620,10 @@ let reduce_logic ri env hyps f p args =
 
   let f' =
     match op_kind p, args with
-    | Some (`Not), [f1]    when pcompat -> f_not_simpl f1
     | Some (`Imp), [f1;f2] when pcompat -> f_imp_simpl f1 f2
     | Some (`Iff), [f1;f2] when pcompat -> f_iff_simpl f1 f2
 
-
+    | Some (`Not)      , [f1]    -> f_not_simpl f1
     | Some (`And `Asym), [f1;f2] -> f_anda_simpl f1 f2
     | Some (`Or  `Asym), [f1;f2] -> f_ora_simpl f1 f2
     | Some (`And `Sym ), [f1;f2] -> f_and_simpl f1 f2
@@ -1268,15 +1269,15 @@ let reduce_user_gen simplify ri env hyps f =
   with NotRed _ -> raise NotReducible
 
 (* -------------------------------------------------------------------- *)
-let is_conv hyps f1 f2 =
+let is_conv ?(ri = full_red) hyps f1 f2 =
   if f_equal f1 f2 then true
   else
-    let ri, env = init_redinfo full_red hyps in
+    let ri, env = init_redinfo ri hyps in
     if EqTest.for_type env f1.f_ty f2.f_ty then conv ri env f1 f2 []
     else false
 
-let check_conv hyps f1 f2 =
-  if is_conv hyps f1 f2 then ()
+let check_conv ?ri hyps f1 f2 =
+  if is_conv ?ri hyps f1 f2 then ()
   else raise (IncompatibleForm ((LDecl.toenv hyps), (f1, f2)))
 
 (* -------------------------------------------------------------------- *)

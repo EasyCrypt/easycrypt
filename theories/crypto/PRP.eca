@@ -581,7 +581,7 @@ section CollisionProbability.
     }
   }.
 
-  local lemma A_ll (S <: ASampler {A}) &m: islossless S.s => islossless A(S).a.
+  local lemma A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
   proof.
   move=> S_ll; proc; inline*; wp.
   call (_: true).

@@ -598,7 +598,7 @@ abstract theory UF1_UF.
     local lemma Aux1_EAux1 &m: 
       Pr[Aux1(LRO).distinguish() @ &m : UF1.forged] =
       Pr[Aux1( RO).distinguish() @ &m : UF1.forged].
-    proof. apply eq_sym; byequiv (RO_LRO_D Aux1 keygen_ll) => //. qed.
+    proof. by apply eq_sym; byequiv (RO_LRO_D Aux1 _) => //=; apply: keygen_ll. qed.
  
     local lemma EAux1_MkAdvUF1 &m:
       Pr[Aux1( RO).distinguish() @ &m : UF1.forged] <=
