@@ -1,8 +1,6 @@
 EasyCrypt: Computer-Aided Cryptographic Proofs
 ====================================================================
 
-[![Build Status](https://travis-ci.org/EasyCrypt/easycrypt.svg?branch=1.0)](https://travis-ci.org/EasyCrypt/easycrypt)
-
 EasyCrypt is a toolset for reasoning about relational properties of
 probabilistic computations with adversarial code. Its main application
 is the construction and verification of game-based cryptographic
