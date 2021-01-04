@@ -161,7 +161,7 @@ section.
          Pr[INDR(O,A).main() @ &m :  res /\ p (glob A) (glob O) Count.c /\
                                      Count.c <= q]).
   proof.
-    cut := Hybrid (Orcl2(O)) A' _ _ _ _ &m (fun ga go c b, b /\ p ga go c).
+    have := Hybrid (Orcl2(O)) A' _ _ _ _ &m (fun ga go c b, b /\ p ga go c).
       by apply losslessL.
       by proc;call losslessO.
       by proc;call losslessO.
@@ -169,10 +169,10 @@ section.
       call (losslessA (<:A'(Ob,LR).O) (<:A'(Ob,LR).LR') _ _ _) => //;proc.
         by call Hlr. by call Ho1.
     zeta beta => H.
-    cut -> : Pr[INDL(O, HybGame2(A)).main() @ &m :
-                 res /\ p (glob A) (glob O) HybOrcl.l /\ HybOrcl.l <= q /\ Count.c <= 1] =
-             Pr[Ln(Orcl2(O), H.HybGame(A')).main() @ &m :
-                 ((res /\ p (glob A) (glob O) HybOrcl.l) /\ HybOrcl.l <= q) /\ Count.c <= 1].
+    have -> : Pr[INDL(O, HybGame2(A)).main() @ &m :
+                  res /\ p (glob A) (glob O) HybOrcl.l /\ HybOrcl.l <= q /\ Count.c <= 1] =
+              Pr[Ln(Orcl2(O), H.HybGame(A')).main() @ &m :
+                  ((res /\ p (glob A) (glob O) HybOrcl.l) /\ HybOrcl.l <= q) /\ Count.c <= 1].
       byequiv (_: ={glob A,glob O} ==>
                      ={res,glob A,glob O,glob HybOrcl, Count.c}) => //;proc.
       call (_: ={glob A,glob O, Count.c} ==> ={glob A,glob O,glob HybOrcl,Count.c,res}).
@@ -189,10 +189,10 @@ section.
           by wp;call (_: true);wp.
         by wp;rnd.
       by call (_:true ==> ={Count.c});first by proc;wp.
-    cut -> : Pr[INDR(O, HybGame2(A)).main() @ &m :
-                 res /\ p (glob A) (glob O) HybOrcl.l /\ HybOrcl.l <= q /\ Count.c <= 1] =
-             Pr[Rn(Orcl2(O), H.HybGame(A')).main() @ &m :
-                 ((res /\ p (glob A) (glob O) HybOrcl.l) /\ HybOrcl.l <= q) /\ Count.c <= 1].
+    have -> : Pr[INDR(O, HybGame2(A)).main() @ &m :
+                  res /\ p (glob A) (glob O) HybOrcl.l /\ HybOrcl.l <= q /\ Count.c <= 1] =
+              Pr[Rn(Orcl2(O), H.HybGame(A')).main() @ &m :
+                  ((res /\ p (glob A) (glob O) HybOrcl.l) /\ HybOrcl.l <= q) /\ Count.c <= 1].
       byequiv (_: ={glob A,glob O} ==>
                      ={res,glob A,glob O,glob HybOrcl, Count.c}) => //;proc.
       call (_: ={glob A,glob O, Count.c} ==> ={glob A,glob O,glob HybOrcl,Count.c,res}).
@@ -210,8 +210,8 @@ section.
         by wp;rnd.
       by call (_:true ==> ={Count.c});first by proc;wp.
    (* BUG : rewrite H.  *)
-   cut -> : Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Count.c <= q] =
-            Pr[Ln(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) Count.c) /\ Count.c <= q].
+   have -> : Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Count.c <= q] =
+             Pr[Ln(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) Count.c) /\ Count.c <= q].
      byequiv (_: ={glob A,glob O} ==>
                     ={res,glob A,glob O, Count.c}) => //;proc.
       call (_: ={glob A,glob O, Count.c} ==> ={glob A,glob O,Count.c,res}).
@@ -224,8 +224,8 @@ section.
           proc;inline OrclCount(L(Orcl2(O))).orcl L(Orcl2(O)).orcl Orcl2(O).orclL Count.incr.
         by wp;call(_:true);wp.
       by call (_:true ==> ={Count.c});first by proc;wp.
-   cut -> : Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Count.c <= q] =
-            Pr[Rn(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) Count.c) /\ Count.c <= q].
+   have -> : Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Count.c <= q] =
+             Pr[Rn(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) Count.c) /\ Count.c <= q].
      byequiv (_: ={glob A,glob O} ==>
                     ={res,glob A,glob O, Count.c}) => //;proc.
       call (_: ={glob A,glob O, Count.c} ==> ={glob A,glob O,Count.c,res}).
@@ -290,15 +290,15 @@ section.
      (Pr[INDL(O,A).main() @ &m : res /\ p (glob A) (glob O) Count.c] -
       Pr[INDR(O,A).main() @ &m : res /\ p (glob A) (glob O) Count.c])/2%r.
   proof.
-   cut := Sample_bool WA &m
+   have := Sample_bool WA &m
      (fun (g:glob WA), let (b,c,ga,go) = g in p ga go c) => /= H.
-   cut -> : Pr[INDb(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] =
+   have -> : Pr[INDb(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] =
     Pr[MB.M.Rand(WA).main() @ &m : fst res = snd res /\ p (glob A) (glob O) Count.c].
      byequiv (_: ={glob A,glob O} ==> ={glob A,glob O, Count.c} /\
                    res{1} = (fst res = snd res){2}) => //;proc.
      inline Count.init WA.work;simplify fst snd.
      by swap{1} 2 -1; sim; proc (={Orclb.b, Count.c}).
-   cut He: equiv [INDR(O, A).main ~ WA.work: x{2}=false /\
+   have He: equiv [INDR(O, A).main ~ WA.work: x{2}=false /\
                    ={glob A,glob O} ==> ={res,glob A,glob O, Count.c}].
     proc.
     call (_: ={glob O, Count.c} /\ Orclb.b{2} = false).
@@ -306,14 +306,14 @@ section.
       by proc (={Count.c} /\ Orclb.b{2} = false).
       by proc;inline Count.incr;wp;call(_:true);wp;skip;progress.
     inline Count.init;by wp.
-   cut -> : Pr[INDR(O, A).main() @ &m : p (glob A) (glob O) Count.c] =
-            Pr[WA.work(false) @ &m : p (glob A) (glob O) Count.c].
+   have -> : Pr[INDR(O, A).main() @ &m : p (glob A) (glob O) Count.c] =
+             Pr[WA.work(false) @ &m : p (glob A) (glob O) Count.c].
      by byequiv He.
-   cut -> : Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] =
-            Pr[WA.work(false) @ &m : res /\ p (glob A) (glob O) Count.c].
+   have -> : Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] =
+             Pr[WA.work(false) @ &m : res /\ p (glob A) (glob O) Count.c].
      by byequiv He.
-   (cut -> : Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] =
-            Pr[WA.work(true) @ &m : res /\ p (glob A) (glob O) Count.c]) => //.
+   (have -> : Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] =
+              Pr[WA.work(true) @ &m : res /\ p (glob A) (glob O) Count.c]) => //.
    byequiv
       (_: x{2}=true /\ ={glob A,glob O} ==> ={res,glob A,glob O, Count.c}) => //.
    proc; call (_: ={glob O, Count.c} /\ Orclb.b{2} = true).

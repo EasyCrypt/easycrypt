@@ -175,8 +175,8 @@ section.
                  Pr[CPAR(S,A).main() @ &m : res /\ K.c <= H.q]).
   proof.
     move=> Hq.
-    cut -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
-             Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
+    have -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
+              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
       proc.
@@ -184,8 +184,8 @@ section.
       wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
-    cut -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
-             Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
+    have -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
+              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
       proc.
@@ -193,7 +193,7 @@ section.
       wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
-    cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
+    have := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
       by proc;call Lkg.
       by proc;call Lenc.
       move=> O LR Llr Ll Lo;proc;call (La LR _) => //.

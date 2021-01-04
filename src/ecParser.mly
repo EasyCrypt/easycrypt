@@ -411,7 +411,6 @@
 %token CONGR
 %token CONSEQ
 %token CONST
-%token CUT
 %token DEBUG
 %token DECLARE
 %token DELTA
@@ -2582,7 +2581,7 @@ revert:
   { { pr_clear = odfl [] cl; pr_genp = gp; } }
 
 %inline have_or_suff:
-| HAVE | CUT { `Have }
+| HAVE { `Have }
 | SUFF { `Suff }
 
 logtactic:
@@ -2694,7 +2693,7 @@ logtactic:
 | m=have_or_suff ip=loc(intro_pattern)* COLON p=form BY t=loc(tactics)
    { Pcut (m, ip, p, Some t) }
 
-| ior_(CUT, HAVE) ip=loc(intro_pattern)* CEQ fp=pcutdef
+| HAVE ip=loc(intro_pattern)* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=ident xs=ptybindings? CEQ p=form_h %prec prec_below_IMPL

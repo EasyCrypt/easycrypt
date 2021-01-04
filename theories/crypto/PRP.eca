@@ -155,7 +155,7 @@ proof.
 elim/fset_ind: (fdom m) {-2}m (eq_refl (fdom m))=> {m} [m /fdom_eq0 ->|].
 + by rewrite frng0 fdom0 !fcards0.
 move=> x s x_notin_s ih m dom_m.
-cut ->: m = (rem m x).[x <- oget m.[x]].
+have ->: m = (rem m x).[x <- oget m.[x]].
 + apply/fmap_eqP=> x'; rewrite get_setE remE; case: (x' = x)=> [->>|//].
   have /fsetP /(_ x):= dom_m; rewrite in_fsetU in_fset1 /= mem_fdom domE.
   by case: m.[x].

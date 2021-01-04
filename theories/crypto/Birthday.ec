@@ -173,8 +173,8 @@ section.
     Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
     <= (q^2)%r * mu1 uT maxu.
   proof.
-    cut ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l] =
-            Pr[Exp(Sample,Bounded(A)).main() @ &m: !uniq Sample.l].
+    have ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l] =
+             Pr[Exp(Sample,Bounded(A)).main() @ &m: !uniq Sample.l].
     + byequiv (PushBound Sample A) => //.
     apply (pr_collision_q2 (Bounded(A)) _ _ &m).
     + move=> S HS;proc;call (A_ll (ABounder(S)) _);2:by auto.
