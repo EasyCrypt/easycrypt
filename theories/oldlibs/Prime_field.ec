@@ -76,9 +76,9 @@ qed.
 lemma gf_q_mult_zero (x:gf_q):
   x * gf_q0 = gf_q0.
 proof strict.
-  cut H: x * gf_q0 + x * gf_q0 = x * gf_q0.
+  have H: x * gf_q0 + x * gf_q0 = x * gf_q0.
     by rewrite -gf_q_distr gf_q_add_unit.
-  cut ->: x * gf_q0 = x * gf_q0 + (x * gf_q0 - x * gf_q0).
+  have ->: x * gf_q0 = x * gf_q0 + (x * gf_q0 - x * gf_q0).
     by rewrite gf_q_minus gf_q_add_unit_right.
   by rewrite /(-) gf_q_add_assoc H gf_q_add_minus.
 qed.
@@ -86,7 +86,7 @@ qed.
 lemma gf_q_mult_minus (x y:gf_q):
   (-x) * y = - (x * y).
 proof strict.
-  cut ->: (-x) * y = (-x) * y + x * y + (-( x * y)).
+  have ->: (-x) * y = (-x) * y + x * y + (-( x * y)).
     by rewrite -(gf_q_add_assoc _ (x * y)) gf_q_add_minus gf_q_add_unit_right.
   rewrite (gf_q_mult_comm (-x)) (gf_q_mult_comm x) -gf_q_distr.
   by rewrite (gf_q_add_comm (-x)) gf_q_add_minus gf_q_mult_zero  gf_q_add_unit.

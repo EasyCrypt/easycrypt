@@ -307,8 +307,8 @@ lemma eq_from_nth x0 (s1 s2 : 'a list):
 proof.                        (* BUG: CHECKING IS TOO LONG *)
 elim: s1 s2 => [|x1 s1 IHs1] [|x2 s2] //=; 1,2: smt w=(size_ge0).
 move=> eq_szS h; have eq_sz: size s1 = size s2 by move=> /#.
-cut := h 0 => /= ->; first smt. rewrite (IHs1 s2) // => i le_i_s1.
-cut := h (i+1); smt.
+have := h 0 => /= ->; first smt. rewrite (IHs1 s2) // => i le_i_s1.
+have := h (i+1); smt.
 qed.
 
 lemma nth_nseq w i n (a : 'a): 0 <= i < n => nth w (nseq n a) i = a.
@@ -917,16 +917,16 @@ lemma perm_eqP (s1 s2 : 'a list):
   perm_eq s1 s2 <=> (forall p, count p s1 = count p s2).
 proof.
   rewrite /perm_eq allP /=; split; last by move=> h x _; apply h.
-  move=> eq_cnt1 a; cut ltzSz: forall z, z < z + 1 by smt.
+  move=> eq_cnt1 a; have ltzSz: forall z, z < z + 1 by smt.
   (* FIX: negative occurence selector *)
-  cut {ltzSz} := ltzSz (count a (s1 ++ s2)); move: {1 3 4}a.
-  pose x := _ + 1; cut : 0 <= x by smt. move: x => {a}.
+  have {ltzSz} := ltzSz (count a (s1 ++ s2)); move: {1 3 4}a.
+  pose x := _ + 1; have : 0 <= x by smt. move: x => {a}.
   elim; first by smt.
   move=> i i_ge0 IHi a le_ai; case: (count a (s1 ++ s2) = 0).
     by rewrite count_cat; smt.
   rewrite neq_ltz ltzNge count_ge0 /=; rewrite -has_count hasP.
   case=> x [s12x a_x]; pose a' := predD1 a x.
-  cut cnt_a': forall s, count a s = count (pred1 x) s + count a' s.
+  have cnt_a': forall s, count a s = count (pred1 x) s + count a' s.
     move=> s; rewrite -size_filter -(count_predC (pred1 x)).
     rewrite  -2!size_filter -!filter_predI !size_filter.
     by congr; apply eq_count => y; delta.
@@ -976,7 +976,7 @@ proof. by rewrite -perm_eqlP perm_catC. qed.
 lemma perm_cat2l (s1 s2 s3 : 'a list):
   perm_eq (s1 ++ s2) (s1 ++ s3) <=> perm_eq s2 s3.
 proof.
-  by rewrite !perm_eqP; split=> h p; cut := h p; rewrite !count_cat; smt.
+  by rewrite !perm_eqP; split=> h p; have := h p; rewrite !count_cat; smt.
 qed.
 
 lemma perm_cat2r (s1 s2 s3 : 'a list):
@@ -997,7 +997,7 @@ proof. by rewrite -perm_eqlP; rewrite perm_cat2r perm_catC. qed.
 
 lemma perm_consCA (x y : 'a) s:
   forall s', perm_eq (x :: y :: s) s' <=> perm_eq (y :: x :: s) s'.
-proof. by move=> s'; cut := perm_catCA [x] [y] s s'. qed.
+proof. by move=> s'; have := perm_catCA [x] [y] s s'. qed.
 
 lemma perm_cons (x : 'a) s1 s2:
   perm_eq (x :: s1) (x :: s2) <=> perm_eq s1 s2.
@@ -1018,7 +1018,7 @@ proof.
   move: (perm_eq_size s1 s2 _) => // {eqs12}.
   case: s2 => [|x []] //=; first last; last 2 smt.
   case: s1 => [|y []] //=; last smt.
-  by move=> h; cut := h x => /= ->.
+  by move=> h; have := h x => /= ->.
 qed.
 
 lemma perm_eq_filter (p : 'a -> bool) (s1 s2 : 'a list):
@@ -1048,7 +1048,7 @@ lemma rem_id (z : 'a) s: ! mem s z => rem z s = s.
 proof.
   elim: s => //= y s IHs; rewrite negb_or; elim.
   move=> neq_yz s_notin_z; rewrite IHs // (eq_sym y).
-  by cut ->: (z = y) <=> false.
+  by have ->: (z = y) <=> false.
 qed.
 
 lemma perm_to_rem (z : 'a) s : mem s z => perm_eq s (z :: rem z s).
@@ -1319,8 +1319,8 @@ proof.
   elim: s => //= y s ih [y_notin_s /ih->]; rewrite /predC1.
   case: (y = x)=> //= <-; apply/eq_sym/all_filterP.
   (* FIXME: non genuine unification failure *)
-     cut := all_predC (fun z => z = y) s => ->.
-  by cut := has_pred1 y => ->.
+     have := all_predC (fun z => z = y) s => ->.
+  by have := has_pred1 y => ->.
 qed.
 
 lemma index_uniq z0 i (s : 'a list):
@@ -1362,9 +1362,9 @@ lemma uniq_leq_size (s1 s2 : 'a list):
 proof.                          (* FIXME: test case: for views *)
   rewrite /Core.(<=); elim: s1 s2 => //.
   move=> x s1 IHs s2 [not_s1x Us1]; rewrite -(allP (mem s2)) /=.
-  case=> s2x; rewrite allP => ss12; cut := rot_to s2 x _ => //.
+  case=> s2x; rewrite allP => ss12; have := rot_to s2 x _ => //.
   case=> i s3 def_s2; rewrite -(size_rot i s2) def_s2 /= lez_add2l.
-  apply IHs => // y s1y; cut := ss12 y _ => //.
+  apply IHs => // y s1y; have := ss12 y _ => //.
   by rewrite -(mem_rot i) def_s2; case.
 qed.
 
@@ -1372,15 +1372,15 @@ lemma leq_size_uniq (s1 s2 : 'a list):
   uniq s1 => (mem s1 <= mem s2) => size s2 <= size s1 => uniq s2.
 proof.
   rewrite /Core.(<=); elim: s1 s2 => [[] | x s1 IHs s2] //; first smt.
-  move=> Us1x; cut [not_s1x Us1] := Us1x; rewrite -(allP (mem s2)).
+  move=> Us1x; have [not_s1x Us1] := Us1x; rewrite -(allP (mem s2)).
   case=> s2x; rewrite allP => ss12 le_s21.
-  cut := rot_to s2 x _ => //; case=> {s2x} i s3 def_s2.
+  have := rot_to s2 x _ => //; case=> {s2x} i s3 def_s2.
   move: le_s21; rewrite -(rot_uniq i) -(size_rot i) def_s2 /= lez_add2l => le_s31.
-  cut ss13: forall y, mem s1 y => mem s3 y.
-    move=> y s1y; cut := ss12 y _ => //.
+  have ss13: forall y, mem s1 y => mem s3 y.
+    move=> y s1y; have := ss12 y _ => //.
     by rewrite -(mem_rot i) def_s2 in_cons; case=> // eq_yx.
   rewrite IHs //=; move: le_s31; apply contraL; rewrite -ltzNge => s3x.
-  rewrite -lez_add1r; cut := uniq_leq_size (x::s1) s3 _ => //= -> //.
+  rewrite -lez_add1r; have := uniq_leq_size (x::s1) s3 _ => //= -> //.
   by apply (allP (mem s3)); rewrite /= s3x /= allP.
 qed.
 
@@ -1398,11 +1398,11 @@ lemma leq_size_perm (s1 s2 : 'a list):
     uniq s1 => (mem s1 <= mem s2) => size s2 <= size s1
   => (forall x, mem s1 x <=> mem s2 x) /\ (size s1 = size s2).
 proof.
-  move=> Us1 ss12 le_s21; cut Us2 := leq_size_uniq s1 s2 _ _ _ => //.
+  move=> Us1 ss12 le_s21; have Us2 := leq_size_uniq s1 s2 _ _ _ => //.
   rewrite -andaE; split=> [|h]; last by rewrite eq_sym -uniq_size_uniq.
   move=> x; split; [by apply ss12 | move=> s2x; move: le_s21].
   apply absurd => not_s1x; rewrite -ltzNge -lez_add1r.
-  cut := uniq_leq_size (x :: s1) => /= -> //=.
+  have := uniq_leq_size (x :: s1) => /= -> //=.
   by rewrite /Core.(<=) -(allP (mem s2)) /= s2x /= allP.
 qed.
 
@@ -1432,7 +1432,7 @@ qed.
 lemma count_mem_uniq (s : 'a list):
   (forall x, count (pred1 x) s = b2i (mem s x)) => uniq s.
 proof.
-  move=> count1_s; cut Uus := undup_uniq s.
+  move=> count1_s; have Uus := undup_uniq s.
   apply (perm_eq_uniq (undup s)); last by apply undup_uniq.
   rewrite /perm_eq allP => x _ /=; rewrite count1_s.
   by rewrite (count_uniq_mem (undup s) x) ?undup_uniq // mem_undup.
@@ -2658,7 +2658,7 @@ theory InsertSort.
 
   lemma nosmt perm_sort (e : 'a -> 'a -> bool) s: perm_eq (sort e s) s.
   proof.
-    elim: s=> //= x s IHs; cut h := perm_insert e x (sort e s).
+    elim: s=> //= x s IHs; have h := perm_insert e x (sort e s).
     by apply perm_eqlE in h; rewrite -h perm_cons => {h}.
   qed.
 

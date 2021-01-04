@@ -266,8 +266,8 @@ lemma nosmt eq_big_perm (P : 'a -> bool) (F : 'a -> t) s1 s2:
 proof.
   move=> /perm_eqP; rewrite !(@big_mkcond P).
   elim s1 s2 => [|i s1 ih1] s2 eq_s12.
-    by case s2 eq_s12 => // i s2 h; cut := h (pred1 i); smt.
-  cut r2i: mem s2 i by rewrite -has_pred1 has_count -eq_s12 smt.
+    by case s2 eq_s12 => // i s2 h; have := h (pred1 i); smt.
+  have r2i: mem s2 i by rewrite -has_pred1 has_count -eq_s12 smt.
   have/splitPr [s3 s4] ->> := r2i.
   rewrite big_cat !big_cons /(predT i) /=.
   rewrite addmCA; congr; rewrite -big_cat; apply/ih1=> a.
