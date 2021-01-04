@@ -48,7 +48,7 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : (string option * string) list;
+  ldro_idirs : (string option * string * bool) list;
   ldro_boot  : bool;
 }
 
@@ -316,8 +316,15 @@ let ldr_options_of_values ?ini values =
   if get_flag "boot" values then
     { ldro_idirs = []; ldro_boot = true; }
   else
-    let idirs = omap_dfl (fun x -> x.ini_idirs) [] ini in
-    { ldro_idirs = idirs @ List.map parse_idir (get_strings "I" values);
+    let add_rec (fl : bool) ((nm, x) : string option * string) =
+      (nm, x, fl) in
+
+    let idirs   = omap_dfl (fun x -> x.ini_idirs) [] ini in
+    let idirs   = List.map (add_rec false) idirs in
+    let idirs_I = List.map (add_rec false) (List.map parse_idir (get_strings "I" values)) in
+    let idirs_R = List.map (add_rec true)  (List.map parse_idir (get_strings "R" values)) in
+
+    { ldro_idirs = idirs @ idirs_I @ idirs_R;
       ldro_boot  = false; }
 
 let glb_options_of_values ?ini values =

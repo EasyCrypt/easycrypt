@@ -1216,6 +1216,7 @@ let is_iff       f = is_from_destr destr_iff       f
 let is_eq        f = is_from_destr destr_eq        f
 let is_forall    f = is_from_destr destr_forall1   f
 let is_exists    f = is_from_destr destr_exists1   f
+let is_lambda    f = is_from_destr destr_lambda    f
 let is_let       f = is_from_destr destr_let1      f
 let is_equivF    f = is_from_destr destr_equivF    f
 let is_equivS    f = is_from_destr destr_equivS    f

@@ -349,7 +349,7 @@ let gen_conseq_nm tnm tc pre post =
     let gs =
       (tnm post @+
         [ t_id;
-          tc pre post @+ [t_id; t_logic_trivial; t_id] ]) g in
+          tc pre post @+ [t_id; t_trivial; t_id] ]) g in
     FApi.t_swap_goals 0 1 gs
   )
 
@@ -476,12 +476,61 @@ let t_equivS_conseq_bd side pr po tc =
   FApi.xmutate1 tc `HlBdEquiv [g1]
 
 (* -------------------------------------------------------------------- *)
+
+(*
+(forall m1, P1 m1 => exists m2, P m1 m2 /\ P2 m2)
+(forall m1 m2, Q m1 m2 => Q2 m2 => Q1 m1)
+equiv M1 ~ M2 : P ==> Q   hoare M2 : P2 ==> Q2.
+-----------------------------------------------
+hoare M1 : P1 ==> Q1.
+*)
+
+let transitivity_side_cond hyps prml poml pomr p q p2 q2 p1 q1 =
+  let env = LDecl.toenv hyps in
+  let cond1 =
+    let fv1 = PV.fv env mright p in
+    let fv2 = PV.fv env mhr p2 in
+    let fv = PV.union fv1 fv2 in
+    let elts, glob = PV.ntr_elements fv in
+    let bd, s = generalize_subst env mhr elts glob in
+    let s1 = PVM.of_mpv s mright in
+    let s2 = PVM.of_mpv s mhr in
+    let concl = f_and (PVM.subst env s1 p) (PVM.subst env s2 p2) in
+    let p1 = Fsubst.f_subst_mem mhr mleft p1 in
+    f_forall_mems [prml] (f_imp p1 (f_exists bd concl)) in
+  let cond2 =
+    let q1 = Fsubst.f_subst_mem mhr mleft q1 in
+    let q2 = Fsubst.f_subst_mem mhr mright q2 in
+    f_forall_mems [poml; pomr] (f_imps [q;q2] q1) in
+  (cond1, cond2)
+
+let t_hoareF_conseq_equiv f2 p q p2 q2 tc =
+  let env, hyps, _ = FApi.tc1_eflat tc in
+  let hf1 = tc1_as_hoareF tc in
+  let ef  = f_equivF p hf1.hf_f f2 q in
+  let hf2 = f_hoareF p2 f2 q2 in
+  let (prml, _prmr), (poml, pomr) = Fun.equivF_memenv hf1.hf_f f2 env in
+  let (cond1, cond2) =
+    transitivity_side_cond hyps prml poml pomr p q p2 q2 hf1.hf_pr hf1.hf_po in
+  FApi.xmutate1 tc `HoareFConseqEquiv [cond1; cond2; ef; hf2]
+
+let t_bdHoareF_conseq_equiv f2 p q p2 q2 tc =
+  let env, hyps, _ = FApi.tc1_eflat tc in
+  let hf1 = tc1_as_bdhoareF tc in
+  let ef  = f_equivF p hf1.bhf_f f2 q in
+  let hf2 = f_bdHoareF p2 f2 q2 hf1.bhf_cmp hf1.bhf_bd in
+  let (prml, _prmr), (poml, pomr) = Fun.equivF_memenv hf1.bhf_f f2 env in
+  let (cond1, cond2) =
+    transitivity_side_cond hyps prml poml pomr p q p2 q2 hf1.bhf_pr hf1.bhf_po in
+  FApi.xmutate1 tc `BdHoareFConseqEquiv [cond1; cond2; ef; hf2]
+
+(* -------------------------------------------------------------------- *)
 let rec t_hi_conseq notmod f1 f2 f3 tc =
-  let t_trivial = fun tc -> t_simplify ?target:None ~delta:false tc in
-  let t_trivial = t_trivial :: [t_split; t_fail] in
-  let t_trivial = FApi.t_try (FApi.t_seqs t_trivial) in
-  let t_on1     = FApi.t_on1 ~ttout:t_trivial in
-  let t_on1seq  = FApi.t_on1seq ~ttout:t_trivial in
+  let t_mytrivial = fun tc -> t_simplify ?target:None ~delta:false tc in
+  let t_mytrivial = [t_mytrivial; t_split; t_fail] in
+  let t_mytrivial = FApi.t_try (FApi.t_seqs t_mytrivial) in
+  let t_on1       = FApi.t_on1 ~ttout:t_mytrivial in
+  let t_on1seq    = FApi.t_on1seq ~ttout:t_mytrivial in
 
   let check_is_detbound who bound =
     if not (EcFol.f_equal bound f_r1) then
@@ -577,9 +626,17 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     FApi.t_seq
       t_hoareF_conseq_bdhoare
       (t_on1seq 1
-         (t_on1seq 2 (tac hs.bhf_pr hs.bhf_po) (t_apply_r nf1))
-         (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd))
+         (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd)
+         (t_on1seq 2 (tac hs.bhf_pr hs.bhf_po) (t_apply_r nf1)))
       tc
+  (* ------------------------------------------------------------------ *)
+  (* hoareF / equivF / hoareF                                           *)
+  | FhoareF _,
+    Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
+    let hf2 = pf_as_hoareF !!tc f2 in
+    FApi.t_seqsub
+      (t_hoareF_conseq_equiv hf2.hf_f ef.ef_pr ef.ef_po hf2.hf_pr hf2.hf_po)
+      [t_id; t_id; t_apply_r nef; t_apply_r nf2] tc
 
   (* ------------------------------------------------------------------ *)
   (* bdhoareS / bdhoareS / ⊥ / ⊥                                        *)
@@ -592,7 +649,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       tc
 
   (* ------------------------------------------------------------------ *)
-  (* bdhoareS / bdhoareS / hoareS / ⊥                                 *)
+  (* bdhoareS / bdhoareS / hoareS / ⊥                                   *)
   | FbdHoareS hs0,
       Some ((_, {f_node = FbdHoareS hs}) as nf1),
       Some ((_, f2) as nf2),
@@ -616,9 +673,9 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
           t_intro_i hi @!
           t_cut (f_hoareS_r {hs2 with hs_pr = pre}) @+ [
             t_hoareS_conseq hs2.hs_pr hs2.hs_po @+
-                [ t_logic_trivial;
-                  t_trivial;
-                   t_clear hi (* subgoal 2 : hs2 *)];
+                [ EcLowGoal.t_trivial;
+                  t_mytrivial;
+                  t_clear hi (* subgoal 2 : hs2 *)];
             t_intro_i hh @!
             (t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd @+ [
               t_id; (* subgoal 3 : bound *)
@@ -626,8 +683,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                 t_hoareS_conseq pre hs2.hs_po @+ [
                   t_intros_i [m;h0] @! t_cutdef
                     {pt_head = PTLocal hi;pt_args = [pamemory m; palocal h0]}
-                    mpre @! t_logic_trivial;
-                  t_trivial;
+                    mpre @! EcLowGoal.t_trivial;
+                  t_mytrivial;
                   t_apply_hyp hh];
                 tac pre posta @+ [
                   t_apply_hyp hi;
@@ -635,8 +692,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_bdHoareS_conseq_conj ~add:true hs2.hs_po post @+ [
                     t_apply_hyp hh;
                     t_bdHoareS_conseq hs.bhs_pr post @+ [
-                      t_logic_trivial;
-                      t_trivial;
+                      EcLowGoal.t_trivial;
+                      t_mytrivial;
                       t_id (* subgoal 5 : bdhoare *)
                     ]
                   ]
@@ -649,7 +706,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tc = FApi.t_swap_goals 1 1 (FApi.t_swap_goals 1 2 tc) in
 
     FApi.t_sub
-      [t_trivial; t_trivial; t_trivial; t_apply_r nf2; t_apply_r nf1]
+      [t_mytrivial; t_mytrivial; t_mytrivial; t_apply_r nf2; t_apply_r nf1]
       tc
 
   (* ------------------------------------------------------------------ *)
@@ -687,9 +744,9 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
           t_intro_i hi @!
           t_cut (f_hoareF_r {hs2 with hf_pr = pre}) @+ [
             t_hoareF_conseq hs2.hf_pr hs2.hf_po @+
-                [ t_logic_trivial;
-                  t_trivial;
-                   t_clear hi (* subgoal 2 : hs2 *)];
+                [ EcLowGoal.t_trivial;
+                  t_mytrivial;
+                  t_clear hi (* subgoal 2 : hs2 *)];
             t_intro_i hh @!
             (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd @+ [
               t_id; (* subgoal 3 : bound *)
@@ -697,8 +754,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                 t_hoareF_conseq pre hs2.hf_po @+ [
                   t_intros_i [m;h0] @! t_cutdef
                     {pt_head = PTLocal hi;pt_args = [pamemory m; palocal h0]}
-                    mpre @! t_logic_trivial;
-                  t_trivial;
+                    mpre @! EcLowGoal.t_trivial;
+                  t_mytrivial;
                   t_apply_hyp hh];
                 tac pre posta @+ [
                   t_apply_hyp hi;
@@ -706,8 +763,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
                   t_bdHoareF_conseq_conj ~add:true hs2.hf_po post @+ [
                     t_apply_hyp hh;
                     t_bdHoareF_conseq hs.bhf_pr post @+ [
-                      t_logic_trivial;
-                      t_trivial;
+                      EcLowGoal.t_trivial;
+                      t_mytrivial;
                       t_id (* subgoal 5 : bdhoare *)
                     ]
                   ]
@@ -718,9 +775,19 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
         ]) tc in
 
     let tc = FApi.t_swap_goals 1 1 (FApi.t_swap_goals 1 2 tc) in
+
     FApi.t_sub
-      [t_trivial; t_trivial; t_trivial; t_apply_r nf2; t_apply_r nf1]
+      [t_mytrivial; t_mytrivial; t_mytrivial; t_apply_r nf2; t_apply_r nf1]
       tc
+
+  (* ------------------------------------------------------------------ *)
+  (* bdhoareF / equivF / bdhoareF                                           *)
+  | FbdHoareF _,
+    Some ((_, {f_node = FequivF ef}) as nef), Some((_, f2) as nf2), _ ->
+    let hf2 = pf_as_bdhoareF !!tc f2 in
+    FApi.t_seqsub
+      (t_bdHoareF_conseq_equiv hf2.bhf_f ef.ef_pr ef.ef_po hf2.bhf_pr hf2.bhf_po)
+      [t_id; t_id; t_apply_r nef; t_apply_r nf2] tc
 
   (* ------------------------------------------------------------------ *)
   (* equivS / equivS / ⊥ / ⊥                                            *)

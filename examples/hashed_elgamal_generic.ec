@@ -253,10 +253,11 @@ section.
     Pr[G0.main() @ &m: res] <= Pr[G1.main() @ &m: res] + Pr[G2.main() @ &m: res].
   proof.
   rewrite (G0_D &m) (G1_D &m) (G2_D &m).
-  move: (OnBound.ROM_BadCall D _ _ dbits_ll &m tt true).
+  move: (OnBound.ROM_BadCall D _ _ _ &m tt true).
   + move=> H H_o_ll; proc; auto; call (choose_ll H _)=> //; auto=> />.
     by rewrite dt_ll DBool.dbool_ll.
   + by move=> H H_o_ll; proc; auto; call (guess_ll H _)=> //; auto=> />.
+  + by move=> _; apply: dbits_ll.
   by rewrite !eqT.
   qed.
 
@@ -291,7 +292,7 @@ section.
 
   local lemma Pr_G1' &m: Pr[G1'.main() @ &m: res] = 1%r/2%r.
   proof.
-    cut LRO_o_ll:= LRO_o_ll dbits_ll.
+    have LRO_o_ll := LRO_o_ll _; first by move=> /=; apply: dbits_ll.
     byphoare (_: true ==> res)=> //.
     proc.
     swap 7 3.

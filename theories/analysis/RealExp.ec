@@ -29,7 +29,7 @@ axiom nosmt le_ln_dw (x : real): 1%r < x => (x - 1%r) / x < ln x.
 
 axiom nosmt le1Dx_exp (x : real): 0%r <= x => 1%r+x <= exp x.
 
-axiom nosmt convexe_exp a b: convexe exp a b.
+axiom nosmt convex_exp a b: convex exp a b.
 
 op log (a : real) = fun x => ln x / ln a.
 
@@ -337,7 +337,7 @@ by rewrite invfM (mulrCA a) divff // mulr1 pmulr_lle0 ?invr_gt0.
 qed.
 
 (* -------------------------------------------------------------------- *)
-abstract theory CauchySchwarz.
+abstract theory Rn.
 
 (* -------------------------------------------------------------------- *)
 type t.
@@ -476,13 +476,6 @@ abbrev norm x = sqrt (dotp x x).
 lemma normv0 : norm zerov = 0%r.
 proof. by rewrite dotpv0 sqrt0. qed.
 
-lemma normvZ a v : norm (a ** v) = `|a| * norm v.
-proof.
-rewrite !(dotpZl, dotpZr) mulrA sqrtM ?ge0_dotp.
-+ by rewrite -expr2 ge0_sqr.
-+ by rewrite -expr2 sqrtsq.
-qed.
-
 lemma ge0_normv x : 0%r <= norm x.
 proof. by apply/ge0_sqrt. qed.
 
@@ -492,6 +485,29 @@ proof. by rewrite sqsqrt // ge0_dotp. qed.
 lemma sqnormvD x y :
   (norm (x + y))^2 = (norm x)^2 + 2%r * dotp x y + (norm y)^2.
 proof. by rewrite !sqnormv !(dotpDl, dotpDr) (@dotpC y x) #ring. qed.
+
+lemma normvC (x y : vector) :
+  norm (x - y) = norm (y - x).
+proof. by rewrite -(opprB x y) dotpNl dotpNr opprK. qed.
+
+lemma normvN (x : vector) : norm (- x) = norm x.
+proof. by rewrite dotpNl dotpNr opprK. qed.
+
+lemma normvZ (c : real) (x : vector) : norm (c ** x) = `|c| * norm x.
+proof.
+by rewrite dotpZl dotpZr mulrA -expr2 sqrtM ?(ge0_sqr, ge0_dotp) sqrtsq.
+qed.
+
+lemma normvD_sq (x y : vector) :
+  (norm (x + y))^2 = (norm x)^2 + 2%r * dotp x y + (norm y)^2.
+proof.
+rewrite !sqnormv dotpDl !dotpDr (@dotpC x y) addrACA.
+by rewrite (@mulrC 2%r _) -intmulr mulr2z !addrA.
+qed.
+
+lemma normvB_sq (x y : vector) :
+  (norm (x - y))^2 = (norm x)^2 - 2%r * dotp x y + (norm y)^2.
+proof. by rewrite normvD_sq normvN dotpNr mulrN. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma CZ x y : dotp x y <= norm x * norm y.
@@ -519,4 +535,51 @@ have ge0_rhs : 0%r <= 2%r * norm x * norm y.
 by rewrite -!rpow_int // rpow_mono // -!mulrA ler_pmul2l.
 qed.
 
-end CauchySchwarz.
+(* -------------------------------------------------------------------- *)
+lemma normvD_le (x y : Rn.vector) : norm (x + y) <= norm x + norm y.
+proof.
+rewrite -(@Bigreal.ler_pexpn2r 2) 1:// ?addr_ge0 ?ge0_normv.
+rewrite sqnormvD sqrrD intmulr; apply/ler_add2r/ler_add2l.
+by rewrite mulrC &(ler_wpmul2r) 1:// &(CZ).
+qed.
+
+lemma normvB_le (x y : Rn.vector) : norm (x - y) <= norm x + norm y.
+proof.
+by have /ler_trans := normvD_le x (-y); apply; rewrite normvN.
+qed.
+
+(* -------------------------------------------------------------------- *)
+theory BigRn.
+
+clone include Bigalg.BigZModule with
+  type t <- Rn.vector,
+    op ZM.zeror  <- zerov,
+    op ZM.( + )  <- ( + ),
+    op ZM.([-])  <- ([-]),
+    op ZM.intmul <- intmul
+
+    proof ZM.*
+
+    remove abbrev ZM.(-).
+
+realize ZM.addrA by exact/addrA.
+realize ZM.addrC by exact/addrC.
+realize ZM.add0r by exact/add0r.
+realize ZM.addNr by exact/addNr.
+
+lemma dotp_sumr ['a] P F (s : 'a list) x :
+  dotp x (big P F s) = BRA.big P (fun y => dotp x (F y)) s.
+proof.
+elim: s => [|y s ih]; first by rewrite !big_nil dotpv0.
+by rewrite !big_cons; case: (P y) => // _; rewrite dotpDr ih.
+qed.
+
+lemma dotp_suml ['a] P F (s : 'a list) x :
+  dotp (big P F s) x = BRA.big P (fun y => dotp (F y) x) s.
+proof.
+by rewrite dotpC dotp_sumr; apply: BRA.eq_bigr => i _ /=; rewrite dotpC.
+qed.
+
+end BigRn.
+
+end Rn.

@@ -28,7 +28,7 @@ let t_exfalso_r tc =
     EcPhlTAuto.t_core_exfalso
     (FApi.t_seqsub
        (EcPhlConseq.t_conseq f_false post)
-       [t_id; t_logic_trivial; EcPhlTAuto.t_core_exfalso])
+       [t_id; t_trivial; EcPhlTAuto.t_core_exfalso])
     tc
 
 let t_exfalso = FApi.t_low0 "exfalso" t_exfalso_r
@@ -92,21 +92,15 @@ let rec t_auto_phl_r tc =
 let t_auto_phl = FApi.t_low0 "auto-phl" t_auto_phl_r
 
 (* -------------------------------------------------------------------- *)
-let t_auto_r tc =
+let t_auto_r ?conv tc =
   let subtc =
     FApi.t_ors [ EcPhlTAuto.t_hoare_true;
                  EcPhlTAuto.t_core_exfalso;
                  EcPhlPr.t_prbounded false;
                  t_auto_phl ]
-  in
-  FApi.t_try
-    (FApi.t_seqs [ FApi.t_try (t_assumption `Conv);
-                   t_progress t_id;
-                   FApi.t_try (t_assumption `Conv);
-                   subtc; t_logic_trivial])
-    tc
+  in t_trivial ?conv ~subtc ~keep:true tc
 
-let t_auto = FApi.t_low0 "auto" t_auto_r
+let t_auto ?conv = FApi.t_low0 "auto" (t_auto_r ?conv)
 
 (* -------------------------------------------------------------------- *)
 let t_phl_trivial_r tc =
@@ -120,10 +114,11 @@ let t_phl_trivial_r tc =
 (* -------------------------------------------------------------------- *)
 let t_phl_trivial = FApi.t_low0 "phl-trivial" t_phl_trivial_r
 
-let t_pl_trivial_r ?bases tc =
+let t_pl_trivial_r ?conv ?bases tc =
   let subtc =
     FApi.t_seqs [t_phl_trivial; EcLowGoal.t_solve ?bases]
-  in EcLowGoal.t_trivial ~subtc tc
+  in EcLowGoal.t_trivial ?conv ~subtc tc
 
 (* -------------------------------------------------------------------- *)
-let t_pl_trivial ?bases = FApi.t_low0 "pl-trivial" (t_pl_trivial_r ?bases)
+let t_pl_trivial ?conv ?bases =
+  FApi.t_low0 "pl-trivial" (t_pl_trivial_r ?conv ?bases)

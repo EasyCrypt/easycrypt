@@ -259,7 +259,7 @@ qed.
 
 lemma phoare_sampleE P :
   phoare [SampleE.sample : true ==> P res ] = (mu (dt i \ test i) P).
-proof. by bypr=> &m; apply (@pr_sampleE &m i{m} test{m} P). qed.
+proof. by bypr=> &m _; apply (@pr_sampleE &m i{m} test{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
 section.
@@ -511,7 +511,7 @@ proof. by rewrite (@sampleE_fixed &m x P) (@WS.pr_sampleE &m x test P). qed.
 
 phoare phoare_sampleE P :
   [ SampleE.sample : true ==> P res ] = (mu (dt i \ test i) P).
-proof. by bypr=> &m; exact/(@pr_sampleE &m i{m} P). qed.
+proof. by bypr=> &m _; exact/(@pr_sampleE &m i{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
 local lemma sampleI_fixed &m x P :

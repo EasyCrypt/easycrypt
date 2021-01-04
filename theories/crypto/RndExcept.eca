@@ -510,7 +510,7 @@ abstract theory Adversary1_1.
       proc;inline *;call (_:true).
       rcondt {2} 4.
       + auto;call (_: true);auto.
-      rnd;auto;call (_: true);auto.
+      by rnd;auto;call (_: true);auto.
     have -> : Pr[Main(A).main() @ &m : E res (glob A)] =
               Pr[Ad1.Main(LA).main() @ &m : E res (glob A)].
     + byequiv ( _: ={glob A} ==> ={res,glob A}) => //.

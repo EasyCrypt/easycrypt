@@ -715,6 +715,13 @@ lemma before_index (x0 : 'a) x s i :
   0 <= i < index x s => nth x0 s i <> x.
 proof. by move/(@before_find x0). qed.
 
+lemma index_nth ['a] (x0 : 'a) s i : 0 <= i < size s =>
+  index (nth x0 s i) s <= i.
+proof.
+case=> ge0_i; apply: contraLR; rewrite -lezNgt -ltzNge.
+by move=> lt; have // := before_index x0 (nth x0 s i) s i _ => /#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                            drop, take                                *)
 (* -------------------------------------------------------------------- *)
@@ -1093,6 +1100,21 @@ move/count_eq0; apply contra => pc'; apply/hasP.
 exists c'; rewrite pc' /=; have: c' \in c :: rem c s.
 + by move/perm_eq_mem: eqs => <-.
 + by rewrite /= ne.
+qed.
+
+lemma mem_rem_neq ['a] (x : 'a) (s : 'a list) y :
+  x <> y => y \in rem x s = y \in s.
+proof.
+move=> ne_xy; elim: s => //= z s ih; case: (z = x) => [->|_].
+- by rewrite (@eq_sym y x) ne_xy.
+- by rewrite ih.
+qed.
+
+lemma remC ['a] (x y : 'a) (s : 'a list) :
+  rem x (rem y s) = rem y (rem x s).
+proof.
+elim: s => //= z s ih; rewrite (@fun_if (rem x)) (@fun_if (rem y)) /= ih.
+by case: (z = x); case: (z = y).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1533,6 +1555,23 @@ lemma map_rev (f : 'a -> 'b) s:
   map f (rev s) = rev (map f s).
 proof. elim: s; first by rewrite rev_nil. smt. qed.
 
+lemma in_undup_map ['a 'b] (f : 'a -> 'b) (s : 'a list) :
+     (forall x y, x \in s => y \in s => f x = f y => x = y)
+  => undup (map f s) = map f (undup s).
+proof.
+elim: s => //= x s ih inj_f; rewrite ih 1:/#.
+case: (x \in s) => [/(map_f f)->//|xNs].
+case: (f x \in map f s) => // /mapP[y [ys]].
+by move/(_ x y): inj_f; rewrite ys /= => h/h ->>.
+qed.
+
+lemma undup_map ['a 'b] (f : 'a -> 'b) s : injective f =>
+  undup (map f s) = map f (undup s).
+proof.
+move=> inj_f; elim: s => //= x s ih.
+by rewrite mem_map // ih; case: (_ \in _).
+qed.
+
 lemma perm_eq_map (f : 'a -> 'b) (s1 s2 : 'a list):
   perm_eq s1 s2 => perm_eq (map f s1) (map f s2).
 proof.
@@ -1907,7 +1946,7 @@ qed.
 lemma assoc_filter (p : 'a -> bool) (s : ('a * 'b) list) x:
   assoc (filter (p \o fst) s) x = if (p x) then assoc s x else None.
 proof.
-  elim: s=> //= [|[x' y'] s ih]; 1: by rewrite assoc_nil.
+  elim: s=> //= -[x' y'] s ih.
   rewrite assoc_cons; case: (x = x') => [<<- |ne_xx'].
     rewrite {1}/(\o) /=; case: (p x).
     by rewrite assoc_cons. by rewrite ih=> ->.
@@ -2428,7 +2467,7 @@ proof. by move=> eq_sz; rewrite -!cats1 zip_cat //= eq_sz. qed.
 lemma rev_zip ['a 'b] (s1 : 'a list) (s2 : 'b list) :
   size s1 = size s2 => rev (zip s1 s2) = zip (rev s1) (rev s2).
 proof.
-elim: s1 s2 => [|x s1 ih] [|y s2] //=; 1,2,3: smt(size_ge0).
+elim: s1 s2 => [|x s1 ih] [|y s2] //=; 1,2: smt(size_ge0).
 by move/addzI=> eq_sz; rewrite !(rev_cons, zip_rcons) ?size_rev // ih.
 qed.
 

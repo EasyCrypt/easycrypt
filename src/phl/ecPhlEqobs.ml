@@ -432,7 +432,7 @@ let process_eqobs_inS info tc =
     match info.EcParsetree.sim_pos with
     | None ->
       FApi.t_last
-        (FApi.t_try (FApi.t_seq EcPhlSkip.t_skip t_logic_trivial))
+        (FApi.t_try (FApi.t_seq EcPhlSkip.t_skip t_trivial))
         (t_eqobs_inS sim eqo tc)
     | Some(p1,p2) ->
       let _,sl2 = s_split p1 es.es_sl in
@@ -444,12 +444,12 @@ let process_eqobs_inS info tc =
         t_id;
         fun tc ->
           FApi.t_last
-            (EcPhlSkip.t_skip @! t_logic_trivial)
+            (EcPhlSkip.t_skip @! t_trivial)
             (t_eqobs_inS sim eqo tc)
       ]) tc in
   (EcPhlConseq.t_equivS_conseq es.es_pr post @+
-    [t_logic_trivial;
-     t_logic_trivial;
+    [t_trivial;
+     t_trivial;
      t_main]) tc
 
 (* -------------------------------------------------------------------- *)
@@ -476,8 +476,8 @@ let process_eqobs_inF info tc =
     with EqObsInError -> tc_error !!tc "not able to process" in
   let ef' = destr_equivF (mk_inv_spec2 env inv (fl, fr, eqi, eqo)) in
   (EcPhlConseq.t_equivF_conseq ef'.ef_pr ef'.ef_po @+ [
-    t_logic_trivial;
-    t_logic_trivial;
+    t_trivial;
+    t_trivial;
      t_eqobs_inF sim eqo]) tc
 
 (* -------------------------------------------------------------------- *)

@@ -76,6 +76,21 @@ lemma nosmt summable0: summable (fun (x:'a) => 0%r).
 proof. by exists 0%r=> J uqJ; rewrite Bigreal.sumr_const normr0. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma summable_fin ['a] s (J : 'a list) :
+  (forall x, s x <> 0%r => x \in J) => summable s.
+proof.
+move=> hfin; exists (BRA.big predT (fun x => `|s x|) (undup J)).
+move=> K uqK; rewrite (@BRA.bigID _ _ (mem J)) addrC BRA.big1 /=.
++ by move=> x [_ @/predC] /=; apply: contraR; rewrite normr0P &(hfin).
+rewrite -BRA.big_filter (@BRA.bigID _ _ (mem K) (undup J)).
+rewrite -!(@BRA.big_filter (predI _ _)) /= ler_paddr.
++ by apply: Bigreal.sumr_ge0 => /= a _; rewrite normr_ge0.
+apply/lerr_eq/BRA.eq_big_perm.
+rewrite uniq_perm_eq ?filter_uniq ?undup_uniq //.
+by move=> x; rewrite !mem_filter mem_undup andbC.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma eq_summable (s1 s2 : 'a -> real):
   (forall x, s1 x = s2 x) => summable s1 <=> summable s2.
 proof. by move=> /fun_ext ->. qed.
@@ -184,6 +199,12 @@ rewrite ltrNge ler_eqVlt (@eq_sym 0%r) => ^ + -> /=.
 rewrite eqr_le andabP negb_and -!ltrNge => -[^h ->/=|].
 + by rewrite gtr0_norm.
 + by move/ltrW => ^h /lerNgt -> /=; rewrite ler0_norm.
+qed.
+
+lemma pos_neg_abs ['a] f (x : 'a) : pos f x + neg f x = `|f x|.
+proof.
+rewrite /pos /neg ltrNge ler_eqVlt (@eq_sym 0%r); case: (f x = 0%r) => //=.
+- by move=> -> /=; rewrite normr0. - by move=> _; case: (0%r < f x).
 qed.
 
 lemma nosmt posN (s : 'a -> real) x: pos (fun x => -s x) x = neg s x.
@@ -571,6 +592,11 @@ lemma nosmt summable_le (s2 s1 : 'a -> real) :
 proof.
 by case=> M h le_s12; exists M => J /h; apply/ler_trans/Bigreal.ler_sum.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_summable_norm ['a] (f g : 'a -> real) :
+  (forall x, `|f x| = `|g x|) => summable f <=> summable g.
+proof. by move=> eq_fg; split=> /summable_le; apply=> x; rewrite eq_fg. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt summable_le_pos (s1 s2 : 'a -> real) :

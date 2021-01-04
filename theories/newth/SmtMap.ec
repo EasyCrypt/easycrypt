@@ -317,7 +317,7 @@ op eq_except ['a 'b] X (m1 m2 : ('a, 'b) fmap) =
 
 (* -------------------------------------------------------------------- *)
 lemma eq_except_refl ['a 'b] X : reflexive (eq_except<:'a, 'b> X).
-proof. by apply/Map.eq_except_refl<:'a, 'b option>. qed.
+proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eq_except_sym ['a 'b] X (m1 m2 : ('a, 'b) fmap) :

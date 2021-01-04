@@ -184,8 +184,10 @@ let main () =
     EcCommands.addidir ~namespace:`System (Filename.concat theories "prelude");
     if not ldropts.ldro_boot then
       EcCommands.addidir ~namespace:`System ~recursive:true theories;
-    List.iter (fun (onm, x) ->
-        EcCommands.addidir ?namespace:(omap (fun nm -> `Named nm) onm) x)
+    List.iter (fun (onm, name, isrec) ->
+        EcCommands.addidir
+          ?namespace:(omap (fun nm -> `Named nm) onm)
+          ~recursive:isrec name)
       ldropts.ldro_idirs;
   end;
 

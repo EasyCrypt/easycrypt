@@ -50,7 +50,7 @@ let (@~+) (tt : FApi.tactical) (ts : FApi.backward list) =
 exception InvalidProofTerm
 
 type side    = [`Left|`Right]
-type lazyred = EcProofTyping.lazyred
+type lazyred = [`Full | `NoDelta | `None]
 
 (* -------------------------------------------------------------------- *)
 module LowApply = struct
@@ -288,12 +288,12 @@ let t_shuffle (ids : EcIdent.t list) (tc : tcenv1) =
     tc_error !!tc "invalid shuffle"
 
 (* -------------------------------------------------------------------- *)
-let t_change_r ?target action (tc : tcenv1) =
+let t_change_r ?(fail=false) ?target action (tc : tcenv1) =
   match target with
   | None -> begin
       let hyps, concl = FApi.tc1_flat tc in
       match action (lazy hyps) concl with
-      | None -> tc
+      | None -> if fail then raise InvalidGoalShape else tc
       | Some fp when fp == concl -> tc
       | Some fp -> FApi.mutate1 tc (fun hd -> VConv (hd, Sid.empty)) fp
   end
@@ -344,6 +344,24 @@ let t_cbn ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
   let ri = if delta then full_red else nodelta in
   let ri = { ri with logic } in
   t_cbv_with_info ?target ri tc
+
+(* -------------------------------------------------------------------- *)
+let t_hred_with_info ?target (ri : reduction_info) (tc : tcenv1) =
+  let action (lazy hyps) fp = EcReduction.h_red_opt ri hyps fp in
+  FApi.tcenv_of_tcenv1 (t_change_r ~fail:true ?target action tc)
+
+(* -------------------------------------------------------------------- *)
+let rec t_lazy_match ?(reduce = `Full) (tx : form -> FApi.backward)
+  (tc : tcenv1) =
+  let concl = FApi.tc1_goal tc in
+  try tx concl tc
+  with TTC.NoMatch ->
+    let strategy =
+      match reduce with
+      | `None    -> raise InvalidGoalShape
+      | `Full    -> EcReduction.full_red
+      | `NoDelta -> EcReduction.nodelta in
+    FApi.t_seq (t_hred_with_info strategy) (t_lazy_match ~reduce tx) tc
 
 (* -------------------------------------------------------------------- *)
 type smode = [ `Cbv | `Cbn ]
@@ -630,7 +648,7 @@ module Apply = struct
       match istop && PT.can_concretize pt.PT.ptev_env with
       | true ->
           let ax = PT.concretize_form pt.PT.ptev_env pt.PT.ptev_ax in
-          if   EcReduction.is_conv hyps ax concl
+          if   EcReduction.is_conv ~ri:EcReduction.full_compat hyps ax concl
           then pt
           else instantiate canview false pt
 
@@ -865,13 +883,17 @@ let t_true (tc : tcenv1) =
 let t_reflex_s (f : form) (tc : tcenv1) =
   t_apply_s LG.p_eq_refl [f.f_ty] ~args:[f] tc
 
-let t_reflex ?reduce (tc : tcenv1) =
+let t_reflex ?(mode=`Conv) ?reduce (tc : tcenv1) =
   let t_reflex_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
-    | SFeq (f1, _f2) -> t_reflex_s f1 tc
+    | SFeq (f1, f2) ->
+      if mode = `Conv || EcReduction.is_alpha_eq (FApi.tc1_hyps tc) f1 f2 then
+        t_reflex_s f1 tc
+      else
+        raise InvalidGoalShape
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_reflex_r tc
+    t_lazy_match ?reduce t_reflex_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_symmetry_s f1 f2 tc =
@@ -883,7 +905,7 @@ let t_symmetry ?reduce (tc : tcenv1) =
     | SFeq (f1, f2) -> t_symmetry_s f1 f2 tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_symmetry_r tc
+    t_lazy_match ?reduce t_symmetry_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_transitivity_s f1 f2 f3 tc =
@@ -895,7 +917,7 @@ let t_transitivity ?reduce f2 (tc : tcenv1) =
     | SFeq (f1, f3) -> t_transitivity_s f1 f2 f3 tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_transitivity_r tc
+    t_lazy_match ?reduce t_transitivity_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_exists_intro_s (args : pt_arg list) (tc : tcenv1) =
@@ -922,7 +944,7 @@ let t_or_intro ?reduce (side : side) (tc : tcenv1) =
     | SFor (b, (left, right)) -> t_or_intro_s b side (left, right) tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_or_intro_r tc
+    t_lazy_match ?reduce t_or_intro_r tc
 
 let t_left  ?reduce tc = t_or_intro ?reduce `Left  tc
 let t_right ?reduce tc = t_or_intro ?reduce `Right tc
@@ -943,7 +965,7 @@ let t_and_intro ?reduce (tc : tcenv1) =
     | SFand (b, (left, right)) -> t_and_intro_s b (left, right) tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_and_intro_r tc
+    t_lazy_match ?reduce t_and_intro_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_iff_intro_s (f1, f2 : form pair) (tc : tcenv1) =
@@ -955,7 +977,7 @@ let t_iff_intro ?reduce (tc : tcenv1) =
     | SFiff (f1, f2) -> t_iff_intro_s (f1, f2) tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_iff_intro_r tc
+    t_lazy_match ?reduce t_iff_intro_r tc
 
 (* -------------------------------------------------------------------- *)
 let gen_tuple_intro tys =
@@ -1005,7 +1027,7 @@ let t_tuple_intro ?reduce (tc : tcenv1) =
         t_tuple_intro_s fs tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_tuple_intro_r tc
+    t_lazy_match ?reduce t_tuple_intro_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
@@ -1322,7 +1344,7 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
 
     | _ -> raise TTC.NoMatch
 
-  in TTC.t_lazy_match ?reduce doit tc
+  in t_lazy_match ?reduce doit tc
 
 (* -------------------------------------------------------------------- *)
 let t_elim_default_r = [
@@ -1371,7 +1393,7 @@ let t_elim_prind_r ?reduce ?accept (_mode : [`Case | `Ind]) tc =
 
     | _ -> raise TTC.NoMatch
 
-  in TTC.t_lazy_match ?reduce doit tc
+  in t_lazy_match ?reduce doit tc
 
 (* -------------------------------------------------------------------- *)
 let t_elim_prind = t_elim_prind_r ?accept:None
@@ -1407,7 +1429,7 @@ let t_elim_iso_or ?reduce tc =
 (* -------------------------------------------------------------------- *)
 let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
   let t_split_r (fp : form) (tc : tcenv1) =
-    let hyps, concl = FApi.tc1_flat tc in
+    let concl = FApi.tc1_goal tc in
 
     match sform_of_form fp with
     | SFtrue ->
@@ -1416,11 +1438,11 @@ let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
         t_and_intro_s b (f1, f2) tc
     | SFiff (f1, f2) when not closeonly ->
         t_iff_intro_s (f1, f2) tc
-    | SFeq (f1, f2) when EcReduction.is_conv hyps f1 f2 ->
-        t_reflex_s f1 tc
     | SFeq (f1, f2) when not closeonly && (is_tuple f1 && is_tuple f2) ->
         let fs = List.combine (destr_tuple f1) (destr_tuple f2) in
         t_tuple_intro_s fs tc
+    | SFeq (f1, _f2) ->
+        t_reflex_s f1 tc
     | SFif (cond, _, _) when not closeonly ->
         (* FIXME: simplify goal *)
         let tc = if f_equal concl fp then tc else t_change fp tc in
@@ -1428,7 +1450,7 @@ let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
           tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match ?reduce t_split_r tc
+    t_lazy_match ?reduce t_split_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_split_prind ?reduce (tc : tcenv1) =
@@ -1449,7 +1471,7 @@ let t_split_prind ?reduce (tc : tcenv1) =
        let p = EcInductive.prind_introsc_path p x in
        t_apply_s p tv ~args ~sk tc
 
-  in TTC.t_lazy_match ?reduce t_split_r tc
+  in t_lazy_match ?reduce t_split_r tc
 
 (* -------------------------------------------------------------------- *)
 let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
@@ -1473,7 +1495,7 @@ let t_or_intro_prind ?reduce (side : side) (tc : tcenv1) =
        t_apply_s p tv ~args ~sk tc
     | _  -> raise InvalidGoalShape
 
-  in TTC.t_lazy_match ?reduce t_split_r tc
+  in t_lazy_match ?reduce t_split_r tc
 
 (* -------------------------------------------------------------------- *)
 type rwspec = [`LtoR|`RtoL] * ptnpos option
@@ -1636,7 +1658,7 @@ module LowSubst = struct
     let cmp x y =
       let x = match x with `High -> 1 | `Low -> 0 in
       let y = match y with `High -> 1 | `Low -> 0 in
-      Pervasives.compare x y in
+      Stdlib.compare x y in
 
     let var = List.ksort ~stable:true ~rev:true ~key:fst ~cmp var in
     let var = List.ohead var |> omap snd in
@@ -2224,25 +2246,17 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
 
 
 (* -------------------------------------------------------------------- *)
-let t_logic_trivial (tc : tcenv1) =
-  let seqs = [
-    FApi.t_try (t_assumption `Conv);
-    t_progress t_id;
-    FApi.t_try (t_assumption `Conv);
-    FApi.t_try (t_absurd_hyp ~conv:`AlphaEq);
-    t_fail;
-  ]
+let t_trivial
+  ?(subtc : FApi.backward option) ?(keep = false) ?(conv = `Alpha) (tc : tcenv1)
+=
+  let core  = FApi.t_or (t_assumption conv) (t_absurd_hyp ~conv:`AlphaEq) in
+  let core  = FApi.t_try core in
+  let core  = FApi.t_seqs [core; t_progress t_id; core] in
 
-  in FApi.t_internal (FApi.t_try (FApi.t_seqs seqs)) tc
-
-(* -------------------------------------------------------------------- *)
-let t_trivial ?(subtc : FApi.backward option) (tc : tcenv1) =
-  let tryassum  = FApi.t_try (t_assumption `Conv) in
-  let tprogress = t_progress t_id in
-  let subtc     = subtc |> odfl t_id in
-  let seqs      =
-    [FApi.t_try (t_false ~conv:`Conv ?id:None);
-     tryassum; tprogress; tryassum; subtc; t_logic_trivial; t_fail] in
+  let subtc = omap (fun tc -> FApi.t_seq tc (FApi.t_try (FApi.t_seq core t_fail))) subtc in
+  let subtc = odfl t_id subtc in
+  let seqs  = [FApi.t_try (t_false ~conv:`Conv ?id:None); core; subtc] in
+  let seqs  = if keep then seqs else seqs @ [t_fail] in
 
   FApi.t_internal (FApi.t_try (FApi.t_seqs seqs)) tc
 

@@ -714,15 +714,17 @@ end
 
 (* -------------------------------------------------------------------- *)
 let e_decimal (n, (l, f)) =
-  let nv = Reals.of_lit n in
+  if EcBigInt.equal f EcBigInt.zero then Reals.of_lit n else
 
-  if EcBigInt.equal f EcBigInt.zero then nv else
+  let d   = EcBigInt.pow (EcBigInt.of_int 10) l in
+  let gcd = EcBigInt.gcd f d in
+  let f   = EcBigInt.div f gcd in
+  let d   = EcBigInt.div d gcd in
+  let fct = Reals.div (Reals.of_lit f) (Reals.of_lit d) in
 
-  let f = Reals.of_lit f in
-  let u = Reals.of_lit (EcBigInt.pow (EcBigInt.of_int 10) l) in
-  let d = Reals.div f u in
-
-  if EcBigInt.equal n EcBigInt.zero then d else Reals.add nv d
+  if   EcBigInt.equal n EcBigInt.zero
+  then fct
+  else Reals.add (Reals.of_lit n) fct
 
 (* -------------------------------------------------------------------- *)
 let e_none (ty : ty) : expr =

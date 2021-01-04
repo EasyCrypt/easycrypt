@@ -78,6 +78,7 @@ type reduction_info = {
 and rlogic_info = [`Full | `ProductCompat] option
 
 val full_red     : reduction_info
+val full_compat  : reduction_info
 val no_red       : reduction_info
 val beta_red     : reduction_info
 val betaiota_red : reduction_info
@@ -88,15 +89,14 @@ val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form
 
 val reduce_user_gen :
-  [`All | `AfterDelta | `BeforeDelta] ->
   (EcFol.form -> EcFol.form) ->
   reduction_info ->
   EcEnv.env -> EcEnv.LDecl.hyps -> EcFol.form -> EcFol.form
 
 val simplify : reduction_info -> LDecl.hyps -> form -> form
 
-val is_conv    : LDecl.hyps -> form -> form -> bool
-val check_conv : LDecl.hyps -> form -> form -> unit
+val is_conv    : ?ri:reduction_info -> LDecl.hyps -> form -> form -> bool
+val check_conv : ?ri:reduction_info -> LDecl.hyps -> form -> form -> unit
 
 (* -------------------------------------------------------------------- *)
 type xconv = [`Eq | `AlphaEq | `Conv]
