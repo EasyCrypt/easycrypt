@@ -3163,10 +3163,6 @@ tactic_core_r:
 | x=phltactic
    { PPhl x }
 
-(* DEBUG *)
-| DEBUG
-    { Pdebug }
-
 %inline tactic_core:
 | x=loc(tactic_core_r) { x }
 
@@ -3657,8 +3653,12 @@ stop:
 | DROP DOT { }
 
 global:
-| tm=boption(TIME) g=loc(global_action) FINAL
-  { { gl_action = g; gl_timed = tm; } }
+| db=debug_global? g=loc(global_action) FINAL
+  { { gl_action = g; gl_debug = db; } }
+
+debug_global:
+| TIME  { `Timed }
+| DEBUG { `Break }
 
 prog_r:
 | g=global { P_Prog ([g], false) }
