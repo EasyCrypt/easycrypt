@@ -517,14 +517,14 @@ conseq (_: true ==> true) (_: _ ==> _)=> //=.
     split; first by rewrite size_cat.
     rewrite (take_nth witness) // -cbc_dec_rcons -h cats1.
     by rewrite size_take // lt_padded_c /= nth_take // 1:/#; congr; algebra.
-  auto=> /> &hr; split.
+  auto=> />; split.
   + by rewrite size_ge0 take0.
   move=> p /lezNgt le_szc_p _ ge_szc_p.
-  rewrite (ler_asym (size p) (size (behead c{hr})) _);
+  rewrite (ler_asym (size p) (size (behead _c)) _);
     rewrite ?ge_szc_p ?le_szc_p // take_size => p_def.
   split.
   + case: {-1}(unpad p) (eq_refl (unpad p))=> //= @/mee_cbc - [] m t.
     by rewrite /mee_dec /= -p_def=> -> /=.
   by rewrite /mee_dec -p_def /= => ->.
-by proc; inline *; wp; while true (size c - i); auto=> &hr /#.
+ proc; inline *; wp; while true (size c - i); auto =>/#.
 qed.

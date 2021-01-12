@@ -176,6 +176,7 @@ module CI_Logic : sig
   val p_fcongr        : path
   val p_eq_sym        : path
   val p_eq_sym_imp    : path
+  val p_eq_iff_imp    : path
   val p_negeqF        : path
 
   val p_iff_lr        : path

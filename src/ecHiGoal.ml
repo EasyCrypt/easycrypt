@@ -94,7 +94,7 @@ let process_reflexivity (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 let process_change fp (tc : tcenv1) =
   let fp = TTC.tc1_process_formula tc fp in
-  FApi.tcenv_of_tcenv1 (t_change fp tc)
+  t_change fp tc
 
 (* -------------------------------------------------------------------- *)
 let process_simplify_info ri (tc : tcenv1) =
@@ -520,7 +520,7 @@ let process_delta ?target (s, o, p) tc =
           EcReduction.delta_h = check_id; }
       hyps target
 
-    in FApi.tcenv_of_tcenv1 (t_change ?target:idtg target tc)
+    in t_change ?target:idtg target tc
 
   | _ ->
 
@@ -610,7 +610,7 @@ let process_delta ?target (s, o, p) tc =
             | _ -> assert false)
           target
       in
-        FApi.tcenv_of_tcenv1 (t_change ?target:idtg target tc)
+        t_change ?target:idtg target tc
     end else t_id tc
   end
 
@@ -639,7 +639,7 @@ let process_delta ?target (s, o, p) tc =
       in
 
       let target = FPosition.map cpos (fun _ -> p) target in
-        FApi.tcenv_of_tcenv1 (t_change ?target:idtg target tc)
+      t_change ?target:idtg target tc
     end else t_id tc
 
 (* -------------------------------------------------------------------- *)
@@ -1390,7 +1390,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
   and intro1_subst (_ : ST.state) d (tc : tcenv1) =
     try
       t_intros_i_seq ~clear:true [EcIdent.create "_"]
-        (EcLowGoal.t_subst ~clear:false ~tside:(d :> tside))
+        (EcLowGoal.t_subst ~clear:true ~tside:(d :> tside))
         tc
     with InvalidGoalShape ->
       tc_error !!tc "nothing to substitute"
@@ -1714,7 +1714,7 @@ let process_pose xsym bds o p (tc : tcenv1) =
   let letin = EcFol.f_let1 x p letin in
 
   FApi.t_seq
-    (fun tc -> tcenv_of_tcenv1 (t_change letin tc))
+    (t_change letin)
     (t_intros [Tagged (x, Some xsym.pl_loc)]) tc
 
 (* -------------------------------------------------------------------- *)

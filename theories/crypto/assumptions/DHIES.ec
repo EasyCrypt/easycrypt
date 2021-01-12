@@ -1241,8 +1241,8 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
    if=> //; 1: by rewrite /inv /= => /> *; smt (mem_fdom).
     inline *.
     rcondt {2} 6.
-     move=> *; wp; skip; rewrite /inv => /> *;
-     (have: exists i, Adv2_Procs.kindex{hr}.[(pk{hr}, ctxt{hr}.`1)] = Some i by smt (mem_fdom));
+     move=> *; wp; skip; rewrite /inv => /> *.
+     (have: exists i, Adv2_Procs.kindex{hr}.[(pk{m0}, ctxt{m0}.`1)] = Some i by smt (mem_fdom));
      smt ().
     wp; skip; rewrite /inv /=; clear inv; progress;
     (have: exists i, Adv2_Procs.kindex{2}.[(pk{2}, ctxt{2}.`1)] = Some i by smt (mem_fdom)); smt ().
