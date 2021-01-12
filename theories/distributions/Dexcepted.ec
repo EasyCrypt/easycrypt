@@ -10,7 +10,7 @@
 require import AllCore Distr FSet Dfilter StdRing.
 (*---*) import RField StdOrder.RealOrder.
 
-pragma -oldip. pragma +implicits.
+pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 op (\) (d : 'a distr) (P : 'a -> bool) : 'a distr = dscale (dfilter d P).

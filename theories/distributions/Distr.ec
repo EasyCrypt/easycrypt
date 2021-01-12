@@ -39,7 +39,6 @@ require import Finite.
 require (*--*) FinType.
 
 pragma +implicits.
-pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 type 'a distr = 'a Pervasive.distr.

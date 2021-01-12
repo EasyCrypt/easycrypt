@@ -8,7 +8,7 @@
 
 require import AllCore Distr FSet.
 
-pragma +implicits. pragma -oldip.
+pragma +implicits.
 
 (** A PRF is a family of functions F from domain D to finite range R
     indexed by a keyspace K equipped with a (lossless) distribution dK. *)

@@ -355,7 +355,7 @@ rewrite size_map size_range /= ler_maxr 1:ge0_order.
 rewrite -{1}(addr0 order) eq_sym => /addrI.
 rewrite size_eq0 => /(congr1 (fun s => g ^ order \in s)) /=.
 rewrite neqF mem_filter elemsP /predC /=.
-case/mapP=> x /= [/mem_range rg_x]; apply: contraLR => _.
+case/mapP=> x /= [/mem_range rg_x]; apply: contraLR => ?.
 apply/negP => /(congr1 (fun y => y / g ^ x)) /=.
 rewrite mulcV -expB; case: (x = 0) => [->//=|nz_k].
 by rewrite expg_eq0 /#.

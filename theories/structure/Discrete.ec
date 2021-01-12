@@ -10,8 +10,6 @@
 require import AllCore Ring StdRing StdOrder List Finite.
 (*---*) import IntID IntOrder.
 
-pragma -oldip.
-
 (* -------------------------------------------------------------------- *)
 op enumerate ['a] (C : int -> 'a option) (E : 'a -> bool) =
      (forall i j x, C i = Some x => C j = Some x => i = j)

@@ -68,7 +68,7 @@ lemma nosmt big_rec2:
     => K (big P F1 r) (big P F2 r).
 proof.
   move=> K r P F1 F2 KI KF; elim: r => //= i r IHr.
-  by rewrite !big_cons; case (P i) => _ //=; apply/KF.
+  by rewrite !big_cons; case (P i) => ? //=; apply/KF.
 qed.
 
 lemma nosmt big_ind2:

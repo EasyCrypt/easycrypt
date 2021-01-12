@@ -448,7 +448,7 @@ section CollisionProbability.
     conseq(:_==>_ : (c%r * mu1 uD witness))=> />.
     proc; sp; rcondt 1=> //.
     inline *; sp; if=> //=; last first.
-    * hoare; auto=> // /> &hr _ _ _ _ _ _.
+    * hoare; auto=> // /> &hr 6?.
       by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (rng ARP.m); skip.

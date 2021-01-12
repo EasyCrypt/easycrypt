@@ -460,7 +460,7 @@ section Security_Aux.
     split.
     + move=> /Hbad [#] !->> /= <- <-.
       by split; rewrite log_bij !(log_g, log_pow, log_mul) /=.
-    by move=> _ {H Hbad} ??????? Hbad /Hbad.
+    by move=> _ {Hbad} ??????? Hbad /Hbad.
   qed.
 
   lemma dt_r_ll x : is_lossless (FDistr.dt \ pred1 x).

@@ -12,7 +12,6 @@ require import StdRing StdOrder StdBigop RealLub RealSeq.
 (*---*) import IterOp Bigint Bigreal Bigreal.BRA.
 (*---*) import Ring.IntID IntOrder RField RealOrder.
 
-pragma -oldip.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)

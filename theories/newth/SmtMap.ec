@@ -382,7 +382,7 @@ lemma eq_except_set ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
   eq_except ((y <> y') ? predU X (pred1 x) : X) m1.[x <- y] m2.[x <- y'].
 proof.
 move=> /eq_exceptP h; case: (y = y') => /= [<-|].
-  by apply/eq_exceptP=> z _; rewrite !get_setE h.
+  by apply/eq_exceptP=> z ?; rewrite !get_setE h.
 move=> ne_y_y'; apply/eq_exceptP=> z; rewrite negb_or.
 by case=> /h; rewrite !get_setE => + @/pred1 -> - ->.
 qed.

@@ -5,7 +5,6 @@ require import IntDiv Mu_mem StdRing StdOrder StdBigop.
 require (*--*) FinType.
 
 (* ---------------- Sane Default Behaviours --------------------------- *)
-pragma -oldip.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)

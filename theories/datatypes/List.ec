@@ -261,7 +261,7 @@ proof. by move=> ge0_n; case: xs => //= x xs; rewrite addz1_neq0. qed.
 
 lemma nth_default (z : 'a) s n: size s <= n => nth z s n = z.
 proof.
-elim: s n => //= x s ih n; case: (n = 0) => [->|_ _].
+elim: s n => //= x s ih n; case: (n = 0) => [->|??].
   by smt w=(size_ge0). by rewrite ih /#.
 qed.
 
@@ -459,7 +459,7 @@ lemma allP p (s : 'a list):
   all p s <=> (forall x, mem s x => p x).
 proof.
   elim: s=> //= x s [IH1 IH2]; split.
-    by elim=> _ h y []; [move=> -> // | apply IH1].
+    by elim=> ? h y []; [move=> -> // | apply IH1].
   move=> h; split; [by apply h | apply IH2].
   by move=> y y_in_s; apply h; right.
 qed.
@@ -1474,7 +1474,7 @@ lemma mem_map ['a 'b] (f : 'a -> 'b) : injective f =>
   forall s x, (mem (map f s) (f x)) <=> (mem s x).
 proof.
 move=> inj_f s x; split=> [/mapP|].
-  by case=> y [_ /inj_f]. by apply/map_f.
+  by case=> y [? /inj_f]. by apply/map_f.
 qed.
 
 lemma uniq_map (f : 'a -> 'b) (s : 'a list):

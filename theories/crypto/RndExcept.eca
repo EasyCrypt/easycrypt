@@ -161,7 +161,7 @@ abstract theory Adversary.
       + wp;if.
         + by rnd;auto; rewrite hsample => &hr /> /test_spec.
       by auto.
-    + move=> _;proc;sp;if =>//.
+    + move=> ?;proc;sp;if =>//.
       by inline *;auto => &hr />;rewrite d_ll.
     inline*; auto => /#.
   qed.
