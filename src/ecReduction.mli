@@ -65,16 +65,17 @@ val can_eta : ident -> form * form list -> bool
 (* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
-  delta_p : (path  -> bool); (* None means all *)
-  delta_h : (ident -> bool); (* None means all *)
-  zeta    : bool;            (* reduce let  *)
-  iota    : bool;            (* reduce case *)
-  eta     : bool;            (* reduce eta-expansion *)
-  logic   : rlogic_info;     (* perform logical simplification *)
-  modpath : bool;            (* reduce module path *)
-  user    : bool             (* reduce user defined rules *)
+  delta_p : (path  -> deltap); (* reduce operators *)
+  delta_h : (ident -> bool);   (* reduce local definitions *)
+  zeta    : bool;              (* reduce let  *)
+  iota    : bool;              (* reduce case *)
+  eta     : bool;              (* reduce eta-expansion *)
+  logic   : rlogic_info;       (* perform logical simplification *)
+  modpath : bool;              (* reduce module path *)
+  user    : bool               (* reduce user defined rules *)
 }
 
+and deltap      = [`Yes | `No | `Force]
 and rlogic_info = [`Full | `ProductCompat] option
 
 val full_red     : reduction_info

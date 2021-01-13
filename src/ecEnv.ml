@@ -745,7 +745,8 @@ module MC = struct
           let for1 i (c, aty) =
             let aty = EcTypes.toarrow aty (tconstr mypath params) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
-            let cop = mk_op (fst aty) (snd aty) (Some (OP_Constr (mypath, i))) in
+            let cop = mk_op ~opaque:false
+                        (fst aty) (snd aty) (Some (OP_Constr (mypath, i))) in
             let cop = (ipath c, cop) in
               (c, cop)
           in
@@ -779,7 +780,8 @@ module MC = struct
             let for1 i (f, aty) =
               let aty = EcTypes.tfun (tconstr mypath params) aty in
               let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
-              let fop = mk_op (fst aty) (snd aty) (Some (OP_Proj (mypath, i, nfields))) in
+              let fop = mk_op ~opaque:false
+                          (fst aty) (snd aty) (Some (OP_Proj (mypath, i, nfields))) in
               let fop = (ipath f, fop) in
                 (f, fop)
             in
@@ -798,7 +800,7 @@ module MC = struct
           let stop   =
             let stty = toarrow (List.map snd fields) (tconstr mypath params) in
             let stty = EcSubst.freshen_type (tyd.tyd_params, stty) in
-              mk_op (fst stty) (snd stty) (Some (OP_Record mypath))
+              mk_op ~opaque:false (fst stty) (snd stty) (Some (OP_Record mypath))
           in
 
           let mc =
@@ -854,7 +856,7 @@ module MC = struct
         let on1 (opid, optype) =
           let opname = EcIdent.name opid in
           let optype = ty_subst tsubst optype in
-          let opdecl = mk_op [(self, Sp.singleton mypath)] optype (Some OP_TC) in
+          let opdecl = mk_op ~opaque:false [(self, Sp.singleton mypath)] optype (Some OP_TC) in
             (opid, xpath opname, optype, opdecl)
         in
           List.map on1 tc.tc_ops
@@ -2610,30 +2612,23 @@ module Op = struct
     | None -> ops
     | Some check -> List.filter (check |- snd) ops
 
-  let reducible env p =
+  let reducible ?(force = false) env p =
     try
       let op = by_path p env in
         match op.op_kind with
         | OB_oper (Some (OP_Plain _))
-        | OB_pred (Some _) -> true
-        | OB_oper None
-        | OB_oper (Some (OP_Constr _))
-        | OB_oper (Some (OP_Record _))
-        | OB_oper (Some (OP_Proj _))
-        | OB_oper (Some (OP_Fix _))
-        | OB_oper (Some (OP_TC))
-        | OB_pred None
-        | OB_nott _ -> false
+        | OB_pred (Some _) when force || not op.op_opaque -> true
+        | _ -> false
 
     with LookupFailure _ -> false
 
-  let reduce env p tys =
+  let reduce ?(force = false) env p tys =
     let op = oget (by_path_opt p env) in
     let f  =
       match op.op_kind with
-      | OB_oper (Some (OP_Plain (e, _))) ->
+      | OB_oper (Some (OP_Plain (e, _))) when force || not op.op_opaque ->
           form_of_expr EcCoreFol.mhr e
-      | OB_pred (Some (PR_Plain f)) ->
+      | OB_pred (Some (PR_Plain f)) when force || not op.op_opaque ->
           f
       | _ -> raise NotReducible
     in

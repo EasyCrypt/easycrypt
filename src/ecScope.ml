@@ -1156,7 +1156,7 @@ module Op = struct
           let codom    = TT.transty TT.tp_relax env ue pty in
           let _env, xs = TT.trans_binding env ue op.po_args in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
-          let opabs    = EcDecl.mk_op [] codom None in
+          let opabs    = EcDecl.mk_op ~opaque:false [] codom None in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
           let openv    = EcEnv.Var.bind_locals xs openv in
           let reft     = TT.trans_prop openv ue reft in
@@ -1196,7 +1196,7 @@ module Op = struct
 
     in
 
-    let tyop   = EcDecl.mk_op tparams ty body in
+    let tyop   = EcDecl.mk_op ~opaque:false tparams ty body in
     let opname = EcPath.pqname (EcEnv.root (env scope)) (unloc op.po_name) in
 
     if op.po_kind = `Const then begin
@@ -1224,7 +1224,7 @@ module Op = struct
                 let nosmt = op.po_nosmt in
                 let nargs = List.sum (List.map (List.length |- fst) op.po_args) in
                   EcDecl.axiomatized_op ~nargs  ~nosmt path (tyop.op_tparams, bd) in
-              let tyop  = { tyop with op_kind = OB_oper None; } in
+              let tyop  = { tyop with op_opaque = true; } in
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope false (unloc ax, axop)
 
@@ -1271,7 +1271,7 @@ module Op = struct
           let subst = Tvar.init
             (List.map fst tparams)
             (List.map (tvar |- fst) nparams) in
-          let op = EcDecl.mk_op nparams (Tvar.subst subst ty) None in
+          let op = EcDecl.mk_op ~opaque:false nparams (Tvar.subst subst ty) None in
           bind scope (unloc name, op)
         in List.fold_left addnew scope op.po_aliases
 

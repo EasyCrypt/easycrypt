@@ -288,8 +288,8 @@ module Op : sig
 
   val all : ?check:(operator -> bool) -> qsymbol -> env -> (path * t) list
 
-  val reducible : env -> path -> bool
-  val reduce    : env -> path -> ty list -> form
+  val reducible : ?force:bool -> env -> path -> bool
+  val reduce    : ?force:bool -> env -> path -> ty list -> form
 
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool

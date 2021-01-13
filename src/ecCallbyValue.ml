@@ -305,8 +305,9 @@ and reduce_user_delta st f1 p tys args =
   match reduce_user st f2 with
   | f -> f
   | exception NotReducible ->
-    if st.st_ri.delta_p p && Op.reducible st.st_env p then
-      let f = Op.reduce st.st_env p tys in
+    let mode = st.st_ri.delta_p p in
+    if mode <> `No && Op.reducible ~force:(mode = `Force) st.st_env p then
+      let f = Op.reduce ~force:(mode = `Force) st.st_env p tys in
       cbv st Subst.subst_id f args
     else f2
 

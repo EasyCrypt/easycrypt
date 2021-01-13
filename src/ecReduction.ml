@@ -429,8 +429,8 @@ let is_alpha_eq hyps f1 f2 =
 (* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
-  delta_p : (path  -> bool);
-  delta_h : (ident -> bool);
+  delta_p : (path  -> deltap); (* reduce operators *)
+  delta_h : (ident -> bool);   (* reduce local definitions *)
   zeta    : bool;
   iota    : bool;
   eta     : bool;
@@ -439,12 +439,13 @@ type reduction_info = {
   user    : bool;
 }
 
+and deltap      = [`Yes | `No | `Force]
 and rlogic_info = [`Full | `ProductCompat] option
 
 (* -------------------------------------------------------------------- *)
 let full_red = {
   beta    = true;
-  delta_p = EcUtils.predT;
+  delta_p = (fun _ -> `Yes);
   delta_h = EcUtils.predT;
   zeta    = true;
   iota    = true;
@@ -456,7 +457,7 @@ let full_red = {
 
 let no_red = {
   beta    = false;
-  delta_p = EcUtils.pred0;
+  delta_p = (fun _ -> `No);
   delta_h = EcUtils.pred0;
   zeta    = false;
   iota    = false;
@@ -472,9 +473,9 @@ let betaiota_red = { no_red with beta = true; iota = true; }
 let nodelta =
   { full_red with
       delta_h = EcUtils.pred0;
-      delta_p = EcUtils.pred0; }
+      delta_p = (fun _ -> `No); }
 
-let delta = { no_red with delta_p = EcUtils.predT; }
+let delta = { no_red with delta_p = (fun _ -> `Yes); }
 
 let full_compat = { full_red with logic = Some `ProductCompat; }
 
@@ -493,8 +494,10 @@ let reduce_local ri hyps x  =
   else raise nohead
 
 let reduce_op ri env p tys =
-  if   ri.delta_p p
-  then try Op.reduce env p tys with NotReducible -> raise nohead
+  if ri.delta_p p <> `No then
+    try
+      Op.reduce ~force:(ri.delta_p p = `Force) env p tys
+    with NotReducible -> raise nohead
   else raise nohead
 
 let is_record env f =
@@ -674,10 +677,10 @@ let reduce_logic ri env hyps f p args =
 (* -------------------------------------------------------------------- *)
 let reduce_delta ri env _hyps f =
   match f.f_node with
-  | Fop (p, tys) when ri.delta_p p ->
+  | Fop (p, tys) when ri.delta_p p <> `No ->
       reduce_op ri env p tys
 
-  | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p ->
+  | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p <> `No ->
       let op = reduce_op ri env p tys in
       f_app_simpl op args f.f_ty
 
