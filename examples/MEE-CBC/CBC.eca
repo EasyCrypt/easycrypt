@@ -5,8 +5,6 @@ require import StdRing StdOrder DList.
 require (*ab*) PRP PRF SKE_INDR. (* Definitions and Security Notions *)
 (*---*) import RField RealOrder.
 
-pragma -oldip.
-
 (* -------------------------------------------------------------------- *)
 (** Parameters and Constants *)
 op q   : {int | 0 < q}   as gt0_q.   (* number of queries *)

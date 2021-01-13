@@ -460,7 +460,7 @@ section Security_Aux.
     split.
     + move=> /Hbad [#] !->> /= <- <-.
       by split; rewrite log_bij !(log_g, log_pow, log_mul) /=.
-    by move=> _ {H Hbad} ??????? Hbad /Hbad.
+    by move=> _ {Hbad} ??????? Hbad /Hbad.
   qed.
 
   lemma dt_r_ll x : is_lossless (FDistr.dt \ pred1 x).
@@ -696,9 +696,9 @@ section Security_Aux.
     rewrite Hg3 /=. 
     case: (G1.bad{m1}) => [_ -> | ] //=. 
     move=> Hbad Hsize Hstar;rewrite !negb_and /= 2!negb_or /= -!andaE.
-    case (v = G2.v{m2}) => [->> /= ? [#]!->> Hstar1 ->>| /=].
-    + by case: (G1.cstar{m2}) Hstareq Hstar Hstar1.
-    move=> Hv Ha _ ->>;left.
+    case (v = G2.v{m2}) => />.
+    + by case: (G1.cstar{m2}) Hstareq Hstar => />.
+    move=> Hv Ha _;left.
     rewrite !(log_g, log_pow, log_mul);field => //.
     + by move: Hv;apply: contra;rewrite ofint0 => H;ring H.
     by move: Ha;apply: contra; rewrite log_bij log_pow ofint0 => H;ring H.

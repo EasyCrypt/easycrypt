@@ -12,7 +12,6 @@ require import StdRing StdOrder StdBigop RealLub RealSeq.
 (*---*) import IterOp Bigint Bigreal Bigreal.BRA.
 (*---*) import Ring.IntID IntOrder RField RealOrder.
 
-pragma -oldip.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
@@ -409,9 +408,9 @@ have: perm_eq (F1 ++ F2) (pmap J (range 0 N)).
     exists (f y); rewrite Jfy /= mem_range ge0_fy /= /N.
     rewrite addrC ltzS (@BIA.bigD1 _ _ y) // ler_addl.
     by apply/Bigint.sumr_ge0=> z _; case: (fE z).
-  * rewrite pmap_map => /mapP[v]; rewrite !mem_filter /predC1.
-    case=> />; case _: v yF2 => @/oget //= v' ->>.
-    rewrite mem_filter /P negb_and /= mem_filter => -[->//|].
+  * rewrite pmap_map => /mapP[v]; rewrite !mem_filter /predC1 => />.
+    case v yF2 => @/oget //= v' />. 
+    rewrite mem_filter /P negb_and /= mem_filter => -[//|].
     move=> h1 h2; suff //: false; move: h2 h1 => /= h.
     rewrite pmap_map; apply/mapP; exists (Some v').
     by rewrite mem_filter.

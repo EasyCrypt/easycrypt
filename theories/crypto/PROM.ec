@@ -7,7 +7,6 @@
  * -------------------------------------------------------------------- *)
 
 pragma +implicits.
-pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 require import AllCore SmtMap Distr.
@@ -333,7 +332,7 @@ lemma eager_get :
 proof.
 eager proc.
 wp; case ((x \in FRO.m /\ FRO.m.[x] \is Known){1}).
-+ rnd{1}; rcondf{2} 2; first by auto=> /> &m' _ @/(\is) -> _ _ /#.
++ rnd{1}; rcondf{2} 2; first by auto=> /> _ @/(\is) -> _ _ /#.
   exists* x{1}, ((oget FRO.m.[x{2}]){1}); elim * => x1 mx; inline RRO.resample.
   call (iter_inv RRO.I (fun z=> x1<>z)
                        (fun o1 o2 => o1 = o2 /\ o1.[x1]= Some mx) _)=> /=.
@@ -345,7 +344,7 @@ wp; case ((x \in FRO.m /\ FRO.m.[x] \is Known){1}).
       by rewrite mx_Known.
     by rewrite get_some.
   rewrite domE mx' //=.
-  move: mx'; rewrite -mx_Known; case: (oget FRO.m.[x]{m'})=> //= y1 y2.
+  move: mx'; rewrite -mx_Known; case: (oget FRO.m.[x1]{m'})=> //= y1 y2.
   exact/get_set_id.
 case ((x \in FRO.m){1}).
 + inline{1} RRO.resample=> /=; rnd{1}.
@@ -386,7 +385,7 @@ case ((x \in FRO.m){1}).
          (I_f_eqex x1 mx1 mx2)); auto=> /> &1 &2 eq_exc get1_x2 get2_x2.
   + split. split=> [| x2].
     + congr; rewrite fsetP=> y; rewrite in_fsetD1 2!mem_fdom.
-      case (y = x{2})=> [->/= | ne_y_x2 /=].
+      case (y = x1)=> [->/= | ne_y_x2 /=].
       by rewrite dom_restr /in_dom_with get2_x2.
     + rewrite !dom_restr /in_dom_with !domE.
       by move/eq_exceptP/(_ y ne_y_x2): eq_exc=> ->.
@@ -446,27 +445,23 @@ case ((x \in FRO.m /\ FRO.m.[x] \is Unknown){1}).
   call (iter_inv RRO.I (fun z=> x1<>z) 
          (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1] = mx1 /\
                        o2.[x1] = mx2) 
-         (I_f_eqex x1 mx1 mx2));
-      auto=> &1 &2 /> eq_exc not_x2_in_unkn_m2 get_m2_x2_eq.
-  split=> [x0 |].
-  + rewrite -memE mem_fdom dom_restr /in_dom_with; apply/contraLR=> />.
-    by rewrite get_m2_x2_eq.
-  by rewrite get_m2_x2_eq.
+         (I_f_eqex x1 mx1 mx2)); auto => /> /#.
 exists* x{1}, y{1}, (FRO.m.[x]{1}); elim*=> x1 y1 mx1.
 pose mx2 := Some (y1, Known).
 call (iter_inv RRO.I (fun z=> x1<>z) 
        (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1] = mx1 /\
                      o2.[x1] = mx2) 
-       (I_f_eqex x1 mx1 mx2))=> /=; auto=> &1 &2 /> /negb_and x2_disj.
-  split=> [| _ _ _ m_L m_R eq_exc m_L_x2_eq m_R_x2_eq];1: split.
+       (I_f_eqex x1 mx1 mx2))=> /=; auto=> /> &2 /negb_and x2_disj.
+  split; 1: split.
   + congr; rewrite fsetP=> z; rewrite !mem_fdom restr_set /= mem_rem dom_restr /in_dom_with.
-    by case: (z = x{2})=> />; rewrite negb_and.
+    by case: (z = x1)=> />; rewrite negb_and.
   split=> [x0 |].
   + rewrite -memE mem_fdom dom_restr /in_dom_with; apply/contraLR=> />.
     by rewrite negb_and.
   by rewrite get_set_sameE /mx2 /= eq_except_setr.
+move=> _ _ _ <- m_L m_R eq_exc m_L_x2_eq m_R_x2_eq. 
 rewrite get_set_sameE in m_R_x2_eq.
-rewrite -fmap_eqP=> z; rewrite get_setE; case (z = x{2})=> [-> |].
+rewrite -fmap_eqP=> z; rewrite get_setE; case (z = x1)=> [-> |].
 + by rewrite -m_R_x2_eq.
 by move=> ne_z_x2; rewrite eq_exceptP in eq_exc; rewrite eq_exc /pred1.
 qed.
@@ -502,9 +497,9 @@ eager proc; case ((x \in FRO.m /\ FRO.m.[x] \is Unknown){1}).
                      o2.[x1] = None) _).
   + by conseq (I_f_eqex x1 mx1 None).
   auto=> /> &1 &2 m1_eqe_m2 _ x_notin_m2; split=> [z|/> _ mL mR mL_eqe_mR mL_x mR_x].
-  + rewrite -memE mem_fdom dom_restr /in_dom_with; apply/contraLR=> />.
+  + rewrite -memE mem_fdom dom_restr /in_dom_with; apply/contraLR=> />. 
     by rewrite domE x_notin_m2.
-  apply/fmap_eqP=> z; rewrite remE. case: (z = x{2})=> /> => [|z_neq_x].
+  apply/fmap_eqP=> z; rewrite remE. case: (z = x1)=> /> => [|z_neq_x].
   + by rewrite mR_x.
   by move/eq_exceptP/(_ _ z_neq_x): mL_eqe_mR.
 inline RRO.resample; wp.
@@ -557,10 +552,10 @@ case: ((x \notin FRO.m){2}).
        (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1]= None /\
                      o2.[x1]=mx2) _).
   + by conseq (I_f_eqex x1 None mx2).
-  auto=> &1 &2 /> m1_eqe_m2 m2_x m1_x; split=> [z|_ mL mR /eq_exceptP mL_eqe_mR mL_x mR_x].
-  + rewrite -memE mem_fdom dom_restr /in_dom_with domE; apply/contraLR=> />.
+  auto=> /> &1 &2 m1_eqe_m2 m2_x m1_x; split => [z |_ <- mL mR /eq_exceptP mL_eqe_mR mL_x mR_x].
+  + rewrite -memE mem_fdom dom_restr /in_dom_with domE; apply/contraLR => /= <<-. 
     by rewrite m1_x.
-  rewrite domE mL_x /=; apply/fmap_eqP=> z; rewrite get_setE; case: (z = x{2})=> />.
+  rewrite domE mL_x /=; apply/fmap_eqP=> z; rewrite get_setE; case: (z = x1)=> />.
   + by rewrite mR_x m2_x.
   by move=> /mL_eqe_mR.
 rcondf{2} 2; first by auto. 

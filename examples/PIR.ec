@@ -259,7 +259,8 @@ proof.
   + move=> H.
     case (oflist PIR.s' = restr x j);first last.
     + seq 3 : true _ 0%r 0%r _ (0 <= j <= N /\ is_restr (oflist PIR.s') j /\ oflist PIR.s' <> restr x j).
-      + auto => &hr [#] ????? b _;case: (j{hr}=i{hr}) => />;rewrite restrS //= oflist_cons;
+      + auto => /> &hr 5? b _.
+       case: (j{hr}=i{hr}) => />; rewrite restrS //= oflist_cons;
           smt (is_restr_addS is_restrS is_restr_Ueq  is_restr_diff fset0U is_restr_restr).
         by conseq H => /#.
       + by hoare;auto.

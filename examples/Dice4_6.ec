@@ -2,7 +2,6 @@ require import Int Real Distr List FSet.
 require import DInterval Dexcepted.
 
 pragma +implicits.
-pragma -oldip.
 
 clone WhileSamplingFixedTest as D4_6 with
   type t             <- int,

@@ -5,7 +5,6 @@
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
-pragma -oldip.
 
 require import Core List.
 

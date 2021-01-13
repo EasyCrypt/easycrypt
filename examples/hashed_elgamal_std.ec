@@ -3,7 +3,6 @@ require import AllCore Int Real Distr DBool.
 require (*--*) DiffieHellman BitWord PKE_CPA.
 
 (* ---------------- Sane Default Behaviours --------------------------- *)
-pragma -oldip.
 pragma +implicits.
 
 (* ---------------------- Let's Get Started --------------------------- *)

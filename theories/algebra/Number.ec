@@ -11,7 +11,6 @@ require import AllCore.
 require (*--*) Ring StdRing.
 
 pragma +implicits.
-pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 pred homo2 ['a 'b] (op_ : 'a -> 'b) (aR : 'a rel) (rR : 'b rel) =

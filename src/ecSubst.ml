@@ -413,8 +413,9 @@ let subst_op (s : _subst) (op : operator) =
   let ty      = sty.s_ty op.op_ty in
   let kind    = subst_op_kind sty op.op_kind in
     { op_tparams = tparams;
-      op_ty      = ty     ;
-      op_kind    = kind   ; }
+      op_ty      = ty;
+      op_kind    = kind;
+      op_opaque  = op.op_opaque; }
 
 (* -------------------------------------------------------------------- *)
 let subst_ax (s : _subst) (ax : axiom) =

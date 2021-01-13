@@ -7,7 +7,6 @@
  * -------------------------------------------------------------------- *)
 
 pragma +implicits.
-pragma -oldip.
 
 require import AllCore Distr.
 
@@ -83,8 +82,8 @@ hoare LRO_oE (M : (in_t, out_t) fmap) x' :
                  then LRO.m = M
                  else LRO.m = M.[x' <- res].
 proof.
-proc; auto=> /> &m r _; rewrite get_set_sameE domE /=.
-by case: (LRO.m.[x]{m}).
+proc; auto=> /> r _; rewrite get_set_sameE domE /=.
+by case: (M.[x']).
 qed.
 
 lemma LRO_o_notinE (M : (in_t, out_t) fmap) x' :
@@ -155,7 +154,7 @@ lemma ERO_oE (M : (in_t, out_t) fmap) x' :
      (forall x, x \in M)
   => hoare [ERO.o :     ERO.m = M /\ x = x'
                     ==> ERO.m = M /\ ERO.m.[x'] = Some res].
-proof. by move=> m_fu; proc; auto=> &m />; rewrite -get_some 1:m_fu. qed.
+proof. by move=> m_fu; proc; auto=> />; rewrite -get_some 1:m_fu. qed.
 end FiniteEager.
 
 (* -------------------------------------------------------------------- *)
@@ -243,7 +242,7 @@ while (   ={w}
        /\ uniq w{1}
        /\ (forall x, x \in w <=> x \notin ERO.m){1}).
 + rcondt{2} 5.
-  + auto=> /> &m' _ ih w_neq_nil r _.
+  + auto=> /> _ ih w_neq_nil r _.
     exact/ih/(@mem_head_behead witness).
   auto=> |> &m uniq partition w_neq_nil r _.
   move: w_neq_nil uniq partition.

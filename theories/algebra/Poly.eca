@@ -94,7 +94,7 @@ op prepolyZ (z : coeff) (p : poly) = fun k =>
 
 lemma ispolyC (c : coeff) : ispoly (prepolyC c).
 proof.
-split=> @/prepolyC [c' _|]; first by rewrite ltr_eqF.
+split=> @/prepolyC [c' ?|]; first by rewrite ltr_eqF.
 by exists 0 => c' gt1_c'; rewrite gtr_eqF.
 qed.
 

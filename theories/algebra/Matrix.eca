@@ -4,8 +4,6 @@ require (*--*) Subtype Monoid Ring Subtype Bigalg StdOrder StdBigop.
 
 import StdOrder.IntOrder StdBigop.Bigreal.
 
-pragma -oldip.
-
 (* -------------------------------------------------------------------- *)
 type R.
 

@@ -5,7 +5,6 @@ require import IntDiv Mu_mem StdRing StdOrder StdBigop.
 require (*--*) FinType.
 
 (* ---------------- Sane Default Behaviours --------------------------- *)
-pragma -oldip.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
@@ -509,24 +508,24 @@ section.
            (n = n0 /\ F.m = m /\ r::logPw = P.logP /\
             n <= qP /\ card (fdom F.m) <= qF)=> //.
     + by wp; rnd=> //.
-    + wp; rnd; auto=> /> &hr _ /le_fromint domF_le_qF _.
+    + wp; rnd; auto=> /> _ /le_fromint domF_le_qF _.
       rewrite (negBadE A AaL)=> //= -[uniq_logP logP_disj_domF].
-      apply (ler_trans (mu dseed (predU (dom F.m{hr})
-                                        (mem P.logP{hr})))).
+      apply (ler_trans (mu dseed (predU (dom m)
+                                        (mem logPw)))).
       + by apply mu_sub=> x [] /#.
-      have ->: dom F.m{hr} = mem (fdom F.m{hr}).
+      have ->: dom m = mem (fdom m).
       + by apply/fun_ext=> x; rewrite mem_fdom.
-      rewrite mu_or (@mu_mem (fdom F.m{hr}) dseed (inv (Support.card%r))).
+      rewrite mu_or (@mu_mem (fdom m) dseed (inv (Support.card%r))).
       + by move=> x _; rewrite dseed1E.
-      rewrite (@mu_mem_card (P.logP{hr}) dseed (inv (Support.card%r))).
+      rewrite (@mu_mem_card (logPw) dseed (inv (Support.card%r))).
       + by move=> x _; rewrite dseed1E.
-      rewrite (@cardE (oflist P.logP{hr})) (@perm_eq_size _ (P.logP{hr})) 1:perm_eq_sym 1:oflist_uniq //.
-      have -> /=: mu dseed (predI (mem (fdom F.m{hr})) (mem P.logP{hr})) = 0%r.
-      + have ->: mem (fdom F.m{hr}) = dom F.m{hr}.
+      rewrite (@cardE (oflist logPw)) (@perm_eq_size _ (logPw)) 1:perm_eq_sym 1:oflist_uniq //.
+      have -> /=: mu dseed (predI (mem (fdom m)) (mem logPw)) = 0%r.
+      + have ->: mem (fdom m) = dom m.
         + by apply/fun_ext=> x; rewrite mem_fdom.
         by rewrite -(@mu0 dseed) /predI; apply/mu_eq=> x; move: (logP_disj_domF x)=> [] ->.
       rewrite -mulrDl fromintD.
-      have: (card (fdom F.m{hr}))%r + (size P.logP{hr})%r <= qF%r + (size P.logP{hr})%r.
+      have: (card (fdom m))%r + (size logPw)%r <= qF%r + (size logPw)%r.
       + exact/ler_add.
       have: 0%r <= Support.card%r by smt(@Support). 
       by move => /invr_ge0 h1; apply: ler_wpmul2r.

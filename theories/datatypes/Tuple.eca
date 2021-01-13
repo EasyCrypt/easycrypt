@@ -12,7 +12,6 @@ require import AllCore List StdOrder StdBigop.
 require (*--*) FinType.
 
 pragma +implicits.
-pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 type t.

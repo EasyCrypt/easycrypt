@@ -11,7 +11,6 @@ require import AllCore Bool Ring StdRing StdOrder StdBigop List.
 (*---*) import IterOp Bigreal.BRA IntID RField IntOrder RealOrder.
 
 pragma +implicits.
-pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 op convergeto (s : int -> real) (x : real) =

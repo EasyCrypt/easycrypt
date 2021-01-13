@@ -4,7 +4,6 @@ require import Distr DBool.
 require (*--*) BitWord OW ROM.
 
 (* ---------------- Sane Default Behaviours --------------------------- *)
-pragma -oldip.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)

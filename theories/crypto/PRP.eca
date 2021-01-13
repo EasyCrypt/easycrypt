@@ -8,7 +8,7 @@
 
 require import AllCore Distr.
 
-pragma +implicits. pragma -oldip.
+pragma +implicits.
 
 (** A PRP is a family of permutations F on domain D indexed by a
     keyspace K equipped with a (lossless) distribution dK. **)
