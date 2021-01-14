@@ -1003,6 +1003,13 @@ and reduce_head_sub ri env f =
     | Fif (f1, f2, f3) ->
       curry3 f_if (as_seq3 (reduce_head_args ri env [f1; f2; f3]))
 
+    | Fmatch (c, bs, tys) ->
+      let c, bs =
+        match reduce_head_args ri env (c :: bs) with
+        | [] -> assert false
+        | c :: bs -> (c, bs)
+      in f_match c bs tys
+
     | Ftuple args ->
       f_tuple (reduce_head_args ri env args)
 
