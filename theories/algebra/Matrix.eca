@@ -539,13 +539,6 @@ qed.
 op dvector (d : R distr) =
   dmap (djoin (nseq size d)) (fun xs => offunv (nth witness xs)).
 
-op dmatrix (d : R distr) =
-  dmap
-    (djoin (nseq size (djoin (nseq size d))))
-    (fun xs : R list list => offunm (fun i j =>
-      nth witness (nth witness xs i) j
-    )).
-
 lemma dvector1E (d : R distr) (v : vector) : mu1 (dvector d) v =
   BRM.bigi predT (fun i => mu1 d v.[i]) 0 size.
 proof.
@@ -565,6 +558,51 @@ rewrite szE !BRM.big_seq &(BRM.eq_bigr) => /= i /mem_range rgi @/(\o); congr.
 + congr; rewrite (nth_change_dfl (witness, witness)) // -szE //.
   by rewrite nth_zip ?(size_nseq, size_mkseq) //= nth_mkseq // szE.
 qed.
+
+lemma dvector_uni d : is_uniform d => is_uniform (dvector d).
+proof.
+move=> uni_d; apply/dmap_uni_in_inj/djoin_uni.
+- move=> xs ys /supp_djoin[+ _] /supp_djoin[+ _] /=.
+  rewrite !size_nseq !ler_maxr // => ??.
+  move/(congr1 tofunv); rewrite !offunvK => eqv.
+  apply/(eq_from_nth witness) => [/#|i rg_i].
+  by move/fun_ext/(_ i): eqv => /#.
+- by move=> d'; rewrite mem_nseq => -[_ <-].
+qed.
+
+lemma dvector_ll d : is_lossless d => is_lossless (dvector d).
+proof.
+move=> ll_d; apply/dmap_ll/djoin_ll.
+by move=> d'; rewrite mem_nseq => -[_ <-].
+qed.
+
+lemma dvector_full d : is_full d => is_full (dvector d).
+proof.
+move=> full_d; apply/dmap_fu_in => v.
+exists (map (fun i => v.[i]) (range 0 size)); split=> /=.
+- apply/supp_djoin; rewrite size_nseq ler_maxr // size_map.
+  rewrite size_range /= ler_maxr //=; apply/allP.
+  case=> d' x /mem_zip []; rewrite mem_nseq => -[_ <<-] /= _.
+  by apply: full_d.  
+- apply/eq_vectorP=> i rg_i; rewrite offunvE //.
+  by rewrite (nth_map witness) -1:nth_range // size_range ler_maxr.
+qed.
+ 
+lemma dvector_funi d : is_full d => is_uniform d =>
+  is_funiform (dvector d).
+proof.
+move=> ??; apply/is_full_funiform => //.
+- by apply/dvector_full.
+- by apply/dvector_uni.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op dmatrix (d : R distr) =
+  dmap
+    (djoin (nseq size (djoin (nseq size d))))
+    (fun xs : R list list => offunm (fun i j =>
+      nth witness (nth witness xs i) j
+    )).
 
 lemma dmatrix1E (d : R distr) (m : matrix) : mu1 (dmatrix d) m =
   BRM.bigi predT (fun i => BRM.bigi predT (fun j => mu1 d m.[i, j]) 0 size) 0 size.
@@ -602,6 +640,62 @@ rewrite !sz'E !BRM.big_seq &(BRM.eq_bigr) => /= j /mem_range rgj @/(\o).
 rewrite (nth_change_dfl (witness, witness)) // -sz'E //.
 rewrite nth_zip ?(size_nseq, size_mkseq) //= nth_nseq 1:sz'E //.
 by rewrite nth_mkseq 1:sz'E.
+qed.
+
+lemma dmatrix_uni d : is_uniform d => is_uniform (dmatrix d).
+proof.
+move=> uni_d; apply/dmap_uni_in_inj/djoin_uni.
+- move=> xs ys /supp_djoin [+ xsin] /supp_djoin[+ ysin] /=.
+  rewrite !size_nseq !ler_maxr // => sz_xs sz_ys.
+  move/(congr1 tofunm); rewrite !offunmK => eqv.
+  apply/(eq_from_nth witness) => [/#|i rg_i].
+  have gt0_size: 0 < size by smt().
+  pose xss := nth witness xs i; pose yss := nth witness ys i.
+  pose ds  := djoin (nseq size d).
+  move/allP/(_ (ds, xss) _): xsin => /= => [|xss_ds].
+  - by rewrite {1}sz_xs; apply/mem_zip_nseqL/mem_nth.
+  move/allP/(_ (ds, yss) _): ysin => /= => [|yss_ds].
+  - by rewrite {1}sz_ys; apply/mem_zip_nseqL/mem_nth => /#.
+  move/supp_djoin: xss_ds => [+ /allP ?].
+  move/supp_djoin: yss_ds => [+ /allP ?].
+  rewrite !size_nseq !ler_maxr // => sz_yss sz_xss.
+  apply/(eq_from_nth witness) => [/#|j rg_j].
+  move/fun_ext2/(_ i j): eqv => @/mclamp /=.
+  rewrite -sz_xs in rg_i; rewrite -sz_xss in rg_j.
+  by rewrite rg_i rg_j /=.
+- move=> ds; rewrite mem_nseq => -[_ <-].
+  by apply/djoin_uni=> ?; rewrite mem_nseq => -[_ <-].
+qed.
+
+lemma dmatrix_ll d : is_lossless d => is_lossless (dmatrix d).
+proof.
+move=> ll_d; apply/dmap_ll/djoin_ll.
+move=> ds; rewrite mem_nseq => -[_ <-].
+by apply/djoin_ll=> ?; rewrite mem_nseq => -[_ <-].
+qed.
+
+lemma dmatrix_full d : is_full d => is_full (dmatrix d).
+proof.
+move=> full_d; apply/dmap_fu_in => m; pose ns := range 0 size.
+exists (map (fun i => map (fun j => m.[i, j]) ns) ns); split=> /=.
+- apply/supp_djoin; rewrite size_nseq ler_maxr // size_map.
+  rewrite size_range /= ler_maxr //=; apply/allP.
+  case=> d' x /mem_zip []; rewrite mem_nseq => -[_ <<-] /=.
+  case/mapP=> /= i [/mem_range rg_i ->]; apply/djoin_fu.
+  - by rewrite size_map size_nseq ler_maxr // size_range ler_maxr.
+  - by move=> ? y; rewrite mem_nseq => -[_ <-]; apply: full_d.
+- apply/eq_matrixP=> i j [rg_i rg_j]; rewrite offunmE //=.
+  rewrite (nth_map witness) -1:nth_range //=.
+  - by rewrite size_range ler_maxr.
+  by rewrite (nth_map witness) -1:nth_range //= size_range ler_maxr.
+qed.
+ 
+lemma dmatrix_funi d : is_full d => is_uniform d =>
+  is_funiform (dmatrix d).
+proof.
+move=> ??; apply/is_full_funiform => //.
+- by apply/dmatrix_full.
+- by apply/dmatrix_uni.
 qed.
 
 end Matrix.
