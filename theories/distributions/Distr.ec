@@ -1125,6 +1125,14 @@ lemma dmap_cst ['a 'b] (d : 'a distr) (b : 'b) :
   is_lossless d => dmap d (fun _ => b) = dunit b.
 proof. apply: dlet_cst. qed.
 
+lemma eq_dmap_in ['a 'b] (d : 'a distr) (f g : 'a -> 'b) :
+  (forall x, x \in d => f x = g x) => dmap d f = dmap d g.
+proof. by move=> eq_fg; apply: in_eq_dlet => x /eq_fg @/(\o) ->. qed.
+
+lemma dmap_id_eq_in ['a] (d : 'a distr) f :
+  (forall x, x \in d => f x = x) => dmap d f = d.
+proof. by move/eq_dmap_in => ->; apply: dmap_id. qed.
+
 (* -------------------------------------------------------------------- *)
 abbrev dfst ['a 'b] (d : ('a * 'b) distr) = dmap d fst.
 abbrev dsnd ['a 'b] (d : ('a * 'b) distr) = dmap d snd.
@@ -1718,6 +1726,15 @@ lemma djoin_dmap ['a 'b 'c] (d : 'a -> 'b distr) (xs : 'a list) (f : 'b -> 'c):
 proof.
 elim: xs => /= [|x xs ih]; first by rewrite !djoinE ?dmap_dunit.
 by rewrite !djoin_cons -ih /= dmap_dprod /= !dmap_comp.
+qed.
+
+lemma djoin_dmap_nseq ['a 'b] n (d : 'a distr) (f : 'a -> 'b) :
+  dmap (djoin (nseq n d)) (map f) = djoin (nseq n (dmap d f)).
+proof.
+elim/natind: n => [n le0_n|].
+- by rewrite !nseq0_le //= !djoin_nil dmap_dunit.
+move=> n ge0_n ih; rewrite !nseqS // !djoin_cons /= -ih.
+by rewrite -dmap_dprod_comp dmap_comp.
 qed.
 
 lemma supp_djoinmap ['a 'b] (d : 'a -> 'b distr) xs ys:
