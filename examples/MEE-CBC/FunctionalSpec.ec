@@ -1,4 +1,4 @@
-require import AllCore Int IntExtra IntDiv List.
+require import AllCore IntDiv List.
 require import Ring StdRing StdOrder StdBigop Distr.
 require import BitEncoding.
 require (*--*) BitWord MAC_then_Pad_then_CBC.
@@ -110,8 +110,8 @@ instance bring with block
   proof addrA     by apply/xorbA
   proof addrC     by apply/xorbC
   proof addrK     by apply/xorbK
-  proof mulr1     by apply andb1
-  proof mulrA     by rewrite andbA
+  proof mulr1     by apply/andb1
+  proof mulrA     by apply/andbA
   proof mulrC     by apply/andbC
   proof mulrDl    by apply/andbDl
   proof mulrK     by apply/andbK
@@ -140,8 +140,7 @@ op os2bs (os : octet list) : block list =
 lemma size_bs2os (bs : block list):
   size (bs2os bs) = 16 * size bs.
 proof.
-elim: bs=> //= [|x xs ih].
-+ by rewrite /bs2os /flatten.
+elim: bs => //= x xs ih.
 rewrite /bs2os /= flatten_cons size_cat size_block ih.
 by algebra.
 qed.
@@ -299,8 +298,8 @@ proof. by rewrite /padding /= size_mkseq [smt (size_ge0 @IntDiv)]. qed.
 lemma last_padding x m: last x (padding (pad_length m)) = int2o (16 - size m %% 16).
 proof.
 rewrite /padding /mkseq /= -(last_nonempty ((fun x => int2o (16 - size m %% 16)) witness<:int>)).
-+ case {-1}(iota_ 0 (16 - size m %% 16)) (eq_refl (iota_ 0 (16 - size m %% 16)))=> //=;
-  by have:= size_iota 0 (16 - size m %% 16); smt (@IntDiv).
++ have h: 0 < 16 - size m %% 16 by rewrite subr_gt0 &(ltz_pmod).
+  by apply/negP => /(congr1 size); rewrite size_map /= size_iota /#.
 by rewrite last_map.
 qed.
 
@@ -331,7 +330,7 @@ have -> /=: bs2os (pad m t)
 + by rewrite /pad /= os2bsK // size_padded [smt (@IntDiv)].
 rewrite !last_cat last_padding int2oK.
 + split=> [|_]; first by smt (size_ge0 @IntDiv).
-  by apply/(ler_lt_trans 16); [smt (size_ge0 @IntDiv)|smt (powS pow0)].
+  by apply/(ler_lt_trans 16); [smt (size_ge0 @IntDiv)|smt (exprS expr0)].
 rewrite drop_size_cat.
 + by rewrite !size_cat size_padding /#.
 rewrite {1}/pad_length /=.
@@ -347,8 +346,7 @@ lemma leak_pad m t:
   size (pad m t)
   = size (pad (mkseq (fun (i : int) => zerow) (size m - size m %% 16)) t).
 proof.
-rewrite /pad /= !size_os2bs !size_padded size_mkseq.
-rewrite max_ler.
+rewrite /pad /= !size_os2bs !size_padded size_mkseq ler_maxr.
 + case: (size m < 16)=> [|/lezNgt] szm_16.
   + by rewrite modz_small 1:size_ge0.
   smt (@IntDiv).
@@ -519,14 +517,14 @@ conseq (_: true ==> true) (_: _ ==> _)=> //=.
     split; first by rewrite size_cat.
     rewrite (take_nth witness) // -cbc_dec_rcons -h cats1.
     by rewrite size_take // lt_padded_c /= nth_take // 1:/#; congr; algebra.
-  auto=> /> &hr; split.
+  auto=> />; split.
   + by rewrite size_ge0 take0.
   move=> p /lezNgt le_szc_p _ ge_szc_p.
-  rewrite (ler_asym (size p) (size (behead c{hr})) _);
+  rewrite (ler_asym (size p) (size (behead _c)) _);
     rewrite ?ge_szc_p ?le_szc_p // take_size => p_def.
   split.
   + case: {-1}(unpad p) (eq_refl (unpad p))=> //= @/mee_cbc - [] m t.
     by rewrite /mee_dec /= -p_def=> -> /=.
   by rewrite /mee_dec -p_def /= => ->.
-by proc; inline *; wp; while true (size c - i); auto=> &hr /#.
+ proc; inline *; wp; while true (size c - i); auto =>/#.
 qed.

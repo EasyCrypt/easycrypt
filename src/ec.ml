@@ -184,8 +184,10 @@ let main () =
     EcCommands.addidir ~namespace:`System (Filename.concat theories "prelude");
     if not ldropts.ldro_boot then
       EcCommands.addidir ~namespace:`System ~recursive:true theories;
-    List.iter (fun (onm, x) ->
-        EcCommands.addidir ?namespace:(omap (fun nm -> `Named nm) onm) x)
+    List.iter (fun (onm, name, isrec) ->
+        EcCommands.addidir
+          ?namespace:(omap (fun nm -> `Named nm) onm)
+          ~recursive:isrec name)
       ldropts.ldro_idirs;
   end;
 
@@ -212,7 +214,7 @@ let main () =
         in
 
         let pid =
-          let args = ["why3"; "config"; "--detect"] in
+          let args = ["why3"; "config"; "--detect"; "--full-config"] in
           let args = args @ (conf |> omap (fun x -> ["-C"; x])|> odfl []) in
 
           Printf.eprintf "Executing: %s\n%!" (String.concat " " args);
@@ -251,7 +253,7 @@ let main () =
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false)
 
-    end
+      end
   in
 
   (match input with
@@ -384,9 +386,11 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+                   let timed = p.EP.gl_debug = Some `Timed in
+                   let break = p.EP.gl_debug = Some `Break in
                      try
                        let tdelta =
-                         EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
+                         EcCommands.process ~timed ~break p.EP.gl_action
                        in tstats loc tdelta
                      with
                      | EcCommands.Restart ->

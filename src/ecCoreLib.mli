@@ -83,9 +83,9 @@ module CI_Int : sig
   val p_int_opp   : path
   val p_int_add   : path
   val p_int_mul   : path
-  val p_int_pow   : path
   val p_int_le    : path
   val p_int_lt    : path
+  val p_int_pow   : path
   val p_int_edivz : path
 end
 
@@ -202,6 +202,7 @@ module CI_Logic : sig
   val p_fcongr        : path
   val p_eq_sym        : path
   val p_eq_sym_imp    : path
+  val p_eq_iff_imp    : path
   val p_negeqF        : path
 
   val p_iff_lr        : path

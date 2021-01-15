@@ -463,20 +463,32 @@ let pp_funname (ppe : PPEnv.t) fmt p =
 (* -------------------------------------------------------------------- *)
 let msymbol_of_pv (ppe : PPEnv.t) p =
   match p with
+  | PVloc name -> [(name,[])]
+
   | PVglob xp ->
+    let mem =
+      let env = ppe.PPEnv.ppe_env in
+      obind (EcEnv.Memory.byid^~ env) (EcEnv.Memory.get_active env) in
+
+    let exception Default in
+
     let x = xp.P.x_sub in
-    (PPEnv.mod_symb ppe xp.P.x_top)
-    @ [(x, [])]
-  | PVloc name ->
-    (*let name =
-      match EcEnv.Memory.current ppe.PPEnv.ppe_env with
-      | None -> assert false
-      | Some mem ->
-        Format.eprintf "name = %s@." name;
-        match EcMemory.get_name name None mem with
-        | None -> assert false
-        | Some name -> name in*)
-    [(name,[])]
+
+    try
+      let pv' =
+        EcEnv.Var.lookup_progvar_opt
+          ?side:(omap fst mem) ([], x) ppe.PPEnv.ppe_env in
+
+      match omap fst pv' with
+      | Some (`Var pv') when EcEnv.NormMp.pv_equal ppe.PPEnv.ppe_env p pv'  ->
+        [(x, [])]
+
+      | _ ->
+        raise Default
+
+    with Default ->
+      (PPEnv.mod_symb ppe xp.P.x_top)
+      @ [(x, [])]
 
 
 (* -------------------------------------------------------------------- *)

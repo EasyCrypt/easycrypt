@@ -647,7 +647,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
       with CanNotTranslate -> trans_gen env fp
     end
   | Fint n ->
-      WTerm.t_bigint_const (BI.to_why3 n)
+      WTerm.t_int_const (BI.to_why3 n)
 
   | Fif    _ -> trans_app env fp []
   | Fmatch _ -> trans_app env fp []
@@ -658,13 +658,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
     (* Special case for `%r` *)
   | Fapp({ f_node = Fop (p, [])},  [{f_node = Fint n}])
       when p_equal p CI_Real.p_real_of_int ->
-    let an = BI.to_string (BI.abs n) in
-    let c  = {
-      Why3.Number.rc_negative = (BI.lt n BI.zero);
-      Why3.Number.rc_abs      = Why3.Number.real_const_dec an "" None;
-    } in
-
-    WTerm.t_const (Why3.Number.ConstReal c) WTy.ty_real
+    WTerm.t_real_const (BI.to_why3 n)
 
   | Fapp (f,args) -> trans_app env f (List.map (trans_form env) args)
 
@@ -1144,7 +1138,7 @@ let lenv_of_hyps genv (hyps : hyps) : lenv =
 
 (* -------------------------------------------------------------------- *)
 let trans_axiom genv (p, ax) =
-  if not ax.ax_nosmt then
+(*  if not ax.ax_nosmt then *)
     let lenv = fst (lenv_of_tparams ax.ax_tparams) in
     add_axiom (genv, lenv) (preid_p p) ax.ax_spec
 

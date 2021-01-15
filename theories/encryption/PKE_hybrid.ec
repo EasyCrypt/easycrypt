@@ -274,8 +274,14 @@ section.
     Pr[CPAR(S,B(S,A)).main() @ &m : res] =
     1%r/H.q%r * (Pr[CPAL(S,A).main() @ &m : res] - Pr[CPAR(S,A).main() @ &m : res]).
   proof.
+<<<<<<< HEAD
     cut -> : Pr[CPAL(S, A).main() @ &m : res] =
              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res].
+=======
+    move=> Hq.
+    have -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
+              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
+>>>>>>> origin/1.0-preview
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk}) => //.
       proc.
@@ -283,8 +289,13 @@ section.
       wp;call (_: ={glob S, K.pk}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
+<<<<<<< HEAD
     cut -> : Pr[CPAR(S, A).main() @ &m : res] =
              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res].
+=======
+    have -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
+              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
+>>>>>>> origin/1.0-preview
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk}) => //.
       proc.
@@ -292,6 +303,7 @@ section.
       wp;call (_: ={glob S, K.pk}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
+<<<<<<< HEAD
     cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ H.q_pos &m (fun ga go c, true) => //=.
     + have h : choare [ToOrcl(S).leaks : true ==> true] time ['0; S.kg:1].
       + by proc; call (_:true); skip => /=; smt(cs_pos).
@@ -299,6 +311,11 @@ section.
     + have h : choare [ToOrcl(S).orcl : true ==> true] time ['0; S.enc:1].
       + by proc; call (_:true); skip => /=; smt(cs_pos).
       conseq h.
+=======
+    have := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
+      by proc;call Lkg.
+      by proc;call Lenc.
+>>>>>>> origin/1.0-preview
       move=> O LR Llr Ll Lo;proc;call (La LR _) => //.
       by call Ll.
     have -> : Pr[INDL(ToOrcl(S), ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q] =

@@ -169,7 +169,7 @@ theory EnfPen.
       (* Count(O).f preserves bad *)
       move=> &m1 //=; bypr; move=> &m0 bad.
         apply/ler_anti; rewrite andaE; split; first by smt w=mu_bounded.
-        cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
+        have lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
           first by conseq [-frame] (CountO_fC O Counter.c{m0} _); apply O_fL.
         by byphoare lbnd=> //; smt.
     by inline Counter.init; wp; skip; smt.
@@ -277,8 +277,8 @@ theory BndPen.
       by progress; proc; sp; if; [call (CountO_fL O _); first apply O_fL |].
       (* O.f preserves bad *)
       progress; bypr; move=> &m0 bad.
-      cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
-      cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
+      have: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
+      have lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
         first by conseq [-frame] (CountO_fC O Counter.c{m0} _); first apply O_fL.
       by byphoare lbnd; last smt.
     inline Counter.init; wp.

@@ -327,7 +327,7 @@ let t_equiv_deno_bad2 pre bad1 tc =
                     t_apply_hyp hcpre;
                     t_intros_s (`Symbol ["_"; "_"]) @!
                       t_apply_prept (`UG real_upto_imp_bad) ];
-                  t_pr_rewrite ("mu_sub",None) @! t_logic_trivial;
+                  t_pr_rewrite ("mu_sub",None) @! t_trivial;
                   t_equiv_deno pre post @+ [
                     t_apply_hyp hequiv;
                     t_apply_hyp hcpre;

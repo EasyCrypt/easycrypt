@@ -11,11 +11,11 @@ require import AllCore List Distr DProd StdBigop.
 (*---*) import Bigreal.BRM MUnit.
 
 op dlist (d : 'a distr) (n : int): 'a list distr =
-  IntExtra.fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
+  fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
   axiomatized by dlist_def.
 
 lemma dlist0 (d : 'a distr) n: n <= 0 => dlist d n = dunit [].
-proof. by move=> ge0_n; rewrite dlist_def IntExtra.foldle0. qed.
+proof. by move=> ge0_n; rewrite dlist_def foldle0. qed.
 
 lemma dlistS (d : 'a distr) n:
   0 <= n =>

@@ -218,7 +218,7 @@ theory NatMul.
     sum f s = (card s)*k.
   proof strict.
   move=> f_x; pose s' := s.
-  cut -> //: s' <= s => sum f s' = (card s') * k;
+  have -> //: s' <= s => sum f s' = (card s') * k;
     last by smt. (* FIXME *)
   elim/fset_ind s'.
     by rewrite sum_empty fcards0 MulZ.
@@ -261,7 +261,7 @@ theory Miplus.
     rewrite /sum_n;elim k.
       by rewrite sum_ij_eq => /=; smt all.
     move=> k Hk Hrec;rewrite sum_ij_le_r;first smt.
-    cut -> : k + 1 - 1 = k;first smt.
+    have -> : k + 1 - 1 = k;first smt.
     rewrite Hrec /=.
     have ->: (k + 1) * (k + 1 + 1) = k * (k + 1) + 2 * (k + 1) by smt.
     rewrite (addzC (k * (k + 1))) Div_mult 1:smt.
@@ -281,7 +281,7 @@ theory Miplus.
    sum_n i j = i*((j - i)+1) + sum_n 0 ((j - i)).
  proof -strict.
    move=> Hle;rewrite {1} (_: j=i+(j-i));first smt.
-   cut: 0 <= (j-i) by smt.
+   have: 0 <= (j-i) by smt.
    elim (j-i)=> //=.
      by rewrite !sum_n_ii.
    move=> {j Hle} j Hj; rewrite -CommutativeGroup.Assoc sum_n_ij1;smt.
@@ -311,7 +311,7 @@ theory Miplus.
    sum_n i j <= sum_n i k.
  proof -strict.
    move=> Hij H0j Hjk;rewrite /sum_n /sum_ij.
-   cut ->: oflist (iota_ i (k - i + 1))
+   have ->: oflist (iota_ i (k - i + 1))
            = oflist (iota_ i (j - i + 1)) `|` oflist (iota_ (j + 1) (k - (j + 1) + 1)).
      by apply/fsetP=> x; rewrite in_fsetU !mem_oflist !mem_iota; smt.
    rewrite sum_disj.
@@ -353,12 +353,12 @@ proof -strict.
   split;last by move=> [x [x_in_s f_x]]; rewrite (Mbor.sum_rm _ _ x) // f_x.
   move=> sum_true; pose p := fun x, mem s x /\ f x; change (exists x, p x);
     apply ex_for; delta p=> {p}; move: sum_true; apply absurd=> /= h.
-  (cut : s <= s by done); pose {1 3} s' := s;elim/fset_ind s'.
+  (have : s <= s by done); pose {1 3} s' := s;elim/fset_ind s'.
     by rewrite Mbor.sum_empty.
   move=> x s' nmem IH leq_adds'_s.
-  cut leq_s'_s : s' <= s by smt.
-  rewrite Mbor.sum_add // -nor IH // /=; cut := h x; rewrite -nand.
-  by case (mem s x)=> //=; cut := leq_adds'_s x; rewrite in_fsetU in_fset1 //= => ->.
+  have leq_s'_s : s' <= s by smt.
+  rewrite Mbor.sum_add // -nor IH // /=; have := h x; rewrite -nand.
+  by case (mem s x)=> //=; have := leq_adds'_s x; rewrite in_fsetU in_fset1 //= => ->.
 qed.
 
 pred cpOrs (X:(('a -> bool)) fset) (x:'a) = Mbor.sum (fun (P:('a -> bool)), P x) X.

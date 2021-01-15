@@ -9,7 +9,7 @@
 require import AllCore List Distr StdBigop StdRing StdOrder.
 (*---*) import Bigreal BRA RField IntOrder RealOrder.
 
-pragma -oldip. pragma +implicits.
+pragma +implicits.
 
 type input, output.
 
@@ -212,8 +212,8 @@ theory SubuniformReference.
     => Pr[M.f(i) @ &m: res = a] = 0%r.
   proof.
   move=> support_M a_notin_X.
-  byphoare (_: arg = i ==> _)=> //=; hoare; conseq (support_M i)=> &hr /> r.
-  by apply/(@contra (r = a) (!mem (X arg{hr}) r))=> ->.
+  byphoare (_: arg = i ==> _)=> //=; hoare; conseq (support_M i)=> /> r.
+  by apply/(@contra (r = a) (!r \in (X i)))=> ->.
   qed.
 
   lemma is_subuniform i X a &m:

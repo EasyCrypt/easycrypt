@@ -11,7 +11,7 @@
  * Von Neumann's trick to simulate a fair coin toss using only a
  * biased coin (of unknown bias). *)
 
-require import AllCore Int IntExtra Real RealExtra List.
+require import AllCore List.
 require import Distr DBool.
 require import StdRing StdOrder.
 (*---*) import MUniform RField RealOrder.

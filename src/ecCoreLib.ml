@@ -67,7 +67,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module CI_Int = struct
-  let i_Int = "Int"
+  let i_Int = "CoreInt"
   let p_Int = EcPath.pqname p_top i_Int
   let p_int = _Pervasive "int"
 
@@ -78,12 +78,12 @@ module CI_Int = struct
   let _IntDiv = fun x -> EcPath.pqname p_IntDiv x
 
   let p_int_elim  = _Int "intind"
-  let p_int_opp   = _Int "[-]"
-  let p_int_add   = _Int "+"
-  let p_int_mul   = _Int "*"
-  let p_int_pow   = _Int "^"
-  let p_int_le    = _Int "<="
-  let p_int_lt    = _Int "<"
+  let p_int_opp   = _Int "opp"
+  let p_int_add   = _Int "add"
+  let p_int_mul   = _Int "mul"
+  let p_int_pow   = EcPath.extend p_top ["Ring"; "IntID"; "exp"]
+  let p_int_le    = _Int "le"
+  let p_int_lt    = _Int "lt"
   let p_int_edivz = _IntDiv "edivz"
   let p_int_max   = _IntDiv "max"
 end
@@ -114,11 +114,11 @@ end
 
 (* -------------------------------------------------------------------- *)
 module CI_Real = struct
-  let i_Real = "Real"
+  let i_Real = "CoreReal"
   let p_Real = EcPath.pqname p_top i_Real
   let p_real = _Pervasive "real"
 
-  let p_RealExtra = EcPath.pqname p_top "RealExtra"
+  let p_RealExtra = EcPath.pqname p_top "Real"
 
 
   let p_RealOrder =
@@ -128,15 +128,15 @@ module CI_Real = struct
 
   let p_real0       = _Real "zero"
   let p_real1       = _Real "one"
-  let p_real_opp    = _Real "[-]"
-  let p_real_add    = _Real "+"
-  let p_real_mul    = _Real "*"
+  let p_real_opp    = _Real "opp"
+  let p_real_add    = _Real "add"
+  let p_real_mul    = _Real "mul"
   let p_real_inv    = _Real "inv"
-  let p_real_pow    = EcPath.extend p_Real ["^"]
-  let p_real_le     = _Real "<="
-  let p_real_lt     = _Real "<"
-  let p_real_of_int = EcPath.extend p_Real ["from_int"]
-  let p_real_abs    = EcPath.extend p_Real ["`|_|"]
+  let p_real_pow    = EcPath.extend p_top ["Real"; "Rfield"; "exp"]
+  let p_real_le     = _Real "le"
+  let p_real_lt     = _Real "lt"
+  let p_real_of_int = _Real "from_int"
+  let p_real_abs    = EcPath.extend p_top ["Real"; "`|_|"]
 end
 
 (* -------------------------------------------------------------------- *)
@@ -217,6 +217,7 @@ module CI_Logic = struct
   let p_eq_ind        = _Logic "eq_ind"
   let p_eq_sym        = _Logic "eq_sym"
   let p_eq_sym_imp    = _Logic "eq_sym_imp"
+  let p_eq_iff_imp    = _Logic "eq_iff_imp"
   let p_negbTE        = _Logic "negbTE"
   let p_negeqF        = _Logic "negeqF"
 

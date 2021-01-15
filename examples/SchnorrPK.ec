@@ -134,10 +134,10 @@ section SchnorrPKSecurity.
             accepting_transcript_2.
     byphoare (_: h = x /\ msg = m /\ ch = e /\ ch' = e' /\ r = z /\ r' = z' ==> _) => //.
     proc; simplify; inline*.
-    auto; rewrite /R /R_DL /oget => &hr /> ? 2!-> /=.
+    auto; rewrite /R /R_DL /oget => &hr /> hne 2!-> /=.
     rewrite F.div_def -pow_pow F.sub_def -mul_pow pow_opp log_bij.
     rewrite accepting_transcript_1 accepting_transcript_2 !(log_gpow, log_pow, log_mul, inv_def). 
-    by field; apply: contra H => heq; ring heq.
+    by field; apply: contra hne => heq; ring heq.
   qed.
 
   (* Special honest verifier zero knowledge *)

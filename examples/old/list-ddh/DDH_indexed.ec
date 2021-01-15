@@ -153,14 +153,14 @@ theory Equiv_Dprod.
     move=> rab &m1 &m2 _.
     pose ra' := fst rab.
     pose rb' := snd rab.
-    cut -> :(  Pr[Sample_dprod.sample() @ &m2 : rab = res]
+    have -> :(  Pr[Sample_dprod.sample() @ &m2 : rab = res]
              = mu_x da ra' * mu_x db rb').
     bdhoare_deno (_ : true ==> (ra', rb')=res).
       fun.
       rnd.
       skip.
       progress.
-      cut ->: (  mu   (Dprod.dprod da db) (lambda (x : (a * b)), (ra', rb') = x)
+      have ->: (  mu   (Dprod.dprod da db) (lambda (x : (a * b)), (ra', rb') = x)
                = mu_x (Dprod.dprod da db) (ra', rb')).
       rewrite /mu_x. congr. apply fun_ext => //.
     rewrite Dprod.mu_x_def => //.
@@ -177,25 +177,25 @@ theory Equiv_Dprod.
     rnd.
     skip. progress.
       rewrite /mu_x.
-      cut -> : ((lambda (x : a), ra' = x) = ((=) ra')).
+      have -> : ((lambda (x : a), ra' = x) = ((=) ra')).
         apply fun_ext. by trivial.
       trivial.
     progress.
    rewrite /mu_x.
-   cut -> : ((lambda (x : b), rb' = x) = ((=) rb')).
+   have -> : ((lambda (x : b), rb' = x) = ((=) rb')).
      apply fun_ext. by trivial.
    trivial.
    rnd. skip. progress.
-   cut -> :  ((lambda (x : a), ! ra' = x) =
+   have -> :  ((lambda (x : a), ! ra' = x) =
              (cpNot (lambda (x : a), ra' = x))).
      apply fun_ext.
      smt.
      rewrite mu_not /weight /mu_x.
-     cut -> : (lambda (x : a), ra' = x) = ((=) ra').
+     have -> : (lambda (x : a), ra' = x) = ((=) ra').
        apply fun_ext. smt.
     smt.
     progress.
-    cut -> : ((lambda (rb : b), rb' = rb /\ ra{hr} = ra') = cpFalse).
+    have -> : ((lambda (rb : b), rb' = rb /\ ra{hr} = ra') = cpFalse).
       apply fun_ext. smt. smt.
     by trivial.
     by smt.
@@ -234,15 +234,15 @@ theory Equiv_Dapply.
     bypr (res{1}) (res{2}).
       progress.
     move=> rb &m1 &m2 _.
-    cut -> :(  Pr[Sample_dapply.sample() @ &m2 : rb= res]
-               = mu da (lambda r, f r = rb)).
+    have -> :(  Pr[Sample_dapply.sample() @ &m2 : rb= res]
+              = mu da (lambda r, f r = rb)).
     bdhoare_deno (_ : true ==> (rb=res)).
       fun.
       rnd.
       skip.
       progress.
       rewrite Dapply.mu_def.
-      cut ->: ((lambda (x : a), (lambda (x0 : b), rb = x0) (f x)) =
+      have ->: ((lambda (x : a), (lambda (x0 : b), rb = x0) (f x)) =
                (lambda (r : a), f r = rb)).
       apply fun_ext. by smt.
       by trivial.
@@ -253,7 +253,7 @@ theory Equiv_Dapply.
       rnd.
       skip.
       progress.
-      cut -> : (lambda (x : a), rb = f x) = (lambda (r : a), f r = rb).
+      have -> : (lambda (x : a), rb = f x) = (lambda (r : a), f r = rb).
         apply fun_ext. smt.
       smt.
       by trivial.
@@ -365,22 +365,22 @@ lemma Eq_Sample_DH_distr_random:
 proof strict.
   bypr (res{1}) (res{2}). by smt.
   move=> a &m1 &m2 _.
-  cut -> :   Pr[Sample_DH.sample_dh_random() @ &m1 : a = res]
+  have -> :  Pr[Sample_DH.sample_dh_random() @ &m1 : a = res]
            = Pr[T1_left.sample_dh_random() @ &m1 : a = res].
   by equiv_deno Eq_Sample_DH_T1_left => // ; smt.
-  cut -> :   Pr[T1_left.sample_dh_random() @ &m1 : a = res]
+  have -> :  Pr[T1_left.sample_dh_random() @ &m1 : a = res]
            = Pr[T1_right.sample_dh_random() @ &m1 : a = res].
   by equiv_deno Eq_T1_left_T1_right => // ; smt.
-  cut -> :   Pr[T1_right.sample_dh_random() @ &m1 : a = res]
+  have -> :  Pr[T1_right.sample_dh_random() @ &m1 : a = res]
            = Pr[T2_left.sample_dh_random() @ &m1 : a = res].
   by equiv_deno Eq_T1_right_T2_left => // ; smt.
-  cut -> :   Pr[T2_left.sample_dh_random() @ &m1 : a = res]
+  have -> :  Pr[T2_left.sample_dh_random() @ &m1 : a = res]
            = Pr[T2_right.sample_dh_random() @ &m1 : a = res].
   by equiv_deno Eq_T2_left_T2_right => // ; smt.
-  cut -> :   Pr[T2_right.sample_dh_random() @ &m1 : a = res]
+  have -> :  Pr[T2_right.sample_dh_random() @ &m1 : a = res]
            = Pr[T3_left.sample_dh_random() @ &m1 : a = res].
   by equiv_deno Eq_T2_right_T3_left => // ; smt.
-  cut -> :   Pr[T3_left.sample_dh_random() @ &m1 : a = res]
+  have -> :  Pr[T3_left.sample_dh_random() @ &m1 : a = res]
            = Pr[T3_right.sample_dh_random() @ &m2 : a = res].
   by equiv_deno Eq_T3_left_T3_right => // ; smt.
   by equiv_deno Eq_T3_right_Sample_DH_distr => // ; smt.
@@ -455,16 +455,16 @@ lemma Eq_Sample_DH_distr_real:
 proof strict.
   bypr (res{1}) (res{2}). by smt.
   move=> a &m1 &m2 _.
-  cut -> :   Pr[Sample_DH.sample_dh_real() @ &m1 : a = res]
+  have -> :  Pr[Sample_DH.sample_dh_real() @ &m1 : a = res]
            = Pr[S1_left.sample_dh_real() @ &m1 : a = res].
   by equiv_deno Eq_Sample_DH_S1_left => // ; smt.
-  cut -> :   Pr[S1_left.sample_dh_real() @ &m1 : a = res]
+  have -> :  Pr[S1_left.sample_dh_real() @ &m1 : a = res]
            = Pr[S1_right.sample_dh_real() @ &m1 : a = res].
   by equiv_deno Eq_S1_left_S1_right => // ; smt.
-  cut -> :   Pr[S1_right.sample_dh_real() @ &m1 : a = res]
+  have -> :  Pr[S1_right.sample_dh_real() @ &m1 : a = res]
            = Pr[S2_left.sample_dh_real() @ &m1 : a = res].
   by equiv_deno Eq_S1_right_S2_left => // ; smt.
-  cut -> :   Pr[S2_left.sample_dh_real() @ &m1 : a = res]
+  have -> :  Pr[S2_left.sample_dh_real() @ &m1 : a = res]
            = Pr[S2_right.sample_dh_real() @ &m1 : a = res].
   by equiv_deno Eq_S2_left_S2_right => // ; smt.
   by equiv_deno Eq_S2_right_Sample_DH_distr => // ; smt.

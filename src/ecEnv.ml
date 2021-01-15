@@ -809,7 +809,8 @@ module MC = struct
           let for1 i (c, aty) =
             let aty = EcTypes.toarrow aty (tconstr mypath params) in
             let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
-            let cop = mk_op (fst aty) (snd aty) (Some (OP_Constr (mypath, i))) in
+            let cop = mk_op ~opaque:false
+                        (fst aty) (snd aty) (Some (OP_Constr (mypath, i))) in
             let cop = (ipath c, cop) in
               (c, cop)
           in
@@ -850,7 +851,8 @@ module MC = struct
             let for1 i (f, aty) =
               let aty = EcTypes.tfun (tconstr mypath params) aty in
               let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
-              let fop = mk_op (fst aty) (snd aty) (Some (OP_Proj (mypath, i, nfields))) in
+              let fop = mk_op ~opaque:false
+                          (fst aty) (snd aty) (Some (OP_Proj (mypath, i, nfields))) in
               let fop = (ipath f, fop) in
                 (f, fop)
             in
@@ -869,7 +871,7 @@ module MC = struct
           let stop   =
             let stty = toarrow (List.map snd fields) (tconstr mypath params) in
             let stty = EcSubst.freshen_type (tyd.tyd_params, stty) in
-              mk_op (fst stty) (snd stty) (Some (OP_Record mypath))
+              mk_op ~opaque:false (fst stty) (snd stty) (Some (OP_Record mypath))
           in
 
           let mc =
@@ -925,7 +927,7 @@ module MC = struct
         let on1 (opid, optype) =
           let opname = EcIdent.name opid in
           let optype = ty_subst tsubst optype in
-          let opdecl = mk_op [(self, Sp.singleton mypath)] optype (Some OP_TC) in
+          let opdecl = mk_op ~opaque:false [(self, Sp.singleton mypath)] optype (Some OP_TC) in
             (opid, xpath opname, optype, opdecl)
         in
           List.map on1 tc.tc_ops
@@ -1801,6 +1803,11 @@ module Var = struct
   let by_xpath_opt (p : xpath) (env : env) =
     try_lf (fun () -> by_xpath p env)
 
+  let add (path : EcPath.xpath) (env : env) =
+    let obj = by_xpath path env in
+    let ip = fst (oget (ipath_of_xpath path)) in
+    MC.import_var ip obj env
+
   let lookup_locals name env =
     MMsym.all name env.env_locals
 
@@ -1940,7 +1947,7 @@ module Mod = struct
 
   let add (p : EcPath.mpath) (env : env) =
     let obj = by_mpath p env in
-      MC.import_mod (fst (ipath_of_mpath p)) obj env
+    MC.import_mod (fst (ipath_of_mpath p)) obj env
 
   let lookup qname (env : env) =
     let (((_, _a), p), x) = MC.lookup_mod qname env in
@@ -2052,6 +2059,19 @@ module Mod = struct
       | _ -> env
     in
       List.fold_left do1 env bd
+
+  let import_vars env p =
+    let do1 env = function
+      | MI_Variable v ->
+        let vp  = EcPath.xpath p v.v_name in
+        let ip  = fst (oget (ipath_of_xpath vp)) in
+        let obj = v.v_type in
+        MC.import_var ip obj env
+
+      | _ -> env
+    in
+
+    List.fold_left do1 env (by_mpath p env).me_comps
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2729,30 +2749,23 @@ module Op = struct
     | None -> ops
     | Some check -> List.filter (check |- snd) ops
 
-  let reducible env p =
+  let reducible ?(force = false) env p =
     try
       let op = by_path p env in
         match op.op_kind with
         | OB_oper (Some (OP_Plain _))
-        | OB_pred (Some _) -> true
-        | OB_oper None
-        | OB_oper (Some (OP_Constr _))
-        | OB_oper (Some (OP_Record _))
-        | OB_oper (Some (OP_Proj _))
-        | OB_oper (Some (OP_Fix _))
-        | OB_oper (Some (OP_TC))
-        | OB_pred None
-        | OB_nott _ -> false
+        | OB_pred (Some _) when force || not op.op_opaque -> true
+        | _ -> false
 
     with LookupFailure _ -> false
 
-  let reduce env p tys =
+  let reduce ?(force = false) env p tys =
     let op = oget (by_path_opt p env) in
     let f  =
       match op.op_kind with
-      | OB_oper (Some (OP_Plain (e, _))) ->
+      | OB_oper (Some (OP_Plain (e, _))) when force || not op.op_opaque ->
           form_of_expr EcCoreFol.mhr e
-      | OB_pred (Some (PR_Plain f)) ->
+      | OB_pred (Some (PR_Plain f)) when force || not op.op_opaque ->
           f
       | _ -> raise NotReducible
     in
@@ -2767,8 +2780,20 @@ module Op = struct
     try  EcDecl.is_rcrd (by_path p env)
     with LookupFailure _ -> false
 
-  let is_dtype_ctor env p =
-    try  EcDecl.is_ctor (by_path p env)
+  let is_dtype_ctor ?nargs env p =
+    try
+      match (by_path p env).op_kind with
+      | OB_oper (Some (OP_Constr (pt,i))) ->
+        begin
+          match nargs with
+          | None -> true
+          | Some nargs ->
+            let tyv = Ty.by_path pt env in
+            let tyv = oget (EcDecl.tydecl_as_datatype tyv) in
+            let ctor_ty = snd (List.nth tyv.tydt_ctors i) in
+            List.length ctor_ty = nargs
+        end
+      | _ -> false
     with LookupFailure _ -> false
 
   let is_fix_def env p =

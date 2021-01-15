@@ -18,6 +18,7 @@ type pattern = (ptnmap * EcUnify.unienv) * form
 type search = [
   | `ByPath    of Sp.t
   | `ByPattern of pattern
+  | `ByOr      of search list
 ]
 
 type search_result =

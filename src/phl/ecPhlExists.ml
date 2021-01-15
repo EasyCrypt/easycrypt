@@ -92,7 +92,7 @@ let t_hr_exists_intro_r fs tc =
           t_exists_intro_s args;
           t_apply_hyp h;
         ];
-        t_logic_trivial;
+        t_trivial;
         t_id]
   in
   FApi.t_internal tactic tc

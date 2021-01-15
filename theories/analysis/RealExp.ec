@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int IntExtra Real RealExtra StdRing StdOrder RealFun.
+require import AllCore StdRing StdOrder RealFun.
 (*---*) import IntOrder RField RealOrder.
 require import List.
 
@@ -29,7 +29,7 @@ axiom nosmt le_ln_dw (x : real): 1%r < x => (x - 1%r) / x < ln x.
 
 axiom nosmt le1Dx_exp (x : real): 0%r <= x => 1%r+x <= exp x.
 
-axiom nosmt convexe_exp a b: convexe exp a b.
+axiom nosmt convex_exp a b: convex exp a b.
 
 op log (a : real) = fun x => ln x / ln a.
 
@@ -175,18 +175,18 @@ proof. by move=> gt0x gt0y; rewrite rpowMr ?invr_gt0 // rpowVr. qed.
 
 lemma rpow_nat x n : 0 <= n => 0%r <= x => x^(n%r) = x^n.
 proof.
-elim: n=> [|n ge0n ih] ge0x; first by rewrite powr0 -fromint1 rpow0.
-rewrite powrS // fromintD; move: ge0x.
+elim: n=> [|n ge0n ih] ge0x; first by rewrite expr0 rpow0.
+rewrite exprS // fromintD; move: ge0x.
 rewrite ler_eqVlt=> -[<-|]; first rewrite (mul0r 0%r).
   by rewrite rpow0r -fromintD eq_fromint /#.
-by move=> gt0x; rewrite rpowD // rpow1 // ih 1:ltrW.
+by move=> gt0x; rewrite rpowD // rpow1 // ih 1:ltrW // mulrC.
 qed.
 
 lemma rpow_int x n : 0%r <= x => x^(n%r) = x^n.
 proof.
 move=> ge0x; case: (lezWP 0 n)=> [/rpow_nat ->|_] //.
 move=> le0n; rewrite -(opprK n%r) rpowN // -fromintN.
-by rewrite rpow_nat // ?oppz_ge0 // powrN invrK.
+by rewrite rpow_nat // ?oppz_ge0 // exprN invrK.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -219,7 +219,7 @@ rewrite ler_eqVlt=> -[<-|gt0n]; first by rewrite !rpow0 lerr.
 by case=> ge0_x le_xy; rewrite rpow_mono // (ler_trans x).
 qed.
 
-lemma nosmt rpowr_hmono (x n m : real) :
+lemma nosmt rexpr_hmono (x n m : real) :
   1%r <= x => 0%r <= n <= m => x^n <= x^m.
 proof.
 move=> ge1x [ge0n lenm]; have ge0m: 0%r <= m by apply/(ler_trans n).
@@ -281,14 +281,14 @@ proof. by move=> ge0_x ge0_y; rewrite rpow_mono // invr_gt0. qed.
 
 lemma sqrtsq_ge0 (x : real) : 0%r <= x => sqrt (x ^ 2) = x.
 proof.
-case/ler_eqVlt => [<-|lt0_x]; first by rewrite powrE expr0z sqrt0.
+case/ler_eqVlt => [<-|lt0_x]; first by rewrite expr0z sqrt0.
 by rewrite -rpow_int 1:ltrW // -rpowM // divff // rpow1.
 qed.
 
 lemma sqrtsq (x : real) : sqrt (x ^ 2) = `|x|.
 proof.
 case: (0%r <= x) => [^/sqrtsq_ge0 -> /ger0_norm ->//|/ltrNge lt0_x].
-rewrite powrE -{1}(opprK x) sqrrN -powrE sqrtsq_ge0 1:2!(oppr_ge0, ltrW) //.
+rewrite -{1}(opprK x) sqrrN sqrtsq_ge0 1:2!(oppr_ge0, ltrW) //.
 by rewrite ltr0_norm.
 qed.
 
@@ -307,27 +307,27 @@ lemma poly2_canon (a b c : real) (x : real) : a <> 0%r =>
   let B = - (D2 a b c / (4%r * a)) in
   a * exp x 2 + b * x + c = a * exp (x - A) 2 + B.
 proof.
-move=> nz_a AE BE; rewrite /AE /BE /D2 -!powrE #field;
+move=> nz_a AE BE; rewrite /AE /BE /D2 #field;
   by rewrite ?mulf_eq0 nz_a.
 qed.
 
 lemma poly2_solve (a b c : real) (x : real) :
      a <> 0%r => 0%r <= D2 a b c
   => (   a * exp x 2 + b * x + c = 0%r
-     <=> exists z, exp z 2 = D2 a b c /\ x = (-b + z) / (2%r * a)).
+     <=> exists (z : real), exp z 2 = D2 a b c /\ x = (-b + z) / (2%r * a)).
 proof.
 move=> nz_a ge0_D2; split; last first.
-+ case=> z []; rewrite -!powrE => z2E ->; rewrite #field ?mulf_eq0 //.
-  by rewrite z2E /D2 -!powrE #ring.
++ case=> z [] z2E ->; rewrite #field ?mulf_eq0 //.
+  by rewrite z2E /D2 #ring.
 have /= -> := poly2_canon a b c x nz_a; rewrite subr_eq0.
 rewrite -(mulr1 (D2 a b c / (4%r * a))) (mulrC a) -eqf_div // divr1.
 move=> h; exists ((x + b / (2%r * a)) * (2%r * a)); split.
-+ by rewrite expfM h -!powrE #field ?mulf_eq0.
++ by rewrite expfM h #field ?mulf_eq0.
 + by rewrite #field mulf_eq0.
 qed.
 
 lemma poly2_same_sign (a b c : real) : a <> 0%r =>
-     (forall x, 0%r <= a * (a * exp x 2 + b * x + c))
+     (forall (x : real), 0%r <= a * (a * exp x 2 + b * x + c))
   => D2 a b c <= 0%r.
 proof.
 move=> nz_a; pose z := -b / (2%r * a); move/(_ z).
@@ -337,7 +337,7 @@ by rewrite invfM (mulrCA a) divff // mulr1 pmulr_lle0 ?invr_gt0.
 qed.
 
 (* -------------------------------------------------------------------- *)
-abstract theory CauchySchwarz.
+abstract theory Rn.
 
 (* -------------------------------------------------------------------- *)
 type t.
@@ -476,13 +476,6 @@ abbrev norm x = sqrt (dotp x x).
 lemma normv0 : norm zerov = 0%r.
 proof. by rewrite dotpv0 sqrt0. qed.
 
-lemma normvZ a v : norm (a ** v) = `|a| * norm v.
-proof.
-rewrite !(dotpZl, dotpZr) mulrA sqrtM ?ge0_dotp.
-+ by rewrite -expr2 ge0_sqr.
-+ by rewrite -expr2 -powrE sqrtsq.
-qed.
-
 lemma ge0_normv x : 0%r <= norm x.
 proof. by apply/ge0_sqrt. qed.
 
@@ -492,6 +485,29 @@ proof. by rewrite sqsqrt // ge0_dotp. qed.
 lemma sqnormvD x y :
   (norm (x + y))^2 = (norm x)^2 + 2%r * dotp x y + (norm y)^2.
 proof. by rewrite !sqnormv !(dotpDl, dotpDr) (@dotpC y x) #ring. qed.
+
+lemma normvC (x y : vector) :
+  norm (x - y) = norm (y - x).
+proof. by rewrite -(opprB x y) dotpNl dotpNr opprK. qed.
+
+lemma normvN (x : vector) : norm (- x) = norm x.
+proof. by rewrite dotpNl dotpNr opprK. qed.
+
+lemma normvZ (c : real) (x : vector) : norm (c ** x) = `|c| * norm x.
+proof.
+by rewrite dotpZl dotpZr mulrA -expr2 sqrtM ?(ge0_sqr, ge0_dotp) sqrtsq.
+qed.
+
+lemma normvD_sq (x y : vector) :
+  (norm (x + y))^2 = (norm x)^2 + 2%r * dotp x y + (norm y)^2.
+proof.
+rewrite !sqnormv dotpDl !dotpDr (@dotpC x y) addrACA.
+by rewrite (@mulrC 2%r _) -intmulr mulr2z !addrA.
+qed.
+
+lemma normvB_sq (x y : vector) :
+  (norm (x - y))^2 = (norm x)^2 - 2%r * dotp x y + (norm y)^2.
+proof. by rewrite normvD_sq normvN dotpNr mulrN. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma CZ x y : dotp x y <= norm x * norm y.
@@ -503,20 +519,67 @@ pose P := fun t => (norm (x + t ** y))^2.
 pose a := (norm y)^2; pose b := 2%r * dotp x y; pose c := (norm x)^2.
 have PE : forall t, P t = a * exp t 2 + b * t + c.
 + move=> t @/P @/a @/b @/c; rewrite sqnormvD dotpZr mulrA #ring.
-rewrite !powrE normvZ expfM mulNr addrC subr_eq0; congr.
+rewrite normvZ expfM mulNr addrC subr_eq0; congr.
 by rewrite -normrX_nat // ger0_norm // ge0_sqr.
 have nz_a : a <> 0%r by rewrite /a sqnormv; apply/negP => /dotp_def.
 have ge0_aP : forall t, 0%r <= a * P t.
-+ move=> t @/P; rewrite powrE mulr_ge0.
-* by rewrite /a powrE ge0_sqr. * by apply/ge0_sqr.
++ move=> t @/P; rewrite mulr_ge0.
+* by rewrite /a ge0_sqr. * by apply/ge0_sqr.
 have @/D2 := poly2_same_sign a b c nz_a _.
 + by move=> t; have := ge0_aP t; rewrite PE.
 have ->: 4%r = exp 2%r 2 by rewrite expr2.
-rewrite subr_le0 /a /c !powrE -!expfM /b -!powrE mulrAC.
+rewrite subr_le0 /a /c -!expfM /b mulrAC.
 have ge0_lhs : 0%r <= 2%r * dotp x y by rewrite mulr_ge0 // lerNgt.
 have ge0_rhs : 0%r <= 2%r * norm x * norm y.
 + by rewrite !mulr_ge0 // ge0_normv.
 by rewrite -!rpow_int // rpow_mono // -!mulrA ler_pmul2l.
 qed.
 
-end CauchySchwarz.
+(* -------------------------------------------------------------------- *)
+lemma normvD_le (x y : Rn.vector) : norm (x + y) <= norm x + norm y.
+proof.
+rewrite -(@Bigreal.ler_pexpn2r 2) 1:// ?addr_ge0 ?ge0_normv.
+rewrite sqnormvD sqrrD intmulr; apply/ler_add2r/ler_add2l.
+by rewrite mulrC &(ler_wpmul2r) 1:// &(CZ).
+qed.
+
+lemma normvB_le (x y : Rn.vector) : norm (x - y) <= norm x + norm y.
+proof.
+by have /ler_trans := normvD_le x (-y); apply; rewrite normvN.
+qed.
+
+(* -------------------------------------------------------------------- *)
+theory BigRn.
+
+clone include Bigalg.BigZModule with
+  type t <- Rn.vector,
+    op ZM.zeror  <- zerov,
+    op ZM.( + )  <- ( + ),
+    op ZM.([-])  <- ([-]),
+    op ZM.intmul <- intmul
+
+    proof ZM.*
+
+    remove abbrev ZM.(-).
+
+realize ZM.addrA by exact/addrA.
+realize ZM.addrC by exact/addrC.
+realize ZM.add0r by exact/add0r.
+realize ZM.addNr by exact/addNr.
+
+lemma dotp_sumr ['a] P F (s : 'a list) x :
+  dotp x (big P F s) = BRA.big P (fun y => dotp x (F y)) s.
+proof.
+elim: s => [|y s ih]; first by rewrite !big_nil dotpv0.
+by rewrite !big_cons; case: (P y) => // _; rewrite dotpDr ih.
+qed.
+
+lemma dotp_suml ['a] P F (s : 'a list) x :
+  dotp (big P F s) x = BRA.big P (fun y => dotp (F y) x) s.
+proof.
+by rewrite dotpC dotp_sumr; apply: BRA.eq_bigr => i _ /=; rewrite dotpC.
+qed.
+
+end BigRn.
+
+end Rn.

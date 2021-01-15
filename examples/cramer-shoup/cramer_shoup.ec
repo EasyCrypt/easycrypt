@@ -1,7 +1,12 @@
 require import AllCore List Distr Dexcepted PKE.
+<<<<<<< HEAD
 require import StdOrder StdBigop CHoareTactic.
 import RealOrder Bigreal.
 (*---*) import StdBigop.Bigint BIA.
+=======
+require import StdOrder StdBigop.
+import RField RealOrder Bigreal.
+>>>>>>> origin/1.0-preview
 
 require TCR RndExcept.
 
@@ -674,7 +679,7 @@ section Security_Aux.
     split.
     + move=> /Hbad [#] !->> /= <- <-.
       by split; rewrite log_bij !(log_g, log_pow, log_mul) /=.
-    by move=> _ {H Hbad} ??????? Hbad /Hbad.
+    by move=> _ {Hbad} ??????? Hbad /Hbad.
   qed.
   
   local lemma aux1 &m : 
@@ -777,7 +782,7 @@ section Security_Aux.
     move=> wL /supp_dexcepted [] _ /= HwL uL _ u'L /supp_dexcepted [] _ /= Hu'L .
     move=> kL _ xL _ x2L _ yL _ y2L _ zL _ resu bL _.
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
-    have H2 : (-uL) * wL + u'L * wL <> ofint 0.
+    have H2 : (-uL) * wL + u'L * wL <> F.ofint 0.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
@@ -806,7 +811,7 @@ section Security_Aux.
     move=> wL /supp_dexcepted [] _ /= HwL uL _ u'L /supp_dexcepted [] _ /= Hu'L .
     move=> kL _ yL _ y2L _ zL _ r'L _ xL _.  
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
-    have H2 : (-uL) * wL + u'L * wL <> ofint 0.
+    have H2 : (-uL) * wL + u'L * wL <> F.ofint 0.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
@@ -905,10 +910,17 @@ section Security_Aux.
     pose v := H _ _. rewrite !negb_or => [[]] Hg3 Hcilog Hstareq.
     rewrite Hg3 /=. 
     case: (G1.bad{m1}) => [_ -> | ] //=. 
+<<<<<<< HEAD
     move=> Hbad Hsize Hstar; rewrite !andaE !negb_and /= 2!negb_or /= -!andaE.
     case (v = G2.v{m2}) => [->> /= ? [#]!->> Hstar1 ->>| /=].
     + by case: (G1.cstar{m2}) Hstareq Hstar Hstar1.
     move=> Hv Ha _ ->>;left.
+=======
+    move=> Hbad Hsize Hstar;rewrite !negb_and /= 2!negb_or /= -!andaE.
+    case (v = G2.v{m2}) => />.
+    + by case: (G1.cstar{m2}) Hstareq Hstar => />.
+    move=> Hv Ha _;left.
+>>>>>>> origin/1.0-preview
     rewrite !(log_g, log_pow, log_mul);field => //.
     + by move: Hv;apply: contra;rewrite ofint0 => H;ring H.
     by move: Ha;apply: contra; rewrite log_bij log_pow ofint0 => H;ring H.
@@ -952,7 +964,7 @@ section Security_Aux.
     move=> uL _ u'L /supp_dexcepted [] _ /= HuL kL _.
     move=> yL _ y2L _ zL _ r'L _ xL _ rL _.
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
-    have H2 : (-uL) * wL + u'L * wL <> ofint 0.
+    have H2 : (-uL) * wL + u'L * wL <> F.ofint 0.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL0 /=.
       by move: HuL;apply: contra => H;ring H.
     split => [ | _].
@@ -1075,8 +1087,6 @@ section Security_Aux.
     by apply le_fromint.
   qed.
 
-import StdRing.RField.
-
   local lemma pr_G4 &m:
     Pr[G4.main() @ &m : (G3.a, G3.a_,G3.c, G3.d) \in G3.cilog] <=
       (qD%r/q%r)^3 * (qD%r/(q-1)%r).
@@ -1131,8 +1141,8 @@ import StdRing.RField.
             (size G3.cilog <= qD) => //;last 2 first.
     + hoare;conseq (_ : _ ==> true) => // /#.
     + move=> &hr _;apply lerr_eq;field.
-      + rewrite (_: 2 = (0 + 1) + 1) // !powrS // powr0;smt (le_fromint gt1_q). 
-      smt (le_fromint gt1_q). 
+      + rewrite expr2; smt (gt1_q). 
+      + smt (gt1_q). 
     + by auto.
     + rnd;skip => /> &hr Hsize _;pose m' := map _ _.
       apply (mu_mem_le_mu1_size FDistr.dt m') => //.

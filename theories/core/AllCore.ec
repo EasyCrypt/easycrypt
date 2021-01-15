@@ -7,7 +7,9 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require export Core Int IntExtra Real RealExtra Xint.
+require (*--*) Ring.
+require export Core Int Real Xint.
+(*---*) export Ring.IntID.
 
 (* -------------------------------------------------------------------- *)
 schema cost_oget ['a] `{P} {o: 'a option} : 

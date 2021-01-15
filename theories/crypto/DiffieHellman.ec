@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int Xint Real RealExtra StdRing StdOrder Distr List FSet CHoareTactic.
+require import AllCore StdRing StdOrder Distr List FSet CHoareTactic.
 (*---*) import RField RealOrder.
 require (*  *) CyclicGroup.
 

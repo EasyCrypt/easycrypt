@@ -10,8 +10,6 @@
 require import AllCore Ring StdRing StdOrder List Finite.
 (*---*) import IntID IntOrder.
 
-pragma -oldip.
-
 (* -------------------------------------------------------------------- *)
 op enumerate ['a] (C : int -> 'a option) (E : 'a -> bool) =
      (forall i j x, C i = Some x => C j = Some x => i = j)
@@ -122,7 +120,7 @@ lemma nosmt inj_condL_countable ['a 'b] (f : 'a -> 'b) p :
      countableT<:'b>
   => (forall x y, p x => p y => f x = f y => x = y)
   => countable<:'a> p.
-proof. by apply/inj_cond_countable. qed.
+proof. by move=> ??; apply: (@inj_cond_countable f predT). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt inj_countable ['a] (f : 'a -> int) (p : 'a -> bool) :
@@ -148,7 +146,7 @@ theory IntPair.
   + move=> ih; case: (lez_total n1 n2); first by apply: ih.
     by move=> h @/P *; rewrite eq_sym &(ih) 1?eq_sym.
   move=> le_n; have lt_n: n1 < n2 by rewrite ltr_neqAle le_n.
-  rewrite (_ : n2 = n1 + (n2 - n1)) 1:#ring exprD ?subr_ge0 //.
+  rewrite (_ : n2 = n1 + (n2 - n1)) 1:#ring exprD_nneg ?subr_ge0 //.
   apply/negP; rewrite -mulrA; have h/h := mulfI (exp 2 n1) _.
   + by rewrite expf_eq0.
   by move/(congr1 odd); rewrite oddM poddX ?subr_gt0 // odd2 !(o1, o2).

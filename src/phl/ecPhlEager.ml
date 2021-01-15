@@ -246,7 +246,7 @@ let t_eager_while_r h tc =
 
   FApi.t_seqsub
     (EcPhlConseq.t_equivS_conseq eqI post)
-    [t_logic_trivial; t_logic_trivial; tsolve]
+    [t_trivial; t_trivial; tsolve]
     tc
 
 (* -------------------------------------------------------------------- *)

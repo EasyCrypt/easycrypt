@@ -9,7 +9,7 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List Distr StdOrder.
 require (*--*) FinType Tuple.
-(*---*) import RealOrder.
+(*---*) import IntOrder RealOrder.
 
 (* -------------------------------------------------------------------- *)
 clone import FinType as Alphabet.
@@ -26,7 +26,7 @@ op wordw : t list = mkseq (fun _ => dchar) n.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt size_wordw: size wordw = n.
-proof. by rewrite size_mkseq max_ler ?ge0_n. qed.
+proof. by rewrite size_mkseq ler_maxr ?ge0_n. qed.
 
 axiom nosmt mkwordK : cancel ofword mkword.
 
@@ -89,7 +89,7 @@ proof. by move=> ih n; rewrite -mkwordK; apply/ih/size_word. qed.
 lemma get_set_if (w : word) (x : t) (i j : int):
   w.[i <- x].[j] = if 0 <= i < n /\ j = i then x else w.[j].
 proof.
-rewrite !Self.getE !Self.setE ofwordK ?size_mkseq ?max_ler ?ge0_n //.
+rewrite !Self.getE !Self.setE ofwordK ?size_mkseq ?ler_maxr ?ge0_n //.
 case: (0 <= j < n)=> j_n.
 + rewrite nth_mkseq ?j_n /= (eq_sym i) getE.
   by case: (j = i)=> [<-|]; rewrite j_n.
@@ -127,8 +127,8 @@ lemma set_set_if (w : word) (k k' : int) (x x' : t):
 proof.
 apply/wordP=> i i_n; rewrite !Self.setE !Self.getE i_n /=.
 rewrite (fun_if ofword) (fun_if (nth witness)) if_arg.
-rewrite !ofwordK ?size_mkseq ?max_ler ?ge0_n //.
-rewrite !nth_mkseq //= !getE !ofwordK ?size_mkseq ?max_ler ?ge0_n // i_n /=.
+rewrite !ofwordK ?size_mkseq ?ler_maxr ?ge0_n //.
+rewrite !nth_mkseq //= !getE !ofwordK ?size_mkseq ?ler_maxr ?ge0_n // i_n /=.
 case: (k = k')=> [->|].
 + by case: (k' = i)=> //= k'_neq_i; rewrite nth_mkseq //= getE i_n k'_neq_i.
 by rewrite !nth_mkseq //=; case: (k' = i); case: (k = i).
@@ -150,7 +150,7 @@ op offun f: word = mkword (mkseq f n).
 lemma offunifE f i:
   (offun f).[i] = if 0 <= i < n then f i else dchar.
 proof.
-rewrite getE ofwordK ?size_mkseq ?size_word ?max_ler ?ge0_n//.
+rewrite getE ofwordK ?size_mkseq ?size_word ?ler_maxr ?ge0_n//.
 by case: (0 <= i < n)=> //= h; rewrite nth_mkseq.
 qed.
 
@@ -181,14 +181,14 @@ proof * rename [op] "enum" as "words".
 realize enum_spec.
 proof.
 move=> x; rewrite count_map -(Enum.word_spec n (ofword x) _).
-+ by rewrite size_word max_ler 1:ge0_n.
-apply/eq_in_count=> s /Enum.wordnP; rewrite !pred1E /preim max_ler 1:ge0_n.
++ by rewrite size_word ler_maxr 1:ge0_n.
+apply/eq_in_count=> s /Enum.wordnP; rewrite !pred1E /preim ler_maxr 1:ge0_n.
 by move=> sx; rewrite -(can_eq _ _ mkwordK) ofwordK.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma word_card: card = Alphabet.card^n.
-proof. by rewrite size_map Enum.size_wordn max_ler ?ge0_n. qed.
+proof. by rewrite /card size_map Enum.size_wordn ler_maxr ?ge0_n. qed.
 
 (* -------------------------------------------------------------------- *)
 clone MFinite as DWord with

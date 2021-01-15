@@ -47,6 +47,7 @@ type prover_infos = {
   pr_wanted    : hints;
   pr_unwanted  : hints;
   pr_selected  : bool;
+  gn_debug     : bool;
 }
 
 val dft_prover_infos : prover_infos

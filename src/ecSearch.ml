@@ -22,6 +22,7 @@ type pattern = (ptnmap * EcUnify.unienv) * form
 type search = [
   | `ByPath    of Sp.t
   | `ByPattern of pattern
+  | `ByOr      of search list
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -39,12 +40,13 @@ let match_ (env : EcEnv.env) (search : search list) f =
   let mode = EcMatching.fmsearch in
   let opts = lazy (EcFol.f_ops f) in
 
-  let do1 (search : search) =
+  let rec do1 (search : search) =
     match search with
     | `ByPath paths ->
+        not (Sp.is_empty paths) &&
         not (Sp.disjoint (Lazy.force opts) paths)
 
-    | `ByPattern ((v, ue), ptn) ->
+    | `ByPattern ((v, ue), ptn) -> begin
         let ev = EcMatching.MEV.of_idents (Mid.keys !v) `Form in
         let na = List.length (snd (EcFol.destr_app ptn)) in
 
@@ -67,6 +69,9 @@ let match_ (env : EcEnv.env) (search : search list) f =
             ignore (EcMatching.FPosition.select trymatch f);
             false
           with E.MatchFound -> true
+      end
+
+    | `ByOr subs -> List.exists do1 subs
 
   in List.for_all do1 search
 

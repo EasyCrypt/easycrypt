@@ -2,7 +2,6 @@
 require import AllCore List Distr.
 
 pragma +implicits.
-pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 abstract theory DMapSampling.

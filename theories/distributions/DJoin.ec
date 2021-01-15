@@ -2,7 +2,6 @@
 require import AllCore List Distr Ring StdBigop StdRing StdOrder.
 (*---*) import IntID Bigreal Bigreal.BRM.
 
-pragma -oldip.
 pragma +implicits.
 
 (* ==================================================================== *)

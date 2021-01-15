@@ -44,7 +44,7 @@ and prv_options = {
 }
 
 and ldr_options = {
-  ldro_idirs : (string option * string) list;
+  ldro_idirs : (string option * string * bool) list;
   ldro_boot  : bool;
 }
 

@@ -171,7 +171,7 @@ lemma nosmt fmap_eqP ['a 'b] (m1 m2 : ('a, 'b) fmap) :
   (forall x, m1.[x] = m2.[x]) <=> m1 = m2.
 proof.
 split=> [pw_eq|->] //; rewrite -tomapK -(tomapK m2).
-by congr; apply/Map.map_eqP=> x; rewrite pw_eq.
+by congr; apply/Map.map_eqP=> x; rewrite -!getE pw_eq.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -317,7 +317,7 @@ op eq_except ['a 'b] X (m1 m2 : ('a, 'b) fmap) =
 
 (* -------------------------------------------------------------------- *)
 lemma eq_except_refl ['a 'b] X : reflexive (eq_except<:'a, 'b> X).
-proof. by apply/Map.eq_except_refl<:'a, 'b option>. qed.
+proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eq_except_sym ['a 'b] X (m1 m2 : ('a, 'b) fmap) :
@@ -382,7 +382,7 @@ lemma eq_except_set ['a 'b] X x y y' (m1 m2 : ('a, 'b) fmap) :
   eq_except ((y <> y') ? predU X (pred1 x) : X) m1.[x <- y] m2.[x <- y'].
 proof.
 move=> /eq_exceptP h; case: (y = y') => /= [<-|].
-  by apply/eq_exceptP=> z _; rewrite !get_setE h.
+  by apply/eq_exceptP=> z ?; rewrite !get_setE h.
 move=> ne_y_y'; apply/eq_exceptP=> z; rewrite negb_or.
 by case=> /h; rewrite !get_setE => + @/pred1 -> - ->.
 qed.

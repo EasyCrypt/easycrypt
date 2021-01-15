@@ -245,7 +245,7 @@ section.
   local lemma Pr_G0_G1 &m:
     Pr[G0.main() @ &m: res] <= Pr[G1.main() @ &m: res] + Pr[G1.main() @ &m: mem Bounder.ARO.qs G1.gxy].
   proof.
-    cut: Pr[G0.main() @ &m: res] <= Pr[G1.main() @ &m: res \/ mem Bounder.ARO.qs G1.gxy].
+    have: Pr[G0.main() @ &m: res] <= Pr[G1.main() @ &m: res \/ mem Bounder.ARO.qs G1.gxy].
       by byequiv G0_G1=> //; smt.
     by rewrite Pr [mu_or]; smt.
   qed.

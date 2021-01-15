@@ -202,12 +202,22 @@ let t_wp_r ?(uselet=true) ?cost_pre k g =
 
 let t_wp ?(uselet=true) ?cost_pre = FApi.t_low1 "wp" (t_wp_r ~uselet ?cost_pre)
 
+
+(* -------------------------------------------------------------------- *)
+let typing_wp env m s f =
+  match wp ~onesided:true env m s f with
+  | [], f, _ -> Some f | _, _, _ -> None
+
+let () = EcTyping.wp := Some typing_wp
+
+
+(* -------------------------------------------------------------------- *)
 let process_wp k cost_pre tc =
   let cost_pre  = match cost_pre with
     | Some pre -> Some (EcProofTyping.tc1_process_Xhl_formula tc pre)
     | None -> None in
   let t_after =
     match (FApi.tc1_goal tc).f_node with
-    | FcHoareS _ -> [EcLowGoal.t_logic_trivial; EcLowGoal.t_id]
+    | FcHoareS _ -> [(fun x -> EcLowGoal.t_trivial x); EcLowGoal.t_id]
     | _          -> [ EcLowGoal.t_id] in
   FApi.t_seqsub (t_wp ?cost_pre k) t_after tc

@@ -322,31 +322,31 @@ section.
   proof.
     move=> p';rewrite (GLB_WL &m p') (GRB_WR &m p').
     simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
-    cut Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
+    have Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
       by move=> x; rewrite !mem_oflist !List.Iota.mem_iota  supp_dinter; smt.
-    cut Hfin: is_finite (support [0..q - 1]).
+    have Hfin: is_finite (support [0..q - 1]).
       exists (List.Iota.iota_ 0 q).
       by rewrite List.Iota.iota_uniq=> /= x; rewrite List.Iota.mem_iota supp_dinter=> /#.
-    cut Huni : forall (x : int), x \in [0..q - 1] => mu1 [0..q - 1] x = 1%r / q%r.
+    have Huni : forall (x : int), x \in [0..q - 1] => mu1 [0..q - 1] x = 1%r / q%r.
       by move=> x Hx; rewrite dinter1E /=; smt(supp_dinter).
     pose ev :=
       fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
         let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
-    cut := M.Mean_uni (HybGameFixed(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
-    cut := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
-    cut -> : oflist (to_seq (support [0..q - 1])) = oflist (List.Iota.iota_ 0 q).
+    have := M.Mean_uni (HybGameFixed(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
+    have := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
+    have -> : oflist (to_seq (support [0..q - 1])) = oflist (List.Iota.iota_ 0 q).
       by apply FSet.fsetP => x; rewrite !mem_oflist mem_to_seq// smt.
-    cut {1}->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 1 (q - 1)) `|` fset1 0.
+    have {1}->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 1 (q - 1)) `|` fset1 0.
       by apply/fsetP=> x; rewrite !inE !mem_oflist !List.Iota.mem_iota; smt.
-    cut ->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 0 (q - 1)) `|` fset1 (q - 1).
+    have ->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 0 (q - 1)) `|` fset1 (q - 1).
       by apply/fsetP=> x; rewrite !inE !mem_oflist !List.Iota.mem_iota; smt.
     rewrite Mrplus.sum_add /=.
       by rewrite mem_oflist List.Iota.mem_iota.
     rewrite Mrplus.sum_add /=.
       by rewrite mem_oflist List.Iota.mem_iota.
-    cut Hq : q%r <> 0%r by smt.
+    have Hq : q%r <> 0%r by smt.
     fieldeq => //.
-    cut ->: q - 1 = q - 1 - 1 - 0 + 1 by smt.
+    have ->: q - 1 = q - 1 - 1 - 0 + 1 by smt.
     rewrite (Mrplus_inter_shift 0 (q - 1 - 1) (-1)) /=.
     have ->: q - 1 - 1 + 1 = q - 1 by smt.
     rewrite -(Mrplus.sum_comp (( * ) (-q%r))) 1..2:smt.
@@ -354,7 +354,7 @@ section.
     rewrite Mrplus.sum_add2 /=.
     rewrite (Mrplus.NatMul.sum_const 0%r) /Mrplus.NatMul.( * ) //=.
     move=> x; rewrite mem_oflist List.Iota.mem_iota=> Hx.
-    cut:= WLR_shift &m x p' _; 1:smt. simplify p'=> ->.
+    have:= WLR_shift &m x p' _; 1:smt. simplify p'=> ->.
     by smt.
   qed.
 
@@ -434,7 +434,7 @@ section.
      Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] =
      Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q].
   proof.
-    cut -> :
+    have -> :
        Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] =
        Pr[Bl.main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q].
       byequiv B_Bl => //.
@@ -445,7 +445,7 @@ section.
      Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] =
      Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q].
   proof.
-    cut -> :
+    have -> :
        Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] =
        Pr[Br.main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q].
       byequiv B_Br => //.
@@ -468,14 +468,14 @@ section.
          Pr[Rn(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res]).
    proof.
      pose p' := fun ga ge l r, p ga ge l r /\ l <= q.
-     cut -> : Pr[Ln(Ob,A).main() @ &m : p  (glob A) (glob Ob) Count.c res] =
+     have -> : Pr[Ln(Ob,A).main() @ &m : p  (glob A) (glob Ob) Count.c res] =
               Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res].
        byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res} /\ Count.c{1} <= q) => //;
          last by rewrite /p'.
        conseq [-frame] (_:  ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res}) (_ : true ==> Count.c <= q);
          last by sim;  proc (={Count.c}).
        apply (A_call (<:L(Ob))).
-     cut -> : Pr[Rn(Ob,A).main() @ &m : p  (glob A) (glob Ob) Count.c res] =
+     have -> : Pr[Rn(Ob,A).main() @ &m : p  (glob A) (glob Ob) Count.c res] =
               Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res].
        byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res} /\ Count.c{1} <= q) => //;
          last by rewrite /p'.
@@ -483,7 +483,7 @@ section.
          last by sim;  proc (={Count.c}).
        apply (A_call (<:R(Ob))).
      rewrite (Pr_Bl &m p) (Pr_Br &m p).
-     cut := Hybrid Ob A _ _ _ _ &m p.
+     have := Hybrid Ob A _ _ _ _ &m p.
       apply losslessL. apply losslessOb1. apply losslessOb2. apply losslessA.
      move=> /= H. rewrite /p' -H.
      congr; last congr.

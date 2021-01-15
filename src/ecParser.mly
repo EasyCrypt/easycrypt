@@ -176,6 +176,7 @@
     | `VERBOSE        of int option
     | `VERSION        of [ `Full | `Lazy ]
     | `SELECTED
+    | `DEBUG
   ]
 
   module SMT : sig
@@ -209,7 +210,8 @@
            "lazy"          ;
            "full"          ;
            "iterate"       ;
-           "selected"      ]
+           "selected"      ;
+           "debug"         ]
 
     let as_int = function
       | None          -> `None
@@ -268,6 +270,7 @@
       | "all"            -> get_as_none s o; (`ALL)
       | "iterate"        -> get_as_none s o; (`ITERATE)
       | "selected"       -> get_as_none s o; (`SELECTED)
+      | "debug"          -> get_as_none s o; (`DEBUG)
       | _                ->  assert false
 
     let mk_smt_option (os : smt list) =
@@ -283,6 +286,7 @@
       let version  = ref None in
       let iterate  = ref None in
       let selected = ref None in
+      let debug    = ref None in
 
       let is_universal p = unloc p = "" || unloc p = "!" in
 
@@ -326,6 +330,7 @@
         | `ITERATE          -> iterate  := Some true
         | `PROVER         p -> List.iter add_prover p
         | `SELECTED         -> selected := Some true
+        | `DEBUG            -> debug    := Some true
       in
 
       List.iter do1 os;
@@ -347,6 +352,7 @@
         plem_wanted     = !wanted;
         plem_unwanted   = !unwanted;
         plem_selected   = !selected;
+        psmt_debug      = !debug;
       }
   end
 %}
@@ -389,6 +395,7 @@
 %token AXIOM
 %token AXIOMATIZED
 %token BACKS
+%token BACKSLASH
 %token BETA
 %token BY
 %token BYEQUIV
@@ -411,7 +418,6 @@
 %token CONSEQ
 %token CONST
 %token COST
-%token CUT
 %token DEBUG
 %token DECLARE
 %token DELTA
@@ -620,7 +626,7 @@
 %right RARROW
 %left  LOP3 STAR SLASH
 %right ROP3
-%left  LOP4 AT AMP HAT
+%left  LOP4 AT AMP HAT BACKSLASH
 %right ROP4
 
 %nonassoc LBRACE
@@ -645,6 +651,7 @@ _lident:
 | ABORT      { "abort"      }
 | ADMITTED   { "admitted"   }
 | ASYNC      { "async"      }
+| DEBUG      { "debug"      }
 | DUMP       { "dump"       }
 | EXPECT     { "expect"     }
 | FIRST      { "first"      }
@@ -808,18 +815,19 @@ f_or_mod_ident:
 | MINUS { "[-]" }
 
 %inline sbinop:
-| EQ    { "="   }
-| PLUS  { "+"   }
-| MINUS { "-"   }
-| STAR  { "*"   }
-| SLASH { "/"   }
-| AT    { "@"   }
-| OR    { "\\/" }
-| ORA   { "||"  }
-| AND   { "/\\" }
-| ANDA  { "&&"  }
-| AMP   { "&"   }
-| HAT   { "^"   }
+| EQ        { "="   }
+| PLUS      { "+"   }
+| MINUS     { "-"   }
+| STAR      { "*"   }
+| SLASH     { "/"   }
+| AT        { "@"   }
+| OR        { "\\/" }
+| ORA       { "||"  }
+| AND       { "/\\" }
+| ANDA      { "&&"  }
+| AMP       { "&"   }
+| HAT       { "^"   }
+| BACKSLASH { "\\"  }
 
 | x=LOP1 | x=LOP2 | x=LOP3 | x=LOP4
 | x=ROP1 | x=ROP2 | x=ROP3 | x=ROP4
@@ -1096,9 +1104,17 @@ costs(P):
                                       {PC_costs(c,calls)}
 
 qident_or_res_or_glob:
-| x=qident   { GVvar x }
-| x=loc(RES) { GVvar (mk_loc x.pl_loc ([], "res")) }
-| GLOB mp=loc(mod_qident) { GVglob mp }
+| x=qident
+    { GVvar x }
+
+| x=loc(RES)
+    { GVvar (mk_loc x.pl_loc ([], "res")) }
+
+| GLOB mp=loc(mod_qident)
+    { GVglob (mp, []) }
+
+| GLOB mp=loc(mod_qident) BACKSLASH ex=brace(plist1(qident, COMMA))
+    { GVglob (mp, ex) }
 
 pfpos:
 | i=sword
@@ -1236,6 +1252,11 @@ sform_u(P):
     COLON event=form_r(P)
   RBRACKET
     { PFprob (mp, args, pn, event) }
+
+| WP LBRACKET
+    mp=loc(fident) args=paren(plist0(expr, COMMA)) COLON f=form_r(P)
+  RBRACKET
+    { PFWP (mp, args, f) }
 
 | r=loc(RBOOL)
     { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
@@ -1571,9 +1592,10 @@ fun_decl:
         pfd_uses     = frestr; }
     }
 
-include_proc:
-| PLUS? xs=plist1(lident,COMMA) { `Include_proc xs }
-| MINUS xs=plist1(lident,COMMA) { `Exclude_proc xs }
+minclude_proc:
+| PLUS? xs=plist1(lident,COMMA) { `MInclude xs }
+| MINUS xs=plist1(lident,COMMA) { `MExclude xs }
+
 mod_item:
 | v=var_decl
     { Pst_var v }
@@ -1593,9 +1615,11 @@ mod_item:
 | PROC x=lident EQ f=loc(fident)
     { Pst_alias (x, f) }
 
-| INCLUDE m=loc(mod_qident) xs=bracket(include_proc)?
-    { Pst_maliases (m,xs) }
+| INCLUDE v=boption(VAR) m=loc(mod_qident) xs=bracket(minclude_proc)?
+    { Pst_include (m, v, xs) }
 
+| IMPORT VAR ms=loc(mod_qident)+
+    { Pst_import ms }
 
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
@@ -1638,7 +1662,6 @@ mod_params:
 (* Memory restrictions *)
 
 mem_restr_el:
-  | el=f_or_mod_ident       { PMPlus el }
   | PLUS  el=f_or_mod_ident { PMPlus el }
   | MINUS el=f_or_mod_ident { PMMinus el }
 
@@ -1741,7 +1764,7 @@ sig_param:
 | x=uident COLON i=mod_type { (x, i) }
 
 signature_item:
-| INCLUDE i=mod_type xs=bracket(include_proc)? qs=brace(qident*)?
+| INCLUDE i=mod_type xs=bracket(minclude_proc)? qs=brace(qident*)?
     { let qs = omap (List.map (fun x -> { inp_in_params = false;
 					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
@@ -2155,6 +2178,9 @@ theory_require_1:
 
 theory_import: IMPORT xs=uqident* { xs }
 theory_export: EXPORT xs=uqident* { xs }
+
+module_import:
+| IMPORT VAR xs=loc(mod_qident)+ { xs }
 
 (* -------------------------------------------------------------------- *)
 (* Instruction matching                                                 *)
@@ -2815,7 +2841,7 @@ revert:
   { { pr_clear = odfl [] cl; pr_genp = gp; } }
 
 %inline have_or_suff:
-| HAVE | CUT { `Have }
+| HAVE { `Have }
 | SUFF { `Suff }
 
 logtactic:
@@ -2927,7 +2953,7 @@ logtactic:
 | m=have_or_suff ip=loc(intro_pattern)* COLON p=form BY t=loc(tactics)
    { Pcut (m, ip, p, Some t) }
 
-| ior_(CUT, HAVE) ip=loc(intro_pattern)* CEQ fp=pcutdef
+| HAVE ip=loc(intro_pattern)* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
 
 | INSTANTIATE ip=loc(intro_pattern)* CEQ fp=pcutdef_schema
@@ -3423,10 +3449,6 @@ tactic_core_r:
 | x=phltactic
    { PPhl x }
 
-(* DEBUG *)
-| DEBUG
-    { Pdebug }
-
 %inline tactic_core:
 | x=loc(tactic_core_r) { x }
 
@@ -3843,7 +3865,7 @@ user_red_info:
 | x=qident i=prefix(AT, word)?
     { ([x], i) }
 
-| xs=paren(plist1(qident, COMMA)) i=prefix(AT, sword)?
+| xs=paren(plist1(qident, COMMA)) i=prefix(AT, word)?
     { (xs, i) }
 
 user_red_option:
@@ -3871,6 +3893,7 @@ global_action:
 | theory_export    { GthExport    $1 }
 | theory_clone     { GthClone     $1 }
 | theory_clear     { GthClear     $1 }
+| module_import    { GModImport   $1 }
 | section_open     { GsctOpen     $1 }
 | section_close    { GsctClose    $1 }
 | top_decl         { Gdeclare     $1 }
@@ -3917,8 +3940,12 @@ stop:
 | DROP DOT { }
 
 global:
-| tm=boption(TIME) g=loc(global_action) FINAL
-  { { gl_action = g; gl_timed = tm; } }
+| db=debug_global? g=loc(global_action) FINAL
+  { { gl_action = g; gl_debug = db; } }
+
+debug_global:
+| TIME  { `Timed }
+| DEBUG { `Break }
 
 prog_r:
 | g=global { P_Prog ([g], false) }

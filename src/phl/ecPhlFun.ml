@@ -723,7 +723,7 @@ type p_upto_info = pformula * pformula * (pformula option)
 let process_fun_def tc =
   let t_cont tcenv =
     if FApi.tc_count tcenv = 2 then
-      FApi.t_sub [EcLowGoal.t_logic_trivial; EcLowGoal.t_id] tcenv
+      FApi.t_sub [EcLowGoal.t_trivial; EcLowGoal.t_id] tcenv
     else tcenv in
   t_cont (t_fun_def tc)
 

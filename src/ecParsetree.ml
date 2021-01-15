@@ -128,6 +128,9 @@ and pinstr = pinstr_r located
 and pstmt  = pinstr list
 
 (* -------------------------------------------------------------------- *)
+type pmodule_type = pqsymbol
+
+
 type ptyparams = (psymbol * pqsymbol list) list
 type ptydname  = (ptyparams * psymbol) located
 
@@ -166,7 +169,7 @@ type pmemory   = psymbol
 type phoarecmp = EcFol.hoarecmp
 
 type glob_or_var =
-  | GVglob of pmsymbol located
+  | GVglob of pmsymbol located * pqsymbol list
   | GVvar  of pqsymbol
 
 type pformula  = pformula_r located
@@ -205,6 +208,7 @@ and pformula_r =
   | PFChoareF  of pformula * pgamepath * pformula * pcost
   | PFChoareFT of pgamepath * pcost
   | PFCoe      of osymbol * pmemtype option * pformula * pexpr * pty option
+  | PFWP       of pgamepath * pexpr list * pformula
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = pmemtype_el list
@@ -272,6 +276,96 @@ and pmod_restr = {
   pmr_mem   : pmod_restr_mem;
 	pmr_procs : pmod_restr_el list;
  }
+
+(* -------------------------------------------------------------------- *)
+and pmodule_sig =
+  | Pmty_struct of pmodule_sig_struct
+
+and pmodule_sig_struct = {
+  pmsig_params : (psymbol * pmodule_type) list;
+  pmsig_body   : pmodule_sig_struct_body;
+  pmsig_restr  : pmod_restr option;
+}
+
+and pmodule_sig_struct_body = pmodule_sig_item list
+
+and minclude_proc = [
+  | `MInclude of psymbol list
+  | `MExclude of psymbol list
+]
+
+and pmodule_sig_item = [
+  | `Include      of pmodule_type * minclude_proc option * qident_inparam list option
+  | `FunctionDecl of pfunction_decl
+]
+
+and pvariable_decl = {
+  pvd_name : psymbol;
+  pvd_type : pty;
+}
+
+and fun_params =
+ | Fparams_exp of (psymbol * pty) list
+ | Fparams_imp of pty
+
+and pfunction_decl = {
+  pfd_name     : psymbol;
+  pfd_tyargs   : fun_params;
+  pfd_tyresult : pty;
+  pfd_uses     : pmod_restr_el;
+}
+
+(* -------------------------------------------------------------------- *)
+
+and pmodule_def = {
+  ptm_header : pmodule_header;
+  ptm_body   : pmodule_expr;
+  ptm_local  : bool;
+}
+
+and pmodule_header =
+  | Pmh_ident  of psymbol
+  | Pmh_params of (pmodule_header * pmodule_params) located
+  | Pmh_cast   of pmodule_header * pqsymbol list
+
+and pmodule_params = (psymbol * pmodule_type) list
+
+and pmodule_expr_r =
+  | Pm_ident  of pmsymbol
+  | Pm_struct of pstructure
+
+and pmodule_expr = pmodule_expr_r located
+
+and pstructure = pstructure_item located list
+
+and pstructure_item =
+  | Pst_mod      of (psymbol * pqsymbol list * pmodule_expr)
+  | Pst_var      of (psymbol list * pty)
+  | Pst_fun      of (pfunction_decl * pfunction_body)
+  | Pst_alias    of (psymbol * pgamepath)
+  | Pst_include  of (pmsymbol located * bool * minclude_proc option)
+  | Pst_import   of (pmsymbol located) list
+
+
+and pfunction_body = {
+  pfb_locals : pfunction_local list;
+  pfb_body   : pstmt;
+  pfb_return : pexpr option;
+}
+
+and pfunction_local = {
+  pfl_names : ([`Single|`Tuple] * (psymbol list)) located;
+  pfl_type  : pty   option;
+  pfl_init  : pexpr option;
+}
+
+
+type pmodule_decl = {
+  ptmd_name  : psymbol;
+  ptmd_modty : pmodule_type_restr;
+}
+
+
 
 (* -------------------------------------------------------------------- *)
 let rec pf_ident ?(raw = false) f =
@@ -351,95 +445,6 @@ type pabbrev = {
   ab_args : ptybindings;
   ab_def  : pty * pexpr;
   ab_opts : abrvopts;
-}
-
-(* -------------------------------------------------------------------- *)
-type pmodule_type = pqsymbol
-
-type pmodule_sig =
-  | Pmty_struct of pmodule_sig_struct
-
-and pmodule_sig_struct = {
-  pmsig_params : (psymbol * pmodule_type) list;
-  pmsig_body   : pmodule_sig_struct_body;
-  pmsig_restr  : pmod_restr option;
-}
-
-and pmodule_sig_struct_body = pmodule_sig_item list
-
-and include_proc = [
-  | `Include_proc of psymbol list
-  | `Exclude_proc of psymbol list
-]
-
-and pmodule_sig_item = [
-  | `Include      of pmodule_type * include_proc option * qident_inparam list option
-  | `FunctionDecl of pfunction_decl
-]
-
-and pvariable_decl = {
-  pvd_name : psymbol;
-  pvd_type : pty;
-}
-
-and fun_params =
- | Fparams_exp of (psymbol * pty) list
- | Fparams_imp of pty
-
-and pfunction_decl = {
-  pfd_name     : psymbol;
-  pfd_tyargs   : fun_params;
-  pfd_tyresult : pty;
-  pfd_uses     : pmod_restr_el;
-}
-
-(* -------------------------------------------------------------------- *)
-
-and pmodule_def = {
-  ptm_header : pmodule_header;
-  ptm_body   : pmodule_expr;
-  ptm_local  : bool;
-}
-
-and pmodule_header =
-  | Pmh_ident  of psymbol
-  | Pmh_params of (pmodule_header * pmodule_params) located
-  | Pmh_cast   of pmodule_header * pqsymbol list
-
-and pmodule_params = (psymbol * pmodule_type) list
-
-and pmodule_expr_r =
-  | Pm_ident  of pmsymbol
-  | Pm_struct of pstructure
-
-and pmodule_expr = pmodule_expr_r located
-
-and pstructure = pstructure_item located list
-
-and pstructure_item =
-  | Pst_mod      of (psymbol * pqsymbol list * pmodule_expr)
-  | Pst_var      of (psymbol list * pty)
-  | Pst_fun      of (pfunction_decl * pfunction_body)
-  | Pst_alias    of (psymbol * pgamepath)
-  | Pst_maliases of (pmsymbol located * include_proc option)
-
-
-and pfunction_body = {
-  pfb_locals : pfunction_local list;
-  pfb_body   : pstmt;
-  pfb_return : pexpr option;
-}
-
-and pfunction_local = {
-  pfl_names : ([`Single|`Tuple] * (psymbol list)) located;
-  pfl_type  : pty   option;
-  pfl_init  : pexpr option;
-}
-
-
-type pmodule_decl = {
-  ptmd_name  : psymbol;
-  ptmd_modty : pmodule_type_restr;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -778,7 +783,8 @@ type pprover_infos = {
   plem_iterate    : bool option;
   plem_wanted     : pdbhint option;
   plem_unwanted   : pdbhint option;
-  plem_selected   : bool option
+  plem_selected   : bool option;
+  psmt_debug      : bool option;
 }
 
 let empty_pprover = {
@@ -795,6 +801,7 @@ let empty_pprover = {
   plem_wanted     = None;
   plem_unwanted   = None;
   plem_selected   = None;
+  psmt_debug      = None;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -948,7 +955,6 @@ and ptactic_core_r =
   | Psubgoal    of ptactic_chain
   | Pnstrict    of ptactic_core
   | Padmit
-  | Pdebug
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core = ptactic_core_r located
@@ -1210,6 +1216,7 @@ type global_action =
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
   | GthClone     of theory_cloning
+  | GModImport   of pmsymbol located list
   | GsctOpen     of osymbol_r
   | GsctClose    of osymbol_r
   | Grealize     of prealize located
@@ -1223,7 +1230,7 @@ type global_action =
 
 type global = {
   gl_action : global_action located;
-  gl_timed  : bool;
+  gl_debug  : [`Timed | `Break] option;
 }
 
 type prog_r =

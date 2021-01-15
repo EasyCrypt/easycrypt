@@ -515,15 +515,12 @@ let process_call side info tc =
       let env, fmake = process_inv tc side in
       let inv, inv_inf = process_inv_inf tc env inv inv_inf in
       subtactic := (fun tc ->
-          (* TODO: (Adrien) What does this subtactic do? It needs to be
-             modified, since I create more premises for choare judgement.
-             FApi.tcenv_of_tcenv1 tc *)
-        FApi.t_firsts t_logic_trivial 2 (EcPhlFun.t_fun inv inv_inf tc));
+        FApi.t_firsts t_trivial 2 (EcPhlFun.t_fun inv inv_inf tc));
       fmake inv inv_inf
 
     | CI_upto info ->
       let bad, p, q, form = process_upto tc side info in
-      let t_tr = FApi.t_or (t_assumption `Conv) t_logic_trivial in
+      let t_tr = FApi.t_or (t_assumption `Conv) t_trivial in
       subtactic := (fun tc ->
         FApi.t_firsts t_tr 3 (EcPhlFun.t_equivF_abs_upto bad p q tc));
       form
@@ -547,7 +544,7 @@ let process_call side info tc =
   let ts =
     match (FApi.tc1_goal tc).f_node with
     | FcHoareS _ ->
-      [ t_logic_trivial; t_logic_trivial; t_id]
+      [ (fun x -> t_trivial x); t_trivial; t_id]
     | _ -> [t_id]
   in
 
@@ -555,5 +552,5 @@ let process_call side info tc =
     (t_call side ax)
     ( FApi.t_seqs
         [EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt;
-         !subtactic; t_logic_trivial] :: ts)
+         !subtactic; t_trivial] :: ts)
     tc

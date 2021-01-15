@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Core Int IntExtra IntMin Ring StdOrder.
+require import Core Int IntMin Ring StdOrder.
 (*---*) import Ring.IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -306,7 +306,7 @@ move: d; have wl: forall d, 0 < d => 0 < p => p * m %/ (p * d) = m %/ d.
   rewrite divzMDl ?mulf_neq0 1,2:gtr_eqF // addrC divz_small ?add0r //.
   rewrite pmulr_rge0 ?modz_ge0 //= 1:gtr_eqF //= normrM gtr0_norm //.
   by rewrite ltr_pmul2l // ltz_mod gtr_eqF.
-move=> d; case: (d = 0) => [->|]; first by rewrite ?divz0.
+move=> d; case: (d = 0) => [->|]; first by rewrite /= !divz0.
 rewrite eqr_le andaE negb_and -!ltrNge => -[/wl //|lt0_d gt0_p].
 by rewrite -(opprK d) mulrN divzN wl 1:oppr_gt0 // -divzN.
 qed.
@@ -377,7 +377,7 @@ lemma nosmt dvdz1 d : d %| 1 <=> `|d| = 1.
 proof.                        (* FIXME: test-case for case analysis *)
 move: d; have wlog: forall d, 0 <= d => d %| 1 <=> `|d| = 1; first last.
   move=> d; case: (0 <= d) => [/wlog//|/ltrNge/ltrW le0_d].
-  by rewrite -{1}(opprK d) dvdzE modzN wlog ?normrN // oppr_ge0.
+  by rewrite -{1}(opprK d) dvdzE modzN /= -dvdzE wlog ?normrN // oppr_ge0.
 move=> d; case: (1 < d) => [lt1_d ge0_d|/lerNgt].
   have lt1_nd: 1 < `|d| by apply/(ltr_le_trans d)/ler_norm.
   by rewrite dvdzE modz_small /= ?gtr_eqF.
@@ -440,7 +440,7 @@ proof. by rewrite dvdzE modzE subr_eq0 eq_sym. qed.
 lemma nosmt dvdz_exp2l p m n : 0 <= m <= n => (p ^ m %| p ^ n).
 proof.
 move=> [ge0_m le_mn]; rewrite dvdzE; rewrite -(subrK n m).
-by rewrite -pow_add // ?subr_ge0 // modzMl.
+by rewrite exprD_nneg ?subr_ge0 // modzMl.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -506,7 +506,7 @@ proof. by move=> /ltr_pmul2r <- /divzK->. qed.
 
 lemma nosmt eqz_div d m n : d <> 0 => d %| m =>
   (n = m %/ d) <=> (n * d = m).
-proof. by move=> /mulIf/inj_eq <- /divzK ->. qed.
+proof. by move=> /mulIf/inj_eq <- /divzK /= ->. qed.
 
 lemma nosmt eqz_mul d m n : d <> 0 => d %| m =>
   (m = n * d) <=> (m %/ d = n).
@@ -748,7 +748,7 @@ case: (pmin_mem _ nzE); (pose d0 := pmin E) => gt0_d [a0 b0] d0E.
 exists a0 b0; apply: gcd_uniq; rewrite ?nz_a // -?d0E.
 + by apply/negP => -[]; rewrite nz_a.
 + by rewrite ltrW.
-+ rewrite eqr_le modz_ge0 1:gtr_eqF //= lerNgt; apply/negP.
++ rewrite dvdzE eqr_le modz_ge0 1:gtr_eqF //= lerNgt; apply/negP.
   move=> gt0_ad0; have: E (a %% d0); 1: move=> @/E.
   * rewrite gt0_ad0 /=; rewrite modzE {2}d0E.
     rewrite mulrDr opprD addrA !mulrA -{1}(mul1r a) -mulrBl.
@@ -756,7 +756,7 @@ exists a0 b0; apply: gcd_uniq; rewrite ?nz_a // -?d0E.
     by exists u (-v); rewrite mulNr.
   move=> Ead0; have := pmin_min _ _ nzE _ Ead0.
   * by rewrite ltrW. * by rewrite lerNgt /= ltz_pmod.
-+ rewrite eqr_le modz_ge0 1:gtr_eqF //= lerNgt; apply/negP.
++ rewrite dvdzE eqr_le modz_ge0 1:gtr_eqF //= lerNgt; apply/negP.
   move=> gt0_bd0; have: E (b %% d0); 1: move=> @/E.
   * rewrite gt0_bd0 /=; rewrite modzE {2}d0E.
     rewrite mulrDr opprD !addrA !mulrA -addrAC -{1}(mul1r b) -mulrBl.

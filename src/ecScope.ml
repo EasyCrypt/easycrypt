@@ -246,7 +246,7 @@ module KnownFlags = struct
 
   let flags = [
     (implicits, false);
-    (oldip    , true );
+    (oldip    , false);
     (redlogic , true );
   ]
 end
@@ -554,6 +554,7 @@ module Prover = struct
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
     pl_selected   : bool option;
+    gn_debug      : bool option;
   }
 
   (* -------------------------------------------------------------------- *)
@@ -570,6 +571,7 @@ module Prover = struct
     pl_wanted    = None;
     pl_unwanted  = None;
     pl_selected  = None;
+    gn_debug     = None;
   }
 
   (* -------------------------------------------------------------------- *)
@@ -609,13 +611,15 @@ module Prover = struct
       pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
       pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
       pl_selected  = ppr.plem_selected;
+      gn_debug     = ppr.psmt_debug;
     }
 
   (* -------------------------------------------------------------------- *)
-  let mk_prover_info scope options =
+  let mk_prover_info scope (options : smt_options) =
     let open EcProvers in
 
     let dft          = Prover_info.get scope.sc_options in
+    let gn_debug     = odfl dft.gn_debug options.gn_debug in
     let pr_maxprocs  = odfl dft.pr_maxprocs options.po_nprovers in
     let pr_timelimit = max 0 (odfl dft.pr_timelimit options.po_timeout) in
     let pr_cpufactor = max 0 (odfl dft.pr_cpufactor options.po_cpufactor) in
@@ -637,7 +641,8 @@ module Prover = struct
 
     { pr_maxprocs; pr_provers ; pr_timelimit; pr_cpufactor;
       pr_verbose ; pr_all     ; pr_max      ; pr_iterate  ;
-      pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum  ; }
+      pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum   ;
+      gn_debug   ; }
 
   (* -------------------------------------------------------------------- *)
   let do_prover_info scope ppr =
@@ -1204,7 +1209,7 @@ module Op = struct
           let codom    = TT.transty TT.tp_relax env ue pty in
           let _env, xs = TT.trans_binding env ue op.po_args in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
-          let opabs    = EcDecl.mk_op [] codom None in
+          let opabs    = EcDecl.mk_op ~opaque:false [] codom None in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
           let openv    = EcEnv.Var.bind_locals xs openv in
           let reft     = TT.trans_prop openv ue reft in
@@ -1244,7 +1249,7 @@ module Op = struct
 
     in
 
-    let tyop   = EcDecl.mk_op tparams ty body in
+    let tyop   = EcDecl.mk_op ~opaque:false tparams ty body in
     let opname = EcPath.pqname (EcEnv.root (env scope)) (unloc op.po_name) in
 
     if op.po_kind = `Const then begin
@@ -1272,7 +1277,7 @@ module Op = struct
                 let nosmt = op.po_nosmt in
                 let nargs = List.sum (List.map (List.length |- fst) op.po_args) in
                   EcDecl.axiomatized_op ~nargs  ~nosmt path (tyop.op_tparams, bd) in
-              let tyop  = { tyop with op_kind = OB_oper None; } in
+              let tyop  = { tyop with op_opaque = true; } in
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope false (unloc ax, axop)
 
@@ -1319,7 +1324,7 @@ module Op = struct
           let subst = Tvar.init
             (List.map fst tparams)
             (List.map (tvar |- fst) nparams) in
-          let op = EcDecl.mk_op nparams (Tvar.subst subst ty) None in
+          let op = EcDecl.mk_op ~opaque:false nparams (Tvar.subst subst ty) None in
           bind scope (unloc name, op)
         in List.fold_left addnew scope op.po_aliases
 
@@ -1508,6 +1513,10 @@ module Mod = struct
     { scope with
       sc_env = EcEnv.Mod.declare_local name tysig scope.sc_env;
       sc_section = EcSection.add_abstract name tysig scope.sc_section }
+
+  let import (scope : scope) (m : pmsymbol located) : scope =
+    let m, _ = EcTyping.trans_msymbol (env scope) m in
+    { scope with sc_env = EcEnv.Mod.import_vars (env scope) m }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2424,7 +2433,30 @@ module Search = struct
             | [] ->
                 hierror ~loc:q.pl_loc "unknown operator: `%s'"
                   (EcSymbols.string_of_qsymbol q.pl_desc)
-            | paths -> `ByPath (Sp.of_list (List.map fst paths))
+            | paths -> begin
+                let for1 (paths, pts) (p, decl) =
+                  match decl.op_kind with
+                  | OB_nott nt -> begin
+                    let ps  = ref Mid.empty in
+                    let ue  = EcUnify.UniEnv.create None in
+                    let tip = EcUnify.UniEnv.opentvi ue decl.op_tparams None in
+                    let tip = Tvar.subst tip in
+                    let xs  = List.map (snd_map tip) nt.ont_args in
+                    let bd  = EcFol.form_of_expr EcFol.mhr (EcTypes.e_mapty tip nt.ont_body) in
+                    let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
+
+                    match fp.f_node with
+                    | Fop (pf, _) -> (pf :: paths, pts)
+                    | _ -> (paths, (ps, ue, fp) ::pts)
+                  end
+
+                  | _ -> (p :: paths, pts) in
+
+                let paths, pts = List.fold_left for1 ([], []) paths in
+                let pts = List.map (fun (ps, ue, fp) -> `ByPattern ((ps, ue), fp)) pts in
+
+                `ByOr (`ByPath (Sp.of_list paths) :: pts)
+              end
         end
 
         | _ ->

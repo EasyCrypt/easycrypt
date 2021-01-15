@@ -24,7 +24,8 @@ open EcCoreGoal
 exception InvalidProofTerm         (* invalid proof term *)
 
 type side    = [`Left|`Right]
-type lazyred = EcProofTyping.lazyred
+type lazyred = [`Full | `NoDelta | `None]
+
 
 (* -------------------------------------------------------------------- *)
 val (@!) : FApi.backward -> FApi.backward -> FApi.backward
@@ -46,8 +47,8 @@ val t_shuffle : EcIdent.t list -> FApi.backward
 val alpha_find_in_hyps : EcEnv.LDecl.hyps -> EcFol.form -> EcIdent.t
 val t_assumption       : [`Alpha | `Conv] -> FApi.backward
 val t_absurd_hyp       : ?conv:xconv -> ?id:EcIdent.t -> FApi.backward
-val t_logic_trivial    : FApi.backward
-val t_trivial          : ?subtc:FApi.backward -> FApi.backward
+val t_trivial          :
+  ?subtc:FApi.backward -> ?keep:bool -> ?conv:[`Alpha | `Conv] -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 type simplify_t =
@@ -63,15 +64,21 @@ val t_cbn : simplify_t
 
 val t_cbv_with_info : simplify_with_info_t
 val t_cbn_with_info : simplify_with_info_t
+val t_hred_with_info : simplify_with_info_t
 
 val t_simplify : ?mode:smode -> simplify_t
 val t_simplify_with_info : ?mode:smode -> simplify_with_info_t
 
 (* -------------------------------------------------------------------- *)
-val t_change : ?target:ident -> form -> tcenv1 -> tcenv1
+val t_change1 : ?ri:EcReduction.reduction_info -> ?target:ident -> form -> tcenv1 -> tcenv1
+val t_change  : ?ri:EcReduction.reduction_info -> ?target:ident -> form -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_reflex       : ?reduce:lazyred -> FApi.backward
+val t_lazy_match:
+  ?reduce:lazyred -> (form -> FApi.backward)-> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_reflex       : ?mode:[`Alpha | `Conv] -> ?reduce:lazyred -> FApi.backward
 val t_transitivity : ?reduce:lazyred -> form -> FApi.backward
 val t_symmetry     : ?reduce:lazyred -> FApi.backward
 
@@ -218,7 +225,7 @@ type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
 
 val t_subst:
      ?kind:subst_kind
-  -> ?tg:Sid.t
+  -> ?except:Sid.t
   -> ?clear:bool
   -> ?var:vsubst
   -> ?tside:tside

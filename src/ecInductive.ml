@@ -189,7 +189,7 @@ let datatype_projectors (tpath, tparams, { tydt_ctors = ctors }) =
     let body = e_match the (List.mapi do1 ctors) (toption rty) in
     let body = e_lam [thv, thety] body in
 
-    (cname, mk_op tparams body.e_ty (Some (OP_Plain (body, false)))) in
+    (cname, mk_op ~opaque:false tparams body.e_ty (Some (OP_Plain (body, false)))) in
 
   List.mapi do1 ctors
 

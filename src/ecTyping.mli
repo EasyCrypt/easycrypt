@@ -19,6 +19,10 @@ open EcModules
 open EcFol
 
 (* -------------------------------------------------------------------- *)
+type wp = EcEnv.env -> EcMemory.memenv -> stmt -> EcFol.form -> EcFol.form option
+val  wp : wp option ref
+
+(* -------------------------------------------------------------------- *)
 type opmatch = [
   | `Op   of EcPath.path * EcTypes.ty list
   | `Lc   of EcIdent.t
@@ -161,6 +165,7 @@ type tyerror =
 | PatternNotAllowed
 | MemNotAllowed
 | UnknownScope           of qsymbol
+| NoWP
 | FilterMatchFailure
 | MissingMemType
 | SchemaVariableReBinded of EcIdent.t

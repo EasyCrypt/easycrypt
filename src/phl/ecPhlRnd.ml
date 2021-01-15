@@ -329,7 +329,7 @@ let wp_equiv_disj_rnd_r side tc =
   | Some hd ->
     let po = c2 in
     FApi.t_onalli (function
-    | 0 -> EcLowGoal.t_trivial ?subtc:None
+    | 0 -> fun tc -> EcLowGoal.t_trivial tc
     | 1 ->
       let open EcProofTerm.Prept in
       let m1  = EcIdent.create "_" in
@@ -381,7 +381,7 @@ let wp_equiv_rnd_r bij tc =
   let hin = EcIdent.create "_" in
 
   FApi.t_onalli (function
-    | 0 -> EcLowGoal.t_trivial ?subtc:None
+    | 0 -> fun tc -> EcLowGoal.t_trivial tc
     | 1 ->
       let open EcProofTerm.Prept in
 
@@ -467,7 +467,7 @@ let process_rnd side tac_info tc =
       | _ -> tc_error !!tc "invalid arguments" in
 
       FApi.t_seqsub (t_choare_rnd tac_info)
-                    [EcLowGoal.t_logic_trivial; EcLowGoal.t_id]
+                    [EcLowGoal.t_trivial; EcLowGoal.t_id]
         tc
 
   | None, _ when is_bdHoareS concl ->

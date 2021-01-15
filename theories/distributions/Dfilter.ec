@@ -10,7 +10,6 @@ require import AllCore Distr FSet StdRing StdOrder StdBigop.
 (*---*) import RField RealOrder Bigreal BRA.
 
 pragma +implicits.
-pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 op mfilter (m : 'a -> real) (P : 'a -> bool) (x : 'a) =

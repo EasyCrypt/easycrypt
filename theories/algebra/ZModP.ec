@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int IntDiv IntExtra.
+require import Int IntDiv.
 require (*--*) Subtype Ring StdOrder.
 (*---*) import Ring.IntID StdOrder.IntOrder.
 
@@ -134,7 +134,7 @@ proof. by move=> eq; exists y. qed.
 
 lemma unitout x : ! unit x => inv x = x.
 proof.
-move=> Nux; rewrite choiceb_dfl //= => y; apply/negP.
+move=> Nux; rewrite /inv choiceb_dfl //= => y; apply/negP.
 by move=> h; apply/Nux; exists y.
 qed.
 end ComRing.

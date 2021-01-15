@@ -11,7 +11,6 @@ require import AllCore List StdOrder Distr StdOrder.
 (*---*) import RealOrder RealSeries StdBigop.Bigreal BRA.
 
 pragma +implicits.
-pragma -oldip.
 
 (* ==================================================================== *)
 abstract theory ProdSampling.

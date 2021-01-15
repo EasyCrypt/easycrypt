@@ -540,6 +540,9 @@ end = struct
     | UnknownScope sc ->
         msg "unknown scope: `%a'" pp_qsymbol sc
 
+    | NoWP ->
+        msg "cannot compute weakest precondition"
+
     | FilterMatchFailure ->
         msg "filter pattern does not match"
 

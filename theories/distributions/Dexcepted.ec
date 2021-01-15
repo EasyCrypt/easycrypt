@@ -10,7 +10,7 @@
 require import AllCore Distr FSet Dfilter StdRing.
 (*---*) import RField StdOrder.RealOrder.
 
-pragma -oldip. pragma +implicits.
+pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 op (\) (d : 'a distr) (P : 'a -> bool) : 'a distr = dscale (dfilter d P).
@@ -122,10 +122,10 @@ case: (forall x, (x \in dt x' => !P x) \/ !(P x /\ !X' x' x)).
     move=> x @/predI @/predC x_in_dt.
     by case: (P_nsub_supp x)=> [/(_ x_in_dt) ->|].
   proc. seq 1: (r \in dt x /\ x = x' /\ X = X'); auto.
-  if; auto=> &m' />.
+  if; auto=> /> &m'.
   + move=> _ _ r /supp_dexcepted [] r_in_dt.
     by case: (P_nsub_supp r)=> [/(_ r_in_dt) ->|/negb_and /implybE /contra].
-  move=> r_in_dt; case: (P_nsub_supp r{m'})=> [/(_ r_in_dt) -> //|].
+  move=> r_in_dt ; case: (P_nsub_supp r{m'})=> [/(_ r_in_dt) -> //|].
   by rewrite negb_and -implybE=> /contra.
 rewrite negb_forall=> - [a]; rewrite /= negb_or=> /> + Pa; rewrite Pa /=.
 move=> a_in_dt a_notin_X.
@@ -259,7 +259,7 @@ qed.
 
 lemma phoare_sampleE P :
   phoare [SampleE.sample : true ==> P res ] = (mu (dt i \ test i) P).
-proof. by bypr=> &m; apply (@pr_sampleE &m i{m} test{m} P). qed.
+proof. by bypr=> &m _; apply (@pr_sampleE &m i{m} test{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
 section.
@@ -300,7 +300,7 @@ case: (X x y)=> [y_in_Xx|y_notin_Xx]; last first.
 byphoare (: i = x /\ r = y /\ test = X ==> P res)=> //; proc=> /=.
 case @[ambient]: (mu (dt x) (X x) = weight (dt x))=> Hpt.
 + hoare.
-  + by move=> &m' />; rewrite dexceptedE Hpt.
+  + by move=> />; rewrite dexceptedE Hpt.
   while (X x r /\ i = x /\ test = X)=> //=.
   auto=> &m' [#] _ -> -> _ r; move: (mu_in_weight (X x) (dt x) r).
   by rewrite Hpt.
@@ -511,7 +511,7 @@ proof. by rewrite (@sampleE_fixed &m x P) (@WS.pr_sampleE &m x test P). qed.
 
 phoare phoare_sampleE P :
   [ SampleE.sample : true ==> P res ] = (mu (dt i \ test i) P).
-proof. by bypr=> &m; exact/(@pr_sampleE &m i{m} P). qed.
+proof. by bypr=> &m _; exact/(@pr_sampleE &m i{m} P). qed.
 
 (* -------------------------------------------------------------------- *)
 local lemma sampleI_fixed &m x P :
