@@ -1090,6 +1090,7 @@ let check_memenv env (x1,mt1) (x2,mt2) =
 type head_sub =
   | Zquant of quantif * bindings (* in reversed order *)
   | Zif
+  | Zmatch of EcTypes.ty
   | Zlet   of lpattern
   | Zapp
   | Ztuple
@@ -1113,6 +1114,7 @@ let zpush se_h se_common se_args1 se_args2 se_ty stk =
 
 let zquant q bd ty stk = zpush (Zquant (q, bd)) [] [] [] ty stk
 let zif args1 args2 ty stk = zpush Zif [] args1 args2 ty stk
+let zmatch bsty args1 args2 ty stk = zpush (Zmatch bsty) [] args1 args2 ty stk
 let zlet lp f1 f2 stk = zpush (Zlet lp) [] [f1] [f2] f1.f_ty stk
 
 let zapp args1 args2 ty stk =
@@ -1134,12 +1136,13 @@ let zpop ri side f hd =
   match hd.se_h, args with
   | Zquant(Llambda,bd), [f] when ri.ri.eta -> eta_norm (f_lambda bd f)
 
-  | Zquant(q,bd), [f] -> f_quant q bd f
-  | Zif, [f1;f2;f3]   -> f_if f1 f2 f3
-  | Zlet lp, [f1;f2]  -> f_let lp f1 f2
-  | Zapp, f1::args    -> f_app f1 args hd.se_ty
-  | Ztuple, args      -> f_tuple args
-  | Zproj i, [f1]     -> f_proj f1 i hd.se_ty
+  | Zquant(q,bd), [f]  -> f_quant q bd f
+  | Zif, [f1;f2;f3]    -> f_if f1 f2 f3
+  | Zmatch ty, c :: bs -> f_match c bs ty
+  | Zlet lp, [f1;f2]   -> f_let lp f1 f2
+  | Zapp, f1::args     -> f_app f1 args hd.se_ty
+  | Ztuple, args       -> f_tuple args
+  | Zproj i, [f1]      -> f_proj f1 i hd.se_ty
   | Zhl {f_node = FhoareF hf}, [pr;po] ->
     f_hoareF_r {hf with hf_pr = pr; hf_po = po }
   | Zhl {f_node = FhoareS hs}, [pr;po] ->
@@ -1199,7 +1202,7 @@ let rec conv ri env f1 f2 stk =
   | Fmatch(c1,bs1,ty1), Fmatch(c2,bs2,ty2) when
           List.length bs1 = List.length bs2
        && EqTest.for_type env ty1 ty2
-    -> conv ri env c1 c2 (zif bs1 bs2 f1.f_ty stk)
+    -> conv ri env c1 c2 (zmatch ty1 bs1 bs2 f1.f_ty stk)
 
   | Flet(lp1,f11,f12), Flet(lp2,f21,f22) -> begin
     match check_lpattern env Fsubst.f_subst_id lp1 lp2 with
