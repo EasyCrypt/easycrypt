@@ -951,6 +951,13 @@ apply: contraR xNJ => /supportP x_in_fa @/J; apply/flatten_mapP.
 by exists a; rewrite mem_to_seq // a_in_d /= mem_to_seq // &(fin_f).
 qed.
 
+lemma dlet_cst ['a 'b] (d1 : 'a distr) (d2 : 'b distr) :
+  is_lossless d1 => dlet d1 (fun _ => d2) = d2.
+proof.
+move=> ll_d1; apply: eq_distr => x; rewrite dlet1E /=.
+by rewrite sumZr -(@eq_sum (mass d1)) /= 1:&(massE) -weightE ll_d1.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op dfold ['a] (f : int -> 'a -> 'a distr) (x : 'a) (i : int) =
   iteri i (fun k d => dlet d (f k)) (dunit x).
@@ -1076,9 +1083,14 @@ qed.
 lemma dmap_fu (d : 'a distr) (f : 'a -> 'b) : 
   surjective f => is_full d => is_full (dmap d f).
 proof. 
-  move=> fsurj fu x;rewrite supp_dmap.
-  have [a ->]:= fsurj x;exists a => /=;apply fu.
+move=> fsurj fu x; rewrite supp_dmap.
+by have [a ->] := fsurj x; exists a => /=; apply: fu.
 qed.
+
+lemma dmap_fu_in ['a 'b] (d : 'a distr) (f : 'a -> 'b) :
+     (forall b, exists a, a \in d /\ b = f a)
+  => is_full (dmap d f).
+proof. by move=> surj_f b; apply/supp_dmap/surj_f. qed.
 
 lemma dmap_dunit ['a 'b] (f : 'a -> 'b) (x : 'a) :
   dmap (dunit x) f = dunit (f x).
@@ -1108,6 +1120,10 @@ lemma eq_dmap ['a 'b] d f g : f == g => dmap<:'a, 'b> d f = dmap d g.
 proof.
 by move=> eq_fg @/dmap; apply: eq_dlet => // x @/(\o); rewrite eq_fg.
 qed.
+
+lemma dmap_cst ['a 'b] (d : 'a distr) (b : 'b) :
+  is_lossless d => dmap d (fun _ => b) = dunit b.
+proof. apply: dlet_cst. qed.
 
 (* -------------------------------------------------------------------- *)
 abbrev dfst ['a 'b] (d : ('a * 'b) distr) = dmap d fst.
@@ -1488,6 +1504,21 @@ lemma dmap_dprodR ['a 'b 'c] (d1 : 'a distr) (d2 : 'b distr) (f : 'b -> 'c) :
   d1 `*` dmap d2 f = dmap (d1 `*` d2) (fun xy : _ * _ => (xy.`1, f xy.`2)).
 proof. by rewrite -{1}(@dmap_id d1) dmap_dprod. qed.
 
+lemma dmap_bij ['a 'b] (d1 : 'a distr) (d2: 'b distr) (f : 'a -> 'b) (g : 'b -> 'a) :
+     (forall x, x \in d1 => f x \in d2)
+  => (forall x, x \in d2 => mu1 d2 x = mu1 d1 (g x))
+  => (forall a, a \in d1 => g (f a) = a)
+  => (forall b, b \in d2 => f (g b) = b)
+  => dmap d1 f = d2.
+proof.
+move=> eqf eqg can_gf can_fg; apply/eq_distr => b.
+rewrite dmap1E /(\o) {1}/pred1; case: (b \in d2); last first.
++ move=> ^/supportPn ->; apply: contraR.
+  by move=> /neq0_mu [a [/= h1 <-]]; apply: eqf.
+move=> b_d2; rewrite eqg 1:// &(mu_eq_support) /pred1 /= => x x_d1.
+by apply eq_iff; split => [<<- | ->>]; rewrite ?can_gf ?can_fg.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma dlet_swap ['a 'b 'c] (d1 : 'a distr) (d2 : 'b distr) (F : 'a -> 'b -> 'c distr):
     dlet d1 (fun x1 => dlet d2 (F x1))
@@ -1602,6 +1633,16 @@ rewrite djoin_cons /= dmap_dprodE_swap /= ih dmap_dprodE_swap.
 rewrite  dlet_dlet eq_sym dmap_dprodE_swap &(eq_dlet) // => xs /=.
 rewrite djoin_cons /= dmap_dprodE_swap /= dmap_dlet dlet_dmap.
 by apply: eq_dlet => // ys /=; rewrite dmap_comp &(eq_dlet) // => ?.
+qed.
+
+lemma djoin_perm_s1s ['a] ds1 d ds2 :
+  djoin<:'a> (ds1 ++ d :: ds2) = 
+    dlet (djoin ds1 `*` djoin ds2)
+      (fun ds : _ * _ => dmap d (fun x => ds.`1 ++ x :: ds.`2)).
+proof.
+rewrite djoin_cat dmap_dprodE dprod_dlet dlet_dlet &(eq_dlet) //= => xs1.
+rewrite djoin_cons /= dmap_dprodE_swap dlet_dlet dmap_dlet &(eq_dlet) //= => xs2.
+by rewrite dmap_comp dlet_unit /=.
 qed.
 
 lemma djoin_seq1 ['a] d : djoin<:'a> [d] = dmap d (fun x => [x]).
