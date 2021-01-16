@@ -348,7 +348,7 @@ and process_interface (scope : EcScope.scope) (x, i) =
 (* -------------------------------------------------------------------- *)
 and process_operator (scope : EcScope.scope) (pop : poperator located) =
   EcScope.check_state `InTop "operator" scope;
-  let op, scope = EcScope.Op.add scope pop in
+  let op, axs, scope = EcScope.Op.add scope pop in
   let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
   List.iter
     (fun { pl_desc = name } ->
@@ -356,7 +356,8 @@ and process_operator (scope : EcScope.scope) (pop : poperator located) =
         name (EcPrinting.pp_added_op ppe) op;
         check_opname_validity scope name)
       (pop.pl_desc.po_name :: pop.pl_desc.po_aliases);
-    scope
+  List.iter (fun s -> EcScope.notify scope `Info "added axiom: `%s'" s) axs;
+  scope
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
