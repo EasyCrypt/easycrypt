@@ -1330,7 +1330,7 @@ module Op = struct
     let scope =
       if   Sstr.mem "lossless" tags
       then add_distr_tag EcCoreLib.CI_Distr.p_lossless
-             [EcCoreLib.base_ll] "lossless" "ll" scope
+             [EcCoreLib.base_ll; EcCoreLib.base_rnd] "lossless" "ll" scope
       else scope in
 
     let scope =
