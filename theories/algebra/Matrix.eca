@@ -576,7 +576,7 @@ move=> ll_d; apply/dmap_ll/djoin_ll.
 by move=> d'; rewrite mem_nseq => -[_ <-].
 qed.
 
-lemma dvector_full d : is_full d => is_full (dvector d).
+lemma dvector_fu d : is_full d => is_full (dvector d).
 proof.
 move=> full_d; apply/dmap_fu_in => v.
 exists (map (fun i => v.[i]) (range 0 size)); split=> /=.
@@ -592,7 +592,7 @@ lemma dvector_funi d : is_full d => is_uniform d =>
   is_funiform (dvector d).
 proof.
 move=> ??; apply/is_full_funiform => //.
-- by apply/dvector_full.
+- by apply/dvector_fu.
 - by apply/dvector_uni.
 qed.
 
@@ -706,7 +706,7 @@ move=> ds; rewrite mem_nseq => -[_ <-].
 by apply/djoin_ll=> ?; rewrite mem_nseq => -[_ <-].
 qed.
 
-lemma dmatrix_full d : is_full d => is_full (dmatrix d).
+lemma dmatrix_fu d : is_full d => is_full (dmatrix d).
 proof.
 move=> full_d; apply/dmap_fu_in => m; pose ns := range 0 size.
 exists (map (fun j => map (fun i => m.[i, j]) ns) ns); split=> /=.
@@ -726,7 +726,7 @@ lemma dmatrix_funi d : is_full d => is_uniform d =>
   is_funiform (dmatrix d).
 proof.
 move=> ??; apply/is_full_funiform => //.
-- by apply/dmatrix_full.
+- by apply/dmatrix_fu.
 - by apply/dmatrix_uni.
 qed.
 
