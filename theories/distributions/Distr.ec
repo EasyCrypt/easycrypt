@@ -1133,6 +1133,62 @@ lemma dmap_id_eq_in ['a] (d : 'a distr) f :
   (forall x, x \in d => f x = x) => dmap d f = d.
 proof. by move/eq_dmap_in => ->; apply: dmap_id. qed.
 
+
+(* -------------------------------------------------------------------- *)
+abstract theory MUniFinFun.
+type t, u.
+
+clone FinType as FinT with type t <- t.
+clone FinType as FinU with type t <- u.
+
+op enum1 (x : t) =
+  map (fun y => (x, y)) FinU.enum.
+
+op enum =
+  foldr (fun x f => allpairs (::) (enum1 x) f) [[]] (FinT.enum).
+
+lemma unzip1_enum xs : xs \in enum => unzip1 xs = FinT.enum.
+proof.
+rewrite /enum; elim: FinT.enum xs => //= y ys ih xs.
+by case/allpairsP=> [[/= z zs]] [] /mapP[u [_ ->>]] [/ih <- ->].
+qed.
+
+op dfun =
+  dmap (duniform enum) (fun f x => oget (assoc f x)).
+
+lemma dfun_fu : is_full dfun.
+proof.
+move=> f; pose s := map (fun x => (x, f x)) FinT.enum.
+apply/supp_dmap; exists s; split; last first.
+- apply/fun_ext=> x /=; have: (x, f x) \in s.
+  - apply/mapP; exists x => /=; rewrite FinT.enumP.
+  rewrite mem_assoc_uniq => [|->//].
+  by rewrite -map_comp /(\o) /= map_id FinT.enum_uniq.
+- rewrite supp_duniform; rewrite /s /enum; elim: (FinT.enum) => //=.
+  move=> x xs ih; apply/allpairsP.
+  exists ((x, f x), map (fun (x0 : t) => (x0, f x0)) xs) => />.
+  by apply/mapP; exists (f x) => /=; rewrite FinU.enumP.
+qed.
+
+lemma dfun_uni : is_uniform dfun.
+proof.
+apply/dmap_uni_in_inj/duniform_uni => [f g].
+rewrite !supp_duniform=> ^ + /unzip1_enum + ^ + /unzip1_enum.
+have := FinT.enum_uniq => @/enum; elim: FinT.enum f g => //= x xs ih.
+move=> f g [x_notin_xs uq_xs].
+case/allpairsP=> [[[yt yu] ys]] /= [y_in [ys_in ->>]] [/= ->> <<-].
+case/allpairsP=> [[[zt zu] zs]] /= [z_in [zs_in ->>]] [/= ->> eq_zs_ys] /=.
+case/mapP: y_in => [? /= [_ <<-]]; case/mapP: z_in=> [? /= [_ <<-]].
+move/fun_ext=> eq_assoc; split; first by have := eq_assoc x.
+apply: ih => //; apply/fun_ext=> t; case: (t = x) => [->>|ne_tx].
+- by move: x_notin_xs => ^; rewrite -{1}assocTP -eq_zs_ys -assocTP => /= -> ->.
+- by have := eq_assoc t; rewrite !assoc_cons ne_tx.
+qed.
+
+lemma dfun_funi : is_funiform dfun.
+proof. by apply: is_full_funiform; [apply/dfun_fu | apply/dfun_uni]. qed.
+end MUniFinFun.
+
 (* -------------------------------------------------------------------- *)
 abbrev dfst ['a 'b] (d : ('a * 'b) distr) = dmap d fst.
 abbrev dsnd ['a 'b] (d : ('a * 'b) distr) = dmap d snd.
