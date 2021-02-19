@@ -2485,6 +2485,14 @@ lemma nosmt mem_zip_snd ['a 'b] (xs : 'a list) (ys : 'b list) xy:
   xy \in zip xs ys => snd xy \in ys.
 proof. by case: xy => [x y]; move/mem_zip. qed.
 
+lemma nosmt mem_zip_nseqL ['a 'b] x y (ys : 'b list) :
+  y \in ys => (x, y) \in zip<:'a, 'b> (nseq (size ys) x) ys.
+proof.
+elim: ys => [|y' ys ih] //= -[->|/ih] /=.
+- by rewrite addzC nseqS ?size_ge0.
+- by rewrite addzC nseqS ?size_ge0 /= => ->.
+qed.
+
 lemma zip_map ['a1 'a2 'b1 'b2] (f : 'a1 -> 'a2) (g : 'b1 -> 'b2) xs ys :
     zip (map f xs) (map g ys)
   = map (fun xy => (f (fst xy), g (snd xy))) (zip xs ys).

@@ -951,6 +951,13 @@ apply: contraR xNJ => /supportP x_in_fa @/J; apply/flatten_mapP.
 by exists a; rewrite mem_to_seq // a_in_d /= mem_to_seq // &(fin_f).
 qed.
 
+lemma dlet_cst ['a 'b] (d1 : 'a distr) (d2 : 'b distr) :
+  is_lossless d1 => dlet d1 (fun _ => d2) = d2.
+proof.
+move=> ll_d1; apply: eq_distr => x; rewrite dlet1E /=.
+by rewrite sumZr -(@eq_sum (mass d1)) /= 1:&(massE) -weightE ll_d1.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op dfold ['a] (f : int -> 'a -> 'a distr) (x : 'a) (i : int) =
   iteri i (fun k d => dlet d (f k)) (dunit x).
@@ -1076,9 +1083,14 @@ qed.
 lemma dmap_fu (d : 'a distr) (f : 'a -> 'b) : 
   surjective f => is_full d => is_full (dmap d f).
 proof. 
-  move=> fsurj fu x;rewrite supp_dmap.
-  have [a ->]:= fsurj x;exists a => /=;apply fu.
+move=> fsurj fu x; rewrite supp_dmap.
+by have [a ->] := fsurj x; exists a => /=; apply: fu.
 qed.
+
+lemma dmap_fu_in ['a 'b] (d : 'a distr) (f : 'a -> 'b) :
+     (forall b, exists a, a \in d /\ b = f a)
+  => is_full (dmap d f).
+proof. by move=> surj_f b; apply/supp_dmap/surj_f. qed.
 
 lemma dmap_dunit ['a 'b] (f : 'a -> 'b) (x : 'a) :
   dmap (dunit x) f = dunit (f x).
@@ -1108,6 +1120,74 @@ lemma eq_dmap ['a 'b] d f g : f == g => dmap<:'a, 'b> d f = dmap d g.
 proof.
 by move=> eq_fg @/dmap; apply: eq_dlet => // x @/(\o); rewrite eq_fg.
 qed.
+
+lemma dmap_cst ['a 'b] (d : 'a distr) (b : 'b) :
+  is_lossless d => dmap d (fun _ => b) = dunit b.
+proof. apply: dlet_cst. qed.
+
+lemma eq_dmap_in ['a 'b] (d : 'a distr) (f g : 'a -> 'b) :
+  (forall x, x \in d => f x = g x) => dmap d f = dmap d g.
+proof. by move=> eq_fg; apply: in_eq_dlet => x /eq_fg @/(\o) ->. qed.
+
+lemma dmap_id_eq_in ['a] (d : 'a distr) f :
+  (forall x, x \in d => f x = x) => dmap d f = d.
+proof. by move/eq_dmap_in => ->; apply: dmap_id. qed.
+
+
+(* -------------------------------------------------------------------- *)
+abstract theory MUniFinFun.
+type t, u.
+
+clone FinType as FinT with type t <- t.
+clone FinType as FinU with type t <- u.
+
+op enum1 (x : t) =
+  map (fun y => (x, y)) FinU.enum.
+
+op enum =
+  foldr (fun x f => allpairs (::) (enum1 x) f) [[]] (FinT.enum).
+
+lemma unzip1_enum xs : xs \in enum => unzip1 xs = FinT.enum.
+proof.
+rewrite /enum; elim: FinT.enum xs => //= y ys ih xs.
+by case/allpairsP=> [[/= z zs]] [] /mapP[u [_ ->>]] [/ih <- ->].
+qed.
+
+op dfun =
+  dmap (duniform enum) (fun f x => oget (assoc f x)).
+
+lemma dfun_fu : is_full dfun.
+proof.
+move=> f; pose s := map (fun x => (x, f x)) FinT.enum.
+apply/supp_dmap; exists s; split; last first.
+- apply/fun_ext=> x /=; have: (x, f x) \in s.
+  - apply/mapP; exists x => /=; rewrite FinT.enumP.
+  rewrite mem_assoc_uniq => [|->//].
+  by rewrite -map_comp /(\o) /= map_id FinT.enum_uniq.
+- rewrite supp_duniform; rewrite /s /enum; elim: (FinT.enum) => //=.
+  move=> x xs ih; apply/allpairsP.
+  exists ((x, f x), map (fun (x0 : t) => (x0, f x0)) xs) => />.
+  by apply/mapP; exists (f x) => /=; rewrite FinU.enumP.
+qed.
+
+lemma dfun_uni : is_uniform dfun.
+proof.
+apply/dmap_uni_in_inj/duniform_uni => [f g].
+rewrite !supp_duniform=> ^ + /unzip1_enum + ^ + /unzip1_enum.
+have := FinT.enum_uniq => @/enum; elim: FinT.enum f g => //= x xs ih.
+move=> f g [x_notin_xs uq_xs].
+case/allpairsP=> [[[yt yu] ys]] /= [y_in [ys_in ->>]] [/= ->> <<-].
+case/allpairsP=> [[[zt zu] zs]] /= [z_in [zs_in ->>]] [/= ->> eq_zs_ys] /=.
+case/mapP: y_in => [? /= [_ <<-]]; case/mapP: z_in=> [? /= [_ <<-]].
+move/fun_ext=> eq_assoc; split; first by have := eq_assoc x.
+apply: ih => //; apply/fun_ext=> t; case: (t = x) => [->>|ne_tx].
+- by move: x_notin_xs => ^; rewrite -{1}assocTP -eq_zs_ys -assocTP => /= -> ->.
+- by have := eq_assoc t; rewrite !assoc_cons ne_tx.
+qed.
+
+lemma dfun_funi : is_funiform dfun.
+proof. by apply: is_full_funiform; [apply/dfun_fu | apply/dfun_uni]. qed.
+end MUniFinFun.
 
 (* -------------------------------------------------------------------- *)
 abbrev dfst ['a 'b] (d : ('a * 'b) distr) = dmap d fst.
@@ -1488,6 +1568,21 @@ lemma dmap_dprodR ['a 'b 'c] (d1 : 'a distr) (d2 : 'b distr) (f : 'b -> 'c) :
   d1 `*` dmap d2 f = dmap (d1 `*` d2) (fun xy : _ * _ => (xy.`1, f xy.`2)).
 proof. by rewrite -{1}(@dmap_id d1) dmap_dprod. qed.
 
+lemma dmap_bij ['a 'b] (d1 : 'a distr) (d2: 'b distr) (f : 'a -> 'b) (g : 'b -> 'a) :
+     (forall x, x \in d1 => f x \in d2)
+  => (forall x, x \in d2 => mu1 d2 x = mu1 d1 (g x))
+  => (forall a, a \in d1 => g (f a) = a)
+  => (forall b, b \in d2 => f (g b) = b)
+  => dmap d1 f = d2.
+proof.
+move=> eqf eqg can_gf can_fg; apply/eq_distr => b.
+rewrite dmap1E /(\o) {1}/pred1; case: (b \in d2); last first.
++ move=> ^/supportPn ->; apply: contraR.
+  by move=> /neq0_mu [a [/= h1 <-]]; apply: eqf.
+move=> b_d2; rewrite eqg 1:// &(mu_eq_support) /pred1 /= => x x_d1.
+by apply eq_iff; split => [<<- | ->>]; rewrite ?can_gf ?can_fg.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma dlet_swap ['a 'b 'c] (d1 : 'a distr) (d2 : 'b distr) (F : 'a -> 'b -> 'c distr):
     dlet d1 (fun x1 => dlet d2 (F x1))
@@ -1604,6 +1699,16 @@ rewrite djoin_cons /= dmap_dprodE_swap /= dmap_dlet dlet_dmap.
 by apply: eq_dlet => // ys /=; rewrite dmap_comp &(eq_dlet) // => ?.
 qed.
 
+lemma djoin_perm_s1s ['a] ds1 d ds2 :
+  djoin<:'a> (ds1 ++ d :: ds2) = 
+    dlet (djoin ds1 `*` djoin ds2)
+      (fun ds : _ * _ => dmap d (fun x => ds.`1 ++ x :: ds.`2)).
+proof.
+rewrite djoin_cat dmap_dprodE dprod_dlet dlet_dlet &(eq_dlet) //= => xs1.
+rewrite djoin_cons /= dmap_dprodE_swap dlet_dlet dmap_dlet &(eq_dlet) //= => xs2.
+by rewrite dmap_comp dlet_unit /=.
+qed.
+
 lemma djoin_seq1 ['a] d : djoin<:'a> [d] = dmap d (fun x => [x]).
 proof.
 by rewrite djoin_cons /= djoin_nil dmap_dprodE_swap dlet_unit.
@@ -1677,6 +1782,15 @@ lemma djoin_dmap ['a 'b 'c] (d : 'a -> 'b distr) (xs : 'a list) (f : 'b -> 'c):
 proof.
 elim: xs => /= [|x xs ih]; first by rewrite !djoinE ?dmap_dunit.
 by rewrite !djoin_cons -ih /= dmap_dprod /= !dmap_comp.
+qed.
+
+lemma djoin_dmap_nseq ['a 'b] n (d : 'a distr) (f : 'a -> 'b) :
+  dmap (djoin (nseq n d)) (map f) = djoin (nseq n (dmap d f)).
+proof.
+elim/natind: n => [n le0_n|].
+- by rewrite !nseq0_le //= !djoin_nil dmap_dunit.
+move=> n ge0_n ih; rewrite !nseqS // !djoin_cons /= -ih.
+by rewrite -dmap_dprod_comp dmap_comp.
 qed.
 
 lemma supp_djoinmap ['a 'b] (d : 'a -> 'b distr) xs ys:
