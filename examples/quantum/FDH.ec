@@ -160,6 +160,7 @@ op [lossless] dfbool : (msg -> bool) distr.
 op p : real.
 
 axiom pr_dfbool m : mu dfbool (fun t => t m) = p.
+
 axiom pr_dfbool_l m (l:msg list) q: 
   !m \in l => size l <= q =>  
   p*(1%r-p)^q <= mu dfbool (fun t => t m /\ forall m', m' \in l => !t m').
@@ -171,20 +172,8 @@ op q : int.
 type result.
 
 module type AdvRNDIF (H:Hash) = {
-  proc init() : hash {}
   proc main() : result
 }.
-
-(*
-op d1 : (A -> B) distr.
-op d2 : (A -> B) distr.
-op eps : real.
-
-axiom forall a (E : B -> bool) : 
-  `| mu d1 (fun f => E (f a)) - mu d2 (fun f => E (f a)) | <= eps.
-
-Pr[main1 () : E f res ] - Pr[main2 () : E res ] <= q^3 * eps.
-*)
     
 module RndIf (A:AdvRNDIF) = {
   var hf : msg -> hash
@@ -204,39 +193,44 @@ module RndIf (A:AdvRNDIF) = {
   }
 
   proc main1(dfh : (msg -> hash) distr) = {
-    var b, h;
+    var b, y;
     c  <- 0;
     bf <$ dfbool;
     hf <$ dfh;
-    h  <@ A(H).init();
+    y  <$ dhash; 
     b  <@ A(H).main();
     return (b,bf);
   }
 
   proc main2(dfh : (msg -> hash) distr) = {
-    var b, h;
+    var b, y;
     c  <- 0;
     bf <$ dfbool;
     hf <$ dfh;
-    h  <@ A(H).init(); 
-    hf <- fun m => if bf m then h else hf m;
+    y  <$ dhash; 
+    hf <- fun m => if bf m then y else hf m;
     b  <@ A(H).main();
     return (b, bf);
   }
 }.
 
-op factor : real.
+(* Remark the event depend of result return by the adversary but also
+   of the function bf indicating if the hf return y or a random value.
+   It would be interesting to known if we can add y in the event
+ *)
 
-axiom advantage (A<:AdvRNDIF{RndIf}) &m dfh0 P:
-  is_uniform dfh0 => 
-  is_full    dfh0 =>
-  `| Pr[RndIf(A).main1(dfh0) @ &m : P res] - Pr[RndIf(A).main2(dfh0) @ &m: P res] | <= factor.
+type event = result * (msg -> bool) -> bool.  
+
+op factor = 8%r/3%r * q%r^4 * p^2.
+
+axiom advantage (A<:AdvRNDIF{RndIf}) &m dfh0 (P:event):
+  is_lossless dfh0 =>
+  is_uniform dfh0  => 
+  is_full    dfh0  =>
+  `| Pr[RndIf(A).main1(dfh0) @ &m : P res] - Pr[RndIf(A).main2(dfh0) @ &m: P res] | 
+   <= 8%r/3%r * q%r^4 * p^2.
 
 end RNDIF.
-
-clone import RNDIF as RNDIF0 with
-  op q = qs + qh + 1,
-  type result <- bool * msg list * msg. 
 
 module B(A:AdvEFH) = {
   import var EF
@@ -259,7 +253,7 @@ module B(A:AdvEFH) = {
 
 section.
 
-declare module A : AdvEFH { RH, EF, Log, Hash, RndIf, B}.
+declare module A : AdvEFH { RH, EF, Log, Hash, B}.
 axiom A_ll (H <: Hash{A}) (O <: OrclSign{A}) : 
  islossless O.sign => islossless H.h => islossless A(H, O).main.
 
@@ -290,7 +284,7 @@ local module G1 = {
 
   proc main'() = {
     var b;
-    t <$ dfbool;      
+    t <$ dfbool;  (* x -> true p  false 1 -p *)  
     b <@ main();
     return b /\ (t m /\ forall m', m' \in Log.log => !t m');
   }
@@ -344,12 +338,6 @@ local module ARI (H:Hash) = {
     }
   }
 
-  proc init () = {
-    var h;
-    h <$ dhash;
-    return h;
-  }
-
   proc main() = {
     var b, hm;
     (pk, sk) <$ kg;
@@ -362,6 +350,9 @@ local module ARI (H:Hash) = {
 }.
 
 (* !m \in Log.log /\ (t m /\ forall m', m' \in Log.log => !t m'); *)
+local clone import RNDIF as RNDIF0 with
+  op q = qs + qh + 1,
+  type result <- bool * msg list * msg. 
 
 local equiv hE z : Hash.h ~ RndIf(ARI).H.h : 
    ={arg} /\ Hash.h{1} = RndIf.hf{2} /\ RndIf.c{2} = z /\ z < q ==>
@@ -377,7 +368,7 @@ local lemma l3 &m :
 proof.
   byequiv => //.
   proc.
-  inline G1.main ARI(RndIf(ARI).H).init ARI(RndIf(ARI).H).main; wp.
+  inline G1.main ARI(RndIf(ARI).H).main; wp.
   ecall (hE (size Log.log + RH.c){1}).
   inline *; wp.
   call (: Hash.h{1} = RndIf.hf{2} /\ ={Log.log, RH.c, EF.pk, EF.sk} /\
@@ -396,6 +387,7 @@ local lemma l4 &m :
    factor.
 proof.
   apply (advantage ARI &m dfhash).
+  + admit. (* is_lossless dfhash *)
   + admit. (* is_uniform dfhash *)
   admit.   (* is_full dfhash *)
 qed.
@@ -447,7 +439,7 @@ proof.
   + by proc; sp; if => //; inline *; auto => /> /#.
   + by move=> *; proc; inline *; auto => /> /#.
   + by move=> *; proc; inline *; auto => /> /#.
-  swap{1} 7 - 6; swap{1} 2 3; swap{1} 4 -2; wp.
+  swap{1} 6 - 5; swap{1} 2 3; swap{1} 4 -2; wp.
   rnd (fun (h:msg -> hash) => fun m => finv EF.sk{1} (h m))
       (fun (h:msg -> sign) => fun m => f EF.pk{1} (h m)).
   rewrite /P; auto => |> k hk h _ bf _; split.
@@ -470,7 +462,7 @@ qed.
 
 lemma conclusion &m : 
    p * (1%r - p) ^ qs * Pr[EF(RA(A, Hash), FDH(Hash)).main() @ &m : res] <=
-   Pr[OW(B(A)).main() @ &m : res] + factor. 
+   Pr[OW(B(A)).main() @ &m : res] + 8%r / 3%r * q%r ^ 4 * p ^ 2. 
 proof.
   move: (l1 &m) (l2 &m) (l3 &m) (l4 &m) (l5 &m) (l6 &m) => /#.
 qed.
@@ -688,14 +680,13 @@ proc Q (Qb, f') (|x,y>) = {
   return r;
 }
 
-qproc Q, e:T->U () = {
+qproc Q () = {
 
   var b;
   b <- (c < q);
   if b then c <- c + 1;
   return b;
-
-}
+}, e (* :T->U *)
 
 module type OT = {
   qproc Q (_: T) : U 
