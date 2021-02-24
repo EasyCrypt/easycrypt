@@ -64,6 +64,10 @@ inductive isdistr (m : 'a -> real) =
        (forall x, 0%r <= m x)
      & (forall s, uniq s => big predT m s <= 1%r).
 
+lemma eq_isdistr (d1 d2 : 'a -> real) :
+  d1 == d2 => isdistr d1 = isdistr d2.
+proof. by move=> /fun_ext=> ->. qed.
+
 lemma ge0_isdistr (d : 'a -> real) x : isdistr d => 0%r <= d x.
 proof. by case=> + _; apply. qed.
 
@@ -101,6 +105,15 @@ lemma isdistr_mu1 (d : 'a distr): isdistr (mu1 d).
 proof.
 have [_ <-] := (fun_ext (mass d) (mu1 d)).
 + by move=> x; apply/massE. + by apply/isdistr_mass.
+qed.
+
+lemma isdistr_comp ['a 'b] f (g : 'a -> 'b) :
+  injective g => isdistr f => isdistr (f \o g).
+proof.
+move=> inj_g [ge0_f le1]; split; first by move=> x; apply: ge0_f.
+move=> s uq_s; rewrite -(@big_map _ predT).
+apply: le1; rewrite map_inj_in_uniq //.
+by move=> x y _ _; apply: inj_g.
 qed.
 
 lemma ge0_mu (d : 'a distr) p : 0%r <= mu d p.
@@ -1133,62 +1146,6 @@ lemma dmap_id_eq_in ['a] (d : 'a distr) f :
   (forall x, x \in d => f x = x) => dmap d f = d.
 proof. by move/eq_dmap_in => ->; apply: dmap_id. qed.
 
-
-(* -------------------------------------------------------------------- *)
-abstract theory MUniFinFun.
-type t, u.
-
-clone FinType as FinT with type t <- t.
-clone FinType as FinU with type t <- u.
-
-op enum1 (x : t) =
-  map (fun y => (x, y)) FinU.enum.
-
-op enum =
-  foldr (fun x f => allpairs (::) (enum1 x) f) [[]] (FinT.enum).
-
-lemma unzip1_enum xs : xs \in enum => unzip1 xs = FinT.enum.
-proof.
-rewrite /enum; elim: FinT.enum xs => //= y ys ih xs.
-by case/allpairsP=> [[/= z zs]] [] /mapP[u [_ ->>]] [/ih <- ->].
-qed.
-
-op dfun =
-  dmap (duniform enum) (fun f x => oget (assoc f x)).
-
-lemma dfun_fu : is_full dfun.
-proof.
-move=> f; pose s := map (fun x => (x, f x)) FinT.enum.
-apply/supp_dmap; exists s; split; last first.
-- apply/fun_ext=> x /=; have: (x, f x) \in s.
-  - apply/mapP; exists x => /=; rewrite FinT.enumP.
-  rewrite mem_assoc_uniq => [|->//].
-  by rewrite -map_comp /(\o) /= map_id FinT.enum_uniq.
-- rewrite supp_duniform; rewrite /s /enum; elim: (FinT.enum) => //=.
-  move=> x xs ih; apply/allpairsP.
-  exists ((x, f x), map (fun (x0 : t) => (x0, f x0)) xs) => />.
-  by apply/mapP; exists (f x) => /=; rewrite FinU.enumP.
-qed.
-
-lemma dfun_uni : is_uniform dfun.
-proof.
-apply/dmap_uni_in_inj/duniform_uni => [f g].
-rewrite !supp_duniform=> ^ + /unzip1_enum + ^ + /unzip1_enum.
-have := FinT.enum_uniq => @/enum; elim: FinT.enum f g => //= x xs ih.
-move=> f g [x_notin_xs uq_xs].
-case/allpairsP=> [[[yt yu] ys]] /= [y_in [ys_in ->>]] [/= ->> <<-].
-case/allpairsP=> [[[zt zu] zs]] /= [z_in [zs_in ->>]] [/= ->> eq_zs_ys] /=.
-case/mapP: y_in => [? /= [_ <<-]]; case/mapP: z_in=> [? /= [_ <<-]].
-move/fun_ext=> eq_assoc; split; first by have := eq_assoc x.
-apply: ih => //; apply/fun_ext=> t; case: (t = x) => [->>|ne_tx].
-- by move: x_notin_xs => ^; rewrite -{1}assocTP -eq_zs_ys -assocTP => /= -> ->.
-- by have := eq_assoc t; rewrite !assoc_cons ne_tx.
-qed.
-
-lemma dfun_funi : is_funiform dfun.
-proof. by apply: is_full_funiform; [apply/dfun_fu | apply/dfun_uni]. qed.
-end MUniFinFun.
-
 (* -------------------------------------------------------------------- *)
 abbrev dfst ['a 'b] (d : ('a * 'b) distr) = dmap d fst.
 abbrev dsnd ['a 'b] (d : ('a * 'b) distr) = dmap d snd.
@@ -1722,7 +1679,6 @@ move=> xs /=; rewrite dmap_comp &(eq_dlet) //.
 by move=> z @/(\o) /=; rewrite cats1.
 qed.
 
-
 lemma weight_djoin (ds : 'a distr list) :
   weight (djoin ds) = BRM.big predT weight ds.
 proof.
@@ -1800,6 +1756,84 @@ proof.
 rewrite supp_djoin size_map; congr; apply/eq_iff.
 by rewrite zip_mapl all_map &(eq_all).
 qed.
+
+
+(* -------------------------------------------------------------------- *)
+abstract theory MUniFinFun.
+type t.
+
+clone FinType as FinT with type t <- t.
+
+op mfun ['u] (d : t -> 'u distr) (f : t -> 'u) =
+  BRM.big predT (fun x => mass (d x) (f x)) FinT.enum.
+
+lemma mfunE ['u] (d : t -> 'u distr) (f : t -> 'u) :
+  mfun d f = mass (djoin (map d FinT.enum)) (map f FinT.enum).
+proof.
+rewrite /mfun massE djoin1E !size_map /=; pose h x := (d x, f x).
+pose s := zip _ _; have ->: s = map h FinT.enum.
+- by rewrite /s zip_map zipss -map_comp.
+by rewrite BRM.big_map &(BRM.eq_bigr) => /= i _; rewrite massE.
+qed.
+
+lemma isdistr_dfun ['u] (d : t -> 'u distr) : isdistr (mfun d).
+proof.
+pose F f := mass (djoin (map d FinT.enum)) (map f FinT.enum).
+rewrite (@eq_isdistr _ F) 1:&(mfunE) /F.
+apply/(@isdistr_comp (mass (djoinmap d _)))/isdistr_mass.
+move=> f g eq; apply/fun_ext=> x; pose i := index x FinT.enum.
+move/(congr1 (fun s => nth witness s i)): eq => /=.
+have rgi: 0 <= i < size FinT.enum.
+- by rewrite index_ge0 index_mem FinT.enumP.
+rewrite !(@nth_map witness) //.
+by rewrite !nth_index ?FinT.enumP.
+qed.
+
+op dfun ['u] (d : t -> 'u distr) = mk (mfun d).
+
+lemma dfun1E ['u] (d : t -> 'u distr) f :
+  mu1 (dfun d) f = BRM.big predT (fun x => mu1 (d x) (f x)) FinT.enum.
+proof.
+rewrite -massE muK 1:isdistr_dfun &(BRM.eq_bigr).
+by move=> i _ /=; rewrite massE.
+qed.
+
+lemma dfun1E_djoin ['u] (d : t -> 'u distr) f :
+  mu1 (dfun d) f = mu1 (djoinmap d FinT.enum) (map f FinT.enum).
+proof. by rewrite -massE muK 1:isdistr_dfun mfunE massE. qed.
+
+lemma dfun_supp ['u] (d : t -> 'u distr) (f : t -> 'u) :
+  f \in dfun d <=> (forall x, f x \in d x).
+proof.
+rewrite supportP dfun1E -prodr_eq0 negb_exists /=; split;
+  by move=> + x - /(_ x); rewrite FinT.enumP /predT /= supportP.
+qed.
+
+lemma dfun_fu ['u] (d : t -> 'u distr) :
+  (forall x, is_full (d x)) => is_full (dfun d).
+proof. by move=> fud f; apply/dfun_supp=> x; apply/fud. qed.
+
+lemma dfun_uni ['u] (d : t -> 'u distr) :
+  (forall x, is_uniform (d x)) => is_uniform (dfun d).
+proof.
+move=> unid f g fd gd; rewrite !dfun1E_djoin &(djoin_uni).
+- by move=> d' /mapP[x [_ ->]]; apply: unid.
+- apply: supp_djoinmap; rewrite size_map /=; apply/allP.
+  by case=> x y /= /mem_zip_mapr [_ ->]; apply/dfun_supp.
+- apply: supp_djoinmap; rewrite size_map /=; apply/allP.
+  by case=> x y /= /mem_zip_mapr [_ ->]; apply/dfun_supp.
+qed.
+
+lemma dfun_funi ['u] (d : t -> 'u distr) :
+     (forall x, is_uniform (d x))
+  => (forall x, is_full (d x))
+  => is_funiform (dfun d).
+proof.
+move=> funi_d full_d; apply: is_full_funiform.
+- by apply/dfun_fu/full_d.
+- by apply/dfun_uni.
+qed.
+end MUniFinFun.
 
 (* -------------------------------------------------------------------- *)
 op mbin (p : real) (n : int) = fun k =>

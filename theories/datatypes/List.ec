@@ -2506,6 +2506,14 @@ lemma zip_mapr ['a 'b1 'b2] (g : 'b1 -> 'b2) (xs : 'a list) ys :
   zip xs (map g ys) = map (fun xy => (fst xy, g (snd xy))) (zip xs ys).
 proof. by rewrite -(@map_id xs) zip_map map_id. qed.
 
+lemma zipss ['a] (s : 'a list) :
+  zip s s = map (fun x => (x, x)) s.
+proof. by elim: s. qed.
+
+lemma mem_zip_mapr ['a 'b] (f : 'a -> 'b) (s : 'a list) x y :
+  (x, y) \in zip s (map f s) <=> (x \in s /\ y = f x).
+proof. by elim: s => //= x' xs -> /#. qed.
+
 lemma assoc_zip ['a, 'b] (ks : 'a list) (vs : 'b list) k:
  size ks = size vs => assoc (zip ks vs) k = onth vs (index k ks).
 proof.
