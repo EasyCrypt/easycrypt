@@ -119,3 +119,42 @@ by move=> ?;rewrite /is_full supp_dbiased.
 qed.
 
 end FixedBiased.
+
+(* -------------------------------------------------------------------- *)
+import Biased Bigreal.
+
+abstract theory MUniFinFunBiased.
+type t.
+
+clone import MUniFinFun with type t <- t.
+
+op dbfun c = dfun (fun _ => dbiased c).
+
+lemma dbfunE (c : real) (pT pF : t -> bool) :
+  (forall x, !(pT x /\ pF x)) =>
+
+  mu (dbfun c) (fun f =>
+         (forall x, pT x =>  f x)
+      /\ (forall x, pF x => !f x)) =
+
+    (      clamp c) ^ (count pT FinT.enum)
+  * (1%r - clamp c) ^ (count pF FinT.enum).
+proof.
+move=> h; pose Q x b := (pT x => b) /\ (pF x => !b).
+rewrite -(mu_eq _ (fun f => forall x, Q x (f x))) /= 1:/#.
+rewrite dfunE (@BRM.bigID _ _ pT) !predTI /=.
+rewrite -(BRM.eq_bigr _ (fun _ => clamp c)).
+- move=> x @/Q /= ^pTx -> /=; rewrite -(mu_eq _ (pred1 true)).
+  - by case=> //=; case: (pF x) (h x). - by rewrite dbiased1E.
+rewrite mulr_const_cond; congr; rewrite (@BRM.bigID _ _ pF).
+rewrite  -(BRM.eq_bigr _ (fun _ => 1%r - clamp c)).
+- move=> x [_] @/Q /= ^pFx -> /=; rewrite -(mu_eq _ (pred1 false)).
+  - by case=> //=; case: (pT x) (h x). - by rewrite dbiased1E.
+rewrite mulr_const_cond -(BRM.eq_bigr _ (fun _ => 1%r)).
+- move=> x /= @/predC [pTNx pFNx]; rewrite -(mu_eq _ predT).
+  - by move=> b @/predT @/Q; rewrite pTNx pFNx.
+  by rewrite dbiased_ll.
+rewrite mulr_const_cond expr1z mulr1; congr; apply: eq_count.
+by move=> x @/predI @/predC; case: (pT x) (pF x) (h x).
+qed.
+end MUniFinFunBiased.
