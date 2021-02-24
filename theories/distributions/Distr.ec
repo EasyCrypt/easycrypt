@@ -1640,6 +1640,15 @@ rewrite supportP djoin1E; case: (size ds = size xs) => //= eq_sz; split.
   by rewrite hmem /predC /= supportPn.
 qed.
 
+lemma supp_djoin_cons ['a] us d ds :
+  us \in djoin<:'a> (d :: ds) =>
+    exists v vs, v \in d /\ vs \in djoin ds.
+proof.
+move/supp_djoin => /=; case: us => /= [|u us]; first smt(size_ge0).
+case=> /addzI => eqsz [ud hall]; exists u us.
+by split=> //; apply/supp_djoin.
+qed.
+
 lemma supp_djoin_size (ds : 'a distr list) xs :
   xs \in djoin ds => size xs = size ds.
 proof. by case/supp_djoin=> ->. qed.
@@ -1802,6 +1811,29 @@ lemma dfun1E_djoin ['u] (d : t -> 'u distr) f :
   mu1 (dfun d) f = mu1 (djoinmap d FinT.enum) (map f FinT.enum).
 proof. by rewrite -massE muK 1:isdistr_dfun mfunE massE. qed.
 
+op tofun ['u] (us : 'u list) =
+  fun x => nth witness us (index x FinT.enum).
+
+op offun (f : t -> 'u) =
+  map f FinT.enum.
+
+lemma offunK ['u] : cancel offun<:'u> tofun.
+proof.
+move=> f; apply/fun_ext => x; rewrite /tofun (@nth_map witness).
+- by rewrite index_ge0 index_mem FinT.enumP.
+- by rewrite nth_index 1:FinT.enumP.
+qed.
+
+lemma tofunK ['u] us :
+  size us = FinT.card => offun<:'u> (tofun us) = us.
+proof.
+move=> sz_us; apply/(eq_from_nth witness).
+- by rewrite size_map sz_us.
+rewrite size_map -/FinT.card => i rg_i.
+rewrite /offun (@nth_map witness) // /tofun.
+by rewrite index_uniq // FinT.enum_uniq.
+qed.
+
 lemma dfun_supp ['u] (d : t -> 'u distr) (f : t -> 'u) :
   f \in dfun d <=> (forall x, f x \in d x).
 proof.
@@ -1833,6 +1865,39 @@ move=> funi_d full_d; apply: is_full_funiform.
 - by apply/dfun_fu/full_d.
 - by apply/dfun_uni.
 qed.
+
+lemma dfunE_djoin ['u] du (E : (t -> 'u) -> bool) : mu (dfun du) E =
+  mu (djoinmap du FinT.enum) (E \o tofun).
+proof.
+rewrite -dmapE; congr; apply/eq_distr=> f.
+rewrite dfun1E_djoin dmap1E &(mu_eq_support) /pred1.
+move=> us /supp_djoinmap [/eq_sym sz_us /allP h] @/(\o) /=.
+apply/eq_iff; split => [->|]; first by apply/offunK.
+by move/(congr1 offun); rewrite tofunK.
+qed.
+
+lemma dfunE ['u] du (p : t -> 'u -> bool) :
+    mu (dfun du) (fun (f : t -> 'u) => forall x, p x (f x))
+  = BRM.big predT (fun x => mu (du x) (p x)) FinT.enum.
+proof.
+pose P f := all (fun x => p x (f x)) FinT.enum.
+rewrite -(@mu_eq _ P) => [f|] @/P; first rewrite allP /=.
+- by apply: eq_iff; split=> h *; apply: h; rewrite FinT.enumP.
+rewrite dfunE_djoin /(\o) /tofun; have {P} := FinT.enum_uniq.
+pose P xs us := all (fun x => p x (nth witness us (index x xs))) xs.
+rewrite -/(P FinT.enum); elim: FinT.enum => [|x xs ih].
+- by rewrite djoin_nilE /= BRM.big_nil.
+case=> x_xs uq_xs; rewrite map_cons /=.
+pose Q us := p x (head witness us) /\ P xs (behead us).
+rewrite -(@mu_eq_support _ Q) => [us /supp_djoin_cons|].
+- case=> v vs [v_dux /supp_djoin []]; rewrite size_map.
+  move=> sz_xs hall @/Q @/P /=; rewrite index_head nth0_head.
+  congr; apply/eq_iff/eq_all_in=> /= x' x'_xs.
+  case: (x' = x) => [->>//|]; rewrite index_cons.
+  by move=> ->; rewrite nth_behead ?index_ge0.
+by rewrite (@djoin_consE _ _ _ (p x) (P xs)) ih.
+qed.
+
 end MUniFinFun.
 
 (* -------------------------------------------------------------------- *)
