@@ -232,6 +232,12 @@ proof. by []. qed.
 lemma nosmt predIC (p1 p2 : 'a -> bool) : predI p1 p2 = predI p2 p1.
 proof. by apply fun_ext=> x; rewrite /predI andbC. qed.
 
+lemma nosmt predIT ['a] p : predI<:'a> p predT = p.
+proof. by []. qed.
+
+lemma nosmt predTI ['a] p : predI<:'a> predT p = p.
+proof. by []. qed.
+
 lemma nosmt predCI (p : 'a -> bool) : predI (predC p) p = pred0.
 proof. by apply/fun_ext=> x /=; delta => /=; rewrite andNb. qed.
 

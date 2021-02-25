@@ -528,13 +528,24 @@ proof. by rewrite all_count count_predT. qed.
 lemma all_predC p (s : 'a list): all (predC p) s = ! has p s.
 proof. by elim: s => //= x s ->; rewrite /predC; case: (p x). qed.
 
+lemma eq_filter_in p1 p2 (s : 'a list):
+  (forall x, x \in s => p1 x <=> p2 x) => filter p1 s = filter p2 s.
+proof.
+elim: s => //= x l ih h; rewrite h //=.
+by rewrite ih // => y yl; apply: h; rewrite yl.
+qed.
+
 lemma eq_filter p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => filter p1 s = filter p2 s.
-proof. by move=> h; elim: s=> //= x l; rewrite h=> ->. qed.
+proof. by move=> h; apply: eq_filter_in=> ? _; apply/h. qed.
+
+lemma eq_count_in p1 p2 (s : 'a list):
+  (forall x, x \in s => p1 x <=> p2 x) => count p1 s = count p2 s.
+proof. by move=> h; rewrite -!size_filter (eq_filter_in _ p2). qed.
 
 lemma eq_count p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => count p1 s = count p2 s.
-proof. by move=> h; rewrite -!size_filter (eq_filter _ p2). qed.
+proof. by move=> h; apply/eq_count_in=> ? _; apply/h. qed.
 
 lemma count_pred0_eq p (s : 'a list):
   (forall x, ! p x) => count p s = 0.
@@ -544,13 +555,21 @@ lemma count_predT_eq p (s : 'a list):
   (forall x, p x) => count p s = size s.
 proof. by move=> eq; rewrite -(count_predT s) &(eq_count). qed.
 
+lemma eq_has_in p1 p2 (s : 'a list):
+  (forall x, x \in s => p1 x <=> p2 x) => has p1 s <=> has p2 s.
+proof. by move=> h; rewrite !has_count (eq_count_in _ p2). qed.
+
 lemma eq_has p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => has p1 s <=> has p2 s.
-proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
+proof. by move=> h; apply/eq_has_in=> ? _; apply/h. qed.
+
+lemma eq_all_in p1 p2 (s : 'a list):
+  (forall x, x \in s => p1 x <=> p2 x) => all p1 s <=> all p2 s.
+proof. by move=> h; rewrite !all_count (eq_count_in _ p2). qed.
 
 lemma eq_all p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => all p1 s <=> all p2 s.
-proof. by move=> h; rewrite !all_count (eq_count _ p2). qed.
+proof. by move=> h; apply/eq_all_in=> ? _; apply/h. qed.
 
 lemma has_sym (s1 s2 : 'a list): has (mem s1) s2 <=> has (mem s2) s1.
 proof. smt. qed.
@@ -2505,6 +2524,14 @@ proof. by rewrite -(@map_id ys) zip_map map_id. qed.
 lemma zip_mapr ['a 'b1 'b2] (g : 'b1 -> 'b2) (xs : 'a list) ys :
   zip xs (map g ys) = map (fun xy => (fst xy, g (snd xy))) (zip xs ys).
 proof. by rewrite -(@map_id xs) zip_map map_id. qed.
+
+lemma zipss ['a] (s : 'a list) :
+  zip s s = map (fun x => (x, x)) s.
+proof. by elim: s. qed.
+
+lemma mem_zip_mapr ['a 'b] (f : 'a -> 'b) (s : 'a list) x y :
+  (x, y) \in zip s (map f s) <=> (x \in s /\ y = f x).
+proof. by elim: s => //= x' xs -> /#. qed.
 
 lemma assoc_zip ['a, 'b] (ks : 'a list) (vs : 'b list) k:
  size ks = size vs => assoc (zip ks vs) k = onth vs (index k ks).
