@@ -1898,6 +1898,15 @@ rewrite -(@mu_eq_support _ Q) => [us /supp_djoin_cons|].
 by rewrite (@djoin_consE _ _ _ (p x) (P xs)) ih.
 qed.
 
+lemma dfun_ll ['u] (d : t -> 'u distr) : 
+  (forall x, is_lossless (d x)) => is_lossless (dfun d).
+proof. 
+ rewrite /is_lossless => d_ll.
+ pose p := fun (_:t) (_:'u) => true.
+ rewrite (@mu_eq _ _ (fun f => forall x, p x (f x))) 1:// dfunE /=.
+ apply BRM.big1_seq => /> ???;apply d_ll.
+qed.
+
 end MUniFinFun.
 
 (* -------------------------------------------------------------------- *)
