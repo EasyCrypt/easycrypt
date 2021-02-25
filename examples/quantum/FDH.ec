@@ -1,4 +1,125 @@
 require import AllCore List Distr DBool SmtMap.
+(*   *) import StdOrder RField RealOrder StdBigop Bigreal.
+
+(* This module represent what we have in mind for quantum oracle *)
+(*
+abstract theory Quantum_full.
+  type c. (* classical input *)
+  type q. (* quantum input   *)
+  type u. (* quantum output  *)
+
+  module type ClassicT = {
+    proc init () : unit
+    proc get (_:c) : (q -> u) option
+  }.
+
+  module type QuantumT = {
+    proc qget (c:c, q:q) : u  
+  }.
+
+  module type QuantumT_i = {
+    proc init () : unit 
+    include QuantumT 
+  }.
+
+  module Quantum(O:ClassicT) = {
+    include O [init]
+    proc qget(c:c, q:q) = {
+      var f;
+      f <@ O.get(c);
+      return (if f = None then witness else (oget f) q);   
+      (* q_ *- U (if f = None then witness else (oget f) q) *)
+    }
+  }.
+
+end Quantum_full.
+
+(* Same a Quantum_full but with no classical input *)
+abstract theory Quantum. 
+  type q. (* quantum input   *)
+  type u. (* quantum output  *)
+
+  module type ClassicT = {
+    proc init () : unit
+    proc get () : (q -> u) option
+  }.
+
+  module type QuantumT = {
+    proc qget (q:q) : u  
+  }.
+
+  module type QuantumT_i = {
+    proc init () : unit 
+    include QuantumT 
+  }.
+
+  module Quantum(O:ClassicT) = {
+    include O [init]
+    proc qget(q:q) = {
+      var f;
+      f <@ O.get();
+      return (if f = None then witness else (oget f) q);
+    }
+  }.
+
+  module type RoT = {
+    proc init () : unit
+    proc get () : (q -> u)
+  }.
+
+  (* We limit the number of queries *)
+  abstract theory Restr.
+
+  op max_queries : int.
+
+  module RQuantum(O:RoT) : ClassicT = {
+    var c : int
+    proc init () = { c <- 0; O.init(); }
+    proc get() = {
+      var f, r;
+      r <- None;
+      if (c < max_queries) { f <@ O.get(); r <- Some f; c <- c + 1;}
+      return r;
+    }
+  }.
+
+  end Restr.
+
+  abstract theory QRom.
+
+  clone import MUniFinFun as MUF with
+    type t <- q.  (* This assume that the type of q is finite *)
+
+  op [lossless uniform full] du : u distr.
+
+  op dfu : (q -> u) distr = dfun (fun _ => du).
+
+  lemma dfu_ll: is_lossless dfu.
+  proof. apply dfun_ll => ?;apply du_ll. qed.
+
+  lemma dfu_uni: is_uniform dfu.
+  proof. apply dfun_uni => ?; apply du_uni. qed.
+
+  lemma dfu_fu: is_full dfu.
+  proof. apply dfun_fu => ?; apply du_fu. qed.
+
+  hint solve 0 random : dfu_ll dfu_uni dfu_fu.
+
+  module RoI = {
+    proc init () : 
+
+    
+
+
+
+
+end QRom.
+*)
+
+
+
+
+(* --------------------------------------------------------------------------- *)
 
 type msg.
 type sign.
@@ -75,6 +196,8 @@ axiom f_finv ks h : ks \in kg => f ks.`1 (finv ks.`2 h) = h.
 op [lossless uniform full] dhash : hash distr.
 op [lossless uniform full] dsign : sign distr.
 
+axiom dhash_dsign : mu1 dhash witness = mu1 dsign witness.
+ 
 module type AdvOW = {
   proc main(pk:pkey, y:hash) : sign
 }.
@@ -89,9 +212,45 @@ module OW(A:AdvOW) = {
   }
 }.
 
-op dfhash : (msg -> hash) distr.
-op dfsign : (msg -> sign) distr.
+(* --------------------------------------------------------------------------*)
+(* We define the random distribution over functions *)
+clone import MUniFinFun as MUFF with
+  type t <- msg.   (* This assume that the type of msg is finite *)
 
+op dfhash : (msg -> hash) distr = dfun (fun _ => dhash).
+
+lemma dfhash_ll: is_lossless dfhash.
+proof. apply dfun_ll => ?;apply dhash_ll. qed.
+
+lemma dfhash_uni: is_uniform dfhash.
+proof. apply dfun_uni => ?; apply dhash_uni. qed.
+
+lemma dfhash_fu: is_full dfhash.
+proof. apply dfun_fu => ?; apply dhash_fu. qed.
+
+hint solve 0 random : dfhash_ll dfhash_uni dfhash_fu.
+
+op dfsign : (msg -> sign) distr = dfun (fun _ => dsign).
+
+lemma dfsign_ll: is_lossless dfsign.
+proof. apply dfun_ll => ?;apply dsign_ll. qed.
+
+lemma dfsign_uni: is_uniform dfsign.
+proof. apply dfun_uni => ?; apply dsign_uni. qed.
+
+lemma dfsign_fu: is_full dfsign.
+proof. apply dfun_fu => ?; apply dsign_fu. qed.
+
+hint solve 0 random : dfsign_ll dfsign_uni dfsign_fu.
+
+lemma dfsign_dfhash (hs: msg -> sign) (hh:msg -> hash) : mu1 dfsign hs = mu1 dfhash hh.
+proof.
+  rewrite !dfun1E;apply BRM.eq_big => //= x _.
+  rewrite (is_full_funiform _ dsign_fu dsign_uni _ witness).
+  by rewrite (is_full_funiform _ dhash_fu dhash_uni _ witness) dhash_dsign.
+qed.
+
+(* --------------------------------------------------------------------------- *)
 module type Hash = {
   proc h (m:msg) : hash 
 }.
@@ -154,16 +313,29 @@ module RA (A:AdvEFH) (H:Hash) (O:OrclSign) = {
     return r;
   }
 }.
-    
-op [lossless] dfbool : (msg -> bool) distr.
+  
+clone import MUniFinFunBiased as DBB with 
+  type t <- msg,
+  op MUniFinFun.FinT.enum <-  MUFF.FinT.enum
+  proof *.
+realize MUniFinFun.FinT.enum_spec by apply MUFF.FinT.enum_spec.
 
 op p : real.
+axiom p_bound : 0%r <= p <= 1%r.
 
-axiom pr_dfbool m : mu dfbool (fun t => t m) = p.
+op dfbool = dbfun p.
 
-axiom pr_dfbool_l m (l:msg list) q: 
+lemma pr_dfbool_l m (l:msg list) q : 
   !m \in l => size l <= q =>  
   p*(1%r-p)^q <= mu dfbool (fun t => t m /\ forall m', m' \in l => !t m').
+proof.
+  move=> hm hl.
+  apply (ler_trans (p ^ 1 * (1%r - p) ^ size l)).
+  rewrite RField.expr1; apply ler_wpmul2l; 1: by case: p_bound.
+  apply ler_wiexpn2l; [1:smt (p_bound)| 2: smt(size_ge0)].
+  apply (ler_trans _ _ _ (dbfunE_mem_le p [m] l p_bound _)); 1: smt().
+  by apply mu_le => /#.
+qed.
 
 theory RNDIF.
 
@@ -387,9 +559,7 @@ local lemma l4 &m :
    factor.
 proof.
   apply (advantage ARI &m dfhash).
-  + admit. (* is_lossless dfhash *)
-  + admit. (* is_uniform dfhash *)
-  admit.   (* is_full dfhash *)
+  + by apply dfhash_ll. + by apply dfhash_uni. + by apply dfhash_fu.
 qed.
 
 local module G2 = {
@@ -444,11 +614,7 @@ proof.
       (fun (h:msg -> sign) => fun m => f EF.pk{1} (h m)).
   rewrite /P; auto => |> k hk h _ bf _; split.
   + move=> *; apply fun_ext => ?; smt(finv_f).
-  move=> _; split.
-  + admit. (* the distribution are uniform *)
-  move=> _ hf ?; split.
-  + admit. (* the distribution is full *)
-  smt(f_finv finv_f ge0_qs ge0_qh).
+  smt(dfsign_dfhash f_finv finv_f ge0_qs ge0_qh).
 qed.
 
 local lemma l6 &m : 
@@ -632,11 +798,7 @@ proof.
   auto => /> {&m}.
   move => k hk t _; split.
   + move=> hs _; apply fun_ext; smt (f2inv_f2 finv_f).
-  move=> _; split.
-  + admit. (* uniform on the same space *)
-  move=> _ h _; split.
-  + admit. (* the distribution is full *)
-  smt (f2_f2inv f_finv).
+  smt (dfsign_dfhash f2_f2inv f_finv).
 qed.
 
 local lemma l4 &m : 
