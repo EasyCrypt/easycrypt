@@ -484,6 +484,13 @@ lemma count_filter p1 p2 (s : 'a list):
   count p1 (filter p2 s) = count (predI p1 p2) s.
 proof. by rewrite -!size_filter filter_predI. qed.
 
+lemma countID ['a] p q (xs : 'a list) :
+  count p xs = count (predI p q) xs + count (predI p (predC q)) xs.
+proof.
+elim: xs => //= x xs ih; rewrite addrACA -ih.
+by move=> @/predI @/predC; case: (q x).
+qed.
+
 lemma count_pred0 (s : 'a list): count pred0 s = 0.
 proof. by rewrite -size_filter filter_pred0. qed.
 
@@ -547,13 +554,21 @@ lemma eq_count p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => count p1 s = count p2 s.
 proof. by move=> h; apply/eq_count_in=> ? _; apply/h. qed.
 
+lemma count_pred0_eq_in p (s : 'a list) :
+  (forall x, x \in s => !p x) => count p s = 0.
+proof. by move=> eq; rewrite -(count_pred0 s) &(eq_count_in). qed.
+
 lemma count_pred0_eq p (s : 'a list):
   (forall x, ! p x) => count p s = 0.
-proof. by move=> eq; rewrite -(count_pred0 s) &(eq_count). qed.
+proof. by move=> eq; apply/count_pred0_eq_in => x ?; apply/eq. qed.
+
+lemma count_predT_eq_in p (s : 'a list):
+  (forall x, x \in s => p x) => count p s = size s.
+proof. by move=> eq; rewrite -(count_predT s) &(eq_count_in). qed.
 
 lemma count_predT_eq p (s : 'a list):
   (forall x, p x) => count p s = size s.
-proof. by move=> eq; rewrite -(count_predT s) &(eq_count). qed.
+proof. by move=> eq; apply/count_predT_eq_in => x ?; apply/eq. qed.
 
 lemma eq_has_in p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => has p1 s <=> has p2 s.
@@ -1455,6 +1470,22 @@ proof.
   apply (perm_eq_uniq (undup s)); last by apply undup_uniq.
   rewrite /perm_eq allP => x _ /=; rewrite count1_s.
   by rewrite (count_uniq_mem (undup s) x) ?undup_uniq // mem_undup.
+qed.
+
+lemma filter_swap ['a] (xs ys : 'a list) :
+  uniq xs => uniq ys =>
+    perm_eq (filter (mem xs) ys) (filter (mem ys) xs).
+proof.
+move=> uq_xs uq_ys; rewrite &(uniq_perm_eq) ?filter_uniq //.
+by move=> x; rewrite !mem_filter andbC.
+qed.
+
+lemma count_swap ['a] (xs ys : 'a list) :
+  uniq xs => uniq ys =>
+    count (mem xs) ys = count (mem ys) xs.
+proof.
+move=> uq_xs uq_ys; rewrite -!size_filter.
+by apply/perm_eq_size/filter_swap.
 qed.
 
 lemma undup_nilp (s : 'a list) : (undup s = []) <=> (s = []).

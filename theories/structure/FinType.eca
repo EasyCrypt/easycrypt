@@ -33,3 +33,11 @@ proof.
 rewrite /card; have: mem enum witness by rewrite enumP.
 by case: enum=> //= x s _; rewrite addzC ltzS size_ge0.
 qed.
+
+lemma count_mem xs :
+  uniq xs => count (mem xs) enum = size xs.
+proof.
+move=> eq_xs; rewrite count_swap // 1:&(enum_uniq).
+by rewrite count_predT_eq // &(enumP).
+qed.
+
