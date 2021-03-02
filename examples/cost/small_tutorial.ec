@@ -1,5 +1,5 @@
 require import AllCore Xint Int List CHoareTactic StdBigop.
-import Bigint IntExtra.
+import Bigint.
 
 module V = { var v : int }.
 
@@ -140,7 +140,7 @@ lemma foo5 : forall (a : int) (b : int),
 0 <= a <= b =>
 choare[D.f : x = a /\ y = b /\ x < y ==> true] time [N (2 * (b - a) + 1)].
 proof.
-move => *.
+move => a b [Ha Hb].
 proc => /=.
 (* The [while] tactic takes the following parameters:
    - invariant, 
@@ -252,7 +252,7 @@ lemma Inv_compl
 proof.    
 move => hk; proc.
 call (_: true; time [(H0.o : [N 0; H0.o : 1])]).
-move=> * /=; proc*; call(_: true; time []); auto => /=.
+move => i Hi /=; proc*; call(_: true; time []); auto => /=.
 by auto => /=; rewrite big_constz count_predT big_constNz !size_range /#.
 qed.
 

@@ -1,5 +1,5 @@
 require import AllCore Int CHoareTactic StdBigop.
-import Bigint IntExtra.
+import Bigint.
 
 schema cost_plus `{P} {e e' : int}: 
   cost[P : e + e'] = cost[P : e] + cost[P : e'] + N 1.
