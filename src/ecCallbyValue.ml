@@ -321,7 +321,8 @@ and reduce_user_delta st f1 p tys args =
   let f2 =
     let args, ty = flatten_args args in
     f_app f1 args ty in
-  match reduce_user st f2 with
+
+  match reduce_user_with_exn st f2 with
   | f -> f
   | exception NotReducible ->
     let mode = st.st_ri.delta_p p in
@@ -334,7 +335,7 @@ and reduce_user_delta st f1 p tys args =
 and reduce_logic st f =
   EcReduction.reduce_logic st.st_ri st.st_env st.st_hyps f
 
-and reduce_user st f =
+and reduce_user_with_exn st f =
   match reduce_logic st f with
   | f -> cbv_init st Subst.subst_id f
   | exception NotReducible ->
@@ -342,6 +343,10 @@ and reduce_user st f =
     let simplify = cbv_init st Subst.subst_id in
     let f = reduce_user_gen simplify st.st_ri st.st_env st.st_hyps f in
     cbv_init st Subst.subst_id f
+
+and reduce_user st f =
+  try  reduce_user_with_exn st f
+  with NotReducible -> f
 
 (* -------------------------------------------------------------------- *)
 and cbv_init st s f =

@@ -315,15 +315,17 @@ let check_cost_l env subst co1 co2 =
           EcPath.Mx.change (fun old -> assert (old = None); Some c) f' calls
         ) co2.c_calls EcPath.Mx.empty in
 
-    EcPath.Mx.fold2_union (fun _ a1 a2 acc -> match a1,a2 with
-        | None, None -> assert false
-        | None, Some _ | Some _, None -> raise NotConv
-        | Some cb1, Some cb2 ->
+    let aco, aca =
+      EcPath.Mx.fold2_union (fun _ a1 a2 (aco, aca) ->
+          match a1,a2 with
+          | None, None -> assert false
+          | None, Some _ | Some _, None -> raise NotConv
+          | Some cb1, Some cb2 ->
+              ((cb1.cb_cost  , cb2.cb_cost  ) :: aco,
+               (cb1.cb_called, cb2.cb_called) :: aca)
+        ) calls1 calls2 ([], []) in
 
-          (cb1.cb_cost, cb2.cb_cost) ::
-          (cb1.cb_called, cb2.cb_called) ::
-          acc
-      ) calls1 calls2 [co1.c_self, co2.c_self]
+    (co1.c_self, co2.c_self) :: aco @ aca
 
 let check_cost test env subst co1 co2 =
   List.iter
@@ -616,9 +618,6 @@ let get_UR_CostExpr = function UR_CostExpr m -> m | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let reduce_user_gen simplify ri env hyps f =
-  (* REM *)
-  Format.eprintf "reduce_user_gen@.";
-
   if not ri.user then raise nohead;
 
   let p =
@@ -910,7 +909,7 @@ let reduce_delta ri env _hyps f =
 (* -------------------------------------------------------------------- *)
 let reduce_cost ri env coe =
   if not ri.cost then raise nohead;
-  if EcCHoare.free_expr coe.coe_e then f_i0
+  if EcCHoare.free_expr coe.coe_e then f_x0
   else match coe.coe_e.e_node with
     | Etuple es ->
       List.fold_left (fun acc e ->
@@ -1238,6 +1237,10 @@ and reduce_head_sub ri env f =
     | Ftuple args ->
       f_tuple (reduce_head_args ri env args)
 
+    | Fcoe coe ->
+      let coe_pre = as_seq1 (reduce_head_args ri env [coe.coe_pre]) in
+      f_coe_r { coe with coe_pre }
+
     | _ -> assert false
 
   in RedTbl.set_sub ri.redtbl f f'; f'
@@ -1266,6 +1269,10 @@ let rec simplify ri env f =
   | FbdHoareF hf when ri.ri.modpath ->
       let bhf_f = EcEnv.NormMp.norm_xfun env hf.bhf_f in
       f_map (fun ty -> ty) (simplify ri env) (f_bdHoareF_r { hf with bhf_f })
+
+  | FcHoareF hf when ri.ri.modpath ->
+      let chf_f = EcEnv.NormMp.norm_xfun env hf.chf_f in
+      f_map (fun ty -> ty) (simplify ri env) (f_cHoareF_r { hf with chf_f })
 
   | FequivF ef when ri.ri.modpath ->
       let ef_fl = EcEnv.NormMp.norm_xfun env ef.ef_fl in
@@ -1372,13 +1379,26 @@ let zpop ri side f hd =
     f_eagerF_r {hs with eg_pr = pr; eg_po = po }
   | Zhl {f_node = Fpr hs}, [a;ev] ->
     f_pr_r {hs with pr_args = a; pr_event = ev }
+  | Zhl {f_node = Fcoe hcoe}, [pre] ->
+    f_coe_r {hcoe with coe_pre = pre}
+  | Zhl {f_node = FcHoareF hfc}, chf_pr::chf_po::self_::pcalls -> (* FIXME *)
+    let co, ca = List.split_at (List.length pcalls / 2) pcalls in
+    let calls =
+      List.map2
+        (fun (xp, _) (cb_cost, cb_called) -> (xp, call_bound_r cb_cost cb_called))
+        (Mx.bindings hfc.chf_co.c_calls) (List.combine co ca) in
+    f_cHoareF_r { hfc with chf_pr; chf_po; chf_co = cost_r self_ (Mx.of_list calls) }
+  | Zhl {f_node = FcHoareS hfs}, chs_pr::chs_po::self_::pcalls -> (* FIXME *)
+    let co, ca = List.split_at (List.length pcalls / 2) pcalls in
+    let calls =
+      List.map2
+        (fun (xp, _) (cb_cost, cb_called) -> (xp, call_bound_r cb_cost cb_called))
+        (Mx.bindings hfs.chs_co.c_calls) (List.combine co ca) in
+    f_cHoareS_r { hfs with chs_pr; chs_po; chs_co = cost_r self_ (Mx.of_list calls) }
   | _, _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let rec conv ri env f1 f2 stk =
-  (* REM *)
-  Format.eprintf "conv@.";
-
   if f_equal f1 f2 then conv_next ri env f1 stk else
   match f1.f_node, f2.f_node with
   | Fquant (q1, bd1, f1'), Fquant(q2,bd2,f2') ->

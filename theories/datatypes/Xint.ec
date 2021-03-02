@@ -36,5 +36,3 @@ op is_int (x:xint) =
 op is_inf (x:xint) = 
   with x = N _ => false
   with x = Inf => true.
-
-

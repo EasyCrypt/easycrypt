@@ -176,11 +176,12 @@ theory List_CDH.
       instantiate /= h := (cost_duniform {gx, gy, x : group, s : group list} 
                         `(true) s).
       rnd (size s <= n).
-      + by move=> /=; apply: is_int_le h.
+      + by apply: (is_int_le _ _ h).
       call hcA; skip => />; split.
       + move=> *; apply duniform_ll;rewrite -size_eq0 /#.
-      move: h; pose t := cost(&hr: {gx, gy, x : group, s : group list})[size s <= n : duniform s].
-      smt().
+      move: h; pose t :=
+        cost(&hr: {gx, gy, x : group, s : group list})[size s <= n : duniform s].
+      by case: t => // ? /#.
     qed.
 
   end C.

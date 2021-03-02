@@ -401,12 +401,9 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
     in
 
     let default () =
-      if opts.fm_conv then begin
-        let subject = Fsubst.f_subst subst subject in
-        let ptn = Fsubst.f_subst (MEV.assubst ue !ev) ptn in
-          if not (conv ptn subject) then
-            failure ()
-      end else failure ()
+      let subject = Fsubst.f_subst subst subject in
+      let ptn = Fsubst.f_subst (MEV.assubst ue !ev) ptn in
+      if not (conv ptn subject) then failure ()
     in
 
     try

@@ -661,7 +661,7 @@ section BOUNDER.
 declare module D : Distinguisher {-RP, -PRFi, -DBounder}.
 axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
 
-lemma DBounder_ll (O <: PRF_Oracles{DBounder(D)}): 
+lemma DBounder_ll (O <: PRF_Oracles{-DBounder(D)}): 
   islossless O.f => islossless DBounder(D, O).distinguish.
 proof.
   move=> hll; islossless.

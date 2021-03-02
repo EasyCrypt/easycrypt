@@ -189,9 +189,7 @@ section.
          time [ (OrclL(ToOrcl(S)).orcl k : [N (cincr H.q); S.enc : 1]) ] => //.
     + by move => />; rewrite !bigi_constz 1..2:[smt (H.q_pos)].
     move=> zo hzo; proc; inline *. 
-    wp := (`|H.Count.c| <= H.q). right. move => /=. 
-
-    call (: true); auto => &hr />.
+    wp := (`|H.Count.c| <= H.q); call (: true); auto => &hr />.
     smt (cs_pos).
   qed.
 
@@ -277,14 +275,8 @@ section.
     Pr[CPAR(S,B(S,A)).main() @ &m : res] =
     1%r/H.q%r * (Pr[CPAL(S,A).main() @ &m : res] - Pr[CPAR(S,A).main() @ &m : res]).
   proof.
-<<<<<<< HEAD
-    cut -> : Pr[CPAL(S, A).main() @ &m : res] =
-             Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res].
-=======
-    move=> Hq.
-    have -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
-              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
->>>>>>> origin/1.0-preview
+    have -> : Pr[CPAL(S, A).main() @ &m : res] =
+              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res].
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk}) => //.
       proc.
@@ -292,13 +284,8 @@ section.
       wp;call (_: ={glob S, K.pk}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
-<<<<<<< HEAD
-    cut -> : Pr[CPAR(S, A).main() @ &m : res] =
-             Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res].
-=======
-    have -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
-              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
->>>>>>> origin/1.0-preview
+    have -> : Pr[CPAR(S, A).main() @ &m : res] =
+              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res].
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk}) => //.
       proc.
@@ -306,19 +293,13 @@ section.
       wp;call (_: ={glob S, K.pk}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
-<<<<<<< HEAD
-    cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ H.q_pos &m (fun ga go c, true) => //=.
+    have := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ H.q_pos &m (fun ga go c, true) => //=.
     + have h : choare [ToOrcl(S).leaks : true ==> true] time ['0; S.kg:1].
       + by proc; call (_:true); skip => /=; smt(cs_pos).
       conseq h.
     + have h : choare [ToOrcl(S).orcl : true ==> true] time ['0; S.enc:1].
       + by proc; call (_:true); skip => /=; smt(cs_pos).
       conseq h.
-=======
-    have := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
-      by proc;call Lkg.
-      by proc;call Lenc.
->>>>>>> origin/1.0-preview
       move=> O LR Llr Ll Lo;proc;call (La LR _) => //.
       by call Ll.
     have -> : Pr[INDL(ToOrcl(S), ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q] =
@@ -418,7 +399,7 @@ section.
                                                                A.main : 1;
                                                                MLR.orcl : 1] => //.
     + wp. 
-      instantiate /(_ H.q) /= h := (cost_dinterval {b' : bool, pk : pkey} 0 H.q).  
+      instantiate /(_ H.q) /= h := (cost_dinterval {b' : bool, pk : pkey} 0 H.q).
       rnd (0 <= H.q <= H.q - 0); 1: by rewrite h.
       skip => &hr />.
       rewrite h /=.

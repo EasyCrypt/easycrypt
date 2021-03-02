@@ -159,3 +159,16 @@ proof.
 qed.
 
 hint simplify is_int_big.
+
+(* -------------------------------------------------------------------- *)
+lemma N_D (x y : int) : N (x + y) = N x + N y.
+proof. by []. qed.
+
+lemma N_N (x : int) : N (-x) = -N x.
+proof. by []. qed.
+
+lemma N_B (x y : int) : N (x-y) = N x - N y.
+proof. by []. qed.
+
+lemma mono_N_le (x y : int): x <= y <=> N x <= N y.
+proof. by []. qed.
