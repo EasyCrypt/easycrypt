@@ -56,7 +56,7 @@ async while
 + by move=> &1 &2 />; smt(gt0_k).
 + by move=> &1 &2 />; smt(gt0_k).
 + by move=> &2; exfalso=> &1; smt(gt0_k).
-+ by move=> &2; exfalso=> &1; smt(gt0_k).
++ by move=> &2; exfalso=> &1 ?; smt(gt0_k).
 + move=> v1 v2.
   rcondt {2} 1; 1: by auto => /> /#.
   rcondf{2} 4; 1: by auto; conseq (_: true);auto.
