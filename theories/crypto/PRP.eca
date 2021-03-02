@@ -523,7 +523,7 @@ section PRPi_PRPi'_Indirect.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
   qed.
 
-  declare module D : Distinguisher { RP }.
+  declare module D : Distinguisher { -RP }.
 
   lemma pr_PRPi_PRPi'_Indirect &m:
     Pr[IND(RP,D).main() @ &m: res] = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].

@@ -9,7 +9,7 @@
 require import AllCore List FSet Finite Distr OldMonoid.
 require import Indist DInterval.
 require import CHoareTactic.
-(*---*) import StdBigop.Bigint BIA.
+(*---*) import StdBigop.Bigint BIA Xint.
 
 type pkey.
 type skey.
@@ -188,7 +188,10 @@ section.
     proc (H.Count.c = k) :
          time [ (OrclL(ToOrcl(S)).orcl k : [N (cincr H.q); S.enc : 1]) ] => //.
     + by move => />; rewrite !bigi_constz 1..2:[smt (H.q_pos)].
-    move=> zo hzo; proc; inline *; wp := (`|H.Count.c| <= H.q); call (: true); auto => &hr />.
+    move=> zo hzo; proc; inline *. 
+    wp := (`|H.Count.c| <= H.q). right. move => /=. 
+
+    call (: true); auto => &hr />.
     smt (cs_pos).
   qed.
 
