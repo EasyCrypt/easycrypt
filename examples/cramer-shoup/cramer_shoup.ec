@@ -1,12 +1,6 @@
 require import AllCore List Distr Dexcepted PKE.
-<<<<<<< HEAD
 require import StdOrder StdBigop CHoareTactic.
-import RealOrder Bigreal.
-(*---*) import StdBigop.Bigint BIA.
-=======
-require import StdOrder StdBigop.
 import RField RealOrder Bigreal.
->>>>>>> origin/1.0-preview
 
 require TCR RndExcept.
 
@@ -910,17 +904,10 @@ section Security_Aux.
     pose v := H _ _. rewrite !negb_or => [[]] Hg3 Hcilog Hstareq.
     rewrite Hg3 /=. 
     case: (G1.bad{m1}) => [_ -> | ] //=. 
-<<<<<<< HEAD
-    move=> Hbad Hsize Hstar; rewrite !andaE !negb_and /= 2!negb_or /= -!andaE.
-    case (v = G2.v{m2}) => [->> /= ? [#]!->> Hstar1 ->>| /=].
-    + by case: (G1.cstar{m2}) Hstareq Hstar Hstar1.
-    move=> Hv Ha _ ->>;left.
-=======
-    move=> Hbad Hsize Hstar;rewrite !negb_and /= 2!negb_or /= -!andaE.
+    move=> Hbad Hsize Hstar;rewrite !andaE !negb_and /= 2!negb_or /= -!andaE.
     case (v = G2.v{m2}) => />.
     + by case: (G1.cstar{m2}) Hstareq Hstar => />.
     move=> Hv Ha _;left.
->>>>>>> origin/1.0-preview
     rewrite !(log_g, log_pow, log_mul);field => //.
     + by move: Hv;apply: contra;rewrite ofint0 => H;ring H.
     by move: Ha;apply: contra; rewrite log_bij log_pow ofint0 => H;ring H.
@@ -1381,17 +1368,17 @@ section Security.
   proof.
     case (Pr[CCA(CramerShoup, A).main() @ &m : res] <= 1%r/2%r);last first.
     + have /#:= aux3 A _ _ guess_ll choose_ll &m.
-      + move=> kC *; proc true : time [(O.dec : [N kC])] => //=.
+      + move=> kC O ?; proc true : time [(O.dec: [N kC])] => //=.
         + rewrite bigi_constz /=; smt(ge0_cA1). 
         by move=> *; proc true : time [].
-      move=> kC *; proc true : time [(O.dec: [N kC])] => //=.
+      move=> kC O *; proc true : time [(O.dec: [N kC])] => //=.
       + by rewrite bigi_constz; smt(ge0_cA1).
       by move=> *; proc true : time [].
     have := aux3 NA _ _ _ choose_ll &m.            
-    + move=> kC *; proc true : time [(O.dec: [N kC])] => //=.
+    + move=> kC O *; proc true : time [(O.dec: [N kC])] => //=.
       + by rewrite bigi_constz; smt(ge0_cA1).
       by move=> *; proc true : time [].      
-    + move=> kC *; proc => /=.
+    + move=> kC O *; proc => /=.
       call (:true; time [(O.dec: [N kC])]).
       + by move=> *; proc true : time []. 
       skip; rewrite bigi_constz; smt(ge0_cA1).
@@ -1420,10 +1407,10 @@ section Security.
   proof.
     exists (B_DDH(A)); split.
     + conseq (choare_B_DDH A _ _ guess_ll choose_ll); 1: by move=> /=;smt().
-      + move=> kC *; proc true : time [(O.dec: [N kC])] => />.
+      + move=> kC O *; proc true : time [(O.dec: [N kC])] => />.
         + by rewrite !bigi_constz 1,2:[smt(ge0_cA1)].    
         by move=> *; proc true : time [].   
-      move=> kC *; proc true : time [(O.dec: [N kC])] => />.
+      move=> kC O *; proc true : time [(O.dec: [N kC])] => />.
       + by rewrite !bigi_constz 1,2:[smt(ge0_cA1)].    
       by move=> *; proc true : time [].
     exists(B_TCR(A));split.

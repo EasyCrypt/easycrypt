@@ -198,7 +198,11 @@ let process_p_abs_inv_inf tc hyps p_abs_inv_inf =
       match x with
       | Some y -> loc y
       | None   -> loc f in
-    let x = mk_loc lo x in
+    let x =
+      match x with
+      | Some _ -> mk_loc lo x
+      | None   -> mk_loc lo (Some (mk_loc lo "k")) in
+
     let f = EcTyping.trans_gamepath env f in
     let bd = [x], mk_loc lo PTunivar in
     let doc c =
