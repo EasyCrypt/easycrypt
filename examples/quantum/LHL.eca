@@ -1,0 +1,124 @@
+require import AllCore List Distr ZModP.
+require (*  *) Matrix.
+
+(* The theory of ZP, integer modulo p where p is a prime number *)
+clone import ZModField as ZP.
+import ZP.ZModpField.
+
+(* We define the square matrix : size * size *)
+clone import Matrix as M with 
+  type R <- zmod,
+  op ZR.zeror <- ZP.zero,
+  op ZR.( + ) <- ZP.( + ),
+  op ZR.([-]) <- ZP.([-]),
+  op ZR.oner  <- ZP.one,
+  op ZR.( * ) <- ZP.( * ),
+  op ZR.invr  <- ZP.inv,
+  pred ZR.unit  <- fun (x : zmod) => x <> zero
+  proof ZR.*, Big.*.
+realize ZR.addrA by apply addrA.
+realize ZR.addrC by apply addrC.
+realize ZR.add0r by apply add0r.
+realize ZR.addNr by apply addNr.
+realize ZR.oner_neq0 by apply oner_neq0.
+realize ZR.mulrA by apply mulrA.
+realize ZR.mulrC by apply mulrC.
+realize ZR.mul1r by apply mul1r.
+realize ZR.mulrDl by apply mulrDl.
+realize ZR.mulVr by apply mulVr.
+realize ZR.unitP by apply unitP.
+realize ZR.unitout by apply unitout.
+realize ZR.mulf_eq0 by apply mulf_eq0.
+realize Big.CR.addrA by apply addrA.
+realize Big.CR.addrC by apply addrC.
+realize Big.CR.add0r by apply add0r.
+realize Big.CR.addNr by apply addNr.
+realize Big.CR.oner_neq0 by apply oner_neq0.
+realize Big.CR.mulrA by apply mulrA.
+realize Big.CR.mulrC by apply mulrC.
+realize Big.CR.mul1r by apply mul1r.
+realize Big.CR.mulrDl by apply mulrDl.
+realize Big.CR.mulVr by apply mulVr.
+realize Big.CR.unitP by apply unitP.
+realize Big.CR.unitout by apply unitout.
+
+
+(* This is equivalent to e <- BS_m; bit_inj(e) *)
+op sample_e = dvector (duniform [zero; one]).  
+
+(* We want to sample uniformly element in ZP.
+   This is a solution, another will be to prove that zmod is a finite type
+ *)
+
+op dzmodp = dmap (drange 0 p) inzmod.
+
+lemma dzmodp_ll : is_lossless dzmodp.
+proof. apply/dmap_ll/drange_ll; smt (ge2_p). qed.
+
+lemma dzmodp_fu : is_full dzmodp.
+proof.
+  apply dmap_fu_in => x.
+  by exists (asint x); rewrite asintK supp_drange rg_asint.
+qed.
+
+lemma dzmodp_uni : is_uniform dzmodp.
+proof.
+  apply dmap_uni_in_inj; 2: by apply drange_uni.
+  move=> x y; rewrite !supp_drange => hx hy hxy.
+  have : asint (inzmod x) = asint (inzmod y) by rewrite hxy.
+  have h : `|p| = p by smt (ge2_p). 
+  by rewrite !inzmodK !IntDiv.modz_small ?h.
+qed.
+
+lemma dzmodp1E x : mu1 dzmodp x = 1%r/p%r.
+proof.
+rewrite dmap1E (mu_eq_support _ _ (pred1 (asint x))).
++ move=> z; rewrite supp_drange /(\o) /pred1; smt (asintK inzmodK).
+by rewrite drange1E rg_asint.
+qed.
+
+(* We can now define the uniform distribution over matrix and vector *)
+op dmatrix_u = dmatrix dzmodp.
+op dvector_u = dvector dzmodp.
+
+(* Now we can define adversary for LHL *)
+
+module type LHL_ADV = {
+  proc main(a: matrix, v:vector) : bool
+}.
+
+module LHL (A:LHL_ADV) = {
+  proc main_l () = {
+    var b, a, e;
+    a <$ dmatrix_u;
+    e <$ sample_e;
+    b <@ A.main(a, a *^ e);
+    return b;
+  }
+
+  proc main_r () = {
+    var b, a, v;
+    a <$ dmatrix_u;
+    v <$ dvector_u;
+    b <@ A.main(a, v);
+    return b;
+  }
+}.
+
+(*
+   Now the advantage of the adversary can be defined by 
+   `| Pr[LHL(A).main_l() @ &m : res] - Pr[LHL(A).main_r() @ &m : res |
+*)
+
+
+
+    
+
+
+
+
+
+
+
+
+
