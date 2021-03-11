@@ -164,6 +164,9 @@ type pmod_restr_mem_el =
 type pmod_restr_mem = pmod_restr_mem_el list
 
 (* -------------------------------------------------------------------- *)
+type quantum = [`Quantum | `Classical]
+
+(* -------------------------------------------------------------------- *)
 type pmemory   = psymbol
 
 type phoarecmp = EcFol.hoarecmp
@@ -282,6 +285,7 @@ and pmodule_sig =
   | Pmty_struct of pmodule_sig_struct
 
 and pmodule_sig_struct = {
+  pmsig_quantum: quantum;
   pmsig_params : (psymbol * pmodule_type) list;
   pmsig_body   : pmodule_sig_struct_body;
   pmsig_restr  : pmod_restr option;
@@ -309,6 +313,7 @@ and fun_params =
  | Fparams_imp of pty
 
 and pfunction_decl = {
+  pfd_quantum  : quantum;
   pfd_name     : psymbol;
   pfd_tyargs   : fun_params;
   pfd_tyresult : pty;

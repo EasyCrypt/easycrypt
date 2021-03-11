@@ -521,6 +521,7 @@
 %token PROOF
 %token PROVER
 %token QED
+%token QUANTUM
 %token QUESTION
 %token RARROW
 %token RBOOL
@@ -1579,14 +1580,15 @@ fun_def_body:
         pfb_return = rs  ; }
     }
 
-fun_decl:
-| x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
+%inline fun_decl:
+| q=quantum PROC x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
     { let frestr = { pmre_in    = true;
 		     pmre_name  = x;
 		     pmre_orcls = None;
 		     pmre_compl = None;	} in
 
-      { pfd_name     = x;
+      { pfd_quantum  = q;
+        pfd_name     = x;
         pfd_tyargs   = pd;
         pfd_tyresult = odfl (mk_loc x.pl_loc PTunivar) ty;
         pfd_uses     = frestr; }
@@ -1603,7 +1605,7 @@ mod_item:
 | MODULE x=uident c=mod_cast? EQ m=loc(mod_body)
     { Pst_mod (x, odfl [] c, m) }
 
-| PROC decl=loc(fun_decl) EQ body=fun_def_body {
+| decl=loc(fun_decl) EQ body=fun_def_body {
     let { pl_loc = loc; pl_desc = decl; } = decl in
         match decl.pfd_tyargs with
         | Fparams_imp _ ->
@@ -1744,10 +1746,11 @@ mod_restr:
 	pmty_mem = Some mr; } }
 
 sig_def:
-| MODULE TYPE x=uident args=sig_params* mr=mod_restr? EQ i=sig_body
-    { (x, Pmty_struct { pmsig_params = List.flatten args;
+| q=quantum MODULE TYPE x=uident args=sig_params* mr=mod_restr? EQ i=sig_body
+    { (x, Pmty_struct { pmsig_quantum= q;
+                        pmsig_params = List.flatten args;
                         pmsig_body   = i;
-			pmsig_restr  = mr; }) }
+                  			pmsig_restr  = mr; }) }
 
 sig_body:
 | body=sig_struct_body { body }
@@ -1763,12 +1766,15 @@ sig_params:
 sig_param:
 | x=uident COLON i=mod_type { (x, i) }
 
+%inline quantum:
+| x=QUANTUM? { if x = None then `Classical else `Quantum }
+
 signature_item:
 | INCLUDE i=mod_type xs=bracket(minclude_proc)? qs=brace(qident*)?
     { let qs = omap (List.map (fun x -> { inp_in_params = false;
 					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
-| PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
+| q=quantum PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
       let frestr = { pmre_in    = not i;
 		     pmre_name  = x;
@@ -1776,7 +1782,8 @@ signature_item:
 		     pmre_compl = compl; } in
 
       `FunctionDecl
-          { pfd_name     = x;
+          { pfd_quantum  = q;
+            pfd_name     = x;
             pfd_tyargs   = pd;
             pfd_tyresult = ty;
             pfd_uses     = frestr; } }
