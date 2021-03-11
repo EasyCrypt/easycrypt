@@ -50,7 +50,7 @@ module Count (O:Oracle) = {
 }.
 
 section.
-  declare module O:Oracle {Count}.
+  declare module O:Oracle {-Count}.
 
   lemma CountO_fL: islossless O.f => islossless Count(O).f.
   proof strict.
@@ -102,11 +102,11 @@ module IND (O:Oracle, A:Adv) = {
 }.
 
 section.
-  declare module O:Oracle {Count}.
+  declare module O:Oracle {-Count}.
   axiom O_fL: islossless O.f.
 
-  declare module A:Adv {Count(O)}.
-  axiom A_distinguishL (O <: Oracle {A}):
+  declare module A:Adv {-Count(O)}.
+  axiom A_distinguishL (O <: Oracle {-A}):
     islossless O.f =>
     islossless A(O).distinguish.
 
@@ -139,11 +139,11 @@ theory EnfPen.
   }.
 
   section.
-    declare module O:Oracle {Count}.
+    declare module O:Oracle {-Count}.
     axiom O_fL: islossless O.f.
 
-    declare module A:Adv {Count(O)}.
-    axiom A_distinguishL (O <: Oracle {A}):
+    declare module A:Adv {-Count(O)}.
+    axiom A_distinguishL (O <: Oracle {-A}):
       islossless O.f =>
       islossless A(O).distinguish.
 
@@ -182,11 +182,11 @@ theory PenBnd.
   axiom leq0_bound: 0 <= bound.
 
   section.
-    declare module O:Oracle {Count}.
+    declare module O:Oracle {-Count}.
     axiom O_fL: islossless O.f.
 
-    declare module A:Adv {Count(O)}.
-    axiom A_distinguishL (O <: Oracle {A}):
+    declare module A:Adv {-Count(O)}.
+    axiom A_distinguishL (O <: Oracle {-A}):
       islossless O.f =>
       islossless A(O).distinguish.
     axiom A_distinguishC:
@@ -226,11 +226,11 @@ theory BndPen.
   module EnforcedAdv (A:Adv, O:Oracle) = A(Enforce(O)).
 
   section.
-    declare module O:Oracle {Count}.
+    declare module O:Oracle {-Count}.
     axiom O_fL: islossless O.f.
 
-    declare module A:Adv {Count(O)}.
-    axiom A_distinguishL (O <: Oracle {A}):
+    declare module A:Adv {-Count(O)}.
+    axiom A_distinguishL (O <: Oracle {-A}):
       islossless O.f =>
       islossless A(O).distinguish.
 

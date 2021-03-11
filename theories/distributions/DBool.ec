@@ -19,6 +19,7 @@ clone include Distr.MFinite with
   op Support.card <- 2
   rename "dunifinE" as "dboolE_count"
   rename "dunifin" as "dbool"
+  rename "cunifin" as "cdbool"
 proof Support.enum_spec by case.
 
 lemma dboolE (E : bool -> bool):

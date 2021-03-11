@@ -17,7 +17,7 @@ open EcFol
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
- | AC_concrete_abstract of mpath * prog_var
+ | AC_concrete_abstract of mpath * xpath
  | AC_abstract_abstract of mpath * mpath
 
 exception AliasClash of env * alias_clash
@@ -42,9 +42,11 @@ module Mpv : sig
 
   val empty : ('a,'b) t
 
-  val check_npv_mp : env -> prog_var -> mpath -> EcEnv.use -> unit
+  val check_npv_mp :
+    env -> xpath -> mpath -> use use_restr -> unit
 
-  val check_mp_mp : env -> mpath -> EcEnv.use -> mpath -> EcEnv.use -> unit
+  val check_mp_mp :
+    env -> mpath -> use use_restr -> mpath -> use use_restr -> unit
 
   val check_npv : env -> prog_var -> ('a,'b) t -> unit
 
@@ -77,9 +79,11 @@ module PVM : sig
 
   val find : env -> prog_var -> memory -> subst -> form
 
-  val subst   : env -> subst -> form  -> form
+  val subst      : env -> subst -> form  -> form
 
-  val subst1  : env -> prog_var -> EcIdent.t -> form -> form -> form
+  val subst_cost : env -> subst -> cost  -> cost
+
+  val subst1     : env -> prog_var -> EcIdent.t -> form -> form -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -108,7 +112,8 @@ module PV : sig
   val mem_pv   : env -> prog_var -> t -> bool
   val mem_glob : env -> mpath -> t -> bool
 
-  val fv : env -> EcIdent.t -> form -> t
+  val fv      : env -> EcIdent.t -> form -> t
+  val fv_cost : env -> EcIdent.t -> cost -> t
 
   val pp : env -> Format.formatter -> t -> unit
 
@@ -151,6 +156,11 @@ exception EqObsInError
 
 module Mpv2 : sig
   type t
+  val empty : t
+  type local
+  val empty_local : local
+  val enter_local: env -> local -> (EcIdent.t * ty) list ->
+                   (EcIdent.t * ty) list -> local
   val to_form : EcIdent.t -> EcIdent.t -> t -> form -> form
   val of_form : env -> EcIdent.t -> EcIdent.t -> form -> t
   val needed_eq : env -> EcIdent.t -> EcIdent.t -> form -> t
@@ -161,6 +171,7 @@ module Mpv2 : sig
   (* remove_glob mp t, mp should be a top abstract functor *)
   val remove_glob : mpath -> t -> t
   val add_glob : env -> mpath -> mpath -> t -> t
+  val add_eqs_loc : env -> local -> t -> expr -> expr -> t
   val add_eqs : env -> expr -> expr -> t -> t
   val subst_l : env -> prog_var -> prog_var -> t -> t
   val subst_r : env -> prog_var -> prog_var -> t -> t

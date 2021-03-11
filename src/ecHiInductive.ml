@@ -33,17 +33,8 @@ type dterror =
 | DTE_Empty
 
 type fxerror =
-| FXE_TypeError of EcTyping.tyerror
-| FXE_EmptyMatch
-| FXE_MatchParamsMixed
-| FXE_MatchParamsDup
-| FXE_MatchParamsUnk
-| FXE_MatchNonLinear
-| FXE_MatchDupBranches
-| FXE_MatchPartial
-| FXE_CtorUnk
-| FXE_CtorAmbiguous
-| FXE_CtorInvalidArity of (symbol * int * int)
+| FXLowError of EcTyping.tyerror
+| FXError    of EcTyping.fxerror
 
 (* -------------------------------------------------------------------- *)
 exception RcError of EcLocation.t * EcEnv.env * rcerror
@@ -53,7 +44,7 @@ exception FxError of EcLocation.t * EcEnv.env * fxerror
 (* -------------------------------------------------------------------- *)
 let rcerror loc env e = raise (RcError (loc, env, e))
 let dterror loc env e = raise (DtError (loc, env, e))
-let fxerror loc env e = raise (FxError (loc, env, e))
+let fxerror loc env e = raise (FxError (loc, env, FXError e))
 
 (* -------------------------------------------------------------------- *)
 let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
@@ -244,7 +235,9 @@ type matchfix_t =  {
 }
 
 (* -------------------------------------------------------------------- *)
-let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, pty, pbs) =
+let trans_matchfix
+  ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, pty, pbs)
+=
   let codom     = TT.transty TT.tp_relax env ue pty in
   let env, args = TT.trans_binding env ue bd in
   let ty        = EcTypes.toarrow (List.map snd args) codom in
@@ -261,11 +254,11 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
     in
       match List.map snd pbsmap with
       | [] ->
-          fxerror loc env FXE_EmptyMatch
+          fxerror loc env TT.FXE_EmptyMatch
 
       | nm :: nms ->
           if not (List.for_all (Msym.set_equal nm) nms) then
-            fxerror loc env FXE_MatchParamsMixed;
+            fxerror loc env TT.FXE_MatchParamsMixed;
           let argsmap =
             List.fold_lefti
               (fun m i (x, xty) -> Msym.add (EcIdent.name x) (i, x, xty) m)
@@ -276,10 +269,10 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
             Msym.fold_left
               (fun (seen, mpty) px _ ->
                  if Msym.mem px seen then
-                   fxerror loc env FXE_MatchParamsDup;
+                   fxerror loc env TT.FXE_MatchParamsDup;
 
                  match Msym.find_opt px argsmap with
-                 | None -> fxerror loc env FXE_MatchParamsUnk
+                 | None -> fxerror loc env TT.FXE_MatchParamsUnk
                  | Some (i, x, xty) -> (Ssym.add px seen, (i, x, xty) :: mpty))
               (Ssym.empty, []) nm
           in
@@ -298,16 +291,16 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
 
           match cts with
           | [] ->
-              fxerror cname.pl_loc env FXE_CtorUnk
+              fxerror cname.pl_loc env TT.FXE_CtorUnk
 
           | _ :: _ :: _ ->
-              fxerror cname.pl_loc env FXE_CtorAmbiguous
+              fxerror cname.pl_loc env TT.FXE_CtorAmbiguous
 
           | [(cp, tvi), opty, subue, _] ->
               let ctor = oget (EcEnv.Op.by_path_opt cp env) in
               let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
               let indty = oget (EcEnv.Ty.by_path_opt indp env) in
-              let ind = (EcDecl.tydecl_as_datatype indty).tydt_ctors in
+              let ind = (oget (EcDecl.tydecl_as_datatype indty)).tydt_ctors in
               let ctorsym, ctorty = List.nth ind ctoridx in
 
               let args_exp = List.length ctorty in
@@ -315,12 +308,12 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
 
               if args_exp <> args_got then
                 fxerror cname.pl_loc env
-                  (FXE_CtorInvalidArity (snd (unloc cname), args_exp, args_got));
+                  (TT.FXE_CtorInvalidArity (snd (unloc cname), args_exp, args_got));
 
               let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
 
               if not (List.is_unique cargs_lin) then
-                fxerror cname.pl_loc env (FXE_MatchNonLinear);
+                fxerror cname.pl_loc env (TT.FXE_MatchNonLinear);
 
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
@@ -370,11 +363,11 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
            (ctor, pvars)) ptns
          in
            if not (CaseMap.add ptns be casemap) then
-             fxerror loc env FXE_MatchDupBranches)
+             fxerror loc env TT.FXE_MatchDupBranches)
       pbs;
 
     match CaseMap.resolve casemap with
-    | None   -> fxerror loc env FXE_MatchPartial
+    | None   -> fxerror loc env TT.FXE_MatchPartial
     | Some x -> x
 
   in

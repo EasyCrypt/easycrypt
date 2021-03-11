@@ -53,6 +53,19 @@ module CI_Bool = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Option = struct
+  let i_Option  = "Logic"
+  let p_Option  = EcPath.pqname p_top i_Option
+
+  let _Option x = EcPath.pqname p_Option x
+
+  let p_option = _Option "option"
+  let p_none   = _Option "None"
+  let p_some   = _Option "Some"
+  let p_oget   = _Option "oget"
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Int = struct
   let i_Int = "CoreInt"
   let p_Int = EcPath.pqname p_top i_Int
@@ -72,6 +85,31 @@ module CI_Int = struct
   let p_int_le    = _Int "le"
   let p_int_lt    = _Int "lt"
   let p_int_edivz = _IntDiv "edivz"
+  let p_int_max   = _IntDiv "max"
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_xint = struct
+  let i_Xint  = "Xint"
+  let p_Xint  = EcPath.pqname p_top i_Xint
+  let _Xint   = fun x -> EcPath.pqname p_Xint x
+  let mk_Xint = _Xint
+
+  let p_xint   = mk_Xint "xint"
+  let p_N      = mk_Xint "N"
+  let p_inf    = mk_Xint "Inf"
+  let p_xopp   = mk_Xint "xopp"
+  let p_xadd   = mk_Xint "xadd"
+  let p_xmul   = mk_Xint "xmul"
+  let p_is_inf = mk_Xint "is_inf"
+  let p_is_int = mk_Xint "is_int"
+
+  let p_choaretac = EcPath.pqname p_top "CHoareTactic"
+
+  let p_xle     = EcPath.pqname p_choaretac "xle"
+  let p_xmax    = EcPath.pqname p_choaretac "xmax"
+  let p_bigxint = EcPath.pqname p_choaretac "Bigxint"
+  let p_big     = EcPath.pqname p_bigxint "big"
 end
 
 (* -------------------------------------------------------------------- *)
@@ -101,6 +139,7 @@ module CI_Real = struct
   let p_real_abs    = EcPath.extend p_top ["Real"; "`|_|"]
 end
 
+(* -------------------------------------------------------------------- *)
 module CI_Pred = struct
   let i_Pred  = "Logic"
   let p_Pred  = EcPath.pqname p_top i_Pred

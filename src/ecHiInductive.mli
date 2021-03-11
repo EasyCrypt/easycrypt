@@ -28,17 +28,8 @@ type dterror =
 | DTE_Empty
 
 type fxerror =
-| FXE_TypeError of EcTyping.tyerror
-| FXE_EmptyMatch
-| FXE_MatchParamsMixed
-| FXE_MatchParamsDup
-| FXE_MatchParamsUnk
-| FXE_MatchNonLinear
-| FXE_MatchDupBranches
-| FXE_MatchPartial
-| FXE_CtorUnk
-| FXE_CtorAmbiguous
-| FXE_CtorInvalidArity of (symbol * int * int)
+| FXLowError of EcTyping.tyerror
+| FXError    of EcTyping.fxerror
 
 (* -------------------------------------------------------------------- *)
 exception RcError of EcLocation.t * EcEnv.env * rcerror
@@ -48,7 +39,7 @@ exception FxError of EcLocation.t * EcEnv.env * fxerror
 (* -------------------------------------------------------------------- *)
 val rcerror : EcLocation.t -> EcEnv.env -> rcerror -> 'a
 val dterror : EcLocation.t -> EcEnv.env -> dterror -> 'a
-val fxerror : EcLocation.t -> EcEnv.env -> fxerror -> 'a
+val fxerror : EcLocation.t -> EcEnv.env -> EcTyping.fxerror -> 'a
 
 (* -------------------------------------------------------------------- *)
 val trans_record : env -> ptydname -> precord -> record

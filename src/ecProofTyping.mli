@@ -30,6 +30,7 @@ val pf_check_tvi   : proofenv -> ty_params -> EcUnify.tvi -> unit
 val process_form_opt : ?mv:metavs -> LDecl.hyps -> pformula -> ty option -> form
 val process_form     : ?mv:metavs -> LDecl.hyps -> pformula -> ty -> form
 val process_formula  : ?mv:metavs -> LDecl.hyps -> pformula -> form
+val process_cost     : ?mv:metavs -> LDecl.hyps -> pcost    -> ty list -> cost
 val process_exp      : LDecl.hyps -> [`InProc|`InOp] -> ty option -> pexpr -> expr
 val process_pattern  : LDecl.hyps -> pformula -> ptnenv * form
 
@@ -37,6 +38,7 @@ val process_pattern  : LDecl.hyps -> pformula -> ptnenv * form
  * Typing exceptions are recasted in the proof env. context *)
 val pf_process_form_opt : proofenv -> ?mv:metavs -> LDecl.hyps -> ty option -> pformula -> form
 val pf_process_form     : proofenv -> ?mv:metavs -> LDecl.hyps -> ty -> pformula -> form
+val pf_process_cost     : proofenv -> ?mv:metavs -> LDecl.hyps -> ty list -> pcost -> cost
 val pf_process_formula  : proofenv -> ?mv:metavs -> LDecl.hyps -> pformula -> form
 val pf_process_exp      : proofenv -> LDecl.hyps -> [`InProc|`InOp] -> ty option -> pexpr -> expr
 val pf_process_pattern  : proofenv -> LDecl.hyps -> pformula -> ptnenv * form
@@ -46,6 +48,7 @@ val pf_process_pattern  : proofenv -> LDecl.hyps -> pformula -> ptnenv * form
 val tc1_process_form_opt : ?mv:metavs -> tcenv1 -> ty option -> pformula -> form
 val tc1_process_form     : ?mv:metavs -> tcenv1 -> ty -> pformula -> form
 val tc1_process_formula  : ?mv:metavs -> tcenv1 -> pformula -> form
+val tc1_process_cost     : ?mv:metavs -> tcenv1 -> ty list -> pcost -> cost
 val tc1_process_exp      : tcenv1 -> [`InProc|`InOp] -> ty option -> pexpr -> expr
 val tc1_process_pattern  : tcenv1 -> pformula -> ptnenv * form
 

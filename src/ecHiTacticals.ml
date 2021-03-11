@@ -39,11 +39,7 @@ module CaseOptions = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let rec process1_debug (_ttenv : ttenv) (tc : tcenv1) =
-  FApi.tcenv_of_tcenv1 tc
-
-(* -------------------------------------------------------------------- *)
-and process1_by (ttenv : ttenv) (t : ptactic list option) (tc : tcenv1) =
+let rec process1_by (ttenv : ttenv) (t : ptactic list option) (tc : tcenv1) =
   t_onall process_done (process1_seq ttenv (odfl [] t) tc)
 
 (* -------------------------------------------------------------------- *)
@@ -93,7 +89,7 @@ and process1_case (_ : ttenv) (doeq, opts, gp) (tc : tcenv1) =
     | _ -> tc_error !!tc "must give exactly one boolean formula"
   in
     match (FApi.tc1_goal tc).f_node with
-    | FbdHoareS _ | FhoareS _ when not opts.cod_ambient ->
+    | FbdHoareS _ | FcHoareS _ | FhoareS _ when not opts.cod_ambient ->
         let fp = TTC.tc1_process_Xhl_formula tc (form_of_gp ()) in
         EcPhlCase.t_hl_case fp tc
 
@@ -156,6 +152,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Papply pe           -> process_apply ~implicits:ttenv.tt_implicits pe
     | Pcut (m, ip, f, t)  -> process_cut ~mode:m engine ttenv (ip, f, t)
     | Pcutdef (ip, f)     -> process_cutdef ttenv (ip, f)
+    | Pcutdef_sc (ip, f)  -> process_cutdef_sc ttenv (ip, f)
     | Pmove pr            -> process_move pr.pr_view pr.pr_rev
     | Pclear l            -> process_clear l
     | Prewrite (ri, x)    -> process_rewrite ttenv ?target:x ri
@@ -179,15 +176,17 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   let (tx : tcenv1 -> tcenv) =
     match unloc t with
     | Pfun `Def                 -> EcPhlFun.process_fun_def
-    | Pfun (`Abs f)             -> EcPhlFun.process_fun_abs f
+    | Pfun (`Abs (f,p_inv_inf)) -> EcPhlFun.process_fun_abs f p_inv_inf
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
     | Papp info                 -> EcPhlApp.process_app info
-    | Pwp wp                    -> EcPhlWp.t_wp wp
+    | Pwp (wp,cost_pre)         -> EcPhlWp.process_wp wp cost_pre
     | Psp sp                    -> EcPhlSp.t_sp sp
-    | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
-    | Pcond side                -> EcPhlHiCond.process_cond side
+    | Prcond (side, b, i, c)    -> EcPhlRCond.process_rcond side b i c
+    | Prmatch (side, c, i)      -> EcPhlRCond.t_rcond_match side c i
+    | Pcond info                -> EcPhlHiCond.process_cond info
+    | Pmatch infos              -> EcPhlHiCond.process_match infos
     | Pwhile (side, info)       -> EcPhlWhile.process_while side info
     | Pasyncwhile info          -> EcPhlWhile.process_async_while info
     | Pfission info             -> EcPhlLoopTx.process_fission info
@@ -317,7 +316,6 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Pseq      ts          -> `One (process1_seq      ttenv ts)
     | Pcase     es          -> `One (process1_case     ttenv es)
     | Pprogress (o, t)      -> `One (process1_progress ttenv o t)
-    | Pdebug                -> `One (process1_debug    ttenv)
     | Psubgoal  tt          -> `All (process_chain     ttenv tt)
     | Pnstrict  t           -> `One (process1_nstrict  ttenv t)
   in

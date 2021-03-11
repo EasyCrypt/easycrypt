@@ -8,10 +8,6 @@
 
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcEnv
-open EcMemory
-open EcModules
-open EcFol
 
 open EcCoreGoal.FApi
 
@@ -22,8 +18,8 @@ open EcCoreGoal.FApi
  * soundness of the bounded hoare logic.
  *)
 
-val wp :
-      ?uselet:bool -> ?onesided:bool
-   -> env -> memory -> stmt -> form -> instr list * form
+val t_wp :
+  ?uselet:bool -> ?cost_pre:EcFol.form ->
+  (codepos1 doption) option -> backward
 
-val t_wp : ?uselet:bool -> (codepos1 doption) option -> backward
+val process_wp : (codepos1 doption) option -> pformula option -> backward

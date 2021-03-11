@@ -184,10 +184,10 @@ module Exp'(A:Adv) = {
 
 section.
   (* Forall Adversary A that does not share memory with P or F... *)
-  declare module A:Adv {P,F}.
+  declare module A:Adv {-P,-F}.
 
   (* ... and whose a procedure is lossless whenever F.f and P.prg are *)
-  axiom AaL (F <: ARF {A}) (P <: APRG {A}):
+  axiom AaL (F <: ARF {-A}) (P <: APRG {-A}):
     islossless P.prg =>
     islossless F.f =>
     islossless A(F,P).a.
@@ -422,8 +422,8 @@ lemma CPprgL (A <: Adv) (F <: ARF) (P <: APRG):
   islossless C(A,F,P).CP.prg.
 proof. by move=> PprgL; proc; sp; if=> //; call PprgL; wp. qed.
 
-lemma CaL (A <: Adv {C}) (F <: ARF {A}) (P <: APRG {A}):
-  (forall (F <: ARF {A}) (P <: APRG {A}),
+lemma CaL (A <: Adv {-C}) (F <: ARF {-A}) (P <: APRG {-A}):
+  (forall (F <: ARF {-A}) (P <: APRG {-A}),
     islossless P.prg => islossless F.f => islossless A(F,P).a) =>
      islossless F.f
   => islossless P.prg
@@ -437,8 +437,8 @@ by wp.
 qed.
 
 section.
-  declare module A:Adv {C,P,F}.
-  axiom AaL (F <: ARF {A}) (P <: APRG {A}):
+  declare module A:Adv {-C,-P,-F}.
+  axiom AaL (F <: ARF {-A}) (P <: APRG {-A}):
     islossless P.prg =>
     islossless F.f =>
     islossless A(F,P).a.

@@ -19,6 +19,7 @@ and theory_item =
   | Th_type      of (symbol * tydecl)
   | Th_operator  of (symbol * operator)
   | Th_axiom     of (symbol * axiom)
+  | Th_schema    of (symbol * ax_schema)
   | Th_modtype   of (symbol * module_sig)
   | Th_module    of module_expr
   | Th_theory    of (symbol * (theory * thmode))
@@ -33,26 +34,31 @@ and theory_item =
 and tcinstance = [ `Ring of ring | `Field of field | `General of EcPath.path ]
 and thmode     = [ `Abstract | `Concrete ]
 
+(* For cost judgement, we have higher-order pattern. *)
 and rule_pattern =
-  | Rule  of top_rule_pattern * rule_pattern list
-  | Int   of EcBigInt.zint
-  | Var   of EcIdent.t
+  | Rule of top_rule_pattern * rule_pattern list
+  | Cost of EcMemory.memenv * rule_pattern * rule_pattern (* memenv, pre, expr *)
+  | Int  of EcBigInt.zint
+  | Var  of EcIdent.t
 
 and top_rule_pattern =
   [`Op of (EcPath.path * EcTypes.ty list) | `Tuple]
 
 and rule = {
-  rl_tyd  : EcDecl.ty_params;
-  rl_vars : (EcIdent.t * EcTypes.ty) list;
-  rl_cond : EcCoreFol.form list;
-  rl_ptn  : rule_pattern;
-  rl_tg   : EcCoreFol.form;
-  rl_prio : int;
+  rl_tyd   : EcDecl.ty_params;
+  rl_vars  : (EcIdent.t * EcTypes.ty) list;
+  rl_evars : (EcIdent.t * EcTypes.ty) list; (* For schemata *)
+  rl_pvars : EcIdent.t list;                (* For schemata *)
+  rl_cond  : EcCoreFol.form list;
+  rl_ptn   : rule_pattern;
+  rl_tg    : EcCoreFol.form;
+  rl_prio  : int;
 }
 
 and rule_option = {
   ur_delta  : bool;
   ur_eqtrue : bool;
+  ur_mode   : [`Ax | `Sc];
 }
 
 (* -------------------------------------------------------------------- *)
@@ -71,6 +77,7 @@ and ctheory_item =
   | CTh_type      of (symbol * tydecl)
   | CTh_operator  of (symbol * operator)
   | CTh_axiom     of (symbol * axiom)
+  | CTh_schema    of (symbol * ax_schema)
   | CTh_modtype   of (symbol * module_sig)
   | CTh_module    of module_expr
   | CTh_theory    of (symbol * (ctheory * thmode))
@@ -91,8 +98,5 @@ and ctheory_override =
 | CTHO_Type   of EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
-val module_comps_of_module_sig_comps:
-  module_sig_body -> module_item list
-
 val module_expr_of_module_sig:
-  EcIdent.t -> module_type -> module_sig -> mod_restr -> module_expr
+  EcIdent.t -> module_type -> module_sig -> module_expr

@@ -72,6 +72,13 @@ let t_hoare_swap_r p1 p2 p3 tc =
   FApi.xmutate1 tc `Swap [concl]
 
 (* -------------------------------------------------------------------- *)
+let t_choare_swap_r p1 p2 p3 tc =
+  let chs   = tc1_as_choareS tc in
+  let s     = LowInternal.swap_stmt tc p1 p2 p3 chs.chs_s in
+  let concl = f_cHoareS_r { chs with chs_s = s } in
+  FApi.xmutate1 tc `Swap [concl]
+
+(* -------------------------------------------------------------------- *)
 let t_bdhoare_swap_r p1 p2 p3 tc =
   let bhs   = tc1_as_bdhoareS tc in
   let s     = LowInternal.swap_stmt tc p1 p2 p3 bhs.bhs_s in
@@ -91,6 +98,7 @@ let t_equiv_swap_r side p1 p2 p3 tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_swap   = FApi.t_low3 "hoare-swap"   t_hoare_swap_r
+let t_choare_swap  = FApi.t_low3 "choare-swap"  t_choare_swap_r
 let t_bdhoare_swap = FApi.t_low3 "bdhoare-swap" t_bdhoare_swap_r
 let t_equiv_swap   = FApi.t_low4 "equiv-swap"   t_equiv_swap_r
 
@@ -99,6 +107,7 @@ module HiInternal = struct
   let stmt_length side tc =
     match (FApi.tc1_goal tc).f_node, side with
     | FhoareS hs   , None -> List.length hs.hs_s.s_node
+    | FcHoareS  chs, None -> List.length chs.chs_s.s_node
     | FbdHoareS bhs, None -> List.length bhs.bhs_s.s_node
 
     | FequivS es, Some `Left  -> List.length es.es_sl.s_node
@@ -149,6 +158,8 @@ let rec process_swap1 info tc =
         match side with
         | None when is_hoareS concl ->
             t_hoare_swap p1 p2 p3
+        | None when is_cHoareS concl ->
+            t_choare_swap p1 p2 p3
         | None when is_bdHoareS concl ->
             t_bdhoare_swap p1 p2 p3
         | None ->

@@ -41,6 +41,7 @@ and 'a ovrhooks = {
   hmodty   : 'a -> (symbol * module_sig) -> 'a;
   hmod     : 'a -> bool -> module_expr -> 'a;
   hax      : 'a -> bool -> (symbol * axiom) -> 'a;
+  hschema  : 'a -> bool -> (symbol * ax_schema) -> 'a;
   hexport  : 'a -> EcPath.path -> 'a;
   hbaserw  : 'a -> symbol -> 'a;
   haddrw   : 'a -> EcPath.path * EcPath.path list -> 'a;

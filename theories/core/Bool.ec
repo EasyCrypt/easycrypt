@@ -7,6 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+require import Int Xint.
 require FinType.
 
 op (^^) (b1 b2:bool) = b1 = !b2.
@@ -28,6 +29,17 @@ by [].
 
 clone FinType as BoolFin with
   type t    <- bool,
-    op enum <- List.(::) true (List.(::) false List."[]"),
-    op card <- 2
+  op enum <- List.(::) true (List.(::) false List."[]"),
+  op card <- 2
 proof enum_spec by case.
+
+schema cost_eqbool `{P} {b1 b2:bool} : cost [P: b1 = b2] = cost[P:b1] + cost[P:b2] + '1.
+schema cost_and  `{P} {b1 b2:bool} : cost [P: b1 /\ b2] = cost[P:b1] + cost[P:b2] + '1.
+schema cost_anda `{P} {b1 b2:bool} : cost [P: b1 && b2] = cost[P:b1] + cost[P:b2] + '1.
+schema cost_or   `{P} {b1 b2:bool} : cost [P: b1 \/ b2] = cost[P:b1] + cost[P:b2] + '1.
+schema cost_ora  `{P} {b1 b2:bool} : cost [P: b1 || b2] = cost[P:b1] + cost[P:b2] + '1.
+schema cost_xor  `{P} {b1 b2:bool} : cost [P: b1 ^^ b2] = cost[P:b1] + cost[P:b2] + '1.
+schema cost_not  `{P} {b: bool}    : cost [P: !b] = cost[P:b] + '1.
+
+hint simplify cost_eqbool, cost_and, cost_anda, cost_or, cost_ora, cost_xor, cost_not.
+

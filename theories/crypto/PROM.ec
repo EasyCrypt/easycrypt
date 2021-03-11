@@ -165,7 +165,7 @@ proof.
 by proc; inline *; auto=> /> &2 r _; rewrite mem_map /noflags map_set.
 qed.
 
-equiv RO_FRO_D (D <: RO_Distinguisher { RO, FRO }) :
+equiv RO_FRO_D (D <: RO_Distinguisher { -RO, -FRO }) :
   D(RO).distinguish ~ D(FRO).distinguish : 
     ={arg, glob D} /\ RO.m{1} = noflags FRO.m{2}
     ==> ={res, glob D} /\ RO.m{1} = noflags FRO.m{2}.
@@ -604,7 +604,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 section.
-declare module D : FRO_Distinguisher {FRO}.
+declare module D : FRO_Distinguisher {-FRO}.
 
 lemma eager_D :
   eager [RRO.resample();, D(FRO).distinguish ~ 
@@ -645,7 +645,7 @@ module Eager (D : FRO_Distinguisher) = {
 
 (* -------------------------------------------------------------------- *)
 section.
-declare module D : FRO_Distinguisher {FRO}.
+declare module D : FRO_Distinguisher {-FRO}.
 
 equiv Eager_1_2 : Eager(D).main1 ~ Eager(D).main2 :
   ={glob D, arg} ==> ={res, glob FRO, glob D}.
@@ -696,7 +696,7 @@ rewrite restr_set=> //= Hnd.
 by rewrite rem_id // dom_restr /in_dom_with Hnd.
 qed.
 
-equiv LRO_RRO_D (D <: RO_Distinguisher{RO, FRO}) :
+equiv LRO_RRO_D (D <: RO_Distinguisher{-RO, -FRO}) :
   D(LRO).distinguish ~ D(RRO).distinguish : 
     ={glob D, arg} /\ RO.m{1} = restr Known FRO.m{2}
     ==> ={res, glob D} /\ RO.m{1} = restr Known FRO.m{2}.
@@ -712,7 +712,7 @@ end EagerCore.
 
 (* -------------------------------------------------------------------- *)
 section.
-declare module D : RO_Distinguisher { RO, FRO }.
+declare module D : RO_Distinguisher { -RO, -FRO }.
 axiom dout_ll x: is_lossless (dout x).
 
 local clone import EagerCore as InnerProof

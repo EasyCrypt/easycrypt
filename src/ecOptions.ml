@@ -16,7 +16,7 @@ type command = [
 | `Cli     of cli_option
 | `Config
 | `Why3Config
-]
+  ]
 
 and options = {
   o_options : glb_options;

@@ -1,5 +1,5 @@
 require import AllCore List Distr Dexcepted PKE.
-require import StdOrder StdBigop.
+require import StdOrder StdBigop CHoareTactic.
 import RField RealOrder Bigreal.
 
 require TCR RndExcept.
@@ -107,6 +107,14 @@ theory DDH_ex.
 end DDH_ex.
 import DDH_ex.
 
+lemma dt_r_ll x : is_lossless (FDistr.dt \ pred1 x).
+proof. 
+  by rewrite dexcepted_ll ?FDistr.dt_ll // FDistr.dt1E ltr_pdivr_mulr /= lt_fromint; smt (gt1_q).
+qed.
+
+schema cost_dte `{P} {e:t} : cost [P: FDistr.dt \ pred1 e] = cost[P:e] + N FDistr.cdt.
+hint simplify cost_dte.
+
 (** Target Collision Resistant *)
 
 clone import TCR as TCR_H with 
@@ -115,6 +123,11 @@ clone import TCR as TCR_H with
 
 axiom dk_ll : is_lossless dk.
 hint exact random : dk_ll.
+
+op cdk:int.
+axiom ge0_cdk : 0 <= cdk.
+schema cost_dk `{P} : cost[P: dk] = N cdk.
+hint simplify cost_dk.
 
 (** Cramer Shoup Encryption *)
 
@@ -181,9 +194,33 @@ qed.
 
 (** IND-CCA Security of the scheme *)
 
-module B_DDH (A:CCA_ADV) = {
+op cH : int.
+schema cost_H `{P} {k:K, t: group * group * group} : cost[P:H k t] = cost[P:k] + cost[P:t] + N cH.
+hint simplify cost_H.
 
-  module CCA = CCA(CramerShoup, A)
+axiom ge0_cH : 0 <= cH.
+
+op cA1 : cost_A.
+axiom ge0_cA1:
+   0 <= cA1.`cchoose /\
+   0 <= cA1.`qD_choose /\ 0 <= cA1.`cguess /\ 0 <= cA1.`qD_guess.
+
+clone import CCA_q with 
+op cS = {|
+ ckg  = 3 + 7 * cgpow + 3 * cgmul + cdk + 7 * FDistr.cdt;
+ cenc = 2 + 5 * cgpow + cfmul + 2*cgmul + cH + FDistr.cdt;
+ cdec = 4 + 2 * cfmul + 2 * cfadd + 4 * cgpow + 2 * cgmul + cgeq + cgdiv + cH;
+|},
+op cA = {|
+  cchoose   = cA1.`cchoose;
+  qD_choose = cA1.`qD_choose;
+  cguess    = cA1.`cguess + 1;
+  qD_guess  = cA1.`qD_guess 
+|}
+proof ge0_cS by smt (ge0_cdk ge0_cg ge0_cH ge0_cf)
+proof ge0_cA by smt (ge0_cA1).
+
+module B_DDHq (A:CCA_ADV) = {
 
   proc guess(gx gy gz:group): bool = {
     var g_, a, a_, x1,x2,y1,y2,z1,z2,k,e,f,h,m0,m1,b,b',c,v,d,c',pk;
@@ -204,84 +241,260 @@ module B_DDH (A:CCA_ADV) = {
     CCA.cstar <- None;
     pk <- (k, g, g_, g^x1 * g_^x2, g^y1 * g_^y2, g^z1 * g_^z2);
     CCA.sk <- (k, g, g_, x1, x2, y1, y2, z1, z2);
-    (m0,m1) <- CCA.A.choose(pk);
+    (m0,m1) <@ CCAq(CramerShoup, A).A.choose(pk);
     b <$ {0,1};
     c <- a^z1 * a_^z2 * (b ? m1 : m0);
     v <- H k (a,a_,c);
     d <- a^(x1 + v*y1) * a_^(x2+v*y2);
     c' <- (a,a_,c,d);
     CCA.cstar <- Some c';
-    b' <- CCA.A.guess(c');
+    b' <@ CCAq(CramerShoup, A).A.guess(c');
     return (b = b');
   }
     
 }.
 
- module B_TCR (A:CCA_ADV) = {
-    var log   : ciphertext list
-    var cstar : ciphertext option
-    var g3    : ( group * group * group) option
-    var g_, a, a_, c, d : group
-    var w, u , u', x, y, z, alpha, v' : t
-    var k : K
-    module O = {
-      proc dec(ci:ciphertext) = {
-        var m, a,a_,c,d,v;
-        m <- None;
-        if (size log < PKE_.qD && Some ci <> cstar) {
-          log <- ci :: log;
-          (a,a_,c,d) <- ci;
-          v <- H k (a, a_, c);
-          if (a_ <> a^w /\ v = v' /\ (a,a_,c) <> (B_TCR.a, B_TCR.a_,B_TCR.c)) g3 <- Some (a,a_,c);
-          m <- if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
-              else None;
-        }
-        return m;
-      }
-    }
+module B_DDH (A:CCA_ADV) = {
 
-    module A = A (O)
-
-    proc c1() = {
-      var r';
-      log <- [];
-      g3 <- None;
-      cstar <- None;
-      w <$ FDistr.dt \ (pred1 F.zero);
-      u <$ FDistr.dt; 
-      u' <$ FDistr.dt \ (pred1 u);
-      g_ <- g ^ w; 
-      a <- g^u; a_ <- g_^u';
-      r' <$ FDistr.dt; c <- g^r';
-      return (a, a_, c);
-    }
+  proc guess(gx gy gz:group): bool = {
+    var g_, a, a_, x1,x2,y1,y2,z1,z2,k,e,f,h,m0,m1,b,b',c,v,d,c',pk;
+    x1 <$ FDistr.dt;
+    x2 <$ FDistr.dt;
+    y1 <$ FDistr.dt;
+    y2 <$ FDistr.dt;
+    z1 <$ FDistr.dt;
+    z2 <$ FDistr.dt;
+    g_ <- gx;
+    a  <- gy;
+    a_ <- gz;
+    k  <$ dk;
+    e  <- g^x1 * g_^x2;
+    f  <- g^y1 * g_^y2;
+    h  <- g^z1 * g_^z2;
+    CCA.log <- [];
+    CCA.cstar <- None;
+    pk <- (k, g, g_, g^x1 * g_^x2, g^y1 * g_^y2, g^z1 * g_^z2);
+    CCA.sk <- (k, g, g_, x1, x2, y1, y2, z1, z2);
+    (m0,m1) <@ CCAl(CramerShoup, A).A.choose(pk);
+    b <$ {0,1};
+    c <- a^z1 * a_^z2 * (b ? m1 : m0);
+    v <- H k (a,a_,c);
+    d <- a^(x1 + v*y1) * a_^(x2+v*y2);
+    c' <- (a,a_,c,d);
+    CCA.cstar <- Some c';
+    b' <@ CCAl(CramerShoup, A).A.guess(c');
+    return (b = b');
+  }
     
-    proc c2 (k:K) = {
-      var m0, m1, b0, e, f, h, r;
-      B_TCR.k <- k;
-      y <$ FDistr.dt; f <- g^y;
-      z <$ FDistr.dt; h <- g^z;      
-      v' <- H k (a, a_, c);
-      x <$ FDistr.dt; r <$ FDistr.dt; e <- g^x;
-      alpha <- (r - u*(x + v'*y))/ (w*(u'-u));
-      d <- g ^ r;
-      (m0,m1) <@ A.choose(k, g, g_, e, f, h); 
-      cstar <- Some (a,a_,c,d);
-      b0 <@ A.guess(a,a_,c,d);
-      return (oget g3);    
+}.
+
+module B_TCR (A:CCA_ADV) = {
+  var log   : ciphertext list
+  var cstar : ciphertext option
+  var g3    : ( group * group * group) option
+  var g_, a, a_, c, d : group
+  var w, u , u', x, y, z, alpha, v' : t
+  var k : K
+  module O = {
+    proc dec(ci:ciphertext) = {
+      var m, a,a_,c,d,v;
+      m <- None;
+      if (Some ci <> cstar) {
+        (a,a_,c,d) <- ci;
+        v <- H k (a, a_, c);
+        if (a_ <> a^w /\ v = v' /\ (a,a_,c) <> (B_TCR.a, B_TCR.a_,B_TCR.c)) g3 <- Some (a,a_,c);
+        m <- if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
+            else None;
+      }
+      return m;
     }
-  }.
+  }
+
+  module A = A (O)
+
+  proc c1() = {
+    var r';
+    g3 <- None;
+    cstar <- None;
+    w <$ FDistr.dt \ (pred1 F.zero);
+    u <$ FDistr.dt; 
+    u' <$ FDistr.dt \ (pred1 u);
+    g_ <- g ^ w; 
+    a <- g^u; a_ <- g_^u';
+    r' <$ FDistr.dt; c <- g^r';
+    return (a, a_, c);
+  }
+  
+  proc c2 (k:K) = {
+    var m0, m1, b0, e, f, h, r;
+    B_TCR.k <- k;
+    y <$ FDistr.dt; f <- g^y;
+    z <$ FDistr.dt; h <- g^z;      
+    v' <- H k (a, a_, c);
+    x <$ FDistr.dt; r <$ FDistr.dt; e <- g^x;
+    alpha <- (r - u*(x + v'*y))/ (w*(u'-u));
+    d <- g ^ r;
+    (m0,m1) <@ A.choose(k, g, g_, e, f, h); 
+    cstar <- Some (a,a_,c,d);
+    b0 <@ A.guess(a,a_,c,d);
+    return (oget g3);    
+  }
+}.
+
+module B_TCRq (A:CCA_ADV) = {
+
+  module O = {
+    proc dec(ci:ciphertext) = {
+      var m, a,a_,c,d,v;
+      m <- None;
+      if (size B_TCR.log < qD && Some ci <> B_TCR.cstar) {
+        B_TCR.log <- ci :: B_TCR.log;
+        (a,a_,c,d) <- ci;
+        v <- H B_TCR.k (a, a_, c);
+        if (a_ <> a^B_TCR.w /\ v = B_TCR.v' /\ (a,a_,c) <> (B_TCR.a, B_TCR.a_,B_TCR.c)) B_TCR.g3 <- Some (a,a_,c);
+        m <- if (a_ = a^B_TCR.w /\ d = a ^ (B_TCR.x + v*B_TCR.y)) then Some (c / a ^ B_TCR.z)
+            else None;
+      }
+      return m;
+    }
+  }
+
+  module A = A (O)
+
+  proc c1() = {
+    var r';
+    B_TCR.log <- [];
+    B_TCR.g3 <- None;
+    B_TCR.cstar <- None;
+    B_TCR.w <$ FDistr.dt \ (pred1 F.zero);
+    B_TCR.u <$ FDistr.dt; 
+    B_TCR.u' <$ FDistr.dt \ (pred1 B_TCR.u);
+    B_TCR.g_ <- g ^ B_TCR.w; 
+    B_TCR.a <- g^B_TCR.u; B_TCR.a_ <- B_TCR.g_^B_TCR.u';
+    r' <$ FDistr.dt; B_TCR.c <- g^r';
+    return (B_TCR.a, B_TCR.a_, B_TCR.c);
+  }
+  
+  proc c2 (k:K) = {
+    var m0, m1, b0, e, f, h, r;
+    B_TCR.k <- k;
+    B_TCR.y <$ FDistr.dt; f <- g^B_TCR.y;
+    B_TCR.z <$ FDistr.dt; h <- g^B_TCR.z;      
+    B_TCR.v' <- H k (B_TCR.a, B_TCR.a_, B_TCR.c);
+    B_TCR.x <$ FDistr.dt; r <$ FDistr.dt; e <- g^B_TCR.x;
+    B_TCR.alpha <- (r - B_TCR.u*(B_TCR.x + B_TCR.v'*B_TCR.y))/ (B_TCR.w*(B_TCR.u'-B_TCR.u));
+    B_TCR.d <- g ^ r;
+    (m0,m1) <@ A.choose(k, g, B_TCR.g_, e, f, h); 
+    B_TCR.cstar <- Some (B_TCR.a,B_TCR.a_,B_TCR.c,B_TCR.d);
+    b0 <@ A.guess(B_TCR.a,B_TCR.a_,B_TCR.c,B_TCR.d);
+    return (oget B_TCR.g3);    
+  }
+}.
+
+module B_TCRl (A:CCA_ADV) = {
+
+  module O = {
+    proc dec(ci:ciphertext) = {
+      var m, a,a_,c,d,v;
+      m <- None;
+      if (Some ci <> B_TCR.cstar) {
+        B_TCR.log <- ci :: B_TCR.log;
+        (a,a_,c,d) <- ci;
+        v <- H B_TCR.k (a, a_, c);
+        if (a_ <> a^B_TCR.w /\ v = B_TCR.v' /\ (a,a_,c) <> (B_TCR.a, B_TCR.a_,B_TCR.c)) B_TCR.g3 <- Some (a,a_,c);
+        m <- if (a_ = a^B_TCR.w /\ d = a ^ (B_TCR.x + v*B_TCR.y)) then Some (c / a ^ B_TCR.z)
+            else None;
+      }
+      return m;
+    }
+  }
+
+  module A = A (O)
+
+  proc c1() = {
+    var r';
+    B_TCR.log <- [];
+    B_TCR.g3 <- None;
+    B_TCR.cstar <- None;
+    B_TCR.w <$ FDistr.dt \ (pred1 F.zero);
+    B_TCR.u <$ FDistr.dt; 
+    B_TCR.u' <$ FDistr.dt \ (pred1 B_TCR.u);
+    B_TCR.g_ <- g ^ B_TCR.w; 
+    B_TCR.a <- g^B_TCR.u; B_TCR.a_ <- B_TCR.g_^B_TCR.u';
+    r' <$ FDistr.dt; B_TCR.c <- g^r';
+    return (B_TCR.a, B_TCR.a_, B_TCR.c);
+  }
+  
+  proc c2 (k:K) = {
+    var m0, m1, b0, e, f, h, r;
+    B_TCR.k <- k;
+    B_TCR.y <$ FDistr.dt; f <- g^B_TCR.y;
+    B_TCR.z <$ FDistr.dt; h <- g^B_TCR.z;      
+    B_TCR.v' <- H k (B_TCR.a, B_TCR.a_, B_TCR.c);
+    B_TCR.x <$ FDistr.dt; r <$ FDistr.dt; e <- g^B_TCR.x;
+    B_TCR.alpha <- (r - B_TCR.u*(B_TCR.x + B_TCR.v'*B_TCR.y))/ (B_TCR.w*(B_TCR.u'-B_TCR.u));
+    B_TCR.d <- g ^ r;
+    (m0,m1) <@ A.choose(k, g, B_TCR.g_, e, f, h); 
+    B_TCR.cstar <- Some (B_TCR.a,B_TCR.a_,B_TCR.c,B_TCR.d);
+    b0 <@ A.guess(B_TCR.a,B_TCR.a_,B_TCR.c,B_TCR.d);
+    return (oget B_TCR.g3);    
+  }
+}.
 
 lemma CCA_dec_ll (A<:CCA_ADV) : islossless CCA(CramerShoup, A).O.dec.
 proof. islossless. qed.
 
+lemma CCAq_dec_ll (A<:CCA_ADV) : islossless CCAq(CramerShoup, A).O.dec.
+proof. islossless. qed.
+
+lemma CSkg : choare [CramerShoup.kg : true ==> true] time [N cS.`ckg].
+proof.
+  proc. auto; do !rnd; skip; rewrite FDistr.dt_ll dk_ll /= => />.
+  split => *; last by smt().
+  apply dexcepted_ll; 1: by apply FDistr.dt_ll.
+  by rewrite FDistr.dt1E ltr_pdivr_mulr /=; smt (Ad1.gt1_n).
+qed.
+
+lemma CSenc : choare [CramerShoup.enc : true ==> true] time [N cS.`cenc].
+proof. by proc; auto; rnd; auto => />; rewrite FDistr.dt_ll /= /#. qed.
+
+lemma CSdec : choare [CramerShoup.dec : true ==> true] time [N cS.`cdec].
+proof. by proc; auto => /> /#. qed.
+
+schema cost_eqtuple3 ['a 'b 'c] `{P} {x1 x2: 'a, y1 y2: 'b, z1 z2: 'c}:
+  cost [P: (x1,y1,z1) = (x2,y2,z2)] = cost [P: x1 = x2] + cost [P: y1 = y2] + cost [P: z1 = z2].
+hint simplify cost_eqtuple3.
+
+schema cost_eqtuple3g `{P} {x1 x2: group * group * group}:
+  cost [P: x1 = x2] = cost [P: x1] + cost [P: x2] + N (3 * cgeq).
+hint simplify cost_eqtuple3g.
+
 section Security_Aux.
 
-  declare module A : CCA_ADV {CCA, B_TCR}.
-  axiom guess_ll : forall (O <: CCA_ORC{A}), islossless O.dec => islossless A(O).guess.
-  axiom choose_ll : forall (O <: CCA_ORC{A}), islossless O.dec => islossless A(O).choose.
+  declare module A : CCA_ADV [choose : `{N cA.`cchoose, #O.dec : cA.`qD_choose},
+                              guess  : `{N cA.`cguess, #O.dec : cA.`qD_guess}]
+                           {-CCA, -B_TCR}.
 
-  equiv CCA_DDH0 : CCA(CramerShoup, A).main ~ DDH0_ex(B_DDH(A)).main : ={glob A} ==> ={res}.
+  axiom guess_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).guess.
+  axiom choose_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).choose.
+
+  equiv CCA_CCAq : 
+    CCA(CramerShoup, A).main ~ CCAq(CramerShoup, A).main : ={glob A} ==> ={res}.
+  proof.
+    conseq (CCA_CCAq CramerShoup _ _ _ A choose_ll guess_ll) => //.
+    + proc; auto; do !rnd; skip; rewrite FDistr.dt_ll dk_ll /= => />.
+      split => *; last by smt().
+      apply dexcepted_ll; 1: by apply FDistr.dt_ll.
+      by rewrite FDistr.dt1E ltr_pdivr_mulr /=; smt (Ad1.gt1_n).
+    + by proc; auto; rnd; auto => />; rewrite FDistr.dt_ll /= /#.
+    + by proc; auto => /> /#.
+  qed.
+
+  lemma pr_CCA_CCAq &m: 
+    Pr[CCA(CramerShoup,A).main() @ &m : res] =  Pr[CCAq(CramerShoup,A).main() @ &m : res].
+  proof. by byequiv CCA_CCAq. qed.
+
+  equiv CCA_DDH0 : CCAq(CramerShoup, A).main ~ DDH0_ex(B_DDHq(A)).main : ={glob A} ==> ={res}.
   proof.   
     proc;inline *;wp.
     call (_: ={glob CCA}); 1: sim.
@@ -302,8 +515,8 @@ section Security_Aux.
   qed.
 
   lemma pr_CCA_DDH0 &m : 
-    Pr[CCA(CramerShoup, A).main() @ &m : res] = 
-    Pr[DDH0_ex(B_DDH(A)).main() @ &m : res].
+    Pr[CCAq(CramerShoup, A).main() @ &m : res] = 
+    Pr[DDH0_ex(B_DDHq(A)).main() @ &m : res].
   proof. by byequiv CCA_DDH0. qed.
 
   local module G1 = {
@@ -321,7 +534,7 @@ section Security_Aux.
       proc dec(ci:ciphertext) = {
         var m, a,a_,c,d,v;
         m <- None;
-        if (size log < PKE_.qD && Some ci <> G1.cstar) {
+        if (size log < qD && Some ci <> G1.cstar) {
           log <- ci :: log;
           (a,a_,c,d) <- ci;
           v <- H k (a, a_, c);
@@ -364,7 +577,7 @@ section Security_Aux.
   }.
 
   local equiv DDH1_G1_dec : 
-    CCA(CramerShoup, A).O.dec ~ G1.O.dec : 
+    CCAq(CramerShoup, A).O.dec ~ G1.O.dec : 
     ( !G1.bad{2} /\ c{1} = ci{2} /\
       (G1.x{2} = G1.x1{2} + G1.w{2} * G1.x2{2} /\
        G1.y{2} = G1.y1{2} + G1.w{2} * G1.y2{2} /\
@@ -400,7 +613,7 @@ section Security_Aux.
   local lemma G1_dec_bad : phoare[ G1.O.dec : G1.bad ==> G1.bad ] = 1%r.
   proof. by proc; auto => ? ->. qed.
 
-  local equiv DDH1_G1 : DDH1_ex(B_DDH(A)).main ~ Ad1.Main(G1).main : 
+  local equiv DDH1_G1 : DDH1_ex(B_DDHq(A)).main ~ Ad1.Main(G1).main : 
                         ={glob A} ==> !G1.bad{2} => ={res}.
   proof.
     proc;inline *;wp.
@@ -413,7 +626,7 @@ section Security_Aux.
               CCA.sk{1} = (G1.k, g, G1.g_, G1.x1, G1.x2, G1.y1, G1.y2, G1.z1, G1.z2){2})).
       + by apply guess_ll.
       + by apply DDH1_G1_dec.
-      + by move=> _ _; apply (CCA_dec_ll A).
+      + by move=> _ _; apply (CCAq_dec_ll A).
       + by move=> _;apply G1_dec_bad.
     wp;rnd.
     call (_: G1.bad, 
@@ -425,7 +638,7 @@ section Security_Aux.
               CCA.sk{1} = (G1.k, g, G1.g_, G1.x1, G1.x2, G1.y1, G1.y2, G1.z1, G1.z2){2})).
       + by apply choose_ll.
       + by apply DDH1_G1_dec.
-      + by move=> _ _; apply (CCA_dec_ll A).
+      + by move=> _ _; apply (CCAq_dec_ll A).
       + by move=> _;apply G1_dec_bad.
     swap{1} 16 -9;wp.
     swap -1;rnd (fun z => z + G1.w{2} * G1.z2{2}) (fun z => z - G1.w{2} * G1.z2{2}).
@@ -453,7 +666,7 @@ section Security_Aux.
     have H2 : forall x1L x2L, x1L + xL * x2L = x1L + xL * x2L - xL * x2L + xL * x2L.
     +  by move=> ??;ring.
     rewrite -!H2 /=;split=> [ | _].
-    + by split ;ring.
+    + by split => *; ring.
     move=> ??????? Hbad ? ? /=.
     have <- /= : g ^ zL = g ^ xL ^ (zL / xL).
     + by rewrite log_bij !(log_g, log_pow, log_mul);field.
@@ -462,25 +675,21 @@ section Security_Aux.
       by split; rewrite log_bij !(log_g, log_pow, log_mul) /=.
     by move=> _ {Hbad} ??????? Hbad /Hbad.
   qed.
-
-  lemma dt_r_ll x : is_lossless (FDistr.dt \ pred1 x).
-  proof. 
-    by rewrite dexcepted_ll ?FDistr.dt_ll // FDistr.dt1E ltr_pdivr_mulr /= lt_fromint; smt (gt1_q).
-  qed.
   
   local lemma aux1 &m : 
     Pr[CCA(CramerShoup, A).main() @ &m : res] <= 
-       `| Pr[DDH0(B_DDH(A)).main() @ &m : res] - Pr[DDH1(B_DDH(A)).main() @ &m : res] | 
+       `| Pr[DDH0(B_DDHq(A)).main() @ &m : res] - Pr[DDH1(B_DDHq(A)).main() @ &m : res] | 
     + Pr[Ad1.MainE(G1).main() @ &m : res \/ G1.bad] + 3%r/q%r.
   proof.
+    rewrite (pr_CCA_CCAq &m).
     have -> : 
-     Pr[CCA(CramerShoup, A).main() @ &m : res] = Pr[DDH0_ex(B_DDH(A)).main() @ &m : res].
+     Pr[CCAq(CramerShoup, A).main() @ &m : res] = Pr[DDH0_ex(B_DDHq(A)).main() @ &m : res].
     + byequiv CCA_DDH0 => //.
-    have := adv_DDH_DDH_ex (B_DDH(A)) _ &m.
-    + proc;call (guess_ll (<:CCA(CramerShoup,A).O) (CCA_dec_ll A));auto.
-      call (choose_ll (<:CCA(CramerShoup,A).O) (CCA_dec_ll A));auto => /=.
+    have := adv_DDH_DDH_ex (B_DDHq(A)) _ &m.
+    + proc;call (guess_ll (<:CCAq(CramerShoup,A).O) (CCAq_dec_ll A));auto.
+      call (choose_ll (<:CCAq(CramerShoup,A).O) (CCAq_dec_ll A));auto => /=.
       by rewrite FDistr.dt_ll  DBool.dbool_ll dk_ll.
-    have : Pr[DDH1_ex(B_DDH(A)).main() @ &m : res] <= 
+    have : Pr[DDH1_ex(B_DDHq(A)).main() @ &m : res] <= 
            Pr[Ad1.Main(G1).main() @ &m : res \/ G1.bad].
     + byequiv DDH1_G1 => //;1: smt ().
     (* print glob G1. *)
@@ -620,7 +829,7 @@ section Security_Aux.
       proc dec(ci:ciphertext) = {
         var m, a,a_,c,d,v, y2';
         m <- None;
-        if (size G1.log < PKE_.qD && Some ci <> G1.cstar) {
+        if (size G1.log < qD && Some ci <> G1.cstar) {
           cilog <- (G1.cstar = None) ? ci :: cilog : cilog;
           G1.log <- ci :: G1.log;
           (a,a_,c,d) <- ci;
@@ -695,7 +904,7 @@ section Security_Aux.
     pose v := H _ _. rewrite !negb_or => [[]] Hg3 Hcilog Hstareq.
     rewrite Hg3 /=. 
     case: (G1.bad{m1}) => [_ -> | ] //=. 
-    move=> Hbad Hsize Hstar;rewrite !negb_and /= 2!negb_or /= -!andaE.
+    move=> Hbad Hsize Hstar;rewrite !andaE !negb_and /= 2!negb_or /= -!andaE.
     case (v = G2.v{m2}) => />.
     + by case: (G1.cstar{m2}) Hstareq Hstar => />.
     move=> Hv Ha _;left.
@@ -751,22 +960,22 @@ section Security_Aux.
   qed.
 
   local lemma pr_G3_y2log &m : 
-    Pr[G3.main() @ &m : G1.y2 \in G3.y2log] <= PKE_.qD%r / q%r.
+    Pr[G3.main() @ &m : G1.y2 \in G3.y2log] <= qD%r / q%r.
   proof. 
     byphoare => //;proc;wp;rnd.
-    conseq (_: _ ==> size G3.y2log <=  PKE_.qD) => /=.
+    conseq (_: _ ==> size G3.y2log <=  qD) => /=.
     + move=> y2log Hsize;apply (ler_trans ((size y2log)%r/q%r)).
       + by apply (mu_mem_le_mu1 FDistr.dt y2log (inv q%r)) => x;rewrite FDistr.dt1E.
       apply ler_wpmul2r => //;2: by apply le_fromint.
       apply invr_ge0;smt (le_fromint gt1_q).
-    call (_: size G3.y2log <= size G1.log /\ size G3.y2log <= PKE_.qD). 
+    call (_: size G3.y2log <= size G1.log /\ size G3.y2log <= qD). 
     + proc;auto => /#. 
-    auto;call (_: size G3.y2log <= size G1.log /\ size G3.y2log <= PKE_.qD). 
+    auto;call (_: size G3.y2log <= size G1.log /\ size G3.y2log <= qD). 
     + proc;auto => /#. 
-    auto => />;smt (qD_pos).
+    auto => />;smt (ge0_qD).
   qed.
 
-  local equiv G3_TCR : G3.main ~ TCR(B_TCR(A)).main : ={glob A} ==> G3.g3{1} <> None => res{2}.
+  local equiv G3_TCR : G3.main ~ TCR(B_TCRq(A)).main : ={glob A} ==> G3.g3{1} <> None => res{2}.
   proof.
     proc;inline *;wp;rnd{1}.
     call (_ : B_TCR.log{2} = G1.log{1} /\
@@ -803,7 +1012,7 @@ section Security_Aux.
       proc dec(ci:ciphertext) = {
         var m, a,a_,c,d,v;
         m <- None;
-        if (size G1.log < PKE_.qD && Some ci <> G1.cstar) {
+        if (size G1.log < qD && Some ci <> G1.cstar) {
           G3.cilog <- (G1.cstar = None) ? ci :: G3.cilog : G3.cilog;
           G1.log <- ci :: G1.log;
           (a,a_,c,d) <- ci;
@@ -867,19 +1076,19 @@ section Security_Aux.
 
   local lemma pr_G4 &m:
     Pr[G4.main() @ &m : (G3.a, G3.a_,G3.c, G3.d) \in G3.cilog] <=
-      (PKE_.qD%r/q%r)^3 * (PKE_.qD%r/(q-1)%r).
+      (qD%r/q%r)^3 * (qD%r/(q-1)%r).
   proof.
     byphoare=> //;proc.
     seq 23 : ((G3.a, G3.a_, G3.c, G3.d) \in G3.cilog) 
-             ((PKE_.qD%r / q%r)^3 * (PKE_.qD%r / (q - 1)%r)) 1%r _ 0%r => //;last first.
+             ((qD%r / q%r)^3 * (qD%r / (q - 1)%r)) 1%r _ 0%r => //;last first.
     + hoare; call (_ : G1.cstar <> None /\ !(G3.a, G3.a_, G3.c, G3.d) \in G3.cilog).
       + by proc;auto => /#.
       by auto.      
-    seq 13 : true 1%r ((PKE_.qD%r / q%r) ^ 3 * (PKE_.qD%r / (q - 1)%r))
-                 0%r _ (size G3.cilog <= PKE_.qD /\ G1.w <> F.zero /\ G1.g_ = g ^ G1.w) => //.
-    + call (_ : size G3.cilog <= size G1.log /\ size G1.log <= PKE_.qD).
+    seq 13 : true 1%r ((qD%r / q%r) ^ 3 * (qD%r / (q - 1)%r))
+                 0%r _ (size G3.cilog <= qD /\ G1.w <> F.zero /\ G1.g_ = g ^ G1.w) => //.
+    + call (_ : size G3.cilog <= size G1.log /\ size G1.log <= qD).
       + proc;auto => /#.
-      auto => /= w /supp_dexcepted;smt (qD_pos).
+      auto => /= w /supp_dexcepted;smt (ge0_qD).
     wp;conseq (_ : _ ==> G1.u \in map (fun (g4:ciphertext) => log g4.`1) G3.cilog /\
                       G1.u' \in map (fun (g4:ciphertext) => log g4.`2 / G1.w) G3.cilog /\
                       r' \in map (fun (g4:ciphertext) => log g4.`3) G3.cilog /\
@@ -890,8 +1099,8 @@ section Security_Aux.
        rewrite Hlog /= !log_pow ?log_g;1,3,4: by ring. 
        by field.
     seq 1 : (G1.u \in map (fun (g4 : ciphertext) => log g4.`1) G3.cilog)
-            (PKE_.qD%r / q%r) ((PKE_.qD%r / q%r)^2 * (PKE_.qD%r / (q - 1)%r))
-            _ 0%r (size G3.cilog <= PKE_.qD) => //;
+            (qD%r / q%r) ((qD%r / q%r)^2 * (qD%r / (q - 1)%r))
+            _ 0%r (size G3.cilog <= qD) => //;
     last 2 first.
     + hoare;conseq (_ : _ ==> true) => // /#.
     + move=> &hr _;apply lerr_eq;ring.
@@ -901,8 +1110,8 @@ section Security_Aux.
       + by rewrite /m' size_map.
       by move=> ?;rewrite FDistr.dt1E.
     seq 1 : (G1.u' \in map (fun (g4 : ciphertext) => log g4.`2 / G1.w) G3.cilog)
-            (PKE_.qD%r / (q-1)%r) ((PKE_.qD%r / q%r)^2) _ 0%r 
-            (size G3.cilog <= PKE_.qD) => //;last 2 first.
+            (qD%r / (q-1)%r) ((qD%r / q%r)^2) _ 0%r 
+            (size G3.cilog <= qD) => //;last 2 first.
     + hoare;conseq (_ : _ ==> true) => // /#.
     + move=> &hr _;apply lerr_eq;ring.
     + by auto.
@@ -915,8 +1124,8 @@ section Security_Aux.
       rewrite FDistr.dt_ll !FDistr.dt1E;apply lerr_eq.
       field;smt (gt1_q le_fromint). 
     seq 1 : (r' \in map (fun (g4 : ciphertext) => log g4.`3) G3.cilog)
-            (PKE_.qD%r / q%r) (PKE_.qD%r / q%r) _ 0%r 
-            (size G3.cilog <= PKE_.qD) => //;last 2 first.
+            (qD%r / q%r) (qD%r / q%r) _ 0%r 
+            (size G3.cilog <= qD) => //;last 2 first.
     + hoare;conseq (_ : _ ==> true) => // /#.
     + move=> &hr _;apply lerr_eq;field.
       + rewrite expr2; smt (gt1_q). 
@@ -935,10 +1144,10 @@ section Security_Aux.
 
   lemma aux2 &m : 
     Pr[CCA(CramerShoup, A).main() @ &m : res] <=
-    `|Pr[DDH0(B_DDH(A)).main() @ &m : res] -
-      Pr[DDH1(B_DDH(A)).main() @ &m : res]| +
-    Pr[TCR(B_TCR(A)).main() @ &m : res] + 
-    1%r/2%r + (PKE_.qD + 3)%r / q%r + (PKE_.qD%r/q%r)^3 * (PKE_.qD%r/(q-1)%r).
+    `|Pr[DDH0(B_DDHq(A)).main() @ &m : res] -
+      Pr[DDH1(B_DDHq(A)).main() @ &m : res]| +
+    Pr[TCR(B_TCRq(A)).main() @ &m : res] + 
+    1%r/2%r + (qD + 3)%r / q%r + (qD%r/q%r)^3 * (qD%r/(q-1)%r).
   proof.
     have := aux1 &m.
     have -> : Pr[Ad1.MainE(G1).main() @ &m : res \/ G1.bad] = 
@@ -953,25 +1162,137 @@ section Security_Aux.
                                G1.y2 \in G3.y2log].
     + byequiv G2_G3 => // /#.                                
     rewrite Pr [mu_or];rewrite Pr [mu_or].
-    have : Pr[G3.main() @ &m : G3.g3 <> None] <= Pr[TCR(B_TCR(A)).main() @ &m : res].
+    have : Pr[G3.main() @ &m : G3.g3 <> None] <= Pr[TCR(B_TCRq(A)).main() @ &m : res].
     + byequiv G3_TCR => //.
     have : Pr[G3.main() @ &m : (G3.a, G3.a_,G3.c, G3.d) \in G3.cilog] =
            Pr[G4.main() @ &m : (G3.a, G3.a_,G3.c, G3.d) \in G3.cilog].
     + byequiv G3_G4=> //.
     have := pr_G4 &m.
     have := pr_G3_y2log &m.
-    have -> : (PKE_.qD + 3)%r / q%r = PKE_.qD%r/q%r + 3%r/q%r.
+    have -> : (qD + 3)%r / q%r = qD%r/q%r + 3%r/q%r.
     + by rewrite fromintD;ring.
     smt (mu_bounded).
+  qed.
+
+  lemma choare_B_DDH : choare [B_DDH(A).guess : true ==> size CCA.log <= qD] 
+    time [N(9 + 2 * cfmul + 2 * cfadd + 16 * cgpow + 9 * cgmul + cH + 
+          DBool.cdbool + cdk + 6 * FDistr.cdt + 
+          (3 + ceqocipher + cS.`cdec) * (cA.`qD_choose + cA.`qD_guess)); A.choose: 1; A.guess: 1].
+  proof.
+    proc.
+    call (: size CCA.log - cA.`qD_choose <= k; time
+            [ (CCAl(CramerShoup, A).O.dec k : [N(3 + ceqocipher + cS.`cdec)])]).
+    + by move=> k hk; proc; if => //;1: call CSdec; auto => />; smt (ge0_cdk ge0_cg ge0_cH ge0_cf).
+    auto; rnd.
+    call (: size CCA.log <= k; time
+            [ (CCAl(CramerShoup, A).O.dec k : [N(3 + ceqocipher + cS.`cdec)])]).
+    + by move=> k hk; proc; if=>//; 1: call CSdec; auto => />; smt (ge0_cdk ge0_cg ge0_cH ge0_cf).
+    auto; rnd; auto; do !rnd; auto=> &hr />. 
+    rewrite FDistr.dt_ll DBool.dbool_ll dk_ll /=; split; 1: smt().
+    rewrite !bigi_constz; smt(ge0_cA). 
+  qed.
+
+  equiv B_DDHq_B_DDH : B_DDHq(A).guess ~ B_DDH(A).guess : ={arg, glob A} ==> ={res, glob A}.
+  proof.
+    conseq (_: ={arg, glob A} ==> size CCA.log{2} <= qD => ={res, glob A})
+           _ (_: true ==> size CCA.log <= qD) => //.
+    + conseq choare_B_DDH.
+    proc.
+    call (: qD < size CCA.log, ={CCA.log, CCA.sk, CCA.cstar}).    
+    + by apply guess_ll.
+    + proc; if{1}.
+      + rcondt{2} ^if; auto.
+        by call (:true); auto.
+      if{2}; last by auto.
+      call{2} (_:true ==> true); 1: by conseq CSdec. 
+      by auto => /> /#.
+    + by move=> *; islossless.
+    + move=> *; proc; if; last by auto.
+      call(:true); auto => /> /#.
+    auto.
+    call (: qD < size CCA.log, ={CCA.log, CCA.sk, CCA.cstar}).    
+    + by apply choose_ll.
+    + proc; if{1}.
+      + rcondt{2} ^if; auto.
+        by call (:true); auto.
+      if{2}; last by auto.
+      call{2} (_:true ==> true); 1: by conseq CSdec. 
+      by auto => /> /#.
+    + by move=> *; islossless.
+    + move=> *; proc; if; last by auto.
+      call(:true); auto => /> /#.
+    auto => /> /#.
+  qed.
+
+  lemma cTCRl : choare [TCR(B_TCRl(A)).main : true ==> size B_TCR.log <= qD] time [
+      N((cH + cH + cfeq + (3 * cgeq + 1) + 1) + 1 +
+      (15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher) * cA.`qD_guess + 2 +
+      (15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher) * cA.`qD_choose +
+      (cgpow + (cfmul + cfadd + cfmul + cfsub + (cfsub + cfmul) + cfdiv) + cgpow) + FDistr.cdt + FDistr.cdt +
+      (1 + cH + cgpow) + FDistr.cdt + cgpow + FDistr.cdt + cdk + (1 + cgpow) + FDistr.cdt + (
+      cgpow + cgpow + cgpow) + FDistr.cdt + FDistr.cdt + FDistr.cdt + 3);
+      A.choose : 1; A.guess : 1].
+  proof.
+    proc; inline *; auto.
+    call(:size B_TCR.log - cA.`qD_choose <= k; time
+         [(B_TCRl(A).O.dec k : [N(15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)])]).
+    + move=> k hk; proc; auto => /> &hr *; smt (ge0_cH ge0_cg ge0_cf).
+    wp; call(:size B_TCR.log <= k; time
+         [(B_TCRl(A).O.dec k : [N(15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)])]).
+    + move=> k hk; proc; auto => /> &hr *; smt (ge0_cH ge0_cg ge0_cf).
+    do !(auto; do ?rnd) => />. 
+    rewrite dt_r_ll FDistr.dt_ll dk_ll /=; split; 1:smt (dt_r_ll).
+    rewrite !bigi_constz /=; smt (ge0_cA).
+  qed.
+
+  equiv B_TCRq_B_TCRl : TCR(B_TCRq(A)).main ~ TCR(B_TCRl(A)).main : ={arg, glob A} ==> ={res, glob A}.
+  proof.
+    conseq (_: ={arg, glob A} ==> size B_TCR.log{2} <= qD => ={res, glob A})
+           _ (_: true ==> size B_TCR.log <= qD) => //.
+    + by conseq cTCRl.
+    proc; inline *; wp.
+    call (: qD < size B_TCR.log, ={glob B_TCR}).
+    + by apply guess_ll.
+    + by proc; auto => /#.
+    + by move=> *; islossless.
+    + by move=> *; proc; auto => /> /#.
+    wp.
+    call (: qD < size B_TCR.log, ={glob B_TCR}).
+    + by apply choose_ll.
+    + by proc; auto => /#.
+    + by move=> *; islossless.
+    + by move=> *; proc; auto => /> /#.
+    auto => /> /#.
+  qed.
+
+  lemma aux3 &m : 
+    Pr[CCA(CramerShoup, A).main() @ &m : res] <=
+    `|Pr[DDH0(B_DDH(A)).main() @ &m : res] -
+      Pr[DDH1(B_DDH(A)).main() @ &m : res]| +
+    Pr[TCR(B_TCR(A)).main() @ &m : res] + 
+    1%r/2%r + (qD + 3)%r / q%r + (qD%r/q%r)^3 * (qD%r/(q-1)%r).
+  proof.
+    have := aux2 &m.
+    have ->: Pr[DDH0(B_DDHq(A)).main() @ &m : res] = Pr[DDH0(B_DDH(A)).main() @ &m : res].
+    + by byequiv => //; proc; call B_DDHq_B_DDH; auto.
+    have ->: Pr[DDH1(B_DDHq(A)).main() @ &m : res] = Pr[DDH1(B_DDH(A)).main() @ &m : res].
+    + by byequiv => //; proc; call B_DDHq_B_DDH; auto.
+    have ->: Pr[TCR(B_TCRq(A)).main() @ &m : res] = Pr[TCR(B_TCRl(A)).main() @ &m : res].
+    + by byequiv B_TCRq_B_TCRl.
+    have -> //: Pr[TCR(B_TCRl(A)).main() @ &m : res] = Pr[TCR(B_TCR(A)).main() @ &m : res].
+    by byequiv => //; sim.
   qed.
 
 end section Security_Aux.
 
 section Security.
 
-  declare module A : CCA_ADV {CCA, B_TCR}.
-  axiom guess_ll : forall (O <: CCA_ORC{A}), islossless O.dec => islossless A(O).guess.
-  axiom choose_ll : forall (O <: CCA_ORC{A}), islossless O.dec => islossless A(O).choose.
+  declare module A : CCA_ADV [choose : `{N cA1.`cchoose, #O.dec : cA1.`qD_choose},
+                              guess  : `{N cA1.`cguess, #O.dec : cA1.`qD_guess}]
+                             {-CCA, -B_TCRq}.
+
+  axiom guess_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).guess.
+  axiom choose_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).choose.
 
   local module NA (O:CCA_ORC) = {
     module A = A(O)
@@ -1010,8 +1331,8 @@ section Security.
     rewrite Pr [mu_not];congr.
     byphoare=> //;proc;inline *;auto.
     islossless.
-    + by apply (guess_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
-    by apply (choose_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
+    + by apply (guess_ll (<:CCAl(CramerShoup, A).O) _); islossless. 
+    by apply (choose_ll (<:CCAl(CramerShoup, A).O) _); islossless.
   qed.
 
   local lemma DDH1_NA &m : Pr[DDH1(B_DDH(NA)).main() @ &m : res] = 
@@ -1023,8 +1344,8 @@ section Security.
       by conseq (_ : _ ==> ={b0} /\ b'{2} = b1{1});[ smt() | sim].   
     rewrite Pr [mu_not];congr.
     byphoare=> //; islossless.
-    + by apply (guess_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
-    by apply (choose_ll (<:CCA(CramerShoup, A).O) (CCA_dec_ll A)).
+    + by apply (guess_ll (<:CCAl(CramerShoup, A).O) _); islossless. 
+    by apply (choose_ll (<:CCAl(CramerShoup, A).O) _); islossless. 
   qed.
 
   local lemma TCR_NA &m : Pr[TCR(B_TCR(NA)).main() @ &m : res] = 
@@ -1032,10 +1353,10 @@ section Security.
   proof.
     byequiv=> //;proc;inline *;sim.
     call (_: ={ B_TCR.v', B_TCR.k, B_TCR.cstar, B_TCR.a, B_TCR.a_, B_TCR.c,
-                B_TCR.log, B_TCR.g3, B_TCR.w, B_TCR.x, B_TCR.y, B_TCR.z}).
+                B_TCR.g3, B_TCR.w, B_TCR.x, B_TCR.y, B_TCR.z}).
     + by sim.
     auto;call (_: ={ B_TCR.v', B_TCR.k, B_TCR.cstar, B_TCR.a, B_TCR.a_, B_TCR.c,
-                     B_TCR.log, B_TCR.g3, B_TCR.w, B_TCR.x, B_TCR.y, B_TCR.z});2: by auto.
+                     B_TCR.g3, B_TCR.w, B_TCR.x, B_TCR.y, B_TCR.z});2: by auto.
     by sim.
   qed.
 
@@ -1043,15 +1364,67 @@ section Security.
     `|Pr[CCA(CramerShoup, A).main() @ &m : res] - 1%r/2%r | <=
     `|Pr[DDH0(B_DDH(A)).main() @ &m : res] - Pr[DDH1(B_DDH(A)).main() @ &m : res]| +
     Pr[TCR(B_TCR(A)).main() @ &m : res] + 
-    (PKE_.qD + 3)%r / q%r + (PKE_.qD%r/q%r)^3 * (PKE_.qD%r/(q-1)%r).
+    (qD + 3)%r / q%r + (qD%r/q%r)^3 * (qD%r/(q-1)%r).
   proof.
     case (Pr[CCA(CramerShoup, A).main() @ &m : res] <= 1%r/2%r);last first.
-    + have /# := aux2 A guess_ll choose_ll &m.
-    have := aux2 NA _ choose_ll &m.            
+    + have /#:= aux3 A _ _ guess_ll choose_ll &m.
+      + move=> kC O ?; proc true : time [(O.dec: [N kC])] => //=.
+        + rewrite bigi_constz /=; smt(ge0_cA1). 
+        by move=> *; proc true : time [].
+      move=> kC O *; proc true : time [(O.dec: [N kC])] => //=.
+      + by rewrite bigi_constz; smt(ge0_cA1).
+      by move=> *; proc true : time [].
+    have := aux3 NA _ _ _ choose_ll &m.            
+    + move=> kC O *; proc true : time [(O.dec: [N kC])] => //=.
+      + by rewrite bigi_constz; smt(ge0_cA1).
+      by move=> *; proc true : time [].      
+    + move=> kC O *; proc => /=.
+      call (:true; time [(O.dec: [N kC])]).
+      + by move=> *; proc true : time []. 
+      skip; rewrite bigi_constz; smt(ge0_cA1).
     + by move=> O O_ll;proc;inline *;call (_ : true) => //; apply guess_ll.
     rewrite (CCA_NA &m) (DDH0_NA &m) (DDH1_NA &m) (TCR_NA &m).
     smt (mu_bounded).
   qed.
 
-end section Security.
+  lemma ex_conclusion &m : 
+    exists (ADDH <: DDH.Adversary 
+      [guess : 
+        `{N(11 + 2 * cfmul + 2 * cfadd + 16 * cgpow + 9 * cgmul + cH + DBool.cdbool + cdk + 6 * FDistr.cdt +
+         (3 + ceqocipher + cS.`cdec) * (cA1.`qD_choose + cA1.`qD_guess) +
+         cA1.`cchoose + cA1.`cguess)}] 
+      {+CCA, +A}),    
+    exists (ATCR <: ADV_TCR [c1: `{N (3 + 4 * cgpow + 4 * FDistr.cdt)}, 
+                             c2: `{N (4 + 4 * cgpow + 3 * cfmul + cfadd + 2 * cfsub + cfdiv + 4 * FDistr.cdt + cH + 
+                                   (14 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher) * 
+                                       (cA1.`qD_choose + cA1.`qD_guess) +
+                                  cA1.`cchoose + cA1.`cguess)}] 
+                             {+B_TCR, +A}),
+   `|Pr[CCA(CramerShoup, A).main() @ &m : res] - 1%r/2%r | <=
+    `|Pr[DDH0(ADDH).main() @ &m : res] - Pr[DDH1(B_DDH(A)).main() @ &m : res]| +
+    Pr[TCR(ATCR).main() @ &m : res] + 
+    (qD + 3)%r / q%r + (qD%r/q%r)^3 * (qD%r/(q-1)%r).
+  proof.
+    exists (B_DDH(A)); split.
+    + conseq (choare_B_DDH A _ _ guess_ll choose_ll); 1: by move=> /=;smt().
+      + move=> kC O *; proc true : time [(O.dec: [N kC])] => />.
+        + by rewrite !bigi_constz 1,2:[smt(ge0_cA1)].    
+        by move=> *; proc true : time [].   
+      move=> kC O *; proc true : time [(O.dec: [N kC])] => />.
+      + by rewrite !bigi_constz 1,2:[smt(ge0_cA1)].    
+      by move=> *; proc true : time [].
+    exists(B_TCR(A));split.
+    + split. 
+      +  proc; do !(auto; do ?rnd) => />; smt(dt_r_ll FDistr.dt_ll).
+      proc.
+      call(:true ; time
+         [(B_TCR(A).O.dec k : [N(14 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)])]).
+      + move=> k hk; proc; auto => />; smt (ge0_cH ge0_cg ge0_cf).
+      wp; call(:true; time
+         [(B_TCR(A).O.dec k : [N(14 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)])]).
+      + move=> k hk; proc; auto => /> ; smt (ge0_cH ge0_cg ge0_cf).
+      by do !(auto; do ?rnd) => />; rewrite FDistr.dt_ll /= !bigi_constz /=; smt (ge0_cA).      
+    by apply (conclusion &m).
+  qed.
 
+end section Security.

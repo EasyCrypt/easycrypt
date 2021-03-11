@@ -37,10 +37,10 @@ and ty_dtype = {
   tydt_schcase : form;
 }
 
-val tydecl_as_concrete : tydecl -> EcTypes.ty
-val tydecl_as_abstract : tydecl -> Sp.t
-val tydecl_as_datatype : tydecl -> ty_dtype
-val tydecl_as_record   : tydecl -> form * (EcSymbols.symbol * EcTypes.ty) list
+val tydecl_as_concrete : tydecl -> EcTypes.ty option
+val tydecl_as_abstract : tydecl -> Sp.t option
+val tydecl_as_datatype : tydecl -> ty_dtype option
+val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list) option
 
 val abs_tydecl : ?tc:Sp.t -> ?params:ty_pctor -> unit -> tydecl
 
@@ -135,15 +135,33 @@ val operator_as_prind : operator -> prind
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
-  ax_tparams : ty_params;
-  ax_spec    : form;
-  ax_kind    : axiom_kind;
-  ax_nosmt   : bool;
-}
+  ax_tparams  : ty_params;
+  ax_spec     : EcCoreFol.form;
+  ax_kind     : axiom_kind;
+  ax_nosmt    : bool; }
 
 (* -------------------------------------------------------------------- *)
-val is_axiom : axiom_kind -> bool
-val is_lemma : axiom_kind -> bool
+val is_axiom  : axiom_kind -> bool
+val is_lemma  : axiom_kind -> bool
+
+(* -------------------------------------------------------------------- *)
+type sc_params = (EcIdent.t * ty) list
+
+type pr_params = EcIdent.t list (* type bool *)
+
+(* [axs_params] are the free variables in [as_spec] expressions, i.e. in
+   [EcTypes.expr]. *)
+type ax_schema = {
+  axs_tparams : ty_params;
+  axs_pparams : pr_params;
+  axs_params  : sc_params;
+  axs_spec    : EcCoreFol.form;
+}
+
+val sc_instantiate :
+  ty_params -> pr_params -> sc_params ->
+  ty list -> EcMemory.memtype -> mem_pr list -> expr list ->
+  EcCoreFol.form -> EcCoreFol.form
 
 (* -------------------------------------------------------------------- *)
 val axiomatized_op :

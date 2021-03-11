@@ -39,7 +39,7 @@ let close_pr_body (uni : EcUnify.uidmap) (body : prbody) =
   | PR_Ind pri ->
      let for1 ctor =
        { prc_ctor = ctor.prc_ctor;
-         prc_bds  = List.map (snd_map (Fsubst.gty_subst fsubst)) ctor.prc_bds;
+         prc_bds  = List.map (snd_map (Fsubst.subst_gty fsubst)) ctor.prc_bds;
          prc_spec = List.map (Fsubst.f_subst fsubst) ctor.prc_spec; } in
      PR_Ind
        { pri_args  = List.map (snd_map tsubst) pri.pri_args;

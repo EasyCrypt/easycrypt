@@ -45,13 +45,19 @@ val record_ind_path  : path -> path
 val indsc_of_record : record -> form
 
 (* -------------------------------------------------------------------- *)
-val datatype_ind_name : [`Elim|`Case] -> symbol -> symbol
-val datatype_ind_path : [`Elim|`Case] -> path   -> path
+val datatype_ind_name  : [`Elim|`Case] -> symbol -> symbol
+val datatype_ind_path  : [`Elim|`Case] -> path   -> path
+val datatype_proj_name : symbol -> symbol
+val datatype_proj_path : path -> symbol -> path
 
 (* -------------------------------------------------------------------- *)
 exception NonPositive
 
 val indsc_of_datatype : ?normty:(ty -> ty) -> [`Elim|`Case] -> datatype -> form
+
+(* -------------------------------------------------------------------- *)
+val datatype_projectors :
+  path * ty_params * ty_dtype -> (symbol * operator) list
 
 (* -------------------------------------------------------------------- *)
 type case1 = {

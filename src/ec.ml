@@ -253,7 +253,7 @@ let main () =
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false)
 
-    end
+      end
   in
 
   (match input with
@@ -287,9 +287,9 @@ let main () =
               List.map
                 (fun (x : EcScope.required_info) ->
                    let ecr = EcEco.{
-                     eco_digest = x.rqd_digest;
-                     eco_kind   = x.rqd_kind;
-                   } in (x.rqd_name, ecr))
+                     eco_digest = x.EcScope.rqd_digest;
+                     eco_kind   = x.EcScope.rqd_kind;
+                   } in (x.EcScope.rqd_name, ecr))
                 (EcScope.Theory.required scope));
         } in
 
@@ -386,9 +386,11 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+                   let timed = p.EP.gl_debug = Some `Timed in
+                   let break = p.EP.gl_debug = Some `Break in
                      try
                        let tdelta =
-                         EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
+                         EcCommands.process ~timed ~break p.EP.gl_action
                        in tstats loc tdelta
                      with
                      | EcCommands.Restart ->

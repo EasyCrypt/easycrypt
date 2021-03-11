@@ -40,16 +40,16 @@ and ty_dtype = {
 }
 
 let tydecl_as_concrete (td : tydecl) =
-  match td.tyd_type with `Concrete x -> x | _ -> assert false
+  match td.tyd_type with `Concrete x -> Some x | _ -> None
 
 let tydecl_as_abstract (td : tydecl) =
-  match td.tyd_type with `Abstract x -> x | _ -> assert false
+  match td.tyd_type with `Abstract x -> Some x | _ -> None
 
 let tydecl_as_datatype (td : tydecl) =
-  match td.tyd_type with `Datatype x -> x | _ -> assert false
+  match td.tyd_type with `Datatype x -> Some x | _ -> None
 
 let tydecl_as_record (td : tydecl) =
-  match td.tyd_type with `Record x -> x | _ -> assert false
+  match td.tyd_type with `Record x -> Some x | _ -> None
 
 (* -------------------------------------------------------------------- *)
 let abs_tydecl ?(tc = Sp.empty) ?(params = `Int 0) () =
@@ -137,13 +137,65 @@ type operator = {
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
-  ax_tparams : ty_params;
-  ax_spec    : EcCoreFol.form;
-  ax_kind    : axiom_kind;
-  ax_nosmt   : bool; }
+  ax_tparams  : ty_params;
+  ax_spec     : EcCoreFol.form;
+  ax_kind     : axiom_kind;
+  ax_nosmt    : bool; }
 
-let is_axiom (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
-let is_lemma (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
+let is_axiom  (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
+let is_lemma  (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
+
+(* -------------------------------------------------------------------- *)
+type sc_params = (EcIdent.t * ty) list
+
+type pr_params = EcIdent.t list (* type bool *)
+
+type ax_schema = {
+  axs_tparams : ty_params;
+  axs_pparams : pr_params; (* variables for predicate *)
+  axs_params  : sc_params; (* variables representing expression *)
+  axs_spec    : EcCoreFol.form;
+}
+
+let sc_instantiate
+    ty_params pr_params sc_params
+    ty_args memtype (pr_args : mem_pr list) sc_args f =
+  let fs = EcTypes.Tvar.init (List.map fst ty_params) ty_args in
+  let sty = { ty_subst_id with ts_v = EcIdent.Mid.find_opt^~ fs } in
+
+
+  (* We substitute the predicate variables. *)
+  let preds = List.map2 (fun (mem,p) id ->
+      id, (mem,p)) pr_args pr_params in
+  let mpreds = EcIdent.Mid.of_list preds in
+
+  let exprs =
+    List.map2 (fun e (id,_ty) ->
+        id, e
+      ) sc_args sc_params in
+  let mexpr = EcIdent.Mid.of_list exprs in
+
+  (* FIXME: instantiating and substituting in schema is ugly. *)
+  (* We instantiate the variables. *)
+  (* For cost judgement, we also need to substitute the expression variables
+     in the precondition. *)
+  let tx f_old f_new = match f_old.f_node, f_new.f_node with
+    | Fcoe coe_old, Fcoe coe_new
+      when EcMemory.is_schema (snd coe_old.coe_mem) ->
+      let fs =
+        List.fold_left (fun s (id,e) ->
+            let f = EcCoreFol.form_of_expr (fst coe_new.coe_mem) e in
+            Fsubst.f_bind_local s id f)
+          (Fsubst.f_subst_init ()) exprs in
+
+      EcCoreFol.f_coe_r { coe_new with
+                          coe_pre = Fsubst.f_subst fs coe_new.coe_pre }
+    | _ -> f_new in
+
+  let fs = Fsubst.f_subst_init ~sty ~esloc:mexpr ~mt:memtype ~mempred:mpreds () in
+
+  Fsubst.f_subst ~tx fs f
+
 
 (* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
@@ -265,10 +317,10 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 
-  { ax_tparams = axpm;
-    ax_spec    = axspec;
-    ax_kind    = `Axiom (Ssym.empty, false);
-    ax_nosmt   = nosmt; }
+  { ax_tparams  = axpm;
+    ax_spec     = axspec;
+    ax_kind     = `Axiom (Ssym.empty, false);
+    ax_nosmt    = nosmt; }
 
 (* -------------------------------------------------------------------- *)
 type typeclass = {

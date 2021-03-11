@@ -76,22 +76,35 @@ let match_ (env : EcEnv.env) (search : search list) f =
   in List.for_all do1 search
 
 (* -------------------------------------------------------------------- *)
+type search_result =
+  (path * [`Axiom of EcDecl.axiom | `Schema of EcDecl.ax_schema]) list
+
 let search (env : EcEnv.env) (search : search list) =
-  let check _ ax = match_ env search ax.EcDecl.ax_spec
-  in EcEnv.Ax.all ~check env
+  let check_ax _ ax = match_ env search ax.EcDecl.ax_spec in
+  let check_sc _ sc = match_ env search sc.EcDecl.axs_spec in
+  let axs = EcEnv.Ax.all ~check:check_ax env
+            |> List.map (fun (p,x) -> p, `Axiom x)
+  and scs = EcEnv.Schema.all ~check:check_sc env
+            |> List.map (fun (p,x) -> p, `Schema x) in
+  axs @ scs
 
 (* -------------------------------------------------------------------- *)
 open EcSmt
 open EcDecl
 
-let sort (relevant:Sp.t) (res:(path * EcDecl.axiom) list) =
+let sort (relevant:Sp.t) (res : search_result) =
   (* initialisation of the frequency *)
   let unwanted_ops = Sp.empty in
   let fr = Frequency.create unwanted_ops in
-  let do1 (p, ax) =
-    Frequency.add fr ax;
-    let used = Frequency.f_ops unwanted_ops ax.ax_spec in
-    (p,ax), used in
+  let do1 (p, r) = match r with
+    | `Axiom ax ->
+      Frequency.add fr ax.ax_spec;
+      let used = Frequency.f_ops unwanted_ops ax.ax_spec in
+      (p,`Axiom ax), used
+    | `Schema sc ->
+      Frequency.add fr sc.axs_spec;
+      let used = Frequency.f_ops unwanted_ops sc.axs_spec in
+      (p,`Schema sc), used in
   let res = List.map do1 res in
 
   (* compute the weight of each axiom *)

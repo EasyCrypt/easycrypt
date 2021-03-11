@@ -5,7 +5,7 @@
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
-
+require import Int Xint.
 require PrimeField.
 
 clone export PrimeField as FD.
@@ -20,10 +20,24 @@ op ( ^ ): group -> t -> group.       (* exponentiation *)
 op log  : group -> t.                (* discrete logarithm *)
 op g1 = g ^ F.zero.
 
+op cgpow :  int.
+op cgmul: int.
+op cgdiv: int.
+op cgeq : int.
+axiom ge0_cg : 0 <= cgpow /\ 0 <= cgmul /\ 0 <= cgdiv /\ 0 <= cgeq.
+
+schema cost_gen `{P} : cost [P:g] = '0.
+schema cost_pow `{P} {g:group, x:t} : cost[P: g ^ x] = cost[P:g] + cost[P:x] + N cgpow.
+schema cost_gmul `{P} {g1 g2:group} : cost[P:g1 * g2] = cost[P:g1] + cost[P:g2] + N cgmul.
+schema cost_geq  `{P} {g1 g2:group} : cost[P:g1 = g2] = cost[P:g1] + cost[P:g2] + N cgeq.
+schema cost_gdiv `{P} {g1 g2:group} : cost[P:g1 / g2] = cost[P:g1] + cost[P:g2] + N cgdiv.
+
+hint simplify cost_gen, cost_pow, cost_gmul, cost_gdiv, cost_geq.
+
 axiom gpow_log (a:group): g ^ (log a) = a.
 axiom log_gpow x : log (g ^ x) = x.
 
-lemma nosmt log_bij x y: x = y <=> log x = log y by smt full.
+lemma nosmt log_bij x y: x = y <=> log x = log y by smt (gpow_log).
 lemma nosmt pow_bij (x y:F.t): x = y <=> g^x =g^y by [].
 
 

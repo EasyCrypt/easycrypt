@@ -129,11 +129,10 @@ let subst_fun_uses (s : _subst) (u : uses) =
   EcModules.mk_uses calls reads writes
 
 (* -------------------------------------------------------------------- *)
-let subst_oracle_info (s:_subst) (x:oracle_info) =
-  let x_subst = EcPath.x_subst s.s_fmp in
-    { oi_calls  = List.map x_subst x.oi_calls;
-      oi_in     = x.oi_in;
-    }
+let subst_oracle_info (s:_subst) =
+  let s = f_subst_of_subst s in
+  fun oi -> Fsubst.subst_oi s oi
+
 
 (* -------------------------------------------------------------------- *)
 let subst_funsig (s : _subst) (funsig : funsig) =
@@ -147,10 +146,21 @@ let subst_funsig (s : _subst) (funsig : funsig) =
     fs_ret    = fs_ret; }
 
 (* -------------------------------------------------------------------- *)
+let subst_mod_restr (s : _subst) (mr : mod_restr) =
+  let rx = ur_app (fun set -> EcPath.Sx.fold (fun x r ->
+      EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r
+    ) set EcPath.Sx.empty) mr.mr_xpaths in
+  let r = ur_app (fun set -> EcPath.Sm.fold (fun x r ->
+      EcPath.Sm.add (s.s_fmp x) r
+    ) set EcPath.Sm.empty) mr.mr_mpaths in
+  let ois = EcSymbols.Msym.map (fun oi ->
+      subst_oracle_info s oi) mr.mr_oinfos in
+  { mr_xpaths = rx; mr_mpaths = r; mr_oinfos = ois }
+
+(* -------------------------------------------------------------------- *)
 let rec subst_modsig_body_item (s : _subst) (item : module_sig_body_item) =
   match item with
-  | Tys_function (funsig, oi) ->
-      Tys_function (subst_funsig s funsig, subst_oracle_info s oi)
+  | Tys_function funsig -> Tys_function (subst_funsig s funsig)
 
 (* -------------------------------------------------------------------- *)
 and subst_modsig_body (s : _subst) (sbody : module_sig_body) =
@@ -188,7 +198,9 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
 
   let comps =
     { mis_params = newparams;
-      mis_body   = subst_modsig_body sbody comps.mis_body; }
+      mis_body   = subst_modsig_body sbody comps.mis_body;
+      mis_restr  = subst_mod_restr sbody comps.mis_restr;
+    }
   in
     (sbody, comps)
 
@@ -196,7 +208,8 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
 and subst_modtype (s : _subst) (modty : module_type) =
   { mt_params = List.map (snd_map (subst_modtype s)) modty.mt_params;
     mt_name   = s.s_p modty.mt_name;
-    mt_args   = List.map s.s_fmp modty.mt_args; }
+    mt_args   = List.map s.s_fmp modty.mt_args;
+    mt_restr = subst_mod_restr s modty.mt_restr; }
 
 (* -------------------------------------------------------------------- *)
 let subst_function_def (s : _subst) (def : function_def) =
@@ -217,6 +230,7 @@ let subst_function (s : _subst) (f : function_) =
   { f_name = f.f_name;
     f_sig  = sig';
     f_def  = def' }
+
 
 (* -------------------------------------------------------------------- *)
 let rec subst_module_item (s : _subst) (item : module_item) =
@@ -250,15 +264,7 @@ and subst_module_body (s : _subst) (body : module_body) =
   | ME_Structure bstruct ->
       ME_Structure (subst_module_struct s bstruct)
 
-  | ME_Decl (p, (rx,r)) ->
-    let rx =
-      EcPath.Sx.fold
-        (fun x r -> EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r) rx EcPath.Sx.empty in
-    let r =
-      EcPath.Sm.fold
-        (fun x r -> EcPath.Sm.add (s.s_fmp x) r) r EcPath.Sm.empty
-      in
-        ME_Decl (subst_modtype s p, (rx, r))
+  | ME_Decl p -> ME_Decl (subst_modtype s p)
 
 (* -------------------------------------------------------------------- *)
 and subst_module_comps (s : _subst) (comps : module_comps) =
@@ -266,10 +272,23 @@ and subst_module_comps (s : _subst) (comps : module_comps) =
 
 (* -------------------------------------------------------------------- *)
 and subst_module (s : _subst) (m : module_expr) =
-  let s, me_sig = subst_modsig s m.me_sig in
-  let me_body   = subst_module_body s m.me_body in
-  let me_comps  = subst_module_comps s m.me_comps in
-    { m with me_body; me_comps; me_sig; }
+  let sbody,me_params = match m.me_params with
+    | [] -> (s, [])
+    | _  ->
+      let aout =
+        List.map_fold
+        (fun (s : subst) (a, aty) ->
+          let a'   = EcIdent.fresh a in
+          let decl = (a', subst_modtype (_subst_of_subst s) aty) in
+           add_module s a (EcPath.mident a'), decl)
+        s.s_s m.me_params
+      in
+      fst_map _subst_of_subst aout in
+
+  let me_body   = subst_module_body sbody m.me_body in
+  let me_comps  = subst_module_comps sbody m.me_comps in
+  let me_sig_body = subst_modsig_body sbody m.me_sig_body in
+  { me_name = m.me_name; me_body; me_comps; me_params; me_sig_body }
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =
@@ -422,11 +441,22 @@ let subst_ax (s : _subst) (ax : axiom) =
   let params = List.map (subst_typaram s) ax.ax_tparams in
   let s      = init_tparams s ax.ax_tparams params in
   let spec   = Fsubst.f_subst (f_subst_of_subst s) ax.ax_spec in
+  { ax_tparams  = params;
+    ax_spec     = spec;
+    ax_kind     = ax.ax_kind;
+    ax_nosmt    = ax.ax_nosmt; }
 
-  { ax_tparams = params;
-    ax_spec    = spec;
-    ax_kind    = ax.ax_kind;
-    ax_nosmt   = ax.ax_nosmt; }
+(* -------------------------------------------------------------------- *)
+let subst_schema (s : _subst) (ax : ax_schema) =
+  (* FIXME: SCHEMA *)
+  let params = List.map (subst_typaram s) ax.axs_tparams in
+  let s      = init_tparams s ax.axs_tparams params in
+  let spec   = Fsubst.f_subst (f_subst_of_subst s) ax.axs_spec in
+
+  { axs_tparams = params;
+    axs_pparams = ax.axs_pparams;
+    axs_params  = List.map (snd_map s.s_ty) ax.axs_params;
+    axs_spec    = spec; }
 
 (* -------------------------------------------------------------------- *)
 let subst_ring (s : _subst) cr =
@@ -480,6 +510,9 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
   | Th_axiom (x, ax) ->
       Th_axiom (x, subst_ax s ax)
 
+  | Th_schema (x, schema) ->
+      Th_schema (x, subst_schema s schema)
+
   | Th_modtype (x, tymod) ->
       Th_modtype (x, snd (subst_modsig s tymod))
 
@@ -527,6 +560,9 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
 
   | CTh_axiom (x, ax) ->
       CTh_axiom (x, subst_ax s ax)
+
+  | CTh_schema (x, schema) ->
+      CTh_schema (x, subst_schema s schema)
 
   | CTh_modtype (x, modty) ->
       CTh_modtype (x, snd (subst_modsig s modty))
@@ -593,6 +629,7 @@ and subst_ctheory (s : _subst) (cth : ctheory) =
 
 (* -------------------------------------------------------------------- *)
 let subst_ax           s = subst_ax (_subst_of_subst s)
+let subst_schema       s = subst_schema (_subst_of_subst s)
 let subst_op           s = subst_op (_subst_of_subst s)
 let subst_tydecl       s = subst_tydecl (_subst_of_subst s)
 let subst_tc           s = subst_tc (_subst_of_subst s)
@@ -605,6 +642,7 @@ let subst_module_comps s = subst_module_comps (_subst_of_subst s)
 let subst_modtype      s = subst_modtype (_subst_of_subst s)
 let subst_modsig         = fun ?params s x -> snd (subst_modsig ?params (_subst_of_subst s) x)
 let subst_modsig_body  s = subst_modsig_body (_subst_of_subst s)
+let subst_mod_restr    s = subst_mod_restr (_subst_of_subst s)
 
 let subst_mpath        s = (_subst_of_subst s).s_fmp
 let subst_path         s = (_subst_of_subst s).s_p

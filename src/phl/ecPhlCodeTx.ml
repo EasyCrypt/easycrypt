@@ -81,15 +81,17 @@ let t_kill_r side cpos olen tc =
   in
 
   let tr = fun side -> `Kill (side, cpos, olen) in
-  t_code_transform side ~bdhoare:true cpos tr (t_zip kill_stmt) tc
+  t_code_transform side
+    ~bdhoare:true ~choare:None
+    cpos tr (t_zip kill_stmt) tc
 
 (* -------------------------------------------------------------------- *)
 let alias_stmt env id (pf, _) me i =
   let dopv ty =
     let id       = odfl "x" (omap EcLocation.unloc id) in
     let id       = { v_name = id; v_type = ty; } in
-    let (me, id) = fresh_pv me id in
-    let pv       = pv_loc (EcMemory.xpath me) id in
+    let (me, id) = EcMemory.bind_fresh id me in
+    let pv       = pv_loc id.v_name in
     me, pv in
 
   match i.i_node with
@@ -111,15 +113,17 @@ let alias_stmt env id (pf, _) me i =
 let t_alias_r side cpos id g =
   let env = FApi.tc1_env g in
   let tr = fun side -> `Alias (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr (t_fold (alias_stmt env id)) g
+  t_code_transform side
+    ~bdhoare:true ~choare:None
+    cpos tr (t_fold (alias_stmt env id)) g
 
 (* -------------------------------------------------------------------- *)
 let set_stmt (fresh, id) e =
   let get_i me =
     let id       = EcLocation.unloc id in
     let  v       = { v_name = id; v_type = e.e_ty } in
-    let (me, id) = fresh_pv me v in
-    let pv       = pv_loc (EcMemory.xpath me) id in
+    let (me, id) = EcMemory.bind_fresh v me in
+    let pv       = pv_loc id.v_name in
 
     (me, i_asgn (LvVar (pv, e.e_ty), e))
   in
@@ -137,7 +141,9 @@ let set_stmt (fresh, id) e =
 
 let t_set_r side cpos (fresh, id) e tc =
   let tr = fun side -> `Set (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt (fresh, id) e)) tc
+  t_code_transform side
+    ~bdhoare:true ~choare:None
+    cpos tr (t_zip (set_stmt (fresh, id) e)) tc
 
 (* -------------------------------------------------------------------- *)
 let cfold_stmt (pf, hyps) me olen zpr =
@@ -173,7 +179,7 @@ let cfold_stmt (pf, hyps) me olen zpr =
 
   List.iter
     (fun (x, _, _) ->
-      if x.pv_kind <> PVloc then
+      if is_glob x then
         tc_error pf "left-values must be local variables")
     asgn;
 
@@ -208,7 +214,9 @@ let cfold_stmt (pf, hyps) me olen zpr =
 let t_cfold_r side cpos olen g =
   let tr = fun side -> `Fold (side, cpos, olen) in
   let cb = fun cenv _ me zpr -> cfold_stmt cenv me olen zpr in
-  t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
+  t_code_transform side
+    ~bdhoare:true ~choare:None
+    cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
 let t_kill  = FApi.t_low3 "code-tx-kill"  t_kill_r

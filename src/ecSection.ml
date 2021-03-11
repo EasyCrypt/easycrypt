@@ -28,7 +28,7 @@ type locals = {
   lc_name      : symbol option;
   lc_lemmas    : (path * lvl) list * lvl Mp.t;
   lc_modules   : Sp.t;
-  lc_abstracts : (EcIdent.t * (module_type * mod_restr)) list * Sid.t;
+  lc_abstracts : (EcIdent.t * module_type) list * Sid.t;
   lc_items     : EcTheory.ctheory_item list;
 }
 
@@ -72,7 +72,9 @@ let rec on_mpath_ty cb (ty : ty) =
   | Tfun (ty1, ty2)  -> List.iter (on_mpath_ty cb) [ty1; ty2]
 
 let on_mpath_pv cb (pv : prog_var)=
-  cb pv.pv_name.x_top
+  match pv with
+  | PVglob xp -> cb xp.x_top
+  | _         -> ()
 
 let on_mpath_lp cb (lp : lpattern) =
   match lp with
@@ -134,36 +136,46 @@ let rec on_mpath_instr cb (i : instr)=
       on_mpath_expr cb e;
       on_mpath_stmt cb s
 
+  | Smatch (e, b) ->
+      let forb (bs, s) =
+        List.iter (on_mpath_ty cb |- snd) bs;
+        on_mpath_stmt cb s
+      in on_mpath_expr cb e; List.iter forb b
+
   | Sabstract _ -> ()
 
 and on_mpath_stmt cb (s : stmt) =
   List.iter (on_mpath_instr cb) s.s_node
 
-let on_mpath_lcmem cb m =
-    cb (EcMemory.lmt_xpath m).x_top;
-    Msym.iter (fun _ (_,ty) -> on_mpath_ty cb ty) (EcMemory.lmt_bindings m)
+let on_mpath_memtype cb mt =
+  EcMemory.mt_iter_ty (on_mpath_ty cb) mt
 
 let on_mpath_memenv cb (m : EcMemory.memenv) =
-  match snd m with
-  | None    -> ()
-  | Some lm -> on_mpath_lcmem cb lm
+  on_mpath_memtype cb (snd m)
+
+let on_mpath_restr cb restr =
+  Sx.iter (fun x -> cb x.x_top) restr.mr_xpaths.ur_neg;
+  oiter (Sx.iter (fun x -> cb x.x_top)) restr.mr_xpaths.ur_pos;
+  Sm.iter cb restr.mr_mpaths.ur_neg;
+  oiter (Sm.iter cb) restr.mr_mpaths.ur_pos;
+  Msym.iter (fun _ oi ->
+      List.iter (fun x -> cb x.x_top) (OI.allowed oi)
+    ) restr.mr_oinfos
 
 let rec on_mpath_modty cb mty =
   List.iter (fun (_, mty) -> on_mpath_modty cb mty) mty.mt_params;
-  List.iter cb mty.mt_args
+  List.iter cb mty.mt_args;
+  on_mpath_restr cb mty.mt_restr
 
 let on_mpath_gbinding cb b =
   match b with
   | EcFol.GTty ty ->
       on_mpath_ty cb ty
-  | EcFol.GTmodty (mty, (rx,r)) ->
-      on_mpath_modty cb mty;
-      Sx.iter (fun x -> cb x.x_top) rx;
-      Sm.iter cb r
-  | EcFol.GTmem None->
-      ()
-  | EcFol.GTmem (Some m) ->
-      on_mpath_lcmem cb m
+  | EcFol.GTmodty mty ->
+      on_mpath_modty cb mty
+
+  | EcFol.GTmem mt ->
+    on_mpath_memtype cb mt
 
 let on_mpath_gbindings cb b =
   List.iter (fun (_, b) -> on_mpath_gbinding cb b) b
@@ -187,11 +199,14 @@ let rec on_mpath_form cb (f : EcFol.form) =
     | EcFol.Fglob     (mp, _)      -> cb mp
     | EcFol.FhoareF   hf           -> on_mpath_hf  cb hf
     | EcFol.FhoareS   hs           -> on_mpath_hs  cb hs
+    | EcFol.FcHoareF  chf          -> on_mpath_chf cb chf
+    | EcFol.FcHoareS  chs          -> on_mpath_chs cb chs
     | EcFol.FequivF   ef           -> on_mpath_ef  cb ef
     | EcFol.FequivS   es           -> on_mpath_es  cb es
     | EcFol.FeagerF   eg           -> on_mpath_eg  cb eg
     | EcFol.FbdHoareS bhs          -> on_mpath_bhs cb bhs
     | EcFol.FbdHoareF bhf          -> on_mpath_bhf cb bhf
+    | EcFol.Fcoe      coe          -> on_mpath_coe cb coe
     | EcFol.Fpr       pr           -> on_mpath_pr  cb pr
 
   and on_mpath_hf cb hf =
@@ -227,6 +242,19 @@ let rec on_mpath_form cb (f : EcFol.form) =
     on_mpath_stmt cb eg.EcFol.eg_sl;
     on_mpath_stmt cb eg.EcFol.eg_sr;
 
+  and on_mpath_chf cb chf =
+    on_mpath_form cb chf.EcFol.chf_pr;
+    on_mpath_form cb chf.EcFol.chf_po;
+    on_mpath_cost cb chf.EcFol.chf_co;
+    cb chf.EcFol.chf_f.x_top
+
+  and on_mpath_chs cb chs =
+    on_mpath_form cb chs.EcFol.chs_pr;
+    on_mpath_form cb chs.EcFol.chs_po;
+    on_mpath_cost cb chs.EcFol.chs_co;
+    on_mpath_stmt cb chs.EcFol.chs_s;
+    on_mpath_memenv cb chs.EcFol.chs_m
+
   and on_mpath_bhf cb bhf =
     on_mpath_form cb bhf.EcFol.bhf_pr;
     on_mpath_form cb bhf.EcFol.bhf_po;
@@ -240,9 +268,21 @@ let rec on_mpath_form cb (f : EcFol.form) =
     on_mpath_stmt cb bhs.EcFol.bhs_s;
     on_mpath_memenv cb bhs.EcFol.bhs_m
 
+  and on_mpath_coe cb coe =
+    on_mpath_form cb coe.EcFol.coe_pre;
+    on_mpath_expr cb coe.EcFol.coe_e;
+    on_mpath_memenv cb coe.EcFol.coe_mem;
+
   and on_mpath_pr cb pr =
     cb pr.EcFol.pr_fun.x_top;
     List.iter (on_mpath_form cb) [pr.EcFol.pr_event; pr.EcFol.pr_args]
+
+  and on_mpath_cost cb cost =
+    on_mpath_form cb cost.EcFol.c_self;
+    Mx.iter (fun f c ->
+        cb f.x_top;
+        on_mpath_form cb c.EcFol.cb_called;
+        on_mpath_form cb c.EcFol.cb_cost) cost.EcFol.c_calls
 
   in
     on_mpath_ty cb f.EcFol.f_ty; fornode ()
@@ -250,13 +290,13 @@ let rec on_mpath_form cb (f : EcFol.form) =
 let rec on_mpath_module cb (me : module_expr) =
   match me.me_body with
   | ME_Alias (_, mp)  -> cb mp
-  | ME_Structure st   -> on_mpath_mstruct cb st
-  | ME_Decl (mty, sm) -> on_mpath_mdecl cb (mty, sm)
+  | ME_Structure st   ->
+    on_mpath_mstruct cb st;
 
-and on_mpath_mdecl cb (mty,(rx,r)) =
+  | ME_Decl mty -> on_mpath_mdecl cb mty
+
+and on_mpath_mdecl cb mty =
   on_mpath_modty cb mty;
-  Sx.iter (fun x -> cb x.x_top) rx;
-  Sm.iter cb r
 
 and on_mpath_mstruct cb st =
   List.iter (on_mpath_mstruct1 cb) st.ms_body
@@ -293,7 +333,7 @@ and on_mpath_uses cb uses =
   Sx.iter   (fun x -> cb x.x_top) uses.us_writes
 
 and on_mpath_fun_oi cb oi =
-  List.iter (fun x -> cb x.x_top) oi.oi_calls
+  List.iter (fun x -> cb x.x_top) (OI.allowed oi)
 
 (* -------------------------------------------------------------------- *)
 
@@ -404,10 +444,10 @@ let generalize env lc (f : EcFol.form) =
       then f
       else begin
         List.fold_right
-          (fun (x, (mty, rt)) f ->
+          (fun (x, mty) f ->
              match Mid.mem x f.EcFol.f_fv with
              | false -> f
-             | true  -> EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f)
+             | true  -> EcFol.f_forall [(x, EcFol.GTmodty mty)] f)
           (fst lc.lc_abstracts) f
       end
 
@@ -419,8 +459,8 @@ let generalize env lc (f : EcFol.form) =
       in
           List.fold_right do1 axioms f in
     let f =
-      let do1 (x, (mty, rt)) f =
-        EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f
+      let do1 (x, mty) f =
+        EcFol.f_forall [(x, EcFol.GTmodty mty)] f
       in
         List.fold_right do1 (fst lc.lc_abstracts) f
     in
