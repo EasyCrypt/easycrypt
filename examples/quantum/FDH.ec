@@ -10,8 +10,52 @@ abstract theory Quantum_full.
 
   module type ClassicT = {
     proc init () : unit
-    proc get (_:c) : (q -> u) option
+    quantum proc get (_:c) : q -> u
   }.
+
+  module Foo : ClassicT = {
+    proc init () = { }
+    quantum proc get (x:c) = {
+       ...
+       return (e: q -> u)   
+    }     
+  }
+
+  quantum module type Adv(O:ClassicT) = {
+     
+  }
+
+  module F = { 
+     cu <@ Foo.get(c,cq);  (* Warning inline *)
+  } 
+
+  Declare module A : Adv.
+
+type quantum_state.
+qstate : quantum_state
+
+qstate in glob A.
+
+glob A -> glob A U qstate
+
+={glob A, qstate} 
+
+A B
+declare quantum module B : ... {-A}
+
+case : on test classic : fail if glob A avec A quantum
+
+and 
+
+
+
+
+q
+
+
+
+  
+    
 
   module type QuantumT = {
     proc qget (c:c, q:q) : u  
