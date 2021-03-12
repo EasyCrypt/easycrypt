@@ -34,19 +34,59 @@ let subst_args_call env m e s =
   PVM.add env pv_arg m (form_of_expr m e) s
 
 (* -------------------------------------------------------------------- *)
+let build_qres env fsig ext qarg m =
+  let vres = EcIdent.create ("result" ^ ext) in
+  let fres = f_local vres fsig.fs_ret in
+  match qarg with
+  | None -> vres, fres, None, fres
+  | Some e ->
+    let dom, codom = EcEnv.Ty.destr_quantum fsig.fs_ret env in
+    let vqarg = EcIdent.create ("qvar" ^ ext) in
+    vres, fres,
+      Some (vqarg, form_of_expr m e), f_app fres [f_local vqarg dom] codom
+
+let let_qvar_post vqarg post =
+  match vqarg with
+  | None -> post
+  | Some (vqarg, fqarg) -> f_let1 vqarg fqarg post
+
+(* -------------------------------------------------------------------- *)
+let wp_call env fpre fpost (lp,f,args,qarg) m post combine =
+ (* The wp *)
+  (* Classical or Quantum without qargs :
+     fpre{arg <- args} /\
+     forall res mod, postf{mod, res <- result} => post{mod, res <- result}
+     Quantum with qargs:
+     fpre{arg <- args} /\
+     let qarg = qargs in
+     forall res mod, postf{mod, res <- result} => post{mod, res <- result qarg}
+   *)
+  let fsig = (Fun.by_xpath f env).f_sig in
+  let modi = f_write env f in
+  let pvres = pv_res in
+  let vres, fres, vqarg, res_post = build_qres env fsig "" qarg m in
+  let post = wp_asgn_call env m lp res_post post in
+  let fpost = PVM.subst1 env pvres m fres fpost in
+
+  let post = generalize_mod env m modi (combine fpost post) in
+  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
+  let post = let_qvar_post vqarg post in
+  let spre = subst_args_call env m (e_tuple args) PVM.empty in
+  f_anda_simpl (PVM.subst env spre fpre) post
+
+(* -------------------------------------------------------------------- *)
 let wp2_call
-  env fpre fpost (lpl,fl,argsl) modil (lpr,fr,argsr) modir ml mr post hyps
+  env fpre fpost (lpl,fl,argsl,qargl) modil (lpr,fr,argsr, qargr) modir ml mr post
 =
   let fsigl = (Fun.by_xpath fl env).f_sig in
   let fsigr = (Fun.by_xpath fr env).f_sig in
+
   (* The wp *)
   let pvresl = pv_res and pvresr = pv_res in
-  let vresl = LDecl.fresh_id hyps "result_L" in
-  let vresr = LDecl.fresh_id hyps "result_R" in
-  let fresl = f_local vresl fsigl.fs_ret in
-  let fresr = f_local vresr fsigr.fs_ret in
-  let post = wp_asgn_call env ml lpl fresl post in
-  let post = wp_asgn_call env mr lpr fresr post in
+  let vresl, fresl, vqargl, res_postl = build_qres env fsigl "_L" qargl ml in
+  let vresr, fresr, vqargr, res_postr = build_qres env fsigr "_R" qargr mr in
+  let post = wp_asgn_call env ml lpl res_postl post in
+  let post = wp_asgn_call env mr lpr res_postr post in
   let s    = PVM.empty in
   let s    = PVM.add env pvresr mr fresr s in
   let s    = PVM.add env pvresl ml fresl s in
@@ -58,6 +98,8 @@ let wp2_call
       [(vresl, GTty fsigl.fs_ret);
        (vresr, GTty fsigr.fs_ret)]
       post in
+  let post = let_qvar_post vqargr post in
+  let post = let_qvar_post vqargl post in
   let spre = subst_args_call env ml (e_tuple argsl) PVM.empty in
   let spre = subst_args_call env mr (e_tuple argsr) spre in
   f_anda_simpl (PVM.subst env spre fpre) post
@@ -66,47 +108,25 @@ let wp2_call
 let t_hoare_call fpre fpost tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
-  let (lp,f,args),s = tc1_last_call tc hs.hs_s in
+  let (lp,f,args,qarg),s = tc1_last_call tc hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
-  let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
   let f_concl = f_hoareF fpre f fpost in
   (* The wp *)
-  let pvres = pv_res in
-  let vres = EcIdent.create "result" in
-  let fres = f_local vres fsig.fs_ret in
-  let post = wp_asgn_call env m lp fres hs.hs_po in
-  let fpost = PVM.subst1 env pvres m fres fpost in
-  let modi = f_write env f in
-  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
-  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let spre = subst_args_call env m (e_tuple args) PVM.empty in
-  let post = f_anda_simpl (PVM.subst env spre fpre) post in
+  let post = wp_call env fpre fpost (lp,f,args,qarg) m hs.hs_po f_imp_simpl in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
-
   FApi.xmutate1 tc `HlCall [f_concl; concl]
 
 (* -------------------------------------------------------------------- *)
 let t_choare_call fpre fpost fcost tc =
   let env = FApi.tc1_env tc in
   let chs = tc1_as_choareS tc in
-  let (lp,f,args),s = tc1_last_call tc chs.chs_s in
+  let (lp,f,args,qarg),s = tc1_last_call tc chs.chs_s in
   let m = EcMemory.memory chs.chs_m in
-  let fsig = (Fun.by_xpath f env).f_sig in
   (* The function satisfies the specification *)
   let f_concl = f_cHoareF fpre f fpost fcost in
   (* The wp *)
-  let pvres = pv_res in
-  let vres = EcIdent.create "result" in
-  let fres = f_local vres fsig.fs_ret in
-  let post = wp_asgn_call env m lp fres chs.chs_po in
-  let fpost = PVM.subst1 env pvres m fres fpost in
-  let modi = f_write env f in
-  let post = generalize_mod env m modi (f_imp_simpl fpost post) in
-  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let spre = subst_args_call env m (e_tuple args) PVM.empty in
-  let post = f_anda_simpl (PVM.subst env spre fpre) post in
-
+  let post = wp_call env fpre fpost (lp,f,args,qarg) m chs.chs_po f_imp_simpl in
   (* The cost of the remaining code must be bounded by the cost of the
      conclusion [chs.chs_co], minus the cost of the call [fcost], and minus
      the cost of the arguments' evaluation.
@@ -140,20 +160,13 @@ let bdhoare_call_spec pf fpre fpost f cmp bd opt_bd =
 let t_bdhoare_call fpre fpost opt_bd tc =
   let env = FApi.tc1_env tc in
   let bhs = tc1_as_bdhoareS tc in
-  let (lp,f,args),s = tc1_last_call tc bhs.bhs_s in
+  let (lp,f,args,qarg),s = tc1_last_call tc bhs.bhs_s in
   let m = EcMemory.memory bhs.bhs_m in
-  let fsig = (Fun.by_xpath f env).f_sig in
   let f_concl =
     bdhoare_call_spec !!tc fpre fpost f bhs.bhs_cmp bhs.bhs_bd opt_bd in
 
   (* The wp *)
-  let pvres = pv_res in
-  let vres = EcIdent.create "result" in
-  let fres = f_local vres fsig.fs_ret in
-  let post = wp_asgn_call env m lp fres bhs.bhs_po in
-  let fpost = PVM.subst1 env pvres m fres fpost in
-  let modi = f_write env f in
-  let post =
+  let combine fpost post =
     match bhs.bhs_cmp with
     | FHle -> f_imp_simpl   post fpost
     | FHge -> f_imp_simpl  fpost  post
@@ -165,13 +178,8 @@ let t_bdhoare_call fpre fpost opt_bd tc =
         f_imp_simpl  fpost post
 
     | FHeq -> f_iff_simpl fpost  post in
+  let post = wp_call env fpre fpost (lp,f,args,qarg) m bhs.bhs_po combine in
 
-  let post = generalize_mod env m modi post in
-  let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let spre = subst_args_call env m (e_tuple args) PVM.empty in
-  let post = f_anda_simpl (PVM.subst env spre fpre) post in
-
-  (* most of the above code is duplicated from t_hoare_call *)
   let concl = match bhs.bhs_cmp, opt_bd with
     | FHle, None ->
         f_hoareS bhs.bhs_m bhs.bhs_pr s post
@@ -194,21 +202,21 @@ let t_bdhoare_call fpre fpost opt_bd tc =
 
 (* -------------------------------------------------------------------- *)
 let t_equiv_call fpre fpost tc =
-  let env, hyps, _ = FApi.tc1_eflat tc in
+  let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
-  let (lpl,fl,argsl),sl = tc1_last_call tc es.es_sl in
-  let (lpr,fr,argsr),sr = tc1_last_call tc es.es_sr in
+  let (lpl,fl,argsl,qargl),sl = tc1_last_call tc es.es_sl in
+  let (lpr,fr,argsr,qargr),sr = tc1_last_call tc es.es_sr in
   let ml = EcMemory.memory es.es_ml in
   let mr = EcMemory.memory es.es_mr in
-  (* The functions satisfy their specification *)
-  let f_concl = f_equivF fpre fl fr fpost in
   let modil = f_write env fl in
   let modir = f_write env fr in
+
+  (* The functions satisfy their specification *)
+  let f_concl = f_equivF fpre fl fr fpost in
   (* The wp *)
   let post =
     wp2_call env fpre fpost
-      (lpl,fl,argsl) modil (lpr,fr,argsr) modir
-      ml mr es.es_po hyps
+      (lpl,fl,argsl,qargl) modil (lpr,fr,argsr, qargr) modir ml mr es.es_po
   in
   let concl =
     f_equivS_r { es with es_sl = sl; es_sr = sr; es_po = post; } in
@@ -226,28 +234,16 @@ let t_equiv_call1 side fpre fpost tc =
     | `Right -> (EcMemory.memory equiv.es_mr, equiv.es_sr)
   in
 
-  let (lp, f, args), fstmt = tc1_last_call tc stmt in
-  let fsig = (Fun.by_xpath f env).f_sig in
-
+  let (lp, f, args, qarg), fstmt = tc1_last_call tc stmt in
   (* The function satisfies its specification *)
   let fconcl = f_bdHoareF fpre f fpost FHeq f_r1 in
 
   (* WP *)
-  let pvres  = pv_res in
-  let vres   = LDecl.fresh_id (FApi.tc1_hyps tc) "result" in
-  let fres   = f_local vres fsig.fs_ret in
-  let post   = wp_asgn_call env me lp fres equiv.es_po in
-  let subst  = PVM.add env pvres me fres PVM.empty in
   let msubst = Fsubst.f_bind_mem Fsubst.f_subst_id EcFol.mhr me in
-  let fpost  = PVM.subst env subst (Fsubst.f_subst msubst fpost) in
-  let modi   = f_write env f in
-  let post   = f_imp_simpl fpost post in
-  let post   = generalize_mod env me modi post in
-  let post   = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let spre   = PVM.empty in
-  let spre   = subst_args_call env me (e_tuple args) spre in
-  let post   =
-    f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
+  let fpost  = Fsubst.f_subst msubst fpost in
+  let fpre   = Fsubst.f_subst msubst fpre in
+  let post =
+    wp_call env fpre fpost (lp,f,args,qarg) me equiv.es_po f_imp_simpl in
   let concl  =
     match side with
     | `Left  -> { equiv with es_sl = fstmt; es_po = post; }
@@ -272,26 +268,26 @@ let t_call side ax tc =
 
   match ax.f_node, concl.f_node with
   | FhoareF hf, FhoareS hs ->
-      let (_, f, _), _ = tc1_last_call tc hs.hs_s in
+      let (_, f, _, _), _ = tc1_last_call tc hs.hs_s in
       if not (EcEnv.NormMp.x_equal env hf.hf_f f) then
         call_error env tc hf.hf_f f;
       t_hoare_call hf.hf_pr hf.hf_po tc
 
   | FcHoareF chf, FcHoareS chs ->
-      let (_, f, _), _ = tc1_last_call tc chs.chs_s in
+      let (_, f, _, _), _ = tc1_last_call tc chs.chs_s in
       if not (EcEnv.NormMp.x_equal env chf.chf_f f) then
         call_error env tc chf.chf_f f;
       t_choare_call chf.chf_pr chf.chf_po chf.chf_co tc
 
   | FbdHoareF hf, FbdHoareS hs ->
-      let (_, f, _), _ = tc1_last_call tc hs.bhs_s in
+      let (_, f, _, _), _ = tc1_last_call tc hs.bhs_s in
       if not (EcEnv.NormMp.x_equal env hf.bhf_f f) then
         call_error env tc hf.bhf_f f;
       t_bdhoare_call hf.bhf_pr hf.bhf_po None tc
 
   | FequivF ef, FequivS es ->
-      let (_, fl, _), _ = tc1_last_call tc es.es_sl in
-      let (_, fr, _), _ = tc1_last_call tc es.es_sr in
+      let (_, fl, _, _), _ = tc1_last_call tc es.es_sl in
+      let (_, fr, _, _), _ = tc1_last_call tc es.es_sr in
       if not (EcEnv.NormMp.x_equal env ef.ef_fl fl) ||
          not (EcEnv.NormMp.x_equal env ef.ef_fr fr) then
         tc_error_lazy !!tc (fun fmt ->
@@ -356,12 +352,12 @@ let process_call side info tc =
     let (hyps, concl) = FApi.tc1_flat tc in
       match concl.f_node, side, cost with
       | FhoareS hs, None, None ->
-          let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
+          let (_,f,_,_) = fst (tc1_last_call tc hs.hs_s) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, fun pre post -> f_hoareF pre f post)
 
       | FcHoareS chs, None, Some cost ->
-          let (_,f,_),_ = tc1_last_call tc chs.chs_s in
+          let (_,f,_,_),_ = tc1_last_call tc chs.chs_s in
           let penv, qenv = LDecl.hoareF f hyps in
 
           let cost  = TTC.tc1_process_cost tc [] cost in
@@ -369,7 +365,7 @@ let process_call side info tc =
           (penv, qenv, fun pre post -> f_cHoareF pre f post cost)
 
       | FbdHoareS bhs, None, None ->
-          let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
+          let (_,f,_,_) = fst (tc1_last_call tc bhs.bhs_s) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, fun pre post ->
             bdhoare_call_spec !!tc pre post f bhs.bhs_cmp bhs.bhs_bd None)
@@ -388,14 +384,14 @@ let process_call side info tc =
             tc_error !!tc "a cost must be given for choare judgements"
 
       | FequivS es, None, None ->
-          let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
-          let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
+          let (_,fl,_,_) = fst (tc1_last_call tc es.es_sl) in
+          let (_,fr,_,_) = fst (tc1_last_call tc es.es_sr) in
           let penv, qenv = LDecl.equivF fl fr hyps in
           (penv, qenv, fun pre post -> f_equivF pre fl fr post)
 
       | FequivS es, Some side, None ->
           let fstmt = sideif side es.es_sl es.es_sr in
-          let (_,f,_) = fst (tc1_last_call tc fstmt) in
+          let (_,f,_,_) = fst (tc1_last_call tc fstmt) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, fun pre post -> f_bdHoareF pre f post FHeq f_r1)
 
@@ -413,14 +409,14 @@ let process_call side info tc =
     let hyps, concl = FApi.tc1_flat tc in
     match concl.f_node with
     | FhoareS hs ->
-        let (_,f,_) = fst (tc1_last_call tc hs.hs_s) in
+        let (_,f,_,_) = fst (tc1_last_call tc hs.hs_s) in
         let penv = LDecl.inv_memenv1 hyps in
         (penv, fun inv inv_info ->
             check_none inv_info;
             f_hoareF inv f inv)
 
     | FcHoareS chs ->
-      let (_,f,_) = fst (tc1_last_call tc chs.chs_s) in
+      let (_,f,_,_) = fst (tc1_last_call tc chs.chs_s) in
       let penv = LDecl.inv_memenv1 hyps in
       (penv, fun inv inv_info ->
           let inv_info = odfl (`CostAbs []) inv_info in
@@ -447,15 +443,15 @@ let process_call side info tc =
             f_cHoareF pre f post cost)
 
     | FbdHoareS bhs ->
-      let (_,f,_) = fst (tc1_last_call tc bhs.bhs_s) in
+      let (_,f,_,_) = fst (tc1_last_call tc bhs.bhs_s) in
       let penv = LDecl.inv_memenv1 hyps in
       (penv, fun inv inv_info ->
           check_none inv_info;
          bdhoare_call_spec !!tc inv inv f bhs.bhs_cmp bhs.bhs_bd None)
 
     | FequivS es ->
-      let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
-      let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
+      let (_,fl,_,_) = fst (tc1_last_call tc es.es_sl) in
+      let (_,fr,_,_) = fst (tc1_last_call tc es.es_sr) in
       let penv = LDecl.inv_memenv hyps in
       let env  = LDecl.toenv hyps in
       (penv, fun inv inv_info ->
@@ -470,8 +466,8 @@ let process_call side info tc =
     let env, _, concl = FApi.tc1_eflat tc in
       match concl.f_node with
       | FequivS es ->
-        let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
-        let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
+        let (_,fl,_,_) = fst (tc1_last_call tc es.es_sl) in
+        let (_,fr,_,_) = fst (tc1_last_call tc es.es_sr) in
         let bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
         let (topl,fl,oil,sigl),
             (topr,fr,_  ,sigr) = EcLowPhlGoal.abstract_info2 env fl fr in

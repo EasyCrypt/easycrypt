@@ -10,7 +10,7 @@ abstract theory Quantum_full.
 
   module type ClassicT = {
     proc init () : unit
-    quantum proc get (_:c) : q -> u
+    quantum proc get (_:c) : q --> u
   }.
 
   module Foo : ClassicT = {
@@ -26,7 +26,8 @@ abstract theory Quantum_full.
   }
 
   module F = { 
-     cu <@ Foo.get(c,cq);  (* Warning inline *)
+     cu <@ Foo.get(c, cq);  (* Warning inline *)
+     cu <@ Foo.get(c);  (* invalid *) 
   } 
 
   Declare module A : Adv.

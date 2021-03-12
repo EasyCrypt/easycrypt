@@ -52,6 +52,7 @@ type mismatch_funsig =
                   ((form * form) option
                    * (form * form) Mx.t) suboreq
 | MF_unbounded
+| MF_quantum   of quantum * quantum (* expected, got *)
 
 type restr_failure = Sx.t * Sm.t
 
@@ -103,6 +104,8 @@ type modsig_error =
 
 type funapp_error =
 | FAE_WrongArgCount
+| FAE_QuantumArgExpected
+| FAE_ClassicalNoQArg
 
 type mem_error =
 | MAE_IsConcrete
@@ -183,6 +186,8 @@ type tyerror =
 | ModuleNotAbstract      of symbol
 | ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
+| QuantumProcType        of symbol * ty
+| QuantumProcFinite      of symbol * ty
 
 (* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -262,8 +267,9 @@ let (_i_inuse, s_inuse, se_inuse) =
       let map = se_inuse map e in
         map
 
-    | Scall (lv, p, es) -> begin
+    | Scall (lv, p, es, qes) -> begin
       let map = List.fold_left se_inuse map es in
+      let map = ofold ((^~)se_inuse) map qes in
       let map = add_call map p in
       let map = lv |> ofold ((^~) lv_inuse) map in
         map
@@ -496,6 +502,9 @@ let check_item_compatible ~proof_obl env mode (fin,oin) (fout,oout) =
 
   let check_item_err err =
     tymod_cnv_failure (E_TyModCnv_MismatchFunSig(fin.fs_name,err)) in
+
+  if not (fin.fs_quantum = fout.fs_quantum) then
+    check_item_err (MF_quantum(fout.fs_quantum,fin.fs_quantum));
 
   let (iargs, oargs) = (fin.fs_arg, fout.fs_arg) in
   let (ires , ores ) = (fin.fs_ret, fout.fs_ret) in
@@ -1827,35 +1836,37 @@ let lookup_fun env name =
 let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
   let (p, sig_) = lookup_module_type env modty in
   let modty = {                         (* eta-normal form *)
-    mt_params = sig_.mis_params;
-    mt_name   = p;
-    mt_args   = List.map (EcPath.mident -| fst) sig_.mis_params;
-    mt_restr  = sig_.mis_restr;
+    mt_quantum = sig_.mis_quantum;
+    mt_params  = sig_.mis_params;
+    mt_name    = p;
+    mt_args    = List.map (EcPath.mident -| fst) sig_.mis_params;
+    mt_restr   = sig_.mis_restr;
   } in
     (modty, sig_)
 
-let transcall transexp env ue loc fsig args =
-  let targ = fsig.fs_arg in
+let transcall transexp env ue loc fsig (args, qarg) =
+
+  let process_arg a ty =
+    let loc = a.pl_loc in
+    let a, aty = transexp a in
+    unify_or_fail env ue loc ~expct:ty aty; a in
 
   let process_args tys =
     if List.length args <> List.length tys then
       tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
-    List.map2
-      (fun a ty ->
-        let loc = a.pl_loc in
-        let a, aty = transexp a in
-        unify_or_fail env ue loc ~expct:ty aty; a) args tys
+    List.map2 process_arg args tys
   in
 
+  let targ = fsig.fs_arg in
   let args =
     match List.length args with
     | 0 ->
-        if not (EcReduction.EqTest.for_type env targ tunit) then
-          tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
-        []
+      if not (EcReduction.EqTest.for_type env targ tunit) then
+        tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
+      []
 
     | _ when EcReduction.EqTest.for_type env targ tunit ->
-        tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
+      tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
 
     | 1 -> process_args [targ]
 
@@ -1865,9 +1876,21 @@ let transcall transexp env ue loc fsig args =
         | Ttuple lty -> lty
         | _ -> [targ] in
       process_args lty
-
   in
-    (args, fsig.fs_ret)
+  let qarg, fs_ret =
+    match fsig.fs_quantum, qarg with
+    | `Quantum, None ->
+      tyerror loc env (InvalidFunAppl FAE_QuantumArgExpected);
+    | `Quantum, Some qarg ->
+      let ty, fs_ret = EcEnv.Ty.destr_quantum fsig.fs_ret env in
+      Some (process_arg qarg ty), fs_ret
+    | `Classical, None ->
+      None, fsig.fs_ret
+    | `Classical, Some e ->
+      tyerror e.pl_loc env (InvalidFunAppl FAE_ClassicalNoQArg)
+  in
+
+  args, qarg, fs_ret
 
 (* -------------------------------------------------------------------- *)
 let trans_gamepath (env : EcEnv.env) gp =
@@ -2050,9 +2073,9 @@ let i_rnd_lv loc env lv e =
   | Lval lv -> i_rnd (lv, e)
   | LvMap _ -> tyerror loc env LvMapOnNonAssign
 
-let i_call_lv loc env lv f args =
+let i_call_lv loc env lv f args qargs =
   match lv with
-  | Lval lv -> i_call (Some lv, f, args)
+  | Lval lv -> i_call (Some lv, f, args, qargs)
   | LvMap _ -> tyerror loc env LvMapOnNonAssign
 
 (* -------------------------------------------------------------------- *)
@@ -2332,9 +2355,25 @@ and transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
   let mr = replace_if_provided env mr mr' modty.pmsig_restr in
 
   assert (Msym.cardinal mr.mr_oinfos = List.length body);
-  { mis_params = margs;
+  { mis_quantum = modty.pmsig_quantum;
+    mis_params = margs;
     mis_body   = body;
     mis_restr  = mr; }
+
+(* Extra restriction for quantum procedure *)
+and check_quantum_type env name fs_quantum resty =
+  if fs_quantum = `Quantum then
+    let td,tc = EcEnv.Ty.destr_fun resty env in
+    if td = None then
+      tyerror (loc name) env (QuantumProcType (unloc name, resty));
+    let td = oget td in
+    (* FIXME quantum: check that td and tc are finite type *)
+    let is_finite t = true in
+    let check_finite t =
+      if not (is_finite t) then
+        tyerror (loc name) env (QuantumProcFinite(unloc name, t)) in
+    check_finite td;
+    check_finite tc
 
 (* -------------------------------------------------------------------- *)
 and transmodsig_body
@@ -2374,7 +2413,12 @@ and transmodsig_body
 
       let oi = OI.mk calls uin compl in
 
-      let sig_ = { fs_name   = name.pl_desc;
+      let fs_quantum = f.pfd_quantum in
+
+      check_quantum_type env name fs_quantum resty;
+
+      let sig_ = { fs_quantum;
+                   fs_name   = name.pl_desc;
                    fs_arg    = tyarg;
                    fs_anames = tyargs;
                    fs_ret    = resty; }
@@ -2618,10 +2662,14 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       (* Computes reads/writes/calls *)
       let uses = result |> ofold ((^~) se_inuse) (s_inuse stmt) in
 
+      let fs_quantum = decl.pfd_quantum in
+      check_quantum_type env decl.pfd_name fs_quantum retty;
+
       (* Compose all results *)
       let fun_ =
         { f_name   = decl.pfd_name.pl_desc;
           f_sig    = {
+            fs_quantum;
             fs_name   = decl.pfd_name.pl_desc;
             fs_arg    = ttuple (List.map (fun vd -> vd.v_type) params);
             fs_anames = Some params;
@@ -2818,10 +2866,10 @@ and transinstr
   let transcall name args =
     let fpath = trans_gamepath env name in
     let fsig  = (EcEnv.Fun.by_xpath fpath env).f_sig in
-    let (args, ty) =
+    let (args, qargs, ty) =
       transcall (transexp env `InProc ue) env ue name.pl_loc fsig args
     in
-      (fpath, args, ty)
+      (fpath, args, qargs, ty)
   in
 
   match i.pl_desc with
@@ -2835,14 +2883,14 @@ and transinstr
   | PSasgn (plvalue, prvalue) -> begin
       match unloc prvalue with
       | PEapp ( { pl_desc = PEident (f, None) },
-                [{ pl_desc = PEtuple es; pl_loc = les; }])
+                [{ pl_desc = PEtuple es; }])
           when EcEnv.Fun.lookup_opt (unloc f) env <> None
           ->
         let fident { pl_loc = loc; pl_desc = (nm, x); } =
           let nm = List.map (fun x -> (mk_loc loc x, None)) nm in
             mk_loc loc (nm, mk_loc loc x)
         in
-        let call = PScall (Some plvalue, fident f, mk_loc les es) in
+        let call = PScall (Some plvalue, fident f, (es,None)) in
           transinstr env ue (mk_loc i.pl_loc call)
 
       | _ ->
@@ -2859,14 +2907,14 @@ and transinstr
       [ i_rnd_lv i.pl_loc env lvalue rvalue ]
 
   | PScall (None, name, args) ->
-      let (fpath, args, _rty) = transcall name (unloc args) in
-      [ i_call (None, fpath, args) ]
+      let (fpath, args, qargs, _rty) = transcall name args in
+      [ i_call (None, fpath, args, qargs) ]
 
   | PScall (Some lvalue, name, args) ->
       let lvalue, lty = translvalue ue env lvalue in
-      let (fpath, args, rty) = transcall name (unloc args) in
+      let (fpath, args, qargs, rty) = transcall name args in
       unify_or_fail env ue name.pl_loc ~expct:lty rty;
-      [ i_call_lv i.pl_loc env lvalue fpath args ]
+      [ i_call_lv i.pl_loc env lvalue fpath args qargs ]
 
   | PSif ((pe, s), cs, sel) -> begin
       let rec for1_i (pe, s) sel =
@@ -3241,12 +3289,15 @@ and trans_form_or_pattern
         let aout = transf env pf in
         unify_or_fail env ue pf.pl_loc ~expct:ty aout.f_ty; aout
 
+(* FIXME quantum : what is this *)
     | PFWP (fn, args, phi) ->
+assert false
+(*
         let fpath   = EcEnv.NormMp.norm_xfun env (trans_gamepath env fn) in
         let fun_    = EcEnv.Fun.by_xpath fpath env in
         let args, argsty =
           transcall (transexp env `InProc ue)
-            env ue f.pl_loc fun_.f_sig args in
+            env ue f.pl_loc fun_.f_sig (args, []) in
 
         let body, ret =
           let init =
@@ -3295,7 +3346,7 @@ and trans_form_or_pattern
             | _ -> EcFol.f_iter check subf
           in check phi in
 
-        phi
+        phi *)
 
     | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
 
@@ -3618,9 +3669,9 @@ and trans_form_or_pattern
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in
         let fun_  = EcEnv.Fun.by_xpath fpath env in
-        let args,_ =
+        let args,_, _ =
           transcall (fun f -> let f = transf env f in f, f.f_ty)
-            env ue f.pl_loc fun_.f_sig args in
+            env ue f.pl_loc fun_.f_sig (args, None) in
         let memid = transmem env m in
         let env = EcEnv.Fun.prF fpath env in
         let event' = transf env event in

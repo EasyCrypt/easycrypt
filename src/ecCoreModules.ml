@@ -70,7 +70,7 @@ type instr = {
 and instr_node =
   | Sasgn     of lvalue * EcTypes.expr
   | Srnd      of lvalue * EcTypes.expr
-  | Scall     of lvalue option * EcPath.xpath * EcTypes.expr list
+  | Scall     of lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr option (* classical args, quantum args *)
   | Sif       of EcTypes.expr * stmt * stmt
   | Swhile    of EcTypes.expr * stmt
   | Smatch    of expr * ((EcIdent.t * EcTypes.ty) list * stmt) list
@@ -107,10 +107,11 @@ module Hinstr = Why3.Hashcons.Make (struct
     | Srnd (lv1, e1), Srnd (lv2, e2) ->
         (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
 
-    | Scall (lv1, f1, es1), Scall (lv2, f2, es2) ->
+    | Scall (lv1, f1, es1, qe1), Scall (lv2, f2, es2, qe2) ->
            (EcUtils.opt_equal lv_equal lv1 lv2)
         && (EcPath.x_equal f1 f2)
-        && (List.all2 EcTypes.e_equal es1 es2)
+        && (List.all2 EcTypes.e_equal es1  es2)
+        && (oeq EcTypes.e_equal qe1 qe2)
 
     | Sif (c1, s1, r1), Sif (c2, s2, r2) ->
            (EcTypes.e_equal c1 c2)
@@ -148,11 +149,14 @@ module Hinstr = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine
           (Hashtbl.hash lv) (EcTypes.e_hash e)
 
-    | Scall (lv, f, tys) ->
-        Why3.Hashcons.combine_list EcTypes.e_hash
-          (Why3.Hashcons.combine
-             (Hashtbl.hash lv) (EcPath.x_hash f))
-          tys
+    | Scall (lv, f, es, qe) ->
+      let hash =
+        Why3.Hashcons.combine
+          (Hashtbl.hash lv) (EcPath.x_hash f) in
+      let hash =
+        ofold (fun e h -> Why3.Hashcons.combine (EcTypes.e_hash e) h)
+          hash qe in
+      Why3.Hashcons.combine_list EcTypes.e_hash hash es
 
     | Sif (c, s1, s2) ->
         Why3.Hashcons.combine2
@@ -179,12 +183,15 @@ module Hinstr = Why3.Hashcons.Make (struct
     | Srnd (lv, e) ->
         EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
 
-    | Scall (olv, f, args) ->
+    | Scall (olv, f, args, qarg) ->
         let ffv = EcPath.x_fv Mid.empty f in
         let ofv = olv |> omap lv_fv |> odfl Mid.empty in
+        let fv = EcIdent.fv_union ffv ofv in
+        let fv =
+          ofold (fun e fv -> EcIdent.fv_union (EcTypes.e_fv e) fv) fv qarg in
         List.fold_left
           (fun s a -> EcIdent.fv_union s (EcTypes.e_fv a))
-          (EcIdent.fv_union ffv ofv) args
+          fv args
 
     | Sif (e, s1, s2) ->
         List.fold_left EcIdent.fv_union Mid.empty
@@ -249,7 +256,7 @@ let rstmt s = stmt (List.rev s)
 (* --------------------------------------------------------------------- *)
 let i_asgn     (lv, e)      = mk_instr (Sasgn (lv, e))
 let i_rnd      (lv, e)      = mk_instr (Srnd (lv, e))
-let i_call     (lv, m, tys) = mk_instr (Scall (lv, m, tys))
+let i_call     (lv, m, es, qes) = mk_instr (Scall (lv, m, es, qes))
 let i_if       (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
 let i_while    (c, s)       = mk_instr (Swhile (c, s))
 let i_match    (e, b)       = mk_instr (Smatch (e, b))
@@ -278,7 +285,7 @@ let get_rnd = function
   | _ -> None
 
 let get_call = function
-  | { i_node = Scall (lv, f, fs) } -> Some (lv, f, fs)
+  | { i_node = Scall (lv, f, es, qes) } -> Some (lv, f, es, qes)
   | _ -> None
 
 let get_if = function
@@ -331,7 +338,7 @@ module ISmart : sig
 
   type i_asgn     = lvalue * EcTypes.expr
   type i_rnd      = lvalue * EcTypes.expr
-  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list
+  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr option
   type i_if       = EcTypes.expr * stmt * stmt
   type i_while    = EcTypes.expr * stmt
   type i_match    = EcTypes.expr * ((EcIdent.t * ty) list * stmt) list
@@ -354,7 +361,7 @@ end = struct
 
   type i_asgn     = lvalue * EcTypes.expr
   type i_rnd      = lvalue * EcTypes.expr
-  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list
+  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr option
   type i_if       = EcTypes.expr * stmt * stmt
   type i_while    = EcTypes.expr * stmt
   type i_match    = EcTypes.expr * ((EcIdent.t * ty) list * stmt) list
@@ -374,9 +381,9 @@ end = struct
   let i_rnd (i, (lv, e)) (lv', e') =
     if lv == lv' && e == e' then i else i_rnd (lv', e')
 
-  let i_call (i, (olv, mp, args)) (olv', mp', args') =
-    if   olv == olv' && mp == mp' && args == args'
-    then i else  i_call (olv', mp', args')
+  let i_call (i, (olv, mp, args, qargs)) (olv', mp', args', qargs') =
+    if   olv == olv' && mp == mp' && args == args' && qargs == qargs'
+    then i else  i_call (olv', mp', args', qargs')
 
   let i_if (i, (e, s1, s2)) (e', s1', s2') =
     if   e == e' && s1 == s1' && s2 == s2'
@@ -429,12 +436,13 @@ let rec s_subst_top (s : EcTypes.e_subst) =
     | Srnd (lv, e) ->
         ISmart.i_rnd (i, (lv, e)) (lv_subst lv, e_subst e)
 
-    | Scall (olv, mp, args) ->
+    | Scall (olv, mp, args, qarg) ->
         let olv'  = olv |> OSmart.omap lv_subst in
         let mp'   = s.EcTypes.es_xp mp in
         let args' = List.Smart.map e_subst args in
+        let qarg' = omap e_subst qarg in
 
-        ISmart.i_call (i, (olv, mp, args)) (olv', mp', args')
+        ISmart.i_call (i, (olv, mp, args, qarg)) (olv', mp', args', qarg')
 
     | Sif (e, s1, s2) ->
         ISmart.i_if (i, (e, s1, s2))
@@ -505,8 +513,10 @@ and i_get_uninit_read (w : Ssym.t) (i : instr) =
       let w2 = lv_get_uninit_read w lv in
       (Ssym.union w w2, r1)
 
-  | Scall (olv, _, args) ->
-      let r1 = Ssym.diff (Ssym.big_union (List.map (Uninit.e_pv) args)) w in
+  | Scall (olv, _, args, qarg) ->
+      let r = Ssym.big_union (List.map Uninit.e_pv args) in
+      let qr = omap_dfl Uninit.e_pv Ssym.empty qarg in
+      let r1 = Ssym.diff (Ssym.union r qr) w in
       let w = olv |> omap (lv_get_uninit_read w) |> odfl w in
       (w, r1)
 
@@ -704,7 +714,12 @@ let has_compl_restriction mr =
     ) mr.mr_oinfos
 
 (* -------------------------------------------------------------------- *)
+type quantum = [`Quantum | `Classical]
+
+(* -------------------------------------------------------------------- *)
+
 type funsig = {
+  fs_quantum: quantum;
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
   fs_anames : variable list option;
@@ -719,6 +734,7 @@ let fs_equal f1 f2 =
 
 (* -------------------------------------------------------------------- *)
 type 'a p_module_type = {
+  mt_quantum: quantum;
   mt_params : (EcIdent.t * 'a p_module_type) list;
   mt_name   : EcPath.path;
   mt_args   : EcPath.mpath list;
@@ -730,6 +746,7 @@ type module_sig_body_item = Tys_function of funsig
 type module_sig_body = module_sig_body_item list
 
 type 'a p_module_sig = {
+  mis_quantum : quantum;
   mis_params : (EcIdent.t * 'a p_module_type) list;
   mis_body   : module_sig_body;
   mis_restr  : 'a p_mod_restr;

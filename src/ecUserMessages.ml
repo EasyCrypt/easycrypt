@@ -128,6 +128,10 @@ end = struct
       msg "the function does not satisfy the required complexity restriction \
           (at least, it cannot be infered from its type)"
 
+    | MF_quantum (ex, got) ->
+        msg "the function is %s while is is expected to be %s"
+          (EcPrinting.string_of_quantum got) (EcPrinting.string_of_quantum ex)
+
   let pp_restr_err_aux env fmt error =
     let msg x = Format.fprintf fmt x in
 
@@ -486,6 +490,12 @@ end = struct
     | InvalidFunAppl FAE_WrongArgCount ->
         msg "invalid function application: wrong number of arguments"
 
+    | InvalidFunAppl FAE_ClassicalNoQArg ->
+        msg "invalid function application: classical function cannot be applied to quantum argument"
+
+    | InvalidFunAppl FAE_QuantumArgExpected ->
+        msg "invalid function application: quantum function expects a quantum argument"
+
     | InvalidModAppl err ->
         msg "invalid module application:@ %a" (pp_modappl_error env1) err
 
@@ -565,6 +575,14 @@ end = struct
 
     | LvMapOnNonAssign ->
         msg "map-style left-value cannot be used with assignments"
+
+    | QuantumProcType(name, ty) ->
+      msg "return type of %s reduce to :%a which is not functional"
+        name pp_type ty
+
+    | QuantumProcFinite(name, ty) ->
+      msg "in declaration of %s: %a should be finite"
+        name pp_type ty
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

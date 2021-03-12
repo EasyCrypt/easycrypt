@@ -360,6 +360,8 @@ module Ty : sig
   val defined : path -> env -> bool
   val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
   val hnorm   : EcTypes.ty -> env -> EcTypes.ty
+  val destr_fun : EcTypes.ty -> env -> EcTypes.ty option * EcTypes.ty
+  val destr_quantum : EcTypes.ty -> env -> EcTypes.ty * EcTypes.ty
   val decompose_fun : EcTypes.ty -> env -> EcTypes.dom * EcTypes.ty
 
   val get_top_decl :

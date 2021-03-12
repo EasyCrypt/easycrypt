@@ -39,10 +39,11 @@ type mismatch_funsig =
 | MF_targs  of ty * ty                               (* expected, got *)
 | MF_tres   of ty * ty                               (* expected, got *)
 | MF_restr  of EcEnv.env * Sx.t mismatch_sets
-| MF_compl     of EcEnv.env *
+| MF_compl  of EcEnv.env *
                   ((form * form) option
                    * (form * form) Mx.t) suboreq
 | MF_unbounded
+| MF_quantum of quantum * quantum (* expected, got *)
 
 type restr_failure = Sx.t * Sm.t
 
@@ -93,6 +94,8 @@ type modsig_error =
 
 type funapp_error =
 | FAE_WrongArgCount
+| FAE_QuantumArgExpected
+| FAE_ClassicalNoQArg
 
 type mem_error =
 | MAE_IsConcrete
@@ -173,6 +176,8 @@ type tyerror =
 | ModuleNotAbstract      of symbol
 | ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
+| QuantumProcType        of symbol * ty
+| QuantumProcFinite      of symbol * ty
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror

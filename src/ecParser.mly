@@ -1472,6 +1472,17 @@ lvalue_u:
 %inline lvalue:
 | x=loc(lvalue_u) { x }
 
+classical_args:
+| LPAREN es=plist0(expr, COMMA) RPAREN { es }
+
+quantum_args:
+| PIPE e=expr GT { e }
+
+proc_args:
+| cargs=classical_args {cargs, None }
+| qargs=quantum_args {[], Some qargs}
+| cargs=classical_args qargs=quantum_args {cargs, Some qargs}
+
 base_instr:
 | x=lident
     { PSident x }
@@ -1482,11 +1493,11 @@ base_instr:
 | x=lvalue LARROW e=expr
     { PSasgn (x, e) }
 
-| x=lvalue LEAT f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
-    { PScall (Some x, f, es) }
+| x=lvalue LEAT f=loc(fident) args=proc_args
+    { PScall (Some x, f, args) }
 
-| f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
-    { PScall (None, f, es) }
+| f=loc(fident) args=proc_args
+    { PScall (None, f, args) }
 
 | ASSERT LPAREN c=expr RPAREN
     { PSassert c }
@@ -1767,7 +1778,8 @@ sig_param:
 | x=uident COLON i=mod_type { (x, i) }
 
 %inline quantum:
-| x=QUANTUM? { if x = None then `Classical else `Quantum }
+| x=ioption(QUANTUM)   { if x = None then `Classical else `Quantum   }
+
 
 signature_item:
 | INCLUDE i=mod_type xs=bracket(minclude_proc)? qs=brace(qident*)?

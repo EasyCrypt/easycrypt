@@ -140,10 +140,11 @@ let subst_funsig (s : _subst) (funsig : funsig) =
   let fs_ret = s.s_ty funsig.fs_ret in
   let fs_anm = funsig.fs_anames |> omap (List.map (subst_variable s)) in
 
-  { fs_name   = funsig.fs_name;
-    fs_arg    = fs_arg;
-    fs_anames = fs_anm;
-    fs_ret    = fs_ret; }
+  { fs_quantum = funsig.fs_quantum;
+    fs_name    = funsig.fs_name;
+    fs_arg     = fs_arg;
+    fs_anames  = fs_anm;
+    fs_ret     = fs_ret; }
 
 (* -------------------------------------------------------------------- *)
 let subst_mod_restr (s : _subst) (mr : mod_restr) =
@@ -197,19 +198,21 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
   in
 
   let comps =
-    { mis_params = newparams;
-      mis_body   = subst_modsig_body sbody comps.mis_body;
-      mis_restr  = subst_mod_restr sbody comps.mis_restr;
+    { mis_quantum = comps.mis_quantum;
+      mis_params  = newparams;
+      mis_body    = subst_modsig_body sbody comps.mis_body;
+      mis_restr   = subst_mod_restr sbody comps.mis_restr;
     }
   in
     (sbody, comps)
 
 (* -------------------------------------------------------------------- *)
 and subst_modtype (s : _subst) (modty : module_type) =
-  { mt_params = List.map (snd_map (subst_modtype s)) modty.mt_params;
-    mt_name   = s.s_p modty.mt_name;
-    mt_args   = List.map s.s_fmp modty.mt_args;
-    mt_restr = subst_mod_restr s modty.mt_restr; }
+  { mt_quantum = modty.mt_quantum;
+    mt_params  = List.map (snd_map (subst_modtype s)) modty.mt_params;
+    mt_name    = s.s_p modty.mt_name;
+    mt_args    = List.map s.s_fmp modty.mt_args;
+    mt_restr   = subst_mod_restr s modty.mt_restr; }
 
 (* -------------------------------------------------------------------- *)
 let subst_function_def (s : _subst) (def : function_def) =
@@ -227,9 +230,9 @@ let subst_function (s : _subst) (f : function_) =
     | FBdef def -> FBdef (subst_function_def s def)
     | FBalias f -> FBalias (EcPath.x_subst s.s_fmp f)
     | FBabs oi  -> FBabs (subst_oracle_info s oi) in
-  { f_name = f.f_name;
-    f_sig  = sig';
-    f_def  = def' }
+  { f_name    = f.f_name;
+    f_sig     = sig';
+    f_def     = def' }
 
 
 (* -------------------------------------------------------------------- *)

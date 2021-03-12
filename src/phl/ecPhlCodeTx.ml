@@ -103,10 +103,12 @@ let alias_stmt env id (pf, _) me i =
     let ty       = proj_distr_ty env e.e_ty in
     let (me, pv) = dopv ty in
     (me, [i_rnd (LvVar (pv, ty), e); i_asgn (lv, e_var pv ty)])
-  | Scall (Some lv, f, args) ->
+  | Scall (Some lv, f, args, qarg) ->
     let ty       = (EcEnv.Fun.by_xpath f env).f_sig.fs_ret in
+    let ty =
+      if qarg = None then ty else snd (EcEnv.Ty.destr_quantum ty env) in
     let (me, pv) = dopv ty in
-    (me, [i_call (Some (LvVar (pv, ty)), f ,args); i_asgn (lv, e_var pv ty)])
+    (me, [i_call (Some (LvVar (pv, ty)), f ,args, qarg); i_asgn (lv, e_var pv ty)])
   | _ ->
       tc_error pf "cannot create an alias for that kind of instruction"
 

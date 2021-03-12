@@ -31,7 +31,7 @@ type instr = private {
 and instr_node =
   | Sasgn     of lvalue * expr
   | Srnd      of lvalue * expr
-  | Scall     of lvalue option * xpath * expr list
+  | Scall     of lvalue option * xpath * expr list * expr option
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * EcTypes.ty) list * stmt) list
@@ -60,7 +60,7 @@ val s_subst   : e_subst -> stmt -> stmt
 (* -------------------------------------------------------------------- *)
 val i_asgn     : lvalue * expr -> instr
 val i_rnd      : lvalue * expr -> instr
-val i_call     : lvalue option * xpath * expr list -> instr
+val i_call     : lvalue option * xpath * expr list * expr option -> instr
 val i_if       : expr * stmt * stmt -> instr
 val i_while    : expr * stmt -> instr
 val i_match    : expr * ((EcIdent.t * ty) list * stmt) list -> instr
@@ -69,7 +69,7 @@ val i_abstract : EcIdent.t -> instr
 
 val s_asgn     : lvalue * expr -> stmt
 val s_rnd      : lvalue * expr -> stmt
-val s_call     : lvalue option * xpath * expr list -> stmt
+val s_call     : lvalue option * xpath * expr list * expr option -> stmt
 val s_if       : expr * stmt * stmt -> stmt
 val s_while    : expr * stmt -> stmt
 val s_match    : expr * ((EcIdent.t * ty) list * stmt) list -> stmt
@@ -84,7 +84,7 @@ val rstmt : instr list -> stmt
 (* the following functions raise Not_found if the argument does not match *)
 val destr_asgn   : instr -> lvalue * expr
 val destr_rnd    : instr -> lvalue * expr
-val destr_call   : instr -> lvalue option * xpath * expr list
+val destr_call   : instr -> lvalue option * xpath * expr list * expr option
 val destr_if     : instr -> expr * stmt * stmt
 val destr_while  : instr -> expr * stmt
 val destr_match  : instr -> expr * ((EcIdent.t * ty) list * stmt) list
@@ -102,7 +102,12 @@ val is_assert : instr -> bool
 val get_uninit_read : stmt -> Sx.t
 
 (* -------------------------------------------------------------------- *)
+type quantum = [`Quantum | `Classical]
+
+(* -------------------------------------------------------------------- *)
+
 type funsig = {
+  fs_quantum: quantum;
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
   fs_anames : variable list option;
@@ -172,6 +177,7 @@ val has_compl_restriction : 'a p_mod_restr -> bool
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)
 type 'a p_module_type = {          (* Always in eta-normal form *)
+  mt_quantum: quantum;
   mt_params : (EcIdent.t * 'a p_module_type) list;
   mt_name   : EcPath.path;
   mt_args   : EcPath.mpath list;
@@ -183,6 +189,7 @@ type module_sig_body_item = Tys_function of funsig
 type module_sig_body = module_sig_body_item list
 
 type 'a p_module_sig = {
+  mis_quantum : quantum;
   mis_params : (EcIdent.t * 'a p_module_type) list;
   mis_body   : module_sig_body;
   mis_restr  : 'a p_mod_restr;

@@ -531,6 +531,14 @@ let pp_local ?fv (ppe : PPEnv.t) fmt x =
     pp_local ppe fmt x
   else pp_string fmt "_"
 
+(* -------------------------------------------------------------------- *)
+let string_of_quantum = function
+  | `Quantum -> "quantum"
+  | `Classical -> "classical"
+
+let pp_quantum fmt = function
+  | `Quantum -> Format.fprintf fmt "quantum "
+  | `Classical -> ()
 
 (* -------------------------------------------------------------------- *)
 type assoc  = [`Left | `Right | `NonAssoc]
@@ -1256,6 +1264,20 @@ let rec pp_lvalue (ppe : PPEnv.t) fmt lv =
         (pp_paren (pp_list ",@ " (pp_pv ppe))) (List.map fst ps)
 
 (* -------------------------------------------------------------------- *)
+and pp_proc_args ppe fmt (args, qarg) =
+  match args, qarg with
+  | _, None ->
+    Format.fprintf fmt "(@[<hov 0>%a@])"
+      (pp_list ",@ " (pp_expr ppe)) args
+  | [], Some qarg  ->
+    Format.fprintf fmt "|@[<hov 0>%a@]>"
+      (pp_list ",@ " (pp_expr ppe)) (decompose_etuple qarg)
+  | _, Some qarg ->
+    Format.fprintf fmt "@[<hov 0>(@[<hov 0>%a@])@ |@[<hov 0>%a@]>@]"
+      (pp_list ",@ " (pp_expr ppe)) args
+      (pp_list ",@ " (pp_expr ppe)) (decompose_etuple qarg)
+
+(* -------------------------------------------------------------------- *)
 and pp_instr_for_form (ppe : PPEnv.t) fmt i =
   match i.i_node with
   | Sasgn (lv, e) -> begin
@@ -1275,16 +1297,17 @@ and pp_instr_for_form (ppe : PPEnv.t) fmt i =
       Format.fprintf fmt "%a <$@;<1 2>$%a"
         (pp_lvalue ppe) lv (pp_expr ppe) e
 
-  | Scall (None, xp, args) ->
-      Format.fprintf fmt "%a(@[<hov 0>%a@]);"
+  | Scall (None, xp, args, qargs) ->
+      Format.fprintf fmt "%a%a;"
         (pp_funname ppe) xp
-        (pp_list ",@ " (pp_expr ppe)) args
+        (pp_proc_args ppe) (args, qargs)
 
-  | Scall (Some lv, xp, args) ->
-      Format.fprintf fmt "%a <@@@;<1 2>@[%a(@[<hov 0>%a@]);@]"
+  | Scall (Some lv, xp, args, qargs) ->
+      Format.fprintf fmt "%a <@@@;<1 2>@[%a%a;@]"
         (pp_lvalue ppe) lv
         (pp_funname ppe) xp
-        (pp_list ",@ " (pp_expr ppe)) args
+        (pp_proc_args ppe) (args, qargs)
+
 
   | Sassert e ->
       Format.fprintf fmt "assert %a;"
@@ -2351,7 +2374,7 @@ let pp_schema ?(long=false) (ppe : PPEnv.t) fmt (x, sc) =
 type ppnode1 = [
   | `Asgn     of (EcModules.lvalue * EcTypes.expr)
   | `Assert   of (EcTypes.expr)
-  | `Call     of (EcModules.lvalue option * P.xpath * EcTypes.expr list)
+  | `Call     of (EcModules.lvalue option * P.xpath * EcTypes.expr list * EcTypes.expr option)
   | `Rnd      of (EcModules.lvalue * EcTypes.expr)
   | `Abstract of EcIdent.t
   | `If       of EcTypes.expr
@@ -2372,7 +2395,7 @@ let at (ppe : PPEnv.t) n i =
   match i, n with
   | Sasgn (lv, e)    , 0 -> Some (`Asgn (lv, e)    , `P, [])
   | Srnd  (lv, e)    , 0 -> Some (`Rnd  (lv, e)    , `P, [])
-  | Scall (lv, f, es), 0 -> Some (`Call (lv, f, es), `P, [])
+  | Scall (lv, f, es, qes), 0 -> Some (`Call (lv, f, es, qes), `P, [])
   | Sassert e        , 0 -> Some (`Assert e        , `P, [])
   | Sabstract id     , 0 -> Some (`Abstract id     , `P, [])
   | Swhile (e, s), 0 -> Some (`While e, `P, s.s_node)
@@ -2463,18 +2486,19 @@ let pp_i_asgn (ppe : PPEnv.t) fmt (lv, e) =
 let pp_i_assert (ppe : PPEnv.t) fmt e =
   Format.fprintf fmt "assert (%a)" (pp_expr ppe) e
 
-let pp_i_call (ppe : PPEnv.t) fmt (lv, xp, args) =
+let pp_i_call (ppe : PPEnv.t) fmt (lv, xp, args, qargs) =
   match lv with
   | None ->
-      Format.fprintf fmt "%a(%a)"
+      Format.fprintf fmt "%a%a"
         (pp_funname ppe) xp
-        (pp_list ",@ " (pp_expr ppe)) args
+        (pp_proc_args ppe) (args, qargs)
+
 
   | Some lv ->
-      Format.fprintf fmt "@[<hov 2>%a <@@@ %a(%a)@]"
+      Format.fprintf fmt "@[<hov 2>%a <@@@ %a%a@]"
         (pp_lvalue ppe) lv
         (pp_funname ppe) xp
-        (pp_list ",@ " (pp_expr ppe)) args
+        (pp_proc_args ppe) (args, qargs)
 
 let pp_i_rnd (ppe : PPEnv.t) fmt (lv, e) =
   Format.fprintf fmt "%a <$@ @[<hov 2>%a@]"
@@ -2999,11 +3023,13 @@ let pp_pvdecl ppe fmt v =
 let pp_funsig ppe fmt fs =
   match fs.fs_anames with
   | None ->
-      Format.fprintf fmt "@[<hov 2>proc %s (%a) :@ %a@]"
-        fs.fs_name (pp_type ppe) fs.fs_arg (pp_type ppe) fs.fs_ret
+    Format.fprintf fmt "@[<hov 2>%aproc %s (%a) :@ %a@]"
+      pp_quantum fs.fs_quantum
+      fs.fs_name (pp_type ppe) fs.fs_arg (pp_type ppe) fs.fs_ret
 
   | Some params ->
-    Format.fprintf fmt "@[<hov 2>proc %s(%a) :@ %a@]"
+    Format.fprintf fmt "@[<hov 2>%aproc %s(%a) :@ %a@]"
+      pp_quantum fs.fs_quantum
       fs.fs_name
       (pp_list ", " (pp_pvdecl ppe)) params
       (pp_type ppe) fs.fs_ret
@@ -3027,9 +3053,10 @@ let pp_modsig ?(long=false) ppe fmt (p,ms) =
       if fst qs <> [] then
         Format.fprintf fmt "(* %a *)@ " EcSymbols.pp_qsymbol qs in
 
-  Format.fprintf fmt "@[<v>@[<hv 2>%amodule type %s%t @,%a@;<0 -2>@] = \
+  Format.fprintf fmt "@[<v>@[<hv 2>%a%amodule type %s%t @,%a@;<0 -2>@] = \
                       {@,  @[<v>%a@]@,}@]"
     pp_long p
+    pp_quantum ms.mis_quantum
     (EcPath.basename p) pp
     (pp_mem_restr ppe) ms.mis_restr
     (pp_list "@,@," (pp_sigitem (Some ms.mis_restr.mr_oinfos) ppe)) ms.mis_body
@@ -3060,16 +3087,16 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
     Format.fprintf fmt "@[<hov 2>%a <$@ @[%a@]@];"
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
-  | Scall (None, xp, args) ->
-    Format.fprintf fmt "%a(@[%a@]);"
+  | Scall (None, xp, args, qargs) ->
+    Format.fprintf fmt "%a%a;"
       (pp_funname ppe) xp
-      (pp_list ",@ " (pp_expr ppe)) args
+      (pp_proc_args ppe) (args, qargs)
 
-  | Scall (Some lv, xp, args) ->
-    Format.fprintf fmt "@[<hov 2>%a <@@@ %a(@[%a@])@];"
+  | Scall (Some lv, xp, args, qargs) ->
+    Format.fprintf fmt "@[<hov 2>%a <@@@ %a%a;"
       (pp_lvalue ppe) lv
       (pp_funname ppe) xp
-      (pp_list ",@ " (pp_expr ppe)) args
+      (pp_proc_args ppe) (args, qargs)
 
   | Sassert e ->
     Format.fprintf fmt "@[<hov 2>assert %a@];"

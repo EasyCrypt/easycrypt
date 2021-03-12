@@ -1121,6 +1121,12 @@ let destr_tuple_var e =
   | Etuple es -> List.map destr_var es
   | _ -> assert false
 
+let decompose_etuple e =
+  match e.e_node with
+  | Etuple es -> es
+  | _         -> [e]
+
+
 (* -------------------------------------------------------------------- *)
 let destr_app = function
     { e_node = Eapp (e, es) } -> (e, es) | e -> (e, [])

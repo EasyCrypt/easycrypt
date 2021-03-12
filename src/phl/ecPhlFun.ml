@@ -561,10 +561,9 @@ module ToCodeLow = struct
       | Some params -> List.mapi (fun i v -> e_proj arg i v.v_type) params
     in
     let r = pv_loc res.v_name in
-    let i = i_call (Some(LvVar(r, res.v_type)), f, args) in
+    let i = i_call (Some(LvVar(r, res.v_type)), f, args, None) in
     let s = stmt [i] in
-    (me, s, arg, res, args)
-  (* (me, s, r, fd.f_sig.fs_ret, args) *)
+    (me, s, arg, res)
 
   let add_var env vfrom mfrom v me s =
     PVM.add env vfrom mfrom (f_pvar (pv_loc v.v_name) v.v_type (fst me)) s
@@ -577,7 +576,7 @@ let t_fun_to_code_hoare_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
   let f = hf.hf_f in
-  let m, st, a, r, _ = ToCodeLow.to_code env f mhr in
+  let m, st, a, r = ToCodeLow.to_code env f mhr in
   let spr = ToCodeLow.add_var env pv_arg mhr a m PVM.empty in
   let spo = ToCodeLow.add_var env pv_res mhr r m PVM.empty in
   let pre  = PVM.subst env spr hf.hf_pr in
@@ -593,7 +592,7 @@ let t_fun_to_code_choare_r tc =
   let env = FApi.tc1_env tc in
   let chf = tc1_as_choareF tc in
   let f = chf.chf_f in
-  let m, st, a, r, _ = ToCodeLow.to_code env f mhr in
+  let m, st, a, r = ToCodeLow.to_code env f mhr in
   let spr = ToCodeLow.add_var env pv_arg mhr a m PVM.empty in
   let spo = ToCodeLow.add_var env pv_res mhr r m PVM.empty in
   let pre  = PVM.subst env spr chf.chf_pr in
@@ -607,7 +606,7 @@ let t_fun_to_code_bdhoare_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_bdhoareF tc in
   let f = hf.bhf_f in
-  let m, st, a, r, _ = ToCodeLow.to_code env f mhr in
+  let m, st, a, r = ToCodeLow.to_code env f mhr in
   let spr = ToCodeLow.add_var env pv_arg mhr a m PVM.empty in
   let spo = ToCodeLow.add_var env pv_res mhr r m PVM.empty in
   let pre  = PVM.subst env spr hf.bhf_pr in
@@ -621,8 +620,8 @@ let t_fun_to_code_equiv_r tc =
   let env = FApi.tc1_env tc in
   let ef = tc1_as_equivF tc in
   let (fl,fr) = ef.ef_fl, ef.ef_fr in
-  let ml, sl, al, rl, _ = ToCodeLow.to_code env fl mleft in
-  let mr, sr, ar, rr, _ = ToCodeLow.to_code env fr mright in
+  let ml, sl, al, rl = ToCodeLow.to_code env fl mleft in
+  let mr, sr, ar, rr = ToCodeLow.to_code env fr mright in
   let spr =
     let s = ToCodeLow.add_var env pv_arg mleft al ml PVM.empty in
     ToCodeLow.add_var env pv_arg mright ar mr s in
@@ -639,8 +638,8 @@ let t_fun_to_code_eager_r tc =
   let env = FApi.tc1_env tc in
   let eg = tc1_as_eagerF tc in
   let (fl,fr) = eg.eg_fl, eg.eg_fr in
-  let ml, sl, al, rl, _ = ToCodeLow.to_code env fl mleft in
-  let mr, sr, ar, rr, _ = ToCodeLow.to_code env fr mright in
+  let ml, sl, al, rl = ToCodeLow.to_code env fl mleft in
+  let mr, sr, ar, rr = ToCodeLow.to_code env fr mright in
   let spr =
     let s = ToCodeLow.add_var env pv_arg mleft al ml PVM.empty in
     ToCodeLow.add_var env pv_arg mright ar mr s in

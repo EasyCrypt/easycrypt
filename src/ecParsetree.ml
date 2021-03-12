@@ -112,7 +112,7 @@ type pinstr_r =
   | PSident  of psymbol
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
-  | PScall   of plvalue option * pgamepath * (pexpr list) located
+  | PScall   of plvalue option * pgamepath * (pexpr list * pexpr option)
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
   | PSmatch  of pexpr * psmatch

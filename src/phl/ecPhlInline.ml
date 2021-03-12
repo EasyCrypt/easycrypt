@@ -51,7 +51,8 @@ module LowSubst = struct
     match i.i_node with
     | Sasgn  (lv, e)     -> i_asgn   (lvsubst m lv, esubst e)
     | Srnd   (lv, e)     -> i_rnd    (lvsubst m lv, esubst e)
-    | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst m), f, List.map esubst es)
+    | Scall  (lv, f, es, qe) ->
+      i_call (lv |> omap (lvsubst m), f, List.map esubst es, omap esubst qe)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Smatch (e, bs)     -> i_match  (esubst e, List.Smart.map (snd_map ssubst) bs)
@@ -71,7 +72,7 @@ module LowInternal = struct
     let hyps = FApi.tc1_hyps tc in
     let env  = LDecl.toenv hyps in
 
-    let inline1 me lv p args =
+    let inline1 me lv p args qarg =
       let p = EcEnv.NormMp.norm_xfun env p in
       let f = EcEnv.Fun.by_xpath p env in
       let fdef =
@@ -113,12 +114,23 @@ module LowInternal = struct
 
       let body = LowSubst.ssubst subst fdef.f_body in
 
+      let ret = omap (LowSubst.esubst subst) fdef.f_ret in
+      let me, ret, qprelude =
+        match ret, qarg with
+        | None, _ | _, None -> me, ret, []
+        | Some r, Some qe ->
+          let dom, codom = EcEnv.Ty.destr_quantum f.f_sig.fs_ret env in
+          let me, qv =
+            EcMemory.bind_fresh {v_name = "qarg"; v_type = dom } me in
+          let pv = pv_loc qv.v_name in
+          me, Some (e_app r [e_var pv dom] codom),
+          [i_asgn (LvVar(pv, dom), qe)] in
+
       let me, resasgn =
-        match fdef.f_ret, lv with
+        match ret, lv with
         | None, _ -> me , []
         | Some _, None -> me, []
         | Some r, Some (LvTuple lvs) when not use_tuple ->
-          let r = LowSubst.esubst subst r in
           let vlvs =
             List.map (fun (x,ty) -> {v_name = symbol_of_pv x; v_type = ty}) lvs in
           let me, auxs = EcMemory.bindall_fresh vlvs me in
@@ -131,15 +143,14 @@ module LowInternal = struct
           me, s1 @ s2
 
         | Some r, Some lv ->
-          let r = LowSubst.esubst subst r in
           me, [i_asgn (lv, r)] in
 
-      me, prelude @ body.s_node @ resasgn in
+      me, qprelude @ prelude @ body.s_node @ resasgn in
 
     let rec inline_i me ip i =
       match ip, i.i_node with
-      | IPpat, Scall (lv, p, args) ->
-          inline1 me lv p args
+      | IPpat, Scall (lv, p, args, qarg) ->
+          inline1 me lv p args qarg
       | IPif (sp1, sp2), Sif (e, s1, s2) ->
           let me, s1 = inline_s me sp1 s1.s_node in
           let me, s2 = inline_s me sp2 s2.s_node in
@@ -237,7 +248,7 @@ module HiInternal = struct
 
     let rec aux_i i =
       match i.i_node with
-      | Scall (_, f, _) ->
+      | Scall (_, f, _, _) ->
           if test f then Some IPpat else None
 
       | Sif (_, s1, s2) ->
@@ -275,7 +286,7 @@ module HiInternal = struct
 
     let rec aux_i occ i =
       match i.i_node with
-      | Scall (_,f,_) ->
+      | Scall (_,f,_,_) ->
         if cond f then
           let occ = 1 + occ in
           if Sint.mem occ !occs then begin

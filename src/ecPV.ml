@@ -123,7 +123,8 @@ module Mpv = struct
     match i.i_node with
     | Sasgn  (lv, e)     -> i_asgn   (lv, esubst e)
     | Srnd   (lv, e)     -> i_rnd    (lv, esubst e)
-    | Scall  (lv, f, es) -> i_call   (lv, f, List.map esubst es)
+    | Scall  (lv, f, es, qe) ->
+      i_call   (lv, f, List.map esubst es, omap esubst qe)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Smatch (e, b)      -> i_match  (esubst e, List.Smart.map (snd_map ssubst) b)
@@ -483,7 +484,7 @@ and i_write_r ?(except=Sx.empty) env w i =
   | Srnd   (lp, _) -> lp_write_r env w lp
   | Sassert _      -> w
 
-  | Scall(lp,f,_) ->
+  | Scall(lp,f,_,_) ->
     if Sx.mem f except then w else
       let w  = match lp with None -> w | Some lp -> lp_write_r env w lp in
       f_write_r ~except env w f
@@ -542,8 +543,9 @@ and i_read_r env r i =
   | Srnd    (_lp, e) -> e_read_r env r e
   | Sassert e       -> e_read_r env r e
 
-  | Scall (_lp, f, es) ->
+  | Scall (_lp, f, es, qe) ->
       let r = List.fold_left (e_read_r env) r es in
+      let r = ofold ((^~)(e_read_r env)) r qe in
       f_read_r env r f
 
   | Sif (e, s1, s2) ->
@@ -983,7 +985,7 @@ and i_eqobs_in_refl env i eqo =
   | Srnd(lv,e) ->
     add_eqs_refl env (remove_refl env lv eqo) e
 
-  | Scall(lv,f,args) ->
+  | Scall(lv,f,args, qarg) ->
     let eqo  =
       match lv with
       | None -> eqo
@@ -992,6 +994,7 @@ and i_eqobs_in_refl env i eqo =
     let leqo = PV.local  eqo in
     let geqi = eqobs_inF_refl env f geqo in
     let eqi  = List.fold_left (add_eqs_refl env) (PV.union leqo geqi) args in
+    let eqi  = ofold ((^~)(add_eqs_refl env)) eqi qarg in
     eqi
 
   | Sif(e,st,sf) ->

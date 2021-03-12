@@ -67,6 +67,8 @@ val pp_tyunivar : PPEnv.t -> EcUid.uid pp
 val pp_path     : path pp
 
 (* -------------------------------------------------------------------- *)
+val string_of_quantum : quantum -> string
+(* -------------------------------------------------------------------- *)
 val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
 val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
 val pp_added_op    : PPEnv.t -> operator pp

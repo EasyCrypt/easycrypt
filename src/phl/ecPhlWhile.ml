@@ -41,8 +41,9 @@ let while_info env e s =
         let r = e_read_r env r e in
         List.fold_left (fun st (_, b) -> s_info st b) (w, r, c) bs
 
-    | Scall (lp, f, es) ->
+    | Scall (lp, f, es, qe) ->
         let r = List.fold_left (e_read_r env) r es in
+        let r = ofold ((^~)(e_read_r env)) r qe in
         let w = match lp with None -> w | Some lp -> lp_write_r env w lp in
         let f = EcEnv.NormMp.norm_xfun env f in
         (w, r, Sx.add f c)

@@ -1565,6 +1565,18 @@ module Ty = struct
     | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
     | _ -> ty
 
+  let destr_fun (ty : ty) (env : env) : ty option * ty =
+    let ty = hnorm ty env in
+    match ty.ty_node with
+    | Tfun (ty1, ty2) -> Some ty1, ty2
+    | _               -> None, ty
+
+  let destr_quantum (ty : ty) (env : env) : ty * ty =
+    let ty = hnorm ty env in
+    match ty.ty_node with
+    | Tfun (ty1, ty2) -> ty1, ty2
+    | _               -> assert false
+
   let rec decompose_fun (ty : ty) (env : env) : dom * ty =
     match (hnorm ty env).ty_node with
     | Tfun (ty1, ty2) ->
@@ -2415,7 +2427,7 @@ module NormMp = struct
           Sm.add (EcPath.mident m) sm
         ) use.us_gl Sm.empty in
       let ur_mpaths = { ur_pos = Some sm;
-                      ur_neg = Sm.empty; } in
+                        ur_neg = Sm.empty; } in
 
       { mr_xpaths = ur_xpaths;
         mr_mpaths = ur_mpaths;
@@ -2431,14 +2443,31 @@ module NormMp = struct
     ur_equal use_equal us1 us2
     && Msym.equal (PreOI.equal f_equiv) r1.mr_oinfos r2.mr_oinfos
 
+  (* FIXME : quantum this is correct ? *)
+  let is_quantum_me env me mis_restr =
+    match me.me_body with
+    | EcModules.ME_Decl mt -> mt.mt_quantum
+    | _ ->
+      let mpaths = mis_restr.mr_mpaths in
+      match mpaths.ur_pos with
+      | Some use ->
+        let is_quantum mp =
+          match (Mod.by_mpath mp env).me_body with
+          | EcModules.ME_Decl mt -> mt.mt_quantum = `Quantum
+          | _ -> assert false in
+        if Sm.exists is_quantum use then `Quantum
+        else `Classical
+      | None -> `Classical
+
 
   let sig_of_mp env mp =
     let mp = norm_mpath env mp in
     let me = Mod.by_mpath mp env in
-
-    { mis_params = me.me_params;
+    let mis_restr = get_restr_me env me mp in
+    { mis_quantum = is_quantum_me env me mis_restr;
+      mis_params = me.me_params;
       mis_body = me.me_sig_body;
-      mis_restr = get_restr_me env me mp }
+      mis_restr; }
 
   let norm_pvar env pv =
     match pv with
@@ -2693,7 +2722,8 @@ module ModTy = struct
     let restr = { mt.mt_restr with
                   mr_oinfos = Msym.map do1 mt.mt_restr.mr_oinfos } in
 
-    { mis_params = params;
+    { mis_quantum = mt.mt_quantum;
+      mis_params = params;
       mis_body   = items;
       mis_restr  = restr; }
 end

@@ -341,11 +341,11 @@ let t_eager_fun_abs_r eqI h tc =
 
 (* -------------------------------------------------------------------- *)
 let t_eager_call_r fpre fpost tc =
-  let env, hyps, _ = FApi.tc1_eflat tc in
+  let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
 
-  let (lvl, fl, argsl), sl = pf_last_call  !!tc es.es_sl in
-  let (lvr, fr, argsr), sr = pf_first_call !!tc es.es_sr in
+  let (lvl, fl, argsl, qargl), sl = pf_last_call  !!tc es.es_sl in
+  let (lvr, fr, argsr, qargr), sr = pf_first_call !!tc es.es_sr in
 
   let swl = s_write env sl in
   let swr = s_write env sr in
@@ -367,9 +367,9 @@ let t_eager_call_r fpre fpost tc =
   let mr = EcMemory.memory es.es_mr in
   let modil = PV.union (f_write env fl) swl in
   let modir = PV.union (f_write env fr) swr in
-  let post  = EcPhlCall.wp2_call env fpre fpost (lvl, fl, argsl) modil
-
-     (lvr,fr,argsr) modir ml mr es.es_po hyps in
+  let post  =
+    EcPhlCall.wp2_call env fpre fpost (lvl, fl, argsl, qargl) modil
+     (lvr,fr,argsr, qargr) modir ml mr es.es_po in
   let f_concl = f_eagerF fpre sl fl fr sr fpost in
   let concl   = f_equivS_r { es with es_sl = stmt []; es_sr = stmt []; es_po = post; } in
 
@@ -467,8 +467,9 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         let eqi = Mpv2.union eqIs eqnm in
         (fhyps, Mpv2.add_eqs env el er (remove lvl lvr eqi) )
 
-    | Scall (lvl, fl, argsl), Scall (lvr, fr, argsr)
-        when List.length argsl = List.length argsr
+    | Scall (lvl, fl, argsl, qargl), Scall (lvr, fr, argsr, qargr)
+        when List.length argsl = List.length argsr &&
+             is_none qargl = is_none qargr
       ->
         check_args argsl;
         let eqo  = oremove lvl lvr eqo in
@@ -483,6 +484,11 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
             (fun eqs e1 e2 -> Mpv2.add_eqs env e1 e2 eqs)
             (Mpv2.union eqnm inf) argsl argsr
         in
+        let eqi =
+          List.fold_left2
+            (fun eqs e1 e2 -> Mpv2.add_eqs env e1 e2 eqs)
+            eqi (otolist qargl) (otolist qargr) in
+
           (fhyps, eqi)
 
     | Sif (el, stl, sfl), Sif (er, str, sfr) ->
@@ -650,8 +656,8 @@ let process_call info tc =
         let env, hyps, _ = FApi.tc1_eflat tc in
         let es  = tc1_as_equivS tc in
 
-        let (_,fl,_), sl = tc1_last_call  tc es.es_sl in
-        let (_,fr,_), sr = tc1_first_call tc es.es_sr in
+        let (_,fl,_,_), sl = tc1_last_call  tc es.es_sl in
+        let (_,fr,_,_), sr = tc1_first_call tc es.es_sr in
 
         check_only_global !!tc env sl;
         check_only_global !!tc env sr;

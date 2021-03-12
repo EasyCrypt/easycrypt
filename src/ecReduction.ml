@@ -202,10 +202,11 @@ module EqTest = struct
            for_lv env ~norm lv1 lv2
         && for_expr env alpha ~norm e1 e2
 
-    | Scall (lv1, f1, e1), Scall (lv2, f2, e2) ->
+    | Scall (lv1, f1, e1, qe1), Scall (lv2, f2, e2, qe2) ->
         oall2 (for_lv env ~norm) lv1 lv2
           && for_xp env ~norm f1 f2
           && List.all2 (for_expr env alpha ~norm) e1 e2
+          && oeq (for_expr env alpha ~norm) qe1 qe2
 
     | Sif (a1, b1, c1), Sif(a2, b2, c2) ->
         for_expr env alpha ~norm a1 a2

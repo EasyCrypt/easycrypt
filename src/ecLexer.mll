@@ -52,6 +52,7 @@
     "for"         , FOR        ;        (* KW: prog *)
     "var"         , VAR        ;        (* KW: prog *)
     "proc"        , PROC       ;        (* KW: prog *)
+    "quantum"     , QUANTUM    ;        (* KW: prog *)
     "if"          , IF         ;        (* KW: prog *)
     "is"          , IS         ;        (* KW: prog *)
     "match"       , MATCH      ;        (* KW: prog *)

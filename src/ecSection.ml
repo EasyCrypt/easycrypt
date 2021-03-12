@@ -123,10 +123,11 @@ let rec on_mpath_instr cb (i : instr)=
   | Sassert e ->
       on_mpath_expr cb e
 
-  | Scall (lv, f, args) ->
+  | Scall (lv, f, args, qarg) ->
       lv |> oiter (on_mpath_lv cb);
       cb f.x_top;
-      List.iter (on_mpath_expr cb) args
+      List.iter (on_mpath_expr cb) args;
+      oiter (on_mpath_expr cb) qarg
 
   | Sif (e, s1, s2) ->
       on_mpath_expr cb e;

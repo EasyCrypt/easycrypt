@@ -1453,6 +1453,9 @@ let destr_op_app f =
 let destr_tuple = function
   { f_node = Ftuple fs } -> fs | _ -> destr_error "tuple"
 
+let decompose_tuple = function
+  { f_node = Ftuple fs } -> fs | f -> [f]
+
 let destr_local = function
   { f_node = Flocal id } -> id | _ -> destr_error "local"
 
@@ -2118,11 +2121,12 @@ module Fsubst = struct
   and subst_mty ~tx s mty =
     let sm = s.fs_sty.ts_mp in
 
+    let mt_quantum = mty.mt_quantum in
     let mt_params = List.map (snd_map (subst_mty ~tx s)) mty.mt_params in
     let mt_name   = s.fs_sty.ts_p mty.mt_name in
     let mt_args   = List.map sm mty.mt_args in
     let mt_restr  = mr_subst ~tx s mty.mt_restr in
-    { mt_params; mt_name; mt_args; mt_restr; }
+    { mt_quantum; mt_params; mt_name; mt_args; mt_restr; }
 
   and subst_gty ~tx s gty =
     if is_subst_id s then gty else

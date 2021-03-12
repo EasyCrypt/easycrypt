@@ -33,7 +33,7 @@ and ll_strategy_of_instr (env : EcEnv.env) (i : instr) =
   | Sasgn _ -> LL_WP
   | Srnd  _ -> LL_RND
 
-  | Scall (_, p, _) ->
+  | Scall (_, p, _, _) ->
       let p    = EcEnv.NormMp.norm_xfun env p in
       let proc = EcEnv.Fun.by_xpath p env in
       let defn = match proc.f_def with FBdef _ -> true | _ -> false in
