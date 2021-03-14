@@ -1,0 +1,100 @@
+require import AllCore List Distr DBool CHoareTactic.
+(*   *) import StdOrder RField RealOrder StdBigop Bigreal.
+
+type from.
+type hash.
+
+(* Remark : this implies that hash is a finite type *)
+op [lossless uniform full] dhash : hash distr.
+
+clone import MUniFinFun as MUFF with
+  type t <- from.   (* This assume that the type of from is finite *)
+
+(* Uniform distribution over from -> hash *)
+op dfhash : (from -> hash) distr = dfun (fun _ => dhash).
+
+lemma dfhash_ll: is_lossless dfhash.
+proof. apply dfun_ll => ?;apply dhash_ll. qed.
+
+lemma dfhash_uni: is_uniform dfhash.
+proof. apply dfun_uni => ?; apply dhash_uni. qed.
+
+lemma dfhash_fu: is_full dfhash.
+proof. apply dfun_fu => ?; apply dhash_fu. qed.
+
+hint solve 0 random : dfhash_ll dfhash_uni dfhash_fu.
+
+module type QRO_i = {
+  proc init () : unit
+  quantum proc h() : from -> hash    
+}.
+
+module type QRO = {
+  include QRO_i [h]
+}.
+
+module QRO : QRO_i = {
+  var  h : from -> hash
+
+  proc init() = { h <$ dfhash; }
+
+  quantum proc h () = { return h; }
+
+}.
+
+(* -------------------------------------------------------------------------- *)
+(* Biased distribution over boolean return true with probability p *)   
+clone MUniFinFunBiased as DBB with 
+  type t <- from,
+  op MUniFinFun.FinT.enum <-  MUFF.FinT.enum
+  proof *.
+realize MUniFinFun.FinT.enum_spec by apply MUFF.FinT.enum_spec.
+
+(* -------------------------------------------------------------------------- *)
+(* Semi Constant Definition Property *)
+abstract theory SemiConstDistr.
+
+type result.
+
+quantum module type AdvSCD (H:QRO) = {
+  proc main() : result
+}.
+ 
+module SCD (A:AdvSCD) = {
+  var bf : from -> bool
+
+  proc main1(p:real) = {
+    var r, y;
+    bf <$ DBB.dbfun p;
+    QRO.init();
+    y  <$ dhash; 
+    r  <@ A(QRO).main();
+    return (r,bf);
+  }
+
+  proc main2(p:real) = {
+    var r, y;
+    bf <$ DBB.dbfun p;
+    QRO.init();
+    y  <$ dhash; 
+    QRO.h <- fun m => if bf m then y else QRO.h m;
+    r  <@ A(QRO).main();
+    return (r, bf);
+  }
+}.
+
+(* Remark the event depend of result return by the adversary but also
+   of the function bf indicating if the h return y or a random value.
+   It would be interesting to known if we can add y in the event
+ *)
+
+type event = result * (from -> bool) -> bool.  
+
+axiom advantage q lam (A<:AdvSCD{-SCD}[main : `{Inf, #H.h : q}]) &m (P:event):
+  0%r <= lam <= 1%r =>
+  `| Pr[SCD(A).main1(lam) @ &m : P res] - Pr[SCD(A).main2(lam) @ &m: P res] | 
+   <= 8%r/3%r * q%r^4 * lam^2.
+
+end SemiConstDistr.
+
+

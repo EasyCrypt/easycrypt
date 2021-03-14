@@ -1,0 +1,53 @@
+require import AllCore List.
+
+(* --------------------------------------------------------------------------- *)
+
+type msg.
+type sign.
+
+type pkey.
+type skey.
+
+module type Sign = {
+  proc kg() : pkey * skey
+  proc sign(sk:skey, m:msg) : sign
+  proc verify(pk:pkey, m:msg, s:sign) : bool
+}.
+
+module type OrclSign = {
+  proc sign (m:msg) : sign
+}.
+
+module type OrclSign_f = {
+  proc init() : pkey
+  proc sign (m:msg)  : sign
+}.
+
+quantum module type AdvEUF (O:OrclSign) = {
+  proc main(pk:pkey) : msg * sign
+}.
+
+module EUF(A:AdvEUF) (O:Sign) = {
+  var pk : pkey
+  var sk : skey
+  var log : msg list
+  var m   : msg
+  module Os = {
+    proc sign(m:msg) = {
+      var s;
+      s   <@ O.sign(sk, m);
+      log <- m :: log;
+      return s;
+    }
+  }
+  proc main() = {
+    var s, b;
+    (pk, sk) <@ O.kg();
+    log <- [];
+    (m,s) <@ A(Os).main(pk);
+    b <@ O.verify(pk, m, s);
+    return b /\ !m \in log;
+  }
+}.
+
+

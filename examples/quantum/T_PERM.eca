@@ -1,0 +1,60 @@
+require import AllCore Distr.
+
+type pkey.
+type skey.
+
+type dom. 
+type codom. 
+
+op kg : (pkey * skey) distr.
+
+abstract theory PERM.
+
+  op f : pkey -> dom -> codom.
+  op finv: skey -> codom -> dom.
+
+  axiom finv_f ks s : ks \in kg => finv ks.`2 (f ks.`1 s) = s.
+  axiom f_finv ks h : ks \in kg => f ks.`1 (finv ks.`2 h) = h.
+
+end PERM.
+
+clone include PERM.
+
+quantum module type AdvOW = {
+  proc main(pk:pkey, y:codom) : dom
+}.
+
+abstract theory T_OW.
+
+op dcodom : codom distr.
+
+module OW(A:AdvOW) = {
+  proc main() = {
+    var pk, sk, y, x;
+    (pk, sk) <$ kg;
+    y <$ dcodom;
+    x <@ A.main(pk, y);
+    return (finv sk y) = x;
+  }
+}.
+
+end T_OW.
+
+quantum module type AdvClawFree = {
+  proc main (pk:pkey) : dom * dom
+}.
+
+abstract theory T_ClawFree.
+
+clone PERM as P2.
+
+module ClawFree(A:AdvClawFree) = {
+  proc main () = {
+    var pk, sk, s1, s2;
+    (pk, sk) <$ kg;
+    (s1, s2) <@ A.main(pk);
+    return f pk s1 = P2.f pk s2;
+  }
+}.
+
+end T_ClawFree.
