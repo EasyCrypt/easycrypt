@@ -117,7 +117,7 @@ let t_equiv_app (i, j) phi tc =
   let sr1,sr2 = s_split j es.es_sr in
   let a = f_equivS_r {es with es_sl=stmt sl1; es_sr=stmt sr1; es_po=phi} in
   let b = f_equivS_r {es with es_pr=phi; es_sl=stmt sl2; es_sr=stmt sr2} in
-
+  EcQuantum.check_wf_quantum (FApi.tc1_env tc) es.es_po;
   FApi.xmutate1 tc `HlApp [a; b]
 
 let t_equiv_app_onesided side i pre post tc =

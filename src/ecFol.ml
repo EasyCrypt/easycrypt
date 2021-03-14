@@ -841,8 +841,8 @@ let rec sform_of_form fp =
   | Fquant (q, [b]  , f) -> SFquant (q, b, lazy f)
   | Fquant (q, b::bs, f) -> SFquant (q, b, lazy (f_quant q bs f))
 
-  | FhoareF  hf -> SFhoareF  hf
-  | FhoareS  hs -> SFhoareS  hs
+  | FhoareF   hf -> SFhoareF  hf
+  | FhoareS   hs -> SFhoareS  hs
   | FcHoareF  hf -> SFcHoareF  hf
   | FcHoareS  hs -> SFcHoareS  hs
   | FbdHoareF hf -> SFbdHoareF hf

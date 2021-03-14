@@ -370,6 +370,7 @@ let t_equiv_while_r inv tc =
   let er = form_of_expr mr er in
   let sync_cond = f_iff_simpl el er in
 
+  EcQuantum.check_wf_quantum env inv;
   (* 1. The body preserves the invariant *)
   let b_pre  = f_ands_simpl [inv; el] er in
   let b_post = f_and_simpl inv sync_cond in

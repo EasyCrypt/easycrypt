@@ -39,6 +39,8 @@ let t_bdhoare_case_r f tc =
 (* --------------------------------------------------------------------- *)
 let t_equiv_case_r f tc =
   let es = tc1_as_equivS tc in
+  (* FIXME quantum: is it needed ? *)
+  EcQuantum.check_classical (FApi.tc1_env tc) f;
   let concl1 = f_equivS_r { es with es_pr = f_and es.es_pr f } in
   let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]

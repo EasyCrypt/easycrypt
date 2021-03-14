@@ -2469,6 +2469,12 @@ module NormMp = struct
       mis_body = me.me_sig_body;
       mis_restr; }
 
+  let use_quantum env mp =
+    let mp = norm_mpath env mp in
+    let me = Mod.by_mpath mp env in
+    let mis_restr = get_restr_me env me mp in
+    is_quantum_me env me mis_restr = `Quantum
+
   let norm_pvar env pv =
     match pv with
     | PVloc _ -> pv

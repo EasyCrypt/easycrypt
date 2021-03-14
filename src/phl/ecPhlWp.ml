@@ -159,6 +159,7 @@ module TacInternal = struct
     let meml, s_wpl = es.es_ml, EcModules.stmt s_wpl in
     let memr, s_wpr = es.es_mr, EcModules.stmt s_wpr in
     let post = es.es_po in
+    EcQuantum.check_wf_quantum env post;
     let s_wpl, post, _ = wp ~uselet env meml s_wpl post in
     let s_wpr, post, _ = wp ~uselet env memr s_wpr post in
     check_wp_progress tc i es.es_sl s_wpl;
