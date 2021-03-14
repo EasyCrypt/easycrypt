@@ -1512,7 +1512,7 @@ module Mod = struct
     let name  = EcIdent.create (unloc m.ptmd_name) in
     let tysig = fst (TT.transmodtype scope.sc_env modty.pmty_pq) in
     (* We modify tysig restrictions according if necessary. *)
-    let tysig = trans_restr_for_modty scope.sc_env tysig modty.pmty_mem in
+    let tysig = trans_restr_for_modty scope.sc_env (loc m.ptmd_name) tysig modty.pmty_mem in
 
     { scope with
       sc_env = EcEnv.Mod.declare_local name tysig scope.sc_env;

@@ -87,6 +87,7 @@ type tymod_cnv_failure =
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
 | E_TyModCnv_SubTypeArg        of
     EcIdent.t * module_type * module_type * tymod_cnv_failure
+| E_TyModCnv_Quantum  of quantum * quantum (* expected, got *)
 
 type modapp_error =
 | MAE_WrongArgCount       of int * int  (* expected, got *)
@@ -188,6 +189,7 @@ type tyerror =
 | LvMapOnNonAssign
 | QuantumProcType        of symbol * ty
 | QuantumProcFinite      of symbol * ty
+| ModTypeQuantumRestr    of mpath list
 
 (* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -845,6 +847,21 @@ let rec check_sig_cnv
    * different, hence, substitute in [tin.tym_params] types the names
    * of [tout.tym_params] *)
 
+  (* check quantum info *)
+  begin
+    let t =
+      match mode with
+      | `Eq -> sin.mis_quantum = sout.mis_quantum
+      | `Sub ->
+        match sin.mis_quantum, sout.mis_quantum with
+        | _, `Quantum -> true
+        | `Classical, _ -> true
+        | `Quantum, `Classical -> false in
+
+    if not t then
+        tymod_cnv_failure (E_TyModCnv_Quantum(sout.mis_quantum, sin.mis_quantum))
+  end;
+
   if List.length sin.mis_params <> List.length sout.mis_params then
     tymod_cnv_failure E_TyModCnv_ParamCountMismatch;
 
@@ -1048,6 +1065,22 @@ let check_modtype env mp mt i =
     check_sig_mt_cnv ~proof_obl:true env sym mt i;
     let obl = restr_proof_obligation env mp sym i in
     `ProofObligation obl
+
+let check_quantum_modtype_restr env loc (mt:module_type) =
+  if mt.mt_quantum = `Quantum then
+    let use = NormMp.restr_use env mt.mt_restr in
+    let is_quantum id =
+      let me = EcEnv.Mod.by_mpath (EcPath.mident id) env in
+      match me.me_body with
+      | ME_Decl mt -> mt.mt_quantum = `Quantum
+      | _ -> false in
+    let quantums = Sid.filter is_quantum use.ur_neg.us_gl in
+    if not (Sid.is_empty quantums) then
+      tyerror loc env
+        (ModTypeQuantumRestr (List.map EcPath.mident (Sid.elements quantums)))
+
+
+
 
 (* -------------------------------------------------------------------- *)
 let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
@@ -1842,7 +1875,7 @@ let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
     mt_args    = List.map (EcPath.mident -| fst) sig_.mis_params;
     mt_restr   = sig_.mis_restr;
   } in
-    (modty, sig_)
+  (modty, sig_)
 
 let transcall transexp env ue loc fsig (args, qarg) =
 
@@ -2310,7 +2343,7 @@ and transmod_restr env env_in (params : Sm.t) (mr : pmod_restr) =
 (* -------------------------------------------------------------------- *)
 (* Return the module type updated with some restriction.
  * Remark: the module type has not been entered. *)
-and trans_restr_for_modty env modty (pmr : pmod_restr option) =
+and trans_restr_for_modty env loc modty (pmr : pmod_restr option) =
   let mr = modty.mt_restr in
 
   let mr' = match pmr with
@@ -2330,7 +2363,9 @@ and trans_restr_for_modty env modty (pmr : pmod_restr option) =
      is provided. *)
   let new_mr = replace_if_provided env mr mr' pmr in
 
-  { modty with mt_restr = new_mr }
+  let modty = { modty with mt_restr = new_mr } in
+  check_quantum_modtype_restr env loc modty;
+  modty
 
 (* -------------------------------------------------------------------- *)
 and transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
@@ -3042,8 +3077,9 @@ and trans_gbinding env ue decl =
         (env, xs)
 
       | PGTY_ModTy { pmty_pq = mi; pmty_mem = restr } ->
+        let lmi = loc mi in
         let mi = fst (transmodtype env mi) in
-        let mi = trans_restr_for_modty env mi restr in
+        let mi = trans_restr_for_modty env lmi mi restr in
 
         let ty = GTmodty mi in
 

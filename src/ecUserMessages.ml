@@ -235,6 +235,10 @@ end = struct
         (EcPrinting.pp_modtype ppe) t2
         (pp_cnv_failure env) err
 
+    | E_TyModCnv_Quantum (qe, qas) ->
+      msg "expected %s module got %s module"
+        (EcPrinting.string_of_quantum qe) (EcPrinting.string_of_quantum qas)
+
   let pp_modappl_error env fmt error =
     let msg x = Format.fprintf fmt x in
 
@@ -583,6 +587,10 @@ end = struct
     | QuantumProcFinite(name, ty) ->
       msg "in declaration of %s: %a should be finite"
         name pp_type ty
+
+    | ModTypeQuantumRestr mps ->
+      msg "quantum module type cannot have negative restrictions over quantum modules: %a"
+      (EcPrinting.pp_list " " (EcPrinting.pp_topmod env)) mps
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

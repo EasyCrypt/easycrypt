@@ -77,6 +77,7 @@ type tymod_cnv_failure =
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
 | E_TyModCnv_SubTypeArg        of
     EcIdent.t * module_type * module_type * tymod_cnv_failure
+| E_TyModCnv_Quantum  of quantum * quantum (* expected, got *)
 
 type modapp_error =
 | MAE_WrongArgCount      of int * int  (* expected, got *)
@@ -178,6 +179,7 @@ type tyerror =
 | LvMapOnNonAssign
 | QuantumProcType        of symbol * ty
 | QuantumProcFinite      of symbol * ty
+| ModTypeQuantumRestr of EcPath.mpath list
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
@@ -259,7 +261,7 @@ val trans_memtype :
 
 (* -------------------------------------------------------------------- *)
 val trans_restr_for_modty :
-  env -> module_type -> pmod_restr option -> module_type
+  env -> EcLocation.t -> module_type -> pmod_restr option -> module_type
 
 (* -------------------------------------------------------------------- *)
 val transmodsig  : env -> symbol -> pmodule_sig  -> module_sig
