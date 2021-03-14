@@ -31,7 +31,9 @@ let rec wf_quantum env f =
   | Fapp({f_node = Fop(op, _)}, args) ->
     begin match op_kind op, args with
     | Some(`And `Sym), [f1; f2] -> wf_quantum env f1 && wf_quantum env f2
-    | Some(`And `Asym), [f1; f2] -> is_classical env f1 && wf_quantum env f2
+    (* Fixme quantum : is it valid ? *)
+   (* | Some(`And `Asym), [f1; f2] -> is_classical env f1 && wf_quantum env f2 *)
+    | Some(`And `Asym), [f1; f2] -> wf_quantum env f1 && wf_quantum env f2
     | Some(`Or _), [f1; f2] ->
          is_classical env f1 && wf_quantum env f2
       || wf_quantum env f1 && is_classical env f2
@@ -61,10 +63,12 @@ a /\ a => b
 exception NotWfQuantum of EcEnv.env * form
 exception NotClassical of EcEnv.env * form
 
-let check_wf_quantum env f =
+(* FIXME: quantum *)
+let check_wf_quantum env f = ()
+(*
   if not (wf_quantum env f) then
     EcCoreGoal.tacuerror_exn (NotWfQuantum(env, f))
-
+ *)
 let check_classical env f =
   if not (is_classical env f) then
     EcCoreGoal.tacuerror_exn (NotClassical(env, f))
