@@ -440,7 +440,7 @@ type event = result * (msg -> bool) -> bool.
 
 op factor = 8%r/3%r * q%r^4 * p^2.
 
-axiom advantage (A<:AdvRNDIF{RndIf}) &m dfh0 (P:event):
+axiom advantage (A<:AdvRNDIF{-RndIf}) &m dfh0 (P:event):
   is_lossless dfh0 =>
   is_uniform dfh0  => 
   is_full    dfh0  =>
@@ -470,8 +470,8 @@ module B(A:AdvEFH) = {
 
 section.
 
-declare module A : AdvEFH { RH, EF, Log, Hash, B}.
-axiom A_ll (H <: Hash{A}) (O <: OrclSign{A}) : 
+declare module A : AdvEFH { -RH, -EF, -Log, -Hash, -B}.
+axiom A_ll (H <: Hash{-A}) (O <: OrclSign{-A}) : 
  islossless O.sign => islossless H.h => islossless A(H, O).main.
 
 local module G1 = {
@@ -722,8 +722,8 @@ module BCF (A:AdvEFH) = {
 
 section.
 
-declare module A : AdvEFH { RH, EF, Log, Hash, BCF}.
-axiom A_ll (H <: Hash{A}) (O <: OrclSign{A}) : 
+declare module A : AdvEFH { -RH, -EF, -Log, -Hash, -BCF}.
+axiom A_ll (H <: Hash{-A}) (O <: OrclSign{-A}) : 
  islossless O.sign => islossless H.h => islossless A(H, O).main.
 
 local module G1 = {
