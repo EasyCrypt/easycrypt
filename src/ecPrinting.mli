@@ -53,10 +53,11 @@ val pp_local   : ?fv:Sid.t -> PPEnv.t -> ident pp
 val pp_opname  : PPEnv.t -> path pp
 val pp_funname : PPEnv.t -> xpath pp
 val pp_topmod  : PPEnv.t -> mpath pp
+val pp_expr    : PPEnv.t -> expr pp
 val pp_form    : PPEnv.t -> form pp
 val pp_type    : PPEnv.t -> ty pp
 val pp_tyname  : PPEnv.t -> path pp
-val pp_axname : PPEnv.t -> path pp
+val pp_axname  : PPEnv.t -> path pp
 
 val pp_mem      : PPEnv.t -> EcIdent.t pp
 val pp_tyvar    : PPEnv.t -> ident pp

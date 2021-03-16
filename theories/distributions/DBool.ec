@@ -38,7 +38,7 @@ op clamp (p : real) = maxr 0%r (minr 1%r p).
 lemma clamp_ge0 p : 0%r <= clamp p by move=> /#.
 lemma clamp_le1 p : clamp p <= 1%r by move=> /#.
 
-lemma clamp_id (p : real) : 0%r < p < 1%r => clamp p = p.
+lemma clamp_id (p : real) : 0%r <= p <= 1%r => clamp p = p.
 proof. by move=> /#. qed.
 
 op mbiased (p : real) =
@@ -99,13 +99,13 @@ op dbiased = Biased.dbiased p.
 
 lemma dbiased1E (b : bool) :
   mu1 dbiased b = if b then p else 1%r - p.
-proof. by rewrite dbiased1E clamp_id ?in01_p. qed.
+proof. rewrite dbiased1E clamp_id //; smt (in01_p). qed.
 
 lemma dbiasedE (E : bool -> bool) :
   mu dbiased E =
       (if E true  then       p else 0%r)
     + (if E false then 1%r - p else 0%r).
-proof. by rewrite dbiasedE !clamp_id ?in01_p. qed.
+proof. rewrite dbiasedE !clamp_id //;smt(in01_p). qed.
 
 lemma supp_dbiased x : x \in dbiased.
 proof. by apply supp_dbiased;apply in01_p. qed.
@@ -119,3 +119,75 @@ by move=> ?;rewrite /is_full supp_dbiased.
 qed.
 
 end FixedBiased.
+
+(* -------------------------------------------------------------------- *)
+import Biased Bigreal.
+
+abstract theory MUniFinFunBiased.
+type t.
+
+clone import MUniFinFun with type t <- t.
+
+op dbfun c = dfun (fun _ => dbiased c).
+
+lemma dbfunE (c : real) (pT pF : t -> bool) :
+  0%r <= c <= 1%r => (forall x, !(pT x /\ pF x)) =>
+
+  mu (dbfun c) (fun f =>
+         (forall x, pT x =>  f x)
+      /\ (forall x, pF x => !f x)) =
+
+    (      c) ^ (count pT FinT.enum)
+  * (1%r - c) ^ (count pF FinT.enum).
+proof.
+move=> rgc h; pose Q x b := (pT x => b) /\ (pF x => !b).
+rewrite -(mu_eq _ (fun f => forall x, Q x (f x))) /= 1:/#.
+rewrite dfunE (@BRM.bigID _ _ pT) !predTI /=.
+rewrite -(BRM.eq_bigr _ (fun _ => clamp c)).
+- move=> x @/Q /= ^pTx -> /=; rewrite -(mu_eq _ (pred1 true)).
+  - by case=> //=; case: (pF x) (h x). - by rewrite dbiased1E.
+rewrite mulr_const_cond clamp_id //; congr; rewrite (@BRM.bigID _ _ pF).
+rewrite  -(BRM.eq_bigr _ (fun _ => 1%r - clamp c)).
+- move=> x [_] @/Q /= ^pFx -> /=; rewrite -(mu_eq _ (pred1 false)).
+  - by case=> //=; case: (pT x) (h x). - by rewrite dbiased1E.
+rewrite mulr_const_cond clamp_id // -(BRM.eq_bigr _ (fun _ => 1%r)).
+- move=> x /= @/predC [pTNx pFNx]; rewrite -(mu_eq _ predT).
+  - by move=> b @/predT @/Q; rewrite pTNx pFNx.
+  by rewrite dbiased_ll.
+rewrite mulr_const_cond expr1z mulr1; congr; apply: eq_count.
+by move=> x @/predI @/predC; case: (pT x) (pF x) (h x).
+qed.
+
+lemma dbfunE_mem_uniq (c: real) (lT lF : t list) : 
+  0%r <= c <= 1%r => uniq lT => uniq lF => 
+  (forall x, !(x \in lT /\ x \in lF)) =>
+  mu (dbfun c) (fun f => 
+         (forall x, x \in lT => f x)
+      /\ (forall x, x \in lF => !f x)) =
+    (      c) ^ (size lT)
+  * (1%r - c) ^ (size lF).
+proof.
+move=> hc huT huF hd; have := dbfunE c (mem lT) (mem lF) hc hd.
+by rewrite !FinT.count_mem.
+qed.
+
+lemma dbfunE_mem_le (c: real) (lT lF : t list) : 
+  0%r <= c <= 1%r =>
+  (forall x, !(x \in lT /\ x \in lF)) =>
+  c ^ (size lT) * (1%r - c) ^ (size lF) <= 
+    mu (dbfun c) (fun f => 
+         (forall x, x \in lT => f x)
+      /\ (forall x, x \in lF => !f x)).
+proof.
+move=> [h0c hc1] hl; have /ler_trans:
+  c ^ (size lT) * (1%r - c) ^ (size lF) <=
+    c ^ (size (undup lT)) * (1%r - c) ^ (size (undup lF)).
++ apply/ler_pmul; try by apply expr_ge0=> //#.
+  + by rewrite &(ler_wiexpn2l) 1://# size_undup size_ge0.
+  + by rewrite &(ler_wiexpn2l) 1://# size_undup size_ge0.
+apply; rewrite -(dbfunE_mem_uniq _ (undup _)) // ?undup_uniq.
++ by move=> x; rewrite !mem_undup hl.
++ by apply mu_le => /= f _; smt (mem_undup).
+qed.
+
+end MUniFinFunBiased.

@@ -12,17 +12,9 @@ open EcPath
 open EcTypes
 
 (* -------------------------------------------------------------------- *)
-(* LvMap (op, m, x, ty)
- * - op is the map-set operator
- * - m  is the map to be updated
- * - x  is the index to update
- * - ty is the type of the value [m] *)
-type lvmap = (path * ty list) *  prog_var * expr * ty
-
 type lvalue =
   | LvVar   of (prog_var * ty)
   | LvTuple of (prog_var * ty) list
-  | LvMap   of lvmap
 
 val lv_equal     : lvalue -> lvalue -> bool
 val symbol_of_lv : lvalue -> symbol

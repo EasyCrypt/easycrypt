@@ -1,8 +1,9 @@
 require import AllCore FSet CoreMap SmtMap CyclicGroup List.
-require import Distr DList DJoin DMap Int.
+require import Distr DList DJoin DMap StdOrder.
 require import AEAD.
-require MRPKE.
-require ODH.
+require (*--*) MRPKE.
+require (*--*) ODH.
+(*---*) import IntOrder.
 
 pragma -implicits.
 pragma +oldip.
@@ -74,21 +75,21 @@ theory DHIES.
     proc gen () : (Sk * Pk) = {
       var y, gy;
 
-      y = $FDistr.dt;
-      gy = g ^ y;
+      y  <$ FDistr.dt;
+      gy <- g ^ y;
       return (y,gy);
     }
 
     proc mencrypt (mpk : MPk, tag : Tag, ptxt : PTxt) : MCTxt = {
       var cphList,scph,x,gx,pkl,i;
 
-      x = $FDistr.dt;
-      gx = g ^ x;
-      pkl = map (fun pk => (pk,(gx, hash(pk^x)))) (elems mpk);
-      i <- size pkl-1;
+      x       <$ FDistr.dt;
+      gx      <- g ^ x;
+      pkl     <- map (fun pk => (pk,(gx, hash(pk^x)))) (elems mpk);
+      i       <- size pkl-1;
       cphList <- [];
       while (0 <= i){
-        scph <$ enc (nth witness pkl i).`2.`2 tag ptxt;
+        scph    <$ enc (nth witness pkl i).`2.`2 tag ptxt;
         cphList <- ((nth witness pkl i).`1, ((nth witness pkl i).`2.`1, scph)) :: cphList;
         i <- i-1;
       }
@@ -461,7 +462,7 @@ module Adv1_Procs (ODHOrcl : ODH_OrclT) : MRPKE_OrclT = {
       if (MRPKE_lor.count_gen < q_gen) {
          pk <@ ODH_Orcl.gen();
          if( pk \notin MRPKE_lor.pklist) { 
-               MRPKE_lor.pklist.[pk] = witness;
+               MRPKE_lor.pklist.[pk] <- witness;
          }
          MRPKE_lor.count_gen <- MRPKE_lor.count_gen + 1;
       }
@@ -501,7 +502,7 @@ module Adv1_Procs (ODHOrcl : ODH_OrclT) : MRPKE_OrclT = {
                 key <- oget okey;
            } 
            else { 
-                key = oget skeys.[(pk,ctxt.`1)]; 
+                key <- oget skeys.[(pk,ctxt.`1)]; 
            }
            msg <- dec key tag (snd ctxt);  
        }
@@ -1144,7 +1145,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
            move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap).
           rewrite H2. 
            move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap). 
-       rewrite size_map /range /= size_iota max_ler 1:size_ge0. 
+       rewrite size_map /range /= size_iota ler_maxr 1:size_ge0. 
        apply eq_in_map => y /mem_iota /= [? ?] /=.
        by rewrite (nth_map witness) /= 1:[smt (size_iota)] nth_iota.
      - rewrite H2. 
@@ -1216,9 +1217,10 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     move: H12; pose E:= ((pk, eph) \in _)%SmtMap; case: E => ? ?; last first.
      pose E':= ((pk, eph) \in _)%SmtMap; case: E' => ?; last first. 
       rewrite (H6 pk eph i) //; smt (nth_cat).
-     move: H12 H14; rewrite !mem_ofassoc !unzip1_zip; smt (size_iota size_ge0 size_map).
+     move: H12 H14; rewrite /E /E' !mem_ofassoc !unzip1_zip;
+       smt (size_iota size_ge0 size_map).
     pose E':= ((pk, eph) \in _)%SmtMap; case: E' => ?; last first.
-     move: H12 H14; rewrite !mem_ofassoc !unzip1_zip; smt (size_iota size_ge0 size_map).
+     move: H12 H14; rewrite /E /E' !mem_ofassoc !unzip1_zip; smt (size_iota size_ge0 size_map).
     move: H13; rewrite !ofassoc_get.
     move=> /assoc_some_onth_mem => [[idx]] /onth_zip_some /= [].
     move=> /onth_map_some => [[pk']]; progress.
@@ -1239,8 +1241,8 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
    if=> //; 1: by rewrite /inv /= => /> *; smt (mem_fdom).
     inline *.
     rcondt {2} 6.
-     move=> *; wp; skip; rewrite /inv => /> *;
-     (have: exists i, Adv2_Procs.kindex{hr}.[(pk{hr}, ctxt{hr}.`1)] = Some i by smt (mem_fdom));
+     move=> *; wp; skip; rewrite /inv => /> *.
+     (have: exists i, Adv2_Procs.kindex{hr}.[(pk{m0}, ctxt{m0}.`1)] = Some i by smt (mem_fdom));
      smt ().
     wp; skip; rewrite /inv /=; clear inv; progress;
     (have: exists i, Adv2_Procs.kindex{2}.[(pk{2}, ctxt{2}.`1)] = Some i by smt (mem_fdom)); smt ().

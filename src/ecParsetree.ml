@@ -131,13 +131,13 @@ and pmodule_sig_struct = {
 
 and pmodule_sig_struct_body = pmodule_sig_item list
 
-and include_proc = [
-  | `Include_proc of psymbol list
-  | `Exclude_proc of psymbol list
+and minclude_proc = [
+  | `MInclude of psymbol list
+  | `MExclude of psymbol list
 ]
 
 and pmodule_sig_item = [
-  | `Include      of pmodule_type * include_proc option * pqsymbol list option
+  | `Include      of pmodule_type * minclude_proc option * pqsymbol list option
   | `FunctionDecl of pfunction_decl
 ]
 
@@ -158,7 +158,6 @@ and pfunction_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
-
 and pmodule_def = {
   ptm_header : pmodule_header;
   ptm_body   : pmodule_expr;
@@ -185,8 +184,8 @@ and pstructure_item =
   | Pst_var      of (psymbol list * pty)
   | Pst_fun      of (pfunction_decl * pfunction_body)
   | Pst_alias    of (psymbol * pgamepath)
-  | Pst_maliases of (pmsymbol located * include_proc option)
-
+  | Pst_include  of (pmsymbol located * bool * minclude_proc option)
+  | Pst_import   of (pmsymbol located) list
 
 and pfunction_body = {
   pfb_locals : pfunction_local list;
@@ -232,7 +231,7 @@ type pmemory   = psymbol
 type phoarecmp = EcFol.hoarecmp
 
 type glob_or_var =
-  | GVglob of pmsymbol located
+  | GVglob of pmsymbol located * pqsymbol list
   | GVvar  of pqsymbol
 
 type pformula  = pformula_r located
@@ -712,7 +711,8 @@ type pprover_infos = {
   plem_iterate    : bool option;
   plem_wanted     : pdbhint option;
   plem_unwanted   : pdbhint option;
-  plem_selected   : bool option
+  plem_selected   : bool option;
+  psmt_debug      : bool option;
 }
 
 let empty_pprover = {
@@ -729,6 +729,7 @@ let empty_pprover = {
   plem_wanted     = None;
   plem_unwanted   = None;
   plem_selected   = None;
+  psmt_debug      = None;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1063,6 +1064,7 @@ and pr_override = pr_override_def * [`Alias | `Inline]
 and th_override = pqsymbol
 
 and op_override_def = {
+  opov_nosmt  : bool;
   opov_tyvars : psymbol list option;
   opov_args   : ptybinding list;
   opov_retty  : pty;
@@ -1136,6 +1138,7 @@ type global_action =
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
   | GthClone     of theory_cloning
+  | GModImport   of pmsymbol located list
   | GsctOpen     of osymbol_r
   | GsctClose    of osymbol_r
   | Grealize     of prealize located

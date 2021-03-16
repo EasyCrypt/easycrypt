@@ -19,6 +19,7 @@ open EcModules
 open EcFol
 
 module MMsym = EcSymbols.MMsym
+module Sid   = EcIdent.Sid
 module Mid   = EcIdent.Mid
 
 module EqTest = EcReduction.EqTest
@@ -120,6 +121,7 @@ type tyerror =
 | MemNotAllowed
 | UnknownScope           of qsymbol
 | FilterMatchFailure
+| LvMapOnNonAssign
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -202,14 +204,6 @@ let (_i_inuse, s_inuse, se_inuse) =
         List.fold_left
           (fun map (p, _) -> add_write map p)
           map ps
-
-    | LvMap (_, p, e, _) ->
-      (* Maps are not modified in place but feed to a mutator
-         operator that returns the augmented map and assigning the
-         result to [p]. Hence the [`Read | `Write] flag. *)
-      let map = add_write (add_read map p) p in
-      let map = se_inuse map e in
-        map
 
   and i_inuse (map : uses) (i : instr) =
     match i.i_node with
@@ -1463,12 +1457,14 @@ and transmodsig_body
         Tys_function( fs, {oi with oi_calls = calls} ) in
       match proc with
       | None -> List.map add sig_.mis_body
-      | Some (`Include_proc xs) ->
+
+      | Some (`MInclude xs) ->
         check_xs xs;
         List.pmap
           (fun fs -> if in_xs fs xs then Some (add fs) else None)
           sig_.mis_body
-      | Some (`Exclude_proc xs) ->
+
+      | Some (`MExclude xs) ->
         check_xs xs;
         List.pmap
           (fun fs -> if not (in_xs fs xs) then Some (add fs) else None)
@@ -1481,6 +1477,36 @@ and transmodsig_body
   Msym.odup unloc names |> oiter (fun (_, x) ->
     tyerror (loc x) env (InvalidModSig (MTS_DupProcName (unloc x))));
   items
+(* -------------------------------------------------------------------- *)
+
+(* LvMap (op, x, e, ty)
+ * - op is the map-set operator
+ * - x  is the map to be updated
+ * - e  is the index to update
+ * - ty is the type of the value [x] *)
+
+type lvmap = (path * ty list) *  prog_var * expr * ty
+
+type lVAl =
+  | Lval  of lvalue
+  | LvMap of lvmap
+
+let i_asgn_lv (_loc : EcLocation.t) (_env : EcEnv.env) lv e =
+  match lv with
+  | Lval lv -> i_asgn (lv, e)
+  | LvMap ((op,tys), x, ei, ty) ->
+    let op = e_op op tys (toarrow [ty; ei.e_ty; e.e_ty] ty) in
+    i_asgn (LvVar (x,ty), e_app op [e_var x ty; ei; e] ty)
+
+let i_rnd_lv loc env lv e =
+  match lv with
+  | Lval lv -> i_rnd (lv, e)
+  | LvMap _ -> tyerror loc env LvMapOnNonAssign
+
+let i_call_lv loc env lv f args =
+  match lv with
+  | Lval lv -> i_call (Some lv, f, args)
+  | LvMap _ -> tyerror loc env LvMapOnNonAssign
 
 (* -------------------------------------------------------------------- *)
 let rec transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
@@ -1568,8 +1594,9 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure lo
     in
     List.fold_left
       (fun (env, acc) item ->
-        let newitems = transstruct1 env item in
+        let imports, newitems = transstruct1 env item in
         let env = EcEnv.bindall (List.map tydecl1 newitems) env in
+        let env = List.fold_left EcEnv.Mod.import_vars env imports in
         (env, acc @ newitems))
       (env, []) st
   in
@@ -1624,19 +1651,22 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   match unloc st with
   | Pst_mod  (x,cast, me) ->
     let pe = {
-      ptm_header = if cast=[] then Pmh_ident x else Pmh_cast(Pmh_ident x, cast);
+      ptm_header = if List.is_empty cast then Pmh_ident x else Pmh_cast(Pmh_ident x, cast);
       ptm_body   = me;
       ptm_local  = true } in
 
     let me = transmod ~attop:false env pe in
-    [me.me_name, MI_Module me]
+    [], [me.me_name, MI_Module me]
 
   | Pst_var (xs, ty) ->
-      let ty = transty_for_decl env ty in
+      let ty    = transty_for_decl env ty in
+      let items =
         List.map
           (fun { pl_desc = x } ->
             (x, MI_Variable { v_name = x; v_type = ty; }))
-          xs
+          xs in
+
+      [], items
 
   | Pst_fun (decl, body) -> begin
       let ue  = UE.create (Some []) in
@@ -1702,42 +1732,56 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
           };
         }
       in
-        [(decl.pfd_name.pl_desc, MI_Function fun_)]
+        [], [(decl.pfd_name.pl_desc, MI_Function fun_)]
     end
 
   | Pst_alias ({pl_desc = name},f) ->
-    [transstruct1_alias env name f]
+    [], [transstruct1_alias env name f]
 
-  | Pst_maliases (m, xs) ->
-    let (mo,ms) = trans_msymbol env m in
+  | Pst_include (m, imp, procs) -> begin
+    let (mo, ms) = trans_msymbol env m in
+
     if ms.mis_params <> [] then
       tyerror (loc m) env (InvalidModType MTE_InnerFunctor);
-    let check_xs xs =
-      List.iter (fun x ->
-          let s = unloc x in
-          if not (List.exists (fun (Tys_function(fs,_)) ->
-                    sym_equal fs.fs_name s) ms.mis_body) then
-            let modsymb = List.map (unloc -| fst) (unloc m)
-            and funsymb = unloc x in
-            tyerror (loc x) env (UnknownFunName (modsymb,funsymb))) xs in
-    let in_xs (Tys_function(fs,_)) xs =
-      List.exists (fun x -> sym_equal fs.fs_name (unloc x)) xs in
-    let mk_fun (Tys_function(fs,_)) =
+
+    let check_procs =
+      let check_proc { pl_loc = ploc; pl_desc = name; } =
+        let check (Tys_function (fs, _)) = sym_equal fs.fs_name name in
+          if not (List.exists check ms.mis_body) then begin
+            let modsymb = List.map (unloc -| fst) (unloc m) in
+            tyerror ploc env (UnknownFunName (modsymb, name))
+          end
+      in List.iter check_proc in
+
+    let in_procs (Tys_function (fs, _)) procs =
+      List.exists (fun x -> sym_equal fs.fs_name (unloc x)) procs in
+
+    let mk_fun (Tys_function (fs, _)) =
       (fs.fs_name,
        MI_Function { f_name = fs.fs_name;
                      f_sig  = fs;
                      f_def  = FBalias (EcPath.xpath_fun mo fs.fs_name) }) in
-    match xs with
-    | None ->
-      List.map mk_fun ms.mis_body
-    | Some (`Include_proc xs) ->
-      check_xs xs;
-      List.pmap (fun fs ->
-        if in_xs fs xs then Some (mk_fun fs) else None) ms.mis_body
-    | Some (`Exclude_proc xs) ->
-      check_xs xs;
-      List.pmap (fun fs ->
-        if not (in_xs fs xs) then Some (mk_fun fs) else None) ms.mis_body
+
+    let items =
+      match procs with
+      | None ->
+        List.map mk_fun ms.mis_body
+
+      | Some (`MInclude procs) ->
+        check_procs procs;
+        List.pmap (fun fs ->
+          if in_procs fs procs then Some (mk_fun fs) else None) ms.mis_body
+
+      | Some (`MExclude procs) ->
+        check_procs procs;
+        List.pmap (fun fs ->
+          if not (in_procs fs procs) then Some (mk_fun fs) else None) ms.mis_body
+
+    in (if imp then [mo] else []), items
+  end
+
+  | Pst_import ms ->
+    (List.map (fst |- trans_msymbol env) ms), []
 
 and transstruct1_alias env name f =
   let f = trans_gamepath env f in
@@ -1748,7 +1792,6 @@ and transstruct1_alias env name f =
       f_def = FBalias f;
     } in
   (name, MI_Function fun_)
-
 
 (* -------------------------------------------------------------------- *)
 and transbody ue symbols (env : EcEnv.env) retty pbody =
@@ -1918,14 +1961,14 @@ and transinstr
         let lvalue, lty = translvalue ue env plvalue in
         let rvalue, rty = transexp env `InProc ue prvalue in
           unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
-          [ i_asgn (lvalue, rvalue) ]
+          [ i_asgn_lv i.pl_loc env lvalue rvalue ]
     end
 
   | PSrnd (plvalue, prvalue) ->
       let lvalue, lty = translvalue ue env plvalue in
       let rvalue, rty = transexp env `InProc ue prvalue in
       unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr lty) rty;
-      [ i_rnd (lvalue, rvalue) ]
+      [ i_rnd_lv i.pl_loc env lvalue rvalue ]
 
   | PScall (None, name, args) ->
       let (fpath, args, _rty) = transcall name (unloc args) in
@@ -1935,7 +1978,7 @@ and transinstr
       let lvalue, lty = translvalue ue env lvalue in
       let (fpath, args, rty) = transcall name (unloc args) in
       unify_or_fail env ue name.pl_loc ~expct:lty rty;
-      [ i_call (Some lvalue, fpath, args) ]
+      [ i_call_lv i.pl_loc env lvalue fpath args ]
 
   | PSif ((pe, s), cs, sel) -> begin
       let rec for1_i (pe, s) sel =
@@ -1975,14 +2018,14 @@ and translvalue ue (env : EcEnv.env) lvalue =
   match lvalue.pl_desc with
   | PLvSymbol x ->
       let pty = trans_pv env x in
-      LvVar pty, snd pty
+      Lval (LvVar pty), snd pty
 
   | PLvTuple xs ->
       let xs = List.map (trans_pv env) xs in
       if not (List.is_unique ~eq:(EqTest.for_pv env) (List.map fst xs)) then
         tyerror lvalue.pl_loc env LvNonLinear;
       let ty = ttuple (List.map snd xs) in
-      (LvTuple xs, ty)
+      Lval (LvTuple xs), ty
 
   | PLvMap (x, tvi, e) ->
       let tvi = tvi |> omap (transtvi env ue) in
@@ -2003,7 +2046,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
           let esig = toarrow esig xty in
           unify_or_fail env ue lvalue.pl_loc ~expct:esig opty;
-          (LvMap ((p, tys), pv, e, xty), codomty)
+          LvMap ((p, tys), pv, e, xty), codomty
 
       | [_] ->
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
@@ -2463,12 +2506,32 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                 unify_or_fail env ue x.pl_loc ~expct:x1.f_ty x2.f_ty;
                 f_eq x1 x2
 
-          | GVglob gp ->
-              let (mp, _) = trans_msymbol env gp in
-                let x1 = f_glob mp EcFol.mleft in
-                let x2 = f_glob mp EcFol.mright in
-                  unify_or_fail env ue gp.pl_loc ~expct:x1.f_ty x2.f_ty;
-                  f_eq x1 x2
+          | GVglob (gp, ex) ->
+              let (m, _) = trans_msymbol env gp in
+              let ex = List.map (trans_pv env) ex in
+
+              let filter_pv (xp, _) =
+                let xp = pv_glob xp in
+                let for1 (ex1, _) = not (EcEnv.NormMp.pv_equal env xp ex1) in
+                List.for_all for1 ex in
+
+              let create mem =
+                if List.is_empty ex then f_glob m mem else
+
+                let use = EcEnv.NormMp.mod_use env m in
+                let gl  = Sid.elements use.us_gl in
+                let pv  = List.filter filter_pv (Mx.bindings use.us_pv) in
+                let res =
+                    List.map (fun mid -> f_glob (EcPath.mident mid) mem) gl
+                  @ List.map (fun (xp, ty) -> f_pvar (EcTypes.pv_glob xp) ty mem) pv in
+
+                f_tuple res in
+
+              let x1 = create EcFol.mleft  in
+              let x2 = create EcFol.mright in
+
+              unify_or_fail env ue gp.pl_loc ~expct:x1.f_ty x2.f_ty;
+              f_eq x1 x2
         in
           check_mem f.pl_loc EcFol.mleft;
           check_mem f.pl_loc EcFol.mright;

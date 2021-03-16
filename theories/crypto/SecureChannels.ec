@@ -38,20 +38,22 @@ theory MultiUser.
 
     proc initKeys(): unit = {
       var i:int;
+      var k;
 
-      i = 0;
+      i <- 0;
       while (i < users)
       {
-        ks.[i] = S.kg();
-        i = i + 1;
+        k <@  S.kg();
+        ks.[i] <- k;
+        i <- i + 1;
       }
     }
 
     proc init(): unit = {
-      qs = fset0;
-      auth = false;
+      qs   <- fset0;
+      auth <- false;
       S.init();
-      b = ${0,1};
+      b    <${0,1};
       initKeys();
     }
 
@@ -61,12 +63,12 @@ theory MultiUser.
 
       if (0 <= i < users)
       {
-        qs = qs `|` (fset1 m0) `|` (fset1 m1);
-        c = S.send(ks.[i],b ? m1 : m0);
-        r = Some c;
+        qs <- qs `|` (fset1 m0) `|` (fset1 m1);
+        c  <@ S.send(ks.[i],b ? m1 : m0);
+        r  <- Some c;
       }
       else
-        r = None;
+        r <- None;
 
       return r;
     }
@@ -76,12 +78,12 @@ theory MultiUser.
 
       if (0 <= i < users)
       {
-        r = S.recv(ks.[i],c);
+        r <@ S.recv(ks.[i],c);
         if (r <> None /\ !mem qs (oget r))
-          auth = true;
+          auth <- true;
       }
       else
-        r = None;
+        r <- None;
       return r;
     }
 
@@ -106,9 +108,9 @@ theory MultiUser.
       var b',sec,auth:bool;
 
       O.init();
-      b' = A.guess();
-      sec = O.guess(b');
-      auth = O.auth();
+      b'   <@ A.guess();
+      sec  <@ O.guess(b');
+      auth <@ O.auth();
       return sec \/ auth;
     }
   }.

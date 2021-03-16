@@ -12,7 +12,7 @@ op F:K -> D -> R.
 (** The Real PRF is defined as follows *)
 module PRFr = {
   var k:K
-  proc init(): unit = { k = $dK; }
+  proc init(): unit = { k <$ dK; }
   proc f(x:D): R = { return F k x; }
 }.
 
@@ -42,7 +42,7 @@ module IND (F:PRF,D:Distinguisher) = {
     var b;
 
     F.init();
-    b = D.distinguish();
+    b <@ D.distinguish();
     return b;
   }
 }.
@@ -50,10 +50,14 @@ module IND (F:PRF,D:Distinguisher) = {
 module PRFi = {
   var m : (D,R) fmap
 
-  proc init(): unit = { m = empty; }
+  proc init(): unit = { m <- empty; }
 
   proc f (x:D): R = {
-    if (x \notin m) m.[x] = $uR;
+    var r;
+    if (x \notin m) { 
+      r <$ uR;
+      m.[x] <- r;
+    }
     return (oget m.[x]);
   }
 }.

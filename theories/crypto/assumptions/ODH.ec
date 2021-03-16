@@ -73,7 +73,7 @@ module ODH_Orcl : ODH_OrclT = {
    x <$ FDistr.dt;
    keys <$ dlist genRange n_keys;
 
-   gx = g ^ x;
+   gx <- g ^ x;
 
    if (count_ror < q_ror) {
      if (gys \subset (fdom genMap)) {

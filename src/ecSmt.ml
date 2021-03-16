@@ -636,7 +636,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
       with CanNotTranslate -> trans_gen env fp
     end
   | Fint n ->
-      WTerm.t_bigint_const (BI.to_why3 n)
+      WTerm.t_int_const (BI.to_why3 n)
 
   | Fif    _ -> trans_app env fp []
   | Fmatch _ -> trans_app env fp []
@@ -647,13 +647,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
     (* Special case for `%r` *)
   | Fapp({ f_node = Fop (p, [])},  [{f_node = Fint n}])
       when p_equal p CI_Real.p_real_of_int ->
-    let an = BI.to_string (BI.abs n) in
-    let c  = {
-      Why3.Number.rc_negative = (BI.lt n BI.zero);
-      Why3.Number.rc_abs      = Why3.Number.real_const_dec an "" None;
-    } in
-
-    WTerm.t_const (Why3.Number.ConstReal c) WTy.ty_real
+    WTerm.t_real_const (BI.to_why3 n)
 
   | Fapp (f,args) -> trans_app env f (List.map (trans_form env) args)
 
@@ -992,12 +986,12 @@ and create_op ?(body = false) (genv : tenv) p =
   if not known then begin
     let decl =
       match body, op.op_kind with
-      | true, OB_oper (Some (OP_Plain body)) ->
+      | true, OB_oper (Some (OP_Plain (body, false))) ->
           let body = EcFol.form_of_expr EcFol.mhr body in
           let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
 
-      | true, OB_oper (Some (OP_Fix body)) ->
+      | true, OB_oper (Some (OP_Fix ({ opf_nosmt = false } as body ))) ->
         OneShot.now register;
         let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
         let wbody = Cast.arg wbody ls.WTerm.ls_value in
@@ -1080,7 +1074,7 @@ let lenv_of_hyps genv (hyps : hyps) : lenv =
 
 (* -------------------------------------------------------------------- *)
 let trans_axiom genv (p, ax) =
-  if not ax.ax_nosmt then
+(*  if not ax.ax_nosmt then *)
     let lenv = fst (lenv_of_tparams ax.ax_tparams) in
     add_axiom (genv, lenv) (preid_p p) ax.ax_spec
 
@@ -1334,9 +1328,9 @@ module Frequency = struct
     match EcEnv.Op.by_path_opt p env with
     | Some {op_kind = OB_pred (Some (PR_Plain f)) } ->
       r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Plain e)) } ->
+    | Some {op_kind = OB_oper (Some (OP_Plain (e, false))) } ->
       r_union rs (f_ops unwanted_op (form_of_expr mhr e))
-    | Some {op_kind = OB_oper (Some (OP_Fix e)) } ->
+    | Some {op_kind = OB_oper (Some (OP_Fix ({ opf_nosmt = false } as e))) } ->
       let rec aux rs = function
         | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
         | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs

@@ -80,7 +80,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcTypes.expr
+  | OP_Plain  of EcTypes.expr * bool  (* nosmt? *)
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -96,6 +96,7 @@ and opfix = {
   opf_resty    : EcTypes.ty;
   opf_struct   : int list * int;
   opf_branches : opbranches;
+  opf_nosmt    : bool;
 }
 
 and opbranches =
@@ -129,6 +130,7 @@ type operator = {
   op_tparams : ty_params;
   op_ty      : EcTypes.ty;
   op_kind    : operator_kind;
+  op_opaque  : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -186,19 +188,20 @@ let is_prind op =
   | OB_pred (Some (PR_Ind _)) -> true
   | _ -> false
 
-let gen_op tparams ty kind = {
+let gen_op ~opaque tparams ty kind = {
   op_tparams = tparams;
   op_ty      = ty;
   op_kind    = kind;
+  op_opaque  = opaque;
 }
 
-let mk_pred tparams dom body =
+let mk_pred ~opaque tparams dom body =
   let kind = OB_pred body in
-    gen_op tparams (EcTypes.toarrow dom EcTypes.tbool) kind
+    gen_op ~opaque tparams (EcTypes.toarrow dom EcTypes.tbool) kind
 
-let mk_op tparams ty body =
+let mk_op ~opaque tparams ty body =
   let kind = OB_oper body in
-    gen_op tparams ty kind
+    gen_op ~opaque tparams ty kind
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) =
   let kind = {
@@ -208,7 +211,8 @@ let mk_abbrev ?(ponly = false) tparams xs (codom, body) =
     ont_ponly = ponly;
   } in
 
-  gen_op tparams (EcTypes.toarrow (List.map snd xs) codom) (OB_nott kind)
+  gen_op ~opaque:false tparams
+    (EcTypes.toarrow (List.map snd xs) codom) (OB_nott kind)
 
 let operator_as_ctor (op : operator) =
   match op.op_kind with

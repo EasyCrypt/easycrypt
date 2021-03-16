@@ -44,22 +44,22 @@ module Wrap (S:Scheme) = {
 
   proc init(): unit = {
     S.init();
-    k = S.kg();
-    qs = [];
+    k  <@ S.kg();
+    qs <- [];
   }
 
   proc enc(p:plaintext): ciphertext = {
     var r:ciphertext;
 
-    r = S.enc(k,p);
+    r <@ S.enc(k,p);
     return r;
   }
 
   proc dec(c:ciphertext): plaintext option = {
     var r:plaintext option;
 
-    qs = c::qs;
-    r = S.dec(k,c);
+    qs <- c::qs;
+    r  <@ S.dec(k,c);
     return r;
   }
 
@@ -78,11 +78,11 @@ module INDCPA (S:Scheme, A:Adv_INDCPA) = {
     var c:ciphertext;
 
     O.init();
-    (p0,p1) = A.choose();
-    b = ${0,1};
-    p = if b then p1 else p0;
-    c = O.enc(p);
-    b' = A.guess(c);
+    (p0,p1) <@ A.choose();
+    b       <$ {0,1};
+    p       <- if b then p1 else p0;
+    c       <@ O.enc(p);
+    b'      <@ A.guess(c);
     return (b = b');
   }
 }.
@@ -97,12 +97,12 @@ module INDCCA (S:Scheme, A:Adv_INDCCA) = {
     var c:ciphertext;
 
     O.init();
-    (p0,p1) = A.choose();
-    b = ${0,1};
-    p = if b then p1 else p0;
-    c = O.enc(p);
-    b' = A.guess(c);
-    qc = O.queried_challenge(c);
+    (p0,p1) <@ A.choose();
+    b       <$ {0,1};
+    p       <- if b then p1 else p0;
+    c       <@ O.enc(p);
+    b'      <@ A.guess(c);
+    qc      <@ O.queried_challenge(c);
     return (b = b' /\ !qc);
   }
 }.

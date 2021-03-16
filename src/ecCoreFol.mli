@@ -318,7 +318,6 @@ val f_eqs : form list -> form list -> form
 (* soft-constructors - integers *)
 val fop_int_opp : form
 val fop_int_add : form
-val fop_int_opp : form
 val fop_int_pow : form
 
 val f_i0  : form
@@ -439,6 +438,7 @@ val is_imp       : form -> bool
 val is_iff       : form -> bool
 val is_forall    : form -> bool
 val is_exists    : form -> bool
+val is_lambda    : form -> bool
 val is_let       : form -> bool
 val is_eq        : form -> bool
 val is_op        : form -> bool

@@ -104,7 +104,7 @@ let test_if_evict_prover tests prover =
 module Evictions = struct
   let alt_ergo_le_0_99_1 = {
     pe_cause = `Inconsistent;
-    pe_test  = `ByVersion ("Alt-Ergo", (`Lt, VP.of_tuple (2, 2, 0)));
+    pe_test  = `ByVersion ("Alt-Ergo", (`Le, VP.of_tuple (2, 3, 0)));
   }
 end
 
@@ -323,6 +323,7 @@ type prover_infos = {
   pr_wanted    : hints;
   pr_unwanted  : hints;
   pr_selected  : bool;
+  gn_debug     : bool;
 }
 
 
@@ -339,6 +340,7 @@ let dft_prover_infos = {
   pr_wanted    = Hints.empty;
   pr_unwanted  = Hints.empty;
   pr_selected  = false;
+  gn_debug     = false;
 }
 
 let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
@@ -445,7 +447,17 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
                 infos in
 
               let handle_answer = function
-                | CP.Valid   -> incr status
+                | CP.Valid   ->
+                    if pi.gn_debug then begin
+                      notify |> oiter (fun notify -> notify `Warning (lazy (
+                        let buf = Buffer.create 0 in
+                        let fmt = Format.formatter_of_buffer buf in
+                        Format.fprintf fmt "success: %s%!" prover;
+                      Buffer.contents buf)))
+                    end;
+                    incr status
+
+
                 | CP.Invalid -> status := (-1)
                 | (CP.Failure _ | CP.HighFailure) as answer->
                   notify |> oiter (fun notify -> notify `Warning (lazy (

@@ -116,18 +116,19 @@ let f_real_sqrt f =
   f_real_rpow f (f_real_inv (f_rint (BI.of_int 2)))
 
 let f_decimal (n, (l, f)) =
-  let nv = f_real_of_int (f_int n) in
+  if   EcBigInt.equal f EcBigInt.zero
+  then f_real_of_int (f_int n)
+  else
 
-  if EcBigInt.equal f EcBigInt.zero then nv else
+  let d   = EcBigInt.pow (EcBigInt.of_int 10) l in
+  let gcd = EcBigInt.gcd f d in
+  let f   = EcBigInt.div f gcd in
+  let d   = EcBigInt.div d gcd in
+  let fct = f_real_div (f_real_of_int (f_int f)) (f_real_of_int (f_int d)) in
 
-  let f = f_real_of_int (f_int f) in
-  let u = f_int (EcBigInt.pow (EcBigInt.of_int 10) l) in
-  let u = f_real_of_int u in
-  let d = f_real_div f u in
-
-  if EcBigInt.equal n EcBigInt.zero then d else
-
-  f_real_add (f_real_of_int (f_int n)) d
+  if   EcBigInt.equal n EcBigInt.zero
+  then fct
+  else f_real_add (f_real_of_int (f_int n)) fct
 
 (* -------------------------------------------------------------------- *)
 let tmap aty bty =
@@ -683,11 +684,18 @@ let rec f_eq_simpl f1 f2 =
   else match f1.f_node, f2.f_node with
   | Fint _ , Fint _ -> f_false
 
+  | Fapp(op, [{f_node = Fint i1}]), Fint i2
+      when f_equal op fop_int_opp ->
+    f_bool (EcBigInt.equal (EcBigInt.neg i1) i2)
+
+  | Fint i1, Fapp(op, [{f_node = Fint i2}])
+      when f_equal op fop_int_opp ->
+     f_bool (EcBigInt.equal i1 (EcBigInt.neg i2))
+
   | Fapp (op1, [{f_node = Fint _}]), Fapp (op2, [{f_node = Fint _}])
       when f_equal op1 f_op_real_of_int &&
            f_equal op2 f_op_real_of_int
     -> f_false
-
   | Fop (op1, []), Fop (op2, []) when
          (EcPath.p_equal op1 CI.CI_Bool.p_true  &&
           EcPath.p_equal op2 CI.CI_Bool.p_false  )

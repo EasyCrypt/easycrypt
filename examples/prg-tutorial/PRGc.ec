@@ -7,7 +7,7 @@
 (* Loading core datatype theories *)
 require import AllCore List FSet SmtMap.
 (* Loading algebraic theories *)
-require import IntExtra RealExtra StdRing StdOrder StdBigop.
+require import StdRing StdOrder StdBigop.
 (*---*) import Ring.IntID RField IntOrder RealOrder Bigreal BRA.
 (* Loading distribution theories *)
 require import Distr DProd Mu_mem.
@@ -216,7 +216,7 @@ module C_PRG(G:PRGa.RG) = {
   }
 
   proc next(): output = {
-    var r = witness;
+    var r <- witness;
 
     r <@ G.next();
     c <- c + 1;
@@ -227,10 +227,10 @@ module C_PRG(G:PRGa.RG) = {
 module C_D_PRG(D:PRGa.Distinguisher,G:PRGa.RGA) = {
   module G' = {
     proc next(): output = {
-      var r = witness;
+      var r <- witness;
 
-      r = G.next();
-      C_PRG.c = C_PRG.c + 1;
+      r <@ G.next();
+      C_PRG.c <- C_PRG.c + 1;
       return r;
     }
   }
@@ -239,8 +239,8 @@ module C_D_PRG(D:PRGa.Distinguisher,G:PRGa.RGA) = {
 
   proc distinguish(): bool = {
     var b;
-    C_PRG.c = 0;
-    b = D'.distinguish();
+    C_PRG.c <- 0;
+    b <@ D'.distinguish();
     return b;
   }
 }.
@@ -282,10 +282,10 @@ module C_PRF(F:PRFa.PRF) = {
 module C_D_PRF(D:PRFa.Distinguisher,F:PRFa.PRFA) = {
   module F' = {
     proc f(x:state): state * output = {
-      var r = witness;
+      var r <- witness;
 
-      r = F.f(x);
-      C_PRF.c = C_PRF.c + 1;
+      r <@ F.f(x);
+      C_PRF.c <- C_PRF.c + 1;
       return r;
     }
   }
@@ -294,8 +294,8 @@ module C_D_PRF(D:PRFa.Distinguisher,F:PRFa.PRFA) = {
 
   proc distinguish(): bool = {
     var b;
-    C_PRF.c = 0;
-    b = D'.distinguish();
+    C_PRF.c <- 0;
+    b <@ D'.distinguish();
     return b;
   }  
 }.
@@ -500,10 +500,10 @@ section Lemma1.
     (* The resulting sum is less than the specified bound *)
     rewrite -mulr_suml mulrAC ler_wpmul2r 1:[smt (mu_bounded)].
     rewrite (@big_reindex _ _ ([-]%Int \o ((-) 1)) ((+) 1)) 1:[smt ml=0].
-    rewrite predTofV (@eq_bigr _ _ from_int) 1:[smt ml=0].
+    rewrite predTofV (@eq_bigr _ _ CoreReal.from_int) 1:[smt ml=0].
     rewrite (@eq_map _ ((+) 1)) 2:-range_add /= 1:[smt ml=0].
     rewrite -(@add0r (bigi _ _ _ _)) -(@big1_eq predT (range 0 1)).
-    rewrite (@eq_big_int _ _ _ from_int) 1:[smt ml=0] -big_cat -range_cat // 1:ler_addr 1:ge0_qN.
+    rewrite (@eq_big_int _ _ _ CoreReal.from_int) 1:[smt ml=0] -big_cat -range_cat // 1:ler_addr 1:ge0_qN.
     by rewrite sumidE [smt (ge0_qN)].
     (* The bounded event implies that from the probability claim *)
     done.

@@ -233,7 +233,8 @@ proof. by apply/fsetP=> x; rewrite in_fset0 in_filter. qed.
 lemma filter_pred1 (a : 'a) (A : 'a fset):
   filter (pred1 a) A = if mem A a then fset1 a else fset0.
 proof.
-by apply/fsetP=> x; rewrite in_filter fun_if2 !inE; case (x = a)=> ->.
+apply/fsetP=> x; rewrite in_filter fun_if2 !inE.
+by case (x = a)=> @/pred1 ->.
 qed.
 
 lemma filter_mem (A B : 'a fset): filter (mem A) B = A `&` B.

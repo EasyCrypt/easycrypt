@@ -278,7 +278,6 @@ section.
 
 end section.
 
-
 (* ------------------------------------------------------------------------- *)
 (* We show that UF reduce to UF1                                             *)
 (* ------------------------------------------------------------------------- *)
@@ -338,7 +337,7 @@ abstract theory UF1_UF.
     var c: int
     module WO : OrclUF = {
       proc keygen() = {
-        var pk = witness;
+        var pk <- witness;
         if (c < q_gen) {
           pk <@ O.keygen();
           c <- c + 1;
@@ -365,7 +364,7 @@ abstract theory UF1_UF.
 
      module WO = {
        proc keygen () = {
-         var pk = witness;
+         var pk <- witness;
          if (WAkg.c < q_gen) {
            if (WAkg.c = i) {
               if (RealSigServ.count_pk < q_gen) {
@@ -381,7 +380,7 @@ abstract theory UF1_UF.
        }
 
        proc sign(pk : pkey, m : message) : signature option = {
-         var so : signature option = None;
+         var so : signature option <- None;
          var s : signature;
          if (count_sig < q_sig) {
             if (mpki.[pk] = Some i) {
@@ -429,7 +428,7 @@ abstract theory UF1_UF.
 
       module WO = {
         proc keygen () = {
-          var pk = witness;
+          var pk <- witness;
           if (WAkg.c < q_gen) {
             pk <@ O.keygen();
             if (! pk \in MkAdvUF1.mpki) MkAdvUF1.mpki.[pk] <- WAkg.c;
@@ -516,21 +515,19 @@ abstract theory UF1_UF.
       rewrite /phi /psi /=; smt (lt0_q_gen).
     qed.
 
-    local clone import PROM.GenEager as Eager with 
-      type from <- unit,
-      type to <- pkey * skey,
-      op sampleto <- fun (_:unit) => keygen,
-      type input <- unit,
-      type output <- bool
-      proof *. 
-      realize sampleto_ll. 
-      proof. by solve (random). qed.
+    local clone import PROM.FullRO as RO with
+      type in_t    <- unit,
+      type out_t   <- pkey * skey,
+      op   dout  _ <- keygen,
+      type d_in_t  <- unit,
+      type d_out_t <- bool.
+    import FullEager.
 
     local module Aux1(RO:RO) = {
       module WO = {
         proc keygen () = {
           var sk;
-          var pk = witness;
+          var pk <- witness;
           if (WAkg.c < q_gen) {
             if (WAkg.c = MkAdvUF1.i) {
               if (RealSigServ.count_pk < q_gen) {
@@ -601,7 +598,7 @@ abstract theory UF1_UF.
     local lemma Aux1_EAux1 &m: 
       Pr[Aux1(LRO).distinguish() @ &m : UF1.forged] =
       Pr[Aux1( RO).distinguish() @ &m : UF1.forged].
-    proof. apply eq_sym; byequiv (RO_LRO_D Aux1) => //. qed.
+    proof. by apply eq_sym; byequiv (RO_LRO_D Aux1 _) => //=; apply: keygen_ll. qed.
  
     local lemma EAux1_MkAdvUF1 &m:
       Pr[Aux1( RO).distinguish() @ &m : UF1.forged] <=

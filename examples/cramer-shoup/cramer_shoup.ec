@@ -1,6 +1,6 @@
 require import AllCore List Distr Dexcepted PKE.
 require import StdOrder StdBigop.
-import RealOrder Bigreal.
+import RField RealOrder Bigreal.
 
 require TCR RndExcept.
 
@@ -33,9 +33,9 @@ theory DDH_ex.
   module DDH0_ex (A:Adversary) = {
     proc main() : bool = {
       var b, x, y;
-      x = $FDistr.dt \ (pred1 F.zero);
-      y = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ (x*y));
+      x <$ FDistr.dt \ (pred1 F.zero);
+      y <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ (x*y));
       return b;
     }
   }.
@@ -44,10 +44,10 @@ theory DDH_ex.
     proc main() : bool = {
       var b, x, y, z;
 
-      x = $FDistr.dt \ (pred1 F.zero);
-      y = $FDistr.dt;
-      z = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ z);
+      x <$ FDistr.dt \ (pred1 F.zero);
+      y <$ FDistr.dt;
+      z <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ z);
       return b;
     }
   }.
@@ -62,8 +62,8 @@ theory DDH_ex.
     proc a1 () = { return ((), F.zero); }
     proc a2 (x:t) = {
       var b, y;
-      y = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ (x*y));
+      y <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ (x*y));
       return b;
     }
   }.
@@ -72,9 +72,9 @@ theory DDH_ex.
     proc a1 = Addh0.a1
     proc a2 (x:t) = {
       var b, y, z;
-      y = $FDistr.dt;
-      z = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ z);
+      y <$ FDistr.dt;
+      z <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ z);
       return b;
     }
   }.
@@ -143,7 +143,7 @@ module CramerShoup : Scheme = {
 
   proc enc(pk:pkey, m:plaintext) : ciphertext = {
     var k,g,g_,e,f,h,u,a,a_,c,v,d;
-    (k,g,g_,e,f,h) = pk;
+    (k,g,g_,e,f,h) <- pk;
     u <$ FDistr.dt;
     a <- g^u; a_ <- g_^u;
     c <- h^u * m;
@@ -233,7 +233,7 @@ module B_DDH (A:CCA_ADV) = {
           (a,a_,c,d) <- ci;
           v <- H k (a, a_, c);
           if (a_ <> a^w /\ v = v' /\ (a,a_,c) <> (B_TCR.a, B_TCR.a_,B_TCR.c)) g3 <- Some (a,a_,c);
-          m = if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
+          m <- if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
               else None;
         }
         return m;
@@ -326,7 +326,7 @@ section Security_Aux.
           (a,a_,c,d) <- ci;
           v <- H k (a, a_, c);
           bad <- bad \/ (a_ <> a^w /\ d = a ^ (x1 + v*y1) * a_ ^ (x2 + v * y2));
-          m = if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
+          m <- if (a_ = a^w /\ d = a ^ (x + v*y)) then Some (c / a ^ z)
               else None;
         }
         return m;
@@ -460,7 +460,7 @@ section Security_Aux.
     split.
     + move=> /Hbad [#] !->> /= <- <-.
       by split; rewrite log_bij !(log_g, log_pow, log_mul) /=.
-    by move=> _ {H Hbad} ??????? Hbad /Hbad.
+    by move=> _ {Hbad} ??????? Hbad /Hbad.
   qed.
 
   lemma dt_r_ll x : is_lossless (FDistr.dt \ pred1 x).
@@ -567,7 +567,7 @@ section Security_Aux.
     move=> wL /supp_dexcepted [] _ /= HwL uL _ u'L /supp_dexcepted [] _ /= Hu'L .
     move=> kL _ xL _ x2L _ yL _ y2L _ zL _ resu bL _.
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
-    have H2 : (-uL) * wL + u'L * wL <> ofint 0.
+    have H2 : (-uL) * wL + u'L * wL <> F.ofint 0.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
@@ -596,7 +596,7 @@ section Security_Aux.
     move=> wL /supp_dexcepted [] _ /= HwL uL _ u'L /supp_dexcepted [] _ /= Hu'L .
     move=> kL _ yL _ y2L _ zL _ r'L _ xL _.  
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
-    have H2 : (-uL) * wL + u'L * wL <> ofint 0.
+    have H2 : (-uL) * wL + u'L * wL <> F.ofint 0.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL /=.
       by move: Hu'L;apply: contra => H;ring H.
     split => [? _ | _ ]; 1: by field.
@@ -632,7 +632,7 @@ section Security_Aux.
               y2log <-  y2' :: y2log;
             }
           }
-          m = if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
+          m <- if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
               else None;
         }
         return m;
@@ -696,9 +696,9 @@ section Security_Aux.
     rewrite Hg3 /=. 
     case: (G1.bad{m1}) => [_ -> | ] //=. 
     move=> Hbad Hsize Hstar;rewrite !negb_and /= 2!negb_or /= -!andaE.
-    case (v = G2.v{m2}) => [->> /= ? [#]!->> Hstar1 ->>| /=].
-    + by case: (G1.cstar{m2}) Hstareq Hstar Hstar1.
-    move=> Hv Ha _ ->>;left.
+    case (v = G2.v{m2}) => />.
+    + by case: (G1.cstar{m2}) Hstareq Hstar => />.
+    move=> Hv Ha _;left.
     rewrite !(log_g, log_pow, log_mul);field => //.
     + by move: Hv;apply: contra;rewrite ofint0 => H;ring H.
     by move: Ha;apply: contra; rewrite log_bij log_pow ofint0 => H;ring H.
@@ -742,7 +742,7 @@ section Security_Aux.
     move=> uL _ u'L /supp_dexcepted [] _ /= HuL kL _.
     move=> yL _ y2L _ zL _ r'L _ xL _ rL _.
     have H1 : (-uL) * wL + u'L * wL = wL * (u'L - uL) by ring.
-    have H2 : (-uL) * wL + u'L * wL <> ofint 0.
+    have H2 : (-uL) * wL + u'L * wL <> F.ofint 0.
     + rewrite H1 ofint0 mulf_eq0 negb_or -{1}ofint0 HwL0 /=.
       by move: HuL;apply: contra => H;ring H.
     split => [ | _].
@@ -808,7 +808,7 @@ section Security_Aux.
           G1.log <- ci :: G1.log;
           (a,a_,c,d) <- ci;
           v <- H G1.k (a, a_, c);
-          m = if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
+          m <- if (a_ = a^G1.w /\ d = a ^ (G1.x + v*G1.y)) then Some (c / a ^ G1.z)
               else None;
         }
         return m;
@@ -865,8 +865,6 @@ section Security_Aux.
     by apply le_fromint.
   qed.
 
-import StdRing.RField.
-
   local lemma pr_G4 &m:
     Pr[G4.main() @ &m : (G3.a, G3.a_,G3.c, G3.d) \in G3.cilog] <=
       (PKE_.qD%r/q%r)^3 * (PKE_.qD%r/(q-1)%r).
@@ -921,8 +919,8 @@ import StdRing.RField.
             (size G3.cilog <= PKE_.qD) => //;last 2 first.
     + hoare;conseq (_ : _ ==> true) => // /#.
     + move=> &hr _;apply lerr_eq;field.
-      + rewrite (_: 2 = (0 + 1) + 1) // !powrS // powr0;smt (le_fromint gt1_q). 
-      smt (le_fromint gt1_q). 
+      + rewrite expr2; smt (gt1_q). 
+      + smt (gt1_q). 
     + by auto.
     + rnd;skip => /> &hr Hsize _;pose m' := map _ _.
       apply (mu_mem_le_mu1_size FDistr.dt m') => //.

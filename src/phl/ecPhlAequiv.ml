@@ -332,7 +332,8 @@ let t_while_r ((ef, df), (v, inv), nf) tc =
     FApi.t_onselect (fun i -> i = 5 || i = 6)
       (EcLowGoal.t_simplify_with_info
         { EcReduction.no_red with
-            EcReduction.delta_p = EcPath.p_equal IAPRHL.sumr_p; })
+            EcReduction.delta_p = (fun p ->
+              if EcPath.p_equal p IAPRHL.sumr_p then `Yes else `No) })
       (FApi.xmutate1 tc `AWhile
          [fn_gt0; ef_gt0; df_gt0; term; concl1; concl2; sume; sumd; sub]));
     EcLowGoal.t_simplify_with_info EcReduction.nodelta;
@@ -396,12 +397,12 @@ let t_while_ac_r ((e, d), (v, inv), (bN, w)) tc =
     let term2 = f_real_sub (f_real_exp ef) f_r1 in
     let term2 = f_real_mul (f_real_mul bNr ef) term2 in
 
-    f_real_le (f_real_add term1 term2) aes.aes_ep 
+    f_real_le (f_real_add term1 term2) aes.aes_ep
   in
 
-  let eqd = 
+  let eqd =
     f_real_le (f_real_add (f_real_mul bNr df) wf) aes.aes_dp in
- 
+
   let concl1 =
     let k  = EcIdent.create "k" in
     let kf = EcFol.f_local k tint in
@@ -418,7 +419,7 @@ let t_while_ac_r ((e, d), (v, inv), (bN, w)) tc =
 
   in
 
-  let cond2 = 
+  let cond2 =
     f_forall_mems [aes.aes_ml; aes.aes_mr]
     (f_imp aes.aes_pr (f_ands [gt0_w; ge0_N; ge0_e; ge0_d])) in
 
@@ -439,11 +440,11 @@ let t_pweq_r (e1, e2) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let aes  = tc1_as_aequivS tc in
 
-  let e1 = 
+  let e1 =
     let hyps = EcEnv.LDecl.push_active aes.aes_ml hyps in
     EcProofTyping.pf_process_form_opt !!tc hyps None e1
 
-  and e2 = 
+  and e2 =
     let hyps = EcEnv.LDecl.push_active aes.aes_mr hyps in
     EcProofTyping.pf_process_form_opt !!tc hyps None e2
   in
@@ -569,28 +570,28 @@ let t_utb_l_r ((e1, e2), (bad, delta)) tc =
     (EcProofTyping.pf_process_form_opt !!tc hyps None e1,
      EcProofTyping.pf_process_formula  !!tc hyps bad) in
 
-  let e2 = 
+  let e2 =
     let hyps = EcEnv.LDecl.push_active aes.aes_mr hyps in
     EcProofTyping.pf_process_form_opt !!tc hyps (Some e1.f_ty) e2
   in
 
-  let delta = 
+  let delta =
     EcProofTyping.pf_process_form_opt !!tc hyps (Some treal) delta in
-    
-  let eq_e = f_eq e1 e2 in 
+
+  let eq_e = f_eq e1 e2 in
   (* 1: post => e1 = e2, application of conseq *)
-  let cond_c = 
+  let cond_c =
     f_forall_mems [aes.aes_ml; aes.aes_mr] (f_imp aes.aes_po eq_e) in
   (* first condition, bounding bad *)
-  let cond_d = 
+  let cond_d =
     let subst = Fsubst.f_subst_mem (fst aes.aes_ml) mhr in
     let pre   = subst aes.aes_pr in
     let post  = (subst bad) in
-    let concl = 
+    let concl =
       f_bdHoareS (mhr, snd aes.aes_ml) pre aes.aes_sl post FHle delta in
     f_forall_mems [aes.aes_mr] concl in
   (* FIXME: check 0 <= f_real_sub aes.aes_dp delta *)
-  let cond_a = 
+  let cond_a =
     let eq = f_eq e1 e2 in
     let post = f_imp (f_not bad) eq in
     let aes = {aes with aes_dp = f_real_sub aes.aes_dp delta; aes_po = post} in

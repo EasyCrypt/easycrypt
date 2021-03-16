@@ -15,7 +15,7 @@ module type I = {
 
 module M(A : I) = {
   proc f(x : value) = {
-    var i = 0;
+    var i <- 0;
 
     while (i < n * k) {
       x <@ A.step(i, x);
@@ -26,7 +26,7 @@ module M(A : I) = {
   }
 
   proc g(x : value) = {
-    var i = 0;
+    var i <- 0;
     var j;
 
     while (i < n) {

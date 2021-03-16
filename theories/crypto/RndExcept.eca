@@ -58,8 +58,8 @@ abstract theory Adversary.
 
     proc sample (i:input, X:t list) = {
       var r: t;
-      r = witness;
-      if (test i X) r = O.sample(i,X);
+      r <- witness;
+      if (test i X) r <@ O.sample(i,X);
       return r;
     }
   }.
@@ -154,14 +154,14 @@ abstract theory Adversary.
       seq 3 3 : (={r0,i0,X0,SampleB.bad} /\ (test i0 X0){1} /\ !SampleB.bad{2}); 1: by auto.
       wp;if{1}; 2 : by  auto => /#.
       by rnd{1};auto => &m1 &m2 /> /test_spec.
-    + move=> &m2 ?;proc;sp 1;if => //;inline *.
+    + move=> &m2 hsample;proc;sp 1;if => //;inline *.
       seq 3 : true 1%r 1%r 0%r _  (test i0 X0 /\ SampleB.bad = SampleB.bad{m2}) => //.
       + by auto.
       + by rnd;auto => &hr />;rewrite d_ll.
       + wp;if.
-        + by rnd;auto;rewrite H => &hr /> /test_spec.
+        + by rnd;auto; rewrite hsample => &hr /> /test_spec.
       by auto.
-    + move=> _;proc;sp;if =>//.
+    + move=> ?;proc;sp;if =>//.
       by inline *;auto => &hr />;rewrite d_ll.
     inline*; auto => /#.
   qed.
@@ -242,10 +242,10 @@ abstract theory AdversaryN.
 
      proc sample(i:input, X:t list) = {
       var r;
-      r = witness;
+      r <- witness;
       if (c < q) {
         r <@ O.sample(i,X);
-        c = c + 1;
+        c <- c + 1;
       }
       return r;
     }
@@ -284,7 +284,7 @@ abstract theory AdversaryN.
     Pr[Main(CountI(R(SampleB)),A).main() @ &m : SampleB.bad /\ 0 <= Count.c <= q ] <= q%r * p%r / n%r .
   proof.
     fel 1 Count.c (fun x => p%r / n%r) q SampleB.bad [CountI(R(SampleB)).sample : (size X <= p /\ Count.c < q)] => //.
-    + rewrite BRA.sumr_const StdRing.RField.intmulr count_predT.
+    + rewrite BRA.sumr_const RField.intmulr count_predT.
       smt (size_range q_pos).
     + inline *;auto.
     + proc;inline *;sp 1;if;last by hoare.
@@ -294,7 +294,7 @@ abstract theory AdversaryN.
       apply (ler_trans (BRA.big predT (fun (x : t) => 1%r/n%r) X{hr})).
       + apply (ler_trans _ _ _ (mu_mem_le (d i{hr}) X{hr})).
         by apply ler_sum_seq => /= ???;rewrite d_uni.
-      rewrite BRA.sumr_const StdRing.RField.intmulr count_predT.
+      rewrite BRA.sumr_const RField.intmulr count_predT.
       by have /# : 0%r < inv n%r; apply invr_gt0; rewrite lt_fromint n_pos.
     + move=> c;proc;sp;inline *.
       by rcondt 1 => //;wp;conseq (_: _ ==> true) => // /#.
@@ -483,7 +483,7 @@ abstract theory Adversary1_1.
     + apply ler_pmul => //; 1: by rewrite le_fromint;apply size_ge0.
       + by apply divr_ge0 => //; rewrite le_fromint; apply ltzW; apply n_pos.
       by rewrite /= le_fromint.
-    rewrite StdRing.RField.mulr1 ltr_pdivr_mulr.
+    rewrite RField.mulr1 ltr_pdivr_mulr.
     + rewrite lt_fromint n_pos.
     by rewrite /= lt_fromint gt1_n.
   qed.
@@ -510,7 +510,7 @@ abstract theory Adversary1_1.
       proc;inline *;call (_:true).
       rcondt {2} 4.
       + auto;call (_: true);auto.
-      rnd;auto;call (_: true);auto.
+      by rnd;auto;call (_: true);auto.
     have -> : Pr[Main(A).main() @ &m : E res (glob A)] =
               Pr[Ad1.Main(LA).main() @ &m : E res (glob A)].
     + byequiv ( _: ={glob A} ==> ={res,glob A}) => //.

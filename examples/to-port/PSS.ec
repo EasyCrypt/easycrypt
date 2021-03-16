@@ -281,7 +281,7 @@ lemma challengeL pk sk:
   mu (challenge pk) True = 1%r.
 proof.
   move=> vkp; apply valid_keypairs in vkp.
-  cut:= Dinter.weight_def 0 (p_n pk - 1).
+  have:= Dinter.weight_def 0 (p_n pk - 1).
   rewrite /challenge /weight (_: 0 <= p_n pk - 1) //=.
   smt. (* 0 <= p_n pk - 1 *)
 qed.
@@ -296,7 +296,7 @@ proof.
   rewrite /challenge -Dinter_uni.dinter_is_dinter. (* Oh, look! Finite sets! *)
   rewrite Dinter_uni.mu_def_nz; first smt.
   rewrite Interval.card_interval_max (_: max (p_n pk - 1 - 0 + 1) 0 = p_n pk); first smt.
-  cut ->: filter (fun x, mem x (interval 0 (2^(k - 1) - 1))) (interval 0 (p_n pk - 1)) =
+  have ->: filter (fun x, mem x (interval 0 (2^(k - 1) - 1))) (interval 0 (p_n pk - 1)) =
             interval 0 (2^(k - 1) - 1).
     by apply set_ext=> x; rewrite mem_filter /= !mem_interval; smt.
   by rewrite card_interval_max (_: max (2^(k - 1) - 1 - 0 + 1) 0 = 2^(k - 1)); first smt.
@@ -318,7 +318,7 @@ clone OW as RSA with
     fofinv        by smt,
     finvof        by smt.
   realize finv_correct.
-    move=> pk sk m vkp; cut:= vkp=> vkp'; apply valid_keypairs in vkp.
+    move=> pk sk m vkp; have:= vkp=> vkp'; apply valid_keypairs in vkp.
     case=> x; rewrite /f_rng /f_dom=> -[vch ->].
     rewrite rsas_rsap // /rsap_dom.
     smt.
@@ -706,26 +706,26 @@ proof.
   move=> vkeys x_in_dom x_invertible.
   pose f:= fun y, simul pk sk b x y.
   pose finv:= fun y, simul_inv pk sk b x y.
-  cut ->: (fun y, 0 <= simul pk sk b x y < 2^(k - 1)) = Fun.preim f (fun x, 0 <= x < 2^(k - 1))
+  have ->: (fun y, 0 <= simul pk sk b x y < 2^(k - 1)) = Fun.preim f (fun x, 0 <= x < 2^(k - 1))
     by beta.
   rewrite -Dapply.dapply_preim.
-  cut supp_eq: support (dapply f (challenge pk)) = support (challenge pk).
+  have supp_eq: support (dapply f (challenge pk)) = support (challenge pk).
     apply fun_ext=> x'; rewrite /challenge /support Dapply.supp_def eq_iff; split.
       move=> [y [->]]; rewrite -/(rsap_dom _ _) !Dinter.supp_def.
-      cut H2: forall x y, 0 <= x <= y - 1 = 0 <= x < y by smt.
+      have H2: forall x y, 0 <= x <= y - 1 = 0 <= x < y by smt.
       by rewrite !H2 -/(rsap_dom _ _) -/(rsap_dom _ _) /f=> {H2}; apply simul_range.
       rewrite Dinter.supp_def.
-      cut H2: forall x y, 0 <= x <= y - 1 = 0 <= x < y by smt.
+      have H2: forall x y, 0 <= x <= y - 1 = 0 <= x < y by smt.
       rewrite H2 -/(rsap_dom _ _)=> x'_in_dom.
       exists (finv x'); split.
         by rewrite /f /finv simul_invK=> //.
         by rewrite Dinter.supp_def H2 -/(rsap_dom _ _) /finv; apply simul_inv_range.
-  cut ->: dapply f (challenge pk) = challenge pk.
+  have ->: dapply f (challenge pk) = challenge pk.
     apply uniform_unique=> //.
       by rewrite Dapply.mu_def.
       move=> x' y'; progress.
       rewrite !Dapply.mu_x_def (mu_support (fun x0, x' = f x0)) (mu_support (fun x0, y' = f x0)).
-      cut invert: forall x, support (challenge pk) x =>
+      have invert: forall x, support (challenge pk) x =>
                   ((fun x0, x = f x0) /\ support (challenge pk))
                   = ((=) (finv x) /\ support (challenge pk)).
         progress; rewrite /Pred.(/\) /= -fun_ext=> x1 /=; rewrite eq_iff; split.
@@ -735,10 +735,10 @@ proof.
       rewrite invert 1:-supp_eq 1:/support //.
       rewrite -!mu_support.
       apply challengeU; first smt.
-        by cut:= H; rewrite -/(support _ _) supp_eq /support !challenge_valid /finv simul_inv_range //; smt.
-        by cut:= H0; rewrite -/(support _ _) supp_eq /support !challenge_valid /finv simul_inv_range //; smt.
+        by have:= H; rewrite -/(support _ _) supp_eq /support !challenge_valid /finv simul_inv_range //; smt.
+        by have:= H0; rewrite -/(support _ _) supp_eq /support !challenge_valid /finv simul_inv_range //; smt.
       by apply challengeU; exists sk.
-  cut ->: (fun x, 0 <= x < 2^(k - 1)) = (fun x, mem x (interval 0 (2^(k - 1) - 1))).
+  have ->: (fun x, 0 <= x < 2^(k - 1)) = (fun x, mem x (interval 0 (2^(k - 1) - 1))).
     by apply fun_ext=> z //=; rewrite mem_interval; smt.
   by apply (mu_challenge0 _ sk).
 qed.
@@ -1108,8 +1108,8 @@ section.
   proof.
     move=> lt0r1 [lt0r3 ler3r2].
     rewrite !(div_def r1) ~3:smt !(Real.Comm.Comm r1); apply mulrMle=> //.
-    cut ->: 1%r / r2 = inv r2 by smt.
-    cut ->: 1%r / r3 = inv r3 by smt.
+    have ->: 1%r / r2 = inv r2 by smt.
+    have ->: 1%r / r3 = inv r3 by smt.
     by apply inv_le; first smt.
   qed.
 
@@ -1119,28 +1119,28 @@ section.
   proof.
     proc; wp; rnd (!invertible Hmem.pk); wp; skip=> //= &hr.
     elim/tuple2_ind (ks{hr})=> ks pk sk ks_def //=; progress=> //.
-    cut vpk: valid_pkey pk by exists sk.
+    have vpk: valid_pkey pk by exists sk.
     rewrite /challenge -Dinter_uni.dinter_is_dinter.
     rewrite Dinter_uni.mu_def_nz; first by apply (Int.Trans _ (2^(k-1) - 1)); smt.
     rewrite (card_noninvertible pk sk) //.
     rewrite card_interval_max (_: max (p_n pk - 1 - 0 + 1) 0 = p_n pk); first smt.
-    cut p_q_2k: s_p sk + s_q sk - 1 <= 2^(k /% 2 + 1) by smt.
-    cut k2_pq: 2^(k - 1) <= p_n pk by smt.
+    have p_q_2k: s_p sk + s_q sk - 1 <= 2^(k /% 2 + 1) by smt.
+    have k2_pq: 2^(k - 1) <= p_n pk by smt.
     apply (Trans _ ((2^(k /% 2 + 1))%r/(2^(k - 1))%r)).
       apply (Trans _ ((s_p sk + s_q sk - 1)%r/(2 ^ (k - 1))%r )).
         apply divrM; last smt.
-          cut: 0 < s_p sk + s_q sk - 1; last smt.
-          cut: 0 < s_p sk /\ 0 < s_q sk; last by smt.
-          cut H0: forall (x y:int), 0 <= x => 0 <= y => 0 < x * y => 0 < x /\ 0 < y by smt.
+          have: 0 < s_p sk + s_q sk - 1; last smt.
+          have: 0 < s_p sk /\ 0 < s_q sk; last by smt.
+          have H0: forall (x y:int), 0 <= x => 0 <= y => 0 < x * y => 0 < x /\ 0 < y by smt.
           apply H0.
-            by cut: 2^(k /%2 - 1) <= s_p sk; smt.
-            by cut: 2^(k /%2 - 1) <= s_q sk; smt.
+            by have: 2^(k /%2 - 1) <= s_p sk; smt.
+            by have: 2^(k /%2 - 1) <= s_q sk; smt.
             smt.
-      cut H0: forall (x y z:real), 0%r < z => x <= y => x / z <= y / z by smt.
+      have H0: forall (x y z:real), 0%r < z => x <= y => x / z <= y / z by smt.
       by apply H0; smt.
     rewrite Real.PowerInt.pow_div_den; first smt.
-    cut ->: k - 1 - (k /% 2 + 1) = k - k /% 2 - 2 by smt.
-    cut leq: k /% 2 - 2 <= k - k /% 2 - 2 by smt.
+    have ->: k - 1 - (k /% 2 + 1) = k - k /% 2 - 2 by smt.
+    have leq: k /% 2 - 2 <= k - k /% 2 - 2 by smt.
     apply (_: forall (x y:real), 0%r < x <= y => 1%r / y <= 1%r / x); first smt.
     split; first smt.
     by rewrite FromInt.from_intMle; smt.
@@ -1166,14 +1166,14 @@ section.
     mem x (dom m0) <=> mem x (dom m1).
   proof.
     rewrite /hmap_preq=> m0_m1.
-    cut: !mem x (dom m0) <=> !mem x (dom m1); last smt.
+    have: !mem x (dom m0) <=> !mem x (dom m1); last smt.
     by rewrite !mem_dom /= m0_m1 none_omap.
   qed.
 
   lemma hmap_preq_get m0 (m1:('a,'b * 'c * 'd) map) x:
     hmap_preq m0 m1 =>
     m0.[x] = omap pi3_1 m1.[x].
-  proof. by move=> hmap_eq; cut:= hmap_eq x. qed.
+  proof. by move=> hmap_eq; have:= hmap_eq x. qed.
 
   (* extending a single output map to pair output *)
   pred gmap_preq (m0:('a,'b) map) (m1:('a,'b * 'c) map) = forall x,
@@ -1184,14 +1184,14 @@ section.
     mem x (dom m0) <=> mem x (dom m1).
   proof.
     rewrite /gmap_preq=> m0_m1.
-    cut: !mem x (dom m0) <=> !mem x (dom m1); last smt.
+    have: !mem x (dom m0) <=> !mem x (dom m1); last smt.
     by rewrite !mem_dom /= m0_m1 none_omap.
   qed.
 
   lemma gmap_preq_get m0 (m1:('a,'b * 'c) map) x:
     gmap_preq m0 m1 =>
     m0.[x] = omap fst m1.[x].
-  proof. by move=> gmap_eq; cut:= gmap_eq x. qed.
+  proof. by move=> gmap_eq; have:= gmap_eq x. qed.
 
   lemma gmap_preq_set m0 (m1:('a,'b * 'c) map) x y z:
     gmap_preq m0 m1 =>
@@ -1211,9 +1211,9 @@ section.
     hmap_peq m0 m1 =>
     mem x (dom m0) <=> mem x (dom m1).
   proof.
-    move=> hmap_peq; cut: !mem x (dom m0) <=> !mem x (dom m1); last smt.
+    move=> hmap_peq; have: !mem x (dom m0) <=> !mem x (dom m1); last smt.
     rewrite !mem_dom /=.
-    cut:= hmap_peq x.
+    have:= hmap_peq x.
     by case (m0.[x])=> //=; [apply none_omap | case (m1.[x])].
   qed.
 
@@ -1231,7 +1231,7 @@ section.
     hmap_peq m0 m1 =>
     pi3_1 (oget m0.[x]) = pi3_1 (oget m1.[x]).
   proof.
-    move=> hmap_peq; cut:= hmap_peq x.
+    move=> hmap_peq; have:= hmap_peq x.
     by case (m0.[x])=> //=; case (m1.[x])=> //=; smt.
   qed.
 
@@ -1239,7 +1239,7 @@ section.
     hmap_peq m0 m1 =>
     pi3_2 (oget m0.[x]) = pi3_2 (oget m1.[x]).
   proof.
-    move=> hmap_peq; cut:= hmap_peq x.
+    move=> hmap_peq; have:= hmap_peq x.
     by case (m0.[x])=> //=; case (m1.[x])=> //=; smt.
   qed.
 
@@ -1281,14 +1281,14 @@ section.
       rcondf{2} 2; first by progress; rnd; skip; progress; rewrite -(hmap_preq_dom Ht.RO.m{m}).
       conseq (_: _ ==> hmap_preq H.m{1} Hmap.m{2}).
         progress.
-        rewrite H; cut: mem (m,r){2} (dom Hmap.m{2}) by rewrite -(hmap_preq_dom Ht.RO.m{1}).
+        rewrite H; have: mem (m,r){2} (dom Hmap.m{2}) by rewrite -(hmap_preq_dom Ht.RO.m{1}).
         by rewrite mem_dom; case (Hmap.m.[(m,r)]{2}).
       by rnd.
       rcondt{1} 2; first by progress ;rnd.
       rcondt{2} 2; first by progress; rnd; skip; progress; rewrite -(hmap_preq_dom Ht.RO.m{m}).
       conseq (_: _ ==> mem (m,r){2} (dom Hmap.m){2} /\ hmap_preq H.m{1} Hmap.m{2}).
         progress.
-        by rewrite H2; cut:= H1; rewrite mem_dom; case (m_R.[(m,r)]{2}).
+        by rewrite H2; have:= H1; rewrite mem_dom; case (m_R.[(m,r)]{2}).
       wp; rnd; skip; progress.
         by rewrite dom_set mem_add; right.
         rewrite /hmap_preq=> x; case ((m,r){2} = x)=> [<- | neq_mr_x].
@@ -1815,9 +1815,9 @@ section.
           move: H8; rewrite -pairS=> H10; case ((m,r){2} = x1).
             by move=> <-; rewrite get_set_eq /oget /pi3_1 /= mem_dom get_set_eq.
             move=> neq_mr_x1; rewrite get_set_neq // mem_dom get_set_neq.
-              by cut:= H10; rewrite mem_dom get_set_neq //; smt.
+              by have:= H10; rewrite mem_dom get_set_neq //; smt.
             rewrite -mem_dom; apply H.
-              by cut:= H10; rewrite mem_dom get_set_neq //; smt.
+              by have:= H10; rewrite mem_dom get_set_neq //; smt.
           smt.
           by rewrite -pairS !get_set_eq /oget /pi3_1.
           by rewrite -pairS !get_set_eq /oget /pi3_1.
@@ -1825,7 +1825,7 @@ section.
             by move=> <-; rewrite get_set_eq /oget /pi3_1.
             move=> neq_mr_x1; rewrite get_set_neq //.
             apply H.
-              by cut:= H10; rewrite mem_dom get_set_neq //; smt.
+              by have:= H10; rewrite mem_dom get_set_neq //; smt.
       (* Ga *)
       by proc; inline *; sp; if=> //; auto; progress; smt.
       (* Ha *)
@@ -1841,14 +1841,14 @@ section.
           move: H7; rewrite -pairS=> H9; case (m{2} = x0).
             by move=> <-; rewrite get_set_eq /oget /pi3_1 /= mem_dom get_set_eq.
             move=> neq_m_x0; rewrite get_set_neq // mem_dom get_set_neq.
-              by cut:= H9; rewrite mem_dom get_set_neq //; smt.
+              by have:= H9; rewrite mem_dom get_set_neq //; smt.
             rewrite -mem_dom; apply H.
-              by cut:= H9; rewrite mem_dom get_set_neq //; smt.
+              by have:= H9; rewrite mem_dom get_set_neq //; smt.
           by rewrite -pairS get_set_eq.
           move: H7; rewrite -pairS=> H7; case (m{2} = x0).
             by move=> <-; rewrite get_set_eq.
             move=> neq_m_x0; rewrite get_set_neq //; apply H.
-            by cut:= H7; rewrite mem_dom get_set_neq //; smt.
+            by have:= H7; rewrite mem_dom get_set_neq //; smt.
     by skip; smt.
   qed.
 
@@ -2065,11 +2065,11 @@ section.
       by rewrite /Monoid.Mrplus.NatMul.( * ); smt.
 (*-*) by inline *; auto.
 (*-*) proc.
-      cut bnd_pos: 0%r <= (qS + qH + qG - 1)%r / (2^kh)%r.
-        cut leq: 0%r <= (qS + qH + qG - 1)%r by smt.
-        cut lt: 0%r < (2^kh)%r by smt.
-        cut H: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z by smt.
-        cut ->: 0%r = 0%r / (2^kh)%r by smt.
+      have bnd_pos: 0%r <= (qS + qH + qG - 1)%r / (2^kh)%r.
+        have leq: 0%r <= (qS + qH + qG - 1)%r by smt.
+        have lt: 0%r < (2^kh)%r by smt.
+        have H: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z by smt.
+        have ->: 0%r = 0%r / (2^kh)%r by smt.
         smt.
       if; last by hoare.
       wp.
@@ -2077,7 +2077,7 @@ section.
         first by auto.
         rnd; skip; progress.
         rewrite -/(cpMem _) (mu_cpMem _ _ (1%r / (2^kh)%r)); first smt.
-        cut ->: forall x, x * (1%r / (2^kh)%r) = x / (2^kh)%r by smt.
+        have ->: forall x, x * (1%r / (2^kh)%r) = x / (2^kh)%r by smt.
         by apply (_: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z); smt.
 (*-*) by hoare; conseq (_ : _ ==> true) => //; smt.
 (*-*) by progress; proc; rcondt 1; auto; smt.
@@ -2274,24 +2274,24 @@ section.
       by wp; call (_: true ==> !H0'2.badh);
         first proc; wp; call (_: true).
 (*-*) proc.
-      cut H: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z by smt.
-      cut bnd1_pos: 0%r <= 1%r / (2^k0)%r.
-        cut leq: 0%r <= 1%r by smt.
-        cut lt: 0%r < (2^k0)%r by smt.
-        cut ->: 0%r = 0%r / (2^k0)%r by smt.
+      have H: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z by smt.
+      have bnd1_pos: 0%r <= 1%r / (2^k0)%r.
+        have leq: 0%r <= 1%r by smt.
+        have lt: 0%r < (2^k0)%r by smt.
+        have ->: 0%r = 0%r / (2^k0)%r by smt.
         smt.
-      cut bnd_pos: 0%r <= (qS + qH)%r / (2^k0)%r.
-        cut leq: 0%r <= (qS + qH)%r by smt.
-        cut lt: 0%r < (2^k0)%r by smt.
-        cut ->: 0%r = 0%r / (2^k0)%r by smt.
+      have bnd_pos: 0%r <= (qS + qH)%r / (2^k0)%r.
+        have leq: 0%r <= (qS + qH)%r by smt.
+        have lt: 0%r < (2^k0)%r by smt.
+        have ->: 0%r = 0%r / (2^k0)%r by smt.
         smt.
       sp; if.
         seq 1: (mem (m,r) (dom Hmap.m) /\ c <> Adv) ((qH + qS)%r/(2^k0)%r) (1%r) _ 0%r (!H0'2.badh)=> //.
           by rnd.
           rnd (fun r, mem (m,r) (dom Hmap.m)); skip; progress.
-          cut <-: mu ((Dunit.dunit m{hr}) * salt) (cpMem (dom Hmap.m{hr}))
+          have <-: mu ((Dunit.dunit m{hr}) * salt) (cpMem (dom Hmap.m{hr}))
                   = mu salt (fun r, mem (m{hr},r) (dom Hmap.m{hr})).
-            cut ->: mu ((Dunit.dunit m{hr}) * salt) (cpMem (dom Hmap.m{hr}))
+            have ->: mu ((Dunit.dunit m{hr}) * salt) (cpMem (dom Hmap.m{hr}))
                     = mu ((Dunit.dunit m{hr}) * salt) (fun x, (fun a, a = m{hr}) (fst x) /\
                                                               (fun b, mem (m{hr},b) (dom Hmap.m{hr})) (snd x)).
               rewrite mu_support /support /Pred.(/\) /cpMem; apply mu_eq=> x //=.
@@ -2300,16 +2300,16 @@ section.
           apply (Trans _ ((card (dom Hmap.m{hr}))%r * (1%r / (2^k0)%r))).
             apply mu_cpMem_le.
             move=> x mem_x; rewrite /mu_x.
-            cut ->: mu ((Dunit.dunit m{hr}) * salt) ((=) x)
+            have ->: mu ((Dunit.dunit m{hr}) * salt) ((=) x)
                     = mu ((Dunit.dunit m{hr}) * salt) (fun y, (fun a, a = fst x) (fst y) /\
                                                               (fun b, b = snd x) (snd y))
               by (apply mu_eq; smt).
             rewrite Dprod.mu_def Dunit.mu_def /charfun /=.
             case (m{hr} = fst x).
-              pose r:= snd x; cut ->: (fun x, x = r) = ((=) r) by (apply fun_ext; smt).
+              pose r:= snd x; have ->: (fun x, x = r) = ((=) r) by (apply fun_ext; smt).
               by rewrite -/(mu_x _ _); smt.
               smt.
-            cut ->: forall x, x * (1%r / (2^k0)%r) = x / (2^k0)%r by smt.
+            have ->: forall x, x * (1%r / (2^k0)%r) = x / (2^k0)%r by smt.
             by apply H; smt.
         hoare; inline Game0'2'badh.H.o; auto; smt.
         smt.
@@ -2331,11 +2331,11 @@ section.
        + qS%r * (qS + qH)%r / (2^k0)%r.
   proof.
     rewrite (Game0'1_G0'1 &m).
-    cut: Pr[GameG0'1.main() @ &m: res] <= Pr[Game0'2.main() @ &m: res \/ H0'2.badg \/ H0'2.badh].
+    have: Pr[GameG0'1.main() @ &m: res] <= Pr[Game0'2.main() @ &m: res \/ H0'2.badg \/ H0'2.badh].
       byequiv (_: ={glob GAdv1} ==> !(H0'2.badg \/ H0'2.badh){2} => ={res}); last 2 smt.
       by (apply (GameG0'1_0'2_abstract GAdv1); apply GAdv1_main_ll).
     rewrite Pr [mu_or] Pr [mu_or] (Game0'2_0'2'badg &m) (Game0'2_0'2'badh &m).
-    by cut:= Game0'2'badg &m; cut:= Game0'2'badh &m; smt.
+    by have:= Game0'2'badg &m; have:= Game0'2'badh &m; smt.
   qed.
   (* end computation *)
 
@@ -2347,7 +2347,7 @@ section.
        + qS%r * (qS + qH)%r / (2^k0)%r.
   proof.
     rewrite (PSS96_Game0 &m) (Game0_0'1 &m).
-    cut <-: Pr[Game0'2.main() @ &m: res] = Pr[Game1.main() @ &m: res].
+    have <-: Pr[Game0'2.main() @ &m: res] = Pr[Game1.main() @ &m: res].
       by byequiv (_: ={glob A} ==> ={res})=> //; sim.
     by apply (Game0'1_0'2 &m).
   qed.
@@ -2517,15 +2517,15 @@ section.
   proof.
     bypr (res{1}) (res{2})=> //.
     progress.
-    cut ->: Pr[SampleWST.sample(c{1}) @ &1: a = res] = 1%r/(2^(kg + kh))%r.
+    have ->: Pr[SampleWST.sample(c{1}) @ &1: a = res] = 1%r/(2^(kg + kh))%r.
       byphoare (_: true ==> a = res)=> //; proc.
       seq 1: (w = a.`1) (1%r/(2^kh)%r) (1%r/(2^kg)%r) _ 0%r=> //.
         rnd; skip; progress.
-        cut ->: (fun x, x = a.`1) = ((=) a.`1) by apply fun_ext; smt.
+        have ->: (fun x, x = a.`1) = ((=) a.`1) by apply fun_ext; smt.
         smt.
         by rnd ((=) a.`2); skip; progress; smt.
         by hoare; rnd; skip; smt.
-        progress; cut ->: (2^kh)%r * (2^kg)%r = (2^kh * 2^kg)%r by smt.
+        progress; have ->: (2^kh)%r * (2^kg)%r = (2^kh * 2^kg)%r by smt.
         by rewrite pow_add; smt.
     rewrite Logic.eq_sym.
     byphoare (_: (c = Adv => invertible Hmem.pk Hmem.xstar) /\
@@ -2540,7 +2540,7 @@ section.
             (_: _ ==> 0 <= z < 2^(k-1)) => //;first by (auto;smt).
       progress; rewrite /from_htag /to_htag /from_gtag /to_gtag /from_signature
         /to_signature; last 2 by smt.
-      cut [_ <-] := msb0_bnd (i2osp z0);first by smt.
+      have [_ <-] := msb0_bnd (i2osp z0);first by smt.
       rewrite /from_signature HTag.pcan_to_from 1:smt.
       rewrite GTag.pcan_to_from 1:smt.
       rewrite sub_app_sub //;first 3 smt.
@@ -2550,8 +2550,8 @@ section.
     rewrite /sigd mu_def /=.
     rewrite mu_support /Pred.(/\) /=.
     pose x0:= os2ip (to_signature (zeros 1 || from_htag w0 || from_gtag st0)).
-    cut x0_bnd: 0 <= x0 < 2^(k - 1) by smt.
-    cut ->: (fun x, simul Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv) Hmem.xstar{hr}
+    have x0_bnd: 0 <= x0 < 2^(k - 1) by smt.
+    have ->: (fun x, simul Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv) Hmem.xstar{hr}
                       (simul_inv Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv) Hmem.xstar{hr} x)
                     = x0 /\ support [0..2^(k - 1) - 1] x)
             = ((=) x0).
@@ -2604,11 +2604,11 @@ section.
       auto; progress.
         by apply hmap_peq_set.
       auto; progress.
-        cut indom1: mem (m,r){2} (dom Hmap.m){1} by smt.
-        cut:= indom1; rewrite (hmap_peq_dom _ Hmap.m{2}) //.
+        have indom1: mem (m,r){2} (dom Hmap.m){1} by smt.
+        have:= indom1; rewrite (hmap_peq_dom _ Hmap.m{2}) //.
         move: indom1.
         rewrite !mem_dom /oget /pi3_1.
-        cut:= H (m,r){2}.
+        have:= H (m,r){2}.
         case (Hmap.m{1}.[(m,r)]{2})=> //=.
         case (Hmap.m.[(m,r)]{2})=> //=.
         smt.
@@ -2640,11 +2640,11 @@ section.
        + qS%r * (qS + qH)%r / (2^k0)%r
        + 1%r / (2^(k /% 2 - 2))%r.
   proof.
-    cut <-: Pr[Game1'2.main() @ &m: res] = Pr[Game2.main() @ &m: res].
+    have <-: Pr[Game1'2.main() @ &m: res] = Pr[Game2.main() @ &m: res].
       by byequiv (Game1'2_2_abstract GAdv1).
-    cut <-: Pr[Game1'1.main() @ &m: res] = Pr[Game1'2.main() @ &m: res].
+    have <-: Pr[Game1'1.main() @ &m: res] = Pr[Game1'2.main() @ &m: res].
       by byequiv (Game1'1_1'2_abstract GAdv1).
-    cut: Pr[Game1.main() @ &m: res] <= Pr[Game1'1.main() @ &m: res \/ !invertible Hmem.pk Hmem.xstar].
+    have: Pr[Game1.main() @ &m: res] <= Pr[Game1'1.main() @ &m: res \/ !invertible Hmem.pk Hmem.xstar].
       byequiv (_: ={glob GAdv} ==> ={res} \/ !invertible Hmem.pk{2} Hmem.xstar{2}); last 2 smt.
       by apply (Game1_1'1_abstract GAdv1 _); apply GAdv1_main_ll.
     by rewrite Pr [mu_or]; smt.
@@ -3039,11 +3039,11 @@ section.
       by rewrite /Monoid.Mrplus.NatMul.( * ); smt.
 (*-*) smt.
 (*-*) by inline *; auto.
-(*-*) cut H: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z by smt.
-      cut bnd1_pos: 0%r <= 1%r / (2^(k /% 2 - 1))%r.
-        cut leq: 0%r <= 1%r by smt.
-        cut lt: 0%r < (2^(k /% 2 - 1))%r by smt.
-        cut ->: 0%r = 0%r / (2^(k /% 2 - 1))%r by smt.
+(*-*) have H: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z by smt.
+      have bnd1_pos: 0%r <= 1%r / (2^(k /% 2 - 1))%r.
+        have leq: 0%r <= 1%r by smt.
+        have lt: 0%r < (2^(k /% 2 - 1))%r by smt.
+        have ->: 0%r = 0%r / (2^(k /% 2 - 1))%r by smt.
         smt.
       proc.
       sp; if=> //; last by hoare; skip; smt.
@@ -3054,7 +3054,7 @@ section.
         rewrite /sigd.
         pose f:= simul Hmem.pk{hr} Hmem.sk{hr} true Hmem.xstar{hr}.
         pose finv:= simul_inv Hmem.pk{hr} Hmem.sk{hr} true Hmem.xstar{hr}.
-        cut ->: mu (dapply finv [0..2^(k - 1) -1]) (fun x, !invertible Hmem.pk{hr} x)
+        have ->: mu (dapply finv [0..2^(k - 1) -1]) (fun x, !invertible Hmem.pk{hr} x)
                 = mu [0..2^(k - 1) - 1] (fun x, !invertible Hmem.pk{hr} x).
           rewrite Dapply.mu_def /=.
           rewrite (mu_support (fun x, !invertible Hmem.pk{hr} x))
@@ -3063,12 +3063,12 @@ section.
             by rewrite /finv /simul_inv /= -invertible_mulzp -invertible_inv H3 -invertible_rsas.
             by progress; rewrite /finv /simul_inv /= -invertible_mulzp -invertible_inv H3 -invertible_rsas.
         rewrite -Dinter_uni.dinter_is_dinter Dinter_uni.mu_def_nz; first smt.
-        cut ->: (fun x, !invertible Hmem.pk{hr} x) = !invertible Hmem.pk{hr} by apply fun_ext.
+        have ->: (fun x, !invertible Hmem.pk{hr} x) = !invertible Hmem.pk{hr} by apply fun_ext.
         apply (Trans _ ((2^(k /% 2))%r / (2^(k - 1))%r)).
           rewrite card_interval_max /max (_: 2^(k - 1) - 1 - 0 + 1 = 2^(k - 1)); first smt.
-          cut ->: 2^(k - 1) < 0 = false by smt.
+          have ->: 2^(k - 1) < 0 = false by smt.
           simplify.
-          cut:= card_noninvertible_2k1 Hmem.pk{hr} Hmem.sk{hr} _=> // bound_den.
+          have:= card_noninvertible_2k1 Hmem.pk{hr} Hmem.sk{hr} _=> // bound_den.
           by apply (_: forall (x y z:real), 0%r < z => x <= y => x / z <= y / z)=> //; smt.
         rewrite Real.PowerInt.pow_div_den; first smt.
         apply (_: forall (x y:real), 0%r < x <= y => 1%r / y <= 1%r / x); first smt.
@@ -3188,12 +3188,12 @@ section.
     progress.
     case (exists r', 0 <= r' < 2^(k - 1) /\ a = simul_inv pk' sk' b' x' r').
       move=> [r'] [valid_r'] ->.
-      cut ->: Pr[Direct.sample((pk',sk',b',x'),d) @ &1: res = simul_inv pk' sk' b' x' r']
+      have ->: Pr[Direct.sample((pk',sk',b',x'),d) @ &1: res = simul_inv pk' sk' b' x' r']
               = 1%r/(2^(k - 1))%r.
         byphoare (_: i = (pk',sk',b',x') ==> res = simul_inv pk' sk' b' x' r')=> //.
         proc; inline *; wp; rnd (fun r, simul pk' sk' b' x' r = r'); wp; skip; progress.
           rewrite /sigd Dapply.mu_def /= mu_support.
-          cut ->: ((fun r, simul pk' sk' b' x' (simul_inv pk' sk' b' x' r) = r') /\ support [0..2^(k - 1) - 1])
+          have ->: ((fun r, simul pk' sk' b' x' (simul_inv pk' sk' b' x' r) = r') /\ support [0..2^(k - 1) - 1])
                   = ((=) r').
             rewrite /Pred.(/\) /= -fun_ext=> y /=.
             rewrite eq_iff; split.
@@ -3202,20 +3202,20 @@ section.
                 by rewrite simul_invK //; first smt.
                 smt.
           rewrite -/(mu_x _ _) Dinter.mu_x_def.
-          cut ->: in_supp r' [0..2^(k - 1) - 1] by smt.
+          have ->: in_supp r' [0..2^(k - 1) - 1] by smt.
           smt.
           by rewrite simulK //; smt.
           by rewrite simul_invK //; smt.
       apply Logic.eq_sym.
       pose bdt:= (2^(k - 1))%r.
-      cut bdt_pos: 0 < 2^(k - 1) by smt.
-      cut bdt_posr: 0%r < (2^(k - 1))%r by smt.
+      have bdt_pos: 0 < 2^(k - 1) by smt.
+      have bdt_posr: 0%r < (2^(k - 1))%r by smt.
       byphoare (_: i = (pk',sk',b',x') /\ dflt = d ==> res = simul_inv pk' sk' b' x' r')=> //; proc.
       pose bd:= mu_x (challenge pk') r'.
-      cut bd_pos: 0%r < bd by smt.
-      cut d_uni: forall x, in_supp x (challenge pk') => mu_x (challenge pk') x = bd.
+      have bd_pos: 0%r < bd by smt.
+      have d_uni: forall x, in_supp x (challenge pk') => mu_x (challenge pk') x = bd.
         by move=> y Hy; rewrite /bd; apply challengeU=> //; smt.
-      cut Hdiff: bdt <> (Real.zero)%Real by smt.
+      have Hdiff: bdt <> (Real.zero)%Real by smt.
       sp.
       conseq [-frame] (_: (pk,sk,b,x){hr} = (pk',sk',b',x') /\ !0 <= z < 2^(k - 1) ==>
                  u = simul_inv pk' sk' b' x' r': = (if 0 <= z < 2^(k - 1)
@@ -3224,17 +3224,17 @@ section.
           first smt.
       while ((pk,sk,b,x){hr} = (pk',sk',b',x'))
             (if 0 <= z < 2^(k - 1) then 0 else 1) 1 (bdt * bd) => //.
-        progress; cut ->: 0 <= z < 2^(k - 1) by smt.
-        rewrite /= /charfun; cut ->: (simul_inv pk sk b x r' = u){hr} = false by smt.
+        progress; have ->: 0 <= z < 2^(k - 1) by smt.
+        rewrite /= /charfun; have ->: (simul_inv pk sk b x r' = u){hr} = false by smt.
         smt.
         smt.
         move=> Hw.
         alias 3 z0 = z.
         phoare split bd ((1%r - bdt*bd) * (1%r/bdt)): (r' = z0).
           move=> &hr [H5 H6]; rewrite (_: 0 <= z{hr} < 2^(k - 1) = false) 1:neqF //=.
-          cut {1}->: bd = bd * bdt / bdt.
-            cut ->: bd * bdt / bdt = bd * (bdt / bdt) by smt.
-            cut ->: bdt / bdt = 1%r by smt.
+          have {1}->: bd = bd * bdt / bdt.
+            have ->: bd * bdt / bdt = bd * (bdt / bdt) by smt.
+            have ->: bdt / bdt = 1%r by smt.
             smt.
           smt.
           seq 3: (r' = z0) bd 1%r _ 0%r (z0 = z /\
@@ -3242,7 +3242,7 @@ section.
                                          (pk,sk,b,x) = (pk',sk',b',x'))=> //.
             by auto; progress; rewrite simulK //; smt.
             wp; rnd; skip; progress.
-            cut ->: mu (challenge pk{hr}) (fun y, r' = simul pk sk b x y){hr}
+            have ->: mu (challenge pk{hr}) (fun y, r' = simul pk sk b x y){hr}
                     = mu (challenge pk{hr}) ((=) (simul_inv pk sk b x r')){hr}.
               rewrite (mu_support (fun y, r' = simul pk sk b x y){hr})
                       (mu_support ((=) (simul_inv pk sk b x r'){hr})).
@@ -3251,7 +3251,7 @@ section.
                 by progress; rewrite simul_invK //; smt.
             by rewrite /bd /mu_x; apply challengeU; smt.
             conseq Hw; progress=> //.
-            cut ->: 0 <= z{hr} < 2^(k - 1) by smt.
+            have ->: 0 <= z{hr} < 2^(k - 1) by smt.
             by rewrite /charfun.
             hoare; conseq (_: _ ==> true) => //.
             by progress;rewrite -nand;left.
@@ -3261,11 +3261,11 @@ section.
             by auto; progress; rewrite simulK //; smt.
             case (r' = z0); first by conseq (_: _ ==> false).
             conseq Hw; progress=> //.
-            cut ->: 0 <= z{hr} < 2^(k - 1) by smt.
+            have ->: 0 <= z{hr} < 2^(k - 1) by smt.
             rewrite /= /charfun.
-            cut simul_inj: (simul_inv pk sk b x r' = simul_inv pk sk b x z => r' = z){hr}.
-              cut {2}<-:= simul_invK pk{hr} sk{hr} b{hr} x{hr} r'=> //; first smt.
-              cut {2}<-:= simul_invK pk{hr} sk{hr} b{hr} x{hr} z{hr}=> //; first smt.
+            have simul_inj: (simul_inv pk sk b x r' = simul_inv pk sk b x z => r' = z){hr}.
+              have {2}<-:= simul_invK pk{hr} sk{hr} b{hr} x{hr} r'=> //; first smt.
+              have {2}<-:= simul_invK pk{hr} sk{hr} b{hr} x{hr} z{hr}=> //; first smt.
               by move=> ->.
             smt.
             phoare split ! 1%r (bdt*bd); wp; rnd=> //.
@@ -3276,17 +3276,17 @@ section.
           by conseq (_: _ ==> true)=> //; auto; smt.
       progress; first smt.
       wp; rnd; skip; progress.
-        cut ->: 0 <= z{hr} < 2^(k - 1) = false by smt.
-        rewrite /=; cut ->: (fun y, (if 0 <= simul pk sk b x y < 2^(k - 1) then 0 else 1) < 1){hr}
+        have ->: 0 <= z{hr} < 2^(k - 1) = false by smt.
+        rewrite /=; have ->: (fun y, (if 0 <= simul pk sk b x y < 2^(k - 1) then 0 else 1) < 1){hr}
                             = (fun y, 0 <= simul pk sk b x y < 2^(k - 1)){hr}.
           by apply fun_ext=> y /=; smt.
         rewrite /bdt /bd {1}/challenge Dinter.mu_x_def_in; first smt.
         by rewrite mu_challenge_in_pim //; smt.
-    cut ->: (!exists r', 0 <= r' < 2^(k - 1) /\ a = simul_inv pk' sk' b' x' r')
+    have ->: (!exists r', 0 <= r' < 2^(k - 1) /\ a = simul_inv pk' sk' b' x' r')
             <=> (forall r', !0 <= r' < 2^(k - 1) \/ a <> simul_inv pk' sk' b' x' r').
       by split; smt.
     move=> r'_constraints.
-    cut ->: Pr[Direct.sample((pk',sk',b',x'),d) @ &1: res = a] = 0%r.
+    have ->: Pr[Direct.sample((pk',sk',b',x'),d) @ &1: res = a] = 0%r.
       byphoare (_: i = (pk',sk',b',x') /\ dflt = d ==> res = a)=> //=.
       hoare; proc; rnd; wp; skip=> //= &hr [i_def d_def] r; subst=> //=.
       rewrite /sigd Dapply.supp_def.
@@ -3299,7 +3299,7 @@ section.
         by auto; progress; rewrite simulK //; smt.
       wp; skip; progress.
         smt.
-        cut:= H8 _; first smt.
+        have:= H8 _; first smt.
         smt.
   qed.
 
@@ -3316,8 +3316,8 @@ section.
     elim/tuple4_ind (i{2})=> i2 pk' sk' b' x' i2_def.
     move: (dflt{2})=> d.
     move=> [[->] ->] [d_invalid] //= [vkeys [vx' invx']].
-    cut:= Direct_Loop pk' sk' b' x' d a &1 &2 _ _ _ _=> //.
-    cut ->: Pr[Direct.sample((pk',sk',b',x'),d) @ &1: res = a]
+    have:= Direct_Loop pk' sk' b' x' d a &1 &2 _ _ _ _=> //.
+    have ->: Pr[Direct.sample((pk',sk',b',x'),d) @ &1: res = a]
             = Pr[Direct.sample((pk',sk',b',x'),d) @ &1: a = res]
       by rewrite Pr [mu_eq].
     by move=> ->; rewrite Pr [mu_eq].
@@ -3428,16 +3428,16 @@ section.
       by auto; smt.
       split.
         progress.
-        cut lt_div: forall (x y z:real), 0%r < z => x < y => x / z < y / z by smt.
-        cut pos_inv: forall x, 0%r < x => 0%r < 1%r/x.
-          by move=> x lt0x; cut ->: 0%r = 0%r/x; smt.
-        cut ->: forall x y, x / y = x * 1%r/y by smt.
-        cut pos_mul: forall x y, 0%r < x => 0%r < y => 0%r < x * y by smt.
+        have lt_div: forall (x y z:real), 0%r < z => x < y => x / z < y / z by smt.
+        have pos_inv: forall x, 0%r < x => 0%r < 1%r/x.
+          by move=> x lt0x; have ->: 0%r = 0%r/x; smt.
+        have ->: forall x y, x / y = x * 1%r/y by smt.
+        have pos_mul: forall x y, 0%r < x => 0%r < y => 0%r < x * y by smt.
         by apply (pos_mul ((2^(k-1))%r) (1%r/(p_n Hmem.pk{hr})%r)); smt.
       move=> z; conseq (_: _: =((2^(k - 1))%r/(p_n Hmem.pk)%r)).
       wp; rnd; skip; progress.
       move: H2; rewrite -neqF=> -> //=.
-      cut ->: (fun x, (if !0 <= (if c{hr} = Adv
+      have ->: (fun x, (if !0 <= (if c{hr} = Adv
                                    then ((rsap Hmem.pk Hmem.xstar) ** (rsap Hmem.pk x)) Hmem.pk
                                    else rsap Hmem.pk x)
                              < 2^(k - 1)
@@ -3445,7 +3445,7 @@ section.
               (fun x, (if (fun y, 0 <= simul Hmem.pk Hmem.sk (c = Adv) Hmem.xstar y < 2^(k - 1)){hr} x
                          then 0 else 1) < 1){hr}.
             by rewrite /simul -fun_ext=> x //=; smt.
-          cut ->: forall (P:int -> bool), (fun x, (if P x then 0 else 1) < 1) = P.
+          have ->: forall (P:int -> bool), (fun x, (if P x then 0 else 1) < 1) = P.
             by move=> P; apply fun_ext=> x /=; smt.
     by apply mu_challenge_in_pim.
   qed.
@@ -3475,7 +3475,7 @@ section.
                w{2}  = to_htag (sub (from_signature (i2osp z)) 1 kh){2} /\
                st{2} = to_gtag (sub (from_signature (i2osp z)) (1 + kh) kg){2})).
         auto; progress; first last; last 2 smt.
-        by cut:= H4; rewrite /simul; smt.
+        by have:= H4; rewrite /simul; smt.
       by wp; skip; progress; expect 8 smt.
     seq  4  1: (={glob Hmap, glob Gmap, u, ho, c, z, w, st, m, r});
       first by wp.
@@ -3609,17 +3609,17 @@ section.
       by auto; smt.
       split.
         progress.
-        cut lt_div: forall (x y z:real), 0%r < z => x < y => x / z < y / z by smt.
-        cut pos_inv: forall x, 0%r < x => 0%r < 1%r/x.
-          by move=> x lt0x; cut ->: 0%r = 0%r/x; smt.
-        cut ->: forall x y, x / y = x * 1%r/y by smt.
-        cut pos_mul: forall x y, 0%r < x => 0%r < y => 0%r < x * y by smt.
+        have lt_div: forall (x y z:real), 0%r < z => x < y => x / z < y / z by smt.
+        have pos_inv: forall x, 0%r < x => 0%r < 1%r/x.
+          by move=> x lt0x; have ->: 0%r = 0%r/x; smt.
+        have ->: forall x y, x / y = x * 1%r/y by smt.
+        have pos_mul: forall x y, 0%r < x => 0%r < y => 0%r < x * y by smt.
         apply (pos_mul ((2^(k-1))%r) (1%r/(p_n Hmem.pk{1})%r)); first smt.
         smt.
         move=> z; conseq (_: _: =((2^(k - 1))%r/(p_n Hmem.pk)%r)).
         wp; rnd; skip; progress.
         move: H2; rewrite -neqF=> -> //=.
-        cut ->: (fun x, (if !0 <= (if c{1} = Adv
+        have ->: (fun x, (if !0 <= (if c{1} = Adv
                                      then ((rsap Hmem.pk Hmem.xstar) ** (rsap Hmem.pk x)) Hmem.pk
                                      else rsap Hmem.pk x)
                                < 2^(k - 1)
@@ -3627,7 +3627,7 @@ section.
                 (fun x, (if (fun y, 0 <= simul Hmem.pk Hmem.sk (c = Adv) Hmem.xstar y < 2^(k - 1)){1} x
                            then 0 else 1) < 1){1}.
           by rewrite /simul -fun_ext=> x //=; smt.
-        cut ->: forall (P:int -> bool), (fun x, (if P x then 0 else 1) < 1) = P.
+        have ->: forall (P:int -> bool), (fun x, (if P x then 0 else 1) < 1) = P.
           by move=> P; apply fun_ext=> x /=; smt.
         by apply mu_challenge_in_pim.
   qed.
@@ -3800,11 +3800,11 @@ section.
       rewrite /max (_: qH + qS < 0 = false) /=; first smt.
       by rewrite /Monoid.Mrplus.NatMul.( * ); smt.
       by inline *;auto.
-      cut Hpos : (0%r <= 1%r / (2 ^ (k0+1))%r).
-        cut lt_div: forall (x y z:real), 0%r < z => x < y => x / z < y / z by smt.
-        cut pos_inv: forall x, 0%r < x => 0%r < 1%r/x.
-          by move=> x lt0x; cut ->: 0%r = 0%r/x; smt.
-        cut pos_mul: forall x y, 0%r < x => 0%r < y => 0%r < x * y by smt.
+      have Hpos : (0%r <= 1%r / (2 ^ (k0+1))%r).
+        have lt_div: forall (x y z:real), 0%r < z => x < y => x / z < y / z by smt.
+        have pos_inv: forall x, 0%r < x => 0%r < 1%r/x.
+          by move=> x lt0x; have ->: 0%r = 0%r/x; smt.
+        have pos_mul: forall x y, 0%r < x => 0%r < y => 0%r < x * y by smt.
         smt.
       proc;sp;if;last by hoare.
       if;last by hoare;auto.
@@ -3823,18 +3823,18 @@ section.
               Hmem.ystar = rsap Hmem.pk Hmem.xstar /\ support keypairs (Hmem.pk, Hmem.sk)) => //;first by auto;smt.
          wp => /=;rnd;skip;progress.
          rewrite (_:b{hr} = false)=> /=;first by smt.
-         cut -> : ((fun (x:int),
+         have -> : ((fun (x:int),
                     ! 0 <= (if c{hr} = Adv then ( ** ) (rsap Hmem.pk{hr} Hmem.xstar{hr}) (rsap Hmem.pk{hr} x) Hmem.pk{hr}
                     else rsap Hmem.pk{hr} x) < 2 ^ (k - 1)) =
                   (!(fun (x:int), 0 <= simul Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv)  Hmem.xstar{hr} x < 2^(k-1)))).
             by apply fun_ext => x;rewrite /Pred.([!]) /simul.
          rewrite mu_not (_ : mu (challenge Hmem.pk{hr}) True = 1%r);first by smt.
-         cut -> := mu_challenge_in_pim Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv) Hmem.xstar{hr} _ _ _ => //.
-         cut : (1%r/2%r <=  (2 ^ (k - 1))%r / (p_n Hmem.pk{hr})%r); last smt.
+         have -> := mu_challenge_in_pim Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv) Hmem.xstar{hr} _ _ _ => //.
+         have : (1%r/2%r <=  (2 ^ (k - 1))%r / (p_n Hmem.pk{hr})%r); last smt.
          apply (_:forall x1 x2 y1 y2, 0%r < y1 => 0%r < y2 => x1 * y2 <= x2 * y1 => x1/y1 <= x2/y2) => //=.
            move=> x1 x2 y1 y2 Hy1 Hy2 Hm.
            apply (_: forall (x y z:real), 0%r < z => x*z <= y => x <= y / z) => //; first by smt.
-           by cut -> : ((x1 / y1) * y2 = (x1*y2) / y1);smt.
+           by have -> : ((x1 / y1) * y2 = (x1*y2) / y1);smt.
            by smt.
          rewrite {2} (_:2 = 2^1); first by rewrite (_: 1 = 0 + 1) // powS // pow0.
          rewrite (_:(2 ^ (k - 1))%r * (2 ^ 1)%r = (2 ^ (k - 1) * 2 ^ 1)%r); first smt.
@@ -3845,7 +3845,7 @@ section.
        progress.
          rewrite (_ : (2%r * (2 ^ (k0 + 1 - (i{hr} + 1)))%r) = (2 ^ (k0 + 1 - i{hr}))%r) //.
          rewrite {1}(_: 2 = (2^1)); first by rewrite (_: 1 = 0 + 1) // powS // pow0.
-         cut ->: (2^1)%r * (2 ^ (k0 + 1 - (i{hr} + 1)))%r = (2^1 * 2^(k0 + 1 - (i{hr} + 1)))%r.
+         have ->: (2^1)%r * (2 ^ (k0 + 1 - (i{hr} + 1)))%r = (2^1 * 2^(k0 + 1 - (i{hr} + 1)))%r.
          smt.
        by rewrite pow_add //;smt.
        by skip;smt.
@@ -3859,11 +3859,11 @@ section.
     <= Pr[Game3'3.main() @ &m: res]
        + (qH + qS)%r * 1%r/(2^(k0+1))%r.
   proof.
-    cut: Pr[Game3'2.main() @ &m: res] <= Pr[Game3'3.main() @ &m: res \/ H3'3.bad].
+    have: Pr[Game3'2.main() @ &m: res] <= Pr[Game3'3.main() @ &m: res \/ H3'3.bad].
       by byequiv GenH3'2_Game3'3=> //; smt.
     rewrite Pr [mu_or].
     rewrite (Game3'3_3'3bad &m).
-    cut := Game3'3'bad &m; smt.
+    have := Game3'3'bad &m; smt.
   qed.
 
   (** Game4: Minor cleanup to facilitate the reduction *)
@@ -3953,25 +3953,25 @@ section.
        + (qH + qS)%r * 1%r/(2^(k0+1))%r.
   proof.
     rewrite -(Game3'3_4 &m).
-    cut: Pr[Game3.main() @ &m: res]
+    have: Pr[Game3.main() @ &m: res]
          <= Pr[Game3'1.main() @ &m: res]
             + qH%r * 1%r/(2^(k /% 2 - 1))%r.
-      cut: Pr[Game3.main() @ &m: res]
+      have: Pr[Game3.main() @ &m: res]
            <= Pr[Game3'1.main() @ &m: res \/ H3'1.bad].
         by byequiv Game3_3'1=> //; smt.
       rewrite Pr [mu_or].
-      cut ->: Pr[Game3'1.main() @ &m: H3'1.bad]
+      have ->: Pr[Game3'1.main() @ &m: H3'1.bad]
               = Pr[Game3'1'bad.main() @ &m: H3'1.bad /\ Mem.cH <= qH]
         by byequiv Game3'1_3'1'bad.
-      by cut:= Pr_Game3'1'bad &m; smt.
-    cut ->: Pr[Game3'1.main() @ &m: res]
+      by have:= Pr_Game3'1'bad &m; smt.
+    have ->: Pr[Game3'1.main() @ &m: res]
             = Pr[Gen1(GAdv3,GenH3(Direct),G1).main() @ &m: res].
       by byequiv Game3'1_Direct.
     rewrite (GameH3Direct_Loop &m).
-    cut ->: Pr[Gen1(GAdv3,GenH3(Loop),G1).main() @ &m: res]
+    have ->: Pr[Gen1(GAdv3,GenH3(Loop),G1).main() @ &m: res]
             = Pr[Game3'2.main() @ &m: res].
       by byequiv Game3'1Loop_3'2.
-    cut:= Game3'2_3'3 &m.
+    have:= Game3'2_3'3 &m.
     smt.
   qed.
 
@@ -3984,7 +3984,7 @@ section.
        + qH%r * 1%r/(2^(k /% 2 - 1))%r
        + (qH + qS)%r * 1%r/(2^(k0+1))%r.
   proof.
-    cut:= PSS96_Game2 &m.
+    have:= PSS96_Game2 &m.
     rewrite (Game2_3 &m).
     smt.
   qed.
@@ -4140,16 +4140,16 @@ section.
         by auto; progress; expect 2 smt.
       auto; progress; first 4 smt.
         rewrite /oget /snd /= -xorwA xorwK xorw0.
-        cut:= H7 _=> // [[->]] [->] ->; rewrite /from_signature /to_signature.
+        have:= H7 _=> // [[->]] [->] ->; rewrite /from_signature /to_signature.
         rewrite /from_htag /to_htag HTag.pcan_to_from; first smt.
         rewrite /from_gtag /to_gtag GTag.pcan_to_from; first smt.
-        cut ->: (sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 1 kh ||
+        have ->: (sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 1 kh ||
                  sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} (1 + kh) kg) =
                   sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 1 (kh + kg)
           by smt.
-        cut:= msb0_bnd (i2osp (rsap Hmem.pk{2} u_R)); rewrite /from_signature; elim=> _ <-.
+        have:= msb0_bnd (i2osp (rsap Hmem.pk{2} u_R)); rewrite /from_signature; elim=> _ <-.
           by rewrite pcan_os2ip_i2osp; smt.
-        cut ->: (sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 0 1 ||
+        have ->: (sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 0 1 ||
                  sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 1 (kh + kg)) =
                   to_bits (i2osp (rsap Hmem.pk u_R)){2}
           by smt.
@@ -4159,16 +4159,16 @@ section.
         smt.
         smt.
         rewrite /oget /snd /= -xorwA xorwK xorw0.
-        cut:= H7 _=> // [[->]] [->] ->; rewrite /from_signature /to_signature.
+        have:= H7 _=> // [[->]] [->] ->; rewrite /from_signature /to_signature.
         rewrite /from_htag /to_htag HTag.pcan_to_from; first smt.
         rewrite /from_gtag /to_gtag GTag.pcan_to_from; first smt.
-        cut ->: (sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 1 kh ||
+        have ->: (sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 1 kh ||
                  sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} (1 + kh) kg) =
                   sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 1 (kh + kg)
           by smt.
-        cut:= msb0_bnd (i2osp (rsap Hmem.pk{2} u_R)); rewrite /from_signature; elim=> _ <-.
+        have:= msb0_bnd (i2osp (rsap Hmem.pk{2} u_R)); rewrite /from_signature; elim=> _ <-.
           by rewrite pcan_os2ip_i2osp; smt.
-        cut ->: (sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 0 1 ||
+        have ->: (sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 0 1 ||
                  sub (to_bits (i2osp (rsap Hmem.pk u_R))){2} 1 (kh + kg)) =
                   to_bits (i2osp (rsap Hmem.pk u_R)){2}
           by smt.
@@ -4283,9 +4283,9 @@ section.
       if=> //; last first.
         rcondf 4; first by auto.
         wp; skip; progress [-split].
-        cut:= H2 m2 r2 _ => //; rewrite H9 /= => -[x1_in_G].
-        cut:= x1_in_G; rewrite mem_dom /oget; case (Gmap.m.[x1]{hr})=> //= [[w st]].
-        by progress; cut:= H12 _=> //; progress; rewrite mem_add; left.
+        have:= H2 m2 r2 _ => //; rewrite H9 /= => -[x1_in_G].
+        have:= x1_in_G; rewrite mem_dom /oget; case (Gmap.m.[x1]{hr})=> //= [[w st]].
+        by progress; have:= H12 _=> //; progress; rewrite mem_add; left.
       rcondf 6; first by auto.
       wp; skip; progress.
         case ((m1,r1){hr} = (m2,r2)).
@@ -4293,66 +4293,66 @@ section.
           by rewrite mem_dom get_set_eq.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           by rewrite mem_dom get_set_neq 2:-mem_dom; first smt.
         case ((m1,r1){hr} = (m2,r2)).
           by elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /=; smt.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          by cut:= H2 m2 r2 _=> //; rewrite hmr /=; smt.
+          by have:= H2 m2 r2 _=> //; rewrite hmr /=; smt.
         case ((m1,r1){hr} = (m2,r2)).
           by elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /=; smt.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          by cut:= H2 m2 r2 _=> //; rewrite hmr /=; smt.
+          by have:= H2 m2 r2 _=> //; rewrite hmr /=; smt.
         case ((m1,r1){hr} = (m2,r2)).
           elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /= => -[w_eq] [c_eq u_eq]; subst.
           by move: H10; rewrite get_set_eq /oget.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> -> /=.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> -> /=; smt.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> -> /=; smt.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> -> /=; smt.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst; smt.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst; smt.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
@@ -4361,22 +4361,22 @@ section.
           by rewrite -xorwA xorwK xorw0; smt.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-          cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
         rewrite /oget /= -xorwA xorwK xorw0.
         case ((m1,r1){hr} = (m2,r2)).
           elim=> [m_eq r_eq]; subst; move: H9; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst.
           move: H10; rewrite get_set_eq /oget /= => -[st_eq c'_eq]; subst.
-          cut:= H3 _; first by split.
+          have:= H3 _; first by split.
           move=> [z_def [-> [-> ->]]].
           rewrite /to_htag /from_htag HTag.pcan_to_from; first smt.
           rewrite /to_gtag /from_gtag GTag.pcan_to_from; first smt.
-          cut ->: (sub (from_signature (i2osp z)) 0 1 ||
+          have ->: (sub (from_signature (i2osp z)) 0 1 ||
                    sub (from_signature (i2osp z)) 1 kh ||
                    sub (from_signature (i2osp z)) (1 + kh) kg){hr} =
                   from_signature (i2osp z){hr}.
-            cut ->: (sub (from_signature (i2osp z)) 1 kh ||
+            have ->: (sub (from_signature (i2osp z)) 1 kh ||
                      sub (from_signature (i2osp z)) (1 + kh) kg){hr} =
                     sub (from_signature (i2osp z)){hr} 1 (kh + kg)
               by smt.
@@ -4387,7 +4387,7 @@ section.
           move=> neq.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dmrh.
           move: H9; rewrite get_set_neq // => hmr.
-          cut:= H2 m2 r2 _ => //; rewrite hmr /=; progress.
+          have:= H2 m2 r2 _ => //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           move=> -> //=.
           by rewrite mem_add; progress; left.
@@ -4539,84 +4539,84 @@ section.
         by rewrite mem_dom get_set_eq.
         move=> neq; move: H10; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         by rewrite mem_dom get_set_neq 2:-mem_dom; first smt.
       case ((m0,r0){hr} = (m1,r1)).
         by elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget; smt.
         move=> neq; move: H10; rewrite get_set_neq //.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> H9 hmr.
-        by cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress; smt.
+        by have:= H2 m1 r1 _=> //; rewrite hmr /=; progress; smt.
       case ((m0,r0){hr} = (m1,r1)).
         by elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget; smt.
         move=> neq; move: H10; rewrite get_set_neq //.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> H9 hmr.
-        by cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress; smt.
+        by have:= H2 m1 r1 _=> //; rewrite hmr /=; progress; smt.
       case ((m0,r0){hr} = (m1,r1)).
         elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget /= => -[w_eq [c_eq u_eq]]; subst.
         by move: H11; rewrite get_set_eq /oget.
         move=> neq; move: H10; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
-        by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget; cut:= H3 _.
+        by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget; have:= H3 _.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst; smt.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->; rewrite /rsap_dom.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst.
         move: H11; rewrite get_set_eq /oget /= => -[st_eq c'_eq]; subst.
-        by cut:= H3 _.
+        by have:= H3 _.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst.
         move: H11; rewrite get_set_eq /oget /= => -[st_eq c'_eq]; subst.
-        by rewrite -xorwA xorwK xorw0; cut:= H3 _.
+        by rewrite -xorwA xorwK xorw0; have:= H3 _.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
-        cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
+        have:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
   qed.
@@ -4627,10 +4627,10 @@ section.
     Pr[Game4.main() @ &m: res] = Pr[Game4.main() @ &m: res /\ GAdv3.lucky]
                                  + Pr[Game4.main() @ &m: res /\ !GAdv3.lucky].
   proof.
-    cut ->: Pr[Game4.main() @ &m: res] = Pr[Game4.main() @ &m: (res /\ GAdv3.lucky) \/ (res /\ !GAdv3.lucky)].
+    have ->: Pr[Game4.main() @ &m: res] = Pr[Game4.main() @ &m: (res /\ GAdv3.lucky) \/ (res /\ !GAdv3.lucky)].
       by rewrite Pr [mu_eq]; first smt.
     rewrite Pr [mu_or].
-    cut ->: Pr[Game4.main() @ &m: (res /\ GAdv3.lucky) /\ (res /\ !GAdv3.lucky)] = Pr[Game4.main() @ &m: false].
+    have ->: Pr[Game4.main() @ &m: (res /\ GAdv3.lucky) /\ (res /\ !GAdv3.lucky)] = Pr[Game4.main() @ &m: false].
       by rewrite Pr [mu_eq]; first smt.
     by rewrite Pr [mu_false].
   qed.
@@ -4694,21 +4694,21 @@ section.
          mem (m,i2osp u) Mem.qs)).
   proof.
     proc; case (mem w (dom Gmap.m)).
-      by rcondf 2; auto; progress; cut:= H0; rewrite mem_dom /fst /oget; case (Gmap.m.[w]{hr}).
+      by rcondf 2; auto; progress; have:= H0; rewrite mem_dom /fst /oget; case (Gmap.m.[w]{hr}).
       rcondt 2; first by auto.
       auto; progress; (* Good opportunity for progress* *)
-        last 9 by (cut:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G];
-                   (cut neq_w_x: w{hr} <> x1 by smt);
-                   cut:= H4; rewrite get_set_neq /rsap_dom // => ->).
+        last 9 by (have:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G];
+                   (have neq_w_x: w{hr} <> x1 by smt);
+                   have:= H4; rewrite get_set_neq /rsap_dom // => ->).
         by rewrite /fst /oget get_set_eq.
-        cut:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G].
-        cut neq_w_x: w{hr} <> x1 by smt.
+        have:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G].
+        have neq_w_x: w{hr} <> x1 by smt.
         by rewrite mem_dom get_set_neq // -mem_dom.
-        cut:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G].
-        cut neq_w_x: w{hr} <> x1 by smt.
+        have:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G].
+        have neq_w_x: w{hr} <> x1 by smt.
         smt.
-        cut:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G].
-        cut neq_w_x: w{hr} <> x1 by smt.
+        have:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G].
+        have neq_w_x: w{hr} <> x1 by smt.
         smt.
   qed.
 
@@ -4775,9 +4775,9 @@ section.
       first 3 by try apply length_sub; smt.
     apply ((_: forall (x y:message), `|x| = kg => `|y| = kg => to_gtag x = to_gtag y => x = y) _ _ _ _) in g_eq;
       first 3 by try apply length_sub; smt.
-    cut decomp1: forall (s:signature), s = to_signature (sub (to_bits s) 0 1 || sub (to_bits s) 1 (kh + kg))
+    have decomp1: forall (s:signature), s = to_signature (sub (to_bits s) 0 1 || sub (to_bits s) 1 (kh + kg))
       by smt.
-    cut decomp2: forall (s:signature), sub (to_bits s) 1 (kh + kg) =
+    have decomp2: forall (s:signature), sub (to_bits s) 1 (kh + kg) =
                                          (sub (to_bits s) 1 kh || sub (to_bits s) (1 + kh) kg)
       by smt.
     by rewrite decomp1 decomp2 b0_eq h_eq g_eq -decomp2 -decomp1.
@@ -4951,12 +4951,12 @@ section.
         by exists* w{1}; elim* => w0; call (G_LocalG w0).
       inline H4.v; wp; rnd; wp; skip; progress.
         move: H5 H7; pose r:= to_salt (sub (from_gtag (to_gtag (sub (from_signature (i2osp (rsap Mem.pk{1} (os2ip s{2})))) (1 + kh) kg) ^ st'{2})) 0 k0); move=> H5 H7.
-        cut:= H2 m{2} r _=> //; move: H5 H7.
+        have:= H2 m{2} r _=> //; move: H5 H7.
         rewrite mem_dom /oget /pi3_1; case (Hmap.m.[(m,r)]{2})=> //= hmr.
         elim/tuple3_ind hmr=> hmr w c u //=.
         case c=> //= hmr_def.
           (* c = Adv *)
-          move=> w_def []; cut:= H; rewrite w_def mem_dom /oget /fst; case (Gmap.m.[w]{2})=> //= stc'.
+          move=> w_def []; have:= H; rewrite w_def mem_dom /oget /fst; case (Gmap.m.[w]{2})=> //= stc'.
           elim/tuple2_ind stc'=> stc' st c' stc'_def //= st'_def [c'_def] [u_inv].
           apply someI in st'_def.
           rewrite -H6 -w_def -H8 /r.
@@ -4965,7 +4965,7 @@ section.
           rewrite app_sub=> //; first 3 smt.
           rewrite /to_gtag /from_gtag GTag.can_from_to -/(to_gtag _) st'_def xorwC -xorwA xorwK xorw0.
           move=> [u_in_ZN] [b0_eq] [w_eq st_eq].
-          cut: i2osp (rsap Mem.pk (os2ip s{2})){1} =
+          have: i2osp (rsap Mem.pk (os2ip s{2})){1} =
                  i2osp (((rsap Mem.pk Hmem.xstar) ** (rsap Mem.pk u)) Mem.pk){1}
             by apply equal_components.
           rewrite -rsap_morphism_mulzp; first 2 smt.
@@ -4979,7 +4979,7 @@ section.
           rewrite mulzp1; first smt.
           smt.
           (* c = Sig: ignore the goal and prove s{2} = i2osp u *)
-          move=> w_def []; cut:= H; rewrite w_def mem_dom /oget /fst; case (Gmap.m.[w]{2})=> //= stc'.
+          move=> w_def []; have:= H; rewrite w_def mem_dom /oget /fst; case (Gmap.m.[w]{2})=> //= stc'.
           elim/tuple2_ind stc'=> stc' st c' stc'_def //= st'_def [c'_def].
           apply someI in st'_def.
           rewrite -H6 -w_def -H8 /r.
@@ -4988,7 +4988,7 @@ section.
           rewrite app_sub=> //; first 3 smt.
           rewrite /to_gtag /from_gtag GTag.can_from_to -/(to_gtag _) st'_def xorwC -xorwA xorwK xorw0.
           move=> [_] [b0_eq] [w_eq] [st_eq unfresh].
-          cut: i2osp (rsap Mem.pk (os2ip s{2})){1} =
+          have: i2osp (rsap Mem.pk (os2ip s{2})){1} =
                  i2osp (rsap Mem.pk u){1}
             by apply equal_components.
           move=> sig_bits_eq.
@@ -5012,11 +5012,11 @@ section.
        + (qH + qS)%r * 1%r/(2^(k0+1))%r
        + 1%r/(2^kh)%r.
   proof.
-    cut:= PSS96_Game4 &m.
+    have:= PSS96_Game4 &m.
     rewrite (Game4_split &m).
-    cut: Pr[Game4.main() @ &m: res /\ !GAdv3.lucky] <= Pr[OW(Inverter(A)).main() @ &m: res].
+    have: Pr[Game4.main() @ &m: res /\ !GAdv3.lucky] <= Pr[OW(Inverter(A)).main() @ &m: res].
       by rewrite -(OW_Local_Global &m); byequiv reduction.
-    cut:= Pr_Game4_lucky &m.
+    have:= Pr_Game4_lucky &m.
     smt.
   qed.
 end section.

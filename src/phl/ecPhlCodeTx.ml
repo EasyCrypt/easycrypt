@@ -148,7 +148,6 @@ let cfold_stmt (pf, hyps) me olen zpr =
     | ({ i_node = Sasgn (lv, e) } as i) :: tl -> begin
       let asgn =
         match lv with
-        | LvMap _ -> tc_error pf "left-value is a map assignment"
         | LvVar (x, ty) -> [(x, ty, e)]
         | LvTuple xs -> begin
             match e.e_node with

@@ -27,9 +27,9 @@ module Correctness (S:Scheme) = {
     var c  : ciphertext;
     var m' : plaintext option;
 
-    (pk, sk) = S.kg();
-    c        = S.enc(pk, m);
-    m'       = S.dec(sk, c);
+    (pk, sk) <@ S.kg();
+    c        <@ S.enc(pk, m);
+    m'       <@ S.dec(sk, c);
     return (m' = Some m);
   }
 }.
@@ -53,8 +53,8 @@ module L (S:Scheme) = {
 
   proc orcl (m0 m1:plaintext) : ciphertext = {
     var r : ciphertext;
-    r = S.enc(K.pk,m0);
-    K.c = K.c + 1;
+    r   <@ S.enc(K.pk,m0);
+    K.c <- K.c + 1;
     return r;
   }
 }.
@@ -63,8 +63,8 @@ module R (S:Scheme) = {
 
   proc orcl (m0 m1:plaintext) : ciphertext = {
     var r : ciphertext;
-    r = S.enc(K.pk,m1);
-    K.c = K.c + 1;
+    r   <@ S.enc(K.pk,m1);
+    K.c <- K.c + 1;
     return r;
   }
 }.
@@ -73,8 +73,8 @@ module LRb (S:Scheme) = {
 
   proc orcl (m0 m1:plaintext) : ciphertext = {
     var r : ciphertext;
-    r = S.enc(K.pk,K.b?m0:m1);
-    K.c = K.c + 1;
+    r   <@ S.enc(K.pk,K.b?m0:m1);
+    K.c <- K.c + 1;
     return r;
   }
 }.
@@ -83,9 +83,9 @@ module CPAL (S:Scheme,A:AdvCPA) = {
   module A = A(L(S))
   proc main():bool = {
     var b':bool;
-    K.c = 0;
-    (K.pk,K.sk) = S.kg();
-    b' = A.main(K.pk);
+    K.c         <- 0;
+    (K.pk,K.sk) <@ S.kg();
+    b'          <@ A.main(K.pk);
     return b';
   }
 }.
@@ -94,9 +94,9 @@ module CPAR (S:Scheme,A:AdvCPA) = {
   module A = A(R(S))
   proc main():bool = {
     var b':bool;
-    K.c = 0;
-    (K.pk,K.sk) = S.kg();
-    b' = A.main(K.pk);
+    K.c         <- 0;
+    (K.pk,K.sk) <@ S.kg();
+    b'          <@ A.main(K.pk);
     return b';
   }
 }.
@@ -105,10 +105,10 @@ module CPA (S:Scheme,A:AdvCPA) = {
   module A = A(LRb(S))
   proc main():bool = {
     var b':bool;
-    K.c = 0;
-    K.b = ${0,1};
-    (K.pk,K.sk) = S.kg();
-    b' = A.main(K.pk);
+    K.c         <- 0;
+    K.b         <$ {0,1};
+    (K.pk,K.sk) <@ S.kg();
+    b'          <@ A.main(K.pk);
     return b';
   }
 }.
@@ -126,7 +126,7 @@ module ToOrcl (S:Scheme) = {
   }
   proc orcl (m:plaintext) : ciphertext = {
     var c : ciphertext;
-    c = S.enc(K.pk, m);
+    c <@ S.enc(K.pk, m);
     return c;
   }
 }.
@@ -175,8 +175,8 @@ section.
                  Pr[CPAR(S,A).main() @ &m : res /\ K.c <= H.q]).
   proof.
     move=> Hq.
-    cut -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
-             Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
+    have -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
+              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
       proc.
@@ -184,8 +184,8 @@ section.
       wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
-    cut -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
-             Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
+    have -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
+              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
       proc.
@@ -193,7 +193,7 @@ section.
       wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
-    cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
+    have := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
       by proc;call Lkg.
       by proc;call Lenc.
       move=> O LR Llr Ll Lo;proc;call (La LR _) => //.

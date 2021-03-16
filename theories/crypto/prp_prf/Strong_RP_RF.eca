@@ -9,7 +9,7 @@
 require import AllCore Distr List FSet SmtMap.
 require import Dexcepted.
 require (*--*) PRP.
-(*---*) import StdRing.RField StdOrder.RealOrder.
+(*---*) import RField StdOrder.RealOrder.
 
 require (*--*) FelTactic.
 
@@ -82,7 +82,7 @@ module Direct = {
   proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD \ X;
+    r <$ uD \ X;
     return r;
   }
 }.
@@ -91,9 +91,9 @@ module Indirect = {
   proc sample(X:D -> bool): D = {
     var r;
 
-    r = $uD;
+    r <$ uD;
     if (X r) {
-      r = $uD \ X;
+      r <$ uD \ X;
     }
     return r;
   }
@@ -103,16 +103,20 @@ module PRPi'(S:Sample_t) = {
   proc init =  PRPi.init
 
   proc f(x:D): D = {
+    var r;
     if (x \notin PRPi.m) {
-      PRPi.m.[x] = S.sample(rng PRPi.m);
+      r <@ S.sample(rng PRPi.m);
+      PRPi.m.[x] <- r;
       PRPi.mi.[oget PRPi.m.[x]] <- x;
     }
     return oget PRPi.m.[x];
   }
 
   proc fi(x:D): D = {
+    var r;
     if (x \notin PRPi.mi) {
-      PRPi.mi.[x] = S.sample(rng PRPi.mi);
+      r <@ S.sample(rng PRPi.mi);
+      PRPi.mi.[x] <- r;
       PRPi.m.[oget PRPi.mi.[x]] <- x;
     }
     return oget PRPi.mi.[x];
@@ -199,25 +203,29 @@ section Upto.
     proc sample(X:D -> bool): D = {
       var r;
 
-      r = $uD;
+      r <$ uD;
       if (X r) {
         bad <- true;
-        r = $uD \ X;
+        r <$ uD \ X;
       }
       return r;
     }
 
     proc f(x:D): D = {
+      var r;
       if (x \notin PRPi.m) {
-        PRPi.m.[x] = sample(rng PRPi.m);
+        r <@ sample(rng PRPi.m);
+        PRPi.m.[x] <- r;
         PRPi.mi.[oget PRPi.m.[x]] <- x;
       }
       return oget PRPi.m.[x];
     }
 
     proc fi(y:D): D = {
+     var r;
      if (y \notin PRPi.mi) {
-        PRPi.mi.[y] = sample(rng PRPi.mi);
+        r <@ sample(rng PRPi.mi);
+        PRPi.mi.[y] <- r;
         PRPi.m.[oget PRPi.mi.[y]] <- y;
       }
       return oget PRPi.mi.[y];
@@ -247,9 +255,9 @@ section Upto.
     swap{1} 1.
     seq  1  4: (={x} /\
                 x{1} \notin PRPi.m{1} /\
-                ARP.m{2} = PRPi.m.[x <- r]{1} /\
-                ARP.mi{2} = PRPi.mi.[r <- x]{1} /\
-                ((PRP_indirect_bad.bad \/ rng PRPi.m r){1} <=> ARP.coll{2})).
+                ARP.m{2} = PRPi.m.[x <- r0]{1} /\
+                ARP.mi{2} = PRPi.mi.[r0 <- x]{1} /\
+                ((PRP_indirect_bad.bad \/ rng PRPi.m r0){1} <=> ARP.coll{2})).
       by auto=> /#.
     sp; if{1}.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
@@ -271,9 +279,9 @@ section Upto.
     swap{1} 1.
     seq  1  4: (={y} /\
                 y{1} \notin PRPi.mi{1} /\
-                ARP.m{2} = PRPi.m.[r <- y]{1} /\
-                ARP.mi{2} = PRPi.mi.[y <- r]{1} /\
-                ((PRP_indirect_bad.bad \/ rng PRPi.mi r){1} <=> ARP.coll{2})).
+                ARP.m{2} = PRPi.m.[r0 <- y]{1} /\
+                ARP.mi{2} = PRPi.mi.[y <- r0]{1} /\
+                ((PRP_indirect_bad.bad \/ rng PRPi.mi r0){1} <=> ARP.coll{2})).
       by auto=> /#.
     sp; if{1}.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
@@ -339,7 +347,7 @@ module DBounder (D : Distinguisher) (F : SPRP_Oracles) = {
 
 section CollisionProbability.
   require import Mu_mem.
-  (*---*) import StdBigop StdRing StdOrder IntExtra.
+  (*---*) import StdBigop StdRing StdOrder.
   (*---*) import Bigreal.BRA RField RField.AddMonoid IntOrder.
 
   declare module D:Distinguisher {ARP, DBounder}.
@@ -350,25 +358,25 @@ section CollisionProbability.
 
     module FBounder = {
       proc f(x:D): D = {
-        var r = witness;
+        var r <- witness;
 
         if (c < q) {
           if (card (frng ARP.m) < q) {
-            r = ARP.f(x);
+            r <@ ARP.f(x);
           }
-          c = c + 1;
+          c <- c + 1;
         }
         return r;
       }
 
       proc fi(x:D): D = {
-        var r = witness;
+        var r <- witness;
 
         if (c < q) {
           if (card (frng ARP.mi) < q) {
-            r = ARP.fi(x);
+            r <@ ARP.fi(x);
           }
-          c = c + 1;
+          c <- c + 1;
         }
         return r;
       }
@@ -434,13 +442,13 @@ section CollisionProbability.
            [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]
            (card (fdom ARP.m) <= FEL.c /\ card (fdom ARP.mi) <= FEL.c)=> //.
   + rewrite -mulr_suml Bigreal.sumidE 1:ge0_q. 
-    by rewrite (powS 1) // pow1;smt(mu_bounded ge0_q).
+    by rewrite expr2;smt(mu_bounded ge0_q).
   + by inline*; auto=> />; rewrite fdom0 fcards0.
   + exists*FEL.c;elim*=> c.
     conseq(:_==>_ : (c%r * mu1 uD witness))=> />.
     proc; sp; rcondt 1=> //.
     inline *; sp; if=> //=; last first.
-    * hoare; auto=> // /> &hr _ _ _ _ _ _.
+    * hoare; auto=> // /> &hr 6?.
       by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (rng ARP.m); skip.

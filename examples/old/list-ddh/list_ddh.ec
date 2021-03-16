@@ -343,7 +343,7 @@ lemma Eq_real_G_App_Lazy_G_App_Fixed:
             true ==> ={res,glob User_LDDH_Hyb2(A)} ].
 proof strict.
   move=> A.
-  cut H := RO_dh_real.Lazy_Fixed_dh_equiv (User_LDDH_Hyb2(A)).
+  have H := RO_dh_real.Lazy_Fixed_dh_equiv (User_LDDH_Hyb2(A)).
   apply H.
 qed.
 
@@ -442,7 +442,7 @@ seq 6 12  :
    xs{1} = FSet.empty).
   wp. rnd. wp. skip. progress.
   smt. smt.
-  cut pick_single: (pick (single tt) = tt). smt.
+  have pick_single: (pick (single tt) = tt). smt.
   rewrite pick_single. smt. smt.
   rcondf {1} 1.
     move=> &m. skip. smt.
@@ -472,18 +472,18 @@ lemma Eq_LDDH_Hyb_i_DDH_real(A <: LDDH_DISTINGUISHER
   = Pr[ DDH_distr_real(Dist(A)).main(i) @ &m2 : res ].
 proof strict.
   move=> i &m1 &m2.
-  cut -> :    Pr[ LDDH_Hyb(A).main(i) @ &m1: res ]
+  have -> :   Pr[ LDDH_Hyb(A).main(i) @ &m1: res ]
             = Pr[ LDDH_Hyb2(A, LRO_real).main(i) @ &m1 : res ].
   by equiv_deno (Eq_Hyb_Hyb2_real A).
-  cut -> :
+  have -> :
       Pr[ LDDH_Hyb2(A, LRO_real).main(i) @ &m1 : res ]
     = Pr[ RO_dh_real.G(LRO_real, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ].
   by equiv_deno (Eq_real_Hyb2_Lazy_G_App_Lazy A).
-  cut -> :
+  have -> :
      Pr[ RO_dh_real.G(LRO_real, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ]
    = Pr[ RO_dh_real.G(FRO_real, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ].
   by equiv_deno (Eq_real_G_App_Lazy_G_App_Fixed A).
-  cut -> :
+  have -> :
      Pr[ RO_dh_real.G(FRO_real, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ]
    = Pr[ LDDH_Hyb2(A, FRO_real).main(i) @ &m1 : res ].
   by equiv_deno (Eq_real_G_App_Fixed_Hyb2_Fixed A).
@@ -565,7 +565,7 @@ lemma Eq_random_G_App_Lazy_G_App_Fixed:
             true ==> ={res,glob User_LDDH_Hyb2(A)} ].
 proof strict.
   move=> A.
-  cut H := RO_dh_random.Lazy_Fixed_dh_equiv (User_LDDH_Hyb2(A)).
+  have H := RO_dh_random.Lazy_Fixed_dh_equiv (User_LDDH_Hyb2(A)).
   apply H.
 qed.
 
@@ -622,7 +622,7 @@ seq 6 12  :
    xs{1} = FSet.empty).
   wp. rnd. wp. skip. progress.
   smt. smt.
-  cut pick_single: (pick (single tt) = tt). smt.
+  have pick_single: (pick (single tt) = tt). smt.
   rewrite pick_single. smt. smt.
   rcondf {1} 1.
     move=> &m. skip. smt.
@@ -653,22 +653,22 @@ lemma Eq_LDDH_Hyb_i_plus_one_DDH_random(A <: LDDH_DISTINGUISHER
   = Pr[ DDH_distr_random(Dist(A)).main(i) @ &m2 : res ].
 proof strict.
   move=> i &m1 &m2.
-  cut -> :    Pr[ LDDH_Hyb(A).main((i+1)) @ &m1: res ]
+  have -> :   Pr[ LDDH_Hyb(A).main((i+1)) @ &m1: res ]
             = Pr[ LDDH_Hyb2(A, LRO_real).main((i+1)) @ &m1 : res ].
   by equiv_deno (Eq_Hyb_Hyb2_real A).
-  cut -> :
+  have -> :
       Pr[ LDDH_Hyb2(A, LRO_real).main((i+1)) @ &m1 : res ]
     = Pr[ LDDH_Hyb2(A, LRO_random).main(i) @ &m1 : res ].
   by equiv_deno (Eq_Hyb2_Lazy_real_Hyb2_Lazy_random A).
-  cut -> :
+  have -> :
       Pr[ LDDH_Hyb2(A, LRO_random).main(i) @ &m1 : res ]
     = Pr[ RO_dh_random.G(LRO_random, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ].
   by equiv_deno (Eq_random_Hyb2_Lazy_G_App_Lazy A).
-  cut -> :
+  have -> :
      Pr[ RO_dh_random.G(LRO_random, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ]
    = Pr[ RO_dh_random.G(FRO_random, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ].
   by equiv_deno (Eq_random_G_App_Lazy_G_App_Fixed A).
-  cut -> :
+  have -> :
      Pr[ RO_dh_random.G(FRO_random, User_LDDH_Hyb2(A)).main(i) @ &m1 : res ]
    = Pr[ LDDH_Hyb2(A, FRO_random).main(i) @ &m1 : res ].
   by equiv_deno (Eq_random_G_App_Fixed_Hyb2_Fixed A).
@@ -724,7 +724,7 @@ rewrite sum_smaller. smt.
 smt.
 simplify.
 move=> i i_leq_z Hyp.
-cut H:
+have H:
 `|Pr[LDDH_Hyb(A).main(0) @ &m : res] -
   Pr[LDDH_Hyb(A).main((i + 1)) @ &m : res]|
  <=
@@ -733,7 +733,7 @@ cut H:
  + `|Pr[LDDH_Hyb(A).main(i) @ &m : res] -
     Pr[LDDH_Hyb(A).main((i+1)) @ &m : res]|.
 smt.
-cut G:
+have G:
 `|Pr[LDDH_Hyb(A).main(0) @ &m : res] -
   Pr[LDDH_Hyb(A).main(i) @ &m : res]|
  + `|Pr[LDDH_Hyb(A).main(i) @ &m : res] -
@@ -760,14 +760,14 @@ lemma Final(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist,LDDH_real,LDDH_Hy
                 `|  Pr[ DDH_distr_real(Dist(A)).main(j) @ &m : res ]
                   - Pr[ DDH_distr_random(Dist(A)).main(j) @ &m : res ] |).
 proof strict.
-cut ->:   Pr[ LDDH_real(A).main() @ &m : res ]
+have ->:  Pr[ LDDH_real(A).main() @ &m : res ]
         = Pr[ LDDH_Hyb(A).main(0) @ &m : res ].
 apply eq_sym.
 by equiv_deno (Eq_LDDH_Hyb0_real A).
-cut ->:   Pr[ LDDH_random(A).main() @ &m : res ]
+have ->:  Pr[ LDDH_random(A).main() @ &m : res ]
         = Pr[ LDDH_Hyb(A).main(q_t) @ &m : res ].
 apply eq_sym.
 by equiv_deno (DDH1_Hybk A).
-cut H:= A A &m q_t _. smt.
+have H:= A A &m q_t _. smt.
 apply H.
 qed.

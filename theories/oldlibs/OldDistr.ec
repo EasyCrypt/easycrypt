@@ -79,7 +79,7 @@ axiom uniform_unique (d d':'a distr):
 lemma witness_nzero P (d:'a distr):
   0%r < mu d P => (exists x, P x ).
 proof.
-  cut: P <> pred0 => (exists x, P x).
+  have: P <> pred0 => (exists x, P x).
     apply absurd=> /=.
     have -> h: (!exists (x:'a), P x) = forall (x:'a), !P x by smt.
     by apply fun_ext=> x; rewrite h.
@@ -132,7 +132,7 @@ lemma mu_disjoint (d:'a distr) (p q:('a -> bool)):
   mu d (predU p q) = mu d p + mu d q.
 proof.
 move=> and_p_q_false; rewrite mu_or.
-cut ->: (predI p q) = pred0 by apply subpred_asym.
+have ->: (predI p q) = pred0 by apply subpred_asym.
 by rewrite mu_false.
 qed.
 
@@ -169,7 +169,7 @@ split=> [|[] x [x_in_P x_in_d]].
   apply witness_nzero in nzero; case nzero=> x.
   rewrite /predI //= => p_supp.
   by exists x.
-cut: mu d (pred1 x) <= mu d P /\ 0%r < mu d (pred1 x); last smt.
+have: mu d (pred1 x) <= mu d P /\ 0%r < mu d (pred1 x); last smt.
 split=> [|//=].
 by rewrite mu_sub // /Core.(<=) /pred1 => x0 <<-.
 qed.

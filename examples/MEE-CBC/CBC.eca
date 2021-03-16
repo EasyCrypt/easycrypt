@@ -5,8 +5,6 @@ require import StdRing StdOrder DList.
 require (*ab*) PRP PRF SKE_INDR. (* Definitions and Security Notions *)
 (*---*) import RField RealOrder.
 
-pragma -oldip.
-
 (* -------------------------------------------------------------------- *)
 (** Parameters and Constants *)
 op q   : {int | 0 < q}   as gt0_q.   (* number of queries *)
@@ -452,17 +450,17 @@ section Reduce.
     var bad: bool
 
     proc init(): unit = {
-      qs = fset0;
-      bad = false;
+      qs <- fset0;
+      bad <- false;
       F.init();
     }
 
     proc f(x:block): block = {
       var r;
 
-      if (mem qs x) { bad = true; }
+      if (mem qs x) { bad <- true; }
       r <@ F.f(x);
-      qs = qs `|` (fset1 x);
+      qs <- qs `|` (fset1 x);
       return r;
     }
   }.
@@ -640,7 +638,7 @@ module OracleBounder(O:RCPA_full) = {
 
   proc enc(p:block list): block list = {
     var i;
-    var r = [];
+    var r <- [];
 
     if (qC < q /\ size p <= ell) {
       r  <@ O.enc(p);
@@ -660,7 +658,7 @@ module QueryBounder(A:RCPA_Adversary, O:RCPA_Oracles) = {
   module O' = {
     proc enc(p:block list): block list = {
       var i;
-      var r = [];
+      var r <- [];
 
       if (OracleBounder.qC < q /\ size p <= ell) {
         r                <@ O.enc(p);
@@ -696,7 +694,7 @@ section Probability_RP_RF.
   lemma Bound_by_PRP_PRF &m:
     `|Pr[IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
       - Pr[IND(PRFi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]|
-    <= ((q * ell)^2)%r * mu dBlock (pred1 witness).
+    <= ((q * ell)*(q * ell - 1))%r/2%r * mu dBlock (pred1 witness).
   proof.
     have ->: Pr[IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
              = Pr[RP_RFc.PRFt.IND(PRPi,RP_RFc.DBounder(PRPF_Adv(QueryBounder(A)))).main() @ &m: res].
@@ -704,14 +702,14 @@ section Probability_RP_RF.
       proc; inline *; auto.
       call (_:   ={PRPi.m, OracleBounder.qC}
               /\ 0 <= OracleBounder.qC{2} <= q
-              /\ 0 <= RP_RFc.DBounder.FBounder.c{2} <= OracleBounder.qC{2} * ell).
+              /\ 0 <= RP_RFc.FBounder.c{2} <= OracleBounder.qC{2} * ell).
         proc; inline *; sp; if=> //=; 2:by while (={i, p, r}); auto.
           wp; while (   ={i0, p0, r, s, c, PRPi.m}
                      /\ 0 <= OracleBounder.qC{2} < q
                      /\ 0 <= i0{2} <= size p0{2} <= ell
-                     /\ 0 <= RP_RFc.DBounder.FBounder.c{2} <= OracleBounder.qC{2} * ell + i0{2}).
+                     /\ 0 <= RP_RFc.FBounder.c{2} <= OracleBounder.qC{2} * ell + i0{2}).
             rcondt{2} 4; first auto; progress.
-              by have: RP_RFc.DBounder.FBounder.c{hr} <= (q - 1) * ell + i0{hr}; smt ml=0.
+              by have: RP_RFc.FBounder.c{hr} <= (q - 1) * ell + i0{hr}; smt ml=0.
             by sp; if=> //=; auto=> /#.
           by auto=> />; smt (size_ge0).
       by auto=> />; smt (gt0_q).
@@ -722,19 +720,19 @@ section Probability_RP_RF.
       call (_:   ={OracleBounder.qC}
               /\ ={m}(PRFi,RP_RFc.PRFi.PRFi)
               /\ 0 <= OracleBounder.qC{2} <= q
-              /\ 0 <= RP_RFc.DBounder.FBounder.c{2} <= OracleBounder.qC{2} * ell).
+              /\ 0 <= RP_RFc.FBounder.c{2} <= OracleBounder.qC{2} * ell).
         proc; inline *; sp; if=> //=; 2:by while (={i, p, r}); auto.
           wp; while (   ={i0, p0, r, s, c}
                      /\ ={m}(PRFi,RP_RFc.PRFi.PRFi)
                      /\ 0 <= OracleBounder.qC{2} < q
                      /\ 0 <= i0{2} <= size p0{2} <= ell
-                     /\ 0 <= RP_RFc.DBounder.FBounder.c{2} <= OracleBounder.qC{2} * ell + i0{2}).
+                     /\ 0 <= RP_RFc.FBounder.c{2} <= OracleBounder.qC{2} * ell + i0{2}).
             rcondt{2} 4; first auto; progress.
-              by have: RP_RFc.DBounder.FBounder.c{hr} <= (q - 1) * ell + i0{hr}; smt ml=0.
+              by have: RP_RFc.FBounder.c{hr} <= (q - 1) * ell + i0{hr}; smt ml=0.
             by sp; if=> //=; auto=> /#.
           by auto; smt (size_ge0).
       by auto; smt (gt0_q).
-  apply/(RP_RFc.Conclusion (PRPF_Adv(QueryBounder(A))) &m).
+  apply/(RP_RFc.Conclusion_DBounder (PRPF_Adv(QueryBounder(A))) _ &m).
   move=> O O_f_ll.
   proc. call (A_run_ll (<: QueryBounder(A,PRPF_Adv(QueryBounder(A),O).O).O') _).
   + proc; inline *; sp; if=> //=.
@@ -847,7 +845,7 @@ lemma Conclusion (A <: RCPA_Adversary { RCPA_Wrap, PRP, PRPi, QueryBounder, PRFi
        - Pr[INDR_CPA(Random,QueryBounder(A)).main() @ &m: res]|
   <=    `|Pr[IND(PRP,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
           - Pr[IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]|
-      + 2%r * ((q * ell)^2)%r * mu dBlock (pred1 witness).
+      + 2%r * ((q*ell)^2)%r * mu dBlock (pred1 witness).
 proof.
 move=> A_distinguish_ll.
 have BA_distinguish_ll: (forall (O <: RCPA_Oracles { QueryBounder(A) }), islossless O.enc => islossless QueryBounder(A,O).distinguish).
@@ -860,5 +858,6 @@ have BA_distinguish_ll: (forall (O <: RCPA_Oracles { QueryBounder(A) }), islossl
 have:= reduction (QueryBounder(A)) &m BA_distinguish_ll.
 have:= Bound_by_Birthday A A_distinguish_ll &m.
 have:= Bound_by_PRP_PRF A A_distinguish_ll &m.
-smt().
+have -> : (q * ell)^2 = (q * ell) * (q * ell) by ring. 
+smt(mu_bounded).
 qed.

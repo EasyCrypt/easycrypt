@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int Real RealExtra StdRing StdOrder Distr List FSet.
+require import AllCore StdRing StdOrder Distr List FSet.
 (*---*) import RField RealOrder.
 require (*  *) CyclicGroup.
 
@@ -21,9 +21,9 @@ theory DDH.
   module DDH0 (A:Adversary) = {
     proc main() : bool = {
       var b, x, y;
-      x = $FDistr.dt;
-      y = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ (x*y));
+      x <$ FDistr.dt;
+      y <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ (x*y));
       return b;
     }
   }.
@@ -32,10 +32,10 @@ theory DDH.
     proc main() : bool = {
       var b, x, y, z;
 
-      x = $FDistr.dt;
-      y = $FDistr.dt;
-      z = $FDistr.dt;
-      b = A.guess(g ^ x, g ^ y, g ^ z);
+      x <$ FDistr.dt;
+      y <$ FDistr.dt;
+      z <$ FDistr.dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ z);
       return b;
     }
   }.
@@ -53,9 +53,9 @@ theory CDH.
     proc main(): bool = {
       var x, y, r;
 
-      x = $FDistr.dt;
-      y = $FDistr.dt;
-      r = A.solve(g ^ x, g ^ y);
+      x <$ FDistr.dt;
+      y <$ FDistr.dt;
+      r <@ A.solve(g ^ x, g ^ y);
       return (r = g ^ (x * y));
     }
   }.
@@ -73,9 +73,9 @@ theory List_CDH.
     proc main(): bool = {
       var x, y, s;
 
-      x = $FDistr.dt;
-      y = $FDistr.dt;
-      s = B.solve(g ^ x, g ^ y);
+      x <$ FDistr.dt;
+      y <$ FDistr.dt;
+      s <@ B.solve(g ^ x, g ^ y);
       return (mem s (g ^ (x * y)) /\ size s <= n);
     }
   }.
@@ -84,8 +84,8 @@ theory List_CDH.
     proc solve(gx:group, gy:group): group = {
       var s, x;
 
-      s = A.solve(gx, gy);
-      x = $MUniform.duniform s;
+      s <@ A.solve(gx, gy);
+      x <$ MUniform.duniform s;
       return x;
     }
   }.
@@ -100,17 +100,17 @@ theory List_CDH.
       proc aux(): group list = {
         var s;
 
-        x = $FDistr.dt;
-        y = $FDistr.dt;
-        s = A.solve(g ^ x, g ^ y);
+        x <$ FDistr.dt;
+        y <$ FDistr.dt;
+        s <@ A.solve(g ^ x, g ^ y);
         return s;
       }
 
       proc main(): bool = {
         var z, s;
 
-        s = aux();
-        z = $MUniform.duniform s;
+        s <@ aux();
+        z <$ MUniform.duniform s;
         return z = g ^ (x * y);
       }
     }.
@@ -175,9 +175,9 @@ theory Set_CDH.
     proc main(): bool = {
       var x, y, s;
 
-      x = $FDistr.dt;
-      y = $FDistr.dt;
-      s = B.solve(g ^ x, g ^ y);
+      x <$ FDistr.dt;
+      y <$ FDistr.dt;
+      s <@ B.solve(g ^ x, g ^ y);
       return (mem s (g ^ (x * y)) /\ card s <= n);
     }
   }.
@@ -186,8 +186,8 @@ theory Set_CDH.
     proc solve(gx:group, gy:group): group = {
       var s, x;
 
-      s = A.solve(gx, gy);
-      x = $MUniform.duniform (elems s);
+      s <@ A.solve(gx, gy);
+      x <$ MUniform.duniform (elems s);
       return x;
     }
   }.
@@ -199,7 +199,7 @@ theory Set_CDH.
     local module AL = {
       proc solve(gx:group, gy:group) = {
         var s;
-        s = A.solve(gx, gy);
+        s <@ A.solve(gx, gy);
         return elems s;
       }
     }.

@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Ring StdRing Int IntExtra Real.
+require import AllCore Ring StdRing.
 require (*--*) Number.
 (*---*) import IntID.
 
@@ -24,8 +24,10 @@ clone include Number.RealDomain
   op   Domain.( * )  <- Int.( * ),
   op   Domain.invr   <- (fun (z : int) => z),
   op   Domain.intmul <- IntID.intmul,
-  op   Domain.ofint  <- IntID.ofint,
+  op   Domain.ofint  <- IntID.ofint_id,
   op   Domain.exp    <- IntID.exp,
+  op   minr          <- min,
+  op   maxr          <- max,
 
   op   "`|_|" <- Int."`|_|",
   op   ( <= ) <- Int.(<=),
@@ -73,8 +75,8 @@ proof.
 rewrite {3}(signzE) mulrA /signz; case: (z = 0).
   by move=> ->; rewrite normr0.
 move=> nz_0; rewrite b2i1 /= -{1}(mul1r `|z|); congr.
-rewrite -exprD ?b2i_ge0 -signr_odd ?addr_ge0 ?b2i_ge0.
-by rewrite -mul1r2z oddM intmulz odd2 expr0.
+rewrite -exprD_nneg ?b2i_ge0 -signr_odd ?addr_ge0 ?b2i_ge0.
+by rewrite -mul1r2z oddM /ofint_id intmulz odd2 expr0.
 qed.
 end IntOrder.
 
@@ -91,6 +93,8 @@ clone Number.RealField as RealOrder
   op   Field.intmul <- RField.intmul,
   op   Field.ofint  <- RField.ofint,
   op   Field.exp    <- RField.exp,
+  op   minr          = fun x y : real => if x <= y then x else y,
+  op   maxr          = fun x y : real => if y <= x then x else y,
 
   op   "`|_|" <- Real."`|_|",
   op   ( <= ) <- Real.(<=),

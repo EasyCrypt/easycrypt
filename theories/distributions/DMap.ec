@@ -2,7 +2,6 @@
 require import AllCore List Distr.
 
 pragma +implicits.
-pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 abstract theory DMapSampling.
@@ -19,7 +18,7 @@ module S = {
   proc map(d: t1 distr, f: t1->t2) : t2 = {
     var r1;
 
-    r1 = $ d;
+    r1 <$ d;
     return f r1;
   }
 }.

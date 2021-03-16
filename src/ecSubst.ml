@@ -350,9 +350,9 @@ and subst_notation (s : _subst) (nott : notation) =
 
 and subst_op_body (s : _subst) (bd : opbody) =
   match bd with
-  | OP_Plain body ->
+  | OP_Plain (body, nosmt) ->
       let s = e_subst_of_subst s in
-        OP_Plain (EcTypes.e_subst s body)
+        OP_Plain (EcTypes.e_subst s body, nosmt)
 
   | OP_Constr (p, i)  -> OP_Constr (s.s_p p, i)
   | OP_Record p       -> OP_Record (s.s_p p)
@@ -365,7 +365,8 @@ and subst_op_body (s : _subst) (bd : opbody) =
         OP_Fix { opf_args     = args;
                  opf_resty    = s.s_ty opfix.opf_resty;
                  opf_struct   = opfix.opf_struct;
-                 opf_branches = subst_branches es opfix.opf_branches; }
+                 opf_branches = subst_branches es opfix.opf_branches;
+                 opf_nosmt    = opfix.opf_nosmt; }
 
   | OP_TC -> OP_TC
 
@@ -412,8 +413,9 @@ let subst_op (s : _subst) (op : operator) =
   let ty      = sty.s_ty op.op_ty in
   let kind    = subst_op_kind sty op.op_kind in
     { op_tparams = tparams;
-      op_ty      = ty     ;
-      op_kind    = kind   ; }
+      op_ty      = ty;
+      op_kind    = kind;
+      op_opaque  = op.op_opaque; }
 
 (* -------------------------------------------------------------------- *)
 let subst_ax (s : _subst) (ax : axiom) =

@@ -9,7 +9,6 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore Int List FSet.
 
-pragma -oldip.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
@@ -597,8 +596,8 @@ lemma find_set (m:('a,'b) fmap) y x (p:'a -> 'b -> bool):
   (forall x, mem (dom m) x => !p x (oget m.[x])) =>
   find p m.[x <- y] = if p x y then Some x else None.
 proof.
-  cut [[a []->[]] | []-> Hp Hnp]:= findP p (m.[x<-y]);1: rewrite getP dom_set !inE /#.
-  by case (p x y)=> //; cut := Hp x;rewrite getP dom_set !inE.
+  have [[a []->[]] | []-> Hp Hnp]:= findP p (m.[x<-y]);1: rewrite getP dom_set !inE /#.
+  by case (p x y)=> //; have := Hp x;rewrite getP dom_set !inE.
 qed.
 
 lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
@@ -751,7 +750,7 @@ proof.
 elim/fset_ind: (dom m) {-2}m (eq_refl (dom m))=> {m} [m /dom_eq0 ->|].
 + by rewrite rng0 dom0 !fcards0.
 move=> x s x_notin_s ih m dom_m.
-cut ->: m = (rem x m).[x <- oget m.[x]].
+have ->: m = (rem x m).[x <- oget m.[x]].
 + apply fmapP=> x'; rewrite getP remP; case: (x' = x)=> [->|//].
   have /fsetP /(_ x):= dom_m; rewrite in_fsetU in_fset1 /= in_dom.
   by case: m.[x].

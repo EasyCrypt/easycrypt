@@ -7,4 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require export Core Int IntExtra Real RealExtra.
+require (*--*) Ring.
+require export Core Int Real.
+(*---*) export Ring.IntID.
+

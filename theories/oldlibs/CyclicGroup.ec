@@ -47,8 +47,8 @@ qed.
 lemma nosmt pow_opp (x:group) (p:F.t): x^(-p) = inv (x^p).
 proof.
   rewrite inv_def.
-  cut -> : -p = (-F.one) * p by ringeq.
-  cut -> : -log (x ^ p) = (-F.one) * log(x^p) by ringeq.
+  have -> : -p = (-F.one) * p by ringeq.
+  have -> : -log (x ^ p) = (-F.one) * log(x^p) by ringeq.
   by rewrite !(F.mulC (-F.one)) -!pow_pow gpow_log.
 qed.
 
@@ -74,8 +74,8 @@ qed.
 
 lemma nosmt log_g : log g = F.one.
 proof strict.
- cut H: log g - log g = F.one + -log g by smt.
- cut H1: log g = log g + F.one + -log g; smt.
+ have H: log g - log g = F.one + -log g by smt.
+ have H1: log g = log g + F.one + -log g; smt.
 qed.
 
 lemma nosmt g_neq0 : g1 <> g.

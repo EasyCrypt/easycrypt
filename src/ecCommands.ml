@@ -348,7 +348,7 @@ and process_interface (scope : EcScope.scope) (x, i) =
 (* -------------------------------------------------------------------- *)
 and process_operator (scope : EcScope.scope) (pop : poperator located) =
   EcScope.check_state `InTop "operator" scope;
-  let op, scope = EcScope.Op.add scope pop in
+  let op, axs, scope = EcScope.Op.add scope pop in
   let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
   List.iter
     (fun { pl_desc = name } ->
@@ -356,7 +356,8 @@ and process_operator (scope : EcScope.scope) (pop : poperator located) =
         name (EcPrinting.pp_added_op ppe) op;
         check_opname_validity scope name)
       (pop.pl_desc.po_name :: pop.pl_desc.po_aliases);
-    scope
+  List.iter (fun s -> EcScope.notify scope `Info "added axiom: `%s'" s) axs;
+  scope
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
@@ -487,6 +488,11 @@ and process_th_export (scope : EcScope.scope) (names : pqsymbol list) =
 and process_th_clone (scope : EcScope.scope) thcl =
   EcScope.check_state `InTop "theory cloning" scope;
   EcScope.Cloning.clone scope (Pragma.get ()).pm_check thcl
+
+(* -------------------------------------------------------------------- *)
+and process_mod_import (scope : EcScope.scope) mods =
+  EcScope.check_state `InTop "module var import" scope;
+  List.fold_left EcScope.Mod.import scope mods
 
 (* -------------------------------------------------------------------- *)
 and process_sct_open (scope : EcScope.scope) name =
@@ -660,6 +666,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | GthImport    name -> `Fct   (fun scope -> process_th_import  scope  name)
       | GthExport    name -> `Fct   (fun scope -> process_th_export  scope  name)
       | GthClone     thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
+      | GModImport   mods -> `Fct   (fun scope -> process_mod_import scope  mods)
       | GsctOpen     name -> `Fct   (fun scope -> process_sct_open   scope  name)
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)

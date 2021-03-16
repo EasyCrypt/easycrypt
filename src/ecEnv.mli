@@ -202,14 +202,15 @@ module Mod : sig
   val sp_lookup     : qsymbol -> env -> mpath * (module_expr suspension)
   val sp_lookup_opt : qsymbol -> env -> (mpath * (module_expr suspension)) option
 
-  val bind : symbol -> module_expr -> env -> env
-
+  val bind  : symbol -> module_expr -> env -> env
   val enter : symbol -> (EcIdent.t * module_type) list -> env -> env
-  val bind_local : EcIdent.t -> module_type -> mod_restr -> env -> env
 
+  val bind_local    : EcIdent.t -> module_type -> mod_restr -> env -> env
   val declare_local : EcIdent.t -> module_type -> mod_restr -> env -> env
 
   val add_restr_to_locals : mod_restr -> env -> env
+
+  val import_vars : env -> mpath -> env
 
   (* Only bind module, ie no memory and no local variable *)
   val add_mod_binding : bindings -> env -> env
@@ -302,8 +303,8 @@ module Op : sig
 
   val all : ?check:(operator -> bool) -> qsymbol -> env -> (path * t) list
 
-  val reducible : env -> path -> bool
-  val reduce    : env -> path -> ty list -> form
+  val reducible : ?force:bool -> env -> path -> bool
+  val reduce    : ?force:bool -> env -> path -> ty list -> form
 
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
@@ -383,18 +384,13 @@ module BaseRw : sig
 end
 
 (* -------------------------------------------------------------------- *)
-
-type redinfo =
-  { ri_before_fix : (EcTheory.rule list) EcMaps.Mint.t;
-    ri_after_fix  : (EcTheory.rule list) EcMaps.Mint.t; }
-
 module Reduction : sig
   type rule   = EcTheory.rule
   type topsym = [ `Path of path | `Tuple ]
 
   val add1 : path * rule_option * rule option -> env -> env
   val add  : (path * rule_option * rule option) list -> env -> env
-  val get  : topsym -> env -> redinfo
+  val get  : topsym -> env -> rule list
 end
 
 (* -------------------------------------------------------------------- *)
