@@ -586,7 +586,6 @@ let tt_apply (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
   let tc, (pt, ax)  =
     RApi.to_pure (fun tc -> LowApply.check `Elim pt (`Tc (tc, None))) tc in
-  let ppe = EcPrinting.PPEnv.ofenv (FApi.tc_env tc) in
   if not (EcReduction.is_conv hyps ax concl) then
     raise InvalidGoalShape;
   FApi.close tc (VApply pt)
