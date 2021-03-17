@@ -227,8 +227,8 @@ require installing specific versions of some of the provers.
 
 At the time of writing, we depend on Why3 1.3.x, which supports the
 following versions (and some versions below):
-- Alt-Ergo 2.3.2 (if you install alt-ergo using opam, you can
-prevent upgrades using `opam pin alt-ergo 2.3.2`)
+- Alt-Ergo 2.3.1 (if you install alt-ergo using opam, you can
+prevent upgrades using `opam pin alt-ergo 2.3.1`)
 - CVC4 1.7
 - Z3 4.8.6
 
