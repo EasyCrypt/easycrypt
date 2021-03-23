@@ -2262,6 +2262,294 @@ let trans_restr_oracle_calls env env_in (params : Sm.t) = function
         pfd_uses
 
 (* -------------------------------------------------------------------- *)
+(* Translation of quantums                                              *)
+
+let is_quantum = function
+  | `C _ -> false | `Q _ -> true
+
+let has_quantum = List.exists is_quantum
+
+let app_q = function
+  | `C e -> e | `Q e -> e
+
+let abs_q e = `Q e
+
+let rec q_expr qmap e =
+  match e.e_node with
+  | Eint _ | Elocal _ | Eop _ -> `C e
+
+  | Evar pv ->
+    if is_glob pv then `C e
+    else begin
+      try Msym.find (get_loc pv) qmap
+      with Not_found -> `C e
+    end
+
+  | Eapp(f,args) ->
+    let f, args = q_expr qmap f, List.map (q_expr qmap) args in
+    if has_quantum (f::args) then
+      abs_q (e_app (app_q f) (List.map app_q args) e.e_ty)
+    else `C e
+
+  | Equant(q, b, e1) ->
+    let e1 = q_expr qmap e1 in
+    if is_quantum e1 then
+      abs_q (e_quantif q b (app_q e1))
+    else `C e
+
+  | Elet(lp,e1,e2) ->
+    let e1, e2 = q_expr qmap e1, q_expr qmap e2 in
+    if has_quantum [e1; e2] then
+      abs_q (e_let lp (app_q e1) (app_q e2))
+    else `C e
+
+  | Etuple(es) ->
+    let es = List.map (q_expr qmap) es in
+    if has_quantum es then
+      abs_q (e_tuple (List.map app_q es))
+    else `C e
+
+  | Eif(e1,e2,e3) ->
+    let es = List.map (q_expr qmap) [e1; e2; e3] in
+    if has_quantum es then
+      let e1, e2, e3 = as_seq3 es in
+      abs_q (e_if (app_q e1) (app_q e2) (app_q e3))
+    else `C e
+
+  | Ematch(e1,es,ty) ->
+    let es = List.map (q_expr qmap) (e1::es) in
+    if has_quantum es then
+      abs_q (e_match (app_q (List.hd es))
+               (List.map app_q (List.tl es)) ty)
+    else `C e
+
+  | Eproj(e1,i) ->
+    let e1 = q_expr qmap e1 in
+    if is_quantum e1 then
+      abs_q (e_proj (app_q e1) i e.e_ty)
+    else `C e
+
+let is_e_identity e =
+  match e.e_node with
+  | Equant(`ELambda, [id,_], e1) ->
+    EcTypes.is_local e1 && EcIdent.id_equal (EcTypes.destr_local e1) id
+  | _ -> false
+
+
+let is_e_eta e =
+  match e.e_node with
+  | Equant(`ELambda, [id, _], {e_node = Eapp(e',[e1])})
+      when EcTypes.is_local e1 &&
+             EcIdent.id_equal (EcTypes.destr_local e1) id ->
+    Some e'
+  | _ -> None
+
+(* Pas d'assign sur q
+   si quantum alors toutes les lval doivent etre quantum
+   M.f(e ); assert M.f is not quantum
+*)
+
+let quantum_body quantum params qv locals qlocals body result =
+
+  let lq, qty, qmap, qlocals =
+    if quantum = `Classical then
+      begin
+        assert (qv = None && qlocals = []);
+        EcIdent.create "_tt", tunit, Msym.empty, []
+      end
+    else
+      match qv with
+      | None ->
+        assert (qlocals = []);
+        EcIdent.create "_tt", tunit, Msym.empty, []
+      | Some {v_name = q; v_type = qty} ->
+        let lq = EcIdent.create q in
+        let eq = e_local lq qty in
+        let qmap =
+          Msym.add q (`Q (e_local lq qty)) Msym.empty in
+        let qmap =
+          List.fold_left (fun qmap v ->
+              let ev = e_var (pv_loc v.v_name) (tfun qty v.v_type) in
+              let e = e_app ev [eq] v.v_type in
+              Msym.add v.v_name (`Q e) qmap) qmap qlocals in
+        let qlocals =
+          List.map (fun v -> {v with v_type = tfun qty v.v_type}) qlocals
+        in
+        lq, qty, qmap, qlocals in
+
+  let eq =  e_local lq qty in
+
+  let memenv = EcMemory.empty_local ~witharg:false mhr in
+  let memenv = EcMemory.bindall params memenv in
+  let memenv = EcMemory.bindall locals memenv in
+  let memenv = EcMemory.bindall qlocals memenv in
+
+  let qlocals = ref qlocals in
+  let memenv  = ref memenv in
+
+  let fresh ?x ty =
+    let dfl =
+      match x with
+      | Some (LvVar (x,_)) -> symbol_of_pv x
+      | _ -> "tmp" in
+    let me, pv =
+      EcMemory.bind_fresh { v_name = dfl; v_type = ty } !memenv in
+    memenv := me;
+    qlocals := pv :: !qlocals;
+    pv in
+
+  let is_quantum_pv (pv,_ty) =
+    is_loc pv && Msym.mem (get_loc pv) qmap in
+
+  let all_quantum_lval = function
+    | LvVar x -> is_quantum_pv x
+    | LvTuple xs -> List.for_all is_quantum_pv xs in
+
+  let has_quantum_lval = function
+    | LvVar x -> is_quantum_pv x
+    | LvTuple xs -> List.exists is_quantum_pv xs in
+
+  let q_asgn x e =
+    assert (all_quantum_lval x);
+    let fe = e_lam [lq, qty] e in
+    match x with
+    | LvVar (x,ty) ->
+      [i_asgn (LvVar (x, tfun qty ty), fe)]
+    | LvTuple xs ->
+      let tmp = fresh fe.e_ty in
+      let pv  = pv_loc tmp.v_name in
+      let atmp = e_app (e_var pv tmp.v_type) [eq] e.e_ty in
+      i_asgn (LvVar (pv, fe.e_ty), fe) ::
+        List.mapi (fun i (x,ty) ->
+            i_asgn (LvVar (x, tfun qty ty),
+                    e_lam [lq, qty] (e_proj atmp i ty))) xs
+  in
+
+  let rec q_instr i =
+    match i.i_node with
+    | Sasgn (x,e) ->
+      let e1 = q_expr qmap e in
+      if is_quantum e1 then q_asgn x (app_q e1)
+      else (assert (not (has_quantum_lval x));
+            [i])
+
+    | Srnd (x, e) ->
+      let e1 = q_expr qmap e in
+      assert (not (is_quantum e1) && not (has_quantum_lval x));
+      [i]
+
+    | Scall(x, f, es, q) ->
+      let es1 = List.map (q_expr qmap) es in
+      assert (not (has_quantum es1));
+      begin match q with
+      | None -> (* Classical call *)
+        assert (not (omap_dfl has_quantum_lval false x));
+        [i]
+      | Some qa ->
+        match x with
+        | None -> [i_call (None, f, es, None)]
+        | Some x ->
+          let qa1 = q_expr qmap qa in
+          assert (if is_quantum qa1 then all_quantum_lval x
+                  else not(has_quantum_lval x));
+          let fq =
+            if is_quantum qa1 then e_lam [lq,qty] (app_q qa1)
+            else (app_q qa1)
+          in
+          let i1, eqa =
+            if is_quantum qa1 && is_e_identity fq then
+              [], eq
+            else
+              let tmpq = fresh fq.e_ty in
+              let pvq = pv_loc tmpq.v_name in
+              let eqa =
+                if is_quantum qa1 then
+                  e_app (e_var pvq tmpq.v_type) [eq] qa.e_ty
+                else e_var pvq tmpq.v_type in
+              let i1 = i_asgn (LvVar (pvq, fq.e_ty), fq) in
+              [i1], eqa in
+          let rty = ty_of_lv x in
+
+          let c =
+            match x with
+            | LvVar(x, _) when
+                is_quantum qa1 &&
+                EcTypes.is_local eqa &&
+                EcIdent.id_equal (EcTypes.destr_local eqa) lq ->
+              [i_call (Some(LvVar(x, tfun qa.e_ty rty)), f, es, None)]
+
+            | _ ->
+              let lam =
+                if is_quantum qa1 then e_lam [lq, qty]
+                else fun e -> e in
+              let tmpr = fresh ~x (tfun qa.e_ty rty) in
+              let pvr = pv_loc tmpr.v_name in
+              let i2 = i_call (Some(LvVar(pvr, tmpr.v_type)), f, es, None) in
+              let e =
+                e_app
+                  (e_var pvr tmpr.v_type)
+                  [eqa]
+                  rty in
+
+              let c =
+                match x with
+                | LvVar (x,_) ->
+                  let e = lam e in
+                  let e =
+                    match is_e_eta e with
+                    | Some e -> e
+                    | None -> e in
+
+                  [i_asgn (LvVar (x, tfun qty rty), e)]
+                | LvTuple xs ->
+                  List.mapi (fun i (x,ty) ->
+                      i_asgn (LvVar (x, tfun qty ty),
+                              lam (e_proj e i ty))) xs
+              in
+              i2::c in
+          i1 @ c
+      end
+
+    | Sif(e,c1,c2) ->
+      let e1 = q_expr qmap e in
+      assert (not (is_quantum e1));
+      [i_if (e, q_cmd c1, q_cmd c2)]
+
+    | Swhile(e,c) ->
+      let e1 = q_expr qmap e in
+      assert (not (is_quantum e1));
+      [i_while (e, q_cmd c)]
+
+    | Sassert e ->
+      let e1 = q_expr qmap e in
+      assert (not (is_quantum e1));
+      [i]
+
+    | Smatch(e,bs) ->
+      let e1 = q_expr qmap e in
+      assert (not (is_quantum e1));
+      [i_match (e, List.map (fun (x,c) -> x, q_cmd c) bs)]
+    | Sabstract _ ->
+      [i]
+
+  and q_cmd c =
+    stmt (List.flatten (List.map q_instr c.s_node)) in
+
+  let body = q_cmd body in
+  let result =
+    omap (fun result ->
+        if quantum = `Classical then result
+        else
+          let r = e_lam [lq,qty] (app_q (q_expr qmap result)) in
+          match is_e_eta r with
+          | None -> r
+          | Some e -> e)
+      result in
+  !qlocals, body, result
+
+
+
+(* -------------------------------------------------------------------- *)
 (* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
 (* If [r_compl] is None, there are no restrictions *)
 let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
@@ -2419,10 +2707,10 @@ and transmodsig_body
 
   let transsig1 mr = function
     | `FunctionDecl f ->
-      let name = f.pfd_name in
+      let name = f.pfd__name in
       names := name::!names;
       let tyarg, tyargs =
-        match f.pfd_tyargs with
+        match f.pfd__tyargs with
         | Fparams_exp args ->
           let tyargs =
             List.map              (* FIXME: continuation *)
@@ -2440,15 +2728,17 @@ and transmodsig_body
           let tyarg = transty_for_decl env ty in
           tyarg, None in
 
-      let resty = transty_for_decl env f.pfd_tyresult in
+      let resty = transty_for_decl env f.pfd__tyresult in
 
-      let uin, rname, compl, calls = trans_restr_fun env env sa f.pfd_uses in
+      assert (f.pfd__qtyarg = None);
+
+      let uin, rname, compl, calls = trans_restr_fun env env sa f.pfd__uses in
 
       assert (rname = name.pl_desc);
 
       let oi = OI.mk calls uin compl in
 
-      let fs_quantum = f.pfd_quantum in
+      let fs_quantum = f.pfd__quantum in
 
       check_quantum_type env name fs_quantum resty;
 
@@ -2662,11 +2952,11 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
 
   | Pst_fun (decl, body) -> begin
       let ue  = UE.create (Some []) in
-      let env = EcEnv.Fun.enter decl.pfd_name.pl_desc env in
+      let env = EcEnv.Fun.enter decl.pfd__name.pl_desc env in
 
       (* Type-check function parameters / check for dups *)
       let dtyargs =
-        match decl.pfd_tyargs with
+        match decl.pfd__tyargs with
         | Fparams_imp _ -> assert false
         | Fparams_exp l -> l in
 
@@ -2675,18 +2965,29 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       let memenv = EcMemory.empty_local ~witharg:false mhr in
       let memenv = fundef_add_symbol env memenv params in
 
+      let qv, memenv =
+        match decl.pfd__qtyarg with
+        | None -> None, memenv
+        | Some (s,pty) ->
+          let v = {v_name = unloc s; v_type = transty tp_uni env ue pty} in
+          let memenv = fundef_add_symbol env memenv [v, s.pl_loc] in
+          Some (v, loc s), memenv
+      in
+
       (* Type-check body *)
-      let retty = transty tp_uni env ue decl.pfd_tyresult in
-      let (env, stmt, result, prelude, locals) =
+      let retty = transty tp_uni env ue decl.pfd__tyresult in
+      let (env, stmt, result, prelude, locals, qlocals) =
         transbody ue memenv env retty (mk_loc st.pl_loc body)
       in
       (* Close all types *)
       let su      = Tuni.offun (UE.assubst ue) in
-      let retty   = fundef_check_type su env None (retty, decl.pfd_tyresult.pl_loc) in
+      let retty   =
+        fundef_check_type su env None (retty, decl.pfd__tyresult.pl_loc) in
       let params  = List.map (fundef_check_decl  su env) params in
       let locals  = List.map (fundef_check_decl  su env) locals in
+      let qlocals = List.map (fundef_check_decl  su env) qlocals in
       let prelude = List.map (fundef_check_iasgn su env) prelude in
-
+      let qv = omap (fundef_check_decl  su env) qv in
       if not (UE.closed ue) then
         tyerror st.pl_loc env (OnlyMonoTypeAllowed None);
       let clsubst = { EcTypes.e_subst_id with es_ty = su } in
@@ -2694,31 +2995,39 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       and result  = result |> omap (e_subst clsubst) in
       let stmt    = EcModules.stmt (List.flatten prelude @ stmt.s_node) in
 
+      let qlocals, stmt, result =
+        quantum_body decl.pfd__quantum params qv locals qlocals stmt result in
+
+      let retty =
+        match qv with
+        | None -> retty
+        | Some v -> tfun (v.v_type) retty in
+
       (* Computes reads/writes/calls *)
       let uses = result |> ofold ((^~) se_inuse) (s_inuse stmt) in
 
-      let fs_quantum = decl.pfd_quantum in
-      check_quantum_type env decl.pfd_name fs_quantum retty;
+      let fs_quantum = decl.pfd__quantum in
+      check_quantum_type env decl.pfd__name fs_quantum retty;
 
       (* Compose all results *)
       let fun_ =
-        { f_name   = decl.pfd_name.pl_desc;
+        { f_name   = decl.pfd__name.pl_desc;
           f_sig    = {
             fs_quantum;
-            fs_name   = decl.pfd_name.pl_desc;
+            fs_name   = decl.pfd__name.pl_desc;
             fs_arg    = ttuple (List.map (fun vd -> vd.v_type) params);
             fs_anames = Some params;
             fs_ret    = retty;
           };
           f_def = FBdef {
-            f_locals = locals;
+            f_locals = locals @ qlocals;
             f_body   = stmt;
             f_ret    = result;
             f_uses   = uses;
           };
         }
       in
-        [], [(decl.pfd_name.pl_desc, MI_Function fun_)]
+        [], [(decl.pfd__name.pl_desc, MI_Function fun_)]
     end
 
   | Pst_alias ({pl_desc = name},f) ->
@@ -2780,43 +3089,51 @@ and transstruct1_alias env name f =
   (name, MI_Function fun_)
 
 (* -------------------------------------------------------------------- *)
-and transbody ue memenv (env : EcEnv.env) retty pbody =
+and transbody ue memenv (env : EcEnv.env) retty pbody :
+     EcEnv.env * stmt * expr option * _ *
+       (variable * _) list * (variable * _) list
+=
   let { pl_loc = loc; pl_desc = pbody; } = pbody in
 
   let prelude = ref []
-  and locals  = ref [] in
+  and locals  = ref []
+  and qlocals = ref [] in
+
 
   (* Type-check local variables / check for dups *)
   let add_local memenv local =
     let env   = EcEnv.Memory.push_active memenv env in
-    let ty     = local.pfl_type |> omap (transty tp_uni env ue) in
-    let init   = local.pfl_init |> omap (fst -| transexp env `InProc ue) in
+    let ty     = local.pfl__type |> omap (transty tp_uni env ue) in
+    let init   = local.pfl__init |> omap (fst -| transexp env `InProc ue) in
     let ty =
       match ty, init with
       | None   , None   -> None
       | Some ty, None   -> Some ty
       | None   , Some e -> Some e.e_ty
       | Some ty, Some e -> begin
-          let loc =  (oget local.pfl_init).pl_loc in
+          let loc =  (oget local.pfl__init).pl_loc in
             unify_or_fail env ue loc ~expct:ty e.e_ty; Some ty
       end
     in
 
-    let xs     = snd (unloc local.pfl_names) in
-    let mode   = fst (unloc local.pfl_names) in
+    let xs     = snd (unloc local.pfl__names) in
+    let mode   = fst (unloc local.pfl__names) in
 
     let xsvars = List.map (fun _ -> UE.fresh ue) xs in
     begin
       ty |> oiter (fun ty ->
         match mode with
         | `Single -> List.iter (fun a -> EcUnify.unify env ue a ty) xsvars
-        | `Tuple  -> unify_or_fail env ue local.pfl_names.pl_loc ~expct:ty (ttuple xsvars))
+        | `Tuple  -> unify_or_fail env ue local.pfl__names.pl_loc ~expct:ty (ttuple xsvars))
     end;
 
     (* building the list of locals *)
     let xs = List.map2 (fun x ty -> {v_name = x.pl_desc; v_type = ty}, x.pl_loc) xs xsvars in
     let memenv = fundef_add_symbol env memenv xs in
-    locals := xs :: !locals;
+    if local.pfl__quantum = `Quantum then
+      qlocals := xs :: !qlocals
+    else
+      locals := xs :: !locals;
     init |> oiter
      (fun init ->
        let doit (v,_) = pv_loc v.v_name, v.v_type in
@@ -2843,7 +3160,10 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
         unify_or_fail env ue pe.pl_loc ~expct:retty ety;
         Some e
   in
-    (env, body, result, List.rev !prelude, List.flatten (List.rev !locals))
+    (env, body, result, List.rev !prelude,
+     List.flatten (List.rev !locals),
+     List.flatten (List.rev !qlocals)
+    )
 
 (* -------------------------------------------------------------------- *)
 and fundef_add_symbol env memenv xtys =  (* for locals dup check *)
@@ -2858,7 +3178,7 @@ and fundef_check_type subst_uni env os (ty, loc) =
       tyerror loc env (OnlyMonoTypeAllowed os);
     ty
 
-and fundef_check_decl subst_uni env (decl, loc) =
+and fundef_check_decl subst_uni env (decl, loc) : variable =
   { decl with
       v_type =
       fundef_check_type subst_uni env (Some decl.v_name) (decl.v_type, loc) }

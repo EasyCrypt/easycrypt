@@ -1452,6 +1452,10 @@ param_decl:
 | LPAREN UNDERSCORE COLON ty=loc(type_exp) RPAREN
     { Fparams_imp ty }
 
+qparam_decl:
+| LBRACE x=ident COLON ty=loc(type_exp) RBRACE
+    { x, ty }
+
 (* -------------------------------------------------------------------- *)
 (* Statements                                                           *)
 
@@ -1555,17 +1559,17 @@ loc_decl_names:
 | LPAREN x=plist2(lident, COMMA) RPAREN { (`Tuple, x) }
 
 loc_decl_r:
-| VAR x=loc(loc_decl_names)
-    { { pfl_names = x; pfl_type = None; pfl_init = None; } }
+| q=quantum VAR x=loc(loc_decl_names)
+    { { pfl__quantum = q; pfl__names = x; pfl__type = None; pfl__init = None; } }
 
-| VAR x=loc(loc_decl_names) COLON ty=loc(type_exp)
-    { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
+| q=quantum VAR x=loc(loc_decl_names) COLON ty=loc(type_exp)
+    { { pfl__quantum = q; pfl__names = x; pfl__type = Some ty; pfl__init = None; } }
 
-| VAR x=loc(loc_decl_names) COLON ty=loc(type_exp) LARROW e=expr
-    { { pfl_names = x; pfl_type = Some ty; pfl_init = Some e; } }
+| q=quantum VAR x=loc(loc_decl_names) COLON ty=loc(type_exp) LARROW e=expr
+    { { pfl__quantum = q; pfl__names = x; pfl__type = Some ty; pfl__init = Some e; } }
 
-| VAR x=loc(loc_decl_names) LARROW e=expr
-    { { pfl_names = x; pfl_type = None; pfl_init = Some e; } }
+| q=quantum VAR x=loc(loc_decl_names) LARROW e=expr
+    { { pfl__quantum = q; pfl__names = x; pfl__type = None; pfl__init = Some e; } }
 
 loc_decl:
 | x=loc_decl_r SEMICOLON { x }
@@ -1592,17 +1596,18 @@ fun_def_body:
     }
 
 %inline fun_decl:
-| q=quantum PROC x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
+| q=quantum PROC x=lident pd=param_decl qd=qparam_decl? ty=prefix(COLON, loc(type_exp))?
     { let frestr = { pmre_in    = true;
 		     pmre_name  = x;
 		     pmre_orcls = None;
 		     pmre_compl = None;	} in
 
-      { pfd_quantum  = q;
-        pfd_name     = x;
-        pfd_tyargs   = pd;
-        pfd_tyresult = odfl (mk_loc x.pl_loc PTunivar) ty;
-        pfd_uses     = frestr; }
+      { pfd__quantum  = q;
+        pfd__name     = x;
+        pfd__tyargs   = pd;
+        pfd__qtyarg   = qd;
+        pfd__tyresult = odfl (mk_loc x.pl_loc PTunivar) ty;
+        pfd__uses     = frestr; }
     }
 
 minclude_proc:
@@ -1618,7 +1623,7 @@ mod_item:
 
 | decl=loc(fun_decl) EQ body=fun_def_body {
     let { pl_loc = loc; pl_desc = decl; } = decl in
-        match decl.pfd_tyargs with
+        match decl.pfd__tyargs with
         | Fparams_imp _ ->
             let msg = "implicite declaration of parameters not allowed" in
               parse_error loc (Some msg)
@@ -1786,7 +1791,8 @@ signature_item:
     { let qs = omap (List.map (fun x -> { inp_in_params = false;
 					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
-| q=quantum PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
+| q=quantum PROC i=boption(STAR) x=lident pd=param_decl
+     COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
       let frestr = { pmre_in    = not i;
 		     pmre_name  = x;
@@ -1794,11 +1800,12 @@ signature_item:
 		     pmre_compl = compl; } in
 
       `FunctionDecl
-          { pfd_quantum  = q;
-            pfd_name     = x;
-            pfd_tyargs   = pd;
-            pfd_tyresult = ty;
-            pfd_uses     = frestr; } }
+          { pfd__quantum  = q;
+            pfd__name     = x;
+            pfd__tyargs   = pd;
+            pfd__qtyarg   = None;
+            pfd__tyresult = ty;
+            pfd__uses     = frestr; } }
 
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions                                   *)
