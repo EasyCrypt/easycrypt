@@ -100,3 +100,64 @@ qed.
 lemma finiteD (A B : 'a -> bool):
   is_finite A => is_finite (predD A B).
 proof. by move=> fin_A; apply/(finite_leq A)=> //= x @/predD. qed.
+
+
+(* -------------------------------------------------------------------- *)
+(* Finite type   *)
+
+pred finite_type = is_finite predT<:'a>.
+
+lemma finite_typeP ['a] : (exists (s:'a list), forall x, x \in s) <=> finite_type <:'a>.
+proof. by rewrite /finite_type -finiteP /predT. qed.
+  
+lemma finite_type_surj ['a 'b] (f : 'a -> 'b):
+   finite_type <:'a> => surjective f => finite_type <:'b>.
+proof. 
+rewrite -!finite_typeP => -[s hs] hf; exists (map f s) => x. 
+apply mapP; case: (hf x) => y ->; exists y => /=; apply hs.
+qed.
+ 
+(* -------------------------------------------------------------------- *)
+(* Boolean is finite                                                    *)
+
+
+lemma finite_bool : finite_type <:bool>.
+proof. by apply finite_typeP; exists [true; false]; case. qed.
+
+(* Pair and tuple are is finite *)
+lemma finite_pair ['a 'b] : 
+  finite_type <:'a> => finite_type <:'b> => finite_type <:'a * 'b>.
+proof.
+rewrite -!finite_typeP=> -[s1 hs1] [s2 hs2].
+exists (allpairs (fun x y => (x,y)) s1 s2) => p.
+by apply /allpairsP; exists p; case: p => /= ??; rewrite hs1 hs2.
+qed.
+
+lemma finite_tuple3 ['a 'b 'c] : 
+  finite_type <:'a> => finite_type <:'b> => finite_type <:'c> => finite_type <:'a * 'b * 'c>.
+proof. 
+move=> ha hb hc. 
+apply (finite_type_surj (fun (p: _ * (_ * _)) => (p.`1, p.`2.`1, p.`2.`2))).
++ by apply:finite_pair;2:apply finite_pair.
+by move=> [t1 t2 t3]; exists (t1, (t2, t3)).
+qed.
+
+lemma finite_tuple4 ['a 'b 'c 'd] : 
+  finite_type <:'a> => finite_type <:'b> => finite_type <:'c> => 
+  finite_type <:'d> => finite_type <:'a * 'b * 'c * 'd>.
+proof. 
+move=> ha hb hc hd. 
+apply (finite_type_surj (fun (p: _ * (_ * _ * _)) => (p.`1, p.`2.`1, p.`2.`2, p.`2.`3))).
++ by apply:finite_pair;2:apply finite_tuple3.
+by move=> [t1 t2 t3 t4]; exists (t1, (t2, t3, t4)).
+qed.
+
+lemma finite_tuple5 ['a 'b 'c 'd 'e] : 
+  finite_type <:'a> => finite_type <:'b> => finite_type <:'c> => 
+  finite_type <:'d> => finite_type <:'e> => finite_type <:'a * 'b * 'c * 'd * 'e>.
+proof. 
+move=> ha hb hc hd he. 
+apply (finite_type_surj (fun (p: _ * (_ * _ * _ * _)) => (p.`1, p.`2.`1, p.`2.`2, p.`2.`3, p.`2.`4))).
++ by apply:finite_pair;2:apply finite_tuple4.
+by move=> [t1 t2 t3 t4 t5]; exists (t1, (t2, t3, t4, t5)).
+qed.

@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import AllCore List.
+require import AllCore List Finite.
 
 (* -------------------------------------------------------------------- *)
 type t.
@@ -33,3 +33,7 @@ proof.
 rewrite /card; have: mem enum witness by rewrite enumP.
 by case: enum=> //= x s _; rewrite addzC ltzS size_ge0.
 qed.
+
+lemma finite_t : finite_type <:t>.
+proof. by apply finite_typeP; exists enum => ?; apply enumP. qed.
+
