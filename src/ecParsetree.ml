@@ -76,7 +76,7 @@ and  ptybindings = ptybinding list
 and pexpr_r =
   | PEcast   of pexpr * pty                       (* type cast          *)
   | PEint    of zint                              (* int. literal       *)
-  | PEdecimal of (zint * (int * zint))            (* dec. literal       *)
+  | PEdecimal of (zint * (int * zint))             (* dec. literal       *)
   | PEident  of pqsymbol * ptyannot option        (* symbol             *)
   | PEapp    of pexpr * pexpr list                (* op. application    *)
   | PElet    of plpattern * pexpr_wty * pexpr     (* let binding        *)
@@ -313,12 +313,11 @@ and fun_params =
  | Fparams_imp of pty
 
 and pfunction_decl = {
-  pfd__quantum  : quantum;
-  pfd__name     : psymbol;
-  pfd__tyargs   : fun_params;
-  pfd__qtyarg   : (psymbol * pty) option;
-  pfd__tyresult : pty;
-  pfd__uses     : pmod_restr_el;
+  pfd_quantum  : quantum;
+  pfd_name     : psymbol;
+  pfd_tyargs   : fun_params;
+  pfd_tyresult : pty;
+  pfd_uses     : pmod_restr_el;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -360,10 +359,9 @@ and pfunction_body = {
 }
 
 and pfunction_local = {
-  pfl__quantum : quantum;
-  pfl__names : ([`Single|`Tuple] * (psymbol list)) located;
-  pfl__type  : pty   option;
-  pfl__init  : pexpr option;
+  pfl_names : ([`Single|`Tuple] * (psymbol list)) located;
+  pfl_type  : pty   option;
+  pfl_init  : pexpr option;
 }
 
 
