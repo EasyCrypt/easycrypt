@@ -178,29 +178,29 @@ module FRO : FRO = {
 }.
 
 equiv RO_FRO_init : RO.init ~ FRO.init : true ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> /=; by rewrite map_empty. qed.
+proof. by proc; auto=> /=; rewrite /noflags map_empty. qed.
 
 equiv RO_FRO_get : RO.get ~ FRO.get :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> ={res} /\ RO.m{1} = noflags FRO.m{2}.
 proof.
   proc; auto=> &1 &2 [] 2!-> /= ? -> /=.
-  rewrite mem_map !map_set /fst /= get_set_sameE oget_some => |>; progress.
+  rewrite /noflags mem_map !map_set /fst /= get_set_sameE oget_some => |>; progress.
   + by rewrite mapE oget_omap_some 1:-domE.
   + by rewrite eq_sym set_eq 1:mapE /= 1:get_some.
 qed.
 
 equiv RO_FRO_set : RO.set ~ FRO.set :
    ={x, y} /\ RO.m{1} = noflags FRO.m{2} ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> &1 &2 [#] 3->; rewrite map_set. qed.
+proof. by proc; auto=> &1 &2 [#] 3->; rewrite /noflags map_set. qed.
 
 equiv RO_FRO_rem : RO.rem ~ FRO.rem :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> RO.m{1} = noflags FRO.m{2}.
-proof. by proc; auto=> ? ?; rewrite map_rem. qed.
+proof. by proc; auto=> ? ?; rewrite /noflags map_rem. qed.
 
 equiv RO_FRO_sample : RO.sample ~ FRO.sample :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> RO.m{1} = noflags FRO.m{2}.
 proof. 
-  by proc; inline *; auto=> &1 &2 [] 2!-> /= ? ->; rewrite mem_map map_set.
+  by proc; inline *; auto=> &1 &2 [] 2!-> /= ? ->; rewrite /noflags mem_map map_set.
 qed.
 
 lemma RO_FRO_D (D <: RO_Distinguisher{-RO, -FRO}) :
@@ -342,7 +342,7 @@ proof.
   + by conseq _ (_ : true ==> true: = 1%r) _ => //; call RRO_resample_ll.
 qed.
 
-lemma iter_perm2 (i1 i2 : from) :
+lemma iter_perm2 :
   equiv [Iter(RRO.I).iter_12 ~ Iter(RRO.I).iter_21 :
          ={glob RRO.I, t1, t2} ==> ={glob RRO.I}].
 proof.
@@ -383,7 +383,7 @@ lemma eager_get :
 proof.
   eager proc.
   wp; case ((dom FRO.m x /\ (oget FRO.m.[x]).`2=Known){1}).
-  + rnd{1}; rcondf{2} 2; 1:by auto=> /> _ _ ->.
+  + rnd{1}; rcondf{2} 2; 1: by auto => /> _ ->.
     exists* x{1}, ((oget FRO.m.[x{2}]){1}); elim*=> x1 mx; inline RRO.resample.
     call (iter_inv RRO.I (fun z=> x1<>z)
                    (fun o1 o2 => o1 = o2 /\ o1.[x1]= Some mx) _)=> /=.
@@ -411,8 +411,8 @@ proof.
       move=> />; by rewrite -neqK_eqU.
     + move=> ? ? ?; rewrite domE=> [#] <*> [#] -> /eq_except_sym H Hxm Hx2.
       split=> [| _ r _]; first apply sampleto_ll.
-      rewrite /= Hxm oget_some /=; apply /eq_sym.
-      have /(congr1 oget) := Hx2 => <-; apply eq_except_setr_as_l=> //.
+      rewrite /= Hxm oget_some /= ; apply /eq_sym.
+      have /(congr1 oget) /= <- := Hx2; apply eq_except_setr_as_l=> //.
       by rewrite domE Hx2.
     + symmetry; call (iter1_perm RRO.I iter_perm2).
       skip=> &1 &2 [[->> ->>]] [Hdom Hm]; split=> //=.
@@ -433,7 +433,7 @@ proof.
            (I_f_eqex x1 mx1 mx2)); auto=> /> &1 &2 eq_exc get1_x2 get2_x2.
       split. split=> [| x2].
       congr; rewrite fsetP=> y; rewrite in_fsetD1 2!mem_fdom.
-      case (y = x{2})=> [->/= | ne_y_x2 /=].
+      case (y = x1)=> [->/= | ne_y_x2 /=].
       by rewrite dom_restr /in_dom_with get2_x2.
       rewrite 2!dom_restr /in_dom_with; rewrite eq_exceptP in eq_exc.
       have ^ get_y_eq -> := eq_exc y _. by rewrite /pred1.
@@ -496,17 +496,15 @@ proof.
                          o2.[x1] = mx2) 
            (I_f_eqex x1 mx1 mx2));
         auto=> &1 &2 /> eq_exc not_x2_in_unkn_m2 get_m2_x2_eq.
-      split=> [x0 |].
-      by rewrite -memE mem_fdom dom_restr /in_dom_with;
+      by move=> x0; rewrite -memE mem_fdom dom_restr /in_dom_with;
         case (x{2} = x0)=> // <-; rewrite get_m2_x2_eq.
-      by rewrite get_m2_x2_eq.
   exists* x{1}, y{1}, (FRO.m.[x]{1}); elim*=> x1 y1 mx1;
     pose mx2 := Some (y1, Known).
   call (iter_inv RRO.I (fun z=> x1<>z) 
          (fun o1 o2 => eq_except (pred1 x1) o1 o2 /\ o1.[x1] = mx1 /\
                        o2.[x1] = mx2) 
          (I_f_eqex x1 mx1 mx2))=> /=; auto=> &1 &2 /> /negb_and x2_disj.
-    split=> [| _ _ _ m_L m_R eq_exc m_L_x2_eq m_R_x2_eq].
+    split=> [| _ _ _ _ m_L m_R eq_exc m_L_x2_eq m_R_x2_eq].
     split.
     congr; rewrite fsetP=> z; rewrite 2!mem_fdom 2!dom_restr /in_dom_with mem_set.
     case (z = x{2})=> [-> /=| ne_z_x2 /=].
@@ -516,9 +514,8 @@ proof.
     rewrite -memE mem_fdom dom_restr /in_dom_with.
     case (x{2} = x0)=> [<- [#] | //]; by elim x2_disj.
     rewrite get_set_sameE /mx2 /= eq_except_setr.
-    rewrite get_set_sameE in m_R_x2_eq.
     rewrite -fmap_eqP=> z; rewrite get_setE; case (z = x{2})=> [-> |].
-    by rewrite -m_R_x2_eq.
+    by rewrite m_R_x2_eq.
     move=> ne_z_x2; rewrite eq_exceptP in eq_exc; by rewrite eq_exc /pred1.
 qed.
 
@@ -591,7 +588,7 @@ proof.
       (={x, FRO.m} /\ ! dom FRO.m{2} x{2} ==> ={x, FRO.m}) 
       (={x, FRO.m} /\ ! dom FRO.m{2} x{2} ==> ={x, FRO.m})=>//; last first.
     + inline{2} RRO.resample; call (iter1_perm RRO.I iter_perm2);
-        auto=> ? &mr [#] 2-> Hmem /= ? -> /=.
+        auto=> |> &2 Hmem ??.
       by apply /perm_eq_sym /perm_to_rem; rewrite restr_set /= mem_fdom mem_set.
     + by move=> ? &mr [#] 2-> ?; exists FRO.m{mr} x{mr}.
     inline Iter(RRO.I).iter_1s RRO.I.f RRO.resample; wp; swap{1} -1.
@@ -668,9 +665,9 @@ proof.
   eager proc; inline *; wp.
   while (={l, FRO.m} /\ (forall z, mem l z => in_dom_with FRO.m z Unknown){1} /\
          restr Known FRO.m{1} = result{2}).
-  + auto=> &1 &2 [#] 2-> Hz <- l2_nonemp _ /= ? -> /=.
+  + auto=> |> &2 Hz l2_nonemp ? /= ?.
     split=>[z /mem_drop Hm |];1:rewrite /in_dom_with mem_set get_setE.
-    case (z = head witness l{2})=> [-> //= | ne /=]; rewrite Hz Hm.
+    case (z = head witness l{2})=> [-> //= | ne /=]; 1: by apply Hz.
     rewrite restr_set rem_id ?dom_restr //.
     by move: l2_nonemp=> /(mem_head_behead witness) /(_ (head witness l{2}))
                          /= /Hz @/in_dom_with />;
@@ -811,7 +808,7 @@ proof.
     + move=> &mr [] _ ->; apply mem_eq0=> z;
         rewrite -memE mem_fdom dom_restr /in_dom_with mapE mem_map domE.
      by case (RO.m{m}.[_]).
-     by move=> ? &mr [] 2!-> /=; rewrite map_comp /fst /= map_id.
+     by move=> ? &mr [] 2!-> /=; rewrite /noflags map_comp /fst /= map_id.
   transitivity M.main2
      (={glob D, FRO.m} ==> ={res, glob D})
      (={glob D} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>

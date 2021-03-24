@@ -51,7 +51,7 @@ let t_equiv_case_r ?(simplify = true) f tc =
 let t_hoare_case ?simplify =
   FApi.t_low1 "hoare-case" (t_hoare_case_r ?simplify)
 
-let t_hoare_case ?simplify =
+let t_choare_case ?simplify =
   FApi.t_low1 "choare-case" (t_choare_case_r ?simplify)
 
 let t_bdhoare_case ?simplify =
