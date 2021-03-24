@@ -10,9 +10,6 @@
 require import Tactics.
 
 (* -------------------------------------------------------------------- *)
-op witness : 'a.                (* All types are inhabited in EC *)
-
-(* -------------------------------------------------------------------- *)
 abbrev [-printing] fst (p : 'a * 'b): 'a = p.`1.
 abbrev [-printing] snd (p : 'a * 'b): 'b = p.`2.
 

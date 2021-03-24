@@ -1333,6 +1333,8 @@ module Op = struct
 
     let tags = Sstr.of_list (List.map unloc op.po_tags) in
 
+    let axs = ref [] in
+
     let add_distr_tag
         (pred : path) (bases : string list) (tag : string) (suffix : string) scope
     =
@@ -1367,6 +1369,8 @@ module Op = struct
         let axname = Printf.sprintf "%s_%s" (unloc op.po_name) suffix in
         (Ax.bind scope false (axname, ax), axname) in
 
+      axs := axname :: !axs;
+
       let axpath = EcPath.pqname (path scope) axname in
 
       List.fold_left
@@ -1379,7 +1383,7 @@ module Op = struct
     let scope =
       if   Sstr.mem "lossless" tags
       then add_distr_tag EcCoreLib.CI_Distr.p_lossless
-             [EcCoreLib.base_ll] "lossless" "ll" scope
+             [EcCoreLib.base_ll; EcCoreLib.base_rnd] "lossless" "ll" scope
       else scope in
 
     let scope =
@@ -1394,7 +1398,7 @@ module Op = struct
              [EcCoreLib.base_rnd] "full" "fu" scope
       else scope in
 
-    tyop, scope
+    tyop, List.rev !axs, scope
 end
 
 (* -------------------------------------------------------------------- *)

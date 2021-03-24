@@ -95,7 +95,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Op : sig
-  val add : scope -> poperator located -> EcDecl.operator * scope
+  val add : scope -> poperator located -> EcDecl.operator * string list * scope
 end
 
 (* -------------------------------------------------------------------- *)

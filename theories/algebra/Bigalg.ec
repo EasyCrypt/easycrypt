@@ -302,12 +302,16 @@ proof. split.
   by move/ih; case=> y [# Py ys z_Fy]; exists y; rewrite Py ys z_Fy.
 qed.
 
-lemma nosmt mulr_const s c:
-  BMul.big<:'a> predT (fun _ => c) s = exp c (size s).
+lemma nosmt mulr_const_cond p s c:
+  BMul.big<:'a> p (fun _ => c) s = exp c (count p s).
 proof.
 rewrite BMul.big_const -MulMonoid.iteropE /exp.
-by rewrite IntOrder.ltrNge size_ge0 /= count_predT.
+by rewrite IntOrder.ltrNge count_ge0.
 qed.
+
+lemma nosmt mulr_const s c:
+  BMul.big<:'a> predT (fun _ => c) s = exp c (size s).
+proof. by rewrite mulr_const_cond count_predT. qed.
 
 lemma ler_pexpn2r n x y :
   0 < n => zeror <= x => zeror <= y => (exp x n <= exp y n) <=> (x <= y).

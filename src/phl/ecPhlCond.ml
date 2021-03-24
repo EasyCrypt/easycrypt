@@ -54,11 +54,12 @@ module LowInternal = struct
      FApi.t_on1seq 0
        (EcPhlRCond.t_rcond side b (Zpr.cpos 1) c)
        (FApi.t_seqs
-          [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h]; t3])
+          [t_introm; EcPhlSkip.t_skip; t_intros_i [m2;h]; t3; t_simplify])
        tc
    in
-
-   FApi.t_seqsub (EcPhlCase.t_hl_case e) [t_sub true; t_sub false] tc
+   FApi.t_seqsub
+     (EcPhlCase.t_hl_case ~simplify:false e)
+     [t_sub true; t_sub false] tc
 end
 
 (* -------------------------------------------------------------------- *)
