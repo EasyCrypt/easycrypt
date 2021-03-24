@@ -441,7 +441,7 @@ theory NONDUMMY_EQUIV_DUMMY.
                   [init : `{N csa.`cinit} {},
                    step : `{N csa.`cstep, #FB.step : csa.`cs_s, #FB.backdoor : csa.`cs_b},
                    backdoor : `{N csa.`cbackdoor, #FB.step: csa.`cb_s, #FB.backdoor : csa.`cb_b}]
-                  {Mem, -F}),
+                  {+Mem, -F}),
       forall (Z<: NONDUMMY_RI.REAL.ENV {-A, -P, -F, -S}),
         `| Pr[NONDUMMY_RI.REAL.UC_emul(Z,A_PROTOCOL(A,P)).main() @ &m : res] -
            Pr[NONDUMMY_RI.REAL.UC_emul(Z,NONDUMMY_RI.CompS(F,S)).main() @ &m : res] | <= eps) =>
@@ -451,7 +451,7 @@ theory NONDUMMY_EQUIV_DUMMY.
                  [init : `{N csd.`cinit} {},
                   step : `{N csd.`cstep, #FB.step : csd.`cs_s, #FB.backdoor : csd.`cs_b},
                   backdoor : `{N csd.`cbackdoor, #FB.step: csd.`cb_s, #FB.backdoor : csd.`cb_b}]
-                 {Mem, -F}),
+                 {+Mem, -F}),
       forall (Z<: RI.REAL.ENV {-P,-F,-S}),
         `| Pr[RI.REAL.UC_emul(Z,P).main() @ &m : res] -
            Pr[RI.REAL.UC_emul(Z,RI.CompS(F,S)).main() @ &m : res] | <= eps).
@@ -476,22 +476,22 @@ theory NONDUMMY_EQUIV_DUMMY.
     move=> Z; have := hS Z. 
     have -> : Pr[NONDUMMY_RI.REAL.UC_emul(Z, A_PROTOCOL(DUMMY_A, P)).main() @ &m : res] = 
               Pr[RI.REAL.UC_emul(Z, P).main() @ &m : res].
-    + byequiv => //.
+    + byequiv => //; last by move=> ?? ->.
       proc; call (_: ={glob P}).
       + by proc *; inline *; call (:true).
       + by proc *; inline *; call (:true).
       + by proc *; inline *; call (:true); auto.
       + by proc *; inline *; wp; call (:true); auto.
-      by inline *; call(:true); auto.
+      by inline *; call(:true); auto => /> ?? 4!->.
     have -> // : Pr[NONDUMMY_RI.REAL.UC_emul(Z, NONDUMMY_RI.CompS(F, S)).main() @ &m : res] =
               Pr[RI.REAL.UC_emul(Z, RI.CompS(F, S)).main() @ &m : res].
-    byequiv => //.
+    byequiv => //; last by move=> ?? ->.
     proc; call (_: ={glob F, glob S}).
     + by proc *; inline *; call (:true).
     + by proc *; inline *; call (:true).
     + by proc *; inline *; call (: ={glob F}); auto; proc true.
     + by proc *; inline *; call (: ={glob F}); auto; proc true.
-    by inline *; call(: ={glob F}); call(: true).
+    by inline *; call(: ={glob F}); call(: true); auto => /> ?? 6!->.
   qed.
 
   end NONDUMMY_DUMMY.
@@ -678,7 +678,7 @@ abstract theory TRANSITIVITY.
       (forall (Z<:CH2.CENV{-P2,-P3,-S23, -P1}),
           `| Pr[H2.REAL.UC_emul(Z,P2).main() @ &m : res] - 
              Pr[H2.REAL.UC_emul(Z,H2.CompS(P3, S23)).main() @ &m : res] | <= e2) =>
-      (exists (S13<:CGOAL.CSIMULATOR {S12,S23, -P3}),
+      (exists (S13<:CGOAL.CSIMULATOR {+S12,+S23, -P3}),
         forall (Z<:CGOAL.CENV{-P1,-P2,-P3,-S12,-S23}),
           `| Pr[GOAL.REAL.UC_emul(Z,P1).main() @ &m : res] - 
              Pr[GOAL.REAL.UC_emul(Z,GOAL.CompS(P3, S13)).main() @ &m : res] | <= e1 + e2).
@@ -687,7 +687,7 @@ abstract theory TRANSITIVITY.
      exists (SeqS(S23, S12)) => /=. 
      split.
      + split.
-       + by move=> *; apply (cost_SeqS_init FB). 
+       + by move=> k1 k2 FB *; apply (cost_SeqS_init FB). 
        split.
        + by move=> k1 k2 FB *; apply (cost_SeqS_step k1 k2 FB).
        by move=> k1 k2 FB *; apply (cost_SeqS_backdoor k1 k2 FB).
@@ -1009,7 +1009,7 @@ theory COMPOSITION.
      (forall (Z <: CPi.CENV {-P, -Ff, -Sf}),
        `|Pr[Pi.REAL.UC_emul(Z, P).main() @ &m : res] - 
           Pr[Pi.REAL.UC_emul(Z, Pi.CompS(Ff,Sf)).main() @ &m : res]| <= e) =>
-     exists (S<:CRPi.CSIMULATOR{Sf}),
+     exists (S<:CRPi.CSIMULATOR{+Sf}),
      (forall (Z <: CRPi.CENV {-Rho,-P,-Ff,-Sf}),
        `|Pr[RPi.REAL.UC_emul(Z,CompRP(Rho,P)).main() @ &m : res] - 
           Pr[RPi.REAL.UC_emul(Z,RPi.CompS(CompRF(Rho,Ff), S)).main() @ &m : res]| <= e).
@@ -1186,7 +1186,7 @@ theory COMPOSITION.
       (forall (Z <: CT.CH2.CENV {-CompRF(Rho,Ff), -F, -S}),
         `| Pr[H2.REAL.UC_emul(Z, CompRF(Rho,Ff)).main() @ &m : res] - 
            Pr[H2.REAL.UC_emul(Z, H2.CompS(F,S)).main() @ &m : res] | <= e2) =>
-      exists (S' <: CT.CGOAL.CSIMULATOR {S, Sf, -F}), 
+      exists (S' <: CT.CGOAL.CSIMULATOR {+S, +Sf, -F}), 
       (forall (Z <: CT.CGOAL.CENV {-Rho, -P, -Ff, -Sf, -F, -S}),
         `| Pr[GOAL.REAL.UC_emul(Z,CompRP(Rho,P)).main() @ &m : res] - 
            Pr[GOAL.REAL.UC_emul(Z,GOAL.CompS(F, S')).main() @ &m : res] | <= e1 + e2).
@@ -1459,7 +1459,7 @@ abstract theory PARA_IR.
       (forall (Z<:CPi2.CENV{-P2, -F2, -S2}), 
          `|Pr[Pi2.REAL.UC_emul(Z, P2).main() @ &m : res] - 
             Pr[Pi2.REAL.UC_emul(Z, Pi2.CompS(F2,S2)).main() @ &m : res]| <= e) =>
-      exists (S <: CRI.CSIMULATOR { S2, -I.PPara(F1,F2)}), 
+      exists (S <: CRI.CSIMULATOR { +S2, -I.PPara(F1,F2)}), 
         forall (Z <: CRI.CENV{-F1, -P2, -F2, -S2}), 
          `|Pr[RI.REAL.UC_emul(Z, R.PPara(F1, P2)).main() @ &m : res] -
              Pr[RI.REAL.UC_emul(Z, RI.CompS(I.PPara(F1,F2), S)).main() @ &m : res]| <= e.
@@ -1709,7 +1709,7 @@ abstract theory PARA_RI.
       (forall (Z<:CPi1.CENV{-P1, -F1, -S1}), 
          `|Pr[Pi1.REAL.UC_emul(Z, P1).main() @ &m : res] - 
             Pr[Pi1.REAL.UC_emul(Z, Pi1.CompS(F1,S1)).main() @ &m : res]| <= e) =>
-      exists (S <: CRI.CSIMULATOR { S1, -I.PPara(F1,F2) }), 
+      exists (S <: CRI.CSIMULATOR { +S1, -I.PPara(F1,F2) }), 
         forall (Z <: CRI.CENV{-F2, -P1, -F1, -S1}), 
          `|Pr[RI.REAL.UC_emul(Z, R.PPara(P1, F2)).main() @ &m : res] -
             Pr[RI.REAL.UC_emul(Z, RI.CompS(I.PPara(F1,F2), S)).main() @ &m : res]| <= e.

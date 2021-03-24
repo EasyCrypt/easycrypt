@@ -38,3 +38,6 @@ type real.
 type 'a distr.
 
 op mu: 'a distr -> ('a -> bool) -> real.
+
+(* -------------------------------------------------------------------- *)
+op witness : 'a.                (* All types are inhabited in EC *)

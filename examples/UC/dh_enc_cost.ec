@@ -1027,9 +1027,10 @@ seq 7 2 : (={glob Z} /\
 + inline *.
   wp; swap {1} 3 -2; rnd; rnd;  wp; rnd (fun x => g^x) (fun x => log x). 
   auto => />; progress; 1,4:algebra. 
-  + rewrite dmapE /(\o) /pred1; congr; apply fun_ext => z; algebra.
-  by rewrite supp_dmap; exists zL; trivial.
-
+  + by rewrite dmapE /(\o) /pred1; congr; apply fun_ext => z; algebra.
+  + by rewrite supp_dmap; exists zL; trivial.
+  + by rewrite /init.
+  + by rewrite /init.
 (* Calling the environment *)
 wp; call (_: 
    DHKE.Initiator._X{1} = DHKE_SIM._X{2} /\
@@ -1104,7 +1105,7 @@ clone FKEWorlds.C as RC
 op cddh =  8 + RC.c.`cd + RC.c.`ci * 29 + RC.c.`co * 2 + RC.c.`cs * 23 + RC.c.`cb * 5.
 
 lemma KEAdv_ex &m :
-    exists (S <: RC.CSIMULATOR {DHKE_SIM}), 
+    exists (S <: RC.CSIMULATOR {+DHKE_SIM}), 
       forall (Z <: RC.CENV { -HybFChan.F2Auth.FAuthLR.FAuth, -HybFChan.F2Auth.FAuthRL.FAuth, -DHKE, -FKE, -DHKE_SIM}),
       `| Pr[ REAL.UC_emul(Z,CompRF(DHKE,HybFChan.F2Auth.F2Auth)).main() @ &m : res] - 
          Pr[ REAL.UC_emul(Z,CompS(FKE, S)).main() @ &m : res] | <= adv_ddh cddh.
