@@ -51,7 +51,12 @@ type w3op_ho =
 
 type w3op = {
   (*---*) w3op_fo : w3op_fo;
-  (*---*) w3op_ta : WTy.ty list -> WTy.ty option list * WTy.ty option;
+  (*---*) w3op_ta : WTy.ty list ->
+                    WTy.ty list * WTy.ty option list * WTy.ty option;
+           (* The first list correspond to the type variables
+              that do not occur in the type of the operator.
+              The translation will automatically add arguments
+            *)
   mutable w3op_ho : w3op_ho;
 }
 
@@ -264,19 +269,20 @@ let lenv_of_tparams_for_hyp genv ts =
     List.map_fold trans_tv empty_lenv ts
 
 (* -------------------------------------------------------------------- *)
-let instantiate tparams targs tres tys =
+let instantiate tparams ~textra targs tres tys =
   let mtv =
     List.fold_left2
       (fun mtv tv ty -> WTy.Mtv.add tv ty mtv)
       WTy.Mtv.empty tparams tys in
+  let textra = List.map (WTy.ty_inst mtv) textra in
   let targs = List.map (some |- WTy.ty_inst mtv) targs in
   let tres  = tres |> omap (WTy.ty_inst mtv) in
-  (targs, tres)
+  (textra, targs, tres)
 
 (* -------------------------------------------------------------------- *)
 let plain_w3op ?(name = "x") tparams ls = {
   w3op_fo = `LDecl ls;
-  w3op_ta = instantiate tparams ls.WTerm.ls_args ls.WTerm.ls_value;
+  w3op_ta = instantiate tparams ~textra:[] ls.WTerm.ls_args ls.WTerm.ls_value;
   w3op_ho = `HO_TODO (name, ls.WTerm.ls_args, ls.WTerm.ls_value);
 }
 
@@ -285,7 +291,7 @@ let prop_w3op ?(name = "x") arity mkfo =
   let hdom = List.make arity WTy.ty_bool in
 
   { w3op_fo = `Internal mkfo;
-    w3op_ta = (fun _ -> dom, None);
+    w3op_ta = (fun _ -> [], dom, None);
     w3op_ho = `HO_TODO (name, hdom, None); }
 
 let w3op_as_ldecl = function
@@ -321,6 +327,19 @@ let ts_distr, fs_mu, distr_theory =
 let ty_distr t = WTy.ty_app ts_distr [t]
 
 let ty_mem_distr = ty_distr ty_mem
+
+(* -------------------------------------------------------------------- *)
+let fs_witness, witness_theory =
+  let th = WTheory.create_theory (WIdent.id_fresh "Witness") in
+  let vta = WTy.create_tvsymbol (WIdent.id_fresh "ta") in
+  let ta  = WTy.ty_var vta in
+  let witness  =
+    WTerm.create_fsymbol (WIdent.id_fresh "witness") [] ta in
+  let th = WTheory.add_param_decl th witness in
+  witness, WTheory.close_theory th
+
+let w_witness ty =
+  WTerm.fs_app fs_witness [] ty
 
 (* -------------------------------------------------------------------- *)
 let mk_tglob genv mp =
@@ -513,18 +532,22 @@ let apply_highorder f args =
   List.fold_left (fun f a -> WTerm.t_func_app f (Cast.force_bool a)) f args
 
 let apply_wop genv wop tys args =
-  let (targs, tres) = wop.w3op_ta tys in
+  let (textra, targs, tres) = wop.w3op_ta tys in
+  let eargs =
+    List.map w_witness textra in
   let arity = List.length targs in
   let nargs = List.length args in
 
-  if nargs = arity then Cast.app (w3op_fo wop) args targs tres
+  let targs = List.map some textra @ targs in
+  if nargs = arity then Cast.app (w3op_fo wop) (eargs @ args) targs tres
   else if nargs < arity then
     let fty = highorder_type targs tres in
     let ls' = w3op_ho_lsymbol genv wop in
-    apply_highorder (WTerm.fs_app ls' [] fty) args
+    apply_highorder (WTerm.fs_app ls' [] fty) (eargs @ args)
   else (* arity < nargs : too many arguments *)
     let args1,args2 = List.takedrop arity args in
-    apply_highorder (Cast.app (w3op_fo wop) args1 targs tres) args2
+    apply_highorder (Cast.app (w3op_fo wop) (eargs @ args1) targs tres) args2
+
 
 (* -------------------------------------------------------------------- *)
 let trans_lambda genv wvs wbody =
@@ -604,7 +627,7 @@ let rec trans_kpattern env (k, (ls, wth)) f =
   let w3op =
     let name = ls.WTerm.ls_name.WIdent.id_string in
     { w3op_fo = `LDecl ls;
-      w3op_ta = instantiate [] wdom wcodom;
+      w3op_ta = instantiate [] ~textra:[] wdom wcodom;
       w3op_ho = `HO_TODO (name, wdom, wcodom); }
   in
 
@@ -824,7 +847,7 @@ and trans_glob ((genv, _) as env) mp mem =
           let ls  = WTerm.create_lsymbol pid [ty_mem] ty in
           let w3op =
             { w3op_fo = `LDecl ls;
-              w3op_ta = (fun _tys -> [Some ty_mem], ty);
+              w3op_ta = (fun _tys -> [], [Some ty_mem], ty);
               w3op_ho = `HO_TODO (EcIdent.name id, [ty_mem], ty); } in
           genv.te_task <- WTask.add_param_decl genv.te_task ls;
           Hid.add genv.te_lc id w3op;
@@ -979,7 +1002,10 @@ and create_op ?(body = false) (genv : tenv) p =
   let op = EcEnv.Op.by_path p genv.te_env in
   let lenv, wparams = lenv_of_tparams op.op_tparams in
   let dom, codom = EcEnv.Ty.signature genv.te_env op.op_ty in
-
+  let textra =
+    List.filter (fun (tv,_) -> not (Mid.mem tv (Tvar.fv op.op_ty))) op.op_tparams in
+  let textra =
+    List.map (fun (tv,_) -> trans_ty (genv,lenv) (tvar tv)) textra in
   let wdom   = trans_tys (genv, lenv) dom in
   let wcodom =
     if   ER.EqTest.is_bool genv.te_env codom
@@ -997,36 +1023,38 @@ and create_op ?(body = false) (genv : tenv) p =
       load_wtheory genv th; (true, ls)
 
     | None ->
-        let ls = WTerm.create_lsymbol (preid_p p) wdom wcodom in
+        let ls = WTerm.create_lsymbol (preid_p p) (textra@wdom) wcodom in
         (false, ls)
   in
 
   let w3op =
     let name = ls.WTerm.ls_name.WIdent.id_string in
     { w3op_fo = `LDecl ls;
-      w3op_ta = instantiate wparams wdom wcodom;
-      w3op_ho = `HO_TODO (name, wdom, wcodom); }
+      w3op_ta = instantiate wparams ~textra wdom wcodom;
+      w3op_ho = `HO_TODO (name, textra@wdom, wcodom); }
   in
 
   let register = OneShot.mk (fun () -> Hp.add genv.te_op p w3op) in
 
   if not known then begin
+    let wextra = List.map (fun ty ->
+                     WTerm.create_vsymbol (WIdent.id_fresh "_") ty) textra in
     let decl =
       match body, op.op_kind with
       | true, OB_oper (Some (OP_Plain (body, false))) ->
           let body = EcFol.form_of_expr EcFol.mhr body in
           let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
-          WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
+          WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
       | true, OB_oper (Some (OP_Fix ({ opf_nosmt = false } as body ))) ->
         OneShot.now register;
         let wparams, wbody = trans_fix (genv, lenv) (wdom, body) in
         let wbody = Cast.arg wbody ls.WTerm.ls_value in
-        WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
+        WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
       | true, OB_pred (Some (PR_Plain body)) ->
           let wparams, wbody = trans_body (genv, lenv) wdom None body in
-          WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
+          WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
       | _, _ -> WDecl.create_param_decl ls
 
@@ -1058,7 +1086,7 @@ let trans_hyp ((genv, _) as env) (x, ty) =
     let ls = WTerm.create_lsymbol (preid x) wdom wcodom in
     let w3op = {
       w3op_fo = `LDecl ls;
-      w3op_ta = (fun _ -> (List.map some wdom, wcodom));
+      w3op_ta = (fun _ -> ([], List.map some wdom, wcodom));
       w3op_ho = `HO_TODO (EcIdent.name x, wdom, wcodom);
     } in
 
@@ -1083,7 +1111,7 @@ let trans_hyp ((genv, _) as env) (x, ty) =
       let ls =  WTerm.create_lsymbol (preid x) [] wcodom in
       let w3op = {
         w3op_fo = `LDecl ls;
-        w3op_ta = (fun _ -> ([], wcodom));
+        w3op_ta = (fun _ -> ([], [], wcodom));
         w3op_ho = `HO_TODO (EcIdent.name x, [], wcodom);
       } in
 
@@ -1192,6 +1220,7 @@ let core_theories = Lazy.from_fun (fun () ->
   Hp.add known CI_Unit.p_tt (WTerm.fs_tuple 0, WTheory.tuple_theory 0);
   List.iter (add_core_theory known) core_theories;
   Hp.add known CI_Distr.p_mu (fs_mu, distr_theory);
+  Hp.add known CI_Witness.p_witness (fs_witness, witness_theory);
 
   let add_core_ty tbl (thname, tys) =
     let theory = curry P.get_w3_th thname in
@@ -1239,7 +1268,7 @@ let add_core_bindings (env : tenv) =
 
     let w3o_eq = {
       w3op_fo = `Internal (fun args _ -> mk_eq (as_seq2 args));
-      w3op_ta = (fun tys -> let ty = Some (as_seq1 tys) in [ty;ty], None);
+      w3op_ta = (fun tys -> let ty = Some (as_seq1 tys) in [], [ty;ty], None);
       w3op_ho = `HO_TODO ("eq", WTerm.ps_equ.WTerm.ls_args, None);
     }
 
@@ -1505,6 +1534,7 @@ let create_global_task () =
   let task  = WTask.use_export task WTheory.bool_theory in
   let task  = WTask.use_export task WTheory.highord_theory in
   let task  = WTask.use_export task distr_theory in
+  let task  = WTask.use_export task witness_theory in
   let thmap = P.get_w3_th ["map"] "Map" in
   let task  = WTask.use_export task thmap in
   task
