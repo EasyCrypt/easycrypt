@@ -1016,7 +1016,7 @@ let process_conseq notmod (info1, info2, info3) tc =
 
   in
 
-  let process_cut2 side ((pre, post), bd) =
+  let process_cut2 side f1 ((pre, post), bd) =
     let penv, qenv, gpre, gpost, fmake =
       match concl.f_node with
       | FhoareS hs ->
@@ -1026,9 +1026,15 @@ let process_conseq notmod (info1, info2, info3) tc =
         in (env, env, hs.hs_pr, hs.hs_po, fmake)
 
       | FhoareF hf ->
-        let penv, qenv = LDecl.hoareF hf.hf_f hyps in
-        let fmake pre post bd = ensure_none bd; f_hoareF pre hf.hf_f post in
-        (penv, qenv, hf.hf_pr, hf.hf_po, fmake)
+        let f, pr, po = match f1 with
+        | None -> hf.hf_f, hf.hf_pr, hf.hf_po
+        | Some f1 -> match (snd f1).f_node with
+                     | FequivF ef when side = `Left -> ef.ef_fr, f_true, f_true
+                     | _ -> hf.hf_f, hf.hf_pr, hf.hf_po
+        in
+        let penv, qenv = LDecl.hoareF f hyps in
+        let fmake pre post bd = ensure_none bd; f_hoareF pre f post in
+        (penv, qenv, pr, po, fmake)
 
       | FbdHoareS bhs ->
         let env = LDecl.push_active bhs.bhs_m hyps in
@@ -1037,10 +1043,16 @@ let process_conseq notmod (info1, info2, info3) tc =
         in (env, env, bhs.bhs_pr, bhs.bhs_po, fmake)
 
       | FbdHoareF bhf ->
-        let penv, qenv = LDecl.hoareF bhf.bhf_f hyps in
+        let f, pr, po = match f1 with
+        | None -> bhf.bhf_f, bhf.bhf_pr, bhf.bhf_po
+        | Some f1 -> match (snd f1).f_node with
+                     | FequivF ef when side = `Left -> ef.ef_fr, f_true, f_true
+                     | _ -> bhf.bhf_f, bhf.bhf_pr, bhf.bhf_po
+        in
+        let penv, qenv = LDecl.hoareF f hyps in
         let fmake pre post bd =
-          ensure_none bd; f_hoareF pre bhf.bhf_f post in
-        (penv, qenv, bhf.bhf_pr, bhf.bhf_po, fmake)
+          ensure_none bd; f_hoareF pre f post in
+        (penv, qenv, pr, po, fmake)
 
       | FequivF ef ->
         let f = sideif side ef.ef_fl ef.ef_fr in
@@ -1082,9 +1094,9 @@ let process_conseq notmod (info1, info2, info3) tc =
   if   List.for_all is_none [info1; info2; info3]
   then t_id tc
   else
-    let f1 = info1 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut1       ) tc) in
-    let f2 = info2 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut2 `Left ) tc) in
-    let f3 = info3 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut2 `Right) tc) in
+    let f1 = info1 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut1          ) tc) in
+    let f2 = info2 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut2 `Left  f1) tc) in
+    let f3 = info3 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut2 `Right f1) tc) in
 
     let ofalse = omap (fun (x, y) -> (Some x, y)) in
 
