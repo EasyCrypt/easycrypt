@@ -31,7 +31,7 @@ type instr = private {
 and instr_node =
   | Sasgn     of lvalue * expr
   | Srnd      of lvalue * expr
-  | Scall     of lvalue option * xpath * expr list * expr option
+  | Scall     of lvalue option * xpath * expr list * expr list option
   | Sif       of expr * stmt * stmt
   | Swhile    of expr * stmt
   | Smatch    of expr * ((EcIdent.t * EcTypes.ty) list * stmt) list
@@ -60,7 +60,7 @@ val s_subst   : e_subst -> stmt -> stmt
 (* -------------------------------------------------------------------- *)
 val i_asgn     : lvalue * expr -> instr
 val i_rnd      : lvalue * expr -> instr
-val i_call     : lvalue option * xpath * expr list * expr option -> instr
+val i_call     : lvalue option * xpath * expr list * expr list option -> instr
 val i_if       : expr * stmt * stmt -> instr
 val i_while    : expr * stmt -> instr
 val i_match    : expr * ((EcIdent.t * ty) list * stmt) list -> instr
@@ -69,7 +69,7 @@ val i_abstract : EcIdent.t -> instr
 
 val s_asgn     : lvalue * expr -> stmt
 val s_rnd      : lvalue * expr -> stmt
-val s_call     : lvalue option * xpath * expr list * expr option -> stmt
+val s_call     : lvalue option * xpath * expr list * expr list option -> stmt
 val s_if       : expr * stmt * stmt -> stmt
 val s_while    : expr * stmt -> stmt
 val s_match    : expr * ((EcIdent.t * ty) list * stmt) list -> stmt
@@ -84,7 +84,7 @@ val rstmt : instr list -> stmt
 (* the following functions raise Not_found if the argument does not match *)
 val destr_asgn   : instr -> lvalue * expr
 val destr_rnd    : instr -> lvalue * expr
-val destr_call   : instr -> lvalue option * xpath * expr list * expr option
+val destr_call   : instr -> lvalue option * xpath * expr list * expr list option
 val destr_if     : instr -> expr * stmt * stmt
 val destr_while  : instr -> expr * stmt
 val destr_match  : instr -> expr * ((EcIdent.t * ty) list * stmt) list
@@ -102,20 +102,20 @@ val is_assert : instr -> bool
 val get_uninit_read : stmt -> Sx.t
 
 (* -------------------------------------------------------------------- *)
-type quantum = [`Quantum | `Classical]
-
-(* -------------------------------------------------------------------- *)
 
 type funsig = {
-  fs_quantum: quantum;
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
+  fs_qarg   : EcTypes.ty option;
   fs_anames : variable list option;
+  fs_qnames : variable list option;
   fs_ret    : EcTypes.ty;
 }
 
 val fs_equal : funsig -> funsig -> bool
 
+val fs_quantum : funsig -> quantum
+val pv_res : funsig -> prog_var
 (* -------------------------------------------------------------------- *)
 type 'a use_restr = {
   ur_pos : 'a option;   (* If not None, can use only element in this set. *)

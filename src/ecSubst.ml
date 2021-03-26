@@ -137,13 +137,16 @@ let subst_oracle_info (s:_subst) =
 (* -------------------------------------------------------------------- *)
 let subst_funsig (s : _subst) (funsig : funsig) =
   let fs_arg = s.s_ty funsig.fs_arg in
+  let fs_qarg = omap s.s_ty funsig.fs_qarg in
   let fs_ret = s.s_ty funsig.fs_ret in
-  let fs_anm = funsig.fs_anames |> omap (List.map (subst_variable s)) in
+  let fs_anames = funsig.fs_anames |> omap (List.map (subst_variable s)) in
+  let fs_qnames = funsig.fs_qnames |> omap (List.map (subst_variable s)) in
 
-  { fs_quantum = funsig.fs_quantum;
-    fs_name    = funsig.fs_name;
-    fs_arg     = fs_arg;
-    fs_anames  = fs_anm;
+  { fs_name    = funsig.fs_name;
+    fs_arg    = fs_arg;
+    fs_anames = fs_anames;
+    fs_qarg   = fs_qarg;
+    fs_qnames = fs_qnames;
     fs_ret     = fs_ret; }
 
 (* -------------------------------------------------------------------- *)

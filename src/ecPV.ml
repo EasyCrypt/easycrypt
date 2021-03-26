@@ -124,7 +124,7 @@ module Mpv = struct
     | Sasgn  (lv, e)     -> i_asgn   (lv, esubst e)
     | Srnd   (lv, e)     -> i_rnd    (lv, esubst e)
     | Scall  (lv, f, es, qe) ->
-      i_call   (lv, f, List.map esubst es, omap esubst qe)
+      i_call   (lv, f, List.map esubst es, omap (List.map esubst) qe)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Smatch (e, b)      -> i_match  (esubst e, List.Smart.map (snd_map ssubst) b)
@@ -544,8 +544,9 @@ and i_read_r env r i =
   | Sassert e       -> e_read_r env r e
 
   | Scall (_lp, f, es, qe) ->
-      let r = List.fold_left (e_read_r env) r es in
-      let r = ofold ((^~)(e_read_r env)) r qe in
+      let doit es r = List.fold_left (e_read_r env) r es in
+      let r = doit es r in
+      let r = ofold doit r qe in
       f_read_r env r f
 
   | Sif (e, s1, s2) ->
@@ -993,8 +994,9 @@ and i_eqobs_in_refl env i eqo =
     let geqo = PV.global eqo in
     let leqo = PV.local  eqo in
     let geqi = eqobs_inF_refl env f geqo in
-    let eqi  = List.fold_left (add_eqs_refl env) (PV.union leqo geqi) args in
-    let eqi  = ofold ((^~)(add_eqs_refl env)) eqi qarg in
+    let doit args s =  List.fold_left (add_eqs_refl env) s args in
+    let eqi  = doit args (PV.union leqo geqi) in
+    let eqi  = ofold doit eqi qarg in
     eqi
 
   | Sif(e,st,sf) ->
@@ -1035,8 +1037,18 @@ and eqobs_inF_refl env f' eqo =
       match ffun.f_sig.fs_anames with
       | None -> PV.add env pv_arg ffun.f_sig.fs_arg PV.empty
       | Some lv ->
-        List.fold_left (fun fv v -> PV.add env (pv_loc v.v_name) v.v_type fv)
+        List.fold_left (fun fv v -> PV.add env (pv_loc v.v_quantum v.v_name) v.v_type fv)
           PV.empty lv in
+    let qparams =
+      match ffun.f_sig.fs_qarg with
+      | None -> PV.empty
+      | Some ty ->
+        match ffun.f_sig.fs_qnames with
+        | None -> PV.add env pv_qarg ty PV.empty
+        | Some lv ->
+          List.fold_left (fun fv v -> PV.add env (pv_loc v.v_quantum v.v_name) v.v_type fv)
+            PV.empty lv in
+    let params = PV.union params qparams in
     if PV.subset local params then PV.global eqi
     else
       let diff = PV.diff local params in

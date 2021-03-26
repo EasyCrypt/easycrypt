@@ -68,6 +68,7 @@ val pp_path     : path pp
 
 (* -------------------------------------------------------------------- *)
 val string_of_quantum : quantum -> string
+val pp_quantum        : quantum pp
 (* -------------------------------------------------------------------- *)
 val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
 val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp

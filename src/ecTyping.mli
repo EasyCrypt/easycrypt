@@ -94,8 +94,7 @@ type modsig_error =
 | MTS_DupArgName  of symbol * symbol
 
 type funapp_error =
-| FAE_WrongArgCount
-| FAE_QuantumArgExpected
+| FAE_WrongArgCount of quantum
 | FAE_ClassicalNoQArg
 
 type mem_error =
@@ -180,7 +179,11 @@ type tyerror =
 | QuantumProcType        of symbol * ty
 | QuantumProcFinite      of symbol * ty
 | ModTypeQuantumRestr of EcPath.mpath list
-
+| QuantumSigNoArg
+| ClassicalSigArg
+| ClassicalExprNeeded    of EcSymbols.symbol
+| ClassicalFormNeeded
+| QuantumLvar            of quantum * prog_var
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
 
@@ -287,3 +290,8 @@ val check_modtype :
 (* -------------------------------------------------------------------- *)
 val get_ring  : (ty_params * ty) -> env -> EcDecl.ring  option
 val get_field : (ty_params * ty) -> env -> EcDecl.field option
+
+(* -------------------------------------------------------------------- *)
+val is_classical_e : expr -> quantum
+val is_classical_es : expr list -> quantum
+val is_quantum_res : expr list option -> quantum

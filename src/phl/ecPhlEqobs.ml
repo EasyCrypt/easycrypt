@@ -22,21 +22,25 @@ module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 let extend_body fsig body =
-  let arg = pv_arg in
-  let i =
-    match fsig.fs_anames with
+  let doit arg names ty =
+    match names with
     | None | Some [] -> []
 
     | Some [v] ->
-        [i_asgn (LvVar (pv_loc v.v_name, v.v_type),
-                 e_var arg fsig.fs_arg)]
+        [i_asgn (LvVar (pv_loc v.v_quantum v.v_name, v.v_type),
+                 e_var arg ty)]
 
     | Some lv ->
-        let lv = List.map (fun v -> pv_loc v.v_name, v.v_type) lv in
-        [i_asgn (LvTuple lv, e_var arg fsig.fs_arg)]
+        let lv = List.map (fun v -> pv_loc v.v_quantum v.v_name, v.v_type) lv in
+        [i_asgn (LvTuple lv, e_var arg ty)]
 
   in
-    (arg, s_seq (stmt i) body)
+  let i = doit pv_arg fsig.fs_anames fsig.fs_arg in
+  match fsig.fs_qarg with
+  | None -> (pv_arg, None, s_seq (stmt i) body)
+  | Some ty ->
+    let i' = doit pv_qarg fsig.fs_qnames ty in
+    (pv_arg, Some pv_qarg, s_seq (stmt (i @ i')) body)
 
 (* -------------------------------------------------------------------- *)
 (* Invariant ifvl,ifvr = PV.fv env ml inv, PV.fv env mr inv *)
@@ -214,7 +218,7 @@ and i_eqobs_in il ir sim local (eqo:Mpv2.t) =
     let eqi =
       List.fold_left2 (add_eqs sim local) (Mpv2.union eqnm eqi) argsl argsr in
     let eqi =
-      List.fold_left2 (add_eqs sim local) eqi (otolist qargl) (otolist qargr) in
+      List.fold_left2 (add_eqs sim local) eqi (odfl [] qargl) (odfl [] qargr) in
 
     sim, eqi
 
@@ -307,7 +311,8 @@ and f_eqobs_in fl fr sim eqO =
         let local = Mpv2.empty_local in
         let sigl, sigr = defl.f_sig, defr.f_sig in
         let testty =
-          EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
+             EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
+          && opt_equal (EcReduction.EqTest.for_type env) sigl.fs_qarg sigr.fs_qarg
           && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret
         in
         if not testty then raise EqObsInError;
@@ -317,11 +322,12 @@ and f_eqobs_in fl fr sim eqO =
           | Some el, Some er -> add_eqs sim Mpv2.empty_local outf el er
           | _, _ -> raise EqObsInError in
 
-        let argl, bodyl = extend_body sigl funl.f_body in
-        let argr, bodyr = extend_body sigr funr.f_body in
+        let argl, qargl, bodyl = extend_body sigl funl.f_body in
+        let argr, qargr, bodyr = extend_body sigr funr.f_body in
         let sim, eqi    = s_eqobs_in_full bodyl bodyr sim local eqo' in
 
         let eqi = Mpv2.remove sim.sim_env argl argr eqi in
+        let eqi = if qargl = None then eqi else Mpv2.remove sim.sim_env (oget qargl) (oget qargr) eqi in
         Mpv2.check_glob eqi;
         sim, eqi
       | _, _ -> raise EqObsInError
@@ -335,14 +341,12 @@ let mk_inv_spec2 env inv (fl, fr, eqi, eqo) =
   let defr = Fun.by_xpath fr env in
   let sigl, sigr = defl.f_sig, defr.f_sig in
   let testty =
-    EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
+       EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
+    && opt_equal (EcReduction.EqTest.for_type env) sigl.fs_qarg sigr.fs_qarg
     && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret in
   if not testty then raise EqObsInError;
-  let eq_params =
-    f_eqparams
-      sigl.fs_arg sigl.fs_anames mleft
-      sigr.fs_arg sigr.fs_anames mright in
-  let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+  let eq_params = f_eqparams sigl mleft sigr mright in
+  let eq_res = f_eqres (fs_quantum sigl) sigl.fs_ret mleft sigr.fs_ret mright in
   let pre = f_and eq_params (Mpv2.to_form mleft mright eqi inv) in
   let post = f_and eq_res (Mpv2.to_form mleft mright eqo inv) in
   f_equivF pre fl fr post
@@ -474,7 +478,12 @@ let process_eqobs_inF info tc =
     | None ->
       try Mpv2.needed_eq env mleft mright ef.ef_po
       with _ -> tc_error !!tc "cannot infer the set of equalities" in
-  let eqo = Mpv2.remove env pv_res pv_res eqo in
+
+  let defl = Fun.by_xpath fl env in
+  let defr = Fun.by_xpath fr env in
+  let sigl, sigr = defl.f_sig, defr.f_sig in
+
+  let eqo = Mpv2.remove env (pv_res sigl) (pv_res sigr) eqo in
   let sim = init_sim env spec inv in
   let _, eqi =
     try f_eqobs_in fl fr sim eqo

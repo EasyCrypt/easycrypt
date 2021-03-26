@@ -87,27 +87,25 @@ let t_kill_r side cpos olen tc =
 
 (* -------------------------------------------------------------------- *)
 let alias_stmt env id (pf, _) me i =
-  let dopv ty =
+  let dopv q ty =
     let id       = odfl "x" (omap EcLocation.unloc id) in
-    let id       = { v_name = id; v_type = ty; } in
+    let id       = { v_quantum = q; v_name = id; v_type = ty; } in
     let (me, id) = EcMemory.bind_fresh id me in
-    let pv       = pv_loc id.v_name in
+    let pv       = pv_loc id.v_quantum id.v_name in
     me, pv in
 
   match i.i_node with
   | Sasgn(lv,e) ->
     let ty = e.e_ty in
-    let (me, pv) = dopv ty in
+    let (me, pv) = dopv (EcTyping.is_classical_e e) ty in
     (me, [i_asgn (LvVar (pv, ty), e); i_asgn (lv, e_var pv ty)])
   | Srnd (lv, e) ->
     let ty       = proj_distr_ty env e.e_ty in
-    let (me, pv) = dopv ty in
+    let (me, pv) = dopv `Classical ty in
     (me, [i_rnd (LvVar (pv, ty), e); i_asgn (lv, e_var pv ty)])
   | Scall (Some lv, f, args, qarg) ->
-    let ty       = (EcEnv.Fun.by_xpath f env).f_sig.fs_ret in
-    let ty =
-      if qarg = None then ty else snd (EcEnv.Ty.destr_quantum ty env) in
-    let (me, pv) = dopv ty in
+    let ty = (EcEnv.Fun.by_xpath f env).f_sig.fs_ret in
+    let (me, pv) = dopv (EcTyping.is_quantum_res qarg) ty in
     (me, [i_call (Some (LvVar (pv, ty)), f ,args, qarg); i_asgn (lv, e_var pv ty)])
   | _ ->
       tc_error pf "cannot create an alias for that kind of instruction"
@@ -123,9 +121,9 @@ let t_alias_r side cpos id g =
 let set_stmt (fresh, id) e =
   let get_i me =
     let id       = EcLocation.unloc id in
-    let  v       = { v_name = id; v_type = e.e_ty } in
+    let  v       = { v_quantum = EcTyping.is_classical_e e; v_name = id; v_type = e.e_ty } in
     let (me, id) = EcMemory.bind_fresh v me in
-    let pv       = pv_loc id.v_name in
+    let pv       = pv_loc id.v_quantum id.v_name in
 
     (me, i_asgn (LvVar (pv, e.e_ty), e))
   in

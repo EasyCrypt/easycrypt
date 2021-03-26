@@ -583,8 +583,9 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let pr_mem   = Subst.subst_m s pr.pr_mem in
     let pr_fun   = norm_xfun st s pr.pr_fun in
     let pr_args  = norm st s pr.pr_args in
+    let pr_qargs = OSmart.omap (norm st s) pr.pr_qargs in
     let pr_event = norm st s pr.pr_event in
-    f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
+    f_pr_r { pr_mem; pr_fun; pr_args; pr_qargs; pr_event; }
 
 (* -------------------------------------------------------------------- *)
 (* FIXME : initialize the subst with let in hyps *)

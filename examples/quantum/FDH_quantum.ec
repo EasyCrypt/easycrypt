@@ -52,13 +52,13 @@ module (FDH:Sign_QROM) (H:QRO) = {
 
   proc sign(sk:skey, m:msg) = {
     var h;
-    h <@ H.h|m>;
+    h <@ H.h{m};
     return finv sk h;
   }
 
   proc verify(pk:pkey, m:msg, s:sign) = {
     var h;
-    h <@ H.h|m>;
+    h <@ H.h{m};
     return h = f pk s;
   }
 
@@ -214,7 +214,7 @@ local module (ASCD:AdvSCD) (H:QRO) = {
     proc sign(m:msg) = {
       var hm;
       log <- m::log;
-      hm  <@ H.h|m>;
+      hm  <@ H.h{m};
       return finv sk hm;
     }
   }
@@ -224,7 +224,7 @@ local module (ASCD:AdvSCD) (H:QRO) = {
     (pk, sk) <$ kg;
     log <- [];
     (m,s) <@ A(H,Os).main(pk);
-    hm <@ H.h|m>;
+    hm <@ H.h{m};
     b <- hm = f pk s;
     return (b, log, m);
   }

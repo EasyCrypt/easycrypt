@@ -131,10 +131,15 @@ val lp_ids   : lpattern -> EcIdent.t list
 val lp_fv    : lpattern -> EcIdent.Sid.t
 
 (* -------------------------------------------------------------------- *)
+type quantum = [`Quantum | `Classical]
+
 type variable = {
-    v_name : symbol;   (* can be "_" *)
-    v_type : ty;
+    v_quantum : quantum;
+    v_name    : symbol;   (* can be "_" *)
+    v_type    : ty;
   }
+
+val v_quantum : variable -> quantum
 val v_name  : variable -> symbol
 val v_type  : variable -> ty
 val v_hash  : variable -> int
@@ -147,7 +152,7 @@ type pvar_kind =
 
 type prog_var = private
   | PVglob of EcPath.xpath
-  | PVloc of EcSymbols.symbol
+  | PVloc  of quantum * EcSymbols.symbol
 
 val pv_equal       : prog_var -> prog_var -> bool
 val pv_compare     : prog_var -> prog_var -> int
@@ -163,6 +168,7 @@ val is_loc     : prog_var -> bool
 val is_glob    : prog_var -> bool
 
 val get_loc     : prog_var -> EcSymbols.symbol
+val get_qloc    : prog_var -> quantum * EcSymbols.symbol
 val get_glob    : prog_var -> EcPath.xpath
 
 val symbol_of_pv   : prog_var -> symbol
@@ -170,14 +176,16 @@ val string_of_pvar : prog_var -> string
 
 val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var
 
-val pv_loc  : EcSymbols.symbol -> prog_var
+val pv_loc  : quantum -> EcSymbols.symbol -> prog_var
 val pv_glob : EcPath.xpath -> prog_var
 val xp_glob : EcPath.xpath -> EcPath.xpath
 
-val arg_symbol : symbol
-val res_symbol : symbol
-val pv_res  : prog_var
+val qarg_symbol : symbol
+val arg_symbol  : symbol
+val res_symbol  : symbol
+val pv_res  : quantum -> prog_var
 val pv_arg  : prog_var
+val pv_qarg : prog_var
 
 (* -------------------------------------------------------------------- *)
 type expr = private {

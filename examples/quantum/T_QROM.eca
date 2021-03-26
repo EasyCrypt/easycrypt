@@ -26,7 +26,7 @@ hint solve 0 random : dfhash_ll dfhash_uni dfhash_fu.
 
 module type QRO_i = {
   proc init () : unit
-  quantum proc h() : from -> hash    
+  quantum proc h {_:from} : hash    
 }.
 
 module type QRO = {
@@ -38,7 +38,7 @@ module QRO : QRO_i = {
 
   proc init() = { h <$ dfhash; }
 
-  quantum proc h () = { return h; }
+  quantum proc h {x:from} = { return h x; }
 
 }.
 

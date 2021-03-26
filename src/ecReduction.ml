@@ -206,7 +206,7 @@ module EqTest = struct
         oall2 (for_lv env ~norm) lv1 lv2
           && for_xp env ~norm f1 f2
           && List.all2 (for_expr env alpha ~norm) e1 e2
-          && oeq (for_expr env alpha ~norm) qe1 qe2
+          && opt_equal (List.all2 (for_expr env alpha ~norm)) qe1 qe2
 
     | Sif (a1, b1, c1), Sif(a2, b2, c2) ->
         for_expr env alpha ~norm a1 a2
@@ -491,7 +491,13 @@ let is_alpha_eq hyps f1 f2 =
       check_mem subst pr1.pr_mem pr2.pr_mem;
       check_xp env subst pr1.pr_fun pr2.pr_fun;
       aux env subst pr1.pr_args pr2.pr_args;
-      aux env subst pr1.pr_event pr2.pr_event
+      begin match pr1.pr_qargs, pr2.pr_qargs with
+      | None, None -> ()
+      | Some f1, Some f2 -> aux env subst f1 f2
+      | _, _ -> error()
+      end;
+      aux env subst pr1.pr_event pr2.pr_event;
+
 
     | Fcoe coe1, Fcoe coe2 ->
       check_e env subst coe1.coe_e coe2.coe_e;
@@ -1379,7 +1385,9 @@ let zpop ri side f hd =
   | Zhl {f_node = FeagerF hs}, [pr;po] ->
     f_eagerF_r {hs with eg_pr = pr; eg_po = po }
   | Zhl {f_node = Fpr hs}, [a;ev] ->
-    f_pr_r {hs with pr_args = a; pr_event = ev }
+    f_pr_r {hs with pr_args = a; pr_qargs = None; pr_event = ev }
+  | Zhl {f_node = Fpr hs}, [a;qa;ev] ->
+    f_pr_r {hs with pr_args = a; pr_qargs = Some qa; pr_event = ev }
   | Zhl {f_node = Fcoe hcoe}, [pre] ->
     f_coe_r {hcoe with coe_pre = pre}
   | Zhl {f_node = FcHoareF hfc}, chf_pr::chf_po::self_::pcalls -> (* FIXME *)
@@ -1536,7 +1544,8 @@ let rec conv ri env f1 f2 stk =
   | Fpr pr1, Fpr pr2 ->
     if EcMemory.mem_equal pr1.pr_mem pr2.pr_mem &&
          EqTest.for_xp env pr1.pr_fun pr2.pr_fun then
-      conv ri env pr1.pr_args pr2.pr_args (zhl f1 [pr1.pr_event] [pr2.pr_event] stk)
+      conv ri env pr1.pr_args pr2.pr_args
+        (zhl f1 (List.ocons pr1.pr_qargs [pr1.pr_event]) (List.ocons pr2.pr_qargs [pr2.pr_event]) stk)
     else
       force_head ri env f1 f2 stk
 

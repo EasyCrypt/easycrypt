@@ -16,7 +16,8 @@ val mem_equal : memory -> memory -> bool
 
 (* -------------------------------------------------------------------- *)
 type proj_arg =
-  { arg_ty  : ty; (* type of the procedure argument "arg" *)
+  { arg_quantum : quantum;
+    arg_ty  : ty; (* type of the procedure argument "arg" *)
     arg_pos : int;       (* projection *)
   }
 
@@ -41,7 +42,7 @@ val memtype  : memenv -> memtype
 
 (* -------------------------------------------------------------------- *)
 (* [empty_local witharg id] if witharg then allows to use symbol "arg"  *)
-val empty_local : witharg:bool -> memory -> memenv
+val empty_local : witharg:bool -> quantum -> memory -> memenv
 val schema    : memory -> memenv
 val schema_mt : memtype
 val abstract    : memory -> memenv
@@ -62,7 +63,7 @@ val lookup_me :
   symbol -> memenv -> (variable * proj_arg option * int option) option
 
 val get_name :
-  symbol -> int option -> memenv -> symbol option
+  quantum * symbol -> int option -> memenv -> symbol option
 
 val is_bound : symbol -> memtype -> bool
 val is_bound_pv : EcTypes.prog_var -> memtype -> bool
@@ -73,8 +74,8 @@ val mt_subst : (ty -> ty) -> memtype -> memtype
 val me_subst : memory EcIdent.Mid.t -> (ty -> ty) -> memenv -> memenv
 
 (* -------------------------------------------------------------------- *)
-val for_printing : memtype -> (symbol option * variable list) option
+val for_printing : memtype -> ((symbol option * variable list)*(symbol option * variable list) option) option
 
 (* -------------------------------------------------------------------- *)
-val local_type : memtype -> ty option
+val local_type : memtype -> (ty * ty option) option
 val has_locals : memtype -> bool

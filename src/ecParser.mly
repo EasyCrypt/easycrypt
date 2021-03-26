@@ -1249,10 +1249,10 @@ sform_u(P):
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
 
 | PR LBRACKET
-    mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) AT pn=mident
+    mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) qargs=brace(plist0(form_r(P), COMMA))? AT pn=mident
     COLON event=form_r(P)
   RBRACKET
-    { PFprob (mp, args, pn, event) }
+    { PFprob (mp, args, qargs, pn, event) }
 
 | WP LBRACKET
     mp=loc(fident) args=paren(plist0(expr, COMMA)) COLON f=form_r(P)
@@ -1445,12 +1445,22 @@ typed_vars:
 | xs=ident+
     { List.map (fun v -> (v, mk_loc v.pl_loc PTunivar)) xs }
 
-param_decl:
-| LPAREN aout=plist0(typed_vars, COMMA) RPAREN
+%inline param_decl1:
+| aout=plist0(typed_vars, COMMA)
     { Fparams_exp (List.flatten aout )}
 
-| LPAREN UNDERSCORE COLON ty=loc(type_exp) RPAREN
+| UNDERSCORE COLON ty=loc(type_exp)
     { Fparams_imp ty }
+
+param_decl:
+| LPAREN p=param_decl1 RPAREN { p }
+
+qparam_decl:
+| LBRACE p=param_decl1 RBRACE { p }
+
+cqparam_decl:
+| p=param_decl q=qparam_decl? { p, q}
+| q=qparam_decl               {Fparams_exp [], Some q}
 
 (* -------------------------------------------------------------------- *)
 (* Statements                                                           *)
@@ -1476,7 +1486,7 @@ classical_args:
 | LPAREN es=plist0(expr, COMMA) RPAREN { es }
 
 quantum_args:
-| PIPE e=expr GT { e }
+| LBRACE es=plist0(expr, COMMA) RBRACE { es }
 
 proc_args:
 | cargs=classical_args {cargs, None }
@@ -1568,11 +1578,11 @@ loc_decl_r:
     { { pfl_names = x; pfl_type = None; pfl_init = Some e; } }
 
 loc_decl:
-| x=loc_decl_r SEMICOLON { x }
+| q=quantum x=loc_decl_r SEMICOLON { q, x }
 
 memtype_decl:
-| x=loc(loc_decl_names) COLON ty=loc(type_exp)
-    { x,ty }
+| q=quantum x=loc(loc_decl_names) COLON ty=loc(type_exp)
+    { q, (x,ty) }
 
 memtype:
 | LBRACE m=rlist0(memtype_decl,COMMA) RBRACE {m}
@@ -1592,7 +1602,7 @@ fun_def_body:
     }
 
 %inline fun_decl:
-| q=quantum PROC x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
+| q=quantum PROC x=lident cqpd=cqparam_decl ty=prefix(COLON, loc(type_exp))?
     { let frestr = { pmre_in    = true;
 		     pmre_name  = x;
 		     pmre_orcls = None;
@@ -1600,7 +1610,8 @@ fun_def_body:
 
       { pfd_quantum  = q;
         pfd_name     = x;
-        pfd_tyargs   = pd;
+        pfd_tyargs   = fst cqpd;
+        pfd_qtyargs  = snd cqpd;
         pfd_tyresult = odfl (mk_loc x.pl_loc PTunivar) ty;
         pfd_uses     = frestr; }
     }
@@ -1618,11 +1629,14 @@ mod_item:
 
 | decl=loc(fun_decl) EQ body=fun_def_body {
     let { pl_loc = loc; pl_desc = decl; } = decl in
-        match decl.pfd_tyargs with
-        | Fparams_imp _ ->
-            let msg = "implicite declaration of parameters not allowed" in
-              parse_error loc (Some msg)
-        | _ -> Pst_fun (decl, body)
+    let check = function
+      | Fparams_imp _ ->
+        let msg = "implicite declaration of parameters not allowed" in
+        parse_error loc (Some msg)
+      | _ -> () in
+    check decl.pfd_tyargs;
+    oiter check decl.pfd_qtyargs;
+    Pst_fun (decl, body)
   }
 
 | PROC x=lident EQ f=loc(fident)
@@ -1786,7 +1800,7 @@ signature_item:
     { let qs = omap (List.map (fun x -> { inp_in_params = false;
 					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
-| q=quantum PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
+| q=quantum PROC i=boption(STAR) x=lident cqpd=cqparam_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
       let frestr = { pmre_in    = not i;
 		     pmre_name  = x;
@@ -1796,7 +1810,8 @@ signature_item:
       `FunctionDecl
           { pfd_quantum  = q;
             pfd_name     = x;
-            pfd_tyargs   = pd;
+            pfd_tyargs   = fst cqpd;
+            pfd_qtyargs  = snd cqpd;
             pfd_tyresult = ty;
             pfd_uses     = frestr; } }
 

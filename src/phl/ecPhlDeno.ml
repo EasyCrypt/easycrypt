@@ -45,6 +45,10 @@ let real_upto_sub     = real_lemma "upto_bad_sub"
 let t_real_le_trans f2 tc =
   t_apply_prept (`App (`UG real_le_trans, [`F f2]))tc
 
+let build_subst_pre env m pr s =
+ let s = PVM.add env pv_arg m pr.pr_args s in
+ ofold (fun a s -> PVM.add env pv_qarg m a s) s pr.pr_qargs
+
 (* -------------------------------------------------------------------- *)
 let t_core_phoare_deno pre post tc =
   let env, _, concl = FApi.tc1_eflat tc in
@@ -71,7 +75,7 @@ let t_core_phoare_deno pre post tc =
   let fun_ = EcEnv.Fun.by_xpath pr.pr_fun env in
 
   (* building the substitution for the pre *)
-  let sargs = PVM.add env pv_arg mhr pr.pr_args PVM.empty in
+  let sargs = build_subst_pre env mhr pr PVM.empty in
   let smem = Fsubst.f_bind_mem Fsubst.f_subst_id mhr pr.pr_mem in
   let concl_pr = Fsubst.f_subst smem (PVM.subst env sargs pre) in
 
@@ -99,8 +103,8 @@ let t_phoare_deno_r pre post tc =
 let cond_pre env prl prr pre =
   (* building the substitution for the pre *)
   (* we substitute param by args and left by ml and right by mr *)
-  let sargs = PVM.add env pv_arg mleft  prl.pr_args PVM.empty in
-  let sargs = PVM.add env pv_arg mright prr.pr_args sargs in
+  let sargs = build_subst_pre env mleft  prl PVM.empty in
+  let sargs = build_subst_pre env mright prr sargs in
   let smem  = Fsubst.f_subst_id in
   let smem  = Fsubst.f_bind_mem smem mleft  prl.pr_mem in
   let smem  = Fsubst.f_bind_mem smem mright prr.pr_mem in
@@ -108,7 +112,7 @@ let cond_pre env prl prr pre =
 
 let t_equiv_deno_r pre post tc =
   let env, _, concl = FApi.tc1_eflat tc in
-
+  EcQuantum.check_wf_quantum env post;
   let cmp, f1, f2 =
     match concl.f_node with
     | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
@@ -347,7 +351,6 @@ let process_pre tc hyps prl prr pre post =
     let penv, _ = LDecl.equivF fl fr hyps in
     TTC.pf_process_formula !!tc penv p
   | None ->
-    let al = prl.pr_args and ar = prr.pr_args in
     let ml = prl.pr_mem and mr = prr.pr_mem in
     let env = LDecl.toenv hyps in
     let eqs = ref [] in
@@ -357,15 +360,19 @@ let process_pre tc hyps prl prr pre post =
       if is_glob x then push (f_eq (f_pvar x ty m) (f_pvar x ty mi)) in
 
     let doglob m mi g = push (f_eq (f_glob g m) (f_glob g mi)) in
-    let dof f a m mi =
+    let dof f a qa m mi =
       try
-        let fv = PV.remove env pv_res (PV.fv env m post) in
+        let sigf = (Fun.by_xpath f env).f_sig in
+        let fv = PV.remove env (EcCoreModules.pv_res sigf) (PV.fv env m post) in
         PV.iter (dopv m mi) (doglob m mi) (eqobs_inF_refl env f fv);
         if not (EcReduction.EqTest.for_type env a.f_ty tunit) then
-          push (f_eq (f_pvarg a.f_ty m) a)
+          push (f_eq (f_pvarg a.f_ty m) a);
+        oiter (fun a ->
+            if not (EcReduction.EqTest.for_type env a.f_ty tunit) then
+              push (f_eq (f_pvqarg a.f_ty m) a)) qa
       with EcCoreGoal.TcError _ | EqObsInError -> () in
 
-    dof fl al mleft ml; dof fr ar mright mr;
+    dof fl prl.pr_args prl.pr_qargs mleft ml; dof fr prr.pr_args prr.pr_qargs mright mr;
     f_ands !eqs
 
 (* -------------------------------------------------------------------- *)

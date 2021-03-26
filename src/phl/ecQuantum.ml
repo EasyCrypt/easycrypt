@@ -1,24 +1,4 @@
 open EcFol
-open EcEnv
-
-let is_classical_glob env mp = not (NormMp.use_quantum env mp)
-
-let rec is_classical env f =
-  match f.f_node with
-  | Fquant (_,_,f) | Fproj(f,_) -> is_classical env f
-  | Fif (f1,f2,f3) -> is_classical env f1 && is_classical env f2 && is_classical env f3
-  | Flet (_,f1,f2) -> is_classical env f1 && is_classical env f2
-  | Fmatch (f,fs,_) | Fapp(f,fs) -> List.for_all (is_classical env) (f::fs)
-  | Ftuple fs -> List.for_all (is_classical env) fs
-  | Fglob   (mp,_) -> is_classical_glob env mp
-  | Fint _ | Flocal _ | Fpvar _  | Fop _ -> true
-
-  (* FIXME quantum : what to do here ? *)
-  | FhoareF _ | FhoareS _
-  | FcHoareF _ | FcHoareS _
-  | FbdHoareF _ | FbdHoareS _
-  | FequivF _ | FequivS _
-  | FeagerF _  | Fcoe _ | Fpr _ -> assert false
 
 let is_f_glob f =
   match f.f_node with
@@ -64,11 +44,10 @@ exception NotWfQuantum of EcEnv.env * form
 exception NotClassical of EcEnv.env * form
 
 (* FIXME: quantum *)
-let check_wf_quantum env f = ()
-(*
+let check_wf_quantum env f =
   if not (wf_quantum env f) then
     EcCoreGoal.tacuerror_exn (NotWfQuantum(env, f))
- *)
+
 let check_classical env f =
   if not (is_classical env f) then
     EcCoreGoal.tacuerror_exn (NotClassical(env, f))

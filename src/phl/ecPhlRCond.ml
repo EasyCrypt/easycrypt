@@ -179,14 +179,14 @@ module LowMatch = struct
     let me, pvs =
       let cvars =
         List.map
-          (fun (x, xty) -> { v_name = EcIdent.name x; v_type = xty; })
+          (fun (x, xty) -> { v_quantum = `Classical; v_name = EcIdent.name x; v_type = xty; })
           cvars in
       EcMemory.bindall_fresh cvars me0 in
 
     let subst, pvs =
       let s, pvs =
         List.fold_left_map (fun s ((x, xty), name) ->
-            let pv = pv_loc name.v_name in
+            let pv = pv_loc name.v_quantum name.v_name in
             let s  = Mid.add x (e_var pv xty) s in
             (s, (pv, xty)))
           Mid.empty (List.combine cvars pvs) in

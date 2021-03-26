@@ -51,8 +51,8 @@ module LowSubst = struct
     match i.i_node with
     | Sasgn  (lv, e)     -> i_asgn   (lvsubst m lv, esubst e)
     | Srnd   (lv, e)     -> i_rnd    (lvsubst m lv, esubst e)
-    | Scall  (lv, f, es, qe) ->
-      i_call (lv |> omap (lvsubst m), f, List.map esubst es, omap esubst qe)
+    | Scall  (lv, f, es, qes) ->
+      i_call (lv |> omap (lvsubst m), f, List.map esubst es, omap (List.map esubst) qes)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Smatch (e, bs)     -> i_match  (esubst e, List.Smart.map (snd_map ssubst) bs)
@@ -72,7 +72,7 @@ module LowInternal = struct
     let hyps = FApi.tc1_hyps tc in
     let env  = LDecl.toenv hyps in
 
-    let inline1 me lv p args qarg =
+    let inline1 me lv p args qargs =
       let p = EcEnv.NormMp.norm_xfun env p in
       let f = EcEnv.Fun.by_xpath p env in
       let fdef =
@@ -88,22 +88,39 @@ module LowInternal = struct
       in
       let params =
         match f.f_sig.fs_anames with
-        | None -> [{ v_name = arg_symbol; v_type = f.f_sig.fs_arg; }]
+        | None -> assert false
         | Some lv -> lv in
+      let qparams =
+        if f.f_sig.fs_qarg = None then []
+        else match f.f_sig.fs_qnames with
+             | None -> assert false
+             | Some lv -> lv in
+      let locals, qlocals = List.partition (fun v -> v.v_quantum = `Classical) fdef.f_locals in
+      let quantum =
+        match qargs with
+        | None -> `Classical
+        | Some es -> EcTyping.is_classical_es es in
+
       let me, anames = EcMemory.bindall_fresh params me in
-      let me, lnames = EcMemory.bindall_fresh fdef.f_locals me in
+      let me, lnames = EcMemory.bindall_fresh locals me in
+      let mquantum = List.map (fun v -> {v with v_quantum = quantum }) in
+      let me, qnames = EcMemory.bindall_fresh (mquantum qparams) me in
+      let me, lqnames = EcMemory.bindall_fresh (mquantum qlocals) me in
+
       let subst =
         let for1 mx v x =
-          PVMap.add (pv_loc v.v_name) (pv_loc x.v_name) mx
+          PVMap.add (pv_loc v.v_quantum v.v_name) (pv_loc x.v_quantum x.v_name) mx
         in
         let mx = PVMap.create env in
         let mx = List.fold_left2 for1 mx params anames in
-        let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
+        let mx = List.fold_left2 for1 mx qparams qnames in
+        let mx = List.fold_left2 for1 mx locals lnames in
+        let mx = List.fold_left2 for1 mx qlocals lqnames in
         mx
       in
 
-      let prelude =
-        let newpv = List.map (fun x -> pv_loc x.v_name, x.v_type) anames in
+      let doprelude names args =
+        let newpv = List.map (fun x -> pv_loc x.v_quantum x.v_name, x.v_type) names in
         if List.length newpv = List.length args then
           List.map2 (fun npv e -> i_asgn (LvVar npv, e)) newpv args
         else
@@ -112,19 +129,12 @@ module LowInternal = struct
           | _   -> [i_asgn(LvTuple newpv, e_tuple args)]
       in
 
+      let prelude = doprelude anames args in
+      let qprelude = omap_dfl (doprelude qnames) [] qargs in
+
       let body = LowSubst.ssubst subst fdef.f_body in
 
       let ret = omap (LowSubst.esubst subst) fdef.f_ret in
-      let me, ret, qprelude =
-        match ret, qarg with
-        | None, _ | _, None -> me, ret, []
-        | Some r, Some qe ->
-          let dom, codom = EcEnv.Ty.destr_quantum f.f_sig.fs_ret env in
-          let me, qv =
-            EcMemory.bind_fresh {v_name = "qarg"; v_type = dom } me in
-          let pv = pv_loc qv.v_name in
-          me, Some (e_app r [e_var pv dom] codom),
-          [i_asgn (LvVar(pv, dom), qe)] in
 
       let me, resasgn =
         match ret, lv with
@@ -132,9 +142,9 @@ module LowInternal = struct
         | Some _, None -> me, []
         | Some r, Some (LvTuple lvs) when not use_tuple ->
           let vlvs =
-            List.map (fun (x,ty) -> {v_name = symbol_of_pv x; v_type = ty}) lvs in
+            List.map (fun (x,ty) -> {v_quantum = quantum; v_name = symbol_of_pv x; v_type = ty}) lvs in
           let me, auxs = EcMemory.bindall_fresh vlvs me in
-          let auxs = List.map (fun v -> pv_loc v.v_name, v.v_type) auxs in
+          let auxs = List.map (fun v -> pv_loc v.v_quantum v.v_name, v.v_type) auxs in
           let s1 =
             let doit i auxi = i_asgn(LvVar auxi, e_proj_simpl r i (snd auxi)) in
             List.mapi doit auxs in
@@ -145,7 +155,7 @@ module LowInternal = struct
         | Some r, Some lv ->
           me, [i_asgn (lv, r)] in
 
-      me, qprelude @ prelude @ body.s_node @ resasgn in
+      me, prelude @ qprelude @ body.s_node @ resasgn in
 
     let rec inline_i me ip i =
       match ip, i.i_node with

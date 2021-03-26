@@ -13,6 +13,7 @@ open EcLowPhlGoal
 
 (* --------------------------------------------------------------------- *)
 let t_hoare_case_r ?(simplify = true) f tc =
+  EcQuantum.check_classical (FApi.tc1_env tc) f;
   let fand = if simplify then f_and_simpl else f_and in
   let hs = tc1_as_hoareS tc in
   let concl1 = f_hoareS_r { hs with hs_pr = fand hs.hs_pr f } in
@@ -21,6 +22,7 @@ let t_hoare_case_r ?(simplify = true) f tc =
 
 (* --------------------------------------------------------------------- *)
 let t_choare_case_r ?(simplify = true) f tc =
+  EcQuantum.check_classical (FApi.tc1_env tc) f;
   let fand = if simplify then f_and_simpl else f_and in
   let chs = tc1_as_choareS tc in
   let concl1 = f_cHoareS_r
@@ -31,6 +33,7 @@ let t_choare_case_r ?(simplify = true) f tc =
 
 (* --------------------------------------------------------------------- *)
 let t_bdhoare_case_r ?(simplify = true) f tc =
+  EcQuantum.check_classical (FApi.tc1_env tc) f;
   let fand = if simplify then f_and_simpl else f_and in
   let bhs = tc1_as_bdhoareS tc in
   let concl1 = f_bdHoareS_r
@@ -41,9 +44,9 @@ let t_bdhoare_case_r ?(simplify = true) f tc =
 
 (* --------------------------------------------------------------------- *)
 let t_equiv_case_r ?(simplify = true) f tc =
+  EcQuantum.check_classical (FApi.tc1_env tc) f;
   let fand = if simplify then f_and_simpl else f_and in
   let es = tc1_as_equivS tc in
-  EcQuantum.check_classical (FApi.tc1_env tc) f;
   let concl1 = f_equivS_r { es with es_pr = fand es.es_pr f } in
   let concl2 = f_equivS_r { es with es_pr = fand es.es_pr (f_not f) } in
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]

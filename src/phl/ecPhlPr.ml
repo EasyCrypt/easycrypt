@@ -18,11 +18,27 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let to_args fun_ arg =
-  match fun_.f_sig.fs_anames with
-  | None     -> arg
-  | Some [_] -> arg
-  | Some lv  -> f_tuple (List.mapi (fun i v -> f_proj arg i v.v_type) lv)
+let to_args fun_ m =
+  let arg =
+    let arg = f_pvarg fun_.f_sig.fs_arg m in
+    match fun_.f_sig.fs_anames with
+    | None     -> arg
+    | Some [_] -> arg
+    | Some lv  -> f_tuple (List.mapi (fun i v -> f_proj arg i v.v_type) lv) in
+  let qarg =
+    match fun_.f_sig.fs_qarg with
+    | None -> None
+    | Some ty ->
+      let arg = f_pvqarg ty m in
+      Some (match fun_.f_sig.fs_qnames with
+        | None     -> arg
+        | Some [_] -> arg
+        | Some lv  -> f_tuple (List.mapi (fun i v -> f_proj arg i v.v_type) lv)) in
+  arg, qarg
+
+
+
+
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_ppr_r tc =
@@ -32,7 +48,7 @@ let t_bdhoare_ppr_r tc =
   let fun_ = EcEnv.Fun.by_xpath f_xpath env in
   let penv,_qenv = EcEnv.Fun.hoareF_memenv f_xpath env in
   let m = EcIdent.create "&m" in
-  let args = to_args fun_ (f_pvarg fun_.f_sig.fs_arg m) in
+  let args, qargs = to_args fun_ m in
   (* Warning: currently no substitution on pre,post since penv is always mhr *)
   let pre,post = bhf.bhf_pr, bhf.bhf_po in
   let fop = match bhf.bhf_cmp with
@@ -41,7 +57,7 @@ let t_bdhoare_ppr_r tc =
     | FHeq -> f_eq
   in
   let subst = Fsubst.f_subst_mem (fst penv) m in
-  let concl = fop (f_pr m f_xpath args post) (subst bhf.bhf_bd) in
+  let concl = fop (f_pr m f_xpath args qargs post) (subst bhf.bhf_bd) in
   let concl = f_imp (subst pre) concl in
   let concl = f_forall_mems [m,snd penv] concl in
   FApi.xmutate1 tc `PPR [concl]
@@ -59,16 +75,16 @@ let t_equiv_ppr_r ty phi_l phi_r tc =
   let funl = EcEnv.Fun.by_xpath fl env in
   let funr = EcEnv.Fun.by_xpath fr env in
   let (penvl,penvr), (qenvl,qenvr) = EcEnv.Fun.equivF_memenv fl fr env in
-  let argsl = to_args funl (f_pvarg funl.f_sig.fs_arg (fst penvl)) in
-  let argsr = to_args funr (f_pvarg funr.f_sig.fs_arg (fst penvr)) in
+  let argsl, qargsl = to_args funl (fst penvl) in
+  let argsr, qargsr = to_args funr (fst penvr) in
   let a_id = EcIdent.create "a" in
   let a_f = f_local a_id ty in
   let smem1 = Fsubst.f_bind_mem Fsubst.f_subst_id mleft mhr in
   let smem2 = Fsubst.f_bind_mem Fsubst.f_subst_id mright mhr in
   let phi1 = Fsubst.f_subst smem1 phi_l in
   let phi2 = Fsubst.f_subst smem2 phi_r in
-  let pr1 = f_pr (fst penvl) fl argsl (f_eq phi1 a_f) in
-  let pr2 = f_pr (fst penvr) fr argsr (f_eq phi2 a_f) in
+  let pr1 = f_pr (fst penvl) fl argsl qargsl (f_eq phi1 a_f) in
+  let pr2 = f_pr (fst penvr) fr argsr qargsr (f_eq phi2 a_f) in
   let concl_pr =
     f_forall_mems [penvl; penvr]
       (f_forall_simpl [a_id,GTty ty]

@@ -1,0 +1,51 @@
+require import AllCore List. (* provide you the type list *)
+
+type msg.
+type sign.
+type pkey.
+type skey.
+
+module type Sign = {
+  proc kg() : pkey * skey
+  quantum proc sign(sk:skey) {m:msg} : sign   (* This procedure need to provide a quantum access *)
+  proc verify(sk:skey, m:msg, s:sign) : bool
+}.
+
+module type OrclSign = {
+  quantum proc sign {m: msg} : sign    
+}.
+
+(* maximun number of a query allowed to the sign oracle *)
+op q : int.
+
+quantum module type AdvEUF_M (O:OrclSign) = {
+  proc main(pk:pkey) : (msg * sign) list  
+}.
+
+
+
+module EUF_M(A:AdvEUF_M) (O:Sign) = {
+  var sk: skey
+  module Os = {
+    quantum proc sign {m:msg} = { 
+      quantum var s; 
+      s <@ O.sign(sk){m};
+      return s;
+    }
+  }
+
+  proc main() = {
+    var pk, b, ms, l, c, m, s;
+    (pk,sk) <@ O.kg();
+    ms <@ A(Os).main(pk);
+    b <- true;
+    l <- ms;
+    while (l <> []) { 
+      (m,s) <- head witness l;
+      l <- behead l;
+      c <@ O.verify(sk,m,s);
+      b <- b && c;
+    }
+    return b && q < size ms;
+  }
+}.

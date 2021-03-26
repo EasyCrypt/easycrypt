@@ -23,53 +23,53 @@ let t_pr_lemma lemma tc =
   FApi.xmutate1 tc `RwPr []
 
 (* -------------------------------------------------------------------- *)
-let pr_eq env m f args p1 p2 =
+let pr_eq env m f args qargs p1 p2 =
   let mem = Fun.prF_memenv mhr f env in
   let hyp = f_forall_mems [mem] (f_iff p1 p2) in
-  let concl = f_eq (f_pr m f args p1) (f_pr m f args p2) in
+  let concl = f_eq (f_pr m f args qargs p1) (f_pr m f args qargs p2) in
     f_imp hyp (f_eq concl f_true)
 
-let pr_sub env m f args p1 p2 =
+let pr_sub env m f args qargs p1 p2 =
   let mem = Fun.prF_memenv mhr f env in
   let hyp = f_forall_mems [mem] (f_imp p1 p2) in
-  let concl = f_real_le (f_pr m f args p1) (f_pr m f args p2) in
+  let concl = f_real_le (f_pr m f args qargs p1) (f_pr m f args qargs p2) in
     f_imp hyp (f_eq concl f_true)
 
-let pr_false m f args =
-  f_eq (f_pr m f args f_false) f_r0
+let pr_false m f args qargs =
+  f_eq (f_pr m f args qargs f_false) f_r0
 
-let pr_not m f args p =
+let pr_not m f args qargs p =
   f_eq
-    (f_pr m f args (f_not p))
-    (f_real_sub (f_pr m f args f_true) (f_pr m f args p))
+    (f_pr m f args qargs (f_not p))
+    (f_real_sub (f_pr m f args qargs f_true) (f_pr m f args qargs p))
 
-let pr_or m f args por p1 p2 =
-  let pr1 = f_pr m f args p1 in
-  let pr2 = f_pr m f args p2 in
-  let pr12 = f_pr m f args (f_and p1 p2) in
+let pr_or m f args qargs por p1 p2 =
+  let pr1 = f_pr m f args qargs p1 in
+  let pr2 = f_pr m f args qargs p2 in
+  let pr12 = f_pr m f args qargs (f_and p1 p2) in
   let pr = f_real_sub (f_real_add pr1 pr2) pr12 in
-    f_eq (f_pr m f args (por p1 p2)) pr
+    f_eq (f_pr m f args qargs (por p1 p2)) pr
 
-let pr_disjoint env m f args por p1 p2 =
+let pr_disjoint env m f args qargs por p1 p2 =
   let mem = Fun.prF_memenv mhr f env in
   let hyp = f_forall_mems [mem] (f_not (f_and p1 p2)) in
-  let pr1 = f_pr m f args p1 in
-  let pr2 = f_pr m f args p2 in
+  let pr1 = f_pr m f args qargs p1 in
+  let pr2 = f_pr m f args qargs p2 in
   let pr =  f_real_add pr1 pr2 in
-    f_imp hyp (f_eq (f_pr m f args (por p1 p2)) pr)
+    f_imp hyp (f_eq (f_pr m f args qargs (por p1 p2)) pr)
 
-let pr_split m f args ev1 ev2 =
-  let pr  = f_pr m f args ev1 in
-  let pr1 = f_pr m f args (f_and ev1 ev2) in
-  let pr2 = f_pr m f args (f_and ev1 (f_not ev2)) in
+let pr_split m f args qargs ev1 ev2 =
+  let pr  = f_pr m f args qargs ev1 in
+  let pr1 = f_pr m f args qargs (f_and ev1 ev2) in
+  let pr2 = f_pr m f args qargs (f_and ev1 (f_not ev2)) in
   f_eq pr (f_real_add pr1 pr2)
 
-let pr_ge0 m f args ev =
-  let pr = f_pr m f args ev in
+let pr_ge0 m f args qargs ev =
+  let pr = f_pr m f args qargs ev in
   f_eq (f_real_le f_r0 pr) f_true
 
-let pr_le1 m f args ev =
-  let pr = f_pr m f args ev in
+let pr_le1 m f args qargs ev =
+  let pr = f_pr m f args qargs ev in
   f_eq (f_real_le pr f_r1) f_true
 
 (* -------------------------------------------------------------------- *)
@@ -93,6 +93,7 @@ let select_pr_cmp on_cmp sid f =
          && EcIdent.id_equal pr1.pr_mem  pr2.pr_mem
          && EcPath.x_equal   pr1.pr_fun  pr2.pr_fun
          && f_equal          pr1.pr_args pr2.pr_args
+         && opt_equal f_equal pr1.pr_qargs pr2.pr_qargs
          && Mid.set_disjoint f.f_fv sid
       then raise (FoundPr f)
       else false
@@ -175,51 +176,51 @@ let t_pr_rewrite_low (s,dof) tc =
       | Fapp(_, [{f_node = Fpr ({ pr_event = ev1 } as pr) };
                  {f_node = Fpr ({ pr_event = ev2 }) };])
         -> begin
-          let { pr_mem = m; pr_fun = f; pr_args = args } = pr in
+          let { pr_mem = m; pr_fun = f; pr_args = args; pr_qargs = qargs } = pr in
           match kind with
-          | `MuEq  -> (pr_eq  env m f args ev1 ev2, 1)
-          | `MuSub -> (pr_sub env m f args ev1 ev2, 1)
+          | `MuEq  -> (pr_eq  env m f args qargs ev1 ev2, 1)
+          | `MuSub -> (pr_sub env m f args qargs ev1 ev2, 1)
         end
       | _ -> assert false
       end
 
     | `MuFalse ->
-        let { pr_mem = m ; pr_fun = f; pr_args = args } = destr_pr torw in
-        (pr_false m f args, 0)
+        let { pr_mem = m ; pr_fun = f; pr_args = args; pr_qargs = qargs } = destr_pr torw in
+        (pr_false m f args qargs, 0)
 
     | `MuNot ->
-        let { pr_mem = m ; pr_fun = f; pr_args = args; } as pr = destr_pr torw in
+        let { pr_mem = m ; pr_fun = f; pr_args = args; pr_qargs = qargs} as pr = destr_pr torw in
         let ev = destr_not pr.pr_event in
-        (pr_not m f args ev, 0)
+        (pr_not m f args qargs ev, 0)
 
     | `MuOr ->
-        let { pr_mem = m ; pr_fun = f; pr_args = args; } as pr = destr_pr torw in
+        let { pr_mem = m ; pr_fun = f; pr_args = args; pr_qargs = qargs} as pr = destr_pr torw in
         let (asym, (ev1, ev2)) = destr_or_r pr.pr_event in
-        (pr_or m f args (match asym with | `Asym -> f_ora | `Sym -> f_or) ev1 ev2, 0)
+        (pr_or m f args qargs (match asym with | `Asym -> f_ora | `Sym -> f_or) ev1 ev2, 0)
 
     | `MuDisj ->
-        let { pr_mem = m ; pr_fun = f; pr_args = args; } as pr = destr_pr torw in
+        let { pr_mem = m ; pr_fun = f; pr_args = args; pr_qargs = qargs } as pr = destr_pr torw in
         let (asym, (ev1, ev2)) = destr_or_r pr.pr_event in
-        (pr_disjoint env m f args (match asym with | `Asym -> f_ora | `Sym -> f_or) ev1 ev2, 1)
+        (pr_disjoint env m f args qargs (match asym with | `Asym -> f_ora | `Sym -> f_or) ev1 ev2, 1)
 
     | `MuSplit ->
       let pr = destr_pr torw in
       let ev' = (oget dof) tc torw in
-      (pr_split pr.pr_mem pr.pr_fun pr.pr_args pr.pr_event ev', 0)
+      (pr_split pr.pr_mem pr.pr_fun pr.pr_args pr.pr_qargs pr.pr_event ev', 0)
 
     | `MuGe0 -> begin
       match torw.f_node with
       | Fapp({f_node = Fop _}, [_; {f_node = Fpr pr}]) ->
-            let { pr_mem = m; pr_fun = f; pr_args = args; pr_event = ev } = pr in
-            (pr_ge0 m f args ev, 0)
+            let { pr_mem = m; pr_fun = f; pr_args = args; pr_qargs = qargs; pr_event = ev } = pr in
+            (pr_ge0 m f args qargs ev, 0)
       | _ -> assert false
       end
 
     | `MuLe1 -> begin
       match torw.f_node with
       | Fapp({f_node = Fop _}, [{f_node = Fpr pr}; _]) ->
-            let { pr_mem = m; pr_fun = f; pr_args = args; pr_event = ev } = pr in
-            (pr_le1 m f args ev, 0)
+            let { pr_mem = m; pr_fun = f; pr_args = args; pr_qargs = qargs; pr_event = ev } = pr in
+            (pr_le1 m f args qargs ev, 0)
       | _ -> assert false
       end
 

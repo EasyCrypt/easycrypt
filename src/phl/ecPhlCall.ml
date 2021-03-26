@@ -30,28 +30,19 @@ let wp_asgn_call env m lv res post =
       let lets = lv_subst m lv res in
       mk_let_of_lv_substs env ([lets], post)
 
-let subst_args_call env m e s =
-  PVM.add env pv_arg m (form_of_expr m e) s
+let subst_args_call env m es qes s =
+  let s = PVM.add env pv_arg m (f_tuple (List.map (form_of_expr m) es)) s in
+  ofold (fun es s -> PVM.add env pv_qarg m (f_tuple (List.map (form_of_expr m) es)) s) s qes
 
 (* -------------------------------------------------------------------- *)
-let build_qres env fsig ext qarg m =
+let build_res fsig ext =
+  let pvres = pv_res fsig in
   let vres = EcIdent.create ("result" ^ ext) in
   let fres = f_local vres fsig.fs_ret in
-  match qarg with
-  | None -> vres, fres, None, fres
-  | Some e ->
-    let dom, codom = EcEnv.Ty.destr_quantum fsig.fs_ret env in
-    let vqarg = EcIdent.create ("qvar" ^ ext) in
-    vres, fres,
-      Some (vqarg, form_of_expr m e), f_app fres [f_local vqarg dom] codom
-
-let let_qvar_post vqarg post =
-  match vqarg with
-  | None -> post
-  | Some (vqarg, fqarg) -> f_let1 vqarg fqarg post
+  pvres, vres, fres
 
 (* -------------------------------------------------------------------- *)
-let wp_call env fpre fpost (lp,f,args,qarg) m post combine =
+let wp_call env fpre fpost (lp,f,args,qargs) m post combine =
  (* The wp *)
   (* Classical or Quantum without qargs :
      fpre{arg <- args} /\
@@ -63,30 +54,27 @@ let wp_call env fpre fpost (lp,f,args,qarg) m post combine =
    *)
   let fsig = (Fun.by_xpath f env).f_sig in
   let modi = f_write env f in
-  let pvres = pv_res in
-  let vres, fres, vqarg, res_post = build_qres env fsig "" qarg m in
-  let post = wp_asgn_call env m lp res_post post in
+  let pvres, vres, fres = build_res fsig "" in
+  let post = wp_asgn_call env m lp fres post in
   let fpost = PVM.subst1 env pvres m fres fpost in
 
   let post = generalize_mod env m modi (combine fpost post) in
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let post = let_qvar_post vqarg post in
-  let spre = subst_args_call env m (e_tuple args) PVM.empty in
+  let spre = subst_args_call env m args qargs PVM.empty in
   f_anda_simpl (PVM.subst env spre fpre) post
 
 (* -------------------------------------------------------------------- *)
 let wp2_call
-  env fpre fpost (lpl,fl,argsl,qargl) modil (lpr,fr,argsr, qargr) modir ml mr post
+  env fpre fpost (lpl,fl,argsl,qargsl) modil (lpr,fr,argsr, qargsr) modir ml mr post
 =
   let fsigl = (Fun.by_xpath fl env).f_sig in
   let fsigr = (Fun.by_xpath fr env).f_sig in
 
   (* The wp *)
-  let pvresl = pv_res and pvresr = pv_res in
-  let vresl, fresl, vqargl, res_postl = build_qres env fsigl "_L" qargl ml in
-  let vresr, fresr, vqargr, res_postr = build_qres env fsigr "_R" qargr mr in
-  let post = wp_asgn_call env ml lpl res_postl post in
-  let post = wp_asgn_call env mr lpr res_postr post in
+  let pvresl, vresl, fresl = build_res fsigl "_L" in
+  let pvresr, vresr, fresr = build_res fsigr "_R" in
+  let post = wp_asgn_call env ml lpl fresl post in
+  let post = wp_asgn_call env mr lpr fresr post in
   let s    = PVM.empty in
   let s    = PVM.add env pvresr mr fresr s in
   let s    = PVM.add env pvresl ml fresl s in
@@ -98,10 +86,8 @@ let wp2_call
       [(vresl, GTty fsigl.fs_ret);
        (vresr, GTty fsigr.fs_ret)]
       post in
-  let post = let_qvar_post vqargr post in
-  let post = let_qvar_post vqargl post in
-  let spre = subst_args_call env ml (e_tuple argsl) PVM.empty in
-  let spre = subst_args_call env mr (e_tuple argsr) spre in
+  let spre = subst_args_call env ml argsl qargsl PVM.empty in
+  let spre = subst_args_call env mr argsr qargsr spre in
   f_anda_simpl (PVM.subst env spre fpre) post
 
 (* -------------------------------------------------------------------- *)
@@ -319,11 +305,8 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       (topr, _, _  , sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
     let eqglob = f_eqglob topl mleft topr mright in
     let lpre = if OI.is_in oil then [eqglob;inv] else [inv] in
-    let eq_params =
-      f_eqparams
-        sigl.fs_arg sigl.fs_anames mleft
-        sigr.fs_arg sigr.fs_anames mright in
-    let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+    let eq_params = f_eqparams sigl mleft sigr mright in
+    let eq_res = f_eqres (fs_quantum sigl) sigl.fs_ret mleft sigr.fs_ret mright in
     let pre    = f_ands (eq_params::lpre) in
     let post   = f_ands [eq_res; eqglob; inv] in
       f_equivF pre fl fr post
@@ -334,15 +317,13 @@ let mk_inv_spec (_pf : proofenv) env inv fl fr =
       let sigl, sigr = defl.f_sig, defr.f_sig in
       let testty =
            EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
+        && opt_equal (EcReduction.EqTest.for_type env) sigl.fs_qarg sigr.fs_qarg
         && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret
       in
 
       if not testty then raise EqObsInError;
-      let eq_params =
-        f_eqparams
-          sigl.fs_arg sigl.fs_anames mleft
-          sigr.fs_arg sigr.fs_anames mright in
-      let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+      let eq_params = f_eqparams sigl mleft sigr mright in
+      let eq_res = f_eqres (fs_quantum sigl) sigl.fs_ret mleft sigr.fs_ret mright in
       let pre = f_and eq_params inv in
       let post = f_and eq_res inv in
         f_equivF pre fl fr post
@@ -474,11 +455,8 @@ let process_call side info tc =
         let bad2 = Fsubst.f_subst_mem mhr mright bad in
         let eqglob = f_eqglob topl mleft topr mright in
         let lpre = if OI.is_in oil then [eqglob;invP] else [invP] in
-        let eq_params =
-          f_eqparams
-            sigl.fs_arg sigl.fs_anames mleft
-            sigr.fs_arg sigr.fs_anames mright in
-        let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+        let eq_params = f_eqparams sigl mleft sigr mright in
+        let eq_res = f_eqres (fs_quantum sigl) sigl.fs_ret mleft sigr.fs_ret mright in
         let pre    = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in
         let post   = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
         (bad,invP,invQ, f_equivF pre fl fr post)

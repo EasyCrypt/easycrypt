@@ -14,9 +14,9 @@ open EcCoreGoal.FApi
 (* -------------------------------------------------------------------- *)
 val wp2_call :
   EcEnv.env -> form -> form ->
-  EcModules.lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr option ->
+  EcModules.lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr list option ->
   EcPV.PV.t ->
-  EcModules.lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr option ->
+  EcModules.lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr list option ->
   EcPV.PV.t ->
   EcMemory.memory -> EcMemory.memory -> form -> form
 

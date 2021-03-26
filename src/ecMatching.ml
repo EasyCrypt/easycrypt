@@ -626,7 +626,8 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
           List.iter2
             (doit env (subst, mxs))
-            [pr1.pr_args; pr1.pr_event] [pr2.pr_args; pr2.pr_event]
+            (pr1.pr_args :: (List.ocons pr1.pr_qargs [pr1.pr_event]))
+            (pr2.pr_args :: (List.ocons pr2.pr_qargs [pr2.pr_event]))
       end
 
       | _, _ -> default ()
@@ -875,7 +876,9 @@ module FPosition = struct
 
           | Fpr pr ->
               let subctxt = Sid.add pr.pr_mem ctxt in
-              doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event)])
+              doit pos (`WithSubCtxt (
+                            (ctxt, pr.pr_args) ::
+                              List.ocons (omap (fun f -> ctxt, f) pr.pr_qargs) [(subctxt, pr.pr_event)]))
 
           | FhoareF hs ->
               doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
@@ -1036,8 +1039,17 @@ module FPosition = struct
               FSmart.f_let (fp, (lv, f1, f2)) (lv, f1', f2')
 
           | Fpr pr ->
-              let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in
-              f_pr pr.pr_mem pr.pr_fun args' event'
+            let args', qargs', event' =
+              match pr.pr_qargs with
+              | None ->
+                let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in
+                args', pr.pr_qargs, event'
+              | Some qargs ->
+                let args', qargs', event' = as_seq3 (doit p [pr.pr_args; qargs; pr.pr_event]) in
+                if qargs == qargs' then
+                  args', pr.pr_qargs, event'
+                else args', Some qargs', event' in
+              f_pr pr.pr_mem pr.pr_fun args' qargs' event'
 
           | FhoareF hf ->
               let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in

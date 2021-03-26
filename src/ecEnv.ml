@@ -1710,25 +1710,32 @@ module Fun = struct
   let add_in_memenv memenv vd = adds_in_memenv memenv [vd]
 
   let add_params mem fun_ =
-    let ty = fun_.f_sig.fs_arg in
-    match fun_.f_sig.fs_anames with
-    | None   -> add_in_memenv mem {v_name = "_"; v_type = ty}
-    | Some l -> adds_in_memenv mem l
+
+    let doit q ty l mem =
+      match l with
+      | None   -> add_in_memenv mem {v_quantum = q; v_name = "_"; v_type = ty}
+      | Some l -> adds_in_memenv mem l in
+    let mem = doit `Classical fun_.f_sig.fs_arg fun_.f_sig.fs_anames mem in
+    match fun_.f_sig.fs_qarg with
+    | None -> mem
+    | Some ty -> doit `Quantum ty fun_.f_sig.fs_qnames mem
 
   let actmem_pre me fun_ =
-    let mem = EcMemory.empty_local ~witharg:true me in
+    let mem = EcMemory.empty_local ~witharg:true (fs_quantum fun_.f_sig) me in
     add_params mem fun_
 
   let actmem_post me fun_ =
-    let mem = EcMemory.empty_local ~witharg:false me in
-    add_in_memenv mem {v_name = res_symbol; v_type = fun_.f_sig.fs_ret}
+    let quantum = fs_quantum fun_.f_sig in
+    let mem = EcMemory.empty_local ~witharg:false quantum me in
+    add_in_memenv mem {v_quantum = quantum; v_name = res_symbol; v_type = fun_.f_sig.fs_ret}
 
   let actmem_body me fun_ =
     match fun_.f_def with
     | FBabs _   -> assert false (* FIXME error message *)
     | FBalias _ -> assert false (* FIXME error message *)
     | FBdef fd   ->
-      let mem = EcMemory.empty_local ~witharg:false me in
+
+      let mem = EcMemory.empty_local ~witharg:false (fs_quantum fun_.f_sig) me in
       let mem = add_params mem fun_ in
       (fun_.f_sig,fd), adds_in_memenv mem fd.f_locals
 
@@ -1838,7 +1845,7 @@ module Var = struct
           let memenv = oget (Memory.byid side env) in
           begin match EcMemory.lookup_me (snd qname) memenv with
           | Some (v, Some pa, _) -> Some (`Proj(pv_arg, pa), v.v_type)
-          | Some (v, None, _)    -> Some (`Var (pv_loc v.v_name), v.v_type)
+          | Some (v, None, _)    -> Some (`Var (pv_loc v.v_quantum v.v_name), v.v_type)
           | None                 -> None
           end
       | _ -> None
@@ -2587,6 +2594,7 @@ module NormMp = struct
             pr_mem   = pr.pr_mem;
             pr_fun   = norm_xfun env pr.pr_fun;
             pr_args  = aux pr.pr_args;
+            pr_qargs = OSmart.omap aux pr.pr_qargs;
             pr_event = aux pr.pr_event;
           } in FSmart.f_pr (f, pr) pr'
 

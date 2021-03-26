@@ -269,9 +269,9 @@ let t_eager_fun_def_r tc =
     match fdef.f_ret with
     | None -> f_tt, mem, fdef.f_body
     | Some e ->
-      let v = {v_name = "result"; v_type = e.e_ty } in
+      let v = {v_quantum = EcTyping.is_classical_e e ;v_name = "result"; v_type = e.e_ty } in
       let mem, s = EcMemory.bind_fresh v mem in
-      let x = EcTypes.pv_loc s.v_name in
+      let x = EcTypes.pv_loc s.v_quantum s.v_name in
       f_pvar x e.e_ty (fst mem), mem,
       s_seq fdef.f_body (stmt [i_asgn(LvVar(x,e.e_ty), e)])
   in
@@ -280,8 +280,8 @@ let t_eager_fun_def_r tc =
   let er, memr, sfr = extend memenvr fdefr in
   let ml, mr = EcMemory.memory meml, EcMemory.memory memr in
   let s = PVM.empty in
-  let s = PVM.add env pv_res ml el s in
-  let s = PVM.add env pv_res mr er s in
+  let s = PVM.add env (pv_res fsigl) ml el s in
+  let s = PVM.add env (pv_res fsigr) mr er s in
   let post = PVM.subst env s eg.eg_po in
   let s = PVM.empty in
   let s = EcPhlFun.subst_pre env fsigl ml s in
@@ -487,7 +487,7 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         let eqi =
           List.fold_left2
             (fun eqs e1 e2 -> Mpv2.add_eqs env e1 e2 eqs)
-            eqi (otolist qargl) (otolist qargr) in
+            eqi (odfl [] qargl) (odfl [] qargr) in
 
           (fhyps, eqi)
 
@@ -565,12 +565,9 @@ let t_eager_r h inv tc =
     let defl = Fun.by_xpath fl env in
     let defr = Fun.by_xpath fr env in
     let sigl, sigr = defl.f_sig, defr.f_sig in
-    let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
+    let eq_res = f_eqres (fs_quantum sigl) sigl.fs_ret mleft sigr.fs_ret mright in
     let post = Mpv2.to_form mleft mright eqo eq_res in
-    let eq_params =
-      f_eqparams
-        sigl.fs_arg sigl.fs_anames mleft
-        sigr.fs_arg sigr.fs_anames mright in
+    let eq_params = f_eqparams sigl mleft sigr mright in
     let pre = f_and_simpl eq_params inv in
     f_eagerF pre s fl fr s' post
   in

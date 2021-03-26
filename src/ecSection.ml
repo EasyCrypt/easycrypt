@@ -127,7 +127,7 @@ let rec on_mpath_instr cb (i : instr)=
       lv |> oiter (on_mpath_lv cb);
       cb f.x_top;
       List.iter (on_mpath_expr cb) args;
-      oiter (on_mpath_expr cb) qarg
+      oiter (List.iter (on_mpath_expr cb)) qarg
 
   | Sif (e, s1, s2) ->
       on_mpath_expr cb e;
@@ -276,7 +276,8 @@ let rec on_mpath_form cb (f : EcFol.form) =
 
   and on_mpath_pr cb pr =
     cb pr.EcFol.pr_fun.x_top;
-    List.iter (on_mpath_form cb) [pr.EcFol.pr_event; pr.EcFol.pr_args]
+    List.iter (on_mpath_form cb) [pr.EcFol.pr_event; pr.EcFol.pr_args];
+    oiter (on_mpath_form cb) pr.EcFol.pr_qargs
 
   and on_mpath_cost cb cost =
     on_mpath_form cb cost.EcFol.c_self;
@@ -314,6 +315,7 @@ and on_mpath_fun cb fun_ =
 
 and on_mpath_fun_sig cb fsig =
   on_mpath_ty cb fsig.fs_arg;
+  oiter (on_mpath_ty cb) fsig.fs_qarg;
   on_mpath_ty cb fsig.fs_ret
 
 and on_mpath_fun_body cb fbody =

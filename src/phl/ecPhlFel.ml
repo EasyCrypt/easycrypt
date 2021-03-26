@@ -188,7 +188,15 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
       let vs = oget fsig.fs_anames in
       let f_x x = f_pvloc x mh in
       f_eq (f_tuple (List.map f_x vs)) pr.pr_args in
-    let pre = f_ands (eqparams :: (eqxs@eqgs)) in
+    let eqqparams =
+      if fsig.fs_qarg = None then None
+      else
+        let vs = oget fsig.fs_qnames in
+        let f_x x = f_pvloc x mh in
+        Some (f_eq (f_tuple (List.map f_x vs)) (oget pr.pr_qargs)) in
+
+    let pre = f_ands (eqparams :: List.ocons eqqparams (eqxs@eqgs)) in
+
     let p = f_and (f_not f_event) (f_eq cntr f_i0) in
     let p = f_and_simpl p inv in
     f_hoareS memenv pre (stmt s_hd) p

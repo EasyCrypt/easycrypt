@@ -19,11 +19,12 @@ include module type of struct include EcCoreFol end
 val f_losslessF: xpath -> form
 
 val f_eqparams:
-     EcTypes.ty -> variable list option -> memory
-  -> EcTypes.ty -> variable list option -> memory
+     EcCoreModules.funsig -> memory
+  -> EcCoreModules.funsig -> memory
   -> form
 
 val f_eqres:
+     quantum ->
      EcTypes.ty -> memory
   -> EcTypes.ty -> memory
   -> form
@@ -239,3 +240,5 @@ val cost_op       : EcEnv.env -> (form -> form -> form ) -> cost -> cost -> cost
 val cost_app      : cost -> form list -> cost
 
 val cost_flatten  : cost -> form *)
+
+val is_classical : EcEnv.env -> form -> bool

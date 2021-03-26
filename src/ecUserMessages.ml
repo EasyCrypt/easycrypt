@@ -491,14 +491,11 @@ end = struct
     | UnknownMemName m ->
         msg "unknown memory: %s" m
 
-    | InvalidFunAppl FAE_WrongArgCount ->
-        msg "invalid function application: wrong number of arguments"
+    | InvalidFunAppl (FAE_WrongArgCount q) ->
+        msg "invalid function application: wrong number of %aarguments" EcPrinting.pp_quantum q
 
     | InvalidFunAppl FAE_ClassicalNoQArg ->
         msg "invalid function application: classical function cannot be applied to quantum argument"
-
-    | InvalidFunAppl FAE_QuantumArgExpected ->
-        msg "invalid function application: quantum function expects a quantum argument"
 
     | InvalidModAppl err ->
         msg "invalid module application:@ %a" (pp_modappl_error env1) err
@@ -591,6 +588,15 @@ end = struct
     | ModTypeQuantumRestr mps ->
       msg "quantum module type cannot have negative restrictions over quantum modules: %a"
       (EcPrinting.pp_list " " (EcPrinting.pp_topmod env)) mps
+
+    | QuantumSigNoArg -> msg "quantum procedure expects quantum arguments"
+    | ClassicalSigArg -> msg "classical procedure does not expect quantum arguments"
+    | ClassicalExprNeeded s -> msg "only classical expression are allowed (%s is quantum)" s
+    | ClassicalFormNeeded -> msg "only classical formula are allowed"
+    | QuantumLvar (q,pv) -> msg "the variable %a should be %s"
+                              (EcPrinting.pp_pv env) pv
+                              (EcPrinting.string_of_quantum q)
+
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

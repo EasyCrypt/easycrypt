@@ -238,7 +238,7 @@ let symbol_of_ty (ty : ty) =
       let rec doit i =
         if   i >= String.length x
         then "x"
-        else match Char.lowercase x.[i] with
+        else match Char.lowercase_ascii x.[i] with
              | 'a' .. 'z' -> String.make 1 x.[i]
              | _ -> doit (i+1)
       in
@@ -357,10 +357,15 @@ module Tvar = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type quantum = [`Quantum | `Classical]
+
 type variable = {
-    v_name : EcSymbols.symbol;   (* can be "_" *)
-    v_type : ty;
+    v_quantum : quantum;
+    v_name    : EcSymbols.symbol;   (* can be "_" *)
+    v_type    : ty;
   }
+
+let v_quantum v = v.v_quantum
 let v_name { v_name = x } = x
 let v_type { v_type = x } = x
 
@@ -379,12 +384,12 @@ type pvar_kind =
 
 type prog_var =
   | PVglob of EcPath.xpath
-  | PVloc of EcSymbols.symbol
+  | PVloc of quantum * EcSymbols.symbol
 
 let pv_equal v1 v2 = match v1, v2 with
   | PVglob x1, PVglob x2 ->
     EcPath.x_equal x1 x2
-  | PVloc i1, PVloc i2 -> EcSymbols.sym_equal i1 i2
+  | PVloc(q1,i1), PVloc(q2,i2) -> q1 = q2 && EcSymbols.sym_equal i1 i2
   | PVloc _, PVglob _ | PVglob _, PVloc _ -> false
 
 let pv_kind = function
@@ -394,38 +399,48 @@ let pv_kind = function
 let pv_hash v =
   let h = match v with
     | PVglob x -> EcPath.x_hash x
-    | PVloc i -> Hashtbl.hash i in
+    | PVloc (_,i) -> Hashtbl.hash i in
 
   Why3.Hashcons.combine
     h (if pv_kind v = PVKglob then 1 else 0)
 
 let pv_compare v1 v2 =
   match v1, v2 with
-  | PVloc i1,  PVloc i2  -> EcSymbols.sym_compare i1 i2
+  | PVloc (q1,i1),  PVloc (q2,i2) ->
+    let c = EcSymbols.sym_compare i1 i2 in
+    if c = 0 then Stdlib.compare q1 q2
+    else c
   | PVglob x1, PVglob x2 -> EcPath.x_compare x1 x2
-  | _, _ -> Pervasives.compare (pv_kind v1) (pv_kind v2)
+  | _, _ -> Stdlib.compare (pv_kind v1) (pv_kind v2)
 
 let pv_compare_p v1 v2 =
   match v1, v2 with
-  | PVloc i1,  PVloc i2  -> EcSymbols.sym_compare i1 i2
+  | PVloc (q1,i1),  PVloc (q2,i2) ->
+    let c = EcSymbols.sym_compare i1 i2 in
+    if c = 0 then Stdlib.compare q1 q2
+    else c
   | PVglob x1, PVglob x2 -> EcPath.x_compare_na x1 x2
-  | _, _ -> Pervasives.compare (pv_kind v1) (pv_kind v2)
+  | _, _ -> Stdlib.compare (pv_kind v1) (pv_kind v2)
 
 let pv_ntr_compare v1 v2 =
   match v1, v2 with
-  | PVloc i1,  PVloc i2  -> EcSymbols.sym_compare i1 i2
+  | PVloc (q1,i1),  PVloc (q2,i2) ->
+    let c = EcSymbols.sym_compare i1 i2 in
+    if c = 0 then Stdlib.compare q1 q2
+    else c
   | PVglob x1, PVglob x2 -> EcPath.x_ntr_compare x1 x2
-  | _, _ -> Pervasives.compare (pv_kind v1) (pv_kind v2)
+  | _, _ -> Stdlib.compare (pv_kind v1) (pv_kind v2)
 
 let is_loc  = function PVloc _ -> true  | PVglob _ -> false
 let is_glob = function PVloc _ -> false | PVglob _ -> true
 
-let get_loc = function PVloc id -> id | PVglob _ -> assert false
+let get_loc = function PVloc (_,id) -> id | PVglob _ -> assert false
+let get_qloc = function PVloc (q,id) -> q,id | PVglob _ -> assert false
 let get_glob = function PVloc _ -> assert false | PVglob xp -> xp
 
 let symbol_of_pv = function
   | PVglob x -> x.EcPath.x_sub
-  | PVloc id -> id
+  | PVloc (_,id) -> id
 
 let string_of_pvar_kind = function
   | PVKglob -> "PVKglob"
@@ -434,17 +449,20 @@ let string_of_pvar_kind = function
 let string_of_pvar (p : prog_var) =
   let sp = match p with
     | PVglob x -> EcPath.x_tostring x
-    | PVloc id -> id in
+    | PVloc (_,id) -> id in
 
   Printf.sprintf "%s[%s]"
     sp (string_of_pvar_kind (pv_kind p))
 
-let pv_loc id = PVloc id
+let pv_loc q id = PVloc (q, id)
 
 let arg_symbol = "arg"
 let res_symbol = "res"
-let pv_arg = PVloc arg_symbol
-let pv_res =  PVloc res_symbol
+let pv_arg = PVloc (`Classical, arg_symbol)
+let pv_res quantum = PVloc (quantum, res_symbol)
+
+let qarg_symbol = "qarg"
+let pv_qarg = PVloc (`Quantum, qarg_symbol)
 
 let xp_glob x =
   let top = x.EcPath.x_top in

@@ -149,6 +149,7 @@ and pr = {
   pr_mem   : memory;
   pr_fun   : EcPath.xpath;
   pr_args  : form;
+  pr_qargs : form option;
   pr_event : form;
 }
 
@@ -365,6 +366,7 @@ let pr_equal pr1 pr2 =
   && EcPath.x_equal   pr1.pr_fun pr2.pr_fun
   && f_equal          pr1.pr_event pr2.pr_event
   && f_equal          pr1.pr_args pr2.pr_args
+  && opt_equal f_equal pr1.pr_qargs pr2.pr_qargs
 
 (* -------------------------------------------------------------------- *)
 let hf_hash hf =
@@ -451,7 +453,8 @@ let pr_hash pr =
   Why3.Hashcons.combine3
     (EcIdent.id_hash pr.pr_mem)
     (EcPath.x_hash   pr.pr_fun)
-    (f_hash          pr.pr_args)
+    (Why3.Hashcons.combine (f_hash pr.pr_args)
+                           (omap_dfl f_hash 0 pr.pr_qargs))
     (f_hash          pr.pr_event)
 
 
@@ -660,7 +663,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fpr pr ->
         let fve = Mid.remove mhr (f_fv pr.pr_event) in
         let fv  = EcPath.x_fv fve pr.pr_fun in
-        fv_union (f_fv pr.pr_args) (fv_add pr.pr_mem fv)
+        let fv = fv_union (f_fv pr.pr_args) (fv_add pr.pr_mem fv) in
+        ofold (fun f fv -> fv_union (f_fv f) fv) fv pr.pr_qargs
 
   let tag n f =
     let fv = fv_union (fv_node f.f_node) f.f_ty.ty_fv in
@@ -717,9 +721,10 @@ let f_app f args ty =
 (* -------------------------------------------------------------------- *)
 let f_local  x ty   = mk_form (Flocal x) ty
 let f_pvar   x ty m = mk_form (Fpvar(x, m)) ty
-let f_pvloc  v  m = f_pvar (pv_loc v.v_name) v.v_type m
+let f_pvloc  v  m = f_pvar (pv_loc v.v_quantum v.v_name) v.v_type m
 
-let f_pvarg  ty m = f_pvar pv_arg ty m
+let f_pvarg  ty m = f_pvar pv_arg  ty m
+let f_pvqarg ty m = f_pvar pv_qarg ty m
 
 let f_pvlocs vs menv = List.map (fun v -> f_pvloc v menv) vs
 let f_glob   mp m   = mk_form (Fglob (mp, m)) (tglob mp)
@@ -882,8 +887,8 @@ let f_coe coe_pre coe_mem coe_e = f_coe_r { coe_pre; coe_mem; coe_e; }
 (* -------------------------------------------------------------------- *)
 let f_pr_r pr = mk_form (Fpr pr) treal
 
-let f_pr pr_mem pr_fun pr_args pr_event =
-  f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
+let f_pr pr_mem pr_fun pr_args pr_qargs pr_event =
+  f_pr_r { pr_mem; pr_fun; pr_args; pr_qargs; pr_event; }
 
 (* -------------------------------------------------------------------- *)
 let fop_int_opp   = f_op EcCoreLib.CI_Int.p_int_opp [] (toarrow [tint]       tint)
@@ -1191,9 +1196,10 @@ let f_map gt g fp =
 
   | Fpr pr ->
       let args' = g pr.pr_args in
+      let qargs' = OSmart.omap g pr.pr_qargs in
       let ev'   = g pr.pr_event in
         FSmart.f_pr (fp, pr)
-          { pr with pr_args = args'; pr_event = ev'; }
+          { pr with pr_args = args'; pr_qargs = qargs'; pr_event = ev'; }
 
 (* -------------------------------------------------------------------- *)
 let f_iter g f =
@@ -1222,7 +1228,7 @@ let f_iter g f =
   | FequivS   es  -> g es.es_pr; g es.es_po
   | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
   | Fcoe      coe -> g coe.coe_pre;
-  | Fpr       pr  -> g pr.pr_args; g pr.pr_event
+  | Fpr       pr  -> g pr.pr_args; oiter g pr.pr_qargs; g pr.pr_event
 
 (* -------------------------------------------------------------------- *)
 let form_exists g f =
@@ -1251,7 +1257,7 @@ let form_exists g f =
   | FequivS   es  -> g es.es_pr    || g es.es_po
   | FeagerF   eg  -> g eg.eg_pr    || g eg.eg_po
   | Fcoe      coe -> g coe.coe_pre
-  | Fpr       pr  -> g pr.pr_args  || g pr.pr_event
+  | Fpr       pr  -> g pr.pr_args || omap_dfl g false pr.pr_qargs || g pr.pr_event
 
 (* -------------------------------------------------------------------- *)
 let form_forall g f =
@@ -1280,7 +1286,7 @@ let form_forall g f =
   | FequivS   es  -> g es.es_pr   && g es.es_po
   | FeagerF   eg  -> g eg.eg_pr   && g eg.eg_po
   | Fcoe      coe -> g coe.coe_pre
-  | Fpr       pr  -> g pr.pr_args && g pr.pr_event
+  | Fpr       pr  -> g pr.pr_args && omap_dfl g true pr.pr_qargs && g pr.pr_event
 
 (* -------------------------------------------------------------------- *)
 let f_ops f =
@@ -2031,9 +2037,10 @@ module Fsubst = struct
       let pr_mem   = Mid.find_def pr.pr_mem pr.pr_mem s.fs_mem in
       let pr_fun   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp pr.pr_fun in
       let pr_args  = f_subst ~tx s pr.pr_args in
+      let pr_qargs = OSmart.omap (f_subst ~tx s) pr.pr_qargs in
       let pr_event = f_subst ~tx s pr.pr_event in
 
-      FSmart.f_pr (fp, pr) { pr_mem; pr_fun; pr_args; pr_event; }
+      FSmart.f_pr (fp, pr) { pr_mem; pr_fun; pr_args; pr_qargs; pr_event; }
 
     | _ ->
       f_map s.fs_ty (f_subst ~tx s) fp)

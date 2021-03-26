@@ -463,7 +463,7 @@ let pp_funname (ppe : PPEnv.t) fmt p =
 (* -------------------------------------------------------------------- *)
 let msymbol_of_pv (ppe : PPEnv.t) p =
   match p with
-  | PVloc name -> [(name,[])]
+  | PVloc (_, name) -> [(name,[])]
 
   | PVglob xp ->
     let mem =
@@ -501,14 +501,15 @@ exception NoProjArg
 let get_projarg_for_var ppe x i =
   let m = oget ~exn:NoProjArg (EcEnv.Memory.current ppe.PPEnv.ppe_env) in
   if is_glob x then raise NoProjArg;
-  oget ~exn:NoProjArg (EcMemory.get_name (get_loc x) (Some i) m)
+  let q,s = get_qloc x in
+  q, oget ~exn:NoProjArg (EcMemory.get_name (q,s) (Some i) m)
 
 let get_f_projarg ppe e i ty =
   match e.f_node with
   | Fpvar (x, m) ->
     let ppe = PPEnv.enter_by_memid ppe m in
-    let s = get_projarg_for_var ppe x i in
-    f_pvar (pv_loc s) ty m
+    let q, s = get_projarg_for_var ppe x i in
+    f_pvar (pv_loc q s) ty m
   | _ -> raise NoProjArg
 
 (* -------------------------------------------------------------------- *)
@@ -719,22 +720,25 @@ let pp_mem (ppe : PPEnv.t) fmt x =
 let pp_memtype ppe fmt mt =
   match EcMemory.for_printing mt with
   | None -> ()
-  | Some (arg, decl) ->
-    match arg with
-    | Some arg ->
-      let pp_vd fmt v =
-        Format.fprintf fmt "@[%s: %a@]" v.v_name (pp_type ppe) v.v_type in
-      Format.fprintf fmt "@[{%s: {@[%a@]}}@]" arg (pp_list ",@ " pp_vd) decl
-    | None ->
-      let add mty v =
-        let ids = Mty.find_def [] v.v_type mty in
-        Mty.add v.v_type (v.v_name::ids) mty in
-      let mty = List.fold_left add Mty.empty decl in
-      let pp_bind fmt (ty, ids) =
-        Format.fprintf fmt "@[%a :@ %a@]"
-          (pp_list ",@ " (fun fmt s -> Format.fprintf fmt "%s" s)) (List.rev ids) (pp_type ppe) ty in
-      let lty = Mty.bindings mty in
-      Format.fprintf fmt "@[{%a}@]" (pp_list ",@ " pp_bind) lty
+  | Some (c,q) ->
+    let doit fmt (arg, decl) =
+      match arg with
+      | Some arg ->
+        let pp_vd fmt v =
+          Format.fprintf fmt "@[%s: %a@]" v.v_name (pp_type ppe) v.v_type in
+        Format.fprintf fmt "@[{%s: {@[%a@]}}@]" arg (pp_list ",@ " pp_vd) decl
+      | None ->
+        let add mty v =
+          let ids = Mty.find_def [] v.v_type mty in
+          Mty.add v.v_type (v.v_name::ids) mty in
+        let mty = List.fold_left add Mty.empty decl in
+        let pp_bind fmt (ty, ids) =
+          Format.fprintf fmt "@[%a :@ %a@]"
+            (pp_list ",@ " (fun fmt s -> Format.fprintf fmt "%s" s)) (List.rev ids) (pp_type ppe) ty in
+        let lty = Mty.bindings mty in
+        Format.fprintf fmt "@[{%a}@]" (pp_list ",@ " pp_bind) lty in
+    Format.fprintf fmt "@[%a@ %a@]" doit c (fun fmt -> oiter (Format.fprintf fmt "quantum%a" doit)) q
+
 
 (* -------------------------------------------------------------------- *)
 let pp_opname fmt (nm, op) =
@@ -1270,12 +1274,12 @@ and pp_proc_args ppe fmt (args, qarg) =
     Format.fprintf fmt "(@[<hov 0>%a@])"
       (pp_list ",@ " (pp_expr ppe)) args
   | [], Some qarg  ->
-    Format.fprintf fmt "|@[<hov 0>%a@]>"
-      (pp_list ",@ " (pp_expr ppe)) (decompose_etuple qarg)
+    Format.fprintf fmt "{@[<hov 0>%a@]}"
+      (pp_list ",@ " (pp_expr ppe)) qarg
   | _, Some qarg ->
-    Format.fprintf fmt "@[<hov 0>(@[<hov 0>%a@])@ |@[<hov 0>%a@]>@]"
+    Format.fprintf fmt "@[<hov 0>(@[<hov 0>%a@])@ {@[<hov 0>%a@]}@]"
       (pp_list ",@ " (pp_expr ppe)) args
-      (pp_list ",@ " (pp_expr ppe)) (decompose_etuple qarg)
+      (pp_list ",@ " (pp_expr ppe)) qarg
 
 (* -------------------------------------------------------------------- *)
 and pp_instr_for_form (ppe : PPEnv.t) fmt i =
@@ -1752,15 +1756,20 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       let me = EcEnv.Fun.prF_memenv EcFol.mhr pr.pr_fun ppe.PPEnv.ppe_env in
 
       let ppep = PPEnv.create_and_push_mem ppe ~active:true me in
-      Format.fprintf fmt "Pr[@[%a@[%t@] @@ %a :@ %a@]]"
+      let pp_args fmt arg =
+        match arg.f_node with
+        | Ftuple fs -> Format.fprintf fmt "@[%a@]" (pp_list ",@ " (pp_form ppe)) fs
+        | _ when EcFol.f_equal f_tt arg -> ()
+        | _ -> pp_form ppe fmt arg
+      in
+      let pp_qargs fmt = function
+        | None -> ()
+        | Some arg -> Format.fprintf fmt "@ {%a}" pp_args arg in
+
+      Format.fprintf fmt "Pr[@[%a@[(%a)%a@] @@ %a :@ %a@]]"
         (pp_funname ppe) pr.pr_fun
-        (match pr.pr_args.f_node with
-         | Ftuple _ ->
-             (fun fmt -> pp_form ppe fmt pr.pr_args)
-         | _ when EcFol.f_equal f_tt pr.pr_args ->
-             (fun fmt -> pp_string fmt "()")
-         | _ ->
-             (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) pr.pr_args))
+        pp_args pr.pr_args
+        pp_qargs pr.pr_qargs
         (pp_local ppe) pr.pr_mem
         (pp_form ppep) pr.pr_event
 
@@ -2374,7 +2383,7 @@ let pp_schema ?(long=false) (ppe : PPEnv.t) fmt (x, sc) =
 type ppnode1 = [
   | `Asgn     of (EcModules.lvalue * EcTypes.expr)
   | `Assert   of (EcTypes.expr)
-  | `Call     of (EcModules.lvalue option * P.xpath * EcTypes.expr list * EcTypes.expr option)
+  | `Call     of (EcModules.lvalue option * P.xpath * EcTypes.expr list * EcTypes.expr list option)
   | `Rnd      of (EcModules.lvalue * EcTypes.expr)
   | `Abstract of EcIdent.t
   | `If       of EcTypes.expr
@@ -3021,18 +3030,22 @@ let pp_pvdecl ppe fmt v =
   Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type
 
 let pp_funsig ppe fmt fs =
-  match fs.fs_anames with
-  | None ->
-    Format.fprintf fmt "@[<hov 2>%aproc %s (%a) :@ %a@]"
-      pp_quantum fs.fs_quantum
-      fs.fs_name (pp_type ppe) fs.fs_arg (pp_type ppe) fs.fs_ret
+  let pp_args fmt (ty, args) =
+    match args with
+    | None -> Format.fprintf fmt "_:%a" (pp_type ppe) ty
+    | Some params -> (pp_list ", " (pp_pvdecl ppe)) fmt params in
 
-  | Some params ->
-    Format.fprintf fmt "@[<hov 2>%aproc %s(%a) :@ %a@]"
-      pp_quantum fs.fs_quantum
-      fs.fs_name
-      (pp_list ", " (pp_pvdecl ppe)) params
-      (pp_type ppe) fs.fs_ret
+  let pp_qargs fmt () =
+    match fs.fs_qarg with
+    | None -> ()
+    | Some ty -> Format.fprintf fmt "@ {%a}" pp_args (ty, fs.fs_qnames) in
+
+  Format.fprintf fmt
+    "@[<hov 2>%aproc %s (%a)%a:@ %a@]"
+    pp_quantum (fs_quantum fs)
+    fs.fs_name pp_args (fs.fs_arg, fs.fs_anames)
+               pp_qargs ()
+               (pp_type ppe) fs.fs_ret
 
 let pp_sigitem moi_opt ppe fmt (Tys_function fs) =
   Format.fprintf fmt "@[<hov 2>%a@ %t@]"

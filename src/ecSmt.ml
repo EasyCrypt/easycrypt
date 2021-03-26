@@ -472,9 +472,10 @@ and trans_tydecl genv (p, tydecl) =
 let trans_memtype ((genv, _) as env) mt =
   match EcMemory.local_type mt with
   | None -> ty_mem
-  | Some ty ->
+  | Some (ty,qty) ->
     let ty = trans_ty env ty in
-    wty_tuple genv [ty; ty_mem]
+    let qty = trans_ty env (odfl tunit qty) in
+    wty_tuple genv [ty; qty; ty_mem]
 
 (* -------------------------------------------------------------------- *)
 exception CanNotTranslate
@@ -620,6 +621,8 @@ let kmatch =
   in
 
   fun k f -> try Some (List.rev (doit [] k f)) with E.MFailure -> None
+
+type vkind = [`Global | `Classical | `Quantum]
 
 (* -------------------------------------------------------------------- *)
 let rec trans_kpattern env (k, (ls, wth)) f =
@@ -828,15 +831,15 @@ and trans_pvar ((genv, lenv) as env) pv ty mem =
   let pv = NormMp.norm_pvar genv.te_env pv in
   let mt = get_memtype lenv mem in
   match pv with
-  | PVloc x ->
-    let m = trans_mem env ~forglobal:false mem in
+  | PVloc (q,x) ->
+    let m = trans_mem env ~forglobal:(q:>vkind) mem in
     begin match EcMemory.lookup x mt with
     | Some (_,_,Some i) -> wproj_tuple genv m i
     | Some (_,_,None)   -> m
     | None              -> assert false
     end
   | PVglob xp ->
-    let m =  trans_mem env ~forglobal:true mem in
+    let m =  trans_mem env ~forglobal:`Global mem in
     let ls =
       match Hx.find_opt genv.te_xpath xp with
       | Some ls -> ls
@@ -857,7 +860,7 @@ and trans_glob ((genv, _) as env) mp mem =
       assert (mp.EcPath.m_args = []);
 
       let id   = EcPath.mget_ident mp in
-      let wmem = trans_mem env ~forglobal:true mem in
+      let wmem = trans_mem env ~forglobal:`Global mem in
       let w3op =
         match Hid.find_opt genv.te_lc id with
         | Some w3op -> w3op
@@ -884,16 +887,18 @@ and trans_mem (genv,lenv) ~forglobal mem =
     | None -> WTerm.t_var (oget (Mid.find_opt mem lenv.le_lv)) in
   let mt = get_memtype lenv mem in
   let has_locals = EcMemory.has_locals mt in
-  if forglobal then
-    if has_locals then wsnd genv wmem
+  match forglobal with
+  | `Classical -> assert has_locals; wproj_tuple genv wmem 0
+  | `Quantum   -> assert has_locals; wproj_tuple genv wmem 1
+  | `Global    ->
+    if has_locals then wproj_tuple genv wmem 2
     else wmem
-  else
-    (assert has_locals; wfst genv wmem)
 
 (* -------------------------------------------------------------------- *)
-and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
-  let wmem = trans_mem env ~forglobal:true pr_mem in
+and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_qargs; pr_event} =
+  let wmem = trans_mem env ~forglobal:`Global pr_mem in
   let warg = trans_form_b env pr_args in
+  let wqarg = trans_form_b env (odfl f_tt pr_qargs) in
 
   (* Translate the procedure *)
   let xp = NormMp.norm_xfun genv.te_env pr_fun in
@@ -903,16 +908,17 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
   let ls =
     let trans () =
       let tya = oget warg.WTerm.t_ty in
+      let tyq = oget wqarg.WTerm.t_ty in
       let tyr = Some tyr in
       let pid = preid_xp xp in
-      let ls  = WTerm.create_lsymbol pid [tya; ty_mem] tyr in
+      let ls  = WTerm.create_lsymbol pid [tya; tyq; ty_mem] tyr in
       genv.te_task <- WTask.add_param_decl genv.te_task ls;
       Hx.add genv.te_xpath xp ls;
       ls
     in Hx.find_opt genv.te_xpath xp |> ofdfl trans
   in
 
-  let d = WTerm.t_app ls [warg; wmem] (Some tyr) in
+  let d = WTerm.t_app ls [warg; wqarg; wmem] (Some tyr) in
 
   let wev =
     let lenv, wbd = trans_binding genv lenv (mhr, GTmem mt) in
@@ -1393,7 +1399,7 @@ module Frequency = struct
 
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;
-        doit pr.pr_event; doit pr.pr_args in
+        doit pr.pr_event; doit pr.pr_args; oiter doit pr.pr_qargs in
     doit f;
     if not (Sx.is_empty !sf) then sp := Sp.add CI_Distr.p_mu !sp;
     !sp, !sf
@@ -1463,7 +1469,7 @@ module Frequency = struct
       | Fapp     (e, es)      -> List.iter add (e :: es)
       | Ftuple   es           -> List.iter add es
       | Fproj    (e, _)       -> add e
-      | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event;add pr.pr_args
+      | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event;add pr.pr_args; oiter add pr.pr_qargs
       | _ -> () in
     add form
 

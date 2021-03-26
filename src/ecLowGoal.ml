@@ -87,7 +87,7 @@ module LowApply = struct
           match v, v' with
           | LD_var (t1, f1), LD_var (t2, f2) ->
                 EqTest.for_type env t1 t2
-             && oeq (is_alpha_eq hyps) f1 f2
+             && opt_equal (is_alpha_eq hyps) f1 f2
 
           | LD_mem m1, LD_mem m2 ->
              EcMemory.mt_equal m1 m2

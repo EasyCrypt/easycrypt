@@ -112,7 +112,7 @@ type pinstr_r =
   | PSident  of psymbol
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
-  | PScall   of plvalue option * pgamepath * (pexpr list * pexpr option)
+  | PScall   of plvalue option * pgamepath * (pexpr list * pexpr list option)
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
   | PSmatch  of pexpr * psmatch
@@ -206,7 +206,7 @@ and pformula_r =
   | PFhoareF   of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
-  | PFprob     of pgamepath * (pformula list) * pmemory * pformula
+  | PFprob     of pgamepath * (pformula list) * (pformula list) option * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
   | PFChoareF  of pformula * pgamepath * pformula * pcost
   | PFChoareFT of pgamepath * pcost
@@ -214,7 +214,7 @@ and pformula_r =
   | PFWP       of pgamepath * pexpr list * pformula
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
-and pmemtype    = pmemtype_el list
+and pmemtype    = (quantum * pmemtype_el) list
 
 and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list
@@ -316,6 +316,7 @@ and pfunction_decl = {
   pfd_quantum  : quantum;
   pfd_name     : psymbol;
   pfd_tyargs   : fun_params;
+  pfd_qtyargs  : fun_params option;
   pfd_tyresult : pty;
   pfd_uses     : pmod_restr_el;
 }
@@ -353,7 +354,7 @@ and pstructure_item =
 
 
 and pfunction_body = {
-  pfb_locals : pfunction_local list;
+  pfb_locals : (quantum * pfunction_local) list;
   pfb_body   : pstmt;
   pfb_return : pexpr option;
 }

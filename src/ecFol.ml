@@ -20,34 +20,42 @@ module CI = EcCoreLib
 include EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
-  let f_pvlocs ty vs m =
-    let arg = f_pvarg ty m in
-    if List.length vs = 1 then [arg]
-    else
-      let t = Array.of_list vs in
-      let t = Array.mapi (fun i vd -> f_proj arg i vd.v_type) t in
-      Array.to_list t
-  in
+let f_eqparams sig1 m1 sig2 m2 =
+  let doit f_pvarg ty1 vs1 ty2 vs2 =
+    let f_pvlocs ty vs m =
+      let arg = f_pvarg ty m in
+      if List.length vs = 1 then [arg]
+      else
+        let t = Array.of_list vs in
+        let t = Array.mapi (fun i vd -> f_proj arg i vd.v_type) t in
+        Array.to_list t
+    in
 
-  match vs1, vs2 with
-  | Some vs1, Some vs2 ->
+    match vs1, vs2 with
+    | Some vs1, Some vs2 ->
       if   List.length vs1 = List.length vs2
       then f_eqs (f_pvlocs ty1 vs1 m1) (f_pvlocs ty2 vs2 m2)
       else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
                  (f_tuple (f_pvlocs ty2 vs2 m2))
 
-  | Some vs1, None ->
+    | Some vs1, None ->
       f_eq (f_tuple (f_pvlocs ty1 vs1 m1)) (f_pvarg ty2 m2)
 
-  | None, Some vs2 ->
+    | None, Some vs2 ->
       f_eq (f_pvarg ty1 m1) (f_tuple (f_pvlocs ty2 vs2 m2))
 
-  | None, None ->
-      f_eq (f_pvarg ty1 m1) (f_pvarg ty2 m2)
+    | None, None ->
+      f_eq (f_pvarg ty1 m1) (f_pvarg ty2 m2) in
+  let open EcCoreModules in
+  let eqa = doit f_pvarg sig1.fs_arg sig1.fs_anames sig2.fs_arg sig2.fs_anames in
+  match sig1.fs_qarg, sig2.fs_qarg with
+  | None, None -> eqa
+  | Some ty1, Some ty2 -> f_and eqa (doit f_pvqarg ty1 sig2.fs_qnames ty2 sig2.fs_qnames)
+  | _, _ -> assert false
 
-let f_eqres ty1 m1 ty2 m2 =
-  f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
+
+let f_eqres quantum ty1 m1 ty2 m2 =
+  f_eq (f_pvar (pv_res quantum) ty1 m1) (f_pvar (pv_res quantum) ty2 m2)
 
 let f_eqglob mp1 m1 mp2 m2 =
   f_eq (f_glob mp1 m1) (f_glob mp2 m2)
@@ -983,3 +991,25 @@ let destr_ands ~deep =
     with DestrError _ -> [f]
 
   in fun f -> doit f
+
+(* -------------------------------------------------------------------- *)
+
+let is_classical_glob env mp = not (EcEnv.NormMp.use_quantum env mp)
+
+let rec is_classical env f =
+  match f.f_node with
+  | Fquant (_,_,f) | Fproj(f,_) -> is_classical env f
+  | Fif (f1,f2,f3) -> is_classical env f1 && is_classical env f2 && is_classical env f3
+  | Flet (_,f1,f2) -> is_classical env f1 && is_classical env f2
+  | Fmatch (f,fs,_) | Fapp(f,fs) -> List.for_all (is_classical env) (f::fs)
+  | Ftuple fs -> List.for_all (is_classical env) fs
+  | Fglob   (mp,_) -> is_classical_glob env mp
+  | Fint _ | Flocal _ | Fop _ -> true
+  | Fpvar (PVglob _, _) -> true
+  | Fpvar (PVloc(q,_), _) -> q = `Classical
+  (* FIXME quantum : what to do here ? *)
+  | FhoareF _ | FhoareS _
+  | FcHoareF _ | FcHoareS _
+  | FbdHoareF _ | FbdHoareS _
+  | FequivF _ | FequivS _
+  | FeagerF _  | Fcoe _ | Fpr _ -> assert false

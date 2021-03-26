@@ -70,7 +70,7 @@ type instr = {
 and instr_node =
   | Sasgn     of lvalue * EcTypes.expr
   | Srnd      of lvalue * EcTypes.expr
-  | Scall     of lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr option (* classical args, quantum args *)
+  | Scall     of lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr list option (* classical args, quantum args *)
   | Sif       of EcTypes.expr * stmt * stmt
   | Swhile    of EcTypes.expr * stmt
   | Smatch    of expr * ((EcIdent.t * EcTypes.ty) list * stmt) list
@@ -111,7 +111,7 @@ module Hinstr = Why3.Hashcons.Make (struct
            (EcUtils.opt_equal lv_equal lv1 lv2)
         && (EcPath.x_equal f1 f2)
         && (List.all2 EcTypes.e_equal es1  es2)
-        && (oeq EcTypes.e_equal qe1 qe2)
+        && (opt_equal (List.all2 EcTypes.e_equal) qe1 qe2)
 
     | Sif (c1, s1, r1), Sif (c2, s2, r2) ->
            (EcTypes.e_equal c1 c2)
@@ -154,7 +154,8 @@ module Hinstr = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine
           (Hashtbl.hash lv) (EcPath.x_hash f) in
       let hash =
-        ofold (fun e h -> Why3.Hashcons.combine (EcTypes.e_hash e) h)
+        ofold (fun es hash ->
+            Why3.Hashcons.combine_list EcTypes.e_hash hash es)
           hash qe in
       Why3.Hashcons.combine_list EcTypes.e_hash hash es
 
@@ -187,11 +188,11 @@ module Hinstr = Why3.Hashcons.Make (struct
         let ffv = EcPath.x_fv Mid.empty f in
         let ofv = olv |> omap lv_fv |> odfl Mid.empty in
         let fv = EcIdent.fv_union ffv ofv in
-        let fv =
-          ofold (fun e fv -> EcIdent.fv_union (EcTypes.e_fv e) fv) fv qarg in
-        List.fold_left
-          (fun s a -> EcIdent.fv_union s (EcTypes.e_fv a))
-          fv args
+        let doit es fv =
+          List.fold_left (fun s a -> EcIdent.fv_union s (EcTypes.e_fv a))
+            fv es in
+        let fv = ofold doit fv qarg in
+        doit args fv
 
     | Sif (e, s1, s2) ->
         List.fold_left EcIdent.fv_union Mid.empty
@@ -338,7 +339,7 @@ module ISmart : sig
 
   type i_asgn     = lvalue * EcTypes.expr
   type i_rnd      = lvalue * EcTypes.expr
-  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr option
+  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr list option
   type i_if       = EcTypes.expr * stmt * stmt
   type i_while    = EcTypes.expr * stmt
   type i_match    = EcTypes.expr * ((EcIdent.t * ty) list * stmt) list
@@ -361,7 +362,7 @@ end = struct
 
   type i_asgn     = lvalue * EcTypes.expr
   type i_rnd      = lvalue * EcTypes.expr
-  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr option
+  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list * EcTypes.expr list option
   type i_if       = EcTypes.expr * stmt * stmt
   type i_while    = EcTypes.expr * stmt
   type i_match    = EcTypes.expr * ((EcIdent.t * ty) list * stmt) list
@@ -440,7 +441,7 @@ let rec s_subst_top (s : EcTypes.e_subst) =
         let olv'  = olv |> OSmart.omap lv_subst in
         let mp'   = s.EcTypes.es_xp mp in
         let args' = List.Smart.map e_subst args in
-        let qarg' = omap e_subst qarg in
+        let qarg' = OSmart.omap (List.Smart.map e_subst) qarg in
 
         ISmart.i_call (i, (olv, mp, args, qarg)) (olv', mp', args', qarg')
 
@@ -479,7 +480,7 @@ module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
     let rec e_pv sid e =
       match e.e_node with
       | Evar (PVglob _) -> sid
-      | Evar (PVloc id) -> Ssym.add id sid
+      | Evar (PVloc(_,id)) -> Ssym.add id sid
       | _               -> e_fold e_pv sid e in
 
     e_pv Ssym.empty e
@@ -487,7 +488,7 @@ end
 
 let rec lv_get_uninit_read (w : Ssym.t) (lv : lvalue) =
   let sx_of_pv pv = match pv with
-    | PVloc v -> Ssym.singleton v
+    | PVloc (_,v) -> Ssym.singleton v
     | PVglob _ -> Ssym.empty
   in
 
@@ -514,8 +515,9 @@ and i_get_uninit_read (w : Ssym.t) (i : instr) =
       (Ssym.union w w2, r1)
 
   | Scall (olv, _, args, qarg) ->
-      let r = Ssym.big_union (List.map Uninit.e_pv args) in
-      let qr = omap_dfl Uninit.e_pv Ssym.empty qarg in
+      let doit es = Ssym.big_union (List.map Uninit.e_pv es) in
+      let r = doit args in
+      let qr = omap_dfl doit Ssym.empty qarg in
       let r1 = Ssym.diff (Ssym.union r qr) w in
       let w = olv |> omap (lv_get_uninit_read w) |> odfl w in
       (w, r1)
@@ -719,19 +721,24 @@ type quantum = [`Quantum | `Classical]
 (* -------------------------------------------------------------------- *)
 
 type funsig = {
-  fs_quantum: quantum;
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
-  fs_anames : variable list option;
+  fs_qarg   : EcTypes.ty option;
+  fs_anames : variable list option; (* only classical variables *)
+  fs_qnames: variable list option; (* only quantum variables *)
   fs_ret    : EcTypes.ty;
 }
 
 let fs_equal f1 f2 =
     (EcUtils.opt_equal (List.all2 EcTypes.v_equal) f1.fs_anames f2.fs_anames)
+    && (EcUtils.opt_equal (List.all2 EcTypes.v_equal) f1.fs_qnames f2.fs_qnames)
     && (EcTypes.ty_equal f1.fs_ret f2.fs_ret)
     && (EcTypes.ty_equal f1.fs_arg f2.fs_arg)
+    && (EcUtils.opt_equal EcTypes.ty_equal f1.fs_qarg f2.fs_qarg)
     && (EcSymbols.sym_equal f1.fs_name f2.fs_name)
 
+let fs_quantum f = if f.fs_qarg = None then `Classical else `Quantum
+let pv_res f = pv_res (fs_quantum f)
 (* -------------------------------------------------------------------- *)
 type 'a p_module_type = {
   mt_quantum: quantum;
@@ -902,8 +909,9 @@ let get_uninit_read_of_fun (f : _ p_function_) =
   | FBdef fd ->
       let w =
         let toloc { v_name = x } = x in
-        let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
-        Ssym.of_list w
+        let doit l s = List.fold_left (fun s x -> Ssym.add (toloc x) s) s l in
+        let w = ofold doit Ssym.empty f.f_sig.fs_anames in
+        ofold doit w f.f_sig.fs_qnames
       in
 
       let w, r  = s_get_uninit_read w fd.f_body in
