@@ -50,7 +50,7 @@ qed.
 equiv D6_Sample: D6.sample ~ D4_6.SampleWi.sample: r{2} = 5 ==> ={res}.
 proof.
 proc=> /=; while (={r}).
-+ by rnd; auto=> /> &2 _ + r; rewrite supp_dinter /#.
++ by rnd; auto=> /> &2 _ _ r; rewrite supp_dinter /#.
 by auto.
 qed.
 
