@@ -1,0 +1,78 @@
+(* require import Distr. *)
+require import AllCore List Distr DBool CHoareTactic.
+(*   *) import StdOrder RField RealOrder StdBigop Bigreal.
+
+
+type msg.
+
+type out.
+op [lossless uniform full] dout : out distr.
+
+
+clone import MUniFinFun as MUFF with type t <- msg.
+
+op df : (msg -> out) distr = dfun (fun _ => dout).
+
+module type QROi = {
+  proc init () : unit
+  quantum proc h() : msg -> out
+}.
+
+(* This is the module type the adversary has access to *)
+module type QRO = {
+  include QROi [h]
+}.
+
+module RO : QROi = {
+  var h : msg -> out
+  proc init() = { h <$ df; }
+  quantum proc h() = { return h; }
+}.
+
+
+type key.
+op [lossless uniform full] dkey : key distr.
+op F : key -> msg -> out.
+
+module PRF : QROi = {
+  var k : key
+  proc init() = { k <$ dkey; }
+  quantum proc h() = { return F k; } 
+}.
+
+(*
+op G : key -> key * key.
+
+module GGM : QROi = {
+  var k : key
+  proc init() = { k <$ dkey; }
+  quantum proc h() = { return F k; } 
+}.
+*)
+
+abstract theory TQPRF.
+
+quantum module type AdvPRF(H : QRO) = {
+  proc main() : bool
+}.
+
+
+module IND (H: QROi, A : AdvPRF) = {
+
+  proc main() : bool = {
+  var b;
+
+  H.init();
+  b <@ A(H).main();
+  return b;
+  }
+}.
+
+
+axiom advantage q (A <: AdvPRF[main: `{Inf, #H.h : q}]) &m:
+`| Pr[IND(PRF, A).main() @ &m : res] - Pr[IND(RO, A).main() @ &m : res] | <= q.
+
+end TQPRF.
+
+
+
