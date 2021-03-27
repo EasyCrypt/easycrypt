@@ -97,4 +97,35 @@ axiom advantage q lam (A<:AdvSCD{-SCD}[main : `{Inf, #H.h : q}]) &m (P:event):
 
 end SemiConstDistr.
 
+quantum module type AdvRO (H:QRO) = {
+  proc main() : bool
+}.
+
+module IND_QRO (H:QRO_i, A:AdvRO) = {
+  proc main() : bool = {
+    var b;
+
+    H.init();
+    b <@ A(H).main();
+    return b;
+  }
+}.
+
+abstract theory T_PRF.
+
+type key.
+op dkey : key distr.
+op F : key -> from -> hash.
+
+module PRF : QRO_i = {
+  var k : key
+  proc init() = { k <$ dkey; }
+  quantum proc h{x:from} = { return F k x; } 
+}.
+
+(* The prf advantage is defined by: 
+  `| Pr[IND_QRO(PRF, A).main() @ &m : res] - Pr[IND_QRO(QRO, A).main() @ &m : res] |
+*)
+
+end T_PRF.
 
