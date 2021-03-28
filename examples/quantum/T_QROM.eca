@@ -129,3 +129,23 @@ module PRF : QRO_i = {
 
 end T_PRF.
 
+abstract theory T_OracleSecurePRG.
+
+type mid.
+
+op G : mid -> hash.
+op [lossless uniform full] dF : (from -> mid) distr.
+
+(* G is an oracle-secure PRG if (G ∘ F) is a PRF for random F. *)
+module PRF : QRO_i = {
+  var f : from -> mid
+  proc init() = { f <$ dF; }
+  quantum proc h {x : from} = { return G (f x); }
+}.
+
+(*
+axiom advantage q (A <: AdvRO[main: `{Inf, #H.h : q}]) &m:
+`| Pr[IND_QRO(PRF, A).main() @ &m : res] - Pr[IND_QRO(QRO, A).main() @ &m : res] | <= negl.
+*)
+
+end T_OracleSecurePRG.
