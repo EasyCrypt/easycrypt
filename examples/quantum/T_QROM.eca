@@ -129,23 +129,80 @@ module PRF : QRO_i = {
 
 end T_PRF.
 
+type seed.
+
+op [lossless uniform full] dF : (from -> seed) distr.
+op G : seed -> hash.
+
 abstract theory T_OracleSecurePRG.
-
-type mid.
-
-op G : mid -> hash.
-op [lossless uniform full] dF : (from -> mid) distr.
 
 (* G is an oracle-secure PRG if (G ∘ F) is a PRF for random F. *)
 module PRF : QRO_i = {
-  var f : from -> mid
+  var f : from -> seed
   proc init() = { f <$ dF; }
   quantum proc h {x : from} = { return G (f x); }
 }.
 
-(*
+(* G is oracle-secure if for polynomial q,
 axiom advantage q (A <: AdvRO[main: `{Inf, #H.h : q}]) &m:
 `| Pr[IND_QRO(PRF, A).main() @ &m : res] - Pr[IND_QRO(QRO, A).main() @ &m : res] | <= negl.
 *)
 
 end T_OracleSecurePRG.
+
+op [lossless uniform full] dseed : seed distr.
+
+abstract theory T_StandardSecurePRG.
+
+(* random number generation *)
+module type RGi = {
+  proc init() : unit
+  proc sample() : hash
+}.
+
+module type RG = {
+  include RGi [sample]
+}.
+
+(* adversary *)
+quantum module type AdvPRG (G : RG) = {
+  proc main() : bool
+}.
+
+module IND_PRG(G : RGi, D : AdvPRG) = {
+  proc main() : bool = {
+    var b;
+    G.init();
+    b <@ D(G).main();
+    return b;
+  }
+}.
+
+module PRG : RGi = {
+  var s : seed
+  proc init() = {
+    s <$ dseed;
+  }
+  proc sample() = {
+    return G s;
+  }
+}.
+
+module RG : RGi = {
+  var r : hash
+  proc init() = {
+    r <$ dhash;
+  }
+  proc sample() = {
+    return r;
+  }
+}.
+
+(* G is standard-secure if for polynomial q,
+axiom advantage q (A <: AdvPRG[main: `{Inf, #G.sample : q}]) &m:
+`| Pr[IND_PRG(PRG, A).main() @ &m : res] - Pr[IND_PRG(RG, A).main() @ &m : res] | <= negl.
+*)
+
+end T_StandardSecurePRG.
+
+(* TODO: if G is standard-secure, then it is also oracle-secure. *)
