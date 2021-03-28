@@ -34,7 +34,7 @@ module EUF_M(A:AdvEUF_M) (O:Sign) = {
   }
 
   proc main() = {
-    var pk, b, ms, l, c, m, s;
+    var b, ms, l, c, m, s;
     sk <@ O.kg();
     ms <@ A(Os).main();
     b <- true;
