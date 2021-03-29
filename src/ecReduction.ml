@@ -494,6 +494,7 @@ let reduce_local ri hyps x  =
   else raise nohead
 
 let reduce_op ri env p tys =
+  Format.eprintf "%s@." (EcPath.tostring p);
   if ri.delta_p p <> `No then
     try
       Op.reduce ~force:(ri.delta_p p = `Force) env p tys
