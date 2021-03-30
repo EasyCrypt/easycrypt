@@ -44,6 +44,22 @@ lemma mulxC : commutative xmul.
 proof. by case=> [x|] [y|] => //=; rewrite mulrC. qed.
 
 (* -------------------------------------------------------------------- *)
+
+lemma xaddInfx (x:xint) : Inf + x = Inf.
+proof. by case: x. qed.
+
+lemma xaddxInf (x:xint) : x + Inf = Inf.
+proof. by case: x. qed.
+
+lemma xmulInfx (x:xint) : Inf * x = Inf.
+proof. by case: x. qed.
+
+lemma xmulxInf (x:xint) : x * Inf = Inf.
+proof. by case: x. qed.
+
+hint simplify xaddInfx, xaddxInf, xmulInfx, xmulxInf.
+
+(* -------------------------------------------------------------------- *)
 op xle (x y : xint) =
   with x = N x, y = N y => (x <= y)
   with x = N x, y = Inf => true
