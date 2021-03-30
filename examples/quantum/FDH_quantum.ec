@@ -245,8 +245,8 @@ proof.
   proc; inline *; wp.
   call (: ={QRO.h, sk, log}).
   + by proc; inline *; auto.
-  + by sim. 
-  by auto; rnd{2}; auto => />.
+  + by sim.
+  swap{2} 3 1; auto; rnd{2}; do 3! rnd; skip => />.
 qed.
 
 local lemma l4 &m : 
@@ -264,7 +264,6 @@ proof.
       (ASCD(H).Os.sign : [Inf; H.h: 1])]).
   + move=> kh ks *; proc.
     call(:true); auto => /=.
-    (* FIXME Adrien: pourquoi -1 *)
     (* FIXME benjamin: add rewrite rule for inf *)
     case: (cost(_: {m : msg, hm : hash})[true : finv sk hm]) => //.
   + move=> kh ks *. 
@@ -295,7 +294,7 @@ proof.
   + by proc; inline *; auto => />; smt(finv_f). 
   + by move=> *; proc; inline *; auto => /> /#.
   + by move=> *; proc; inline *; auto => /> /#.
-  + by proc; inline *; auto => /> /#.
+  + proc; inline *; auto => /> /#.
   + by move=> *; proc; inline *; auto => /> /#.
   + by move=> *; proc; inline *; auto => /> /#.
   swap{1}5 -4. swap{1} 4 -2; wp.
