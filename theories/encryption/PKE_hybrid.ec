@@ -186,7 +186,7 @@ section.
            S.enc  : H.q].
   proof.
     proc (H.Count.c = k) :
-         time [ (OrclL(ToOrcl(S)).orcl k : [N (cincr H.q); S.enc : 1]) ] => //.
+         time [ OrclL(ToOrcl(S)).orcl k : [N (cincr H.q); S.enc : 1] ] => //.
     + by move => />; rewrite !bigi_constz 1..2:[smt (H.q_pos)].
     move=> zo hzo; proc; inline *. 
     wp := (`|H.Count.c| <= H.q); call (: true); auto => &hr />.
@@ -203,7 +203,7 @@ section.
            S.enc  : H.q].
   proof.
     proc (H.Count.c = k) : time
-         [ (OrclR(ToOrcl(S)).orcl k : [N (cincr H.q); S.enc : 1]) ] => //.
+         [ OrclR(ToOrcl(S)).orcl k : [N (cincr H.q); S.enc : 1] ] => //.
     + by move => />; rewrite !bigi_constz 1..2:[smt (H.q_pos)].
     move=> zo hzo; proc; inline *; wp; call(:true); wp:=(`|H.Count.c| <= H.q); skip => &hr />.
     smt(cs_pos).
@@ -221,7 +221,7 @@ section.
     proc 
       (H.HybOrcl.l = k /\ 0 <= H.HybOrcl.l0 <= H.q /\ H.Count.c = if H.HybOrcl.l <= H.HybOrcl.l0 then 0 else 1):
       time
-      [ (HybOrcl2(ToOrcl(S), OrclL(ToOrcl(S))).orcl k : [N(cincr H.q + cincr 1 + cltint H.q + ceqint H.q); S.enc : 1]) ] => //=.
+      [ HybOrcl2(ToOrcl(S), OrclL(ToOrcl(S))).orcl k : [N(cincr H.q + cincr 1 + cltint H.q + ceqint H.q); S.enc : 1] ] => //=.
     + by rewrite !bigi_constz 1,2:[smt(H.q_pos)].
     + by move=> &hr /> ->.
     + by move=> /> /#.
@@ -250,7 +250,7 @@ section.
   proof.
     proc 
       (H.HybOrcl.l = k /\ 0 <= H.HybOrcl.l0 <= H.q /\ H.Count.c = if H.HybOrcl.l <= H.HybOrcl.l0 then 0 else 1): time
-      [ (HybOrcl2(ToOrcl(S), OrclR(ToOrcl(S))).orcl k : [N (cincr H.q + cincr 1 + cltint H.q + ceqint H.q); S.enc : 1]) ] => //=.
+      [ HybOrcl2(ToOrcl(S), OrclR(ToOrcl(S))).orcl k : [N (cincr H.q + cincr 1 + cltint H.q + ceqint H.q); S.enc : 1] ] => //=.
     + by rewrite !bigi_constz 1,2:[smt(H.q_pos)].
     + by move=> &hr /> ->.
     + by move=> /> /#.
@@ -406,8 +406,8 @@ section.
       smt (DInterval.supp_dinter DInterval.dinter_ll H.q_pos).
     exlim H.HybOrcl.l0 => l0. 
     call (: (H.HybOrcl.l = k /\ 0 <= H.HybOrcl.l0 <= H.q /\ l0 = H.HybOrcl.l0); time 
-      [ (HybOrcl2(ToOrcl(S), MLR).orcl k : [N (cincr H.q + ceqint H.q + cltint H.q); 
-                                             S.enc : b2i (k <> l0); MLR.orcl : b2i(k=l0)]) ]) => //=.
+      [ HybOrcl2(ToOrcl(S), MLR).orcl k : [N (cincr H.q + ceqint H.q + cltint H.q); 
+                                             S.enc : b2i (k <> l0); MLR.orcl : b2i(k=l0)] ]) => //=.
     + move=> zo hzo; proc; inline *; wp := (`|H.HybOrcl.l| <= H.q).
       if := (`|H.HybOrcl.l0| <= H.q /\ `|H.HybOrcl.l| <= H.q) => //; 1: smt().
       + by wp; call (:true; time []); auto => &hr />; smt (ge0_ceqint). 

@@ -2665,8 +2665,9 @@ conseq_xt:
 | c=conseq   COLON TIME co=costs(none)         { c, Some (CQI_c co) }
 | UNDERSCORE COLON TIME co=costs(none)         { (None, None), Some (CQI_c co) }
 
+
 ci_cost_el:
-| LPAREN o=loc(fident) x=ident? COLON co=costs(none) RPAREN   {o, x, co}
+| o=loc(fident) x=ident? COLON co=costs(none) {o, x, co}
 
 abs_call_info:
 | TIME LBRACKET xc=rlist0(ci_cost_el, COMMA) RBRACKET { xc }

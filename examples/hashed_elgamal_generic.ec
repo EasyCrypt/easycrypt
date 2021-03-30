@@ -194,12 +194,12 @@ section.
     proc; wp.
     call (_: size H.qs- cA.`ochoose <= k /\ bounded LRO.m (size H.qs);
            time
-           [(H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)])]).
+           [H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)]]).
     + move=> zo hzo; proc; inline *.
       wp := (bounded LRO.m qH).
       by rnd; auto => &hr />; rewrite dbits_ll /=; smt (cset_pos bounded_set).
     wp; rnd; call (_: size H.qs = k /\ bounded LRO.m (size H.qs);
-           time [(H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)])]).
+           time [H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)]]).
     + move=> zo hzo; proc; inline *.
       wp := (bounded LRO.m qH).
       rnd;auto => &hr />; rewrite dbits_ll /=; smt(cset_pos bounded_set cA_pos).
