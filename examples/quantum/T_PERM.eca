@@ -6,7 +6,7 @@ type skey.
 type dom. 
 type codom. 
 
-op kg : (pkey * skey) distr.
+op [lossless] kg : (pkey * skey) distr.
 
 abstract theory PERM.
 

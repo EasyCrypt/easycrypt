@@ -15,7 +15,6 @@ clone include T_PERM with
    type dom   <- sign,
    type codom <- hash.
 
-
 (* --------------------------------------------------------------------------- *)
 (* Security definition of existencial unforgeability in the QROM  *)
 
@@ -263,18 +262,11 @@ proof.
      [(H.h : [N kH]),
       (ASCD(H).Os.sign : [Inf; H.h: 1])]).
   + move=> kh ks *; proc.
-    call(:true); auto => /=.
-    (* FIXME benjamin: add rewrite rule for inf *)
-    case: (cost(_: {m : msg, hm : hash})[true : finv sk hm]) => //.
+    by call(:true); auto.  
   + move=> kh ks *. 
     (* FIXME Adrien: time [] optionel ? *)
     by proc (true) : time [ ].
-  + move=> /=.
-    by case: (cost(_: {b:bool, s:sign, hm:hash})[true : hm = f pk s]).
-  wp; rnd => //=.
-  + admit.
-  (* FIXME Adrien: pourquoi is_lossless ? *)
-  admit.
+  by wp; rnd; skip => />; apply kg_ll.
 qed.
 
 local lemma l5 &m :
