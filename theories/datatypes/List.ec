@@ -2334,6 +2334,15 @@ lemma mask_cat m1 m2 s1 s2 : size m1 = size s1 =>
   mask<:'a> (m1 ++ m2) (s1 ++ s2) = mask m1 s1 ++ mask m2 s2.
 proof. by move: m1 s1; apply/seq2_ind=> //= -[]. qed.
 
+lemma all_mask a m s : all a s => all a (mask<:'a> m s).
+proof. by elim: s m => [|x s ih] [|[] m] //= [ax /ih->]. qed.
+
+lemma has_mask a m s : has a (mask<:'a> m s) => has a s.
+proof. apply: contraLR; rewrite -!all_predC &(all_mask). qed.
+
+lemma mem_mask x m s : x \in mask<:'a> m s => x \in s.
+proof. by rewrite -!has_pred1 => /has_mask. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                             Subseq                                   *)
 (* -------------------------------------------------------------------- *)
@@ -2440,6 +2449,10 @@ elim: s2 s1 => [|y s2 ih] [|x s1] //=.
 + by rewrite addz_ge0 ?(count_ge0, b2i_ge0).
 + by case: (y = x) => [-> /ih|? /ih] /#.
 qed.
+
+lemma subseq_mem ['a] (xs ys : 'a list) x:
+  subseq xs ys => x \in xs => x \in ys.
+proof. by case/subseqP=> m [_ ->]; apply: mem_mask. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)
@@ -2897,3 +2910,43 @@ lemma lex_total (e : 'a -> 'a -> bool):
      (forall x y, e x y \/ e y x)
   => (forall s1 s2, lex e s1 s2 \/ lex e s2 s1).
 proof. by move=> h; elim=> [|x1 s1 IHs1] [|x2 s2] //=; smt. qed.
+
+(* -------------------------------------------------------------------- *)
+op subseqs ['a] (xs : 'a list) : 'a list list =
+  with xs = [] => [[]]
+  with xs = y :: ys => map ((::) y) (subseqs ys) ++ subseqs ys.
+
+lemma inj_cons ['a] (x : 'a) : injective ((::) x).
+proof. by []. qed.
+
+lemma subseqsP ['a] (xs ys : 'a list) : subseq xs ys <=> xs \in subseqs ys.
+proof.
+elim: ys xs => [|y ys ih] [|x xs] //=.
+- by rewrite mem_cat -ih // sub0seq.
+rewrite mem_cat; case: (y = x) => [<<-|ne_xy].
+- rewrite (mem_map ((::) y)) 1:inj_cons -!ih -eq_iff.
+  by rewrite eq_sym orb_idr // &(subseq_trans) subseq_cons.
+by split=> [/ih ->//|[/mapP[? [_ [/>]]]|/ih //]].
+qed.
+
+lemma subseqs_uniq ['a] (xs : 'a list) : uniq xs => uniq (subseqs xs).
+proof.
+elim: xs => [|x xs ih] //= [x_xs uq]; apply/cat_uniq; do! split.
+- by apply map_inj_in_uniq => />; apply/ih.
+- apply/hasPn=> y; apply/contraL => /mapP[ys] [_ ->>].
+  apply/negP=> /subseqsP /(count_subseq (pred1 x)).
+  by rewrite (count_pred0_eq_in _ xs) 1:/#; smt(count_ge0).
+- by apply/ih.
+qed.
+
+lemma uniq_subseq_eq ['a] (xs xs1 xs2: 'a list) :
+   uniq xs => subseq xs1 xs => subseq xs2 xs
+     => (forall x, x \in xs1 = x \in xs2) => xs1 = xs2.
+proof.
+elim: xs xs1 xs2 => [| x xs ih] /=.
++ by move=> xs1 xs2; rewrite !subseq0 => />.
+case=> [| x1 xs1] [| x2 xs2] [] hxl hu //=.
++ by move=> _; apply/negP => /(_ x2).
++ by move=> _; apply/negP => /(_ x1).
+smt(subseq_mem).
+qed.
