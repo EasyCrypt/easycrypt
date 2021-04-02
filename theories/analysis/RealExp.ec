@@ -298,12 +298,6 @@ proof. by rewrite rpoweE; apply/le1Dx_exp. qed.
 (* -------------------------------------------------------------------- *)
 op ilog (b x : int) : int = floor (log b%r x%r).
 
-lemma fromintXn (n k : int) : 0 <= k => (n%r)^k = (n^k)%r.
-proof.
-elim: k => [|k ge0_k ih]; first by rewrite !expr0.
-by rewrite !exprS // fromintM ih.
-qed.
-
 lemma ilog_ge0 b x : 1 <= b => 1 <= x => 0 <= ilog b x.
 proof.
 move=> ge1_b ge1_x; have := floor_gt (log b%r x%r).
