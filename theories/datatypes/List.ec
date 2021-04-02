@@ -2950,3 +2950,66 @@ case=> [| x1 xs1] [| x2 xs2] [] hxl hu //=.
 + by move=> _; apply/negP => /(_ x1).
 smt(subseq_mem).
 qed.
+
+(* -------------------------------------------------------------------- *)
+op alltuples ['a] (n : int) (xs : 'a list) =
+  iter n (fun ys => allpairs (::) xs ys) [[]].
+
+lemma alltuples_le0 ['a] (n : int) (xs : 'a list) :
+  n <= 0 => alltuples n xs = [[]].
+proof. by move=> le0_n; rewrite /alltuples iter0. qed.
+
+lemma alltuplesS ['a] (n : int) (xs : 'a list) : 0 <= n =>
+  alltuples (n+1) xs = allpairs (::) xs (alltuples n xs).
+proof. admitted.
+
+lemma alltuplesP ['a] (n : int) (xs ys : 'a list) :
+  xs \in alltuples n ys <=> (size xs = max 0 n /\ all (mem ys) xs).
+proof.
+elim/natind: n xs => [n ^le0_n /alltuples_le0<:'a> ->|n ge0_n ih] xs.
+- rewrite -eq_iff eq_sym mem_seq1 /max ltzNge le0_n /= size_eq0.
+  by apply/eq_iff/andb_idr => ->.
+rewrite /max ltzS ge0_n /= alltuplesS //; split.
+- by case/allpairsP=> -[/= z zs] [# z_ys + ->>] - /= /ih[-> ->] /> /#.
+- case: xs => /= [/#|x xs]; rewrite addzC => [#] /addIz sz_xs x_ys h.
+  by apply/allpairsP; exists (x, xs) => />; apply/ih => /#.
+qed.
+
+lemma alltuples_uniq ['a] (n : int) (xs : 'a list) :
+  uniq xs => uniq (alltuples n xs).
+proof.
+elim/natind: n => [n /alltuples_le0<:'a> ->//|n ge0_n ih uq_xs].
+by rewrite alltuplesS // &(allpairs_uniq) // &(ih).
+qed.
+
+lemma size_alltuples ['a] (n : int) (xs : 'a list) :
+  size (alltuples n xs) = (size xs)^(max 0 n).
+proof.
+elim/natind: n => [n ^le0_n /alltuples_le0<:'a> ->//=|].
+- by rewrite /max ltzNge le0_n /= expr0.
+move=> n ge0_n ih; rewrite /max ltzS ge0_n /=.
+by rewrite exprS // alltuplesS // size_allpairs ih /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op allsubtuples ['a] (n : int) (xs : 'a list) =
+  flatten (map (fun i => alltuples i xs) (range 0 (max 0 n + 1))).
+
+lemma allsubtuplesP ['a] (n : int) (xs ys : 'a list) :
+  xs \in allsubtuples n ys <=> (size xs <= max 0 n /\ all (mem ys) xs).
+proof. split.
+- by case/flatten_mapP=> i [# /= /mem_range rg_i /alltuplesP] [2!-> /#].
+case=> sz allxs; apply/flatten_mapP; exists (size xs).
+rewrite mem_range size_ge0 /= alltuplesP allxs /=.
+by rewrite ltzS sz /=; smt(size_ge0).
+qed.
+
+lemma allsubtuples_uniq ['a] (n : int) (xs : 'a list) :
+  uniq xs => uniq (allsubtuples n xs).
+proof.
+move=> uq_xs; apply: uniq_flatten_map => /=.
+- by move=> x; apply: alltuples_uniq.
+- move=> i j /mem_range rg_i /mem_range rg_j.
+  by case/hasP => ys [#] /alltuplesP[+ _] /alltuplesP[+ _] - -> /#.
+- by apply: range_uniq.
+qed.
