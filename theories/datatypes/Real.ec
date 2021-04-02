@@ -216,10 +216,22 @@ instance field with real
 op floor : real -> int.
 op ceil  : real -> int.
 
-axiom floor_bound (x:real) : x - 1%r <= (floor x)%r <= x.
-axiom  ceil_bound (x:real) : x <= (ceil x)%r <= x + 1%r.
+axiom floor_bound (x:real) : x - 1%r < (floor x)%r <= x.
+axiom  ceil_bound (x:real) : x <= (ceil x)%r < x + 1%r.
 axiom from_int_floor n : floor n%r = n.
 axiom from_int_ceil  n : ceil  n%r = n.
+
+lemma floor_gt x : x - 1%r < (floor x)%r.
+proof. by case: (floor_bound x). qed.
+
+lemma floor_le x : (floor x)%r <= x.
+proof. by case: (floor_bound x). qed.
+
+lemma ceil_ge x : x <= (ceil x)%r.
+proof. by case: (ceil_bound x). qed.
+
+lemma ceil_lt x : (ceil x)%r < x + 1%r.
+proof. by case: (ceil_bound x). qed.
 
 (* -------------------------------------------------------------------- *)
 (* WARNING Lemmas used by tactics: *)
