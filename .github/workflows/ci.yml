@@ -49,16 +49,17 @@ jobs:
         path: report.log
         if-no-files-found: ignore
 
-  notify:
-    name: Notify on failure
+  slack:
+    name: Slack
     needs: [compile, check]
     if: always()
     runs-on: ubuntu-20.04
     steps:
+    - uses: technote-space/workflow-conclusion-action@v2
     - uses: rtCamp/action-slack-notify@v2
       env:
         SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
         SLACK_ICON: https://raw.githubusercontent.com/EasyCrypt/easycrypt/1.0/easycrypt.png 
         SLACK_USERNAME: "CI/CD"
-        SLACK_COLOR: ${{ job.status }}
-        SLACK_TITLE: "CI (${{ job.status }})"
+        SLACK_COLOR: ${{ env.WORKFLOW_CONCLUSION }}
+        SLACK_TITLE: "CI (${{ env.WORKFLOW_CONCLUSION }})"
