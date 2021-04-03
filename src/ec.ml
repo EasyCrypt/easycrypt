@@ -195,7 +195,7 @@ let main () =
   begin let open EcUserMessages in register () end;
 
   (* Initialize I/O + interaction module *)
-  let (prvopts, input, terminal, interactive) =
+  let (prvopts, input, terminal, interactive, eco) =
     match options.o_command with
     | `Config ->
         let config = {
@@ -231,7 +231,7 @@ let main () =
           then lazy (EcTerminal.from_emacs ())
           else lazy (EcTerminal.from_tty ())
 
-        in (cliopts.clio_provers, None, terminal, true)
+        in (cliopts.clio_provers, None, terminal, true, false)
     end
 
     | `Compile cmpopts -> begin
@@ -251,7 +251,7 @@ let main () =
           lazy (EcTerminal.from_channel ~name ~gcstats (open_in name))
         in
           ({cmpopts.cmpo_provers with prvo_iterate = true},
-           Some name, terminal, false)
+           Some name, terminal, false, cmpopts.cmpo_noeco)
 
       end
   in
@@ -410,7 +410,8 @@ let main () =
         EcTerminal.finish `ST_Ok terminal;
         if !terminate then begin
             EcTerminal.finalize terminal;
-            finalize_input input (EcCommands.current ());
+            if not eco then
+              finalize_input input (EcCommands.current ());
             exit 0
           end;
       with

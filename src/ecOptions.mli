@@ -24,6 +24,7 @@ and cmp_option = {
   cmpo_provers : prv_options;
   cmpo_gcstats : bool;
   cmpo_tstats  : string option;
+  cmpo_noeco   : bool;
 }
 
 and cli_option = {
