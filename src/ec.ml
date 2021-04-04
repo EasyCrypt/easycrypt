@@ -214,7 +214,7 @@ let main () =
         in
 
         let pid =
-          let args = ["why3"; "config"; "--detect"; "--full-config"] in
+          let args = ["why3"; "config"; "detect"] in
           let args = args @ (conf |> omap (fun x -> ["-C"; x])|> odfl []) in
 
           Printf.eprintf "Executing: %s\n%!" (String.concat " " args);
@@ -222,7 +222,11 @@ let main () =
             Unix.stdin Unix.stdout Unix.stderr
         in
 
-        exit (fst (Unix.waitpid [] pid))
+        let code =
+          match snd (Unix.waitpid [] pid) with
+          | WSIGNALED _ -> 127
+          | WEXITED   e -> e
+          | WSTOPPED  _ -> assert false in exit code
       end
 
     | `Cli cliopts -> begin

@@ -225,12 +225,13 @@ Why3 and SMT solvers are independent pieces of software with their
 own version-specific interactions. Obtaining a working SMT setup may
 require installing specific versions of some of the provers.
 
-At the time of writing, we depend on Why3 1.3.x, which supports the
+At the time of writing, we depend on Why3 1.4.x, which supports the
 following versions (and some versions below):
-- Alt-Ergo 2.3.1 (if you install alt-ergo using opam, you can
-prevent upgrades using `opam pin alt-ergo 2.3.1`)
-- CVC4 1.7
-- Z3 4.8.6
+
+ * Alt-Ergo 2.4.0 (if you install alt-ergo using opam, you can
+   prevent upgrades using `opam pin alt-ergo 2.4.0`)
+ * CVC4 1.8
+ * Z3 4.8.10
 
 Installing/Compiling EasyCrypt
 ====================================================================

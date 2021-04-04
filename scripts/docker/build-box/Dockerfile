@@ -17,7 +17,7 @@ ENV OPAMROOT=/home/root/.opam OPAMROOTISOK=1 OPAMYES=true OPAMVERBOSE=0 OPAMJOBS
 
 RUN \
 	opam init --disable-sandboxing -a && \
-	opam switch create -v easycrypt ocaml-base-compiler.4.07.1 && \
+	opam switch create -v easycrypt ocaml-base-compiler.4.12.0 && \
 	opam pin add -n easycrypt https://github.com/EasyCrypt/easycrypt.git && \
 	opam install depext && opam depext easycrypt && \
 	opam clean
@@ -25,7 +25,7 @@ RUN \
 RUN \
 	opam install --deps-only easycrypt && opam clean
 
-ENV ALTERGO=2.3.1 CVC4V=1.5 Z3V=4.8.4 Z3SV=.d6df51951f4c
+ENV ALTERGO=2.4.0 CVC4V=1.8 Z3V=4.8.10 Z3SV= Z3A=ubuntu-18.04
 
 RUN \
 	opam pin add -n alt-ergo ${ALTERGO} && \
@@ -36,10 +36,10 @@ RUN \
         mv cvc4 /usr/local/bin/ && chmod 755 /usr/local/bin/cvc4
 
 RUN \
-        wget https://github.com/Z3Prover/z3/releases/download/z3-${Z3V}/z3-${Z3V}${Z3SV}-x64-ubuntu-16.04.zip && \
-        unzip -j z3-${Z3V}${Z3SV}-x64-ubuntu-16.04.zip z3-${Z3V}${Z3SV}-x64-ubuntu-16.04/bin/z3 && \
+        wget https://github.com/Z3Prover/z3/releases/download/z3-${Z3V}/z3-${Z3V}${Z3SV}-x64-${Z3A}.zip && \
+        unzip -j z3-${Z3V}${Z3SV}-x64-${Z3A}.zip z3-${Z3V}${Z3SV}-x64-${Z3A}/bin/z3 && \
         cp z3 /usr/local/bin/ && chmod 755 /usr/local/bin/z3 && \
-	rm -rf z3-${Z3V}${Z3SV}-x64-ubuntu-16.04.zip
+	rm -rf z3-${Z3V}${Z3SV}-x64-${Z3A}.zip
 
 RUN \
-	opam config exec -- why3 config --detect --full-config
+	opam config exec -- why3 config detect
