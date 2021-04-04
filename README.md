@@ -202,7 +202,7 @@ Before running EasyCrypt and after the installation/removal/update
 of an SMT prover, you need to (re)configure Why3.
 
 ```
-$> why3 config --detect --full-config
+$> why3 config detect
 ```
 
 EasyCrypt is using the default Why3 location, i.e. ~/.why3.conf.
