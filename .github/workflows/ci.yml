@@ -36,7 +36,9 @@ jobs:
     - name: Compile EasyCrypt
       run: opam config exec -- make
     - name: Detect SMT provers
-      run: opam config exec -- why3 config --detect --full-config
+      run: |
+        rm -f ~/.why3.conf
+        opam config exec -- ./ec.native why3config -why3 ~/.why3.conf
     - name: Compile Library (${{ matrix.target }})
       env:
         TARGET: ${{ matrix.target }}

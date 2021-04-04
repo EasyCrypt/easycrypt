@@ -42,4 +42,4 @@ RUN \
 	rm -rf z3-${Z3V}${Z3SV}-x64-ubuntu-16.04.zip
 
 RUN \
-	opam config exec -- why3 config --detect --full-config
+	opam config exec -- why3 config detect
