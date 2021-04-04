@@ -84,6 +84,12 @@ proof. by rewrite -exp0 lnK. qed.
 lemma nosmt ln_gt0 x : 1%r < x => 0%r < ln x.
 proof. by move=> h; rewrite -ln1 ln_mono_ltr //#. qed.
 
+lemma ln_eq0 (x : real) : 0%r < x => (ln x = 0%r) <=> (x = 1%r).
+proof.
+move=> gt0_x; split=> [|->]; last by rewrite ln1.
+by move/(congr1 exp); rewrite expK // exp0.
+qed.
+
 lemma nosmt lnM (x y : real) : 0%r < x => 0%r < y =>
   ln (x * y) = ln x + ln y.
 proof.
@@ -201,6 +207,48 @@ lemma nosmt rpoweM (x y : real): e^(x * y) = (e^x)^y.
 proof. by rewrite rpowM // e_gt0. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma inj_ln (x y : real) : 0%r < x => 0%r < y => ln x = ln y => x = y.
+proof. by move=> gt0_x gt0_y; move/(congr1 exp); rewrite !expK. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma inj_log (b x y : real) : 0%r < b => b <> 1%r =>
+  0%r < x => 0%r < y => log b x = log b y => x = y.
+proof.
+move=> gt0_b ne1_b gt0_x gt0_y @/log.
+have: ln b <> 0%r by rewrite ln_eq0.
+rewrite -invr_eq0 => /mulIf h /h => {h}.
+by move/(congr1 exp); rewrite !expK.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma logK (b x : real) : 0%r < b => b <> 1%r =>
+  log b (b ^ x) = x.
+proof.
+move=> gt0_b ne1_b; rewrite /log rpowE //.
+by rewrite lnK -mulrA divrr // ln_eq0.
+qed.  
+
+(* -------------------------------------------------------------------- *)
+lemma log_ge0 (b x : real) : 1%r <= b => 1%r <= x => 0%r <= log b x.
+proof. by move=> ge1_b ge1_x; rewrite /log divr_ge0 ?ln_ge0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma log_mono (b x y : real) :
+  1%r < b => 0%r < x => 0%r < y => (log b x <= log b y) <=> x <= y.
+proof.
+move=> gt1_b gt0_x gt0_y @/log; rewrite ler_pmul2r.
+- by rewrite invr_gt0 ln_gt0.
+- by apply/ln_mono.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma rpowK (b x : real) : 0%r < b => b <> 1%r => 0%r < x =>
+  b ^ (log b x) = x.
+proof.
+by move=> gt0_b ne1_b gt0_x; rewrite &(inj_log b) // 1:rpow_gt0 // logK.
+qed.  
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt rpow_mono (x y n : real):
      0%r < n => 0%r <= x => 0%r <= y
   => (x^n <= y^n) <=> (x <= y).
@@ -219,6 +267,13 @@ rewrite ler_eqVlt=> -[<-|gt0n]; first by rewrite !rpow0 lerr.
 by case=> ge0_x le_xy; rewrite rpow_mono // (ler_trans x).
 qed.
 
+lemma inj_rexpr (x n m : real) : 0%r < x => x <> 1%r =>
+  x ^ n = x ^ m => n = m.
+proof.
+move=> gt0_x ne1_x; rewrite !rpowE // => /inj_exp.
+by apply: mulIf; rewrite ln_eq0.
+qed.
+
 lemma nosmt rexpr_hmono (x n m : real) :
   1%r <= x => 0%r <= n <= m => x^n <= x^m.
 proof.
@@ -227,9 +282,46 @@ rewrite !rpowE 1,2:(ltr_le_trans 1%r) // exp_mono.
 by apply/ler_wpmul2r=> //; apply/ln_ge0.
 qed.
 
+lemma nosmt rexpr_hmono_ltr (x n m : real) :
+  1%r < x => 0%r <= n < m => x^n < x^m.
+proof.
+move=> gt0_x [gt0_n lt_nm]; rewrite ltr_neqAle.
+rewrite rexpr_hmono ~-1://# /=; apply: contraL lt_nm.
+move=> eq; rewrite ltrNge /= ler_eqVlt; left.
+by apply/eq_sym; apply: inj_rexpr eq => /#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt le1Dx_rpowe (x : real): 0%r <= x => 1%r+x <= e^x.
 proof. by rewrite rpoweE; apply/le1Dx_exp. qed.
+
+(* -------------------------------------------------------------------- *)
+op ilog (b x : int) : int = floor (log b%r x%r).
+
+lemma ilog_ge0 b x : 1 <= b => 1 <= x => 0 <= ilog b x.
+proof.
+move=> ge1_b ge1_x; have := floor_gt (log b%r x%r).
+rewrite ltr_subl_addr -fromintD => h.
+have := log_ge0 b%r x%r _ _; rewrite ?le_fromint //.
+by move/ler_lt_trans => /(_ _ h); rewrite lt_fromint ltzS.
+qed.
+
+lemma ilogP (b x : int) : 1 < b => 1 <= x =>
+  b ^ ilog b x <= x < b ^ (ilog b x + 1).
+proof.
+rewrite -!(lt_fromint, le_fromint) => gt1_b ge1_x;
+  (have gt0_b: 0%r <  b%r by move=> /#);
+  (have ge0_b: 0%r <= b%r by move=> /#);
+  (have gt0_x: 0%r <  x%r by move=> /#); split=> [|_].
+- rewrite -fromintXn ?ilog_ge0 ~-1://# -rpow_int //.
+  rewrite -(@log_mono b%r) ?rpow_gt0 //.
+  by rewrite logK // 1?gtr_eqF // &(floor_le).
+- move=> @/ilog; rewrite -{1}(@rpowK b%r x%r) // 1:/#.
+  rewrite -!fromintXn 1?(lez_trans (0+1)) //.
+  - by rewrite ler_add2r ?ilog_ge0 /#.
+  rewrite -rpow_int // &(rexpr_hmono_ltr) // log_ge0 //= 1:/#.
+  by rewrite fromintD -ltr_subl_addr &(floor_gt).
+qed.
 
 (* -------------------------------------------------------------------- *)
 require import StdBigop.

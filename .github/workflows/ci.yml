@@ -1,0 +1,67 @@
+name: EasyCrypt compilation & check
+
+on: [push,pull_request]
+
+jobs:
+  compile:
+    name: EasyCrypt compilation
+    runs-on: ubuntu-20.04
+    container: easycryptpa/ec-build-box
+    steps:
+    - uses: actions/checkout@v2
+    - name: Update OPAM & EasyCrypt dependencies
+      run: |
+        opam update
+        opam pin add -n easycrypt .
+        opam install --deps-only easycrypt
+    - name: Compile EasyCrypt
+      run: opam config exec -- make
+
+  check:
+    name: Check EasyCrypt Libraries
+    needs: compile
+    runs-on: ubuntu-20.04
+    container: easycryptpa/ec-build-box
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [check, examples]
+    steps:
+    - uses: actions/checkout@v2
+    - name: Update OPAM & EasyCrypt dependencies
+      run: |
+        opam update
+        opam pin add -n easycrypt .
+        opam install --deps-only easycrypt
+    - name: Compile EasyCrypt
+      run: opam config exec -- make
+    - name: Detect SMT provers
+      run: |
+        rm -f ~/.why3.conf
+        opam config exec -- ./ec.native why3config -why3 ~/.why3.conf
+    - name: Compile Library (${{ matrix.target }})
+      env:
+        TARGET: ${{ matrix.target }}
+      run: opam config exec -- make $TARGET
+    - uses: actions/upload-artifact@v2
+      name: Upload report.log
+      if: always()
+      with:
+        name: report.log (${{ matrix.target }})
+        path: report.log
+        if-no-files-found: ignore
+
+  slack:
+    name: Slack
+    needs: [compile, check]
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: technote-space/workflow-conclusion-action@v2
+    - uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        SLACK_ICON: https://raw.githubusercontent.com/EasyCrypt/easycrypt/1.0/easycrypt.png 
+        SLACK_USERNAME: "CI/CD"
+        SLACK_COLOR: ${{ env.WORKFLOW_CONCLUSION }}
+        SLACK_TITLE: "CI (${{ env.WORKFLOW_CONCLUSION }})"
