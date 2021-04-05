@@ -31,6 +31,13 @@ local hint exact : size_ge0.
 lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case: s => //=; smt. qed.
 
+lemma size_eq1 ['a] (xs : 'a list) :
+  (size xs = 1) <=> (exists x, xs = [x]).
+proof.
+split=> [|[x ->//]]; case: xs => // x [|y xs] sz.
+- by exists x. - smt(size_ge0).
+qed.
+
 lemma seq2_ind ['a 'b] (P : 'a list -> 'b list -> bool) :
   P [] [] => (forall x1 x2 s1 s2, P s1 s2 => P (x1 :: s1) (x2 :: s2)) =>
     forall s1 s2, size s1 = size s2 => P s1 s2.
