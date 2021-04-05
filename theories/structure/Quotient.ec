@@ -121,8 +121,9 @@ move=> x y @/pi; split=> [eq_xy|]; first by congr; apply: eqv_canon_eq.
 by move/(congr1 val); rewrite !val_insubd !iscanon_canon /= => /eqvP.
 qed.
 
-lemma eqv_repr : forall x, eqv x (repr (pi x)).
+lemma eqv_repr : forall x, eqv (repr (pi x)) x.
 proof.
-by move=> x @/pi @/repr; rewrite val_insubd iscanon_canon &(eqv_canon).
+move=> x @/pi @/repr; rewrite val_insubd.
+by rewrite iscanon_canon /= eqv_sym &(eqv_canon).
 qed.
 end EquivQuotient.
