@@ -80,14 +80,30 @@ op iscanon x = canon x = x.
 lemma canon_iscanon x : iscanon x => canon x = x.
 proof. by move=> @/iscanon /eq_sym ->; apply: canonK. qed.
 
+lemma iscanon_canon x : iscanon (canon x).
+proof. by rewrite /iscanon canonK. qed.
+
+lemma eqvP x y : (eqv x y) <=> (canon x = canon y).
+proof.
+split=> [/eqv_canon_eq //|eq].
+apply/(eqv_trans (canon y))/eqv_sym/eqv_canon.
+apply/(eqv_trans (canon x)); first by apply/eqv_canon.
+by rewrite eq &(eqv_refl).
+qed.
+
+type qT.
+
 clone import Subtype with
-  type T <- T, pred P <- iscanon, op wsT <- canon witness.
+  type T  <- T,
+  type sT <- qT,
+  pred P  <- iscanon,
+  op  wsT <- canon witness.
 
 clone include CoreQuotient with
   type T     <- T,
-  type qT    =  Subtype.sT,
-  op   pi    =  fun x : T  => Subtype.insubd (canon x),
-  op   repr  =  fun x : qT => Subtype.val x
+  type qT    <- qT,
+  op   pi    =  fun x => Subtype.insubd (canon x),
+  op   repr  =  fun x => Subtype.val x
 
   proof *.
 
@@ -97,32 +113,12 @@ qed.
 
 lemma eqv_pi : forall x y , eqv x y <=> pi x = pi y.
 proof.
-move => x y.
-split.
-+ move => eqvxy.
-  rewrite /pi.
-  congr.
-  by apply eqv_canon_eq.
-+ rewrite /pi /insubd.
-  case (insubP (canon x)) => [[ux [cx [sx vx]]] | [cx sx]] ; case (insubP (canon y)) => [[uy [cy [sy vy]]] | [cy sy] | [uy [cy [sy vy]]] | [cy sy]] ; rewrite sx sy //=.
-  - move => equ.
-    apply (eqv_trans (canon x)) ; [apply eqv_canon|].
-    apply (eqv_trans (canon y)) ; [|apply eqv_sym;apply eqv_canon].
-    rewrite - vx -vy equ.
-    by apply eqv_refl.
-  - by rewrite /iscanon canonK //= in cy.
-  - by rewrite /iscanon canonK //= in cx.
-  - by rewrite /iscanon canonK //= in cy.
+move=> x y @/pi; split=> [eq_xy|]; first by congr; apply: eqv_canon_eq.
+by move/(congr1 val); rewrite !val_insubd !iscanon_canon /= => /eqvP.
 qed.
 
-lemma eqvP : forall x, eqv x (repr (pi x)).
+lemma eqv_repr : forall x, eqv x (repr (pi x)).
 proof.
-move => x.
-rewrite /pi /repr.
-case (insubP (canon x)) => [[ux [cx [sx vx]]] | [cx sx]].
-+ rewrite - vx valKd vx.
-  by apply eqv_canon.
-+ by rewrite /iscanon canonK //= in cx.
+by move=> x @/pi @/repr; rewrite val_insubd iscanon_canon &(eqv_canon).
 qed.
-
 end EquivQuotient.
