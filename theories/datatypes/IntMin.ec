@@ -48,3 +48,24 @@ proof.
 move/pmin_spec/choicebP/(_ 0) => /=.
 by rewrite -/(pmin E); case=> _ hmin ge0_x Ex; apply: hmin.
 qed.
+
+(* -------------------------------------------------------------------- *)
+op fmin_spec ['a] (f : 'a -> int) (p : 'a -> bool) (x : 'a) =
+  0 <= f x /\ p x /\ forall y, 0 <= f y => p y => f x <= f y.
+
+op fmin ['a] f p = choiceb (fmin_spec<:'a> f p) witness.
+
+lemma fminP ['a] (f : 'a -> int) (p : 'a -> bool) :
+  (exists x, 0 <= f x /\ p x) =>
+    0 <= f (fmin f p) /\ p (fmin f p) /\
+      forall y, 0 <= f y => p y => f (fmin f p) <= f y.
+proof.
+case=> x [ge0_fx px]; apply: (choicebP (fmin_spec f p) witness).
+suff h: forall n, 0 <= n => forall x, n = f x => p x =>
+  exists y, fmin_spec f p y by apply: (h (f x) _ x).
+elim/sintind=> {x ge0_fx px} i ge0_i ih x ->> px.
+case: (exists y, 0 <= f y /\ p y /\ f y < f x) => [[y [# 3?]]|].
+- by apply: (ih (f y) _ y).
+rewrite negb_exists /= => hx; exists x; do! split => //.
+by move=> y ge0_fy py; have := hx y; rewrite ge0_fy py /= ltrNge.
+qed.
