@@ -48,9 +48,13 @@ type T.
 
 op eqv : T -> T -> bool.
 
-axiom eqv_refl : forall x, eqv x x.
-axiom eqv_sym  : forall x y, eqv x y => eqv y x.
-axiom eqv_trans: forall y x z, eqv x y => eqv y z => eqv x z.
+theory EqvEquiv.
+axiom eqv_refl : reflexive  eqv.
+axiom eqv_sym  : symmetric  eqv.
+axiom eqv_trans: transitive eqv.
+end EqvEquiv.
+
+import EqvEquiv.
 
 lemma eqv_choose (x : T): exists y, eqv x y.
 proof. by exists x; rewrite eqv_refl. qed.
@@ -66,14 +70,14 @@ qed.
 lemma eqv_canon_eq (x y : T): eqv x y => canon x = canon y.
 proof.
 move=> eqv_xy; rewrite /canon (@eq_choice (eqv x) (eqv y)).
-+ move=> z; split => [eqv_xz|eqv_yz].
-  * by apply: (eqv_trans _ (eqv_sym eqv_xy) eqv_xz).
-  * by apply: (eqv_trans _ eqv_xy eqv_yz).
+- move=> z; split => [eqv_xz|eqv_yz].
+  - by apply/(eqv_trans x) => //; rewrite eqv_sym.
+  - by apply/(eqv_trans _ eqv_xy eqv_yz).
 by apply: choice_dfl_irrelevant; exists y; apply: eqv_refl.
 qed.
 
 lemma canonK x : canon (canon x) = canon x.
-proof. by apply/eqv_canon_eq/eqv_sym/eqv_canon. qed.
+proof. by rewrite &(eqv_canon_eq) eqv_sym eqv_canon. qed.
 
 op iscanon x = canon x = x.
 
@@ -86,7 +90,7 @@ proof. by rewrite /iscanon canonK. qed.
 lemma eqvP x y : (eqv x y) <=> (canon x = canon y).
 proof.
 split=> [/eqv_canon_eq //|eq].
-apply/(eqv_trans (canon y))/eqv_sym/eqv_canon.
+rewrite &(eqv_trans (canon y)) -1:eqv_sym -1:eqv_canon.
 apply/(eqv_trans (canon x)); first by apply/eqv_canon.
 by rewrite eq &(eqv_refl).
 qed.
