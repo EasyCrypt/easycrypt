@@ -2968,7 +2968,7 @@ proof. by move=> le0_n; rewrite /alltuples iter0. qed.
 
 lemma alltuplesS ['a] (n : int) (xs : 'a list) : 0 <= n =>
   alltuples (n+1) xs = allpairs (::) xs (alltuples n xs).
-proof. admitted.
+proof. by move=> ge0_n; rewrite /alltuples iterS. qed.
 
 lemma alltuplesP ['a] (n : int) (xs ys : 'a list) :
   xs \in alltuples n ys <=> (size xs = max 0 n /\ all (mem ys) xs).
