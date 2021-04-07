@@ -1,4 +1,4 @@
-require import AllCore Distr.
+require import AllCore Distr Dexcepted.
 
 type pkey.
 type skey.
@@ -58,3 +58,28 @@ module ClawFree(A:AdvClawFree) = {
 }.
 
 end T_ClawFree.
+
+abstract theory PSF.
+
+op sampleD : dom distr.
+op samplePre : skey -> codom -> dom distr.
+
+op sampleDf (pk:pkey) = dmap sampleD (f pk).
+
+(* Domain sampling with uniform output *)
+axiom sampleDf_uni pk sk: 
+  (pk, sk) \in kg => is_uniform (sampleDf pk).
+
+(* Preimage sampling with trapdoor *)
+axiom samplePreE pk sk y: 
+   (pk, sk) \in kg =>
+   samplePre sk y = sampleD \ (fun x => f pk x <> y).
+
+clone include T_OW.
+
+end PSF.
+  
+
+
+
+
