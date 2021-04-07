@@ -332,42 +332,20 @@ proof.
 split=> [/eqmodP[u [_ ->]]|]; first by rewrite mulr0.
 by move=> ->; apply/eqp_refl.
 qed.
-end Ideal.
 
 (* ==================================================================== *)
 abstract theory RingQuotient.
-type b, t.
-
-clone import IDomain as IDomain with type t <- b.
-clear [IDomain.* IDomain.AddMonoid.* IDomain.MulMonoid.*].
-
-clone import Ideal with
-  type t <- b,
-  pred Domain.unit   <- IDomain.unit,
-    op Domain.zeror  <- IDomain.zeror,
-    op Domain.oner   <- IDomain.oner,
-    op Domain.( + )  <- IDomain.( + ),
-    op Domain.([-])  <- IDomain.([-]),
-    op Domain.( * )  <- IDomain.( * ),
-    op Domain.invr   <- IDomain.invr,
-    op Domain.intmul <- IDomain.intmul,
-    op Domain.ofint  <- IDomain.ofint,
-    op Domain.exp    <- IDomain.exp
-
-  proof * by smt(@IDomain)
-
-  remove abbrev Domain.(-)
-  remove abbrev Domain.(/).
+type qT.
 
 (* -------------------------------------------------------------------- *)
-op p : b -> bool.
+op p : t -> bool.
 
 axiom ideal_p : ideal p.
 axiom ideal_Ntriv : forall x, unit x => !p x.
 
 hint exact : ideal_p.
 
-op rel (x y : b) = p (y - x).
+op rel (x y : t) = p (y - x).
 
 lemma relxx : reflexive rel.
 proof. by move=> x @/rel; rewrite /rel subrr ideal0 ideal_p. qed.
@@ -406,8 +384,8 @@ proof. by rewrite !(mulrC _ y) &(relMl). qed.
 
 (* -------------------------------------------------------------------- *)
 clone import Quotient.EquivQuotient
-  with type T   <- b,
-       type qT  <- t,
+  with type T   <- t,
+       type qT  <- qT,
          op eqv <- rel
 
    proof EqvEquiv.*.
@@ -420,12 +398,12 @@ realize EqvEquiv.eqv_trans by apply: rel_trans.
 op zeror = pi zeror.
 op oner  = pi oner.
 
-op ( + ) (x y : t) = pi (repr x + repr y).
-op [ - ] (x   : t) = pi (- repr x).
-op ( * ) (x y : t) = pi (repr x * repr y).
+op ( + ) (x y : qT) = pi (repr x + repr y).
+op [ - ] (x   : qT) = pi (- repr x).
+op ( * ) (x y : qT) = pi (repr x * repr y).
 
-op   invr : t -> t.
-pred unit : t.
+op   invr : qT -> qT.
+pred unit : qT.
 
 lemma addE x y : (pi x) + (pi y) = pi (x + y).
 proof.
@@ -448,11 +426,11 @@ by rewrite &(idealD) ?ideal_p // idealMl ?ideal_p &(eqv_repr).
 qed.
 
 axiom mulVr   : left_inverse_in unit oner invr ( * ).
-axiom unitP   : forall (x y : t), y * x = oner => unit x.
-axiom unitout : forall (x : t), !unit x => invr x = x.
+axiom unitP   : forall (x y : qT), y * x = oner => unit x.
+axiom unitout : forall (x : qT), !unit x => invr x = x.
 
 clone import ComRing with
-  type t     <- t    ,
+  type t     <- qT   ,
   op   zeror <- zeror,
   op   ( + ) <- (+)  ,
   op   [ - ] <- [-]  ,
@@ -514,3 +492,5 @@ realize mulVr   by apply: mulVr.
 realize unitP   by apply: unitP.
 realize unitout by apply: unitout.
 end RingQuotient.
+
+end Ideal.
