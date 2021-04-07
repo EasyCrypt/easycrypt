@@ -1,0 +1,57 @@
+require import AllCore List Distr DBool.
+
+(* --------------------------------------------------------------------------- *)
+
+type msg.
+type cipher.
+
+type mpkey.
+type mskey.
+
+type identity.
+type pkey.
+type skey.
+
+module type IBEScheme = {
+  proc kg() : mpkey * mskey
+  proc extract(msk:mskey, id:identity) : skey
+  proc enc(id:identity, m:msg) : cipher
+  proc dec(sk:skey, c:cipher) : msg option
+}.
+
+module type OrclIBE = {
+  proc extract(id:identity) : skey
+}.
+
+quantum module type AdvIDCPA (O:OrclIBE) = {
+  proc choose (mpk:mpkey) : identity * msg * msg
+  proc guess (c:cipher) : bool
+}.
+
+module IDCPA(A:AdvIDCPA) (O:IBEScheme) = {
+  var mpk : mpkey
+  var msk : mskey
+  var log : identity list
+  var id  : identity
+
+  module E = {
+    proc extract(id:identity) : skey = {
+      var sk;
+      log <- id::log;
+      sk <@ O.extract(msk, id);
+      return sk;
+    }
+  }
+
+  proc main() = {
+    var pk, sk, b, b', m1, m2, c;
+    (pk, sk) <@ O.kg();
+    (id,m1,m2) <@ A(E).choose(pk);
+    b <$ {0,1};
+    c   <@ O.enc(id, if b then m1 else m2);
+    b' <@ A(E).guess(c);
+    return b = b' /\ !id \in log ;
+  }
+}.
+
+
