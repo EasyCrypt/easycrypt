@@ -225,6 +225,9 @@ apply/poly_eqP=> c ge0_c; rewrite poly0E.
 by apply/gedeg_coeff; rewrite z_degp.
 qed.
 
+lemma deg_ge1 p : (1 <= deg p) <=> (p <> poly0).
+proof. by rewrite -deg_eq0 eqr_le ge0_deg /= (lerNgt _ 0) /#. qed.
+
 lemma deg_eq1 p : (deg p = 1) <=> (exists c, c <> zeror /\ p = polyC c).
 proof.
 split=> [eq1_degp|[c [nz_c ->>]]]; last first.
@@ -386,7 +389,7 @@ rewrite /polyV; case: (deg p = 1); last done.
 by case/deg_eq1=> c [nz_c ->>]; rewrite !degC polyCE /= invr_eq0.
 qed.
 
-clone import Ring.ComRing as PolyRing with
+clone import Ring.IDomain as PolyRing with
   type t     <- poly ,
     op zeror <- poly0,
     op oner  <- poly1,
@@ -445,6 +448,14 @@ move/deg_eq1=> [cp [nz_cp ->>]]; move/deg_eq1=> [cq [nz_cq ->>]].
 move/poly_eqP: ME => /(_ 0 _) //; rewrite polyCE /=.
 rewrite polyME BCA.big_int1 /= => /unitP @/unitp -> /=.
 by rewrite deg_eq1; exists cp.
+qed.
+
+realize mulf_eq0.
+proof.
+move=> p q; split=> [|[] ->]; last 2 by rewrite (mulr0, mul0r).
+apply: contraLR; rewrite negb_or => -[nz_p nz_q]; apply/negP.
+move/(congr1 (fun p => deg p + 1)) => /=; rewrite  deg0 degM //=.
+by rewrite gtr_eqF // -lez_add1r ler_add deg_ge1.
 qed.
 
 (* -------------------------------------------------------------------- *)
