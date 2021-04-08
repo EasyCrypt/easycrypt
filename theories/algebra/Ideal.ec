@@ -93,6 +93,16 @@ move=> ^iI [_ [+ _] Ix Iy] - /(_ x (-y)); rewrite opprK.
 by apply=> //; apply/idealN.
 qed.
 
+lemma ideal_sum ['a] I P F s :
+     ideal I
+  => (forall x, P x => I (F x))
+  => I (BAdd.big<:'a> P F s).
+proof.
+elim: s => [|x s ih] idI IF; first by rewrite BAdd.big_nil ideal0.
+rewrite BAdd.big_cons; case: (P x) => Px; last by apply/ih.
+by rewrite idealD -1:&(ih) // &(IF).
+qed.
+
 lemma idealB I x y : ideal I => I x => I y => I (x - y).
 proof. by move=> iI Ix Iy; rewrite idealD -1:idealN. qed.
 
@@ -156,6 +166,11 @@ apply/fun_ext=> x @/idD; apply: eq_iff; split;
   by case=> i j [? ->]; exists j i; rewrite addrC /= andbC.
 qed.
 
+(* -------------------------------------------------------------------- *)
+lemma mem_idT x : idT x.
+proof. by []. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma mem_idDl I J x : I x => ideal J => (idD I J) x.
 proof.
 by move=> Ix iJ; exists x zeror; rewrite Ix addr0 ideal0.
@@ -164,6 +179,13 @@ qed.
 lemma mem_idDr I J x : J x => ideal I => (idD I J) x.
 proof.
 by move=> Jx iI; rewrite idDC; apply: mem_idDl.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma ideal_eq1P I u : ideal I => unit u => I u <=> (I = idT).
+proof.
+move=> idI un_u; split => [Iu|->//]; apply/fun_ext=> x.
+by rewrite mem_idT -(mulr1 x) idealMl // -(mulrV u) // idealMr.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -340,59 +362,76 @@ type qT.
 (* -------------------------------------------------------------------- *)
 op p : t -> bool.
 
+theory IdealAxioms.
 axiom ideal_p : ideal p.
 axiom ideal_Ntriv : forall x, unit x => !p x.
+end IdealAxioms.
+
+import IdealAxioms.
 
 hint exact : ideal_p.
 
-op rel (x y : t) = p (y - x).
+op eqv (x y : t) = p (y - x).
 
-lemma relxx : reflexive rel.
-proof. by move=> x @/rel; rewrite /rel subrr ideal0 ideal_p. qed.
+lemma eqvxx : reflexive eqv.
+proof. by move=> x @/eqv; rewrite /eqv subrr ideal0 ideal_p. qed.
 
-lemma rel_sym : symmetric rel.
-proof. by move=> x y @/rel; rewrite -opprB idealNP // ideal_p. qed.
+lemma eqv_sym : symmetric eqv.
+proof. by move=> x y @/eqv; rewrite -opprB idealNP // ideal_p. qed.
 
-lemma rel_trans : transitive rel.
+lemma eqv_trans : transitive eqv.
 proof.
-move=> y x z @/rel hpyx hpzy.
+move=> y x z @/eqv hpyx hpzy.
 have ->: z - x = (z - y) + (y - x).
 - by rewrite addrACA !addrA addrK.
 by apply/idealD => //; apply/ideal_p.
 qed.
 
-hint exact : relxx.
+hint exact : eqvxx.
 
 (* -------------------------------------------------------------------- *)
-lemma rel0r x : rel x zeror <=> p x.
-proof. by rewrite rel_sym /rel subr0. qed.
+lemma eqv0r x : eqv x zeror <=> p x.
+proof. by rewrite eqv_sym /eqv subr0. qed.
 
-lemma rel0l x : rel zeror x <=> p x.
-proof. by rewrite rel_sym &(rel0r). qed.
+lemma eqv0l x : eqv zeror x <=> p x.
+proof. by rewrite eqv_sym &(eqv0r). qed.
 
-lemma relN x y : rel x y => rel (-x) (-y).
-proof. by rewrite /rel -idealNP 1:ideal_p opprD. qed.
+lemma eqvN x y : eqv x y => eqv (-x) (-y).
+proof. by rewrite /eqv -idealNP 1:ideal_p opprD. qed.
 
-lemma relD x1 x2 y1 y2 : rel x1 x2 => rel y1 y2 => rel (x1 + y1) (x2 + y2).
-proof. by rewrite /rel subrACA &(idealD) ideal_p. qed.
+lemma eqvD x1 x2 y1 y2 : eqv x1 x2 => eqv y1 y2 => eqv (x1 + y1) (x2 + y2).
+proof. by rewrite /eqv subrACA &(idealD) ideal_p. qed.
 
-lemma relMl x y1 y2 : rel y1 y2 => rel (x * y1) (x * y2).
-proof. by rewrite /rel -mulrBr &(idealMl) ideal_p. qed.
+lemma eqv_sum ['a] P F1 F2 r :
+     (forall x, P x => eqv (F1 x) (F2 x))
+  => eqv (BAdd.big<:'a> P F1 r) (BAdd.big<:'a> P F2 r).
+proof.
+move=> heqv; elim: r => [|x r ih].
+- by rewrite !BAdd.big_nil eqvxx.
+rewrite !BAdd.big_cons; case: (P x) => // Px.
+by apply: eqvD=> //; apply: heqv.
+qed.
 
-lemma relMr x1 x2 y : rel x1 x2 => rel (x1 * y) (x2 * y).
-proof. by rewrite !(mulrC _ y) &(relMl). qed.
+lemma eqvMl x y1 y2 : eqv y1 y2 => eqv (x * y1) (x * y2).
+proof. by rewrite /eqv -mulrBr &(idealMl) ideal_p. qed.
+
+lemma eqvMr x1 x2 y : eqv x1 x2 => eqv (x1 * y) (x2 * y).
+proof. by rewrite !(mulrC _ y) &(eqvMl). qed.
+
+lemma eqvX x y n : eqv x y => eqv (exp x n) (exp y n).
+proof. admitted.
 
 (* -------------------------------------------------------------------- *)
-clone import Quotient.EquivQuotient
+clone include Quotient.EquivQuotient
   with type T   <- t,
        type qT  <- qT,
-         op eqv <- rel
+         op eqv <- eqv
 
    proof EqvEquiv.*.
 
-realize EqvEquiv.eqv_refl  by apply: relxx.
-realize EqvEquiv.eqv_sym   by apply: rel_sym.
-realize EqvEquiv.eqv_trans by apply: rel_trans.
+realize EqvEquiv.eqv_refl  by apply: eqvxx.
+realize EqvEquiv.eqv_sym   by apply: eqv_sym.
+realize EqvEquiv.eqv_trans by apply: eqv_trans.
 
 (* -------------------------------------------------------------------- *)
 op zeror = pi zeror.
@@ -407,19 +446,19 @@ pred unit : qT.
 
 lemma addE x y : (pi x) + (pi y) = pi (x + y).
 proof.
-rewrite /(+) &(eqv_pi) /rel subrACA.
+rewrite /(+) &(eqv_pi) /eqv subrACA.
 by rewrite &(idealD) ?ideal_p // &(eqv_repr).
 qed.
 
 lemma oppE x : -(pi x) = pi (-x).
 proof.
-rewrite /([-]) &(eqv_pi) /rel opprK addrC.
-by rewrite -/(rel _ _) rel_sym &(eqv_repr).
+rewrite /([-]) &(eqv_pi) /eqv opprK addrC.
+by rewrite -/(eqv _ _) eqv_sym &(eqv_repr).
 qed.
 
 lemma mulE x y : (pi x) * (pi y) = pi (x * y).
 proof.
-rewrite /(+) &(eqv_pi) /rel; pose z := repr (pi x).
+rewrite /(+) &(eqv_pi) /eqv; pose z := repr (pi x).
 have ->: x = x - z + z by rewrite subrK.
 rewrite mulrDl -addrA -mulrBr (mulrC _ y) {1}/z.
 by rewrite &(idealD) ?ideal_p // idealMl ?ideal_p &(eqv_repr).
@@ -444,7 +483,7 @@ clone import ComRing with
 realize addrA.
 proof.
 elim/quotW=> x; elim/quotW=> y; elim/quotW=> z.
-by rewrite !addE &(eqv_pi) !addrA !relD // 1:rel_sym &(eqv_repr).
+by rewrite !addE &(eqv_pi) !addrA !eqvD // 1:eqv_sym &(eqv_repr).
 qed.
 
 realize addrC.
@@ -458,19 +497,19 @@ proof. by elim/quotW=> x; rewrite !addE add0r. qed.
 realize addNr.
 proof.
 elim/quotW=> x; rewrite !addE &(eqv_pi) addrC.
-by apply/rel0r/eqv_repr.
+by apply/eqv0r/eqv_repr.
 qed.
 
 realize oner_neq0.
-proof. by rewrite -eqv_pi rel0r; apply/ideal_Ntriv/unitr1. qed.
+proof. by rewrite -eqv_pi eqv0r; apply/ideal_Ntriv/unitr1. qed.
 
 realize mulrA.
 proof.
 elim/quotW=> x; elim/quotW=> y; elim/quotW=> z.
 rewrite !mulE &(eqv_pi) !mulrA.
-apply: (rel_trans (x * (repr (pi y)) * z)).
-- by apply/relMl/eqv_repr.
-- by apply/relMr/relMr; rewrite rel_sym &(eqv_repr).
+apply: (eqv_trans (x * (repr (pi y)) * z)).
+- by apply/eqvMl/eqv_repr.
+- by apply/eqvMr/eqvMr; rewrite eqv_sym &(eqv_repr).
 qed.
 
 realize mulrC.
@@ -483,9 +522,9 @@ realize mulrDl.
 proof.
 elim/quotW=> x1; elim/quotW=> x2; elim/quotW=> y.
 rewrite !(addE, mulE) &(eqv_pi) -mulrDl.
-apply: (rel_trans ((x1 + x2) * (repr (pi y)))).
-- by apply/relMl; rewrite rel_sym &(eqv_repr).
-- by apply/relMr/relD; rewrite rel_sym &(eqv_repr).
+apply: (eqv_trans ((x1 + x2) * (repr (pi y)))).
+- by apply/eqvMl; rewrite eqv_sym &(eqv_repr).
+- by apply/eqvMr/eqvD; rewrite eqv_sym &(eqv_repr).
 qed.
 
 realize mulVr   by apply: mulVr.
