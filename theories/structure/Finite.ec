@@ -9,8 +9,20 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List.
 
+op is_finite_for (p : 'a -> bool) (s : 'a list) =
+  uniq s /\ (forall x, x \in s <=> p x).
+
 op is_finite (p : 'a -> bool) =
-  exists s, uniq s /\ (forall x, x \in s <=> p x).
+  exists s, is_finite_for p s.
+
+lemma is_finiteE (p : 'a -> bool) :
+  is_finite p <=> (exists s, uniq s /\ (forall x, x \in s <=> p x)).
+proof. by apply/eq_iff. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma finite_for_finite ['a] p s:
+  is_finite_for<:'a> p s => is_finite p.
+proof. by move=> ?; exists s. qed.
 
 (* -------------------------------------------------------------------- *)
 op to_seq: ('a -> bool) -> 'a list.
@@ -50,7 +62,7 @@ qed.
 lemma NfiniteP ['a] n (p : 'a -> bool) : 0 <= n =>
   !is_finite p => exists s, (n <= size s /\ uniq s) /\ (mem s) <= p.
 proof.
-move=> ge0_n; rewrite /is_finite negb_exists /= => h.
+move=> ge0_n; rewrite is_finiteE negb_exists /= => h.
 elim: n ge0_n => [|n ge0_n [s [[sz uq_s] ih]]]; first by exists [].
 suff [x [px x_notin_s]]: exists x, p x /\ !(x \in s).
 + exists (x :: s); rewrite /= x_notin_s uq_s /= addzC.
@@ -102,6 +114,24 @@ lemma finiteD (A B : 'a -> bool):
 proof. by move=> fin_A; apply/(finite_leq A)=> //= x @/predD. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma eq_is_finite_for ['a] (p q : 'a -> bool) s :
+  (forall x, p x <=> q x) => is_finite_for p s => is_finite_for q s.
+proof. by move=> eq_pq [uqs h]; split=> // x; rewrite -eq_pq &(h). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma is_finite_for_bij ['a 'b] (f : 'a -> 'b) p s :
+     is_finite_for p s
+  => (forall x y, p x => p y => f x = f y => x = y)
+  => (forall y, exists x, p x /\ y = f x)
+  => is_finite_for predT (map f s).
+proof.
+case=> uq hmem inj_f surj_f; split.
+- by apply: map_inj_in_uniq => // x y /hmem px /hmem py; apply: inj_f.
+move=> y @/predT /=; apply/mapP; case: (surj_f y).
+by move=> x [/hmem x_in_s ->]; exists x.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma is_finite_surj ['a 'b] (f : 'a -> 'b) pa pb :
       (forall b, pb b => exists a, pa a /\ b = f a)
    => is_finite pa
@@ -113,17 +143,40 @@ by apply/mapP; exists a => /=; apply/hs.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma finite_unit (p : unit -> bool): is_finite p.
+lemma finite_for_unit (p : unit -> bool):
+  is_finite_for p (filter p [tt]).
 proof.
-exists (filter p [tt]); split; first by apply/filter_uniq.
+split; first by apply/filter_uniq.
+by move=> x; rewrite mem_filter; apply/andb_idr; case: x.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma finite_unit (p : unit -> bool): is_finite p.
+proof. exact: (finite_for_finite _ _ (finite_for_unit p)). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma finite_for_bool (p : bool -> bool):
+  is_finite_for p (filter p [true; false]).
+proof.
+split; first by apply/filter_uniq.
 by move=> x; rewrite mem_filter; apply/andb_idr; case: x.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma finite_bool (p : bool -> bool): is_finite p.
+proof. exact: (finite_for_finite _ _ (finite_for_bool p)). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma finite_for_pair ['a 'b] pa pb sa sb:
+  is_finite_for<:'a> pa sa => is_finite_for<:'b> pb sb =>
+  is_finite_for
+    (fun x : _ * _ => pa x.`1 /\ pb x.`2)
+    (allpairs (fun x y => (x, y)) sa sb).
 proof.
-exists (filter p [true; false]); split; first by apply/filter_uniq.
-by move=> x; rewrite mem_filter; apply/andb_idr; case: x.
+case=> [uqa mema] [uqb memb]; split; first by apply: allpairs_uniq.
+case=> a b /=; rewrite allpairsP; split.
+- by case=> -[/= a' b'] [# ?? ->> ->>]; rewrite -!(mema, memb).
+- by case=> /mema ? /memb ?; exists (a, b) => /=.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -131,9 +184,24 @@ lemma finite_pair ['a 'b] pa pb :
   is_finite<:'a> pa => is_finite<:'b> pb
     => is_finite (fun x : _ * _ => pa x.`1 /\ pb x.`2).
 proof.
-move=> /finiteP[sa ha] /finiteP[sb hb]; apply/finiteP.
-exists (allpairs (fun x y => (x, y)) sa sb) => /= p [hpa hpb].
-by apply/allpairsP; exists p; rewrite !(ha, hb) //=; case: (p).
+case=> [sa ha] [sb hb]; have h := finite_for_pair _ _ _ _ ha hb.
+exact: (finite_for_finite _ _ h).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma finite_for_list ['a] n p s : is_finite_for<:'a> p s =>
+  is_finite_for (fun r => size r = max 0 n /\ all p r) (alltuples n s).
+proof.
+case=> uq hmem; split; first by rewrite alltuples_uniq.
+move=> r; rewrite alltuplesP &(andb_id2l) => _.
+by apply/eq_iff/eq_all.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma finite_list ['a] n p :
+  is_finite<:'a> p => is_finite (fun r => size r = max 0 n /\ all p r).
+proof.
+by case=> [s h]; apply: (finite_for_finite _ _ (finite_for_list _ _ _ h)).
 qed.
 
 (* -------------------------------------------------------------------- *)
