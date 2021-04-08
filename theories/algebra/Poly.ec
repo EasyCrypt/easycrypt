@@ -695,6 +695,16 @@ apply/poly_eqP=> c ge0_c; rewrite polysumE /=; case: (c < deg p).
   by rewrite !(coeffpE, polyXnE) // (_ : c <> i) ?mulr0 //#.
 qed.
 
+lemma polywE n (p : poly) : deg p <= n =>
+  p = PCA.bigi predT (fun i => p.[i] ** exp X i) 0 n.
+proof.
+move=> le_pn; rewrite (PCA.big_cat_int (deg p)) // ?ge0_deg.
+rewrite {1}polyE; pose c := PCA.big _ _ _.
+pose d := PCA.big _ _ _; suff ->: d = poly0 by rewrite addr0.
+rewrite /d PCA.big_seq PCA.big1 => //= i /mem_range [gei _].
+by rewrite gedeg_coeff // scale0p.
+qed.
+
 lemma deg_sum ['a] P F r c :
      0 <= c
   => (forall x, P x => deg (F x) <= c)
