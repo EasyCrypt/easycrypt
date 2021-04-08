@@ -54,7 +54,12 @@ realize MUniFinFun.FinT.enum_spec by apply MUFF.FinT.enum_spec.
 (* Semi Constant Definition Property *)
 abstract theory SemiConstDistr.
 
-type result.
+op k : int.
+
+type result = bool * from * from list.
+
+op good(bf : from -> bool, x : from, l : from list) = 
+     bf x /\ (forall x', x' \in l => !bf x') /\ size l <= k.
 
 quantum module type AdvSCD (H:QRO) = {
   proc main() : result
@@ -62,38 +67,33 @@ quantum module type AdvSCD (H:QRO) = {
  
 module SCD (A:AdvSCD) = {
   var bf : from -> bool
+  var x : from
+  var l : from list
 
-  proc main1(p:real) = {
-    var r, y;
+  proc _F0(p:real) = {
+    var c, y;
     bf <$ DBB.dbfun p;
     QRO.init();
     y  <$ dhash; 
-    r  <@ A(QRO).main();
-    return (r,bf);
+    (c,x,l)  <@ A(QRO).main();
+    return (c /\ good bf x l);
   }
 
-  proc main2(p:real) = {
-    var r, y;
+  proc _F1(p:real) = {
+    var c, y;
     bf <$ DBB.dbfun p;
     QRO.init();
     y  <$ dhash; 
     QRO.h <- fun m => if bf m then y else QRO.h m;
-    r  <@ A(QRO).main();
-    return (r, bf);
+    (c,x,l)  <@ A(QRO).main();
+    return (c /\ good bf x l);
   }
 }.
 
-(* Remark the event depend of result return by the adversary but also
-   of the function bf indicating if the h return y or a random value.
-   It would be interesting to known if we can add y in the event
- *)
-
-type event = result * (from -> bool) -> bool.  
-
-axiom advantage q lam (A<:AdvSCD{-SCD}[main : `{Inf, #H.h : q}]) &m (P:event):
-  0%r <= lam <= 1%r =>
-  `| Pr[SCD(A).main1(lam) @ &m : P res] - Pr[SCD(A).main2(lam) @ &m: P res] | 
-   <= 8%r/3%r * q%r^4 * lam^2.
+axiom advantage q lambda (A<:AdvSCD{-SCD}[main : `{Inf, #H.h : q}]) &m:
+  0%r <= lambda <= 1%r =>
+  `| Pr[SCD(A)._F0(lambda) @ &m : res] - Pr[SCD(A)._F1(lambda) @ &m: res] | 
+   <= (2%r * q%r + k%r + 1%r)/ 6%r * lambda^2.
 
 end SemiConstDistr.
 
@@ -206,3 +206,42 @@ axiom advantage q (A <: AdvPRG[main: `{Inf, #G.sample : q}]) &m:
 end T_StandardSecurePRG.
 
 (* TODO: if G is standard-secure, then it is also oracle-secure. *)
+
+
+(* Efficient QROM simulation *)
+
+require (****) Matrix.
+abstract theory T_LazyQROM.
+
+op q : int.
+
+axiom q_ge0 : 0 <= q.
+
+(* we need an efficient bijection that relates
+   from/hash to a finite field *)
+type F.
+
+op from2f : from -> F.
+op f2from : F -> from.
+
+axiom from2fB : bijective from2f.
+axiom from2fK : cancel from2f f2from.
+lemma f2fromK : cancel f2from from2f by smt (bij_can_sym from2fB from2fK).
+lemma f2fromB : bijective f2from by  smt (bij_can_bij from2fB from2fK).
+
+op hash2f : hash -> F.
+op f2hash : F -> hash.
+
+axiom hash2fB : bijective hash2f.
+axiom hash2fK : cancel hash2f f2hash.
+lemma f2hashK : cancel f2hash hash2f by smt (bij_can_sym hash2fB hash2fK).
+lemma f2hashB : bijective f2hash by  smt (bij_can_bij hash2fB hash2fK).
+
+clone import Matrix with
+  type R <- F,
+  op size <- 2*q
+  proof ge0_size by smt(q_ge0).
+
+
+
+end T_LazyQROM.

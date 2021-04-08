@@ -202,9 +202,10 @@ axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) :
   islossless S.sign => islossless H.h => islossless A(H, S).main.
 
 local clone import START.
-
 local clone import SemiConstDistr with
-  type result <- bool * msg list * msg.
+    op k <- qs.
+
+lemma good_spill bf x l : good bf x l => !x \in l by smt().
 
 local module (ASCD:AdvSCD) (H:QRO) = {
   import var EUF
@@ -225,35 +226,32 @@ local module (ASCD:AdvSCD) (H:QRO) = {
     (m,s) <@ A(H,Os).main(pk);
     hm <@ H.h{m};
     b <- hm = f pk s;
-    return (b, log, m);
+    return (b, m, log);
   }
 }.
-
-op P (r:(bool * msg list * msg) * (msg -> bool)) = 
-  let (r,t) = r in
-  let (b, log, m) = r in 
-  b /\ !m \in log /\ (t m /\ forall m', m' \in log => !t m').
 
 import var EUF B SCD.
 
 local lemma l3 &m : 
   Pr[EUF_QROM'(A).main(lam) @ &m : res] =
-  Pr[SCD(ASCD).main1(lam) @ &m : P res].
+  Pr[SCD(ASCD)._F0(lam) @ &m : res].
 proof.
   byequiv => //.
   proc; inline *; wp.
-  call (: ={QRO.h, sk, log}).
-  + by proc; inline *; auto.
-  + by sim.
+  (* fixme: need to relate size log w/ query count *)
+  call (: ={QRO.h, sk, log} /\ size log{1} <= qs). 
+  + proc ; inline *; auto. admit.
+  + by proc; inline *;auto => />;skip => />.
   swap{2} 3 1; auto; rnd{2}; do 3! rnd; skip => />.
+  by rewrite /good; smt(ge0_qs good_spill). 
 qed.
 
 local lemma l4 &m : 
-  `| Pr[SCD(ASCD).main1(lam) @ &m : P res] - 
-     Pr[SCD(ASCD).main2(lam) @ &m: P res] | 
-   <= 8%r/3%r * q%r^4 * lam^2.
+  `| Pr[SCD(ASCD)._F0(lam) @ &m : res] - 
+     Pr[SCD(ASCD)._F1(lam) @ &m: res] | 
+   <= (2%r * qh%r + qs%r + 1%r)/ 6%r * lam^2.
 proof.
-  apply (advantage q lam ASCD); last by apply lam_bound.
+  apply (advantage qh lam ASCD); last by apply lam_bound.
   move=> kH H hkH.
   proc; wp.
   call(:true).
@@ -270,36 +268,46 @@ proof.
 qed.
 
 local lemma l5 &m :
-  Pr[SCD(ASCD).main2(lam) @ &m: P res] <= Pr[OW(B(A)).main() @ &m : res].
+  Pr[SCD(ASCD)._F1(lam) @ &m: res] <= Pr[OW(B(A)).main() @ &m : res].
 proof.
-  byequiv (: ={glob A} /\ p{1} = lam ==> P res{1} => res{2}) => //.
+  byequiv (: ={glob A} /\ p{1} = lam ==> res{1} => res{2}) => //.
   proc; inline *; wp.
   (* Proof using upto bad *)
   call (: (exists m', m' \in log /\ B.bf m'), 
           (={log, QRO.h} /\ SCD.bf{1} = B.bf{2} /\
            (forall m', !SCD.bf{1} m' => QRO.h{1} m' = f pk{1} (hs{2} m')) /\
-          (pk,sk){1} \in kg),
+          (pk,sk){1} \in kg /\ size log{1} <= qs),
           (exists m', m' \in log /\ SCD.bf m'){1} =
           (exists m', m' \in log /\ B.bf m'){2}
           ).
   + exact A_ll. 
-  + by proc; inline *; auto => />; smt(finv_f). 
+  + (* by proc; inline *; auto => />; smt(finv_f). *) admit. 
   + by move=> *; proc; inline *; auto => /> /#.
   + by move=> *; proc; inline *; auto => /> /#.
-  + proc; inline *; auto => /> /#.
+  + proc; inline *; auto => />; skip => /#.
   + by move=> *; proc; inline *; auto => /> /#.
   + by move=> *; proc; inline *; auto => /> /#.
   swap{1}5 -4. swap{1} 4 -2; wp.
   rnd (fun (h:msg -> hash) => fun m => finv sk{1} (h m))
       (fun (h:msg -> sign) => fun m => f pk{1} (h m)).
-  rewrite /P; auto => |> k hk h _ bf _; split.
-  + by move=> *; apply fun_ext => ?; smt(finv_f).
-  smt(dfsign_dfhash f_finv finv_f).
+  rewrite /good; auto =>  |>. 
+  move => *; split; first by  smt().
+  move => *; split; first by  smt().
+  move => *; split; first by  smt().
+  move => *; split; first by  smt().
+  move => *; split; first by  smt().
+  move => *; split; first by  smt().
+  move => *; split; first by  smt(dfsign_dfhash).
+  move => *; split; first by  smt(dfsign_dfhash).
+  move => *; split; first by  smt(dfsign_dfhash).
+  move => *. admit. (* ? *)
+  by auto => />; rewrite /good;
+       smt(finv_f dfsign_dfhash f_finv ge0_qs).
 qed.
 
 lemma conclusion &m : 
   lam * (1%r - lam) ^ qs * Pr[EUF_QROM(A,FDH).main() @ &m : res] <=
-  Pr[OW(B(A)).main() @ &m : res] + 8%r / 3%r * q%r ^ 4 * lam ^ 2. 
+  Pr[OW(B(A)).main() @ &m : res] + (2%r * qh%r + qs%r + 1%r)/ 6%r * lam^2. 
 proof. move: (l1 A lam &m lam_bound) (l3 &m) (l4 &m) (l5 &m) => /#. qed.
 
 end section OW.
