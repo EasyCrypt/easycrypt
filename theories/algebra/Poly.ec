@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List Ring Bigalg StdBigop StdOrder.
+require import AllCore Finite List Ring Bigalg StdBigop StdOrder.
 require (*--*) Subtype.
 (*---*) import Bigint IntID IntOrder.
 
@@ -714,5 +714,79 @@ op peval (p : poly) (a : coeff) =
 
 (* -------------------------------------------------------------------- *)
 abbrev root p a = peval p a = zeror.
+
+(* -------------------------------------------------------------------- *)
+op prepolyL (a : coeff list) = fun i => nth zeror a i.
+
+lemma isprepolyL a : ispoly (prepolyL a).
+proof.
+split=> [c lt0_c|]; first by rewrite /prepolyL nth_neg.
+exists (size a) => c gtc; rewrite /prepolyL nth_out //.
+by apply/negP => -[_]; rewrite ltrNge /= ltrW.
+qed.
+
+op polyL a = to_polyd (prepolyL a).
+
+lemma polyLE a c : (polyL a).[c] = nth zeror a c.
+proof. by rewrite coeffE 1:isprepolyL. qed.
+
+lemma degLle a : deg (polyL a) <= size a.
+proof.
+apply: deg_leP; first exact: size_ge0.
+by move=> i gei; rewrite polyLE nth_out //#.
+qed.
+
+lemma degL a : last zeror a <> zeror => deg (polyL a) = size a.
+proof.
+move=> nz; apply/degP.
+- by case: a nz => //= x a _; rewrite addrC ltzS size_ge0.
+- by rewrite polyLE nth_last.
+- move=> i sza; rewrite gedeg_coeff //.
+  by apply: (ler_trans (size a)) => //; apply: degLle.
+qed.
+
+lemma inj_polyL a1 a2 :
+  size a1 = size a2 => polyL a1 = polyL a2 => a1 = a2.
+proof.
+move=> eq_sz /poly_eqP eq; apply: (eq_from_nth zeror)=> //.
+by move=> i [+ _] - /eq; rewrite !polyLE.
+qed.
+
+lemma surj_polyL p n : deg p <= n => exists s, p = polyL s.
+proof.
+move=> len; exists (map (fun i => p.[i]) (range 0 n)).
+apply/poly_eqP=> c ge0_c; rewrite polyLE; case: (c < n).
+- by move=> lt_cn; rewrite (nth_map 0) ?size_range ?nth_range //#.
+- rewrite ltrNge /= => le_nc; rewrite gedeg_coeff // 1:/#.
+  by rewrite nth_out // size_map size_range /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma finite_for_poly_ledeg n p s :
+     is_finite_for p s
+  => is_finite_for
+       (fun q => deg q <= max 0 n /\ (forall i, 0 <= i < n => p q.[i]))
+       (map polyL (alltuples n s)).
+proof.
+move=> ^[uq hmem] /finite_for_list /(_ n) [usq hmems]; split.
+- rewrite map_inj_in_uniq // => xs ys
+    /alltuplesP [szxs memxs] /alltuplesP [szys memys].
+  by apply: inj_polyL; rewrite szxs szys.
+move=> q; split=> [/mapP[xs [/alltuplesP [szxs memxs ->]]]|].
+- rewrite (ler_trans (size xs)) ?szxs //= => [|i [ge0_i lei]].
+  - by rewrite -szxs; apply: degLle.
+  - by rewrite polyLE &(all_nthP) -1:/#; move/(eq_all _ _ _ hmem): memxs.
+case=> ledeg memp; apply/mapP; pose xs :=  map (fun i => q.[i]) (range 0 n).
+exists xs; split; first (apply/alltuplesP; split).
+- by rewrite size_map size_range.
+- apply/(all_nthP _ _ zeror) => i [ge0_i +]; rewrite hmem.
+  rewrite size_map size_range /= => lei.
+  move/(_ i _): memp; first (split=> // _; 1: move=> /#).
+  by rewrite (nth_map 0) ?size_range //= nth_range //#.
+- apply/poly_eqP=> c ge0_c; rewrite polyLE; case: (c < n).
+  - move=> lt_cn; rewrite (nth_map 0) ?size_range ?nth_range //#.
+  - rewrite ltrNge /= => le_nc; rewrite gedeg_coeff // 1:/#.
+  by rewrite nth_out // size_map size_range /#.
+qed.
 
 end Poly.
