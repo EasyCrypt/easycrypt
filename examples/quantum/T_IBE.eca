@@ -44,9 +44,10 @@ module IDCPA(A:AdvIDCPA) (O:IBEScheme) = {
   }
 
   proc main() = {
-    var pk, sk, b, b', m1, m2, c;
-    (pk, sk) <@ O.kg();
-    (id,m1,m2) <@ A(E).choose(pk);
+    var b, b', m1, m2, c;
+    log <- [];
+    (mpk, msk) <@ O.kg();
+    (id,m1,m2) <@ A(E).choose(mpk);
     b <$ {0,1};
     c   <@ O.enc(id, if b then m1 else m2);
     b' <@ A(E).guess(c);

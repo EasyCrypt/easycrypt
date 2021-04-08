@@ -59,7 +59,7 @@ module ClawFree(A:AdvClawFree) = {
 
 end T_ClawFree.
 
-abstract theory PSF.
+abstract theory T_PSF.
 
 op sampleD : dom distr.
 op samplePre : skey -> codom -> dom distr.
@@ -77,7 +77,7 @@ axiom samplePreE pk sk y:
 
 clone include T_OW.
 
-end PSF.
+end T_PSF.
   
 
 

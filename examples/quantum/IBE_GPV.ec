@@ -11,6 +11,8 @@ clone include T_PERM with
    type dom   <- skey,
    type codom <- pkey.
 
+clone import T_PSF as PSF.
+
 clone import T_QROM as QROM with
   type from <- identity,
   type hash <- pkey.
@@ -45,10 +47,25 @@ module IDCPA_QROM (A:AdvIDCPA_QROM) (S:IBEScheme_QROM) = {
   }
 }.
 
+module type EncScheme0  = {
+  proc enc (pk : pkey, m : msg): cipher   
+  proc dec (sk : skey, c : cipher): msg option 
+}.
+
+module ES(E:EncScheme0) : EncScheme = {
+  proc kg() : pkey * skey = {
+    var mpk, msk, sk;
+    (mpk, msk) <$ kg;
+    sk <$ sampleD;
+    return (f mpk sk, sk);
+  }
+  include E
+}.
+
 (* --------------------------------------------------------------------------- *)
 (* GPV scheme                                                                  *)
 
-module GPV (E:EncScheme) (H:QRO) = {
+module GPV (E:EncScheme0) (H:QRO) = {
   proc kg() : mpkey * mskey = { var keys; keys <$ kg; return keys; }
   proc extract(msk:mskey, id:identity) : skey = {
     var pk;
@@ -68,10 +85,30 @@ module GPV (E:EncScheme) (H:QRO) = {
 
 (* --------------------------------------------------------------------------- *)
 (* Maximal number of queries to the extract/hash oracle *)
-op qe : { int | 0 <= qe } as ge0_qe.
-op qh : { int | 0 <= qh } as ge0_qh.
+op cqe : { int | 0 <= cqe } as ge0_cqe.
+op cqh : { int | 0 <= cqh } as ge0_cqh.
+
+op gqe : { int | 0 <= gqe } as ge0_gqe.
+op gqh : { int | 0 <= gqh } as ge0_gqh.
+
+op qe = cqe + gqe.
+op qh = cqh + gqh.
+
+lemma ge0_qe : 0 <= qe.
+proof. smt(ge0_cqe ge0_gqe). qed.
+
+lemma ge0_qh : 0 <= qh.
+proof. smt(ge0_cqh ge0_gqh). qed.
 
 (* --------------------------------------------------------------------------- *)
+
+section.
+
+declare module E: EncScheme0 {-IDCPA, -QRO}.
+
+declare module A : 
+  AdvIDCPA_QROM { -IDCPA, -QRO, -E }[choose : `{Inf, #H.h : cqh, #O.extract : cqe},
+                                 guess  : `{Inf, #H.h : gqh, #O.extract : gqe}].
 
 (* FIXME: share this with FDH *)
 import DBB.
@@ -90,7 +127,7 @@ proof.
   by apply mu_le => /#.
 qed.
 
-module IDCPA_QROM' (A:AdvIDCPA_QROM) (E:EncScheme) = {
+local module IDCPA_QROM' (A:AdvIDCPA_QROM) (E:EncScheme0) = {
   var bf : identity -> bool
 
   proc main(lam_:real) = {
@@ -101,4 +138,27 @@ module IDCPA_QROM' (A:AdvIDCPA_QROM) (E:EncScheme) = {
   }
 }.
 
+local lemma l1 lam &m:
+  0%r <= lam <= 1%r =>
+  Pr[IDCPA_QROM'(A,E).main(lam) @ &m : res] >=
+    lam * (1%r - lam)^qe * Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res].
+proof.
+move=> lam_bound.
+byphoare (:(glob A, glob E){m} = (glob A, glob E) /\ lam_ = lam ==> _) => //.
+proc.
+swap 1 1.
+seq 1 : b Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res] (lam * (1%r - lam) ^ qe) 
+          _ 0%r (lam_ = lam /\ (b => !IDCPA.id \in IDCPA.log /\ size IDCPA.log <= qe)).
++ inline *; wp.
+  conseq (:size IDCPA.log <= qe) => />.
+  (* FIXME: Adrien can we use complexity info here *)
+  admit.
++ call (: (glob A, glob E){m} = (glob A, glob E) ==> res); 2: by auto.
+  bypr => &m0 h.
+  byequiv (: ={glob A, glob E} ==> ={res}) => //; 1: sim; move: h => />.
++ rnd (fun t => t IDCPA.id /\ forall id', id' \in IDCPA.log => ! t id').
+  by skip => /> &hr h /h [] ??; apply: pr_dfbool_l.
++ by auto.
+smt().
+qed.
 
