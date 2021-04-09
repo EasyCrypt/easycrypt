@@ -37,16 +37,35 @@ qed.
 
 lemma pmin_mem (E : int -> bool) :
   !sempty (pcap E) => E (pmin E).
-proof.
-move/pmin_spec/choicebP/(_ 0) => /=.
-by rewrite -/(pmin E); case=> -[].
-qed.
+proof. by move/pmin_spec/choicebP/(_ 0) => /=; do 2! case. qed.
 
 lemma pmin_min (E : int -> bool) x :
   !sempty (pcap E) => 0 <= x => E x => pmin E <= x.
 proof.
 move/pmin_spec/choicebP/(_ 0) => /=.
 by rewrite -/(pmin E); case=> _ hmin ge0_x Ex; apply: hmin.
+qed.
+
+lemma pmin_empty E : sempty (pcap E) => pmin E = 0.
+proof.
+move=> h; rewrite /pmin choiceb_dfl //.
+rewrite -negb_exists /=; apply: contraL h.
+by case=> i [??]; apply/semptyNP; exists i.
+qed.
+
+lemma ge0_pmin E : 0 <= pmin E.
+proof.
+case: (sempty (pcap E)); first by move/pmin_empty=> ->.
+by move/pmin_spec/choicebP/(_ 0) => /=; do 2! case.
+qed.
+
+lemma pmin_eq (E : int -> bool) (i : int) :
+  0 <= i => E i => (forall j, 0 <= j < i => !E j) => pmin E = i.
+proof.
+move=> ge0_i Ei min_i; have h: !sempty (pcap E).
+- by apply/semptyNP; exists i.
+rewrite eqr_le pmin_min //= lerNgt; apply/negP=> gti.
+by apply/(min_i (pmin E))/pmin_mem => //; rewrite ge0_pmin.
 qed.
 
 (* -------------------------------------------------------------------- *)
