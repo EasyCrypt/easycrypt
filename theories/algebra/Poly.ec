@@ -638,6 +638,22 @@ move=> ge0_i; rewrite degXn_proper //.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma lcXn_proper (p : poly) i :
+  lreg (lc p) => 0 <= i => lc (exp p i) = exp (lc p) i.
+proof.
+move=> reg_p; elim: i => [|i ge0_i ih]; 1: by rewrite !expr0 lc1.
+rewrite !exprS // degM_proper /=; last by rewrite -mul_lc ih.
+by rewrite mulrI_eq0 // lreg_neq0 // ih lregXn.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma lc_polyXn i : 0 <= i => lc (exp X i) = oner.
+proof.
+move=> ge0_0; rewrite lcXn_proper ?lcX //.
+- by apply: Coeff.lreg1. - by rewrite expr1z.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma polyCX c i : 0 <= i => exp (polyC c) i = polyC (exp c i).
 proof.
 elim: i => [|i ge0_i ih]; first by rewrite !expr0.
@@ -647,6 +663,13 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma deg_polyXnDC i c : 0 < i => deg (exp X i + polyC c) = i + 1.
 proof. by move=> ge0_i; rewrite degDl 1?degC deg_polyXn 1:ltrW //#. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma lc_polyXnDC i c : 0 < i => lc (exp X i + polyC c) = oner.
+proof.
+move=> gti_0; rewrite lcDl ?lc_polyXn // -1:ltrW //.
+by rewrite degC deg_polyXn 1:ltrW //#.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma polyXnE i k : 0 <= i => (exp X i).[k] = if k = i then oner else zeror.
