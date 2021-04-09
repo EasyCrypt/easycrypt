@@ -378,6 +378,10 @@ pose Q j := 0 <= j /\ p (f j) /\ forall i, 0 <= i < j => !p (f i).
 have /# := choicebP Q 0 _; first by exists i.
 qed.
 
+lemma argmin_le ['a] f p q :
+  (forall j, p j => q j) => argmin<:'a> f q <= argmin<:'a> f p.
+proof. move=> le_pq. admitted.
+
 (* -------------------------------------------------------------------- *)
 abbrev minz = argmin (fun (i : int) => i).
 

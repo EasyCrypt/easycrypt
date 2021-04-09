@@ -22,7 +22,8 @@ clone import Bigalg.BigComRing as Big with
     op CR.invr   <- ZR.invr,
     op CR.intmul <- ZR.intmul,
     op CR.ofint  <- ZR.ofint,
-    op CR.exp    <- ZR.exp.
+    op CR.exp    <- ZR.exp,
+    op CR.lreg   <- ZR.lreg.
 
 import BAdd.
 
