@@ -581,6 +581,10 @@ by rewrite lerNgt /= => lt_pq; rewrite mul_lc gedeg_coeff //#.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma lcM_proper p q : lc p * lc q <> zeror => lc (p * q) = lc p * lc q.
+proof. by move=> reg; rewrite degM_proper //= -mul_lc. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma degZ_le c p : deg (c ** p) <= deg p.
 proof.
 case: (c = zeror) => [->|nz_c]; 1: by rewrite scale0p deg0 ge0_deg.
@@ -606,7 +610,11 @@ proof. by move=> reg_c; rewrite degZ_lreg // polyZE. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma lreg_lc p : lreg (lc p) => lreg p.
-proof. admitted.
+proof.
+move/Coeff.mulrI_eq0=> reg_p; apply/mulrI0_lreg => q.
+apply: contraLR=> nz_q; rewrite -lc_eq0.
+by rewrite lcM_proper reg_p lc_eq0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma degXn_le (p : poly) i :
@@ -1018,6 +1026,14 @@ move=> p q; split=> [|[] ->]; last 2 by rewrite (mulr0, mul0r).
 apply: contraLR; rewrite negb_or => -[nz_p nz_q]; apply/negP.
 move/(congr1 (fun p => deg p + 1)) => /=; rewrite  deg0 degM //=.
 by rewrite gtr_eqF // -lez_add1r ler_add deg_ge1.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma lcM (p q : poly) : lc (p * q) = lc p * lc q.
+proof.
+case: (p = poly0) => [->|nz_p]; first by rewrite !(mul0r, lc0).
+case: (q = poly0) => [->|nz_q]; first by rewrite !(mulr0, lc0).
+by rewrite lcM_proper // mulf_eq0 !lc_eq0 !(nz_p, nz_q).
 qed.
 
 (* -------------------------------------------------------------------- *)
