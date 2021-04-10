@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore Finite List Ring Bigalg StdBigop StdOrder.
+require import AllCore Finite Distr DList List.
+require import Ring Bigalg StdBigop StdOrder.
 require (*--*) Subtype.
 (*---*) import Bigint IntID IntOrder.
 
@@ -60,7 +61,6 @@ clone include Subtype
   rename "insub" as "to_poly"
   rename "val"   as "of_poly".
 
-(* FIXME: pourquoi un operateur et pas une abbrev *)
 op "_.[_]" (p : poly) (i : int) = (of_poly p) i.
 
 lemma lt0_coeff p c : c < 0 => p.[c] = zeror.
@@ -782,7 +782,7 @@ op polyL a = to_polyd (prepolyL a).
 lemma polyLE a c : (polyL a).[c] = nth zeror a c.
 proof. by rewrite coeffE 1:isprepolyL. qed.
 
-lemma degLle a : deg (polyL a) <= size a.
+lemma degL_le a : deg (polyL a) <= size a.
 proof.
 apply: deg_leP; first exact: size_ge0.
 by move=> i gei; rewrite polyLE nth_out //#.
@@ -794,7 +794,7 @@ move=> nz; apply/degP.
 - by case: a nz => //= x a _; rewrite addrC ltzS size_ge0.
 - by rewrite polyLE nth_last.
 - move=> i sza; rewrite gedeg_coeff //.
-  by apply: (ler_trans (size a)) => //; apply: degLle.
+  by apply: (ler_trans (size a)) => //; apply: degL_le.
 qed.
 
 lemma inj_polyL a1 a2 :
@@ -804,9 +804,11 @@ move=> eq_sz /poly_eqP eq; apply: (eq_from_nth zeror)=> //.
 by move=> i [+ _] - /eq; rewrite !polyLE.
 qed.
 
-lemma surj_polyL p n : deg p <= n => exists s, p = polyL s.
+lemma surj_polyL p n :
+  deg p <= n => exists s, size s = n /\ p = polyL s.
 proof.
-move=> len; exists (map (fun i => p.[i]) (range 0 n)).
+move=> len; exists (map (fun i => p.[i]) (range 0 n)); split.
+- by rewrite size_map size_range /=; smt(ge0_deg).
 apply/poly_eqP=> c ge0_c; rewrite polyLE; case: (c < n).
 - by move=> lt_cn; rewrite (nth_map 0) ?size_range ?nth_range //#.
 - rewrite ltrNge /= => le_nc; rewrite gedeg_coeff // 1:/#.
@@ -826,7 +828,7 @@ move=> ^[uq hmem] /finite_for_list /(_ n) [usq hmems]; split.
   by apply: inj_polyL; rewrite szxs szys.
 move=> q; split=> [/mapP[xs [/alltuplesP [szxs memxs ->]]]|].
 - rewrite (ler_trans (size xs)) ?szxs //= => [|i [ge0_i lei]].
-  - by rewrite -szxs; apply: degLle.
+  - by rewrite -szxs; apply: degL_le.
   - by rewrite polyLE &(all_nthP) -1:/#; move/(eq_all _ _ _ hmem): memxs.
 case=> ledeg memp; apply/mapP; pose xs :=  map (fun i => q.[i]) (range 0 n).
 exists xs; split; first (apply/alltuplesP; split).
@@ -841,6 +843,44 @@ exists xs; split; first (apply/alltuplesP; split).
   by rewrite nth_out // size_map size_range /#.
 qed.
 
+(* -------------------------------------------------------------------- *)
+op dpoly (n : int) (d : coeff distr) =
+  dmap (dlist d n) polyL.
+
+lemma supp_dpoly n d p : 0 <= n =>
+      p \in dpoly n d
+  <=> (deg p <= n /\ forall i, 0 <= i < n => p.[i] \in d).
+proof. move=> ge0_n; split.
+- case/supp_dmap=> xs [/(supp_dlist _ _ _ ge0_n)].
+  case=> ^szxs <- /allP hcf ->; rewrite degL_le /=.
+  by move=> i [ge0_i lei]; rewrite polyLE; apply/hcf/mem_nth.
+- case=> degp hcf; apply/supp_dmap; case: (surj_polyL _ _ degp).  
+  move=> xs [^szxs <- ^pE ->]; exists xs => //=; apply/supp_dlist => /=.
+  - by apply/size_ge0.
+  apply/allP=> c ^c_in_xs /(nth_index zeror) <-.
+  rewrite -polyLE -pE; apply/hcf; rewrite index_ge0 /=.
+  by rewrite -szxs index_mem c_in_xs.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dpoly_ll n d : is_lossless d => is_lossless (dpoly n d).
+proof. by move=> d_ll; apply/dmap_ll/dlist_ll. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dpoly_fu n d : 0 <= n => is_full d =>
+  forall (p : poly), deg p <= n => p \in dpoly n d.
+proof.
+move=> ge0_n d_fu p /surj_polyL[xs [szxs ->>]].
+apply/dmap_supp/supp_dlist => //; rewrite szxs /=.
+by apply/allP=> x _; apply/d_fu.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dpoly_uni n d : 0 <= n => is_uniform d => is_uniform (dpoly n d).
+proof.
+move=> ge0_n d_uni; apply/dmap_uni_in_inj/dlist_uni/d_uni.
+by move=> xs ys xs_d ys_d; rewrite &(inj_polyL) !(supp_dlist_size d n).
+qed.
 end PolyComRing.
 
 (* ==================================================================== *)
