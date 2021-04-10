@@ -1,5 +1,6 @@
 require import AllCore List Distr DBool CHoareTactic.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal.
+require (*  *) Matrix.
 
 type from.
 type hash.
@@ -208,40 +209,71 @@ end T_StandardSecurePRG.
 (* TODO: if G is standard-secure, then it is also oracle-secure. *)
 
 
-(* Efficient QROM simulation *)
+(* Efficient QROM simulation: Theorem 6.1 in 
+    Mark Zhandry
+    Secure Identity-Based Encryption in the Quantum Random Oracle Model
+    https://eprint.iacr.org/2012/076.pdf  *)
 
-require (****) Matrix.
 abstract theory T_LazyQROM.
 
 op q : int.
 
 axiom q_ge0 : 0 <= q.
 
-(* we need an efficient bijection that relates
-   from/hash to a finite field *)
-type F.
+(* Sampling is based on a finite field. *)
+type FF.
 
-op from2f : from -> F.
-op f2from : F -> from.
+op [lossless uniform full] duni_FF : FF distr.
+hint solve 0 random : duni_FF_ll duni_FF_uni duni_FF_fu.
 
-axiom from2fB : bijective from2f.
-axiom from2fK : cancel from2f f2from.
-lemma f2fromK : cancel f2from from2f by smt (bij_can_sym from2fB from2fK).
-lemma f2fromB : bijective f2from by  smt (bij_can_bij from2fB from2fK).
+lemma duni_FF_funi : is_funiform duni_FF.
+proof. apply is_full_funiform; [apply duni_FF_fu | apply duni_FF_uni]. qed.
 
-op hash2f : hash -> F.
-op f2hash : F -> hash.
+(* The bijection requirement makes everything commute nicely,
+   but these restrictions can probably be looser *)
 
-axiom hash2fB : bijective hash2f.
-axiom hash2fK : cancel hash2f f2hash.
-lemma f2hashK : cancel f2hash hash2f by smt (bij_can_sym hash2fB hash2fK).
-lemma f2hashB : bijective f2hash by  smt (bij_can_bij hash2fB hash2fK).
+op encode : from -> FF.
+axiom encodeB : bijective encode.
+
+op decode : FF -> hash.
+axiom decodeB : bijective decode.
 
 clone import Matrix with
-  type R <- F,
+  type R <- FF,
   op size <- 2*q
   proof ge0_size by smt(q_ge0).
 
+op genseed = dvector duni_FF.
 
+(* We use exponentiation to generate a row in a Vondermonde matrix *)
+op (^) : FF -> int -> FF.
+
+op compute(seed : vector, x : from) : hash =
+        let xv = offunv (fun (i : int) => encode x^i) in
+        let yf = dotp xv seed in
+            decode yf.
+
+module LQRO : QRO_i = {
+  var seed : vector
+
+  proc init() = { seed <$ genseed; }
+
+  quantum proc h {x:from} = { return compute seed x; }
+
+}.
+
+type output.
+
+quantum module type AdvRO (H:QRO) = {
+  proc main() : output
+}.
+
+
+axiom efficient_sim P (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m:
+  Pr[A(QRO).main() @ &m : P res] = Pr[ A(LQRO).main() @ &m: P res].
+
+(* Could be a lemma based on Theorem 3.1 in the same paper and the
+   fact that any set of 2q rows in the Vondermonde matrix we construct
+   are linearly independent.  *)
 
 end T_LazyQROM.
