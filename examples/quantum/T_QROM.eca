@@ -1,6 +1,6 @@
 require import AllCore List Distr DBool CHoareTactic.
-(*   *) import StdOrder RField RealOrder StdBigop Bigreal.
-require (*  *) Matrix.
+(*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
+require (*  *) Matrix Tuple.
 
 type from.
 type hash.
@@ -208,11 +208,62 @@ end T_StandardSecurePRG.
 
 (* TODO: if G is standard-secure, then it is also oracle-secure. *)
 
+(* 
+    Mark Zhandry
+    Secure Identity-Based Encryption in the Quantum Random Oracle Model
+    https://eprint.iacr.org/2012/076.pdf
+    Theorem 3.1.  *)
+
+abstract theory QROM_Fundamental_Lemma.
+
+clone import Tuple as TupleXY with 
+  type t <- from * hash.
+
+op q : int.
+
+axiom q_ge0 : 0 <= q.
+
+
+type result.
+
+quantum module type AdvRO (H:QRO) = {
+  proc main() : result
+}.
+
+module QRO_main_D(A : AdvRO) = {
+  proc main(adfhash : (from -> hash) distr) = {
+    var r;
+    QRO.h <$ adfhash;
+    r <@ A(QRO).main();
+    return r;
+  }
+}.
+
+module QRO_main(A : AdvRO, H : QRO_i) = {
+  proc main() = {
+    var r;
+    H.init();
+    r <@ A(H).main();
+    return r;
+  }
+}.
+
+op C : (from * hash) list -> result -> real.
+
+axiom dA_split (A<:AdvRO{-QRO_main}[main : `{Inf, #H.h : q}]) &m:
+   forall (adfhash: (from -> hash) distr) (r:result),
+    Pr[ QRO_main_D(A).main(adfhash) @ &m : res = r] = 
+    big predT (fun l => 
+      C l r * mu adfhash (fun fx => all (fun (xr:_*_) => fx xr.`1 = xr.`2) l))
+        (wordn (2*q)).
+
+end QROM_Fundamental_Lemma.
 
 (* Efficient QROM simulation: Theorem 6.1 in 
     Mark Zhandry
     Secure Identity-Based Encryption in the Quantum Random Oracle Model
     https://eprint.iacr.org/2012/076.pdf  *)
+
 
 abstract theory T_LazyQROM.
 
@@ -245,7 +296,7 @@ clone import Matrix with
 
 op genseed = dvector duni_FF.
 
-(* We use exponentiation to generate a row in a Vondermonde matrix *)
+(* We use exponentiation to generate a row in a Vandermonde matrix *)
 op (^) : FF -> int -> FF.
 
 op compute(seed : vector, x : from) : hash =
@@ -262,18 +313,38 @@ module LQRO : QRO_i = {
 
 }.
 
-type output.
+op dcompute : (from -> hash) distr = 
+       dmap genseed (fun seed => compute seed).
 
-quantum module type AdvRO (H:QRO) = {
-  proc main() : output
-}.
+clone import QROM_Fundamental_Lemma with
+    op q <- q
+    proof q_ge0 by smt(q_ge0).
+import TupleXY.
 
+(* This follows from the following property on the Vandermonde matrix: 
+   any 2q rows are linearly independent and the fact that we have
+   bijections to/from the hash inputs/outputs. *)
 
-axiom efficient_sim P (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m:
-  Pr[A(QRO).main() @ &m : P res] = Pr[ A(LQRO).main() @ &m: P res].
+lemma indep2q xy:
+  xy \in wordn (2 * q) =>
+ mu dfhash (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy) =
+ mu dcompute (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
+admitted.
 
-(* Could be a lemma based on Theorem 3.1 in the same paper and the
-   fact that any set of 2q rows in the Vondermonde matrix we construct
-   are linearly independent.  *)
+(* This requires some random sampling magic *)
+
+lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
+  Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r].
+admitted.
+
+lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
+  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ QRO_main(A,LQRO).main() @ &m: res = r ].
+proof.
+have -> : 
+ Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[QRO_main_D(A).main(dfhash) @ &m : res = r].
+   by byequiv=>//; conseq (_: _ ==> ={res})=> //; proc;inline*; sim; auto => />.
+rewrite (eager_sampling A) (dA_split A &m dfhash r) (dA_split A &m dcompute r).
+by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply indep2q.
+qed.
 
 end T_LazyQROM.
