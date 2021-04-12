@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int IntDiv.
+require import List Distr Int IntDiv.
 require (*--*) Subtype Ring StdOrder.
 (*---*) import Ring.IntID StdOrder.IntOrder.
 
@@ -205,6 +205,27 @@ proof.
 rewrite /intmul ltrNge ge0_asint /= AddMonoid.iteropE -{1}(asintK x).
 elim: (asint x) (ge0_asint x) => [|i ge0_i ih]; first by rewrite iter0.
 by rewrite iterS //= inzmodD -ih addrC.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma inzmodW (P : zmod -> bool) :
+  (forall i, 0 <= i < p => P (inzmod i)) => forall n, P n.
+proof. by move=> ih n; rewrite -(asintK n) &(ih) rg_asint. qed.
+
+(* -------------------------------------------------------------------- *)
+clone MFinite as DZmodP with
+  type t <- zmod,
+    op Support.enum = map inzmod (range 0 p)
+
+  proof *.
+
+realize Support.enum_spec.
+proof.
+elim/inzmodW=> i rgi; rewrite count_uniq_mem; last first.
+- by apply/b2i_eq1; apply/mapP; exists i=> /=; rewrite mem_range.
+rewrite &(map_inj_in_uniq) -1:range_uniq // => m n.
+rewrite !mem_range => rgm rgn /(congr1 asint).
+by rewrite !inzmodK !pmod_small.
 qed.
 end ZModRing.
 
