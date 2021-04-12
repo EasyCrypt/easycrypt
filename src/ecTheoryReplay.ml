@@ -585,7 +585,7 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
   | CTh_theory (ox, (cth, thmode)) -> begin
       let (subst, x) = rename ove subst (`Theory, ox) in
-      let subovrds = Msym.find_opt x ove.ovre_ovrd.evc_ths in
+      let subovrds = Msym.find_opt ox ove.ovre_ovrd.evc_ths in
       let subovrds = EcUtils.odfl evc_empty subovrds in
       let subove   = { ove with
         ovre_ovrd     = subovrds;
