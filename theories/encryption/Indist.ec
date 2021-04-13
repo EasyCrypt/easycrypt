@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore FSet Distr SampleBool OldMonoid.
+require import AllCore FSet Distr SampleBool.
 require DBool Hybrid.
 
 type input.

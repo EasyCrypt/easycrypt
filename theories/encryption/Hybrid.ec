@@ -6,9 +6,9 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore FSet Finite Distr DInterval.
-require import OldMonoid.
-require Means.
+require import AllCore List Finite Distr DInterval.
+require (*--*) Means StdOrder.
+(*---*) import StdBigop.Bigreal.BRA.
 
 type input.
 type output.
@@ -299,19 +299,6 @@ section.
     by wp.
   qed.
 
-  (* TODO : move this *)
-  lemma Mrplus_inter_shift (i j k:int) f:
-      Mrplus.sum f (oflist (List.Iota.iota_ i (j - i + 1))) =
-      Mrplus.sum (fun l, f (l + k)) (oflist (List.Iota.iota_ (i-k) (j - i + 1))).
-  proof strict.
-    rewrite (Mrplus.sum_chind f (fun l, l - k) (fun l, l + k)) /=;first smt.
-    congr => //.
-    apply FSet.fsetP => x.
-    rewrite imageP !mem_oflist !List.Iota.mem_iota; split.
-      move=> [y];rewrite !mem_oflist !List.Iota.mem_iota;smt.
-    move=> Hx;exists (x+k);rewrite !mem_oflist !List.Iota.mem_iota;smt.
-  qed.
-
   lemma Hybrid &m (p:glob A -> glob Ob -> int -> outputA -> bool):
     let p' = fun ga ge l r, p ga ge l r /\ l <= q in
     Pr[Ln(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1] -
@@ -320,42 +307,45 @@ section.
       Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res] -
         Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res]).
   proof.
-    move=> p';rewrite (GLB_WL &m p') (GRB_WR &m p').
-    simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
-    have Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
-      by move=> x; rewrite !mem_oflist !List.Iota.mem_iota  supp_dinter; smt.
-    have Hfin: is_finite (support [0..q - 1]).
-      rewrite is_finiteE; exists (List.Iota.iota_ 0 q).
-      by rewrite List.Iota.iota_uniq=> /= x; rewrite List.Iota.mem_iota supp_dinter=> /#.
-    have Huni : forall (x : int), x \in [0..q - 1] => mu1 [0..q - 1] x = 1%r / q%r.
-      by move=> x Hx; rewrite dinter1E /=; smt(supp_dinter).
-    pose ev :=
-      fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
-        let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
-    have := M.Mean_uni (HybGameFixed(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
-    have := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
-    have -> : oflist (to_seq (support [0..q - 1])) = oflist (List.Iota.iota_ 0 q).
-      by apply FSet.fsetP => x; rewrite !mem_oflist mem_to_seq// smt.
-    have {1}->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 1 (q - 1)) `|` fset1 0.
-      by apply/fsetP=> x; rewrite !inE !mem_oflist !List.Iota.mem_iota; smt.
-    have ->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 0 (q - 1)) `|` fset1 (q - 1).
-      by apply/fsetP=> x; rewrite !inE !mem_oflist !List.Iota.mem_iota; smt.
-    rewrite Mrplus.sum_add /=.
-      by rewrite mem_oflist List.Iota.mem_iota.
-    rewrite Mrplus.sum_add /=.
-      by rewrite mem_oflist List.Iota.mem_iota.
-    have Hq : q%r <> 0%r by smt.
-    fieldeq => //.
-    have ->: q - 1 = q - 1 - 1 - 0 + 1 by smt.
-    rewrite (Mrplus_inter_shift 0 (q - 1 - 1) (-1)) /=.
-    have ->: q - 1 - 1 + 1 = q - 1 by smt.
-    rewrite -(Mrplus.sum_comp (( * ) (-q%r))) 1..2:smt.
-    rewrite -(Mrplus.sum_comp (( * ) (q%r))) 1..2:smt.
-    rewrite Mrplus.sum_add2 /=.
-    rewrite (Mrplus.NatMul.sum_const 0%r) /Mrplus.NatMul.( * ) //=.
-    move=> x; rewrite mem_oflist List.Iota.mem_iota=> Hx.
-    have:= WLR_shift &m x p' _; 1:smt. simplify p'=> ->.
-    by smt.
+  move=> p';rewrite (GLB_WL &m p') (GRB_WR &m p').
+  simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
+  have Hint : forall x, support [0..q - 1] x <=> mem (List.Iota.iota_ 0 q) x.
+    by move=> x; rewrite !List.Iota.mem_iota  supp_dinter; smt.
+  have Hfin: is_finite (support [0..q - 1]).
+    rewrite is_finiteE; exists (range 0 q).
+    by rewrite range_uniq=> /= x; rewrite mem_range supp_dinter=> /#.
+  have Huni : forall (x : int), x \in [0..q - 1] => mu1 [0..q - 1] x = 1%r / q%r.
+    by move=> x Hx; rewrite dinter1E /=; smt(supp_dinter).
+  pose ev :=
+    fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
+      let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
+  have := M.Mean_uni (HybGameFixed(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
+  have := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
+  have supp_range: perm_eq (to_seq (support [0..q - 1])) (range 0 q).
+  + apply: uniq_perm_eq.
+    + exact: uniq_to_seq.
+    + exact: range_uniq.
+    by move=> x; rewrite mem_to_seq // supp_dinter mem_range /#.
+  rewrite !(eq_big_perm _ _ _ _ supp_range) {1}range_ltn 1:q_pos big_cons {1}/predT /=.
+  have {6}->: q = q - 1 + 1 by smt().
+  rewrite rangeSr 1:[smt(q_pos)] big_rcons {2}/predT /=.
+  fieldeq; 1:smt(q_pos).
+  rewrite RField.mulNr -RField.mulrN -RField.mulrDr.
+  rewrite (big_reindex _ _ (fun x=> x - 1) (fun x=> x + 1) (range 0 (q - 1))) //.
+  have ->: (transpose Int.(+) 1) = ((+) 1).
+  + by apply: fun_ext=> x /#.
+  have ->: predT \o transpose Int.(+) (-1) = predT.
+  + by apply: fun_ext=> x.
+  rewrite /(\o) //= -(range_addl 0 q 1) /= sumrB /=.
+  rewrite (eq_big_seq _ (fun _=> 0%r)) //.
+  + move=> n /mem_range /andaE [] ge1_q n_lt_q /=.
+    by rewrite (WLR_shift &m n p' _) 1:/# /p'.
+  rewrite big_const count_predT size_range.
+  rewrite (: max 0 (q - 1) = q - 1) 1:[smt(q_pos)].
+  have: (0 <= q - 1) by smt(q_pos).
+  elim: (q - 1)=> //= => [|n ge0_n ih].
+  + by rewrite iter0.
+  by rewrite iterS.
   qed.
 
 end section.

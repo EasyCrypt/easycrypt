@@ -6,7 +6,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore List FSet Finite Distr OldMonoid.
+require import AllCore List FSet Finite Distr.
 require import Indist.
 
 type pkey.

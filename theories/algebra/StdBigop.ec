@@ -12,6 +12,52 @@ require (*--*) Bigop Bigalg.
 (*---*) import RField IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
+theory Bigbool.
+theory BBXor.
+clone include Bigop with
+  type t <- bool,
+    op Support.idm   <- false,
+    op Support.( + ) <- Bool.( ^^ )
+
+proof Support.Axioms.* by smt().
+end BBXor.
+
+theory BBOr.
+clone include Bigop with
+  type t <- bool,
+    op Support.idm   <- false,
+    op Support.( + ) <- ( \/ )
+
+proof Support.Axioms.* by smt().
+
+lemma bigP (P F : 'a -> bool) (xs : 'a list):
+  big P F xs <=> has F (filter P xs).
+proof.
+elim: xs=> //= x xs ih.
+rewrite big_cons; case: (P x)=> //=.
+by rewrite ih.
+qed.
+end BBOr.
+
+theory BBAnd.
+clone include Bigop with
+  type t <- bool,
+    op Support.idm   <- true,
+    op Support.( + ) <- ( /\ )
+
+proof Support.Axioms.* by smt().
+
+lemma bigP (P F : 'a -> bool) (xs : 'a list):
+  big P F xs <=> all F (filter P xs).
+proof.
+elim: xs=> //= x xs ih.
+rewrite big_cons; case: (P x)=> //=.
+by rewrite ih.
+qed.
+end BBAnd.
+end Bigbool.
+
+(* -------------------------------------------------------------------- *)
 theory Bigint.
 clone include Bigalg.BigOrder with
   type t <- int,
