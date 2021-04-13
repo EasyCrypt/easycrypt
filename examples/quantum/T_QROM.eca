@@ -1,6 +1,6 @@
-require import AllCore List Distr DBool CHoareTactic.
+require import AllCore List Distr DBool CHoareTactic IntDiv.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
-require (*  *) Matrix Tuple.
+require (*  *) Matrix Tuple (* FinType *).
 
 type from.
 type hash.
@@ -273,28 +273,39 @@ axiom q_ge0 : 0 <= q.
 
 (* Sampling is based on a finite field. *)
 type FF.
+op enum : FF list.
+op n : { int | 0 < n } as gt0_n.
+op p : { int | 1 < p } as gt1_p.
+axiom order : size enum = p^n.
 
-op [lossless uniform full] duni_FF : FF distr.
-hint solve 0 random : duni_FF_ll duni_FF_uni duni_FF_fu.
+clone import MFinite with
+  type t <- FF,
+  op Support.enum <- enum.
+import Support.
+lemma char_order : p %| card. 
+have -> : (p = p^1); first by smt(@Ring.IntID).
+by rewrite /card  order; apply dvdz_exp2l; smt(gt0_n).
+qed.
 
-lemma duni_FF_funi : is_funiform duni_FF.
-proof. apply is_full_funiform; [apply duni_FF_fu | apply duni_FF_uni]. qed.
-
-(* The bijection requirement makes everything commute nicely,
-   but these restrictions can probably be looser *)
-
+(* Injection means that you have an FF that is large enough
+   to encode all possible inputs *)
 op encode : from -> FF.
-axiom encodeB : bijective encode.
+axiom encodeB : injective encode.
 
+(* Bijection means that a uniform field element gives you a uniform
+   element in hash, which is all we need *)
 op decode : FF -> hash.
 axiom decodeB : bijective decode.
+
+(* Note that this will work for any hash type that has p^n elements,
+   for p prime and n > 0 some integer. And |from| <= |hash|. *)
 
 clone import Matrix with
   type R <- FF,
   op size <- 2*q
   proof ge0_size by smt(q_ge0).
 
-op genseed = dvector duni_FF.
+op genseed = dvector dunifin.
 
 (* We use exponentiation to generate a row in a Vandermonde matrix *)
 op (^) : FF -> int -> FF.
@@ -348,3 +359,19 @@ by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply indep2q.
 qed.
 
 end T_LazyQROM.
+
+(* The above theory can be generalized to capture any QROM of the following form:
+
+   |X| < p^n
+   |Y| = p^m
+
+s.t. 1 < m <= n and 1 < p
+
+The idea is that the linear independence argument gives a random element in FF_p^n,
+which can be converted in a random element in FF_p^m by raising to p^{n-m}.
+
+This means, in particular, that we can model any possible compressing or
+length preserving QROM over bit strings and, in particular, random oracles
+that map bit strings to a single bit.
+
+*)
