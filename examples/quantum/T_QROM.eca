@@ -375,3 +375,121 @@ length preserving QROM over bit strings and, in particular, random oracles
 that map bit strings to a single bit.
 
 *)
+
+abstract theory T_LazyQROM_General.
+
+op q : int.
+
+axiom q_ge0 : 0 <= q.
+
+(* Sampling is based on two finite fields with the same characteristic. *)
+op p : { int | 1 < p } as gt1_p.
+
+type ff_in.
+op enum_ff_in : ff_in list.
+op n : { int | 0 < n } as gt0_n.
+axiom ff_in_order : size enum_ff_in = p^n.
+
+clone  MFinite as FFin with
+  type t <- ff_in,
+  op Support.enum <- enum_ff_in.
+
+lemma in_char_order : p %| FFin.Support.card. 
+have -> : (p = p^1); first by smt(@Ring.IntID).
+by rewrite /card  ff_in_order; apply dvdz_exp2l; smt(gt0_n).
+qed.
+
+type ff_out.
+op enum_ff_out : ff_out list.
+op m : { int | 0 < m <= n } as bnd_m.
+axiom ff_out_order : size enum_ff_out = p^m.
+
+clone  MFinite as FFout with
+  type t <- ff_out,
+  op Support.enum <- enum_ff_out.
+
+lemma out_char_order : p %| FFout.Support.card. 
+have -> : (p = p^1); first by smt(@Ring.IntID).
+by rewrite /card  ff_out_order; apply dvdz_exp2l; smt(bnd_m).
+qed.
+
+
+(* Injection means that you have an FF that is large enough
+   to encode all possible inputs *)
+op encode : from -> ff_in.
+axiom encodeB : injective encode.
+
+(* Bijection means that a uniform field element gives you a uniform
+   element in hash, which is all we need *)
+op decode : ff_out -> hash.
+axiom decodeB : bijective decode.
+
+(* Note that this will work for any hash type that has p^n elements,
+   for p prime and n > 0 some integer. And |from| <= |hash|. *)
+
+clone import Matrix with
+  type R <- ff_in,
+  op size <- 2*q
+  proof ge0_size by smt(q_ge0).
+
+op genseed = dvector FFin.dunifin.
+
+(* We use exponentiation to generate a row in a Vandermonde matrix *)
+op (^) : ff_in -> int -> ff_in.
+
+(* We use a projection function to obtain a value in ff_out *)
+
+op project : ff_in -> ff_out.
+
+axiom project_uniform y :
+   size (filter (fun x => project x = y) enum_ff_in) = p^(n-m).
+
+op compute(seed : vector, x : from) : hash =
+        let xv = offunv (fun (i : int) => encode x^i) in
+        let yf = dotp xv seed in
+            decode (project yf).
+
+module LQRO : QRO_i = {
+  var seed : vector
+
+  proc init() = { seed <$ genseed; }
+
+  quantum proc h {x:from} = { return compute seed x; }
+
+}.
+
+op dcompute : (from -> hash) distr = 
+       dmap genseed (fun seed => compute seed).
+
+clone import QROM_Fundamental_Lemma with
+    op q <- q
+    proof q_ge0 by smt(q_ge0).
+import TupleXY.
+
+(* This follows from the following property on the Vandermonde matrix: 
+   any 2q rows are linearly independent and the fact that we have
+   bijections to/from the hash inputs/outputs. *)
+
+lemma indep2q xy:
+  xy \in wordn (2 * q) =>
+ mu dfhash (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy) =
+ mu dcompute (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
+admitted.
+
+(* This requires some random sampling magic *)
+
+lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
+  Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r].
+admitted.
+
+lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
+  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ QRO_main(A,LQRO).main() @ &m: res = r ].
+proof.
+have -> : 
+ Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[QRO_main_D(A).main(dfhash) @ &m : res = r].
+   by byequiv=>//; conseq (_: _ ==> ={res})=> //; proc;inline*; sim; auto => />.
+rewrite (eager_sampling A) (dA_split A &m dfhash r) (dA_split A &m dcompute r).
+by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply indep2q.
+qed.
+
+end T_LazyQROM_General.
