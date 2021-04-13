@@ -332,20 +332,31 @@ clone import QROM_Fundamental_Lemma with
     proof q_ge0 by smt(q_ge0).
 import TupleXY.
 
-(* This follows from the following property on the Vandermonde matrix: 
-   any 2q rows are linearly independent and the fact that we have
-   bijections to/from the hash inputs/outputs. *)
-
-lemma indep2q xy:
-  xy \in wordn (2 * q) =>
- mu dfhash (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy) =
- mu dcompute (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
-admitted.
-
 (* This requires some random sampling magic *)
 
 lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
   Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r].
+admitted.
+
+(* This axiom captures the following property on the Vandermonde 
+   matrix:  any 2q rows are linearly independent. *)
+
+axiom indep2q xs: 
+  size xs = 2*q =>
+  uniq xs =>
+    bijective 
+     (fun seed => 
+       map
+        (fun x =>
+            let xv = offunv (fun (i : int) => encode x^i) in
+                dotp xv seed) xs).
+
+(* This should somehow follow from the previous axiom *)
+
+lemma perfect_sim xy:
+  xy \in wordn (2 * q) =>
+ mu dfhash (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy) =
+ mu dcompute (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
 admitted.
 
 lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
@@ -355,7 +366,7 @@ have -> :
  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[QRO_main_D(A).main(dfhash) @ &m : res = r].
    by byequiv=>//; conseq (_: _ ==> ={res})=> //; proc;inline*; sim; auto => />.
 rewrite (eager_sampling A) (dA_split A &m dfhash r) (dA_split A &m dcompute r).
-by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply indep2q.
+by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply perfect_sim.
 qed.
 
 end T_LazyQROM.
@@ -466,20 +477,31 @@ clone import QROM_Fundamental_Lemma with
     proof q_ge0 by smt(q_ge0).
 import TupleXY.
 
-(* This follows from the following property on the Vandermonde matrix: 
-   any 2q rows are linearly independent and the fact that we have
-   bijections to/from the hash inputs/outputs. *)
-
-lemma indep2q xy:
-  xy \in wordn (2 * q) =>
- mu dfhash (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy) =
- mu dcompute (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
-admitted.
-
 (* This requires some random sampling magic *)
 
 lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
   Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r].
+admitted.
+
+(* This axiom captures the following property on the Vandermonde 
+   matrix:  any 2q rows are linearly independent. *)
+
+axiom indep2q xs: 
+  size xs = 2*q =>
+  uniq xs =>
+    bijective 
+     (fun seed => 
+       map
+        (fun x =>
+            let xv = offunv (fun (i : int) => encode x^i) in
+                dotp xv seed) xs).
+
+(* This should somehow follow from the previous axiom *)
+
+lemma perfect_sim xy:
+  xy \in wordn (2 * q) =>
+ mu dfhash (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy) =
+ mu dcompute (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
 admitted.
 
 lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
@@ -489,7 +511,7 @@ have -> :
  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[QRO_main_D(A).main(dfhash) @ &m : res = r].
    by byequiv=>//; conseq (_: _ ==> ={res})=> //; proc;inline*; sim; auto => />.
 rewrite (eager_sampling A) (dA_split A &m dfhash r) (dA_split A &m dcompute r).
-by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply indep2q.
+by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply perfect_sim.
 qed.
 
 end T_LazyQROM_General.
