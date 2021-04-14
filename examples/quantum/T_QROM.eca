@@ -394,21 +394,23 @@ lemma universal2q xs :
   size xs = 2*q =>
   uniq xs =>
   genseed = dmap genseed (uhash_list xs).
+proof. 
 move => sxs uxs.
-apply eq_distr => x.
-have : (is_funiform genseed); first
-   by rewrite /genseed; apply (dvector_funi _ FFin.dunifin_fu FFin.dunifin_uni).
-move => genseed_funi.
-have : (is_funiform (dmap genseed (uhash_list xs)));
- first by apply (dmap_funi _ _ (indep2q xs sxs uxs) genseed_funi).
-move => uhash_funiform.
-(* not sure how to prove this, which is obviously true *)
-admitted.
+apply eq_funi_ll.
++  by rewrite /genseed; apply (dvector_funi _ FFin.dunifin_fu FFin.dunifin_uni).
++ by rewrite /genseed (dvector_ll _ FFin.dunifin_ll).
++ by rewrite /genseed;  apply (dmap_funi _ _ (indep2q xs sxs uxs) (dvector_funi _ FFin.dunifin_fu FFin.dunifin_uni)).
++ by rewrite /genseed; apply dmap_ll; apply dvector_ll; apply FFin.dunifin_ll.
+qed.
 
 lemma perfect_sim xy:
   xy \in wordn (2 * q) =>
  mu dfhash (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy) =
  mu dcompute (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
+proof.
+move => xys.
+pose P := (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
+rewrite /dfhash /dcompute.
 admitted.
 
 lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
