@@ -325,7 +325,7 @@ section.
     have Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
       by move=> x; rewrite !mem_oflist !List.Iota.mem_iota  supp_dinter; smt.
     have Hfin: is_finite (support [0..q - 1]).
-      exists (List.Iota.iota_ 0 q).
+      rewrite is_finiteE; exists (List.Iota.iota_ 0 q).
       by rewrite List.Iota.iota_uniq=> /= x; rewrite List.Iota.mem_iota supp_dinter=> /#.
     have Huni : forall (x : int), x \in [0..q - 1] => mu1 [0..q - 1] x = 1%r / q%r.
       by move=> x Hx; rewrite dinter1E /=; smt(supp_dinter).

@@ -124,12 +124,20 @@ qed.
 lemma dlist_uni (d:'a distr) n : 
   is_uniform d => is_uniform (dlist d n).
 proof.
-  case (n < 0)=> [Hlt0 Hu xs ys| /lezNgt Hge0 Hu xs ys].
-  + rewrite !supp_dlist0 ?ltzW //. 
-  rewrite !supp_dlist // => -[eqxs Hxs] [eqys Hys].
-  rewrite !dlist1E // eqxs eqys /=;move: eqys;rewrite -eqxs => {eqxs}.
-  elim: xs ys Hxs Hys => [ | x xs Hrec] [ | y ys] //=; 1,2:smt (size_ge0).
-  rewrite !big_consT /#.
+case (n < 0)=> [Hlt0 Hu xs ys| /lezNgt Hge0 Hu xs ys].
++ rewrite !supp_dlist0 ?ltzW //. 
+rewrite !supp_dlist // => -[eqxs Hxs] [eqys Hys].
+rewrite !dlist1E // eqxs eqys /=;move: eqys;rewrite -eqxs => {eqxs}.
+elim: xs ys Hxs Hys => [ | x xs Hrec] [ | y ys] //=; 1,2:smt (size_ge0).
+rewrite !big_consT /#.
+qed.
+
+lemma dlist_dmap ['a 'b] (d : 'a distr) (f : 'a -> 'b) n :
+  dlist (dmap d f) n = dmap (dlist d n) (map f).
+proof.
+elim/natind: n => [n le0_n| n ge0_n ih].
+- by rewrite !dlist0 // dmap_dunit.
+- by rewrite !dlistS //= ih -dmap_dprod_comp dmap_comp.
 qed.
 
 abstract theory Program.

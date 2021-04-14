@@ -184,7 +184,8 @@ clone include BigComRing with
     op CR.invr   <- Num.Domain.invr,
     op CR.intmul <- Num.Domain.intmul,
     op CR.ofint  <- Num.Domain.ofint,
-    op CR.exp    <- Num.Domain.exp
+    op CR.exp    <- Num.Domain.exp,
+    op CR.lreg   <- Num.Domain.lreg
 
     proof * remove abbrev CR.(-) remove abbrev CR.(/).
 

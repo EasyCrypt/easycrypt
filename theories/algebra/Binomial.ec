@@ -128,7 +128,8 @@ clone import Bigalg.BigComRing as BCR with
     op CR.invr   <- R.invr,
     op CR.intmul <- R.intmul,
     op CR.ofint  <- R.ofint,
-    op CR.exp    <- R.exp
+    op CR.exp    <- R.exp,
+    op CR.lreg   <- R.lreg
 
     proof CR.*
 
@@ -191,6 +192,7 @@ clone include BinomialCoeffs with
     op R.intmul <- RField.intmul,
     op R.ofint  <- RField.ofint,
     op R.exp    <- RField.exp,
+    op R.lreg   <- RField.lreg,
 
     op BCR.BAdd.big <- Bigreal.BRA.big<:'a>,
     op BCR.BMul.big <- Bigreal.BRM.big<:'a>
