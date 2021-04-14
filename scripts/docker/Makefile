@@ -3,7 +3,7 @@
 # --------------------------------------------------------------------
 # docker.com account name
 DNAME ?= easycryptpa
-BBOX  := build-box doc-box test-box
+BBOX  := build-box test-box
 
 # --------------------------------------------------------------------
 .PHONY: all __force__

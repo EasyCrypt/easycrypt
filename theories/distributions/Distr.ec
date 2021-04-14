@@ -266,16 +266,20 @@ proof. by move=> Hf Hu x y; apply: Hu; apply: Hf. qed.
 lemma funi_uni (d : 'a distr) : is_funiform d => is_uniform d.
 proof. by move=> h ????; apply: h. qed.
 
-lemma funi_ll_full (d : 'a distr) :
-  is_funiform d => is_lossless d => is_full d.
+lemma funi_neq0_full (d : 'a distr) :
+  is_funiform d => 0%r < weight d => is_full d.
 proof.
 move=> funi_d ll_d x; suff: exists y, y \in d.
 + by case=> y; rewrite !supportP (@funi_d x y).
 move: ll_d; apply/contraLR; rewrite negb_exists /= => h.
-rewrite /is_lossless (_ : weight d = 0%r) // muE.
+rewrite (_ : weight d = 0%r) // muE.
 rewrite sum0_eq //= => @/predT /= y.
 by rewrite massE -supportPn h.
 qed.
+
+lemma funi_ll_full (d : 'a distr) :
+  is_funiform d => is_lossless d => is_full d.
+proof. by move=> funi_d ll_d; rewrite &(funi_neq0_full) // ll_d. qed.
 
 lemma rnd_funi ['a] (d : 'a distr) :
   is_funiform d => forall x y, mu1 d x = mu1 d y.
@@ -471,6 +475,28 @@ lemma mu1_uni_ll ['a] (d : 'a distr) x :
   is_uniform d => is_lossless d => mu1 d x =
     if x \in d then 1%r / (size (to_seq (support d)))%r else 0%r.
 proof. by move=> uf_d ll_d; rewrite mu1_uni // ll_d. qed.
+
+lemma eq_funi ['a] (d1 d2 : 'a distr) :
+  is_funiform d1 => is_funiform d2 => weight d1 = weight d2 => d1 = d2.
+proof.
+move=> ^funi1 /funi_uni uni1 ^funi2 /funi_uni uni2 eq_wgt.
+apply/eq_distr=> x; rewrite !mu1_uni // eq_wgt.
+move: (ge0_weight d2) => /ler_eqVlt [<-//|^].
+rewrite -{1}eq_wgt => gt0_w1 gt0_w2.
+rewrite !funi_neq0_full //=; do 3! congr.
+apply/perm_eq_size/uniq_perm_eq;
+  1,2: by apply/uniq_to_seq/uniform_finite.
+move=> a; rewrite !mem_to_seq ?uniform_finite //.
+by rewrite !funi_neq0_full.
+qed.
+
+lemma eq_funi_ll ['a] (d1 d2 : 'a distr) :
+     is_funiform d1 => is_lossless d1
+  => is_funiform d2 => is_lossless d2
+  => d1 = d2.
+proof.
+by move=> funi1 ll1 funi2 ll2; apply: eq_funi => //; rewrite ll1 ll2.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op mnull ['a] = fun (x : 'a) => 0%r.

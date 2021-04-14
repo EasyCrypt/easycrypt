@@ -313,7 +313,7 @@ proof.
   proc.
   call (: size CCA.log - cA.`qD_choose <= k; 
            time
-           [(CCAl(S,A).O.dec k : [N (3 + ceqocipher); S.dec: 1])]).
+           [CCAl(S,A).O.dec k : [N (3 + ceqocipher); S.dec: 1]]).
   + move=> zdec hzdec; proc => //.
     if => //.
     + call (:true);auto => &hr /> /#.
@@ -321,7 +321,7 @@ proof.
   wp; call (:true); rnd.
   call (:size CCA.log <= k; 
            time
-           [(CCAl(S,A).O.dec k : [N (3 + ceqocipher); S.dec: 1])]).
+           [CCAl(S,A).O.dec k : [N (3 + ceqocipher); S.dec: 1]]).
   + move=> zdec hzdec; proc.
     if => //.
     + call (:true); auto => &hr /> /#.
@@ -375,5 +375,3 @@ qed.
 end section.
 
 end CCA_q.
-
-

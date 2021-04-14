@@ -31,6 +31,13 @@ local hint exact : size_ge0.
 lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case: s => //=; smt. qed.
 
+lemma size_eq1 ['a] (xs : 'a list) :
+  (size xs = 1) <=> (exists x, xs = [x]).
+proof.
+split=> [|[x ->//]]; case: xs => // x [|y xs] sz.
+- by exists x. - smt(size_ge0).
+qed.
+
 lemma seq2_ind ['a 'b] (P : 'a list -> 'b list -> bool) :
   P [] [] => (forall x1 x2 s1 s2, P s1 s2 => P (x1 :: s1) (x2 :: s2)) =>
     forall s1 s2, size s1 = size s2 => P s1 s2.
@@ -2334,6 +2341,15 @@ lemma mask_cat m1 m2 s1 s2 : size m1 = size s1 =>
   mask<:'a> (m1 ++ m2) (s1 ++ s2) = mask m1 s1 ++ mask m2 s2.
 proof. by move: m1 s1; apply/seq2_ind=> //= -[]. qed.
 
+lemma all_mask a m s : all a s => all a (mask<:'a> m s).
+proof. by elim: s m => [|x s ih] [|[] m] //= [ax /ih->]. qed.
+
+lemma has_mask a m s : has a (mask<:'a> m s) => has a s.
+proof. apply: contraLR; rewrite -!all_predC &(all_mask). qed.
+
+lemma mem_mask x m s : x \in mask<:'a> m s => x \in s.
+proof. by rewrite -!has_pred1 => /has_mask. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                             Subseq                                   *)
 (* -------------------------------------------------------------------- *)
@@ -2440,6 +2456,10 @@ elim: s2 s1 => [|y s2 ih] [|x s1] //=.
 + by rewrite addz_ge0 ?(count_ge0, b2i_ge0).
 + by case: (y = x) => [-> /ih|? /ih] /#.
 qed.
+
+lemma subseq_mem ['a] (xs ys : 'a list) x:
+  subseq xs ys => x \in xs => x \in ys.
+proof. by case/subseqP=> m [_ ->]; apply: mem_mask. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)
@@ -2898,10 +2918,111 @@ lemma lex_total (e : 'a -> 'a -> bool):
   => (forall s1 s2, lex e s1 s2 \/ lex e s2 s1).
 proof. by move=> h; elim=> [|x1 s1 IHs1] [|x2 s2] //=; smt. qed.
 
+op subseqs ['a] (xs : 'a list) : 'a list list =
+  with xs = [] => [[]]
+  with xs = y :: ys => map ((::) y) (subseqs ys) ++ subseqs ys.
+
+lemma inj_cons ['a] (x : 'a) : injective ((::) x).
+proof. by []. qed.
+
+lemma subseqsP ['a] (xs ys : 'a list) : subseq xs ys <=> xs \in subseqs ys.
+proof.
+elim: ys xs => [|y ys ih] [|x xs] //=.
+- by rewrite mem_cat -ih // sub0seq.
+rewrite mem_cat; case: (y = x) => [<<-|ne_xy].
+- rewrite (mem_map ((::) y)) 1:inj_cons -!ih -eq_iff.
+  by rewrite eq_sym orb_idr // &(subseq_trans) subseq_cons.
+by split=> [/ih ->//|[/mapP[? [_ [/>]]]|/ih //]].
+qed.
+
+lemma subseqs_uniq ['a] (xs : 'a list) : uniq xs => uniq (subseqs xs).
+proof.
+elim: xs => [|x xs ih] //= [x_xs uq]; apply/cat_uniq; do! split.
+- by apply map_inj_in_uniq => />; apply/ih.
+- apply/hasPn=> y; apply/contraL => /mapP[ys] [_ ->>].
+  apply/negP=> /subseqsP /(count_subseq (pred1 x)).
+  by rewrite (count_pred0_eq_in _ xs) 1:/#; smt(count_ge0).
+- by apply/ih.
+qed.
+
+lemma uniq_subseq_eq ['a] (xs xs1 xs2: 'a list) :
+   uniq xs => subseq xs1 xs => subseq xs2 xs
+     => (forall x, x \in xs1 = x \in xs2) => xs1 = xs2.
+proof.
+elim: xs xs1 xs2 => [| x xs ih] /=.
++ by move=> xs1 xs2; rewrite !subseq0 => />.
+case=> [| x1 xs1] [| x2 xs2] [] hxl hu //=.
++ by move=> _; apply/negP => /(_ x2).
++ by move=> _; apply/negP => /(_ x1).
+smt(subseq_mem).
+qed.
+
+(* -------------------------------------------------------------------- *)
+op alltuples ['a] (n : int) (xs : 'a list) =
+  iter n (fun ys => allpairs (::) xs ys) [[]].
+
+lemma alltuples_le0 ['a] (n : int) (xs : 'a list) :
+  n <= 0 => alltuples n xs = [[]].
+proof. by move=> le0_n; rewrite /alltuples iter0. qed.
+
+lemma alltuplesS ['a] (n : int) (xs : 'a list) : 0 <= n =>
+  alltuples (n+1) xs = allpairs (::) xs (alltuples n xs).
+proof. by move=> ge0_n; rewrite /alltuples iterS. qed.
+
+lemma alltuplesP ['a] (n : int) (xs ys : 'a list) :
+  xs \in alltuples n ys <=> (size xs = max 0 n /\ all (mem ys) xs).
+proof.
+elim/natind: n xs => [n ^le0_n /alltuples_le0<:'a> ->|n ge0_n ih] xs.
+- rewrite -eq_iff eq_sym mem_seq1 /max ltzNge le0_n /= size_eq0.
+  by apply/eq_iff/andb_idr => ->.
+rewrite /max ltzS ge0_n /= alltuplesS //; split.
+- by case/allpairsP=> -[/= z zs] [# z_ys + ->>] - /= /ih[-> ->] /> /#.
+- case: xs => /= [/#|x xs]; rewrite addzC => [#] /addIz sz_xs x_ys h.
+  by apply/allpairsP; exists (x, xs) => />; apply/ih => /#.
+qed.
+
+lemma alltuples_uniq ['a] (n : int) (xs : 'a list) :
+  uniq xs => uniq (alltuples n xs).
+proof.
+elim/natind: n => [n /alltuples_le0<:'a> ->//|n ge0_n ih uq_xs].
+by rewrite alltuplesS // &(allpairs_uniq) // &(ih).
+qed.
+
+lemma size_alltuples ['a] (n : int) (xs : 'a list) :
+  size (alltuples n xs) = (size xs)^(max 0 n).
+proof.
+elim/natind: n => [n ^le0_n /alltuples_le0<:'a> ->//=|].
+- by rewrite /max ltzNge le0_n /= expr0.
+move=> n ge0_n ih; rewrite /max ltzS ge0_n /=.
+by rewrite exprS // alltuplesS // size_allpairs ih /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op allsubtuples ['a] (n : int) (xs : 'a list) =
+  flatten (map (fun i => alltuples i xs) (range 0 (max 0 n + 1))).
+
+lemma allsubtuplesP ['a] (n : int) (xs ys : 'a list) :
+  xs \in allsubtuples n ys <=> (size xs <= max 0 n /\ all (mem ys) xs).
+proof. split.
+- by case/flatten_mapP=> i [# /= /mem_range rg_i /alltuplesP] [2!-> /#].
+case=> sz allxs; apply/flatten_mapP; exists (size xs).
+rewrite mem_range size_ge0 /= alltuplesP allxs /=.
+by rewrite ltzS sz /=; smt(size_ge0).
+qed.
+
+lemma allsubtuples_uniq ['a] (n : int) (xs : 'a list) :
+  uniq xs => uniq (allsubtuples n xs).
+proof.
+move=> uq_xs; apply: uniq_flatten_map => /=.
+- by move=> x; apply: alltuples_uniq.
+- move=> i j /mem_range rg_i /mem_range rg_j.
+  by case/hasP => ys [#] /alltuplesP[+ _] /alltuplesP[+ _] - -> /#.
+- by apply: range_uniq.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                          Cost on list                                *)
 (* -------------------------------------------------------------------- *)
-
 schema cost_eqnil ['a] `{P} {l:'a list} : cost [P: l = []] = cost [P:l] + '1.
 hint simplify cost_eqnil.
 

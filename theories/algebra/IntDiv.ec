@@ -199,6 +199,9 @@ qed.
 lemma nosmt divz_small m d: 0 <= m < `|d| => m %/ d = 0.
 proof. by move=> /edivz_eq /(_ 0). qed.
 
+lemma nosmt pdiv_small n d: 0 <= n < d => n %/ d = 0.
+proof. by move=> h; apply/divz_small => /#. qed.
+
 lemma nosmt modz_small m d: 0 <= m < `|d| => m %% d = m.
 proof. by move=> /emodz_eq /(_ 0). qed.
 
