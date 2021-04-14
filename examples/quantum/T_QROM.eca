@@ -264,115 +264,7 @@ end QROM_Fundamental_Lemma.
     Secure Identity-Based Encryption in the Quantum Random Oracle Model
     https://eprint.iacr.org/2012/076.pdf  *)
 
-
-abstract theory T_LazyQROM.
-
-op q : int.
-
-axiom q_ge0 : 0 <= q.
-
-(* Sampling is based on a finite field. *)
-type FF.
-op enum : FF list.
-op n : { int | 0 < n } as gt0_n.
-op p : { int | 1 < p } as gt1_p.
-axiom order : size enum = p^n.
-
-clone import MFinite with
-  type t <- FF,
-  op Support.enum <- enum.
-import Support.
-lemma char_order : p %| card. 
-have -> : (p = p^1); first by smt(@Ring.IntID).
-by rewrite /card  order; apply dvdz_exp2l; smt(gt0_n).
-qed.
-
-(* Injection means that you have an FF that is large enough
-   to encode all possible inputs *)
-op encode : from -> FF.
-axiom encodeB : injective encode.
-
-(* Bijection means that a uniform field element gives you a uniform
-   element in hash, which is all we need *)
-op decode : FF -> hash.
-axiom decodeB : bijective decode.
-
-(* Note that this will work for any hash type that has p^n elements,
-   for p prime and n > 0 some integer. And |from| <= |hash|. *)
-
-clone import Matrix with
-  type R <- FF,
-  op size <- 2*q
-  proof ge0_size by smt(q_ge0).
-
-op genseed = dvector dunifin.
-
-(* We use exponentiation to generate a row in a Vandermonde matrix *)
-op (^) : FF -> int -> FF.
-
-op compute(seed : vector, x : from) : hash =
-        let xv = offunv (fun (i : int) => encode x^i) in
-        let yf = dotp xv seed in
-            decode yf.
-
-module LQRO : QRO_i = {
-  var seed : vector
-
-  proc init() = { seed <$ genseed; }
-
-  quantum proc h {x:from} = { return compute seed x; }
-
-}.
-
-op dcompute : (from -> hash) distr = 
-       dmap genseed (fun seed => compute seed).
-
-clone import QROM_Fundamental_Lemma with
-    op q <- q
-    proof q_ge0 by smt(q_ge0).
-import TupleXY.
-
-(* This requires some random sampling magic *)
-
-lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
-  Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r].
-admitted.
-
-(* This axiom captures the following property on the Vandermonde 
-   matrix:  any 2q rows are linearly independent. *)
-
-op uhash_list(xs : FF list, seed : vector) : vector = 
-   offunv (fun i =>
-              let x = nth witness xs i in
-              let xv = offunv (fun (j : int) =>  x^j) in
-                  dotp xv seed).
-
-axiom indep2q xs: 
-  size xs = 2*q =>
-  uniq xs =>
-    bijective (uhash_list xs).
-
-(* This should somehow follow from the previous axiom *)
-
-lemma perfect_sim xy:
-  xy \in wordn (2 * q) =>
- mu dfhash (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy) =
- mu dcompute (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
-admitted.
-
-lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
-  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ QRO_main(A,LQRO).main() @ &m: res = r ].
-proof.
-have -> : 
- Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[QRO_main_D(A).main(dfhash) @ &m : res = r].
-   by byequiv=>//; conseq (_: _ ==> ={res})=> //; proc;inline*; sim; auto => />.
-rewrite (eager_sampling A) (dA_split A &m dfhash r) (dA_split A &m dcompute r).
-by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply perfect_sim.
-qed.
-
-end T_LazyQROM.
-
-(* The above theory can be generalized to capture any QROM of the following form:
+(* The theorem can be generalized to capture any QROM of the following form:
 
    |X| < p^n
    |Y| = p^m
@@ -388,7 +280,7 @@ that map bit strings to a single bit.
 
 *)
 
-abstract theory T_LazyQROM_General.
+abstract theory T_LazyQROM.
 
 op q : int.
 
@@ -498,7 +390,20 @@ axiom indep2q xs:
   uniq xs =>
     bijective (uhash_list xs).
 
-(* This should somehow follow from the previous axiom *)
+lemma universal2q xs :
+  size xs = 2*q =>
+  uniq xs =>
+  genseed = dmap genseed (uhash_list xs).
+move => sxs uxs.
+apply eq_distr => x.
+have : (is_funiform genseed); first
+   by rewrite /genseed; apply (dvector_funi _ FFin.dunifin_fu FFin.dunifin_uni).
+move => genseed_funi.
+have : (is_funiform (dmap genseed (uhash_list xs)));
+ first by apply (dmap_funi _ _ (indep2q xs sxs uxs) genseed_funi).
+move => uhash_funiform.
+(* not sure how to prove this, which is obviously true *)
+admitted.
 
 lemma perfect_sim xy:
   xy \in wordn (2 * q) =>
@@ -516,4 +421,4 @@ rewrite (eager_sampling A) (dA_split A &m dfhash r) (dA_split A &m dcompute r).
 by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply perfect_sim.
 qed.
 
-end T_LazyQROM_General.
+end T_LazyQROM.
