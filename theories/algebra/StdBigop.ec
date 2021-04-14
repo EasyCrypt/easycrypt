@@ -25,6 +25,7 @@ clone include Bigalg.BigOrder with
     op Num.Domain.intmul <- IntID.intmul,
     op Num.Domain.ofint  <- IntID.ofint_id,
     op Num.Domain.exp    <- IntID.exp,
+    op Num.Domain.lreg   <- IntID.lreg,
 
     op Num."`|_|" <- Int."`|_|",
     op Num.( <= ) <- Int.(<=),
@@ -96,6 +97,7 @@ clone include Bigalg.BigOrder with
     op Num.Domain.intmul <- RField.intmul,
     op Num.Domain.ofint  <- RField.ofint,
     op Num.Domain.exp    <- RField.exp,
+    op Num.Domain.lreg   <- RField.lreg,
 
     op Num."`|_|" <- Real."`|_|",
     op Num.( <= ) <- Real.(<=),

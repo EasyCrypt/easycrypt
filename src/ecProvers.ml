@@ -147,7 +147,7 @@ end = struct
 
   let load ?(ovrevict = []) ?why3conf () =
     if !theconfig = None then begin
-      let config  = Whyconf.read_config why3conf in
+      let config  = Whyconf.init_config why3conf in
       let main    = Whyconf.get_main config in
 
       Whyconf.load_plugins main;
@@ -157,7 +157,7 @@ end = struct
       let load_prover p config =
         let name    = p.Whyconf.prover_name in
         let version = p.Whyconf.prover_version in
-        let driver  = Whyconf.load_driver main w3_env config.Whyconf.driver [] in
+        let driver  = Whyconf.load_driver_raw main w3_env config.Whyconf.driver [] in
 
         { pr_prover  =
             { pr_name    = name;
