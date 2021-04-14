@@ -213,7 +213,8 @@ lemma inzmodW (P : zmod -> bool) :
 proof. by move=> ih n; rewrite -(asintK n) &(ih) rg_asint. qed.
 
 (* -------------------------------------------------------------------- *)
-clone MFinite as DZmodP with
+theory DZmodP.
+clone include MFinite with
   type t <- zmod,
     op Support.enum = map inzmod (range 0 p)
 
@@ -227,6 +228,23 @@ rewrite &(map_inj_in_uniq) -1:range_uniq // => m n.
 rewrite !mem_range => rgm rgn /(congr1 asint).
 by rewrite !inzmodK !pmod_small.
 qed.
+
+require import DInterval.
+
+lemma cardE : Support.card = p.
+proof. by rewrite /Support.card size_map size_range; smt(ge2_p). qed.
+
+lemma dzmodE : dunifin = dmap [0..p-1] inzmod.
+proof.
+apply/eq_distr; elim/inzmodW => i rgi.
+rewrite dunifin1E cardE dmapE /pred1 /(\o) /=.
+rewrite -(mu_eq_support _ (pred1 i)) => /= [j /supp_dinter|].
+- rewrite ler_subr_addl (addzC 1) -ltzE /pred1 => rgj.
+  by rewrite -eq_inzmod !pmod_small.
+- by rewrite dinter1E ler_subr_addl (addzC 1) -ltzE rgi.
+qed.
+end DZmodP.
+
 end ZModRing.
 
 (* ==================================================================== *)
