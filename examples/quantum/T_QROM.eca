@@ -341,15 +341,16 @@ admitted.
 (* This axiom captures the following property on the Vandermonde 
    matrix:  any 2q rows are linearly independent. *)
 
+op uhash_list(xs : FF list, seed : vector) : vector = 
+   offunv (fun i =>
+              let x = nth witness xs i in
+              let xv = offunv (fun (j : int) =>  x^j) in
+                  dotp xv seed).
+
 axiom indep2q xs: 
   size xs = 2*q =>
   uniq xs =>
-    bijective 
-     (fun seed => 
-       map
-        (fun x =>
-            let xv = offunv (fun (i : int) => encode x^i) in
-                dotp xv seed) xs).
+    bijective (uhash_list xs).
 
 (* This should somehow follow from the previous axiom *)
 
@@ -486,15 +487,16 @@ admitted.
 (* This axiom captures the following property on the Vandermonde 
    matrix:  any 2q rows are linearly independent. *)
 
+op uhash_list(xs : ff_in list, seed : vector) : vector = 
+   offunv (fun i =>
+              let x = nth witness xs i in
+              let xv = offunv (fun (j : int) =>  x^j) in
+                  dotp xv seed).
+
 axiom indep2q xs: 
   size xs = 2*q =>
   uniq xs =>
-    bijective 
-     (fun seed => 
-       map
-        (fun x =>
-            let xv = offunv (fun (i : int) => encode x^i) in
-                dotp xv seed) xs).
+    bijective (uhash_list xs).
 
 (* This should somehow follow from the previous axiom *)
 
