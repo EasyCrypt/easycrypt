@@ -68,7 +68,7 @@ op sampleDf (pk:pkey) = dmap sampleD (f pk).
 
 (* Domain sampling with uniform output *)
 axiom sampleDf_uni pk sk: 
-  (pk, sk) \in kg => is_uniform (sampleDf pk).
+  (pk, sk) \in kg => is_funiform (sampleDf pk).
 
 (* Preimage sampling with trapdoor *)
 axiom samplePreE pk sk y: 

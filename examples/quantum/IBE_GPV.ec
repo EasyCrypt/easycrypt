@@ -15,13 +15,41 @@ clone import T_PSF as PSF.
 
 clone import T_QROM as QROM with
   type from <- identity,
-  type hash <- pkey.
+  type hash <- pkey
+  rename "hash" as "pkey".
 
 clone include T_CPA with
    type msg    <- msg,
    type cipher <- cipher,
-   type pkey   <- pkey,
-   type skey   <- skey.
+   type pkey   <- mpkey * pkey,
+   type skey   <- skey,
+   type input  <- real.
+
+import MUFF.
+(* --------------------------------------------------------------------------*)
+op [lossless uniform full] dskey : skey distr.
+(* FIXME: this should be provable because f is bijective *)
+axiom dpkey_dskey : mu1 dpkey witness = mu1 dskey witness.
+
+op dfskey : (identity -> skey) distr = dfun (fun _ => dskey).
+
+lemma dfskey_ll: is_lossless dfskey.
+proof. apply dfun_ll => ?;apply dskey_ll. qed.
+
+lemma dfskey_uni: is_uniform dfskey.
+proof. apply dfun_uni => ?; apply dskey_uni. qed.
+
+lemma dfskey_fu: is_full dfskey.
+proof. apply dfun_fu => ?; apply dskey_fu. qed.
+
+hint solve 0 random : dfskey_ll dfskey_uni dfskey_fu.
+
+lemma dfskey_dfpkey (hs: identity -> skey) (hh:identity -> pkey) : mu1 dfskey hs = mu1 dfpkey hh.
+proof.
+  rewrite !dfun1E;apply BRM.eq_big => //= x _.
+  rewrite (is_full_funiform _ dskey_fu dskey_uni _ witness).
+  by rewrite (is_full_funiform _ dpkey_fu dpkey_uni _ witness) dpkey_dskey.
+qed.
 
 (* --------------------------------------------------------------------------- *)
 (* Security definition of IBE scheme in the QROM  *)
@@ -29,7 +57,7 @@ clone include T_CPA with
 module type IBEScheme_QROM (H:QRO) = {
   proc kg() : mpkey * mskey
   proc extract(msk:mskey, id:identity) : skey
-  proc enc(id:identity, m:msg) : cipher
+  proc enc(mpk:mpkey, id:identity, m:msg) : cipher
   proc dec(sk:skey, c:cipher) : msg option
 }.
 
@@ -48,16 +76,16 @@ module IDCPA_QROM (A:AdvIDCPA_QROM) (S:IBEScheme_QROM) = {
 }.
 
 module type EncScheme0  = {
-  proc enc (pk : pkey, m : msg): cipher   
+  proc enc (pk : mpkey * pkey, m : msg): cipher   
   proc dec (sk : skey, c : cipher): msg option 
 }.
 
 module ES(E:EncScheme0) : EncScheme = {
-  proc kg() : pkey * skey = {
+  proc kg() : (mpkey*pkey) * skey = {
     var mpk, msk, sk;
     (mpk, msk) <$ kg;
     sk <$ sampleD;
-    return (f mpk sk, sk);
+    return ((mpk, f mpk sk), sk);
   }
   include E
 }.
@@ -73,10 +101,10 @@ module GPV (E:EncScheme0) (H:QRO) = {
     return (finv msk pk);
   }
      
-  proc enc(id:identity, m:msg) : cipher = {
+  proc enc(mpk:mpkey, id:identity, m:msg) : cipher = {
     var pk, c;
     pk <@ H.h{id};
-    c <@ E.enc(pk, m);
+    c <@ E.enc((mpk, pk), m);
     return c;
   }
   proc dec = E.dec
@@ -100,6 +128,8 @@ proof. smt(ge0_cqe ge0_gqe). qed.
 lemma ge0_qh : 0 <= qh.
 proof. smt(ge0_cqh ge0_gqh). qed.
 
+op q = qe + qh + 1.
+
 (* --------------------------------------------------------------------------- *)
 
 section.
@@ -110,55 +140,312 @@ declare module A :
   AdvIDCPA_QROM { -IDCPA, -QRO, -E }[choose : `{Inf, #H.h : cqh, #O.extract : cqe},
                                  guess  : `{Inf, #H.h : gqh, #O.extract : gqe}].
 
+axiom A_wf : hoare [ IDCPA_QROM(A,GPV(E)).main : true ==> !IDCPA.id \in IDCPA.log /\
+                                                          uniq IDCPA.log /\
+                                                          size IDCPA.log = qe].
 (* FIXME: share this with FDH *)
 import DBB.
 
-lemma pr_dfbool_l lam m (l:identity list) q : 
-  0%r <= lam <= 1%r =>
-  !m \in l => size l <= q =>  
-  lam*(1%r-lam)^q <= 
-    mu (dbfun lam) (fun t => t m /\ forall m', m' \in l => !t m').
-proof.
-  move=> lam_bound hm hl.
-  apply (ler_trans (lam ^ 1 * (1%r - lam) ^ size l)).
-  rewrite RField.expr1; apply ler_wpmul2l; 1: by case: lam_bound.
-  apply ler_wiexpn2l; [1:smt ()| 2: smt(size_ge0)].
-  apply (ler_trans _ _ _ (dbfunE_mem_le lam [m] l lam_bound _)); 1: smt().
-  by apply mu_le => /#.
-qed.
+module type Init = {
+  proc * init (h: identity -> pkey, lam_: real) : (identity -> bool) * (identity -> pkey)
+}.
 
-local module IDCPA_QROM' (A:AdvIDCPA_QROM) (E:EncScheme0) = {
-  var bf : identity -> bool
+local module G(I:Init) = {
+  import var IDCPA
+  var bf   : identity -> bool
+ 
+  proc main0(lam_:real) = {
+    var b2;
+    QRO.init();
+    (bf, QRO.h) <- I.init(QRO.h, lam_);
+    b2 <@ IDCPA(A(QRO), GPV(E,QRO)).main();
+    return b2;
+  }
 
   proc main(lam_:real) = {
-    var b;
-    bf <$ dbfun lam_;
-    b <@ IDCPA_QROM(A, GPV(E)).main();
-    return b /\ (bf IDCPA.id /\ forall id', id' \in IDCPA.log => !bf id');
+    var b1;
+    b1 <- main0(lam_);
+    if (bf IDCPA.id /\ forall id', id' \in log => !bf id') b1 <- IDCPA.b = IDCPA.b';
+    else b1 <$ {0,1};
+    return b1 ;
   }
 }.
 
-local lemma l1 lam &m:
-  0%r <= lam <= 1%r =>
-  Pr[IDCPA_QROM'(A,E).main(lam) @ &m : res] >=
-    lam * (1%r - lam)^qe * Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res].
+local lemma pr_split lam (I<:Init{-A,-E, -QRO}) &m :
+  equiv [I.init ~ I.init : ={arg} ==> ={res}] =>
+  Pr[G(I).main(lam) @ &m : res] = 
+   0.5 * (1.0 - Pr[G(I).main0(lam) @ &m : G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => !G.bf id']) +
+   Pr[G(I).main0(lam) @ &m : res /\ (G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => !G.bf id')].
+proof.
+  move=> hI.
+  have -> : Pr[G(I).main(lam) @ &m : res] =
+    Pr[G(I).main(lam) @ &m : 
+      res /\ !(G.bf IDCPA.id /\ (forall id', id' \in IDCPA.log => !G.bf id')) \/
+      res /\  (G.bf IDCPA.id /\ (forall id', id' \in IDCPA.log => !G.bf id'))].
+  + by rewrite Pr [mu_eq] 1:/#.
+  rewrite Pr [mu_disjoint] 1:/#; congr.
+  + pose r :=  
+      Pr[G(I).main0(lam) @ &m : G.bf IDCPA.id /\ forall (id' : identity), id' \in IDCPA.log => ! G.bf id'].
+    byphoare (_: lam_ = lam /\ glob A = (glob A){m} /\ glob E = (glob E){m}==> _) => //.
+    proc.
+    seq 1 : (G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => ! G.bf id')
+            r 0.0
+            (1.0 - r) 0.5 
+            true => //.
+    + by conseq (: false) => /> //.
+    + phoare split ! 1.0 r.
+      + admit. (* Need loosless adv *)
+      call (: (glob A, glob E) = (glob A, glob E){m} /\ lam_ = lam ==> 
+               G.bf IDCPA.id /\ forall (id' : identity), id' \in IDCPA.log => ! G.bf id'); 2: by auto.
+      by bypr => &m0 h; rewrite /r; byequiv => //; sim; move: h => />.  
+    by rcondf 1 => //; conseq />; rnd (pred1 true); skip => /> *; rewrite dbool1E /= /pred1.
+  byequiv (: _ ==> (res /\ G.bf IDCPA.id /\ forall (id' : identity), id' \in IDCPA.log => ! G.bf id'){1} =
+                 (res /\ G.bf IDCPA.id /\ forall (id' : identity), id' \in IDCPA.log => ! G.bf id'){2}) => //;
+    last by move=> &1 &2 ->.
+  proc. inline *; wp.
+  seq 16 15: (={IDCPA.id, IDCPA.log, IDCPA.b, IDCPA.b', G.bf}); 1: by sim.
+  sp; if{1}; 1: by wp; skip => /> /#.
+  conseq (:true). smt().
+  rnd{1}; auto.
+qed.
+
+local module Init1 = {
+  proc init(h:identity -> pkey, lam_:real) = {
+    var bf;
+    bf <$ dbfun lam_;
+    return (bf, h);
+  }
+}.
+
+local module G1 = {
+  proc main(lam_) = {
+    var b2;
+    b2 <@ IDCPA_QROM(A,GPV(E)).main();
+    G.bf <$ dbfun lam_;
+    return b2;
+  }  
+}.
+
+local equiv GI1_G1 : G(Init1).main0 ~ G1.main : ={glob A, glob E, lam_} ==> 
+                     ={res,IDCPA.id, IDCPA.log,G.bf}.
+proof.
+  proc; inline [-tuple] Init1.init IDCPA_QROM(A, GPV(E)).main.
+  swap{1} 7 2; swap{1} [3..5] 3; wp. 
+  rnd; wp; conseq (_: b2{1} = b{2} /\ ={IDCPA.id, IDCPA.log}) => />.
+  by sim.  
+qed.
+
+local lemma pr_GI1 &m lam:
+  0.0 <= lam <= 1.0 => 
+  Pr[G(Init1).main0(lam) @ &m : res /\ (G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => !G.bf id')] =
+  (lam * (1.0 -lam)^qe) * Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res].
 proof.
 move=> lam_bound.
-byphoare (:(glob A, glob E){m} = (glob A, glob E) /\ lam_ = lam ==> _) => //.
-proc.
-swap 1 1.
-seq 1 : b Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res] (lam * (1%r - lam) ^ qe) 
-          _ 0%r (lam_ = lam /\ (b => !IDCPA.id \in IDCPA.log /\ size IDCPA.log <= qe)).
-+ inline *; wp.
-  conseq (:size IDCPA.log <= qe) => />.
-  (* FIXME: Adrien can we use complexity info here *)
-  admit.
-+ call (: (glob A, glob E){m} = (glob A, glob E) ==> res); 2: by auto.
-  bypr => &m0 h.
-  byequiv (: ={glob A, glob E} ==> ={res}) => //; 1: sim; move: h => />.
+have -> : Pr[G(Init1).main0(lam) @ &m : res /\ (G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => !G.bf id')] =
+          Pr[G1.main(lam) @ &m : res /\ (G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => !G.bf id')].
++ by byequiv GI1_G1.
+byphoare (:(glob A, glob E) = (glob A, glob E){m} /\ lam_ = lam==> _) => //.
+proc. 
+seq 1 : b2 (Pr[IDCPA_QROM(A, GPV(E)).main() @ &m : res]) (lam*(1.0-lam)^qe)
+        _ 0.0 
+       (!IDCPA.id \in IDCPA.log /\ uniq IDCPA.log /\ size IDCPA.log = qe /\ lam_ = lam).
++ by call A_wf; auto.
++ call (: (glob A, glob E) = (glob A, glob E){m} ==> res); 2: by auto.
+  by bypr => &m0 /> ??; byequiv => //; sim.
 + rnd (fun t => t IDCPA.id /\ forall id', id' \in IDCPA.log => ! t id').
-  by skip => /> &hr h /h [] ??; apply: pr_dfbool_l.
-+ by auto.
+  skip => /> &1 hid hu hs _.
+  have /= := dbfunE_mem_uniq lam [IDCPA.id{1}] IDCPA.log{1} lam_bound _ hu _.
+  + done. + smt().
+  by rewrite expr1 hs => <-; apply mu_eq => x /#.
++ by conseq (:false) => // />.
 smt().
 qed.
+
+local lemma pr_GI1t &m lam: 
+  0.0 <= lam <= 1.0 => 
+  Pr[G(Init1).main0(lam) @ &m : G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => !G.bf id'] =
+  (lam * (1.0 -lam)^qe).
+proof.
+move=> lam_bound.
+have -> : Pr[G(Init1).main0(lam) @ &m : G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => !G.bf id'] =
+          Pr[G1.main(lam) @ &m : G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => !G.bf id'].
++ by byequiv GI1_G1.
+byphoare (:(glob A, glob E) = (glob A, glob E){m} /\ lam_ = lam ==> _) => //.
+proc.
+seq 1 : true 1.0 (lam*(1.0-lam)^qe)
+        _ 0.0 
+       (!IDCPA.id \in IDCPA.log /\ uniq IDCPA.log /\ size IDCPA.log = qe /\ lam_ = lam).
++ by call A_wf; auto.
++ admit. (* Adversary lossless *)
++ rnd (fun t => t IDCPA.id /\ forall id', id' \in IDCPA.log => ! t id').
+  skip => /> &1 hid hu hs.
+  have /=:= dbfunE_mem_uniq lam [IDCPA.id{1}] IDCPA.log{1} lam_bound _ hu _.
+  + done. + smt().
+  by rewrite expr1 hs => <-; apply mu_eq => x /#.
++ by conseq (:false) => // />.
+smt().
+qed.
+
+(* FIXME move this *)
+lemma mul_le_pow lam n : 0.0 <= lam <= 1.0 => 0 <= n => 1%r - n%r * lam <= (1%r - lam) ^ n.
+proof.
+  move=> hlam; elim/natind n; 1:smt(expr0).
+  move=> *; rewrite exprS 1:// /#.
+qed.
+
+local lemma l1 &m lam:
+  0.0 < lam <= 1.0 => 
+  `|Pr[G(Init1).main(lam) @ &m : res] - 0.5| >= 
+    lam * `|Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res] - 0.5| - lam^2 * qe%r.
+proof.
+  move=> [hlam0 hlam1]; have hlam' :  0.0 <= lam <= 1.0 by smt().
+  pose eps := `|Pr[IDCPA_QROM(A, GPV(E)).main() @ &m : res] - 1%r / 2%r|.
+  apply (ler_trans ((lam * (1.0 - qe%r*lam)) * eps)).
+  + have -> : lam * (1%r - qe%r * lam) * eps = lam * eps - lam ^ 2 * qe%r * eps by ring.
+    apply ler_sub => //; rewrite -mulrA ler_pmul2l; 1: by apply expr_gt0.
+    by rewrite -{2}(mulr1 qe%r) ler_wpmul2l;[ smt(ge0_qe) | smt(mu_bounded)].
+  have ->:  
+   Pr[G(Init1).main(lam) @ &m : res] - 0.5 =
+     (lam * (1.0-lam)^qe) * (Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res] - 0.5).
+  + rewrite (pr_split lam Init1); 1: by sim.
+    by rewrite pr_GI1 1:// pr_GI1t 1://; ring.
+  by have := mul_le_pow lam qe hlam' ge0_qe; smt(mu_bounded).
+qed.
+
+local module Init2 = {
+  proc init(h:identity -> pkey, lam_:real) = {
+    var bf, y;
+    y <$ dpkey;
+    bf <$ dbfun lam_;
+    h <- fun m => if bf m then y else h m;
+    return (bf, h);
+  }
+}.
+
+local clone import SemiConstDistr with
+    op k <- qe.
+
+local lemma pr_size (p : bool -> bool) (I<:Init{-A,-E,-QRO}) &m lam: 
+  Pr[G(I).main0(lam) @ &m : p res /\ G.bf IDCPA.id /\ forall id', id' \in IDCPA.log => !G.bf id'] = 
+  Pr[G(I).main0(lam) @ &m : p res /\ good G.bf IDCPA.id IDCPA.log].
+proof.
+  rewrite /good /=.
+  byequiv => //.
+  conseq (_: _ ==> ={res, G.bf, IDCPA.id, IDCPA.log}) _ (_: true ==> size IDCPA.log <= qe) => //; last by sim.
+  admit.
+qed.
+
+local module ASCDr (H:QRO) = {
+  proc main() = {
+    var b;
+    b <@ IDCPA(A(H), GPV(E,H)).main();
+    return (b, IDCPA.id, IDCPA.log);
+  }
+}.
+
+local module ASCDt (H:QRO) = {
+  proc main() = {
+    var b;
+    b <@ IDCPA(A(H), GPV(E,H)).main();
+    return (true, IDCPA.id, IDCPA.log);
+  }
+}.
+ 
+local lemma l2 &m lam :
+  0.0 <= lam <= 1.0 => 
+  `|Pr[G(Init2).main(lam) @ &m : res] - Pr[G(Init1).main(lam) @ &m : res] | <=
+   (2%r * q%r + qe%r + 1%r) / 4.0 * lam ^2.
+proof.
+  move=> lam_bound.
+  rewrite (pr_split lam Init2); 1: (by sim); rewrite (pr_split lam Init1); 1: by sim.
+  rewrite (pr_size (fun _ => true) Init1) (pr_size (fun _ => true) Init2).
+  rewrite (pr_size idfun Init1) (pr_size idfun Init2) /idfun /=.
+  apply (ler_trans 
+      (0.5 * `| Pr[G(Init1).main0(lam) @ &m : good G.bf IDCPA.id IDCPA.log] -
+                Pr[G(Init2).main0(lam) @ &m : good G.bf IDCPA.id IDCPA.log] | 
+           + `| Pr[G(Init1).main0(lam) @ &m : res /\ good G.bf IDCPA.id IDCPA.log] -
+                Pr[G(Init2).main0(lam) @ &m : res /\ good G.bf IDCPA.id IDCPA.log] |)); 1: smt().
+  have -> : Pr[G(Init1).main0(lam) @ &m : res /\ good G.bf IDCPA.id IDCPA.log] =
+            Pr[SCD(ASCDr)._F0(lam) @ &m : res].
+  + byequiv => //; proc; inline ASCDr(QRO).main Init1.init; swap{2} 3 2; swap{2} 1 1.
+    by rnd{2}; wp; conseq (_: ={IDCPA.id, IDCPA.log} /\ G.bf{1} = SCD.bf{2} /\ b2{1} = b{2}) => //; sim.
+  have ->: Pr[G(Init2).main0(lam) @ &m : res /\ good G.bf IDCPA.id IDCPA.log] =
+         Pr[SCD(ASCDr)._F1(lam) @ &m : res].
+  + byequiv => //; proc; inline ASCDr(QRO).main Init2.init. swap{2} 1 2. 
+    by wp; conseq (_: ={IDCPA.id, IDCPA.log} /\ G.bf{1} = SCD.bf{2} /\ b2{1} = b{2}) => //; sim.
+  have -> : Pr[G(Init1).main0(lam) @ &m : good G.bf IDCPA.id IDCPA.log] =
+            Pr[SCD(ASCDt)._F0(lam) @ &m : res].
+  + byequiv => //; proc; inline ASCDt(QRO).main Init1.init. swap{2} 3 2; swap{2} 1 1.
+    by rnd{2}; wp; conseq (_: ={IDCPA.id, IDCPA.log} /\ G.bf{1} = SCD.bf{2} /\ b2{1} = b{2}) => //; sim.
+  have ->: Pr[G(Init2).main0(lam) @ &m : good G.bf IDCPA.id IDCPA.log] =
+         Pr[SCD(ASCDt)._F1(lam) @ &m : res].
+  + byequiv => //; proc; inline ASCDt(QRO).main Init2.init. swap{2} 1 2. 
+    by wp; conseq (_: ={IDCPA.id, IDCPA.log} /\ G.bf{1} = SCD.bf{2} /\ b2{1} = b{2}) => //; sim.
+  have := advantage q lam ASCDr _ &m lam_bound. 
+  + admit.
+  have /# := advantage q lam ASCDt _ &m lam_bound.
+  + admit.
+qed.
+
+module B (A:AdvIDCPA_QROM) : AdvCPA = {
+  import var IDCPA
+
+  var he : identity -> skey
+  var bf : identity -> bool
+
+  module E0 = {
+    proc extract(id:identity) : skey = {
+      log <- id::log;
+      return he id;
+    }
+  }
+
+  proc choose (lam_:real, k: mpkey * pkey) : msg * msg = {
+    var m1, m2, mpk, pk;
+    (mpk, pk) <- k;
+    log <- [];
+    bf <$ dbfun lam_;
+    he <$ dfskey;
+    QRO.h <- (fun m => if bf m then pk else f mpk (he m)); 
+    (id,m1,m2) <@ A(QRO,E0).choose(mpk);
+    return (m1,m2);
+  }
+
+  proc guess(c:cipher) : bool = {
+    var b';
+    b' <@ A(QRO,E0).guess(c);
+    if (!(bf id /\ (forall x', x' \in log => !bf x'))) b' <$ {0,1};
+    return b';
+  }
+    
+}.
+
+local lemma l3 &m lam : 
+   Pr[G(Init2).main(lam) @ &m : res] = Pr[CPA(B(A), ES(E)).main(lam) @ &m : res].
+proof.
+admitted.
+
+local lemma l4 &m lam: 
+  0.0 < lam <= 1.0 =>
+  lam * `|Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res] - 0.5|
+    - (2%r * q%r + 5.0* qe%r + 1%r) / 4.0 * lam ^2
+    <= `|Pr[CPA(B(A), ES(E)).main(lam) @ &m : res]- 0.5|.
+proof. move: (l1 &m) (l2 &m) (l3 &m) => /#. qed.
+
+local lemma conclusion &m:
+  let eps = `|Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res] - 0.5| in
+  let lam = 2.0 * eps / (2%r * q%r + 5.0*qe%r + 1%r) in 
+  eps^2 / (2%r * q%r + 5.0*qe%r + 1%r) <=
+     `|Pr[CPA(B(A), ES(E)).main(lam) @ &m : res]- 0.5|.
+proof.
+  move=> eps; case: (eps = 0%r).
+  + by move: eps => />; rewrite expr2 /= /#.
+  move=> heps lam.
+  have := l4 &m lam _.
+  + admit.
+  apply/ler_trans/lerr_eq; rewrite -/eps /lam;field => //.
+  admit.
+qed.
+
+end section.
 
