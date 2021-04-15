@@ -218,7 +218,7 @@ clone include MFinite with
   type t <- zmod,
     op Support.enum = map inzmod (range 0 p)
 
-  proof *.
+  proof Support.enum_spec.
 
 realize Support.enum_spec.
 proof.
