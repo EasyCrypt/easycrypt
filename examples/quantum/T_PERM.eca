@@ -66,8 +66,10 @@ op samplePre : skey -> codom -> dom distr.
 
 op sampleDf (pk:pkey) = dmap sampleD (f pk).
 
+axiom sampleD_ll : is_lossless sampleD.
+
 (* Domain sampling with uniform output *)
-axiom sampleDf_uni pk sk: 
+axiom sampleDf_funi pk sk: 
   (pk, sk) \in kg => is_funiform (sampleDf pk).
 
 (* Preimage sampling with trapdoor *)

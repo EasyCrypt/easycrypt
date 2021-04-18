@@ -512,7 +512,11 @@ seq 11 10 :
    + by byphoare => //; proc; rnd; skip.
    have -> : Pr[S.sample2(mpk{2}, msk{2}) @ &2 : res = a] = mu1 (dmap sampleD (f mpk{2})) a.
    + by byphoare (_: arg = (mpk,msk){2} ==> res = a) => //; proc; rnd; skip => />; rewrite dmap1E.
-   by admit. (* both distribution are funiform *)
+   congr;apply eq_funi_ll. 
+   + by apply is_full_funiform; [apply dpkey_fu | apply dpkey_uni].
+   + by apply dpkey_ll.
+   + by case: (arg{2}) harg; apply sampleDf_funi.
+   by apply/dmap_ll/sampleD_ll.
 
 seq 10 6 : ( (!G.bf IDCPA.id \/ exists m', m' \in IDCPA.log /\ G.bf m'){1} = 
               (!B.bf IDCPA.id \/ exists m', m' \in IDCPA.log /\ B.bf m'){2} /\
