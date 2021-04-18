@@ -253,8 +253,8 @@ proof.
   call(:true).
   call(:true; 
      time 
-       [(H.h : [N kH]),
-        (ASCD(H).Os.sign : [Inf; H.h: 1])]).
+       [H.h : [N kH],
+        ASCD(H).Os.sign : [Inf; H.h: 1]]).
   + move=> kh ks *; proc.
     by call(:true); auto.  
   + move=> kh ks *. 

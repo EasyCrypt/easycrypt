@@ -1181,11 +1181,11 @@ section Security_Aux.
   proof.
     proc.
     call (: size CCA.log - cA.`qD_choose <= k; time
-            [ (CCAl(CramerShoup, A).O.dec k : [N(3 + ceqocipher + cS.`cdec)])]).
+            [ CCAl(CramerShoup, A).O.dec k : [N(3 + ceqocipher + cS.`cdec)]]).
     + by move=> k hk; proc; if => //;1: call CSdec; auto => />; smt (ge0_cdk ge0_cg ge0_cH ge0_cf).
     auto; rnd.
     call (: size CCA.log <= k; time
-            [ (CCAl(CramerShoup, A).O.dec k : [N(3 + ceqocipher + cS.`cdec)])]).
+            [ CCAl(CramerShoup, A).O.dec k : [N(3 + ceqocipher + cS.`cdec)]]).
     + by move=> k hk; proc; if=>//; 1: call CSdec; auto => />; smt (ge0_cdk ge0_cg ge0_cH ge0_cf).
     auto; rnd; auto; do !rnd; auto=> &hr />. 
     rewrite FDistr.dt_ll DBool.dbool_ll dk_ll /=; split; 1: smt().
@@ -1235,10 +1235,10 @@ section Security_Aux.
   proof.
     proc; inline *; auto.
     call(:size B_TCR.log - cA.`qD_choose <= k; time
-         [(B_TCRl(A).O.dec k : [N(15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)])]).
+         [B_TCRl(A).O.dec k : [N(15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)]]).
     + move=> k hk; proc; auto => /> &hr *; smt (ge0_cH ge0_cg ge0_cf).
     wp; call(:size B_TCR.log <= k; time
-         [(B_TCRl(A).O.dec k : [N(15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)])]).
+         [B_TCRl(A).O.dec k : [N(15 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)]]).
     + move=> k hk; proc; auto => /> &hr *; smt (ge0_cH ge0_cg ge0_cf).
     do !(auto; do ?rnd) => />. 
     rewrite dt_r_ll FDistr.dt_ll dk_ll /=; split; 1:smt (dt_r_ll).
@@ -1368,18 +1368,18 @@ section Security.
   proof.
     case (Pr[CCA(CramerShoup, A).main() @ &m : res] <= 1%r/2%r);last first.
     + have /#:= aux3 A _ _ guess_ll choose_ll &m.
-      + move=> kC O ?; proc true : time [(O.dec: [N kC])] => //=.
+      + move=> kC O ?; proc true : time [O.dec: [N kC]] => //=.
         + rewrite bigi_constz /=; smt(ge0_cA1). 
         by move=> *; proc true : time [].
-      move=> kC O *; proc true : time [(O.dec: [N kC])] => //=.
+      move=> kC O *; proc true : time [O.dec: [N kC]] => //=.
       + by rewrite bigi_constz; smt(ge0_cA1).
       by move=> *; proc true : time [].
     have := aux3 NA _ _ _ choose_ll &m.            
-    + move=> kC O *; proc true : time [(O.dec: [N kC])] => //=.
+    + move=> kC O *; proc true : time [O.dec: [N kC]] => //=.
       + by rewrite bigi_constz; smt(ge0_cA1).
       by move=> *; proc true : time [].      
     + move=> kC O *; proc => /=.
-      call (:true; time [(O.dec: [N kC])]).
+      call (:true; time [O.dec: [N kC]]).
       + by move=> *; proc true : time []. 
       skip; rewrite bigi_constz; smt(ge0_cA1).
     + by move=> O O_ll;proc;inline *;call (_ : true) => //; apply guess_ll.
@@ -1407,10 +1407,10 @@ section Security.
   proof.
     exists (B_DDH(A)); split.
     + conseq (choare_B_DDH A _ _ guess_ll choose_ll); 1: by move=> /=;smt().
-      + move=> kC O *; proc true : time [(O.dec: [N kC])] => />.
+      + move=> kC O *; proc true : time [O.dec: [N kC]] => />.
         + by rewrite !bigi_constz 1,2:[smt(ge0_cA1)].    
         by move=> *; proc true : time [].   
-      move=> kC O *; proc true : time [(O.dec: [N kC])] => />.
+      move=> kC O *; proc true : time [O.dec: [N kC]] => />.
       + by rewrite !bigi_constz 1,2:[smt(ge0_cA1)].    
       by move=> *; proc true : time [].
     exists(B_TCR(A));split.
@@ -1418,13 +1418,14 @@ section Security.
       +  proc; do !(auto; do ?rnd) => />; smt(dt_r_ll FDistr.dt_ll).
       proc.
       call(:true ; time
-         [(B_TCR(A).O.dec k : [N(14 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)])]).
+         [B_TCR(A).O.dec k : [N(14 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)]]).
       + move=> k hk; proc; auto => />; smt (ge0_cH ge0_cg ge0_cf).
       wp; call(:true; time
-         [(B_TCR(A).O.dec k : [N(14 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)])]).
+         [B_TCR(A).O.dec k : [N(14 + 4 * cgpow + 6 * cgeq + cfmul + cfadd + cgdiv + cfeq + cH + ceqocipher)]]).
       + move=> k hk; proc; auto => /> ; smt (ge0_cH ge0_cg ge0_cf).
       by do !(auto; do ?rnd) => />; rewrite FDistr.dt_ll /= !bigi_constz /=; smt (ge0_cA).      
     by apply (conclusion &m).
   qed.
 
 end section Security.
+
