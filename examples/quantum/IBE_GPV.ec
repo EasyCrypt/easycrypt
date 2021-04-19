@@ -362,7 +362,10 @@ proof.
   + rewrite (pr_split lam Init1); 2: by sim.
     + islossless => *. 
     by rewrite pr_GI1 1:// pr_GI1t 1://; ring.
-  by have := mul_le_pow lam qe hlam' ge0_qe; smt(mu_bounded).
+  have -> : `|lam * (1%r - lam) ^ qe * (Pr[IDCPA_QROM(A, GPV(E)).main() @ &m : res] - 1%r / 2%r)| = lam * (1%r - lam) ^ qe * eps.
+  + rewrite /eps; smt(expr_ge0).
+  apply ler_wpmul2r; 1:smt(); apply ler_wpmul2l; 1: smt().
+  apply (mul_le_pow _ _ hlam' ge0_qe).
 qed.
 
 local module Init2 = {
@@ -602,7 +605,7 @@ proof.
   move=> heps lam.
   have h1 : 0%r < (2%r * q%r + 5%r * qe%r + 1%r) by smt(ge0_qh ge0_qe).
   have := l4 &m lam _.
-  + rewrite ler_pdivr_mulr => //; smt(mu_bounded). 
+  + rewrite ler_pdivr_mulr => //; smt(mu_bounded ge0_qe ge0_qh).
   apply/ler_trans/lerr_eq; rewrite -/eps /lam;field => //.
   smt(). 
 qed.
