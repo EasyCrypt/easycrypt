@@ -197,12 +197,20 @@ section.
            [H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)]]).
     + move=> zo hzo; proc; inline *.
       wp := (bounded LRO.m qH).
-      by rnd; auto => &hr />; rewrite dbits_ll /=; smt (cset_pos bounded_set).
+      rnd; auto => &hr />; rewrite dbits_ll /= => *; split => *.
+      + have ? := bounded_set LRO.m{hr} (qH - 1) x{hr}.
+        have ? := bounded_set LRO.m{hr} (size H.qs{hr}).
+        smt().
+      smt(cset_pos).
     wp; rnd; call (_: size H.qs = k /\ bounded LRO.m (size H.qs);
            time [H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)]]).
     + move=> zo hzo; proc; inline *.
       wp := (bounded LRO.m qH).
-      rnd;auto => &hr />; rewrite dbits_ll /=; smt(cset_pos bounded_set cA_pos).
+      rnd;auto => &hr />; rewrite dbits_ll /= => *; split => *.
+      + have ? := bounded_set LRO.m{hr} (qH - 1) x{hr}.
+        have ? := bounded_set LRO.m{hr} (size H.qs{hr}).
+        smt(cA_pos).
+      smt(cset_pos).
     inline *; auto => />.
     split => *.
     + smt (bounded_empty dbits_ll size_ge0 size_eq0 cA_pos).
