@@ -1052,7 +1052,8 @@ wp; call (_:
 
 (* INPUTS *)
 (* PY: SMT doesn't catch this without rewrite *)
-+ by proc; inline *;wp;skip; rewrite /staterel; smt(pkgid). 
++ proc; inline *;wp;skip; rewrite /staterel => &1 &2 />. 
+  case: (FKE.st{2}.`kst) => />. smt(pkgid). 
 
 (* OUTPUTS *)
 + by proc;inline *;auto => />; rewrite /staterel => /#. 
