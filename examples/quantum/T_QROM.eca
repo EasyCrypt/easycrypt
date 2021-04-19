@@ -112,6 +112,37 @@ module IND_QRO (H:QRO_i, A:AdvRO) = {
   }
 }.
 
+abstract theory SmallRange.
+
+type R.
+
+clone import MUniFinFun as FFR with
+  type t <- R.   (* This assume that the type of R is finite *)
+
+clone import MFinite with 
+  type t <- R,
+  op Support.enum <- FFR.FinT.enum
+  proof Support.enum_spec by apply FFR.FinT.enum_spec.
+
+op small_range = 
+  dlet (MUFF.dfun (fun _ => dunifin)) 
+    (fun fr => dlet (FFR.dfun (fun _ => dhash))
+                 (fun rh => dunit (rh \o fr))).
+                  
+module SR : QRO_i = {
+  include QRO [-init]
+
+  proc init () = {
+    QRO.h <$ small_range;
+  } 
+}.
+
+axiom advantage q (A<:AdvRO{-QRO}[main : `{Inf, #H.h : q}]) &m:
+  `| Pr[IND_QRO(QRO,A).main() @ &m : res] - Pr[IND_QRO(SR,A).main() @ &m : res] | <= 
+      27%r * q%r^3 / FFR.FinT.card%r.
+
+end SmallRange.
+
 abstract theory T_PRF.
 
 type key.
