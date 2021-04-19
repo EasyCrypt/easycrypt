@@ -1,4 +1,4 @@
-require import AllCore List Distr DBool CHoareTactic IntDiv.
+require import AllCore List Distr DBool DProd ZModP CHoareTactic IntDiv.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
 require (*  *) Matrix Tuple (* FinType *).
 
@@ -114,21 +114,28 @@ module IND_QRO (H:QRO_i, A:AdvRO) = {
 
 abstract theory SmallRange.
 
-type R.
+clone include ZModRing.
 
 clone import MUniFinFun as FFR with
-  type t <- R.   (* This assume that the type of R is finite *)
-
-clone import MFinite with 
-  type t <- R,
-  op Support.enum <- FFR.FinT.enum
-  proof Support.enum_spec by apply FFR.FinT.enum_spec.
-
+  type t <- zmod,
+  op FinT.enum <- DZmodP.Support.enum
+  proof FinT.enum_spec by apply  DZmodP.Support.enum_spec.
+(*
 op small_range = 
-  dlet (MUFF.dfun (fun _ => dunifin)) 
-    (fun fr => dlet (FFR.dfun (fun _ => dhash))
-                 (fun rh => dunit (rh \o fr))).
-                  
+  dmap (MUFF.dfun (fun _ => DZmodP.dunifin) `*` FFR.dfun (fun _ => dhash))
+    (fun (p:_ * _) => p.`2 \o p.`1).
+*) 
+module SR : QRO_i = {
+  include QRO [-init]
+
+  proc init () = {
+    var fr, rh;
+    fr <$ MUFF.dfun (fun _ => DZmodP.dunifin);
+    rh <$ FFR.dfun (fun _ => dhash);
+    QRO.h <- rh \o fr;
+  } 
+}.
+(*                 
 module SR : QRO_i = {
   include QRO [-init]
 
@@ -136,7 +143,7 @@ module SR : QRO_i = {
     QRO.h <$ small_range;
   } 
 }.
-
+*)
 axiom advantage q (A<:AdvRO{-QRO}[main : `{Inf, #H.h : q}]) &m:
   `| Pr[IND_QRO(QRO,A).main() @ &m : res] - Pr[IND_QRO(SR,A).main() @ &m : res] | <= 
       27%r * q%r^3 / FFR.FinT.card%r.
