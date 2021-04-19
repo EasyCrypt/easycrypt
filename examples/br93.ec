@@ -438,7 +438,11 @@ proof.
            [Log(LRO).o k : [N(3 + cdptxt + cget qH + cset qH + cin qH)]]).
       + move=> zo hzo; proc; inline *.
         wp := (bounded LRO.m qH).
-        rnd; auto => &hr />; rewrite dptxt_ll /=; smt (cset_pos bounded_set).
+        rnd; auto => &hr />; rewrite dptxt_ll /= => *; split => *.
+        + have ? := bounded_set LRO.m{hr} (qH - 1) x{hr}.
+          have ? := bounded_set LRO.m{hr} (size Log.qs{hr}).
+          smt().
+        smt(cset_pos).
       rnd; call (_: size Log.qs = k /\ bounded LRO.m (size Log.qs);
            time [Log(LRO).o k : [N(3 + cdptxt + cget qH + cset qH + cin qH)]]).
       + move=> zo hzo; proc; inline *.
