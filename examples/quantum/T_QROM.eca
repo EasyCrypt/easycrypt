@@ -248,9 +248,8 @@ module QRO_main(A : AdvRO, H : QRO_i) = {
   }
 }.
 
-op C : (from * hash) list -> result -> real.
-
 axiom dA_split (A<:AdvRO{-QRO_main}[main : `{Inf, #H.h : q}]) &m:
+   exists (C : (from * hash) list -> result -> real),
    forall (adfhash: (from -> hash) distr) (r:result),
     Pr[ QRO_main_D(A).main(adfhash) @ &m : res = r] = 
     big predT (fun l => 
@@ -373,7 +372,8 @@ import TupleXY.
 (* This requires some random sampling magic *)
 
 lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
-  Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r].
+  Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r]. 
+(* Just use random *)
 admitted.
 
 (* This axiom captures the following property on the Vandermonde 
@@ -389,6 +389,15 @@ axiom indep2q xs:
   size xs = 2*q =>
   uniq xs =>
     bijective (uhash_list xs).
+
+op u2q_from : from list.
+axiom unique_2q_valuesE : size u2q_from = 2*q /\ uniq u2q_from.
+
+op extend : from list -> from list.
+axiom extends_u2q l : size l <= 2*q => 
+   (forall x, x \in l => x \in extend l) /\
+   size (extend l) = 2*q /\ 
+   uniq (extend l).
 
 lemma universal2q xs :
   size xs = 2*q =>
@@ -410,7 +419,7 @@ lemma perfect_sim xy:
 proof.
 move => xys.
 pose P := (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
-rewrite /dfhash /dcompute.
+rewrite /dfhash /dcompute /compute.
 admitted.
 
 lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
