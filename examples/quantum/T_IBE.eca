@@ -15,7 +15,7 @@ type skey.
 module type IBEScheme = {
   proc kg() : mpkey * mskey
   proc extract(msk:mskey, id:identity) : skey
-  proc enc(id:identity, m:msg) : cipher
+  proc enc(msk:mpkey, id:identity, m:msg) : cipher
   proc dec(sk:skey, c:cipher) : msg option
 }.
 
@@ -33,6 +33,7 @@ module IDCPA(A:AdvIDCPA) (O:IBEScheme) = {
   var msk : mskey
   var log : identity list
   var id  : identity
+  var b, b' : bool
 
   module E = {
     proc extract(id:identity) : skey = {
@@ -44,15 +45,25 @@ module IDCPA(A:AdvIDCPA) (O:IBEScheme) = {
   }
 
   proc main() = {
-    var b, b', m1, m2, c;
+    var m1, m2, c;
     log <- [];
     (mpk, msk) <@ O.kg();
     (id,m1,m2) <@ A(E).choose(mpk);
     b <$ {0,1};
-    c   <@ O.enc(id, if b then m1 else m2);
+    c   <@ O.enc(mpk, id, if b then m1 else m2);
     b' <@ A(E).guess(c);
-    return b = b' /\ !id \in log ;
+    return b = b'; 
+(*    if (!id \in log) r <- b = b';
+      else r <$ {0,1} *)
   }
 }.
+
+(* The advantage of an adversary respecting constraintes on extraction
+   is defined as: 
+   `| Pr[IDCPA(A,S).main() @ &m : res] - 0.5 |
+   under the condition that Pr[IDCPA(A,S).main() @ &m : id \in log] = 0%r. *)
+
+
+
 
 

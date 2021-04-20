@@ -8,6 +8,8 @@ type cipher.
 type pkey.
 type skey.
 
+type input.
+
 module type EncScheme = {
   proc kg() : pkey * skey
   proc enc(pk:pkey, m:msg) : cipher
@@ -15,16 +17,16 @@ module type EncScheme = {
 }.
 
 quantum module type AdvCPA = {
-  proc choose (pk:pkey) : msg * msg
+  proc choose (i:input, pk:pkey) : msg * msg
   proc guess (c:cipher) : bool
 }.
 
 module CPA(A:AdvCPA) (O:EncScheme) = {
 
-  proc main() = {
+  proc main(i:input) = {
     var pk, sk, b, b', m1, m2, c;
     (pk, sk) <@ O.kg();
-    (m1,m2) <@ A.choose(pk);
+    (m1,m2) <@ A.choose(i, pk);
     b <$ {0,1};
     c   <@ O.enc(pk, if b then m1 else m2);
     b' <@ A.guess(c);

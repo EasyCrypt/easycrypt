@@ -251,7 +251,7 @@ lemma Inv_compl
     choare[Inv(Adv0, H0).i] time [N 1; Adv0.a : 1; H0.o : k ].
 proof.    
 move => hk; proc.
-call (_: true; time [(H0.o : [N 0; H0.o : 1])]).
+call (_: true; time [H0.o : [N 0; H0.o : 1]]).
 move => i Hi /=; proc*; call(_: true; time []); auto => /=.
 by auto => /=; rewrite big_constz count_predT big_constNz !size_range /#.
 qed.

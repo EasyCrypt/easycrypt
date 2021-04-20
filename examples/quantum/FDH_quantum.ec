@@ -65,7 +65,7 @@ module (FDH:Sign_QROM) (H:QRO) = {
 
 (* --------------------------------------------------------------------------- *)
 (* Maximal number of queries to the sign/hash oracle *)
-op qs : { int | 0 <= qs } as ge0_qs.
+op qs : { int | 0 < qs } as gt0_qs.
 op qh : { int | 0 <= qh } as ge0_qh.
 
 (* --------------------------------------------------------------------------- *)
@@ -205,8 +205,6 @@ local clone import START.
 local clone import SemiConstDistr with
     op k <- qs.
 
-(* lemma good_spill bf x l : good bf x l => !x \in l by smt(). *)
-
 local module (ASCD:AdvSCD) (H:QRO) = {
   import var EUF
 
@@ -255,8 +253,8 @@ proof.
   call(:true).
   call(:true; 
      time 
-       [(H.h : [N kH]),
-        (ASCD(H).Os.sign : [Inf; H.h: 1])]).
+       [H.h : [N kH],
+        ASCD(H).Os.sign : [Inf; H.h: 1]]).
   + move=> kh ks *; proc.
     by call(:true); auto.  
   + move=> kh ks *. 
@@ -293,24 +291,30 @@ proof.
   smt(dfsign_dfhash f_finv finv_f).
 qed.
 
-lemma conclusion1 &m : 
-  lam * (1%r - lam) ^ qs * Pr[EUF_QROM(A,FDH).main() @ &m : res] <=
-  Pr[OW(B(A)).main() @ &m : res] + (2%r * q%r + qs%r + 1%r)/ 6%r * lam^2. 
-proof. move: (l1 A lam &m) lam_bound (l3 &m) (l4 &m) (l5 &m) => /#. qed.
-
 lemma conclusion &m : 
   Pr[EUF_QROM(A,FDH).main() @ &m : res] <=
   Pr[OW(B(A)).main() @ &m : res] / (lam * (1%r - lam) ^ qs) + 
-   (2%r * q%r + qs%r + 1%r)/ 6%r * lam / (1%r - lam) ^ qs. 
+   (2*qh + 3*qs + 3)%r/ 6%r * lam / (1%r - lam) ^ qs. 
 proof. 
-  have := conclusion1 &m.
-  rewrite -ler_pdivl_mull; 1: smt (expr_gt0 lam_bound).
+  have : lam * (1%r - lam) ^ qs * Pr[EUF_QROM(A,FDH).main() @ &m : res] <=
+         Pr[OW(B(A)).main() @ &m : res] + (2%r * q%r + qs%r + 1%r)/ 6%r * lam^2. 
+  + by move: (l1 A lam &m) lam_bound (l3 &m) (l4 &m) (l5 &m) => /#. 
+  rewrite /q !fromintD -ler_pdivl_mull; 1: smt (expr_gt0 lam_bound).
   move=> h; apply/(ler_trans _ _ _ h)/lerr_eq; field => //; smt (expr_gt0 lam_bound).
 qed.
 
 end section OW.
 
 end FDH_OW.
+
+(* The minimun of the above bound is found for lam = 1/(qs+1) *)
+abstract theory FDH_OW_instanciate.
+
+clone include FDH_OW with
+  op lam = 1%r/(qs+1)%r
+  proof lam_bound by smt(gt0_qs).
+
+end FDH_OW_instanciate.
 
 (* --------------------------------------------------------------------------*)
 (* Proof assuming that f is a claw free permutation *)
@@ -385,21 +389,27 @@ proof.
   smt (dfsign_dfhash P2.f_finv f_finv).
 qed.
 
-local lemma conclusion1 &m : 
-  lam * (1%r - lam) ^ qs * Pr[EUF_QROM(A, FDH).main() @ &m : res] <= 
-    Pr[ClawFree(B(A)).main() @ &m : res].
-proof. move: (l1 A lam &m) lam_bound (l3 &m) => /#. qed.
-
 lemma conclusion &m : 
    Pr[EUF_QROM(A, FDH).main() @ &m : res] <= 
     Pr[ClawFree(B(A)).main() @ &m : res] / (lam * (1%r - lam) ^ qs).
 proof.
-  have := conclusion1 &m; rewrite -ler_pdivl_mull; smt(expr_gt0 lam_bound).
+  have : lam * (1%r - lam) ^ qs * Pr[EUF_QROM(A, FDH).main() @ &m : res] <= 
+    Pr[ClawFree(B(A)).main() @ &m : res].
+  + move: (l1 A lam &m) lam_bound (l3 &m) => /#.
+  rewrite -ler_pdivl_mull; smt(expr_gt0 lam_bound).
 qed.
 
 end section.
 end FDH_CF.
 
+(* The minimun of the above bound is found for lam = 1/(qs+1) *)
+abstract theory FDH_CF_instanciate.
+
+clone include FDH_CF with
+  op lam = 1%r/(qs+1)%r
+  proof lam_bound by smt(gt0_qs).
+
+end FDH_CF_instanciate.
 
 
 

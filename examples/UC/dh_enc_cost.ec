@@ -1052,7 +1052,8 @@ wp; call (_:
 
 (* INPUTS *)
 (* PY: SMT doesn't catch this without rewrite *)
-+ by proc; inline *;wp;skip; rewrite /staterel; smt(pkgid). 
++ proc; inline *;wp;skip; rewrite /staterel => &1 &2 />. 
+  case: (FKE.st{2}.`kst) => />. smt(pkgid). 
 
 (* OUTPUTS *)
 + by proc;inline *;auto => />; rewrite /staterel => /#. 
@@ -1163,10 +1164,10 @@ proof.
   apply (adv_ddh_max cddh (UC_emul_DDH(Z, CompRFEager(DHKE_Eager, HybFChan.F2Auth.PARA.PPara(HybFChan.F2Auth.FAuthLR.FAuth, HybFChan.F2Auth.FAuthRL.FAuth))))).
   proc; inline *.
   call (:true; time [
-     (CompRFEager(DHKE_Eager, HybFChan.F2Auth.PARA.PPara(HybFChan.F2Auth.FAuthLR.FAuth, HybFChan.F2Auth.FAuthRL.FAuth)).inputs : [N 29]),
-     (CompRFEager(DHKE_Eager, HybFChan.F2Auth.PARA.PPara(HybFChan.F2Auth.FAuthLR.FAuth, HybFChan.F2Auth.FAuthRL.FAuth)).outputs : [N 2]),
-     (CompRFEager(DHKE_Eager, HybFChan.F2Auth.PARA.PPara(HybFChan.F2Auth.FAuthLR.FAuth, HybFChan.F2Auth.FAuthRL.FAuth)).step : [N 23]),
-     (CompRFEager(DHKE_Eager, HybFChan.F2Auth.PARA.PPara(HybFChan.F2Auth.FAuthLR.FAuth, HybFChan.F2Auth.FAuthRL.FAuth)).backdoor : [N 5]) ]) => /= *.
+     CompRFEager(DHKE_Eager, HybFChan.F2Auth.PARA.PPara(HybFChan.F2Auth.FAuthLR.FAuth, HybFChan.F2Auth.FAuthRL.FAuth)).inputs : [N 29],
+     CompRFEager(DHKE_Eager, HybFChan.F2Auth.PARA.PPara(HybFChan.F2Auth.FAuthLR.FAuth, HybFChan.F2Auth.FAuthRL.FAuth)).outputs : [N 2],
+     CompRFEager(DHKE_Eager, HybFChan.F2Auth.PARA.PPara(HybFChan.F2Auth.FAuthLR.FAuth, HybFChan.F2Auth.FAuthRL.FAuth)).step : [N 23],
+     CompRFEager(DHKE_Eager, HybFChan.F2Auth.PARA.PPara(HybFChan.F2Auth.FAuthLR.FAuth, HybFChan.F2Auth.FAuthRL.FAuth)).backdoor : [N 5] ]) => /= *.
   + by proc; inline *; auto => />.
   + by proc; inline *; auto => />.
   + by proc; inline *; auto => /> /#.
@@ -2038,8 +2039,8 @@ exists (C_OTP.Sid(S1)); split.
     + match Left 1; [auto; smt() | done |].
       by call (:true); auto => /> /#. 
     match Right 1;[auto; smt() | done |].
-    call (:true; time [(C_OTP.Sid(S1, FB).FBPi.step : [N 1; FB.step : 1]), 
-                       (C_OTP.Sid(S1, FB).FBPi.backdoor : [N 4; FB.backdoor : 1])]).
+    call (:true; time [C_OTP.Sid(S1, FB).FBPi.step : [N 1; FB.step : 1], 
+                       C_OTP.Sid(S1, FB).FBPi.backdoor : [N 4; FB.backdoor : 1]]).
     + by move=> *; proc; call(:true); auto.
     + by move=> *; proc; call(:true); auto.
     auto => />.
@@ -2049,8 +2050,8 @@ exists (C_OTP.Sid(S1)); split.
   + match Left 1; [auto; smt() | done |].
     by wp; call (:true); auto => />. 
   match Right 1;[auto; smt() | done |].
-  wp;call (:true; time [(C_OTP.Sid(S1, FB).FBPi.step : [N 1; FB.step : 1]), 
-                        (C_OTP.Sid(S1, FB).FBPi.backdoor : [N 4; FB.backdoor : 1])]).
+  wp;call (:true; time [C_OTP.Sid(S1, FB).FBPi.step : [N 1; FB.step : 1], 
+                        C_OTP.Sid(S1, FB).FBPi.backdoor : [N 4; FB.backdoor : 1]]).
   + by move=> *; proc; call(:true); auto.
   + by move=> *; proc; call(:true); auto.
   auto => />.
@@ -2087,10 +2088,10 @@ have -> : Pr[RPi.REAL.UC_emul(Z, RPi.CompS(I_OTP, C_OTP.Sid(S1))).main() @ &m : 
 apply (hS1 (C_OTP.CompZR(Z, OTP))). 
 move=> kb ks ko ki I0 * {S h S1 hS1}.
 proc.
-call (:true; time [ (CompR_I(OTP, I0).inputs  : [N 9; I0.inputs : 1]), 
-                    (CompR_I(OTP, I0).outputs : [N (22 + cgdiv); I0.outputs : 2]), 
-                    (CompR_I(OTP, I0).step    : [N (19 + cgmul); I0.inputs : 1; I0.outputs : 1; I0.step : 1]), 
-                    (CompR_I(OTP, I0).backdoor : [N 5; I0.backdoor : 1])]) => /= *.
+call (:true; time [ CompR_I(OTP, I0).inputs  : [N 9; I0.inputs : 1], 
+                    CompR_I(OTP, I0).outputs : [N (22 + cgdiv); I0.outputs : 2], 
+                    CompR_I(OTP, I0).step    : [N (19 + cgmul); I0.inputs : 1; I0.outputs : 1; I0.step : 1], 
+                    CompR_I(OTP, I0).backdoor : [N 5; I0.backdoor : 1]]) => /= *.
 + proc; inline *;if => //.
   + sp => //; if => //; auto; last by smt().
     by call (:true); auto => />.
