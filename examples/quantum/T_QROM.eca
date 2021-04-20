@@ -1,4 +1,4 @@
-require import AllCore List Distr DBool DProd ZModP CHoareTactic IntDiv.
+require import AllCore List Distr DBool DProd DList DInterval CHoareTactic IntDiv.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
 require (*  *) Matrix Tuple (* FinType *).
 
@@ -112,41 +112,46 @@ module IND_QRO (H:QRO_i, A:AdvRO) = {
   }
 }.
 
-abstract theory SmallRange.
+theory SmallRange.
 
-clone include ZModRing.
+module type SR_i = {
+  proc init (r: int) : unit
+  quantum proc h {_:from} : hash    
+}.
 
-clone import MUniFinFun as FFR with
-  type t <- zmod,
-  op FinT.enum <- DZmodP.Support.enum
-  proof FinT.enum_spec by apply  DZmodP.Support.enum_spec.
-(*
-op small_range = 
-  dmap (MUFF.dfun (fun _ => DZmodP.dunifin) `*` FFR.dfun (fun _ => dhash))
-    (fun (p:_ * _) => p.`2 \o p.`1).
-*) 
-module SR : QRO_i = {
+module IND_SR (H:SR_i, A:AdvRO) = {
+  proc main(r:int) : bool = {
+    var b;
+
+    H.init(r);
+    b <@ A(H).main();
+    return b;
+  }
+}.
+
+module SRO = {
+  proc init (r:int) = { QRO.init(); }
+  include QRO [-init]
+}.
+
+module SR : SR_i = {
+  var rh : hash list
+
+  proc init (r:int) = {
+    var rh, fr;
+    rh <$ dlist dhash r;
+    fr <$ MUFF.dfun (fun _ => [0..r+1]);
+    QRO.h <- fun x => nth witness rh (fr x); 
+  } 
+
   include QRO [-init]
 
-  proc init () = {
-    var fr, rh;
-    fr <$ MUFF.dfun (fun _ => DZmodP.dunifin);
-    rh <$ FFR.dfun (fun _ => dhash);
-    QRO.h <- rh \o fr;
-  } 
 }.
-(*                 
-module SR : QRO_i = {
-  include QRO [-init]
 
-  proc init () = {
-    QRO.h <$ small_range;
-  } 
-}.
-*)
-axiom advantage q (A<:AdvRO{-QRO}[main : `{Inf, #H.h : q}]) &m:
-  `| Pr[IND_QRO(QRO,A).main() @ &m : res] - Pr[IND_QRO(SR,A).main() @ &m : res] | <= 
-      27%r * q%r^3 / FFR.FinT.card%r.
+axiom advantage q r (A<:AdvRO{-QRO}[main : `{Inf, #H.h : q}]) &m:
+  0 <= r => 
+  `| Pr[IND_SR(SRO,A).main(r) @ &m : res] - Pr[IND_SR(SR,A).main(r) @ &m : res] | <= 
+      27%r * q%r^3 / r%r.
 
 end SmallRange.
 
@@ -168,12 +173,14 @@ module PRF : QRO_i = {
 
 end T_PRF.
 
-type seed.
+abstract theory T_PRG.
 
-op [lossless uniform full] dF : (from -> seed) distr.
+type seed.
 op G : seed -> hash.
 
 abstract theory T_OracleSecurePRG.
+
+op [lossless uniform full] dF : (from -> seed) distr.
 
 (* G is an oracle-secure PRG if (G ∘ F) is a PRF for random F. *)
 module PRF : QRO_i = {
@@ -189,9 +196,9 @@ axiom advantage q (A <: AdvRO[main: `{Inf, #H.h : q}]) &m:
 
 end T_OracleSecurePRG.
 
-op [lossless uniform full] dseed : seed distr.
-
 abstract theory T_StandardSecurePRG.
+
+op [lossless uniform full] dseed : seed distr.
 
 (* random number generation *)
 module type RGi = {
@@ -243,6 +250,9 @@ axiom advantage q (A <: AdvPRG[main: `{Inf, #G.sample : q}]) &m:
 *)
 
 end T_StandardSecurePRG.
+
+end T_PRG.
+
 
 (* TODO: if G is standard-secure, then it is also oracle-secure. *)
 

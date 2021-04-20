@@ -5,6 +5,26 @@ let is_f_glob f =
   | Fglob _ -> true
   | _       -> false
 
+let is_classical_or_local  =
+  let rec is_classical env f =
+  match f.f_node with
+  | Fquant (_,_,f) | Fproj(f,_) -> is_classical env f
+  | Fif (f1,f2,f3) -> is_classical env f1 && is_classical env f2 && is_classical env f3
+  | Flet (_,f1,f2) -> is_classical env f1 && is_classical env f2
+  | Fmatch (f,fs,_) | Fapp(f,fs) -> List.for_all (is_classical env) (f::fs)
+  | Ftuple fs -> List.for_all (is_classical env) fs
+  | Fglob   (mp,_) -> is_classical_glob env mp
+  | Fint _ | Flocal _ | Fop _ -> true
+  | Fpvar _ -> true
+  (* FIXME quantum : what to do here ? *)
+  | FhoareF _ | FhoareS _
+  | FcHoareF _ | FcHoareS _
+  | FbdHoareF _ | FbdHoareS _
+  | FequivF _ | FequivS _
+  | FeagerF _  | Fcoe _ | Fpr _ -> assert false in
+  is_classical
+
+
 let rec wf_quantum env f =
   match f.f_node with
   | Fquant(Lforall, _, f) -> wf_quantum env f
@@ -15,12 +35,12 @@ let rec wf_quantum env f =
    (* | Some(`And `Asym), [f1; f2] -> is_classical env f1 && wf_quantum env f2 *)
     | Some(`And `Asym), [f1; f2] -> wf_quantum env f1 && wf_quantum env f2
     | Some(`Or _), [f1; f2] ->
-         is_classical env f1 && wf_quantum env f2
-      || wf_quantum env f1 && is_classical env f2
+         is_classical_or_local env f1 && wf_quantum env f2
+      || wf_quantum env f1 && is_classical_or_local env f2
     | Some `Imp, [f1; f2] ->
-      is_classical env f1 && wf_quantum env f2
+      is_classical_or_local env f1 && wf_quantum env f2
     | Some `Eq, [f1; f2] when is_f_glob f1 && is_f_glob f2 -> true
-    | _ -> is_classical env f
+    | _ -> is_classical_or_local env f
     end
   | Fif (f1, f2, f3) ->
     is_classical env f1 && wf_quantum env f2 && wf_quantum env f3

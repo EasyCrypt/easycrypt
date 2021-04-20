@@ -161,7 +161,7 @@ qed.
 (* --------------------------------------------------------------------------*)
 (* Proof assuming that f in OW *)
 
-abstract theory FDH_OW.
+abstract theory FDH_OW_semi_constant.
 
 op lam : real.
 axiom lam_bound : 0%r < lam < 1%r.
@@ -305,16 +305,16 @@ qed.
 
 end section OW.
 
-end FDH_OW.
+end FDH_OW_semi_constant.
 
 (* The minimun of the above bound is found for lam = 1/(qs+1) *)
-abstract theory FDH_OW_instanciate.
+abstract theory FDH_OW_SC_instanciate.
 
-clone include FDH_OW with
+clone include FDH_OW_semi_constant with
   op lam = 1%r/(qs+1)%r
   proof lam_bound by smt(gt0_qs).
 
-end FDH_OW_instanciate.
+end FDH_OW_SC_instanciate.
 
 (* --------------------------------------------------------------------------*)
 (* Proof assuming that f is a claw free permutation *)
@@ -411,6 +411,120 @@ clone include FDH_CF with
 
 end FDH_CF_instanciate.
 
+abstract theory FDH_OW_small_range.
+
+clone import T_OW with 
+  op dcodom <- dhash.
+
+module B (* (A:AdvEUF_QROM) : AdvOW *) = {
+  import var EUF
+  var hs : msg -> sign
+(*
+  module Os = {
+    proc sign(m:msg) = { 
+      log <- m :: log;
+      return hs m; 
+    }
+  }
+
+  proc main(pk:pkey, y:hash) : sign = {
+    var m,s;
+    bf <$ dbfun lam;
+    hs <$ dfsign;
+    QRO.h <- fun m => if bf m then y else f pk (hs m);
+    EUF.log <- [];
+    (m,s) <@ A(QRO, Os).main(pk);
+    return s;
+  }
+*)
+}.
+
+op q = qs + qh + 1.
+
+clone T_QROM as SQRO with
+  type from <- msg,
+  type hash <- sign,
+  op dhash <- dsign,
+  op MUFF.FinT.enum <- QROM.MUFF.FinT.enum
+  proof dhash_ll by apply dsign_ll,
+        dhash_uni by apply dsign_uni,
+        dhash_fu by apply dsign_fu,    
+        MUFF.FinT.enum_spec by apply QROM.MUFF.FinT.enum_spec.
+
+import SQRO.SmallRange. 
+
+section OW.
+
+declare module A : AdvEUF_QROM { -QRO, -SQRO.QRO, -EUF , -B}
+                     [main : `{Inf, #H.h : qh, #S.sign : qs}].
+
+axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) : 
+  islossless S.sign => islossless H.h => islossless A(H, S).main.
+
+local module G1 (S:SQRO.QRO) = {
+  import var EUF QRO B
+  module Os = {
+    proc sign(m:msg) = { 
+      var s;
+      s <@ S.h{m};
+      log <- m :: log;
+      return s; 
+    }
+  }
+
+  module RO = {
+    quantum proc h {m:msg} = {
+      quantum var s;
+      s <@ S.h{m};
+      return f pk s;
+    }
+  }
+
+  proc main() = {
+    var s, s';
+    (pk, sk) <$ kg;
+    log <- [];
+    (m,s) <@ A(RO, Os).main(pk);
+    s' <@ S.h{m};
+    return f pk s' = f pk s /\ !m \in log;
+  }
+}.
+
+local lemma SROdfhash_dfsign : SQRO.dfhash = dfsign.
+proof. done. qed. 
+
+local lemma l1 &m r : 
+  Pr[EUF_QROM(A,FDH).main() @ &m : res] = Pr[IND_SR(SRO,G1).main(r) @ &m : res].
+proof.
+  byequiv => //; proc; inline *;wp.
+  call (: ={EUF.pk, EUF.sk, EUF.log} /\ (EUF.pk, EUF.sk){1} \in kg /\
+           QRO.h{1} = (fun m => f EUF.pk (SQRO.QRO.h m)){2}).
+  + by proc; inline *; auto => /> &2 /finv_f /= ->.
+  + by proc; inline *; auto.
+  sp; wp; swap 2 -1.
+  rnd (fun (h:msg -> hash) => fun m => finv EUF.sk{2} (h m))
+      (fun (h:msg -> sign) => fun m => f EUF.pk{2} (h m)).
+  rnd; skip => /> ks hks; rewrite SROdfhash_dfsign; smt (fun_ext finv_f f_finv dfsign_dfhash).
+qed.
+
+local lemma l2 &m r : 
+  0 <= r => 
+  `| Pr[IND_SR(SRO,G1).main(r) @ &m : res] - Pr[IND_SR(SR,G1).main(r) @ &m : res]| 
+   <= 27%r * q%r^3 / r%r.
+proof.
+  apply (SQRO.SmallRange.advantage q r G1).
+  admit.
+qed.
+
+
+
+
+
+lemma conclusion &m : 
+  Pr[EUF_QROM(A,FDH).main() @ &m : res] <=
+  Pr[OW(B(A)).main() @ &m : res] / (lam * (1%r - lam) ^ qs) + 
+   (2*qh + 3*qs + 3)%r/ 6%r * lam / (1%r - lam) ^ qs. 
+proof. 
 
 
 

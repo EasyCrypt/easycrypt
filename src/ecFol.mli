@@ -241,4 +241,5 @@ val cost_app      : cost -> form list -> cost
 
 val cost_flatten  : cost -> form *)
 
+val is_classical_glob : EcEnv.env -> mpath -> bool
 val is_classical : EcEnv.env -> form -> bool
