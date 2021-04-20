@@ -20,11 +20,26 @@ proof. by move=> ge0_n; rewrite dlist_def foldle0. qed.
 lemma dlistS (d : 'a distr) n:
   0 <= n =>
   dlist d (n + 1)
-  = dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` (dlist d n)).
-proof.
-elim n=> [|n le0_n ih].
-+ by rewrite !dlist_def /= -foldpos // fold0.
-by rewrite dlist_def -foldpos 1:/# -dlist_def /=.
+  = dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` dlist d n).
+proof. by move=> hn; rewrite !dlist_def foldS. qed.
+
+lemma dlist1 (d : 'a distr) : dlist d 1 = dmap d (fun a => [a]).
+proof. 
+  rewrite (dlistS d 0) // dlist0 //=; rewrite dmap_dprodE; apply eq_dlet => //= a.
+  by rewrite dmap_dunit.
+qed.
+
+lemma dlist_add (d : 'a distr) n1 n2:
+  0 <= n1 => 0 <= n2 =>
+  dlist d (n1 + n2)
+  = dapply (fun (xy : 'a list * 'a list) => xy.`1 ++ xy.`2) (dlist d n1 `*` dlist d n2).
+proof. 
+move=> hn1 hn2; rewrite !dlist_def -fold_add //.
+move: (fold _ _ n2) => {n2 hn2 hn1}. 
+elim/natind: n1.
++ by move=> n hn dl2; rewrite !foldle0 // dmap_dprodE dlet_unit /= dmap_id.
+move=> n hn hrec dl.
+by rewrite !foldS //= hrec dmap_dprodR dmap_dprodL !dmap_comp dprodA dmap_comp.
 qed.
 
 lemma dlist01E (d : 'a distr) n x:

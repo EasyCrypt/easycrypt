@@ -1614,6 +1614,14 @@ rewrite dprodC dmap_comp dmap_dprodE &(eq_dlet) //.
 by move=> b /=; apply: eq_dlet => // ?.
 qed.
 
+lemma dprodA ['a 'b 'c] (da: 'a distr) (db:'b distr) (dc:'c distr) :
+  da `*` (db `*` dc) = dmap (da `*` db `*` dc) (fun (p:(_ * _) * _) => (p.`1.`1, (p.`1.`2, p.`2))).
+proof.
+rewrite dmap_dprodE !dprod_dlet !dlet_dlet; apply eq_dlet => // a.
+rewrite !dlet_dlet; apply eq_dlet => //= b; rewrite dlet_dunit dlet_unit /= dmap_dlet.
+by apply eq_dlet => //= c; rewrite /(\o) dmap_dunit.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op djoin (ds : 'a distr list) : 'a list distr =
  foldr
