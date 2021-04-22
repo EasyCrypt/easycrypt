@@ -1,4 +1,4 @@
-require import AllCore List Distr DBool CHoareTactic.
+require import AllCore List Distr DBool DList DProd CHoareTactic.
 require (*  *) T_QROM T_EUF T_PERM.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal.
 
@@ -71,21 +71,22 @@ op qh : { int | 0 <= qh } as ge0_qh.
 (* --------------------------------------------------------------------------- *)
 (* Generic start of the proof used for OW and ClawFree *)
 
-import DBB.
+(* FIXME: move this in EUF ? *)
+section. 
 
-lemma pr_dfbool_l lam m (l:msg list) q : 
-  0%r <= lam <= 1%r =>
-  !m \in l => size l <= q =>  
-  lam*(1%r-lam)^q <= 
-    mu (dbfun lam) (fun t => t m /\ forall m', m' \in l => !t m').
+declare module A : 
+  AdvEUF_QROM { -QRO, -EUF}[main : `{Inf, #H.h : qh, #S.sign : qs}].
+
+hoare EUF_QROM_bound : EUF_QROM(A,FDH).main : 
+   true ==> res => ! (EUF.m \in EUF.log) /\ size EUF.log <= qs.
 proof.
-  move=> lam_bound hm hl.
-  apply (ler_trans (lam ^ 1 * (1%r - lam) ^ size l)).
-  rewrite RField.expr1; apply ler_wpmul2l; 1: by case: lam_bound.
-  apply ler_wiexpn2l; [1:smt ()| 2: smt(size_ge0)].
-  apply (ler_trans _ _ _ (dbfunE_mem_le lam [m] l lam_bound _)); 1: smt().
-  by apply mu_le => /#.
+  proc; inline *; wp.
+  conseq (:size EUF.log <= qs) => />.
+  (* FIXME: Adrien can we use complexity info here *)
+  admit.
 qed.
+
+end section.
 
 abstract theory START.
 
@@ -101,9 +102,9 @@ module EUF_QROM' (A:AdvEUF_QROM) = {
 }.
 
 section.
-
+ 
 declare module A : 
-  AdvEUF_QROM { -QRO, -EUF, -EUF_QROM'}[main : `{Inf, #H.h : qh, #S.sign : qs}].
+  AdvEUF_QROM { -QRO, -EUF, - EUF_QROM'}[main : `{Inf, #H.h : qh, #S.sign : qs}].
 
 lemma l1 lam &m:
   0%r <= lam <= 1%r =>
@@ -116,15 +117,12 @@ proc.
 swap 1 1.
 seq 1 : b Pr[EUF_QROM(A,FDH).main() @ &m : res] (lam * (1%r - lam) ^ qs) 
           _ 0%r (lam_ = lam /\ (b => !EUF.m \in EUF.log /\ size EUF.log <= qs)).
-+ inline *; wp.
-  conseq (:size EUF.log <= qs) => />.
-  (* FIXME: Adrien can we use complexity info here *)
-  admit.
++ by call (EUF_QROM_bound A); skip => />.
 + call (: (glob A){m} = glob A ==> res); 2: by auto.
   bypr => &m0 ?.
   byequiv (: ={glob A} ==> ={res}) => //; 1: sim.
 + rnd (fun t => t EUF.m /\ forall (m' : msg), m' \in EUF.log => ! t m').
-  by skip => /> &hr h /h /> *; apply: pr_dfbool_l.
+  by skip => /> &hr h /h /> *; apply: pr_dbfun_l_pow.
 + by auto.
 smt().
 qed.
@@ -136,7 +134,7 @@ import MUFF.
 (* --------------------------------------------------------------------------*)
 op [lossless uniform full] dsign : sign distr.
 (* FIXME: this should be provable because f is bijective *)
-axiom dhash_dsign : mu1 dhash witness = mu1 dsign witness.
+axiom dhash_dsign h s: mu1 dhash h = mu1 dsign s.
 
 op dfsign : (msg -> sign) distr = dfun (fun _ => dsign).
 
@@ -152,21 +150,19 @@ proof. apply dfun_fu => ?; apply dsign_fu. qed.
 hint solve 0 random : dfsign_ll dfsign_uni dfsign_fu.
 
 lemma dfsign_dfhash (hs: msg -> sign) (hh:msg -> hash) : mu1 dfsign hs = mu1 dfhash hh.
-proof.
-  rewrite !dfun1E;apply BRM.eq_big => //= x _.
-  rewrite (is_full_funiform _ dsign_fu dsign_uni _ witness).
-  by rewrite (is_full_funiform _ dhash_fu dhash_uni _ witness) dhash_dsign.
-qed.
+proof. by rewrite !dfun1E;apply BRM.eq_big => //= x _; rewrite eq_sym; apply dhash_dsign. qed.
 
 (* --------------------------------------------------------------------------*)
 (* Proof assuming that f in OW *)
 
 abstract theory FDH_OW_semi_constant.
 
+(* FIXME: be undep of lam *)
 op lam : real.
 axiom lam_bound : 0%r < lam < 1%r.
 
 clone import T_OW with 
+  type init <- unit,
   op dcodom <- dhash.
 
 module B(A:AdvEUF_QROM) : AdvOW = {
@@ -180,7 +176,7 @@ module B(A:AdvEUF_QROM) : AdvOW = {
     }
   }
 
-  proc main(pk:pkey, y:hash) : sign = {
+  proc main(pk:pkey, y:hash, i:unit) : sign = {
     var m,s;
     bf <$ dbfun lam;
     hs <$ dfsign;
@@ -286,7 +282,7 @@ proof.
   swap{1}5 -4. swap{1} 4 -2; wp.
   rnd (fun (h:msg -> hash) => fun m => finv sk{1} (h m))
       (fun (h:msg -> sign) => fun m => f pk{1} (h m)).
-  rewrite /good; auto; rnd; skip => /> k hk h _ bf _; split.
+  rewrite /good; auto => /> k hk h _ bf _; split.
   + by move=> *; apply fun_ext => ?; smt(finv_f).
   smt(dfsign_dfhash f_finv finv_f).
 qed.
@@ -383,8 +379,7 @@ proof.
   swap{1} 3 -2; wp.
   rnd (fun h  => fun m => if B.bf m then P2.finv sk (h m) else finv sk (h m)){2}
       (fun hs => fun m => if B.bf m then P2.f pk (hs m) else f pk (hs m)){2}.
-  auto; rnd; skip => /> {&m}.
-  move => k hk t _; split.
+  auto => /> {&m} k hk t _; split.
   + move=> hs _; apply fun_ext; smt (P2.finv_f finv_f).
   smt (dfsign_dfhash P2.f_finv f_finv).
 qed.
@@ -413,13 +408,16 @@ end FDH_CF_instanciate.
 
 abstract theory FDH_OW_small_range.
 
-clone import T_OW with 
+clone import T_OW with
+  type init <- int, 
   op dcodom <- dhash.
 
-module B (* (A:AdvEUF_QROM) : AdvOW *) = {
+op q = qs + qh + 1.
+
+module B (A:AdvEUF_QROM) : AdvOW = {
   import var EUF
   var hs : msg -> sign
-(*
+
   module Os = {
     proc sign(m:msg) = { 
       log <- m :: log;
@@ -427,104 +425,225 @@ module B (* (A:AdvEUF_QROM) : AdvOW *) = {
     }
   }
 
-  proc main(pk:pkey, y:hash) : sign = {
-    var m,s;
-    bf <$ dbfun lam;
-    hs <$ dfsign;
-    QRO.h <- fun m => if bf m then y else f pk (hs m);
-    EUF.log <- [];
-    (m,s) <@ A(QRO, Os).main(pk);
-    return s;
+  proc main(pk_:pkey, y:hash, r:int) = {
+    var s, i, fr, rs1, rs2, rs, rh;
+    log <- [];
+    i <$ [0 .. r-1];
+    rs1 <$ dlist dsign i;
+    rs2 <$ dlist dsign (r-i-1);
+    rs  <- rs1 ++ witness :: rs2;
+    rh  <- map (f pk_) rs1 ++ y :: map (f pk_) rs2;
+    fr  <$ difun r; 
+    hs <- fun x => nth witness rs (fr x); 
+    QRO.h <- fun x => nth witness rh (fr x);
+    (m,s) <@ A(QRO, Os).main(pk_);
+    return s; 
   }
-*)
 }.
-
-op q = qs + qh + 1.
-
-clone T_QROM as SQRO with
-  type from <- msg,
-  type hash <- sign,
-  op dhash <- dsign,
-  op MUFF.FinT.enum <- QROM.MUFF.FinT.enum
-  proof dhash_ll by apply dsign_ll,
-        dhash_uni by apply dsign_uni,
-        dhash_fu by apply dsign_fu,    
-        MUFF.FinT.enum_spec by apply QROM.MUFF.FinT.enum_spec.
-
-import SQRO.SmallRange. 
 
 section OW.
 
-declare module A : AdvEUF_QROM { -QRO, -SQRO.QRO, -EUF , -B}
+declare module A : AdvEUF_QROM { -QRO, -EUF , -B}
                      [main : `{Inf, #H.h : qh, #S.sign : qs}].
 
 axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) : 
   islossless S.sign => islossless H.h => islossless A(H, S).main.
 
-local module G1 (S:SQRO.QRO) = {
-  import var EUF QRO B
-  module Os = {
-    proc sign(m:msg) = { 
-      var s;
-      s <@ S.h{m};
-      log <- m :: log;
-      return s; 
-    }
-  }
+local clone import SmallRange.
 
-  module RO = {
-    quantum proc h {m:msg} = {
-      quantum var s;
-      s <@ S.h{m};
-      return f pk s;
-    }
-  }
-
-  proc main() = {
-    var s, s';
-    (pk, sk) <$ kg;
-    log <- [];
-    (m,s) <@ A(RO, Os).main(pk);
-    s' <@ S.h{m};
-    return f pk s' = f pk s /\ !m \in log;
-  }
+local module G1 = {
+   var i : int
+   var bad : bool
+   proc main(r:int) = {
+     var b;
+     b <@ EUF_QROM(A,FDH).main();
+     i <$ [0..r-1]; 
+     SR.fr <$ difun r; 
+     return b /\ SR.fr EUF.m = i /\ (forall m, m \in EUF.log => SR.fr m <> i);
+   }
 }.
 
-local lemma SROdfhash_dfsign : SQRO.dfhash = dfsign.
-proof. done. qed. 
-
-local lemma l1 &m r : 
-  Pr[EUF_QROM(A,FDH).main() @ &m : res] = Pr[IND_SR(SRO,G1).main(r) @ &m : res].
+local lemma l1 r0 &m:
+  0 < r0 => 
+  let lam = 1.0 / r0%r in
+  Pr[ G1.main(r0) @ &m : res] >= 
+    lam * (1%r - qs%r * lam) * Pr[EUF_QROM(A,FDH).main() @ &m : res].
 proof.
-  byequiv => //; proc; inline *;wp.
-  call (: ={EUF.pk, EUF.sk, EUF.log} /\ (EUF.pk, EUF.sk){1} \in kg /\
-           QRO.h{1} = (fun m => f EUF.pk (SQRO.QRO.h m)){2}).
-  + by proc; inline *; auto => /> &2 /finv_f /= ->.
-  + by proc; inline *; auto.
-  sp; wp; swap 2 -1.
-  rnd (fun (h:msg -> hash) => fun m => finv EUF.sk{2} (h m))
-      (fun (h:msg -> sign) => fun m => f EUF.pk{2} (h m)).
-  rnd; skip => /> ks hks; rewrite SROdfhash_dfsign; smt (fun_ext finv_f f_finv dfsign_dfhash).
+move=> hr lam.
+byphoare (:(glob A){m} = glob A /\ r = r0 ==> _) => //.
+proc.
+seq 1 : b Pr[EUF_QROM(A,FDH).main() @ &m : res] (lam * (1%r - qs%r * lam)) 
+          _ 0%r (r = r0 /\ (b => !EUF.m \in EUF.log /\ size EUF.log <= qs)).
++ by call (EUF_QROM_bound A); skip => />.
++ call (: (glob A){m} = glob A ==> res); 2: by auto.
+  bypr => &m0 h.
+  by byequiv (: ={glob A} ==> ={res}) => //; sim.
++ seq 1 : true 1%r (lam * (1%r - qs%r * lam)) _ 0%r 
+   (0 <= G1.i < r /\ r = r0 /\ ! (EUF.m \in EUF.log) /\ size EUF.log <= qs /\ b) => //.
+  + by rnd; skip => />; smt (DInterval.supp_dinter).
+  + by rnd; skip => /> *; apply DInterval.dinter_ll => /#.
+  conseq />.
+  rnd (fun fr => fr EUF.m = G1.i /\ forall (m' : msg), m' \in EUF.log => fr m' <> G1.i).
+  by skip => /> *; apply: pr_difun_l. 
++ by auto. 
+smt().
 qed.
 
-local lemma l2 &m r : 
-  0 <= r => 
-  `| Pr[IND_SR(SRO,G1).main(r) @ &m : res] - Pr[IND_SR(SR,G1).main(r) @ &m : res]| 
-   <= 27%r * q%r^3 / r%r.
+local module FDH' (H:SR) = {
+  import var G1
+  proc kg () = {
+    var k;
+    k <$ kg;
+    return k;
+  }
+
+  proc sign(sk:skey, m:msg) = {
+    var i', h;
+    (i', h) <@ H.h{m};
+    bad <- bad \/ i = i';
+    return finv sk h;
+  }
+
+  proc verify(pk:pkey, m:msg, s:sign) = {
+    var i', h;
+    (i', h) <@ H.h{m};
+    bad <- bad \/ i <> i';
+    return h = f pk s;
+  }
+
+}.
+
+local module G2 (SR: SR) = {
+  import var G1
+
+  module RO = { 
+    quantum proc h {m:msg} = {
+      quantum var r;
+      r <@ SR.h{m};
+      return r.`2;
+    }
+  }
+
+  proc main(r:int) = { 
+    var b;
+    i <$ [0..r-1]; 
+    bad <- false;
+    b <@ EUF(A(RO),FDH'(SR)).main();
+    return b /\ !bad;
+  }
+
+}.
+
+local lemma l2 &m r_ : 
+  Pr[ G1.main(r_) @ &m : res] = Pr[IND_SR(SRO, G2).main(r_) @ &m : res].
 proof.
-  apply (SQRO.SmallRange.advantage q r G1).
+  byequiv => //; proc.
+  swap{1} [2..3]-1; inline *; wp.
+  call (: ={QRO.h, EUF.log, EUF.pk, EUF.sk, SR.fr, G1.i} /\ 
+          (G1.bad = exists m, m \in EUF.log /\ SR.fr m = G1.i){2}).
+  + by proc; inline *; auto => /> /#.
+  + by proc;inline *; auto => />.
+  by swap{2} [4..5] -2; auto => /> /#.
+qed.
+
+local lemma l3 &m r_ : 
+  0 < r_ => 
+  `| Pr[IND_SR(SRO,G2).main(r_) @ &m : res] - Pr[IND_SR(SR,G2).main(r_) @ &m : res]| 
+   <= 27%r * q%r^3 / r_%r.
+proof.
+  apply (SmallRange.advantage q r_ G2).
   admit.
 qed.
 
+local clone import DList.Program with
+  type t <- hash,
+  op d <- dhash.
 
+local module S = {
+  proc sample2(n1:int, n2:int) = {
+    var rh1, y, rh2;
+    (rh1,y,rh2) <@ Sample.sample2(n1,n2); 
+    return rh1 ++ y :: rh2;
+  }
+}.
 
+local lemma l4 &m r_ :
+  0 < r_ =>
+  Pr[IND_SR(SR,G2).main(r_) @ &m : res] <= Pr[OW(B(A)).main(r_) @ &m : res].
+proof.
+  move=> hr; byequiv => //; proc; symmetry.
+  inline *; wp.
+  call (_: G1.bad, 
+           ={QRO.h, EUF.log} /\ 
+           (forall m, SR.fr{2} m <> G1.i{2} => B.hs{1} m = (finv EUF.sk (QRO.h m)){2})) => //.
+  + by apply A_ll.
+  + by proc; inline *; auto => /> /#.
+  + by move=> *; islossless.
+  + by move=> *; proc; inline *; auto => /> /#.
+  + by proc; inline *; auto.
+  + by move=> *; islossless. 
+  + by move=> *; proc; inline *; auto.
+  swap{2} 8 -7; wp.
+  swap{2} [6..7] -3. swap{2} [2..3] -1.
+  swap{1} 5 -4; sp. swap{1} 11 -2. swap{1} [6..9] -3. swap{1} 2 2; wp.
+  seq 2 2 : (#pre /\ (pk,sk){1} = k{2} /\ i0{1} = G1.i{2} /\ (pk,sk){1} \in kg /\ 0 <= G1.i{2} < r_).
+  + by conseq />; auto => />; smt(DInterval.supp_dinter).
+  rnd; conseq (: SR.rh{2} = (map (f pk) rs1 ++ y :: map (f pk) rs2){1} /\ size rs1{1} = i0{1} /\
+                 size rs2{1} = r{1} - i0{1} - 1).
+  + move=> /> &1 &2 hk ?? rs1 rs2 y <<- ? fr /dfun_supp /= hfr; split.
+    + move=> m' hm'; rewrite !nth_cat size_map /=.
+      have /DInterval.supp_dinter hfrm' := hfr m'.
+      case: (fr m' < size rs1) => ?.
+      + by rewrite (nth_map witness witness (f pk{1}) (fr m')) 1:/# (finv_f _ _ hk). 
+      rewrite (nth_map witness witness (f pk{1})); smt(finv_f).
+    smt (finv_f f_finv nth_cat size_map).
+  transitivity * {2} { SR.rh <@ Sample.sample(r0); } => //; 1:smt(); last by inline *;auto.
+  transitivity {2} { SR.rh <@ S.sample2(G1.i, r - G1.i - 1); } 
+    (={r} /\ i0{1} = G1.i{2} /\ (pk,sk){1} \in kg /\ 0 <= G1.i{2} < r{2} ==> 
+       SR.rh{2} = map (f pk{1}) rs1{1} ++ y{1} :: map (f pk{1}) rs2{1} /\
+       size rs1{1} = i0{1} /\ size rs2{1} = r{1} - i0{1} - 1)
+    (r0{2} = r{1} /\ 0 <= r{1} /\ 0 <= G1.i{1} < r{1} ==> ={SR.rh}) => //;1: smt(); last first.
+  + symmetry; inline S.sample2; wp; ecall (Sample_Sample2 n1{2} n2{2}); wp; skip => /> /#.
+  inline *; wp; sp.
+  rnd (map (f pk{1})) (map (finv sk{1})); rnd; rnd (map (f pk{1})) (map (finv sk{1})); skip => />.
+  move=> &1 &2 hk hi0 hir; split. 
+  + move=> rs1 ?; rewrite -map_comp -{1}(map_id rs1); apply eq_map.
+    by move=> x; rewrite /(\o) (f_finv _ _ hk).
+  move=> _; split.
+  + admit.
+  move=> _ rs1; rewrite supp_dlist 1:// => -[] <<- ?; split.
+  + rewrite supp_dlist 1:// size_map /= allP => *; apply dhash_fu.
+  move=> _; split.
+  + rewrite -map_comp -{1}(map_id rs1); apply eq_map.
+    by move=> x; rewrite /(\o) (finv_f _ _ hk).
+  move=> _ y hy; split.
+  + move=> rs2 ?; rewrite -map_comp -{1}(map_id rs2); apply eq_map.
+    by move=> x; rewrite /(\o) (f_finv _ _ hk).
+  move=> _; split.
+  + admit.
+  move=> _ rs2; rewrite supp_dlist 1:/# => -[] hrs2 ?; split.
+  + rewrite supp_dlist 1:/# size_map hrs2 /= allP => *; apply dhash_fu.
+  move=> _; split => //.
+  rewrite -map_comp -{1}(map_id rs2); apply eq_map.
+  by move=> x; rewrite /(\o) (finv_f _ _ hk).
+qed.
 
+(*
+l1 : Pr[ G1.main(r0) @ &m : res] >= 
+    lam * (1%r - qs%r * lam) * Pr[EUF_QROM(A,FDH).main() @ &m : res].
 
+l2 : Pr[ G1.main(r_) @ &m : res] = Pr[IND_SR(SRO, G2).main(r_) @ &m : res].
+
+l3 : | Pr[IND_SR(SRO,G2).main(r_) @ &m : res] - Pr[IND_SR(SR,G2).main(r_) @ &m : res]| 
+   <= 27%r * q%r^3 / r_%r.
+
+l4 : Pr[IND_SR(SR,G2).main(r_) @ &m : res] <= Pr[OW]
+*)
+  
+(*
 lemma conclusion &m : 
   Pr[EUF_QROM(A,FDH).main() @ &m : res] <=
-  Pr[OW(B(A)).main() @ &m : res] / (lam * (1%r - lam) ^ qs) + 
-   (2*qh + 3*qs + 3)%r/ 6%r * lam / (1%r - lam) ^ qs. 
 proof. 
 
-
+*)
 

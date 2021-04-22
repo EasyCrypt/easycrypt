@@ -338,13 +338,6 @@ seq 1 : true 1.0 (lam*(1.0-lam)^qe)
 smt().
 qed.
 
-(* FIXME move this *)
-lemma mul_le_pow lam n : 0.0 <= lam <= 1.0 => 0 <= n => 1%r - n%r * lam <= (1%r - lam) ^ n.
-proof.
-  move=> hlam; elim/natind n; 1:smt(expr0).
-  move=> *; rewrite exprS 1:// /#.
-qed.
-
 local lemma l1 &m lam:
   0.0 < lam <= 1.0 => 
   `|Pr[G(Init1).main(lam) @ &m : res] - 0.5| >= 
@@ -365,7 +358,7 @@ proof.
   have -> : `|lam * (1%r - lam) ^ qe * (Pr[IDCPA_QROM(A, GPV(E)).main() @ &m : res] - 1%r / 2%r)| = lam * (1%r - lam) ^ qe * eps.
   + rewrite /eps; smt(expr_ge0).
   apply ler_wpmul2r; 1:smt(); apply ler_wpmul2l; 1: smt().
-  apply (mul_le_pow _ _ hlam' ge0_qe).
+  apply (le_binomial _ _ hlam' ge0_qe).
 qed.
 
 local module Init2 = {

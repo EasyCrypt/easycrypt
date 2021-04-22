@@ -867,6 +867,15 @@ qed.
 lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
 proof. by elim: s n=>/#. qed.
 
+lemma drop_add n1 n2 (l:'a list) : 
+  0 <= n1 => 0 <= n2 => drop (n1 + n2) l = drop n2 (drop n1 l).
+proof.
+  move=> h1 h2; case (n1 <= size l) => hl1; 2: smt(drop_oversize).
+  case (n2 <= size (drop n1 l)) => hl2; 2:smt(drop_oversize size_drop).
+  rewrite -{1}(cat_take_drop n1 l) -{1}(cat_take_drop n2 (drop n1 l)) catA drop_size_cat //.
+  rewrite size_cat; smt(size_takel).
+qed.
+
 lemma mem_drop n (s:'a list) x: mem (drop n s) x => mem s x.
 proof. by rewrite -{2}(cat_take_drop n) mem_cat=>->. qed.
 

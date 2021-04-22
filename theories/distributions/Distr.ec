@@ -1946,6 +1946,64 @@ proof.
  apply BRM.big1_seq => /> ???;apply d_ll.
 qed.
 
+lemma dfun_allE c (d: t -> 'u distr) (pT pF : t -> bool) (e : t -> 'u -> bool) :
+  (forall x, is_lossless (d x)) => 
+  (forall x, mu (d x) (e x) = c) =>
+  (forall x, !(pT x /\ pF x)) =>
+  mu (dfun d) (fun f =>
+         (forall x, pT x =>  e x (f x))
+      /\ (forall x, pF x => !e x (f x))) =
+
+    (      c) ^ (count pT FinT.enum)
+  * (1%r - c) ^ (count pF FinT.enum).
+proof.
+move=> d_ll hdc h; pose Q x u := (pT x => e x u) /\ (pF x => !e x u).
+rewrite -(@mu_eq _ (fun f => forall x, Q x (f x))) /= 1:/#.
+rewrite dfunE (@BRM.bigID _ _ pT) !predTI /=.
+rewrite -(@BRM.eq_bigr _ (fun _ => c)).
+- by move=> x @/Q /= ^pTx -> /=; rewrite -(@mu_eq _ (e x)) /#.
+rewrite mulr_const_cond; congr; rewrite (@BRM.bigID _ _ pF).
+rewrite  -(@BRM.eq_bigr _ (fun _ => 1%r - c)).
+- by move=> x [_] @/Q /= ^pFx -> /=;rewrite -(@mu_eq _ (predC (e x))) 1:/# mu_not d_ll hdc.
+rewrite mulr_const_cond -(@BRM.eq_bigr _ (fun _ => 1%r)).
+- by move=> x /= @/predC [pTNx pFNx]; rewrite -(@mu_eq _ predT) 1:/# d_ll.
+by rewrite mulr_const_cond expr1z mulr1; congr; apply: eq_count => /#.
+qed.
+
+lemma dfunE_mem_uniq (c: real) (d: t -> 'u distr) (lT lF : t list) (e : t -> 'u -> bool) : 
+  (forall x, is_lossless (d x)) => 
+  (forall x, mu (d x) (e x) = c) =>
+  uniq lT => uniq lF => 
+  (forall x, !(x \in lT /\ x \in lF)) =>
+  mu (dfun d) (fun f => 
+         (forall x, x \in lT =>  e x (f x))
+      /\ (forall x, x \in lF => !e x (f x))) =
+    (      c) ^ (size lT)
+  * (1%r - c) ^ (size lF).
+proof.
+move=> d_ll hdc ulT ulF h; have -> := dfun_allE c d (mem lT) (mem lF) e d_ll hdc h.
+by rewrite !FinT.count_mem.
+qed.
+
+lemma dfunE_mem_le (c: real) (d: t -> 'u distr) (lT lF : t list) (e : t -> 'u -> bool) : 
+  (forall x, is_lossless (d x)) => 
+  (forall x, mu (d x) (e x) = c) =>
+  (forall x, !(x \in lT /\ x \in lF)) =>
+  c ^ (size lT) * (1%r - c) ^ (size lF) <= 
+    mu (dfun d) (fun f => 
+         (forall x, x \in lT =>  e x (f x))
+      /\ (forall x, x \in lF => !e x (f x))).
+proof.
+move=> d_ll hdc h; have [hc0 hc1] : 0%r <= c <= 1%r by rewrite -(@hdc witness) mu_bounded.
+apply (@ler_trans (c ^ (size (undup lT)) * (1%r - c) ^ (size (undup lF)))).
++ apply/ler_pmul; try by apply expr_ge0=> //#.
+  + by rewrite &(ler_wiexpn2l) 1://# size_undup size_ge0.
+  by rewrite &(ler_wiexpn2l) 1://# size_undup size_ge0.
+rewrite -(dfunE_mem_uniq d_ll hdc) ?undup_uniq. 
++ by move=> x; rewrite !mem_undup h.
+by apply mu_le => /= f _; smt (mem_undup).
+qed.
+
 end MUniFinFun.
 
 (* -------------------------------------------------------------------- *)

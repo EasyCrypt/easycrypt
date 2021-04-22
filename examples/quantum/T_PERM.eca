@@ -20,20 +20,22 @@ end PERM.
 
 clone include PERM.
 
-quantum module type AdvOW = {
-  proc main(pk:pkey, y:codom) : dom
-}.
-
 abstract theory T_OW.
+
+type init.
+
+quantum module type AdvOW = {
+  proc main(pk:pkey, y:codom, i:init) : dom
+}.
 
 op dcodom : codom distr.
 
 module OW(A:AdvOW) = {
-  proc main() = {
+  proc main(i:init) = {
     var pk, sk, y, x;
     (pk, sk) <$ kg;
     y <$ dcodom;
-    x <@ A.main(pk, y);
+    x <@ A.main(pk, y, i);
     return (finv sk y) = x;
   }
 }.
@@ -80,8 +82,3 @@ axiom samplePreE pk sk y:
 clone include T_OW.
 
 end T_PSF.
-  
-
-
-
-

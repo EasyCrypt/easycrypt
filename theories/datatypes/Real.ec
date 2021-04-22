@@ -267,3 +267,6 @@ lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
 lemma nosmt upto_bad_sub (ev bad:bool) :
   ev /\ ! bad => ev by [].
 
+lemma le_binomial x n : 0.0 <= x <= 1.0 => 0 <= n => 1%r - n%r * x <= (1%r - x) ^ n.
+proof. move=> hx; elim n => *;[smt(expr0) | rewrite exprS //#]. qed.
+
