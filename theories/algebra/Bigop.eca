@@ -573,3 +573,28 @@ lemma nosmt big_int_recr_cond (n m : int) P F: m <= n =>
   bigi P F m (n+1) =
     bigi P F m n + (if P n then F n else idm).
 proof. by move=> lemn; rewrite !(@big_mkcond P) big_int_recr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_int_split_cond (P : int -> bool, F : int -> t,
+                          i n m : int) :
+  0 <= n <= i < m => bigi P F n m = bigi P F n i + bigi P F i m.
+proof.  
+move=> [#] ge0_n.
+move: m.
+apply natind=> /= [m le0_m le_n_i | m ge0_m IH le_n_i lt_i_m_plus1]. 
+have: m <= i by rewrite (lez_trans 0) // (lez_trans n).
+rewrite lez_eqVlt => [[-> // | lt_m_i lt_i_m]].
+have //: i < i by rewrite (ltz_trans m).
+have le_i_m: i <= m by rewrite ltzS in lt_i_m_plus1.
+rewrite big_int_recr_cond 1:(lez_trans i) //.
+rewrite big_int_recr_cond 1:(lez_trans i) //.
+case (m = i)=> [<- | ne_i_m].
+by rewrite (@big_geq m m) // add0m.
+by rewrite IH // 1:ltz_def // addmA.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_int_split (F : int -> t, i n m : int) :
+  0 <= n <= i < m =>
+  bigi predT F n m = bigi predT F n i + bigi predT F i m.
+proof. apply big_int_split_cond. qed.
