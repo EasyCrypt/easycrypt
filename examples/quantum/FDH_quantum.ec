@@ -451,108 +451,112 @@ axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) :
 
 local clone import SmallRange.
 
-local module G1 = {
-   var i : int
-   var bad : bool
-   proc main(r:int) = {
-     var b;
-     b <@ EUF_QROM(A,FDH).main();
-     i <$ [0..r-1]; 
-     SR.fr <$ difun r; 
-     return b /\ SR.fr EUF.m = i /\ (forall m, m \in EUF.log => SR.fr m <> i);
-   }
+local module G1(SR:SR) = {
+  proc main (r:int) = {
+    var b;
+    b <@ EUF(A(SR), FDH(SR)).main();
+    return b;
+  }
 }.
 
-local lemma l1 r0 &m:
-  0 < r0 => 
-  let lam = 1.0 / r0%r in
-  Pr[ G1.main(r0) @ &m : res] >= 
-    lam * (1%r - qs%r * lam) * Pr[EUF_QROM(A,FDH).main() @ &m : res].
+local lemma l1 r &m :
+  0 < r => 
+  Pr[EUF_QROM(A,FDH).main() @ &m : res] = Pr[IND_SR(SRO,G1).main(r) @ &m : res].
 proof.
-move=> hr lam.
-byphoare (:(glob A){m} = glob A /\ r = r0 ==> _) => //.
-proc.
-seq 1 : b Pr[EUF_QROM(A,FDH).main() @ &m : res] (lam * (1%r - qs%r * lam)) 
-          _ 0%r (r = r0 /\ (b => !EUF.m \in EUF.log /\ size EUF.log <= qs)).
-+ by call (EUF_QROM_bound A); skip => />.
-+ call (: (glob A){m} = glob A ==> res); 2: by auto.
-  bypr => &m0 h.
-  by byequiv (: ={glob A} ==> ={res}) => //; sim.
-+ seq 1 : true 1%r (lam * (1%r - qs%r * lam)) _ 0%r 
-   (0 <= G1.i < r /\ r = r0 /\ ! (EUF.m \in EUF.log) /\ size EUF.log <= qs /\ b) => //.
-  + by rnd; skip => />; smt (DInterval.supp_dinter).
-  + by rnd; skip => /> *; apply DInterval.dinter_ll => /#.
-  conseq />.
-  rnd (fun fr => fr EUF.m = G1.i /\ forall (m' : msg), m' \in EUF.log => fr m' <> G1.i).
-  by skip => /> *; apply: pr_difun_l. 
-+ by auto. 
-smt().
+  move=> hr; byequiv => //; proc; inline *; wp; sim.
+  rnd{2}; auto => />; apply dfun_ll => /=; apply DInterval.dinter_ll => /#.
 qed.
 
-local module FDH' (H:SR) = {
-  import var G1
-  proc kg () = {
-    var k;
-    k <$ kg;
-    return k;
-  }
+local lemma l2 r &m :
+  0 < r => 
+  `| Pr[IND_SR(SRO,G1).main(r) @ &m : res] - Pr[IND_SR(SR,G1).main(r) @ &m : res] | <= 27%r * q%r^3 / r%r.
+proof.
+  apply (SmallRange.advantage q r G1).
+  admit.
+qed.
 
-  proc sign(sk:skey, m:msg) = {
-    var i', h;
-    (i', h) <@ H.h{m};
-    bad <- bad \/ i = i';
-    return finv sk h;
-  }
+local clone import Collision with 
+  type input <- int,
+  type hash <- int.
 
-  proc verify(pk:pkey, m:msg, s:sign) = {
-    var i', h;
-    (i', h) <@ H.h{m};
-    bad <- bad \/ i <> i';
-    return h = f pk s;
-  }
-
-}.
-
-local module G2 (SR: SR) = {
-  import var G1
-
+local module G2 (H:QROd) = {
   module RO = { 
-    quantum proc h {m:msg} = {
-      quantum var r;
-      r <@ SR.h{m};
-      return r.`2;
+    quantum proc h {x:msg} = { 
+      quantum var i;
+      i <@ H.h{x};
+      return (nth witness SR.rh i);
     }
   }
 
-  proc main(r:int) = { 
-    var b;
-    i <$ [0..r-1]; 
-    bad <- false;
-    b <@ EUF(A(RO),FDH'(SR)).main();
-    return b /\ !bad;
+  proc main(r:int) = {
+    var b; 
+    SR.rh <$ dlist dhash r; 
+    b <@ EUF(A(RO), FDH(RO)).main();
+    return EUF.m :: EUF.log;
   }
-
 }.
 
-local lemma l2 &m r_ : 
-  Pr[ G1.main(r_) @ &m : res] = Pr[IND_SR(SRO, G2).main(r_) @ &m : res].
+local lemma l3 r &m:
+  0 < r => 
+  Pr[IND_SR(SR,G1).main(r) @ &m : res] <= 
+    Pr[IND_SR(SR,G1).main(r) @ &m : res /\ !SR.fr EUF.m \in map SR.fr EUF.log ] + 
+    q%r^3 / r%r.
 proof.
-  byequiv => //; proc.
-  swap{1} [2..3]-1; inline *; wp.
-  call (: ={QRO.h, EUF.log, EUF.pk, EUF.sk, SR.fr, G1.i} /\ 
-          (G1.bad = exists m, m \in EUF.log /\ SR.fr m = G1.i){2}).
-  + by proc; inline *; auto => /> /#.
-  + by proc;inline *; auto => />.
-  by swap{2} [4..5] -2; auto => /> /#.
+  have -> : Pr[IND_SR(SR,G1).main(r)@ &m : res] =
+     Pr[IND_SR(SR,G1).main(r) @ &m : res /\ !SR.fr EUF.m \in map SR.fr EUF.log \/ 
+                                     res /\ SR.fr EUF.m \in map SR.fr EUF.log].
+  + rewrite Pr[mu_eq] => /#.
+  move=> hr;rewrite Pr[mu_disjoint];1: smt().
+  apply ler_add2l.
+  have := pr_col (inv r%r) [0..r-1] r q G2 _ &m _.
+  + admit.
+  + by move=> m; rewrite DInterval.dinter1E /#.
+  apply ler_trans.
+  byequiv => //; proc; inline *; wp.
+  conseq (: SR.fr{1} = QROd.h{2} /\ ={EUF.log, EUF.m}) _ (: _ ==> size EUF.log <= qs).
+  + move=> />. smt (mapP ge0_qh).
+  + admit.
+  call (: QRO.h{1} = (fun x => nth witness SR.rh{1} (QROd.h{2} x)) /\ 
+            ={EUF.log, EUF.sk, SR.rh}).
+  + by proc; inline *; auto.
+  + by proc; inline *; auto.
+  by swap{2} [2..3]-1; auto => />.
 qed.
 
-local lemma l3 &m r_ : 
-  0 < r_ => 
-  `| Pr[IND_SR(SRO,G2).main(r_) @ &m : res] - Pr[IND_SR(SR,G2).main(r_) @ &m : res]| 
-   <= 27%r * q%r^3 / r_%r.
-proof.
-  apply (SmallRange.advantage q r_ G2).
-  admit.
+local module G3 = {
+  var i : int
+
+  proc main(r:int) = {
+    var b;
+    b <@ IND_SR(SR,G1).main(r);
+    b <- b /\ !SR.fr EUF.m \in map SR.fr EUF.log;
+    i <$ [0..r-1];
+    return (b /\ SR.fr EUF.m = i);
+  }
+}.
+
+local lemma l4 r_ &m : 
+  0 < r_ =>
+  Pr[G3.main(r_) @ &m : res] >= inv(r_%r) * 
+    Pr[IND_SR(SR,G1).main(r_) @ &m : res /\ !SR.fr EUF.m \in map SR.fr EUF.log ].
+proof. 
+move=> hr.
+byphoare (:(glob A){m} = glob A /\ r = r_ ==> _) => //.
+proc.
+seq 2 : b Pr[IND_SR(SR,G1).main(r_) @ &m : res /\ !SR.fr EUF.m \in map SR.fr EUF.log] (inv r%r)
+          _ 0%r (r = r_ /\ 0 <= SR.fr EUF.m < r).
++ inline *; wp.
+  conseq (: forall x, 0 <= SR.fr x < r); 1: by move=> /> m0 ? /(_ m0) />.
+  call (: true) => //; auto => /> rh _ fr /dfun_supp /= h _ _ x. 
+  by have /DInterval.supp_dinter /# := h x.
++ wp.
+  call (: (glob A){m} = glob A /\ r = r_ ==> res /\ !SR.fr EUF.m \in map SR.fr EUF.log); 2: by auto.
+  bypr => &m0 h.
+  byequiv (: ={glob A, arg} ==> ={res, EUF.m, EUF.log, SR.fr}) => //; 1: by sim.
+  by move: h => />.
++ by conseq />; rnd (pred1 (SR.fr EUF.m)); skip => />; smt (DInterval.dinter1E).
++ by auto.
+smt().
 qed.
 
 local clone import DList.Program with
@@ -567,15 +571,15 @@ local module S = {
   }
 }.
 
-local lemma l4 &m r_ :
+local lemma l5 &m r_ :
   0 < r_ =>
-  Pr[IND_SR(SR,G2).main(r_) @ &m : res] <= Pr[OW(B(A)).main(r_) @ &m : res].
+  Pr[G3.main(r_) @ &m : res] <= Pr[OW(B(A)).main(r_) @ &m : res].
 proof.
   move=> hr; byequiv => //; proc; symmetry.
-  inline *; wp.
-  call (_: G1.bad, 
+  inline *; swap{2} -20; wp. 
+  call (_: exists m', m' \in EUF.log /\ SR.fr m' = G3.i, 
            ={QRO.h, EUF.log} /\ 
-           (forall m, SR.fr{2} m <> G1.i{2} => B.hs{1} m = (finv EUF.sk (QRO.h m)){2})) => //.
+           (forall m, SR.fr{2} m <> G3.i{2} => B.hs{1} m = (finv EUF.sk (QRO.h m)){2})) => //.
   + by apply A_ll.
   + by proc; inline *; auto => /> /#.
   + by move=> *; islossless.
@@ -583,10 +587,9 @@ proof.
   + by proc; inline *; auto.
   + by move=> *; islossless. 
   + by move=> *; proc; inline *; auto.
-  swap{2} 8 -7; wp.
-  swap{2} [6..7] -3. swap{2} [2..3] -1.
+  swap{2} 8 -7; wp. swap{2} [3..4] -2.
   swap{1} 5 -4; sp. swap{1} 11 -2. swap{1} [6..9] -3. swap{1} 2 2; wp.
-  seq 2 2 : (#pre /\ (pk,sk){1} = k{2} /\ i0{1} = G1.i{2} /\ (pk,sk){1} \in kg /\ 0 <= G1.i{2} < r_).
+  seq 2 2 : (#pre /\ (pk,sk){1} = k{2} /\ i0{1} = G3.i{2} /\ (pk,sk){1} \in kg /\ 0 <= G3.i{2} < r_).
   + by conseq />; auto => />; smt(DInterval.supp_dinter).
   rnd; conseq (: SR.rh{2} = (map (f pk) rs1 ++ y :: map (f pk) rs2){1} /\ size rs1{1} = i0{1} /\
                  size rs2{1} = r{1} - i0{1} - 1).
@@ -596,13 +599,13 @@ proof.
       case: (fr m' < size rs1) => ?.
       + by rewrite (nth_map witness witness (f pk{1}) (fr m')) 1:/# (finv_f _ _ hk). 
       rewrite (nth_map witness witness (f pk{1})); smt(finv_f).
-    smt (finv_f f_finv nth_cat size_map).
-  transitivity * {2} { SR.rh <@ Sample.sample(r0); } => //; 1:smt(); last by inline *;auto.
-  transitivity {2} { SR.rh <@ S.sample2(G1.i, r - G1.i - 1); } 
-    (={r} /\ i0{1} = G1.i{2} /\ (pk,sk){1} \in kg /\ 0 <= G1.i{2} < r{2} ==> 
+    smt (finv_f f_finv nth_cat size_map mapP).
+  transitivity * {2} { SR.rh <@ Sample.sample(r1); } => //; 1:smt(); last by inline *;auto.
+  transitivity {2} { SR.rh <@ S.sample2(G3.i, r - G3.i - 1); } 
+    (={r} /\ i0{1} = G3.i{2} /\ (pk,sk){1} \in kg /\ 0 <= G3.i{2} < r{2} ==> 
        SR.rh{2} = map (f pk{1}) rs1{1} ++ y{1} :: map (f pk{1}) rs2{1} /\
        size rs1{1} = i0{1} /\ size rs2{1} = r{1} - i0{1} - 1)
-    (r0{2} = r{1} /\ 0 <= r{1} /\ 0 <= G1.i{1} < r{1} ==> ={SR.rh}) => //;1: smt(); last first.
+    (r1{2} = r{1} /\ 0 <= r{1} /\ 0 <= G3.i{1} < r{1} ==> ={SR.rh}) => //;1: smt(); last first.
   + symmetry; inline S.sample2; wp; ecall (Sample_Sample2 n1{2} n2{2}); wp; skip => /> /#.
   inline *; wp; sp.
   rnd (map (f pk{1})) (map (finv sk{1})); rnd; rnd (map (f pk{1})) (map (finv sk{1})); skip => />.
@@ -628,22 +631,45 @@ proof.
   by move=> x; rewrite /(\o) (finv_f _ _ hk).
 qed.
 
-(*
-l1 : Pr[ G1.main(r0) @ &m : res] >= 
-    lam * (1%r - qs%r * lam) * Pr[EUF_QROM(A,FDH).main() @ &m : res].
-
-l2 : Pr[ G1.main(r_) @ &m : res] = Pr[IND_SR(SRO, G2).main(r_) @ &m : res].
-
-l3 : | Pr[IND_SR(SRO,G2).main(r_) @ &m : res] - Pr[IND_SR(SR,G2).main(r_) @ &m : res]| 
-   <= 27%r * q%r^3 / r_%r.
-
-l4 : Pr[IND_SR(SR,G2).main(r_) @ &m : res] <= Pr[OW]
-*)
-  
-(*
 lemma conclusion &m : 
-  Pr[EUF_QROM(A,FDH).main() @ &m : res] <=
-proof. 
+  let k = 28%r * q%r^3 in
+  let eps = Pr[EUF_QROM(A,FDH).main() @ &m : res] in
+  let r = 3 * floor (k / eps) in 
+  eps ^2 / (6%r * k) <= Pr[OW(B(A)).main(r) @ &m : res].
+proof.
+  move=> /=. 
+  case: (Pr[EUF_QROM(A, FDH).main() @ &m : res] = 0.0).
+  + by move=> -> /=; rewrite expr0z /=; smt(mu_bounded).
+  have gt0_q3 : 1%r <= q%r ^ 3 by apply exprn_ege1 => //; smt (gt0_qs ge0_qh).
+  move=> eps0; have heps : 0%r < Pr[EUF_QROM(A, FDH).main() @ &m : res] by smt(mu_bounded).
+  have gt0_r : 0 < 3 * floor((28%r * q%r^3) / Pr[EUF_QROM(A, FDH).main() @ &m : res]).
+  + have : 1%r <= (28%r * q%r^3) / Pr[EUF_QROM(A, FDH).main() @ &m : res]; last by smt(floor_gt).
+    rewrite ler_pdivl_mulr //=; smt(mu_bounded). 
+  move: eps0 heps gt0_r.
+  pose k := 28%r * q%r^3.
+  pose eps := Pr[EUF_QROM(A,FDH).main() @ &m : res].
+  pose r := 3 * floor(k/eps); move => eps0 heps gt0_r.
+  apply : ler_trans (l5 &m r gt0_r).
+  apply : ler_trans (l4 r &m gt0_r).
+  apply (ler_trans (inv r%r * (Pr[IND_SR(SRO, G1).main(r) @ &m : res] - 28%r*q%r ^ 3 / r%r))); last first.
+  + by move: (l2 r &m gt0_r) (l3 r &m gt0_r) => /#.
+  rewrite -(l1 r &m gt0_r) -/eps. 
+  apply (ler_trans ((eps/(3%r*k))*(eps/2%r))); 1: by rewrite expr2; smt().
+  have h0k: 0%r < k by smt().
+  have hepsk : 0%r <= eps/k by smt().
+  have hepsr : eps / (3%r*k) <= inv r%r. 
+  + have -> : eps/(3%r*k) = inv(3%r*k/eps) by smt().
+    by rewrite lef_pinv; smt (floor_bound).
+  apply ler_pmul => //; 1,2:smt(). 
+  have /# : 28%r * q%r ^ 3 / r%r <= eps/2%r.
+  rewrite -/k ler_pdivl_mulr 1:// mulrC mulrA ler_pdivr_mulr 1:/#.
+  rewrite (mulrC eps) -ler_pdivr_mulr 1:// -mulrA mulrC -ler_pdivl_mulr 1://. 
+  have : 3%r <= k / eps.
+  + apply (ler_trans k); 1: smt().
+    rewrite ler_pdivl_mulr 1://; have /#: eps <= 1%r by smt(mu_bounded). 
+  smt (floor_bound).
+qed.
 
-*)
+end section OW.
 
+end FDH_OW_small_range.

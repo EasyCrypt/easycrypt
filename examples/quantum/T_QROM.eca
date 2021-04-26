@@ -3,13 +3,58 @@ require import AllCore List Distr DBool DProd DList DInterval CHoareTactic IntDi
 require (*  *) Matrix Tuple (* FinType *).
 
 type from.
+
+clone import MUniFinFun as MUFF with
+  type t <- from.   (* This assume that the type of from is finite *)
+
+abstract theory Collision.
+ 
+  type input.
+  type hash.
+
+  module type QROd_i = {
+    proc init (dhash : hash distr) : unit
+    quantum proc h {_:from} : hash    
+  }.
+  
+  module type QROd = {
+    include QROd_i [h]
+  }.
+  
+  module QROd : QROd_i = {
+    var  h : from -> hash
+  
+    proc init(dhash:hash distr) = { h <$ dfun (fun _ => dhash); }
+  
+    quantum proc h {x:from} = { return h x; }
+  
+  }.
+  
+  quantum module type AdvCol (H:QROd) = {
+    proc main(i:input) : from list
+  }.
+  
+  module Col(A:AdvCol) = {
+    proc main(d:hash distr, i:input) = {
+      var l;
+      QROd.h <$ dfun (fun _ => d);
+      l <@ A(QROd).main(i);
+      return l;
+    }
+  }.
+  
+  (* FIXME: check this axiom *)
+  axiom pr_col r (d_:hash distr) i_ q (A<:AdvCol{-QROd}[main : `{Inf, #H.h : q}]) &m:
+    (forall h, mu1 d_ h <= r) =>
+    Pr[Col(A).main(d_, i_) @ &m : size res <= q /\ exists x1 x2, x1 <> x2 /\ x1 \in res /\ x2 \in res /\
+                                 QROd.h x1 = QROd.h x2] <= q%r^3 * r. 
+
+end Collision.
+  
 type hash.
 
 (* Remark : this implies that hash is a finite type *)
 op [lossless uniform full] dhash : hash distr.
-
-clone import MUniFinFun as MUFF with
-  type t <- from.   (* This assume that the type of from is finite *)
 
 (* Uniform distribution over from -> hash *)
 op dfhash : (from -> hash) distr = dfun (fun _ => dhash).
@@ -42,7 +87,7 @@ module QRO : QRO_i = {
   quantum proc h {x:from} = { return h x; }
 
 }.
-
+ 
 (* -------------------------------------------------------------------------- *)
 (* Biased distribution over boolean return true with probability p *)   
 
@@ -164,7 +209,7 @@ theory SmallRange.
 
 module type SR_i = {
   proc init (r: int) : unit
-  quantum proc h {_:from} : int * hash    
+  quantum proc h {_:from} : hash    
 }.
 
 module type SR = {
@@ -195,7 +240,7 @@ module SR : SR_i = {
   } 
 
   quantum proc h {x:from} = {
-    return (fr x, QRO.h x);
+    return (QRO.h x);
   }
 }.
 
@@ -206,7 +251,7 @@ module SRO : SR_i = {
   } 
 
   quantum proc h {x:from} = {
-    return (SR.fr x, QRO.h x);
+    return (QRO.h x);
   }
 }.
 
@@ -214,6 +259,61 @@ module SRO : SR_i = {
 axiom advantage q r (A<:AdvSR{-SR}[main : `{Inf, #H.h : q}]) &m:
   0 < r => 
   `| Pr[IND_SR(SRO,A).main(r) @ &m : res] - Pr[IND_SR(SR,A).main(r) @ &m : res] | <= 
+      27%r * q%r^3 / r%r.
+
+module type SRr_i = {
+  proc init (r: int) : unit
+  quantum proc h {_:from} : int * hash    
+}.
+
+module type SRr = {
+  include SRr_i [-init]
+}.
+
+module SRr : SRr_i = {
+  var rh : hash list
+  var fr : from -> int
+  proc init (r:int) = {
+    rh <$ dlist dhash r;
+    fr <$ difun r; 
+    QRO.h <- fun x => nth witness rh (fr x); 
+  } 
+
+  quantum proc h {x:from} = {
+    return (fr x, QRO.h x);
+  }
+}.
+
+module SROr : SRr_i = {
+  proc init (r:int) = {
+    SR.fr <$ difun r; 
+    QRO.init();
+  } 
+
+  quantum proc h {x:from} = {
+    return (SR.fr x, QRO.h x);
+  }
+}.
+
+quantum module type AdvSRr (H:SRr) = {
+  proc main(r:int) : bool
+}.
+
+module IND_SRr (H:SRr_i, A:AdvSRr) = {
+  proc main(r:int) : bool = {
+    var b;
+
+    H.init(r);
+    b <@ A(H).main(r);
+    return b;
+  }
+}.
+
+(* FIXME: check this bound, this come from Theorem 4.16 of Zhandry thesis,
+   normaly this is provable from the previous axiom *)
+axiom advantage_r q r (A<:AdvSRr{-SR}[main : `{Inf, #H.h : q}]) &m:
+  0 < r => 
+  `| Pr[IND_SRr(SROr,A).main(r) @ &m : res] - Pr[IND_SRr(SRr,A).main(r) @ &m : res] | <= 
       27%r * q%r^3 / r%r.
 
 end SmallRange.
