@@ -43,7 +43,8 @@ abstract theory Collision.
     }
   }.
   
-  (* FIXME: check this axiom *)
+  (* FIXME: change to Thm 3.9 in MZ Thesis: C(q+2)^2/N where
+     C is a fixed constant and N is the hash range cardinality. *)
   axiom pr_col r (d_:hash distr) i_ q (A<:AdvCol{-QROd}[main : `{Inf, #H.h : q}]) &m:
     (forall h, mu1 d_ h <= r) =>
     Pr[Col(A).main(d_, i_) @ &m : size res <= q /\ exists x1 x2, x1 <> x2 /\ x1 \in res /\ x2 \in res /\
@@ -255,7 +256,7 @@ module SRO : SR_i = {
   }
 }.
 
-(* FIXME: check this bound, this come from Theorem 4.16 of Zhandry thesis *)
+(* This bound comes from Corollary 4.15 of Mark Zhandry's thesis *)
 axiom advantage q r (A<:AdvSR{-SR}[main : `{Inf, #H.h : q}]) &m:
   0 < r => 
   `| Pr[IND_SR(SRO,A).main(r) @ &m : res] - Pr[IND_SR(SR,A).main(r) @ &m : res] | <= 
@@ -309,8 +310,10 @@ module IND_SRr (H:SRr_i, A:AdvSRr) = {
   }
 }.
 
-(* FIXME: check this bound, this come from Theorem 4.16 of Zhandry thesis,
-   normaly this is provable from the previous axiom *)
+(* FIXME: The proof of Theorem 4.16  gives a bound that is the summation
+   of that in Corollary 4.15 (currently used) and that in Theorem 4.9
+   ( C(q + 2)3/N) where C is a constant and N is the cardinality of 
+   the range of the hash. *)
 axiom advantage_r q r (A<:AdvSRr{-SR}[main : `{Inf, #H.h : q}]) &m:
   0 < r => 
   `| Pr[IND_SRr(SROr,A).main(r) @ &m : res] - Pr[IND_SRr(SRr,A).main(r) @ &m : res] | <= 
