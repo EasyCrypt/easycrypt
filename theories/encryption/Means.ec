@@ -6,10 +6,12 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore OldMonoid Finite FSet Distr.
+require import AllCore List Distr.
+require import Finite.
+require (*--*) StdBigop.
+(*---*) import StdBigop.Bigbool.BBOr StdBigop.Bigreal.BRA.
 
-type input.
-type output.
+type input, output.
 
 op d : input distr.
 
@@ -17,10 +19,9 @@ module type Worker = {
   proc work(x:input) : output
 }.
 
-module Rand (W:Worker) = {
+module Rand (W : Worker) = {
   proc main() : input * output = {
-    var x : input;
-    var r : output;
+    var x, r;
 
     x <$ d;
     r <@ W.work(x);
@@ -30,92 +31,76 @@ module Rand (W:Worker) = {
 
 lemma prCond (A <: Worker) &m (v:input)
              (ev:input -> glob A -> output -> bool):
-    Pr[Rand(A).main() @ &m: ev v (glob A) (snd res) /\ v = fst res] =
-      (mu1 d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
+    Pr[Rand(A).main() @ &m: ev v (glob A) (snd res) /\ v = fst res]
+  = (mu1 d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
 proof.
-byphoare (_: (glob A) = (glob A){m} ==>
-                 ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
-pose pr := Pr[A.work(v) @ &m: ev v (glob A) res];
-conseq (_: _: = (mu1 d v * pr)). (* WEIRD! *)
-proc; seq 1 : (v = x) (mu1 d v) pr 1%r 0%r ((glob A)=(glob A){m})=> //.
+byphoare (: (glob A) = (glob A){m}
+            ==> ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
+pose pr:= Pr[A.work(v) @ &m: ev v (glob A) res].
+proc.
+seq 1: (v = x) (mu1 d v) pr 1%r 0%r ((glob A) = (glob A){m})=> //.
 + by rnd.
-+ by rnd; skip; progress; rewrite pred1E. 
-+ call (_: (glob A) = (glob A){m} /\ x = v ==>
-           ev v (glob A) res) => //.
-  simplify pr; bypr => &m' eqGlob.
-  by byequiv (_: ={glob A, x} ==> ={res, glob A}) => //; proc true.
-by hoare; rewrite /fst /snd /=; call (_: true); auto; progress; rewrite eq_sym H.
++ by rnd; auto=> />; rewrite pred1E.
++ call (: (glob A) = (glob A){m} /\ x = v
+          ==> ev v (glob A) res)=> //.
+  rewrite /pr; bypr=> /> &0 eqGlob <<-.
+  by byequiv (: ={glob A, x} ==> ={res, glob A})=> //; proc true.
+by hoare; rewrite /fst /snd /=; call (: true); auto=> /#.
 qed.
 
 lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):
-  is_finite (support d) =>
-  let sup = oflist (to_seq (support d)) in
-  Pr[Rand(A).main() @ &m: ev (fst res) (glob A) (snd res)] =
-   Pr[Rand(A).main() @ &m:
-        cpOrs (image (fun v r, ev v (glob A) (snd r) /\ v = fst r) sup) res].
-proof strict.
+     is_finite (support d)
+  => let sup = to_seq (support d) in
+       Pr[Rand(A).main() @ &m: ev (fst res) (glob A) (snd res)]
+     = Pr[Rand(A).main() @ &m:
+            big predT (fun v=> ev v (glob A) (snd res) /\ v = fst res) sup].
+proof.
 move=> Fsup sup.
-byequiv (_: ={glob A} ==> ={glob A, res} /\ (fst res{1}) \in d)=> //;
-  first by proc; call (_: true); rnd.
-move=> &m1 &m2 [[<- <-] Hin].
-rewrite /cpOrs or_exists;split.
-  move=> H.
-  exists (fun r,
-            ev (fst res{m1}) (glob A){m1} (snd r) /\ (fst res{m1}) = fst r).
-  split=> //.
-  by rewrite imageP; exists (fst (res{m1})); smt.
-  by move=> [x]; rewrite imageP => /= -[[v] /= [Hm <-] /= [h1 <-]].
+byequiv (: ={glob A} ==> ={glob A, res} /\ (fst res{1}) \in d)=> //.
++ by proc; call (_: true); rnd.
+move=> |> &2 res2_in_d.
+rewrite bigP hasP //=; split.
++ move=> H; exists res{2}.`1=> //=.
+  by rewrite mem_filter /predT /sup mem_to_seq.
+by move=> [] x />.
 qed.
 
 lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool):
-  is_finite (support d) =>
-  let sup = oflist (to_seq (support d)) in
-  Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)] =
-   Mrplus.sum
-     (fun (v:input), mu1 d v * Pr[A.work(v)@ &m:ev v (glob A) res])
-     sup.
+     is_finite (support d)
+  => let sup = to_seq (support d) in
+       Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)]
+     = big predT (fun v, mu1 d v * Pr[A.work(v)@ &m:ev v (glob A) res]) sup.
 proof.
 move=> Fsup /=.
 have:= introOrs A &m ev _=> //= ->.
-elim/fset_ind (oflist (to_seq (support d))).
-  rewrite Mrplus.sum_empty.
-  byphoare (_ : true ==> false)=> //.
-  by rewrite /cpOrs image0 Mbor.sum_empty.
-  move=> x s Hx Hrec.
-  rewrite Mrplus.sum_add //=.
-  have ->: Pr[Rand(A).main() @ &m:
-                cpOrs (image (fun (v : input) (r : input * output),
-                              ev v (glob A) (snd r) /\ v = fst r) (s `|` fset1 x)) res] =
-            Pr[Rand(A).main() @ &m:
-                (ev x (glob A) (snd res) /\ x = fst res) \/
-                cpOrs (image (fun (v : input) (r : input * output),
-                              ev v (glob A){hr} (snd r) /\ v = fst r) s) res].
-    rewrite Pr[mu_eq] => // &m1.
-    pose f:= (fun (v : input) (r : input * output),
-                ev v (glob A){m1} (snd r) /\ v = fst r).
-    by rewrite imageU image1 cpOrs_add /predU /f.
-  rewrite Pr[mu_disjoint].
-  + move=> /> &hr; rewrite negb_and negb_and.
-    case: (x = res{hr}.`1)=> //= ->>. 
-    case: (ev res{hr}.`1 (glob A){hr} res{hr}.`2)=> //= hev.
-    move: Hx=> {Hrec}; elim/fset_ind: s.
-    + by rewrite image0 cpOrs0.
-    move=> x s x_notin_s ih; rewrite in_fsetU in_fset1 negb_or eq_sym=> - [] /ih.
-    by rewrite imageU image1 cpOrs_add /= /predU=> -> ->.
-  by rewrite Hrec (prCond A &m x ev).
+elim: (to_seq (support d)) (uniq_to_seq _ Fsup)=> //= => [|v vs ih [] v_notin_vs uniq_vs].
++ by rewrite big_nil; byphoare (: true ==> false).
+rewrite big_cons {2}/predT /=.
+have ->:   Pr[Rand(A).main() @ &m:
+                big predT (fun v=> ev v (glob A) res.`2 /\ v = res.`1) (v::vs)]
+         = Pr[Rand(A).main() @ &m:
+                (ev v (glob A) (snd res) /\ v = fst res) \/
+                big predT (fun v=> ev v (glob A) res.`2 /\ v = res.`1) vs].
++ by rewrite Pr[mu_eq].
+rewrite Pr[mu_disjoint].
++ move=> /> &0; rewrite negb_and negb_and //=.
+  case: (v = res{0}.`1)=> //= ->>. 
+  case: (ev res{0}.`1 (glob A){0} res{0}.`2)=> //= hev.
+  rewrite bigP hasP negb_exists=> //= v'.
+  rewrite negb_and negb_and filter_predT.
+  by case: (v' = res{0}.`1)=> [->>|//]; rewrite v_notin_vs.
+by rewrite ih // (prCond A &m v ev).
 qed.
 
-lemma Mean_uni (A<:Worker) &m (ev:input -> glob A -> output -> bool) r:
-   (forall x, x \in d => mu1 d x = r) =>
-   is_finite (support d) =>
-   let sup = oflist (to_seq (support d)) in
-   Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)] =
-     r * Mrplus.sum (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) sup.
+lemma Mean_uni (A <: Worker) &m (ev : input -> glob A -> output -> bool) r:
+      (forall x, x \in d => mu1 d x = r)
+   => is_finite (support d)
+   => let sup = to_seq (support d) in
+        Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)]
+      = r * big predT (fun v=> Pr[A.work(v) @ &m:ev v (glob A) res]) sup.
 proof.
-  move=> Hd Hfin /=.
-  have := Mean A &m ev => /= -> //.
-  have := Mrplus.sum_comp (( * ) r) (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) => /= <-.
-    by move=> x y;ringeq.
-  apply Mrplus.sum_eq => /= x.
-  by rewrite mem_oflist mem_to_seq// /support=> Hin; rewrite Hd.
+move=> Hd Hfin /=.
+have := Mean A &m ev => /= -> //.
+rewrite mulr_sumr; apply: eq_big_seq=> /= v.
+by rewrite mem_to_seq=> // /Hd ->.
 qed.
