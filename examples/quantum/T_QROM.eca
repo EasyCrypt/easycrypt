@@ -656,7 +656,9 @@ proof.
 have -> : 
  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[QRO_main_D(A).main(dfhash) @ &m : res = r].
    by byequiv=>//; conseq (_: _ ==> ={res})=> //; proc;inline*; sim; auto => />.
-rewrite (eager_sampling A) (dA_split A &m dfhash r) (dA_split A &m dcompute r).
+move : (dA_split A &m) => dA_split.
+elim dA_split => C dA_split.
+rewrite (eager_sampling A) (dA_split dfhash r) (dA_split dcompute r).
 by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply perfect_sim.
 qed.
 
