@@ -75,6 +75,23 @@ end Collision.
 
 op dbfun lam = dfun (fun _ => Biased.dbiased lam).
 
+lemma dbfun_ll lam : is_lossless (dbfun lam).
+proof. apply/dfun_ll => /=; apply/Biased.dbiased_ll. qed.
+hint solve 0 random : dbfun_ll.
+
+lemma pr_dbfun_l_eq lam x (l:from list) :
+  0%r <= lam <= 1%r =>
+  !x \in l => uniq l =>
+  mu (dbfun lam) (fun (t : from -> bool) => t x /\ forall x', x' \in l => ! t x') =
+    lam * (1%r - lam) ^ size l.
+proof.
+  move=> lam_bound hx hl; apply (eq_trans _ (lam ^ (size [x]) * (1%r - lam) ^ size l)); last first.
+  + by rewrite /= RField.expr1.
+  rewrite -(dfunE_mem_uniq lam (fun _ => Biased.dbiased lam) [x] l (fun _ => pred1 true)) //=.
+  + by apply Biased.dbiased_ll. + by rewrite Biased.dbiased1E /= Biased.clamp_id. + smt().
+  by apply mu_eq => /#.
+qed.
+
 lemma pr_dbfun_l_pow lam x (l:from list) q : 
   0%r <= lam <= 1%r =>
   !x \in l => size l <= q =>  

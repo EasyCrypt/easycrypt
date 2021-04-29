@@ -131,12 +131,6 @@ proof. smt(ge0_cqh ge0_gqh). qed.
 op q = qe + qh + 1.
 
 (* --------------------------------------------------------------------------- *)
-import DBB Bool.
-
-(* FIXME: move this *)
-lemma dbfun_ll lam : is_lossless (dbfun lam).
-proof. apply/dfun_ll => /=; apply/Biased.dbiased_ll. qed.
-hint solve 0 random : dbfun_ll.
 
 module B (A:AdvIDCPA_QROM) : AdvCPA = {
   import var IDCPA
@@ -302,10 +296,7 @@ seq 1 : b2 (Pr[IDCPA_QROM(A, GPV(E)).main() @ &m : res]) (lam*(1.0-lam)^qe)
 + call (: (glob A, glob E) = (glob A, glob E){m} ==> res); 2: by auto.
   by bypr => &m0 /> ??; byequiv => //; sim.
 + rnd (fun t => t IDCPA.id /\ forall id', id' \in IDCPA.log => ! t id').
-  skip => /> &1 hid hu hs _.
-  have /= := dbfunE_mem_uniq lam [IDCPA.id{1}] IDCPA.log{1} lam_bound _ hu _.
-  + done. + smt().
-  by rewrite expr1 hs => <-; apply mu_eq => x /#.
+  by skip => /> &1 hid hu <- _; apply pr_dbfun_l_eq.
 + by conseq (:false) => // />.
 smt().
 qed.
@@ -330,10 +321,7 @@ seq 1 : true 1.0 (lam*(1.0-lam)^qe)
   + by apply enc_ll.
   by apply (choose_ll QRO (<:IDCPA(A(QRO), GPV(E, QRO)).E)); islossless. 
 + rnd (fun t => t IDCPA.id /\ forall id', id' \in IDCPA.log => ! t id').
-  skip => /> &1 hid hu hs.
-  have /=:= dbfunE_mem_uniq lam [IDCPA.id{1}] IDCPA.log{1} lam_bound _ hu _.
-  + done. + smt().
-  by rewrite expr1 hs => <-; apply mu_eq => x /#.
+  by skip => /> &1 hid hu <-; apply pr_dbfun_l_eq.
 + by conseq (:false) => // />.
 smt().
 qed.
