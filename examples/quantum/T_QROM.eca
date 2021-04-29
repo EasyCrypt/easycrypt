@@ -7,51 +7,6 @@ type from.
 clone import MUniFinFun as MUFF with
   type t <- from.   (* This assume that the type of from is finite *)
 
-abstract theory Collision.
- 
-  type input.
-  type hash.
-
-  module type QROd_i = {
-    proc init (dhash : hash distr) : unit
-    quantum proc h {_:from} : hash    
-  }.
-  
-  module type QROd = {
-    include QROd_i [h]
-  }.
-  
-  module QROd : QROd_i = {
-    var  h : from -> hash
-  
-    proc init(dhash:hash distr) = { h <$ dfun (fun _ => dhash); }
-  
-    quantum proc h {x:from} = { return h x; }
-  
-  }.
-  
-  quantum module type AdvCol (H:QROd) = {
-    proc main(i:input) : from list
-  }.
-  
-  module Col(A:AdvCol) = {
-    proc main(d:hash distr, i:input) = {
-      var l;
-      QROd.h <$ dfun (fun _ => d);
-      l <@ A(QROd).main(i);
-      return l;
-    }
-  }.
-  
-  (* FIXME: change to Thm 3.9 in MZ Thesis: C(q+2)^2/N where
-     C is a fixed constant and N is the hash range cardinality. *)
-  axiom pr_col r (d_:hash distr) i_ q (A<:AdvCol{-QROd}[main : `{Inf, #H.h : q}]) &m:
-    (forall h, mu1 d_ h <= r) =>
-    Pr[Col(A).main(d_, i_) @ &m : size res <= q /\ exists x1 x2, x1 <> x2 /\ x1 \in res /\ x2 \in res /\
-                                 QROd.h x1 = QROd.h x2] <= q%r^3 * r. 
-
-end Collision.
-  
 type hash.
 
 (* Remark : this implies that hash is a finite type *)
@@ -88,6 +43,32 @@ module QRO : QRO_i = {
   quantum proc h {x:from} = { return h x; }
 
 }.
+
+abstract theory Collision.
+ 
+  type input.
+
+  quantum module type AdvCol (H:QRO) = {
+    proc main(i:input) : from * from
+  }.
+  
+  module Col(A:AdvCol) = {
+    proc main(i:input) = {
+      var xx;
+      QRO.init();
+      xx <@ A(QRO).main(i);
+      return (xx.`1 <> xx.`2 && QRO.h xx.`1 = QRO.h xx.`2);
+    }
+  }.
+
+  op q : int.
+  
+  (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
+  axiom pr_col r  i_ (A<:AdvCol{-QRO}[main : `{Inf, #H.h : q}]) &m:
+    (forall h, mu1 dfhash h = r) =>
+    Pr[Col(A).main(i_) @ &m : res] <= 27%r*(q%r+2%r)^3 * r. 
+
+end Collision.
  
 (* -------------------------------------------------------------------------- *)
 (* Biased distribution over boolean return true with probability p *)   
@@ -310,14 +291,13 @@ module IND_SRr (H:SRr_i, A:AdvSRr) = {
   }
 }.
 
-(* FIXME: The proof of Theorem 4.16  gives a bound that is the summation
-   of that in Corollary 4.15 (currently used) and that in Theorem 4.9
-   ( C(q + 2)3/N) where C is a constant and N is the cardinality of 
-   the range of the hash. *)
+(* The proof of Theorem 4.16  gives a bound that is the summation
+   of that in Corollary 4.15and that in Theorem 4.9
+   ( C(q + 2)^3/N) where C <= 27 is a constant and N=r. *)
 axiom advantage_r q r (A<:AdvSRr{-SR}[main : `{Inf, #H.h : q}]) &m:
   0 < r => 
   `| Pr[IND_SRr(SROr,A).main(r) @ &m : res] - Pr[IND_SRr(SRr,A).main(r) @ &m : res] | <= 
-      27%r * q%r^3 / r%r.
+      27%r * q%r^3 / r%r + 27%r * (q%r+2%r)^3 / r%r.
 
 end SmallRange.
 
@@ -663,3 +643,53 @@ by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply perfect_sim.
 qed.
 
 end T_LazyQROM.
+
+(*
+abstract theory Collision.
+ 
+  type input.
+  type hash.
+
+  module type QROd_i = {
+    proc init (dhash : hash distr) : unit
+    quantum proc h {_:from} : hash    
+  }.
+  
+  module type QROd = {
+    include QROd_i [h]
+  }.
+  
+  module QROd : QROd_i = {
+    var  h : from -> hash
+  
+    proc init(dhash:hash distr) = { h <$ dfun (fun _ => dhash); }
+  
+    quantum proc h {x:from} = { return h x; }
+  
+  }.
+  
+  quantum module type AdvCol (H:QROd) = {
+    proc main(i:input) : from list
+  }.
+  
+  module Col(A:AdvCol) = {
+    proc main(d:hash distr, i:input) = {
+      var l;
+      QROd.h <$ dfun (fun _ => d);
+      l <@ A(QROd).main(i);
+      return l;
+    }
+  }.
+  
+  (* FIXME: change to Thm 3.9 in MZ Thesis: 27(q+2)^3/N 
+     where N is the hash range cardinality. *)
+  axiom pr_col r (d_:hash distr) i_ q (A<:AdvCol{-QROd}[main : `{Inf, #H.h : q}]) &m:
+    (forall h, mu1 d_ h <= r) =>
+    Pr[Col(A).main(d_, i_) @ &m : size res <= q /\ 
+                                  exists x1 x2, x1 <> x2 /\ 
+                                                x1 \in res /\ 
+                                                x2 \in res /\
+                                                QROd.h x1 = QROd.h x2] <= q%r^3 * r. 
+
+end Collision.
+  *)
