@@ -1154,18 +1154,30 @@ module Ax = struct
           ?name:axname ax
 
   (* ------------------------------------------------------------------ *)
-  let try_kill_goals (scope : scope) =
-    let mode = (Pragma.get ()).pm_check in
-
+  let try_kill_goals (scope : scope) (mode : mode) =
     let prealize =
       List.map
-        (fun (_, p, _) -> EcPath.toqsymbol p)
+        (fun (_, p, _) -> mk_loc EcLocation._dummy
+          { pr_name  = mk_loc EcLocation._dummy (EcPath.toqsymbol p);
+            pr_proof = Some (Some [{
+              pt_core = mk_loc EcLocation._dummy (Pby (Some [
+                { pt_core   = mk_loc EcLocation._dummy (Psolve (None, Some [
+                    mk_loc EcLocation._dummy "finite"
+                  ]));
+                  pt_intros = []; }
+              ]));
+              pt_intros = [];
+            }]); })
         (fst (oget scope.sc_pr_uc).puc_cont) in
 
-    List.fold_left realize scope perealize
+    List.fold_left
+      (fun scope pl ->
+        try  snd (realize scope mode pl)
+        with EcCoreGoal.TcError _ -> scope)
+      scope prealize
 
   (* ------------------------------------------------------------------ *)
-  let add_defer_goals (scope : scope) (goals : EcTyping.goal1 list) =
+  let add_defer_goals (scope : scope) (mode : mode) (goals : EcTyping.goal1 list) =
     let do1 i = function
       | `Finite ty ->
           let ax =
@@ -1184,7 +1196,7 @@ module Ax = struct
     let goals = List.mapi do1 goals in
     let scope = add_defer scope goals in
 
-    try_kill_goals scope
+    try_kill_goals scope mode
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1501,7 +1513,7 @@ module Mod = struct
     in
       scope
 
-  let add (scope : scope) (ptm : pmodule_def) =
+  let add (scope : scope) (mode : Ax.mode) (ptm : pmodule_def) =
     assert (scope.sc_pr_uc = None);
 
     if ptm.ptm_local && not (EcSection.in_section scope.sc_section) then
@@ -1540,7 +1552,7 @@ module Mod = struct
 
     let scope = bind scope ptm.ptm_local m in
 
-    Ax.add_defer_goals scope goals
+    Ax.add_defer_goals scope mode goals
 
   let declare (scope : scope) m =
     if not (EcSection.in_section scope.sc_section) then
@@ -1572,14 +1584,14 @@ module ModType = struct
     let scope = maybe_add_to_section scope (EcTheory.CTh_modtype (x, tysig)) in
       scope
 
-  let add (scope : scope) (name : symbol) (i : pmodule_sig) =
+  let add (scope : scope) (mode : Ax.mode) (name : symbol) (i : pmodule_sig) =
     assert (scope.sc_pr_uc = None);
     let tysig, goals =
       let goals = ref [] in
       let tysig = EcTyping.transmodsig scope.sc_env goals name i in
       tysig, !goals in
     let scope = bind scope (name, tysig) in
-    Ax.add_defer_goals scope goals
+    Ax.add_defer_goals scope mode goals
 end
 
 (* -------------------------------------------------------------------- *)

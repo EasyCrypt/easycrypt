@@ -331,7 +331,7 @@ and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) m =
   EcScope.check_state `InTop "module" scope;
-  EcScope.Mod.add scope m
+  EcScope.Mod.add scope (Pragma.get ()).pm_check  m
 
 (* -------------------------------------------------------------------- *)
 and process_declare (scope : EcScope.scope) x =
@@ -344,7 +344,7 @@ and process_declare (scope : EcScope.scope) x =
 (* -------------------------------------------------------------------- *)
 and process_interface (scope : EcScope.scope) (x, i) =
   EcScope.check_state `InTop "interface" scope;
-  EcScope.ModType.add scope x.pl_desc i
+  EcScope.ModType.add scope (Pragma.get ()).pm_check x.pl_desc i
 
 (* -------------------------------------------------------------------- *)
 and process_operator (scope : EcScope.scope) (pop : poperator located) =
