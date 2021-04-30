@@ -19,6 +19,10 @@ open EcModules
 open EcFol
 
 (* -------------------------------------------------------------------- *)
+type goal1 = [`Finite of EcTypes.ty]
+type goals = (goal1 list) ref
+
+(* -------------------------------------------------------------------- *)
 type wp = EcEnv.env -> EcMemory.memenv -> stmt -> EcFol.form -> EcFol.form option
 val  wp : wp option ref
 
@@ -267,9 +271,9 @@ val trans_restr_for_modty :
   env -> EcLocation.t -> module_type -> pmod_restr option -> module_type
 
 (* -------------------------------------------------------------------- *)
-val transmodsig  : env -> symbol -> pmodule_sig  -> module_sig
+val transmodsig  : env -> goals -> symbol -> pmodule_sig  -> module_sig
 val transmodtype : env -> pmodule_type -> module_type * module_sig
-val transmod     : attop:bool -> env -> pmodule_def -> module_expr
+val transmod     : attop:bool -> env -> goals -> pmodule_def -> module_expr
 
 val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig

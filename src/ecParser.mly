@@ -1792,14 +1792,14 @@ sig_param:
 | x=uident COLON i=mod_type { (x, i) }
 
 %inline quantum:
-| x=ioption(QUANTUM)   { if x = None then `Classical else `Quantum   }
-
+| x=ioption(QUANTUM)   { if x = None then `Classical else `Quantum }
 
 signature_item:
 | INCLUDE i=mod_type xs=bracket(minclude_proc)? qs=brace(qident*)?
     { let qs = omap (List.map (fun x -> { inp_in_params = false;
 					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
+
 | q=quantum PROC i=boption(STAR) x=lident cqpd=cqparam_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
       let frestr = { pmre_in    = not i;

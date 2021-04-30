@@ -29,6 +29,10 @@ module NormMp = EcEnv.NormMp
 module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
+type goal1 = [`Finite of EcTypes.ty]
+type goals = (goal1 list) ref
+
+(* -------------------------------------------------------------------- *)
 type wp = EcEnv.env -> EcMemory.memenv -> stmt -> form -> form option
 let  wp = (ref (None : wp option))
 
@@ -1150,9 +1154,6 @@ let check_quantum_modtype_restr env loc (mt:module_type) =
     if not (Sid.is_empty quantums) then
       tyerror loc env
         (ModTypeQuantumRestr (List.map EcPath.mident (Sid.elements quantums)))
-
-
-
 
 (* -------------------------------------------------------------------- *)
 let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
@@ -2439,7 +2440,7 @@ and trans_restr_for_modty env loc modty (pmr : pmod_restr option) =
   modty
 
 (* -------------------------------------------------------------------- *)
-and transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
+and transmodsig (env : EcEnv.env) (goals : goals) (name : symbol) (modty : pmodule_sig) =
   let Pmty_struct modty = modty in
 
   let margs =
@@ -2454,7 +2455,7 @@ and transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
 
   (* We compute the body of the signature, and the restrictions given at
      function declarations. *)
-  let body, mr = transmodsig_body env params modty.pmsig_body in
+  let body, mr = transmodsig_body env goals params modty.pmsig_body in
   (* We translate the additional restrictions that may have been given. *)
   let mr' = omap (transmod_restr env env params) modty.pmsig_restr in
 
@@ -2467,18 +2468,20 @@ and transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
     mis_restr  = mr; }
 
 (* Extra restriction for quantum procedure *)
-and check_quantum_type env name fs_quantum argty resty =
+and check_quantum_type (env : EcEnv.env) (goals : goals) name fs_quantum argty resty =
   if fs_quantum = `Quantum then
     (* FIXME quantum: check that td and tc are finite type *)
-    let is_finite t = true in
+    let is_finite t =
+      goals := (`Finite t) :: !goals; true in
     let check_finite t =
       if not (is_finite t) then
         tyerror (loc name) env (QuantumProcFinite(unloc name, t)) in
     check_finite (oget argty);
     check_finite resty
+
 (* -------------------------------------------------------------------- *)
 and transmodsig_body
-  (env : EcEnv.env) (sa : Sm.t) (is : pmodule_sig_struct_body)
+  (env : EcEnv.env) (goals : goals) (sa : Sm.t) (is : pmodule_sig_struct_body)
 =
 
   let names = ref [] in
@@ -2526,7 +2529,7 @@ and transmodsig_body
 
       let oi = OI.mk calls uin compl in
 
-      check_quantum_type env name fs_quantum tyqarg resty;
+      check_quantum_type env goals name fs_quantum tyqarg resty;
 
       let sig_ = { fs_name   = name.pl_desc;
                    fs_arg    = tyarg;
@@ -2593,20 +2596,20 @@ and transmodsig_body
   items, mr
 
 (* -------------------------------------------------------------------- *)
-and transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
-  snd (transmod_header ~attop env me.ptm_header [] me.ptm_body)
+and transmod ~attop (env : EcEnv.env) (goals : goals) (me : pmodule_def) =
+  snd (transmod_header ~attop env goals me.ptm_header [] me.ptm_body)
 
 (* -------------------------------------------------------------------- *)
 and transmod_header
-    ~attop (env : EcEnv.env) (mh:pmodule_header) params (me:pmodule_expr) =
+    ~attop (env : EcEnv.env) (goals : goals) (mh:pmodule_header) params (me:pmodule_expr) =
   match mh with
   | Pmh_ident x ->
-    0, transmod_body ~attop env x params me
+    0, transmod_body ~attop env goals x params me
   | Pmh_params {pl_desc = (mh,params')} ->
-    let n, me = transmod_header ~attop env mh (params' @ params) me in
+    let n, me = transmod_header ~attop env goals mh (params' @ params) me in
     n + List.length params', me
   | Pmh_cast(mh, mts) ->
-    let n, me = transmod_header ~attop env mh params me in
+    let n, me = transmod_header ~attop env goals mh params me in
     (* Compute the signature at the given position,
        i.e: remove the n first argument *)
     let rm,_ = List.takedrop n me.me_params in
@@ -2643,7 +2646,7 @@ and transmod_header
     n,me
 
 (* -------------------------------------------------------------------- *)
-and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
+and transmod_body ~attop (env : EcEnv.env) (goals : goals) x params (me:pmodule_expr) =
   (* Check parameters types *) (* FIXME: dup names *)
   let stparams =
     List.map                          (* FIXME: exn *)
@@ -2672,11 +2675,11 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
       } in
     me
   | Pm_struct ps ->
-    transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
+    transstruct ~attop env goals x.pl_desc stparams (mk_loc me.pl_loc ps)
 
 (* -------------------------------------------------------------------- *)
 and transstruct
-    ~attop (env : EcEnv.env) (x : symbol)
+    ~attop (env : EcEnv.env) (goals : goals) (x : symbol)
     stparams (st:pstructure located) =
   let { pl_loc = loc; pl_desc = st; } = st in
 
@@ -2692,7 +2695,7 @@ and transstruct
     in
     List.fold_left
       (fun (env, acc) item ->
-        let imports, newitems = transstruct1 env item in
+        let imports, newitems = transstruct1 env goals item in
         let env = EcEnv.bindall (List.map tydecl1 newitems) env in
         let env = List.fold_left EcEnv.Mod.import_vars env imports in
         (env, acc @ newitems))
@@ -2716,7 +2719,7 @@ and transstruct
   me
 
 (* -------------------------------------------------------------------- *)
-and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
+and transstruct1 (env : EcEnv.env) (goals : goals) (st : pstructure_item located) =
   match unloc st with
   | Pst_mod  (x,cast, me) ->
     let pe = {
@@ -2724,7 +2727,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       ptm_body   = me;
       ptm_local  = true } in
 
-    let me = transmod ~attop:false env pe in
+    let me = transmod ~attop:false env goals pe in
     [], [me.me_name, MI_Module me]
 
   | Pst_var (xs, ty) ->
@@ -2795,7 +2798,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       let uses = result |> ofold ((^~) se_inuse) (s_inuse stmt) in
 
       let fs_qarg = omap (fun params -> ttuple (List.map (fun vd -> vd.v_type) params)) qparams in
-      check_quantum_type env decl.pfd_name fs_quantum fs_qarg retty;
+      check_quantum_type env goals decl.pfd_name fs_quantum fs_qarg retty;
 
       (* Compose all results *)
       let fun_ =

@@ -1002,17 +1002,6 @@ module Ax = struct
       bind_schema scope (snd pucflags).puc_local (unloc ax.pa_name, sc)
 
   (* ------------------------------------------------------------------ *)
-  and add_defer (scope : scope) proofs =
-    match proofs with
-    | [] -> scope
-    | _  ->
-        assert (scope.sc_pr_uc = None);
-        let puc = { puc_active = None;
-                    puc_cont   = (proofs, Some scope.sc_env);
-                    puc_init   = scope.sc_env; }
-        in { scope with sc_pr_uc = Some puc; }
-
-  (* ------------------------------------------------------------------ *)
   and save_r ?(mode = `Save) scope =
     let puc = oget scope.sc_pr_uc in
     let pac, pct =
@@ -1114,6 +1103,17 @@ module Ax = struct
     add_r scope mode ax
 
   (* ------------------------------------------------------------------ *)
+  let add_defer (scope : scope) proofs =
+    match proofs with
+    | [] -> scope
+    | _  ->
+        assert (scope.sc_pr_uc = None);
+        let puc = { puc_active = None;
+                    puc_cont   = (proofs, Some scope.sc_env);
+                    puc_init   = scope.sc_env; }
+        in { scope with sc_pr_uc = Some puc; }
+
+  (* ------------------------------------------------------------------ *)
   let realize (scope : scope) (mode : mode) (rl : prealize located) =
     check_state `InProof "activate" scope;
 
@@ -1152,6 +1152,39 @@ module Ax = struct
         start_lemma_with_proof scope
           None pucflags (mode, mk_loc loc tc) check
           ?name:axname ax
+
+  (* ------------------------------------------------------------------ *)
+  let try_kill_goals (scope : scope) =
+    let mode = (Pragma.get ()).pm_check in
+
+    let prealize =
+      List.map
+        (fun (_, p, _) -> EcPath.toqsymbol p)
+        (fst (oget scope.sc_pr_uc).puc_cont) in
+
+    List.fold_left realize scope perealize
+
+  (* ------------------------------------------------------------------ *)
+  let add_defer_goals (scope : scope) (goals : EcTyping.goal1 list) =
+    let do1 i = function
+      | `Finite ty ->
+          let ax =
+            EcFol.f_op
+              (EcPath.fromqsymbol (["Finite"], "finite_type"))
+              [ty] tbool in
+          let ax = EcDecl.{
+            ax_tparams = [];
+            ax_spec    = ax;
+            ax_kind    = `Lemma;
+            ax_nosmt   = false;
+          } in
+          let name = Format.sprintf "typing__%d" i in
+          (None, ax), EcPath.psymbol name, scope.sc_env in
+
+    let goals = List.mapi do1 goals in
+    let scope = add_defer scope goals in
+
+    try_kill_goals scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1474,7 +1507,10 @@ module Mod = struct
     if ptm.ptm_local && not (EcSection.in_section scope.sc_section) then
       hierror "cannot declare a local module outside of a section";
 
-    let m = TT.transmod scope.sc_env ~attop:true ptm in
+    let m, goals =
+      let g = ref [] in
+      let m = TT.transmod scope.sc_env g ~attop:true ptm in
+      (m, !g) in
 
     if not ptm.ptm_local then begin
       match EcSection.olocals scope.sc_section with
@@ -1502,7 +1538,9 @@ module Mod = struct
         (EcPrinting.pp_list "@," pp) ur
     end;
 
-    bind scope ptm.ptm_local m
+    let scope = bind scope ptm.ptm_local m in
+
+    Ax.add_defer_goals scope goals
 
   let declare (scope : scope) m =
     if not (EcSection.in_section scope.sc_section) then
@@ -1536,8 +1574,12 @@ module ModType = struct
 
   let add (scope : scope) (name : symbol) (i : pmodule_sig) =
     assert (scope.sc_pr_uc = None);
-    let tysig = EcTyping.transmodsig scope.sc_env name i in
-      bind scope (name, tysig)
+    let tysig, goals =
+      let goals = ref [] in
+      let tysig = EcTyping.transmodsig scope.sc_env goals name i in
+      tysig, !goals in
+    let scope = bind scope (name, tysig) in
+    Ax.add_defer_goals scope goals
 end
 
 (* -------------------------------------------------------------------- *)
