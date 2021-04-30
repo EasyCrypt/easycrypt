@@ -7,10 +7,51 @@ type from.
 clone import MUniFinFun as MUFF with
   type t <- from.   (* This assume that the type of from is finite *)
 
-type hash.
+abstract theory Collision.
+ 
+  type input.
+  type hash.
+
+  module type QROd_i = {
+    proc init (dhash : hash distr) : unit
+    quantum proc h {_:from} : hash    
+  }.
+  
+  module type QROd = {
+    include QROd_i [h]
+  }.
+  
+  module QROd : QROd_i = {
+    var  h : from -> hash
+  
+    proc init(dhash:hash distr) = { h <$ dfun (fun _ => dhash); }
+  
+    quantum proc h {x:from} = { return h x; }
+  
+  }.
+  
+  quantum module type AdvCol (H:QROd) = {
+    proc main(i:input) : from * from
+  }.
+  
+  module Col(A:AdvCol) = {
+    proc main(d:hash distr, i:input) = {
+      var xx;
+      QROd.init(d);
+      xx <@ A(QROd).main(i);
+      return (xx.`1 <> xx.`2 && QROd.h xx.`1 = QROd.h xx.`2);
+    }
+  }.
+
+  (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
+  axiom pr_col r  d_ i_ q (A<:AdvCol{-QROd}[main : `{Inf, #H.h : q}]) &m:
+    (forall h, mu1 d_ h <> 0%r => mu1 d_ h = r) =>
+    Pr[Col(A).main(d_, i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
+
+end Collision.
 
 (* Remark : this implies that hash is a finite type *)
-op [lossless uniform full] dhash : hash distr.
+op [lossless uniform full ] dhash : hash distr.
 
 (* Uniform distribution over from -> hash *)
 op dfhash : (from -> hash) distr = dfun (fun _ => dhash).
@@ -21,8 +62,8 @@ proof. apply dfun_ll => ?;apply dhash_ll. qed.
 lemma dfhash_uni: is_uniform dfhash.
 proof. apply dfun_uni => ?; apply dhash_uni. qed.
 
-lemma dfhash_fu: is_full dfhash.
-proof. apply dfun_fu => ?; apply dhash_fu. qed.
+lemma dfhash_fu: is_full dhash => is_full dfhash.
+proof. move=> dhash_fu; apply dfun_fu => ?; apply dhash_fu. qed.
 
 hint solve 0 random : dfhash_ll dfhash_uni dfhash_fu.
 
@@ -43,32 +84,6 @@ module QRO : QRO_i = {
   quantum proc h {x:from} = { return h x; }
 
 }.
-
-abstract theory Collision.
- 
-  type input.
-
-  quantum module type AdvCol (H:QRO) = {
-    proc main(i:input) : from * from
-  }.
-  
-  module Col(A:AdvCol) = {
-    proc main(i:input) = {
-      var xx;
-      QRO.init();
-      xx <@ A(QRO).main(i);
-      return (xx.`1 <> xx.`2 && QRO.h xx.`1 = QRO.h xx.`2);
-    }
-  }.
-
-  op q : int.
-  
-  (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
-  axiom pr_col r  i_ (A<:AdvCol{-QRO}[main : `{Inf, #H.h : q}]) &m:
-    (forall h, mu1 dfhash h = r) =>
-    Pr[Col(A).main(i_) @ &m : res] <= 27%r*(q%r+2%r)^3 * r. 
-
-end Collision.
  
 (* -------------------------------------------------------------------------- *)
 (* Biased distribution over boolean return true with probability p *)   
@@ -255,10 +270,10 @@ module SRO : SR_i = {
 }.
 
 (* This bound comes from Corollary 4.15 of Mark Zhandry's thesis *)
-axiom advantage q r (A<:AdvSR{-SR}[main : `{Inf, #H.h : q}]) &m:
+axiom advantage (q:int) r (A<:AdvSR{-SR}[main : `{Inf, #H.h : q}]) &m:
   0 < r => 
   `| Pr[IND_SR(SRO,A).main(r) @ &m : res] - Pr[IND_SR(SR,A).main(r) @ &m : res] | <= 
-      27%r * q%r^3 / r%r.
+      (27 * q^3)%r / r%r.
 
 module type SRr_i = {
   proc init (r: int) : unit
@@ -311,10 +326,10 @@ module IND_SRr (H:SRr_i, A:AdvSRr) = {
 (* The proof of Theorem 4.16  gives a bound that is the summation
    of that in Corollary 4.15and that in Theorem 4.9
    ( C(q + 2)^3/N) where C <= 27 is a constant and N=r. *)
-axiom advantage_r q r (A<:AdvSRr{-SR}[main : `{Inf, #H.h : q}]) &m:
+axiom advantage_r (q:int) r (A<:AdvSRr{-SR}[main : `{Inf, #H.h : q}]) &m:
   0 < r => 
   `| Pr[IND_SRr(SROr,A).main(r) @ &m : res] - Pr[IND_SRr(SRr,A).main(r) @ &m : res] | <= 
-      27%r * q%r^3 / r%r + 27%r * (q%r+2%r)^3 / r%r.
+      (54 * q^3)%r / r%r.
 
 end SmallRange.
 
@@ -661,52 +676,3 @@ qed.
 
 end T_LazyQROM.
 
-(*
-abstract theory Collision.
- 
-  type input.
-  type hash.
-
-  module type QROd_i = {
-    proc init (dhash : hash distr) : unit
-    quantum proc h {_:from} : hash    
-  }.
-  
-  module type QROd = {
-    include QROd_i [h]
-  }.
-  
-  module QROd : QROd_i = {
-    var  h : from -> hash
-  
-    proc init(dhash:hash distr) = { h <$ dfun (fun _ => dhash); }
-  
-    quantum proc h {x:from} = { return h x; }
-  
-  }.
-  
-  quantum module type AdvCol (H:QROd) = {
-    proc main(i:input) : from list
-  }.
-  
-  module Col(A:AdvCol) = {
-    proc main(d:hash distr, i:input) = {
-      var l;
-      QROd.h <$ dfun (fun _ => d);
-      l <@ A(QROd).main(i);
-      return l;
-    }
-  }.
-  
-  (* FIXME: change to Thm 3.9 in MZ Thesis: 27(q+2)^3/N 
-     where N is the hash range cardinality. *)
-  axiom pr_col r (d_:hash distr) i_ q (A<:AdvCol{-QROd}[main : `{Inf, #H.h : q}]) &m:
-    (forall h, mu1 d_ h <= r) =>
-    Pr[Col(A).main(d_, i_) @ &m : size res <= q /\ 
-                                  exists x1 x2, x1 <> x2 /\ 
-                                                x1 \in res /\ 
-                                                x2 \in res /\
-                                                QROd.h x1 = QROd.h x2] <= q%r^3 * r. 
-
-end Collision.
-  *)

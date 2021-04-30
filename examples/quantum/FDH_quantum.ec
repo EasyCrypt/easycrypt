@@ -469,7 +469,7 @@ qed.
 
 local lemma l2 r &m :
   0 < r => 
-  `| Pr[IND_SR(SRO,G1).main(r) @ &m : res] - Pr[IND_SR(SR,G1).main(r) @ &m : res] | <= 27%r * q%r^3 / r%r.
+  `| Pr[IND_SR(SRO,G1).main(r) @ &m : res] - Pr[IND_SR(SR,G1).main(r) @ &m : res] | <= (27 * q^3)%r / r%r.
 proof.
   apply (SmallRange.advantage q r G1).
   admit.
@@ -481,6 +481,12 @@ local clone import Collision with
 
 local module G2 (H:QROd) = {
   module RO = { 
+   quantum proc hi {x:msg} = { 
+      quantum var i;
+      i <@ H.h{x};
+      return (i, nth witness SR.rh i);
+    }
+
     quantum proc h {x:msg} = { 
       quantum var i;
       i <@ H.h{x};
@@ -488,19 +494,46 @@ local module G2 (H:QROd) = {
     }
   }
 
+  var logs : (int * msg) list
+  var hm  : int
+
+  module FDH = {
+    proc kg () = {
+      var k;
+      k <$ kg;
+      return k;
+    }
+  
+    proc sign(sk:skey, m:msg) = {
+      var i, h;
+      (i,h) <@ RO.hi{m};
+      logs <- (i,m) :: logs;
+      return finv sk h;
+    }
+  
+    proc verify(pk:pkey, m:msg, s:sign) = {
+      var h;
+      (hm,h) <@ RO.hi{m};
+      return h = f pk s;
+    }
+  
+  }
+
   proc main(r:int) = {
     var b; 
     SR.rh <$ dlist dhash r; 
-    b <@ EUF(A(RO), FDH(RO)).main();
-    return EUF.m :: EUF.log;
+    logs <- [];
+    b <@ EUF(A(RO), FDH).main();
+    return (EUF.m, oget (assoc logs hm));
   }
+
 }.
 
 local lemma l3 r &m:
   0 < r => 
   Pr[IND_SR(SR,G1).main(r) @ &m : res] <= 
     Pr[IND_SR(SR,G1).main(r) @ &m : res /\ !SR.fr EUF.m \in map SR.fr EUF.log ] + 
-    q%r^3 / r%r.
+    (27*(q+2)^3)%r / r%r.
 proof.
   have -> : Pr[IND_SR(SR,G1).main(r)@ &m : res] =
      Pr[IND_SR(SR,G1).main(r) @ &m : res /\ !SR.fr EUF.m \in map SR.fr EUF.log \/ 
@@ -513,14 +546,13 @@ proof.
   + by move=> m; rewrite DInterval.dinter1E /#.
   apply ler_trans.
   byequiv => //; proc; inline *; wp.
-  conseq (: SR.fr{1} = QROd.h{2} /\ ={EUF.log, EUF.m}) _ (: _ ==> size EUF.log <= qs).
-  + move=> />. smt (mapP ge0_qh).
-  + admit.
+  conseq (: SR.fr{1} = QROd.h{2} /\ ={EUF.log, EUF.m} /\ (G2.logs = map (fun m => (QROd.h m, m)) EUF.log){2}).
+  + move=> />; smt (mapP assocP).
   call (: QRO.h{1} = (fun x => nth witness SR.rh{1} (QROd.h{2} x)) /\ 
-            ={EUF.log, EUF.sk, SR.rh}).
+            ={EUF.log, EUF.sk, SR.rh} /\ (G2.logs = map (fun m => (QROd.h m, m)) EUF.log){2}).
   + by proc; inline *; auto.
   + by proc; inline *; auto.
-  by swap{2} [2..3]-1; auto => />.
+  by swap{1} 2 1; auto => />.
 qed.
 
 local module G3 = {
@@ -632,40 +664,43 @@ proof.
 qed.
 
 lemma conclusion &m : 
-  let k = 28%r * q%r^3 in
+  let k = 54 * (q + 2)^3 in
   let eps = Pr[EUF_QROM(A,FDH).main() @ &m : res] in
-  let r = 3 * floor (k / eps) in 
-  eps ^2 / (6%r * k) <= Pr[OW(B(A)).main(r) @ &m : res].
+  let r = 3 * floor (k%r / eps) in 
+  eps ^2 / (6 * k)%r <= Pr[OW(B(A)).main(r) @ &m : res].
 proof.
   move=> /=. 
   case: (Pr[EUF_QROM(A, FDH).main() @ &m : res] = 0.0).
   + by move=> -> /=; rewrite expr0z /=; smt(mu_bounded).
-  have gt0_q3 : 1%r <= q%r ^ 3 by apply exprn_ege1 => //; smt (gt0_qs ge0_qh).
+  have gt0_q3 : 1 <= (q + 2) ^ 3 by apply IntOrder.exprn_ege1 => //; smt (gt0_qs ge0_qh).
   move=> eps0; have heps : 0%r < Pr[EUF_QROM(A, FDH).main() @ &m : res] by smt(mu_bounded).
-  have gt0_r : 0 < 3 * floor((28%r * q%r^3) / Pr[EUF_QROM(A, FDH).main() @ &m : res]).
-  + have : 1%r <= (28%r * q%r^3) / Pr[EUF_QROM(A, FDH).main() @ &m : res]; last by smt(floor_gt).
-    rewrite ler_pdivl_mulr //=; smt(mu_bounded). 
+  have gt0_r : 0 < 3 * floor ((54 * (q + 2)^3)%r/ Pr[EUF_QROM(A, FDH).main() @ &m : res]).
+  + smt(floor_bound mu_bounded).
   move: eps0 heps gt0_r.
-  pose k := 28%r * q%r^3.
+  pose k := 54 * (q + 2)^3.
   pose eps := Pr[EUF_QROM(A,FDH).main() @ &m : res].
-  pose r := 3 * floor(k/eps); move => eps0 heps gt0_r.
+  pose r := 3 * floor(k%r/ eps); move => eps0 heps gt0_r.
   apply : ler_trans (l5 &m r gt0_r).
   apply : ler_trans (l4 r &m gt0_r).
-  apply (ler_trans (inv r%r * (Pr[IND_SR(SRO, G1).main(r) @ &m : res] - 28%r*q%r ^ 3 / r%r))); last first.
-  + by move: (l2 r &m gt0_r) (l3 r &m gt0_r) => /#.
+  apply (ler_trans (inv r%r * (Pr[IND_SR(SRO, G1).main(r) @ &m : res] - (54 * (q + 2)^3)%r / r%r))); 
+    last first.
+  + move: (l2 r &m gt0_r) (l3 r &m gt0_r).
+    have -> : (54 * (q + 2) ^ 3)%r = 2%r * (27 * (q + 2) ^ 3)%r. smt().
+    have /#: (27 * q^3)%r /r%r <= (27 * (q + 2)^3)%r /r%r.
+    smt (IntOrder.ler_pexp gt0_qs ge0_qh).
   rewrite -(l1 r &m gt0_r) -/eps. 
-  apply (ler_trans ((eps/(3%r*k))*(eps/2%r))); 1: by rewrite expr2; smt().
-  have h0k: 0%r < k by smt().
-  have hepsk : 0%r <= eps/k by smt().
-  have hepsr : eps / (3%r*k) <= inv r%r. 
-  + have -> : eps/(3%r*k) = inv(3%r*k/eps) by smt().
+  apply (ler_trans ((eps/(3*k)%r)*(eps/2%r))); 1: by rewrite expr2; smt().
+  have h0k: 0%r < k%r by smt().
+  have hepsk : 0%r <= eps/k%r by smt().
+  have hepsr: eps/(3 * k)%r <= inv r%r.
+  + have -> : eps/(3*k)%r = inv((3*k)%r/eps) by smt().
     by rewrite lef_pinv; smt (floor_bound).
   apply ler_pmul => //; 1,2:smt(). 
-  have /# : 28%r * q%r ^ 3 / r%r <= eps/2%r.
+  have /# : (54 * (q + 2)^ 3)%r / r%r <= eps/2%r.
   rewrite -/k ler_pdivl_mulr 1:// mulrC mulrA ler_pdivr_mulr 1:/#.
   rewrite (mulrC eps) -ler_pdivr_mulr 1:// -mulrA mulrC -ler_pdivl_mulr 1://. 
-  have : 3%r <= k / eps.
-  + apply (ler_trans k); 1: smt().
+  have : 3%r <= k%r / eps.
+  + apply (ler_trans k%r); 1: smt().
     rewrite ler_pdivl_mulr 1://; have /#: eps <= 1%r by smt(mu_bounded). 
   smt (floor_bound).
 qed.
