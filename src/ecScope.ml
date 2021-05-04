@@ -1155,6 +1155,7 @@ module Ax = struct
 
   (* ------------------------------------------------------------------ *)
   let try_kill_goals (scope : scope) (mode : mode) =
+    if scope.sc_pr_uc = None then scope else
     let prealize =
       List.map
         (fun (_, p, _) -> mk_loc EcLocation._dummy
