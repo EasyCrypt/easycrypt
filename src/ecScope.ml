@@ -1179,12 +1179,14 @@ module Ax = struct
 
   (* ------------------------------------------------------------------ *)
   let add_defer_goals (scope : scope) (mode : mode) (goals : EcTyping.goal1 list) =
-    let do1 i = function
+    (*let do1 i = function
       | `Finite ty ->
+
           let ax =
-            EcFol.f_op
-              (EcPath.fromqsymbol (["Finite"], "finite_type"))
-              [ty] tbool in
+            (* FIXME: how to ensure that finite is required *)
+            let op, _ =
+              EcEnv.Op.lookup (["Finite"], "finite_type") scope.sc_env in
+            EcFol.f_op op [ty] tbool in
           let ax = EcDecl.{
             ax_tparams = [];
             ax_spec    = ax;
@@ -1197,7 +1199,7 @@ module Ax = struct
     let goals = List.mapi do1 goals in
     let scope = add_defer scope goals in
 
-    try_kill_goals scope mode
+    try_kill_goals scope mode *) scope
 end
 
 (* -------------------------------------------------------------------- *)

@@ -16,7 +16,7 @@ abstract theory Collision.
     proc init (dhash : hash distr) : unit
     quantum proc h {_:from} : hash    
   }.
-  
+
   module type QROd = {
     include QROd_i [h]
   }.
@@ -49,6 +49,11 @@ abstract theory Collision.
     Pr[Col(A).main(d_, i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
 
 end Collision.
+
+type hash.
+
+axiom hash_finite : Finite.finite_type <:hash>.
+hint solve 0 finite : hash_finite.
 
 (* Remark : this implies that hash is a finite type *)
 op [lossless uniform full ] dhash : hash distr.
@@ -279,6 +284,7 @@ module type SRr_i = {
   proc init (r: int) : unit
   quantum proc h {_:from} : int * hash    
 }.
+
 
 module type SRr = {
   include SRr_i [-init]

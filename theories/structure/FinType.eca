@@ -44,4 +44,5 @@ qed.
 lemma finite_t : finite_type <:t>.
 proof. by apply finite_typeP; exists enum => ?; apply enumP. qed.
 
+hint solve 0 finite : finite_t.
 

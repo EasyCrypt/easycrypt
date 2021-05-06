@@ -2805,6 +2805,7 @@ module Op = struct
 
   let reduce ?(force = false) env p tys =
     let op = oget (by_path_opt p env) in
+
     let f  =
       match op.op_kind with
       | OB_oper (Some (OP_Plain (e, _))) when force || not op.op_opaque ->

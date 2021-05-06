@@ -443,11 +443,53 @@ module B (A:AdvEUF_QROM) : AdvOW = {
 
 section OW.
 
+module EUF_QROMi (A:AdvEUF_QROM) = {
+  var bf : msg -> bool
+
+  proc main(r:int) = {
+    var b;
+    bf <$ dfun (fun _ => [0..r-1]);
+    b <@ EUF_QROM(A, FDH).main();
+    return b /\ (bf EUF.m /\ (forall m', m' \in EUF.log => !bf m') /\ size EUF.log <= qs );
+  }
+}.
+
+section.
+ 
+declare module A : 
+  AdvEUF_QROM { -QRO, -EUF, - EUF_QROM'}[main : `{Inf, #H.h : qh, #S.sign : qs}].
+
+lemma l1 lam &m:
+  0%r <= lam <= 1%r =>
+  Pr[EUF_QROM'(A).main(lam) @ &m : res] >=
+    lam * (1%r - lam)^qs * Pr[EUF_QROM(A,FDH).main() @ &m : res].
+proof.
+move=> lam_bound.
+byphoare (:(glob A){m} = glob A /\ lam_ = lam ==> _) => //.
+proc.
+swap 1 1.
+seq 1 : b Pr[EUF_QROM(A,FDH).main() @ &m : res] (lam * (1%r - lam) ^ qs) 
+          _ 0%r (lam_ = lam /\ (b => !EUF.m \in EUF.log /\ size EUF.log <= qs)).
++ by call (EUF_QROM_bound A); skip => />.
++ call (: (glob A){m} = glob A ==> res); 2: by auto.
+  bypr => &m0 ?.
+  byequiv (: ={glob A} ==> ={res}) => //; 1: sim.
++ rnd (fun t => t EUF.m /\ forall (m' : msg), m' \in EUF.log => ! t m').
+  by skip => /> &hr h /h /> *; apply: pr_dbfun_l_pow.
++ by auto.
+smt().
+qed.
+
+
+
+(*
 declare module A : AdvEUF_QROM { -QRO, -EUF , -B}
                      [main : `{Inf, #H.h : qh, #S.sign : qs}].
 
 axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) : 
   islossless S.sign => islossless H.h => islossless A(H, S).main.
+
+
 
 local clone import SmallRange.
 
@@ -706,5 +748,5 @@ proof.
 qed.
 
 end section OW.
-
+*)
 end FDH_OW_small_range.
