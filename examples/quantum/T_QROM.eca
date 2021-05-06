@@ -524,7 +524,7 @@ length preserving QROM over bit strings and, in particular, random oracles
 that map bit strings to a single bit.
 
 *)
-
+(*
 abstract theory T_LazyQROM.
 
 op q : int.
@@ -619,6 +619,10 @@ import TupleXY.
 
 lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
   Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r]. 
+byequiv => //.
+proc. 
+inline *.
+
 (* Just use random *)
 admitted.
 
@@ -682,3 +686,4 @@ qed.
 
 end T_LazyQROM.
 
+*)
