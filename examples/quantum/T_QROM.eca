@@ -275,7 +275,7 @@ module SRO : SR_i = {
 }.
 
 (* This bound comes from Corollary 4.15 of Mark Zhandry's thesis *)
-axiom advantage (q:int) r (A<:AdvSR{-SR}[main : `{Inf, #H.h : q}]) &m:
+axiom advantage (q:int) r (A<:AdvSR{-SR, -QRO}[main : `{Inf, #H.h : q}]) &m:
   0 < r => 
   `| Pr[IND_SR(SRO,A).main(r) @ &m : res] - Pr[IND_SR(SR,A).main(r) @ &m : res] | <= 
       (27 * q^3)%r / r%r.
@@ -494,7 +494,7 @@ module QRO_main(A : AdvRO, H : QRO_i) = {
   }
 }.
 
-axiom dA_split (A<:AdvRO{-QRO_main}[main : `{Inf, #H.h : q}]) &m:
+axiom dA_split (A<:AdvRO{QRO}[main : `{Inf, #H.h : q}]) &m:
    exists (C : (from * hash) list -> result -> real),
    forall (adfhash: (from -> hash) distr) (r:result),
     Pr[ QRO_main_D(A).main(adfhash) @ &m : res = r] = 
