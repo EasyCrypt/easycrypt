@@ -494,7 +494,7 @@ module QRO_main(A : AdvRO, H : QRO_i) = {
   }
 }.
 
-axiom dA_split (A<:AdvRO{QRO}[main : `{Inf, #H.h : q}]) &m:
+axiom dA_split (A<:AdvRO{-QRO}[main : `{Inf, #H.h : q}]) &m:
    exists (C : (from * hash) list -> result -> real),
    forall (adfhash: (from -> hash) distr) (r:result),
     Pr[ QRO_main_D(A).main(adfhash) @ &m : res = r] = 

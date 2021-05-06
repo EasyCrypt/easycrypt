@@ -1,4 +1,4 @@
-require import AllCore List Distr DBool DProd DList DInterval CHoareTactic IntDiv.
+require import AllCore List Distr DBool DProd DList DMap DInterval CHoareTactic IntDiv.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
 require (*  *) Matrix Tuple (* FinType *).
 require (****) T_QROM.
@@ -45,14 +45,16 @@ op compute(seed : vector, x : from) : hash =
              dotp xv seed.
             
 module LQRO : QRO_i = {
-  var seed : vector
+  
+  proc init() = { 
+    var seed : vector;
+    seed <$ genseed;
+    QRO.h <- (fun x => compute seed x);
+ }
 
-  proc init() = { seed <$ genseed; }
-
-  quantum proc h {x:from} = { return compute seed x; }
+ include QRO [h]
 
 }.
-
 
 op dcompute : (from -> hash) distr = 
        dmap genseed (fun seed => compute seed).
@@ -61,13 +63,25 @@ clone import QROM_Fundamental_Lemma with
     op q <- q
     proof q_ge0 by smt(q_ge0).
 
+section.
+
+local clone import DMapSampling with 
+  type t1 <- vector,
+  type t2 <- (from -> hash).
+
 lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
   Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r]. 
-byequiv. 
-proc. inline *.
-(* This is moving the compute function from the oracle on the left
-   to the sampled function on the right. *)
-admitted.
+proof.
+byequiv (_: _ ==> ={res}) => //.
+proc; sim; conseq />.
+transitivity*{1} { QRO.h <@ S.map(genseed, (fun seed x => compute seed x)); } => //; 1: smt ().
++ inline *; wp; rnd; wp; skip => />.
+transitivity*{1} { QRO.h <@ S.sample(genseed, (fun seed x => compute seed x)); } => //; 1: smt().
++ by symmetry; call sample; skip => />.
+by inline *; wp; rnd; wp; skip => />.
+qed.
+
+end section.
 
 import TupleXY.
 
