@@ -180,7 +180,7 @@ module SCD (A:AdvSCD) = {
   }
 }.
 
-axiom advantage q lambda (A<:AdvSCD{-SCD}[main : `{Inf, #H.h : q}]) &m:
+axiom advantage q lambda (A<:AdvSCD{-SCD, -QRO}[main : `{Inf, #H.h : q}]) &m:
   0%r <= lambda <= 1%r =>
   `| Pr[SCD(A)._F0(lambda) @ &m : res] - Pr[SCD(A)._F1(lambda) @ &m: res] | 
    <= (2%r * q%r + k%r + 1%r)/ 6%r * lambda^2.
