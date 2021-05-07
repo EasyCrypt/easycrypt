@@ -1,50 +1,38 @@
-require import AllCore List Distr DList StdOrder IntDiv ZModP.
-require (*--*) Matrix.
+require import AllCore List Distr DList StdOrder Ring IntDiv.
+require FinType.
 
-op p : { int | prime p } as prime_p.
-op n : { int | 0 < n <= p } as gt0_n.
-op k : { int | 0 < k <= n } as rg_k.
+(* We assume that a have a finite type (with p elements) and 
+   this type is a field. This implies that p is of the form q^n with q a prime *)
+clone import MFinite as FT.
+import Support.
+op p = card.
 
-clone import ZModField
-  with op p <- p proof prime_p by exact/prime_p.
+clone import Field as F
+  with type t <- FT.t.
 
-import ZModpField.
+lemma gt0_p : 0 < p.
+proof.
+rewrite /p /card; have /= /#:= uniq_leq_size [zeror] enum _ _ => //.
+by move=> x _; apply enumP.
+qed.
 
-clone Matrix as ZModMx_n with 
-  type R         <- zmod,
-    op size      <- n,
+clone import Bigalg.BigComRing as Big with
+  type t <- t,
+  pred CR.unit (x : t)  <- x <> zeror,
+    op CR.zeror  <- zeror,
+    op CR.oner   <- oner,
+    op CR.( + )  <- F.( + ),
+    op CR.([-])  <- F.([-]),
+    op CR.( * )  <- F.( * ),
+    op CR.invr   <- F.invr,
+    op CR.intmul <- F.intmul,
+    op CR.ofint  <- F.ofint,
+    op CR.exp    <- F.exp,
+    op CR.lreg   <- F.lreg.
 
-  pred ZR.unit   <- ZModField .unit,
-    op ZR.zeror  <- ZModField .zero,
-    op ZR.oner   <- ZModField .one,
-    op ZR.( + )  <- ZModField .( + ),
-    op ZR.([-])  <- ZModField .([-]),
-    op ZR.( * )  <- ZModField .( * ),
-    op ZR.invr   <- ZModField .inv,
-    op ZR.intmul <- ZModpField.intmul,
-    op ZR.ofint  <- ZModpField.ofint,
-    op ZR.exp    <- ZModpField.exp,
-    op ZR.lreg   <- ZModpField.lreg.
+import BAdd.
 
-clone Matrix as ZModMx_k with 
-  type R         <- zmod,
-    op size      <- k,
-
-  pred ZR.unit   <- ZModField .unit,
-    op ZR.zeror  <- ZModField .zero,
-    op ZR.oner   <- ZModField .one,
-    op ZR.( + )  <- ZModField .( + ),
-    op ZR.([-])  <- ZModField .([-]),
-    op ZR.( * )  <- ZModField .( * ),
-    op ZR.invr   <- ZModField .inv,
-    op ZR.intmul <- ZModpField.intmul,
-    op ZR.ofint  <- ZModpField.ofint,
-    op ZR.exp    <- ZModpField.exp,
-    op ZR.lreg   <- ZModpField.lreg.
-
-import ZModMx_k.Big.
-
-lemma duni_zmod_shift (d : zmod distr) (c : zmod) :
+lemma duni_zmod_shift (d : t distr) (c : t) :
   is_funiform d => is_lossless d => dmap d (fun z => z + c) = d.
 proof.
 move=> funi_d ll_d; apply: (@dmap_bij _ _ _ (fun z => z - c)) => /=.
@@ -54,31 +42,71 @@ move=> funi_d ll_d; apply: (@dmap_bij _ _ _ (fun z => z - c)) => /=.
 - by move=> v _; rewrite subrK.
 qed.
 
-op s, t : zmod list.
+op uhash_list (s:t list) (vs : t list) = 
+ let k = size s in
+ map (fun (i : int) =>
+       BAdd.bigi predT
+         (fun (j : int) => exp (nth zeror s i) j * nth zeror vs j)
+           0 k) (range 0 k).
+
+op uhash_list_inv : t list -> t list -> t list.
+
+axiom uhash_list_bij s vs :
+  uniq s => size s = size vs =>
+  uhash_list_inv s (uhash_list s vs) = vs /\
+  uhash_list s (uhash_list_inv s vs) = vs.
+
+axiom uhash_list_inv s vs : 
+  uniq s => size s = size vs => 
+  size (uhash_list_inv s vs) = size s.
+
+lemma vdmV s :
+    uniq s => 
+    dmap (dlist dunifin (size s)) (uhash_list s) = dlist dunifin (size s).
+proof.
+  move=> hu.
+  have h0s: 0 <= size s by apply size_ge0.
+  have hsize : forall l, size s = size (uhash_list s l).
+  + move=> l; rewrite /uhash_list /= size_map size_range /#.
+  apply (dmap_bij _ _ _ (uhash_list_inv s)) => /=.
+  + move=> l /(supp_dlist dunifin (size s) l h0s) [] heq _; rewrite (hsize l).
+    by apply dlist_fu => x _; apply dunifin_fu.
+  + move=> l /(supp_dlist dunifin (size s) l h0s) [] heq _.
+    apply dlist_uni => //; 1: by apply dunifin_uni.
+    by rewrite -heq; apply dlist_fu => ??; apply dunifin_fu.
+  + have <- := uhash_list_inv s l hu _; 1: by rewrite heq.
+    by apply dlist_fu => ??; apply dunifin_fu.
+  + move=> l  /(supp_dlist dunifin (size s) l h0s) [] heq _.
+    by case : (uhash_list_bij s l hu _); 1: by rewrite heq.
+  move=> l  /(supp_dlist dunifin (size s) l h0s) [] heq _.
+  by case : (uhash_list_bij s l hu _); 1: by rewrite heq.
+qed.
+
+(*
+
+op n : { int | 0 < n <= p } as gt0_n.
+op k : { int | 0 < k <= n } as rg_k.
+
+op s, t : t list.
 
 axiom size_s : size s = k.
 axiom size_t : k + size t = n.
 axiom uniq_s : uniq s.
 axiom sub_ts : forall x, x \in t => x \in s.
+x
 
-axiom vdmV :
-    dmap (dlist DZmodP.dunifin k)
-      (fun vs => map (fun (i : int) =>
-          (BAdd.bigi predT
-            (fun (j : int) => exp (nth zero s i) j * nth zero vs j)
-            0 k)) (range 0 k))
-  = dlist DZmodP.dunifin k.
+*)
 
-op dv =
-  dlist DZmodP.dunifin p.
+
+op dv = dlist dunifin p.
 
 op dout r =
-  dmap dv (fun v => map (fun i => nth zero v (asint i)) r).
+  dmap dv (fun v => map (fun i => nth zeror v (index i enum)) r).
 
-op dsim k r =
-  dmap (dlist DZmodP.dunifin n) (fun seed => map
+op dsim n k r =
+  dmap (dlist dunifin n) (fun seed => map
     (fun i =>
-      BAdd.bigi predT (fun j => exp (nth zero r i) j * nth zero seed j) 0 n)
+      BAdd.bigi predT (fun j => exp (nth zeror r i) j * nth zeror seed j) 0 n)
     (range 0 k)).
 
 lemma dletC ['a 'b] (da : 'a distr) (db : 'b distr) :
@@ -198,184 +226,193 @@ rewrite -(ih (rem c0 r) idx' g).
 by apply: eq_dmap_in=> xs xs_in /#.
 qed.
 
-lemma dsim_dout : dsim n (s ++ t) = dout (s ++ t).
+lemma dsim_dout (s t : t list) :
+  uniq s => 
+  (forall x, x \in t => x \in s) => 
+  let n = size s + size t in
+  dsim n n (s ++ t) = dout (s ++ t).
 proof.
+move=> uniq_s sub_ts n.
 have ->: dout (s ++ t) =
-  dmap (dout s) (fun s' => s' ++ map (fun i => nth zero s' (index i s)) t).
-- apply/eq_sym; apply/(@dmap_bij _ _ _ (take k)) => /=.
+  dmap (dout s) (fun s' => s' ++ map (fun i => nth zeror s' (index i s)) t).
+- apply/eq_sym; apply/(@dmap_bij _ _ _ (take (size s))) => /=.
   - move=> xs /supp_dmap[vs [vs_dv ->>]] /=; apply/supp_dmap.
     exists vs; split=> //=; rewrite map_cat; congr=> //.
-    apply: eq_in_map=> z z_in_t /=; rewrite (nth_map zero) /=.
+    apply: eq_in_map=> z z_in_t /=; rewrite (nth_map zeror) /=.
     - by rewrite index_ge0 /= index_mem sub_ts.
     by rewrite nth_index // sub_ts.
   - move=> xs /supp_dmap[vs [vs_dv ->>]]; rewrite !dmap1E.
     rewrite /(\o) /=; apply: mu_eq_support.
     move=> ws ws_dv @/pred1 /=; rewrite !map_cat take_cat.
-    rewrite size_map size_s /= take0 cats0; apply: eq_iff.
+    rewrite size_map /= take0 cats0; apply: eq_iff.
     split=> [|^eq <-]; first by rewrite eqseq_cat ?size_map.
     congr; apply/eq_in_map=> v /sub_ts v_in_s /=.
-    move/(congr1 (nth zero)): eq => /fun_ext /(_ (index v s)).
-    by rewrite !(nth_map zero) ?index_ge0 ?index_mem //= nth_index.
+    move/(congr1 (nth zeror)): eq => /fun_ext /(_ (index v s)).
+    by rewrite !(nth_map zeror) ?index_ge0 ?index_mem //= nth_index.
   - move=> vs /supp_dmap[ws [_ ->>]] /=; rewrite take_cat.
-    by rewrite size_map size_s /= take0 cats0.
+    by rewrite size_map /= take0 cats0.
   - move=> vs /supp_dmap[ws [_ ->>]]; rewrite map_cat take_cat.
-    rewrite size_map size_s /= take0 cats0; congr.
+    rewrite size_map /= take0 cats0; congr.
     apply: eq_in_map=> v /sub_ts v_in_s /=.
-    by rewrite (nth_map zero) ?index_ge0 ?index_mem //= nth_index.
-have ->: dsim n (s ++ t) =
-  dmap (dsim k (s ++ t)) (fun s' => s' ++ map (fun i => nth zero s' (index i s)) t).
+    by rewrite (nth_map zeror) ?index_ge0 ?index_mem //= nth_index.
+pose k := size s.
+have ->: dsim n n (s ++ t) =
+  dmap (dsim n k (s ++ t)) (fun s' => s' ++ map (fun i => nth zeror s' (index i s)) t).
 - apply/eq_sym; apply/(@dmap_bij _ _ _ (take k)) => /=.
   - move=> xs /supp_dmap[vs [vs_dv ->>]] /=; apply/supp_dmap.
-    exists vs; split=> //=; rewrite {4}(range_cat k 0 n); 1,2: smt(rg_k).
+    exists vs; split=> //=; rewrite {4}(range_cat k 0 n); 1,2: smt(size_ge0).
     rewrite map_cat; congr=> //.
-    pose f := fun z : zmod =>
-      BAdd.bigi predT (fun (j : int) => exp z j * nth zero vs j) 0 n.
-    apply/eq_sym; rewrite (map_comp f (fun i => nth zero (s ++ t) i)).
+    pose f := fun z : t =>
+      BAdd.bigi predT (fun (j : int) => exp z j * nth zeror vs j) 0 n.
+    apply/eq_sym; rewrite (map_comp f (fun i => nth zeror (s ++ t) i)).
     pose w := map _ (range k n); have ->: w = t.
     - rewrite /w (_ : n = n - k + k) 1:#ring range_addr /=.
-      rewrite -map_comp /(\o) -{2}(map_nth_range zero t).
-      rewrite (_ : size t = n - k); 1: smt(size_t).
+      rewrite -map_comp /(\o) -{2}(map_nth_range zeror t).
+      rewrite (_ : size t = n - k); 1: smt(). 
       apply: eq_in_map => i /mem_range rg_i /=.
-      rewrite nth_cat size_s /#.
+      rewrite nth_cat /#.
     apply: eq_in_map=> x x_t @/f /=; rewrite (nth_map 0) /=.
     - rewrite index_ge0 /= size_range /=.
-      rewrite IntOrder.ler_maxr; 1: smt(rg_k).
-      by rewrite -size_s index_mem sub_ts.
+      rewrite IntOrder.ler_maxr; 1: smt(size_ge0).
+      by rewrite index_mem sub_ts.
     apply: BAdd.eq_bigr=> i _ /=; do 2! congr.
     rewrite nth_range /=; first by
-      rewrite index_ge0 -size_s index_mem sub_ts.
+      rewrite index_ge0 index_mem sub_ts.
     by rewrite nth_cat index_mem sub_ts //= nth_index ?sub_ts.
   - move=> xs /supp_dmap[vs [vs_dv ->>]]; rewrite !dmap1E.
     rewrite /(\o) /=; apply: mu_eq_support.
     move=> ws ws_dv @/pred1 /=;
-      rewrite {2 4 7}(range_cat k 0 n); 1,2: smt(rg_k).
+      rewrite {2 4 7}(range_cat k 0 n); 1,2: smt(size_ge0).
     rewrite !map_cat take_cat size_map size_range /=.
-    rewrite IntOrder.ler_maxr /=; 1: smt(rg_k).
+    rewrite IntOrder.ler_maxr /=; 1: smt(size_ge0).
     rewrite take0 cats0; apply: eq_iff.
     split=> [|^eq <-]; first by rewrite eqseq_cat ?size_map.
     congr; apply/eq_in_map=> v /= /mem_range rg_v /=.
-    pose i0 := index (nth zero (s ++ t) v) s.
+    pose i0 := index (nth zeror (s ++ t) v) s.
     have rg_i0: 0 <= i0 < k.
-    - rewrite index_ge0 /= -size_s /i0 nth_cat.
-      rewrite {1}size_s (_ : !(v < k)) 1:/# /=.
-      by rewrite index_mem sub_ts mem_nth /= size_s; smt(size_t).
-    move/(congr1 (nth zero)): eq => /fun_ext /(_ i0).
+    - rewrite index_ge0 /= /i0 nth_cat.
+      rewrite (_ : !(v < size s)) 1:/# /=.
+      by rewrite index_mem sub_ts mem_nth /= /#.
+    move/(congr1 (nth zeror)): eq => /fun_ext /(_ i0).
     rewrite !(nth_map 0) ?index_ge0 ?index_mem //=;
-      1,2: by rewrite size_range /= IntOrder.ler_maxr; smt(rg_k).
-    suff ->//: nth zero (s ++ t) (nth 0 (range 0 k) i0)
-      = nth zero (s ++ t) v.
-    rewrite nth_range //= nth_cat size_s.
+      1,2: by rewrite size_range /= IntOrder.ler_maxr; smt(size_ge0).
+    suff ->//: nth zeror (s ++ t) (nth 0 (range 0 k) i0)
+      = nth zeror (s ++ t) v.
+    rewrite nth_range //= nth_cat.
     rewrite (_ : (i0 < k)) 1:/# /= /i0 nth_index //.
-    rewrite nth_cat size_s (_ : !(v < k)) 1:/# /=.
-    by apply/sub_ts; rewrite mem_nth; smt(size_t).
+    rewrite nth_cat (_ : !(v < k)) 1:/# /=.
+    by apply/sub_ts; rewrite mem_nth; smt().
   - move=> vs /supp_dmap[ws [_ ->>]] /=; rewrite take_cat.
-    rewrite size_map size_range IntOrder.ler_maxr /=; 1: smt(rg_k).
+    rewrite size_map size_range IntOrder.ler_maxr /=; 1: smt(size_ge0).
     by rewrite take0 cats0.
   - move=> vs /supp_dmap[ws [_ ->>]].
-    rewrite -map_take take_range0; 1: smt(rg_k).
-    rewrite {4}(range_cat k 0 n); 1,2: smt(rg_k).
+    rewrite -map_take take_range0; 1: smt(size_ge0).
+    rewrite {4}(range_cat k 0 n); 1,2: smt(size_ge0).
     rewrite map_cat; congr.
-    pose f := fun z : zmod =>
-      BAdd.bigi predT (fun (j : int) => exp z j * nth zero ws j) 0 n.
-    apply/eq_sym; rewrite (map_comp f (fun i => nth zero (s ++ t) i)).
+    pose f := fun z : t =>
+      BAdd.bigi predT (fun (j : int) => exp z j * nth zeror ws j) 0 n.
+    apply/eq_sym; rewrite (map_comp f (fun i => nth zeror (s ++ t) i)).
     pose w := map _ (range k n); have ->: w = t.
     - rewrite /w (_ : n = n - k + k) 1:#ring range_addr /=.
-      rewrite -map_comp /(\o) -{2}(map_nth_range zero t).
-      rewrite (_ : size t = n - k); 1: smt(size_t).
+      rewrite -map_comp /(\o) -{2}(map_nth_range zeror t).
+      rewrite (_ : size t = n - k); 1: smt().
       apply: eq_in_map => i /mem_range rg_i /=.
-      rewrite nth_cat size_s /#.
+      rewrite nth_cat /#.
     apply: eq_in_map=> x x_t @/f /=; rewrite (nth_map 0) /=.
     - rewrite index_ge0 /= size_range /=.
-      rewrite IntOrder.ler_maxr; 1: smt(rg_k).
-      by rewrite -size_s index_mem sub_ts.
+      rewrite IntOrder.ler_maxr; 1: smt(size_ge0).
+      by rewrite index_mem sub_ts.
     apply: BAdd.eq_bigr=> i _ /=; do 2! congr.
     rewrite nth_range /=; first by
-      rewrite index_ge0 -size_s index_mem sub_ts.
+      rewrite index_ge0 index_mem sub_ts.
     by rewrite nth_cat index_mem sub_ts //= nth_index ?sub_ts.
 pose F x := map (fun i =>
   BAdd.bigi predT (fun j =>
-    exp (nth zero s i) j * nth zero x j
+    exp (nth zeror s i) j * nth zeror x j
   ) 0 k) (range 0 k).
-congr; have ->: dout s = dmap (dlist DZmodP.dunifin k) F.
-- rewrite vdmV /dout /dv (dmap_select zero DZmodP.dunifin p s asint idfun).
-  - smt(gt0_prime prime_p).
+congr; have ->: dout s = dmap (dlist dunifin k) F.
+- rewrite vdmV // /dout /dv 
+     (dmap_select zeror dunifin p s (fun x => index x enum) idfun).
+  - smt(gt0_p). 
   - by apply: uniq_s.  
-  - smt(asint_inj).
-  - smt(gtp_asint ge0_asint).
-  - by apply/DZmodP.dunifin_ll.
-  by rewrite size_s dmap_id.
+  + (* FIXME this should be a lemma *)
+    move=> /=.
+    admit.
+  - smt (index_ge0 index_mem enumP).
+  - by apply/dunifin_ll.
+  by rewrite dmap_id.
 rewrite /dsim {1}(_ : n = k + (n - k)) 1:#ring.
-rewrite dlist_add /= 1,2:[smt(rg_k)] dmap_comp dmap_dprodE_swap /(\o) /=.
+rewrite dlist_add /= 1,2:[smt(size_ge0)] dmap_comp dmap_dprodE_swap /(\o) /=.
 pose G y c :=
-  map (fun i => nth zero c i +
-    BAdd.bigi predT (fun j => exp (nth zero (s ++ t) i) j * nth zero y (j - k)
+  map (fun i => nth zeror c i +
+    BAdd.bigi predT (fun j => exp (nth zeror (s ++ t) i) j * nth zeror y (j - k)
   ) k n) (range 0 k).
-pose D y := dmap (dlist DZmodP.dunifin k) (fun x => G y (F x)).
-rewrite -(eq_dlet D _ (dlist DZmodP.dunifin (n - k))) //.
+pose D y := dmap (dlist dunifin k) (fun x => G y (F x)).
+rewrite -(eq_dlet D _ (dlist dunifin (n - k))) //.
 - move=> vs @/D; apply/eq_dmap_in => ws ws_in /= @/G @/F /=.
   apply: eq_in_map => i /mem_range rg_i /=.
   rewrite (nth_map 0) /= ?size_range 1:/# nth_range 1:/# /=.
-  pose H r d j := exp (nth zero (s ++ t) i) j * nth zero r (j - d).
+  pose H r d j := exp (nth zeror (s ++ t) i) j * nth zeror r (j - d).
   rewrite -(BAdd.eq_big_int _ _ (H (ws ++ vs) 0)).
   - move=> l rg_l @/H /=; congr; rewrite nth_cat.
-    - by rewrite size_s (_ : i < k) 1:/#.
-    rewrite (supp_dlist_size _ _ _ _ ws_in); 1: smt(rg_k).
+    - by rewrite (_ : i < k) 1:/#.
+    rewrite (supp_dlist_size _ _ _ _ ws_in); 1: smt(size_ge0).
     by rewrite (_ : l < k) 1:/#.
   rewrite addrC -(BAdd.eq_big_int _ _ (H (ws ++ vs) 0)).
   - move=> l rg_l @/H /=; congr; rewrite nth_cat.
-    by rewrite (supp_dlist_size _ _ _ _ ws_in); smt(rg_k).
-  by rewrite addrC -BAdd.big_cat_int; 1,2: smt(rg_k).
-move=> @/D => {D}; pose D y := dmap (dmap (dlist DZmodP.dunifin k) F) (G y).
-rewrite -(eq_dlet D _ (dlist DZmodP.dunifin (n - k))) //.
+    by rewrite (supp_dlist_size _ _ _ _ ws_in); smt(size_ge0).
+  by rewrite addrC -BAdd.big_cat_int; 1,2: smt(size_ge0).
+move=> @/D => {D}; pose D y := dmap (dmap (dlist dunifin k) F) (G y).
+rewrite -(eq_dlet D _ (dlist dunifin (n - k))) //.
 - by move=> vs @/D; rewrite dmap_comp.
 move=> @/D => {D}.
-have ->: dmap (dlist DZmodP.dunifin k) F = dlist DZmodP.dunifin k.
+have ->: dmap (dlist dunifin k) F = dlist dunifin k.
 - by apply: vdmV.
-pose d := dlist DZmodP.dunifin k.
-rewrite -(eq_dlet (fun _ => d) _ (dlist DZmodP.dunifin (n - k))) //.
+pose d := dlist dunifin k.
+rewrite -(eq_dlet (fun _ => d) _ (dlist dunifin (n - k))) //.
 pose Gi y c :=
-  map (fun i => nth zero c i -
-    BAdd.bigi predT (fun j => exp (nth zero (s ++ t) i) j * nth zero y (j - k)
+  map (fun i => nth zeror c i -
+    BAdd.bigi predT (fun j => exp (nth zeror (s ++ t) i) j * nth zeror y (j - k)
   ) k n) (range 0 (size c)).
 move=> vs; apply/eq_sym/(dmap_bij _ _ _ (Gi vs)).
-- move=> ws _; apply/supp_dlist; 1: smt(rg_k).
-  rewrite size_map size_range; split; 1: smt(rg_k).
-  by apply/allP=> z _; apply: DZmodP.dunifin_fu.
+- move=> ws _; apply/supp_dlist; 1: smt(size_ge0).
+  rewrite size_map size_range; split; 1: smt(size_ge0).
+  by apply/allP=> z _; apply: dunifin_fu.
 - move=> ws _; case: (ws \in d).
-  - move=> ws_d; apply: dlist_uni; 1: by apply/DZmodP.dunifin_uni.
-    - apply/supp_dlist; 1: smt(rg_k); split.
-      - by apply: (supp_dlist_size _ _ _ _ ws_d); smt(rg_k).
-      - by apply/allP => ? _; apply/DZmodP.dunifin_fu.
-    - apply/supp_dlist; 1: smt(rg_k); split.
+  - move=> ws_d; apply: dlist_uni; 1: by apply/dunifin_uni.
+    - apply/supp_dlist; 1: smt(size_ge0); split.
+      - by apply: (supp_dlist_size _ _ _ _ ws_d); smt(size_ge0).
+      - by apply/allP => ? _; apply/dunifin_fu.
+    - apply/supp_dlist; 1: smt(size_ge0); split.
       rewrite size_map size_range /= IntOrder.ler_maxr ?size_ge0.
-      have /supp_dlist_size<:zmod>: 0 <= k by smt(rg_k).
-      by move/(_ DZmodP.dunifin _ ws_d).
-    - by apply/allP => ? _; apply/DZmodP.dunifin_fu.
+      have /supp_dlist_size<:t>: 0 <= k by smt(size_ge0).
+      by move/(_ dunifin _ ws_d).
+    - by apply/allP => ? _; apply/dunifin_fu.
   - move=> ^ws_d /supportPn => ->; apply/eq_sym/supportPn.
-    apply: contra ws_d => vs_d; apply/supp_dlist; 1: smt(rg_k); split.
-    - have /supp_dlist_size<:zmod>: 0 <= k by smt(rg_k).
-      move/(_ DZmodP.dunifin _ vs_d); rewrite size_map.
+    apply: contra ws_d => vs_d; apply/supp_dlist; 1: smt(size_ge0); split.
+    - have /supp_dlist_size<:t>: 0 <= k by smt(size_ge0).
+      move/(_ dunifin _ vs_d); rewrite size_map.
       by rewrite size_range /= IntOrder.ler_maxr ?size_ge0.
-    - by apply/allP=> ? _; apply/DZmodP.dunifin_fu.
-- move=> ws ws_d @/Gi @/G; apply: (eq_from_nth zero).
+    - by apply/allP=> ? _; apply/dunifin_fu.
+- move=> ws ws_d @/Gi @/G; apply: (eq_from_nth zeror).
   - rewrite size_map size_range /= IntOrder.ler_maxr ?size_ge0.
-    rewrite size_map size_range /= IntOrder.ler_maxr; 1: smt(rg_k).
-    apply/eq_sym/(supp_dlist_size _ _ _ _ ws_d); smt(rg_k).
-  rewrite !size_map !size_range /= IntOrder.ler_maxr; 1: smt(rg_k). 
-  move=> i rgi; rewrite (nth_map 0) ?size_range /=; 1: smt(rg_k).
-  rewrite nth_range //= (nth_map 0) ?size_range /=; 1: smt(rg_k).
-  by rewrite nth_range /=; 1: smt(rg_k); rewrite addrK.
-- move=> ws ws_d @/Gi @/G; apply: (eq_from_nth zero).
-  - rewrite size_map size_range /= (_ : max 0 k = k); 1: smt(rg_k).
-    apply/eq_sym/(supp_dlist_size _ _ _ _ ws_d); smt(rg_k).
-  rewrite size_map size_range /= (_ : max 0 k = k); 1: smt(rg_k).
-  move=> i rgi; rewrite (nth_map 0) ?size_range /=; 1: smt(rg_k).
+    rewrite size_map size_range /= IntOrder.ler_maxr; 1: smt(size_ge0).
+    apply/eq_sym/(supp_dlist_size _ _ _ _ ws_d); smt(size_ge0).
+  rewrite !size_map !size_range /= IntOrder.ler_maxr; 1: smt(size_ge0). 
+  move=> i rgi; rewrite (nth_map 0) ?size_range /=; 1: smt(size_ge0).
+  rewrite nth_range //= (nth_map 0) ?size_range /=; 1: smt(size_ge0).
+  by rewrite nth_range /=; 1: smt(size_ge0); rewrite addrK.
+- move=> ws ws_d @/Gi @/G; apply: (eq_from_nth zeror).
+  - rewrite size_map size_range /= (_ : max 0 k = k); 1: smt(size_ge0).
+    apply/eq_sym/(supp_dlist_size _ _ _ _ ws_d); smt(size_ge0).
+  rewrite size_map size_range /= (_ : max 0 k = k); 1: smt(size_ge0).
+  move=> i rgi; rewrite (nth_map 0) ?size_range /=; 1: smt(size_ge0).
   rewrite nth_range //= (nth_map 0) ?size_range /=.
   - rewrite IntOrder.ler_maxr ?size_ge0.
     split=> [/#|_]; suff: size ws = k by smt().
-    by apply/(supp_dlist_size _ _ _ _ ws_d); smt(rg_k).
+    by apply/(supp_dlist_size _ _ _ _ ws_d); smt(size_ge0).
   rewrite nth_range //=; first suff: size ws = k by smt().
-  - by apply/(supp_dlist_size _ _ _ _ ws_d); smt(rg_k).
+  - by apply/(supp_dlist_size _ _ _ _ ws_d); smt(size_ge0).
   by rewrite subrK.
-by rewrite dletC // dlist_ll DZmodP.dunifin_ll.
+by rewrite dletC // dlist_ll dunifin_ll.
 qed.
