@@ -52,9 +52,6 @@ end Collision.
 
 type hash.
 
-axiom hash_finite : Finite.finite_type <:hash>.
-hint solve 0 finite : hash_finite.
-
 (* Remark : this implies that hash is a finite type *)
 op [lossless uniform full ] dhash : hash distr.
 
@@ -224,7 +221,7 @@ qed.
 (* -------------------------------------------------------------------------- *)
 (* Small Range Definition Property *)
 
-theory SmallRange.
+abstract theory SmallRange.
 
 module type SR_i = {
   proc init (r: int) : unit

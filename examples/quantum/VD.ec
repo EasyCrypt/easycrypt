@@ -336,8 +336,8 @@ congr; have ->: dout s = dmap (dlist dunifin k) F.
   - smt(gt0_p). 
   - by apply: uniq_s.  
   + (* FIXME this should be a lemma *)
-    move=> /=.
-    admit.
+    move=> /= i j hi hj; apply contra => /(congr1 (nth witness enum)).
+    by rewrite !nth_index // enumP.
   - smt (index_ge0 index_mem enumP).
   - by apply/dunifin_ll.
   by rewrite dmap_id.
