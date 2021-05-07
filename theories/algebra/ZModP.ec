@@ -274,7 +274,9 @@ clone import Ring.Field as ZModpField with
   op   [ - ] <- ([-]),
   op   ( * ) <- ( * ),
   op   invr  <- inv
-  proof *.
+  proof *
+
+  remove abbrev (-) (/).
 
 realize addrA.     proof. by apply/ZModule.addrA. qed.
 realize addrC.     proof. by apply/ZModule.addrC. qed.
