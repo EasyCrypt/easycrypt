@@ -67,20 +67,101 @@ end section.
 
 import TupleXY. 
 
-op cundup ['a] (s : 'a list) =
-  foldr rem s (undup s).
-search perm_eq.
+lemma perm_eq_rem ['a] (x : 'a) (s t : 'a list) :
+  perm_eq s t => perm_eq (rem x s) (rem x t).
+proof.
+move=> eq_st; apply/perm_eqP => p.
+have /(_ x) mem_st := perm_eq_mem _ _ eq_st.
+case: (x \in s) => x_s; last first.
+- by rewrite !rem_id -?mem_st // &(perm_eqP).
+rewrite &(addzI (b2i (p x))) -!count_rem -?mem_st //.
+by apply: perm_eqP.
+qed.
 
-lemma size_cundup ['a] (s : 'a list) :
-  size (cundup s) = size s - size (undup s).
+op trim ['a] (s t : 'a list) =
+  foldr rem s t.
+
+lemma undup_consR ['a] (x : 'a) (s : 'a list) :
+  perm_eq (undup (x :: s)) (filter (predC1 x) s).
 proof. admitted.
+
+lemma trim_cons_notmem ['a] (x : 'a) (s t : 'a list) :
+  !(x \in t) => trim (x :: s) t = x :: trim s t.
+proof.
+move=> @/trim /=; elim: t s => //= y t ih s.
+by rewrite negb_or; case=> ne_xy /ih /(_ s) -> /=; rewrite ne_xy.
+qed.
+
+lemma trim_consR ['a] (x : 'a) (s t : 'a list) :
+  perm_eq (trim s (x :: t)) (trim (rem x s) t).
+proof.
+elim: t => /= [|y t +]; 1: exact: perm_eq_refl.
+by move=> @/trim /= /perm_eq_rem /(_ y); rewrite remC.
+qed.
+
+lemma trim_cons2 ['a] (x : 'a) (s t : 'a list) :
+  perm_eq (trim (x :: s) (x :: t)) (trim s t).
+proof. by have := trim_consR x (x :: s) t. qed.
+
+lemma trim_permL ['a] (s1 s2 t : 'a list) :
+  perm_eq s1 s2 => perm_eq (trim s1 t) (trim s2 t).
+proof.
+elim: t s1 s2 => // y t ih s1 s2 eq_s @/trim /=.
+by apply/perm_eq_rem/ih.
+qed.
+
+op cundup ['a] (s : 'a list) = trim s (undup s).
+
+lemma cundup_cons ['a] (x : 'a) (s : 'a list) :
+  !(x \in s) => perm_eq (cundup (x :: s)) (cundup s).
+proof.
+move=> @/cundup ^x_s /= -> /=; have {x_s}: !(x \in (undup s)).
+- by rewrite mem_undup.
+move: (undup s) => t; elim: t => //=; 1: by apply: perm_eq_refl.
+move=> y t iht; rewrite negb_or; case => ne_xy x_t.
+by rewrite /trim /= remC &(perm_eq_rem) &(iht).
+qed.
+
+lemma cundup_cons_dup ['a] (x : 'a) (s : 'a list) :
+  x \in s => perm_eq (cundup (x :: s)) (x :: (cundup s)).
+proof.
+move=> @/cundup ^x_s /= -> /=; pose t := undup s.
+have: uniq t by apply/undup_uniq.
+have: forall x, x \in t => x \in s by move=> a; rewrite mem_undup.
+move: t => t; elim: t s x x_s => /= [|y t iht] s x x_s.
+- by apply: perm_eq_refl.
+move=> sub_t [y_t uq_t]; case: (x = y) => [<<-|ne_xy]; last first.
+- have := iht s x _ _ _ => //.
+  - by move=> a a_t; apply: sub_t; rewrite a_t.
+  by move/(perm_eq_rem y) => /=; rewrite ne_xy.
+apply: (perm_eq_trans (trim s t)); 1: exact: trim_cons2.
+have /trim_permL /(_ t) := perm_to_rem _ _ x_s.
+move/perm_eq_trans; apply; rewrite trim_cons_notmem //.
+by apply/perm_cons/perm_eq_sym/trim_consR.
+qed.
 
 lemma undup_cundup ['a] (s : 'a list) :
   perm_eq (undup s ++ cundup s) s.
-admitted.
+proof.
+apply: perm_eqP=> p; elim: s => //= x s ih; case: (x \in s) => x_s.
+- have /perm_eqP /(_ p) /= := (cundup_cons_dup _ _ x_s).
+  by rewrite count_cat => ->; rewrite addrCA -count_cat ih.
+- congr; move: ih; rewrite !count_cat => <-; congr.
+  by apply/perm_eqP/cundup_cons.
+qed.
 
 lemma mem_cundup ['a] (s:'a list) (x:'a) : x \in cundup s => x \in undup s.
-admitted.
+proof.
+move=> x_cs; have /perm_eq_mem /(_ x) := undup_cundup s.
+by rewrite mem_cat mem_undup; case: (x \in s).
+qed.
+
+lemma size_cundup ['a] (s : 'a list) :
+  size (cundup s) = size s - size (undup s).
+proof.
+have := (perm_eq_size _ _ (undup_cundup s)).
+by rewrite size_cat => <-; ring.
+qed.
 
 lemma map_cst ['a 'b] (c:'b) (s:'a list) : map (fun _ => c) s = nseq (size s) c.
 proof.
