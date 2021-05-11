@@ -1,9 +1,11 @@
 require import AllCore List Distr DBool DProd DList DMap DInterval CHoareTactic IntDiv.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
-require import VD.
+require (****) VD.
 require (****) T_QROM.
 
 abstract theory T_QROM_SIM.
+
+clone import VD. 
 
 import Big.BAdd F.
 
@@ -238,3 +240,102 @@ qed.
 
 end T_QROM_SIM.
 
+
+theory T_QROM_SIM_GEN.
+
+(* Sampling is based on two finite fields with the same characteristic. *)
+op p : { int | 1 < p } as gt1_p.
+
+type ff_in.
+op enum_ff_in : ff_in list.
+op n : { int | 0 < n } as gt0_n.
+axiom ff_in_order : size enum_ff_in = p^n.
+
+axiom  enum_spec: forall (x : ff_in), count (pred1 x) enum_ff_in = 1.
+(* axiom ge0_cunifin: 0 <= cunifin *)
+
+type ff_out.
+op enum_ff_out : ff_out list.
+op m : { int | 0 < m <= n } as bnd_m.
+axiom ff_out_order : size enum_ff_out = p^m.
+
+clone import T_QROM_SIM with
+  type VD.FT.t = ff_in,
+  op VD.FT.Support.enum <- enum_ff_in
+  proof VD.FT.Support.enum_spec by apply enum_spec.
+import VD Big.BAdd F.
+
+lemma in_char_order : p %| FT.Support.card. 
+have -> : (p = p^1); first by smt(@Ring.IntID).
+by rewrite /card  ff_in_order; apply dvdz_exp2l; smt(gt0_n).
+qed.
+
+clone import T_QROM.
+
+op encode : from -> FT.t.
+op decode : FT.t -> hash.
+
+axiom encode_inj : injective encode.
+axiom decode_bij : bijective encode.
+
+op compute1(seed : FT.t list, x : from) : hash =
+ decode
+   (bigi predT 
+     (fun (j : int) => exp (encode x) j * nth F.zeror seed j) 0 (2 * q)).
+            
+module LQRO_GEN : QRO_i = {
+  
+  proc init() = { 
+    var seed : FT.t list;
+    seed <$ genseed;
+    QRO.h <- compute1 seed;
+ }
+
+ include QRO [h]
+
+}.
+
+clone import QROM_Fundamental_Lemma as FLT with
+    op q <- q,
+    type result <- FL.result
+    proof q_ge0 by smt(q_ge0).
+
+module (B (A : AdvRO) : FL.AdvRO) (H : T_QROM_SIM.QRO) = {
+
+    module O = {
+       quantum proc h() {x : from} : hash = {
+            quantum var preh;
+            preh <@ H.h() {encode x};
+            return (decode preh);
+       }
+    }
+
+    proc main() : FL.result = {
+       var r;
+       r <@ A(O).main();
+       return r;
+    }
+}.
+
+lemma efficient_sim_gen (A<:AdvRO{-QRO, -LQRO, -LQRO_GEN}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
+  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ QRO_main(A,LQRO_GEN).main() @ &m: res = r ].
+proof.
+have -> : 
+ Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ FL.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m : res = r].
+byequiv => //.
+proc;inline *.
+wp; call(_: forall x, QRO.h{1} x = decode (T_QROM_SIM.QRO.h{2} (encode x))).
+by proc; inline *; auto => /> /#.
+admit.
+have -> : 
+ Pr[ QRO_main(A,LQRO_GEN).main() @ &m: res = r ] = Pr[ FL.QRO_main(B(A),LQRO).main() @ &m : res = r].
+byequiv => //.
+proc;inline *.
+wp; call(_: forall x, QRO.h{1} x = decode (T_QROM_SIM.QRO.h{2} (encode x))).
+by proc; inline *; auto => /> /#.
+by wp; rnd; auto => />.
+apply (efficient_sim (B(A))).
+admit.
+qed.
+
+end T_QROM_SIM_GEN.
