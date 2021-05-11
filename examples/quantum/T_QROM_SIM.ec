@@ -327,7 +327,18 @@ op dcomputei : (from -> hash) distr =
  dmap T_QROM_SIM.dfhash (fun ff => (fun x => (decode \o project) (ff (encode x)))).
 
 lemma dcompute_dfhash : dcomputei = T_QROM.dfhash. 
-admitted. (* encode + project + decode give the RO *)
+rewrite /dcomputei.
+apply eq_funi_ll.
+admit. (* taking a random function mapping ff_in to ff_in and using it 
+          to construct a function as above gives a random function 
+          over from -> hash *)
+by apply dmap_ll;apply T_QROM_SIM.dfhash_ll.
+apply is_full_funiform. 
+apply T_QROM.dfhash_fu.
+apply T_QROM.dhash_fu.
+apply T_QROM.dfhash_uni.
+apply T_QROM.dfhash_ll.
+qed.
 
 lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
   Pr [ FL.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m: res = r ] = 
