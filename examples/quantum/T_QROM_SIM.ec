@@ -273,13 +273,18 @@ qed.
 clone import T_QROM.
 
 op encode : from -> FT.t.
-op decode : FT.t -> hash.
+op decode : ff_out -> hash.
 
 axiom encode_inj : injective encode.
 axiom decode_bij : bijective encode.
 
+(* FIXME: transform this into a lemma *)
+op project : ff_in -> ff_out.
+axiom project_preimages y :
+   size (filter (fun x => project x = y) enum_ff_in) = p^(n-m).
+
 op compute1(seed : FT.t list, x : from) : hash =
- decode
+ (decode \o project)
    (bigi predT 
      (fun (j : int) => exp (encode x) j * nth F.zeror seed j) 0 (2 * q)).
             
@@ -306,7 +311,7 @@ module (B (A : AdvRO) : FL.AdvRO) (H : T_QROM_SIM.QRO) = {
        quantum proc h() {x : from} : hash = {
             quantum var preh;
             preh <@ H.h() {encode x};
-            return (decode preh);
+            return ((decode \o project) preh);
        }
     }
 
@@ -317,25 +322,37 @@ module (B (A : AdvRO) : FL.AdvRO) (H : T_QROM_SIM.QRO) = {
     }
 }.
 
+
+op dcomputei : (from -> hash) distr = 
+ dmap T_QROM_SIM.dfhash (fun ff => (fun x => (decode \o project) (ff (encode x)))).
+
+lemma dcompute_dfhash : dcomputei = T_QROM.dfhash. 
+admitted. (* encode + project + decode give the RO *)
+
+lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
+  Pr [ FL.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m: res = r ] = 
+    Pr[ QRO_main_D(A).main(dcomputei) @ &m: res = r]. 
+admitted. (* B's strategy is same as sampling dcomputei upfront *)
+
 lemma efficient_sim_gen (A<:AdvRO{-QRO, -LQRO, -LQRO_GEN}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
   Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ QRO_main(A,LQRO_GEN).main() @ &m: res = r ].
 proof.
 have -> : 
  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ FL.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m : res = r].
+rewrite (eager_sampling A).
 byequiv => //.
 proc;inline *.
-wp; call(_: forall x, QRO.h{1} x = decode (T_QROM_SIM.QRO.h{2} (encode x))).
-by proc; inline *; auto => /> /#.
-admit.
+wp; call(_: ={QRO.h}); first by proc; inline *; auto => />.  
+by auto => />; smt(dcompute_dfhash).
 have -> : 
  Pr[ QRO_main(A,LQRO_GEN).main() @ &m: res = r ] = Pr[ FL.QRO_main(B(A),LQRO).main() @ &m : res = r].
 byequiv => //.
 proc;inline *.
-wp; call(_: forall x, QRO.h{1} x = decode (T_QROM_SIM.QRO.h{2} (encode x))).
+wp; call(_: forall x, QRO.h{1} x = (decode \o project) (T_QROM_SIM.QRO.h{2} (encode x))).
 by proc; inline *; auto => /> /#.
 by wp; rnd; auto => />.
 apply (efficient_sim (B(A))).
-admit.
+admit. (* cost *)
 qed.
 
 end T_QROM_SIM_GEN.
