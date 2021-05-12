@@ -43,9 +43,16 @@ module LQRO : QRO_i = {
 op dcompute : (from -> hash) distr = 
   dmap genseed (fun seed => compute1 seed).
 
-clone import QROM_Fundamental_Lemma as FL with
-    op q <- q
-    proof q_ge0 by smt(q_ge0).
+clone import QROM_Fundamental_Lemma as FL.
+
+module QRO_main(A:AdvRO, H:QRO_i) = {
+  proc main() = {
+    var r;
+    H.init();
+    r <@ A(H).main();
+    return r;
+  }
+}.
 
 section.
 
@@ -53,8 +60,8 @@ local clone import DMapSampling with
   type t1 <- hash list,
   type t2 <- (from -> hash).
 
-lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
-  Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r]. 
+lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}) &m (r : result):
+  Pr[ QRO_main(A, LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r]. 
 proof.
 byequiv (_: _ ==> ={res}) => //.
 proc; sim; conseq />.
@@ -82,10 +89,6 @@ qed.
 
 op trim ['a] (s t : 'a list) =
   foldr rem s t.
-
-lemma undup_consR ['a] (x : 'a) (s : 'a list) :
-  perm_eq (undup (x :: s)) (filter (predC1 x) s).
-proof. admitted.
 
 lemma trim_cons_notmem ['a] (x : 'a) (s t : 'a list) :
   !(x \in t) => trim (x :: s) t = x :: trim s t.
@@ -226,22 +229,23 @@ rewrite /(\o) /compute1 /= -(map_nth_range zeror xs) -map_comp.
 by have -> : size xs = 2 * q by rewrite /xs size_cat.
 qed.
 
-lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
+lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}) &m (r : result):
+  hoare[ QRO_main_D(A).main : true ==> QRO.ch <= q] =>
   Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ QRO_main(A,LQRO).main() @ &m: res = r ].
 proof.
+move=> hq.  
 have -> : 
  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[QRO_main_D(A).main(dfhash) @ &m : res = r].
    by byequiv=>//; conseq (_: _ ==> ={res})=> //; proc;inline*; sim; auto => />.
-move : (dA_split A &m) => dA_split.
-elim dA_split => C dA_split.
+have [C dA_split] := dA_split q A &m hq. 
 rewrite (eager_sampling A) (dA_split dfhash r) (dA_split dcompute r).
 by apply BRA.eq_big_seq => */=; congr; apply perfect_sim.
 qed.
 
 end T_QROM_SIM.
 
-
-theory T_QROM_SIM_GEN.
+(*
+abstract theory T_QROM_SIM_GEN.
 
 (* Sampling is based on two finite fields with the same characteristic. *)
 op p : { int | 1 < p } as gt1_p.
@@ -367,3 +371,4 @@ admit. (* cost *)
 qed.
 
 end T_QROM_SIM_GEN.
+*)
