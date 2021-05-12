@@ -276,12 +276,12 @@ op encode : from -> FT.t.
 op decode : ff_out -> hash.
 
 axiom encode_inj : injective encode.
-axiom decode_bij : bijective encode.
+axiom decode_bij : bijective decode.
 
 (* FIXME: transform this into a lemma *)
 op project : ff_in -> ff_out.
 axiom project_preimages y :
-   size (filter (fun x => project x = y) enum_ff_in) = p^(n-m).
+   count (fun x => project x = y) enum_ff_in = p^(n-m).
 
 op compute1(seed : FT.t list, x : from) : hash =
  (decode \o project)
@@ -322,17 +322,62 @@ module (B (A : AdvRO) : FL.AdvRO) (H : T_QROM_SIM.QRO) = {
     }
 }.
 
-
 op dcomputei : (from -> hash) distr = 
- dmap T_QROM_SIM.dfhash (fun ff => (fun x => (decode \o project) (ff (encode x)))).
+ MUFF.dfun (fun f => dmap FT.dunifin (fun x => (decode \o project) x)).
+
+lemma int_real_exp : forall (b e : int),
+  0 <= e => (b^e)%r = b%r ^ e by smt.
+
+lemma mudecode y:
+ mu1 (dmap FT.dunifin project) y = 1%r/(p^m)%r. 
+search FT.dunifin.
+rewrite /mu1 dmapE /pred1 /(\o) /=.
+rewrite FT.dunifinE /=.
+rewrite project_preimages.
+have -> : (FT.Support.card = p^n). 
+smt.
+have -> :((T_QROM_SIM_GEN.p ^ (n - m))%r = (T_QROM_SIM_GEN.p ^ n)%r / (T_QROM_SIM_GEN.p ^ m)%r).
+rewrite !int_real_exp; smt. 
+smt.
+qed.
+
+lemma bijective_surjective ['a,'b] (f : 'a -> 'b) :
+    bijective f => surjective f.
+rewrite /bijective /surjective.
+move => bij; elim bij => g [#] gc1 gc2 x.
+exists (g x). 
+by rewrite gc2.
+qed.
+
+lemma dcomputei_funi : 
+ is_funiform dcomputei. 
+rewrite /dcomputei -dmap_comp.
+apply MUFF.dfun_funi => /=.
+apply dmap_uni; first by apply (bij_inj _ decode_bij).
+by rewrite /is_uniform;smt(mudecode).
+apply dmap_fu. 
+apply (bijective_surjective _ decode_bij).
+apply dmap_fu. 
+rewrite /surjective => x.
+move : (count_gt0 (fun (x0 : ff_in) => project x0 = x) enum_ff_in _). 
+move : (project_preimages x). 
+smt(@List @Ring.IntID gt1_p gt0_n bnd_m).
+smt(@FT).
+smt(@FT).
+qed.
+
+lemma dcomputei_ll : 
+ is_lossless dcomputei.
+rewrite /dcomputei. 
+apply MUFF.dfun_ll => /=.
+apply dmap_ll. 
+apply FT.dunifin_ll. 
+qed.
 
 lemma dcompute_dfhash : dcomputei = T_QROM.dfhash. 
-rewrite /dcomputei.
 apply eq_funi_ll.
-admit. (* taking a random function mapping ff_in to ff_in and using it 
-          to construct a function as above gives a random function 
-          over from -> hash *)
-by apply dmap_ll;apply T_QROM_SIM.dfhash_ll.
+apply dcomputei_funi.
+apply dcomputei_ll.
 apply is_full_funiform. 
 apply T_QROM.dfhash_fu.
 apply T_QROM.dhash_fu.
@@ -341,9 +386,14 @@ apply T_QROM.dfhash_ll.
 qed.
 
 lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
-  Pr [ FL.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m: res = r ] = 
-    Pr[ QRO_main_D(A).main(dcomputei) @ &m: res = r]. 
-admitted. (* B's strategy is same as sampling dcomputei upfront *)
+  Pr [ FL.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m: res = r ] =  
+    Pr[ QRO_main_D(A).main(dcomputei) @ &m: res = r].
+byequiv (_: _ ==> ={res}) => //.
+proc; inline *;sim;conseq />.
+call(_: forall x, QRO.h{2} x = (decode \o project) (T_QROM_SIM.QRO.h{1} (encode x))).
+by proc; inline *; auto => /> /#. 
+conseq />. 
+admitted. (* We should be able to construct a bijection *)
 
 lemma efficient_sim_gen (A<:AdvRO{-QRO, -LQRO, -LQRO_GEN}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
   Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ QRO_main(A,LQRO_GEN).main() @ &m: res = r ].
@@ -367,3 +417,4 @@ admit. (* cost *)
 qed.
 
 end T_QROM_SIM_GEN.
+
