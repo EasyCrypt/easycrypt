@@ -7,49 +7,6 @@ type from.
 clone import MUniFinFun as MUFF with
   type t <- from.   (* This assume that the type of from is finite *)
 
-abstract theory Collision.
- 
-  type input.
-  type hash.
-
-  module type QROd_i = {
-    proc init (dhash : hash distr) : unit
-    quantum proc h {_:from} : hash    
-  }.
-
-  module type QROd = {
-    include QROd_i [h]
-  }.
-  
-  module QROd : QROd_i = {
-    var  h : from -> hash
-  
-    proc init(dhash:hash distr) = { h <$ dfun (fun _ => dhash); }
-  
-    quantum proc h {x:from} = { return h x; }
-  
-  }.
-  
-  quantum module type AdvCol (H:QROd) = {
-    proc main(i:input) : from * from
-  }.
-  
-  module Col(A:AdvCol) = {
-    proc main(d:hash distr, i:input) = {
-      var xx;
-      QROd.init(d);
-      xx <@ A(QROd).main(i);
-      return (xx.`1 <> xx.`2 && QROd.h xx.`1 = QROd.h xx.`2);
-    }
-  }.
-
-  (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
-  axiom pr_col r  d_ i_ q (A<:AdvCol{-QROd}[main : `{Inf, #H.h : q}]) &m:
-    (forall h, mu1 d_ h <> 0%r => mu1 d_ h = r) =>
-    Pr[Col(A).main(d_, i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
-
-end Collision.
-
 type hash.
 
 (* Remark : this implies that hash is a finite type *)
@@ -80,13 +37,39 @@ module type QRO = {
 
 module QRO : QRO_i = {
   var  h : from -> hash
+  var ch : int
 
-  proc init() = { h <$ dfhash; }
+  proc init() = { ch <- 0; h <$ dfhash; }
 
-  quantum proc h {x:from} = { return h x; }
+  quantum proc h {x:from} = { ch <- ch + 1; return h x; }
 
 }.
  
+abstract theory Collision.
+ 
+  type input.
+  
+  quantum module type AdvCol (H:QRO) = {
+    proc main(i:input) : from * from
+  }.
+  
+  module Col(A:AdvCol) = {
+    proc main(i:input) = {
+      var xx;
+      QRO.init();
+      xx <@ A(QRO).main(i);
+      return (xx.`1 <> xx.`2 && QRO.h xx.`1 = QRO.h xx.`2);
+    }
+  }.
+
+  (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
+  axiom pr_col i_ q (A<:AdvCol{-QRO}) &m:
+    let r = mu1 dhash witness in
+    hoare [Col(A).main : i = i_ ==> QRO.ch <= q] =>
+    Pr[Col(A).main(i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
+
+end Collision.
+
 (* -------------------------------------------------------------------------- *)
 (* Biased distribution over boolean return true with probability p *)   
 
@@ -177,15 +160,16 @@ module SCD (A:AdvSCD) = {
   }
 }.
 
-axiom advantage q lambda (A<:AdvSCD{-SCD, -QRO}[main : `{Inf, #H.h : q}]) &m:
+axiom advantage q lambda (A<:AdvSCD{-SCD,-QRO}) &m:
   0%r <= lambda <= 1%r =>
+  hoare [SCD(A)._F0 : p = lambda ==> QRO.ch <= q] =>
   `| Pr[SCD(A)._F0(lambda) @ &m : res] - Pr[SCD(A)._F1(lambda) @ &m: res] | 
    <= (2%r * q%r + k%r + 1%r)/ 6%r * lambda^2.
 
 end SemiConstDistr.
 
 (* -------------------------------------------------------------------------- *)
-(* Semi Constant Definition Property *)
+(* Small Range Definition Property                                            *)
 
 op difun r = dfun (fun _ => [0..r-1]).
 
@@ -218,9 +202,6 @@ proof.
   apply le_binomial => //; smt(size_ge0).
 qed.
 
-(* -------------------------------------------------------------------------- *)
-(* Small Range Definition Property *)
-
 abstract theory SmallRange.
 
 module type SR_i = {
@@ -232,8 +213,31 @@ module type SR = {
   include SR_i [-init]
 }.
 
+
 quantum module type AdvSR (H:SR) = {
   proc main(r:int) : bool
+}.
+
+module SR : SR_i = {
+  var rh : hash list
+  var fr : from -> int
+  proc init (r:int) = {
+    rh <$ dlist dhash r;
+    fr <$ difun r; 
+    QRO.ch <- 0;
+    QRO.h <- fun x => nth witness rh (fr x); 
+  } 
+
+  include QRO [h]
+}.
+
+module SRO : SR_i = {
+  proc init (r:int) = {
+    SR.fr <$ difun r; 
+    QRO.init();
+  } 
+
+  include QRO [h]
 }.
 
 module IND_SR (H:SR_i, A:AdvSR) = {
@@ -246,70 +250,46 @@ module IND_SR (H:SR_i, A:AdvSR) = {
   }
 }.
 
-module SR : SR_i = {
-  var rh : hash list
-  var fr : from -> int
-  proc init (r:int) = {
-    rh <$ dlist dhash r;
-    fr <$ difun r; 
-    QRO.h <- fun x => nth witness rh (fr x); 
-  } 
-
-  quantum proc h {x:from} = {
-    return (QRO.h x);
-  }
-}.
-
-module SRO : SR_i = {
-  proc init (r:int) = {
-    SR.fr <$ difun r; 
-    QRO.init();
-  } 
-
-  quantum proc h {x:from} = {
-    return (QRO.h x);
-  }
-}.
-
 (* This bound comes from Corollary 4.15 of Mark Zhandry's thesis *)
-axiom advantage (q:int) r (A<:AdvSR{-SR, -QRO}[main : `{Inf, #H.h : q}]) &m:
-  0 < r => 
-  `| Pr[IND_SR(SRO,A).main(r) @ &m : res] - Pr[IND_SR(SR,A).main(r) @ &m : res] | <= 
-      (27 * q^3)%r / r%r.
+axiom advantage (q:int) r_ (A<:AdvSR{-SR,-QRO}) &m:
+  0 < r_ => 
+  hoare [IND_SR(SRO,A).main : r = r_ ==> QRO.ch <= q] => 
+  `| Pr[IND_SR(SRO,A).main(r_) @ &m : res] - Pr[IND_SR(SR,A).main(r_) @ &m : res] | <= 
+      (27 * q^3)%r / r_%r.
 
 module type SRr_i = {
   proc init (r: int) : unit
   quantum proc h {_:from} : int * hash    
 }.
 
-
 module type SRr = {
   include SRr_i [-init]
 }.
 
-module SRr : SRr_i = {
-  var rh : hash list
-  var fr : from -> int
+module SRr: SRr_i = {
+  import var SR
   proc init (r:int) = {
     rh <$ dlist dhash r;
     fr <$ difun r; 
+    QRO.ch <- 0;
     QRO.h <- fun x => nth witness rh (fr x); 
   } 
 
   quantum proc h {x:from} = {
+    QRO.ch <- QRO.ch + 1;
     return (fr x, QRO.h x);
   }
 }.
 
 module SROr : SRr_i = {
+  import var SR
   proc init (r:int) = {
-    SR.fr <$ difun r; 
+    fr <$ difun r; 
     QRO.init();
   } 
 
-  quantum proc h {x:from} = {
-    return (SR.fr x, QRO.h x);
-  }
+  include SRr [h]
+
 }.
 
 quantum module type AdvSRr (H:SRr) = {
@@ -327,14 +307,54 @@ module IND_SRr (H:SRr_i, A:AdvSRr) = {
 }.
 
 (* The proof of Theorem 4.16  gives a bound that is the summation
-   of that in Corollary 4.15and that in Theorem 4.9
+   of that in Corollary 4.15 and that in Theorem 4.9
    ( C(q + 2)^3/N) where C <= 27 is a constant and N=r. *)
-axiom advantage_r (q:int) r (A<:AdvSRr{-SR}[main : `{Inf, #H.h : q}]) &m:
-  0 < r => 
-  `| Pr[IND_SRr(SROr,A).main(r) @ &m : res] - Pr[IND_SRr(SRr,A).main(r) @ &m : res] | <= 
-      (54 * q^3)%r / r%r.
+axiom advantage_r (q:int) r_ (A<:AdvSRr{-SR,-QRO}) &m:
+  0 < r_ => 
+  hoare [IND_SRr(SROr,A).main : r = r_ ==> QRO.ch <= q] => 
+  `| Pr[IND_SRr(SROr,A).main(r_) @ &m : res] - Pr[IND_SRr(SRr,A).main(r_) @ &m : res] | <= 
+      (54 * q^3)%r / r_%r.
 
 end SmallRange.
+
+(* 
+    Mark Zhandry
+    Secure Identity-Based Encryption in the Quantum Random Oracle Model
+    https://eprint.iacr.org/2012/076.pdf
+    Theorem 3.1.  *)
+
+abstract theory QROM_Fundamental_Lemma.
+
+clone import Tuple as TupleXY with 
+  type t <- from * hash.
+
+type result.
+
+quantum module type AdvRO (H:QRO) = {
+  proc main() : result
+}.
+
+module QRO_main_D(A : AdvRO) = {
+  proc main(adfhash : (from -> hash) distr) = {
+    var r;
+    QRO.ch <- 0;
+    QRO.h <$ adfhash;
+    r <@ A(QRO).main();
+    return r;
+  }
+}.
+
+axiom dA_split q (A<:AdvRO{-QRO}) &m:
+   hoare [ QRO_main_D(A).main : true ==> QRO.ch <= q] => 
+   exists (C : (from * hash) list -> result -> real),
+   forall (adfhash: (from -> hash) distr) (r:result),
+    Pr[ QRO_main_D(A).main(adfhash) @ &m : res = r] = 
+    big predT (fun l => 
+      C l r * mu adfhash (fun fx => all (fun (xr:_*_) => fx xr.`1 = xr.`2) l))
+        (wordn (2*q)).
+
+end QROM_Fundamental_Lemma.
+
 
 quantum module type AdvRO (H:QRO) = {
   proc main() : bool
@@ -350,6 +370,7 @@ module IND_QRO (H:QRO_i, A:AdvRO) = {
   }
 }.
 
+(*
 abstract theory T_PRF.
 
 type key.
@@ -448,239 +469,5 @@ end T_StandardSecurePRG.
 
 end T_PRG.
 
-
-(* TODO: if G is standard-secure, then it is also oracle-secure. *)
-
-(* 
-    Mark Zhandry
-    Secure Identity-Based Encryption in the Quantum Random Oracle Model
-    https://eprint.iacr.org/2012/076.pdf
-    Theorem 3.1.  *)
-
-abstract theory QROM_Fundamental_Lemma.
-
-clone import Tuple as TupleXY with 
-  type t <- from * hash.
-
-op q : int.
-
-axiom q_ge0 : 0 <= q.
-
-
-type result.
-
-quantum module type AdvRO (H:QRO) = {
-  proc main() : result
-}.
-
-module QRO_main_D(A : AdvRO) = {
-  proc main(adfhash : (from -> hash) distr) = {
-    var r;
-    QRO.h <$ adfhash;
-    r <@ A(QRO).main();
-    return r;
-  }
-}.
-
-module QRO_main(A : AdvRO, H : QRO_i) = {
-  proc main() = {
-    var r;
-    H.init();
-    r <@ A(H).main();
-    return r;
-  }
-}.
-
-axiom dA_split (A<:AdvRO{-QRO}[main : `{Inf, #H.h : q}]) &m:
-   exists (C : (from * hash) list -> result -> real),
-   forall (adfhash: (from -> hash) distr) (r:result),
-    Pr[ QRO_main_D(A).main(adfhash) @ &m : res = r] = 
-    big predT (fun l => 
-      C l r * mu adfhash (fun fx => all (fun (xr:_*_) => fx xr.`1 = xr.`2) l))
-        (wordn (2*q)).
-
-end QROM_Fundamental_Lemma.
-
-(* Efficient QROM simulation: Theorem 6.1 in 
-    Mark Zhandry
-    Secure Identity-Based Encryption in the Quantum Random Oracle Model
-    https://eprint.iacr.org/2012/076.pdf  *)
-
-(* The theorem can be generalized to capture any QROM of the following form:
-
-   |X| < p^n
-   |Y| = p^m
-
-s.t. 1 < m <= n and 1 < p
-
-The idea is that the linear independence argument gives a random element in FF_p^n,
-which can be converted in a random element in FF_p^m by raising to p^{n-m}.
-
-This means, in particular, that we can model any possible compressing or
-length preserving QROM over bit strings and, in particular, random oracles
-that map bit strings to a single bit.
-
-*)
-(*
-abstract theory T_LazyQROM.
-
-op q : int.
-
-axiom q_ge0 : 0 <= q.
-
-(* Sampling is based on two finite fields with the same characteristic. *)
-op p : { int | 1 < p } as gt1_p.
-
-type ff_in.
-op enum_ff_in : ff_in list.
-op n : { int | 0 < n } as gt0_n.
-axiom ff_in_order : size enum_ff_in = p^n.
-
-clone  MFinite as FFin with
-  type t <- ff_in,
-  op Support.enum <- enum_ff_in.
-
-lemma in_char_order : p %| FFin.Support.card. 
-have -> : (p = p^1); first by smt(@Ring.IntID).
-by rewrite /card  ff_in_order; apply dvdz_exp2l; smt(gt0_n).
-qed.
-
-type ff_out.
-op enum_ff_out : ff_out list.
-op m : { int | 0 < m <= n } as bnd_m.
-axiom ff_out_order : size enum_ff_out = p^m.
-
-clone  MFinite as FFout with
-  type t <- ff_out,
-  op Support.enum <- enum_ff_out.
-
-lemma out_char_order : p %| FFout.Support.card. 
-have -> : (p = p^1); first by smt(@Ring.IntID).
-by rewrite /card  ff_out_order; apply dvdz_exp2l; smt(bnd_m).
-qed.
-
-
-(* Injection means that you have an FF that is large enough
-   to encode all possible inputs *)
-op encode : from -> ff_in.
-axiom encodeB : injective encode.
-
-(* Bijection means that a uniform field element gives you a uniform
-   element in hash, which is all we need *)
-op decode : ff_out -> hash.
-axiom decodeB : bijective decode.
-
-(* Note that this will work for any hash type that has p^n elements,
-   for p prime and n > 0 some integer. And |from| <= |hash|. *)
-
-clone import Matrix with
-  type R <- ff_in,
-  op size <- 2*q
-  proof ge0_size by smt(q_ge0).
-
-op genseed = dvector FFin.dunifin.
-
-(* We use exponentiation to generate a row in a Vandermonde matrix *)
-op (^) : ff_in -> int -> ff_in.
-
-(* We use a projection function to obtain a value in ff_out *)
-
-op project : ff_in -> ff_out.
-
-axiom project_uniform y :
-   size (filter (fun x => project x = y) enum_ff_in) = p^(n-m).
-
-op compute(seed : vector, x : from) : hash =
-        let xv = offunv (fun (i : int) => encode x^i) in
-        let yf = dotp xv seed in
-            decode (project yf).
-
-module LQRO : QRO_i = {
-  var seed : vector
-
-  proc init() = { seed <$ genseed; }
-
-  quantum proc h {x:from} = { return compute seed x; }
-
-}.
-
-op dcompute : (from -> hash) distr = 
-       dmap genseed (fun seed => compute seed).
-
-clone import QROM_Fundamental_Lemma with
-    op q <- q
-    proof q_ge0 by smt(q_ge0).
-import TupleXY.
-
-(* This requires some random sampling magic *)
-
-lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
-  Pr[ QRO_main(A,LQRO).main() @ &m: res = r] = Pr[ QRO_main_D(A).main(dcompute) @ &m: res = r]. 
-byequiv => //.
-proc. 
-inline *.
-
-(* Just use random *)
-admitted.
-
-(* This axiom captures the following property on the Vandermonde 
-   matrix:  any 2q rows are linearly independent. *)
-
-op uhash_list(xs : ff_in list, seed : vector) : vector = 
-   offunv (fun i =>
-              let x = nth witness xs i in
-              let xv = offunv (fun (j : int) =>  x^j) in
-                  dotp xv seed).
-
-axiom indep2q xs: 
-  size xs = 2*q =>
-  uniq xs =>
-    bijective (uhash_list xs).
-
-op u2q_from : from list.
-axiom unique_2q_valuesE : size u2q_from = 2*q /\ uniq u2q_from.
-
-op extend : from list -> from list.
-axiom extends_u2q l : size l <= 2*q => 
-   (forall x, x \in l => x \in extend l) /\
-   size (extend l) = 2*q /\ 
-   uniq (extend l).
-
-lemma universal2q xs :
-  size xs = 2*q =>
-  uniq xs =>
-  genseed = dmap genseed (uhash_list xs).
-proof. 
-move => sxs uxs.
-apply eq_funi_ll.
-+  by rewrite /genseed; apply (dvector_funi _ FFin.dunifin_fu FFin.dunifin_uni).
-+ by rewrite /genseed (dvector_ll _ FFin.dunifin_ll).
-+ by rewrite /genseed;  apply (dmap_funi _ _ (indep2q xs sxs uxs) (dvector_funi _ FFin.dunifin_fu FFin.dunifin_uni)).
-+ by rewrite /genseed; apply dmap_ll; apply dvector_ll; apply FFin.dunifin_ll.
-qed.
-
-lemma perfect_sim xy:
-  xy \in wordn (2 * q) =>
- mu dfhash (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy) =
- mu dcompute (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
-proof.
-move => xys.
-pose P := (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
-rewrite /dfhash /dcompute /compute.
-admitted.
-
-lemma efficient_sim (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : result):
-  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ QRO_main(A,LQRO).main() @ &m: res = r ].
-proof.
-have -> : 
- Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[QRO_main_D(A).main(dfhash) @ &m : res = r].
-   by byequiv=>//; conseq (_: _ ==> ={res})=> //; proc;inline*; sim; auto => />.
-move : (dA_split A &m) => dA_split.
-elim dA_split => C dA_split.
-rewrite (eager_sampling A) (dA_split dfhash r) (dA_split dcompute r).
-by apply (eq_big_seq _ _  (wordn (2*q))); move => * /=;congr; apply perfect_sim.
-qed.
-
-end T_LazyQROM.
 
 *)
