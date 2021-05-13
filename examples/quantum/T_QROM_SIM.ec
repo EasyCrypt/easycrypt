@@ -244,8 +244,9 @@ qed.
 
 end T_QROM_SIM.
 
-(*
 abstract theory T_QROM_SIM_GEN.
+
+op q : { int | 0 <= q} as q_ge0.
 
 (* Sampling is based on two finite fields with the same characteristic. *)
 op p : { int | 1 < p } as gt1_p.
@@ -264,9 +265,12 @@ op m : { int | 0 < m <= n } as bnd_m.
 axiom ff_out_order : size enum_ff_out = p^m.
 
 clone import T_QROM_SIM with
+  op q <- q,
   type VD.FT.t = ff_in,
   op VD.FT.Support.enum <- enum_ff_in
-  proof VD.FT.Support.enum_spec by apply enum_spec.
+  proof VD.FT.Support.enum_spec by apply enum_spec
+  proof q_ge0 by apply q_ge0.
+
 import VD Big.BAdd F.
 
 lemma in_char_order : p %| FT.Support.card. 
@@ -304,10 +308,18 @@ module LQRO_GEN : QRO_i = {
 
 }.
 
+
 clone import QROM_Fundamental_Lemma as FLT with
-    op q <- q,
-    type result <- FL.result
-    proof q_ge0 by smt(q_ge0).
+    type result <- FL.result.
+
+module QRO_main(A:AdvRO, H:QRO_i) = {
+  proc main() = {
+    var r;
+    H.init();
+    r <@ A(H).main();
+    return r;
+  }
+}.
 
 module (B (A : AdvRO) : FL.AdvRO) (H : T_QROM_SIM.QRO) = {
 
@@ -330,19 +342,25 @@ op dcomputei : (from -> hash) distr =
  MUFF.dfun (fun f => dmap FT.dunifin (fun x => (decode \o project) x)).
 
 lemma int_real_exp : forall (b e : int),
-  0 <= e => (b^e)%r = b%r ^ e by smt.
+  0 <= e => (b^e)%r = b%r ^ e by smt(@Real).
 
 lemma mudecode y:
  mu1 (dmap FT.dunifin project) y = 1%r/(p^m)%r. 
-search FT.dunifin.
 rewrite /mu1 dmapE /pred1 /(\o) /=.
 rewrite FT.dunifinE /=.
 rewrite project_preimages.
 have -> : (FT.Support.card = p^n). 
-smt.
-have -> :((T_QROM_SIM_GEN.p ^ (n - m))%r = (T_QROM_SIM_GEN.p ^ n)%r / (T_QROM_SIM_GEN.p ^ m)%r).
-rewrite !int_real_exp; smt. 
-smt.
+  by rewrite /FT.Support.card; apply ff_in_order.
+rewrite !int_real_exp; 1..3: smt(bnd_m gt0_n).  
+have -> :(T_QROM_SIM_GEN.p%r ^ (n - m) = (T_QROM_SIM_GEN.p%r ^ n) / (T_QROM_SIM_GEN.p%r ^ m)).
+rewrite exprD; first by smt(gt1_p).
+by rewrite exprN; smt().
+pose a := p%r^n. pose b := p%r^m. 
+have an0 : a <> 0%r. print Num.Domain.unitrX_neq0.
+   by apply (Num.Domain.unitrX p%r n); smt(gt1_p). 
+have bn0 : b <> 0%r. print Num.Domain.unitrX_neq0.
+   by apply (Num.Domain.unitrX p%r m); smt(gt1_p). 
+smt().
 qed.
 
 lemma bijective_surjective ['a,'b] (f : 'a -> 'b) :
@@ -389,36 +407,44 @@ apply T_QROM.dfhash_uni.
 apply T_QROM.dfhash_ll.
 qed.
 
+
 lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
-  Pr [ FL.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m: res = r ] =  
-    Pr[ QRO_main_D(A).main(dcomputei) @ &m: res = r].
+  Pr [ T_QROM_SIM.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m: res = r ] =  
+    Pr[ FLT.QRO_main_D(A).main(dcomputei) @ &m: res = r].
 byequiv (_: _ ==> ={res}) => //.
 proc; inline *;sim;conseq />.
 call(_: forall x, QRO.h{2} x = (decode \o project) (T_QROM_SIM.QRO.h{1} (encode x))).
 by proc; inline *; auto => /> /#. 
-conseq />. 
+conseq />. seq 1 1 : #pre; first by auto => />.
 admitted. (* We should be able to construct a bijection *)
 
+lemma queries (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) :
+  hoare[ QRO_main_D(A).main : true ==> QRO.ch <= q] =>
+  hoare[ FL.QRO_main_D(B(A)).main : true ==> T_QROM_SIM.QRO.ch <= q].
+admitted. 
+
 lemma efficient_sim_gen (A<:AdvRO{-QRO, -LQRO, -LQRO_GEN}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
-  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ QRO_main(A,LQRO_GEN).main() @ &m: res = r ].
+  hoare[ QRO_main_D(A).main : true ==> QRO.ch <= q] =>
+  Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = 
+    Pr[ QRO_main(A,LQRO_GEN).main() @ &m: res = r ].
 proof.
+move => qH.
 have -> : 
- Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = Pr[ FL.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m : res = r].
+ Pr[ QRO_main(A,QRO).main() @ &m: res = r ] = 
+   Pr[ T_QROM_SIM.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m : res = r].
 rewrite (eager_sampling A).
 byequiv => //.
 proc;inline *.
 wp; call(_: ={QRO.h}); first by proc; inline *; auto => />.  
 by auto => />; smt(dcompute_dfhash).
 have -> : 
- Pr[ QRO_main(A,LQRO_GEN).main() @ &m: res = r ] = Pr[ FL.QRO_main(B(A),LQRO).main() @ &m : res = r].
+ Pr[ QRO_main(A,LQRO_GEN).main() @ &m: res = r ] = Pr[ T_QROM_SIM.QRO_main(B(A),LQRO).main() @ &m : res = r].
 byequiv => //.
 proc;inline *.
 wp; call(_: forall x, QRO.h{1} x = (decode \o project) (T_QROM_SIM.QRO.h{2} (encode x))).
 by proc; inline *; auto => /> /#.
 by wp; rnd; auto => />.
-apply (efficient_sim (B(A))).
-admit. (* cost *)
+by apply (efficient_sim (B(A)) _ _ (queries A qH)).
 qed.
 
 end T_QROM_SIM_GEN.
-*)
