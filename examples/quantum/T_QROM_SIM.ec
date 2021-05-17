@@ -338,6 +338,26 @@ module (B (A : AdvRO) : FL.AdvRO) (H : T_QROM_SIM.QRO) = {
     }
 }.
 
+module Aux(A : AdvRO)  = {
+
+    proc main() : FL.result = {
+       var r, h;
+       h <$ T_QROM_SIM.dfhash;
+       QRO.h <- decode \o project \o h \o encode;
+       r <@ A(QRO).main();
+       return r;
+    }
+}.
+
+lemma aux  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
+  Pr [ T_QROM_SIM.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m: res = r ] =  
+    Pr[ Aux(A).main() @ &m: res = r].
+byequiv => //;proc;inline *.
+wp; call (_: QRO.h{2} = decode \o project \o T_QROM_SIM.QRO.h{1} \o encode).
+by proc; inline *;auto => />.
+by wp;rnd;auto => />.
+qed.
+
 op dcomputei : (from -> hash) distr = 
  MUFF.dfun (fun f => dmap FT.dunifin (fun x => (decode \o project) x)).
 
@@ -407,21 +427,23 @@ apply T_QROM.dfhash_uni.
 apply T_QROM.dfhash_ll.
 qed.
 
+op fill_zeros : ff_out -> FT.t.
+axiom fill_zeros_proj x : project (fill_zeros x) = x.
 
 lemma eager_sampling  (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
   Pr [ T_QROM_SIM.QRO_main(B(A),T_QROM_SIM.QRO).main() @ &m: res = r ] =  
     Pr[ FLT.QRO_main_D(A).main(dcomputei) @ &m: res = r].
-byequiv (_: _ ==> ={res}) => //.
-proc; inline *;sim;conseq />.
-call(_: forall x, QRO.h{2} x = (decode \o project) (T_QROM_SIM.QRO.h{1} (encode x))).
-by proc; inline *; auto => /> /#. 
-conseq />. seq 1 1 : #pre; first by auto => />.
-admitted. (* We should be able to construct a bijection *)
+rewrite (aux A).
+byequiv => //;proc;inline *.
+conseq (_: _ ==> ={r}); first by auto => />. 
+sim.
+admitted. (* We can't construct a bijection, as there are more functions on the
+             left, but the distributions are identical *)
 
 lemma queries (A<:AdvRO{-QRO, -LQRO}[main : `{Inf, #H.h : q}]) :
   hoare[ QRO_main_D(A).main : true ==> QRO.ch <= q] =>
   hoare[ FL.QRO_main_D(B(A)).main : true ==> T_QROM_SIM.QRO.ch <= q].
-admitted. 
+admitted. (* Can't go around lossless issues *)
 
 lemma efficient_sim_gen (A<:AdvRO{-QRO, -LQRO, -LQRO_GEN}[main : `{Inf, #H.h : q}]) &m (r : FL.result):
   hoare[ QRO_main_D(A).main : true ==> QRO.ch <= q] =>
