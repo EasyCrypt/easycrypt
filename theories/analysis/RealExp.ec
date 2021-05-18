@@ -434,7 +434,7 @@ abstract theory Rn.
 (* -------------------------------------------------------------------- *)
 type t.
 
-clone FinType with type t <- t.
+clone FinType.FinType with type t <- t.
 
 abbrev dim = FinType.card.
 

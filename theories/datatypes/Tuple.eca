@@ -16,7 +16,7 @@ pragma +implicits.
 (* -------------------------------------------------------------------- *)
 type t.
 
-clone import FinType as Support with type t <- t.
+clone import FinType.FinType as Support with type t <- t.
 
 (* -------------------------------------------------------------------- *)
 theory WordN.

@@ -104,7 +104,7 @@ require import List SmtMap.
 require (*--*) FinType.
 
 (** TODO: expose finiteness assumption **)
-clone include FinType with
+clone include FinType.FinType with
   type t <- in_t.
 
 module ERO : Oracle = {
@@ -162,7 +162,7 @@ abstract theory LazyEager.
 require import List SmtMap PROM.
 require (*--*) FinType.
 
-clone import FinType with
+clone import FinType.FinType with
   type t <- in_t.
 
 import Lazy.

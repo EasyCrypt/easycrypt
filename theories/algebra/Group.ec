@@ -275,7 +275,7 @@ abstract theory CyclicGroup.
 type group.
 
 (* -------------------------------------------------------------------- *)
-clone include FinType
+clone include FinType.FinType
   with type t <- group
   rename "card" as "order"
   rename "enum" as "elems".

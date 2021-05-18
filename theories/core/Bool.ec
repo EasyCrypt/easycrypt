@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require FinType.
+require import FinType.
 
 op (^^) (b1 b2:bool) = b1 = !b2.
 
@@ -26,7 +26,7 @@ by [].
 lemma nosmt xorK b: b ^^ b = false
 by [].
 
-clone FinType as BoolFin with
+clone FinType.FinType as BoolFin with
   type t    <- bool,
     op enum <- List.(::) true (List.(::) false List."[]"),
     op card <- 2
