@@ -1,50 +1,5 @@
 require import AllCore PROM SmtMap Distr DProd.
 
-(* TODO: should we move this in SmtMap ? *)
-op o_union (_:'a) (x y : 'b option) = if x = None then y else x.
-
-lemma o_union_none a : o_union <:'a,'b> a None None = None.
-proof. done. qed.
-
-op union_map (m1 m2: ('a, 'b)fmap) = merge o_union m1 m2.
-
-lemma set_union_map_l (m1 m2: ('a, 'b)fmap) x y: 
-  (union_map m1 m2).[x <- y] = union_map m1.[x <- y] m2.
-proof. 
-  have hn := o_union_none <:'a, 'b>.
-  by apply fmap_eqP => z; rewrite mergeE // !get_setE mergeE // /#. 
-qed. 
-
-lemma set_union_map_r (m1 m2:('a, 'b)fmap) x y:
-  x \notin m1 => 
-  (union_map m1 m2).[x <- y] = union_map m1 m2.[x <- y].
-proof. 
-  have hn := o_union_none <:'a, 'b>.
-  by move=> h; apply fmap_eqP => z; rewrite mergeE // !get_setE mergeE // /#. 
-qed. 
-
-lemma mem_union_map (m1 m2:('a, 'b)fmap) x: (x \in union_map m1 m2) = (x \in m1 || x \in m2).
-proof. have hn := o_union_none <:'a, 'b>; rewrite /dom mergeE // /#. qed. 
-
-op o_pair (_:'a) (x: 'b1 option) (y:'b2 option) = 
-  if x = None /\ y = None then None
-  else Some (oget x, oget y).
-
-lemma o_pair_none a : o_pair <:'a,'b1, 'b2> a None None = None.
-proof. done. qed.
-
-op pair_map (m1:('a, 'b1)fmap) (m2:('a, 'b2)fmap) = merge o_pair m1 m2.
-
-lemma set_pair_map (m1: ('a, 'b1)fmap) (m2: ('a, 'b2)fmap) x y: 
-  (pair_map m1 m2).[x <- y] = pair_map m1.[x <- y.`1] m2.[x <- y.`2].
-proof. 
-  have hn := o_pair_none <:'a, 'b1, 'b2>.
-  by apply fmap_eqP => z; rewrite mergeE // !get_setE mergeE // /#. 
-qed. 
-
-lemma mem_pair_map (m1: ('a, 'b1)fmap) (m2: ('a, 'b2)fmap) x: (x \in pair_map m1 m2) = (x \in m1 || x \in m2).
-proof. have hn := o_pair_none <:'a, 'b1, 'b2>; rewrite /dom mergeE // /#. qed. 
-
 abstract theory Split.
 
   type from, to, input, output.
