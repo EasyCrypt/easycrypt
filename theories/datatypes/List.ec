@@ -1586,6 +1586,10 @@ lemma has_map (f : 'a -> 'b) p s:
   has p (map f s) = has (preim f p) s.
 proof. by elim: s => //= x s ->. qed.
 
+lemma has_filter ['a] (p q: 'a -> bool) s:
+  has p (filter q s) = has (predI p q) s.
+proof. by elim: s=> //= x s @/predI; case: (q x)=> //= ? ->. qed.
+
 lemma all_map (f :  'a -> 'b) p s:
   all p (map f s) = all (preim f p) s.
 proof. by elim: s => //= x s ->. qed.

@@ -8,7 +8,8 @@
 
 (* -------------------------------------------------------------------- *)
 require import AllCore List Distr StdOrder.
-require (*--*) FinType Tuple.
+require import FinType.
+require (*--*) Tuple.
 (*---*) import IntOrder RealOrder.
 
 (* -------------------------------------------------------------------- *)

@@ -8,6 +8,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import AllCore StdRing StdOrder RealFun.
+require import FinType.
 (*---*) import IntOrder RField RealOrder.
 require import List.
 
