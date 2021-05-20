@@ -807,13 +807,12 @@ qed.
 lemma set_union_map_r (m1 m2: ('a, 'b)fmap) x y:
   x \notin m1 => 
   (union_map m1 m2).[x <- y] = union_map m1 m2.[x <- y].
-proof. 
-  have hn := o_union_none <:'a, 'b>.
-  by move=> h; apply fmap_eqP => z; rewrite mergeE // !get_setE mergeE // /#. 
+proof.
+by rewrite domE=> /= h; apply fmap_eqP=> z; rewrite mergeE // !get_setE //= mergeE /#.
 qed. 
 
 lemma mem_union_map (m1 m2:('a, 'b)fmap) x: (x \in union_map m1 m2) = (x \in m1 || x \in m2).
-proof. have hn := o_union_none <:'a, 'b>; rewrite /dom mergeE // /#. qed. 
+proof. by rewrite /dom mergeE // /#. qed. 
 
 (* -------------------------------------------------------------------- *)
 op o_pair (_ : 'a) (x : 'b1 option) (y : 'b2 option) =
@@ -826,10 +825,8 @@ op pair_map (m1:('a, 'b1)fmap) (m2:('a, 'b2)fmap) = merge o_pair m1 m2.
 
 lemma set_pair_map (m1: ('a, 'b1)fmap) (m2: ('a, 'b2)fmap) x y: 
   (pair_map m1 m2).[x <- y] = pair_map m1.[x <- y.`1] m2.[x <- y.`2].
-proof. 
-  have hn := o_pair_none <:'a, 'b1, 'b2>.
-  by apply fmap_eqP => z; rewrite mergeE // !get_setE mergeE // /#. 
-qed. 
+proof. by apply fmap_eqP=> z; rewrite mergeE // !get_setE mergeE // /#. qed.
 
-lemma mem_pair_map (m1: ('a, 'b1)fmap) (m2: ('a, 'b2)fmap) x: (x \in pair_map m1 m2) = (x \in m1 /\ x \in m2).
-proof. have hn := o_pair_none <:'a, 'b1, 'b2>; rewrite /dom mergeE // /#. qed. 
+lemma mem_pair_map (m1: ('a, 'b1)fmap) (m2: ('a, 'b2)fmap) x:
+  (x \in pair_map m1 m2) = (x \in m1 /\ x \in m2).
+proof. by rewrite /dom mergeE // /#. qed.
