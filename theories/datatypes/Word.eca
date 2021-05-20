@@ -8,11 +8,12 @@
 
 (* -------------------------------------------------------------------- *)
 require import AllCore List Distr StdOrder.
-require (*--*) FinType Tuple.
+require import FinType.
+require (*--*) Tuple.
 (*---*) import IntOrder RealOrder.
 
 (* -------------------------------------------------------------------- *)
-clone import FinType.FinType as Alphabet.
+clone import FinType as Alphabet.
 
 op n : {int | 0 <= n} as ge0_n.
 
@@ -173,7 +174,7 @@ clone Tuple as Enum with
 proof * by exact/enum_spec.
 
 (* -------------------------------------------------------------------- *)
-clone include FinType.FinType with
+clone include FinType with
   type t    <- word,
   op enum = List.map mkword (Enum.wordn n)
 proof * rename [op] "enum" as "words".

@@ -9,14 +9,14 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List StdOrder StdBigop.
 (*---*) import StdOrder.IntOrder StdBigop.Bigint.BIA.
-require (*--*) FinType.
+require import FinType.
 
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 type t.
 
-clone import FinType.FinType as Support with type t <- t.
+clone import FinType as Support with type t <- t.
 
 (* -------------------------------------------------------------------- *)
 theory WordN.

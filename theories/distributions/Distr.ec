@@ -35,8 +35,7 @@ require import Ring StdRing StdOrder StdBigop Discrete.
 require import RealFun RealSeq RealSeries.
 (*---*) import IterOp Bigint Bigreal Bigreal.BRA.
 (*---*) import IntOrder RealOrder RField.
-require import Finite.
-require (*--*) FinType.
+require import Finite FinType.
 
 pragma +implicits.
 
@@ -773,7 +772,7 @@ export MUniform.
 abstract theory MFinite.
 type t.
 
-clone import FinType.FinType as Support with type t <- t.
+clone import FinType as Support with type t <- t.
 
 op dunifin : t distr = MUniform.duniform enum.
 
@@ -1818,7 +1817,7 @@ qed.
 abstract theory MUniFinFun.
 type t.
 
-clone FinType.FinType as FinT with type t <- t.
+clone FinType as FinT with type t <- t.
 
 op mfun ['u] (d : t -> 'u distr) (f : t -> 'u) =
   BRM.big predT (fun x => mass (d x) (f x)) FinT.enum.

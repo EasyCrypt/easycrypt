@@ -1,4 +1,5 @@
 require import AllCore List Int IntDiv Real SmtMap Distr DBool DList DProd FSet PROM SplitRO FelTactic.
+require import FinType.
 
 require (****) Subtype Ske RndProd Indistinguishability Monoid EventPartitioning.
 import StdOrder IntOrder RealOrder.
@@ -85,7 +86,7 @@ theory C.
     rename [type] "sT" as "counter"
            [op] "insubd" as "ofint".
 
-  clone FinType.FinType with 
+  clone FinType with 
     type t  = counter,
     op enum = List.map ofint (iota_ 0 (max_counter + 1)),
     op card = max_counter
@@ -103,7 +104,7 @@ theory C.
 
 end C.
 
-clone FinType.FinProdType as NonceCount with
+clone FinProdType as NonceCount with
   type t1 <- nonce, type t2 <- C.counter,
   theory FT1 <- Nonce.MFinite.Support, theory FT2 <- C.FinType.
 

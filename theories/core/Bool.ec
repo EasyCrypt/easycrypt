@@ -26,7 +26,7 @@ by [].
 lemma nosmt xorK b: b ^^ b = false
 by [].
 
-clone FinType.FinType as BoolFin with
+clone FinType as BoolFin with
   type t    <- bool,
     op enum <- List.(::) true (List.(::) false List."[]"),
     op card <- 2

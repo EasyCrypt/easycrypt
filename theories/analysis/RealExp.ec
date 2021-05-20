@@ -8,6 +8,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import AllCore StdRing StdOrder RealFun.
+require import FinType.
 (*---*) import IntOrder RField RealOrder.
 require import List.
 
@@ -434,7 +435,7 @@ abstract theory Rn.
 (* -------------------------------------------------------------------- *)
 type t.
 
-clone FinType.FinType with type t <- t.
+clone FinType with type t <- t.
 
 abbrev dim = FinType.card.
 

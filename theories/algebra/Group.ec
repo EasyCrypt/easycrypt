@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List IntMin IntDiv.
-require (*--*) FinType Ring Number StdOrder ZModP.
+require import FinType.
+require (*--*) Ring Number StdOrder ZModP.
 
 import Ring.IntID StdOrder.IntOrder.
 
@@ -275,7 +276,7 @@ abstract theory CyclicGroup.
 type group.
 
 (* -------------------------------------------------------------------- *)
-clone include FinType.FinType
+clone include FinType
   with type t <- group
   rename "card" as "order"
   rename "enum" as "elems".

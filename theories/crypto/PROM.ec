@@ -10,6 +10,7 @@ pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 require import AllCore SmtMap Distr.
+require import FinType.
 
 (* -------------------------------------------------------------------- *)
 type flag = [ Unknown | Known ].
@@ -785,7 +786,7 @@ require import List.
 
 clone include FullEager.
 
-clone FinType.FinType as FinFrom with
+clone FinType as FinFrom with
   type t = in_t.
 
 module FinRO : RO = {
