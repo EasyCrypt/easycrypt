@@ -2386,12 +2386,12 @@ section PROOFS.
     by rewrite size_map size_filter count_map /pred1 /preim; congr; apply fun_ext=> y *; rewrite (eq_sym y.`1).
   have<-:= size_map (fun c:ciphertext => c.`1).
   rewrite -(filter_predT (map (fun c:ciphertext => c.`1) lc)).
-  rewrite -big_count. search filter predC.
+  rewrite -big_count.
   pose nlc := map _ lc.
   have H0 :=perm_filterC (mem lenc) (undup nlc).
   rewrite -(BIA.eq_big_perm _ _ _ _ H0) BIA.big_cat.
   rewrite filter_predT. 
-  have H1 :perm_eq (filter (mem lenc) (undup nlc)) (filter (mem nlc) lenc). search perm_eq mem.
+  have H1 :perm_eq (filter (mem lenc) (undup nlc)) (filter (mem nlc) lenc).
   + have->:=uniq_perm_eq (filter (mem lenc) (undup nlc)) (filter (mem nlc) lenc);
     rewrite ?filter_uniq ?undup_uniq /= //= ?filter_uniq //=.
     by move=> *; rewrite !mem_filter mem_undup.
@@ -2413,7 +2413,7 @@ section PROOFS.
   rewrite !size_flatten /= !sumzE /= !BIA.big_cons /=.
   pose p1 := predT _; have->/={p1}:p1=true by done. 
   rewrite !size_map; congr.
-  rewrite !BIA.big_map /= !predTofV/(\o) /=. search BIA.big mem (=).
+  rewrite !BIA.big_map /= !predTofV/(\o) /=.
   apply BIA.congr_big_seq  => />; rewrite {1}/predT /= => *.
   by rewrite !size_map.
   qed.
