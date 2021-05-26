@@ -140,8 +140,8 @@ proof. by rewrite set_set_if. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma set_set_swap (arr : 'a array) (k k' : int) (x x' : 'a):
-  k <> k => arr.[k <- x].[k' <- x'] = arr.[k' <- x'].[k' <- x'].
-proof. by rewrite set_set_if. qed.
+  k <> k' => arr.[k <- x].[k' <- x'] = arr.[k' <- x'].[k <- x].
+proof. by rewrite set_set_if=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 op offun f n: 'a array = mkarray (mkseq f n).
