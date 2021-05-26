@@ -34,5 +34,3 @@ module CPA(A:AdvCPA) (O:EncScheme) = {
   }
 
 }.
-
-
