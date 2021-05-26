@@ -60,7 +60,7 @@ end Bigbool.
 (* -------------------------------------------------------------------- *)
 theory Bigint.
 clone include Bigalg.BigOrder with
-  type t <- int,
+  type Num.t <- int,
   pred Num.Domain.unit (z : int) <- (z = 1 \/ z = -1),
     op Num.Domain.zeror  <- 0,
     op Num.Domain.oner   <- 1,
@@ -132,7 +132,7 @@ import Bigint.
 (* -------------------------------------------------------------------- *)
 theory Bigreal.
 clone include Bigalg.BigOrder with
-  type t <- real,
+  type Num.t <- real,
   pred Num.Domain.unit (z : real) <- (z <> 0%r),
     op Num.Domain.zeror  <- 0%r,
     op Num.Domain.oner   <- 1%r,

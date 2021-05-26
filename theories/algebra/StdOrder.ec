@@ -83,7 +83,7 @@ end IntOrder.
 
 (* -------------------------------------------------------------------- *)
 clone Number.RealField as RealOrder
-  with type t <- real,
+  with type Field.t <- real,
 
   op   Field.zeror  <- 0%r,
   op   Field.oner   <- 1%r,

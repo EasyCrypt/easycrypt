@@ -1011,7 +1011,7 @@ and theory_cloning_options =
 and theory_cloning_proof = {
   pthp_mode   : [
     | `All   of (pqsymbol option * theory_cloning_proof_tag list)
-    | `Named of pqsymbol
+    | `Named of pqsymbol * clmode
   ];
   pthp_tactic : ptactic_core option;
 }
@@ -1023,12 +1023,29 @@ and theory_override =
 | PTHO_Type   of ty_override
 | PTHO_Op     of op_override
 | PTHO_Pred   of pr_override
+| PTHO_Axiom  of ax_override
+| PTHO_Module of me_override
+| PTHO_ModTyp of mt_override
 | PTHO_Theory of th_override
 
-and ty_override = psymbol list * pty * [`Alias | `Inline]
-and op_override = op_override_def * [`Alias | `Inline]
-and pr_override = pr_override_def * [`Alias | `Inline]
-and th_override = pqsymbol
+
+and ty_override = ty_override_def genoverride * clmode
+and op_override = op_override_def genoverride * clmode
+and pr_override = pr_override_def genoverride * clmode
+and me_override = pqsymbol * clmode
+and mt_override = pqsymbol * clmode
+and th_override = pqsymbol * clmode
+and ax_override = pqsymbol * clmode
+and nt_override = EcPath.path * clmode
+
+and clmode = [`Alias | `Inline of [`Keep | `Clear]]
+
+and 'a genoverride = [
+| `ByPath   of EcPath.path
+| `BySyntax of 'a
+]
+
+and ty_override_def = psymbol list * pty
 
 and op_override_def = {
   opov_nosmt  : bool;

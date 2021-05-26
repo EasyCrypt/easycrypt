@@ -5,25 +5,12 @@ require (*--*) Subtype Monoid Ring Subtype Bigalg StdOrder StdBigop.
 import StdOrder.IntOrder StdBigop.Bigreal.
 
 (* -------------------------------------------------------------------- *)
-type R.
-
-clone import Ring.IDomain as ZR with type t <- R.
-clear [ZR.* ZR.AddMonoid.* ZR.MulMonoid.*].
+clone import Ring.IDomain as ZR.
 
 (* -------------------------------------------------------------------- *)
-clone import Bigalg.BigComRing as Big with
-  type t <- R,
-  pred CR.unit   <- ZR.unit,
-    op CR.zeror  <- ZR.zeror,
-    op CR.oner   <- ZR.oner,
-    op CR.( + )  <- ZR.( + ),
-    op CR.([-])  <- ZR.([-]),
-    op CR.( * )  <- ZR.( * ),
-    op CR.invr   <- ZR.invr,
-    op CR.intmul <- ZR.intmul,
-    op CR.ofint  <- ZR.ofint,
-    op CR.exp    <- ZR.exp,
-    op CR.lreg   <- ZR.lreg.
+clone import Bigalg.BigComRing as Big with theory CR <- ZR.
+
+type R = t.
 
 import BAdd.
 

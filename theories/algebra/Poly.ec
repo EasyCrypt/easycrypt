@@ -8,42 +8,13 @@ require (*--*) Subtype.
 abstract theory PolyComRing.
 type coeff, poly.
 
-clone import ComRing as Coeff with type t <- coeff.
+clone import ComRing as Coeff with type t <= coeff.
 
-clone import BigComRing as BigCf with
-  type t <- coeff,
-  pred CR.unit   <- Coeff.unit,
-    op CR.zeror  <- Coeff.zeror,
-    op CR.oner   <- Coeff.oner,
-    op CR.( + )  <- Coeff.( + ),
-    op CR.([-])  <- Coeff.([-]),
-    op CR.( * )  <- Coeff.( * ),
-    op CR.invr   <- Coeff.invr,
-    op CR.intmul <- Coeff.intmul,
-    op CR.ofint  <- Coeff.ofint,
-    op CR.exp    <- Coeff.exp,
-    op CR.lreg   <- Coeff.lreg
+clone import BigComRing as BigCf
+  with theory CR <- Coeff
 
-    proof CR.*
-
-    rename [theory] "BAdd" as "BCA"
-           [theory] "BMul" as "BCM"
-
-    remove abbrev CR.(-)
-    remove abbrev CR.(/).
-
-realize CR.addrA     by apply: Coeff.addrA    .
-realize CR.addrC     by apply: Coeff.addrC    .
-realize CR.add0r     by apply: Coeff.add0r    .
-realize CR.addNr     by apply: Coeff.addNr    .
-realize CR.oner_neq0 by apply: Coeff.oner_neq0.
-realize CR.mulrA     by apply: Coeff.mulrA    .
-realize CR.mulrC     by apply: Coeff.mulrC    .
-realize CR.mul1r     by apply: Coeff.mul1r    .
-realize CR.mulrDl    by apply: Coeff.mulrDl   .
-realize CR.mulVr     by apply: Coeff.mulVr    .
-realize CR.unitP     by apply: Coeff.unitP    .
-realize CR.unitout   by apply: Coeff.unitout  .
+  rename [theory] "BAdd" as "BCA"
+         [theory] "BMul" as "BCM".
 
 (* -------------------------------------------------------------------- *)
 type prepoly = int -> coeff.
@@ -519,12 +490,12 @@ lemma onep_neq0 : poly1 <> poly0.
 proof. by apply/negP => /poly_eqP /(_ 0); rewrite !polyCE /= oner_neq0. qed.
 
 clone import Ring.ComRing as PolyComRing with
-  type t      <- poly ,
-    op zeror  <- poly0,
-    op oner   <- poly1,
-    op ( + )  <- polyD,
-    op [ - ]  <- polyN,
-    op ( * )  <- polyM
+  type t      <= poly ,
+    op zeror  <= poly0,
+    op oner   <= poly1,
+    op ( + )  <= polyD,
+    op [ - ]  <= polyN,
+    op ( * )  <= polyM
 
   proof addrA     by apply ZPoly.addrA
   proof addrC     by apply ZPoly.addrC
@@ -689,40 +660,13 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 theory BigPoly.
-clone include BigComRing with
-  type t         <- poly,
-    op CR.zeror  <- poly0,
-    op CR.oner   <- poly1,
-    op CR.( + )  <- polyD,
-    op CR.([-])  <- polyN,
-    op CR.( * )  <- polyM,
-    op CR.invr   <- PolyComRing.invr,
-    op CR.intmul <- PolyComRing.intmul,
-    op CR.ofint  <- PolyComRing.ofint,
-    op CR.exp    <- PolyComRing.exp,
-    op CR.lreg   <- PolyComRing.lreg,
-  pred CR.unit   <- PolyComRing.unit
-
-  proof *
+clone include BigComRing with theory CR <- PolyComRing
 
   remove abbrev CR.(-)
-  remove abbrev CR.(/)
+  remove abbrev CR.(/) 
 
   rename [theory] "BAdd" as "PCA"
          [theory] "BMul" as "PCM".
-
-realize CR.addrA     by apply: PolyComRing.addrA    .
-realize CR.addrC     by apply: PolyComRing.addrC    .
-realize CR.add0r     by apply: PolyComRing.add0r    .
-realize CR.addNr     by apply: PolyComRing.addNr    .
-realize CR.oner_neq0 by apply: PolyComRing.oner_neq0.
-realize CR.mulrA     by apply: PolyComRing.mulrA    .
-realize CR.mulrC     by apply: PolyComRing.mulrC    .
-realize CR.mul1r     by apply: PolyComRing.mul1r    .
-realize CR.mulrDl    by apply: PolyComRing.mulrDl   .
-realize CR.mulVr     by apply: PolyComRing.mulVr    .
-realize CR.unitP     by apply: PolyComRing.unitP    .
-realize CR.unitout   by apply: PolyComRing.unitout  .
 
 lemma polysumE ['a] P F s k :
   (PCA.big<:'a> P F s).[k] = BCA.big P (fun i => (F i).[k]) s.
@@ -895,42 +839,13 @@ end PolyComRing.
 abstract theory Poly.
 type coeff, poly.
 
-clone import IDomain as IDCoeff with type t <- coeff.
+clone import IDomain as IDCoeff with type t <= coeff.
 
 clone include PolyComRing with
   type coeff        <- coeff,
   type poly         <- poly,
-  pred Coeff.unit   <- IDCoeff.unit,
-    op Coeff.zeror  <- IDCoeff.zeror,
-    op Coeff.oner   <- IDCoeff.oner,
-    op Coeff.( + )  <- IDCoeff.( + ),
-    op Coeff.([-])  <- IDCoeff.([-]),
-    op Coeff.( * )  <- IDCoeff.( * ),
-    op Coeff.invr   <- IDCoeff.invr,
-    op Coeff.intmul <- IDCoeff.intmul,
-    op Coeff.ofint  <- IDCoeff.ofint,
-    op Coeff.exp    <- IDCoeff.exp,
-    op Coeff.lreg   <- IDCoeff.lreg
-
-  proof Coeff.*
-
-  remove abbrev Coeff.(-)
-  remove abbrev Coeff.(/).
-
-realize Coeff.addrA     by apply: IDCoeff.addrA    .
-realize Coeff.addrC     by apply: IDCoeff.addrC    .
-realize Coeff.add0r     by apply: IDCoeff.add0r    .
-realize Coeff.addNr     by apply: IDCoeff.addNr    .
-realize Coeff.oner_neq0 by apply: IDCoeff.oner_neq0.
-realize Coeff.mulrA     by apply: IDCoeff.mulrA    .
-realize Coeff.mulrC     by apply: IDCoeff.mulrC    .
-realize Coeff.mul1r     by apply: IDCoeff.mul1r    .
-realize Coeff.mulrDl    by apply: IDCoeff.mulrDl   .
-realize Coeff.mulVr     by apply: IDCoeff.mulVr    .
-realize Coeff.unitP     by apply: IDCoeff.unitP    .
-realize Coeff.unitout   by apply: IDCoeff.unitout  .
-
-clear [Coeff.* Coeff.AddMonoid.* Coeff.MulMonoid.*].
+  theory Coeff      <- IDCoeff.
+  
 clear [PolyComRing.* PolyComRing.AddMonoid.* PolyComRing.MulMonoid.*].
 
 import BigCf.

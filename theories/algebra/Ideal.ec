@@ -12,7 +12,7 @@ clone import Ring.ComRing as IComRing with type t <- t.
 clear [IComRing.* IComRing.AddMonoid.* IComRing.MulMonoid.*].
 
 clone import Bigalg.BigComRing as BigDom with
-  type  t        <- t,
+  type  CR.t     <- t,
     op  CR.zeror <- IComRing.zeror,
     op  CR.oner  <- IComRing.oner,
     op  CR.(+)   <- IComRing.(+),

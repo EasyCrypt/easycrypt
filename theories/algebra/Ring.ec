@@ -201,9 +201,7 @@ end ZModule.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ComRing.
-  type t.
-
-  clone include ZModule with type t <- t.
+  clone include ZModule.
 
   op   oner  : t.
   op   ( * ) : t -> t -> t.
@@ -656,9 +654,7 @@ end ComRing.
 
 (* -------------------------------------------------------------------- *)
 abstract theory BoolRing.
-  type t.
-
-  clone include ComRing with type t <- t.
+  clone include ComRing.
 
   axiom mulrr : forall (x : t), x * x = x.
 
@@ -671,9 +667,7 @@ end BoolRing.
 
 (* -------------------------------------------------------------------- *)
 abstract theory IDomain.
-  type t.
-
-  clone include ComRing with type t <- t.
+  clone include ComRing.
 
   axiom mulf_eq0:
     forall (x y : t), x * y = zeror <=> x = zeror \/ y = zeror.
@@ -707,9 +701,7 @@ end IDomain.
 
 (* -------------------------------------------------------------------- *)
 abstract theory Field.
-  type t.
-
-  clone include IDomain with type t <- t, pred unit (x : t) <- x <> zeror.
+  clone include IDomain with pred unit (x : t) <- x <> zeror.
 
   lemma mulfV (x : t): x <> zeror => x * (invr x) = oner.
   proof. by apply/mulrV. qed.

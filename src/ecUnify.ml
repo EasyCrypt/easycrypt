@@ -408,7 +408,9 @@ let tfun_expected ue psig =
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 
 (* -------------------------------------------------------------------- *)
-let select_op ?(filter = fun _ -> true) tvi env name ue psig =
+let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
+  ignore hidden;                (* FIXME *)
+
   let module D = EcDecl in
 
   let filter op =

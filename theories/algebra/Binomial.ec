@@ -112,13 +112,11 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory BinomialCoeffs.
-type t.
-
-clone import Ring.ComRing as R with type t <- t.
+clone import Ring.ComRing as R.
 clear [R.* R.AddMonoid.* R.MulMonoid.*].
 
 clone import Bigalg.BigComRing as BCR with
-  type t <- t,
+  type CR.t <- t,
   pred CR.unit   <- R.unit,
     op CR.zeror  <- R.zeror,
     op CR.oner   <- R.oner,
@@ -180,7 +178,7 @@ import RField.
 
 theory BCR.
 clone include BinomialCoeffs with
-  type t <- real,
+  type R.t <- real,
 
   pred R.unit   <- (fun x => x <> 0%r),
     op R.zeror  <- 0%r,

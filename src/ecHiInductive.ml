@@ -97,8 +97,9 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
   let tpath = EcPath.pqname (EcEnv.root env) (unloc name) in
   let env0  =
     let myself = {
-      tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = `Abstract EcPath.Sp.empty;
+      tyd_params  = EcUnify.UniEnv.tparams ue;
+      tyd_type    = `Abstract EcPath.Sp.empty;
+      tyd_resolve = true;
     } in
       EcEnv.Ty.bind (unloc name) myself env
   in

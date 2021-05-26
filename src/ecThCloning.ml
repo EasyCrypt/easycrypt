@@ -21,29 +21,35 @@ module Mp = EcPath.Mp
 type incompatible =
 | NotSameNumberOfTyParam of int * int
 | DifferentType of EcTypes.ty * EcTypes.ty
+| OpBody (* of (EcPath.path * EcDecl.operator) * (EcPath.path * EcDecl.operator) *)
+| TyBody (* of (EcPath.path * EcDecl.tydecl) * (EcPath.path * EcDecl.tydecl) *)
 
 type ovkind =
 | OVK_Type
 | OVK_Operator
 | OVK_Predicate
+| OVK_Abbrev
 | OVK_Theory
 | OVK_Lemma
+| OVK_ModExpr
+| OVK_ModType
 
 type clone_error =
-| CE_UnkTheory      of qsymbol
-| CE_DupOverride    of ovkind * qsymbol
-| CE_UnkOverride    of ovkind * qsymbol
-| CE_CrtOverride    of ovkind * qsymbol
-| CE_UnkAbbrev      of qsymbol
-| CE_TypeArgMism    of ovkind * qsymbol
-| CE_OpIncompatible of qsymbol * incompatible
-| CE_PrIncompatible of qsymbol * incompatible
-| CE_InvalidRE      of string
+| CE_UnkTheory         of qsymbol
+| CE_DupOverride       of ovkind * qsymbol
+| CE_UnkOverride       of ovkind * qsymbol
+| CE_UnkAbbrev         of qsymbol
+| CE_TypeArgMism       of ovkind * qsymbol
+| CE_OpIncompatible    of qsymbol * incompatible
+| CE_PrIncompatible    of qsymbol * incompatible
+| CE_TyIncompatible    of qsymbol * incompatible
+| CE_ModTyIncompatible of qsymbol
+| CE_ModIncompatible   of qsymbol
+| CE_InvalidRE         of string
 
 exception CloneError of EcEnv.env * clone_error
 
-let clone_error env error =
-  raise (CloneError (env, error))
+let clone_error env ce = raise (CloneError(env,ce))
 
 (* -------------------------------------------------------------------- *)
 type axclone = {
@@ -55,28 +61,35 @@ type axclone = {
 
 (* ------------------------------------------------------------------ *)
 type evclone = {
-  evc_types  : (ty_override located) Msym.t;
-  evc_ops    : (op_override located) Msym.t;
-  evc_preds  : (pr_override located) Msym.t;
-  evc_lemmas : evlemma;
-  evc_ths    : evclone Msym.t;
+  evc_types    : (ty_override located) Msym.t;
+  evc_ops      : (op_override located) Msym.t;
+  evc_preds    : (pr_override located) Msym.t;
+  evc_abbrevs  : (nt_override located) Msym.t;
+  evc_modexprs : (me_override located) Msym.t;
+  evc_modtypes : (mt_override located) Msym.t;
+  evc_lemmas   : evlemma;
+  evc_ths      : evclone Msym.t;
 }
 
 and evlemma = {
   ev_global  : (ptactic_core option * evtags option) list;
-  ev_bynames : (ptactic_core option) Msym.t;
+  ev_bynames : evinfo Msym.t;
 }
 
 and evtags = ([`Include | `Exclude] * symbol) list
+and evinfo = ptactic_core option * clmode
 
 (*-------------------------------------------------------------------- *)
 let evc_empty =
   let evl = { ev_global = []; ev_bynames = Msym.empty; } in
-    { evc_types  = Msym.empty;
-      evc_ops    = Msym.empty;
-      evc_preds  = Msym.empty;
-      evc_lemmas = evl;
-      evc_ths    = Msym.empty; }
+    { evc_types    = Msym.empty;
+      evc_ops      = Msym.empty;
+      evc_preds    = Msym.empty;
+      evc_abbrevs  = Msym.empty;
+      evc_modexprs = Msym.empty;
+      evc_modtypes = Msym.empty;
+      evc_lemmas   = evl;
+      evc_ths      = Msym.empty; }
 
 let rec evc_update (upt : evclone -> evclone) (nm : symbol list) (evc : evclone) =
   match nm with
@@ -103,7 +116,7 @@ let find_mc =
     let test = function
       | CTh_theory (x, (sub, _)) when x = nm -> Some sub.cth_struct
       | _ -> None
-    in List.opick test cth
+    in List.opick (fun item -> test item.cti_item) cth
   in
 
   let rec doit nm cth =
@@ -118,35 +131,35 @@ let find_type cth (nm, x) =
   let test = function
     | CTh_type (xty, ty) when xty = x -> Some ty
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.opick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick (fun item -> test item.cti_item))
 
 (* -------------------------------------------------------------------- *)
 let find_theory cth (nm, x) =
   let test = function
     | CTh_theory (xth, th) when xth = x -> Some th
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.opick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick (fun item -> test item.cti_item))
 
 (* -------------------------------------------------------------------- *)
 let find_op cth (nm, x) =
   let test = function
     | CTh_operator (xop, op) when xop = x && EcDecl.is_oper op -> Some op
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.opick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick (fun item -> test item.cti_item))
 
 (* -------------------------------------------------------------------- *)
 let find_pr cth (nm, x) =
   let test = function
     | CTh_operator (xpr, pr) when xpr = x && EcDecl.is_pred pr -> Some pr
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.opick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick (fun item -> test item.cti_item))
 
 (* -------------------------------------------------------------------- *)
 let find_ax cth (nm, x) =
   let test = function
     | CTh_axiom (xax, ax) when xax = x -> Some ax
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.opick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick (fun item -> test item.cti_item))
 
 (* -------------------------------------------------------------------- *)
 let find_nt cth (nm, x) =
@@ -154,7 +167,23 @@ let find_nt cth (nm, x) =
     | CTh_operator (xop, op) when xop = x && EcDecl.is_abbrev op ->
        Some op
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.opick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick (fun item -> test item.cti_item))
+
+(* -------------------------------------------------------------------- *)
+let find_modexpr cth (nm, x) =
+  let test = function
+    | CTh_module me when me.me_name = x ->
+       Some me
+    | _ -> None
+  in find_mc cth.cth_struct nm |> obind (List.opick (fun item -> test item.cti_item))
+
+(* -------------------------------------------------------------------- *)
+let find_modtype cth (nm, x) =
+  let test = function
+    | CTh_modtype (mtx, mt) when mtx = x ->
+       Some mt
+    | _ -> None
+  in find_mc cth.cth_struct nm |> obind (List.opick (fun item -> test item.cti_item))
 
 (* -------------------------------------------------------------------- *)
 type clone = {
@@ -213,36 +242,34 @@ type octxt = {
 module OVRD : sig
   type state = theory_cloning_proof list * evclone
 
-  type 'a ovrd =
-    cancrt:bool -> octxt -> state -> pqsymbol -> 'a -> state
+  type 'a ovrd = octxt -> state -> pqsymbol -> 'a -> state
 
   val ty_ovrd : ty_override ovrd
   val op_ovrd : op_override ovrd
   val pr_ovrd : pr_override ovrd
   val th_ovrd : th_override ovrd
 
-  val ovrd :
-       ?cancrt:bool -> octxt -> state -> pqsymbol
-    -> theory_override -> state
+  val ovrd : octxt -> state -> pqsymbol -> theory_override -> state
 end = struct
   type state = theory_cloning_proof list * evclone
 
-  type 'a ovrd =
-    cancrt:bool -> octxt -> state -> pqsymbol -> 'a -> state
+  type 'a ovrd = octxt -> state -> pqsymbol -> 'a -> state
 
   (* ------------------------------------------------------------------ *)
-  let ty_ovrd ~cancrt oc ((proofs, evc) : state) name (tyd : ty_override) =
-    let (tyargs, _, _) = tyd in
+  let ty_ovrd oc ((proofs, evc) : state) name (tyd : ty_override) =
+    let ntyargs =
+      match fst tyd with
+      | `BySyntax (tyargs, _) -> List.length tyargs
+      | `ByPath p -> List.length (EcEnv.Ty.by_path p oc.oc_env).tyd_params in
+
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
     let () =
       match find_type oc.oc_oth name with
       | None ->
          clone_error oc.oc_env (CE_UnkOverride (OVK_Type, name));
-      | Some { EcDecl.tyd_type = `Concrete _ } when not cancrt ->
-         clone_error oc.oc_env (CE_CrtOverride (OVK_Type, name))
       | Some refty ->
-         if List.length refty.tyd_params <> List.length tyargs then
+         if List.length refty.tyd_params <> ntyargs then
            clone_error oc.oc_env (CE_TypeArgMism (OVK_Type, name)) in
 
     let evc =
@@ -256,18 +283,11 @@ end = struct
     in (proofs, evc)
 
   (* ------------------------------------------------------------------ *)
-  let op_ovrd ~cancrt oc ((proofs, evc) : state) name (opd : op_override) =
+  let op_ovrd oc ((proofs, evc) : state) name (opd : op_override) =
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
-    let (_ : bool) = cancrt in
 
-    let () =
-      match find_op oc.oc_oth name with
-      | None
-      | Some { op_kind = OB_pred _ } ->
-         clone_error oc.oc_env (CE_UnkOverride (OVK_Operator, name));
-      | Some { op_kind = OB_oper (Some _) } ->
-         (* FIXME: check convertibility *) ()
-      | _ -> () in
+    if find_op oc.oc_oth name = None then
+      clone_error oc.oc_env (CE_UnkOverride (OVK_Operator, name));
 
     let evc =
       evc_update
@@ -280,17 +300,11 @@ end = struct
     in (proofs, evc)
 
   (* ------------------------------------------------------------------ *)
-  let pr_ovrd ~cancrt oc ((proofs, evc) : state) name (prd : pr_override) =
+  let pr_ovrd oc ((proofs, evc) : state) name (prd : pr_override) =
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
-    let () =
-      match find_pr oc.oc_oth name with
-      | None
-      | Some { op_kind = OB_oper _ } ->
-         clone_error oc.oc_env (CE_UnkOverride (OVK_Predicate, name));
-      | Some { op_kind = OB_pred (Some _) } when not cancrt ->
-         clone_error oc.oc_env (CE_CrtOverride (OVK_Predicate, name));
-      | _ -> () in
+    if find_pr oc.oc_oth name = None then
+      clone_error oc.oc_env (CE_UnkOverride (OVK_Predicate, name));
 
     let evc =
       evc_update
@@ -303,9 +317,76 @@ end = struct
     in (proofs, evc)
 
   (* ------------------------------------------------------------------ *)
-  let th_ovrd ~cancrt oc ((proofs, evc) : state) name (thd : th_override) =
+  let nt_ovrd oc ((proofs, evc) : state) name (ntd : nt_override) =
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
-    let (_ : bool) = cancrt in
+
+    if find_nt oc.oc_oth name = None then
+      clone_error oc.oc_env (CE_UnkOverride (OVK_Abbrev, name));
+
+    let evc =
+      evc_update
+        (fun evc ->
+         if Msym.mem x evc.evc_abbrevs then
+           clone_error oc.oc_env (CE_DupOverride (OVK_Abbrev, name));
+         { evc with evc_abbrevs = Msym.add x (mk_loc lc ntd) evc.evc_abbrevs })
+        nm evc
+
+    in (proofs, evc)
+
+  (* ------------------------------------------------------------------ *)
+  let ax_ovrd _oc ((proofs, evc) : state) name ((axd, mode) : ax_override) =
+    let loc = axd.pl_loc in
+    let tc = FPNamed (axd, None) in
+    let tc = { fp_mode = `Explicit; fp_head = tc; fp_args = []; } in
+    let tc = Papply (`Apply ([tc], `Exact), None) in
+    let tc = mk_loc loc (Plogic tc) in
+    let pr = { pthp_mode   = `Named (name, mode);
+               pthp_tactic = Some tc; } in
+    (pr :: proofs, evc)
+
+  (* ------------------------------------------------------------------ *)
+  let modexpr_ovrd oc ((proofs, evc) : state) name (med : me_override) =
+    let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
+
+    let () =
+      match find_modexpr oc.oc_oth name with
+      | None ->
+         clone_error oc.oc_env (CE_UnkOverride (OVK_ModExpr, name));
+      | _ -> () in
+
+    let evc =
+      evc_update
+        (fun evc ->
+         if Msym.mem x evc.evc_modexprs then
+           clone_error oc.oc_env (CE_DupOverride (OVK_ModExpr, name));
+         { evc with evc_modexprs = Msym.add x (mk_loc lc med) evc.evc_modexprs })
+        nm evc
+
+    in (proofs, evc)
+
+  (* ------------------------------------------------------------------ *)
+  let modtype_ovrd oc ((proofs, evc) : state) name (mtd : mt_override) =
+    let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
+
+    let () =
+      match find_modtype oc.oc_oth name with
+      | None ->
+         clone_error oc.oc_env (CE_UnkOverride (OVK_ModType, name));
+      | _ -> () in
+
+    let evc =
+      evc_update
+        (fun evc ->
+         if Msym.mem x evc.evc_modtypes then
+           clone_error oc.oc_env (CE_DupOverride (OVK_ModType, name));
+         { evc with evc_modtypes = Msym.add x (mk_loc lc mtd) evc.evc_modtypes })
+        nm evc
+
+    in (proofs, evc)
+
+  (* ------------------------------------------------------------------ *)
+  let th_ovrd oc ((proofs, evc) : state) name ((thd, mode) : th_override) =
+    let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
     let loced x = mk_loc lc x in
 
@@ -322,67 +403,35 @@ end = struct
       | Some (sp, _) -> sp
     in
 
-    let thd = let thd = EcPath.toqsymbol sp in (fst thd @ [snd thd]) in
+    let thd  = let thd = EcPath.toqsymbol sp in (fst thd @ [snd thd]) in
     let xdth = nm @ [x] in
 
-    let rec doit prefix (proofs, evc) dth =
+    let rec doit_r prefix (proofs, evc) dth =
       match dth with
-      | CTh_type (x, otyd) ->
-         let params = List.map (EcIdent.name |- fst) otyd.tyd_params in
-         let params = List.map (mk_loc lc) params in
-         let tyd    =
-           match List.map (fun a -> loced (PTvar a)) params with
-           | [] -> PTnamed (loced (thd @ prefix, x))
-           | pt -> PTapp   (loced (thd @ prefix, x), pt)
-         in
-         let ovrd = (params, loced tyd, `Inline) in
-         ty_ovrd ~cancrt:true oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
+      | CTh_type (x, _) ->
+         let ovrd = `ByPath (EcPath.fromqsymbol (thd @ prefix, x)) in
+         let ovrd = (ovrd, mode) in
+         ty_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
 
-      | CTh_operator (x, ({ op_kind = OB_oper _ } as oopd)) ->
-         let params = List.map (EcIdent.name |- fst) oopd.op_tparams in
-         let params = List.map (mk_loc lc) params in
-         let ovrd   = {
-             opov_nosmt = false;  (* because inline mode *)
-             opov_tyvars = Some params;
-             opov_args   = [];
-             opov_retty  = loced PTunivar;
-             opov_body   =
-               let sym = loced (thd @ prefix, x) in
-               let tya = List.map (fun a -> loced (PTvar a)) params in
-               loced (PEident (sym, Some (loced (TVIunamed tya))));
-           } in
-         let ovrd = (ovrd, `Inline) in
-         op_ovrd ~cancrt:true oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
+      | CTh_operator (x, ({ op_kind = OB_oper _ })) ->
+         let ovrd = `ByPath (EcPath.fromqsymbol (thd @ prefix, x)) in
+         let ovrd = (ovrd, mode) in
+         op_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
 
-      | CTh_operator (x, ({ op_kind = OB_pred _ } as oprd)) ->
-         let params = List.map (EcIdent.name |- fst) oprd.op_tparams in
-         let params = List.map (mk_loc lc) params in
-         let ovrd   = {
-             prov_tyvars = Some params;
-             prov_args   = [];
-             prov_body   =
-               let sym = loced (thd @ prefix, x) in
-               let tya = List.map (fun a -> loced (PTvar a)) params in
-               loced (PFident (sym, Some (loced (TVIunamed tya))));
-           } in
-         let ovrd = (ovrd, `Inline) in
-         pr_ovrd ~cancrt:true oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
+      | CTh_operator (x, ({ op_kind = OB_pred _ })) ->
+         let ovrd = `ByPath (EcPath.fromqsymbol (thd @ prefix, x)) in
+         let ovrd = (ovrd, mode) in
+         pr_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
 
-      | CTh_axiom (x, ax) ->
-         if is_axiom ax.ax_kind then
-           let params = List.map (EcIdent.name |- fst) ax.ax_tparams in
-           let params = List.map (mk_loc lc) params in
-           let params = List.map (fun a -> loced (PTvar a)) params in
+      | CTh_operator (x, {op_kind=OB_nott _; _ }) ->
+         let ovrd = EcPath.fromqsymbol (thd @ prefix, x) in
+         let ovrd = (ovrd, mode) in
+         nt_ovrd oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
 
-           let tc = FPNamed (loced (thd @ prefix, x),
-                             Some (loced (TVIunamed params))) in
-           let tc = { fp_mode = `Explicit; fp_head = tc; fp_args = []; } in
-           let tc = Papply (`Apply ([tc], `Exact), None) in
-           let tc = loced (Plogic tc) in
-           let pr = { pthp_mode   = `Named (loced (xdth @ prefix, x));
-                      pthp_tactic = Some tc }
-           in (pr :: proofs, evc)
-         else (proofs, evc)
+      | CTh_axiom (x, _) ->
+        let axd = loced (thd @ prefix, x) in
+        let name = (loced (xdth @ prefix, x)) in
+        ax_ovrd oc (proofs, evc) name  (axd, mode)
 
       | CTh_theory (x, (dth, `Concrete)) ->
          List.fold_left (doit (prefix @ [x])) (proofs, evc) dth.cth_struct
@@ -390,24 +439,56 @@ end = struct
       | CTh_export _ ->
          (proofs, evc)
 
-      | _ -> clone_error oc.oc_env (CE_CrtOverride (OVK_Theory, name))
+      | CTh_module m ->
+         modexpr_ovrd
+           oc (proofs, evc) (loced (xdth @ prefix, m.me_name))
+           (loced (thd @ prefix, m.me_name), mode)
+
+      | CTh_modtype (x, _) ->
+         modtype_ovrd
+           oc (proofs, evc) (loced (xdth @ prefix, x))
+           (loced (thd @ prefix, x), mode)
+
+
+      | CTh_theory (_, (_, `Abstract)) ->
+          (proofs, evc)
+
+      | CTh_instance (_, _) -> (proofs, evc)
+      | CTh_typeclass _     -> (proofs, evc)
+
+      | CTh_baserw _     -> (proofs, evc)
+      | CTh_addrw  _     -> (proofs, evc)
+      | CTh_reduction _  -> (proofs, evc)
+      | CTh_auto _       -> (proofs, evc)
+
+    and doit prefix (proofs, evc) dth =
+      doit_r prefix (proofs, evc) dth.cti_item
 
     in List.fold_left (doit []) (proofs, evc) dth.cth_struct
 
   (* ------------------------------------------------------------------ *)
-  let ovrd ?(cancrt = false) oc state name (ovrd : theory_override) =
+  let ovrd oc state name (ovrd : theory_override) =
      match ovrd with
      | PTHO_Type tyd ->
-        ty_ovrd ~cancrt oc state name tyd
+        ty_ovrd oc state name tyd
 
      | PTHO_Op opd ->
-        op_ovrd ~cancrt oc state name opd
+        op_ovrd oc state name opd
 
      | PTHO_Pred prd ->
-        pr_ovrd ~cancrt oc state name prd
+        pr_ovrd oc state name prd
+
+     | PTHO_Axiom axd ->
+        ax_ovrd oc state name axd
+
+     | PTHO_Module med ->
+       modexpr_ovrd oc state name med
+
+     | PTHO_ModTyp mtd ->
+       modtype_ovrd oc state name mtd
 
      | PTHO_Theory thd ->
-        th_ovrd ~cancrt oc state name thd
+        th_ovrd oc state name thd
 end
 
 (* -------------------------------------------------------------------- *)
@@ -481,19 +562,14 @@ end = struct
     | None ->
         clone_error oc.oc_env (CE_UnkOverride (OVK_Lemma, name))
 
-    | Some ax ->
-        if not (is_axiom ax.ax_kind) then
-          clone_error oc.oc_env (CE_CrtOverride (OVK_Lemma, name));
-
+    | Some _ ->
         let update1 evc =
-          match Msym.find_opt (snd name) evc.evc_lemmas.ev_bynames with
-          | Some (Some _) ->
-              clone_error oc.oc_env (CE_DupOverride (OVK_Lemma, name))
-          | _ ->
-              let map = evc.evc_lemmas.ev_bynames in
-              let map = Msym.add (snd name) tactics map in
-              let evl = { evc.evc_lemmas with ev_bynames = map } in
-                { evc with evc_lemmas = evl }
+          if Msym.mem (snd name) evc.evc_lemmas.ev_bynames then
+              clone_error oc.oc_env (CE_DupOverride (OVK_Lemma, name));
+          let map = evc.evc_lemmas.ev_bynames in
+          let map = Msym.add (snd name) tactics map in
+          let evl = { evc.evc_lemmas with ev_bynames = map } in
+          { evc with evc_lemmas = evl }
         in
           evc_update update1 (fst name) evc
 
@@ -501,8 +577,8 @@ end = struct
     match prf.pthp_mode with
     | `All (name, tags) ->
          all_proof oc evc (name, tags, prf.pthp_tactic)
-    | `Named name ->
-         name_proof oc evc (name, prf.pthp_tactic)
+    | `Named (name, hide) ->
+         name_proof oc evc (name, (prf.pthp_tactic, hide))
 end
 
 (* -------------------------------------------------------------------- *)
@@ -518,7 +594,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
   let (genproofs, ovrds) =
     List.fold_left
-      (fun st -> curry (OVRD.ovrd ~cancrt:false oc st))
+      (fun st -> curry (OVRD.ovrd oc st))
       ([], evc_empty) thcl.pthc_ext
   in
 

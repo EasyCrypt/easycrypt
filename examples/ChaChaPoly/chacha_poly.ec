@@ -88,8 +88,7 @@ theory C.
 
   clone FinType with 
     type t  = counter,
-    op enum = List.map ofint (iota_ 0 (max_counter + 1)),
-    op card = max_counter
+    op enum = List.map ofint (iota_ 0 (max_counter + 1))
     proof *.
   realize enum_spec.  
   proof.
