@@ -84,7 +84,6 @@ let ty_compatible env ue (rtyvars, rty) (ntyvars, nty) =
 let error_body exn b = if not b then raise exn
 
 (* -------------------------------------------------------------------- *)
-
 let constr_compatible exn env cs1 cs2 =
   error_body exn (List.length cs1 = List.length cs2);
   let doit (s1,tys1) (s2,tys2) =
@@ -836,6 +835,9 @@ and replay_auto
   (ove : _ ovrenv) (subst, ops, proofs, scope) (lc, lvl, base, ps)
 =
   let ps = List.map (EcSubst.subst_path subst) ps in
+  let ps = List.filter (fun p ->
+      Option.is_some (EcEnv.Ax.by_path_opt p (ove.ovre_hooks.henv scope))
+    ) ps in
   let scope = ove.ovre_hooks.hauto scope (lc, lvl, base, ps) in
   (subst, ops, proofs, scope)
 
