@@ -39,7 +39,7 @@ let check_concrete pf env f =
     tc_error_lazy pf (fun fmt ->
       let ppe = EcPrinting.PPEnv.ofenv env in
       Format.fprintf fmt
-        "The function %a is abstract, it should be concrete"
+        "The function %a is abstract. Provide an invariant to the [proc] tactic"
         (EcPrinting.pp_funname ppe) f)
 
 (* -------------------------------------------------------------------- *)
