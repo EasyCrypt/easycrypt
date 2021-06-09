@@ -553,17 +553,17 @@ lemma eq_filter p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => filter p1 s = filter p2 s.
 proof. by move=> h; apply: eq_filter_in=> ? _; apply/h. qed.
 
-lemma eq_count_in p1 p2 (s : 'a list):
+lemma eq_in_count p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => count p1 s = count p2 s.
 proof. by move=> h; rewrite -!size_filter (eq_filter_in _ p2). qed.
 
 lemma eq_count p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => count p1 s = count p2 s.
-proof. by move=> h; apply/eq_count_in=> ? _; apply/h. qed.
+proof. by move=> h; apply/eq_in_count=> ? _; apply/h. qed.
 
 lemma count_pred0_eq_in p (s : 'a list) :
   (forall x, x \in s => !p x) => count p s = 0.
-proof. by move=> eq; rewrite -(count_pred0 s) &(eq_count_in). qed.
+proof. by move=> eq; rewrite -(count_pred0 s) &(eq_in_count). qed.
 
 lemma count_pred0_eq p (s : 'a list):
   (forall x, ! p x) => count p s = 0.
@@ -571,7 +571,7 @@ proof. by move=> eq; apply/count_pred0_eq_in => x ?; apply/eq. qed.
 
 lemma count_predT_eq_in p (s : 'a list):
   (forall x, x \in s => p x) => count p s = size s.
-proof. by move=> eq; rewrite -(count_predT s) &(eq_count_in). qed.
+proof. by move=> eq; rewrite -(count_predT s) &(eq_in_count). qed.
 
 lemma count_predT_eq p (s : 'a list):
   (forall x, p x) => count p s = size s.
@@ -579,7 +579,7 @@ proof. by move=> eq; apply/count_predT_eq_in => x ?; apply/eq. qed.
 
 lemma eq_has_in p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => has p1 s <=> has p2 s.
-proof. by move=> h; rewrite !has_count (eq_count_in _ p2). qed.
+proof. by move=> h; rewrite !has_count (eq_in_count _ p2). qed.
 
 lemma eq_has p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => has p1 s <=> has p2 s.
@@ -587,7 +587,7 @@ proof. by move=> h; apply/eq_has_in=> ? _; apply/h. qed.
 
 lemma eq_all_in p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => all p1 s <=> all p2 s.
-proof. by move=> h; rewrite !all_count (eq_count_in _ p2). qed.
+proof. by move=> h; rewrite !all_count (eq_in_count _ p2). qed.
 
 lemma eq_all p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => all p1 s <=> all p2 s.
@@ -2161,10 +2161,6 @@ proof. by move=> Ps; rewrite (@eq_in_filter P predT) ?filter_predT. qed.
 lemma eq_in_filter_pred0 (P : 'a -> bool) s:
   (forall x, mem s x => !P x) => filter P s = [].
 proof. by move=> Ps; rewrite (@eq_in_filter P pred0) ?filter_pred0. qed.
-
-lemma eq_in_count (p1 p2 : 'a -> bool) (s : 'a list):
-  (forall x, mem s x => p1 x <=> p2 x) => count p1 s = count p2 s.
-proof. by move=> h; rewrite -!size_filter (eq_in_filter _ p2). qed.
 
 lemma eq_in_has (p1 p2 : 'a -> bool) (s : 'a list):
   (forall x, mem s x => p1 x <=> p2 x) => has p1 s <=> has p2 s.
