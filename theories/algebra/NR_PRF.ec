@@ -1,64 +1,111 @@
 (* NR-PRF *)
-require import Int List SmtMap.
+require import Int Real List SmtMap Distr.
 require (*--*) GroupAction PRF.
-(*---*) import GroupAction.EGA SmtMap.Map.
 
-print Map.
+clone import GroupAction.EGA as Ega.
 
-clone GroupAction.EGA as Ega.
+op dR : { set distr | is_lossless dR } as dR_ll.
 
-(*
-clone include PRF with
-  type D <- bool, (* Only one bit for the moment but should be an l-bit word *) 
-  type R <- Ega.set.
+type K = group * group.
+type D = bool.
+type R = set.
 
-clone include RF.
-clone PseudoRF as Prf with
-  type K <- Ega.group * Ega.group,
-  op F <- (fun (g : Ega.group * Ega.group) (b : bool) =>
-    b ? Ega.act (Ega.( * ) (g .` 1) (g .` 2)) Ega.x0 : Ega.act (g .` 1) Ega.x0).
-*)
+clone import PRF as PRF_t with
+  type D <- D, (* Only one bit for the moment but should be an l-bit word *) 
+  type R <- R.
+
+clone import RF with
+  op dR <- fun _=> dR
+proof
+  dR_ll by (move=> _; exact: dR_ll).
+
+op F (k : K) (m : D) =
+  if   m
+  then act (k.`1 * k.`2) x0
+  else act k.`1 x0.
+
+clone import PseudoRF as Prf with
+  type K  <- K,
+    op F  <- F,
+    op dK <- sample `*` sample
+proof *.
+realize dK_ll.
+apply: dprod_ll.
+admit.
+qed.
 
 (* Lemma 4.21 *)
 (* Start by just considering the case when l = 1, here we will just have two games for an adversary to distinguish *)
 
 (* This adversary attempts to distinguish between the following two games *)
-module type Adversary1 = {
-    proc make_query () : bool
-    proc give_response (x : Ega.set) : unit
-    proc make_guess () : bool
+module type WPR_Oracles = {
+    proc doit(_ : D): R
+}.
+
+module type Adversary1 (O : WPR_Oracles) = {
+    proc distinguish() : bool
 }.
 
 (* Real PRF *)
 module Hybrid0 (A : Adversary1) = {
-    proc main (Q : int) : bool = {
-        var g0, g1 : Ega.group;
-        var q : int;
-        var s, b : bool;
-        var yq : Ega.set;
+    var g0, g1 : Ega.group
+
+    module O = {
+        proc doit(x) = {
+            var yq;
+
+            yq <- act g0 x0;
+            if (x) {
+                yq <- act g1 yq;
+            }
+          return yq;
+        }
+    }
+
+    proc main () : bool = {
+        var b : bool;
 
         (* Sample the key *)
-        g0 <$ Ega.sample;
-        g1 <$ Ega.sample;
+        g0 <$ sample;
+        g1 <$ sample;
 
         (* Allow the adversary to make Q adaptive queries *)
-        q <- 0;
-        while (q <= Q) {
-            s <@ A.make_query();
-
-            yq <- Ega.act g0 Ega.x0;
-            if (s) {
-                yq <- Ega.act g1 yq;
-            }
-
-            A.give_response(yq);
-            
-            q <- q + 1;
-        }
-        b <@ A.make_guess();
+        b <@ A(O).distinguish();
         return b;
     }
 }.
+
+module (D (A : Adversary1) : Distinguisher) (F : PRF_Oracles) = {
+  module O = {
+    proc doit = F.f
+  }
+
+  proc distinguish() = {
+    var b;
+
+    b <@ A(O).distinguish();
+    return b;
+  }
+}.
+
+(** |Pr[IND(PRF, D(A)).main() @ &m: res] - Pr[IND(RF, D(A)).main() @ &m: res]|
+    <= Advantage of A against something we think is hard **)
+
+lemma Hybrid0_INDPRF_eq (A <: Adversary1 {Hybrid0, PRF} ) &m:
+  Pr[IND(PRF, D(A)).main() @ &m: res] = Pr[Hybrid0(A).main() @ &m: res].
+proof.
+byequiv=> //.
+proc.
+inline *.
+seq  1  2: (={glob A} /\ PRF.k{1} = (Hybrid0.g0,Hybrid0.g1){2}).
++ admit. (** DProd sampling **)
+wp.
+call (: PRF.k{1} = (Hybrid0.g0,Hybrid0.g1){2}).
++ proc; wp; skip=> />.
+  move=> &2 _ @/F /=.
+  admit. (** We need a commutative group action **)
+by skip.
+qed.
 
 (* Ideal Randomness *)
 module Hybrid1 (A : Adversary1) = {
