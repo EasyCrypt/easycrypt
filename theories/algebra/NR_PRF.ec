@@ -75,29 +75,29 @@ module Hybrid0 (A : Adversary1) = {
     }
 }.
 
-module (D (A : Adversary1) : Distinguisher) (F : PRF_Oracles) = {
+module (A (D : Distinguisher) : Adversary1) (F : WPR_Oracles) = {
   module O = {
-    proc doit = F.f
+    proc f = F.doit
   }
 
   proc distinguish() = {
     var b;
 
-    b <@ A(O).distinguish();
+    b <@ D(O).distinguish();
     return b;
   }
 }.
 
-(** |Pr[IND(PRF, D(A)).main() @ &m: res] - Pr[IND(RF, D(A)).main() @ &m: res]|
-    <= Advantage of A against something we think is hard **)
+(** |Pr[IND(PRF, D).main() @ &m: res] - Pr[IND(RF, D).main() @ &m: res]|
+    <= Advantage of A(D) against something we think is hard **)
 
-lemma Hybrid0_INDPRF_eq (A <: Adversary1 {Hybrid0, PRF} ) &m:
-  Pr[IND(PRF, D(A)).main() @ &m: res] = Pr[Hybrid0(A).main() @ &m: res].
+lemma Hybrid0_INDPRF_eq (D <: Distinguisher {Hybrid0, PRF} ) &m:
+  Pr[IND(PRF, D).main() @ &m: res] = Pr[Hybrid0(A(D)).main() @ &m: res].
 proof.
 byequiv=> //.
 proc.
 inline *.
-seq  1  2: (={glob A} /\ PRF.k{1} = (Hybrid0.g0,Hybrid0.g1){2}).
+seq  1  2: (={glob D} /\ PRF.k{1} = (Hybrid0.g0,Hybrid0.g1){2}).
 + admit. (** DProd sampling **)
 wp.
 call (: PRF.k{1} = (Hybrid0.g0,Hybrid0.g1){2}).
