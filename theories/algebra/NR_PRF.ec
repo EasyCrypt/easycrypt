@@ -11,23 +11,23 @@ type D = bool.
 type R = set.
 
 clone import PRF as PRF_t with
-  type D <- D, (* Only one bit for the moment but should be an l-bit word *) 
-  type R <- R.
-
+    type D <- D, (* Only one bit for the moment but should be an l-bit word *) 
+    type R <- R.
+    
 clone import RF with
-  op dR <- fun _=> dR
+    op dR <- fun _=> dR
 proof
-  dR_ll by (move=> _; exact: dR_ll).
+    dR_ll by (move=> _; exact: dR_ll).
 
 op F (k : K) (m : D) =
-  if   m
-  then act (k.`1 * k.`2) x0
-  else act k.`1 x0.
+    if   m
+    then act (k.`1 * k.`2) x0
+    else act k.`1 x0.
 
 clone import PseudoRF as Prf with
-  type K  <- K,
-    op F  <- F,
-    op dK <- sample `*` sample
+    type K  <- K,
+      op F  <- F,
+      op dK <- sample `*` sample
 proof *.
 realize dK_ll.
 apply: dprod_ll.
@@ -58,7 +58,7 @@ module Hybrid0 (A : Adversary1) = {
             if (x) {
                 yq <- act g1 yq;
             }
-          return yq;
+            return yq;
         }
     }
 
@@ -76,23 +76,23 @@ module Hybrid0 (A : Adversary1) = {
 }.
 
 module (A (D : Distinguisher) : Adversary1) (F : WPR_Oracles) = {
-  module O = {
-    proc f = F.doit
-  }
+    module O = {
+        proc f = F.doit
+    }
 
-  proc distinguish() = {
-    var b;
+    proc distinguish() = {
+        var b;
 
-    b <@ D(O).distinguish();
-    return b;
-  }
+        b <@ D(O).distinguish();
+        return b;
+    }
 }.
 
 (** |Pr[IND(PRF, D).main() @ &m: res] - Pr[IND(RF, D).main() @ &m: res]|
     <= Advantage of A(D) against something we think is hard **)
 
 lemma Hybrid0_INDPRF_eq (D <: Distinguisher {Hybrid0, PRF} ) &m:
-  Pr[IND(PRF, D).main() @ &m: res] = Pr[Hybrid0(A(D)).main() @ &m: res].
+    Pr[IND(PRF, D).main() @ &m: res] = Pr[Hybrid0(A(D)).main() @ &m: res].
 proof.
 byequiv=> //.
 proc.
@@ -110,36 +110,64 @@ qed.
 (* Ideal Randomness *)
 module Hybrid1 (A : Adversary1) = {
     (* Keep track of previous input output pairs *) 
-    var queries : (bool, Ega.set) fmap
+    var queries : (D, R) fmap
 
-    proc main (Q : int) : bool = {
-        var gq : Ega.group;
-        var q : int;
-        var s, b : bool;
-        var yq : Ega.set;
-
-        (* Allow the adversary to make Q adaptive queries *)
-        q <- 0;
-        while (q <= Q) {
-            s <@ A.make_query();
-
-            if (s \notin queries) {
-                gq <$ Ega.sample;
-                yq <- Ega.act gq Ega.x0;
-                queries.[s] <- yq;
-            } else {
-                yq <- oget queries.[s];
-            }
-
-            A.give_response(yq);
+    module O = {
+        proc doit(x) = {
+            var gq, yq;
             
-            q <- q + 1;
+            if (x \notin queries) {
+                gq <$ sample;
+                yq <- act gq x0;
+                queries.[x] <- yq;
+            } else {
+                yq <- oget queries.[x];
+            }
+            return yq;
         }
+    }
 
-        b <@ A.make_guess();
+    proc main () : bool = {
+        var b : bool;
+        queries <- empty;
+        b <@ A(O).distinguish();
         return b;
     }
 }.
+
+lemma Hybrid1_INDRF_eq (D <: Distinguisher {Hybrid1, RF} ) &m:
+    Pr[IND(RF, D).main() @ &m: res] = Pr[Hybrid1(A(D)).main() @ &m: res].
+proof.
+byequiv=> //.
+proc.
+inline *.
+wp.
+sp.
+call (: RF.m{1} = Hybrid1.queries{2}). (* Assume that the maps are equivalently distributed *)
+proc.
+if.
+move=> &1 &2.
+case=> h1 h2.
+by subst.
+seq 1 2 : (={x} /\ RF.m{1} = Hybrid1.queries{2} /\ r{1} = yq{2}).
+wp.
+admit. (* Need to prove x <$ set = g <$ group, x <- act g x0 *)
+(* This relies on act being a regular group action *)
+wp.
+skip.
+move=> &1 &2.
+case=> eq1.
+case=> eq2 eq3.
+simplify.
+subst.
+split.
+rewrite get_set_sameE.
+by rewrite oget_some.
+trivial.
+wp.
+by skip.
+by skip.
+qed.
 
 (* Lemma 4.20 *)
 module type Adversary2 = {
