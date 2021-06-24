@@ -90,6 +90,10 @@ module (A (D : Distinguisher) : Adversary1) (F : WPR_Oracles) = {
 
 (** |Pr[IND(PRF, D).main() @ &m: res] - Pr[IND(RF, D).main() @ &m: res]|
     <= Advantage of A(D) against something we think is hard **)
+require (*--*) DProd.
+clone DProd.ProdSampling with
+  type t1 <- group,
+  type t2 <- group.
 
 lemma Hybrid0_INDPRF_eq (D <: Distinguisher {Hybrid0, PRF} ) &m:
     Pr[IND(PRF, D).main() @ &m: res] = Pr[Hybrid0(A(D)).main() @ &m: res].
@@ -98,7 +102,18 @@ byequiv=> //.
 proc.
 inline *.
 seq  1  2: (={glob D} /\ PRF.k{1} = (Hybrid0.g0,Hybrid0.g1){2}).
-+ admit. (** DProd sampling **)
++ conseq />.
++ transitivity {1} (** Which memory should the piece of code operate in? **)
+               { PRF.k <@ ProdSampling.S.sample(sample, sample); } (** Which piece of code? **)
+               (true ==> ={PRF.k}) (** Left-to-step similarity **)
+               (true ==> PRF.k{1} = (Hybrid0.g0, Hybrid0.g1){2}) (** Step-to-right similarity **)=> //.
+  + by inline {2} 1; auto.
+  transitivity {2}
+               { (Hybrid0.g0, Hybrid0.g1) <@ ProdSampling.S.sample2(sample, sample); }
+               ( true ==> PRF.k{1} = (Hybrid0.g0, Hybrid0.g1){2})
+               (true ==> ={Hybrid0.g0, Hybrid0.g1})=> //.
+  + by call ProdSampling.sample_sample2; auto=> /> [].
+  by inline {1} 1; auto.
 wp.
 call (: PRF.k{1} = (Hybrid0.g0,Hybrid0.g1){2}).
 + proc; wp; skip=> />.
