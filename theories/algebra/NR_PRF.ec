@@ -4,14 +4,16 @@ require (*--*) GroupAction PRF.
 
 clone import GroupAction.EGA as Ega.
 
+(* Could be MUniform here *)
 op dR : { set distr | is_lossless dR } as dR_ll.
 
+(* Setup keyspace, domain, and range *)
 type K = group * group.
-type D = bool.
+type D = bool. (* Only one bit for the moment but will be an l-bit word *) 
 type R = set.
 
 clone import PRF as PRF_t with
-    type D <- D, (* Only one bit for the moment but should be an l-bit word *) 
+    type D <- D, 
     type R <- R.
     
 clone import RF with
@@ -31,7 +33,7 @@ clone import PseudoRF as Prf with
 proof *.
 realize dK_ll.
 apply: dprod_ll.
-admit.
+admit. (* Sample needs to be lossless *)
 qed.
 
 (* Lemma 4.21 *)
@@ -51,11 +53,11 @@ module Hybrid0 (A : Adversary1) = {
     var g0, g1 : Ega.group
 
     module O = {
-        proc doit(x) = {
+        proc doit(s) = {
             var yq;
 
             yq <- act g0 x0;
-            if (x) {
+            if (s) {
                 yq <- act g1 yq;
             }
             return yq;
@@ -96,7 +98,7 @@ clone DProd.ProdSampling with
   type t2 <- group.
 
 lemma Hybrid0_INDPRF_eq (D <: Distinguisher {Hybrid0, PRF} ) &m:
-    Pr[IND(PRF, D).main() @ &m: res] = Pr[Hybrid0(A(D)).main() @ &m: res].
+  Pr[IND(PRF, D).main() @ &m: res] = Pr[Hybrid0(A(D)).main() @ &m: res].
 proof.
 byequiv=> //.
 proc.
@@ -128,15 +130,15 @@ module Hybrid1 (A : Adversary1) = {
     var queries : (D, R) fmap
 
     module O = {
-        proc doit(x) = {
+        proc doit(s) = {
             var gq, yq;
             
-            if (x \notin queries) {
+            if (s \notin queries) {
                 gq <$ sample;
                 yq <- act gq x0;
-                queries.[x] <- yq;
+                queries.[s] <- yq;
             } else {
-                yq <- oget queries.[x];
+                yq <- oget queries.[s];
             }
             return yq;
         }
@@ -159,50 +161,64 @@ inline *.
 wp.
 sp.
 call (: RF.m{1} = Hybrid1.queries{2}). (* Assume that the maps are equivalently distributed *)
-proc.
-if.
-move=> &1 &2.
-case=> h1 h2.
-by subst.
-seq 1 2 : (={x} /\ RF.m{1} = Hybrid1.queries{2} /\ r{1} = yq{2}).
-wp.
-admit. (* Need to prove x <$ set = g <$ group, x <- act g x0 *)
-(* This relies on act being a regular group action *)
-wp.
-skip.
-move=> &1 &2.
-case=> eq1.
-case=> eq2 eq3.
-simplify.
-subst.
-split.
-rewrite get_set_sameE.
-by rewrite oget_some.
-trivial.
-wp.
-by skip.
++ proc.
+  if.
+  + move=> &1 &2.
+    case=> h1 h2.
+    by subst.
+  + seq 1 2 : (x{1} = s{2} /\ RF.m{1} = Hybrid1.queries{2} /\ r{1} = yq{2}).
+    + wp.
+      rnd (fun x => extract x0 x) (fun g => act g x0).
+      skip=> />.
+      move=> &2 _.
+      split.
+      + move=> g _.
+        admit. (* Assumes regularity *)
+      move=> _.
+      split.
+      + move=> g _.
+        (* sample MUniform, dR uniform, supports equal cardinality <== finite sizes *)
+        admit.
+      move=> _ r rin.
+      split.
+      + admit. (* Comes from MUniform *)
+      move=> _.
+      admit. (* Comes from Transitivity *)
+    wp.
+    skip.
+    move=> &1 &2.
+    case=> eq1.
+    case=> eq2 eq3.
+    simplify.
+    subst.
+    split.
+    + rewrite get_set_sameE.
+      trivial.
+    trivial.
+  wp.
+  by skip.
 by skip.
 qed.
 
 (* Lemma 4.20 *)
 module type Adversary2 = {
-    proc solve(x0 : Ega.set, ins : (Ega.set * Ega.set) list, Q : int) : bool
+    proc solve(x0 : set, ins : (set * set) list, Q : int) : bool
 }.
 
 module GameReal (A : Adversary2) = {
     proc main (Q : int) : bool = {
-        var gt : Ega.group;
+        var gt : group;
         var b : bool;
-        var ins : (Ega.set * Ega.set) list;
+        var ins : (set * set) list;
         
-        gt <$ Ega.sample;
+        gt <$ sample;
 
         (* FIXME: Get a nice way to sample a list of set tuples such that 
             (xq, Ega.act gt xq) : xq <- Ega.act gq Ega.x0, gq <$ Ega.sample, q \in Q]
         *)
 
         ins <- []; (*$ dmap (dlist n) (map (fun x => (x, Ega.act gt x)));*) 
-        b <@ A.solve(Ega.x0, ins, Q);
+        b <@ A.solve(x0, ins, Q);
         return b;
     }
 }.
@@ -210,26 +226,26 @@ module GameReal (A : Adversary2) = {
 module GameIdeal (A : Adversary2) = {
     proc main (Q : int) : bool = {
         var b : bool;
-        var ins : (Ega.set * Ega.set) list;
+        var ins : (set * set) list;
         
         (* FIXME: Get a nice way to sample a list of set tuples such that 
             (xq, Ega.act hq xq) : xq <- Ega.act gq Ega.x0, gq, hq <$ Ega.sample, q \in Q]
         *)
 
         ins <- []; (* dmap (dlist set_dist n) (map (fun x => (x, act gt x)));*) 
-        b <- A.solve(Ega.x0, ins, Q);
+        b <- A.solve(x0, ins, Q);
         return b;
     }
 }.
 
 
 module Adv (A : Adversary1) = {
-    var queries : (bool, (Ega.set * Ega.set)) fmap
+    var queries : (bool, (set * set)) fmap
   
-    proc solve(x0 : Ega.set, ins : (Ega.set * Ega.set) list, Q : int) = {
+    proc solve(x0 : set, ins : (set * set) list, Q : int) = {
         var cnt, q : int;
         var s, b : bool;
-        var xq, yq : Ega.set;
+        var xq, yq : set;
 
         cnt <- 1;
         q <- 1;
@@ -237,13 +253,11 @@ module Adv (A : Adversary1) = {
             s <@ A.make_query();
 
             if (s \notin queries) {
-                xq <- (oget (onth ins cnt)) .` 1;
-                yq <- (oget (onth ins cnt)) .` 2;
+                (xq, yq) <- (oget (onth ins cnt));
                 cnt <- cnt + 1;
                 queries.[s] <- (xq, yq);
             } else {
-                xq <- (oget queries.[s]) .` 1;
-                yq <- (oget queries.[s]) .` 2;
+                (xq, yq) <- (oget queries.[s]);
             }
             
             if (s) {
