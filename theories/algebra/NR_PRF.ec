@@ -2,10 +2,15 @@
 require import Int Real List SmtMap Distr.
 require (*--*) GroupAction PRF.
 
-clone import GroupAction.EGA as Ega.
+clone import GroupAction.ARegEGA as Ega.
 
+(*
 (* Could be MUniform here *)
 op dR : { set distr | is_lossless dR } as dR_ll.
+*)
+clone import MFinite as DR with
+    type t <- set.
+op dR = DR.dunifin.
 
 (* Setup keyspace, domain, and range *)
 type K = group * group.
@@ -19,7 +24,7 @@ clone import PRF as PRF_t with
 clone import RF with
     op dR <- fun _=> dR
 proof
-    dR_ll by (move=> _; exact: dR_ll).
+    dR_ll by (move=> _; exact: DR.dunifin_ll).
 
 op F (k : K) (m : D) =
     if   m
@@ -33,7 +38,10 @@ clone import PseudoRF as Prf with
 proof *.
 realize dK_ll.
 apply: dprod_ll.
-admit. (* Sample needs to be lossless *)
+search is_lossless.
+split.
++ exact DG.dunifin_ll.
+exact DG.dunifin_ll.
 qed.
 
 (* Lemma 4.21 *)
@@ -120,7 +128,8 @@ wp.
 call (: PRF.k{1} = (Hybrid0.g0,Hybrid0.g1){2}).
 + proc; wp; skip=> />.
   move=> &2 _ @/F /=.
-  admit. (** We need a commutative group action **)
+  rewrite comp.
+  exact actC.  
 by skip.
 qed.
 
@@ -160,7 +169,7 @@ proc.
 inline *.
 wp.
 sp.
-call (: RF.m{1} = Hybrid1.queries{2}). (* Assume that the maps are equivalently distributed *)
+call (: RF.m{1} = Hybrid1.queries{2}). (* maps are equivalently distributed *)
 + proc.
   if.
   + move=> &1 &2.
@@ -173,17 +182,17 @@ call (: RF.m{1} = Hybrid1.queries{2}). (* Assume that the maps are equivalently 
       move=> &2 _.
       split.
       + move=> g _.
-        admit. (* Assumes regularity *)
+        exact extractUniq.
       move=> _.
       split.
       + move=> g _.
+        rewrite DG.dunifin1E DR.dunifin1E.
+        search (_ / _)%Real.
+        rewrite !RField.div1r.
         (* sample MUniform, dR uniform, supports equal cardinality <== finite sizes *)
         admit.
       move=> _ r rin.
-      split.
-      + admit. (* Comes from MUniform *)
-      move=> _.
-      admit. (* Comes from Transitivity *)
+      by rewrite extractP.
     wp.
     skip.
     move=> &1 &2.
@@ -241,35 +250,45 @@ module GameIdeal (A : Adversary2) = {
 
 module Adv (A : Adversary1) = {
     var queries : (bool, (set * set)) fmap
+    var cnt, q : int
+    var els : (set * set) list
   
-    proc solve(x0 : set, ins : (set * set) list, Q : int) = {
-        var cnt, q : int;
-        var s, b : bool;
-        var xq, yq : set;
-
-        cnt <- 1;
-        q <- 1;
-        while (q <= Q) {
-            s <@ A.make_query();
+    module O = {
+        proc doit(s) : set = {
+            var xq, yq : set;
+            
+            if (q <= cnt) {
+                cnt <- 1;
+            }
 
             if (s \notin queries) {
-                (xq, yq) <- (oget (onth ins cnt));
+                (xq, yq) <- (oget (onth els cnt));
                 cnt <- cnt + 1;
                 queries.[s] <- (xq, yq);
             } else {
                 (xq, yq) <- (oget queries.[s]);
             }
-            
+          
+            (* FIXME: why doesn't this work
             if (s) {
-                A.give_response(yq);
+                return yq;
             } else {
-                A.give_response(xq);
+                return xq;
             }
+            *)
 
-            q <- q + 1;
-        }
-
-        b <@ A.make_guess();
+            return s ? yq : xq;
+        }  
+    }
+  
+    proc solve(x0 : set, ins : (set * set) list, Q : int) = {
+        var s, b : bool;
+        var xq, yq : set;
+        
+        els <- ins;
+        q <- Q;
+        cnt <- 1;
+        b <@ A(O).distinguish();
         return b;
     }
 }.
