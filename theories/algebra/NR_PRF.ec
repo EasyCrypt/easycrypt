@@ -1,5 +1,5 @@
 (* NR-PRF *)
-require import Int Real List SmtMap Distr.
+require import Int Real List SmtMap Distr DList FSet.
 require (*--*) GroupAction PRF.
 
 clone import GroupAction.ARegEGA as Ega.
@@ -168,7 +168,6 @@ byequiv=> //.
 proc.
 inline *.
 wp.
-sp.
 call (: RF.m{1} = Hybrid1.queries{2}). (* maps are equivalently distributed *)
 + proc.
   if.
@@ -187,10 +186,38 @@ call (: RF.m{1} = Hybrid1.queries{2}). (* maps are equivalently distributed *)
       split.
       + move=> g _.
         rewrite DG.dunifin1E DR.dunifin1E.
-        search (_ / _)%Real.
-        rewrite !RField.div1r.
-        (* sample MUniform, dR uniform, supports equal cardinality <== finite sizes *)
-        admit.
+        rewrite (RField.eqf_div 1%r _ 1%r _).
+        + apply (StdOrder.RealOrder.ltr0_neq0 _).
+          rewrite lt_fromint.
+          exact DG.Support.card_gt0.        
+        + apply (StdOrder.RealOrder.ltr0_neq0 _).
+          rewrite lt_fromint.
+          exact Support.card_gt0.        
+        rewrite -!fromintM eq_fromint.                  
+        rewrite !Ring.IntID.div1r.
+        rewrite/Support.card.
+        rewrite/DG.Support.card.
+        have->: size Support.enum = size (map (fun g => act g x0) DG.Support.enum).
+        + apply perm_eq_size.
+          apply uniq_perm_eq.
+          + exact Support.enum_uniq.
+          + apply map_inj_in_uniq.        
+            + move=> a b _ _ /= h1.
+              apply (freeP a b).            
+              by exists x0.
+            exact DG.Support.enum_uniq.
+          move=> x.
+          split.
+          + move=> xin.
+            rewrite mapP.
+            exists (extract x0 x).
+            simplify.
+            rewrite extractP.
+            simplify.
+            exact DG.Support.enumP.
+          move=> _.
+          exact Support.enumP.
+        exact size_map.
       move=> _ r rin.
       by rewrite extractP.
     wp.
@@ -206,9 +233,11 @@ call (: RF.m{1} = Hybrid1.queries{2}). (* maps are equivalently distributed *)
     trivial.
   wp.
   by skip.
+wp.
 by skip.
 qed.
 
+(* ----------------------------------------------- *)
 (* Lemma 4.20 *)
 module type Adversary2 = {
     proc solve(x0 : set, ins : (set * set) list, Q : int) : bool
@@ -217,38 +246,37 @@ module type Adversary2 = {
 module GameReal (A : Adversary2) = {
     proc main (Q : int) : bool = {
         var gt : group;
+        var gs : group list;
+        var xs : (set * set) list;
         var b : bool;
-        var ins : (set * set) list;
         
         gt <$ sample;
-
-        (* FIXME: Get a nice way to sample a list of set tuples such that 
-            (xq, Ega.act gt xq) : xq <- Ega.act gq Ega.x0, gq <$ Ega.sample, q \in Q]
-        *)
-
-        ins <- []; (*$ dmap (dlist n) (map (fun x => (x, Ega.act gt x)));*) 
-        b <@ A.solve(x0, ins, Q);
+        gs <$ dlist sample Q;
+        xs <- map (fun (g : group) => (act g x0, act gt (act g x0))) gs;
+        b <@ A.solve(x0, xs, Q);
         return b;
     }
 }.
 
 module GameIdeal (A : Adversary2) = {
     proc main (Q : int) : bool = {
+        var gs : group list;
+        var hs : group list;
+        var ts : (group * group) list;
         var b : bool;
-        var ins : (set * set) list;
+        var xs : (set * set) list;
         
-        (* FIXME: Get a nice way to sample a list of set tuples such that 
-            (xq, Ega.act hq xq) : xq <- Ega.act gq Ega.x0, gq, hq <$ Ega.sample, q \in Q]
-        *)
-
-        ins <- []; (* dmap (dlist set_dist n) (map (fun x => (x, act gt x)));*) 
-        b <- A.solve(x0, ins, Q);
+        gs <$ dlist sample Q;
+        hs <$ dlist sample Q;
+        ts <- zip gs hs;
+        xs <- map (fun (t : group * group) => (act (t.`1) x0, act (t.`2) (act (t.`1) x0))) ts;
+        b <- A.solve(x0, xs, Q);
         return b;
     }
 }.
 
 
-module Adv (A : Adversary1) = {
+module (Adv (A : Adversary1) : Adversary2) = {
     var queries : (bool, (set * set)) fmap
     var cnt, q : int
     var els : (set * set) list
@@ -293,3 +321,12 @@ module Adv (A : Adversary1) = {
     }
 }.
 
+lemma Lem20_IND_eq (A <: Adversary1 {GameIdeal, GameReal}) (Q : int) &m:
+  Pr[GameReal(Adv(A)).main(Q) @ &m: res] = Pr[GameIdeal(Adv(A)).main(Q) @ &m: res].
+proof.
+byequiv=> //.
+proc.
+inline *.
+wp.
+admit.
+qed.
