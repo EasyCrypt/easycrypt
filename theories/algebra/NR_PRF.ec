@@ -61,9 +61,10 @@ module Hybrid0 (A : Adversary1) = {
     var g0, g1 : Ega.group
 
     module O = {
+        (** var c : int **)
         proc doit(s) = {
             var yq;
-
+(** if c < Q, doit and increment c, otherwise, do nothing, return witness **)
             yq <- act g0 x0;
             if (s) {
                 yq <- act g1 yq;
@@ -78,6 +79,7 @@ module Hybrid0 (A : Adversary1) = {
         (* Sample the key *)
         g0 <$ sample;
         g1 <$ sample;
+        (** c <- 0; **)
 
         (* Allow the adversary to make Q adaptive queries *)
         b <@ A(O).distinguish();
@@ -113,7 +115,7 @@ proc.
 inline *.
 seq  1  2: (={glob D} /\ PRF.k{1} = (Hybrid0.g0,Hybrid0.g1){2}).
 + conseq />.
-+ transitivity {1} (** Which memory should the piece of code operate in? **)
+  transitivity {1} (** Which memory should the piece of code operate in? **)
                { PRF.k <@ ProdSampling.S.sample(sample, sample); } (** Which piece of code? **)
                (true ==> ={PRF.k}) (** Left-to-step similarity **)
                (true ==> PRF.k{1} = (Hybrid0.g0, Hybrid0.g1){2}) (** Step-to-right similarity **)=> //.
@@ -185,39 +187,18 @@ call (: RF.m{1} = Hybrid1.queries{2}). (* maps are equivalently distributed *)
       move=> _.
       split.
       + move=> g _.
-        rewrite DG.dunifin1E DR.dunifin1E.
-        rewrite (RField.eqf_div 1%r _ 1%r _).
-        + apply (StdOrder.RealOrder.ltr0_neq0 _).
-          rewrite lt_fromint.
-          exact DG.Support.card_gt0.        
-        + apply (StdOrder.RealOrder.ltr0_neq0 _).
-          rewrite lt_fromint.
-          exact Support.card_gt0.        
-        rewrite -!fromintM eq_fromint.                  
-        rewrite !Ring.IntID.div1r.
-        rewrite/Support.card.
-        rewrite/DG.Support.card.
-        have->: size Support.enum = size (map (fun g => act g x0) DG.Support.enum).
-        + apply perm_eq_size.
-          apply uniq_perm_eq.
-          + exact Support.enum_uniq.
-          + apply map_inj_in_uniq.        
-            + move=> a b _ _ /= h1.
-              apply (freeP a b).            
-              by exists x0.
-            exact DG.Support.enum_uniq.
-          move=> x.
-          split.
-          + move=> xin.
-            rewrite mapP.
-            exists (extract x0 x).
-            simplify.
-            rewrite extractP.
-            simplify.
-            exact DG.Support.enumP.
-          move=> _.
-          exact Support.enumP.
-        exact size_map.
+        have /= <- := dmap1E_can dR (extract x0) (fun g=> act g x0) g _ _.
+        + by rewrite /cancel=> g'; rewrite -extractUniq.
+        + by move=> x _ /=; rewrite extractP.
+        congr; apply: eq_funi_ll.
+        + exact: DG.dunifin_funi.
+        + exact: DG.dunifin_ll.
+        + apply/dmap_funi.
+          + exists (fun g=> act g x0); split.
+            + by move=> x; exact: extractP.
+            by move=> h; rewrite -extractUniq.
+          exact: dunifin_funi.
+        exact/dmap_ll/dunifin_ll.
       move=> _ r rin.
       by rewrite extractP.
     wp.
@@ -321,8 +302,9 @@ module (Adv (A : Adversary1) : Adversary2) = {
     }
 }.
 
-lemma Lem20_IND_eq (A <: Adversary1 {GameIdeal, GameReal}) (Q : int) &m:
-  Pr[GameReal(Adv(A)).main(Q) @ &m: res] = Pr[GameIdeal(Adv(A)).main(Q) @ &m: res].
+lemma Lem20_IND_eq_Real (A <: Adversary1 {GameIdeal, GameReal}) (Q : int) &m:
+  (** Hybrid 0 and GameReal need to actively bound number of oracle queries **)
+  Pr[Hybrid0(A).main() @ &m: res] = Pr[GameReal(Adv(A)).main(Q) @ &m: res].
 proof.
 byequiv=> //.
 proc.
