@@ -32,7 +32,7 @@ RUN \
         opam depext alt-ergo && opam install alt-ergo && opam clean
 
 RUN \
-        wget -O cvc4 https://cvc4.cs.stanford.edu/downloads/builds/x86_64-linux-opt/cvc4-${CVC4V}-x86_64-linux-opt && \
+        wget -O cvc4 https://github.com/cvc5/cvc5/releases/download/${CVC4V}/cvc4-${CVC4V}-x86_64-linux-opt && \
         mv cvc4 /usr/local/bin/ && chmod 755 /usr/local/bin/cvc4
 
 RUN \
