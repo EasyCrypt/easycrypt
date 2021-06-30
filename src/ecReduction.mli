@@ -25,13 +25,15 @@ type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 module EqTest : sig
   val for_type_exn : env -> ty -> ty -> unit
 
-  val for_type  : ty       eqtest
-  val for_pv    : prog_var eqntest
-  val for_xp    : xpath    eqntest
-  val for_mp    : mpath    eqntest
-  val for_instr : instr    eqntest
-  val for_stmt  : stmt     eqntest
-  val for_expr  : expr     eqntest
+  val for_type  : ty          eqtest
+  val for_pv    : prog_var    eqntest
+  val for_xp    : xpath       eqntest
+  val for_mp    : mpath       eqntest
+  val for_instr : instr       eqntest
+  val for_stmt  : stmt        eqntest
+  val for_expr  : expr        eqntest
+  val for_msig  : module_sig  eqntest
+  val for_mexpr : module_expr eqntest
 
   val is_unit : env -> ty -> bool
   val is_bool : env -> ty -> bool
@@ -99,7 +101,13 @@ val simplify : reduction_info -> LDecl.hyps -> form -> form
 val is_conv    : ?ri:reduction_info -> LDecl.hyps -> form -> form -> bool
 val check_conv : ?ri:reduction_info -> LDecl.hyps -> form -> form -> unit
 
+val check_bindings :
+  exn -> EcEnv.env -> EcFol.f_subst ->
+  (EcIdent.t * EcFol.gty) list -> (EcIdent.t * EcFol.gty) list ->
+  EcEnv.env * EcFol.f_subst
 (* -------------------------------------------------------------------- *)
 type xconv = [`Eq | `AlphaEq | `Conv]
 
 val xconv : xconv -> LDecl.hyps -> form -> form -> bool
+
+(* -------------------------------------------------------------------- *)

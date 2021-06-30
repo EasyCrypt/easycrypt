@@ -1300,9 +1300,7 @@ end RealDomain.
 
 (* -------------------------------------------------------------------- *)
 theory RealField.
-type t.
-
-clone import Ring.Field as Field with type t <- t.
+clone import Ring.Field as Field.
 clear [Field.* Field.AddMonoid.* Field.MulMonoid.*].
 
 clone include RealDomain with type t <- t,
@@ -1315,7 +1313,8 @@ clone include RealDomain with type t <- t,
   op   Domain.invr   <- Field.invr,
   op   Domain.intmul <- Field.intmul,
   op   Domain.ofint  <- Field.ofint,
-  op   Domain.exp    <- Field.exp
+  op   Domain.exp    <- Field.exp,
+  op   Domain.lreg   <- Field.lreg
 
   proof Domain.*
   remove abbrev Domain.(-)

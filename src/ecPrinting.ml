@@ -217,7 +217,7 @@ module PPEnv = struct
         fun sm ->
           check_for_local sm;
           let ue = EcUnify.UniEnv.create None in
-          match  EcUnify.select_op ~filter tvi ppe.ppe_env sm ue dom with
+          match  EcUnify.select_op ~hidden:true ~filter tvi ppe.ppe_env sm ue dom with
           | [(p1, _), _, _, _] -> p1
           | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
 
@@ -2100,10 +2100,14 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
          Format.fprintf fmt "(* %a *)@ " EcSymbols.pp_qsymbol qs in
 
   let pp_decl fmt () =
+    let vs =
+      match ax.ax_visibility with
+      | `Visible -> []
+      | `NoSmt   -> ["nosmt"]
+      | `Hidden  -> ["(* hidden *)"] in
     Format.fprintf fmt "@[<hov 2>%a %t%t:@ %t.@]"
       (pp_list " " pp_string)
-      (  [string_of_axkind ax.ax_kind]
-       @ (if ax.ax_nosmt then ["nosmt"] else []))
+      ([string_of_axkind ax.ax_kind] @ vs)
       pp_tags pp_name pp_spec in
 
   Format.fprintf fmt "@[<v>%a%a@]" pp_long x pp_decl ()
@@ -2965,10 +2969,12 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
   Format.fprintf fmt "@[<v>%a%s %s.@,  @[<v>%a@]@,end %s.@]"
     pp_clone cth.EcTheory.cth_desc
     thkw basename
-    (pp_list "@,@," (pp_th_item ppe path)) cth.EcTheory.cth_struct
+    (pp_list "@,@," (pp_th_item ppe path))
+    cth.EcTheory.cth_struct
     basename
 
- and pp_th_item ppe p fmt = function
+ and pp_th_item ppe p fmt item =
+  match item.cti_item with
   | EcTheory.CTh_type (id, ty) ->
       pp_typedecl ppe fmt (EcPath.pqname p id,ty)
 

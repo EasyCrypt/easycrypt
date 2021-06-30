@@ -548,8 +548,11 @@ end = struct
     | OVK_Type      -> "type"
     | OVK_Operator  -> "operator"
     | OVK_Predicate -> "predicate"
+    | OVK_Abbrev    -> "abbreviation"
     | OVK_Theory    -> "theory"
     | OVK_Lemma     -> "lemma/axiom"
+    | OVK_ModExpr   -> "module"
+    | OVK_ModType   -> "module type"
 
   let pp_incompatible env fmt = function
     | NotSameNumberOfTyParam (exp, got) ->
@@ -557,9 +560,12 @@ end = struct
 
     | DifferentType (exp, got) ->
       let ppe = EcPrinting.PPEnv.ofenv env in
-
       Format.fprintf fmt "has type %a instead of %a"
         (EcPrinting.pp_type ppe) got  (EcPrinting.pp_type ppe) exp
+    | OpBody  ->
+      Format.fprintf fmt "incompatible body"
+    | TyBody  ->
+      Format.fprintf fmt "incompatible type declaration"
 
   let pp_clone_error env fmt error =
     let msg x = Format.fprintf fmt x in
@@ -577,10 +583,6 @@ end = struct
         msg "unknown %s `%s'"
           (string_of_ovkind kd) (string_of_qsymbol x)
 
-    | CE_CrtOverride (kd, x) ->
-        msg "cannot instantiate the _concrete_ %s `%s' / they may be not convertible"
-          (string_of_ovkind kd) (string_of_qsymbol x)
-
     | CE_UnkAbbrev x ->
         msg "unknown abbreviation: `%s'" (string_of_qsymbol x)
 
@@ -595,6 +597,16 @@ end = struct
     | CE_PrIncompatible (x, err) ->
         msg "predicate `%s' body %a"
           (string_of_qsymbol x) (pp_incompatible env) err
+
+    | CE_TyIncompatible (x, err) ->
+        msg "type `%s` %a"
+          (string_of_qsymbol x) (pp_incompatible env) err
+    | CE_ModTyIncompatible x ->
+        msg "module type `%s` is incompatible"
+          (string_of_qsymbol x)
+    | CE_ModIncompatible x ->
+        msg "module `%s` is incompatible"
+          (string_of_qsymbol x)
 
     | CE_InvalidRE x ->
         msg "invalid regexp: `%s'" x

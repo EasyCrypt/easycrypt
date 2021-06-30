@@ -539,6 +539,9 @@ module List = struct
     let hd, tl = takedrop i (mrev xs) in
     (i, mrev (tl @ hd))
 
+  let for_all2 f xs ys =
+    List.length xs = List.length ys && for_all2 f xs ys
+
   (* ------------------------------------------------------------------ *)
   let ksort ?(stable = false) ?(rev = false) ~key ~cmp xs =
     let cmp  =

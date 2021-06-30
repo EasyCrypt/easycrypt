@@ -12,9 +12,55 @@ require (*--*) Bigop Bigalg.
 (*---*) import RField IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
+theory Bigbool.
+theory BBXor.
+clone include Bigop with
+  type t <- bool,
+    op Support.idm   <- false,
+    op Support.( + ) <- Bool.( ^^ )
+
+proof Support.Axioms.* by smt().
+end BBXor.
+
+theory BBOr.
+clone include Bigop with
+  type t <- bool,
+    op Support.idm   <- false,
+    op Support.( + ) <- ( \/ )
+
+proof Support.Axioms.* by smt().
+
+lemma bigP (P F : 'a -> bool) (xs : 'a list):
+  big P F xs <=> has F (filter P xs).
+proof.
+elim: xs=> //= x xs ih.
+rewrite big_cons; case: (P x)=> //=.
+by rewrite ih.
+qed.
+end BBOr.
+
+theory BBAnd.
+clone include Bigop with
+  type t <- bool,
+    op Support.idm   <- true,
+    op Support.( + ) <- ( /\ )
+
+proof Support.Axioms.* by smt().
+
+lemma bigP (P F : 'a -> bool) (xs : 'a list):
+  big P F xs <=> all F (filter P xs).
+proof.
+elim: xs=> //= x xs ih.
+rewrite big_cons; case: (P x)=> //=.
+by rewrite ih.
+qed.
+end BBAnd.
+end Bigbool.
+
+(* -------------------------------------------------------------------- *)
 theory Bigint.
 clone include Bigalg.BigOrder with
-  type t <- int,
+  type Num.t <- int,
   pred Num.Domain.unit (z : int) <- (z = 1 \/ z = -1),
     op Num.Domain.zeror  <- 0,
     op Num.Domain.oner   <- 1,
@@ -25,6 +71,7 @@ clone include Bigalg.BigOrder with
     op Num.Domain.intmul <- IntID.intmul,
     op Num.Domain.ofint  <- IntID.ofint_id,
     op Num.Domain.exp    <- IntID.exp,
+    op Num.Domain.lreg   <- IntID.lreg,
 
     op Num."`|_|" <- Int."`|_|",
     op Num.( <= ) <- Int.(<=),
@@ -85,7 +132,7 @@ import Bigint.
 (* -------------------------------------------------------------------- *)
 theory Bigreal.
 clone include Bigalg.BigOrder with
-  type t <- real,
+  type Num.t <- real,
   pred Num.Domain.unit (z : real) <- (z <> 0%r),
     op Num.Domain.zeror  <- 0%r,
     op Num.Domain.oner   <- 1%r,
@@ -96,6 +143,7 @@ clone include Bigalg.BigOrder with
     op Num.Domain.intmul <- RField.intmul,
     op Num.Domain.ofint  <- RField.ofint,
     op Num.Domain.exp    <- RField.exp,
+    op Num.Domain.lreg   <- RField.lreg,
 
     op Num."`|_|" <- Real."`|_|",
     op Num.( <= ) <- Real.(<=),

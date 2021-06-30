@@ -31,6 +31,13 @@ local hint exact : size_ge0.
 lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case: s => //=; smt. qed.
 
+lemma size_eq1 ['a] (xs : 'a list) :
+  (size xs = 1) <=> (exists x, xs = [x]).
+proof.
+split=> [|[x ->//]]; case: xs => // x [|y xs] sz.
+- by exists x. - smt(size_ge0).
+qed.
+
 lemma seq2_ind ['a 'b] (P : 'a list -> 'b list -> bool) :
   P [] [] => (forall x1 x2 s1 s2, P s1 s2 => P (x1 :: s1) (x2 :: s2)) =>
     forall s1 s2, size s1 = size s2 => P s1 s2.
@@ -1579,6 +1586,10 @@ lemma has_map (f : 'a -> 'b) p s:
   has p (map f s) = has (preim f p) s.
 proof. by elim: s => //= x s ->. qed.
 
+lemma has_filter ['a] (p q: 'a -> bool) s:
+  has p (filter q s) = has (predI p q) s.
+proof. by elim: s=> //= x s @/predI; case: (q x)=> //= ? ->. qed.
+
 lemma all_map (f :  'a -> 'b) p s:
   all p (map f s) = all (preim f p) s.
 proof. by elim: s => //= x s ->. qed.
@@ -2961,7 +2972,7 @@ proof. by move=> le0_n; rewrite /alltuples iter0. qed.
 
 lemma alltuplesS ['a] (n : int) (xs : 'a list) : 0 <= n =>
   alltuples (n+1) xs = allpairs (::) xs (alltuples n xs).
-proof. admitted.
+proof. by move=> ge0_n; rewrite /alltuples iterS. qed.
 
 lemma alltuplesP ['a] (n : int) (xs ys : 'a list) :
   xs \in alltuples n ys <=> (size xs = max 0 n /\ all (mem ys) xs).

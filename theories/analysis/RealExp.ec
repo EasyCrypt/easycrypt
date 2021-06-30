@@ -8,6 +8,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import AllCore StdRing StdOrder RealFun.
+require import FinType.
 (*---*) import IntOrder RField RealOrder.
 require import List.
 
@@ -644,15 +645,15 @@ qed.
 theory BigRn.
 
 clone include Bigalg.BigZModule with
-  type t <- Rn.vector,
-    op ZM.zeror  <- zerov,
-    op ZM.( + )  <- ( + ),
-    op ZM.([-])  <- ([-]),
-    op ZM.intmul <- intmul
+  type ZM.t <- Rn.vector,
+  op ZM.zeror  <- zerov,
+  op ZM.( + )  <- ( + ),
+  op ZM.([-])  <- ([-]),
+  op ZM.intmul <- intmul
 
-    proof ZM.*
+  proof ZM.*
 
-    remove abbrev ZM.(-).
+  remove abbrev ZM.(-).
 
 realize ZM.addrA by exact/addrA.
 realize ZM.addrC by exact/addrC.

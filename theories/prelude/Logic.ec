@@ -106,10 +106,10 @@ pred monomorphism_2 (f : 'a -> 'b) (aR : 'a -> 'a -> 'c) rR =
   forall x y, rR (f x) (f y) = aR x y.
 
 (* -------------------------------------------------------------------- *)
-pred injective (f : 'a -> 'b) =
+op injective (f : 'a -> 'b) =
   forall x y, f x = f y => x = y.
 
-pred surjective (f: 'a -> 'b) =
+op surjective (f: 'a -> 'b) =
   forall x, exists y, x = f y.
 
 pred cancel (f : 'a -> 'b) (g : 'b -> 'a) =

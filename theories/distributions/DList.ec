@@ -27,6 +27,29 @@ elim n=> [|n le0_n ih].
 by rewrite dlist_def -foldpos 1:/# -dlist_def /=.
 qed.
 
+lemma dapply_dmap ['a 'b] (d:'a distr) (F:'a -> 'b): dapply F d = dmap d F by done.
+
+lemma dlist_add (d:'a distr) n1 n2:
+  0 <= n1 => 0 <= n2 =>
+  dlist d (n1 + n2) =
+    dmap (dlist d n1 `*` dlist d n2) (fun (p:'a list * 'a list) => p.`1 ++ p.`2).
+proof.
+move=> hn1 hn2;elim: n1 hn1 => /= [ | n1 hn1 hrec].
++ rewrite dprod_dlet //= (dlist0 d 0) // dlet_unit /= /dmap dlet_dlet.
+  rewrite -{1}(dlet_d_unit (dlist d n2)) &(eq_dlet) // => l.
+  by rewrite dlet_unit.
+rewrite addzAC !dlistS 1:/# 1:// hrec.
+rewrite !dprod_dlet !dlet_dlet dapply_dmap /dapply /dmap !dlet_dlet.
+apply eq_dlet => // x.
+rewrite /(\o) /= !dlet_dlet &(eq_dlet) // => l1 /=.
+rewrite dlet_unit /= dlet_unit /= dlet_dlet.
+have /eq_sym:= (dlet_dlet (dlist d n2) (fun (b : 'a list) => dunit (x :: l1, b))
+                 (fun (x0 : 'a list * 'a list) => dunit (x0.`1 ++ x0.`2))).
+apply: eq_trans; rewrite dlet_dlet.
+apply: eq_dlet => // l2 /=.
+by rewrite !dlet_unit /= dlet_unit /= dlet_unit.
+qed.
+
 lemma dlist01E (d : 'a distr) n x:
   n <= 0 => mu1 (dlist d n) x = b2r (x = []).
 proof. by move=> /(dlist0 d) ->;rewrite dunit1E (eq_sym x). qed.
@@ -68,7 +91,7 @@ move=> le0_n;elim: n le0_n xs => [xs | i le0 Hrec xs].
 + by smt (supp_dlist0 size_eq0).
 rewrite dlistS // supp_dmap /=;split => [[p]|].
 + rewrite supp_dprod => [# Hp /Hrec [<- Ha] ->] /=.
-  by rewrite Hp Ha addzC. 
+  by rewrite Hp Ha addzC.
 case xs => //= [/# | x xs [# Hs Hin Ha]];exists (x,xs);smt (supp_dprod).
 qed.
 
@@ -113,23 +136,31 @@ lemma weight_dlistS n (d:'a distr):
   0 <= n => weight (dlist d (n + 1)) = weight d * weight (dlist d n).
 proof. by move=> ge0;rewrite -(dlistSE witness) //. qed.
 
-lemma dlist_fu (d: 'a distr) (xs:'a list): 
+lemma dlist_fu (d: 'a distr) (xs:'a list):
   (forall x, x \in xs => x \in d) =>
   xs \in dlist d (size xs).
-proof. 
+proof.
 move=> fu; rewrite /support dlist1E 1:size_ge0 /=.
 by apply Bigreal.prodr_gt0_seq => /= a Hin _;apply fu.
 qed.
 
-lemma dlist_uni (d:'a distr) n : 
+lemma dlist_uni (d:'a distr) n :
   is_uniform d => is_uniform (dlist d n).
 proof.
-  case (n < 0)=> [Hlt0 Hu xs ys| /lezNgt Hge0 Hu xs ys].
-  + rewrite !supp_dlist0 ?ltzW //. 
-  rewrite !supp_dlist // => -[eqxs Hxs] [eqys Hys].
-  rewrite !dlist1E // eqxs eqys /=;move: eqys;rewrite -eqxs => {eqxs}.
-  elim: xs ys Hxs Hys => [ | x xs Hrec] [ | y ys] //=; 1,2:smt (size_ge0).
-  rewrite !big_consT /#.
+case (n < 0)=> [Hlt0 Hu xs ys| /lezNgt Hge0 Hu xs ys].
++ rewrite !supp_dlist0 ?ltzW //.
+rewrite !supp_dlist // => -[eqxs Hxs] [eqys Hys].
+rewrite !dlist1E // eqxs eqys /=;move: eqys;rewrite -eqxs => {eqxs}.
+elim: xs ys Hxs Hys => [ | x xs Hrec] [ | y ys] //=; 1,2:smt (size_ge0).
+rewrite !big_consT /#.
+qed.
+
+lemma dlist_dmap ['a 'b] (d : 'a distr) (f : 'a -> 'b) n :
+  dlist (dmap d f) n = dmap (dlist d n) (map f).
+proof.
+elim/natind: n => [n le0_n| n ge0_n ih].
+- by rewrite !dlist0 // dmap_dunit.
+- by rewrite !dlistS //= ih -dmap_dprod_comp dmap_comp.
 qed.
 
 abstract theory Program.

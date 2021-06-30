@@ -53,6 +53,7 @@ val subst_mpath        : subst -> mpath -> mpath
 val subst_function     : subst -> function_ -> function_
 val subst_module       : subst -> module_expr -> module_expr
 val subst_module_comps : subst -> module_comps -> module_comps
+val subst_module_body  : subst -> module_body -> module_body
 val subst_modtype      : subst -> module_type -> module_type
 val subst_modsig       : ?params:(ident list) -> subst -> module_sig -> module_sig
 val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
@@ -61,3 +62,7 @@ val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
 val subst_genty : subst -> (ty_params * ty) -> (ty_params * ty)
 val subst_ty    : subst -> ty   -> ty
 val subst_form  : subst -> form -> form
+
+(* -------------------------------------------------------------------- *)
+val open_oper : operator -> ty list -> ty * operator_kind
+val open_tydecl : tydecl -> ty list -> ty_body

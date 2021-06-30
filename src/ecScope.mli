@@ -57,8 +57,8 @@ and proof_state =
   PSNoCheck | PSCheck of EcCoreGoal.proof
 
 and pucflags = {
-  puc_nosmt : bool;
-  puc_local : bool;
+  puc_visibility : EcDecl.ax_visibility;
+  puc_local      : bool;
 }
 
 (* -------------------------------------------------------------------- *)

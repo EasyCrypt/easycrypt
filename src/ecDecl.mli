@@ -20,8 +20,9 @@ type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
 type tydecl = {
-  tyd_params : ty_params;
-  tyd_type   : ty_body;
+  tyd_params  : ty_params;
+  tyd_type    : ty_body;
+  tyd_resolve : bool;
 }
 
 and ty_body = [
@@ -42,7 +43,7 @@ val tydecl_as_abstract : tydecl -> Sp.t
 val tydecl_as_datatype : tydecl -> ty_dtype
 val tydecl_as_record   : tydecl -> form * (EcSymbols.symbol * EcTypes.ty) list
 
-val abs_tydecl : ?tc:Sp.t -> ?params:ty_pctor -> unit -> tydecl
+val abs_tydecl : ?resolve:bool -> ?tc:Sp.t -> ?params:ty_pctor -> unit -> tydecl
 
 val ty_instanciate : ty_params -> ty list -> ty -> ty
 
@@ -102,10 +103,11 @@ and prctor = {
 }
 
 type operator = {
-  op_tparams : ty_params;
-  op_ty      : EcTypes.ty;
-  op_kind    : operator_kind;
-  op_opaque  : bool;
+  op_tparams  : ty_params;
+  op_ty       : EcTypes.ty;
+  op_kind     : operator_kind;
+  op_opaque   : bool;
+  op_clinline : bool;
 }
 
 val op_ty     : operator -> ty
@@ -118,8 +120,8 @@ val is_fix    : operator -> bool
 val is_abbrev : operator -> bool
 val is_prind  : operator -> bool
 
-val mk_op   : opaque:bool -> ty_params -> ty -> opbody option -> operator
-val mk_pred : opaque:bool -> ty_params -> ty list -> prbody option -> operator
+val mk_op   : ?clinline:bool -> opaque:bool -> ty_params -> ty -> opbody option -> operator
+val mk_pred : ?clinline:bool -> opaque:bool -> ty_params -> ty list -> prbody option -> operator
 
 val mk_abbrev :
      ?ponly:bool -> ty_params -> (EcIdent.ident * ty) list
@@ -135,11 +137,13 @@ val operator_as_prind : operator -> prind
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
-  ax_tparams : ty_params;
-  ax_spec    : form;
-  ax_kind    : axiom_kind;
-  ax_nosmt   : bool;
+  ax_tparams    : ty_params;
+  ax_spec       : form;
+  ax_kind       : axiom_kind;
+  ax_visibility : ax_visibility;
 }
+
+and ax_visibility = [`Visible | `NoSmt | `Hidden]
 
 (* -------------------------------------------------------------------- *)
 val is_axiom : axiom_kind -> bool

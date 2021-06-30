@@ -201,9 +201,7 @@ end ZModule.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ComRing.
-  type t.
-
-  clone include ZModule with type t <- t.
+  clone include ZModule.
 
   op   oner  : t.
   op   ( * ) : t -> t -> t.
@@ -619,13 +617,44 @@ abstract theory ComRing.
   rewrite mulrBl mulrDr !(mulr1, mul1r) expr2 -addrA.
   by congr; rewrite opprD addrA addrN add0r.
   qed.
+
+  op lreg (x : t) = injective (fun y => x * y).
+
+  lemma mulrI_eq0 x y : lreg x => (x * y = zeror) <=> (y = zeror).
+  proof. by move=> reg_x; rewrite -{1}(mulr0 x) (inj_eq reg_x). qed.
+
+  lemma lreg_neq0 x : lreg x => x <> zeror.
+  proof.
+  apply/contraL=> ->; apply/negP => /(_ zeror oner).
+  by rewrite (@eq_sym _ oner) oner_neq0 /= !mul0r.
+  qed.
+
+  lemma mulrI0_lreg x : (forall y, x * y = zeror => y = zeror) => lreg x.
+  proof.
+  by move=> reg_x y z eq; rewrite -subr_eq0 &(reg_x) mulrBr eq subrr.
+  qed.
+
+  lemma lregN x : lreg x => lreg (-x).
+  proof. by move=> reg_x y z; rewrite !mulNr => /oppr_inj /reg_x. qed.
+
+  lemma lreg1 : lreg oner.
+  proof. by move=> x y; rewrite !mul1r. qed.
+
+
+  lemma lregM x y : lreg x => lreg y => lreg (x * y).
+  proof. by move=> reg_x reg_y z t; rewrite -!mulrA => /reg_x /reg_y. qed.
+
+  lemma lregXn x n : 0 <= n => lreg x => lreg (exp x n).
+  proof.
+  move=> + reg_x; elim: n => [|n ge0_n ih].
+  - by rewrite expr0 &(lreg1).
+  - by rewrite exprS // &(lregM).
+  qed.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
 abstract theory BoolRing.
-  type t.
-
-  clone include ComRing with type t <- t.
+  clone include ComRing.
 
   axiom mulrr : forall (x : t), x * x = x.
 
@@ -638,9 +667,7 @@ end BoolRing.
 
 (* -------------------------------------------------------------------- *)
 abstract theory IDomain.
-  type t.
-
-  clone include ComRing with type t <- t.
+  clone include ComRing.
 
   axiom mulf_eq0:
     forall (x y : t), x * y = zeror <=> x = zeror \/ y = zeror.
@@ -667,13 +694,14 @@ abstract theory IDomain.
 
   lemma sqrf_eq1 x : (exp x 2 = oner) <=> (x = oner \/ x = -oner).
   proof. by rewrite -subr_eq0 subr_sqr_1 mulf_eq0 subr_eq0 addr_eq0. qed.
+
+  lemma lregP x : lreg x <=> x <> zeror.
+  proof. by split=> [/lreg_neq0//|/mulfI]. qed.
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
 abstract theory Field.
-  type t.
-
-  clone include IDomain with type t <- t, pred unit (x : t) <- x <> zeror.
+  clone include IDomain with pred unit (x : t) <- x <> zeror.
 
   lemma mulfV (x : t): x <> zeror => x * (invr x) = oner.
   proof. by apply/mulrV. qed.
