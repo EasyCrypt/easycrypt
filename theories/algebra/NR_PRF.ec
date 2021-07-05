@@ -19,8 +19,8 @@ op F (k : K) (m : D) =
 (* Setup the uniform distribution on our range *)
 clone import MFinite as DR with
     type t <- R.
-op dR : D -> R distr = fun _ => DR.dunifin.
-lemma dR_ll (x : D) : is_lossless (dR x).
+op dR = DR.dunifin.
+lemma dR_ll (x : D) : is_lossless dR.
 proof.
 exact DR.dunifin_ll.
 qed. 
@@ -93,7 +93,7 @@ module Bounded_PRF_Ideal = {
         var val : R;
         if (c <= q) {
             if (x \notin m) {
-                val <$ dR x;
+                val <$ dR;
                 m.[x] <- val;
             }
             val <- (oget m.[x]);
@@ -216,10 +216,8 @@ byequiv=> //.
 proc.
 inline *.
 sp.
-seq  1  2: (={glob D}
+seq  1  2: (={glob D, Q, Q0}
             /\ Bounded_PRF_Real.k{1} = (Hybrid_PRF_0.g0,Hybrid_PRF_0.g1){2}
-            /\ ={Q}
-            /\ ={Q0}
             ).
 + conseq />.
   transitivity {1} (** Which memory should the piece of code operate in? **)
@@ -308,11 +306,11 @@ qed.
 (* ----------------------------------------------- *)
 module type Hybrid_WPR = {
     proc init(_ : int) : unit
-    proc vals() : R * R
+    proc query() : R * R
 }.
 
 module type H_WPR_Oracles = {
-    proc vals() : R * R
+    proc query() : R * R
 }.
 
 module type Hybrid_WPR_Adv (F : H_WPR_Oracles) = {
@@ -328,85 +326,265 @@ module Hybrid_WPR_IND (H : Hybrid_WPR) (A : Hybrid_WPR_Adv) = {
     }
 }.
 
-module Hybrid_WPR_Ideal = {
+module Hybrid_WPR_Real = {
     var q, c : int
     var gt : group
   
     proc init(Q : int) = {
+        gt <$ sample;
         q <- Q;
         c <- 1;
-        gt <$ sample;
     }
 
-    proc vals() = {
+    proc query() = {
         var gq, xq, yq;
+        var xy;
         if (c <= q) {
             gq <$ sample;
             xq <- act gq x0;
             yq <- act gt xq;
+            xy <- (xq, yq);
             c <- c + 1;
         } else {
-            (xq, yq) <- witness;
+            xy <- witness;
         }
-        return (xq, yq);
+        return xy;
     }
 }.
 
-module Hybrid_WPR_Real = {
+module Hybrid_WPR_Ideal = {
     var q, c : int
   
     proc init(Q : int) = {
         q <- Q;
         c <- 1;
     }
-
-    proc vals() = {
+    
+    proc query() = {
         var gq, hq, xq, yq;
+        var xy;
         if (c <= q) {
             gq <$ sample;
-            hq <$ sample;
             xq <- act gq x0;
+            hq <$ sample;
             yq <- act hq xq;
+            xy <- (xq, yq);
             c <- c + 1;
         } else {
-            (xq, yq) <- witness;
+            xy <- witness;
         }
-        return (xq, yq);
+        return xy;
     }
 }.
 
-module (B (D : Hybrid_PRF_Adv) : Hybrid_WPR_Adv) (F : H_WPR_Oracles) = {
-    module O = {
-        var m : (D, R) fmap
-      
-        proc doit(s : D) = {
-            var val : R;
-            var tup : R * R;
-            if (s \notin m) {
-                tup <- F.vals();
-                if (s) {
-                    val <- tup.`1;            
-                } else {
-                    val <- tup.`2; 
-                }
-                m.[s] <- val;
-            } else {
-                val <- oget m.[s];
-            }
-            return val;
-        }
-    }  
+(* Weak pseudorandomness assumption *)
+module type WP = {
+    proc init(_ : int) : unit
+    proc query() : R * R
+}.
 
-    proc solve() = {
+module type WP_Oracles = {
+    proc query() : R * R
+}.
+
+module type WP_Adv (F : WP_Oracles) = {
+  proc distinguish () : bool
+}.
+
+module WP_IND (F : WP) (A : WP_Adv) = {
+  proc main (Q : int) : bool = {
+    var b : bool;
+    F.init(Q);
+    b <@ A(F).distinguish();
+    return b;
+  }
+}.
+
+module WP_Real = {
+    var q, c : int
+    var g : group
+  
+    proc init(Q : int) = {
+        g <$ sample;
+        q <- Q;
+        c <- 1;
+    }
+
+    proc query() = {
+        var r : set * set;
+        var xq, yq : set;
+        if (c <= q) {
+            xq <$ dR;
+            yq <- act g xq;
+            r <- (xq, yq);
+            c <- c + 1;
+        } else {
+            r <- witness;
+        }
+        return r;
+    }
+}.
+
+module WP_Ideal = {
+    var q, c : int
+
+    proc init(Q : int) = {
+        q <- Q;
+        c <- 1;
+    }
+
+    proc query() = {
+        var r : set * set;
+        var xq, yq : set;
+        if (c <= q) {
+            xq <$ dR;
+            yq <$ dR;
+            r <- (xq, yq);
+            c <- c + 1;
+        } else {
+            r <- witness;
+        }
+        return r;
+    }
+}.
+
+(* Reduction from Hybrid_WPR to WP *)
+module (B1 (A : Hybrid_WPR_Adv) : WP_Adv) (F : WP_Oracles) = {
+    module O = {
+        proc query = F.query
+    } 
+
+    proc distinguish() = {
         var b;
-        b <@ D(O).distinguish();
+        b <@ A(O).solve();
         return b;
     }
 }.
 
-
-lemma Hybrid_WPR_Real_Hybrid_PRF_0_eq (A <: Hybrid_PRF_Adv{Hybrid_WPR_Real, Hybrid_PRF_0}) (x : int) &m:
-  Pr[Hybrid_PRF_IND(Hybrid_PRF_0, A).main(x) @ &m: res] = Pr[Hybrid_WPR_IND(Hybrid_WPR_Real, B(A)).main(x) @ &m: res].
+lemma Hybrid_WPR_WP_Real_eq (A <: Hybrid_WPR_Adv{Hybrid_WPR_Real, WP_Real}) (x : int) &m:
+   Pr[WP_IND(WP_Real, B1(A)).main(x) @ &m: res] = Pr[Hybrid_WPR_IND(Hybrid_WPR_Real, A).main(x) @ &m: res].
 proof.
-admit.
+byequiv=> //.
+proc.
+inline *.
+wp.
+sp.
+seq 1 1 : ( WP_Real.g{1} = Hybrid_WPR_Real.gt{2}
+          /\ ={Q, Q0, glob A}).
++ rnd.
+    by skip=> />.
+sp.
+call (: WP_Real.c{1} = Hybrid_WPR_Real.c{2}
+     /\ WP_Real.q{1} = Hybrid_WPR_Real.q{2}
+     /\ WP_Real.g{1} = Hybrid_WPR_Real.gt{2}
+     ).
++ proc.
+  if.  
+  + by move=> />.
+  + wp.
+    sp.
+    rnd (fun x => extract x0 x) (fun g => act g x0).
+    skip=> &1 &2 /> le.
+    split.
+    + move=> g _.
+        exact extractUniq.
+    move=> _.
+    split.
+    + move=> g _.
+        have /= <- := dmap1E_can DR.dunifin (extract x0) (fun g=> act g x0) g _ _.
+        + by rewrite /cancel=> g'; rewrite -extractUniq.
+        + by move=> a _ /=; rewrite extractP.
+        congr; apply: eq_funi_ll.
+        + exact: DG.dunifin_funi.
+        + exact: DG.dunifin_ll.
+        + apply/dmap_funi.
+        + exists (fun g=> act g x0); split.
+            + by move=> a; exact: extractP.
+            by move=> h; rewrite -extractUniq.
+        exact: dunifin_funi.
+        exact/dmap_ll/dunifin_ll.
+    move=> _ r rin.
+    split.
+    by rewrite extractP.    
+    move=> req.
+    by rewrite -req.    
+  wp.
+  by skip=> />.  
+by skip=> />.
+qed.
+
+
+lemma Hybrid_WPR_WP_Ideal_eq (A <: Hybrid_WPR_Adv{Hybrid_WPR_Ideal, WP_Ideal}) (x : int) &m:
+   Pr[WP_IND(WP_Ideal, B1(A)).main(x) @ &m: res] = Pr[Hybrid_WPR_IND(Hybrid_WPR_Ideal, A).main(x) @ &m: res].
+proof.
+byequiv=> //.
+proc.
+inline *.
+wp.
+sp.
+call (: WP_Ideal.c{1} = Hybrid_WPR_Ideal.c{2}
+     /\ WP_Ideal.q{1} = Hybrid_WPR_Ideal.q{2}
+     ).
++ proc.
+  if.
+  + by move=> />.
+  + seq 1 2 : (={xq}
+              /\ WP_Ideal.c{1} = Hybrid_WPR_Ideal.c{2}
+              /\ WP_Ideal.q{1} = Hybrid_WPR_Ideal.q{2}
+              ).
+    wp.    
+    rnd (fun x => extract x0 x) (fun g => act g x0).
+    skip=> &1 &2 /> le.
+    split.
+    + move=> g _.
+        exact extractUniq.
+    move=> _.
+    split.
+    + move=> g _.
+        have /= <- := dmap1E_can DR.dunifin (extract x0) (fun g=> act g x0) g _ _.
+        + by rewrite /cancel=> g'; rewrite -extractUniq.
+        + by move=> a _ /=; rewrite extractP.
+        congr; apply: eq_funi_ll.
+        + exact: DG.dunifin_funi.
+        + exact: DG.dunifin_ll.
+        + apply/dmap_funi.
+        + exists (fun g=> act g x0); split.
+            + by move=> a; exact: extractP.
+            by move=> h; rewrite -extractUniq.
+        exact: dunifin_funi.
+        exact/dmap_ll/dunifin_ll.
+    move=> _ r rin.
+    by rewrite extractP.    
+    wp.
+    rnd (fun x => extract xq{1} x) (fun g => act g xq{2}).
+    skip=> &1 &2 />.
+    split.
+    + move=> g _.
+        exact extractUniq.
+    move=> _.
+    split.
+    + move=> g _.
+        have /= <- := dmap1E_can DR.dunifin (extract xq{2}) (fun g=> act g xq{2}) g _ _.
+        + by rewrite /cancel=> g'; rewrite -extractUniq.
+        + by move=> a _ /=; rewrite extractP.
+        congr; apply: eq_funi_ll.
+        + exact: DG.dunifin_funi.
+        + exact: DG.dunifin_ll.
+        + apply/dmap_funi.
+        + exists (fun g=> act g xq{2}); split.
+            + by move=> a; exact: extractP.
+            by move=> h; rewrite -extractUniq.
+        exact: dunifin_funi.
+        exact/dmap_ll/dunifin_ll.
+    move=> _ r rin.
+    by rewrite extractP.   
+  wp.
+  by skip=> />.
+by skip=> />.
+qed.
+
+lemma Hybrid_WPR_WP_eq (A <: Hybrid_WPR_Adv{Hybrid_WPR_Ideal, Hybrid_WPR_Real, WP_Real, WP_Ideal}) (x : int) &m : 
+`|Pr[Hybrid_WPR_IND(Hybrid_WPR_Real, A).main(x) @ &m: res] - Pr[Hybrid_WPR_IND(Hybrid_WPR_Ideal, A).main(x) @ &m: res]| 
+= `| Pr[WP_IND(WP_Real, B1(A)).main(x) @ &m: res] - Pr[WP_IND(WP_Ideal, B1(A)).main(x) @ &m: res] |.
+by rewrite (Hybrid_WPR_WP_Real_eq A) (Hybrid_WPR_WP_Ideal_eq A).
 qed.
