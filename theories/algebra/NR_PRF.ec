@@ -461,58 +461,37 @@ module (B1 (A : Hybrid_WPR_Adv) : WP_Adv) (F : WP_Oracles) = {
     }
 }.
 
+lemma sample_dR_iso g: mu1 sample g = mu1 dR (act g x0).
+proof.
+have /= <- := dmap1E_can DR.dunifin (extract x0) (fun g=> act g x0) g _ _.
++ by rewrite /cancel=> g'; rewrite -extractUniq.
++ by move=> a _ /=; rewrite extractP.
+congr; apply: eq_funi_ll.
++ exact: DG.dunifin_funi.
++ exact: DG.dunifin_ll.
++ apply/dmap_funi.
++ exists (fun g=> act g x0); split.
+  + by move=> a; exact: extractP.
+  by move=> h; rewrite -extractUniq.
+exact: dunifin_funi.
+exact/dmap_ll/dunifin_ll.
+qed.
+
 lemma Hybrid_WPR_WP_Real_eq (A <: Hybrid_WPR_Adv{Hybrid_WPR_Real, WP_Real}) (x : int) &m:
    Pr[WP_IND(WP_Real, B1(A)).main(x) @ &m: res] = Pr[Hybrid_WPR_IND(Hybrid_WPR_Real, A).main(x) @ &m: res].
 proof.
-byequiv=> //.
-proc.
-inline *.
+byequiv (: ={glob A, arg} ==> ={res})=> //.
+proc; inline *.
 wp.
-sp.
-seq 1 1 : ( WP_Real.g{1} = Hybrid_WPR_Real.gt{2}
-          /\ ={Q, Q0, glob A}).
-+ rnd.
-    by skip=> />.
-sp.
-call (: WP_Real.c{1} = Hybrid_WPR_Real.c{2}
-     /\ WP_Real.q{1} = Hybrid_WPR_Real.q{2}
-     /\ WP_Real.g{1} = Hybrid_WPR_Real.gt{2}
-     ).
-+ proc.
-  if.  
-  + by move=> />.
-  + wp.
-    sp.
-    rnd (fun x => extract x0 x) (fun g => act g x0).
-    skip=> &1 &2 /> le.
-    split.
-    + move=> g _.
-        exact extractUniq.
-    move=> _.
-    split.
-    + move=> g _.
-        have /= <- := dmap1E_can DR.dunifin (extract x0) (fun g=> act g x0) g _ _.
-        + by rewrite /cancel=> g'; rewrite -extractUniq.
-        + by move=> a _ /=; rewrite extractP.
-        congr; apply: eq_funi_ll.
-        + exact: DG.dunifin_funi.
-        + exact: DG.dunifin_ll.
-        + apply/dmap_funi.
-        + exists (fun g=> act g x0); split.
-            + by move=> a; exact: extractP.
-            by move=> h; rewrite -extractUniq.
-        exact: dunifin_funi.
-        exact/dmap_ll/dunifin_ll.
-    move=> _ r rin.
-    split.
-    by rewrite extractP.    
-    move=> req.
-    by rewrite -req.    
-  wp.
-  by skip=> />.  
-by skip=> />.
+call (:    ={c, q}(WP_Real, Hybrid_WPR_Real)
+        /\ WP_Real.g{1} = Hybrid_WPR_Real.gt{2}).
++ proc; if; auto.
+  rnd (extract x0) (transpose act x0); auto=> /> &2 c_le_q.
+  split=> [g _|_]; first exact: extractUniq.
+  split=> [g _|_ xq _]; first exact: sample_dR_iso.
+  by rewrite extractP.
+by auto.
 qed.
-
 
 lemma Hybrid_WPR_WP_Ideal_eq (A <: Hybrid_WPR_Adv{Hybrid_WPR_Ideal, WP_Ideal}) (x : int) &m:
    Pr[WP_IND(WP_Ideal, B1(A)).main(x) @ &m: res] = Pr[Hybrid_WPR_IND(Hybrid_WPR_Ideal, A).main(x) @ &m: res].
