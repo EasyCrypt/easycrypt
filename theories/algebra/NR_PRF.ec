@@ -247,7 +247,7 @@ qed.
 lemma Hybrid_PRF_L_PRF_Real_eq (D <: Distinguisher {Hybrid_PRF_L, Bounded_PRF_Ideal}) (a : int) &m:
     Pr[Bounded_PRF_IND(Bounded_PRF_Ideal, D).main(a) @ &m: res] = Pr[Hybrid_PRF_IND(Hybrid_PRF_L, A(D)).main(a) @ &m: res].
 proof.
-byequiv=> //.
+byequiv (_ : ={glob D, arg} ==> ={res})=> //.
 proc.
 inline *.
 wp.
