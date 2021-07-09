@@ -103,6 +103,7 @@ module Hybrid_PRF_0 = {
     }
 }.
 
+(* The lazy variant *)
 module Hybrid_PRF_0' = {
     var m : (int, group) fmap
     var g1 : group
@@ -145,6 +146,23 @@ module Hybrid_PRF_L = {
             gq <$ sample;
             m.[s] <- act gq x0;
         }
+        return oget m.[s];
+    }
+}.
+
+(* The eager variant *)
+module Hybrid_PRF_L' = {
+    var m : (D, R) fmap
+
+    proc init() = {
+        var g;
+        g <$ sample;
+        m.[true] <- act g x0;
+        g <$ sample;
+        m.[false] <- act g x0;
+    }
+
+    proc f(s) = {
         return oget m.[s];
     }
 }.
@@ -379,11 +397,10 @@ by rewrite (Hybrid_WP_WP_Real_eq A) (Hybrid_WP_WP_Ideal_eq A).
 qed.
 
 (* Reduction the middle *)
-
 module (C (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
     module O = {
         var gs : (int, group) fmap
-        var qs : (D, R * R) fmap
+        var qs : (D list, R * R) fmap
         var j : int
 
         proc init() = {
@@ -401,12 +418,16 @@ module (C (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
         }
 
         proc f(s) = {
-            var x, y, val : R; 
-            if (witness \notin qs) {
+            var x, y, val : R;
+            var wrd, prefix : bool list;
+            wrd <- [s];
+            prefix <- behead wrd;
+            (* Witness is replaced by the empty list in this case *)
+            if (prefix \notin qs) {
                 (x, y) <- F.query();
-                qs.[witness] <- (x, y);
+                qs.[prefix] <- (x, y);
             } else {
-                (x, y) <- oget qs.[witness];
+                (x, y) <- oget qs.[prefix];
             }
             if (s) {
                 val <- y;
@@ -430,42 +451,44 @@ module (C (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
 lemma Hybrid_PRF_WPR_Real_eq (D <: Distinguisher{Hybrid_PRF_0', Hybrid_WP_Real, C}) &m :
     Pr[IND(Hybrid_PRF_0', D).main() @ &m: res] = Pr[WP_IND(Hybrid_WP_Real, C(D)).main() @ &m: res].
 proof.
-(* byequiv (: ={glob D, arg} ==> ={res})=> //.*)
-byequiv=> //.
+byequiv (: ={glob D, arg} ==> ={res})=> //.
 proc.
 inline *.
 wp.
-seq 1 1 : (Hybrid_PRF_0'.g1{1} = Hybrid_WP_Real.gt{2}
-            /\ ={glob D}).
-+ by rnd.
-sp.
 call (:   Hybrid_PRF_0'.g1{1} = Hybrid_WP_Real.gt{2}
-       /\ (0 \notin Hybrid_PRF_0'.m{1} <=> witness \notin C.O.qs{2})
-       /\ act (oget Hybrid_PRF_0'.m.[0]{1}) x0 = (oget C.O.qs.[witness]).`1{2}
-       /\ act Hybrid_PRF_0'.g1{1} (act (oget Hybrid_PRF_0'.m.[0]{1}) x0) = (oget C.O.qs.[witness]).`2{2}).
-+ proc; sp; inline*.
+  (* This will need generalised for i \in [0..j]*)
+       /\ (0 \notin Hybrid_PRF_0'.m{1} <=> [] \notin C.O.qs{2})
+       /\ (0 \in Hybrid_PRF_0'.m{1} => act (oget Hybrid_PRF_0'.m.[0]{1}) x0 = (oget C.O.qs.[[]]).`1{2})
+       /\ (0 \in Hybrid_PRF_0'.m{1} => act Hybrid_PRF_0'.g1{1} (act (oget Hybrid_PRF_0'.m.[0]{1}) x0) = (oget C.O.qs.[[]]).`2{2})).
++ proc.
+  inline *.
   sp.
-  if=> />.
+  if=> //.
   + auto=> &1 &2 /> _ _ _ g h.
     rewrite !mem_set.
     auto=> _ />.
     by rewrite !get_set_sameE !Core.oget_some.
-  by auto=> &1 &2 />.
-auto=> &1 &2 />.
+  auto=> &1 &2 /> _.
+  move=> h1 h2 ?.
+  split=> _.
+  + exact h2.
+  exact h1.
+auto=> &1 &2 /> g _.
 rewrite !emptyE !Core.oget_none.
-do split; first 2 by apply contra; rewrite !emptyE.
-(* Seems reasonable but also not, can a witness act? can you take the fst*)
-admit.
-admit.
+do split; by apply contraLR; move=> _; rewrite mem_empty.
 qed.
 
-lemma Hybrid_PRF_WPR_Ideal_eq (D <: Distinguisher{Hybrid_PRF_L, Hybrid_WP_Ideal, C}) &m :
-    Pr[IND(Hybrid_PRF_L, D).main() @ &m: res] = Pr[WP_IND(Hybrid_WP_Ideal, C(D)).main() @ &m: res].
+lemma Hybrid_PRF_WPR_Ideal_eq (D <: Distinguisher{Hybrid_PRF_L', Hybrid_WP_Ideal, C}) &m :
+    Pr[IND(Hybrid_PRF_L', D).main() @ &m: res] = Pr[WP_IND(Hybrid_WP_Ideal, C(D)).main() @ &m: res].
 proof.
 byequiv (: ={glob D, arg} ==> ={res})=> //.
 proc.
 inline *.
 sp.
 wp.
+call (: true).
+proc.
+inline*.
+sim.
 admit.
 qed.
