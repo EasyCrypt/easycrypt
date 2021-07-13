@@ -240,7 +240,7 @@ sp.
 call (:  PRF.k{1} = (Hybrid_PRF_0.g0, Hybrid_PRF_0.g1){2}
       /\ ={BoundPRF.c, BoundPRF.q}).
 + proc; inline*; wp; skip=> />.
-  move=> &2 _ _ @/F /=.  
+  move=> &2 _ _ @/F /=.
   rewrite comp.
   exact: actC.
 skip=> />.
@@ -437,15 +437,21 @@ module Hj (D : Distinguisher) = {
       var  p <- take j xs;
       var  s <- drop j xs;
       var gq;
+      var yq;
       var r <- witness;
 
       if (c <= q) {
-          gq <$ sample;
-        if (p \notin yqs) {
-          yqs.[p] <- act gq x0;
+        if (j = 0) {
+          yq <- act g0 x0;
+        } else {
+          if (p \notin yqs) {
+            gq <$ sample;
+            yqs.[p] <- act gq x0;
+          }
+          yq <- oget (yqs.[p]);
         }
         c <- c + 1;
-        r <- compute_action [gis] s (oget (yqs.[p]));
+        r <- compute_action [gis] s yq;
       }
       return r;
     }
@@ -460,6 +466,7 @@ module Hj (D : Distinguisher) = {
       q <- Q;
      g0 <$ sample;
     gis <$ sample;
+    yqs <- empty;
 
       b <@ D(O).distinguish();
     return b;
@@ -474,20 +481,73 @@ proof.
 proc=> /=.
 call (:    Hj.j{2} = 0
         /\ ={q, c}(BoundPRF, Hj)
-        /\ PRF.k{1} = (Hj.g0, Hj.gis){2}
-        /\ true).
+        /\ PRF.k{1} = (Hj.g0, Hj.gis){2}).
 + proc; sp; if; 1,3:auto.
-  inline *; auto.
-  admit.
+  inline *; auto=> />.
+  if{2}=> //.
+  + auto=> />.
+    move=> &2 _ @/F /=.
+    by rewrite actC comp.
+  by if{2}; auto=> />.
 inline *; sp; wp; conseq />.
-admit.
-qed.  
+transitivity {1} (** Which memory should the piece of code operate in? **)
+              {PRF.k <@ ProdSampling.S.sample(sample, sample); } (** Which piece of code? **)
+              (true ==> ={PRF.k}) (** Left-to-step similarity **)
+              (true ==> PRF.k{1} = (Hj.g0, Hj.gis){2}) (** Step-to-right similarity **)=> //.
++ by inline {2} 1; auto.
+transitivity {2}
+              { (Hj.g0, Hj.gis) <@ ProdSampling.S.sample2(sample, sample); }
+              (true ==> PRF.k{1} = (Hj.g0, Hj.gis){2})
+              (true ==> ={Hj.g0, Hj.gis})=> //.
++ by call ProdSampling.sample_sample2; auto=> /> [].
+by inline {1} 1; auto.
+qed.
 
 lemma PRF_Hybrid0_pr (D <: Distinguisher { BoundPRF, PRF, Hj }) q &m:
      0 <= q
   =>   Pr[Bounded_PRF_IND(BoundPRF(PRF), D).main(q) @ &m: res]
      = Pr[Hj(D).run(0, q) @ &m: res].
 proof. by move=> ge0_q; byequiv (PRF_Hybrid0 D). qed.
+
+equiv PRF_HybridL (D <: Distinguisher { BoundPRF, RF, Hj }):
+  Bounded_PRF_IND(BoundPRF(RF), D).main ~ Hj(D).run:
+    ={glob D, Q} /\ 0 <= Q{1} /\ i{2} = 1
+    ==> ={res}.
+proof.
+proc=> /=; inline *.
+call (:    Hj.j{2} = 1
+        /\ ={q, c}(BoundPRF, Hj)
+        /\ (forall (x : D), x \in RF.m{1} <=> [x] \in Hj.yqs{2})
+        /\ (forall (x : D), RF.m.[x]{1} = Hj.yqs.[[x]]{2})).
++ proc; sp; if; auto.
+  inline *.
+  if{2}; sp.
+  + if{1}; auto=> />.
+  if=> /=.
+  + move=> &1 &2 /> eqv _.
+    by rewrite (eqv x{2}).
+  + wp.
+    rnd (fun x => extract x0 x) (fun g => act g x0).
+    skip=> /> &1 &2 eqv ein _ nin.
+    split=> [g _ | _]; first exact extractUniq.
+    split=> [g _ | _ r _]; first exact sample_dR_iso.
+    rewrite extractP !get_set_sameE /=.
+    split=> x.
+    + by rewrite !mem_set (eqv x).
+  search (_.[_]).
+    by rewrite !get_setE (ein x).
+  auto=> &1 &2 /> eqv ein _ xin.
+  by rewrite (ein x{2}).
+auto=> /> &2 _ g _ gs _.
+search empty.
+admit.
+qed.
+
+lemma PRF_HybridL_pr (D <: Distinguisher { BoundPRF, RF, Hj }) q &m:
+     0 <= q
+  =>   Pr[Bounded_PRF_IND(BoundPRF(RF), D).main(q) @ &m: res]
+     = Pr[Hj(D).run(1, q) @ &m: res].
+proof. by move=> ge0_q; byequiv (PRF_HybridL D). qed.
 
 module (C (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
     module O = {
