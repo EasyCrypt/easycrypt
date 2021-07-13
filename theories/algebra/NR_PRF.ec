@@ -81,6 +81,14 @@ module BoundPRF(O : PRF_t.PRF) : Bounded_PRF = {
     }
 }.
 
+op compute_action (gs : group list) (ss : bool list) (x : set) : set =
+    with gs = "[]"     ,      ss = "[]" => x
+    with gs = "[]"     , ss = (::) s ss => x
+    with gs = (::) g gs,      ss = "[]" => x
+    with gs = (::) g gs, ss = (::) s ss =>
+      if s then compute_action gs ss (act g x)
+           else compute_action gs ss x.
+
 (* ------------------------------------------------------------ *)
 (* Lemma 4.21 *)
 (* Start by just considering the case when l = 1, here we will just have two games for an adversary to distinguish *)
@@ -167,6 +175,13 @@ module Hybrid_PRF_L' = {
     }
 }.
 
+equiv PRF_Eager_Lazy_eq:
+  Hybrid_PRF_L.f ~ Hybrid_PRF_L'.f:
+  Hybrid_PRF_L.m{1} = empty /\ true ==> ={res}.
+proof.
+admit.
+qed.
+
 (** |Pr[IND(PRF, D).main() @ &m: res] - Pr[IND(RF, D).main() @ &m: res]|
     <= Advantage of A(D) against something we think is hard **)
 
@@ -184,6 +199,14 @@ congr; apply: eq_funi_ll.
     by move=> h; rewrite -extractUniq.
   exact: dR_funi.
 exact/dmap_ll/Uni_dR.dR_ll.
+qed.
+
+equiv prf_bound_eq (D <: Distinguisher) (O <: PRF) :
+  D(O).distinguish ~ D(BoundPRF(O)).distinguish:
+      ={glob D, glob O} /\ BoundPRF.c{1} = 1 /\ BoundPRF.c{2} = 1
+  ==> ={res}.
+proof.
+admit.
 qed.
 
 require (*--*) DProd.
@@ -405,7 +428,8 @@ module (C (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
 
         proc init() = {
             qs <- empty;
-            j <- 0; (* Hard code the simple variant *)
+            j <- 0;
+
         (* More General
             i <- j + 2;
             gs <- empty;
@@ -419,22 +443,26 @@ module (C (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
 
         proc f(s) = {
             var x, y, val : R;
-            var wrd, prefix : bool list;
+            var wrd, prefix, suffix : bool list;
+            var switch : bool;
             wrd <- [s];
-            prefix <- behead wrd;
+            prefix <- take j wrd;
+            switch <- nth witness wrd j;
+            suffix <- drop (j+1) wrd;
+
             (* Witness is replaced by the empty list in this case *)
             if (prefix \notin qs) {
-                (x, y) <- F.query();
+                (x, y) <@ F.query();
                 qs.[prefix] <- (x, y);
             } else {
                 (x, y) <- oget qs.[prefix];
             }
-            if (s) {
+            if (switch) {
                 val <- y;
             } else {
                 val <- x;
             }
-            
+            (* Handle the suffix stuff f~, j+2 onwards use compute_action gs suffix x0 *)
             return val;
         }
     }    
@@ -447,10 +475,11 @@ module (C (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
     }
 }.
 
-
-lemma Hybrid_PRF_WPR_Real_eq (D <: Distinguisher{Hybrid_PRF_0', Hybrid_WP_Real, C}) &m :
+lemma Hybrid_PRF_WP_Real_eq (D <: Distinguisher{Hybrid_PRF_0', Hybrid_WP_Real, C}) &m :
     Pr[IND(Hybrid_PRF_0', D).main() @ &m: res] = Pr[WP_IND(Hybrid_WP_Real, C(D)).main() @ &m: res].
 proof.
+admit.
+(*
 byequiv (: ={glob D, arg} ==> ={res})=> //.
 proc.
 inline *.
@@ -476,19 +505,43 @@ call (:   Hybrid_PRF_0'.g1{1} = Hybrid_WP_Real.gt{2}
 auto=> &1 &2 /> g _.
 rewrite !emptyE !Core.oget_none.
 do split; by apply contraLR; move=> _; rewrite mem_empty.
+*)
 qed.
 
-lemma Hybrid_PRF_WPR_Ideal_eq (D <: Distinguisher{Hybrid_PRF_L', Hybrid_WP_Ideal, C}) &m :
-    Pr[IND(Hybrid_PRF_L', D).main() @ &m: res] = Pr[WP_IND(Hybrid_WP_Ideal, C(D)).main() @ &m: res].
+lemma Hybrid_PRF_WP_Ideal_eq (D <: Distinguisher{Hybrid_PRF_L', Hybrid_WP_Ideal, C}) &m :
+  Pr[IND(Hybrid_PRF_L', D).main() @ &m: res] = Pr[WP_IND(Hybrid_WP_Ideal, C(D)).main() @ &m: res].
 proof.
 byequiv (: ={glob D, arg} ==> ={res})=> //.
 proc.
-inline *.
-sp.
-wp.
-call (: true).
-proc.
 inline*.
-sim.
-admit.
+wp.
+call (:   ([] \in C.O.qs{2} => oget Hybrid_PRF_L'.m.[false]{1} = (oget C.O.qs.[[]]{2}).`1)
+      /\  ([] \in C.O.qs{2} => oget Hybrid_PRF_L'.m.[true]{1} = (oget C.O.qs.[[]]{2}).`2)).
++ proc.
+  inline *.
+  sp.
+  wp.
+  if{2}.
+  wp=> /=.
+  + auto=> &1 &2 />.
+    search dmap
+    (* Need some magic, mainly g * h = j when all random*)
+    admit.
+  auto=> &1 &2 />.
+  move=> h1 h2 ?.
+  split=> _.
+  + exact h2.
+  exact h1.
+auto=> &1 /> g1 _ g2 _.
+split; by apply contraLR; move=> _; rewrite mem_empty.
+qed.
+
+lemma Security (D <: Distinguisher{PRF, RF, WP_Ideal, WP_Real, BoundPRF, Hybrid_PRF_0, Hybrid_PRF_0', Hybrid_PRF_L', C, Hybrid_PRF_L, Hybrid_WP_Ideal, Hybrid_WP_Real}) &m (x : int):
+    `| Pr[Bounded_PRF_IND(BoundPRF(PRF), D).main(x) @ &m: res] - Pr[Bounded_PRF_IND(BoundPRF(RF), D).main(x) @ &m: res] |
+    <= `| Pr[WP_IND(WP_Real, C(D)).main() @ &m: res] - Pr[WP_IND(WP_Ideal, C(D)).main() @ &m: res] |.
+proof.
+rewrite (PRF_Hybrid_PRF_Reduction D).
+rewrite -(Hybrid_WP_WP_Reduction (C(D))).
+rewrite -(Hybrid_PRF_WP_Real_eq D).
+rewrite -(Hybrid_PRF_WP_Ideal_eq D).
 qed.
