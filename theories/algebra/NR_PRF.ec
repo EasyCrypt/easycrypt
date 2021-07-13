@@ -420,6 +420,75 @@ by rewrite (Hybrid_WP_WP_Real_eq A) (Hybrid_WP_WP_Ideal_eq A).
 qed.
 
 (* Reduction the middle *)
+module Hj (D : Distinguisher) = {
+  var j   : int
+
+  var g0  : group
+  var gis : group
+
+  var yqs : (bool list, set) fmap
+
+  var c   : int
+  var q   : int
+
+  module O = {
+    proc f(x) = {
+      var xs <- [x];
+      var  p <- take j xs;
+      var  s <- drop j xs;
+      var gq;
+      var r <- witness;
+
+      if (c <= q) {
+          gq <$ sample;
+        if (p \notin yqs) {
+          yqs.[p] <- act gq x0;
+        }
+        c <- c + 1;
+        r <- compute_action [gis] s (oget (yqs.[p]));
+      }
+      return r;
+    }
+  }
+
+  proc run(i : int, Q : int) : bool = {
+    var b;
+
+      j <- i;
+
+      c <- 1;
+      q <- Q;
+     g0 <$ sample;
+    gis <$ sample;
+
+      b <@ D(O).distinguish();
+    return b;
+  }
+}.
+
+equiv PRF_Hybrid0 (D <: Distinguisher { BoundPRF, PRF, Hj }):
+  Bounded_PRF_IND(BoundPRF(PRF), D).main ~ Hj(D).run:
+    ={glob D, Q} /\ 0 <= Q{1} /\ i{2} = 0
+    ==> ={res}.
+proof.
+proc=> /=.
+call (:    Hj.j{2} = 0
+        /\ ={q, c}(BoundPRF, Hj)
+        /\ PRF.k{1} = (Hj.g0, Hj.gis){2}
+        /\ true).
++ proc; sp; if; 1,3:auto.
+  inline *; auto.
+  admit.
+inline *; sp; wp; conseq />.
+admit.
+qed.  
+
+lemma PRF_Hybrid0_pr (D <: Distinguisher { BoundPRF, PRF, Hj }) q &m:
+     0 <= q
+  =>   Pr[Bounded_PRF_IND(BoundPRF(PRF), D).main(q) @ &m: res]
+     = Pr[Hj(D).run(0, q) @ &m: res].
+proof. by move=> ge0_q; byequiv (PRF_Hybrid0 D). qed.
+
 module (C (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
     module O = {
         var gs : (int, group) fmap
