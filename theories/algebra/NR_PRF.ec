@@ -484,11 +484,8 @@ call (:    Hj.j{2} = 0
         /\ PRF.k{1} = (Hj.g0, Hj.gis){2}).
 + proc; sp; if; 1,3:auto.
   inline *; auto=> />.
-  if{2}=> //.
-  + auto=> />.
-    move=> &2 _ @/F /=.
-    by rewrite actC comp.
-  by if{2}; auto=> />.
+  rcondt {2} 1; 1:by auto.
+  by auto=> /> &2 _ @/F /=; rewrite actC comp.
 inline *; sp; wp; conseq />.
 transitivity {1} (** Which memory should the piece of code operate in? **)
               {PRF.k <@ ProdSampling.S.sample(sample, sample); } (** Which piece of code? **)
@@ -517,30 +514,21 @@ proof.
 proc=> /=; inline *.
 call (:    Hj.j{2} = 1
         /\ ={q, c}(BoundPRF, Hj)
-        /\ (forall (x : D), x \in RF.m{1} <=> [x] \in Hj.yqs{2})
         /\ (forall (x : D), RF.m.[x]{1} = Hj.yqs.[[x]]{2})).
 + proc; sp; if; auto.
+  rcondf {2} 1; 1:by auto.
   inline *.
-  if{2}; sp.
-  + if{1}; auto=> />.
-  if=> /=.
-  + move=> &1 &2 /> eqv _.
-    by rewrite (eqv x{2}).
+  sp; if=> /=.
+  + by rewrite !domE=> /> &1 &2 ->.
   + wp.
     rnd (fun x => extract x0 x) (fun g => act g x0).
-    skip=> /> &1 &2 eqv ein _ nin.
+    skip=> /> &1 &2 eqv _ nin.
     split=> [g _ | _]; first exact extractUniq.
     split=> [g _ | _ r _]; first exact sample_dR_iso.
     rewrite extractP !get_set_sameE /=.
-    split=> x.
-    + by rewrite !mem_set (eqv x).
-  search (_.[_]).
-    by rewrite !get_setE (ein x).
-  auto=> &1 &2 /> eqv ein _ xin.
-  by rewrite (ein x{2}).
-auto=> /> &2 _ g _ gs _.
-search empty.
-admit.
+    by move=> x'; rewrite !get_setE (eqv x').
+  by auto=> &1 &2 /> eqv _ xin; rewrite eqv.
+by auto=> /> &2 _ g _ gs _ x; rewrite !emptyE.
 qed.
 
 lemma PRF_HybridL_pr (D <: Distinguisher { BoundPRF, RF, Hj }) q &m:
@@ -548,6 +536,91 @@ lemma PRF_HybridL_pr (D <: Distinguisher { BoundPRF, RF, Hj }) q &m:
   =>   Pr[Bounded_PRF_IND(BoundPRF(RF), D).main(q) @ &m: res]
      = Pr[Hj(D).run(1, q) @ &m: res].
 proof. by move=> ge0_q; byequiv (PRF_HybridL D). qed.
+
+module (B (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
+  var j   : int
+
+  var gis : group
+
+  var c   : int
+  var q   : int
+
+  var _qs : (bool list, set * set) fmap
+
+  module O = {
+    proc f(x) = {
+      var xq, yq;
+      var xs <- [x];
+      var  p <- take j xs;
+      var  b <- nth witness xs j;
+      var  s <- drop (j + 1) xs;
+      var  r <- witness;
+
+      if (c <= q) {
+        if (p \notin _qs) {
+          (xq, yq) <@ F.query();
+           _qs.[p] <- (xq, yq);
+        }
+        (xq, yq) <- oget _qs.[p];
+               r <- compute_action [gis] s (if b then yq else xq);
+               c <- c + 1;
+      }
+      return r;
+    }
+  }
+
+  proc distinguish() = {
+    var b;
+
+      j <- 0;
+      c <- 1;
+    _qs <- empty;
+    gis <$ sample;
+      b <@ D(O).distinguish();
+    return b;
+  }
+}.
+
+equiv Toto (D <: Distinguisher { Hj, B, WP_Ideal }):
+  Hj(D).run ~ B(D, WP_Ideal).distinguish:
+    ={glob D} /\ i{1} = 1 /\ Q{1} = B.q{2} /\ 0 <= Q{1}
+    ==> ={res}.
+proof.
+proc; sp=> //=.
+call (:    B.j{2} = 0 /\ Hj.j{1} = 1
+        /\ ={c, q, gis}(Hj, B)
+        /\ (forall p, p \in Hj.yqs{1} => size p = Hj.j{1})
+        /\ (forall p, p \in Hj.yqs{1} => take (size p - 1) p \in B._qs{2})
+        /\ (forall p, p \in B._qs{1} => size p = B.j{1})
+        /\ (forall p, p \in B._qs{2} => exists b, rcons p b \in Hj.yqs{1})
+        /\ (forall p' b y',    Hj.yqs.[rcons p' b]{1} = Some y'
+                           => exists x, B._qs.[p']{2} = Some (x, act B.gis{2} x)
+                                     /\ y' = if b then act B.gis{2} x else x)
+        /\ (forall p x y,    B._qs.[p]{2} = Some (x, y)
+                          => forall b y', Hj.yqs.[rcons p b]{1} = Some y' => y' = if b then y else x)
+        (** yqs[p' ++ [b]] = yq; _qs[p'] = (xq, gt * xq) **)).
++ proc; sp; if; 1,3:by auto.
+  rcondf {1} 1; 1:by auto.
+  inline WP_Ideal.query.
+  if {1}.
+  + if {2}.
+    + wp=> />.
+      conseq (: act gq{1} x0 = if x{2} then yq0{2} else xq0{2})=> //=.
+      + move=> />. admit.
+      case: (x{2}).
+      + wp; rnd (fun g => act g x0) (fun x => extract x0 x); rnd {2}.
+        admit.
+      wp; rnd {2}; rnd (fun g=> act g x0) (fun x => extract x0 x).
+      admit.
+    admit.
+  rcondf {2} 1.
+  + by auto=> /> &0 _ /(_ [x{m}]).
+  wp=> //=.
+  auto=> /> &1 &2 domL_size domLR domR_size domRL valLR valRL c_le_q ^x_in_yqs; rewrite domE.
+  case: {-1}(Hj.yqs{1}.[[x{2}]]) (eq_refl Hj.yqs{1}.[[x{2}]])=> //= y yqs_x.
+  by move: (valLR [] x{2} y yqs_x)=> //= [] xq /> ->.
+admit.
+qed.  
 
 module (C (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
     module O = {
