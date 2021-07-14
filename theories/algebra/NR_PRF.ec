@@ -591,11 +591,11 @@ call (:    B.j{2} = 0 /\ Hj.j{1} = 1
         /\ ={c, q, gis}(Hj, B)
         /\ (forall p, p \in Hj.yqs{1} => size p = Hj.j{1})
         /\ (forall p, p \in Hj.yqs{1} => take (size p - 1) p \in B._qs{2})
-        /\ (forall p, p \in B._qs{1} => size p = B.j{1})
+        /\ (forall p, p \in B._qs{2} => size p = B.j{2})
         /\ (forall p, p \in B._qs{2} => exists b, rcons p b \in Hj.yqs{1})
         /\ (forall p' b y',    Hj.yqs.[rcons p' b]{1} = Some y'
-                           => exists x, B._qs.[p']{2} = Some (x, act B.gis{2} x)
-                                     /\ y' = if b then act B.gis{2} x else x)
+                           => exists x y, B._qs.[p']{2} = Some (x, y)
+                                     /\ y' = if b then y else x)
         /\ (forall p x y,    B._qs.[p]{2} = Some (x, y)
                           => forall b y', Hj.yqs.[rcons p b]{1} = Some y' => y' = if b then y else x)
         (** yqs[p' ++ [b]] = yq; _qs[p'] = (xq, gt * xq) **)).
@@ -606,7 +606,34 @@ call (:    B.j{2} = 0 /\ Hj.j{1} = 1
   + if {2}.
     + wp=> />.
       conseq (: act gq{1} x0 = if x{2} then yq0{2} else xq0{2})=> //=.
-      + move=> />. admit.
+      + move=> /> &1 &2 domL_size domLR domR_size domRL valLR valRL c_le_q x_notin_yqs e_notin_qs.
+        move=> gq xq yq eq_r; rewrite !get_setE {1}eq_r /=.
+        split.
+        + by move=> p; rewrite mem_set=> - [] // /domL_size.
+        split.
+        + by move=> p; rewrite !mem_set=> - [] // /domLR ->.
+        split.
+        + by move=> p; rewrite mem_set=> - [] // /domR_size.
+        split.
+        + move=> p; rewrite mem_set=> - [] />.
+          + move=> /domRL [] b pb_in_yqs.
+            by exists b; rewrite mem_set pb_in_yqs.
+          by exists x{2}; rewrite domE get_set_sameE.
+        split.
+        + move=> p' b y'; rewrite !get_setE; case: (rcons p' b = [x{2}])=> />.
+          + move=> ^ /(congr1 size); rewrite size_rcons //=.
+            move=> /(addIz _ _ 0) /size_eq0 ->> //= ->>.
+            by exists xq yq.
+          case: (p' = [])=> />; last first.
+          + move=> + + h; move: (domL_size (rcons p' b) _); 2:smt().
+            by rewrite domE h.
+          by move=> _ /(valLR [] b y') [] xq' yq'; move: e_notin_qs; rewrite domE=> /= ->.
+        move=> p' x' y'; rewrite get_setE; case: p'=> />; last first.
+        + move=> b bs h; move: (domR_size (b :: bs) _).
+          + by rewrite domE h.
+          smt(size_ge0).
+        move=> b y; rewrite get_setE; case: (b = x{2})=> />.
+        by move=> _ h; move: (domLR [b] _)=> //=; rewrite domE h.
       case: (x{2}).
       + wp; rnd (fun g => act g x0) (fun x => extract x0 x); rnd {2}.
         admit.
@@ -618,7 +645,7 @@ call (:    B.j{2} = 0 /\ Hj.j{1} = 1
   wp=> //=.
   auto=> /> &1 &2 domL_size domLR domR_size domRL valLR valRL c_le_q ^x_in_yqs; rewrite domE.
   case: {-1}(Hj.yqs{1}.[[x{2}]]) (eq_refl Hj.yqs{1}.[[x{2}]])=> //= y yqs_x.
-  by move: (valLR [] x{2} y yqs_x)=> //= [] xq /> ->.
+  by move: (valLR [] x{2} y yqs_x)=> //= [] xq yq /> ->.
 admit.
 qed.  
 
