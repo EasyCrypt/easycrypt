@@ -1,22 +1,9 @@
 # -*- Makefile -*-
 
 # --------------------------------------------------------------------
-OCAMLBUILD_JOBS  ?= 1
-OCAMLBUILD_BIN   ?= ocamlbuild
-OCAMLBUILD_EXTRA ?= 
-OCAMLBUILD_OPTS  := -use-ocamlfind -j $(OCAMLBUILD_JOBS)
-
-
-# In Emacs, use classic display to enable error jumping.
-ifeq ($(shell echo $$TERM), dumb)
- OCAMLBUILD_OPTS += -classic-display
-endif
-ifeq ($(LINT),1)
- OCAMLBUILD_OPTS += -tag lint
-endif
-OCAMLBUILD_OPTS += $(OCAMLBUILD_EXTRA)
-
-OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_OPTS)
+# EJGA: I recommend to let dune detect the number of cores
+# DUNE_JOBS  ?= 1
+DUNE_BIN   ?= dune
 
 DESTDIR    ?=
 PREFIX     ?= /usr/local
@@ -59,7 +46,7 @@ all: build
 build: native
 
 define do-core-build
-	$(OCAMLBUILD) "$(1)"
+	$(DUNE) "$(1)"
 endef
 
 define do-build
@@ -67,7 +54,7 @@ define do-build
 	sed 's/COMMIT/$(COMMIT)/g' < $(FVERSION).in > $(FVERSION)
   $(call do-core-build,src/$(1))
 	if [ ! -z "$(EXE)" ]; then \
-	  cp "_build/src/$(1)" "$(1)$(EXE)"; \
+	  cp "_build/default/src/$(1)" "$(1)$(EXE)"; \
 	fi
 endef
 

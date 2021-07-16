@@ -236,7 +236,7 @@ let symbol_of_ty (ty : ty) =
       let rec doit i =
         if   i >= String.length x
         then "x"
-        else match Char.lowercase x.[i] with
+        else match Char.lowercase_ascii x.[i] with
              | 'a' .. 'z' -> String.make 1 x.[i]
              | _ -> doit (i+1)
       in
@@ -779,7 +779,7 @@ module ExprSmart = struct
     then e
     else e_match b es ty
 
-  let e_lam (e, (b, body)) (b', body') =
+  let _e_lam (e, (b, body)) (b', body') =
     if   b == b' && body == body'
     then e
     else e_lam b' body'
@@ -839,7 +839,7 @@ let e_map fty fe e =
       let bd' = fe bd in
       ExprSmart.e_quant (e, (q, b, bd)) (q, b', bd')
 
-let rec e_fold fe state e =
+let e_fold fe state e =
   match e.e_node with
   | Eint _                -> state
   | Elocal _              -> state

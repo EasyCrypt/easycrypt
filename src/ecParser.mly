@@ -3291,12 +3291,12 @@ proof:
 | PROOF modes=proofmode1* {
     let seen = Hashtbl.create 0 in
       List.fold_left
-        (fun pmodes (mode, flag) ->
+        (fun _pmodes (mode, flag) ->
            if Hashtbl.mem seen mode then
              parse_error mode.pl_loc (Some "duplicated flag");
            Hashtbl.add seen mode ();
            match unloc mode with
-           | `Strict -> { pmodes with pm_strict = flag; })
+           | `Strict -> { pm_strict = flag; })
         { pm_strict = true; } modes
   }
 

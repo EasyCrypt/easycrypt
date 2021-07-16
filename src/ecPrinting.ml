@@ -45,7 +45,7 @@ module PPEnv = struct
 
   let ofenv (env : EcEnv.env) =
     let width =
-      EcGState.asint 0 (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
+      EcGState.asint ~default:0 (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
 
     { ppe_env    = env;
       ppe_locals = Mid.empty;
@@ -185,7 +185,7 @@ module PPEnv = struct
     in
       p_shorten exists p
 
-  let ax_symb (ppe : t) p =
+  let _ax_symb (ppe : t) p =
       let exists sm =
       try  EcPath.p_equal (EcEnv.Ax.lookup_path sm ppe.ppe_env) p
       with EcEnv.LookupFailure _ -> false
@@ -287,7 +287,7 @@ module PPEnv = struct
     in
       msymb
 
-  let rec modtype_symb (ppe : t) mty : EcSymbols.msymbol =
+  let modtype_symb (ppe : t) mty : EcSymbols.msymbol =
     let exists sm =
       match EcEnv.ModTy.lookup_opt sm ppe.ppe_env with
       | None -> false
@@ -371,7 +371,7 @@ end
 let pp_id pp fmt x = Format.fprintf fmt "%a" pp x
 
 (* -------------------------------------------------------------------- *)
-let pp_null (_fmt : Format.formatter) = fun _ -> ()
+let _pp_null (_fmt : Format.formatter) = fun _ -> ()
 
 (* -------------------------------------------------------------------- *)
 let pp_if c pp1 pp2 fmt x =
@@ -392,7 +392,7 @@ let rec pp_list sep pp fmt xs =
     | x :: xs -> Format.fprintf fmt "%a%(%)%a" pp x sep pp_list xs
 
 (* -------------------------------------------------------------------- *)
-let pp_option pp fmt x =
+let _pp_option pp fmt x =
   match x with None -> () | Some x -> pp fmt x
 
 (* -------------------------------------------------------------------- *)
@@ -401,7 +401,7 @@ let pp_enclose ~pre ~post pp fmt x =
 
 (* -------------------------------------------------------------------- *)
 let pp_paren pp fmt x =
-  pp_enclose "(" ")" pp fmt x
+  pp_enclose ~pre:"(" ~post:")" pp fmt x
 
 (* -------------------------------------------------------------------- *)
 let pp_maybe_paren c pp =
@@ -538,7 +538,7 @@ let get_f_projarg ppe e i =
 
   | _ -> raise NoProjArg
 
-let get_e_projarg ppe e i =
+let _get_e_projarg ppe e i =
   match e.e_node with
   | Evar x ->
       get_projarg_for_var
@@ -751,7 +751,7 @@ let pp_stype ppe fmt ty =
   pp_type_r ppe ((1 + fst t_prio_tpl, `NonAssoc), `NonAssoc) fmt ty
 
 (* -------------------------------------------------------------------- *)
-let pp_if3 (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
+let _pp_if3 (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
   let pp fmt (b, e1, e2)=
     Format.fprintf fmt "@[<hov 2>%a@ ? %a@ : %a@]"
       (pp_sub ppe (fst outer, (e_bin_prio_if3, `Left    ))) b
@@ -836,7 +836,7 @@ let pp_opname fmt (nm, op) =
 
   in EcSymbols.pp_qsymbol fmt (nm, op)
 
-let pp_opname_with_tvi ppe fmt (nm, op, tvi) =
+let _pp_opname_with_tvi ppe fmt (nm, op, tvi) =
   match tvi with
   | None ->
       pp_opname fmt (nm, op)
@@ -1166,7 +1166,7 @@ let rec pp_locbinds_blocks ppe ?fv vs =
       (ppe, fun fmt -> Format.fprintf fmt "%t@ %t" pp1 pp2)
 
 (* -------------------------------------------------------------------- *)
-let rec pp_locbinds ppe ?fv vs =
+let pp_locbinds ppe ?fv vs =
   let rec merge_r (xs, ty) vs =
     match vs with
     | [] ->
@@ -1234,7 +1234,7 @@ let rec pp_bindings_blocks ppe ?(break = true) ?fv bds =
       let ppe, pp2 = pp_bindings_blocks ppe ?fv bds in
       (ppe, fun fmt -> Format.fprintf fmt "%t%(%)%t" pp1 pp_sep pp2)
 
-let rec pp_bindings ppe ?break ?fv bds =
+let pp_bindings ppe ?break ?fv bds =
   let rec merge_r (xs, gty) bds =
     match bds with
     | [] ->
@@ -1512,7 +1512,7 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
 
       try
         let (ue, ev) =
-          EcMatching.f_match_core fmnotation hy (ue, ev) bd f
+          EcMatching.f_match_core fmnotation hy (ue, ev) ~ptn:bd f
         in
 
         if not (EcMatching.can_concretize ev ue) then
@@ -2584,7 +2584,7 @@ module PPGoal = struct
           | Some pk -> Format.fprintf fmt "%t " pk in
 
         Format.fprintf fmt
-          "%-.2s%t: @[<hov 2>%t@]@\n%!"
+          "%s%t: @[<hov 2>%t@]@\n%!"
           (PPEnv.local_symb ppe id) pk dk)
         pps
     end;
@@ -2625,7 +2625,7 @@ let pp_hyps (ppe : PPEnv.t) fmt hyps =
       | Some pk -> Format.fprintf fmt "%t" pk in
 
     Format.fprintf fmt
-      "%-.2s%t: @[<hov 2>%t@]@\n%!"
+      "%s%t: @[<hov 2>%t@]@\n%!"
       (PPEnv.local_symb ppe id) pk dk)
     pps
 

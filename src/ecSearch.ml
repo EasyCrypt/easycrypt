@@ -26,10 +26,10 @@ type search = [
 ]
 
 (* -------------------------------------------------------------------- *)
-let as_bypath (search : search) =
+let _as_bypath (search : search) =
   match search with `ByPath p -> Some p | _ -> None
 
-let as_bypattern (search : search) =
+let _as_bypattern (search : search) =
   match search with `ByPattern ptn -> Some ptn | _ -> None
 
 (* -------------------------------------------------------------------- *)

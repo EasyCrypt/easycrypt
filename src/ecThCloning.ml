@@ -102,13 +102,13 @@ let rec evc_update (upt : evclone -> evclone) (nm : symbol list) (evc : evclone)
       in
         { evc with evc_ths = ths }
 
-let rec evc_get (nm : symbol list) (evc : evclone) =
+let rec _evc_get (nm : symbol list) (evc : evclone) =
   match nm with
   | []      -> Some evc
   | x :: nm ->
       match Msym.find_opt x evc.evc_ths with
       | None     -> None
-      | Some evc -> evc_get nm evc
+      | Some evc -> _evc_get nm evc
 
 (* -------------------------------------------------------------------- *)
 let find_mc =
@@ -244,10 +244,10 @@ module OVRD : sig
 
   type 'a ovrd = octxt -> state -> pqsymbol -> 'a -> state
 
-  val ty_ovrd : ty_override ovrd
-  val op_ovrd : op_override ovrd
-  val pr_ovrd : pr_override ovrd
-  val th_ovrd : th_override ovrd
+  (* val ty_ovrd : ty_override ovrd *)
+  (* val op_ovrd : op_override ovrd *)
+  (* val pr_ovrd : pr_override ovrd *)
+  (* val th_ovrd : th_override ovrd *)
 
   val ovrd : octxt -> state -> pqsymbol -> theory_override -> state
 end = struct

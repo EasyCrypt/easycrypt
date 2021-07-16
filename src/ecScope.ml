@@ -439,13 +439,13 @@ module Options = struct
   let get_oldip scope =
     get scope KnownFlags.oldip
 
-  let set_oldip scope value =
+  let _set_oldip scope value =
     set scope KnownFlags.oldip value
 
   let get_redlogic scope =
     get scope KnownFlags.redlogic
 
-  let set_redlogic scope value =
+  let _set_redlogic scope value =
     set scope KnownFlags.redlogic value
 end
 
@@ -771,7 +771,7 @@ module Tactics = struct
   let process1_r mark mode scope t =
     process_r mark mode scope [t]
 
-  let process_core mark mode (scope : scope) (ts : ptactic_core list) =
+  let _process_core mark mode (scope : scope) (ts : ptactic_core list) =
     let ts = List.map (fun t -> { pt_core = t; pt_intros = []; }) ts in
     snd (process_r mark mode scope ts)
 
@@ -1798,7 +1798,7 @@ module Ty = struct
     in Ax.add_defer scope inter
 
   (* ------------------------------------------------------------------ *)
-  let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
+  let _symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
     let subst = { ty_subst_id with ts_def = Mp.of_list [tcp, ([], ty)] } in
       List.map (fun (x, opty) ->
         (EcIdent.name x, (true, ty_subst subst opty)))
@@ -2287,9 +2287,9 @@ module Cloning = struct
 
     let default = { clo_abstract = false; }
 
-    let merge1 opts (b, (x : theory_cloning_option)) =
+    let merge1 _opts (b, (x : theory_cloning_option)) =
       match x with
-      | `Abstract -> { opts with clo_abstract = b; }
+      | `Abstract -> { clo_abstract = b; }
 
     let merge opts (specs : theory_cloning_options) =
       List.fold_left merge1 opts specs

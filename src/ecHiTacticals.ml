@@ -26,13 +26,13 @@ type caseoption = {
 module CaseOptions = struct
   let default = { cod_ambient = false; }
 
-  let merged1 opts (b, x) =
+  let _merged1 _opts (b, x) =
     match x with
-    | `Ambient -> { opts with cod_ambient  = b; }
+    | `Ambient -> { cod_ambient  = b; }
 
-  let merge1 opts ((b, x) : bool * EcParsetree.pcaseoption) =
+  let merge1 _opts ((b, x) : bool * EcParsetree.pcaseoption) =
     match x with
-    | `Ambient -> { opts with cod_ambient = b; }
+    | `Ambient -> { cod_ambient = b; }
 
   let merge opts (specs : EcParsetree.pcaseoptions) =
     List.fold_left merge1 opts specs

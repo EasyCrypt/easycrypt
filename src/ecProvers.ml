@@ -19,7 +19,7 @@ module Version : sig
   val compare : version -> version -> int
 
   val of_tuple  : int * int * int -> version
-  val to_string : version -> string
+  val _to_string : version -> string
 end = struct
   type version = {
     v_major    : int;
@@ -57,7 +57,7 @@ end = struct
     match compare v1.v_subminor v2.v_subminor with n when n <> 0 -> n | _ ->
     compare v1.v_extra v2.v_extra
 
-  let to_string (v : version) =
+  let _to_string (v : version) =
     Printf.sprintf "%d.%d.%d.%s"
       v.v_major v.v_minor v.v_subminor v.v_extra
 end
@@ -348,7 +348,7 @@ let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit
 
-let rec run_prover
+let run_prover
   ?(notify : notify option) (pi : prover_infos) (prover : string) task
 =
   let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
@@ -470,7 +470,7 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
                     ()
               in
 
-              let rec handle_info upd =
+              let handle_info upd =
                 match upd with
                 | CP.NoUpdates
                 | CP.ProverStarted ->

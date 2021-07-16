@@ -73,7 +73,7 @@ let rec string_of_qsymbol = function
   | ([]    , x) -> Printf.sprintf "%s" x
   | (n :: p, x) -> Printf.sprintf "%s.%s" n (string_of_qsymbol (p, x))
 
-let rec pp_qsymbol fmt qn =
+let pp_qsymbol fmt qn =
   Format.fprintf fmt "%s" (string_of_qsymbol qn)
 
 let rec string_of_msymbol (mx : msymbol) =

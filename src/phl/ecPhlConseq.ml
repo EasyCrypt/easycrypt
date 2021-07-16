@@ -1110,7 +1110,7 @@ let process_bd_equiv side (pr, po) tc =
   process_conseq true (None, info2, info3) tc
 
 (* -------------------------------------------------------------------- *)
-type pgoptions =  {
+type _pgoptions =  {
   pgo_split  : bool;
   pgo_solve  : bool;
   pgo_subst  : bool;
@@ -1118,7 +1118,7 @@ type pgoptions =  {
   pgo_delta  : pgo_delta;
 }
 
-and pgo_delta = {
+and _pgo_delta = {
   pgod_case  : bool;
   pgod_split : bool;
 }
@@ -1131,9 +1131,9 @@ type cqpotions = {
 module CQOptions = struct
   let default = { cqo_frame = true; }
 
-  let merge1 opts ((b, x) : bool * EcParsetree.pcqoption) =
+  let merge1 _opts ((b, x) : bool * EcParsetree.pcqoption) =
     match x with
-    | `Frame -> { opts with cqo_frame = b; }
+    | `Frame -> { cqo_frame = b; }
 
   let merge opts (specs : EcParsetree.pcqoptions) =
     List.fold_left merge1 opts specs

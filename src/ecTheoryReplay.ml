@@ -269,7 +269,7 @@ let check_evtags (tags : evtags) (src : symbol list) =
     let dfl = not (List.exists (fun (mode, _) -> mode = `Include) tags) in
     let stt =
       List.map (fun src ->
-        let rec do1 status (mode, dst) =
+        let do1 status (mode, dst) =
           match mode with
           | `Exclude -> if sym_equal src dst then raise E.Reject; status
           | `Include -> status || (sym_equal src dst)
@@ -1023,7 +1023,7 @@ let replay (hooks : 'a ovrhooks)
   ~abstract ~local ~incl ~clears ~renames
   ~opath ~npath ovrds (scope : 'a) (name, items)
 =
-  let subst = EcSubst.add_path EcSubst.empty opath npath in
+  let subst = EcSubst.add_path EcSubst.empty ~src:opath ~dst:npath in
   let ove   = {
     ovre_ovrd     = ovrds;
     ovre_rnms     = renames;

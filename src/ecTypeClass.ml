@@ -50,7 +50,7 @@ module Graph = struct
       | Some m -> Mp.mem dst m
 
   let add ~src ~dst g =
-    if has_path dst src g then
+    if has_path ~dst ~src g then
       raise CycleDetected;
 
     match Mp.find_opt src g.tcg_nodes with
@@ -62,9 +62,8 @@ module Graph = struct
           (odfl Sp.empty (Mp.find_opt dst g.tcg_closure))
           (Sp.add dst (odfl Sp.empty m))
       in
-        { g with
-            tcg_nodes   = Mp.change (some -| up_node) src g.tcg_nodes;
-            tcg_closure = Mp.change (some -| up_clos) src g.tcg_closure; }
+        { tcg_nodes   = Mp.change (some -| up_node) src g.tcg_nodes;
+          tcg_closure = Mp.change (some -| up_clos) src g.tcg_closure; }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -81,8 +80,8 @@ module Nodes = struct
       let aout =
         Sp.filter
           (fun p ->
-             if Graph.has_path p n nodes.tcn_graph then raise E.Discard;
-             not (Graph.has_path n p nodes.tcn_graph))
+             if Graph.has_path ~src:p ~dst:n nodes.tcn_graph then raise E.Discard;
+             not (Graph.has_path ~src:n ~dst:p nodes.tcn_graph))
           nodes.tcn_nodes
       in
         { nodes with tcn_nodes = Sp.add n aout }

@@ -51,11 +51,11 @@ module LowInternal = struct
 
   and assignables = assignable list
 
-  type assoc_t = (assignable list * form) list
+  type _assoc_t = (assignable list * form) list
 
   (* ------------------------------------------------------------------ *)
-  let isAPVar  = function APVar  _ -> true | _ -> false
-  let isALocal = function ALocal _ -> true | _ -> false
+  let _isAPVar  = function APVar  _ -> true | _ -> false
+  let _isALocal = function ALocal _ -> true | _ -> false
 
   (* ------------------------------------------------------------------ *)
   let rec sp_asgn mem env lv e (bds, assoc, pre) =

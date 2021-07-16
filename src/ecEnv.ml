@@ -88,7 +88,7 @@ type varbind = {
   vb_kind  : [`Var of EcTypes.pvar_kind | `Proj of int];
 }
 
-type obj = [
+type _obj = [
   | `Variable of varbind
   | `Function of function_
   | `Module   of module_expr
@@ -346,7 +346,7 @@ module MC = struct
       | (p, `Dn q) -> (p, Some q)
 
   (* ------------------------------------------------------------------ *)
-  let _downpath_for_modcp isvar ~local ~spsc env p args =
+  let downpath_for_modcp isvar ~local ~spsc env p args =
     let prefix =
       let prefix_of_mtop = function
         | `Concrete (p1, _) -> Some p1
@@ -417,8 +417,8 @@ module MC = struct
     with Not_found ->
       assert false
 
-  let _downpath_for_var = _downpath_for_modcp true
-  let _downpath_for_fun = _downpath_for_modcp false ~local:false
+  let downpath_for_var = downpath_for_modcp true
+  let downpath_for_fun = downpath_for_modcp false ~local:false
 
   (* ------------------------------------------------------------------ *)
   let _downpath_for_mod spsc env p args =
@@ -612,7 +612,7 @@ module MC = struct
         match obj.vb_kind with
         | `Var EcTypes.PVglob -> false
         | `Var EcTypes.PVloc | `Proj _ -> true in
-      (_downpath_for_var local false env p args, obj)
+      (downpath_for_var ~local ~spsc:false env p args, obj)
 
   let _up_var candup mc x obj =
     if not candup && MMsym.last x mc.mc_variables <> None then
@@ -626,7 +626,7 @@ module MC = struct
   let lookup_fun qnx env =
     match lookup (fun mc -> mc.mc_functions) qnx env with
     | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_fun false env p args, obj)
+    | Some (p, (args, obj)) -> (downpath_for_fun ~spsc:false env p args, obj)
 
   let _up_fun candup mc x obj =
     if not candup && MMsym.last x mc.mc_functions <> None then
@@ -1598,7 +1598,7 @@ module Fun = struct
         match MC.by_path (fun mc -> mc.mc_functions) ip env with
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
-           let ((spi, params), _op) = MC._downpath_for_fun spsc env ip params in
+           let ((spi, params), _op) = MC.downpath_for_fun ~spsc env ip params in
            if i <> spi || susp && args <> [] then
              assert false;
            if not susp && List.length args <> List.length params then
@@ -1796,7 +1796,7 @@ module Var = struct
              | `Var EcTypes.PVglob -> false
              | `Var EcTypes.PVloc | `Proj _ -> true in
            let ((spi, _params), _) =
-             MC._downpath_for_var local spsc env ip params in
+             MC.downpath_for_var ~local ~spsc env ip params in
            if i <> spi then
              assert false;
            o
@@ -2627,7 +2627,7 @@ module Op = struct
         env_ntbase = ofold List.cons env.env_ntbase nt;
         env_item   = mk_citem import (CTh_operator(name, op)) :: env.env_item; }
 
-  let rebind name op env =
+  let _rebind name op env =
     MC.bind_operator name op env
 
   let all ?(check = fun _ -> true) (qname : qsymbol) (env : env) =
@@ -2726,7 +2726,7 @@ module Ax = struct
     let env = MC.bind_axiom name ax env in
     { env with env_item = mk_citem import (CTh_axiom (name, ax)) :: env.env_item }
 
-  let rebind name ax env =
+  let _rebind name ax env =
     MC.bind_axiom name ax env
 
   let instanciate p tys env =
@@ -2770,12 +2770,12 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Algebra = struct
-  let bind_ring ty cr env =
+  let _bind_ring ty cr env =
     assert (Mid.is_empty ty.ty_fv);
     { env with env_tci =
         TypeClass.bind_instance ([], ty) (`Ring cr) env.env_tci }
 
-  let bind_field ty cr env =
+  let _bind_field ty cr env =
     assert (Mid.is_empty ty.ty_fv);
     { env with env_tci =
         TypeClass.bind_instance ([], ty) (`Field cr) env.env_tci }
@@ -2790,16 +2790,20 @@ module Theory = struct
   type mode = [`All | thmode]
 
   (* -------------------------------------------------------------------- *)
-  let rec ctheory_of_theory =
+  let rec _ctheory_of_theory =
       fun th ->
-        let items = List.map ctheory_item_of_theory_item th in
+        let items = List.map _ctheory_item_of_theory_item th in
           { cth_desc = CTh_struct items; cth_struct = items; }
 
+<<<<<<< HEAD
   and ctheory_item_of_theory_item (item : theory_item) =
     { cti_import = item.ti_import;
       cti_item   = ctheory_item_of_theory_item_r item.ti_item; }
 
   and ctheory_item_of_theory_item_r = function
+=======
+  and _ctheory_item_of_theory_item = function
+>>>>>>> [build] Enable and fix "unused value" warning.
     | Th_type      (x, ty)  -> CTh_type      (x, ty)
     | Th_operator  (x, op)  -> CTh_operator  (x, op)
     | Th_axiom     (x, ax)  -> CTh_axiom     (x, ax)
@@ -2814,7 +2818,7 @@ module Theory = struct
     | Th_auto      ps       -> CTh_auto      ps
 
     | Th_theory (x, (th, md)) ->
-        CTh_theory (x, (ctheory_of_theory th, md))
+        CTh_theory (x, (_ctheory_of_theory th, md))
 
   (* ------------------------------------------------------------------ *)
   let enter name env =
@@ -2980,7 +2984,7 @@ module Theory = struct
         env
 
   (* ------------------------------------------------------------------ *)
-  let rebind name cth env =
+  let _rebind name cth env =
     MC.bind_theory name cth env
 
   (* ------------------------------------------------------------------ *)

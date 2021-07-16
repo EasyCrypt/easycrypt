@@ -293,7 +293,7 @@ module FApi = struct
     get_pregoal_by_id pe.pr_main pe
 
   (* ------------------------------------------------------------------ *)
-  let tc1_get_pregoal_by_id (hd : handle) (tc : tcenv1) =
+  let _tc1_get_pregoal_by_id (hd : handle) (tc : tcenv1) =
     (tc1_get_goal_by_id hd tc).g_goal
 
   (* ------------------------------------------------------------------ *)
@@ -326,9 +326,8 @@ module FApi = struct
         | [] -> tc
         | hd :: tcx1 ->
             let goal = tc_get_pregoal_by_id hd tc in
-            { tc with
-                tce_tcenv = { tc.tce_tcenv with tce_goal = Some goal };
-                tce_goals = tcx1; }
+            { tce_tcenv = { tc.tce_tcenv with tce_goal = Some goal };
+              tce_goals = tcx1; }
 
   (* ------------------------------------------------------------------ *)
   let tcenv_of_tcenv1 (tc : tcenv1) =
@@ -409,9 +408,8 @@ module FApi = struct
     | [] -> raise (InvalidStateException "goal-at-top")
     | tcx1 :: tcx ->
         let tc =
-          { tc with
-              tce_tcenv = { tc.tce_tcenv with tce_ctxt = tcx };
-              tce_goals = tc.tce_goals @ tcx1; }
+          { tce_tcenv = { tc.tce_tcenv with tce_ctxt = tcx };
+            tce_goals = tc.tce_goals @ tcx1; }
         in tc_normalize tc
 
   (* ------------------------------------------------------------------ *)
@@ -697,7 +695,7 @@ module FApi = struct
         | 0, _ -> tc
         | _, s ->
             let tcenv = { tc.tce_tcenv with tce_goal = None; } in
-            let tc    = { tc with tce_goals = s; tce_tcenv = tcenv; } in
+            let tc    = { tce_goals = s; tce_tcenv = tcenv; } in
             tc_normalize tc
 
   (* ------------------------------------------------------------------ *)
@@ -718,7 +716,7 @@ module FApi = struct
           let gs1, gs2 = List.takedrop (min delta len) gs2 in
           List.rev_append rgs1 (gs1 @ g :: gs2) in
       let tcenv = { tc.tce_tcenv with tce_goal = None; } in
-      let tc    = { tc with tce_goals = s; tce_tcenv = tcenv; } in
+      let tc    = { tce_goals = s; tce_tcenv = tcenv; } in
       tc_normalize tc
 
   (* ------------------------------------------------------------------ *)
@@ -843,7 +841,7 @@ module FApi = struct
     t_ors_pmap (some |- totc) xs tc
 
   (* ------------------------------------------------------------------ *)
-  let rec t_ors (tts : backward list) (tc : tcenv1) =
+  let t_ors (tts : backward list) (tc : tcenv1) =
     t_ors_pmap (fun x -> Some x) tts tc
 
   (* ------------------------------------------------------------------ *)

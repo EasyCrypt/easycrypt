@@ -30,7 +30,7 @@ let default_end_without_anchor =
   Named (Repeat (Any, (None, None), `Greedy), default_end_name)
 
 (*-------------------------------------------------------------------- *)
-let default_stmt x = odfl any_stmt x
+let _default_stmt x = odfl any_stmt x
 
 (*-------------------------------------------------------------------- *)
 let add_default_names (at_begin, at_end) pattern =

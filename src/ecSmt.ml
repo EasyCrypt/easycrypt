@@ -121,7 +121,7 @@ let str_p p =
 
 let preid    id = WIdent.id_fresh (EcIdent.name id)
 let preid_p  p  = str_p (EcPath.tostring p)
-let preid_mp mp = str_p (EcPath.m_tostring mp)
+let _preid_mp mp = str_p (EcPath.m_tostring mp)
 let preid_xp xp = str_p (EcPath.x_tostring xp)
 
 (* -------------------------------------------------------------------- *)
@@ -297,7 +297,7 @@ let prop_w3op ?(name = "x") arity mkfo =
 let w3op_as_ldecl = function
   | `LDecl ls -> ls | _ -> assert false
 
-let w3op_as_internal = function
+let _w3op_as_internal = function
   | `Internal mk -> mk | _ -> assert false
 
 let w3op_fo w3op =
@@ -1279,7 +1279,7 @@ let unwanted_ops =
 (* See "Lightweight Relevance Filtering for Machine-Generated           *)
 (* Resolution Problems" for a description of axioms selection.          *)
 
-type ax_info = {
+type _ax_info = {
   ax_name : path;
   ax_symb : Sp.t;
 }
@@ -1401,7 +1401,7 @@ module Frequency = struct
       f_tabp        = Hp.create 0;
       f_tabf        = Hx.create 0 }
 
-  let init unwanted_op all : frequency =
+  let _init unwanted_op all : frequency =
     let fr = create unwanted_op in
     List.iter (fun (_,ax) -> add fr ax) all;
     fr

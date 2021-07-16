@@ -35,9 +35,6 @@ type datatype = {
 }
 
 (* -------------------------------------------------------------------- *)
-val record_ctor_name : symbol -> symbol
-val record_ind_path  : symbol -> symbol
-
 val record_ctor_path : path -> path
 val record_ind_path  : path -> path
 
