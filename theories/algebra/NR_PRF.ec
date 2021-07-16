@@ -1,8 +1,8 @@
 (* NR-PRF *)
-require import Int Real List SmtMap Distr DList FSet.
+require import Int Real List SmtMap Distr DList FSet PROM.
 require (*--*) GroupAction PRF.
 
-(* We need a regular, effective, abelian group action for this construction *) 
+(* We need a regular, effective, abelian group action for this construction *)
 clone import GroupAction.ARegEGA as Ega.
 
 (* Setup keyspace, domain, and range *)
@@ -490,20 +490,74 @@ qed.
 
 (* -------------------------------------------------------- *)
 (* Proving the hybrid reduction of lemma 4.21/ theorem 4.19 *)
+clone import PROM.FullRO as YRO_t with
+  type in_t    <- bool list,
+  type out_t   <- R,
+  type d_in_t  <- unit,
+  type d_out_t <- bool,
+    op dout _  <- dR. (* Might need to change this, who knows? *)
 
-module (B (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
+clone import PROM.FullRO as XRO_t with
+  type in_t    <- bool list,
+  type out_t   <- R,
+  type d_in_t  <- unit,
+  type d_out_t <- bool,
+    op dout _  <- dR. (* Might need to change this, who knows? *)
+
+module Y_RO (F : WP_Oracles)  : YRO_t.RO = {
+  var yqs : (bool list, R) fmap
+
+  proc init() = {
+    yqs <- empty;
+  }
+
+  proc get(x) = {
+    var xq, yq;
+    if (x \notin yqs) {
+      (xq, yq) <@ F.query();
+      yqs.[x] <- yq;
+    }
+    return oget yqs.[x];
+  }
+
+  proc sample(x) = { get(x); }
+
+  proc set(x : bool list, y : R) = {}
+  proc rem(x : bool list) = {}
+}.
+
+module X_RO (F : WP_Oracles)  : XRO_t.RO = {
+  var xqs : (bool list, R) fmap
+
+  proc init() = {
+    xqs <- empty;
+  }
+
+  proc get(x) = {
+    var xq, yq;
+    if (x \notin xqs) {
+      (xq, yq) <@ F.query();
+      xqs.[x] <- xq;
+    }
+    return oget xqs.[x];
+  }
+
+  proc sample(x) = { get(x); }
+
+  proc set(x : bool list, y : R) = {}
+  proc rem(x : bool list) = {}
+}.
+
+module B (D : Distinguisher) (Ys : YRO_t.RO) (Xs : XRO_t.RO) = {
   var j   : int
 
-  var gis : group
+  var gis : group list
 
   var c   : int
   var q   : int
 
-  var _qs : (bool list, set * set) fmap
-
   module O = {
     proc f(x) = {
-      var xq, yq;
       var xs <- [x];
       var  p <- take j xs;
       var  b <- nth witness xs j;
@@ -511,13 +565,13 @@ module (B (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
       var  r <- witness;
 
       if (c <= q) {
-        if (p \notin _qs) {
-          (xq, yq) <@ F.query();
-           _qs.[p] <- (xq, yq);
+        if (b) {
+          r <@ Ys.get(p);
+        } else {
+          r <@ Xs.get(p);
         }
-        (xq, yq) <- oget _qs.[p];
-               r <- compute_action [gis] s (if b then yq else xq);
-               c <- c + 1;
+        r <- compute_action gis s r;
+        c <- c + 1;
       }
       return r;
     }
@@ -525,108 +579,106 @@ module (B (D : Distinguisher) : WP_Adv) (F : WP_Oracles) = {
 
   proc distinguish() = {
     var b;
-
+      Ys.init();
+      Xs.init();
       j <- 0;
       c <- 1;
-    _qs <- empty;
-    gis <$ sample;
+    gis <$ dlist sample 0; (* This should only sample for indices [j+2, l] *)
       b <@ D(O).distinguish();
     return b;
   }
 }.
 
-equiv Toto (D <: Distinguisher { Hj, B, WP_Ideal }):
-  Hj(D).run ~ B(D, WP_Ideal).distinguish:
+equiv Toto (D <: Distinguisher { Hj, B, Y_RO, X_RO, WP_Ideal }):
+  Hj(D).run ~ B(D, Y_RO(WP_Ideal), X_RO(WP_Ideal)).distinguish:
     ={glob D} /\ i{1} = 1 /\ Q{1} = B.q{2} /\ 0 <= Q{1}
     ==> ={res}.
 proof.
 proc; sp=> //=.
 call (:    B.j{2} = 0 /\ Hj.j{1} = 1
-        /\ ={c, q, gis}(Hj, B)
+        /\ ={c, q}(Hj, B)
+        /\ size B.gis{2} = 1 - B.j{2} - 1
         /\ (forall p, p \in Hj.yqs{1} => size p = Hj.j{1})
-        /\ (forall p, p \in Hj.yqs{1} => take (size p - 1) p \in B._qs{2})
-        /\ (forall p, p \in B._qs{2} => size p = B.j{2})
-        /\ (forall p, p \in B._qs{2} => exists b, rcons p b \in Hj.yqs{1})
-        /\ (forall p' b y',    Hj.yqs.[rcons p' b]{1} = Some y'
-                           => exists x y, B._qs.[p']{2} = Some (x, y)
-                                     /\ y' = if b then y else x)
-        /\ (forall p x y,    B._qs.[p]{2} = Some (x, y)
-                          => forall b y', Hj.yqs.[rcons p b]{1} = Some y' => y' = if b then y else x)
+        /\ (forall p, p \in Y_RO.yqs{2} => size p = B.j{2})
+        /\ (forall p, p \in X_RO.xqs{2} => size p = B.j{2})
+        /\ (forall p, p \in Y_RO.yqs{2} => rcons p true \in Hj.yqs{1})
+        /\ (forall p, p \in X_RO.xqs{2} => rcons p false \in Hj.yqs{1})
+        /\ (forall p, Y_RO.yqs.[p]{2} = Hj.yqs.[rcons p true]{1})
+        /\ (forall p, X_RO.xqs.[p]{2} = Hj.yqs.[rcons p false]{1})
         (** yqs[p' ++ [b]] = yq; _qs[p'] = (xq, gt * xq) **)).
 + proc; sp; if; 1,3:by auto.
   rcondf {1} 1; 1:by auto.
-  inline WP_Ideal.query.
+  inline *.
   if {1}.
-  + if {2}.
-    + wp=> />.
-      conseq (: act gq{1} x0 = if x{2} then yq0{2} else xq0{2})=> //=.
-      + move=> /> &1 &2 domL_size domLR domR_size domRL valLR valRL c_le_q x_notin_yqs e_notin_qs.
-        move=> gq xq yq eq_r; rewrite !get_setE {1}eq_r /=.
-        split.
-        + by move=> p; rewrite mem_set=> - [] // /domL_size.
-        split.
-        + by move=> p; rewrite !mem_set=> - [] // /domLR ->.
-        split.
-        + by move=> p; rewrite mem_set=> - [] // /domR_size.
-        split.
-        + move=> p; rewrite mem_set=> - [] />.
-          + move=> /domRL [] b pb_in_yqs.
-            by exists b; rewrite mem_set pb_in_yqs.
-          by exists x{2}; rewrite domE get_set_sameE.
-        split.
-        + move=> p' b y'; rewrite !get_setE; case: (rcons p' b = [x{2}])=> />.
-          + move=> ^ /(congr1 size); rewrite size_rcons //=.
-            move=> /(addIz _ _ 0) /size_eq0 ->> //= ->>.
-            by exists xq yq.
-          case: (p' = [])=> />; last first.
-          + move=> + + h; move: (domL_size (rcons p' b) _); 2:smt().
-            by rewrite domE h.
-          by move=> _ /(valLR [] b y') [] xq' yq'; move: e_notin_qs; rewrite domE=> /= ->.
-        move=> p' x' y'; rewrite get_setE; case: p'=> />; last first.
-        + move=> b bs h; move: (domR_size (b :: bs) _).
-          + by rewrite domE h.
-          smt(size_ge0).
-        move=> b y; rewrite get_setE; case: (b = x{2})=> />.
-        by move=> _ h; move: (domLR [b] _)=> //=; rewrite domE h.
+  + if {2}; sp.
+    + rcondt{2} 1=> //=.
+      + auto=> /> &1 _ _ _ _ _ _ valLRy _ _ + x'.
+        by rewrite x' !domE valLRy.
+      wp=> />.
       symmetry.
-      case: (x{1}).
-      + wp; rnd (fun x => extract x0 x) (fun g => act g x0); rnd {1}.
-        auto=> /> &1 &2 domL_size domLR domR_size domRL valLR valRL c_le_q x_notin_yqs e_notin_qs _ x' _.
-        split=> [g _ | _]; first exact extractUniq.
-        split=> [g _ | _ r _]; first exact sample_dR_iso.
-        by rewrite extractP /=.
-      wp; rnd{1}; rnd (fun x => extract x0 x) (fun g => act g x0).
-      auto=> /> &1 &2 domL_size domLR domR_size domRL valLR valRL c_le_q x_notin_yqs e_notin_qs x'.
+      rnd (fun x => extract x0 x) (fun g => act g x0); rnd {1}.
+      auto=> /> &1 &2 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q x_notin_yqs x'.
+      move=> x xin.
       split=> [g _ | _]; first exact extractUniq.
       split=> [g _ | _ r _]; first exact sample_dR_iso.
-      by rewrite extractP /=.
-    auto=> /> &1 &2 domL_size domLR domR_size domRL valLR valRL c_le_q x_notin_yqs e_in_qs g _.
-    rewrite !get_setE /=.
+      rewrite extractP /=.
+      split.
+      + rewrite !get_setE.
+        by case (B.gis{1}).
+      split.
+      + by move=> p; rewrite mem_set=> - [] // /domR_size.
+      split.
+      + by move=> p; rewrite mem_set=> - [] // /domLy_size.
+      split.
+      + by move=> p; rewrite !mem_set=> - [] // /domLRy ->.
+      split.
+      + by move=> p; rewrite !mem_set=> /domLRx ->.
+    by split; (case=> [ | b l]; rewrite !get_setE ?valLRy ?valLRx //=; case l).
+    rcondt{2} 1=> //=.
+      + auto=> /> &1 _ _ _ _ _ _ _ valLRx _ + x'.
+        by rewrite x' !domE valLRx.
+    wp=> />.
+    symmetry.
+    rnd {1}; rnd (fun x => extract x0 x) (fun g => act g x0).
+    auto=> /> &1 &2 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q x_notin_yqs x'.
+    split=> [g _ | _]; first exact extractUniq.
+    split=> [g _ | _ r _]; first exact sample_dR_iso.
+    rewrite extractP /=.
+    move=> y yin.
     split.
-    + admit.
+    + rewrite !get_setE.
+      by case (B.gis{1}).
     split.
-    + by move=> p; rewrite mem_set=> - [] // /domL_size.
+    + by move=> p; rewrite mem_set=> - [] // /domR_size.
     split.
-    + by move=> p; rewrite !mem_set=> - [] // /domLR ->.
-    admit.
-  rcondf {2} 1.
-  + by auto=> /> &0 _ /(_ [x{m}]).
-  wp=> //=.
-  auto=> /> &1 &2 domL_size domLR domR_size domRL valLR valRL c_le_q ^x_in_yqs; rewrite domE.
-  case: {-1}(Hj.yqs{1}.[[x{2}]]) (eq_refl Hj.yqs{1}.[[x{2}]])=> //= y yqs_x.
-  by move: (valLR [] x{2} y yqs_x)=> //= [] xq yq /> ->.
-auto=> /> &2 z_le_q g0 _ g1 _.
+    + by move=> p; rewrite mem_set=> - [] // /domLx_size.
+    split.
+    + by move=> p; rewrite !mem_set=> /domLRy ->.
+    split.
+    + by move=> p; rewrite !mem_set=> - [] // /domLRx ->.
+    by split; (case=> [ | b l]; rewrite !get_setE ?valLRy ?valLRx //=; case l).
+  if {2}=> //=; sp.
+  + rcondf{2} 1=> //=.
+    + auto=> /> &1 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q + x'.
+      by rewrite x' !domE valLRy.
+    auto=> /> &1 &2 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q x_notin_yqs x'.
+    move: size_gis.
+    rewrite size_eq0=> -> /=; congr.
+    by rewrite -(valLRy []).
+  rcondf{2} 1=> //=.
+  + auto=> /> &1 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q + x'.
+    by rewrite x' !domE valLRx.
+  auto=> /> &1 &2 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q x_notin_yqs x'.
+  move: size_gis.
+  rewrite size_eq0=> -> /=; congr.
+  by rewrite -(valLRx []).
+inline *.
+sp; wp.
+rnd {2}.
+auto=> /> &2 z_le_q g _ gi _ gis gis_in.
 split.
-+ by move=> p; apply contraLR; rewrite mem_empty.
-split.
-+ by move=> p; apply contraLR; rewrite !mem_empty.
-split.
-+ by move=> p; apply contraLR; rewrite !mem_empty.
-split.
-+ by move=> p; apply contraLR; rewrite !mem_empty.
-split.
-+ by move=> p b y; apply contraLR; rewrite !emptyE.
-by move=> p b y; apply contraLR; rewrite !emptyE.
++ exact (supp_dlist_size sample).
+smt(mem_empty emptyE).
 qed.
 
 lemma Hybrid_PRF_WP_Real_eq (D <: Distinguisher{Hybrid_PRF_0', Hybrid_WP_Real, B}) &m :
