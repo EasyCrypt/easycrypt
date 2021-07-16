@@ -490,13 +490,6 @@ qed.
 
 (* -------------------------------------------------------- *)
 (* Proving the hybrid reduction of lemma 4.21/ theorem 4.19 *)
-clone import PROM.FullRO as YRO_t with
-  type in_t    <- bool list,
-  type out_t   <- R,
-  type d_in_t  <- unit,
-  type d_out_t <- bool,
-    op dout _  <- dR. (* Might need to change this, who knows? *)
-
 clone import PROM.FullRO as XRO_t with
   type in_t    <- bool list,
   type out_t   <- R,
@@ -504,51 +497,73 @@ clone import PROM.FullRO as XRO_t with
   type d_out_t <- bool,
     op dout _  <- dR. (* Might need to change this, who knows? *)
 
-module Y_RO (F : WP_Oracles)  : YRO_t.RO = {
-  var yqs : (bool list, R) fmap
+module X  = RO.
+module LX = FullEager.LRO.
 
-  proc init() = {
-    yqs <- empty;
-  }
+clone import PROM.FullRO as YRO_t with
+  type in_t    <- bool list,
+  type out_t   <- R,
+  type d_in_t  <- unit,
+  type d_out_t <- bool,
+    op dout _  <- dR. (* Might need to change this, who knows? *)
 
-  proc get(x) = {
-    var xq, yq;
-    if (x \notin yqs) {
-      (xq, yq) <@ F.query();
-      yqs.[x] <- yq;
+module Y  = RO.
+module LY = FullEager.LRO.
+
+clone import PROM.FullRO as XYRO_t with
+  type in_t    <- bool list,
+  type out_t   <- R * R,
+  type d_in_t  <- unit,
+  type d_out_t <- bool,
+    op dout _  <- dR `*` dR.
+
+module XY  = RO.
+module LXY = FullEager.LRO.
+
+(** The hybrid—distinguishes random {(xq,yq)} from pseudorandom {(xq,yq)}
+    We index the family with query prefixes because we don't really
+    care about what the index is: we;; run a hybrid over it anyway
+**)
+module Bj (D : Distinguisher) (XYs : XYRO_t.RO) = {
+  var j   : int
+
+  var gis : group list
+
+  var c   : int
+  var q   : int
+
+  module O = {
+    proc f(x) = {
+      var xq, yq;
+      var xs <- [x];
+      var  p <- take j xs;
+      var  b <- nth witness xs j;
+      var  s <- drop (j + 1) xs;
+      var  r <- witness;
+
+      if (c <= q) {
+        (xq, yq) <@ XYs.get(p);
+        r <- compute_action gis s (if b then yq else xq);
+        c <- c + 1;
+      }
+      return r;
     }
-    return oget yqs.[x];
   }
 
-  proc sample(x) = { get(x); }
-
-  proc set(x : bool list, y : R) = {}
-  proc rem(x : bool list) = {}
+  proc distinguish(J, Q) = {
+    var b;
+      XYs.init();
+      j <- J;
+      c <- 1;
+      q <- Q;
+    gis <$ dlist sample 0; (* This should only sample for indices [j+2, l] *)
+      b <@ D(O).distinguish();
+    return b;
+  }
 }.
 
-module X_RO (F : WP_Oracles)  : XRO_t.RO = {
-  var xqs : (bool list, R) fmap
-
-  proc init() = {
-    xqs <- empty;
-  }
-
-  proc get(x) = {
-    var xq, yq;
-    if (x \notin xqs) {
-      (xq, yq) <@ F.query();
-      xqs.[x] <- xq;
-    }
-    return oget xqs.[x];
-  }
-
-  proc sample(x) = { get(x); }
-
-  proc set(x : bool list, y : R) = {}
-  proc rem(x : bool list) = {}
-}.
-
-module B (D : Distinguisher) (Ys : YRO_t.RO) (Xs : XRO_t.RO) = {
+(** We only sample the value that's needed **)
+module B' (D : Distinguisher) (Xs : XRO_t.RO) (Ys : YRO_t.RO) = {
   var j   : int
 
   var gis : group list
@@ -566,9 +581,11 @@ module B (D : Distinguisher) (Ys : YRO_t.RO) (Xs : XRO_t.RO) = {
 
       if (c <= q) {
         if (b) {
+               Xs.sample(p);
           r <@ Ys.get(p);
         } else {
           r <@ Xs.get(p);
+               Ys.sample(p);
         }
         r <- compute_action gis s r;
         c <- c + 1;
@@ -577,110 +594,242 @@ module B (D : Distinguisher) (Ys : YRO_t.RO) (Xs : XRO_t.RO) = {
     }
   }
 
-  proc distinguish() = {
+  proc distinguish(J, Q) = {
     var b;
       Ys.init();
       Xs.init();
-      j <- 0;
+      j <- J;
       c <- 1;
+      q <- Q;
     gis <$ dlist sample 0; (* This should only sample for indices [j+2, l] *)
       b <@ D(O).distinguish();
     return b;
   }
 }.
 
-equiv Toto (D <: Distinguisher { Hj, B, Y_RO, X_RO, WP_Ideal }):
-  Hj(D).run ~ B(D, Y_RO(WP_Ideal), X_RO(WP_Ideal)).distinguish:
-    ={glob D} /\ i{1} = 1 /\ Q{1} = B.q{2} /\ 0 <= Q{1}
+clone import DProd.ProdSampling as ProdR with
+  type t1 <- R,
+  type t2 <- R.
+
+module B'_X (D : Distinguisher) (Y : YRO_t.RO) (X : XRO_t.RO) = {
+  proc distinguish() = {
+    var b;
+
+    b <@ B'(D, X, Y).distinguish(B'.j, B'.q);
+    return b;
+  }
+}.
+
+module B'_Y (D : Distinguisher) (X : XRO_t.RO) (Y : YRO_t.RO) = {
+  proc distinguish() = {
+    var b;
+
+    b <@ B'(D, X, Y).distinguish(B'.j, B'.q);
+    return b;
+  }
+}.
+
+equiv split_XY (D <: Distinguisher { Bj, B', XY, X, Y, XRO_t.FRO, YRO_t.FRO }):
+    Bj(D, XY).distinguish ~ B'(D, LX, LY).distinguish:
+      ={glob D, arg} ==> ={glob D, res}.
+proof.
+transitivity
+  B'_X(D, LY, X).distinguish
+  (={glob D} /\ arg{1} = (B'.j, B'.q){2} ==> ={glob D, res})
+  (={glob D, glob X} /\ arg{2} = (B'.j, B'.q){1} ==> ={glob D, res})=> // [/#||]; last first.
++ transitivity
+    B'_X(D, LY, LX).distinguish
+    (={glob D, glob X, glob Y, glob B'} ==> ={glob D, res})
+    (={glob D} /\ arg{2} = (B'.j, B'.q){1} ==> ={glob D, res})=> // [/#||].
+  + conseq (XRO_t.FullEager.RO_LRO_D (B'_X(D, LY)) _)=> />.
+    exact: (dR_ll witness).
+  by proc; inline *; sim.
+transitivity
+  B'_Y(D, X, Y).distinguish
+  (={glob D} /\ arg{1} = (B'.j, B'.q){2} ==> ={glob D, res})
+  (={glob D, glob X, glob Y, glob B'} ==> ={glob D, res})=> // [/#||]; last first.
++ transitivity
+    B'_Y(D, X, LY).distinguish
+    (={glob D, glob X, glob Y, glob B'} ==> ={glob D, res})
+    (={glob D, glob X, glob Y, glob B'} ==> ={glob D, res})=> // [/#||].
+  + conseq (YRO_t.FullEager.RO_LRO_D (B'_Y(D, X)) _)=> />.
+    exact: (dR_ll witness).
+  by proc; inline *; sim.
+transitivity
+  B'(D, X, Y).distinguish
+  (={glob D, arg} ==> ={glob D, res})
+  (={glob D} /\ arg{1} = (B'.j, B'.q){2} ==> ={glob D, res})=> // [/#||]; last first.
++ by proc; inline *; sim.
+proc.
+call (:    ={j, c, q, gis}(Bj, B')
+        /\ (forall p x y,
+                  XY.m{1}.[p] = Some (x, y)
+              <=> (X.m{2}.[p] = Some x /\ Y.m{2}.[p] = Some y))
+        /\ (forall p, p \in X.m{2} <=> p \in Y.m{2})).
++ proc; sp; if; auto.
+  if {2}; inline *.
+  + swap {2} 6 -3.
+    exists * RO.m.[p]{1}; elim * => - [|[] xq yq].
+    + rcondt {1} 3; 1:by auto=> /#.
+      rcondt {2} 5.
+      + auto=> /> &0 /eq_sym + + + _ _ _ _ _ _.
+        pose p := if Bj.j{m} <= 0 then [] else [x{m}].
+        rewrite !domE=> //= xy_p val_inv dom_inv.
+        by move: (val_inv p) xy_p; case: (XY.m.[p]{m})=> /#.
+      rcondt {2} 7.
+      + auto=> /> &0 /eq_sym + + + _ _ _ _ _ _.
+        pose p := if Bj.j{m} <= 0 then [] else [x{m}].
+        rewrite !domE=> //= xy_p val_inv dom_inv.
+        by move: (val_inv p) xy_p; case: (XY.m.[p]{m})=> /#.
+      sp; auto; conseq (: r0{1} = (r1,r0){2}).
+      + move=> /> &1 &2 /eq_sym.
+        pose p := if B'.j{2} <= 0 then [] else [x{2}].
+        move=> xy_p val_inv dom_inv _ _ r0 r1; rewrite !get_setE //=.
+        smt(get_setE).
+      transitivity {1}
+        {r0 <@ ProdR.S.sample(dR, dR); }
+        (true ==> ={r0})
+        (true ==> r0{1} = (r1, r0){2})=> //.
+      + by inline {2} 1; auto.
+      transitivity {2}
+        { (r1, r0) <@ ProdR.S.sample2(dR, dR); }
+        (true ==> r0{1} = (r1, r0){2})
+        (true ==> ={r0, r1})=> //.
+      + by call ProdR.sample_sample2; auto=> /> [].
+      by swap {2} 1 1; inline {1} 1; auto.
+    rcondf {1} 3; 1:by auto=> /#.
+    rcondf {2} 5.
+    + auto=> /> &0 /eq_sym + + + _ _ _ _ _ _.
+      pose p := if Bj.j{m} <= 0 then [] else [x{m}].
+      rewrite !domE=> //= xy_p val_inv dom_inv.
+      by move: (val_inv p xq yq); rewrite xy_p=> /> ->.
+    rcondf {2} 6.
+    + auto=> /> &0 /eq_sym + + + _ _ _ _ _ _.
+      pose p := if Bj.j{m} <= 0 then [] else [x{m}].
+      rewrite !domE=> //= xy_p val_inv dom_inv.
+      by move: (val_inv p xq yq); rewrite xy_p=> /> _ ->.
+    sp; auto; conseq (: r0{1} = (r1,r0){2}).
+    + move=> /> &1 &2 /eq_sym.
+      pose p := if B'.j{2} <= 0 then [] else [x{2}].
+      by move=> xy_p /(_ p xq yq) + _ _ _; rewrite xy_p=> /> _ ->.
+    transitivity {1}
+      {r0 <@ ProdR.S.sample(dR, dR); }
+      (true ==> ={r0})
+      (true ==> r0{1} = (r1, r0){2})=> //.
+    + by inline {2} 1; auto.
+    transitivity {2}
+      { (r1, r0) <@ ProdR.S.sample2(dR, dR); }
+      (true ==> r0{1} = (r1, r0){2})
+      (true ==> ={r0, r1})=> //.
+    + by call ProdR.sample_sample2; auto=> /> [].
+    by swap {2} 1 1; inline {1} 1; auto.
+  swap {2} 7 -4.
+  exists * RO.m.[p]{1}; elim * => - [|[] xq yq].
+  + rcondt {1} 3; 1:by auto=> /#.
+    rcondt {2} 4.
+    + auto=> /> &0 /eq_sym + + + _ _ _ _ _ _.
+      pose p := if Bj.j{m} <= 0 then [] else [x{m}].
+      rewrite !domE=> //= xy_p val_inv dom_inv.
+      by move: (val_inv p) xy_p; case: (XY.m.[p]{m})=> /#.
+    rcondt {2} 8.
+    + auto=> /> &0 /eq_sym + + + _ _ _ _ _ _.
+      pose p := if Bj.j{m} <= 0 then [] else [x{m}].
+      rewrite !domE=> //= xy_p val_inv dom_inv.
+      by move: (val_inv p) xy_p; case: (XY.m.[p]{m})=> /#.
+    sp; auto; conseq (: r0{1} = (r0,r1){2}).
+    + move=> /> &1 &2 /eq_sym.
+      pose p := if B'.j{2} <= 0 then [] else [x{2}].
+      move=> xy_p val_inv dom_inv _ _ r0 r1; rewrite !get_setE //=.
+      smt(get_setE).
+    transitivity {1}
+      {r0 <@ ProdR.S.sample(dR, dR); }
+      (true ==> ={r0})
+      (true ==> r0{1} = (r0, r1){2})=> //.
+    + by inline {2} 1; auto.
+    transitivity {2}
+      { (r0, r1) <@ ProdR.S.sample2(dR, dR); }
+      (true ==> r0{1} = (r0, r1){2})
+      (true ==> ={r0, r1})=> //.
+    + by call ProdR.sample_sample2; auto=> /> [].
+    by inline {1} 1; auto.
+  rcondf {1} 3; 1:by auto=> /#.
+  rcondf {2} 4.
+  + auto=> /> &0 /eq_sym + + + _ _ _ _ _ _.
+    pose p := if Bj.j{m} <= 0 then [] else [x{m}].
+    rewrite !domE=> //= xy_p val_inv dom_inv.
+    by move: (val_inv p xq yq); rewrite xy_p=> /> ->.
+  rcondf {2} 7.
+  + auto=> /> &0 /eq_sym + + + _ _ _ _ _ _.
+    pose p := if Bj.j{m} <= 0 then [] else [x{m}].
+    rewrite !domE=> //= xy_p val_inv dom_inv.
+    by move: (val_inv p xq yq); rewrite xy_p=> /> _ ->.
+  sp; auto; conseq (: r0{1} = (r0,r1){2}).
+  + move=> /> &1 &2 /eq_sym.
+    pose p := if B'.j{2} <= 0 then [] else [x{2}].
+    by move=> xy_p /(_ p xq yq) + _ _ _; rewrite xy_p=> /> ->.
+  transitivity {1}
+    {r0 <@ ProdR.S.sample(dR, dR); }
+    (true ==> ={r0})
+    (true ==> r0{1} = (r0, r1){2})=> //.
+  + by inline {2} 1; auto.
+  transitivity {2}
+    { (r0, r1) <@ ProdR.S.sample2(dR, dR); }
+    (true ==> r0{1} = (r0, r1){2})
+    (true ==> ={r0, r1})=> //.
+  + by call ProdR.sample_sample2; auto=> /> [].
+  by inline {1} 1; auto.
+by inline *; auto=> /> _ _ p x y; rewrite !emptyE.
+qed.
+
+equiv HSj_Bj (D <: Distinguisher { Hj, Bj, B', XY, Y, X, XRO_t.FRO, YRO_t.FRO }):
+  Hj(D).run ~ Bj(D, XY).distinguish:
+    ={glob D, Q} /\ i{1} = 1 /\ J{2} = 0 /\ 0 <= Q{1}
     ==> ={res}.
 proof.
+transitivity
+  B'(D, LX, LY).distinguish
+  (={glob D, Q} /\ i{1} = 1 /\ J{2} = 0 /\ 0 <= Q{1} ==> ={res})
+  (={glob D, arg} ==> ={res})=> // [/#||]; last first.
++ by symmetry; conseq (split_XY D).
 proc; sp=> //=.
-call (:    B.j{2} = 0 /\ Hj.j{1} = 1
-        /\ ={c, q}(Hj, B)
-        /\ size B.gis{2} = 1 - B.j{2} - 1
+call (:    B'.j{2} = 0 /\ Hj.j{1} = 1
+        /\ ={c, q}(Hj, B')
+        /\ size B'.gis{2} = 1 - B'.j{2} - 1
         /\ (forall p, p \in Hj.yqs{1} => size p = Hj.j{1})
-        /\ (forall p, p \in Y_RO.yqs{2} => size p = B.j{2})
-        /\ (forall p, p \in X_RO.xqs{2} => size p = B.j{2})
-        /\ (forall p, p \in Y_RO.yqs{2} => rcons p true \in Hj.yqs{1})
-        /\ (forall p, p \in X_RO.xqs{2} => rcons p false \in Hj.yqs{1})
-        /\ (forall p, Y_RO.yqs.[p]{2} = Hj.yqs.[rcons p true]{1})
-        /\ (forall p, X_RO.xqs.[p]{2} = Hj.yqs.[rcons p false]{1})
+        /\ (forall p, p \in Y.m{2} => size p = B'.j{2})
+        /\ (forall p, p \in X.m{2} => size p = B'.j{2})
+        /\ (forall p, Y.m.[p]{2} = Hj.yqs.[rcons p true]{1})
+        /\ (forall p, X.m.[p]{2} = Hj.yqs.[rcons p false]{1})
         (** yqs[p' ++ [b]] = yq; _qs[p'] = (xq, gt * xq) **)).
 + proc; sp; if; 1,3:by auto.
   rcondf {1} 1; 1:by auto.
   inline *.
-  if {1}.
-  + if {2}; sp.
-    + rcondt{2} 1=> //=.
-      + auto=> /> &1 _ _ _ _ _ _ valLRy _ _ + x'.
-        by rewrite x' !domE valLRy.
-      wp=> />.
-      symmetry.
-      rnd (fun x => extract x0 x) (fun g => act g x0); rnd {1}.
-      auto=> /> &1 &2 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q x_notin_yqs x'.
-      move=> x xin.
-      split=> [g _ | _]; first exact extractUniq.
-      split=> [g _ | _ r _]; first exact sample_dR_iso.
-      rewrite extractP /=.
-      split.
-      + rewrite !get_setE.
-        by case (B.gis{1}).
-      split.
-      + by move=> p; rewrite mem_set=> - [] // /domR_size.
-      split.
-      + by move=> p; rewrite mem_set=> - [] // /domLy_size.
-      split.
-      + by move=> p; rewrite !mem_set=> - [] // /domLRy ->.
-      split.
-      + by move=> p; rewrite !mem_set=> /domLRx ->.
-    by split; (case=> [ | b l]; rewrite !get_setE ?valLRy ?valLRx //=; case l).
-    rcondt{2} 1=> //=.
-      + auto=> /> &1 _ _ _ _ _ _ _ valLRx _ + x'.
-        by rewrite x' !domE valLRx.
-    wp=> />.
-    symmetry.
-    rnd {1}; rnd (fun x => extract x0 x) (fun g => act g x0).
-    auto=> /> &1 &2 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q x_notin_yqs x'.
-    split=> [g _ | _]; first exact extractUniq.
-    split=> [g _ | _ r _]; first exact sample_dR_iso.
-    rewrite extractP /=.
-    move=> y yin.
-    split.
-    + rewrite !get_setE.
-      by case (B.gis{1}).
-    split.
-    + by move=> p; rewrite mem_set=> - [] // /domR_size.
-    split.
-    + by move=> p; rewrite mem_set=> - [] // /domLx_size.
-    split.
-    + by move=> p; rewrite !mem_set=> /domLRy ->.
-    split.
-    + by move=> p; rewrite !mem_set=> - [] // /domLRx ->.
-    by split; (case=> [ | b l]; rewrite !get_setE ?valLRy ?valLRx //=; case l).
-  if {2}=> //=; sp.
-  + rcondf{2} 1=> //=.
-    + auto=> /> &1 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q + x'.
-      by rewrite x' !domE valLRy.
-    auto=> /> &1 &2 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q x_notin_yqs x'.
-    move: size_gis.
-    rewrite size_eq0=> -> /=; congr.
-    by rewrite -(valLRy []).
-  rcondf{2} 1=> //=.
-  + auto=> /> &1 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q + x'.
-    by rewrite x' !domE valLRx.
-  auto=> /> &1 &2 size_gis domR_size domLy_size domLx_size domLRy domLRx valLRy valLRx c_le_q x_notin_yqs x'.
-  move: size_gis.
-  rewrite size_eq0=> -> /=; congr.
-  by rewrite -(valLRx []).
+  if {2}.
+  + if {1}; [rcondt {2} 4|rcondf {2} 4]; 1,3:(by auto=> /> &0 _ _ _ _ /(_ []); rewrite !domE=> /= <-).
+    + auto; symmetry; rnd (extract x0) (fun g=> act g x0).
+      auto=> /> &1 &2 /size_eq0 ->> domR_size domLy_size domLx_size valLRy valLRx _ _ x_notin_yqs.
+      split=> [g _|_]; 1:exact: extractUniq.
+      split=> [g _|_ r _]; 1:exact: sample_dR_iso.
+      by rewrite extractP /= [smt(get_setE)].
+    auto=> /> &1 &2 /size_eq0 ->> domR_size domLy_size domLx_size valLRy valLRx _ _ x_in_yqs _ _.
+    by rewrite valLRy.
+  if {1}; [rcondt {2} 3|rcondf {2} 3]; 1,3:(by auto=> /> &0 _ _ _ _ _ /(_ []); rewrite !domE=> /= <-).
+  + auto; symmetry; rnd (extract x0) (fun g=> act g x0).
+    auto=> /> &1 &2 /size_eq0 ->> domR_size domLy_size domLx_size valLRy valLRx _ _ x_notin_yqs.
+    split=> [g _|_]; 1:exact: extractUniq.
+    split=> [g _|_ r _]; 1:exact: sample_dR_iso.
+    by rewrite extractP /= [smt(get_setE)].
+  auto=> /> &1 &2 /size_eq0 ->> domR_size domLy_size domLx_size valLRy valLRx _ _ x_in_yqs _ _.
+  by rewrite valLRx.
 inline *.
 sp; wp.
 rnd {2}.
-auto=> /> &2 z_le_q g _ gi _ gis gis_in.
-split.
-+ exact (supp_dlist_size sample).
+auto=> /> &2 z_le_q g _ gi _ gis gin.
+split; 1:exact (supp_dlist_size sample).
 smt(mem_empty emptyE).
 qed.
 
+(**
 lemma Hybrid_PRF_WP_Real_eq (D <: Distinguisher{Hybrid_PRF_0', Hybrid_WP_Real, B}) &m :
     Pr[IND(Hybrid_PRF_0', D).main() @ &m: res] = Pr[WP_IND(Hybrid_WP_Real, B(D)).main() @ &m: res].
 proof.
@@ -712,9 +861,12 @@ auto=> &1 &2 /> g _.
 rewrite !emptyE !Core.oget_none.
 do split; by apply contraLR; move=> _; rewrite mem_empty.
 *)
+**)
 
-lemma Security (D <: Distinguisher{PRF, RF, WP_Ideal, WP_Real, BoundPRF, Hybrid_PRF_0, Hybrid_PRF_0', Hybrid_PRF_L', B, Hybrid_PRF_L, Hybrid_WP_Ideal, Hybrid_WP_Real}) &m (x : int):
+(** FIXME: WP_IND expects a WP adversary, but we provide it something that distinguishes PROMs
+lemma Security (D <: Distinguisher{PRF, RF, WP_Ideal, WP_Real, BoundPRF, Hybrid_PRF_0, Hybrid_PRF_0', Hybrid_PRF_L', Bj, Hybrid_PRF_L, Hybrid_WP_Ideal, Hybrid_WP_Real}) &m (x : int):
     `| Pr[Bounded_PRF_IND(BoundPRF(PRF), D).main(x) @ &m: res] - Pr[Bounded_PRF_IND(BoundPRF(RF), D).main(x) @ &m: res] |
-    <= `| Pr[WP_IND(WP_Real, B(D)).main() @ &m: res] - Pr[WP_IND(WP_Ideal, B(D)).main() @ &m: res] |.
+    <= `| Pr[WP_IND(WP_Real, Bj(D)).main() @ &m: res] - Pr[WP_IND(WP_Ideal, B(D)).main() @ &m: res] |.
 proof.
 admitted.
+**)
