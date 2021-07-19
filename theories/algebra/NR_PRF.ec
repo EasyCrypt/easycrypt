@@ -830,7 +830,7 @@ call (:    ={j, c, q, gis}(Bj, B')
 by inline *; auto=> /> _ _ p x y; rewrite !emptyE.
 qed.
 
-equiv HSj_Bj (D <: Distinguisher { Hj, Bj, B', XY, Y, X, XRO_t.FRO, YRO_t.FRO }):
+equiv HSj_BjI (D <: Distinguisher { Hj, Bj, B', XY, Y, X, XRO_t.FRO, YRO_t.FRO }):
   Hj(D).run ~ Bj(D, XY).distinguish:
     ={glob D, Q} /\ i{1} = 1 /\ J{2} = 0 /\ 0 <= Q{1}
     ==> ={res}.
@@ -878,7 +878,7 @@ split; 1:exact (supp_dlist_size sample).
 smt(mem_empty emptyE).
 qed.
 
-equiv HSj_Bj_Real (D <: Distinguisher { Hj, Bj, XY_Real}):
+equiv Hj_BjR (D <: Distinguisher { Hj, Bj, XY_Real}):
   Hj(D).run ~ Bj(D, XY_Real).distinguish:
     ={glob D, Q} /\ i{1} = 0 /\ J{2} = 0 /\ 0 <= Q{1}
     ==> ={res}.
