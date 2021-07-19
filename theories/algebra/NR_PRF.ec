@@ -528,7 +528,6 @@ clone import PROM.FullRO as XYRO_t with
 
 module XY  = RO.
 module LXY = FullEager.LRO.
-print RO.
 
 module XY_Real = {
     var m : (bool list, R * R) fmap
@@ -610,7 +609,7 @@ module Bj (D : Distinguisher) (XYs : XYRO_t.RO) = {
   }
 }.
 
-(** We only sample the value that's needed **)
+(** In this version of the hybrids, we only sample the value that's needed **)
 module B' (D : Distinguisher) (Xs : XRO_t.RO) (Ys : YRO_t.RO) = {
   var j   : int
 
@@ -659,6 +658,7 @@ clone import DProd.ProdSampling as ProdR with
   type t1 <- R,
   type t2 <- R.
 
+(** Simple wrappers to consider distinguishers against one or the other RO **)
 module B'_X (D : Distinguisher) (Y : YRO_t.RO) (X : XRO_t.RO) = {
   proc distinguish() = {
     var b;
@@ -708,6 +708,7 @@ transitivity
   (={glob D, arg} ==> ={glob D, res})
   (={glob D} /\ arg{1} = (B'.j, B'.q){2} ==> ={glob D, res})=> // [/#||]; last first.
 + by proc; inline *; sim.
+(** This should really have been kept as a separate lemma **)
 proc.
 call (:    ={j, c, q, gis}(Bj, B')
         /\ (forall p x y,
@@ -877,42 +878,34 @@ split; 1:exact (supp_dlist_size sample).
 smt(mem_empty emptyE).
 qed.
 
-
 equiv HSj_Bj_Real (D <: Distinguisher { Hj, Bj, XY_Real}):
   Hj(D).run ~ Bj(D, XY_Real).distinguish:
     ={glob D, Q} /\ i{1} = 0 /\ J{2} = 0 /\ 0 <= Q{1}
     ==> ={res}.
 proof.
-proc.
+proc=> //=.
 inline *.
-swap {1} 5 -4.
-swap {2} [2..5] -1.
-swap {2} 5 1.
 call (:   ={j, c, q}(Hj, Bj) /\ Hj.j{1} = 0
        /\ Hj.gis{1} = XY_Real.g{2}
        /\ size Bj.gis{2} = 0
        /\ (Hj.O.first{1} <=> [] \notin XY_Real.m{2})
        /\ (! Hj.O.first{1} => act Hj.O.g0{1} x0 = (oget XY_Real.m.[[]]).`1{2})
        /\ (! Hj.O.first{1} => act Hj.gis{1} (act Hj.O.g0{1} x0) = (oget XY_Real.m.[[]]).`2{2})).
-+ proc; inline *; sp.
-  if=> />.
-  + rcondt {1} 1; first auto=> />.
-    sp.
-    if=> />.
-    + auto; symmetry; rnd (extract x0) (fun g=> act g x0).
-      auto=> /> &1 &2 size_gis dom_eqx dom_eqy c_le_q e_notin_m.
-      split=> [g _|_]; 1:exact: extractUniq.
-      split=> [g _|_ r _]; 1:exact: sample_dR_iso.
-      rewrite extractP /=.
-      move: size_gis=> /size_eq0 -> /=.
-      by rewrite domE !get_set_sameE Core.oget_some.
-    auto=> /> &1 &2 size_gis dom_eqx dom_eqy c_le_q e_in_m.
-    rewrite (dom_eqy e_in_m) (dom_eqx e_in_m).
-    by move: size_gis=> /size_eq0 -> /=.
-  by auto=> />.
++ proc; inline *; sp; if; auto=> />.
+  rcondt {1} 1; 1:by auto=> />.
+  sp; if; auto=> />.
+  + symmetry; rnd (extract x0) (fun g=> act g x0).
+    auto=> /> &1 &2 size_gis dom_eqx dom_eqy c_le_q e_notin_m.
+    split=> [g _|_]; 1:exact: extractUniq.
+    split=> [g _|_ r _]; 1:exact: sample_dR_iso.
+    rewrite extractP /= domE get_set_sameE.
+    by move: size_gis=> /size_eq0 ->>.
+  auto=> /> &1 &2 size_gis dom_eqx dom_eqy c_le_q e_in_m.
+  rewrite (dom_eqy e_in_m) (dom_eqx e_in_m).
+  by move: size_gis=> /size_eq0 -> /=.
+swap {2} 6 -5.
 auto=> /> &2 z_le_Q g gin g1 g1in.
-rewrite mem_empty /=.
-exact (supp_dlist_size sample).
+by rewrite mem_empty /=; exact (supp_dlist_size sample).
 qed.
 
 (**
