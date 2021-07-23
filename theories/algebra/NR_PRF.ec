@@ -924,34 +924,169 @@ move=> _.
 split; 1:apply (supp_dlist_size sample); smt(mem_empty emptyE).
 qed.
 
+equiv H0_BjR (D <: Distinguisher { Hj, Bj, XY_Real, LG0}):
+   Hj(D, LG0).run ~ Bj(D, XY_Real).distinguish:
+     ={glob D, Q} /\ i{1} = 0 /\ J{2} = 0 /\ 0 <= Q{1}
+     ==> ={res}.
+proof.
+proc=> //=.
+inline *.
+swap {2} 1 5.
+call (:   ={j, c, q}(Hj, Bj) /\ Hj.j{1} = 0
+      /\ (() \notin G0.m{1} <=> [] \notin XY_Real.m{2})
+      /\ (Hj.gis{1} = (XY_Real.g :: Bj.gis){2})
+      /\ size Bj.gis{2} = l - 1
+      /\ (() \in G0.m{1} => act (oget G0.m.[()]{1}) x0 = (oget XY_Real.m.[[]]).`1{2})
+      /\ (() \in G0.m{1} => act XY_Real.g{2} (act (oget G0.m.[()]{1}) x0) = (oget XY_Real.m.[[]]).`2{2})).
++ proc; inline *; sp; if; auto=> />.
+  rcondt {1} 1; 1:by auto=> />.
+  sp; if {2}=> />.
+  + rcondt {1} 2; 1:auto=> /> &2.
+    + case (x0{2})=> + _ _ _ _ + _ _.
+      by rewrite take0=> ->.
+    wp; symmetry; rnd (extract x0) (fun g=> act g x0).
+    skip=> /> &1 &2 dom_eqv size_Bj_gis val_eq1 val_eq2 c_le_q e_notin_m.
+    split=> [g _|_]; 1:exact: extractUniq.
+    split=> [g _|_ r _]; 1:exact: sample_dR_iso.
+    case (x0{2}).
+    rewrite !domE take0 !get_set_sameE !extractP drop0 /=.
+    case {-1}(ofbits x{1}) (eq_refl (ofbits x{1}))=> />.
+    + move=> /= /(congr1 size).
+      rewrite size_bits /=.
+      smt(gt0_l).
+    move=> x1 l.
+    rewrite drop0 !extractP.
+    by case x1=> />.
+  rcondf {1} 2; 1:auto=> /> &2.
+  + case (x0{2})=> + _ _ _ _ + _ _.
+    by rewrite take0=> ->.
+  auto=> /> &1 &2 dom_eqv size_Bj_gis val_eq1 val_eq2 c_le_q.
+  case (x0{1}).
+  rewrite take0 drop0=> e_in g gin.
+  split.
+  + case {-1}(ofbits x{2}) (eq_refl (ofbits x{2}))=> />.
+    + move=> /= /(congr1 size).
+      rewrite size_bits /=.
+      smt(gt0_l).
+    move=> x1 l.
+    rewrite drop0.
+    rewrite -dom_eqv in e_in.
+    case x1=> />.
+    + by rewrite (val_eq2 e_in).
+    by rewrite (val_eq1 e_in).
+  by rewrite dom_eqv.
+sp; wp.
+conseq />.
+transitivity {2}
+  {Bj.gis <@ SampleCons.sample(l);}
+  (Hj.j{1} = 0 ==> ={gis}(Hj, Bj))
+  (Bj.j{2} = 0 ==> size Bj.gis{2} = l - 1 /\ Bj.gis{1} = (XY_Real.g :: Bj.gis){2})=> />; 1:smt(emptyE mem_empty); first last.
++ inline *; auto=> /> gis + _ _.
+  apply supp_dlist_size.
+  smt(gt0_l).
+transitivity {2}
+    {Bj.gis <@ Sample.sample(l);}
+    (Hj.j{1} = 0 ==> ={gis}(Hj, Bj))
+    (true ==> ={Bj.gis})=> //; last by call Sample_SampleCons_eq; auto=> />; smt(gt0_l).
+by inline *; auto=> />.
+qed.
+
+
 lemma Hj_BjR (D <: Distinguisher { Hj, Bj, XY_Real, LG0}) (j : int):
-  0 <= j < l =>
+  0 < j < l =>
   equiv[Hj(D, LG0).run ~ Bj(D, XY_Real).distinguish:
     ={glob D, Q} /\ i{1} = j /\ J{2} = j /\ 0 <= Q{1}
     ==> ={res}].
 proof.
-move=> z_le_j_l_l.
+move=> z_lt_j_lt_l.
 proc=> //=.
 inline *.
-swap {2} 1 4.
-admit.
-(*call (:   ={j, c, q}(Hj, Bj) /\ Hj.j{1} = j).
-+ proc; inline *; sp; if; auto=> />.
-  if {1}=> />.
-  sp; if; auto=> />.
-  + symmetry; rnd (extract x0) (fun g=> act g x0).
-    auto=> /> &1 &2 size_gis dom_eqx dom_eqy c_le_q e_notin_m.
+swap {2} 1 5.
+call (:   ={j, c, q}(Hj, Bj) /\ Hj.j{1} = j
+      /\ (Hj.gis{1} = (XY_Real.g :: Bj.gis){2})
+      /\ size Bj.gis{2} = l - j - 1
+      /\ (forall (p : bool list), p \in Hj.yqs{1} <=> p \in XY_Real.m{2})
+      /\ (forall (p : bool list), p \in Hj.yqs{1} => oget Hj.yqs.[p]{1} = (oget XY_Real.m.[p]{2}).`1)
+      /\ (forall (p : bool list), p \in Hj.yqs{1} => act XY_Real.g{2} (oget Hj.yqs.[p]{1}) = (oget XY_Real.m.[p]{2}).`2)).
++ proc; inline *; sp; if; auto=> //.
+  rcondf {1} 1.
+  + auto=> /> &2 -> /#.
+  sp; if=> //.
+  + move=> &1 &2 /> _ eqv _.
+    by rewrite (eqv _).
+  + wp; symmetry; rnd (extract x0) (fun g=> act g x0).
+    skip=> /> &1 &2 size_Bj_gis dom_eqv val_eq1 val_eq2 c_le_q e_notin_m.
     split=> [g _|_]; 1:exact: extractUniq.
     split=> [g _|_ r _]; 1:exact: sample_dR_iso.
-    rewrite extractP /= domE get_set_sameE.
-    by move: size_gis=> /size_eq0 ->>.
-  auto=> /> &1 &2 size_gis dom_eqx dom_eqy c_le_q e_in_m.
-  rewrite (dom_eqy e_in_m) (dom_eqx e_in_m).
-  by move: size_gis=> /size_eq0 -> /=.
-swap {2} 6 -5.
-auto=> /> &2 z_le_Q g gin g1 g1in.
-by rewrite mem_empty /=; exact (supp_dlist_size sample).*)
+    rewrite !extractP get_set_sameE /=.
+    split; first last.
+    + split.
+      + move=> p.
+        rewrite !domE !get_setE.
+        case (p = take j (ofbits x{1}))=> />.
+        by rewrite -!domE (dom_eqv p).
+      split.
+      + move=> p.
+        rewrite !domE !get_setE.
+        case (p = take j (ofbits x{1}))=> />.
+        rewrite -!domE=> _.
+        exact val_eq1.
+      move=> p.
+      rewrite !domE !get_setE.
+      case (p = take j (ofbits x{1}))=> />.
+      rewrite -!domE=> _.
+      exact val_eq2.
+    case {-1}(ofbits x{1}) (eq_refl (ofbits x{1}))=> />.
+    + move=> /= /(congr1 size).
+      rewrite size_bits /=.
+      smt(gt0_l).
+    move=> x1 p'.
+    case {-1}(j <= 0) (eq_refl (j <= 0))=> />; first smt.
+    move=> _.
+    case {-1}(j = 0) (eq_refl (j = 0))=> />; first smt.
+    move=> _.
+    case {-1}(j + 1 <= 0) (eq_refl (j + 1 <= 0))=> />; first smt.
+    move=> _ use.
+    rewrite get_set_sameE (drop_nth witness) /=.
+    + move: use.
+      move=> /(congr1 size).
+      rewrite size_bits -cat1s size_cat /#.
+    by case (nth witness p' (j - 1))=> />.
+  auto=> /> &1 &2 size_Bj_gis dom_eqv val_eq1 val_eq2 c_le_q.
+  case {-1}(ofbits x{2}) (eq_refl (ofbits x{2}))=> />.
+  + move=> /= /(congr1 size).
+    rewrite size_bits /=.
+    smt(gt0_l).
+  move=> x1 p'.
+  case {-1}(j <= 0) (eq_refl (j <= 0))=> />; first smt.
+  case {-1}(j = 0) (eq_refl (j = 0))=> />; first smt.
+  case {-1}(j + 1 <= 0) (eq_refl (j + 1 <= 0))=> />; first smt.
+  move=> _ _ _ use.
+  rewrite (drop_nth witness) /=.
+  + move: use.
+    move=> /(congr1 size).
+    rewrite size_bits -cat1s size_cat /#.
+  case (nth witness p' (j - 1))=> /> _ p_in.
+  + by rewrite val_eq2.
+  by rewrite val_eq1.
+sp; wp.
+conseq />.
++ smt(mem_empty emptyE).
+  (* Transitivity argument with samplecons *)
+transitivity {2}
+  {Bj.gis <@ SampleCons.sample(l - j);}
+  (Hj.j{1} = j /\ i{1} = j ==> i{1} = j /\ ={gis}(Hj, Bj))
+  (Bj.j{2} = j ==> size Bj.gis{2} = l - j - 1 /\ Bj.gis{1} = (XY_Real.g :: Bj.gis){2})=> />; 1:smt(emptyE mem_empty); first last.
++ inline *; auto=> /> gis + _ _.
+  apply supp_dlist_size.
+  smt(gt0_l).
+transitivity {2}
+    {Bj.gis <@ Sample.sample(l - j);}
+    (Hj.j{1} = j ==> ={gis}(Hj, Bj))
+    (true ==> ={Bj.gis})=> //; last by call Sample_SampleCons_eq; auto=> />; smt(gt0_l).
+by inline *; auto=> />.
 qed.
+
 
 (** FIXME: WP_IND expects a WP adversary, but we provide it something that distinguishes PROMs
 lemma Security (D <: Distinguisher{PRF, RF, WP_Ideal, WP_Real, BoundPRF, Hybrid_PRF_0, Hybrid_PRF_0', Hybrid_PRF_L', Bj, Hybrid_PRF_L, Hybrid_WP_Ideal, Hybrid_WP_Real}) &m (x : int):
