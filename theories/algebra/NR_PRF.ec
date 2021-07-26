@@ -192,6 +192,14 @@ module BoundPRF(O : PRF_t.PRF) : Bounded_PRF = {
     }
 }.
 
+(** Define the final reduction(s) **)
+(** module R (D : PRF_Distinguisher) (WP : WP_Oracles) = {
+      proc distinguish(J, Q) = {
+        An inlined version of R(Bj(D)).distinguish(J, Q);
+      }
+    }
+**)
+
 section PRF_Security.
 declare module D : Distinguisher { BoundPRF, PRF, RF }.
 
@@ -484,11 +492,95 @@ local module XY_Real = {
     }
 }.
 
+local module DecompWP (O : WP) = {
+  var m : (bool list, R * R) fmap
+
+  proc init() = {
+         O.init();
+    m <- empty;
+  }
+
+  proc get(x) = {
+    var xy;
+
+    if (x \notin m) {
+         xy <@ O.query();
+      m.[x] <- xy;
+    }
+    return oget m.[x];
+  }
+
+  proc set(x, y) = {
+    m.[x] <- y;
+  }
+
+  proc rem(x) = {
+    m <- SmtMap.rem m x;
+  }
+
+  proc sample(x) = {
+    get(x);
+  }
+
+  proc restrK() = {
+    return m;
+  }
+}.
+
+local module R (D : RO_Distinguisher) (O : WP_Oracles) = {
+  module O' = {
+    proc init = WP_Real.init
+    proc query = O.query
+  }
+
+  proc distinguish() = {
+    var b;
+
+         DecompWP(O').init();
+    b <@ D(DecompWP(O')).distinguish();
+    return b;
+  }
+}.
+
+local equiv XY_WP_Ideal (D <: RO_Distinguisher { XY, WP_Ideal, WP_Real, DecompWP }):
+  MainD(D, XY).distinguish ~ WP_IND(WP_Ideal, R(D)).main:
+    ={glob D} ==> ={res}.
+proof.
+proc; inline *; wp.
+call (: ={m}(XY, DecompWP))=> //.
++ by proc; inline *; auto.
++ proc; if {2}; last by auto.
+  rcondt {1} 2; first by auto.
+  inline *.
+  auto.
+  admit.
++ by sim.
++ by sim.
++ proc; inline *; sp; if {2}; last by auto.
+  rcondt {1} 2; first by auto.
+  inline *; auto. admit.
+by inline *; auto.
+qed.
+
+local equiv XY_WP_Real ( D <: RO_Distinguisher { XY_Real, WP_Real, DecompWP }):
+  MainD(D, XY_Real).distinguish ~ WP_IND(WP_Real, R(D)).main:
+    ={glob D} ==> ={res}.
+proof.
+proc; inline *; wp.
+call (: ={m}(XY_Real, DecompWP) /\ ={g}(XY_Real, WP_Real))=> //.
++ by proc; inline *; auto.
++ by proc; if=> //; inline *; auto.
++ by sim.
++ by sim.
++ by proc; inline *; sp; if=> //; inline *; auto.
+by inline *; auto.
+qed.
+
 (** The hybrid—distinguishes random {(xq,yq)} from pseudorandom {(xq,yq)}
     We index the family with query prefixes because we don't really
     care about what the index is: we;; run a hybrid over it anyway
 **)
-local module Bj (XYs : XYRO_t.RO) = {
+local module Bj (XYs : RO) = {
   var j   : int
 
   var gis : group list
@@ -516,7 +608,7 @@ local module Bj (XYs : XYRO_t.RO) = {
 
   proc distinguish(J, Q) = {
     var b;
-      XYs.init();
+           XYs.init();
       j <- J;
       c <- 1;
       q <- Q;
@@ -560,8 +652,8 @@ local module B' (Xs : XRO_t.RO) (Ys : YRO_t.RO) = {
 
   proc distinguish(J, Q) = {
     var b;
-      Ys.init();
-      Xs.init();
+           Xs.init();
+           Ys.init();
       j <- J;
       c <- 1;
       q <- Q;
@@ -596,16 +688,17 @@ local module B'_Y (X : XRO_t.RO) (Y : YRO_t.RO) = {
 
 local equiv split_XY:
     Bj(XY).distinguish ~ B'(LX, LY).distinguish:
-      ={glob D, arg} ==> ={glob D, res}.
+          ={glob D, arg}
+      ==> ={glob D, res}.
 proof.
 transitivity
   B'_X(LY, X).distinguish
   (={glob D} /\ arg{1} = (B'.j, B'.q){2} ==> ={glob D, res})
-  (={glob D, glob X} /\ arg{2} = (B'.j, B'.q){1} ==> ={glob D, res})=> // [/#||]; last first.
+  (={glob D, glob X, glob Y} /\ arg{2} = (B'.j, B'.q){1} ==> ={glob D, res})=> // [/#||]; last first.
 + transitivity
     B'_X(LY, LX).distinguish
     (={glob D, glob X, glob Y, glob B'} ==> ={glob D, res})
-    (={glob D} /\ arg{2} = (B'.j, B'.q){1} ==> ={glob D, res})=> // [/#||].
+    (={glob D, glob X, glob Y} /\ arg{2} = (B'.j, B'.q){1} ==> ={glob D, res})=> // [/#||].
   + conseq (XRO_t.FullEager.RO_LRO_D (B'_X(LY)) _)=> />.
     exact: (dR_ll witness).
   by proc; inline *; sim.
@@ -623,7 +716,7 @@ transitivity
 transitivity
   B'(X, Y).distinguish
   (={glob D, arg} ==> ={glob D, res})
-  (={glob D} /\ arg{1} = (B'.j, B'.q){2} ==> ={glob D, res})=> // [/#||]; last first.
+  (={glob D, glob X, glob Y} /\ arg{1} = (B'.j, B'.q){2} ==> ={glob D, res})=> // [/#||]; last first.
 + by proc; inline *; sim.
 (** This should really have been kept as a separate lemma **)
 proc.
