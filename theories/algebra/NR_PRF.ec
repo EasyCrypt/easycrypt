@@ -150,9 +150,11 @@ module WP_Ideal = {
 abstract theory WPRF.
 module WF = {
   var m : (set, set) fmap
+  var bad : bool
 
   proc init() = {
-    m <- empty;
+      m <- empty;
+    bad <- false;
   }
 
   proc query() = {
@@ -162,6 +164,8 @@ module WF = {
     yq <$ dR;
     if (xq \notin m) {
       m.[xq] <- yq;
+    } else {
+       bad <- true;
     }
     return (xq, oget m.[xq]);
   }
@@ -277,7 +281,9 @@ fel 1 (CountWP.c)
     (exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y)
     [WP_BIND(WF).O.query: (CountWP.c < q)]
     (0 <= card (frng WF.m) <= CountWP.c <= q)=> />.
-+ admit. (** big_distrr sumidE **)
++ rewrite -(StdBigop.Bigreal.BRA.big_distrl _ _ (fun i=> i%r))=> //.
+  + smt().
+  by rewrite StdBigop.Bigreal.sumidE 1:ge0_q /#.
 + inline *; auto=> />; rewrite frng0 fcards0 ge0_q //=.
   by rewrite negb_exists=> x /=; rewrite emptyE.
 + proc; inline *; sp 1; if=> //.
@@ -426,8 +432,6 @@ call (: ={glob D, glob WP} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
 by inline *; auto; call (: true).
 qed.
 
-require (*--*) FelTactic.
-
 local lemma WS_pr_coll &m:
      Pr[WP_BIND(WS).main() @ &m: !uniq WS.xs]
   <= (q * (q - 1))%r / (2 * Support.card)%r.
@@ -438,7 +442,9 @@ fel 1 (CountWP.c)
     (!uniq WS.xs)
     [WP_BIND(WS).O.query: (CountWP.c < q)]
     (   0 <= size WS.xs <= CountWP.c <= q)=> />.
-+ admit. (** big_distrr sumidE **)
++ rewrite -(StdBigop.Bigreal.BRA.big_distrl _ _ (fun i=> i%r))=> //.
+  + smt().
+  by rewrite StdBigop.Bigreal.sumidE 1:ge0_q /#.
 + by inline *; auto=> />; rewrite ge0_q.
 + proc; inline *; sp 1; if=> //.
   wp; seq 1: (xq \in WS.xs) (CountWP.c%r / Support.card%r) 1%r _ 0%r (uniq WS.xs)=> //.
@@ -452,23 +458,41 @@ fel 1 (CountWP.c)
 by move=> b c; proc; sp; if=> //; inline *; auto.
 qed.
 
-lemma WP_PRF_Sample &m:
-     `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
-       - Pr[WP_IND(WS, D).main() @ &m: res]|
-  <=   `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
-         - Pr[WP_IND(WF, D).main() @ &m: res]|
-     + (q * (q - 1))%r / (2 * Support.card)%r.
+local equiv WS_WF:
+  WP_IND(WF, D).main ~ WP_IND(WS, D).main:
+    ={glob D}
+    ==>    (WF.bad{1} <=> !uniq WS.xs{2})
+        /\ (uniq WS.xs{2} => ={res}).
 proof.
-have:    `|  Pr[WP_IND(WS, D).main() @ &m: res]
-           - Pr[WP_IND(WF, D).main() @ &m: res]|
-      <= Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs].
-+ admit.
-have ->:   Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs]
-         = Pr[WP_BIND(WS).main() @ &m: !uniq WS.xs].
-+ byequiv (WP_Bounded WS _)=> //.
-  by proc; auto; rewrite dR_ll.
-move: (WS_pr_coll &m).
-smt(ge0_mu).
+proc.
+call (: !uniq WS.xs
+      ,    (forall x, x \in WF.m{1} <=> x \in WS.xs{2})
+        /\ !WF.bad{1}
+        /\ uniq WS.xs{2}
+      , WF.bad{1} <=> !uniq WS.xs{2}).
++ exact: D_ll.
++ proc; auto=> /> &1 &2 xs_uniq dom_xs not_bad xq _ yq _.
+  rewrite dom_xs=> />; rewrite get_set_sameE=> /= xq_notin_xs x.
+  by rewrite mem_set dom_xs=> /=; case: (x = xq).
++ by move=> &2 -> /=; proc; auto; rewrite dR_ll.
++ by move=> &1; proc; auto; rewrite dR_ll=> />.
+by inline *; auto=> />; split=> [|/#]; smt(emptyE).
+qed.
+
+local lemma WS_WF_pr &m:
+     `|  Pr[WP_IND(WS, D).main() @ &m: res]
+       - Pr[WP_IND(WF, D).main() @ &m: res]|
+  <= Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs].
+proof.
+rewrite /(`|_|)%Real.
+case: (0%r <= Pr[WP_IND(WS, D).main() @ &m: res] - Pr[WP_IND(WF, D).main() @ &m: res])=> _.
++ have ->:   Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs]
+           = Pr[WP_IND(WF, D).main() @ &m: WF.bad].
+  + by rewrite eq_sym; byequiv WS_WF.
+  rewrite StdOrder.RealOrder.ler_subl_addl.
+  by byequiv=> //; symmetry; conseq WS_WF=> /#.
+rewrite RField.opprB StdOrder.RealOrder.ler_subl_addl.
+by byequiv WS_WF=> /#.
 qed.
 
 end section WSample_Security.
