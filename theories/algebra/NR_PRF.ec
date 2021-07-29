@@ -99,15 +99,15 @@ module type WP_Oracles = {
 }.
 
 module type WP_Adv (F : WP_Oracles) = {
-  proc distinguish () : bool
+  proc distinguish (_ : int) : bool
 }.
 
 module WP_IND (F : WP) (A : WP_Adv) = {
-  proc main() : bool = {
+  proc main(J : int) : bool = {
     var b : bool;
 
          F.init();
-    b <@ A(F).distinguish();
+    b <@ A(F).distinguish(J);
     return b;
   }
 }.
@@ -230,11 +230,11 @@ local module WP_BIND (WP : WP) = {
     }
   }
 
-  proc main() = {
+  proc main(J : int) = {
     var r;
 
          CountWP(WP).init();
-    r <@ D(O).distinguish();
+    r <@ D(O).distinguish(J);
     return r;
   }
 }.
@@ -242,16 +242,16 @@ local module WP_BIND (WP : WP) = {
 local lemma WP_Bounded (WP <: WP { D, CountWP }):
      islossless WP.query
   => equiv [WP_IND(WP, D).main ~ WP_BIND(WP).main:
-              ={glob D, glob WP} ==> ={glob D, glob WP, res}].
+              ={glob D, glob WP, arg} ==> ={glob D, glob WP, res}].
 proof.
 move=> WP_query_ll.
 proc.
-call (: ={glob D, glob WP} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
+call (: ={glob D, glob WP, arg} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
 + transitivity
     D(CountWP(WP)).distinguish
-    (={glob D, glob WP} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res})
-    (={glob D, glob WP, glob CountWP} /\ CountWP.c{1} = 0 ==> ={glob D, glob WP, res})=> />.
-  + by move=> &2; exists (glob D){2} (glob WP){2} 0.
+    (={glob D, glob WP, arg} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res})
+    (={glob D, glob WP, glob CountWP, arg} /\ CountWP.c{1} = 0 ==> ={glob D, glob WP, res})=> />.
+  + by move=> &2; exists (glob D){2} (glob WP){2} 0 (arg{2}).
   + proc (={glob WP})=> //.
     by proc *; inline *; sim.
   conseq (: CountWP.c{1} <= q => ={glob D, glob WP, res}) (: CountWP.c = 0 ==> CountWP.c <= 0 + q)=> //.
@@ -271,8 +271,8 @@ call (: ={glob D, glob WP} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
 by inline *; auto; call (: true).
 qed.
 
-local lemma WF_pr_coll &m:
-     Pr[WP_BIND(WF).main() @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y]
+local lemma WF_pr_coll &m j:
+     Pr[WP_BIND(WF).main(j) @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y]
   <= (q * (q - 1))%r / (2 * Support.card)%r.
 proof.
 fel 1 (CountWP.c)
@@ -551,11 +551,11 @@ local module WP_BIND (WP : WP) = {
     }
   }
 
-  proc main() = {
+  proc main(J : int) = {
     var r;
 
          CountWP(WP).init();
-    r <@ D(O).distinguish();
+    r <@ D(O).distinguish(J);
     return r;
   }
 }.
@@ -563,16 +563,16 @@ local module WP_BIND (WP : WP) = {
 local lemma WP_Bounded (WP <: WP { D, CountWP }):
      islossless WP.query
   => equiv [WP_IND(WP, D).main ~ WP_BIND(WP).main:
-              ={glob D, glob WP} ==> ={glob D, glob WP, res}].
+              ={glob D, glob WP, arg} ==> ={glob D, glob WP, res}].
 proof.
 move=> WP_query_ll.
 proc.
-call (: ={glob D, glob WP} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
+call (: ={glob D, glob WP, arg} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
 + transitivity
     D(CountWP(WP)).distinguish
-    (={glob D, glob WP} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res})
-    (={glob D, glob WP, glob CountWP} /\ CountWP.c{1} = 0 ==> ={glob D, glob WP, res})=> />.
-  + by move=> &2; exists (glob D){2} (glob WP){2} 0.
+    (={glob D, glob WP, arg} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res})
+    (={glob D, glob WP, glob CountWP, arg} /\ CountWP.c{1} = 0 ==> ={glob D, glob WP, res})=> />.
+  + by move=> &2; exists (glob D){2} (glob WP){2} 0 (arg{2}).
   + proc (={glob WP})=> //.
     by proc *; inline *; sim.
   conseq (: CountWP.c{1} <= q => ={glob D, glob WP, res}) (: CountWP.c = 0 ==> CountWP.c <= 0 + q)=> //.
@@ -592,8 +592,8 @@ call (: ={glob D, glob WP} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
 by inline *; auto; call (: true).
 qed.
 
-local lemma WS_pr_coll &m:
-     Pr[WP_BIND(WS).main() @ &m: !uniq WS.xs]
+local lemma WS_pr_coll &m j:
+     Pr[WP_BIND(WS).main(j) @ &m: !uniq WS.xs]
   <= (q * (q - 1))%r / (2 * Support.card)%r.
 proof.
 fel 1 (CountWP.c)
@@ -620,7 +620,7 @@ qed.
 
 local equiv WS_WF:
   WP_IND(WF, D).main ~ WP_IND(WS, D).main:
-    ={glob D}
+    ={glob D, arg}
     ==>    (WF.bad{1} <=> !uniq WS.xs{2})
         /\ (uniq WS.xs{2} => ={res}).
 proof.
@@ -639,15 +639,15 @@ call (: !uniq WS.xs
 by inline *; auto=> />; split=> [|/#]; smt(emptyE).
 qed.
 
-local lemma WS_WF_pre_pr &m:
-     `|  Pr[WP_IND(WS, D).main() @ &m: res]
-       - Pr[WP_IND(WF, D).main() @ &m: res]|
-  <= Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs].
+local lemma WS_WF_pr &m j:
+     `|  Pr[WP_IND(WS, D).main(j) @ &m: res]
+       - Pr[WP_IND(WF, D).main(j) @ &m: res]|
+  <= Pr[WP_IND(WS, D).main(j) @ &m: !uniq WS.xs].
 proof.
 rewrite /(`|_|)%Real.
-case: (0%r <= Pr[WP_IND(WS, D).main() @ &m: res] - Pr[WP_IND(WF, D).main() @ &m: res])=> _.
-+ have ->:   Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs]
-           = Pr[WP_IND(WF, D).main() @ &m: WF.bad].
+case: (0%r <= Pr[WP_IND(WS, D).main(j) @ &m: res] - Pr[WP_IND(WF, D).main(j) @ &m: res])=> _.
++ have ->:   Pr[WP_IND(WS, D).main(j) @ &m: !uniq WS.xs]
+           = Pr[WP_IND(WF, D).main(j) @ &m: WF.bad].
   + by rewrite eq_sym; byequiv WS_WF.
   rewrite StdOrder.RealOrder.ler_subl_addl.
   by byequiv=> //; symmetry; conseq WS_WF=> /#.
@@ -675,12 +675,42 @@ end section WSample_Security.
 end WPRF.
 
 (** Define the final reduction(s) **)
-(** module R (D : PRF_Distinguisher) (WP : WP_Oracles) = {
-      proc distinguish(J, Q) = {
-        An inlined version of R(Bj(D)).distinguish(J, Q);
+module Red (D : Distinguisher) (WP : WP_Oracles) = {
+  var j : int
+  var m : (bool list, R * R) fmap
+
+  var gis : group list
+
+  module O = {
+    proc f(x) = {
+      var xq, yq;
+      var xs <- ofbits x;
+      var  p <- take j xs;
+      var  b <- nth witness xs j;
+      var  s <- drop (j + 1) xs;
+      var  r <- witness;
+
+      if (p \notin m) {
+        (xq, yq) <@ WP.query();
+        m.[p] <- (xq, yq);
       }
+      (xq, yq) <- oget m.[p];
+
+      r <- compute_action gis s (if b then yq else xq);
+      return r;
     }
-**)
+  }
+
+  proc distinguish(J) = {
+    var b;
+      m <- empty;
+      j <- J;
+    gis <$ dlist sample (l - j - 1);
+      b <@ D(O).distinguish();
+    return b;
+  }
+}.
+
 
 section PRF_Security.
 declare module D : Distinguisher { PRF, RF }.
@@ -859,7 +889,7 @@ proof. by rewrite (PRF_HybridL_pr &m) (PRF_Hybrid0_pr &m). qed.
 local clone import PROM.FullRO as XRO_t with
   type in_t    <- bool list,
   type out_t   <- R,
-  type d_in_t  <- unit,
+  type d_in_t  <- int,
   type d_out_t <- bool,
     op dout _  <- dR. (* Might need to change this, who knows? *)
 
@@ -869,7 +899,7 @@ local module LX = FullEager.LRO.
 local clone import PROM.FullRO as YRO_t with
   type in_t    <- bool list,
   type out_t   <- R,
-  type d_in_t  <- unit,
+  type d_in_t  <- int,
   type d_out_t <- bool,
     op dout _  <- dR. (* Might need to change this, who knows? *)
 
@@ -879,7 +909,7 @@ local module LY = FullEager.LRO.
 local clone import PROM.FullRO as XYRO_t with
   type in_t    <- bool list,
   type out_t   <- R * R,
-  type d_in_t  <- unit,
+  type d_in_t  <- int,
   type d_out_t <- bool,
     op dout _  <- dR `*` dR.
 
@@ -964,20 +994,25 @@ local module R (D : RO_Distinguisher) (O : WP_Oracles) = {
     proc query = O.query
   }
 
-  proc distinguish() = {
+  proc distinguish(J : int) = {
     var b;
 
          DecompWP(O').init();
-    b <@ D(DecompWP(O')).distinguish();
+    b <@ D(DecompWP(O')).distinguish(J);
     return b;
   }
 }.
 
 local clone import WPRF as WeakPRF.
 
+require (*--*) DProd.
+clone DProd.ProdSampling with
+  type t1 <- set,
+  type t2 <- set.
+
 local equiv XY_WP_Ideal (D <: RO_Distinguisher { XY, WF, WS, WP_Real, DecompWP }):
   MainD(D, XY).distinguish ~ WP_IND(WS, R(D)).main:
-    ={glob D} ==> ={res}.
+    ={glob D, arg} ==> ={res}.
 proof.
 proc; inline *; wp.
 call (: ={m}(XY, DecompWP))=> //.
@@ -986,20 +1021,40 @@ call (: ={m}(XY, DecompWP))=> //.
   rcondt {1} 2; first by auto.
   inline *; auto=> />.
   conseq (: r{1} = (xq, yq){2})=> //.
-  admit.
+  transitivity {1}
+        { r <@ ProdSampling.S.sample(dR, dR); }
+        (true ==> ={r})
+        (true ==> r{1} = (xq, yq){2})=> //.
+  + by inline {2} 1; auto.
+  transitivity {2}
+        { (xq, yq) <@ ProdSampling.S.sample2(dR, dR); }
+        ( true ==> r{1} = (xq, yq){2})
+        (true ==> ={xq, yq})=> //.
+  + by call ProdSampling.sample_sample2; auto=> /> [].
+  by inline {1} 1; auto.
 + by sim.
 + by sim.
 + proc; inline *; sp; if {2}; last by auto.
   rcondt {1} 2; first by auto.
   inline *; auto=> />.
   conseq (: r{1} = (xq, yq){2})=> //.
-  admit.
+  transitivity {1}
+        { r <@ ProdSampling.S.sample(dR, dR); }
+        (true ==> ={r})
+        (true ==> r{1} = (xq, yq){2})=> //.
+  + by inline {2} 1; auto.
+  transitivity {2}
+        { (xq, yq) <@ ProdSampling.S.sample2(dR, dR); }
+        ( true ==> r{1} = (xq, yq){2})
+        (true ==> ={xq, yq})=> //.
+   + by call ProdSampling.sample_sample2; auto=> /> [].
+   by inline {1} 1; auto.
 by inline *; auto.
 qed.
 
 local equiv XY_WP_Real ( D <: RO_Distinguisher { XY_Real, WP_Real, DecompWP }):
   MainD(D, XY_Real).distinguish ~ WP_IND(WP_Real, R(D)).main:
-    ={glob D} ==> ={res}.
+    ={glob D, arg} ==> ={res}.
 proof.
 proc; inline *; wp.
 call (: ={m}(XY_Real, DecompWP) /\ ={g}(XY_Real, WP_Real))=> //.
@@ -1089,19 +1144,19 @@ local clone import DProd.ProdSampling as ProdR with
 
 (** Simple wrappers to consider distinguishers against one or the other RO **)
 local module B'_X (Y : YRO_t.RO) (X : XRO_t.RO) = {
-  proc distinguish() = {
+  proc distinguish(J : int) = {
     var b;
 
-    b <@ B'(X, Y).distinguish(B'.j);
+    b <@ B'(X, Y).distinguish(J);
     return b;
   }
 }.
 
 local module B'_Y (X : XRO_t.RO) (Y : YRO_t.RO) = {
-  proc distinguish() = {
+  proc distinguish(J : int) = {
     var b;
 
-    b <@ B'(X, Y).distinguish(B'.j);
+    b <@ B'(X, Y).distinguish(J);
     return b;
   }
 }.
@@ -1113,30 +1168,30 @@ local equiv split_XY:
 proof.
 transitivity
   B'_X(LY, X).distinguish
-  (={glob D} /\ arg{1} = B'.j{2} ==> ={glob D, res})
-  (={glob D, glob X, glob Y} /\ arg{2} = B'.j{1} ==> ={glob D, res})=> // [/#||]; last first.
+  (={glob D, arg} ==> ={glob D, res})
+  (={glob D, glob X, glob Y, arg} ==> ={glob D, res})=> // [/#||]; last first.
 + transitivity
     B'_X(LY, LX).distinguish
-    (={glob D, glob X, glob Y, glob B'} ==> ={glob D, res})
-    (={glob D, glob X, glob Y} /\ arg{2} = B'.j{1} ==> ={glob D, res})=> // [/#||].
+    (={glob D, glob X, glob Y, glob B', arg} ==> ={glob D, res})
+    (={glob D, glob X, glob Y, arg} ==> ={glob D, res})=> // [/#||].
   + conseq (XRO_t.FullEager.RO_LRO_D (B'_X(LY)) _)=> />.
     exact: (dR_ll witness).
   by proc; inline *; sim.
 transitivity
   B'_Y(X, Y).distinguish
-  (={glob D} /\ arg{1} = B'.j{2} ==> ={glob D, res})
-  (={glob D, glob X, glob Y, glob B'} ==> ={glob D, res})=> // [/#||]; last first.
+  (={glob D, arg} ==> ={glob D, res})
+  (={glob D, glob X, glob Y, glob B', arg} ==> ={glob D, res})=> // [/#||]; last first.
 + transitivity
     B'_Y(X, LY).distinguish
-    (={glob D, glob X, glob Y, glob B'} ==> ={glob D, res})
-    (={glob D, glob X, glob Y, glob B'} ==> ={glob D, res})=> // [/#||].
+    (={glob D, glob X, glob Y, glob B', arg} ==> ={glob D, res})
+    (={glob D, glob X, glob Y, glob B', arg} ==> ={glob D, res})=> // [/#||].
   + conseq (YRO_t.FullEager.RO_LRO_D (B'_Y(X)) _)=> />.
     exact: (dR_ll witness).
   by proc; inline *; sim.
 transitivity
   B'(X, Y).distinguish
   (={glob D, arg} ==> ={glob D, res})
-  (={glob D, glob X, glob Y} /\ arg{1} = B'.j{2} ==> ={glob D, res})=> // [/#||]; last first.
+  (={glob D, glob X, glob Y, arg} ==> ={glob D, res})=> // [/#||]; last first.
 + by proc; inline *; sim.
 (** This should really have been kept as a separate lemma **)
 proc.
@@ -1509,7 +1564,6 @@ call (:   ={j}(Hj, Bj) /\ Hj.j{1} = j
 sp; wp.
 conseq />.
 + smt(mem_empty emptyE).
-  (* Transitivity argument with samplecons *)
 transitivity {2}
   {Bj.gis <@ SampleCons.sample(l - j);}
   (Hj.j{1} = j /\ J{1} = j ==> J{1} = j /\ ={gis}(Hj, Bj))
@@ -1524,12 +1578,17 @@ transitivity {2}
 by inline *; auto=> />.
 qed.
 
-end section PRF_Security.
+require (*--*) StdBigop.
+(*---*) import StdBigop.Bigreal BRA.
 
-(** FIXME: WP_IND expects a WP adversary, but we provide it something that distinguishes PROMs
-lemma Security (D <: Distinguisher{PRF, RF, WP_Ideal, WP_Real, BoundPRF, Hybrid_PRF_0, Hybrid_PRF_0', Hybrid_PRF_L', Bj, Hybrid_PRF_L, Hybrid_WP_Ideal, Hybrid_WP_Real}) &m (x : int):
-    `| Pr[Bounded_PRF_IND(BoundPRF(PRF), D).main(x) @ &m: res] - Pr[Bounded_PRF_IND(BoundPRF(RF), D).main(x) @ &m: res] |
-    <= `| Pr[WP_IND(WP_Real, Bj(D)).main() @ &m: res] - Pr[WP_IND(WP_Ideal, B(D)).main() @ &m: res] |.
-proof.
-admitted.
-**)
+lemma Security &m:
+    `| Pr[IND(PRF, D).main() @ &m: res] - Pr[IND(RF, D).main() @ &m: res] |
+    <=
+    bigi predT
+    (fun i => `| Pr[WP_IND(WP_Real, Red(D)).main(i) @ &m:res] - Pr[WP_IND(WP_Ideal, Red(D)).main(i) @ &m: res] |)
+    0 (l-1).
+rewrite Hybrid_PRF_Reduction.
+have ->: Pr[Hj(G0).run(l) @ &m: res] = Pr[Bj(XY).distinguish(l - 1) @ &m: res].
+byequiv (HSj_BjI (l-1) _)=> //.
++ smt(gt0_l).
+end section PRF_Security.
