@@ -311,61 +311,221 @@ fel 1 (CountWP.c)
 by move=> b c; proc; rcondf 2; auto.
 qed.
 
-lemma WP_PRF_PRP &m:
+local module WRP_bad = {
+  var m   : (set, set) fmap
+  var bad : bool
+
+  proc init() = {
+      m <- empty;
+    bad <- false;
+  }
+
+  proc query() = {
+    var xq, yq : set;
+  
+    xq <$ dR;
+    if (xq \notin m) {
+      yq <$ dR;
+      if (rng m yq) {
+        bad <- true;
+         yq <$ dR \ (rng m);
+      }
+      m.[xq] <- yq;
+    }
+    return (xq, oget m.[xq]);
+  }
+}.
+
+local clone import TwoStepSampling with
+  type    i <- unit,
+  type    t <- set,
+    op dt _ <- dR.
+
+local equiv WP_Ideal_bad_query:
+  WP_Ideal.query ~ WRP_bad.query:
+    ={m}(WP_Ideal, WRP_bad)
+    ==> ={res} /\ ={m}(WP_Ideal, WRP_bad).
+proof.
+proc.
+seq  1  1: (={xq} /\ #pre).
++ by auto.
+if=> //.
+transitivity {1}
+  { yq <@ S.direct((), fun _=> rng WP_Ideal.m); WP_Ideal.m <- WP_Ideal.m.[xq <- yq]; }
+  (={xq, WP_Ideal.m} ==> ={xq, yq, WP_Ideal.m})
+  (={xq} /\ WP_Ideal.m{1} = WRP_bad.m{2} ==> ={xq, yq} /\ WP_Ideal.m{1} = WRP_bad.m{2})=> // [/#||].
++ by inline *; auto.
+transitivity {2}
+  { yq <@ S.indirect((), fun _=> rng WRP_bad.m); WRP_bad.m <- WRP_bad.m.[xq <- yq]; }
+  (={xq} /\ WP_Ideal.m{1} = WRP_bad.m{2} ==> ={xq, yq} /\ WP_Ideal.m{1} = WRP_bad.m{2})
+  (={xq, WRP_bad.m} ==> ={xq, yq, WRP_bad.m})=> // [/#||].
++ by wp; call ll_direct_indirect_eq; auto; rewrite dR_ll.
+inline *; sp.
+seq  1  1: (r{1} = yq{2} /\ #pre); first by auto.
+by if=> //; auto.
+qed.
+
+(** TODO: This should be moved out of PRP and somewhere more accessible **)
+lemma leq_card_rng_dom (m:('a,'b) fmap):
+  card (frng m) <= card (fdom m).
+proof.
+elim/fset_ind: (fdom m) {-2}m (eq_refl (fdom m))=> {m} [m /fdom_eq0 ->|].
++ by rewrite frng0 fdom0 !fcards0.
+move=> x s x_notin_s ih m dom_m.
+have ->: m = (rem m x).[x <- oget m.[x]].
++ apply/fmap_eqP=> x'; rewrite get_setE remE; case: (x' = x)=> [->>|//].
+  have /fsetP /(_ x):= dom_m; rewrite in_fsetU in_fset1 /= mem_fdom domE.
+  by case: m.[x].
+have ->: frng (rem m x).[x <- oget m.[x]] = frng (rem m x) `|` fset1 (oget m.[x]).
++ apply/fsetP=> y'; rewrite in_fsetU in_fset1 !mem_frng !rngE /=.
+  split=> [[] a|].
+  + rewrite get_setE remE; case: (a = x)=> [->>|a_neq_x ma_y'] />.
+    by left; exists a; rewrite remE a_neq_x.
+  case=> [[a]|->].
+  + rewrite remE; case: (a = x)=> //= x_neq_a ma_y'.
+    by exists a; rewrite get_setE remE x_neq_a.
+  by exists x; rewrite get_set_sameE.
+rewrite fcardU fsetI1 fun_if !fcard1 fcards0.
+rewrite fdom_set fcardUI_indep 2:fcard1.
++ by apply/fsetP=> x0; rewrite in_fsetI fdom_rem !inE -andbA andNb.
+rewrite StdOrder.IntOrder.ler_subl_addr; apply/StdOrder.IntOrder.ler_paddr.
++ by case: (mem (frng _) _).
+apply/StdOrder.IntOrder.ler_add2r/ih/fsetP=> x0.
+by rewrite fdom_rem dom_m !inE; case: (x0 = x).
+qed.
+
+lemma endo_dom_rng (m:('a,'a) fmap):
+  (exists x, x \notin m) =>
+  exists x, !rng m x.
+proof.
+elim=> x x_notin_m.
+have h: 0 < card (((fdom m) `|` fset1 x) `\` (frng m)); last first.
++ have [a]: exists a, a \in (fdom m `|` fset1 x) `\` frng m.
+  + have ->: forall b, b = !!b by done.
+    rewrite negb_exists /= -negP=> /in_eq_fset0 h'.
+    by move: h' h=> ->; rewrite fcards0.
+  by rewrite in_fsetD mem_frng=> - [] _ a_notin_rng_m; exists a.
+rewrite fcardD fcardUI_indep.
++ by apply/fsetP=> x'; rewrite !inE mem_fdom /#.
+rewrite fcard1 fsetIUl fcardUI_indep.
++ by apply/fsetP=> x'; rewrite !inE mem_fdom /#.
+have ->: card (fset1 x `&` frng m) = if x \in (frng m) then 1 else 0.
++ smt (@FSet).
+by move: x_notin_m; rewrite -mem_fdom; smt (leq_card_rng_dom @FSet).
+qed.
+
+lemma nosmt notin_supportIP (P : 'a -> bool) (d : 'a distr):
+  (exists a, support d a /\ !P a) <=> mu d P < mu d predT.
+proof.
+rewrite (@mu_split _ predT P) /predI /predT /predC /=.
+rewrite (@exists_eq (fun a => support d a /\ !P a) (fun a => !P a /\ a \in d)) /=.
++ by move=> a /=; rewrite andbC.
+by rewrite -(@witness_support (predC P)) -/(predC _) /#.
+qed.
+
+lemma excepted_lossless (m:(R,R) fmap):
+  (exists x, x \notin m) =>
+  is_lossless (dR \ rng m).
+proof.
+move=> /endo_dom_rng [x h]; rewrite dexcepted_ll 1:dR_ll //.
+by rewrite -dR_ll; apply/notin_supportIP; exists x=> />; exact/dR_fu.
+qed.
+(** End of TODO **)
+
+local equiv WRP_bad_WF:
+  WP_IND(WRP_bad, D).main ~ WP_IND(WF, D).main:
+    ={glob D}
+    ==>    (WRP_bad.bad{1} <=> (exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y){2})
+        /\ (!WRP_bad.bad{1} => ={res}).
+proof.
+symmetry; proc.
+call (: WRP_bad.bad
+      ,    ={m}(WF, WRP_bad)
+        /\ !WRP_bad.bad{2}
+        /\ (forall x x' y, WF.m.[x] = Some y => WF.m.[x'] = Some y => x = x'){1}
+      , (WRP_bad.bad{2} <=> (exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y){1}))=> //.
++ exact: D_ll.
++ proc; seq  1  1: (={xq} /\ #pre); first by auto.
+  if {2}.
+  + rcondt {1} 2; first by auto.
+    seq  1  1: (={yq} /\ #pre); first by auto.
+    if {2}.
+    + auto=> /> &2 not_bad2 not_bad1 xq_notin_m yq_in_m.
+      split=> [|_].
+      + by apply: excepted_lossless; exists xq{2}.
+      move=> y _.
+      move: yq_in_m=> @/rng [] x0 m_x0.
+      move: xq_notin_m; rewrite domE=> /= m_xq.
+      have neq_x: (x0 <> xq{2}).
+      + rewrite -negP=> /(congr1 (fun x=> WRP_bad.m{2}.[x])) //=.
+        by rewrite m_x0 m_xq.
+      by exists x0 xq{2} yq{2}; rewrite !get_setE neq_x.
+    auto=> /> &2 _ not_bad1 _ yq_notin_m x x' y.
+    rewrite !get_setE; case: (x = xq{2})=> />; case: (x' = xq{2})=> />.
+    + by move: yq_notin_m=> @/rng; rewrite negb_exists=> /= ->.
+    + by case: (yq{2} = y)=> />; move: yq_notin_m=> @/rng; rewrite negb_exists=> /= ->.
+    by move=> _ _; exact: not_bad1.
+  by auto.
++ move=> &2 -> /=; proc; auto=> /> &0 x x' y x_neq_x' m_x m_x'.
+  rewrite dR_ll=> //= xq _ _ yq _ _; rewrite domE=> /= m_xq.
+  have neq_x: x <> xq.
+  + by rewrite -negP=> /(congr1 (fun x=> WF.m{0}.[x])) /=; rewrite m_x m_xq.
+  have neq_x': x' <> xq.
+  + by rewrite -negP=> /(congr1 (fun x=> WF.m{0}.[x])) /=; rewrite m_x' m_xq.
+  by exists x x' y; rewrite x_neq_x' !get_set_neqE.
++ move=> &1.
+  conseq (: WRP_bad.bad ==> WRP_bad.bad)=> //.
+  + proc; seq 1: WRP_bad.bad=> //.
+    + by auto; rewrite dR_ll.
+    + if=> //; seq 1: (WRP_bad.bad /\ xq \notin WRP_bad.m)=> //.
+      + by auto; rewrite dR_ll.
+      + if=> //; auto=> /> &0 _ xq_notin_m _.
+        by apply: excepted_lossless; exists xq{0}.
+      by hoare; conseq />.
+    by hoare; conseq />.
+by inline *; auto=> />; smt(emptyE).
+qed.
+
+local lemma WP_WF_pre_pr &m:
+     `|  Pr[WP_IND(WP_Ideal, D).main() @ &m: res]
+       - Pr[WP_IND(WF, D).main() @ &m: res]|
+  <= Pr[WP_IND(WF, D).main() @ &m:
+         exists x x' y,    x <> x'
+                       /\ WF.m.[x] = Some y
+                       /\ WF.m.[x'] = Some y].
+proof.
+have ->:   Pr[WP_IND(WP_Ideal, D).main() @ &m: res]
+         = Pr[WP_IND(WRP_bad, D).main() @ &m: res].
++ byequiv (: ={glob D} ==> ={res})=> //.
+  proc; call (: ={m}(WP_Ideal, WRP_bad)).
+  + by conseq WP_Ideal_bad_query.
+  by inline *; auto.
+rewrite /(`|_|)%Real.
+case: (0%r <= Pr[WP_IND(WRP_bad, D).main() @ &m: res] - Pr[WP_IND(WF, D).main() @ &m: res])=> _.
++ rewrite StdOrder.RealOrder.ler_subl_addl.
+  by byequiv WRP_bad_WF=> /#.
+rewrite RField.opprB StdOrder.RealOrder.ler_subl_addl.
++ have <-:   Pr[WP_IND(WRP_bad, D).main() @ &m: WRP_bad.bad]
+           = Pr[WP_IND(WF, D).main() @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y].
+  + by byequiv WRP_bad_WF.
+by byequiv=> //; symmetry; conseq WRP_bad_WF=> /#.
+qed.
+
+lemma WP_WF_pr &m:
      `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
        - Pr[WP_IND(WF, D).main() @ &m: res]|
   <=   `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
          - Pr[WP_IND(WP_Ideal, D).main() @ &m: res]|
      + (q * (q - 1))%r / (2 * Support.card)%r.
 proof.
-have:    `|  Pr[WP_IND(WF, D).main() @ &m: res]
-           - Pr[WP_IND(WP_Ideal, D).main() @ &m: res]|
-      <= Pr[WP_IND(WF, D).main() @ &m:
-              exists x x' y,    x <> x'
-                             /\ WF.m.[x] = Some y
-                             /\ WF.m.[x'] = Some y].
-+ admit (** See PRP.eca 
-+ byequiv (: ={glob D}
-             ==>    (forall x x' y, WF.m.[x] = Some y /\ WF.m.[x'] = Some y => x = x'){2}
-                 => ={res})=> // [|/#].
-  proc.
-  call (: (exists x x' y,
-             x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y)
-        , WP_Ideal.m{1} = WF.m{2}).
-  + exact: D_ll.
-  + proc.
-    seq  1  1: (={xq} /\ #pre); first by auto.
-    if {1}; last by rcondf {2} 2; auto.
-    rcondt {2} 2; first by auto.
-    seq  1  1: ((!rng WF.m{2} yq{2} => ={yq}) /\ #pre).
-    + admit.
-    auto=> /> &1 &2 @/rng /contra /= eq_nocoll inv x_notin_m.
-    rewrite !get_set_sameE /=.
-    case: (yq{1} = yq{2})=> /> /eq_nocoll [] x mx_yq.
-    have neq_x: (x <> xq{2}).
-    + by move: x_notin_m; apply: contra=> />; rewrite domE mx_yq.
-    by exists x xq{2} yq{2}; rewrite neq_x get_set_sameE get_set_neqE.
-  + move=> _ _; proc; seq  1: true 1%r 1%r 0%r _=> //.
-    + by auto; rewrite dR_ll.
-    if=> //.
-    auto. admit. (** As long as there's an element not in the domain, there is an element not in the range **)
-  + move=> _; proc; auto=> /> &0 x x' y neq_x m_x m_x'.
-    rewrite dR_ll=> //= xq _ _ yq _ _; rewrite domE=> /= m_xq.
-    exists x x' y; rewrite !get_set_neqE //.
-    + rewrite -negP=> /(congr1 (fun x=> WF.m{0}.[x])) /=.
-      by rewrite m_x m_xq.
-    rewrite -negP=> /(congr1 (fun x=> WF.m{0}.[x])) /=.
-    by rewrite m_x' m_xq.
-  by inline *; auto=> /#.
-**).
-have ->:   Pr[WP_IND(WF, D).main() @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y]
+move: (WF_pr_coll &m).
+have <-:   Pr[WP_IND(WF, D).main() @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y]
          = Pr[WP_BIND(WF).main() @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y].
 + byequiv (WP_Bounded WF _)=> //.
   by proc; auto; rewrite dR_ll.
-move: (WF_pr_coll &m).
-smt(ge0_mu).
+move: (WP_WF_pre_pr &m).
+smt().
 qed.
-
 end section WPRF_Security.
 
 section WSample_Security.
@@ -479,7 +639,7 @@ call (: !uniq WS.xs
 by inline *; auto=> />; split=> [|/#]; smt(emptyE).
 qed.
 
-local lemma WS_WF_pr &m:
+local lemma WS_WF_pre_pr &m:
      `|  Pr[WP_IND(WS, D).main() @ &m: res]
        - Pr[WP_IND(WF, D).main() @ &m: res]|
   <= Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs].
@@ -493,6 +653,22 @@ case: (0%r <= Pr[WP_IND(WS, D).main() @ &m: res] - Pr[WP_IND(WF, D).main() @ &m:
   by byequiv=> //; symmetry; conseq WS_WF=> /#.
 rewrite RField.opprB StdOrder.RealOrder.ler_subl_addl.
 by byequiv WS_WF=> /#.
+qed.
+
+lemma WS_WF_pr &m:
+     `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
+       - Pr[WP_IND(WS, D).main() @ &m: res]|
+  <=   `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
+         - Pr[WP_IND(WF, D).main() @ &m: res]|
+     + (q * (q - 1))%r / (2 * Support.card)%r.
+proof.
+move: (WS_pr_coll &m).
+have <-:   Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs]
+         = Pr[WP_BIND(WS).main() @ &m: !uniq WS.xs].
++ byequiv (WP_Bounded WS _)=> //.
+  by proc; auto; rewrite dR_ll.
+move: (WS_WF_pre_pr &m).
+smt().
 qed.
 
 end section WSample_Security.
