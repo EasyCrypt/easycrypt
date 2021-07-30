@@ -671,7 +671,7 @@ module Red (D : Distinguisher) (WP : WP_Oracles) = {
 }.
 
 section PRF_Security.
-declare module D : Distinguisher { PRF, RF }.
+declare module D : Distinguisher { PRF, RF, WP_Real, WP_Ideal, Red }.
 
 (* ---------------------------------------------------------------------------------------- *)
 
@@ -1539,18 +1539,56 @@ qed.
 require (*--*) StdBigop.
 (*---*) import StdBigop.Bigreal BRA.
 
-lemma Security &m:
+local lemma Security &m:
     `| Pr[IND(PRF, D).main() @ &m: res] - Pr[IND(RF, D).main() @ &m: res] |
     <=
     bigi predT
-    (fun i => `| Pr[WP_IND(WP_Real, Red(D)).main(i) @ &m:res] - Pr[WP_IND(WP_Ideal, Red(D)).main(i) @ &m: res] |)
-    0 (l-1).
+    (fun i => `| Pr[WP_IND(WP_Real, Red(D)).main(i) @ &m:res] - Pr[WP_IND(WS, Red(D)).main(i) @ &m: res] |)
+    0 l.
 proof.
 rewrite Hybrid_PRF_Reduction.
 have ->: Pr[Hj(G0).run(l) @ &m: res] = Pr[Bj(XY).distinguish(l - 1) @ &m: res].
-byequiv (HSj_BjI (l-1) _)=> //.
++ byequiv (HSj_BjI (l - 1) _)=> //.
+  + smt(gt0_l).
+have ->: Pr[Hj(G0).run(0) @ &m: res] = Pr[Bj(XY_Real).distinguish(0) @ &m: res].
++ admit. (** Hj_BjR++ **)
+rewrite -(eq_big_int _ _ (fun i=> `|  Pr[Bj(XY_Real).distinguish(i) @ &m: res]
+                                    - Pr[Bj(XY).distinguish(i) @ &m: res]|) _ _).
++ move=> i /> ge0_i i_lt_l.
+  congr; congr; [|congr].
+  + byequiv=> //; proc.
+    inline *; wp.
+    call (:    ={g}(XY_Real, WP_Real)
+            /\ ={m}(XY_Real, Red)
+            /\ ={j, gis}(Bj, Red)).
+    + by proc; inline *; sim.
+    by auto.
+  byequiv=> //; proc.
+  inline *; wp.
+  call (:    ={m}(XY, Red)
+          /\ ={j, gis}(Bj, Red)).
+  + proc; inline *. admit. (** Define XY_Ideal to split the sampling once and for all? **)
+  by auto.
+have ->: forall n, 0 <= n => n < l =>
+             Pr[Bj(XY_Real).distinguish(0) @ &m: res] - Pr[Bj(XY).distinguish(n) @ &m: res]
+           = bigi predT (fun i=> Pr[Bj(XY_Real).distinguish(i) @ &m: res] - Pr[Bj(XY).distinguish(i) @ &m: res]) 0 (n + 1).
++ elim=> />.
+  + by rewrite big_int1.
+  move=> n ge0_n ih Sn_lt_l.
+  rewrite (big_int_recr (n + 1)) 1:[smt(ge0_n)].
+  rewrite -ih 1:/# /=.
+  have <-: Pr[Hj(G0).run(n + 1) @ &m: res] = Pr[Bj(XY_Real).distinguish(n + 1) @ &m: res].
+  + admit. (* byequiv (Hj_BjR (n + 1) _). + Hj_BjR++ *)
+  have <-: Pr[Hj(G0).run(n + 1) @ &m: res] = Pr[Bj(XY).distinguish(n) @ &m: res].
+  + by byequiv (HSj_BjI n _)=> //#.
+  smt().
 + smt(gt0_l).
-admit.
++ smt().
+exact: big_normr.
 qed.
+
+print WS_WF_pr.
+print WP_WF_pr.
+print ler_sum.
 
 end section PRF_Security.
