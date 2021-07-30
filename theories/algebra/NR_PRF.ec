@@ -681,7 +681,7 @@ declare module D : Distinguisher { PRF, RF, WP_Real, WP_Ideal, Red }.
 local clone import PROM.FullRO as G0_RO with
   type in_t <- unit,
   type out_t <- group,
-  type d_in_t <- unit,
+  type d_in_t <- int,
   type d_out_t <- bool,
   op dout _ <- sample.
 
@@ -723,7 +723,7 @@ local module Hj (G0 : G0_RO.RO) = {
     }
   }
 
-  proc run(J : int) : bool = {
+  proc distinguish(J : int) : bool = {
     var b;
 
       j <- J;
@@ -742,7 +742,7 @@ local clone import Program with
   op d <- sample.
 
 local equiv PRF_Hybrid0:
-  IND(PRF, D).main ~ Hj(G0).run:
+  IND(PRF, D).main ~ Hj(G0).distinguish:
     ={glob D} /\ J{2} = 0
     ==> ={res}.
 proof.
@@ -790,11 +790,11 @@ qed.
 
 local lemma PRF_Hybrid0_pr &m:
     Pr[IND(PRF, D).main() @ &m: res]
-  = Pr[Hj(G0).run(0) @ &m: res].
+  = Pr[Hj(G0).distinguish(0) @ &m: res].
 proof. by byequiv PRF_Hybrid0. qed.
 
 local equiv PRF_HybridL:
-  IND(RF, D).main ~ Hj(G0).run:
+  IND(RF, D).main ~ Hj(G0).distinguish:
     ={glob D} /\ J{2} = l ==> ={res}.
 proof.
 proc=> /=; inline *.
@@ -833,13 +833,13 @@ qed.
 
 local lemma PRF_HybridL_pr &m:
     Pr[IND(RF, D).main() @ &m: res]
-  = Pr[Hj(G0).run(l) @ &m: res].
+  = Pr[Hj(G0).distinguish(l) @ &m: res].
 proof. by byequiv PRF_HybridL. qed.
 
 (* Simple reduction statement for the case of l = 1 *)
 local lemma Hybrid_PRF_Reduction &m :
      `|Pr[IND(PRF, D).main() @ &m: res] - Pr[IND(RF, D).main() @ &m: res]|
-   = `|Pr[Hj(G0).run(0) @ &m: res] - Pr[Hj(G0).run(l) @ &m: res]|.
+   = `|Pr[Hj(G0).distinguish(0) @ &m: res] - Pr[Hj(G0).distinguish(l) @ &m: res]|.
 proof. by rewrite (PRF_HybridL_pr &m) (PRF_Hybrid0_pr &m). qed.
 
 (* -------------------------------------------------------- *)
@@ -911,6 +911,43 @@ local module XY_Real = {
     }
 }.
 
+local module XY_Ideal = {
+    var m : (bool list, R * R) fmap
+
+    proc init() = {
+      m <- empty;
+    }
+
+    proc get(x) = {
+      var xq, yq : set;
+
+      if (x \notin m) {
+        xq <$ dR;
+        yq <$ dR;
+        m.[x] <- (xq, yq);
+      }
+      return oget m.[x];
+    }
+
+    proc set(x, y) = {
+      m.[x] <- y;
+    }
+
+    proc rem(x) = {
+      m <- SmtMap.rem m x;
+    }
+
+    proc sample(x) = {
+      get(x);
+    }
+
+    proc restrK() = {
+      return m;
+    }
+}.
+
+print XYRO_t.RO.
+
 local module DecompWP (O : WP) = {
   var m : (bool list, R * R) fmap
 
@@ -968,14 +1005,16 @@ clone DProd.ProdSampling with
   type t1 <- set,
   type t2 <- set.
 
-local equiv XY_WP_Ideal (D <: RO_Distinguisher { XY, WF, WS, WP_Real, DecompWP }):
-  MainD(D, XY).distinguish ~ WP_IND(WS, R(D)).main:
+local equiv XY_WP_Ideal (D <: RO_Distinguisher { XY_Ideal, WF, WS, WP_Real, DecompWP }):
+  MainD(D, XY_Ideal).distinguish ~ WP_IND(WS, R(D)).main:
     ={glob D, arg} ==> ={res}.
 proof.
 proc; inline *; wp.
-call (: ={m}(XY, DecompWP))=> //.
+call (: ={m}(XY_Ideal, DecompWP))=> //.
 + by proc; inline *; auto.
-+ proc; if {2}; last by auto.
++ by proc; inline *; if=> //; auto.
+(*
+  proc ; if {2}; last by auto.
   rcondt {1} 2; first by auto.
   inline *; auto=> />.
   conseq (: r{1} = (xq, yq){2})=> //.
@@ -989,10 +1028,11 @@ call (: ={m}(XY, DecompWP))=> //.
         ( true ==> r{1} = (xq, yq){2})
         (true ==> ={xq, yq})=> //.
   + by call ProdSampling.sample_sample2; auto=> /> [].
-  by inline {1} 1; auto.
+  by inline {1} 1; auto.*)
 + by sim.
 + by sim.
-+ proc; inline *; sp; if {2}; last by auto.
++ by proc; inline *; sp; if=> //; auto.
+(*+ proc; inline *; sp; if {2}; last by auto.
   rcondt {1} 2; first by auto.
   inline *; auto=> />.
   conseq (: r{1} = (xq, yq){2})=> //.
@@ -1006,7 +1046,7 @@ call (: ={m}(XY, DecompWP))=> //.
         ( true ==> r{1} = (xq, yq){2})
         (true ==> ={xq, yq})=> //.
    + by call ProdSampling.sample_sample2; auto=> /> [].
-   by inline {1} 1; auto.
+   by inline {1} 1; auto.*)
 by inline *; auto.
 qed.
 
@@ -1273,12 +1313,43 @@ call (:    ={j, gis}(Bj, B')
 by inline *; auto=> /> _ _ _ p x y; rewrite !emptyE.
 qed.
 
+local equiv XY_XY_Ideal :
+  Bj(XY_Ideal).distinguish ~ Bj(XY).distinguish:
+  ={arg} ==> ={res}.
+proof.
+proc.
+admit.
+(*
+  call (: ={RO.m}).
+proc.
+inline*; sp.
+if {1}=> //.
+  sp; wp.
+  transitivity {1}
+        { (xq0, yq0) <@ ProdSampling.S.sample2(dR, dR); }
+        ( true ==> ={xq0, yq0})
+        (true ==> (xq0, yq0){1} = r0{2})=> //.
+  + admit.
+  + inline {2} 1; auto.
+  transitivity {2}
+        { r0 <@ ProdSampling.S.sample(dR, dR); }
+        (true ==> true)
+        (true ==> r0{2} = (xq0, yq0){1})=> //.
+  + call ProdSampling.sample_sample2; auto=> /> []. *)
+*)
+qed.
+
 local lemma HSj_BjI (j : int):
-  0 <= j < l => equiv[Hj(G0).run ~ Bj(XY).distinguish:
+  0 <= j < l => equiv[Hj(G0).distinguish ~ Bj(XY_Ideal).distinguish:
     ={glob D} /\ J{1} = j + 1 /\ J{2} = j
     ==> ={res}].
 proof.
 move=> z_le_j_l_l.
+transitivity
+  Bj(XY).distinguish
+  (={glob D} /\ J{1} = j + 1 /\ J{2} = j ==> ={res})
+  (={glob D, arg} ==> ={res})=> // [/#||]; last first.
++ by symmetry; conseq XY_XY_Ideal.
 transitivity
   B'(LX, LY).distinguish
   (={glob D} /\ J{1} = j + 1 /\ J{2} = j ==> ={res})
@@ -1376,10 +1447,18 @@ split; 1:apply (supp_dlist_size sample); smt(mem_empty emptyE).
 qed.
 
 local equiv H0_BjR:
-   Hj(LG0).run ~ Bj(XY_Real).distinguish:
+   Hj(G0).distinguish ~ Bj(XY_Real).distinguish:
      ={glob D} /\ J{1} = 0 /\ J{2} = 0
      ==> ={res}.
 proof.
+transitivity
+  Hj(LG0).distinguish
+  (={glob Hj, G0.m, arg} /\ J{1} = 0 ==> ={res})
+  (={glob D} /\ J{1} = 0 /\ J{2} = 0 ==> ={res})=> //.
++ move=> /> &1 &2.
+  by exists ((glob D){2}) (Hj.gis{1}) (Hj.j{1}) (Hj.yqs{1}) (G0.m{1}) 0.
++ conseq (G0_RO.FullEager.RO_LRO_D Hj _)=> />.
+  exact DG.dunifin_ll.
 proc=> //=.
 inline *.
 swap {2} 1 3.
@@ -1444,11 +1523,19 @@ qed.
 
 local lemma Hj_BjR (j : int):
   0 < j < l =>
-  equiv[Hj(LG0).run ~ Bj(XY_Real).distinguish:
+  equiv[Hj(G0).distinguish ~ Bj(XY_Real).distinguish:
     ={glob D} /\ J{1} = j /\ J{2} = j
     ==> ={res}].
 proof.
 move=> z_lt_j_lt_l.
+transitivity
+  Hj(LG0).distinguish
+  (={glob Hj, G0.m, arg} /\ J{1} = j ==> ={res})
+  (={glob D} /\ J{1} = j /\ J{2} = j ==> ={res})=> //.
++ move=> /> &1 &2.
+  by exists ((glob D){2}) (Hj.gis{1}) (Hj.j{1}) (Hj.yqs{1}) (G0.m{1}) j.
++ conseq (G0_RO.FullEager.RO_LRO_D Hj _)=> />.
+  exact DG.dunifin_ll.
 proc=> //=.
 inline *.
 swap {2} 1 3.
@@ -1547,13 +1634,13 @@ local lemma Security &m:
     0 l.
 proof.
 rewrite Hybrid_PRF_Reduction.
-have ->: Pr[Hj(G0).run(l) @ &m: res] = Pr[Bj(XY).distinguish(l - 1) @ &m: res].
+have ->: Pr[Hj(G0).distinguish(l) @ &m: res] = Pr[Bj(XY_Ideal).distinguish(l - 1) @ &m: res].
 + byequiv (HSj_BjI (l - 1) _)=> //.
   + smt(gt0_l).
-have ->: Pr[Hj(G0).run(0) @ &m: res] = Pr[Bj(XY_Real).distinguish(0) @ &m: res].
-+ admit. (** Hj_BjR++ **)
+have ->: Pr[Hj(G0).distinguish(0) @ &m: res] = Pr[Bj(XY_Real).distinguish(0) @ &m: res].
++ byequiv (H0_BjR)=> //.
 rewrite -(eq_big_int _ _ (fun i=> `|  Pr[Bj(XY_Real).distinguish(i) @ &m: res]
-                                    - Pr[Bj(XY).distinguish(i) @ &m: res]|) _ _).
+                                    - Pr[Bj(XY_Ideal).distinguish(i) @ &m: res]|) _ _).
 + move=> i /> ge0_i i_lt_l.
   congr; congr; [|congr].
   + byequiv=> //; proc.
@@ -1565,21 +1652,21 @@ rewrite -(eq_big_int _ _ (fun i=> `|  Pr[Bj(XY_Real).distinguish(i) @ &m: res]
     by auto.
   byequiv=> //; proc.
   inline *; wp.
-  call (:    ={m}(XY, Red)
+  call (:    ={m}(XY_Ideal, Red)
           /\ ={j, gis}(Bj, Red)).
-  + proc; inline *. admit. (** Define XY_Ideal to split the sampling once and for all? **)
+  + proc; inline *; sim.
   by auto.
 have ->: forall n, 0 <= n => n < l =>
-             Pr[Bj(XY_Real).distinguish(0) @ &m: res] - Pr[Bj(XY).distinguish(n) @ &m: res]
-           = bigi predT (fun i=> Pr[Bj(XY_Real).distinguish(i) @ &m: res] - Pr[Bj(XY).distinguish(i) @ &m: res]) 0 (n + 1).
+             Pr[Bj(XY_Real).distinguish(0) @ &m: res] - Pr[Bj(XY_Ideal).distinguish(n) @ &m: res]
+           = bigi predT (fun i=> Pr[Bj(XY_Real).distinguish(i) @ &m: res] - Pr[Bj(XY_Ideal).distinguish(i) @ &m: res]) 0 (n + 1).
 + elim=> />.
   + by rewrite big_int1.
   move=> n ge0_n ih Sn_lt_l.
   rewrite (big_int_recr (n + 1)) 1:[smt(ge0_n)].
   rewrite -ih 1:/# /=.
-  have <-: Pr[Hj(G0).run(n + 1) @ &m: res] = Pr[Bj(XY_Real).distinguish(n + 1) @ &m: res].
-  + admit. (* byequiv (Hj_BjR (n + 1) _). + Hj_BjR++ *)
-  have <-: Pr[Hj(G0).run(n + 1) @ &m: res] = Pr[Bj(XY).distinguish(n) @ &m: res].
+  have <-: Pr[Hj(G0).distinguish(n + 1) @ &m: res] = Pr[Bj(XY_Real).distinguish(n + 1) @ &m: res].
+  + byequiv (Hj_BjR (n + 1) _)=> //#.
+  have <-: Pr[Hj(G0).distinguish(n + 1) @ &m: res] = Pr[Bj(XY_Ideal).distinguish(n) @ &m: res].
   + by byequiv (HSj_BjI n _)=> //#.
   smt().
 + smt(gt0_l).
