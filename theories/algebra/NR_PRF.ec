@@ -537,79 +537,25 @@ qed.
 end section WPRF_Security.
 
 section WSample_Security.
-declare module D : WP_Adv { WF, WS, CountWP }.
-
-axiom D_Count (WP <: WP { D, CountWP }) c0:
-  hoare [D(CountWP(WP)).distinguish: CountWP.c = c0 ==> CountWP.c <= c0 + q].
+declare module D : WP_Adv { WF, WS, CountWP, WP_BIND }.
 
 axiom D_ll (WP <: WP_Oracles { D }):
      islossless WP.query
   => islossless D(WP).distinguish.
 
-local module WP_BIND (WP : WP) = {
-  module O = {
-    proc query() = {
-      var r <- witness;
-
-      if (CountWP.c < q) {
-                r <- WP.query();
-        CountWP.c <- CountWP.c + 1;
-      }
-      return r;
-    }
-  }
-
-  proc main() = {
-    var r;
-
-         CountWP(WP).init();
-    r <@ D(O).distinguish();
-    return r;
-  }
-}.
-
-local lemma WP_Bounded (WP <: WP { D, CountWP }):
-     islossless WP.query
-  => equiv [WP_IND(WP, D).main ~ WP_BIND(WP).main:
-              ={glob D, glob WP} ==> ={glob D, glob WP, res}].
+local lemma WS_pr_coll &m q:
+     0 <= q
+  =>    Pr[WP_BIND(WS, D).main(q) @ &m: !uniq WS.xs]
+     <= (q * (q - 1))%r / (2 * Support.card)%r.
 proof.
-move=> WP_query_ll.
-proc.
-call (: ={glob D, glob WP} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
-+ transitivity
-    D(CountWP(WP)).distinguish
-    (={glob D, glob WP} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res})
-    (={glob D, glob WP, glob CountWP} /\ CountWP.c{1} = 0 ==> ={glob D, glob WP, res})=> />.
-  + by move=> &2; exists (glob D){2} (glob WP){2} 0.
-  + proc (={glob WP})=> //.
-    by proc *; inline *; sim.
-  conseq (: CountWP.c{1} <= q => ={glob D, glob WP, res}) (: CountWP.c = 0 ==> CountWP.c <= 0 + q)=> //.
-  + exact: (D_Count WP 0).
-  symmetry.
-  proc (q < CountWP.c) (={glob WP, glob CountWP})=> />.
-  + smt().
-  + exact: D_ll.
-  + proc; sp; if {1}.
-    + by conseq (: ={r, glob WP, CountWP.c})=> //; inline *; sim.
-    conseq (: true) _ (: CountWP.c = q ==> q < CountWP.c)=> /> => [/#||].
-    + by wp; conseq (: true)=> /> => [/#|]; auto.
-    by wp; call {2} WP_query_ll.
-  + move=> _ _; proc; sp; if; auto.
-    by inline *; auto; call WP_query_ll.
-  by proc; wp; call WP_query_ll; auto=> /#.
-by inline *; auto; call (: true).
-qed.
-
-local lemma WS_pr_coll &m:
-     Pr[WP_BIND(WS).main() @ &m: !uniq WS.xs]
-  <= (q * (q - 1))%r / (2 * Support.card)%r.
-proof.
-fel 1 (CountWP.c)
+move=> ge0_q.
+fel 2 (CountWP.c)
     (fun i=> i%r / Support.card%r)
     q
     (!uniq WS.xs)
-    [WP_BIND(WS).O.query: (CountWP.c < q)]
-    (   0 <= size WS.xs <= CountWP.c <= q)=> />.
+    [WP_BIND(WS, D).O.query: (CountWP.c < WP_BIND.q)]
+    (   0 <= size WS.xs <= CountWP.c <= WP_BIND.q
+     /\ WP_BIND.q = q)=> />.
 + rewrite -(StdBigop.Bigreal.BRA.big_distrl _ _ (fun i=> i%r))=> //.
   + smt().
   by rewrite StdBigop.Bigreal.sumidE 1:ge0_q /#.
@@ -663,20 +609,25 @@ rewrite RField.opprB StdOrder.RealOrder.ler_subl_addl.
 by byequiv WS_WF=> /#.
 qed.
 
-lemma WS_WF_pr &m:
-     `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
-       - Pr[WP_IND(WS, D).main() @ &m: res]|
-  <=   `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
-         - Pr[WP_IND(WF, D).main() @ &m: res]|
-     + (q * (q - 1))%r / (2 * Support.card)%r.
+lemma WS_WF_pr &m q:
+     0 <= q
+  => (forall (WP <: WP { D, CountWP }) c0,
+        hoare [D(CountWP(WP)).distinguish: CountWP.c = c0 ==> CountWP.c <= c0 + q])
+  =>    `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
+          - Pr[WP_IND(WS, D).main() @ &m: res]|
+     <=   `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
+            - Pr[WP_IND(WF, D).main() @ &m: res]|
+        + (q * (q - 1))%r / (2 * Support.card)%r.
 proof.
-move: (WS_pr_coll &m).
+move=> ge0_q D_CountWP.
+move: (WS_pr_coll &m q ge0_q).
 have <-:   Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs]
-         = Pr[WP_BIND(WS).main() @ &m: !uniq WS.xs].
-+ byequiv (WP_Bounded WS _)=> //.
+         = Pr[WP_BIND(WS, D).main(q) @ &m: !uniq WS.xs].
++ byequiv (WP_Bounded WS D q ge0_q _ _ _)=> //.
+  + exact: D_ll.
+  + by move=> c0; conseq (D_CountWP WS c0).
   by proc; auto; rewrite dR_ll.
-move: (WS_WF_pre_pr &m).
-smt().
+by move: (WS_WF_pre_pr &m)=> /#.
 qed.
 
 end section WSample_Security.
