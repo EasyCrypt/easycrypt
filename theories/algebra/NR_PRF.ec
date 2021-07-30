@@ -205,19 +205,9 @@ module CountWP (WP : WP) = {
   }
 }.
 
-op q : { int | 0 <= q } as ge0_q.
+module WP_BIND (WP : WP) (D : WP_Adv) = {
+  var q : int
 
-section WPRF_Security.
-declare module D : WP_Adv { WP_Real, WP_Ideal, WF, CountWP }.
-
-axiom D_Count (WP <: WP { D, CountWP }) c0:
-  hoare [D(CountWP(WP)).distinguish: CountWP.c = c0 ==> CountWP.c <= c0 + q].
-
-axiom D_ll (WP <: WP_Oracles { D }):
-     islossless WP.query
-  => islossless D(WP).distinguish.
-
-local module WP_BIND (WP : WP) = {
   module O = {
     proc query() = {
       var r <- witness;
@@ -230,64 +220,77 @@ local module WP_BIND (WP : WP) = {
     }
   }
 
-  proc main(J : int) = {
+  proc main(Q, J) = {
     var r;
 
+    q <- Q;
          CountWP(WP).init();
     r <@ D(O).distinguish(J);
     return r;
   }
 }.
 
-local lemma WP_Bounded (WP <: WP { D, CountWP }):
-     islossless WP.query
-  => equiv [WP_IND(WP, D).main ~ WP_BIND(WP).main:
-              ={glob D, glob WP, arg} ==> ={glob D, glob WP, res}].
+lemma WP_Bounded (WP <: WP { CountWP, WP_BIND }) (D <: WP_Adv { CountWP, WP_BIND, WP }) q:
+     0 <= q
+  => (forall (WP <: WP_Oracles { D }), islossless WP.query => islossless D(WP).distinguish)
+  => (forall c0, hoare [D(CountWP(WP)).distinguish: CountWP.c = c0 ==> CountWP.c <= c0 + q])
+  => islossless WP.query
+  => equiv [WP_IND(WP, D).main ~ WP_BIND(WP, D).main:
+              ={glob D, glob WP, J} /\ Q{2} = q ==> ={glob D, glob WP, res}].
 proof.
-move=> WP_query_ll.
+move=> ge0_q D_ll D_CountWP WP_query_ll.
 proc.
-call (: ={glob D, glob WP, arg} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
+call (: ={glob D, glob WP, arg} /\ CountWP.c{2} = 0 /\ WP_BIND.q{2} = q ==> ={glob D, glob WP, res}).
 + transitivity
     D(CountWP(WP)).distinguish
-    (={glob D, glob WP, arg} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res})
-    (={glob D, glob WP, glob CountWP, arg} /\ CountWP.c{1} = 0 ==> ={glob D, glob WP, res})=> />.
-  + by move=> &2; exists (glob D){2} (glob WP){2} 0 (arg{2}).
+    (={glob D, glob WP, arg} /\ CountWP.c{2} = 0 /\ WP_BIND.q{2} = q ==> ={glob D, glob WP, res})
+    (={glob D, glob WP, glob CountWP, arg} /\ CountWP.c{1} = 0 /\ WP_BIND.q{2} = q ==> ={glob D, glob WP, res})=> />.
+  + by move=> &2; exists (glob D){2} (glob WP){2} 0 q (arg{2}).
   + proc (={glob WP})=> //.
     by proc *; inline *; sim.
-  conseq (: CountWP.c{1} <= q => ={glob D, glob WP, res}) (: CountWP.c = 0 ==> CountWP.c <= 0 + q)=> //.
-  + exact: (D_Count WP 0).
+  conseq (: CountWP.c{1} <= WP_BIND.q{2} /\ WP_BIND.q{2} = q => ={glob D, glob WP, res})
+         (: CountWP.c = 0 ==> CountWP.c <= 0 + q)=> //.
+  + exact: (D_CountWP 0).
   symmetry.
-  proc (q < CountWP.c) (={glob WP, glob CountWP})=> />.
+  proc (q < CountWP.c) (={glob WP, glob CountWP} /\ WP_BIND.q{1} = q)=> />.
   + smt().
-  + exact: D_ll.
   + proc; sp; if {1}.
     + by conseq (: ={r, glob WP, CountWP.c})=> //; inline *; sim.
-    conseq (: true) _ (: CountWP.c = q ==> q < CountWP.c)=> /> => [/#||].
-    + by wp; conseq (: true)=> /> => [/#|]; auto.
-    by wp; call {2} WP_query_ll.
+    conseq (: WP_BIND.q{1} < CountWP.c{2})=> />.
+    by wp; call {2} WP_query_ll; auto=> /#.
   + move=> _ _; proc; sp; if; auto.
     by inline *; auto; call WP_query_ll.
   by proc; wp; call WP_query_ll; auto=> /#.
-by inline *; auto; call (: true).
+by inline *; auto; call (: true); auto.
 qed.
 
-local lemma WF_pr_coll &m j:
-     Pr[WP_BIND(WF).main(j) @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y]
-  <= (q * (q - 1))%r / (2 * Support.card)%r.
+section WPRF_Security.
+declare module D : WP_Adv { WP_Real, WP_Ideal, WF, CountWP, WP_BIND }.
+
+axiom D_ll (WP <: WP_Oracles { D }):
+     islossless WP.query
+  => islossless D(WP).distinguish.
+
+lemma WF_pr_coll &m q j:
+     0 <= q
+  =>    Pr[WP_BIND(WF, D).main(q, j) @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y]
+     <= (q * (q - 1))%r / (2 * Support.card)%r.
 proof.
-fel 1 (CountWP.c)
+move=> ge0_q.
+fel 2 (CountWP.c)
     (fun i=> i%r / Support.card%r)
     q
     (exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y)
-    [WP_BIND(WF).O.query: (CountWP.c < q)]
-    (0 <= card (frng WF.m) <= CountWP.c <= q)=> />.
+    [WP_BIND(WF, D).O.query: (CountWP.c < WP_BIND.q)]
+    (   0 <= card (frng WF.m) <= CountWP.c <= WP_BIND.q
+     /\ WP_BIND.q = q)=> />.
 + rewrite -(StdBigop.Bigreal.BRA.big_distrl _ _ (fun i=> i%r))=> //.
   + smt().
   by rewrite StdBigop.Bigreal.sumidE 1:ge0_q /#.
-+ inline *; auto=> />; rewrite frng0 fcards0 ge0_q //=.
++ inline *; auto=> />; rewrite frng0 fcards0 //=.
   by rewrite negb_exists=> x /=; rewrite emptyE.
 + proc; inline *; sp 1; if=> //.
-  wp; rnd (mem (frng WF.m)); auto=> /> &0 ge0_c c_lt_q nocoll ge0_rng rng_le_c _.
+  wp; rnd (mem (frng WF.m)); auto=> /> &0 ge0_c c_lt_q nocoll ge0_rng rng_le_c _ _.
   move=> xq _; split=> [|_ yq _].
   + rewrite (mu_mem (frng WF.m{0}) dR (1%r / Support.card%r) _).
     + by move=> x _; rewrite dR1E.
@@ -302,12 +305,12 @@ fel 1 (CountWP.c)
   move=> &0 c_lt_q ge0_card card_le_c _ xq _ yq _.
   split=> [|/#].
   rewrite domE=> /= m_xq.
-  + rewrite fcard_ge0 /=; split=> [/#|]; split=> [|/#].
-    rewrite frng_set fcardU fcard1.
-    move: (subset_leq_fcard (frng (rem WF.m{0} xq)) (frng WF.m{0}) _).
-    + move=> x; rewrite !mem_frng /rng=> /> x'.
-      by rewrite remE; case: (x' = xq)=> /> _ m_x'; exists x'.
-    smt(fcard_ge0).
+  rewrite fcard_ge0 /=; split=> [/#|]; split=> [|/#].
+  rewrite frng_set fcardU fcard1.
+  move: (subset_leq_fcard (frng (rem WF.m{0} xq)) (frng WF.m{0}) _).
+  + move=> x; rewrite !mem_frng /rng=> /> x'.
+    by rewrite remE; case: (x' = xq)=> /> _ m_x'; exists x'.
+  smt(fcard_ge0).
 by move=> b c; proc; rcondf 2; auto.
 qed.
 
@@ -434,7 +437,7 @@ qed.
 
 local equiv WRP_bad_WF:
   WP_IND(WRP_bad, D).main ~ WP_IND(WF, D).main:
-    ={glob D}
+    ={glob D, J}
     ==>    (WRP_bad.bad{1} <=> (exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y){2})
         /\ (!WRP_bad.bad{1} => ={res}).
 proof.
@@ -486,122 +489,73 @@ call (: WRP_bad.bad
 by inline *; auto=> />; smt(emptyE).
 qed.
 
-local lemma WP_WF_pre_pr &m:
-     `|  Pr[WP_IND(WP_Ideal, D).main() @ &m: res]
-       - Pr[WP_IND(WF, D).main() @ &m: res]|
-  <= Pr[WP_IND(WF, D).main() @ &m:
+lemma WP_WF_pre_pr &m j:
+     `|  Pr[WP_IND(WP_Ideal, D).main(j) @ &m: res]
+       - Pr[WP_IND(WF, D).main(j) @ &m: res]|
+  <= Pr[WP_IND(WF, D).main(j) @ &m:
          exists x x' y,    x <> x'
                        /\ WF.m.[x] = Some y
                        /\ WF.m.[x'] = Some y].
 proof.
-have ->:   Pr[WP_IND(WP_Ideal, D).main() @ &m: res]
-         = Pr[WP_IND(WRP_bad, D).main() @ &m: res].
-+ byequiv (: ={glob D} ==> ={res})=> //.
+have ->:   Pr[WP_IND(WP_Ideal, D).main(j) @ &m: res]
+         = Pr[WP_IND(WRP_bad, D).main(j) @ &m: res].
++ byequiv (: ={glob D, arg} ==> ={res})=> //.
   proc; call (: ={m}(WP_Ideal, WRP_bad)).
   + by conseq WP_Ideal_bad_query.
   by inline *; auto.
 rewrite /(`|_|)%Real.
-case: (0%r <= Pr[WP_IND(WRP_bad, D).main() @ &m: res] - Pr[WP_IND(WF, D).main() @ &m: res])=> _.
+case: (0%r <= Pr[WP_IND(WRP_bad, D).main(j) @ &m: res] - Pr[WP_IND(WF, D).main(j) @ &m: res])=> _.
 + rewrite StdOrder.RealOrder.ler_subl_addl.
   by byequiv WRP_bad_WF=> /#.
 rewrite RField.opprB StdOrder.RealOrder.ler_subl_addl.
-+ have <-:   Pr[WP_IND(WRP_bad, D).main() @ &m: WRP_bad.bad]
-           = Pr[WP_IND(WF, D).main() @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y].
++ have <-:   Pr[WP_IND(WRP_bad, D).main(j) @ &m: WRP_bad.bad]
+           = Pr[WP_IND(WF, D).main(j) @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y].
   + by byequiv WRP_bad_WF.
 by byequiv=> //; symmetry; conseq WRP_bad_WF=> /#.
 qed.
 
-lemma WP_WF_pr &m:
-     `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
-       - Pr[WP_IND(WF, D).main() @ &m: res]|
-  <=   `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
-         - Pr[WP_IND(WP_Ideal, D).main() @ &m: res]|
-     + (q * (q - 1))%r / (2 * Support.card)%r.
+lemma WP_WF_pr &m q j:
+     0 <= q
+  => (forall (WP <: WP { D, CountWP }) c0,
+        hoare [D(CountWP(WP)).distinguish: CountWP.c = c0 ==> CountWP.c <= c0 + q])
+  =>    `|  Pr[WP_IND(WP_Real, D).main(j) @ &m: res]
+          - Pr[WP_IND(WF, D).main(j) @ &m: res]|
+     <=   `|  Pr[WP_IND(WP_Real, D).main(j) @ &m: res]
+            - Pr[WP_IND(WP_Ideal, D).main(j) @ &m: res]|
+        + (q * (q - 1))%r / (2 * Support.card)%r.
 proof.
-move: (WF_pr_coll &m).
-have <-:   Pr[WP_IND(WF, D).main() @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y]
-         = Pr[WP_BIND(WF).main() @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y].
-+ byequiv (WP_Bounded WF _)=> //.
+move=> ge0_q D_CountWP.
+move: (WF_pr_coll &m q j ge0_q).
+have <-:   Pr[WP_IND(WF, D).main(j) @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y]
+         = Pr[WP_BIND(WF, D).main(q, j) @ &m: exists x x' y, x <> x' /\ WF.m.[x] = Some y /\ WF.m.[x'] = Some y].
++ byequiv (WP_Bounded WF D q ge0_q _ _ _)=> //.
+  + exact: D_ll.
+  + by move=> c0; conseq (D_CountWP WF c0).
   by proc; auto; rewrite dR_ll.
-move: (WP_WF_pre_pr &m).
-smt().
+by move: (WP_WF_pre_pr &m)=> /#.
 qed.
 end section WPRF_Security.
 
 section WSample_Security.
-declare module D : WP_Adv { WF, WS, CountWP }.
-
-axiom D_Count (WP <: WP { D, CountWP }) c0:
-  hoare [D(CountWP(WP)).distinguish: CountWP.c = c0 ==> CountWP.c <= c0 + q].
+declare module D : WP_Adv { WF, WS, CountWP, WP_BIND }.
 
 axiom D_ll (WP <: WP_Oracles { D }):
      islossless WP.query
   => islossless D(WP).distinguish.
 
-local module WP_BIND (WP : WP) = {
-  module O = {
-    proc query() = {
-      var r <- witness;
-
-      if (CountWP.c < q) {
-                r <- WP.query();
-        CountWP.c <- CountWP.c + 1;
-      }
-      return r;
-    }
-  }
-
-  proc main(J : int) = {
-    var r;
-
-         CountWP(WP).init();
-    r <@ D(O).distinguish(J);
-    return r;
-  }
-}.
-
-local lemma WP_Bounded (WP <: WP { D, CountWP }):
-     islossless WP.query
-  => equiv [WP_IND(WP, D).main ~ WP_BIND(WP).main:
-              ={glob D, glob WP, arg} ==> ={glob D, glob WP, res}].
+local lemma WS_pr_coll &m q j:
+     0 <= q
+  =>    Pr[WP_BIND(WS, D).main(q, j) @ &m: !uniq WS.xs]
+     <= (q * (q - 1))%r / (2 * Support.card)%r.
 proof.
-move=> WP_query_ll.
-proc.
-call (: ={glob D, glob WP, arg} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res}).
-+ transitivity
-    D(CountWP(WP)).distinguish
-    (={glob D, glob WP, arg} /\ CountWP.c{2} = 0 ==> ={glob D, glob WP, res})
-    (={glob D, glob WP, glob CountWP, arg} /\ CountWP.c{1} = 0 ==> ={glob D, glob WP, res})=> />.
-  + by move=> &2; exists (glob D){2} (glob WP){2} 0 (arg{2}).
-  + proc (={glob WP})=> //.
-    by proc *; inline *; sim.
-  conseq (: CountWP.c{1} <= q => ={glob D, glob WP, res}) (: CountWP.c = 0 ==> CountWP.c <= 0 + q)=> //.
-  + exact: (D_Count WP 0).
-  symmetry.
-  proc (q < CountWP.c) (={glob WP, glob CountWP})=> />.
-  + smt().
-  + exact: D_ll.
-  + proc; sp; if {1}.
-    + by conseq (: ={r, glob WP, CountWP.c})=> //; inline *; sim.
-    conseq (: true) _ (: CountWP.c = q ==> q < CountWP.c)=> /> => [/#||].
-    + by wp; conseq (: true)=> /> => [/#|]; auto.
-    by wp; call {2} WP_query_ll.
-  + move=> _ _; proc; sp; if; auto.
-    by inline *; auto; call WP_query_ll.
-  by proc; wp; call WP_query_ll; auto=> /#.
-by inline *; auto; call (: true).
-qed.
-
-local lemma WS_pr_coll &m j:
-     Pr[WP_BIND(WS).main(j) @ &m: !uniq WS.xs]
-  <= (q * (q - 1))%r / (2 * Support.card)%r.
-proof.
-fel 1 (CountWP.c)
+move=> ge0_q.
+fel 2 (CountWP.c)
     (fun i=> i%r / Support.card%r)
     q
     (!uniq WS.xs)
-    [WP_BIND(WS).O.query: (CountWP.c < q)]
-    (   0 <= size WS.xs <= CountWP.c <= q)=> />.
+    [WP_BIND(WS, D).O.query: (CountWP.c < WP_BIND.q)]
+    (   0 <= size WS.xs <= CountWP.c <= WP_BIND.q
+     /\ WP_BIND.q = q)=> />.
 + rewrite -(StdBigop.Bigreal.BRA.big_distrl _ _ (fun i=> i%r))=> //.
   + smt().
   by rewrite StdBigop.Bigreal.sumidE 1:ge0_q /#.
@@ -639,7 +593,7 @@ call (: !uniq WS.xs
 by inline *; auto=> />; split=> [|/#]; smt(emptyE).
 qed.
 
-local lemma WS_WF_pr &m j:
+local lemma WS_WF_pre_pr &m j:
      `|  Pr[WP_IND(WS, D).main(j) @ &m: res]
        - Pr[WP_IND(WF, D).main(j) @ &m: res]|
   <= Pr[WP_IND(WS, D).main(j) @ &m: !uniq WS.xs].
@@ -655,20 +609,25 @@ rewrite RField.opprB StdOrder.RealOrder.ler_subl_addl.
 by byequiv WS_WF=> /#.
 qed.
 
-lemma WS_WF_pr &m:
-     `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
-       - Pr[WP_IND(WS, D).main() @ &m: res]|
-  <=   `|  Pr[WP_IND(WP_Real, D).main() @ &m: res]
-         - Pr[WP_IND(WF, D).main() @ &m: res]|
-     + (q * (q - 1))%r / (2 * Support.card)%r.
+lemma WS_WF_pr &m q j:
+     0 <= q
+  => (forall (WP <: WP { D, CountWP }) c0,
+        hoare [D(CountWP(WP)).distinguish: CountWP.c = c0 ==> CountWP.c <= c0 + q])
+  =>    `|  Pr[WP_IND(WP_Real, D).main(j) @ &m: res]
+          - Pr[WP_IND(WS, D).main(j) @ &m: res]|
+     <=   `|  Pr[WP_IND(WP_Real, D).main(j) @ &m: res]
+            - Pr[WP_IND(WF, D).main(j) @ &m: res]|
+        + (q * (q - 1))%r / (2 * Support.card)%r.
 proof.
-move: (WS_pr_coll &m).
-have <-:   Pr[WP_IND(WS, D).main() @ &m: !uniq WS.xs]
-         = Pr[WP_BIND(WS).main() @ &m: !uniq WS.xs].
-+ byequiv (WP_Bounded WS _)=> //.
+move=> ge0_q D_CountWP.
+move: (WS_pr_coll &m q j ge0_q).
+have <-:   Pr[WP_IND(WS, D).main(j) @ &m: !uniq WS.xs]
+         = Pr[WP_BIND(WS, D).main(q, j) @ &m: !uniq WS.xs].
++ byequiv (WP_Bounded WS D q ge0_q _ _ _)=> //.
+  + exact: D_ll.
+  + by move=> c0; conseq (D_CountWP WS c0).
   by proc; auto; rewrite dR_ll.
-move: (WS_WF_pre_pr &m).
-smt().
+by move: (WS_WF_pre_pr &m j)=> /#.
 qed.
 
 end section WSample_Security.
@@ -710,7 +669,6 @@ module Red (D : Distinguisher) (WP : WP_Oracles) = {
     return b;
   }
 }.
-
 
 section PRF_Security.
 declare module D : Distinguisher { PRF, RF }.
@@ -1587,8 +1545,12 @@ lemma Security &m:
     bigi predT
     (fun i => `| Pr[WP_IND(WP_Real, Red(D)).main(i) @ &m:res] - Pr[WP_IND(WP_Ideal, Red(D)).main(i) @ &m: res] |)
     0 (l-1).
+proof.
 rewrite Hybrid_PRF_Reduction.
 have ->: Pr[Hj(G0).run(l) @ &m: res] = Pr[Bj(XY).distinguish(l - 1) @ &m: res].
 byequiv (HSj_BjI (l-1) _)=> //.
 + smt(gt0_l).
+admit.
+qed.
+
 end section PRF_Security.
