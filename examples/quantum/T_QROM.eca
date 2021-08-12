@@ -360,17 +360,6 @@ quantum module type AdvRO (H:QRO) = {
   proc main() : bool
 }.
 
-module IND_QRO (H:QRO_i, A:AdvRO) = {
-  proc main() : bool = {
-    var b;
-
-    H.init();
-    b <@ A(H).main();
-    return b;
-  }
-}.
-
-(*
 abstract theory T_PRF.
 
 type key.
@@ -383,12 +372,30 @@ module PRF : QRO_i = {
   quantum proc h{x:from} = { return F k x; } 
 }.
 
-(* The prf advantage is defined by: 
-  `| Pr[IND_QRO(PRF, A).main() @ &m : res] - Pr[IND_QRO(QRO, A).main() @ &m : res] |
-*)
+module IND_QRO (A: AdvRO) = {
+  proc rf() : bool = {
+    var b;
+    QRO.init();
+    b <@ A(QRO).main();
+    return b;
+  }
+  
+  proc prf() : bool = {
+    var b;
+    PRF.init();
+    b <@ A(PRF).main();
+    return b;
+  }
+}.
+
+(* The prf advantage is defined by: *)
+axiom advantage_prf q (A <: AdvRO) &m:
+  hoare [IND_QRO(A).rf : true ==> QRO.ch <= q] =>
+  `| Pr[IND_QRO(A).rf() @ &m : res] - Pr[IND_QRO(A).prf() @ &m : res] | <= 1%r.
 
 end T_PRF.
 
+(*
 abstract theory T_PRG.
 
 type seed.
