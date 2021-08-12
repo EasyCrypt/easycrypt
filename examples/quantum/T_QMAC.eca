@@ -1,29 +1,29 @@
 require import AllCore List. (* provide you the type list *)
 
 type msg.
-type sign.
+type tag.
 type skey.
 
-module type Sign = {
+module type QMACScheme = {
   proc kg() : skey
-  quantum proc sign(sk:skey) {m:msg} : sign   (* This procedure needs to provide a quantum access *)
-  proc verify(sk:skey, m:msg, s:sign) : bool
+  quantum proc sign(sk:skey) {m:msg} : tag   (* This procedure needs to provide a quantum access *)
+  proc verify(sk:skey, m:msg, s:tag) : bool
 }.
 
 module type OrclSign = {
-  quantum proc sign {m: msg} : sign    
+  quantum proc sign {m: msg} : tag   
 }.
 
 (* maximun number of a query allowed to the sign oracle *)
 op q : int.
 
 quantum module type AdvEUF_M (O:OrclSign) = {
-  proc main() : (msg * sign) list  
+  proc main() : (msg * tag) list  
 }.
 
 
 
-module EUF_M(A:AdvEUF_M) (O:Sign) = {
+module EUF_M(A:AdvEUF_M) (O:QMACScheme) = {
   var sk: skey
   module Os = {
     quantum proc sign {m:msg} = { 
