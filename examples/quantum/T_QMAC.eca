@@ -14,17 +14,16 @@ module type OrclSign = {
   quantum proc sign {m: msg} : tag   
 }.
 
-(* maximun number of a query allowed to the sign oracle *)
-op q : int.
-
-quantum module type AdvEUF_M (O:OrclSign) = {
-  proc main() : (msg * tag) list  
+quantum module type AdvEUF (O:OrclSign) = {
+  proc choose() : (msg * tag) list  
 }.
 
 
 
-module EUF_M(A:AdvEUF_M) (O:QMACScheme) = {
+module EUF(A:AdvEUF) (O:QMACScheme) = {
   var sk: skey
+  var ms: (msg * tag) list
+
   module Os = {
     quantum proc sign {m:msg} = { 
       quantum var s; 
@@ -34,9 +33,9 @@ module EUF_M(A:AdvEUF_M) (O:QMACScheme) = {
   }
 
   proc main() = {
-    var b, ms, l, c, m, s;
+    var b, l, c, m, s;
     sk <@ O.kg();
-    ms <@ A(Os).main();
+    ms <@ A(Os).choose();
     b <- true;
     l <- ms;
     while (l <> []) { 
@@ -45,6 +44,34 @@ module EUF_M(A:AdvEUF_M) (O:QMACScheme) = {
       c <@ O.verify(sk,m,s);
       b <- b && c;
     }
-    return b && q < size ms;
+    return b; 
   }
 }.
+
+require T_QROM.
+
+clone import T_QROM as QROM with
+  type from <- msg,
+  type hash <- tag
+  rename "hash" as "tag".
+
+clone import T_PRF as PRF with
+  type key <- skey.
+
+module PRF_MAC : QMACScheme = {
+
+  var ch : int
+
+  proc kg(): skey = { var k : skey; ch <- 0; k <$ dkey; return k; }
+
+  quantum proc sign(k: skey) {m: msg} : tag = { ch <- ch + 1; return F k m; }
+
+  proc verify (k: skey, m: msg, s: tag) = { return F k m = s; }
+}.
+
+
+axiom advantage_euf q (A <: AdvEUF) &m:
+  hoare [EUF(A, PRF_MAC).main : true ==> PRF_MAC.ch <= q < size EUF.ms ] =>
+  `| Pr[EUF(A, PRF_MAC).main() @ &m : res] | <= 2%r. 
+  (* FIXME: the probability should be (q+1)/N where N is the size of tag space*)
+
