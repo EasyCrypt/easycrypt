@@ -388,10 +388,10 @@ module IND_QRO (A: AdvRO) = {
   }
 }.
 
-(* The prf advantage is defined by: *)
 axiom advantage_prf q (A <: AdvRO) &m:
   hoare [IND_QRO(A).rf : true ==> QRO.ch <= q] =>
   `| Pr[IND_QRO(A).rf() @ &m : res] - Pr[IND_QRO(A).prf() @ &m : res] | <= 1%r.
+  (* FIXME: The probability should be a negligible function. *)
 
 end T_PRF.
 
