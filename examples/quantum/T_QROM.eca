@@ -368,32 +368,57 @@ op F : key -> from -> hash.
 
 module PRF : QRO_i = {
   var k : key
-  proc init() = { k <$ dkey; }
-  quantum proc h{x:from} = { return F k x; } 
+  proc init() = { QRO.ch <- 0; k <$ dkey; }
+  quantum proc h{x:from} = { QRO.ch <- QRO.ch + 1; return F k x; } 
 }.
 
-module IND_QRO (A: AdvRO) = {
-  proc rf() : bool = {
+module IND_QRO (R:QRO_i, A: AdvRO) = {
+  proc main() : bool = {
     var b;
-    QRO.init();
-    b <@ A(QRO).main();
+    R.init();
+    b <@ A(R).main();
     return b;
   }
+}.
+
+(* The PRF-advantage is defined as :
+   `| Pr[IND_QRO(PRF, A).main() @ &m : res] - Pr[IND_QRO(QRO, A).main() @ &m : res] | 
+  The restriction on the number of queries can be obtained by adding the hypothesis:
+   hoare [IND_QRO(QRO, A).main : true ==> QRO.ch <= q] or
+   hoare [IND_QRO(PRF, A).main : true ==> QRO.ch <= q] 
   
-  proc prf() : bool = {
-    var b;
-    PRF.init();
-    b <@ A(PRF).main();
-    return b;
-  }
-}.
-
-axiom advantage_prf q (A <: AdvRO) &m:
-  hoare [IND_QRO(A).rf : true ==> QRO.ch <= q] =>
-  `| Pr[IND_QRO(A).rf() @ &m : res] - Pr[IND_QRO(A).prf() @ &m : res] | <= 1%r.
-  (* FIXME: The probability should be a negligible function. *)
+*)
 
 end T_PRF.
+
+(* -------------------------------------------------------------------- *)
+(* Finding q+1 distinct queries                                         *)
+(* ---------------------------------------------------------------------*)
+
+abstract theory T_Distinct.
+
+(* This assume that the type hash is finite and contains "card" elements *)
+clone export FinType with 
+  type t <- hash.
+
+quantum module type Adv_DistinctQueries (H:QRO) = {
+  proc main(q:int) : (from * hash) list
+}.
+
+module DistinctQueries(A:Adv_DistinctQueries) = {
+  proc main(q:int) : bool = {
+    var fh : (from * hash) list;
+    QRO.init();
+    fh <@ A(QRO).main(q);
+    return size fh = q + 1 /\ all (fun (p: from * hash) => QRO.h p.`1 = p.`2) fh; 
+  }
+}.
+
+axiom bound_distinct (q_:int) (A<:Adv_DistinctQueries{-QRO}) &m :  
+  hoare [DistinctQueries(A).main : q = q_ ==> QRO.ch <= q_] => 
+    Pr[DistinctQueries(A).main(q_) @ &m : res] <= (q_ + 1)%r / card%r.
+
+end T_Distinct.
 
 (*
 abstract theory T_PRG.

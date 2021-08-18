@@ -1,8 +1,11 @@
 require import AllCore List. (* provide you the type list *)
+require (*  *) T_QROM.
 
 type msg.
 type tag.
 type skey.
+
+op q : int.
 
 module type QMACScheme = {
   proc kg() : skey
@@ -18,11 +21,8 @@ quantum module type AdvEUF (O:OrclSign) = {
   proc choose() : (msg * tag) list  
 }.
 
-
-
-module EUF(A:AdvEUF) (O:QMACScheme) = {
+module EUF_qCMA(A:AdvEUF) (O:QMACScheme) = {
   var sk: skey
-  var ms: (msg * tag) list
 
   module Os = {
     quantum proc sign {m:msg} = { 
@@ -33,7 +33,7 @@ module EUF(A:AdvEUF) (O:QMACScheme) = {
   }
 
   proc main() = {
-    var b, l, c, m, s;
+    var b, l, c, m, s, ms;
     sk <@ O.kg();
     ms <@ A(Os).choose();
     b <- true;
@@ -42,13 +42,11 @@ module EUF(A:AdvEUF) (O:QMACScheme) = {
       (m,s) <- head witness l;
       l <- behead l;
       c <@ O.verify(sk,m,s);
-      b <- b && c;
+      b <- b /\ c;
     }
-    return b; 
+    return b /\ size ms = q + 1; 
   }
 }.
-
-require T_QROM.
 
 clone import T_QROM as QROM with
   type from <- msg,
@@ -58,20 +56,84 @@ clone import T_QROM as QROM with
 clone import T_PRF as PRF with
   type key <- skey.
 
+clone import T_Distinct.
+
 module PRF_MAC : QMACScheme = {
 
-  var ch : int
+  proc kg(): skey = { var k : skey; k <$ dkey; return k; }
 
-  proc kg(): skey = { var k : skey; ch <- 0; k <$ dkey; return k; }
-
-  quantum proc sign(k: skey) {m: msg} : tag = { ch <- ch + 1; return F k m; }
+  quantum proc sign(k: skey) {m: msg} : tag = { return F k m; }
 
   proc verify (k: skey, m: msg, s: tag) = { return F k m = s; }
 }.
 
+module S (R:QRO) = {
+  quantum proc sign {m:msg} = {
+    quantum var s; 
+    s <@ R.h{m};
+    return s;
+  }
+}.
 
-axiom advantage_euf q (A <: AdvEUF) &m:
-  hoare [EUF(A, PRF_MAC).main : true ==> PRF_MAC.ch <= q < size EUF.ms ] =>
-  `| Pr[EUF(A, PRF_MAC).main() @ &m : res] | <= 2%r. 
-  (* FIXME: the probability should be (q+1)/N where N is the size of tag space*)
+module B (A:AdvEUF, R:QRO) = { 
 
+  proc main() = {
+    var b, l, m, s, sm, ms;
+    ms <@ A(S(R)).choose();
+    b <- true;
+    l <- ms;
+    while (l <> []) { 
+      (m,s) <- head witness l;
+      l <- behead l;
+      sm <@ R.h{m};
+      b <- b /\ sm = s;
+    }
+    return b /\ size ms = q + 1; 
+  }
+}.
+
+section.
+
+declare module A: AdvEUF{-PRF, -QRO, -EUF_qCMA}.
+
+local module C(R:QRO) = { 
+  proc main(q:int) = {
+    var ms;
+    ms <@ A(S(R)).choose();
+    return ms; 
+  }
+}.
+
+lemma advantage_euf &m:
+  hoare [A(S(QRO)).choose : QRO.ch = 0 ==> QRO.ch <= q ] =>
+  Pr[EUF_qCMA (A, PRF_MAC).main() @ &m : res] <= 
+    `| Pr[IND_QRO(PRF, B(A)).main() @ &m : res] - Pr[IND_QRO(QRO, B(A)).main() @ &m : res] | + 
+     (q + 1)%r / card%r.
+proof.
+  have -> : 
+    Pr[EUF_qCMA (A, PRF_MAC).main() @ &m : res] = Pr[IND_QRO(PRF, B(A)).main() @ &m : res].
+  + byequiv => //.
+    proc; inline *; wp.
+    while (={l} /\ b{1} = b0{2} /\ EUF_qCMA.sk{1} = PRF.k{2}).
+    + by auto => />.
+    wp; call (: EUF_qCMA.sk{1} = PRF.k{2}); last by auto.
+    by proc; inline *; auto.
+  move=> hq.
+  have -> : 
+    Pr[IND_QRO(QRO, B(A)).main() @ &m : res] = Pr[DistinctQueries(C).main(q) @ &m : res].
+  + byequiv => //.
+    proc; inline *; wp.
+    while{1} (exists l1, 
+                 l1 ++ l{1} = ms{1} /\
+                 b0{1} =  all (fun (p : msg * tag) => QRO.h{1} p.`1 = p.`2) l1{2}) (size l{1}).
+    + move=> _ z; auto => /> &1 l1; case: (l{1}) => //= -[] m h l0.
+      split; last smt().
+      by exists (l1 ++ [(m,h)]); rewrite all_cat -catA /=.
+    wp; call (: ={QRO.h}); 1: by sim.
+    auto => /> hL _ ms; split; 1: by exists [].
+    move=> l; split; 1: smt(size_eq0 size_ge0).
+    by move=> l1; rewrite cats0 /#.
+  have /# := bound_distinct q C &m _.
+  proc; inline *; wp.
+  call hq; auto.
+qed.
