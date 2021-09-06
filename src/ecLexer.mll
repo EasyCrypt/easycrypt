@@ -423,7 +423,9 @@ rule main = parse
   | '.' (eof | blank | newline as r) {
       if r = "\n" then
         Lexing.new_line lexbuf;
-      [FINAL]
+      let lc = Lexing.lexeme_start_p lexbuf in
+      let lc = { lc with pos_cnum = lc.pos_cnum + 1; } in
+      [FINAL lc]
     }
 
   | "." { [DOT] }
