@@ -439,7 +439,6 @@
 %token EXPECT
 %token EXPORT
 %token FEL
-%token FINAL
 %token FIRST
 %token FISSION
 %token FOR
@@ -587,6 +586,7 @@
 %token ZETA
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4 NUMOP
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
+%token < Lexing.position> FINAL
 
 %nonassoc prec_below_comma
 %nonassoc COMMA ELSE
@@ -3644,8 +3644,9 @@ stop:
 | DROP DOT { }
 
 global:
-| tm=boption(TIME) g=loc(global_action) FINAL
-  { { gl_action = g; gl_timed = tm; } }
+| tm=boption(TIME) g=global_action ep=FINAL
+  { let lc = EcLocation.make $startpos ep in
+    { gl_action = EcLocation.mk_loc lc g; gl_timed = tm; } }
 
 prog_r:
 | g=global { P_Prog ([g], false) }
