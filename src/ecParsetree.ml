@@ -909,10 +909,11 @@ type prealize = {
 
 (* -------------------------------------------------------------------- *)
 type ptypeclass = {
-  ptc_name : psymbol;
-  ptc_inth : pqsymbol option;
-  ptc_ops  : (psymbol * pty) list;
-  ptc_axs  : (psymbol * pformula) list;
+  ptc_name   : psymbol;
+  ptc_params : ptyvardecls option;
+  ptc_inth   : pqsymbol option;
+  ptc_ops    : (psymbol * pty) list;
+  ptc_axs    : (psymbol * pformula) list;
 }
 
 type ptycinstance = {

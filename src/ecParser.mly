@@ -1633,15 +1633,15 @@ typedecl:
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
 typeclass:
-| TYPE CLASS x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
-    { ptc_name = x;
-      ptc_inth = inth;
-      ptc_ops  = fst body;
-      ptc_axs  = snd body; }
+| TYPE CLASS
+    tya=tyvars_decl? x=lident inth=prefix(LTCOLON, lqident)?
+  EQ LBRACE body=tc_body RBRACE {
+    { ptc_name   = x;
+      ptc_params = tya;
+      ptc_inth   = inth;
+      ptc_ops    = fst body;
+      ptc_axs    = snd body; }
   }
-
-tc_inth:
-| LTCOLON x=lqident { x }
 
 tc_body:
 | ops=tc_op* axs=tc_ax* { (ops, axs) }

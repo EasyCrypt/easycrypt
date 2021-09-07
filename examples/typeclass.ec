@@ -1,94 +1,173 @@
-(* ==================================================================== *)
-subtype 'a word (n : int) = {
-  w : 'a list | size w = n
-} + witness.
+(* -------------------------------------------------------------------- *)
+require import AllCore List.
 
-op cat ['a] [n m : int] (x : {'a word n}) (y : {'a word m}) : {'a word (n+m)} =
-  x ++ y.
+type class finite = {
+  op enum     : finite list
+  axiom enumP : forall (x : finite), x \in enum
+}.
 
-==> (traduction)
+type class monoid = {
+  op mzero : monoid
+  op madd  : monoid -> monoid -> monoid
+}.
 
-op cat ['a] (x : 'a word) (y : 'a word) : 'a word =
-  x ++ y.
+(* instance monoid with int ... *)
 
-lemma cat_spec ['a] :
-  forall (n m : int) (x y : 'a word),
-    size x = n => size y = m => size (cat x y) = (n + m).
+type class group = {
+  op zero  : group
+  op ([-]) : group -> group
+  op ( + ) : group -> group -> group
 
-op xor [n m : int] (w1 : {word n}) (w2 : {word m}) : {word (min (n, m))} =
-  ...
+  axiom addr0 : left_id zero (+)
+  axiom addrN : left_inverse zero ([-]) (+)
+  axiom addrC : commutative (+)
+  axiom addrA : associative (+)
+}.
 
-lemma foo ['a] [n : int] (w1 w2 : {'a word n}) :
-  xor w1 w2 = xor w2 w1.
+(* instance ['a <: group] monoid with 'a ... *)
 
-op vectorize ['a] [n m : int] (w : {'a word (n * m)}) : {{'a word n} word m}.
+type class ring <: group = {
+  op one   : ring
+  op ( * ) : ring -> ring -> ring
 
--> Keeping information in application? Yes
-   -> should provide a syntax for giving the arguments
+  axiom mulr1  : left_id one ( * )
+  axiom mulrC  : commutative ( * )
+  axiom mulrA  : associative ( * )
+  axiom mulrDl : left_distributive ( * ) ( + )
+}.
 
-      {w : word 256}
+(* instance group with int ... *)
 
-      vectorize<:int, n = 4> w ==> infer: m = 64
+(*
+type class ['a <: ring] module_ <: group = {
+  op ( ** )  : 'a -> module_ -> module_
 
--> What to do when the inference fails
-   1. we reject (most likely)
-   2. we open a goal
+  axiom scalerDl : forall (a b : 'a) (x : module_),
+    (a + b) ** x = a ** x + b ** x
 
--> In a proof script (apply: foo) or (rewrite foo)
-   1. inference des dépendances (n, m, ...)
-   2. décharger les conditions de bord (size w1 = n, size w2 = n)
+  axiom scalerDr : forall (a : 'a) (x y : module_),
+    a ** (x + y) = a ** x + a ** y
+}.
+*)
 
--> Goal
-      n : int
-      m : int
-     w1 : {word n}
-     w2 : {word m}
-   ====================================================================
-     E[xor (cat w1 w2) (cat w2 w1)]
 
-   rewrite foo
+type class A = ...
+type class B1 <: A
+type class B2 <: A
+type class C <: B1 & B2
 
-      n : int
-      m : int
-     w1 : {word n}
-     w2 : {word m}
-   ====================================================================
-     E[xor (cat w2 w1) (cat w1 w2)]
+op ['a <: B1 & B2]
 
-   under condition:
-     exists p . size (cat w1 w2) = p /\ size (cat w2 w1) = p.
+int -> group -> monoid
+int -> monoid
 
-   ?p = size (cat w1 w2)
-   ?p = size (cat w2 w1)
 
--> can be solved using a extended prolog-like engine
-    1. declarations of variables (w1 : {word n}) (w2 : {word m})
-    2. prolog-like facts from operators types (-> ELPI)
-    3. theories (ring / int)
+type ('a <: ring) poly = 'a list.
 
--> subtypes in procedures
+op foo ['a <: group] (x y : 'a) = x + y.
 
-   We can only depend on operators / constants. I.e. the following
-   program should be rejected:
+lemma add0r ['a <: group] : right_id<:'a, 'a> zero (+).
+proof.
+  (* Works for bad reasons *)
+  by move=> x /=; rewrite addrC addr0.
+qed.
 
-   module M = {
-     var n : int
+(* type fingroup <: group & finite. *)
 
-     proc f(x : {bool word M.n}) = {
+(* type class fingroup = group & finite *)
+
+(* -------------------------------------------------------------------- *)
+op izero = 0.
+
+instance group with int
+  op zero = izero
+  op (+)  = RealInt.add.
+
+instance ['a <: ring] ('a poly) <: ring = {
+}.
+
+instance ['a <: group & ...] 'a <: ... = {
+}.
+
+instance ['a <: group] 'a <: monoid = {
+}.
+
+typeclass witness = {
+  op witness : witness;
+}.
+
+instance ['a] 'a <: witness = {
+}.
+
+(* -------------------------------------------------------------------- *)
+
+ 1. typage -> selection des operateurs / inference des instances de tc
+ 2. reduction
+ 3. unification (tactiques)
+ 4. clonage
+ 5. envoi au SMT
+
+ 1.
+   Fop :
+     -(old) path * ty list -> form
+     -(new) path * (ty * (map tcname -> tcinstance)) list -> form
+
+   op ['a <: monoid] (+) : 'a -> 'a -> 'a.
+
+   (+)<:int + monoid -> intadd_monoid>
+   (+)<:int + monoid -> intmul_monoid>
+
+   1.1 module de construction des formules avec typage
+   1.2 utiliser le module ci-dessous
+
+     let module M = MkForm(struct let env = env' end) in 
+
+   1.3 UnionFind avec contraintes de TC
+
+   1.4 Overloading:
+       3 + 4
+         a. 3 Int.(+) 4
+         b. 3 Monoid<:int>.(+) 4 (-> instance du dessus -> ignore)
+
+   1.5 foo<: int[monoid -> intadd_monoid] >
+       foo<: int[monoid -> intmul_monoid] >
+
+ 2. -> Monoid.(+)<:int> -> Int.(+)
+
+ 3. -> Pb d'unification des op
+         (+)<: ?[monoid -> ?] > ~ Int.(+)
+
+       Mecanisme de resolution des TC
+
+ 4. -> il faut cloner les TC
+
+ 5.
+
+   a. encodage
+
+     record 'a premonoid = {
+       op zero : 'a
+       op add  : 'a -> 'a -> 'a;
      }
-   }
 
-   Question:
-     - What about dependent types in the type for results:
-         we reject programs if we cannot statically check the condition
-     - What about the logics? we have to patch them.
+     pred ['a] ismonoid (m : 'a premonoid) = {
+       left_id m.zero m.add
+     }
 
-(* ==================================================================== *)
-nth ['a] 'a -> 'a list -> int -> 'a
+     op ['a <: monoid] foo (x y : 'a) = x + y
 
-ws : {word n} list
+     ->> foo ['a] (m : 'a premonoid) (x y : 'a) = m.add x y
 
-nth<:word> witness ws 2 : word
-nth<:{word n}>
+     lemma foo ['a <: monoid] P
 
-coercion : 'a word n -> 'a list
+     ->> foo ['a] (m : 'a premonoid) : ismonoid m => P
+
+     let intmonoid = { zero = 0; add = intadd }
+
+     lemma intmonoid_is_monoid : ismonoid int_monoid
+
+   b. reduction avant envoi
+       (+)<: int[monoid -> intadd_monoid > -> Int.(+)
+
+   c. ne pas envoyer certaines instances (e.g. int est un groupe)
+      -> instance [nosmt] e.g.
