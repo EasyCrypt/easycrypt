@@ -1315,28 +1315,28 @@ qed.
 
 local equiv XY_XY_Ideal :
   Bj(XY_Ideal).distinguish ~ Bj(XY).distinguish:
-  ={arg} ==> ={res}.
+  ={glob D, arg} ==> ={res}.
 proof.
 proc.
-admit.
-(*
-  call (: ={RO.m}).
+call (: XY_Ideal.m{1} = RO.m{2}
+        /\ ={Bj.j, Bj.gis}).
 proc.
 inline*; sp.
 if {1}=> //.
-  sp; wp.
+  rcondt {2} 2; auto=> />.
   transitivity {1}
-        { (xq0, yq0) <@ ProdSampling.S.sample2(dR, dR); }
-        ( true ==> ={xq0, yq0})
-        (true ==> (xq0, yq0){1} = r0{2})=> //.
-  + admit.
-  + inline {2} 1; auto.
+    { (xq0, yq0) <@ ProdR.S.sample2(dR, dR); }
+    (true ==> ={xq0, yq0})
+    (true ==> (xq0, yq0){1} = r0{2})=> //.
+  + by inline {2} 1; auto.
   transitivity {2}
-        { r0 <@ ProdSampling.S.sample(dR, dR); }
-        (true ==> true)
-        (true ==> r0{2} = (xq0, yq0){1})=> //.
-  + call ProdSampling.sample_sample2; auto=> /> []. *)
-*)
+    {r0 <@ ProdR.S.sample(dR, dR); }
+    (true ==> (xq0, yq0){1} = r0{2})
+    (true ==> ={r0})=> //.
+  + by symmetry; call ProdR.sample_sample2; auto=> /> [].
+  inline*; auto.
++ rcondf {2} 2; auto=> />.
+by inline *; auto=> />.
 qed.
 
 local lemma HSj_BjI (j : int):
@@ -1578,11 +1578,11 @@ call (:   ={j}(Hj, Bj) /\ Hj.j{1} = j
       rewrite size_bits /=.
       smt(gt0_l).
     move=> x1 p'.
-    case {-1}(j <= 0) (eq_refl (j <= 0))=> />; first smt.
+    case {-1}(j <= 0) (eq_refl (j <= 0))=> />; first smt().
     move=> _.
-    case {-1}(j = 0) (eq_refl (j = 0))=> />; first smt.
+    case {-1}(j = 0) (eq_refl (j = 0))=> />; first smt().
     move=> _.
-    case {-1}(j + 1 <= 0) (eq_refl (j + 1 <= 0))=> />; first smt.
+    case {-1}(j + 1 <= 0) (eq_refl (j + 1 <= 0))=> />; first smt().
     move=> _ use.
     rewrite get_set_sameE (drop_nth witness) /=.
     + move: use.
@@ -1595,9 +1595,9 @@ call (:   ={j}(Hj, Bj) /\ Hj.j{1} = j
     rewrite size_bits /=.
     smt(gt0_l).
   move=> x1 p'.
-  case {-1}(j <= 0) (eq_refl (j <= 0))=> />; first smt.
-  case {-1}(j = 0) (eq_refl (j = 0))=> />; first smt.
-  case {-1}(j + 1 <= 0) (eq_refl (j + 1 <= 0))=> />; first smt.
+  case {-1}(j <= 0) (eq_refl (j <= 0))=> />; first smt().
+  case {-1}(j = 0) (eq_refl (j = 0))=> />; first smt().
+  case {-1}(j + 1 <= 0) (eq_refl (j + 1 <= 0))=> />; first smt().
   move=> _ _ _ use.
   rewrite (drop_nth witness) /=.
   + move: use.
