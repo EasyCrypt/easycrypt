@@ -420,9 +420,10 @@ let transtcs (env : EcEnv.env) tcs =
 
 (* -------------------------------------------------------------------- *)
 let transtyvars (env : EcEnv.env) (loc, tparams) =
+
   let tparams = tparams |> omap
     (fun tparams ->
-        let for1 ({ pl_desc = x }, tc) = (EcIdent.create x, transtcs env tc) in
+        let for1 ({ pl_desc = x }, tc) = (EcIdent.create x, [] (*transtcs env tc*)) in (*TODO*)
           if not (List.is_unique (List.map (unloc |- fst) tparams)) then
             tyerror loc env DuplicatedTyVar;
           List.map for1 tparams)

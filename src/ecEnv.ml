@@ -109,7 +109,7 @@ type mc = {
   mc_operators  : (ipath * EcDecl.operator) MMsym.t;
   mc_axioms     : (ipath * EcDecl.axiom) MMsym.t;
   mc_theories   : (ipath * (ctheory * thmode)) MMsym.t;
-  mc_typeclasses: (ipath * typeclass) MMsym.t;
+  mc_typeclasses: (ipath * tc_decl) MMsym.t;
   mc_rwbase     : (ipath * path) MMsym.t;
   mc_components : ipath MMsym.t;
 }
@@ -856,7 +856,7 @@ module MC = struct
         let on1 (opid, optype) =
           let opname = EcIdent.name opid in
           let optype = ty_subst tsubst optype in
-          let opdecl = mk_op ~opaque:false [(self, Sp.singleton mypath)] optype (Some OP_TC) in
+          let opdecl = mk_op ~opaque:false [(*(self, Sp.singleton mypath)*)] optype (Some OP_TC) in (*TODO: typeclass list to define*)
             (opid, xpath opname, optype, opdecl)
         in
           List.map on1 tc.tc_ops
@@ -875,7 +875,7 @@ module MC = struct
         List.map
           (fun (x, ax) ->
             let ax = Fsubst.f_subst fsubst ax in
-              (x, { ax_tparams    = [(self, Sp.singleton mypath)];
+              (x, { ax_tparams    = [(*(self, Sp.singleton mypath)*)]; (*TODO: typeclass list to define*)
                     ax_spec       = ax;
                     ax_kind       = `Axiom (Ssym.empty, false);
                     ax_visibility = `NoSmt; }))
@@ -1274,7 +1274,7 @@ let try_lf f =
 
 (* ------------------------------------------------------------------ *)
 module TypeClass = struct
-  type t = typeclass
+  type t = tc_decl
 
   let by_path_opt (p : EcPath.path) (env : env) =
     omap

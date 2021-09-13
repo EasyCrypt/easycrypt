@@ -341,7 +341,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module TypeClass : sig
-  type t = typeclass
+  type t = tc_decl
 
   val add   : path -> env -> env
   val bind  : ?import:import -> symbol -> t -> env -> env

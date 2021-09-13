@@ -1804,12 +1804,12 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvar_ctt (ppe : PPEnv.t) fmt (tvar, ctt) =
-  match EcPath.Sp.elements ctt with
+  match ctt with
   | []  -> pp_tyvar ppe fmt tvar
   | ctt ->
       Format.fprintf fmt "%a <: %a"
         (pp_tyvar ppe) tvar
-        (pp_list " &@ " (pp_tcname ppe)) ctt
+        (pp_list " &@ " (fun fmt tc -> pp_tcname ppe fmt tc.tc_name)) ctt
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvarannot (ppe : PPEnv.t) fmt ids =

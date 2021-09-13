@@ -292,8 +292,8 @@ let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =
   add_tparams s params (List.map (fun (p',_) -> tvar p') params')
 
 (* -------------------------------------------------------------------- *)
-let subst_typaram (s : _subst) ((id, tc) : ty_param) =
-  (EcIdent.fresh id, Sp.fold (fun p tc -> Sp.add (s.s_p p) tc) tc Sp.empty)
+let subst_typaram (s : _subst) ((id, tc) : ty_param) : ty_param =
+  (EcIdent.fresh id, [] (*Sp.fold (fun p tc -> Sp.add (s.s_p p) tc) tc Sp.empty*)) (*TODO: typeclass list to define*)
 
 let subst_typarams (s : _subst) (typ : ty_params) =
   List.map (subst_typaram s) typ
@@ -472,10 +472,10 @@ let subst_instance (s : _subst) tci =
 (* -------------------------------------------------------------------- *)
 let subst_tc (s : _subst) tc =
   let tc_prt = tc.tc_prt |> omap s.s_p in
+  let tc_tparams = List.map (subst_typaram s) tc.tc_tparams in
   let tc_ops = List.map (snd_map s.s_ty) tc.tc_ops in
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
-    { tc_prt; tc_ops; tc_axs; }
-
+    { tc_prt; tc_tparams; tc_ops; tc_axs; }
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item_r (s : _subst) (item : theory_item_r) =

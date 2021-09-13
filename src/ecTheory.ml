@@ -39,7 +39,7 @@ and theory_item_r =
   | Th_theory    of (symbol * (theory * thmode))
   | Th_export    of EcPath.path
   | Th_instance  of (ty_params * EcTypes.ty) * tcinstance
-  | Th_typeclass of (symbol * typeclass)
+  | Th_typeclass of (symbol * tc_decl)
   | Th_baserw    of symbol
   | Th_addrw     of EcPath.path * EcPath.path list
   | Th_reduction of (EcPath.path * rule_option * rule option) list
@@ -96,7 +96,7 @@ and ctheory_item_r =
   | CTh_theory    of (symbol * (ctheory * thmode))
   | CTh_export    of EcPath.path
   | CTh_instance  of (ty_params * EcTypes.ty) * tcinstance
-  | CTh_typeclass of (symbol * typeclass)
+  | CTh_typeclass of (symbol * tc_decl)
   | CTh_baserw    of symbol
   | CTh_addrw     of EcPath.path * EcPath.path list
   | CTh_reduction of (EcPath.path * rule_option * rule option) list

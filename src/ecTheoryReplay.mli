@@ -45,7 +45,7 @@ and 'a ovrhooks = {
   hbaserw  : 'a -> symbol -> 'a;
   haddrw   : 'a -> EcPath.path * EcPath.path list -> 'a;
   hauto    : 'a -> bool * int * string option * EcPath.path list -> 'a;
-  htycl    : 'a -> symbol * typeclass -> 'a;
+  htycl    : 'a -> symbol * tc_decl -> 'a;
   hinst    : 'a -> (ty_params * ty) * tcinstance -> 'a;
   husered  : 'a -> (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list -> 'a;
   hthenter : 'a -> thmode -> symbol -> 'a;

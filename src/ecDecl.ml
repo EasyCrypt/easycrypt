@@ -17,7 +17,12 @@ module BI   = EcBigInt
 module Ssym = EcSymbols.Ssym
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t * EcPath.Sp.t
+type typeclass = {
+  tc_name : EcPath.path;
+  tc_args : ty list;
+}
+
+type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
@@ -53,7 +58,7 @@ let tydecl_as_record (td : tydecl) =
   match td.tyd_type with `Record x -> x | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) () =
+let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) () : tydecl =
   let params =
     match params with
     | `Named params ->
@@ -61,7 +66,7 @@ let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) () =
     | `Int n ->
         let fmt = fun x -> Printf.sprintf "'%s" x in
         List.map
-          (fun x -> (EcIdent.create x, Sp.empty))
+          (fun x -> (EcIdent.create x, [])) (*TODO: typeclass list to define*)
           (EcUid.NameGen.bulk ~fmt n)
   in
 
@@ -277,10 +282,11 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
     ax_visibility = if nosmt then `NoSmt else `Visible; }
 
 (* -------------------------------------------------------------------- *)
-type typeclass = {
-  tc_prt : EcPath.path option;
-  tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : (EcSymbols.symbol * EcCoreFol.form) list;
+type tc_decl = {
+  tc_prt     : EcPath.path option;
+  tc_tparams : ty_params;
+  tc_ops     : (EcIdent.t * EcTypes.ty) list;
+  tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
 }
 
 (* -------------------------------------------------------------------- *)

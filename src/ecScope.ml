@@ -1308,7 +1308,7 @@ module Op = struct
       let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in
 
       let ax =
-        { ax_tparams    = List.map (fun ty -> (ty, Sp.empty)) nparams;
+        { ax_tparams    = List.map (fun ty -> (ty, [])) nparams;
           ax_spec       = ax;
           ax_kind       = `Axiom (Ssym.empty, false);
           ax_visibility = `Visible; } in
@@ -1559,7 +1559,7 @@ module Ty = struct
       scope
 
   (* ------------------------------------------------------------------ *)
-  let add_class (scope : scope) { pl_desc = tcd } =
+  let add_class (scope : scope) { pl_desc = tcd; pl_loc = loc } =
     assert (scope.sc_pr_uc = None);
 
     let name  = unloc tcd.ptc_name in
@@ -1590,10 +1590,13 @@ module Ty = struct
         |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
                     "duplicated axiom name: `%s'" x.pl_desc);
 
+      (* Check typeclasses arguments *)
+      let ue = TT.transtyvars scenv (loc, tcd.ptc_params) in
+
       (* Check operators types *)
       let operators =
         let check1 (x, ty) =
-          let ue = EcUnify.UniEnv.create (Some []) in
+          let ue = EcUnify.UniEnv.copy ue in
           let ty = transty tp_tydecl scenv ue ty in
           let ty = Tuni.offun (EcUnify.UniEnv.close ue) ty in
             (EcIdent.create (unloc x), ty)
@@ -1604,7 +1607,7 @@ module Ty = struct
       let axioms =
         let scenv = EcEnv.Var.bind_locals operators scenv in
         let check1 (x, ax) =
-          let ue = EcUnify.UniEnv.create (Some []) in
+          let ue = EcUnify.UniEnv.copy ue in
           let ax = trans_prop scenv ue ax in
           let ax = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ax in
             (unloc x, ax)
@@ -1612,7 +1615,8 @@ module Ty = struct
           tcd.ptc_axs |> List.map check1 in
 
       (* Construct actual type-class *)
-      { tc_prt = uptc; tc_ops = operators; tc_axs = axioms; }
+      { tc_prt = uptc; tc_tparams = EcUnify.UniEnv.tparams ue;
+        tc_ops = operators; tc_axs = axioms; }
     in
       bindclass scope (name, tclass)
 

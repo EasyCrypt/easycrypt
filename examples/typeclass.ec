@@ -38,7 +38,6 @@ type class ring <: group = {
 
 (* instance group with int ... *)
 
-(*
 type class ['a <: ring] module_ <: group = {
   op ( ** )  : 'a -> module_ -> module_
 
@@ -48,9 +47,8 @@ type class ['a <: ring] module_ <: group = {
   axiom scalerDr : forall (a : 'a) (x y : module_),
     a ** (x + y) = a ** x + a ** y
 }.
-*)
 
-
+(*
 type class A = ...
 type class B1 <: A
 type class B2 <: A
@@ -60,7 +58,7 @@ op ['a <: B1 & B2]
 
 int -> group -> monoid
 int -> monoid
-
+*)
 
 type ('a <: ring) poly = 'a list.
 
@@ -79,6 +77,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 op izero = 0.
 
+(*
 instance group with int
   op zero = izero
   op (+)  = RealInt.add.
@@ -98,6 +97,7 @@ typeclass witness = {
 
 instance ['a] 'a <: witness = {
 }.
+*)
 
 (* -------------------------------------------------------------------- *)
 
@@ -106,6 +106,8 @@ instance ['a] 'a <: witness = {
  3. unification (tactiques)
  4. clonage
  5. envoi au SMT
+
+ 0. Define or find tcname
 
  1.
    Fop :

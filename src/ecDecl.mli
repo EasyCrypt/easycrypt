@@ -15,7 +15,12 @@ open EcTypes
 open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t * EcPath.Sp.t
+type typeclass = {
+  tc_name : EcPath.path;
+  tc_args : ty list;
+}
+
+type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
@@ -158,10 +163,11 @@ val axiomatized_op :
   -> axiom
 
 (* -------------------------------------------------------------------- *)
-type typeclass = {
-  tc_prt : EcPath.path option;
-  tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : (EcSymbols.symbol * form) list;
+type tc_decl = {
+  tc_prt     : EcPath.path option;
+  tc_tparams : ty_params;
+  tc_ops     : (EcIdent.t * EcTypes.ty) list;
+  tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
 }
 
 (* -------------------------------------------------------------------- *)
