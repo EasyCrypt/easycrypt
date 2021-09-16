@@ -293,7 +293,8 @@ let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =
 
 (* -------------------------------------------------------------------- *)
 let subst_typeclass s tc =
-  {tc_name = s.s_p tc.tc_name; tc_args = List.map s.s_ty tc.tc_args; }
+  { tc_name = s.s_p tc.tc_name;
+    tc_args = List.map s.s_ty tc.tc_args; }
 
 (* -------------------------------------------------------------------- *)
 let subst_typaram (s : _subst) ((id, tc) : ty_param) : ty_param =
@@ -313,7 +314,7 @@ let open_tydecl (s:_subst) (tyd:tydecl) tys =
   let sty = add_tparams s tyd.tyd_params tys in
   match tyd.tyd_type with
   | `Abstract tc ->
-    `Abstract (Sp.fold (fun p tc -> Sp.add (s.s_p p) tc) tc Sp.empty)
+    `Abstract (List.map (subst_typeclass s) tc)
   | `Concrete ty ->
     `Concrete (sty.s_ty ty)
   | `Datatype dtype ->
@@ -471,15 +472,16 @@ let subst_instance (s : _subst) tci =
   match tci with
   | `Ring    cr -> `Ring  (subst_ring  s cr)
   | `Field   cr -> `Field (subst_field s cr)
-  | `General p  -> `General (s.s_p p)
+  | `General tc -> `General (subst_typeclass s tc)
 
 (* -------------------------------------------------------------------- *)
 let subst_tc (s : _subst) tc =
-  let tc_prt = tc.tc_prt |> omap s.s_p in
+  let tc_prt = omap (subst_typeclass s) tc.tc_prt in
   let tc_tparams = List.map (subst_typaram s) tc.tc_tparams in
   let tc_ops = List.map (snd_map s.s_ty) tc.tc_ops in
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
     { tc_prt; tc_tparams; tc_ops; tc_axs; }
+
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item_r (s : _subst) (item : theory_item_r) =

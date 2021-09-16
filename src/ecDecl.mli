@@ -10,7 +10,6 @@
 open EcUtils
 open EcSymbols
 open EcBigInt
-open EcPath
 open EcTypes
 open EcCoreFol
 
@@ -32,7 +31,7 @@ type tydecl = {
 
 and ty_body = [
   | `Concrete of EcTypes.ty
-  | `Abstract of Sp.t
+  | `Abstract of typeclass list
   | `Datatype of ty_dtype
   | `Record   of form * (EcSymbols.symbol * EcTypes.ty) list
 ]
@@ -44,11 +43,11 @@ and ty_dtype = {
 }
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty
-val tydecl_as_abstract : tydecl -> Sp.t
+val tydecl_as_abstract : tydecl -> typeclass list
 val tydecl_as_datatype : tydecl -> ty_dtype
 val tydecl_as_record   : tydecl -> form * (EcSymbols.symbol * EcTypes.ty) list
 
-val abs_tydecl : ?resolve:bool -> ?tc:Sp.t -> ?params:ty_pctor -> unit -> tydecl
+val abs_tydecl : ?resolve:bool -> ?tc:typeclass list -> ?params:ty_pctor -> unit -> tydecl
 
 val ty_instanciate : ty_params -> ty list -> ty -> ty
 
@@ -164,8 +163,8 @@ val axiomatized_op :
 
 (* -------------------------------------------------------------------- *)
 type tc_decl = {
-  tc_prt     : EcPath.path option;
   tc_tparams : ty_params;
+  tc_prt     : typeclass option;
   tc_ops     : (EcIdent.t * EcTypes.ty) list;
   tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
 }

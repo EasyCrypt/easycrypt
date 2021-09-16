@@ -84,13 +84,13 @@ instance group with int
   op (+)   = CoreInt.add
   op ([-]) = CoreInt.opp.
 
-instance 'a module_ with ['a <: ring] 'a poly
-.
+op polyZ ['a <: ring] (c : 'a) (p : 'a poly) : 'a poly.
 
-
+instance 'b module_ with ['b <: ring] 'b poly
+  op ( ** ) = polyZ<:'b>.
 
 instance ['a <: group & ...] 'a <: ... = {
-}.
+}
 
 instance ['a <: group] 'a <: monoid = {
 }.

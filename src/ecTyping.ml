@@ -783,28 +783,24 @@ let transty_for_decl env ty =
     transty tp_nothing env ue ty
 
 (* -------------------------------------------------------------------- *)
-let transtcs (env : EcEnv.env) (tyvars : ty_params) (tcs : (pqsymbol * pty list) list) : typeclass list =
-  let for1 (tc : pqsymbol * pty list) =
-    let (tc_name, args) = tc in
-    match EcEnv.TypeClass.lookup_opt (unloc tc_name) env with
-    | None -> tyerror (loc tc_name) env (UnknownTypeClass (unloc tc_name))
-    | Some (p, decl) ->
-        (*TODOTCD: TC HOOK.*)
-        let ue = UE.create (Some (List.rev tyvars)) in
-        let args = List.map (transty tp_nothing env ue) args in
-        (*Raise an exception like in None*)
-        assert (List.length decl.tc_tparams = List.length args);
-        { tc_name = p; tc_args = args; }
-  in
-    List.map for1 tcs
+let transtc (env : EcEnv.env) ue ((tc_name, args) : ptcparam) : typeclass =
+  match EcEnv.TypeClass.lookup_opt (unloc tc_name) env with
+  | None ->
+     tyerror (loc tc_name) env (UnknownTypeClass (unloc tc_name))
+  | Some (p, decl) ->
+     let args = List.map (transty tp_tydecl env ue) args in
+     (*FIXME: TC: Raise an exception like in None*)
+     assert (List.length decl.tc_tparams = List.length args);
+     { tc_name = p; tc_args = args; }
 
 (* -------------------------------------------------------------------- *)
 let transtyvars (env : EcEnv.env) (loc, (tparams : ptyparams option)) =
   let tparams = tparams |> omap
     (fun tparams ->
         let for1 tyvars ({ pl_desc = x }, tc) =
-          let x = EcIdent.create x in
-          let t = transtcs env tyvars tc in
+          let x  = EcIdent.create x in
+          let ue = UE.create (Some tyvars) in
+          let t  = List.map (transtc env ue) tc in
           (x, t) :: tyvars
         in
           if not (List.is_unique (List.map (unloc |- fst) tparams)) then

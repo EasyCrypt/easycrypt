@@ -34,7 +34,7 @@ type tydecl = {
 
 and ty_body = [
   | `Concrete of EcTypes.ty
-  | `Abstract of Sp.t
+  | `Abstract of typeclass list
   | `Datatype of ty_dtype
   | `Record   of EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
 ]
@@ -58,7 +58,7 @@ let tydecl_as_record (td : tydecl) =
   match td.tyd_type with `Record x -> x | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) () : tydecl =
+let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) () : tydecl =
   let params =
     match params with
     | `Named params ->
@@ -283,8 +283,8 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
 
 (* -------------------------------------------------------------------- *)
 type tc_decl = {
-  tc_prt     : EcPath.path option;
   tc_tparams : ty_params;
+  tc_prt     : typeclass option;
   tc_ops     : (EcIdent.t * EcTypes.ty) list;
   tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
 }

@@ -1623,7 +1623,7 @@ typedecl:
 | TYPE td=rlist1(tyd_name, COMMA)
     { List.map (mk_tydecl^~ (PTYD_Abstract [])) td }
 
-| TYPE td=tyd_name LTCOLON tcs=rlist1(qident, COMMA)
+| TYPE td=tyd_name LTCOLON tcs=rlist1(tcparam, COMMA)
     { [mk_tydecl td (PTYD_Abstract tcs)] }
 
 | TYPE td=tyd_name EQ te=loc(type_exp)
@@ -1639,7 +1639,7 @@ typedecl:
 (* Type classes                                                         *)
 typeclass:
 | TYPE CLASS
-    tya=tyvars_decl? x=lident inth=prefix(LTCOLON, lqident)?
+    tya=tyvars_decl? x=lident inth=prefix(LTCOLON, tcparam)?
   EQ LBRACE body=tc_body RBRACE {
     { ptc_name   = x;
       ptc_params = tya;

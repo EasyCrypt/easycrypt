@@ -1525,15 +1525,11 @@ module Ty = struct
     assert (scope.sc_pr_uc = None);
 
     let (args, name) = info.pl_desc and loc = info.pl_loc in
-    let tcs =
-      List.map
-        (fun tc -> fst (EcEnv.TypeClass.lookup (unloc tc) scope.sc_env))
-        tcs
-    in
     let ue = TT.transtyvars scope.sc_env (loc, Some args) in
+    let tcs = List.map (TT.transtc scope.sc_env ue) tcs in
     let tydecl = {
       tyd_params  = EcUnify.UniEnv.tparams ue;
-      tyd_type    = `Abstract (Sp.of_list tcs);
+      tyd_type    = `Abstract tcs;
       tyd_resolve = true;
     } in
       bind scope (unloc name, tydecl)
@@ -1568,21 +1564,14 @@ module Ty = struct
     check_name_available scope tcd.ptc_name;
 
     let tclass =
-      let uptc =
-        tcd.ptc_inth |> omap
-          (fun { pl_loc = uploc; pl_desc = uptc } ->
-            match EcEnv.TypeClass.lookup_opt uptc scenv with
-            | None -> hierror ~loc:uploc "unknown type-class: `%s'"
-                        (string_of_qsymbol uptc)
-            | Some (tcp, _) -> tcp)
-      in
-
       (* Check typeclasses arguments *)
       let ue = TT.transtyvars scenv (loc, tcd.ptc_params) in
 
+      let uptc = tcd.ptc_inth |> omap (TT.transtc scenv ue) in
+
       let asty  =
-        let body = ofold (fun p tc -> Sp.add p tc) Sp.empty uptc in
-          { tyd_params = []; tyd_type = `Abstract body; tyd_resolve = true; } in
+        let body = otolist uptc in
+        { tyd_params = []; tyd_type = `Abstract body; tyd_resolve = true; } in
       let scenv = EcEnv.Ty.bind name asty scenv in
 
       (* Check for duplicated field names *)
@@ -1672,9 +1661,11 @@ module Ty = struct
            match Mstr.find_opt x ops with
            | None -> m
            | Some (loc, (p, opty)) ->
-               if not (EcReduction.EqTest.for_type env ty opty) then
-                 hierror ~loc "invalid type for operator `%s'" x;
-               Mstr.add x p m)
+               if not (EcReduction.EqTest.for_type env ty opty) then begin
+                 let ppe = EcPrinting.PPEnv.ofenv env in
+                 hierror ~loc "invalid type for operator `%s': %a / %a"
+                   x (EcPrinting.pp_type ppe) ty (EcPrinting.pp_type ppe) opty
+               end; Mstr.add x p m)
         Mstr.empty reqs
 
   (* ------------------------------------------------------------------ *)
@@ -1765,7 +1756,9 @@ module Ty = struct
     let scope   =
       { scope with sc_env =
           List.fold_left
-            (fun env p -> EcEnv.TypeClass.add_instance ty (`General p) env)
+            (fun env p ->
+              let tc = { tc_name = p; tc_args = [] } in
+              EcEnv.TypeClass.add_instance ty (`General tc) env)
             (EcEnv.Algebra.add_ring (snd ty) cr scope.sc_env)
             [p_zmod; p_ring; p_idomain] }
 
@@ -1795,7 +1788,9 @@ module Ty = struct
     let scope   =
       { scope with sc_env =
           List.fold_left
-            (fun env p -> EcEnv.TypeClass.add_instance ty (`General p) env)
+            (fun env p ->
+              let tc = { tc_name = p; tc_args = [] } in
+              EcEnv.TypeClass.add_instance ty (`General tc) env)
             (EcEnv.Algebra.add_field (snd ty) cr scope.sc_env)
             [p_zmod; p_ring; p_idomain; p_field] }
 
@@ -1803,34 +1798,34 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
-    let subst = { ty_subst_id with ts_def = Mp.of_list [tcp, ([], ty)] } in
+    (* FIXME: TC: substitute tc.tc_tparams with tcp.tc_args *)
+    (* FIXME: TC: check that tcp.tc_args meets the reqs. of tc.tc_params *)
+    let subst = { ty_subst_id with ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)] } in
       List.map (fun (x, opty) ->
         (EcIdent.name x, (true, ty_subst subst opty)))
         tc.tc_ops
 
   (* ------------------------------------------------------------------ *)
   let add_generic_instance (scope : scope) _mode { pl_desc = tci; pl_loc = loc; } =
-    let ty =
+    let (typarams, _) as ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
         assert (EcUnify.UniEnv.closed ue);
         (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
 
-    let (tcp, tc) =
-      match EcEnv.TypeClass.lookup_opt (unloc (fst tci.pti_name)) (env scope) with
-      | None ->
-          hierror ~loc:(fst tci.pti_name).pl_loc
-            "unknown type-class: %s" (string_of_qsymbol (unloc (fst tci.pti_name)))
-      | Some tc -> tc
-    in
+    let tcp =
+      let ue = EcUnify.UniEnv.create (Some typarams) in
+      TT.transtc scope.sc_env ue tci.pti_name in
 
-    let  symbols = symbols_of_tc scope.sc_env (snd ty) (tcp, tc) in
+    let tc = EcEnv.TypeClass.by_path tcp.tc_name scope.sc_env in
+
+    let  symbols = symbols_of_tc scope.sc_env ty (tcp, tc) in
     let _symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
-    let scope =
+
     { scope with
         sc_env = EcEnv.TypeClass.add_instance ty (`General tcp) scope.sc_env }
-    in
+
     (*TODOTCD*)
     (*
     let _ = snd tci.pti_name in
@@ -1840,7 +1835,6 @@ module Ty = struct
     with EcUnify.UnificationFailure _ ->
       hierror "type must be an instance of `%s'" (EcPath.tostring tc.tc_name)
     *)
-    assert false
 
   (* ------------------------------------------------------------------ *)
   let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =

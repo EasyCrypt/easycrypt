@@ -173,7 +173,7 @@ and escope = {
 and tcinstance = [
   | `Ring    of EcDecl.ring
   | `Field   of EcDecl.field
-  | `General of EcPath.path
+  | `General of typeclass
 ]
 
 and redinfo =
@@ -1302,7 +1302,7 @@ module TypeClass = struct
       | None -> env
       | Some prt ->
           let myself = EcPath.pqname (root env) name in
-            { env with env_tc = TC.Graph.add ~src:myself ~dst:prt env.env_tc }
+            { env with env_tc = TC.Graph.add ~src:myself ~dst:prt.tc_name env.env_tc }
 
   let bind ?(import = import0) name tc env =
     let env = if import.im_immediate then rebind name tc env else env in
@@ -1321,7 +1321,7 @@ module TypeClass = struct
   let graph (env : env) =
     env.env_tc
 
-  let bind_instance ty cr tci =
+  let bind_instance (ty : ty_params * ty) (cr : tcinstance) tci =
     (ty, cr) :: tci
 
   let add_instance ?(import = import0) ty cr env =
@@ -1565,17 +1565,17 @@ module Ty = struct
     let env = MC.bind_tydecl name ty env in
 
     match ty.tyd_type with
-    | `Abstract tc ->
+    | `Abstract tcs ->
         let myty =
           let myp = EcPath.pqname (root env) name in
           let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
-            (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
-        let instr =
-          Sp.fold
-            (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
-            tc env.env_tci
+          (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
+        let env_tci =
+          List.fold
+            (fun inst (tc : typeclass) -> TypeClass.bind_instance myty (`General tc) inst)
+            env.env_tci tcs
         in
-          { env with env_tci = instr }
+          { env with env_tci }
 
     | _ -> env
 
@@ -2875,14 +2875,14 @@ module Theory = struct
 
     | CTh_type (x, tyd) -> begin
         match tyd.tyd_type with
-        | `Abstract tc ->
+        | `Abstract tcs ->      (* FIXME: this code is a duplicate *)
             let myty =
               let typ = List.map (fst_map EcIdent.fresh) tyd.tyd_params in
-                (typ, EcTypes.tconstr (xpath x) (List.map (tvar |- fst) typ))
+              (typ, EcTypes.tconstr (xpath x) (List.map (tvar |- fst) typ))
             in
-              Sp.fold
-                (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
-                tc inst
+              List.fold
+                (fun inst tc -> TypeClass.bind_instance myty (`General tc) inst)
+                inst tcs
 
         | _ -> inst
     end
@@ -2911,7 +2911,7 @@ module Theory = struct
       | CTh_typeclass (x, tc) ->
           tc.tc_prt |> omap (fun prt ->
             let src = EcPath.pqname path x in
-            TC.Graph.add ~src ~dst:prt base)
+            TC.Graph.add ~src ~dst:prt.tc_name base)
       | _ -> None
 
     in bind_base_cth for1

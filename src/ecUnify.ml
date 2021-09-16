@@ -93,7 +93,7 @@ let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) p
       List.filter
         (fun (_, tc1) ->
           List.for_all
-            (fun tc2 -> TC.Graph.has_path ~src:tc1 ~dst:tc2.tc_name gr)
+            (fun tc2 -> TC.Graph.has_path ~src:tc1.tc_name ~dst:tc2.tc_name gr)
             tcs)
         (List.pmap tcfilter inst)
   in
@@ -427,7 +427,7 @@ let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
           let len = List.length lt in
             fun op ->
               let tparams = op.D.op_tparams in
-                 List.length tparams = len
+              List.length tparams = len
 
       | Some (TVInamed ls) -> fun op ->
           let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in

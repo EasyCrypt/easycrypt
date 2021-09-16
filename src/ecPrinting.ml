@@ -2957,9 +2957,9 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
               ops
       end
 
-      | `General p ->
+      | `General tc ->
           Format.fprintf fmt "instance %a with %a."
-            (pp_type ppe) ty pp_path p
+            (pp_type ppe) ty (pp_tc ppe) tc
   end
 
   | EcTheory.CTh_baserw name ->

@@ -206,7 +206,10 @@ type pmodule_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
-type ptyparams = (psymbol * (pqsymbol * pty list) list) list
+(*TODOTCC*)
+type ptcparam = pqsymbol * pty list
+type ptyparam  = psymbol * ptcparam list
+type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
@@ -216,7 +219,7 @@ type ptydecl = {
 }
 
 and ptydbody =
-  | PTYD_Abstract of pqsymbol list
+  | PTYD_Abstract of ptcparam list
   | PTYD_Alias    of pty
   | PTYD_Record   of precord
   | PTYD_Datatype of pdatatype
@@ -908,13 +911,13 @@ type prealize = {
 type ptypeclass = {
   ptc_name   : psymbol;
   ptc_params : ptyparams option;
-  ptc_inth   : pqsymbol option;
+  ptc_inth   : ptcparam option;
   ptc_ops    : (psymbol * pty) list;
   ptc_axs    : (psymbol * pformula) list;
 }
 
 type ptycinstance = {
-  pti_name : (pqsymbol * pty list);
+  pti_name : ptcparam;
   pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;

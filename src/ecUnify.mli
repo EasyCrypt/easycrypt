@@ -9,7 +9,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUid
 open EcSymbols
-open EcPath
 open EcTypes
 open EcDecl
 

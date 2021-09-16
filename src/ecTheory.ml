@@ -45,7 +45,7 @@ and theory_item_r =
   | Th_reduction of (EcPath.path * rule_option * rule option) list
   | Th_auto      of (bool * int * symbol option * path list)
 
-and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
+and tcinstance = [ `Ring of ring | `Field of field | `General of typeclass ]
 and thmode     = [ `Abstract | `Concrete ]
 
 and rule_pattern =

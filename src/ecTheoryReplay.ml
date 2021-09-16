@@ -911,6 +911,11 @@ and replay_instance
 
   let forpath p = odfl p (forpath p) in
 
+  let fortypeclass (tc : typeclass) =
+    (* FIXME: TC *)
+    { tc_name = forpath tc.tc_name;
+      tc_args = List.map (EcSubst.subst_ty subst) tc.tc_args; } in
+
   try
     let (typ, ty) = EcSubst.subst_genty subst (typ, ty) in
     let tc =
@@ -939,7 +944,7 @@ and replay_instance
         match tc with
         | `Ring    cr -> `Ring  (doring  cr)
         | `Field   cr -> `Field (dofield cr)
-        | `General p  -> `General (forpath p)
+        | `General p  -> `General (fortypeclass p)
     in
 
     let scope = ove.ovre_hooks.hinst scope ((typ, ty), tc) in
