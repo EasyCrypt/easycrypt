@@ -1802,6 +1802,19 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   in
     Format.fprintf fmt "@[%t%t.@]" pp_prelude pp_body
 
+
+
+(* -------------------------------------------------------------------- *)
+let pp_tc (ppe : PPEnv.t) fmt tc =
+  match tc.tc_args with
+  | []   -> pp_tcname ppe fmt tc.tc_name
+  | [ty] -> Format.fprintf fmt "%a %a"
+              (pp_type ppe) ty
+              (pp_tcname ppe) tc.tc_name
+  | tys  -> Format.fprintf fmt "(%a) %a"
+              (pp_list ",@ " (pp_type ppe)) tys
+              (pp_tcname ppe) tc.tc_name
+
 (* -------------------------------------------------------------------- *)
 let pp_tyvar_ctt (ppe : PPEnv.t) fmt (tvar, ctt) =
   match ctt with
@@ -1809,7 +1822,7 @@ let pp_tyvar_ctt (ppe : PPEnv.t) fmt (tvar, ctt) =
   | ctt ->
       Format.fprintf fmt "%a <: %a"
         (pp_tyvar ppe) tvar
-        (pp_list " &@ " (fun fmt tc -> pp_tcname ppe fmt tc.tc_name)) ctt
+        (pp_list " &@ " (fun fmt tc -> pp_tc ppe fmt tc)) ctt
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvarannot (ppe : PPEnv.t) fmt ids =
@@ -1958,7 +1971,8 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
           (pp_list "@\n" pp_branch) cfix
 
     | Some (OP_TC) ->
-        Format.fprintf fmt "= < type-class-operator >"
+        Format.fprintf fmt ": %a = < type-class-operator >"
+          (pp_type ppe) ty
   in
 
   match ts with

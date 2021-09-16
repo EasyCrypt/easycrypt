@@ -292,8 +292,12 @@ let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =
   add_tparams s params (List.map (fun (p',_) -> tvar p') params')
 
 (* -------------------------------------------------------------------- *)
+let subst_typeclass s tc =
+  {tc_name = s.s_p tc.tc_name; tc_args = List.map s.s_ty tc.tc_args; }
+
+(* -------------------------------------------------------------------- *)
 let subst_typaram (s : _subst) ((id, tc) : ty_param) : ty_param =
-  (EcIdent.fresh id, [] (*Sp.fold (fun p tc -> Sp.add (s.s_p p) tc) tc Sp.empty*)) (*TODO: typeclass list to define*)
+  (EcIdent.fresh id, List.map (subst_typeclass s) tc)
 
 let subst_typarams (s : _subst) (typ : ty_params) =
   List.map (subst_typaram s) typ

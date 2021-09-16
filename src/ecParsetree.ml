@@ -206,7 +206,8 @@ type pmodule_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
-type ptyparams = (psymbol * pqsymbol list) list
+type ptyparam  = psymbol * (pqsymbol * pty list) list
+type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
@@ -304,9 +305,6 @@ let rec pf_ident ?(raw = false) f =
 type ppattern =
 | PPApp of (pqsymbol * ptyannot option) * osymbol list
 
-type ptyvardecls =
-  (psymbol * pqsymbol list) list
-
 type pop_def =
   | PO_abstr of pty
   | PO_concr of pty * pexpr
@@ -328,7 +326,7 @@ type poperator = {
   po_name   : psymbol;
   po_aliases: psymbol list;
   po_tags   : psymbol list;
-  po_tyvars : ptyvardecls option;
+  po_tyvars : ptyparams option;
   po_args   : ptybindings;
   po_def    : pop_def;
   po_ax     : osymbol_r;
@@ -350,14 +348,14 @@ and ppind = ptybindings * (ppind_ctor list)
 
 type ppredicate = {
   pp_name   : psymbol;
-  pp_tyvars : (psymbol * pqsymbol list) list option;
+  pp_tyvars : ptyparams option;
   pp_def    : ppred_def;
 }
 
 (* -------------------------------------------------------------------- *)
 type pnotation = {
   nt_name  : psymbol;
-  nt_tv    : ptyvardecls option;
+  nt_tv    : ptyparams option;
   nt_bd    : (psymbol * pty) list;
   nt_args  : (psymbol * (psymbol list * pty option)) list;
   nt_codom : pty;
@@ -370,7 +368,7 @@ type abrvopts = (bool * abrvopt) list
 
 type pabbrev = {
   ab_name : psymbol;
-  ab_tv   : ptyvardecls option;
+  ab_tv   : ptyparams option;
   ab_args : ptybindings;
   ab_def  : pty * pexpr;
   ab_opts : abrvopts;
@@ -893,7 +891,7 @@ type paxiom_kind =
 
 type paxiom = {
   pa_name    : psymbol;
-  pa_tyvars  : (psymbol * pqsymbol list) list option;
+  pa_tyvars  : ptyparams option;
   pa_vars    : pgtybindings option;
   pa_formula : pformula;
   pa_kind    : paxiom_kind;
@@ -910,15 +908,15 @@ type prealize = {
 (* -------------------------------------------------------------------- *)
 type ptypeclass = {
   ptc_name   : psymbol;
-  ptc_params : ptyvardecls option;
+  ptc_params : ptyparams option;
   ptc_inth   : pqsymbol option;
   ptc_ops    : (psymbol * pty) list;
   ptc_axs    : (psymbol * pformula) list;
 }
 
 type ptycinstance = {
-  pti_name : pqsymbol;
-  pti_type : (psymbol * pqsymbol list) list * pty;
+  pti_name : psymbol;
+  pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
   pti_args : [`Ring of (zint option * zint option)] option;
@@ -926,7 +924,6 @@ type ptycinstance = {
 
 (* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
-
 
 (* -------------------------------------------------------------------- *)
 type ('inv, 's) gphelper =

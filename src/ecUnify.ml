@@ -85,20 +85,21 @@ let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) p
   let uf = ref uf in
   let pb = let x = Queue.create () in Queue.push pb x; x in
 
-  let instances_for_tcs tcs =
+  (*TODOTCC*)
+  let instances_for_tcs (tcs : typeclass list) =
     let tcfilter (i, tc) =
       match tc with `General p -> Some (i, p) | _ -> None
     in
       List.filter
         (fun (_, tc1) ->
-          Sp.for_all
-            (fun tc2 -> TC.Graph.has_path ~src:tc1 ~dst:tc2 gr)
+          List.for_all
+            (fun tc2 -> TC.Graph.has_path ~src:tc1 ~dst:tc2.tc_name gr)
             tcs)
         (List.pmap tcfilter inst)
   in
 
   let has_tcs ~src ~dst =
-    true (*TODO*)
+    true (*TODOTCD*)
     (*
     Sp.for_all
       (fun dst1 ->
@@ -210,7 +211,7 @@ let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) p
               if not (has_tcs ~src:tytc ~dst:tc) then
                 let module E = struct exception Failure end in
 
-                let inst = [] (*instances_for_tcs tc*) in (*TODO*)
+                (*let inst = instances_for_tcs tc in*) (*TODOTCD*)
 
                 let for1 uf p =
                    uf
@@ -222,7 +223,7 @@ let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) p
                        let (uf, gty) =
                          let (uf, subst) =
                            List.fold_left
-                             (fun (uf, s) (v, tc) -> (*TODO: typeclass list to use*)
+                             (fun (uf, s) (v, tc) -> (*TODOTCD: typeclass list to use*)
                                let (uf, uid) = UnifyCore.fresh uf in
                                  (uf, Mid.add v uid s))
                              (uf, Mid.empty) typ
@@ -341,19 +342,19 @@ module UniEnv = struct
     match tvi with
     | None ->
         List.fold_left
-          (fun s (v, tc) -> Mid.add v (fresh ue) s) (*TODO: typeclass list to use*)
+          (fun s (v, tc) -> Mid.add v (fresh ue) s) (*TODOTCD: typeclass list to use*)
           Mid.empty params
 
     | Some (TVIunamed lt) ->
         List.fold_left2
-          (fun s (v, tc) ty -> Mid.add v (fresh ~ty ue) s) (*TODO: typeclass list to define*)
+          (fun s (v, tc) ty -> Mid.add v (fresh ~ty ue) s) (*TODOTCD: typeclass list to define*)
           Mid.empty params lt
 
     | Some (TVInamed lt) ->
         let for1 s (v, tc) =
           let t =
-            try  fresh ~ty:(List.assoc (EcIdent.name v) lt) ue (*TODO: typeclass list to define*)
-            with Not_found -> fresh ue (*TODO: typeclass list to define*)
+            try  fresh ~ty:(List.assoc (EcIdent.name v) lt) ue (*TODOTCD: typeclass list to define*)
+            with Not_found -> fresh ue (*TODOTCD: typeclass list to define*)
           in
             Mid.add v t s
         in
@@ -389,7 +390,7 @@ module UniEnv = struct
   let assubst ue = subst_of_uf (!ue).ue_uf
 
   let tparams ue =
-    let fortv x = [](*odfl Sp.empty (Mid.find_opt x (!ue).ue_tvtc)*) in
+    let fortv x = odfl [] (Mid.find_opt x (!ue).ue_tvtc) in
       List.map (fun x -> (x, fortv x)) (List.rev (!ue).ue_decl)
 end
 

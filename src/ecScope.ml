@@ -1577,6 +1577,9 @@ module Ty = struct
             | Some (tcp, _) -> tcp)
       in
 
+      (* Check typeclasses arguments *)
+      let ue = TT.transtyvars scenv (loc, tcd.ptc_params) in
+
       let asty  =
         let body = ofold (fun p tc -> Sp.add p tc) Sp.empty uptc in
           { tyd_params = []; tyd_type = `Abstract body; tyd_resolve = true; } in
@@ -1589,9 +1592,6 @@ module Ty = struct
       Msym.odup unloc (List.map fst tcd.ptc_axs)
         |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
                     "duplicated axiom name: `%s'" x.pl_desc);
-
-      (* Check typeclasses arguments *)
-      let ue = TT.transtyvars scenv (loc, tcd.ptc_params) in
 
       (* Check operators types *)
       let operators =
@@ -1808,9 +1808,8 @@ module Ty = struct
         (EcIdent.name x, (true, ty_subst subst opty)))
         tc.tc_ops
 
-(*
   (* ------------------------------------------------------------------ *)
-  let add_generic_tc (scope : scope) _mode { pl_desc = tci; pl_loc = loc; } =
+  let add_generic_instance (scope : scope) _mode { pl_desc = tci; pl_loc = loc; } =
     let ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
@@ -1838,7 +1837,6 @@ module Ty = struct
             try  EcUnify.hastc scope.sc_env ue ty (Sp.singleton (fst tc)); tc
             with EcUnify.UnificationFailure _ ->
               hierror "type must be an instance of `%s'" (EcPath.tostring (fst tc))
-*)
 *)
 
   (* ------------------------------------------------------------------ *)
@@ -1871,7 +1869,7 @@ module Ty = struct
     | _ ->
         if EcUtils.is_some tci.pti_args then
           hierror "unsupported-option";
-        failwith "unsupported"          (* FIXME *)
+        add_generic_instance scope mode toptci         (* FIXME *)
 
   (* ------------------------------------------------------------------ *)
   let add_datatype (scope : scope) (tydname : ptydname) dt =

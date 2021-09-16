@@ -1586,11 +1586,16 @@ signature_item:
             pfd_uses     = (not i, qs); } }
 
 (* -------------------------------------------------------------------- *)
-(* EcTypes declarations / definitions                                   *)
+(* EcTypes declarations / definitions *)
+
+tcparam:
+| x=lqident { (x, []) }
+| ty=loc(simpl_type_exp) x=lqident { (x, [ty]) }
+| tys=paren(plist1(loc(type_exp), COMMA)) x=lqident { (x, tys) }
 
 typaram:
 | x=tident { (x, []) }
-| x=tident LTCOLON tc=plist1(lqident, AMP) { (x, tc) }
+| x=tident LTCOLON tc=plist1(tcparam, AMP) { (x, tc) }
 
 typarams:
 | empty { []  }
@@ -1655,25 +1660,20 @@ tc_ax:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| INSTANCE x=qident
+| INSTANCE x=qident args=tyci_args?
     WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
   {
+    let args = args |> omap (fun (c, p) -> `Ring (c, p)) in
     { pti_name = x;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs;
-      pti_args = None; }
+      pti_args = args; }
   }
 
-| INSTANCE x=qident c=uoption(UINT) p=uoption(UINT)
-    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
-  {
-    { pti_name = x;
-      pti_type = (odfl [] typ, ty);
-      pti_ops  = ops;
-      pti_axs  = axs;
-      pti_args = Some (`Ring (c, p)); }
-  }
+tyci_args:
+| c=uoption(UINT) p=uoption(UINT)
+   { (c, p) }
 
 tyci_op:
 | OP x=oident EQ tg=qoident

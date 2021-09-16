@@ -856,7 +856,10 @@ module MC = struct
         let on1 (opid, optype) =
           let opname = EcIdent.name opid in
           let optype = ty_subst tsubst optype in
-          let opdecl = mk_op ~opaque:false [(*(self, Sp.singleton mypath)*)] optype (Some OP_TC) in (*TODO: typeclass list to define*)
+          let tcargs = List.map (fun (a, _) -> tvar a) tc.tc_tparams in
+          let opargs = (self, [{tc_name = mypath; tc_args = tcargs}]) in
+          let opargs = tc.tc_tparams @ [opargs] in
+          let opdecl = mk_op ~opaque:false opargs optype (Some OP_TC) in
             (opid, xpath opname, optype, opdecl)
         in
           List.map on1 tc.tc_ops
@@ -874,8 +877,11 @@ module MC = struct
       let axioms =
         List.map
           (fun (x, ax) ->
+            let tcargs = List.map (fun (a, _) -> tvar a) tc.tc_tparams in
+            let axargs = (self, [{tc_name = mypath; tc_args = tcargs}]) in
+            let axargs = tc.tc_tparams @ [axargs] in
             let ax = Fsubst.f_subst fsubst ax in
-              (x, { ax_tparams    = [(*(self, Sp.singleton mypath)*)]; (*TODO: typeclass list to define*)
+              (x, { ax_tparams    = axargs;
                     ax_spec       = ax;
                     ax_kind       = `Axiom (Ssym.empty, false);
                     ax_visibility = `NoSmt; }))

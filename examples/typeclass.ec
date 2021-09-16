@@ -48,6 +48,8 @@ type class ['a <: ring] module_ <: group = {
     a ** (x + y) = a ** x + a ** y
 }.
 
+print ( ** ).
+
 (*
 type class A = ...
 type class B1 <: A
@@ -60,7 +62,7 @@ int -> group -> monoid
 int -> monoid
 *)
 
-type ('a <: ring) poly = 'a list.
+type 'a poly = 'a list.
 
 op foo ['a <: group] (x y : 'a) = x + y.
 
@@ -77,13 +79,15 @@ qed.
 (* -------------------------------------------------------------------- *)
 op izero = 0.
 
-(*
 instance group with int
-  op zero = izero
-  op (+)  = RealInt.add.
+  op zero  = izero
+  op (+)   = CoreInt.add
+  op ([-]) = CoreInt.opp.
 
-instance ['a <: ring] ('a poly) <: ring = {
-}.
+instance 'a module_ with ['a <: ring] 'a poly
+.
+
+
 
 instance ['a <: group & ...] 'a <: ... = {
 }.
@@ -97,7 +101,6 @@ typeclass witness = {
 
 instance ['a] 'a <: witness = {
 }.
-*)
 
 (* -------------------------------------------------------------------- *)
 
