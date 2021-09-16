@@ -1818,30 +1818,33 @@ module Ty = struct
     in
 
     let (tcp, tc) =
-      match EcEnv.TypeClass.lookup_opt (unloc tci.pti_name) (env scope) with
+      match EcEnv.TypeClass.lookup_opt (unloc (fst tci.pti_name)) (env scope) with
       | None ->
-          hierror ~loc:tci.pti_name.pl_loc
-            "unknown type-class: %s" (string_of_qsymbol (unloc tci.pti_name))
+          hierror ~loc:(fst tci.pti_name).pl_loc
+            "unknown type-class: %s" (string_of_qsymbol (unloc (fst tci.pti_name)))
       | Some tc -> tc
     in
 
     let  symbols = symbols_of_tc scope.sc_env (snd ty) (tcp, tc) in
     let _symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
-
+    let scope =
     { scope with
         sc_env = EcEnv.TypeClass.add_instance ty (`General tcp) scope.sc_env }
-
-(*
-          let ue = EcUnify.UniEnv.create (Some []) in
-          let ty = fst (EcUnify.UniEnv.openty ue (fst ty) None (snd ty)) in
-            try  EcUnify.hastc scope.sc_env ue ty (Sp.singleton (fst tc)); tc
-            with EcUnify.UnificationFailure _ ->
-              hierror "type must be an instance of `%s'" (EcPath.tostring (fst tc))
-*)
+    in
+    (*TODOTCD*)
+    (*
+    let _ = snd tci.pti_name in
+    let ue = EcUnify.UniEnv.create (Some []) in
+    let ty = fst (EcUnify.UniEnv.openty ue (fst ty) None (snd ty)) in
+    try  EcUnify.hastc scope.sc_env ue ty tc; tc
+    with EcUnify.UnificationFailure _ ->
+      hierror "type must be an instance of `%s'" (EcPath.tostring tc.tc_name)
+    *)
+    assert false
 
   (* ------------------------------------------------------------------ *)
   let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =
-    match unloc tci.pti_name with
+    match unloc (fst tci.pti_name) with
     | ([], "bring") -> begin
         if EcUtils.is_some tci.pti_args then
           hierror "unsupported-option";

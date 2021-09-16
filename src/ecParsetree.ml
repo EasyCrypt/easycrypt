@@ -206,8 +206,7 @@ type pmodule_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
-type ptyparam  = psymbol * (pqsymbol * pty list) list
-type ptyparams = ptyparam list
+type ptyparams = (psymbol * (pqsymbol * pty list) list) list
 type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
@@ -915,7 +914,7 @@ type ptypeclass = {
 }
 
 type ptycinstance = {
-  pti_name : psymbol;
+  pti_name : (pqsymbol * pty list);
   pti_type : ptyparams * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;

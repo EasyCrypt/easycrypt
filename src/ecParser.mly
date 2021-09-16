@@ -1660,7 +1660,7 @@ tc_ax:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| INSTANCE x=qident args=tyci_args?
+| INSTANCE x=tcparam args=tyci_args?
     WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
   {
     let args = args |> omap (fun (c, p) -> `Ring (c, p)) in
