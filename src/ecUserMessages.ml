@@ -365,6 +365,13 @@ end = struct
     | LvMapOnNonAssign ->
         msg "map-style left-value cannot be used with assignments"
 
+    (*TODOTCC: printing correctly, lineskip*)
+    | NumberOfTypeclassArgumentsMismatch (sc, typarams, tys) ->
+        msg "different number of typeclass type parameters and arguments provided in %a: %a %a"
+          pp_qsymbol sc
+          (EcPrinting.pp_list "@, " (fun fmt (id, _) -> pp_symbol fmt (EcIdent.name id))) typarams
+          (EcPrinting.pp_list "@, " pp_type) tys
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
     let pp_v fmt xp = EcPrinting.pp_pv ppe fmt (pv_glob xp) in
