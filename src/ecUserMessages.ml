@@ -365,9 +365,8 @@ end = struct
     | LvMapOnNonAssign ->
         msg "map-style left-value cannot be used with assignments"
 
-    (*TODOTCC: printing correctly, lineskip*)
     | NumberOfTypeclassArgumentsMismatch (sc, typarams, tys) ->
-        msg "different number of typeclass type parameters and arguments provided in %a: %a %a"
+        msg "different number of typeclass type parameters and arguments provided in %a:@\n - %a @\n - %a"
           pp_qsymbol sc
           (EcPrinting.pp_list "@, " (fun fmt (id, _) -> pp_symbol fmt (EcIdent.name id))) typarams
           (EcPrinting.pp_list "@, " pp_type) tys

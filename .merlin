@@ -15,6 +15,7 @@ PKG zarith
 PKG pcre
 PKG inifiles
 PKG yojson
+PKG elpi
 
 FLG -rectypes
 FLG -w Y -w Z -w -23 -w +28 -w +33

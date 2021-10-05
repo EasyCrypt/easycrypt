@@ -26,6 +26,7 @@ depends: [
   "ocamlbuild"
   "ocamlfind"
   "yojson"
+  "elpi"
 ]
 post-messages: [
 "EasyCrypt needs external provers to be installed. From opam, you

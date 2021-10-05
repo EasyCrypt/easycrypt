@@ -206,7 +206,6 @@ type pmodule_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
-(*TODOTCC*)
 type ptcparam = pqsymbol * pty list
 type ptyparam  = psymbol * ptcparam list
 type ptyparams = ptyparam list
