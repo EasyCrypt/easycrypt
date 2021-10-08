@@ -823,6 +823,27 @@ by rewrite psumB /=; [apply/hp | apply/hn | apply: eq_sum] => /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma norm_sum ['a] (s : 'a -> real) : summable s => `|sum s| <= psum s.
+proof.
+move=> sms; rewrite psum_sum // ler_norml; split=> [|_]; last first.
+- apply: ler_sum => //=; last by apply/summable_norm.
+  by move=> a; apply/ler_norm.
+rewrite -sumN /=; apply/ler_sum => //=; last first.
+- by apply/summableN/summable_norm.
+by move=> a; rewrite ler_oppl ler_normr.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma summable_partition ['a 'b] (f : 'a -> 'b) s : summable s =>
+  summable (fun y => sum (fun x => if y = f x then s x else 0%r)).
+proof.
+move=> sms; exists (psum s) => J uqJ.
+have h := summable_psum_partition f s sms J uqJ.
+apply/(ler_trans _ _ h)/Bigreal.ler_sum => /= b _.
+by apply/norm_sum/summable_cond.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma summable_bij ['a 'b] (h : 'a -> 'b) s :
   bijective h => summable s => summable (s \o h).
 proof.
@@ -833,17 +854,6 @@ move=> le; apply: (ler_trans _ _ le) => {le}.
 rewrite lerr_eq eq_sym (@big_reindex _ _ h g) //.
 apply: congr_big => //; rewrite -map_comp.
 by rewrite -{2}(@map_id J) &(eq_map).
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma nosmt sum_pair ['a 'b] (s : 'a * 'b -> real) :
-  summable s => sum s = sum (fun a => sum (fun b => s (a, b))).
-proof.
-move=> sms; rewrite (@sum_partition<:'a * 'b, 'a> fst) 1://.
-apply: eq_sum => a /=.
-rewrite (@sum_partition<:'a * 'b, 'b> snd) 1:&(summable_cond) //=.
-apply: eq_sum => b /=.
-by rewrite (@sumE_fin _ [(a, b)]) //= /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -865,6 +875,27 @@ pose J := cenum _; rewrite (@sumEw _ (fun i => omap h (J i)) (support s)) //.
 apply: (@lim_eq 0) => n _ /=; rewrite -(@big_map h predT).
 apply: congr_big => //; move: (range _ _) => si.
 by elim: si => //= x si ih; case: (J x).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma summable_pair_sum (s : 'a * 'b -> real) :
+  summable s => summable (fun x => sum (fun y => s (x, y))).
+proof.
+move=> sms; have /= := summable_partition fst s sms.
+apply: eq_summable=> /= a; pose F (b : 'b) := (a, b).
+rewrite (@sum_partition snd) 1:summable_cond //=.
+by apply: eq_sum => /= b; rewrite (@sumE_fin _ [(a, b)]) //= /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt sum_pair ['a 'b] (s : 'a * 'b -> real) :
+  summable s => sum s = sum (fun a => sum (fun b => s (a, b))).
+proof.
+move=> sms; rewrite (@sum_partition<:'a * 'b, 'a> fst) 1://.
+apply: eq_sum => a /=.
+rewrite (@sum_partition<:'a * 'b, 'b> snd) 1:&(summable_cond) //=.
+apply: eq_sum => b /=.
+by rewrite (@sumE_fin _ [(a, b)]) //= /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
