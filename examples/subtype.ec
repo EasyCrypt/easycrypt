@@ -23,6 +23,10 @@ lemma foo ['a] [n : int] (w1 w2 : {'a word n}) :
 
 op vectorize ['a] [n m : int] (w : {'a word (n * m)}) : {{'a word n} word m}.
 
+lemma vectorize_spec ['a] (w : 'a list) : size w = (n * m) =>
+     size (vectorize w) = m
+  /\ (all (fun w' => size w' = n) (vectorize w)).
+
 -> Keeping information in application? Yes
    -> should provide a syntax for giving the arguments
 
@@ -84,7 +88,16 @@ op vectorize ['a] [n m : int] (w : {'a word (n * m)}) : {{'a word n} word m}.
      - What about the logics? we have to patch them.
 
 (* ==================================================================== *)
+all : 'a t * 'a -> bool
+
+axiom all_spec : forall (f : 'a t -> 'a) (s : 'a t), all (s, f s).
+
 nth ['a] 'a -> 'a list -> int -> 'a
+
+lemma nth_spec ['a] (x : 'a) (s : 'a list) (i : int) :
+  forall P,
+    (forall y, all<: 'a> (y, x) -> P y) ->
+    P x -> (forall y, all<: 'a list> (s, y) -> P y) -> P (nth x s i).
 
 ws : {word n} list
 
