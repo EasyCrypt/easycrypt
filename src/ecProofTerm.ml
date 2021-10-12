@@ -744,6 +744,26 @@ and apply_pterm_to_holes ?loc n pt =
   EcUtils.iterop (apply_pterm_to_hole ?loc) n pt
 
 (* -------------------------------------------------------------------- *)
+and apply_pterm_to_local ?loc pt id =
+  match LDecl.by_id id pt.ptev_env.pte_hy with
+  | LD_var (ty, _) ->
+      apply_pterm_to_arg_r ?loc pt (PVAFormula (f_local id ty))
+
+  | LD_modty (mty, _) ->
+      let env  = LDecl.toenv pt.ptev_env.pte_hy in
+      let msig = EcEnv.ModTy.sig_of_mt env mty in
+      apply_pterm_to_arg_r ?loc pt (PVAModule (EcPath.mident id, msig))
+
+  | LD_hyp _ ->
+      let sub = pt_of_hyp_r pt.ptev_env id in
+      apply_pterm_to_arg_r ?loc pt (PVASub sub)
+
+  | LD_mem _ ->
+      apply_pterm_to_arg_r ?loc pt (PVAMemory id)
+
+  | LD_abs_st _ -> assert false
+
+(* -------------------------------------------------------------------- *)
 and process_implicits ip ({ ptev_pt = pt; ptev_env = env; } as pe) =
   match ip with
   | [] -> ([], pe)

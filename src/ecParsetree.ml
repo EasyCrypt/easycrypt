@@ -805,6 +805,9 @@ type apply_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type pgenhave = psymbol * intropattern option * psymbol list * pformula
+
+(* -------------------------------------------------------------------- *)
 type logtactic =
   | Preflexivity
   | Passumption
@@ -831,7 +834,8 @@ type logtactic =
   | Pcbv        of preduction
   | Pchange     of pformula
   | Ppose       of (psymbol * ptybinding list * rwocc * pformula)
-  | Pwlog       of (psymbol list * pformula)
+  | Pgenhave    of pgenhave
+  | Pwlog       of (psymbol list * bool * pformula)
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core_r =

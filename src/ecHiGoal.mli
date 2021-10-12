@@ -98,7 +98,8 @@ val process_simplify    : preduction -> backward
 val process_cbv         : preduction -> backward
 val process_pose        : psymbol -> ptybindings -> rwocc -> pformula -> backward
 val process_done        : backward
-val process_wlog        : psymbol list -> pformula -> backward
+val process_wlog        : suff:bool -> psymbol list -> pformula -> backward
+val process_genhave     : ttenv -> pgenhave -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_algebra : [`Solve] -> [`Ring|`Field] -> psymbol list -> backward

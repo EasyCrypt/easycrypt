@@ -447,6 +447,7 @@
 %token FUN
 %token FUSION
 %token FWDS
+%token GEN
 %token GLOB
 %token GOAL
 %token HAT
@@ -642,6 +643,7 @@ _lident:
 | DUMP       { "dump"       }
 | EXPECT     { "expect"     }
 | FIRST      { "first"      }
+| GEN        { "gen"        }
 | INTERLEAVE { "interleave" }
 | LAST       { "last"       }
 | LEFT       { "left"       }
@@ -2693,14 +2695,18 @@ logtactic:
 | m=have_or_suff ip=loc(intro_pattern)* COLON p=form BY t=loc(tactics)
    { Pcut (m, ip, p, Some t) }
 
+| GEN HAVE x=loc(ipcore_name) ip=prefix(COMMA, loc(intro_pattern)*)?
+   COLON ids=loc(ipcore_name)* SLASH f=form %prec prec_below_IMPL
+   { Pgenhave (x, ip, ids, f) }
+
 | HAVE ip=loc(intro_pattern)* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=ident xs=ptybindings? CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, odfl [] xs, o, p) }
 
-| WLOG COLON ids=loc(ipcore_name)* SLASH f=form
-   { Pwlog (ids, f) }
+| WLOG b=boption(SUFF) COLON ids=loc(ipcore_name)* SLASH f=form
+   { Pwlog (ids, b, f) }
 
 eager_info:
 | h=ident

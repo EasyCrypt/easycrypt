@@ -1986,3 +1986,66 @@ let process_wlog ids wlog tc =
     (t_first
        (t_seq (t_clears ids) (t_intros_i ids))
        (t_cut gen tc))
+
+(* -------------------------------------------------------------------- *)
+let process_wlog_suff ids wlog tc =
+  let hyps, _ = FApi.tc1_flat tc in
+
+  let toid s =
+    if not (LDecl.has_name (unloc s) hyps) then
+      tc_lookup_error !!tc ~loc:s.pl_loc `Local ([], unloc s);
+    fst (LDecl.by_name (unloc s) hyps) in
+
+  let ids = List.map toid ids in
+
+  let wlog =
+    let wlog = TTC.tc1_process_formula tc wlog in
+    let tc   = t_first (t_generalize_hyps ~clear:`Yes ids) (t_cut wlog tc) in
+    FApi.tc_goal tc in
+
+  t_rotate `Left 1
+    (t_first
+       (t_seq (t_clears ids) (t_intros_i ids))
+       (t_cut wlog tc))
+
+(* -------------------------------------------------------------------- *)
+let process_wlog ~suff ids wlog tc =
+  if   suff
+  then process_wlog_suff ids wlog tc
+  else process_wlog ids wlog tc
+
+(* -------------------------------------------------------------------- *)
+let process_genhave (ttenv : ttenv) ((name, ip, ids, gen) : pgenhave) tc =
+  let hyps, _ = FApi.tc1_flat tc in
+
+  let toid s =
+    if not (LDecl.has_name (unloc s) hyps) then
+      tc_lookup_error !!tc ~loc:s.pl_loc `Local ([], unloc s);
+    fst (LDecl.by_name (unloc s) hyps) in
+
+  let ids = List.map toid ids in
+
+  let gen =
+    let gen = TTC.tc1_process_formula tc gen in
+    let tc  = EcLowGoal.t_cut gen tc in
+    let tc  = t_first (t_generalize_hyps ~clear:`Yes ids) tc in
+    FApi.tc_goal tc in
+
+  let doip tc =
+    let genid = EcIdent.create (unloc name) in
+    let tc = t_intros_i_1 [genid] tc in
+
+    match ip with
+    | None ->
+        t_id tc
+
+    | Some ip ->
+        let pt = EcProofTerm.pt_of_hyp !!tc (FApi.tc1_hyps tc) genid in
+        let pt = List.fold_left EcProofTerm.apply_pterm_to_local pt ids in
+        let tc = t_cutdef pt.ptev_pt pt.ptev_ax tc in
+        process_mintros ttenv [ip] tc in
+
+  t_sub [
+      t_seq (t_clears ids) (t_intros_i ids);
+      doip
+  ] (t_cut gen tc)

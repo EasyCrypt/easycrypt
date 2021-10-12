@@ -93,6 +93,7 @@
     "case"        , CASE       ;        (* KW: tactic *)
 
     "pose"        , POSE       ;        (* KW: tactic *)
+    "gen"         , GEN        ;        (* KW: tactic *)
     "have"        , HAVE       ;        (* KW: tactic *)
     "suff"        , SUFF       ;        (* KW: tactic *)
     "elim"        , ELIM       ;        (* KW: tactic *)

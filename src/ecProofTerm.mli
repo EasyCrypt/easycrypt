@@ -111,6 +111,7 @@ val check_pterm_arg :
 
 val apply_pterm_to_arg   : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg -> pt_ev
 val apply_pterm_to_arg_r : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg_r -> pt_ev
+val apply_pterm_to_local : ?loc:EcLocation.t -> pt_ev -> EcIdent.t -> pt_ev
 val apply_pterm_to_hole  : ?loc:EcLocation.t -> pt_ev -> pt_ev
 val apply_pterm_to_holes : ?loc:EcLocation.t -> int -> pt_ev -> pt_ev
 
