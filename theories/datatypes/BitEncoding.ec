@@ -164,10 +164,7 @@ lemma int2bs_cat K N n :
   int2bs N n = (int2bs K n) ++ (int2bs (N - K) (n %/ (2 ^ K))).
 proof.
   move => [le0K leKN]; rewrite /int2bs.
-  (*FIXME: why does it not work? Pierre-Yves*)
-  (*rewrite -{1}(subrK N K) (addrC _ K).*)
-  move: (subrK N K) => {1}<-.
-  move: (addrC (N - K) K) => ->.
+  rewrite -{1}(@subrK N K) (@addrC _ K).
   rewrite mkseq_add ?subr_ge0 //.
   congr; apply eq_in_mkseq => I /= [le0I _].
   by rewrite exprD_nneg // IntDiv.divz_mul // expr_ge0.
@@ -183,17 +180,15 @@ lemma int2bs_mulr_pow2 K N n :
   int2bs N (2 ^ K * n) = nseq K false ++ int2bs (N - K) n.
 proof.
   move => [le0K leKN]; rewrite /int2bs.
-  (*FIXME: same.*)
-  (*rewrite -{1}(subrK N K) (addrC _ K).*)
+  rewrite -{1}(@subrK N K) (@addrC _ K).
   move: (subrK N K) => {1}<-.
   move: (addrC (N - K) K) => ->.
-  rewrite mkseq_add //; first by apply/subr_ge0.
+  rewrite mkseq_add //; first by apply/subr_ge0/ler_subl_addl => /=; apply/subr_ge0.
   rewrite -/int2bs.
-  (*FIXME: same.*)
-  (*rewrite -(int2bs_nseq_false _ (2 ^ K * n)).*)
-  move: (int2bs_nseq_false K (2 ^ K * n)) => <-.
+  rewrite -(@int2bs_nseq_false _ (2 ^ K * n)).
   + by apply/dvdz_mulr/dvdzz.
-  congr => //; apply eq_in_mkseq => I /= /mem_range HI_range.
+  congr; rewrite // (addrC K) -(addrA N) /=.
+  apply eq_in_mkseq => I /= /mem_range HI_range.
   rewrite exprD_nneg //; first by move/mem_range: HI_range.
   by rewrite divzMpl //; apply expr_gt0.
 qed.
@@ -203,9 +198,7 @@ lemma int2bs_divr_pow2 K N n :
 proof.
   rewrite pow_normr; case (0 <= N) => [le0N|/ltzNge/ltzW leN0]; last first.
   + by rewrite drop_oversize; [rewrite size_int2bs ler_maxrP normr_ge0 ler_naddl|rewrite int2bs0s_le].
-  (*FIXME: same.*)
-  (*rewrite (int2bs_cat `|K| (N + `|K|)) ?normr_ge0 ?lez_addr //= drop_size_cat -?addrA //=.*)
-  move: (int2bs_cat `|K| (N + `|K|)) => ->; rewrite ?normr_ge0 ?lez_addr //= drop_size_cat -?addrA //=.
+  rewrite (@int2bs_cat `|K| (N + `|K|)) ?normr_ge0 ?lez_addr //= drop_size_cat -?addrA //=.
   by rewrite size_int2bs ler_maxr // normr_ge0.
 qed.
 
@@ -267,14 +260,10 @@ proof.
   by rewrite bs2int_cons; move: (bs2int_nseq_false 0); rewrite nseq0 => -> /=; rewrite addrC.
 qed.
 
-(*hint simplify bitrev_neg, bitrev_cons.*)
-
 lemma bitrev_ge0 N n :
   0 <= bitrev N n.
 proof. by rewrite /bitrev bs2int_ge0. qed.
 
-(*TODO: weird name.*)
-print bs2int_le2Xs.
 lemma bitrev_lt_pow2 N n :
   bitrev N n < 2 ^ N.
 proof.
@@ -290,7 +279,7 @@ proof. by rewrite mem_range bitrev_ge0 bitrev_lt_pow2. qed.
 lemma bitrev_cat K N n :
   0 <= K <= N =>
   bitrev N n = bitrev (N - K) (n %/ 2 ^ K) + 2 ^ (N - K) * bitrev K n.
-proof. by move => [le0K leKN]; rewrite /bitrev (int2bs_cat K) // rev_cat bs2int_cat size_rev size_int2bs ler_maxr // subr_ge0. qed.
+proof. by move => [le0K leKN]; rewrite /bitrev (@int2bs_cat K) // rev_cat bs2int_cat size_rev size_int2bs ler_maxr // subr_ge0. qed.
 
 lemma bitrev_mod N n :
   bitrev N (n %% 2 ^ N) = bitrev N n.
@@ -313,7 +302,7 @@ lemma bitrev_injective N n1 n2 :
   n2 \in range 0 (2 ^ N) =>
   bitrev N n1 = bitrev N n2 =>
   n1 = n2.
-proof. by move => le0N Hn1_range Hn2_range eq_bitrev; rewrite -(bitrev_involutive N n1) // -(bitrev_involutive N n2) // eq_bitrev. qed.
+proof. by move => le0N Hn1_range Hn2_range eq_bitrev; rewrite -(@bitrev_involutive N n1) // -(@bitrev_involutive N n2) // eq_bitrev. qed.
 
 lemma bitrev_bijective N n1 n2 :
   0 <= N =>
@@ -340,7 +329,7 @@ lemma bitrev_mulr_pow2 K N n :
   bitrev N (2 ^ K * n) = bitrev N n %/ 2 ^ K.
 proof.
   move => [le0K leKN]; rewrite /bitrev int2bs_mulr_pow2 // rev_cat rev_nseq bs2int_cat bs2int_nseq_false /=.
-  rewrite (int2bs_cat (N - K) N); first by split; [rewrite subr_ge0|move => _; rewrite ler_subl_addr ler_addl].
+  rewrite (@int2bs_cat (N - K) N); first by split; [rewrite subr_ge0|move => _; rewrite ler_subl_addr ler_addl].
   rewrite rev_cat bs2int_cat size_rev size_int2bs opprD addrA /= ler_maxr // (mulrC (exp _ _)%IntDiv) divzMDr.
   + by apply/gtr_eqF/expr_gt0.
   by rewrite divz_small // -mem_range normrX_nat // bitrev_range.
@@ -364,9 +353,9 @@ lemma bitrev_pow2 K N :
   K \in range 0 N =>
   bitrev N (2 ^ K) = 2 ^ (N - 1 - K).
 proof.
-  move => HK_range; move: (bitrev_mulr_pow2 K N 1) => /= ->; first by rewrite (ltzW K); move/mem_range: HK_range.
+  move => HK_range; move: (bitrev_mulr_pow2 K N 1) => /= ->; first by rewrite (@ltzW K); move/mem_range: HK_range.
   rewrite bitrev1; first by apply/(ler_lt_trans K); move/mem_range: HK_range.
-  by rewrite -exprD_subz //= -(ltzS K); move/mem_range: HK_range.
+  by rewrite -exprD_subz //= -(@ltzS K); move/mem_range: HK_range.
 qed.
 
 lemma bitrev_range_dvdz K N n :
@@ -374,7 +363,7 @@ lemma bitrev_range_dvdz K N n :
   n \in range 0 (2 ^ (N - K)) =>
   2 ^ K %| bitrev N n.
 proof.
-  move => [le0K leKN] Hn_range; rewrite (bitrev_cat (N - K)) //.
+  move => [le0K leKN] Hn_range; rewrite (@bitrev_cat (N - K)) //.
   + by rewrite subr_ge0 leKN /= ler_subl_addl -ler_subl_addr.
   rewrite opprD addrA /= divz_small; first by rewrite -mem_range normrX_nat // subr_ge0.
   by rewrite bitrev0 /= dvdz_mulr dvdzz.
@@ -385,12 +374,12 @@ lemma bitrev_dvdz_range K N n :
   (2 ^ (N - K)) %| n =>
   bitrev N n \in range 0 (2 ^ K).
 proof.
-  move => [le0K leKN] dvdz_n; rewrite (bitrev_cat (N - K)).
+  move => [le0K leKN] dvdz_n; rewrite (@bitrev_cat (N - K)).
   + by rewrite subr_ge0 leKN /= ler_subl_addl -ler_subl_addr.
   rewrite opprD addrA /=; move/dvdzP: dvdz_n => [q ->>].
   rewrite (mulrC q) bitrev_mulr_pow2.
   + by rewrite subr_ge0 leKN.
-  rewrite (divz_small (bitrev _ _)) /=; last by apply bitrev_range.
+  rewrite (@divz_small (bitrev _ _)) /=; last by apply bitrev_range.
   by rewrite -mem_range normrX_nat ?subr_ge0 // bitrev_range.
 qed.
 
@@ -399,13 +388,13 @@ lemma bitrev_add K N m n :
   m \in range 0 (2 ^ K) =>
   bitrev N (m + 2 ^ K * n) = bitrev N m + bitrev N n %/ 2 ^ K.
 proof.
-  move => [le0K leKN] Hm_range; rewrite (bitrev_cat K) //.
+  move => [le0K leKN] Hm_range; rewrite (@bitrev_cat K) //.
   rewrite (mulrC (exp _ _)) divzMDr; first by apply/gtr_eqF/expr_gt0.
   rewrite divz_small /=; first by rewrite -mem_range normrX_nat.
-  rewrite -(bitrev_mod K) modzMDr bitrev_mod (addrC (bitrev _ _)); congr.
-  + rewrite (bitrev_cat K N) // divz_small; last by rewrite bitrev0.
+  rewrite -(@bitrev_mod K) modzMDr bitrev_mod (addrC (bitrev _ _)); congr.
+  + rewrite (@bitrev_cat K N) // divz_small; last by rewrite bitrev0.
     by rewrite -mem_range normrX_nat.
-  rewrite (bitrev_cat (N - K) N).
+  rewrite (@bitrev_cat (N - K) N).
   + by split; [rewrite subr_ge0|move => _; rewrite ler_subl_addr ler_addl].
   rewrite !opprD addrA /= (mulrC (exp _ _)) divzMDr.
   + by apply/gtr_eqF/expr_gt0.
@@ -416,7 +405,7 @@ lemma bitrev2_le M N n :
   0 <= M <= N =>
   bitrev M (bitrev N n) = n %% 2 ^ N %/ 2 ^ (N - M).
 proof.
-  move => [le0M leMN]; rewrite -(bitrev_mod N) /bitrev (int2bs_cat (N - M) N).
+  move => [le0M leMN]; rewrite -(@bitrev_mod N) /bitrev (@int2bs_cat (N - M) N).
   + by rewrite subr_ge0 ler_subl_addl -ler_subl_addr.
   rewrite opprD addrA /= rev_cat bs2int_cat size_rev size_int2bs ler_maxr //.
   rewrite -{1}int2bs_mod mulrC modzMDr int2bs_mod.
@@ -431,7 +420,7 @@ lemma bitrev2_ge M N n :
   0 <= N <= M =>
   bitrev M (bitrev N n) = 2 ^ (M - N) * (n %% 2 ^ N).
 proof.
-  move => [le0N leNM]; rewrite -(bitrev_mod N) /bitrev (int2bs_cat N M) //.
+  move => [le0N leNM]; rewrite -(@bitrev_mod N) /bitrev (@int2bs_cat N M) //.
   rewrite divz_small; first by rewrite -mem_range normrX_nat // bitrev_range.
   rewrite int2bs0 rev_cat rev_nseq bs2int_cat size_nseq ler_maxr ?subr_ge0 //.
   rewrite bs2int_nseq_false /=; congr; move: (bitrev_involutive N (n %% 2 ^ N) _ _) => //.
@@ -465,7 +454,7 @@ proof.
   + by rewrite subr_ge0 leKN /= ger_addl oppz_le0.
   + by apply/(lez_trans K).
   + rewrite mem_range_mull ?expr_gt0 //=.
-    rewrite -(mulN1r (exp _ _)%Int) -divzpMr.
+    rewrite -(@mulN1r (exp _ _)%Int) -divzpMr.
     - by rewrite dvdz_exp2l subr_ge0 leKN /= ger_addl oppz_le0.
     rewrite mulN1r opprK -exprD_subz // ?opprD ?addrA //=.
     by rewrite subr_ge0 leKN /= ger_addl oppz_le0.
@@ -488,7 +477,7 @@ proof.
   move => [Heq_map _]; move: Heq_map => -> => [x Hx_range|].
   (*FIXME*)
   + admit.
-  rewrite (map_comp (transpose _ _) (( * )%Int _)) perm_eq_map bitrev_range_pow2_perm_eq.
+  rewrite (@map_comp (transpose _ _) (( * )%Int _)) perm_eq_map bitrev_range_pow2_perm_eq.
   by rewrite le0K /= (lez_trans (K + M)) // ler_addl.
 qed.
 
