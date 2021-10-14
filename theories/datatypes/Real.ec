@@ -114,6 +114,9 @@ abbrev ( ^ ) = RField.exp.
 (* -------------------------------------------------------------------- *)
 lemma divr0: forall x, x / 0%r = 0%r by done.
 
+lemma divrK (u v : real) : v <> 0%r => u = u / v * v.
+proof. by move => neqv0; rewrite -mulrA mulVf. qed.
+
 lemma invr0: inv 0%r = 0%r by done.
 
 (* -------------------------------------------------------------------- *)
@@ -221,7 +224,7 @@ op floor : real -> int.
 op ceil  : real -> int.
 
 axiom floor_bound (x:real) : x - 1%r < (floor x)%r <= x.
-axiom  ceil_bound (x:real) : x <= (ceil x)%r < x + 1%r.
+axiom ceil_bound  (x:real) : x <= (ceil x)%r < x + 1%r.
 axiom from_int_floor n : floor n%r = n.
 axiom from_int_ceil  n : ceil  n%r = n.
 
@@ -236,6 +239,18 @@ proof. by case: (ceil_bound x). qed.
 
 lemma ceil_lt x : (ceil x)%r < x + 1%r.
 proof. by case: (ceil_bound x). qed.
+
+lemma floorP x n : floor x = n <=> n%r <= x < n%r + 1%r.
+proof. smt. qed.
+
+lemma from_int_floor_addl n x : floor (n%r + x) = n + floor x.
+proof. smt. qed.
+
+lemma from_int_floor_addr n x : floor (x + n%r) = floor x + n.
+proof. smt. qed.
+
+lemma floor_mono (x y : real) : x <= y => floor x <= floor y.
+proof. smt. qed.
 
 (* -------------------------------------------------------------------- *)
 (* WARNING Lemmas used by tactics: *)

@@ -79,6 +79,7 @@ move=> nz_0; rewrite b2i1 /= -{1}(mul1r `|z|); congr.
 rewrite -exprD_nneg ?b2i_ge0 -signr_odd ?addr_ge0 ?b2i_ge0.
 by rewrite -mul1r2z oddM /ofint_id intmulz odd2 expr0.
 qed.
+
 end IntOrder.
 
 (* -------------------------------------------------------------------- *)

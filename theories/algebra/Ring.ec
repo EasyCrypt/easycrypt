@@ -243,6 +243,9 @@ abstract theory ComRing.
   lemma nosmt mulrACA: interchange ( * ) ( * ).
   proof. by move=> x y z t; rewrite -!mulrA (mulrCA y). qed.
 
+  lemma nosmt mulrSl x y : (x + oner) * y = x * y + y.
+  proof. by rewrite mulrDl mul1r. qed.
+
   lemma nosmt mulrDr: right_distributive ( * ) (+).
   proof. by move=> x y z; rewrite mulrC mulrDl !(@mulrC _ x). qed.
 
