@@ -109,7 +109,7 @@ proof.
 move=> le0_n; case (n = size xs)=> [->|].
 + elim xs=> [|x xs ih];first by rewrite dlist01E.
   by rewrite dlistS1E /= big_cons ih.
-smt w=(supp_dlist mu_bounded).
+by move=> ?; rewrite -supportPn supp_dlist /#.
 qed.
 
 lemma dlist0E n (d : 'a distr) P : n <= 0 => mu (dlist d n) P = b2r (P []).
@@ -135,6 +135,14 @@ proof. by move=> le0;rewrite dlist0E. qed.
 lemma weight_dlistS n (d:'a distr):
   0 <= n => weight (dlist d (n + 1)) = weight d * weight (dlist d n).
 proof. by move=> ge0;rewrite -(dlistSE witness) //. qed.
+
+lemma weight_dlist (d : 'a distr) n : 
+ 0 <= n => weight (dlist d n) = (weight d)^n.
+proof.
+elim: n => [|n ? IHn]; 1: by rewrite weight_dlist0 // RField.expr0.
+by rewrite weight_dlistS // IHn RField.exprS.
+qed.
+
 
 lemma dlist_fu (d: 'a distr) (xs:'a list):
   (forall x, x \in xs => x \in d) =>

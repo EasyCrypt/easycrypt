@@ -1,5 +1,5 @@
 require import AllCore List FSet Distr DProd DList StdBigop StdOrder.
-(*---*) import Bigreal RealSeries RealOrder RField.
+(*---*) import Bigreal RealSeries RealOrder RField BRA MRat.
 
 (********** preliminaries (to move) ***************************************)
 
@@ -23,12 +23,6 @@ apply RealLub.lub_le_ub => //.
 split; [by exists (F witness) witness| by exists r].
 qed.
 
-(* DList.ec *)
-lemma weight_dlist (d : 'a distr) n : 0 <= n => weight (dlist d n) = (weight d)^n.
-proof.
-elim: n => [|n ? IHn]; 1: by rewrite weight_dlist0 // expr0.
-by rewrite weight_dlistS // IHn exprS.
-qed.
 
 (* additional lemmas for summable *)
 
@@ -148,14 +142,21 @@ apply eq_sum => a /=; rewrite (muE _ E) -sumZ /= !massE.
 apply eq_sum => b /=; smt().
 qed.
 
-import MRat.
-
 (* same as muE, but using [mu1] rather than [mass] *)
 lemma mu_mu1 (d : 'a distr) E : mu d E = sum (fun x => if E x then mu1 d x else 0%r).
 proof. by rewrite muE; apply eq_sum => x /=; rewrite massE. qed.
 
 lemma weightE (d : 'a distr) : weight d = sum (fun x => mu1 d x).
 proof. by rewrite mu_mu1. qed.
+
+lemma const_weight_dlet r (d : 'a distr) (F : 'a -> 'b distr) : 
+  (forall x, weight (F x) = r) => weight (dlet d F) = r * weight d.
+proof.
+move => wF; rewrite !dletE (eq_sum _ (fun x => r * mu1 d x)) => [x /=|].
+  by rewrite wF mulrC. 
+by rewrite sumZ -weightE.
+qed.
+
 
 (********** statistical distance ***************************************)
 
@@ -226,7 +227,8 @@ lemma sdist_triangle (d2 d1 d3 : 'a distr) :
   sdist d1 d3 <= sdist d1 d2 + sdist d2 d3.
 proof.
 apply sdist_max => E.
-apply (ler_trans (`| mu d1 E - mu d2 E | + `| mu d2 E - mu d3 E |)); 1: smt(mu_bounded).
+apply (ler_trans (`| mu d1 E - mu d2 E | + `| mu d2 E - mu d3 E |)).
+  smt(mu_bounded).
 by rewrite ler_add; apply/sdist_sup.
 qed.
 
@@ -297,27 +299,26 @@ lemma sdist_dlet (d1 d2 : 'a distr) (F : 'a -> 'b distr) :
 proof.
 move => eq_w_d eq_w_dF; rewrite !sdist_sumE // ler_pmul2l 1:/#.
 have sum_dF : forall d y, summable (fun (x : 'a) => mu1 d x * mu1 (F x) y).
-  by move => d y; apply (summableM_bound 1%r) => //; [exact summable_mu1| smt(mu_bounded)].
-have H : forall y, `|mu1 (dlet d1 F) y - mu1 (dlet d2 F) y| <= 
-                    sum (fun x => `| mu1 d1 x - mu1 d2 x | * mu1 (F x) y).
-  move => y. rewrite !dletE -sumB /=; 1,2: exact: sum_dF.
-  apply (ler_trans _ _ _ (norm_sum_sum _ _) _) => /=. 
-    apply summableD. apply sum_dF. apply/summableN/sum_dF.
-  rewrite ler_eqVlt; left; apply eq_sum => /= x; smt(mu_bounded).
-have I : forall x, 0%r <= sum (fun y => `|mu1 d1 x - mu1 d2 x| * mu1 (F x) y) <= `|mu1 d1 x - mu1 d2 x|.
-  move => x. split => [|_]; 1: by apply ge0_sum; smt(mu_bounded).
+  move => d y; apply (summableM_bound 1%r) => //; first exact summable_mu1.
+  smt(mu_bounded).
+have I : forall x, 0%r <= sum (fun y => 
+    `|mu1 d1 x - mu1 d2 x| * mu1 (F x) y) <= `|mu1 d1 x - mu1 d2 x|.
++ move => x. split => [|_]; 1: by apply ge0_sum; smt(mu_bounded).
   rewrite sumZ -weightE; smt(mu_bounded ler_pimulr).
 apply (ler_trans _ _ _ _ (ler_sum_pos _ _ I _)); 2: by apply summable_sdist. 
-have sum_I := summable_le_pos _ _ _ I; 1: by apply summable_sdist.
-have sum_p : summable (fun (p : 'a * 'b) => `|mu1 d1 p.`1 - mu1 d2 p.`1| * mu1 (F p.`1) p.`2).
-  apply (summableM_dep (fun x => `|mu1 d1 x - mu1 d2 x|) (fun x y => mu1 (F x) y)). 
+have sum_p : summable (fun (p : 'a * 'b) => 
+    `|mu1 d1 p.`1 - mu1 d2 p.`1| * mu1 (F p.`1) p.`2).
++ apply (summableM_dep (fun x => `|mu1 d1 x - mu1 d2 x|) (fun x y => mu1 (F x) y)).
     exact summable_sdist.
   rewrite /(\o). exists 1%r => x J uniq_J. 
-  rewrite (BRA.eq_bigr _ _ (mu1 (F x))) => [y /= _|]; 1: by rewrite ger0_norm // ge0_mu. 
+  rewrite (eq_bigr _ _ (mu1 (F x))) => [y /= _|]; 1: by rewrite ger0_norm // ge0_mu.
   by rewrite -mu_mem_uniq. 
-rewrite sum_swap' //=. 
-apply (ler_trans _ _ _ (ler_sum _ _ H _ _)) => //; 1: by apply summable_sdist. 
-  by move/summable_pswap/summable_pair_sum : sum_p. 
+rewrite sum_swap' //=; apply ler_sum => [y /=| |]; 2: exact summable_sdist.
++ rewrite !dletE -sumB /=; 1,2: exact: sum_dF.
+  apply (ler_trans _ _ _ (norm_sum_sum _ _) _) => /=.
+    by apply summableD;[apply sum_dF|apply/summableN/sum_dF].
+  rewrite ler_eqVlt; left; apply eq_sum => /= x; smt(mu_bounded).
+by move/summable_pswap/summable_pair_sum : sum_p. 
 qed.
 
 (*----------------------------------------------------------------------------*)
@@ -368,45 +369,126 @@ qed.
 
 (*----------------------------------------------------------------------------*)
 
-(* Experiments *)
-
-theory T.
-
-type a.
-op d1, d2 : a distr.
+(* Generic Distinguishers and their output distributions *)
+theory A.
+type a, b. 
 
 module type Distinguisher = { 
-  proc guess (x : a) : bool
+  proc guess (x : a) : b
 }.
 
+lemma uniq_big_res (A <: Distinguisher) &m x' (bs : b list) : 
+  uniq bs =>
+  big predT (fun b => Pr[A.guess(x') @ &m : res = b]) bs = 
+  Pr[A.guess(x') @ &m : res \in bs].
+proof.
+elim: bs => [_|b bs IHbs /= [bNbs uq_bs]].
+  by rewrite big_nil; byphoare => //; hoare; auto.
+by rewrite big_cons {1}/predT /= IHbs // Pr[mu_disjoint] /#.
+qed.
+
+lemma adv_isdistr (A <: Distinguisher) &m x' : 
+    isdistr (fun b => Pr[A.guess(x') @ &m : res = b]).
+proof.
+split => [/= y|bs uq_bs]; 1: by byphoare.
+by rewrite (uniq_big_res A &m) //; byphoare. 
+qed.
+
+lemma adv_mu1 (A <: Distinguisher) &m z x' : 
+  Pr[A.guess(x') @ &m : res = z] = 
+  mu1 (mk (fun b => Pr[A.guess(x') @ &m : res = b])) z.
+proof.
+by rewrite -massE muK //; exact (adv_isdistr A).
+qed.
+
+module S = {
+  proc sample (d : b distr) = {
+    var r; 
+  
+    r <$ d;
+    return r;
+  }
+}.
+
+lemma sampleE d' &m a : 
+    Pr[S.sample(d') @ &m : res = a] = mu1 d' a.
+proof.
+by byphoare (: d = d' ==> _) => //; proc; rnd; auto.
+qed.
+
+end A.
+
+(* Boolean distinguishers for distributions *)
+theory T. 
+type a. 
+
+clone import A with
+  type a <- a,
+  type b <- bool.
+
+clone import DLetSampling as DLS with
+  type t <- a,
+  type u <- bool.
+
 module Sample (A : Distinguisher) = { 
-  proc main(b : bool) = {
-    var x,r;
-    x <- witness;
-    if (!b) { x <$ d1; } else { x <$ d2; }
+  proc main(d : a distr) = {
+    var x,r; 
+
+    x <$ d;
     r <@ A.guess(x);
     return r;
   }
 }.
 
-lemma plik &m z (A <: Distinguisher) x' : 
-  Pr[A.guess(x') @ &m : res = z] = 
-  mu1 (mk (fun b => Pr[A.guess(x') @ &m : res = b])) z.
-proof.
-byphoare (: x = x' ==> _) => //; proc*.
-admit.
+lemma Sample_dlet (A <: Distinguisher) &m d' : 
+    Pr [Sample(A).main(d') @ &m : res] = 
+    mu1 (dlet d' (fun x => (mk (fun z => Pr [A.guess(x) @ &m : res=z])))) true.
+proof. 
+pose F := (fun x => (mk (fun r => Pr [A.guess(x) @ &m : res = r]))).
+have -> : Pr[Sample(A).main(d') @ &m : res] = 
+          Pr[SampleDep.sample(d',F) @ &m : res].
+  byequiv => //; proc. 
+  seq 1 1 : ((glob A){1} = (glob A){m} /\ du{2} = F /\ x{1} = t{2}). 
+    by rnd; skip; smt(). (* rnd; auto raises anomaly *)
+  transitivity{2} {u <@ S.sample(du t); } 
+    ((glob A){1} = (glob A){m} /\ du{2} = F /\ x{1} = t{2} ==> r{1} = u{2}) 
+    (={du,t} ==> ={u}); 1,2: smt(); 2: by inline*;auto.
+  call (: d{2} = (F x){1} /\ (glob A){1} = (glob A){m} ==> ={res}).
+  bypr (res{1}) (res{2}); 1:smt(). 
+  move => &1 &2 a [-> eq_globA]; rewrite sampleE -(adv_mu1 A). 
+  byequiv (: ={x,glob A} ==> ={res}) => //; 1: by sim. 
+  by move: F => F; auto. (* abstracting over F avoids anomaly *)
+have -> : Pr[SampleDep.sample(d', F) @ &m : res] = 
+          Pr[SampleDLet.sample(d', F) @ &m : res].
+  byequiv => //; conseq SampleDepDLet. by move: F; auto.
+byphoare (: dt = d' /\ du = F ==> _) => //; proc. 
+by rnd; skip; move => &1 /= [-> ->]; apply mu_eq; case.
 qed.
 
-lemma bar (A <: Distinguisher) &m y : 
-    Pr [Sample(A).main(false) @ &m : res = y] = 
-    mu1 (dlet d1 (fun x => (mk (fun r => Pr [A.guess(x) @ &m : res = y])))) y.
-proof. 
-byphoare (_ : b = false ==> _) => //. proc; rcondt 2; 1:by auto.
+(* TOTHINK: This proof relies on an explicit enumeration of [bool].
+   It should be *)
+lemma distinguisher_ll (A <: Distinguisher) &m x : 
+  islossless A.guess => 
+  is_lossless (mk (fun (z : bool) => Pr[A.guess(x) @ &m : res = z])).
+proof.
+move => A_ll; rewrite /F /is_lossless muE {1}/predT /=. 
+have <- : Pr[A.guess(x) @ &m : res = true \/ res = false] = 1%r. 
+  by byphoare => //; conseq (:_ ==> true) => // /#.  
+rewrite (eq_sum _ (fun (z : bool) => Pr[A.guess(x) @ &m : res = z])) => [z /=|].
+  by rewrite muK; 1: exact: (adv_isdistr A).
+rewrite (sumE_fin _ [true; false]) // 1:/# !big_cons big_nil /predT/=.
+by rewrite Pr[mu_disjoint] 1:/#. 
+qed.
 
-(* provable ? *) abort.
-
-(* Justified by semantic argument using sdist_dlet *)
-axiom foo (A <: Distinguisher) &m : 
-  `| Pr[Sample(A).main(false) @ &m : res] - Pr[Sample(A).main(true) @ &m : res] | <=  sdist d1 d2.
+lemma adv_sdist (A <: Distinguisher) &m d1 d2 : 
+  weight d1 = weight d2 => islossless A.guess =>
+  `| Pr[Sample(A).main(d1) @ &m : res] - Pr[Sample(A).main(d2) @ &m : res] | <=  sdist d1 d2.
+proof.
+move => eq_w a_ll; rewrite !(Sample_dlet A).
+pose F x := mk (fun (z : bool) => Pr[A.guess(x) @ &m : res = z]).
+have WF : forall x, weight (F x) = 1%r by move => x; exact (distinguisher_ll A).
+apply (ler_trans _ _ _ (sdist_sup _ _ _) (sdist_dlet _ _ F _ _)) => //.
+by rewrite !(const_weight_dlet 1%r).
+qed.
 
 end T.
