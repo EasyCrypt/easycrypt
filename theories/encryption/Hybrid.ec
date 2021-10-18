@@ -350,7 +350,7 @@ section.
     by move=> x; rewrite mem_to_seq // supp_dinter mem_range /#.
   rewrite !(eq_big_perm _ _ _ _ supp_range) {1}range_ltn 1:q_pos big_cons {1}/predT /=.
   have {6}->: q = q - 1 + 1 by smt().
-  rewrite rangeSr 1:[smt(q_pos)] big_rcons {2}/predT /=.
+  rewrite rangeSr 1:#smt:(q_pos) big_rcons {2}/predT /=.
   fieldeq; 1:smt(q_pos).
   rewrite RField.mulNr -RField.mulrN -RField.mulrDr.
   rewrite (big_reindex _ _ (fun x=> x - 1) (fun x=> x + 1) (range 0 (q - 1))) //.
@@ -363,7 +363,7 @@ section.
   + move=> n /mem_range /andaE [] ge1_q n_lt_q /=.
     by rewrite (WLR_shift &m n p' _) 1:/# /p'.
   rewrite big_const count_predT size_range.
-  rewrite (: max 0 (q - 1) = q - 1) 1:[smt(q_pos)].
+  rewrite (: max 0 (q - 1) = q - 1) 1:#smt:(q_pos).
   have: (0 <= q - 1) by smt(q_pos).
   elim: (q - 1)=> //= => [|n ge0_n ih].
   + by rewrite iter0.

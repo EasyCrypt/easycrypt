@@ -298,7 +298,7 @@ lemma iter_gen_ctr_round_nil merge genblock k n i j:
   iter i round ([], [],j) = ([], [], max j (j + i)).
 proof.
   move=> hm round; elim /natind: i j => [i hi| i hi hrec] j; 1: by rewrite iter0 // /#.
-  rewrite iter_gen_ctr_round_S // drop_oversize 1:[smt(gt0_block_size)].
+  rewrite iter_gen_ctr_round_S // drop_oversize 1:#smt:(gt0_block_size).
   rewrite hrec /= hm /#.
 qed.
 
@@ -578,7 +578,7 @@ abstract theory OpCC.
             by rewrite (divzMDl 1 _ _ hd) (modzMDl 1 _ block_size); ring.
           have hm : 0 <= size p < `|block_size| by smt (size_ge0).
           by rewrite modz_small 1:hm divz_small 1:hm drop_oversize 1:/# /= size_eq0 hp.
-        rewrite iterSr 1:[smt(size_ge0 gt0_block_size)]=> /> _.
+        rewrite iterSr 1:#smt:(size_ge0 gt0_block_size)=> /> _.
         smt(size_drop size_ge0 size_eq0 ge0_block_size).
       auto; rewrite /r=> {r} /> c i' p'; split;1: smt (size_eq0 size_ge0).  
       by rewrite /b2i /= (iter0 0) 1:// => ->.    
@@ -796,7 +796,7 @@ proof.
   move=> j hj.
   have [hj1 hj2] : j < block_size /\ j < size p.
   + smt (size_map2 Block.valP size_cat size_take gt0_block_size size_ge0).
-  rewrite (nth_map2 Byte.zero Byte.zero) ?(size_cat, size_map2, Block.valP) 1:[smt(size_ge0)].
+  rewrite (nth_map2 Byte.zero Byte.zero) ?(size_cat, size_map2, Block.valP) 1:#smt:(size_ge0).
   rewrite nth_cat ?(size_cat, size_map2, Block.valP) /min hsz /= hj1.
   by rewrite (nth_map2 Byte.zero Byte.zero) ?Block.valP 1:/# /= -Byte.xorK1 nth_take 1:ge0_block_size.
 qed.
@@ -2730,4 +2730,3 @@ section PROOFS.
    qed.
 
 end section PROOFS.
-

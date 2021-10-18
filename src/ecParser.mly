@@ -2333,17 +2333,17 @@ rwarg1:
 | PR s=bracket(rwpr_arg)
    { RWPr s }
 
-| SMT
-   { RWSmt (false, SMT.mk_smt_option []) }
-
-| LBRACKET SMT pi=smt_info RBRACKET
-   { RWSmt (false, pi) }
-
-| LBRACKET SMT LPAREN dbmap=dbmap1* RPAREN RBRACKET
-   { RWSmt (false, SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
-
 | AMP f=pterm
    { RWApp f }
+
+| SHARP SMT
+   { RWSmt (false, SMT.mk_smt_option []) }
+
+| SHARP SMT COLON pi=bracket(smt_info)
+   { RWSmt (false, pi) }
+
+| SHARP SMT COLON dbmap=paren(dbmap1*)
+   { RWSmt (false, SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | SHARP x=ident {
     let tactics = [("ring", `Ring); ("field", `Field)] in

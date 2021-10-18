@@ -232,7 +232,7 @@ abstract theory Program.
         by rnd (pred1 x); skip; smt.
         by hoare; auto; smt.
         smt.
-    move=> len_xs; rewrite dlist1E 1:smt (_: n{1} <> size xs) /= 1:smt.
+    move=> len_xs; rewrite dlist1E 1:#smt (_: n{1} <> size xs) /= 1:#smt.
     byphoare (_: n = n{1} ==> xs = res)=> //=; hoare.
     by proc; auto; smt.
   qed.

@@ -805,7 +805,7 @@ lemma drop_nth (z0 : 'a) n s: 0 <= n < size s =>
   drop n s = nth z0 s n :: drop (n+1) s.
 proof.
 elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
-by elim: n => [|n ge0_n _] /=; rewrite ?drop0 //= smt.
+by elim: n => [|n ge0_n _] /=; rewrite ?drop0 //= #smt.
 qed.
 
 op take n (xs : 'a list) =
@@ -1783,7 +1783,7 @@ theory Iota.
   proof.
     move=> ge0_n1 ge0_n2; elim: n1 ge0_n1 m => /= [|n1 ge0_n1 ih] m.
       by rewrite (iota0 m 0).
-    by rewrite addzAC !iotaS // 1:smt ih addzAC addzA.
+    by rewrite addzAC !iotaS // 1:/# ih addzAC addzA.
   qed.
 
   lemma iotaSr i n : 0 <= n =>
@@ -1806,8 +1806,8 @@ theory Iota.
   lemma mem_iota m n i : mem (iota_ m n) i <=> (m <= i /\ i < m + n).
   proof.
     elim/natind: n m => [n hn|n hn ih] m.
-      by rewrite iota0 // smt.
-    by rewrite iotaS // in_cons ih smt.
+      by rewrite iota0 // /#.
+    by rewrite iotaS // in_cons ih /#.
   qed.
 
   lemma mema_iota m n i : mem (iota_ m n) i <=> (m <= i < m + n).
@@ -1817,7 +1817,7 @@ theory Iota.
   proof.
     elim/natind: n m => [n hn|n hn ih] m.
       by rewrite iota0.
-    by rewrite iotaS // cons_uniq mem_iota ih // smt.
+    by rewrite iotaS // cons_uniq mem_iota ih //#.
   qed.
 
   lemma last_iota k m n:
@@ -1825,7 +1825,7 @@ theory Iota.
   proof.
     elim/natind: n m k => [n hn|n hn ih] m k.
       by rewrite iota0 hn.
-    by rewrite iotaS //= ih smt.
+    by rewrite iotaS //= ih /#.
   qed.
 
   lemma take_iota (k n m : int):
@@ -1876,11 +1876,11 @@ theory Range.
   proof. smt. qed.
 
   lemma rangeS (m : int): range m (m+1) = [m].
-  proof. by rewrite range_ltn 1:smt range_geq. qed.
+  proof. by rewrite range_ltn 1:/# range_geq. qed.
 
   lemma range_add (m n a : int):
     range (m+a) (n+a) = map (Int.(+) a) (range m n).
-  proof. by rewrite /range addrC iota_addl; congr; smt. qed.
+  proof. by rewrite /range addrC iota_addl; congr => /#. qed.
 
   lemma range_addl (m n a : int):
     range (m+a) n = map (Int.(+) a) (range m (n-a)).
@@ -1893,8 +1893,8 @@ theory Range.
   lemma range_cat (n m p : int): m <= n => n <= p =>
     range m p = range m n ++ range n p.
   proof.
-    rewrite /range (_: p - m = n - m + (p - n)) 1:smt.
-    by move=> le_mn le_np; rewrite iota_add; smt.
+    rewrite /range (_: p - m = n - m + (p - n)) 1:/#.
+    by move=> le_mn le_np; rewrite iota_add /#.
   qed.
 
   lemma rangeSr (n m:int): n <= m =>

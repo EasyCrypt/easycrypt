@@ -636,7 +636,7 @@ rewrite /support dratE -has_pred1 has_count.
 case: (count (pred1 x) s <= 0); [smt w=count_ge0|].
 move=> /IntOrder.ltrNge ^ + -> /=; rewrite -lt_fromint; case: s=> //=.
 move=> ? s /(@mulr_gt0 _ (inv (1 + size s)%r)) -> //.
-by rewrite invr_gt0 lt_fromint [smt w=size_ge0].
+by rewrite invr_gt0 lt_fromint #smt:(size_ge0).
 qed.
 
 lemma eq_dratP ['a] (s1 s2 : 'a list) :
@@ -1487,7 +1487,7 @@ qed.
 
 lemma dprod_ll (da : 'a distr) (db : 'b distr):
   is_lossless (da `*` db) <=> is_lossless da /\ is_lossless db.
-proof. by rewrite /is_lossless weight_dprod [smt(mu_bounded)]. qed.
+proof. by rewrite /is_lossless weight_dprod #smt:(mu_bounded). qed.
 
 lemma dprod_ll_auto (da : 'a distr) (db : 'b distr):
   is_lossless da => is_lossless db => is_lossless (da `*` db).

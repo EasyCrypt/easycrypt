@@ -98,7 +98,7 @@ lemma addrC (x y : zmod): x + y = y + x.
 proof. by apply/asint_inj; rewrite !addE addzC. qed.
 
 lemma add0r (x : zmod): zero + x = x.
-proof. by apply/asint_inj; rewrite !(addE, zeroE) add0z smt. qed.
+proof. by apply/asint_inj; rewrite !(addE, zeroE) add0z #smt. qed.
 
 lemma addNr (x : zmod): (-x) + x = zero.
 proof.
@@ -118,7 +118,7 @@ lemma mulrC (x y : zmod): x * y = y * x.
 proof. by apply/asint_inj; rewrite !mulE mulzC. qed.
 
 lemma mul1r (x : zmod): one * x = x.
-proof. by apply/asint_inj; rewrite !(mulE, oneE) mul1z smt. qed.
+proof. by apply/asint_inj; rewrite !(mulE, oneE) mul1z #smt. qed.
 
 lemma mulrDl (x y z : zmod): (x + y) * z = (x * z) + (y * z).
 proof.

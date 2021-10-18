@@ -498,13 +498,13 @@ section Lemma1.
         []                              (* condition(s) under which the oracle(s) do not respond *)
         (size D_PRF.log = C_PRG.c).     (* general unconditional invariants *)
     (* The resulting sum is less than the specified bound *)
-    rewrite -mulr_suml mulrAC ler_wpmul2r 1:[smt (mu_bounded)].
-    rewrite (@big_reindex _ _ ([-]%Int \o ((-) 1)) ((+) 1)) 1:[smt ml=0].
-    rewrite predTofV (@eq_bigr _ _ CoreReal.from_int) 1:[smt ml=0].
-    rewrite (@eq_map _ ((+) 1)) 2:-range_add /= 1:[smt ml=0].
+    rewrite -mulr_suml mulrAC ler_wpmul2r 1:#smt:(mu_bounded).
+    rewrite (@big_reindex _ _ ([-]%Int \o ((-) 1)) ((+) 1)) 1:#smt:[ml=0].
+    rewrite predTofV (@eq_bigr _ _ CoreReal.from_int) 1:#smt:[ml=0].
+    rewrite (@eq_map _ ((+) 1)) 2:-range_add /= 1:#smt:[ml=0].
     rewrite -(@add0r (bigi _ _ _ _)) -(@big1_eq predT (range 0 1)).
-    rewrite (@eq_big_int _ _ _ CoreReal.from_int) 1:[smt ml=0] -big_cat -range_cat // 1:ler_addr 1:ge0_qN.
-    by rewrite sumidE [smt (ge0_qN)].
+    rewrite (@eq_big_int _ _ _ CoreReal.from_int) 1:#smt:[ml=0] -big_cat -range_cat // 1:ler_addr 1:ge0_qN.
+    by rewrite sumidE #smt:(ge0_qN).
     (* The bounded event implies that from the probability claim *)
     done.
     (* Initialization sets counter to 0, bad event to false, and
