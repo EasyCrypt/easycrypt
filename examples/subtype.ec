@@ -90,7 +90,7 @@ lemma vectorize_spec ['a] (w : 'a list) : size w = (n * m) =>
 (* ==================================================================== *)
 all : 'a t * 'a -> bool
 
-axiom all_spec : forall (f : 'a t -> 'a) (s : 'a t), all (s, f s).
+axiom all_spec ['a] : forall (f : 'a t -> 'a) (s : 'a t), all (s, f s).
 
 nth ['a] 'a -> 'a list -> int -> 'a
 
