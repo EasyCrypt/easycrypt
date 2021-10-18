@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore Finite Distr DList List.
-require import Ring Bigalg StdBigop StdOrder.
+require import Ring IntMin Bigalg StdBigop StdOrder.
 require (*--*) Subtype.
 (*---*) import Bigint IntID IntOrder.
 
