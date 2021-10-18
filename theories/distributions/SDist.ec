@@ -418,7 +418,10 @@ qed.
 
 end A.
 
+(*----------------------------------------------------------------------------*)
+
 (* Boolean distinguishers for distributions *)
+
 theory T. 
 type a. 
 
@@ -429,6 +432,8 @@ clone import A with
 clone import DLetSampling as DLS with
   type t <- a,
   type u <- bool.
+
+(* Part 1 : Sampling game: the distinguiser is given a sampled value *)
 
 module Sample (A : Distinguisher) = { 
   proc main(d : a distr) = {
@@ -466,7 +471,7 @@ by rnd; skip; move => &1 /= [-> ->]; apply mu_eq; case.
 qed.
 
 (* TOTHINK: This proof relies on an explicit enumeration of [bool].
-   It should be *)
+   It should be possible to generalize the result to arbitary types *)
 lemma distinguisher_ll (A <: Distinguisher) &m x : 
   islossless A.guess => 
   is_lossless (mk (fun (z : bool) => Pr[A.guess(x) @ &m : res = z])).
@@ -482,7 +487,8 @@ qed.
 
 lemma adv_sdist (A <: Distinguisher) &m d1 d2 : 
   weight d1 = weight d2 => islossless A.guess =>
-  `| Pr[Sample(A).main(d1) @ &m : res] - Pr[Sample(A).main(d2) @ &m : res] | <=  sdist d1 d2.
+  `| Pr[Sample(A).main(d1) @ &m : res] - Pr[Sample(A).main(d2) @ &m : res] | 
+  <=  sdist d1 d2.
 proof.
 move => eq_w a_ll; rewrite !(Sample_dlet A).
 pose F x := mk (fun (z : bool) => Pr[A.guess(x) @ &m : res = z]).
@@ -490,5 +496,198 @@ have WF : forall x, weight (F x) = 1%r by move => x; exact (distinguisher_ll A).
 apply (ler_trans _ _ _ (sdist_sup _ _ _) (sdist_dlet _ _ F _ _)) => //.
 by rewrite !(const_weight_dlet 1%r).
 qed.
+
+
+(* Part 2 : The distinguiser is given oracle acces to the distribution *)
+
+module type Oracle = {
+  proc get() : a
+}.
+
+module type Oracle_i = {
+  include Oracle
+  proc init(d : a distr) : unit
+}.
+
+module type Adversary (O : Oracle) = { 
+  proc main() : bool
+}.
+
+module Count (O : Oracle_i) = { 
+  var n : int
+  
+  proc init (d' : a distr) = {
+    n <- 0;
+    O.init(d');
+  }
+
+ proc get() = { 
+    var r;
+
+    n <- n + 1;
+    r <@ O.get();
+    return r;
+  }
+}.
+
+(* main distringuisher game *)
+module Game(A : Adversary, O:Oracle_i) = {
+  module CO = Count(O)
+
+  proc main(d) = {
+    var r;
+
+    CO.init(d);
+    r <@ A(CO).main();
+    return r;
+  }
+}.
+
+(* adversary of reduction to sampling game *)
+module B1(A : Adversary) = {
+  var x' : a
+
+  module Ox = {
+    proc init(x : a) = { x' <- x; }
+    proc get() = {return x'; }
+  }
+
+  proc guess(x : a) = {
+    var r;
+
+    Ox.init(x);
+    r <@ A(Ox).main();
+    return r;
+  }
+}.
+
+
+(* always sample *)
+module Os : Oracle_i = {
+  var d : a distr
+  proc init (d' : a distr) = { d <- d'; }
+  proc get () = { var r; r <$ d; return r; }
+}.
+
+section.
+
+declare module A : Adversary {B1,Os,Count}.
+
+axiom A_ll : forall (O <: Oracle), islossless O.get => islossless A(O).main.
+
+op d1,d2 : a distr.
+axiom d1_ll : is_lossless d1.
+axiom d2_ll : is_lossless d2.
+
+local lemma eq_w_d1_d2 : weight d1 = weight d2.
+proof. by rewrite d1_ll d2_ll. qed.
+
+(* global variables for eager/lazy proof *)
+local module Var = { 
+  var x : a  
+  var b : bool 
+  var d : a distr
+}.
+
+(* sample once *)
+local module O1 : Oracle_i = {
+  proc init (d' : a distr) = { Var.x <$ d'; }
+  proc get () = { return Var.x; }
+}.
+
+(* conditional sampling - eager *)
+local module O1e : Oracle_i = {
+  proc init (d' : a distr) = { 
+    Var.x <- witness;
+    Var.d <- d'; 
+    Var.b <- true; 
+    if (Var.b) Var.x <$ Var.d ; 
+  }
+
+  proc get () = { Var.b <- false; return Var.x; }
+}.
+
+(* conditional sampling - lazy *)
+local module O1l = {
+  var d : a distr
+
+  proc init(d') = { 
+    Var.x <- witness;
+    Var.d <- d'; 
+    Var.b <- true; 
+  }
+  proc get() = { 
+    if (Var.b) Var.x <$ Var.d; 
+    Var.b <- false ; 
+    return Var.x;
+  }
+}.
+
+(* "Game" with conditional resampling at the end *)
+local module Gr(O : Oracle_i) = {
+  module CO = Count(O)
+
+  proc main(d) = { 
+    var r;
+
+    CO.init(d);
+    r <@ A(CO).main();
+    if (Var.b) Var.x <$ Var.d;
+    return r;
+  }
+}.
+
+local module M = B1(A).Ox.
+
+lemma sdist_oracle1 &m: 
+  (forall (O <: Oracle_i), 
+     hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= 1]) =>
+  `| Pr[Game(A,Os).main(d1) @ &m : res] - Pr[Game(A,Os).main(d2) @ &m : res] | 
+  <= sdist d1 d2.
+proof.
+move => A_bound. 
+suff H : forall d', is_lossless d' =>
+  Pr[Game(A, Os).main(d') @ &m : res] = Pr [Sample(B1(A)).main(d') @ &m : res].
++ rewrite !H ?d1_ll ?d2_ll; apply (adv_sdist (B1(A))); 1: exact (eq_w_d1_d2). 
+  by islossless; apply (A_ll M); islossless.
+move => d' d'_ll.
+suff <-: Pr[Game(A, O1).main(d') @ &m : res] = Pr[Game(A, Os).main(d') @ &m : res].
++ byequiv => //. proc; inline *; wp. 
+  by call(: Var.x{1} = B1.x'{2}); [proc; inline *|]; auto. 
+byequiv => //.
+transitivity Game(A,O1e).main 
+  (={arg,glob A} /\ d{1} = d' ==> ={res}) 
+  (={arg,glob A} /\ d{1} = d' ==> ={res}); 1,2: smt().
+  by proc; inline *; rcondt{2} 7; auto; call(: ={Var.x}); 1: sim; auto => />.
+transitivity Gr(O1l).main 
+  (={arg,glob A} /\ d{1} = d' ==> ={res}) 
+  (={arg,glob A} /\ d{1} = d' ==> ={res}); 1,2: smt().
+  proc; inline *.
+  seq 6 6 : (={glob Var, glob A}); 1: by auto.
+  eager (H : if (Var.b) Var.x <$ Var.d; ~  if (Var.b) Var.x <$ Var.d; 
+    : ={glob Var} ==> ={glob Var} )
+    : (={glob A,glob Var} ) => //; 1: by sim. 
+  eager proc H (={glob Var}) => //; 2: by sim.
+  proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
+proc; inline*. 
+seq 7 5 : (={r} /\ Var.d{1} = d'); last by if{1}; auto => />.
+conseq (_ : _ ==> Count.n{1} <= 1 /\ Count.n{2} <= 1 => 
+                  ={Count.n,r} /\ Var.d{1} = d')
+       (_ : _ ==> Count.n <= 1) (_ : _ ==> Count.n <= 1); 1: smt().
++ by call (A_bound O1l); auto.
++ by call (A_bound Os); auto.
+call (: 2 <= Count.n, 
+        ={Count.n} /\ Var.d{1} = Os.d{2} /\ 0 <= Count.n{1} /\ 
+        (Var.b <=> Count.n = 0){1} /\ Os.d{2} = d', 
+        Var.d{1} = Os.d{2} /\ Os.d{2} = d' /\ 2 <= Count.n{2}).
+- move=> O; exact (A_ll O).
+- proc; inline *; sp; if{1}; 1: by wp; rnd; auto => />. 
+  auto => />. smt().
+- by move => ? _; proc; inline*; sp; if; auto.
+- by move => ?; proc; inline*; auto => /> /#. 
+- by auto => />; smt().
+qed.
+
+end section.
 
 end T.
