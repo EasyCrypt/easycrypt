@@ -203,9 +203,8 @@ let pt_of_handle_r ptenv hd =
     ptev_ax  = g.g_concl; }
 
 (* -------------------------------------------------------------------- *)
-let pt_of_uglobal pf hyps p =
-  let ptenv   = ptenv_of_penv hyps pf in
-  let env     = LDecl.toenv hyps in
+let pt_of_uglobal_r ptenv p =
+  let env     = LDecl.toenv ptenv.pte_hy in
   let ax      = oget (EcEnv.Ax.by_path_opt p env) in
   let typ, ax = (ax.EcDecl.ax_tparams, ax.EcDecl.ax_spec) in
 
@@ -217,6 +216,11 @@ let pt_of_uglobal pf hyps p =
   { ptev_env = ptenv;
     ptev_pt  = { pt_head = PTGlobal (p, typ); pt_args = []; };
     ptev_ax  = ax; }
+
+(* -------------------------------------------------------------------- *)
+let pt_of_uglobal pf hyps p =
+  let ptenv = ptenv_of_penv hyps pf in
+  pt_of_uglobal_r ptenv p
 
 (* -------------------------------------------------------------------- *)
 let get_implicits (hyps : LDecl.hyps) (f : form) : bool list =
@@ -277,7 +281,9 @@ type occmode = {
 
 let om_rigid = { k_keyed = true; k_conv = false; }
 
-let rec pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
+let rec pf_find_occurence
+  (pt : pt_env) ?(full = true) ?(rooted = false) ?occmode ~ptn subject
+=
   let module E = struct exception MatchFound of form end in
 
   let occmode = odfl { k_keyed = false; k_conv = true; } occmode in
@@ -337,10 +343,13 @@ let rec pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
   let (ue, pe) = (EcUnify.UniEnv.copy pt.pte_ue, !(pt.pte_ev)) in
 
   try
-    ignore (EcMatching.FPosition.select (trymatch mode) subject);
-    raise (FindOccFailure `MatchFailure)
+    let _ =
+      if   rooted
+      then ignore (trymatch mode Mid.empty subject)
+      else ignore (EcMatching.FPosition.select (trymatch mode) subject)
+    in raise (FindOccFailure `MatchFailure)
   with E.MatchFound subf ->
-     if not (can_concretize pt) then begin
+     if full && not (can_concretize pt) then begin
        EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue; pt.pte_ev := pe;
        raise (FindOccFailure `IncompleteMatch)
      end;
@@ -353,24 +362,28 @@ let default_modes = [
   { k_keyed = false; k_conv =  true; };
 ]
 
-let pf_find_occurence_lazy (pt : pt_env) ?(modes = default_modes) ~ptn subject =
+let pf_find_occurence_lazy
+  (pt : pt_env) ?full ?rooted ?(modes = default_modes) ~ptn subject
+=
   let rec doit (modes : occmode list) =
     match modes with
     | [] ->
         assert false
     | [occmode] ->
-        (pf_find_occurence pt ~occmode ~ptn subject, occmode)
+        (pf_find_occurence ?full ?rooted pt ~occmode ~ptn subject, occmode)
     | occmode :: modes ->
-      try  (pf_find_occurence pt ~occmode ~ptn subject, occmode)
+      try  (pf_find_occurence ?full ?rooted pt ~occmode ~ptn subject, occmode)
       with FindOccFailure _ -> doit modes in
 
   doit modes
 
 (* --------------------------------------------------------------------- *)
-let pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
+let pf_find_occurence (pt : pt_env) ?full ?rooted ?occmode ~ptn subject =
   match occmode with
-  | Some occmode -> (pf_find_occurence pt ~occmode ~ptn subject, occmode)
-  | None         -> pf_find_occurence_lazy pt ~ptn subject
+  | Some occmode ->
+      (pf_find_occurence ?full ?rooted pt ~occmode ~ptn subject, occmode)
+  | None ->
+      pf_find_occurence_lazy ?full ?rooted pt ~ptn subject
 
 (* -------------------------------------------------------------------- *)
 let pf_unify (pt : pt_env) ty1 ty2 =

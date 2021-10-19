@@ -46,26 +46,28 @@ module LowRewrite : sig
   | LRW_InvalidOccurence
   | LRW_CannotInfer
   | LRW_IdRewriting
+  | LRW_RPatternNoMatch
+  | LRW_RPatternNoRuleMatch
 
   exception RewriteError of error
 
   val find_rewrite_patterns:
     rwside -> pt_ev -> (pt_ev * rwmode * (form * form)) list
 
+  type rwinfos = rwside * EcFol.form option * EcMatching.occ option
+
   val t_rewrite_r:
       ?mode:[ `Full | `Light] ->
-      ?target:EcIdent.t ->
-    rwside * EcMatching.occ option -> pt_ev -> backward
+      ?target:EcIdent.t -> rwinfos -> pt_ev -> backward
 
-  val t_rewrite:?target:EcIdent.t ->
-    rwside * EcMatching.occ option -> proofterm -> backward
+  val t_rewrite:?target:EcIdent.t -> rwinfos -> proofterm -> backward
 
   val t_autorewrite: EcPath.path list -> backward
 end
 
 (* -------------------------------------------------------------------- *)
 val t_apply_prept : prept -> backward
-val t_rewrite_prept: rwside * EcMatching.occ option -> prept -> backward
+val t_rewrite_prept: LowRewrite.rwinfos -> prept -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_reflexivity : backward
