@@ -1,7 +1,9 @@
-require import AllCore List FSet Distr DProd DList StdBigop StdOrder.
+require import AllCore List FSet Distr DProd DList StdBigop StdOrder Hybrid.
 (*---*) import Bigreal RealSeries RealOrder RField BRA MRat.
 
 (********** preliminaries (to move) ***************************************)
+
+lemma normrZ (x y : real) : 0%r <= x => `| x * y | = x * `| y |. proof. smt(). qed.
 
 (* lub for functions *)
 op flub (F : 'a -> real) : real = lub (fun r => exists a, F a = r).
@@ -370,7 +372,7 @@ qed.
 (*----------------------------------------------------------------------------*)
 
 (* Generic Distinguishers and their output distributions *)
-theory A.
+abstract theory A.
 type a, b. 
 
 module type Distinguisher = { 
@@ -422,7 +424,7 @@ end A.
 
 (* Boolean distinguishers for distributions *)
 
-theory T. 
+abstract theory T. 
 type a. 
 
 clone import A with
@@ -569,18 +571,11 @@ module Os : Oracle_i = {
   proc get () = { var r; r <$ d; return r; }
 }.
 
-section.
+section. (* Reduction from single oracle call to sampling game *)
 
 declare module A : Adversary {B1,Os,Count}.
 
 axiom A_ll : forall (O <: Oracle), islossless O.get => islossless A(O).main.
-
-op d1,d2 : a distr.
-axiom d1_ll : is_lossless d1.
-axiom d2_ll : is_lossless d2.
-
-local lemma eq_w_d1_d2 : weight d1 = weight d2.
-proof. by rewrite d1_ll d2_ll. qed.
 
 (* global variables for eager/lazy proof *)
 local module Var = { 
@@ -637,19 +632,18 @@ local module Gr(O : Oracle_i) = {
   }
 }.
 
-local module M = B1(A).Ox.
-
-lemma sdist_oracle1 &m: 
-  (forall (O <: Oracle_i), 
+lemma sdist_oracle1 &m (d1 d2 : a distr) : 
+   is_lossless d1 => is_lossless d2 =>
+  (forall (O <: Oracle_i{Count,A}), 
      hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= 1]) =>
   `| Pr[Game(A,Os).main(d1) @ &m : res] - Pr[Game(A,Os).main(d2) @ &m : res] | 
   <= sdist d1 d2.
 proof.
-move => A_bound. 
+move => d1_ll d2_ll A_bound. 
 suff H : forall d', is_lossless d' =>
   Pr[Game(A, Os).main(d') @ &m : res] = Pr [Sample(B1(A)).main(d') @ &m : res].
-+ rewrite !H ?d1_ll ?d2_ll; apply (adv_sdist (B1(A))); 1: exact (eq_w_d1_d2). 
-  by islossless; apply (A_ll M); islossless.
++ rewrite !H ?d1_ll ?d2_ll; apply (adv_sdist (B1(A))); 1: by rewrite d1_ll d2_ll.
+  by islossless; apply (A_ll (<: B1(A).Ox)); islossless.
 move => d' d'_ll.
 suff <-: Pr[Game(A, O1).main(d') @ &m : res] = Pr[Game(A, Os).main(d') @ &m : res].
 + byequiv => //. proc; inline *; wp. 
@@ -689,5 +683,161 @@ call (: 2 <= Count.n,
 qed.
 
 end section.
+
+(* Reduction from n oracle calls to single oracle call *)
+abstract theory N1.
+
+(* We need operators, because we need to define modules that use them *)
+op d1,d2 : a distr.
+axiom d1_ll : is_lossless d1.
+axiom d2_ll : is_lossless d2.
+
+op N : { int | 0 < N } as N_pos.
+
+section. 
+
+declare module A : Adversary {B1,Os,Count}.
+
+axiom A_ll : forall (O <: Oracle), islossless O.get => islossless A(O).main.
+
+axiom A_bound : (forall (O <: Oracle_i{A,Count}), 
+  hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= N]).
+
+local clone Hybrid as Hyb with
+  type input <- unit,
+  type output <- a,
+  type inleaks <- unit,
+  type outleaks <- unit,
+  type outputA <- bool,
+  op q <- N,
+  lemma q_pos <- N_pos.
+
+local module Ob : Hyb.Orclb = {
+
+  proc leaks () = { return (); }
+  
+  proc orclL () = {
+    var r;
+
+    r <$ d1;
+    return r;
+  }
+
+  proc orclR () = {
+    var r;
+
+    r <$ d2;
+    return r;
+  }
+}.
+
+(* : Hyb.AdvOrclb *)
+local module B (Ob : Hyb.Orclb) (O : Hyb.Orcl) = {
+  module O' : Oracle = {
+    proc init(d : a distr) = {}
+    proc get = O.orcl
+  }
+    
+  proc main() : bool = {
+    var r; 
+    
+    (* Adding counting here simplifies the proof of the bound
+      for Hyb.AdvCount(B(Ob, Hyb.OrclCount(O))).main below *)
+    Count.n <- 0; 
+    r <@ A(Count(O')).main();
+    return r;
+  }
+}.
+
+(* It would be nice to replace [Game(C,Os)] with [Game(Hyb.HybOrcl(Ob,O))] 
+   for some Ob/O. However, HybOrcl does not have an init, so we need a module 
+   an do the initialization in [main] *)
+local module C (O : Oracle) = {
+  var k, i : int
+
+  module O' = {
+    proc get () = {
+      var x; 
+      if   (k < i) x <$ d1;
+      elif (i = k) x <@ O.get();
+      else         x <$ d2;
+      i <- i + 1;
+      return x;
+    }
+  }
+
+  proc main() = { 
+    var r;
+
+    k <$ [0..N-1];
+    i <- 0;
+    r <@ A(O').main();
+    return r;
+  } 
+}.
+
+local lemma Osd1_Hyb &m :
+   Pr[Game(A, Os).main(d1) @ &m : res] = Pr[ Hyb.Ln(Ob, B).main() @ &m : res ].
+proof.
+byequiv => //; proc; inline *; auto. 
+call (: Os.d{1} = d1); [by proc; inline*; auto| by auto].
+qed.
+
+local lemma Osd2_Hyb &m :
+   Pr[Game(A, Os).main(d2) @ &m : res] = Pr[ Hyb.Rn(Ob, B).main() @ &m : res ].
+proof.
+byequiv => //; proc; inline *; auto. 
+call (: Os.d{1} = d2); [by proc; inline*; auto| by auto].
+qed.
+
+local lemma A_bound' (O <: Oracle_i{A,Count}) : hoare [ Game(A,O).main : true ==> Count.n <= N ].
+proof.
+by proc; inline *; sp; call (A_bound O); call(: true); auto.
+qed.
+
+lemma sdist_oracleN &m : 
+  `| Pr[Game(A,Os).main(d1) @ &m : res] - Pr[Game(A,Os).main(d2) @ &m : res] | 
+  <= N%r * sdist d1 d2.
+proof.
+rewrite -ler_pdivr_mull -?normrZ; 1,2: smt(N_pos). 
+rewrite Osd1_Hyb Osd2_Hyb. 
+have /= H := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
+- move => O; proc; inline *; sp; wp. 
+  conseq (: Hyb.Count.c = Count.n) (: Count.n = 0 ==> Count.n <= N) => //. 
+    by call (A_bound (<: B(Ob, Hyb.OrclCount(O)).O')).
+  by call (: Hyb.Count.c = Count.n) => //; proc; inline *; auto; call(: true); auto.
+- by islossless.
+- islossless; exact d1_ll.
+- islossless; exact d2_ll.
+- move => Ob LR *; islossless. apply (A_ll (<: Count(B(Ob, LR).O'))). islossless.
+rewrite -H => {H}.
+have -> : Pr[Hyb.HybGame(B, Ob, Hyb.L(Ob)).main() @ &m : res] = Pr[Game(C, Os).main(d1) @ &m : res].
+  byequiv => //; proc; inline*; auto. 
+  call (: Hyb.HybOrcl.l0{1} = C.k{2} /\ Hyb.HybOrcl.l{1} = C.i{2} /\ Os.d{2} = d1); last by auto.
+  proc; inline *; sp.
+  if; [smt() | by auto |].
+  if; [smt()| by auto | by auto].
+have -> : Pr[Hyb.HybGame(B, Ob, Hyb.R(Ob)).main() @ &m : res] = Pr[Game(C, Os).main(d2) @ &m : res].
+  byequiv => //; proc; inline*; auto. 
+  call (: Hyb.HybOrcl.l0{1} = C.k{2} /\ Hyb.HybOrcl.l{1} = C.i{2} /\ Os.d{2} = d2); last by auto.
+  proc; inline *; sp.
+  if; [smt() | by auto |].
+  if; [smt()| by auto | by auto].
+apply (sdist_oracle1 C).
+- move => O O_ll; islossless. 
+  + apply (A_ll (<: C(O).O')); islossless. exact: d1_ll. exact: d2_ll.
+  + rewrite DInterval.weight_dinter. smt(N_pos).
+- exact: d1_ll.
+- exact: d2_ll.
+move => O; proc.
+call(: if C.i <= C.k then Count.n = 0 else Count.n = 1). 
+- proc; if; 1: (by auto; smt()); if; 2: by auto; smt().
+  inline *; auto. call(: true) => //. auto; smt().
+auto; smt(DInterval.supp_dinter).
+qed.
+
+end section.
+
+end N1.
 
 end T.
