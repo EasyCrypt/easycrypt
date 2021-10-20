@@ -1,6 +1,8 @@
 require import AllCore List FSet Distr DProd DList StdBigop StdOrder Hybrid.
 (*---*) import Bigreal RealSeries RealOrder RField BRA MRat.
 
+require ROM.
+
 (********** preliminaries (to move) ***************************************)
 
 lemma normrZ (x y : real) : 0%r <= x => `| x * y | = x * `| y |. proof. smt(). qed.
@@ -257,10 +259,12 @@ rewrite (sum_split _ pos) // -/Sp -/Sn.
 have eq_p_n : Sp = Sn. 
   rewrite /Sp /Sn /f.
   rewrite (eq_sum _ 
-     (fun x => (if pos x then mu1 d1 x else 0%r) - (if pos x then mu1 d2 x else 0%r))); 1: smt().
+     (fun x => (if pos x then mu1 d1 x else 0%r) - 
+               (if pos x then mu1 d2 x else 0%r))); 1: smt().
   rewrite sumB; 1,2 : exact summable_mu1_cond.
   rewrite (eq_sum (fun x => if !pos x then `|mu1 d1 x - mu1 d2 x| else 0%r) 
-    (fun x => (if ! pos x then mu1 d2 x else 0%r) - (if !pos x then mu1 d1 x else 0%r))); 1: smt().
+    (fun x => (if ! pos x then mu1 d2 x else 0%r) - 
+              (if !pos x then mu1 d1 x else 0%r))); 1: smt().
   rewrite sumB /=; 1,2: exact summable_mu1_cond.
   rewrite RField.eqr_sub -!sum_split; 1,2: exact summable_mu1.
   by rewrite -!weightE.
@@ -275,13 +279,16 @@ apply sdist_max => E.
 rewrite (mu_split d1 E pos) (mu_split d2 E pos). 
 have -> : forall (a b c d : real), a + b - (c + d) = (a - c) + (b - d) by smt().
 rewrite !mu_mu1 -!sumB /=; 1..4: exact: summable_mu1_cond.
-rewrite (eq_sum _ (fun x => if predI E pos x then mu1 d1 x - mu1 d2 x else 0%r)); 1: smt().
+rewrite (eq_sum _ 
+  (fun x => if predI E pos x then mu1 d1 x - mu1 d2 x else 0%r)); 1: smt().
 rewrite (eq_sum 
   (fun (x : 'a) => (if predI E (predC pos) x then mu1 d1 x else 0%r) - 
-                   if predI E (predC pos) x then mu1 d2 x else 0%r)
+                    if predI E (predC pos) x then mu1 d2 x else 0%r)
   (fun x => if predI E (predC pos) x then mu1 d1 x - mu1 d2 x else 0%r)); 1: smt().
-pose SEp := sum (fun (x : 'a) => if predI E pos x then mu1 d1 x - mu1 d2 x else 0%r).
-pose SEn := sum (fun (x : 'a) => if predI E (predC pos) x then mu1 d1 x - mu1 d2 x else 0%r).
+pose SEp := sum (fun (x : 'a) => 
+                 if predI E pos x then mu1 d1 x - mu1 d2 x else 0%r).
+pose SEn := sum (fun (x : 'a) => 
+                 if predI E (predC pos) x then mu1 d1 x - mu1 d2 x else 0%r).
 have ? : 0%r <= SEp /\ SEn <= 0%r. 
   split; 1: by apply ge0_sum; smt().
   apply/oppr_ge0. rewrite -sumN /=. by apply ge0_sum; smt().
@@ -575,7 +582,7 @@ section. (* Reduction from single oracle call to sampling game *)
 
 declare module A : Adversary {B1,Os,Count}.
 
-axiom A_ll : forall (O <: Oracle), islossless O.get => islossless A(O).main.
+axiom A_ll : forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
 
 (* global variables for eager/lazy proof *)
 local module Var = { 
@@ -698,7 +705,7 @@ section.
 
 declare module A : Adversary {B1,Os,Count}.
 
-axiom A_ll : forall (O <: Oracle), islossless O.get => islossless A(O).main.
+axiom A_ll : forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
 
 axiom A_bound : (forall (O <: Oracle_i{A,Count}), 
   hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= N]).
@@ -790,7 +797,8 @@ byequiv => //; proc; inline *; auto.
 call (: Os.d{1} = d2); [by proc; inline*; auto| by auto].
 qed.
 
-local lemma A_bound' (O <: Oracle_i{A,Count}) : hoare [ Game(A,O).main : true ==> Count.n <= N ].
+local lemma A_bound' (O <: Oracle_i{A,Count}) : 
+  hoare [ Game(A,O).main : true ==> Count.n <= N ].
 proof.
 by proc; inline *; sp; call (A_bound O); call(: true); auto.
 qed.
@@ -801,25 +809,30 @@ lemma sdist_oracleN &m :
 proof.
 rewrite -ler_pdivr_mull -?normrZ; 1,2: smt(N_pos). 
 rewrite Osd1_Hyb Osd2_Hyb. 
-have /= H := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
+have /= <- := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
 - move => O; proc; inline *; sp; wp. 
   conseq (: Hyb.Count.c = Count.n) (: Count.n = 0 ==> Count.n <= N) => //. 
     by call (A_bound (<: B(Ob, Hyb.OrclCount(O)).O')).
-  by call (: Hyb.Count.c = Count.n) => //; proc; inline *; auto; call(: true); auto.
+  call (: Hyb.Count.c = Count.n) => //.
+  by proc; inline *; auto; call(: true); auto.
 - by islossless.
 - islossless; exact d1_ll.
 - islossless; exact d2_ll.
-- move => Ob LR *; islossless. apply (A_ll (<: Count(B(Ob, LR).O'))). islossless.
-rewrite -H => {H}.
-have -> : Pr[Hyb.HybGame(B, Ob, Hyb.L(Ob)).main() @ &m : res] = Pr[Game(C, Os).main(d1) @ &m : res].
+- move => Ob LR *; islossless. 
+  by apply (A_ll (<: Count(B(Ob, LR).O'))); islossless.
+have -> : Pr[Hyb.HybGame(B, Ob, Hyb.L(Ob)).main() @ &m : res] = 
+          Pr[Game(C, Os).main(d1) @ &m : res].
   byequiv => //; proc; inline*; auto. 
-  call (: Hyb.HybOrcl.l0{1} = C.k{2} /\ Hyb.HybOrcl.l{1} = C.i{2} /\ Os.d{2} = d1); last by auto.
+  call (: Hyb.HybOrcl.l0{1} = C.k{2} /\ Hyb.HybOrcl.l{1} = C.i{2} /\ 
+          Os.d{2} = d1); last by auto.
   proc; inline *; sp.
   if; [smt() | by auto |].
   if; [smt()| by auto | by auto].
-have -> : Pr[Hyb.HybGame(B, Ob, Hyb.R(Ob)).main() @ &m : res] = Pr[Game(C, Os).main(d2) @ &m : res].
+have -> : Pr[Hyb.HybGame(B, Ob, Hyb.R(Ob)).main() @ &m : res] = 
+          Pr[Game(C, Os).main(d2) @ &m : res].
   byequiv => //; proc; inline*; auto. 
-  call (: Hyb.HybOrcl.l0{1} = C.k{2} /\ Hyb.HybOrcl.l{1} = C.i{2} /\ Os.d{2} = d2); last by auto.
+  call (: Hyb.HybOrcl.l0{1} = C.k{2} /\ Hyb.HybOrcl.l{1} = C.i{2} /\ 
+          Os.d{2} = d2); last by auto.
   proc; inline *; sp.
   if; [smt() | by auto |].
   if; [smt()| by auto | by auto].
@@ -839,5 +852,133 @@ qed.
 end section.
 
 end N1.
+
+abstract theory ROM.
+
+import SmtMap.
+
+type in_t. (* TODO: rename "a" to something more meaningful *)
+op d1, d2 : a distr.
+axiom d1_ll : is_lossless d1.
+axiom d2_ll : is_lossless d2.
+op N : { int | 0 < N } as N_pos.
+
+clone ROM as R1 with 
+  type in_t <- in_t, 
+  type out_t <- a, 
+  type d_in_t <- unit,
+  type d_out_t <- bool,
+  op dout <- fun _ => d1.
+
+clone ROM as R2 with 
+  type in_t <- in_t, 
+  type out_t <- a, 
+  type d_in_t <- unit,
+  type d_out_t <- bool,
+  op dout <- fun _ => d2.
+
+module O1 = R1.Lazy.LRO.
+module O2 = R2.Lazy.LRO.
+
+module Wrap (O : R1.Oracle) : R1.Oracle = {
+  var dom : in_t fset
+
+  proc init() = { 
+    dom <- fset0 ; 
+    O.init(); 
+  }
+  proc o(x) = { 
+    var r;
+    dom <- dom `|` fset1 x; 
+    r <@ O.o(x); 
+    return r;
+  }
+}.
+
+section.
+
+declare module D : R1.Distinguisher {Os, O1,O2, Count, B1, Wrap}.
+
+axiom D_ll : forall (O <: R1.POracle{D}), 
+  islossless O.o => islossless D(O).run.
+
+local module Cache (O : Oracle) : R1.Oracle = {
+  var m : (in_t,a) fmap 
+
+  proc init () = { m <- empty; }
+
+  proc o (i) = {
+    var x; 
+
+    if (! i \in m) {
+      x <@ O.get();
+      m.[i] <- x;
+    }
+    return oget (m.[i]);
+  }
+}.
+
+local module A (O : Oracle) = {
+  module O' = Wrap(Cache(O))
+ 
+  proc main () = {
+     var r;
+
+     O'.init();
+     r <@ D(O').run();
+     return r;
+  }
+}.
+
+local clone N1 as N1 with
+  op d1 <- d1,
+  op d2 <- d2,
+  axiom d1_ll <- d1_ll,
+  axiom d2_ll <- d2_ll,
+  op N <- N,
+  axiom N_pos <- N_pos.
+
+lemma sdist_ROM  &m : 
+ (forall (O <: R1.Oracle{Wrap,D}), 
+   hoare [ D(Wrap(O)).run : Wrap.dom = fset0 ==> card Wrap.dom <= N]) =>
+  `| Pr [R1.Exp(O1,D).main() @ &m : res] - 
+     Pr [R1.Exp(O2,D).main() @ &m : res] |
+  <= N%r * sdist d1 d2.
+proof.
+move => D_bound. 
+have -> : Pr[R1.Exp(O1, D).main() @ &m : res] = 
+          Pr[Game(A,Os).main(d1) @ &m : res].
+- byequiv => //; proc; inline *; wp.
+  call(: ={m}(O1,Cache) /\ Os.d{2} = d1); last by auto.
+  proc; inline *; sp.
+  if{2}; [by rcondt{1} 2; auto| rcondf{1} 2; auto; smt(d1_ll)].
+have -> : Pr[R1.Exp(O2, D).main() @ &m : res] = 
+          Pr[Game(A,Os).main(d2) @ &m : res].
+- byequiv => //; proc; inline *; wp.
+  call(: ={m}(O2,Cache) /\ Os.d{2} = d2); last by auto.
+  proc; inline *; sp.
+  if{2}; [by rcondt{1} 2; auto| rcondf{1} 2; auto; smt(d2_ll)].
+apply (N1.sdist_oracleN A _ _ &m). 
+- move=> O get_ll. islossless. apply (D_ll (<: Wrap(Cache(O)))).
+  islossless. 
+move => O; proc; inline *; sp.
+conseq (: Count.n <= card Wrap.dom /\ fdom Cache.m = Wrap.dom) 
+       (: Wrap.dom = fset0 ==> card Wrap.dom <= N); 1,2: smt(). 
+- by call (D_bound (<: Cache(Count(O)))).
+call (: Count.n <= card Wrap.dom /\ fdom Cache.m = Wrap.dom); last first.
+  by auto; smt(fcards0 fdom0).
+proc; inline*; wp; sp; if. 
+- auto; call(: true); auto => /> &1 cnt_n x_cache a.
+  split; last by rewrite fdom_set.
+  by rewrite !fcardU fsetI1 !mem_fdom x_cache /= fcards0 fcard1 /#.
+- auto => /> &1 cnt_n x_cache. 
+  split; last by apply/fsetP => x; rewrite !inE !mem_fdom /#.
+  rewrite fcardU fcard1 fsetI1 mem_fdom x_cache /=.
+  smt (fcardU fcard1 fcard_ge0).
+qed.
+
+end section.
+
+end ROM.
 
 end T.
