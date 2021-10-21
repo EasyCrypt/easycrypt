@@ -1,7 +1,7 @@
 require import AllCore List FSet Distr DProd DList StdBigop StdOrder Hybrid.
 (*---*) import Bigreal RealSeries RealOrder RField BRA MRat.
 
-require ROM.
+require PROM.
 
 (********** preliminaries (to move) ***************************************)
 
@@ -863,51 +863,62 @@ axiom d1_ll : is_lossless d1.
 axiom d2_ll : is_lossless d2.
 op N : { int | 0 < N } as N_pos.
 
-clone ROM as R1 with 
+clone PROM.FullRO as R1 with 
   type in_t <- in_t, 
   type out_t <- a, 
   type d_in_t <- unit,
   type d_out_t <- bool,
   op dout <- fun _ => d1.
 
-clone ROM as R2 with 
+clone PROM.FullRO as R2 with 
   type in_t <- in_t, 
   type out_t <- a, 
   type d_in_t <- unit,
   type d_out_t <- bool,
   op dout <- fun _ => d2.
 
-module O1 = R1.Lazy.LRO.
-module O2 = R2.Lazy.LRO.
+module O1 = R1.RO.
+module O2 = R2.RO.
 
-module Wrap (O : R1.Oracle) : R1.Oracle = {
+(* This allows us to PROM rather then ROM, and the former has better
+infrastructure (e.g., for splitting into muliple oracles *)
+module type Distinguisher (O : R1.RO) = {
+  proc distinguish(_ : unit) : bool {O.get}
+}.
+
+module Wrap (O : R1.RO) : R1.RO = {
   var dom : in_t fset
 
   proc init() = { 
     dom <- fset0 ; 
     O.init(); 
   }
-  proc o(x) = { 
+  proc get(x) = { 
     var r;
     dom <- dom `|` fset1 x; 
-    r <@ O.o(x); 
+    r <@ O.get(x); 
     return r;
   }
+  
+  (* never called by our distinguisher *)
+  proc set = O.set
+  proc sample = O.sample
+  proc rem = O.rem
 }.
 
 section.
 
-declare module D : R1.Distinguisher {Os, O1,O2, Count, B1, Wrap}.
+declare module D : Distinguisher {Os, O1,O2, Count, B1, Wrap}.
 
-axiom D_ll : forall (O <: R1.POracle{D}), 
-  islossless O.o => islossless D(O).run.
+axiom D_ll : forall (O <: R1.RO{D}), 
+  islossless O.get => islossless D(O).distinguish.
 
-local module Cache (O : Oracle) : R1.Oracle = {
+local module Cache (O : Oracle) : R1.RO = {
   var m : (in_t,a) fmap 
 
   proc init () = { m <- empty; }
 
-  proc o (i) = {
+  proc get(i) = {
     var x; 
 
     if (! i \in m) {
@@ -916,6 +927,11 @@ local module Cache (O : Oracle) : R1.Oracle = {
     }
     return oget (m.[i]);
   }
+
+  (* never called by our distinguisher *)
+  proc set(x : in_t, y : a) = {}
+  proc sample(x: in_t) = {}
+  proc rem(x: in_t) = {}
 }.
 
 local module A (O : Oracle) = {
@@ -925,7 +941,7 @@ local module A (O : Oracle) = {
      var r;
 
      O'.init();
-     r <@ D(O').run();
+     r <@ D(O').distinguish();
      return r;
   }
 }.
@@ -939,20 +955,20 @@ local clone N1 as N1 with
   axiom N_pos <- N_pos.
 
 lemma sdist_ROM  &m : 
- (forall (O <: R1.Oracle{Wrap,D}), 
-   hoare [ D(Wrap(O)).run : Wrap.dom = fset0 ==> card Wrap.dom <= N]) =>
-  `| Pr [R1.Exp(O1,D).main() @ &m : res] - 
-     Pr [R1.Exp(O2,D).main() @ &m : res] |
+ (forall (O <: R1.RO{Wrap,D}), 
+   hoare [ D(Wrap(O)).distinguish : Wrap.dom = fset0 ==> card Wrap.dom <= N]) =>
+  `| Pr [R1.MainD(D,O1).distinguish() @ &m : res] - 
+     Pr [R1.MainD(D,O2).distinguish() @ &m : res] |
   <= N%r * sdist d1 d2.
 proof.
 move => D_bound. 
-have -> : Pr[R1.Exp(O1, D).main() @ &m : res] = 
+have -> : Pr[R1.MainD(D,O1).distinguish() @ &m : res] = 
           Pr[Game(A,Os).main(d1) @ &m : res].
 - byequiv => //; proc; inline *; wp.
   call(: ={m}(O1,Cache) /\ Os.d{2} = d1); last by auto.
   proc; inline *; sp.
   if{2}; [by rcondt{1} 2; auto| rcondf{1} 2; auto; smt(d1_ll)].
-have -> : Pr[R1.Exp(O2, D).main() @ &m : res] = 
+have -> : Pr[R1.MainD(D,O2).distinguish() @ &m : res] = 
           Pr[Game(A,Os).main(d2) @ &m : res].
 - byequiv => //; proc; inline *; wp.
   call(: ={m}(O2,Cache) /\ Os.d{2} = d2); last by auto.
