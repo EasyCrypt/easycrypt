@@ -478,7 +478,8 @@ rewrite -big_seq Bigreal.sumr_const count_predT negP -ltrNge.
 apply/(@ltr_le_trans (r%r * mu1 d x)); last first.
 + by apply/ler_wpmul2r/le_fromint => //; apply/ge0_mu1.
 have h: 0%r <> mu1 d x by rewrite ltr_eqF.
-apply (ltr_le_trans ((1%r + 1%r/mu1 d x) * mu1 d x)); smt (ceil_bound).
+apply (ltr_le_trans ((1%r + 1%r/mu1 d x) * mu1 d x)); 1: smt.
+smt (ceil_bound).
 qed.
 
 lemma mu1_uni ['a] (d : 'a distr) x : is_uniform d => mu1 d x =
@@ -893,7 +894,7 @@ qed.
 lemma summable_dlet ['a 'b] d f:
   summable (fun (ab : 'a * 'b) => mass d ab.`1 * mass (f ab.`1) ab.`2).
 proof.
-pose G a b := mass (f a) b; apply/(@summableM_dep (mass d) G).
+pose G a b := mass (f a) b; apply/(@summableM_prod_dep (mass d) G).
   by apply/summable_mass.
 exists 1%r => a @/G @/(\o) J uqJ; rewrite (@eq_bigr _ _ (mass (f a))).
   by move=> b _ /=; rewrite ger0_norm.
