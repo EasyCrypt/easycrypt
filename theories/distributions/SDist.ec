@@ -27,48 +27,7 @@ apply RealLub.lub_le_ub => //.
 split; [by exists (F witness) witness| by exists r].
 qed.
 
-
 (* additional lemmas for summable *)
-
-(* subsumes summable_bij *)
-lemma summable_inj (h : 'a -> 'b) (s : 'b -> real) : 
-  injective h => summable s => summable (s \o h).
-proof.
-move => inj_h [M] sum_s; exists M => J uniq_J. 
-have R := sum_s (map h J) _; 1: by rewrite map_inj_in_uniq /#.
-apply (ler_trans _ _ _ _ R) => {R}. 
-rewrite BRA.big_map /(\o)/= BRA.big_mkcond.
-have -> : (fun (x : 'a) => predT (h x)) = predT by apply/fun_ext.
-apply Bigreal.ler_sum; smt().
-qed.
-
-lemma summable_cond p (s : 'a -> real) : 
-  summable s => summable (fun x => if p x then s x else 0%r).
-proof. 
-case => r Hr; exists r => J uniJ; apply (ler_trans _ _ _ _ (Hr J uniJ)).
-by apply ler_sum_seq => /=; smt().
-qed.
-
-lemma summableN (s : 'a -> real) : summable s => summable (fun x => - s x).
-proof.
-by move => sum_s; apply (summable_le _ _ sum_s) => /= a; rewrite normrN.
-qed.
-
-lemma norm_summable (s : 'a -> real) : summable (fun x => `|s x|) => summable s.
-proof. 
-move => sum_s; apply (summable_le _ _ sum_s) => /= a. 
-by rewrite (ger0_norm `|s a|) ?normr_ge0.
-qed.
-
-lemma summable_mu1 (d : 'a distr) : summable (fun x => mu1 d x).
-proof. 
-rewrite (eq_summable _ (mass d)) /= => [x|]; 1: by rewrite massE.
-exact summable_mass.
-qed.
-
-lemma summable_mu1_cond p (d : 'a distr) : 
-  summable (fun x => if p x then mu1 d x else 0%r).
-proof. exact/summable_cond/summable_mu1. qed.
 
 lemma summable_sdist (d1 d2 : 'a distr) : 
   summable (fun x => `| mu1 d1 x - mu1 d2 x |).
@@ -77,68 +36,12 @@ apply/summable_norm/summableD; 1: exact/summable_mu1.
 exact/summableN/summable_mu1.
 qed.
 
-(* should replace summable_pswap, whoch proves only one direction *)
-lemma summable_pswap (s : 'a * 'b -> real) : summable s <=> summable (s \o pswap).
-proof.
-split => [|H]; 1: exact summable_pswap.
-have -> : s = (s \o pswap) \o pswap by apply/fun_ext => -[].
-exact summable_pswap.
-qed.
-
-(* name clash *)
-lemma summableM' (s1 s2 : 'a -> real) : 
-  summable s1 => summable s2 => summable (fun x => s1 x * s2 x).
-proof.
-move => sum_s1 sum_s2. 
-have H := summableM _ _ sum_s1 sum_s2.
-have := summable_inj (fun x : 'a => (x,x)) _ _ H. smt().
-move => sum_s. exact(summable_le _ _ sum_s).
-qed.
-
-lemma ler_sum_norm (s : 'a -> real) : 
-  summable s => sum s <= sum (fun x => `|s x|).
-proof.
-move => sum_s; apply ler_sum => // => [x|]; 1: exact ler_norm. 
-exact summable_norm.
-qed.
-
-lemma norm_sum_sum (s : 'a -> real) : 
-  summable s => `| sum s | <= sum (fun x => `| s x |).
-proof.
-move => sum_s; rewrite ler_norml ler_sum_norm //= ler_oppl -sumN. 
-apply ler_sum => /=; [smt()| exact summableN| exact summable_norm].
-qed.
-
-lemma summableM_bound (k : real) (s1 s2 : 'a -> real)  : 
-  0%r < k => summable s1 => (forall x, `|s2 x| <= k) => summable (fun x => s1 x * s2 x).
-proof.
-move => k_gt0 [M sum_s1] bound_s2; exists (k * M) => J uniq_J. 
-have R := sum_s1 _ uniq_J; rewrite -(ler_pmul2l k) // in R.
-apply (ler_trans _ _ _ _ R) => {R}. rewrite BRA.mulr_sumr /=. 
-apply Bigreal.ler_sum => /= x _. 
-rewrite normrM Domain.mulrC. rewrite ler_wpmul2r /#.
-qed.
-
-lemma ler_sum_pos ['a] (s1 s2 : 'a -> real) : 
-  (forall (x : 'a), 0%r <= s1 x <= s2 x) => summable s2 => sum s1 <= sum s2.
-proof.
-move => H sum_s2; apply: ler_sum => //; 1: smt().
-by apply (summable_le_pos _ _ _ H).
-qed.
-
-(* the pattern [s a b] seems to be preferrable over the pattern [s(a,b)] *)
-lemma sum_swap' (s : 'a -> 'b -> real) :
-  summable (fun p : 'a * 'b => s p.`1 p.`2) => 
-  sum (fun (a : 'a) => sum (fun (b : 'b) => s a b)) = 
-  sum (fun (b : 'b) => sum (fun (a : 'a) => s a b)).
-proof. exact (sum_swap (fun (ab : 'a * 'b) => s ab.`1 ab.`2)). qed.
-
 (* this should probably replace dletE *)
 lemma dletE (d : 'a distr) (F : 'a -> 'b distr) (E : 'b -> bool) : 
   mu (dlet d F) E = sum (fun x => mu1 d x * mu (F x) E).
-proof.
+proof. 
 rewrite dletE sum_swap' /=. 
-  apply summable_cond; apply summable_pswap.
+- apply summable_cond; apply pswap_summable.
   rewrite (eq_summable _ 
      (fun (ab : 'a * 'b) => mass d ab.`1 * mass (F ab.`1) ab.`2)) //.
   apply summable_dlet. 
@@ -146,10 +49,7 @@ apply eq_sum => a /=; rewrite (muE _ E) -sumZ /= !massE.
 apply eq_sum => b /=; smt().
 qed.
 
-(* same as muE, but using [mu1] rather than [mass] *)
-lemma mu_mu1 (d : 'a distr) E : mu d E = sum (fun x => if E x then mu1 d x else 0%r).
-proof. by rewrite muE; apply eq_sum => x /=; rewrite massE. qed.
-
+(* name clash - weightE uses mass *)
 lemma weightE (d : 'a distr) : weight d = sum (fun x => mu1 d x).
 proof. by rewrite mu_mu1. qed.
 
@@ -317,14 +217,14 @@ have I : forall x, 0%r <= sum (fun y =>
 apply (ler_trans _ _ _ _ (ler_sum_pos _ _ I _)); 2: by apply summable_sdist. 
 have sum_p : summable (fun (p : 'a * 'b) => 
     `|mu1 d1 p.`1 - mu1 d2 p.`1| * mu1 (F p.`1) p.`2).
-+ apply (summableM_dep (fun x => `|mu1 d1 x - mu1 d2 x|) (fun x y => mu1 (F x) y)).
++ apply (summableM_prod_dep (fun x => `|mu1 d1 x - mu1 d2 x|) (fun x y => mu1 (F x) y)).
     exact summable_sdist.
   rewrite /(\o). exists 1%r => x J uniq_J. 
   rewrite (eq_bigr _ _ (mu1 (F x))) => [y /= _|]; 1: by rewrite ger0_norm // ge0_mu.
   by rewrite -mu_mem_uniq. 
 rewrite sum_swap' //=; apply ler_sum => [y /=| |]; 2: exact summable_sdist.
 + rewrite !dletE -sumB /=; 1,2: exact: sum_dF.
-  apply (ler_trans _ _ _ (norm_sum_sum _ _) _) => /=.
+  apply (ler_trans _ _ _ (ler_norm_sum _ _) _) => /=.
     by apply summableD;[apply sum_dF|apply/summableN/sum_dF].
   rewrite ler_eqVlt; left; apply eq_sum => /= x; smt(mu_bounded).
 by move/summable_pswap/summable_pair_sum : sum_p. 

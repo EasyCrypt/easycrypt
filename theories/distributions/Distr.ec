@@ -131,14 +131,13 @@ lemma summable_mass_cond (d : 'a distr) (p : 'a -> bool) :
   summable (fun x => if p x then mass d x else 0%r).
 proof. by apply/summable_cond/summable_mass. qed.
 
+(* TODO: assuming (forall x, |F x| <= k) would suffice *)
 lemma summable_mass_wght (d : 'a distr) (F : 'a -> real) :
      (forall x, 0%r <= F x <= 1%r)
   => summable (fun x => mass d x * F x).
-proof.
-move=> dF; apply: (@summable_le (mass d)) => /= [|x].
-+ by apply: summable_mass.
-+ rewrite !ger0_norm ?mulr_ge0 //; first by case: (dF x).
-  by rewrite ler_pimulr //; case: (dF x).
+proof. 
+move=> dF; apply (summableM_bound 1%r); 1,3: smt().
+by apply: summable_mass.
 qed.
 
 lemma le1_mu (d : 'a distr) p : mu d p <= 1%r.
@@ -165,11 +164,19 @@ split=> [->//|eq_mu]; rewrite -(@mkK d1) -(@mkK d2).
 by congr; apply/fun_ext.
 qed.
 
+(* same as muE, but using [mu1] rather than [mass] *)
+lemma mu_mu1 (d : 'a distr) E : 
+  mu d E = sum (fun x => if E x then mu1 d x else 0%r).
+proof. by rewrite muE; apply eq_sum => x /=; rewrite massE. qed.
+
 lemma summable_mu1 (d : 'a distr) : summable (mu1 d).
-proof.
-rewrite -(@eq_summable (mass d)) ?summable_mass.
-by move=> x; rewrite massE.
+proof. 
+by apply: eq_summable (summable_mass d) => x /=; rewrite massE.
 qed.
+
+lemma summable_mu1_cond p (d : 'a distr) : 
+  summable (fun x => if p x then mu1 d x else 0%r).
+proof. exact/summable_cond/summable_mu1. qed.
 
 lemma eq_distr (d1 d2 : 'a distr):
   (d1 = d2) <=> (forall x, mu1 d1 x = mu1 d2 x).
