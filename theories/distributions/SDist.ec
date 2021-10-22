@@ -1,72 +1,13 @@
-require import AllCore List FSet Distr DProd DList StdBigop StdOrder Hybrid.
+require import AllCore List FSet Distr DProd DList StdBigop StdOrder RealFLub.
+require import Hybrid.
 (*---*) import Bigreal RealSeries RealOrder RField BRA MRat.
 
 require PROM.
 
-(********** preliminaries (to move) ***************************************)
-
-lemma normrZ (x y : real) : 0%r <= x => `| x * y | = x * `| y |. proof. smt(). qed.
-
-(* lub for functions *)
-op flub (F : 'a -> real) : real = lub (fun r => exists a, F a = r).
-
-lemma flub_sup r (F : 'a -> real) x : 
-    (forall x, F x <= r) => F x <= flub F.
-proof.
-move => H. apply lub_upper_bound; 2: by exists x.
-split; [by exists (F x) x|exists r => y [a] <-; exact H].
-qed.
-
-lemma ler_flub (F : 'a -> real) r :
-    (forall x, F x <= r) => flub F <= r.
-proof.
-move => H. 
-have ub_r : ub (fun (x : real) => exists (a : 'a), F a = x) r. 
-  move => y [a] <-; exact H.
-apply RealLub.lub_le_ub => //. 
-split; [by exists (F witness) witness| by exists r].
-qed.
-
-(* additional lemmas for summable *)
-
-lemma summable_sdist (d1 d2 : 'a distr) : 
-  summable (fun x => `| mu1 d1 x - mu1 d2 x |).
-proof. 
-apply/summable_norm/summableD; 1: exact/summable_mu1. 
-exact/summableN/summable_mu1.
-qed.
-
-(* this should probably replace dletE *)
-lemma dletE (d : 'a distr) (F : 'a -> 'b distr) (E : 'b -> bool) : 
-  mu (dlet d F) E = sum (fun x => mu1 d x * mu (F x) E).
-proof. 
-rewrite dletE sum_swap' /=. 
-- apply summable_cond; apply pswap_summable.
-  rewrite (eq_summable _ 
-     (fun (ab : 'a * 'b) => mass d ab.`1 * mass (F ab.`1) ab.`2)) //.
-  apply summable_dlet. 
-apply eq_sum => a /=; rewrite (muE _ E) -sumZ /= !massE.
-apply eq_sum => b /=; smt().
-qed.
-
-(* name clash - weightE uses mass *)
-lemma weightE (d : 'a distr) : weight d = sum (fun x => mu1 d x).
-proof. by rewrite mu_mu1. qed.
-
-lemma const_weight_dlet r (d : 'a distr) (F : 'a -> 'b distr) : 
-  (forall x, weight (F x) = r) => weight (dlet d F) = r * weight d.
-proof.
-move => wF; rewrite !dletE (eq_sum _ (fun x => r * mu1 d x)) => [x /=|].
-  by rewrite wF mulrC. 
-by rewrite sumZ -weightE.
-qed.
-
-
 (********** statistical distance ***************************************)
 
-(* There are two common definitions of statistical distance between
-(sub-)distributions (e.g. totoal variation distance) in the
-literature: 
+(* There are two common definitions of statistical distance (i.e.,
+totoal variation distance) between distributions in the literature:
 
     1/2 * sum_x | mu1 d1 x - mu d2 x |
 
@@ -77,73 +18,68 @@ and
 The two notions agree whenever d1 and d2 have the same weight,
 otherwise they potentially differ. For instance, when [d1 = dunit tt]
 and [d2 = drat []] then the former definition yields 1/2 while the
-latter definition yields 1. (See [example_sum] and [example_sup]
-below.) *)
-
-(* TOTHINK: Currently, we take the sup-based characterization as the
-definition, but reason mostly about the sum-based one, switching the
-roles mmay shift the weight-equivalence assumption to other lemmas *)
+latter definition yields 1. *)
 
 op sdist (d1 d2 : 'a distr) = flub (fun E => `|mu d1 E - mu d2 E|).
 
-lemma sdist_sup (d1 d2 : 'a distr) E : 
+lemma sdist_upper_bound (d1 d2 : 'a distr) E : 
   `|mu d1 E - mu d2 E| <= sdist d1 d2.
 proof.
-apply (flub_sup 1%r (fun E => `|mu d1 E - mu d2 E|)).
+apply (flub_upper_bound 1%r (fun E => `|mu d1 E - mu d2 E|)).
 move => {E} E /=; smt(mu_bounded).
 qed.
  
-lemma sdist_max (d1 d2 : 'a distr) r :
+lemma sdist_le_ub (d1 d2 : 'a distr) r :
   (forall E, `|mu d1 E - mu d2 E| <= r) => sdist d1 d2 <= r .
-proof. exact ler_flub. qed.
+proof. exact flub_le_ub. qed.
 
-(*----------------------------------------------------------------------------*)
-
-lemma example_sum : 
-    1%r/2%r * sum (fun x => `|mu1 (dunit tt) x - mu1 (drat []) x|) = 1%r/2%r.
-proof.
-rewrite (sumE_fin _ [tt]) //= BRA.big_cons BRA.big_nil /predT /=.
-by rewrite dunitE dratE.
-qed.
-
-lemma example_sup : sdist (dunit tt) (drat []) = 1%r.
-proof. 
-apply ler_anti; split => [|_]; 1: by apply sdist_max => E; smt(mu_bounded).
-apply (ler_trans _ _ _ _ (sdist_sup _ _ (pred1 tt))).
-by rewrite dunit1E dratE divr0.
-qed.
-
-(*----------------------------------------------------------------------------*)
+(*-- sdist is a metric -------------------------------------------------------*)
 
 lemma sdist_ge0 (d1 d2 : 'a distr) : 0%r <= sdist d1 d2.
 proof. 
 have -> : 0%r = `|mu d1 pred0 - mu d2 pred0| by rewrite !mu0.
-exact sdist_sup.
+exact sdist_upper_bound.
 qed.
 
 lemma sdistdd (d : 'a distr) : sdist d d = 0%r.
 proof. 
 apply ler_anti; rewrite sdist_ge0 /=. 
-by apply sdist_max => E; rewrite subrr.
+by apply sdist_le_ub => E; rewrite subrr.
 qed.
 
 lemma sdist_triangle (d2 d1 d3 : 'a distr) : 
   sdist d1 d3 <= sdist d1 d2 + sdist d2 d3.
 proof.
-apply sdist_max => E.
+apply sdist_le_ub => E.
 apply (ler_trans (`| mu d1 E - mu d2 E | + `| mu d2 E - mu d3 E |)).
   smt(mu_bounded).
-by rewrite ler_add; apply/sdist_sup.
+by rewrite ler_add; apply/sdist_upper_bound.
+qed.
+
+lemma sdist0_eq (d1 d2 : 'a distr) : sdist d1 d2 = 0%r => d1 = d2.
+proof.
+suff S: d1 <> d2 => 0%r < sdist d1 d2 by apply contraLR; smt(sdist_ge0). 
+apply: distrW d2 => m2 isd2 /=; apply: distrW d1 => m1 isd1 /= H.
+have {H} [x Dx] : exists x, m1 x <> m2 x. 
+  by apply: contraLR H => ?; rewrite negbK; congr; smt().
+apply (ltr_le_trans `|mu1 (mk m1) x - mu1 (mk m2) x|); last exact sdist_upper_bound.
+by rewrite -!massE !muK // /#.
 qed.
 
 (*----------------------------------------------------------------------------*)
 
 lemma sdist_dmap (d1 d2 : 'a distr) (F : 'a -> 'b) : 
   sdist (dmap d1 F) (dmap d2 F) <= sdist d1 d2.
-proof. by apply sdist_max => E; rewrite !dmapE; exact sdist_sup. qed.
-
+proof. by apply sdist_le_ub => E; rewrite !dmapE; exact sdist_upper_bound. qed.
 
 (*----------------------------------------------------------------------------*)
+
+lemma summable_sdist (d1 d2 : 'a distr) : 
+  summable (fun x => `| mu1 d1 x - mu1 d2 x |).
+proof. 
+apply/summable_norm/summableD; 1: exact/summable_mu1. 
+exact/summableN/summable_mu1.
+qed.
 
 lemma sdist_sumE (d1 d2 : 'a distr) : 
   weight d1 = weight d2 =>
@@ -167,15 +103,15 @@ have eq_p_n : Sp = Sn.
               (if !pos x then mu1 d1 x else 0%r))); 1: smt().
   rewrite sumB /=; 1,2: exact summable_mu1_cond.
   rewrite RField.eqr_sub -!sum_split; 1,2: exact summable_mu1.
-  by rewrite -!weightE.
+  by rewrite -!weightE_mu.
 suff : flub F = Sp by smt().
 apply ler_anti; split => [|_]; last first. 
-- apply (ler_trans (F pos)); 2: by apply (flub_sup 1%r); smt(mu_bounded).
+- apply (ler_trans (F pos)); 2: by apply (flub_upper_bound 1%r); smt(mu_bounded).
   rewrite /Sp /F /f !mu_mu1 -sumB /=; 1,2: exact summable_mu1_cond.
   apply (ler_trans _ _ _ _ (ler_norm _)). 
   apply ler_sum; [smt()|apply/summable_cond/summable_sdist|].
   by apply/summableD;[|apply/summableN]; apply/summable_mu1_cond.
-apply sdist_max => E.
+apply sdist_le_ub => E.
 rewrite (mu_split d1 E pos) (mu_split d2 E pos). 
 have -> : forall (a b c d : real), a + b - (c + d) = (a - c) + (b - d) by smt().
 rewrite !mu_mu1 -!sumB /=; 1..4: exact: summable_mu1_cond.
@@ -213,7 +149,7 @@ have sum_dF : forall d y, summable (fun (x : 'a) => mu1 d x * mu1 (F x) y).
 have I : forall x, 0%r <= sum (fun y => 
     `|mu1 d1 x - mu1 d2 x| * mu1 (F x) y) <= `|mu1 d1 x - mu1 d2 x|.
 + move => x. split => [|_]; 1: by apply ge0_sum; smt(mu_bounded).
-  rewrite sumZ -weightE; smt(mu_bounded ler_pimulr).
+  rewrite sumZ -weightE_mu; smt(mu_bounded ler_pimulr).
 apply (ler_trans _ _ _ _ (ler_sum_pos _ _ I _)); 2: by apply summable_sdist. 
 have sum_p : summable (fun (p : 'a * 'b) => 
     `|mu1 d1 p.`1 - mu1 d2 p.`1| * mu1 (F p.`1) p.`2).
@@ -223,7 +159,7 @@ have sum_p : summable (fun (p : 'a * 'b) =>
   rewrite (eq_bigr _ _ (mu1 (F x))) => [y /= _|]; 1: by rewrite ger0_norm // ge0_mu.
   by rewrite -mu_mem_uniq. 
 rewrite sum_swap' //=; apply ler_sum => [y /=| |]; 2: exact summable_sdist.
-+ rewrite !dletE -sumB /=; 1,2: exact: sum_dF.
++ rewrite !dletE_mu -sumB /=; 1,2: exact: sum_dF.
   apply (ler_trans _ _ _ (ler_norm_sum _ _) _) => /=.
     by apply summableD;[apply sum_dF|apply/summableN/sum_dF].
   rewrite ler_eqVlt; left; apply eq_sum => /= x; smt(mu_bounded).
@@ -241,14 +177,14 @@ congr. rewrite mulrC -sumZ /= sum_pair; 1: exact summable_sdist.
 apply eq_sum => x /=.
 rewrite (eq_sum _ (fun b => `|mu1 d1 x - mu1 d2 x| * mu1 d b)) => [b /=|].
 + rewrite !dprod1E; smt(mu_bounded).
-by rewrite sumZ mulrC -weightE.
+by rewrite sumZ mulrC -weightE_mu.
 qed.
 
 lemma sdist_dprodC_aux (dl1 dl2 : 'a distr) (dr1 dr2 : 'b distr) :
   sdist (dl1 `*` dr1) (dl2 `*` dr2) <= sdist (dr1 `*` dl1) (dr2 `*` dl2).
 proof.
-apply sdist_max => E; rewrite (dprodC dl1 dr1) (dprodC dl2 dr2) !dmapE.
-exact: sdist_sup.
+apply sdist_le_ub => E; rewrite (dprodC dl1 dr1) (dprodC dl2 dr2) !dmapE.
+exact: sdist_upper_bound.
 qed.
 
 lemma sdist_dprodC (dl1 dl2 : 'a distr) (dr1 dr2 : 'b distr) :
@@ -402,7 +338,7 @@ proof.
 move => eq_w a_ll; rewrite !(Sample_dlet A).
 pose F x := mk (fun (z : bool) => Pr[A.guess(x) @ &m : res = z]).
 have WF : forall x, weight (F x) = 1%r by move => x; exact (distinguisher_ll A).
-apply (ler_trans _ _ _ (sdist_sup _ _ _) (sdist_dlet _ _ F _ _)) => //.
+apply (ler_trans _ _ _ (sdist_upper_bound _ _ _) (sdist_dlet _ _ F _ _)) => //.
 by rewrite !(const_weight_dlet 1%r).
 qed.
 
@@ -595,9 +531,8 @@ end section.
 abstract theory N1.
 
 (* We need operators, because we need to define modules that use them *)
-op d1,d2 : a distr.
-axiom d1_ll : is_lossless d1.
-axiom d2_ll : is_lossless d2.
+op d1 : { a distr | is_lossless d1 } as d1_ll.
+op d2 : { a distr | is_lossless d2 } as d2_ll.
 
 op N : { int | 0 < N } as N_pos.
 
@@ -758,9 +693,8 @@ abstract theory ROM.
 import SmtMap.
 
 type in_t. (* TODO: rename "a" to something more meaningful *)
-op d1, d2 : a distr.
-axiom d1_ll : is_lossless d1.
-axiom d2_ll : is_lossless d2.
+op d1 : { a distr | is_lossless d1 } as d1_ll.
+op d2 : { a distr | is_lossless d2 } as d2_ll.
 op N : { int | 0 < N } as N_pos.
 
 clone PROM.FullRO as R1 with 

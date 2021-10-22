@@ -174,6 +174,14 @@ proof.
 by apply: eq_summable (summable_mass d) => x /=; rewrite massE.
 qed.
 
+lemma summable_mu1_wght (d : 'a distr) (F : 'a -> real) :
+     (forall x, 0%r <= F x <= 1%r)
+  => summable (fun x => mu1 d x * F x).
+proof.
+move=> dF; apply (summableM_bound 1%r); 1,3: smt().
+by apply: summable_mu1.
+qed.
+
 lemma summable_mu1_cond p (d : 'a distr) : 
   summable (fun x => if p x then mu1 d x else 0%r).
 proof. exact/summable_cond/summable_mu1. qed.
@@ -215,6 +223,9 @@ qed.
 
 lemma weightE (d : 'a distr) : weight d = sum (mass d).
 proof. by rewrite muE; apply/eq_sum=> x /=. qed.
+
+lemma weightE_mu (d : 'a distr) : weight d = sum (mu1 d).
+proof. by rewrite mu_mu1. qed.
 
 lemma weight_eq0 ['a] (d : 'a distr) :
   weight d = 0%r => (forall x, mu1 d x = 0%r).
@@ -912,16 +923,31 @@ pose F (ab : 'a * 'b) :=
 rewrite dletE (@sum_swap F) // /F summable_cond summable_dlet.
 qed.
 
-lemma weight_dlet (d:'a distr) (F:'a -> 'b distr) :
+(* should this one be called dletE *)
+lemma dletE_mu (d : 'a distr) (F : 'a -> 'b distr) (E : 'b -> bool) : 
+  mu (dlet d F) E = sum (fun x => mu1 d x * mu (F x) E).
+proof. 
+rewrite dletE_swap; apply eq_sum => a /=. 
+rewrite (@eq_sum _ (fun b => mu1 d a * if  E b then mass (F a) b else 0%r)).
+  by move => x /=; rewrite -massE; case (E x).
+by rewrite sumZ -muE.
+qed.
+
+lemma const_weight_dlet r (d : 'a distr) (F : 'a -> 'b distr) : 
+  (forall x, weight (F x) = r) => weight (dlet d F) = r * weight d.
+proof.
+move => wF; rewrite !dletE_mu (@eq_sum _ (fun x => r * mu1 d x)) => [x /=|].
+  by rewrite wF mulrC. 
+by rewrite sumZ -weightE_mu.
+qed.
+
+lemma nosmt weight_dlet (d:'a distr) (F:'a -> 'b distr) :
   weight (dlet d F) <= weight d.
 proof.
-rewrite dletE_swap muE /predT ler_sum /=; first last.
-+ rewrite -(@eq_summable (fun a => mass d a * sum (mass (F a)))).
-    by move=> a /=; rewrite sumZ.
-  apply: summable_mass_wght => /= a.
-  by rewrite -weightE le1_mu ge0_mu.
-+ by apply/summable_mass.
-+ by move=> a; rewrite sumZ -weightE ler_pimulr (ge0_mass,le1_mu).
+rewrite dletE_mu weightE; apply RealSeries.ler_sum; first last.
++ apply summable_mu1_wght; smt(mu_bounded).
++ exact summable_mass.
+by move => x /=; rewrite massE ler_pimulr ?ge0_mu ?le1_mu.
 qed.
 
 lemma nosmt supp_dlet (d : 'a distr) (F : 'a -> 'b distr) (b : 'b) :
