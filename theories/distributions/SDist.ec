@@ -63,7 +63,7 @@ apply: distrW d2 => m2 isd2 /=; apply: distrW d1 => m1 isd1 /= H.
 have {H} [x Dx] : exists x, m1 x <> m2 x. 
   by apply: contraLR H => ?; rewrite negbK; congr; smt().
 apply (ltr_le_trans `|mu1 (mk m1) x - mu1 (mk m2) x|); last exact sdist_upper_bound.
-by rewrite -!massE !muK // /#.
+by rewrite !muK // /#.
 qed.
 
 lemma sdistC (d1 d2 : 'a distr) : sdist d1 d2 = sdist d2 d1.
@@ -117,19 +117,19 @@ move => tmp; have {tmp} ler_Sn_Sp : Sn <= Sp by done.
 rewrite (sum_split _ pos) // -/Sp -/Sn.
 have <- : `| Sp - Sn | = `|weight d1 - weight d2|.
   rewrite /Sp /Sn -sumB /=; try exact/summable_cond/summable_sdist.
-  rewrite !weightE_mu -sumB /= ?summable_mu1. 
+  rewrite !weightE -sumB /= ?summable_mu1. 
   by congr; apply eq_sum => x /= /#.
 suff : flub F = Sp by rewrite /sdist -/F; smt(ler_def).
 apply ler_anti; split => [|_]; last first. 
 - apply (ler_trans (F pos)); 2: by apply (flub_upper_bound 1%r); smt(mu_bounded).
-  rewrite /Sp /F /f !mu_mu1 -sumB /=; 1,2: exact summable_mu1_cond.
+  rewrite /Sp /F /f !muE -sumB /=; 1,2: exact summable_mu1_cond.
   apply (ler_trans _ _ _ _ (ler_norm _)). 
   apply ler_sum;  [smt()|apply/summable_cond/summable_sdist|].
   by apply/summableD;[|apply/summableN]; apply/summable_mu1_cond.
 apply sdist_le_ub => E.
 rewrite (mu_split d1 E pos) (mu_split d2 E pos). 
 have -> : forall (a b c d : real), a + b - (c + d) = (a - c) + (b - d) by smt().
-rewrite !mu_mu1 -!sumB /=; 1..4: exact: summable_mu1_cond.
+rewrite !muE -!sumB /=; 1..4: exact: summable_mu1_cond.
 rewrite (eq_sum _ 
   (fun x => if predI E pos x then mu1 d1 x - mu1 d2 x else 0%r)); 1: smt().
 rewrite (eq_sum 
@@ -181,7 +181,7 @@ case : (`|Sp| >= `|Sn|) => H.
   rewrite sum_split_dist /= ?summable_mu1.
   have -> : forall x, 2%r * x = x + x by smt().
   rewrite -addrA &(ler_add) // addrC ler_subr_addl.
-  by rewrite -sum_split // sumB ?summable_mu1 -!weightE_mu; smt().
+  by rewrite -sum_split // sumB ?summable_mu1 -!weightE; smt().
 + apply (ler_trans (2%r* -Sn)) => [|{H}]; 1: smt().
   apply (ler_trans (2%r * - sum (fun x => if !p x then mu1 d1 x - mu1 d2 x else 0%r))).
     rewrite ler_pmul2l // &(ler_opp2) &(ler_sum) => [x /=| |]; 2,3: exact summable_cond.
@@ -190,7 +190,7 @@ case : (`|Sp| >= `|Sn|) => H.
   rewrite -[(_ - _)%Real]addrC -addrA. 
   have -> : forall x, 2%r * x = x + x by smt().
   apply ler_add => //. rewrite -ler_subl_addl -opprD -sum_split //. 
-  by rewrite sumB ?summable_mu1 -!weightE_mu /#.
+  by rewrite sumB ?summable_mu1 -!weightE /#.
 qed. 
 
 (*----------------------------------------------------------------------------*)
@@ -205,7 +205,7 @@ rewrite mulrC -sumZ /= sum_pair; 1: exact summable_sdist.
 apply eq_sum => x /=.
 rewrite (eq_sum _ (fun b => `|mu1 d1 x - mu1 d2 x| * mu1 d b)) => [b /=|].
 + rewrite !dprod1E; smt(mu_bounded).
-by rewrite sumZ mulrC -weightE_mu.
+by rewrite sumZ mulrC -weightE.
 qed.
 
 lemma sdist_dprodC_aux (dl1 dl2 : 'a distr) (dr1 dr2 : 'b distr) :
@@ -267,7 +267,7 @@ lemma adv_mu1 (A <: Distinguisher) &m z x' :
   Pr[A.guess(x') @ &m : res = z] = 
   mu1 (mk (fun b => Pr[A.guess(x') @ &m : res = b])) z.
 proof.
-by rewrite -massE muK //; exact (adv_isdistr A).
+by rewrite muK //; exact (adv_isdistr A).
 qed.
 
 module S = {
