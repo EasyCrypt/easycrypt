@@ -124,10 +124,10 @@ suff ->//:   Pr[SampleDLet.sample2(dt{m1}, du{m1}) @ &m2 : res.`2 = x]
 byphoare(_ : dt{m1} = dt /\ du{m1} = du ==> _) => //=.
 proc; rnd; skip => /=; rewrite dlet1E dletE_swap /=.
 move=> &hr [-> ->]; apply: eq_sum => y /=; rewrite (@sumD1 _ (y, x)) /=.
-+ by apply/summable_cond/summableZ/summable_mass. 
-rewrite !massE dprod1E dunit1E sum0_eq //=.
++ by apply/summable_cond/summableZ/summable_mu1. 
+rewrite dprod1E dunit1E sum0_eq //=.
 case=> y' x' /=; case: (x' = x) => //= ->>.
-case: (y' = y) => //= ne_y'y; rewrite !massE dprod1E.
+case: (y' = y) => //= ne_y'y; rewrite dprod1E.
 by rewrite dunit1E (@eq_sym y) ne_y'y.
 qed.
 
