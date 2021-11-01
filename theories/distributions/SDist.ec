@@ -66,6 +66,14 @@ apply (ltr_le_trans `|mu1 (mk m1) x - mu1 (mk m2) x|); last exact sdist_upper_bo
 by rewrite -!massE !muK // /#.
 qed.
 
+lemma sdistC (d1 d2 : 'a distr) : sdist d1 d2 = sdist d2 d1.
+proof.
+suff S : forall (d1 d2 : 'a distr), sdist d1 d2 <= sdist d2 d1.
+  by apply/ler_anti; split => [|_]; exact S.
+move => {d1 d2} d1 d2; apply sdist_le_ub => E. 
+by rewrite distrC sdist_upper_bound.
+qed.
+
 (*----------------------------------------------------------------------------*)
 
 lemma sdist_dmap (d1 d2 : 'a distr) (F : 'a -> 'b) : 
@@ -81,35 +89,42 @@ apply/summable_norm/summableD; 1: exact/summable_mu1.
 exact/summableN/summable_mu1.
 qed.
 
-lemma sdist_sumE (d1 d2 : 'a distr) : 
-  weight d1 = weight d2 =>
-  sdist d1 d2 = 1%r/2%r * sum (fun x => `| mu1 d1 x - mu1 d2 x |).
+lemma sdist_tvd (d1 d2 : 'a distr) : 
+  sdist d1 d2 = 
+  1%r/2%r * (sum (fun x => `| mu1 d1 x - mu1 d2 x |) + `|weight d1 - weight d2|).
 proof.
-rewrite /sdist => w_d1_d2.
+wlog : d1 d2 / 
+  sum (fun x => if ! mu1 d1 x >= mu1 d2 x then `|mu1 d1 x - mu1 d2 x| else 0%r) <= 
+  sum (fun x => if mu1 d1 x >= mu1 d2 x then `|mu1 d1 x - mu1 d2 x| else 0%r).
++ move => W; have := W d1 d2; have {W} := W d2 d1.
+  pose Sp (d1 d2 : 'a distr) := 
+    sum (fun x => if mu1 d1 x >= mu1 d2 x then `|mu1 d1 x - mu1 d2 x| else 0%r).
+  pose Sn (d1 d2 : 'a distr) := 
+    sum (fun x => if ! mu1 d1 x >= mu1 d2 x then `|mu1 d1 x - mu1 d2 x| else 0%r). 
+  rewrite -/(Sp d1 d2) -/(Sp d2 d1) -/(Sn d1 d2) -/(Sn d2 d1) => W2 W1.
+  case: (Sn d1 d2 <= Sp d1 d2) => [|H]; 1: exact W1. 
+  rewrite sdistC distrC (eq_sum _ (fun (x : 'a) => `|mu1 d2 x - mu1 d1 x|)).
+    by move => x /=; rewrite distrC. 
+  apply: W2; move: H; rewrite -ltrNge => {W1 W2} /ltrW H. 
+  suff S : forall d1 d2, Sn d2 d1 = Sp d1 d2 by rewrite S -(S d2 d1).
+  by move => d1' d2'; apply/eq_sum => x /=; smt().  
 pose F E := `|mu d1 E - mu d2 E|; pose f x := `|mu1 d1 x - mu1 d2 x|.
 have sum_f : summable f by apply summable_sdist.
 pose pos x := mu1 d1 x >= mu1 d2 x.
 pose Sp := sum (fun x => if pos x then f x else 0%r).
 pose Sn := sum (fun x => if !pos x then f x else 0%r).
+move => tmp; have {tmp} ler_Sn_Sp : Sn <= Sp by done.
 rewrite (sum_split _ pos) // -/Sp -/Sn.
-have eq_p_n : Sp = Sn. 
-  rewrite /Sp /Sn /f.
-  rewrite (eq_sum _ 
-     (fun x => (if pos x then mu1 d1 x else 0%r) - 
-               (if pos x then mu1 d2 x else 0%r))); 1: smt().
-  rewrite sumB; 1,2 : exact summable_mu1_cond.
-  rewrite (eq_sum (fun x => if !pos x then `|mu1 d1 x - mu1 d2 x| else 0%r) 
-    (fun x => (if ! pos x then mu1 d2 x else 0%r) - 
-              (if !pos x then mu1 d1 x else 0%r))); 1: smt().
-  rewrite sumB /=; 1,2: exact summable_mu1_cond.
-  rewrite RField.eqr_sub -!sum_split; 1,2: exact summable_mu1.
-  by rewrite -!weightE_mu.
-suff : flub F = Sp by smt().
+have <- : `| Sp - Sn | = `|weight d1 - weight d2|.
+  rewrite /Sp /Sn -sumB /=; try exact/summable_cond/summable_sdist.
+  rewrite !weightE_mu -sumB /= ?summable_mu1. 
+  by congr; apply eq_sum => x /= /#.
+suff : flub F = Sp by rewrite /sdist -/F; smt(ler_def).
 apply ler_anti; split => [|_]; last first. 
 - apply (ler_trans (F pos)); 2: by apply (flub_upper_bound 1%r); smt(mu_bounded).
   rewrite /Sp /F /f !mu_mu1 -sumB /=; 1,2: exact summable_mu1_cond.
   apply (ler_trans _ _ _ _ (ler_norm _)). 
-  apply ler_sum; [smt()|apply/summable_cond/summable_sdist|].
+  apply ler_sum;  [smt()|apply/summable_cond/summable_sdist|].
   by apply/summableD;[|apply/summableN]; apply/summable_mu1_cond.
 apply sdist_le_ub => E.
 rewrite (mu_split d1 E pos) (mu_split d2 E pos). 
@@ -126,54 +141,67 @@ pose SEp := sum (fun (x : 'a) =>
 pose SEn := sum (fun (x : 'a) => 
                  if predI E (predC pos) x then mu1 d1 x - mu1 d2 x else 0%r).
 have ? : 0%r <= SEp /\ SEn <= 0%r. 
-  split; 1: by apply ge0_sum; smt().
-  apply/oppr_ge0. rewrite -sumN /=. by apply ge0_sum; smt().
+  split; [apply ge0_sum| apply le0_sum => x /= @/predI @/predC @/pos]; smt().
 suff : maxr SEp (-SEn) <= Sp by smt().
 apply/ler_maxrP; split. 
 - (apply ler_sum; 1: smt()); 2: exact/summable_cond.
   exact/summable_cond/norm_summable/summable_sdist.
-- rewrite eq_p_n -sumN; (apply ler_sum; 1: smt()); 2: exact/summable_cond.
+- apply: ler_trans ler_Sn_Sp; 
+    rewrite -sumN; (apply ler_sum; 1: smt()); 2: exact/summable_cond.
   exact/summableN/summable_cond/norm_summable/summable_sdist.
 qed.
 
 (*----------------------------------------------------------------------------*)
 
 lemma sdist_dlet (d1 d2 : 'a distr) (F : 'a -> 'b distr) : 
-  weight d1 = weight d2 => weight (dlet d1 F) = weight (dlet d2 F) => 
    sdist (dlet d1 F) (dlet d2 F) <= sdist d1 d2.
-proof.
-move => eq_w_d eq_w_dF; rewrite !sdist_sumE // ler_pmul2l 1:/#.
-have sum_dF : forall d y, summable (fun (x : 'a) => mu1 d x * mu1 (F x) y).
-  move => d y; apply (summableM_bound 1%r) => //; first exact summable_mu1.
-  smt(mu_bounded).
-have I : forall x, 0%r <= sum (fun y => 
-    `|mu1 d1 x - mu1 d2 x| * mu1 (F x) y) <= `|mu1 d1 x - mu1 d2 x|.
-+ move => x. split => [|_]; 1: by apply ge0_sum; smt(mu_bounded).
-  rewrite sumZ -weightE_mu; smt(mu_bounded ler_pimulr).
-apply (ler_trans _ _ _ _ (ler_sum_pos _ _ I _)); 2: by apply summable_sdist. 
-have sum_p : summable (fun (p : 'a * 'b) => 
-    `|mu1 d1 p.`1 - mu1 d2 p.`1| * mu1 (F p.`1) p.`2).
-+ apply (summableM_prod_dep (fun x => `|mu1 d1 x - mu1 d2 x|) (fun x y => mu1 (F x) y)).
-    exact summable_sdist.
-  rewrite /(\o). exists 1%r => x J uniq_J. 
-  rewrite (eq_bigr _ _ (mu1 (F x))) => [y /= _|]; 1: by rewrite ger0_norm // ge0_mu.
-  by rewrite -mu_mem_uniq. 
-rewrite sum_swap' //=; apply ler_sum => [y /=| |]; 2: exact summable_sdist.
-+ rewrite !dletE_mu -sumB /=; 1,2: exact: sum_dF.
-  apply (ler_trans _ _ _ (ler_norm_sum _ _) _) => /=.
-    by apply summableD;[apply sum_dF|apply/summableN/sum_dF].
-  rewrite ler_eqVlt; left; apply eq_sum => /= x; smt(mu_bounded).
-by move/summable_pswap/summable_pair_sum : sum_p. 
-qed.
+proof. 
+apply sdist_le_ub => E; rewrite !dletE_mu sdist_tvd.
+rewrite div1r (ler_pdivl_mull 2%r) //.
+rewrite -sumB ?summable_mu1_wght /=; 1,2: smt(mu_bounded).
+rewrite (eq_sum _ (fun x => (mu1 d1 x - mu1 d2 x) * mu (F x) E)).
+  by move => x /= /#.
+pose p x := mu1 d2 x <= mu1 d1 x.
+have sum_d1d2 : summable (fun x => mu1 d1 x - mu1 d2 x).
+  by apply/summableD;[|apply summableN]; apply summable_mu1.
+have sum_d1d2E : summable (fun x => (mu1 d1 x - mu1 d2 x) * mu (F x) E).
+  by apply (summableM_bound 1%r) => // x; smt(mu_bounded).
+rewrite (sum_split _ p) //=. 
+pose Sp := sum (fun (x : 'a) => 
+           if p x then (mu1 d1 x - mu1 d2 x) * mu (F x) E else 0%r).
+pose Sn := sum (fun (x : 'a) => 
+           if !p x then (mu1 d1 x - mu1 d2 x) * mu (F x) E else 0%r).
+have Sp_ge0 : 0%r <= Sp by apply ge0_sum => /= x;smt(mu_bounded).
+have Sn_le0 : Sn <= 0%r by apply le0_sum => /= x;smt(mu_bounded).
+case : (`|Sp| >= `|Sn|) => H.
++ apply (ler_trans (2%r*Sp)); 1: smt().
+  apply (ler_trans (2%r * sum (fun x => if p x then mu1 d1 x - mu1 d2 x else 0%r))).
+    rewrite ler_pmul2l // /Sp &(ler_sum) => [x /=| |]; 2,3: exact summable_cond.
+    by case: (p x) => // @/p Hp; apply ler_pimulr; smt(mu_bounded).
+  rewrite sum_split_dist /= ?summable_mu1.
+  have -> : forall x, 2%r * x = x + x by smt().
+  rewrite -addrA &(ler_add) // addrC ler_subr_addl.
+  by rewrite -sum_split // sumB ?summable_mu1 -!weightE_mu; smt().
++ apply (ler_trans (2%r* -Sn)) => [|{H}]; 1: smt().
+  apply (ler_trans (2%r * - sum (fun x => if !p x then mu1 d1 x - mu1 d2 x else 0%r))).
+    rewrite ler_pmul2l // &(ler_opp2) &(ler_sum) => [x /=| |]; 2,3: exact summable_cond.
+    by case: (p x) => //= @/p Hp; rewrite &(ler_nimulr); smt(mu_bounded).
+  rewrite sum_split_dist /= ?summable_mu1.
+  rewrite -[(_ - _)%Real]addrC -addrA. 
+  have -> : forall x, 2%r * x = x + x by smt().
+  apply ler_add => //. rewrite -ler_subl_addl -opprD -sum_split //. 
+  by rewrite sumB ?summable_mu1 -!weightE_mu /#.
+qed. 
 
 (*----------------------------------------------------------------------------*)
 
 lemma sdist_dprod2r (d1 d2 : 'a distr) (d : 'b distr) : 
-  weight d1 = weight d2 => 
   sdist (d1 `*` d) (d2 `*` d) = sdist d1 d2 * weight d.
 proof.
-move => eq_w; rewrite !sdist_sumE // ?weight_dprod ?eq_w // -(mulrA (1%r/2%r)).
-congr. rewrite mulrC -sumZ /= sum_pair; 1: exact summable_sdist.
+rewrite !sdist_tvd -[1%r/2%r * _ * _]mulrA !weight_dprod; congr.
+have -> : forall (a b c : real), (a + b) * c = a * c + b * c by smt().
+congr; 2:smt(mu_bounded).
+rewrite mulrC -sumZ /= sum_pair; 1: exact summable_sdist.
 apply eq_sum => x /=.
 rewrite (eq_sum _ (fun b => `|mu1 d1 x - mu1 d2 x| * mu1 d b)) => [b /=|].
 + rewrite !dprod1E; smt(mu_bounded).
@@ -192,34 +220,30 @@ lemma sdist_dprodC (dl1 dl2 : 'a distr) (dr1 dr2 : 'b distr) :
 proof. by apply ler_anti; rewrite !sdist_dprodC_aux. qed.
 
 lemma sdist_dprod (dl1 dl2 : 'a distr) (dr1 dr2 : 'b distr) :
-  weight dl1 = weight dl2 => weight dr1 = weight dr2 =>
   sdist (dl1 `*` dr1) (dl2 `*` dr2) <= sdist dl1 dl2 + sdist dr1 dr2.
 proof.
-move => eq_wl eq_wr. 
 have L := sdist_triangle (dl2 `*` dr1) (dl1 `*` dr1) (dl2 `*` dr2).
 apply (ler_trans _ _ _ L); rewrite (sdist_dprodC dl2) !sdist_dprod2r //.
 rewrite ler_add; smt(mu_bounded sdist_ge0 ler_pimulr).
 qed.
 
 lemma sdist_dlist (d1 d2 : 'a distr) n : 
-  weight d1 = weight d2 => 0 <= n => 
-  sdist (dlist d1 n) (dlist d2 n) <= n%r * sdist d1 d2.
+  0 <= n => sdist (dlist d1 n) (dlist d2 n) <= n%r * sdist d1 d2.
 proof.
-move => eq_w; elim: n => [|n ? IHn]; 1: by rewrite !dlist0 // sdistdd.
+elim: n => [|n ? IHn]; 1: by rewrite !dlist0 // sdistdd.
 rewrite !dlistS //. 
 apply (ler_trans _ _ _ (sdist_dmap _ _ _)).
-apply (ler_trans _ _ _ (sdist_dprod _ _ _ _ _ _)) => //; 2: smt().
-by rewrite !weight_dlist // eq_w.
+apply (ler_trans _ _ _ (sdist_dprod _ _ _ _ )); smt().
 qed.
 
 (*----------------------------------------------------------------------------*)
 
 (* Generic Distinguishers and their output distributions *)
-abstract theory A.
-type a, b. 
+abstract theory GenDist.
+type in_t, b. 
 
 module type Distinguisher = { 
-  proc guess (x : a) : b
+  proc guess (x : in_t) : b
 }.
 
 lemma uniq_big_res (A <: Distinguisher) &m x' (bs : b list) : 
@@ -261,7 +285,7 @@ proof.
 by byphoare (: d = d' ==> _) => //; proc; rnd; auto.
 qed.
 
-end A.
+end GenDist.
 
 (*----------------------------------------------------------------------------*)
 
@@ -270,8 +294,8 @@ end A.
 abstract theory T. 
 type a. 
 
-clone import A with
-  type a <- a,
+clone import GenDist with
+  type in_t <- a,
   type b <- bool.
 
 clone import DLetSampling as DLS with
@@ -331,15 +355,14 @@ by rewrite Pr[mu_disjoint] 1:/#.
 qed.
 
 lemma adv_sdist (A <: Distinguisher) &m d1 d2 : 
-  weight d1 = weight d2 => islossless A.guess =>
+  islossless A.guess =>
   `| Pr[Sample(A).main(d1) @ &m : res] - Pr[Sample(A).main(d2) @ &m : res] | 
   <=  sdist d1 d2.
 proof.
-move => eq_w a_ll; rewrite !(Sample_dlet A).
+move => a_ll; rewrite !(Sample_dlet A).
 pose F x := mk (fun (z : bool) => Pr[A.guess(x) @ &m : res = z]).
 have WF : forall x, weight (F x) = 1%r by move => x; exact (distinguisher_ll A).
-apply (ler_trans _ _ _ (sdist_upper_bound _ _ _) (sdist_dlet _ _ F _ _)) => //.
-by rewrite !(const_weight_dlet 1%r).
+exact (ler_trans _ _ _ (sdist_upper_bound _ _ _) (sdist_dlet _ _ F)).
 qed.
 
 
@@ -475,6 +498,11 @@ local module Gr(O : Oracle_i) = {
   }
 }.
 
+(* TOTHINK: Can this be strenthened by dropping the requirement that
+d1 and d2 are lossless? The current proof uses the eager tactics to
+swap the statement [if (Var.b) Var.x <$ Var.d;] over the call to the
+adversary, which only works if the distributions are lossless. *)
+
 lemma sdist_oracle1 &m (d1 d2 : a distr) : 
    is_lossless d1 => is_lossless d2 =>
   (forall (O <: Oracle_i{Count,A}), 
@@ -485,11 +513,11 @@ proof.
 move => d1_ll d2_ll A_bound. 
 suff H : forall d', is_lossless d' =>
   Pr[Game(A, Os).main(d') @ &m : res] = Pr [Sample(B1(A)).main(d') @ &m : res].
-+ rewrite !H ?d1_ll ?d2_ll; apply (adv_sdist (B1(A))); 1: by rewrite d1_ll d2_ll.
++ rewrite !H ?d1_ll ?d2_ll; apply (adv_sdist (B1(A))). 
   by islossless; apply (A_ll (<: B1(A).Ox)); islossless.
 move => d' d'_ll.
 suff <-: Pr[Game(A, O1).main(d') @ &m : res] = Pr[Game(A, Os).main(d') @ &m : res].
-+ byequiv => //. proc; inline *; wp. 
++ byequiv => //; proc; inline *; wp. 
   by call(: Var.x{1} = B1.x'{2}); [proc; inline *|]; auto. 
 byequiv => //.
 transitivity Game(A,O1e).main 
@@ -518,11 +546,10 @@ call (: 2 <= Count.n,
         (Var.b <=> Count.n = 0){1} /\ Os.d{2} = d', 
         Var.d{1} = Os.d{2} /\ Os.d{2} = d' /\ 2 <= Count.n{2}).
 - move=> O; exact (A_ll O).
-- proc; inline *; sp; if{1}; 1: by wp; rnd; auto => />. 
-  auto => />. smt().
+- by proc; inline *; sp; if{1}; [wp; rnd|]; auto => /> /#. 
 - by move => ? _; proc; inline*; sp; if; auto.
 - by move => ?; proc; inline*; auto => /> /#. 
-- by auto => />; smt().
+- by auto => /> /#.
 qed.
 
 end section.
@@ -531,9 +558,8 @@ end section.
 abstract theory N1.
 
 (* We need operators, because we need to define modules that use them *)
-op d1 : { a distr | is_lossless d1 } as d1_ll.
-op d2 : { a distr | is_lossless d2 } as d2_ll.
-
+op [lossless] d1 : a distr.
+op [lossless] d2 : a distr.
 op N : { int | 0 < N } as N_pos.
 
 section. 
@@ -672,9 +698,8 @@ have -> : Pr[Hyb.HybGame(B, Ob, Hyb.R(Ob)).main() @ &m : res] =
   if; [smt() | by auto |].
   if; [smt()| by auto | by auto].
 apply (sdist_oracle1 C).
-- move => O O_ll; islossless. 
-  + apply (A_ll (<: C(O).O')); islossless. exact: d1_ll. exact: d2_ll.
-  + rewrite DInterval.weight_dinter. smt(N_pos).
+- move => O O_ll; islossless; 1: by apply (A_ll (<: C(O).O')); islossless. 
+  rewrite DInterval.weight_dinter; smt(N_pos).
 - exact: d1_ll.
 - exact: d2_ll.
 move => O; proc.

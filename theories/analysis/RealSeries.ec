@@ -688,6 +688,13 @@ lemma nosmt sumB (s1 s2 : 'a -> real) :
 proof. by move=> sm1 sm2; rewrite sumD // 1:&(summableN) // sumN. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma le0_sum (s : 'a -> real) : 
+  (forall x, s x <= 0%r) => sum s <= 0%r.
+proof. 
+by move=> le0_s; rewrite -(add0r (sum s)) -ler_subr_addr /= -sumN &(ge0_sum) /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt sum_split ['a] (s : 'a -> real) p : summable s => sum s =
     sum (fun x => if  p x then s x else 0%r)
   + sum (fun x => if !p x then s x else 0%r).
@@ -703,6 +710,28 @@ proof.
 move=> sms; rewrite (@sum_split s (pred1 x0)) //=; congr=> //.
 rewrite (@sumE_fin _ [x0]) //= 1?big_seq1 //.
 by move=> @/pred1 x; case: (x = x0).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt sum_split_norm (s : 'a -> real) : summable s => 
+    sum (fun x => `|s x|) = 
+    sum (fun x => if 0%r <= s x then s x else 0%r) - 
+    sum (fun x => if ! 0%r <= s x then s x else 0%r).
+proof.
+move=> sum_s; rewrite (@sum_split _ (fun x => 0%r <= s x)) /=.
+  exact summable_norm.
+by congr; [|rewrite -sumN]; apply eq_sum => x /=; smt().
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma sum_split_dist (f g : 'a -> real) : summable f => summable g => 
+  sum (fun x => `|f x - g x|) = 
+  sum (fun x => if g x <= f x then f x - g x else 0%r) - 
+  sum (fun x => if ! g x <= f x then f x - g x else 0%r).
+proof.
+move=> sum_f sum_g; rewrite sum_split_norm /=.
+ by  apply summableD => //; apply/summableN.
+by congr;[|congr]; apply eq_sum => x /= /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -863,7 +892,6 @@ proof.
 move => inj_h [M] sum_s; exists M => J uniq_J. 
 have R := sum_s (map h J) _; 1: rewrite map_inj_in_uniq /#.
 apply (ler_trans _ _ R) => {R}; rewrite big_map /(\o)/= big_mkcond.
-have -> : (fun (x : 'a) => predT (h x)) = predT by apply/fun_ext.
 exact Bigreal.ler_sum.
 qed.
 
