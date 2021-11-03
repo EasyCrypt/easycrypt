@@ -6,19 +6,19 @@ require PROM.
 
 (********** statistical distance ***************************************)
 
-(* There are two common definitions of statistical distance (i.e.,
-totoal variation distance) between distributions in the literature:
+(* This file defines the notion of statistical distance for
+(sub)distributions: 
 
-    1/2 * sum_x | mu1 d1 x - mu d2 x |
+  sdist d1 d2 = lub_E ( |mu d1 E - mu d2 E| )
 
-and 
+Note that for subdistributions, this definition is not equivalent to
+the usual total variation distance (1/2 * sum_x | mu1 d1 x - mu d2 x |). 
+To see this, consider [d1 = dunit tt] and [d2 = drat []]. The correct 
+equivalence is given by:
 
-    sup_E ( |mu d1 E - mu d2 E| )
+  sdist d1 d2 = 1/2 * (|weight d1 - weight d2| + sum_x | mu1 d1 x - mu d2 x |)
 
-The two notions agree whenever d1 and d2 have the same weight,
-otherwise they potentially differ. For instance, when [d1 = dunit tt]
-and [d2 = drat []] then the former definition yields 1/2 while the
-latter definition yields 1. *)
+(see [sdist_tvd below). *)
 
 op sdist (d1 d2 : 'a distr) = flub (fun E => `|mu d1 E - mu d2 E|).
 
@@ -240,13 +240,13 @@ qed.
 
 (* Generic Distinguishers and their output distributions *)
 abstract theory GenDist.
-type in_t, b. 
+type in_t, out_t. 
 
 module type Distinguisher = { 
-  proc guess (x : in_t) : b
+  proc guess (x : in_t) : out_t
 }.
 
-lemma uniq_big_res (A <: Distinguisher) &m x' (bs : b list) : 
+lemma uniq_big_res (A <: Distinguisher) &m x' (bs : out_t list) : 
   uniq bs =>
   big predT (fun b => Pr[A.guess(x') @ &m : res = b]) bs = 
   Pr[A.guess(x') @ &m : res \in bs].
@@ -271,7 +271,7 @@ by rewrite -massE muK //; exact (adv_isdistr A).
 qed.
 
 module S = {
-  proc sample (d : b distr) = {
+  proc sample (d : out_t distr) = {
     var r; 
   
     r <$ d;
@@ -291,16 +291,18 @@ end GenDist.
 
 (* Boolean distinguishers for distributions *)
 
-abstract theory T. 
+abstract theory Dist. 
 type a. 
 
 clone import GenDist with
   type in_t <- a,
-  type b <- bool.
+  type out_t <- bool
+  proof*.
 
 clone import DLetSampling as DLS with
   type t <- a,
-  type u <- bool.
+  type u <- bool
+  proof*.
 
 (* Part 1 : Sampling game: the distinguiser is given a sampled value *)
 
@@ -579,7 +581,8 @@ local clone Hybrid as Hyb with
   type outleaks <- unit,
   type outputA <- bool,
   op q <- N,
-  lemma q_pos <- N_pos.
+  lemma q_pos <- N_pos
+  proof*.
 
 local module Ob : Hyb.Orclb = {
 
@@ -706,14 +709,16 @@ clone PROM.FullRO as R1 with
   type out_t <- a, 
   type d_in_t <- unit,
   type d_out_t <- bool,
-  op dout <- fun _ => d1.
+  op dout <- fun _ => d1
+  proof*.
 
 clone PROM.FullRO as R2 with 
   type in_t <- in_t, 
   type out_t <- a, 
   type d_in_t <- unit,
   type d_out_t <- bool,
-  op dout <- fun _ => d2.
+  op dout <- fun _ => d2
+  proof*.
 
 module O1 = R1.RO.
 module O2 = R2.RO.
@@ -808,7 +813,8 @@ local clone N1 as N1 with
   axiom d1_ll <- d1_ll,
   axiom d2_ll <- d2_ll,
   op N <- N,
-  axiom N_pos <- N_pos.
+  axiom N_pos <- N_pos
+  proof*.
 
 lemma sdist_ROM  &m : 
  (forall (O <: R1.RO{Wrap,D}), 
@@ -865,4 +871,4 @@ end section.
 
 end ROM.
 
-end T.
+end Dist.
