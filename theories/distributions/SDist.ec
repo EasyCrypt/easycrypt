@@ -697,8 +697,8 @@ abstract theory ROM.
 import SmtMap.
 
 type in_t.
-op d1 : { a distr | is_lossless d1 } as d1_ll.
-op d2 : { a distr | is_lossless d2 } as d2_ll.
+op [lossless] d1 : a distr.
+op [lossless] d2 : a distr.
 op N : { int | 0 < N } as N_pos.
 
 clone PROM.FullRO as R1 with 
@@ -721,11 +721,13 @@ module O2 = R2.RO.
 (* This allows us to PROM rather then ROM, and the former has better
 infrastructure (e.g., for splitting into muliple oracles *) 
 
-(* TODO: add set and sample *)
 module type Distinguisher (O : R1.RO) = {
-  proc distinguish(_ : unit) : bool {O.get}
+  proc distinguish(_ : unit) : bool {O.get O.set O.sample}
 }.
 
+(* TOTHINK: Calls to [sample] and [get] do not actually provide any
+information about the underying distribution. However, unless one uses
+a lazy oracle, [sample] does require an oracle call. *)
 module Wrap (O : R1.RO) : R1.RO = {
   var dom : in_t fset
 
@@ -733,6 +735,7 @@ module Wrap (O : R1.RO) : R1.RO = {
     dom <- fset0 ; 
     O.init(); 
   }
+
   proc get(x) = { 
     var r;
     dom <- dom `|` fset1 x; 
@@ -740,9 +743,16 @@ module Wrap (O : R1.RO) : R1.RO = {
     return r;
   }
   
+  proc set(x,v) = {
+    dom <- dom `|` fset1 x; 
+    O.set(x,v); 
+  }
+
+  proc sample(x) = { 
+    get(x);
+  }
+
   (* never called by our distinguisher *)
-  proc set = O.set
-  proc sample = O.sample
   proc rem = O.rem
 }.
 
@@ -768,9 +778,15 @@ local module Cache (O : Oracle) : R1.RO = {
     return oget (m.[i]);
   }
 
+  proc set(x : in_t, y : a) = {
+    m.[x] <- y;
+  }
+
+  proc sample(x: in_t) = {
+    get(x);
+  }
+  
   (* never called by our distinguisher *)
-  proc set(x : in_t, y : a) = {}
-  proc sample(x: in_t) = {}
   proc rem(x: in_t) = {}
 }.
 
@@ -806,31 +822,43 @@ have -> : Pr[R1.MainD(D,O1).distinguish() @ &m : res] =
           Pr[Game(A,Os).main(d1) @ &m : res].
 - byequiv => //; proc; inline *; wp.
   call(: ={m}(O1,Cache) /\ Os.d{2} = d1); last by auto.
-  proc; inline *; sp.
-  if{2}; [by rcondt{1} 2; auto| rcondf{1} 2; auto; smt(d1_ll)].
+  + proc; inline *; sp.
+    if{2}; [by rcondt{1} 2; auto| rcondf{1} 2; auto; smt(d1_ll)].
+  + by proc; inline *; auto.
+  + proc; inline *; sp.
+    if{2}; [by rcondt{1} 2; auto| rcondf{1} 2; auto; smt(d1_ll)].
 have -> : Pr[R1.MainD(D,O2).distinguish() @ &m : res] = 
           Pr[Game(A,Os).main(d2) @ &m : res].
 - byequiv => //; proc; inline *; wp.
   call(: ={m}(O2,Cache) /\ Os.d{2} = d2); last by auto.
-  proc; inline *; sp.
-  if{2}; [by rcondt{1} 2; auto| rcondf{1} 2; auto; smt(d2_ll)].
-apply (N1.sdist_oracleN A _ _ &m). 
-- move=> O get_ll. islossless. apply (D_ll (<: Wrap(Cache(O)))).
-  islossless. 
+  + proc; inline *; sp.
+    if{2}; [by rcondt{1} 2; auto| rcondf{1} 2; auto; smt(d2_ll)].
+  + by proc; inline *; auto.
+  + proc; inline *; sp.
+    if{2}; [by rcondt{1} 2; auto| rcondf{1} 2; auto; smt(d1_ll)].
+apply (N1.sdist_oracleN A _ _ &m) => [O get_ll|].
+- by islossless; apply (D_ll (<: Wrap(Cache(O)))); islossless. 
 move => O; proc; inline *; sp.
 conseq (: Count.n <= card Wrap.dom /\ fdom Cache.m = Wrap.dom) 
        (: Wrap.dom = fset0 ==> card Wrap.dom <= N); 1,2: smt(). 
 - by call (D_bound (<: Cache(Count(O)))).
+have Wget : hoare [ Wrap(Cache(Count(O))).get : 
+  Count.n <= card Wrap.dom /\ fdom Cache.m = Wrap.dom ==> 
+  Count.n <= card Wrap.dom /\ fdom Cache.m = Wrap.dom].
+- proc; inline*; wp; sp; if. 
+  + auto; call(: true); auto => /> &1 cnt_n x_cache a.
+    split; last by rewrite fdom_set.
+    by rewrite !fcardU fsetI1 !mem_fdom x_cache /= fcards0 fcard1 /#.
+  + auto => /> &1 cnt_n x_cache.
+    split; last by apply/fsetP => x; rewrite !inE !mem_fdom /#.
+    rewrite fcardU fcard1 fsetI1 mem_fdom x_cache /=.
+    smt (fcardU fcard1 fcard_ge0).
 call (: Count.n <= card Wrap.dom /\ fdom Cache.m = Wrap.dom); last first.
   by auto; smt(fcards0 fdom0).
-proc; inline*; wp; sp; if. 
-- auto; call(: true); auto => /> &1 cnt_n x_cache a.
-  split; last by rewrite fdom_set.
-  by rewrite !fcardU fsetI1 !mem_fdom x_cache /= fcards0 fcard1 /#.
-- auto => /> &1 cnt_n x_cache. 
-  split; last by apply/fsetP => x; rewrite !inE !mem_fdom /#.
-  rewrite fcardU fcard1 fsetI1 mem_fdom x_cache /=.
-  smt (fcardU fcard1 fcard_ge0).
+- proc; inline*; auto => /> &1. 
+  rewrite !fcardU !fcard1 fsetI1 mem_fdom fdom_set => H.
+  smt (fcardU fcard1 fcards0 fcard_ge0).
+- by proc; inline Wrap(Cache(Count(O))).sample; call Wget.
 qed.
 
 end section.
