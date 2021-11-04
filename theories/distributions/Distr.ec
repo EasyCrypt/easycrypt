@@ -851,9 +851,9 @@ qed.
 
 lemma dlet1E (d : 'a distr) (f : 'a -> 'b distr) (b : 'b):
   mu1 (dlet d f) b = sum<:'a> (fun a => mu1 d a * mu1 (f a) b).
-proof. by rewrite muK 1:isdistr_mlet /mlet &(eq_sum). qed.
+proof. by rewrite muK 1:isdistr_mlet. qed.
 
-lemma dletE (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
+lemma dlet_muE (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
   mu (dlet d f) P
   = sum<:'b> (fun b =>
       sum<:'a> (fun a =>
@@ -873,7 +873,7 @@ exists 1%r => a @/G @/(\o) J uqJ; rewrite (@eq_bigr _ _ (mu1 (f a))).
 by apply: le1_mu1_fin.
 qed.
 
-lemma dletE_swap (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
+lemma dlet_muE_swap (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
   mu (dlet d f) P
   = sum<:'a> (fun a =>
       sum<:'b> (fun b =>
@@ -881,14 +881,13 @@ lemma dletE_swap (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
 proof.
 pose F (ab : 'a * 'b) :=
   if P ab.`2 then mu1 d ab.`1 * mu1 (f ab.`1) ab.`2 else 0%r.
-rewrite dletE (@sum_swap F) // /F summable_cond summable_dlet.
+rewrite dlet_muE (@sum_swap F) // /F summable_cond summable_dlet.
 qed.
 
-(* should this one be called dletE *)
-lemma dletE_mu (d : 'a distr) (F : 'a -> 'b distr) (E : 'b -> bool) : 
+lemma dletE (d : 'a distr) (F : 'a -> 'b distr) (E : 'b -> bool) : 
   mu (dlet d F) E = sum (fun x => mu1 d x * mu (F x) E).
 proof. 
-rewrite dletE_swap; apply eq_sum => a /=. 
+rewrite dlet_muE_swap; apply eq_sum => a /=. 
 rewrite (@eq_sum _ (fun b => mu1 d a * if  E b then mu1 (F a) b else 0%r)).
   by move => x /=; case: (E x).
 by rewrite sumZ -muE.
@@ -897,7 +896,7 @@ qed.
 lemma const_weight_dlet r (d : 'a distr) (F : 'a -> 'b distr) : 
   (forall x, weight (F x) = r) => weight (dlet d F) = r * weight d.
 proof.
-move => wF; rewrite !dletE_mu (@eq_sum _ (fun x => r * mu1 d x)) => [x /=|].
+move => wF; rewrite !dletE (@eq_sum _ (fun x => r * mu1 d x)) => [x /=|].
   by rewrite wF mulrC. 
 by rewrite sumZ -weightE.
 qed.
@@ -905,7 +904,7 @@ qed.
 lemma nosmt weight_dlet (d:'a distr) (F:'a -> 'b distr) :
   weight (dlet d F) <= weight d.
 proof.
-rewrite dletE_mu weightE; apply RealSeries.ler_sum; first last.
+rewrite dletE weightE; apply RealSeries.ler_sum; first last.
 + apply summable_mu1_wght; smt(mu_bounded).
 + exact summable_mu1.
 by move => x /=; rewrite ler_pimulr ?ge0_mu ?le1_mu.
@@ -977,7 +976,7 @@ lemma dlet_ll ['a 'b] d f :
      is_lossless d => (forall x, x \in d => is_lossless (f x))
   => is_lossless (dlet<:'a, 'b> d f).
 proof.
-move=> ll_d ll_df; rewrite /is_lossless dletE_swap /predT /=.
+move=> ll_d ll_df; rewrite /is_lossless dlet_muE_swap /predT /=.
 rewrite -(@eq_sum (fun a => mu1 d a * sum (mu1 (f a)))) /=.
 - by move=> a; rewrite sumZ.
 rewrite -(@eq_sum (fun a => mu1 d a)) /=.
@@ -1049,7 +1048,7 @@ qed.
 lemma dmapE (d : 'a distr) (f : 'a -> 'b) (P : 'b -> bool):
   mu (dmap d f) P = mu d (P \o f).
 proof.
-rewrite dletE_swap muE.
+rewrite dlet_muE_swap muE.
 apply/eq_sum=> a /=; rewrite (@sumE_fin _ [f a]) //=.
 + by move=> b; rewrite (@eq_sym b) MUnit.dunit1E;case: (f a = b);rewrite /b2r.
 by rewrite big_seq1 /= MUnit.dunit1E.
@@ -1540,7 +1539,7 @@ lemma dprod_partition
   ['a 'b] (E : 'a * 'b -> bool) (da : 'a distr) (db : 'b distr)
 : mu (da `*` db) E = sum (fun a => mu db (fun b => E (a, b)) * mu1 da a).
 proof.
-rewrite dprod_dlet dletE_mu &(eq_sum) => /= x; rewrite mulrC; congr.
+rewrite dprod_dlet dletE &(eq_sum) => /= x; rewrite mulrC; congr.
 by rewrite (@dlet_dunit db (fun b => (x,b))) dmapE.
 qed.
 
@@ -2500,7 +2499,7 @@ rewrite /E /Ec sum0_eq 1:// /= -sumZr &(eq_sum) => /= a.
 case: (p a); last done.
 move=> pa; case: (a \in d); last by move/supportPn=> ->.
 move=> a_in_d; rewrite h2 1,2:// /=; do 2! congr; last first.
-- move=> {a pa a_in_d}; rewrite dletE_swap muE &(eq_sum) => /= a.
+- move=> {a pa a_in_d}; rewrite dlet_muE_swap muE &(eq_sum) => /= a.
   pose F b := mu1 d a * (if p b then mu1 (df a) b else 0%r).
   rewrite -(@eq_sum F); first by move=> @/F /= x; case: (p x).
   rewrite /F sumZ -muE; case: (a \in d); last first.

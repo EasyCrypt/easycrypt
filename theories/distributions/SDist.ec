@@ -156,7 +156,7 @@ qed.
 lemma sdist_dlet (d1 d2 : 'a distr) (F : 'a -> 'b distr) : 
    sdist (dlet d1 F) (dlet d2 F) <= sdist d1 d2.
 proof. 
-apply sdist_le_ub => E; rewrite !dletE_mu sdist_tvd.
+apply sdist_le_ub => E; rewrite !dletE sdist_tvd.
 rewrite div1r (ler_pdivl_mull 2%r) //.
 rewrite -sumB ?summable_mu1_wght /=; 1,2: smt(mu_bounded).
 rewrite (eq_sum _ (fun x => (mu1 d1 x - mu1 d2 x) * mu (F x) E)).
