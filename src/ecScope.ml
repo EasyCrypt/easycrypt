@@ -1821,6 +1821,20 @@ module Ty = struct
 
     let tc = EcEnv.TypeClass.by_path tcp.tc_name scope.sc_env in
 
+    tc.tc_prt |> oiter (fun prt ->
+      let ue = EcUnify.UniEnv.create (Some typarams) in
+
+      let ppe = EcPrinting.PPEnv.ofenv scope.sc_env in
+      Format.eprintf "[W]%a@." (EcPrinting.pp_type ppe) (snd ty);
+      Format.eprintf "[W]%s %a@."
+        (EcPath.tostring prt.tc_name)
+        (EcPrinting.pp_list " " (EcPrinting.pp_type ppe)) prt.tc_args;
+      try  EcUnify.hastc scope.sc_env ue (snd ty) prt
+      with EcUnify.UnificationFailure _ ->
+        hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name)
+    );
+
+
     let tcsyms  = symbols_of_tc scope.sc_env ty (tcp, tc) in
     let tcsyms  = Mstr.of_list tcsyms in
     let symbols = check_tci_operators scope.sc_env ty tci.pti_ops tcsyms in
@@ -1849,16 +1863,6 @@ module Ty = struct
           sc_env = EcEnv.TypeClass.add_instance ty (`General tcp) scope.sc_env } in
 
     Ax.add_defer scope inter
-
-    (*TODOTCD*)
-    (*
-    let _ = snd tci.pti_name in
-    let ue = EcUnify.UniEnv.create (Some []) in
-    let ty = fst (EcUnify.UniEnv.openty ue (fst ty) None (snd ty)) in
-    try  EcUnify.hastc scope.sc_env ue ty tc; tc
-    with EcUnify.UnificationFailure _ ->
-      hierror "type must be an instance of `%s'" (EcPath.tostring tc.tc_name)
-    *)
 
   (* ------------------------------------------------------------------ *)
   let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =

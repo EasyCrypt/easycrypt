@@ -6,6 +6,9 @@ type class finite = {
   axiom enumP : forall (x : finite), x \in enum
 }.
 
+type class foo <: finite = {
+}.
+
 type class monoid = {
   op mzero : monoid
   op madd  : monoid -> monoid -> monoid
@@ -79,11 +82,14 @@ qed.
 (* -------------------------------------------------------------------- *)
 op bool_enum = [true; false].
 
+instance foo with bool.
+
 instance finite with bool
   op enum = bool_enum.
 
 realize enumP.
 proof. by case. qed.
+
 
 op all ['a <: finite] (p : 'a -> bool) =
   all p enum<:'a>.
