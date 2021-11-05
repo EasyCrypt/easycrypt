@@ -365,7 +365,7 @@ end = struct
     | LvMapOnNonAssign ->
         msg "map-style left-value cannot be used with assignments"
 
-    | NumberOfTypeclassArgumentsMismatch (sc, typarams, tys) ->
+    | TCArgsCountMismatch (sc, typarams, tys) ->
         msg "different number of typeclass type parameters and arguments provided in %a:@\n - %a @\n - %a"
           pp_qsymbol sc
           (EcPrinting.pp_list "@, " (fun fmt (id, _) -> pp_symbol fmt (EcIdent.name id))) typarams

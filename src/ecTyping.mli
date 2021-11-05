@@ -112,7 +112,7 @@ type tyerror =
 | UnknownScope           of qsymbol
 | FilterMatchFailure
 | LvMapOnNonAssign
-| NumberOfTypeclassArgumentsMismatch of qsymbol * ty_params * ty list
+| TCArgsCountMismatch    of qsymbol * ty_params * ty list
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror

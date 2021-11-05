@@ -77,6 +77,18 @@ qed.
 (* type class fingroup = group & finite *)
 
 (* -------------------------------------------------------------------- *)
+op bool_enum = [true; false].
+
+instance finite with bool
+  op enum = bool_enum.
+
+realize enumP.
+proof. by case. qed.
+
+op all ['a <: finite] (p : 'a -> bool) =
+  all p enum<:'a>.
+
+(* -------------------------------------------------------------------- *)
 op izero = 0.
 
 instance group with int

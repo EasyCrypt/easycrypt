@@ -122,7 +122,7 @@ type tyerror =
 | UnknownScope           of qsymbol
 | FilterMatchFailure
 | LvMapOnNonAssign
-| NumberOfTypeclassArgumentsMismatch of qsymbol * ty_params * ty list
+| TCArgsCountMismatch    of qsymbol * ty_params * ty list
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -790,9 +790,8 @@ let transtc (env : EcEnv.env) ue ((tc_name, args) : ptcparam) : typeclass =
      tyerror (loc tc_name) env (UnknownTypeClass (unloc tc_name))
   | Some (p, decl) ->
      let args = List.map (transty tp_tydecl env ue) args in
-     (*TODOTCC: name of error and arguments*)
-     if (List.length decl.tc_tparams = List.length args) then
-       tyerror (loc tc_name) env (NumberOfTypeclassArgumentsMismatch ((unloc tc_name), decl.tc_tparams, args));
+     if List.length decl.tc_tparams <> List.length args then
+       tyerror (loc tc_name) env (TCArgsCountMismatch (unloc tc_name, decl.tc_tparams, args));
      { tc_name = p; tc_args = args; }
 
 (* -------------------------------------------------------------------- *)

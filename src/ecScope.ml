@@ -1611,12 +1611,11 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let check_tci_operators env tcty ops reqs =
-    let ue   = EcUnify.UniEnv.create (Some (fst tcty)) in
-    let rmap = Mstr.of_list reqs in
+    let ue  = EcUnify.UniEnv.create (Some (fst tcty)) in
 
     let ops =
       let tt1 m (x, (tvi, op)) =
-        if not (Mstr.mem (unloc x) rmap) then
+        if not (Mstr.mem (unloc x) reqs) then
           hierror ~loc:x.pl_loc "invalid operator name: `%s'" (unloc x);
 
         let tvi = List.map (TT.transty tp_tydecl env ue) tvi in
@@ -1651,13 +1650,13 @@ module Ty = struct
       in
         List.fold_left tt1 Mstr.empty ops
     in
-      List.iter
-        (fun (x, (req, _)) ->
+      Mstr.iter
+        (fun x (req, _) ->
            if req && not (Mstr.mem x ops) then
              hierror "no definition for operator `%s'" x)
         reqs;
-      List.fold_left
-        (fun m (x, (_, ty)) ->
+      Mstr.fold
+        (fun x (_, ty) m ->
            match Mstr.find_opt x ops with
            | None -> m
            | Some (loc, (p, opty)) ->
@@ -1666,7 +1665,7 @@ module Ty = struct
                  hierror ~loc "invalid type for operator `%s': %a / %a"
                    x (EcPrinting.pp_type ppe) ty (EcPrinting.pp_type ppe) opty
                end; Mstr.add x p m)
-        Mstr.empty reqs
+        reqs Mstr.empty
 
   (* ------------------------------------------------------------------ *)
   let check_tci_axioms scope mode axs reqs =
@@ -1749,6 +1748,7 @@ module Ty = struct
         (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
     let symbols = EcAlgTactic.ring_symbols scope.sc_env kind (snd ty) in
+    let symbols = Mstr.of_list symbols in
     let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
     let cr      = ring_of_symmap scope.sc_env (snd ty) kind symbols in
     let axioms  = EcAlgTactic.ring_axioms scope.sc_env cr in
@@ -1781,6 +1781,7 @@ module Ty = struct
         (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
     let symbols = EcAlgTactic.field_symbols scope.sc_env (snd ty) in
+    let symbols = Mstr.of_list symbols in
     let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
     let cr      = field_of_symmap scope.sc_env (snd ty) symbols in
     let axioms  = EcAlgTactic.field_axioms scope.sc_env cr in
@@ -1806,7 +1807,7 @@ module Ty = struct
         tc.tc_ops
 
   (* ------------------------------------------------------------------ *)
-  let add_generic_instance (scope : scope) _mode { pl_desc = tci; pl_loc = loc; } =
+  let add_generic_instance (scope : scope) mode { pl_desc = tci; pl_loc = loc; } =
     let (typarams, _) as ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
@@ -1820,11 +1821,34 @@ module Ty = struct
 
     let tc = EcEnv.TypeClass.by_path tcp.tc_name scope.sc_env in
 
-    let  symbols = symbols_of_tc scope.sc_env ty (tcp, tc) in
-    let _symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
+    let tcsyms  = symbols_of_tc scope.sc_env ty (tcp, tc) in
+    let tcsyms  = Mstr.of_list tcsyms in
+    let symbols = check_tci_operators scope.sc_env ty tci.pti_ops tcsyms in
 
-    { scope with
-        sc_env = EcEnv.TypeClass.add_instance ty (`General tcp) scope.sc_env }
+    let tysubst = EcSubst.add_tydef EcSubst.empty tcp.tc_name ([], snd ty) in
+
+    let subst =
+      List.fold_left
+        (fun subst (opname, ty) ->
+          let oppath = Mstr.find (EcIdent.name opname) symbols in
+          let op = EcFol.f_op oppath [] ty in
+          EcFol.Fsubst.f_bind_local subst opname op)
+        EcFol.Fsubst.f_subst_id tc.tc_ops in
+
+    let axioms =
+      List.map
+        (fun (name, ax) ->
+          let ax = EcFol.Fsubst.f_subst subst ax in
+          let ax = EcSubst.subst_form tysubst ax in
+          (name, ax))
+        tc.tc_axs in
+
+    let inter = check_tci_axioms scope mode tci.pti_axs axioms in
+    let scope =
+      { scope with
+          sc_env = EcEnv.TypeClass.add_instance ty (`General tcp) scope.sc_env } in
+
+    Ax.add_defer scope inter
 
     (*TODOTCD*)
     (*
