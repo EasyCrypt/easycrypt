@@ -98,6 +98,7 @@ let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) p
         (List.pmap tcfilter inst)
   in
 
+  (*Checks if *)
   let has_tcs ~src ~dst =
     true (*TODOTCD*)
     (*
@@ -211,7 +212,9 @@ let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) p
               if not (has_tcs ~src:tytc ~dst:tc) then
                 let module E = struct exception Failure end in
 
-                (*let inst = instances_for_tcs tc in*) (*TODOTCD*)
+
+
+                (*let inst = instances_for_tcs tc in*) (*TODOTCD: ELPI here*)
 
                 let for1 uf p =
                    uf
