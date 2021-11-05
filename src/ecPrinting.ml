@@ -654,33 +654,34 @@ let max_op_prec = (max_int, `Infix `NonAssoc)
 (* -------------------------------------------------------------------- *)
 let priority_of_binop name =
   match EcIo.lex_single_token name with
-  | Some EP.IMPL   -> Some e_bin_prio_impl
-  | Some EP.IFF    -> Some e_bin_prio_iff
-  | Some EP.ORA    -> Some e_bin_prio_or
-  | Some EP.OR     -> Some e_bin_prio_or
-  | Some EP.ANDA   -> Some e_bin_prio_and
-  | Some EP.AND    -> Some e_bin_prio_and
-  | Some EP.EQ     -> Some e_bin_prio_eq
-  | Some EP.NE     -> Some e_bin_prio_eq
-  | Some EP.GT     -> Some e_bin_prio_order
-  | Some EP.GE     -> Some e_bin_prio_order
-  | Some EP.LT     -> Some e_bin_prio_order
-  | Some EP.LE     -> Some e_bin_prio_order
-  | Some EP.LOP1 _ -> Some e_bin_prio_lop1
-  | Some EP.ROP1 _ -> Some e_bin_prio_rop1
-  | Some EP.LOP2 _ -> Some e_bin_prio_lop2
-  | Some EP.ROP2 _ -> Some e_bin_prio_rop2
-  | Some EP.PLUS   -> Some e_bin_prio_lop2
-  | Some EP.MINUS  -> Some e_bin_prio_lop2
-  | Some EP.LOP3 _ -> Some e_bin_prio_lop3
-  | Some EP.ROP3 _ -> Some e_bin_prio_rop3
-  | Some EP.STAR   -> Some e_bin_prio_lop3
-  | Some EP.SLASH  -> Some e_bin_prio_lop3
-  | Some EP.LOP4 _ -> Some e_bin_prio_lop4
-  | Some EP.ROP4 _ -> Some e_bin_prio_rop4
-  | Some EP.AT     -> Some e_bin_prio_lop4
-  | Some EP.HAT    -> Some e_bin_prio_lop4
-  | Some EP.NOP _  -> Some e_bin_prio_nop
+  | Some EP.IMPL      -> Some e_bin_prio_impl
+  | Some EP.IFF       -> Some e_bin_prio_iff
+  | Some EP.ORA       -> Some e_bin_prio_or
+  | Some EP.OR        -> Some e_bin_prio_or
+  | Some EP.ANDA      -> Some e_bin_prio_and
+  | Some EP.AND       -> Some e_bin_prio_and
+  | Some EP.EQ        -> Some e_bin_prio_eq
+  | Some EP.NE        -> Some e_bin_prio_eq
+  | Some EP.GT        -> Some e_bin_prio_order
+  | Some EP.GE        -> Some e_bin_prio_order
+  | Some EP.LT        -> Some e_bin_prio_order
+  | Some EP.LE        -> Some e_bin_prio_order
+  | Some EP.LOP1 _    -> Some e_bin_prio_lop1
+  | Some EP.ROP1 _    -> Some e_bin_prio_rop1
+  | Some EP.LOP2 _    -> Some e_bin_prio_lop2
+  | Some EP.ROP2 _    -> Some e_bin_prio_rop2
+  | Some EP.PLUS      -> Some e_bin_prio_lop2
+  | Some EP.MINUS     -> Some e_bin_prio_lop2
+  | Some EP.LOP3 _    -> Some e_bin_prio_lop3
+  | Some EP.ROP3 _    -> Some e_bin_prio_rop3
+  | Some EP.STAR      -> Some e_bin_prio_lop3
+  | Some EP.SLASH     -> Some e_bin_prio_lop3
+  | Some EP.LOP4 _    -> Some e_bin_prio_lop4
+  | Some EP.ROP4 _    -> Some e_bin_prio_rop4
+  | Some EP.AT        -> Some e_bin_prio_lop4
+  | Some EP.HAT       -> Some e_bin_prio_lop4
+  | Some EP.BACKSLASH -> Some e_bin_prio_lop4
+  | Some EP.NOP _     -> Some e_bin_prio_nop
 
   | _ -> None
 
