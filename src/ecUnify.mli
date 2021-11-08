@@ -29,7 +29,7 @@ module UniEnv : sig
   val create     : (EcIdent.t * typeclass list) list option -> unienv
   val copy       : unienv -> unienv                 (* constant time *)
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
-  val fresh      : ?tc:typeclass list -> ?ty:ty -> unienv -> ty
+  val fresh      : ?tcs:typeclass list -> ?ty:ty -> unienv -> ty
   val getnamed   : unienv -> symbol -> EcIdent.t
   val repr       : unienv -> ty -> ty
   val opentvi    : unienv -> ty_params -> tvi -> ty EcIdent.Mid.t
@@ -42,7 +42,9 @@ module UniEnv : sig
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
-val hastc : EcEnv.env -> unienv -> ty -> typeclass -> unit
+
+val hastc  : EcEnv.env -> unienv -> ty -> typeclass -> unit
+val hastcs : EcEnv.env -> unienv -> ty -> typeclass list -> unit
 
 val tfun_expected : unienv -> EcTypes.ty list -> EcTypes.ty
 

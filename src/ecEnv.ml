@@ -24,7 +24,6 @@ module Msym = EcSymbols.Msym
 module Mp   = EcPath.Mp
 module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
-module TC   = EcTypeClass
 module Mint = EcMaps.Mint
 
 (* -------------------------------------------------------------------- *)
@@ -153,7 +152,7 @@ type preenv = {
   env_actmem   : EcMemory.memory option;
   env_abs_st   : EcModules.abs_uses Mid.t;
   env_tci      : ((ty_params * ty) * tcinstance) list;
-  env_tc       : TC.graph;
+  env_tc       : tc_decl list;
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : (path list Mint.t) Msym.t;
   env_redbase  : mredinfo;
@@ -263,7 +262,7 @@ let empty gstate =
     env_actmem   = None;
     env_abs_st   = Mid.empty;
     env_tci      = [];
-    env_tc       = TC.Graph.empty;
+    env_tc       = [];
     env_rwbase   = Mip.empty;
     env_atbase   = Msym.empty;
     env_redbase  = Mrd.empty;
@@ -1298,11 +1297,7 @@ module TypeClass = struct
 
   let rebind name tc env =
     let env = MC.bind_typeclass name tc env in
-      match tc.tc_prt with
-      | None -> env
-      | Some prt ->
-          let myself = EcPath.pqname (root env) name in
-            { env with env_tc = TC.Graph.add ~src:myself ~dst:prt.tc_name env.env_tc }
+    { env with env_tc = tc :: env.env_tc }
 
   let bind ?(import = import0) name tc env =
     let env = if import.im_immediate then rebind name tc env else env in
@@ -1333,6 +1328,14 @@ module TypeClass = struct
         env_item = mk_citem import (CTh_instance (ty, cr)) :: env.env_item; }
 
   let get_instances env = env.env_tci
+
+  let hastc
+        (env : env) (tvtc : (typeclass list) Mid.t)
+        (ty : ty) (tc : typeclass)
+    = (* env.env_tc  -> all tc declaration *)
+      (* env.env_tci -> all tc instances   *)
+
+    true
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2907,11 +2910,10 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let bind_tc_cth =
-    let for1 path base = function
-      | CTh_typeclass (x, tc) ->
-          tc.tc_prt |> omap (fun prt ->
-            let src = EcPath.pqname path x in
-            TC.Graph.add ~src ~dst:prt.tc_name base)
+    let for1 _path base = function
+      | CTh_typeclass (_, tc) ->
+          Some (tc :: base)
+
       | _ -> None
 
     in bind_base_cth for1

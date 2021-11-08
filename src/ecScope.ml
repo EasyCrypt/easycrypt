@@ -2425,7 +2425,7 @@ module Search = struct
 
                     match fp.f_node with
                     | Fop (pf, _) -> (pf :: paths, pts)
-                    | _ -> (paths, (ps, ue, fp) ::pts)
+                    | _ -> (paths, (ps, ue, fp) :: pts)
                   end
 
                   | _ -> (p :: paths, pts) in

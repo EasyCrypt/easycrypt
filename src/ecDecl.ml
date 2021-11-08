@@ -12,7 +12,6 @@ open EcTypes
 open EcCoreFol
 
 module Sp   = EcPath.Sp
-module TC   = EcTypeClass
 module BI   = EcBigInt
 module Ssym = EcSymbols.Ssym
 

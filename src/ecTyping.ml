@@ -25,8 +25,6 @@ module Mid   = EcIdent.Mid
 module EqTest = EcReduction.EqTest
 module NormMp = EcEnv.NormMp
 
-module TC = EcTypeClass
-
 (* -------------------------------------------------------------------- *)
 type opmatch = [
   | `Op   of EcPath.path * EcTypes.ty list
@@ -788,10 +786,18 @@ let transtc (env : EcEnv.env) ue ((tc_name, args) : ptcparam) : typeclass =
   match EcEnv.TypeClass.lookup_opt (unloc tc_name) env with
   | None ->
      tyerror (loc tc_name) env (UnknownTypeClass (unloc tc_name))
+
   | Some (p, decl) ->
      let args = List.map (transty tp_tydecl env ue) args in
-     if List.length decl.tc_tparams <> List.length args then
-       tyerror (loc tc_name) env (TCArgsCountMismatch (unloc tc_name, decl.tc_tparams, args));
+     if List.length decl.tc_tparams <> List.length args then begin
+       tyerror (loc tc_name) env
+         (TCArgsCountMismatch (unloc tc_name, decl.tc_tparams, args));
+     end;
+
+     (* FIXME: TC *)
+     List.iter2
+       (fun (_, tcs) ty -> EcUnify.hastcs env ue ty tcs)
+       decl.tc_tparams args;
      { tc_name = p; tc_args = args; }
 
 (* -------------------------------------------------------------------- *)
@@ -808,7 +814,7 @@ let transtyvars (env : EcEnv.env) (loc, (tparams : ptyparams option)) =
             tyerror loc env DuplicatedTyVar;
           List.rev (List.fold_left for1 [] tparams))
   in
-    EcUnify.UniEnv.create tparams
+    UE.create tparams
 
 (* -------------------------------------------------------------------- *)
 let transpattern1 env ue (p : EcParsetree.plpattern) =

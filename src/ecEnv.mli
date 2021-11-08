@@ -7,6 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcIdent
 open EcPath
 open EcSymbols
 open EcTypes
@@ -343,9 +344,8 @@ end
 module TypeClass : sig
   type t = tc_decl
 
-  val add   : path -> env -> env
-  val bind  : ?import:import -> symbol -> t -> env -> env
-  val graph : env -> EcTypeClass.graph
+  val add  : path -> env -> env
+  val bind : ?import:import -> symbol -> t -> env -> env
 
   val by_path     : path -> env -> t
   val by_path_opt : path -> env -> t option
@@ -355,7 +355,10 @@ module TypeClass : sig
 
   val add_instance  : ?import:import -> (ty_params * ty) -> tcinstance -> env -> env
   val get_instances : env -> ((ty_params * ty) * tcinstance) list
+
+  val hastc : env -> (typeclass list) Mid.t -> ty -> typeclass -> bool
 end
+
 (* -------------------------------------------------------------------- *)
 module BaseRw : sig
   val by_path     : path -> env -> Sp.t
