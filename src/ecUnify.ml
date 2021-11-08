@@ -76,40 +76,12 @@ module UnifyCore = struct
 end
 
 (* -------------------------------------------------------------------- *)
+(*TODOTCC: what is this big function supposed to do?*)
 let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) pb =
   let failure () = raise (UnificationFailure pb) in
 
-  let gr   = EcEnv.TypeClass.graph env in
-  let inst = EcEnv.TypeClass.get_instances env in
-
   let uf = ref uf in
   let pb = let x = Queue.create () in Queue.push pb x; x in
-
-  (*TODOTCC*)
-  let instances_for_tcs (tcs : typeclass list) =
-    let tcfilter (i, tc) =
-      match tc with `General p -> Some (i, p) | _ -> None
-    in
-      List.filter
-        (fun (_, tc1) ->
-          List.for_all
-            (fun tc2 -> TC.Graph.has_path ~src:tc1.tc_name ~dst:tc2.tc_name gr)
-            tcs)
-        (List.pmap tcfilter inst)
-  in
-
-  (*Checks if *)
-  let has_tcs ~src ~dst =
-    true (*TODOTCD*)
-    (*
-    Sp.for_all
-      (fun dst1 ->
-        Sp.exists
-          (fun src1 -> TC.Graph.has_path ~src:src1 ~dst:dst1 gr)
-          src)
-      dst
-    *)
-  in
 
   let ocheck i t =
     let i   = UF.find i !uf in
@@ -205,8 +177,7 @@ let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) p
 
           | Tvar x ->
               let xtcs = odfl [] (Mid.find_opt x tvtc) in
-                if not (has_tcs ~src:xtcs ~dst:tc) then
-                  failure ()
+                ()
 
           | _ ->
               if not (has_tcs ~src:tytc ~dst:tc) then
@@ -214,11 +185,9 @@ let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) p
 
 
 
-                (*let inst = instances_for_tcs tc in*) (*TODOTCD: ELPI here*)
+                let inst = instances_for_tcs tc in (*TODOTCD: ELPI here*)
 
                 let for1 uf p =
-                   uf
-                   (*
                    let for_inst ((typ, gty), p') =
                      try
                        if not (TC.Graph.has_path ~src:p' ~dst:p gr) then
@@ -239,7 +208,6 @@ let rec unify_core (env : EcEnv.env) (tvtc : typeclass list Mid.t) (uf : UF.t) p
                    in
                      try  List.find_map for_inst inst
                      with Not_found -> failure ()
-                *)
                 in
                   uf := for1 !uf  tc
       end
