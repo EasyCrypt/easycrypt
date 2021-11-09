@@ -777,7 +777,7 @@ let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =
         let x    = fresh id in
         let s    = Fsubst.f_bind_mod s id (EcPath.mident x) in
         let mp   = EcPath.mident id in
-        let sig_ = (EcEnv.Mod.by_mpath mp env).EcModules.me_sig in
+        let sig_ = (fst (EcEnv.Mod.by_mpath mp env)).EcModules.me_sig in
         let bds  = `Forall (x, GTmodty (mt, r)) :: bds in
         let args = PAModule (mp, sig_) :: args in
         (s, bds, args, cls)
@@ -1692,7 +1692,7 @@ module LowSubst = struct
       let rec add fv x _ =
         if Sid.mem x fv then fv
         else
-          (* check if x is a declare module *)
+          (* check if x is a declared module *)
           let fv = Sid.add x fv in
           if EcEnv.Mod.by_mpath_opt (EcPath.mident x) env <> None then fv
           else match LDecl.by_id x hyps with

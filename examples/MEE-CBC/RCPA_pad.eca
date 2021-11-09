@@ -76,8 +76,8 @@ module RCPAa (A:RCPA_Adversary,O:CoreDefs.RCPA.RCPA_Oracles) = {
 }.
 
 section RCPA.
-  declare module S : CoreDefs.Enc_Scheme { RCPA_Wrap, CoreDefs.RCPA.RCPA_Wrap }.
-  declare module A : RCPA_Adversary  { RCPA_Wrap, CoreDefs.RCPA.RCPA_Wrap, S }.
+  declare module S <: CoreDefs.Enc_Scheme { RCPA_Wrap, CoreDefs.RCPA.RCPA_Wrap }.
+  declare module A <: RCPA_Adversary  { RCPA_Wrap, CoreDefs.RCPA.RCPA_Wrap, S }.
 
   local lemma PtE_Ideal &m:
     Pr[INDR_CPA(Ideal,A).main() @ &m: res]

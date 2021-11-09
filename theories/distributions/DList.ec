@@ -125,7 +125,7 @@ lemma dlist_perm_eq (d : 'a distr) s1 s2:
   perm_eq s1 s2 =>
   mu1 (dlist d (size s1)) s1 = mu1 (dlist d (size s2)) s2.
 proof.
-rewrite !dlist1E //= 1,2:size_ge0;apply eq_big_perm.
+by rewrite !dlist1E ?size_ge0 /=;apply eq_big_perm.
 qed.
 
 lemma weight_dlist0 n (d:'a distr):

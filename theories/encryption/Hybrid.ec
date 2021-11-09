@@ -130,13 +130,13 @@ clone import Means as M with
 (* Prove that it is equivalent to consider n or 1 calls to the oracle *)
 section.
 
-  declare module Ob : Orclb    {Count,HybOrcl}.
-  declare module A  : AdvOrclb {Count,HybOrcl,Ob}.
+  declare module Ob <: Orclb    {Count,HybOrcl}.
+  declare module A <: AdvOrclb {Count,HybOrcl,Ob}.
 
-  axiom losslessL: islossless Ob.leaks.
-  axiom losslessOb1: islossless Ob.orclL.
-  axiom losslessOb2: islossless Ob.orclR.
-  axiom losslessA (Ob0 <: Orclb {A}) (LR <: Orcl {A}):
+  declare axiom losslessL: islossless Ob.leaks.
+  declare axiom losslessOb1: islossless Ob.orclL.
+  declare axiom losslessOb2: islossless Ob.orclR.
+  declare axiom losslessA (Ob0 <: Orclb {A}) (LR <: Orcl {A}):
     islossless LR.orcl =>
     islossless Ob0.leaks => islossless Ob0.orclL => islossless Ob0.orclR =>
     islossless A(Ob0, LR).main.
@@ -374,15 +374,17 @@ end section.
 (* -------------------------------------------------------------------- *)
 (* Simplified variant: Assume that A calls the oracle at most q times. *)
 section.
-  declare module Ob : Orclb    {Count,HybOrcl}.
-  declare module A  : AdvOrclb {Count,HybOrcl,Ob}.
+  declare module Ob <: Orclb    {Count,HybOrcl}.
+  declare module A <: AdvOrclb {Count,HybOrcl,Ob}.
 
-  axiom A_call : forall (O <: Orcl{Count,A}), hoare [ Orcln(A(Ob), O).main : true ==> Count.c <= q ].
+  declare axiom A_call :
+    forall (O <: Orcl{Count,A}),
+      hoare [ Orcln(A(Ob), O).main : true ==> Count.c <= q ].
 
-  axiom losslessL: islossless Ob.leaks.
-  axiom losslessOb1: islossless Ob.orclL.
-  axiom losslessOb2: islossless Ob.orclR.
-  axiom losslessA (Ob0 <: Orclb{A}) (LR <: Orcl{A}):
+  declare axiom losslessL: islossless Ob.leaks.
+  declare axiom losslessOb1: islossless Ob.orclL.
+  declare axiom losslessOb2: islossless Ob.orclR.
+  declare axiom losslessA (Ob0 <: Orclb{A}) (LR <: Orcl{A}):
     islossless LR.orcl =>
     islossless Ob0.leaks => islossless Ob0.orclL => islossless Ob0.orclR =>
     islossless A(Ob0, LR).main.

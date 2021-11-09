@@ -32,6 +32,7 @@ val gtmem   : EcMemory.memtype -> gty
 
 val gty_equal : gty  -> gty -> bool
 val gty_fv    : gty -> int Mid.t
+val gty_fv_and_tvar : gty -> int Mid.t
 
 type quantif =
   | Lforall

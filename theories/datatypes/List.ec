@@ -9,6 +9,7 @@
 (* This API has been mostly inspired from the [seq] library of the
  * ssreflect Coq extension. *)
 
+
 (* -------------------------------------------------------------------- *)
 require import AllCore.
 
@@ -26,7 +27,7 @@ op size (xs : 'a list) =
 lemma size_ge0 (s : 'a list): 0 <= size s.
 proof. by elim: s => //= x s; smt. qed.
 
-local hint exact : size_ge0.
+hint exact : size_ge0. 
 
 lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case: s => //=; smt. qed.

@@ -115,9 +115,9 @@ by do !(auto; call (_: true)); auto.
 qed.
 
 section.
-  declare module O:Orcl.
+  declare module O <: Orcl.
 
-  axiom iter2_eq:
+  declare axiom iter2_eq:
     equiv [Iter(O).iter_12 ~ Iter(O).iter_21:
            ={glob O,t1,t2} ==> ={glob O}].
 

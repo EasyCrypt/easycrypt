@@ -44,7 +44,7 @@ let check_concrete pf env f =
 
 (* -------------------------------------------------------------------- *)
 let lossless_hyps env top sub =
-  let sig_ = (EcEnv.Mod.by_mpath top env).me_sig in
+  let sig_ = (fst (EcEnv.Mod.by_mpath top env)).me_sig in
   let bd =
     List.map
       (fun (id, mt) -> (id, GTmodty (mt, (Sx.empty, Sm.singleton top))))

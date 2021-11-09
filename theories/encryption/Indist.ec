@@ -117,17 +117,17 @@ module HybGame2(A:Adv) (O:Orcl) (LR:LR) = {
 }.
 
 section.
-declare module O:Orcl {Count, HybOrcl}.
-declare module A:Adv  {Count, O, HybOrcl}.
+declare module O <: Orcl {Count, HybOrcl}.
+declare module A <: Adv  {Count, O, HybOrcl}.
 
-axiom losslessL: islossless O.leaks.
-axiom losslessO: islossless O.orcl.
-axiom losslessA (O <: Orcl{A}) (LR <: LR{A}):
+declare axiom losslessL: islossless O.leaks.
+declare axiom losslessO: islossless O.orcl.
+declare axiom losslessA (O <: Orcl{A}) (LR <: LR{A}):
   islossless LR.orcl =>
   islossless O.leaks => islossless O.orcl =>
   islossless A(O, LR).main.
 
-axiom q_pos : 0 < q.
+declare axiom q_pos : 0 < q.
 
 local module A' (Ob : Orclb) (LR : H.Orcl) = {
   module O = {
@@ -286,8 +286,8 @@ module INDb(O:Orcl) (A:Adv) = {
 }.
 
 section.
-declare module O:Orcl {Count, Orclb}.
-declare module A:Adv  {Count, O, Orclb}.
+declare module O <: Orcl {Count, Orclb}.
+declare module A <: Adv  {Count, O, Orclb}.
 
 local module WA = {
   proc work(x : bool) : bool = {

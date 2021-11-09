@@ -172,16 +172,17 @@ clone include FiniteEager with
 proof * by exact/enum_spec.
 
 section.
-declare module D : Distinguisher { LRO, ERO }.
+declare module D <: Distinguisher { LRO, ERO }.
 
-axiom dout_ll x : is_lossless (dout x).
+declare axiom dout_ll x : is_lossless (dout x).
 
 local clone import PROM.FullRO as H with
   type in_t    <- in_t,
   type out_t   <- out_t,
   type d_in_t  <- d_in_t,
   type d_out_t <- d_out_t,
-  op   dout    <- dout.
+  op   dout    <- dout
+  proof *.
 
 local module Wrap (O : RO) : Oracle = {
   proc init() = {
@@ -494,11 +495,11 @@ module G_bad (D : Dist) (H : Oracle) = {
 }.
 
 section.
-declare module D : Dist { Log, LRO }.
-axiom D_a1_ll (H <: POracle { D }): islossless H.o => islossless D(H).a1.
-axiom D_a2_ll (H <: POracle { D }): islossless H.o => islossless D(H).a2.
+declare module D <: Dist { Log, LRO }.
+declare axiom D_a1_ll (H <: POracle { D }): islossless H.o => islossless D(H).a1.
+declare axiom D_a2_ll (H <: POracle { D }): islossless H.o => islossless D(H).a2.
 
-axiom dout_ll x : is_lossless (dout x).
+declare axiom dout_ll x : is_lossless (dout x).
 
 local module G1' (D : Dist) (H : Oracle) = {
   var x : in_t
@@ -602,11 +603,11 @@ module G_bad (D : Dist) (H : Oracle) = {
 }.
 
 section.
-declare module D : Dist { Log, LRO }.
-axiom D_a1_ll (H <: POracle { D }): islossless H.o => islossless D(H).a1.
-axiom D_a2_ll (H <: POracle { D }): islossless H.o => islossless D(H).a2.
+declare module D <: Dist { Log, LRO }.
+declare axiom D_a1_ll (H <: POracle { D }): islossless H.o => islossless D(H).a1.
+declare axiom D_a2_ll (H <: POracle { D }): islossless H.o => islossless D(H).a2.
 
-axiom dout_ll x : is_lossless (dout x).
+declare axiom dout_ll x : is_lossless (dout x).
 
 local module G1' (D : Dist) (H : Oracle) = {
   var x : in_t

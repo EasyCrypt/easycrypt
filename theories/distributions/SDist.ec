@@ -438,9 +438,10 @@ module Os : Oracle_i = {
 
 section. (* Reduction from single oracle call to sampling game *)
 
-declare module A : Adversary {B1,Os,Count}.
+declare module A <: Adversary {B1,Os,Count}.
 
-axiom A_ll : forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
+declare axiom A_ll :
+  forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
 
 (* global variables for eager/lazy proof *)
 local module Var = { 
@@ -567,11 +568,12 @@ op N : { int | 0 < N } as N_pos.
 
 section. 
 
-declare module A : Adversary {B1,Os,Count}.
+declare module A <: Adversary {B1,Os,Count}.
 
-axiom A_ll : forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
+declare axiom A_ll :
+  forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
 
-axiom A_bound : (forall (O <: Oracle_i{A,Count}), 
+declare axiom A_bound : (forall (O <: Oracle_i{A,Count}), 
   hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= N]).
 
 local clone Hybrid as Hyb with
@@ -763,9 +765,9 @@ module Wrap (O : R1.RO) : R1.RO = {
 
 section.
 
-declare module D : Distinguisher {Os, O1,O2, Count, B1, Wrap}.
+declare module D <: Distinguisher {Os, O1,O2, Count, B1, Wrap}.
 
-axiom D_ll : forall (O <: R1.RO{D}), 
+declare axiom D_ll : forall (O <: R1.RO{D}), 
   islossless O.get => islossless D(O).distinguish.
 
 local module Cache (O : Oracle) : R1.RO = {

@@ -161,6 +161,16 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
   in scheme mode (List.map fst dt.dt_tparams, tpath) dt.dt_ctors
 
 (* -------------------------------------------------------------------- *)
+
+let datatype_as_ty_dtype datatype =
+  let indsc    = indsc_of_datatype `Elim datatype in
+  let casesc   = indsc_of_datatype `Case datatype in
+  datatype.dt_tparams,
+    { tydt_ctors   = datatype.dt_ctors ;
+      tydt_schcase = casesc;
+      tydt_schelim = indsc ; }
+
+(* -------------------------------------------------------------------- *)
 type case1 = {
   cs1_ctor : EcPath.path;
   cs1_vars : (EcIdent.t * EcTypes.ty) list;

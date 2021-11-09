@@ -884,7 +884,7 @@ module Inverter(A:PSS_AdvCMA): RSA.Inverter = {
 
 (*** Games and transitions *)
 section.
-  declare module A: PSS_AdvCMA {H,G,Ge,Wrap(PSS96(H,G)),Bounded_PSS_Adv,
+  declare module A <: PSS_AdvCMA {H,G,Ge,Wrap(PSS96(H,G)),Bounded_PSS_Adv,
                                 Inverter}.
   axiom A_forge_ll (H <: Ht.Types.ARO {A}) (G <: Gt.Types.ARO {A}) (O <: AdvOracles {A}):
     islossless H.o =>

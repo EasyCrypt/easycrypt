@@ -53,6 +53,7 @@ exception NonPositive
 
 val indsc_of_datatype : ?normty:(ty -> ty) -> [`Elim|`Case] -> datatype -> form
 
+val datatype_as_ty_dtype : datatype -> ty_params * ty_dtype
 (* -------------------------------------------------------------------- *)
 type case1 = {
   cs1_ctor : EcPath.path;

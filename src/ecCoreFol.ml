@@ -165,6 +165,14 @@ let gty_fv = function
     EcPath.Sx.fold (fun xp fv -> EcPath.x_fv fv xp) rx fv
   | GTmem mt -> EcMemory.mt_fv mt
 
+let gty_fv_and_tvar = function
+  | GTty ty -> EcTypes.ty_fv_and_tvar ty
+  | GTmodty(_, (rx,r)) ->
+    let fv =
+      EcPath.Sm.fold (fun mp fv -> EcPath.m_fv fv mp) r EcIdent.Mid.empty in
+    EcPath.Sx.fold (fun xp fv -> EcPath.x_fv fv xp) rx fv
+  | GTmem mt -> EcMemory.mt_fv mt
+
 let gtty (ty : EcTypes.ty) =
   GTty ty
 
@@ -926,6 +934,7 @@ let f_iter g f =
   | FequivS   es  -> g es.es_pr; g es.es_po
   | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
   | Fpr       pr  -> g pr.pr_args; g pr.pr_event
+
 
 (* -------------------------------------------------------------------- *)
 let form_exists g f =
