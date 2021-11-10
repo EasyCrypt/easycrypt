@@ -665,7 +665,7 @@ lemma sdist_oracleN &m :
 proof.
 (* rewrite -ler_pdivr_mull -?normrZ; 1,2: smt(N_ge0).  *)
 rewrite Osd1_Hyb Osd2_Hyb. 
-have /= <- := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
+have /= -> := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
 - move => O; proc; inline *; sp; wp. 
   inline *.
   conseq (: Hyb.Count.c = Count.n) (: Count.n = 0 ==> Count.n <= N) => //. 
