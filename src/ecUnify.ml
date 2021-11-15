@@ -21,18 +21,6 @@ module Sp = EcPath.Sp
 exception UnificationFailure of [`TyUni of ty * ty | `TcCtt of ty * typeclass]
 exception UninstanciateUni
 
-(* -------------------------------------------------------------------- *)
-module TypeClass = struct
-  let hastc
-        (env : EcEnv.env) (tvtc : (typeclass list) Mid.t)
-        (ty  : ty ) (tc   : typeclass)
-    =
-
-    let instances = EcEnv.TypeClass.get_instances env in
-
-    false
-end
-
 (* ==================================================================== *)
 module type UFRaw = sig
   type uf
@@ -55,8 +43,11 @@ module type UnifyExtra = sig
 
   module Problem : sig
     val solve :
-      (module EcUFind.S with type data = state * ty option) ->
-        EcEnv.env -> state Mid.t -> problem -> problem list
+      (module EcUFind.S
+        with type t    = 'uf
+         and type item = uid
+         and type data = state * ty option)
+      -> 'uf ref -> EcEnv.env -> state Mid.t -> problem -> problem list
   end
 end
 
@@ -111,18 +102,16 @@ module UnifyGen(X : UnifyExtra) = struct
   module UF = EcUFind.Make(UFArgs.I)(UFArgs.D)
 
   (* ------------------------------------------------------------------ *)
-  module UnifyCore = struct
-    let fresh ?(extra = X.State.default) ?ty uf =
-      let uid = EcUid.unique () in
-      let uf  =
-        match ty with
-        | Some { ty_node = Tunivar id } ->
-            let uf = UF.set uid (extra, None) uf in
-            fst (UF.union uid id uf)
-        | None | Some _ -> UF.set uid (extra, ty) uf
-      in
-        (uf, tuni uid)
-  end
+  let fresh ?(extra = X.State.default) ?ty uf =
+    let uid = EcUid.unique () in
+    let uf  =
+      match ty with
+      | Some { ty_node = Tunivar id } ->
+          let uf = UF.set uid (extra, None) uf in
+          fst (UF.union uid id uf)
+      | None | Some _ -> UF.set uid (extra, ty) uf
+    in
+      (uf, tuni uid)
 
   (* ------------------------------------------------------------------ *)
   let rec unify_core (env : EcEnv.env) (tvtc : X.state Mid.t) (uf : UF.t) pb =
@@ -222,40 +211,8 @@ module UnifyGen(X : UnifyExtra) = struct
             try
               List.iter
                 (fun x -> Queue.push (`Other x) pb)
-                (X.Problem.solve (module UF) env tvtc pb1)
+                (X.Problem.solve (module UF) uf env tvtc pb1)
             with X.Failure -> failure ()
-
-(*
-        | `TcCtt (ty, tc) -> begin
-            Format.eprintf "[W]TC: %s / %s[%s]@."
-              (EcTypes.dump_ty ty)
-              (EcPath.tostring tc.tc_name)
-              (String.concat ", " (List.map EcTypes.dump_ty tc.tc_args));
-
-            let tytc, ty = getvar ty in
-
-            match ty.ty_node with
-            | Tunivar i ->
-                uf := UF.set i (tc :: tytc, None) !uf
-
-            | _ ->
-                if not (TypeClass.hastc env tvtc ty tc) then
-                  failure ()
-
-  (*
-                let xtcs = odfl [] (Mid.find_opt x tvtc) in
-                Format.eprintf "[W] TC2: %s (%s)@."
-                  (EcIdent.tostring x)
-                  (String.concat " / "
-                     (List.map (fun tc ->
-                          Format.asprintf "%s[%s]"
-                            (EcPath.tostring tc.tc_name)
-                            (String.concat ", " (List.map EcTypes.dump_ty tc.tc_args))
-                        ) xtcs));
-                ()
-  *)
-        end
-*)
       done
     in
       doit (); !uf
@@ -293,26 +250,163 @@ module UnifyGen(X : UnifyExtra) = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module UnifyExtraEmpty :
+  UnifyExtra with type state   = unit
+              and type problem = unit =
+struct
+  type state   = unit
+  type problem = unit
+  type uparam  = state * ty option
+
+  exception Failure
+
+  module State = struct
+    let default : state =
+      ()
+
+    let union (_ : uparam) (_ : uparam) : state * problem list =
+      ((), [])
+  end
+
+  module Problem = struct
+    let solve (type uf) (module _)
+      (_ : uf ref) (_ : EcEnv.env) (_ : state Mid.t) (() : problem)
+    =
+      []
+  end
+end
+
+(* -------------------------------------------------------------------- *)
+module UnifyCore = UnifyGen(UnifyExtraEmpty)
+
+(* -------------------------------------------------------------------- *)
+module TypeClass = struct
+  let hastc
+        (env : EcEnv.env) (tvtc : (typeclass list) Mid.t)
+        (ty : ty) (tc : typeclass)
+    =
+
+    let instances = EcEnv.TypeClass.get_instances env in
+
+    let instances =
+      List.filter_map
+        (function (x, `General y) -> Some (x, y) | _ -> None)
+        instances in
+
+    let instances =
+      let tvinst =
+        (List.map
+           (fun (tv, tcs) ->
+              List.map
+                (fun tc -> (([], tvar tv), tc))
+                tcs)
+           (Mid.bindings tvtc)) in
+      List.flatten tvinst @ instances in
+
+
+      let exception Bailout in
+
+      let for1 ((tgparams, tgty), tginst) =
+        if not (EcPath.p_equal tc.tc_name tginst.tc_name) then
+          raise Bailout;
+
+        let uf, tvinfo =
+          List.fold_left_map
+            (fun uf (tv, tcs) ->
+              let uf, tvty = UnifyCore.fresh uf in uf, (tv, (tvty, tcs)))
+            UnifyCore.UF.initial tgparams in
+        let uf, subst = ref uf, Mid.of_list (List.map (snd_map fst) tvinfo) in
+
+        List.iter2
+          (fun pty tgty ->
+             let tgty = Tvar.subst subst tgty in
+             try
+               uf := UnifyCore.unify_core env Mid.empty !uf (`TyUni (pty, tgty))
+             with UnifyCore.UnificationFailure _ ->
+               raise Bailout)
+          tc.tc_args tginst.tc_args;
+
+        let tgty = Tvar.subst subst tgty in
+
+        begin try
+          uf := UnifyCore.unify_core env Mid.empty !uf (`TyUni (ty, tgty))
+        with UnifyCore.UnificationFailure _ -> raise Bailout end;
+
+        assert (UnifyCore.UF.closed !uf);
+
+        let subst = UnifyCore.subst_of_uf !uf in
+        let subst = Tuni.offun subst in
+
+        List.flatten (List.map
+          (fun (_, (ty, tcs)) ->
+            List.map (fun tc -> (subst ty, tc)) tcs)
+          tvinfo)
+
+    in
+
+    let for1 pb =
+      try Some (for1 pb) with Bailout -> None in
+
+    List.find_map_opt for1 instances
+end
+
+(* -------------------------------------------------------------------- *)
 module UnifyExtraForTC :
   UnifyExtra with type state   = typeclass list
               and type problem = [ `TcCtt of ty * typeclass ] =
 struct
   type state   = typeclass list
   type problem = [ `TcCtt of ty * typeclass ]
+  type uparam  = state * ty option
 
   exception Failure
 
   module State = struct
-    let default =
-      assert false
+    let default : state =
+      []
 
-    let union =
-      assert false
+    let union (d1 : uparam) (d2 : uparam) =
+      match d1, d2 with
+      | (tc1, None), (tc2, None) ->
+          (tc1 @ tc2), []
+
+      | (tc1, Some _), (tc2, Some _) ->
+          (tc1 @ tc2), []
+
+      | (tc1, None   ), (tc2, Some ty)
+      | (tc2, Some ty), (tc1, None   ) ->
+          (tc1 @ tc2), List.map (fun tc -> `TcCtt (ty, tc)) tc1
   end
 
   module Problem = struct
-    let solve =
-      assert false
+    let solve (type uf)
+      (module UF : EcUFind.S
+              with type t    = uf
+               and type item = uid
+               and type data = uparam)
+      (uf              : uf ref)
+      (env             : EcEnv.env)
+      (tvtc            : state Mid.t)
+      (`TcCtt (ty, tc) : problem)
+      : problem list
+    =
+      let tytc, ty =
+        match ty.ty_node with
+        | Tunivar i -> snd_map (odfl ty) (UF.data i !uf)
+        | _ -> (State.default, ty) in
+
+        match ty.ty_node with
+        | Tunivar i ->
+            uf := UF.set i (tc :: tytc, None) !uf;
+            []
+
+        | _ -> begin
+            match TypeClass.hastc env tvtc ty tc with
+            | None ->
+                raise Failure
+            | Some effects ->
+                List.map (fun (ty, tc) -> `TcCtt (ty, tc)) effects
+        end
   end
 end
 
@@ -379,7 +473,7 @@ module UniEnv = struct
       ref ue
 
   let fresh ?tcs ?ty ue =
-    let (uf, uid) = Unify.UnifyCore.fresh ?extra:tcs ?ty (!ue).ue_uf in
+    let (uf, uid) = Unify.fresh ?extra:tcs ?ty (!ue).ue_uf in
       ue := { !ue with ue_uf = uf }; uid
 
   let opentvi ue (params : ty_params) tvi =
@@ -391,8 +485,8 @@ module UniEnv = struct
       | Some (TVIunamed lt) ->
           List.map2 (fun (v, tc) ty -> (v, (Some ty, tc))) params lt
 
-    | Some (TVInamed lt) ->
-        List.map (fun (v, tc) ->
+      | Some (TVInamed lt) ->
+          List.map (fun (v, tc) ->
             let ty = List.assoc_opt (EcIdent.name v) lt in
             (v, (ty, tc))
           ) params in
@@ -522,7 +616,7 @@ let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
               hastcs env subue ty (oget (Msym.find_opt x tparams)))
               ls
 
-        with Unify.UnificationFailure _ -> raise E.Failure
+        with UnificationFailure _ -> raise E.Failure
       end;
 
       let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
@@ -530,7 +624,7 @@ let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
       let texpected = tfun_expected subue psig in
 
       (try  unify env subue top texpected
-       with Unify.UnificationFailure _ -> raise E.Failure);
+       with UnificationFailure _ -> raise E.Failure);
 
       let bd =
         match op.D.op_kind with

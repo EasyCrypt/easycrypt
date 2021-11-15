@@ -23,50 +23,13 @@ exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
 exception IncompatibleModuleSig of module_sig * module_sig
 
-(* -------------------------------------------------------------------- *)
-type 'a eqtest  = env -> 'a -> 'a -> bool
+type 'a eqtest = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 
+(* -------------------------------------------------------------------- *)
 module EqTest_base = struct
-  let rec for_type env t1 t2 =
-    ty_equal t1 t2 || for_type_r env t1 t2
-
-  and for_type_r env t1 t2 =
-    match t1.ty_node, t2.ty_node with
-    | Tunivar uid1, Tunivar uid2 -> EcUid.uid_equal uid1 uid2
-
-    | Tvar i1, Tvar i2 -> i1 = i2
-
-    | Ttuple lt1, Ttuple lt2 ->
-          List.length lt1 = List.length lt2
-       && List.all2 (for_type env) lt1 lt2
-
-    | Tfun (t1, t2), Tfun (t1', t2') ->
-        for_type env t1 t1' && for_type env t2 t2'
-
-    | Tglob mp, _ when EcEnv.NormMp.tglob_reducible env mp ->
-        for_type env (EcEnv.NormMp.norm_tglob env mp) t2
-
-    | _, Tglob mp when EcEnv.NormMp.tglob_reducible env mp ->
-        for_type env t1 (EcEnv.NormMp.norm_tglob env mp)
-
-    | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
-        if
-             List.length lt1 = List.length lt2
-          && List.all2 (for_type env) lt1 lt2
-        then true
-        else
-          if   Ty.defined p1 env
-          then for_type env (Ty.unfold p1 lt1 env) (Ty.unfold p2 lt2 env)
-          else false
-
-    | Tconstr(p1,lt1), _ when Ty.defined p1 env ->
-        for_type env (Ty.unfold p1 lt1 env) t2
-
-    | _, Tconstr(p2,lt2) when Ty.defined p2 env ->
-        for_type env t1 (Ty.unfold p2 lt2 env)
-
-    | _, _ -> false
+  (* ------------------------------------------------------------------ *)
+  let for_type = EcCoreEqTest.for_type
 
   (* ------------------------------------------------------------------ *)
   let is_unit env ty = for_type env tunit ty
@@ -192,7 +155,7 @@ end) = struct
   open EqTest_base
   open Fe
 
-  (* ------------------------------------------------------------------ *)  
+  (* ------------------------------------------------------------------ *)
   let rec for_stmt env ~norm s1 s2 =
        s_equal s1 s2
     || List.all2 (for_instr env ~norm) s1.s_node s2.s_node
