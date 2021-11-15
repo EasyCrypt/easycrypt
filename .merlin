@@ -16,6 +16,7 @@ PKG pcre
 PKG inifiles
 PKG yojson
 PKG elpi
+PKG ppx_deriving.std
 
 FLG -rectypes
 FLG -w Y -w Z -w -23 -w +28 -w +33

@@ -7,7 +7,6 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-open EcIdent
 open EcPath
 open EcSymbols
 open EcTypes
@@ -353,10 +352,10 @@ module TypeClass : sig
   val lookup_opt  : qsymbol -> env -> (path * t) option
   val lookup_path : qsymbol -> env -> path
 
+  val get_typeclasses : env -> t list
+
   val add_instance  : ?import:import -> (ty_params * ty) -> tcinstance -> env -> env
   val get_instances : env -> ((ty_params * ty) * tcinstance) list
-
-  val hastc : env -> (typeclass list) Mid.t -> ty -> typeclass -> bool
 end
 
 (* -------------------------------------------------------------------- *)

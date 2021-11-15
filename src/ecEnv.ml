@@ -1313,7 +1313,7 @@ module TypeClass = struct
   let lookup_path name env =
     fst (lookup name env)
 
-  let graph (env : env) =
+  let get_typeclasses (env : env) =
     env.env_tc
 
   let bind_instance (ty : ty_params * ty) (cr : tcinstance) tci =
@@ -1328,14 +1328,6 @@ module TypeClass = struct
         env_item = mk_citem import (CTh_instance (ty, cr)) :: env.env_item; }
 
   let get_instances env = env.env_tci
-
-  let hastc
-        (env : env) (tvtc : (typeclass list) Mid.t)
-        (ty : ty) (tc : typeclass)
-    = (* env.env_tc  -> all tc declaration *)
-      (* env.env_tci -> all tc instances   *)
-
-    true
 end
 
 (* -------------------------------------------------------------------- *)
