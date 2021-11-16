@@ -1,20 +1,13 @@
 # -*- Makefile -*-
 
 # --------------------------------------------------------------------
-# EJGA: I recommend to let dune detect the number of cores
-# DUNE_JOBS  ?= 1
-DUNE_BIN   ?= dune
-
+DUNE       ?= dune
 DESTDIR    ?=
 PREFIX     ?= /usr/local
 VERSION    ?= $(shell date '+%F')
 DISTDIR    := easycrypt-$(VERSION)
 INSTALL    := scripts/install/install-sh
 PWD        := $(shell pwd)
-COMMIT     := $(shell scripts/install/get-commit)
-FVERSION   := src/ecVersion.ml
-
-include Makefile.system
 
 # --------------------------------------------------------------------
 BINDIR := $(PREFIX)/bin
@@ -35,34 +28,15 @@ CHECK     += $(ECEXTRA) config/tests.config
 CHECKCATS ?= prelude stdlib
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native tests check weak-check examples
+.PHONY: default build byte native tests check weak-check examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
 .PHONY: license
-.PHONY: %.ml %.mli %.inferred.mli
 
-all: build
+default: build
 	@true
 
-build: native
-
-define do-core-build
-	$(DUNE) "$(1)"
-endef
-
-define do-build
-	rm -f "$(1)$(EXE)"
-	sed 's/COMMIT/$(COMMIT)/g' < $(FVERSION).in > $(FVERSION)
-  $(call do-core-build,src/$(1))
-	if [ ! -z "$(EXE)" ]; then \
-	  cp "_build/default/src/$(1)" "$(1)$(EXE)"; \
-	fi
-endef
-
-byte:
-	$(call do-build,ec.byte)
-
-native:
-	$(call do-build,ec.native)
+build:
+	rm -f ec.native && $(DUNE) build && ln -sf src/ec.exe ec.native
 
 define check-for-staled-files
 	if [ -d "$(DESTDIR)$(PREFIX)/lib/easycrypt/" ]; then   \
@@ -75,8 +49,8 @@ endef
 install: build uninstall
 	-@$(call check-for-staled-files)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
-	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt$(EXE)
-	$(INSTALL) -m 0755 -T scripts/testing/runtest $(DESTDIR)$(BINDIR)/ec-runtest$(EXE)
+	$(INSTALL) -m 0755 -T src/ec.exe $(DESTDIR)$(BINDIR)/easycrypt
+	$(INSTALL) -m 0755 -T scripts/testing/runtest $(DESTDIR)$(BINDIR)/ec-runtest
 	for i in $$(find theories -type d -mindepth 1); do \
 	  $(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/$$i ';'; \
 	  $(INSTALL) -m 0644 -t $(DESTDIR)$(LIBDIR)/$$i $$i/*.ec*; \
@@ -88,11 +62,11 @@ endef
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/easycrypt
+	rm -f $(DESTDIR)$(BINDIR)/ec-runtest
 	for i in $$(find theories -depth -type d); do \
 	  for j in $$i/*.ec*; do rm -f $(DESTDIR)$(LIBDIR)/$$j; done; \
 	  rmdir $(DESTDIR)$(LIBDIR)/$$i 2>/dev/null || true; \
 	done
-	rm -f $(DESTDIR)$(SHRDIR)/emacs/*.el
 	$(call rmdir,$(DESTDIR)$(SHRDIR)/emacs)
 	$(call rmdir,$(DESTDIR)$(SHRDIR))
 
@@ -119,9 +93,7 @@ license:
 	  $(shell find proofgeneral/easycrypt -name '*.el')
 
 clean:
-	$(OCAMLBUILD) -clean
-	rm -f ec.native ec.byte
-	rm -f ec.native.exe ec.byte.exe
+	rm -f ec.native && dune clean
 	find theories examples -name '*.eco' -exec rm '{}' ';'
 
 clean_eco:
@@ -131,11 +103,11 @@ clean_eco:
 dist:
 	if [ -e $(DISTDIR) ]; then rm -rf $(DISTDIR); fi
 	./scripts/install/distribution $(DISTDIR) MANIFEST
-	BZIP2=-9 $(TAR) -cjf $(DISTDIR).tar.bz2 --owner=0 --group=0 $(DISTDIR)
+	BZIP2=-9 tar -cjf $(DISTDIR).tar.bz2 --owner=0 --group=0 $(DISTDIR)
 	rm -rf $(DISTDIR)
 
 distcheck: dist
-	$(TAR) -xof $(DISTDIR).tar.bz2
+	tar -xof $(DISTDIR).tar.bz2
 	set -x; \
 	     $(MAKE) -C $(DISTDIR) \
 	  && $(MAKE) -C $(DISTDIR) dist \
@@ -147,15 +119,3 @@ distcheck: dist
 	rm -rf $(DISTDIR)
 	@echo "$(DISTDIR) is ready for distribution" | \
 	  sed -e 1h -e 1s/./=/g -e 1p -e 1x -e '$$p' -e '$$x'
-
-# --------------------------------------------------------------------
-%.inferred.mli:
-	@$(call do-core-build,src/$@) && cat _build/src/$@
-
-# --------------------------------------------------------------------
-%.ml:
-	$(call do-core-build,src/$*.cmo)
-
-# --------------------------------------------------------------------
-%.mli:
-	$(call do-core-build,src/$*.cmi)

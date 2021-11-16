@@ -3,18 +3,13 @@
  (release (flags :standard -rectypes)
           (ocamlopt_flags -O3 -unbox-closures)))
 
-; Fixme: use Dune's build-info library once the build system is
-; migrated to Dune
-(rule
- (targets ecVersion.ml)
- (action (copy ecVersion.ml.in %{targets})))
-
 (include_subdirs unqualified)
 
 (executable
  (public_name easycrypt)
  (name ec)
- (libraries batteries inifiles why3 zarith yojson))
+ (promote (until-clean))
+ (libraries batteries dune-build-info inifiles why3 yojson zarith))
 
 (ocamllex ecLexer)
 

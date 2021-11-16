@@ -13,10 +13,14 @@ let copyright = [
 ]
 
 let url  = "https://www.easycrypt.info/"
-let hash = "COMMIT"
 let app  = "easycrypt"
 
 module License = struct
   let engine = "Distributed under the terms of the CeCILL-C license"
   let stdlib = "Distributed under the terms of the CeCILL-B license"
 end
+
+let hash =
+  match Build_info.V1.version () with
+  | None   -> "n/a"
+  | Some v -> Build_info.V1.Version.to_string v

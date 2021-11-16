@@ -2,13 +2,14 @@
 depends: [
   "dune" {>= "2.8"}
   "ocaml" {>= "4.08.0"}
-  "why3" {>= "1.4.0" & < "1.5"}
-  "zarith" {>= "1.10"}
-  "ocaml-inifiles" {>= "1.2"}
-  "camlzip"
-  "yojson"
-  "pcre" {>= "7"}
   "batteries" {>= "2.3.0"}
+  "camlzip"
+  "dune-build-info"
+  "ocaml-inifiles" {>= "1.2"}
+  "pcre" {>= "7"}
+  "why3" {>= "1.4.0" & < "1.5"}
+  "yojson"
+  "zarith" {>= "1.10"}
   "odoc" {with-doc}
 ]
 opam-version: "2.0"

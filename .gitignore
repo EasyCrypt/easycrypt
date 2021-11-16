@@ -12,6 +12,8 @@ setup.log
 /attic
 /attic.ec*
 /theories/attic
+/ec.native
+/src/*.exe
 
 *.aux
 *.bbl
@@ -28,7 +30,6 @@ setup.log
 *.synctex.gz
 *.kilepr
 *.eco
-/src/ecVersion.ml
 
 /doc/refman/easycrypt.pdf
 /doc/userman/easycrypt.pdf
