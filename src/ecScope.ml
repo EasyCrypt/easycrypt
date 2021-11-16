@@ -1574,7 +1574,10 @@ module Ty = struct
            | Some (loc, (p, opty)) ->
                if not (EcReduction.EqTest.for_type env ty opty) then begin
                  let ppe = EcPrinting.PPEnv.ofenv env in
-                 hierror ~loc "invalid type for operator `%s': %a / %a"
+                 hierror ~loc
+"invalid type for operator `%s':@\n\
+\  - expected: %a@\n\
+\  - got     : %a"
                    x (EcPrinting.pp_type ppe) ty (EcPrinting.pp_type ppe) opty
                end; Mstr.add x p m)
         reqs Mstr.empty
