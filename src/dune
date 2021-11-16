@@ -9,19 +9,12 @@
  (targets ecVersion.ml)
  (action (copy ecVersion.ml.in %{targets})))
 
-(library
- (name ec_core)
- (wrapped false)
- (modules :standard \ ec ecCoreHiPhl)
- (libraries batteries inifiles why3 zarith yojson))
-
 (include_subdirs unqualified)
 
 (executable
  (public_name easycrypt)
  (name ec)
- (modules ec)
- (libraries ec_core))
+ (libraries batteries inifiles why3 zarith yojson))
 
 (ocamllex ecLexer)
 
