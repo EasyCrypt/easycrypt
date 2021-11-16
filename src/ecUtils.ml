@@ -527,7 +527,6 @@ module List = struct
     | x :: xs -> not (List.exists (eq x) xs) && (is_unique ~eq xs)
 
   let sum  xs = List.fold_left (+)  0  xs
-  let sumf xs = List.fold_left (+.) 0. xs
 
   let rotate (d : [`Left|`Right]) (i : int) (xs : 'a list) =
     if i < 0 then invalid_arg "List.rotate: [i < 0]";
@@ -591,7 +590,7 @@ module Parray = struct
   let fold_left2 f a t1 t2 =
     if Array.length t1 <> Array.length t2 then
       raise (Invalid_argument "Parray.fold_left2");
-    let rec aux i a t1 t2 =
+    let aux i a t1 t2 =
       if i < Array.length t1 then f a t1.(i) t2.(i)
       else a in
     aux 0 a t1 t2
@@ -665,8 +664,6 @@ module String = struct
           end
       in aux matched 0
 
-    let last_matching tomatch s =
-      List.map rev (first_matching (List.map rev tomatch) (rev s))
   end
 
   let option_matching tomatch s =

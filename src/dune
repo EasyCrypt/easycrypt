@@ -1,0 +1,18 @@
+(env
+ (dev     (flags :standard -rectypes -w +28+33-3-6-9-23-32-34-35-38-39-58))
+ (release (flags :standard -rectypes)
+          (ocamlopt_flags -O3 -unbox-closures)))
+
+(include_subdirs unqualified)
+
+(executable
+ (public_name easycrypt)
+ (name ec)
+ (promote (until-clean))
+ (libraries batteries dune-build-info inifiles why3 yojson zarith))
+
+(ocamllex ecLexer)
+
+(menhir
+ (modules ecParser)
+ (flags --table))
