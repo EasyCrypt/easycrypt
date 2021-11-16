@@ -113,6 +113,7 @@ type tyerror =
 | FilterMatchFailure
 | LvMapOnNonAssign
 | TCArgsCountMismatch    of qsymbol * ty_params * ty list
+| CannotInferTC          of ty * typeclass
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror

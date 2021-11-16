@@ -2049,6 +2049,18 @@ let pp_added_op (ppe : PPEnv.t) fmt op =
 let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
   pp_opname fmt (PPEnv.op_symb ppe p None)
 
+(* -------------------------------------------------------------------- *)
+let pp_typeclass (ppe : PPEnv.t) fmt (tc : typeclass) =
+  match tc.tc_args with
+  | [] ->
+      Format.fprintf fmt "%a" (pp_tcname ppe) tc.tc_name
+  | [ty] ->
+      Format.fprintf fmt "%a %a"
+        (pp_type ppe) ty (pp_tcname ppe) tc.tc_name
+  | tys ->
+      Format.fprintf fmt "(%a) %a"
+        (pp_list ", " (pp_type ppe)) tys
+        (pp_tcname ppe) tc.tc_name
 
 (* -------------------------------------------------------------------- *)
 let string_of_axkind = function
@@ -2231,6 +2243,7 @@ let pp_i_blk (_ppe : PPEnv.t) fmt _ =
 
 let pp_i_abstract (_ppe : PPEnv.t) fmt id =
   Format.fprintf fmt "%s" (EcIdent.name id)
+
 (* -------------------------------------------------------------------- *)
 let c_ppnode1 ~width ppe (pp1 : ppnode1) =
   match pp1 with

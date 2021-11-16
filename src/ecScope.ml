@@ -1744,7 +1744,6 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
-    (* FIXME: TC: check that tcp.tc_args meets the reqs. of tc.tc_params *)
     let subst = { ty_subst_id with
        ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
        ts_v   =
@@ -1775,11 +1774,9 @@ module Ty = struct
     tc.tc_prt |> oiter (fun prt ->
       let ue = EcUnify.UniEnv.create (Some typarams) in
 
-      try  EcUnify.hastc (env scope) ue (snd ty) prt
-      with EcUnify.UnificationFailure _ ->
+      if not (EcUnify.hastc (env scope) ue (snd ty) prt) then
         hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name)
     );
-
 
     let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
     let tcsyms  = Mstr.of_list tcsyms in

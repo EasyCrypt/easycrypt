@@ -121,6 +121,7 @@ type tyerror =
 | FilterMatchFailure
 | LvMapOnNonAssign
 | TCArgsCountMismatch    of qsymbol * ty_params * ty list
+| CannotInferTC          of ty * typeclass
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -796,7 +797,10 @@ let transtc (env : EcEnv.env) ue ((tc_name, args) : ptcparam) : typeclass =
 
      (* FIXME: TC *)
      List.iter2
-       (fun (_, tcs) ty -> EcUnify.hastcs env ue ty tcs)
+       (fun (_, tcs) ty ->
+          List.iter (fun tc ->
+            if not (EcUnify.hastc env ue ty tc) then
+              tyerror (loc tc_name) env (CannotInferTC (ty, tc))) tcs)
        decl.tc_tparams args;
      { tc_name = p; tc_args = args; }
 

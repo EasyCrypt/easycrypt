@@ -365,11 +365,13 @@ end = struct
     | LvMapOnNonAssign ->
         msg "map-style left-value cannot be used with assignments"
 
-    | TCArgsCountMismatch (sc, typarams, tys) ->
-        msg "different number of typeclass type parameters and arguments provided in %a:@\n - %a @\n - %a"
-          pp_qsymbol sc
-          (EcPrinting.pp_list "@, " (fun fmt (id, _) -> pp_symbol fmt (EcIdent.name id))) typarams
-          (EcPrinting.pp_list "@, " pp_type) tys
+    | TCArgsCountMismatch (_, typarams, tys) ->
+        msg "typeclass expects %d arguments, got %d"
+          (List.length typarams) (List.length tys)
+
+    | CannotInferTC (ty, tc) ->
+        msg "cannot infer typeclass `%a' for type `%a'"
+          (EcPrinting.pp_typeclass env) tc pp_type ty
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

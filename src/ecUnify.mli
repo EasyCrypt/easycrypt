@@ -43,8 +43,7 @@ end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
 
-val hastc  : EcEnv.env -> unienv -> ty -> typeclass -> unit
-val hastcs : EcEnv.env -> unienv -> ty -> typeclass list -> unit
+val hastc : EcEnv.env -> unienv -> ty -> typeclass -> bool
 
 val tfun_expected : unienv -> EcTypes.ty list -> EcTypes.ty
 

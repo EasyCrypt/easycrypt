@@ -565,11 +565,16 @@ let unify_core env ue pb =
 let unify env ue t1 t2 =
   unify_core env ue (`TyUni (t1, t2))
 
-let hastc env ue ty tc =
+let hastc_r env ue ty tc =
   unify_core env ue (`Other (`TcCtt (ty, tc)))
 
-let hastcs env ue ty tcs =
-  List.iter (hastc env ue ty) tcs
+let hastcs_r env ue ty tcs =
+  List.iter (hastc_r env ue ty) tcs
+
+(* -------------------------------------------------------------------- *)
+let hastc env ue ty tc =
+  try  hastc_r env ue ty tc; true
+  with UnificationFailure _ -> false
 
 (* -------------------------------------------------------------------- *)
 let tfun_expected ue psig =
@@ -619,14 +624,14 @@ let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
 
         | Some (TVIunamed lt) ->
             List.iter2
-              (fun ty (_, tc) -> hastcs env subue ty tc)
+              (fun ty (_, tc) -> hastcs_r env subue ty tc)
               lt op.D.op_tparams
 
         | Some (TVInamed ls) ->
             let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in
             let tparams = Msym.of_list tparams in
             List.iter (fun (x, ty) ->
-              hastcs env subue ty (oget (Msym.find_opt x tparams)))
+              hastcs_r env subue ty (oget (Msym.find_opt x tparams)))
               ls
 
         with UnificationFailure _ -> raise E.Failure
