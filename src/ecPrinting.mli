@@ -58,6 +58,8 @@ val pp_form    : PPEnv.t -> form pp
 val pp_type    : PPEnv.t -> ty pp
 val pp_tyname  : PPEnv.t -> path pp
 val pp_axname  : PPEnv.t -> path pp
+val pp_tcname  : PPEnv.t -> path pp
+val pp_thname  : PPEnv.t -> path pp
 
 val pp_mem      : PPEnv.t -> EcIdent.t pp
 val pp_tyvar    : PPEnv.t -> ident pp
@@ -69,7 +71,7 @@ val pp_typedecl : PPEnv.t -> (path * tydecl                ) pp
 val pp_opdecl   : ?long:bool -> PPEnv.t -> (path * operator) pp
 val pp_added_op : PPEnv.t -> operator pp
 val pp_axiom    : ?long:bool -> PPEnv.t -> (path * axiom   ) pp
-val pp_theory   : PPEnv.t -> (path * (ctheory * thmode)    ) pp
+val pp_theory   : PPEnv.t -> (path * ctheory               ) pp
 val pp_modtype1 : PPEnv.t -> module_type                     pp
 val pp_modtype  : PPEnv.t -> (module_type * mod_restr      ) pp
 val pp_modexp   : PPEnv.t -> (mpath * module_expr          ) pp

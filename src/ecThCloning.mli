@@ -71,14 +71,14 @@ val evc_empty : evclone
 type axclone = {
   axc_axiom : symbol * EcDecl.axiom;
   axc_path  : EcPath.path;
-  axc_env   : EcEnv.env;
+  axc_env   : EcSection.scenv;
   axc_tac   : EcParsetree.ptactic_core option;
 }
 
 (* -------------------------------------------------------------------- *)
 type clone = {
   cl_name   : symbol;
-  cl_theory : EcPath.path * (EcEnv.Theory.t * EcTheory.thmode);
+  cl_theory : EcPath.path * EcEnv.Theory.t;
   cl_clone  : evclone;
   cl_rename : renaming list;
   cl_ntclr  : EcPath.Sp.t;
@@ -104,4 +104,4 @@ and rk_categories = {
 
 (* -------------------------------------------------------------------- *)
 val rename : renaming -> theory_renaming_kind * string -> string option
-val clone  : EcEnv.env -> theory_cloning -> clone
+val clone  : EcSection.scenv -> theory_cloning -> clone

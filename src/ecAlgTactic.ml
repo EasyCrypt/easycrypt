@@ -90,7 +90,7 @@ module Axioms = struct
     let addctt = fun subst x f -> EcSubst.add_opdef subst (xpath x) ([], f) in
 
     let subst  =
-      EcSubst.add_tydef EcSubst.empty (xpath tname) ([], cr.r_type) in
+      EcSubst.add_tydef (EcSubst.empty ()) (xpath tname) ([], cr.r_type) in
     let subst  =
       List.fold_left (fun subst (x, p) -> add subst x p) subst crcore in
     let subst  = odfl subst (cr.r_opp |> omap (fun p -> add subst opp p)) in

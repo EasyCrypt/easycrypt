@@ -287,35 +287,83 @@ module PV = struct
   let fv env m f =
 
     let remove b fv =
-      let do1 fv (id,gty) =
+      let do1 fv (id, gty) =
         match gty with
-        | GTmodty _ -> { fv with s_gl = Sm.remove (EcPath.mident id) fv.s_gl }
+        | GTmodty _ ->
+            { fv with s_gl = Sm.remove (EcPath.mident id) fv.s_gl }
         | _ -> fv in
       List.fold_left do1 fv b in
 
     let rec aux env fv f =
       match f.f_node with
-      | Fquant(_,b,f1) ->
+      | Fquant (_, b, f1) ->
         let env = Mod.add_mod_binding b env in
         let fv1 = aux env fv f1 in
         remove b fv1
-      | Fif(f1,f2,f3) -> List.fold_left (aux env) fv [f1;f2;f3]
-      | Fmatch(b,bs,_) -> List.fold_left (aux env) fv (b::bs)
-      | Flet(_,f1,f2) -> aux env (aux env fv f1) f2
-      | Fpvar(x,m') ->
+
+      | Fif (f1, f2, f3) ->
+          List.fold_left (aux env) fv [f1; f2; f3]
+
+      | Fmatch (b, bs, _) ->
+          List.fold_left (aux env) fv (b :: bs)
+
+      | Flet (_, f1, f2) ->
+          aux env (aux env fv f1) f2
+
+      | Fpvar (x, m') ->
         if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
-      | Fglob (mp,m') ->
+
+      | Fglob (mp, m') ->
         if EcIdent.id_equal m m' then
           let f' = NormMp.norm_glob env m mp in
-          if f_equal f f' then add_glob env mp fv
+          if   f_equal f f'
+          then add_glob env mp fv
           else aux env fv f'
         else fv
+
       | Fint _ | Flocal _ | Fop _ -> fv
-      | Fapp(e, es) -> List.fold_left (aux env) (aux env fv e) es
-      | Ftuple es   -> List.fold_left (aux env) fv es
-      | Fproj(e,_)  -> aux env fv e
-      | FhoareF _  | FhoareS _ | FbdHoareF _  | FbdHoareS _
-      | FequivF _ | FequivS _ | FeagerF _ | Fpr _ -> assert false
+
+      | Fapp (e, es) ->
+          List.fold_left (aux env) (aux env fv e) es
+
+      | Ftuple es ->
+          List.fold_left (aux env) fv es
+
+      | Fproj (e, _) ->
+          aux env fv e
+
+      | FhoareF hf ->
+          in_mem_scope env fv [mhr] [hf.hf_pr; hf.hf_po]
+
+      | FhoareS hs ->
+          in_mem_scope env fv [fst hs.hs_m] [hs.hs_pr; hs.hs_po]
+
+      | FbdHoareF bhf ->
+          in_mem_scope env fv [mhr] [bhf.bhf_pr; bhf.bhf_po; bhf.bhf_bd]
+
+
+      | FbdHoareS bhs ->
+          in_mem_scope env fv
+            [fst bhs.bhs_m] [bhs.bhs_pr; bhs.bhs_po; bhs.bhs_bd]
+
+      | FequivF ef ->
+          in_mem_scope env fv [mleft; mright] [ef.ef_pr; ef.ef_po]
+
+      | FequivS es ->
+          in_mem_scope env fv [fst es.es_ml; fst es.es_mr] [es.es_pr; es.es_po]
+
+      | FeagerF eg ->
+          in_mem_scope env fv [mhr] [eg.eg_pr; eg.eg_po]
+
+      | Fpr pr ->
+          let fv = aux env fv pr.pr_args in
+          in_mem_scope env fv [pr.pr_mem] [pr.pr_event]
+
+    and in_mem_scope env fv mems fs =
+      if   List.exists (EcIdent.id_equal m) mems
+      then fv
+      else List.fold_left (aux env) fv fs
+
     in
     aux env empty f
 

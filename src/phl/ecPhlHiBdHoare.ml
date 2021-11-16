@@ -60,7 +60,7 @@ let process_bdhoare_split info tc =
 
           let rwtt = [
             EcLowGoal.t_intros_i [EcIdent.create "_"];
-            EcHiGoal.LowRewrite.t_rewrite (`LtoR, None) pt;
+            EcHiGoal.LowRewrite.t_rewrite (`LtoR, None, None) pt;
             t_true;
           ] in FApi.t_seqs rwtt tc
         in

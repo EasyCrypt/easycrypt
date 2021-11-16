@@ -92,7 +92,7 @@ theory List_CDH.
 
   (** Naive reduction to CDH **)
   section.
-    declare module A: Adversary.
+    declare module A <: Adversary.
 
     local module LCDH' = {
       var x, y: F.t
@@ -194,7 +194,7 @@ theory Set_CDH.
 
   (** Naive reduction to CDH **)
   section.
-    declare module A: Adversary.
+    declare module A <: Adversary.
 
     local module AL = {
       proc solve(gx:group, gy:group) = {

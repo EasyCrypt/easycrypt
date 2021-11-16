@@ -473,7 +473,7 @@ lemma exp0 x : x ^ ZModE.zero = e.
 proof. by rewrite expE inzmodK mod0z exp0. qed.
 
 lemma exp1 x : x ^ ZModE.one = x.
-proof. by rewrite expE inzmodK modz_small 1:[smt(ge2_p)] exp1. qed.
+proof. by rewrite expE inzmodK modz_small 1:#smt:(ge2_p) exp1. qed.
 
 lemma expN x (k : exp) : x ^ (- k) = inv (x ^ k).
 proof.

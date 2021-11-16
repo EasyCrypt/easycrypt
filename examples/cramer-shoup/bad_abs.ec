@@ -20,10 +20,10 @@ module type NegA (A:Adv) = {
 section TEST.
 
 
-   declare module M1:Main.
-   declare module M2:Main.
-   declare module N:NegA.
-   declare module A:Adv.
+   declare module M1 <: Main.
+   declare module M2 <: Main.
+   declare module N <: NegA.
+   declare module A <: Adv.
 
    lemma test : 
      forall (pre : input_m -> input_m -> glob M1 -> glob M2 -> bool)
@@ -69,10 +69,10 @@ end section TEST.
 section TEST1.
 
 
-   declare module M1:Main.
-   declare module M2:Main.
-   declare module N:NegA.
-   declare module A:Adv.
+   declare module M1 <: Main.
+   declare module M2 <: Main.
+   declare module N <: NegA.
+   declare module A <: Adv.
 
    lemma test1 : 
      forall (pre : input_m -> input_m -> glob M1 -> glob M2 -> bool)

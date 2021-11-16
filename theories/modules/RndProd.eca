@@ -89,7 +89,7 @@ module O2 (Oa : ROa.RO) (Ob : ROb.RO) = {
 }.
 
 section.
-declare module D : 
+declare module D <: 
   Distinguisher { ROa.RO, ROa.FRO, ROb.RO, ROb.FRO, ROab.RO, ROab.FRO }.
 
 local module O3 (Oa : ROa.RO) (Ob : ROb.RO) = {

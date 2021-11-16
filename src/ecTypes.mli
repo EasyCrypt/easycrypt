@@ -14,6 +14,14 @@ open EcUid
 open EcIdent
 
 (* -------------------------------------------------------------------- *)
+(* FIXME: section: move me *)
+
+type locality  = [`Declare | `Local | `Global ]
+type is_local  =           [ `Local | `Global ]
+
+val local_of_locality : locality -> is_local
+
+(* -------------------------------------------------------------------- *)
 type ty = private {
   ty_node : ty_node;
   ty_fv   : int Mid.t;
@@ -46,6 +54,8 @@ val tconstr : EcPath.path -> ty list -> ty
 val tfun    : ty -> ty -> ty
 val tglob   : EcPath.mpath -> ty
 val tpred   : ty -> ty
+
+val ty_fv_and_tvar : ty -> int Mid.t
 
 (* -------------------------------------------------------------------- *)
 val tunit   : ty

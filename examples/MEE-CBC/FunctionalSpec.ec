@@ -293,7 +293,7 @@ op unpad (bs : block list) =
 
 (* Proofs for instantiation *)
 lemma size_padding m: size (padding (pad_length m)) = 16 - size m %% 16.
-proof. by rewrite /padding /= size_mkseq [smt (size_ge0 @IntDiv)]. qed.
+proof. by rewrite /padding /= size_mkseq #smt:(size_ge0 @IntDiv). qed.
 
 lemma last_padding x m: last x (padding (pad_length m)) = int2o (16 - size m %% 16).
 proof.
@@ -307,7 +307,7 @@ lemma size_padded m t:
   size (m ++ t2os t ++ padding (pad_length m))
   = 48 + (size m - size m %% 16).
 proof.
-by rewrite !size_cat size_padding size_t2os [smt (@IntDiv)].
+by rewrite !size_cat size_padding size_t2os #smt:(@IntDiv).
 qed.
 
 lemma padded_is_blocks m t:
@@ -320,14 +320,14 @@ qed.
 lemma size_pad m t:
   size (pad m t) (* this is in blocks of 16 octets *)
   = size m %/ 16 (* message *) + 2 (* tag *) + 1 (* padding *).
-proof. by rewrite /pad /= size_os2bs size_padded [smt (@IntDiv)]. qed.
+proof. by rewrite /pad /= size_os2bs size_padded #smt:(@IntDiv). qed.
 
 lemma padK m t: unpad (pad m t) = Some (m,t).
 proof.
 rewrite /unpad.
 have -> /=: bs2os (pad m t)
             = m ++ t2os t ++ padding (pad_length m).
-+ by rewrite /pad /= os2bsK // size_padded [smt (@IntDiv)].
++ by rewrite /pad /= os2bsK // size_padded #smt:(@IntDiv).
 rewrite !last_cat last_padding int2oK.
 + split=> [|_]; first by smt (size_ge0 @IntDiv).
   by apply/(ler_lt_trans 16); [smt (size_ge0 @IntDiv)|smt (exprS expr0)].
@@ -338,7 +338,7 @@ rewrite -catA take_size_cat //=.
 + by rewrite !size_cat size_padding 1:size_t2os /#.
 rewrite drop_size_cat.
 + by rewrite !size_cat size_padding 1:size_t2os /#.
-rewrite (_: 1 <= 16 - size m %% 16 <= 16) 1:[smt (@IntDiv)] /=.
+rewrite (_: 1 <= 16 - size m %% 16 <= 16) 1:#smt:(@IntDiv) /=.
 + by rewrite take_size_cat 1:size_t2os// t2osK.
 qed.
 

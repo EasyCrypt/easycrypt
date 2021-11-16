@@ -55,7 +55,7 @@ end DLog.
 *)
 section DLogSecurity.
 
-  declare module L:DLog.Adversary.
+  declare module L <: DLog.Adversary.
 
   module StdRedAdversary(L:DLog.Adversary) = {
     proc guess(h: group) : F.t = {

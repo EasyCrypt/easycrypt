@@ -22,10 +22,11 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
-  let mk_tydecl (tyvars, name) body = {
-    pty_name   = name;
-    pty_tyvars = tyvars;
-    pty_body   = body;
+  let mk_tydecl ~locality (tyvars, name) body = {
+    pty_name     = name;
+    pty_tyvars   = tyvars;
+    pty_body     = body;
+    pty_locality = locality;
   }
 
   let opdef_of_opbody ty b =
@@ -88,14 +89,14 @@
   let pflist loc ti (es : pformula    list) : pformula    =
     List.fold_right (fun e1 e2 -> pf_cons loc ti e1 e2) es (pf_nil loc ti)
 
-  let mk_axiom ?(local = false) ?(nosmt = false) (x, ty, vd, f) k =
-    { pa_name    = x;
-      pa_tyvars  = ty;
-      pa_vars    = vd;
-      pa_formula = f;
-      pa_kind    = k;
-      pa_nosmt   = nosmt;
-      pa_local   = local; }
+  let mk_axiom  ?(nosmt = false) ~locality (x, ty, vd, f) k =
+    { pa_name     = x;
+      pa_tyvars   = ty;
+      pa_vars     = vd;
+      pa_formula  = f;
+      pa_kind     = k;
+      pa_nosmt    = nosmt;
+      pa_locality = locality; }
 
   let mk_simplify l =
     if l = [] then
@@ -136,18 +137,21 @@
   let mk_tactic_of_tactics ts =
     mk_core_tactic (mk_loc ts.pl_loc (Pseq (unloc ts)))
 
-  let mk_topmod ~local (header, body) =
-    {
-      ptm_header = header;
-      ptm_body   = body;
-      ptm_local  = local;
-    }
-
   let mk_rel_pterm info =
     odfl ({ fp_mode = `Implicit;
             fp_head = FPCut (None, None);
             fp_args = []; }) info
 
+  (* ------------------------------------------------------------------ *)
+  let locality_as_local (lc : locality located) =
+    match unloc lc with
+    | `Global  -> `Global
+    | `Local   -> `Local
+    | `Declare -> parse_error (loc lc)
+                   (Some "cannot mark with 'declare' this kind of objects ")
+
+  let bool_as_local b =
+    if b then `Local else `Global
   (* ------------------------------------------------------------------ *)
   type prover =
     [ `Exclude | `Include | `Only] * psymbol
@@ -447,6 +451,7 @@
 %token FUN
 %token FUSION
 %token FWDS
+%token GEN
 %token GLOB
 %token GOAL
 %token HAT
@@ -642,6 +647,7 @@ _lident:
 | DUMP       { "dump"       }
 | EXPECT     { "expect"     }
 | FIRST      { "first"      }
+| GEN        { "gen"        }
 | INTERLEAVE { "interleave" }
 | LAST       { "last"       }
 | LEFT       { "left"       }
@@ -1515,10 +1521,15 @@ mod_body:
 | LBRACE stt=loc(mod_item)* RBRACE
     { Pm_struct stt }
 
-mod_def:
-| MODULE header=mod_header c=mod_cast? EQ body=loc(mod_body)
-  { let header = match c with None -> header | Some c ->  Pmh_cast(header,c) in
-    header, body }
+mod_def_or_decl:
+| locality=locality MODULE header=mod_header c=mod_cast? EQ ptm_body=loc(mod_body)
+  { let ptm_header = match c with None -> header | Some c ->  Pmh_cast(header,c) in
+    { ptm_def      = `Concrete { ptm_header; ptm_body; };
+      ptm_locality = locality; } }
+
+| locality=locality MODULE ptm_name=uident LTCOLON ptm_modty=mod_type_restr
+    { { ptm_def      = `Abstract { ptm_name; ptm_modty; };
+        ptm_locality = locality; } }
 
 mod_header:
 | x=uident                  { Pmh_ident x }
@@ -1530,14 +1541,6 @@ mod_cast:
 
 mod_header_params:
 | mh=mod_header p=mod_params { mh,p }
-
-top_mod_def:
-| LOCAL x=mod_def { mk_topmod ~local:true  x }
-| /*-*/ x=mod_def { mk_topmod ~local:false x }
-
-top_mod_decl:
-| DECLARE MODULE x=uident COLON t=mod_type_restr
-    { { ptmd_name = x; ptmd_modty = t; } }
 
 mod_params:
 | LPAREN a=plist1(sig_param, COMMA) RPAREN  { a }
@@ -1556,9 +1559,10 @@ mod_params:
     { (x, restr) }
 
 sig_def:
-| MODULE TYPE x=uident args=sig_params* EQ i=sig_body
-    { (x, Pmty_struct { pmsig_params = List.flatten args;
-                        pmsig_body   = i; }) }
+| pi_locality=loc(locality) MODULE TYPE pi_name=uident args=sig_params* EQ i=sig_body
+    { let pi_sig =
+        Pmty_struct { pmsig_params = List.flatten args; pmsig_body = i; } in
+      { pi_name; pi_sig; pi_locality = locality_as_local pi_locality; } }
 
 sig_body:
 | body=sig_struct_body { body }
@@ -1587,6 +1591,19 @@ signature_item:
 
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions *)
+%inline locality:
+| (* empty *) { `Global }
+| LOCAL       { `Local }
+| DECLARE     { `Declare }
+
+| LOCAL DECLARE
+| DECLARE LOCAL
+    { parse_error
+        (EcLocation.make $startpos $endpos)
+        (Some "cannot mix declare & local") }
+
+%inline is_local:
+| lc=loc(locality) { locality_as_local lc }
 
 tcparam:
 | x=lqident { (x, []) }
@@ -1620,32 +1637,32 @@ rec_field_def:
     { fields }
 
 typedecl:
-| TYPE td=rlist1(tyd_name, COMMA)
-    { List.map (mk_tydecl^~ (PTYD_Abstract [])) td }
+| locality=locality TYPE td=rlist1(tyd_name, COMMA)
+    { List.map (fun x -> mk_tydecl ~locality x (PTYD_Abstract [])) td }
 
-| TYPE td=tyd_name LTCOLON tcs=rlist1(tcparam, COMMA)
-    { [mk_tydecl td (PTYD_Abstract tcs)] }
+| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(tcparam, COMMA)
+    { [mk_tydecl ~locality td (PTYD_Abstract tcs)] }
 
-| TYPE td=tyd_name EQ te=loc(type_exp)
-    { [mk_tydecl td (PTYD_Alias te)] }
+| locality=locality TYPE td=tyd_name EQ te=loc(type_exp)
+    { [mk_tydecl ~locality td (PTYD_Alias te)] }
 
-| TYPE td=tyd_name EQ te=record_def
-    { [mk_tydecl td (PTYD_Record te)] }
+| locality=locality TYPE td=tyd_name EQ te=record_def
+    { [mk_tydecl ~locality td (PTYD_Record te)] }
 
-| TYPE td=tyd_name EQ te=datatype_def
-    { [mk_tydecl td (PTYD_Datatype te)] }
+| locality=locality TYPE td=tyd_name EQ te=datatype_def
+    { [mk_tydecl ~locality td (PTYD_Datatype te)] }
 
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
 typeclass:
-| TYPE CLASS
-    tya=tyvars_decl? x=lident inth=prefix(LTCOLON, tcparam)?
+| loca=is_local TYPE CLASS  tya=tyvars_decl? x=lident inth=prefix(LTCOLON, tcparam)?
   EQ LBRACE body=tc_body RBRACE {
     { ptc_name   = x;
       ptc_params = tya;
       ptc_inth   = inth;
       ptc_ops    = fst body;
-      ptc_axs    = snd body; }
+      ptc_axs    = snd body;
+      ptc_loca   = loca; }
   }
 
 tc_body:
@@ -1660,7 +1677,7 @@ tc_ax:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| INSTANCE x=tcparam args=tyci_args?
+| loca=is_local INSTANCE x=tcparam args=tyci_args?
     WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
   {
     let args = args |> omap (fun (c, p) -> `Ring (c, p)) in
@@ -1668,7 +1685,8 @@ tycinstance:
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs;
-      pti_args = args; }
+      pti_args = args;
+      pti_loca = loca; }
   }
 
 tyci_args:
@@ -1711,37 +1729,39 @@ op_or_const:
 | CONST { `Const }
 
 operator:
-| k=op_or_const st=nosmt tags=bracket(ident*)? x=plist1(oident, COMMA)
-    tyvars=tyvars_decl? args=ptybindings_decl?
+| locality=locality k=op_or_const st=nosmt tags=bracket(ident*)?
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl?
     sty=prefix(COLON, loc(type_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
 
   { let gloc = EcLocation.make $startpos $endpos in
     let sty  = sty |> ofdfl (fun () ->
       mk_loc (b |> omap (loc |- fst) |> odfl gloc) PTunivar) in
 
-    { po_kind    = k;
-      po_name    = List.hd x;
-      po_aliases = List.tl x;
-      po_tags    = odfl [] tags;
-      po_tyvars  = tyvars;
-      po_args    = odfl [] args;
-      po_def     = opdef_of_opbody sty (omap (unloc |- fst) b);
-      po_ax      = obind snd b;
-      po_nosmt   = st; } }
+    { po_kind     = k;
+      po_name     = List.hd x;
+      po_aliases  = List.tl x;
+      po_tags     = odfl [] tags;
+      po_tyvars   = tyvars;
+      po_args     = odfl [] args;
+      po_def      = opdef_of_opbody sty (omap (unloc |- fst) b);
+      po_ax       = obind snd b;
+      po_nosmt    = st;
+      po_locality = locality; } }
 
-| k=op_or_const st=nosmt tags=bracket(ident*)? x=plist1(oident, COMMA)
-    tyvars=tyvars_decl? args=ptybindings_decl?
+| locality=locality k=op_or_const st=nosmt tags=bracket(ident*)?
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
 
-  { { po_kind    = k;
-      po_name    = List.hd x;
-      po_aliases = List.tl x;
-      po_tags    = odfl [] tags;
-      po_tyvars  = tyvars;
-      po_args    = odfl [] args;
-      po_def     = opdef_of_opbody sty (Some (`Reft (rname, reft)));
-      po_ax      = None;
-      po_nosmt   = st; } }
+  { { po_kind     = k;
+      po_name     = List.hd x;
+      po_aliases  = List.tl x;
+      po_tags     = odfl [] tags;
+      po_tyvars   = tyvars;
+      po_args     = odfl [] args;
+      po_def      = opdef_of_opbody sty (Some (`Reft (rname, reft)));
+      po_ax       = None;
+      po_nosmt    = st;
+      po_locality = locality; } }
 
 opbody:
 | e=expr   { `Expr e  }
@@ -1788,27 +1808,31 @@ opptn(BOP):
 (* -------------------------------------------------------------------- *)
 (* Predicate definitions                                                *)
 predicate:
-| PRED x=oident
-   { { pp_name   = x;
-       pp_tyvars = None;
-       pp_def    = PPabstr []; } }
+| locality=locality PRED x=oident
+   { { pp_name     = x;
+       pp_tyvars   = None;
+       pp_def      = PPabstr [];
+       pp_locality = locality; } }
 
-| PRED x=oident tyvars=tyvars_decl? COLON sty=pred_tydom
-   { { pp_name   = x;
-       pp_tyvars = tyvars;
-       pp_def    = PPabstr sty; } }
+| locality=locality PRED x=oident tyvars=tyvars_decl? COLON sty=pred_tydom
+   { { pp_name     = x;
+       pp_tyvars   = tyvars;
+       pp_def      = PPabstr sty;
+       pp_locality = locality; } }
 
-| PRED x=oident tyvars=tyvars_decl? p=ptybindings? EQ f=form
-   { { pp_name   = x;
-       pp_tyvars = tyvars;
-       pp_def    = PPconcr (odfl [] p, f); } }
+| locality=locality PRED x=oident tyvars=tyvars_decl? p=ptybindings? EQ f=form
+   { { pp_name     = x;
+       pp_tyvars   = tyvars;
+       pp_def      = PPconcr (odfl [] p, f);
+       pp_locality = locality; } }
 
-| INDUCTIVE x=oident tyvars=tyvars_decl? p=ptybindings?
+| locality=locality INDUCTIVE x=oident tyvars=tyvars_decl? p=ptybindings?
     EQ b=indpred_def
 
-   { { pp_name   = x;
-       pp_tyvars = tyvars;
-       pp_def    = PPind (odfl [] p, b) } }
+   { { pp_name     = x;
+       pp_tyvars   = tyvars;
+       pp_def      = PPind (odfl [] p, b);
+       pp_locality = locality; } }
 
 indpred_def:
 | PIPE? ctors=plist0(ip_ctor_def, PIPE)
@@ -1846,14 +1870,15 @@ nt_bindings:
     { bd }
 
 notation:
-| NOTATION x=loc(NOP) tv=tyvars_decl? bd=nt_bindings?
+| locality=loc(locality) NOTATION x=loc(NOP) tv=tyvars_decl? bd=nt_bindings?
     args=nt_arg1* codom=prefix(COLON, loc(type_exp))? EQ body=expr
   { { nt_name  = x;
       nt_tv    = tv;
       nt_bd    = odfl [] bd;
       nt_args  = args;
       nt_codom = ofdfl (fun () -> mk_loc (loc body) PTunivar) codom;
-      nt_body  = body; } }
+      nt_body  = body;
+      nt_local = locality_as_local locality; } }
 
 abrvopt:
 | b=boption(MINUS) x=ident {
@@ -1868,20 +1893,17 @@ abrvopts:
 | opts=bracket(abrvopt+) { opts }
 
 abbreviation:
-| ABBREV opts=abrvopts? x=oident tyvars=tyvars_decl? args=ptybindings_decl?
-    sty=prefix(COLON, loc(type_exp))? EQ b=expr
+| locality=loc(locality) ABBREV opts=abrvopts? x=oident tyvars=tyvars_decl?
+    args=ptybindings_decl? sty=prefix(COLON, loc(type_exp))? EQ b=expr
 
   { let sty  = sty |> ofdfl (fun () -> mk_loc (loc b) PTunivar) in
 
-    { ab_name = x;
-      ab_tv   = tyvars;
-      ab_args = odfl [] args;
-      ab_def  = (sty, b);
-      ab_opts = odfl [] opts; } }
-
-(* -------------------------------------------------------------------- *)
-top_decl:
-| x=top_mod_decl { PDCL_Module x }
+    { ab_name  = x;
+      ab_tv    = tyvars;
+      ab_args  = odfl [] args;
+      ab_def   = (sty, b);
+      ab_opts  = odfl [] opts;
+      ab_local = locality_as_local locality; } }
 
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
@@ -1893,26 +1915,22 @@ nosmt:
 | NOSMT { true  }
 | empty { false }
 
-%inline local:
-| LOCAL { true  }
-| empty { false }
-
 axiom_tc:
-| /* empty */       { PILemma }
-| BY bracket(empty) { PLemma None }
-| BY t=tactics      { PLemma (Some t) }
+| /* empty */       { PLemma None }
+| BY bracket(empty) { PLemma (Some None) }
+| BY t=tactics      { PLemma (Some (Some t)) }
 
 axiom:
-| l=local AXIOM ids=bracket(ident+)? o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~nosmt:o d (PAxiom (odfl [] ids)) }
+| l=locality AXIOM ids=bracket(ident+)? o=nosmt d=lemma_decl
+    { mk_axiom ~locality:l ~nosmt:o d (PAxiom (odfl [] ids)) }
 
-| l=local LEMMA o=nosmt d=lemma_decl ao=axiom_tc
-    { mk_axiom ~local:l ~nosmt:o d ao }
+| l=locality LEMMA o=nosmt d=lemma_decl ao=axiom_tc
+    { mk_axiom ~locality:l ~nosmt:o d ao }
 
-| l=local  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
-| l=local  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
-| l=local PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
-    { mk_axiom ~local:l (x, None, pd, p) ao }
+| l=locality  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
+| l=locality  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
+| l=locality PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
+    { mk_axiom ~locality:l (x, None, pd, p) ao }
 
 proofend:
 | QED      { `Qed   }
@@ -1933,8 +1951,8 @@ theory_clear_items:
 | xs=theory_clear_item1* { xs }
 
 theory_open:
-| b=boption(ABSTRACT) THEORY x=uident
-    { (b, x) }
+| loca=is_local b=boption(ABSTRACT) THEORY x=uident
+    { (loca, b, x) }
 
 theory_close:
 | END xs=bracket(theory_clear_items)? x=uident
@@ -2322,26 +2340,26 @@ rwarg1:
 | SLASHTILDEQ
    { RWSimpl `Variant }
 
-| s=rwside r=rwrepeat? o=rwocc? fp=rwpterms
-   { RWRw ((s, r, o), fp) }
+| s=rwside r=rwrepeat? o=rwocc? p=bracket(form_h)? fp=rwpterms
+   { RWRw ((s, r, o, p), fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
-   { RWDelta ((s, r, o), x); }
+   { RWDelta ((s, r, o, None), x); }
 
 | PR s=bracket(rwpr_arg)
    { RWPr s }
 
-| SMT
-   { RWSmt (false, SMT.mk_smt_option []) }
-
-| LBRACKET SMT pi=smt_info RBRACKET
-   { RWSmt (false, pi) }
-
-| LBRACKET SMT LPAREN dbmap=dbmap1* RPAREN RBRACKET
-   { RWSmt (false, SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
-
 | AMP f=pterm
    { RWApp f }
+
+| SHARP SMT
+   { RWSmt (false, SMT.mk_smt_option []) }
+
+| SHARP SMT COLON pi=bracket(smt_info)
+   { RWSmt (false, pi) }
+
+| SHARP SMT COLON dbmap=paren(dbmap1*)
+   { RWSmt (false, SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | SHARP x=ident {
     let tactics = [("ring", `Ring); ("field", `Field)] in
@@ -2693,14 +2711,18 @@ logtactic:
 | m=have_or_suff ip=loc(intro_pattern)* COLON p=form BY t=loc(tactics)
    { Pcut (m, ip, p, Some t) }
 
+| GEN HAVE x=loc(ipcore_name) ip=prefix(COMMA, loc(intro_pattern)*)?
+   COLON ids=loc(ipcore_name)* SLASH f=form %prec prec_below_IMPL
+   { Pgenhave (x, ip, ids, f) }
+
 | HAVE ip=loc(intro_pattern)* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=ident xs=ptybindings? CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, odfl [] xs, o, p) }
 
-| WLOG COLON ids=loc(ipcore_name)* SLASH f=form
-   { Pwlog (ids, f) }
+| WLOG b=boption(SUFF) COLON ids=loc(ipcore_name)* SLASH f=form
+   { Pwlog (ids, b, f) }
 
 eager_info:
 | h=ident
@@ -3331,7 +3353,7 @@ tactic_dump:
 (* Theory cloning                                                       *)
 
 theory_clone:
-| local=boption(LOCAL) CLONE options=clone_opts?
+| local=is_local CLONE options=clone_opts?
     ip=clone_import? x=uqident y=prefix(AS, uident)? cw=clone_with?
     c=or3(clone_proof, clone_rename, clone_clear)*
 
@@ -3547,15 +3569,15 @@ gprover_info:
     { { empty_pprover with pprov_cpufactor = Some t; } }
 
 addrw:
-| local=iboption(LOCAL) HINT REWRITE p=lqident COLON l=lqident*
+| local=is_local HINT REWRITE p=lqident COLON l=lqident*
     { (local, p, l) }
 
 hint:
-| local=iboption(LOCAL) HINT EXACT base=lident? COLON l=qident*
+| local=is_local HINT EXACT base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = 0;
         ht_base  = base ; ht_names = l; } }
 
-| local=iboption(LOCAL) HINT SOLVE i=word base=lident? COLON l=qident*
+| local=is_local HINT SOLVE i=word base=lident? COLON l=qident*
     { { ht_local = local; ht_prio  = i;
         ht_base  = base ; ht_names = l; } }
 
@@ -3600,8 +3622,7 @@ global_action:
 | module_import    { GModImport   $1 }
 | section_open     { GsctOpen     $1 }
 | section_close    { GsctClose    $1 }
-| top_decl         { Gdeclare     $1 }
-| top_mod_def      { Gmodule      $1 }
+| mod_def_or_decl  { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
 | typeclass        { Gtypeclass   $1 }

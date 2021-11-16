@@ -118,6 +118,11 @@ and pinstr = pinstr_r located
 and pstmt  = pinstr list
 
 (* -------------------------------------------------------------------- *)
+type is_local = [ `Local | `Global]
+
+type locality = [`Declare | `Local | `Global]
+
+(* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol
 type pmodule_type_restr = pqsymbol * pmsymbol located list
 
@@ -158,10 +163,19 @@ and pfunction_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
+and pmodule_def_or_decl = {
+  ptm_locality : locality;
+  ptm_def      : [`Concrete of pmodule_def | `Abstract of pmodule_decl];
+}
+
+and pmodule_decl = {
+  ptm_name  : psymbol;
+  ptm_modty : pmodule_type_restr;
+}
+
 and pmodule_def = {
   ptm_header : pmodule_header;
   ptm_body   : pmodule_expr;
-  ptm_local  : bool;
 }
 
 and pmodule_header =
@@ -199,10 +213,10 @@ and pfunction_local = {
   pfl_init  : pexpr option;
 }
 
-
-type pmodule_decl = {
-  ptmd_name  : psymbol;
-  ptmd_modty : pmodule_type_restr;
+type pinterface = {
+  pi_name : psymbol;
+  pi_sig : pmodule_sig;
+  pi_locality : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -215,6 +229,7 @@ type ptydecl = {
   pty_name   : psymbol;
   pty_tyvars : ptyparams;
   pty_body   : ptydbody;
+  pty_locality : locality;
 }
 
 and ptydbody =
@@ -332,6 +347,7 @@ type poperator = {
   po_def    : pop_def;
   po_ax     : osymbol_r;
   po_nosmt  : bool;
+  po_locality : locality;
 }
 
 type ppred_def =
@@ -351,6 +367,7 @@ type ppredicate = {
   pp_name   : psymbol;
   pp_tyvars : ptyparams option;
   pp_def    : ppred_def;
+  pp_locality  : locality;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -361,6 +378,7 @@ type pnotation = {
   nt_args  : (psymbol * (psymbol list * pty option)) list;
   nt_codom : pty;
   nt_body  : pexpr;
+  nt_local : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -368,16 +386,13 @@ type abrvopt  = [`Printing]
 type abrvopts = (bool * abrvopt) list
 
 type pabbrev = {
-  ab_name : psymbol;
-  ab_tv   : ptyparams option;
-  ab_args : ptybindings;
-  ab_def  : pty * pexpr;
-  ab_opts : abrvopts;
+  ab_name  : psymbol;
+  ab_tv    : ptyparams option;
+  ab_args  : ptybindings;
+  ab_def   : pty * pexpr;
+  ab_opts  : abrvopts;
+  ab_local : is_local;
 }
-
-(* -------------------------------------------------------------------- *)
-type pdeclare =
-| PDCL_Module of pmodule_decl
 
 (* -------------------------------------------------------------------- *)
 type 'a ppt_head =
@@ -715,7 +730,7 @@ and rwarg1 =
   | RWApp    of ppterm
   | RWTactic of rwtactic
 
-and rwoptions = rwside * trepeat option * rwocc
+and rwoptions = rwside * trepeat option * rwocc * pformula option
 and rwside    = [`LtoR | `RtoL]
 and rwocc     = rwocci option
 and rwocci    = [`Inclusive of Sint.t | `Exclusive of Sint.t | `All]
@@ -804,6 +819,9 @@ type apply_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type pgenhave = psymbol * intropattern option * psymbol list * pformula
+
+(* -------------------------------------------------------------------- *)
 type logtactic =
   | Preflexivity
   | Passumption
@@ -830,7 +848,8 @@ type logtactic =
   | Pcbv        of preduction
   | Pchange     of pformula
   | Ppose       of (psymbol * ptybinding list * rwocc * pformula)
-  | Pwlog       of (psymbol list * pformula)
+  | Pgenhave    of pgenhave
+  | Pwlog       of (psymbol list * bool * pformula)
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core_r =
@@ -887,17 +906,16 @@ and pcut =
 (* -------------------------------------------------------------------- *)
 type paxiom_kind =
 | PAxiom of psymbol list
-| PLemma of ptactics option
-| PILemma
+| PLemma of ptactics option option
 
 type paxiom = {
-  pa_name    : psymbol;
-  pa_tyvars  : ptyparams option;
-  pa_vars    : pgtybindings option;
-  pa_formula : pformula;
-  pa_kind    : paxiom_kind;
-  pa_nosmt   : bool;
-  pa_local   : bool;
+  pa_name     : psymbol;
+  pa_tyvars   : ptyparams option;
+  pa_vars     : pgtybindings option;
+  pa_formula  : pformula;
+  pa_kind     : paxiom_kind;
+  pa_nosmt    : bool;
+  pa_locality : locality;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -913,6 +931,7 @@ type ptypeclass = {
   ptc_inth   : ptcparam option;
   ptc_ops    : (psymbol * pty) list;
   ptc_axs    : (psymbol * pformula) list;
+  ptc_loca   : is_local;
 }
 
 type ptycinstance = {
@@ -921,6 +940,7 @@ type ptycinstance = {
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
   pti_args : [`Ring of (zint option * zint option)] option;
+  pti_loca : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -988,7 +1008,7 @@ type theory_cloning = {
   pthc_rnm    : theory_renaming list;
   pthc_opts   : theory_cloning_options;
   pthc_clears : theory_cloning_clear list;
-  pthc_local  : bool;
+  pthc_local  : is_local;
   pthc_import : [`Export | `Import | `Include] option;
 }
 
@@ -1080,7 +1100,7 @@ type theory_clear = (pqsymbol option) list
 
 (* -------------------------------------------------------------------- *)
 type phint = {
-  ht_local : bool;
+  ht_local : is_local;
   ht_prio  : int;
   ht_base  : psymbol option;
   ht_names : pqsymbol list;
@@ -1098,9 +1118,8 @@ type threquire =
 
 (* -------------------------------------------------------------------- *)
 type global_action =
-  | Gdeclare     of pdeclare
-  | Gmodule      of pmodule_def
-  | Ginterface   of (psymbol * pmodule_sig)
+  | Gmodule      of pmodule_def_or_decl
+  | Ginterface   of pinterface
   | Goperator    of poperator
   | Gpredicate   of ppredicate
   | Gnotation    of pnotation
@@ -1109,12 +1128,12 @@ type global_action =
   | Gtype        of ptydecl list
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
-  | Gaddrw       of (bool * pqsymbol * pqsymbol list)
+  | Gaddrw       of (is_local * pqsymbol * pqsymbol list)
   | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list
-  | GthOpen      of (bool * psymbol)
+  | GthOpen      of (is_local * bool * psymbol)
   | GthClose     of (theory_clear * psymbol)
   | GthClear     of theory_clear
   | GthRequire   of threquire

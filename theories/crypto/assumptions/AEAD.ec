@@ -125,7 +125,7 @@ module AEAD_LoRCondProb(A : AEAD_Adv) = {
    }
 }.
 
-declare module A : AEAD_Adv {AEAD_Oracles}.
+declare module A <: AEAD_Adv {AEAD_Oracles}.
 
 equiv condprob_equiv : 
   AEAD_LoR(A).main ~ AEAD_LoRCondProb(A).main : 
