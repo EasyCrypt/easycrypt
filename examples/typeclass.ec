@@ -126,6 +126,115 @@ typeclass witness = {
 instance ['a] 'a <: witness = {
 }.
 
+require import AllCore.
+
+type class tc = {}.
+
+type class ['a <: tc] foo = {
+  op bar : 'a -> foo -> bool
+  axiom barL : forall x f, bar x f
+}.
+
+op mybar (x : bool) (b : bool) = false.
+
+instance tc with int.
+
+type ('a, 'b) t = 'a * 'b.
+
+type u = (bool, int) t.
+
+instance int foo with bool
+  op bar = mybar.
+
+(*
+type class foo = {}.
+
+type class tc  = {
+  op foo : tc -> bool
+
+  axiom foo_lemma : forall x, foo x
+}.
+
+op foo_int (x : int) = true.
+
+instance tc with int
+  op foo = foo_int.
+
+realize foo_lemma.
+proof. done. qed.
+
+type class ['a <: foo] tc2 <: tc = {
+  op bar : tc2 -> bool
+
+  axiom bar_lemma : forall x, foo x => !bar x
+}.
+
+op bar_int (x : int) = false.
+
+instance foo with bool.
+
+instance bool tc2 with int
+  op bar = bar_int.             (* BUG *)
+
+realize bar_lemma.
+proof. done. qed.
+
+op foo_2 ['a <: foo, 'b <: 'a tc2] = 0.
+*)
+
+
+type class tc = {}.
+type class tc2 <: tc = {}.
+
+(* instance tc  with int (* as tc_int *). *)
+(* instance tc2 with int (* as tc2_int *). *)
+
+(* instance tc with ['a <: tc2] 'a. (* as myinstance. *)*)
+
+op foo ['a <: tc] = 0.
+
+op bar ['a <: tc2] = foo<:'a>.
+
+lemma addrC ['a <: group] : associative (+)<:'a>.
+
+forall x y : int, x + y = y + x.
+
+(+)<:'a> ~ Int.(+)
+
+(+)<:int_group> -> Int.(+)
+
+rewrite addrC.
+apply   addrC.
+
+op foo ['a <: tc2] = 0.
+
+tc_int
+parent(tc2_int) --> tc_int
+
+tc2_int -> mysinstance
+
+op bar = foo<: int[tc2 -> myinstance]>.
+
+
+(*
+*)
+
+
+instance tc with int.
+
+op bar = foo<:int>.
+
+type t <: tc, tc2.
+
+op bar2 = foo<:t>.
+
+type t <: foo.
+
+type class ['a <: tc2] bar = {}.
+
+op foo ['a <: foo, 'b <: 'a bar] : 'a -> 'b -> int.
+
+
 (* -------------------------------------------------------------------- *)
 
  1. typage -> selection des operateurs / inference des instances de tc
@@ -200,3 +309,4 @@ instance ['a] 'a <: witness = {
 
    c. ne pas envoyer certaines instances (e.g. int est un groupe)
       -> instance [nosmt] e.g.
+
