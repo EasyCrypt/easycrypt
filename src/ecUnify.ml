@@ -295,20 +295,27 @@ module TypeClass = struct
 
     let instances =
       let tvinst =
-        (List.map
-           (fun (tv, tcs) ->
-              (*TODOTCC: does it work as intended? Why are there always no type parameters in these cases?*)
-              let rec parent_instances_of_tc otc =
-                match otc with
-                | Some tc -> (([], tvar tv), tc) :: parent_instances_of_tc (EcEnv.TypeClass.by_path tc.tc_name env).tc_prt
-                | None -> []
-              in
-              List.map
-                (fun tc -> parent_instances_of_tc (Some tc))
-                tcs)
-           (Mid.bindings tvtc)) in
-      List.flatten (List.flatten tvinst) @ instances in
+        List.map
+          (fun (tv, tcs) ->
+             let rec parent_instances_of_tc acc tc =
+               let acc    = (([], tvar tv), tc) :: acc in
+               let tcdecl = EcEnv.TypeClass.by_path tc.tc_name env in
 
+               match tcdecl.tc_prt with
+               | None ->
+                   List.rev acc
+
+               | Some prt ->
+                   let subst = List.combine (List.fst tcdecl.tc_tparams) tc.tc_args in
+                   let subst = Tvar.subst (Mid.of_list subst) in
+                   let prt   = { prt with tc_args = List.map subst prt.tc_args } in
+
+                   parent_instances_of_tc acc prt
+
+             in List.map (fun tc -> parent_instances_of_tc [] tc) tcs)
+          (Mid.bindings tvtc)
+
+      in List.flatten (List.flatten tvinst) @ instances in
 
     let exception Bailout in
 
