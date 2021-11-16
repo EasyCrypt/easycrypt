@@ -189,8 +189,8 @@ qed.
      restricted oracles into a security statement about restricted
      adversaries. **)
 section Upto.
-  declare module D:Distinguisher {PRPi, ARP}.
-  axiom D_ll (O <: SPRP_Oracles {D}): islossless O.f => islossless O.fi => islossless D(O).distinguish.
+  declare module D <: Distinguisher {PRPi, ARP}.
+  declare axiom D_ll (O <: SPRP_Oracles {D}): islossless O.f => islossless O.fi => islossless D(O).distinguish.
 
   local module PRP_indirect_bad = {
     var bad : bool
@@ -350,8 +350,8 @@ section CollisionProbability.
   (*---*) import StdBigop StdRing StdOrder.
   (*---*) import Bigreal.BRA RField RField.AddMonoid IntOrder.
 
-  declare module D:Distinguisher {ARP, DBounder}.
-  axiom D_ll (O <: SPRP_Oracles {D}): islossless O.f => islossless O.fi => islossless D(O).distinguish.
+  declare module D <: Distinguisher {ARP, DBounder}.
+  declare axiom D_ll (O <: SPRP_Oracles {D}): islossless O.f => islossless O.fi => islossless D(O).distinguish.
 
   local module FEL (D : Distinguisher) = {
     var c : int
@@ -556,7 +556,7 @@ section PRPi_PRPi'_Indirect.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
   qed.
 
-  declare module D:Distinguisher {PRPi}.
+  declare module D <: Distinguisher {PRPi}.
 
   lemma pr_PRPi_PRPi'_Indirect &m:
     Pr[IND(PRPi,D).main() @ &m: res] = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].

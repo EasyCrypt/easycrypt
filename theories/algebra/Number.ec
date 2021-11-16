@@ -253,6 +253,9 @@ rewrite sqrf_eq1=> -[->//|]; rewrite -ger0_def le0r oppr_eq0.
 by rewrite oner_neq0 /= => /(addr_gt0 _ _ ltr01); rewrite addrN ltrr.
 qed.
 
+lemma nosmt normrZ (x y : t) : zeror <= x => `| x * y | = x * `| y |.
+proof. by move=> ge0; rewrite normrM ger0_norm. qed.
+
 lemma nosmt normrN (x : t): `|- x| = `|x|.
 proof. by rewrite -mulN1r normrM normrN1 mul1r. qed.
 

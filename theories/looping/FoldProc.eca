@@ -48,9 +48,9 @@ smt w=(size_eq0 size_ge0).
 qed.
 
 section.
-  declare module O:Orcl.
+  declare module O <: Orcl.
 
-  axiom fold_swap12:
+  declare axiom fold_swap12:
     equiv [Fold(O).fold_12 ~ Fold(O).fold_21 : ={t1,t2,glob O,s} ==> ={glob O,res}].
 
   local clone import IterProc as IP with

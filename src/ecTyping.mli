@@ -176,7 +176,7 @@ val trans_prop     : env -> ?mv:metavs -> EcUnify.unienv -> pformula -> EcFol.fo
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
-val transmodsig  : env -> symbol -> pmodule_sig  -> module_sig
+val transmodsig  : env -> pinterface -> top_module_sig
 val transmodtype : env -> pmodule_type -> module_type * module_sig
 val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 

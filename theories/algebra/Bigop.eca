@@ -267,7 +267,7 @@ proof.
   move=> /perm_eqP; rewrite !(@big_mkcond P).
   elim s1 s2 => [|i s1 ih1] s2 eq_s12.
     by case s2 eq_s12 => // i s2 h; have := h (pred1 i); smt.
-  have r2i: mem s2 i by rewrite -has_pred1 has_count -eq_s12 smt.
+  have r2i: mem s2 i by rewrite -has_pred1 has_count -eq_s12 #smt.
   have/splitPr [s3 s4] ->> := r2i.
   rewrite big_cat !big_cons /(predT i) /=.
   rewrite addmCA; congr; rewrite -big_cat; apply/ih1=> a.
@@ -505,7 +505,7 @@ lemma nosmt congr_big_int (m1 n1 m2 n2 : int) P1 P2 F1 F2:
     => bigi P1 F1 m1 n1 = bigi P2 F2 m2 n2.
 proof.
   move=> <- <- eqP12 eqF12; rewrite big_seq_cond (@big_seq_cond P2).
-  by apply/eq_big=> i /=; rewrite mem_range smt.
+  by apply/eq_big=> i /=; rewrite mem_range #smt.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -542,7 +542,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int1 n F: bigi predT F n (n+1) = F n.
-proof. by rewrite big_ltn 1:smt big_geq // addm0. qed.
+proof. by rewrite big_ltn 1:/# big_geq // addm0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_cat_int (n m p : int) P F: m <= n => n <= p =>
@@ -552,12 +552,12 @@ proof. by move=> lemn lenp; rewrite -big_cat -range_cat. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recl (n m : int) F: m <= n =>
   bigi predT F m (n+1) = F m + bigi predT (fun i => F (i+1)) m n.
-proof. by move=> lemn; rewrite big_ltn 1?big_addn /= 1:smt. qed.
+proof. by move=> lemn; rewrite big_ltn 1?big_addn /= 1:/#. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recr (n m : int) F: m <= n =>
   bigi predT F m (n+1) = bigi predT F m n + F n.
-proof. by move=> lemn; rewrite (@big_cat_int n) ?big_int1 // smt. qed.
+proof. by move=> lemn; rewrite (@big_cat_int n) ?big_int1 //#. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recl_cond (n m : int) P F: m <= n =>

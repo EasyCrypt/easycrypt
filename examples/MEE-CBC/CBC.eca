@@ -294,7 +294,7 @@ proof.
 qed.
 
 section Cleanup.
-  declare module A : RCPA_Adversary { RCPA_Wrap, PRP }.
+  declare module A <: RCPA_Adversary { RCPA_Wrap, PRP }.
 
   local module M : Enc_Scheme = {
     proc keygen = IV_Wrap(CBC(PseudoRP)).keygen
@@ -380,7 +380,7 @@ module PRPF_Adv(A:RCPA_Adversary, F:PRF_Oracles) = {
 }.
 
 section Decomposition.
-  declare module A : RCPA_Adversary { RCPA_Wrap, PRP, PRPi, PRFi }.
+  declare module A <: RCPA_Adversary { RCPA_Wrap, PRP, PRPi, PRFi }.
 
   local lemma refactor_abstract (O <: PRP {A}) &m:
     Pr[INDR_CPA_direct(CBC_Oracle(O),A).main() @ &m: res]
@@ -442,8 +442,8 @@ module Compute = {
 }.
 
 section Reduce.
-  declare module A : RCPA_Adversary { RCPA_Wrap, PRFi, Compute }.
-  axiom A_distinguish_ll (O <: RCPA_Oracles {A}): islossless O.enc => islossless A(O).distinguish.
+  declare module A <: RCPA_Adversary { RCPA_Wrap, PRFi, Compute }.
+  declare axiom A_distinguish_ll (O <: RCPA_Oracles {A}): islossless O.enc => islossless A(O).distinguish.
 
   local module DoubleQuery (F : PRF) = {
     var qs : block fset
@@ -684,8 +684,8 @@ module QueryBounder(A:RCPA_Adversary, O:RCPA_Oracles) = {
 }.
 
 section Probability_RP_RF.
-  declare module A : RCPA_Adversary { PRPi, PRFi, QueryBounder }.
-  axiom A_run_ll (O <: RCPA_Oracles { A }): islossless O.enc => islossless A(O).distinguish.
+  declare module A <: RCPA_Adversary { PRPi, PRFi, QueryBounder }.
+  declare axiom A_run_ll (O <: RCPA_Oracles { A }): islossless O.enc => islossless A(O).distinguish.
 
   local clone PRPi_RF as RP_RFc with
     op   q    <- q * ell
@@ -745,8 +745,8 @@ section Probability_RP_RF.
 end section Probability_RP_RF.
 
 section Probability_Collision.
-  declare module A : RCPA_Adversary { PRPi, PRFi, Compute, QueryBounder }.
-  axiom A_run_ll (O <: RCPA_Oracles { A }): islossless O.enc => islossless A(O).distinguish.
+  declare module A <: RCPA_Adversary { PRPi, PRFi, Compute, QueryBounder }.
+  declare axiom A_run_ll (O <: RCPA_Oracles { A }): islossless O.enc => islossless A(O).distinguish.
 
   local clone import Birthday as BBound with
     type T  <- block,

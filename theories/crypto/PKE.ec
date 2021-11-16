@@ -75,8 +75,8 @@ module CPA_R (S:Scheme, A:Adversary) = {
 
 section.
 
-  declare module S:Scheme.
-  declare module A:Adversary{S}.
+  declare module S <: Scheme.
+  declare module A <: Adversary{S}.
 
   lemma pr_CPA_LR &m: 
     islossless S.kg => islossless S.enc =>

@@ -298,7 +298,7 @@ lemma iter_gen_ctr_round_nil merge genblock k n i j:
   iter i round ([], [],j) = ([], [], max j (j + i)).
 proof.
   move=> hm round; elim /natind: i j => [i hi| i hi hrec] j; 1: by rewrite iter0 // /#.
-  rewrite iter_gen_ctr_round_S // drop_oversize 1:[smt(gt0_block_size)].
+  rewrite iter_gen_ctr_round_S // drop_oversize 1:#smt:(gt0_block_size).
   rewrite hrec /= hm /#.
 qed.
 
@@ -551,8 +551,8 @@ abstract theory OpCC.
 
   section PROOFS.
   
-    declare module I: Init { OCC }.
-    declare module A: Adv { OCC, I}.
+    declare module I <: Init { OCC }.
+    declare module A <: Adv { OCC, I}.
    
     phoare chacha_spec k0 n0 p0 gs0 : 
       [ChaCha(OCC(I)).enc : 
@@ -578,7 +578,7 @@ abstract theory OpCC.
             by rewrite (divzMDl 1 _ _ hd) (modzMDl 1 _ block_size); ring.
           have hm : 0 <= size p < `|block_size| by smt (size_ge0).
           by rewrite modz_small 1:hm divz_small 1:hm drop_oversize 1:/# /= size_eq0 hp.
-        rewrite iterSr 1:[smt(size_ge0 gt0_block_size)]=> /> _.
+        rewrite iterSr 1:#smt:(size_ge0 gt0_block_size)=> /> _.
         smt(size_drop size_ge0 size_eq0 ge0_block_size).
       auto; rewrite /r=> {r} /> c i' p'; split;1: smt (size_eq0 size_ge0).  
       by rewrite /b2i /= (iter0 0) 1:// => ->.    
@@ -796,7 +796,7 @@ proof.
   move=> j hj.
   have [hj1 hj2] : j < block_size /\ j < size p.
   + smt (size_map2 Block.valP size_cat size_take gt0_block_size size_ge0).
-  rewrite (nth_map2 Byte.zero Byte.zero) ?(size_cat, size_map2, Block.valP) 1:[smt(size_ge0)].
+  rewrite (nth_map2 Byte.zero Byte.zero) ?(size_cat, size_map2, Block.valP) 1:#smt:(size_ge0).
   rewrite nth_cat ?(size_cat, size_map2, Block.valP) /min hsz /= hj1.
   by rewrite (nth_map2 Byte.zero Byte.zero) ?Block.valP 1:/# /= -Byte.xorK1 nth_take 1:ge0_block_size.
 qed.
@@ -1016,11 +1016,11 @@ module G9 (A:CCA_Adv, RO1:SplitC1.I1.RO) = {
 
 section PROOFS.
 
-  declare module A : CCA_Adv { RO, FRO, OpCCinit.OCC, OpCCRO.OCC, IndBlock, Mem, StLSke,
+  declare module A <: CCA_Adv { RO, FRO, OpCCinit.OCC, OpCCRO.OCC, IndBlock, Mem, StLSke,
                                Split0.IdealAll.RO, ROT.RO, ROF.RO, SplitC1.I1.RO, SplitC1.I2.RO,
                                Split1.IdealAll.RO, SplitC2.I1.RO, SplitC2.I2.RO }.
 
-  axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   local module G1 (S:SKE) = CCA_game(A, RealOrcls(S)).
 
@@ -1075,7 +1075,7 @@ section PROOFS.
       Pr[Indist.Distinguish(D(A), IndRO).game() @ &m : res] = 
       Pr[MainD(G2,RO).distinguish() @ &m : res].
     + by byequiv => //; proc; inline *; sim.
-    rewrite (pr_RO_FinRO_D G2 _ &m () (fun x => x)) /=.
+    rewrite (pr_RO_FinRO_D _ G2 &m () (fun x => x)) /=.
     + exact: dblock_ll.
     rewrite -(pr_CCP_OCCP IFinRO G1 &m).
     byequiv => //; proc; inline G2(FinRO).distinguish; wp.
@@ -1103,8 +1103,8 @@ section PROOFS.
     + byequiv => //;proc; call (_: OCC.gs{1} = StLSke.gs{2} /\ ={Mem.k}); last by sim />.
       + by proc; inline *; auto => /> &2; case: (p{2}).
       proc; inline *; auto => /> &2; case: (c{2}) => /> n a c t.
-      by rewrite /dec /get /= => ->. 
-    by apply (CCA_CPA_UFCMA St A _ _ &m) => //; apply A_ll.
+      by rewrite /dec /get /= => ->.
+    by apply (CCA_CPA_UFCMA St _ A _ &m) => //; apply A_ll.
   qed.
 
   local module G3 (S:SKE) = CPA_game(CCA_CPA_Adv(A), RealOrcls(S)).
@@ -1169,11 +1169,11 @@ section PROOFS.
     + congr.
       + apply (eq_trans _ Pr[MainD(G4(A), FinRO).distinguish() @ &m : res]).
         + by byequiv => //; proc; inline *;sim.
-        rewrite -(pr_RO_FinRO_D (G4(A)) _ &m () (fun x => x)) //.
+        rewrite -(pr_RO_FinRO_D _ (G4(A)) &m () (fun x => x)) //.
         by move=> _; exact: dblock_ll.
       apply (eq_trans _ Pr[MainD(G5(A), FinRO).distinguish() @ &m : res]).
       + by byequiv => //; proc; inline *; sim.
-      rewrite -(pr_RO_FinRO_D (G5(A)) _ &m () (fun x => x)) //.
+      rewrite -(pr_RO_FinRO_D _ (G5(A)) &m () (fun x => x)) //.
       by move=> _; exact: dblock_ll.
     apply (eq_trans _ (Pr[Split0.IdealAll.MainD(G4(A), Split0.IdealAll.RO).distinguish() @ &m : res] +
                        Pr[Split0.IdealAll.MainD(G5(A), Split0.IdealAll.RO).distinguish() @ &m : res])).
@@ -1209,7 +1209,7 @@ end Step1_2.
 (*   * dec is bounded by qdec                                                 *)
 
 op qenc : int.
-axiom ge0_qenc : 0 <= qenc.
+ axiom ge0_qenc : 0 <= qenc.
 
 op qdec : int.
 axiom ge0_qdec : 0 <= qdec.
@@ -1355,9 +1355,9 @@ module EncRnd = {
 }.
 
 section PROOFS.
-  declare module A : CCA_Adv { BNR, Mem, IndBlock, RO, FRO}.
+  declare module A <: CCA_Adv { BNR, Mem, IndBlock, RO, FRO}.
 
-  axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   local clone import Step1_2 as Step1_2'.
 
@@ -1365,7 +1365,7 @@ section PROOFS.
   local module ROout = SplitC2.I2.RO.
   local module ROF   = SplitD.ROF.RO.
 
-  lemma mk_rs_ofpair r s e : 
+  local lemma mk_rs_ofpair r s e : 
     mk_rs (SplitC1.ofpair (SplitC2.ofpair (r, s), e)) = (r, s).
   proof.
     rewrite /mk_rs /SplitC1.ofpair /SplitC2.ofpair /= insubdK.
@@ -2497,12 +2497,11 @@ section PROOFS.
 
   local clone EP.ListPartitioning as LP with
     type partition <- int.
-  
 
   op w1 : poly_out.
   op w2 : poly_out.
 
-  axiom neq_w1_w2 : w1 <> w2.
+  declare axiom neq_w1_w2 : w1 <> w2.
 
   local lemma step4_lbad1_sum &m :
     Pr[UFCMA_l.f() @ &m : size UFCMA_l.lbad1 <= qdec /\ exists tt, tt \in UFCMA_l.lbad1 /\ tt.`1 = tt.`2] <=
@@ -2730,4 +2729,3 @@ section PROOFS.
    qed.
 
 end section PROOFS.
-

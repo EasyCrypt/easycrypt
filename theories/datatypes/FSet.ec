@@ -180,6 +180,22 @@ lemma in_fsetD1 (s : 'a fset) x:
 proof. by move=> x'; rewrite in_fsetD in_fset1. qed.
 
 (* -------------------------------------------------------------------- *)
+abbrev disjoint (xs ys : 'a fset) = xs `&` ys = fset0.
+
+lemma disjointP (xs ys : 'a fset):
+  disjoint xs ys <=> forall (x : 'a), x \in xs => ! x \in ys.
+proof.
+split=> [disj_xs_ys x x_in_xs | all_xs_not_in_ys].
+case (x \in ys)=> [x_in_ys | //].
+have x_in_inter_xs_ys: x \in (xs `&` ys) by rewrite in_fsetI.
+by rewrite /= -(in_fset0 x) -disj_xs_ys in_fsetI.
+rewrite fsetP=> x.
+rewrite in_fsetI in_fset0 /= negb_and.
+case (x \in xs)=> [x_in_xs | //].
+right; by rewrite all_xs_not_in_ys.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op pick ['a] (A : 'a fset) = head witness (elems A)
 axiomatized by pickE.
 

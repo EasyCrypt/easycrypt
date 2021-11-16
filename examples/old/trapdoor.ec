@@ -390,7 +390,7 @@ module Trapdoor2( A : Adv) ={
 
 section.
 
-declare module A : Adv {M}.
+declare module A <: Adv {M}.
 
 axiom run_ll : forall (O <: O{A}), islossless O.check => islossless A(O).run.
 

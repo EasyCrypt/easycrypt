@@ -207,7 +207,7 @@ end) = struct
   (* -------------------------------------------------------------------- *)
   let add_modules p1 p2 : EcSubst.subst =
     List.fold_left2 (fun s (id1,_) (id2,_) ->
-        EcSubst.add_module s id1 (EcPath.mident id2)) EcSubst.empty p1 p2
+        EcSubst.add_module s id1 (EcPath.mident id2)) (EcSubst.empty ()) p1 p2
 
   (* ------------------------------------------------------------------ *)
   let rec for_module_type env ~norm mt1 mt2 =

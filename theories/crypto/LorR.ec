@@ -16,8 +16,8 @@ module RandomLR(L:A) (R:A) = {
 
 section.
 
-  declare module L:A.
-  declare module R:A.
+  declare module L <: A.
+  declare module R <: A.
 
   local module Aux = {
     var b,r : bool

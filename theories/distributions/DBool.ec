@@ -60,7 +60,7 @@ op dbiased (p : real) = Distr.mk (mbiased p).
 lemma dbiased1E (p : real) (b : bool) :
   mu1 (dbiased p) b =
    if b then clamp p else 1%r - clamp p.
-proof. by rewrite -massE muK  // isdistr_mbiased. qed.
+proof. by rewrite muK  // isdistr_mbiased. qed.
 
 lemma dbiasedE (p : real) (E : bool -> bool) :
   mu (dbiased p) E =
@@ -68,7 +68,7 @@ lemma dbiasedE (p : real) (E : bool -> bool) :
     + (if E false then 1%r - clamp p else 0%r).
 proof.
 rewrite muE (@sumE_fin _ [true; false]) => [|[]|] //.
-by rewrite 2!big_cons big_nil => @/predT /=; rewrite !massE !dbiased1E.
+by rewrite 2!big_cons big_nil => @/predT /=; rewrite !dbiased1E.
 qed.
 
 lemma supp_dbiased (p : real) b :

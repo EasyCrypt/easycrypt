@@ -75,11 +75,11 @@ wp; while (={glob O} /\ l{1} = l{2}++_l2).
   rewrite !drop0=> /= _ Ol Or ->> /= - {Or}; split=> [[] _|].
   + by apply/contraLR=> /= ->.
   rewrite -size_eq0=> size_l'.
-  by split; rewrite -negP=> /(congr1 size); rewrite size_cat [smt(size_ge0)].
+  by split; rewrite -negP=> /(congr1 size); rewrite size_cat #smt:(size_ge0).
 auto=> /> &2; split=> [_|].
 + by apply/contraLR=> /= ->.
 rewrite -size_eq0=> size_l1.
-by split; rewrite -negP=> /(congr1 size); rewrite size_cat [smt(size_ge0)].
+by split; rewrite -negP=> /(congr1 size); rewrite size_cat #smt:(size_ge0).
 qed.
 
 equiv iter_cat_cat (O <: Orcl):
@@ -115,9 +115,9 @@ by do !(auto; call (_: true)); auto.
 qed.
 
 section.
-  declare module O:Orcl.
+  declare module O <: Orcl.
 
-  axiom iter2_eq:
+  declare axiom iter2_eq:
     equiv [Iter(O).iter_12 ~ Iter(O).iter_21:
            ={glob O,t1,t2} ==> ={glob O}].
 

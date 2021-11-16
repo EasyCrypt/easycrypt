@@ -213,7 +213,7 @@ lemma FRO_set_ll : islossless FRO.set.
 proof. by proc; auto. qed.
 
 section ConditionalLL.
-axiom dout_ll x: is_lossless (dout x).
+declare axiom dout_ll x: is_lossless (dout x).
 
 lemma RO_get_ll : islossless RO.get.
 proof. by proc; auto=> />; rewrite dout_ll. qed.
@@ -619,7 +619,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 section.
-declare module D : FRO_Distinguisher {FRO}.
+declare module D <: FRO_Distinguisher {FRO}.
 
 lemma eager_D :
   eager [RRO.resample();, D(FRO).distinguish ~ 
@@ -660,7 +660,7 @@ module Eager (D : FRO_Distinguisher) = {
 
 (* -------------------------------------------------------------------- *)
 section.
-declare module D : FRO_Distinguisher {FRO}.
+declare module D <: FRO_Distinguisher {FRO}.
 
 equiv Eager_1_2 : Eager(D).main1 ~ Eager(D).main2 :
   ={glob D, arg} ==> ={res, glob FRO, glob D}.
@@ -727,8 +727,8 @@ end EagerCore.
 
 (* -------------------------------------------------------------------- *)
 section.
-declare module D : RO_Distinguisher { RO, FRO }.
-axiom dout_ll x: is_lossless (dout x).
+declare module D <: RO_Distinguisher { RO, FRO }.
+declare axiom dout_ll x: is_lossless (dout x).
 
 local clone import EagerCore as InnerProof
 proof dout_ll by exact/dout_ll.
@@ -815,9 +815,9 @@ module type FinRO_Distinguisher(G : RO) = {
 }.
 
 section PROOFS.
-axiom dout_ll x: is_lossless (dout x).
+declare axiom dout_ll x: is_lossless (dout x).
 
-declare module D : FinRO_Distinguisher{RO, FRO}.
+declare module D <: FinRO_Distinguisher{RO, FRO}.
 
 local module GenFinRO (RO:RO) = {
   include RO [set, rem, get]

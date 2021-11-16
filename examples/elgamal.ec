@@ -63,9 +63,9 @@ module DDHAdv (A:Adversary) = {
       = `| Pr[DDH0(DDHAdv(A)).main() @ &m : res]
            - Pr[DDH1(DDHAdv(A)).main() @ &m : res] |.        **)
 section Security.
-  declare module A:Adversary.
-  axiom Ac_ll: islossless A.choose.
-  axiom Ag_ll: islossless A.guess.
+  declare module A <: Adversary.
+  declare axiom Ac_ll: islossless A.choose.
+  declare axiom Ag_ll: islossless A.guess.
 
   local lemma cpa_ddh0 &m:
       Pr[CPA(ElGamal,A).main() @ &m : res] =

@@ -96,7 +96,7 @@ lemma andwC: commutative andw.
 proof. by move=> w1 w2; apply/wordP=> i h; rewrite !bwordE andbC. qed.
 
 lemma andwDl: left_distributive andw (+^).
-proof. move=> w1 w2 w3; apply/wordP=> i h; rewrite !bwordE smt. qed.
+proof. move=> w1 w2 w3; apply/wordP=> i h; rewrite !bwordE /#. qed.
 
 lemma andwK: idempotent andw.
 proof. by move=> x; apply/wordP=> i h; rewrite !bwordE andbb. qed.
@@ -151,4 +151,3 @@ proof.
 move=> x y; rewrite /unitw !wordP => + i Hi -/(_ i Hi).
 by rewrite andwE onewE Hi /#.
 qed.
-
