@@ -488,7 +488,12 @@ let pp_thname scenv =
 (* -------------------------------------------------------------------- *)
 let locality (env : EcEnv.env) (who : cbarg) =
   match who with
-  | `Type       p -> (EcEnv.Ty.by_path p env).tyd_loca
+  | `Type p -> begin
+      match EcEnv.TypeClass.by_path_opt p env with
+      | Some tc -> (tc.tc_loca :> locality)
+      | _ -> (EcEnv.Ty.by_path p env).tyd_loca
+    end
+
   | `Op         p -> (EcEnv.Op.by_path p env).op_loca
   | `Ax         p -> (EcEnv.Ax.by_path p env).ax_loca
   | `Typeclass  p -> ((EcEnv.TypeClass.by_path p env).tc_loca :> locality)
