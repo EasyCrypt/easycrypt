@@ -1744,9 +1744,13 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
-    (* FIXME: TC: substitute tc.tc_tparams with tcp.tc_args *)
     (* FIXME: TC: check that tcp.tc_args meets the reqs. of tc.tc_params *)
-    let subst = { ty_subst_id with ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)] } in
+    let subst = { ty_subst_id with
+       ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
+       ts_v   =
+         let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
+         Mid.find_opt^~ (Mid.of_list vsubst);
+    } in
       List.map (fun (x, opty) ->
         (EcIdent.name x, (true, ty_subst subst opty)))
         tc.tc_ops
@@ -1781,8 +1785,13 @@ module Ty = struct
     let tcsyms  = Mstr.of_list tcsyms in
     let symbols = check_tci_operators (env scope) ty tci.pti_ops tcsyms in
 
-    let tysubst =
-      EcSubst.add_tydef (EcSubst.empty ()) tcp.tc_name ([], snd ty) in
+    let subst = {
+      ty_subst_id with
+        ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
+        ts_v   =
+          let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
+          Mid.find_opt^~ (Mid.of_list vsubst);
+    } in
 
     let subst =
       List.fold_left
@@ -1790,13 +1799,12 @@ module Ty = struct
           let oppath = Mstr.find (EcIdent.name opname) symbols in
           let op = EcFol.f_op oppath [] ty in
           EcFol.Fsubst.f_bind_local subst opname op)
-        EcFol.Fsubst.f_subst_id tc.tc_ops in
+        (EcFol.Fsubst.f_subst_init ~sty:subst ()) tc.tc_ops in
 
     let axioms =
       List.map
         (fun (name, ax) ->
           let ax = EcFol.Fsubst.f_subst subst ax in
-          let ax = EcSubst.subst_form tysubst ax in
           (name, ax))
         tc.tc_axs in
 
