@@ -1606,9 +1606,8 @@ signature_item:
 | lc=loc(locality) { locality_as_local lc }
 
 tcparam:
-| x=lqident { (x, []) }
-| ty=loc(simpl_type_exp) x=lqident { (x, [ty]) }
-| tys=paren(plist1(loc(type_exp), COMMA)) x=lqident { (x, tys) }
+| tys=ioption(type_args) x=lqident
+    { (x, odfl [] tys) }
 
 typaram:
 | x=tident { (x, []) }
