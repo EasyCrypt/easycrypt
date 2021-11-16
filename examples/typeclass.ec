@@ -82,7 +82,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 op bool_enum = [true; false].
 
-instance foo with bool.
+(* instance foo with bool. *)
 
 instance finite with bool
   op enum = bool_enum.
@@ -101,6 +101,12 @@ instance group with int
   op zero  = izero
   op (+)   = CoreInt.add
   op ([-]) = CoreInt.opp.
+
+(*TODO: what does Alt-Ergo have to do with this?*)
+realize addr0 by [].
+realize addrN by [].
+realize addrC by [].
+realize addrA by [].
 
 op polyZ ['a <: ring] (c : 'a) (p : 'a poly) : 'a poly.
 

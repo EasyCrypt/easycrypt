@@ -297,50 +297,56 @@ module TypeClass = struct
       let tvinst =
         (List.map
            (fun (tv, tcs) ->
+              (*TODOTCC: does it work as intended? Why are there always no type parameters in these cases?*)
+              let rec parent_instances_of_tc otc =
+                match otc with
+                | Some tc -> (([], tvar tv), tc) :: parent_instances_of_tc (EcEnv.TypeClass.by_path tc.tc_name env).tc_prt
+                | None -> []
+              in
               List.map
-                (fun tc -> (([], tvar tv), tc))
+                (fun tc -> parent_instances_of_tc (Some tc))
                 tcs)
            (Mid.bindings tvtc)) in
-      List.flatten tvinst @ instances in
+      List.flatten (List.flatten tvinst) @ instances in
 
 
-      let exception Bailout in
+    let exception Bailout in
 
-      let for1 ((tgparams, tgty), tginst) =
-        if not (EcPath.p_equal tc.tc_name tginst.tc_name) then
-          raise Bailout;
+    let for1 ((tgparams, tgty), tginst) =
+      if not (EcPath.p_equal tc.tc_name tginst.tc_name) then
+        raise Bailout;
 
-        let uf, tvinfo =
-          List.fold_left_map
-            (fun uf (tv, tcs) ->
-              let uf, tvty = UnifyCore.fresh uf in uf, (tv, (tvty, tcs)))
-            UnifyCore.UF.initial tgparams in
-        let uf, subst = ref uf, Mid.of_list (List.map (snd_map fst) tvinfo) in
+      let uf, tvinfo =
+        List.fold_left_map
+          (fun uf (tv, tcs) ->
+            let uf, tvty = UnifyCore.fresh uf in uf, (tv, (tvty, tcs)))
+          UnifyCore.UF.initial tgparams in
+      let uf, subst = ref uf, Mid.of_list (List.map (snd_map fst) tvinfo) in
 
-        List.iter2
-          (fun pty tgty ->
-             let tgty = Tvar.subst subst tgty in
-             try
-               uf := UnifyCore.unify_core env Mid.empty !uf (`TyUni (pty, tgty))
-             with UnifyCore.UnificationFailure _ ->
-               raise Bailout)
-          tc.tc_args tginst.tc_args;
+      List.iter2
+        (fun pty tgty ->
+           let tgty = Tvar.subst subst tgty in
+           try
+             uf := UnifyCore.unify_core env Mid.empty !uf (`TyUni (pty, tgty))
+           with UnifyCore.UnificationFailure _ ->
+             raise Bailout)
+        tc.tc_args tginst.tc_args;
 
-        let tgty = Tvar.subst subst tgty in
+      let tgty = Tvar.subst subst tgty in
 
-        begin try
-          uf := UnifyCore.unify_core env Mid.empty !uf (`TyUni (ty, tgty))
-        with UnifyCore.UnificationFailure _ -> raise Bailout end;
+      begin try
+        uf := UnifyCore.unify_core env Mid.empty !uf (`TyUni (ty, tgty))
+      with UnifyCore.UnificationFailure _ -> raise Bailout end;
 
-        assert (UnifyCore.UF.closed !uf);
+      assert (UnifyCore.UF.closed !uf);
 
-        let subst = UnifyCore.subst_of_uf !uf in
-        let subst = Tuni.offun subst in
+      let subst = UnifyCore.subst_of_uf !uf in
+      let subst = Tuni.offun subst in
 
-        List.flatten (List.map
-          (fun (_, (ty, tcs)) ->
-            List.map (fun tc -> (subst ty, tc)) tcs)
-          tvinfo)
+      List.flatten (List.map
+        (fun (_, (ty, tcs)) ->
+          List.map (fun tc -> (subst ty, tc)) tcs)
+        tvinfo)
 
     in
 
