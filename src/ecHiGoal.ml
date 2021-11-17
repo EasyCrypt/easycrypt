@@ -674,7 +674,7 @@ let process_delta ?target (s, o, p) tc =
     end else t_id tc
 
 (* -------------------------------------------------------------------- *)
-let rec process_rewrite1_r ttenv ?target ri tc =
+let process_rewrite1_r ttenv ?target ri tc =
   let implicits = ttenv.tt_implicits in
 
   match unloc ri with
@@ -805,7 +805,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       process_algebra `Solve `Field [] tc
 
 (* -------------------------------------------------------------------- *)
-let rec process_rewrite1 ttenv ?target ri tc =
+let process_rewrite1 ttenv ?target ri tc =
   EcCoreGoal.reloc (loc ri) (process_rewrite1_r ttenv ?target ri) tc
 
 (* -------------------------------------------------------------------- *)

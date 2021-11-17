@@ -128,7 +128,7 @@ let on_bindings (cb : cb) (bds : (EcIdent.t * ty) list) =
 let rec on_expr (cb : cb) (e : expr) =
   let cbrec = on_expr cb in
 
-  let rec fornode () =
+  let fornode () =
     match e.e_node with
     | Eint   _            -> ()
     | Elocal _            -> ()
@@ -587,28 +587,28 @@ let add_declared_op to_gen path opdecl =
 
   let tvar_fv ty = Mid.map (fun () -> 1) (Tvar.fv ty)
   let fv_and_tvar_e e =
-    let rec aux fv e = 
-      let fv = EcIdent.fv_union fv (tvar_fv e.e_ty) in 
+    let rec aux fv e =
+      let fv = EcIdent.fv_union fv (tvar_fv e.e_ty) in
       match e.e_node with
       | Eop(_, tys) -> List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) fv tys
-      | Equant(_,d,e) -> 
+      | Equant(_,d,e) ->
         let fv = List.fold_left (fun fv (_,ty) -> EcIdent.fv_union fv (tvar_fv ty)) fv d in
-        aux fv e 
+        aux fv e
       | _ -> e_fold aux fv e
-    in aux e.e_fv e 
-   
+    in aux e.e_fv e
 
-let fv_and_tvar_f f = 
+
+let fv_and_tvar_f f =
   let fv = ref f.f_fv in
-  let rec aux f = 
+  let rec aux f =
     fv := EcIdent.fv_union !fv (tvar_fv f.f_ty);
     match f.f_node with
     | Fop(_, tys) -> fv := List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) !fv tys
     | Fquant(_, d, f) ->
       fv := List.fold_left (fun fv (_,gty) -> EcIdent.fv_union fv (gty_fv_and_tvar gty)) !fv d;
-      aux f 
-    | _ -> EcFol.f_iter aux f 
-  in 
+      aux f
+    | _ -> EcFol.f_iter aux f
+  in
   aux f; !fv
 
 let tydecl_fv tyd =
@@ -887,7 +887,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
     let to_gen = add_declared_op to_gen path operator in
     to_gen, None
 
-let rec generalize_axiom to_gen prefix (name, ax) =
+let generalize_axiom to_gen prefix (name, ax) =
   let ax = EcSubst.subst_ax to_gen.tg_subst ax in
   let path = pqname prefix name in
   match ax.ax_loca with

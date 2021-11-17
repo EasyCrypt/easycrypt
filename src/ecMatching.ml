@@ -185,7 +185,7 @@ module Zipper = struct
     in
       List.rev after
 
-  let rec fold env cpos f state s =
+  let fold env cpos f state s =
     let zpr = zipper_of_cpos cpos s in
 
       match zpr.z_tail with

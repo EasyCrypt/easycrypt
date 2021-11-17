@@ -852,7 +852,7 @@ let e_map fty fe e =
       let bd' = fe bd in
       ExprSmart.e_quant (e, (q, b, bd)) (q, b', bd')
 
-let rec e_fold fe state e =
+let e_fold fe state e =
   match e.e_node with
   | Eint _                -> state
   | Elocal _              -> state

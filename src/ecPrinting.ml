@@ -287,7 +287,7 @@ module PPEnv = struct
     in
       msymb
 
-  let rec modtype_symb (ppe : t) mty : EcSymbols.msymbol =
+  let modtype_symb (ppe : t) mty : EcSymbols.msymbol =
     let exists sm =
       match EcEnv.ModTy.lookup_opt sm ppe.ppe_env with
       | None -> false
@@ -1171,7 +1171,7 @@ let rec pp_locbinds_blocks ppe ?fv vs =
       (ppe, fun fmt -> Format.fprintf fmt "%t@ %t" pp1 pp2)
 
 (* -------------------------------------------------------------------- *)
-let rec pp_locbinds ppe ?fv vs =
+let pp_locbinds ppe ?fv vs =
   let rec merge_r (xs, ty) vs =
     match vs with
     | [] ->
@@ -1239,7 +1239,7 @@ let rec pp_bindings_blocks ppe ?(break = true) ?fv bds =
       let ppe, pp2 = pp_bindings_blocks ppe ?fv bds in
       (ppe, fun fmt -> Format.fprintf fmt "%t%(%)%t" pp1 pp_sep pp2)
 
-let rec pp_bindings ppe ?break ?fv bds =
+let pp_bindings ppe ?break ?fv bds =
   let rec merge_r (xs, gty) bds =
     match bds with
     | [] ->

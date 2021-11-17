@@ -56,7 +56,7 @@ module LowInternal = struct
   let isALocal = function ALocal _ -> true | _ -> false
 
   (* ------------------------------------------------------------------ *)
-  let rec sp_asgn mem env lv e (bds, assoc, pre) =
+  let sp_asgn mem env lv e (bds, assoc, pre) =
     let subst_in_assoc lv new_id_exp new_ids ((ass : assignables), f) =
       let replace_assignable var =
         match var with

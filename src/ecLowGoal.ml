@@ -740,7 +740,7 @@ let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =
       | Some x -> EcIdent.create x
   in
 
-  let rec for1 (s, bds, args, cls) (clid, id) =
+  let for1 (s, bds, args, cls) (clid, id) =
     try
       let cls =
         match clid with

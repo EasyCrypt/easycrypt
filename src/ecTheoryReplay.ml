@@ -258,7 +258,7 @@ let check_evtags (tags : evtags) (src : symbol list) =
     let dfl = not (List.exists (fun (mode, _) -> mode = `Include) tags) in
     let stt =
       List.map (fun src ->
-        let rec do1 status (mode, dst) =
+        let do1 status (mode, dst) =
           match mode with
           | `Exclude -> if sym_equal src dst then raise E.Reject; status
           | `Include -> status || (sym_equal src dst)

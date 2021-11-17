@@ -3003,7 +3003,7 @@ module Theory = struct
   let import (path : EcPath.path) (env : env) =
     let rec import (env : env) path (th : theory) =
       let xpath x = EcPath.pqname path x in
-      let rec import_th_item (env : env) (item : theory_item) =
+      let import_th_item (env : env) (item : theory_item) =
         if not item.ti_import.im_atimport then env else
 
         match item.ti_item with

@@ -371,7 +371,7 @@ module UniEnv = struct
     let (subst, tvs) = openty_r ue params tvi in
       (subst ty, tvs)
 
-  let rec repr (ue : unienv) (t : ty) : ty =
+  let repr (ue : unienv) (t : ty) : ty =
     match t.ty_node with
     | Tunivar id -> odfl t (snd (UF.data id (!ue).ue_uf))
     | _ -> t

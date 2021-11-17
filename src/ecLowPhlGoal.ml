@@ -47,7 +47,7 @@ let tc_error_noXhl ?(kinds : hlkinds option) pf =
   let string_of_form =
     function `Pred -> "[F]" | `Stmt -> "[S]" | `Any -> "" in
 
-  let rec string_of_kind kind =
+  let string_of_kind kind =
     let kind, fm =
       match kind with
       | `Hoare  fm -> ("hoare" , fm)

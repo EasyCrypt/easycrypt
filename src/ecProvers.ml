@@ -348,7 +348,7 @@ let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit
 
-let rec run_prover
+let run_prover
   ?(notify : notify option) (pi : prover_infos) (prover : string) task
 =
   let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
@@ -470,7 +470,7 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
                     ()
               in
 
-              let rec handle_info upd =
+              let handle_info upd =
                 match upd with
                 | CP.NoUpdates
                 | CP.ProverStarted ->

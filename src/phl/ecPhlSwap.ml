@@ -165,7 +165,7 @@ let process_swap info tc =
   FApi.t_seqs (List.map process_swap1 info) tc
 
 (* -------------------------------------------------------------------- *)
-let rec process_interleave info tc =
+let process_interleave info tc =
   let loc = info.pl_loc in
   let (side, pos_n1, lpos2, k) = info.pl_desc in
 
