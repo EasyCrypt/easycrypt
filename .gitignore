@@ -4,6 +4,7 @@
 *.pyo
 
 /_build
+/etc
 /theories/attic
 
 /ec.*
@@ -12,6 +13,7 @@
 *.eco
 
 /*.ec
+/*.eca
 /*.smt
 /*.why
 
