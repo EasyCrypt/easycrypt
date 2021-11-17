@@ -29,8 +29,7 @@ CHECKCATS ?= prelude stdlib
 
 # --------------------------------------------------------------------
 .PHONY: default build byte native tests check weak-check examples
-.PHONY: clean install uninstall uninstall-purge dist distcheck
-.PHONY: license
+.PHONY: clean install uninstall uninstall-purge license
 
 default: build
 	@true
@@ -98,24 +97,3 @@ clean:
 
 clean_eco:
 	find theories examples -name '*.eco' -exec rm '{}' ';'
-
-# --------------------------------------------------------------------
-dist:
-	if [ -e $(DISTDIR) ]; then rm -rf $(DISTDIR); fi
-	./scripts/install/distribution $(DISTDIR) MANIFEST
-	BZIP2=-9 tar -cjf $(DISTDIR).tar.bz2 --owner=0 --group=0 $(DISTDIR)
-	rm -rf $(DISTDIR)
-
-distcheck: dist
-	tar -xof $(DISTDIR).tar.bz2
-	set -x; \
-	     $(MAKE) -C $(DISTDIR) \
-	  && $(MAKE) -C $(DISTDIR) dist \
-	  && mkdir $(DISTDIR)/dist1 $(DISTDIR)/dist2 \
-	  && ( cd $(DISTDIR)/dist1 && $(TAR) -xof ../$(DISTDIR).tar.bz2 ) \
-	  && ( cd $(DISTDIR)/dist2 && $(TAR) -xof ../../$(DISTDIR).tar.bz2 ) \
-	  && diff -rq $(DISTDIR)/dist1 $(DISTDIR)/dist2 \
-	  || exit 1
-	rm -rf $(DISTDIR)
-	@echo "$(DISTDIR) is ready for distribution" | \
-	  sed -e 1h -e 1s/./=/g -e 1p -e 1x -e '$$p' -e '$$x'
