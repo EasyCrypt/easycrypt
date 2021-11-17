@@ -14,19 +14,14 @@ of probabilistic computations with adversarial code. Its main
 application is the construction and verification of game-based
 cryptographic proofs."""
 
-build: [
-  [make "OCAMLBUILD_ECJOBS=%{jobs}%"]
-]
-install: [
-  [make "PREFIX=%{prefix}%" "install"]
-]
-remove: [
-  [make "PREFIX=%{prefix}%" "uninstall-purge"]
-]
-
 post-messages: """
 EasyCrypt needs external provers to be installed. From opam, you
 can install AltErgo (package: alt-ergo).
 
 The required steps for configuring the provers are listed on:
   https://github.com/EasyCrypt/easycrypt#configuring-why3"""
+
+build: [
+  ["dune" "subst"] {pinned}
+  ["dune" "build" "-p" name "-j" jobs "@install"]
+]

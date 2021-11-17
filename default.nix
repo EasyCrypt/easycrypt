@@ -12,6 +12,7 @@ else
       batteries
       dune_2
       dune-build-info
+      dune-site
       inifiles
       menhir
       menhirLib

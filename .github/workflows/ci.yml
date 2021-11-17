@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [check, examples]
+        target: [stdlib, examples]
     steps:
     - uses: actions/checkout@v2
     - name: Update OPAM & EasyCrypt dependencies
