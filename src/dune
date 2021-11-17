@@ -1,6 +1,6 @@
 (env
- (dev     (flags :standard -rectypes -w +28+33-9-23-32-58))
- (release (flags :standard -rectypes)
+ (dev     (flags :standard -rectypes -warn-error -a+31 -w +28+33-9-23-32-58))
+ (release (flags :standard -rectypes -warn-error -a+31 -w +28+33-9-23-32-58)
           (ocamlopt_flags -O3 -unbox-closures)))
 
 (include_subdirs unqualified)
