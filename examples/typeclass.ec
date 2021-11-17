@@ -1,25 +1,70 @@
-(* -------------------------------------------------------------------- *)
+(* =====================================================================*)
 require import AllCore List.
+
+
+(* ==================================================================== *)
+(* Typeclass examples *)
+
+(* -------------------------------------------------------------------- *)
+(* Set theory *)
 
 type class finite = {
   op enum     : finite list
   axiom enumP : forall (x : finite), x \in enum
 }.
 
-type class foo <: finite = {
+type class countable = {
+  op count : int -> countable
+  axiom countP : forall (x : countable), exists (n : int), x = count n
 }.
 
-type class monoid = {
-  op mzero : monoid
-  op madd  : monoid -> monoid -> monoid
+(* -------------------------------------------------------------------- *)
+(* Simple algebraic structures *)
+
+type class magma = {
+  op mmul : magma -> magma -> magma
 }.
 
-(* instance monoid with int ... *)
+(* TODO: no explicit error message, and why is this not working but ring is? *)
+(*
+type class semigroup <: magma = {
+  axiom maddA : associative mmul
+}.
 
-type class group = {
-  op zero  : group
-  op ([-]) : group -> group
-  op ( + ) : group -> group -> group
+type class monoid <: semigroup = {
+  op mid : monoid
+
+  axiom mmulr0 : left_id mid mmul
+  axiom mmul0r : right_id mid mmul
+}.
+
+type class group <: monoid = {
+  op minv : group -> group
+
+  axiom mmulN : left_inverse mid minv mmul
+}.
+
+type class ['a <: group] action = {
+  op amul  : 'a -> action -> action
+
+  axiom identity :
+    forall (x : action), amul mid x = x
+  axiom compatibility :
+    forall (g h : 'a) (x : action), amul (mmul g h) x = amul g (amul h x)
+}.
+*)
+
+(* TODO: make one of these work, and then finish the hierarchy here:
+   https://en.wikipedia.org/wiki/Magma_(algebra) *)
+(* type fingroup <: group & finite. *)
+(* type fingroup <: group & finite = {}. *)
+(* type class fingroup = group & finite. *)
+
+(* TODO: we may want to rename mmul to ( + ) and build this from group *)
+type class comgroup = {
+  op zero  : comgroup
+  op ([-]) : comgroup -> comgroup
+  op ( + ) : comgroup -> comgroup -> comgroup
 
   axiom addr0 : left_id zero (+)
   axiom addrN : left_inverse zero ([-]) (+)
@@ -27,11 +72,12 @@ type class group = {
   axiom addrA : associative (+)
 }.
 
-(* instance ['a <: group] monoid with 'a ... *)
+(* -------------------------------------------------------------------- *)
+(* Advanced algebraic structures *)
 
-type class ring <: group = {
-  op one   : ring
-  op ( * ) : ring -> ring -> ring
+type class comring <: comgroup = {
+  op one   : comring
+  op ( * ) : comring -> comring -> comring
 
   axiom mulr1  : left_id one ( * )
   axiom mulrC  : commutative ( * )
@@ -39,114 +85,179 @@ type class ring <: group = {
   axiom mulrDl : left_distributive ( * ) ( + )
 }.
 
-(* instance group with int ... *)
+type class ['a <: comring] commodule <: comgroup = {
+  op ( ** )  : 'a -> commodule -> commodule
 
-type class ['a <: ring] module_ <: group = {
-  op ( ** )  : 'a -> module_ -> module_
-
-  axiom scalerDl : forall (a b : 'a) (x : module_),
+  axiom scalerDl : forall (a b : 'a) (x : commodule),
     (a + b) ** x = a ** x + b ** x
-
-  axiom scalerDr : forall (a : 'a) (x y : module_),
+  axiom scalerDr : forall (a : 'a) (x y : commodule),
     a ** (x + y) = a ** x + a ** y
 }.
 
-print ( ** ).
 
-(*
-type class A = ...
-type class B1 <: A
-type class B2 <: A
-type class C <: B1 & B2
-
-op ['a <: B1 & B2]
-
-int -> group -> monoid
-int -> monoid
-*)
-
-type 'a poly = 'a list.
-
-op foo ['a <: group] (x y : 'a) = x + y.
-
-lemma add0r ['a <: group] : right_id<:'a, 'a> zero (+).
-proof.
-  (* Works for bad reasons *)
-  by move=> x /=; rewrite addrC addr0.
-qed.
-
-(* type fingroup <: group & finite. *)
-
-(* type class fingroup = group & finite *)
+(* ==================================================================== *)
+(* Operator examples *)
 
 (* -------------------------------------------------------------------- *)
+(* Set theory *)
+
+op all_finite ['a <: finite] (p : 'a -> bool) =
+  all p enum<:'a>.
+
+op all_countable ['a <: countable] (p : 'a -> bool) =
+  forall (n : int), p (count<:'a> n).
+
+
+(* ==================================================================== *)
+(* Lemma examples *)
+
+(* -------------------------------------------------------------------- *)
+(* Set theory *)
+
+(* TODO: why is the rewrite/all_finite needed? *)
+lemma all_finiteP ['a <: finite] p : (all_finite p) <=> (forall (x : 'a), p x).
+proof. by rewrite/all_finite allP; split => Hp x; rewrite Hp // enumP. qed.
+
+lemma all_countableP ['a <: countable] p : (all_countable p) <=> (forall (x : 'a), p x).
+proof.
+  rewrite/all_countable; split => [Hp x|Hp n].
+    by case (countP x) => n ->>; rewrite Hp.
+  by rewrite Hp.
+qed.
+
+lemma all_finite_countable ['a <: finite & countable] (p : 'a -> bool) : (all_finite p) <=> (all_countable p).
+proof. by rewrite all_finiteP all_countableP. qed.
+
+(* ==================================================================== *)
+(* Instance examples *)
+
+(* -------------------------------------------------------------------- *)
+(* Set theory *)
+
 op bool_enum = [true; false].
 
-(* instance foo with bool. *)
-
+(* TODO: we want to be ale to give the list directly.*)
 instance finite with bool
   op enum = bool_enum.
 
 realize enumP.
 proof. by case. qed.
 
-
-op all ['a <: finite] (p : 'a -> bool) =
-  all p enum<:'a>.
-
 (* -------------------------------------------------------------------- *)
+(* Simple algebraic structures *)
+
 op izero = 0.
 
-instance group with int
+instance comgroup with int
   op zero  = izero
   op (+)   = CoreInt.add
   op ([-]) = CoreInt.opp.
 
-(*TODO: what does Alt-Ergo have to do with this?*)
-realize addr0 by [].
-realize addrN by [].
-realize addrC by [].
-realize addrA by [].
-
-op polyZ ['a <: ring] (c : 'a) (p : 'a poly) : 'a poly.
-
-instance 'b module_ with ['b <: ring] 'b poly
-  op ( ** ) = polyZ<:'b>.
-
-instance ['a <: group & ...] 'a <: ... = {
-}
-
-instance ['a <: group] 'a <: monoid = {
-}.
-
-typeclass witness = {
-  op witness : witness;
-}.
-
-instance ['a] 'a <: witness = {
-}.
-
-require import AllCore.
-
-type class tc = {}.
-
-type class ['a <: tc] foo = {
-  op bar : 'a -> foo -> bool
-  axiom barL : forall x f, bar x f
-}.
-
-op mybar (x : bool) (b : bool) = false.
-
-instance tc with int.
-
-type ('a, 'b) t = 'a * 'b.
-
-type u = (bool, int) t.
-
-instance int foo with bool
-  op bar = mybar.
-
+realize addr0 by trivial.
+realize addrN by trivial.
+(* TODO: what? *)
 (*
+realize addrC by apply addrC.
+realize addrC by apply Ring.IntID.addrC.
+*)
+realize addrC by rewrite addrC.
+realize addrA by rewrite addrA.
+
+(* -------------------------------------------------------------------- *)
+(* Advanced algebraic structures *)
+
+op ione = 1.
+
+(* TODO: this automatically fetches the only instance of comgroup we have defined for int.
+   We should give the choice of which instance to use, by adding  as desired_name after the with.
+   Also we should give the choice to define directly an instance of comring with int. *)
+instance comring with int
+  op one   = ione
+  op ( * ) = CoreInt.mul.
+
+realize mulr1 by trivial.
+realize mulrC by rewrite mulrC.
+realize mulrA by rewrite mulrA.
+realize mulrDl.
+  print mulrDl.
+  (* TODO: what? *)
+  admit.
+qed.
+
+type 'a poly = 'a list.
+
+op pzero ['a] : 'a poly = [].
+op padd  ['a <: comgroup] p q =
+  mkseq (fun n => (nth zero<:'a> p n) + (nth zero<:'a> q n)) (max (size p) (size q)).
+op pinv  ['a <: comgroup] = map [-]<:'a>.
+op pone  ['a <: comring] = [one <:'a>].
+op pmul  ['a <: comring] : 'a poly -> 'a poly -> 'a poly.
+op ipmul ['a <: comring] (x : 'a) = map (( * ) x).
+
+(* TODO: we may not need to specify the <:'a>. *)
+instance comgroup with ['a <: comring] 'a poly
+  op zero  = pzero<:'a>
+  op (+)   = padd<:'a>
+  op ([-]) = pinv<:'a>.
+
+realize addr0.
+proof.
+  (* TODO: error message. *)
+  move => x (*y*).
+  (* TODO: error message. *)
+  (*rewrite //.*)
+  (* TODO: wow I just broke something. *)
+  (* rewrite /padd /pzero. *)
+  admit.
+qed.
+
+realize addrN.
+proof.
+  (* TODO: all truly is broken. *)
+  (*rewrite /pzero /padd.*)
+  admit.
+qed.
+
+realize addrC by admit.
+realize addrA by admit.
+
+instance comring with ['a <: comring] 'a poly
+  op one   = pone<:'a>
+  op ( * ) = pmul<:'a>.
+
+realize mulr1 by admit.
+realize mulrC by admit.
+realize mulrA by admit.
+realize mulrDl by admit.
+
+instance 'a commodule with ['a <: comring] 'a poly
+  op ( ** ) = ipmul<:'a>.
+
+realize scalerDl by admit.
+realize scalerDr by admit.
+
+
+
+
+
+
+(* ==================================================================== *)
+(* Misc *)
+
+(* -------------------------------------------------------------------- *)
+(* TODO: which instance is kept in memory after this? *)
+
+op bool_enum_alt = [true; false].
+
+instance finite with bool
+  op enum = bool_enum_alt.
+
+realize enumP.
+proof. by case. qed.
+
+(* -------------------------------------------------------------------- *)
+(* TODO: some old bug that maybe already is fixed? *)
+
 type class foo = {}.
 
 type class tc  = {
@@ -172,6 +283,7 @@ type class ['a <: foo] tc2 <: tc = {
 op bar_int (x : int) = false.
 
 instance foo with bool.
+instance foo with bool.
 
 instance bool tc2 with int
   op bar = bar_int.             (* BUG *)
@@ -180,70 +292,18 @@ realize bar_lemma.
 proof. done. qed.
 
 op foo_2 ['a <: foo, 'b <: 'a tc2] = 0.
-*)
 
 
-type class tc = {}.
-type class tc2 <: tc = {}.
 
-(* instance tc  with int (* as tc_int *). *)
-(* instance tc2 with int (* as tc2_int *). *)
-
-(* instance tc with ['a <: tc2] 'a. (* as myinstance. *)*)
-
-op foo ['a <: tc] = 0.
-
-op bar ['a <: tc2] = foo<:'a>.
-
-lemma addrC ['a <: group] : associative (+)<:'a>.
-
-forall x y : int, x + y = y + x.
-
-(+)<:'a> ~ Int.(+)
-
-(+)<:int_group> -> Int.(+)
-
-rewrite addrC.
-apply   addrC.
-
-op foo ['a <: tc2] = 0.
-
-tc_int
-parent(tc2_int) --> tc_int
-
-tc2_int -> mysinstance
-
-op bar = foo<: int[tc2 -> myinstance]>.
-
+(* ==================================================================== *)
+(* Old TODO list *)
 
 (*
-*)
-
-
-instance tc with int.
-
-op bar = foo<:int>.
-
-type t <: tc, tc2.
-
-op bar2 = foo<:t>.
-
-type t <: foo.
-
-type class ['a <: tc2] bar = {}.
-
-op foo ['a <: foo, 'b <: 'a bar] : 'a -> 'b -> int.
-
-
-(* -------------------------------------------------------------------- *)
-
  1. typage -> selection des operateurs / inference des instances de tc
  2. reduction
  3. unification (tactiques)
  4. clonage
  5. envoi au SMT
-
- 0. Define or find tcname
 
  1.
    Fop :
@@ -309,4 +369,4 @@ op foo ['a <: foo, 'b <: 'a bar] : 'a -> 'b -> int.
 
    c. ne pas envoyer certaines instances (e.g. int est un groupe)
       -> instance [nosmt] e.g.
-
+*)
