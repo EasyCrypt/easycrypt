@@ -1279,11 +1279,6 @@ let unwanted_ops =
 (* See "Lightweight Relevance Filtering for Machine-Generated           *)
 (* Resolution Problems" for a description of axioms selection.          *)
 
-type ax_info = {
-  ax_name : path;
-  ax_symb : Sp.t;
-}
-
 module Frequency = struct
 
   (* -------------------------------------------------------------------- *)

@@ -88,17 +88,6 @@ type varbind = {
   vb_kind  : [`Var of EcTypes.pvar_kind | `Proj of int];
 }
 
-type obj = [
-  | `Variable of varbind
-  | `Function of function_
-  | `Module   of (module_expr * locality option)
-  | `ModSig   of module_sig
-  | `TypeDecl of EcDecl.tydecl
-  | `Operator of EcDecl.operator
-  | `Axiom    of EcDecl.axiom
-  | `Theory   of (theory * thmode)
-]
-
 type mc = {
   mc_parameters : ((EcIdent.t * module_type) list) option;
   mc_variables  : (ipath * varbind) MMsym.t;

@@ -1,5 +1,5 @@
 (env
- (dev     (flags :standard -rectypes -w +28+33-3-9-23-32-34-35-38-39-58))
+ (dev     (flags :standard -rectypes -w +28+33-3-9-23-32-35-38-39-58))
  (release (flags :standard -rectypes)
           (ocamlopt_flags -O3 -unbox-closures)))
 

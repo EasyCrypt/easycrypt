@@ -1110,20 +1110,6 @@ let process_bd_equiv side (pr, po) tc =
   process_conseq true (None, info2, info3) tc
 
 (* -------------------------------------------------------------------- *)
-type pgoptions =  {
-  pgo_split  : bool;
-  pgo_solve  : bool;
-  pgo_subst  : bool;
-  pgo_disjct : bool;
-  pgo_delta  : pgo_delta;
-}
-
-and pgo_delta = {
-  pgod_case  : bool;
-  pgod_split : bool;
-}
-
-(* -------------------------------------------------------------------- *)
 type cqpotions = {
   cqo_frame : bool;
 }

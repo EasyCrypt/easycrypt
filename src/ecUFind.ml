@@ -183,9 +183,7 @@ module UMake (I : Item) = struct
 
   module UF = Make(I)(D)
 
-  type item    = I.t
-  type data    = D.data
-  type effects = D.effects
+  type item = I.t
 
   type t = UF.t
 

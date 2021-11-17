@@ -435,8 +435,6 @@ module LowIntro = struct
   let valid_mod_name   (x : symbol) = valid_name EcIo.is_mod_ident x
   let valid_mem_name   (x : symbol) = valid_name EcIo.is_mem_ident x
 
-  type kind = [`Value | `Module | `Memory]
-
   let tc_no_product (pe : proofenv) ?loc () =
     tc_error pe ?loc "nothing to introduce"
 

@@ -319,7 +319,6 @@ end = struct
   type i_while    = EcTypes.expr * stmt
   type i_assert   = EcTypes.expr
   type i_abstract = EcIdent.t
-  type s_stmt     = instr list
 
   let lv_var (lv, pvt) pvt' =
     if pvt == pvt' then lv else LvVar pvt'

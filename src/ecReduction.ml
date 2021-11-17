@@ -1195,8 +1195,6 @@ type stk_elem = {
     se_ty     : ty;
   }
 
-type stk = stk_elem list
-
 let zpush se_h se_common se_args1 se_args2 se_ty stk =
   { se_h; se_common; se_args1; se_args2; se_ty} :: stk
 
