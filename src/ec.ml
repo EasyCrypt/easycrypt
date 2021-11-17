@@ -105,6 +105,8 @@ let main () =
     | None -> EcRelocate.Sites.theories
     | Some src -> [Filename.concat src "theories"] in
 
+  List.iter (Format.printf "%s@.") theories;
+
   (* Parse command line arguments *)
   let options =
     let ini =
