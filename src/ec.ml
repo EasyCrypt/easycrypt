@@ -105,7 +105,9 @@ let main () =
     | None -> EcRelocate.Sites.theories
     | Some src -> [Filename.concat src "theories"] in
 
+  Format.printf "=@.";
   List.iter (Format.printf "%s@.") theories;
+  Format.printf "=@.";
 
   (* Parse command line arguments *)
   let options =
