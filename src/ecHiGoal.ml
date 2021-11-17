@@ -1357,8 +1357,6 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
   and intro1_full_case (st : ST.state)
     ((prind, delta), withor, (cnt : icasemode_full option)) pis tc
   =
-    let module E = struct exception IterDone of tcenv end in
-
     let cnt = cnt |> odfl (`AtMost 1) in
     let red = if delta then `Full else `NoDelta in
 

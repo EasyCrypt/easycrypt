@@ -21,7 +21,6 @@ module BI = EcBigInt
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
-exception IncompatibleModuleSig of module_sig * module_sig
 
 (* -------------------------------------------------------------------- *)
 type 'a eqtest  = env -> 'a -> 'a -> bool
