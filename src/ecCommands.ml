@@ -790,7 +790,7 @@ let mode () : string =
 (* -------------------------------------------------------------------- *)
 let undo (olduuid : int) =
   if olduuid < (uuid ()) then
-    for i = (uuid ()) - 1 downto olduuid do
+    for _ = (uuid ()) - 1 downto olduuid do
       context := Some (pop_context (oget !context))
     done
 
