@@ -122,7 +122,7 @@ end
 (* --------------------------------------------------------------------*)
 module Int = struct
   type t = int
-  let compare = (Pervasives.compare : t -> t -> int)
+  let compare = (Stdlib.compare : t -> t -> int)
   let equal   = ((=) : t -> t -> bool)
   let hash    = (fun (x : t) -> x)
 end
@@ -134,7 +134,7 @@ module Hint = EHashtbl.Make(Int)
 (* --------------------------------------------------------------------*)
 module DInt = struct
   type t = int * int
-  let compare = (Pervasives.compare : t -> t -> int)
+  let compare = (Stdlib.compare : t -> t -> int)
   let equal   = ((=) : t -> t -> bool)
   let hash    = (fun (x : t) -> Hashtbl.hash x)
 end

@@ -7,7 +7,7 @@
  (name easycrypt)
  (depends
   (ocaml (>= 4.08.0))
-  (batteries (>= 2.3.0))
+  (batteries (>= 3))
   camlzip
   dune-build-info
   (ocaml-inifiles (>= 1.2))

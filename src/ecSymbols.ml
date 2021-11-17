@@ -12,12 +12,12 @@ type qsymbol = symbol list * symbol
 type msymbol = (symbol * msymbol list) list
 
 let sym_equal   : symbol -> symbol -> bool = (=)
-let sym_compare : symbol -> symbol -> int  = Pervasives.compare
+let sym_compare : symbol -> symbol -> int  = Stdlib.compare
 
 (* -------------------------------------------------------------------- *)
 module SymCmp = struct
   type t = symbol
-  let compare = (Pervasives.compare : t -> t -> int)
+  let compare = (Stdlib.compare : t -> t -> int)
 end
 
 module Msym = EcMaps.Map.Make(SymCmp)

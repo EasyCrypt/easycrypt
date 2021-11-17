@@ -386,16 +386,16 @@ let pv_hash v =
 
 let pv_compare v1 v2 =
   match EcPath.x_compare v1.pv_name v2.pv_name with
-  | 0 -> Pervasives.compare v1.pv_kind v2.pv_kind
+  | 0 -> Stdlib.compare v1.pv_kind v2.pv_kind
   | r -> r
 
 let pv_compare_p v1 v2 =
   match EcPath.x_compare_na v1.pv_name v2.pv_name with
-  | 0 -> Pervasives.compare v1.pv_kind v2.pv_kind
+  | 0 -> Stdlib.compare v1.pv_kind v2.pv_kind
   | r -> r
 
 let pv_ntr_compare v1 v2 =
-  match Pervasives.compare v1.pv_kind v2.pv_kind with
+  match Stdlib.compare v1.pv_kind v2.pv_kind with
   | 0 -> EcPath.x_ntr_compare v1.pv_name v2.pv_name
   | r -> r
 
