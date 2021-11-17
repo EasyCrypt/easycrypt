@@ -519,7 +519,7 @@ let process_pterm pe pt =
     match fp with
     | None    -> tc_pterm_apperror pe AE_CannotInfer
     | Some fp -> PT.pf_process_formula pe.pte_pe pe.pte_hy fp
-  in process_pterm_cut prcut pe pt
+  in process_pterm_cut ~prcut pe pt
 
 (* ------------------------------------------------------------------ *)
 let rec trans_pterm_arg_impl pe f =

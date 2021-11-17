@@ -724,7 +724,7 @@ and replay_modtype
         match mode with
         | `Alias -> rename ove subst (`Module, x)
         | `Inline _ ->
-          let subst = EcSubst.add_path subst (xpath ove x) np in
+          let subst = EcSubst.add_path subst ~src:(xpath ove x) ~dst:np in
           subst, x in
 
       let modty = EcSubst.subst_top_modsig subst modty in
@@ -765,7 +765,7 @@ and replay_mod
         | _ -> assert false
       in
 
-      let substme = EcSubst.add_path subst (xpath ove name) np in
+      let substme = EcSubst.add_path subst ~src:(xpath ove name) ~dst:np in
 
       let me    = EcSubst.subst_top_module subst me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
@@ -1018,7 +1018,7 @@ let replay (hooks : 'a ovrhooks)
   ~abstract ~local ~incl ~clears ~renames
   ~opath ~npath ovrds (scope : 'a) (name, items)
 =
-  let subst = EcSubst.add_path (EcSubst.empty ()) opath npath in
+  let subst = EcSubst.add_path (EcSubst.empty ()) ~src:opath ~dst:npath in
   let ove   = {
     ovre_ovrd     = ovrds;
     ovre_rnms     = renames;

@@ -50,7 +50,7 @@ module Graph = struct
       | Some m -> Mp.mem dst m
 
   let add ~src ~dst g =
-    if has_path dst src g then
+    if has_path ~src ~dst g then
       raise CycleDetected;
 
     match Mp.find_opt src g.tcg_nodes with
@@ -81,8 +81,8 @@ module Nodes = struct
       let aout =
         Sp.filter
           (fun p ->
-             if Graph.has_path p n nodes.tcn_graph then raise E.Discard;
-             not (Graph.has_path n p nodes.tcn_graph))
+             if Graph.has_path ~src:p ~dst:n nodes.tcn_graph then raise E.Discard;
+             not (Graph.has_path ~src:n ~dst:p nodes.tcn_graph))
           nodes.tcn_nodes
       in
         { nodes with tcn_nodes = Sp.add n aout }

@@ -612,7 +612,7 @@ module MC = struct
         match obj.vb_kind with
         | `Var EcTypes.PVglob -> false
         | `Var EcTypes.PVloc | `Proj _ -> true in
-      (_downpath_for_var local false env p args, obj)
+      (_downpath_for_var ~local ~spsc:false env p args, obj)
 
   let _up_var candup mc x obj =
     if not candup && MMsym.last x mc.mc_variables <> None then
@@ -626,7 +626,7 @@ module MC = struct
   let lookup_fun qnx env =
     match lookup (fun mc -> mc.mc_functions) qnx env with
     | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_fun false env p args, obj)
+    | Some (p, (args, obj)) -> (_downpath_for_fun ~spsc:false env p args, obj)
 
   let _up_fun candup mc x obj =
     if not candup && MMsym.last x mc.mc_functions <> None then
@@ -1613,7 +1613,7 @@ module Fun = struct
         match MC.by_path (fun mc -> mc.mc_functions) ip env with
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
-           let ((spi, params), _op) = MC._downpath_for_fun spsc env ip params in
+           let ((spi, params), _op) = MC._downpath_for_fun ~spsc env ip params in
            if i <> spi || susp && args <> [] then
              assert false;
            if not susp && List.length args <> List.length params then
@@ -1811,7 +1811,7 @@ module Var = struct
              | `Var EcTypes.PVglob -> false
              | `Var EcTypes.PVloc | `Proj _ -> true in
            let ((spi, _params), _) =
-             MC._downpath_for_var local spsc env ip params in
+             MC._downpath_for_var ~local ~spsc env ip params in
            if i <> spi then
              assert false;
            o
@@ -3098,26 +3098,26 @@ module Theory = struct
              let cth = { cth with cth_items = items } in
              Th_theory (x, cth)) in
            (cleared, item)
-  
+
         | _ -> let item_r = match item.ti_item with
-  
+
         | Th_axiom (_, { ax_kind = `Lemma }) when thclear ->
             None
-  
+
         | Th_axiom (x, ({ ax_kind = `Axiom (tags, false) } as ax)) when thclear ->
             Some (Th_axiom (x, { ax with ax_kind = `Axiom (tags, true) }))
-  
+
         | Th_addrw (p, ps, lc) ->
             let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
             if List.is_empty ps then None else Some (Th_addrw (p, ps,lc))
-  
+
         | Th_auto (lvl, base, ps, lc) ->
             let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
             if List.is_empty ps then None else Some (Th_auto (lvl, base, ps, lc))
-  
+
         | (Th_export (p, _)) as item ->
             if Sp.mem p cleared then None else Some item
-  
+
         | _ as item -> Some item
 
         in (cleared, item_r)

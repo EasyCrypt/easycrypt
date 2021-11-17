@@ -45,7 +45,8 @@ module PPEnv = struct
 
   let ofenv (env : EcEnv.env) =
     let width =
-      EcGState.asint 0 (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
+      EcGState.asint ~default:0
+        (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
 
     { ppe_env    = env;
       ppe_locals = Mid.empty;
@@ -400,7 +401,7 @@ let pp_enclose ~pre ~post pp fmt x =
 
 (* -------------------------------------------------------------------- *)
 let pp_paren pp fmt x =
-  pp_enclose "(" ")" pp fmt x
+  pp_enclose ~pre:"(" ~post:")" pp fmt x
 
 (* -------------------------------------------------------------------- *)
 let pp_maybe_paren c pp =
@@ -1525,7 +1526,7 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
 
       try
         let (ue, ev) =
-          EcMatching.f_match_core fmnotation hy (ue, ev) bd f
+          EcMatching.f_match_core fmnotation hy (ue, ev) ~ptn:bd f
         in
 
         if not (EcMatching.can_concretize ev ue) then

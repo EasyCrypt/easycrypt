@@ -192,7 +192,7 @@ end) = struct
   open EqTest_base
   open Fe
 
-  (* ------------------------------------------------------------------ *)  
+  (* ------------------------------------------------------------------ *)
   let rec for_stmt env ~norm s1 s2 =
        s_equal s1 s2
     || List.all2 (for_instr env ~norm) s1.s_node s2.s_node
@@ -269,7 +269,7 @@ end) = struct
     match i1, i2 with
     | Tys_function (fs1,oi1), Tys_function(fs2,oi2) ->
       for_funsig env fs1 fs2 &&
-        for_oracle_info env norm oi1 oi2
+        for_oracle_info env ~norm oi1 oi2
 
   (* ------------------------------------------------------------------ *)
   and for_module_sig_body env ~norm b1 b2 =

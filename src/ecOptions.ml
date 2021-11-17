@@ -278,7 +278,7 @@ let get_string name values =
 
 let get_string_list name values : string list =
   let split x =
-    let aout = List.map String.trim (String.nsplit x ",") in
+    let aout = List.map String.trim (String.nsplit x ~by:",") in
     List.filter ((<>) "") aout
   in
 

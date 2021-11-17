@@ -1823,7 +1823,7 @@ module Theory = struct
   let bind (scope : scope) (x, cth) =
     assert (scope.sc_pr_uc = None);
     { scope with
-        sc_env = EcSection.add_th EcTheory.import0 x cth scope.sc_env }
+        sc_env = EcSection.add_th ~import:EcTheory.import0 x cth scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : required_info) =
