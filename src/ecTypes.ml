@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -386,16 +386,16 @@ let pv_hash v =
 
 let pv_compare v1 v2 =
   match EcPath.x_compare v1.pv_name v2.pv_name with
-  | 0 -> Pervasives.compare v1.pv_kind v2.pv_kind
+  | 0 -> Stdlib.compare v1.pv_kind v2.pv_kind
   | r -> r
 
 let pv_compare_p v1 v2 =
   match EcPath.x_compare_na v1.pv_name v2.pv_name with
-  | 0 -> Pervasives.compare v1.pv_kind v2.pv_kind
+  | 0 -> Stdlib.compare v1.pv_kind v2.pv_kind
   | r -> r
 
 let pv_ntr_compare v1 v2 =
-  match Pervasives.compare v1.pv_kind v2.pv_kind with
+  match Stdlib.compare v1.pv_kind v2.pv_kind with
   | 0 -> EcPath.x_ntr_compare v1.pv_name v2.pv_name
   | r -> r
 
@@ -852,7 +852,7 @@ let e_map fty fe e =
       let bd' = fe bd in
       ExprSmart.e_quant (e, (q, b, bd)) (q, b', bd')
 
-let rec e_fold fe state e =
+let e_fold fe state e =
   match e.e_node with
   | Eint _                -> state
   | Elocal _              -> state

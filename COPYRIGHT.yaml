@@ -2,18 +2,28 @@ entities:
   IMDEA : "IMDEA Software Institute"
   INRIA : "Inria"
   X     : "Ecole Polytechnique"
+  RM    : "Roberto Metere <r.metere2@ncl.ac.uk>"
 copyrights:
   - pattern: ["src/*.ml*", "src/*/*.ml*"]
     style: "ocaml"
     license: "CeCILL-C-V1"
     copyrights:
       - { who: "IMDEA", date: "2012--2016" }
-      - { who: "INRIA", date: "2012--2018" }
-      - { who: "X"    , date: "2012--2018" }
+      - { who: "INRIA", date: "2012--2021" }
+      - { who: "X"    , date: "2012--2021" }
+  - pattern:
+      - "theories/crypto/SigmaProtocol.ec"
+      - "theories/crypto/Commitment.ec"
+      - "theories/crypto/DLog.ec"
+    style: "ocaml"
+    license: "CeCILL-B-V1"
+    last: true
+    copyrights:
+      - { who: "RM", date: "2016--2017" }
   - pattern: ["theories/*.ec", "theories/*/*.ec*"]
     style: "ocaml"
     license: "CeCILL-B-V1"
     copyrights:
       - { who: "IMDEA", date: "2012--2016" }
-      - { who: "INRIA", date: "2012--2018" }
-      - { who: "X"    , date: "2012--2018" }
+      - { who: "INRIA", date: "2012--2021" }
+      - { who: "X"    , date: "2012--2021" }

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -635,6 +635,14 @@ proof. by elim: s1 => //= x s1 IHs; rewrite IHs. qed.
 lemma mem_filter (p : 'a -> bool) x s:
   mem (filter p s) x <=> p x /\ (mem s x).
 proof. by elim: s => //= y s IHs; smt. qed.
+
+lemma find_eq_in (q p : 'a -> bool) (xs : 'a list) :
+  (forall x, x \in xs => p x <=> q x)
+  => find p xs = find q xs.
+proof.
+elim: xs=> //= x xs ih eq_in; rewrite (eq_in x _) //; case: (q x)=> //=.
+by rewrite ih=> // x0 x0_in_xs; rewrite eq_in // x0_in_xs.
+qed.
 
 lemma find_ge0 p (s : 'a list): 0 <= find p s.
 proof. elim: s; smt. qed.

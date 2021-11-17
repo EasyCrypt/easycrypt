@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -337,7 +337,7 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
 
               (try  EcUnify.unify env ue (toarrow ctorty pty) opty
                with EcUnify.UnificationFailure _ -> assert false);
-              TT.unify_or_fail env ue pb.pop_name.pl_loc pty xty;
+              TT.unify_or_fail env ue pb.pop_name.pl_loc ~expct:pty xty;
 
               let create o =
                 EcIdent.create (omap_dfl unloc "_" o) in

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -217,7 +217,7 @@ object(self)
         | Some loc -> LC.tostring loc
       in
         self#_clear_update ~final:false ();
-        Format.eprintf "[%.8s] [%s] %s\n%!" prefix strloc msg;
+        Format.eprintf "[%s] [%s] %s\n%!" prefix strloc msg;
         self#_update_progress
 
   method interactive = false

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -21,7 +21,6 @@ module BI = EcBigInt
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
-exception IncompatibleModuleSig of module_sig * module_sig
 
 type 'a eqtest = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
@@ -232,7 +231,7 @@ end) = struct
     match i1, i2 with
     | Tys_function (fs1,oi1), Tys_function(fs2,oi2) ->
       for_funsig env fs1 fs2 &&
-        for_oracle_info env norm oi1 oi2
+        for_oracle_info env ~norm oi1 oi2
 
   (* ------------------------------------------------------------------ *)
   and for_module_sig_body env ~norm b1 b2 =
@@ -1157,8 +1156,6 @@ type stk_elem = {
     se_args2  : form list;
     se_ty     : ty;
   }
-
-type stk = stk_elem list
 
 let zpush se_h se_common se_args1 se_args2 se_ty stk =
   { se_h; se_common; se_args1; se_args2; se_ty} :: stk

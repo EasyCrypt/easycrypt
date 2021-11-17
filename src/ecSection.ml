@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -128,7 +128,7 @@ let on_bindings (cb : cb) (bds : (EcIdent.t * ty) list) =
 let rec on_expr (cb : cb) (e : expr) =
   let cbrec = on_expr cb in
 
-  let rec fornode () =
+  let fornode () =
     match e.e_node with
     | Eint   _            -> ()
     | Elocal _            -> ()
@@ -896,7 +896,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
     let to_gen = add_declared_op to_gen path operator in
     to_gen, None
 
-let rec generalize_axiom to_gen prefix (name, ax) =
+let generalize_axiom to_gen prefix (name, ax) =
   let ax = EcSubst.subst_ax to_gen.tg_subst ax in
   let path = pqname prefix name in
   match ax.ax_loca with

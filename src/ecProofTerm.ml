@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -148,7 +148,7 @@ let concretize_form pe f =
   concretize_e_form (concretize_env pe) f
 
 (* -------------------------------------------------------------------- *)
-let rec concretize ({ ptev_env = pe } as pt) =
+let concretize ({ ptev_env = pe } as pt) =
   let (CPTEnv subst) as cptenv = concretize_env pe in
   (concretize_e_pt cptenv pt.ptev_pt, Fsubst.f_subst subst pt.ptev_ax)
 
@@ -281,7 +281,7 @@ type occmode = {
 
 let om_rigid = { k_keyed = true; k_conv = false; }
 
-let rec pf_find_occurence
+let pf_find_occurence
   (pt : pt_env) ?(full = true) ?(rooted = false) ?occmode ~ptn subject
 =
   let module E = struct exception MatchFound of form end in
@@ -519,7 +519,7 @@ let process_pterm pe pt =
     match fp with
     | None    -> tc_pterm_apperror pe AE_CannotInfer
     | Some fp -> PT.pf_process_formula pe.pte_pe pe.pte_hy fp
-  in process_pterm_cut prcut pe pt
+  in process_pterm_cut ~prcut pe pt
 
 (* ------------------------------------------------------------------ *)
 let rec trans_pterm_arg_impl pe f =

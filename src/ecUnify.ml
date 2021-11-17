@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -528,7 +528,7 @@ module UniEnv = struct
     let (subst, tvs) = openty_r ue params tvi in
     (subst ty, tvs)
 
-  let rec repr (ue : unienv) (t : ty) : ty =
+  let repr (ue : unienv) (t : ty) : ty =
     match t.ty_node with
     | Tunivar id -> odfl t (snd (Unify.UF.data id (!ue).ue_uf))
     | _ -> t

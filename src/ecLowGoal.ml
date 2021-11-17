@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -435,8 +435,6 @@ module LowIntro = struct
   let valid_mod_name   (x : symbol) = valid_name EcIo.is_mod_ident x
   let valid_mem_name   (x : symbol) = valid_name EcIo.is_mem_ident x
 
-  type kind = [`Value | `Module | `Memory]
-
   let tc_no_product (pe : proofenv) ?loc () =
     tc_error pe ?loc "nothing to introduce"
 
@@ -742,7 +740,7 @@ let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =
       | Some x -> EcIdent.create x
   in
 
-  let rec for1 (s, bds, args, cls) (clid, id) =
+  let for1 (s, bds, args, cls) (clid, id) =
     try
       let cls =
         match clid with

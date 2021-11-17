@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -45,7 +45,8 @@ module PPEnv = struct
 
   let ofenv (env : EcEnv.env) =
     let width =
-      EcGState.asint 0 (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
+      EcGState.asint ~default:0
+        (EcGState.getvalue "PP:width" (EcEnv.gstate env)) in
 
     { ppe_env    = env;
       ppe_locals = Mid.empty;
@@ -286,7 +287,7 @@ module PPEnv = struct
     in
       msymb
 
-  let rec modtype_symb (ppe : t) mty : EcSymbols.msymbol =
+  let modtype_symb (ppe : t) mty : EcSymbols.msymbol =
     let exists sm =
       match EcEnv.ModTy.lookup_opt sm ppe.ppe_env with
       | None -> false
@@ -400,7 +401,7 @@ let pp_enclose ~pre ~post pp fmt x =
 
 (* -------------------------------------------------------------------- *)
 let pp_paren pp fmt x =
-  pp_enclose "(" ")" pp fmt x
+  pp_enclose ~pre:"(" ~post:")" pp fmt x
 
 (* -------------------------------------------------------------------- *)
 let pp_maybe_paren c pp =
@@ -1170,7 +1171,7 @@ let rec pp_locbinds_blocks ppe ?fv vs =
       (ppe, fun fmt -> Format.fprintf fmt "%t@ %t" pp1 pp2)
 
 (* -------------------------------------------------------------------- *)
-let rec pp_locbinds ppe ?fv vs =
+let pp_locbinds ppe ?fv vs =
   let rec merge_r (xs, ty) vs =
     match vs with
     | [] ->
@@ -1238,7 +1239,7 @@ let rec pp_bindings_blocks ppe ?(break = true) ?fv bds =
       let ppe, pp2 = pp_bindings_blocks ppe ?fv bds in
       (ppe, fun fmt -> Format.fprintf fmt "%t%(%)%t" pp1 pp_sep pp2)
 
-let rec pp_bindings ppe ?break ?fv bds =
+let pp_bindings ppe ?break ?fv bds =
   let rec merge_r (xs, gty) bds =
     match bds with
     | [] ->
@@ -1525,7 +1526,7 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
 
       try
         let (ue, ev) =
-          EcMatching.f_match_core fmnotation hy (ue, ev) bd f
+          EcMatching.f_match_core fmnotation hy (ue, ev) ~ptn:bd f
         in
 
         if not (EcMatching.can_concretize ev ue) then
@@ -2628,7 +2629,7 @@ module PPGoal = struct
           | Some pk -> Format.fprintf fmt "%t " pk in
 
         Format.fprintf fmt
-          "%-.2s%t: @[<hov 2>%t@]@\n%!"
+          "%s%t: @[<hov 2>%t@]@\n%!"
           (PPEnv.local_symb ppe id) pk dk)
         pps
     end;
@@ -2669,7 +2670,7 @@ let pp_hyps (ppe : PPEnv.t) fmt hyps =
       | Some pk -> Format.fprintf fmt "%t" pk in
 
     Format.fprintf fmt
-      "%-.2s%t: @[<hov 2>%t@]@\n%!"
+      "%s%t: @[<hov 2>%t@]@\n%!"
       (PPEnv.local_symb ppe id) pk dk)
     pps
 

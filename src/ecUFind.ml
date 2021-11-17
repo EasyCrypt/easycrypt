@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -183,9 +183,7 @@ module UMake (I : Item) = struct
 
   module UF = Make(I)(D)
 
-  type item    = I.t
-  type data    = D.data
-  type effects = D.effects
+  type item = I.t
 
   type t = UF.t
 

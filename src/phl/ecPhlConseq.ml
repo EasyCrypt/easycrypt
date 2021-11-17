@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -1108,20 +1108,6 @@ let process_bd_equiv side (pr, po) tc =
   let info = Some { fp_mode = `Implicit; fp_head = info; fp_args = []; } in
   let info2, info3 = sideif side (info, None) (None, info) in
   process_conseq true (None, info2, info3) tc
-
-(* -------------------------------------------------------------------- *)
-type pgoptions =  {
-  pgo_split  : bool;
-  pgo_solve  : bool;
-  pgo_subst  : bool;
-  pgo_disjct : bool;
-  pgo_delta  : pgo_delta;
-}
-
-and pgo_delta = {
-  pgod_case  : bool;
-  pgod_split : bool;
-}
 
 (* -------------------------------------------------------------------- *)
 type cqpotions = {

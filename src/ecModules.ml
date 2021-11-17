@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -319,7 +319,6 @@ end = struct
   type i_while    = EcTypes.expr * stmt
   type i_assert   = EcTypes.expr
   type i_abstract = EcIdent.t
-  type s_stmt     = instr list
 
   let lv_var (lv, pvt) pvt' =
     if pvt == pvt' then lv else LvVar pvt'

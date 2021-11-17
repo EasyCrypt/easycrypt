@@ -1,0 +1,27 @@
+opam-version: "2.0"
+
+homepage: "https://www.easycrypt.info/"
+bug-reports: "https://www.easycrypt.info/trac/newticket"
+dev-repo: "git+https://github.com/EasyCrypt/easycrypt.git"
+authors: "EasyCrypt Development Team <team@easycrypt.info>"
+maintainer: "pierre-yves@strub.nu"
+license: "CeCILL-C"
+
+synopsis: "EasyCrypt: Computer-Aided Cryptographic Proofs"
+description: """
+EasyCrypt is a toolset for reasoning about relational properties
+of probabilistic computations with adversarial code. Its main
+application is the construction and verification of game-based
+cryptographic proofs."""
+
+post-messages: """
+EasyCrypt needs external provers to be installed. From opam, you
+can install AltErgo (package: alt-ergo).
+
+The required steps for configuring the provers are listed on:
+  https://github.com/EasyCrypt/easycrypt#configuring-why3"""
+
+build: [
+  ["dune" "subst"] {pinned}
+  ["dune" "build" "-p" name "-j" jobs "@install"]
+]

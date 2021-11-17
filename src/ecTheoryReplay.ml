@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -258,7 +258,7 @@ let check_evtags (tags : evtags) (src : symbol list) =
     let dfl = not (List.exists (fun (mode, _) -> mode = `Include) tags) in
     let stt =
       List.map (fun src ->
-        let rec do1 status (mode, dst) =
+        let do1 status (mode, dst) =
           match mode with
           | `Exclude -> if sym_equal src dst then raise E.Reject; status
           | `Include -> status || (sym_equal src dst)
@@ -724,7 +724,7 @@ and replay_modtype
         match mode with
         | `Alias -> rename ove subst (`Module, x)
         | `Inline _ ->
-          let subst = EcSubst.add_path subst (xpath ove x) np in
+          let subst = EcSubst.add_path subst ~src:(xpath ove x) ~dst:np in
           subst, x in
 
       let modty = EcSubst.subst_top_modsig subst modty in
@@ -765,7 +765,7 @@ and replay_mod
         | _ -> assert false
       in
 
-      let substme = EcSubst.add_path subst (xpath ove name) np in
+      let substme = EcSubst.add_path subst ~src:(xpath ove name) ~dst:np in
 
       let me    = EcSubst.subst_top_module subst me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
@@ -1023,7 +1023,7 @@ let replay (hooks : 'a ovrhooks)
   ~abstract ~local ~incl ~clears ~renames
   ~opath ~npath ovrds (scope : 'a) (name, items)
 =
-  let subst = EcSubst.add_path (EcSubst.empty ()) opath npath in
+  let subst = EcSubst.add_path (EcSubst.empty ()) ~src:opath ~dst:npath in
   let ove   = {
     ovre_ovrd     = ovrds;
     ovre_rnms     = renames;

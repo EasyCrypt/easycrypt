@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -83,13 +83,11 @@ and xspec = [
 
 and xkind = [ `Flag | `Int | `String ]
 
-type xvalue = [ `Bool of bool | `Int of int | `String of string ]
-
 (* -------------------------------------------------------------------- *)
 let print_usage ?progname ?(out = stderr) ?msg specs =
   let progname = odfl Sys.argv.(0) progname in
 
-  let rec ccspecs hashelp specs =
+  let ccspecs hashelp specs =
     let for1 = function
       | `Spec (name, kind, help) ->
         let kind =
@@ -278,7 +276,7 @@ let get_string name values =
 
 let get_string_list name values : string list =
   let split x =
-    let aout = List.map String.trim (String.nsplit x ",") in
+    let aout = List.map String.trim (String.split_on_string x ~by:",") in
     List.filter ((<>) "") aout
   in
 

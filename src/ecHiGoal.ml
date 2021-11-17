@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -674,7 +674,7 @@ let process_delta ?target (s, o, p) tc =
     end else t_id tc
 
 (* -------------------------------------------------------------------- *)
-let rec process_rewrite1_r ttenv ?target ri tc =
+let process_rewrite1_r ttenv ?target ri tc =
   let implicits = ttenv.tt_implicits in
 
   match unloc ri with
@@ -805,7 +805,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       process_algebra `Solve `Field [] tc
 
 (* -------------------------------------------------------------------- *)
-let rec process_rewrite1 ttenv ?target ri tc =
+let process_rewrite1 ttenv ?target ri tc =
   EcCoreGoal.reloc (loc ri) (process_rewrite1_r ttenv ?target ri) tc
 
 (* -------------------------------------------------------------------- *)
@@ -1357,8 +1357,6 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
   and intro1_full_case (st : ST.state)
     ((prind, delta), withor, (cnt : icasemode_full option)) pis tc
   =
-    let module E = struct exception IterDone of tcenv end in
-
     let cnt = cnt |> odfl (`AtMost 1) in
     let red = if delta then `Full else `NoDelta in
 

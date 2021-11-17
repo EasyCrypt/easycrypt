@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -86,17 +86,6 @@ type varbind = {
   vb_type  : EcTypes.ty;
   vb_kind  : [`Var of EcTypes.pvar_kind | `Proj of int];
 }
-
-type obj = [
-  | `Variable of varbind
-  | `Function of function_
-  | `Module   of (module_expr * locality option)
-  | `ModSig   of module_sig
-  | `TypeDecl of EcDecl.tydecl
-  | `Operator of EcDecl.operator
-  | `Axiom    of EcDecl.axiom
-  | `Theory   of (theory * thmode)
-]
 
 type mc = {
   mc_parameters : ((EcIdent.t * module_type) list) option;
@@ -611,7 +600,7 @@ module MC = struct
         match obj.vb_kind with
         | `Var EcTypes.PVglob -> false
         | `Var EcTypes.PVloc | `Proj _ -> true in
-      (_downpath_for_var local false env p args, obj)
+      (_downpath_for_var ~local ~spsc:false env p args, obj)
 
   let _up_var candup mc x obj =
     if not candup && MMsym.last x mc.mc_variables <> None then
@@ -625,7 +614,7 @@ module MC = struct
   let lookup_fun qnx env =
     match lookup (fun mc -> mc.mc_functions) qnx env with
     | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_fun false env p args, obj)
+    | Some (p, (args, obj)) -> (_downpath_for_fun ~spsc:false env p args, obj)
 
   let _up_fun candup mc x obj =
     if not candup && MMsym.last x mc.mc_functions <> None then
@@ -1612,7 +1601,7 @@ module Fun = struct
         match MC.by_path (fun mc -> mc.mc_functions) ip env with
         | None -> lookup_error (`XPath p)
         | Some (params, o) ->
-           let ((spi, params), _op) = MC._downpath_for_fun spsc env ip params in
+           let ((spi, params), _op) = MC._downpath_for_fun ~spsc env ip params in
            if i <> spi || susp && args <> [] then
              assert false;
            if not susp && List.length args <> List.length params then
@@ -1810,7 +1799,7 @@ module Var = struct
              | `Var EcTypes.PVglob -> false
              | `Var EcTypes.PVloc | `Proj _ -> true in
            let ((spi, _params), _) =
-             MC._downpath_for_var local spsc env ip params in
+             MC._downpath_for_var ~local ~spsc env ip params in
            if i <> spi then
              assert false;
            o
@@ -3012,7 +3001,7 @@ module Theory = struct
   let import (path : EcPath.path) (env : env) =
     let rec import (env : env) path (th : theory) =
       let xpath x = EcPath.pqname path x in
-      let rec import_th_item (env : env) (item : theory_item) =
+      let import_th_item (env : env) (item : theory_item) =
         if not item.ti_import.im_atimport then env else
 
         match item.ti_item with
