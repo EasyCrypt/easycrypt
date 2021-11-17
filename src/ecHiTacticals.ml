@@ -67,7 +67,6 @@ and process1_try (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 and process1_admit (_ : ttenv) (tc : tcenv1) =
-  EcFortune.pick () |> oiter (EcEnv.notify (FApi.tc1_env tc) `Warning "%s");
   EcLowGoal.t_admit tc
 
 (* -------------------------------------------------------------------- *)
