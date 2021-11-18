@@ -240,4 +240,5 @@ end
 (* -------------------------------------------------------------------- *)
 module Search : sig
   val search : scope -> pformula list -> unit
+  val locate : scope -> pqsymbol -> unit
 end

@@ -201,6 +201,10 @@ let process_search scope qs =
   EcScope.Search.search scope qs
 
 (* -------------------------------------------------------------------- *)
+let process_locate scope x =
+  EcScope.Search.locate scope x
+
+(* -------------------------------------------------------------------- *)
 module HiPrinting = struct
   let pr_glob fmt env pm =
     let ppe = EcPrinting.PPEnv.ofenv env in
@@ -654,6 +658,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
+      | Glocate      x    -> `Fct   (fun scope -> process_locate     scope  x; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
       | Gtcdump      info -> `Fct   (fun scope -> process_dump       scope  info)
       | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)

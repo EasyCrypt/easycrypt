@@ -483,6 +483,7 @@
 %token LET
 %token LLARROW
 %token LOCAL
+%token LOCATE
 %token LOGIC
 %token LONGARROW
 %token LOSSLESS
@@ -3649,6 +3650,7 @@ global_action:
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
 | SEARCH x=search+ { Gsearch      x  }
+| LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
 
 | PRAGMA       x=pragma { Gpragma x }
