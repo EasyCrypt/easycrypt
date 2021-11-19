@@ -1792,7 +1792,7 @@ module Ty = struct
     let tcsyms  = Mstr.of_list tcsyms in
     let symbols = check_tci_operators (env scope) ty tci.pti_ops tcsyms in
 
-    let subst = {
+    let tysubst = {
       ty_subst_id with
         ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
         ts_v   =
@@ -1804,9 +1804,9 @@ module Ty = struct
       List.fold_left
         (fun subst (opname, ty) ->
           let oppath = Mstr.find (EcIdent.name opname) symbols in
-          let op = EcFol.f_op oppath [] ty in
+          let op = EcFol.f_op oppath [] (ty_subst tysubst ty) in
           EcFol.Fsubst.f_bind_local subst opname op)
-        (EcFol.Fsubst.f_subst_init ~sty:subst ()) tc.tc_ops in
+        (EcFol.Fsubst.f_subst_init ~sty:tysubst ()) tc.tc_ops in
 
     let axioms =
       List.map

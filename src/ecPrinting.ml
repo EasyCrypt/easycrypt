@@ -849,7 +849,7 @@ let pp_opname_with_tvi ppe fmt (nm, op, tvi) =
   | Some tvi ->
       Format.fprintf fmt "%a<:%a>"
         pp_opname (nm, op)
-        (pp_list "@, " (pp_type ppe)) tvi
+        (pp_list ",@ " (pp_type ppe)) tvi
 
 let pp_opapp
      (ppe     : PPEnv.t)
@@ -918,12 +918,13 @@ let pp_opapp
       fun () ->
         match es with
         | [] ->
-            pp_opname fmt (nm, opname)
+            pp_opname_with_tvi ppe fmt (nm, opname, Some tvi)
 
         | _  ->
-            let pp_subs = ((fun _ _ -> pp_opname), pp_sub) in
-            let pp fmt () = pp_app ppe pp_subs outer fmt (([], opname), es) in
-            maybe_paren outer (inm, max_op_prec) pp fmt ()
+            let pp_subs = ((fun ppe _ -> pp_opname_with_tvi ppe), pp_sub) in
+            let pp fmt () =
+              pp_app ppe pp_subs outer fmt (([], opname, Some tvi), es)
+            in maybe_paren outer (inm, max_op_prec) pp fmt ()
 
   and try_pp_as_uniop () =
     match es with
