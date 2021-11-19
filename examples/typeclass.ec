@@ -164,7 +164,7 @@ instance comgroup with int
   op gopp  = CoreInt.opp.
 
 realize addr0.
-
+apply: addr0.
 have : left_id izero Int.(+).
 
 locate left_id.
