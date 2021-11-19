@@ -319,6 +319,7 @@ type required_info = {
   rqd_namespace : EcLoader.namespace option;
   rqd_kind      : EcLoader.kind;
   rqd_digest    : Digest.t;
+  rqd_direct    : bool;
 }
 
 type required = required_info list
@@ -1830,10 +1831,19 @@ module Theory = struct
     assert (scope.sc_pr_uc = None);
     List.exists (fun x ->
         if x.rqd_name = name.rqd_name then (
-(* PY: FIXME, should we ensure this, raise an error message ... *)
+          (* FIXME: raise an error message *)
           assert (x.rqd_digest = name.rqd_digest);
           true)
-        else false) scope.sc_required
+        else false)
+      scope.sc_required
+
+  (* ------------------------------------------------------------------ *)
+  let mark_as_direct (scope : scope) (name : symbol) =
+    let for1 rq =
+      if   rq.rqd_name = name
+      then { rq with rqd_direct = true }
+      else rq
+    in { scope with sc_required = List.map for1 scope.sc_required }
 
   (* ------------------------------------------------------------------ *)
   let enter (scope : scope) (mode : thmode) (name : symbol) =
@@ -1841,7 +1851,7 @@ module Theory = struct
     subscope scope mode name
 
   (* ------------------------------------------------------------------ *)
-  let rec require_loaded (id:required_info) scope =
+  let rec require_loaded (id : required_info) scope =
     if required scope id then
       scope
     else
@@ -1950,9 +1960,11 @@ module Theory = struct
   let require (scope : scope) ((name, mode) : required_info * thmode) loader =
     assert (scope.sc_pr_uc = None);
 
-    if required scope name then
-      scope
-    else
+    if required scope name then begin
+      if   name.rqd_direct
+      then mark_as_direct scope name.rqd_name
+      else scope
+    end else
       match Msym.find_opt name.rqd_name scope.sc_loaded with
       | Some _ -> require_loaded name scope
 

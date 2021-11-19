@@ -436,6 +436,7 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
         rqd_kind      = kind;
         rqd_namespace = fnm;
         rqd_digest    = Digest.file filename;
+        rqd_direct    = true;
       } in
 
       let loader iscope =
