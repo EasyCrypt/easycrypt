@@ -25,23 +25,32 @@ type class magma = {
   op mmul : magma -> magma -> magma
 }.
 
-(* TODO: no explicit error message, and why is this not working but ring is? *)
-(*
+(* TODO: when removing the type argument of associative, no explicit error message.
+   Should work anyway and if not, have a readable error message.*)
 type class semigroup <: magma = {
-  axiom maddA : associative mmul
+  axiom mmulA : associative<:semigroup> mmul
 }.
+
+(* TODO: why do I need this instead of using left_id and right_id directly?
+   Or even specifying the type?
+   Or even specifying semigroup and not magma? *)
+pred left_id_mmul ['a <: semigroup] (e : 'a) = left_id e mmul.
+pred right_id_mmul ['a <: semigroup] (e : 'a) = right_id e mmul.
 
 type class monoid <: semigroup = {
   op mid : monoid
 
-  axiom mmulr0 : left_id mid mmul
-  axiom mmul0r : right_id mid mmul
+  axiom mmulr0 : left_id_mmul mid
+  axiom mmul0r : right_id_mmul mid
 }.
+
+(* TODO: same. *)
+pred left_inverse_mid_mmul ['a <: monoid] (inv : 'a -> 'a) = left_inverse mid inv mmul.
 
 type class group <: monoid = {
   op minv : group -> group
 
-  axiom mmulN : left_inverse mid minv mmul
+  axiom mmulN : left_inverse_mid_mmul minv
 }.
 
 type class ['a <: group] action = {
@@ -52,7 +61,6 @@ type class ['a <: group] action = {
   axiom compatibility :
     forall (g h : 'a) (x : action), amul (mmul g h) x = amul g (amul h x)
 }.
-*)
 
 (* TODO: make one of these work, and then finish the hierarchy here:
    https://en.wikipedia.org/wiki/Magma_(algebra) *)
@@ -75,6 +83,9 @@ type class comgroup = {
 (* -------------------------------------------------------------------- *)
 (* Advanced algebraic structures *)
 
+(*TODO: we don't have here the issues we had with semigroup and monoid,
+  probably because left_distributive was adequatly typed by ( * )
+  before beign applied to ( + ). *)
 type class comring <: comgroup = {
   op one   : comring
   op ( * ) : comring -> comring -> comring
@@ -179,7 +190,11 @@ realize mulr1 by trivial.
 realize mulrC by rewrite mulrC.
 realize mulrA by rewrite mulrA.
 realize mulrDl.
+proof.
   print mulrDl.
+  move => x y z.
+  move: (Ring.IntID.mulrDl x y z).
+  move => HmulrDl.
   (* TODO: what? *)
   admit.
 qed.
@@ -204,6 +219,7 @@ realize addr0.
 proof.
   (* TODO: error message. *)
   move => x (*y*).
+  (* Top.Logic turned into top... *)
   (* TODO: error message. *)
   (*rewrite //.*)
   (* TODO: wow I just broke something. *)
@@ -255,6 +271,17 @@ instance finite with bool
 realize enumP.
 proof. by case. qed.
 
+type class find_out <: finite = {
+  axiom rev_enum : rev<:find_out> enum = enum
+}.
+
+instance find_out with bool.
+
+realize rev_enum.
+proof.
+  admit.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (* TODO: some old bug that maybe already is fixed? *)
 
@@ -296,7 +323,7 @@ op foo_2 ['a <: foo, 'b <: 'a tc2] = 0.
 
 
 (* ==================================================================== *)
-(* Old TODO list *)
+(* Old TODO list: 1-3 are done, modulo bugs, 4 is to be done, 5 will be done later. *)
 
 (*
  1. typage -> selection des operateurs / inference des instances de tc
