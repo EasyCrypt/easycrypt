@@ -196,6 +196,7 @@
     "instance"    , INSTANCE   ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "search"      , SEARCH     ;        (* KW: global *)
+    "locate"      , LOCATE     ;        (* KW: global *)
     "as"          , AS         ;        (* KW: global *)
     "Pr"          , PR         ;        (* KW: global *)
     "clone"       , CLONE      ;        (* KW: global *)

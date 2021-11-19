@@ -30,6 +30,7 @@ type required_info = {
   rqd_namespace : EcLoader.namespace option;
   rqd_kind      : EcLoader.kind;
   rqd_digest    : Digest.t;
+  rqd_direct    : bool;
 }
 
 type required = required_info list
@@ -239,4 +240,5 @@ end
 (* -------------------------------------------------------------------- *)
 module Search : sig
   val search : scope -> pformula list -> unit
+  val locate : scope -> pqsymbol -> unit
 end

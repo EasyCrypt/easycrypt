@@ -209,8 +209,8 @@ module PPEnv = struct
       | Some (mode, typ, dom) ->
           let filter =
             match mode with
-            | `Expr -> fun op -> not (EcDecl.is_pred op)
-            | `Form -> fun _  -> true
+            | `Expr -> fun _ op -> not (EcDecl.is_pred op)
+            | `Form -> fun _ _  -> true
           in
           let tvi = Some (EcUnify.TVIunamed typ) in
 
@@ -3072,7 +3072,7 @@ module ObjectInfo = struct
   (* ------------------------------------------------------------------ *)
   let pr_op_r =
     let get_ops qs env =
-      let l = EcEnv.Op.all qs env in
+      let l = EcEnv.Op.all ~name:qs env in
       if l = [] then raise NoObject;
       l in
     { od_name    = "operators or predicates";

@@ -620,12 +620,12 @@ let tfun_expected ue psig =
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 
 (* -------------------------------------------------------------------- *)
-let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
+let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig =
   ignore hidden;                (* FIXME *)
 
   let module D = EcDecl in
 
-  let filter op =
+  let filter oppath op =
     (* Filter operator based on given type variables instanciation *)
     let filter_on_tvi =
       match tvi with
@@ -643,7 +643,7 @@ let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
             List.for_all (fun (x, _) -> Msym.mem x tparams) ls
 
     in
-      filter op && filter_on_tvi op
+      filter oppath op && filter_on_tvi op
   in
 
   let select (path, op) =
@@ -695,4 +695,4 @@ let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
     with E.Failure -> None
 
   in
-    List.pmap select (EcEnv.Op.all ~check:filter name env)
+    List.pmap select (EcEnv.Op.all ~check:filter ~name env)

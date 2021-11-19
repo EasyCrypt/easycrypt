@@ -319,6 +319,7 @@ type required_info = {
   rqd_namespace : EcLoader.namespace option;
   rqd_kind      : EcLoader.kind;
   rqd_digest    : Digest.t;
+  rqd_direct    : bool;
 }
 
 type required = required_info list
@@ -1147,7 +1148,9 @@ module Op = struct
 
     in
 
-    let tyop   = EcDecl.mk_op ~opaque:false tparams ty body lc in
+    let tags   = Sstr.of_list (List.map unloc op.po_tags) in
+    let opaque = Sstr.mem "opaque" tags in
+    let tyop   = EcDecl.mk_op ~opaque tparams ty body lc in
     let opname = EcPath.pqname (EcEnv.root eenv) (unloc op.po_name) in
 
     if op.po_kind = `Const then begin
@@ -1229,8 +1232,6 @@ module Op = struct
 
       end else scope
     in
-
-    let tags = Sstr.of_list (List.map unloc op.po_tags) in
 
     let axs = ref [] in
 
@@ -1538,7 +1539,7 @@ module Ty = struct
 
         let tvi = List.map (TT.transty tp_tydecl env ue) tvi in
         let selected =
-          EcUnify.select_op ~filter:EcDecl.is_oper
+          EcUnify.select_op ~filter:(fun _ -> EcDecl.is_oper)
             (Some (EcUnify.TVIunamed tvi)) env (unloc op) ue []
         in
         let op =
@@ -1878,10 +1879,19 @@ module Theory = struct
     assert (scope.sc_pr_uc = None);
     List.exists (fun x ->
         if x.rqd_name = name.rqd_name then (
-          (* PY: FIXME, should we ensure this, raise an error message ... *)
+          (* FIXME: raise an error message *)
           assert (x.rqd_digest = name.rqd_digest);
           true)
-        else false) scope.sc_required
+        else false)
+      scope.sc_required
+
+  (* ------------------------------------------------------------------ *)
+  let mark_as_direct (scope : scope) (name : symbol) =
+    let for1 rq =
+      if   rq.rqd_name = name
+      then { rq with rqd_direct = true }
+      else rq
+    in { scope with sc_required = List.map for1 scope.sc_required }
 
   (* ------------------------------------------------------------------ *)
   let enter (scope : scope) (mode : thmode) (name : symbol) =
@@ -1889,7 +1899,7 @@ module Theory = struct
     subscope scope mode name
 
   (* ------------------------------------------------------------------ *)
-  let rec require_loaded (id:required_info) scope =
+  let rec require_loaded (id : required_info) scope =
     if required scope id then
       scope
     else
@@ -1998,9 +2008,11 @@ module Theory = struct
   let require (scope : scope) ((name, mode) : required_info * thmode) loader =
     assert (scope.sc_pr_uc = None);
 
-    if required scope name then
-      scope
-    else
+    if required scope name then begin
+      if   name.rqd_direct
+      then mark_as_direct scope name.rqd_name
+      else scope
+    end else
       match Msym.find_opt name.rqd_name scope.sc_loaded with
       | Some _ -> require_loaded name scope
 
@@ -2030,7 +2042,6 @@ module Theory = struct
         end
 
   let required scope = scope.sc_required
-
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2185,7 +2196,7 @@ module Search = struct
       let do1 fp =
         match unloc fp with
         | PFident (q, None) -> begin
-            match EcEnv.Op.all q.pl_desc env with
+            match EcEnv.Op.all ~name:q.pl_desc env with
             | [] ->
                 hierror ~loc:q.pl_loc "unknown operator: `%s'"
                   (EcSymbols.string_of_qsymbol q.pl_desc)
@@ -2236,5 +2247,67 @@ module Search = struct
     List.iter (fun ax ->
       Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ~long:true ppe) ax)
       axioms;
+    notify scope `Info "%s" (Buffer.contents buffer)
+
+  let locate (scope : scope) ({ pl_desc = name } : pqsymbol) =
+    let shorten lk p =
+      let rec doit prefix (nm, x) =
+        match lk (nm, x) (env scope) with
+        | Some (p', _) when EcPath.p_equal p p' ->
+            (nm, x)
+        | _ -> begin
+            match prefix with
+            | [] -> (nm, x)
+            | n :: prefix -> doit prefix (n :: nm, x)
+          end
+      in
+
+      let (nm, x) = EcPath.toqsymbol p in
+      let nm =
+        match nm with
+        | top :: nm when top = EcCoreLib.i_top ->
+            nm
+        | _ -> nm in
+
+      let nm', x' = doit (List.rev nm) ([], x) in
+      let plong, pshort = (nm, x), (nm', x') in
+
+      (plong, if plong = pshort then None else Some pshort)
+    in
+
+    let buffer = Buffer.create 0 in
+    let fmt    = Format.formatter_of_buffer buffer in
+
+    let for_kind section getall shorten =
+      let objs = getall ?check:None ?name:(Some name) (env scope) in
+      let objs = List.map shorten (List.fst objs) in
+
+      if not (List.is_empty objs) then begin
+        Format.fprintf fmt "In section [%s]@\n@\n" section;
+
+        List.iter (fun (long, short) ->
+            match short with
+            | None ->
+                Format.fprintf fmt " - %a@\n"
+                  EcSymbols.pp_qsymbol long
+            | Some short ->
+                Format.fprintf fmt " - %a (shorten name: %a)@\n"
+                  EcSymbols.pp_qsymbol long
+                  EcSymbols.pp_qsymbol short
+          )  objs
+      end in
+
+    for_kind "operators" EcEnv.Op.all (shorten EcEnv.Op.lookup_opt);
+    for_kind "types"     EcEnv.Ty.all (shorten EcEnv.Ty.lookup_opt);
+    for_kind "lemmas"    EcEnv.Ax.all (shorten EcEnv.Ax.lookup_opt);
+
+    Format.pp_print_flush fmt ();
+
+    if Buffer.length buffer = 0 then begin
+      Format.fprintf fmt
+        "no objects found for `%a'"
+        EcSymbols.pp_qsymbol name
+    end;
+
     notify scope `Info "%s" (Buffer.contents buffer)
 end
