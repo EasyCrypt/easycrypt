@@ -1147,7 +1147,9 @@ module Op = struct
 
     in
 
-    let tyop   = EcDecl.mk_op ~opaque:false tparams ty body lc in
+    let tags   = Sstr.of_list (List.map unloc op.po_tags) in
+    let opaque = Sstr.mem "opaque" tags in
+    let tyop   = EcDecl.mk_op ~opaque tparams ty body lc in
     let opname = EcPath.pqname (EcEnv.root eenv) (unloc op.po_name) in
 
     if op.po_kind = `Const then begin
@@ -1229,8 +1231,6 @@ module Op = struct
 
       end else scope
     in
-
-    let tags = Sstr.of_list (List.map unloc op.po_tags) in
 
     let axs = ref [] in
 
