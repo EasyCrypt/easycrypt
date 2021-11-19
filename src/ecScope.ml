@@ -1994,7 +1994,6 @@ module Theory = struct
         end
 
   let required scope = scope.sc_required
-
 end
 
 (* -------------------------------------------------------------------- *)
