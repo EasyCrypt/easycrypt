@@ -1435,9 +1435,15 @@ module Ty = struct
       | PTYD_Abstract tcs ->
         let ue = TT.transtyvars env (loc, Some args) in
         let tcs = List.map (TT.transtc env ue) tcs in
-        EcUnify.UniEnv.tparams ue, `Abstract tcs
+        let tp = EcUnify.UniEnv.tparams ue in
 
-      | PTYD_Alias    bd ->
+        begin match tp, tcs with
+          | [(x, [])], [{ tc_args = [ty] }] ->
+            Format.eprintf "[W]%s %s@." (EcIdent.tostring x) (EcTypes.dump_ty ty)
+          | _ -> () end;
+        tp, `Abstract tcs
+
+      | PTYD_Alias bd ->
         let ue     = TT.transtyvars env (loc, Some args) in
         let body   = transty tp_tydecl env ue bd in
         EcUnify.UniEnv.tparams ue, `Concrete body
@@ -1751,7 +1757,7 @@ module Ty = struct
        ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
        ts_v   =
          let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
-         Mid.find_opt^~ (Mid.of_list vsubst);
+         Mid.of_list vsubst;
     } in
       List.map (fun (x, opty) ->
         (EcIdent.name x, (true, ty_subst subst opty)))
@@ -1790,7 +1796,7 @@ module Ty = struct
         ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
         ts_v   =
           let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
-          Mid.find_opt^~ (Mid.of_list vsubst);
+          Mid.of_list vsubst;
     } in
 
     let subst =

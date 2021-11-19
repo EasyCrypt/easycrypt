@@ -1639,7 +1639,7 @@ typedecl:
 | locality=locality TYPE td=rlist1(tyd_name, COMMA)
     { List.map (fun x -> mk_tydecl ~locality x (PTYD_Abstract [])) td }
 
-| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(tcparam, COMMA)
+| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(tcparam, AMP)
     { [mk_tydecl ~locality td (PTYD_Abstract tcs)] }
 
 | locality=locality TYPE td=tyd_name EQ te=loc(type_exp)

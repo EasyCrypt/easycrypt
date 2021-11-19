@@ -260,21 +260,21 @@ type ty_subst = {
   ts_mp  : EcPath.mpath -> EcPath.mpath;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
   ts_u   : EcUid.uid -> ty option;
-  ts_v   : EcIdent.t -> ty option;
+  ts_v   : ty Mid.t;
 }
 
 let ty_subst_id =
-  { ts_p   = identity;
-    ts_mp  = identity;
-    ts_def = Mp.empty;
-    ts_u   = funnone ;
-    ts_v   = funnone ; }
+  { ts_p   = identity ;
+    ts_mp  = identity ;
+    ts_def = Mp.empty ;
+    ts_u   = funnone  ;
+    ts_v   = Mid.empty; }
 
 let is_ty_subst_id s =
      s.ts_p  == identity
   && s.ts_mp == identity
   && s.ts_u  == funnone
-  && s.ts_v  == funnone
+  && Mid.is_empty s.ts_v
   && Mp.is_empty s.ts_def
 
 let rec ty_subst s =
@@ -284,7 +284,7 @@ let rec ty_subst s =
       match ty.ty_node with
       | Tglob m       -> TySmart.tglob (ty, m) (s.ts_mp m)
       | Tunivar id    -> odfl ty (s.ts_u id)
-      | Tvar id       -> odfl ty (s.ts_v id)
+      | Tvar id       -> Mid.find_def ty id s.ts_v
       | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.Smart.map aux lty)
       | Tfun (t1, t2) -> TySmart.tfun (ty, (t1, t2)) (aux t1, aux t2)
 
@@ -300,7 +300,7 @@ let rec ty_subst s =
               try  Mid.of_list (List.combine args (List.map aux lty))
               with Failure _ -> assert false
             in
-              ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s; } body
+              ty_subst { ty_subst_id with ts_v = s; } body
       end)
 
 (* -------------------------------------------------------------------- *)
@@ -346,7 +346,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Tvar = struct
   let subst (s : ty Mid.t) =
-    ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s }
+    ty_subst { ty_subst_id with ts_v = s }
 
   let subst1 (id,t) =
     subst (Mid.singleton id t)
@@ -1010,7 +1010,7 @@ and e_subst_op ~freshen ety tys args (tyids, e) =
 
   let e =
     let sty = Tvar.init tyids tys in
-    let sty = ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ sty; } in
+    let sty = ty_subst { ty_subst_id with ts_v = sty; } in
     let sty = { e_subst_id with
                   es_freshen = freshen;
                   es_ty      = sty } in

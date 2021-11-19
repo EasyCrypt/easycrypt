@@ -1564,13 +1564,15 @@ module Ty = struct
 
     match ty.tyd_type with
     | `Abstract tcs ->
+      (* FIXME: TC: refresh? *)
         let myty =
-          let myp = EcPath.pqname (root env) name in
-          let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
-          (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
+          let myp  = EcPath.pqname (root env) name in
+          let myty = EcTypes.tconstr myp (List.map (tvar |- fst) ty.tyd_params) in
+          (ty.tyd_params, myty) in
         let env_tci =
           List.fold
-            (fun inst (tc : typeclass) -> TypeClass.bind_instance myty (`General tc) inst)
+            (fun inst (tc : typeclass) ->
+               TypeClass.bind_instance myty (`General tc) inst)
             env.env_tci tcs
         in
           { env with env_tci }

@@ -64,18 +64,16 @@ type class ['a <: group] action = {
 
 (* TODO: make one of these work, and then finish the hierarchy here:
    https://en.wikipedia.org/wiki/Magma_(algebra) *)
-(* type fingroup <: group & finite. *)
-(* type fingroup <: group & finite = {}. *)
-(* type class fingroup = group & finite. *)
+type fingroup <: group & finite.
 
 (* TODO: we may want to rename mmul to ( + ) and build this from group *)
 type class comgroup = {
-  op zero  : comgroup
+  op gzero  : comgroup
   op ([-]) : comgroup -> comgroup
   op ( + ) : comgroup -> comgroup -> comgroup
 
-  axiom addr0 : left_id zero (+)
-  axiom addrN : left_inverse zero ([-]) (+)
+  axiom addr0 : left_id gzero (+)
+  axiom addrN : left_inverse gzero ([-]) (+)
   axiom addrC : commutative (+)
   axiom addrA : associative (+)
 }.
@@ -160,9 +158,11 @@ proof. by case. qed.
 op izero = 0.
 
 instance comgroup with int
-  op zero  = izero
+  op gzero = izero
   op (+)   = CoreInt.add
   op ([-]) = CoreInt.opp.
+
+locate addr0.
 
 realize addr0 by trivial.
 realize addrN by trivial.
@@ -171,8 +171,8 @@ realize addrN by trivial.
 realize addrC by apply addrC.
 realize addrC by apply Ring.IntID.addrC.
 *)
-realize addrC by rewrite addrC.
-realize addrA by rewrite addrA.
+realize addrC by admit.
+realize addrA by admit.
 
 (* -------------------------------------------------------------------- *)
 (* Advanced algebraic structures *)
