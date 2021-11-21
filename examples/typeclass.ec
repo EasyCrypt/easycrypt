@@ -26,22 +26,23 @@ type class magma = {
 }.
 
 (* TODO: when removing the type argument of associative, no explicit error message.
-   Should work anyway and if not, have a readable error message.*)
+   Any inherited operator should have self as type argument.
+   Type error slicing to do as well.*)
 type class semigroup <: magma = {
-  axiom mmulA : associative<:semigroup> mmul
+  axiom mmulA : associative mmul<:semigroup>
 }.
 
 (* TODO: why do I need this instead of using left_id and right_id directly?
    Or even specifying the type?
    Or even specifying semigroup and not magma? *)
-pred left_id_mmul ['a <: semigroup] (e : 'a) = left_id e mmul.
-pred right_id_mmul ['a <: semigroup] (e : 'a) = right_id e mmul.
+
+op mmul_ ['a <: semigroup] = mmul<:'a>.
 
 type class monoid <: semigroup = {
   op mid : monoid
 
-  axiom mmulr0 : left_id_mmul mid
-  axiom mmul0r : right_id_mmul mid
+  axiom mmulr0 : left_id<:monoid, monoid> mid mmul_<:monoid>
+  axiom mmul0r : right_id<:monoid, monoid> mid mmul_<:monoid>
 }.
 
 (* TODO: same. *)
@@ -281,44 +282,6 @@ realize rev_enum.
 proof.
   admit.
 qed.
-
-(* -------------------------------------------------------------------- *)
-(* TODO: some old bug that maybe already is fixed? *)
-
-type class foo = {}.
-
-type class tc  = {
-  op foo : tc -> bool
-
-  axiom foo_lemma : forall x, foo x
-}.
-
-op foo_int (x : int) = true.
-
-instance tc with int
-  op foo = foo_int.
-
-realize foo_lemma.
-proof. done. qed.
-
-type class ['a <: foo] tc2 <: tc = {
-  op bar : tc2 -> bool
-
-  axiom bar_lemma : forall x, foo x => !bar x
-}.
-
-op bar_int (x : int) = false.
-
-instance foo with bool.
-instance foo with bool.
-
-instance bool tc2 with int
-  op bar = bar_int.             (* BUG *)
-
-realize bar_lemma.
-proof. done. qed.
-
-op foo_2 ['a <: foo, 'b <: 'a tc2] = 0.
 
 
 
