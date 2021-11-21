@@ -106,10 +106,10 @@ module Tuni : sig
 end
 
 module Tvar : sig
-  val subst1  : (EcIdent.t * ty) -> ty -> ty
-  val subst   : ty Mid.t -> ty -> ty
-  val init    : EcIdent.t list -> ty list -> ty Mid.t
-  val fv      : ty -> Sid.t
+  val subst1 : (EcIdent.t * ty) -> ty -> ty
+  val subst  : ty Mid.t -> ty -> ty
+  val init   : EcIdent.t list -> ty list -> ty Mid.t
+  val fv     : ty -> Sid.t
 end
 
 (* -------------------------------------------------------------------- *)
@@ -183,7 +183,7 @@ and expr_node =
   | Eint   of zint                         (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
-  | Eop    of EcPath.path * ty list        (* op apply to type args *)
+  | Eop    of EcPath.path * etyarg list    (* op apply to type args *)
   | Eapp   of expr * expr list             (* op. application       *)
   | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
@@ -192,9 +192,13 @@ and expr_node =
   | Ematch of expr * expr list * ty        (* match _ with _        *)
   | Eproj  of expr * int                   (* projection of a tuple *)
 
+and etyarg    = ty * tcwitness list
 and equantif  = [ `ELambda | `EForall | `EExists ]
 and ebinding  = EcIdent.t * ty
 and ebindings = ebinding list
+
+and tcwitness =
+  (ty * tcwitness list) list * EcPath.path
 
 type closure = (EcIdent.t * ty) list * expr
 
@@ -202,6 +206,12 @@ type closure = (EcIdent.t * ty) list * expr
 val qt_equal : equantif -> equantif -> bool
 
 (* -------------------------------------------------------------------- *)
+val etyarg_fv    : etyarg -> int Mid.t
+val etyargs_fv   : etyarg list -> int Mid.t
+val etyarg_hash  : etyarg -> int
+val etyarg_equal : etyarg -> etyarg -> bool
+val etyarg_map   : (ty -> ty) -> etyarg -> etyarg
+
 val e_equal   : expr -> expr -> bool
 val e_compare : expr -> expr -> int
 val e_hash    : expr -> int
@@ -214,6 +224,7 @@ val e_int      : zint -> expr
 val e_decimal  : zint * (int * zint) -> expr
 val e_local    : EcIdent.t -> ty -> expr
 val e_var      : prog_var -> ty -> expr
+val e_op_tc    : EcPath.path -> etyarg list -> ty -> expr
 val e_op       : EcPath.path -> ty list -> ty -> expr
 val e_app      : expr -> expr list -> ty -> expr
 val e_let      : lpattern -> expr -> expr -> expr
@@ -282,3 +293,7 @@ val e_subst : e_subst -> expr -> expr
 
 val e_mapty : (ty -> ty) -> expr -> expr
 val e_uni   : (uid -> ty option) -> expr -> expr
+
+val etyarg_tvar_fv : etyarg -> Sid.t
+val etyargs_tvar_fv : etyarg list -> Sid.t
+val etyarg_subst : e_subst -> etyarg -> etyarg

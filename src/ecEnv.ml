@@ -2734,7 +2734,9 @@ module Op = struct
       | _ -> raise NotReducible
     in
       EcCoreFol.Fsubst.subst_tvar
-        (EcTypes.Tvar.init (List.map fst op.op_tparams) tys) f
+        (EcTypes.Tvar.init
+           (List.fst op.op_tparams)
+           (List.fst tys) (* FIXM:TC *)) f
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)

@@ -48,10 +48,25 @@ and for_type_r env t1 t2 =
         then for_type env (Ty.unfold p1 lt1 env) (Ty.unfold p2 lt2 env)
         else false
 
-  | Tconstr(p1,lt1), _ when Ty.defined p1 env ->
+  | Tconstr (p1, lt1), _ when Ty.defined p1 env ->
       for_type env (Ty.unfold p1 lt1 env) t2
 
-  | _, Tconstr(p2,lt2) when Ty.defined p2 env ->
+  | _, Tconstr (p2, lt2) when Ty.defined p2 env ->
       for_type env t1 (Ty.unfold p2 lt2 env)
 
   | _, _ -> false
+
+(* -------------------------------------------------------------------- *)
+let rec for_etyarg env ((ty1, tcws1) : etyarg) ((ty2, tcws2) : etyarg) =
+  for_type env ty1 ty2 && for_tcws env tcws1 tcws2
+
+and for_etyargs env (tyargs1 : etyarg list) (tyargs2 : etyarg list) =
+     List.length tyargs1 = List.length tyargs2
+  && List.for_all2 (for_etyarg env) tyargs1 tyargs2
+
+and for_tcw env ((tyargs1, p1) : tcwitness) ((tyargs2, p2) : tcwitness) =
+  EcPath.p_equal p1 p2 && for_etyargs env tyargs1 tyargs2
+
+and for_tcws env (tcws1 : tcwitness list) (tcws2 : tcwitness list) =
+    List.length tcws1 = List.length tcws2
+ && List.for_all2 (for_tcw env) tcws1 tcws2

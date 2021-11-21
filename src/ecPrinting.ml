@@ -1135,6 +1135,7 @@ let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =
       (fun fmt ->
         ignore (List.fold_left
           (fun fe (op, tvi, f) ->
+            let tvi = List.fst tvi (* FIXME:TC *) in
             let (nm, opname) =
               PPEnv.op_symb ppe op (Some (`Form, tvi, [t_ty fe; t_ty f]))
             in
@@ -1478,7 +1479,8 @@ and try_pp_chained_orderings (ppe : PPEnv.t) outer fmt f =
     match collect [] None f with
     | None | Some (_, ([] | [_])) -> false
     | Some (f, fs) ->
-        pp_chained_orderings ppe f_ty pp_form_r outer fmt (f, fs);
+        pp_chained_orderings
+          ppe f_ty pp_form_r outer fmt (f, fs);
         true
 
 and try_pp_lossless (ppe : PPEnv.t) outer fmt f =
@@ -1556,6 +1558,8 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
 
 and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   let pp_opapp ppe outer fmt (op, tys, es) =
+    let tys = List.fst tys in   (* FIXME:TC *)
+
     let rec dt_sub f =
       match destr_app f with
       | ({ f_node = Fop (p, tvi) }, args) -> Some (p, tvi, args)

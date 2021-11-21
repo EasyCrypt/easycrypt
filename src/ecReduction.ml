@@ -29,6 +29,7 @@ type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 module EqTest_base = struct
   (* ------------------------------------------------------------------ *)
   let for_type = EcCoreEqTest.for_type
+  let for_etyarg = EcCoreEqTest.for_etyarg
 
   (* ------------------------------------------------------------------ *)
   let is_unit env ty = for_type env tunit ty
@@ -107,7 +108,7 @@ module EqTest_base = struct
           for_pv env ~norm p1 p2
 
       | Eop(o1,ty1), Eop(o2,ty2) ->
-          p_equal o1 o2 && List.all2 (for_type env) ty1 ty2
+          p_equal o1 o2 && List.all2 (for_etyarg env) ty1 ty2
 
       | Equant(q1,b1,e1), Equant(q2,b2,e2) when qt_equal q1 q2 ->
           let alpha = check_bindings env alpha b1 b2 in
@@ -344,6 +345,10 @@ let ensure b = if b then () else raise NotConv
 let check_ty env subst ty1 ty2 =
   ensure (EqTest_base.for_type env ty1 (subst.fs_ty ty2))
 
+let check_etyarg env subst etyarg1 etyarg2 =
+  let subst = Fsubst.esubst_of_fsubst subst in
+  ensure (EqTest_base.for_etyarg env etyarg1 (etyarg_subst subst etyarg2))
+
 let add_local (env, subst) (x1, ty1) (x2, ty2) =
   check_ty env subst ty1 ty2;
   env,
@@ -456,7 +461,7 @@ let check_alpha_eq hyps f1 f2 =
       check_mp env subst p1 p2
 
     | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 ->
-      List.iter2 (check_ty env subst) ty1 ty2
+      List.iter2 (check_etyarg env subst) ty1 ty2
 
     | Fapp(f1',args1), Fapp(f2',args2) when
         List.length args1 = List.length args2 ->
@@ -656,6 +661,8 @@ let reduce_user_gen simplify ri env hyps f =
               when EcPath.p_equal p p' && List.length args = List.length args' ->
 
           let tys' = List.map (EcTypes.Tvar.subst tvi) tys' in
+
+          let tys  = List.fst tys  in (* FIXME:TC *)
 
           begin
             try  List.iter2 (EcUnify.unify env ue) tys tys'
@@ -915,7 +922,10 @@ let reduce_head simplify ri env hyps f =
       let body = EcFol.form_of_expr EcFol.mhr body in
       let body =
         EcFol.Fsubst.subst_tvar
-          (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
+          (EcTypes.Tvar.init
+             (List.map fst op.EcDecl.op_tparams)
+             (List.fst tys))    (* FIXME:TC *)
+          body in
 
       f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
@@ -1256,7 +1266,8 @@ let rec conv ri env f1 f2 stk =
     end
 
   | Fop(p1, ty1), Fop(p2,ty2)
-      when EcPath.p_equal p1 p2 && List.all2 (EqTest_i.for_type env) ty1 ty2 ->
+      when EcPath.p_equal p1 p2
+        && List.all2 (EqTest_i.for_etyarg env) ty1 ty2 ->
     conv_next ri env f1 stk
 
   | Fapp(f1', args1), Fapp(f2', args2)
@@ -1462,8 +1473,10 @@ module User = struct
     let rule =
       let rec rule (f : form) : EcTheory.rule_pattern =
         match EcFol.destr_app f with
-        | { f_node = Fop (p, tys) }, args ->
-            R.Rule (`Op (p, tys), List.map rule args)
+        | { f_node = Fop (p, etyargs) }, args
+            when List.for_all (fun (_, ws) -> List.is_empty ws) etyargs
+          ->                    (* FIXME: TC *)
+            R.Rule (`Op (p, List.fst etyargs), List.map rule args)
         | { f_node = Ftuple args }, [] ->
             R.Rule (`Tuple, List.map rule args)
         | { f_node = Fint i }, [] ->
@@ -1542,15 +1555,12 @@ let check_bindings exn env s bd1 bd2 =
 let rec conv_oper env ob1 ob2 =
   match ob1, ob2 with
   | OP_Plain(e1,_), OP_Plain(e2,_)  ->
-    Format.eprintf "[W]: ICI1@.";
     conv_expr env Fsubst.f_subst_id e1 e2
   | OP_Plain({e_node = Eop(p,tys)},_), _ ->
-    Format.eprintf "[W]: ICI2@.";
-    let ob1 = get_open_oper env p tys  in
+    let ob1 = get_open_oper env p (List.fst tys) in (* FIXME:TC *)
     conv_oper env ob1 ob2
   | _, OP_Plain({e_node = Eop(p,tys)}, _) ->
-    Format.eprintf "[W]: ICI3@.";
-    let ob2 = get_open_oper env p tys in
+    let ob2 = get_open_oper env p (List.fst tys) in (* FIXME:TC *)
     conv_oper env ob1 ob2
   | OP_Constr(p1,i1), OP_Constr(p2,i2) ->
     error_body (EcPath.p_equal p1 p2 && i1 = i2)
@@ -1605,10 +1615,10 @@ let rec conv_pred env pb1 pb2 =
   match pb1, pb2 with
   | PR_Plain f1, PR_Plain f2 -> error_body (is_conv (LDecl.init env []) f1 f2)
   | PR_Plain {f_node = Fop(p,tys)}, _ ->
-    let pb1 = get_open_pred env p tys  in
+    let pb1 = get_open_pred env p (List.fst tys) in (* FIXME:TC *)
     conv_pred env pb1 pb2
   | _, PR_Plain {f_node = Fop(p,tys)} ->
-    let pb2 = get_open_pred env p tys  in
+    let pb2 = get_open_pred env p (List.fst tys) in (* FIXME:TC *)
     conv_pred env pb1 pb2
   | PR_Ind pr1, PR_Ind pr2 ->
     conv_ind env pr1 pr2

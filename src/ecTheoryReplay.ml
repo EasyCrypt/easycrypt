@@ -135,7 +135,7 @@ let expr_compatible exn env s e1 e2 =
 
 let get_open_oper exn env p tys =
   let oper = EcEnv.Op.by_path p env in
-  let _, okind = EcSubst.open_oper oper tys in
+  let _, okind = EcSubst.open_oper oper (List.fst tys) in (* FIXME:TC *)
   match okind with
   | OB_oper (Some ob) -> ob
   | _ -> raise exn
@@ -194,7 +194,7 @@ and opbranch_compatible exn env s ob1 ob2 =
 
 let get_open_pred exn env p tys =
   let oper = EcEnv.Op.by_path p env in
-  let _, okind = EcSubst.open_oper oper tys in
+  let _, okind = EcSubst.open_oper oper (List.fst tys) in (* FIXME:TC *)
   match okind with
   | OB_pred (Some pb) -> pb
   | _ -> raise exn

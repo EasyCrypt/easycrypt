@@ -192,7 +192,7 @@ type sform =
   | SFimp   of form * form
   | SFiff   of form * form
   | SFeq    of form * form
-  | SFop    of (path * ty list) * (form list)
+  | SFop    of (path * etyarg list) * (form list)
 
   | SFhoareF   of hoareF
   | SFhoareS   of hoareS

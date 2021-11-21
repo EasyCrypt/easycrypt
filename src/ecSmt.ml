@@ -699,6 +699,7 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
 
   | Fop (p, ts) ->
       let wop = trans_op genv p in
+      let ts  = List.fst ts in  (* FIXME:TC *)
       let tys = List.map (trans_ty (genv,lenv)) ts in
       apply_wop genv wop tys args
 

@@ -562,6 +562,8 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
           if not (EcPath.p_equal op1 op2) then
             failure ();
+          let tys1 = List.fst tys1 in (* FIXME:TC *)
+          let tys2 = List.fst tys2 in (* FIXME:TC *)
           try  List.iter2 (EcUnify.unify env ue) tys1 tys2
           with EcUnify.UnificationFailure _ -> failure ()
       end

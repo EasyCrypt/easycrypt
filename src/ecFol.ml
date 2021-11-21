@@ -797,7 +797,7 @@ type sform =
   | SFimp   of form * form
   | SFiff   of form * form
   | SFeq    of form * form
-  | SFop    of (EcPath.path * ty list) * (form list)
+  | SFop    of (EcPath.path * etyarg list) * (form list)
 
   | SFhoareF   of hoareF
   | SFhoareS   of hoareS

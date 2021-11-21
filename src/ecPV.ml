@@ -840,7 +840,7 @@ module Mpv2 = struct
         if f_equal f1 f1' && f_equal f2 f2' then add_glob env mp1 mp2 eqs
         else add_eq local eqs f1' f2'
       | Fop(op1,tys1), Fop(op2,tys2) when EcPath.p_equal op1 op2 &&
-          List.all2 (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
+          List.all2 (EcReduction.EqTest.for_etyarg env) tys1 tys2 -> eqs
       | Fapp(f1,a1), Fapp(f2,a2) ->
         List.fold_left2 (add_eq local) eqs (f1::a1) (f2::a2)
       | Ftuple es1, Ftuple es2 ->
@@ -939,7 +939,7 @@ module Mpv2 = struct
      I postpone this for latter *)
     | Eop(op1,tys1), Eop(op2,tys2)
       when EcPath.p_equal op1 op2 &&
-        List.all2  (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
+        List.all2  (EcReduction.EqTest.for_etyarg env) tys1 tys2 -> eqs
     | Eapp(f1,a1), Eapp(f2,a2) ->
       List.fold_left2 (add_eqs env local) eqs (f1::a1) (f2::a2)
     | Elet(lp1,a1,b1), Elet(lp2,a2,b2) ->

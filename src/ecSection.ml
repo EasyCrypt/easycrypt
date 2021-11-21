@@ -125,6 +125,14 @@ let on_binding (cb : cb) ((_, ty) : (EcIdent.t * ty)) =
 let on_bindings (cb : cb) (bds : (EcIdent.t * ty) list) =
   List.iter (on_binding cb) bds
 
+let rec on_etyarg cb ((ty, tcw) : etyarg) =
+  on_ty cb ty;
+  List.iter (on_tcwitness cb) tcw
+
+and on_tcwitness cb ((args, p) : tcwitness) =
+  List.iter (on_etyarg cb) args;
+  cb (`Type p)                  (* FIXME:TC *)
+
 let rec on_expr (cb : cb) (e : expr) =
   let cbrec = on_expr cb in
 
@@ -136,7 +144,7 @@ let rec on_expr (cb : cb) (e : expr) =
     | Evar   pv           -> on_pv cb pv
     | Elet   (lp, e1, e2) -> on_lp cb lp; List.iter cbrec [e1; e2]
     | Etuple es           -> List.iter cbrec es
-    | Eop    (p, tys)     -> cb (`Op p); List.iter (on_ty cb) tys
+    | Eop    (p, tys)     -> cb (`Op p); List.iter (on_etyarg cb) tys
     | Eapp   (e, es)      -> List.iter cbrec (e :: es)
     | Eif    (c, e1, e2)  -> List.iter cbrec [c; e1; e2]
     | Ematch (e, es, ty)  -> on_ty cb ty; List.iter cbrec (e :: es)
@@ -222,7 +230,7 @@ let rec on_form (cb : cb) (f : EcFol.form) =
     | EcFol.Fif       (f1, f2, f3) -> List.iter cbrec [f1; f2; f3]
     | EcFol.Fmatch    (b, fs, ty)  -> on_ty cb ty; List.iter cbrec (b :: fs)
     | EcFol.Flet      (lp, f1, f2) -> on_lp cb lp; List.iter cbrec [f1; f2]
-    | EcFol.Fop       (p, tys)     -> cb (`Op p); List.iter (on_ty cb) tys
+    | EcFol.Fop       (p, tys)     -> cb (`Op p); List.iter (on_etyarg cb) tys
     | EcFol.Fapp      (f, fs)      -> List.iter cbrec (f :: fs)
     | EcFol.Ftuple    fs           -> List.iter cbrec fs
     | EcFol.Fproj     (f, _)       -> cbrec f
@@ -594,15 +602,24 @@ let add_declared_op to_gen path opdecl =
       | OB_pred _ ->  EcSubst.add_pddef to_gen.tg_subst path ([], f_local id ty)
       | _ -> assert false }
 
-  let tvar_fv ty = Mid.map (fun () -> 1) (Tvar.fv ty)
+  and tvar_fv ty =
+    Mid.map (fun () -> 1) (Tvar.fv ty)
+
+  and etyargs_tvar_fv etyargs =
+    Mid.map (fun () -> 1) (EcTypes.etyargs_tvar_fv etyargs)
+
   let fv_and_tvar_e e =
     let rec aux fv e =
       let fv = EcIdent.fv_union fv (tvar_fv e.e_ty) in
       match e.e_node with
-      | Eop(_, tys) -> List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) fv tys
+      | Eop(_, etyargs) ->
+        EcIdent.fv_union fv (etyargs_tvar_fv etyargs)
       | Equant(_,d,e) ->
-        let fv = List.fold_left (fun fv (_,ty) -> EcIdent.fv_union fv (tvar_fv ty)) fv d in
-        aux fv e
+        let fv =
+          List.fold_left
+            (fun fv (_,ty) -> EcIdent.fv_union fv (tvar_fv ty))
+            fv d
+        in aux fv e
       | _ -> e_fold aux fv e
     in aux e.e_fv e
 
@@ -612,7 +629,8 @@ let fv_and_tvar_f f =
   let rec aux f =
     fv := EcIdent.fv_union !fv (tvar_fv f.f_ty);
     match f.f_node with
-    | Fop(_, tys) -> fv := List.fold_left (fun fv ty -> EcIdent.fv_union fv (tvar_fv ty)) !fv tys
+    | Fop(_, tys) ->
+      fv := EcIdent.fv_union !fv (etyargs_tvar_fv tys)
     | Fquant(_, d, f) ->
       fv := List.fold_left (fun fv (_,gty) -> EcIdent.fv_union fv (gty_fv_and_tvar gty)) !fv d;
       aux f

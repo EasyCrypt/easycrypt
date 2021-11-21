@@ -292,7 +292,9 @@ and app_red st f1 args =
       let body = EcFol.form_of_expr EcFol.mhr body in
       let body =
         EcFol.Fsubst.subst_tvar
-          (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
+          (EcTypes.Tvar.init
+             (List.map fst op.EcDecl.op_tparams)
+             (List.fst tys) (* FIXME:TC *)) body in
 
       cbv st subst body (mk_args eargs (Aempty ty))
     with E.NoCtor ->
@@ -351,7 +353,9 @@ and reduce_logic st f =
         | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
         | Some (`Real_inv ), [f]     -> f_real_inv_simpl f
         | Some (`Eq       ), [f1;f2] -> f_eq_simpl st f1 f2
-        | Some (`Map_get  ), [f1;f2] -> f_map_get_simpl st f1 f2 (snd (as_seq2 tys))
+
+        | Some (`Map_get  ), [f1;f2] ->
+          f_map_get_simpl st f1 f2 (fst (snd (as_seq2 tys))) (* FIXME:TC *)
 
         | _, _ -> f in
         if f_equal f f' then raise NotReducible

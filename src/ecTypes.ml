@@ -493,7 +493,7 @@ and expr_node =
   | Eint   of BI.zint                      (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
-  | Eop    of EcPath.path * ty list        (* op apply to type args *)
+  | Eop    of EcPath.path * etyarg list    (* op apply to type args *)
   | Eapp   of expr * expr list             (* op. application       *)
   | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
@@ -502,11 +502,48 @@ and expr_node =
   | Ematch of expr * expr list * ty        (* match _ with _        *)
   | Eproj  of expr * int                   (* projection of a tuple *)
 
+and etyarg    = ty * tcwitness list
 and equantif  = [ `ELambda | `EForall | `EExists ]
 and ebinding  = EcIdent.t * ty
 and ebindings = ebinding list
 
+and tcwitness =
+  (ty * tcwitness list) list * EcPath.path
+
 type closure = (EcIdent.t * ty) list * expr
+
+(* -------------------------------------------------------------------- *)
+let rec tcw_fv ((ws, _) : tcwitness) =
+  List.fold_left
+    (fun fv (ty, tcws) -> fv_union fv (fv_union ty.ty_fv (tcws_fv tcws)))
+    Mid.empty ws
+
+and tcws_fv (tcws : tcwitness list) =
+  List.fold_left
+    (fun fv tcw -> fv_union fv (tcw_fv tcw))
+    Mid.empty tcws
+
+let etyarg_fv ((ty, tcws) : etyarg) =
+  fv_union ty.ty_fv (tcws_fv tcws)
+
+let etyargs_fv (tyargs : etyarg list) =
+  List.fold_left
+    (fun fv tyarg -> fv_union fv (etyarg_fv tyarg))
+    Mid.empty tyargs
+
+(* -------------------------------------------------------------------- *)
+let rec tcw_equal ((tcw1, p1) : tcwitness) ((tcw2, p2) : tcwitness) =
+  EcPath.p_equal p1 p2 && List.all2 etyarg_equal tcw1 tcw2
+
+and etyarg_equal ((ty1, tcws1) : etyarg) ((ty2, tcws2) : etyarg) =
+  ty_equal ty1 ty2 && List.all2 tcw_equal tcws1 tcws2
+
+(* -------------------------------------------------------------------- *)
+let rec tcw_hash ((tcw, p) : tcwitness) =
+  Why3.Hashcons.combine_list etyarg_hash (p_hash p) tcw
+
+and etyarg_hash ((ty, tcws) : etyarg) =
+  Why3.Hashcons.combine_list tcw_hash (ty_hash ty) tcws
 
 (* -------------------------------------------------------------------- *)
 let e_equal   = ((==) : expr -> expr -> bool)
@@ -532,12 +569,11 @@ let pv_fv pv = EcPath.x_fv Mid.empty pv.pv_name
 
 let fv_node e =
   let union ex =
-    List.fold_left (fun s e -> fv_union s (ex e)) Mid.empty
-  in
+    List.fold_left (fun s e -> fv_union s (ex e)) Mid.empty in
 
   match e with
   | Eint _            -> Mid.empty
-  | Eop (_, tys)      -> union (fun a -> a.ty_fv) tys
+  | Eop (_, tyargs)   -> etyargs_fv tyargs
   | Evar v            -> pv_fv v
   | Elocal id         -> fv_singleton id
   | Eapp (e, es)      -> union e_fv (e :: es)
@@ -569,7 +605,7 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Eop (p1, tys1), Eop (p2, tys2) ->
            (EcPath.p_equal p1 p2)
-        && (List.all2 ty_equal tys1 tys2)
+        && (List.all2 etyarg_equal tys1 tys2)
 
     | Eapp (e1, es1), Eapp (e2, es2) ->
            (e_equal e1 e2)
@@ -612,9 +648,8 @@ module Hexpr = Why3.Hashcons.Make (struct
     | Elocal x -> Hashtbl.hash x
     | Evar   x -> pv_hash x
 
-    | Eop (p, tys) ->
-        Why3.Hashcons.combine_list ty_hash
-          (EcPath.p_hash p) tys
+    | Eop (p, tyargs) ->
+        Why3.Hashcons.combine_list etyarg_hash (EcPath.p_hash p) tyargs
 
     | Eapp (e, es) ->
         Why3.Hashcons.combine_list e_hash (e_hash e) es
@@ -654,7 +689,13 @@ let e_tt    = mk_expr (Eop (EcCoreLib.CI_Unit.p_tt, [])) tunit
 let e_int   = fun i -> mk_expr (Eint i) tint
 let e_local = fun x ty -> mk_expr (Elocal x) ty
 let e_var   = fun x ty -> mk_expr (Evar x) ty
-let e_op    = fun x targs ty -> mk_expr (Eop (x, targs)) ty
+
+let e_op_tc x targs ty =
+  mk_expr (Eop (x, targs)) ty
+
+let e_op x targs ty =
+  e_op_tc x (List.map (fun ty -> (ty, [])) targs) ty
+
 let e_let   = fun pt e1 e2 -> mk_expr (Elet (pt, e1, e2)) e2.e_ty
 let e_tuple = fun es ->
   match es with
@@ -762,7 +803,7 @@ module ExprSmart = struct
   let e_op (e, (p, tys, ty)) (p', tys', ty') =
     if   p == p' && tys == tys' && ty == ty'
     then e
-    else e_op p' tys' ty'
+    else e_op_tc p' tys' ty'
 
   let e_app (e, (x, args, ty)) (x', args', ty') =
     if   x == x' && args == args' && ty == ty'
@@ -803,29 +844,37 @@ module ExprSmart = struct
     else e_quantif q' b' body'
 end
 
+let rec tcw_map fty ((w, p) as wp : tcwitness) : tcwitness=
+  let for1 ((ty, ws) as arg) =
+    SmartPair.mk arg (fty ty) (List.Smart.map (tcw_map fty) ws)
+  in SmartPair.mk wp (List.map for1 w) p
+
+let etyarg_map fty ((ty, tcw) as arg : etyarg) : etyarg =
+  SmartPair.mk arg (fty ty) (List.Smart.map (tcw_map fty) tcw)
+
 let e_map fty fe e =
   match e.e_node with
   | Eint _ | Elocal _ | Evar _ -> e
 
-  | Eop (p, tys) ->
-      let tys' = List.Smart.map fty tys in
-      let ty'  = fty e.e_ty in
-        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p, tys', ty')
+  | Eop (p, tyargs) ->
+      let tyargs' = List.Smart.map (etyarg_map fty) tyargs in
+      let ty'     = fty e.e_ty in
+      ExprSmart.e_op (e, (p, tyargs, e.e_ty)) (p, tyargs', ty')
 
   | Eapp (e1, args) ->
       let e1'   = fe e1 in
       let args' = List.Smart.map fe args in
       let ty'   = fty e.e_ty in
-        ExprSmart.e_app (e, (e1, args, e.e_ty)) (e1', args', ty')
+      ExprSmart.e_app (e, (e1, args, e.e_ty)) (e1', args', ty')
 
   | Elet (lp, e1, e2) ->
       let e1' = fe e1 in
       let e2' = fe e2 in
-        ExprSmart.e_let (e, (lp, e1, e2)) (lp, e1', e2')
+      ExprSmart.e_let (e, (lp, e1, e2)) (lp, e1', e2')
 
   | Etuple le ->
       let le' = List.Smart.map fe le in
-        ExprSmart.e_tuple (e, le) le'
+      ExprSmart.e_tuple (e, le) le'
 
   | Eproj (e1, i) ->
       let e' = fe e1 in
@@ -958,6 +1007,34 @@ let subst_lpattern (s: e_subst) (lp:lpattern) =
         (s, ExprSmart.l_record (lp, (p, xs)) (s.es_p p, xs'))
 
 (* -------------------------------------------------------------------- *)
+let rec tcw_subst (s : e_subst) ((tcws, p) as tcw : tcwitness) : tcwitness =
+  let tcws' = List.Smart.map (etyarg_subst s) tcws in
+  let p'    = s.es_p p in
+  SmartPair.mk tcw tcws' p'
+
+and etyarg_subst (s : e_subst) ((ty, tcws) as tyarg : etyarg) : etyarg =
+  let ty'   = s.es_ty ty in
+  let tcws' = List.Smart.map (tcw_subst s) tcws in
+  SmartPair.mk tyarg ty' tcws'
+
+(* -------------------------------------------------------------------- *)
+let rec etyargs_tvar_fv (etyargs : etyarg list) =
+  List.fold_left
+    (fun fv etyarg -> Sid.union fv (etyarg_tvar_fv etyarg))
+    Sid.empty etyargs
+
+and etyarg_tvar_fv ((ty, tcws) : etyarg) : Sid.t =
+  Sid.union (Tvar.fv ty) (tcws_tvar_fv tcws)
+
+and tcws_tvar_fv (tcws : tcwitness list) =
+  List.fold_left
+    (fun fv tcw -> Sid.union fv (tcw_tvar_fv tcw))
+    Sid.empty tcws
+
+and tcw_tvar_fv ((etyargs, _) : tcwitness) : Sid.t =
+  etyargs_tvar_fv etyargs
+
+(* -------------------------------------------------------------------- *)
 let rec e_subst (s: e_subst) e =
   match e.e_node with
   | Elocal id -> begin
@@ -971,36 +1048,36 @@ let rec e_subst (s: e_subst) e =
   | Evar pv ->
       let pv' = pv_subst s.es_xp pv in
       let ty' = s.es_ty e.e_ty in
-        ExprSmart.e_var (e, (pv, e.e_ty)) (pv', ty')
+      ExprSmart.e_var (e, (pv, e.e_ty)) (pv', ty')
 
-  | Eapp ({ e_node = Eop (p, tys) }, args) when Mp.mem p s.es_opdef ->
-      let tys  = List.Smart.map s.es_ty tys in
+  | Eapp ({ e_node = Eop (p, tyargs) }, args) when Mp.mem p s.es_opdef ->
+      let tys  = List.Smart.map (etyarg_subst s) tyargs in
       let ty   = s.es_ty e.e_ty in
       let body = oget (Mp.find_opt p s.es_opdef) in
-        e_subst_op ~freshen:s.es_freshen ty tys (List.map (e_subst s) args) body
+      e_subst_op ~freshen:s.es_freshen ty tys (List.map (e_subst s) args) body
 
-  | Eop (p, tys) when Mp.mem p s.es_opdef ->
-      let tys  = List.Smart.map s.es_ty tys in
+  | Eop (p, tyargs) when Mp.mem p s.es_opdef ->
+      let tys  = List.Smart.map (etyarg_subst s) tyargs in
       let ty   = s.es_ty e.e_ty in
       let body = oget (Mp.find_opt p s.es_opdef) in
-        e_subst_op ~freshen:s.es_freshen ty tys [] body
+      e_subst_op ~freshen:s.es_freshen ty tys [] body
 
-  | Eop (p, tys) ->
-      let p'   = s.es_p p in
-      let tys' = List.Smart.map s.es_ty tys in
-      let ty'  = s.es_ty e.e_ty in
-        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p', tys', ty')
+  | Eop (p, tyargs) ->
+      let p'      = s.es_p p in
+      let tyargs' = List.Smart.map (etyarg_subst s) tyargs in
+      let ty'     = s.es_ty e.e_ty in
+      ExprSmart.e_op (e, (p, tyargs, e.e_ty)) (p', tyargs', ty')
 
   | Elet (lp, e1, e2) ->
       let e1' = e_subst s e1 in
       let s, lp' = subst_lpattern s lp in
       let e2' = e_subst s e2 in
-        ExprSmart.e_let (e, (lp, e1, e2)) (lp', e1', e2')
+      ExprSmart.e_let (e, (lp, e1, e2)) (lp', e1', e2')
 
   | Equant (q, b, e1) ->
       let s, b' = add_locals s b in
       let e1' = e_subst s e1 in
-        ExprSmart.e_quant (e, (q, b, e1)) (q, b', e1')
+      ExprSmart.e_quant (e, (q, b, e1)) (q, b', e1')
 
   | _ -> e_map s.es_ty (e_subst s) e
 
@@ -1009,7 +1086,7 @@ and e_subst_op ~freshen ety tys args (tyids, e) =
   (* FIXME: is es_freshen value correct? *)
 
   let e =
-    let sty = Tvar.init tyids tys in
+    let sty = Tvar.init tyids (List.fst tys) in (* FIXME *)
     let sty = ty_subst { ty_subst_id with ts_v = sty; } in
     let sty = { e_subst_id with
                   es_freshen = freshen;

@@ -59,7 +59,7 @@ and f_node =
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
   | Fglob   of mpath * memory
-  | Fop     of path * ty list
+  | Fop     of path * etyarg list
   | Fapp    of form * form list
   | Ftuple  of form list
   | Fproj   of form * int
@@ -280,7 +280,7 @@ module FSmart : sig
   type a_if     = form tuple3
   type a_match  = form * form list * ty
   type a_let    = lpattern * form * form
-  type a_op     = path * ty list * ty
+  type a_op     = path * etyarg list * ty
   type a_tuple  = form list
   type a_app    = form * form list * ty
   type a_proj   = form * ty
@@ -319,13 +319,13 @@ val destr_app2 : name:string -> (path -> bool) -> form -> form * form
 val destr_app1_eq : name:string -> path -> form -> form
 val destr_app2_eq : name:string -> path -> form -> form * form
 
-val destr_op        : form -> EcPath.path * ty list
+val destr_op        : form -> EcPath.path * etyarg list
 val destr_local     : form -> EcIdent.t
 val destr_pvar      : form -> prog_var * memory
 val destr_proj      : form -> form * int
 val destr_tuple     : form -> form list
 val destr_app       : form -> form * form list
-val destr_op_app    : form -> (EcPath.path * ty list) * form list
+val destr_op_app    : form -> (EcPath.path * etyarg list) * form list
 val destr_not       : form -> form
 val destr_nots      : form -> bool * form
 val destr_and       : form -> form * form
@@ -449,6 +449,8 @@ module Fsubst : sig
   val subst_me       : f_subst -> EcMemory.memenv -> EcMemory.memenv
   val subst_m        : f_subst -> EcIdent.t -> EcIdent.t
   val subst_ty       : f_subst -> ty -> ty
+
+  val esubst_of_fsubst : f_subst -> e_subst
 end
 
 (* -------------------------------------------------------------------- *)

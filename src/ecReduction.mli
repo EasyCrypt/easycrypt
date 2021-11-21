@@ -25,15 +25,16 @@ type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 module EqTest : sig
   val for_type_exn : env -> ty -> ty -> unit
 
-  val for_type  : ty          eqtest
-  val for_pv    : prog_var    eqntest
-  val for_xp    : xpath       eqntest
-  val for_mp    : mpath       eqntest
-  val for_instr : instr       eqntest
-  val for_stmt  : stmt        eqntest
-  val for_expr  : expr        eqntest
-  val for_msig  : module_sig  eqntest
-  val for_mexpr : module_expr eqntest
+  val for_type   : ty          eqtest
+  val for_etyarg : etyarg      eqtest
+  val for_pv     : prog_var    eqntest
+  val for_xp     : xpath       eqntest
+  val for_mp     : mpath       eqntest
+  val for_instr  : instr       eqntest
+  val for_stmt   : stmt        eqntest
+  val for_expr   : expr        eqntest
+  val for_msig   : module_sig  eqntest
+  val for_mexpr  : module_expr eqntest
 
   val is_unit : env -> ty -> bool
   val is_bool : env -> ty -> bool

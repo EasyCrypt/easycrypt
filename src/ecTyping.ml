@@ -340,14 +340,14 @@ let gen_select_op
      [ flc (id, ty, ue) ]
 
   | None ->
-      let ops () =
+      let ops () : (OpSelect.opsel * ty * EcUnify.unienv * opmatch) list =
         let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
         let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
         let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
         let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
         (List.map fop ops)
 
-      and pvs () =
+      and pvs () : (OpSelect.opsel * ty * EcUnify.unienv * opmatch) list =
         let me, pvs =
           match EcEnv.Memory.get_active env, actonly with
           | None, true -> (None, [])

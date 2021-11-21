@@ -291,7 +291,7 @@ module Op : sig
   val bind : ?import:import -> symbol -> operator -> env -> env
 
   val reducible : ?force:bool -> env -> path -> bool
-  val reduce    : ?force:bool -> env -> path -> ty list -> form
+  val reduce    : ?force:bool -> env -> path -> etyarg list -> form
 
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool

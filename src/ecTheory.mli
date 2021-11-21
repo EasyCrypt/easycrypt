@@ -63,7 +63,7 @@ and rule_pattern =
   | Var   of EcIdent.t
 
 and top_rule_pattern =
-  [`Op of (EcPath.path * EcTypes.ty list) | `Tuple]
+  [`Op of (EcPath.path * ty list) | `Tuple]
 
 and rule = {
   rl_tyd  : EcDecl.ty_params;
