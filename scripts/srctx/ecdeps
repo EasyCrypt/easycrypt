@@ -1,0 +1,51 @@
+#! /usr/bin/env python3
+
+# --------------------------------------------------------------------
+import sys, os, json, collections as cl
+
+# --------------------------------------------------------------------
+IGNORE = { 'Logic', 'Pervasive', 'Tactics' }
+
+# --------------------------------------------------------------------
+def read_eco(stream):
+    return json.load(stream)
+
+# --------------------------------------------------------------------
+def create_deps(ecos):
+    deps = cl.defaultdict(set)
+
+    for econame in ecos:
+        thname = os.path.basename(econame)
+        thname = os.path.splitext(thname)[0]
+        if thname in IGNORE:
+            continue
+        with open(econame) as ecostream:
+            eco = read_eco(ecostream)
+        deps[thname].update(
+            name
+                for name, data in eco['depends'].items()
+                if name not in IGNORE and data['direct']
+        )
+
+    return deps
+
+# --------------------------------------------------------------------
+def print_graph(deps):
+    print( "digraph interval_deps {")
+    print( "  node [shape=ellipse, style=filled];")
+    print(f"  {' '.join(deps.keys())};")
+    for src, dsts in deps.items():
+        for dst in dsts:
+            print(f"  {src} -> {dst};")
+    print( "}")
+
+# --------------------------------------------------------------------
+def _main():
+    ecos = sys.argv[1:]
+    deps = create_deps(ecos)
+
+    print_graph(deps)
+
+# --------------------------------------------------------------------
+if __name__ == '__main__':
+    _main()

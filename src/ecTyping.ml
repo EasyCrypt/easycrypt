@@ -318,8 +318,8 @@ let gen_select_op
 
   let ue_filter =
     match mode with
-    | `Expr _ -> fun op -> not (EcDecl.is_pred op)
-    | `Form   -> fun _  -> true
+    | `Expr _ -> fun _ op -> not (EcDecl.is_pred op)
+    | `Form   -> fun _ _  -> true
   in
 
   let by_scope opsc ((p, _), _, _, _) =
@@ -372,7 +372,7 @@ let select_form_op env opsc name ue tvi psig =
 
 (* -------------------------------------------------------------------- *)
 let select_proj env opsc name ue tvi recty =
-  let filter = (fun op -> EcDecl.is_proj op) in
+  let filter = (fun _ op -> EcDecl.is_proj op) in
   let ops = EcUnify.select_op ~filter tvi env name ue [recty] in
   let ops = List.map (fun (p, ty, ue, _) -> (p, ty, ue)) ops in
 
@@ -844,7 +844,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
 
       let fields =
         let for1 (name, v) =
-          let filter = fun op -> EcDecl.is_proj op in
+          let filter = fun _ op -> EcDecl.is_proj op in
           let fds    = EcUnify.select_op ~filter None env (unloc name) ue [] in
             match List.ohead fds with
             | None ->
@@ -983,7 +983,7 @@ let trans_binding env ue bd =
 let trans_record env ue (subtt, proj) (loc, b, fields) =
   let fields =
     let for1 rf =
-      let filter = fun op -> EcDecl.is_proj op in
+      let filter = fun _ op -> EcDecl.is_proj op in
       let tvi    = rf.rf_tvi |> omap (transtvi env ue) in
       let fds    = EcUnify.select_op ~filter tvi env (unloc rf.rf_name) ue [] in
         match List.ohead fds with

@@ -483,6 +483,7 @@
 %token LET
 %token LLARROW
 %token LOCAL
+%token LOCATE
 %token LOGIC
 %token LONGARROW
 %token LOSSLESS
@@ -1639,7 +1640,7 @@ typedecl:
 | locality=locality TYPE td=rlist1(tyd_name, COMMA)
     { List.map (fun x -> mk_tydecl ~locality x (PTYD_Abstract [])) td }
 
-| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(tcparam, COMMA)
+| locality=locality TYPE td=tyd_name LTCOLON tcs=rlist1(tcparam, AMP)
     { [mk_tydecl ~locality td (PTYD_Abstract tcs)] }
 
 | locality=locality TYPE td=tyd_name EQ te=loc(type_exp)
@@ -3641,6 +3642,7 @@ global_action:
 | x=loc(proofend)  { Gsave        x  }
 | PRINT p=print    { Gprint       p  }
 | SEARCH x=search+ { Gsearch      x  }
+| LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
 
 | PRAGMA       x=pragma { Gpragma x }

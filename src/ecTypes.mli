@@ -83,8 +83,8 @@ type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.mpath -> EcPath.mpath;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : EcUid.uid -> ty option;
-  ts_v   : EcIdent.t -> ty option;
+  ts_u   : (uid -> ty option);
+  ts_v   : ty Mid.t;
 }
 
 val ty_subst_id    : ty_subst

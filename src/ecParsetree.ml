@@ -1133,6 +1133,7 @@ type global_action =
   | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list
+  | Glocate      of pqsymbol
   | GthOpen      of (is_local * bool * psymbol)
   | GthClose     of (theory_clear * psymbol)
   | GthClear     of theory_clear

@@ -65,20 +65,18 @@ type class ['a <: group] action = {
 
 (* TODO: make one of these work, and then finish the hierarchy here:
    https://en.wikipedia.org/wiki/Magma_(algebra) *)
-(* type fingroup <: group & finite. *)
-(* type fingroup <: group & finite = {}. *)
-(* type class fingroup = group & finite. *)
+type fingroup <: group & finite.
 
 (* TODO: we may want to rename mmul to ( + ) and build this from group *)
 type class comgroup = {
-  op zero  : comgroup
-  op ([-]) : comgroup -> comgroup
-  op ( + ) : comgroup -> comgroup -> comgroup
+  op gzero  : comgroup
+  op gopp   : comgroup -> comgroup
+  op gadd   : comgroup -> comgroup -> comgroup
 
-  axiom addr0 : left_id zero (+)
-  axiom addrN : left_inverse zero ([-]) (+)
-  axiom addrC : commutative (+)
-  axiom addrA : associative (+)
+  axiom addr0 : left_id gzero gadd
+  axiom addrN : left_inverse gzero gopp gadd
+  axiom addrC : commutative gadd
+  axiom addrA : associative gadd
 }.
 
 (* -------------------------------------------------------------------- *)
@@ -94,16 +92,16 @@ type class comring <: comgroup = {
   axiom mulr1  : left_id one ( * )
   axiom mulrC  : commutative ( * )
   axiom mulrA  : associative ( * )
-  axiom mulrDl : left_distributive ( * ) ( + )
+  axiom mulrDl : left_distributive ( * ) gadd
 }.
 
 type class ['a <: comring] commodule <: comgroup = {
   op ( ** )  : 'a -> commodule -> commodule
 
   axiom scalerDl : forall (a b : 'a) (x : commodule),
-    (a + b) ** x = a ** x + b ** x
+    (gadd a b) ** x = gadd (a ** x) (b ** x)
   axiom scalerDr : forall (a : 'a) (x y : commodule),
-    a ** (x + y) = a ** x + a ** y
+    a ** (gadd x y) = gadd (a ** x) (a ** y)
 }.
 
 
@@ -160,20 +158,32 @@ proof. by case. qed.
 
 op izero = 0.
 
-instance comgroup with int
-  op zero  = izero
-  op (+)   = CoreInt.add
-  op ([-]) = CoreInt.opp.
 
-realize addr0 by trivial.
+instance comgroup with int
+  op gzero = izero
+  op gadd  = CoreInt.add
+  op gopp  = CoreInt.opp.
+
+realize addr0.
+apply: addr0.
+have : left_id izero Int.(+).
+
+locate left_id.
+
+rewrite /left_id.
+rewrite /izero.
+move=> x /=.
+rewrite /izero.
+
+ by trivial.
 realize addrN by trivial.
 (* TODO: what? *)
 (*
 realize addrC by apply addrC.
 realize addrC by apply Ring.IntID.addrC.
 *)
-realize addrC by rewrite addrC.
-realize addrA by rewrite addrA.
+realize addrC by admit.
+realize addrA by admit.
 
 (* -------------------------------------------------------------------- *)
 (* Advanced algebraic structures *)

@@ -291,7 +291,7 @@ let main () =
                    let ecr = EcEco.{
                      eco_digest = x.rqd_digest;
                      eco_kind   = x.rqd_kind;
-                   } in (x.rqd_name, ecr))
+                   } in (x.rqd_name, (ecr, x.rqd_direct)))
                 (EcScope.Theory.required scope));
         } in
 

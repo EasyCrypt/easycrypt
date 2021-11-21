@@ -164,12 +164,10 @@ module Ax : sig
   val lookup_path : qsymbol -> env -> path
 
   val add  : path -> env -> env
-  val bind : ?import:import -> symbol -> axiom -> env -> env
+  val bind : ?import:import -> symbol -> t -> env -> env
 
-  val iter : ?name:qsymbol -> (path -> axiom -> unit) -> env -> unit
-
-  val all :
-    ?check:(path -> axiom -> bool) -> ?name:qsymbol -> env -> (path * t) list
+  val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
+  val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
   val instanciate : path -> EcTypes.ty list -> env -> form
 end
@@ -292,8 +290,6 @@ module Op : sig
   val add  : path -> env -> env
   val bind : ?import:import -> symbol -> operator -> env -> env
 
-  val all : ?check:(operator -> bool) -> qsymbol -> env -> (path * t) list
-
   val reducible : ?force:bool -> env -> path -> bool
   val reduce    : ?force:bool -> env -> path -> ty list -> form
 
@@ -310,6 +306,9 @@ module Op : sig
   type notation = ty_params * EcDecl.notation
 
   val get_notations : env -> (path * notation) list
+
+  val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
+  val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
 end
 
 (* -------------------------------------------------------------------- *)
@@ -335,6 +334,9 @@ module Ty : sig
     [`Ind | `Case] -> EcTypes.ty -> env -> (path * EcTypes.ty list) option
 
   val signature : env -> ty -> ty list * ty
+
+  val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
+  val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list
 end
 
 val ty_hnorm : ty -> env -> ty

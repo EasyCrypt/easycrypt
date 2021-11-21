@@ -114,7 +114,7 @@ module UnifyGen(X : UnifyExtra) = struct
       (uf, tuni uid)
 
   (* ------------------------------------------------------------------ *)
-  let rec unify_core (env : EcEnv.env) (tvtc : X.state Mid.t) (uf : UF.t) pb =
+  let unify_core (env : EcEnv.env) (tvtc : X.state Mid.t) (uf : UF.t) pb =
     let failure () = raise (UnificationFailure pb) in
 
     let uf = ref uf in
@@ -294,41 +294,58 @@ module TypeClass = struct
         instances in
 
     let instances =
+      (* FIXME:TC *)
+      let ring = EcPath.fromqsymbol ([EcCoreLib.i_top], "Ring") in
+      List.filter
+        (fun (_, tc) -> not (EcPath.isprefix ring tc.tc_name))
+        instances in
+
+    let instances =
       let tvinst =
         List.map
           (fun (tv, tcs) ->
-             let rec parent_instances_of_tc acc tc =
-               let acc    = (([], tvar tv), tc) :: acc in
-               let tcdecl = EcEnv.TypeClass.by_path tc.tc_name env in
-
-               match tcdecl.tc_prt with
-               | None ->
-                   List.rev acc
-
-               | Some prt ->
-                   let subst = List.combine (List.fst tcdecl.tc_tparams) tc.tc_args in
-                   let subst = Tvar.subst (Mid.of_list subst) in
-                   let prt   = { prt with tc_args = List.map subst prt.tc_args } in
-
-                   parent_instances_of_tc acc prt
-
-             in List.map (fun tc -> parent_instances_of_tc [] tc) tcs)
+             List.map (fun tc -> (([], tvar tv), tc)) tcs)
           (Mid.bindings tvtc)
-
-      in List.flatten (List.flatten tvinst) @ instances in
+      in List.flatten tvinst @ instances in
 
     let exception Bailout in
 
+    let rec find_tc_in_parent acc tginst =
+      if EcPath.p_equal tc.tc_name tginst.tc_name then
+        Some (tginst.tc_args, List.rev acc)
+      else
+        let tcdecl = EcEnv.TypeClass.by_path tginst.tc_name env in
+        tcdecl.tc_prt |> obind (fun prt ->
+          let acc = (tcdecl.tc_tparams, tginst.tc_args) :: acc in
+          find_tc_in_parent acc prt) in
+
     let for1 ((tgparams, tgty), tginst) =
-      if not (EcPath.p_equal tc.tc_name tginst.tc_name) then
-        raise Bailout;
+      let tgi_args, tgparams_prt  =
+        oget ~exn:Bailout (find_tc_in_parent [] tginst) in
 
       let uf, tvinfo =
         List.fold_left_map
           (fun uf (tv, tcs) ->
             let uf, tvty = UnifyCore.fresh uf in uf, (tv, (tvty, tcs)))
           UnifyCore.UF.initial tgparams in
-      let uf, subst = ref uf, Mid.of_list (List.map (snd_map fst) tvinfo) in
+
+      let subst =
+        Mid.of_list (List.map (snd_map fst) tvinfo) in
+
+      let subst =
+        let tcsubst =
+          List.fold_left
+            (fun subst (tparams, args) ->
+               let args  = List.map (Tvar.subst subst) args in
+               let subst = List.combine (List.fst tparams) args in
+               Mid.of_list subst)
+            subst tgparams_prt in
+
+        Mid.fold
+          (fun x ty subst -> Mid.add x ty subst)
+          tcsubst subst in
+
+      let uf, tgi_args = ref uf, List.map (Tvar.subst subst) tgi_args in
 
       List.iter2
         (fun pty tgty ->
@@ -337,7 +354,7 @@ module TypeClass = struct
              uf := UnifyCore.unify_core env Mid.empty !uf (`TyUni (pty, tgty))
            with UnifyCore.UnificationFailure _ ->
              raise Bailout)
-        tc.tc_args tginst.tc_args;
+        tc.tc_args tgi_args;
 
       let tgty = Tvar.subst subst tgty in
 
@@ -585,12 +602,12 @@ let tfun_expected ue psig =
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 
 (* -------------------------------------------------------------------- *)
-let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
+let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig =
   ignore hidden;                (* FIXME *)
 
   let module D = EcDecl in
 
-  let filter op =
+  let filter oppath op =
     (* Filter operator based on given type variables instanciation *)
     let filter_on_tvi =
       match tvi with
@@ -608,7 +625,7 @@ let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
             List.for_all (fun (x, _) -> Msym.mem x tparams) ls
 
     in
-      filter op && filter_on_tvi op
+      filter oppath op && filter_on_tvi op
   in
 
   let select (path, op) =
@@ -660,4 +677,4 @@ let select_op ?(hidden = false) ?(filter = fun _ -> true) tvi env name ue psig =
     with E.Failure -> None
 
   in
-    List.pmap select (EcEnv.Op.all ~check:filter name env)
+    List.pmap select (EcEnv.Op.all ~check:filter ~name env)

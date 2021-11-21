@@ -713,6 +713,11 @@ module MC = struct
     | None -> lookup_error (`QSymbol qnx)
     | Some (p, (args, obj)) -> (_downpath_for_tydecl env p args, obj)
 
+  let lookup_tydecls qnx env =
+    List.map
+      (fun (p, (args, obj)) -> (_downpath_for_tydecl env p args, obj))
+      (lookup_all (fun mc -> mc.mc_tydecls) qnx env)
+
   let _up_tydecl candup mc x obj =
     if not candup && MMsym.last x mc.mc_tydecls <> None then
       raise (DuplicatedBinding x);
@@ -1278,6 +1283,37 @@ let try_lf f =
   try  Some (f ())
   with LookupFailure _ -> None
 
+(* -------------------------------------------------------------------- *)
+let gen_iter fmc flk ?name f env =
+  match name with
+  | Some name ->
+    List.iter (fun (p, ax) -> f p ax) (flk name env)
+
+  | None ->
+    Mip.iter
+      (fun _ mc -> MMsym.iter
+        (fun _ (ip, obj) ->
+          match ip with IPPath p -> f p obj | _ -> ())
+        (fmc mc))
+      env.env_comps
+
+(* -------------------------------------------------------------------- *)
+let gen_all fmc flk ?(check = fun _ _ -> true) ?name (env : env) =
+  match name with
+  | Some name ->
+      List.filter (fun (p, ax) -> check p ax) (flk name env)
+
+  | None ->
+      Mip.fold (fun _ mc aout ->
+        MMsym.fold (fun _ objs aout ->
+          List.fold_right (fun (ip, obj) aout ->
+            match ip with
+            | IPPath p -> if check p obj then (p, obj) :: aout else aout
+            | _ -> aout)
+            objs aout)
+          (fmc mc) aout)
+        env.env_comps []
+
 (* ------------------------------------------------------------------ *)
 module TypeClass = struct
   type t = tc_decl
@@ -1564,13 +1600,15 @@ module Ty = struct
 
     match ty.tyd_type with
     | `Abstract tcs ->
+      (* FIXME: TC: refresh? *)
         let myty =
-          let myp = EcPath.pqname (root env) name in
-          let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
-          (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
+          let myp  = EcPath.pqname (root env) name in
+          let myty = EcTypes.tconstr myp (List.map (tvar |- fst) ty.tyd_params) in
+          (ty.tyd_params, myty) in
         let env_tci =
           List.fold
-            (fun inst (tc : typeclass) -> TypeClass.bind_instance myty (`General tc) inst)
+            (fun inst (tc : typeclass) ->
+               TypeClass.bind_instance myty (`General tc) inst)
             env.env_tci tcs
         in
           { env with env_tci }
@@ -1581,6 +1619,13 @@ module Ty = struct
     let env = if import.im_immediate then rebind name ty env else env in
     { env with env_item =
         mkitem import (Th_type (name, ty)) :: env.env_item }
+
+
+  let iter ?name f (env : env) =
+    gen_iter (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?name f env
+
+  let all ?check ?name (env : env) =
+    gen_all (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?check ?name env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2129,6 +2174,12 @@ module Mod = struct
     in
 
     List.fold_left do1 env (fst (by_mpath p env)).me_comps
+
+  let iter ?name f (env : env) =
+    gen_iter (fun mc -> mc.mc_modules) (assert false) ?name f env
+
+  let all ?check ?name (env : env) =
+    gen_all (fun mc -> mc.mc_modules) (assert false) ?check ?name env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2618,7 +2669,6 @@ module ModTy = struct
       mis_body   = List.map do1 items }
 end
 
-
 (* -------------------------------------------------------------------- *)
 module Op = struct
   type t = EcDecl.operator
@@ -2662,11 +2712,6 @@ module Op = struct
 
   let rebind name op env =
     MC.bind_operator name op env
-
-  let all ?(check = fun _ -> true) (qname : qsymbol) (env : env) =
-    let ops = MC.lookup_operators qname env in
-    let check (_, op) = check op in
-    List.filter check ops
 
   let reducible ?(force = false) env p =
     try
@@ -2725,6 +2770,12 @@ module Op = struct
 
   let get_notations env =
     env.env_ntbase
+
+  let iter ?name f (env : env) =
+    gen_iter (fun mc -> mc.mc_operators) MC.lookup_operators ?name f env
+
+  let all ?check ?name (env : env) =
+    gen_all (fun mc -> mc.mc_operators) MC.lookup_operators ?check ?name env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2770,35 +2821,10 @@ module Ax = struct
     | _ -> raise (LookupFailure (`Path p))
 
   let iter ?name f (env : env) =
-    match name with
-    | Some name ->
-      let axs = MC.lookup_axioms name env in
-      List.iter (fun (p,ax) -> f p ax) axs
+    gen_iter (fun mc -> mc.mc_axioms) MC.lookup_axioms ?name f env
 
-    | None ->
-        Mip.iter
-          (fun _ mc -> MMsym.iter
-            (fun _ (ip, ax) ->
-              match ip with IPPath p -> f p ax | _ -> ())
-            mc.mc_axioms)
-          env.env_comps
-
-  let all ?(check = fun _ _ -> true) ?name (env : env) =
-    match name with
-    | Some name ->
-        let axs = MC.lookup_axioms name env in
-        List.filter (fun (p, ax) -> check p ax) axs
-
-    | None ->
-        Mip.fold (fun _ mc aout ->
-          MMsym.fold (fun _ axioms aout ->
-            List.fold_right (fun (ip, ax) aout ->
-              match ip with
-              | IPPath p -> if check p ax then (p, ax) :: aout else aout
-              | _ -> aout)
-              axioms aout)
-            mc.mc_axioms aout)
-          env.env_comps []
+  let all ?check ?name (env : env) =
+    gen_all (fun mc -> mc.mc_axioms) MC.lookup_axioms ?check ?name env
 end
 
 (* -------------------------------------------------------------------- *)
