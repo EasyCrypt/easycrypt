@@ -1,1 +1,5 @@
-(dirs src theories examples)
+(dirs src theories examples scripts)
+(install
+ (files (scripts/testing/runtest as ec-runtest))
+ (section bin)
+)
