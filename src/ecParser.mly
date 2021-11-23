@@ -471,6 +471,7 @@
 %token INTERLEAVE
 %token INSTANCE
 %token IOTA
+%token IS
 %token KILL
 %token LARROW
 %token LAST
@@ -489,6 +490,7 @@
 %token LOSSLESS
 %token LPAREN
 %token LPBRACE
+%token MATCH
 %token MINUS
 %token MODPATH
 %token MODULE
@@ -965,6 +967,11 @@ expr_u:
 | IF c=expr THEN e1=expr ELSE e2=expr
    { PEif (c, e1, e2) }
 
+| MATCH e=expr WITH
+    PIPE? bs=plist0(p=mcptn(sbinop) IMPL be=expr { (p, be) }, PIPE)
+  END
+    { PEmatch (e, bs) }
+
 | LET p=lpattern EQ e1=expr IN e2=expr
    { PElet (p, (e1, None), e2) }
 
@@ -1202,6 +1209,11 @@ sform_u(P):
   RBRACKET
     { PFprob (mp, args, pn, event) }
 
+| WP LBRACKET
+    mp=loc(fident) args=paren(plist0(expr, COMMA)) COLON f=form_r(P)
+  RBRACKET
+    { PFWP (mp, args, f) }
+
 | r=loc(RBOOL)
     { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
 
@@ -1231,6 +1243,11 @@ form_u(P):
 
 | c=form_r(P) QUESTION e1=form_r(P) COLON e2=form_r(P) %prec LOP2
     { PFif (c, e1, e2) }
+
+| MATCH f=form_r(P) WITH
+    PIPE? bs=plist0(p=mcptn(sbinop) IMPL bf=form_r(P) { (p, bf) }, PIPE)
+  END
+    { PFmatch (f, bs) }
 
 | EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE
     { PFeqveq (xs, None) }
@@ -1413,7 +1430,13 @@ instr:
 | WHILE LPAREN c=expr RPAREN b=block
    { PSwhile (c, b) }
 
-if_expr:
+| MATCH e=expr WITH PIPE? bs=plist0(match_branch, PIPE) END SEMICOLON
+   { PSmatch (e, `Full bs) }
+
+| IF LPAREN e=expr IS c=opptn RPAREN b1=block b2=option(prefix(ELSE, block))
+   { PSmatch (e, `If ((c, b1), b2)) }
+
+%inline if_expr:
 | IF c=paren(expr) b=block el=if_else_expr
    { PSif ((c, b), fst el, snd el) }
 
@@ -1423,6 +1446,10 @@ if_else_expr:
 
 | ELIF e=paren(expr) b=block el=if_else_expr
     { ((e, b) :: fst el, snd el) }
+
+match_branch:
+| c=opptn IMPL b=block
+    { (c, b) }
 
 block:
 | i=loc(base_instr) SEMICOLON
@@ -1783,13 +1810,17 @@ opbr:
    { { pop_patterns = ptn; pop_body = e; } }
 
 %inline opcase:
-| x=ident EQ p=opptn(sbinop)
+| x=ident EQ p=opptn
     { { pop_name = x; pop_pattern = p; } }
 
-| x=ident EQ p=paren(opptn(binop))
-    { { pop_name = x; pop_pattern = p; } }
+%inline opptn:
+| p=mcptn(sbinop)
+    { p }
 
-opptn(BOP):
+| p=paren(mcptn(binop))
+    { p }
+
+mcptn(BOP):
 | c=qoident tvi=tvars_app? ps=bdident*
     { PPApp ((c, tvi), ps) }
 
@@ -2854,8 +2885,19 @@ phltactic:
 | RCONDF s=side? i=codepos1
     { Prcond (s, false, i) }
 
+| MATCH c=oident s=side? i=codepos1
+    { Prmatch (s, unloc c, i) }
+
 | IF opt=if_option
     { Pcond opt }
+
+| MATCH s=loc(side?) eq=boption(EQ)
+    { match unloc s, eq with
+      | None  , false -> Pmatch (`DSided `ConstrSynced)
+      | None  , true  -> Pmatch (`DSided `Eq)
+      | Some s, false -> Pmatch (`SSided s)
+      | Some _, true  ->
+          parse_error s.pl_loc (Some "cannot give side and '='") }
 
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }
@@ -3192,10 +3234,6 @@ tactic_core_r:
 
 | x=phltactic
    { PPhl x }
-
-(* DEBUG *)
-| DEBUG
-    { Pdebug }
 
 %inline tactic_core:
 | x=loc(tactic_core_r) { x }
@@ -3674,9 +3712,13 @@ stop:
 | DROP DOT { }
 
 global:
-| tm=boption(TIME) g=global_action ep=FINAL
+| db=debug_global? g=global_action ep=FINAL
   { let lc = EcLocation.make $startpos ep in
-    { gl_action = EcLocation.mk_loc lc g; gl_timed = tm; } }
+    { gl_action = EcLocation.mk_loc lc g; gl_debug = db; } }
+
+debug_global:
+| TIME  { `Timed }
+| DEBUG { `Break }
 
 prog_r:
 | g=global { P_Prog ([g], false) }

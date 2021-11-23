@@ -255,7 +255,7 @@ let main () =
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false, cmpopts.cmpo_noeco)
 
-    end
+      end
   in
 
   (match input with
@@ -385,9 +385,11 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+                   let timed = p.EP.gl_debug = Some `Timed in
+                   let break = p.EP.gl_debug = Some `Break in
                      try
                        let tdelta =
-                         EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
+                         EcCommands.process ~timed ~break p.EP.gl_action
                        in tstats loc tdelta
                      with
                      | EcCommands.Restart ->

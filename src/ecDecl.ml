@@ -42,16 +42,16 @@ and ty_dtype = {
 }
 
 let tydecl_as_concrete (td : tydecl) =
-  match td.tyd_type with `Concrete x -> x | _ -> assert false
+  match td.tyd_type with `Concrete x -> Some x | _ -> None
 
 let tydecl_as_abstract (td : tydecl) =
-  match td.tyd_type with `Abstract x -> x | _ -> assert false
+  match td.tyd_type with `Abstract x -> Some x | _ -> None
 
 let tydecl_as_datatype (td : tydecl) =
-  match td.tyd_type with `Datatype x -> x | _ -> assert false
+  match td.tyd_type with `Datatype x -> Some x | _ -> None
 
 let tydecl_as_record (td : tydecl) =
-  match td.tyd_type with `Record x -> x | _ -> assert false
+  match td.tyd_type with `Record x -> Some x | _ -> None
 
 (* -------------------------------------------------------------------- *)
 let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) lc =

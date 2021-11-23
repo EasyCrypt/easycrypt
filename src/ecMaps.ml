@@ -62,6 +62,7 @@ module Set = struct
     include Why3.Extset.S
 
     val big_union : t list -> t
+    val big_inter : t list -> t
     val map : (elt -> elt) -> t -> t
     val undup : elt list -> elt list
   end
@@ -71,6 +72,11 @@ module Set = struct
 
     let big_union (xs : t list) : t =
       List.fold_left union empty xs
+
+    let big_inter (xs : t list) : t =
+      match xs with
+      | [] -> empty
+      | x :: xs -> List.fold_left inter x xs
 
     let map f s =
       fold (fun k s -> add (f k) s) s empty
