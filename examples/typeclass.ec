@@ -24,34 +24,21 @@ type class countable = {
 type class magma = {
   op mmul : magma -> magma -> magma
 }.
-
-(* TODO: when removing the type argument of associative, no explicit error message.
-   Any inherited operator should have self as type argument.
-   Type error slicing to do as well.*)
 type class semigroup <: magma = {
   axiom mmulA : associative mmul<:semigroup>
 }.
 
-(* TODO: why do I need this instead of using left_id and right_id directly?
-   Or even specifying the type?
-   Or even specifying semigroup and not magma? *)
-
-op mmul_ ['a <: semigroup] = mmul<:'a>.
-
 type class monoid <: semigroup = {
   op mid : monoid
 
-  axiom mmulr0 : left_id<:monoid, monoid> mid mmul_<:monoid>
-  axiom mmul0r : right_id<:monoid, monoid> mid mmul_<:monoid>
+  axiom mmulr0 : right_id mid mmul<:monoid>
+  axiom mmul0r : left_id mid mmul<:monoid>
 }.
-
-(* TODO: same. *)
-pred left_inverse_mid_mmul ['a <: monoid] (inv : 'a -> 'a) = left_inverse mid inv mmul.
 
 type class group <: monoid = {
   op minv : group -> group
 
-  axiom mmulN : left_inverse_mid_mmul minv
+  axiom mmulN : left_inverse mid minv mmul
 }.
 
 type class ['a <: group] action = {
@@ -63,45 +50,41 @@ type class ['a <: group] action = {
     forall (g h : 'a) (x : action), amul (mmul g h) x = amul g (amul h x)
 }.
 
-(* TODO: make one of these work, and then finish the hierarchy here:
+(* TODO: finish the hierarchy here:
    https://en.wikipedia.org/wiki/Magma_(algebra) *)
 type fingroup <: group & finite.
-
-(* TODO: we may want to rename mmul to ( + ) and build this from group *)
-type class comgroup = {
-  op gzero  : comgroup
-  op gopp   : comgroup -> comgroup
-  op gadd   : comgroup -> comgroup -> comgroup
-
-  axiom addr0 : left_id gzero gadd
-  axiom addrN : left_inverse gzero gopp gadd
-  axiom addrC : commutative gadd
-  axiom addrA : associative gadd
-}.
 
 (* -------------------------------------------------------------------- *)
 (* Advanced algebraic structures *)
 
-(*TODO: we don't have here the issues we had with semigroup and monoid,
-  probably because left_distributive was adequatly typed by ( * )
-  before beign applied to ( + ). *)
+type class comgroup = {
+  op zero  : comgroup
+  op ([-])   : comgroup -> comgroup
+  op ( + )   : comgroup -> comgroup -> comgroup
+
+  axiom addr0 : right_id zero ( + )
+  axiom addrN : left_inverse zero ([-]) ( + )
+  axiom addrC : commutative ( + )
+  axiom addrA : associative ( + )
+}.
+
 type class comring <: comgroup = {
   op one   : comring
   op ( * ) : comring -> comring -> comring
 
-  axiom mulr1  : left_id one ( * )
+  axiom mulr1  : right_id one ( * )
   axiom mulrC  : commutative ( * )
   axiom mulrA  : associative ( * )
-  axiom mulrDl : left_distributive ( * ) gadd
+  axiom mulrDl : left_distributive ( * ) ( + )
 }.
 
 type class ['a <: comring] commodule <: comgroup = {
   op ( ** )  : 'a -> commodule -> commodule
 
   axiom scalerDl : forall (a b : 'a) (x : commodule),
-    (gadd a b) ** x = gadd (a ** x) (b ** x)
+    (a + b) ** x = (a ** x) + (b ** x)
   axiom scalerDr : forall (a : 'a) (x y : commodule),
-    a ** (gadd x y) = gadd (a ** x) (a ** y)
+    a ** (x + y) = (a ** x) + (a ** y)
 }.
 
 
@@ -124,7 +107,6 @@ op all_countable ['a <: countable] (p : 'a -> bool) =
 (* -------------------------------------------------------------------- *)
 (* Set theory *)
 
-(* TODO: why is the rewrite/all_finite needed? *)
 lemma all_finiteP ['a <: finite] p : (all_finite p) <=> (forall (x : 'a), p x).
 proof. by rewrite/all_finite allP; split => Hp x; rewrite Hp // enumP. qed.
 
@@ -146,7 +128,7 @@ proof. by rewrite all_finiteP all_countableP. qed.
 
 op bool_enum = [true; false].
 
-(* TODO: we want to be ale to give the list directly.*)
+(* TODO: we want to be able to give the list directly.*)
 instance finite with bool
   op enum = bool_enum.
 
@@ -154,39 +136,20 @@ realize enumP.
 proof. by case. qed.
 
 (* -------------------------------------------------------------------- *)
-(* Simple algebraic structures *)
+(* Advanced algebraic structures *)
 
 op izero = 0.
 
-
 instance comgroup with int
-  op gzero = izero
-  op gadd  = CoreInt.add
-  op gopp  = CoreInt.opp.
+  op zero = izero
+  op ( + )  = CoreInt.add
+  op ([-])  = CoreInt.opp.
 
-realize addr0.
-apply: addr0.
-have : left_id izero Int.(+).
-
-locate left_id.
-
-rewrite /left_id.
-rewrite /izero.
-move=> x /=.
-rewrite /izero.
-
- by trivial.
+(* TODO: might be any of the two addr0, also apply fails but rewrite works. *)
+realize addr0 by rewrite addr0.
 realize addrN by trivial.
-(* TODO: what? *)
-(*
-realize addrC by apply addrC.
-realize addrC by apply Ring.IntID.addrC.
-*)
-realize addrC by admit.
-realize addrA by admit.
-
-(* -------------------------------------------------------------------- *)
-(* Advanced algebraic structures *)
+realize addrC by rewrite addrC.
+realize addrA by rewrite addrA.
 
 op ione = 1.
 
@@ -200,6 +163,7 @@ instance comring with int
 realize mulr1 by trivial.
 realize mulrC by rewrite mulrC.
 realize mulrA by rewrite mulrA.
+
 realize mulrDl.
 proof.
   print mulrDl.
@@ -212,9 +176,15 @@ qed.
 
 type 'a poly = 'a list.
 
+op rev_normalize_rev ['a <: comgroup] (p : 'a poly) : 'a poly =
+  with p = "[]" => []
+  with p = h :: t => if h = zero<:'a> then rev_normalize_rev t else p.
+
+op normalize ['a <: comgroup] (p : 'a poly) : 'a poly = rev (rev_normalize_rev (rev p)).
+
 op pzero ['a] : 'a poly = [].
 op padd  ['a <: comgroup] p q =
-  mkseq (fun n => (nth zero<:'a> p n) + (nth zero<:'a> q n)) (max (size p) (size q)).
+  normalize (mkseq (fun n => (nth zero<:'a> p n) + (nth zero<:'a> q n)) (max (size p) (size q))).
 op pinv  ['a <: comgroup] = map [-]<:'a>.
 op pone  ['a <: comring] = [one <:'a>].
 op pmul  ['a <: comring] : 'a poly -> 'a poly -> 'a poly.
