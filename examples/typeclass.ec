@@ -8,15 +8,26 @@ require import AllCore List.
 (* -------------------------------------------------------------------- *)
 (* Set theory *)
 
+type class witness = {
+  op witness : witness
+}.
+
+print witness.
+
 type class finite = {
   op enum     : finite list
   axiom enumP : forall (x : finite), x \in enum
 }.
 
+print enumP.
+
 type class countable = {
   op count : int -> countable
   axiom countP : forall (x : countable), exists (n : int), x = count n
 }.
+
+(* TODO: printing typeclasses *)
+(* print countable. *)
 
 (* -------------------------------------------------------------------- *)
 (* Simple algebraic structures *)
@@ -24,9 +35,14 @@ type class countable = {
 type class magma = {
   op mmul : magma -> magma -> magma
 }.
+
+print mmul.
+
 type class semigroup <: magma = {
   axiom mmulA : associative mmul<:semigroup>
 }.
+
+print associative.
 
 type class monoid <: semigroup = {
   op mid : monoid
@@ -41,18 +57,31 @@ type class group <: monoid = {
   axiom mmulN : left_inverse mid minv mmul
 }.
 
-type class ['a <: group] action = {
-  op amul  : 'a -> action -> action
+print minv.
 
-  axiom identity :
-    forall (x : action), amul mid x = x
+type class ['a <: semigroup] semigroup_action = {
+  op amul  : 'a -> semigroup_action -> semigroup_action
+
   axiom compatibility :
-    forall (g h : 'a) (x : action), amul (mmul g h) x = amul g (amul h x)
+    forall (g h : 'a) (x : semigroup_action), amul (mmul g h) x = amul g (amul h x)
 }.
 
-(* TODO: finish the hierarchy here:
-   https://en.wikipedia.org/wiki/Magma_(algebra) *)
-type fingroup <: group & finite.
+print compatibility.
+
+(* TODO: nice error message, already known *)
+(*
+type class ['a <: monoid] monoid_action <: 'a semigroup_action = {
+  axiom identity :
+    forall (x : id_action), amul mid x = x
+}.
+*)
+
+type class ['a <: monoid] monoid_action <: 'a semigroup_action = {
+  axiom identity : forall (x : monoid_action), amul mid<:'a> x = x
+}.
+
+(* TODO: why again is this not possible/a good idea? *)
+(* type class finite_group <: group & finite = {}. *)
 
 (* -------------------------------------------------------------------- *)
 (* Advanced algebraic structures *)
@@ -89,6 +118,15 @@ type class ['a <: comring] commodule <: comgroup = {
 
 
 (* ==================================================================== *)
+(* Abstract type examples *)
+
+(* TODO: finish the hierarchy here:
+   https://en.wikipedia.org/wiki/Magma_(algebra) *)
+type foo <: witness.
+type fingroup <: group & finite.
+
+
+(* ==================================================================== *)
 (* Operator examples *)
 
 (* -------------------------------------------------------------------- *)
@@ -99,6 +137,21 @@ op all_finite ['a <: finite] (p : 'a -> bool) =
 
 op all_countable ['a <: countable] (p : 'a -> bool) =
   forall (n : int), p (count<:'a> n).
+
+(* -------------------------------------------------------------------- *)
+(* Simple algebraic structures *)
+
+(* TODO: weird issue and/or inapropriate error message *)
+(*
+print amul.
+
+op foo1 ['a <: semigroup, 'b <: 'a semigroup_action] = amul<:'a,'b>.
+op foo2 ['a <: semigroup, 'b <: 'a semigroup_action] (g : 'a) (x : 'b) = amul g x.
+op foo3 ['a <: semigroup, 'b <: 'a semigroup_action] (g : 'a) (x : 'b) = amul<:'a,'b> g x.
+*)
+
+op big ['a, 'b <: monoid] (P : 'a -> bool) (F : 'a -> 'b) (r : 'a list) =
+  foldr mmul mid (map F (filter P r)).
 
 
 (* ==================================================================== *)
@@ -119,6 +172,7 @@ qed.
 
 lemma all_finite_countable ['a <: finite & countable] (p : 'a -> bool) : (all_finite p) <=> (all_countable p).
 proof. by rewrite all_finiteP all_countableP. qed.
+
 
 (* ==================================================================== *)
 (* Instance examples *)
@@ -151,6 +205,11 @@ realize addrN by trivial.
 realize addrC by rewrite addrC.
 realize addrA by rewrite addrA.
 
+op foo = 1 + 3.
+
+print ( + ).
+print foo.
+
 op ione = 1.
 
 (* TODO: this automatically fetches the only instance of comgroup we have defined for int.
@@ -173,65 +232,6 @@ proof.
   (* TODO: what? *)
   admit.
 qed.
-
-type 'a poly = 'a list.
-
-op rev_normalize_rev ['a <: comgroup] (p : 'a poly) : 'a poly =
-  with p = "[]" => []
-  with p = h :: t => if h = zero<:'a> then rev_normalize_rev t else p.
-
-op normalize ['a <: comgroup] (p : 'a poly) : 'a poly = rev (rev_normalize_rev (rev p)).
-
-op pzero ['a] : 'a poly = [].
-op padd  ['a <: comgroup] p q =
-  normalize (mkseq (fun n => (nth zero<:'a> p n) + (nth zero<:'a> q n)) (max (size p) (size q))).
-op pinv  ['a <: comgroup] = map [-]<:'a>.
-op pone  ['a <: comring] = [one <:'a>].
-op pmul  ['a <: comring] : 'a poly -> 'a poly -> 'a poly.
-op ipmul ['a <: comring] (x : 'a) = map (( * ) x).
-
-(* TODO: we may not need to specify the <:'a>. *)
-instance comgroup with ['a <: comring] 'a poly
-  op zero  = pzero<:'a>
-  op (+)   = padd<:'a>
-  op ([-]) = pinv<:'a>.
-
-realize addr0.
-proof.
-  (* TODO: error message. *)
-  move => x (*y*).
-  (* Top.Logic turned into top... *)
-  (* TODO: error message. *)
-  (*rewrite //.*)
-  (* TODO: wow I just broke something. *)
-  (* rewrite /padd /pzero. *)
-  admit.
-qed.
-
-realize addrN.
-proof.
-  (* TODO: all truly is broken. *)
-  (*rewrite /pzero /padd.*)
-  admit.
-qed.
-
-realize addrC by admit.
-realize addrA by admit.
-
-instance comring with ['a <: comring] 'a poly
-  op one   = pone<:'a>
-  op ( * ) = pmul<:'a>.
-
-realize mulr1 by admit.
-realize mulrC by admit.
-realize mulrA by admit.
-realize mulrDl by admit.
-
-instance 'a commodule with ['a <: comring] 'a poly
-  op ( ** ) = ipmul<:'a>.
-
-realize scalerDl by admit.
-realize scalerDr by admit.
 
 
 
