@@ -51,8 +51,8 @@ jobs:
         path: report.log
         if-no-files-found: ignore
 
-  slack:
-    name: Slack
+  notification:
+    name: Notification
     needs: [compile, check]
     if: |
       (github.event_name == 'push') ||
@@ -60,10 +60,17 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: technote-space/workflow-conclusion-action@v2
-    - uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_ICON: https://raw.githubusercontent.com/EasyCrypt/easycrypt/1.0/easycrypt.png 
-        SLACK_USERNAME: "CI/CD"
-        SLACK_COLOR: ${{ env.WORKFLOW_CONCLUSION }}
-        SLACK_TITLE: "CI (${{ env.WORKFLOW_CONCLUSION }})"
+    - uses: zulip/github-actions-zulip/send-message@v1
+      with:
+        api-key: ${{ secrets.ZULIP_APIKEY }}
+        email: ${{ secrets.ZULIP_EMAIL }}
+        organization-url: 'https://formosa-crypto.zulipchat.com'
+        type: 'stream'
+        to: 'GitHub notifications'
+        topic: 'EasyCrypt / CI'
+        content: |
+          **Build status**: ${{ env.WORKFLOW_CONCLUSION }} ${{ env.WORKFLOW_CONCLUSION == 'success' && ':check_mark:' || ':cross_mark:' }}
+          **Author**: [${{ github.actor }}](${{ github.server_url }}/${{ github.actor }})
+          **Event**: ${{ github.event_name }} on ${{ github.ref }}
+          **Commit**: [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          **Details**: [Build log](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}/checks)
