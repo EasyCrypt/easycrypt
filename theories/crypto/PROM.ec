@@ -47,6 +47,16 @@ module MainD (D : RO_Distinguisher) (RO : RO) = {
 }.
 
 (* -------------------------------------------------------------------- *)
+module type ROmap = {
+  proc init  ()                    : unit
+  proc get   (x : in_t)            : out_t
+  proc set   (x : in_t, y : out_t) : unit
+  proc rem   (x : in_t)            : unit
+  proc sample(x : in_t)            : unit
+  proc restrK()                    : (in_t, out_t) fmap
+}.
+
+(* -------------------------------------------------------------------- *)
 module type FRO = {
   proc init    ()                    : unit
   proc get     (x : in_t)            : out_t
@@ -64,7 +74,8 @@ module type FRO_Distinguisher (G : FRO) = {
 
 (* -------------------------------------------------------------------- *)
 abstract theory MkRO.
-module RO : RO = {
+
+module RO : RO, ROmap = {
   var m : (in_t, out_t) fmap
 
   proc init () = {
