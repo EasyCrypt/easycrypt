@@ -108,6 +108,19 @@ module RO : RO, ROmap = {
     return m;
   }
 }.
+
+module LRO : RO = {
+  proc init = RO.init
+
+  proc get = RO.get
+
+  proc set = RO.set 
+
+  proc rem = RO.rem
+
+  proc sample(x : in_t) = { }
+}.
+
 end MkRO.
 
 clone include MkRO.
@@ -244,18 +257,6 @@ end section LL.
 theory FullEager.
 require import List FSet.
 require (*--*) IterProc.
-
-module LRO : RO = {
-  proc init = RO.init
-
-  proc get = RO.get
-
-  proc set = RO.set 
-
-  proc rem = RO.rem
-
-  proc sample(x : in_t) = { }
-}.
 
 (* -------------------------------------------------------------------- *)
 (** Hides internals in normal usage while allowing use where needed    **)

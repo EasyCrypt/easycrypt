@@ -208,7 +208,7 @@ smt(mem_empty fdom0).
 qed.
 
 local equiv eq_2 :
-  D(O3(ROa.FullEager.LRO,ROb.FullEager.LRO)).distinguish ~ D(O2(ROa.RO,ROb.RO)).distinguish :
+  D(O3(ROa.LRO,ROb.LRO)).distinguish ~ D(O2(ROa.RO,ROb.RO)).distinguish :
   ={arg, glob D, ROa.RO.m, ROb.RO.m} ==>
   ={res, glob D, ROa.RO.m, ROb.RO.m}.
 proof.
@@ -230,16 +230,16 @@ transitivity Game(D, O3(ROa.RO, ROb.RO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + by conseq eq_1=> />.
-transitivity Game(D, O3(ROa.FullEager.LRO, ROb.RO)).main
+transitivity Game(D, O3(ROa.LRO, ROb.RO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + proc; inline*. 
   by call(ROa.FullEager.RO_LRO_D (D1(ROb.RO)) _); auto=> /=; apply: da_ll.
-transitivity Game(D, O3(ROa.FullEager.LRO, ROb.FullEager.LRO)).main
+transitivity Game(D, O3(ROa.LRO, ROb.LRO)).main
   (={arg, glob D} ==> ={res, glob D})
   (={arg, glob D} ==> ={res, glob D})=> //=; 1: smt().
 + proc; inline*. 
-  by call(ROb.FullEager.RO_LRO_D (D2(ROa.FullEager.LRO)) _);
+  by call(ROb.FullEager.RO_LRO_D (D2(ROa.LRO)) _);
     auto=> /=; apply: db_ll.
 by proc; inline*; call eq_2; auto.
 qed.
