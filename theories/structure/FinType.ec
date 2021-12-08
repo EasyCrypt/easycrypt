@@ -62,3 +62,9 @@ case=> x y; rewrite count_uniq_mem.
 + by apply/b2i_eq1/allpairsP; exists (x, y); rewrite !(FT1.enumP, FT2.enumP).
 qed.
 end FinProdType.
+
+clone FinType as UnitFinType with
+  type t = unit,
+  op enum = [tt]
+  proof*.
+realize enum_spec by case.

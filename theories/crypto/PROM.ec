@@ -9,7 +9,7 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import AllCore SmtMap Distr.
+require import AllCore SmtMap Distr List FSet.
 require import FinType.
 
 (* -------------------------------------------------------------------- *)
@@ -255,7 +255,6 @@ end section LL.
 
 (* -------------------------------------------------------------------- *)
 theory FullEager.
-require import List FSet.
 require (*--*) IterProc.
 
 (* -------------------------------------------------------------------- *)
@@ -897,3 +896,65 @@ end section PROOFS.
 end FinEager.
 
 end FullRO.
+
+abstract theory UnitRO.
+clone include FullRO with
+  type in_t <- unit.
+
+clone include FinEager with
+  theory FinFrom <- UnitFinType
+  proof*.
+
+module ERO : RO = {
+  var m : out_t
+
+  proc init () = {
+    m <$ dout ();
+  }
+
+  proc get() = {
+    return m;
+  }
+
+  proc set(x : unit, y : out_t) = {
+    m <- y;
+  }
+
+  proc sample(x : unit) = { }
+
+  proc rem(x : unit) = { }
+}.
+
+section.
+declare axiom dout_ll x: is_lossless (dout x).
+
+declare module D <: FinRO_Distinguisher{RO, FRO,ERO}.
+
+local equiv RO_ERO_init : FinRO.init ~ ERO.init :
+  true ==> RO.m{1}.[tt] = Some ERO.m{2}.
+proof.
+proc; inline*.
+rcondt{1} 3; 1: by auto.
+rcondt{1} 6; 1: by auto; smt(mem_empty).
+rcondf{1} 8; 1: by auto.
+auto; move => _ _ _ /=.
+by case ((head witness UnitFinType.enum)); smt(get_setE).
+qed.
+
+equiv Unit_RO_ERO : MainD(D,RO).distinguish ~ MainD(D,ERO).distinguish :
+  ={glob D, arg} ==> ={res, glob D}.
+proof.
+transitivity MainD(D,FinRO).distinguish
+  (={glob D, arg} ==> ={res, glob D}) (={glob D, arg} ==> ={res, glob D}) => //.
+  - move => &1 &2 [A B]; exists (glob D){2} x{2}; smt().
+  - by proc*; call (RO_FinRO_D _ D) => //; exact: dout_ll.
+proc.
+call (: RO.m{1}.[tt] = Some ERO.m{2}).
+- by proc*; call RO_ERO_init; auto.
+- proc; auto; smt().
+- proc; auto. move => &1 &2 />; case (x{1}); smt(get_setE).
+- proc; auto.
+- by call RO_ERO_init; auto.
+qed.
+end section.
+end UnitRO.
