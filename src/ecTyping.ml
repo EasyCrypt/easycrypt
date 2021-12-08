@@ -2448,7 +2448,7 @@ let rec trans_form_or_pattern env ?mv ?ps ue pf tt =
                     `Range (i, j)
               with
               | `Single k        -> [List.nth fs k]
-              | `Range  (k1, k2) -> List.take (k2 - k1) (List.drop k1 fs) in
+              | `Range  (k1, k2) -> List.take (k2 + 1 - k1) (List.drop k1 fs) in
 
             let filter f pf =
               match pf with
