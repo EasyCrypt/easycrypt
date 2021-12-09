@@ -6,43 +6,55 @@ jobs:
   compile:
     name: EasyCrypt compilation
     runs-on: ubuntu-20.04
-    container: easycryptpa/ec-build-box
+    container:
+      image: easycryptpa/ec-build-box
+      options: --user root
     steps:
     - uses: actions/checkout@v2
+    - name: Set ownership
+      run: |
+        sudo chown opam:opam -R .
+        sudo chown opam:opam -R ~
     - name: Update OPAM & EasyCrypt dependencies
       run: |
-        opam update
-        opam pin add -n easycrypt .
-        opam install --deps-only easycrypt
+        sudo -u opam opam update
+        sudo -u opam opam pin add -n easycrypt .
+        sudo -u opam opam install --deps-only easycrypt
     - name: Compile EasyCrypt
-      run: opam config exec -- make
+      run: sudo -u opam opam config exec -- make
 
   check:
     name: Check EasyCrypt Libraries
     needs: compile
     runs-on: ubuntu-20.04
-    container: easycryptpa/ec-build-box
+    container:
+      image: easycryptpa/ec-build-box
+      options: --user root
     strategy:
       fail-fast: false
       matrix:
         target: [stdlib, examples]
     steps:
     - uses: actions/checkout@v2
+    - name: Set ownership
+      run: |
+        sudo chown opam:opam -R .
+        sudo chown opam:opam -R ~
     - name: Update OPAM & EasyCrypt dependencies
       run: |
-        opam update
-        opam pin add -n easycrypt .
-        opam install --deps-only easycrypt
+        sudo -u opam opam update
+        sudo -u opam opam pin add -n easycrypt .
+        sudo -u opam opam install --deps-only easycrypt
     - name: Compile EasyCrypt
-      run: opam config exec -- make
+      run: sudo -u opam opam config exec -- make
     - name: Detect SMT provers
       run: |
-        rm -f ~/.why3.conf
-        opam config exec -- ./ec.native why3config -why3 ~/.why3.conf
+        sudo -u opam rm -f ~/.why3.conf
+        sudo -u opam opam config exec -- ./ec.native why3config -why3 ~/.why3.conf
     - name: Compile Library (${{ matrix.target }})
       env:
         TARGET: ${{ matrix.target }}
-      run: opam config exec -- make $TARGET
+      run: sudo -u opam opam config exec -- make $TARGET
     - uses: actions/upload-artifact@v2
       name: Upload report.log
       if: always()
@@ -51,8 +63,8 @@ jobs:
         path: report.log
         if-no-files-found: ignore
 
-  slack:
-    name: Slack
+  notification:
+    name: Notification
     needs: [compile, check]
     if: |
       (github.event_name == 'push') ||
@@ -60,10 +72,17 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: technote-space/workflow-conclusion-action@v2
-    - uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_ICON: https://raw.githubusercontent.com/EasyCrypt/easycrypt/1.0/easycrypt.png 
-        SLACK_USERNAME: "CI/CD"
-        SLACK_COLOR: ${{ env.WORKFLOW_CONCLUSION }}
-        SLACK_TITLE: "CI (${{ env.WORKFLOW_CONCLUSION }})"
+    - uses: zulip/github-actions-zulip/send-message@v1
+      with:
+        api-key: ${{ secrets.ZULIP_APIKEY }}
+        email: ${{ secrets.ZULIP_EMAIL }}
+        organization-url: 'https://formosa-crypto.zulipchat.com'
+        type: 'stream'
+        to: 'GitHub notifications'
+        topic: 'EasyCrypt / CI'
+        content: |
+          **Build status**: ${{ env.WORKFLOW_CONCLUSION }} ${{ env.WORKFLOW_CONCLUSION == 'success' && ':check_mark:' || ':cross_mark:' }}
+          **Author**: [${{ github.actor }}](${{ github.server_url }}/${{ github.actor }})
+          **Event**: ${{ github.event_name }} on ${{ github.ref }}
+          **Commit**: [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          **Details**: [Build log](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}/checks)

@@ -765,8 +765,6 @@ and replay_mod
 
       let mp, (newme, newlc) = EcEnv.Mod.lookup (unloc newname) env in
 
-      assert (newlc = None);    (* FIXME: error message *)
-
       let np =
         match mp.m_top with
         | `Concrete (p, None) -> p
@@ -775,13 +773,13 @@ and replay_mod
 
       let substme = EcSubst.add_path subst ~src:(xpath ove name) ~dst:np in
 
-      let me    = EcSubst.subst_top_module subst me in
+      let me    = EcSubst.subst_top_module substme me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
       let newme = { newme with me_name = name } in
       let newme = { tme_expr = newme; tme_loca = Option.get newlc; } in
 
       if not (EcReduction.EqTest.for_mexpr env me.tme_expr newme.tme_expr) then
-          clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
+        clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
 
       let (subst, _) =
         match mode with
@@ -791,7 +789,7 @@ and replay_mod
           substme, EcPath.basename np in
 
       let newme =
-        if mode = `Alias then
+        if mode = `Alias || mode = `Inline `Keep then
           { newme with tme_expr = { newme.tme_expr with
               me_body = ME_Alias (List.length newme.tme_expr.me_params, mp) } }
         else newme in

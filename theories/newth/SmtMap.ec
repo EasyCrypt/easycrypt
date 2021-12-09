@@ -149,6 +149,11 @@ lemma get_some (m : ('a, 'b) fmap, x : 'a) :
   x \in m => m.[x] = Some (oget m.[x]).
 proof. move=> /domE; by case m.[x]. qed.
 
+lemma fmapP (m : ('a,'b) fmap) x : x \in m <=> exists y, m.[x] = Some y.
+proof.
+by split => [/get_some ?|[y @/dom -> //]]; 1: by exists (oget m.[x]).
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma getE ['a 'b] (m : ('a, 'b) fmap) x : m.[x] = (tomap m).[x].
 proof. by []. qed.

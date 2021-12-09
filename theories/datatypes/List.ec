@@ -2359,6 +2359,15 @@ proof. apply: contraLR; rewrite -!all_predC &(all_mask). qed.
 lemma mem_mask x m s : x \in mask<:'a> m s => x \in s.
 proof. by rewrite -!has_pred1 => /has_mask. qed.
 
+lemma map_mask (f : 'a -> 'b) m s : map f (mask m s) = mask m (map f s).
+proof. by elim: m s => [|[|] m IHm] [|x p] //=; rewrite IHm. qed.
+
+lemma mask_uniq (s : 'a list) m : uniq s => uniq (mask m s).
+proof.
+elim: s m => [m|x s IHs [|b m] Uxs] //=; 1: by rewrite mask0.
+case: b Uxs => //= -[s'x Us]; smt(mem_mask).
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                             Subseq                                   *)
 (* -------------------------------------------------------------------- *)
@@ -2458,6 +2467,13 @@ elim: s => //= y s ih; case: (a y)=> //= Nay.
 by apply/(subseq_trans s)/subseq_cons/ih.
 qed.
 
+lemma map_subseq (f : 'a -> 'b) s1 s2 :
+  subseq s1 s2 => subseq (map f s1) (map f s2).
+proof.
+case/subseqP=> m [sz_m ->]; apply/subseqP.
+by exists m; rewrite ?size_map ?map_mask.
+qed.
+
 lemma count_subseq ['a] (p : 'a -> bool) s1 s2 : subseq s1 s2 =>
   count p s1 <= count p s2.
 proof.
@@ -2469,6 +2485,13 @@ qed.
 lemma subseq_mem ['a] (xs ys : 'a list) x:
   subseq xs ys => x \in xs => x \in ys.
 proof. by case/subseqP=> m [_ ->]; apply: mem_mask. qed.
+
+lemma subseq_uniq (s1 s2 : 'a list) : subseq s1 s2 => uniq s2 => uniq s1.
+proof. by case/subseqP=> m [_ -> Us2]; apply: mask_uniq. qed.
+
+lemma subseq_map_uniq (s1 s2 : 'a list) (f : 'a -> 'b) :
+  subseq s1 s2 => uniq (map f s2) => uniq (map f s1).
+proof. by move/(map_subseq f); apply: subseq_uniq. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)

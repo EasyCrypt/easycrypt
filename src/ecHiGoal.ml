@@ -683,7 +683,9 @@ let process_rewrite1_r ttenv ?target ri tc =
       let tt =
         match simpl with
         | Some logic ->
-           t_simplify_lg ?target:None ~delta:false (ttenv, logic)
+           let hyps   = FApi.tc1_hyps tc in
+           let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
+           t_simplify_lg ?target ~delta:false (ttenv, logic)
         | None -> t_id
       in FApi.t_seq tt process_trivial tc
 

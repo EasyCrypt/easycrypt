@@ -651,6 +651,10 @@ rewrite !ler_maxr ?addr_ge0 ?size_ge0 // eqf_div;
 by rewrite -!fromintM eq_fromint !(@mulzC (1 + _)).
 qed.
 
+lemma perm_eq_drat ['a] (s1 s2 : 'a list) :
+  perm_eq s1 s2 => drat s1 = drat s2.
+proof. by move => ?; apply/eq_dratP/perm_eq_ratl. qed.
+
 lemma eq_sz_dratP ['a] (s1 s2 : 'a list) : size s1 = size s2 =>
   perm_eq s1 s2 <=> (drat s1 = drat s2).
 proof.
