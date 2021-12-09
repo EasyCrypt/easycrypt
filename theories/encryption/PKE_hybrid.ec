@@ -1,15 +1,16 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore List FSet Finite Distr OldMonoid.
-require import Indist DInterval.
+require import AllCore List FSet Finite Distr.
+require import Indist.
 require import CHoareTactic.
 (*---*) import StdBigop.Bigint BIA Xint.
+
 
 type pkey.
 type skey.
@@ -51,60 +52,60 @@ module K = {
 }.
 
 module L (S:Scheme) = {
-
   proc orcl (m0 m1:plaintext) : ciphertext = {
     var r : ciphertext;
+
     r   <@ S.enc(K.pk,m0);
     return r;
   }
 }.
 
 module R (S:Scheme) = {
-
   proc orcl (m0 m1:plaintext) : ciphertext = {
     var r : ciphertext;
+
     r   <@ S.enc(K.pk,m1);
     return r;
   }
 }.
 
 module LRb (S:Scheme) = {
-
   proc orcl (m0 m1:plaintext) : ciphertext = {
     var r : ciphertext;
+
     r   <@ S.enc(K.pk,K.b?m0:m1);
     return r;
   }
 }.
 
-module CPAL (S:Scheme,A: AdvCPA) = {
+module CPAL (S:Scheme) (A:AdvCPA) = {
   module A = A(L(S))
   proc main():bool = {
     var b':bool;
+
     (K.pk,K.sk) <@ S.kg();
-    b'          <@ A.main(K.pk);
+    b'          <@ A(L(S)).main(K.pk);
     return b';
   }
 }.
 
-module CPAR (S:Scheme,A:AdvCPA) = {
-  module A = A(R(S))
+module CPAR (S:Scheme) (A:AdvCPA) = {
   proc main():bool = {
     var b':bool;
     (K.pk,K.sk) <@ S.kg();
-    b'          <@ A.main(K.pk);
+    b'          <@ A(R(S)).main(K.pk);
     return b';
   }
 }.
 
-module CPA (S:Scheme,A:AdvCPA) = {
-
+module CPA (S:Scheme) (A:AdvCPA) = {
   module A = A(LRb(S))
+
   proc main():bool = {
     var b':bool;
     K.b         <$ {0,1};
     (K.pk,K.sk) <@ S.kg();
-    b'          <@ A.main(K.pk);
+    b'          <@ A(LRb(S)).main(K.pk);
     return b';
   }
 }.
@@ -120,30 +121,33 @@ module ToOrcl (S:Scheme) = {
     (K.pk, K.sk) <@ S.kg();
     return K.pk;
   }
+
   proc orcl (m:plaintext) : ciphertext = {
     var c : ciphertext;
+
     c <@ S.enc(K.pk, m);
     return c;
   }
 }.
 
-module ToAdv(A:AdvCPA, O:Orcl,LR:LR) = {
+module ToAdv(A:AdvCPA) (O:Orcl) (LR:LR) = {
   proc main() : bool = {
     var pk:pkey;
     var b':bool;
+
     pk <@ O.leaks();
     b' <@ A(LR).main(pk);
     return b';
   }
 }.
 
-module B (S:Scheme, A:AdvCPA, LR:LR) = {
-  module A = A(HybOrcl2(ToOrcl(S),LR))
+module B (S:Scheme) (A:AdvCPA) (LR:LR) = {
   proc main(pk:pkey) : bool = {
     var b':bool;
+
     H.HybOrcl.l0 <$ [0..H.q-1];
     H.HybOrcl.l <- 0;
-    b' <@ A.main(pk);
+    b' <@ A(HybOrcl2(ToOrcl(S),LR)).main(pk);
     return b';
   }
 }.
@@ -165,8 +169,7 @@ schema cost_Hq `{P} : cost [P : H.q] = '0.
 hint simplify cost_Hq.
 
 section.
-
-  declare module S:Scheme [ kg : `{N cs.`ckg},
+  declare module S<:Scheme [ kg : `{N cs.`ckg},
                             enc: `{N cs.`cenc}]
                  {-K, -H.Count, -H.HybOrcl}.
     (* Normaly I would like to locally
@@ -422,5 +425,4 @@ section.
     rewrite !(bigi_inP _ _ (fun (k : int) => k <> l0)) 1,2:/# !bigi_constz 1:// 1:/#.
     by rewrite !bigi1 /= /#.
   qed.
-   
 end section.

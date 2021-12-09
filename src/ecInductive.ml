@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -189,9 +189,21 @@ let datatype_projectors (tpath, tparams, { tydt_ctors = ctors }) =
     let body = e_match the (List.mapi do1 ctors) (toption rty) in
     let body = e_lam [thv, thety] body in
 
-    (cname, mk_op ~opaque:false tparams body.e_ty (Some (OP_Plain (body, false)))) in
+    let op = Some (OP_Plain (body, false)) in
+    let op = mk_op ~opaque:false tparams body.e_ty op `Global in (* FIXME *)
+
+    (cname, op) in
 
   List.mapi do1 ctors
+
+(* -------------------------------------------------------------------- *)
+let datatype_as_ty_dtype datatype =
+  let indsc    = indsc_of_datatype `Elim datatype in
+  let casesc   = indsc_of_datatype `Case datatype in
+  datatype.dt_tparams,
+    { tydt_ctors   = datatype.dt_ctors ;
+      tydt_schcase = casesc;
+      tydt_schelim = indsc ; }
 
 (* -------------------------------------------------------------------- *)
 type case1 = {

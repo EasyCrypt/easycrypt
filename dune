@@ -1,0 +1,5 @@
+(dirs src theories examples scripts)
+
+(install
+  (section (bin))
+  (files (scripts/testing/runtest as ec-runtest)))

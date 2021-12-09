@@ -129,9 +129,9 @@ module ESAdv(A:Adversary) = {
 }.
 
 section Security.
-  declare module A:Adversary.
-  axiom Ac_ll: islossless A.choose.
-  axiom Ag_ll: islossless A.guess.
+  declare module A <: Adversary.
+  declare axiom Ac_ll: islossless A.choose.
+  declare axiom Ag_ll: islossless A.guess.
 
   local lemma cpa_ddh0 &m:
       Pr[CPA(Hashed_ElGamal,A).main() @ &m : res]

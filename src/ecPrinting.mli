@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -59,6 +59,8 @@ val pp_form    : PPEnv.t -> form pp
 val pp_type    : PPEnv.t -> ty pp
 val pp_tyname  : PPEnv.t -> path pp
 val pp_axname  : PPEnv.t -> path pp
+val pp_tcname  : PPEnv.t -> path pp
+val pp_thname  : PPEnv.t -> path pp
 
 val pp_mem      : PPEnv.t -> EcIdent.t pp
 val pp_memtype  : PPEnv.t -> EcMemory.memtype pp
@@ -72,9 +74,10 @@ val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp
 val pp_added_op    : PPEnv.t -> operator pp
 val pp_axiom       : ?long:bool -> PPEnv.t -> (path * axiom     ) pp
 val pp_schema      : ?long:bool -> PPEnv.t -> (path * ax_schema ) pp
-val pp_theory      : PPEnv.t -> (path * (ctheory * thmode)      ) pp
+val pp_theory      : PPEnv.t -> (path * ctheory                 ) pp
 val pp_restr_s     :            (bool                           ) pp
 val pp_restr       : PPEnv.t -> (mod_restr                      ) pp
+val pp_modtype1    : PPEnv.t -> (module_type                    ) pp
 val pp_modtype     : PPEnv.t -> (module_type                    ) pp
 val pp_modexp      : PPEnv.t -> (mpath * module_expr            ) pp
 val pp_modsig      : ?long:bool -> PPEnv.t -> (path * module_sig) pp

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -16,9 +16,7 @@ import Ring.IntID.
 
 (* -------------------------------------------------------------------- *)
 abstract theory BigZModule.
-type t.
-
-clone import Ring.ZModule as ZM with type t <- t.
+clone import Ring.ZModule as ZM.
 clear [ZM.* ZM.AddMonoid.*].
 
 clone include Bigop with
@@ -66,15 +64,13 @@ end BigZModule.
 
 (* -------------------------------------------------------------------- *)
 abstract theory BigComRing.
-type t.
-
-clone import Ring.ComRing as CR with type t <- t.
+clone import Ring.ComRing as CR.
 clear [CR.* CR.AddMonoid.* CR.MulMonoid.*].
 
 (* -------------------------------------------------------------------- *)
 theory BAdd.
 clone include BigZModule with
-  type t <- t,
+  type ZM.t <- t,
     op ZM.zeror  <- CR.zeror,
     op ZM.( + )  <- CR.( + ),
     op ZM.([-])  <- CR.([-]),
@@ -166,15 +162,13 @@ end BigComRing.
 
 (* -------------------------------------------------------------------- *)
 abstract theory BigOrder.
-type t.
-
-clone import Number.RealDomain as Num with type t <- t.
+clone import Number.RealDomain as Num.
 clear [Num.*].
 
 import Num.Domain.
 
 clone include BigComRing with
-  type t <- t,
+  type CR.t      <- Num.t,
   pred CR.unit   <- Num.Domain.unit,
     op CR.zeror  <- Num.Domain.zeror,
     op CR.oner   <- Num.Domain.oner,

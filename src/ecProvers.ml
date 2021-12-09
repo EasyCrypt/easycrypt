@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -348,7 +348,7 @@ let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit
 
-let rec run_prover
+let run_prover
   ?(notify : notify option) (pi : prover_infos) (prover : string) task
 =
   let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
@@ -470,7 +470,7 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
                     ()
               in
 
-              let rec handle_info upd =
+              let handle_info upd =
                 match upd with
                 | CP.NoUpdates
                 | CP.ProverStarted ->

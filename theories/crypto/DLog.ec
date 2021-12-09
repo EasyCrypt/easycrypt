@@ -1,9 +1,9 @@
 (* --------------------------------------------------------------------
- * Copyright (c) - 2016--2017 - Roberto Metere (r.metere2@ncl.ac.uk)
+ * Copyright (c) - 2016--2017 - Roberto Metere <r.metere2@ncl.ac.uk>
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
- 
+
 (* A formalisation of the discrete logarithm assumption. *)
 
 require import CyclicGroup.
@@ -55,7 +55,7 @@ end DLog.
 *)
 section DLogSecurity.
 
-  declare module L:DLog.Adversary.
+  declare module L <: DLog.Adversary.
 
   module StdRedAdversary(L:DLog.Adversary) = {
     proc guess(h: group) : F.t = {

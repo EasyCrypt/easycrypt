@@ -1,3 +1,11 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
 require import AllCore FSet SmtMap Distr.
 (* Formalisation of collision resistance:
      CR : Collision resistance game 
@@ -218,9 +226,9 @@ module (MkAdvCR(A:AdvInd):AdvCR) (O:OrclCR) = {
 
 section.
 
-  declare module A:AdvInd { -RealHash, -OrclCR}.
+  declare module A <: AdvInd { -RealHash, -OrclCR}.
   
-  axiom Alossless :
+  declare axiom Alossless :
     forall (O <: OrclInd{-A}),
           islossless O.hash => 
           islossless O.check => islossless A(O).main.

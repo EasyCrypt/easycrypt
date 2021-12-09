@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -30,6 +30,7 @@ type required_info = {
   rqd_namespace : EcLoader.namespace option;
   rqd_kind      : EcLoader.kind;
   rqd_digest    : Digest.t;
+  rqd_direct    : bool;
 }
 
 type required = required_info list
@@ -38,8 +39,8 @@ type scope
 
 type proof_uc = {
   puc_active : (proof_auc * proof_ctxt option) option;
-  puc_cont   : proof_ctxt list * (EcEnv.env option);
-  puc_init   : EcEnv.env;
+  puc_cont   : proof_ctxt list * (EcSection.scenv option);
+  puc_init   : EcSection.scenv;
 }
 
 and proof_auc = {
@@ -51,14 +52,14 @@ and proof_auc = {
 }
 
 and proof_ctxt =
-  (symbol option * EcDecl.axiom) * EcPath.path * EcEnv.env
+  (symbol option * EcDecl.axiom) * EcPath.path * EcSection.scenv
 
 and proof_state =
   PSNoCheck | PSCheck of EcCoreGoal.proof
 
 and pucflags = {
-  puc_nosmt : bool;
-  puc_local : bool;
+  puc_visibility : EcDecl.ax_visibility;
+  puc_local      : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -116,26 +117,22 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ty : sig
-  val add : scope -> ptydname -> pqsymbol list -> scope
+  val add : scope -> ptydecl located -> scope
 
   val add_class    : scope -> ptypeclass located -> scope
-  val add_instance : scope -> Ax.mode -> ptycinstance located -> scope
-  val add_datatype : scope -> ptydname -> pdatatype -> scope
-  val add_record   : scope -> ptydname -> precord -> scope
-
-  val define : scope -> ptydname -> pty -> scope
+  val add_instance : ?import:EcTheory.import -> scope -> Ax.mode -> ptycinstance located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
 module Mod : sig
-  val add : scope -> pmodule_def -> scope
+  val add : scope -> pmodule_def_or_decl -> scope
   val declare : scope -> pmodule_decl -> scope
   val import : scope -> pmsymbol located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
 module ModType : sig
-  val add : scope -> symbol -> pmodule_sig -> scope
+  val add : scope -> pinterface -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -146,7 +143,7 @@ module Theory : sig
 
   (* [enter scope mode name] start a theory in scope [scope] with
    * name [name] and mode (abstract/concrete) [mode]. *)
-  val enter : scope -> thmode -> symbol -> scope
+  val enter : scope -> thmode -> symbol -> EcTypes.is_local -> scope
 
   (* [exit scope] close and finalize the top-most theory and returns
    * its name. Raises [TopScope] if [scope] has not super scope. *)
@@ -227,7 +224,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Auto : sig
-  val add_rw   : scope -> local:bool -> base:pqsymbol -> pqsymbol list -> scope
+  val add_rw   : scope -> local:EcTypes.is_local -> base:pqsymbol -> pqsymbol list -> scope
   val add_hint : scope -> phint -> scope
 end
 
@@ -244,4 +241,5 @@ end
 (* -------------------------------------------------------------------- *)
 module Search : sig
   val search : scope -> pformula list -> unit
+  val locate : scope -> pqsymbol -> unit
 end

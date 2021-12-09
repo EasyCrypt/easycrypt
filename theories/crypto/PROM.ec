@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -10,6 +10,7 @@ pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 require import AllCore SmtMap Distr.
+require import FinType.
 
 (* -------------------------------------------------------------------- *)
 type flag = [ Unknown | Known ].
@@ -35,6 +36,16 @@ module type RO_Distinguisher (G : RO) = {
   proc distinguish(_ : d_in_t): d_out_t
 }.
 
+module MainD (D : RO_Distinguisher) (RO : RO) = {
+  proc distinguish(x) = {
+    var r;
+
+    RO.init();
+    r <@ D(RO).distinguish(x);
+    return r;
+  }
+}.
+
 (* -------------------------------------------------------------------- *)
 module type FRO = {
   proc init    ()                    : unit
@@ -52,6 +63,7 @@ module type FRO_Distinguisher (G : FRO) = {
 }.
 
 (* -------------------------------------------------------------------- *)
+abstract theory MkRO.
 module RO : RO = {
   var m : (in_t, out_t) fmap
 
@@ -85,6 +97,9 @@ module RO : RO = {
     return m;
   }
 }.
+end MkRO.
+
+clone include MkRO.
 
 (* -------------------------------------------------------------------- *)
 module FRO : FRO = {
@@ -198,7 +213,7 @@ lemma FRO_set_ll : islossless FRO.set.
 proof. by proc; auto. qed.
 
 section ConditionalLL.
-axiom dout_ll x: is_lossless (dout x).
+declare axiom dout_ll x: is_lossless (dout x).
 
 lemma RO_get_ll : islossless RO.get.
 proof. by proc; auto=> />; rewrite dout_ll. qed.
@@ -604,7 +619,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 section.
-declare module D : FRO_Distinguisher {-FRO}.
+declare module D <: FRO_Distinguisher {-FRO}.
 
 lemma eager_D :
   eager [RRO.resample();, D(FRO).distinguish ~ 
@@ -645,7 +660,7 @@ module Eager (D : FRO_Distinguisher) = {
 
 (* -------------------------------------------------------------------- *)
 section.
-declare module D : FRO_Distinguisher {-FRO}.
+declare module D <: FRO_Distinguisher {-FRO}.
 
 equiv Eager_1_2 : Eager(D).main1 ~ Eager(D).main2 :
   ={glob D, arg} ==> ={res, glob FRO, glob D}.
@@ -712,8 +727,8 @@ end EagerCore.
 
 (* -------------------------------------------------------------------- *)
 section.
-declare module D : RO_Distinguisher { -RO, -FRO }.
-axiom dout_ll x: is_lossless (dout x).
+declare module D <: RO_Distinguisher { -RO, -FRO }.
+declare axiom dout_ll x: is_lossless (dout x).
 
 local clone import EagerCore as InnerProof
 proof dout_ll by exact/dout_ll.
@@ -765,5 +780,105 @@ qed.
 
 end section.
 end FullEager.
+
+abstract theory FinEager.
+require import List.
+
+clone include FullEager.
+
+clone FinType as FinFrom with
+  type t = in_t.
+
+module FinRO : RO = {
+  include RO [set, rem]
+
+  proc init () = {
+    var l;
+    l <- FinFrom.enum;
+    RO.init();
+    while (l <> []) {
+      RO.sample(head witness l);
+      l <- behead l;
+    } 
+  }
+
+  proc get (x) = {
+    return oget RO.m.[x];
+  }
+  
+  proc sample(x : in_t) = { 
+  }
+}.
+
+module type FinRO_Distinguisher(G : RO) = {
+  proc distinguish(_ : d_in_t): d_out_t { G.init G.get G.set G.sample }
+}.
+
+section PROOFS.
+declare axiom dout_ll x: is_lossless (dout x).
+
+declare module D <: FinRO_Distinguisher{RO, FRO}.
+
+local module GenFinRO (RO:RO) = {
+  include RO [set, rem, get]
+
+  proc init () = {
+    var l;
+    l <- FinFrom.enum;
+    RO.init();
+    while (l <> []) {
+      RO.sample(head witness l);
+      l <- behead l;
+    } 
+  }
+
+  proc sample (x:in_t) = {
+    RO.get(x);
+  }
+}.
+
+local module D' (RO:RO) = MainD (D, GenFinRO(RO)).
+
+local equiv RO_LFinRO_init : RO.init ~ GenFinRO(LRO).init : ={glob RO} ==> ={res, glob RO}.
+proof.
+  proc; inline *.
+  while{2} true (size l{2}); auto; smt (head_behead size_eq0 size_ge0).
+qed.
+
+local equiv GFinRO_RO_init : 
+   GenFinRO(RO).init ~ FinRO.init : 
+     ={RO.m} ==>
+     ={RO.m} /\ forall (x : in_t), x \in RO.m{1}.
+proof.
+  proc; inline *.
+  while ( ={l, RO.m} /\ (forall x, x \in RO.m \/ x \in l){1}); auto => />;1: smt (head_behead mem_set).
+  by move=> ?; rewrite FinFrom.enumP.
+qed.
+
+equiv RO_FinRO_D : MainD(D,RO).distinguish ~ MainD(D,FinRO).distinguish :
+  ={glob D, RO.m, arg} ==> ={res, glob D}.
+proof.
+  proc *.
+  transitivity*{1} {r <@ MainD(D, GenFinRO(LRO)).distinguish(x); } => //;1:smt().
+  + inline MainD(D, RO).distinguish MainD(D, GenFinRO(LRO)).distinguish; wp.
+    call (_: ={glob RO});2..4: by sim.
+    + by apply RO_LFinRO_init.
+    by call RO_LFinRO_init;wp.
+  transitivity*{1} {r <@ MainD(D,GenFinRO(RO)).distinguish(x); } => //;1:smt().
+  + by symmetry; call (RO_LRO_D D')=> //; exact:dout_ll.
+  inline MainD(D, GenFinRO(RO)).distinguish MainD(D, FinRO).distinguish; wp.
+  call (_: ={RO.m} /\ (forall x, x \in RO.m){1}).
+  + by conseq GFinRO_RO_init.
+  + by proc; rcondf{1} ^if; auto => />; 1: smt(); move=> ??; apply dout_ll.
+  + by proc; auto; smt(mem_set).
+  + by proc;inline *;rcondf{1} ^if; auto => />; 1: smt(); move=> ??; apply dout_ll.
+  by call GFinRO_RO_init; wp.
+qed.
+
+lemma pr_RO_FinRO_D &m x (p : d_out_t -> bool): 
+  Pr[MainD(D,RO).distinguish(x) @ &m : p res] = Pr[MainD(D,FinRO).distinguish(x) @ &m : p res].
+proof. by byequiv RO_FinRO_D. qed. 
+end section PROOFS.
+end FinEager.
 
 end FullRO.

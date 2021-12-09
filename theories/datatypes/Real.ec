@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -27,7 +27,6 @@ op "`|_|" x = if from_int 0 <= x then x else -x.
 abbrev b2r (b:bool) = if b then from_int 1 else from_int 0.
 
 (* -------------------------------------------------------------------- *)
-
 lemma nosmt fromint0 : 0%r = CoreReal.zero by [].
 lemma nosmt fromint1 : 1%r = CoreReal.one  by [].
 
@@ -94,7 +93,7 @@ theory RField.
         by rewrite mulr0z.
       by rewrite mulrS // ih fromintD mulrDr mulr1 addrC.
     case: (lezWP c 0) => [le0c|_ /h //].
-    rewrite -{2}(@oppzK c) fromintN mulrN -h 1:smt.
+    rewrite -{2}(@oppzK c) fromintN mulrN -h 1:#smt.
     by rewrite mulrNz opprK.
   qed.
 
@@ -107,7 +106,6 @@ theory RField.
   elim: k => [|k ge0_k ih]; 1: by rewrite !(expr0, IntID.expr0).
   by rewrite !(exprS, IntID.exprS) // fromintM ih.
   qed.
-
 end RField.
 import RField.
 
@@ -266,4 +264,3 @@ lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
 
 lemma nosmt upto_bad_sub (ev bad:bool) :
   ev /\ ! bad => ev by [].
-

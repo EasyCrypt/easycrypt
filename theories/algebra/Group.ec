@@ -1,6 +1,15 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
 (* -------------------------------------------------------------------- *)
 require import AllCore List IntMin IntDiv.
-require (*--*) FinType Ring Number StdOrder ZModP.
+require import FinType.
+require (*--*) Ring Number StdOrder ZModP.
 
 import Ring.IntID StdOrder.IntOrder.
 
@@ -472,7 +481,7 @@ lemma exp0 x : x ^ ZModE.zero = e.
 proof. by rewrite expE inzmodK mod0z exp0. qed.
 
 lemma exp1 x : x ^ ZModE.one = x.
-proof. by rewrite expE inzmodK modz_small 1:[smt(ge2_p)] exp1. qed.
+proof. by rewrite expE inzmodK modz_small 1:#smt:(ge2_p) exp1. qed.
 
 lemma expN x (k : exp) : x ^ (- k) = inv (x ^ k).
 proof.

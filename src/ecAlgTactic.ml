@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -86,11 +86,11 @@ module Axioms = struct
                   (mul , cr.r_mul ); ] in
 
     let xpath  = fun x -> EcPath.pqname tmod x in
-    let add    = fun subst x p -> EcSubst.add_path subst (xpath x) p in
+    let add    = fun subst x p -> EcSubst.add_path subst ~src:(xpath x) ~dst:p in
     let addctt = fun subst x f -> EcSubst.add_opdef subst (xpath x) ([], f) in
 
     let subst  =
-      EcSubst.add_tydef EcSubst.empty (xpath tname) ([], cr.r_type) in
+      EcSubst.add_tydef (EcSubst.empty ()) (xpath tname) ([], cr.r_type) in
     let subst  =
       List.fold_left (fun subst (x, p) -> add subst x p) subst crcore in
     let subst  = odfl subst (cr.r_opp |> omap (fun p -> add subst opp p)) in
@@ -116,7 +116,7 @@ module Axioms = struct
 
   let subst_of_field (cr : field) =
     let xpath  = fun x -> EcPath.pqname tmod x in
-    let add    = fun subst x p -> EcSubst.add_path subst (xpath x) p in
+    let add    = fun subst x p -> EcSubst.add_path subst ~src:(xpath x) ~dst:p in
 
     let subst = subst_of_ring cr.f_ring in
     let subst = add subst inv cr.f_inv in

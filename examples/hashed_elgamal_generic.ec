@@ -115,11 +115,10 @@ module S = Hashed_ElGamal(H).
    the probability of B = CDH_from_CPA(SCDH_from_CPA(A,RO)) winning CDH(B) *)
 
 section.
+  declare module A <: Adversary [choose : `{N cA.`cchoose, #O.o : cA.`ochoose},
+                                 guess  : `{N cA.`cguess,  #O.o : cA.`oguess}] {-H}.
 
-  declare module A: Adversary [choose : `{N cA.`cchoose, #O.o : cA.`ochoose},
-                               guess  : `{N cA.`cguess,  #O.o : cA.`oguess}] {-H}.
-
-  axiom guess_ll (O <: POracle {-A}) : islossless O.o => islossless A(O).guess.
+  declare axiom guess_ll (O <: POracle {-A}) : islossless O.o => islossless A(O).guess.
 
   local module G0 = {
     var gxy:group

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -80,6 +80,7 @@ let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
 
 (* -------------------------------------------------------------------- *)
 let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
+  let lc = `Global in
   let { pl_loc = loc; pl_desc = (tyvars, name); } = name in
 
   (* Check type-parameters / env0 is the env. augmented with an
@@ -88,8 +89,10 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
   let tpath = EcPath.pqname (EcEnv.root env) (unloc name) in
   let env0  =
     let myself = {
-      tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = `Abstract EcPath.Sp.empty;
+      tyd_params  = EcUnify.UniEnv.tparams ue;
+      tyd_type    = `Abstract EcPath.Sp.empty;
+      tyd_loca    = lc;
+      tyd_resolve = true;
     } in
       EcEnv.Ty.bind (unloc name) myself env
   in
@@ -134,7 +137,7 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       if EcPath.p_equal tname tpath then true else
 
       let tdecl = EcEnv.Ty.by_path_opt tname env0
-        |> ofdfl (EcDecl.abs_tydecl ~params:(`Named tparams)) in
+        |> odfl (EcDecl.abs_tydecl ~params:(`Named tparams) lc) in
       let tyinst () =
         fun ty -> ty_instanciate tdecl.tyd_params targs ty in
 
@@ -284,7 +287,7 @@ let trans_matchfix
       let trans_b ((body, pbmap) : _ * pop_pattern Msym.t) =
         let trans1 ((_, x, xty) : _ * EcIdent.t * ty) =
           let pb     = oget (Msym.find_opt (EcIdent.name x) pbmap) in
-          let filter = fun op -> EcDecl.is_ctor op in
+          let filter = fun _ op -> EcDecl.is_ctor op in
           let PPApp ((cname, tvi), cargs) = pb.pop_pattern in
           let tvi = tvi |> omap (TT.transtvi env ue) in
           let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
@@ -324,7 +327,7 @@ let trans_matchfix
 
               (try  EcUnify.unify env ue (toarrow ctorty pty) opty
                with EcUnify.UnificationFailure _ -> assert false);
-              TT.unify_or_fail env ue pb.pop_name.pl_loc pty xty;
+              TT.unify_or_fail env ue pb.pop_name.pl_loc ~expct:pty xty;
 
               let create o =
                 EcIdent.create (omap_dfl unloc "_" o) in

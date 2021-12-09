@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -256,8 +256,7 @@ val trans_memtype :
 val trans_restr_for_modty :
   env -> module_type -> pmod_restr option -> module_type
 
-(* -------------------------------------------------------------------- *)
-val transmodsig  : env -> symbol -> pmodule_sig  -> module_sig
+val transmodsig  : env -> pinterface -> top_module_sig
 val transmodtype : env -> pmodule_type -> module_type * module_sig
 val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 

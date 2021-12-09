@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -112,8 +112,7 @@ module PV : sig
   val mem_pv   : env -> prog_var -> t -> bool
   val mem_glob : env -> mpath -> t -> bool
 
-  val fv      : env -> EcIdent.t -> form -> t
-  val fv_cost : env -> EcIdent.t -> cost -> t
+  val fv : env -> EcIdent.t -> form -> t
 
   val pp : env -> Format.formatter -> t -> unit
 

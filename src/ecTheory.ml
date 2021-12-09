@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -10,6 +10,7 @@
 open EcUtils
 open EcSymbols
 open EcPath
+open EcTypes
 open EcDecl
 open EcModules
 
@@ -17,23 +18,45 @@ open EcModules
 module Sp = EcPath.Sp
 
 (* -------------------------------------------------------------------- *)
+type import = { im_immediate : bool; im_atimport : bool; }
+
+let import0  = { im_immediate =  true; im_atimport =  true; }
+let noimport = { im_immediate = false; im_atimport = false; }
+
+(* -------------------------------------------------------------------- *)
 type theory = theory_item list
 
-and theory_item =
+and theory_item = {
+  ti_item   : theory_item_r;
+  ti_import : import;
+}
+
+and theory_item_r =
   | Th_type      of (symbol * tydecl)
   | Th_operator  of (symbol * operator)
   | Th_axiom     of (symbol * axiom)
   | Th_schema    of (symbol * ax_schema)
-  | Th_modtype   of (symbol * module_sig)
-  | Th_module    of module_expr
-  | Th_theory    of (symbol * (theory * thmode))
-  | Th_export    of EcPath.path
-  | Th_instance  of (ty_params * EcTypes.ty) * tcinstance
+  | Th_modtype   of (symbol * top_module_sig)
+  | Th_module    of top_module_expr
+  | Th_theory    of (symbol * ctheory)
+  | Th_export    of EcPath.path * is_local
+  | Th_instance  of (ty_params * EcTypes.ty) * tcinstance * is_local
   | Th_typeclass of (symbol * typeclass)
-  | Th_baserw    of symbol
-  | Th_addrw     of EcPath.path * EcPath.path list
+  | Th_baserw    of symbol * is_local
+  | Th_addrw     of EcPath.path * EcPath.path list * is_local
   | Th_reduction of (EcPath.path * rule_option * rule option) list
-  | Th_auto      of (bool * int * symbol option * path list)
+  | Th_auto      of (int * symbol option * path list * is_local)
+
+and thsource = {
+  ths_base : EcPath.path;
+}
+
+and ctheory = {
+  cth_items  : theory;
+  cth_mode   : thmode;
+  cth_loca   : is_local;
+  cth_source : thsource option;
+}
 
 and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
 and thmode     = [ `Abstract | `Concrete ]
@@ -64,41 +87,8 @@ and rule_option = {
   ur_mode   : [`Ax | `Sc];
 }
 
-(* -------------------------------------------------------------------- *)
-type ctheory = {
-  cth_desc   : ctheory_desc;
-  cth_struct : ctheory_struct;
-}
-
-and ctheory_desc =
-  | CTh_struct of ctheory_struct
-  | CTh_clone  of ctheory_clone
-
-and ctheory_struct = ctheory_item list
-
-and ctheory_item =
-  | CTh_type      of (symbol * tydecl)
-  | CTh_operator  of (symbol * operator)
-  | CTh_axiom     of (symbol * axiom)
-  | CTh_schema    of (symbol * ax_schema)
-  | CTh_modtype   of (symbol * module_sig)
-  | CTh_module    of module_expr
-  | CTh_theory    of (symbol * (ctheory * thmode))
-  | CTh_export    of EcPath.path
-  | CTh_instance  of (ty_params * EcTypes.ty) * tcinstance
-  | CTh_typeclass of (symbol * typeclass)
-  | CTh_baserw    of symbol
-  | CTh_addrw     of EcPath.path * EcPath.path list
-  | CTh_reduction of (EcPath.path * rule_option * rule option) list
-  | CTh_auto      of (bool * int * symbol option * path list)
-
-and ctheory_clone = {
-  cthc_base : EcPath.path;
-  cthc_ext  : (EcIdent.t * ctheory_override) list;
-}
-
-and ctheory_override =
-| CTHO_Type   of EcTypes.ty
+let mkitem (import : import) (item : theory_item_r) =
+  { ti_import = import; ti_item = item; }
 
 (* -------------------------------------------------------------------- *)
 let module_comps_of_module_sig_comps (comps : module_sig_body) restr =

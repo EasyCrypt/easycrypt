@@ -360,7 +360,6 @@ end = struct
   type i_match    = EcTypes.expr * ((EcIdent.t * ty) list * stmt) list
   type i_assert   = EcTypes.expr
   type i_abstract = EcIdent.t
-  type s_stmt     = instr list
 
   let lv_var (lv, pvt) pvt' =
     if pvt == pvt' then lv else LvVar pvt'
@@ -735,6 +734,11 @@ type 'a p_module_sig = {
   mis_restr  : 'a p_mod_restr;
 }
 
+type 'a p_top_module_sig = {
+  tms_sig  : 'a p_module_sig;
+  tms_loca : is_local;
+}
+
 (* -------------------------------------------------------------------- *)
 (* Simple module signature, without restrictions. *)
 type 'a p_module_smpl_sig = {
@@ -842,6 +846,11 @@ and 'a p_module_item =
 and 'a p_module_comps = 'a p_module_comps_item list
 
 and 'a p_module_comps_item = 'a p_module_item
+
+type 'a p_top_module_expr = {
+  tme_expr : 'a p_module_expr;
+  tme_loca : locality;
+}
 
 (* -------------------------------------------------------------------- *)
 let ur_hash elems el_hash ur =

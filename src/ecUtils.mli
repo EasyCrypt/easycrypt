@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -257,8 +257,8 @@ module List : sig
 
   (* Functions working on 2 lists in parallel *)
   module Parallel : sig
-    val iter2i    : (int -> 'a -> 'b -> 'c) -> 'a list -> 'b list -> unit
-    val iter2o    : ('a option -> 'b option -> 'c) -> 'a list -> 'b list -> unit
+    val iter2i    : (int -> 'a -> 'b -> unit) -> 'a list -> 'b list -> unit
+    val iter2o    : ('a option -> 'b option -> unit) -> 'a list -> 'b list -> unit
     val filter2   : ('a -> 'b -> bool) -> 'a list -> 'b list -> 'a list * 'b list
     val all2      : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
     val map_fold2 : ('a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b list -> 'c list -> 'a * 'd list

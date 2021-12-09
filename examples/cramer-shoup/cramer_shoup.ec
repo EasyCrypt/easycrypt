@@ -54,9 +54,9 @@ theory DDH_ex.
 
   section PROOFS.
 
-  declare module A:Adversary.  
+  declare module A <: Adversary.  
 
-  axiom A_ll : islossless A.guess.
+  declare axiom A_ll : islossless A.guess.
 
   local module Addh0 : Ad1.ADV = {
     proc a1 () = { return ((), F.zero); }
@@ -471,12 +471,12 @@ hint simplify cost_eqtuple3g.
 
 section Security_Aux.
 
-  declare module A : CCA_ADV [choose : `{N cA.`cchoose, #O.dec : cA.`qD_choose},
+  declare module A <: CCA_ADV [choose : `{N cA.`cchoose, #O.dec : cA.`qD_choose},
                               guess  : `{N cA.`cguess, #O.dec : cA.`qD_guess}]
                            {-CCA, -B_TCR}.
 
-  axiom guess_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).guess.
-  axiom choose_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).choose.
+  declare axiom guess_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).guess.
+  declare axiom choose_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).choose.
 
   equiv CCA_CCAq : 
     CCA(CramerShoup, A).main ~ CCAq(CramerShoup, A).main : ={glob A} ==> ={res}.
@@ -1287,12 +1287,12 @@ end section Security_Aux.
 
 section Security.
 
-  declare module A : CCA_ADV [choose : `{N cA1.`cchoose, #O.dec : cA1.`qD_choose},
+  declare module A <: CCA_ADV [choose : `{N cA1.`cchoose, #O.dec : cA1.`qD_choose},
                               guess  : `{N cA1.`cguess, #O.dec : cA1.`qD_guess}]
                              {-CCA, -B_TCRq}.
 
-  axiom guess_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).guess.
-  axiom choose_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).choose.
+  declare axiom guess_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).guess.
+  declare axiom choose_ll : forall (O <: CCA_ORC{-A}), islossless O.dec => islossless A(O).choose.
 
   local module NA (O:CCA_ORC) = {
     module A = A(O)
