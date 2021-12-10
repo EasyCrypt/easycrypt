@@ -642,6 +642,15 @@ proof.
   by rewrite ler_add2r.
 qed.
 
+lemma inj_fcard_image (f : 'a -> 'b) (A : 'a fset) :
+    injective f => card (image f A) = card A.
+proof.
+move => inj_f.
+have/oflist_uniq uniq_f : uniq (map f (elems A)).
+  apply map_inj_in_uniq => *; [exact inj_f|exact uniq_elems].
+by rewrite /image /card -(perm_eq_size _ _ uniq_f) size_map.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op product (A : 'a fset) (B : 'b fset): ('a * 'b) fset =
   oflist (flatten (map (fun a => map (fun b => (a,b)) (elems B)) (elems A)))
