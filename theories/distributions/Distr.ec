@@ -1890,7 +1890,8 @@ proof.
 move=> hll; rewrite dfun_dmap.
 pose n := index x FinT.enum.
 have -> : FinT.enum = take n FinT.enum ++ x :: drop (n + 1) FinT.enum.
-+ admit.
++ rewrite -{1}(@cat_take_drop n FinT.enum).
+  by congr; rewrite (@drop_nth witness) 1:index_ge0 1:index_mem 2:nth_index ?FinT.enumP.
 rewrite map_cat /= djoin_cat djoin_cons.
 pose hd := djoinmap d (take n FinT.enum); pose tl := djoinmap d (drop (n + 1) FinT.enum).
 rewrite !dmap_dprodE !dmap_dlet dlet_dlet; apply in_eq_dlet => lhd /supp_djoinmap [shd _] /=.
