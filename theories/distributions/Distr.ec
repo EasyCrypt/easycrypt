@@ -1873,6 +1873,41 @@ rewrite /offun (@nth_map witness) // /tofun.
 by rewrite index_uniq // FinT.enum_uniq.
 qed.
 
+lemma dfun_dmap ['u] (d : t -> 'u distr) : 
+  dfun d = dmap (djoinmap d FinT.enum) tofun.
+proof.
+apply: eq_distr => f; rewrite dfun1E_djoin dmap1E /(\o) /pred1.
+apply: mu_eq_support => l /supp_djoinmap [hsz _] /=.
+apply eq_iff; split => [-> | <-]; first by apply offunK.
+by rewrite -/(offun (tofun l)) tofunK // -hsz.
+qed.
+
+lemma dfun_dmap_up ['u] (d : t -> 'u distr) (x : t) :
+  is_lossless (d x) =>
+  dfun d = 
+    dmap (dfun d `*` d x) (fun (p: _ * _) => fun x' => if x = x' then p.`2 else p.`1 x').
+proof.
+move=> hll; rewrite dfun_dmap.
+pose n := index x FinT.enum.
+have -> : FinT.enum = take n FinT.enum ++ x :: drop (n + 1) FinT.enum.
++ admit.
+rewrite map_cat /= djoin_cat djoin_cons.
+pose hd := djoinmap d (take n FinT.enum); pose tl := djoinmap d (drop (n + 1) FinT.enum).
+rewrite !dmap_dprodE !dmap_dlet dlet_dlet; apply in_eq_dlet => lhd /supp_djoinmap [shd _] /=.
+rewrite !dmap_dprodE_swap dmap_dlet !dlet_dlet; apply in_eq_dlet => ltl /supp_djoinmap [stl _] /=.
+rewrite eq_sym dlet_swap dlet_dmap; apply eq_dlet => // y.
+rewrite dlet_dlet /= /(\o) -(@dlet_cst (d x) (dmap (dunit (lhd ++ y :: ltl)) tofun) hll).
+apply eq_dlet => // y_.
+rewrite dlet_dmap /dmap !dlet_unit /= /(\o); congr; apply fun_ext => x'.
+rewrite /tofun !nth_cat /=.
+have <- : index x FinT.enum = size lhd.
++ by rewrite -shd size_takel 2:// /n index_size index_ge0.
+case: (x = x') => [<<- //| hne].
+have /#: index x' FinT.enum <> index x FinT.enum.
+apply/negP => h; apply hne.
+by rewrite -(@nth_index x x FinT.enum) 1:FinT.enumP -(@nth_index x x' FinT.enum) 1:FinT.enumP h.
+qed.
+
 lemma dfun_supp ['u] (d : t -> 'u distr) (f : t -> 'u) :
   f \in dfun d <=> (forall x, f x \in d x).
 proof.
