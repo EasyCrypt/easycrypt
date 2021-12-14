@@ -663,7 +663,6 @@ lemma sdist_oracleN &m :
   `| Pr[Game(A,Os).main(d1) @ &m : res] - Pr[Game(A,Os).main(d2) @ &m : res] | 
   <= N%r * sdist d1 d2.
 proof.
-(* rewrite -ler_pdivr_mull -?normrZ; 1,2: smt(N_ge0).  *)
 rewrite Osd1_Hyb Osd2_Hyb. 
 have /= -> := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
 - move => O; proc; inline *; sp; wp. 
