@@ -716,12 +716,15 @@ let pp_memtype ppe fmt mt =
     match arg with
     | Some arg ->
       let pp_vd fmt v =
-        Format.fprintf fmt "@[%s: %a@]" v.v_name (pp_type ppe) v.v_type in
+        Format.fprintf fmt "@[%s: %a@]"
+          (odfl "_" v.ov_name)
+          (pp_type ppe) v.ov_type
+      in
       Format.fprintf fmt "@[{%s: {@[%a@]}}@]" arg (pp_list ",@ " pp_vd) decl
     | None ->
       let add mty v =
-        let ids = Mty.find_def [] v.v_type mty in
-        Mty.add v.v_type (v.v_name::ids) mty in
+        let ids = Mty.find_def [] v.ov_type mty in
+        Mty.add v.ov_type (odfl "_" v.ov_name::ids) mty in
       let mty = List.fold_left add Mty.empty decl in
       let pp_bind fmt (ty, ids) =
         Format.fprintf fmt "@[%a :@ %a@]"
@@ -3011,21 +3014,17 @@ let pp_goal (ppe : PPEnv.t) (prpo : prpo_display) fmt (g, extra) =
         gs
 
 (* -------------------------------------------------------------------- *)
+let pp_ovdecl ppe fmt ov =
+  Format.fprintf fmt "%s : %a" (odfl "_" ov.ov_name) (pp_type ppe) ov.ov_type
 
 let pp_pvdecl ppe fmt v =
   Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type
 
 let pp_funsig ppe fmt fs =
-  match fs.fs_anames with
-  | None ->
-      Format.fprintf fmt "@[<hov 2>proc %s (%a) :@ %a@]"
-        fs.fs_name (pp_type ppe) fs.fs_arg (pp_type ppe) fs.fs_ret
-
-  | Some params ->
-    Format.fprintf fmt "@[<hov 2>proc %s(%a) :@ %a@]"
-      fs.fs_name
-      (pp_list ", " (pp_pvdecl ppe)) params
-      (pp_type ppe) fs.fs_ret
+  Format.fprintf fmt "@[<hov 2>proc %s(%a) :@ %a@]"
+    fs.fs_name
+    (pp_list ", " (pp_ovdecl ppe)) fs.fs_anames
+    (pp_type ppe) fs.fs_ret
 
 let pp_sigitem moi_opt ppe fmt (Tys_function fs) =
   Format.fprintf fmt "@[<hov 2>%a@ %t@]"

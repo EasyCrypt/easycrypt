@@ -1759,10 +1759,7 @@ module Fun = struct
   let add_in_memenv memenv vd = adds_in_memenv memenv [vd]
 
   let add_params mem fun_ =
-    let ty = fun_.f_sig.fs_arg in
-    match fun_.f_sig.fs_anames with
-    | None   -> add_in_memenv mem {v_name = "_"; v_type = ty}
-    | Some l -> adds_in_memenv mem l
+    adds_in_memenv mem fun_.f_sig.fs_anames
 
   let actmem_pre me fun_ =
     let mem = EcMemory.empty_local ~witharg:true me in
@@ -1770,7 +1767,7 @@ module Fun = struct
 
   let actmem_post me fun_ =
     let mem = EcMemory.empty_local ~witharg:false me in
-    add_in_memenv mem {v_name = res_symbol; v_type = fun_.f_sig.fs_ret}
+    add_in_memenv mem { ov_name = Some res_symbol; ov_type = fun_.f_sig.fs_ret}
 
   let actmem_body me fun_ =
     match fun_.f_def with
@@ -1779,7 +1776,8 @@ module Fun = struct
     | FBdef fd   ->
       let mem = EcMemory.empty_local ~witharg:false me in
       let mem = add_params mem fun_ in
-      (fun_.f_sig,fd), adds_in_memenv mem fd.f_locals
+      let locals = List.map ovar_of_var fd.f_locals in
+      (fun_.f_sig,fd), adds_in_memenv mem locals
 
   let inv_memory side =
     let id    = if side = `Left then EcCoreFol.mleft else EcCoreFol.mright in

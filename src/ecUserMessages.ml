@@ -290,6 +290,9 @@ end = struct
     | TypeVarNotAllowed ->
         msg "type variables not allowed"
 
+    | NoConcreteAnonParams ->
+        msg "parameters to concrete procedures must be named"
+
     | OnlyMonoTypeAllowed s ->
         msg "%s, %s%a"
           "only monomorphic types are allowed"

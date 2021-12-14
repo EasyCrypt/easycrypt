@@ -302,9 +302,7 @@ and pvariable_decl = {
   pvd_type : pty;
 }
 
-and fun_params =
- | Fparams_exp of (psymbol * pty) list
- | Fparams_imp of pty
+and fun_params = (osymbol * pty) list
 
 and pfunction_decl = {
   pfd_name     : psymbol;

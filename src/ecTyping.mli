@@ -110,6 +110,7 @@ type tyerror =
 | FreeTypeVariables
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed    of symbol option
+| NoConcreteAnonParams
 | UnboundTypeParameter   of symbol
 | UnknownTypeName        of qsymbol
 | UnknownTypeClass       of qsymbol

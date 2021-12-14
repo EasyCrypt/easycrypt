@@ -16,14 +16,21 @@ module TTC = EcProofTyping
 let extend_body fsig body =
   let arg = pv_arg in
   let i =
-    match fsig.fs_anames with
-    | None | Some [] -> []
-
-    | Some [v] ->
+    let args =
+      let named_arg ov =
+        match ov.ov_name with
+        | None   -> assert false; (* only called on concrete procedures *)
+        | Some v -> { v_name = v; v_type = ov.ov_type }
+      in
+      List.map named_arg fsig.fs_anames
+    in
+    match args with
+    | []  -> []
+    | [v] ->
         [i_asgn (LvVar (pv_loc v.v_name, v.v_type),
                  e_var arg fsig.fs_arg)]
 
-    | Some lv ->
+    | lv ->
         let lv = List.map (fun v -> pv_loc v.v_name, v.v_type) lv in
         [i_asgn (LvTuple lv, e_var arg fsig.fs_arg)]
 

@@ -12,9 +12,9 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 let to_args fun_ arg =
   match fun_.f_sig.fs_anames with
-  | None     -> arg
-  | Some [_] -> arg
-  | Some lv  -> f_tuple (List.mapi (fun i v -> f_proj arg i v.v_type) lv)
+  | []  -> f_tt
+  | [_] -> arg
+  | lv  -> f_tuple (List.mapi (fun i v -> f_proj arg i v.ov_type) lv)
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_ppr_r tc =
