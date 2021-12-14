@@ -111,6 +111,9 @@ let subst_form (s : _subst) =
     fun f -> Fsubst.f_subst s f
 
 (* -------------------------------------------------------------------- *)
+let subst_ovariable (s : _subst) (x : ovariable) =
+  { x with ov_type = s.s_ty x.ov_type; }
+
 let subst_variable (s : _subst) (x : variable) =
   { x with v_type = s.s_ty x.v_type; }
 
@@ -132,7 +135,7 @@ let subst_oracle_info (s:_subst) =
 let subst_funsig (s : _subst) (funsig : funsig) =
   let fs_arg = s.s_ty funsig.fs_arg in
   let fs_ret = s.s_ty funsig.fs_ret in
-  let fs_anm = funsig.fs_anames |> omap (List.map (subst_variable s)) in
+  let fs_anm = List.map (subst_ovariable s) funsig.fs_anames in
 
   { fs_name   = funsig.fs_name;
     fs_arg    = fs_arg;

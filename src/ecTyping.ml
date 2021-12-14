@@ -120,6 +120,7 @@ type tyerror =
 | FreeTypeVariables
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed    of symbol option
+| NoConcreteAnonParams
 | UnboundTypeParameter   of symbol
 | UnknownTypeName        of qsymbol
 | UnknownTypeClass       of qsymbol
@@ -187,7 +188,7 @@ type ptnmap = ty EcIdent.Mid.t ref
 type metavs = EcFol.form Msym.t
 
 (* -------------------------------------------------------------------- *)
-let ident_of_osymbol x =
+let ident_of_osymbol (x : osymbol_r): EcIdent.ident =
   omap unloc x |> odfl "_" |> EcIdent.create
 
 (* -------------------------------------------------------------------- *)
@@ -2354,24 +2355,26 @@ and transmodsig_body
     | `FunctionDecl f ->
       let name = f.pfd_name in
       names := name::!names;
-      let tyarg, tyargs =
-        match f.pfd_tyargs with
-        | Fparams_exp args ->
-          let tyargs =
-            List.map              (* FIXME: continuation *)
-              (fun (x, ty) -> {
-                   v_name = x.pl_desc;
-                   v_type = transty_for_decl env ty}) args
-          in
+      let tyargs =
+        let tyargs =
+          List.map
+            (fun (x, ty) -> {
+                 ov_name = omap unloc x.pl_desc;
+                 ov_type = transty_for_decl env ty }) f.pfd_tyargs
+        in
 
-          Msym.odup unloc (List.map fst args) |> oiter (fun (_, a) ->
-            tyerror name.pl_loc env
-            (InvalidModSig (MTS_DupArgName (unloc name, unloc a))));
-          let tyarg = ttuple (List.map (fun vd -> vd.v_type) tyargs) in
-          tyarg, Some tyargs
-        | Fparams_imp ty ->
-          let tyarg = transty_for_decl env ty in
-          tyarg, None in
+        let args = List.fold_left (fun names (x, _) ->
+          match unloc x with
+          | None   -> names
+          | Some x -> x :: names) [] f.pfd_tyargs
+        in
+
+        Msym.odup unloc args |> oiter (fun (_, a) ->
+          tyerror name.pl_loc env
+          (InvalidModSig (MTS_DupArgName (unloc name, unloc a))));
+
+        tyargs
+      in
 
       let resty = transty_for_decl env f.pfd_tyresult in
 
@@ -2382,7 +2385,7 @@ and transmodsig_body
       let oi = OI.mk calls uin compl in
 
       let sig_ = { fs_name   = name.pl_desc;
-                   fs_arg    = tyarg;
+                   fs_arg    = ttuple (List.map ov_type tyargs);
                    fs_anames = tyargs;
                    fs_ret    = resty; }
       and mr = EcModules.add_oinfo mr name.pl_desc oi in
@@ -2598,13 +2601,16 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       let env = EcEnv.Fun.enter decl.pfd_name.pl_desc env in
 
       (* Type-check function parameters / check for dups *)
-      let dtyargs =
-        match decl.pfd_tyargs with
-        | Fparams_imp _ -> assert false
-        | Fparams_exp l -> l in
-
       let params =
-        List.map (fun (s,pty) -> {v_name = unloc s; v_type = transty tp_uni env ue pty}, s.pl_loc) dtyargs in
+        let checked_name os =
+          match unloc os with
+          | None    -> tyerror os.pl_loc env NoConcreteAnonParams
+          | Some os -> unloc os
+        in
+        List.map (fun (s,pty) -> {
+              v_name = checked_name s;
+              v_type = transty tp_uni env ue pty}, s.pl_loc) decl.pfd_tyargs
+      in
       let memenv = EcMemory.empty_local ~witharg:false mhr in
       let memenv = fundef_add_symbol env memenv params in
 
@@ -2636,7 +2642,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
           f_sig    = {
             fs_name   = decl.pfd_name.pl_desc;
             fs_arg    = ttuple (List.map (fun vd -> vd.v_type) params);
-            fs_anames = Some params;
+            fs_anames = List.map ovar_of_var params;
             fs_ret    = retty;
           };
           f_def = FBdef {
@@ -2778,7 +2784,9 @@ and transbody ue memenv (env : EcEnv.env) retty pbody =
 
 (* for locals dup check *)
 and fundef_add_symbol_mt env (memtype : memtype) xtys : memtype =
-  try EcMemory.bindall_mt (List.map fst xtys) memtype
+  try
+    let f (x, _) = ovar_of_var x in
+    EcMemory.bindall_mt (List.map f xtys) memtype
   with EcMemory.DuplicatedMemoryBinding s ->
     let (_, loc) = List.find (fun (v,_l) -> s = v.v_name) xtys in
     tyerror loc env (DuplicatedLocal s)
@@ -3265,19 +3273,17 @@ and trans_form_or_pattern
     | PFWP (fn, args, phi) ->
         let fpath   = EcEnv.NormMp.norm_xfun env (trans_gamepath env fn) in
         let fun_    = EcEnv.Fun.by_xpath fpath env in
-        let args, argsty =
+        let args, _argsty =
           transcall (transexp env `InProc ue)
             env ue f.pl_loc fun_.f_sig args in
 
         let body, ret =
           let init =
-            match fun_.f_sig.fs_anames with
-            | None ->
-                [i_asgn (LvVar (pv_arg, argsty), e_tuple args)]
-            | Some anames ->
-                List.map2 (fun x e ->
-                    i_asgn (LvVar (pv_loc x.v_name, e.e_ty), e))
-                  anames args
+            List.map2 (fun x e ->
+                (* only called on concrete procedures *)
+                assert (is_some x.ov_name);
+                i_asgn (LvVar (pv_loc (oget x.ov_name), e.e_ty), e))
+              fun_.f_sig.fs_anames args
           in
 
           let def =

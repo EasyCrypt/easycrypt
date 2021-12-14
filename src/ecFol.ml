@@ -18,25 +18,14 @@ let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
     if List.length vs = 1 then [arg]
     else
       let t = Array.of_list vs in
-      let t = Array.mapi (fun i vd -> f_proj arg i vd.v_type) t in
+      let t = Array.mapi (fun i vd -> f_proj arg i vd.ov_type) t in
       Array.to_list t
   in
 
-  match vs1, vs2 with
-  | Some vs1, Some vs2 ->
-      if   List.length vs1 = List.length vs2
-      then f_eqs (f_pvlocs ty1 vs1 m1) (f_pvlocs ty2 vs2 m2)
-      else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
-                 (f_tuple (f_pvlocs ty2 vs2 m2))
-
-  | Some vs1, None ->
-      f_eq (f_tuple (f_pvlocs ty1 vs1 m1)) (f_pvarg ty2 m2)
-
-  | None, Some vs2 ->
-      f_eq (f_pvarg ty1 m1) (f_tuple (f_pvlocs ty2 vs2 m2))
-
-  | None, None ->
-      f_eq (f_pvarg ty1 m1) (f_pvarg ty2 m2)
+  if   List.length vs1 = List.length vs2
+  then f_eqs (f_pvlocs ty1 vs1 m1) (f_pvlocs ty2 vs2 m2)
+  else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
+             (f_tuple (f_pvlocs ty2 vs2 m2))
 
 let f_eqres ty1 m1 ty2 m2 =
   f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)

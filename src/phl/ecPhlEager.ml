@@ -261,9 +261,10 @@ let t_eager_fun_def_r tc =
     match fdef.f_ret with
     | None -> f_tt, mem, fdef.f_body
     | Some e ->
-      let v = {v_name = "result"; v_type = e.e_ty } in
+      let v = { ov_name = Some "result"; ov_type = e.e_ty } in
       let mem, s = EcMemory.bind_fresh v mem in
-      let x = EcTypes.pv_loc s.v_name in
+      (* oget cannot fail — Some in, Some out *)
+      let x = EcTypes.pv_loc (oget s.ov_name) in
       f_pvar x e.e_ty (fst mem), mem,
       s_seq fdef.f_body (stmt [i_asgn(LvVar(x,e.e_ty), e)])
   in

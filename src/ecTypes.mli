@@ -133,6 +133,15 @@ val lp_ids   : lpattern -> EcIdent.t list
 val lp_fv    : lpattern -> EcIdent.Sid.t
 
 (* -------------------------------------------------------------------- *)
+type ovariable = {
+  ov_name : symbol option;
+  ov_type : ty;
+}
+val ov_name  : ovariable -> symbol option
+val ov_type  : ovariable -> ty
+val ov_hash  : ovariable -> int
+val ov_equal : ovariable -> ovariable -> bool
+
 type variable = {
     v_name : symbol;   (* can be "_" *)
     v_type : ty;
@@ -141,6 +150,8 @@ val v_name  : variable -> symbol
 val v_type  : variable -> ty
 val v_hash  : variable -> int
 val v_equal : variable -> variable -> bool
+
+val ovar_of_var: variable -> ovariable
 
 (* -------------------------------------------------------------------- *)
 type pvar_kind =

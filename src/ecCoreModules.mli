@@ -97,7 +97,7 @@ val get_uninit_read : stmt -> Sx.t
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
-  fs_anames : variable list option;
+  fs_anames : ovariable list;
   fs_ret    : EcTypes.ty;
 }
 

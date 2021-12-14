@@ -1439,20 +1439,23 @@ type_exp:
 
 (* -------------------------------------------------------------------- *)
 (* Parameter declarations                                              *)
+var_or_anon:
+| x=loc(UNDERSCORE)
+    { mk_loc x.pl_loc None }
 
-typed_vars:
-| xs=ident+ COLON ty=loc(type_exp)
+| x=ident
+    { mk_loc x.pl_loc (Some x) }
+
+typed_vars_or_anons:
+| xs=var_or_anon+ COLON ty=loc(type_exp)
    { List.map (fun v -> (v, ty)) xs }
 
-| xs=ident+
+| xs=var_or_anon+
     { List.map (fun v -> (v, mk_loc v.pl_loc PTunivar)) xs }
 
 param_decl:
-| LPAREN aout=plist0(typed_vars, COMMA) RPAREN
-    { Fparams_exp (List.flatten aout )}
-
-| LPAREN UNDERSCORE COLON ty=loc(type_exp) RPAREN
-    { Fparams_imp ty }
+| LPAREN aout=plist0(typed_vars_or_anons, COMMA) RPAREN
+    { List.flatten aout }
 
 (* -------------------------------------------------------------------- *)
 (* Statements                                                           *)
@@ -1607,12 +1610,8 @@ mod_item:
     { Pst_mod (x, odfl [] c, m) }
 
 | PROC decl=loc(fun_decl) EQ body=fun_def_body {
-    let { pl_loc = loc; pl_desc = decl; } = decl in
-        match decl.pfd_tyargs with
-        | Fparams_imp _ ->
-            let msg = "implicite declaration of parameters not allowed" in
-              parse_error loc (Some msg)
-        | _ -> Pst_fun (decl, body)
+    let { pl_desc = decl; } = decl in
+    Pst_fun (decl, body)
   }
 
 | PROC x=lident EQ f=loc(fident)

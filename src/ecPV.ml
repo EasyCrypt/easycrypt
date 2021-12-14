@@ -1085,11 +1085,14 @@ and eqobs_inF_refl env f' eqo =
     let eqi = s_eqobs_in_refl env fdef.f_body eqo in
     let local = PV.local eqi in
     let params =
-      match ffun.f_sig.fs_anames with
-      | None -> PV.add env pv_arg ffun.f_sig.fs_arg PV.empty
-      | Some lv ->
-        List.fold_left (fun fv v -> PV.add env (pv_loc v.v_name) v.v_type fv)
-          PV.empty lv in
+      let add fv ov =
+        match ov.ov_name with
+        (* This is only called on concrete procedures *)
+        | None   -> assert false;
+        | Some v -> PV.add env (pv_loc v) ov.ov_type fv
+      in
+      List.fold_left add PV.empty ffun.f_sig.fs_anames
+    in
     if PV.subset local params then PV.global eqi
     else
       let diff = PV.diff local params in
