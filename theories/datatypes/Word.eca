@@ -197,3 +197,31 @@ clone MFinite as DWord with
   op   Support.enum = List.map mkword (Enum.wordn n),
   op   Support.card <- card
 proof Support.enum_spec by exact/enum_spec.
+
+(* -------------------------------------------------------------------- *)
+theory ListSample.
+require import DList.
+
+clone MFinite as DAlphabet with
+  type         t <= Alphabet.t,
+  theory Support <= Alphabet
+proof *.
+
+lemma dword_is_dlist:
+  dmap (dlist DAlphabet.dunifin n) mkword = DWord.dunifin.
+proof.
+apply: eq_funi_ll.
++ apply: is_full_funiform.
+  + apply: dmap_fu_in=> w; exists (ofword w).
+    rewrite mkwordK //= (supp_dlist _ _ _ ge0_n) size_word //=.
+    by apply: allP=> l _; exact: DAlphabet.supp_dunifin.
+  apply: dmap_uni_in_inj.
+  + move=> ls ls'; rewrite !(supp_dlist _ _ _ ge0_n)=> /> + _ + _.
+    by move=> /ofwordK {2}<- /ofwordK {2}<- ->.
+  exact/dlist_uni/DAlphabet.dunifin_uni.
++ exact/dmap_ll/dlist_ll/DAlphabet.dunifin_ll.
++ exact/DWord.dunifin_funi.
+exact/DWord.dunifin_ll.
+qed.
+
+end ListSample.
