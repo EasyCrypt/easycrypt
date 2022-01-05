@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -156,18 +156,18 @@ module B (S:Scheme) (A:AdvCPA) (LR:LR) = {
 }.
 
 section.
-declare module S:Scheme {K, H.Count, H.HybOrcl}.
+declare module S <: Scheme {K, H.Count, H.HybOrcl}.
   (* Normaly I would like to locally
      clone Indist in the section, in that case
      restrictions at least on H.c are not needed.
      But LRB and B are used so we need to do it
    *)
 
-declare module A:AdvCPA {K,H.Count,H.HybOrcl,S}.
+declare module A <: AdvCPA {K,H.Count,H.HybOrcl,S}.
 
-axiom Lkg  : islossless S.kg.
-axiom Lenc : islossless S.enc.
-axiom La   : forall (LR<:LR{A}), islossless LR.orcl => islossless A(LR).main.
+declare axiom Lkg  : islossless S.kg.
+declare axiom Lenc : islossless S.enc.
+declare axiom La   : forall (LR<:LR{A}), islossless LR.orcl => islossless A(LR).main.
 
 lemma CPA1_CPAn &m :
     0 < H.q

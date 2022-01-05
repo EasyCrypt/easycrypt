@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -30,8 +30,13 @@ val gtty    : EcTypes.ty -> gty
 val gtmodty : module_type -> mod_restr -> gty
 val gtmem   : EcMemory.memtype -> gty
 
+val as_gtty  : gty -> EcTypes.ty
+val as_modty : gty -> module_type * mod_restr
+val as_mem   : gty -> EcMemory.memtype
+
 val gty_equal : gty  -> gty -> bool
 val gty_fv    : gty -> int Mid.t
+val gty_fv_and_tvar : gty -> int Mid.t
 
 type quantif =
   | Lforall
@@ -180,6 +185,7 @@ val f_app    : form -> form list -> EcTypes.ty -> form
 val f_tuple  : form list -> form
 val f_proj   : form -> int -> EcTypes.ty -> form
 val f_if     : form -> form -> form -> form
+val f_match  : form -> form list -> EcTypes.ty -> form
 val f_let    : EcTypes.lpattern -> form -> form -> form
 val f_let1   : EcIdent.t -> form -> form -> form
 val f_quant  : quantif -> bindings -> form -> form

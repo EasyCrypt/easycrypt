@@ -151,7 +151,7 @@ module D_PRF (D:PRGa.Distinguisher,F:PRFA) = {
 section Fact1.
   (* Lemmas in this section are true forall PRG distinguisher D
      that do not share memory with SRG, PRFr, PRFi, or D_PRF. *)
-  declare module D: PRGa.Distinguisher {SRG,PRFr,PRFi,D_PRF}.
+  declare module D <: PRGa.Distinguisher {SRG,PRFr,PRFi,D_PRF}.
 
   local lemma SRG_PRGp &m:
     Pr[IND_PRG(SRG,D).main() @ &m: res] = Pr[IND_PRF(PRFc,D_PRF(D)).main() @ &m: res].
@@ -333,8 +333,8 @@ qed.
   *   Pr[IND^PRF_PRFi(D^PRF_D): res] - Pr[IND^PRF_PRGi(D): res]
   *   <= Pr[IND^PRF_PRFi(D^PRF_D): !uniq D^PRF_D.log]                  **)
 section Fact2.
-  declare module D: PRGa.Distinguisher {SRG,PRFr,PRFi,D_PRF}.
-  axiom D_distinguish_ll (G <: RGA {D}): islossless G.next => islossless D(G).distinguish.
+  declare module D <: PRGa.Distinguisher {SRG,PRFr,PRFi,D_PRF}.
+  declare axiom D_distinguish_ll (G <: RGA {D}): islossless G.next => islossless D(G).distinguish.
 
   inductive inv (m : ('a,'b) fmap) (logP : 'a list) =
     | EqQueries of (dom m = mem logP).
@@ -451,12 +451,12 @@ qed.
 op     qN : { int | 0 <= qN } as ge0_qN.
 
 section Lemma1.
-  declare module D : PRGa.Distinguisher {SRG,PRFc,PRFi,C_PRG,C_PRF,D_PRF}.
+  declare module D <: PRGa.Distinguisher {SRG,PRFc,PRFi,C_PRG,C_PRF,D_PRF}.
 
-  axiom D_distinguish_ll (G <: PRGa.RGA {D}):
+  declare axiom D_distinguish_ll (G <: PRGa.RGA {D}):
     islossless G.next => islossless D(G).distinguish.
 
-  axiom D_bounded (G <: PRGa.RG {D,C_PRG}) &m:
+  declare axiom D_bounded (G <: PRGa.RG {D,C_PRG}) &m:
     islossless G.init => islossless G.next =>
     Pr[IND_PRG(C_PRG(G),D).main() @ &m: C_PRG.c <= qN] = 1%r.
 
@@ -498,13 +498,13 @@ section Lemma1.
         []                              (* condition(s) under which the oracle(s) do not respond *)
         (size D_PRF.log = C_PRG.c).     (* general unconditional invariants *)
     (* The resulting sum is less than the specified bound *)
-    rewrite -mulr_suml mulrAC ler_wpmul2r 1:[smt (mu_bounded)].
-    rewrite (@big_reindex _ _ ([-]%Int \o ((-) 1)) ((+) 1)) 1:[smt ml=0].
-    rewrite predTofV (@eq_bigr _ _ CoreReal.from_int) 1:[smt ml=0].
-    rewrite (@eq_map _ ((+) 1)) 2:-range_add /= 1:[smt ml=0].
+    rewrite -mulr_suml mulrAC ler_wpmul2r 1:#smt:(mu_bounded).
+    rewrite (@big_reindex _ _ ([-]%Int \o ((-) 1)) ((+) 1)) 1:#smt:[ml=0].
+    rewrite predTofV (@eq_bigr _ _ CoreReal.from_int) 1:#smt:[ml=0].
+    rewrite (@eq_map _ ((+) 1)) 2:-range_add /= 1:#smt:[ml=0].
     rewrite -(@add0r (bigi _ _ _ _)) -(@big1_eq predT (range 0 1)).
-    rewrite (@eq_big_int _ _ _ CoreReal.from_int) 1:[smt ml=0] -big_cat -range_cat // 1:ler_addr 1:ge0_qN.
-    by rewrite sumidE [smt (ge0_qN)].
+    rewrite (@eq_big_int _ _ _ CoreReal.from_int) 1:#smt:[ml=0] -big_cat -range_cat // 1:ler_addr 1:ge0_qN.
+    by rewrite sumidE #smt:(ge0_qN).
     (* The bounded event implies that from the probability claim *)
     done.
     (* Initialization sets counter to 0, bad event to false, and

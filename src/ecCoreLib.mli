@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -47,6 +47,14 @@ end
 (*-------------------------------------------------------------------- *)
 module CI_Witness : sig
   val p_witness : path
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_Option : sig
+  val p_option : path
+  val p_none   : path
+  val p_some   : path
+  val p_oget   : path
 end
 
 (*-------------------------------------------------------------------- *)

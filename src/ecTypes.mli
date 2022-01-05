@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -12,6 +12,14 @@ open EcMaps
 open EcSymbols
 open EcUid
 open EcIdent
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: section: move me *)
+
+type locality  = [`Declare | `Local | `Global ]
+type is_local  =           [ `Local | `Global ]
+
+val local_of_locality : locality -> is_local
 
 (* -------------------------------------------------------------------- *)
 type ty = private {
@@ -47,12 +55,15 @@ val tfun    : ty -> ty -> ty
 val tglob   : EcPath.mpath -> ty
 val tpred   : ty -> ty
 
+val ty_fv_and_tvar : ty -> int Mid.t
+
 (* -------------------------------------------------------------------- *)
 val tunit   : ty
 val tbool   : ty
 val tint    : ty
 val treal   : ty
 val tdistr  : ty -> ty
+val toption : ty -> ty
 val tcpred  : ty -> ty
 val toarrow : ty list -> ty -> ty
 
@@ -215,6 +226,9 @@ val e_quantif  : equantif -> ebindings -> expr -> expr
 val e_forall   : ebindings -> expr -> expr
 val e_exists   : ebindings -> expr -> expr
 val e_proj     : expr -> int -> ty -> expr
+val e_none     : ty -> expr
+val e_some     : expr -> expr
+val e_oget     : expr -> ty -> expr
 
 val e_proj_simpl : expr -> int -> ty -> expr
 

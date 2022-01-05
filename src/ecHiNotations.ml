@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -96,7 +96,8 @@ let trans_abbrev_r (env : env) (at : pabbrev located) =
   let xs      = List.map (snd_map (Tuni.offun uni)) xs in
   let tparams = EcUnify.UniEnv.tparams ue in
   let ponly   = trans_abbrev_opts at.ab_opts in
-  let tyat    = EcDecl.mk_abbrev ~ponly tparams xs (codom, body) in
+  let tyat    = EcDecl.mk_abbrev ~ponly
+                  tparams xs (codom, body) (at.ab_local :> locality) in
 
   if EcTypes.is_local body then
     nterror gloc env NTE_AbbrevIsVar;

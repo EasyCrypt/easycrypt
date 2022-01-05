@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -45,13 +45,20 @@ val record_ind_path  : path -> path
 val indsc_of_record : record -> form
 
 (* -------------------------------------------------------------------- *)
-val datatype_ind_name : [`Elim|`Case] -> symbol -> symbol
-val datatype_ind_path : [`Elim|`Case] -> path   -> path
+val datatype_ind_name  : [`Elim|`Case] -> symbol -> symbol
+val datatype_ind_path  : [`Elim|`Case] -> path   -> path
+val datatype_proj_name : symbol -> symbol
+val datatype_proj_path : path -> symbol -> path
 
 (* -------------------------------------------------------------------- *)
 exception NonPositive
 
 val indsc_of_datatype : ?normty:(ty -> ty) -> [`Elim|`Case] -> datatype -> form
+
+val datatype_as_ty_dtype : datatype -> ty_params * ty_dtype
+(* -------------------------------------------------------------------- *)
+val datatype_projectors :
+  path * ty_params * ty_dtype -> (symbol * operator) list
 
 (* -------------------------------------------------------------------- *)
 type case1 = {

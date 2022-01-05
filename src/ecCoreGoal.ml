@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -843,7 +843,7 @@ module FApi = struct
     t_ors_pmap (some |- totc) xs tc
 
   (* ------------------------------------------------------------------ *)
-  let rec t_ors (tts : backward list) (tc : tcenv1) =
+  let t_ors (tts : backward list) (tc : tcenv1) =
     t_ors_pmap (fun x -> Some x) tts tc
 
   (* ------------------------------------------------------------------ *)

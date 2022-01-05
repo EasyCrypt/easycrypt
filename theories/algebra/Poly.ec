@@ -1,3 +1,11 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
 (* -------------------------------------------------------------------- *)
 require import AllCore Finite Distr DList List.
 require import Ring IntMin Bigalg StdBigop StdOrder.
@@ -542,7 +550,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma degM_proper p q :
-  lc p * lc q <> zeror => deg (p * q) = (deg p + deg q) - 1.
+  lc p * lc q <> Coeff.zeror => deg (p * q) = (deg p + deg q) - 1.
 proof.
 case: (p = poly0) => [->|nz_p]; first by rewrite lc0 !mul0r.
 case: (q = poly0) => [->|nz_q]; first by rewrite lc0 !mulr0.
@@ -552,13 +560,14 @@ by rewrite lerNgt /= => lt_pq; rewrite mul_lc gedeg_coeff //#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma lcM_proper p q : lc p * lc q <> zeror => lc (p * q) = lc p * lc q.
+lemma lcM_proper p q :
+  lc p * lc q <> Coeff.zeror => lc (p * q) = lc p * lc q.
 proof. by move=> reg; rewrite degM_proper //= -mul_lc. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma degZ_le c p : deg (c ** p) <= deg p.
 proof.
-case: (c = zeror) => [->|nz_c]; 1: by rewrite scale0p deg0 ge0_deg.
+case: (c = Coeff.zeror) => [->|nz_c]; 1: by rewrite scale0p deg0 ge0_deg.
 case: (p = poly0) => [->|nz_p]; 1: by rewrite scalep0 deg0.
 have nz_cp : polyC c <> poly0.
 - by apply/negP => /(congr1 deg); rewrite deg0 degC nz_c.
@@ -626,7 +635,7 @@ by rewrite mulrI_eq0 // lreg_neq0 // ih lregXn.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma lc_polyXn i : 0 <= i => lc (exp X i) = oner.
+lemma lc_polyXn i : 0 <= i => lc (exp X i) = Coeff.oner.
 proof.
 move=> ge0_0; rewrite lcXn_proper ?lcX //.
 - by apply: Coeff.lreg1. - by rewrite expr1z.
@@ -644,14 +653,15 @@ lemma deg_polyXnDC i c : 0 < i => deg (exp X i + polyC c) = i + 1.
 proof. by move=> ge0_i; rewrite degDl 1?degC deg_polyXn 1:ltrW //#. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma lc_polyXnDC i c : 0 < i => lc (exp X i + polyC c) = oner.
+lemma lc_polyXnDC i c : 0 < i => lc (exp X i + polyC c) = Coeff.oner.
 proof.
 move=> gti_0; rewrite lcDl ?lc_polyXn // -1:ltrW //.
 by rewrite degC deg_polyXn 1:ltrW //#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma polyXnE i k : 0 <= i => (exp X i).[k] = if k = i then oner else zeror.
+lemma polyXnE i k :
+  0 <= i => (exp X i).[k] = if k = i then Coeff.oner else Coeff.zeror.
 proof.
 move=> ge0_i; elim: i ge0_i k => [|i ge0_i ih] k.
 - by rewrite expr0 polyCE.
@@ -717,10 +727,10 @@ op peval (p : poly) (a : coeff) =
   BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p + 1).
 
 (* -------------------------------------------------------------------- *)
-abbrev root p a = peval p a = zeror.
+abbrev root p a = peval p a = Coeff.zeror.
 
 (* -------------------------------------------------------------------- *)
-op prepolyL (a : coeff list) = fun i => nth zeror a i.
+op prepolyL (a : coeff list) = fun i => nth Coeff.zeror a i.
 
 lemma isprepolyL a : ispoly (prepolyL a).
 proof.
@@ -731,7 +741,7 @@ qed.
 
 op polyL a = to_polyd (prepolyL a).
 
-lemma polyLE a c : (polyL a).[c] = nth zeror a c.
+lemma polyLE a c : (polyL a).[c] = nth Coeff.zeror a c.
 proof. by rewrite coeffE 1:isprepolyL. qed.
 
 lemma degL_le a : deg (polyL a) <= size a.
@@ -740,7 +750,8 @@ apply: deg_leP; first exact: size_ge0.
 by move=> i gei; rewrite polyLE nth_out //#.
 qed.
 
-lemma degL a : last zeror a <> zeror => deg (polyL a) = size a.
+lemma degL a :
+  last Coeff.zeror a <> Coeff.zeror => deg (polyL a) = size a.
 proof.
 move=> nz; apply/degP.
 - by case: a nz => //= x a _; rewrite addrC ltzS size_ge0.
@@ -752,7 +763,7 @@ qed.
 lemma inj_polyL a1 a2 :
   size a1 = size a2 => polyL a1 = polyL a2 => a1 = a2.
 proof.
-move=> eq_sz /poly_eqP eq; apply: (eq_from_nth zeror)=> //.
+move=> eq_sz /poly_eqP eq; apply: (eq_from_nth Coeff.zeror)=> //.
 by move=> i [+ _] - /eq; rewrite !polyLE.
 qed.
 
@@ -785,7 +796,7 @@ move=> q; split=> [/mapP[xs [/alltuplesP [szxs memxs ->]]]|].
 case=> ledeg memp; apply/mapP; pose xs :=  map (fun i => q.[i]) (range 0 n).
 exists xs; split; first (apply/alltuplesP; split).
 - by rewrite size_map size_range.
-- apply/(all_nthP _ _ zeror) => i [ge0_i +]; rewrite hmem.
+- apply/(all_nthP _ _ Coeff.zeror) => i [ge0_i +]; rewrite hmem.
   rewrite size_map size_range /= => lei.
   move/(_ i _): memp; first (split=> // _; 1: move=> /#).
   by rewrite (nth_map 0) ?size_range //= nth_range //#.
@@ -809,7 +820,7 @@ proof. move=> ge0_n; split.
 - case=> degp hcf; apply/supp_dmap; case: (surj_polyL _ _ degp).  
   move=> xs [^szxs <- ^pE ->]; exists xs => //=; apply/supp_dlist => /=.
   - by apply/size_ge0.
-  apply/allP=> c ^c_in_xs /(nth_index zeror) <-.
+  apply/allP=> c ^c_in_xs /(nth_index Coeff.zeror) <-.
   rewrite -polyLE -pE; apply/hcf; rewrite index_ge0 /=.
   by rewrite -szxs index_mem c_in_xs.
 qed.

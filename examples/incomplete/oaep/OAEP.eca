@@ -301,7 +301,7 @@ module I (A : CCA_ADV) (H : AH) (G : AG) = {
 *)
 
 section.
-declare module A : CCA_ADV {H, G,(* I,*) IND_CCA}.
+declare module A <: CCA_ADV {H, G,(* I,*) IND_CCA}.
 
 axiom A_choose_ll (H <: AH {A}) (G <: AG {A}) (S <: APKE {A}):
   islossless S.dec => islossless G.o => islossless H.o =>

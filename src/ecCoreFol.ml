@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -165,6 +165,14 @@ let gty_fv = function
     EcPath.Sx.fold (fun xp fv -> EcPath.x_fv fv xp) rx fv
   | GTmem mt -> EcMemory.mt_fv mt
 
+let gty_fv_and_tvar = function
+  | GTty ty -> EcTypes.ty_fv_and_tvar ty
+  | GTmodty(_, (rx,r)) ->
+    let fv =
+      EcPath.Sm.fold (fun mp fv -> EcPath.m_fv fv mp) r EcIdent.Mid.empty in
+    EcPath.Sx.fold (fun xp fv -> EcPath.x_fv fv xp) rx fv
+  | GTmem mt -> EcMemory.mt_fv mt
+
 let gtty (ty : EcTypes.ty) =
   GTty ty
 
@@ -173,6 +181,11 @@ let gtmodty (mt : module_type) (mr : mod_restr) =
 
 let gtmem (mt : EcMemory.memtype) =
   GTmem mt
+
+(* -------------------------------------------------------------------- *)
+let as_gtty  = function GTty ty  -> ty  | _ -> assert false
+let as_modty = function GTmodty (mty, r) -> (mty, r) | _ -> assert false
+let as_mem   = function GTmem m -> m | _ -> assert false
 
 (*-------------------------------------------------------------------- *)
 let b_equal (b1 : bindings) (b2 : bindings) =
@@ -926,6 +939,7 @@ let f_iter g f =
   | FequivS   es  -> g es.es_pr; g es.es_po
   | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
   | Fpr       pr  -> g pr.pr_args; g pr.pr_event
+
 
 (* -------------------------------------------------------------------- *)
 let form_exists g f =

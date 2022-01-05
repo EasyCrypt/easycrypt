@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -13,6 +13,15 @@ open EcPath
 open EcUid
 
 module BI = EcBigInt
+
+(* -------------------------------------------------------------------- *)
+type locality  = [`Local | `Declare | `Global]
+type is_local  = [`Local | `Global]
+
+let local_of_locality = function
+  | `Local   -> `Local
+  | `Global  -> `Global
+  | `Declare -> `Local
 
 (* -------------------------------------------------------------------- *)
 type ty = {
@@ -75,7 +84,7 @@ module Hsty = Why3.Hashcons.Make (struct
     match ty with
     | Tglob m          -> EcPath.m_fv Mid.empty m
     | Tunivar _        -> Mid.empty
-    | Tvar    _        -> Mid.empty
+    | Tvar    _        -> Mid.empty (* FIXME: section *)
     | Ttuple  tys      -> union (fun a -> a.ty_fv) tys
     | Tconstr (_, tys) -> union (fun a -> a.ty_fv) tys
     | Tfun    (t1, t2) -> union (fun a -> a.ty_fv) [t1; t2]
@@ -125,11 +134,12 @@ let tfun t1 t2   = mk_ty (Tfun (t1, t2))
 let tglob m      = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)
-let tunit      = tconstr EcCoreLib.CI_Unit .p_unit  []
-let tbool      = tconstr EcCoreLib.CI_Bool .p_bool  []
-let tint       = tconstr EcCoreLib.CI_Int  .p_int   []
-let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr [ty]
-let treal      = tconstr EcCoreLib.CI_Real .p_real  []
+let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
+let tbool      = tconstr EcCoreLib.CI_Bool .p_bool    []
+let tint       = tconstr EcCoreLib.CI_Int  .p_int     []
+let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr   [ty]
+let toption ty = tconstr EcCoreLib.CI_Option.p_option [ty]
+let treal      = tconstr EcCoreLib.CI_Real .p_real    []
 let tcpred ty  = tfun ty tbool
 
 let ttuple lt    =
@@ -236,7 +246,7 @@ let symbol_of_ty (ty : ty) =
       let rec doit i =
         if   i >= String.length x
         then "x"
-        else match Char.lowercase x.[i] with
+        else match Char.lowercase_ascii x.[i] with
              | 'a' .. 'z' -> String.make 1 x.[i]
              | _ -> doit (i+1)
       in
@@ -355,6 +365,10 @@ module Tvar = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let ty_fv_and_tvar (ty : ty) =
+  EcIdent.fv_union ty.ty_fv (Mid.map (fun () -> 1) (Tvar.fv ty))
+
+(* -------------------------------------------------------------------- *)
 type pvar_kind =
   | PVglob
   | PVloc
@@ -373,16 +387,16 @@ let pv_hash v =
 
 let pv_compare v1 v2 =
   match EcPath.x_compare v1.pv_name v2.pv_name with
-  | 0 -> Pervasives.compare v1.pv_kind v2.pv_kind
+  | 0 -> Stdlib.compare v1.pv_kind v2.pv_kind
   | r -> r
 
 let pv_compare_p v1 v2 =
   match EcPath.x_compare_na v1.pv_name v2.pv_name with
-  | 0 -> Pervasives.compare v1.pv_kind v2.pv_kind
+  | 0 -> Stdlib.compare v1.pv_kind v2.pv_kind
   | r -> r
 
 let pv_ntr_compare v1 v2 =
-  match Pervasives.compare v1.pv_kind v2.pv_kind with
+  match Stdlib.compare v1.pv_kind v2.pv_kind with
   | 0 -> EcPath.x_ntr_compare v1.pv_name v2.pv_name
   | r -> r
 
@@ -726,6 +740,18 @@ let e_decimal (n, (l, f)) =
   else Reals.add (Reals.of_lit n) fct
 
 (* -------------------------------------------------------------------- *)
+let e_none (ty : ty) : expr =
+  e_op EcCoreLib.CI_Option.p_none [ty] (toption ty)
+
+let e_some ({ e_ty = ty } as e : expr) : expr =
+  let op = e_op EcCoreLib.CI_Option.p_some [ty] (tfun ty (toption ty)) in
+  e_app op [e] (toption ty)
+
+let e_oget (e : expr) (ty : ty) : expr =
+  let op = e_op EcCoreLib.CI_Option.p_oget [ty] (tfun (toption ty) ty) in
+  e_app op [e] ty
+
+(* -------------------------------------------------------------------- *)
 module ExprSmart = struct
   let l_symbol (lp, x) x' =
     if x == x' then lp else LSymbol x'
@@ -777,7 +803,7 @@ module ExprSmart = struct
   let e_match (e, (b, es, ty)) (b', es', ty') =
     if   b == b' && es == es' && ty == ty'
     then e
-    else e_match b es ty
+    else e_match b' es' ty'
 
   let e_lam (e, (b, body)) (b', body') =
     if   b == b' && body == body'
@@ -839,7 +865,7 @@ let e_map fty fe e =
       let bd' = fe bd in
       ExprSmart.e_quant (e, (q, b, bd)) (q, b', bd')
 
-let rec e_fold fe state e =
+let e_fold fe state e =
   match e.e_node with
   | Eint _                -> state
   | Elocal _              -> state
@@ -964,13 +990,13 @@ let rec e_subst (s: e_subst) e =
       let tys  = List.Smart.map s.es_ty tys in
       let ty   = s.es_ty e.e_ty in
       let body = oget (Mp.find_opt p s.es_opdef) in
-        e_subst_op ty tys (List.map (e_subst s) args) body
+        e_subst_op ~freshen:s.es_freshen ty tys (List.map (e_subst s) args) body
 
   | Eop (p, tys) when Mp.mem p s.es_opdef ->
       let tys  = List.Smart.map s.es_ty tys in
       let ty   = s.es_ty e.e_ty in
       let body = oget (Mp.find_opt p s.es_opdef) in
-        e_subst_op ty tys [] body
+        e_subst_op ~freshen:s.es_freshen ty tys [] body
 
   | Eop (p, tys) ->
       let p'   = s.es_p p in
@@ -991,7 +1017,7 @@ let rec e_subst (s: e_subst) e =
 
   | _ -> e_map s.es_ty (e_subst s) e
 
-and e_subst_op ety tys args (tyids, e) =
+and e_subst_op ~freshen ety tys args (tyids, e) =
   (* FIXME: factor this out *)
   (* FIXME: is es_freshen value correct? *)
 
@@ -999,7 +1025,7 @@ and e_subst_op ety tys args (tyids, e) =
     let sty = Tvar.init tyids tys in
     let sty = ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ sty; } in
     let sty = { e_subst_id with
-                  es_freshen = true;
+                  es_freshen = freshen;
                   es_ty      = sty } in
       e_subst sty e
   in

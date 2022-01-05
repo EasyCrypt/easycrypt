@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -12,12 +12,12 @@ type qsymbol = symbol list * symbol
 type msymbol = (symbol * msymbol list) list
 
 let sym_equal   : symbol -> symbol -> bool = (=)
-let sym_compare : symbol -> symbol -> int  = Pervasives.compare
+let sym_compare : symbol -> symbol -> int  = Stdlib.compare
 
 (* -------------------------------------------------------------------- *)
 module SymCmp = struct
   type t = symbol
-  let compare = (Pervasives.compare : t -> t -> int)
+  let compare = (Stdlib.compare : t -> t -> int)
 end
 
 module Msym = EcMaps.Map.Make(SymCmp)
@@ -73,7 +73,7 @@ let rec string_of_qsymbol = function
   | ([]    , x) -> Printf.sprintf "%s" x
   | (n :: p, x) -> Printf.sprintf "%s.%s" n (string_of_qsymbol (p, x))
 
-let rec pp_qsymbol fmt qn =
+let pp_qsymbol fmt qn =
   Format.fprintf fmt "%s" (string_of_qsymbol qn)
 
 let rec string_of_msymbol (mx : msymbol) =

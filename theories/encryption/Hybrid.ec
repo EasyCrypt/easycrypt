@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -130,13 +130,13 @@ clone import Means as M with
 (* Prove that it is equivalent to consider n or 1 calls to the oracle *)
 section.
 
-  declare module Ob : Orclb    {Count,HybOrcl}.
-  declare module A  : AdvOrclb {Count,HybOrcl,Ob}.
+  declare module Ob <: Orclb    {Count,HybOrcl}.
+  declare module A <: AdvOrclb {Count,HybOrcl,Ob}.
 
-  axiom losslessL: islossless Ob.leaks.
-  axiom losslessOb1: islossless Ob.orclL.
-  axiom losslessOb2: islossless Ob.orclR.
-  axiom losslessA (Ob0 <: Orclb {A}) (LR <: Orcl {A}):
+  declare axiom losslessL: islossless Ob.leaks.
+  declare axiom losslessOb1: islossless Ob.orclL.
+  declare axiom losslessOb2: islossless Ob.orclR.
+  declare axiom losslessA (Ob0 <: Orclb {A}) (LR <: Orcl {A}):
     islossless LR.orcl =>
     islossless Ob0.leaks => islossless Ob0.orclL => islossless Ob0.orclR =>
     islossless A(Ob0, LR).main.
@@ -350,7 +350,7 @@ section.
     by move=> x; rewrite mem_to_seq // supp_dinter mem_range /#.
   rewrite !(eq_big_perm _ _ _ _ supp_range) {1}range_ltn 1:q_pos big_cons {1}/predT /=.
   have {6}->: q = q - 1 + 1 by smt().
-  rewrite rangeSr 1:[smt(q_pos)] big_rcons {2}/predT /=.
+  rewrite rangeSr 1:#smt:(q_pos) big_rcons {2}/predT /=.
   fieldeq; 1:smt(q_pos).
   rewrite RField.mulNr -RField.mulrN -RField.mulrDr.
   rewrite (big_reindex _ _ (fun x=> x - 1) (fun x=> x + 1) (range 0 (q - 1))) //.
@@ -363,7 +363,7 @@ section.
   + move=> n /mem_range /andaE [] ge1_q n_lt_q /=.
     by rewrite (WLR_shift &m n p' _) 1:/# /p'.
   rewrite big_const count_predT size_range.
-  rewrite (: max 0 (q - 1) = q - 1) 1:[smt(q_pos)].
+  rewrite (: max 0 (q - 1) = q - 1) 1:#smt:(q_pos).
   have: (0 <= q - 1) by smt(q_pos).
   elim: (q - 1)=> //= => [|n ge0_n ih].
   + by rewrite iter0.
@@ -374,15 +374,17 @@ end section.
 (* -------------------------------------------------------------------- *)
 (* Simplified variant: Assume that A calls the oracle at most q times. *)
 section.
-  declare module Ob : Orclb    {Count,HybOrcl}.
-  declare module A  : AdvOrclb {Count,HybOrcl,Ob}.
+  declare module Ob <: Orclb    {Count,HybOrcl}.
+  declare module A <: AdvOrclb {Count,HybOrcl,Ob}.
 
-  axiom A_call : forall (O <: Orcl{Count,A}), hoare [ Orcln(A(Ob), O).main : true ==> Count.c <= q ].
+  declare axiom A_call :
+    forall (O <: Orcl{Count,A}),
+      hoare [ Orcln(A(Ob), O).main : true ==> Count.c <= q ].
 
-  axiom losslessL: islossless Ob.leaks.
-  axiom losslessOb1: islossless Ob.orclL.
-  axiom losslessOb2: islossless Ob.orclR.
-  axiom losslessA (Ob0 <: Orclb{A}) (LR <: Orcl{A}):
+  declare axiom losslessL: islossless Ob.leaks.
+  declare axiom losslessOb1: islossless Ob.orclL.
+  declare axiom losslessOb2: islossless Ob.orclR.
+  declare axiom losslessA (Ob0 <: Orclb{A}) (LR <: Orcl{A}):
     islossless LR.orcl =>
     islossless Ob0.leaks => islossless Ob0.orclL => islossless Ob0.orclR =>
     islossless A(Ob0, LR).main.

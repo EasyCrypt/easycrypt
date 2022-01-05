@@ -1,62 +1,50 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-open EcSymbols
-open EcIdent
-open EcPath
-open EcFol
-open EcDecl
 open EcModules
-
-type locals
-
-(* -------------------------------------------------------------------- *)
-val env_of_locals   : locals -> EcEnv.env
-val items_of_locals : locals -> EcTheory.ctheory_item list
-
-val is_local : [`Lemma | `Module] -> path -> locals -> bool
-val is_mp_local : mpath -> locals -> bool
-
-val form_use_local : form  -> locals -> mpath option
-
-val form_use_local_or_abs   : form        -> locals -> bool
-val module_use_local_or_abs : module_expr -> locals -> bool
-val opdecl_use_local_or_abs : operator    -> locals -> bool
-val tydecl_use_local_or_abs : tydecl      -> locals -> bool
-
-val abstracts : locals -> (EcIdent.t * (module_type * mod_restr)) list * Sid.t
-
-val generalize : EcEnv.env -> locals -> form -> form
+open EcEnv
+open EcTheory
 
 (* -------------------------------------------------------------------- *)
-type t
+exception SectionError of string
 
-exception NoSectionOpened
+(* -------------------------------------------------------------------- *)
+type sc_item =
+  | SC_th_item  of theory_item
+  | SC_decl_mod of EcIdent.t * module_type * mod_restr
 
-val initial : t
+(* -------------------------------------------------------------------- *)
+type scenv
 
-val in_section : t -> bool
+val env : scenv -> env
 
-val enter : EcEnv.env -> symbol option -> t -> t
-val exit  : t -> locals * t
+val initial : env -> scenv
 
-val path  : t -> symbol option * path
-val opath : t -> (symbol option * path) option
+val add_item     : theory_item -> scenv -> scenv
+val add_decl_mod : EcIdent.t -> module_type -> mod_restr -> scenv -> scenv
 
-val topenv  : t -> EcEnv.env
+val enter_section : EcSymbols.symbol option -> scenv -> scenv
+val exit_section  : EcSymbols.symbol option -> scenv -> scenv
 
-val locals  : t -> locals
-val olocals : t -> locals option
+type checked_ctheory = private ctheory
 
-type lvl = [`Local | `Global] * [`Axiom | `Lemma]
+val enter_theory : EcSymbols.symbol -> EcTypes.is_local -> thmode -> scenv -> scenv
+val exit_theory  :
+  ?clears:EcPath.path list ->
+  ?pempty:[ `ClearOnly | `Full | `No ] ->
+  scenv -> EcSymbols.symbol * checked_ctheory option * scenv
 
-val add_local_mod : path -> t -> t
-val add_lemma     : path -> lvl -> t -> t
-val add_item      : EcTheory.ctheory_item -> t -> t
-val add_abstract  : EcIdent.t -> (module_type * mod_restr) -> t -> t
+val import : EcPath.path -> scenv -> scenv
+
+val import_vars : EcPath.mpath -> scenv -> scenv
+
+val add_th  : import:import -> EcSymbols.symbol -> checked_ctheory -> scenv -> scenv
+val require : EcSymbols.symbol -> checked_ctheory -> scenv -> scenv
+
+val astop : scenv -> scenv

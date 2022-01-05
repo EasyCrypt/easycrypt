@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -26,8 +26,9 @@ type record = {
 }
 
 (* -------------------------------------------------------------------- *)
-let record_ctor_name (x : symbol) = Printf.sprintf "mk_%s"  x
-let record_ind_name  (x : symbol) = Printf.sprintf "%s_ind" x
+let record_ctor_name   (x : symbol) = Printf.sprintf "mk_%s"  x
+let record_ind_name    (x : symbol) = Printf.sprintf "%s_ind" x
+let datatype_proj_name (x : symbol) = Printf.sprintf "get_as_%s" x
 
 (* -------------------------------------------------------------------- *)
 let record_ctor_path (p : EP.path) =
@@ -36,6 +37,10 @@ let record_ctor_path (p : EP.path) =
 (* -------------------------------------------------------------------- *)
 let record_ind_path (p : EP.path) =
   EcPath.pqoname (EcPath.prefix p) (record_ind_name (EcPath.basename p))
+
+(* -------------------------------------------------------------------- *)
+let datatype_proj_path (p : EP.path) (x : symbol) =
+  EcPath.pqoname (EcPath.prefix p) (datatype_proj_name x)
 
 (* -------------------------------------------------------------------- *)
 let indsc_of_record (rc : record) =
@@ -159,6 +164,46 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
     | _ -> EcTypes.ty_sub_exists (occurs p) t
 
   in scheme mode (List.map fst dt.dt_tparams, tpath) dt.dt_ctors
+
+(* -------------------------------------------------------------------- *)
+let datatype_projectors (tpath, tparams, { tydt_ctors = ctors }) =
+  let thety = tconstr tpath (List.map (tvar |- fst) tparams) in
+
+  let do1 i (cname, cty) =
+    let thv = EcIdent.create "the" in
+    let the = e_local thv thety in
+    let rty = ttuple cty in
+
+    let do1 j (_, cty2) =
+      let lvars =
+        List.map
+          (fun ty -> (EcIdent.create (symbol_of_ty ty), ty))
+          cty2 in
+
+      e_lam lvars
+        (if   i = j
+         then e_some (e_tuple (List.map (curry e_local) lvars))
+         else e_none rty) in
+
+
+    let body = e_match the (List.mapi do1 ctors) (toption rty) in
+    let body = e_lam [thv, thety] body in
+
+    let op = Some (OP_Plain (body, false)) in
+    let op = mk_op ~opaque:false tparams body.e_ty op `Global in (* FIXME *)
+
+    (cname, op) in
+
+  List.mapi do1 ctors
+
+(* -------------------------------------------------------------------- *)
+let datatype_as_ty_dtype datatype =
+  let indsc    = indsc_of_datatype `Elim datatype in
+  let casesc   = indsc_of_datatype `Case datatype in
+  datatype.dt_tparams,
+    { tydt_ctors   = datatype.dt_ctors ;
+      tydt_schcase = casesc;
+      tydt_schelim = indsc ; }
 
 (* -------------------------------------------------------------------- *)
 type case1 = {

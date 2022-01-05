@@ -1,3 +1,11 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
 require import AllCore PROM SmtMap Distr DProd.
 
 abstract theory Split.
@@ -47,7 +55,7 @@ clone MkRO as ROT.
 clone MkRO as ROF.
 
 section PROOFS.
-  declare module D: RO_Distinguisher { RO, ROT.RO, ROF.RO }.
+  declare module D <: RO_Distinguisher { RO, ROT.RO, ROF.RO }.
 
   equiv RO_split: 
     MainD(D,RO).distinguish ~ MainD(D,RO_DOM(ROT.RO,ROF.RO)).distinguish : 
@@ -134,7 +142,7 @@ module RO_Pair (RO1 : I1.RO) (RO2 : I2.RO) : RO = {
 
 section PROOFS.
 
-  declare module D : RO_Distinguisher { RO, I1.RO, I2.RO }.
+  declare module D <: RO_Distinguisher { RO, I1.RO, I2.RO }.
 
   local clone import ProdSampling with
     type t1 <- to1,

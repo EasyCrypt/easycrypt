@@ -145,7 +145,7 @@ module SCDH_from_CPA(A:Adversary,O:ARO): Set_CDH.Adversary = {
 (* We want to bound the probability of A winning CPA(Bounder(A,RO),S) in terms of
    the probability of B = CDH_from_SCDH(SCDH_from_CPA(A,RO)) winning CDH(B) *)
 section.
-  declare module A: Adversary {RO, Bounder}.
+  declare module A <: Adversary {RO, Bounder}.
 
   axiom chooseL (O <: ARO {A}): islossless O.o => islossless A(O).choose.
   axiom guessL (O <: ARO {A}) : islossless O.o => islossless A(O).guess.

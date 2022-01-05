@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -62,6 +62,7 @@ module Set = struct
     include Why3.Extset.S
 
     val big_union : t list -> t
+    val big_inter : t list -> t
     val map : (elt -> elt) -> t -> t
     val undup : elt list -> elt list
   end
@@ -71,6 +72,11 @@ module Set = struct
 
     let big_union (xs : t list) : t =
       List.fold_left union empty xs
+
+    let big_inter (xs : t list) : t =
+      match xs with
+      | [] -> empty
+      | x :: xs -> List.fold_left inter x xs
 
     let map f s =
       fold (fun k s -> add (f k) s) s empty
@@ -122,7 +128,7 @@ end
 (* --------------------------------------------------------------------*)
 module Int = struct
   type t = int
-  let compare = (Pervasives.compare : t -> t -> int)
+  let compare = (Stdlib.compare : t -> t -> int)
   let equal   = ((=) : t -> t -> bool)
   let hash    = (fun (x : t) -> x)
 end
@@ -134,7 +140,7 @@ module Hint = EHashtbl.Make(Int)
 (* --------------------------------------------------------------------*)
 module DInt = struct
   type t = int * int
-  let compare = (Pervasives.compare : t -> t -> int)
+  let compare = (Stdlib.compare : t -> t -> int)
   let equal   = ((=) : t -> t -> bool)
   let hash    = (fun (x : t) -> Hashtbl.hash x)
 end

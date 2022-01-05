@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -39,11 +39,7 @@ module CaseOptions = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let rec process1_debug (_ttenv : ttenv) (tc : tcenv1) =
-  FApi.tcenv_of_tcenv1 tc
-
-(* -------------------------------------------------------------------- *)
-and process1_by (ttenv : ttenv) (t : ptactic list option) (tc : tcenv1) =
+let rec process1_by (ttenv : ttenv) (t : ptactic list option) (tc : tcenv1) =
   t_onall process_done (process1_seq ttenv (odfl [] t) tc)
 
 (* -------------------------------------------------------------------- *)
@@ -67,7 +63,6 @@ and process1_try (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 and process1_admit (_ : ttenv) (tc : tcenv1) =
-  EcFortune.pick () |> oiter (EcEnv.notify (FApi.tc1_env tc) `Warning "%s");
   EcLowGoal.t_admit tc
 
 (* -------------------------------------------------------------------- *)
@@ -164,7 +159,8 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Pcbv ri             -> process_cbv ri
     | Pchange pf          -> process_change pf
     | Ppose (x, xs, o, p) -> process_pose x xs o p
-    | Pwlog (ids, f)      -> process_wlog ids f
+    | Pwlog (ids, b, f)   -> process_wlog ~suff:b ids f
+    | Pgenhave gh         -> process_genhave ttenv gh
     | Prwnormal _         -> assert false
   in
     tx tc
@@ -187,7 +183,9 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pwp wp                    -> EcPhlWp.t_wp wp
     | Psp sp                    -> EcPhlSp.t_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
+    | Prmatch (side, c, i)      -> EcPhlRCond.t_rcond_match side c i
     | Pcond side                -> EcPhlHiCond.process_cond side
+    | Pmatch infos              -> EcPhlHiCond.process_match infos
     | Pwhile (side, info)       -> EcPhlWhile.process_while side info
     | Pasyncwhile info          -> EcPhlWhile.process_async_while info
     | Pfission info             -> EcPhlLoopTx.process_fission info
@@ -317,7 +315,6 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Pseq      ts          -> `One (process1_seq      ttenv ts)
     | Pcase     es          -> `One (process1_case     ttenv es)
     | Pprogress (o, t)      -> `One (process1_progress ttenv o t)
-    | Pdebug                -> `One (process1_debug    ttenv)
     | Psubgoal  tt          -> `All (process_chain     ttenv tt)
     | Pnstrict  t           -> `One (process1_nstrict  ttenv t)
   in

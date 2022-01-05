@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -67,25 +67,29 @@ type plpattern_r =
 
 and plpattern = plpattern_r located
 
+type ppattern =
+| PPApp of (pqsymbol * ptyannot option) * osymbol list
+
 type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
 
 and pexpr_r =
-  | PEcast    of pexpr * pty                       (* type cast          *)
-  | PEint     of zint                              (* int. literal       *)
+  | PEcast   of pexpr * pty                       (* type cast          *)
+  | PEint    of zint                              (* int. literal       *)
   | PEdecimal of (zint * (int * zint))             (* dec. literal       *)
-  | PEident   of pqsymbol * ptyannot option        (* symbol             *)
-  | PEapp     of pexpr * pexpr list                (* op. application    *)
-  | PElet     of plpattern * pexpr_wty * pexpr     (* let binding        *)
-  | PEtuple   of pexpr list                        (* tuple constructor  *)
-  | PEif      of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
-  | PEforall  of ptybindings * pexpr               (* forall quant.      *)
-  | PEexists  of ptybindings * pexpr               (* exists quant.      *)
-  | PElambda  of ptybindings * pexpr               (* lambda abstraction *)
-  | PErecord  of pexpr option * pexpr rfield list  (* record             *)
-  | PEproj    of pexpr * pqsymbol                  (* projection         *)
-  | PEproji   of pexpr * int                       (* tuple projection   *)
-  | PEscope   of pqsymbol * pexpr                  (* scope selection    *)
+  | PEident  of pqsymbol * ptyannot option        (* symbol             *)
+  | PEapp    of pexpr * pexpr list                (* op. application    *)
+  | PElet    of plpattern * pexpr_wty * pexpr     (* let binding        *)
+  | PEtuple  of pexpr list                        (* tuple constructor  *)
+  | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
+  | PEmatch  of pexpr * (ppattern * pexpr) list   (* match              *)
+  | PEforall of ptybindings * pexpr               (* forall quant.      *)
+  | PEexists of ptybindings * pexpr               (* exists quant.      *)
+  | PElambda of ptybindings * pexpr               (* lambda abstraction *)
+  | PErecord of pexpr option * pexpr rfield list  (* record             *)
+  | PEproj   of pexpr * pqsymbol                  (* projection         *)
+  | PEproji  of pexpr * int                       (* tuple projection   *)
+  | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
 and pexpr_wty = pexpr * pty option
@@ -111,11 +115,22 @@ type pinstr_r =
   | PScall   of plvalue option * pgamepath * (pexpr list) located
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
+  | PSmatch  of pexpr * psmatch
   | PSassert of pexpr
+
+and psmatch = [
+  | `Full of (ppattern * pstmt) list
+  | `If   of (ppattern * pstmt) * pstmt option
+]
 
 and pscond = pexpr * pstmt
 and pinstr = pinstr_r located
 and pstmt  = pinstr list
+
+(* -------------------------------------------------------------------- *)
+type is_local = [ `Local | `Global]
+
+type locality = [`Declare | `Local | `Global]
 
 (* -------------------------------------------------------------------- *)
 type pmodule_type = pqsymbol
@@ -158,10 +173,19 @@ and pfunction_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
+and pmodule_def_or_decl = {
+  ptm_locality : locality;
+  ptm_def      : [`Concrete of pmodule_def | `Abstract of pmodule_decl];
+}
+
+and pmodule_decl = {
+  ptm_name  : psymbol;
+  ptm_modty : pmodule_type_restr;
+}
+
 and pmodule_def = {
   ptm_header : pmodule_header;
   ptm_body   : pmodule_expr;
-  ptm_local  : bool;
 }
 
 and pmodule_header =
@@ -199,10 +223,10 @@ and pfunction_local = {
   pfl_init  : pexpr option;
 }
 
-
-type pmodule_decl = {
-  ptmd_name  : psymbol;
-  ptmd_modty : pmodule_type_restr;
+type pinterface = {
+  pi_name : psymbol;
+  pi_sig : pmodule_sig;
+  pi_locality : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -213,6 +237,7 @@ type ptydecl = {
   pty_name   : psymbol;
   pty_tyvars : ptyparams;
   pty_body   : ptydbody;
+  pty_locality : locality;
 }
 
 and ptydbody =
@@ -248,6 +273,7 @@ and pformula_r =
   | PFside    of pformula * symbol located
   | PFapp     of pformula * pformula list
   | PFif      of pformula * pformula * pformula
+  | PFmatch   of pformula * (ppattern * pformula) list
   | PFlet     of plpattern * (pformula * pty option) * pformula
   | PFforall  of pgtybindings * pformula
   | PFexists  of pgtybindings * pformula
@@ -266,6 +292,7 @@ and pformula_r =
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
+  | PFWP       of pgamepath * pexpr list * pformula
 
 and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list
@@ -301,9 +328,6 @@ let rec pf_ident ?(raw = false) f =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-type ppattern =
-| PPApp of (pqsymbol * ptyannot option) * osymbol list
-
 type ptyvardecls =
   (psymbol * pqsymbol list) list
 
@@ -333,6 +357,7 @@ type poperator = {
   po_def    : pop_def;
   po_ax     : osymbol_r;
   po_nosmt  : bool;
+  po_locality : locality;
 }
 
 type ppred_def =
@@ -352,6 +377,7 @@ type ppredicate = {
   pp_name   : psymbol;
   pp_tyvars : (psymbol * pqsymbol list) list option;
   pp_def    : ppred_def;
+  pp_locality  : locality;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -362,6 +388,7 @@ type pnotation = {
   nt_args  : (psymbol * (psymbol list * pty option)) list;
   nt_codom : pty;
   nt_body  : pexpr;
+  nt_local : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -369,16 +396,13 @@ type abrvopt  = [`Printing]
 type abrvopts = (bool * abrvopt) list
 
 type pabbrev = {
-  ab_name : psymbol;
-  ab_tv   : ptyvardecls option;
-  ab_args : ptybindings;
-  ab_def  : pty * pexpr;
-  ab_opts : abrvopts;
+  ab_name  : psymbol;
+  ab_tv    : ptyvardecls option;
+  ab_args  : ptybindings;
+  ab_def   : pty * pexpr;
+  ab_opts  : abrvopts;
+  ab_local : is_local;
 }
-
-(* -------------------------------------------------------------------- *)
-type pdeclare =
-| PDCL_Module of pmodule_decl
 
 (* -------------------------------------------------------------------- *)
 type 'a ppt_head =
@@ -588,6 +612,12 @@ type pcqoptions = (bool * pcqoption) list
 type crushmode = { cm_simplify : bool; cm_solve : bool; }
 
 (* -------------------------------------------------------------------- *)
+type matchmode = [
+  | `DSided of [ `Eq | `ConstrSynced ]
+  | `SSided of side
+]
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
@@ -603,7 +633,9 @@ type phltactic =
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
   | Prcond         of (oside * bool * codepos1)
+  | Prmatch        of (oside * symbol * codepos1)
   | Pcond          of pcond_info
+  | Pmatch         of matchmode
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
   | Pinline        of inline_info
@@ -716,7 +748,7 @@ and rwarg1 =
   | RWApp    of ppterm
   | RWTactic of rwtactic
 
-and rwoptions = rwside * trepeat option * rwocc
+and rwoptions = rwside * trepeat option * rwocc * pformula option
 and rwside    = [`LtoR | `RtoL]
 and rwocc     = rwocci option
 and rwocci    = [`Inclusive of Sint.t | `Exclusive of Sint.t | `All]
@@ -805,6 +837,9 @@ type apply_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type pgenhave = psymbol * intropattern option * psymbol list * pformula
+
+(* -------------------------------------------------------------------- *)
 type logtactic =
   | Preflexivity
   | Passumption
@@ -831,7 +866,8 @@ type logtactic =
   | Pcbv        of preduction
   | Pchange     of pformula
   | Ppose       of (psymbol * ptybinding list * rwocc * pformula)
-  | Pwlog       of (psymbol list * pformula)
+  | Pgenhave    of pgenhave
+  | Pwlog       of (psymbol list * bool * pformula)
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core_r =
@@ -849,7 +885,6 @@ and ptactic_core_r =
   | Psubgoal    of ptactic_chain
   | Pnstrict    of ptactic_core
   | Padmit
-  | Pdebug
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core = ptactic_core_r located
@@ -888,17 +923,16 @@ and pcut =
 (* -------------------------------------------------------------------- *)
 type paxiom_kind =
 | PAxiom of psymbol list
-| PLemma of ptactics option
-| PILemma
+| PLemma of ptactics option option
 
 type paxiom = {
-  pa_name    : psymbol;
-  pa_tyvars  : (psymbol * pqsymbol list) list option;
-  pa_vars    : pgtybindings option;
-  pa_formula : pformula;
-  pa_kind    : paxiom_kind;
-  pa_nosmt   : bool;
-  pa_local   : bool;
+  pa_name     : psymbol;
+  pa_tyvars   : (psymbol * pqsymbol list) list option;
+  pa_vars     : pgtybindings option;
+  pa_formula  : pformula;
+  pa_kind     : paxiom_kind;
+  pa_nosmt    : bool;
+  pa_locality : locality;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -913,6 +947,7 @@ type ptypeclass = {
   ptc_inth : pqsymbol option;
   ptc_ops  : (psymbol * pty) list;
   ptc_axs  : (psymbol * pformula) list;
+  ptc_loca : is_local;
 }
 
 type ptycinstance = {
@@ -921,6 +956,7 @@ type ptycinstance = {
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
   pti_args : [`Ring of (zint option * zint option)] option;
+  pti_loca : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -989,7 +1025,7 @@ type theory_cloning = {
   pthc_rnm    : theory_renaming list;
   pthc_opts   : theory_cloning_options;
   pthc_clears : theory_cloning_clear list;
-  pthc_local  : bool;
+  pthc_local  : is_local;
   pthc_import : [`Export | `Import | `Include] option;
 }
 
@@ -1081,7 +1117,7 @@ type theory_clear = (pqsymbol option) list
 
 (* -------------------------------------------------------------------- *)
 type phint = {
-  ht_local : bool;
+  ht_local : is_local;
   ht_prio  : int;
   ht_base  : psymbol option;
   ht_names : pqsymbol list;
@@ -1099,9 +1135,8 @@ type threquire =
 
 (* -------------------------------------------------------------------- *)
 type global_action =
-  | Gdeclare     of pdeclare
-  | Gmodule      of pmodule_def
-  | Ginterface   of (psymbol * pmodule_sig)
+  | Gmodule      of pmodule_def_or_decl
+  | Ginterface   of pinterface
   | Goperator    of poperator
   | Gpredicate   of ppredicate
   | Gnotation    of pnotation
@@ -1110,12 +1145,13 @@ type global_action =
   | Gtype        of ptydecl list
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
-  | Gaddrw       of (bool * pqsymbol * pqsymbol list)
+  | Gaddrw       of (is_local * pqsymbol * pqsymbol list)
   | Greduction   of puserred
   | Ghint        of phint
   | Gprint       of pprint
   | Gsearch      of pformula list
-  | GthOpen      of (bool * psymbol)
+  | Glocate      of pqsymbol
+  | GthOpen      of (is_local * bool * psymbol)
   | GthClose     of (theory_clear * psymbol)
   | GthClear     of theory_clear
   | GthRequire   of threquire
@@ -1136,7 +1172,7 @@ type global_action =
 
 type global = {
   gl_action : global_action located;
-  gl_timed  : bool;
+  gl_debug  : [`Timed | `Break] option;
 }
 
 type prog_r =

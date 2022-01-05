@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -89,7 +89,7 @@ case: (m < size s) => [lt_m_s|/lerNgt gt_m_s]; last first.
 + rewrite nth_default.
   * by rewrite size_map size_range /= ler_maxr ?size_ge0.
   by rewrite !binp // ~-1:/# !nth_default ~-1://#.
-rewrite (nth_map 0) 1:size_range /= 1:ler_maxr // 1:size_ge0.
+rewrite (nth_map 0) 1:size_range /= 1:ler_maxr //.
 by rewrite !nth_range //= !binp //#.
 qed.
 

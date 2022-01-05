@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -107,6 +107,7 @@ and callable_oracles_i env modv os i =
   match i.i_node with
     | Scall  (_, f, _)   -> callable_oracles_f  env modv os f
     | Swhile (_, s)      -> callable_oracles_s  env modv os s
+    | Smatch (_, b)      -> callable_oracles_sx env modv os (List.map snd b)
     | Sif    (_, s1, s2) -> callable_oracles_sx env modv os [s1; s2]
 
     | Sasgn _ | Srnd _ | Sassert _ -> os

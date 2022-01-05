@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -53,9 +53,12 @@
     "var"         , VAR        ;        (* KW: prog *)
     "proc"        , PROC       ;        (* KW: prog *)
     "if"          , IF         ;        (* KW: prog *)
+    "is"          , IS         ;        (* KW: prog *)
+    "match"       , MATCH      ;        (* KW: prog *)
     "then"        , THEN       ;        (* KW: prog *)
     "else"        , ELSE       ;        (* KW: prog *)
     "elif"        , ELIF       ;        (* KW: prog *)
+    "match"       , MATCH      ;        (* KW: prog *)
     "for"         , FOR        ;        (* KW: prog *)
     "while"       , WHILE      ;        (* KW: prog *)
     "assert"      , ASSERT     ;        (* KW: prog *)
@@ -93,6 +96,7 @@
     "case"        , CASE       ;        (* KW: tactic *)
 
     "pose"        , POSE       ;        (* KW: tactic *)
+    "gen"         , GEN        ;        (* KW: tactic *)
     "have"        , HAVE       ;        (* KW: tactic *)
     "suff"        , SUFF       ;        (* KW: tactic *)
     "elim"        , ELIM       ;        (* KW: tactic *)
@@ -195,6 +199,7 @@
     "instance"    , INSTANCE   ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "search"      , SEARCH     ;        (* KW: global *)
+    "locate"      , LOCATE     ;        (* KW: global *)
     "as"          , AS         ;        (* KW: global *)
     "Pr"          , PR         ;        (* KW: global *)
     "clone"       , CLONE      ;        (* KW: global *)
@@ -423,7 +428,9 @@ rule main = parse
   | '.' (eof | blank | newline as r) {
       if r = "\n" then
         Lexing.new_line lexbuf;
-      [FINAL]
+      let lc = Lexing.lexeme_start_p lexbuf in
+      let lc = { lc with pos_cnum = lc.pos_cnum + 1; } in
+      [FINAL lc]
     }
 
   | "." { [DOT] }

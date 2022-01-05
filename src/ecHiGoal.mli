@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -46,26 +46,28 @@ module LowRewrite : sig
   | LRW_InvalidOccurence
   | LRW_CannotInfer
   | LRW_IdRewriting
+  | LRW_RPatternNoMatch
+  | LRW_RPatternNoRuleMatch
 
   exception RewriteError of error
 
   val find_rewrite_patterns:
     rwside -> pt_ev -> (pt_ev * rwmode * (form * form)) list
 
+  type rwinfos = rwside * EcFol.form option * EcMatching.occ option
+
   val t_rewrite_r:
       ?mode:[ `Full | `Light] ->
-      ?target:EcIdent.t ->
-    rwside * EcMatching.occ option -> pt_ev -> backward
+      ?target:EcIdent.t -> rwinfos -> pt_ev -> backward
 
-  val t_rewrite:?target:EcIdent.t ->
-    rwside * EcMatching.occ option -> proofterm -> backward
+  val t_rewrite:?target:EcIdent.t -> rwinfos -> proofterm -> backward
 
   val t_autorewrite: EcPath.path list -> backward
 end
 
 (* -------------------------------------------------------------------- *)
 val t_apply_prept : prept -> backward
-val t_rewrite_prept: rwside * EcMatching.occ option -> prept -> backward
+val t_rewrite_prept: LowRewrite.rwinfos -> prept -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_reflexivity : backward
@@ -98,7 +100,8 @@ val process_simplify    : preduction -> backward
 val process_cbv         : preduction -> backward
 val process_pose        : psymbol -> ptybindings -> rwocc -> pformula -> backward
 val process_done        : backward
-val process_wlog        : psymbol list -> pformula -> backward
+val process_wlog        : suff:bool -> psymbol list -> pformula -> backward
+val process_genhave     : ttenv -> pgenhave -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_algebra : [`Solve] -> [`Ring|`Field] -> psymbol list -> backward

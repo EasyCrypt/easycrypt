@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -51,14 +51,12 @@ module LowInternal = struct
 
   and assignables = assignable list
 
-  type assoc_t = (assignable list * form) list
-
   (* ------------------------------------------------------------------ *)
   let isAPVar  = function APVar  _ -> true | _ -> false
   let isALocal = function ALocal _ -> true | _ -> false
 
   (* ------------------------------------------------------------------ *)
-  let rec sp_asgn mem env lv e (bds, assoc, pre) =
+  let sp_asgn mem env lv e (bds, assoc, pre) =
     let subst_in_assoc lv new_id_exp new_ids ((ass : assignables), f) =
       let replace_assignable var =
         match var with

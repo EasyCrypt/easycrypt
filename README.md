@@ -28,7 +28,7 @@ Installation requirements
 
 EasyCrypt uses the following third-party tools/libraries:
 
- * OCaml (>= 4.05)
+ * OCaml (>= 4.08)
 
      Available at http://caml.inria.fr/
 

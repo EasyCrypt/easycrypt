@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -126,11 +126,12 @@ module Mpv = struct
     | Scall  (lv, f, es) -> i_call   (lv, f, List.map esubst es)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
+    | Smatch (e, b)      -> i_match  (esubst e, List.Smart.map (snd_map ssubst) b)
     | Sassert e          -> i_assert (esubst e)
     | Sabstract _        -> i
 
   and issubst env (s : esubst) (is : instr list) =
-    List.map (isubst env s) is
+    List.Smart.map (isubst env s) is
 
   and ssubst env (s : esubst) (st : stmt) =
     stmt (issubst env s st.s_node)
@@ -287,35 +288,83 @@ module PV = struct
   let fv env m f =
 
     let remove b fv =
-      let do1 fv (id,gty) =
+      let do1 fv (id, gty) =
         match gty with
-        | GTmodty _ -> { fv with s_gl = Sm.remove (EcPath.mident id) fv.s_gl }
+        | GTmodty _ ->
+            { fv with s_gl = Sm.remove (EcPath.mident id) fv.s_gl }
         | _ -> fv in
       List.fold_left do1 fv b in
 
     let rec aux env fv f =
       match f.f_node with
-      | Fquant(_,b,f1) ->
+      | Fquant (_, b, f1) ->
         let env = Mod.add_mod_binding b env in
         let fv1 = aux env fv f1 in
         remove b fv1
-      | Fif(f1,f2,f3) -> List.fold_left (aux env) fv [f1;f2;f3]
-      | Fmatch(b,bs,_) -> List.fold_left (aux env) fv (b::bs)
-      | Flet(_,f1,f2) -> aux env (aux env fv f1) f2
-      | Fpvar(x,m') ->
+
+      | Fif (f1, f2, f3) ->
+          List.fold_left (aux env) fv [f1; f2; f3]
+
+      | Fmatch (b, bs, _) ->
+          List.fold_left (aux env) fv (b :: bs)
+
+      | Flet (_, f1, f2) ->
+          aux env (aux env fv f1) f2
+
+      | Fpvar (x, m') ->
         if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
-      | Fglob (mp,m') ->
+
+      | Fglob (mp, m') ->
         if EcIdent.id_equal m m' then
           let f' = NormMp.norm_glob env m mp in
-          if f_equal f f' then add_glob env mp fv
+          if   f_equal f f'
+          then add_glob env mp fv
           else aux env fv f'
         else fv
+
       | Fint _ | Flocal _ | Fop _ -> fv
-      | Fapp(e, es) -> List.fold_left (aux env) (aux env fv e) es
-      | Ftuple es   -> List.fold_left (aux env) fv es
-      | Fproj(e,_)  -> aux env fv e
-      | FhoareF _  | FhoareS _ | FbdHoareF _  | FbdHoareS _
-      | FequivF _ | FequivS _ | FeagerF _ | Fpr _ -> assert false
+
+      | Fapp (e, es) ->
+          List.fold_left (aux env) (aux env fv e) es
+
+      | Ftuple es ->
+          List.fold_left (aux env) fv es
+
+      | Fproj (e, _) ->
+          aux env fv e
+
+      | FhoareF hf ->
+          in_mem_scope env fv [mhr] [hf.hf_pr; hf.hf_po]
+
+      | FhoareS hs ->
+          in_mem_scope env fv [fst hs.hs_m] [hs.hs_pr; hs.hs_po]
+
+      | FbdHoareF bhf ->
+          in_mem_scope env fv [mhr] [bhf.bhf_pr; bhf.bhf_po; bhf.bhf_bd]
+
+
+      | FbdHoareS bhs ->
+          in_mem_scope env fv
+            [fst bhs.bhs_m] [bhs.bhs_pr; bhs.bhs_po; bhs.bhs_bd]
+
+      | FequivF ef ->
+          in_mem_scope env fv [mleft; mright] [ef.ef_pr; ef.ef_po]
+
+      | FequivS es ->
+          in_mem_scope env fv [fst es.es_ml; fst es.es_mr] [es.es_pr; es.es_po]
+
+      | FeagerF eg ->
+          in_mem_scope env fv [mhr] [eg.eg_pr; eg.eg_po]
+
+      | Fpr pr ->
+          let fv = aux env fv pr.pr_args in
+          in_mem_scope env fv [pr.pr_mem] [pr.pr_event]
+
+    and in_mem_scope env fv mems fs =
+      if   List.exists (EcIdent.id_equal m) mems
+      then fv
+      else List.fold_left (aux env) fv fs
+
     in
     aux env empty f
 
@@ -472,6 +521,9 @@ and i_write_r ?(except=Sx.empty) env w i =
   | Swhile (_, s) ->
       s_write_r ~except env w s
 
+  | Smatch (_, b) ->
+      List.fold_left (fun w (_, b) -> s_write_r ~except env w b) w b
+
   | Sabstract id ->
       let us = AbsStmt.byid id env in
       let add_pv w (pv,ty) = PV.add env pv ty w in
@@ -527,6 +579,11 @@ and i_read_r env r i =
   | Swhile (e, s) ->
       s_read_r env (e_read_r env r e) s
 
+  | Smatch (e, b) ->
+      List.fold_left
+        (fun r (_, b) -> s_read_r env r b)
+        (e_read_r env r e) b
+
   | Sabstract id ->
       let us = AbsStmt.byid id env in
       let add_pv r (pv,ty) = PV.add env pv ty r in
@@ -556,7 +613,10 @@ module Mpv2 = struct
     s_gl : Sm.t;
   }
 
+  type local = EcIdent.t EcIdent.Mid.t
+
   let empty = { s_pv = Mnpv.empty; s_gl = Sm.empty }
+  let empty_local = EcIdent.Mid.empty
 
   let add env ty pv1 pv2 eqs =
     let pv1 = pvm env pv1 in
@@ -876,11 +936,11 @@ module Mpv2 = struct
 
 (*add_eqs env local eqs e1 e2 : collect a set of equalities with ensure the
    equality of e1 and e2 *)
-  let rec add_eqs env local eqs e1 e2 =
+  let rec add_eqs_loc env local eqs e1 e2 =
     match e1.e_node, e2.e_node with
     | Equant(qt1,bds1,e1), Equant(qt2,bds2,e2) when qt_equal qt1 qt2 ->
       let local = enter_local env local bds1 bds2 in
-      add_eqs env local eqs e1 e2
+      add_eqs_loc env local eqs e1 e2
     | Eint i1, Eint i2 when EcBigInt.equal i1 i2 -> eqs
     | Elocal x1, Elocal x2 when
         opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs
@@ -893,24 +953,24 @@ module Mpv2 = struct
       when EcPath.p_equal op1 op2 &&
         List.all2  (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
     | Eapp(f1,a1), Eapp(f2,a2) ->
-      List.fold_left2 (add_eqs env local) eqs (f1::a1) (f2::a2)
+      List.fold_left2 (add_eqs_loc env local) eqs (f1::a1) (f2::a2)
     | Elet(lp1,a1,b1), Elet(lp2,a2,b2) ->
       let blocal = enter_local env local (lp_bind lp1) (lp_bind lp2) in
-      let eqs = add_eqs env local eqs a1 a2 in
-      add_eqs env blocal eqs b1 b2
+      let eqs = add_eqs_loc env local eqs a1 a2 in
+      add_eqs_loc env blocal eqs b1 b2
     | Etuple es1, Etuple es2 ->
-      List.fold_left2 (add_eqs env local) eqs es1 es2
+      List.fold_left2 (add_eqs_loc env local) eqs es1 es2
     | Eproj(es1,i1), Eproj(es2,i2) when i1 = i2 ->
-      add_eqs env local eqs es1 es2
+      add_eqs_loc env local eqs es1 es2
     | Eif(e1,t1,f1), Eif(e2,t2,f2) ->
-      List.fold_left2 (add_eqs env local) eqs [e1;t1;f1] [e2;t2;f2]
+      List.fold_left2 (add_eqs_loc env local) eqs [e1;t1;f1] [e2;t2;f2]
     | Ematch(b1,es1,ty1), Ematch(b2,es2,ty2)
       when EcReduction.EqTest.for_type env ty1 ty2
         && EcReduction.EqTest.for_type env b1.e_ty b2.e_ty ->
-      List.fold_left2 (add_eqs env local) eqs (b1::es1) (b2::es2)
+      List.fold_left2 (add_eqs_loc env local) eqs (b1::es1) (b2::es2)
     | _, _ -> raise EqObsInError
 
-  let add_eqs env e1 e2 eqs =  add_eqs env Mid.empty eqs e1 e2
+  let add_eqs env e1 e2 eqs =  add_eqs_loc env Mid.empty eqs e1 e2
 
 end
 
@@ -975,6 +1035,12 @@ and i_eqobs_in_refl env i eqo =
       if PV.subset eqi eqo then eqo
       else aux (PV.union eqi eqo) in
     aux (add_eqs_refl env eqo e)
+
+  | Smatch(e,bs) ->
+    (* FIXME: match: something to do with constructors variables? *)
+    let eqs = List.map (fun s -> s_eqobs_in_refl env s eqo) (List.snd bs) in
+    let eqs = List.fold_left PV.union PV.empty eqs in
+    add_eqs_refl env eqs e
 
   | Sassert e -> add_eqs_refl env eqo e
   | Sabstract _ -> assert false

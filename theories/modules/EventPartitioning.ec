@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -21,7 +21,7 @@ abstract theory ListPartitioning.
   type partition.
 
   section.
-  declare module M : T.
+  declare module M <: T.
 
   lemma list_partitioning
           (i : input)
@@ -54,7 +54,7 @@ abstract theory FSetPartitioning.
   type partition.
 
   section.
-  declare module M : T.
+  declare module M <: T.
 
   local clone import ListPartitioning with
     type partition <- partition.
@@ -80,7 +80,7 @@ abstract theory FPredPartitioning.
   type partition.
 
   section.
-  declare module M : T.
+  declare module M <: T.
 
   local clone import ListPartitioning with
     type partition <- partition.
@@ -104,7 +104,7 @@ end FPredPartitioning.
 
 theory ResultPartitioning.
   section.
-  declare module M : T.
+  declare module M <: T.
 
   local clone import ListPartitioning with
     type partition <- output.
@@ -128,7 +128,7 @@ theory TotalResultPartitioning.
   (*---*) import ResultPartitioning.
 
   section.
-  declare module M : T.
+  declare module M <: T.
 
   lemma total_result_partitioning
           (i : input)
@@ -154,9 +154,9 @@ theory TotalSubuniformResultOnly.
   import TotalResultPartitioning.
 
   section.
-  declare module M : T.
+  declare module M <: T.
 
-  axiom M_suf a b i (X:input -> output list) &m:
+  declare axiom M_suf a b i (X:input -> output list) &m:
        mem (X i) a
     => mem (X i) b
     => Pr[M.f(i) @ &m: res = a] = Pr[M.f(i) @ &m: res = b].
@@ -177,7 +177,7 @@ theory TotalSubuniformResultOnly.
   end section.
 end TotalSubuniformResultOnly.
 
-theory SubuniformReference.
+abstract theory SubuniformReference.
   import TotalSubuniformResultOnly.
   (*---*) import MUniform DScalar.
 
@@ -197,14 +197,14 @@ theory SubuniformReference.
   }.
 
   section.
-  declare module M : T.
+  declare module M <: T.
 
-  axiom M_suf a b i X &m:
+  declare axiom M_suf a b i X &m:
        List.mem (X i) a
     => mem (X i) b
     => Pr[M.f(i) @ &m: res = a] = Pr[M.f(i) @ &m: res = b].
 
-  axiom weight_M: phoare [M.f: true ==> true] =(k arg).
+  declare axiom weight_M: phoare [M.f: true ==> true] =(k arg).
 
   lemma pr_res_notin_X a i X &m:
        (forall i, hoare [M.f: arg = i ==> List.mem (X i) res])

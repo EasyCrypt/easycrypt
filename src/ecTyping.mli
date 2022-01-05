@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -16,6 +16,10 @@ open EcLocation
 open EcParsetree
 open EcTypes
 open EcModules
+
+(* -------------------------------------------------------------------- *)
+type wp = EcEnv.env -> EcMemory.memory -> stmt -> EcFol.form -> EcFol.form option
+val  wp : wp option ref
 
 (* -------------------------------------------------------------------- *)
 type opmatch = [
@@ -58,6 +62,18 @@ type funapp_error =
 type mem_error =
 | MAE_IsConcrete
 
+type fxerror =
+| FXE_EmptyMatch
+| FXE_MatchParamsMixed
+| FXE_MatchParamsDup
+| FXE_MatchParamsUnk
+| FXE_MatchNonLinear
+| FXE_MatchDupBranches
+| FXE_MatchPartial
+| FXE_CtorUnk
+| FXE_CtorAmbiguous
+| FXE_CtorInvalidArity of (symbol * int * int)
+
 type filter_error =
 | FE_InvalidIndex of int
 | FE_NoMatch
@@ -91,6 +107,7 @@ type tyerror =
 | TypeClassMismatch
 | TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
+| NotAnInductive
 | AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
@@ -104,12 +121,14 @@ type tyerror =
 | InvalidModType         of modtyp_error
 | InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
+| InvalidMatch           of fxerror
 | InvalidFilter          of filter_error
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
 | MemNotAllowed
 | UnknownScope           of qsymbol
+| NoWP
 | FilterMatchFailure
 | LvMapOnNonAssign
 
@@ -172,7 +191,7 @@ val trans_prop     : env -> ?mv:metavs -> EcUnify.unienv -> pformula -> EcFol.fo
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
-val transmodsig  : env -> symbol -> pmodule_sig  -> module_sig
+val transmodsig  : env -> pinterface -> top_module_sig
 val transmodtype : env -> pmodule_type -> module_type * module_sig
 val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 

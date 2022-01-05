@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -93,7 +93,7 @@ theory RField.
         by rewrite mulr0z.
       by rewrite mulrS // ih fromintD mulrDr mulr1 addrC.
     case: (lezWP c 0) => [le0c|_ /h //].
-    rewrite -{2}(@oppzK c) fromintN mulrN -h 1:smt.
+    rewrite -{2}(@oppzK c) fromintN mulrN -h 1:#smt.
     by rewrite mulrNz opprK.
   qed.
 

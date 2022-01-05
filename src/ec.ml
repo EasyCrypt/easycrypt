@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -55,7 +55,7 @@ let print_config config =
     Format.eprintf "load-path:@\n%!";
     List.iter
       (fun (nm, dir) ->
-         Format.eprintf "  %.10s@@%s@\n%!" (string_of_namespace nm) dir)
+         Format.eprintf "  %s@@%s@\n%!" (string_of_namespace nm) dir)
       (EcCommands.loadpath ());
   end;
 
@@ -100,53 +100,51 @@ let print_config config =
 
 (* -------------------------------------------------------------------- *)
 let main () =
-  let myname  = Filename.basename Sys.executable_name
-  and mydir   = Filename.dirname  Sys.executable_name in
-
-  let eclocal =
-    let rex = EcRegexp.regexp "^ec\\.(?:native|byte)(?:\\.exe)?$" in
-    EcRegexp.match_ (`C rex) myname
-  in
-
-  let resource name =
-    match eclocal with
-    | true ->
-        if Filename.basename (Filename.dirname mydir) = "_build" then
-          List.fold_left Filename.concat mydir
-            ([Filename.parent_dir_name;
-              Filename.parent_dir_name] @ name)
-        else
-          List.fold_left Filename.concat mydir name
-
-    | false ->
-        List.fold_left Filename.concat mydir
-          ([Filename.parent_dir_name; "lib"; "easycrypt"] @ name)
-  in
+  let theories =
+    match EcRelocate.sourceroot with
+    | None -> EcRelocate.Sites.theories
+    | Some src -> [Filename.concat src "theories"] in
 
   (* Parse command line arguments *)
   let options =
     let ini =
       let xdgini =
-        XDG.Config.file ~exists:true ~mode:`All ~appname:EcVersion.app
-          confname
-      in List.hd (List.append xdgini [resource ["etc"; "easycrypt.conf"]]) in
+        XDG.Config.file
+          ~exists:true ~mode:`All ~appname:EcVersion.app
+          confname in
+      let localini =
+        Option.map
+          (fun src -> List.fold_left Filename.concat src ["etc"; "easycrypt.conf"])
+          EcRelocate.sourceroot in
+      List.Exceptionless.hd (xdgini @ Option.to_list localini) in
 
     let ini =
-      try  Some (EcOptions.read_ini_file ini)
-      with
-      | Sys_error _ -> None
-      | EcOptions.InvalidIniFile (lineno, file) ->
-          Format.eprintf "%s:%l: cannot read INI file@." file lineno;
-          exit 1
+      Option.bind ini (fun ini ->
+        try  Some (EcOptions.read_ini_file ini)
+        with
+        | Sys_error _ -> None
+        | EcOptions.InvalidIniFile (lineno, file) ->
+            Format.eprintf "%s:%l: cannot read INI file@." file lineno;
+            exit 1
+      )
 
     in EcOptions.parse_cmdline ?ini Sys.argv in
 
   (* chrdir_$PATH if in reloc mode (FIXME / HACK) *)
   let relocdir =
     match options.o_options.o_reloc with
+    | true when Option.is_none EcRelocate.sourceroot ->
+        let pwd = Sys.getcwd () in
+        Sys.chdir (
+          List.fold_left Filename.concat
+            (List.hd EcRelocate.Sites.theories)
+            (List.init 3 (fun _ -> ".."))
+        ); Some pwd
+
     | true ->
-      let pwd = Sys.getcwd () in
-        Sys.chdir (resource [".."; ".."]); Some pwd
+        Format.eprintf "cannot relocate a local installation@.";
+        exit 1
+
     | false ->
         None
   in
@@ -179,11 +177,11 @@ let main () =
   let ldropts = options.o_options.o_loader in
 
   begin
-    let theories = resource ["theories"] in
-
-    EcCommands.addidir ~namespace:`System (Filename.concat theories "prelude");
-    if not ldropts.ldro_boot then
-      EcCommands.addidir ~namespace:`System ~recursive:true theories;
+    List.iter (fun theory ->
+      EcCommands.addidir ~namespace:`System (Filename.concat theory "prelude");
+      if not ldropts.ldro_boot then
+        EcCommands.addidir ~namespace:`System ~recursive:true theory
+    ) theories;
     List.iter (fun (onm, name, isrec) ->
         EcCommands.addidir
           ?namespace:(omap (fun nm -> `Named nm) onm)
@@ -257,7 +255,7 @@ let main () =
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false, cmpopts.cmpo_noeco)
 
-    end
+      end
   in
 
   (match input with
@@ -293,7 +291,7 @@ let main () =
                    let ecr = EcEco.{
                      eco_digest = x.rqd_digest;
                      eco_kind   = x.rqd_kind;
-                   } in (x.rqd_name, ecr))
+                   } in (x.rqd_name, (ecr, x.rqd_direct)))
                 (EcScope.Theory.required scope));
         } in
 
@@ -324,9 +322,6 @@ let main () =
 
   (* Initialize PRNG *)
   Random.self_init ();
-
-  (* Initialize fortune *)
-  EcFortune.init ();
 
   (* Display Copyright *)
   if EcTerminal.interactive terminal then
@@ -390,9 +385,11 @@ let main () =
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+                   let timed = p.EP.gl_debug = Some `Timed in
+                   let break = p.EP.gl_debug = Some `Break in
                      try
                        let tdelta =
-                         EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
+                         EcCommands.process ~timed ~break p.EP.gl_action
                        in tstats loc tdelta
                      with
                      | EcCommands.Restart ->

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -185,7 +185,7 @@ module Zipper = struct
     in
       List.rev after
 
-  let rec fold env cpos f state s =
+  let fold env cpos f state s =
     let zpr = zipper_of_cpos cpos s in
 
       match zpr.z_tail with

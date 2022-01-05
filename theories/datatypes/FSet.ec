@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -178,6 +178,22 @@ proof. by move=> x'; rewrite in_fsetI in_fset1. qed.
 lemma in_fsetD1 (s : 'a fset) x:
   forall x', mem (s `\` fset1 x) x' <=> mem s x' /\ x' <> x.
 proof. by move=> x'; rewrite in_fsetD in_fset1. qed.
+
+(* -------------------------------------------------------------------- *)
+abbrev disjoint (xs ys : 'a fset) = xs `&` ys = fset0.
+
+lemma disjointP (xs ys : 'a fset):
+  disjoint xs ys <=> forall (x : 'a), x \in xs => ! x \in ys.
+proof.
+split=> [disj_xs_ys x x_in_xs | all_xs_not_in_ys].
+case (x \in ys)=> [x_in_ys | //].
+have x_in_inter_xs_ys: x \in (xs `&` ys) by rewrite in_fsetI.
+by rewrite /= -(in_fset0 x) -disj_xs_ys in_fsetI.
+rewrite fsetP=> x.
+rewrite in_fsetI in_fset0 /= negb_and.
+case (x \in xs)=> [x_in_xs | //].
+right; by rewrite all_xs_not_in_ys.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op pick ['a] (A : 'a fset) = head witness (elems A)
@@ -624,6 +640,15 @@ proof.
     by rewrite fcardU fcard1 ler_naddr 1:oppr_le0 1:fcard_ge0.
   rewrite fcardU fsetI1 x_notin_A fcards0 fcard1 oppz0 addz0.
   by rewrite ler_add2r.
+qed.
+
+lemma inj_fcard_image (f : 'a -> 'b) (A : 'a fset) :
+    injective f => card (image f A) = card A.
+proof.
+move => inj_f.
+have/oflist_uniq uniq_f : uniq (map f (elems A)).
+  apply map_inj_in_uniq => *; [exact inj_f|exact uniq_elems].
+by rewrite /image /card -(perm_eq_size _ _ uniq_f) size_map.
 qed.
 
 (* -------------------------------------------------------------------- *)

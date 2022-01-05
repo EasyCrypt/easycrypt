@@ -1,3 +1,11 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
 require import AllCore FSet CoreMap SmtMap CyclicGroup List.
 require import Distr DList DJoin DMap StdOrder.
 require import AEAD.
@@ -1147,7 +1155,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
            move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap). 
        rewrite size_map /range /= size_iota ler_maxr 1:size_ge0. 
        apply eq_in_map => y /mem_iota /= [? ?] /=.
-       by rewrite (nth_map witness) /= 1:[smt (size_iota)] nth_iota.
+       by rewrite (nth_map witness) /= 1:#smt:(size_iota) nth_iota.
      - rewrite H2. 
            move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap). 
   wp; skip; rewrite /inv /=; clear inv; progress.
@@ -1226,7 +1234,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     move=> /onth_map_some => [[pk']]; progress.
     move: H15 => /onth_map_some [[i' c']]; progress.
     move: H15 => /onth_zip_some [] /onth_iota_some; progress.
-    rewrite assoc_zip 1:[smt (size_map)] (onth_nth witness). 
+    rewrite assoc_zip 1:#smt:(size_map) (onth_nth witness). 
     + smt (index_map onth_some index_uniq uniq_elems).
     congr.
     rewrite nth_cat.

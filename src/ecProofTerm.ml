@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -148,7 +148,7 @@ let concretize_form pe f =
   concretize_e_form (concretize_env pe) f
 
 (* -------------------------------------------------------------------- *)
-let rec concretize ({ ptev_env = pe } as pt) =
+let concretize ({ ptev_env = pe } as pt) =
   let (CPTEnv subst) as cptenv = concretize_env pe in
   (concretize_e_pt cptenv pt.ptev_pt, Fsubst.f_subst subst pt.ptev_ax)
 
@@ -203,9 +203,8 @@ let pt_of_handle_r ptenv hd =
     ptev_ax  = g.g_concl; }
 
 (* -------------------------------------------------------------------- *)
-let pt_of_uglobal pf hyps p =
-  let ptenv   = ptenv_of_penv hyps pf in
-  let env     = LDecl.toenv hyps in
+let pt_of_uglobal_r ptenv p =
+  let env     = LDecl.toenv ptenv.pte_hy in
   let ax      = oget (EcEnv.Ax.by_path_opt p env) in
   let typ, ax = (ax.EcDecl.ax_tparams, ax.EcDecl.ax_spec) in
 
@@ -217,6 +216,11 @@ let pt_of_uglobal pf hyps p =
   { ptev_env = ptenv;
     ptev_pt  = { pt_head = PTGlobal (p, typ); pt_args = []; };
     ptev_ax  = ax; }
+
+(* -------------------------------------------------------------------- *)
+let pt_of_uglobal pf hyps p =
+  let ptenv = ptenv_of_penv hyps pf in
+  pt_of_uglobal_r ptenv p
 
 (* -------------------------------------------------------------------- *)
 let get_implicits (hyps : LDecl.hyps) (f : form) : bool list =
@@ -277,7 +281,9 @@ type occmode = {
 
 let om_rigid = { k_keyed = true; k_conv = false; }
 
-let rec pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
+let pf_find_occurence
+  (pt : pt_env) ?(full = true) ?(rooted = false) ?occmode ~ptn subject
+=
   let module E = struct exception MatchFound of form end in
 
   let occmode = odfl { k_keyed = false; k_conv = true; } occmode in
@@ -337,10 +343,13 @@ let rec pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
   let (ue, pe) = (EcUnify.UniEnv.copy pt.pte_ue, !(pt.pte_ev)) in
 
   try
-    ignore (EcMatching.FPosition.select (trymatch mode) subject);
-    raise (FindOccFailure `MatchFailure)
+    let _ =
+      if   rooted
+      then ignore (trymatch mode Mid.empty subject)
+      else ignore (EcMatching.FPosition.select (trymatch mode) subject)
+    in raise (FindOccFailure `MatchFailure)
   with E.MatchFound subf ->
-     if not (can_concretize pt) then begin
+     if full && not (can_concretize pt) then begin
        EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue; pt.pte_ev := pe;
        raise (FindOccFailure `IncompleteMatch)
      end;
@@ -353,24 +362,28 @@ let default_modes = [
   { k_keyed = false; k_conv =  true; };
 ]
 
-let pf_find_occurence_lazy (pt : pt_env) ?(modes = default_modes) ~ptn subject =
+let pf_find_occurence_lazy
+  (pt : pt_env) ?full ?rooted ?(modes = default_modes) ~ptn subject
+=
   let rec doit (modes : occmode list) =
     match modes with
     | [] ->
         assert false
     | [occmode] ->
-        (pf_find_occurence pt ~occmode ~ptn subject, occmode)
+        (pf_find_occurence ?full ?rooted pt ~occmode ~ptn subject, occmode)
     | occmode :: modes ->
-      try  (pf_find_occurence pt ~occmode ~ptn subject, occmode)
+      try  (pf_find_occurence ?full ?rooted pt ~occmode ~ptn subject, occmode)
       with FindOccFailure _ -> doit modes in
 
   doit modes
 
 (* --------------------------------------------------------------------- *)
-let pf_find_occurence (pt : pt_env) ?occmode ~ptn subject =
+let pf_find_occurence (pt : pt_env) ?full ?rooted ?occmode ~ptn subject =
   match occmode with
-  | Some occmode -> (pf_find_occurence pt ~occmode ~ptn subject, occmode)
-  | None         -> pf_find_occurence_lazy pt ~ptn subject
+  | Some occmode ->
+      (pf_find_occurence ?full ?rooted pt ~occmode ~ptn subject, occmode)
+  | None ->
+      pf_find_occurence_lazy ?full ?rooted pt ~ptn subject
 
 (* -------------------------------------------------------------------- *)
 let pf_unify (pt : pt_env) ty1 ty2 =
@@ -506,7 +519,7 @@ let process_pterm pe pt =
     match fp with
     | None    -> tc_pterm_apperror pe AE_CannotInfer
     | Some fp -> PT.pf_process_formula pe.pte_pe pe.pte_hy fp
-  in process_pterm_cut prcut pe pt
+  in process_pterm_cut ~prcut pe pt
 
 (* ------------------------------------------------------------------ *)
 let rec trans_pterm_arg_impl pe f =
@@ -742,6 +755,26 @@ and apply_pterm_to_hole ?loc pt =
 (* -------------------------------------------------------------------- *)
 and apply_pterm_to_holes ?loc n pt =
   EcUtils.iterop (apply_pterm_to_hole ?loc) n pt
+
+(* -------------------------------------------------------------------- *)
+and apply_pterm_to_local ?loc pt id =
+  match LDecl.by_id id pt.ptev_env.pte_hy with
+  | LD_var (ty, _) ->
+      apply_pterm_to_arg_r ?loc pt (PVAFormula (f_local id ty))
+
+  | LD_modty (mty, _) ->
+      let env  = LDecl.toenv pt.ptev_env.pte_hy in
+      let msig = EcEnv.ModTy.sig_of_mt env mty in
+      apply_pterm_to_arg_r ?loc pt (PVAModule (EcPath.mident id, msig))
+
+  | LD_hyp _ ->
+      let sub = pt_of_hyp_r pt.ptev_env id in
+      apply_pterm_to_arg_r ?loc pt (PVASub sub)
+
+  | LD_mem _ ->
+      apply_pterm_to_arg_r ?loc pt (PVAMemory id)
+
+  | LD_abs_st _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 and process_implicits ip ({ ptev_pt = pt; ptev_env = env; } as pe) =

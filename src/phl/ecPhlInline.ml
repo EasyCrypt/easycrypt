@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -25,6 +25,7 @@ type i_pat =
   | IPpat
   | IPif    of s_pat pair
   | IPwhile of s_pat
+  | IPmatch of s_pat list
 
 and s_pat = (int * i_pat) list
 
@@ -53,11 +54,12 @@ module LowSubst = struct
     | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst m), f, List.map esubst es)
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
+    | Smatch (e, bs)     -> i_match  (esubst e, List.Smart.map (snd_map ssubst) bs)
     | Sassert e          -> i_assert (esubst e)
     | Sabstract _        -> i
 
   and issubst m (is : instr list) =
-    List.map (isubst m) is
+    List.Smart.map (isubst m) is
 
   and ssubst m (st : stmt) =
     stmt (issubst m st.s_node)
@@ -149,13 +151,19 @@ module LowInternal = struct
       match ip, i.i_node with
       | IPpat, Scall (lv, p, args) ->
           inline1 me lv p args
-      | IPif(sp1, sp2), Sif(e,s1,s2) ->
-          let me,s1 = inline_s me sp1 s1.s_node in
-          let me,s2 = inline_s me sp2 s2.s_node in
+      | IPif (sp1, sp2), Sif (e, s1, s2) ->
+          let me, s1 = inline_s me sp1 s1.s_node in
+          let me, s2 = inline_s me sp2 s2.s_node in
           me, [i_if (e, stmt s1, stmt s2)]
-      | IPwhile sp, Swhile(e,s) ->
+      | IPwhile sp, Swhile (e, s) ->
           let me, s = inline_s me sp s.s_node in
-          me, [i_while(e,stmt s)]
+          me, [i_while (e, stmt s)]
+      | IPmatch sps, Smatch (e, bs) ->
+          let me, bs = List.fold_left_map (fun me (sp, (xs, s)) ->
+              let me, s = inline_s me sp s.s_node in (me, (xs, stmt s)))
+            me (List.combine sps bs)
+          in me, [i_match (e, bs)]
+
       | _, _ -> assert false (* FIXME error message *)
 
     and inline_s me sp s =
@@ -240,6 +248,12 @@ module HiInternal = struct
       | Swhile (_, s) ->
           let sp = aux_s 0 s.s_node in
           if List.is_empty sp then None else Some (IPwhile (sp))
+
+      | Smatch (_, bs) ->
+          let sps = List.map (fun (_, b) -> aux_s 0 b.s_node) bs in
+          if   List.for_all List.is_empty sps
+          then None
+          else Some (IPmatch sps)
 
       | _ -> None
 

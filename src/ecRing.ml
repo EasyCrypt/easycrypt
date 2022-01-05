@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -349,7 +349,7 @@ module Make (C : Coef) : Rnorm = struct
         | c when c > 0 -> cm2 :: add p1 p2'
         | _ -> cons (C.cadd c1 c2) m1 (add p1' p2')
 
-    let rec opp (p : t) : t =
+    let opp (p : t) : t =
       List.map (fst_map C.copp) p
 
     let rec sub (p1 : t) (p2 : t) : t =
