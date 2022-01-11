@@ -180,7 +180,7 @@ theory DHIES.
   lemma nosmt mencDHIES_eq : equiv [MEnc.mencDHIES1 ~ MEnc.mencDHIES2: ={tag,ptxt,kks} ==> ={res}].
   proof.
   proc.
-  transitivity{1} { mcph <- MEncDHIES_loop.S.loop(encDHIES tag ptxt, kks); }
+  transitivity{1} { mcph <@ MEncDHIES_loop.S.loop(encDHIES tag ptxt, kks); }
                   ( ={tag, ptxt, kks} ==> ={mcph} )
                   ( ={tag, ptxt, kks} ==> mcph{1}=cphl{2} ).
   + by move=> *; exists kks{2} ptxt{2} tag{2}.
@@ -193,7 +193,7 @@ theory DHIES.
     - by inline*; wp; rnd; wp.
     - by call MEncDHIES_loop.Sample_Loop_eq.
   transitivity{2} { skeys <- map (snd \o snd) kks;
-                    cs <- MEnc_loop.S.loop(fun k=> enc k tag ptxt, skeys); 
+                    cs <@ MEnc_loop.S.loop(fun k=> enc k tag ptxt, skeys); 
                     cphl <- map (fun x:(_*(_*_))*_ => (x.`1.`1, (x.`1.`2.`1, x.`2)))
                                 (zip kks cs); }
                   ( ={tag, ptxt, kks} ==> mcph{1}=cphl{2} )
@@ -519,7 +519,7 @@ module Adv1(A : MRPKE_Adv, O : ODH_OrclT) = {
       var b,b' : bool;
       b <$ {0,1};
       Adv1_Procs(O).init(b);
-      b' <- A.guess();
+      b' <@ A.guess();
       return (MRPKE_lor.b = b');
    }    
 }.
@@ -952,7 +952,7 @@ module Adv2(A : MRPKE_Adv, O : AEADmul_OraclesT) = {
    proc guess() : bool = {
       var b' : bool;
       Adv2_Procs(O).init();
-      b' <- A.guess();
+      b' <@ A.guess();
       return b';
    }    
 }.

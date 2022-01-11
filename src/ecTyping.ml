@@ -177,6 +177,7 @@ type tyerror =
 | ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
 | NoDefaultMemRestr
+| ProcAssign             of qsymbol
 
 (* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -2859,16 +2860,9 @@ and transinstr
 
   | PSasgn (plvalue, prvalue) -> begin
       match unloc prvalue with
-      | PEapp ( { pl_desc = PEident (f, None) },
-                [{ pl_desc = PEtuple es; pl_loc = les; }])
+      | PEapp ( { pl_desc = PEident (f, None) }, _)
           when EcEnv.Fun.lookup_opt (unloc f) env <> None
-          ->
-        let fident { pl_loc = loc; pl_desc = (nm, x); } =
-          let nm = List.map (fun x -> (mk_loc loc x, None)) nm in
-            mk_loc loc (nm, mk_loc loc x)
-        in
-        let call = PScall (Some plvalue, fident f, mk_loc les es) in
-          transinstr env ue (mk_loc i.pl_loc call)
+          -> tyerror prvalue.pl_loc env (ProcAssign (unloc f))
 
       | _ ->
         let lvalue, lty = translvalue ue env plvalue in

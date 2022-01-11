@@ -51,7 +51,7 @@ module ElGamal : Scheme = {
 module DDHAdv (A:Adversary) = {
   proc guess (gx, gy, gz) : bool = {
     var m0, m1, b, b';
-    (m0, m1) <- A.choose(gx);
+    (m0, m1) <@ A.choose(gx);
     b        <$ {0,1};
     b'       <@ A.guess(gy, gz * (b?m1:m0));
     return b' = b;

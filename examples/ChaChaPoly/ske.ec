@@ -145,7 +145,7 @@ module StLSke (StL:StLOrcls) : SKE = {
   var gs : globS
 
   proc init () = { 
-    gs <- StL.init();
+    gs <@ StL.init();
   }
  
   proc kg = StL.kg
