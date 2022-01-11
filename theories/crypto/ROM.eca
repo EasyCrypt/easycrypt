@@ -295,7 +295,7 @@ module Bound (O : Oracle) = {
     var r <- witness;
 
     if (c < qH) {
-      r <- O.o(x);
+      r <@ O.o(x);
       c <- c + 1;
     }
     return r;

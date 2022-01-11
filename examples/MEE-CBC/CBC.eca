@@ -83,7 +83,7 @@ module CBC(P : PseudoRP) = {
     i <- 0;
     while (i < size p) {
       pi <- nth witness p i;
-      s  <- P.f(key,(s + pi));
+      s  <@ P.f(key,(s + pi));
       c  <- c ++ [s];
       i  <- i + 1;
     }
@@ -98,9 +98,9 @@ module CBC(P : PseudoRP) = {
     s <- iv;
     while (i < size c) {
       ci <- nth witness c i;
-      pi <- P.fi(key,ci);
+      pi <@ P.fi(key,ci);
       p  <- p ++ [s + pi];
-      s <- ci;
+      s  <- ci;
       i  <- i + 1;
     }
     return Some p;
@@ -221,7 +221,7 @@ module CBC_Oracle (P:PRF) = {
     i <- 0;
     while (i < size p) {
       pi <- nth witness p i;
-      s  <- P.f(s + pi);
+      s  <@ P.f(s + pi);
       c  <- c ++ [s];
       i  <- i + 1;
     }
@@ -368,7 +368,7 @@ module PRPF_Adv(A:RCPA_Adversary, F:PRF_Oracles) = {
       i <- 0;
       while (i < size p) {
         pi <- nth witness p i;
-        s  <- F.f(s + pi);
+        s  <@ F.f(s + pi);
         c  <- c ++ [s];
         i  <- i + 1;
       }

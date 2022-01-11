@@ -114,7 +114,7 @@ module BR93 (H:Oracle) = {
 
     (r,m) <- c;
     r     <- fi sk r;
-    h     <- H.o(r);
+    h     <@ H.o(r);
     return h +^ m;
   }
 }.
