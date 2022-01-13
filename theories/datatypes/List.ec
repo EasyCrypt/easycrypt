@@ -1819,6 +1819,106 @@ lemma mapiP x0 (f : int -> 'a -> 'b) (s : 'a list) y :
 proof. exact: mapi_recP. qed.
 
 (* -------------------------------------------------------------------- *)
+(*                          Element Replacement                         *)
+(* -------------------------------------------------------------------- *)
+op put (s : 'a list) (n : int) (x : 'a) =
+  if (0 <= n < size s)
+  then take n s ++ (x :: drop (n + 1) s)
+  else s.
+
+lemma put_empty (n : int) (x : 'a) :
+  put [] n x = [].
+proof. by smt(). qed.
+
+lemma size_put (s : 'a list) (n : int) (x : 'a) :
+  size (put s n x) = size s.
+proof.
+rewrite /put; case (0 <= n < size s) => [[? lts_n] | //].
+by rewrite size_cat size_take // lts_n /= size_drop /#.
+qed.
+
+lemma put_in (s : 'a list) (n : int) (x : 'a) :
+  0 <= n < size s => put s n x = take n s ++ (x :: drop (n + 1) s).
+proof. by rewrite /put => ->. qed.
+
+lemma put_out (s : 'a list) (n : int) (x : 'a) :
+  !(0 <= n < size s) => put s n x = s.
+proof. by rewrite /put => ->. qed.
+
+lemma put_cons0 (s : 'a list) (x y : 'a) :
+  put (y :: s) 0 x = x :: s.
+proof. by rewrite /put /= drop0 addrC ltzS size_ge0. qed.
+
+lemma put_consS (s : 'a list) (n : int) (x y : 'a) :
+  n <> 0 => put (y :: s) n x = y :: (put s (n - 1) x).
+proof. by move => ? @/put /#. qed.
+
+lemma put_cat (s1 s2 : 'a list) (n : int) (x : 'a) :
+  put (s1 ++ s2) n x =
+    if n < size s1 then put s1 n x ++ s2 else s1 ++ put s2 (n - size s1) x.
+proof.
+case (n < 0) => [? |]; first by smt(put_out size_ge0).
+elim: s1 s2 n => [/#| y s1 ih s2 n ge0_n]; case (n = 0) => [-> | neq0_n].
++ by rewrite ?put_cons0; smt(size_ge0).
++ by rewrite ?put_consS // ih /#.
+qed.
+
+lemma put_rcons (s : 'a list) (n : int) (x y : 'a) :
+  put (rcons s x) n y =
+    if   n = size s
+    then rcons s y
+    else rcons (put s n y) x.
+proof.
+case: (0 <= n < size s); first by rewrite -cats1 put_cat cats1 /#.
+move=> ?; case: (n = size s) => [eqn|].
+- by rewrite -!cats1 put_cat eqn ltzz.
+- by move=> ?; rewrite put_out 1:size_rcons /#.
+qed.
+
+lemma put_rcons_size (s : 'a list) (x y : 'a) :
+  put (rcons s y) (size s) x = rcons s x.
+proof. by rewrite put_rcons. qed.
+
+lemma put_rcons_in (s : 'a list) (n : int) (x y : 'a) :
+  n <> size s => put (rcons s y) n x = rcons (put s n x) y.
+proof. by move=> ?; rewrite put_rcons /#. qed.
+
+lemma nth_put (x0 : 'a) (s : 'a list) (n i : int) (x : 'a) :
+  0 <= n < size s => nth x0 (put s n x) i = if n = i then x else nth x0 s i.
+proof.
+move=> ^[ge0_n le_is] /put_in->; rewrite nth_cat /= size_take ?le_is //=.
+rewrite subr_eq0 [i=n]eq_sym; case: (i < n).
+- by move=> ^lt_in /ltz_def [-> _] /=; rewrite nth_take.
+rewrite ltzNge /= lez_eqVlt => -[->//|^lt_in /ltz_def [+ _]].
+by rewrite eq_sym => ->/=; (rewrite nth_drop //=; last congr) => /#.
+qed.
+
+lemma put_nth (x0 : 'a) (s1 s2 : 'a list) (n1 n2 : int) (x : 'a) :
+  nth x0 s1 n1 = nth x0 s2 n2 => put s1 n1 (nth x0 s2 n2) = s1.
+proof.
+move=> eq; rewrite &(@eq_from_nth x0) size_put //.
+move=> i rgi; case: (0 <= n1 < size s1) => [|/put_out->//].
+by move/nth_put=> ->; case: (n1 = i) => // <-; rewrite eq.
+qed.
+
+lemma eq_from_put (x0 : 'a) (s1 s2 : 'a list) (n : int) :
+     size s1 = size s2
+  => (forall (i : int), i <> n => nth x0 s1 i = nth x0 s2 i)
+  => s1 = put s2 n (nth x0 s1 n).
+proof. by move=> *; apply (eq_from_nth x0); smt(size_put nth_put). qed.
+
+lemma mem_put (s : 'a list) (n : int) (x : 'a) :
+  0 <= n < size s => x \in put s n x.
+proof. by move=> @/put ->/=; rewrite mem_cat in_cons. qed.
+
+lemma map_put (f : 'a -> 'b) (s : 'a list) (n : int) (x : 'a) :
+  map f (put s n x) = put (map f s) n (f x).
+proof.
+case: (0 <= n < size s) => ?; last by rewrite !put_out 1?size_map.
+by rewrite !put_in 1?size_map // !(map_cons, map_cat, map_take, map_drop).
+qed.
+
+(* -------------------------------------------------------------------- *)
 (*                          Index sequence                              *)
 (* -------------------------------------------------------------------- *)
 theory Iota.
