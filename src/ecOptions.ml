@@ -67,6 +67,7 @@ type ini_options = {
   ini_ovrevict : string list;
   ini_provers  : string list;
   ini_idirs    : (string option * string) list;
+  ini_rdirs    : (string option * string) list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -322,9 +323,11 @@ let ldr_options_of_values ?ini values =
     let idirs   = omap_dfl (fun x -> x.ini_idirs) [] ini in
     let idirs   = List.map (add_rec false) idirs in
     let idirs_I = List.map (add_rec false) (List.map parse_idir (get_strings "I" values)) in
+    let rdirs   = omap_dfl (fun x -> x.ini_rdirs) [] ini in
+    let rdirs   = List.map (add_rec true) rdirs in
     let idirs_R = List.map (add_rec true)  (List.map parse_idir (get_strings "R" values)) in
 
-    { ldro_idirs = idirs @ idirs_I @ idirs_R;
+    { ldro_idirs = idirs @ idirs_I @ rdirs @ idirs_R;
       ldro_boot  = false; }
 
 let glb_options_of_values ?ini values =
@@ -475,10 +478,12 @@ let read_ini_file (filename : string) =
       ini_why3     = tryget  "why3conf";
       ini_ovrevict = trylist "no-evict";
       ini_provers  = trylist "provers" ;
-      ini_idirs    = List.map parse_idir (trylist "idirs"); } in
+      ini_idirs    = List.map parse_idir (trylist "idirs");
+      ini_rdirs    = List.map parse_idir (trylist "rdirs"); } in
 
   { ini_ppwidth  = ini.ini_ppwidth;
     ini_why3     = omap expand ini.ini_why3;
     ini_ovrevict = ini.ini_ovrevict;
     ini_provers  = ini.ini_provers;
-    ini_idirs    = ini.ini_idirs; }
+    ini_idirs    = ini.ini_idirs;
+    ini_rdirs    = ini.ini_rdirs; }
