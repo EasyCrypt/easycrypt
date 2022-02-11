@@ -498,7 +498,7 @@ theory EtM.
     section CTXT.
       declare module E <: SKEa.Enc_Scheme { -CTXT_Wrap, -MACa.SUF_CMA.SUF_Wrap, -CMAa }.
       declare module M <:MACa.MAC_Scheme { -CTXT_Wrap, -MACa.SUF_CMA.SUF_Wrap, -CMAa, -E }.
-      declare module A < :CTXT_Adversary  { -CTXT_Wrap, -MACa.SUF_CMA.SUF_Wrap, -CMAa, -E, -M }.
+      declare module A <: CTXT_Adversary  { -CTXT_Wrap, -MACa.SUF_CMA.SUF_Wrap, -CMAa, -E, -M }.
 
       (* Equivalence up to failure requires termination of oracles and adversaries *)
       declare axiom E_keygen_ll: islossless E.keygen.

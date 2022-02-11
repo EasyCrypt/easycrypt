@@ -213,7 +213,7 @@ qed.
 (* The same lemma, but in a section. *)
 section.
 op mk : int.
-declare module H0 : H [ o : `{N mk}].
+declare module H0 <: H [ o : `{N mk}].
 
 lemma MyAdv_compl_loc : choare[MyAdv(H0).a] time [N 3; H0.o : 2].
 proof. by proc; do !(call(_: true; time [])); auto. qed.
@@ -251,7 +251,7 @@ lemma Inv_compl
     choare[Inv(Adv0, H0).i] time [N 1; Adv0.a : 1; H0.o : k ].
 proof.    
 move => hk; proc.
-call (_: true; time [(H0.o : [N 0; H0.o : 1])]).
+call (_: true; time [H0.o : [N 0; H0.o : 1]]).
 move => i Hi /=; proc*; call(_: true; time []); auto => /=.
 by auto => /=; rewrite big_constz count_predT big_constNz !size_range /#.
 qed.
@@ -270,8 +270,8 @@ module type AB (H0 : H) = {
 }.
 
 section.
- declare module H0 : H.
- declare module AB0 : AB.
+ declare module H0 <: H.
+ declare module AB0 <: AB.
 
  local module AB1 = AB0(H0).
 
