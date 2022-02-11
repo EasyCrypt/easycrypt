@@ -551,8 +551,8 @@ abstract theory OpCC.
 
   section PROOFS.
   
-    declare module I <: Init { OCC }.
-    declare module A <: Adv { OCC, I}.
+    declare module I <: Init { -OCC }.
+    declare module A <: Adv { -OCC, -I}.
    
     phoare chacha_spec k0 n0 p0 gs0 : 
       [ChaCha(OCC(I)).enc : 
@@ -1016,11 +1016,11 @@ module G9 (A:CCA_Adv, RO1:SplitC1.I1.RO) = {
 
 section PROOFS.
 
-  declare module A <: CCA_Adv { RO, FRO, OpCCinit.OCC, OpCCRO.OCC, IndBlock, Mem, StLSke,
-                               Split0.IdealAll.RO, ROT.RO, ROF.RO, SplitC1.I1.RO, SplitC1.I2.RO,
-                               Split1.IdealAll.RO, SplitC2.I1.RO, SplitC2.I2.RO }.
+  declare module A <: CCA_Adv { -RO, -FRO, -OpCCinit.OCC, -OpCCRO.OCC, -IndBlock, -Mem, -StLSke,
+                               -Split0.IdealAll.RO, -ROT.RO, -ROF.RO, -SplitC1.I1.RO, -SplitC1.I2.RO,
+                               -Split1.IdealAll.RO, -SplitC2.I1.RO, -SplitC2.I2.RO }.
 
-  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{-A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   local module G1 (S:SKE) = CCA_game(A, RealOrcls(S)).
 
@@ -1355,9 +1355,9 @@ module EncRnd = {
 }.
 
 section PROOFS.
-  declare module A <: CCA_Adv { BNR, Mem, IndBlock, RO, FRO}.
+  declare module A <: CCA_Adv { -BNR, -Mem, -IndBlock, -RO, -FRO}.
 
-  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{-A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   local clone import Step1_2 as Step1_2'.
 

@@ -199,9 +199,9 @@ module CCAl (S:Scheme, A:CCA_ADV) = {
 
 section.
 
-declare module S: Scheme {-CCA}.
+declare module S<: Scheme {-CCA}.
 
-declare module A: CCA_ADV {-CCA, -S}.
+declare module A<: CCA_ADV {-CCA, -S}.
 
 equiv eq_CCA_CCAl : CCA(S,A).main ~ CCAl(S,A).main : ={glob S, glob A} ==> ={res, glob S, glob A, CCA.sk, CCA.cstar}.
 proof. by sim. qed.
@@ -278,7 +278,7 @@ module CCAq (S:Scheme, A:CCA_ADV) = {
 
 section.
 
-declare module S: Scheme [kg  : `{N cS.`ckg},
+declare module S<: Scheme [kg  : `{N cS.`ckg},
                           enc : `{N cS.`cenc}, 
                           dec : `{N cS.`cdec} ]
                          {-CCA}.
@@ -297,7 +297,7 @@ have h : choare [S.enc : true ==> true] time [N cS.`cenc].
 conseq h.
 qed.
 
-declare module A : CCA_ADV [choose : `{N cA.`cchoose, #O.dec : cA.`qD_choose},
+declare module A <: CCA_ADV [choose : `{N cA.`cchoose, #O.dec : cA.`qD_choose},
                             guess  : `{N cA.`cguess, #O.dec : cA.`qD_guess}]
                            {-CCA, -S}.
 
@@ -327,7 +327,7 @@ proof.
     + call (:true); auto => &hr /> /#.
     by auto => &hr />; smt(ge0_cS).
   call(:true); auto => />. rewrite dbool_ll /=; split. smt().
-  rewrite !bigi_constz /= smt(ge0_cA). 
+  rewrite !bigi_constz /=; smt(ge0_cA). 
 qed.
 
 lemma CCAl_bound : hoare [CCAl(S,A).main : true ==> size CCA.log <= qD].

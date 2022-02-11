@@ -827,13 +827,13 @@ module FinRO : RO = {
 }.
 
 module type FinRO_Distinguisher(G : RO) = {
-  proc distinguish(_ : d_in_t): d_out_t { G.init G.get G.set G.sample }
+  proc distinguish(_ : d_in_t): d_out_t { G.init, G.get, G.set, G.sample }
 }.
 
 section PROOFS.
 declare axiom dout_ll x: is_lossless (dout x).
 
-declare module D <: FinRO_Distinguisher{RO, FRO}.
+declare module D <: FinRO_Distinguisher{-RO, -FRO}.
 
 local module GenFinRO (RO:RO) = {
   include RO [set, rem, get]

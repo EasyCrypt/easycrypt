@@ -257,8 +257,6 @@ abstract theory GenEager.
 
 clone include Ideal. 
 
-axiom sampleto_ll : forall x, Distr.weight (sampleto x) = 1%r.
-
 clone include IterProc with type t <- from.
 
 (* RRO is an FRO that resamples a query if the associated value is
@@ -677,7 +675,7 @@ qed.
 
 section.
 
-declare module D : FRO_Distinguisher {-FRO}.
+declare module D <: FRO_Distinguisher {-FRO}.
 
 lemma eager_D :
   eager [RRO.resample();, D(FRO).distinguish ~ 
@@ -775,7 +773,7 @@ qed.
 
 section.
 
-declare module D : RO_Distinguisher{-RO, -FRO}.
+declare module D <: RO_Distinguisher{-RO, -FRO}.
 
 local module M = {
   proc main1() = {
