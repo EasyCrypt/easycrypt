@@ -11,12 +11,13 @@ require import AllCore List Ring StdOrder Quotient Bigalg Binomial.
 (*---*) import IntOrder.
 
 (* ==================================================================== *)
-abstract theory Ideal.
+abstract theory IdealComRing.
 (* -------------------------------------------------------------------- *)
 type t.
 
-clone import IDomain as Domain with type t <- t.
-clear [Domain.* Domain.AddMonoid.* Domain.MulMonoid.*].
+clone import Ring.ComRing as IComRing with type t <- t.
+
+clear [IComRing.* IComRing.AddMonoid.* IComRing.MulMonoid.*].
 
 clone import Bigalg.BigComRing as BigDom with
   type  CR.t     <- t,
@@ -32,18 +33,18 @@ clone import Bigalg.BigComRing as BigDom with
   remove abbrev CR.(-)
   remove abbrev CR.(/).
 
-realize CR.addrA     by exact: Domain.addrA    .
-realize CR.addrC     by exact: Domain.addrC    .
-realize CR.add0r     by exact: Domain.add0r    .
-realize CR.addNr     by exact: Domain.addNr    .
-realize CR.oner_neq0 by exact: Domain.oner_neq0.
-realize CR.mulrA     by exact: Domain.mulrA    .
-realize CR.mulrC     by exact: Domain.mulrC    .
-realize CR.mul1r     by exact: Domain.mul1r    .
-realize CR.mulrDl    by exact: Domain.mulrDl   .
-realize CR.mulVr     by exact: Domain.mulVr    .
-realize CR.unitP     by exact: Domain.unitP    .
-realize CR.unitout   by exact: Domain.unitout  .
+realize CR.addrA     by exact: IComRing.addrA    .
+realize CR.addrC     by exact: IComRing.addrC    .
+realize CR.add0r     by exact: IComRing.add0r    .
+realize CR.addNr     by exact: IComRing.addNr    .
+realize CR.oner_neq0 by exact: IComRing.oner_neq0.
+realize CR.mulrA     by exact: IComRing.mulrA    .
+realize CR.mulrC     by exact: IComRing.mulrC    .
+realize CR.mul1r     by exact: IComRing.mul1r    .
+realize CR.mulrDl    by exact: IComRing.mulrDl   .
+realize CR.mulVr     by exact: IComRing.mulVr    .
+realize CR.unitP     by exact: IComRing.unitP    .
+realize CR.unitout   by exact: IComRing.unitout  .
 
 clear [BigDom.* BigDom.CR.* BigDom.BAdd.* BigDom.BMul.*].
 
@@ -101,6 +102,16 @@ move=> ^iI [_ [+ _] Ix Iy] - /(_ x (-y)); rewrite opprK.
 by apply=> //; apply/idealN.
 qed.
 
+lemma ideal_sum ['a] I P F s :
+     ideal I
+  => (forall x, P x => I (F x))
+  => I (BAdd.big<:'a> P F s).
+proof.
+elim: s => [|x s ih] idI IF; first by rewrite BAdd.big_nil ideal0.
+rewrite BAdd.big_cons; case: (P x) => Px; last by apply/ih.
+by rewrite idealD -1:&(ih) // &(IF).
+qed.
+
 lemma idealB I x y : ideal I => I x => I y => I (x - y).
 proof. by move=> iI Ix Iy; rewrite idealD -1:idealN. qed.
 
@@ -119,7 +130,7 @@ op idD (I J : t -> bool) : t -> bool =
   fun x => exists i j, (I i /\ J j) /\ x = i + j.
 
 op idR (I : t -> bool) : t -> bool =
-  fun x => exists n, 0 <= n /\ I (Domain.exp x n).
+  fun x => exists n, 0 <= n /\ I (IComRing.exp x n).
 
 (* -------------------------------------------------------------------- *)
 lemma mem_id0 x : id0 x <=> x = zeror.
@@ -164,6 +175,11 @@ apply/fun_ext=> x @/idD; apply: eq_iff; split;
   by case=> i j [? ->]; exists j i; rewrite addrC /= andbC.
 qed.
 
+(* -------------------------------------------------------------------- *)
+lemma mem_idT x : idT x.
+proof. by []. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma mem_idDl I J x : I x => ideal J => (idD I J) x.
 proof.
 by move=> Ix iJ; exists x zeror; rewrite Ix addr0 ideal0.
@@ -172,6 +188,13 @@ qed.
 lemma mem_idDr I J x : J x => ideal I => (idD I J) x.
 proof.
 by move=> Jx iI; rewrite idDC; apply: mem_idDl.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma ideal_eq1P I u : ideal I => unit u => I u <=> (I = idT).
+proof.
+move=> idI un_u; split => [Iu|->//]; apply/fun_ext=> x.
+by rewrite mem_idT -(mulr1 x) idealMl // -(mulrV u) // idealMr.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -295,17 +318,10 @@ split=> [|->]; last by exists zeror; rewrite mulr0.
 by case=> ?; rewrite mulr0.
 qed.
 
-lemma eqmodP x y : (x %= y) <=> (exists u, unit u /\ x = u * y).
+lemma eqmodP x y : (exists u, unit u /\ x = u * y) => x %= y.
 proof.
-split=> [[dxy dyx]|[u [invu ->]]]; last first.
-- rewrite /(%=) dvdr_mull 1:dvdrr /=; apply/dvdrP.
-  by exists (invr u); rewrite mulrA mulVr // mul1r.
-case: (y = zeror) => [->>|nz_y].
-- rewrite (_ : x = zeror) 1:-dvd0r //.
-  by exists oner; rewrite mul1r /= unitr1.
-case/dvdrP: dyx=> u xE; exists u; rewrite xE eq_refl /=.
-apply/unitrP; case/dvdrP: dxy=> v yE; exists v.
-by apply: (mulIf y) => //; rewrite mul1r -mulrA -xE yE.
+case=> u [invu ->]; rewrite /(%=) dvdr_mull 1:dvdrr /=.
+by apply/dvdrP; exists (invr u); rewrite mulrA mulVr // mul1r.
 qed.
 
 lemma idgen_mulVl x y : unit x => idgen [x * y] = idgen [y].
@@ -317,150 +333,131 @@ move=> z /mem_idgen1[c ->]; apply/mem_idgen1.
 by exists (c * invr x); rewrite !mulrA mulrVK.
 qed.
 
-lemma eqmod_idP x y : (x %= y) <=> (idgen [x] = idgen [y]).
-proof.
-split; first by case/eqmodP=> [u [invu ->]]; rewrite idgen_mulVl.
-move=> eq; have: idgen[x] <= idgen[y] /\ idgen[y] <= idgen[x].
-- by apply/subpred_eqP=> z; rewrite eq.
-by case=> /le_idgen1_dvd dyx /le_idgen1_dvd dxy.
-qed.
-
 (* -------------------------------------------------------------------- *)
 lemma eqp_refl x : x %= x.
-proof. by rewrite eqmod_idP. qed.
+proof. by rewrite /(%=) dvdrr. qed.
 
 lemma eqp_sym x y : x %= y => y %= x.
-proof. by rewrite !eqmod_idP eq_sym. qed.
+proof. by rewrite /(%=) andbC. qed.
 
 lemma eqp_trans y x z : x %= y => y %= z => x %= z.
-proof. by rewrite !eqmod_idP => <-. qed.
-
-lemma eqp0P x : (x %= zeror) <=> (x = zeror).
-proof.
-split=> [/eqmodP[u [_ ->]]|]; first by rewrite mulr0.
-by move=> ->; apply/eqp_refl.
-qed.
-end Ideal.
+proof. by case=> [xy yx] [yz zy]; split; apply: (dvdr_trans y). qed.
 
 (* ==================================================================== *)
 abstract theory RingQuotient.
-type b, t.
-
-clone import IDomain as IDomain with type t <- b.
-clear [IDomain.* IDomain.AddMonoid.* IDomain.MulMonoid.*].
-
-clone import Ideal with
-  type t <- b,
-  pred Domain.unit   <- IDomain.unit,
-    op Domain.zeror  <- IDomain.zeror,
-    op Domain.oner   <- IDomain.oner,
-    op Domain.( + )  <- IDomain.( + ),
-    op Domain.([-])  <- IDomain.([-]),
-    op Domain.( * )  <- IDomain.( * ),
-    op Domain.invr   <- IDomain.invr,
-    op Domain.intmul <- IDomain.intmul,
-    op Domain.ofint  <- IDomain.ofint,
-    op Domain.exp    <- IDomain.exp
-
-  proof * by smt(@IDomain)
-
-  remove abbrev Domain.(-)
-  remove abbrev Domain.(/).
+type qT.
 
 (* -------------------------------------------------------------------- *)
-op p : b -> bool.
+op p : t -> bool.
 
+theory IdealAxioms.
 axiom ideal_p : ideal p.
 axiom ideal_Ntriv : forall x, unit x => !p x.
+end IdealAxioms.
+
+import IdealAxioms.
 
 hint exact : ideal_p.
 
-op rel (x y : b) = p (y - x).
+op eqv (x y : t) = p (y - x).
 
-lemma relxx : reflexive rel.
-proof. by move=> x @/rel; rewrite /rel subrr ideal0 ideal_p. qed.
+lemma eqvxx : reflexive eqv.
+proof. by move=> x @/eqv; rewrite /eqv subrr ideal0 ideal_p. qed.
 
-lemma rel_sym : symmetric rel.
-proof. by move=> x y @/rel; rewrite -opprB idealNP // ideal_p. qed.
+lemma eqv_sym : symmetric eqv.
+proof. by move=> x y @/eqv; rewrite -opprB idealNP // ideal_p. qed.
 
-lemma rel_trans : transitive rel.
+lemma eqv_trans : transitive eqv.
 proof.
-move=> y x z @/rel hpyx hpzy.
+move=> y x z @/eqv hpyx hpzy.
 have ->: z - x = (z - y) + (y - x).
 - by rewrite addrACA !addrA addrK.
 by apply/idealD => //; apply/ideal_p.
 qed.
 
-hint exact : relxx.
+hint exact : eqvxx.
 
 (* -------------------------------------------------------------------- *)
-lemma rel0r x : rel x zeror <=> p x.
-proof. by rewrite rel_sym /rel subr0. qed.
+lemma eqv0r x : eqv x zeror <=> p x.
+proof. by rewrite eqv_sym /eqv subr0. qed.
 
-lemma rel0l x : rel zeror x <=> p x.
-proof. by rewrite rel_sym &(rel0r). qed.
+lemma eqv0l x : eqv zeror x <=> p x.
+proof. by rewrite eqv_sym &(eqv0r). qed.
 
-lemma relN x y : rel x y => rel (-x) (-y).
-proof. by rewrite /rel -idealNP 1:ideal_p opprD. qed.
+lemma eqvN x y : eqv x y => eqv (-x) (-y).
+proof. by rewrite /eqv -idealNP 1:ideal_p opprD. qed.
 
-lemma relD x1 x2 y1 y2 : rel x1 x2 => rel y1 y2 => rel (x1 + y1) (x2 + y2).
-proof. by rewrite /rel subrACA &(idealD) ideal_p. qed.
+lemma eqvD x1 x2 y1 y2 : eqv x1 x2 => eqv y1 y2 => eqv (x1 + y1) (x2 + y2).
+proof. by rewrite /eqv subrACA &(idealD) ideal_p. qed.
 
-lemma relMl x y1 y2 : rel y1 y2 => rel (x * y1) (x * y2).
-proof. by rewrite /rel -mulrBr &(idealMl) ideal_p. qed.
+lemma eqv_sum ['a] P F1 F2 r :
+     (forall x, P x => eqv (F1 x) (F2 x))
+  => eqv (BAdd.big<:'a> P F1 r) (BAdd.big<:'a> P F2 r).
+proof.
+move=> heqv; elim: r => [|x r ih].
+- by rewrite !BAdd.big_nil eqvxx.
+rewrite !BAdd.big_cons; case: (P x) => // Px.
+by apply: eqvD=> //; apply: heqv.
+qed.
 
-lemma relMr x1 x2 y : rel x1 x2 => rel (x1 * y) (x2 * y).
-proof. by rewrite !(mulrC _ y) &(relMl). qed.
+lemma eqvMl x y1 y2 : eqv y1 y2 => eqv (x * y1) (x * y2).
+proof. by rewrite /eqv -mulrBr &(idealMl) ideal_p. qed.
+
+lemma eqvMr x1 x2 y : eqv x1 x2 => eqv (x1 * y) (x2 * y).
+proof. by rewrite !(mulrC _ y) &(eqvMl). qed.
+
+lemma eqvX x y n : eqv x y => eqv (exp x n) (exp y n).
+proof. admitted.
 
 (* -------------------------------------------------------------------- *)
-clone import Quotient.EquivQuotient
-  with type T   <- b,
-       type qT  <- t,
-         op eqv <- rel
+clone include Quotient.EquivQuotient
+  with type T   <- t,
+       type qT  <- qT,
+         op eqv <- eqv
 
    proof EqvEquiv.*.
 
-realize EqvEquiv.eqv_refl  by apply: relxx.
-realize EqvEquiv.eqv_sym   by apply: rel_sym.
-realize EqvEquiv.eqv_trans by apply: rel_trans.
+realize EqvEquiv.eqv_refl  by apply: eqvxx.
+realize EqvEquiv.eqv_sym   by apply: eqv_sym.
+realize EqvEquiv.eqv_trans by apply: eqv_trans.
 
 (* -------------------------------------------------------------------- *)
 op zeror = pi zeror.
 op oner  = pi oner.
 
-op ( + ) (x y : t) = pi (repr x + repr y).
-op [ - ] (x   : t) = pi (- repr x).
-op ( * ) (x y : t) = pi (repr x * repr y).
+op ( + ) (x y : qT) = pi (repr x + repr y).
+op [ - ] (x   : qT) = pi (- repr x).
+op ( * ) (x y : qT) = pi (repr x * repr y).
 
-op   invr : t -> t.
-pred unit : t.
+op   invr : qT -> qT.
+pred unit : qT.
 
 lemma addE x y : (pi x) + (pi y) = pi (x + y).
 proof.
-rewrite /(+) &(eqv_pi) /rel subrACA.
+rewrite /(+) &(eqv_pi) /eqv subrACA.
 by rewrite &(idealD) ?ideal_p // &(eqv_repr).
 qed.
 
 lemma oppE x : -(pi x) = pi (-x).
 proof.
-rewrite /([-]) &(eqv_pi) /rel opprK addrC.
-by rewrite -/(rel _ _) rel_sym &(eqv_repr).
+rewrite /([-]) &(eqv_pi) /eqv opprK addrC.
+by rewrite -/(eqv _ _) eqv_sym &(eqv_repr).
 qed.
 
 lemma mulE x y : (pi x) * (pi y) = pi (x * y).
 proof.
-rewrite /(+) &(eqv_pi) /rel; pose z := repr (pi x).
+rewrite /(+) &(eqv_pi) /eqv; pose z := repr (pi x).
 have ->: x = x - z + z by rewrite subrK.
 rewrite mulrDl -addrA -mulrBr (mulrC _ y) {1}/z.
 by rewrite &(idealD) ?ideal_p // idealMl ?ideal_p &(eqv_repr).
 qed.
 
 axiom mulVr   : left_inverse_in unit oner invr ( * ).
-axiom unitP   : forall (x y : t), y * x = oner => unit x.
-axiom unitout : forall (x : t), !unit x => invr x = x.
+axiom unitP   : forall (x y : qT), y * x = oner => unit x.
+axiom unitout : forall (x : qT), !unit x => invr x = x.
 
 clone import ComRing with
-  type t     <- t    ,
+  type t     <- qT   ,
   op   zeror <- zeror,
   op   ( + ) <- (+)  ,
   op   [ - ] <- [-]  ,
@@ -474,7 +471,7 @@ clone import ComRing with
 realize addrA.
 proof.
 elim/quotW=> x; elim/quotW=> y; elim/quotW=> z.
-by rewrite !addE &(eqv_pi) !addrA !relD // 1:rel_sym &(eqv_repr).
+by rewrite !addE &(eqv_pi) !addrA !eqvD // 1:eqv_sym &(eqv_repr).
 qed.
 
 realize addrC.
@@ -488,19 +485,19 @@ proof. by elim/quotW=> x; rewrite !addE add0r. qed.
 realize addNr.
 proof.
 elim/quotW=> x; rewrite !addE &(eqv_pi) addrC.
-by apply/rel0r/eqv_repr.
+by apply/eqv0r/eqv_repr.
 qed.
 
 realize oner_neq0.
-proof. by rewrite -eqv_pi rel0r; apply/ideal_Ntriv/unitr1. qed.
+proof. by rewrite -eqv_pi eqv0r; apply/ideal_Ntriv/unitr1. qed.
 
 realize mulrA.
 proof.
 elim/quotW=> x; elim/quotW=> y; elim/quotW=> z.
 rewrite !mulE &(eqv_pi) !mulrA.
-apply: (rel_trans (x * (repr (pi y)) * z)).
-- by apply/relMl/eqv_repr.
-- by apply/relMr/relMr; rewrite rel_sym &(eqv_repr).
+apply: (eqv_trans (x * (repr (pi y)) * z)).
+- by apply/eqvMl/eqv_repr.
+- by apply/eqvMr/eqvMr; rewrite eqv_sym &(eqv_repr).
 qed.
 
 realize mulrC.
@@ -513,12 +510,83 @@ realize mulrDl.
 proof.
 elim/quotW=> x1; elim/quotW=> x2; elim/quotW=> y.
 rewrite !(addE, mulE) &(eqv_pi) -mulrDl.
-apply: (rel_trans ((x1 + x2) * (repr (pi y)))).
-- by apply/relMl; rewrite rel_sym &(eqv_repr).
-- by apply/relMr/relD; rewrite rel_sym &(eqv_repr).
+apply: (eqv_trans ((x1 + x2) * (repr (pi y)))).
+- by apply/eqvMl; rewrite eqv_sym &(eqv_repr).
+- by apply/eqvMr/eqvD; rewrite eqv_sym &(eqv_repr).
 qed.
 
 realize mulVr   by apply: mulVr.
 realize unitP   by apply: unitP.
 realize unitout by apply: unitout.
 end RingQuotient.
+end IdealComRing.
+
+(* ==================================================================== *)
+abstract theory Ideal.
+type t.
+
+clone import IDomain with type t <- t.
+
+clear [IDomain.* IDomain.AddMonoid.* IDomain.MulMonoid.*].
+
+clone include IdealComRing with
+  type t               <- t,
+  pred IComRing.unit   <- IDomain.unit,
+    op IComRing.zeror  <- IDomain.zeror,
+    op IComRing.oner   <- IDomain.oner,
+    op IComRing.( + )  <- IDomain.( + ),
+    op IComRing.([-])  <- IDomain.([-]),
+    op IComRing.( * )  <- IDomain.( * ),
+    op IComRing.invr   <- IDomain.invr,
+    op IComRing.intmul <- IDomain.intmul,
+    op IComRing.ofint  <- IDomain.ofint,
+    op IComRing.exp    <- IDomain.exp,
+    op IComRing.lreg   <- IDomain.lreg
+
+  proof IComRing.*
+
+  remove abbrev IComRing.(-)
+  remove abbrev IComRing.(/).
+
+realize IComRing.addrA     by apply: IDomain.addrA    .
+realize IComRing.addrC     by apply: IDomain.addrC    .
+realize IComRing.add0r     by apply: IDomain.add0r    .
+realize IComRing.addNr     by apply: IDomain.addNr    .
+realize IComRing.oner_neq0 by apply: IDomain.oner_neq0.
+realize IComRing.mulrA     by apply: IDomain.mulrA    .
+realize IComRing.mulrC     by apply: IDomain.mulrC    .
+realize IComRing.mul1r     by apply: IDomain.mul1r    .
+realize IComRing.mulrDl    by apply: IDomain.mulrDl   .
+realize IComRing.mulVr     by apply: IDomain.mulVr    .
+realize IComRing.unitP     by apply: IDomain.unitP    .
+realize IComRing.unitout   by apply: IDomain.unitout  .
+
+lemma eqmodfP x y : (x %= y) <=> (exists u, unit u /\ x = u * y).
+proof.
+split=> [[dxy dyx]|[u [invu ->]]]; last first.
+- rewrite /(%=) dvdr_mull 1:dvdrr /=; apply/dvdrP.
+  by exists (invr u); rewrite mulrA mulVr // mul1r.
+case: (y = zeror) => [->>|nz_y].
+- rewrite (_ : x = zeror) 1:-dvd0r //.
+  by exists oner; rewrite mul1r /= unitr1.
+case/dvdrP: dyx=> u xE; exists u; rewrite xE eq_refl /=.
+apply/unitrP; case/dvdrP: dxy=> v yE; exists v.
+by apply: (mulIf y) => //; rewrite mul1r -mulrA -xE yE.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqmodf_idP x y : (x %= y) <=> (idgen [x] = idgen [y]).
+proof.
+split; first by case/eqmodfP=> [u [invu ->]]; rewrite idgen_mulVl.
+move=> eq; have: idgen[x] <= idgen[y] /\ idgen[y] <= idgen[x].
+- by apply/subpred_eqP=> z; rewrite eq.
+by case=> /le_idgen1_dvd dyx /le_idgen1_dvd dxy.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eqpf0P x : (x %= zeror) <=> (x = zeror).
+proof.
+split=> [/eqmodfP[u [_ ->]]|]; first by rewrite mulr0.
+by move=> ->; apply/eqp_refl.
+qed.
+end Ideal.
