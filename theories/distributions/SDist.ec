@@ -446,10 +446,10 @@ module Os : Oracle_i = {
 
 section. (* Reduction from single oracle call to sampling game *)
 
-declare module A <: Adversary {B1,Os,Count}.
+declare module A <: Adversary {-B1,-Os,-Count}.
 
 declare axiom A_ll :
-  forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
+  forall (O <: Oracle{-A}), islossless O.get => islossless A(O).main.
 
 (* global variables for eager/lazy proof *)
 local module Var = { 
@@ -518,7 +518,7 @@ logic. *)
 
 lemma sdist_oracle1 &m (d1 d2 : a distr) : 
    is_lossless d1 => is_lossless d2 =>
-  (forall (O <: Oracle_i{Count,A}), 
+  (forall (O <: Oracle_i{-Count,-A}), 
      hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= 1]) =>
   `| Pr[Game(A,Os).main(d1) @ &m : res] - Pr[Game(A,Os).main(d2) @ &m : res] | 
   <= sdist d1 d2.
@@ -576,12 +576,12 @@ op N : { int | 0 < N } as N_pos.
 
 section. 
 
-declare module A <: Adversary {B1,Os,Count}.
+declare module A <: Adversary {-B1,-Os,-Count}.
 
 declare axiom A_ll :
-  forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
+  forall (O <: Oracle{-A}), islossless O.get => islossless A(O).main.
 
-declare axiom A_bound : (forall (O <: Oracle_i{A,Count}), 
+declare axiom A_bound : (forall (O <: Oracle_i{-A,-Count}), 
   hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= N]).
 
 local clone Hybrid as Hyb with
@@ -737,7 +737,7 @@ module O2 = R2.RO.
 infrastructure (e.g., for splitting into muliple oracles *) 
 
 module type Distinguisher (O : R1.RO) = {
-  proc distinguish(_ : unit) : bool {O.get O.set O.sample}
+  proc distinguish(_ : unit) : bool {O.get, O.set, O.sample}
 }.
 
 (* TOTHINK: Calls to [sample] and [get] do not actually provide any
@@ -773,9 +773,9 @@ module Wrap (O : R1.RO) : R1.RO = {
 
 section.
 
-declare module D <: Distinguisher {Os, O1,O2, Count, B1, Wrap}.
+declare module D <: Distinguisher {-Os, -O1, -O2, -Count, -B1, -Wrap}.
 
-declare axiom D_ll : forall (O <: R1.RO{D}), 
+declare axiom D_ll : forall (O <: R1.RO{-D}), 
   islossless O.get => islossless D(O).distinguish.
 
 local module Cache (O : Oracle) : R1.RO = {
@@ -827,7 +827,7 @@ local clone N1 as N1 with
   proof*.
 
 lemma sdist_ROM  &m : 
- (forall (O <: R1.RO{Wrap,D}), 
+ (forall (O <: R1.RO{-Wrap,-D}), 
    hoare [ D(Wrap(O)).distinguish : Wrap.dom = fset0 ==> card Wrap.dom <= N]) =>
   `| Pr [R1.MainD(D,O1).distinguish() @ &m : res] - 
      Pr [R1.MainD(D,O2).distinguish() @ &m : res] |
