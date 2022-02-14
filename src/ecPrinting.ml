@@ -2945,7 +2945,6 @@ module PPGoal = struct
 
         Format.fprintf fmt
           "%s%t: @[<hov 2>%t@]@\n%!"
-          (* FIXME:COST-MERGE "@[<hv>@[%-.2s%t:@]@;<1 2>@[<hov 2>%t@]@]@\n%!" *)
           (PPEnv.local_symb ppe id) pk dk)
         pps
     end;

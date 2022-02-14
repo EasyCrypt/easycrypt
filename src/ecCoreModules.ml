@@ -686,9 +686,13 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type mr_xpaths = EcPath.Sx.t use_restr
+
+type mr_mpaths = EcPath.Sm.t use_restr
+
 type 'a p_mod_restr = {
-  mr_xpaths : EcPath.Sx.t use_restr;
-  mr_mpaths : EcPath.Sm.t use_restr;
+  mr_xpaths : mr_xpaths;
+  mr_mpaths : mr_mpaths;
   mr_oinfos : 'a PreOI.t Msym.t;
 }
 
@@ -701,6 +705,22 @@ let has_compl_restriction mr =
   Msym.exists (fun _ oi ->
       (PreOI.costs oi) <> `Unbounded
     ) mr.mr_oinfos
+
+let mr_xpaths_fv (m : mr_xpaths) : int Mid.t =
+  EcPath.Sx.fold
+    (fun xp fv -> EcPath.x_fv fv xp)
+    (Sx.union
+       m.ur_neg
+       (EcUtils.odfl Sx.empty m.ur_pos))
+    EcIdent.Mid.empty
+
+let mr_mpaths_fv (m : mr_mpaths) : int Mid.t =
+  EcPath.Sm.fold
+    (fun mp fv -> EcPath.m_fv fv mp)
+    (Sm.union
+       m.ur_neg
+       (EcUtils.odfl Sm.empty m.ur_pos))
+    EcIdent.Mid.empty
 
 (* -------------------------------------------------------------------- *)
 type funsig = {

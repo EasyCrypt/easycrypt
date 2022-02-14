@@ -638,8 +638,31 @@ let add_declared_op to_gen path opdecl =
       | _ -> e_fold aux fv e
     in aux e.e_fv e
 
+let rec gty_fv_and_tvar : gty -> int Mid.t = function
+  | GTty ty -> EcTypes.ty_fv_and_tvar ty
+  | GTmodty { mt_restr = restr } ->
+    (* mr_oinfos *)
+    let fv =
+      EcSymbols.Msym.fold (fun _ oi fv ->
+          let fv = List.fold_left EcPath.x_fv fv (PreOI.allowed oi) in
+          match PreOI.costs oi with
+          | `Unbounded -> fv
+          | `Bounded (self,calls) ->
+            EcPath.Mx.fold (fun xp call fv ->
+                let fv = EcPath.x_fv fv xp in
+                EcIdent.fv_union fv (fv_and_tvar_f call)
+              ) calls (EcIdent.fv_union fv (fv_and_tvar_f self))
+        ) restr.mr_oinfos Mid.empty
+    in
 
-let fv_and_tvar_f f =
+    EcIdent.fv_union fv
+      (EcIdent.fv_union
+         (mr_xpaths_fv restr.mr_xpaths)
+         (mr_mpaths_fv restr.mr_mpaths))
+
+  | GTmem mt -> EcMemory.mt_fv mt
+
+and fv_and_tvar_f f =
   let fv = ref f.f_fv in
   let rec aux f =
     fv := EcIdent.fv_union !fv (tvar_fv f.f_ty);

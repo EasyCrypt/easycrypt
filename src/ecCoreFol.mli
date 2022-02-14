@@ -188,9 +188,8 @@ val as_modty : gty -> module_type
 val as_mem   : gty -> EcMemory.memtype
 
 (* -------------------------------------------------------------------- *)
-val gty_equal       : gty  -> gty -> bool
-val gty_fv          : gty -> int Mid.t
-val gty_fv_and_tvar : gty -> int Mid.t
+val gty_equal : gty -> gty -> bool
+val gty_fv    : gty -> int Mid.t
 
 (* -------------------------------------------------------------------- *)
 val mty_equal : module_type -> module_type -> bool
