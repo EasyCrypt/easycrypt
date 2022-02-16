@@ -100,10 +100,7 @@ let print_config config =
 
 (* -------------------------------------------------------------------- *)
 let main () =
-  let theories =
-    match EcRelocate.sourceroot with
-    | None -> EcRelocate.Sites.theories
-    | Some src -> [Filename.concat src "theories"] in
+  let theories = EcRelocate.Sites.theories in
 
   (* Parse command line arguments *)
   let options =
