@@ -343,6 +343,9 @@ and process1 (ttenv : ttenv) (t : ptactic) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process (ttenv : ttenv) (t : ptactic list) (pf : proof) =
+  if EcCoreGoal.closed pf then
+    tc_error (proofenv_of_proof pf) "all goals are closed";
+
   let tc  = tcenv1_of_proof pf in
   let hd  = FApi.tc1_handle tc in
   let tc  = process1_seq ttenv t tc in
