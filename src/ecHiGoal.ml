@@ -270,7 +270,7 @@ module LowRewrite = struct
             else None
           else None
         and pt2 = obind base
-          (EcReduction.h_red_opt EcReduction.full_red hyps ax)
+          (EcReduction.h_red_opt (EcReduction.full_red ~opaque:false) hyps ax)
         in (otolist pt1) @ (otolist pt2)) in
 
         let rec doit reduce =
@@ -585,8 +585,9 @@ let process_delta ?target (s, o, p) tc =
 
   in
 
-  let ri = { EcReduction.full_red with
-               delta_p = (fun p -> if Some p = dp then `Force else `Yes)} in
+  let ri =
+    let delta_p p = if Some p = dp then `Force else `Yes in
+    { (EcReduction.full_red ~opaque:false) with delta_p } in
   let na = List.length args in
 
   match s with
@@ -1191,7 +1192,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
           | SFimp (_, fp) ->
               ("H", None, `Hyp, fp)
           | _ -> begin
-            match EcReduction.h_red_opt EcReduction.full_red hyps fp with
+            match EcReduction.h_red_opt (EcReduction.full_red ~opaque:false) hyps fp with
             | None   -> ("_", None, `None, f_true)
             | Some f -> destruct f
           end
@@ -1342,7 +1343,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
         end
     in
 
-    let tc = t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case] in
+    let tc = t_ors [
+        t_elimT_ind ~reduce:(`Full true) `Case;
+        t_elim ~reduce:(`Full true);
+        t_elim_prind ~reduce:(`Full true) `Case] in
     let tc =
       fun g ->
         try  tc g
@@ -1360,7 +1364,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     ((prind, delta), withor, (cnt : icasemode_full option)) pis tc
   =
     let cnt = cnt |> odfl (`AtMost 1) in
-    let red = if delta then `Full else `NoDelta in
+    let red = if delta then `Full true else `NoDelta in
 
     let t_case =
       let t_and, t_or =
@@ -1873,7 +1877,11 @@ let process_split (tc : tcenv1) =
 let process_elim (pe, qs) tc =
   let doelim tc =
     match qs with
-    | None    -> t_or (t_elimT_ind `Ind) t_elim tc
+    | None ->
+        t_or
+          (t_elimT_ind ~reduce:(`Full true) `Ind)
+          (t_elim ~reduce:(`Full true))
+          tc
     | Some qs ->
         let qs = {
             fp_mode = `Implicit;
@@ -1919,7 +1927,10 @@ let process_case ?(doeq = false) gp tc =
   with E.LEMFailure ->
     try
       FApi.t_last
-        (t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case])
+        (t_ors [
+          t_elimT_ind ~reduce:(`Full true) `Case;
+          t_elim ~reduce:(`Full true);
+          t_elim_prind ~reduce:(`Full true) `Case])
         (process_move ~doeq gp.pr_view gp.pr_rev tc)
 
     with EcCoreGoal.InvalidGoalShape ->
