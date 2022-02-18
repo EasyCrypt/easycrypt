@@ -214,7 +214,7 @@ move=> <-; congr.
       by inline ToOrcl(S).orcl H.Count.incr; wp; call (: true); wp.
     by call (: ={glob S, K.pk}); first sim.
   swap{1} [4..5] -2; inline ToOrcl(S).leaks; wp.
-  by call (: true); auto.
+  call(: true); auto; smt().
 congr.
 byequiv (: ={glob S,glob A} ==> ={res,glob H.HybOrcl} /\ K.c{1} = H.Count.c{2})=> //.
 proc.
@@ -229,6 +229,6 @@ wp; call (: ={glob S,glob H.HybOrcl, K.pk} /\ K.c{1} = H.Count.c{2}).
     by inline ToOrcl(S).orcl H.Count.incr; wp; call (: true); wp.
   by call (: ={glob S, K.pk}); first sim.
 swap {1} [4..5] -2; inline ToOrcl(S).leaks; wp.
-by call (: true); auto.
+by call (: true); auto; smt().
 qed.
 end section.
