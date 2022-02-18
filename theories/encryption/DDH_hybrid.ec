@@ -13,7 +13,7 @@ require import Cyclic_group_prime.
 
 require Hybrid.
 
-op n : int.
+op n : { int | 0 < n } as n_pos.
 clone Hybrid as H with
   type input <- unit,
   type output <- group * group * group,
@@ -76,9 +76,9 @@ section.
         Pr[Rn(DDHb, A).main() @ &m : (res /\ Count.c <= n) ]).
   proof.
    move=> &m.
-   apply (H.Hybrid (<:DDHb) (<:A) _ _ _ _ &m
+   apply (H.Hybrid_div (<:DDHb) (<:A) _ _ _ _ &m
        (fun (ga:glob A) (gb:glob DDHb) (c:int) (r:bool), r)).
    apply islossless_leaks. apply islossless_orcl1. apply islossless_orcl2. apply losslessA.
+   smt(n_pos).
   qed.
-
 end section.
