@@ -2039,6 +2039,34 @@ theory Range.
     0 <= i < p - k => nth w (range k p) i = k + i.
   proof. by apply/nth_iota. qed.
 
+  lemma le2_mem_range (m n i: int):
+    (m <= i <= n) <=> (mem (range m (n+1)) i).
+  proof. by rewrite mem_range ltzS. qed.
+
+  lemma mem_range_le (m n i j: int):
+    j <= m =>
+    mem (range m n) i =>
+    j <= i.
+  proof. by move => lejm /mem_range [lemi _]; apply/(lez_trans m). qed.
+
+  lemma mem_range_gt (m n i j: int):
+    n <= j =>
+    mem (range m n) i =>
+    i < j.
+  proof. by move => lenj /mem_range [_ ltin]; rewrite ltzE (lez_trans n) // -ltzE. qed.
+
+  lemma mem_range_lt (m n i j: int):
+    j < m =>
+    mem (range m n) i =>
+    j < i.
+  proof. by rewrite !ltzE; apply mem_range_le. qed.
+
+  lemma mem_range_ge (m n i j: int):
+    n <= j + 1 =>
+    mem (range m n) i =>
+    i <= j.
+  proof. by move => ?; rewrite -ltzS; apply mem_range_gt. qed.
+
   lemma mem_range_incl (m1 n1 m2 n2 i : int) :
     m2 <= m1 =>
     n1 <= n2 =>

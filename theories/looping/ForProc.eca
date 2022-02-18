@@ -1,0 +1,137 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
+require import Core List Int.
+require (*--*) IterProc.
+
+theory For.
+
+type const_t, in_t, state_t.
+
+op cond : const_t -> in_t -> bool.
+
+module type Orcl = {
+  proc f (c : const_t, x : in_t, s : state_t) : in_t * state_t
+}.
+
+module For (O:Orcl) = {
+  var c : const_t
+  var x : in_t
+  var s : state_t
+
+  proc _for () : unit = {
+    while (cond c x) {
+      (x, s) <@ O.f(c, x, s);
+    }
+  }
+}.
+
+section.
+  declare module O <: Orcl.
+
+  op val : const_t -> in_t -> int -> in_t.
+
+  declare axiom val_f c x n :
+    hoare [O.f :
+           exists s , arg = (c, val c x n, s) ==>
+           exists s , res = (val c x (n + 1), s)].
+
+  op out : const_t -> in_t -> int option.
+
+  op cond_val c x n = cond c (val c x n).
+
+  declare axiom out_cond c x :
+    oapp
+      (fun n =>
+       ! cond_val c x n &&
+       forall k ,
+         0 <= k < n =>
+         cond_val c x k)
+      true (out c x).
+
+  print glob For.
+
+  (*TODO: how to use glob?*)
+  lemma hoare_l s x c g :
+    hoare [For(O)._for : (glob For(O)) = (s, x, c, g) ==> true].
+  proof.
+    proc.
+    while ((glob For(O)) = (s, x, c, g)).
+    + admit.
+    skip => &m.
+  abort.
+
+  lemma for_ll c x :
+    is_some (out c x) =>
+    islossless O.f =>
+    phoare [For(O)._for : For.c = c /\ For.x = x ==> true] = 1%r.
+  proof.
+    move=> is_some_out; have: (exists n , out c x = Some n).
+    + by move: is_some_out; case: (out c x) => //= n; exists n.
+    move => [n] out_n O_ll; proc.
+    (*TODO: this while is not documented.*)
+    (*
+    while (For.c = c) n. auto=> /=.
+    + call O_ll; skip=> /= ? [#] Hl <-.
+      smt w=(size_eq0 size_ge0 size_drop).
+    smt w=(size_eq0 size_ge0).
+    *)
+  admitted.
+
+  local clone import IterProc as IP with
+    type t <- in_t.
+
+  local module O' = {
+    var c : const_t
+    var _x : in_t
+    var s : state_t
+
+    proc f (x : in_t): unit = {
+      (_x, s) <@ O.f(c, x, s);
+    }
+  }.
+
+  local equiv For_Iter: For(O)._for ~ Iter(O').iter:
+    ={glob O} /\ l{2} = [] (*/\ s{1} = O'.s{2}*) ==> ={glob O} /\ res{1} = O'.s{2}.
+  proof.
+  proc; while (={glob O,l} /\ s{1} = O'.s{2}); last by auto.
+  by inline O'.f; wp; call (_: true); auto.
+  qed.
+
+  local equiv iter_swap1 :
+    Iter(O').iter_12 ~ Iter(O').iter_21 :
+            ={glob O', t1, t2} ==> ={glob O'}.
+  proof.
+  transitivity Fold(O).fold_12
+    (={glob O,t1,t2} /\ s{2} = O'.s{1} ==> ={glob O} /\ res{2} = O'.s{1})
+    (={glob O,t1,t2} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2})=> //.
+  + by move=> /> &1 &2 <- <-; exists ((glob O){2}) (O'.s{2},t1{1},t2{1}).
+  + by proc;inline *;sim.
+  transitivity Fold(O).fold_21
+    (={glob O,s,t1,t2} ==> ={glob O, res})
+    (={glob O,t1,t2} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2})=> [/#|//||].
+  + by conseq fold_swap12.
+  by proc;inline *;sim.
+  qed.
+
+  equiv fold_perm : Fold(O).fold ~ Fold(O).fold :
+    ={glob O,s} /\ perm_eq l{1} l{2} ==> ={glob O,res}.
+  proof.
+  transitivity Iter(O').iter
+    (={glob O,l} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2})
+    (={glob O} /\ O'.s{1} = s{2} /\ perm_eq l{1} l{2} ==>
+     ={glob O} /\ O'.s{1} = res{2})=> [/#|//||].
+  + by conseq Fold_Iter.
+  transitivity Iter(O').iter
+    (={glob O'} /\ perm_eq l{1} l{2} ==> ={glob O'})
+    (={glob O,l} /\ O'.s{1} = s{2} ==> ={glob O} /\ O'.s{1} = res{2})=> [/#|//||].
+  + by conseq (iter_perm O' _)=>//=; conseq iter_swap1.
+  by symmetry; conseq Fold_Iter.
+  qed.
+
+end section.

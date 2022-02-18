@@ -312,7 +312,8 @@ have := log_ge0 b%r x%r _ _; rewrite ?le_fromint //.
 by move/ler_lt_trans => /(_ _ h); rewrite lt_fromint ltzS.
 qed.
 
-lemma ilogP (b x : int) : 1 < b => 1 <= x =>
+lemma ilogP (b x : int) :
+  1 < b => 1 <= x =>
   b ^ ilog b x <= x < b ^ (ilog b x + 1).
 proof.
 rewrite -!(lt_fromint, le_fromint) => gt1_b ge1_x;
@@ -360,7 +361,7 @@ lemma ilog_mull (b x y : int) : 1 < b => 0 < x => 0 < y => is_pow b x => ilog b 
 proof.
 move => lt1b lt0x lt0y /(is_powP _ _ lt1b lt0x) [n [le0n ->>]].
 rewrite /ilog -RField.fromintXn // -rpow_int 1:/# fromintM logM //.
-+ rewrite lt_fromint. apply IntOrder.expr_gt0. move: (IntOrder.ltr_naddr 1 (-1) b _ lt1b) => // ->.
++ by rewrite lt_fromint; apply IntOrder.expr_gt0; move: (IntOrder.ltr_naddr 1 (-1) b _ lt1b) => // ->.
 + by rewrite lt_fromint.
 rewrite -RField.fromintXn // -rpow_int 1:/# logK ?le_fromint // 1,2:/#.
 by rewrite from_int_floor from_int_floor_addl.
