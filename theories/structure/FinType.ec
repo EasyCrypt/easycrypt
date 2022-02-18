@@ -41,6 +41,12 @@ proof.
 move=> eq_xs; rewrite count_swap // 1:&(enum_uniq).
 by rewrite count_predT_eq // &(enumP).
 qed.
+
+lemma finite_t : finite_type <:t>.
+proof. by apply finite_typeP; exists enum => ?; apply enumP. qed.
+
+hint solve 0 finite : finite_t.
+
 end FinType.
 
 (* ==================================================================== *)
@@ -50,13 +56,6 @@ type t1, t2.
 clone FinType as FT1 with type t <- t1.
 clone FinType as FT2 with type t <- t2.
 
-<<<<<<< HEAD:theories/structure/FinType.eca
-lemma finite_t : finite_type <:t>.
-proof. by apply finite_typeP; exists enum => ?; apply enumP. qed.
-
-hint solve 0 finite : finite_t.
-
-=======
 clone include FinType
   with type t    = t1 * t2,
          op enum = allpairs (fun x y => (x, y)) FT1.enum FT2.enum
@@ -69,4 +68,3 @@ case=> x y; rewrite count_uniq_mem.
 + by apply/b2i_eq1/allpairsP; exists (x, y); rewrite !(FT1.enumP, FT2.enumP).
 qed.
 end FinProdType.
->>>>>>> deploy-cost-1.0-preview:theories/structure/FinType.ec
