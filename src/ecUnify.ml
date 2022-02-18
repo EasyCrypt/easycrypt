@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -371,7 +371,7 @@ module UniEnv = struct
     let (subst, tvs) = openty_r ue params tvi in
       (subst ty, tvs)
 
-  let rec repr (ue : unienv) (t : ty) : ty =
+  let repr (ue : unienv) (t : ty) : ty =
     match t.ty_node with
     | Tunivar id -> odfl t (snd (UF.data id (!ue).ue_uf))
     | _ -> t
@@ -408,10 +408,12 @@ let tfun_expected ue psig =
 type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
 
 (* -------------------------------------------------------------------- *)
-let select_op ?(filter = fun _ -> true) tvi env name ue psig =
+let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig =
+  ignore hidden;                (* FIXME *)
+
   let module D = EcDecl in
 
-  let filter op =
+  let filter oppath op =
     (* Filter operator based on given type variables instanciation *)
     let filter_on_tvi =
       match tvi with
@@ -429,7 +431,7 @@ let select_op ?(filter = fun _ -> true) tvi env name ue psig =
             List.for_all (fun (x, _) -> Msym.mem x tparams) ls
 
     in
-      filter op && filter_on_tvi op
+      filter oppath op && filter_on_tvi op
   in
 
   let select (path, op) =
@@ -480,4 +482,4 @@ let select_op ?(filter = fun _ -> true) tvi env name ue psig =
     with E.Failure -> None
 
   in
-    List.pmap select (EcEnv.Op.all ~check:filter name env)
+    List.pmap select (EcEnv.Op.all ~check:filter ~name env)

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -111,6 +111,7 @@ val check_pterm_arg :
 
 val apply_pterm_to_arg   : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg -> pt_ev
 val apply_pterm_to_arg_r : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg_r -> pt_ev
+val apply_pterm_to_local : ?loc:EcLocation.t -> pt_ev -> EcIdent.t -> pt_ev
 val apply_pterm_to_hole  : ?loc:EcLocation.t -> pt_ev -> pt_ev
 val apply_pterm_to_holes : ?loc:EcLocation.t -> int -> pt_ev -> pt_ev
 
@@ -129,10 +130,12 @@ type occmode = {
 val om_rigid : occmode
 
 val pf_find_occurence :
-  pt_env -> ?occmode:occmode -> ptn:form -> form -> form * occmode
+  pt_env -> ?full:bool -> ?rooted:bool -> ?occmode:occmode
+    -> ptn:form -> form -> form * occmode
 
 val pf_find_occurence_lazy :
-  pt_env -> ?modes:occmode list -> ptn:form -> form -> form * occmode
+  pt_env -> ?full:bool -> ?rooted:bool -> ?modes:occmode list
+    -> ptn:form -> form -> form * occmode
 
 (* -------------------------------------------------------------------- *)
 val pattern_form :
@@ -155,11 +158,12 @@ val ptenv : proofenv -> LDecl.hyps -> (EcUnify.unienv * mevmap) -> pt_env
 val copy  : pt_env -> pt_env
 
 (* Proof-terms construction from components *)
-val pt_of_hyp    : proofenv -> LDecl.hyps -> EcIdent.t -> pt_ev
-val pt_of_global : proofenv -> LDecl.hyps -> EcPath.path -> ty list -> pt_ev
-val pt_of_uglobal: proofenv -> LDecl.hyps -> EcPath.path -> pt_ev
+val pt_of_hyp       : proofenv -> LDecl.hyps -> EcIdent.t -> pt_ev
+val pt_of_global_r  : pt_env -> EcPath.path -> ty list -> pt_ev
+val pt_of_global    : proofenv -> LDecl.hyps -> EcPath.path -> ty list -> pt_ev
+val pt_of_uglobal_r : pt_env -> EcPath.path -> pt_ev
+val pt_of_uglobal   : proofenv -> LDecl.hyps -> EcPath.path -> pt_ev
 
-val pt_of_global_r : pt_env -> EcPath.path -> ty list -> pt_ev
 
 (* -------------------------------------------------------------------- *)
 val ffpattern_of_genpattern : LDecl.hyps -> genpattern -> ppterm option

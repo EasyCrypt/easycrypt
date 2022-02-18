@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -90,7 +90,7 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
   let body    = body |> omap (close_pr_body uni) in
   let dom     = List.map (Tuni.offun uni) dom in
 
-  EcDecl.mk_pred ~opaque:false tparams dom body
+  EcDecl.mk_pred ~opaque:false tparams dom body pr.pp_locality
 
 (* -------------------------------------------------------------------- *)
 let trans_preddecl (env : EcEnv.env) (pr : ppredicate located) =

@@ -1,3 +1,11 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
 (* -------------------------------------------------------------------- *)
 require import AllCore List Ring StdOrder Quotient Bigalg Binomial.
 (*---*) import IntOrder.
@@ -11,14 +19,14 @@ clone import IDomain as Domain with type t <- t.
 clear [Domain.* Domain.AddMonoid.* Domain.MulMonoid.*].
 
 clone import Bigalg.BigComRing as BigDom with
-  type  t        <- t,
-    op  CR.zeror <- Domain.zeror,
-    op  CR.oner  <- Domain.oner,
-    op  CR.(+)   <- Domain.(+),
-    op  CR.([-]) <- Domain.([-]),
-    op  CR.( * ) <- Domain.( * ),
-    op  CR.invr  <- Domain.invr,
-  pred  CR.unit  <- Domain.unit
+  type  CR.t     <- t,
+    op  CR.zeror <- IComRing.zeror,
+    op  CR.oner  <- IComRing.oner,
+    op  CR.(+)   <- IComRing.(+),
+    op  CR.([-]) <- IComRing.([-]),
+    op  CR.( * ) <- IComRing.( * ),
+    op  CR.invr  <- IComRing.invr,
+  pred  CR.unit  <- IComRing.unit
   proof CR.*
 
   remove abbrev CR.(-)

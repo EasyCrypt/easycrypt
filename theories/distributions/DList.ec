@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -22,6 +22,33 @@ lemma dlistS (d : 'a distr) n:
   dlist d (n + 1)
   = dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` dlist d n).
 proof. by move=> hn; rewrite !dlist_def foldS. qed.
+
+lemma dapply_dmap ['a 'b] (d:'a distr) (F:'a -> 'b): dapply F d = dmap d F by done.
+
+lemma dlist_add (d:'a distr) n1 n2:
+  0 <= n1 => 0 <= n2 =>
+  dlist d (n1 + n2) =
+    dmap (dlist d n1 `*` dlist d n2) (fun (p:'a list * 'a list) => p.`1 ++ p.`2).
+proof.
+move=> hn1 hn2;elim: n1 hn1 => /= [ | n1 hn1 hrec].
++ rewrite dprod_dlet //= (dlist0 d 0) // dlet_unit /= /dmap dlet_dlet.
+  rewrite -{1}(dlet_d_unit (dlist d n2)) &(eq_dlet) // => l.
+  by rewrite dlet_unit.
+rewrite addzAC !dlistS 1:/# 1:// hrec.
+rewrite !dprod_dlet !dlet_dlet dapply_dmap /dapply /dmap !dlet_dlet.
+apply eq_dlet => // x.
+rewrite /(\o) /= !dlet_dlet &(eq_dlet) // => l1 /=.
+rewrite dlet_unit /= dlet_unit /= dlet_dlet.
+have /eq_sym:= (dlet_dlet (dlist d n2) (fun (b : 'a list) => dunit (x :: l1, b))
+                 (fun (x0 : 'a list * 'a list) => dunit (x0.`1 ++ x0.`2))).
+apply: eq_trans; rewrite dlet_dlet.
+apply: eq_dlet => // l2 /=.
+by rewrite !dlet_unit /= dlet_unit /= dlet_unit.
+qed.
+
+lemma dlist01E (d : 'a distr) n x:
+  n <= 0 => mu1 (dlist d n) x = b2r (x = []).
+proof. by move=> /(dlist0 d) ->;rewrite dunit1E (eq_sym x). qed.
 
 lemma dlist1 (d : 'a distr) : dlist d 1 = dmap d (fun a => [a]).
 proof. 
@@ -55,7 +82,7 @@ move=> le0_n;elim: n le0_n xs => [xs | i le0 Hrec xs].
 + by smt (supp_dlist0 size_eq0).
 rewrite dlistS // supp_dmap /=;split => [[p]|].
 + rewrite supp_dprod => [# Hp /Hrec [<- Ha] ->] /=.
-  by rewrite Hp Ha addzC. 
+  by rewrite Hp Ha addzC.
 case xs => //= [/# | x xs [# Hs Hin Ha]];exists (x,xs);smt (supp_dprod).
 qed.
 
@@ -84,7 +111,7 @@ proof.
 move=> le0_n; case (n = size xs)=> [->|].
 + elim xs=> [|x xs ih];first by rewrite dlist01E.
   by rewrite dlistS1E /= big_cons ih.
-smt w=(supp_dlist mu_bounded).
+by move=> ?; rewrite -supportPn supp_dlist /#.
 qed.
 
 lemma dlist1E_add (d : 'a distr) n1 n2 l : 
@@ -130,7 +157,7 @@ lemma dlist_perm_eq (d : 'a distr) s1 s2:
   perm_eq s1 s2 =>
   mu1 (dlist d (size s1)) s1 = mu1 (dlist d (size s2)) s2.
 proof.
-rewrite !dlist1E //= 1,2:size_ge0;apply eq_big_perm.
+by rewrite !dlist1E ?size_ge0 /=;apply eq_big_perm.
 qed.
 
 lemma weight_dlist0 n (d:'a distr):
@@ -141,19 +168,27 @@ lemma weight_dlistS n (d:'a distr):
   0 <= n => weight (dlist d (n + 1)) = weight d * weight (dlist d n).
 proof. by move=> ge0;rewrite -(dlistSE witness) //. qed.
 
-lemma dlist_fu (d: 'a distr) (xs:'a list): 
+lemma weight_dlist (d : 'a distr) n : 
+ 0 <= n => weight (dlist d n) = (weight d)^n.
+proof.
+elim: n => [|n ? IHn]; 1: by rewrite weight_dlist0 // RField.expr0.
+by rewrite weight_dlistS // IHn RField.exprS.
+qed.
+
+
+lemma dlist_fu (d: 'a distr) (xs:'a list):
   (forall x, x \in xs => x \in d) =>
   xs \in dlist d (size xs).
-proof. 
+proof.
 move=> fu; rewrite /support dlist1E 1:size_ge0 /=.
 by apply Bigreal.prodr_gt0_seq => /= a Hin _;apply fu.
 qed.
 
-lemma dlist_uni (d:'a distr) n : 
+lemma dlist_uni (d:'a distr) n :
   is_uniform d => is_uniform (dlist d n).
 proof.
 case (n < 0)=> [Hlt0 Hu xs ys| /lezNgt Hge0 Hu xs ys].
-+ rewrite !supp_dlist0 ?ltzW //. 
++ rewrite !supp_dlist0 ?ltzW //.
 rewrite !supp_dlist // => -[eqxs Hxs] [eqys Hys].
 rewrite !dlist1E // eqxs eqys /=;move: eqys;rewrite -eqxs => {eqxs}.
 elim: xs ys Hxs Hys => [ | x xs Hrec] [ | y ys] //=; 1,2:smt (size_ge0).
@@ -244,7 +279,7 @@ abstract theory Program.
         by rnd (pred1 x); skip; smt.
         by hoare; auto; smt.
         smt.
-    move=> len_xs; rewrite dlist1E 1:smt (_: n{1} <> size xs) /= 1:smt.
+    move=> len_xs; rewrite dlist1E 1:#smt (_: n{1} <> size xs) /= 1:#smt.
     byphoare (_: n = n{1} ==> xs = res)=> //=; hoare.
     by proc; auto; smt.
   qed.

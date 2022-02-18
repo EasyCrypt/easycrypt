@@ -256,8 +256,8 @@ module Weak_PRPa (M : MAC_Scheme, A : RCPA_Adversary, P : PRP_Oracles) = {
 }.
 
 section RCPA.
-  declare module A : RCPA_Adversary { -PRPi, -PRP, -RCPA_Wrap, -RCPA_QueryBounder, -Weak_PRPa }.
-  axiom A_distinguish_ll (O <: RCPA_Oracles { -A }):
+  declare module A <: RCPA_Adversary { -PRPi, -PRP, -RCPA_Wrap, -RCPA_QueryBounder, -Weak_PRPa }.
+  declare axiom A_distinguish_ll (O <: RCPA_Oracles { -A }):
     islossless O.enc => islossless A(O).distinguish.
 
   local clone import CBC as CBCa with
@@ -282,20 +282,16 @@ section RCPA.
   realize addbK       by exact/addbK.
   realize bijective_P. by move=> k; apply/bijectiveP; smt(@Distr d_eK_uffu). qed.
 
-  (** We really want to clone only MtE, but since RCPA_CPA is
-      abstract, its inner theories don't exist until cloned...
-      Unintended side-effect or intended behaviour? **)
-  local clone RCPA_CMA as CPA_CMA with
-    type MtE.mK              <- mK,
-    type MtE.eK              <- eK,
-    type MtE.ptxt            <- msg,
-    type MtE.ctxt            <- block list,
-    type MtE.tag             <- tag,
-    type MtE.leaks           <- msg,
-    op   MtE.leak  (m : msg) <- leak m,
-    op   MtE.dC    (m : msg) <- CBCa.dBlocks (size (pad (m,witness<:tag>)) + 1)
-  proof MtE.* by smt (dlist_ll d_block_uffu).
-  import CPA_CMA.MtE.
+  local clone import RCPA_CMA.MtE as CPA_CMA with
+    type mK              <- mK,
+    type eK              <- eK,
+    type ptxt            <- msg,
+    type ctxt            <- block list,
+    type tag             <- tag,
+    type leaks           <- msg,
+    op   leak  (m : msg) <- leak m,
+    op   dC    (m : msg) <- CBCa.dBlocks (size (pad (m,witness<:tag>)) + 1)
+  proof dC_ll by smt (dlist_ll d_block_uffu).
 
   local clone import RCPA_pad as PtE with
     type key                     <- eK,
@@ -540,8 +536,8 @@ module CMAa (P : PseudoRP) (A : PTXT_Adversary) (M : CMA_Oracles) = {
 }.
 
 section PTXT.
-  declare module A : PTXT_Adversary { -WUF_Wrap, -PTXT_Wrap, -CMAa }.
-  axiom A_forge_ll (O <: PTXT_Oracles { -A }):
+  declare module A <: PTXT_Adversary { -WUF_Wrap, -PTXT_Wrap, -CMAa }.
+  declare axiom A_forge_ll (O <: PTXT_Oracles { -A }):
     islossless O.enc => islossless O.verify => islossless A(O).forge.
 
   (** TODO: this is not useful apart from avoiding having to define
@@ -580,22 +576,20 @@ section PTXT.
     op   leak_p                  <- size<:block>,
     op   pad                     <- pad,
     op   unpad                   <- unpad,
-    op   dC_m          (m : msg) <- CBCa.dBlocks (size (pad (m,witness<:tag>)) + 1),
-    op   dC_p          (l : int) <- CBCa.dBlocks (l + 1)
+    op   dC_m          (m : msg) <- dlist d_block (size (pad (m,witness<:tag>)) + 1),
+    op   dC_p          (l : int) <- dlist d_block (l + 1)
   proof * by smt (dlist_ll d_block_uffu can_unpad leak_pad pad_tag).
 
-  (** See comment in CPA proof **)
-  local clone import RCPA_CMA as MtEb (* FIXME *) with
-    type MtE.mK              <- mK,
-    type MtE.eK              <- eK,
-    type MtE.ptxt            <- msg,
-    type MtE.ctxt            <- block list,
-    type MtE.tag             <- tag,
-    type MtE.leaks           <- msg,
-    op   MtE.leak  (m : msg) <- leak m,
-    op   MtE.dC    (m : msg) <- CBCa.dBlocks (size (pad (m,witness<:tag>)) + 1)
-  proof MtE.* by smt (dlist_ll d_block_uffu).
-  import MtEb.MtE.
+  local clone import RCPA_CMA.MtE as MtEb with
+    type mK              <- mK,
+    type eK              <- eK,
+    type ptxt            <- msg,
+    type ctxt            <- block list,
+    type tag             <- tag,
+    type leaks           <- msg,
+    op   leak  (m : msg) <- leak m,
+    op   dC    (m : msg) <- dlist d_block (size (pad (m,witness<:tag>)) + 1)
+  proof * by smt (dlist_ll d_block_uffu).
 
   local lemma MEE_unfold &m:
     Pr[INT_PTXT(MEE(PseudoRP,MAC),A).main() @ &m: res]

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -1351,11 +1351,6 @@ let unwanted_ops =
 (* See "Lightweight Relevance Filtering for Machine-Generated           *)
 (* Resolution Problems" for a description of axioms selection.          *)
 
-type ax_info = {
-  ax_name : path;
-  ax_symb : Sp.t;
-}
-
 module Frequency = struct
 
   (* -------------------------------------------------------------------- *)
@@ -1522,7 +1517,7 @@ let init_relevant env pi rs =
   let push e r = r := e :: !r in
   let do1 p ax =
     let wanted = wanted_ax p in
-    if wanted || (not ax.ax_nosmt && not (unwanted_ax p)) then begin
+    if wanted || (ax.ax_visibility = `Visible && not (unwanted_ax p)) then begin
       Frequency.add fr ax.ax_spec;
       let used = Frequency.f_ops unwanted_ops ax.ax_spec in
       let paxu = (p,ax), used in
@@ -1653,7 +1648,7 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
 
   if pi.P.pr_all then
     let init_select p ax =
-      not ax.ax_nosmt && not (P.Hints.mem p pi.P.pr_unwanted) in
+      ax.ax_visibility = `Visible && not (P.Hints.mem p pi.P.pr_unwanted) in
     (execute_task (EcEnv.Ax.all ~check:init_select env) = Some true)
   else
     let rs = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in

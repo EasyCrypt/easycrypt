@@ -1,13 +1,14 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
 (* This API has been mostly inspired from the [seq] library of the
  * ssreflect Coq extension. *)
+
 
 (* -------------------------------------------------------------------- *)
 require import AllCore.
@@ -26,7 +27,7 @@ op size (xs : 'a list) =
 lemma size_ge0 (s : 'a list): 0 <= size s.
 proof. by elim: s => //= x s; smt. qed.
 
-local hint exact : size_ge0.
+hint exact : size_ge0. 
 
 lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case: s => //=; smt. qed.
@@ -553,17 +554,17 @@ lemma eq_filter p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => filter p1 s = filter p2 s.
 proof. by move=> h; apply: eq_filter_in=> ? _; apply/h. qed.
 
-lemma eq_count_in p1 p2 (s : 'a list):
+lemma eq_in_count p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => count p1 s = count p2 s.
 proof. by move=> h; rewrite -!size_filter (eq_filter_in _ p2). qed.
 
 lemma eq_count p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => count p1 s = count p2 s.
-proof. by move=> h; apply/eq_count_in=> ? _; apply/h. qed.
+proof. by move=> h; apply/eq_in_count=> ? _; apply/h. qed.
 
 lemma count_pred0_eq_in p (s : 'a list) :
   (forall x, x \in s => !p x) => count p s = 0.
-proof. by move=> eq; rewrite -(count_pred0 s) &(eq_count_in). qed.
+proof. by move=> eq; rewrite -(count_pred0 s) &(eq_in_count). qed.
 
 lemma count_pred0_eq p (s : 'a list):
   (forall x, ! p x) => count p s = 0.
@@ -571,7 +572,7 @@ proof. by move=> eq; apply/count_pred0_eq_in => x ?; apply/eq. qed.
 
 lemma count_predT_eq_in p (s : 'a list):
   (forall x, x \in s => p x) => count p s = size s.
-proof. by move=> eq; rewrite -(count_predT s) &(eq_count_in). qed.
+proof. by move=> eq; rewrite -(count_predT s) &(eq_in_count). qed.
 
 lemma count_predT_eq p (s : 'a list):
   (forall x, p x) => count p s = size s.
@@ -579,7 +580,7 @@ proof. by move=> eq; apply/count_predT_eq_in => x ?; apply/eq. qed.
 
 lemma eq_has_in p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => has p1 s <=> has p2 s.
-proof. by move=> h; rewrite !has_count (eq_count_in _ p2). qed.
+proof. by move=> h; rewrite !has_count (eq_in_count _ p2). qed.
 
 lemma eq_has p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => has p1 s <=> has p2 s.
@@ -587,7 +588,7 @@ proof. by move=> h; apply/eq_has_in=> ? _; apply/h. qed.
 
 lemma eq_all_in p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => all p1 s <=> all p2 s.
-proof. by move=> h; rewrite !all_count (eq_count_in _ p2). qed.
+proof. by move=> h; rewrite !all_count (eq_in_count _ p2). qed.
 
 lemma eq_all p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => all p1 s <=> all p2 s.
@@ -634,6 +635,14 @@ proof. by elim: s1 => //= x s1 IHs; rewrite IHs. qed.
 lemma mem_filter (p : 'a -> bool) x s:
   mem (filter p s) x <=> p x /\ (mem s x).
 proof. by elim: s => //= y s IHs; smt. qed.
+
+lemma find_eq_in (q p : 'a -> bool) (xs : 'a list) :
+  (forall x, x \in xs => p x <=> q x)
+  => find p xs = find q xs.
+proof.
+elim: xs=> //= x xs ih eq_in; rewrite (eq_in x _) //; case: (q x)=> //=.
+by rewrite ih=> // x0 x0_in_xs; rewrite eq_in // x0_in_xs.
+qed.
 
 lemma find_ge0 p (s : 'a list): 0 <= find p s.
 proof. elim: s; smt. qed.
@@ -805,7 +814,7 @@ lemma drop_nth (z0 : 'a) n s: 0 <= n < size s =>
   drop n s = nth z0 s n :: drop (n+1) s.
 proof.
 elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
-by elim: n => [|n ge0_n _] /=; rewrite ?drop0 //= smt.
+by elim: n => [|n ge0_n _] /=; rewrite ?drop0 //= #smt.
 qed.
 
 op take n (xs : 'a list) =
@@ -1595,6 +1604,10 @@ lemma has_map (f : 'a -> 'b) p s:
   has p (map f s) = has (preim f p) s.
 proof. by elim: s => //= x s ->. qed.
 
+lemma has_filter ['a] (p q: 'a -> bool) s:
+  has p (filter q s) = has (predI p q) s.
+proof. by elim: s=> //= x s @/predI; case: (q x)=> //= ? ->. qed.
+
 lemma all_map (f :  'a -> 'b) p s:
   all p (map f s) = all (preim f p) s.
 proof. by elim: s => //= x s ->. qed.
@@ -1788,7 +1801,7 @@ theory Iota.
   proof.
     move=> ge0_n1 ge0_n2; elim: n1 ge0_n1 m => /= [|n1 ge0_n1 ih] m.
       by rewrite (iota0 m 0).
-    by rewrite addzAC !iotaS // 1:smt ih addzAC addzA.
+    by rewrite addzAC !iotaS // 1:/# ih addzAC addzA.
   qed.
 
   lemma iotaSr i n : 0 <= n =>
@@ -1811,8 +1824,8 @@ theory Iota.
   lemma mem_iota m n i : mem (iota_ m n) i <=> (m <= i /\ i < m + n).
   proof.
     elim/natind: n m => [n hn|n hn ih] m.
-      by rewrite iota0 // smt.
-    by rewrite iotaS // in_cons ih smt.
+      by rewrite iota0 // /#.
+    by rewrite iotaS // in_cons ih /#.
   qed.
 
   lemma mema_iota m n i : mem (iota_ m n) i <=> (m <= i < m + n).
@@ -1822,7 +1835,7 @@ theory Iota.
   proof.
     elim/natind: n m => [n hn|n hn ih] m.
       by rewrite iota0.
-    by rewrite iotaS // cons_uniq mem_iota ih // smt.
+    by rewrite iotaS // cons_uniq mem_iota ih //#.
   qed.
 
   lemma last_iota k m n:
@@ -1830,7 +1843,7 @@ theory Iota.
   proof.
     elim/natind: n m k => [n hn|n hn ih] m k.
       by rewrite iota0 hn.
-    by rewrite iotaS //= ih smt.
+    by rewrite iotaS //= ih /#.
   qed.
 
   lemma take_iota (k n m : int):
@@ -1881,11 +1894,11 @@ theory Range.
   proof. smt. qed.
 
   lemma rangeS (m : int): range m (m+1) = [m].
-  proof. by rewrite range_ltn 1:smt range_geq. qed.
+  proof. by rewrite range_ltn 1:/# range_geq. qed.
 
   lemma range_add (m n a : int):
     range (m+a) (n+a) = map (Int.(+) a) (range m n).
-  proof. by rewrite /range addrC iota_addl; congr; smt. qed.
+  proof. by rewrite /range addrC iota_addl; congr => /#. qed.
 
   lemma range_addl (m n a : int):
     range (m+a) n = map (Int.(+) a) (range m (n-a)).
@@ -1898,8 +1911,8 @@ theory Range.
   lemma range_cat (n m p : int): m <= n => n <= p =>
     range m p = range m n ++ range n p.
   proof.
-    rewrite /range (_: p - m = n - m + (p - n)) 1:smt.
-    by move=> le_mn le_np; rewrite iota_add; smt.
+    rewrite /range (_: p - m = n - m + (p - n)) 1:/#.
+    by move=> le_mn le_np; rewrite iota_add /#.
   qed.
 
   lemma rangeSr (n m:int): n <= m =>
@@ -2167,10 +2180,6 @@ lemma eq_in_filter_pred0 (P : 'a -> bool) s:
   (forall x, mem s x => !P x) => filter P s = [].
 proof. by move=> Ps; rewrite (@eq_in_filter P pred0) ?filter_pred0. qed.
 
-lemma eq_in_count (p1 p2 : 'a -> bool) (s : 'a list):
-  (forall x, mem s x => p1 x <=> p2 x) => count p1 s = count p2 s.
-proof. by move=> h; rewrite -!size_filter (eq_in_filter _ p2). qed.
-
 lemma eq_in_has (p1 p2 : 'a -> bool) (s : 'a list):
   (forall x, mem s x => p1 x <=> p2 x) => has p1 s <=> has p2 s.
 proof. by move=> h; rewrite !has_count (eq_in_count _ p2). qed.
@@ -2359,6 +2368,15 @@ proof. apply: contraLR; rewrite -!all_predC &(all_mask). qed.
 lemma mem_mask x m s : x \in mask<:'a> m s => x \in s.
 proof. by rewrite -!has_pred1 => /has_mask. qed.
 
+lemma map_mask (f : 'a -> 'b) m s : map f (mask m s) = mask m (map f s).
+proof. by elim: m s => [|[|] m IHm] [|x p] //=; rewrite IHm. qed.
+
+lemma mask_uniq (s : 'a list) m : uniq s => uniq (mask m s).
+proof.
+elim: s m => [m|x s IHs [|b m] Uxs] //=; 1: by rewrite mask0.
+case: b Uxs => //= -[s'x Us]; smt(mem_mask).
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                             Subseq                                   *)
 (* -------------------------------------------------------------------- *)
@@ -2458,6 +2476,13 @@ elim: s => //= y s ih; case: (a y)=> //= Nay.
 by apply/(subseq_trans s)/subseq_cons/ih.
 qed.
 
+lemma map_subseq (f : 'a -> 'b) s1 s2 :
+  subseq s1 s2 => subseq (map f s1) (map f s2).
+proof.
+case/subseqP=> m [sz_m ->]; apply/subseqP.
+by exists m; rewrite ?size_map ?map_mask.
+qed.
+
 lemma count_subseq ['a] (p : 'a -> bool) s1 s2 : subseq s1 s2 =>
   count p s1 <= count p s2.
 proof.
@@ -2469,6 +2494,13 @@ qed.
 lemma subseq_mem ['a] (xs ys : 'a list) x:
   subseq xs ys => x \in xs => x \in ys.
 proof. by case/subseqP=> m [_ ->]; apply: mem_mask. qed.
+
+lemma subseq_uniq (s1 s2 : 'a list) : subseq s1 s2 => uniq s2 => uniq s1.
+proof. by case/subseqP=> m [_ -> Us2]; apply: mask_uniq. qed.
+
+lemma subseq_map_uniq (s1 s2 : 'a list) (f : 'a -> 'b) :
+  subseq s1 s2 => uniq (map f s2) => uniq (map f s1).
+proof. by move/(map_subseq f); apply: subseq_uniq. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)

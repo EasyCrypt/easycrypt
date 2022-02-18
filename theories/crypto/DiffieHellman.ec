@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -93,7 +93,7 @@ theory List_CDH.
 
   (** Naive reduction to CDH **)
   section.
-    declare module A: Adversary.
+    declare module A <: Adversary.
 
     local module LCDH' = {
       var x, y: F.t
@@ -151,7 +151,7 @@ theory List_CDH.
       (* The second part is just arithmetic, but smt needs some help. *)
       rnd (pred1 (g^(LCDH'.x * LCDH'.y))).
       wp; skip=> /> ? Hin Hle /=.
-      rewrite /pred1 MUniform.duniform1E Hin /= lef_pinv 2:[smt (gt0_n)].
+      rewrite /pred1 MUniform.duniform1E Hin /= lef_pinv; [2:smt (gt0_n)].
       + by move: Hin;rewrite -mem_undup -index_mem;smt (index_ge0).
       smt (size_undup).
     qed.
@@ -226,7 +226,7 @@ theory Set_CDH.
 
   (** Naive reduction to CDH **)
   section.
-    declare module A: Adversary.
+    declare module A <: Adversary.
 
     (* FIXME: schemas cannot be declared in sections *)
     (* local clone List_CDH as LCDH with op n <- n. *)
@@ -244,7 +244,7 @@ theory Set_CDH.
                 Pr[CDH.CDH(LCDH.CDH_from_LCDH(CDH_from_SCDH(A).AL)).main() @ &m : res].
       + by byequiv=> //;proc;inline *;auto=> /=;call (_:true);auto.
       apply: ler_trans h0 => /=.
-      by apply ler_wpmul2r => //; rewrite invr_ge0 le_fromint [smt(gt0_n)].
+      by apply ler_wpmul2r => //; rewrite invr_ge0 le_fromint; smt(gt0_n).
     qed.
   
   end section.

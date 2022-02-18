@@ -463,12 +463,12 @@ theory NONDUMMY_EQUIV_DUMMY.
     exists S; split.
     + (split; last split) => kBb kBs FB ??.
       + by proc true : time []. 
-      + proc true : time [FB.step : [N kBs], FB.backdoor :[N kBb]] => //=.
-        + have cS_pos := hcS cdA _; 1: done.
+      + proc true : time [FB.step : [N kBs], FB.backdoor : [N kBb]] => //=.
+
           by rewrite !bigi_constz /#. 
         + by move=> *; proc true : time [].
         by move=> *; proc true : time [].
-      proc true : time [FB.step : [N kBs], FB.backdoor :[N kBb]] => //=.
+      proc true : time [FB.step : [N kBs], FB.backdoor : [N kBb]] => //=.
       + have cS_pos := hcS cdA _; 1: done.
         by rewrite !bigi_constz /#. 
       + by move=> *; proc true : time [].
@@ -548,13 +548,13 @@ abstract theory TRANSITIVITY.
   }.
 
   section TRANS.
-     declare module P1 : GOAL.REAL.PROTOCOL.
-     declare module P2 : H1.IDEAL.PROTOCOL.
-     declare module P3 : H2.IDEAL.PROTOCOL.
-     declare module S12 : H1.SIMULATOR {-P2, -P3}.
-     declare module S23 : H2.SIMULATOR {-P3, -S12}.
+     declare module P1 <: GOAL.REAL.PROTOCOL.
+     declare module P2 <: H1.IDEAL.PROTOCOL.
+     declare module P3 <: H2.IDEAL.PROTOCOL.
+     declare module S12 <: H1.SIMULATOR {-P2, -P3}.
+     declare module S23 <: H2.SIMULATOR {-P3, -S12}.
   
-     declare module Z : GOAL.REAL.ENV { -P1, -P2, -P3, -S12, -S23}.
+     declare module Z <: GOAL.REAL.ENV { -P1, -P2, -P3, -S12, -S23}.
  
      lemma uc_transitivity &m : 
        `| Pr[GOAL.REAL.UC_emul(Z, P1).main() @ &m : res] - 
@@ -623,11 +623,11 @@ abstract theory TRANSITIVITY.
 
    section.
 
-   declare module P1  : GOAL.REAL.PROTOCOL.
-   declare module P2  : H1.IDEAL.PROTOCOL.
-   declare module P3  : H2.IDEAL.PROTOCOL.
-   declare module S12 : CH1.CSIMULATOR {-P2, -P3}.
-   declare module S23 : CH2.CSIMULATOR {-P3, -S12}.
+   declare module P1  <: GOAL.REAL.PROTOCOL.
+   declare module P2  <: H1.IDEAL.PROTOCOL.
+   declare module P3  <: H2.IDEAL.PROTOCOL.
+   declare module S12 <: CH1.CSIMULATOR {-P2, -P3}.
+   declare module S23 <: CH2.CSIMULATOR {-P3, -S12}.
 
    lemma cost_S23_step (kbackdoor kstep : int) (FB <: GOAL.IDEAL.BACKDOORS[backdoor : `{N kbackdoor} , step : `{N kstep} ]) :
      choare[S23(FB).step] time [N cs23.`cstep; FB.step : cs23.`cs_s; FB.backdoor : cs23.`cs_b].
@@ -641,7 +641,7 @@ abstract theory TRANSITIVITY.
    lemma cost_S23_backdoor (kbackdoor kstep : int) (FB <: GOAL.IDEAL.BACKDOORS[backdoor : `{N kbackdoor} , step : `{N kstep} ]) :
        choare[S23(FB).backdoor] time [N cs23.`cbackdoor; FB.step : cs23.`cb_s; FB.backdoor : cs23.`cb_b].
    proof.
-     proc true : time [ FB.step : [N kstep], FB.backdoor : [N kbackdoor]] => //=.
+     proc true : time [FB.step : [N kstep], FB.backdoor : [N kbackdoor]] => //=.
      + by rewrite !bigi_constz; smt(cs23_pos). 
      + by move=> /= *; proc true : time [].
      by move=> /= *; proc true : time [].
@@ -860,13 +860,13 @@ theory COMPOSITION.
       
   section COMP.
  
-    declare module P  : Pi.REAL.PROTOCOL.
-    declare module Ff : Pi.IDEAL.PROTOCOL.
-    declare module Sf : Pi.SIMULATOR {-Ff}.
+    declare module P  <: Pi.REAL.PROTOCOL.
+    declare module Ff <: Pi.IDEAL.PROTOCOL.
+    declare module Sf <: Pi.SIMULATOR {-Ff}.
 
-    declare module Rho: RHO {-P, -Ff, -Sf}.
+    declare module Rho<: RHO {-P, -Ff, -Sf}.
  
-    declare module Z: RPi.REAL.ENV {-Rho, -P, -Ff, -Sf}.
+    declare module Z<: RPi.REAL.ENV {-Rho, -P, -Ff, -Sf}.
 
     lemma compose &m : 
       Pr[RPi.REAL.UC_emul(Z,CompRP(Rho,P)).main() @ &m : res] - 
@@ -999,11 +999,11 @@ theory COMPOSITION.
 
   section.
 
-   declare module P  : Pi.REAL.PROTOCOL.
-   declare module Ff : Pi.IDEAL.PROTOCOL.
-   declare module Sf : CPi.CSIMULATOR {-Ff}.
+   declare module P  <: Pi.REAL.PROTOCOL.
+   declare module Ff <: Pi.IDEAL.PROTOCOL.
+   declare module Sf <: CPi.CSIMULATOR {-Ff}.
 
-   declare module Rho: CRHO {-P, -Ff, -Sf}.
+   declare module Rho<: CRHO {-P, -Ff, -Sf}.
 
    lemma ex_compose e &m : 
      (forall (Z <: CPi.CENV {-P, -Ff, -Sf}),
@@ -1092,15 +1092,15 @@ theory COMPOSITION.
 
   section StrongCOMP.
 
-    declare module P  : Pi.REAL.PROTOCOL.
-    declare module Ff : Pi.IDEAL.PROTOCOL.
-    declare module Sf : Pi.SIMULATOR {-Ff}.
+    declare module P  <: Pi.REAL.PROTOCOL.
+    declare module Ff <: Pi.IDEAL.PROTOCOL.
+    declare module Sf <: Pi.SIMULATOR {-Ff}.
 
-    declare module Rho: RHO {-P, -Ff, -Sf}.
-    declare module F : H2.IDEAL.PROTOCOL {-Sf}.
-    declare module S : H2.SIMULATOR {-F, -Sf}.
+    declare module Rho<: RHO {-P, -Ff, -Sf}.
+    declare module F <: H2.IDEAL.PROTOCOL {-Sf}.
+    declare module S <: H2.SIMULATOR {-F, -Sf}.
 
-    declare module Z: RPi.REAL.ENV {-Rho, -P, -Ff, -Sf, -F, -S}.
+    declare module Z<: RPi.REAL.ENV {-Rho, -P, -Ff, -Sf, -F, -S}.
 
     lemma strong_compose &m : 
       `| Pr[GOAL.REAL.UC_emul(Z,CompRP(Rho,P)).main() @ &m : res] - 
@@ -1171,13 +1171,13 @@ theory COMPOSITION.
     proof csi_pos by apply csi_pos.
 
   section.  
-    declare module P  : Pi.REAL.PROTOCOL.
-    declare module Ff : Pi.IDEAL.PROTOCOL.
-    declare module Sf : C0.CPi.CSIMULATOR {-Ff}.
+    declare module P  <: Pi.REAL.PROTOCOL.
+    declare module Ff <: Pi.IDEAL.PROTOCOL.
+    declare module Sf <: C0.CPi.CSIMULATOR {-Ff}.
 
-    declare module Rho: C0.CRHO {-P, -Ff, -Sf}.
-    declare module F : H2.IDEAL.PROTOCOL {-Sf}.
-    declare module S : CT.CH2.CSIMULATOR {-F, -Sf}.
+    declare module Rho<: C0.CRHO {-P, -Ff, -Sf}.
+    declare module F <: H2.IDEAL.PROTOCOL {-Sf}.
+    declare module S <: CT.CH2.CSIMULATOR {-F, -Sf}.
 
     lemma ex_strong_compose &m e1 e2 : 
       (forall (Z <: C0.CPi.CENV {-P, -Ff, -Sf}),
@@ -1361,12 +1361,12 @@ abstract theory PARA_IR.
   
   section PROOF.
 
-    declare module F1 : Pi1.PROTOCOL.
-    declare module P2 : Pi2.REAL.PROTOCOL {-F1}.
-    declare module F2 : Pi2.IDEAL.PROTOCOL {-F1, -P2}.
-    declare module S2 : Pi2.SIMULATOR {-F1, -P2, -F2}.
+    declare module F1 <: Pi1.PROTOCOL.
+    declare module P2 <: Pi2.REAL.PROTOCOL {-F1}.
+    declare module F2 <: Pi2.IDEAL.PROTOCOL {-F1, -P2}.
+    declare module S2 <: Pi2.SIMULATOR {-F1, -P2, -F2}.
 
-    declare module Z  : RI.REAL.ENV { -F1, -P2, -F2, -S2 }.
+    declare module Z  <: RI.REAL.ENV { -F1, -P2, -F2, -S2 }.
 
     equiv F2_step : Sid(S2, I.PPara(F1, F2)).FBPi.step ~ F2.step : ={arg, glob F2, glob F1} ==>  ={res, glob F2, glob F1}.
     proof.
@@ -1450,10 +1450,10 @@ abstract theory PARA_IR.
 
   section.
 
-    declare module F1 : CPi1.CPROTOCOL.
-    declare module P2 : Pi2.REAL.PROTOCOL {-F1}.
-    declare module F2 : Pi2.IDEAL.PROTOCOL {-F1, -P2}.
-    declare module S2 : CPi2.CSIMULATOR {-F1, -P2, -F2}.
+    declare module F1 <: CPi1.CPROTOCOL.
+    declare module P2 <: Pi2.REAL.PROTOCOL {-F1}.
+    declare module F2 <: Pi2.IDEAL.PROTOCOL {-F1, -P2}.
+    declare module S2 <: CPi2.CSIMULATOR {-F1, -P2, -F2}.
 
     lemma ex_compose &m e : 
       (forall (Z<:CPi2.CENV{-P2, -F2, -S2}), 
@@ -1611,12 +1611,12 @@ abstract theory PARA_RI.
   
   section PROOF.
 
-    declare module F2 : Pi2.PROTOCOL.
-    declare module P1 : Pi1.REAL.PROTOCOL {-F2}.
-    declare module F1 : Pi1.IDEAL.PROTOCOL {-F2, -P1}.
-    declare module S1 : Pi1.SIMULATOR {-F2, -P1, -F1}.
+    declare module F2 <: Pi2.PROTOCOL.
+    declare module P1 <: Pi1.REAL.PROTOCOL {-F2}.
+    declare module F1 <: Pi1.IDEAL.PROTOCOL {-F2, -P1}.
+    declare module S1 <: Pi1.SIMULATOR {-F2, -P1, -F1}.
 
-    declare module Z  : RI.REAL.ENV { -F2, -P1, -F1, -S1 }.
+    declare module Z  <: RI.REAL.ENV { -F2, -P1, -F1, -S1 }.
 
     equiv F1_step : Sid(S1, I.PPara(F1, F2)).FBPi.step ~ F1.step : ={arg, glob F2, glob F1} ==>  ={res, glob F2, glob F1}.
     proof.
@@ -1700,10 +1700,10 @@ abstract theory PARA_RI.
 
   section.
 
-    declare module F2 : CPi2.CPROTOCOL.
-    declare module P1 : Pi1.REAL.PROTOCOL {-F2}.
-    declare module F1 : Pi1.IDEAL.PROTOCOL {-F2, -P1}.
-    declare module S1 : CPi1.CSIMULATOR {-F2, -P1}.
+    declare module F2 <: CPi2.CPROTOCOL.
+    declare module P1 <: Pi1.REAL.PROTOCOL {-F2}.
+    declare module F1 <: Pi1.IDEAL.PROTOCOL {-F2, -P1}.
+    declare module S1 <: CPi1.CSIMULATOR {-F2, -P1}.
 
     lemma ex_compose &m e : 
       (forall (Z<:CPi1.CENV{-P1, -F1, -S1}), 

@@ -1,3 +1,11 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-C-V1 license
+ * -------------------------------------------------------------------- *)
+
 (* -------------------------------------------------------------------- *)
 open EcMaps
 
@@ -5,7 +13,7 @@ module Json = Yojson
 
 (* -------------------------------------------------------------------- *)
 module Version = struct
-  let current : int = 2
+  let current : int = 3
 end
 
 (* -------------------------------------------------------------------- *)
@@ -18,11 +26,23 @@ type ecoroot = {
 
 type eco = {
   eco_root    : ecoroot;
-  eco_depends : ecoroot Mstr.t;
+  eco_depends : ecodepend Mstr.t;
 }
+
+and ecodepend =
+  ecoroot * bool
 
 (* -------------------------------------------------------------------- *)
 exception InvalidEco
+
+(* -------------------------------------------------------------------- *)
+let flag_of_json (data : Json.t) : bool =
+  match data with
+  | `Bool b -> b
+  | _ -> raise InvalidEco
+
+let flag_to_json (flag : bool) : Json.t =
+  `Bool flag
 
 (* -------------------------------------------------------------------- *)
 let kind_to_json (k : EcLoader.kind) =
@@ -54,35 +74,54 @@ let namespace_of_json (date : Json.t) : string =
   match date with `String x -> x | _ -> raise InvalidEco
 
 (* -------------------------------------------------------------------- *)
+let ecoroot_to_map (ecor : ecoroot) : (string * Json.t) list =
+  [ "kind"  , kind_to_json ecor.eco_kind     ;
+    "digest", digest_to_json ecor.eco_digest ]
+
+let ecoroot_of_map (data : Json.t Mstr.t) : ecoroot =
+  let kd = kind_of_json (Mstr.find_exn InvalidEco "kind" data) in
+  let dg = digest_of_json (Mstr.find_exn InvalidEco "digest" data) in
+  { eco_kind = kd; eco_digest = dg; }
+
+(* -------------------------------------------------------------------- *)
 let ecoroot_to_json (ecor : ecoroot) : Json.t =
-  `Assoc [
-     "kind"     , kind_to_json ecor.eco_kind;
-     "digest"   , digest_to_json ecor.eco_digest;
-   ]
+  `Assoc (ecoroot_to_map ecor)
 
 let ecoroot_of_json (data : Json.t) : ecoroot =
   match data with
   | `Assoc data ->
-      let data = Mstr.of_list data in
-      let kd = kind_of_json (Mstr.find_exn InvalidEco "kind" data) in
-      let dg = digest_of_json (Mstr.find_exn InvalidEco "digest" data) in
-      { eco_kind = kd; eco_digest = dg; }
+      ecoroot_of_map (Mstr.of_list data)
 
   | _ -> raise InvalidEco
 
 (* -------------------------------------------------------------------- *)
-let depends_of_json (data : Json.t) : ecoroot Mstr.t =
+let ecodepend_to_json ((ecor, direct) : ecodepend) : Json.t =
+  `Assoc ([ "direct", flag_to_json direct] @ (ecoroot_to_map ecor))
+
+let ecodepend_of_json (data : Json.t) : ecodepend =
   match data with
   | `Assoc data ->
-      let data = List.map (EcUtils.snd_map ecoroot_of_json) data in
-      Mstr.of_list data
+      let data   = Mstr.of_list data in
+      let ecor   = ecoroot_of_map data in
+      let direct = flag_of_json (Mstr.find_exn InvalidEco "direct" data) in
+      (ecor, direct)
+
+  | _ ->
+      assert false
+
+(* -------------------------------------------------------------------- *)
+let depends_of_json (data : Json.t) : ecodepend Mstr.t =
+  match data with
+  | `Assoc data ->
+      Mstr.of_list
+        (List.map (EcUtils.snd_map ecodepend_of_json) data)
 
   | _ ->
       raise InvalidEco
 
 (* -------------------------------------------------------------------- *)
 let to_json (eco : eco) : Json.t =
-  let depends = Mstr.bindings (Mstr.map ecoroot_to_json eco.eco_depends) in
+  let depends = Mstr.bindings (Mstr.map ecodepend_to_json eco.eco_depends) in
 
   `Assoc
     [ "version", `Int Version.current;
@@ -163,7 +202,7 @@ let check_eco loader filename =
 
     check_digest filename eco.eco_root;
 
-    let doit name d =
+    let doit name (d, _) =
       match loader name with
       | None ->
           raise E.BadEco

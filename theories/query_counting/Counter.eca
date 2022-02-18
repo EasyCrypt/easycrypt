@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -42,8 +42,9 @@ module Counter(S : System) = {
 }.
 
 section.
-  declare module S : System.
-  declare module D : Distinguisher { -S }.
+  declare module S <: System.
+  declare module D <: Distinguisher { -S }.
+
 
   lemma ind_counting (E : (glob S) -> bool) &m:
       Pr[D(S).distinguish() @ &m: E (glob S)]
@@ -61,9 +62,9 @@ end section.
 op q : { int | 0 <= q } as ge0_q.
 
 section.
-  declare module D : Distinguisher { -Counter }.
+  declare module D <: Distinguisher { -Counter }.
 
-  axiom D_bounded (S <: System { -Counter, -D }) c0 &m:
+  declare axiom D_bounded (S <: System { -Counter, -D }) c0 &m:
     islossless S.oracle =>
     Counter.c{m} = c0 =>
     Pr[D(Counter(S)).distinguish() @ &m : Counter.c <= c0 + q] = 1%r.

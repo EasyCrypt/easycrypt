@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -220,6 +220,7 @@ let gty_hash = function
   | GTmodty p  ->  mty_hash p
   | GTmem _ -> 1
 
+(* -------------------------------------------------------------------- *)
 let mr_fv mr =
   EcPath.Sm.fold (fun mp fv ->
       EcPath.m_fv fv mp)
@@ -245,9 +246,30 @@ let mr_fv mr =
           ) calls (fv_union fv (f_fv self))
     ) mr.mr_oinfos
 
+(* -------------------------------------------------------------------- *)
 let gty_fv = function
   | GTty ty -> ty.ty_fv
   | GTmodty mty -> mr_fv mty.mt_restr
+  | GTmem mt -> EcMemory.mt_fv mt
+
+(* -------------------------------------------------------------------- *)
+let gty_fv_and_tvar = function
+  | GTty ty -> EcTypes.ty_fv_and_tvar ty
+  | GTmodty { mt_restr = restr } ->
+    let fv =
+      let mps = Sm.union
+        restr.mr_mpaths.ur_neg
+        (odfl Sm.empty restr.mr_mpaths.ur_pos) in
+      EcPath.Sm.fold
+        (fun mp fv -> EcPath.m_fv fv mp) mps EcIdent.Mid.empty in
+    let fv =
+      let xps = Sx.union
+        restr.mr_xpaths.ur_neg
+        (odfl Sx.empty restr.mr_xpaths.ur_pos) in
+      EcPath.Sx.fold (fun xp fv -> EcPath.x_fv fv xp)xps fv in
+
+    (* FIXME:MERGE-COST *)
+    fv
 
   | GTmem mt -> EcMemory.mt_fv mt
 
@@ -260,6 +282,11 @@ let gtmodty (mt : module_type) =
 
 let gtmem (mt : EcMemory.memtype) =
   GTmem mt
+
+(* -------------------------------------------------------------------- *)
+let as_gtty  = function GTty ty  -> ty  | _ -> assert false
+let as_modty = function GTmodty mty -> mty | _ -> assert false
+let as_mem   = function GTmem m -> m | _ -> assert false
 
 (*-------------------------------------------------------------------- *)
 let b_equal (b1 : bindings) (b2 : bindings) =
@@ -1229,6 +1256,7 @@ let f_iter g f =
   | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
   | Fcoe      coe -> g coe.coe_pre;
   | Fpr       pr  -> g pr.pr_args; oiter g pr.pr_qargs; g pr.pr_event
+
 
 (* -------------------------------------------------------------------- *)
 let form_exists g f =

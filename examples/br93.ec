@@ -193,11 +193,24 @@ clone import OW as OW_rand with
   op   challenge _ <- drand,
   op   f           <- f,
   op   finv        <- fi
-proof dkeys_ll, finvof, challenge_ll, challenge_uni.
+proof *.
+(* proof dkeys_ll, finvof, challenge_ll, challenge_uni. *)
 realize dkeys_ll by exact/dkeys_ll.
 realize challenge_ll by move=> _ _; exact/drand_ll.
 realize challenge_uni by move=> _ _; exact/drand_uni.
 realize finvof by move=> pk sk x /fK ->.
+realize finv_correct.
+proof.
+  move=> pk sk y h.
+  have hp : valid_pkey pk by exists sk.
+  by move=> /(_ hp) [] x [ ? ->]; rewrite fK.
+qed.
+realize fofinv.
+proof.
+  move=> pk sk x h.
+  have hp : valid_pkey pk by exists sk.
+  by move=> /(_ hp) [ y [ ? ->]]; rewrite fK.
+qed.
 
 (* But we can't do it (yet) for IND-CPA because of the random oracle    *)
 (*             Instead, we define CPA for BR93 with that particular RO. *)
@@ -261,10 +274,9 @@ module I(A:Adv): Inverter = {
 (* We now prove the result using a sequence of games                    *)
 section.
 (* All lemmas in this section hold for all (valid) CPA adversary A      *)
+declare module A <: Adv { -LRO, -Log }.
 
-declare module A : Adv { -LRO, -Log }.
-
-axiom A_guess_ll (O <: POracle {-A}): islossless O.o => islossless A(O).guess.
+declare axiom A_guess_ll (O <: POracle {-A}): islossless O.o => islossless A(O).guess.
 
 (* Step 1: replace RO call with random sampling                         *)
 local module Game1 = {
@@ -426,6 +438,36 @@ lemma ex_Reduction (cA:adv_cost) (A<:Adv [choose : `{N cA.`cchoose, #ARO.o : cA.
     cA.`cguess + cA.`cchoose in
   exists (B <: Inverter [invert : `{N cB} ]),
     Pr[CPA(BR93(LRO), A(LRO)).main() @ &m : res] - 1%r/2%r <= Pr[OW(B).main() @ &m: res].  
+
+section.
+declare module A <: Adv { -LRO, -I }.
+
+declare axiom A_a1_ll (O <: POracle {-A}): islossless O.o => islossless A(O).a1.
+declare axiom A_a2_ll (O <: POracle {-A}): islossless O.o => islossless A(O).a2.
+
+local clone import BR93 as Instance with
+  type pkey  <- pkey,
+  type skey  <- skey,
+  op   dkeys <- dkeys,
+  op   f     <- f,
+  op   fi    <- fi,
+  type ptxt  <- ptxt,
+  op   (+^)  <- Plaintext.(+^),
+  op   dptxt <- dptxt,
+  type rand  <- rand,
+  op   drand <- drand
+proof *.
+realize addA          by move=> p1 p2 p3; algebra.
+realize addC          by move=> p1 p2; algebra.
+realize addKp         by move=> p1 p2; algebra.
+realize dptxt_llfuuni by smt(@Plaintext.DWord).
+realize drand_lluni   by smt(@Randomness.DWord).
+realize dkeys_llfuni  by exact/dkeys_llfuni.
+realize fK            by exact/fK.
+
+lemma Reduction &m:
+     Pr[CPA(LRO, BR, A).main() @ &m : res] - 1%r / 2%r
+  <= Pr[Exp_OW(Self.I(A, LRO)).main() @ &m : res].
 proof.
   move=> cA_pos A_choose_ll qH.
   exists (Ifind(A)); split.  
@@ -494,4 +536,4 @@ proof.
   by sim.
 qed.
 
-end BR93.
+end section.

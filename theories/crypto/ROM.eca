@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -101,7 +101,7 @@ end Lazy.
 (* -------------------------------------------------------------------- *)
 abstract theory FiniteEager.
 require import List SmtMap.
-require (*--*) FinType.
+require import FinType.
 
 (** TODO: expose finiteness assumption **)
 clone include FinType with
@@ -160,7 +160,7 @@ end FiniteEager.
 (* -------------------------------------------------------------------- *)
 abstract theory LazyEager.
 require import List SmtMap PROM.
-require (*--*) FinType.
+require import FinType.
 
 clone import FinType with
   type t <- in_t.
@@ -172,16 +172,17 @@ clone include FiniteEager with
 proof * by exact/enum_spec.
 
 section.
-declare module D : Distinguisher { -LRO, -ERO }.
+declare module D <: Distinguisher { -LRO, -ERO }.
 
-axiom dout_ll x : is_lossless (dout x).
+declare axiom dout_ll x : is_lossless (dout x).
 
 local clone import PROM.FullRO as H with
   type in_t    <- in_t,
   type out_t   <- out_t,
   type d_in_t  <- d_in_t,
   type d_out_t <- d_out_t,
-  op   dout    <- dout.
+  op   dout    <- dout
+  proof *.
 
 local module Wrap (O : RO) : Oracle = {
   proc init() = {
@@ -219,12 +220,14 @@ local module Exp' (O : RO) = {
   }
 }.
 
+
+
 local equiv eq_LRO_RO:
-  Exp(LRO, D).main ~ Exp'(FullEager.LRO).main:
+  Exp(Lazy.LRO, D).main ~ Exp'(H.LRO).main:
     ={glob D, arg} ==> ={res}.
 proof.
 proc; inline *; wp.
-call (: LRO.m{1} = RO.m{2})=> />; first by sim.
+call (: Lazy.LRO.m{1} = RO.m{2})=> />; first by sim.
 while{2} true (size w{2}).
 + by auto=> &m />; case: (w{m})=> //#.
 by auto=> /> w; rewrite -size_eq0 Int.eqz_leq size_ge0.
@@ -263,9 +266,9 @@ by call eq_ERO_RO_init; inline *; auto.
 qed.
 
 equiv eq_eager_sampling:
-  Exp(LRO, D).main ~ Exp(ERO, D).main: ={glob D, arg} ==> ={res}.
+  Exp(Lazy.LRO, D).main ~ Exp(ERO, D).main: ={glob D, arg} ==> ={res}.
 proof.
-transitivity Exp'(FullEager.LRO).main
+transitivity Exp'(H.LRO).main
              (={glob D, arg} ==> ={res})
              (={glob D, arg} ==> ={res})=> />.
 + by move=> &2; exists (glob D){2} (x{2}).
@@ -494,11 +497,11 @@ module G_bad (D : Dist) (H : Oracle) = {
 }.
 
 section.
-declare module D : Dist { -Log, -LRO }.
-axiom D_a1_ll (H <: POracle { -D }): islossless H.o => islossless D(H).a1.
-axiom D_a2_ll (H <: POracle { -D }): islossless H.o => islossless D(H).a2.
+declare module D <: Dist { -Log, -LRO }.
+declare axiom D_a1_ll (H <: POracle { -D }): islossless H.o => islossless D(H).a1.
+declare axiom D_a2_ll (H <: POracle { -D }): islossless H.o => islossless D(H).a2.
 
-axiom dout_ll x : is_lossless (dout x).
+declare axiom dout_ll x : is_lossless (dout x).
 
 local module G1' (D : Dist) (H : Oracle) = {
   var x : in_t
@@ -602,11 +605,11 @@ module G_bad (D : Dist) (H : Oracle) = {
 }.
 
 section.
-declare module D : Dist { -Log, -LRO }.
-axiom D_a1_ll (H <: POracle { -D }): islossless H.o => islossless D(H).a1.
-axiom D_a2_ll (H <: POracle { -D }): islossless H.o => islossless D(H).a2.
+declare module D <: Dist { -Log, -LRO }.
+declare axiom D_a1_ll (H <: POracle { -D }): islossless H.o => islossless D(H).a1.
+declare axiom D_a2_ll (H <: POracle { -D }): islossless H.o => islossless D(H).a2.
 
-axiom dout_ll x : is_lossless (dout x).
+declare axiom dout_ll x : is_lossless (dout x).
 
 local module G1' (D : Dist) (H : Oracle) = {
   var x : in_t

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -140,8 +140,8 @@ proof. by rewrite set_set_if. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma set_set_swap (arr : 'a array) (k k' : int) (x x' : 'a):
-  k <> k => arr.[k <- x].[k' <- x'] = arr.[k' <- x'].[k' <- x'].
-proof. by rewrite set_set_if. qed.
+  k <> k' => arr.[k <- x].[k' <- x'] = arr.[k' <- x'].[k <- x].
+proof. by rewrite set_set_if=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 op offun f n: 'a array = mkarray (mkseq f n).

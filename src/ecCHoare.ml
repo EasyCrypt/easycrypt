@@ -181,7 +181,7 @@ val cost_of_expr_any : EcMemory.memenv -> EcTypes.expr -> form
 
 val free_expr : EcTypes.expr -> bool
  *)
-let rec free_expr e = match e.e_node with
+let free_expr e = match e.e_node with
   | Elocal _ | Evar _ | Eint _ -> true
 
   | Eop _

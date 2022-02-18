@@ -1,3 +1,11 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
 require import AllCore Distr DBool.
 
 module type A = {
@@ -16,8 +24,8 @@ module RandomLR(L:A) (R:A) = {
 
 section.
 
-  declare module L:A.
-  declare module R:A.
+  declare module L <: A.
+  declare module R <: A.
 
   local module Aux = {
     var b,r : bool

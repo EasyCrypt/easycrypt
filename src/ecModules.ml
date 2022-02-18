@@ -67,6 +67,8 @@ type module_structure  = form p_module_structure
 type module_item       = form p_module_item
 type module_comps      = form p_module_comps
 type module_comps_item = form p_module_comps_item
+type top_module_sig    = form p_top_module_sig
+type top_module_expr   = form p_top_module_expr
 
 let mr_empty = {
   mr_xpaths = ur_empty EcPath.Sx.empty;

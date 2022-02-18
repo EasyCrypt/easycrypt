@@ -213,7 +213,7 @@ qed.
 (* The same lemma, but in a section. *)
 section.
 op mk : int.
-declare module H0 : H [ o : `{N mk}].
+declare module H0 <: H [ o : `{N mk}].
 
 lemma MyAdv_compl_loc : choare[MyAdv(H0).a] time [N 3; H0.o : 2].
 proof. by proc; do !(call(_: true; time [])); auto. qed.
@@ -270,8 +270,8 @@ module type AB (H0 : H) = {
 }.
 
 section.
- declare module H0 : H.
- declare module AB0 : AB.
+ declare module H0 <: H.
+ declare module AB0 <: AB.
 
  local module AB1 = AB0(H0).
 

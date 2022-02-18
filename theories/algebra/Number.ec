@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -252,6 +252,9 @@ have: exp `|-oner| 2 = oner.
 rewrite sqrf_eq1=> -[->//|]; rewrite -ger0_def le0r oppr_eq0.
 by rewrite oner_neq0 /= => /(addr_gt0 _ _ ltr01); rewrite addrN ltrr.
 qed.
+
+lemma nosmt normrZ (x y : t) : zeror <= x => `| x * y | = x * `| y |.
+proof. by move=> ge0; rewrite normrM ger0_norm. qed.
 
 lemma nosmt normrN (x : t): `|- x| = `|x|.
 proof. by rewrite -mulN1r normrM normrN1 mul1r. qed.
@@ -1300,9 +1303,7 @@ end RealDomain.
 
 (* -------------------------------------------------------------------- *)
 theory RealField.
-type t.
-
-clone import Ring.Field as Field with type t <- t.
+clone import Ring.Field as Field.
 clear [Field.* Field.AddMonoid.* Field.MulMonoid.*].
 
 clone include RealDomain with type t <- t,

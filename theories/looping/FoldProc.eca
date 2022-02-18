@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
@@ -48,9 +48,9 @@ smt w=(size_eq0 size_ge0).
 qed.
 
 section.
-  declare module O:Orcl.
+  declare module O <: Orcl.
 
-  axiom fold_swap12:
+  declare axiom fold_swap12:
     equiv [Fold(O).fold_12 ~ Fold(O).fold_21 : ={t1,t2,glob O,s} ==> ={glob O,res}].
 
   local clone import IterProc as IP with

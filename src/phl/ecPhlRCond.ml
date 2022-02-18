@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -338,6 +338,6 @@ let t_rcond_match side c at_pos tc =
 
   match side with
   | None when is_bdHoareS concl -> LowMatch.t_bdhoare_rcond_match c at_pos tc
-  | None when is_cHoareS concl  -> LowMatch.t_choare_rcond_match c at_pos tc
+  | None when is_cHoareS concl -> LowMatch.t_choare_rcond_match c at_pos tc
   | None -> LowMatch.t_hoare_rcond_match c at_pos tc
   | Some side -> LowMatch.t_equiv_rcond_match side c at_pos tc

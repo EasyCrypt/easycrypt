@@ -1,0 +1,24 @@
+type t_in, t_out.
+
+module type Oracle = {
+  proc f (_: t_in) : t_out
+}.
+
+module type Function = {
+  proc init () : unit
+  proc f (_: t_in) : t_out
+}.
+
+module type Distinguisher (O : Oracle) = {
+  proc guess () : bool
+}.
+
+module Distinguish (D : Distinguisher) (O : Function) = {
+  proc game () : bool = {
+    var b;
+    
+    O.init();
+    b <@ D(O).guess();
+    return b;
+  }
+}.

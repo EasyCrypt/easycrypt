@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -63,14 +63,15 @@ module LowInternal = struct
 
     | Smatch (e, bs) -> begin
         let wps =
-          let do1 (_, s) = wp_stmt onesided c_pre env memenv (List.rev s.s_node) letsf f_x0 in
+          let do1 (_, s) =
+            wp_stmt onesided c_pre env memenv (List.rev s.s_node) letsf f_x0 in
           List.map do1 bs in
 
-        if not (List.for_all (fun ((r, _),_) -> List.is_empty r) wps) then
+        if not (List.for_all (fun ((r, _), _) -> List.is_empty r) wps) then
           raise No_wp;
         let pbs =
           List.map2
-            (fun (bds, _) ((_, letsf),_) ->
+            (fun (bds, _) ((_, letsf), _) ->
               let post = mk_let_of_lv_substs env letsf in
               f_lambda (List.map (snd_map gtty) bds) post)
             bs wps
@@ -200,9 +201,7 @@ let t_wp_r ?(uselet=true) ?cost_pre k g =
 
   t_hS_or_chS_or_bhS_or_eS ?th ?tch ?tbh ?te g
 
-
 let t_wp ?(uselet=true) ?cost_pre = FApi.t_low1 "wp" (t_wp_r ~uselet ?cost_pre)
-
 
 (* -------------------------------------------------------------------- *)
 let typing_wp env m s f =
@@ -210,7 +209,6 @@ let typing_wp env m s f =
   | [], f, _ -> Some f | _, _, _ -> None
 
 let () = EcTyping.wp := Some typing_wp
-
 
 (* -------------------------------------------------------------------- *)
 let process_wp k cost_pre tc =

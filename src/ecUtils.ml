@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -23,7 +23,7 @@ type 'a cmp = 'a -> 'a -> int
 
 (* -------------------------------------------------------------------- *)
 let clamp ~min ~max i =
-  Pervasives.min max (Pervasives.max min i)
+  Stdlib.min max (Stdlib.max min i)
 
 (* -------------------------------------------------------------------- *)
 let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
@@ -81,12 +81,12 @@ let postincr (i : int ref) = incr i; !i
 let compare_tag (x1 : 'a) (x2 : 'a) =
   match Obj.tag (Obj.repr x1), Obj.tag (Obj.repr x2) with
   | n1, n2 when (n1, n2) = (Obj.int_tag, Obj.int_tag) ->
-      Pervasives.compare (Obj.magic x1 : int) (Obj.magic x2 : int)
+      Stdlib.compare (Obj.magic x1 : int) (Obj.magic x2 : int)
 
   | n1, _ when n1 = Obj.int_tag ->  1
   | _, n2 when n2 = Obj.int_tag -> -1
 
-  | n1, n2 -> Pervasives.compare n1 n2
+  | n1, n2 -> Stdlib.compare n1 n2
 
 type lzcmp = int lazy_t
 
@@ -521,7 +521,6 @@ module List = struct
     | x :: xs -> not (List.exists (eq x) xs) && (is_unique ~eq xs)
 
   let sum  xs = List.fold_left (+)  0  xs
-  let sumf xs = List.fold_left (+.) 0. xs
 
   let rotate (d : [`Left|`Right]) (i : int) (xs : 'a list) =
     if i < 0 then invalid_arg "List.rotate: [i < 0]";
@@ -533,6 +532,9 @@ module List = struct
     let hd, tl = takedrop i (mrev xs) in
     (i, mrev (tl @ hd))
 
+  let for_all2 f xs ys =
+    List.length xs = List.length ys && for_all2 f xs ys
+
   (* ------------------------------------------------------------------ *)
   let ksort ?(stable = false) ?(rev = false) ~key ~cmp xs =
     let cmp  =
@@ -542,10 +544,10 @@ module List = struct
     let sort = if stable then List.stable_sort else List.sort in
     sort cmp xs
 
-  let min ?(cmp = Pervasives.compare) s =
+  let min ?(cmp = Stdlib.compare) s =
     reduce (fun x y -> if cmp x y < 0 then x else y) s
 
-  let max ?(cmp = Pervasives.compare) s =
+  let max ?(cmp = Stdlib.compare) s =
     reduce (fun x y -> if cmp x y > 0 then x else y) s
 
   let is_singleton l =
@@ -562,13 +564,13 @@ module List = struct
     function [x] -> x | xs  -> f xs
 
   (* ------------------------------------------------------------------ *)
-  let rec find_dup ?(cmp = Pervasives.compare) (xs : 'a list ) =
+  let rec find_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     match xs with
     | []      -> None
     | x :: xs ->
         if BatList.mem_cmp cmp x xs then Some x else find_dup ~cmp xs
 
-  let has_dup ?(cmp = Pervasives.compare) (xs : 'a list) =
+  let has_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     Option.is_some (find_dup ~cmp xs)
 end
 
@@ -592,7 +594,7 @@ module Parray = struct
   let fold_left2 f a t1 t2 =
     if Array.length t1 <> Array.length t2 then
       raise (Invalid_argument "Parray.fold_left2");
-    let rec aux i a t1 t2 =
+    let aux i a t1 t2 =
       if i < Array.length t1 then f a t1.(i) t2.(i)
       else a in
     aux 0 a t1 t2
@@ -619,7 +621,7 @@ end
 module String = struct
   include BatString
 
-  let split_lines = nsplit ~by:"\n"
+  let split_lines = split_on_string ~by:"\n"
 
   let trim (s : string) =
     let aout = BatString.trim s in
@@ -666,8 +668,6 @@ module String = struct
           end
       in aux matched 0
 
-    let last_matching tomatch s =
-      List.map rev (first_matching (List.map rev tomatch) (rev s))
   end
 
   let option_matching tomatch s =
@@ -685,12 +685,12 @@ module File = struct
 
   let read_from_file ~offset ~length source =
     try
-      let input = Pervasives.open_in_bin source in
+      let input = Stdlib.open_in_bin source in
       try_finally
         (fun () ->
-          Pervasives.seek_in input offset;
-          Pervasives.really_input_string input length)
-        (fun () -> Pervasives.close_in input)
+          Stdlib.seek_in input offset;
+          Stdlib.really_input_string input length)
+        (fun () -> Stdlib.close_in input)
     with
     | End_of_file
     | Invalid_argument _
@@ -698,12 +698,12 @@ module File = struct
 
   let write_to_file ~output data =
     try
-      let output = Pervasives.open_out_bin output in
+      let output = Stdlib.open_out_bin output in
       try_finally
         (fun () ->
-          Pervasives.output_string output data;
-          Pervasives.flush output)
-        (fun () -> Pervasives.close_out output)
+          Stdlib.output_string output data;
+          Stdlib.flush output)
+        (fun () -> Stdlib.close_out output)
     with
     | Invalid_argument _
     | Sys_error _ -> invalid_arg "File.write_to_file"

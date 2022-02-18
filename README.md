@@ -28,7 +28,7 @@ Installation requirements
 
 EasyCrypt uses the following third-party tools/libraries:
 
- * OCaml (>= 4.05)
+ * OCaml (>= 4.08)
 
      Available at http://caml.inria.fr/
 
@@ -270,3 +270,11 @@ Proof General Front-End
 
 EasyCrypt mode has been integrated upstream. Please, go
 to <https://github.com/ProofGeneral/PG> and follow the instructions.
+
+Examples
+====================================================================
+
+Examples of how to use EasyCrypt are in the `examples` directory. You
+will find basic examples at the root of this directory, as well as a
+more advanced example in the `MEE-CBC` sub-directory and a tutorial on
+how to use the complexity system in `cost` sub-directory.

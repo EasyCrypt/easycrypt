@@ -195,6 +195,11 @@ type 'a p_module_sig = {
   mis_restr  : 'a p_mod_restr;
 }
 
+type 'a p_top_module_sig = {
+  tms_sig  : 'a p_module_sig;
+  tms_loca : is_local;
+}
+
 (* -------------------------------------------------------------------- *)
 (* Simple module signature, without restrictions. *)
 type 'a p_module_smpl_sig = {
@@ -271,6 +276,11 @@ and 'a p_module_item =
 and 'a p_module_comps = 'a p_module_comps_item list
 
 and 'a p_module_comps_item = 'a p_module_item
+
+type 'a p_top_module_expr = {
+  tme_expr : 'a p_module_expr;
+  tme_loca : locality;
+}
 
 (* -------------------------------------------------------------------- *)
 val p_mty_equal :
