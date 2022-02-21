@@ -158,9 +158,14 @@ module PreOI : sig
 end
 
 (* -------------------------------------------------------------------- *)
+
+type mr_xpaths = EcPath.Sx.t use_restr
+
+type mr_mpaths = EcPath.Sm.t use_restr
+
 type 'a p_mod_restr = {
-  mr_xpaths : EcPath.Sx.t use_restr;
-  mr_mpaths : EcPath.Sm.t use_restr;
+  mr_xpaths : mr_xpaths;
+  mr_mpaths : mr_mpaths;
   mr_oinfos : 'a PreOI.t Msym.t;
 }
 
@@ -173,6 +178,9 @@ val p_mr_equal :
 val p_mr_hash : ('a -> int) -> 'a p_mod_restr -> int
 
 val has_compl_restriction : 'a p_mod_restr -> bool
+
+val mr_xpaths_fv : mr_xpaths -> int EcIdent.Mid.t
+val mr_mpaths_fv : mr_mpaths -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)

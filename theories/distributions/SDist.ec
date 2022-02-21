@@ -446,10 +446,10 @@ module Os : Oracle_i = {
 
 section. (* Reduction from single oracle call to sampling game *)
 
-declare module A <: Adversary {B1,Os,Count}.
+declare module A <: Adversary {-B1,-Os,-Count}.
 
 declare axiom A_ll :
-  forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
+  forall (O <: Oracle{-A}), islossless O.get => islossless A(O).main.
 
 (* global variables for eager/lazy proof *)
 local module Var = { 
@@ -518,7 +518,7 @@ logic. *)
 
 lemma sdist_oracle1 &m (d1 d2 : a distr) : 
    is_lossless d1 => is_lossless d2 =>
-  (forall (O <: Oracle_i{Count,A}), 
+  (forall (O <: Oracle_i{-Count,-A}), 
      hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= 1]) =>
   `| Pr[Game(A,Os).main(d1) @ &m : res] - Pr[Game(A,Os).main(d2) @ &m : res] | 
   <= sdist d1 d2.
@@ -572,16 +572,16 @@ abstract theory N1.
 (* We need operators, because we need to define modules that use them *)
 op [lossless] d1 : a distr.
 op [lossless] d2 : a distr.
-op N : { int | 0 < N } as N_pos.
+op N : { int | 0 <= N } as N_ge0.
 
 section. 
 
-declare module A <: Adversary {B1,Os,Count}.
+declare module A <: Adversary {-B1,-Os,-Count}.
 
 declare axiom A_ll :
-  forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
+  forall (O <: Oracle{-A}), islossless O.get => islossless A(O).main.
 
-declare axiom A_bound : (forall (O <: Oracle_i{A,Count}), 
+declare axiom A_bound : (forall (O <: Oracle_i{-A,-Count}), 
   hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= N]).
 
 local clone Hybrid as Hyb with
@@ -591,7 +591,7 @@ local clone Hybrid as Hyb with
   type outleaks <- unit,
   type outputA <- bool,
   op q <- N,
-  lemma q_pos <- N_pos
+  lemma q_ge0 <- N_ge0
   proof*.
 
 local module Ob : Hyb.Orclb = {
@@ -663,9 +663,8 @@ lemma sdist_oracleN &m :
   `| Pr[Game(A,Os).main(d1) @ &m : res] - Pr[Game(A,Os).main(d2) @ &m : res] | 
   <= N%r * sdist d1 d2.
 proof.
-rewrite -ler_pdivr_mull -?normrZ; 1,2: smt(N_pos). 
 rewrite Osd1_Hyb Osd2_Hyb. 
-have /= <- := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
+have /= -> := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
 - move => O; proc; inline *; sp; wp. 
   inline *.
   conseq (: Hyb.Count.c = Count.n) (: Count.n = 0 ==> Count.n <= N) => //. 
@@ -691,8 +690,9 @@ have -> : Pr[Hyb.HybGame(B, Ob, Hyb.R(Ob)).main() @ &m : res] =
   proc; inline *; sp.
   if; [smt() | by auto |].
   if; [smt()| by auto | by auto].
+rewrite normrZ /= 2:ler_wpmul2l; 1,2: smt(N_ge0).
 apply (sdist_oracle1 C);[|exact d1_ll|exact d2_ll|].
-- move => O O_ll; islossless; 2: by rewrite DInterval.weight_dinter; smt(N_pos).
+- move => O O_ll; islossless; 2: by rewrite DInterval.weight_dinter; smt(N_ge0).
   by apply (A_ll (<: B'(Ob, Hyb.HybOrcl(Ob, C(O).O')).O')); islossless. 
 move => O; proc.
 call(: if Hyb.HybOrcl.l <= Hyb.HybOrcl.l0 then Count.n = 0 else Count.n = 1).
@@ -712,7 +712,7 @@ import SmtMap.
 type in_t.
 op [lossless] d1 : a distr.
 op [lossless] d2 : a distr.
-op N : { int | 0 < N } as N_pos.
+op N : { int | 0 <= N } as N_ge0.
 
 clone PROM.FullRO as R1 with 
   type in_t <- in_t, 
@@ -737,7 +737,7 @@ module O2 = R2.RO.
 infrastructure (e.g., for splitting into muliple oracles *) 
 
 module type Distinguisher (O : R1.RO) = {
-  proc distinguish(_ : unit) : bool {O.get O.set O.sample}
+  proc distinguish(_ : unit) : bool {O.get, O.set, O.sample}
 }.
 
 (* TOTHINK: Calls to [sample] and [get] do not actually provide any
@@ -773,9 +773,9 @@ module Wrap (O : R1.RO) : R1.RO = {
 
 section.
 
-declare module D <: Distinguisher {Os, O1,O2, Count, B1, Wrap}.
+declare module D <: Distinguisher {-Os, -O1, -O2, -Count, -B1, -Wrap}.
 
-declare axiom D_ll : forall (O <: R1.RO{D}), 
+declare axiom D_ll : forall (O <: R1.RO{-D}), 
   islossless O.get => islossless D(O).distinguish.
 
 local module Cache (O : Oracle) : R1.RO = {
@@ -823,11 +823,11 @@ local clone N1 as N1 with
   axiom d1_ll <- d1_ll,
   axiom d2_ll <- d2_ll,
   op N <- N,
-  axiom N_pos <- N_pos
+  axiom N_ge0 <- N_ge0
   proof*.
 
 lemma sdist_ROM  &m : 
- (forall (O <: R1.RO{Wrap,D}), 
+ (forall (O <: R1.RO{-Wrap,-D}), 
    hoare [ D(Wrap(O)).distinguish : Wrap.dom = fset0 ==> card Wrap.dom <= N]) =>
   `| Pr [R1.MainD(D,O1).distinguish() @ &m : res] - 
      Pr [R1.MainD(D,O2).distinguish() @ &m : res] |

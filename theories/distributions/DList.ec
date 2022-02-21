@@ -7,8 +7,8 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import AllCore List Distr DProd StdBigop.
-(*---*) import Bigreal.BRM MUnit.
+require import AllCore List FSet Distr DProd StdBigop.
+(*---*) import Bigreal Bigreal.BRM MUnit.
 
 op dlist (d : 'a distr) (n : int): 'a list distr =
   fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
@@ -17,11 +17,27 @@ op dlist (d : 'a distr) (n : int): 'a list distr =
 lemma dlist0 (d : 'a distr) n: n <= 0 => dlist d n = dunit [].
 proof. by move=> ge0_n; rewrite dlist_def foldle0. qed.
 
+lemma dlist1 (d : 'a distr) : dlist d 1 = dmap d (fun x => [x]).
+proof.
+rewrite /dlist -foldpos //= fold0 /= dmap_dprodE /dmap /(\o).
+by apply eq_dlet => // x; rewrite dlet_unit.
+qed.
+
+lemma dlist01E (d : 'a distr) n x:
+  n <= 0 => mu1 (dlist d n) x = b2r (x = []).
+proof. by move=> /(dlist0 d) ->; rewrite dunit1E (eq_sym x). qed.
+
 lemma dlistS (d : 'a distr) n:
   0 <= n =>
   dlist d (n + 1)
   = dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` dlist d n).
 proof. by move=> hn; rewrite !dlist_def foldS. qed.
+
+lemma dlist_djoin (d : 'a distr) n: 0 <= n => dlist d n = djoin (nseq n d).
+proof.
+elim: n => [|n Hn IHn]; first by rewrite dlist0 // /nseq iter0 // djoin_nil.
+by rewrite dlistS // nseqS // djoin_cons IHn.
+qed.
 
 lemma dapply_dmap ['a 'b] (d:'a distr) (F:'a -> 'b): dapply F d = dmap d F by done.
 
@@ -30,43 +46,21 @@ lemma dlist_add (d:'a distr) n1 n2:
   dlist d (n1 + n2) =
     dmap (dlist d n1 `*` dlist d n2) (fun (p:'a list * 'a list) => p.`1 ++ p.`2).
 proof.
-move=> hn1 hn2;elim: n1 hn1 => /= [ | n1 hn1 hrec].
-+ rewrite dprod_dlet //= (dlist0 d 0) // dlet_unit /= /dmap dlet_dlet.
-  rewrite -{1}(dlet_d_unit (dlist d n2)) &(eq_dlet) // => l.
-  by rewrite dlet_unit.
-rewrite addzAC !dlistS 1:/# 1:// hrec.
-rewrite !dprod_dlet !dlet_dlet dapply_dmap /dapply /dmap !dlet_dlet.
-apply eq_dlet => // x.
-rewrite /(\o) /= !dlet_dlet &(eq_dlet) // => l1 /=.
-rewrite dlet_unit /= dlet_unit /= dlet_dlet.
-have /eq_sym:= (dlet_dlet (dlist d n2) (fun (b : 'a list) => dunit (x :: l1, b))
-                 (fun (x0 : 'a list * 'a list) => dunit (x0.`1 ++ x0.`2))).
-apply: eq_trans; rewrite dlet_dlet.
-apply: eq_dlet => // l2 /=.
-by rewrite !dlet_unit /= dlet_unit /= dlet_unit.
+elim: n1 => [hn2|n1 hn1 IHn1 hn2].
+  by rewrite (dlist0 d 0) //= /(\o) dmap_dprodE dlet_unit /= dmap_id_eq_in.
+rewrite addzAC !dlistS 1:/# //= IHn1 //.
+rewrite !dmap_dprodE /= dlet_dlet; apply eq_dlet => //= x.
+rewrite dmap_dlet dlet_dmap; apply eq_dlet => //= x1.
+rewrite /dmap dlet_dlet /(\o); apply eq_dlet => //= x2.
+by rewrite dlet_dunit dmap_dunit.
 qed.
 
-lemma dlist01E (d : 'a distr) n x:
-  n <= 0 => mu1 (dlist d n) x = b2r (x = []).
-proof. by move=> /(dlist0 d) ->;rewrite dunit1E (eq_sym x). qed.
-
-lemma dlist1 (d : 'a distr) : dlist d 1 = dmap d (fun a => [a]).
-proof. 
-  rewrite (dlistS d 0) // dlist0 //=; rewrite dmap_dprodE; apply eq_dlet => //= a.
-  by rewrite dmap_dunit.
-qed.
-
-lemma dlist_add (d : 'a distr) n1 n2:
-  0 <= n1 => 0 <= n2 =>
-  dlist d (n1 + n2)
-  = dapply (fun (xy : 'a list * 'a list) => xy.`1 ++ xy.`2) (dlist d n1 `*` dlist d n2).
-proof. 
-move=> hn1 hn2; rewrite !dlist_def -fold_add //.
-move: (fold _ _ n2) => {n2 hn2 hn1}. 
-elim/natind: n1.
-+ by move=> n hn dl2; rewrite !foldle0 // dmap_dprodE dlet_unit /= dmap_id.
-move=> n hn hrec dl.
-by rewrite !foldS //= hrec dmap_dprodR dmap_dprodL !dmap_comp dprodA dmap_comp.
+lemma dlistSr (d : 'a distr) (n : int) : 0 <= n =>
+  dlist d (n + 1) = dapply (fun (xy : 'a list * 'a) => rcons xy.`1 xy.`2) (dlist d n `*` d).
+proof.
+move => hn; rewrite dlist_add // dlist1 /= !dmap_dprodE.
+apply eq_dlet => // xs; rewrite dmap_comp.
+by apply eq_dmap => x //=; rewrite /(\o) cats1.
 qed.
 
 lemma supp_dlist0 (d : 'a distr) n xs:
@@ -90,15 +84,29 @@ lemma supp_dlist_size (d : 'a distr) n xs:
   0 <= n => xs \in dlist d n => size xs = n.
 proof. by move=> ge0_n; case/(supp_dlist d n xs ge0_n). qed.
 
-lemma dlist01E (d : 'a distr) n x:
-  n <= 0 => mu1 (dlist d n) x = b2r (x = []).
-proof. by move=> /(dlist0 d) ->;rewrite dunit1E (eq_sym x). qed.
-
 lemma dlistS1E (d : 'a distr) x xs:
   mu1 (dlist d (size (x::xs))) (x::xs) =
     mu1 d x * mu1 (dlist d (size xs)) xs.
 proof.
 rewrite /= addzC dlistS 1:size_ge0 /= dmap1E -dprod1E &(mu_eq) => z /#.
+qed.
+
+lemma dlistE x0 (d : 'a distr) (p : int -> 'a -> bool) n :
+    mu (dlist d n) (fun xs : 'a list =>
+                    forall i, (0 <= i) && (i < n) => (p i (nth x0 xs i)))
+  = bigi predT (fun i => mu d (p i)) 0 n.
+proof.
+elim/natind : n p => [n n_le0|n n_ge0 IHn] p.
+- rewrite dlist0 // dunitE range_geq //= big_nil; smt().
+rewrite rangeSr // -cats1 big_cat big_seq1.
+rewrite dlistSr //= dmapE.
+pose P1 xs := forall i, 0 <= i && i < n => p i (nth x0 xs i).
+pose P2 x := p n x.
+pose P (a : 'a list * 'a) := P1 a.`1 /\ P2 a.`2.
+rewrite (mu_eq_support _ _ P); 2: by rewrite dprodE IHn.
+case => xs x /=. rewrite supp_dprod /= supp_dlist // => -[[? ?] ?].
+rewrite /(\o) /P /P1 /P2 /= eq_iff; subst n; split; 2: smt(nth_rcons).
+move => H; split => [i|];[have := (H i)|have := H (size xs)]; smt(nth_rcons).
 qed.
 
 lemma dlist1E (d : 'a distr) n xs:
@@ -202,6 +210,48 @@ elim/natind: n => [n le0_n| n ge0_n ih].
 - by rewrite !dlist0 // dmap_dunit.
 - by rewrite !dlistS //= ih -dmap_dprod_comp dmap_comp.
 qed.
+
+(* 0 <= n could be removed, but applying the lemma is pointless in that case *)
+lemma dlist_set2E x0 (d : 'a distr) (p : 'a -> bool) n (I J : int fset) :
+  is_lossless d => 0 <= n =>
+  (forall i, i \in I => 0 <= i && i < n) =>
+  (forall j, j \in J => 0 <= j && j < n) =>
+  (forall k, !(k \in I /\ k \in J)) =>
+  mu (dlist d n)
+     (fun xs => (forall i, i \in I => p (nth x0 xs i)) /\
+                (forall j, j \in J => !p (nth x0 xs j)))
+  = (mu d p)^(card I) * (mu d (predC p))^(card J).
+proof.
+move => d_ll n_ge0 I_range J_range disjIJ.
+pose q i x := (i \in I => p x) /\ (i \in J => !p x).
+rewrite (mu_eq_support _ _
+  (fun xs => forall i, (0 <= i) && (i < n) => q i (nth x0 xs i))); 1: smt(supp_dlist).
+rewrite dlistE (bigEM (mem (I `|` J))).
+rewrite (big1 (predC (mem (I `|` J)))) ?mulr1.
+  move => i; rewrite /predC in_fsetU negb_or /= /q => -[iNI iNJ].
+  rewrite (mu_eq _ _ predT) 1:/# //.
+rewrite -big_filter (eq_big_perm _ _ _ (elems I ++ elems J)) ?big_cat.
+- apply uniq_perm_eq => [| |x].
+  + by rewrite filter_uniq range_uniq.
+  + rewrite cat_uniq !uniq_elems => />; apply/hasPn; smt().
+  + by rewrite mem_filter mem_range mem_cat -!memE in_fsetU /#.
+rewrite big_seq_cond (eq_bigr _ _ (fun _ => mu d p)) -?big_seq_cond.
+  move => i; rewrite /= /q -memE => -[iI _]; apply mu_eq => /#.
+rewrite mulr_const big_seq_cond (eq_bigr _ _ (fun _ => mu d (predC p))) -?big_seq_cond.
+  move => i; rewrite /= /q -memE => -[iI _]; apply mu_eq => /#.
+by rewrite mulr_const /card.
+qed.
+
+lemma dlist_setE x0 (d : 'a distr) (p : 'a -> bool) n (I : int fset) :
+  is_lossless d => 0 <= n => (forall i, i \in I => 0 <= i && i < n) =>
+  mu (dlist d n) (fun xs => forall i, i \in I => p (nth x0 xs i)) = (mu d p)^(card I).
+proof.
+move => d_ll n_ge0 hI.
+have := dlist_set2E x0 d p n I fset0 d_ll n_ge0 hI _ _; 1,2 : smt(in_fset0).
+rewrite fcards0 RField.expr0 RField.mulr1 => <-.
+apply: mu_eq_support => xs; rewrite supp_dlist //= => -[? ?]; smt(in_fset0).
+qed.
+
 
 abstract theory Program.
   type t.

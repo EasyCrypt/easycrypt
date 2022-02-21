@@ -886,10 +886,10 @@ section.
    group element in the real-world. Then it shows that the simulator
    perfectly emulates this modified game *)
 
-declare module Z : REAL.ENV {-DHKE_SIM, -FKE, 
-                           -HybFChan.F2Auth.FAuthLR.FAuth,
-                           -HybFChan.F2Auth.FAuthRL.FAuth,
-                           -DHKE}.
+declare module Z <: REAL.ENV {-DHKE_SIM, -FKE, 
+                              -HybFChan.F2Auth.FAuthLR.FAuth,
+                              -HybFChan.F2Auth.FAuthRL.FAuth,
+                              -DHKE}.
 
 lemma hop1 &m : 
    Pr[ REAL.UC_emul(Z,CompRF(DHKE,HybFChan.F2Auth.F2Auth)).main() @ &m : res] =

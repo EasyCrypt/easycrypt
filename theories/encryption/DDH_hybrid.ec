@@ -13,15 +13,15 @@ require import Cyclic_group_prime.
 
 require Hybrid.
 
-op n : int.
-clone Hybrid as H with
+op n : { int | 0 < n } as n_pos.
+clone import Hybrid as H with
   type input <- unit,
   type output <- group * group * group,
   type inleaks <- unit,
   type outleaks <- unit,
   type outputA <- bool,
-  op q <- n.
-import H.
+  op q <- n 
+  proof* by smt(n_pos).
 
 module DDHl = {
   proc orcl () : group * group * group = {
@@ -76,9 +76,9 @@ section.
         Pr[Rn(DDHb, A).main() @ &m : (res /\ Count.c <= n) ]).
   proof.
    move=> &m.
-   apply (H.Hybrid (<:DDHb) (<:A) _ _ _ _ &m
+   apply (H.Hybrid_div (<:DDHb) (<:A) _ _ _ _ &m
        (fun (ga:glob A) (gb:glob DDHb) (c:int) (r:bool), r)).
    apply islossless_leaks. apply islossless_orcl1. apply islossless_orcl2. apply losslessA.
+   smt(n_pos).
   qed.
-
 end section.

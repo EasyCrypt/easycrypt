@@ -3169,9 +3169,6 @@ phltactic:
 | MATCH c=oident s=side? i=codepos1
     { Prmatch (s, unloc c, i) }
 
-| MATCH c=oident s=side? i=codepos1
-    { Prmatch (s, unloc c, i) }
-
 | IF opt=if_option
     { Pcond opt }
 

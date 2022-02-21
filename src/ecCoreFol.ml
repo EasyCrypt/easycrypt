@@ -221,30 +221,25 @@ let gty_hash = function
   | GTmem _ -> 1
 
 (* -------------------------------------------------------------------- *)
-let mr_fv mr =
-  EcPath.Sm.fold (fun mp fv ->
-      EcPath.m_fv fv mp)
-    (Sm.union
-       mr.mr_mpaths.ur_neg
-       (EcUtils.odfl Sm.empty mr.mr_mpaths.ur_pos))
-    EcIdent.Mid.empty
+let mr_fv (mr : form p_mod_restr) : int Mid.t =
+  (* mr_oinfos *)
+  let fv =
+    EcSymbols.Msym.fold (fun _ oi fv ->
+        let fv = List.fold_left EcPath.x_fv fv (PreOI.allowed oi) in
+        match PreOI.costs oi with
+        | `Unbounded -> fv
+        | `Bounded (self,calls) ->
+          EcPath.Mx.fold (fun xp call fv ->
+              let fv = EcPath.x_fv fv xp in
+              fv_union fv (f_fv call)
+            ) calls (fv_union fv (f_fv self))
+      ) mr.mr_oinfos Mid.empty
+  in
 
-  |> EcPath.Sx.fold (fun xp fv ->
-      EcPath.x_fv fv xp)
-    (Sx.union
-       mr.mr_xpaths.ur_neg
-       (EcUtils.odfl Sx.empty mr.mr_xpaths.ur_pos))
-
-  |> EcSymbols.Msym.fold (fun _ oi fv ->
-      let fv = List.fold_left EcPath.x_fv fv (PreOI.allowed oi) in
-      match PreOI.costs oi with
-      | `Unbounded -> fv
-      | `Bounded (self,calls) ->
-        EcPath.Mx.fold (fun xp call fv ->
-            let fv = EcPath.x_fv fv xp in
-            fv_union fv (f_fv call)
-          ) calls (fv_union fv (f_fv self))
-    ) mr.mr_oinfos
+  fv_union fv
+    (fv_union
+       (mr_xpaths_fv mr.mr_xpaths)
+       (mr_mpaths_fv mr.mr_mpaths))
 
 (* -------------------------------------------------------------------- *)
 let gty_fv = function
@@ -252,26 +247,6 @@ let gty_fv = function
   | GTmodty mty -> mr_fv mty.mt_restr
   | GTmem mt -> EcMemory.mt_fv mt
 
-(* -------------------------------------------------------------------- *)
-let gty_fv_and_tvar = function
-  | GTty ty -> EcTypes.ty_fv_and_tvar ty
-  | GTmodty { mt_restr = restr } ->
-    let fv =
-      let mps = Sm.union
-        restr.mr_mpaths.ur_neg
-        (odfl Sm.empty restr.mr_mpaths.ur_pos) in
-      EcPath.Sm.fold
-        (fun mp fv -> EcPath.m_fv fv mp) mps EcIdent.Mid.empty in
-    let fv =
-      let xps = Sx.union
-        restr.mr_xpaths.ur_neg
-        (odfl Sx.empty restr.mr_xpaths.ur_pos) in
-      EcPath.Sx.fold (fun xp fv -> EcPath.x_fv fv xp)xps fv in
-
-    (* FIXME:MERGE-COST *)
-    fv
-
-  | GTmem mt -> EcMemory.mt_fv mt
 
 (* -------------------------------------------------------------------- *)
 let gtty (ty : EcTypes.ty) =

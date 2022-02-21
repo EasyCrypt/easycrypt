@@ -9,15 +9,10 @@
  (public_name easycrypt)
  (name ec)
  (promote (until-clean))
- (libraries batteries dune-build-info dune-site inifiles why3 yojson zarith))
-
-(generate_sites_module
- (module EcRelocate)
- (sites easycrypt)
- (sourceroot))
+ (libraries batteries dune-build-info inifiles why3 yojson zarith))
 
 (ocamllex ecLexer)
 
 (menhir
  (modules ecParser)
- (flags --table))
+ (flags --table --explain))
