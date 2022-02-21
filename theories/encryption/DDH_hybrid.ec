@@ -14,14 +14,14 @@ require import Cyclic_group_prime.
 require Hybrid.
 
 op n : { int | 0 < n } as n_pos.
-clone Hybrid as H with
+clone import Hybrid as H with
   type input <- unit,
   type output <- group * group * group,
   type inleaks <- unit,
   type outleaks <- unit,
   type outputA <- bool,
-  op q <- n.
-import H.
+  op q <- n 
+  proof* by smt(n_pos).
 
 module DDHl = {
   proc orcl () : group * group * group = {
