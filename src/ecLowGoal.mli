@@ -24,7 +24,8 @@ open EcCoreGoal
 exception InvalidProofTerm         (* invalid proof term *)
 
 type side    = [`Left|`Right]
-type lazyred = [`Full of bool | `NoDelta | `None]
+type lazyred = [`Full | `NoDelta | `None]
+
 
 (* -------------------------------------------------------------------- *)
 val (@!) : FApi.backward -> FApi.backward -> FApi.backward
