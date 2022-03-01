@@ -6,7 +6,11 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import AllCore List Distr DBool LorR.
+require import AllCore List Distr DBool.
+
+require LorR. 
+clone import LorR as LorR' with
+  type input <- unit.  
 
 type pkey.
 type skey.
