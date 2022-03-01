@@ -109,7 +109,7 @@ module HybGame2(A:Adv) (O:Orcl) (LR:LR) = {
   proc main():bool = {
     var b':bool;
 
-    HybOrcl.l0 <$ [0..q-1];
+    HybOrcl.l0 <$ [0..max 0 (q-1)];
     HybOrcl.l  <- 0;
     b'         <@ A(O,HybOrcl2(O,LR)).main();
     return b';
@@ -248,13 +248,14 @@ have ->:   Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Cou
     proc; inline OrclCount(R(Orcl2(O))).orcl R(Orcl2(O)).orcl Orcl2(O).orclR Count.incr.
     by wp; call(: true); wp.
   by inline *; auto.
-apply: (Hybrid (Orcl2(O)) A' losslessL _ _ _ &m (fun ga go c b, b /\ p ga go c)).
+apply: (Hybrid_div (Orcl2(O)) A' losslessL _ _ _ &m (fun ga go c b, b /\ p ga go c)).
 + by proc; call losslessO.
 + by proc; call losslessO.
 move=> Ob LR Hlr Hl Ho1 Ho2; proc.
 call (losslessA (<: A'(Ob,LR).O) (<: A'(Ob,LR).LR') _ _ _)=> //.
 + by proc; call Hlr.
-by proc; call Ho1.
++ by proc; call Ho1.
++ smt(q_pos).
 qed.
 end section.
 

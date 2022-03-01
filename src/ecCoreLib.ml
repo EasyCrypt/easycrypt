@@ -57,6 +57,19 @@ module CI_Bool = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Option = struct
+  let i_Option  = "Logic"
+  let p_Option  = EcPath.pqname p_top i_Option
+
+  let _Option x = EcPath.pqname p_Option x
+
+  let p_option = _Option "option"
+  let p_none   = _Option "None"
+  let p_some   = _Option "Some"
+  let p_oget   = _Option "oget"
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Int = struct
   let i_Int = "CoreInt"
   let p_Int = EcPath.pqname p_top i_Int
@@ -105,6 +118,7 @@ module CI_Real = struct
   let p_real_abs    = EcPath.extend p_top ["Real"; "`|_|"]
 end
 
+(* -------------------------------------------------------------------- *)
 module CI_Pred = struct
   let i_Pred  = "Logic"
   let p_Pred  = EcPath.pqname p_top i_Pred

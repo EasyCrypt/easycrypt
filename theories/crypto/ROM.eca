@@ -220,12 +220,14 @@ local module Exp' (O : RO) = {
   }
 }.
 
+
+
 local equiv eq_LRO_RO:
-  Exp(LRO, D).main ~ Exp'(FullEager.LRO).main:
+  Exp(Lazy.LRO, D).main ~ Exp'(H.LRO).main:
     ={glob D, arg} ==> ={res}.
 proof.
 proc; inline *; wp.
-call (: LRO.m{1} = RO.m{2})=> />; first by sim.
+call (: Lazy.LRO.m{1} = RO.m{2})=> />; first by sim.
 while{2} true (size w{2}).
 + by auto=> &m />; case: (w{m})=> //#.
 by auto=> /> w; rewrite -size_eq0 Int.eqz_leq size_ge0.
@@ -264,9 +266,9 @@ by call eq_ERO_RO_init; inline *; auto.
 qed.
 
 equiv eq_eager_sampling:
-  Exp(LRO, D).main ~ Exp(ERO, D).main: ={glob D, arg} ==> ={res}.
+  Exp(Lazy.LRO, D).main ~ Exp(ERO, D).main: ={glob D, arg} ==> ={res}.
 proof.
-transitivity Exp'(FullEager.LRO).main
+transitivity Exp'(H.LRO).main
              (={glob D, arg} ==> ={res})
              (={glob D, arg} ==> ={res})=> />.
 + by move=> &2; exists (glob D){2} (x{2}).

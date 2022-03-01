@@ -173,6 +173,12 @@ let rec on_instr (cb : cb) (i : instr)=
       on_expr cb e;
       on_stmt cb s
 
+  | Smatch (e, b) ->
+      let forb (bs, s) =
+        List.iter (on_ty cb |- snd) bs;
+        on_stmt cb s
+      in on_expr cb e; List.iter forb b
+
   | Sabstract _ -> ()
 
 and on_stmt (cb : cb) (s : stmt) =

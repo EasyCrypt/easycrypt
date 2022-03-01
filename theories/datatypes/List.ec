@@ -1770,6 +1770,55 @@ rewrite pmap_map; split => [|/mapP].
 qed.
 
 (* -------------------------------------------------------------------- *)
+(*                       Mapping with an index                          *)
+(* -------------------------------------------------------------------- *)
+
+op mapi_rec (f : int -> 'a -> 'b) (xs : 'a list) (i : int) =
+ with xs = [] => []
+ with xs = x::xs => f i x :: mapi_rec f xs (i+1).
+
+op mapi (f : int -> 'a -> 'b) (xs : 'a list) = mapi_rec f xs 0.
+
+lemma mapiK (f : int -> 'a -> 'b) (g : int -> 'b -> 'a) :
+    (forall i, cancel (g i) (f i)) => cancel (mapi g) (mapi f).
+proof. move => can_f xs; rewrite /mapi; elim: xs 0 => //=; smt(). qed.
+
+lemma in_mapiK (f : int -> 'a -> 'b) (g : int -> 'b -> 'a) (xs : 'a list) :
+    (forall i x, x \in xs => 0 <= i && i < size xs => g i (f i x) = x) =>
+    mapi g (mapi f xs) = xs.
+proof.
+move => H.
+have {H} : forall i x, x \in xs => 0 <= i && i < (0 + size xs) =>
+             g (i) (f (i) x) = x; 1: by [].
+rewrite /mapi; elim: xs 0 => //= x xs IHxs k Hk.
+split; 1: by rewrite Hk; smt(size_ge0).
+apply IHxs; smt(size_ge0).
+qed.
+
+lemma size_mapi (f : int -> 'a -> 'b) (xs : 'a list) :
+    size (mapi f xs) = size xs.
+proof. rewrite /mapi. elim: xs 0 => //= xs IHxs n. by rewrite IHxs. qed.
+
+lemma nth_mapi_rec x1 (s : 'a list) x2 (f : int -> 'a -> 'b) n m :
+    0 <= n && n < size s =>
+    nth x2 (mapi_rec f s m) n = f (m + n) (nth x1 s n).
+proof. by elim: s n m => /= [|x s IHs]; smt(). qed.
+
+lemma nth_mapi x1 (s : 'a list) x2 (f : int -> 'a -> 'b) n :
+    0 <= n && n < size s => nth x2 (mapi f s) n = f n (nth x1 s n).
+proof. exact: nth_mapi_rec. qed.
+
+lemma mapi_recP x0 (f : int -> 'a -> 'b) (s : 'a list) y m :
+    y \in mapi_rec f s m <=>
+    exists n, (0 <= n && n < size s) /\ y = f (n+m) (nth x0 s n).
+proof. elim: s m; smt(size_ge0). qed.
+
+lemma mapiP x0 (f : int -> 'a -> 'b) (s : 'a list) y :
+    y \in mapi f s <=>
+    exists n, (0 <= n && n < size s) /\ y = f n (nth x0 s n).
+proof. exact: mapi_recP. qed.
+
+(* -------------------------------------------------------------------- *)
 (*                          Index sequence                              *)
 (* -------------------------------------------------------------------- *)
 theory Iota.
@@ -2359,6 +2408,15 @@ proof. apply: contraLR; rewrite -!all_predC &(all_mask). qed.
 lemma mem_mask x m s : x \in mask<:'a> m s => x \in s.
 proof. by rewrite -!has_pred1 => /has_mask. qed.
 
+lemma map_mask (f : 'a -> 'b) m s : map f (mask m s) = mask m (map f s).
+proof. by elim: m s => [|[|] m IHm] [|x p] //=; rewrite IHm. qed.
+
+lemma mask_uniq (s : 'a list) m : uniq s => uniq (mask m s).
+proof.
+elim: s m => [m|x s IHs [|b m] Uxs] //=; 1: by rewrite mask0.
+case: b Uxs => //= -[s'x Us]; smt(mem_mask).
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                             Subseq                                   *)
 (* -------------------------------------------------------------------- *)
@@ -2458,6 +2516,13 @@ elim: s => //= y s ih; case: (a y)=> //= Nay.
 by apply/(subseq_trans s)/subseq_cons/ih.
 qed.
 
+lemma map_subseq (f : 'a -> 'b) s1 s2 :
+  subseq s1 s2 => subseq (map f s1) (map f s2).
+proof.
+case/subseqP=> m [sz_m ->]; apply/subseqP.
+by exists m; rewrite ?size_map ?map_mask.
+qed.
+
 lemma count_subseq ['a] (p : 'a -> bool) s1 s2 : subseq s1 s2 =>
   count p s1 <= count p s2.
 proof.
@@ -2469,6 +2534,13 @@ qed.
 lemma subseq_mem ['a] (xs ys : 'a list) x:
   subseq xs ys => x \in xs => x \in ys.
 proof. by case/subseqP=> m [_ ->]; apply: mem_mask. qed.
+
+lemma subseq_uniq (s1 s2 : 'a list) : subseq s1 s2 => uniq s2 => uniq s1.
+proof. by case/subseqP=> m [_ -> Us2]; apply: mask_uniq. qed.
+
+lemma subseq_map_uniq (s1 s2 : 'a list) (f : 'a -> 'b) :
+  subseq s1 s2 => uniq (map f s2) => uniq (map f s1).
+proof. by move/(map_subseq f); apply: subseq_uniq. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)

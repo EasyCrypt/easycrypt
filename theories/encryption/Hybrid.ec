@@ -16,6 +16,37 @@ type inleaks.
 type outleaks.
 type outputA.
 
+op q : { int | 0 <= q } as q_ge0.
+
+(* This file provides a theory for hybrid arguments. The main lemmas are
+  named: Hybrid[_restr][_div] where the "restr" suffix denotes the variant
+  where the adversary is known to make at most q calls and the "div" suffix 
+  denotes the statement using 1/q, in the case where q is not 0.
+
+  The main module types and modules are:
+  - Orclb: packages left and right oracles and "leaks", which can be used
+    to encode any remaining oracle procedures, inlcuding "init"
+  - Orcl: a single procedure oracle
+  - L : projection from Oraclb to Orcl, using the left oracle
+  - R : projection from Oraclb to Orcl, using the right oracle
+  - AdvOrclb: Main adversary, requirig acces to both (Ob : Orclb) and (O : Orcl)
+  - AdvOrcl: Adversary requiring only (O: Orcl), 
+    usually a partially instantiated (A : AdvOrclb)
+  - OrclCount: counting wrapper for (O:Orcl)
+  - HybGame(A,Ob,O): Hybrid game, where at most one randomly chosen
+    query is made to O.orcl and all other queries are answered using Ob.
+  
+  All four main lemmas express the difference beween the games
+
+    AdvCount(A(Ob, OrclCount(L(Ob)))).main    and
+    AdvCount(A(Ob, OrclCount(L(Ob)))).main 
+
+  with q allowed queries in terms of 
+
+    AdvCount(HybGame(A, Ob, OrclCount(L(Ob)))).main   and
+    AdvCount(HybGame(A, Ob, OrclCount(R(Ob)))).main
+*)  
+
 (* -------------------------------------------------------------------- *)
 (* Wrappers for counting *)
 
@@ -62,8 +93,6 @@ module OrclCount (O : Orcl) = {
 (* -------------------------------------------------------------------- *)
 (* Hybrid oracles and games *)
 
-op q : { int | 0 < q } as q_pos.
-
 module type AdvOrcl (O : Orcl) = {
   include Adv
 }.
@@ -108,13 +137,13 @@ module HybOrcl (Ob : Orclb) (O : Orcl) = {
   }
 }.
 
-(* Hybrid game: Adversary has access to
-   leaks, left, right, and hybrid oracle *)
+(* Hybrid game: Adversary has access to leaks, left, right, and hybrid oracle *)
+(* We use [max 0 (q-1)] to ensure that the game is lossless even for [q = 0] *)
 module HybGame (A:AdvOrclb) (Ob:Orclb) (O:Orcl) = {
   proc main() : outputA = {
     var r : outputA;
 
-    HybOrcl.l0 <$ [0..q-1];
+    HybOrcl.l0 <$ [0..max 0 (q-1)];
     HybOrcl.l  <- 0;
     r <@ A(Ob, HybOrcl(Ob, O)).main();
     return r;
@@ -124,7 +153,28 @@ module HybGame (A:AdvOrclb) (Ob:Orclb) (O:Orcl) = {
 clone import Means as M with
   type input <- int,
   type output <- outputA,
-    op d <- [0..q-1].
+    op d <- [0..max 0 (q-1)].
+
+(* In the case of 0 oracle calls, the behavor does not depend on the oracle *)
+lemma orcl_no_call (A <: AdvOrcl{Count}) (O1 <: Orcl{Count,A}) (O2 <: Orcl{Count,A}) &m p : 
+  (forall (O <: Orcl{A}), islossless O.orcl => islossless A(O).main ) => 
+  islossless O1.orcl => islossless O2.orcl =>
+  let p' = fun ga l r, p ga l r /\ l <= 0 in
+    Pr[ AdvCount(A(OrclCount(O1))).main() @ &m : p' (glob A) Count.c res] = 
+    Pr[ AdvCount(A(OrclCount(O2))).main() @ &m : p' (glob A) Count.c res].
+proof.
+move=> A_ll O1_ll O2_ll p'; byequiv => //; proc; inline*; auto.
+call (: 0 < Count.c, 0 <= Count.c{2} /\ ={Count.c}, 0 < Count.c{1} /\ 0 < Count.c{2}).
+- proc; inline *; auto; conseq(:_ ==> true); 1: smt().
+  by call{1} O1_ll; call{2} O2_ll.
+- move=> &m2 *; conseq (:_ ==> true) (: 0 < Count.c /\ 0 < Count.c{m2}); 1,2: smt().
+    by proc; inline *; auto; call(: true); auto; smt().
+  by islossless.
+- move=> &m1; conseq (:_ ==> true) (: 0 < Count.c /\ 0 < Count.c{m1}); 1,2: smt().
+    by proc; inline *; auto; call(: true); auto; smt().
+  by islossless.
+by auto => />; smt().
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* Prove that it is equivalent to consider n or 1 calls to the oracle *)
@@ -241,7 +291,7 @@ section.
     rcondt {1} 1; first by auto=> /#.
     by wp; call Oborcl1; auto=> /#.
   + move=> _ _; proc.
-    rcondt 1; first by auto; smt(q_pos).
+    rcondt 1; first by auto; smt(q_ge0).
     by wp; call losslessOb1; auto=> /#.
   + by move=> &1; proc; inline Count.incr; wp; call losslessOb1; auto=> /#.
   + by conseq Obleaks.
@@ -322,53 +372,111 @@ section.
   by wp.
   qed.
 
+  (* We would like to instantiate [orcl_no_call] with [A = A(Ob), O1 = L(Ob), O2 = R(Ob)].
+     However, that lemma requires the globals of A and O1/O2 to be disjoint, and there
+     is currently no way to relax this requirement. Hence, we need to reprove the lemma
+     for the concrete instance, dealing with the additonal cases. *)
+  local lemma Hybrid0 &m (p:glob A -> glob Ob -> int -> outputA -> bool):
+    let p' = fun ga ge l r, p ga ge l r /\ l <= q in
+    q = 0 => 
+    Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res] = 
+    Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res].
+  proof.
+    move=> /= ?; byequiv => //; proc; inline *.
+    call(: 0 < Count.c, 0 <= Count.c{2} /\ ={glob Ob,Count.c}, 0 < Count.c{1} /\ 0 < Count.c{2}).
+    + apply losslessA.
+    + proc; inline *; wp; conseq (: true ==> true); 1: smt(). 
+      by call {1} losslessOb1; call {2} losslessOb2.
+    + move => &m2 *; proc; inline*; auto.
+      conseq (:_ ==> true) (:  0 < Count.c /\ 0 < Count.c{m2});[smt()|smt()|by call(: true)|]. 
+      by islossless; apply losslessOb1.
+    + move => &m1 *; proc; inline*; auto.
+      conseq (:_ ==> true) (:  0 < Count.c /\ 0 < Count.c{m1});[smt()|smt()|by call(: true)|]. 
+      by islossless; apply losslessOb2.
+    + by proc (={Count.c} /\ Count.c{2} = 0); smt().
+    + move => &m2 *; conseq (:_ ==> true) (:  0 < Count.c /\ 0 < Count.c{m2}); 1,2: smt(). 
+        by proc ( 0 < Count.c /\ 0 < Count.c{m2}); smt(). 
+      by conseq losslessL.
+    + move => &m1 *; conseq (:_ ==> true) (:  0 < Count.c /\ 0 < Count.c{m1}); 1,2: smt(). 
+        by proc ( 0 < Count.c /\ 0 < Count.c{m1}); smt(). 
+      by conseq losslessL.
+    + by proc (={Count.c} /\ Count.c{2} = 0); smt().
+    + move => &m2 *; conseq (:_ ==> true) (:  0 < Count.c /\ 0 < Count.c{m2}); 1,2: smt(). 
+        by proc ( 0 < Count.c /\ 0 < Count.c{m2}); smt(). 
+      by conseq losslessOb1.
+    + move => &m1 *; conseq (:_ ==> true) (:  0 < Count.c /\ 0 < Count.c{m1}); 1,2: smt(). 
+        by proc ( 0 < Count.c /\ 0 < Count.c{m1}); smt(). 
+      by conseq losslessOb1.
+    + by proc (={Count.c} /\ Count.c{2} = 0); smt().
+    + move => &m2 *; conseq (:_ ==> true) (:  0 < Count.c /\ 0 < Count.c{m2}); 1,2: smt(). 
+        by proc ( 0 < Count.c /\ 0 < Count.c{m2}); smt(). 
+      by conseq losslessOb2.
+    + move => &m1 *; conseq (:_ ==> true) (:  0 < Count.c /\ 0 < Count.c{m1}); 1,2: smt(). 
+        by proc ( 0 < Count.c /\ 0 < Count.c{m1}); smt(). 
+      by conseq losslessOb2.
+    + by auto => />; smt().
+  qed.
+
   lemma Hybrid &m (p:glob A -> glob Ob -> int -> outputA -> bool):
     let p' = fun ga ge l r, p ga ge l r /\ l <= q in
-        Pr[Ln(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1]
-      - Pr[Rn(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1]
-    = 1%r/q%r * (  Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res]
-                 - Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res]).
+        Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res]
+      - Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res]
+    = q%r * (  Pr[Ln(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1]
+             - Pr[Rn(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1]).
   proof.
-  move=> p';rewrite (GLB_WL &m p') (GRB_WR &m p').
+  move => p'; case: (q = 0) => [q_0|qN0].
+    have /= -> // := Hybrid0 &m p q_0; rewrite /p'; smt().
+  have q_pos : 0 < q by smt(q_ge0).
+  rewrite (GLB_WL &m p') (GRB_WR &m p').
   simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
   have Hint : forall x, support [0..q - 1] x <=> mem (List.Iota.iota_ 0 q) x.
     by move=> x; rewrite !List.Iota.mem_iota  supp_dinter; smt.
-  have Hfin: is_finite (support [0..q - 1]).
+  have Hfin: is_finite (support [0..max 0 (q - 1)]).
     rewrite is_finiteE; exists (range 0 q).
     by rewrite range_uniq=> /= x; rewrite mem_range supp_dinter=> /#.
-  have Huni : forall (x : int), x \in [0..q - 1] => mu1 [0..q - 1] x = 1%r / q%r.
+  have Huni : forall (x : int), x \in [0..max 0 (q - 1)] => mu1 [0..max 0 (q - 1)] x = 1%r / q%r.
     by move=> x Hx; rewrite dinter1E /=; smt(supp_dinter).
   pose ev :=
     fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
       let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
   have := M.Mean_uni (HybGameFixed(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
   have := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
-  have supp_range: perm_eq (to_seq (support [0..q - 1])) (range 0 q).
+  have supp_range: perm_eq (to_seq (support [0..max 0 (q - 1)])) (range 0 q).
   + apply: uniq_perm_eq.
     + exact: uniq_to_seq.
     + exact: range_uniq.
     by move=> x; rewrite mem_to_seq // supp_dinter mem_range /#.
   rewrite !(eq_big_perm _ _ _ _ supp_range) {1}range_ltn 1:q_pos big_cons {1}/predT /=.
-  have {6}->: q = q - 1 + 1 by smt().
-  rewrite rangeSr 1:#smt:(q_pos) big_rcons {2}/predT /=.
-  fieldeq; 1:smt(q_pos).
-  rewrite RField.mulNr -RField.mulrN -RField.mulrDr.
+  have {10}->: q = q - 1 + 1 by smt().
+  rewrite rangeSr 1:#smt:() big_rcons {2}/predT /=.
+  fieldeq; 1:smt().
   rewrite (big_reindex _ _ (fun x=> x - 1) (fun x=> x + 1) (range 0 (q - 1))) //.
   have ->: (transpose Int.(+) 1) = ((+) 1).
   + by apply: fun_ext=> x /#.
   have ->: predT \o transpose Int.(+) (-1) = predT.
   + by apply: fun_ext=> x.
-  rewrite /(\o) //= -(range_addl 0 q 1) /= sumrB /=.
+  rewrite /(\o) //= -(range_addl 0 q 1) /= RField.addrC sumrB /=.
   rewrite (eq_big_seq _ (fun _=> 0%r)) //.
   + move=> n /mem_range /andaE [] ge1_q n_lt_q /=.
     by rewrite (WLR_shift &m n p' _) 1:/# /p'.
   rewrite big_const count_predT size_range.
-  rewrite (: max 0 (q - 1) = q - 1) 1:#smt:(q_pos).
-  have: (0 <= q - 1) by smt(q_pos).
+  rewrite (: max 0 (q - 1) = q - 1) 1:#smt:().
+  have: (0 <= q - 1) by smt().
   elim: (q - 1)=> //= => [|n ge0_n ih].
   + by rewrite iter0.
   by rewrite iterS.
   qed.
+
+  (* previous statement using division for [q <> 0] *)
+  lemma Hybrid_div &m (p:glob A -> glob Ob -> int -> outputA -> bool):
+    q <> 0 => 
+    let p' = fun ga ge l r, p ga ge l r /\ l <= q in
+       Pr[Ln(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1]
+     - Pr[Rn(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1]
+   = 1%r/q%r * (  Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res]
+                - Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res]).
+  proof. by move => qN0 p'; rewrite Hybrid /= /p'; smt(q_ge0). qed.
+
 end section.
 
 (* -------------------------------------------------------------------- *)
@@ -395,7 +503,7 @@ section.
     proc main() : outputA = {
       var r : outputA;
 
-      HybOrcl.l0 <$ [0..q-1];
+      HybOrcl.l0 <$ [0..max 0 (q-1)];
       HybOrcl.l  <- 0;
       r <@ Al.main();
       return r;
@@ -408,7 +516,7 @@ section.
     proc main() : outputA = {
       var r : outputA;
 
-      HybOrcl.l0 <$ [0..q-1];
+      HybOrcl.l0 <$ [0..max 0 (q-1)];
       HybOrcl.l  <- 0;
       r <@ Ar.main();
       return r;
@@ -490,12 +598,12 @@ section.
   qed.
 
   lemma Hybrid_restr &m (p:glob A -> glob Ob -> int -> outputA -> bool):
-        Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res]
-      - Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res]
-    = 1%r/q%r * (  Pr[Ln(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res]
-                 - Pr[Rn(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res]).
+        Pr[Ln(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res]
+      - Pr[Rn(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res]
+    = q%r *(  Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res]
+            - Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res]).
   proof.
-  pose p' := fun ga ge l r, p ga ge l r /\ l <= q.
+  apply/eq_sym; pose p' := fun ga ge l r, p ga ge l r /\ l <= q.
   have ->:   Pr[Ln(Ob,A).main() @ &m : p  (glob A) (glob Ob) Count.c res]
            = Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res].
   + byequiv (: ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res} /\ Count.c{1} <= q)=> [| |@/p'] //=.
@@ -510,8 +618,8 @@ section.
     by sim.
   rewrite (Pr_Bl &m p) (Pr_Br &m p).
   have /= H := Hybrid Ob A losslessL losslessOb1 losslessOb2 losslessA &m p.
-  rewrite /p' -H.
-  congr.
+  rewrite /p' H.
+  congr; congr.
   + byequiv (: ={glob A, glob Ob} ==> ={glob A, glob Ob, glob HybOrcl, res} /\ Count.c{2} <= 1)=> //.
     proc; inline *; wp.
     call (: ={glob Ob, glob HybOrcl} /\ (if HybOrcl.l <= HybOrcl.l0 then Count.c = 0 else Count.c =1){2}).
@@ -540,4 +648,12 @@ section.
   + by conseq (: _ ==> ={res, glob Ob})=> //; sim.
   by auto=> /> l0 /supp_dinter /#.
   qed.
+  
+  lemma Hybrid_restr_div &m (p:glob A -> glob Ob -> int -> outputA -> bool):
+      q <> 0 =>
+        Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res]
+      - Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res]
+    = 1%r/q%r * (  Pr[Ln(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res]
+                 - Pr[Rn(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res]).
+  proof. by move=> qN0; rewrite Hybrid_restr; smt(q_ge0). qed.
 end section.

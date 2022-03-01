@@ -37,5 +37,6 @@ The required steps for configuring the provers are listed on:
   https://github.com/EasyCrypt/easycrypt#configuring-why3"""
 
 build: [
+  ["dune" "subst"]
   ["dune" "build" "-p" name "-j" jobs "@install"]
 ]

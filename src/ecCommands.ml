@@ -805,7 +805,9 @@ let reset () =
   context := Some (rootctxt (oget !context).ct_root)
 
 (* -------------------------------------------------------------------- *)
-let process ?(timed = false) (g : global_action located) : float option =
+let process ?(timed = false) ?(break = false) (g : global_action located) : float option =
+  ignore break;
+
   let current = oget !context in
   let scope   = current.ct_current in
 

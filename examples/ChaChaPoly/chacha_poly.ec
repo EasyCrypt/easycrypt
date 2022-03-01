@@ -2163,10 +2163,10 @@ section PROOFS.
   have->:Pr[UFCMA(ROIN.RO).distinguish() @ &m : res \/ UFCMA.bad2] = 
          Pr[UFCMA3(ROIN.RO).distinguish() @ &m : res] by byequiv equiv_step4.
   have->:Pr[UFCMA3(ROIN.RO).distinguish() @ &m : res] =
-         Pr[UFCMA3(ROIN.FullEager.LRO).distinguish() @ &m : res].
+         Pr[UFCMA3(ROIN.LRO).distinguish() @ &m : res].
   + byequiv (ROIN.FullEager.RO_LRO_D UFCMA3 _)=> //=; exact: dpoly_in_ll.
-  have->:Pr[UFCMA3(ROIN.FullEager.LRO).distinguish() @ &m : res] = 
-         Pr[UFCMA4(ROIN.FullEager.LRO).distinguish() @ &m : UF.forged \/ UFCMA.bad2].
+  have->:Pr[UFCMA3(ROIN.LRO).distinguish() @ &m : res] = 
+         Pr[UFCMA4(ROIN.LRO).distinguish() @ &m : UF.forged \/ UFCMA.bad2].
   + byequiv=> //=; proc; inline*; sim; sp.
     seq 5 5 : (={glob UFCMA3, RO.m} /\ (UF.forged,UFCMA.bad2,UFCMA.cbad2, RO.m){2} = (false,false,0, empty)).
     + by wp; conseq/>; sim.
@@ -2224,7 +2224,7 @@ section PROOFS.
                                         (* the probability of bad occuring during ith query *)
         (size l1)                       (* the bound on the counter (after which we stop caring) *)
         UF.forged                       (* the bad event *)
-        [UFCMA4(FullEager.LRO).set_forged : (UFCMA4.cforged < size l1) ]
+        [UFCMA4(LRO).set_forged : (UFCMA4.cforged < size l1) ]
                                         (* condition(s) under which the oracle(s) do not respond *)
         (ROout.m = roout /\ Mem.lc = l /\ UFCMA4.cforged <= size l1)
                                         (* general unconditional invariants *);
@@ -2256,7 +2256,7 @@ section PROOFS.
                                         (* the probability of bad occuring during ith query *)
         (size l2)                       (* the bound on the counter (after which we stop caring) *)
         UFCMA.bad2                      (* the bad event *)
-        [UFCMA4(FullEager.LRO).set_bad2 : (UFCMA.cbad2 < size l2) ]
+        [UFCMA4(LRO).set_bad2 : (UFCMA.cbad2 < size l2) ]
                                         (* condition(s) under which the oracle(s) do not respond *)
         (ROout.m = roout /\ Mem.lc = l /\ UFCMA.cbad2 <= size l2)
                                         (* general unconditional invariants *);

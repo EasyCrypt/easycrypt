@@ -39,11 +39,7 @@ module CaseOptions = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let rec process1_debug (_ttenv : ttenv) (tc : tcenv1) =
-  FApi.tcenv_of_tcenv1 tc
-
-(* -------------------------------------------------------------------- *)
-and process1_by (ttenv : ttenv) (t : ptactic list option) (tc : tcenv1) =
+let rec process1_by (ttenv : ttenv) (t : ptactic list option) (tc : tcenv1) =
   t_onall process_done (process1_seq ttenv (odfl [] t) tc)
 
 (* -------------------------------------------------------------------- *)
@@ -187,7 +183,9 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pwp wp                    -> EcPhlWp.t_wp wp
     | Psp sp                    -> EcPhlSp.t_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
+    | Prmatch (side, c, i)      -> EcPhlRCond.t_rcond_match side c i
     | Pcond side                -> EcPhlHiCond.process_cond side
+    | Pmatch infos              -> EcPhlHiCond.process_match infos
     | Pwhile (side, info)       -> EcPhlWhile.process_while side info
     | Pasyncwhile info          -> EcPhlWhile.process_async_while info
     | Pfission info             -> EcPhlLoopTx.process_fission info
@@ -317,7 +315,6 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
     | Pseq      ts          -> `One (process1_seq      ttenv ts)
     | Pcase     es          -> `One (process1_case     ttenv es)
     | Pprogress (o, t)      -> `One (process1_progress ttenv o t)
-    | Pdebug                -> `One (process1_debug    ttenv)
     | Psubgoal  tt          -> `All (process_chain     ttenv tt)
     | Pnstrict  t           -> `One (process1_nstrict  ttenv t)
   in
@@ -346,6 +343,9 @@ and process1 (ttenv : ttenv) (t : ptactic) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process (ttenv : ttenv) (t : ptactic list) (pf : proof) =
+  if EcCoreGoal.closed pf then
+    tc_error (proofenv_of_proof pf) "all goals are closed";
+
   let tc  = tcenv1_of_proof pf in
   let hd  = FApi.tc1_handle tc in
   let tc  = process1_seq ttenv t tc in
