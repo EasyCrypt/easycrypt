@@ -234,7 +234,7 @@ end) = struct
           if List.length xs1 <> List.length xs2 then
             raise E.NotConv;
           let alpha =
-            let rec do1 alpha (id1, ty1) (id2, ty2) =
+            let do1 alpha (id1, ty1) (id2, ty2) =
               if not (for_type env ty1 ty2) then
                 raise E.NotConv;
               Mid.add id1 (id2, ty2) alpha in
