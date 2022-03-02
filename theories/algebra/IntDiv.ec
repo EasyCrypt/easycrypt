@@ -569,6 +569,13 @@ qed.
 lemma nosmt divzDr m n d : d %| n => (m + n) %/ d = (m %/ d) + (n %/ d).
 proof. by move=> dv_n; rewrite addrC divzDl // addrC. qed.
 
+lemma nosmt expz_div (x n m : int) :
+  0 <= m <= n => 0 < x => x^n %/ x^m = x^(n-m).
+proof.
+move=> [ge0_m le_mn] gt0_x; rewrite -{1}(subrK n m).
+by rewrite exprD_nneg 1:subr_ge0 // mulzK // expf_eq0 (@gtr_eqF x).
+qed.
+
 (* ==================================================================== *)
 op gcd_spec a b = fun z =>
      (0 <= z /\ z %| a /\ z %| b)
@@ -853,3 +860,13 @@ qed.
 lemma nosmt modz_pow2_div n p i: 0 <= i => 0 <= p <= n =>
   (i %% 2^n) %/ 2^p = (i %/ 2^p) %% 2^(n-p).
 proof. admitted.
+
+(* -------------------------------------------------------------------- *)
+require import Real.
+
+lemma fromint_div (x y : int) : y %| x => (x %/ y)%r = x%r / y%r.
+proof.
+case: (y = 0) => [->|nz_y] /=; first by rewrite divz0.
+case/dvdzP => [q ->]; rewrite mulzK //.
+by rewrite fromintM RField.mulrK // eq_fromint.
+qed.
