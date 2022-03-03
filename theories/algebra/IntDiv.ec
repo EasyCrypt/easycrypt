@@ -478,6 +478,13 @@ proof. by move=> gt0_m gt0_d; rewrite !modzE !divNz //; ring. qed.
 lemma nosmt divzK d m : d %| m => m %/ d * d = m.
 proof. by move/dvdz_eq. qed.
 
+(* -------------------------------------------------------------------- *)
+lemma divMr p q m : m %| q => (p * q) %/ m = p * (q %/ m).
+proof.
+case: (m = 0) => [-> /dvd0z ->|nz_m]; first by rewrite !div0z.
+by case/dvdzP=> [k ->]; rewrite mulrA !mulzK.
+qed.
+
 lemma nosmt lez_floor m d : d <> 0 => m %/ d * d <= m.
 proof. by rewrite -subr_ge0 -modzE; apply/modz_ge0. qed.
 
