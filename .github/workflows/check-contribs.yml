@@ -1,0 +1,105 @@
+name: check-contributions
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: actions
+    steps:
+      - name: Trigger check
+        run: |
+          echo '${{ github.event_name }}'
+      - name: Container setup
+        uses: cachix/install-nix-action@v16
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Cachix setup (push)
+        if: github.event_name == 'push'
+        uses: cachix/cachix-action@v10
+        with:
+          name: formosa-crypto
+          authToken: '${{ secrets.CACHIX_TOKEN }}'
+      - name: Cachix setup (pr)
+        if: github.event_name == 'pull_request'
+        uses: cachix/cachix-action@v10
+        with:
+          name: formosa-crypto
+          skipPush: true
+      - name: Fetch EC source
+        if: github.event_name == 'push'
+        uses: actions/checkout@v3
+      - name: Build binaries
+        if: github.event_name == 'push'
+        run: |
+          export NIXPKGS_ALLOW_UNFREE=1
+          cd "${{ github.workspace }}/scripts/nix"
+          nix-build z3.nix \
+            --arg    lib                 "(import <nixpkgs> {}).lib" \
+            --arg    stdenv              "(import <nixpkgs> {}).stdenv" \
+            --arg    fetchFromGitHub     "(import <nixpkgs> {}).fetchFromGitHub" \
+            --arg    python              "(import <nixpkgs> {}).python3" \
+            --arg    fixDarwinDylibNames "(import <nixpkgs> {}).fixDarwinDylibNames" \
+            --arg    writeScript         "(import <nixpkgs> {}).writeScript" \
+            --argstr version             "4.8.10"
+          nix-build alt-ergo.nix \
+            --arg    lib                 "(import <nixpkgs> {}).lib" \
+            --arg    fetchFromGitHub     "(import <nixpkgs> {}).fetchFromGitHub" \
+            --arg    which               "(import <nixpkgs> {}).which" \
+            --arg    ocamlPackages       "(import <nixpkgs> {}).ocamlPackages" \
+            --argstr version             "2.4.0" \
+            --argstr sha256              "r5gqJ5bMlnmEdlnaWM83y58oevtInLXSdT6ip3f2oco="
+          nix-build easycrypt.nix --argstr ecRev "$GITHUB_SHA"
+  check:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: actions
+    strategy:
+      matrix:
+        contribs:
+          - name: "sha3"
+            url: "https://gitlab.com/easycrypt/sha3.git"
+            branch: "master"
+            workdir: "."
+            command: "CHECKS=sponge make check"
+    steps:
+      - name: Container setup
+        uses: cachix/install-nix-action@v16
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - name: Cachix setup
+        uses: cachix/cachix-action@v10
+        with:
+          name: formosa-crypto
+      - name: Fetch EC source
+        uses: actions/checkout@v3
+      - name: Install binaries
+        run: |
+          export NIXPKGS_ALLOW_UNFREE=1
+          cd ${{ github.workspace }}/scripts/nix
+          nix-env --install --file z3.nix \
+            --arg    lib                 "(import <nixpkgs> {}).lib" \
+            --arg    stdenv              "(import <nixpkgs> {}).stdenv" \
+            --arg    fetchFromGitHub     "(import <nixpkgs> {}).fetchFromGitHub" \
+            --arg    python              "(import <nixpkgs> {}).python3" \
+            --arg    fixDarwinDylibNames "(import <nixpkgs> {}).fixDarwinDylibNames" \
+            --arg    writeScript         "(import <nixpkgs> {}).writeScript" \
+            --argstr version             "4.8.10"
+          nix-env --install --file alt-ergo.nix \
+            --arg    lib                 "(import <nixpkgs> {}).lib" \
+            --arg    fetchFromGitHub     "(import <nixpkgs> {}).fetchFromGitHub" \
+            --arg    which               "(import <nixpkgs> {}).which" \
+            --arg    ocamlPackages       "(import <nixpkgs> {}).ocamlPackages" \
+            --argstr version             "2.4.0" \
+            --argstr sha256              "r5gqJ5bMlnmEdlnaWM83y58oevtInLXSdT6ip3f2oco="
+          nix-env --install --file easycrypt.nix --argstr ecRev "$GITHUB_SHA"
+          nix-env --install gnumake why3 cvc4 --file '<nixpkgs>'
+      - name: Configure EasyCrypt
+        run: |
+          mkdir -p ~/.config/easycrypt
+          easycrypt why3config
+      - name: Checkout contrib
+        run: |
+          git clone --branch ${{ matrix.contribs.branch }} ${{ matrix.contribs.url }} ${{ github.workspace }}/${{ matrix.contribs.name }}
+      - name: Check contrib
+        run: |
+          cd ${{ github.workspace }}/${{ matrix.contribs.name }}/${{ matrix.contribs.workdir }}
+          ${{ matrix.contribs.command }}
