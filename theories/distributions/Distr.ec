@@ -1055,7 +1055,7 @@ move=> a ad @/(\o) @/pred1; apply/eq_iff; split; last exact: canLR.
 by move=> faE; move/can_gf: ad; rewrite faE.
 qed.
 
-lemma nosmt dmap1E_can_local (d: 'a distr) (f: 'a -> 'b) (g: 'b -> 'a) (x: 'b):
+lemma nosmt in_dmap1E_can (d: 'a distr) (f: 'a -> 'b) (g: 'b -> 'a) (x: 'b):
   f (g x) = x =>
   (forall (y: 'a), y \in d => f y = x => y = g x) => 
   mu1 (dmap d f) x = mu1 d (g x). 
