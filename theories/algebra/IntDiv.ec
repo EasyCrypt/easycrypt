@@ -864,9 +864,34 @@ move=> lt_pn; rewrite {1}(divz_eq i (k^n)); rewrite -addrA; congr.
 by rewrite {1}(divz_eq (i %% k^n) (k^p)) modz_dvd_pow.
 qed.
 
-lemma nosmt modz_pow2_div n p i: 0 <= i => 0 <= p <= n =>
-  (i %% 2^n) %/ 2^p = (i %/ 2^p) %% 2^(n-p).
-proof. admitted.
+lemma nosmt divzMr i a b :  
+  0 <= a => 0 <= b => i %/ (a * b) = i %/ a %/ b.
+proof.
+move=> ge0_a ge0_b.
+case (a = 0) => [-> | neq0_a]; first by rewrite mul0r divz0 div0z.
+case (b = 0) => [-> | neq0_b]; first by rewrite mulr0 2!divz0.
+pose ab := a * b; move: (edivzP i ab) (divz_eq i a) (divz_eq (i %/ a) b) => [].
+rewrite mulf_eq0 neq0_b neq0_a /= => eqi_ab rngi_ab eqi_a eqia_b.
+move: (euclideU ab (i %/ ab) (i %/ a %/ b) (i %% ab) (i %/ a %% b * a + i %% a)).
+move=> /(_ _ _ _) //; last rewrite andaE. 
++ by rewrite -eqi_ab /ab (mulrC a) mulrA addrA -mulrDl -eqia_b -eqi_a.
+split; first by rewrite addz_ge0 1:mulr_ge0 1,3:modz_ge0.
+rewrite ger0_norm 1:mulr_ge0 // (ltr_le_trans ((b - 1) * a + a)).
++ by rewrite ler_lt_add 1:ler_pmul 1:modz_ge0 // 1:-ltzS ltz_pmod ltr_def. 
+by rewrite mulzDl mulNr -addzA addNz mulzC.
+qed.
+
+lemma nosmt divzMl i a b :
+  0 <= a => 0 <= b => i %/ (a * b) = i %/ b %/ a.
+proof. by move=> *; rewrite mulrC divzMr. qed.
+
+lemma nosmt modz_pow2_div n p i: 
+  0 <= p <= n => (i %% 2^n) %/ 2^p = (i %/ 2^p) %% 2^(n-p).
+proof.
+move=> [ge0_p len_p].
+rewrite !modzE (: 2^n = 2^(n-p) * 2^p) 1:-exprD_nneg 1:subr_ge0 3:subrK //.
+by rewrite -mulNr mulrA divzMDr 1:expf_eq0 // mulNr addrC divzMl 1,2:expr_ge0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 require import Real.
