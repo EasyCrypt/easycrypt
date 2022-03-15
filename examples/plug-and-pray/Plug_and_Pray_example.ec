@@ -59,7 +59,7 @@ clone import Plug_and_Pray as PnP with
   type tval    <- int,
   type tin     <- unit,
   op   indices <- range 0 q
-proof indices_not_nil by smt(@List gt0_q).
+proof indices_not_nil by smt(size_range gt0_q).
 
 (*
    We first apply the general Lemma that yields
