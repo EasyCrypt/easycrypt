@@ -3085,6 +3085,56 @@ by rewrite -eqss (@perm_eq_trans s) // perm_sort.
 qed.
 
 (* -------------------------------------------------------------------- *)
+(*                    retrieving a maximal element                      *)
+(* -------------------------------------------------------------------- *)
+section ListMax.
+
+declare type t.
+
+(* get max relative to this transitive and strongly connective relation *)
+declare op rel: t -> t -> bool.
+
+declare axiom nosmt rel_trans: transitive rel. 
+
+declare axiom nosmt rel_conn (a b: t): rel a b \/ rel b a.
+
+lemma nosmt rel_refl: reflexive rel by move => x; elim (rel_conn x x).
+
+(* returns the greater of x and a maximal element in the list *)
+op listmax_bounded (x: t) (xs: t list): t =
+  with xs = [] => x
+  with xs = x'::xs' => listmax_bounded (if rel x x' then x' else x) xs'.
+
+(* returns dfl if empty, and a maximal element in the list otherwise *)
+op listmax (dfl: t) (xs: t list): t =
+  with xs = [] => dfl
+  with xs = x::xs' => listmax_bounded x xs'.
+
+lemma nosmt listmax_gt_in (dfl: t) (xs: t list): forall x, x \in xs => rel x (listmax dfl xs).
+proof.
+case xs => [x| x xs]; 1: by rewrite in_nil.
+move: x; elim xs => /= [x y ->| x xs indH y z]; 1: exact rel_refl.
+case (rel y x) => rel_y_x [->|]; 2,3: by apply indH.
+- apply (rel_trans x) => //.
+  by apply indH.
+have rel_x_y :rel x y by case (rel_conn x y).
+elim => [->| z_in_xs].
+- apply (rel_trans y) => //.
+  by apply indH.
+- by apply indH; right.
+qed.
+
+lemma nosmt listmax_in (dfl: t) (xs: t list): size xs <> 0 => listmax dfl xs \in xs.
+proof.
+case xs => [//|x xs _ /=].
+move: x; elim xs => // x xs indH y /=.
+case (rel y x) => _; 1: (right; apply indH).
+by elim (indH y) => ->.
+qed.
+
+end section ListMax.
+
+(* -------------------------------------------------------------------- *)
 (*                          Order lifting                               *)
 (* -------------------------------------------------------------------- *)
 op lex (e : 'a -> 'a -> bool) s1 s2 =
