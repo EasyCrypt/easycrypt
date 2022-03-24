@@ -244,6 +244,14 @@ apply (ler_trans _ _ _ (sdist_dmap _ _ _)).
 apply (ler_trans _ _ _ (sdist_dprod _ _ _ _ )); smt().
 qed.
 
+lemma sdist_dopt (d1 d2 : 'a distr) : 
+  sdist (dopt d1) (dopt d2) = sdist d1 d2.
+proof.
+rewrite !sdist_tvd !dopt_ll normr0 /=; congr.
+rewrite sumD1_None ?summable_sdist addrC /=; congr; 2: by rewrite !dopt1E /= /#.
+by apply eq_sum => x /=; rewrite /(\o) !dopt1E.
+qed.
+
 (*----------------------------------------------------------------------------*)
 
 (* Generic Distinguishers and their output distributions *)

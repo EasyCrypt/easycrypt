@@ -1394,6 +1394,40 @@ apply dscalar_uni =>//; smt (ge0_weight @Real).
 qed.
 
 (* -------------------------------------------------------------------- *)
+
+op mopt (d : 'a distr) = oapp (mu1 d) (1%r - weight d).
+op dopt (d : 'a distr) : 'a option distr = mk (mopt d).
+
+lemma isdistr_mopt (d : 'a distr) : isdistr (mopt d).
+proof.
+have sum_mopt : summable (mopt d) by apply/summable_oapp/summable_mu1.
+have mopt_ge0 : forall x, 0%r <= oapp (mu1 d) (1%r - weight d) x.
+  by case; smt(mu_bounded).
+split => [//|s uniq_s].
+suff S: sum (mopt d) <= 1%r by apply: ler_trans S; apply ler_big_sum.
+by rewrite /mopt sumD1_None // /(\o) /= -weightE /#.
+qed.
+
+lemma dopt1E (d : 'a distr) x : mu1 (dopt d) x = oapp (mu1 d) (1%r - weight d) x.
+proof. by rewrite muK ?isdistr_mopt. qed.
+
+lemma doptE (d : 'a distr) E :
+  mu (dopt d) E =
+  mu d (E \o Some) + (if E None then 1%r - weight d else 0%r).
+proof.
+rewrite !muE sumD1_None ?summable_cond ?summable_mu1 /= addrC; congr.
+  by apply eq_sum => /= x; rewrite /(\o) dopt1E.
+by case (E None) => @/predT //=; by rewrite dopt1E -weightE.
+qed.
+
+lemma dopt_ll (d : 'a distr) : is_lossless (dopt d).
+proof.
+rewrite /is_lossless muE /predT /= sumD1_None ?(summable_mu1) /=.
+rewrite dopt1E /= (@eq_sum _ (mu1 d)) //=; 2: by rewrite -weightE /#.
+by move => ?; rewrite /(\o) dopt1E.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op mrestrict ['a] (d : 'a distr) (p : 'a -> bool) =
   fun x => if p x then mu1 d x else 0%r.
 
