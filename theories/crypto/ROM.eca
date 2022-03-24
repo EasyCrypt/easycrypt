@@ -503,10 +503,22 @@ local module G1' (D : Dist) (H : Oracle) = {
   }
 }.
 
+local module G0' (D : Dist) (H : Oracle) = {
+  proc main(i : d_in_t): d_out_t = {
+    var y, r;
+
+             Log(H).init();
+    G1'.x <@ D(Log(H)).a1(i);
+        y <@ H.o(G1'.x);
+        r <@ D(Log(H)).a2(y);
+    return r;
+  }
+}.
+
 lemma ROM_BadCall &m i r:
-     Pr[G0(D,LRO).main(i) @ &m: res = r]
-  <=   Pr[G1(D,LRO).main(i) @ &m: res = r]
-     + Pr[G_bad(D,LRO).main(i) @ &m: res].
+     `|  Pr[G0(D,LRO).main(i) @ &m: res = r]
+       - Pr[G1(D,LRO).main(i) @ &m: res = r]|
+  <= Pr[G_bad(D,LRO).main(i) @ &m: res].
 proof.
 have ->: Pr[G_bad(D,LRO).main(i) @ &m: res] = Pr[G1'(D,LRO).main(i) @ &m: G1'.x \in Log.qs].
 + byequiv (_: ={glob D, arg} ==> res{1} = (G1'.x \in Log.qs){2})=> //.
@@ -516,39 +528,40 @@ have ->: Pr[G_bad(D,LRO).main(i) @ &m: res] = Pr[G1'(D,LRO).main(i) @ &m: G1'.x 
   by inline *; wp.
 have ->: Pr[G1(D,LRO).main(i) @ &m: res = r] = Pr[G1'(D,LRO).main(i) @ &m: res = r].
 + by byequiv (_: ={glob D, arg} ==> ={res}); first by sim.
-have: Pr[G0(D,LRO).main(i) @ &m: res = r] <= Pr[G1'(D,LRO).main(i) @ &m: res = r \/ G1'.x \in Log.qs].
-+ byequiv (_: ={glob D, arg} ==> !mem Log.qs{2} G1'.x{2} => ={res})=> //; last smt().
-  proc.
-  call (_: G1'.x \in Log.qs,
-              ={glob Log}
-           /\ (forall x, x \in Log.qs{2} <=> x \in LRO.m{2})
-           /\ eq_except (pred1 G1'.x{2}) LRO.m{1} LRO.m{2}).
-  + by apply D_a2_ll.
-  + proc; inline LRO.o; auto=> /> //= &1 &2 x2_notin_qs eq_qs_m eqe y _.
-    rewrite !inE !get_setE x2_notin_qs /= eq_except_set_eq //= eq_sym.
-    split.
-    + move=> x_notin_m2; split.
-      + by move=> x_notin_m1 + x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
-      move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
-      by rewrite domE eq_mx -domE.
-    move=> x_in_m2; split.
-    + move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
-      by rewrite domE eq_mx -domE.
-    move=> x_in_m1 x2_neq_G1'x. move: eqe; rewrite eq_exceptP=> -> //= x1.
-    by rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> [->|] //=; rewrite x_in_m2.
-  + by progress; apply (Log_o_ll LRO); apply (LRO_o_ll dout_ll).
-  + progress; exists* G1'.x; elim* => x; conseq (Log_o_ll LRO _) (Log_o_stable LRO x)=> //.
-    by apply (LRO_o_ll dout_ll).
-  inline Log(LRO).o LRO.o; auto.
-  call (_: ={glob Log, glob LRO} /\ (forall x, x \in Log.qs{2} = x \in LRO.m{2})).
-  + proc; inline LRO.o; auto=> /> &2 eq_qs_m y _; split.
-    + by move=> x_notin_m x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
-    move=> x_in_m x1; rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> //=.
-    by move=> ->; rewrite x_in_m.          
-  inline Log(LRO).init LRO.init; auto=> />; split=> [x1|_ a qs m eq_qs_m y _].
-  + by rewrite in_fset0 mem_empty.
-  by rewrite get_set_eqE //= eq_except_setl /= eq_qs_m /#.
-by rewrite Pr [mu_or]; smt(mu_bounded).
+have ->: Pr[G0(D,LRO).main(i) @ &m: res = r] = Pr[G0'(D,LRO).main(i) @ &m: res = r].
++ by byequiv (_: ={glob D, arg} ==> ={res}); first by sim.
+byequiv: (G1'.x \in Log.qs)=> //; proc.
+call (_: G1'.x \in Log.qs
+       ,    ={glob Log, G1'.x}
+         /\ (forall x, x \in Log.qs{2} <=> x \in LRO.m{2})
+         /\ eq_except (pred1 G1'.x{2}) LRO.m{1} LRO.m{2}
+       , (G1'.x \in Log.qs){1} <=> (G1'.x \in Log.qs){2}).
++ by apply D_a2_ll.
++ proc; inline LRO.o; auto=> /> //= &1 &2 x2_notin_qs eq_qs_m eqe y _.
+  rewrite !inE !get_setE x2_notin_qs /= eq_except_set_eq //= eq_sym.
+  split.
+  + move=> x_notin_m2; split.
+    + by move=> x_notin_m1 + x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
+    move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
+    by rewrite domE eq_mx -domE.
+  move=> x_in_m2; split.
+  + move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
+    by rewrite domE eq_mx -domE.
+  move=> x_in_m1 x2_neq_G1'x. move: eqe; rewrite eq_exceptP=> -> //= x1.
+  by rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> [->|] //=; rewrite x_in_m2.
++ move=> /> &2 x'_in_log.
+  by proc; inline *; auto=> /> &0; rewrite dout_ll in_fsetU=> ->.
++ move=> &1.
+  by proc; inline *; auto=> /> &0; rewrite dout_ll in_fsetU=> ->.
+inline Log(LRO).o LRO.o; auto.
+call (_: ={glob Log, glob LRO} /\ (forall x, x \in Log.qs{2} = x \in LRO.m{2})).
++ proc; inline LRO.o; auto=> /> &2 eq_qs_m y _; split.
+  + by move=> x_notin_m x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
+  move=> x_in_m x1; rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> //=.
+  by move=> ->; rewrite x_in_m.
+inline Log(LRO).init LRO.init; auto=> />; split=> [x1|_ a qs m eq_qs_m y _].
++ by rewrite in_fset0 mem_empty.
+by rewrite get_set_eqE //= eq_except_setl /= eq_qs_m=> /> /#.
 qed.
 end section.
 end OnLog.
@@ -611,10 +624,22 @@ local module G1' (D : Dist) (H : Oracle) = {
   }
 }.
 
+local module G0' (D : Dist) (H : Oracle) = {
+  proc main(i : d_in_t): d_out_t = {
+    var y, r;
+
+             Log(H).init();
+    G1'.x <@ D(Bound(H)).a1(i);
+        y <@ H.o(G1'.x);
+        r <@ D(Bound(H)).a2(y);
+    return r;
+  }
+}.
+
 lemma ROM_BadCall &m i r:
-     Pr[G0(D,LRO).main(i) @ &m: res = r]
-  <=   Pr[G1(D,LRO).main(i) @ &m: res = r]
-     + Pr[G_bad(D,LRO).main(i) @ &m: res].
+     `|  Pr[G0(D,LRO).main(i) @ &m: res = r]
+       - Pr[G1(D,LRO).main(i) @ &m: res = r]|
+  <= Pr[G_bad(D,LRO).main(i) @ &m: res].
 proof.
 have ->: Pr[G_bad(D,LRO).main(i) @ &m: res] = Pr[G1'(D,LRO).main(i) @ &m: G1'.x \in Log.qs].
 + byequiv (_: ={glob D, arg} ==> res{1} = (mem Log.qs G1'.x){2})=> //.
@@ -624,39 +649,40 @@ have ->: Pr[G_bad(D,LRO).main(i) @ &m: res] = Pr[G1'(D,LRO).main(i) @ &m: G1'.x 
   by inline *; wp.
 have ->: Pr[G1(D,LRO).main(i) @ &m: res = r] = Pr[G1'(D,LRO).main(i) @ &m: res = r].
 + by byequiv (_: ={glob D, arg} ==> ={res}); first by sim.
-have: Pr[G0(D,LRO).main(i) @ &m: res = r] <= Pr[G1'(D,LRO).main(i) @ &m: res = r \/ G1'.x \in Log.qs].
-+ byequiv (_: ={glob D, arg} ==> (!G1'.x \in Log.qs){2} => ={res})=> //; last by smt().
-  proc.
-  call (_: G1'.x \in Log.qs,
-              ={glob Log}
-           /\ (forall x, x \in Log.qs{2} = x \in LRO.m{2})
-           /\ eq_except (pred1 G1'.x{2}) LRO.m{1} LRO.m{2}).
-  + by apply D_a2_ll.
-  + proc; inline *; sp; if=> //=; auto=> /> //= &1 &2 x2_notin_qs eq_qs_m eqe _ y _.
-    rewrite !inE !get_setE x2_notin_qs /= eq_except_set_eq //= eq_sym.
-    split.
-    + move=> x_notin_m2; split.
-      + by move=> x_notin_m1 + x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
-      move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
-      by rewrite domE eq_mx -domE.
-    move=> x_in_m2; split.
-    + move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
-      by rewrite domE eq_mx -domE.
-    move=> x_in_m1 x2_neq_G1'x. move: eqe; rewrite eq_exceptP=> -> //= x1.
-    by rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> [->|] //=; rewrite x_in_m2.
-  + by progress; apply (Bound_o_ll LRO); apply (LRO_o_ll dout_ll).
-  + progress; exists* G1'.x; elim* => x; conseq (Bound_o_ll LRO _) (Bound_o_stable LRO x)=> //.
-    by apply (LRO_o_ll dout_ll).
-  + inline LRO.o; auto.
-    call (_: ={glob Log, glob LRO} /\ (forall x, x \in Log.qs{2} = x \in LRO.m{2})).
-    + proc; inline Log(LRO).o LRO.o; sp; if=> //; auto=> /> &2 eq_qs_m _ y _; split.
-      + by move=> x_notin_m x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
-      move=> x_in_m x1; rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> //=.
-      by move=> ->; rewrite x_in_m.          
-    inline Log(LRO).init LRO.init; auto=> />; split=> [x1|_ a qs m eq_qs_m y _].
-    + by rewrite in_fset0 mem_empty.
-  by rewrite get_set_eqE //= eq_except_setl /= eq_qs_m /#.
-by rewrite Pr [mu_or]; smt(mu_bounded).
+have ->: Pr[G0(D,LRO).main(i) @ &m: res = r] = Pr[G0'(D,LRO).main(i) @ &m: res = r].
++ by byequiv (_: ={glob D, arg} ==> ={res}); first by sim.
+byequiv: (G1'.x \in Log.qs)=> //; proc.
+call (_: G1'.x \in Log.qs
+       ,    ={glob Log, G1'.x}
+         /\ (forall x, x \in Log.qs{2} = x \in LRO.m{2})
+         /\ eq_except (pred1 G1'.x{2}) LRO.m{1} LRO.m{2}
+       , (G1'.x \in Log.qs){1} <=> (G1'.x \in Log.qs){2}).
++ by apply D_a2_ll.
++ proc; inline *; sp; if=> //=; auto=> /> //= &1 &2 x2_notin_qs eq_qs_m eqe _ y _.
+  rewrite !inE !get_setE x2_notin_qs /= eq_except_set_eq //= eq_sym.
+  split.
+  + move=> x_notin_m2; split.
+    + by move=> x_notin_m1 + x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
+    move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
+    by rewrite domE eq_mx -domE.
+  move=> x_in_m2; split.
+  + move: eqe; rewrite eq_exceptP /pred1=> /(_ x{2}) h + /h eq_mx.
+    by rewrite domE eq_mx -domE.
+  move=> x_in_m1 x2_neq_G1'x. move: eqe; rewrite eq_exceptP=> -> //= x1.
+  by rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> [->|] //=; rewrite x_in_m2.
++ move=> &2 x_in_log.
+  by proc; inline *; sp; if; auto=> /> &0; rewrite dout_ll in_fsetU /#.
++ move=> &1.
+  by proc; inline *; sp; if; auto=> /> &0; rewrite dout_ll in_fsetU /#.
+inline LRO.o; auto.
+call (_: ={glob Log, glob LRO} /\ (forall x, x \in Log.qs{2} = x \in LRO.m{2})).
++ proc; inline Log(LRO).o LRO.o; sp; if=> //; auto=> /> &2 eq_qs_m _ y _; split.
+  + by move=> x_notin_m x1; rewrite in_fsetU in_fset1 mem_set eq_qs_m.
+  move=> x_in_m x1; rewrite in_fsetU in_fset1 eq_qs_m; case: (x1 = x{2})=> //=.
+  by move=> ->; rewrite x_in_m.
+inline Log(LRO).init LRO.init; auto=> />; split=> [x1|_ a qs m eq_qs_m y _].
++ by rewrite in_fset0 mem_empty.
+by rewrite get_set_eqE //= eq_except_setl /= eq_qs_m /#.
 qed.
 end section.
 end OnBound.
