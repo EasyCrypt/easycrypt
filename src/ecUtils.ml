@@ -570,7 +570,7 @@ module List = struct
     function [x] -> x | xs  -> f xs
 
   (* ------------------------------------------------------------------ *)
-  let rec find_dup ?(cmp = Stdlib.compare) (xs : 'a list ) =
+  let rec find_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
     match xs with
     | []      -> None
     | x :: xs ->

@@ -10,7 +10,6 @@
 open EcBigInt
 open EcPath
 open EcTypes
-open EcModules
 open EcMemory
 
 (* -------------------------------------------------------------------- *)
@@ -20,13 +19,13 @@ include module type of struct include EcCoreFol end
 val f_losslessF: xpath -> form
 
 val f_eqparams:
-     xpath -> EcTypes.ty -> variable list option -> memory
-  -> xpath -> EcTypes.ty -> variable list option -> memory
+     EcTypes.ty -> variable list option -> memory
+  -> EcTypes.ty -> variable list option -> memory
   -> form
 
 val f_eqres:
-     xpath -> EcTypes.ty -> memory
-  -> xpath -> EcTypes.ty -> memory
+     EcTypes.ty -> memory
+  -> EcTypes.ty -> memory
   -> form
 
 val f_eqglob:
@@ -112,6 +111,7 @@ val f_eq_simpl    : form -> form -> form
 
 val f_int_le_simpl  : form -> form -> form
 val f_int_lt_simpl  : form -> form -> form
+
 val f_real_le_simpl : form -> form -> form
 val f_real_lt_simpl : form -> form -> form
 
@@ -194,8 +194,10 @@ type sform =
   | SFeq    of form * form
   | SFop    of (path * ty list) * (form list)
 
-  | SFhoareF   of hoareF
-  | SFhoareS   of hoareS
+  | SFhoareF  of sHoareF
+  | SFhoareS  of sHoareS
+  | SFcHoareF  of cHoareF
+  | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
@@ -225,3 +227,15 @@ module DestrReal : sig
   val div : form -> form * form
   val abs : form -> form
 end
+
+(* -------------------------------------------------------------------- *)
+(*val cost_sub_self : cost -> form -> cost
+val cost_add_self : cost -> form -> cost
+val cost_sub_call : EcEnv.env -> cost -> EcPath.xpath -> form -> cost
+val cost_add_call : EcEnv.env -> cost -> EcPath.xpath -> form -> cost
+
+val cost_map      : (form -> form) -> cost -> cost
+val cost_op       : EcEnv.env -> (form -> form -> form ) -> cost -> cost -> cost
+val cost_app      : cost -> form list -> cost
+
+val cost_flatten  : cost -> form *)

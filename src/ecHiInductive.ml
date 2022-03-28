@@ -46,9 +46,6 @@ let rcerror loc env e = raise (RcError (loc, env, e))
 let dterror loc env e = raise (DtError (loc, env, e))
 let fxerror loc env e = raise (FxError (loc, env, FXError e))
 
-
-
-
 (* -------------------------------------------------------------------- *)
 let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
   let { pl_loc = loc; pl_desc = (tyvars, name); } = name in

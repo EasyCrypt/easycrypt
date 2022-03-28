@@ -3099,7 +3099,6 @@ lemma lex_total (e : 'a -> 'a -> bool):
   => (forall s1 s2, lex e s1 s2 \/ lex e s2 s1).
 proof. by move=> h; elim=> [|x1 s1 IHs1] [|x2 s2] //=; smt. qed.
 
-(* -------------------------------------------------------------------- *)
 op subseqs ['a] (xs : 'a list) : 'a list list =
   with xs = [] => [[]]
   with xs = y :: ys => map ((::) y) (subseqs ys) ++ subseqs ys.
@@ -3201,3 +3200,13 @@ move=> uq_xs; apply: uniq_flatten_map => /=.
   by case/hasP => ys [#] /alltuplesP[+ _] /alltuplesP[+ _] - -> /#.
 - by apply: range_uniq.
 qed.
+
+(* -------------------------------------------------------------------- *)
+(*                          Cost on list                                *)
+(* -------------------------------------------------------------------- *)
+schema cost_eqnil ['a] `{P} {l:'a list} : cost [P: l = []] = cost [P:l] + '1.
+hint simplify cost_eqnil.
+
+schema cost_drop ['a] `{P} {l: 'a list} : cost [P: drop 1 l] = cost [P: l] + '1.
+schema cost_head ['a] `{P} {w:'a, l:'a list} : cost [P:head w l] = cost[P:w] + cost[P:l] + '1.
+hint simplify cost_drop, cost_head.

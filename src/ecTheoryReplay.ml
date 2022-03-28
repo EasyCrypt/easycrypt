@@ -219,7 +219,7 @@ and ind_compatible exn env pi1 pi2 =
 
 and prctor_compatible exn env s prc1 prc2 =
   error_body exn (EcSymbols.sym_equal prc1.prc_ctor prc2.prc_ctor);
-  let env, s = EcReduction.check_bindings exn env s prc1.prc_bds prc2.prc_bds in
+  let env, s = EcReduction.check_bindings exn [] env s prc1.prc_bds prc2.prc_bds in
   error_body exn (List.length prc1.prc_spec = List.length prc2.prc_spec);
   let doit f1 f2 =
     error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 (EcFol.Fsubst.f_subst s f2)) in
@@ -707,6 +707,14 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
   in (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
+and replay_scd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, sc) =
+  let subst, x = rename ove subst (`Lemma, x) in
+  let sc = EcSubst.subst_schema subst sc in
+  let item = Th_schema (x, sc) in
+  let scope = ove.ovre_hooks.hadd_item scope import item in
+  (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
 and replay_modtype
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, modty)
 =
@@ -783,7 +791,7 @@ and replay_mod
       let newme =
         if mode = `Alias || mode = `Inline `Keep then
           { newme with tme_expr = { newme.tme_expr with
-              me_body = ME_Alias (List.length newme.tme_expr.me_sig.mis_params, mp) } }
+              me_body = ME_Alias (List.length newme.tme_expr.me_params, mp) } }
         else newme in
 
       let scope =
@@ -841,11 +849,15 @@ and replay_reduction
   let for1 (p, opts, rule) =
     let p = EcSubst.subst_path subst p in
 
+    (* TODO: A: schema are not replayed for now, but reduction rules can use a
+       schema. Fix this. *)
     let rule =
       obind (fun rule ->
         try
           Some (EcReduction.User.compile
-                 ~opts ~prio:rule.rl_prio (EcSection.env (ove.ovre_hooks.henv scope)) p)
+                  ~opts ~prio:rule.rl_prio
+                  (EcSection.env (ove.ovre_hooks.henv scope))
+                  opts.ur_mode p)
         with EcReduction.User.InvalidUserRule _ -> None) rule
 
     in (p, opts, rule) in
@@ -957,6 +969,9 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
   | Th_axiom (x, ax) ->
      replay_axd ove (subst, ops, proofs, scope) (item.ti_import, x, ax)
+
+  | Th_schema (x, schema) ->
+     replay_scd ove (subst, ops, proofs, scope) (item.ti_import, x, schema)
 
   | Th_modtype (x, modty) ->
      replay_modtype ove (subst, ops, proofs, scope) (item.ti_import, x, modty)

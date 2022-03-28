@@ -166,13 +166,13 @@ module UFCMA(A:CCA_Adv, StL:StLOrcls) =
 
 section PROOFS.
 
-  declare module St <: StLOrcls { StLSke, Mem }.
+  declare module St <: StLOrcls { -StLSke, -Mem }.
 
   declare axiom valid_kg : hoare [St.kg : true ==> valid_key res].
 
-  declare module A <: CCA_Adv { StLSke, Mem, St }.
+  declare module A <: CCA_Adv { -StLSke, -Mem, -St }.
 
-  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{-A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   equiv eqv_CCA_UFCMA : CCA_game(A, RealOrcls(StLSke(St))).main ~ UFCMA(A, St).main :
      ={glob A} ==> !(exists c, c \in Mem.lc /\ dec StLSke.gs Mem.k c <> None){2} => ={res}.

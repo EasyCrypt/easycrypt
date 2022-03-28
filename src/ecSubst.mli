@@ -42,6 +42,7 @@ val freshen_type : (ty_params * ty) -> (ty_params * ty)
 (* -------------------------------------------------------------------- *)
 val subst_theory  : subst -> theory -> theory
 val subst_ax      : subst -> axiom -> axiom
+val subst_schema  : subst -> ax_schema -> ax_schema
 val subst_op      : subst -> operator -> operator
 val subst_tydecl  : subst -> tydecl -> tydecl
 val subst_tc      : subst -> typeclass -> typeclass
@@ -60,7 +61,7 @@ val subst_modtype      : subst -> module_type -> module_type
 val subst_modsig       : ?params:(ident list) -> subst -> module_sig -> module_sig
 val subst_top_modsig   : subst -> top_module_sig -> top_module_sig
 val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
-
+val subst_mod_restr    : subst -> mod_restr -> mod_restr
 (* -------------------------------------------------------------------- *)
 val subst_genty : subst -> (ty_params * ty) -> (ty_params * ty)
 val subst_ty    : subst -> ty   -> ty

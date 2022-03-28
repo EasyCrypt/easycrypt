@@ -7,7 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Bool Core Int List.
+require import Bool Core Int Xint List.
 require (*--*) FinType Word Ring.
 
 pragma +implicits.
@@ -33,6 +33,10 @@ op onew : word = offun (fun i => true ).
 
 op (+^) (w1 w2 : word): word =
   offun (fun i => w1.[i] ^^ w2.[i]).
+
+op cxor : {int | 0 <= cxor } as ge0_cxor.
+schema cost_xor `{P} {w1 w2: word} : cost [P: w1 +^ w2] = cost[P:w1] + cost[P:w2] + N cxor.
+hint simplify cost_xor.
 
 op andw (w1 w2:word): word =
   offun (fun i => w1.[i] /\ w2.[i]).

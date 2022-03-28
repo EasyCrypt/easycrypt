@@ -8,73 +8,81 @@
 
 (* -------------------------------------------------------------------- *)
 open EcSymbols
-
+open EcTypes
 (* -------------------------------------------------------------------- *)
 type memory = EcIdent.t
 
 val mem_equal : memory -> memory -> bool
 
 (* -------------------------------------------------------------------- *)
-type local_memtype
+type proj_arg =
+  { arg_ty  : ty; (* type of the procedure argument "arg" *)
+    arg_pos : int;       (* projection *)
+  }
 
-type memtype = local_memtype option
+type memtype
 
-val lmt_equal    : local_memtype -> local_memtype -> bool
-val lmt_xpath    : local_memtype -> EcPath.xpath
-val lmt_bindings : local_memtype -> ((int*int) option * EcTypes.ty) Msym.t
-(* the "int option" indicate if the variable is defined as the projection of
-   "arg" or as a variable *)
-
+val mt_equal_gen : (ty -> ty -> bool) -> memtype -> memtype -> bool
 val mt_equal    : memtype -> memtype -> bool
-val mt_xpath    : memtype -> EcPath.xpath
-val mt_bindings : memtype -> ((int*int) option * EcTypes.ty) Msym.t
 val mt_fv       : memtype -> int EcIdent.Mid.t
+
+val mt_iter_ty : (ty -> unit) -> memtype -> unit
 
 (* -------------------------------------------------------------------- *)
 type memenv = memory * memtype
 
+val mem_hash : memenv -> int
+val me_equal_gen : (ty -> ty -> bool) -> memenv -> memenv -> bool
 val me_equal : memenv -> memenv -> bool
 
 (* -------------------------------------------------------------------- *)
-exception DuplicatedMemoryBinding of symbol
-
 val memory   : memenv -> memory
 val memtype  : memenv -> memtype
-val xpath    : memenv -> EcPath.xpath
-val bindings : memenv -> ((int*int) option * EcTypes.ty) Msym.t
 
 (* -------------------------------------------------------------------- *)
-val empty_local : memory -> EcPath.xpath -> memenv
+(* [empty_local witharg id] if witharg then allows to use symbol "arg"  *)
+val empty_local    : witharg:bool -> memory -> memenv
+val empty_local_mt : witharg:bool -> memtype
+
+val schema    : memory -> memenv
+val schema_mt : memtype
+
 val abstract    : memory -> memenv
+val abstract_mt : memtype
 
-val bindp    : symbol -> (int*int) option -> EcTypes.ty -> memenv -> memenv
-val bind     : symbol -> EcTypes.ty -> memenv -> memenv
-val bind_proj: int -> int -> symbol -> EcTypes.ty -> memenv -> memenv
-val lookup   : symbol -> memenv -> ((int*int) option * EcTypes.ty) option
-val is_bound : symbol -> memenv -> bool
-val is_bound_pv : EcTypes.prog_var -> memenv -> bool
+val is_schema : memtype -> bool
+
+exception DuplicatedMemoryBinding of symbol
+
+val bindall    : variable list -> memenv -> memenv
+val bindall_mt : variable list -> memtype -> memtype
+
+val bind_fresh : variable -> memenv -> memenv * variable
+val bindall_fresh : variable list -> memenv -> memenv * variable list
 
 (* -------------------------------------------------------------------- *)
-val mt_subst :
-     (EcPath.xpath -> EcPath.xpath)
-  -> (EcTypes.ty -> EcTypes.ty)
-  -> memtype -> memtype
+val lookup :
+  symbol -> memtype -> (variable * proj_arg option * int option) option
 
-val mt_substm :
-     (EcPath.path -> EcPath.path)
-  -> EcPath.mpath EcIdent.Mid.t
-  -> (EcTypes.ty -> EcTypes.ty)
-  -> memtype -> memtype
+val lookup_me :
+  symbol -> memenv -> (variable * proj_arg option * int option) option
 
-val me_subst :
-     (EcPath.xpath -> EcPath.xpath)
-  -> memory EcIdent.Mid.t
-  -> (EcTypes.ty -> EcTypes.ty)
-  -> memenv -> memenv
+val get_name :
+  symbol -> int option -> memenv -> symbol option
 
-val me_substm :
-     (EcPath.path -> EcPath.path)
-  -> EcPath.mpath EcIdent.Mid.t
-  -> memory EcIdent.Mid.t
-  -> (EcTypes.ty -> EcTypes.ty)
-  -> memenv -> memenv
+val is_bound : symbol -> memtype -> bool
+val is_bound_pv : EcTypes.prog_var -> memtype -> bool
+
+(* -------------------------------------------------------------------- *)
+val mt_subst : (ty -> ty) -> memtype -> memtype
+
+val me_subst : memory EcIdent.Mid.t -> (ty -> ty) -> memenv -> memenv
+
+(* -------------------------------------------------------------------- *)
+val for_printing : memtype -> (symbol option * variable list) option
+
+val dump_memtype : memtype -> string
+
+(* -------------------------------------------------------------------- *)
+val local_type : memtype -> ty option
+val has_locals : memtype -> bool

@@ -61,6 +61,10 @@ val datatype_projectors :
   path * ty_params * ty_dtype -> (symbol * operator) list
 
 (* -------------------------------------------------------------------- *)
+val datatype_projectors :
+  path * ty_params * ty_dtype -> (symbol * operator) list
+
+(* -------------------------------------------------------------------- *)
 type case1 = {
   cs1_ctor : EcPath.path;
   cs1_vars : (EcIdent.t * EcTypes.ty) list;

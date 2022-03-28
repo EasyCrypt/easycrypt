@@ -90,10 +90,10 @@ module LowApply = struct
              && oeq (is_alpha_eq hyps) f1 f2
 
           | LD_mem m1, LD_mem m2 ->
-             oeq EcMemory.lmt_equal m1 m2
+             EcMemory.mt_equal m1 m2
 
-          | LD_modty (mt1, mr1), LD_modty (mt2, mr2) ->
-             (mt1 == mt2) && (mr1 == mr2)
+          | LD_modty mt1, LD_modty mt2 ->
+            mt1 == mt2
 
           | LD_hyp f1, LD_hyp f2 ->
              is_alpha_eq hyps f1 f2
@@ -142,6 +142,10 @@ module LowApply = struct
         let env = LDecl.toenv (hyps_of_ckenv tc) in
         (pt, EcEnv.Ax.instanciate p tys env)
 
+    | PTSchema (p, tys, mt, mps, es) ->
+      let env = LDecl.toenv (hyps_of_ckenv tc) in
+      (pt, EcEnv.Schema.instanciate p tys mt mps es env)
+
   (* ------------------------------------------------------------------ *)
   and check (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
     let hyps = hyps_of_ckenv tc in
@@ -157,7 +161,7 @@ module LowApply = struct
 
     and check_arg (sbt, ax) arg =
       let check_binder (x, xty) f =
-        let xty = Fsubst.gty_subst sbt xty in
+        let xty = Fsubst.subst_gty sbt xty in
 
         match xty, arg with
         | GTty xty, PAFormula arg ->
@@ -168,11 +172,19 @@ module LowApply = struct
         | GTmem _, PAMemory m ->
             (Fsubst.f_bind_mem sbt x m, f)
 
-        | GTmodty (emt, restr), PAModule (mp, mt) -> begin
+        | GTmodty emt, PAModule (mp, mt) -> begin
           (* FIXME: poor API ==> poor error recovery *)
           try
-            EcTyping.check_modtype_with_restrictions env mp mt emt restr;
+            let obl = EcTyping.check_modtype env mp mt emt in
             EcPV.check_module_in env mp emt;
+
+            let f = match obl with
+              | `Ok ->  f
+              | `ProofObligation obl ->
+                if mode = `Elim then f_imps obl f
+                else f_and (f_ands obl) f
+            in
+
             (Fsubst.f_bind_mod sbt x mp, f)
           with _ -> raise InvalidProofTerm
         end
@@ -452,7 +464,7 @@ end
 (* -------------------------------------------------------------------- *)
 let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
   let add_local hyps id sbt x gty =
-    let gty = Fsubst.gty_subst sbt gty in
+    let gty = Fsubst.subst_gty sbt gty in
     let id  = tg_map (function
       | Some id -> id
       | None    -> EcEnv.LDecl.fresh_id hyps (EcIdent.name x)) id
@@ -467,9 +479,9 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
     | GTmem me ->
         LowIntro.check_name_validity !!tc `Memory name;
         (id, LD_mem me, Fsubst.f_bind_mem sbt x (tg_val id))
-    | GTmodty (i, r) ->
+    | GTmodty i ->
         LowIntro.check_name_validity !!tc `Module name;
-        (id, LD_modty (i, r), Fsubst.f_bind_mod sbt x (EcPath.mident (tg_val id)))
+        (id, LD_modty i, Fsubst.f_bind_mod sbt x (EcPath.mident (tg_val id)))
   in
 
   let add_ld id ld hyps =
@@ -584,8 +596,19 @@ let tt_apply (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
   let tc, (pt, ax)  =
     RApi.to_pure (fun tc -> LowApply.check `Elim pt (`Tc (tc, None))) tc in
-  if not (EcReduction.is_conv hyps ax concl) then
+
+  if not (EcReduction.is_conv hyps ax concl) then begin
+    (*
+    let env = FApi.tc_env tc in
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    (* FIXME: add this to the exception *)
+    Format.eprintf "%a@.should be convertible to:@.%a@.but is not@."
+      (EcPrinting.pp_form ppe) ax
+      (EcPrinting.pp_form ppe) concl;
+    *)
     raise InvalidGoalShape;
+  end;
+
   FApi.close tc (VApply pt)
 
 (* -------------------------------------------------------------------- *)
@@ -771,12 +794,12 @@ let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =
         let args = PAMemory id :: args in
         (s, bds, args, cls)
 
-      | LD_modty (mt,r) ->
+      | LD_modty mt ->
         let x    = fresh id in
         let s    = Fsubst.f_bind_mod s id (EcPath.mident x) in
         let mp   = EcPath.mident id in
-        let sig_ = (fst (EcEnv.Mod.by_mpath mp env)).EcModules.me_sig in
-        let bds  = `Forall (x, GTmodty (mt, r)) :: bds in
+        let sig_ = EcEnv.NormMp.sig_of_mp env mp in
+        let bds  = `Forall (x, GTmodty mt) :: bds in
         let args = PAModule (mp, sig_) :: args in
         (s, bds, args, cls)
 
@@ -1742,7 +1765,7 @@ let gen_hyps post gG =
     | LD_var (_ty, Some body) -> f_let1 id body gG
     | LD_var (ty, None)       -> f_forall [id, GTty ty] gG
     | LD_mem mt               -> f_forall_mems [id, mt] gG
-    | LD_modty(mt,r)          -> f_forall [id, GTmodty(mt,r)] gG
+    | LD_modty mt             -> f_forall [id, GTmodty mt] gG
     | LD_hyp f                -> f_imp f gG
     | LD_abs_st _             -> raise InvalidGoalShape in
   List.fold_left do1 gG post
@@ -1823,7 +1846,7 @@ let t_subst_x ?kind ?(except = Sid.empty) ?(clear = SCall) ?var ?tside ?eqid (tc
         else `Pre  (id, lk)
 
     | LD_mem    _ -> `Pre (id, lk)
-    | LD_modty  _ -> `Pre (id, lk)
+    | LD_modty  _ -> `Pre (id, lk) (* TODO: subst cost *)
     | LD_abs_st _ -> `Pre (id, lk)
   in
 
@@ -2121,6 +2144,7 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
   in entry tc
 
 (* -------------------------------------------------------------------- *)
+
 let pp_tc tc =
   let pr = proofenv_of_proof (proof_of_tcenv tc) in
   let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in

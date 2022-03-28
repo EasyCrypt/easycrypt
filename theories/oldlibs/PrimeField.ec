@@ -7,6 +7,7 @@
  * -------------------------------------------------------------------- *)
 
 require Int IntDiv.
+require import Xint.
 
 
   (* prime fields GF(q) for q prime *)
@@ -185,6 +186,9 @@ theory FDistr.
   require import Real.
   (* distrinution *)
   op dt: t distr.
+  op cdt : {int | 0 <= cdt } as ge0_cdt.
+  schema cost_dt `{P}: cost [P: dt] = N cdt.
+  hint simplify cost_dt.
 
   axiom dt_fu: is_full dt.
 
@@ -197,5 +201,23 @@ theory FDistr.
 
   hint exact random : dt_fu dt_ll dt_funi.
 
+
 end FDistr.
 
+(* ------------------------------------------------------------------------- *)
+op cfeq  : int.
+op cfadd : int.
+op cfsub : int.
+op cfmul : int.
+op cfdiv : int.
+
+axiom ge0_cf : 0 <= cfeq /\ 0 <= cfadd /\ 0 <= cfsub /\ 0 <= cfmul /\ 0 <= cfdiv /\ 0 <= FDistr.cdt.
+
+schema cost_F0 `{P} : cost[P:F.zero] = '0.
+schema cost_feq `{P} {x y : t} : cost [P: x = y] = cost[P:x] + cost[P:y] + N cfeq.
+schema cost_fadd `{P} {x1 x2:t} : cost[P:x1 + x2] = cost[P:x1] + cost[P:x2] + N cfadd.
+schema cost_fsub `{P} {x y: t} : cost [P:x - y] = cost[P:x] + cost[P:y] + N cfsub.
+schema cost_fmul `{P} {x1 x2:t} : cost[P:x1 * x2] = cost[P:x1] + cost[P:x2] + N cfmul.
+schema cost_fdiv `{P} {x y: t} : cost [P:x / y] = cost[P:x] + cost[P:y] + N cfdiv.
+
+hint simplify cost_F0, cost_feq, cost_fadd, cost_fsub, cost_fmul, cost_fdiv.

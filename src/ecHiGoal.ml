@@ -129,6 +129,7 @@ let process_simplify_info ri (tc : tcenv1) =
     EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
     EcReduction.user    = ri.puser;
+    EcReduction.cost    = ri.pcost;
   }
 
 (*-------------------------------------------------------------------- *)
@@ -1848,6 +1849,16 @@ let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
   FApi.t_sub
     [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
     (t_cut ax tc)
+
+(* -------------------------------------------------------------------- *)
+type cutdef_sc_t = intropattern * pcutdef_schema
+
+let process_cutdef_sc ttenv (ip, inst) (tc : tcenv1) =
+  let pt,sc_i = PT.tc1_process_sc_instantiation tc inst in
+
+  FApi.t_sub
+    [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
+    (t_cut sc_i tc)
 
 (* -------------------------------------------------------------------- *)
 let process_left (tc : tcenv1) =

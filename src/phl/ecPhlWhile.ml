@@ -21,6 +21,7 @@ module TTC = EcProofTyping
 module EP  = EcParsetree
 module Mid = EcIdent.Mid
 
+
 (* -------------------------------------------------------------------- *)
 let while_info env e s =
   let rec i_info (w,r,c) i =
@@ -84,6 +85,63 @@ let t_hoare_while_r inv tc =
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
 
   FApi.xmutate1 tc `While [b_concl; concl]
+
+(* - [inv] is the loop invariant.
+   - [qdec] the strictly decreasing quantity at each iteration.
+   - [n] is the maximum number of iterations.
+   - [lam_cost] is the cost of one iteration (of the form [λ k. cost(k)]) *)
+let t_choare_while_r inv qdec n (lam_cost : cost) tc =
+  let env = FApi.tc1_env tc in
+
+  let chs = tc1_as_choareS tc in
+  let (expr_e, c), s = tc1_last_while tc chs.chs_s in
+  let m = EcMemory.memory chs.chs_m in
+  let e = form_of_expr m expr_e in
+
+  (* The [k]-th iteration preserves the invariant, and costs [lam_cost k]. *)
+  let k_id = EcIdent.create "z" in
+  let k = f_local k_id tint in
+  let qinc_eq_k = f_eq qdec k in
+  let k_lt_qinc = f_int_lt qdec k in
+  let c_pre  = f_and_simpl (f_and_simpl inv e) qinc_eq_k in
+  let c_post = f_and_simpl inv k_lt_qinc in
+  let c_cost = EcCHoare.cost_app lam_cost [k] in
+  let c_concl = f_cHoareS_r { chs with chs_pr = c_pre;
+                                       chs_s  = c;
+                                       chs_po = c_post;
+                                       chs_co  = c_cost; } in
+  let c_concl = f_forall_simpl [(k_id,GTty tint)] c_concl in
+
+  (* When the decreasing quantity is less than zero, the loop exists *)
+  let n_term = f_imp_simpl (f_and_simpl inv (f_int_le qdec f_i0)) (f_not e) in
+  let n_term = f_forall_mems [chs.chs_m] n_term in
+
+  (* We compute the final cost. Since we have at most [n] iterations, we have:
+     - at most [n+1] evaluations of the loop condition [e].
+     - at most [n] evaluations of the loop body. *)
+  let e_cost_self =
+    f_xmuli
+      (f_int_add_simpl n f_i1)
+      (EcCHoare.cost_of_expr inv chs.chs_m expr_e) in
+
+  let body_cost = EcCHoare.choare_sum lam_cost (f_i0, n) in
+  let cond, cost =
+    EcCHoare.cost_sub env
+      chs.chs_co
+      (EcCHoare.cost_add_self body_cost e_cost_self) in
+
+  (* The wp of the while. *)
+  let post = f_imps_simpl [f_not_simpl e; inv] chs.chs_po in
+  let modi = s_write env c in
+  let post = generalize_mod env m modi post in
+  let inv_bd_loop = f_and_simpl inv (f_int_le qdec n) in
+  let post = f_and_simpl inv_bd_loop post in
+  let concl = f_cHoareS_r { chs with chs_s  = s;
+                                     chs_po = post;
+                                     chs_co  = cost; } in
+
+  FApi.xmutate1 tc `While [c_concl; n_term; cond; concl]
+
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_while_r inv vrnt tc =
@@ -329,6 +387,7 @@ let t_equiv_while_r inv tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_while           = FApi.t_low1 "hoare-while"   t_hoare_while_r
+let t_choare_while          = FApi.t_low4 "choare-while"  t_choare_while_r
 let t_bdhoare_while         = FApi.t_low2 "bdhoare-while" t_bdhoare_while_r
 let t_bdhoare_while_rev_geq = FApi.t_low4 "bdhoare-while" t_bdhoare_while_rev_geq_r
 let t_bdhoare_while_rev     = FApi.t_low1 "bdhoare-while" t_bdhoare_while_rev_r
@@ -348,6 +407,23 @@ let process_while side winfos tc =
       | _    -> tc_error !!tc "invalid arguments"
     end
 
+  | FcHoareS _ -> begin
+      match vrnt, bds with
+      | Some vrnt, Some (`Cost (n, cost)) ->
+        t_choare_while
+          (TTC.tc1_process_Xhl_formula tc         phi)
+          (TTC.tc1_process_Xhl_form    tc tint    vrnt)
+          (TTC.tc1_process_Xhl_form    tc tint    n)
+          (TTC.tc1_process_cost        tc [tint]  cost)
+          tc
+
+      | _    -> tc_error !!tc "@[<v 2>invalid arguments, you must supply :@;\
+                               I (invariant),@ \
+                               c (increasing quantity),@ \
+                               n (loop bound),@ \
+                               cost (iteration cost)@]"
+    end
+
   | FbdHoareS _ -> begin
       match vrnt, bds with
       | Some vrnt, None ->
@@ -356,7 +432,7 @@ let process_while side winfos tc =
             (TTC.tc1_process_Xhl_form tc tint vrnt)
             tc
 
-      | Some vrnt, Some (k, eps) ->
+      | Some vrnt, Some (`Bd (k, eps)) ->
         t_bdhoare_while_rev_geq
           (TTC.tc1_process_Xhl_formula tc phi)
           (TTC.tc1_process_Xhl_form    tc tint vrnt)
@@ -367,7 +443,8 @@ let process_while side winfos tc =
       | None, None ->
           t_bdhoare_while_rev (TTC.tc1_process_Xhl_formula tc phi) tc
 
-      | None, Some _ -> tc_error !!tc "invalid arguments"
+      | Some _, Some (`Cost _) | None, Some _ ->
+        tc_error !!tc "invalid arguments"
   end
 
   | FequivS _ -> begin
@@ -425,7 +502,7 @@ module ASyncWhile = struct
              | None ->
                  let pfx = EcIdent.name m in
                  let pfx = String.sub pfx  1 (String.length pfx - 1) in
-                 let x   = EcPath.basename pv.pv_name.EcPath.x_sub in
+                 let x   = symbol_of_pv pv in
                  let x   = EcIdent.create (x ^ "_" ^ pfx) in
                  let bds = EcPV.PVMap.add pv (x, fp.f_ty) bds in
                  map := Mid.add m bds !map; x
@@ -433,8 +510,10 @@ module ASyncWhile = struct
 
            in e_local idx fp.f_ty
 
+      | Fcoe      _
       | Fglob     _
       | FhoareF   _ | FhoareS   _
+      | FcHoareF  _ | FcHoareS  _
       | FbdHoareF _ | FbdHoareS _
       | FequivF   _ | FequivS   _
       | FeagerF   _ | Fpr       _ -> raise CannotTranslate

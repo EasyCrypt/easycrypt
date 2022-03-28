@@ -36,9 +36,6 @@ module Frequency : sig
   val frequency : frequency -> all_rel -> int
   val f_ops : Sp.t -> form -> relevant
 
-  val add : frequency -> EcDecl.axiom -> unit
+  val add : frequency -> EcFol.form -> unit
 
 end
-
-
-

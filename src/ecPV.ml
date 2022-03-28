@@ -17,7 +17,7 @@ open EcEnv
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
- | AC_concrete_abstract of mpath * prog_var
+ | AC_concrete_abstract of mpath * xpath (* path to the global variable *)
  | AC_abstract_abstract of mpath * mpath
 
 exception AliasClash of env * alias_clash
@@ -60,18 +60,18 @@ end
 module Mpv = struct
   type ('a, 'b) t =
     { s_pv : 'a Mnpv.t;
-      s_gl : (EcEnv.use * 'b) Mm.t;  (* only abstract module *)
+      s_gl : (use use_restr * 'b) Mm.t;  (* only abstract module *)
     }
 
   let empty = { s_pv = Mnpv.empty; s_gl = Mm.empty }
 
   let check_npv_mp env npv mp restr =
-    if not (NormMp.use_mem_xp npv.pv_name restr) then
+    if not (NormMp.use_mem_xp npv restr) then
       raise (AliasClash (env,AC_concrete_abstract(mp,npv)))
 
   let check_npv env npv m =
     if is_glob npv then
-      let check1 mp (restr,_) =  check_npv_mp env npv mp restr in
+      let check1 mp (restr,_) =  check_npv_mp env (get_glob npv) mp restr in
       Mm.iter check1 m.s_gl
 
   let add env pv f m =
@@ -91,17 +91,17 @@ module Mpv = struct
         raise (AliasClash(env,AC_abstract_abstract(mp,mp')))
 
   let check_glob env mp m =
-    let restr = NormMp.get_restr env mp in
+    let restr = NormMp.get_restr_use env mp in
     let check npv _ =
       if is_glob npv then
-        check_npv_mp env npv mp restr in
+        check_npv_mp env (get_glob npv) mp restr in
     Mnpv.iter check m.s_pv;
     let check mp' (restr',_) = check_mp_mp env mp restr mp' restr' in
     Mm.iter check m.s_gl
 
   let add_glob env mp f m =
     check_glob env mp m;
-    { m with s_gl = Mm.add mp (NormMp.get_restr env mp, f) m.s_gl }
+    { m with s_gl = Mm.add mp (NormMp.get_restr_use env mp, f) m.s_gl }
 
   let find_glob env mp m =
     try snd (Mm.find mp m.s_gl)
@@ -188,11 +188,14 @@ module PVM = struct
         check_binding (fst es.es_ml) s;
         check_binding (fst es.es_mr) s;
         EcFol.f_map (fun ty -> ty) aux f
-      | FhoareF _ | FbdHoareF _ ->
+      | FhoareF _ | FcHoareF _ | FbdHoareF _ ->
         check_binding EcFol.mhr s;
         EcFol.f_map (fun ty -> ty) aux f
       | FhoareS hs ->
         check_binding (fst hs.hs_m) s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FcHoareS hs ->
+        check_binding (fst hs.chs_m) s;
         EcFol.f_map (fun ty -> ty) aux f
       | FbdHoareS hs ->
         check_binding (fst hs.bhs_m) s;
@@ -207,6 +210,14 @@ module PVM = struct
         f_quant q b f1
 
       | _ -> EcFol.f_map (fun ty -> ty) aux f)
+
+  let subst_cost env s c =
+    let cb_subst cb =
+      call_bound_r (subst env s cb.cb_cost) (subst env s cb.cb_called) in
+
+    let c_self  = subst env s c.c_self
+    and c_calls = Mx.map cb_subst c.c_calls in
+    cost_r c_self c_calls
 
   let subst1 env pv m f =
     let s = add env pv m f empty in
@@ -269,7 +280,7 @@ module PV = struct
 
   (* We assume that mp is an abstract functor *)
   let mem_glob env mp fv =
-    ignore (NormMp.get_restr env mp);
+    ignore (NormMp.get_restr_use env mp);
     Sm.mem mp fv.s_gl
 
   let union fv1 fv2 =
@@ -284,6 +295,13 @@ module PV = struct
     let xs, gs = elements fv in
     (List.ksort ~key:fst ~cmp:pv_ntr_compare xs,
      List.ksort ~key:identity ~cmp:m_ntr_compare gs)
+
+  let remove_aux b fv =
+    let do1 fv (id,gty) =
+      match gty with
+      | GTmodty _ -> { fv with s_gl = Sm.remove (EcPath.mident id) fv.s_gl }
+      | _ -> fv in
+    List.fold_left do1 fv b
 
   let fv env m f =
 
@@ -339,9 +357,16 @@ module PV = struct
       | FhoareS hs ->
           in_mem_scope env fv [fst hs.hs_m] [hs.hs_pr; hs.hs_po]
 
+      | FcHoareF chf ->
+          let fv = in_mem_scope env fv [mhr] [chf.chf_pr; chf.chf_po] in
+          fv_cost env fv chf.chf_co
+
+      | FcHoareS chs ->
+          let fv = in_mem_scope env fv [fst chs.chs_m] [chs.chs_pr; chs.chs_po] in
+          fv_cost env fv chs.chs_co
+
       | FbdHoareF bhf ->
           in_mem_scope env fv [mhr] [bhf.bhf_pr; bhf.bhf_po; bhf.bhf_bd]
-
 
       | FbdHoareS bhs ->
           in_mem_scope env fv
@@ -356,6 +381,11 @@ module PV = struct
       | FeagerF eg ->
           in_mem_scope env fv [mhr] [eg.eg_pr; eg.eg_po]
 
+      | Fcoe coe ->
+          let m = fst coe.coe_mem in
+          let e = form_of_expr m coe.coe_e in
+          in_mem_scope env fv [m; m] [coe.coe_pre; e]
+
       | Fpr pr ->
           let fv = aux env fv pr.pr_args in
           in_mem_scope env fv [pr.pr_mem] [pr.pr_event]
@@ -365,15 +395,21 @@ module PV = struct
       then fv
       else List.fold_left (aux env) fv fs
 
-    in
-    aux env empty f
+    and fv_cost env fv cost =
+      Mx.fold (fun _ cb fv ->
+          let fv = aux env fv cb.cb_cost in
+          aux env fv cb.cb_called)
+        cost.c_calls (aux env fv cost.c_self)
+
+    in aux env empty f
 
   let pp env fmt fv =
     let ppe = EcPrinting.PPEnv.ofenv env in
     let vs,gs = ntr_elements fv in
     let pp_vs fmt (pv,_) = EcPrinting.pp_pv ppe fmt pv in
     let pp_gl fmt mp =
-      Format.fprintf fmt "(glob %a)" (EcPrinting.pp_topmod ppe) mp in
+      Format.fprintf fmt "(glob %a)" (EcPrinting.pp_topmod ppe) mp
+    in
 
     begin
       if vs = [] || gs = [] then
@@ -388,19 +424,20 @@ module PV = struct
 
   let check_depend env fv mp =
     try
-      let restr = NormMp.get_restr env mp in
+      let restr = NormMp.get_restr_use env mp in
       let check_v v _ =
-        if is_loc v then begin
+        if is_glob v then
+          Mpv.check_npv_mp env (get_glob v) mp restr
+        else
           let ppe = EcPrinting.PPEnv.ofenv env in
           EcCoreGoal.tacuerror
             "only global variable can be used in inv, %a is local"
             (EcPrinting.pp_pv ppe) v
-        end;
-        Mpv.check_npv_mp env v mp restr in
+        in
       Mnpv.iter check_v fv.s_pv;
       let check_m mp' =
         if not (NormMp.use_mem_gl mp' restr) then
-          let restr' = NormMp.get_restr env mp' in
+          let restr' = NormMp.get_restr_use env mp' in
           if not (NormMp.use_mem_gl mp restr') then
             raise (AliasClash(env,AC_abstract_abstract(mp,mp')))
       in
@@ -416,17 +453,17 @@ module PV = struct
       Mnpv.mem pv fv2.s_pv ||
         (is_glob pv &&
            let check1 mp =
-             let restr = NormMp.get_restr env mp in
-             not (NormMp.use_mem_xp pv.pv_name restr) in
+             let restr = NormMp.get_restr_use env mp in
+             not (NormMp.use_mem_xp (get_glob pv) restr) in
            Sm.exists check1 fv2.s_gl) in
     let test_mp mp =
-      let restr = NormMp.get_restr env mp in
+      let restr = NormMp.get_restr_use env mp in
       let test_pv pv _ =
         is_glob pv &&
-          not (NormMp.use_mem_xp pv.pv_name restr) in
+          not (NormMp.use_mem_xp (get_glob pv) restr) in
       let test_mp mp' =
         not (NormMp.use_mem_gl mp' restr ||
-             NormMp.use_mem_gl mp (NormMp.get_restr env mp')) in
+             NormMp.use_mem_gl mp (NormMp.get_restr_use env mp')) in
       Mnpv.exists test_pv fv2.s_pv || Sm.exists test_mp fv2.s_gl in
 
     { s_pv = Mnpv.filter test_pv fv1.s_pv;
@@ -446,8 +483,8 @@ module PV = struct
         if is_glob pv then begin
           let pv = EcEnv.NormMp.norm_pvar env pv in
           let check1 mp =
-            let restr = NormMp.get_restr env mp in
-            Mpv.check_npv_mp env pv mp restr in
+            let restr = NormMp.get_restr_use env mp in
+            Mpv.check_npv_mp env (get_glob pv) mp restr in
           Sm.iter check1 fv.s_gl
         end;
         true
@@ -487,13 +524,13 @@ let rec f_write_r ?(except=Sx.empty) env w f =
       assert false
 
   | FBabs oi ->
-      let mp = get_abs_functor f in
-      List.fold_left folder (PV.add_glob env mp w) oi.oi_calls
+    let mp = get_abs_functor f in
+    List.fold_left folder (PV.add_glob env mp w) (OI.allowed oi)
 
   | FBdef fdef ->
       let add x w =
-        let vb = Var.by_xpath x env in
-        PV.add env (pv_glob x) vb.vb_type w in
+        let ty = Var.by_xpath x env in
+        PV.add env (pv_glob x) ty w in
       List.fold_left folder
         (EcPath.Sx.fold add fdef.f_uses.us_writes w )
         fdef.f_uses.us_calls
@@ -541,14 +578,14 @@ let rec f_read_r env r f =
       assert false
 
   | FBabs oi ->
-      let mp = get_abs_functor f in
-      let r = if oi.oi_in then (PV.add_glob env mp r) else r in
-      List.fold_left (f_read_r env) r oi.oi_calls
+    let mp = get_abs_functor f in
+    let r = if OI.is_in oi then (PV.add_glob env mp r) else r in
+    List.fold_left (f_read_r env) r (OI.allowed oi)
 
   | FBdef fdef ->
       let add x r =
-        let vb = Var.by_xpath x env in
-        PV.add env (pv_glob x) vb.vb_type r in
+        let ty = Var.by_xpath x env in
+        PV.add env (pv_glob x) ty r in
       let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
       List.fold_left (f_read_r env) r fdef.f_uses.us_calls
 
@@ -680,22 +717,20 @@ module Mpv2 = struct
     if Mnpv.mem pv mod_.PV.s_pv then true
     else
       if is_glob pv then
-        let x = pv.pv_name in
+        let x = get_glob pv in
         let check_mp mp =
-          let restr = NormMp.get_restr env mp in
-          not (EcPath.Mx.mem x restr.us_pv) in
+          let restr = NormMp.get_restr_use env mp in
+          not (NormMp.use_mem_xp x restr) in
         Sm.exists check_mp mod_.PV.s_gl
       else false
 
   let is_mod_mp env mp mod_ =
-    let id = EcPath.mget_ident mp in
-    let restr = NormMp.get_restr env mp in
+    let restr = NormMp.get_restr_use env mp in
     let check_v pv _ty =
-      let x = pv.pv_name in
-      not (EcPath.Mx.mem x restr.us_pv) in
+      not (is_glob pv) || not (NormMp.use_mem_xp (get_glob pv) restr) in
     let check_mp mp' =
-      not (Sid.mem (EcPath.mget_ident mp') restr.us_gl ||
-           Sid.mem id (NormMp.get_restr env mp').us_gl) in
+      not (NormMp.use_mem_gl mp' restr ||
+           NormMp.use_mem_gl mp (NormMp.get_restr_use env mp')) in
     Mnpv.exists check_v mod_.PV.s_pv ||
     Sm.exists check_mp mod_.PV.s_gl
 
@@ -1059,9 +1094,9 @@ and eqobs_inF_refl env f' eqo =
     let local = PV.local eqi in
     let params =
       match ffun.f_sig.fs_anames with
-      | None -> PV.add env (pv_arg f) ffun.f_sig.fs_arg PV.empty
+      | None -> PV.add env pv_arg ffun.f_sig.fs_arg PV.empty
       | Some lv ->
-        List.fold_left (fun fv v -> PV.add env (pv_loc f v.v_name) v.v_type fv)
+        List.fold_left (fun fv v -> PV.add env (pv_loc v.v_name) v.v_type fv)
           PV.empty lv in
     if PV.subset local params then PV.global eqi
     else
@@ -1074,10 +1109,10 @@ and eqobs_inF_refl env f' eqo =
     let do1 eqo o = PV.union (eqobs_inF_refl env o eqo) eqo in
     let top = EcPath.m_functor f.x_top in
     let rec aux eqo =
-      let eqi = List.fold_left do1 eqo oi.oi_calls in
+      let eqi = List.fold_left do1 eqo (OI.allowed oi) in
       if PV.subset eqi eqo then eqo
       else aux eqi in
-    if oi.oi_in then aux (PV.add_glob env top eqo)
+    if OI.is_in oi then aux (PV.add_glob env top eqo)
     else
       let eqi = aux (PV.remove_glob top eqo) in
       if PV.mem_glob env top eqi then begin
@@ -1094,17 +1129,21 @@ let check_module_in env mp mt =
   let global = PV.fv env mhr (NormMp.norm_glob env mhr mp) in
   let env = List.fold_left
     (fun env (id,mt) ->
-      Mod.bind_local id mt (Sx.empty,Sm.empty) env) env params in
+      Mod.bind_local id mt env) env params in
   let extra = List.map (fun (id,_) -> EcPath.mident id) params in
   let mp = EcPath.mpath mp.m_top (mp.m_args @ extra) in
   let check = function
-    | Tys_function(fs,oi) ->
-      let f = EcPath.xpath_fun mp fs.fs_name in
+    | Tys_function fs ->
+      let f = EcPath.xpath mp fs.fs_name in
       let eqi = eqobs_inF_refl env f global in
+
+      let oinfos = (NormMp.get_restr env mp).mr_oinfos in
+      let oi = EcSymbols.Msym.find fs.fs_name oinfos in
+
       (* We remove the paramater not take into account *)
       let eqi =
         List.fold_left (fun eqi mp -> PV.remove_glob mp eqi) eqi extra in
-      if not (oi.oi_in) && not (PV.is_empty eqi) then
+      if not (OI.is_in oi) && not (PV.is_empty eqi) then
         let ppe = EcPrinting.PPEnv.ofenv env in
         EcCoreGoal.tacuerror "The function %a should initialize %a"
           (EcPrinting.pp_funname ppe) f (PV.pp env) eqi in

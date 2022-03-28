@@ -588,7 +588,7 @@ by rewrite (ctxt1mem_foldenc _ _ _ _ _ _ H).
 qed.
 
 lemma hop1false &m 
-    (A <: MRPKE_Adv {MRPKE_lor, Adv1_Procs, ODH_Orcl}):
+    (A <: MRPKE_Adv {-MRPKE_lor, -Adv1_Procs, -ODH_Orcl}):
        Pr [MRPKE_Sec(A).main() @ &m : res ] = 
        Pr [ODH_Sec(Adv1(A)).game(false) @ &m : !res].
 proof.
@@ -787,7 +787,7 @@ module MRPKErnd_Sec (A:MRPKE_Adv) = {
 }.
 
 lemma hop1true &m 
-    (A <: MRPKE_Adv {MRPKErnd_lor, Adv1_Procs, ODH_Orcl}):
+    (A <: MRPKE_Adv {-MRPKErnd_lor, -Adv1_Procs, -ODH_Orcl}):
        Pr [MRPKErnd_Sec(A).main() @ &m : res ] = 
        Pr [ODH_Sec(Adv1(A)).game(true) @ &m : res].
 proof.
@@ -991,7 +991,7 @@ apply eq_in_map => y /mem_iota [? ?] /#.
 qed.
 
 lemma hop2 &m 
-    (A <: MRPKE_Adv { Adv2_Procs, MRPKErnd_lor, AEADmul_Oracles }):
+    (A <: MRPKE_Adv { -Adv2_Procs, -MRPKErnd_lor, -AEADmul_Oracles }):
        Pr [MRPKErnd_Sec(A).main() @ &m : res ] = 
        Pr [AEADmul_Sec(Adv2(A)).main() @ &m : res].
 proof. 
@@ -1261,7 +1261,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
 qed.
 
 lemma reduction &m 
-  (A <: MRPKE_Adv {  Adv2_Procs, Adv1_Procs, ODH_Orcl, MRPKE_lor, AEADmul_Oracles, MRPKErnd_lor }):
+  (A <: MRPKE_Adv {  -Adv2_Procs, -Adv1_Procs, -ODH_Orcl, -MRPKE_lor, -AEADmul_Oracles, -MRPKErnd_lor }):
      Pr [MRPKE_Sec(A).main() @ &m : res ] <= 
      `| Pr[ODH_Sec(Adv1(A)).game(false) @ &m : !res] - 
         Pr[ODH_Sec(Adv1(A)).game(true) @ &m : res] | +

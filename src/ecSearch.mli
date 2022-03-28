@@ -21,5 +21,9 @@ type search = [
   | `ByOr      of search list
 ]
 
-val search : EcEnv.env -> search list -> (path * EcDecl.axiom) list
-val sort : Sp.t -> (path * EcDecl.axiom) list -> (path * EcDecl.axiom) list
+type search_result =
+  (path * [`Axiom of EcDecl.axiom | `Schema of EcDecl.ax_schema]) list
+
+val search : EcEnv.env -> search list -> search_result
+
+val sort : Sp.t -> search_result -> search_result

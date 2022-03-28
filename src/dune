@@ -15,4 +15,4 @@
 
 (menhir
  (modules ecParser)
- (flags --table))
+ (flags --table --explain))

@@ -140,9 +140,9 @@ theory MtE.
     }.
 
     section RCPA.
-      declare module E <: SKEa.Enc_Scheme { RCPA_Wrap, SKEa.RCPA.RCPA_Wrap, RCPAa }.
-      declare module M <: MACa.MAC_Scheme { RCPA_Wrap, SKEa.RCPA.RCPA_Wrap, RCPAa, E }.
-      declare module A <: RCPA_Adversary  { RCPA_Wrap, SKEa.RCPA.RCPA_Wrap, RCPAa, E, M }.
+      declare module E <: SKEa.Enc_Scheme { -RCPA_Wrap, -SKEa.RCPA.RCPA_Wrap, -RCPAa }.
+      declare module M <: MACa.MAC_Scheme { -RCPA_Wrap, -SKEa.RCPA.RCPA_Wrap, -RCPAa, -E }.
+      declare module A <: RCPA_Adversary  { -RCPA_Wrap, -SKEa.RCPA.RCPA_Wrap, -RCPAa, -E, -M }.
 
       lemma RCPA_prob &m:
         Pr[INDR_CPA(MacThenEncrypt(E,M),A).main() @ &m: res]
@@ -162,9 +162,9 @@ theory MtE.
     end section RCPA.
 
     (* Adv^{IND$-CPA}_{MacThenEncrypt(E,M)}(A) = Adv^{IND$-CPA}_{E}(RCPAa(A)) *)
-    lemma RCPA_preservation (E <: SKEa.Enc_Scheme { RCPA_Wrap, SKEa.RCPA.RCPA_Wrap, RCPAa })
-                            (M <: MACa.MAC_Scheme { RCPA_Wrap, SKEa.RCPA.RCPA_Wrap, RCPAa, E })
-                            (A <: RCPA_Adversary  { RCPA_Wrap, SKEa.RCPA.RCPA_Wrap, RCPAa, E, M })
+    lemma RCPA_preservation (E <: SKEa.Enc_Scheme { -RCPA_Wrap, -SKEa.RCPA.RCPA_Wrap, -RCPAa })
+                            (M <: MACa.MAC_Scheme { -RCPA_Wrap, -SKEa.RCPA.RCPA_Wrap, -RCPAa, -E })
+                            (A <: RCPA_Adversary  { -RCPA_Wrap, -SKEa.RCPA.RCPA_Wrap, -RCPAa, -E, -M })
                             &m:
       islossless M.keygen =>
       islossless M.tag    =>
@@ -221,9 +221,9 @@ theory MtE.
     }.
 
     section PTXT.
-      declare module E <: SKEa.Enc_Scheme { PTXT_Wrap, MACa.WUF_CMA.WUF_Wrap, CMAa }.
-      declare module M <: MACa.MAC_Scheme { PTXT_Wrap, MACa.WUF_CMA.WUF_Wrap, CMAa, E }.
-      declare module A <: PTXT_Adversary  { PTXT_Wrap, MACa.WUF_CMA.WUF_Wrap, CMAa, E, M }.
+      declare module E <: SKEa.Enc_Scheme { -PTXT_Wrap, -MACa.WUF_CMA.WUF_Wrap, -CMAa }.
+      declare module M <: MACa.MAC_Scheme { -PTXT_Wrap, -MACa.WUF_CMA.WUF_Wrap, -CMAa, -E }.
+      declare module A <: PTXT_Adversary  { -PTXT_Wrap, -MACa.WUF_CMA.WUF_Wrap, -CMAa, -E, -M }.
 
       (* Equivalence up to failure requires termination of oracles and adversaries *)
       declare axiom E_keygen_ll: islossless E.keygen.
@@ -234,7 +234,7 @@ theory MtE.
       declare axiom M_tag_ll   : islossless M.tag.
       declare axiom M_verify_ll: islossless M.verify.
 
-      declare axiom A_forge_ll (O <: PTXT_Oracles { A }):
+      declare axiom A_forge_ll (O <: PTXT_Oracles { -A }):
         islossless O.enc => islossless O.verify => islossless A(O).forge.
 
       (* Adv^{INT-PTXT}_{MacThenEncrypt(E,M)}(A) <= Adv^{WUF-CMA}_{M}(CMAa(E,A)) *)
@@ -434,9 +434,9 @@ theory EtM.
     }.
 
     section RCPA.
-      declare module E <: SKEa.Enc_Scheme { RCPA_Wrap, SKEa.RCPA.RCPA_Wrap, RCPAa }.
-      declare module M <: MACa.MAC_Scheme { RCPA_Wrap, SKEa.RCPA.RCPA_Wrap, RCPAa, E }.
-      declare module A <: RCPA_Adversary  { RCPA_Wrap, SKEa.RCPA.RCPA_Wrap, RCPAa, E, M }.
+      declare module E <: SKEa.Enc_Scheme { -RCPA_Wrap, -SKEa.RCPA.RCPA_Wrap, -RCPAa }.
+      declare module M <: MACa.MAC_Scheme { -RCPA_Wrap, -SKEa.RCPA.RCPA_Wrap, -RCPAa, -E }.
+      declare module A <: RCPA_Adversary  { -RCPA_Wrap, -SKEa.RCPA.RCPA_Wrap, -RCPAa, -E, -M }.
 
       local lemma RCPA_prob &m:
         Pr[INDR_CPA(EtM(E,M),A).main() @ &m: res]
@@ -496,9 +496,9 @@ theory EtM.
     }.
 
     section CTXT.
-      declare module E <: SKEa.Enc_Scheme { CTXT_Wrap, MACa.SUF_CMA.SUF_Wrap, CMAa }.
-      declare module M <: MACa.MAC_Scheme { CTXT_Wrap, MACa.SUF_CMA.SUF_Wrap, CMAa, E }.
-      declare module A <: CTXT_Adversary  { CTXT_Wrap, MACa.SUF_CMA.SUF_Wrap, CMAa, E, M }.
+      declare module E <: SKEa.Enc_Scheme { -CTXT_Wrap, -MACa.SUF_CMA.SUF_Wrap, -CMAa }.
+      declare module M <:MACa.MAC_Scheme { -CTXT_Wrap, -MACa.SUF_CMA.SUF_Wrap, -CMAa, -E }.
+      declare module A <: CTXT_Adversary  { -CTXT_Wrap, -MACa.SUF_CMA.SUF_Wrap, -CMAa, -E, -M }.
 
       (* Equivalence up to failure requires termination of oracles and adversaries *)
       declare axiom E_keygen_ll: islossless E.keygen.
@@ -509,7 +509,7 @@ theory EtM.
       declare axiom M_tag_ll   : islossless M.tag.
       declare axiom M_verify_ll: islossless M.verify.
 
-      declare axiom A_forge_ll (O <: CTXT_Oracles { A }):
+      declare axiom A_forge_ll (O <: CTXT_Oracles { -A }):
         islossless O.enc => islossless O.verify => islossless A(O).forge.
 
       (* In addition, this result requires that the encryption scheme is correct,
