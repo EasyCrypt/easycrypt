@@ -137,6 +137,8 @@ let tglob m      = mk_ty (Tglob m)
 let tunit      = tconstr EcCoreLib.CI_Unit .p_unit    []
 let tbool      = tconstr EcCoreLib.CI_Bool .p_bool    []
 let tint       = tconstr EcCoreLib.CI_Int  .p_int     []
+let txint      = tconstr EcCoreLib.CI_xint .p_xint    []
+
 let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr   [ty]
 let toption ty = tconstr EcCoreLib.CI_Option.p_option [ty]
 let treal      = tconstr EcCoreLib.CI_Real .p_real    []
@@ -365,64 +367,99 @@ module Tvar = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type variable = {
+  v_name : EcSymbols.symbol;   (* can be "_" *)
+  v_type : ty;
+}
+
+let v_name { v_name = x } = x
+let v_type { v_type = x } = x
+
+let v_hash v =
+  Why3.Hashcons.combine
+    (Hashtbl.hash v.v_name)
+    (ty_hash v.v_type)
+
+let v_equal vd1 vd2 =
+  vd1.v_name = vd2.v_name &&
+  ty_equal vd1.v_type vd2.v_type
+
 let ty_fv_and_tvar (ty : ty) =
   EcIdent.fv_union ty.ty_fv (Mid.map (fun () -> 1) (Tvar.fv ty))
 
 (* -------------------------------------------------------------------- *)
 type pvar_kind =
-  | PVglob
-  | PVloc
+  | PVKglob
+  | PVKloc
 
-type prog_var = {
-  pv_name : EcPath.xpath;
-  pv_kind : pvar_kind;
-}
+type prog_var =
+  | PVglob of EcPath.xpath
+  | PVloc of EcSymbols.symbol
 
-let pv_equal v1 v2 =
-  EcPath.x_equal v1.pv_name v2.pv_name && v1.pv_kind = v2.pv_kind
+let pv_equal v1 v2 = match v1, v2 with
+  | PVglob x1, PVglob x2 ->
+    EcPath.x_equal x1 x2
+  | PVloc i1, PVloc i2 -> EcSymbols.sym_equal i1 i2
+  | PVloc _, PVglob _ | PVglob _, PVloc _ -> false
+
+let pv_kind = function
+  | PVglob _ -> PVKglob
+  | PVloc _ -> PVKloc
 
 let pv_hash v =
-  Why3.Hashcons.combine (EcPath.x_hash v.pv_name)
-    (if v.pv_kind = PVglob then 1 else 0)
+  let h = match v with
+    | PVglob x -> EcPath.x_hash x
+    | PVloc i -> Hashtbl.hash i in
+
+  Why3.Hashcons.combine
+    h (if pv_kind v = PVKglob then 1 else 0)
 
 let pv_compare v1 v2 =
-  match EcPath.x_compare v1.pv_name v2.pv_name with
-  | 0 -> Stdlib.compare v1.pv_kind v2.pv_kind
-  | r -> r
+  match v1, v2 with
+  | PVloc i1,  PVloc i2  -> EcSymbols.sym_compare i1 i2
+  | PVglob x1, PVglob x2 -> EcPath.x_compare x1 x2
+  | _, _ -> Stdlib.compare (pv_kind v1) (pv_kind v2)
 
 let pv_compare_p v1 v2 =
-  match EcPath.x_compare_na v1.pv_name v2.pv_name with
-  | 0 -> Stdlib.compare v1.pv_kind v2.pv_kind
-  | r -> r
+  match v1, v2 with
+  | PVloc i1,  PVloc i2  -> EcSymbols.sym_compare i1 i2
+  | PVglob x1, PVglob x2 -> EcPath.x_compare_na x1 x2
+  | _, _ -> Stdlib.compare (pv_kind v1) (pv_kind v2)
 
 let pv_ntr_compare v1 v2 =
-  match Stdlib.compare v1.pv_kind v2.pv_kind with
-  | 0 -> EcPath.x_ntr_compare v1.pv_name v2.pv_name
-  | r -> r
+  match v1, v2 with
+  | PVloc i1,  PVloc i2  -> EcSymbols.sym_compare i1 i2
+  | PVglob x1, PVglob x2 -> EcPath.x_ntr_compare x1 x2
+  | _, _ -> Stdlib.compare (pv_kind v1) (pv_kind v2)
 
-let is_loc  v = match v.pv_kind with PVloc  -> true | _ -> false
-let is_glob v = match v.pv_kind with PVglob -> true | _ -> false
+let is_loc  = function PVloc _ -> true  | PVglob _ -> false
+let is_glob = function PVloc _ -> false | PVglob _ -> true
 
-let symbol_of_pv pv =
-  EcPath.basename pv.pv_name.EcPath.x_sub
+let get_loc = function PVloc id -> id | PVglob _ -> assert false
+let get_glob = function PVloc _ -> assert false | PVglob xp -> xp
+
+let symbol_of_pv = function
+  | PVglob x -> x.EcPath.x_sub
+  | PVloc id -> id
 
 let string_of_pvar_kind = function
-  | PVglob -> "PVglob"
-  | PVloc  -> "PVloc"
+  | PVKglob -> "PVKglob"
+  | PVKloc  -> "PVKloc"
 
 let string_of_pvar (p : prog_var) =
+  let sp = match p with
+    | PVglob x -> EcPath.x_tostring x
+    | PVloc id -> id in
+
   Printf.sprintf "%s[%s]"
-    (EcPath.x_tostring p.pv_name)
-    (string_of_pvar_kind p.pv_kind)
+    sp (string_of_pvar_kind (pv_kind p))
 
-(* Notice: global variables are never suspended, local are since they
- * contain the path of the function. *)
+let pv_loc id = PVloc id
 
-let pv_loc f s =
-  { pv_name = EcPath.xqname f s; pv_kind = PVloc }
-
-let pv_arg (f : EcPath.xpath) = pv_loc f "arg"
-let pv_res (f : EcPath.xpath) = pv_loc f "res"
+let arg_symbol = "arg"
+let res_symbol = "res"
+let pv_arg = PVloc arg_symbol
+let pv_res =  PVloc res_symbol
 
 let xp_glob x =
   let top = x.EcPath.x_top in
@@ -431,17 +468,13 @@ let xp_glob x =
     let ntop = EcPath.mpath top.m_top [] in
     EcPath.xpath ntop x.EcPath.x_sub
 
-let pv_glob x =
-  { pv_name = xp_glob x; pv_kind = PVglob }
+let pv_glob x = PVglob (xp_glob x)
 
-let pv x k =
-  match k with
-  | PVglob -> pv_glob x
-  | PVloc  -> { pv_name = x; pv_kind = k }
-
-let pv_subst m_subst px =
-  let mp' = m_subst px.pv_name in
-  if px.pv_name == mp' then px else pv mp' px.pv_kind
+let pv_subst m_subst px = match px with
+  | PVglob x ->
+    let mp' = m_subst x in
+    if x == mp' then px else pv_glob mp'
+  | PVloc _ -> px
 
 (* -------------------------------------------------------------------- *)
 type lpattern =
@@ -529,7 +562,9 @@ let lp_fv = function
         (fun s (id, _) -> ofold Sid.add s id)
         Sid.empty ids
 
-let pv_fv pv = EcPath.x_fv Mid.empty pv.pv_name
+let pv_fv = function
+  | PVglob x -> EcPath.x_fv Mid.empty x
+  | PVloc _ -> Mid.empty
 
 let fv_node e =
   let union ex =
@@ -977,7 +1012,8 @@ let rec e_subst (s: e_subst) e =
       match Mid.find_opt id s.es_loc with
       | Some e' -> e'
       | None    ->
-        assert (not s.es_freshen);
+(* FIXME schema *)
+(*        assert (not s.es_freshen); *)
         ExprSmart.e_local (e, (id, e.e_ty)) (id, s.es_ty e.e_ty)
   end
 
@@ -1099,6 +1135,10 @@ let destr_tuple_var e =
    match e.e_node with
   | Etuple es -> List.map destr_var es
   | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let destr_app = function
+    { e_node = Eapp (e, es) } -> (e, es) | e -> (e, [])
 
 (* -------------------------------------------------------------------- *)
 let split_args e =

@@ -551,8 +551,8 @@ abstract theory OpCC.
 
   section PROOFS.
   
-    declare module I <: Init { OCC }.
-    declare module A <: Adv { OCC, I}.
+    declare module I <: Init { -OCC }.
+    declare module A <: Adv { -OCC, -I}.
    
     phoare chacha_spec k0 n0 p0 gs0 : 
       [ChaCha(OCC(I)).enc : 
@@ -1016,11 +1016,11 @@ module G9 (A:CCA_Adv, RO1:SplitC1.I1.RO) = {
 
 section PROOFS.
 
-  declare module A <: CCA_Adv { RO, FRO, OpCCinit.OCC, OpCCRO.OCC, IndBlock, Mem, StLSke,
-                               Split0.IdealAll.RO, ROT.RO, ROF.RO, SplitC1.I1.RO, SplitC1.I2.RO,
-                               Split1.IdealAll.RO, SplitC2.I1.RO, SplitC2.I2.RO }.
+  declare module A <: CCA_Adv { -RO, -FRO, -OpCCinit.OCC, -OpCCRO.OCC, -IndBlock, -Mem, -StLSke,
+                               -Split0.IdealAll.RO, -ROT.RO, -ROF.RO, -SplitC1.I1.RO, -SplitC1.I2.RO,
+                               -Split1.IdealAll.RO, -SplitC2.I1.RO, -SplitC2.I2.RO }.
 
-  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{-A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   local module G1 (S:SKE) = CCA_game(A, RealOrcls(S)).
 
@@ -1355,9 +1355,9 @@ module EncRnd = {
 }.
 
 section PROOFS.
-  declare module A <: CCA_Adv { BNR, Mem, IndBlock, RO, FRO}.
+  declare module A <: CCA_Adv { -BNR, -Mem, -IndBlock, -RO, -FRO}.
 
-  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{-A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   local clone import Step1_2 as Step1_2'.
 
@@ -1676,13 +1676,15 @@ section PROOFS.
       + move=> &2 _; islossless.
         while true (size p).
         + move=> z; wp; conseq (_: true) => />; 2: by islossless.
+          move => &hr; elim (p{hr}) => //.
           smt (size_drop size_eq0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0).         
       + move=> _; proc; inline *; sp; if => //.
         swap 13 9; wp; conseq (_: true) => />; 1: smt(); islossless.
         while true (size p2).
         + move=> z; wp; conseq (_: true) => //=; 2: by islossless.
-          move=> &h.
+          move => &hr; elim (p2{hr}) => //. 
+          clear &hr.
           smt (size_drop size_eq0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0 dpoly_out_ll). 
       + by proc; inline *; sp 1 1; if; auto => /> *; smt(get_setE mem_set).
@@ -2463,8 +2465,10 @@ section PROOFS.
     - by conseq(:_==> true)=> />; while(true); auto.
     rcondf{2} 5; 1: auto=> />.
     - by conseq(:_==> true)=> />; while(true); auto.
-    wp -7 -7=> />; 1: smt(get_setE).
+    wp -7 -7=> />.
+    move => />; smt (get_setE).
     conseq(:_==> ={c1, t, RO.m, Mem.log, t, c1}); 2:(sim=> /#).
+    move => />.
     smt(get_setE leq_make_lbad1 make_lbad1_size_cons3 size_ge0).
   inline*; sp.
   rcondt{1} 5; 1: auto=> />.

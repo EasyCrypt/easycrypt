@@ -55,7 +55,7 @@ clone MkRO as ROT.
 clone MkRO as ROF.
 
 section PROOFS.
-  declare module D <: RO_Distinguisher { RO, ROT.RO, ROF.RO }.
+  declare module D <: RO_Distinguisher { -RO, -ROT.RO, -ROF.RO }.
 
   equiv RO_split: 
     MainD(D,RO).distinguish ~ MainD(D,RO_DOM(ROT.RO,ROF.RO)).distinguish : 
@@ -142,7 +142,7 @@ module RO_Pair (RO1 : I1.RO) (RO2 : I2.RO) : RO = {
 
 section PROOFS.
 
-  declare module D <: RO_Distinguisher { RO, I1.RO, I2.RO }.
+  declare module D <: RO_Distinguisher { -RO, -I1.RO, -I2.RO }.
 
   local clone import ProdSampling with
     type t1 <- to1,
@@ -161,8 +161,10 @@ section PROOFS.
     swap{2} 5 -3; swap{2} 6 -2; sp 0 2.
     seq 1 2 : (#pre /\ r{1} = ofpair (r{2}, r0{2})).
     + conseq />.
-      transitivity*{2} { (r,r0) <@ S.sample2(sampleto1 x0, sampleto2 x1); } => //; 1: smt().
-      + transitivity*{2} { (r,r0) <@ S.sample(sampleto1 x0, sampleto2 x1); } => //; 1: smt().
+      transitivity*{2} { (r,r0) <@ S.sample2(sampleto1 x0, sampleto2 x1); } => //.
+      move => />; smt().
+      + transitivity*{2} { (r,r0) <@ S.sample(sampleto1 x0, sampleto2 x1); } => //.
+        move => />; smt(). 
         + inline *; wp; rnd topair ofpair; auto => /> &2 ?; split.
           + by move=> ??; rewrite ofpairK. 
           move=> _; split.
@@ -172,7 +174,7 @@ section PROOFS.
           by rewrite topairK ofpairK => ->.
         by call sample_sample2; auto.
       by inline *; auto => />.
-    by auto; smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE).
+    by auto => />; smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE).
   qed.
 
   equiv RO_split: 

@@ -19,7 +19,13 @@ clone include Distr.MFinite with
   op Support.card <- 2
   rename "dunifinE" as "dboolE_count"
   rename "dunifin" as "dbool"
+  rename "cunifin" as "cdbool"
 proof Support.enum_spec by case.
+
+op cdbool : { int | 0 <= cdbool } as ge0_cdbool.
+
+schema cost_dbool `{P} : cost [P: dbool] = N cdbool.
+hint simplify cost_dbool.
 
 lemma dboolE (E : bool -> bool):
   mu dbool E =   (if E true  then 1%r/2%r else 0%r)

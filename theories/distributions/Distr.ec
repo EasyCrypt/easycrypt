@@ -1547,7 +1547,7 @@ lemma dmap_dprod ['a1 'a2 'b1 'b2]
   = dmap (d1 `*` d2) (fun xy : _ * _ => (f1 xy.`1, f2 xy.`2)).
 proof.
 apply/eq_distr=> -[b1 b2]; rewrite !dprod1E !dmap1E /(\o) /=.
-by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1.
+by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1 /=; rewrite andaE.
 qed.
 
 lemma dprod_partition
@@ -1652,7 +1652,7 @@ elim: ds xs => [|d ds ih] xs /=; 1: rewrite djoin_nil dunitE.
 rewrite djoin_cons /= dmap1E /(\o) /=; case: xs => [|x xs] /=.
 + by rewrite add1z_neq0 1:size_ge0 /= mu0_false.
 rewrite -(@mu_eq _ (pred1 (x, xs))).
-+ by case=> y ys @/pred1 /=.
++ by case=> y ys @/pred1 /=; rewrite andaE.
 rewrite dprod1E ih BRM.big_cons /predT /=; pose B := BRM.big _ _ _.
 by rewrite (@fun_if (( * ) (mu1 d x))) /= /#.
 qed.

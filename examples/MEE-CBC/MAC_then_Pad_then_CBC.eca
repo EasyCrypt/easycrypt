@@ -256,8 +256,8 @@ module Weak_PRPa (M : MAC_Scheme, A : RCPA_Adversary, P : PRP_Oracles) = {
 }.
 
 section RCPA.
-  declare module A <: RCPA_Adversary { PRPi, PRP, RCPA_Wrap, RCPA_QueryBounder, Weak_PRPa }.
-  declare axiom A_distinguish_ll (O <: RCPA_Oracles { A }):
+  declare module A <: RCPA_Adversary { -PRPi, -PRP, -RCPA_Wrap, -RCPA_QueryBounder, -Weak_PRPa }.
+  declare axiom A_distinguish_ll (O <: RCPA_Oracles { -A }):
     islossless O.enc => islossless A(O).distinguish.
 
   local clone import CBC as CBCa with
@@ -367,7 +367,7 @@ section RCPA.
        defines its own QueryCounter and QueryBounder and to make sure that
        abstract security results come in both bounded and unbounded (when
        possible) flavours. This is TODO when we rework the crypto libraries    *)
-    have PushQueryBounder: forall (O <: CBCa.SKEa.RCPA.RCPA_Oracles { A, RCPA_QueryBounder, OracleBounder, RCPA_WUF_RCPA.RCPAa }),
+    have PushQueryBounder: forall (O <: CBCa.SKEa.RCPA.RCPA_Oracles { -A, -RCPA_QueryBounder, -OracleBounder, -RCPA_WUF_RCPA.RCPAa }),
       equiv [QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)),O).distinguish
              ~ RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)),O).distinguish
              : ={arg, glob A, glob O} ==> ={res}].
@@ -449,7 +449,7 @@ section RCPA.
     done.
   qed.
 
-  local lemma CleanupAdversary (P <: PRP { A, Weak_PRPa, OracleBounder, RCPA_WUF_RCPA.RCPAa }) &m:
+  local lemma CleanupAdversary (P <: PRP { -A, -Weak_PRPa, -OracleBounder, -RCPA_WUF_RCPA.RCPAa }) &m:
     Pr[IND(P,Weak_PRPa(MAC,A)).main() @ &m: res]
     = Pr[IND(P, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res].
   proof.
@@ -536,8 +536,8 @@ module CMAa (P : PseudoRP) (A : PTXT_Adversary) (M : CMA_Oracles) = {
 }.
 
 section PTXT.
-  declare module A <: PTXT_Adversary { WUF_Wrap, PTXT_Wrap, CMAa }.
-  declare axiom A_forge_ll (O <: PTXT_Oracles { A }):
+  declare module A <: PTXT_Adversary { -WUF_Wrap, -PTXT_Wrap, -CMAa }.
+  declare axiom A_forge_ll (O <: PTXT_Oracles { -A }):
     islossless O.enc => islossless O.verify => islossless A(O).forge.
 
   (** TODO: this is not useful apart from avoiding having to define

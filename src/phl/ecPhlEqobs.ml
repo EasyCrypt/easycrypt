@@ -21,18 +21,18 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let extend_body f fsig body =
-  let arg = pv_arg f in
+let extend_body fsig body =
+  let arg = pv_arg in
   let i =
     match fsig.fs_anames with
     | None | Some [] -> []
 
     | Some [v] ->
-        [i_asgn (LvVar (pv_loc f v.v_name, v.v_type),
+        [i_asgn (LvVar (pv_loc v.v_name, v.v_type),
                  e_var arg fsig.fs_arg)]
 
     | Some lv ->
-        let lv = List.map (fun v -> pv_loc f v.v_name, v.v_type) lv in
+        let lv = List.map (fun v -> pv_loc v.v_name, v.v_type) lv in
         [i_asgn (LvTuple lv, e_var arg fsig.fs_arg)]
 
   in
@@ -282,7 +282,7 @@ and f_eqobs_in fl fr sim eqO =
             let sim, eqi =
               List.fold_left2
                 (fun (sim,eqo) o_l o_r -> f_eqobs_in o_l o_r sim eqo)
-                (sim,eqo) oil.oi_calls oir.oi_calls in
+                (sim,eqo) (OI.allowed oil) (OI.allowed oir) in
             if Mpv2.subset eqi eqo then sim, eqo
             else aux (Mpv2.union eqi eqo) in
           aux eqo in
@@ -295,7 +295,7 @@ and f_eqobs_in fl fr sim eqO =
             PV.check_depend env fvr topr
           with TcError _ -> raise EqObsInError
         end;
-        let eqi = if oil.oi_in then Mpv2.add_glob env top top eqi else eqi in
+        let eqi = if OI.is_in oil then Mpv2.add_glob env top top eqi else eqi in
         sim, eqi
 
       | FBdef funl, FBdef funr ->
@@ -312,8 +312,8 @@ and f_eqobs_in fl fr sim eqO =
           | Some el, Some er -> add_eqs sim Mpv2.empty_local outf el er
           | _, _ -> raise EqObsInError in
 
-        let argl, bodyl = extend_body nfl sigl funl.f_body in
-        let argr, bodyr = extend_body nfr sigr funr.f_body in
+        let argl, bodyl = extend_body sigl funl.f_body in
+        let argr, bodyr = extend_body sigr funr.f_body in
         let sim, eqi    = s_eqobs_in_full bodyl bodyr sim local eqo' in
 
         let eqi = Mpv2.remove sim.sim_env argl argr eqi in
@@ -335,9 +335,9 @@ let mk_inv_spec2 env inv (fl, fr, eqi, eqo) =
   if not testty then raise EqObsInError;
   let eq_params =
     f_eqparams
-      fl sigl.fs_arg sigl.fs_anames mleft
-      fr sigr.fs_arg sigr.fs_anames mright in
-  let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
+      sigl.fs_arg sigl.fs_anames mleft
+      sigr.fs_arg sigr.fs_anames mright in
+  let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
   let pre = f_and eq_params (Mpv2.to_form mleft mright eqi inv) in
   let post = f_and eq_res (Mpv2.to_form mleft mright eqo inv) in
   f_equivF pre fl fr post
@@ -469,7 +469,7 @@ let process_eqobs_inF info tc =
     | None ->
       try Mpv2.needed_eq env mleft mright ef.ef_po
       with _ -> tc_error !!tc "cannot infer the set of equalities" in
-  let eqo = Mpv2.remove env (pv_res fl) (pv_res fr) eqo in
+  let eqo = Mpv2.remove env pv_res pv_res eqo in
   let sim = init_sim env spec inv in
   let _, eqi =
     try f_eqobs_in fl fr sim eqo

@@ -70,8 +70,8 @@ module Experiment (O : Oracle) (AdvF : A) = {
 
 (* TODO: wut? Document this. *)
 lemma Conclusion &m p
-                 (O1 <: Oracle{Experiment})(O2 <: Oracle{Experiment})
-                 (Adv <: A{Experiment, O1, O2})
+                 (O1 <: Oracle{-Experiment})(O2 <: Oracle{-Experiment})
+                 (Adv <: A{-Experiment, -O1, -O2})
                  I P (m : glob O2 -> int) (g : int -> real):
   (forall x, 0%r <= g x <= 1%r) =>
   bigi predT g 0 qO <= qO%r * p =>
@@ -93,7 +93,7 @@ lemma Conclusion &m p
      phoare [O2.f : m (glob O2) = k ==> snd res] <= (g k )) =>
   islossless O1.f =>
   islossless O2.f =>
-  (forall (O <: Oracle{Adv}), islossless O.f => islossless Adv(O).run) =>
+  (forall (O <: Oracle{-Adv}), islossless O.f => islossless Adv(O).run) =>
   I (glob O1){m} (glob O2){m} =>
   Pr [Experiment(O1, Adv).main() @ &m : P res]
   <= Pr [Experiment(O2, Adv).main() @ &m : P res]  + qO%r * p.

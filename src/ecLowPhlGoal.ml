@@ -27,6 +27,7 @@ type hlform = [`Any | `Pred | `Stmt]
 
 type hlkind = [
   | `Hoare  of hlform
+  | `CHoare of hlform
   | `PHoare of hlform
   | `Equiv  of hlform
   | `Eager
@@ -51,6 +52,7 @@ let tc_error_noXhl ?(kinds : hlkinds option) pf =
     let kind, fm =
       match kind with
       | `Hoare  fm -> ("hoare" , fm)
+      | `CHoare fm -> ("choare", fm)
       | `PHoare fm -> ("phoare", fm)
       | `Equiv  fm -> ("equiv" , fm)
       | `Eager     -> ("eager" , `Any)
@@ -156,6 +158,8 @@ let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s
 (* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe
 let pf_as_hoareS   pe c = as_phl (`Hoare  `Stmt) (fun () -> destr_hoareS   c) pe
+let pf_as_choareF  pe c = as_phl (`CHoare `Pred) (fun () -> destr_cHoareF  c) pe
+let pf_as_choareS  pe c = as_phl (`CHoare `Stmt) (fun () -> destr_cHoareS  c) pe
 let pf_as_bdhoareF pe c = as_phl (`PHoare `Pred) (fun () -> destr_bdHoareF c) pe
 let pf_as_bdhoareS pe c = as_phl (`PHoare `Stmt) (fun () -> destr_bdHoareS c) pe
 let pf_as_equivF   pe c = as_phl (`Equiv  `Pred) (fun () -> destr_equivF   c) pe
@@ -165,6 +169,8 @@ let pf_as_eagerF   pe c = as_phl `Eager          (fun () -> destr_eagerF   c) pe
 (* -------------------------------------------------------------------- *)
 let tc1_as_hoareF   tc = pf_as_hoareF   !!tc (FApi.tc1_goal tc)
 let tc1_as_hoareS   tc = pf_as_hoareS   !!tc (FApi.tc1_goal tc)
+let tc1_as_choareF  tc = pf_as_choareF  !!tc (FApi.tc1_goal tc)
+let tc1_as_choareS  tc = pf_as_choareS  !!tc (FApi.tc1_goal tc)
 let tc1_as_bdhoareF tc = pf_as_bdhoareF !!tc (FApi.tc1_goal tc)
 let tc1_as_bdhoareS tc = pf_as_bdhoareS !!tc (FApi.tc1_goal tc)
 let tc1_as_equivF   tc = pf_as_equivF   !!tc (FApi.tc1_goal tc)
@@ -176,8 +182,9 @@ let tc1_get_stmt side tc =
   let concl = FApi.tc1_goal tc in
   match side, concl.f_node with
   | None, FhoareS hs -> hs.hs_s
+  | None, FcHoareS hs -> hs.chs_s
   | None, FbdHoareS hs -> hs.bhs_s
-  | Some _ , (FhoareS _ | FbdHoareS _) ->
+  | Some _ , (FhoareS _ | FcHoareS _ | FbdHoareS _) ->
       tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
   | Some `Left, FequivS es   -> es.es_sl
   | Some `Right, FequivS es  -> es.es_sr
@@ -189,8 +196,10 @@ let tc1_get_stmt side tc =
 (* -------------------------------------------------------------------- *)
 let get_pre f =
   match f.f_node with
-  | FhoareF hf   -> Some (hf.hf_pr )
-  | FhoareS hs   -> Some (hs.hs_pr )
+  | FhoareF hf  -> Some (hf.hf_pr)
+  | FhoareS hs  -> Some (hs.hs_pr)
+  | FcHoareF hf  -> Some (hf.chf_pr)
+  | FcHoareS hs  -> Some (hs.chs_pr)
   | FbdHoareF hf -> Some (hf.bhf_pr)
   | FbdHoareS hs -> Some (hs.bhs_pr)
   | FequivF ef   -> Some (ef.ef_pr )
@@ -205,8 +214,10 @@ let tc1_get_pre tc =
 (* -------------------------------------------------------------------- *)
 let get_post f =
   match f.f_node with
-  | FhoareF hf   -> Some (hf.hf_po )
-  | FhoareS hs   -> Some (hs.hs_po )
+  | FhoareF hf  -> Some (hf.hf_po )
+  | FhoareS hs  -> Some (hs.hs_po )
+  | FcHoareF hf  -> Some (hf.chf_po )
+  | FcHoareS hs  -> Some (hs.chs_po )
   | FbdHoareF hf -> Some (hf.bhf_po)
   | FbdHoareS hs -> Some (hs.bhs_po)
   | FequivF ef   -> Some (ef.ef_po )
@@ -221,8 +232,10 @@ let tc1_get_post tc =
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
   match f.f_node with
- | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
- | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre }
+ | FhoareF hf  -> f_hoareF pre hf.hf_f hf.hf_po
+ | FhoareS hs  -> f_hoareS_r { hs with hs_pr = pre }
+ | FcHoareF hf  -> f_cHoareF pre hf.chf_f hf.chf_po hf.chf_co
+ | FcHoareS hs  -> f_cHoareS_r { hs with chs_pr = pre }
  | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
  | FbdHoareS hs -> f_bdHoareS_r { hs with bhs_pr = pre }
  | FequivF ef   -> f_equivF pre ef.ef_fl ef.ef_fr ef.ef_po
@@ -248,23 +261,26 @@ let o_split ?rev i s =
   with Zpr.InvalidCPos -> raise (InvalidSplit (oget i))
 
 (* -------------------------------------------------------------------- *)
-let t_hS_or_bhS_or_eS ?th ?tbh ?te tc =
+let t_hS_or_chS_or_bhS_or_eS ?th ?tch ?tbh ?te tc =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareS   _ when EcUtils.is_some th  -> (oget th ) tc
+  | FhoareS  _ when EcUtils.is_some th  -> (oget th ) tc
+  | FcHoareS  _ when EcUtils.is_some tch -> (oget tch) tc
   | FbdHoareS _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivS   _ when EcUtils.is_some te  -> (oget te ) tc
 
   | _ ->
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
+         if EcUtils.is_some tch then [`CHoare `Stmt] else [];
          if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
          if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
 
     in tc_error_noXhl ~kinds !!tc
 
-let t_hF_or_bhF_or_eF ?th ?tbh ?te ?teg tc =
+let t_hF_or_chF_or_bhF_or_eF ?th ?tch ?tbh ?te ?teg tc =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareF   _ when EcUtils.is_some th  -> (oget th ) tc
+  | FhoareF  _ when EcUtils.is_some th  -> (oget th ) tc
+  | FcHoareF  _ when EcUtils.is_some tch -> (oget tch) tc
   | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
   | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
@@ -272,6 +288,7 @@ let t_hF_or_bhF_or_eF ?th ?tbh ?te ?teg tc =
   | _ ->
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Pred] else [];
+         if EcUtils.is_some tch then [`CHoare `Pred] else [];
          if EcUtils.is_some tbh then [`PHoare `Pred] else [];
          if EcUtils.is_some te  then [`Equiv  `Pred] else [];
          if EcUtils.is_some teg then [`Eager       ] else []]
@@ -286,7 +303,7 @@ let tag_sym_with_side name m =
 
 (* -------------------------------------------------------------------- *)
 let id_of_pv pv m =
-  let id = EcPath.basename pv.pv_name.EcPath.x_sub in
+  let id = symbol_of_pv pv in
   let id = tag_sym_with_side id m in
     EcIdent.create id
 
@@ -300,39 +317,30 @@ let id_of_mp mp m =
     EcIdent.create (tag_sym_with_side name m)
 
 (* -------------------------------------------------------------------- *)
-let fresh_pv me v =
-  let rec for_idx idx =
-    let x = Printf.sprintf "%s%d" v.v_name idx in
-      if EcMemory.is_bound x me then
-        for_idx (idx+1)
-      else
-        (EcMemory.bind x v.v_type me, x)
-  in
-    if EcMemory.is_bound v.v_name me then
-      for_idx 0
-    else
-      (EcMemory.bind v.v_name v.v_type me, v.v_name)
-
-(* -------------------------------------------------------------------- *)
-let lv_subst m lv f = lv, m, f
+let lv_subst ?c_pre m lv f = c_pre, lv, m, f
 
 (* -------------------------------------------------------------------- *)
 let mk_let_of_lv_substs_nolet env (lets, f) =
   if List.is_empty lets then f
   else
-    let s =
-      List.fold_left (fun s (lv,m,f1) ->
+    let ps, s =
+      List.fold_left (fun (ps, s) (c_pre, lv,m,f1) ->
+        let c_pre = omap (PVM.subst env s) c_pre in
         let f1 = PVM.subst env s f1 in
-        match lv, f1.f_node with
-        | LvVar (pv,_), _ -> PVM.add env pv m f1 s
-        | LvTuple vs, Ftuple fs ->
-          List.fold_left2 (fun s (pv,_) f -> PVM.add env pv m f s) s vs fs
-        | LvTuple vs, _ ->
-          List.fold_lefti
-            (fun s i (pv,ty) -> PVM.add env pv m (f_proj f i ty) s)
-            s vs
-        )  PVM.empty lets in
-    PVM.subst env s f
+        let s =
+          match lv, f1.f_node with
+          | LvVar (pv,_), _ -> PVM.add env pv m f1 s
+          | LvTuple vs, Ftuple fs ->
+            List.fold_left2 (fun s (pv,_) f -> PVM.add env pv m f s) s vs fs
+          | LvTuple vs, _ ->
+            List.fold_lefti
+              (fun s i (pv,ty) -> PVM.add env pv m (f_proj f i ty) s)
+              s vs in
+        let ps =
+          match c_pre with None -> ps | Some p -> p::ps in
+        ps, s) ([], PVM.empty) lets in
+    let f = PVM.subst env s f in
+    f_ands_simpl (List.rev ps) f
 
 let add_lv_subst env lv m s =
   match lv with
@@ -353,17 +361,19 @@ let mk_let_of_lv_substs_let env (lets, f) =
   if List.is_empty lets then f
   else
     let accu,s =
-      List.fold_left (fun (accu,s) (lv,m,f1) ->
+      List.fold_left (fun (accu,s) (c_pre, lv,m,f1) ->
+        let c_pre = omap (PVM.subst env s) c_pre in
         let f1 = PVM.subst env s f1 in
         let lv, s = add_lv_subst env lv m s in
-        (lv,f1)::accu, s) ([],PVM.empty) lets in
+        (c_pre,lv,f1)::accu, s) ([],PVM.empty) lets in
     (* accu is the sequence of let in reverse order *)
     let f = PVM.subst env s f in
     (* compute the fv *)
     let _, fvlets =
-      List.fold_left (fun (fv2,lets) (lp,f1 as lpf) ->
+      List.fold_left (fun (fv2,lets) (c_pre, lp,f1 as lpf) ->
         let fv = EcIdent.fv_diff fv2 (lp_fv lp) in
         let fv = EcIdent.fv_union (f_fv f1) fv in
+        let fv = omap_dfl (fun c_pre -> EcIdent.fv_union fv (f_fv c_pre)) fv c_pre in
         fv, (lpf,fv2)::lets) (f.f_fv,[]) accu in
     (* fvlets is the sequence of let in the right order *)
     (* build the lets and perform the substitution/simplification *)
@@ -376,33 +386,39 @@ let mk_let_of_lv_substs_let env (lets, f) =
         else (LSymbol(id,ty), f1)::accu, s in
 
     let rlets, s =
-      List.fold_left (fun (rlets,s as accus) ((lp,f1),fv) ->
+      List.fold_left (fun (rlets,s) ((c_pre, lp,f1),fv) ->
+        let c_pre = omap (Fsubst.f_subst s) c_pre in
         let f1 = Fsubst.f_subst s f1 in
-        match lp, f1.f_node with
-        | LRecord _, _ -> assert false
-        | LSymbol idt, _ -> add_id fv accus idt f1
-        | LTuple ids, Ftuple fs -> List.fold_left2 (add_id fv) accus ids fs
-        | LTuple ids, _ ->
-          let used =
-            List.fold_left (fun u (id, _) ->
-              match u, EcIdent.Mid.find_opt id fv with
-              | Some i1, Some i2 -> Some (i1+i2)
-              | None, i | i, None -> i) None ids in
-          match used with
-          | None -> accus
-          | Some i ->
-            let accus, fx =
-              if i = 1 || can_subst f1 then accus, f1
-              else
-                let x = EcIdent.create "tpl" in
-                let ty = ttuple (List.map snd ids) in
-                let lpx = LSymbol(x,ty) in
-                let fx = f_local x ty in
-                ((lpx,f1)::rlets,s), fx in
-            List.fold_lefti (fun accus i (_,ty as idt) ->
-              add_id fv accus idt (f_proj fx i ty)) accus ids)
+        let rlet, s =
+          match lp, f1.f_node with
+          | LRecord _, _ -> assert false
+          | LSymbol idt, _ -> add_id fv ([], s) idt f1
+          | LTuple ids, Ftuple fs -> List.fold_left2 (add_id fv) ([],s) ids fs
+          | LTuple ids, _ ->
+            let used =
+              List.fold_left (fun u (id, _) ->
+                  match u, EcIdent.Mid.find_opt id fv with
+                  | Some i1, Some i2 -> Some (i1+i2)
+                  | None, i | i, None -> i) None ids in
+            match used with
+            | None -> [], s
+            | Some i ->
+              let (rlet,s), fx =
+                if i = 1 || can_subst f1 then ([],s), f1
+                else
+                  let x = EcIdent.create "tpl" in
+                  let ty = ttuple (List.map snd ids) in
+                  let lpx = LSymbol(x,ty) in
+                  let fx = f_local x ty in
+                  ([lpx,f1],s), fx in
+              List.fold_lefti (fun accus i (_,ty as idt) ->
+                add_id fv accus idt (f_proj fx i ty)) (rlet, s) ids in
+        (c_pre, rlet) :: rlets, s)
         ([],Fsubst.f_subst_id) fvlets in
-    List.fold_left (fun f2 (lp,f1) -> f_let lp f1 f2) (Fsubst.f_subst s f) rlets
+    List.fold_left (fun f2 (c_pre, lpf) ->
+      let f2 = List.fold_left (fun f2 (lp,f1) -> f_let lp f1 f2) f2 lpf in
+      let c_pre = odfl f_true c_pre in
+      f_and_simpl c_pre f2) (Fsubst.f_subst s f) rlets
 
 
 let mk_let_of_lv_substs ?(uselet=true) env letsf =
@@ -456,17 +472,17 @@ let generalize_mod_ env m modi f =
            the variables not generalized *)
   let restrs =
     List.fold_left (fun r mp ->
-      let restr = NormMp.get_restr env mp in
+      let restr = NormMp.get_restr_use env mp in
       EcPath.Mm.add mp restr r) EcPath.Mm.empty mglob in
   List.iter (fun (npv,_) ->
     if is_glob npv then
-      let check1 mp restr =  Mpv.check_npv_mp env npv mp restr in
+      let check1 mp restr =  Mpv.check_npv_mp env (get_glob npv) mp restr in
       EcPath.Mm.iter check1 restrs) nelts;
   List.iter (fun mp ->
-    let restr = NormMp.get_restr env mp in
+    let restr = NormMp.get_restr_use env mp in
     let check (npv,_) =
       if is_glob npv then
-        Mpv.check_npv_mp env npv mp restr in
+        Mpv.check_npv_mp env (get_glob npv) mp restr in
     List.iter check melts;
     let check mp' restr' = Mpv.check_mp_mp env mp restr mp' restr' in
     EcPath.Mm.iter check restrs) nglob;
@@ -489,6 +505,7 @@ let abstract_info env f1 =
   let f   = EcEnv.NormMp.norm_xfun env f1 in
   let top = EcPath.m_functor f.EcPath.x_top in
   let def = EcEnv.Fun.by_xpath f env in
+
   let oi  =
     match def.f_def with
     | FBabs oi -> oi
@@ -548,30 +565,49 @@ let t_zip f (cenv : code_txenv) (cpos : codepos) (prpo : form * form) (state, s)
       ((me, Zpr.zip zpr, gs) : memenv * _ * form list)
   with Zpr.InvalidCPos -> tc_error (fst cenv) "invalid code position"
 
-let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
+(* Does not apply to cost statements if [choare] is None.
+   If [choare] is [Some c], then [c] is the cost that must be **removed** in
+   the premise to compensate for the difference in cost due to the inlining. *)
+let t_code_transform
+    (side : oside) ?(bdhoare = false) ?(choare = None) cpos tr tx tc =
   let pf = FApi.tc1_penv tc in
 
   match side with
   | None -> begin
       let (hyps, concl) = FApi.tc1_flat tc in
 
-      match concl.f_node with
-      | FhoareS hoare ->
+      match concl.f_node, choare with
+      | FhoareS hoare, _ ->
           let pr, po = hoare.hs_pr, hoare.hs_po in
-          let (me, stmt, cs) = tx (pf, hyps) cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
+          let (me, stmt, cs) =
+            tx (pf, hyps) cpos (pr, po) (hoare.hs_m, hoare.hs_s) in
           let concl = f_hoareS_r { hoare with hs_m = me; hs_s = stmt; } in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
-      | FbdHoareS bhs when bdhoare ->
+      | FcHoareS chs, Some c ->
+        let pr, po = chs.chs_pr, chs.chs_po in
+        let (me, stmt, cs) =
+          tx (pf, hyps) cpos (pr, po) (chs.chs_m, chs.chs_s) in
+        let cond, cost = EcCHoare.cost_sub_self chs.chs_co c in
+        let concl = f_cHoareS_r { chs with chs_m = me;
+                                           chs_s = stmt;
+                                           chs_co = cost; } in
+        FApi.xmutate1 tc (tr None) (cs @ [concl; cond])
+
+      | FbdHoareS bhs, _ when bdhoare ->
           let pr, po = bhs.bhs_pr, bhs.bhs_po in
-          let (me, stmt, cs) = tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
+          let (me, stmt, cs) =
+            tx (pf, hyps) cpos (pr, po) (bhs.bhs_m, bhs.bhs_s) in
           let concl = f_bdHoareS_r { bhs with bhs_m = me; bhs_s = stmt; } in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
       | _ ->
-        match bdhoare with
-        | true  -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] pf
-        | false -> tc_error_noXhl ~kinds:[`Hoare `Stmt] pf
+        let kinds =
+            (if bdhoare        then [`PHoare `Stmt] else [])
+          @ (if choare <> None then [`CHoare `Stmt] else [])
+          @ [`Hoare `Stmt] in
+
+        tc_error_noXhl ~kinds:kinds pf
   end
 
   | Some side ->

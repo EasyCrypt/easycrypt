@@ -42,6 +42,7 @@ val eq_handle : handle -> handle -> bool
 (*   |  handle                     (formula associated to <handle>)     *)
 (*   |  local<id>                  (local hypothesis <id>)              *)
 (*   |  global<p,tyargs>           (global lemma <p<:tyargs>>)          *)
+(*   |  schema<p,tyargs,eargs>     (global schema <p<:tyargs>> eargs)   *)
 (*                                                                      *)
 (* pt-arg ::=                                                           *)
 (*   | formula                     (∀-elimination)                      *)
@@ -57,6 +58,8 @@ and pt_head =
 | PTHandle of handle
 | PTLocal  of EcIdent.t
 | PTGlobal of EcPath.path * (ty list)
+| PTSchema of
+    EcPath.path * (ty list) * EcMemory.memtype * mem_pr list * (expr list)
 
 and pt_arg =
 | PAFormula of EcFol.form
@@ -211,7 +214,7 @@ val tacuerror_exn :
   ?catchable:bool -> exn -> 'a
 
 (* -------------------------------------------------------------------- *)
-type symkind = [`Lemma | `Operator | `Local]
+type symkind = [`Lemma | `Operator | `Local | `Schema]
 
 val tc_lookup_error :
   proofenv -> ?loc:EcLocation.t -> ?who:string -> symkind -> qsymbol -> 'a

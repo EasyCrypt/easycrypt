@@ -433,6 +433,9 @@ end = struct
         let name = (loced (xdth @ prefix, x)) in
         ax_ovrd oc (proofs, evc) name  (axd, mode)
 
+      | Th_schema _ ->
+          (proofs, evc)
+
       | Th_theory (x, dth) when dth.cth_mode = `Concrete ->
          List.fold_left (doit (prefix @ [x])) (proofs, evc) dth.cth_items
 

@@ -300,7 +300,7 @@ let rec pp_m fmt mp =
 (* -------------------------------------------------------------------- *)
 type xpath = {
   x_top : mpath;
-  x_sub : path;
+  x_sub : symbol;
   x_tag : int;
 }
 
@@ -310,7 +310,7 @@ let x_compare = fun p1 p2 -> x_hash p1 - x_hash p2
 
 let x_equal_na x1 x2 =
      mt_equal x1.x_top.m_top x2.x_top.m_top
-  && p_equal x1.x_sub x2.x_sub
+  && EcSymbols.sym_equal x1.x_sub x2.x_sub
 
 let x_compare_na x1 x2 =
   x_compare x1 x2 (* FIXME: doc says something about x_top being normalized *)
@@ -319,10 +319,10 @@ module Hsxpath = Why3.Hashcons.Make (struct
   type t = xpath
 
   let equal m1 m2 =
-    m_equal m1.x_top m2.x_top && p_equal m1.x_sub m2.x_sub
+    m_equal m1.x_top m2.x_top && EcSymbols.sym_equal m1.x_sub m2.x_sub
 
   let hash m =
-    Why3.Hashcons.combine (m_hash m.x_top) (p_hash m.x_sub)
+    Why3.Hashcons.combine (m_hash m.x_top) (Hashtbl.hash m.x_sub)
 
   let tag n p = { p with x_tag = n }
 end)
@@ -334,7 +334,7 @@ end)
 
 let x_ntr_compare (xp1 : xpath) (xp2 : xpath) =
   match m_ntr_compare xp1.x_top xp2.x_top with
-  | 0 -> p_ntr_compare xp1.x_sub xp2.x_sub
+  | 0 -> String.compare xp1.x_sub xp2.x_sub
   | n -> n
 
 let xpath top sub =
@@ -342,10 +342,8 @@ let xpath top sub =
 
 let x_fv fv xp = m_fv fv xp.x_top
 
-let xpath_fun mp f = xpath mp (psymbol f)
-let xqname x s = xpath x.x_top (pqname x.x_sub s)
 let xastrip x = { x with x_top = mastrip x.x_top }
-let xbasename xp = basename xp.x_sub
+let xbasename xp = xp.x_sub
 
 (* -------------------------------------------------------------------- *)
 module Mx = XPath.M
@@ -383,7 +381,7 @@ let rec m_tostring (m : mpath) =
 
 let x_tostring x =
   Printf.sprintf "%s./%s"
-    (m_tostring x.x_top) (tostring x.x_sub)
+    (m_tostring x.x_top) x.x_sub
 
 (* -------------------------------------------------------------------- *)
 let p_subst (s : path Mp.t) =

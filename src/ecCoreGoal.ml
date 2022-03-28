@@ -58,6 +58,8 @@ and pt_head =
 | PTHandle of handle
 | PTLocal  of EcIdent.t
 | PTGlobal of EcPath.path * (ty list)
+| PTSchema of
+    EcPath.path * (ty list) * EcMemory.memtype * mem_pr list * (expr list)
 
 and pt_arg =
 | PAFormula of EcFol.form
@@ -238,12 +240,13 @@ let tc_error_lazy (penv : proofenv) ?(catchable = true) ?loc ?who msg =
   raise (TcError (mk_tcerror ~catchable ~penv ?loc (lazy (getmsg ()))))
 
 (* -------------------------------------------------------------------- *)
-type symkind = [`Lemma | `Operator | `Local]
+type symkind = [`Lemma | `Operator | `Local | `Schema]
 
 let tc_lookup_error pe ?loc ?who kind qs =
   let string_of_kind kind =
     match kind with
     | `Lemma    -> "lemma"
+    | `Schema   -> "schema"
     | `Operator -> "operator"
     | `Local    -> "local variable"
   in

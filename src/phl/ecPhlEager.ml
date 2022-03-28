@@ -270,9 +270,8 @@ let t_eager_fun_def_r tc =
     | None -> f_tt, mem, fdef.f_body
     | Some e ->
       let v = {v_name = "result"; v_type = e.e_ty } in
-      let mem, s = EcLowPhlGoal.fresh_pv mem v in
-      let f = EcMemory.xpath mem in
-      let x = EcTypes.pv_loc f s in
+      let mem, s = EcMemory.bind_fresh v mem in
+      let x = EcTypes.pv_loc s.v_name in
       f_pvar x e.e_ty (fst mem), mem,
       s_seq fdef.f_body (stmt [i_asgn(LvVar(x,e.e_ty), e)])
   in
@@ -281,12 +280,12 @@ let t_eager_fun_def_r tc =
   let er, memr, sfr = extend memenvr fdefr in
   let ml, mr = EcMemory.memory meml, EcMemory.memory memr in
   let s = PVM.empty in
-  let s = PVM.add env (pv_res fl) ml el s in
-  let s = PVM.add env (pv_res fr) mr er s in
+  let s = PVM.add env pv_res ml el s in
+  let s = PVM.add env pv_res mr er s in
   let post = PVM.subst env s eg.eg_po in
   let s = PVM.empty in
-  let s = EcPhlFun.subst_pre env fl fsigl ml s in
-  let s = EcPhlFun.subst_pre env fr fsigr mr s in
+  let s = EcPhlFun.subst_pre env fsigl ml s in
+  let s = EcPhlFun.subst_pre env fsigr mr s in
   let pre = PVM.subst env s eg.eg_pr in
 
   let cond = f_equivS_r {
@@ -560,12 +559,12 @@ let t_eager_r h inv tc =
     let defl = Fun.by_xpath fl env in
     let defr = Fun.by_xpath fr env in
     let sigl, sigr = defl.f_sig, defr.f_sig in
-    let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
+    let eq_res = f_eqres sigl.fs_ret mleft sigr.fs_ret mright in
     let post = Mpv2.to_form mleft mright eqo eq_res in
     let eq_params =
       f_eqparams
-        fl sigl.fs_arg sigl.fs_anames mleft
-        fr sigr.fs_arg sigr.fs_anames mright in
+        sigl.fs_arg sigl.fs_anames mleft
+        sigr.fs_arg sigr.fs_anames mright in
     let pre = f_and_simpl eq_params inv in
     f_eagerF pre s fl fr s' post
   in
@@ -592,7 +591,7 @@ let t_eager         = FApi.t_low2 "eager"         t_eager_r
 
 (* -------------------------------------------------------------------- *)
 let process_info info tc =
-  let env,hyps,_ = FApi.tc1_eflat tc in
+  let hyps = FApi.tc1_hyps tc in
 
   match info with
   | EcParsetree.LE_done h ->
@@ -602,7 +601,7 @@ let process_info info tc =
     let ml,mr =
       match (FApi.tc1_goal tc).f_node with
       | FeagerF _ ->
-        EcEnv.Fun.inv_memory `Left env, EcEnv.Fun.inv_memory `Right env
+        EcEnv.Fun.inv_memory `Left, EcEnv.Fun.inv_memory `Right
       | _ ->
         let es    = tc1_as_equivS tc in
         es.es_ml, es.es_mr in
@@ -647,7 +646,7 @@ let process_fun_abs info eqI tc =
 let process_call info tc =
   let process_cut info =
     match info with
-    | EcParsetree.CI_spec (fpre, fpost) ->
+    | EcParsetree.CI_spec (fpre, fpost, None) ->
         let env, hyps, _ = FApi.tc1_eflat tc in
         let es  = tc1_as_equivS tc in
 

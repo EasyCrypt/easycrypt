@@ -21,6 +21,7 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
+type chl_infos_t = (form, form option, form) rnd_tac_info
 type bhl_infos_t = (form, ty -> form option, ty -> form) rnd_tac_info
 type rnd_infos_t = (pformula, pformula option, pformula) rnd_tac_info
 type mkbij_t     = EcTypes.ty -> EcTypes.ty -> EcFol.form
@@ -42,6 +43,33 @@ module Core = struct
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
     let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
     FApi.xmutate1 tc `Rnd [concl]
+
+  (* -------------------------------------------------------------------- *)
+  let t_choare_rnd_r (tac_info : chl_infos_t) tc =
+    let env = FApi.tc1_env tc in
+    let chs = tc1_as_choareS tc in
+    let (lv, distr_e), s = tc1_last_rnd tc chs.chs_s in
+    let ty_distr = proj_distr_ty env (e_ty distr_e) in
+    let x_id = EcIdent.create (symbol_of_lv lv) in
+    let x = f_local x_id ty_distr in
+    let distr = EcFol.form_of_expr (EcMemory.memory chs.chs_m) distr_e in
+    let post = subst_form_lv env (EcMemory.memory chs.chs_m) lv x chs.chs_po in
+    let post = f_imp (f_in_supp x distr) post in
+    let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+    let post = f_anda (f_lossless ty_distr distr) post in
+
+    let cost_pre = match tac_info with
+      | PNoRndParams -> f_true
+      | PSingleRndParam p -> p
+      | _ -> assert false in
+    let cond, cost =
+      EcCHoare.cost_sub_self
+        chs.chs_co
+        (EcCHoare.cost_of_expr cost_pre chs.chs_m distr_e) in
+    let concl = f_cHoareS_r { chs with chs_s = s;
+                                       chs_po = f_and_simpl cost_pre post;
+                                       chs_co = cost} in
+    FApi.xmutate1 tc `Rnd [cond; concl]
 
   (* -------------------------------------------------------------------- *)
   let wp_equiv_disj_rnd_r side tc =
@@ -414,6 +442,7 @@ let wp_equiv_rnd      = FApi.t_low1 "wp-equiv-rnd"      wp_equiv_rnd_r
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_rnd   = FApi.t_low0 "hoare-rnd"   Core.t_hoare_rnd_r
+let t_choare_rnd  = FApi.t_low1 "choare-rnd"  Core.t_choare_rnd_r
 let t_bdhoare_rnd = FApi.t_low1 "bdhoare-rnd" Core.t_bdhoare_rnd_r
 let t_equiv_rnd   = FApi.t_low2 "equiv-rnd"   t_equiv_rnd_r
 
@@ -424,6 +453,22 @@ let process_rnd side tac_info tc =
   match side, tac_info with
   | None, PNoRndParams when is_hoareS concl ->
       t_hoare_rnd tc
+
+  | None, _ when is_cHoareS concl ->
+    let tac_info =
+      match tac_info with
+      | PNoRndParams ->
+        PNoRndParams
+
+      | PSingleRndParam fp ->
+        PSingleRndParam
+          (TTC.tc1_process_Xhl_form tc tbool fp)
+
+      | _ -> tc_error !!tc "invalid arguments" in
+
+      FApi.t_seqsub (t_choare_rnd tac_info)
+                    [EcLowGoal.t_trivial; EcLowGoal.t_id]
+        tc
 
   | None, _ when is_bdHoareS concl ->
     let tac_info =

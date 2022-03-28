@@ -67,6 +67,12 @@ let setvalue (name : string) (value : value) (g : gstate) =
   g.gs_values <- Mstr.add name value g.gs_values
 
 (* -------------------------------------------------------------------- *)
+let old_mem_restr = "old_mem_restr"
+
+let get_old_mem_restr (g : gstate) : bool =
+  getflag ~default:false old_mem_restr g
+
+(* -------------------------------------------------------------------- *)
 let add_notifier (notifier : loglevel -> string Lazy.t -> unit) (gs : gstate) =
   let notifier = { nt_id = EcUid.unique (); nt_cb = notifier; } in
   gs.gs_notifiers <- notifier :: gs.gs_notifiers; notifier.nt_id

@@ -226,7 +226,7 @@ module HiPrinting = struct
       let ty = EcEnv.Var.by_xpath xp env in
       Format.fprintf fmt "  @[%a : %a@]@."
         (EcPrinting.pp_pv ppe) pv
-        (EcPrinting.pp_type ppe) ty.EcEnv.vb_type)
+        (EcPrinting.pp_type ppe) ty)
       (List.rev (Mx.bindings us.EcEnv.us_pv))
 
 
@@ -271,6 +271,7 @@ let process_pr fmt scope p =
   | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   (unloc qs)
   | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   (unloc qs)
   | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   (unloc qs)
+  | Pr_sc   qs -> EcPrinting.ObjectInfo.pr_sc   fmt env   (unloc qs)
   | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   (unloc qs)
   | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   (unloc qs)
   | Pr_any  qs -> EcPrinting.ObjectInfo.pr_any  fmt env   (unloc qs)
@@ -376,12 +377,14 @@ and process_abbrev (scope : EcScope.scope) (a : pabbrev located) =
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
+  (* TODO: A: aybe rename, as this now also adds schemata. *)
   let (name, scope) = EcScope.Ax.add scope (Pragma.get ()).pm_check ax in
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
          | PAxiom _ -> EcScope.notify scope `Info "added axiom: `%s'" x
-         | _        -> EcScope.notify scope `Info "added lemma: `%s'" x);
+         | PLemma _ -> EcScope.notify scope `Info "added lemma: `%s'" x
+         | PSchema  -> EcScope.notify scope `Info "added schema: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -454,8 +457,8 @@ and process_th_require1 ld scope (nm, (sysname, thname), io) =
       let scope = EcScope.Theory.require scope (name, kind) loader in
           match io with
           | None         -> scope
-          | Some `Export -> EcScope.Theory.export scope ([], name.rqd_name)
-          | Some `Import -> EcScope.Theory.import scope ([], name.rqd_name)
+          | Some `Export -> EcScope.Theory.export scope ([], name.EcScope.rqd_name)
+          | Some `Import -> EcScope.Theory.import scope ([], name.EcScope.rqd_name)
 
 (* -------------------------------------------------------------------- *)
 and process_th_require ld scope (nm, xs, io) =
@@ -552,15 +555,19 @@ and process_pragma (scope : EcScope.scope) opt =
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
   match value with
+  | `Bool value when EcLocation.unloc name = EcGState.old_mem_restr ->
+    let gs = EcEnv.gstate (EcScope.env scope) in
+    EcGState.setflag (unloc name) value gs; scope
+
+  | (`Int _) as value ->
+      let gs = EcEnv.gstate (EcScope.env scope) in
+      EcGState.setvalue (unloc name) value gs; scope
+
   | `Bool value -> begin
       try  EcScope.Options.set scope (unloc name) value
       with EcScope.UnknownFlag _ ->
         EcScope.hierror "unknown option: %s" (unloc name)
     end
-
-  | (`Int _) as value ->
-      let gs = EcEnv.gstate (EcScope.env scope) in
-      EcGState.setvalue (unloc name) value gs; scope
 
 (* -------------------------------------------------------------------- *)
 and process_addrw scope (local, base, names) =

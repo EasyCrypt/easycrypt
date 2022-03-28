@@ -36,6 +36,7 @@ module Subst : sig
   val subst_me       : subst -> EcMemory.memenv -> EcMemory.memenv
   val subst_lpattern : subst -> lpattern -> subst * lpattern
   val subst_stmt     : subst -> EcModules.stmt -> EcModules.stmt
+  val subst_e        : subst -> expr -> expr
 
   val bind_local   : subst -> ident -> form -> subst
   val bind_locals  : subst -> (ident * form) list -> subst
@@ -54,6 +55,7 @@ end = struct
   let subst_me       = Fsubst.subst_me
   let subst_lpattern = Fsubst.subst_lpattern
   let subst_stmt     = Fsubst.subst_stmt
+  let subst_e        = Fsubst.subst_e
   let bind_local     = Fsubst.f_bind_local
   let add_binding    = Fsubst.add_binding
   let add_bindings   = Fsubst.add_bindings
@@ -168,12 +170,26 @@ let norm_xfun st s f =
 
 let norm_stmt s c  = Subst.subst_stmt s c
 let norm_me   s me = Subst.subst_me s me
+let norm_e    s e  = Subst.subst_e s e
 
 (* -------------------------------------------------------------------- *)
 let rec norm st s f =
 (* FIXME : I think substitution in type is wrong *)
  let f = cbv st s f (Aempty (Subst.subst_ty s f.f_ty)) in
  norm_lambda st f
+
+and norm_cost st s c =
+  let self'  = norm st s c.c_self
+  and calls' =
+    EcPath.Mx.fold (fun f cb calls ->
+        (* We do not normalize the xpath, as it is not a valid xpath. *)
+        let f' = Subst.subst_xpath s f
+        and cb' = call_bound_r (norm st s cb.cb_cost)
+                               (norm st s cb.cb_called) in
+        EcPath.Mx.change (fun old -> assert (old = None); Some cb') f' calls
+      ) c.c_calls EcPath.Mx.empty in
+  cost_r self' calls'
+
 
 and norm_lambda (st : state) (f : form) =
   match f.f_node with
@@ -191,8 +207,11 @@ and norm_lambda (st : state) (f : form) =
 
   | Fquant  _ | Fif     _ | Fmatch    _ | Flet _ | Fint _ | Flocal _
   | Fglob   _ | Fpvar   _ | Fop       _
-  | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _
-  | FequivF _ | FequivS _ | FeagerF   _ | Fpr _
+  | FhoareF _   | FhoareS _
+  | FcHoareF _  | FcHoareS _
+  | FbdHoareF _ | FbdHoareS _
+  | FequivF _   | FequivS _
+  | FeagerF   _ | Fpr _ | Fcoe _
 
     -> f
 
@@ -310,7 +329,8 @@ and reduce_user_delta st f1 p tys args =
   let f2 =
     let args, ty = flatten_args args in
     f_app f1 args ty in
-  match reduce_user st f2 with
+
+  match reduce_user_with_exn st f2 with
   | f -> f
   | exception NotReducible ->
     let mode = st.st_ri.delta_p p in
@@ -321,45 +341,9 @@ and reduce_user_delta st f1 p tys args =
 
 (* -------------------------------------------------------------------- *)
 and reduce_logic st f =
-  if is_some st.st_ri.logic then
-    let (p, tys), args =
-      try destr_op_app f with DestrError _ -> raise NotReducible in
-    if is_logical_op p then
-      let pcompat =
-        match st.st_ri.logic with Some `Full -> true | _ -> false
-      in
-      let f' =
-        match op_kind p, args with
-        | Some (`Not), [f1]    when pcompat -> f_not_simpl f1
-        | Some (`Imp), [f1;f2] when pcompat -> f_imp_simpl f1 f2
-        | Some (`Iff), [f1;f2] when pcompat -> f_iff_simpl f1 f2
+  EcReduction.reduce_logic st.st_ri st.st_env st.st_hyps f
 
-        | Some (`And `Asym), [f1;f2] -> f_anda_simpl f1 f2
-        | Some (`Or  `Asym), [f1;f2] -> f_ora_simpl f1 f2
-        | Some (`And `Sym ), [f1;f2] -> f_and_simpl f1 f2
-        | Some (`Or  `Sym ), [f1;f2] -> f_or_simpl f1 f2
-        | Some (`Int_le   ), [f1;f2] -> f_int_le_simpl f1 f2
-        | Some (`Int_lt   ), [f1;f2] -> f_int_lt_simpl f1 f2
-        | Some (`Real_le  ), [f1;f2] -> f_real_le_simpl f1 f2
-        | Some (`Real_lt  ), [f1;f2] -> f_real_lt_simpl f1 f2
-        | Some (`Int_add  ), [f1;f2] -> f_int_add_simpl f1 f2
-        | Some (`Int_opp  ), [f]     -> f_int_opp_simpl f
-        | Some (`Int_mul  ), [f1;f2] -> f_int_mul_simpl f1 f2
-        | Some (`Int_edivz), [f1;f2] -> f_int_edivz_simpl f1 f2
-        | Some (`Real_add ), [f1;f2] -> f_real_add_simpl f1 f2
-        | Some (`Real_opp ), [f]     -> f_real_opp_simpl f
-        | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
-        | Some (`Real_inv ), [f]     -> f_real_inv_simpl f
-        | Some (`Eq       ), [f1;f2] -> f_eq_simpl st f1 f2
-        | Some (`Map_get  ), [f1;f2] -> f_map_get_simpl st f1 f2 (snd (as_seq2 tys))
-
-        | _, _ -> f in
-        if f_equal f f' then raise NotReducible
-        else f'
-    else raise NotReducible
-  else raise NotReducible
-
-and reduce_user st f =
+and reduce_user_with_exn st f =
   match reduce_logic st f with
   | f -> cbv_init st Subst.subst_id f
   | exception NotReducible ->
@@ -367,6 +351,10 @@ and reduce_user st f =
     let simplify = cbv_init st Subst.subst_id in
     let f = reduce_user_gen simplify st.st_ri st.st_env st.st_hyps f in
     cbv_init st Subst.subst_id f
+
+and reduce_user st f =
+  try  reduce_user_with_exn st f
+  with NotReducible -> f
 
 (* -------------------------------------------------------------------- *)
 and cbv_init st s f =
@@ -378,10 +366,10 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   | Fquant ((Lforall | Lexists) as q, b, f) -> begin
     assert (is_Aempty args);
 
-    let f =
+    let b, f =
       let s, b = Subst.add_bindings s b in
       let st = { st with st_env = Mod.add_mod_binding b st.st_env } in
-      norm st s f in
+      b, norm st s f in
 
     match q, st.st_ri.logic with
     | Lforall, Some `Full -> f_forall_simpl b f
@@ -496,7 +484,6 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   | FhoareF hf ->
     assert (is_Aempty args);
     assert (not (Subst.has_mem s mhr));
-    assert (not (Subst.has_mem s mhr));
     let hf_pr = norm st s hf.hf_pr in
     let hf_po = norm st s hf.hf_po in
     let hf_f  = norm_xfun st s hf.hf_f in
@@ -510,6 +497,25 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
     f_hoareS_r { hs_pr; hs_po; hs_s; hs_m }
+
+  | FcHoareF chf ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s mhr));
+    let chf_pr = norm st s chf.chf_pr in
+    let chf_po = norm st s chf.chf_po in
+    let chf_f  = norm_xfun st s chf.chf_f in
+    let chf_c  = norm_cost st s chf.chf_co in
+    f_cHoareF_r { chf_pr; chf_f; chf_po; chf_co = chf_c; }
+
+  | FcHoareS chs ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s (fst chs.chs_m)));
+    let chs_pr = norm st s chs.chs_pr in
+    let chs_po = norm st s chs.chs_po in
+    let chs_s  = norm_stmt s chs.chs_s in
+    let chs_m  = norm_me s chs.chs_m in
+    let chs_c  = norm_cost st s chs.chs_co in
+    f_cHoareS_r { chs_pr; chs_po; chs_s; chs_m; chs_co = chs_c; }
 
   | FbdHoareF hf ->
     assert (is_Aempty args);
@@ -563,6 +569,21 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let eg_sl = norm_stmt s eg.eg_sl in
     let eg_sr = norm_stmt s eg.eg_sr in
     f_eagerF_r {eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po }
+
+  | Fcoe coe ->
+    assert (is_Aempty args);
+    assert (not (Subst.has_mem s (fst coe.coe_mem)));
+    let coe_pre = norm st s coe.coe_pre in
+    let coe_e   = norm_e s coe.coe_e in
+    let coe_mem = norm_me s coe.coe_mem in
+
+    let coe = { coe_pre; coe_e; coe_mem } in
+
+    begin
+      match reduce_cost st.st_ri st.st_env coe with
+      | coe -> cbv_init st Subst.subst_id coe
+      | exception NotReducible -> reduce_user st (f_coe_r coe)
+    end
 
   | Fpr pr ->
     assert (is_Aempty args);

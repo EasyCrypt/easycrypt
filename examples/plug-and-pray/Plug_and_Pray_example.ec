@@ -68,7 +68,7 @@ proof indices_not_nil by smt(@List gt0_q).
    ``Guess'' functor and we use an if-then-else to ensure that
    G0.k is in [0..q-1].
 *)
-lemma Bound_aux &m (A <: Adv {G0}):
+lemma Bound_aux &m (A <: Adv {-G0}):
   (1%r/q%r) * Pr[ G0(A).main() @ &m : G0.b ]
   = Pr[ Guess(G0(A)).main() @ &m :  G0.b /\ res.`1 = G0.k ].
 proof.
@@ -94,7 +94,7 @@ qed.
   We now transfer the previous lemma to G0 and G1 by relating
   Guess(G0) with G1.
 *)
-lemma Bound &m (A <: Adv{G1,G0}):
+lemma Bound &m (A <: Adv{-G1,-G0}):
     (1%r/q%r) * Pr[ G0(A).main() @ &m : G0.b ]
   = Pr[ G1(A).main() @ &m :  G1.b /\ G1.k = G1.i].
 proof.

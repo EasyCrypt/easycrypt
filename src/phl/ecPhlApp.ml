@@ -31,6 +31,24 @@ let t_hoare_app_r i phi tc =
 let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
 
 (* -------------------------------------------------------------------- *)
+let t_choare_app_r i phi cost tc =
+  let chs = tc1_as_choareS tc in
+  let env = FApi.tc1_env tc in
+  let s1, s2 = s_split i chs.chs_s in
+  let cond, cost1 = EcCHoare.cost_sub env chs.chs_co cost in
+
+  let a = f_cHoareS_r { chs with chs_s  = stmt s1;
+                                 chs_po = phi;
+                                 chs_co  = cost1; }  in
+  let b = f_cHoareS_r { chs with chs_pr = phi;
+                                 chs_s  = stmt s2;
+                                 chs_co  = cost; } in
+  FApi.xmutate1 tc `HlApp [cond; a; b]
+
+
+let t_choare_app = FApi.t_low3 "choare-app" t_choare_app_r
+
+(* -------------------------------------------------------------------- *)
 let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let bhs = tc1_as_bdhoareS tc in
   let s1, s2 = s_split i bhs.bhs_s in
@@ -130,6 +148,21 @@ let t_equiv_app_onesided side i pre post tc =
     ] tc
 
 (* -------------------------------------------------------------------- *)
+let process_phl_c_info app_c_info tc =
+  match app_c_info with
+
+  | PAppCost c   -> TTC.tc1_process_cost tc [] c
+
+  | PAppSingle _ ->
+    tc_error !!tc "seq choare: a cost must be supplied, not a bound"
+
+  | PAppNone     ->
+    tc_error !!tc "seq choare: a cost must be supplied"
+
+  | PAppMult _   ->
+    tc_error !!tc "seq choare: too many arguments, only a cost must be supplied"
+
+(* -------------------------------------------------------------------- *)
 let process_phl_bd_info dir bd_info tc =
   match bd_info with
   | PAppNone ->
@@ -183,6 +216,10 @@ let process_phl_bd_info dir bd_info tc =
 
       (phi, f1, f2, g1, g2)
 
+  | PAppCost _ ->
+    tc_error !!tc "a cost cannot be supplied here"
+
+
 (* -------------------------------------------------------------------- *)
 let process_app (side, dir, k, phi, bd_info) tc =
   let concl = FApi.tc1_goal tc in
@@ -214,6 +251,12 @@ let process_app (side, dir, k, phi, bd_info) tc =
       | None -> tc_error !!tc "seq onsided: side information expected"
       | Some side -> side in
     t_equiv_app_onesided side i pre post tc
+
+  | Single i, _ when is_cHoareS concl ->
+    check_side side;
+    let phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+    let cost = process_phl_c_info bd_info tc in
+    t_choare_app i phi cost tc
 
   | Single i, _ when is_bdHoareS concl ->
       let pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in

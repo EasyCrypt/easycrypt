@@ -33,6 +33,10 @@ val getflag : ?default:bool -> string -> gstate -> bool
 val setflag : string -> bool -> gstate -> unit
 
 (* --------------------------------------------------------------------- *)
+val old_mem_restr : string
+val get_old_mem_restr : gstate -> bool
+
+(* --------------------------------------------------------------------- *)
 type nid_t
 type loglevel = [`Debug | `Info | `Warning | `Critical]
 
