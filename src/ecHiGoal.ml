@@ -247,32 +247,53 @@ module LowRewrite = struct
 
     let base ax =
       match EcFol.sform_of_form ax with
-      | EcFol.SFeq  (f1, f2) -> Some (pt, `Eq, (f1, f2))
-      | EcFol.SFiff (f1, f2) -> Some (pt, `Eq, (f1, f2))
+      | EcFol.SFeq  (f1, f2) -> [(pt, `Eq, (f1, f2))]
+      | EcFol.SFiff (f1, f2) -> [(pt, `Eq, (f1, f2))]
 
       | EcFol.SFnot f ->
           let pt' = pt_of_global_r pt.ptev_env LG.p_negeqF [] in
           let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
           let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
-          Some (pt', `Eq, (f, f_false))
+          [(pt', `Eq, (f, f_false))]
 
-      | _ -> None
+      | _ -> []
+
+    and split ax =
+      match EcFol.sform_of_form ax with
+      | EcFol.SFand (`Sym, (f1, f2)) ->
+         let pt1 =
+           let pt'= pt_of_global_r pt.ptev_env LG.p_and_proj_l [] in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f1) in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f2) in
+           apply_pterm_to_arg_r pt' (PVASub pt) in
+
+         let pt2 =
+           let pt'= pt_of_global_r pt.ptev_env LG.p_and_proj_r [] in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f1) in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f2) in
+           apply_pterm_to_arg_r pt' (PVASub pt) in
+
+           (find_rewrite_patterns ~inpred dir pt2)
+         @ (find_rewrite_patterns ~inpred dir pt1)
+
+      | _ -> []
     in
 
     match base ax with
-    | Some x -> [x]
+    | _::_ as rws -> rws
 
-    | _ -> begin
+    | [] -> begin
       let ptb = Lazy.from_fun (fun () ->
-        let pt1 =
+        let pt1 = split ax
+        and pt2 =
           if dir = `LtoR then
             if   ER.EqTest.for_type env ax.f_ty tbool
             then Some (ptc, `Bool, (ax, f_true))
             else None
           else None
-        and pt2 = obind base
+        and pt3 = omap base
           (EcReduction.h_red_opt EcReduction.full_red hyps ax)
-        in (otolist pt1) @ (otolist pt2)) in
+        in pt1 @ (otolist pt2) @ (odfl [] pt3)) in
 
         let rec doit reduce =
           match TTC.destruct_product ~reduce hyps ax with
