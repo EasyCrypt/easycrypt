@@ -1,10 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2015 - IMDEA Software Institute
- * Copyright (c) - 2012--2015 - Inria
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import Int Real Distr StdOrder StdBigop.
 (*---*) import RealOrder Bigreal BRA.
 require (*--*) FelTactic.
