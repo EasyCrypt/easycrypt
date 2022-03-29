@@ -1,9 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2021-2021 - Boston University
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* An axiom-free formalization of well-founded relations, induction
    and recursion.
 

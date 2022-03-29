@@ -1,21 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
-(* Copyright The Coq Development Team, 1999-2010
- * Copyright INRIA - CNRS - LIX - LRI - PPS, 1999-2010
- *
- * This file is distributed under the terms of the:
- *   GNU Lesser General Public License Version 2.1
- *
- * This file originates from the `Coq Proof Assistant'
- * It has been modified for the needs of EasyCrypt
- *)
-
 (* -------------------------------------------------------------------- *)
 open EcRing
 open EcBigInt.Notations
