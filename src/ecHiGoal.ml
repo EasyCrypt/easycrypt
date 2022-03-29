@@ -462,6 +462,10 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
     in
 
     let (pte, cutf) = instantiate pte in
+
+    if not (PT.can_concretize pte.ptev_env) then
+      tc_error !!tc "cannot infer all variables";
+
     let pt = fst (PT.concretize pte) in
     let pt = { pt with pt_args = pt.pt_args @ [palocal hyp]; } in
     let cutf = PT.concretize_form pte.PT.ptev_env cutf in
