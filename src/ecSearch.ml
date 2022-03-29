@@ -43,7 +43,7 @@ let match_ (env : EcEnv.env) (search : search list) f =
         let ev = EcMatching.MEV.of_idents (Mid.keys !v) `Form in
         let na = List.length (snd (EcFol.destr_app ptn)) in
 
-        let trymatch _bds tp =
+        let trymatch _bds hyps tp =
           let tp =
             match tp.f_node with
             | Fapp (h, hargs) when List.length hargs > na ->
@@ -59,7 +59,7 @@ let match_ (env : EcEnv.env) (search : search list) f =
             `Continue
 
         in try
-            ignore (EcMatching.FPosition.select trymatch f);
+            ignore (EcMatching.FPosition.select trymatch hyps f);
             false
           with E.MatchFound -> true
       end

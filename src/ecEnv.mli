@@ -459,7 +459,7 @@ module LDecl : sig
   val baseenv : hyps -> env
 
   val ld_subst  : f_subst -> local_kind -> local_kind
-  val add_local : EcIdent.t -> local_kind -> hyps -> hyps
+  val add_local : ?onlyid:bool -> EcIdent.t -> local_kind -> hyps -> hyps
 
   val by_name : symbol    -> hyps -> l_local
   val by_id   : EcIdent.t -> hyps -> local_kind

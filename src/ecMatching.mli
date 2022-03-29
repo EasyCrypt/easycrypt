@@ -171,7 +171,7 @@ module FPosition : sig
 
   val tostring : ptnpos -> string
 
-  val select : ?o:occ -> (Sid.t -> form -> select) -> form -> ptnpos
+  val select : ?o:occ -> (Sid.t -> LDecl.hyps -> form -> select) -> LDecl.hyps -> form -> ptnpos
 
   val select_form : ?xconv:EcReduction.xconv -> ?keyed:bool ->
     LDecl.hyps -> occ option -> form -> form -> ptnpos

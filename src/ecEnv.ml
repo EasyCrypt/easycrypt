@@ -3446,16 +3446,17 @@ module LDecl = struct
     with LdeclError _ -> raise NotReducible
 
   (* ------------------------------------------------------------------ *)
-  let check_name_clash id hyps =
+  let check_name_clash ?(onlyid = false) id hyps =
     if   has_id id hyps
     then error (NameClash (`Ident id))
-    else
+    else if not onlyid then begin
       let s = EcIdent.name id in
       if s <> "_" && has_name ~dep:false s hyps then
         error (NameClash (`Symbol s))
+    end
 
-  let add_local id ld hyps =
-    check_name_clash id hyps;
+  let add_local ?onlyid id ld hyps =
+    check_name_clash ?onlyid id hyps;
     { hyps with h_local = (id, ld) :: hyps.h_local }
 
   (* ------------------------------------------------------------------ *)
@@ -3497,8 +3498,8 @@ module LDecl = struct
     | LD_abs_st us    -> AbsStmt.bind x us env
 
   (* ------------------------------------------------------------------ *)
-  let add_local x k h =
-    let le_hyps = add_local x k (tohyps h) in
+  let add_local ?onlyid x k h =
+    let le_hyps = add_local ?onlyid x k (tohyps h) in
     let le_env  = add_local_env x k h.le_env in
     { h with le_hyps; le_env; }
 

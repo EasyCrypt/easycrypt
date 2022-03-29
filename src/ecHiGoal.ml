@@ -663,7 +663,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
     if matches then begin
       let p    = concretize_form ptenv p in
       let cpos =
-        let test = fun _ fp ->
+        let test = fun _ hyps fp ->
           let fp =
             match fp.f_node with
             | Fapp (h, hargs) when List.length hargs > na ->
@@ -675,7 +675,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
             then `Accept (-1)
             else `Continue
         in
-          try  FPosition.select ?o test target
+          try  FPosition.select ?o test hyps target
           with InvalidOccurence ->
             tc_error !!tc "invalid occurences selector"
       in

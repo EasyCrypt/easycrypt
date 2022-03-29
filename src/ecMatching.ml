@@ -825,50 +825,82 @@ module FPosition = struct
 
   (* ------------------------------------------------------------------ *)
   let select ?o test =
-    let rec doit1 ctxt pos fp =
-      match test ctxt fp with
+    let module Ctxt = struct
+      type ctxt = Sid.t * LDecl.hyps
+
+      let add_memory (m, mty) ((ctxt, hyps) : ctxt) =
+        (Sid.add m ctxt, EcEnv.LDecl.add_local ~onlyid:true m (LD_mem mty) hyps)
+
+      let add_module (mx, mty) ((ctxt, hyps) : ctxt) =
+        (Sid.add mx ctxt, EcEnv.LDecl.add_local ~onlyid:true mx (LD_modty mty) hyps)
+
+      let add_local (x, xty) ((ctxt, hyps) : ctxt) =
+        (Sid.add x ctxt, EcEnv.LDecl.add_local ~onlyid:true x (LD_var (xty, None)) hyps)
+
+      let add_binding ((x, gty) : binding) (ce : ctxt) =
+        match gty with
+        | GTty    xty -> add_local  (x, xty) ce
+        | GTmem   m   -> add_memory (x, m  ) ce
+        | GTmodty mty -> add_module (x, mty) ce
+    end in
+
+    let rec doit1 ce pos fp =
+      match let ctxt, env = ce in test ctxt env fp with
       | `Accept i -> Some (`Select i)
       | `Continue -> begin
         let subp =
           match fp.f_node with
-          | Fif    (c, f1, f2) -> doit pos (`WithCtxt (ctxt, [c; f1; f2]))
-          | Fapp   (f, fs)     -> doit pos (`WithCtxt (ctxt, f :: fs))
-          | Ftuple fs          -> doit pos (`WithCtxt (ctxt, fs))
+          | Fif    (c, f1, f2) -> doit pos (`WithCtxt (ce, [c; f1; f2]))
+          | Fapp   (f, fs)     -> doit pos (`WithCtxt (ce, f :: fs))
+          | Ftuple fs          -> doit pos (`WithCtxt (ce, fs))
 
           | Fmatch (b, fs, _) ->
-               doit pos (`WithCtxt (ctxt, b :: fs))
+               doit pos (`WithCtxt (ce, b :: fs))
 
-          | Fquant (_, b, f) ->
-              let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
-              let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
-              doit pos (`WithCtxt (ctxt, [f]))
+          | Fquant (_, bs, f) ->
+              let ce = List.fold_left ((^~) Ctxt.add_binding) ce bs in
+              doit pos (`WithCtxt (ce, [f]))
 
           | Flet (lp, f1, f2) ->
-              let subctxt = List.fold_left ((^~) Sid.add) ctxt (lp_ids lp) in
-              doit pos (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
+              let subce = List.fold_left ((^~) Ctxt.add_local) ce (lp_bind lp) in
+              doit pos (`WithSubCtxt [(ce, f1); (subce, f2)])
 
           | Fproj (f, _) ->
-              doit pos (`WithCtxt (ctxt, [f]))
+              doit pos (`WithCtxt (ce, [f]))
 
           | Fpr pr ->
-              let subctxt = Sid.add pr.pr_mem ctxt in
-              doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event)])
+              let subce =
+                let env = EcEnv.LDecl.toenv (snd ce) in
+                let m, mty = EcEnv.Fun.prF_memenv pr.pr_mem pr.pr_fun env in
+                Ctxt.add_memory (m, mty) ce
+              in doit pos (`WithSubCtxt [(ce, pr.pr_args); (subce, pr.pr_event)])
 
-          | FhoareF hs ->
-              doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
+          | FhoareF hf ->
+              let subce_pr, subce_po =
+                let env = EcEnv.LDecl.toenv (snd ce) in
+                let mpr, mpo = EcEnv.Fun.hoareF_memenv hf.hf_f env in
+                (Ctxt.add_memory mpr ce, Ctxt.add_memory mpo ce) in
+              doit pos (`WithSubCtxt [(subce_pr, hf.hf_pr); (subce_po, hf.hf_po)])
 
           (* TODO: A: From what I undertand, there is an error there:
              it should be  (subctxt, hs.bhf_bd) *)
-          | FbdHoareF hs ->
-              let subctxt = Sid.add EcFol.mhr ctxt in
-              doit pos (`WithSubCtxt ([(subctxt, hs.bhf_pr);
-                                       (subctxt, hs.bhf_po);
-                                       (   ctxt, hs.bhf_bd)]))
+          | FbdHoareF hf ->
+              let subce_pr, subce_po =
+                let env = EcEnv.LDecl.toenv (snd ce) in
+                let mpr, mpo = EcEnv.Fun.hoareF_memenv hf.bhf_f env in
+                (Ctxt.add_memory mpr ce, Ctxt.add_memory mpo ce) in
+              doit pos (`WithSubCtxt ([(subce_pr, hf.bhf_pr);
+                                       (subce_po, hf.bhf_po);
+                                       (ce      , hf.bhf_bd)]))
 
-          | FequivF es ->
-              let ctxt = Sid.add EcFol.mleft  ctxt in
-              let ctxt = Sid.add EcFol.mright ctxt in
-              doit pos (`WithCtxt (ctxt, [es.ef_pr; es.ef_po]))
+          | FequivF ef ->
+             let ce_pr, ce_po =
+               let env = EcEnv.LDecl.toenv (snd ce) in
+               let (prl, prr), (pol, por) =
+                 EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+               (Ctxt.add_memory prr (Ctxt.add_memory prl ce),
+                Ctxt.add_memory por (Ctxt.add_memory pol ce)) in
+              doit pos (`WithSubCtxt [(ce_pr, ef.ef_pr); (ce_po, ef.ef_po)])
 
           | _ -> None
         in
@@ -878,16 +910,16 @@ module FPosition = struct
     and doit pos fps =
       let fps =
         match fps with
-        | `WithCtxt (ctxt, fps) ->
+        | `WithCtxt (ce, fps) ->
             List.mapi
               (fun i fp ->
-                doit1 ctxt (i::pos) fp |> omap (fun p -> (i, p)))
+                doit1 ce (i::pos) fp |> omap (fun p -> (i, p)))
               fps
 
         | `WithSubCtxt fps ->
             List.mapi
-              (fun i (ctxt, fp) ->
-                doit1 ctxt (i::pos) fp |> omap (fun p -> (i, p)))
+              (fun i (ce, fp) ->
+                doit1 ce (i::pos) fp |> omap (fun p -> (i, p)))
               fps
       in
 
@@ -897,9 +929,9 @@ module FPosition = struct
         | _  -> Some (Mint.of_list fps)
 
     in
-      fun fp ->
+      fun hyps fp ->
         let cpos =
-          match doit [] (`WithCtxt (Sid.empty, [fp])) with
+          match doit [] (`WithCtxt ((Sid.empty, hyps), [fp])) with
           | None   -> Mint.empty
           | Some p -> p
         in
@@ -932,7 +964,7 @@ module FPosition = struct
       | _          -> `NoKey
     in
 
-    let test xconv _ tp =
+    let test xconv _ hyps tp =
       if not (keycheck tp key) then `Continue else begin
         let (tp, ti) =
           match tp.f_node with
@@ -944,7 +976,7 @@ module FPosition = struct
         if EcReduction.xconv xconv hyps p tp then `Accept ti else `Continue
       end
 
-    in select ?o (test xconv) target
+    in select ?o (test xconv) hyps target
 
   (* ------------------------------------------------------------------ *)
   let map (p : ptnpos) (tx : form -> form) (f : form) =
