@@ -14,10 +14,7 @@ clone include Word with
   op   n             <- n,
   op   dchar         <- false
 
-proof Alphabet.* by case, ge0_n by apply/ltzW/gt0_n
-
-rename [op] "oflist"  as "bits2w"
-       [op] "tolist"  as "w2bits".
+proof Alphabet.* by case, ge0_n by apply/ltzW/gt0_n.
 
 (* -------------------------------------------------------------------- *)
 op zerow: word = offun (fun i => false).
