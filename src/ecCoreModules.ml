@@ -694,9 +694,11 @@ let p_mr_equal a_equal mr1 mr2 =
   && Msym.equal (PreOI.equal a_equal) mr1.mr_oinfos mr2.mr_oinfos
 
 let has_compl_restriction mr =
-  Msym.exists (fun _ oi ->
-      (PreOI.costs oi) <> `Unbounded
-    ) mr.mr_oinfos
+  Msym.exists (fun _ oi -> (PreOI.costs oi) <> `Unbounded) mr.mr_oinfos
+
+let mr_is_empty mr =
+     not (has_compl_restriction mr)
+  && Msym.for_all (fun _ oi -> [] = PreOI.allowed oi && PreOI.is_in oi) mr.mr_oinfos
 
 let mr_xpaths_fv (m : mr_xpaths) : int Mid.t =
   EcPath.Sx.fold

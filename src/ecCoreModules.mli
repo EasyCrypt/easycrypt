@@ -145,7 +145,6 @@ module PreOI : sig
 end
 
 (* -------------------------------------------------------------------- *)
-
 type mr_xpaths = EcPath.Sx.t use_restr
 
 type mr_mpaths = EcPath.Sm.t use_restr
@@ -165,6 +164,8 @@ val p_mr_equal :
 val p_mr_hash : ('a -> int) -> 'a p_mod_restr -> int
 
 val has_compl_restriction : 'a p_mod_restr -> bool
+
+val mr_is_empty : 'a p_mod_restr -> bool
 
 val mr_xpaths_fv : mr_xpaths -> int EcIdent.Mid.t
 val mr_mpaths_fv : mr_mpaths -> int EcIdent.Mid.t
