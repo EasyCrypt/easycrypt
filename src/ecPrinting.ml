@@ -711,7 +711,7 @@ let pp_mem (ppe : PPEnv.t) fmt x =
 
 let pp_memtype ppe fmt mt =
   match EcMemory.for_printing mt with
-  | None -> ()
+  | None -> Format.fprintf fmt "{}"
   | Some (arg, decl) ->
     match arg with
     | Some arg ->
@@ -1834,9 +1834,10 @@ and pp_orclinfo ppe fmt (sym, oi) =
     pp_symbol sym
     (pp_orclinfo_bare ppe) oi
 
-and pp_orclinfos ppe fmt ois =
-  Format.fprintf fmt "[@[<hv>%a@]]"
-    (pp_list ",@ " (pp_orclinfo ppe)) (Msym.bindings ois)
+and pp_orclinfos ppe fmt mr =
+  if not (EcModules.mr_is_empty mr) then
+    Format.fprintf fmt "[@[<hv>%a@]]"
+      (pp_list ",@ " (pp_orclinfo ppe)) (Msym.bindings mr.mr_oinfos)
 
 (* -------------------------------------------------------------------- *)
 and pp_mem_restr ppe fmt mr =
@@ -1884,7 +1885,7 @@ and pp_mem_restr ppe fmt mr =
 and pp_restr ppe fmt mr =
   Format.fprintf fmt "%a%a"
     (pp_mem_restr ppe) mr
-    (pp_orclinfos ppe) mr.mr_oinfos
+    (pp_orclinfos ppe) mr
 
 (* -------------------------------------------------------------------- *)
 and pp_modtype (ppe : PPEnv.t) fmt (mty : module_type) =
