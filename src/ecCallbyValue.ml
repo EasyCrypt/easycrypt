@@ -65,29 +65,25 @@ type subst = Subst.subst
 let rec f_eq_simpl st f1 f2 =
   if f_equal f1 f2 then f_true else
 
-  match f1.f_node, f2.f_node with
-  | Ftuple args1, Ftuple args2 ->
-    f_ands0_simpl (List.map2 (f_eq_simpl st) args1 args2)
+  match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
+  | (Fop (p1, _), args1), (Fop (p2, _), args2)
+      when EcEnv.Op.is_dtype_ctor st.st_env p1
+           && EcEnv.Op.is_dtype_ctor st.st_env p2 ->
+
+    let idx p =
+      let idx = EcEnv.Op.by_path p st.st_env in
+      snd (EcDecl.operator_as_ctor idx)
+    in
+    if   idx p1 <> idx p2
+    then f_false
+    else f_ands0_simpl (List.map2 (f_eq_simpl st) args1 args2)
+
   | _, _ ->
-    match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
-    | (Fop (p1, _), args1), (Fop (p2, _), args2)
-        when EcEnv.Op.is_dtype_ctor st.st_env p1
-             && EcEnv.Op.is_dtype_ctor st.st_env p2 ->
-
-      let idx p =
-        let idx = EcEnv.Op.by_path p st.st_env in
-        snd (EcDecl.operator_as_ctor idx)
-      in
-      if   idx p1 <> idx p2
-      then f_false
-      else f_ands0_simpl (List.map2 (f_eq_simpl st) args1 args2)
-
-    | _, _ ->
-      if (EqTest.for_type st.st_env f1.f_ty EcTypes.tunit &&
-          EqTest.for_type st.st_env f2.f_ty EcTypes.tunit) ||
-         is_alpha_eq st.st_hyps f1 f2
-      then f_true
-      else EcFol.f_eq_simpl f1 f2
+    if (EqTest.for_type st.st_env f1.f_ty EcTypes.tunit &&
+        EqTest.for_type st.st_env f2.f_ty EcTypes.tunit) ||
+       is_alpha_eq st.st_hyps f1 f2
+    then f_true
+    else EcFol.f_eq_simpl f1 f2
 
 (* -------------------------------------------------------------------- *)
 let rec f_map_get_simpl st m x bty =

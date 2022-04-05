@@ -695,7 +695,7 @@ section Security_Aux.
     pose v := H _ _. rewrite !negb_or => [[]] Hg3 Hcilog Hstareq.
     rewrite Hg3 /=. 
     case: (G1.bad{m1}) => [_ -> | ] //=. 
-    move=> Hbad Hsize Hstar;rewrite !andaE !negb_and /= 2!negb_or /= -!andaE.
+    move=> Hbad Hsize Hstar; rewrite !negb_and /= 2!negb_or /= -!andaE.
     case (v = G2.v{m2}) => />.
     + by case: (G1.cstar{m2}) Hstareq Hstar => />.
     move=> Hv Ha _;left.
