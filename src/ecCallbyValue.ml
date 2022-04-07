@@ -124,32 +124,40 @@ and f_map_set_simplify st m x =
   | _ -> m
 
 (* -------------------------------------------------------------------- *)
-type args =
-  | Aempty of ty
-  | Aapp   of form list * args
+module Args : sig
+  type args = private { resty : ty; stack : form list; }
 
-let is_Aempty = function Aempty _ -> true | _ -> false
-let is_Aapp   = function Aapp   _ -> true | _ -> false
+  val empty   : ty -> args
+  val create  : ty -> form list -> args
+  val isempty : args -> bool
+  val push1   : form -> args -> args
+  val pushn   : form list -> args -> args
+  val pop     : args -> (form * args) option
+end = struct
+  type args = { resty : ty; stack : form list; }
 
-let mk_args args args' =
-  if List.is_empty args then args' else Aapp (args, args')
+  let empty (ty : ty) : args =
+    { resty = ty; stack = []; }
 
-let rec get1_args = function
-  | Aempty _ -> None
-  | Aapp ([], args) -> get1_args args
-  | Aapp (a :: args, args') -> Some (a, mk_args args args')
+  let create (resty : ty) (stack : form list) : args =
+    { resty; stack; }
 
-let rec flatten_args = function
-  | Aempty ty -> [], ty
-  | Aapp(args, Aempty ty) -> args, ty
-  | Aapp(args, args') ->
-    let args', ty = flatten_args args' in
-    args @ args', ty
+  let isempty (args : args) : bool =
+    List.is_empty args.stack
 
-let rec args_is_empty = function
-  | Aempty _ -> true
-  | Aapp ([], args) when args_is_empty args  -> true
-  | _ -> false
+  let push1 (f : form) (args : args) =
+    { args with stack = f :: args.stack; }
+
+  let pushn (fs : form list) (args : args) =
+    { args with stack = fs @ args.stack; }
+
+  let pop (args : args) : (form * args) option =
+    match args.stack with
+    | [] -> None
+    | f :: stack -> Some (f, { args with stack; })
+end
+
+type args = Args.args
 
 (* -------------------------------------------------------------------- *)
 let norm_xfun st s f =
@@ -163,7 +171,7 @@ let norm_e    s e  = Subst.subst_e s e
 (* -------------------------------------------------------------------- *)
 let rec norm st s f =
 (* FIXME : I think substitution in type is wrong *)
- let f = cbv st s f (Aempty (Subst.subst_ty s f.f_ty)) in
+ let f = cbv st s f (Args.empty (Subst.subst_ty s f.f_ty)) in
  norm_lambda st f
 
 and norm_cost st s c =
@@ -205,24 +213,23 @@ and norm_lambda (st : state) (f : form) =
 
 (* -------------------------------------------------------------------- *)
 and betared st s bd f args =
-  match bd, args with
-  | _, Aapp([], args) -> betared st s bd f args
+  match bd, Args.pop args with
+  | [], _ ->
+     cbv st s f args
 
-  | [], _ -> cbv st s f args
+  | _, None ->
+     Subst.subst s (f_quant Llambda bd f)
 
-  | _ , Aempty _ -> Subst.subst s (f_quant Llambda bd f)
-
-  | (x, GTty _) :: bd, Aapp (v :: args, args') ->
-    let s = Subst.bind_local s x v in
-    betared st s bd f (Aapp(args,args'))
-
-  | _::_, _ -> assert false
+  | (x, gty) :: bd, Some (v, args) ->
+     let _ : ty = EcFol.as_gtty gty in
+     let s = Subst.bind_local s x v in
+     betared st s bd f args
 
 (* -------------------------------------------------------------------- *)
 and app_red st f1 args =
   match f1.f_node with
   (* β-reduction *)
-  | Fquant (Llambda, bd, f2) when not (args_is_empty args) && st.st_ri.beta ->
+  | Fquant (Llambda, bd, f2) when not (Args.isempty args) && st.st_ri.beta ->
       betared st Subst.subst_id bd f2 args
 
   (* ι-reduction (records projection) *)
@@ -230,7 +237,7 @@ and app_red st f1 args =
       st.st_ri.iota && EcEnv.Op.is_projection st.st_env p
     -> begin
 
-    let mk, args1 = oget (get1_args args) in
+    let mk, args1 = oget (Args.pop args) in
 
     match mk.f_node with
     | Fapp ({ f_node = Fop (mkp, _) }, mkargs)
@@ -240,8 +247,7 @@ and app_red st f1 args =
       app_red st (List.nth mkargs v) args1
 
     | _ ->
-      let args, ty = flatten_args args in
-      f_app f1 args ty
+      f_app f1 args.stack args.resty
   end
 
   (* ι-reduction (fix-def reduction) *)
@@ -251,7 +257,7 @@ and app_red st f1 args =
     let module E = struct exception NoCtor end in
 
     try
-      let args, ty = flatten_args args in
+      let Args.{ resty = ty; stack = args; } = args in
       let op  = oget (EcEnv.Op.by_path_opt p st.st_env) in
       let fix = EcDecl.operator_as_fix op in
 
@@ -301,7 +307,7 @@ and app_red st f1 args =
         EcFol.Fsubst.subst_tvar
           (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
 
-      cbv st subst body (mk_args eargs (Aempty ty))
+      cbv st subst body (Args.create ty eargs)
     with E.NoCtor ->
       reduce_user_delta st f1 p tys args
   end
@@ -310,13 +316,11 @@ and app_red st f1 args =
     reduce_user_delta st f1 p tys args
 
   | _ ->
-    let args, ty = flatten_args args in
-    f_app f1 args ty
+    f_app f1 args.stack args.resty
 
 and reduce_user_delta st f1 p tys args =
   let f2 =
-    let args, ty = flatten_args args in
-    f_app f1 args ty in
+    f_app f1 args.stack args.resty in
 
   match reduce_user_with_exn st f2 with
   | f -> f
@@ -346,13 +350,13 @@ and reduce_user st f =
 
 (* -------------------------------------------------------------------- *)
 and cbv_init st s f =
-  cbv st s f (Aempty (Subst.subst_ty s f.f_ty))
+  cbv st s f (Args.empty (Subst.subst_ty s f.f_ty))
 
 (* -------------------------------------------------------------------- *)
 and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   match f.f_node with
   | Fquant ((Lforall | Lexists) as q, b, f) -> begin
-    assert (is_Aempty args);
+    assert (Args.isempty args);
 
     let b, f =
       let s, b = Subst.add_bindings s b in
@@ -368,7 +372,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
   end
 
   | Fquant (Llambda, [x, GTty _], { f_node = Fapp (fn, fnargs) })
-      when st.st_ri.eta && args_is_empty args && EcReduction.can_eta x (fn, fnargs)
+      when st.st_ri.eta && Args.isempty args && EcReduction.can_eta x (fn, fnargs)
     ->
     let rfn = f_app fn (List.take (List.length fnargs - 1) fnargs) f.f_ty in
     cbv st s rfn args
@@ -398,7 +402,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
             let idx = EcEnv.Op.by_path p st.st_env in
             let idx = snd (EcDecl.operator_as_ctor idx) in
             let br  = oget (List.nth_opt bs idx) in
-            cbv st s br (Aapp (cargs, args))
+            cbv st s br (Args.pushn cargs args)
 
         | _ ->
           let bs = List.map (norm st s) bs in
@@ -429,7 +433,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
       app_red st (f_let p f1 f2) args
     end
 
-  | Fint _ -> assert (is_Aempty args); f
+  | Fint _ -> assert (Args.isempty args); f
 
   | Flocal _ -> app_red st (Subst.subst s f) args
 
@@ -455,10 +459,10 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | Fapp (f1, args1) ->
     let args1 = List.map (cbv_init st s) args1 in
-    cbv st s f1 (Aapp(args1, args))
+    cbv st s f1 (Args.pushn args1 args)
 
   | Ftuple args1 ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     f_tuple (List.map (cbv_init st s) args1)
 
   | Fproj (f1, i) ->
@@ -470,7 +474,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     app_red st f1 args
 
   | FhoareF hf ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s mhr));
     let hf_pr = norm st s hf.hf_pr in
     let hf_po = norm st s hf.hf_po in
@@ -478,7 +482,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     f_hoareF_r { hf_pr; hf_f; hf_po }
 
   | FhoareS hs ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst hs.hs_m)));
     let hs_pr = norm st s hs.hs_pr in
     let hs_po = norm st s hs.hs_po in
@@ -487,7 +491,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     f_hoareS_r { hs_pr; hs_po; hs_s; hs_m }
 
   | FcHoareF chf ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s mhr));
     let chf_pr = norm st s chf.chf_pr in
     let chf_po = norm st s chf.chf_po in
@@ -496,7 +500,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     f_cHoareF_r { chf_pr; chf_f; chf_po; chf_co = chf_c; }
 
   | FcHoareS chs ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst chs.chs_m)));
     let chs_pr = norm st s chs.chs_pr in
     let chs_po = norm st s chs.chs_po in
@@ -506,7 +510,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     f_cHoareS_r { chs_pr; chs_po; chs_s; chs_m; chs_co = chs_c; }
 
   | FbdHoareF hf ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s mhr));
     let bhf_pr = norm st s hf.bhf_pr in
     let bhf_po = norm st s hf.bhf_po in
@@ -515,7 +519,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     f_bdHoareF_r { hf with bhf_pr; bhf_po; bhf_f; bhf_bd }
 
   | FbdHoareS bhs ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst bhs.bhs_m)));
     let bhs_pr = norm st s bhs.bhs_pr in
     let bhs_po = norm st s bhs.bhs_po in
@@ -525,7 +529,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     f_bdHoareS_r { bhs with bhs_m; bhs_pr; bhs_po; bhs_s; bhs_bd }
 
   | FequivF ef ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s mleft));
     assert (not (Subst.has_mem s mright));
     let ef_pr = norm st s ef.ef_pr in
@@ -535,7 +539,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     f_equivF_r {ef_pr; ef_fl; ef_fr; ef_po }
 
   | FequivS es ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst es.es_ml)));
     assert (not (Subst.has_mem s (fst es.es_mr)));
     let es_pr = norm st s es.es_pr in
@@ -547,7 +551,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     f_equivS_r {es_ml; es_mr; es_pr; es_sl; es_sr; es_po }
 
   | FeagerF eg ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s mleft));
     assert (not (Subst.has_mem s mright));
     let eg_pr = norm st s eg.eg_pr in
@@ -559,7 +563,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     f_eagerF_r {eg_pr; eg_sl; eg_fl; eg_fr; eg_sr; eg_po }
 
   | Fcoe coe ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s (fst coe.coe_mem)));
     let coe_pre = norm st s coe.coe_pre in
     let coe_e   = norm_e s coe.coe_e in
@@ -574,7 +578,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     end
 
   | Fpr pr ->
-    assert (is_Aempty args);
+    assert (Args.isempty args);
     assert (not (Subst.has_mem s mhr));
     let pr_mem   = Subst.subst_m s pr.pr_mem in
     let pr_fun   = norm_xfun st s pr.pr_fun in
