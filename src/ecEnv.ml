@@ -1574,119 +1574,6 @@ module Auto = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Ty = struct
-  type t = EcDecl.tydecl
-
-  let by_path_opt (p : EcPath.path) (env : env) =
-    omap
-      check_not_suspended
-      (MC.by_path (fun mc -> mc.mc_tydecls) (IPPath p) env)
-
-  let by_path (p : EcPath.path) (env : env) =
-    match by_path_opt p env with
-    | None -> lookup_error (`Path p)
-    | Some obj -> obj
-
-  let add (p : EcPath.path) (env : env) =
-    let obj = by_path p env in
-      MC.import_tydecl p obj env
-
-  let lookup qname (env : env) =
-    MC.lookup_tydecl qname env
-
-  let lookup_opt name env =
-    try_lf (fun () -> lookup name env)
-
-  let lookup_path name env =
-    fst (lookup name env)
-
-  let defined (name : EcPath.path) (env : env) =
-    match by_path_opt name env with
-    | Some { tyd_type = `Concrete _ } -> true
-    | _ -> false
-
-  let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
-    match by_path_opt name env with
-    | Some ({ tyd_type = `Concrete body } as tyd) ->
-        EcTypes.Tvar.subst
-          (EcTypes.Tvar.init (List.map fst tyd.tyd_params) args)
-          body
-    | _ -> raise (LookupFailure (`Path name))
-
-  let rec hnorm (ty : ty) (env : env) =
-    match ty.ty_node with
-    | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
-    | _ -> ty
-
-  let rec decompose_fun (ty : ty) (env : env) : dom * ty =
-    match (hnorm ty env).ty_node with
-    | Tfun (ty1, ty2) ->
-        fst_map (fun tys -> ty1 :: tys) (decompose_fun ty2 env)
-    | _ -> ([], ty)
-
-  let signature env =
-    let rec doit acc ty =
-      match (hnorm ty env).ty_node with
-      | Tfun (dom, codom) -> doit (dom::acc) codom
-      | _ -> (List.rev acc, ty)
-    in fun ty -> doit [] ty
-
-  let scheme_of_ty mode (ty : ty) (env : env) =
-    let ty = hnorm ty env in
-      match ty.ty_node with
-      | Tconstr (p, tys) -> begin
-          match by_path_opt p env with
-          | Some ({ tyd_type = (`Datatype _ | `Record _) as body }) ->
-              let prefix   = EcPath.prefix   p in
-              let basename = EcPath.basename p in
-              let basename =
-                match body, mode with
-                | `Record   _, (`Ind | `Case) -> basename ^ "_ind"
-                | `Datatype _, `Ind           -> basename ^ "_ind"
-                | `Datatype _, `Case          -> basename ^ "_case"
-              in
-                Some (EcPath.pqoname prefix basename, tys)
-          | _ -> None
-      end
-      | _ -> None
-
-  let get_top_decl (ty : ty) (env : env) =
-    match (hnorm ty env).ty_node with
-    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys)
-    | _ -> None
-
-  let rebind name ty env =
-    let env = MC.bind_tydecl name ty env in
-
-    match ty.tyd_type with
-    | `Abstract tc ->
-        let myty =
-          let myp = EcPath.pqname (root env) name in
-          let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
-            (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
-        let instr =
-          Sp.fold
-            (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
-            tc env.env_tci
-        in
-          { env with env_tci = instr }
-
-    | _ -> env
-
-  let bind ?(import = import0) name ty env =
-    let env = if import.im_immediate then rebind name ty env else env in
-    { env with env_item =
-        mkitem import (Th_type (name, ty)) :: env.env_item }
-
-
-  let iter ?name f (env : env) =
-    gen_iter (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?name f env
-
-  let all ?check ?name (env : env) =
-    gen_all (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?check ?name env
-end
-
-(* -------------------------------------------------------------------- *)
 module Fun = struct
   type t = EcModules.function_
 
@@ -2721,12 +2608,6 @@ module NormMp = struct
     EcTypes.pv_equal (norm_pvar env pv1) (norm_pvar env pv2)
 end
 
-let rec ty_hnorm (ty : ty) (env : env) =
-    match ty.ty_node with
-    | Tconstr (p, tys) when Ty.defined p env -> ty_hnorm (Ty.unfold p tys env) env
-    | Tglob p -> NormMp.norm_tglob env p
-    | _ -> ty
-
 (* -------------------------------------------------------------------- *)
 module ModTy = struct
   type t = top_module_sig
@@ -2829,6 +2710,129 @@ module ModTy = struct
       mis_body   = items;
       mis_restr  = restr; }
 end
+
+(* -------------------------------------------------------------------- *)
+module Ty = struct
+  type t = EcDecl.tydecl
+
+  let by_path_opt (p : EcPath.path) (env : env) =
+    omap
+      check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_tydecls) (IPPath p) env)
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_tydecl p obj env
+
+  let lookup qname (env : env) =
+    MC.lookup_tydecl qname env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path name env =
+    fst (lookup name env)
+
+  let defined (name : EcPath.path) (env : env) =
+    match by_path_opt name env with
+    | Some { tyd_type = `Concrete _ } -> true
+    | _ -> false
+
+  let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
+    match by_path_opt name env with
+    | Some ({ tyd_type = `Concrete body } as tyd) ->
+        EcTypes.Tvar.subst
+          (EcTypes.Tvar.init (List.map fst tyd.tyd_params) args)
+          body
+    | _ -> raise (LookupFailure (`Path name))
+
+  let rec hnorm (ty : ty) (env : env) =
+    match ty.ty_node with
+    | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
+    | _ -> ty
+
+
+  let rec ty_hnorm (ty : ty) (env : env) =
+    match ty.ty_node with
+    | Tconstr (p, tys) when defined p env -> ty_hnorm (unfold p tys env) env
+    | Tglob p -> NormMp.norm_tglob env p
+    | _ -> ty
+
+
+  let rec decompose_fun (ty : ty) (env : env) : dom * ty =
+    match (hnorm ty env).ty_node with
+    | Tfun (ty1, ty2) ->
+        fst_map (fun tys -> ty1 :: tys) (decompose_fun ty2 env)
+    | _ -> ([], ty)
+
+  let signature env =
+    let rec doit acc ty =
+      match (hnorm ty env).ty_node with
+      | Tfun (dom, codom) -> doit (dom::acc) codom
+      | _ -> (List.rev acc, ty)
+    in fun ty -> doit [] ty
+
+  let scheme_of_ty mode (ty : ty) (env : env) =
+    let ty = hnorm ty env in
+      match ty.ty_node with
+      | Tconstr (p, tys) -> begin
+          match by_path_opt p env with
+          | Some ({ tyd_type = (`Datatype _ | `Record _) as body }) ->
+              let prefix   = EcPath.prefix   p in
+              let basename = EcPath.basename p in
+              let basename =
+                match body, mode with
+                | `Record   _, (`Ind | `Case) -> basename ^ "_ind"
+                | `Datatype _, `Ind           -> basename ^ "_ind"
+                | `Datatype _, `Case          -> basename ^ "_case"
+              in
+                Some (EcPath.pqoname prefix basename, tys)
+          | _ -> None
+      end
+      | _ -> None
+
+  let get_top_decl (ty : ty) (env : env) =
+    match (ty_hnorm ty env).ty_node with
+    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys)
+    | _ -> None
+
+  let rebind name ty env =
+    let env = MC.bind_tydecl name ty env in
+
+    match ty.tyd_type with
+    | `Abstract tc ->
+        let myty =
+          let myp = EcPath.pqname (root env) name in
+          let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
+            (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
+        let instr =
+          Sp.fold
+            (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
+            tc env.env_tci
+        in
+          { env with env_tci = instr }
+
+    | _ -> env
+
+  let bind ?(import = import0) name ty env =
+    let env = if import.im_immediate then rebind name ty env else env in
+    { env with env_item =
+        mkitem import (Th_type (name, ty)) :: env.env_item }
+
+
+  let iter ?name f (env : env) =
+    gen_iter (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?name f env
+
+  let all ?check ?name (env : env) =
+    gen_all (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?check ?name env
+end
+
+let ty_hnorm = Ty.ty_hnorm
 
 (* -------------------------------------------------------------------- *)
 module Op = struct
