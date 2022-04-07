@@ -2507,19 +2507,25 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
   match me.pl_desc with
   | Pm_ident m ->
     let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
-    let extraparams = sig_.miss_params in
-    let allparams = stparams @ extraparams in
-    if allparams <> [] && not attop then
+
+    let nb_params = List.length stparams + List.length sig_.miss_params in
+    if nb_params > 0 && not attop then
       tyerror me.pl_loc env
-        (InvalidModAppl (MAE_WrongArgCount(0,List.length allparams)));
+        (InvalidModAppl (MAE_WrongArgCount(0,nb_params)));
     let me, _ = EcEnv.Mod.by_mpath mp env in
     let arity = List.length stparams in
-    let me =
-      { me with
+
+    assert (List.length sig_.miss_params = List.length me.me_params);
+
+    let extraparams = me.me_params in
+    let allparams = stparams @ extraparams in
+
+    let me = {
         me_name  = x.pl_desc;
         me_body  = ME_Alias (arity,mp);
         me_params = allparams;
         me_sig_body = me.me_sig_body;
+        me_comps    = me.me_comps;
       } in
     me
   | Pm_struct ps ->
