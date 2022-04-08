@@ -47,6 +47,16 @@ module MainD (D : RO_Distinguisher) (RO : RO) = {
 }.
 
 (* -------------------------------------------------------------------- *)
+module type ROmap = {
+  proc init  ()                    : unit
+  proc get   (x : in_t)            : out_t
+  proc set   (x : in_t, y : out_t) : unit
+  proc rem   (x : in_t)            : unit
+  proc sample(x : in_t)            : unit
+  proc restrK()                    : (in_t, out_t) fmap
+}.
+
+(* -------------------------------------------------------------------- *)
 module type FRO = {
   proc init    ()                    : unit
   proc get     (x : in_t)            : out_t
@@ -64,7 +74,8 @@ module type FRO_Distinguisher (G : FRO) = {
 
 (* -------------------------------------------------------------------- *)
 abstract theory MkRO.
-module RO : RO = {
+
+module RO : RO, ROmap = {
   var m : (in_t, out_t) fmap
 
   proc init () = {
@@ -97,6 +108,19 @@ module RO : RO = {
     return m;
   }
 }.
+
+module LRO : RO = {
+  proc init = RO.init
+
+  proc get = RO.get
+
+  proc set = RO.set 
+
+  proc rem = RO.rem
+
+  proc sample(x : in_t) = { }
+}.
+
 end MkRO.
 
 clone include MkRO.
@@ -233,18 +257,6 @@ end section LL.
 theory FullEager.
 require import List FSet.
 require (*--*) IterProc.
-
-module LRO : RO = {
-  proc init = RO.init
-
-  proc get = RO.get
-
-  proc set = RO.set 
-
-  proc rem = RO.rem
-
-  proc sample(x : in_t) = { }
-}.
 
 (* -------------------------------------------------------------------- *)
 (** Hides internals in normal usage while allowing use where needed    **)
@@ -778,6 +790,10 @@ symmetry; call (LRO_RRO_D D); auto=> /> &1.
 by apply/fmap_eqP=> x; rewrite restrP mapE; case: (RO.m.[x]{1}).
 qed.
 
+equiv RO_LRO : MainD(D,RO).distinguish ~ MainD(D,LRO).distinguish :
+  ={glob D, arg} ==> ={res, glob D}.
+proof. by proc; call RO_LRO_D; inline*; auto. qed.
+
 end section.
 end FullEager.
 
@@ -837,7 +853,7 @@ local module GenFinRO (RO:RO) = {
   }
 }.
 
-local module D' (RO:RO) = MainD (D, GenFinRO(RO)).
+local module D' (RO:RO) = MainD(D, GenFinRO(RO)).
 
 local equiv RO_LFinRO_init : RO.init ~ GenFinRO(LRO).init : ={glob RO} ==> ={res, glob RO}.
 proof.
@@ -847,8 +863,7 @@ qed.
 
 local equiv GFinRO_RO_init : 
    GenFinRO(RO).init ~ FinRO.init : 
-     ={RO.m} ==>
-     ={RO.m} /\ forall (x : in_t), x \in RO.m{1}.
+     true ==> ={RO.m} /\ forall (x : in_t), x \in RO.m{1}.
 proof.
   proc; inline *.
   while ( ={l, RO.m} /\ (forall x, x \in RO.m \/ x \in l){1}); auto => />;1: smt (head_behead mem_set).
@@ -856,7 +871,7 @@ proof.
 qed.
 
 equiv RO_FinRO_D : MainD(D,RO).distinguish ~ MainD(D,FinRO).distinguish :
-  ={glob D, RO.m, arg} ==> ={res, glob D}.
+  ={glob D, arg} ==> ={res, glob D}.
 proof.
   proc *.
   transitivity*{1} {r <@ MainD(D, GenFinRO(LRO)).distinguish(x); } => //;1:smt().

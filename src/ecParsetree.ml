@@ -67,25 +67,29 @@ type plpattern_r =
 
 and plpattern = plpattern_r located
 
+type ppattern =
+| PPApp of (pqsymbol * ptyannot option) * osymbol list
+
 type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
 
 and pexpr_r =
-  | PEcast    of pexpr * pty                       (* type cast          *)
-  | PEint     of zint                              (* int. literal       *)
+  | PEcast   of pexpr * pty                       (* type cast          *)
+  | PEint    of zint                              (* int. literal       *)
   | PEdecimal of (zint * (int * zint))             (* dec. literal       *)
-  | PEident   of pqsymbol * ptyannot option        (* symbol             *)
-  | PEapp     of pexpr * pexpr list                (* op. application    *)
-  | PElet     of plpattern * pexpr_wty * pexpr     (* let binding        *)
-  | PEtuple   of pexpr list                        (* tuple constructor  *)
-  | PEif      of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
-  | PEforall  of ptybindings * pexpr               (* forall quant.      *)
-  | PEexists  of ptybindings * pexpr               (* exists quant.      *)
-  | PElambda  of ptybindings * pexpr               (* lambda abstraction *)
-  | PErecord  of pexpr option * pexpr rfield list  (* record             *)
-  | PEproj    of pexpr * pqsymbol                  (* projection         *)
-  | PEproji   of pexpr * int                       (* tuple projection   *)
-  | PEscope   of pqsymbol * pexpr                  (* scope selection    *)
+  | PEident  of pqsymbol * ptyannot option        (* symbol             *)
+  | PEapp    of pexpr * pexpr list                (* op. application    *)
+  | PElet    of plpattern * pexpr_wty * pexpr     (* let binding        *)
+  | PEtuple  of pexpr list                        (* tuple constructor  *)
+  | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
+  | PEmatch  of pexpr * (ppattern * pexpr) list   (* match              *)
+  | PEforall of ptybindings * pexpr               (* forall quant.      *)
+  | PEexists of ptybindings * pexpr               (* exists quant.      *)
+  | PElambda of ptybindings * pexpr               (* lambda abstraction *)
+  | PErecord of pexpr option * pexpr rfield list  (* record             *)
+  | PEproj   of pexpr * pqsymbol                  (* projection         *)
+  | PEproji  of pexpr * int                       (* tuple projection   *)
+  | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
 and pexpr_wty = pexpr * pty option
@@ -111,7 +115,13 @@ type pinstr_r =
   | PScall   of plvalue option * pgamepath * (pexpr list) located
   | PSif     of pscond * pscond list * pstmt
   | PSwhile  of pscond
+  | PSmatch  of pexpr * psmatch
   | PSassert of pexpr
+
+and psmatch = [
+  | `Full of (ppattern * pstmt) list
+  | `If   of (ppattern * pstmt) * pstmt option
+]
 
 and pscond = pexpr * pstmt
 and pinstr = pinstr_r located
@@ -265,6 +275,7 @@ and pformula_r =
   | PFside    of pformula * symbol located
   | PFapp     of pformula * pformula list
   | PFif      of pformula * pformula * pformula
+  | PFmatch   of pformula * (ppattern * pformula) list
   | PFlet     of plpattern * (pformula * pty option) * pformula
   | PFforall  of pgtybindings * pformula
   | PFexists  of pgtybindings * pformula
@@ -283,6 +294,7 @@ and pformula_r =
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
+  | PFWP       of pgamepath * pexpr list * pformula
 
 and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list
@@ -318,6 +330,9 @@ let rec pf_ident ?(raw = false) f =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
+type ptyvardecls =
+  (psymbol * pqsymbol list) list
+
 type ppattern =
 | PPApp of (pqsymbol * ptyannot option) * osymbol list
 
@@ -602,6 +617,12 @@ type pcqoptions = (bool * pcqoption) list
 type crushmode = { cm_simplify : bool; cm_solve : bool; }
 
 (* -------------------------------------------------------------------- *)
+type matchmode = [
+  | `DSided of [ `Eq | `ConstrSynced ]
+  | `SSided of side
+]
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Prepl_stmt     of trans_info
@@ -617,7 +638,9 @@ type phltactic =
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
   | Prcond         of (oside * bool * codepos1)
+  | Prmatch        of (oside * symbol * codepos1)
   | Pcond          of pcond_info
+  | Pmatch         of matchmode
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
   | Pinline        of inline_info
@@ -867,7 +890,6 @@ and ptactic_core_r =
   | Psubgoal    of ptactic_chain
   | Pnstrict    of ptactic_core
   | Padmit
-  | Pdebug
 
 (* -------------------------------------------------------------------- *)
 and ptactic_core = ptactic_core_r located
@@ -1155,7 +1177,7 @@ type global_action =
 
 type global = {
   gl_action : global_action located;
-  gl_timed  : bool;
+  gl_debug  : [`Timed | `Break] option;
 }
 
 type prog_r =

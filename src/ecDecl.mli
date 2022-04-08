@@ -43,10 +43,10 @@ and ty_dtype = {
   tydt_schcase : form;
 }
 
-val tydecl_as_concrete : tydecl -> EcTypes.ty
-val tydecl_as_abstract : tydecl -> typeclass list
-val tydecl_as_datatype : tydecl -> ty_dtype
-val tydecl_as_record   : tydecl -> form * (EcSymbols.symbol * EcTypes.ty) list
+val tydecl_as_concrete : tydecl -> EcTypes.ty option
+val tydecl_as_abstract : tydecl -> (typeclass list) option
+val tydecl_as_datatype : tydecl -> ty_dtype option
+val tydecl_as_record   : tydecl -> (form * (EcSymbols.symbol * EcTypes.ty) list) option
 
 val abs_tydecl : ?resolve:bool -> ?tc:typeclass list -> ?params:ty_pctor -> locality -> tydecl
 

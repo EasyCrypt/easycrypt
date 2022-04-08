@@ -41,3 +41,7 @@ let process_cond info tc =
     FApi.t_seqsub
       (EcPhlApp.t_equiv_app_onesided s n f1 f2)
       [ t_id; t_bdhoare_cond] tc
+
+(* -------------------------------------------------------------------- *)
+let process_match infos tc =
+  t_hS_or_bhS_or_eS ~te:(t_equiv_match infos) tc
