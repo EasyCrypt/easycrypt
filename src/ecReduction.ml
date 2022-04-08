@@ -582,9 +582,9 @@ and deltap      = [`Yes | `No | `Force]
 and rlogic_info = [`Full | `ProductCompat] option
 
 (* -------------------------------------------------------------------- *)
-let full_red = {
+let full_red ~opaque = {
   beta    = true;
-  delta_p = (fun _ -> `Yes);
+  delta_p = (fun _ -> if opaque then `Force else `Yes);
   delta_h = EcUtils.predT;
   zeta    = true;
   iota    = true;
@@ -610,13 +610,15 @@ let beta_red     = { no_red with beta = true; }
 let betaiota_red = { no_red with beta = true; iota = true; }
 
 let nodelta =
-  { full_red with
+  { (full_red ~opaque:false) with
       delta_h = EcUtils.pred0;
       delta_p = (fun _ -> `No); }
 
 let delta = { no_red with delta_p = (fun _ -> `Yes); }
 
-let full_compat = { full_red with logic = Some `ProductCompat; }
+let full_compat = {
+  (full_red ~opaque:false) with
+    logic = Some `ProductCompat; }
 
 (* -------------------------------------------------------------------- *)
 type not_reducible = NoHead | NeedSubTerm
@@ -1439,7 +1441,7 @@ let reduce_user_gen simplify ri env hyps f =
   with NotRed _ -> raise NotReducible
 
 (* -------------------------------------------------------------------- *)
-let is_conv ?(ri = full_red) hyps f1 f2 =
+let is_conv ?(ri = full_red ~opaque:false) hyps f1 f2 =
   if f_equal f1 f2 then true
   else
     let ri, env = init_redinfo ri hyps in
