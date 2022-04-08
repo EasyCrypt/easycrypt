@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcMaps
 open EcPath
@@ -17,7 +9,7 @@ open EcFol
 
 (* -------------------------------------------------------------------- *)
 type alias_clash =
- | AC_concrete_abstract of mpath * prog_var
+ | AC_concrete_abstract of mpath * xpath
  | AC_abstract_abstract of mpath * mpath
 
 exception AliasClash of env * alias_clash
@@ -42,9 +34,11 @@ module Mpv : sig
 
   val empty : ('a,'b) t
 
-  val check_npv_mp : env -> prog_var -> mpath -> EcEnv.use -> unit
+  val check_npv_mp :
+    env -> xpath -> mpath -> use use_restr -> unit
 
-  val check_mp_mp : env -> mpath -> EcEnv.use -> mpath -> EcEnv.use -> unit
+  val check_mp_mp :
+    env -> mpath -> use use_restr -> mpath -> use use_restr -> unit
 
   val check_npv : env -> prog_var -> ('a,'b) t -> unit
 
@@ -77,9 +71,11 @@ module PVM : sig
 
   val find : env -> prog_var -> memory -> subst -> form
 
-  val subst   : env -> subst -> form  -> form
+  val subst      : env -> subst -> form  -> form
 
-  val subst1  : env -> prog_var -> EcIdent.t -> form -> form -> form
+  val subst_cost : env -> subst -> cost  -> cost
+
+  val subst1     : env -> prog_var -> EcIdent.t -> form -> form -> form
 end
 
 (* -------------------------------------------------------------------- *)

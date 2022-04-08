@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore Distr.
 
 pragma +implicits.
@@ -409,8 +401,8 @@ qed.
          = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
  **)
 section Upto.
-  declare module D <: PRFt.Distinguisher {RP, PRFi}.
-  declare axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+  declare module D <: PRFt.Distinguisher {-RP, -PRFi}.
+  declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
 
   local module PRP_indirect_bad = {
     var bad : bool
@@ -523,7 +515,7 @@ section PRPi_PRPi'_Indirect.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
   qed.
 
-  declare module D <: Distinguisher { RP }.
+  declare module D <: Distinguisher { -RP }.
 
   lemma pr_PRPi_PRPi'_Indirect &m:
     Pr[IND(RP,D).main() @ &m: res] = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
@@ -537,9 +529,9 @@ section PRPi_PRPi'_Indirect.
 end section PRPi_PRPi'_Indirect.
 
 section CollisionProbability.
-  declare module D <: Distinguisher {RP, PRFi}.
+  declare module D <: Distinguisher {-RP, -PRFi}.
 
-  declare axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+  declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
   declare axiom D_bounded  : hoare [D(PRFi).distinguish : PRFi.m = empty ==> card (fdom PRFi.m) <= q].
 
   local clone import Birthday as BBound with
@@ -581,7 +573,7 @@ section CollisionProbability.
     }
   }.
 
-  local lemma A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
+  local lemma A_ll (S <: ASampler {-A}): islossless S.s => islossless A(S).a.
   proof.
   move=> S_ll; proc; inline*; wp.
   call (_: true).
@@ -658,10 +650,10 @@ module DBounder (D : Distinguisher) (F : PRF_Oracles) = {
 
 section BOUNDER.
 
-declare module D <: Distinguisher {RP, PRFi, DBounder}.
-declare axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+declare module D <: Distinguisher {-RP, -PRFi, -DBounder}.
+declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
 
-lemma DBounder_ll (O <: PRF_Oracles{DBounder(D)}): 
+lemma DBounder_ll (O <: PRF_Oracles{-DBounder(D)}): 
   islossless O.f => islossless DBounder(D, O).distinguish.
 proof.
   move=> hll; islossless.

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcPath
@@ -17,8 +9,10 @@ open EcEnv
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
+exception IncompatibleExpr of env * (expr * expr)
 
 (* -------------------------------------------------------------------- *)
+
 type 'a eqtest = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 
@@ -48,7 +42,9 @@ module User : sig
 
   type error =
     | MissingVarInLhs   of EcIdent.t
+    | MissingEVarInLhs  of EcIdent.t
     | MissingTyVarInLhs of EcIdent.t
+    | MissingPVarInLhs  of EcIdent.t
     | NotAnEq
     | NotFirstOrder
     | RuleDependsOnMemOrModule
@@ -58,7 +54,7 @@ module User : sig
 
   type rule = EcEnv.Reduction.rule
 
-  val compile : opts:options -> prio:int -> EcEnv.env -> EcPath.path -> rule
+  val compile : opts:options -> prio:int -> EcEnv.env -> [`Ax | `Sc] -> EcPath.path -> rule
 end
 
 (* -------------------------------------------------------------------- *)
@@ -74,7 +70,8 @@ type reduction_info = {
   eta     : bool;              (* reduce eta-expansion *)
   logic   : rlogic_info;       (* perform logical simplification *)
   modpath : bool;              (* reduce module path *)
-  user    : bool               (* reduce user defined rules *)
+  user    : bool;              (* reduce user defined rules *)
+  cost    : bool;              (* reduce trivial cost statements *)
 }
 
 and deltap      = [`Yes | `No | `Force]
@@ -88,8 +85,12 @@ val betaiota_red : reduction_info
 val nodelta      : reduction_info
 val delta        : reduction_info
 
+val reduce_logic : reduction_info -> env -> LDecl.hyps -> form -> form
+
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form
+
+val reduce_cost : reduction_info -> env -> coe -> form
 
 val reduce_user_gen :
   (EcFol.form -> EcFol.form) ->
@@ -102,7 +103,7 @@ val is_conv    : ?ri:reduction_info -> LDecl.hyps -> form -> form -> bool
 val check_conv : ?ri:reduction_info -> LDecl.hyps -> form -> form -> unit
 
 val check_bindings :
-  exn -> EcEnv.env -> EcFol.f_subst ->
+  exn -> EcDecl.ty_params -> EcEnv.env -> EcFol.f_subst ->
   (EcIdent.t * EcFol.gty) list -> (EcIdent.t * EcFol.gty) list ->
   EcEnv.env * EcFol.f_subst
 (* -------------------------------------------------------------------- *)

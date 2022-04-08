@@ -1,16 +1,7 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcUtils
 open EcTypes
-open EcModules
 open EcMemory
 open EcBigInt.Notations
 
@@ -21,9 +12,9 @@ module CI = EcCoreLib
 include EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-let f_eqparams f1 ty1 vs1 m1 f2 ty2 vs2 m2 =
-  let f_pvlocs f ty vs m =
-    let arg = f_pvarg f ty m in
+let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
+  let f_pvlocs ty vs m =
+    let arg = f_pvarg ty m in
     if List.length vs = 1 then [arg]
     else
       let t = Array.of_list vs in
@@ -34,21 +25,21 @@ let f_eqparams f1 ty1 vs1 m1 f2 ty2 vs2 m2 =
   match vs1, vs2 with
   | Some vs1, Some vs2 ->
       if   List.length vs1 = List.length vs2
-      then f_eqs (f_pvlocs f1 ty1 vs1 m1) (f_pvlocs f2 ty2 vs2 m2)
-      else f_eq  (f_tuple (f_pvlocs f1 ty1 vs1 m1))
-                 (f_tuple (f_pvlocs f2 ty2 vs2 m2))
+      then f_eqs (f_pvlocs ty1 vs1 m1) (f_pvlocs ty2 vs2 m2)
+      else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
+                 (f_tuple (f_pvlocs ty2 vs2 m2))
 
   | Some vs1, None ->
-      f_eq (f_tuple (f_pvlocs f1 ty1 vs1 m1)) (f_pvarg f2 ty2 m2)
+      f_eq (f_tuple (f_pvlocs ty1 vs1 m1)) (f_pvarg ty2 m2)
 
   | None, Some vs2 ->
-      f_eq (f_pvarg f1 ty1 m1) (f_tuple (f_pvlocs f2 ty2 vs2 m2))
+      f_eq (f_pvarg ty1 m1) (f_tuple (f_pvlocs ty2 vs2 m2))
 
   | None, None ->
-      f_eq (f_pvarg f1 ty1 m1) (f_pvarg f2 ty2 m2)
+      f_eq (f_pvarg ty1 m1) (f_pvarg ty2 m2)
 
-let f_eqres f1 ty1 m1 f2 ty2 m2 =
-  f_eq (f_pvar (pv_res f1) ty1 m1) (f_pvar (pv_res f2) ty2 m2)
+let f_eqres ty1 m1 ty2 m2 =
+  f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
 
 let f_eqglob mp1 m1 mp2 m2 =
   f_eq (f_glob mp1 m1) (f_glob mp2 m2)
@@ -73,6 +64,7 @@ let destr_rint f =
   | Fop (p, _) when EcPath.p_equal p CI.CI_Real.p_real1 -> BI.one
 
   | _ -> destr_error "destr_rint"
+
 
 (* -------------------------------------------------------------------- *)
 let fop_int_le     = f_op CI.CI_Int .p_int_le    [] (toarrow [tint ; tint ] tbool)
@@ -691,7 +683,7 @@ let rec f_eq_simpl f1 f2 =
     -> f_false
 
   | Ftuple fs1, Ftuple fs2 when List.length fs1 = List.length fs2 ->
-      f_andas_simpl (List.map2 f_eq_simpl fs1 fs2) f_true
+      f_ands_simpl (List.map2 f_eq_simpl fs1 fs2) f_true
 
   | _ -> f_eq f1 f2
 
@@ -799,8 +791,10 @@ type sform =
   | SFeq    of form * form
   | SFop    of (EcPath.path * ty list) * (form list)
 
-  | SFhoareF   of hoareF
-  | SFhoareS   of hoareS
+  | SFhoareF  of sHoareF
+  | SFhoareS  of sHoareS
+  | SFcHoareF  of cHoareF
+  | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
@@ -839,8 +833,10 @@ let rec sform_of_form fp =
   | Fquant (q, [b]  , f) -> SFquant (q, b, lazy f)
   | Fquant (q, b::bs, f) -> SFquant (q, b, lazy (f_quant q bs f))
 
-  | FhoareF   hf -> SFhoareF   hf
-  | FhoareS   hs -> SFhoareS   hs
+  | FhoareF  hf -> SFhoareF  hf
+  | FhoareS  hs -> SFhoareS  hs
+  | FcHoareF  hf -> SFcHoareF  hf
+  | FcHoareS  hs -> SFcHoareS  hs
   | FbdHoareF hf -> SFbdHoareF hf
   | FbdHoareS hs -> SFbdHoareS hs
   | FequivF   ef -> SFequivF   ef

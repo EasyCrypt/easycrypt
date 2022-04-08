@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (*
  * This file contains a formalization of (discrete) distributions
  *
@@ -1049,6 +1041,17 @@ move=> a ad @/(\o) @/pred1; apply/eq_iff; split; last exact: canLR.
 by move=> faE; move/can_gf: ad; rewrite faE.
 qed.
 
+lemma nosmt in_dmap1E_can (d: 'a distr) (f: 'a -> 'b) (g: 'b -> 'a) (x: 'b):
+  f (g x) = x =>
+  (forall (y: 'a), y \in d => f y = x => y = g x) => 
+  mu1 (dmap d f) x = mu1 d (g x). 
+proof.
+rewrite dmap1E /= => can_fg local_can_gf.
+apply mu_eq_support => y y_in_d @/(\o) @/pred1; apply/eq_iff.
+split => [|->//].
+by apply local_can_gf.
+qed.
+
 lemma dmapE (d : 'a distr) (f : 'a -> 'b) (P : 'b -> bool):
   mu (dmap d f) P = mu d (P \o f).
 proof.
@@ -1383,6 +1386,40 @@ apply dscalar_uni =>//; smt (ge0_weight @Real).
 qed.
 
 (* -------------------------------------------------------------------- *)
+
+op mopt (d : 'a distr) = oapp (mu1 d) (1%r - weight d).
+op dopt (d : 'a distr) : 'a option distr = mk (mopt d).
+
+lemma isdistr_mopt (d : 'a distr) : isdistr (mopt d).
+proof.
+have sum_mopt : summable (mopt d) by apply/summable_oapp/summable_mu1.
+have mopt_ge0 : forall x, 0%r <= oapp (mu1 d) (1%r - weight d) x.
+  by case; smt(mu_bounded).
+split => [//|s uniq_s].
+suff S: sum (mopt d) <= 1%r by apply: ler_trans S; apply ler_big_sum.
+by rewrite /mopt sumD1_None // /(\o) /= -weightE /#.
+qed.
+
+lemma dopt1E (d : 'a distr) x : mu1 (dopt d) x = oapp (mu1 d) (1%r - weight d) x.
+proof. by rewrite muK ?isdistr_mopt. qed.
+
+lemma doptE (d : 'a distr) E :
+  mu (dopt d) E =
+  mu d (E \o Some) + (if E None then 1%r - weight d else 0%r).
+proof.
+rewrite !muE sumD1_None ?summable_cond ?summable_mu1 /= addrC; congr.
+  by apply eq_sum => /= x; rewrite /(\o) dopt1E.
+by case (E None) => @/predT //=; by rewrite dopt1E -weightE.
+qed.
+
+lemma dopt_ll (d : 'a distr) : is_lossless (dopt d).
+proof.
+rewrite /is_lossless muE /predT /= sumD1_None ?(summable_mu1) /=.
+rewrite dopt1E /= (@eq_sum _ (mu1 d)) //=; 2: by rewrite -weightE /#.
+by move => ?; rewrite /(\o) dopt1E.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op mrestrict ['a] (d : 'a distr) (p : 'a -> bool) =
   fun x => if p x then mu1 d x else 0%r.
 
@@ -1536,7 +1573,7 @@ lemma dmap_dprod ['a1 'a2 'b1 'b2]
   = dmap (d1 `*` d2) (fun xy : _ * _ => (f1 xy.`1, f2 xy.`2)).
 proof.
 apply/eq_distr=> -[b1 b2]; rewrite !dprod1E !dmap1E /(\o) /=.
-by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1.
+by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1 /=.
 qed.
 
 lemma dprod_partition

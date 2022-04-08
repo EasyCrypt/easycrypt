@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcLocation
@@ -129,6 +121,7 @@ let process_simplify_info ri (tc : tcenv1) =
     EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
     EcReduction.user    = ri.puser;
+    EcReduction.cost    = ri.pcost;
   }
 
 (*-------------------------------------------------------------------- *)
@@ -246,32 +239,53 @@ module LowRewrite = struct
 
     let base ax =
       match EcFol.sform_of_form ax with
-      | EcFol.SFeq  (f1, f2) -> Some (pt, `Eq, (f1, f2))
-      | EcFol.SFiff (f1, f2) -> Some (pt, `Eq, (f1, f2))
+      | EcFol.SFeq  (f1, f2) -> [(pt, `Eq, (f1, f2))]
+      | EcFol.SFiff (f1, f2) -> [(pt, `Eq, (f1, f2))]
 
       | EcFol.SFnot f ->
           let pt' = pt_of_global_r pt.ptev_env LG.p_negeqF [] in
           let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
           let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
-          Some (pt', `Eq, (f, f_false))
+          [(pt', `Eq, (f, f_false))]
 
-      | _ -> None
+      | _ -> []
+
+    and split ax =
+      match EcFol.sform_of_form ax with
+      | EcFol.SFand (`Sym, (f1, f2)) ->
+         let pt1 =
+           let pt'= pt_of_global_r pt.ptev_env LG.p_and_proj_l [] in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f1) in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f2) in
+           apply_pterm_to_arg_r pt' (PVASub pt) in
+
+         let pt2 =
+           let pt'= pt_of_global_r pt.ptev_env LG.p_and_proj_r [] in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f1) in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f2) in
+           apply_pterm_to_arg_r pt' (PVASub pt) in
+
+           (find_rewrite_patterns ~inpred dir pt2)
+         @ (find_rewrite_patterns ~inpred dir pt1)
+
+      | _ -> []
     in
 
     match base ax with
-    | Some x -> [x]
+    | _::_ as rws -> rws
 
-    | _ -> begin
+    | [] -> begin
       let ptb = Lazy.from_fun (fun () ->
-        let pt1 =
+        let pt1 = split ax
+        and pt2 =
           if dir = `LtoR then
             if   ER.EqTest.for_type env ax.f_ty tbool
             then Some (ptc, `Bool, (ax, f_true))
             else None
           else None
-        and pt2 = obind base
+        and pt3 = omap base
           (EcReduction.h_red_opt (EcReduction.full_red ~opaque:false) hyps ax)
-        in (otolist pt1) @ (otolist pt2)) in
+        in pt1 @ (otolist pt2) @ (odfl [] pt3)) in
 
         let rec doit reduce =
           match TTC.destruct_product ~reduce hyps ax with
@@ -461,6 +475,10 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
     in
 
     let (pte, cutf) = instantiate pte in
+
+    if not (PT.can_concretize pte.ptev_env) then
+      tc_error !!tc "cannot infer all variables";
+
     let pt = fst (PT.concretize pte) in
     let pt = { pt with pt_args = pt.pt_args @ [palocal hyp]; } in
     let cutf = PT.concretize_form pte.PT.ptev_env cutf in
@@ -1852,6 +1870,16 @@ let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
   FApi.t_sub
     [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
     (t_cut ax tc)
+
+(* -------------------------------------------------------------------- *)
+type cutdef_sc_t = intropattern * pcutdef_schema
+
+let process_cutdef_sc ttenv (ip, inst) (tc : tcenv1) =
+  let pt,sc_i = PT.tc1_process_sc_instantiation tc inst in
+
+  FApi.t_sub
+    [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
+    (t_cut sc_i tc)
 
 (* -------------------------------------------------------------------- *)
 let process_left (tc : tcenv1) =

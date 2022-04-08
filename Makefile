@@ -15,7 +15,7 @@ CHECK     += $(ECEXTRA) config/tests.config
 
 # --------------------------------------------------------------------
 .PHONY: default build byte native tests check examples
-.PHONY: clean install uninstall license
+.PHONY: clean install uninstall
 
 default: build
 	@true
@@ -46,9 +46,3 @@ clean:
 
 clean_eco:
 	find theories examples -name '*.eco' -exec rm '{}' ';'
-
-license:
-	scripts/srctx/license COPYRIGHT.yaml \
-	  $(shell find src -name '*.ml' -o -name '*.ml[a-z]') \
-	  $(shell find theories -name '*.ec' -o -name '*.ec[a-z]') \
-	  $(shell find proofgeneral/easycrypt -name '*.el')

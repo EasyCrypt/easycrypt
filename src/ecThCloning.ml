@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* ------------------------------------------------------------------ *)
 open EcUtils
 open EcSymbols
@@ -432,6 +424,9 @@ end = struct
         let axd = loced (thd @ prefix, x) in
         let name = (loced (xdth @ prefix, x)) in
         ax_ovrd oc (proofs, evc) name  (axd, mode)
+
+      | Th_schema _ ->
+          (proofs, evc)
 
       | Th_theory (x, dth) when dth.cth_mode = `Concrete ->
          List.fold_left (doit (prefix @ [x])) (proofs, evc) dth.cth_items

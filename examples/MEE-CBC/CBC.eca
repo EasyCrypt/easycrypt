@@ -282,7 +282,7 @@ lemma CPA_direct_eq (P  <: PRF)
   equiv [P.init ~ P'.init: true ==> I (glob P){1} (glob P'){2}] =>
   equiv [P.f ~ P'.f: ={arg} /\ I (glob P){1} (glob P'){2}
                  ==> ={res} /\ I (glob P){1} (glob P'){2}] =>
-  forall &m (A <: RCPA_Adversary {P, P'}),
+  forall &m (A <: RCPA_Adversary {-P, -P'}),
     Pr[INDR_CPA_direct(CBC_Oracle(P),A).main() @ &m: res]
     = Pr[INDR_CPA_direct(CBC_Oracle(P'),A).main() @ &m: res].
 proof.
@@ -294,7 +294,7 @@ proof.
 qed.
 
 section Cleanup.
-  declare module A <: RCPA_Adversary { RCPA_Wrap, PRP }.
+  declare module A <: RCPA_Adversary { -RCPA_Wrap, -PRP }.
 
   local module M : Enc_Scheme = {
     proc keygen = IV_Wrap(CBC(PseudoRP)).keygen
@@ -380,9 +380,9 @@ module PRPF_Adv(A:RCPA_Adversary, F:PRF_Oracles) = {
 }.
 
 section Decomposition.
-  declare module A <: RCPA_Adversary { RCPA_Wrap, PRP, PRPi, PRFi }.
+  declare module A <: RCPA_Adversary { -RCPA_Wrap, -PRP, -PRPi, -PRFi }.
 
-  local lemma refactor_abstract (O <: PRP {A}) &m:
+  local lemma refactor_abstract (O <: PRP {-A}) &m:
     Pr[INDR_CPA_direct(CBC_Oracle(O),A).main() @ &m: res]
     = Pr[IND(O,PRPF_Adv(A)).main() @ &m: res].
   proof. by byequiv=> //=; proc; inline *; sim. qed.
@@ -442,8 +442,8 @@ module Compute = {
 }.
 
 section Reduce.
-  declare module A <: RCPA_Adversary { RCPA_Wrap, PRFi, Compute }.
-  declare axiom A_distinguish_ll (O <: RCPA_Oracles {A}): islossless O.enc => islossless A(O).distinguish.
+  declare module A <: RCPA_Adversary { -RCPA_Wrap, -PRFi, -Compute }.
+  declare axiom A_distinguish_ll (O <: RCPA_Oracles {-A}): islossless O.enc => islossless A(O).distinguish.
 
   local module DoubleQuery (F : PRF) = {
     var qs : block fset
@@ -465,7 +465,7 @@ section Reduce.
     }
   }.
 
-  local lemma doublequery_eq (F <: PRF {A, DoubleQuery}) &m:
+  local lemma doublequery_eq (F <: PRF {-A, -DoubleQuery}) &m:
     Pr[INDR_CPA_direct(CBC_Oracle(F),A).main() @ &m: res]
     = Pr[INDR_CPA_direct(CBC_Oracle(DoubleQuery(F)),A).main() @ &m: res].
   proof.
@@ -594,8 +594,8 @@ end section Reduce.
  **          - Pr[IND(PRFa.PRFi,PRPF_Adv(A)).main() @ &m: res]|
  **      + Pr[INDR_CPA_direct(Compute,A).main() @ &m: Compute.bad]
  **)
-lemma reduction (A <: RCPA_Adversary { RCPA_Wrap, PRP, PRPi, PRFi, Compute }) &m:
-  (forall (O <: RCPA_Oracles {A}), islossless O.enc => islossless A(O).distinguish) =>
+lemma reduction (A <: RCPA_Adversary { -RCPA_Wrap, -PRP, -PRPi, -PRFi, -Compute }) &m:
+  (forall (O <: RCPA_Oracles {-A}), islossless O.enc => islossless A(O).distinguish) =>
      `|Pr[INDR_CPA(IV_Wrap(CBC(PseudoRP)),A).main() @ &m: res]
        - Pr[INDR_CPA(Random,A).main() @ &m: res]|
   <=    `|Pr[IND(PRP,PRPF_Adv(A)).main() @ &m: res]
@@ -684,8 +684,8 @@ module QueryBounder(A:RCPA_Adversary, O:RCPA_Oracles) = {
 }.
 
 section Probability_RP_RF.
-  declare module A <: RCPA_Adversary { PRPi, PRFi, QueryBounder }.
-  declare axiom A_run_ll (O <: RCPA_Oracles { A }): islossless O.enc => islossless A(O).distinguish.
+  declare module A <: RCPA_Adversary { -PRPi, -PRFi, -QueryBounder }.
+  declare axiom A_run_ll (O <: RCPA_Oracles { -A }): islossless O.enc => islossless A(O).distinguish.
 
   local clone PRPi_RF as RP_RFc with
     op   q    <- q * ell
@@ -745,8 +745,8 @@ section Probability_RP_RF.
 end section Probability_RP_RF.
 
 section Probability_Collision.
-  declare module A <: RCPA_Adversary { PRPi, PRFi, Compute, QueryBounder }.
-  declare axiom A_run_ll (O <: RCPA_Oracles { A }): islossless O.enc => islossless A(O).distinguish.
+  declare module A <: RCPA_Adversary { -PRPi, -PRFi, -Compute, -QueryBounder }.
+  declare axiom A_run_ll (O <: RCPA_Oracles { -A }): islossless O.enc => islossless A(O).distinguish.
 
   local clone import Birthday as BBound with
     type T  <- block,
@@ -839,8 +839,8 @@ section Probability_Collision.
   qed.
 end section Probability_Collision.
 
-lemma Conclusion (A <: RCPA_Adversary { RCPA_Wrap, PRP, PRPi, QueryBounder, PRFi (* pollution *), Compute (* pollution *) }) &m:
-  (forall (O <: RCPA_Oracles {A}), islossless O.enc => islossless A(O).distinguish) =>
+lemma Conclusion (A <: RCPA_Adversary { -RCPA_Wrap, -PRP, -PRPi, -QueryBounder, -PRFi (* pollution *), -Compute (* pollution *) }) &m:
+  (forall (O <: RCPA_Oracles {-A}), islossless O.enc => islossless A(O).distinguish) =>
      `|Pr[INDR_CPA(IV_Wrap(CBC(PseudoRP)),QueryBounder(A)).main() @ &m: res]
        - Pr[INDR_CPA(Random,QueryBounder(A)).main() @ &m: res]|
   <=    `|Pr[IND(PRP,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
@@ -848,7 +848,7 @@ lemma Conclusion (A <: RCPA_Adversary { RCPA_Wrap, PRP, PRPi, QueryBounder, PRFi
       + 2%r * ((q*ell)^2)%r * mu dBlock (pred1 witness).
 proof.
 move=> A_distinguish_ll.
-have BA_distinguish_ll: (forall (O <: RCPA_Oracles { QueryBounder(A) }), islossless O.enc => islossless QueryBounder(A,O).distinguish).
+have BA_distinguish_ll: (forall (O <: RCPA_Oracles { -QueryBounder(A) }), islossless O.enc => islossless QueryBounder(A,O).distinguish).
 + move=> O O_enc_ll; proc.
   call (A_distinguish_ll (<: QueryBounder(A,O).O') _).
   + proc; sp; if.

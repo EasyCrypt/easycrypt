@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import Bool Core List DBool.
 
 type key.
@@ -109,7 +101,7 @@ module INDCCA (S:Scheme, A:Adv_INDCCA) = {
 
 module ToCCA (A:Adv_INDCPA, O:CCA_Oracles) = A(O).
 
-lemma CCA_implies_CPA (S <: Scheme {INDCPA}) (A <: Adv_INDCPA {S, INDCPA}) &m:
+lemma CCA_implies_CPA (S <: Scheme {-INDCPA}) (A <: Adv_INDCPA {-S, -INDCPA}) &m:
   Pr[INDCPA(S,A).main() @ &m: res] = Pr[INDCCA(S,ToCCA(A)).main() @ &m: res].
 proof strict.
 byequiv (_: ={glob A} ==> ={res})=> //; proc.

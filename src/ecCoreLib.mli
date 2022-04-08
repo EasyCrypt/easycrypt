@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcPath
@@ -91,6 +83,24 @@ module CI_Int : sig
   val p_int_lt    : path
   val p_int_pow   : path
   val p_int_edivz : path
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_xint : sig
+  val p_Xint      : path
+  val p_xint      : path
+  val p_N         : path
+  val p_inf       : path
+  val p_xopp      : path
+  val p_xadd      : path
+  val p_xmul      : path
+  val p_xle       : path
+  val p_xmax      : path
+  val p_is_int    : path
+  val p_is_inf    : path
+  val p_choaretac : path
+  val p_bigxint   : path
+  val p_big       : path
 end
 
 (* -------------------------------------------------------------------- *)

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import Real.
 require import Int IntDiv.
 require import Prime_field.
@@ -59,9 +51,9 @@ proof. proc;auto;progress;smt. qed.
 
 section.
 
-  declare module A <: H.AdvOrclb{Count,HybOrcl,DDHb}.
+  declare module A <: H.AdvOrclb{-Count,-HybOrcl,-DDHb}.
 
-  declare axiom losslessA : forall (Ob0 <: Orclb{A}) (LR <: Orcl{A}),
+  declare axiom losslessA : forall (Ob0 <: Orclb{-A}) (LR <: Orcl{-A}),
     islossless LR.orcl =>
     islossless Ob0.leaks =>
     islossless Ob0.orclL =>
@@ -81,5 +73,4 @@ section.
    apply islossless_leaks. apply islossless_orcl1. apply islossless_orcl2. apply losslessA.
    smt(n_pos).
   qed.
-
 end section.

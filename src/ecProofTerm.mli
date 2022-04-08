@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcLocation
 open EcSymbols
@@ -23,7 +15,7 @@ type apperror =
   | AE_CannotInferMod
   | AE_NotFunctional
   | AE_InvalidArgForm     of invalid_arg_form
-  | AE_InvalidArgMod
+  | AE_InvalidArgMod      of EcTyping.tymod_cnv_failure
   | AE_InvalidArgProof    of (form * form)
   | AE_InvalidArgModRestr of EcTyping.restriction_error
 
@@ -72,8 +64,6 @@ val process_pterm_cut
   : prcut:('a -> form) -> pt_env -> 'a ppt_head -> pt_ev
 val process_pterm
   : pt_env -> (pformula option) ppt_head -> pt_ev
-val process_pterm_arg
-   : ?implicits:bool -> pt_ev  -> ppt_arg located -> pt_ev_arg
 val process_pterm_args_app
   :  ?implicits:bool -> ?ip:(bool list) -> pt_ev  -> ppt_arg located list
   -> pt_ev * bool list
@@ -98,7 +88,9 @@ val tc1_process_full_pterm
 val tc1_process_full_closed_pterm_cut
  : prcut:('a -> form) -> tcenv1 -> 'a gppterm -> proofterm * form
 val tc1_process_full_closed_pterm
- : tcenv1 -> ppterm -> proofterm * form
+  : tcenv1 -> ppterm -> proofterm * form
+val tc1_process_sc_instantiation
+ : tcenv1 -> pcutdef_schema -> proofterm * form
 
 (* Proof-terms manipulation *)
 val check_pterm_arg :

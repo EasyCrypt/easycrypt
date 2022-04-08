@@ -2,6 +2,8 @@
 (using menhir 2.0)
 (using dune_site 0.1)
 
+(wrapped_executables false)
+
 (name easycrypt)
 
 (generate_opam_files true)

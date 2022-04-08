@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
@@ -153,8 +145,28 @@ type axiom = {
 and ax_visibility = [`Visible | `NoSmt | `Hidden]
 
 (* -------------------------------------------------------------------- *)
-val is_axiom : axiom_kind -> bool
-val is_lemma : axiom_kind -> bool
+val is_axiom  : axiom_kind -> bool
+val is_lemma  : axiom_kind -> bool
+
+(* -------------------------------------------------------------------- *)
+type sc_params = (EcIdent.t * ty) list
+
+type pr_params = EcIdent.t list (* type bool *)
+
+(* [axs_params] are the free variables in [as_spec] expressions, i.e. in
+   [EcTypes.expr]. *)
+type ax_schema = {
+  axs_tparams : ty_params;
+  axs_pparams : pr_params;
+  axs_params  : sc_params;
+  axs_loca    : locality;
+  axs_spec    : EcCoreFol.form;
+}
+
+val sc_instantiate :
+  ty_params -> pr_params -> sc_params ->
+  ty list -> EcMemory.memtype -> mem_pr list -> expr list ->
+  EcCoreFol.form -> EcCoreFol.form
 
 (* -------------------------------------------------------------------- *)
 val axiomatized_op :

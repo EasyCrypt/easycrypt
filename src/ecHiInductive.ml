@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcLocation
@@ -45,9 +37,6 @@ exception FxError of EcLocation.t * EcEnv.env * fxerror
 let rcerror loc env e = raise (RcError (loc, env, e))
 let dterror loc env e = raise (DtError (loc, env, e))
 let fxerror loc env e = raise (FxError (loc, env, FXError e))
-
-
-
 
 (* -------------------------------------------------------------------- *)
 let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
