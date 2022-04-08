@@ -265,6 +265,12 @@ module FunAbsLow = struct
 
     let ospec o_called =
       let k_called = Mx.find o_called mks in
+      let k_called =
+        try Mx.find o_called mks with
+        | Not_found ->
+          tc_error pf_ "missing cost invariant for %a"
+            (EcPrinting.pp_funname ppe) o_called
+      in
       let kargs_po =
         List.map (fun (x,_) ->
             let f = f_local x tint in
