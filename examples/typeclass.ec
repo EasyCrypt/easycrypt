@@ -27,7 +27,7 @@ type class countable = {
 }.
 
 (* TODO: printing typeclasses *)
-(* print countable. *)
+print countable.
 
 (* -------------------------------------------------------------------- *)
 (* Simple algebraic structures *)
