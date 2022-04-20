@@ -9,7 +9,8 @@
  (public_name easycrypt)
  (name ec)
  (promote (until-clean))
- (libraries batteries dune-build-info inifiles why3 yojson zarith))
+ (libraries batteries dune-build-info inifiles why3 yojson zarith)
+ (preprocess (pps ppx_deriving.show)))
 
 (ocamllex ecLexer)
 

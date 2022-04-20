@@ -24,30 +24,34 @@ type quantif =
 type hoarecmp = FHle | FHeq | FHge
 
 type gty =
-  | GTty    of EcTypes.ty
-  | GTmodty of module_type
-  | GTmem   of EcMemory.memtype
+  | GTty    of (EcTypes.ty [@opaque])
+  | GTmodty of (module_type [@opaque])
+  | GTmem   of (EcMemory.memtype [@opaque])
+[@@deriving show]
 
-and binding  = (EcIdent.t * gty)
-and bindings = binding list
+and binding  = ((EcIdent.t * gty) [@opaque])
+[@@deriving show]
+and bindings = (binding list [@opaque])
+[@@deriving show]
 
 and form = {
   f_node : f_node;
-  f_ty   : ty;
-  f_fv   : int EcIdent.Mid.t; (* local, memory, module ident *)
-  f_tag  : int;
+  f_ty   : (ty [@opaque]);
+  f_fv   : (int EcIdent.Mid.t [@opaque]); (* local, memory, module ident *)
+  f_tag  : (int [@opaque]);
 }
+[@@deriving show]
 
 and f_node =
-  | Fquant  of quantif * bindings * form
+  | Fquant  of (quantif [@opaque]) * bindings * form
   | Fif     of form * form * form
-  | Fmatch  of form * form list * ty
-  | Flet    of lpattern * form * form
-  | Fint    of BI.zint
-  | Flocal  of EcIdent.t
-  | Fpvar   of EcTypes.prog_var * memory
-  | Fglob   of EcPath.mpath     * memory
-  | Fop     of EcPath.path * ty list
+  | Fmatch  of form * form list * (ty [@opaque])
+  | Flet    of (lpattern [@opaque]) * form * form
+  | Fint    of (BI.zint [@opaque])
+  | Flocal  of (EcIdent.t [@opaque])
+  | Fpvar   of (EcTypes.prog_var [@opaque]) * (memory [@opaque])
+  | Fglob   of (EcPath.mpath [@opaque])     * (memory [@opaque])
+  | Fop     of (EcPath.path [@opaque]) * (ty [@opaque]) list
   | Fapp    of form * form list
   | Ftuple  of form list
   | Fproj   of form * int
@@ -69,103 +73,118 @@ and f_node =
   | Fcoe of coe
 
   | Fpr of pr (* hr *)
+[@@deriving show]
 
 and eagerF = {
-  eg_pr : form;
-  eg_sl : stmt;  (* No local program variables *)
-  eg_fl : EcPath.xpath;
-  eg_fr : EcPath.xpath;
-  eg_sr : stmt;  (* No local program variables *)
-  eg_po : form
+  eg_pr : (form [@opaque]);
+  eg_sl : (stmt [@opaque]);  (* No local program variables *)
+  eg_fl : (EcPath.xpath [@opaque]);
+  eg_fr : (EcPath.xpath [@opaque]);
+  eg_sr : (stmt [@opaque]);  (* No local program variables *)
+  eg_po : (form [@opaque])
 }
+[@@deriving show]
 
 and equivF = {
-  ef_pr : form;
-  ef_fl : EcPath.xpath;
-  ef_fr : EcPath.xpath;
-  ef_po : form;
+  ef_pr : (form [@opaque]);
+  ef_fl : (EcPath.xpath [@opaque]);
+  ef_fr : (EcPath.xpath [@opaque]);
+  ef_po : (form [@opaque]);
 }
+[@@deriving show]
 
 and equivS = {
-  es_ml  : EcMemory.memenv;
-  es_mr  : EcMemory.memenv;
-  es_pr  : form;
-  es_sl  : stmt;
-  es_sr  : stmt;
-  es_po  : form; }
+  es_ml  : (EcMemory.memenv [@opaque]);
+  es_mr  : (EcMemory.memenv [@opaque]);
+  es_pr  : (form [@opaque]);
+  es_sl  : (stmt [@opaque]);
+  es_sr  : (stmt [@opaque]);
+  es_po  : (form [@opaque]); }
+[@@deriving show]
 
 and sHoareF = {
-  hf_pr : form;
-  hf_f  : EcPath.xpath;
-  hf_po : form;
+  hf_pr : (form [@opaque]);
+  hf_f  : (EcPath.xpath [@opaque]);
+  hf_po : (form [@opaque]);
 }
+[@@deriving show]
 
 and sHoareS = {
-  hs_m  : EcMemory.memenv;
-  hs_pr : form;
-  hs_s  : stmt;
-  hs_po : form; }
+  hs_m  : (EcMemory.memenv [@opaque]);
+  hs_pr : (form [@opaque]);
+  hs_s  : (stmt [@opaque]);
+  hs_po : (form [@opaque]); }
+[@@deriving show]
 
 and cHoareF = {
-  chf_pr : form;
-  chf_f  : EcPath.xpath;
-  chf_po : form;
-  chf_co : cost;
+  chf_pr : (form [@opaque]);
+  chf_f  : (EcPath.xpath [@opaque]);
+  chf_po : (form [@opaque]);
+  chf_co : (cost [@opaque]);
 }
+[@@deriving show]
 
 and cHoareS = {
-  chs_m  : EcMemory.memenv;
-  chs_pr : form;
-  chs_s  : stmt;
-  chs_po : form;
-  chs_co : cost; }
+  chs_m  : (EcMemory.memenv [@opaque]);
+  chs_pr : (form [@opaque]);
+  chs_s  : (stmt [@opaque]);
+  chs_po : (form [@opaque]);
+  chs_co : (cost [@opaque]); }
+[@@deriving show]
 
 and bdHoareF = {
-  bhf_pr  : form;
-  bhf_f   : EcPath.xpath;
-  bhf_po  : form;
-  bhf_cmp : hoarecmp;
-  bhf_bd  : form;
+  bhf_pr  : (form [@opaque]);
+  bhf_f   : (EcPath.xpath [@opaque]);
+  bhf_po  : (form [@opaque]);
+  bhf_cmp : (hoarecmp [@opaque]);
+  bhf_bd  : (form [@opaque]);
 }
+[@@deriving show]
 
 and bdHoareS = {
-  bhs_m   : EcMemory.memenv;
-  bhs_pr  : form;
-  bhs_s   : stmt;
-  bhs_po  : form;
-  bhs_cmp : hoarecmp;
-  bhs_bd  : form;
+  bhs_m   : (EcMemory.memenv [@opaque]);
+  bhs_pr  : (form [@opaque]);
+  bhs_s   : (stmt [@opaque]);
+  bhs_po  : (form [@opaque]);
+  bhs_cmp : (hoarecmp [@opaque]);
+  bhs_bd  : (form [@opaque]);
 }
+[@@deriving show]
 
 and pr = {
-  pr_mem   : memory;
-  pr_fun   : EcPath.xpath;
-  pr_args  : form;
-  pr_event : form;
+  pr_mem   : (memory [@opaque]);
+  pr_fun   : (EcPath.xpath [@opaque]);
+  pr_args  : (form [@opaque]);
+  pr_event : (form [@opaque]);
 }
+[@@deriving show]
 
 and coe = {
-  coe_pre : form;
-  coe_mem : EcMemory.memenv;
-  coe_e   : expr;
+  coe_pre : (form [@opaque]);
+  coe_mem : (EcMemory.memenv [@opaque]);
+  coe_e   : (expr [@opaque]);
 }
+[@@deriving show]
 
 (* Invariant: keys of c_calls are functions of local modules,
    with no arguments. *)
 and cost = {
-  c_self  : form;    (* of type xint *)
-  c_calls : call_bound EcPath.Mx.t;
+  c_self  : (form [@opaque]);    (* of type xint *)
+  c_calls : (call_bound EcPath.Mx.t [@opaque]);
 }
+[@@deriving show]
 
 (* Call with cost at most [cb_cost], called at mist [cb_called].
    [cb_cost] is here to properly handle substsitution when instantiating an
    abstract module by a concrete one. *)
 and call_bound = {
-  cb_cost  : form;   (* of type xint *)
-  cb_called : form;  (* of type int  *)
+  cb_cost  : (form [@opaque]);   (* of type xint *)
+  cb_called : (form [@opaque]);  (* of type int  *)
 }
+[@@deriving show]
 
-and module_type = form p_module_type
+and module_type = (form p_module_type [@opaque])
+[@@deriving show]
 
 type mod_restr = form p_mod_restr
 
