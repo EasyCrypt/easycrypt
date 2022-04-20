@@ -57,8 +57,6 @@ type class group <: monoid = {
   axiom mmulN : left_inverse mid minv mmul
 }.
 
-print minv.
-
 type class ['a <: semigroup] semigroup_action = {
   op amul  : 'a -> semigroup_action -> semigroup_action
 
@@ -66,22 +64,12 @@ type class ['a <: semigroup] semigroup_action = {
     forall (g h : 'a) (x : semigroup_action), amul (mmul g h) x = amul g (amul h x)
 }.
 
-print compatibility.
-
-(* TODO: nice error message, already known *)
-(*
-type class ['a <: monoid] monoid_action <: 'a semigroup_action = {
-  axiom identity :
-    forall (x : id_action), amul mid x = x
-}.
-*)
-
 type class ['a <: monoid] monoid_action <: 'a semigroup_action = {
   axiom identity : forall (x : monoid_action), amul mid<:'a> x = x
 }.
 
 (* TODO: why again is this not possible/a good idea? *)
-(* type class finite_group <: group & finite = {}. *)
+(*type class finite_group <: group & finite = {}.*)
 
 (* -------------------------------------------------------------------- *)
 (* Advanced algebraic structures *)
@@ -141,12 +129,14 @@ op all_countable ['a <: countable] (p : 'a -> bool) =
 (* -------------------------------------------------------------------- *)
 (* Simple algebraic structures *)
 
-(* TODO: weird issue and/or inapropriate error message *)
-(*
-print amul.
+(* TODO: weird issue and/or inapropriate error message : bug in ecUnify select_op*)
 
+print amul.
+(*
 op foo1 ['a <: semigroup, 'b <: 'a semigroup_action] = amul<:'a,'b>.
+*)
 op foo2 ['a <: semigroup, 'b <: 'a semigroup_action] (g : 'a) (x : 'b) = amul g x.
+(*
 op foo3 ['a <: semigroup, 'b <: 'a semigroup_action] (g : 'a) (x : 'b) = amul<:'a,'b> g x.
 *)
 
@@ -199,7 +189,8 @@ instance comgroup with int
   op ( + )  = CoreInt.add
   op ([-])  = CoreInt.opp.
 
-(* TODO: might be any of the two addr0, also apply fails but rewrite works. *)
+(* TODO: might be any of the two addr0, also apply fails but rewrite works.
+   In ecScope, where instances are declared. *)
 realize addr0 by rewrite addr0.
 realize addrN by trivial.
 realize addrC by rewrite addrC.
@@ -229,6 +220,7 @@ proof.
   move => x y z.
   move: (Ring.IntID.mulrDl x y z).
   move => HmulrDl.
+  rewrite HmulrDl.
   (* TODO: what? *)
   admit.
 qed.

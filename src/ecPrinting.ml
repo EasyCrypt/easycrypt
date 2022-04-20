@@ -2885,6 +2885,12 @@ let pp_rwbase ppe fmt (p, rws) =
     (pp_rwname ppe) p (pp_list ", " (pp_axname ppe)) (Sp.elements rws)
 
 (* -------------------------------------------------------------------- *)
+(*TODOTC*)
+let pp_tcbase ppe fmt (p, tcdecl) =
+  Format.fprintf fmt "%a = %a@\n%!"
+    (pp_tcname ppe) p (pp_option (pp_typeclass ppe)) (tcdecl.tc_prt)
+
+(* -------------------------------------------------------------------- *)
 let pp_solvedb ppe fmt db =
   List.iter (fun (lvl, ps) ->
     Format.fprintf fmt "[%3d] %a\n%!"
@@ -3545,6 +3551,13 @@ module ObjectInfo = struct
     | `Solve   name -> pr_at fmt env name
 
   (* ------------------------------------------------------------------ *)
+  (*TODOTC: the printing of a typeclass*)
+  let pr_tc_r =
+    { od_name    = "typeclasses";
+      od_lookup  = EcEnv.TypeClass.lookup;
+      od_printer = pp_tcbase; }
+
+  (* ------------------------------------------------------------------ *)
   let pr_any fmt env qs =
     let printers = [pr_gen_r ~prcat:true pr_ty_r ;
                     pr_gen_r ~prcat:true pr_op_r ;
@@ -3554,7 +3567,8 @@ module ObjectInfo = struct
                     pr_gen_r ~prcat:true pr_mod_r;
                     pr_gen_r ~prcat:true pr_mty_r;
                     pr_gen_r ~prcat:true pr_rw_r ;
-                    pr_gen_r ~prcat:true pr_at_r ; ] in
+                    pr_gen_r ~prcat:true pr_at_r ;
+                    pr_gen_r ~prcat:true pr_tc_r ; ] in
 
     let ok = ref (List.length printers) in
 
