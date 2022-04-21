@@ -204,6 +204,23 @@ lemma inzmodB (a b : int):
 proof. by rewrite inzmodD inzmodN. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma inzmodD_mod (a b : int):
+  inzmod ((a + b) %% p) = inzmod a + inzmod b.
+proof. by rewrite -inzmod_mod inzmodD. qed.
+
+lemma inzmodM_mod (a b : int):
+  inzmod ((a * b) %% p) = inzmod a * inzmod b.
+proof. by rewrite -inzmod_mod inzmodM. qed.
+
+lemma inzmodN_mod (n : int):
+  inzmod ((- n) %% p) = -(inzmod n).
+proof. by rewrite -inzmod_mod inzmodN. qed.
+
+lemma inzmodB_mod (a b : int):
+  inzmod ((a - b) %% p) = (inzmod a) + (- (inzmod b)).
+proof. by rewrite -inzmod_mod inzmodB. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma intmul_asint (x : zmod) : x = intmul one (asint x).
 proof.
 rewrite /intmul ltrNge ge0_asint /= AddMonoid.iteropE -{1}(asintK x).

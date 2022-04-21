@@ -435,6 +435,9 @@ lemma nosmt orb_id2r a b c : (!b => a = c) => a \/ b <=> c \/ b by [].
 lemma nosmt negb_and a b : !(a /\ b) <=> !a \/ !b by [].
 lemma nosmt negb_or  a b : !(a \/ b) <=> !a /\ !b by [].
 
+lemma nosmt andlP a b c : a => ((a /\ b) => c) => b => c by [].
+lemma nosmt andrP a b c : a => ((b /\ a) => c) => b => c by [].
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt negb_exists (P : 'a -> bool) :
   !(exists a, P a) <=> forall a, !P a

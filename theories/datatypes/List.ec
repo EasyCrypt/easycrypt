@@ -1720,6 +1720,16 @@ proof.
   by rewrite mem_behead.
 qed.
 
+lemma map_uniq_inj_in ['b, 'a] (f : 'a -> 'b) (s : 'a list) :
+     uniq (map f s)
+  => forall x y, mem s x => mem s y => f x = f y => x = y.
+proof.
+  elim: s => // z s ih /= [Nmemfx uniqfs] x y [<<-|memxs] [<<-|memys] eqf //.
+    by move: Nmemfx; rewrite eqf map_f.
+    by move: Nmemfx; rewrite -eqf map_f.
+  by apply ih.
+qed.
+
 lemma mem_map_fst (xs : ('a * 'b) list) (x : 'a):
   mem (map fst xs) x <=> (exists y, mem xs (x,y)).
 proof.
@@ -2309,6 +2319,10 @@ lemma foldr_cat (f : 'a -> 'b -> 'b) z0 s1 s2:
   foldr f z0 (s1 ++ s2) = foldr f (foldr f z0 s2) s1.
 proof. by elim: s1 => //= x s1 ->. qed.
 
+lemma foldr_rcons (f : 'a -> 'b -> 'b) z0 s z :
+  foldr f z0 (rcons s z) = foldr f (f z z0) s.
+proof. by rewrite -cats1 foldr_cat. qed.
+
 lemma foldr_map ['a 'b 'c] (f : 'a -> 'b -> 'b) (h : 'c -> 'a) z0 s:
   foldr f z0 (map h s) = foldr (fun x z, f (h x) z) z0 s.
 proof. by elim: s => //= x s ->. qed.
@@ -2330,6 +2344,14 @@ proof.
   by rewrite -(revK (s1 ++ s2)) foldl_rev rev_cat foldr_cat -!foldl_rev !revK.
 qed.
 
+lemma foldl_rcons (f : 'b -> 'a -> 'b) z0 s z :
+  foldl f z0 (rcons s z) = f (foldl f z0 s) z.
+proof. by rewrite -cats1 foldl_cat. qed.
+
+lemma foldl_map ['a 'b 'c] (f : 'b -> 'a -> 'b) (h : 'c -> 'a) z0 s:
+  foldl f z0 (map h s) = foldl (fun z x, f z (h x)) z0 s.
+proof. by elim: s z0 => //= x s ih z0; rewrite ih. qed.
+
 lemma foldr_perm (f : 'a -> 'b -> 'b) (z : 'b) (s1 s2 : 'a list):
      (forall a b v, f a (f b v) = f b (f a v))
   => perm_eq s1 s2
@@ -2343,32 +2365,6 @@ move: eq_s12; rewrite -(cat1s i s4) catA perm_eq_sym.
 rewrite perm_catCA /= perm_cons perm_eq_sym => /ih ->.
 rewrite foldr_cat; elim: s3 => [|x s3 {ih} ih] //=.
 by rewrite fgAC ih.
-qed.
-
-op left_commutative_in ['b 'a] o (z : 'b) (s : 'a list) =
-  forall x y ,
-    x \in s =>
-    y \in s =>
-    o x (o y z) = o y (o x z).
-
-lemma foldr_perm_in ['b 'a] o (s1 s2 : 'a list) :
-  (forall (z : 'b) , left_commutative_in o z s1) =>
-  perm_eq s1 s2 =>
-  (forall (z : 'b) , foldr o z s1 = foldr o z s2).
-proof.
-  elim: s1 s2 => [|h1 t1 IHs1] s2 Hlci Heqs12 /=.
-  + by have -> //: s2 = []; apply/perm_eq_small/perm_eq_sym.
-  have/perm_eq_mem/(_ h1) := Heqs12; rewrite mem_head /=.
-  move/splitPr => [h2 t2] ->> z; rewrite foldr_cat /=.
-  move: Heqs12; rewrite -(cat1s h1 t2) catA perm_eq_sym.
-  rewrite perm_catCA /= perm_cons perm_eq_sym => Heqs1_.
-  move: (IHs1 _ _ Heqs1_); first by move => w a b Has1 Hbs1; apply/Hlci => /=; right.
-  move => ->; rewrite foldr_cat; have Heqin:= (perm_eq_mem _ _ Heqs1_).
-  have {Heqs1_ Heqin Hlci} Hlci: forall z , left_commutative_in o z (h1 :: h2).
-  + by move => w a b /= [->>|Hat1] [->>|Hbt2]; apply/Hlci => //=; right; rewrite Heqin mem_cat; left.
-  elim: h2 Hlci => [|x h2 {IHs1} IHs1 Hlci] //=.
-  rewrite -IHs1; first by move => w a b /= [->>|Has1] [->>|Hbs1] //; apply/Hlci => //=; rewrite ?Has1 ?Hbs1.
-  by rewrite Hlci.
 qed.
 
 lemma foldr_rem (x : 'a) (f : 'a -> 'b -> 'b) (z : 'b) (s : 'a list):
@@ -2387,12 +2383,12 @@ lemma eq_foldr ['a, 'b] (f1 f2 : 'a -> 'b -> 'b) z1 z2 s1 s2 :
   foldr f1 z1 s1 = foldr f2 z2 s2.
 proof. by move => Heq <<- <<-; elim s1 => //= hs1 ts1 ->; rewrite Heq. qed.
 
-lemma eq_in_foldr ['a, 'b] (f1 f2 : 'a -> 'b -> 'b) z1 z2 s1 s2 :
-  (forall x,  x \in s1 => f1 x = f2 x) =>
+lemma eq_foldl ['a, 'b] (f1 f2 : 'a -> 'b -> 'a) z1 z2 s1 s2 :
+  (forall x y , f1 x y = f2 x y) =>
   z1 = z2 =>
   s1 = s2 =>
-  foldr f1 z1 s1 = foldr f2 z2 s2.
-proof. by move => Heq <<- <<-; elim s1 Heq => //= hs1 ts1 IHs1 Heq; rewrite IHs1 => [x Hin|]; rewrite Heq // Hin. qed.
+  foldl f1 z1 s1 = foldl f2 z2 s2.
+proof. by move => Heq <<- <<-; elim s1 z1 => //= hs1 ts1 ih z1; rewrite ih Heq. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                               EqIn                                   *)
@@ -2434,6 +2430,65 @@ lemma eq_in_mkseq (f1 f2 : int -> 'a) n:
      (forall i, 0 <= i < n => f1 i = f2 i)
   => mkseq f1 n = mkseq f2 n.
 proof. by move=> h; rewrite -eq_in_map=> x /mema_iota /h. qed.
+
+lemma eq_in_foldr ['a, 'b] (f1 f2 : 'a -> 'b -> 'b) z1 z2 s1 s2 :
+  (forall x,  x \in s1 => f1 x = f2 x) =>
+  z1 = z2 =>
+  s1 = s2 =>
+  foldr f1 z1 s1 = foldr f2 z2 s2.
+proof. by move => Heq <<- <<-; elim s1 Heq => //= hs1 ts1 IHs1 Heq; rewrite IHs1 => [x Hin|]; rewrite Heq // Hin. qed.
+
+lemma eq_in_foldl ['a, 'b] (f1 f2 : 'a -> 'b -> 'a) z1 z2 s1 s2 :
+  (forall x y,  y \in s1 => f1 x y = f2 x y) =>
+  z1 = z2 =>
+  s1 = s2 =>
+  foldl f1 z1 s1 = foldl f2 z2 s2.
+proof. by move => Heq <<- <<-; elim s1 z1 Heq => //= hs1 ts1 IHs1 z1 Heq; rewrite IHs1 => [x y Hin|]; rewrite Heq // Hin. qed.
+
+op left_commutative_in ['b 'a] o (z : 'b) (s : 'a list) =
+  forall x y ,
+    x \in s =>
+    y \in s =>
+    o x (o y z) = o y (o x z).
+
+lemma foldr_perm_in ['b 'a] o (s1 s2 : 'a list) :
+  (forall (z : 'b) , left_commutative_in o z s1) =>
+  perm_eq s1 s2 =>
+  (forall (z : 'b) , foldr o z s1 = foldr o z s2).
+proof.
+  elim: s1 s2 => [|h1 t1 IHs1] s2 Hlci Heqs12 /=.
+  + by have -> //: s2 = []; apply/perm_eq_small/perm_eq_sym.
+  have/perm_eq_mem/(_ h1) := Heqs12; rewrite mem_head /=.
+  move/splitPr => [h2 t2] ->> z; rewrite foldr_cat /=.
+  move: Heqs12; rewrite -(cat1s h1 t2) catA perm_eq_sym.
+  rewrite perm_catCA /= perm_cons perm_eq_sym => Heqs1_.
+  move: (IHs1 _ _ Heqs1_); first by move => w a b Has1 Hbs1; apply/Hlci => /=; right.
+  move => ->; rewrite foldr_cat; have Heqin:= (perm_eq_mem _ _ Heqs1_).
+  have {Heqs1_ Heqin Hlci} Hlci: forall z , left_commutative_in o z (h1 :: h2).
+  + by move => w a b /= [->>|Hat1] [->>|Hbt2]; apply/Hlci => //=; right; rewrite Heqin mem_cat; left.
+  elim: h2 Hlci => [|x h2 {IHs1} IHs1 Hlci] //=.
+  rewrite -IHs1; first by move => w a b /= [->>|Has1] [->>|Hbs1] //; apply/Hlci => //=; rewrite ?Has1 ?Hbs1.
+  by rewrite Hlci.
+qed.
+
+op right_commutative_in ['a 'b] o (x : 'a) (s : 'b list) =
+  forall y z ,
+    y \in s =>
+    z \in s =>
+    o (o x y) z = o (o x z) y.
+
+lemma foldl_perm_in ['a 'b] o (s1 s2 : 'a list) :
+  (forall (x : 'b) , right_commutative_in o x s1) =>
+  perm_eq s1 s2 =>
+  (forall (x : 'b) , foldl o x s1 = foldl o x s2).
+proof.
+  move => rcomm peq x; rewrite -(revK s1) -(revK s2) !foldl_rev.
+  apply foldr_perm_in.
+  + move => {x} z x y; rewrite !mem_rev => mems1 mems2.
+    by rewrite rcomm.
+  apply/(perm_eq_trans s1); [by apply/perm_eq_sym/perm_eq_rev|].
+  by apply/(perm_eq_trans s2) => //; apply/perm_eq_rev.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            Flattening                                *)
@@ -2937,6 +2992,13 @@ proof.
   by rewrite addrC nseqS ?size_ge0 //= IHs.
 qed.
 
+lemma foldl_zip_nseq ['a,'b,'c] (f : 'a -> 'c -> 'b -> 'c) x z s :
+  foldl (f x) z s = foldl (fun y p => f (fst p) y (snd p)) z (zip (nseq (size s) x) s).
+proof.
+  elim s z => [|hs ts IHs z] /=; first by rewrite nseq0.
+  by rewrite addrC nseqS ?size_ge0 //= IHs.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)
 (* -------------------------------------------------------------------- *)
@@ -2952,6 +3014,14 @@ proof. by elim: s. qed.
 lemma allpairs_consl f x s t :
  allpairs<:'a, 'b, 'c> f (x :: s) t = map (f x) t ++ allpairs f s t.
 proof. by []. qed.
+
+lemma allpairs_consr f x s t :
+ perm_eq (allpairs<:'a, 'b, 'c> f s (x :: t)) (map (transpose f x) s ++ allpairs f s t).
+proof.
+  elim: s => [|h s ih]; [by rewrite allpairs0l|].
+  rewrite !allpairs_consl /= perm_cons catA perm_eq_sym.
+  by rewrite perm_catCA -catA perm_cat2l perm_eq_sym.
+qed.
 
 lemma size_allpairs ['a 'b 'c] f s t :
   size (allpairs<:'a, 'b, 'c> f s t) = size s * size t.
@@ -3002,6 +3072,19 @@ rewrite perm_cons perm_eq_sym=> /ih /= /(perm_cat2l (map (f x) t1)).
 move/perm_eq_trans; apply; elim: s3 => [|y s3 {ih} ih] /=.
   by apply/perm_cat2r/perm_eq_map.
 by rewrite catA perm_catCA -catA; apply/perm_cat2l/ih.
+qed.
+
+lemma allpairs_swap ['a 'b 'c] (f : 'a -> 'b -> 'c) s1 s2 :
+  perm_eq
+    (allpairs f s1 s2)
+    (allpairs (transpose f) s2 s1).
+proof.
+  elim: s1 => [|h1 t1 ih /=]; [by rewrite allpairs0l allpairs0r|].
+  rewrite allpairs_consl perm_eq_sym.
+  apply/(perm_eq_trans (map (transpose (transpose f) h1) s2 ++ allpairs (transpose f) s2 t1)).
+  + by apply/allpairs_consr.
+  rewrite (eq_map _ (f h1)); [by move => ?|].
+  by rewrite perm_cat2l perm_eq_sym.
 qed.
 
 (* -------------------------------------------------------------------- *)

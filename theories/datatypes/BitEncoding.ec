@@ -94,6 +94,11 @@ proof.
   by rewrite -divz_mul // -exprS // (addrC 1).
 qed.
 
+lemma int2bs_rcons N n :
+  0 < N =>
+  int2bs N n = rcons (int2bs (N - 1) n) ((n %/ 2 ^ (N - 1)) %% 2 <> 0).
+proof. by move => lt0N; rewrite -int2bsS // subr_ge0; move: lt0N; rewrite ltzE. qed.
+
 lemma int2bs_mod N n :
   int2bs N (n %% 2 ^ N) = int2bs N n.
 proof.
@@ -101,6 +106,23 @@ proof.
   rewrite IntDiv.modz_pow2_div; first by move/mem_range: HK_range => [-> /=]; apply ltzW.
   rewrite modz_dvd //; move: (dvdz_exp2l 2 1 (N - K)); rewrite expr1 => /= -> //.
   by apply/ler_subr_addl/ltzE; move/mem_range: HK_range.
+qed.
+
+lemma int2bs_nseq_true N :
+  int2bs N (2 ^ N - 1) = nseq N true.
+proof.
+  rewrite /int2bs -mkseq_nseq.
+  apply eq_in_mkseq => K /mem_range HK_range /=.
+  rewrite divzDl.
+  + by apply dvdz_exp2l; move/mem_range: HK_range => [-> /ltzW].
+  rewrite -IntDiv.exprD_subz //; first by move/mem_range: HK_range => [-> /ltzW].
+  rewrite dvdz_modzDl.
+  + move: (dvdz_exp2l 2 1 (N - K)); rewrite expr1 /= => -> //.
+    by rewrite ler_subr_addr addrC -ltzE; case/mem_range: HK_range.
+  move: (subrK (-1) (2 ^ K)) => <-; rewrite addrAC (addrC (-1)).
+  rewrite divzDr; [by rewrite -{2}(mul1r (2 ^ K)) -mulNr dvdz_mull dvdzz|].
+  rewrite divz_small; [by rewrite normrX ltzE //= subr_ge0 -ltzS ltr_addr expr_gt0|].
+  by rewrite -{1}(mul1r (2 ^ K)) -mulNr mulzK //=; apply/gtr_eqF/expr_gt0.
 qed.
 
 lemma nosmt bs2int_eq N i j: 0 <= i => 0 <= j => i %% 2^N = j %% 2^N =>
@@ -175,6 +197,15 @@ lemma int2bs1 N :
   int2bs N 1 = true :: nseq (N - 1) false.
 proof. by move => lt0N; rewrite int2bs_cons // dvdzE /= int2bs_nseq_false. qed.
 
+lemma int2bs_cat_nseq_true_false K N :
+  0 <= K <= N =>
+  int2bs N (2 ^ K - 1) = nseq K true ++ nseq (N - K) false.
+proof.
+  move => le2; move: (int2bs_cat _ _ (2 ^ K - 1) le2) => ->.
+  rewrite int2bs_nseq_true divz_small; [by rewrite normrX ltzE //= subr_ge0 -ltzS ltr_addr expr_gt0|].
+  by rewrite int2bs0.
+qed.
+
 lemma int2bs_mulr_pow2 K N n :
   0 <= K <= N =>
   int2bs N (2 ^ K * n) = nseq K false ++ int2bs (N - K) n.
@@ -229,6 +260,23 @@ lemma bs2int1 N :
   bs2int (true :: nseq N false) = 1.
 proof. by rewrite bs2int_cons bs2int_nseq_false /b2i. qed.
 
+lemma bs2int_nseq_true N :
+  0 <= N =>
+  bs2int (nseq N true) = 2 ^ N - 1.
+proof.
+  move => le0N; rewrite -int2bs_nseq_true int2bsK //.
+  by rewrite ltzE //= subr_ge0 -ltzS ltr_addr expr_gt0.
+qed.
+
+lemma bs2int_cat_nseq_true_false K N :
+  0 <= K <= N =>
+  bs2int (nseq K true ++ nseq (N - K) false) = 2 ^ K - 1.
+proof.
+  move => le2; rewrite -int2bs_cat_nseq_true_false // int2bsK //.
+  + by move: le2 => [? ?]; apply/(ler_trans K).
+  by rewrite ltzE //= subr_ge0 -ltzS ltr_addr expr_gt0 //= ler_weexpn2l.
+qed.
+
 lemma bs2int_mulr_pow2 N s :
   bs2int (nseq N false ++ s) = 2 ^ max 0 N * bs2int s.
 proof. by rewrite bs2int_cat bs2int_nseq_false size_nseq. qed.
@@ -246,6 +294,18 @@ theory BitReverse.
 import BS2Int.
 
 op bsrev N n = bs2int (rev (int2bs N n)).
+
+lemma int2bs_bsrev N n :
+  int2bs N (bsrev N n) = rev (int2bs N n).
+proof.
+  rewrite /bsrev; move: (bs2intK (rev (int2bs N n))).
+  rewrite size_rev size_int2bs /max.
+  by case (0 < N) => // /lezNgt ?; rewrite !int2bs0s_le.
+qed.
+
+lemma bsrev_bs2int s :
+  bsrev (size s) (bs2int s) = bs2int (rev s).
+proof. by rewrite /bsrev bs2intK. qed.
 
 lemma bsrev_neg N n :
   N <= 0 =>
@@ -480,6 +540,18 @@ proof.
     by rewrite -exprD_subz // le0M /= ler_subr_addl.
   rewrite (@map_comp (transpose _ _) (( * )%Int _)) perm_eq_map bsrev_range_pow2_perm_eq.
   by rewrite le0K /= (lez_trans (K + M)) // ler_addl.
+qed.
+
+lemma bsrev_cat_nseq_true_false K N :
+  0 <= K <= N =>
+  bsrev N (2 ^ K - 1) = 2 ^ N - 2 ^ (N - K).
+proof.
+  move => [? ?]; rewrite /bsrev int2bs_cat_nseq_true_false //.
+  rewrite rev_cat !rev_nseq bs2int_mulr_pow2 bs2int_nseq_true // ler_maxr.
+  + by rewrite subr_ge0.
+  rewrite mulrDr -exprD_nneg //=.
+  + by rewrite subr_ge0.
+  by rewrite -addrA /= mulrN.
 qed.
 
 end BitReverse.

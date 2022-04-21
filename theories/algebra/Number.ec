@@ -358,6 +358,25 @@ proof. by rewrite ltr_neqAle normr_le0 normr0P; case: (_ = _). qed.
 lemma nosmt normr_gt0 (x : t): (zeror < `|x|) <=> (x <> zeror).
 proof. by rewrite ltr_def normr0P normr_ge0; case: (_ = _). qed.
 
+lemma nosmt unit_normr (x : t): unit (`|x|) => unit x.
+proof.
+case: (real_axiom x) => [le0n|len0].
+  by move: (normr_idP x); rewrite le0n /= => ->.
+by rewrite ler0_norm // unitrN.
+qed.
+
+lemma nosmt normrX n (x : t) : `|exp x n| = exp `|x| n.
+proof.
+case (0 <= n); [by apply normrX_nat|].
+rewrite -ltzNge -{1}(invrK x) exprV => ltn0.
+rewrite normrX_nat; [by rewrite oppz_ge0 ltzW|].
+case: (unit x) => [unitx|Nunitx].
+  by rewrite normrV // exprV.
+move: (unit_normr x) => /contra; rewrite Nunitx /=.
+move => unitNx; rewrite invr_out //.
+by rewrite -{1}(@invr_out `|_|) // exprV.
+qed.
+
 (*-------------------------------------------------------------------- *)
 hint rewrite normrE : normr_id normr0 normr1 normrN1.
 hint rewrite normrE : normr_ge0 normr_lt0 normr_le0 normr_gt0.
