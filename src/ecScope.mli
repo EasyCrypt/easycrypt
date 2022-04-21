@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcLocation
@@ -118,7 +110,6 @@ end
 (* -------------------------------------------------------------------- *)
 module Ty : sig
   val add : scope -> ptydecl located -> scope
-
   val add_class    : scope -> ptypeclass located -> scope
   val add_instance : ?import:EcTheory.import -> scope -> Ax.mode -> ptycinstance located -> scope
 end

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcPath
 open EcFol
@@ -36,9 +28,6 @@ module Frequency : sig
   val frequency : frequency -> all_rel -> int
   val f_ops : Sp.t -> form -> relevant
 
-  val add : frequency -> EcDecl.axiom -> unit
+  val add : frequency -> EcFol.form -> unit
 
 end
-
-
-

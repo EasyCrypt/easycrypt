@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
@@ -811,6 +803,13 @@ module Ax = struct
   type mode = [`WeakCheck | `Check | `Report]
 
   (* ------------------------------------------------------------------ *)
+  let bind_schema
+    ?(import = EcTheory.import0) (scope : scope) ((x, sc) : _ * ax_schema)
+    =
+    assert (scope.sc_pr_uc = None);
+    let item = EcTheory.mkitem import (EcTheory.Th_schema (x, sc)) in
+    { scope with sc_env = EcSection.add_item item scope.sc_env }
+
   let bind ?(import = EcTheory.import0) (scope : scope) ((x, ax) : _ * axiom) =
     assert (scope.sc_pr_uc = None);
     let item = EcTheory.mkitem import (EcTheory.Th_axiom (x, ax)) in
@@ -846,6 +845,9 @@ module Ax = struct
     let loc = ax.pl_loc and ax = ax.pl_desc in
     let ue  = TT.transtyvars env (loc, ax.pa_tyvars) in
 
+    if ax.pa_kind <> PSchema && ax.pa_scvars <> None then
+      hierror "can only have schema variables in schema";
+
     let (pconcl, tintro) =
       match ax.pa_vars with
       | None ->
@@ -861,7 +863,34 @@ module Ax = struct
     let tintro = mk_loc loc (Plogic (Pmove prevertv0)) in
     let tintro = { pt_core = tintro; pt_intros = [`Ip ip]; } in
 
-    let concl = TT.trans_prop env ue pconcl in
+    let pparams =
+      if ax.pa_kind <> PSchema
+      then begin
+        assert (ax.pa_pvars = None);
+        None end
+      else omap_dfl (fun (PT_MemPred l) ->
+          List.map (fun v -> EcIdent.create (unloc v)) l
+          |> some
+        ) (Some []) ax.pa_pvars in
+
+    let scparams =
+      if ax.pa_kind <> PSchema
+      then begin
+        assert (ax.pa_scvars = None);
+        None end
+      else match ax.pa_scvars with
+        | None -> Some []
+        | Some scv ->
+          List.map (fun (vs,pty) ->
+              let ty = TT.transty tp_tydecl env ue pty in
+              List.map (fun v -> EcIdent.create (unloc v), ty) vs
+            ) scv
+          |> List.flatten
+          |> some in
+
+    let concl =
+      TT.trans_prop env
+        ?schema_mpreds:pparams ?schema_mt:scparams ue pconcl in
 
     if not (EcUnify.UniEnv.closed ue) then
       hierror "the formula contains free type variables";
@@ -869,47 +898,61 @@ module Ax = struct
     let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
     let tparams = EcUnify.UniEnv.tparams ue in
 
-    let axd  =
-      let kind =
-        match ax.pa_kind with
-        | PAxiom tags -> `Axiom (Ssym.of_list (List.map unloc tags), false)
-        | _ -> `Lemma
+    if ax.pa_kind <> PSchema then
+      let axd  =
+        let kind =
+          match ax.pa_kind with
+          | PAxiom tags -> `Axiom (Ssym.of_list (List.map unloc tags), false)
+          | _ -> `Lemma
 
-      in { ax_tparams    = tparams;
-           ax_spec       = concl;
-           ax_kind       = kind;
-           ax_loca       = ax.pa_locality;
-           ax_visibility = if ax.pa_nosmt then `NoSmt else `Visible; }
-    in
+        in { ax_tparams    = tparams;
+             ax_spec       = concl;
+             ax_kind       = kind;
+             ax_loca       = ax.pa_locality;
+             ax_visibility = if ax.pa_nosmt then `NoSmt else `Visible; }
+      in
 
-    match ax.pa_kind with
-    | PLemma tc -> begin
-        let local =
-          match ax.pa_locality with
-          | `Declare -> hierror ~loc "cannot mark with `declare` a lemma"
-          | `Local   -> true
-          | `Global  -> false in
+      match ax.pa_kind with
+      | PLemma tc -> begin
+          let local =
+            match ax.pa_locality with
+            | `Declare -> hierror ~loc "cannot mark with `declare` a lemma"
+            | `Local   -> true
+            | `Global  -> false in
 
-        let check    = Check_mode.check scope.sc_options in
-        let pucflags = { puc_visibility = axd.ax_visibility; puc_local = local; } in
-        let pucflags = (([], None), pucflags) in
+          let check    = Check_mode.check scope.sc_options in
+          let pucflags = { puc_visibility = axd.ax_visibility; puc_local = local; } in
+          let pucflags = (([], None), pucflags) in
 
-        match tc with
-        | None ->
-            let scope =
-              start_lemma scope ~name:(unloc ax.pa_name)
-                pucflags check (axd, None) in
-            let scope = snd (Tactics.process1_r false `Check scope tintro) in
-            None, scope
+          match tc with
+          | None ->
+              let scope =
+                start_lemma scope ~name:(unloc ax.pa_name)
+                  pucflags check (axd, None) in
+              let scope = snd (Tactics.process1_r false `Check scope tintro) in
+              None, scope
 
-        | Some tc ->
-            start_lemma_with_proof scope
-              (Some tintro) pucflags (mode, mk_loc loc tc) check
-              ~name:(unloc ax.pa_name) axd
-      end
+          | Some tc ->
+              start_lemma_with_proof scope
+                (Some tintro) pucflags (mode, mk_loc loc tc) check
+                ~name:(unloc ax.pa_name) axd
+        end
 
-    | PAxiom _ ->
-        (Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd))
+      | PAxiom _ ->
+          (Some (unloc ax.pa_name), bind scope (unloc ax.pa_name, axd))
+
+      | PSchema ->
+          assert false
+    else
+      let sc = { axs_tparams = tparams;
+                 axs_pparams = odfl [] pparams;
+                 axs_params  = odfl [] scparams;
+                 axs_spec    = concl;
+                 axs_loca    = ax.pa_locality; }
+      in
+
+      Some (unloc ax.pa_name),
+      bind_schema scope (unloc ax.pa_name, sc)
 
   (* ------------------------------------------------------------------ *)
   and add_defer (scope : scope) proofs =
@@ -1260,7 +1303,7 @@ module Op = struct
       let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in
 
       let ax =
-        { ax_tparams    = List.map (fun ty -> (ty, Sp.empty)) nparams;
+        { ax_tparams    = List.map (fun ty -> (ty, [])) nparams;
           ax_spec       = ax;
           ax_kind       = `Axiom (Ssym.empty, false);
           ax_loca       = lc;
@@ -1330,6 +1373,27 @@ end
 module Mod = struct
   module TT = EcTyping
 
+  let add_local_restr env path m =
+    let mpath = EcPath.pqname path m.me_name in
+    match m.me_body with
+    | ME_Alias _ | ME_Decl _ -> env
+    | ME_Structure _ ->
+      (* We keep only the internal part, i.e the inner global variables *)
+      (* TODO : using mod_use here to compute the set of inner global
+         variables is inefficient, change this algo *)
+      let mp = EcPath.mpath_crt mpath [] None in
+      let use = EcEnv.NormMp.mod_use env mp in
+      let rx =
+        let add x _ rx =
+          if EcPath.m_equal (EcPath.m_functor x.EcPath.x_top) mp then
+            Sx.add x rx
+          else rx in
+        Mx.fold add use.EcEnv.us_pv EcPath.Sx.empty in
+      EcEnv.Mod.add_restr_to_locals
+        { (ur_empty Sx.empty) with ur_neg = rx }
+        (ur_empty Sm.empty)
+        env
+
   let bind ?(import = EcTheory.import0) (scope : scope) (m : top_module_expr) =
     assert (scope.sc_pr_uc = None);
     let item = EcTheory.mkitem import (EcTheory.Th_module m) in
@@ -1347,7 +1411,7 @@ module Mod = struct
         Format.fprintf fmt "  - %a -> [%a]"
           (EcPrinting.pp_funname ppe) (xastrip xp)
           (EcPrinting.pp_list ", " pp_symbol)
-          (List.map EcPath.xbasename (Sx.ntr_elements names))
+          (Ssym.elements names)
       in
 
       notify scope `Warning
@@ -1359,13 +1423,13 @@ module Mod = struct
 
   let declare (scope : scope) (m : pmodule_decl) =
     let modty = m.ptm_modty in
-    let env = env scope in
-    let tysig = fst (TT.transmodtype env (fst modty)) in
-    let restr = List.map (TT.trans_topmsymbol env) (snd modty) in
     let name  = EcIdent.create (unloc m.ptm_name) in
-    let restr = Sx.empty, Sm.of_list restr in
+    let tysig = fst (TT.transmodtype (env scope) modty.pmty_pq) in
+    (* We modify tysig restrictions according if necessary. *)
+    let tysig = trans_restr_for_modty (env scope) tysig modty.pmty_mem in
+
     { scope with
-      sc_env = EcSection.add_decl_mod name tysig restr scope.sc_env }
+        sc_env = EcSection.add_decl_mod name tysig scope.sc_env }
 
   let add (scope : scope) (m : pmodule_def_or_decl) =
     match m with
@@ -1434,14 +1498,17 @@ module Ty = struct
     let tyd_params, tyd_type =
       match body with
       | PTYD_Abstract tcs ->
-        let tcs =
-          List.map
-            (fun tc -> fst (EcEnv.TypeClass.lookup (unloc tc) env))
-            tcs  in
         let ue = TT.transtyvars env (loc, Some args) in
-        EcUnify.UniEnv.tparams ue, `Abstract (Sp.of_list tcs)
+        let tcs = List.map (TT.transtc env ue) tcs in
+        let tp = EcUnify.UniEnv.tparams ue in
 
-      | PTYD_Alias    bd ->
+        begin match tp, tcs with
+          | [(x, [])], [{ tc_args = [ty] }] ->
+            Format.eprintf "[W]%s %s@." (EcIdent.tostring x) (EcTypes.dump_ty ty)
+          | _ -> () end;
+        tp, `Abstract tcs
+
+      | PTYD_Alias bd ->
         let ue     = TT.transtyvars env (loc, Some args) in
         let body   = transty tp_tydecl env ue bd in
         EcUnify.UniEnv.tparams ue, `Concrete body
@@ -1469,7 +1536,7 @@ module Ty = struct
     { scope with sc_env = EcSection.add_item item scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
-  let add_class (scope : scope) { pl_desc = tcd } =
+  let add_class (scope : scope) { pl_desc = tcd; pl_loc = loc } =
     assert (scope.sc_pr_uc = None);
     let lc = tcd.ptc_loca in
     let name  = unloc tcd.ptc_name in
@@ -1478,21 +1545,16 @@ module Ty = struct
     check_name_available scope tcd.ptc_name;
 
     let tclass =
-      let uptc =
-        tcd.ptc_inth |> omap
-          (fun { pl_loc = uploc; pl_desc = uptc } ->
-            match EcEnv.TypeClass.lookup_opt uptc scenv with
-            | None -> hierror ~loc:uploc "unknown type-class: `%s'"
-                        (string_of_qsymbol uptc)
-            | Some (tcp, _) -> tcp)
-      in
+      (* Check typeclasses arguments *)
+      let ue = TT.transtyvars scenv (loc, tcd.ptc_params) in
+
+      let uptc = tcd.ptc_inth |> omap (TT.transtc scenv ue) in
 
       let asty  =
-        let body = ofold (fun p tc -> Sp.add p tc) Sp.empty uptc in
-          { tyd_params  = [];
-            tyd_type    = `Abstract body;
-            tyd_loca    = (lc :> locality);
-            tyd_resolve = true;  } in
+        { tyd_params  = [];
+          tyd_type    = `Abstract (otolist uptc);
+          tyd_resolve = true;
+          tyd_loca    = (lc :> locality); } in
       let scenv = EcEnv.Ty.bind name asty scenv in
 
       (* Check for duplicated field names *)
@@ -1506,7 +1568,7 @@ module Ty = struct
       (* Check operators types *)
       let operators =
         let check1 (x, ty) =
-          let ue = EcUnify.UniEnv.create (Some []) in
+          let ue = EcUnify.UniEnv.copy ue in
           let ty = transty tp_tydecl scenv ue ty in
           let ty = Tuni.offun (EcUnify.UniEnv.close ue) ty in
             (EcIdent.create (unloc x), ty)
@@ -1517,7 +1579,7 @@ module Ty = struct
       let axioms =
         let scenv = EcEnv.Var.bind_locals operators scenv in
         let check1 (x, ax) =
-          let ue = EcUnify.UniEnv.create (Some []) in
+          let ue = EcUnify.UniEnv.copy ue in
           let ax = trans_prop scenv ue ax in
           let ax = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ax in
             (unloc x, ax)
@@ -1525,18 +1587,18 @@ module Ty = struct
           tcd.ptc_axs |> List.map check1 in
 
       (* Construct actual type-class *)
-      { tc_prt = uptc; tc_ops = operators; tc_axs = axioms; tc_loca = lc}
+      { tc_prt = uptc; tc_tparams = EcUnify.UniEnv.tparams ue;
+        tc_ops = operators; tc_axs = axioms; tc_loca = lc; }
     in
       bindclass scope (name, tclass)
 
   (* ------------------------------------------------------------------ *)
   let check_tci_operators env tcty ops reqs =
-    let ue   = EcUnify.UniEnv.create (Some (fst tcty)) in
-    let rmap = Mstr.of_list reqs in
+    let ue  = EcUnify.UniEnv.create (Some (fst tcty)) in
 
     let ops =
       let tt1 m (x, (tvi, op)) =
-        if not (Mstr.mem (unloc x) rmap) then
+        if not (Mstr.mem (unloc x) reqs) then
           hierror ~loc:x.pl_loc "invalid operator name: `%s'" (unloc x);
 
         let tvi = List.map (TT.transty tp_tydecl env ue) tvi in
@@ -1571,20 +1633,25 @@ module Ty = struct
       in
         List.fold_left tt1 Mstr.empty ops
     in
-      List.iter
-        (fun (x, (req, _)) ->
+      Mstr.iter
+        (fun x (req, _) ->
            if req && not (Mstr.mem x ops) then
              hierror "no definition for operator `%s'" x)
         reqs;
-      List.fold_left
-        (fun m (x, (_, ty)) ->
+      Mstr.fold
+        (fun x (_, ty) m ->
            match Mstr.find_opt x ops with
            | None -> m
            | Some (loc, (p, opty)) ->
-               if not (EcReduction.EqTest.for_type env ty opty) then
-                 hierror ~loc "invalid type for operator `%s'" x;
-               Mstr.add x p m)
-        Mstr.empty reqs
+               if not (EcReduction.EqTest.for_type env ty opty) then begin
+                 let ppe = EcPrinting.PPEnv.ofenv env in
+                 hierror ~loc
+"invalid type for operator `%s':@\n\
+\  - expected: %a@\n\
+\  - got     : %a"
+                   x (EcPrinting.pp_type ppe) ty (EcPrinting.pp_type ppe) opty
+               end; Mstr.add x p m)
+        reqs Mstr.empty
 
   (* ------------------------------------------------------------------ *)
   let check_tci_axioms scope mode axs reqs lc =
@@ -1673,17 +1740,21 @@ module Ty = struct
         assert (EcUnify.UniEnv.closed ue);
         (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
+
     if not (List.is_empty (fst ty)) then
       hierror "ring instances cannot be polymorphic";
 
     let symbols = EcAlgTactic.ring_symbols env kind (snd ty) in
+    let symbols = Mstr.of_list symbols in
     let symbols = check_tci_operators env ty tci.pti_ops symbols in
     let cr      = ring_of_symmap env (snd ty) kind symbols in
     let axioms  = EcAlgTactic.ring_axioms env cr in
     let lc      = (tci.pti_loca :> locality) in
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc in
+
     let add env p =
-      let item = EcTheory.Th_instance (ty,`General p, tci.pti_loca) in
+      let item = { tc_name = p; tc_args = []; } in
+      let item = EcTheory.Th_instance (ty, `General item, tci.pti_loca) in
       let item = EcTheory.mkitem import item in
       EcSection.add_item item env in
 
@@ -1715,18 +1786,24 @@ module Ty = struct
         assert (EcUnify.UniEnv.closed ue);
         (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
+
     if not (List.is_empty (fst ty)) then
       hierror "field instances cannot be polymorphic";
+
     let symbols = EcAlgTactic.field_symbols env (snd ty) in
+    let symbols = Mstr.of_list symbols in
     let symbols = check_tci_operators env ty tci.pti_ops symbols in
     let cr      = field_of_symmap env (snd ty) symbols in
     let axioms  = EcAlgTactic.field_axioms env cr in
     let lc      = (tci.pti_loca :> locality) in
     let inter   = check_tci_axioms scope mode tci.pti_axs axioms lc; in
+
     let add env p =
-      let item = EcTheory.Th_instance(ty,`General p, tci.pti_loca) in
+      let item = { tc_name = p; tc_args = [] } in
+      let item = EcTheory.Th_instance(ty, `General item, tci.pti_loca) in
       let item = EcTheory.mkitem import item in
       EcSection.add_item item env in
+
     let scope   =
       { scope with
         sc_env =
@@ -1741,49 +1818,84 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
-    let subst = { ty_subst_id with ts_def = Mp.of_list [tcp, ([], ty)] } in
+    let subst = { ty_subst_id with
+       ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
+       ts_v   =
+         let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
+         Mid.of_list vsubst;
+    } in
       List.map (fun (x, opty) ->
         (EcIdent.name x, (true, ty_subst subst opty)))
         tc.tc_ops
 
-(*
   (* ------------------------------------------------------------------ *)
-  let add_generic_tc (scope : scope) _mode { pl_desc = tci; pl_loc = loc; } =
-    let ty =
-      let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
-      let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
+  let add_generic_instance
+    ~import (scope : scope) mode { pl_desc = tci; pl_loc = loc; }
+  =
+    let (typarams, _) as ty =
+      let ue = TT.transtyvars (env scope) (loc, Some (fst tci.pti_type)) in
+      let ty = transty tp_tydecl (env scope) ue (snd tci.pti_type) in
         assert (EcUnify.UniEnv.closed ue);
         (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
 
-    let (tcp, tc) =
-      match EcEnv.TypeClass.lookup_opt (unloc tci.pti_name) (env scope) with
-      | None ->
-          hierror ~loc:tci.pti_name.pl_loc
-            "unknown type-class: %s" (string_of_qsymbol (unloc tci.pti_name))
-      | Some tc -> tc
-    in
+    let tcp =
+      let ue = EcUnify.UniEnv.create (Some typarams) in
+      TT.transtc (env scope) ue tci.pti_name in
 
-    let  symbols = symbols_of_tc scope.sc_env (snd ty) (tcp, tc) in
-    let _symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
+    let tc = EcEnv.TypeClass.by_path tcp.tc_name (env scope) in
 
-    { scope with
-        sc_env = EcEnv.TypeClass.add_instance ty (`General tcp) scope.sc_env }
+    tc.tc_prt |> oiter (fun prt ->
+      let ue = EcUnify.UniEnv.create (Some typarams) in
 
-(*
-          let ue = EcUnify.UniEnv.create (Some []) in
-          let ty = fst (EcUnify.UniEnv.openty ue (fst ty) None (snd ty)) in
-            try  EcUnify.hastc scope.sc_env ue ty (Sp.singleton (fst tc)); tc
-            with EcUnify.UnificationFailure _ ->
-              hierror "type must be an instance of `%s'" (EcPath.tostring (fst tc))
-*)
-*)
+      if not (EcUnify.hastc (env scope) ue (snd ty) prt) then
+        hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name)
+    );
+
+    let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
+    let tcsyms  = Mstr.of_list tcsyms in
+    let symbols = check_tci_operators (env scope) ty tci.pti_ops tcsyms in
+
+    let tysubst = {
+      ty_subst_id with
+        ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
+        ts_v   =
+          let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
+          Mid.of_list vsubst;
+    } in
+
+    let subst =
+      List.fold_left
+        (fun subst (opname, ty) ->
+          let oppath = Mstr.find (EcIdent.name opname) symbols in
+          let op = EcFol.f_op oppath [] (ty_subst tysubst ty) in
+          EcFol.Fsubst.f_bind_local subst opname op)
+        (EcFol.Fsubst.f_subst_init ~sty:tysubst ()) tc.tc_ops in
+
+    let axioms =
+      List.map
+        (fun (name, ax) ->
+          let ax = EcFol.Fsubst.f_subst subst ax in
+          (name, ax))
+        tc.tc_axs in
+
+    let lc    = (tci.pti_loca :> locality) in
+    let inter = check_tci_axioms scope mode tci.pti_axs axioms lc in
+
+    let add env =
+      let item = EcTheory.Th_instance(ty, `General tcp, tci.pti_loca) in
+      let item = EcTheory.mkitem import item in
+      EcSection.add_item item env in
+
+    let scope = { scope with sc_env = add scope.sc_env } in
+
+    Ax.add_defer scope inter
 
   (* ------------------------------------------------------------------ *)
   let add_instance
     ?(import = EcTheory.import0) (scope : scope) mode ({ pl_desc = tci } as toptci)
   =
-    match unloc tci.pti_name with
+    match unloc (fst tci.pti_name) with
     | ([], "bring") -> begin
         if EcUtils.is_some tci.pti_args then
           hierror "unsupported-option";
@@ -1811,7 +1923,7 @@ module Ty = struct
     | _ ->
         if EcUtils.is_some tci.pti_args then
           hierror "unsupported-option";
-        failwith "unsupported"          (* FIXME *)
+        add_generic_instance ~import scope mode toptci
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2016,17 +2128,23 @@ module Reduction = struct
   let add_reduction scope (opts, reds) =
     check_state `InTop "hint simplify" scope;
 
-    let opts = EcTheory.{
-      ur_delta  = List.mem `Delta  opts;
-      ur_eqtrue = List.mem `EqTrue opts;
-    } in
-
     let rules =
       let for1 idx name =
         let idx      = odfl 0 idx in
-        let lemma    = fst (EcEnv.Ax.lookup (unloc name) (env scope)) in
-        let red_info = EcReduction.User.compile ~opts ~prio:idx (env scope) lemma in
-        (lemma, opts, Some red_info) in
+        let mode, ax_sc_p =
+          match EcEnv.Ax.lookup_opt (unloc name) (env scope) with
+          | Some (p,_) -> `Ax, p
+          | None -> `Sc, EcEnv.Schema.lookup_path (unloc name) (env scope) in
+
+        let opts = EcTheory.{
+          ur_delta  = List.mem `Delta  opts;
+          ur_eqtrue = List.mem `EqTrue opts;
+          ur_mode   = mode;
+        } in
+
+        let red_info =
+          EcReduction.User.compile ~opts ~prio:idx (env scope) mode ax_sc_p in
+        (ax_sc_p, opts, Some red_info) in
 
       let rules = List.map (fun (xs, idx) -> List.map (for1 idx) xs) reds in
       List.flatten rules
@@ -2166,7 +2284,7 @@ module Search = struct
 
                     match fp.f_node with
                     | Fop (pf, _) -> (pf :: paths, pts)
-                    | _ -> (paths, (ps, ue, fp) ::pts)
+                    | _ -> (paths, (ps, ue, fp) :: pts)
                   end
 
                   | _ -> (p :: paths, pts) in
@@ -2189,16 +2307,19 @@ module Search = struct
       let get_path r = function `ByPath s -> Sp.union r s | _ -> r in
       List.fold_left get_path Sp.empty paths in
 
-    let axioms = EcSearch.search env paths in
-    let axioms = EcSearch.sort relevant axioms in
+    let search_res = EcSearch.search env paths in
+    let search_res = EcSearch.sort relevant search_res in
 
     let buffer = Buffer.create 0 in
     let fmt    = Format.formatter_of_buffer buffer in
     let ppe    = EcPrinting.PPEnv.ofenv env in
 
-    List.iter (fun ax ->
-      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ~long:true ppe) ax)
-      axioms;
+    List.iter (fun r -> match r with
+        | p,`Axiom ax ->
+          Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ~long:true ppe) (p,ax)
+        | p,`Schema sc ->
+          Format.fprintf fmt "%a@." (EcPrinting.pp_schema ~long:true ppe) (p,sc)
+      ) search_res;
     notify scope `Info "%s" (Buffer.contents buffer)
 
   let locate (scope : scope) ({ pl_desc = name } : pqsymbol) =

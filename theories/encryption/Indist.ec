@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore FSet Distr SampleBool.
 require DBool Hybrid.
 
@@ -49,7 +41,7 @@ module OrclR (O:Orcl) = {
 }.
 
 module type Adv (O : Orcl) (LR : LR) = {
-  proc main(): bool { O.leaks O.orcl LR.orcl }
+  proc main(): bool { O.leaks, O.orcl, LR.orcl }
 }.
 
 module INDL (O : Orcl) (A : Adv) = {
@@ -117,12 +109,12 @@ module HybGame2(A:Adv) (O:Orcl) (LR:LR) = {
 }.
 
 section.
-declare module O <: Orcl {Count, HybOrcl}.
-declare module A <: Adv  {Count, O, HybOrcl}.
+declare module O <: Orcl {-Count, -HybOrcl}.
+declare module A <: Adv  {-Count, -O, -HybOrcl}.
 
 declare axiom losslessL: islossless O.leaks.
 declare axiom losslessO: islossless O.orcl.
-declare axiom losslessA (O <: Orcl{A}) (LR <: LR{A}):
+declare axiom losslessA (O <: Orcl{-A}) (LR <: LR{-A}):
   islossless LR.orcl =>
   islossless O.leaks => islossless O.orcl =>
   islossless A(O, LR).main.
@@ -193,7 +185,8 @@ have ->:   Pr[INDL(O, HybGame2(A)).main() @ &m:
       + inline OrclL(O).orcl Count.incr.
         by wp; call (: true); auto.
       by wp; call (: true); auto.
-    by wp;rnd.
+  by wp;rnd;auto; smt(q_pos).
+
   by inline *; auto.
 have ->:   Pr[INDR(O, HybGame2(A)).main() @ &m:
                 res /\ p (glob A) (glob O) HybOrcl.l /\ HybOrcl.l <= q /\ Count.c <= 1]
@@ -218,7 +211,7 @@ have ->:   Pr[INDR(O, HybGame2(A)).main() @ &m:
       + inline OrclR(O).orcl Count.incr.
         by wp; call (: true); auto.
       by wp; call (: true); auto.
-    by wp;rnd.
+  by wp;rnd;auto; smt(q_pos).
   by inline *; auto.
 have ->:   Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Count.c <= q]
          = Pr[Ln(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) Count.c) /\ Count.c <= q].
@@ -287,8 +280,8 @@ module INDb(O:Orcl) (A:Adv) = {
 }.
 
 section.
-declare module O <: Orcl {Count, Orclb}.
-declare module A <: Adv  {Count, O, Orclb}.
+declare module O <: Orcl {-Count, -Orclb}.
+declare module A <: Adv  {-Count, -O, -Orclb}.
 
 local module WA = {
   proc work(x : bool) : bool = {

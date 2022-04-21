@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcFol
@@ -108,6 +100,8 @@ let process_exists_intro ~(elim : bool) fs tc =
     match concl.f_node with
     | FhoareF hf -> fst (LDecl.hoareF hf.hf_f hyps)
     | FhoareS hs -> LDecl.push_active hs.hs_m hyps
+    | FcHoareF hf -> fst (LDecl.hoareF hf.chf_f hyps)
+    | FcHoareS hs -> LDecl.push_active hs.chs_m hyps
     | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_f hyps)
     | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps
     | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)

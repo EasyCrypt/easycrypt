@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcModules
 open EcEnv
@@ -17,7 +9,7 @@ exception SectionError of string
 (* -------------------------------------------------------------------- *)
 type sc_item =
   | SC_th_item  of theory_item
-  | SC_decl_mod of EcIdent.t * module_type * mod_restr
+  | SC_decl_mod of EcIdent.t * module_type
 
 (* -------------------------------------------------------------------- *)
 type scenv
@@ -27,7 +19,7 @@ val env : scenv -> env
 val initial : env -> scenv
 
 val add_item     : theory_item -> scenv -> scenv
-val add_decl_mod : EcIdent.t -> module_type -> mod_restr -> scenv -> scenv
+val add_decl_mod : EcIdent.t -> module_type -> scenv -> scenv
 
 val enter_section : EcSymbols.symbol option -> scenv -> scenv
 val exit_section  : EcSymbols.symbol option -> scenv -> scenv

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore List Distr Ring.
 require import StdRing StdOrder StdBigop FelTactic.
@@ -67,8 +59,8 @@ module Exp(S:Sampler,A:Adv) = {
     the probability that the same output is sampled twice is bounded
     by q^2/|T|                                                        **)
 section.
-  declare module A <: Adv {Sample}.
-  declare axiom A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
+  declare module A <: Adv {-Sample}.
+  declare axiom A_ll (S <: ASampler {-A}): islossless S.s => islossless A(S).a.
 
   lemma pr_Sample_le &m:
     Pr[Exp(Sample,A).main() @ &m : size Sample.l <= q /\ !uniq Sample.l]
@@ -155,7 +147,7 @@ module Bounded(A:Adv,S:ASampler) = {
   }
 }.
 
-equiv PushBound (S <: Sampler {Bounder}) (A <: Adv {S,Bounder}):
+equiv PushBound (S <: Sampler {-Bounder}) (A <: Adv {-S,-Bounder}):
   Exp(Bounder(S),A).main ~ Exp(S,Bounded(A)).main:
     ={glob A,glob S} ==>
     ={glob A,glob S}.
@@ -165,9 +157,9 @@ proof. by proc; inline*; sim. qed.
     probability that the same output is sampled twice is bounded by
     q^2/|T|                                                         **)
 section.
-  declare module A <: Adv {Sample,Bounder}.
+  declare module A <: Adv {-Sample,-Bounder}.
 
-  declare axiom A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
+  declare axiom A_ll (S <: ASampler {-A}): islossless S.s => islossless A(S).a.
 
   lemma pr_collision_bounded_oracles &m:
     Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]

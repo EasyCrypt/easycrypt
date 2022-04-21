@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore List Distr Ring Number.
 require import StdRing StdOrder StdBigop RealSeq RealSeries.
@@ -19,7 +11,13 @@ clone include Distr.MFinite with
   op Support.card <- 2
   rename "dunifinE" as "dboolE_count"
   rename "dunifin" as "dbool"
+  rename "cunifin" as "cdbool"
 proof Support.enum_spec by case.
+
+op cdbool : { int | 0 <= cdbool } as ge0_cdbool.
+
+schema cost_dbool `{P} : cost [P: dbool] = N cdbool.
+hint simplify cost_dbool.
 
 lemma dboolE (E : bool -> bool):
   mu dbool E =   (if E true  then 1%r/2%r else 0%r)

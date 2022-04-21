@@ -1,23 +1,19 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcTypes
 open EcCoreFol
 
 module Sp   = EcPath.Sp
-module TC   = EcTypeClass
 module BI   = EcBigInt
 module Ssym = EcSymbols.Ssym
 
 (* -------------------------------------------------------------------- *)
-type ty_param  = EcIdent.t * EcPath.Sp.t
+type typeclass = {
+  tc_name : EcPath.path;
+  tc_args : ty list;
+}
+
+type ty_param  = EcIdent.t * typeclass list
 type ty_params = ty_param list
 type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
@@ -30,7 +26,7 @@ type tydecl = {
 
 and ty_body = [
   | `Concrete of EcTypes.ty
-  | `Abstract of Sp.t
+  | `Abstract of typeclass list
   | `Datatype of ty_dtype
   | `Record   of EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
 ]
@@ -54,7 +50,7 @@ let tydecl_as_record (td : tydecl) =
   match td.tyd_type with `Record x -> Some x | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) lc =
+let abs_tydecl ?(resolve = true) ?(tc = []) ?(params = `Int 0) lc =
   let params =
     match params with
     | `Named params ->
@@ -62,11 +58,14 @@ let abs_tydecl ?(resolve = true) ?(tc = Sp.empty) ?(params = `Int 0) lc =
     | `Int n ->
         let fmt = fun x -> Printf.sprintf "'%s" x in
         List.map
-          (fun x -> (EcIdent.create x, Sp.empty))
+          (fun x -> (EcIdent.create x, []))
           (EcUid.NameGen.bulk ~fmt n)
   in
 
-  { tyd_params = params; tyd_type = `Abstract tc; tyd_resolve = resolve; tyd_loca = lc; }
+  { tyd_params  = params;
+    tyd_type    = `Abstract tc;
+    tyd_resolve = resolve;
+    tyd_loca    = lc; }
 
 (* -------------------------------------------------------------------- *)
 let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
@@ -149,8 +148,60 @@ type axiom = {
 
 and ax_visibility = [`Visible | `NoSmt | `Hidden]
 
-let is_axiom (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
-let is_lemma (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
+let is_axiom  (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
+let is_lemma  (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
+
+(* -------------------------------------------------------------------- *)
+type sc_params = (EcIdent.t * ty) list
+
+type pr_params = EcIdent.t list (* type bool *)
+
+type ax_schema = {
+  axs_tparams : ty_params;
+  axs_pparams : pr_params; (* variables for predicate *)
+  axs_params  : sc_params; (* variables representing expression *)
+  axs_loca    : locality;
+  axs_spec    : EcCoreFol.form;
+}
+
+let sc_instantiate
+    ty_params pr_params sc_params
+    ty_args memtype (pr_args : mem_pr list) sc_args f =
+  let fs = EcTypes.Tvar.init (List.map fst ty_params) ty_args in
+  let sty = { ty_subst_id with ts_v = fs } in
+
+
+  (* We substitute the predicate variables. *)
+  let preds = List.map2 (fun (mem,p) id ->
+      id, (mem,p)) pr_args pr_params in
+  let mpreds = EcIdent.Mid.of_list preds in
+
+  let exprs =
+    List.map2 (fun e (id,_ty) ->
+        id, e
+      ) sc_args sc_params in
+  let mexpr = EcIdent.Mid.of_list exprs in
+
+  (* FIXME: instantiating and substituting in schema is ugly. *)
+  (* We instantiate the variables. *)
+  (* For cost judgement, we also need to substitute the expression variables
+     in the precondition. *)
+  let tx f_old f_new = match f_old.f_node, f_new.f_node with
+    | Fcoe coe_old, Fcoe coe_new
+      when EcMemory.is_schema (snd coe_old.coe_mem) ->
+      let fs =
+        List.fold_left (fun s (id,e) ->
+            let f = EcCoreFol.form_of_expr (fst coe_new.coe_mem) e in
+            Fsubst.f_bind_local s id f)
+          (Fsubst.f_subst_init ()) exprs in
+
+      EcCoreFol.f_coe_r { coe_new with
+                          coe_pre = Fsubst.f_subst fs coe_new.coe_pre }
+    | _ -> f_new in
+
+  let fs = Fsubst.f_subst_init ~sty ~esloc:mexpr ~mt:memtype ~mempred:mpreds () in
+
+  Fsubst.f_subst ~tx fs f
 
 (* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
@@ -282,11 +333,12 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) lc =
     ax_visibility = if nosmt then `NoSmt else `Visible; }
 
 (* -------------------------------------------------------------------- *)
-type typeclass = {
-  tc_prt : EcPath.path option;
-  tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : (EcSymbols.symbol * EcCoreFol.form) list;
-  tc_loca: is_local;
+type tc_decl = {
+  tc_tparams : ty_params;
+  tc_prt     : typeclass option;
+  tc_ops     : (EcIdent.t * EcTypes.ty) list;
+  tc_axs     : (EcSymbols.symbol * EcCoreFol.form) list;
+  tc_loca    : is_local;
 }
 
 (* -------------------------------------------------------------------- *)

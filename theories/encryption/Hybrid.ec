@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore List Finite Distr DInterval.
 require (*--*) Means StdOrder.
 (*---*) import StdBigop.Bigreal.BRA.
@@ -156,8 +148,8 @@ clone import Means as M with
     op d <- [0..max 0 (q-1)].
 
 (* In the case of 0 oracle calls, the behavor does not depend on the oracle *)
-lemma orcl_no_call (A <: AdvOrcl{Count}) (O1 <: Orcl{Count,A}) (O2 <: Orcl{Count,A}) &m p : 
-  (forall (O <: Orcl{A}), islossless O.orcl => islossless A(O).main ) => 
+lemma orcl_no_call (A <: AdvOrcl{-Count}) (O1 <: Orcl{-Count,-A}) (O2 <: Orcl{-Count,-A}) &m p : 
+  (forall (O <: Orcl{-A}), islossless O.orcl => islossless A(O).main ) => 
   islossless O1.orcl => islossless O2.orcl =>
   let p' = fun ga l r, p ga l r /\ l <= 0 in
     Pr[ AdvCount(A(OrclCount(O1))).main() @ &m : p' (glob A) Count.c res] = 
@@ -180,13 +172,13 @@ qed.
 (* Prove that it is equivalent to consider n or 1 calls to the oracle *)
 section.
 
-  declare module Ob <: Orclb    {Count,HybOrcl}.
-  declare module A <: AdvOrclb {Count,HybOrcl,Ob}.
+  declare module Ob <: Orclb   {-Count,-HybOrcl}.
+  declare module A <: AdvOrclb {-Count,-HybOrcl,-Ob}.
 
   declare axiom losslessL: islossless Ob.leaks.
   declare axiom losslessOb1: islossless Ob.orclL.
   declare axiom losslessOb2: islossless Ob.orclR.
-  declare axiom losslessA (Ob0 <: Orclb {A}) (LR <: Orcl {A}):
+  declare axiom losslessA (Ob0 <: Orclb {-A}) (LR <: Orcl {-A}):
     islossless LR.orcl =>
     islossless Ob0.leaks => islossless Ob0.orclL => islossless Ob0.orclR =>
     islossless A(Ob0, LR).main.
@@ -482,17 +474,17 @@ end section.
 (* -------------------------------------------------------------------- *)
 (* Simplified variant: Assume that A calls the oracle at most q times. *)
 section.
-  declare module Ob <: Orclb    {Count,HybOrcl}.
-  declare module A <: AdvOrclb {Count,HybOrcl,Ob}.
+  declare module Ob <: Orclb   {-Count,-HybOrcl}.
+  declare module A <: AdvOrclb {-Count,-HybOrcl,-Ob}.
 
   declare axiom A_call :
-    forall (O <: Orcl{Count,A}),
+    forall (O <: Orcl{-Count,-A}),
       hoare [ Orcln(A(Ob), O).main : true ==> Count.c <= q ].
 
   declare axiom losslessL: islossless Ob.leaks.
   declare axiom losslessOb1: islossless Ob.orclL.
   declare axiom losslessOb2: islossless Ob.orclR.
-  declare axiom losslessA (Ob0 <: Orclb{A}) (LR <: Orcl{A}):
+  declare axiom losslessA (Ob0 <: Orclb{-A}) (LR <: Orcl{-A}):
     islossless LR.orcl =>
     islossless Ob0.leaks => islossless Ob0.orclL => islossless Ob0.orclR =>
     islossless A(Ob0, LR).main.

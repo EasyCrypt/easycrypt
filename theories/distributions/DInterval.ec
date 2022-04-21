@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore List StdBigop StdOrder IntDiv Distr.
 (*---*) import IntOrder Bigint MUniform Range.
@@ -83,3 +75,10 @@ rewrite mulzK 1:gtr_eqF // fromintM gt0_r /=.
 rewrite  RField.invrM ?eq_fromint 1,2:gtr_eqF //.
 by rewrite RField.mulrCA RField.divff // eq_fromint gtr_eqF.
 qed.
+
+(* -------------------------------------------------------------------- *)
+op cdinterval : int -> int.
+axiom ge0_cdinterval m : 0 <= cdinterval m.
+
+schema cost_dinterval {i j : int} (k:int) : cost [ i <= j <= k - i : dinter i (j - 1)] = cost [true : i] + cost [true : j] + N (cdinterval k).
+hint simplify cost_dinterval.
