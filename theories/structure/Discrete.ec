@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore Ring StdRing StdOrder List Finite.
+require import AllCore Ring StdRing StdOrder List Finite IntMin.
 (*---*) import IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
