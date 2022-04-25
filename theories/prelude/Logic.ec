@@ -83,6 +83,8 @@ pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
 abbrev [-printing] transpose ['a 'b 'c] (f : 'a -> 'b -> 'c) (y : 'b) =
   fun x => f x y.
 
+lemma transposeP ['a, 'b, 'c] (f : 'a -> 'b -> 'c) (x : 'a) (y : 'b) : f x y = transpose f y x by done.
+
 (* -------------------------------------------------------------------- *)
 op eta_ (f : 'a -> 'b) = fun x => f x
   axiomatized by etaE.
@@ -449,6 +451,9 @@ lemma nosmt orb_id2r a b c : (!b => a = c) => a \/ b <=> c \/ b by [].
 lemma nosmt negb_and a b : !(a /\ b) <=> !a \/ !b by [].
 lemma nosmt negb_or  a b : !(a \/ b) <=> !a /\ !b by [].
 
+lemma nosmt andlP a b c : a => ((a /\ b) => c) => b => c by [].
+lemma nosmt andrP a b c : a => ((b /\ a) => c) => b => c by [].
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt negb_exists (P : 'a -> bool) :
   !(exists a, P a) <=> forall a, !P a
@@ -515,6 +520,17 @@ lemma nosmt oraP  b1 b2 : b1 \/ b2 <=> b1 \/ (!b1 => b2) by [].
 
 lemma nosmt andabP b1 b2 : b1 && b2 <=> b1 /\ b2 by [].
 lemma nosmt orabP  b1 b2 : b1 || b2 <=> b1 \/ b2 by [].
+
+(* -------------------------------------------------------------------- *)
+(*FIXME: may be useless because of rewrite, or may not be.*)
+lemma nosmt andb_id2 a b c d : (a <=> b) => (c <=> d) => ((a /\ c) <=> (b /\ d)) by [].
+lemma nosmt or_andl a b : (a \/ b) <=> ((a /\ !b) \/ b) by [].
+lemma nosmt or_andr a b : (a \/ b) <=> (a \/ (!a /\ b)) by [].
+lemma nosmt and_impl a b : (a /\ b) <=> ((b => a) /\ b) by [].
+lemma nosmt and_impr a b : (a /\ b) <=> ( a /\ (a => b)) by [].
+
+lemma nosmt negb_eqbl a b : ! (a <=> b) <=> (!a <=> b) by [].
+lemma nosmt negb_eqbr a b : ! (a <=> b) <=> (a <=> !b) by [].
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt forall_orl (P : bool) (Q : 'a -> bool) :

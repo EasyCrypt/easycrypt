@@ -235,3 +235,18 @@ call Hf;auto=> ??[#]-> HP HI Hl _ /=;split.
 + by rewrite HI HP // <@ Hl=>/head_behead /(_ witness) {1}<-.
 by move=>_ ??->/= x Hx;apply/HP/(mem_drop 1).
 qed.
+
+lemma iter_inv_HL (O<:Orcl) (P:t -> bool) (Inv: glob O -> bool):
+  hoare [ O.f :
+          P x /\ Inv (glob O) ==>
+          Inv (glob O) ] =>
+  hoare [ Iter(O).iter :
+          (forall x, mem l x => P x) /\ Inv (glob O) ==>
+          Inv (glob O) ].
+proof.
+move=> Hf;proc.
+while ((forall x, mem l x => P x) /\ Inv (glob O));auto.
+call Hf;auto => ? [[HP HI] Hl]; split.
++ by rewrite HI HP // <@ Hl=>/head_behead /(_ witness) {1}<-.
+by move=>_ ?->/= x Hx;apply/HP/(mem_drop 1).
+qed.
