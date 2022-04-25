@@ -77,8 +77,12 @@ by rewrite RField.mulrCA RField.divff // eq_fromint gtr_eqF.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op cdinterval : int -> int.
-axiom ge0_cdinterval m : 0 <= cdinterval m.
-
-schema cost_dinterval {i j : int} (k:int) : cost [ i <= j <= k - i : dinter i (j - 1)] = cost [true : i] + cost [true : j] + N (cdinterval k).
-hint simplify cost_dinterval.
+abstract theory Cost.
+  op cdinterval : int -> int.
+  axiom ge0_cdinterval m : 0 <= cdinterval m.
+  
+  schema cost_dinterval {i j : int} (k:int) : 
+    cost [ i <= j <= k - i : dinter i (j - 1)] = 
+    cost [true : i] + cost [true : j] + N (cdinterval k).
+  hint simplify cost_dinterval.
+end Cost.
