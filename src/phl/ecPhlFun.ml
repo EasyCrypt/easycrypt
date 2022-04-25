@@ -266,7 +266,6 @@ module FunAbsLow = struct
     let pr = f_app_simpl inv kargs_pr tbool in
 
     let ospec o_called =
-      let k_called = Mx.find o_called mks in
       let k_called =
         try Mx.find o_called mks with
         | Not_found ->

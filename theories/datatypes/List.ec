@@ -3196,9 +3196,15 @@ qed.
 (* -------------------------------------------------------------------- *)
 (*                          Cost on list                                *)
 (* -------------------------------------------------------------------- *)
-schema cost_eqnil ['a] `{P} {l:'a list} : cost [P: l = []] = cost [P:l] + '1.
-hint simplify cost_eqnil.
+abstract theory Cost.
+  schema cost_eqnil ['a] `{P} {l:'a list} : cost [P: l = []] = cost [P:l] + '1.
+  hint simplify cost_eqnil.
+  
+  schema cost_drop ['a] `{P} {l: 'a list} : 
+    cost [P: drop 1 l] = cost [P: l] + '1.
 
-schema cost_drop ['a] `{P} {l: 'a list} : cost [P: drop 1 l] = cost [P: l] + '1.
-schema cost_head ['a] `{P} {w:'a, l:'a list} : cost [P:head w l] = cost[P:w] + cost[P:l] + '1.
-hint simplify cost_drop, cost_head.
+  schema cost_head ['a] `{P} {w:'a, l:'a list} : 
+    cost [P:head w l] = cost[P:w] + cost[P:l] + '1.
+
+  hint simplify cost_drop, cost_head.
+end Cost.

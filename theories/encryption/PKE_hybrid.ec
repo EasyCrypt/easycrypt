@@ -230,7 +230,11 @@ qed.
 end section.
 
 (* ==================================================================== *)
-abstract theory WithCost.
+abstract theory Cost.
+clone include AllCore.Cost.
+clone import DInterval.Cost.
+
+
 module K = {
   var pk : pkey
   var sk : skey
@@ -616,3 +620,4 @@ proof.
   by rewrite !bigi1 /= /#.
 qed.
 end section.
+end Cost.

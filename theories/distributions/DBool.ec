@@ -14,11 +14,6 @@ clone include Distr.MFinite with
   rename "cunifin" as "cdbool"
 proof Support.enum_spec by case.
 
-op cdbool : { int | 0 <= cdbool } as ge0_cdbool.
-
-schema cost_dbool `{P} : cost [P: dbool] = N cdbool.
-hint simplify cost_dbool.
-
 lemma dboolE (E : bool -> bool):
   mu dbool E =   (if E true  then 1%r/2%r else 0%r)
                + (if E false then 1%r/2%r else 0%r).
@@ -189,3 +184,12 @@ apply; rewrite -(dbfunE_mem_uniq _ (undup _)) // ?undup_uniq.
 qed.
 
 end MUniFinFunBiased.
+
+
+(* -------------------------------------------------------------------- *)
+abstract theory Cost.
+  op cdbool : { int | 0 <= cdbool } as ge0_cdbool.
+  
+  schema cost_dbool `{P} : cost [P: dbool] = N cdbool.
+  hint simplify cost_dbool.
+end Cost.
