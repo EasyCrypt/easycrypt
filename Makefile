@@ -21,13 +21,15 @@ default: build
 	@true
 
 build:
-	rm -f ec.native && $(DUNE) build && ln -sf src/ec.exe ec.native
+	rm -f src/ec.exe ec.native
+	$(DUNE) build
+	ln -sf src/ec.exe ec.native
 
 install: build
-	dune install
+	$(DUNE) install
 
 uninstall:
-	dune uninstall
+	$(DUNE) uninstall
 
 check: stdlib examples
 
@@ -41,7 +43,7 @@ check: stdlib examples
 	@true
 
 clean:
-	rm -f ec.native && dune clean
+	rm -f ec.native && $(DUNE) clean
 	find theories examples -name '*.eco' -exec rm '{}' ';'
 
 clean_eco:
