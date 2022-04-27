@@ -103,9 +103,9 @@ let main () =
           confname in
       let localini =
         Option.map
-          (fun src -> List.fold_left Filename.concat src ["etc"; "easycrypt.conf"])
+          (fun src -> List.fold_left Filename.concat src ["etc"; confname])
           EcRelocate.sourceroot in
-      List.Exceptionless.hd (xdgini @ Option.to_list localini) in
+      List.Exceptionless.hd (Option.to_list localini @ xdgini) in
 
     let ini =
       Option.bind ini (fun ini ->
