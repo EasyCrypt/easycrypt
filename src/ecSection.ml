@@ -36,16 +36,17 @@ type dep_error =
 let pp_cbarg env fmt (who : cbarg) =
   let ppe = EcPrinting.PPEnv.ofenv env in
   match who with
-  | `Type p -> Format.fprintf fmt "type %a" (EcPrinting.pp_tyname ppe) p
-  | `Op   p -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
-  | `Ax   p -> Format.fprintf fmt "lemma/axiom %a" (EcPrinting.pp_axname ppe) p
-  | `Sc   p -> Format.fprintf fmt "schema %a" (EcPrinting.pp_scname ppe) p
-  | `Module mp -> Format.fprintf fmt "module %a" (EcPrinting.pp_topmod ppe) mp
+  | `Type   p -> Format.fprintf fmt "type %a" (EcPrinting.pp_tyname ppe) p
+  | `Op     p -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
+  | `Ax     p -> Format.fprintf fmt "lemma/axiom %a" (EcPrinting.pp_axname ppe) p
+  | `Sc     p -> Format.fprintf fmt "schema %a" (EcPrinting.pp_scname ppe) p
+  | `Module p -> Format.fprintf fmt "module %a" (EcPrinting.pp_topmod ppe) p
   | `ModuleType p ->
-    let mty = EcEnv.ModTy.modtype p env in
-    Format.fprintf fmt "module type %a" (EcPrinting.pp_modtype1 ppe) mty
+      Format.fprintf fmt "module type %a"
+        (EcPrinting.pp_modtype1 ppe)
+        (EcEnv.ModTy.modtype p env)
   | `Typeclass p ->
-    Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tc_name ppe) p
+      Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tyname ppe) p
   | `Instance tci ->
     match tci with
     | `Ring _ -> Format.fprintf fmt "ring instance"

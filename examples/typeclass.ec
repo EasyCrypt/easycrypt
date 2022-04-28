@@ -19,6 +19,7 @@ type class finite = {
   axiom enumP : forall (x : finite), x \in enum
 }.
 
+print enum.
 print enumP.
 
 type class countable = {
