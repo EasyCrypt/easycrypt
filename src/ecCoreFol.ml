@@ -6,6 +6,7 @@ open EcTypes
 open EcCoreModules
 
 type memory = EcMemory.memory
+[@@deriving show]
 
 module BI = EcBigInt
 module Mp = EcPath.Mp
@@ -20,18 +21,19 @@ type quantif =
   | Lforall
   | Lexists
   | Llambda
+[@@deriving show]
 
 type hoarecmp = FHle | FHeq | FHge
 
 type gty =
-  | GTty    of (EcTypes.ty [@opaque])
+  | GTty    of EcTypes.ty
   | GTmodty of (module_type [@opaque])
   | GTmem   of (EcMemory.memtype [@opaque])
 [@@deriving show]
 
-and binding  = ((EcIdent.t * gty) [@opaque])
+and binding  = (EcIdent.t * gty)
 [@@deriving show]
-and bindings = (binding list [@opaque])
+and bindings = binding list
 [@@deriving show]
 
 and form = {
@@ -43,36 +45,36 @@ and form = {
 [@@deriving show]
 
 and f_node =
-  | Fquant  of (quantif [@opaque]) * bindings * form
+  | Fquant  of quantif * bindings * form
   | Fif     of form * form * form
-  | Fmatch  of form * form list * (ty [@opaque])
-  | Flet    of (lpattern [@opaque]) * form * form
-  | Fint    of (BI.zint [@opaque])
-  | Flocal  of (EcIdent.t [@opaque])
-  | Fpvar   of (EcTypes.prog_var [@opaque]) * (memory [@opaque])
-  | Fglob   of (EcPath.mpath [@opaque])     * (memory [@opaque])
-  | Fop     of (EcPath.path [@opaque]) * (ty [@opaque]) list
+  | Fmatch  of form * form list * ty
+  | Flet    of lpattern * form * form
+  | Fint    of BI.zint
+  | Flocal  of EcIdent.t
+  | Fpvar   of EcTypes.prog_var * memory
+  | Fglob   of EcPath.mpath * memory
+  | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
   | Fproj   of form * int
 
-  | FhoareF of sHoareF (* $hr / $hr *)
-  | FhoareS of sHoareS
+  | FhoareF of (sHoareF [@opaque]) (* $hr / $hr *)
+  | FhoareS of (sHoareS [@opaque])
 
-  | FcHoareF of cHoareF (* $hr / $hr *)
-  | FcHoareS of cHoareS
+  | FcHoareF of (cHoareF [@opaque]) (* $hr / $hr *)
+  | FcHoareS of (cHoareS [@opaque])
 
-  | FbdHoareF of bdHoareF (* $hr / $hr *)
-  | FbdHoareS of bdHoareS
+  | FbdHoareF of (bdHoareF [@opaque]) (* $hr / $hr *)
+  | FbdHoareS of (bdHoareS [@opaque])
 
-  | FequivF of equivF (* $left,$right / $left,$right *)
-  | FequivS of equivS
+  | FequivF of (equivF [@opaque]) (* $left,$right / $left,$right *)
+  | FequivS of (equivS [@opaque])
 
-  | FeagerF of eagerF
+  | FeagerF of (eagerF [@opaque])
 
-  | Fcoe of coe
+  | Fcoe of (coe [@opaque])
 
-  | Fpr of pr (* hr *)
+  | Fpr of (pr [@opaque]) (* hr *)
 [@@deriving show]
 
 and eagerF = {

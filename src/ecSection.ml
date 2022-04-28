@@ -45,7 +45,7 @@ let pp_cbarg env fmt (who : cbarg) =
     let mty = EcEnv.ModTy.modtype p env in
     Format.fprintf fmt "module type %a" (EcPrinting.pp_modtype1 ppe) mty
   | `Typeclass p ->
-    Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tcname ppe) p
+    Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tc_name ppe) p
   | `Instance tci ->
     match tci with
     | `Ring _ -> Format.fprintf fmt "ring instance"

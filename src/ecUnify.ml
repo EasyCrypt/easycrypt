@@ -375,7 +375,7 @@ end
 (* -------------------------------------------------------------------- *)
 module UnifyExtraForTC :
   UnifyExtra with type state   = typeclass list
-              and type problem = [ `TcCtt of ty * typeclass ] =
+              and type problem = [ `TcCtt of ty * typeclass] =
 struct
   type state   = typeclass list
   type problem = [ `TcCtt of ty * typeclass ]

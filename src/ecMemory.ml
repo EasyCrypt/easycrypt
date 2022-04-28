@@ -8,6 +8,9 @@ module Msym = EcSymbols.Msym
 (* -------------------------------------------------------------------- *)
 type memory = EcIdent.t
 
+let pp_memory fmt m =
+  Format.fprintf fmt "&%a" EcIdent.pp m
+
 let mem_equal = EcIdent.id_equal
 
 (* -------------------------------------------------------------------- *)

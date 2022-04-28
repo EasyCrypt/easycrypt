@@ -1829,6 +1829,8 @@ module Ty = struct
         tc.tc_ops
 
   (* ------------------------------------------------------------------ *)
+  (*TODOTC: we have to consider the operators of the parent typeclass instance, and also the types.
+    How can I find this instance?*)
   let add_generic_instance
     ~import (scope : scope) mode { pl_desc = tci; pl_loc = loc; }
   =
@@ -1845,12 +1847,17 @@ module Ty = struct
 
     let tc = EcEnv.TypeClass.by_path tcp.tc_name (env scope) in
 
-    tc.tc_prt |> oiter (fun prt ->
-      let ue = EcUnify.UniEnv.create (Some typarams) in
-
-      if not (EcUnify.hastc (env scope) ue (snd ty) prt) then
-        hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name)
-    );
+    let prti =
+      Option.map
+        (fun prt ->
+          let ue = EcUnify.UniEnv.create (Some typarams) in
+          if not (EcUnify.hastc (env scope) ue (snd ty) prt) then
+            hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name);
+          let oprti = EcEnv.TypeClass.get_instance (env scope) prt in
+          match oprti with
+          | Some prti -> prti
+          | _ -> hierror "instance of `%s' was said to be in the env, but was not found" (EcPath.tostring tcp.tc_name) )
+        tc.tc_prt in
 
     let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
     let tcsyms  = Mstr.of_list tcsyms in
@@ -1861,6 +1868,14 @@ module Ty = struct
         ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
         ts_v   =
           let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
+(*
+          let vsubst =
+            ofold
+              (fun tcp_prt vs ->
+                let tc_prt = EcEnv.TypeClass.by_path tcp_prt.tc_name (env scope) in
+                List.combine (List.fst tc_prt.tc_tparams) tcp_prt.tc_args @ vs)
+              vsubst tc.tc_prt in
+*)
           Mid.of_list vsubst;
     } in
 
@@ -1872,13 +1887,26 @@ module Ty = struct
           EcFol.Fsubst.f_bind_local subst opname op)
         (EcFol.Fsubst.f_subst_init ~sty:tysubst ()) tc.tc_ops in
 
+(*
+    let subst =
+      ofold
+        (fun tcp_prt s ->
+          let tc_prt = EcEnv.TypeClass.by_path tcp_prt.tc_name (env scope) in
+          List.fold_left
+            (fun subst (opname, ty) ->
+            let oppath = Mstr.find (EcIdent.name opname) symbols in
+            let op = EcFol.f_op oppath [] (ty_subst tysubst ty) in
+            EcFol.Fsubst.f_bind_local subst opname op)
+          s tc_prt.tc_ops)
+        subst tc.tc_prt in
+*)
+
     let axioms =
       List.map
         (fun (name, ax) ->
           let ax = EcFol.Fsubst.f_subst subst ax in
           (name, ax))
         tc.tc_axs in
-
     let lc    = (tci.pti_loca :> locality) in
     let inter = check_tci_axioms scope mode tci.pti_axs axioms lc in
 

@@ -19,6 +19,7 @@ type ty = private {
   ty_fv   : int Mid.t;
   ty_tag  : int;
 }
+[@@deriving show]
 
 and ty_node =
   | Tglob   of EcPath.mpath (* The tuple of global variable of the module *)
@@ -125,6 +126,7 @@ type lpattern =
   | LSymbol of (EcIdent.t * ty)
   | LTuple  of (EcIdent.t * ty) list
   | LRecord of EcPath.path * (EcIdent.t option * ty) list
+[@@deriving show]
 
 val lp_equal : lpattern -> lpattern -> bool
 val lp_hash  : lpattern -> int
@@ -146,10 +148,12 @@ val v_equal : variable -> variable -> bool
 type pvar_kind =
   | PVKglob
   | PVKloc
+[@@deriving show]
 
 type prog_var = private
   | PVglob of EcPath.xpath
   | PVloc of EcSymbols.symbol
+[@@deriving show]
 
 val pv_equal       : prog_var -> prog_var -> bool
 val pv_compare     : prog_var -> prog_var -> int

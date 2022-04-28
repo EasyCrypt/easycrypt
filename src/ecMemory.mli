@@ -4,6 +4,8 @@ open EcTypes
 (* -------------------------------------------------------------------- *)
 type memory = EcIdent.t
 
+val pp_memory : Format.formatter -> memory -> unit
+
 val mem_equal : memory -> memory -> bool
 
 (* -------------------------------------------------------------------- *)

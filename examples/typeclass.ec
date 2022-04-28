@@ -26,9 +26,6 @@ type class countable = {
   axiom countP : forall (x : countable), exists (n : int), x = count n
 }.
 
-(* TODO: printing typeclasses *)
-print countable.
-
 (* -------------------------------------------------------------------- *)
 (* Simple algebraic structures *)
 
@@ -112,6 +109,17 @@ type class ['a <: comring] commodule <: comgroup = {
    https://en.wikipedia.org/wiki/Magma_(algebra) *)
 type foo <: witness.
 type fingroup <: group & finite.
+
+
+
+(* TODO: printing typeclasses *)
+print countable.
+print magma.
+print semigroup.
+print monoid.
+print group.
+print semigroup_action.
+print monoid_action.
 
 
 (* ==================================================================== *)
@@ -216,10 +224,13 @@ realize mulrA by rewrite mulrA.
 
 realize mulrDl.
 proof.
+  (*TODO: in the goal, the typeclass operator + should have been replaced with the + from CoreInt, but has not been.*)
   print mulrDl.
   move => x y z.
   move: (Ring.IntID.mulrDl x y z).
   move => HmulrDl.
+  have: false.
+  move: HmulrDl.
   rewrite HmulrDl.
   (* TODO: what? *)
   admit.

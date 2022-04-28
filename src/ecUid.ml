@@ -31,6 +31,9 @@ let forsym (um : uidmap) (x : symbol) =
         Hashtbl.add um.um_tbl x uid;
         uid
 
+let pp_uid fmt u =
+  Format.fprintf fmt "#%d" u
+
 (* -------------------------------------------------------------------- *)
 let uid_equal x y = x == y
 let uid_compare x y = x - y

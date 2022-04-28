@@ -38,3 +38,4 @@ val fv_add       : ident -> int Mid.t -> int Mid.t
 
 (* -------------------------------------------------------------------- *)
 val pp_ident : Format.formatter -> t -> unit
+val pp : Format.formatter -> t -> unit

@@ -1418,6 +1418,14 @@ module TypeClass = struct
         env_item = mkitem import (Th_instance (ty, cr, lc)) :: env.env_item; }
 
   let get_instances env = env.env_tci
+
+  let get_instance env tc =
+    List.find_opt
+      (fun p ->
+        match (snd p) with
+        | `General tc' -> tc = tc'
+        | _ -> false )
+      (get_instances env)
 end
 
 (* -------------------------------------------------------------------- *)

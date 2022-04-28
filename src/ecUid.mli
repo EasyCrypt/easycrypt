@@ -12,6 +12,7 @@ type uidmap
 val create : unit -> uidmap
 val lookup : uidmap -> symbol -> uid option
 val forsym : uidmap -> symbol -> uid
+val pp_uid : Format.formatter -> uid -> unit
 
 (* -------------------------------------------------------------------- *)
 val uid_equal   : uid -> uid -> bool
