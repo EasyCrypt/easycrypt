@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcMaps
 open EcPath
 open EcTypes
 open EcDecl
@@ -50,8 +51,13 @@ and ctheory = {
   cth_source : thsource option;
 }
 
-and tcinstance = [ `Ring of ring | `Field of field | `General of typeclass ]
-and thmode     = [ `Abstract | `Concrete ]
+and tcinstance = [
+  | `Ring    of ring
+  | `Field   of field
+  | `General of typeclass * (path Mstr.t) option
+]
+
+and thmode = [ `Abstract | `Concrete ]
 
 and rule_pattern =
   | Rule of top_rule_pattern * rule_pattern list

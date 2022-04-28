@@ -398,7 +398,6 @@ module TypeClass : sig
 
   val add_instance  : ?import:import -> (ty_params * ty) -> tcinstance -> is_local -> env -> env
   val get_instances : env -> ((ty_params * ty) * tcinstance) list
-  val get_instance  : env -> typeclass -> ((ty_params * ty) * tcinstance) option
 end
 
 (* -------------------------------------------------------------------- *)

@@ -1754,7 +1754,7 @@ module Ty = struct
 
     let add env p =
       let item = { tc_name = p; tc_args = []; } in
-      let item = EcTheory.Th_instance (ty, `General item, tci.pti_loca) in
+      let item = EcTheory.Th_instance (ty, `General (item, None), tci.pti_loca) in
       let item = EcTheory.mkitem import item in
       EcSection.add_item item env in
 
@@ -1800,7 +1800,7 @@ module Ty = struct
 
     let add env p =
       let item = { tc_name = p; tc_args = [] } in
-      let item = EcTheory.Th_instance(ty, `General item, tci.pti_loca) in
+      let item = EcTheory.Th_instance(ty, `General (item, None), tci.pti_loca) in
       let item = EcTheory.mkitem import item in
       EcSection.add_item item env in
 
@@ -1847,6 +1847,7 @@ module Ty = struct
 
     let tc = EcEnv.TypeClass.by_path tcp.tc_name (env scope) in
 
+(*
     let prti =
       Option.map
         (fun prt ->
@@ -1858,6 +1859,7 @@ module Ty = struct
           | Some prti -> prti
           | _ -> hierror "instance of `%s' was said to be in the env, but was not found" (EcPath.tostring tcp.tc_name) )
         tc.tc_prt in
+*)
 
     let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
     let tcsyms  = Mstr.of_list tcsyms in
@@ -1911,7 +1913,7 @@ module Ty = struct
     let inter = check_tci_axioms scope mode tci.pti_axs axioms lc in
 
     let add env =
-      let item = EcTheory.Th_instance(ty, `General tcp, tci.pti_loca) in
+      let item = EcTheory.Th_instance (ty, `General (tcp, Some symbols), tci.pti_loca) in
       let item = EcTheory.mkitem import item in
       EcSection.add_item item env in
 

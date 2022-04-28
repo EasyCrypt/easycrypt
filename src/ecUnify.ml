@@ -282,7 +282,7 @@ module TypeClass = struct
 
     let instances =
       List.filter_map
-        (function (x, `General y) -> Some (x, y) | _ -> None)
+        (function (x, `General (y, _)) -> Some (x, y) | _ -> None)
         instances in
 
     let instances =

@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcMaps
 open EcPath
 open EcTypes
 open EcDecl
@@ -387,7 +388,7 @@ let on_typeclasses cb tcs =
   List.iter (on_typeclass cb) tcs
 
 let on_typarams cb typarams =
-  List.iter (fun (_,tc) -> on_typeclasses cb tc) typarams
+  List.iter (fun (_, tc) -> on_typeclasses cb tc) typarams
 
 (* -------------------------------------------------------------------- *)
 let on_tydecl (cb : cb) (tyd : tydecl) =
@@ -488,9 +489,12 @@ let on_instance cb ty tci =
   on_ty cb (snd ty);
   (* FIXME section: ring/field use type class that do not exists *)
   match tci with
-  | `Ring r      -> on_ring  cb r
-  | `Field f     -> on_field cb f
-  | `General tci -> on_typeclass cb tci
+  | `Ring  r -> on_ring  cb r
+  | `Field f -> on_field cb f
+
+  | `General (tci, syms) ->
+     on_typeclass cb tci;
+     Option.iter (Mstr.iter (fun _ p -> cb (`Op p))) syms
 
 (* -------------------------------------------------------------------- *)
 

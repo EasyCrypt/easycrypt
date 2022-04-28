@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcMaps
 open EcTypes
 open EcDecl
 open EcCoreFol
@@ -501,9 +502,13 @@ let subst_field (s : _subst) cr =
 (* -------------------------------------------------------------------- *)
 let subst_instance (s : _subst) tci =
   match tci with
-  | `Ring    cr -> `Ring  (subst_ring  s cr)
-  | `Field   cr -> `Field (subst_field s cr)
-  | `General tc -> `General (subst_typeclass s tc)
+  | `Ring  cr -> `Ring  (subst_ring  s cr)
+  | `Field cr -> `Field (subst_field s cr)
+
+  | `General (tc, syms) ->
+     let tc   = subst_typeclass s tc in
+     let syms = Option.map (Mstr.map s.s_p) syms in
+     `General (tc, syms)
 
 (* -------------------------------------------------------------------- *)
 let subst_tc (s : _subst) tc =

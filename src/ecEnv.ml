@@ -205,12 +205,6 @@ and scope = [
   | `Fun    of EcPath.xpath
 ]
 
-and tcinstance = [
-  | `Ring    of EcDecl.ring
-  | `Field   of EcDecl.field
-  | `General of typeclass
-]
-
 and redinfo =
   { ri_priomap : (EcTheory.rule list) Mint.t;
     ri_list    : (EcTheory.rule list) Lazy.t; }
@@ -1418,14 +1412,6 @@ module TypeClass = struct
         env_item = mkitem import (Th_instance (ty, cr, lc)) :: env.env_item; }
 
   let get_instances env = env.env_tci
-
-  let get_instance env tc =
-    List.find_opt
-      (fun p ->
-        match (snd p) with
-        | `General tc' -> tc = tc'
-        | _ -> false )
-      (get_instances env)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1675,7 +1661,7 @@ module Ty = struct
         let env_tci =
           List.fold
             (fun inst (tc : typeclass) ->
-               TypeClass.bind_instance myty (`General tc) inst)
+               TypeClass.bind_instance myty (`General (tc, None)) inst)
             env.env_tci tcs
         in
           { env with env_tci }
@@ -3160,13 +3146,14 @@ module Theory = struct
 
     | Th_type (x, tyd) -> begin
         match tyd.tyd_type with
-        | `Abstract tcs ->      (* FIXME: this code is a duplicate *)
+        | `Abstract tcs ->      (* FIXME:TC this code is a duplicate *)
             let myty =
               let typ = List.map (fst_map EcIdent.fresh) tyd.tyd_params in
               (typ, EcTypes.tconstr (xpath x) (List.map (tvar |- fst) typ))
             in
               List.fold
-                (fun inst tc -> TypeClass.bind_instance myty (`General tc) inst)
+                (fun inst tc ->
+                  TypeClass.bind_instance myty (`General (tc, None)) inst)
                 inst tcs
 
         | _ -> inst

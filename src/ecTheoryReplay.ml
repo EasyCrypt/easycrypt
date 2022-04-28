@@ -1,5 +1,6 @@
 (* ------------------------------------------------------------------ *)
 open EcSymbols
+open EcMaps
 open EcUtils
 open EcLocation
 open EcParsetree
@@ -938,13 +939,18 @@ and replay_instance
           f_div  = cr.f_div |> omap forpath; }
       in
         match tc with
-        | `Ring    cr -> `Ring  (doring  cr)
-        | `Field   cr -> `Field (dofield cr)
-        | `General p  -> `General (fortypeclass p)
+        | `Ring  cr -> `Ring  (doring  cr)
+        | `Field cr -> `Field (dofield cr)
+
+        | `General (tc, syms) ->
+           let tc   = fortypeclass tc in
+           let syms = Option.map (Mstr.map forpath) syms in
+           `General (tc, syms)
     in
 
-    let scope = ove.ovre_hooks.hadd_item scope import (Th_instance ((typ, ty), tc, lc)) in
-    (subst, ops, proofs, scope)
+    let scope =
+      ove.ovre_hooks.hadd_item scope import (Th_instance ((typ, ty), tc, lc))
+    in (subst, ops, proofs, scope)
 
   with E.InvInstPath ->
     (subst, ops, proofs, scope)

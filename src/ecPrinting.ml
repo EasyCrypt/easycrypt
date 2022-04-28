@@ -3400,7 +3400,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, cth) =
               ops
       end
 
-      | `General tc ->
+      | `General (tc, _) ->
           Format.fprintf fmt "%ainstance %a with %a."
             pp_locality lc (pp_type ppe) ty (pp_typeclass ppe) tc
   end
