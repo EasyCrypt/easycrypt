@@ -1206,7 +1206,7 @@ let transtc (env : EcEnv.env) ue ((tc_name, args) : ptcparam) : typeclass =
      List.iter2
        (fun (_, tcs) ty ->
           List.iter (fun tc ->
-            if not (EcUnify.hastc env ue ty tc) then
+            if Option.is_none (EcUnify.hastc env ue ty tc) then
               tyerror (loc tc_name) env (CannotInferTC (ty, tc))) tcs)
        decl.tc_tparams args;
      { tc_name = p; tc_args = args; }
