@@ -358,7 +358,11 @@ let run_prover
         } in
 
         let rec doit gcdone =
-          try  Driver.prove_task ~command ~limit dr task
+          try
+            Driver.prove_task
+              ~libdir:Why3.Config.libdir
+              ~datadir:Why3.Config.datadir
+              ~command ~limit dr task
           with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
             Gc.compact (); doit true
         in
@@ -434,9 +438,10 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
           match pcs.(i) with
           | None -> ()
           | Some (prover, pc) ->
-              let myinfos = List.pmap
-                (fun (pc', upd) -> if pc = pc' then Some upd else None)
-                infos in
+              let myinfos =
+                List.pmap
+                  (fun (pc', upd) -> if pc = pc' then Some upd else None)
+                  infos in
 
               let handle_answer = function
                 | CP.Valid   ->
@@ -499,6 +504,6 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
         match pcs.(i) with
         | None -> ()
         | Some (_prover, pc) ->
-            CP.interrupt_call pc;
+            CP.interrupt_call ~libdir:Why3.Config.libdir pc;
             (try ignore (CP.wait_on_call pc : CP.prover_result) with _ -> ());
       done)
