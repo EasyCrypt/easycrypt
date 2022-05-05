@@ -20,7 +20,7 @@
   (ocaml-inifiles (>= 1.2))
   (pcre (>= 7))
   (ppx_deriving (>= 5.2.0))
-  (why3 (and (>= 1.4.0) (< 1.5)))
+  (why3 (and (>= 1.5.0) (< 1.6)))
   yojson
   (zarith (>= 1.10))
  )
