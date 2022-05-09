@@ -1847,14 +1847,17 @@ module Ty = struct
 
     let tc = EcEnv.TypeClass.by_path tcp.tc_name (env scope) in
 
-    let opstc_prt =
+    let prt =
       Option.map
         (fun prt ->
           let ue = EcUnify.UniEnv.create (Some typarams) in
           match EcUnify.opstc (env scope) ue (snd ty) prt with
-          | Some ops -> ops
-          | None -> hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name) )
-        tc.tc_prt in
+          | None ->
+             hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name)
+          | Some (_, symbs) ->
+             let prtdecl = EcEnv.TypeClass.by_path prt.tc_name (env scope) in
+             (prt, prtdecl, symbols_of_tc (env scope) ty (prt, prtdecl), symbs)
+        ) tc.tc_prt in
 
     let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
     let tcsyms  = Mstr.of_list tcsyms in
@@ -1865,14 +1868,14 @@ module Ty = struct
         ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
         ts_v   =
           let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
-(*
           let vsubst =
-            ofold
-              (fun tcp_prt vs ->
-                let tc_prt = EcEnv.TypeClass.by_path tcp_prt.tc_name (env scope) in
-                List.combine (List.fst tc_prt.tc_tparams) tcp_prt.tc_args @ vs)
-              vsubst tc.tc_prt in
-*)
+            vsubst @ (
+              prt
+                |> Option.map (fun (prt, prtdecl, _, _) ->
+                     List.combine (List.fst prtdecl.tc_tparams) prt.tc_args
+                   )
+                |> odfl []
+            ) in
           Mid.of_list vsubst;
     } in
 
@@ -1884,16 +1887,17 @@ module Ty = struct
           EcFol.Fsubst.f_bind_local subst opname op)
         (EcFol.Fsubst.f_subst_init ~sty:tysubst ()) tc.tc_ops in
 
-    (*TODO: Must find a way to add the substitution oppath -> oppath' to subst.
-            Must create a form? If so, where to find the type?*)
     let subst =
-      let add_op subst opid oppath =
-        let ooppath = Mstr.find_opt opid symbols in
-        ofold
-          (fun oppath' subst ->
-            subst)
-          subst ooppath in
-      ofold (fun otc subst -> ofold (fun ops subst -> Mstr.fold_left add_op subst ops) subst otc) subst opstc_prt in
+      match prt   with None -> subst | Some (_, ptrdecl, _, symbs) ->
+      match symbs with None -> subst | Some symbs ->
+
+      List.fold_left (fun subst (opname, ty) ->
+        let path = Mstr.find (EcIdent.name opname) symbs in
+        let form = EcFol.f_op path [] (ty_subst tysubst ty) in
+        EcFol.Fsubst. subst opname form
+      ) subst ptrdecl.tc_ops
+
+    in
 
     let axioms =
       List.map

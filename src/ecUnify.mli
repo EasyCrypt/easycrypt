@@ -1,8 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUid
-open EcPath
 open EcSymbols
-open EcMaps
 open EcTypes
 open EcDecl
 
@@ -37,7 +35,7 @@ end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
 
-val opstc : EcEnv.env -> unienv -> ty -> typeclass -> (path Mstr.t) option option
+val opstc : EcEnv.env -> unienv -> ty -> typeclass -> EcTheory.tcsolution option
 
 val hastc : EcEnv.env -> unienv -> ty -> typeclass -> bool
 

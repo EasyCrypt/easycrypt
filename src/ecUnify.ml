@@ -1,7 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
-open EcIdent
 open EcMaps
+open EcIdent
 open EcUtils
 open EcUid
 open EcTypes
@@ -370,7 +370,7 @@ module TypeClass = struct
             List.map (fun tc -> (subst ty, tc)) tcs)
           tvinfo)
 
-      in (effects, opsyms)
+      in (effects, (tginst, opsyms))
 
     in
 
@@ -382,7 +382,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 type tcproblem = [
-  `TcCtt of ty * typeclass * (EcPath.path Mstr.t) option ref
+  `TcCtt of ty * typeclass * EcTheory.tcsolution option ref
 ]
 
 module UnifyExtraForTC :
@@ -440,8 +440,8 @@ struct
             match TypeClass.hastc env tvtc ty tc with
             | None ->
                 raise Failure
-            | Some (effects, opsyms) ->
-                tcrec := opsyms;
+            | Some (effects, solution) ->
+                tcrec := Some solution;
                 List.map (fun (ty, tc) -> `TcCtt (ty, tc, ref None)) effects
         end
   end
@@ -592,10 +592,10 @@ let unify env ue t1 t2 =
 let xopstc_r env ue ty tc =
   let instance = ref None in
   unify_core env ue (`Other (`TcCtt (ty, tc, instance)));
-  !instance
+  oget !instance
 
 let opstc_r env ue ty tc =
-  ignore (xopstc_r env ue ty tc : _ option)
+  ignore (xopstc_r env ue ty tc : EcTheory.tcsolution)
 
 let xopstcs_r env ue ty tcs =
   List.map (opstc_r env ue ty) tcs
