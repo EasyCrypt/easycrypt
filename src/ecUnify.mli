@@ -37,7 +37,9 @@ end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
 
-val hastc : EcEnv.env -> unienv -> ty -> typeclass -> (path Mstr.t) option option
+val opstc : EcEnv.env -> unienv -> ty -> typeclass -> (path Mstr.t) option option
+
+val hastc : EcEnv.env -> unienv -> ty -> typeclass -> bool
 
 val tfun_expected : unienv -> EcTypes.ty list -> EcTypes.ty
 
