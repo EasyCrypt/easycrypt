@@ -343,7 +343,7 @@ type notify = EcGState.loglevel -> string Lazy.t -> unit
 let run_prover
   ?(notify : notify option) (pi : prover_infos) (prover : string) task
 =
-  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
+(*  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in*)
 
   EcUtils.try_finally (fun () ->
     try
@@ -389,8 +389,8 @@ let run_prover
         Buffer.contents buf)));
       None)
 
-  (fun () ->
-     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ())
+  (fun () -> ()) (*
+     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ()) *)
 
 (* -------------------------------------------------------------------- *)
 let execute_task ?(notify : notify option) (pi : prover_infos) task =
