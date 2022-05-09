@@ -251,8 +251,9 @@ let main () =
 
 
         let gcstats  = cmpopts.cmpo_gcstats in
+        let progress = if cmpopts.cmpo_script then `Script else `Human in
         let terminal =
-          lazy (EcTerminal.from_channel ~name ~gcstats (open_in name))
+          lazy (EcTerminal.from_channel ~name ~gcstats ~progress (open_in name))
         in
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false, cmpopts.cmpo_noeco)

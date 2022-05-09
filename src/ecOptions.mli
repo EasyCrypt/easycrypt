@@ -17,6 +17,7 @@ and cmp_option = {
   cmpo_gcstats : bool;
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
+  cmpo_script  : bool;
 }
 
 and cli_option = {

@@ -21,6 +21,7 @@ and cmp_option = {
   cmpo_gcstats : bool;
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
+  cmpo_script  : bool;
 }
 
 and cli_option = {
@@ -225,9 +226,10 @@ let specs = {
     ("compile", "Check an EasyCrypt file", [
       `Group "loader";
       `Group "provers";
-      `Spec  ("gcstats", `Flag, "Display GC statistics");
-      `Spec  ("tstats", `String, "Save timing statistics to <file>");
-      `Spec  ("no-eco", `Flag, "Do not cache verification results")]);
+      `Spec  ("gcstats", `Flag  , "Display GC statistics");
+      `Spec  ("tstats" , `String, "Save timing statistics to <file>");
+      `Spec  ("script" , `Flag  , "Computer-friendly output");
+      `Spec  ("no-eco" , `Flag  , "Do not cache verification results")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -366,7 +368,8 @@ let cmp_options_of_values ?ini values input =
     cmpo_provers = prv_options_of_values ?ini values;
     cmpo_gcstats = get_flag "gcstats" values;
     cmpo_tstats  = get_string "tstats" values;
-    cmpo_noeco   = get_flag "no-eco" values; }
+    cmpo_noeco   = get_flag "no-eco" values;
+    cmpo_script  = get_flag "script" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse ?ini argv =
