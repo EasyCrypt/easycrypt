@@ -1829,8 +1829,7 @@ module Ty = struct
         tc.tc_ops
 
   (* ------------------------------------------------------------------ *)
-  (*TODOTC: we have to consider the operators of the parent typeclass instance, and also the types.
-    How can I find this instance?*)
+  (*TODOTC*)
   let add_generic_instance
     ~import (scope : scope) mode { pl_desc = tci; pl_loc = loc; }
   =
@@ -1859,10 +1858,6 @@ module Ty = struct
              (prt, prtdecl, symbols_of_tc (env scope) ty (prt, prtdecl), symbs)
         ) tc.tc_prt in
 
-    let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
-    let tcsyms  = Mstr.of_list tcsyms in
-    let symbols = check_tci_operators (env scope) ty tci.pti_ops tcsyms in
-
     let tysubst = {
       ty_subst_id with
         ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
@@ -1879,6 +1874,12 @@ module Ty = struct
           Mid.of_list vsubst;
     } in
 
+    let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
+    let tcsyms  = prt |> (tcsyms |> ofold
+                  (fun (_, _, prtsymbs, _) tcsymbs -> prtsymbs @ tcsymbs)) in
+    let tcsyms  = Mstr.of_list tcsyms in
+    let symbols = check_tci_operators (env scope) ty tci.pti_ops tcsyms in
+
     let subst =
       List.fold_left
         (fun subst (opname, ty) ->
@@ -1888,16 +1889,16 @@ module Ty = struct
         (EcFol.Fsubst.f_subst_init ~sty:tysubst ()) tc.tc_ops in
 
     let subst =
-      match prt   with None -> subst | Some (_, ptrdecl, _, symbs) ->
-      match symbs with None -> subst | Some symbs ->
-
-      List.fold_left (fun subst (opname, ty) ->
-        let path = Mstr.find (EcIdent.name opname) symbs in
-        let form = EcFol.f_op path [] (ty_subst tysubst ty) in
-        EcFol.Fsubst. subst opname form
-      ) subst ptrdecl.tc_ops
-
-    in
+      prt |> (subst |> ofold
+      (fun (_, ptrdecl, _, symbs) subst ->
+        symbs |> (subst |> ofold
+        (fun symbs subst ->
+          List.fold_left
+            (fun subst (opname, ty) ->
+              let path = Mstr.find (EcIdent.name opname) symbs in
+              let form = EcFol.f_op path [] (ty_subst tysubst ty) in
+              EcFol.Fsubst.f_bind_local subst opname form)
+            subst ptrdecl.tc_ops )))) in
 
     let axioms =
       List.map
