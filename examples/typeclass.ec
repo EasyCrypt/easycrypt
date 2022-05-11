@@ -230,6 +230,8 @@ proof.
   move => x y z.
   move: (Ring.IntID.mulrDl x y z).
   move => HmulrDl.
+  have: false.
+  move: HmulrDl.
   rewrite HmulrDl.
   (* TODO: what? *)
   admit.

@@ -51,10 +51,8 @@ and ctheory = {
 and tcinstance = [
   | `Ring    of ring
   | `Field   of field
-  | `General of tcsolution
+  | `General of typeclass * (path Mstr.t) option
 ]
-
-and tcsolution = typeclass * (path Mstr.t) option
 
 and thmode = [ `Abstract | `Concrete ]
 
