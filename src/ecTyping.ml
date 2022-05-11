@@ -177,6 +177,7 @@ type tyerror =
 | ProcedureUnbounded     of symbol * symbol
 | LvMapOnNonAssign
 | NoDefaultMemRestr
+| ProcAssign             of qsymbol
 
 (* -------------------------------------------------------------------- *)
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -2858,8 +2859,20 @@ and transinstr
     end
 
   | PSasgn (plvalue, prvalue) -> begin
+      let handle_unknown_op = function
+        | PEapp ({ pl_desc = PEident (f, None) }, _)
+            when EcEnv.Fun.lookup_opt (unloc f) env <> None
+          -> tyerror prvalue.pl_loc env (ProcAssign (unloc f))
+        | _ -> ()
+      in
+
       let lvalue, lty = translvalue ue env plvalue in
-      let rvalue, rty = transexp env `InProc ue prvalue in
+      let rvalue, rty =
+        try transexp env `InProc ue prvalue with
+        | TyError (l, e, exn) ->
+            handle_unknown_op (unloc prvalue);
+            tyerror l e exn
+      in
       unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
       [ i_asgn_lv i.pl_loc env lvalue rvalue ]
     end
