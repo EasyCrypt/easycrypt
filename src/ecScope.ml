@@ -1847,14 +1847,19 @@ module Ty = struct
 
     let tc = EcEnv.TypeClass.by_path tcp.tc_name (env scope) in
 
-    let opstc_prt =
+(*
+    let prti =
       Option.map
         (fun prt ->
           let ue = EcUnify.UniEnv.create (Some typarams) in
-          match EcUnify.opstc (env scope) ue (snd ty) prt with
-          | Some ops -> ops
-          | None -> hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name) )
+          if not (EcUnify.hastc (env scope) ue (snd ty) prt) then
+            hierror "type must be an instance of `%s'" (EcPath.tostring tcp.tc_name);
+          let oprti = EcEnv.TypeClass.get_instance (env scope) prt in
+          match oprti with
+          | Some prti -> prti
+          | _ -> hierror "instance of `%s' was said to be in the env, but was not found" (EcPath.tostring tcp.tc_name) )
         tc.tc_prt in
+*)
 
     let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
     let tcsyms  = Mstr.of_list tcsyms in
@@ -1884,16 +1889,19 @@ module Ty = struct
           EcFol.Fsubst.f_bind_local subst opname op)
         (EcFol.Fsubst.f_subst_init ~sty:tysubst ()) tc.tc_ops in
 
-    (*TODO: Must find a way to add the substitution oppath -> oppath' to subst.
-            Must create a form? If so, where to find the type?*)
+(*
     let subst =
-      let add_op subst opid oppath =
-        let ooppath = Mstr.find_opt opid symbols in
-        ofold
-          (fun oppath' subst ->
-            subst)
-          subst ooppath in
-      ofold (fun otc subst -> ofold (fun ops subst -> Mstr.fold_left add_op subst ops) subst otc) subst opstc_prt in
+      ofold
+        (fun tcp_prt s ->
+          let tc_prt = EcEnv.TypeClass.by_path tcp_prt.tc_name (env scope) in
+          List.fold_left
+            (fun subst (opname, ty) ->
+            let oppath = Mstr.find (EcIdent.name opname) symbols in
+            let op = EcFol.f_op oppath [] (ty_subst tysubst ty) in
+            EcFol.Fsubst.f_bind_local subst opname op)
+          s tc_prt.tc_ops)
+        subst tc.tc_prt in
+*)
 
     let axioms =
       List.map
