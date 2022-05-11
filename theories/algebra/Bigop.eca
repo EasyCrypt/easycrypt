@@ -346,10 +346,12 @@ proof. by rewrite -bigU 1:/#; apply: eq_bigl => /#. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_reindex ['a 'b]
-  (P : 'a -> bool) (F : 'a -> t) (f : 'b -> 'a) (f' : 'a -> 'b) s
-:
-  cancel f' f => big P F s = big (P \o f) (F \o f) (map f' s).
-proof. by move=> bij_ff'; rewrite -big_map -map_comp id_map. qed.
+  (P : 'a -> bool) (F : 'a -> t) (f : 'b -> 'a) (f' : 'a -> 'b) (s : 'a list) :
+     (forall x, x \in s => f (f' x) = x) 
+  => big P F s = big (P \o f) (F \o f) (map f' s).
+proof. 
+by move => /eq_in_map id_ff'; rewrite -big_map -map_comp id_ff' id_map.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_pair_pswap ['a 'b] p f s :
