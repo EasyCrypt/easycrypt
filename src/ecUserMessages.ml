@@ -566,6 +566,11 @@ end = struct
            set the %s pragma to retrieve the old behaviour"
         EcGState.old_mem_restr
 
+    | ProcAssign q ->
+        msg "the right-hand side of this assignment cannot be typed as an expression;
+             if you meant to call procedure `%a', assign its result using `<@' rather than `<-'"
+            pp_qsymbol q
+
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 
