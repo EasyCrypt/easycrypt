@@ -1533,6 +1533,15 @@ rewrite big_seq1 /= dlet1E  (@sumE_fin _ [b]) //= => [b'|].
 by rewrite big_seq1 /= dunitE.
 qed.
 
+lemma finite_dprod (da : 'a distr) (db : 'b distr) : 
+     is_finite (support da) 
+  => is_finite (support db) 
+  => is_finite (support (da `*` db)).
+proof.
+move=> *; rewrite dprod_dlet finite_dlet // => *.
+by apply finite_dlet => // *; apply finite_dunit.
+qed.
+
 lemma dmap_dprod ['a1 'a2 'b1 'b2]
   (d1 : 'a1 distr ) (d2 : 'a2 distr )
   (f1 : 'a1 -> 'b1) (f2 : 'a2 -> 'b2)

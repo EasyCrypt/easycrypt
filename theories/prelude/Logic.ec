@@ -393,6 +393,14 @@ lemma  if_arg b x (fT fF : 'a -> 'b) :
   (if b then fT else fF) x = if b then fT x else fF x
 by [].
 
+lemma ifT (b : bool) (e1 e2 : 'a) : 
+  b => (if b then e1 else e2) = e1 
+by [].
+
+lemma ifF (b : bool) (e1 e2 : 'a) : 
+ !b => (if b then e1 else e2) = e2
+by [].
+
 lemma  iffP p q r :
   (r <=> q) => (p => q) => (q => p) => r <=> p
 by [].
