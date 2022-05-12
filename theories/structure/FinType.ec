@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List.
+require import AllCore List Finite.
 
 (* ==================================================================== *)
 abstract theory FinType.
@@ -33,6 +33,20 @@ proof.
 move=> eq_xs; rewrite count_swap // 1:&(enum_uniq).
 by rewrite count_predT_eq // &(enumP).
 qed.
+
+lemma is_finite : is_finite predT<:t>.
+proof. by exists enum; split=> [|x]; [apply: enum_uniq | rewrite enumP]. qed.
+
+lemma perm_eq_enum_to_seq : perm_eq enum (Finite.to_seq predT).
+proof.
+apply: uniq_perm_eq.
+- by apply: enum_uniq.
+- by apply/uniq_to_seq/is_finite.
+- by move=> x; rewrite mem_to_seq 1:&(is_finite) enumP.
+qed.
+
+lemma card_size_to_seq : card = size (Finite.to_seq<:t> predT).
+proof. by apply/perm_eq_size/perm_eq_enum_to_seq. qed.
 end FinType.
 
 (* ==================================================================== *)
