@@ -566,9 +566,6 @@ end = struct
            set the %s pragma to retrieve the old behaviour"
         EcGState.old_mem_restr
 
-    | ProcAssign f ->
-        msg "`%a' is a procedure name. Assign its result to a variable using `<@` instead" pp_qsymbol f
-
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in
 
