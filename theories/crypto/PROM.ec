@@ -1,8 +1,9 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import AllCore SmtMap Distr.
+require import AllCore SmtMap Distr Mu_mem.
 require import FinType.
+require import StdBigop FelTactic.
 
 (* -------------------------------------------------------------------- *)
 type flag = [ Unknown | Known ].
@@ -244,6 +245,57 @@ lemma FRO_sample_ll : islossless FRO.sample.
 proof. by proc; auto=> />; rewrite dout_ll. qed.
 end section ConditionalLL.
 end section LL.
+
+
+(* Bounding the Probability that a ROmap distinguisher can cause a
+collision in the map under some function f *)
+
+module type RM_Distinguisher(G : ROmap) = {
+  proc distinguish(_ : d_in_t): d_out_t { G.get, G.sample, G.restrK }
+}.
+
+module MainRM (D : RM_Distinguisher) (RO : ROmap) = {
+  proc distinguish(x) = {
+    var r;
+
+    RO.init();
+    r <@ D(RO).distinguish(x);
+    return r;
+  }
+}.
+
+section Collision.
+
+declare type rT.
+declare op f : out_t -> rT.
+declare op Pc : real.
+declare axiom Pc_ge0 : 0%r <= Pc.
+declare axiom fcollP :
+  forall x1 x2 y, y \in dmap (dout x1) f => mu1 (dmap (dout x2) f) y <= Pc.
+declare op q : { int | 0 <= q } as q_ge0.
+declare module D <: RM_Distinguisher{-RO}.
+
+lemma fcoll_bound &m z :
+  Pr [ MainRM(D,RO).distinguish(z) @ &m :
+    fcoll f RO.m /\ fsize RO.m <= q] <= (q*(q-1))%r / 2%r * Pc.
+proof.
+fel 1 (fsize RO.m) (fun x => x%r * Pc) q (fcoll f RO.m)
+  [RO.get : (x \notin RO.m) ]
+  (forall x, x \in RO.m => oget RO.m.[x] \in dout x).
+- by rewrite -Bigreal.BRA.mulr_suml  Bigreal.sumidE 1:q_ge0.
+- by auto.
+- inline*; auto; smt(fsize_empty mem_empty).
+- proc; inline*; (rcondt 2; first by auto); wp.
+  rnd (fun r => exists u, u \in RO.m /\ f (oget RO.m.[u]) = f r).
+  skip => &hr; rewrite andaE => /> 3? I ?; split; 2: smt(get_setE).
+  apply mu_mem_le_fsize => u /I /(dmap_supp _ f) /fcollP /= /(_ x{hr}).
+  rewrite dmap1E. apply: StdOrder.RealOrder.ler_trans.
+  by apply mu_sub => /#.
+- move => c; proc; auto => />; smt(get_setE fsize_set).
+- move => b c. proc. by auto.
+qed.
+
+end section Collision.
 
 (* -------------------------------------------------------------------- *)
 theory FullEager.
