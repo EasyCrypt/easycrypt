@@ -34,8 +34,8 @@ proof. by case: ox. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt frefl  (f     : 'a -> 'b): f == f by [].
-lemma nosmt fsym   (f g   : 'a -> 'b): f == g => g == f by [].
-lemma nosmt ftrans (f g h : 'a -> 'b): f == g => g == h => f == h by [].
+lemma nosmt fsym   (f g   : 'a -> 'b): f == g => g == f by smt().
+lemma nosmt ftrans (f g h : 'a -> 'b): f == g => g == h => f == h by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma econgr1 ['a 'b] (f g : 'a -> 'b) x y: f == g => x = y => f x = g y.
@@ -43,8 +43,8 @@ proof. by move/fun_ext=> -> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt f2refl  (f     : 'a -> 'b -> 'c): f === f by [].
-lemma nosmt f2sym   (f g   : 'a -> 'b -> 'c): f === g => g === f by [].
-lemma nosmt f2trans (f g h : 'a -> 'b -> 'c): f === g => g === h => f === h by [].
+lemma nosmt f2sym   (f g   : 'a -> 'b -> 'c): f === g => g === f by smt().
+lemma nosmt f2trans (f g h : 'a -> 'b -> 'c): f === g => g === h => f === h by smt().
 
 lemma rel_ext (f g : 'a -> 'b -> 'c) : f = g <=> f === g.
 proof.
@@ -197,7 +197,7 @@ pred (< ) (p q:'a -> bool) = (* proper *)
 (* -------------------------------------------------------------------- *)
 lemma nosmt subpred_eqP (p1 p2 : 'a -> bool):
   (forall x, p1 x <=> p2 x) <=> (p1 <= p2 /\ p2 <= p1)
-by [].
+by smt().
 
 lemma nosmt subpred_refl (X : 'a -> bool): X <= X
 by [].
@@ -208,15 +208,15 @@ by (rewrite fun_ext; smt).
 
 lemma nosmt subpred_trans (X Y Z:'a -> bool):
   X <= Y => Y <= Z => X <= Z
-by [].
+by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt pred1E (c : 'a) : pred1 c = ((=) c).
 proof. by apply fun_ext=> x; rewrite (eq_sym c). qed.
 
 lemma nosmt predU1l (x y : 'a) b : x = y => (x = y) \/ b by [].
-lemma nosmt predU1r (x y : 'a) b : b => (x = y) \/ b by [].
-lemma nosmt eqVneq (x y : 'a) : x = y \/ x <> y by [].
+lemma nosmt predU1r (x y : 'a) b : b => (x = y) \/ b by smt().
+lemma nosmt eqVneq (x y : 'a) : x = y \/ x <> y by smt().
 
 lemma nosmt predT_comp ['a 'b] (p : 'a -> 'b) : predT \o p = predT.
 proof. by []. qed.
@@ -238,19 +238,19 @@ proof. by apply/fun_ext=> x /=; delta => /=; case: (p x). qed.
 
 lemma nosmt subpredUl (p1 p2 : 'a -> bool):
   p1 <= predU p1 p2
-by [].
+by smt().
 
 lemma nosmt subpredUr (p1 p2 : 'a -> bool):
   p2 <= predU p1 p2
-by [].
+by smt().
 
 lemma nosmt predIsubpredl (p1 p2 : 'a -> bool):
   predI p1 p2 <= p1
-by [].
+by smt().
 
 lemma nosmt predIsubpredr (p1 p2 : 'a -> bool):
   predI p1 p2 <= p2
-by [].
+by smt().
 
 lemma nosmt predTofV (f : 'a -> 'b): predT \o f = predT.
 proof. by apply/fun_ext=> x. qed.
