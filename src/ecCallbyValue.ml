@@ -326,7 +326,10 @@ and reduce_user_delta st f1 p tys args =
       let f = Op.reduce ~force:(mode = `Force) st.st_env p tys in
       cbv st Subst.subst_id f args
     else if st.st_ri.delta_tc then
-      match EcReduction.reduce_tc st.st_env p tys with
+      match EcReduction.reduce_tc
+              ~params:(LDecl.tohyps st.st_hyps).h_tvar
+              st.st_env p tys
+      with
       | None -> f2
       | Some f -> cbv st Subst.subst_id f args
     else f2

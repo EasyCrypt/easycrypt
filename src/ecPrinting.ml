@@ -3037,7 +3037,7 @@ module PPGoal = struct
     | FhoareS hs   -> pp_hoareS   ?prpo ppe fmt hs
     | FequivF ef   -> pp_equivF   ppe fmt ef
     | FequivS es   -> pp_equivS   ?prpo ppe fmt es
-    | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
+    | _ -> Format.fprintf fmt "%a@\n%!" EcFol.pp_form concl
 end
 
 (* -------------------------------------------------------------------- *)

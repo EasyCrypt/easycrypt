@@ -686,13 +686,13 @@ let reduce_op ri env p tys =
     with NotReducible -> raise nohead
   else raise nohead
 
-let reduce_tc env p tys =
+let reduce_tc ?params env p tys =
   if not (EcEnv.Op.is_tc_op env p) then None else
 
   let tys = List.rev tys in
   let tcty, tys = List.hd tys, List.rev (List.tl tys) in
   let (tcp, opname) = EcDecl.operator_as_tc (EcEnv.Op.by_path p env) in
-  let ue = EcUnify.UniEnv.create None in
+  let ue = EcUnify.UniEnv.create params in
   let syms = oget (EcUnify.hastc env ue tcty { tc_name = tcp; tc_args = tys }) in
 
   match syms with None -> None | Some syms ->
@@ -704,8 +704,8 @@ let reduce_tc env p tys =
 
   Some (EcFol.f_op optg opargs (Tvar.subst tysubst optg_decl.op_ty))
 
-let may_reduce_tc ri env p tys =
-  if ri.delta_tc then oget ~exn:nohead (reduce_tc env p tys) else raise nohead
+let may_reduce_tc ri ?params env p tys =
+  if ri.delta_tc then oget ~exn:nohead (reduce_tc ?params env p tys) else raise nohead
 
 let is_record env f =
   match EcFol.destr_app f with
@@ -1016,10 +1016,10 @@ let reduce_logic ri env hyps f p args =
   check_reduced hyps needsubterm f f'
 
 (* -------------------------------------------------------------------- *)
-let reduce_delta ri env _hyps f =
+let reduce_delta ri env hyps f =
   match f.f_node with
   | Fop (p, tys) when ri.delta_tc && EcEnv.Op.is_tc_op env p ->
-     may_reduce_tc ri env p tys
+     may_reduce_tc ri ~params:(LDecl.tohyps hyps).h_tvar env p tys
 
   | Fop (p, tys) when ri.delta_p p <> `No ->
       reduce_op ri env p tys

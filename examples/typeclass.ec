@@ -2,34 +2,30 @@
 (* Typeclass examples *)
 
 (* -------------------------------------------------------------------- *)
+require import AllCore List.
+
+(* -------------------------------------------------------------------- *)
 (* Set theory *)
 
-type class ['a] foo = {
-  op bar : foo * 'a
+type class ['a] artificial = {
+  op myop : artificial * 'a
 }.
 
-op bari ['a] : int * 'a = (0, witness<:'a>).
+op myopi ['a] : int * 'a = (0, witness<:'a>).
 
-instance 'b foo with ['b] int
-  op bar = bari<:'b>.
+instance 'b artificial with ['b] int
+  op myop = myopi<:'b>.
 
-lemma L : bar<:bool, int> = (0, witness).
+lemma reduce_tc : myop<:bool, int> = (0, witness).
 proof.
 class.
-
 reflexivity.
+qed.
 
-
-
-(*
-
-
-
+(* -------------------------------------------------------------------- *)
 type class witness = {
   op witness : witness
 }.
-
-
 
 print witness.
 
@@ -179,7 +175,7 @@ op big ['a, 'b <: monoid] (P : 'a -> bool) (F : 'a -> 'b) (r : 'a list) =
 (* Set theory *)
 
 lemma all_finiteP ['a <: finite] p : (all_finite p) <=> (forall (x : 'a), p x).
-proof. by rewrite/all_finite allP; split => Hp x; rewrite Hp // enumP. qed.
+proof. by rewrite/all_finite allP; split=> Hp x; rewrite Hp enumP. qed.
 
 lemma all_countableP ['a <: countable] p : (all_countable p) <=> (forall (x : 'a), p x).
 proof.
@@ -247,19 +243,9 @@ proof.
   (*TODO: in the goal, the typeclass operator + should have been replaced with the + from CoreInt, but has not been.*)
   print mulrDl.
   move => x y z.
-  move: (Ring.IntID.mulrDl x y z).
-  move => HmulrDl.
-  have: false.
-  move: HmulrDl.
-  rewrite HmulrDl.
-  (* TODO: what? *)
-  admit.
+  class.
+  apply Ring.IntID.mulrDl.
 qed.
-
-
-
-
-
 
 (* ==================================================================== *)
 (* Misc *)

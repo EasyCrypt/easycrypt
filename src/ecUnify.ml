@@ -663,7 +663,11 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
     try
       let (tip, tvtcs) = UniEnv.openty_r subue op.D.op_tparams tvi in
 
-      List.iter (fun (tv, tcs) -> hastcs_r env subue tv tcs) tvtcs;
+      List.iter
+        (fun (tv, tcs) ->
+          try  hastcs_r env subue tv tcs
+          with UnificationFailure _ -> raise E.Failure)
+        tvtcs;
 
       let top = tip op.D.op_ty in
       let texpected = tfun_expected subue psig in
