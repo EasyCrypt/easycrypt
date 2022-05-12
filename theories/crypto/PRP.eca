@@ -294,7 +294,7 @@ lemma collision_stable (m:(D,D) fmap) y y':
   collision m =>
   y \notin m =>
   collision m.[y <- y']
-by [].
+by smt(collision_add).
 
 (** To factor out the difficult step, we parameterize the PRP by a
     procedure that samples its output, and provide two instantiations
@@ -595,8 +595,8 @@ section CollisionProbability.
   + proc; inline*.
     if => //=.
     auto => /> &1 &2 h1 h2 h3 h4 r _.
-    rewrite fdom_set fcardUI_indep 2:fcard1; 1: by rewrite fsetI1 mem_fdom h4. 
-    smt (get_setE mem_frng rngE collision_add).
+    rewrite fdom_set fcardUI_indep 2:fcard1; 1: by rewrite fsetI1 mem_fdom h4.
+    smt(get_setE mem_frng rngE collision_add).
   auto; smt (size_eq0 fdom0 fcards0 frng0 in_fset0 mem_empty).
   qed.
 

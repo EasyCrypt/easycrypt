@@ -5,19 +5,19 @@ require import FinType.
 op (^^) (b1 b2:bool) = b1 = !b2.
 
 lemma nosmt xor_false b: b ^^ false = b
-by [].
+by smt().
 
 lemma nosmt xor_true b: b ^^ true = !b
-by [].
+by smt().
 
 lemma nosmt xorA b1 b2 b3: (b1 ^^ b2) ^^ b3 = b1 ^^ (b2 ^^ b3)
-by [].
+by smt().
 
 lemma nosmt xorC b1 b2: b1 ^^ b2 = b2 ^^ b1
-by [].
+by smt().
 
 lemma nosmt xorK b: b ^^ b = false
-by [].
+by smt().
 
 clone FinType as BoolFin with
   type t    <- bool,

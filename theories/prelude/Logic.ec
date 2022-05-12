@@ -302,7 +302,7 @@ by [].
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt andaE a b : (a && b) <=> (a /\ b) by [].
-lemma nosmt oraE  a b : (a || b) <=> (a \/ b) by [].
+lemma nosmt oraE  a b : (a || b) <=> (a \/ b) by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma eqboolP (b1 b2 : bool) : (b1 = b2) <=> (b1 <=> b2) by [].
@@ -319,39 +319,39 @@ op (^) b1 b2  = if b1 then !b2 else b2.
 (* -------------------------------------------------------------------- *)
 lemma nosmt negP: forall (x:bool), (x => false) <=> !x by [].
 
-lemma nosmt eqT : forall (x:bool), (x = true) <=> x by [].
-lemma nosmt neqF : forall (x:bool), (x = false) <=> !x by [].
+lemma nosmt eqT : forall (x:bool), (x = true) <=> x by smt().
+lemma nosmt neqF : forall (x:bool), (x = false) <=> !x by smt().
 
 lemma nosmt negbT b  : b = false => !b by [].
-lemma nosmt negbTE b : !b => b = false by [].
-lemma nosmt negbF b  : b => !b = false by [].
-lemma nosmt negbFE b : !b = false => b by [].
+lemma nosmt negbTE b : !b => b = false by smt().
+lemma nosmt negbF b  : b => !b = false by smt().
+lemma nosmt negbFE b : !b = false => b by smt().
 lemma nosmt negbK    : involutive [!]  by [].
 lemma nosmt negbNE b : !!b => b        by [].
 
-lemma nosmt negb_inj : injective [!]      by [].
-lemma nosmt negbLR b c : b = !c => !b = c by [].
-lemma nosmt negbRL b c : !b = c => b = !c by [].
+lemma nosmt negb_inj : injective [!]      by smt().
+lemma nosmt negbLR b c : b = !c => !b = c by smt().
+lemma nosmt negbRL b c : !b = c => b = !c by smt().
 
-lemma nosmt contra   c b : (c => b) => !b => !c by [].
-lemma nosmt contraL  c b : (c => !b) => b => !c by [].
-lemma nosmt contraR  c b : (!c => b) => !b => c by [].
-lemma nosmt contraLR c b : (!c => !b) => b => c by [].
+lemma nosmt contra   c b : (c => b) => !b => !c by smt().
+lemma nosmt contraL  c b : (c => !b) => b => !c by smt().
+lemma nosmt contraR  c b : (!c => b) => !b => c by smt().
+lemma nosmt contraLR c b : (!c => !b) => b => c by smt().
 lemma nosmt contraT  b   : (!b => false) => b   by [].
 
-lemma nosmt absurd (b a : bool) : (!a => !b) => b => a by [].
+lemma nosmt absurd (b a : bool) : (!a => !b) => b => a by smt().
 
-lemma nosmt wlog_neg b : (!b => b) => b by [].
+lemma nosmt wlog_neg b : (!b => b) => b by smt().
 
 lemma nosmt contraFT c b : (!c => b) => b = false => c by [].
 lemma nosmt contraFN c b : (c => b) => b = false => !c by [].
-lemma nosmt contraTF c b : (c => !b) => b => c = false by [].
-lemma nosmt contraNF c b : (c => b) => !b => c = false by [].
-lemma nosmt contraFF c b : (c => b) => b = false => c = false by [].
+lemma nosmt contraTF c b : (c => !b) => b => c = false by smt().
+lemma nosmt contraNF c b : (c => b) => !b => c = false by smt().
+lemma nosmt contraFF c b : (c => b) => b = false => c = false by smt().
 
 lemma nosmt contraNneq (b : bool) (x y : 'a):
   (x = y => b) => !b => x <> y
-by [].
+by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt iffLR (a b : bool) : (a <=> b) => a => b by [].
@@ -371,27 +371,27 @@ by [].
 
 lemma  if_neg b (vT vF : 'a) :
   (if !b then vT else vF) = if b then vF else vT
-by [].
+by smt().
 
 lemma  fun_if ['a 'b] (f:'a -> 'b) b x1 x2 :
   f (if b then x1 else x2) = (if b then f x1 else f x2)
-by [].
+by smt().
 
 lemma  fun_if2 ['a 'b 'c] (f:'a -> 'b -> 'c) b x1 x2 x :
   f (if b then x1 else x2) x = (if b then f x1 x else f x2 x)
-by [].
+by smt().
 
 lemma  if_arg b x (fT fF : 'a -> 'b) :
   (if b then fT else fF) x = if b then fT x else fF x
-by [].
+by smt().
 
 lemma ifT (b : bool) (e1 e2 : 'a) : 
   b => (if b then e1 else e2) = e1 
-by [].
+by move=> ->.
 
 lemma ifF (b : bool) (e1 e2 : 'a) : 
  !b => (if b then e1 else e2) = e2
-by [].
+by move=> ->.
 
 lemma  iffP p q r :
   (r <=> q) => (p => q) => (q => p) => r <=> p
@@ -406,7 +406,7 @@ lemma nosmt andTb : left_id true (/\)       by [].
 lemma nosmt andFb : left_zero false (/\)    by [].
 lemma nosmt andbT : right_id true (/\)      by [].
 lemma nosmt andbF : right_zero false (/\)   by [].
-lemma nosmt andbb : idempotent (/\)         by [].
+lemma nosmt andbb : idempotent (/\)         by smt().
 lemma nosmt andbC : commutative (/\)        by move=> [] /#.
 lemma nosmt andbA : associative (/\)        by move=> [] /#.
 lemma nosmt andbCA : left_commutative (/\)  by move=> [] /#.
@@ -417,52 +417,52 @@ lemma nosmt orTb : forall b, true \/ b     by [].
 lemma nosmt orFb : left_id false (\/)      by [].
 lemma nosmt orbT : forall b, b \/ true     by [].
 lemma nosmt orbF : right_id false (\/)     by [].
-lemma nosmt orbb : idempotent (\/)         by [].
-lemma nosmt orbC : commutative (\/)        by [].
-lemma nosmt orbA : associative (\/)        by [].
-lemma nosmt orbCA : left_commutative (\/)  by [].
-lemma nosmt orbAC : right_commutative (\/) by [].
-lemma nosmt orbACA : interchange (\/) (\/) by [].
+lemma nosmt orbb : idempotent (\/)         by smt().
+lemma nosmt orbC : commutative (\/)        by smt().
+lemma nosmt orbA : associative (\/)        by smt().
+lemma nosmt orbCA : left_commutative (\/)  by smt().
+lemma nosmt orbAC : right_commutative (\/) by smt().
+lemma nosmt orbACA : interchange (\/) (\/) by smt().
 
-lemma nosmt andbN b : (b /\ !b) <=> false by [].
-lemma nosmt andNb b : (!b /\ b) <=> false by [].
-lemma nosmt orbN b  : (b \/ !b) <=> true  by [].
-lemma nosmt orNb b  : (!b \/ b) <=> true  by [].
+lemma nosmt andbN b : (b /\ !b) <=> false by smt().
+lemma nosmt andNb b : (!b /\ b) <=> false by smt().
+lemma nosmt orbN b  : (b \/ !b) <=> true  by smt().
+lemma nosmt orNb b  : (!b \/ b) <=> true  by smt().
 
 lemma nosmt andb_orl : left_distributive  (/\) (\/) by move=> [] /#.
 lemma nosmt andb_orr : right_distributive (/\) (\/) by move=> [] /#.
 lemma nosmt orb_andl : left_distributive  (\/) (/\) by move=> [] /#.
 lemma nosmt orb_andr : right_distributive (\/) (/\) by move=> [] /#.
 
-lemma nosmt andb_idl a b : (b => a) => a /\ b <=> b by [].
-lemma nosmt andb_idr a b : (a => b) => a /\ b <=> a by [].
+lemma nosmt andb_idl a b : (b => a) => a /\ b <=> b by smt().
+lemma nosmt andb_idr a b : (a => b) => a /\ b <=> a by smt().
 
-lemma nosmt andb_id2l a b c : (a => b = c) => a /\ b <=> a /\ c by [].
-lemma nosmt andb_id2r a b c : (b => a = c) => a /\ b <=> c /\ b by [].
+lemma nosmt andb_id2l a b c : (a => b = c) => a /\ b <=> a /\ c by smt().
+lemma nosmt andb_id2r a b c : (b => a = c) => a /\ b <=> c /\ b by smt().
 
-lemma nosmt orb_idl a b : (a => b) => a \/ b <=> b by [].
-lemma nosmt orb_idr a b : (b => a) => a \/ b <=> a by [].
+lemma nosmt orb_idl a b : (a => b) => a \/ b <=> b by smt().
+lemma nosmt orb_idr a b : (b => a) => a \/ b <=> a by smt().
 
-lemma nosmt orb_id2l a b c : (!a => b = c) => a \/ b <=> a \/ c by [].
-lemma nosmt orb_id2r a b c : (!b => a = c) => a \/ b <=> c \/ b by [].
+lemma nosmt orb_id2l a b c : (!a => b = c) => a \/ b <=> a \/ c by smt().
+lemma nosmt orb_id2r a b c : (!b => a = c) => a \/ b <=> c \/ b by smt().
 
-lemma nosmt negb_and a b : !(a /\ b) <=> !a \/ !b by [].
-lemma nosmt negb_or  a b : !(a \/ b) <=> !a /\ !b by [].
+lemma nosmt negb_and a b : !(a /\ b) <=> !a \/ !b by smt().
+lemma nosmt negb_or  a b : !(a \/ b) <=> !a /\ !b by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt negb_exists (P : 'a -> bool) :
   !(exists a, P a) <=> forall a, !P a
-by [].
+by smt().
 
 lemma nosmt negb_forall (P : 'a -> bool) :
   !(forall a, P a) <=> exists a, !P a
-by [].
+by smt().
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt andbK a b : a /\ b \/ a <=> a  by [].
-lemma nosmt andKb a b : a \/ b /\ a <=> a  by [].
-lemma nosmt orbK a b : (a \/ b) /\ a <=> a by [].
-lemma nosmt orKb a b : a /\ (b \/ a) <=> a by [].
+lemma nosmt andbK a b : a /\ b \/ a <=> a  by smt().
+lemma nosmt andKb a b : a \/ b /\ a <=> a  by smt().
+lemma nosmt orbK a b : (a \/ b) /\ a <=> a by smt().
+lemma nosmt orKb a b : a /\ (b \/ a) <=> a by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt implybT b : b => true         by [].
@@ -471,50 +471,50 @@ lemma nosmt implyFb b : false => b        by [].
 lemma nosmt implyTb b : (true => b) = b   by [].
 lemma nosmt implybb b : b => b            by [].
 
-lemma nosmt negb_imply a b : !(a => b) <=> a /\ !b by [].
+lemma nosmt negb_imply a b : !(a => b) <=> a /\ !b by smt().
 
-lemma nosmt implybE  a b : (a => b) <=> !a \/ b by [].
-lemma nosmt implyNb  a b : (!a => b) <=> a \/ b by [].
-lemma nosmt implybN  a b : (a => !b) <=> (b => !a) by [].
-lemma nosmt implybNN a b : (!a => !b) <=> (b => a) by [].
+lemma nosmt implybE  a b : (a => b) <=> !a \/ b by smt().
+lemma nosmt implyNb  a b : (!a => b) <=> a \/ b by smt().
+lemma nosmt implybN  a b : (a => !b) <=> (b => !a) by smt().
+lemma nosmt implybNN a b : (!a => !b) <=> (b => a) by smt().
 
-lemma nosmt implyb_idl a b : (!a => b) => (a => b) <=> b by [].
-lemma nosmt implyb_idr a b : (b => !a) => (a => b) <=> !a by [].
+lemma nosmt implyb_idl a b : (!a => b) => (a => b) <=> b by smt().
+lemma nosmt implyb_idr a b : (b => !a) => (a => b) <=> !a by smt().
 
 lemma nosmt implyb_id2l (a b c : bool) :
   (a => b <=> c) => (a => b) <=> (a => c)
-by [].
+by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt addFb : left_id false (^)               by [].
 lemma nosmt addbF : right_id false (^)              by [].
-lemma nosmt addbb : self_inverse false (^)          by [].
-lemma nosmt addbC : commutative (^)                 by [].
-lemma nosmt addbA : associative (^)                 by [].
-lemma nosmt addbCA : left_commutative (^)           by [].
-lemma nosmt addbAC : right_commutative (^)          by [].
-lemma nosmt addbACA : interchange (^) (^)           by [].
-lemma nosmt andb_addl : left_distributive (/\) (^)  by [].
-lemma nosmt andb_addr : right_distributive (/\) (^) by [].
-lemma nosmt addKb : left_loop idfun (^)             by [].
-lemma nosmt addbK : right_loop idfun (^)            by [].
-lemma nosmt addIb : left_injective (^)              by [].
-lemma nosmt addbI : right_injective (^)             by [].
+lemma nosmt addbb : self_inverse false (^)          by smt().
+lemma nosmt addbC : commutative (^)                 by smt().
+lemma nosmt addbA : associative (^)                 by smt().
+lemma nosmt addbCA : left_commutative (^)           by smt().
+lemma nosmt addbAC : right_commutative (^)          by smt().
+lemma nosmt addbACA : interchange (^) (^)           by smt().
+lemma nosmt andb_addl : left_distributive (/\) (^)  by smt().
+lemma nosmt andb_addr : right_distributive (/\) (^) by smt().
+lemma nosmt addKb : left_loop idfun (^)             by smt().
+lemma nosmt addbK : right_loop idfun (^)            by smt().
+lemma nosmt addIb : left_injective (^)              by smt().
+lemma nosmt addbI : right_injective (^)             by smt().
 
 lemma nosmt addTb b : true ^ b <=> !b by [].
 lemma nosmt addbT b : b ^ true <=> !b by [].
 
-lemma nosmt addbN a b : a ^ !b <=> !(a ^ b) by [].
+lemma nosmt addbN a b : a ^ !b <=> !(a ^ b) by smt().
 lemma nosmt addNb a b : !a ^ b <=> !(a ^ b) by [].
 
-lemma nosmt addbP a b : (!a <=> b) <=> (a ^ b) by [].
+lemma nosmt addbP a b : (!a <=> b) <=> (a ^ b) by smt().
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt andaP b1 b2 : b1 => (b1 => b2) => b1 /\ b2 by [].
-lemma nosmt oraP  b1 b2 : b1 \/ b2 <=> b1 \/ (!b1 => b2) by [].
+lemma nosmt andaP b1 b2 : b1 => (b1 => b2) => b1 /\ b2 by smt().
+lemma nosmt oraP  b1 b2 : b1 \/ b2 <=> b1 \/ (!b1 => b2) by smt().
 
 lemma nosmt andabP b1 b2 : b1 && b2 <=> b1 /\ b2 by [].
-lemma nosmt orabP  b1 b2 : b1 || b2 <=> b1 \/ b2 by [].
+lemma nosmt orabP  b1 b2 : b1 || b2 <=> b1 \/ b2 by smt().
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt forall_orl (P : bool) (Q : 'a -> bool) :

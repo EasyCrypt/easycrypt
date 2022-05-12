@@ -1039,10 +1039,8 @@ module Ax = struct
       match tc with
       | Some tc -> tc
       | None    ->
-          let dtc = Plogic (Psmt empty_pprover) in
-          let dtc = { pl_loc = loc; pl_desc = dtc } in
-          let dtc = { pt_core = dtc; pt_intros = []; } in
-          [dtc]
+          let dtc = { pl_loc = loc; pl_desc = Pby None; } in
+          [{ pt_core = dtc; pt_intros = []; }]
     in
 
     let tc = { pl_loc = loc; pl_desc = Pby (Some tc) } in

@@ -22,24 +22,24 @@ abbrev b2r (b:bool) = if b then from_int 1 else from_int 0.
 lemma nosmt fromint0 : 0%r = CoreReal.zero by [].
 lemma nosmt fromint1 : 1%r = CoreReal.one  by [].
 
-lemma nosmt fromintN (z     : int) : (-z)%r = - z%r by [].
-lemma nosmt fromintD (z1 z2 : int) : (z1 + z2)%r = z1%r + z2%r by [].
-lemma nosmt fromintB (z1 z2 : int) : (z1 - z2)%r = z1%r - z2%r by [].
-lemma nosmt fromintM (z1 z2 : int) : (z1 * z2)%r = z1%r * z2%r by [].
+lemma nosmt fromintN (z     : int) : (-z)%r = - z%r by smt().
+lemma nosmt fromintD (z1 z2 : int) : (z1 + z2)%r = z1%r + z2%r by smt().
+lemma nosmt fromintB (z1 z2 : int) : (z1 - z2)%r = z1%r - z2%r by smt().
+lemma nosmt fromintM (z1 z2 : int) : (z1 * z2)%r = z1%r * z2%r by smt().
 
 lemma nosmt eq_fromint (z1 z2 : int) :
   (z1%r = z2%r) <=> (z1 = z2)
-by [].
+by smt().
 
 lemma nosmt le_fromint (z1 z2 : int) :
   (z1%r <= z2%r) <=> (z1 <= z2)
-by smt ml=0.
+by smt().
 
 lemma nosmt lt_fromint (z1 z2 : int) :
   (z1%r < z2%r) <=> (z1 < z2)
-by smt ml=0.
+by smt().
 
-lemma nosmt fromint_abs  (z : int) : `|z|%r = `|z%r| by smt ml=0.
+lemma nosmt fromint_abs  (z : int) : `|z|%r = `|z%r| by smt().
 
 hint rewrite lte_fromint : le_fromint lt_fromint.
 
@@ -237,22 +237,22 @@ lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
    x1 <= x5 =>
    x3 <= x5 =>
    x2 = x4 =>
-   `|x1 + x2 - (x3 + x4)| <= x5 by [].
+   `|x1 + x2 - (x3 + x4)| <= x5 by smt().
 
 lemma nosmt upto2_notbad (ev1 ev2 bad1 bad2:bool) :
   ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
-  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by [].
+  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by smt().
 
 lemma nosmt upto2_imp_bad (ev1 ev2 bad1 bad2:bool) :
   ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
   (ev1 /\ bad1) => bad2 by [].
 
 lemma nosmt upto_bad_false (ev bad2:bool) :
-  !((ev /\ !bad2) /\ bad2) by [].
+  !((ev /\ !bad2) /\ bad2) by smt().
 
 lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
    (!bad2 => ev1 => ev2) => ev1 =>
-    ev2 /\ !bad2 \/ bad2 by [].
+    ev2 /\ !bad2 \/ bad2 by smt().
 
 lemma nosmt upto_bad_sub (ev bad:bool) :
   ev /\ ! bad => ev by [].
