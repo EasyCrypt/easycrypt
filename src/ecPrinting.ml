@@ -2260,9 +2260,9 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
           (pp_type ppe) fix.opf_resty
           (pp_list "@\n" pp_branch) cfix
 
-    | Some (OP_TC) ->
-        Format.fprintf fmt ": %a = < type-class-operator >"
-          (pp_type ppe) ty
+    | Some (OP_TC (path, name)) ->
+        Format.fprintf fmt ": %a = < type-class operator `%s' of `%a'>"
+          (pp_type ppe) ty name (pp_tyname ppe) path
   in
 
   match ts with
@@ -2839,8 +2839,8 @@ let pp_equivS (ppe : PPEnv.t) ?prpo fmt es =
 
   let insync =
        EcMemory.mt_equal (snd es.es_ml) (snd es.es_mr)
-    && EcReduction.EqTest.for_stmt
-         ppe.PPEnv.ppe_env ~norm:false es.es_sl es.es_sr in
+(*    && EcReduction.EqTest.for_stmt
+         ppe.PPEnv.ppe_env ~norm:false es.es_sl es.es_sr in *) in
 
   let ppnode =
     if insync then begin
@@ -3037,7 +3037,7 @@ module PPGoal = struct
     | FhoareS hs   -> pp_hoareS   ?prpo ppe fmt hs
     | FequivF ef   -> pp_equivF   ppe fmt ef
     | FequivS es   -> pp_equivS   ?prpo ppe fmt es
-    | _ -> Format.fprintf fmt "%a@\n%!" EcFol.pp_form concl
+    | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
 end
 
 (* -------------------------------------------------------------------- *)

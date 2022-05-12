@@ -134,6 +134,7 @@ let get_open_oper exn env p tys =
   | _ -> raise exn
 
 let rec oper_compatible exn env ob1 ob2 =
+  (* FIXME: duplicated code *)
   match ob1, ob2 with
   | OP_Plain(e1,_), OP_Plain(e2,_)  ->
     expr_compatible exn env EcFol.Fsubst.f_subst_id e1 e2
@@ -151,7 +152,8 @@ let rec oper_compatible exn env ob1 ob2 =
     error_body exn (EcPath.p_equal p1 p2 && i11 = i21 && i12 = i22)
   | OP_Fix f1, OP_Fix f2 ->
     opfix_compatible exn env f1 f2
-  | OP_TC, OP_TC -> ()
+  | OP_TC (p1, n1), OP_TC (p2, n2) ->
+     error_body exn (EcPath.p_equal p1 p2 && n1 = n2)
   | _, _ -> raise exn
 
 and opfix_compatible exn env f1 f2 =
@@ -898,7 +900,7 @@ and replay_instance
                 | OB_oper (Some (OP_Record _))
                 | OB_oper (Some (OP_Proj   _))
                 | OB_oper (Some (OP_Fix    _))
-                | OB_oper (Some (OP_TC      )) ->
+                | OB_oper (Some (OP_TC     _)) ->
                     Some (EcPath.pappend npath q)
                 | OB_oper (Some (OP_Plain (e, _))) ->
                     match e.EcTypes.e_node with
@@ -944,7 +946,11 @@ and replay_instance
 
         | `General (tc, syms) ->
            let tc   = fortypeclass tc in
-           let syms = Option.map (Mstr.map forpath) syms in
+           let syms =
+             Option.map
+               (Mstr.map (fun (p, tys) ->
+                    (forpath p, List.map (EcSubst.subst_ty subst) tys)))
+               syms in
            `General (tc, syms)
     in
 

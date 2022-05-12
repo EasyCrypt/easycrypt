@@ -1,16 +1,35 @@
-(* =====================================================================*)
-require import AllCore List.
-
-
 (* ==================================================================== *)
 (* Typeclass examples *)
 
 (* -------------------------------------------------------------------- *)
 (* Set theory *)
 
+type class ['a] foo = {
+  op bar : foo * 'a
+}.
+
+op bari ['a] : int * 'a = (0, witness<:'a>).
+
+instance 'b foo with ['b] int
+  op bar = bari<:'b>.
+
+lemma L : bar<:bool, int> = (0, witness).
+proof.
+class.
+
+reflexivity.
+
+
+
+(*
+
+
+
 type class witness = {
   op witness : witness
 }.
+
+
 
 print witness.
 
@@ -343,4 +362,5 @@ qed.
 
    c. ne pas envoyer certaines instances (e.g. int est un groupe)
       -> instance [nosmt] e.g.
+*)
 *)

@@ -34,9 +34,9 @@ and bindings = (binding list [@opaque])
 
 and form = private {
   f_node : f_node;
-  f_ty   : (ty [@opaque]);
-  f_fv   : (int EcIdent.Mid.t [@opaque]); (* local, memory, module ident *)
-  f_tag  : (int [@opaque]);
+  f_ty   : ty;
+  f_fv   : int EcIdent.Mid.t; (* local, memory, module ident *)
+  f_tag  : int;
 }
 [@@deriving show]
 

@@ -399,7 +399,7 @@ and subst_op_body (s : _subst) (bd : opbody) =
                  opf_branches = subst_branches es opfix.opf_branches;
                  opf_nosmt    = opfix.opf_nosmt; }
 
-  | OP_TC -> OP_TC
+  | OP_TC (p, n) -> OP_TC (s.s_p p, n)
 
 and subst_branches es = function
   | OPB_Leaf (locals, e) ->
@@ -507,7 +507,10 @@ let subst_instance (s : _subst) tci =
 
   | `General (tc, syms) ->
      let tc   = subst_typeclass s tc in
-     let syms = Option.map (Mstr.map s.s_p) syms in
+     let syms =
+       Option.map
+         (Mstr.map (fun (p, tys) -> (s.s_p p, List.map s.s_ty tys)))
+         syms in
      `General (tc, syms)
 
 (* -------------------------------------------------------------------- *)

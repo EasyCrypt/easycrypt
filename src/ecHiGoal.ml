@@ -112,16 +112,17 @@ let process_simplify_info ri (tc : tcenv1) =
   in
 
   {
-    EcReduction.beta    = ri.pbeta;
-    EcReduction.delta_p = delta_p;
-    EcReduction.delta_h = delta_h;
-    EcReduction.zeta    = ri.pzeta;
-    EcReduction.iota    = ri.piota;
-    EcReduction.eta     = ri.peta;
-    EcReduction.logic   = if ri.plogic then Some `Full else None;
-    EcReduction.modpath = ri.pmodpath;
-    EcReduction.user    = ri.puser;
-    EcReduction.cost    = ri.pcost;
+    EcReduction.beta     = ri.pbeta;
+    EcReduction.delta_p  = delta_p;
+    EcReduction.delta_h  = delta_h;
+    EcReduction.delta_tc = ri.pdeltatc;
+    EcReduction.zeta     = ri.pzeta;
+    EcReduction.iota     = ri.piota;
+    EcReduction.eta      = ri.peta;
+    EcReduction.logic    = if ri.plogic then Some `Full else None;
+    EcReduction.modpath  = ri.pmodpath;
+    EcReduction.user     = ri.puser;
+    EcReduction.cost     = ri.pcost;
   }
 
 (*-------------------------------------------------------------------- *)

@@ -434,7 +434,7 @@ let on_opdecl (cb : cb) (opdecl : operator) =
    | OB_oper Some b ->
      match b with
      | OP_Constr _ | OP_Record _ | OP_Proj   _ -> assert false
-     | OP_TC -> assert false
+     | OP_TC _ -> assert false
      | OP_Plain  (e, _) -> on_expr cb e
      | OP_Fix    f ->
        let rec on_mpath_branches br =
@@ -494,7 +494,9 @@ let on_instance cb ty tci =
 
   | `General (tci, syms) ->
      on_typeclass cb tci;
-     Option.iter (Mstr.iter (fun _ p -> cb (`Op p))) syms
+     Option.iter
+       (Mstr.iter (fun _ (p, tys) -> cb (`Op p); List.iter (on_ty cb) tys))
+       syms
 
 (* -------------------------------------------------------------------- *)
 
@@ -724,7 +726,7 @@ let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
   match body with
   | OP_Plain (e, _) -> EcIdent.fv_union fv (fv_and_tvar_e e)
-  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> fv
+  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC _ -> fv
   | OP_Fix opfix ->
     let fv =
       List.fold_left (fun fv (_, ty) -> EcIdent.fv_union fv (ty_fv_and_tvar ty))
@@ -909,7 +911,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let body =
           match body with
           | OP_Constr _ | OP_Record _ | OP_Proj _ -> assert false
-          | OP_TC -> assert false (* ??? *)
+          | OP_TC _ -> assert false (* FIXME:TC *)
           | OP_Plain (e,nosmt) ->
             OP_Plain (e_lam extra_a e, nosmt)
           | OP_Fix opfix ->

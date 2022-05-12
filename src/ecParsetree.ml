@@ -495,6 +495,7 @@ type pcutdef_schema = {
 type preduction = {
   pbeta    : bool;                      (* β-reduction *)
   pdelta   : pqsymbol list option;      (* definition unfolding *)
+  pdeltatc : bool;
   pzeta    : bool;                      (* let-reduction *)
   piota    : bool;                      (* case/if-reduction *)
   peta     : bool;                      (* η-reduction *)

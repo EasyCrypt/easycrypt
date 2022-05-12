@@ -58,7 +58,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
-  | OP_TC
+  | OP_TC     of EcPath.path * string
 
 and prbody =
   | PR_Plain of form
@@ -114,6 +114,7 @@ val is_oper   : operator -> bool
 val is_ctor   : operator -> bool
 val is_proj   : operator -> bool
 val is_rcrd   : operator -> bool
+val is_tc_op  : operator -> bool
 val is_fix    : operator -> bool
 val is_abbrev : operator -> bool
 val is_prind  : operator -> bool
@@ -130,6 +131,7 @@ val operator_as_rcrd  : operator -> EcPath.path
 val operator_as_proj  : operator -> EcPath.path * int * int
 val operator_as_fix   : operator -> opfix
 val operator_as_prind : operator -> prind
+val operator_as_tc    : operator -> EcPath.path * string
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]

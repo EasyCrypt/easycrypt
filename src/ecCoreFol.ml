@@ -38,7 +38,7 @@ and bindings = binding list
 
 and form = {
   f_node : f_node;
-  f_ty   : (ty [@opaque]);
+  f_ty   : ty;
   f_fv   : (int EcIdent.Mid.t [@opaque]); (* local, memory, module ident *)
   f_tag  : (int [@opaque]);
 }

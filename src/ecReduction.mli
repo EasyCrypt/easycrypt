@@ -62,16 +62,17 @@ val can_eta : ident -> form * form list -> bool
 
 (* -------------------------------------------------------------------- *)
 type reduction_info = {
-  beta    : bool;
-  delta_p : (path  -> deltap); (* reduce operators *)
-  delta_h : (ident -> bool);   (* reduce local definitions *)
-  zeta    : bool;              (* reduce let  *)
-  iota    : bool;              (* reduce case *)
-  eta     : bool;              (* reduce eta-expansion *)
-  logic   : rlogic_info;       (* perform logical simplification *)
-  modpath : bool;              (* reduce module path *)
-  user    : bool;              (* reduce user defined rules *)
-  cost    : bool;              (* reduce trivial cost statements *)
+  beta     : bool;
+  delta_p  : (path  -> deltap); (* reduce operators *)
+  delta_h  : (ident -> bool);   (* reduce local definitions *)
+  delta_tc : bool;              (* reduce tc-operators *)
+  zeta     : bool;              (* reduce let  *)
+  iota     : bool;              (* reduce case *)
+  eta      : bool;              (* reduce eta-expansion *)
+  logic    : rlogic_info;       (* perform logical simplification *)
+  modpath  : bool;              (* reduce module path *)
+  user     : bool;              (* reduce user defined rules *)
+  cost     : bool;              (* reduce trivial cost statements *)
 }
 
 and deltap      = [`Yes | `No | `Force]
@@ -86,6 +87,7 @@ val nodelta      : reduction_info
 val delta        : reduction_info
 
 val reduce_logic : reduction_info -> env -> LDecl.hyps -> form -> form
+val reduce_tc : env -> path -> ty list -> form option
 
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form

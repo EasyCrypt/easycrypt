@@ -914,9 +914,10 @@ module MC = struct
           let opname = EcIdent.name opid in
           let optype = ty_subst tsubst optype in
           let tcargs = List.map (fun (a, _) -> tvar a) tc.tc_tparams in
-          let opargs = (self, [{tc_name = mypath; tc_args = tcargs}]) in
+          let opargs = (self, [{tc_name = mypath; tc_args = tcargs;}]) in
           let opargs = tc.tc_tparams @ [opargs] in
-          let opdecl = mk_op ~opaque:false opargs optype (Some OP_TC) loca in
+          let opdecl = OP_TC (mypath, opname) in
+          let opdecl = mk_op ~opaque:false opargs optype (Some opdecl) loca in
             (opid, xpath opname, optype, opdecl)
         in
           List.map on1 tc.tc_ops
@@ -2898,6 +2899,10 @@ module Op = struct
 
   let is_record_ctor env p =
     try  EcDecl.is_rcrd (by_path p env)
+    with LookupFailure _ -> false
+
+  let is_tc_op env p =
+    try  EcDecl.is_tc_op (by_path p env)
     with LookupFailure _ -> false
 
   let is_dtype_ctor ?nargs env p =

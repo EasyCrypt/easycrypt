@@ -1614,14 +1614,11 @@ module Ty = struct
                 "ambiguous operator (%s / %s)"
                 (EcPath.tostring (fst (proj4_1 op1)))
                 (EcPath.tostring (fst (proj4_1 op2)))
-          | [((p, _), _, _, _)] ->
-              let op   = EcEnv.Op.by_path p env in
-              let opty =
-                Tvar.subst
-                  (Tvar.init (List.map fst op.op_tparams) tvi)
-                  op.op_ty
-              in
-                (p, opty)
+          | [((p, opparams), opty, subue, _)] ->
+              let subst    = Tuni.offun (EcUnify.UniEnv.assubst subue) in
+              let opty     = subst opty in
+              let opparams = List.map subst opparams in
+              ((p, opparams), opty)
 
         in
           Mstr.change
@@ -1642,7 +1639,7 @@ module Ty = struct
         (fun x (_, ty) m ->
            match Mstr.find_opt x ops with
            | None -> m
-           | Some (loc, (p, opty)) ->
+           | Some (loc, ((p, opparams), opty)) ->
                if not (EcReduction.EqTest.for_type env ty opty) then begin
                  let ppe = EcPrinting.PPEnv.ofenv env in
                  hierror ~loc
@@ -1650,7 +1647,7 @@ module Ty = struct
 \  - expected: %a@\n\
 \  - got     : %a"
                    x (EcPrinting.pp_type ppe) ty (EcPrinting.pp_type ppe) opty
-               end; Mstr.add x p m)
+               end; Mstr.add x (p, opparams) m)
         reqs Mstr.empty
 
   (* ------------------------------------------------------------------ *)
@@ -1714,18 +1711,23 @@ module Ty = struct
   let p_field   = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "Field"  ], "field"  )
 
   (* ------------------------------------------------------------------ *)
+  let get_ring_field_op (name : string) (symbols : (path * ty list) Mstr.t) =
+    Option.map
+      (fun (p, tys) -> assert (List.is_empty tys); p)
+      (Mstr.find_opt name symbols)
+
   let ring_of_symmap env ty kind symbols =
     { r_type  = ty;
-      r_zero  = oget (Mstr.find_opt "rzero" symbols);
-      r_one   = oget (Mstr.find_opt "rone"  symbols);
-      r_add   = oget (Mstr.find_opt "add"   symbols);
-      r_opp   =      (Mstr.find_opt "opp"   symbols);
-      r_mul   = oget (Mstr.find_opt "mul"   symbols);
-      r_exp   =      (Mstr.find_opt "expr"  symbols);
-      r_sub   =      (Mstr.find_opt "sub"   symbols);
+      r_zero  = oget (get_ring_field_op "rzero" symbols);
+      r_one   = oget (get_ring_field_op "rone"  symbols);
+      r_add   = oget (get_ring_field_op "add"   symbols);
+      r_opp   =      (get_ring_field_op "opp"   symbols);
+      r_mul   = oget (get_ring_field_op "mul"   symbols);
+      r_exp   =      (get_ring_field_op "expr"  symbols);
+      r_sub   =      (get_ring_field_op "sub"   symbols);
       r_kind  = kind;
       r_embed =
-        (match Mstr.find_opt "ofint" symbols with
+        (match get_ring_field_op "ofint" symbols with
          | None when EcReduction.EqTest.for_type env ty tint -> `Direct
          | None -> `Default | Some p -> `Embed p); }
 
@@ -1772,8 +1774,8 @@ module Ty = struct
   (* ------------------------------------------------------------------ *)
   let field_of_symmap env ty symbols =
     { f_ring = ring_of_symmap env ty `Integer symbols;
-      f_inv  = oget (Mstr.find_opt "inv" symbols);
-      f_div  = Mstr.find_opt "div" symbols; }
+      f_inv  = oget (get_ring_field_op "inv" symbols);
+      f_div  = get_ring_field_op "div" symbols; }
 
   let addfield ~import (scope : scope) mode { pl_desc = tci; pl_loc = loc; } =
     let env = env scope in
@@ -1884,9 +1886,10 @@ module Ty = struct
     let subst =
       List.fold_left
         (fun subst (opname, ty) ->
-          let oppath = Mstr.find (EcIdent.name opname) symbols in
-          let op = EcFol.f_op oppath [] (ty_subst tysubst ty) in
-          EcFol.Fsubst.f_bind_local subst opname op)
+          let oppath, optys = Mstr.find (EcIdent.name opname) symbols in
+          let op =
+            EcFol.f_op oppath (List.map (ty_subst tysubst) optys) (ty_subst tysubst ty)
+          in EcFol.Fsubst.f_bind_local subst opname op)
         (EcFol.Fsubst.f_subst_init ~sty:tysubst ()) tc.tc_ops in
 
 (*
