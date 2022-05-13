@@ -202,18 +202,21 @@ Before running EasyCrypt and after the installation/removal/update
 of an SMT prover, you need to (re)configure Why3.
 
 ```
-$> why3 config detect
+$> easycrypt why3config
 ```
 
-EasyCrypt is using the default Why3 location, i.e. ~/.why3.conf.
-If you have several versions of Why3 installed, it may be impossible
-to share the same configuration file among them. EasyCrypt via the
-option -why3, allows you to load a Why3 configuration file from a
-custom location. For instance:
+EasyCrypt is storing the Why3 configuration file under
 
 ```
-$> why3 config --detect -C $WHY3CONF.conf
-$> ./ec.native -why3 $WHY3CONF.conf
+$XDG_CONFIG_HOME/easycrypt/why3.conf
+```
+
+EasyCrypt allows you, via the option -why3, to load a Why3
+configuration file from a custom location. For instance:
+
+```
+$> easycrypt why3config -why3 $WHY3CONF.conf
+$> easycrypt -why3 $WHY3CONF.conf
 ```
 
 where `$WHY3CONF` must be replaced by some custom location.
