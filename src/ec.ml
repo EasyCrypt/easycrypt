@@ -205,6 +205,9 @@ let main () =
     | `Why3Config -> begin
         let conf = cp_why3conf ~exists:false ~mode:`User in
 
+        conf |> Option.iter (fun conf ->
+          EcUtils.makedirs (Filename.dirname conf));
+
         let () =
           let ulnk = conf |> odfl why3dflconf in
           try Unix.unlink ulnk with Unix.Unix_error _ -> ()
