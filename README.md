@@ -251,13 +251,6 @@ assuming that all dependencies have been successfully installed. If
 you choose not to install EasyCrypt system wide, you can use the
 binary `ec.native` that is located at the root of the source tree.
 
-It is possible to change the installation prefix by setting the
-environment variable PREFIX:
-
-```
-$> make PREFIX=/my/prefix install
-```
-
 EasyCrypt comes also with an opam package. Running
 
 ```
