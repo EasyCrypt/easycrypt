@@ -1002,6 +1002,7 @@ move=> ll_d1; apply: eq_distr => x; rewrite dlet1E /=.
 by rewrite sumZr -weightE ll_d1.
 qed.
 
+
 (* -------------------------------------------------------------------- *)
 op dfold ['a] (f : int -> 'a -> 'a distr) (x : 'a) (i : int) =
   iteri i (fun k d => dlet d (f k)) (dunit x).
@@ -1312,6 +1313,25 @@ rewrite -(@eq_sum (fun x => k * if E x then mu1 d x else 0%r)).
 by rewrite sumZ.
 qed.
 
+lemma dscalar0r ['a] k : k \cdot dnull<:'a> = dnull.
+proof.
+apply/eq_distr=> a; rewrite muK; last by rewrite /mscalar !dnull1E.
+split => /=.
+- by move=> {a}a @/mscalar; rewrite dnull1E.
+- move=> s _; rewrite (@BRA.eq_bigr _ _ (fun _ => 0%r)).
+  - by move=> a' /= _ @/mscalar; rewrite dnull1E.
+  - by rewrite Bigreal.sumr_const.
+qed.
+
+lemma dscalar1 ['a] (d : 'a distr) : 1%r \cdot d = d.
+proof.
+case: (d = dnull) => [->|nz_d]; first by rewrite dscalar0r.
+apply/eq_distr=> x; rewrite dscalar1E //=.
+have nz_wd: weight d <> 0%r.
+- by apply: contra nz_d; apply: weight_eq0_dnull.
+by apply: invr_ge1 => //; rewrite ltr_neqAle eq_sym ge0_weight.
+qed.
+
 lemma weight_dscalar (k : real) (d : 'a distr):
   0%r <= k => k <= inv (weight d) =>
   weight (k \cdot d) = k * weight d.
@@ -1343,6 +1363,19 @@ qed.
 
 end DScalar.
 export DScalar.
+
+(* -------------------------------------------------------------------- *)
+lemma dlet_cst_weight ['a 'b] da db :
+  dlet<:'a, 'b> da (fun _ => db) = weight da \cdot db.
+proof.
+apply/eq_distr=> b; rewrite dlet1E /= sumZr -weightE.
+case: (db = dnull) => [->|nz_db]; first by rewrite dscalar0r !dnull1E.
+rewrite dscalar1E // ge0_weight /=; apply: (@ler_trans 1%r).
+- by apply: le1_mu.
+suff ?: weight db <> 0%r.
+- by apply/invr_ge1/le1_mu => //; rewrite ltr_neqAle eq_sym ge0_weight.
+by apply: contra nz_db; apply: weight_eq0_dnull.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op dscale ['a] (d : 'a distr) = dscalar (inv (weight d)) d.
