@@ -2401,7 +2401,7 @@ section PROOFS.
   smt(count_eq0 has_pred1).
   qed.
 
-  lemma make_lbad1_size_cons3 log lc lenc n a c t:
+  lemma make_lbad1_size_cons3 (log : (_, _) fmap) lc lenc n a c t:
       uniq lenc =>
       ! n \in lenc =>
       size (make_lbad1 log.[n <- (a,c,t)] lc (n::lenc)) =

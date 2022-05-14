@@ -69,6 +69,22 @@ by split=> [->//|eq]; apply/fun_ext=> x; apply/fun_ext=> y; apply/eq.
 qed.
 
 (* -------------------------------------------------------------------- *)
+op "_.[_<-_]" ['a, 'b] (f : 'a -> 'b) (x : 'a) (y : 'b) =
+  fun x' => if x = x' then y else f x'.
+
+lemma fupdateE ['a 'b] (f : 'a -> 'b) (x x' : 'a) (y : 'b) :
+  f.[x <- y] x' = if x = x' then y else f x'.
+proof. by []. qed.
+
+lemma fupdate_eq ['a 'b] (f : 'a -> 'b) (x : 'a) (y : 'b) :
+  f.[x <- y] x = y.
+proof. by []. qed.
+
+lemma fupdate_neq ['a 'b] (f : 'a -> 'b) (x x' : 'a) (y : 'b) :
+  x <> x' => f.[x <- y] x' = f x'.
+proof. by move=> @/"_.[_<-_]" ->. qed.
+
+(* -------------------------------------------------------------------- *)
 pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
 
 (* -------------------------------------------------------------------- *)
