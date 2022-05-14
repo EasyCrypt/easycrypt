@@ -905,39 +905,48 @@ let pp_opapp
     let module E = struct exception PrintAsPlain end in
 
     try
-      let (pp, prio) =
+      let (pp, prio, es) =
         match opname, es with
-        | x, [] when x = EcCoreLib.s_nil ->
-            ((fun fmt -> pp_string fmt "[]"), max_op_prec)
+        | x, _ when x = EcCoreLib.s_nil ->
+            ((fun fmt -> pp_string fmt "[]"), max_op_prec, es)
 
-        | x, [e] when x = EcCoreLib.s_abs ->
+        | x, e :: es when x = EcCoreLib.s_abs ->
             let pp fmt =
               Format.fprintf fmt "`|%a|"
                 (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e
             in
-              (pp, e_app_prio)
+              (pp, e_app_prio, es)
 
-        | x, [e1; e2] when x = EcCoreLib.s_get ->
+        | x, e1 :: e2 :: es when x = EcCoreLib.s_get ->
             let pp fmt =
               Format.fprintf fmt "@[%a.[%a]@]"
                 (pp_sub       ppe (inm, (e_get_prio , `Left    ))) e1
                 (pp_tuple_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
             in
-              (pp, e_get_prio)
+              (pp, e_get_prio, es)
 
-        | x, [e1; e2; e3] when x = EcCoreLib.s_set ->
+        | x, e1 :: e2 :: e3 :: es when x = EcCoreLib.s_set ->
             let pp fmt =
               Format.fprintf fmt "@[<hov 2>%a.[%a <-@ %a]@]"
                 (pp_sub       ppe (inm, (e_get_prio , `Left    ))) e1
                 (pp_tuple_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
                 (pp_sub       ppe (inm, (min_op_prec, `NonAssoc))) e3
             in
-              (pp, e_get_prio)
+              (pp, e_get_prio, es)
 
         | _ ->
             raise E.PrintAsPlain
       in
-        maybe_paren outer (inm, prio) (fun fmt () -> pp fmt) fmt
+      let rec doit fmt args =
+        match args with
+        | [] ->
+           maybe_paren outer (inm, prio) (fun fmt () -> pp fmt) fmt ()
+
+        | a :: args ->
+           Format.fprintf fmt "%a@ %a"
+             doit args (pp_sub ppe (fst outer, (e_app_prio, `IRight))) a
+
+      in fun () -> doit fmt es
 
     with E.PrintAsPlain ->
       fun () ->
