@@ -34,7 +34,7 @@ EasyCrypt uses the following third-party tools/libraries:
 
  * OCamlbuild
 
- * Why3 (>= 1.3)
+ * Why3 (= 1.5.x)
 
      Available at <http://why3.lri.fr/>
 
@@ -195,32 +195,6 @@ run:
     
 to compile EasyCrypt.
 
-Configuring Why3
-====================================================================
-
-Before running EasyCrypt and after the installation/removal/update
-of an SMT prover, you need to (re)configure Why3.
-
-```
-$> easycrypt why3config
-```
-
-EasyCrypt is storing the Why3 configuration file under
-
-```
-$XDG_CONFIG_HOME/easycrypt/why3.conf
-```
-
-EasyCrypt allows you, via the option -why3, to load a Why3
-configuration file from a custom location. For instance:
-
-```
-$> easycrypt why3config -why3 $WHY3CONF.conf
-$> easycrypt -why3 $WHY3CONF.conf
-```
-
-where `$WHY3CONF` must be replaced by some custom location.
-
 Note on Prover Versions
 --------------------------------------------------------------------
 
@@ -228,11 +202,11 @@ Why3 and SMT solvers are independent pieces of software with their
 own version-specific interactions. Obtaining a working SMT setup may
 require installing specific versions of some of the provers.
 
-At the time of writing, we depend on Why3 1.4.x, which supports the
-following versions (and some versions below):
+At the time of writing, we depend on Why3 1.5.x, which supports the
+following prover versions:
 
- * Alt-Ergo 2.4.0 (if you install alt-ergo using opam, you can
-   prevent upgrades using `opam pin alt-ergo 2.4.0`)
+ * Alt-Ergo 2.4.1 (if you install alt-ergo using opam, you can
+   prevent upgrades using `opam pin alt-ergo 2.4.1`)
  * CVC4 1.8
  * Z3 4.8.10
 
@@ -260,6 +234,31 @@ $> opam install easycrypt
 installs EasyCrypt and its dependencies via opam. In that case, the
 EasyCrypt binary is named `easycrypt`.
 
+Configuring Why3
+====================================================================
+
+Initially, and after the installation/removal/update of SMT provers,
+you need to (re)configure Why3 via the following `easycrypt` command:
+
+```
+$> easycrypt why3config
+```
+
+EasyCrypt stores the Why3 configuration file under
+
+```
+$XDG_CONFIG_HOME/easycrypt/why3.conf
+```
+
+EasyCrypt allows you, via the option -why3, to load a Why3
+configuration file from a custom location. For instance:
+
+```
+$> easycrypt why3config -why3 $WHY3CONF.conf
+$> easycrypt -why3 $WHY3CONF.conf
+```
+
+where `$WHY3CONF` must be replaced by some custom location.
 
 Proof General Front-End
 ====================================================================
