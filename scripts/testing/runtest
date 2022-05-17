@@ -181,7 +181,7 @@ class Listener(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def error(self, handle, msg):
+    def error(self, handle, level, msg):
         pass
 
     @abc.abstractmethod
@@ -498,6 +498,20 @@ MARKS = {
 }
 
 # --------------------------------------------------------------------
+LOGMARKS = {
+    'critical':
+        ('✗', CurseWrapper.COLOR_RED),
+    'warning':
+        ('ϟ', CurseWrapper.COLOR_YELLOW),
+    'info':
+        ('ⓘ', CurseWrapper.COLOR_BLUE),
+    'debug':
+        ('ⓘ', CurseWrapper.COLOR_BLUE),
+    None:
+        ('✗', CurseWrapper.COLOR_RED),
+}
+
+# --------------------------------------------------------------------
 class TermListener(Listener):
     REFRESH = 0.1
 
@@ -533,9 +547,9 @@ class TermListener(Listener):
     def tick(self):
         self._mbar.refresh()
 
-    def error(self, handle, msg):
+    def error(self, handle, level, msg):
         handle = self._handles[handle]
-        mark, color = MARKS[None]
+        mark, color = LOGMARKS.get(level, LOGMARKS[None])
         self._mbar.log(mark, '{}: {}'.format(handle.filename, msg), color)
 
     @clib.contextmanager
@@ -577,8 +591,8 @@ class RawListener(Listener):
         self.log(f'[{mark}] [{self._checked:04d}/{self._total:04d}] [{delta}] {handle.filename}')
         del self._handles[id(handle)]
 
-    def error(self, handle, msg):
-        handle, (mark, _) = self._handles[handle], MARKS[None]
+    def error(self, handle, level, msg):
+        handle, (mark, _) = self._handles[handle], LOGMARKS.get(level, LOGMARKS[None])
         self.log('[{}] {}: {}'.format(mark, handle.filename, msg))
 
     def tick(self):
@@ -623,7 +637,12 @@ async def _run_all(options, allscripts, listener : Listener):
                             listener.file_check_progress(handle, float(line.split()[3]))
                         elif re.match(rb'E\b', line):
                             error = line[1:].decode('utf-8').strip()
-                            listener.error(handle, error)
+                            error = error.split(None, 1)
+                            if not error:
+                                continue
+                            if len(error) < 2:
+                                error = [None, error]
+                            listener.error(handle, *error)
                             errors.append(error)
     
             finally:
