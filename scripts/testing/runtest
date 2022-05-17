@@ -753,6 +753,10 @@ async def _main():
         with open(options.report, 'wb') as output:
             _dump_report(mainconfig, log, output)
 
+    haserrors = any(not x.success for x in log)
+
+    exit(2 if haserrors else 0)
+
 # --------------------------------------------------------------------
 if __name__ == '__main__':
     try:
