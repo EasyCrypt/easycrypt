@@ -171,6 +171,7 @@
     | `WANTEDLEMMAS   of EcParsetree.pdbhint
     | `VERBOSE        of int option
     | `VERSION        of [ `Full | `Lazy ]
+    | `DUMPIN         of string located
     | `SELECTED
     | `DEBUG
   ]
@@ -206,6 +207,7 @@
            "lazy"          ;
            "full"          ;
            "iterate"       ;
+           "dumpin"        ;
            "selected"      ;
            "debug"         ]
 
@@ -281,6 +283,7 @@
       let verbose  = ref None in
       let version  = ref None in
       let iterate  = ref None in
+      let dumpin   = ref None in
       let selected = ref None in
       let debug    = ref None in
 
@@ -325,6 +328,7 @@
         | `VERSION        v -> version  := Some v
         | `ITERATE          -> iterate  := Some true
         | `PROVER         p -> List.iter add_prover p
+        | `DUMPIN         f -> dumpin   := Some f
         | `SELECTED         -> selected := Some true
         | `DEBUG            -> debug    := Some true
       in
@@ -347,6 +351,7 @@
         plem_iterate    = !iterate;
         plem_wanted     = !wanted;
         plem_unwanted   = !unwanted;
+        plem_dumpin     = !dumpin;
         plem_selected   = !selected;
         psmt_debug      = !debug;
       }
@@ -3832,6 +3837,9 @@ smt_info1:
 
 | PROVER EQ p=prover_kind
     { `PROVER p }
+
+| DUMP IN EQ file=loc(STRING)
+    { `DUMPIN file }
 
 | x=lident po=prefix(EQ, smt_option)?
     { SMT.mk_pi_option x po }

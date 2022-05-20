@@ -1590,7 +1590,7 @@ let dump_why3 (env : EcEnv.env) (filename : string) =
 (* -------------------------------------------------------------------- *)
 let cnt = Counter.create ()
 
-let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
+let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
   let out_task filename task =
     let stream = open_out filename in
     EcUtils.try_finally
@@ -1626,7 +1626,13 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
     let task = WTask.add_decl tenv.te_task decl in
     let tkid = Counter.next cnt in
 
-    (Os.getenv "EC_WHY3" |> oiter (fun filename ->
+    let dumpin_opt =
+      match pi.pr_dumpin with
+      | None -> Os.getenv "EC_WHY3"
+      | Some filename -> Some (EcLocation.unloc filename)
+    in
+    ( dumpin_opt |> oiter (fun filename ->
+          Format.eprintf "dumping in %s" filename;
       let filename = Printf.sprintf "%.4d-%s" tkid filename in
       out_task filename task));
     let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in
