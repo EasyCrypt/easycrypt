@@ -314,6 +314,7 @@ type prover_infos = {
   pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
+  pr_dumpin    : string EcLocation.located option;
   pr_selected  : bool;
   gn_debug     : bool;
 }
@@ -331,6 +332,7 @@ let dft_prover_infos = {
   pr_max       = 50;
   pr_wanted    = Hints.empty;
   pr_unwanted  = Hints.empty;
+  pr_dumpin    = None;
   pr_selected  = false;
   gn_debug     = false;
 }
