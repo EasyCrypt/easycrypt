@@ -1,3 +1,11 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2021 - Inria
+ * Copyright (c) - 2012--2021 - Ecole Polytechnique
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
 (* -------------------------------------------------------------------- *)
 require import Tactics.
 
@@ -61,26 +69,10 @@ by split=> [->//|eq]; apply/fun_ext=> x; apply/fun_ext=> y; apply/eq.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op "_.[_<-_]" ['a, 'b] (f : 'a -> 'b) (x : 'a) (y : 'b) =
-  fun x' => if x = x' then y else f x'.
-
-lemma fupdateE ['a 'b] (f : 'a -> 'b) (x x' : 'a) (y : 'b) :
-  f.[x <- y] x' = if x = x' then y else f x'.
-proof. by []. qed.
-
-lemma fupdate_eq ['a 'b] (f : 'a -> 'b) (x : 'a) (y : 'b) :
-  f.[x <- y] x = y.
-proof. by []. qed.
-
-lemma fupdate_neq ['a 'b] (f : 'a -> 'b) (x x' : 'a) (y : 'b) :
-  x <> x' => f.[x <- y] x' = f x'.
-proof. by move=> @/"_.[_<-_]" ->. qed.
-
-(* -------------------------------------------------------------------- *)
 pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
 
 (* -------------------------------------------------------------------- *)
-abbrev [-printing] transpose ['a 'b 'c] (f : 'a -> 'b -> 'c) (y : 'b) =
+abbrev transpose ['a 'b 'c] (f : 'a -> 'b -> 'c) (y : 'b) =
   fun x => f x y.
 
 (* -------------------------------------------------------------------- *)
@@ -383,14 +375,6 @@ by [].
 
 lemma  if_arg b x (fT fF : 'a -> 'b) :
   (if b then fT else fF) x = if b then fT x else fF x
-by [].
-
-lemma ifT (b : bool) (e1 e2 : 'a) : 
-  b => (if b then e1 else e2) = e1 
-by [].
-
-lemma ifF (b : bool) (e1 e2 : 'a) : 
- !b => (if b then e1 else e2) = e2
 by [].
 
 lemma  iffP p q r :
