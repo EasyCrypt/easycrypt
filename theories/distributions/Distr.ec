@@ -2062,6 +2062,30 @@ rewrite mulr_const_cond -(@BRM.eq_bigr _ (fun _ => 1%r)).
 by rewrite mulr_const_cond expr1z mulr1; congr; apply: eq_count => /#.
 qed.
 
+lemma dfun_allE_cond c (d: t -> 'u distr) (pT pF : t -> bool) (e : t -> 'u -> bool) :
+  (forall x, is_lossless (d x)) => 
+  (forall x, pT x \/ pF x => mu (d x) (e x) = c) =>
+  (forall x, !(pT x /\ pF x)) =>
+  mu (dfun d) (fun f =>
+         (forall x, pT x =>  e x (f x))
+      /\ (forall x, pF x => !e x (f x))) =
+
+    (      c) ^ (count pT FinT.enum)
+  * (1%r - c) ^ (count pF FinT.enum).
+proof.
+move=> d_ll hdc h; pose Q x u := (pT x => e x u) /\ (pF x => !e x u).
+rewrite -(@mu_eq _ (fun f => forall x, Q x (f x))) /= 1:/#.
+rewrite dfunE (@BRM.bigID _ _ pT) !predTI /=.
+rewrite -(@BRM.eq_bigr _ (fun _ => c)).
+- by move=> x @/Q /= ^pTx -> /=; rewrite -(@mu_eq _ (e x)) /#.
+rewrite mulr_const_cond; congr; rewrite (@BRM.bigID _ _ pF).
+rewrite  -(@BRM.eq_bigr _ (fun _ => 1%r - c)).
+- by move=> x [_] @/Q /= ^pFx -> /=;rewrite -(@mu_eq _ (predC (e x))) 1:/# mu_not d_ll hdc; 1: by rewrite pFx /=.
+rewrite mulr_const_cond -(@BRM.eq_bigr _ (fun _ => 1%r)).
+- by move=> x /= @/predC [pTNx pFNx]; rewrite -(@mu_eq _ predT) 1:/# d_ll.
+by rewrite mulr_const_cond expr1z mulr1; congr; apply: eq_count => /#.
+qed.
+
 lemma dfunE_mem_uniq (c: real) (d: t -> 'u distr) (lT lF : t list) (e : t -> 'u -> bool) : 
   (forall x, is_lossless (d x)) => 
   (forall x, mu (d x) (e x) = c) =>
