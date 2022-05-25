@@ -22,6 +22,7 @@ default: build
 
 build:
 	rm -f ec.native && $(DUNE) build && ln -sf src/ec.exe ec.native
+	codesign -s - ec.native
 
 install: build
 	dune install
