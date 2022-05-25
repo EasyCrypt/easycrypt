@@ -196,8 +196,8 @@ require import DList.
 
 clone MFinite as DAlphabet with
   type         t <= Alphabet.t,
-  theory Support <= Alphabet
-proof *.
+  theory Support <= Alphabet.
+(* proof *.*)
 
 lemma dword_is_dlist:
   dmap (dlist DAlphabet.dunifin n) mkword = DWord.dunifin.
