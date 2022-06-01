@@ -14,6 +14,10 @@ CHECK     += --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
 CHECK     += $(ECEXTRA) config/tests.config
 
 # --------------------------------------------------------------------
+UNAME_P = $(shell uname -p)
+UNAME_S = $(shell uname -s)
+
+# --------------------------------------------------------------------
 .PHONY: default build byte native tests check examples
 .PHONY: clean install uninstall
 
@@ -24,6 +28,9 @@ build:
 	rm -f src/ec.exe ec.native
 	$(DUNE) build
 	ln -sf src/ec.exe ec.native
+ifeq ($(UNAME_P)-$(UNAME_S),arm-Darwin)
+	-codesign -s - src/ec.exe
+endif
 
 install: build
 	$(DUNE) install
