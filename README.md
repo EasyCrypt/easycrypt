@@ -117,7 +117,7 @@ packages manager.
   2. Optionally, use opam to install the system dependencies:
 
       ```
-      $> opam install depext
+      $> opam install opam-depext
       $> opam depext easycrypt
       ```
 
