@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
@@ -539,6 +531,7 @@ module Prover = struct
     pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
+    pl_dumpin     : string located option;
     pl_selected   : bool option;
     gn_debug      : bool option;
   }
@@ -556,6 +549,7 @@ module Prover = struct
     pl_iterate   = None;
     pl_wanted    = None;
     pl_unwanted  = None;
+    pl_dumpin    = None;
     pl_selected  = None;
     gn_debug     = None;
   }
@@ -596,6 +590,7 @@ module Prover = struct
       pl_iterate   = ppr.plem_iterate;
       pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
       pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
+      pl_dumpin    = ppr.plem_dumpin;
       pl_selected  = ppr.plem_selected;
       gn_debug     = ppr.psmt_debug;
     }
@@ -617,6 +612,7 @@ module Prover = struct
     let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
     let pr_selected  = odfl dft.pr_selected options.pl_selected in
     let pr_quorum    = max 1 (odfl dft.pr_quorum options.po_quorum) in
+    let pr_dumpin    = options.pl_dumpin in
     let pr_provers   =
       let l = odfl dft.pr_provers (fst options.po_provers) in
       let do_ar l (k, p) =
@@ -628,6 +624,7 @@ module Prover = struct
     { pr_maxprocs; pr_provers ; pr_timelimit; pr_cpufactor;
       pr_verbose ; pr_all     ; pr_max      ; pr_iterate  ;
       pr_wanted  ; pr_unwanted; pr_selected ; pr_quorum   ;
+      pr_dumpin  ;
       gn_debug   ; }
 
   (* -------------------------------------------------------------------- *)
@@ -955,7 +952,9 @@ module Ax = struct
       let sc = { axs_tparams = tparams;
                  axs_pparams = odfl [] pparams;
                  axs_params  = odfl [] scparams;
-                 axs_spec    = concl; } in
+                 axs_spec    = concl;
+                 axs_loca    = ax.pa_locality; }
+      in
 
       (* TODO: A: check this. *)
       Some (unloc ax.pa_name),

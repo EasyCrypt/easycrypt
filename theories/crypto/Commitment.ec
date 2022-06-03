@@ -1,9 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2016--2017 - Roberto Metere <r.metere2@ncl.ac.uk>
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* A formalisation of generic commitment schemes *)
 require import DBool.
 

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
@@ -369,6 +361,28 @@ end
 (* -------------------------------------------------------------------- *)
 type quantum = [`Quantum | `Classical]
 
+type ovariable = {
+  ov_quantum : quantum;
+  ov_name    : EcSymbols.symbol option;
+  ov_type    : ty;
+}
+
+let ov_quantum { ov_quantum = x } = x
+let ov_name    { ov_name    = x } = x
+let ov_type    { ov_type    = x } = x
+
+let ov_hash v =
+  Why3.Hashcons.combine2
+    (Hashtbl.hash v.ov_quantum)
+    (Hashtbl.hash v.ov_name)
+    (ty_hash v.ov_type)
+
+let ov_equal vd1 vd2 =
+     vd1.ov_quantum = vd2.ov_quantum
+  && EcUtils.opt_equal (=) vd1.ov_name vd2.ov_name
+  && ty_equal vd1.ov_type vd2.ov_type
+
+(* -------------------------------------------------------------------- *)
 type variable = {
   v_quantum : quantum;
   v_name    : EcSymbols.symbol;   (* can be "_" *)
@@ -380,13 +394,22 @@ let v_name    { v_name    = x } = x
 let v_type    { v_type    = x } = x
 
 let v_hash v =
-  Why3.Hashcons.combine
+  Why3.Hashcons.combine2
+    (Hashtbl.hash v.v_quantum)
     (Hashtbl.hash v.v_name)
     (ty_hash v.v_type)
 
 let v_equal vd1 vd2 =
-  vd1.v_name = vd2.v_name &&
-  ty_equal vd1.v_type vd2.v_type
+     vd1.v_quantum = vd2.v_quantum
+  && vd1.v_name = vd2.v_name
+  && ty_equal vd1.v_type vd2.v_type
+
+(* -------------------------------------------------------------------- *)
+let ovar_of_var { v_quantum = q; v_name = n; v_type = t } =
+  { ov_quantum = q; ov_name = Some n; ov_type = t }
+
+let var_of_ovar { ov_quantum = q; ov_name = n; ov_type = t } =
+  { v_quantum = q; v_name = oget n; v_type = t }
 
 let ty_fv_and_tvar (ty : ty) =
   EcIdent.fv_union ty.ty_fv (Mid.map (fun () -> 1) (Tvar.fv ty))
@@ -398,13 +421,15 @@ type pvar_kind =
 
 type prog_var =
   | PVglob of EcPath.xpath
-  | PVloc of quantum * EcSymbols.symbol
+  | PVloc  of quantum * EcSymbols.symbol
 
 let pv_equal v1 v2 = match v1, v2 with
   | PVglob x1, PVglob x2 ->
-    EcPath.x_equal x1 x2
-  | PVloc(q1,i1), PVloc(q2,i2) -> q1 = q2 && EcSymbols.sym_equal i1 i2
-  | PVloc _, PVglob _ | PVglob _, PVloc _ -> false
+     EcPath.x_equal x1 x2
+  | PVloc(q1, i1), PVloc(q2, i2) ->
+     q1 = q2 && EcSymbols.sym_equal i1 i2
+  | PVloc _, PVglob _ | PVglob _, PVloc _ ->
+     false
 
 let pv_kind = function
   | PVglob _ -> PVKglob
@@ -412,45 +437,58 @@ let pv_kind = function
 
 let pv_hash v =
   let h = match v with
-    | PVglob x -> EcPath.x_hash x
-    | PVloc (_,i) -> Hashtbl.hash i in
+    | PVglob x ->
+       EcPath.x_hash x
+    | PVloc (q, i) ->
+       Why3.Hashcons.combine (Hashtbl.hash q) (Hashtbl.hash i) in
 
   Why3.Hashcons.combine
     h (if pv_kind v = PVKglob then 1 else 0)
 
 let pv_compare v1 v2 =
   match v1, v2 with
-  | PVloc (q1,i1),  PVloc (q2,i2) ->
-    let c = EcSymbols.sym_compare i1 i2 in
-    if c = 0 then Stdlib.compare q1 q2
-    else c
-  | PVglob x1, PVglob x2 -> EcPath.x_compare x1 x2
-  | _, _ -> Stdlib.compare (pv_kind v1) (pv_kind v2)
+  | PVloc (q1,i1), PVloc (q2,i2) ->
+     EcUtils.compare2
+       (lazy (EcSymbols.sym_compare i1 i2))
+       (lazy (Stdlib.compare q1 q2))
+  | PVglob x1, PVglob x2 ->
+     EcPath.x_compare x1 x2
+  | _, _ ->
+     Stdlib.compare (pv_kind v1) (pv_kind v2)
 
 let pv_compare_p v1 v2 =
   match v1, v2 with
-  | PVloc (q1,i1),  PVloc (q2,i2) ->
-    let c = EcSymbols.sym_compare i1 i2 in
-    if c = 0 then Stdlib.compare q1 q2
-    else c
-  | PVglob x1, PVglob x2 -> EcPath.x_compare_na x1 x2
-  | _, _ -> Stdlib.compare (pv_kind v1) (pv_kind v2)
+  | PVloc (q1, i1), PVloc (q2, i2) ->
+     EcUtils.compare2
+       (lazy (EcSymbols.sym_compare i1 i2))
+       (lazy (Stdlib.compare q1 q2))
+
+  | PVglob x1, PVglob x2 ->
+     EcPath.x_compare_na x1 x2
+
+  | _, _ ->
+     Stdlib.compare (pv_kind v1) (pv_kind v2)
 
 let pv_ntr_compare v1 v2 =
   match v1, v2 with
-  | PVloc (q1,i1),  PVloc (q2,i2) ->
-    let c = EcSymbols.sym_compare i1 i2 in
-    if c = 0 then Stdlib.compare q1 q2
-    else c
-  | PVglob x1, PVglob x2 -> EcPath.x_ntr_compare x1 x2
-  | _, _ -> Stdlib.compare (pv_kind v1) (pv_kind v2)
+  | PVloc (q1, i1), PVloc (q2, i2) ->
+     EcUtils.compare2
+       (lazy (EcSymbols.sym_compare i1 i2))
+       (lazy (Stdlib.compare q1 q2))
+
+  | PVglob x1, PVglob x2 ->
+     EcPath.x_ntr_compare x1 x2
+
+  | _, _ ->
+     Stdlib.compare (pv_kind v1) (pv_kind v2)
 
 let is_loc  = function PVloc _ -> true  | PVglob _ -> false
 let is_glob = function PVloc _ -> false | PVglob _ -> true
 
-let get_loc = function PVloc (_,id) -> id | PVglob _ -> assert false
-let get_qloc = function PVloc (q,id) -> q,id | PVglob _ -> assert false
-let get_glob = function PVloc _ -> assert false | PVglob xp -> xp
+let get_loc  = function PVloc (_, id) -> id      | _ -> assert false
+let get_qloc = function PVloc (q, id) -> (q, id) | _ -> assert false
+
+let get_glob = function  PVglob xp -> xp | _ -> assert false
 
 let symbol_of_pv = function
   | PVglob x -> x.EcPath.x_sub
@@ -470,13 +508,13 @@ let string_of_pvar (p : prog_var) =
 
 let pv_loc q id = PVloc (q, id)
 
-let arg_symbol = "arg"
-let res_symbol = "res"
-let pv_arg = PVloc (`Classical, arg_symbol)
-let pv_res quantum = PVloc (quantum, res_symbol)
-
+let arg_symbol  = "arg"
 let qarg_symbol = "qarg"
-let pv_qarg = PVloc (`Quantum, qarg_symbol)
+let res_symbol  = "res"
+
+let pv_arg   = PVloc (`Classical, arg_symbol)
+let pv_qarg  = PVloc (`Quantum, qarg_symbol)
+let pv_res q = PVloc (q, res_symbol)
 
 let xp_glob x =
   let top = x.EcPath.x_top in
@@ -1158,6 +1196,10 @@ let decompose_etuple e =
   | Etuple es -> es
   | _         -> [e]
 
+
+(* -------------------------------------------------------------------- *)
+let destr_app = function
+    { e_node = Eapp (e, es) } -> (e, es) | e -> (e, [])
 
 (* -------------------------------------------------------------------- *)
 let destr_app = function

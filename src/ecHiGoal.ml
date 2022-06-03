@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcLocation
@@ -247,32 +239,53 @@ module LowRewrite = struct
 
     let base ax =
       match EcFol.sform_of_form ax with
-      | EcFol.SFeq  (f1, f2) -> Some (pt, `Eq, (f1, f2))
-      | EcFol.SFiff (f1, f2) -> Some (pt, `Eq, (f1, f2))
+      | EcFol.SFeq  (f1, f2) -> [(pt, `Eq, (f1, f2))]
+      | EcFol.SFiff (f1, f2) -> [(pt, `Eq, (f1, f2))]
 
       | EcFol.SFnot f ->
           let pt' = pt_of_global_r pt.ptev_env LG.p_negeqF [] in
           let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
           let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
-          Some (pt', `Eq, (f, f_false))
+          [(pt', `Eq, (f, f_false))]
 
-      | _ -> None
+      | _ -> []
+
+    and split ax =
+      match EcFol.sform_of_form ax with
+      | EcFol.SFand (`Sym, (f1, f2)) ->
+         let pt1 =
+           let pt'= pt_of_global_r pt.ptev_env LG.p_and_proj_l [] in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f1) in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f2) in
+           apply_pterm_to_arg_r pt' (PVASub pt) in
+
+         let pt2 =
+           let pt'= pt_of_global_r pt.ptev_env LG.p_and_proj_r [] in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f1) in
+           let pt'= apply_pterm_to_arg_r pt' (PVAFormula f2) in
+           apply_pterm_to_arg_r pt' (PVASub pt) in
+
+           (find_rewrite_patterns ~inpred dir pt2)
+         @ (find_rewrite_patterns ~inpred dir pt1)
+
+      | _ -> []
     in
 
     match base ax with
-    | Some x -> [x]
+    | _::_ as rws -> rws
 
-    | _ -> begin
+    | [] -> begin
       let ptb = Lazy.from_fun (fun () ->
-        let pt1 =
+        let pt1 = split ax
+        and pt2 =
           if dir = `LtoR then
             if   ER.EqTest.for_type env ax.f_ty tbool
             then Some (ptc, `Bool, (ax, f_true))
             else None
           else None
-        and pt2 = obind base
-          (EcReduction.h_red_opt (EcReduction.full_red ~opaque:false) hyps ax)
-        in (otolist pt1) @ (otolist pt2)) in
+        and pt3 = omap base
+          (EcReduction.h_red_opt EcReduction.full_red hyps ax)
+        in pt1 @ (otolist pt2) @ (odfl [] pt3)) in
 
         let rec doit reduce =
           match TTC.destruct_product ~reduce hyps ax with
@@ -462,6 +475,10 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
     in
 
     let (pte, cutf) = instantiate pte in
+
+    if not (PT.can_concretize pte.ptev_env) then
+      tc_error !!tc "cannot infer all variables";
+
     let pt = fst (PT.concretize pte) in
     let pt = { pt with pt_args = pt.pt_args @ [palocal hyp]; } in
     let cutf = PT.concretize_form pte.PT.ptev_env cutf in
@@ -586,9 +603,8 @@ let process_delta ?target (s, o, p) tc =
 
   in
 
-  let ri =
-    let delta_p p = if Some p = dp then `Force else `Yes in
-    { (EcReduction.full_red ~opaque:false) with delta_p } in
+  let ri = { EcReduction.full_red with
+               delta_p = (fun p -> if Some p = dp then `Force else `Yes)} in
   let na = List.length args in
 
   match s with
@@ -1193,7 +1209,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
           | SFimp (_, fp) ->
               ("H", None, `Hyp, fp)
           | _ -> begin
-            match EcReduction.h_red_opt (EcReduction.full_red ~opaque:false) hyps fp with
+            match EcReduction.h_red_opt EcReduction.full_red hyps fp with
             | None   -> ("_", None, `None, f_true)
             | Some f -> destruct f
           end
@@ -1344,10 +1360,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
         end
     in
 
-    let tc = t_ors [
-        t_elimT_ind ~reduce:(`Full true) `Case;
-        t_elim ~reduce:(`Full true);
-        t_elim_prind ~reduce:(`Full true) `Case] in
+    let tc = t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case] in
     let tc =
       fun g ->
         try  tc g
@@ -1365,7 +1378,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     ((prind, delta), withor, (cnt : icasemode_full option)) pis tc
   =
     let cnt = cnt |> odfl (`AtMost 1) in
-    let red = if delta then `Full true else `NoDelta in
+    let red = if delta then `Full else `NoDelta in
 
     let t_case =
       let t_and, t_or =
@@ -1888,11 +1901,7 @@ let process_split (tc : tcenv1) =
 let process_elim (pe, qs) tc =
   let doelim tc =
     match qs with
-    | None ->
-        t_or
-          (t_elimT_ind ~reduce:(`Full true) `Ind)
-          (t_elim ~reduce:(`Full true))
-          tc
+    | None    -> t_or (t_elimT_ind `Ind) t_elim tc
     | Some qs ->
         let qs = {
             fp_mode = `Implicit;
@@ -1938,10 +1947,7 @@ let process_case ?(doeq = false) gp tc =
   with E.LEMFailure ->
     try
       FApi.t_last
-        (t_ors [
-          t_elimT_ind ~reduce:(`Full true) `Case;
-          t_elim ~reduce:(`Full true);
-          t_elim_prind ~reduce:(`Full true) `Case])
+        (t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case])
         (process_move ~doeq gp.pr_view gp.pr_rev tc)
 
     with EcCoreGoal.InvalidGoalShape ->

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcSymbols
@@ -59,6 +51,7 @@ val pp_form    : PPEnv.t -> form pp
 val pp_type    : PPEnv.t -> ty pp
 val pp_tyname  : PPEnv.t -> path pp
 val pp_axname  : PPEnv.t -> path pp
+val pp_scname  : PPEnv.t -> path pp
 val pp_tcname  : PPEnv.t -> path pp
 val pp_thname  : PPEnv.t -> path pp
 
@@ -71,6 +64,7 @@ val pp_path     : path pp
 (* -------------------------------------------------------------------- *)
 val string_of_quantum : quantum -> string
 val pp_quantum        : quantum pp
+
 (* -------------------------------------------------------------------- *)
 val pp_typedecl    : PPEnv.t -> (path * tydecl                  ) pp
 val pp_opdecl      : ?long:bool -> PPEnv.t -> (path * operator  ) pp

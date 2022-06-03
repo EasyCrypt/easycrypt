@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
@@ -203,7 +195,7 @@ let rec lazy_destruct ?(reduce = true) hyps tx fp =
   with
   | NoMatch when not reduce -> None
   | NoMatch ->
-      match EcReduction.h_red_opt (EcReduction.full_red ~opaque:false) hyps fp with
+      match EcReduction.h_red_opt EcReduction.full_red hyps fp with
       | None    -> None
       | Some fp -> lazy_destruct ~reduce hyps tx fp
 

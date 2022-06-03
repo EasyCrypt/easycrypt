@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcTypes
@@ -15,11 +7,11 @@ type memory = EcIdent.t
 val mem_equal : memory -> memory -> bool
 
 (* -------------------------------------------------------------------- *)
-type proj_arg =
-  { arg_quantum : quantum;
-    arg_ty  : ty; (* type of the procedure argument "arg" *)
-    arg_pos : int;       (* projection *)
-  }
+type proj_arg = {
+  arg_quantum : quantum;  (* classical/quantum *)
+  arg_ty      : ty;       (* type of the procedure argument "arg" *)
+  arg_pos     : int;      (* projection *)
+}
 
 type memtype
 
@@ -42,19 +34,27 @@ val memtype  : memenv -> memtype
 
 (* -------------------------------------------------------------------- *)
 (* [empty_local witharg id] if witharg then allows to use symbol "arg"  *)
-val empty_local : witharg:bool -> quantum -> memory -> memenv
+val empty_local    : witharg:bool -> quantum -> memory -> memenv
+val empty_local_mt : witharg:bool -> quantum -> memtype
+
 val schema    : memory -> memenv
 val schema_mt : memtype
+
 val abstract    : memory -> memenv
 val abstract_mt : memtype
 
 val is_schema : memtype -> bool
 
 exception DuplicatedMemoryBinding of symbol
-val bindall : variable list -> memenv -> memenv
 
-val bind_fresh : variable -> memenv -> memenv * variable
-val bindall_fresh : variable list -> memenv -> memenv * variable list
+(* -------------------------------------------------------------------- *)
+val bindall    : ovariable list -> memenv -> memenv
+val bindall_mt : ovariable list -> memtype -> memtype
+
+(* -------------------------------------------------------------------- *)
+val bind_fresh : ovariable -> memenv -> memenv * ovariable
+val bindall_fresh : ovariable list -> memenv -> memenv * ovariable list
+
 (* -------------------------------------------------------------------- *)
 val lookup :
   symbol -> memtype -> (variable * proj_arg option * int option) option
@@ -74,7 +74,11 @@ val mt_subst : (ty -> ty) -> memtype -> memtype
 val me_subst : memory EcIdent.Mid.t -> (ty -> ty) -> memenv -> memenv
 
 (* -------------------------------------------------------------------- *)
-val for_printing : memtype -> ((symbol option * variable list)*(symbol option * variable list) option) option
+type lmt_printing = symbol option * ovariable list
+type mt_printing  = lmt_printing * lmt_printing option
+
+val for_printing : memtype -> mt_printing option
+val dump_memtype : memtype -> string
 
 (* -------------------------------------------------------------------- *)
 val local_type : memtype -> (ty * ty option) option

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore Ring StdRing StdOrder List Finite.
 (*---*) import IntID IntOrder.
@@ -134,7 +126,7 @@ theory IntPair.
        0 <= n1 => 0 <= p1
     => 0 <= n2 => 0 <= p2
     => exp 2 n1 * exp 3 p1 = exp 2 n2 * exp 3 p2
-    => n1 = n2 && p1 = p2.
+    => n1 = n2 /\ p1 = p2.
   proof.
   move=> ge0_n1 ge0_p1 ge0_n2 ge0_p2; case: (n1 = n2) => /= [<-|neq_n].
   (* FIXME: move/ieexprIn fails *)

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore StdRing StdOrder Distr List FSet CHoareTactic.
 (*---*) import RField RealOrder.
 require (*  *) CyclicGroup.
@@ -157,7 +149,7 @@ theory List_CDH.
     qed.
   end section.
 
-  abstract theory C.
+  abstract theory Cost.
 
     op cduniform_n : { int | 0 <= cduniform_n } as ge0_cduniform_n.
 
@@ -184,7 +176,7 @@ theory List_CDH.
       by case: t => // ? /#.
     qed.
 
-  end C.
+  end Cost.
 
 end List_CDH.
 

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
@@ -25,6 +17,7 @@ type cbarg = [
   | `Type       of path
   | `Op         of path
   | `Ax         of path
+  | `Sc         of path
   | `Module     of mpath
   | `ModuleType of path
   | `Typeclass  of path
@@ -46,6 +39,7 @@ let pp_cbarg env fmt (who : cbarg) =
   | `Type p -> Format.fprintf fmt "type %a" (EcPrinting.pp_tyname ppe) p
   | `Op   p -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
   | `Ax   p -> Format.fprintf fmt "lemma/axiom %a" (EcPrinting.pp_axname ppe) p
+  | `Sc   p -> Format.fprintf fmt "schema %a" (EcPrinting.pp_scname ppe) p
   | `Module mp -> Format.fprintf fmt "module %a" (EcPrinting.pp_topmod ppe) mp
   | `ModuleType p ->
     let mty = EcEnv.ModTy.modtype p env in
@@ -193,36 +187,6 @@ let on_memtype cb mt =
 let on_memenv cb (m : EcMemory.memenv) =
   on_memtype cb (snd m)
 
-let on_restr (cb : cb) restr =
-  Sx.iter (on_xp cb) restr.mr_xpaths.ur_neg;
-  oiter (Sx.iter (on_xp cb)) restr.mr_xpaths.ur_pos;
-  Sm.iter (on_mp cb) restr.mr_mpaths.ur_neg;
-  oiter (Sm.iter (on_mp cb)) restr.mr_mpaths.ur_pos;
-  Msym.iter (fun _ oi ->
-    List.iter (on_xp cb) (OI.allowed oi)
-  ) restr.mr_oinfos
-
-let rec on_modty cb mty =
-  cb (`ModuleType mty.mt_name);
-  List.iter (fun (_, mty) -> on_modty cb mty) mty.mt_params;
-  List.iter (on_mp cb) mty.mt_args;
-  on_restr cb mty.mt_restr
-
-let on_mdecl (cb : cb) (mty : module_type) =
-  on_modty cb mty
-
-let on_gbinding (cb : cb) (b : gty) =
-  match b with
-  | EcFol.GTty ty ->
-      on_ty cb ty
-  | EcFol.GTmodty mty ->
-      on_mdecl cb mty
-  | EcFol.GTmem m ->
-      on_memtype cb m
-
-let on_gbindings (cb : cb) (b : (EcIdent.t * gty) list) =
-  List.iter (fun (_, b) -> on_gbinding cb b) b
-
 let rec on_form (cb : cb) (f : EcFol.form) =
   let cbrec = on_form cb in
 
@@ -321,7 +285,7 @@ let rec on_form (cb : cb) (f : EcFol.form) =
     List.iter (on_form cb) [pr.EcFol.pr_event; pr.EcFol.pr_args];
     oiter (on_form cb) pr.EcFol.pr_qargs
 
-  and on_cost cb cost =
+  and on_cost cb (cost : cost) =
     on_form cb cost.EcFol.c_self;
     Mx.iter (fun f c ->
         on_xp cb f;
@@ -331,7 +295,35 @@ let rec on_form (cb : cb) (f : EcFol.form) =
   in
     on_ty cb f.EcFol.f_ty; fornode ()
 
-let rec on_module (cb : cb) (me : module_expr) =
+and on_restr (cb : cb) (restr : mod_restr) =
+  Sx.iter (on_xp cb) restr.mr_xpaths.ur_neg;
+  oiter (Sx.iter (on_xp cb)) restr.mr_xpaths.ur_pos;
+  Sm.iter (on_mp cb) restr.mr_mpaths.ur_neg;
+  oiter (Sm.iter (on_mp cb)) restr.mr_mpaths.ur_pos;
+  Msym.iter (fun _ oi -> on_oi cb oi) restr.mr_oinfos
+
+and on_modty cb mty =
+  cb (`ModuleType mty.mt_name);
+  List.iter (fun (_, mty) -> on_modty cb mty) mty.mt_params;
+  List.iter (on_mp cb) mty.mt_args;
+  on_restr cb mty.mt_restr
+
+and on_mdecl (cb : cb) (mty : module_type) =
+  on_modty cb mty
+
+and on_gbinding (cb : cb) (b : gty) =
+  match b with
+  | EcFol.GTty ty ->
+      on_ty cb ty
+  | EcFol.GTmodty mty ->
+      on_mdecl cb mty
+  | EcFol.GTmem m ->
+      on_memtype cb m
+
+and on_gbindings (cb : cb) (b : (EcIdent.t * gty) list) =
+  List.iter (fun (_, b) -> on_gbinding cb b) b
+
+and on_module (cb : cb) (me : module_expr) =
   match me.me_body with
   | ME_Alias (_, mp)  -> on_mp cb mp
   | ME_Structure st   -> on_mstruct cb st
@@ -359,7 +351,7 @@ and on_fun_body (cb : cb) (fbody : function_body) =
   match fbody with
   | FBalias xp -> on_xp cb xp
   | FBdef fdef -> on_fun_def cb fdef
-  | FBabs oi   -> on_fun_oi  cb oi
+  | FBabs oi   -> on_oi  cb oi
 
 and on_fun_def (cb : cb) (fdef : function_def) =
   List.iter (fun v -> on_ty cb v.v_type) fdef.f_locals;
@@ -372,10 +364,21 @@ and on_uses (cb : cb) (uses : uses) =
   Sx.iter   (on_xp cb) uses.us_reads;
   Sx.iter   (on_xp cb) uses.us_writes
 
-and on_fun_oi (_cb : cb) (_oi : OI.t) =
-  ()
-  (* FIXME:MERGE-COST *)
-  (* List.iter (on_xp cb) (OI.allowed oi) *)
+and on_oi_costs (cb : cb) (b : [`Bounded of form * form Mx.t | `Unbounded]) =
+  match b with
+  | `Unbounded -> ()
+  | `Bounded (f,m) ->
+    on_form cb f;
+    let _ : unit Mx.t =
+      Mx.mapi (fun x c ->
+          on_xp cb x;
+          on_form cb c;
+          ()) m
+    in ()
+
+and on_oi (cb : cb) (oi : OI.t) =
+  List.iter (on_xp cb) (OI.allowed oi);
+  on_oi_costs cb (OI.costs oi)
 
 (* -------------------------------------------------------------------- *)
 let on_typeclasses cb s =
@@ -451,12 +454,17 @@ let on_axiom (cb : cb) (ax : axiom) =
   on_typarams cb ax.ax_tparams;
   on_form cb ax.ax_spec
 
+let on_schema (cb : cb) (ax : ax_schema) =
+  on_typarams cb ax.axs_tparams;
+  List.iter (fun (_, y) -> on_ty cb y) ax.axs_params;
+  on_form cb ax.axs_spec
+
 (* -------------------------------------------------------------------- *)
 let on_modsig (cb:cb) (ms:module_sig) =
   List.iter (fun (_,mt) -> on_modty cb mt) ms.mis_params;
   List.iter (fun (Tys_function fs) ->
       on_ty cb fs.fs_arg;
-      oiter (List.iter (fun x -> on_ty cb x.v_type)) fs.fs_anames;
+      List.iter (fun x -> on_ty cb x.ov_type) fs.fs_anames;
       on_ty cb fs.fs_ret;) ms.mis_body
 
 let on_ring cb r =
@@ -523,15 +531,19 @@ let env scenv = scenv.sc_env
 let pp_axname scenv =
   EcPrinting.pp_axname (EcPrinting.PPEnv.ofenv scenv.sc_env)
 
+let pp_scname scenv =
+  EcPrinting.pp_scname (EcPrinting.PPEnv.ofenv scenv.sc_env)
+
 let pp_thname scenv =
   EcPrinting.pp_thname (EcPrinting.PPEnv.ofenv scenv.sc_env)
 
 (* -------------------------------------------------------------------- *)
 let locality (env : EcEnv.env) (who : cbarg) =
   match who with
-  | `Type       p -> (EcEnv.Ty.by_path p env).tyd_loca
-  | `Op         p -> (EcEnv.Op.by_path p env).op_loca
-  | `Ax         p -> (EcEnv.Ax.by_path p env).ax_loca
+  | `Type p -> (EcEnv.    Ty.by_path p env).tyd_loca
+  | `Op   p -> (EcEnv.    Op.by_path p env).op_loca
+  | `Ax   p -> (EcEnv.    Ax.by_path p env).ax_loca
+  | `Sc   p -> (EcEnv.Schema.by_path p env).axs_loca
   | `Typeclass  p -> ((EcEnv.TypeClass.by_path p env).tc_loca :> locality)
   | `Module mp    ->
     begin match EcEnv.Mod.by_mpath_opt mp env with
@@ -546,6 +558,7 @@ let locality (env : EcEnv.env) (who : cbarg) =
 type to_clear =
   { lc_theory    : Sp.t;
     lc_axioms    : Sp.t;
+    lc_schemas   : Sp.t;
     lc_baserw    : Sp.t;
   }
 
@@ -564,6 +577,7 @@ and bind =
 let empty_locals =
   { lc_theory    = Sp.empty;
     lc_axioms    = Sp.empty;
+    lc_schemas   = Sp.empty;
     lc_baserw    = Sp.empty;
   }
 
@@ -571,9 +585,11 @@ let add_clear to_gen who =
   let tg_clear = to_gen.tg_clear in
   let tg_clear =
     match who with
-    | `Th         p -> {tg_clear with lc_theory = Sp.add p tg_clear.lc_theory }
-    | `Ax         p -> {tg_clear with lc_axioms = Sp.add p tg_clear.lc_axioms }
-    | `Baserw     p -> {tg_clear with lc_baserw = Sp.add p tg_clear.lc_baserw } in
+    | `Th         p -> {tg_clear with lc_theory  = Sp.add p tg_clear.lc_theory  }
+    | `Ax         p -> {tg_clear with lc_axioms  = Sp.add p tg_clear.lc_axioms  }
+    | `Sc         p -> {tg_clear with lc_schemas = Sp.add p tg_clear.lc_schemas }
+    | `Baserw     p -> {tg_clear with lc_baserw  = Sp.add p tg_clear.lc_baserw  }
+  in
   { to_gen with tg_clear }
 
 let add_bind binds bd = binds @ [Binding bd]
@@ -584,6 +600,7 @@ let to_clear to_gen who =
   match who with
   | `Th p -> Sp.mem p to_gen.tg_clear.lc_theory
   | `Ax p -> Sp.mem p to_gen.tg_clear.lc_axioms
+  | `Sc p -> Sp.mem p to_gen.tg_clear.lc_schemas
   | `Baserw p -> Sp.mem p to_gen.tg_clear.lc_baserw
 
 let to_keep to_gen who = not (to_clear to_gen who)
@@ -974,9 +991,39 @@ let generalize_axiom to_gen prefix (name, ax) =
     to_gen, Some (Th_axiom (name, {ax with ax_tparams; ax_spec}))
   | `Declare ->
     assert (is_axiom ax.ax_kind);
+    assert (ax.ax_tparams = []);
     let to_gen = add_clear to_gen (`Ax path) in
     let to_gen =
       { to_gen with tg_binds = add_imp to_gen.tg_binds ax.ax_spec } in
+    to_gen, None
+
+(* FIXME: copy of [generalize_axiom], but for schema. Remove duplicated code *)
+let generalize_schema to_gen prefix (name, sc) =
+  let ax = EcSubst.subst_schema to_gen.tg_subst sc in
+  let path = pqname prefix name in
+  match sc.axs_loca with
+  | `Local -> assert false
+
+  | `Global ->
+    let axs_spec =
+      generalize_extra_forall ~imply:false to_gen.tg_binds ax.axs_spec
+    in
+    let extra_t =
+      let fv =
+        List.fold_left (fun fv (_, ty) ->
+            EcIdent.fv_union fv (tvar_fv ty)
+          ) Mid.empty sc.axs_params
+      in
+      generalize_extra_ty to_gen (EcIdent.fv_union fv (fv_and_tvar_f axs_spec))
+    in
+    let axs_tparams = extra_t @ ax.axs_tparams in
+    to_gen, Some (Th_schema (name, {sc with axs_tparams; axs_spec}))
+
+  | `Declare ->
+    assert (sc.axs_pparams = [] && sc.axs_tparams = [] && sc.axs_params = []);
+    let to_gen = add_clear to_gen (`Sc path) in
+    let to_gen =
+      { to_gen with tg_binds = add_imp to_gen.tg_binds sc.axs_spec } in
     to_gen, None
 
 let generalize_modtype to_gen (name, ms) =
@@ -1030,14 +1077,14 @@ let generalize_auto to_gen (n,s,ps,lc) =
 let rec generalize_th_item to_gen prefix th_item =
   let togen, item =
     match th_item.ti_item with
-    | Th_type tydecl     -> generalize_tydecl to_gen prefix tydecl
-    | Th_operator opdecl -> generalize_opdecl to_gen prefix opdecl
-    | Th_schema _        -> assert false
-    | Th_axiom  ax       -> generalize_axiom  to_gen prefix ax
+    | Th_type tydecl     -> generalize_tydecl  to_gen prefix tydecl
+    | Th_operator opdecl -> generalize_opdecl  to_gen prefix opdecl
+    | Th_schema sc       -> generalize_schema  to_gen prefix sc
+    | Th_axiom  ax       -> generalize_axiom   to_gen prefix ax
     | Th_modtype ms      -> generalize_modtype to_gen ms
     | Th_module me       -> generalize_module  to_gen me
     | Th_theory cth      -> generalize_ctheory to_gen prefix cth
-    | Th_export (p,lc)   -> generalize_export to_gen (p,lc)
+    | Th_export (p,lc)   -> generalize_export  to_gen (p,lc)
     | Th_instance (ty,i,lc) -> generalize_instance to_gen (ty,i,lc)
     | Th_typeclass _     -> assert false
     | Th_baserw (s,lc)   -> generalize_baserw to_gen prefix (s,lc)
@@ -1125,7 +1172,7 @@ let rec set_local_item item =
     | Th_type         (s,ty) -> Th_type      (s, { ty with tyd_loca = set_local ty.tyd_loca })
     | Th_operator     (s,op) -> Th_operator  (s, { op with op_loca  = set_local op.op_loca   })
     | Th_axiom        (s,ax) -> Th_axiom     (s, { ax with ax_loca  = set_local ax.ax_loca   })
-    | Th_schema       _      -> assert false (* FIXME:MERGE-COST *)
+    | Th_schema       (s,sc) -> Th_schema    (s, { sc with axs_loca = set_local sc.axs_loca  })
     | Th_modtype      (s,ms) -> Th_modtype   (s, { ms with tms_loca = set_local ms.tms_loca  })
     | Th_module          me  -> Th_module        { me with tme_loca = set_local me.tme_loca  }
     | Th_typeclass    (s,tc) -> Th_typeclass (s, { tc with tc_loca  = set_local tc.tc_loca   })
@@ -1191,6 +1238,7 @@ type can_depend = {
     d_ty    : locality list;
     d_op    : locality list;
     d_ax    : locality list;
+    d_sc    : locality list;
     d_mod   : locality list;
     d_modty : locality list;
     d_tc    : locality list;
@@ -1200,6 +1248,7 @@ let cd_glob =
   { d_ty    = [`Global];
     d_op    = [`Global];
     d_ax    = [`Global];
+    d_sc    = [`Global];
     d_mod   = [`Global];
     d_modty = [`Global];
     d_tc    = [`Global];
@@ -1209,6 +1258,7 @@ let can_depend (cd : can_depend) = function
   | `Type       _ -> cd.d_ty
   | `Op         _ -> cd.d_op
   | `Ax         _ -> cd.d_ax
+  | `Sc         _ -> cd.d_sc
   | `Module     _ -> cd.d_mod
   | `ModuleType _ -> cd.d_modty
   | `Typeclass  _ -> cd.d_tc
@@ -1240,6 +1290,7 @@ let check_tyd scenv prefix name tyd =
         d_ty    = [`Declare; `Global];
         d_op    = [`Global];
         d_ax    = [];
+        d_sc    = [];
         d_mod   = [`Global];
         d_modty = [];
         d_tc    = [`Global];
@@ -1285,6 +1336,7 @@ let check_op scenv prefix name op =
         d_ty    = [`Declare; `Global];
         d_op    = [`Declare; `Global];
         d_ax    = [];
+        d_sc    = [];
         d_mod   = [`Declare; `Global];
         d_modty = [];
         d_tc    = [`Global];
@@ -1296,6 +1348,7 @@ let check_op scenv prefix name op =
         d_ty    = [`Declare; `Global];
         d_op    = [`Declare; `Global];
         d_ax    = [];
+        d_sc    = [];
         d_mod   = [`Global];
         d_modty = [];
         d_tc    = [`Global];
@@ -1307,13 +1360,14 @@ let is_inth scenv =
   | Th _ -> true
   | _    -> false
 
-let check_ax scenv prefix name ax =
+let check_ax (scenv : scenv) (prefix : path) (name : symbol) (ax : axiom) =
   let path = EcPath.pqname prefix name in
   let from = ax.ax_loca, `Ax path in
   let cd = {
       d_ty    = [`Declare; `Global];
       d_op    = [`Declare; `Global];
       d_ax    = [];
+      d_sc    = [];
       d_mod   = [`Declare; `Global];
       d_modty = [`Global];
       d_tc    = [`Global];
@@ -1343,9 +1397,43 @@ let check_ax scenv prefix name ax =
         doit ax
       end
 
-let check_schema _env _prefix _name _sc =
-  (* FIXME:COST-MERGE *)
-  ()
+(* FIXME: copy of [check_ax], but for schema. Remove duplicated code *)
+let check_sc (scenv : scenv) (prefix : path) (name : symbol) (axs : ax_schema) =
+  let path = EcPath.pqname prefix name in
+  let from = axs.axs_loca, `Sc path in
+  let cd = {
+      d_ty    = [`Declare; `Global];
+      d_op    = [`Declare; `Global];
+      d_ax    = [];
+      d_sc    = [];
+      d_mod   = [`Declare; `Global];
+      d_modty = [`Global];
+      d_tc    = [`Global];
+    } in
+  let doit = on_schema (cb scenv from cd) in
+  let error b s1 s =
+    if b then hierror "%s %a %s" s1 (pp_scname scenv) path s in
+
+  match axs.axs_loca with
+  | `Local ->
+    check_section scenv from;
+    error (not scenv.sc_abstr) "schema" "cannot be local"
+
+  | `Declare ->
+    check_section scenv from;
+    check_polymorph scenv from axs.axs_tparams;
+    check "cannot have predicate parameters" scenv from (axs.axs_pparams = []);
+    check "cannot have expression parameters" scenv from (axs.axs_params = []);
+    doit axs
+
+  | `Global ->
+    if scenv.sc_insec then
+      begin
+        (* FIXME section: is it the correct way to do a warning *)
+        EcEnv.notify ~immediate:true scenv.sc_env `Warning
+          "global schema %a in section" (pp_axname scenv) path;
+        doit axs
+      end
 
 let check_modtype scenv prefix name ms =
   let path = pqname prefix name in
@@ -1369,6 +1457,7 @@ let check_module scenv prefix tme =
         { d_ty    = [`Global];
           d_op    = [`Global];
           d_ax    = [];
+          d_sc    = [];
           d_mod   = [`Global]; (* FIXME section: add local *)
           d_modty = [`Global];
           d_tc    = [`Global];
@@ -1472,7 +1561,7 @@ let check_item scenv item =
   | Th_type     (s,tyd) -> check_tyd     scenv prefix s tyd
   | Th_operator  (s,op) -> check_op      scenv prefix s op
   | Th_axiom    (s, ax) -> check_ax      scenv prefix s ax
-  | Th_schema   (s, sc) -> check_schema  scenv prefix s sc
+  | Th_schema   (s, sc) -> check_sc      scenv prefix s sc
   | Th_modtype  (s, ms) -> check_modtype scenv prefix s ms
   | Th_module        me -> check_module  scenv prefix me
   | Th_typeclass (s,tc) -> check_typeclass scenv prefix s tc

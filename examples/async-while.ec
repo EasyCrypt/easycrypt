@@ -67,7 +67,7 @@ async while
          /\ 0 <= j{2} <= k) => /=; last by auto; smt(gt0_k ge0_n).
   wp; call (_ : true); skip => &1 &2 /= />.
   rewrite -fromintM !lt_fromint => *. 
-  by have := StdOrder.IntOrder.ler_wpmul2l k{2} _ i{2} (n - 1); smt().
+  by have := StdOrder.IntOrder.ler_wpmul2l k _ i{2} (n - 1); smt().
 + by while true (n * k - i) => //; auto;1: call llA; auto => /#.
 + while true (n - i);2: by auto=>/#.
   move=> z;wp; while (true) (k - j);auto;1:call llA;auto => /#.

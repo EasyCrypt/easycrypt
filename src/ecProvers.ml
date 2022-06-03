@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open Why3
@@ -322,6 +314,7 @@ type prover_infos = {
   pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
+  pr_dumpin    : string EcLocation.located option;
   pr_selected  : bool;
   gn_debug     : bool;
 }
@@ -339,6 +332,7 @@ let dft_prover_infos = {
   pr_max       = 50;
   pr_wanted    = Hints.empty;
   pr_unwanted  = Hints.empty;
+  pr_dumpin    = None;
   pr_selected  = false;
   gn_debug     = false;
 }
@@ -351,7 +345,7 @@ type notify = EcGState.loglevel -> string Lazy.t -> unit
 let run_prover
   ?(notify : notify option) (pi : prover_infos) (prover : string) task
 =
-  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
+(*  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in*)
 
   EcUtils.try_finally (fun () ->
     try
@@ -366,7 +360,11 @@ let run_prover
         } in
 
         let rec doit gcdone =
-          try  Driver.prove_task ~command ~limit dr task
+          try
+            Driver.prove_task
+              ~libdir:Why3.Config.libdir
+              ~datadir:Why3.Config.datadir
+              ~command ~limit dr task
           with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
             Gc.compact (); doit true
         in
@@ -393,8 +391,8 @@ let run_prover
         Buffer.contents buf)));
       None)
 
-  (fun () ->
-     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ())
+  (fun () -> ()) (*
+     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ()) *)
 
 (* -------------------------------------------------------------------- *)
 let execute_task ?(notify : notify option) (pi : prover_infos) task =
@@ -442,9 +440,10 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
           match pcs.(i) with
           | None -> ()
           | Some (prover, pc) ->
-              let myinfos = List.pmap
-                (fun (pc', upd) -> if pc = pc' then Some upd else None)
-                infos in
+              let myinfos =
+                List.pmap
+                  (fun (pc', upd) -> if pc = pc' then Some upd else None)
+                  infos in
 
               let handle_answer = function
                 | CP.Valid   ->
@@ -507,6 +506,6 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
         match pcs.(i) with
         | None -> ()
         | Some (_prover, pc) ->
-            CP.interrupt_call pc;
+            CP.interrupt_call ~libdir:Why3.Config.libdir pc;
             (try ignore (CP.wait_on_call pc : CP.prover_result) with _ -> ());
       done)

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcTypes
@@ -89,9 +81,10 @@ let t_kill_r side cpos olen tc =
 let alias_stmt env id (pf, _) me i =
   let dopv q ty =
     let id       = odfl "x" (omap EcLocation.unloc id) in
-    let id       = { v_quantum = q; v_name = id; v_type = ty; } in
+    let id       = { ov_quantum = q; ov_name = Some id; ov_type = ty; } in
     let (me, id) = EcMemory.bind_fresh id me in
-    let pv       = pv_loc id.v_quantum id.v_name in
+    (* oget cannot fail — Some in, Some out *)
+    let pv       = pv_loc id.ov_quantum (oget id.ov_name)  in
     me, pv in
 
   match i.i_node with
@@ -121,9 +114,10 @@ let t_alias_r side cpos id g =
 let set_stmt (fresh, id) e =
   let get_i me =
     let id       = EcLocation.unloc id in
-    let  v       = { v_quantum = EcTyping.is_classical_e e; v_name = id; v_type = e.e_ty } in
+    let  v       = { ov_quantum = EcTyping.is_classical_e e; ov_name = Some id; ov_type = e.e_ty } in
     let (me, id) = EcMemory.bind_fresh v me in
-    let pv       = pv_loc id.v_quantum id.v_name in
+    (* oget cannot fail — Some in, Some out *)
+    let pv       = pv_loc id.ov_quantum (oget id.ov_name) in
 
     (me, i_asgn (LvVar (pv, e.e_ty), e))
   in

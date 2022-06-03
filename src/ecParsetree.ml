@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcBigInt
 open EcMaps
@@ -162,8 +154,9 @@ type f_or_mod_ident =
 
 
 type pmod_restr_mem_el =
-  | PMPlus  of f_or_mod_ident
-  | PMMinus of f_or_mod_ident
+  | PMPlus    of f_or_mod_ident
+  | PMMinus   of f_or_mod_ident
+  | PMDefault of f_or_mod_ident
 
 (* A memory restricition. *)
 type pmod_restr_mem = pmod_restr_mem_el list
@@ -230,7 +223,7 @@ and pgscbindings = pgscbinding list
 and pgty =
 | PGTY_Type  of pty
 | PGTY_ModTy of pmodule_type_restr
-| PGTY_Mem
+| PGTY_Mem   of pmemtype option
 
 and pffilter =
 | PFRange      of bool * pfrange list
@@ -290,10 +283,10 @@ and pmodule_sig =
   | Pmty_struct of pmodule_sig_struct
 
 and pmodule_sig_struct = {
-  pmsig_quantum: quantum;
-  pmsig_params : (psymbol * pmodule_type) list;
-  pmsig_body   : pmodule_sig_struct_body;
-  pmsig_restr  : pmod_restr option;
+  pmsig_quantum : quantum;
+  pmsig_params  : (psymbol * pmodule_type) list;
+  pmsig_body    : pmodule_sig_struct_body;
+  pmsig_restr   : pmod_restr option;
 }
 
 and pmodule_sig_struct_body = pmodule_sig_item list
@@ -313,9 +306,7 @@ and pvariable_decl = {
   pvd_type : pty;
 }
 
-and fun_params =
- | Fparams_exp of (psymbol * pty) list
- | Fparams_imp of pty
+and fun_params = (osymbol * pty) list
 
 and pfunction_decl = {
   pfd_quantum  : quantum;
@@ -800,6 +791,7 @@ type pprover_infos = {
   plem_iterate    : bool option;
   plem_wanted     : pdbhint option;
   plem_unwanted   : pdbhint option;
+  plem_dumpin     : string located option;
   plem_selected   : bool option;
   psmt_debug      : bool option;
 }
@@ -817,6 +809,7 @@ let empty_pprover = {
   plem_iterate    = None;
   plem_wanted     = None;
   plem_unwanted   = None;
+  plem_dumpin     = None;
   plem_selected   = None;
   psmt_debug      = None;
 }

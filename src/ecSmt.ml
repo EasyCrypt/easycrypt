@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
@@ -118,6 +110,7 @@ let empty_lenv : lenv =
 
 let get_memtype lenv m =
   try Mid.find m lenv.le_mt with Not_found -> assert false
+
 (* -------------------------------------------------------------------- *)
 let str_p p =
   WIdent.id_fresh (String.map (function '.' -> '_' | c -> c) p)
@@ -126,6 +119,16 @@ let preid    id = WIdent.id_fresh (EcIdent.name id)
 let preid_p  p  = str_p (EcPath.tostring p)
 let preid_mp mp = str_p (EcPath.m_tostring mp)
 let preid_xp xp = str_p (EcPath.x_tostring xp)
+
+
+(* -------------------------------------------------------------------- *)
+let dump_tasks (tasks : WTask.task) (filename : string) =
+  let stream = open_out filename in
+    EcUtils.try_finally
+      (fun () -> Format.fprintf
+        (Format.formatter_of_out_channel stream)
+        "%a@." Why3.Pretty.print_task tasks)
+      (fun () -> close_out stream)
 
 (* -------------------------------------------------------------------- *)
 module Cast = struct
@@ -182,7 +185,7 @@ module Cast = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let load_wtheory genv th =
+let load_wtheory (genv : tenv) (th : WTheory.theory) : unit =
   genv.te_task <- WTask.use_export genv.te_task th
 
 (* -------------------------------------------------------------------- *)
@@ -471,9 +474,10 @@ and trans_tydecl genv (p, tydecl) =
 (* -------------------------------------------------------------------- *)
 let trans_memtype ((genv, _) as env) mt =
   match EcMemory.local_type mt with
-  | None -> ty_mem
-  | Some (ty,qty) ->
-    let ty = trans_ty env ty in
+  | None ->
+     ty_mem
+  | Some (ty, qty) ->
+    let  ty = trans_ty env ty in
     let qty = trans_ty env (odfl tunit qty) in
     wty_tuple genv [ty; qty; ty_mem]
 
@@ -831,8 +835,8 @@ and trans_pvar ((genv, lenv) as env) pv ty mem =
   let pv = NormMp.norm_pvar genv.te_env pv in
   let mt = get_memtype lenv mem in
   match pv with
-  | PVloc (q,x) ->
-    let m = trans_mem env ~forglobal:(q:>vkind) mem in
+  | PVloc (q, x) ->
+    let m = trans_mem env ~forglobal:(q :> vkind) mem in
     begin match EcMemory.lookup x mt with
     | Some (_,_,Some i) -> wproj_tuple genv m i
     | Some (_,_,None)   -> m
@@ -891,8 +895,9 @@ and trans_mem (genv,lenv) ~forglobal mem =
   | `Classical -> assert has_locals; wproj_tuple genv wmem 0
   | `Quantum   -> assert has_locals; wproj_tuple genv wmem 1
   | `Global    ->
-    if has_locals then wproj_tuple genv wmem 2
-    else wmem
+     if   has_locals
+     then wproj_tuple genv wmem 2
+     else wmem
 
 (* -------------------------------------------------------------------- *)
 and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_qargs; pr_event} =
@@ -1582,25 +1587,18 @@ let create_global_task () =
   let task  = WTask.use_export task thmap in
   task
 
-(* -------------------------------------------------------------------- *)
 let dump_why3 (env : EcEnv.env) (filename : string) =
   let known = Lazy.force core_theories in
   let tenv  = empty_tenv env (create_global_task ()) known in
   let ()    = add_core_bindings tenv in
 
   List.iter (trans_axiom tenv) (EcEnv.Ax.all env);
-
-  let stream = open_out filename in
-    EcUtils.try_finally
-      (fun () -> Format.fprintf
-        (Format.formatter_of_out_channel stream)
-        "%a@." Why3.Pretty.print_task tenv.te_task)
-      (fun () -> close_out stream)
+  dump_tasks tenv.te_task filename
 
 (* -------------------------------------------------------------------- *)
 let cnt = Counter.create ()
 
-let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
+let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
   let out_task filename task =
     let stream = open_out filename in
     EcUtils.try_finally
@@ -1636,7 +1634,13 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
     let task = WTask.add_decl tenv.te_task decl in
     let tkid = Counter.next cnt in
 
-    (Os.getenv "EC_WHY3" |> oiter (fun filename ->
+    let dumpin_opt =
+      match pi.pr_dumpin with
+      | None -> Os.getenv "EC_WHY3"
+      | Some filename -> Some (EcLocation.unloc filename)
+    in
+    ( dumpin_opt |> oiter (fun filename ->
+          Format.eprintf "dumping in %s" filename;
       let filename = Printf.sprintf "%.4d-%s" tkid filename in
       out_task filename task));
     let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in

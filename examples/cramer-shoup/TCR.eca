@@ -16,9 +16,9 @@ module type ADV_TCR = {
 module TCR (A:ADV_TCR) = {
   proc main() = {
     var x,y,k;
-    x <- A.c1();
+    x <@ A.c1();
     k <$ dk;
-    y <- A.c2(k);
+    y <@ A.c2(k);
     return (H k x = H k y /\ x <> y);
   }
 }.

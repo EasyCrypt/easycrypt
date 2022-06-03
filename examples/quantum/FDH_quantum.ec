@@ -106,9 +106,9 @@ op q = qs + qh + 1.
 
 section. 
 
-declare module A : AdvEUF_QROM { -QRO, -EUF, -Wrap}.
+declare module A <: AdvEUF_QROM { -QRO, -EUF, -Wrap}.
 
-axiom hoare_bound (H<:QRO{-A,-Wrap}) (S<:OrclSign{-A,-Wrap}) : 
+declare axiom hoare_bound (H<:QRO{-A,-Wrap}) (S<:OrclSign{-A,-Wrap}) : 
   hoare [Wrap(A, H, S).main : true  ==> Wrap.cs <= qs /\ Wrap.ch <= qh].
 
 hoare hoare_bound1 : Wrap(A, QRO, EUF(Wrap(A, QRO), FDH(QRO)).Os).main : 
@@ -152,11 +152,9 @@ module EUF_QROM' (A:AdvEUF_QROM) = {
 
 section.
  
-declare module A : AdvEUF_QROM { -QRO, -EUF, - EUF_QROM'}.
+declare module A <: AdvEUF_QROM { -QRO, -EUF, - EUF_QROM'}.
 
-print EUF_QROM_bound.
-
-axiom hoare_bound (H<:QRO{-A, -Wrap}) (S<:OrclSign{-A, -Wrap}) :
+declare axiom hoare_bound (H<:QRO{-A, -Wrap}) (S<:OrclSign{-A, -Wrap}) :
   hoare[ Wrap(A, H, S).main : true ==> Wrap.cs <= qs /\ Wrap.ch <= qh].
 
 lemma l1 lam &m:
@@ -243,12 +241,12 @@ module B (A:AdvEUF_QROM) = {
 
 section.
 
-declare module A : AdvEUF_QROM { -EUF, -QRO, -B, -Wrap}.
+declare module A <: AdvEUF_QROM { -EUF, -QRO, -B, -Wrap}.
 
-axiom hoare_bound (H<:QRO{-A, -Wrap}) (S<:OrclSign{-A, -Wrap}) :
+declare axiom hoare_bound (H<:QRO{-A, -Wrap}) (S<:OrclSign{-A, -Wrap}) :
   hoare[ Wrap(A, H, S).main : true ==> Wrap.cs <= qs /\ Wrap.ch <= qh].
 
-axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) : 
+declare axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) : 
  islossless S.sign => islossless H.h => islossless A(H, S).main.
 
 local clone import START.
@@ -334,20 +332,20 @@ module B(A:AdvEUF_QROM) : AdvOW = {
   }
 }.
 
+clone import SemiConstDistr with
+    op k <- qs.
+
 section OW.
 
-declare module A : AdvEUF_QROM { -QRO, -EUF, -B, -Wrap}.
+declare module A <: AdvEUF_QROM { -QRO, -EUF, -B, -Wrap, -SCD}.
 
-axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) : 
+declare axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) : 
   islossless S.sign => islossless H.h => islossless A(H, S).main.
 
-axiom hoare_bound (H<:QRO{-A, -Wrap}) (S<:OrclSign{-A, -Wrap}) :
+declare axiom hoare_bound (H<:QRO{-A, -Wrap}) (S<:OrclSign{-A, -Wrap}) :
   hoare[ Wrap(A, H, S).main : true ==> Wrap.cs <= qs /\ Wrap.ch <= qh].
 
 local clone import START.
-
-local clone import SemiConstDistr with
-    op k <- qs.
 
 local module (ASCD:AdvSCD) (H:QRO) = {
   import var EUF
@@ -772,18 +770,20 @@ module B (A:AdvEUF_QROM) : AdvOW = {
   }
 }.
 
+clone import SmallRange.
+
+clone import Collision with 
+  type input <- unit.
+
 section OW.
 
-declare module A : AdvEUF_QROM { -QRO, -EUF , -B, -Wrap}.
+declare module A <: AdvEUF_QROM { -QRO, -EUF , -B, -Wrap, -SR}.
 
-axiom hoare_bound (H<:QRO{-A, -Wrap}) (S<:OrclSign{-A, -Wrap}) :
+declare axiom hoare_bound (H<:QRO{-A, -Wrap}) (S<:OrclSign{-A, -Wrap}) :
   hoare[ Wrap(A, H, S).main : true ==> Wrap.cs <= qs /\ Wrap.ch <= qh].
 
-axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) : 
+declare axiom A_ll (H <: QRO{-A}) (S <: OrclSign{-A}) : 
   islossless S.sign => islossless H.h => islossless A(H, S).main.
-
-local clone import Collision with 
-  type input <- unit.
 
 local module G1 (H:QRO) = {
   var logs : (hash * msg) list
@@ -817,6 +817,8 @@ local module G1 (H:QRO) = {
     return b;
   }
 }.
+
+clone import T_PRF.
 
 local lemma EUF_G1 &m : 
   Pr[EUF_QROM(A,FDH).main() @ &m : res] = Pr[IND_QRO(QRO,G1).main() @ &m : res].
@@ -872,8 +874,6 @@ proof.
              G1(QRO).FDH.verify QRO.h; wp.
   by call hoare_bound1; inline *; auto => /> /#.
 qed.
-
-local clone import SmallRange.
 
 local module G2(H:SR) = {
   proc main (r:int) = {

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcBigInt
 open EcPath
@@ -24,8 +16,8 @@ val f_eqparams:
   -> form
 
 val f_eqres:
-     quantum ->
-     EcTypes.ty -> memory
+     quantum
+  -> EcTypes.ty -> memory
   -> EcTypes.ty -> memory
   -> form
 
@@ -230,6 +222,10 @@ module DestrReal : sig
 end
 
 (* -------------------------------------------------------------------- *)
+val is_classical_glob : EcEnv.env -> mpath -> bool
+val is_classical : EcEnv.env -> form -> bool
+
+(* -------------------------------------------------------------------- *)
 (*val cost_sub_self : cost -> form -> cost
 val cost_add_self : cost -> form -> cost
 val cost_sub_call : EcEnv.env -> cost -> EcPath.xpath -> form -> cost
@@ -240,6 +236,3 @@ val cost_op       : EcEnv.env -> (form -> form -> form ) -> cost -> cost -> cost
 val cost_app      : cost -> form list -> cost
 
 val cost_flatten  : cost -> form *)
-
-val is_classical_glob : EcEnv.env -> mpath -> bool
-val is_classical : EcEnv.env -> form -> bool

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
@@ -30,9 +22,11 @@ let wp_asgn_call env m lv res post =
       let lets = lv_subst m lv res in
       mk_let_of_lv_substs env ([lets], post)
 
+(* -------------------------------------------------------------------- *)
 let subst_args_call env m es qes s =
   let s = PVM.add env pv_arg m (f_tuple (List.map (form_of_expr m) es)) s in
-  ofold (fun es s -> PVM.add env pv_qarg m (f_tuple (List.map (form_of_expr m) es)) s) s qes
+  let s = ofold (fun es s -> PVM.add env pv_qarg m (f_tuple (List.map (form_of_expr m) es)) s) s qes in
+  s
 
 (* -------------------------------------------------------------------- *)
 let build_res fsig ext =
@@ -86,7 +80,8 @@ let wp2_call
       [(vresl, GTty fsigl.fs_ret);
        (vresr, GTty fsigr.fs_ret)]
       post in
-  let spre = subst_args_call env ml argsl qargsl PVM.empty in
+  let spre = PVM.empty in
+  let spre = subst_args_call env ml argsl qargsl spre in
   let spre = subst_args_call env mr argsr qargsr spre in
   f_anda_simpl (PVM.subst env spre fpre) post
 
@@ -94,7 +89,7 @@ let wp2_call
 let t_hoare_call fpre fpost tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
-  let (lp,f,args,qarg),s = tc1_last_call tc hs.hs_s in
+  let (lp, f, args, qarg),s = tc1_last_call tc hs.hs_s in
   let m = EcMemory.memory hs.hs_m in
   (* The function satisfies the specification *)
   let f_concl = f_hoareF fpre f fpost in
@@ -113,6 +108,7 @@ let t_choare_call fpre fpost fcost tc =
   let f_concl = f_cHoareF fpre f fpost fcost in
   (* The wp *)
   let post = wp_call env fpre fpost (lp,f,args,qarg) m chs.chs_po f_imp_simpl in
+
   (* The cost of the remaining code must be bounded by the cost of the
      conclusion [chs.chs_co], minus the cost of the call [fcost], and minus
      the cost of the arguments' evaluation.
@@ -164,6 +160,7 @@ let t_bdhoare_call fpre fpost opt_bd tc =
         f_imp_simpl  fpost post
 
     | FHeq -> f_iff_simpl fpost  post in
+
   let post = wp_call env fpre fpost (lp,f,args,qarg) m bhs.bhs_po combine in
 
   let concl = match bhs.bhs_cmp, opt_bd with
@@ -228,8 +225,7 @@ let t_equiv_call1 side fpre fpost tc =
   let msubst = Fsubst.f_bind_mem Fsubst.f_subst_id EcFol.mhr me in
   let fpost  = Fsubst.f_subst msubst fpost in
   let fpre   = Fsubst.f_subst msubst fpre in
-  let post =
-    wp_call env fpre fpost (lp,f,args,qarg) me equiv.es_po f_imp_simpl in
+  let post   = wp_call env fpre fpost (lp,f,args,qarg) me equiv.es_po f_imp_simpl in
   let concl  =
     match side with
     | `Left  -> { equiv with es_sl = fstmt; es_po = post; }
@@ -340,7 +336,6 @@ let process_call side info tc =
       | FcHoareS chs, None, Some cost ->
           let (_,f,_,_),_ = tc1_last_call tc chs.chs_s in
           let penv, qenv = LDecl.hoareF f hyps in
-
           let cost  = TTC.tc1_process_cost tc [] cost in
 
           (penv, qenv, fun pre post -> f_cHoareF pre f post cost)

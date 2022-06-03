@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
@@ -72,21 +64,25 @@ let lossless_hyps env top sub =
     f_forall bd (f_imps hyps concl)
 
 (* -------------------------------------------------------------------- *)
-let subst_pre env fs (m : memory) s =
-  let s =
-    match fs.fs_anames with
-    | Some lv ->
-      let v = List.map (fun v -> f_pvloc v m) lv in
-      PVM.add env pv_arg m (f_tuple v) s
-    | None -> s in
-  match fs.fs_qarg with
-  | None -> s
-  | Some _ ->
-    match fs.fs_qnames with
-    | Some lv ->
-      let v = List.map (fun v -> f_pvloc v m) lv in
-      PVM.add env pv_qarg m (f_tuple v) s
-    | None -> s
+let subst_pre env fs (m : memory) subst =
+  let fresh ov =
+    match ov.ov_name with
+    | None   -> assert false;
+    | Some v -> { v_quantum = ov.ov_quantum; v_name = v; v_type = ov.ov_type }
+  in
+
+  let subst =
+    let v = List.map (fun v -> f_pvloc (fresh v) m) fs.fs_anames in
+    PVM.add env pv_arg m (f_tuple v) subst in
+
+  let subst =
+    if is_none fs.fs_qarg then
+      subst
+    else
+      let v = List.map (fun v -> f_pvloc (fresh v) m) fs.fs_qnames in
+      PVM.add env pv_qarg m (f_tuple v) subst in
+
+  subst
 
 (* ------------------------------------------------------------------ *)
 let t_hoareF_fun_def_r tc =
@@ -156,7 +152,8 @@ let t_equivF_fun_def_r tc =
   let mr = EcMemory.memory menvr in
   let fresl = odfl f_tt (omap (form_of_expr ml) fdefl.f_ret) in
   let fresr = odfl f_tt (omap (form_of_expr mr) fdefr.f_ret) in
-  let s = PVM.add env (pv_res fsigl) ml fresl PVM.empty in
+  let s = PVM.empty in
+  let s = PVM.add env (pv_res fsigl) ml fresl s in
   let s = PVM.add env (pv_res fsigr) mr fresr s in
   let post = PVM.subst env s ef.ef_po in
   let s = subst_pre env fsigl ml PVM.empty in
@@ -281,7 +278,12 @@ module FunAbsLow = struct
     let pr = f_app_simpl inv kargs_pr tbool in
 
     let ospec o_called =
-      let k_called = Mx.find o_called mks in
+      let k_called =
+        try Mx.find o_called mks with
+        | Not_found ->
+          tc_error pf_ "missing cost invariant for %a"
+            (EcPrinting.pp_funname ppe) o_called
+      in
       let kargs_po =
         List.map (fun (x,_) ->
             let f = f_local x tint in
@@ -385,11 +387,13 @@ module FunAbsLow = struct
       let fo_l = EcEnv.Fun.by_xpath o_l env in
       let fo_r = EcEnv.Fun.by_xpath o_r env in
 
-      let eq_params =
-        f_eqparams fo_l.f_sig ml fo_r.f_sig mr in
+      let eq_params = f_eqparams fo_l.f_sig ml fo_r.f_sig mr in
 
       let eq_res =
-        f_eqres (fs_quantum fo_l.f_sig) fo_l.f_sig.fs_ret ml fo_r.f_sig.fs_ret mr in
+        f_eqres
+          (fs_quantum fo_l.f_sig)
+          fo_l.f_sig.fs_ret ml
+          fo_r.f_sig.fs_ret mr in
 
       let invs = if use then [eqglob; inv] else [inv] in
       let pre  = EcFol.f_ands (eq_params :: invs) in
@@ -399,10 +403,9 @@ module FunAbsLow = struct
 
     let sg = List.map2 ospec (OI.allowed oil) (OI.allowed oir) in
 
-    let eq_params =
-      f_eqparams sigl ml sigr mr in
+    let eq_params = f_eqparams sigl ml sigr mr in
+    let eq_res    = f_eqres (fs_quantum sigl) sigl.fs_ret ml sigr.fs_ret mr in
 
-    let eq_res = f_eqres (fs_quantum sigl) sigl.fs_ret ml sigr.fs_ret mr in
     let lpre   = if OI.is_in oil then [eqglob;inv] else [inv] in
     let pre    = f_ands (eq_params::lpre) in
     let post   = f_ands [eq_res; eqglob; inv] in
@@ -490,10 +493,13 @@ module UpToLow = struct
 
       let fo_l = EcEnv.Fun.by_xpath o_l env in
       let fo_r = EcEnv.Fun.by_xpath o_r env in
-      let eq_params = f_eqparams fo_l.f_sig ml fo_r.f_sig mr in
 
-      let eq_res =
-        f_eqres (fs_quantum fo_l.f_sig) fo_l.f_sig.fs_ret ml fo_r.f_sig.fs_ret mr in
+      let eq_params = f_eqparams fo_l.f_sig ml fo_r.f_sig mr in
+      let eq_res    =
+        f_eqres
+          (fs_quantum fo_l.f_sig)
+          fo_l.f_sig.fs_ret ml
+          fo_r.f_sig.fs_ret mr in
 
       let pre   = EcFol.f_ands [EcFol.f_not bad2; eq_params; invP] in
       let post  = EcFol.f_if_simpl bad2 invQ (f_and eq_res invP) in
@@ -517,7 +523,6 @@ module UpToLow = struct
     let sg = lossless_a :: sg in
 
     let eq_params = f_eqparams sigl ml sigr mr in
-
     let eq_res = f_eqres (fs_quantum sigl) sigl.fs_ret ml sigr.fs_ret mr in
 
     let pre  = if OI.is_in oil then [eqglob;invP] else [invP] in
@@ -548,62 +553,95 @@ module ToCodeLow = struct
   (* ------------------------------------------------------------------ *)
   let to_code env f m =
     let fd = Fun.by_xpath f env in
+
     let quantum =
-      match fd.f_sig.fs_qarg with None -> `Classical | Some _ -> `Quantum in
+      match fd.f_sig.fs_qarg with
+      | None   -> `Classical
+      | Some _ -> `Quantum in
 
     let me = EcMemory.empty_local ~witharg:false quantum m in
-    let doarg quantum ty names =
-      let arg_name =
-        match names with
-        | Some [v] -> v.v_name
-        | _        -> if quantum = `Classical then arg_symbol else qarg_symbol in
-      let arg = { v_quantum = quantum; v_name = arg_name; v_type = ty } in
-      let args =
-        let arg = e_var (pv_loc arg.v_quantum arg.v_name) arg.v_type in
-        match names with
-        | None -> [arg]
-        | Some [_] -> [arg]
-        | Some params -> List.mapi (fun i v -> e_proj arg i v.v_type) params
-      in
-      arg, args in
-    let arg, args = doarg `Classical fd.f_sig.fs_arg fd.f_sig.fs_anames in
-    let me = EcMemory.bindall [arg] me in
-    let me, qarg, qargs =
-      if quantum = `Classical then me, None, None
-      else
-        let qarg, qargs = doarg `Quantum (oget fd.f_sig.fs_qarg) fd.f_sig.fs_qnames in
-        let me = EcMemory.bindall [qarg] me in
-        me, Some qarg, Some qargs in
 
-    let res = { v_quantum = quantum; v_name = "r"; v_type = fd.f_sig.fs_ret } in
-    let me = EcMemory.bindall [res] me in
-    let r = pv_loc res.v_quantum res.v_name in
-    let i = i_call (Some(LvVar(r, res.v_type)), f, args, qargs) in
-    let s = stmt [i] in
-    (fd.f_sig, me, s, arg, qarg, res)
+    let doargs prefix =
+      let doarg i ov =
+        match ov.ov_name with
+        | None   -> { ov with ov_name = Some (Printf.sprintf "%s%d" prefix (i + 1)) }
+        | Some _ -> ov
+      in fun ovs -> List.mapi doarg ovs in
+
+    let (me, args) =
+      let args = doargs "arg" fd.f_sig.fs_anames in
+      EcMemory.bindall_fresh args me in
+
+    let (me, qargs) =
+      match quantum with
+      | `Classical ->
+         (me, None)
+
+      | `Quantum ->
+         let qargs = doargs "qarg" fd.f_sig.fs_qnames in
+         let me, qargs = EcMemory.bindall_fresh qargs me in
+         (me, Some qargs) in
+
+    let me, res =
+      let res = {
+        ov_quantum = quantum;
+        ov_name    = Some "r";
+        ov_type    = fd.f_sig.fs_ret;
+      } in
+      EcMemory.bind_fresh res me in
+
+    let res = var_of_ovar res in
+
+    let var ov = var_of_ovar ov in
+
+    let args  = List.map var args in
+    let qargs = omap (List.map var) qargs in
+
+    let eargs  =
+      List.map
+        (fun v -> e_var (pv_loc (v_quantum v) (v_name v)) (v_type v))
+        args in
+
+    let qeargs = omap (
+      List.map
+        (fun v -> e_var (pv_loc (v_quantum v) (v_name v)) (v_type v))
+      )  qargs
+    in
+
+    let icall =
+      let lv = LvVar (pv_loc res.v_quantum res.v_name, res.v_type) in
+      i_call (Some lv, f, eargs, qeargs) in
+
+    (fd.f_sig, me, stmt [icall], res, args, qargs)
 
   let add_var env vfrom mfrom v me s =
     PVM.add env vfrom mfrom (f_pvar (pv_loc v.v_quantum v.v_name) v.v_type (fst me)) s
 
-  let add_qvar env vfrom mfrom v me s =
-    match v with
-    | None -> s
-    | Some v -> add_var env vfrom mfrom v me s
+  let add_var_tuple env vfrom mfrom vs me s =
+    let vs =
+      List.map
+        (fun v -> f_pvar (pv_loc v.v_quantum v.v_name) v.v_type (fst me))
+        vs
+    in PVM.add env vfrom mfrom (f_tuple vs) s
 
+  let maybe_add_var_tuple env vfrom mfrom vs me s =
+    match vs with
+    | None -> s
+    | Some vs -> add_var_tuple env vfrom mfrom vs me s
 end
 
 (* -------------------------------------------------------------------- *)
-
 let t_fun_to_code_hoare_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_hoareF tc in
   let f = hf.hf_f in
-  let fsig, m, st, a, qa, r = ToCodeLow.to_code env f mhr in
-  let spr = ToCodeLow.add_var env pv_arg mhr a m PVM.empty in
-  let spr = ToCodeLow.add_qvar env pv_qarg mhr qa m spr in
-  let spo = ToCodeLow.add_var env (pv_res fsig) mhr r m PVM.empty in
-  let pre  = PVM.subst env spr hf.hf_pr in
-  let post = PVM.subst env spo hf.hf_po in
+  let fsig, m, st, r, a, qa = ToCodeLow.to_code env f mhr in
+  let spr   = PVM.empty in
+  let spr   = ToCodeLow.add_var_tuple env pv_arg mhr a m spr in
+  let spr   = ToCodeLow.maybe_add_var_tuple env pv_qarg mhr qa m spr in
+  let spo   = ToCodeLow.add_var env (pv_res fsig) mhr r m PVM.empty in
+  let pre   = PVM.subst env spr hf.hf_pr in
+  let post  = PVM.subst env spo hf.hf_po in
   let concl = f_hoareS m pre st post in
 
   FApi.xmutate1 tc `FunToCode [concl]
@@ -615,12 +653,13 @@ let t_fun_to_code_choare_r tc =
   let env = FApi.tc1_env tc in
   let chf = tc1_as_choareF tc in
   let f = chf.chf_f in
-  let fsig, m, st, a, qa, r = ToCodeLow.to_code env f mhr in
-  let spr = ToCodeLow.add_var env pv_arg mhr a m PVM.empty in
-  let spr = ToCodeLow.add_qvar env pv_qarg mhr qa m spr in
-  let spo = ToCodeLow.add_var env (pv_res fsig) mhr r m PVM.empty in
-  let pre  = PVM.subst env spr chf.chf_pr in
-  let post = PVM.subst env spo chf.chf_po in
+  let fsig, m, st, r, a, qa = ToCodeLow.to_code env f mhr in
+  let spr   = PVM.empty in
+  let spr   = ToCodeLow.add_var_tuple env pv_arg mhr a m spr in
+  let spr   = ToCodeLow.maybe_add_var_tuple env pv_qarg mhr qa m spr in
+  let spo   = ToCodeLow.add_var env (pv_res fsig) mhr r m PVM.empty in
+  let pre   = PVM.subst env spr chf.chf_pr in
+  let post  = PVM.subst env spo chf.chf_po in
   let concl = f_cHoareS m pre st post chf.chf_co in
 
   FApi.xmutate1 tc `FunToCode [concl]
@@ -630,13 +669,14 @@ let t_fun_to_code_bdhoare_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_bdhoareF tc in
   let f = hf.bhf_f in
-  let fsig, m, st, a, qa, r = ToCodeLow.to_code env f mhr in
-  let spr = ToCodeLow.add_var env pv_arg mhr a m PVM.empty in
-  let spr = ToCodeLow.add_qvar env pv_qarg mhr qa m spr in
-  let spo = ToCodeLow.add_var env (pv_res fsig) mhr r m PVM.empty in
-  let pre  = PVM.subst env spr hf.bhf_pr in
-  let post = PVM.subst env spo hf.bhf_po in
-  let bd   = PVM.subst env spr hf.bhf_bd in
+  let fsig, m, st, r, a, qa = ToCodeLow.to_code env f mhr in
+  let spr   = PVM.empty in
+  let spr   = ToCodeLow.add_var_tuple env pv_arg mhr a m spr in
+  let spr   = ToCodeLow.maybe_add_var_tuple env pv_qarg mhr qa m spr in
+  let spo   = ToCodeLow.add_var env (pv_res fsig) mhr r m PVM.empty in
+  let pre   = PVM.subst env spr hf.bhf_pr in
+  let post  = PVM.subst env spo hf.bhf_po in
+  let bd    = PVM.subst env spr hf.bhf_bd in
   let concl = f_bdHoareS m pre st post hf.bhf_cmp bd in
   FApi.xmutate1 tc `FunToCode [concl]
 
@@ -645,35 +685,44 @@ let t_fun_to_code_equiv_r tc =
   let env = FApi.tc1_env tc in
   let ef = tc1_as_equivF tc in
   let (fl,fr) = ef.ef_fl, ef.ef_fr in
-  let sigl, ml, sl, al, qal, rl = ToCodeLow.to_code env fl mleft in
-  let sigr, mr, sr, ar, qar, rr = ToCodeLow.to_code env fr mright in
+  let sigl, ml, sl, rl, al, qal = ToCodeLow.to_code env fl mleft in
+  let sigr, mr, sr, rr, ar, qar = ToCodeLow.to_code env fr mright in
   let spr =
-    let s = ToCodeLow.add_var env pv_arg mleft al ml PVM.empty in
-    let s = ToCodeLow.add_qvar env pv_qarg mleft qal ml s in
-    let s = ToCodeLow.add_var env pv_arg mright ar mr s in
-            ToCodeLow.add_qvar env pv_qarg mright qar mr s in
-  let spo =
-    let s = ToCodeLow.add_var env (pv_res sigl) mleft rl ml PVM.empty in
-    ToCodeLow.add_var env (pv_res sigr) mright rr mr s in
+    let s = PVM.empty in
+    let s = ToCodeLow.add_var_tuple env pv_arg mleft al ml s in
+    let s = ToCodeLow.maybe_add_var_tuple env pv_qarg mleft qal ml s in
+    let s = ToCodeLow.add_var_tuple env pv_arg mright ar mr s in
+    let s = ToCodeLow.maybe_add_var_tuple env pv_qarg mright qar mr s in
+    s in
+ let spo =
+    let s = PVM.empty in
+    let s = ToCodeLow.add_var env (pv_res sigl) mleft rl ml s in
+    let s = ToCodeLow.add_var env (pv_res sigr) mright rr mr s in
+    s in
   let pre   = PVM.subst env spr ef.ef_pr in
   let post  = PVM.subst env spo ef.ef_po in
   let concl = f_equivS ml mr pre sl sr post in
+
   FApi.xmutate1 tc `FunToCode [concl]
 
 let t_fun_to_code_eager_r tc =
   let env = FApi.tc1_env tc in
   let eg = tc1_as_eagerF tc in
   let (fl,fr) = eg.eg_fl, eg.eg_fr in
-  let sigl, ml, sl, al, qal, rl = ToCodeLow.to_code env fl mleft in
-  let sigr, mr, sr, ar, qar, rr = ToCodeLow.to_code env fr mright in
+  let sigl, ml, sl, rl, al, qal = ToCodeLow.to_code env fl mleft in
+  let sigr, mr, sr, rr, ar, qar = ToCodeLow.to_code env fr mright in
   let spr =
-    let s = ToCodeLow.add_var env pv_arg mleft al ml PVM.empty in
-    let s = ToCodeLow.add_qvar env pv_qarg mleft qal ml s in
-    let s = ToCodeLow.add_var env pv_arg mright ar mr s in
-            ToCodeLow.add_qvar env pv_qarg mright qar mr s in
+    let s = PVM.empty in
+    let s = ToCodeLow.add_var_tuple env pv_arg mleft al ml s in
+    let s = ToCodeLow.maybe_add_var_tuple env pv_qarg mleft qal ml s in
+    let s = ToCodeLow.add_var_tuple env pv_arg mright ar mr s in
+    let s = ToCodeLow.maybe_add_var_tuple env pv_qarg mright qar mr s in
+    s in
   let spo =
-    let s = ToCodeLow.add_var env (pv_res sigl) mleft rl ml PVM.empty in
-    ToCodeLow.add_var env (pv_res sigr) mright rr mr s in
+    let s = PVM.empty in
+    let s = ToCodeLow.add_var env (pv_res sigl) mleft rl ml s in
+    let s = ToCodeLow.add_var env (pv_res sigr) mright rr mr s in
+    s in
   let pre   = PVM.subst env spr eg.eg_pr in
   let post  = PVM.subst env spo eg.eg_po in
   let concl =
@@ -686,7 +735,6 @@ let t_fun_to_code_choare  = FApi.t_low0 "choare-fun-to-code"  t_fun_to_code_choa
 let t_fun_to_code_bdhoare = FApi.t_low0 "bdhoare-fun-to-code" t_fun_to_code_bdhoare_r
 let t_fun_to_code_equiv   = FApi.t_low0 "equiv-fun-to-code"   t_fun_to_code_equiv_r
 let t_fun_to_code_eager   = FApi.t_low0 "eager-fun-to-code"   t_fun_to_code_eager_r
-
 
 (* -------------------------------------------------------------------- *)
 let t_fun_to_code_r tc =

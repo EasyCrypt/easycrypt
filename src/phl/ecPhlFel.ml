@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
@@ -185,15 +177,14 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     let eqxs = List.map f_xeq xs in
     let eqgs = List.map (fun m -> f_eqglob m mh m mi) gs in
     let eqparams =
-      let vs = oget fsig.fs_anames in
-      let f_x x = f_pvloc x mh in
+      let vs = fsig.fs_anames in
+      let f_x x = assert (is_some x.ov_name); f_pvloc (var_of_ovar x) mh in
       f_eq (f_tuple (List.map f_x vs)) pr.pr_args in
     let eqqparams =
-      if fsig.fs_qarg = None then None
-      else
-        let vs = oget fsig.fs_qnames in
-        let f_x x = f_pvloc x mh in
-        Some (f_eq (f_tuple (List.map f_x vs)) (oget pr.pr_qargs)) in
+      if is_none fsig.fs_qarg then None else
+      let vs = fsig.fs_qnames in
+      let f_x x = assert (is_some x.ov_name); f_pvloc (var_of_ovar x) mh in
+      Some (f_eq (f_tuple (List.map f_x vs)) (oget pr.pr_qargs)) in
 
     let pre = f_ands (eqparams :: List.ocons eqqparams (eqxs@eqgs)) in
 

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore List.
 
@@ -25,10 +17,13 @@ lemma finite_for_finite ['a] p s:
 proof. by move=> ?; exists s. qed.
 
 (* -------------------------------------------------------------------- *)
-op to_seq: ('a -> bool) -> 'a list.
+op to_seq ['a] (p : 'a -> bool) : 'a list =
+  choiceb (fun s : 'a list => is_finite_for p s) [].
 
-axiom to_seq_finite (P : 'a -> bool):
+(* -------------------------------------------------------------------- *)
+lemma to_seq_finite (P : 'a -> bool):
   is_finite P => uniq (to_seq P) /\ (forall x, x \in to_seq P <=> P x).
+proof. by move/is_finiteE/choicebP/(_ []); apply. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mkfinite ['a] (p : 'a -> bool) :

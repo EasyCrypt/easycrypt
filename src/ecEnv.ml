@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
@@ -1582,131 +1574,6 @@ module Auto = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Ty = struct
-  type t = EcDecl.tydecl
-
-  let by_path_opt (p : EcPath.path) (env : env) =
-    omap
-      check_not_suspended
-      (MC.by_path (fun mc -> mc.mc_tydecls) (IPPath p) env)
-
-  let by_path (p : EcPath.path) (env : env) =
-    match by_path_opt p env with
-    | None -> lookup_error (`Path p)
-    | Some obj -> obj
-
-  let add (p : EcPath.path) (env : env) =
-    let obj = by_path p env in
-      MC.import_tydecl p obj env
-
-  let lookup qname (env : env) =
-    MC.lookup_tydecl qname env
-
-  let lookup_opt name env =
-    try_lf (fun () -> lookup name env)
-
-  let lookup_path name env =
-    fst (lookup name env)
-
-  let defined (name : EcPath.path) (env : env) =
-    match by_path_opt name env with
-    | Some { tyd_type = `Concrete _ } -> true
-    | _ -> false
-
-  let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
-    match by_path_opt name env with
-    | Some ({ tyd_type = `Concrete body } as tyd) ->
-        EcTypes.Tvar.subst
-          (EcTypes.Tvar.init (List.map fst tyd.tyd_params) args)
-          body
-    | _ -> raise (LookupFailure (`Path name))
-
-  let rec hnorm (ty : ty) (env : env) =
-    match ty.ty_node with
-    | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
-    | _ -> ty
-
-  let destr_fun (ty : ty) (env : env) : ty option * ty =
-    let ty = hnorm ty env in
-    match ty.ty_node with
-    | Tfun (ty1, ty2) -> Some ty1, ty2
-    | _               -> None, ty
-
-  let destr_quantum (ty : ty) (env : env) : ty * ty =
-    let ty = hnorm ty env in
-    match ty.ty_node with
-    | Tfun (ty1, ty2) -> ty1, ty2
-    | _               -> assert false
-
-  let rec decompose_fun (ty : ty) (env : env) : dom * ty =
-    match (hnorm ty env).ty_node with
-    | Tfun (ty1, ty2) ->
-        fst_map (fun tys -> ty1 :: tys) (decompose_fun ty2 env)
-    | _ -> ([], ty)
-
-  let signature env =
-    let rec doit acc ty =
-      match (hnorm ty env).ty_node with
-      | Tfun (dom, codom) -> doit (dom::acc) codom
-      | _ -> (List.rev acc, ty)
-    in fun ty -> doit [] ty
-
-  let scheme_of_ty mode (ty : ty) (env : env) =
-    let ty = hnorm ty env in
-      match ty.ty_node with
-      | Tconstr (p, tys) -> begin
-          match by_path_opt p env with
-          | Some ({ tyd_type = (`Datatype _ | `Record _) as body }) ->
-              let prefix   = EcPath.prefix   p in
-              let basename = EcPath.basename p in
-              let basename =
-                match body, mode with
-                | `Record   _, (`Ind | `Case) -> basename ^ "_ind"
-                | `Datatype _, `Ind           -> basename ^ "_ind"
-                | `Datatype _, `Case          -> basename ^ "_case"
-              in
-                Some (EcPath.pqoname prefix basename, tys)
-          | _ -> None
-      end
-      | _ -> None
-
-  let get_top_decl (ty : ty) (env : env) =
-    match (hnorm ty env).ty_node with
-    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys)
-    | _ -> None
-
-  let rebind name ty env =
-    let env = MC.bind_tydecl name ty env in
-
-    match ty.tyd_type with
-    | `Abstract tc ->
-        let myty =
-          let myp = EcPath.pqname (root env) name in
-          let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
-            (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
-        let instr =
-          Sp.fold
-            (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
-            tc env.env_tci
-        in
-          { env with env_tci = instr }
-
-    | _ -> env
-
-  let bind ?(import = import0) name ty env =
-    let env = if import.im_immediate then rebind name ty env else env in
-    { env with env_item =
-        mkitem import (Th_type (name, ty)) :: env.env_item }
-
-
-  let iter ?name f (env : env) =
-    gen_iter (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?name f env
-
-  let all ?check ?name (env : env) =
-    gen_all (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?check ?name env
-end
-
-(* -------------------------------------------------------------------- *)
 module Fun = struct
   type t = EcModules.function_
 
@@ -1775,38 +1642,39 @@ module Fun = struct
     let ip = fst (oget (ipath_of_xpath path)) in
       MC.import_fun ip obj env
 
-  let adds_in_memenv memenv vd = EcMemory.bindall vd memenv
-  let add_in_memenv memenv vd = adds_in_memenv memenv [vd]
+  let adds_in_memenv memenv vd =
+    EcMemory.bindall vd memenv
+
+  let add_in_memenv memenv vd =
+    adds_in_memenv memenv [vd]
 
   let add_params mem fun_ =
-
-    let doit q ty l mem =
-      match l with
-      | None   -> add_in_memenv mem {v_quantum = q; v_name = "_"; v_type = ty}
-      | Some l -> adds_in_memenv mem l in
-    let mem = doit `Classical fun_.f_sig.fs_arg fun_.f_sig.fs_anames mem in
-    match fun_.f_sig.fs_qarg with
-    | None -> mem
-    | Some ty -> doit `Quantum ty fun_.f_sig.fs_qnames mem
+    let mem = adds_in_memenv mem fun_.f_sig.fs_anames in
+    let mem = adds_in_memenv mem fun_.f_sig.fs_qnames in
+    mem
 
   let actmem_pre me fun_ =
-    let mem = EcMemory.empty_local ~witharg:true (fs_quantum fun_.f_sig) me in
-    add_params mem fun_
+    let mem =
+      EcMemory.empty_local ~witharg:true (fs_quantum fun_.f_sig) me
+    in add_params mem fun_
 
   let actmem_post me fun_ =
-    let quantum = fs_quantum fun_.f_sig in
-    let mem = EcMemory.empty_local ~witharg:false quantum me in
-    add_in_memenv mem {v_quantum = quantum; v_name = res_symbol; v_type = fun_.f_sig.fs_ret}
+    let ov_quantum = fs_quantum fun_.f_sig in
+    let ov_type    = fun_.f_sig.fs_ret in
+
+    add_in_memenv
+      (EcMemory.empty_local ~witharg:false ov_quantum me)
+      { ov_quantum; ov_type; ov_name = Some res_symbol;  }
 
   let actmem_body me fun_ =
     match fun_.f_def with
     | FBabs _   -> assert false (* FIXME error message *)
     | FBalias _ -> assert false (* FIXME error message *)
     | FBdef fd   ->
-
       let mem = EcMemory.empty_local ~witharg:false (fs_quantum fun_.f_sig) me in
       let mem = add_params mem fun_ in
-      (fun_.f_sig,fd), adds_in_memenv mem fd.f_locals
+      let locals = List.map ovar_of_var fd.f_locals in
+      (fun_.f_sig,fd), adds_in_memenv mem locals
 
   let inv_memory side =
     let id    = if side = `Left then EcCoreFol.mleft else EcCoreFol.mright in
@@ -2565,8 +2433,7 @@ module NormMp = struct
       let sm = Sid.fold (fun m sm ->
           Sm.add (EcPath.mident m) sm
         ) use.us_gl Sm.empty in
-      let ur_mpaths = { ur_pos = Some sm;
-                        ur_neg = Sm.empty; } in
+      let ur_mpaths = { ur_pos = Some sm; ur_neg = Sm.empty; } in
 
       { mr_xpaths = ur_xpaths;
         mr_mpaths = ur_mpaths;
@@ -2582,7 +2449,6 @@ module NormMp = struct
     ur_equal use_equal us1 us2
     && Msym.equal (PreOI.equal f_equiv) r1.mr_oinfos r2.mr_oinfos
 
-  (* FIXME : quantum this is correct ? *)
   let is_quantum_me env me mis_restr =
     match me.me_body with
     | EcModules.ME_Decl mt -> mt.mt_quantum
@@ -2598,22 +2464,20 @@ module NormMp = struct
         else `Classical
       | None -> `Classical
 
-
-  let sig_of_mp env mp =
-    let mp = norm_mpath env mp in
-    let me, _ = Mod.by_mpath mp env in
-    let mis_restr = get_restr_me env me mp in
-
-    { mis_quantum = is_quantum_me env me mis_restr;
-      mis_params  = me.me_params;
-      mis_body    = me.me_sig_body;
-      mis_restr   = mis_restr; }
-
   let use_quantum env mp =
     let mp = norm_mpath env mp in
     let me, _ = Mod.by_mpath mp env in
     let mis_restr = get_restr_me env me mp in
     is_quantum_me env me mis_restr = `Quantum
+
+  let sig_of_mp env mp =
+    let mp = norm_mpath env mp in
+    let me, _ = Mod.by_mpath mp env in
+    let mis_restr = get_restr_me env me mp in
+    { mis_quantum = is_quantum_me env me mis_restr;
+      mis_params = me.me_params;
+      mis_body = me.me_sig_body;
+      mis_restr = get_restr_me env me mp }
 
   let norm_pvar env pv =
     match pv with
@@ -2773,12 +2637,6 @@ module NormMp = struct
     EcTypes.pv_equal (norm_pvar env pv1) (norm_pvar env pv2)
 end
 
-let rec ty_hnorm (ty : ty) (env : env) =
-    match ty.ty_node with
-    | Tconstr (p, tys) when Ty.defined p env -> ty_hnorm (Ty.unfold p tys env) env
-    | Tglob p -> NormMp.norm_tglob env p
-    | _ -> ty
-
 (* -------------------------------------------------------------------- *)
 module ModTy = struct
   type t = top_module_sig
@@ -2810,10 +2668,10 @@ module ModTy = struct
     let { tms_sig = sig_ } = by_path p env in
     (* eta-normal form *)
     { mt_quantum = sig_.mis_quantum;
-      mt_params  = sig_.mis_params;
-      mt_name    = p;
-      mt_args    = List.map (EcPath.mident -| fst) sig_.mis_params;
-      mt_restr   = sig_.mis_restr; }
+      mt_params = sig_.mis_params;
+      mt_name   = p;
+      mt_args   = List.map (EcPath.mident -| fst) sig_.mis_params;
+      mt_restr  = sig_.mis_restr; }
 
   let bind ?(import = import0) name modty env =
     let env = if import.im_immediate then MC.bind_modty name modty env else env in
@@ -2879,10 +2737,141 @@ module ModTy = struct
                   mr_oinfos = Msym.map do1 mt.mt_restr.mr_oinfos } in
 
     { mis_quantum = mt.mt_quantum;
-      mis_params = params;
-      mis_body   = items;
-      mis_restr  = restr; }
+      mis_params  = params;
+      mis_body    = items;
+      mis_restr   = restr; }
 end
+
+(* -------------------------------------------------------------------- *)
+module Ty = struct
+  type t = EcDecl.tydecl
+
+  let by_path_opt (p : EcPath.path) (env : env) =
+    omap
+      check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_tydecls) (IPPath p) env)
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_tydecl p obj env
+
+  let lookup qname (env : env) =
+    MC.lookup_tydecl qname env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path name env =
+    fst (lookup name env)
+
+  let defined (name : EcPath.path) (env : env) =
+    match by_path_opt name env with
+    | Some { tyd_type = `Concrete _ } -> true
+    | _ -> false
+
+  let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
+    match by_path_opt name env with
+    | Some ({ tyd_type = `Concrete body } as tyd) ->
+        EcTypes.Tvar.subst
+          (EcTypes.Tvar.init (List.map fst tyd.tyd_params) args)
+          body
+    | _ -> raise (LookupFailure (`Path name))
+
+  let rec hnorm (ty : ty) (env : env) =
+    match ty.ty_node with
+    | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
+    | _ -> ty
+
+  let rec ty_hnorm (ty : ty) (env : env) =
+    match ty.ty_node with
+    | Tconstr (p, tys) when defined p env -> ty_hnorm (unfold p tys env) env
+    | Tglob p -> NormMp.norm_tglob env p
+    | _ -> ty
+
+  let destr_fun (ty : ty) (env : env) : ty option * ty =
+    match (hnorm ty env).ty_node with
+    | Tfun (ty1, ty2) -> Some ty1, ty2
+    | _               -> None, ty
+
+  let destr_quantum (ty : ty) (env : env) : ty * ty =
+    match (hnorm ty env).ty_node with
+    | Tfun (ty1, ty2) -> ty1, ty2
+    | _               -> assert false
+
+  let rec decompose_fun (ty : ty) (env : env) : dom * ty =
+    match (hnorm ty env).ty_node with
+    | Tfun (ty1, ty2) ->
+        fst_map (fun tys -> ty1 :: tys) (decompose_fun ty2 env)
+    | _ -> ([], ty)
+
+  let signature env =
+    let rec doit acc ty =
+      match (hnorm ty env).ty_node with
+      | Tfun (dom, codom) -> doit (dom::acc) codom
+      | _ -> (List.rev acc, ty)
+    in fun ty -> doit [] ty
+
+  let scheme_of_ty mode (ty : ty) (env : env) =
+    let ty = hnorm ty env in
+      match ty.ty_node with
+      | Tconstr (p, tys) -> begin
+          match by_path_opt p env with
+          | Some ({ tyd_type = (`Datatype _ | `Record _) as body }) ->
+              let prefix   = EcPath.prefix   p in
+              let basename = EcPath.basename p in
+              let basename =
+                match body, mode with
+                | `Record   _, (`Ind | `Case) -> basename ^ "_ind"
+                | `Datatype _, `Ind           -> basename ^ "_ind"
+                | `Datatype _, `Case          -> basename ^ "_case"
+              in
+                Some (EcPath.pqoname prefix basename, tys)
+          | _ -> None
+      end
+      | _ -> None
+
+  let get_top_decl (ty : ty) (env : env) =
+    match (ty_hnorm ty env).ty_node with
+    | Tconstr (p, tys) -> Some (p, oget (by_path_opt p env), tys)
+    | _ -> None
+
+  let rebind name ty env =
+    let env = MC.bind_tydecl name ty env in
+
+    match ty.tyd_type with
+    | `Abstract tc ->
+        let myty =
+          let myp = EcPath.pqname (root env) name in
+          let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
+            (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
+        let instr =
+          Sp.fold
+            (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
+            tc env.env_tci
+        in
+          { env with env_tci = instr }
+
+    | _ -> env
+
+  let bind ?(import = import0) name ty env =
+    let env = if import.im_immediate then rebind name ty env else env in
+    { env with env_item =
+        mkitem import (Th_type (name, ty)) :: env.env_item }
+
+
+  let iter ?name f (env : env) =
+    gen_iter (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?name f env
+
+  let all ?check ?name (env : env) =
+    gen_all (fun mc -> mc.mc_tydecls) MC.lookup_tydecls ?check ?name env
+end
+
+let ty_hnorm = Ty.ty_hnorm
 
 (* -------------------------------------------------------------------- *)
 module Op = struct

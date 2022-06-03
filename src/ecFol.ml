@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcUtils
@@ -21,38 +13,35 @@ include EcCoreFol
 
 (* -------------------------------------------------------------------- *)
 let f_eqparams sig1 m1 sig2 m2 =
-  let doit f_pvarg ty1 vs1 ty2 vs2 =
-    let f_pvlocs ty vs m =
-      let arg = f_pvarg ty m in
-      if List.length vs = 1 then [arg]
-      else
-        let t = Array.of_list vs in
-        let t = Array.mapi (fun i vd -> f_proj arg i vd.v_type) t in
-        Array.to_list t
-    in
+  let f_pvlocs mkpv ty vs m =
+    let arg = mkpv ty m in
+    if List.length vs = 1 then [arg]
+    else
+      let t = Array.of_list vs in
+      let t = Array.mapi (fun i vd -> f_proj arg i vd.ov_type) t in
+      Array.to_list t
+  in
 
-    match vs1, vs2 with
-    | Some vs1, Some vs2 ->
-      if   List.length vs1 = List.length vs2
-      then f_eqs (f_pvlocs ty1 vs1 m1) (f_pvlocs ty2 vs2 m2)
-      else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
-                 (f_tuple (f_pvlocs ty2 vs2 m2))
+  let doit mkpv ty1 vs1 ty2 vs2 =
+    if   List.length vs1 = List.length vs2
+    then f_eqs (f_pvlocs mkpv ty1 vs1 m1) (f_pvlocs mkpv ty2 vs2 m2)
+    else f_eq  (f_tuple (f_pvlocs mkpv ty1 vs1 m1))
+               (f_tuple (f_pvlocs mkpv ty2 vs2 m2))
+  in
 
-    | Some vs1, None ->
-      f_eq (f_tuple (f_pvlocs ty1 vs1 m1)) (f_pvarg ty2 m2)
-
-    | None, Some vs2 ->
-      f_eq (f_pvarg ty1 m1) (f_tuple (f_pvlocs ty2 vs2 m2))
-
-    | None, None ->
-      f_eq (f_pvarg ty1 m1) (f_pvarg ty2 m2) in
   let open EcCoreModules in
-  let eqa = doit f_pvarg sig1.fs_arg sig1.fs_anames sig2.fs_arg sig2.fs_anames in
-  match sig1.fs_qarg, sig2.fs_qarg with
-  | None, None -> eqa
-  | Some ty1, Some ty2 -> f_and eqa (doit f_pvqarg ty1 sig2.fs_qnames ty2 sig2.fs_qnames)
-  | _, _ -> assert false
 
+  let eqa =
+    doit f_pvarg sig1.fs_arg sig1.fs_anames sig2.fs_arg sig2.fs_anames in
+  let eqq =
+    match sig1.fs_qarg, sig2.fs_qarg with
+    | None, None ->
+       None
+    | Some ty1, Some ty2 ->
+       Some (doit f_pvqarg ty1 sig2.fs_qnames ty2 sig2.fs_qnames)
+    | _, _ -> assert false in
+
+  ofold (fun eqq eqa -> f_and eqa eqq) eqa eqq
 
 let f_eqres quantum ty1 m1 ty2 m2 =
   f_eq (f_pvar (pv_res quantum) ty1 m1) (f_pvar (pv_res quantum) ty2 m2)
@@ -699,7 +688,7 @@ let rec f_eq_simpl f1 f2 =
     -> f_false
 
   | Ftuple fs1, Ftuple fs2 when List.length fs1 = List.length fs2 ->
-      f_andas_simpl (List.map2 f_eq_simpl fs1 fs2) f_true
+      f_ands_simpl (List.map2 f_eq_simpl fs1 fs2) f_true
 
   | _ -> f_eq f1 f2
 
@@ -993,9 +982,10 @@ let destr_ands ~deep =
   in fun f -> doit f
 
 (* -------------------------------------------------------------------- *)
+let is_classical_glob env mp =
+  not (EcEnv.NormMp.use_quantum env mp)
 
-let is_classical_glob env mp = not (EcEnv.NormMp.use_quantum env mp)
-
+(* -------------------------------------------------------------------- *)
 let rec is_classical env f =
   match f.f_node with
   | Fquant (_,_,f) | Fproj(f,_) -> is_classical env f

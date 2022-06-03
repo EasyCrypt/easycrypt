@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcPath
 open EcSymbols
@@ -273,7 +265,7 @@ module NormMp : sig
   val get_restr_me  : env -> module_expr -> mpath -> mod_restr
   val get_restr     : env -> mpath -> mod_restr
 
-  val use_quantum    : env -> mpath -> bool
+  val use_quantum   : env -> mpath -> bool
   val sig_of_mp     : env -> mpath -> module_sig
 
   (* Return [true] if [x] is forbidden in [restr]. *)

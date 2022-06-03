@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcUtils
@@ -86,41 +78,45 @@ module LowInternal = struct
                   (EcPrinting.pp_funname ppe) p)
         end
       in
-      let params =
-        match f.f_sig.fs_anames with
-        | None -> assert false
-        | Some lv -> lv in
-      let qparams =
-        if f.f_sig.fs_qarg = None then []
-        else match f.f_sig.fs_qnames with
-             | None -> assert false
-             | Some lv -> lv in
-      let locals, qlocals = List.partition (fun v -> v.v_quantum = `Classical) fdef.f_locals in
+
+      let locals, qlocals =
+        let alllocals = List.map ovar_of_var fdef.f_locals in
+        List.partition (fun ov -> ov.ov_quantum = `Classical) alllocals in
+
       let quantum =
         match qargs with
-        | None -> `Classical
+        | None    -> `Classical
         | Some es -> EcTyping.is_classical_es es in
 
-      let me, anames = EcMemory.bindall_fresh params me in
+      let mquantum ovs = List.map (fun ov -> { ov with ov_quantum = quantum }) ovs in
+
+      let me, anames = EcMemory.bindall_fresh f.f_sig.fs_anames me in
       let me, lnames = EcMemory.bindall_fresh locals me in
-      let mquantum = List.map (fun v -> {v with v_quantum = quantum }) in
-      let me, qnames = EcMemory.bindall_fresh (mquantum qparams) me in
+
+      let me, qnames  = EcMemory.bindall_fresh (mquantum f.f_sig.fs_qnames) me in
       let me, lqnames = EcMemory.bindall_fresh (mquantum qlocals) me in
 
       let subst =
         let for1 mx v x =
-          PVMap.add (pv_loc v.v_quantum v.v_name) (pv_loc x.v_quantum x.v_name) mx
+          PVMap.add
+            (pv_loc v.ov_quantum (oget v.ov_name))
+            (pv_loc x.ov_quantum (oget x.ov_name))
+            mx
         in
         let mx = PVMap.create env in
-        let mx = List.fold_left2 for1 mx params anames in
-        let mx = List.fold_left2 for1 mx qparams qnames in
+        let mx = List.fold_left2 for1 mx f.f_sig.fs_anames anames in
+        let mx = List.fold_left2 for1 mx f.f_sig.fs_qnames qnames in
         let mx = List.fold_left2 for1 mx locals lnames in
         let mx = List.fold_left2 for1 mx qlocals lqnames in
         mx
       in
 
       let doprelude names args =
-        let newpv = List.map (fun x -> pv_loc x.v_quantum x.v_name, x.v_type) names in
+        let newpv =
+          List.map
+            (fun x -> pv_loc x.ov_quantum (oget x.ov_name), x.ov_type)
+            names
+        in
         if List.length newpv = List.length args then
           List.map2 (fun npv e -> i_asgn (LvVar npv, e)) newpv args
         else
@@ -129,7 +125,7 @@ module LowInternal = struct
           | _   -> [i_asgn(LvTuple newpv, e_tuple args)]
       in
 
-      let prelude = doprelude anames args in
+      let prelude  = doprelude anames args in
       let qprelude = omap_dfl (doprelude qnames) [] qargs in
 
       let body = LowSubst.ssubst subst fdef.f_body in
@@ -141,10 +137,14 @@ module LowInternal = struct
         | None, _ -> me , []
         | Some _, None -> me, []
         | Some r, Some (LvTuple lvs) when not use_tuple ->
+          let r = LowSubst.esubst subst r in
           let vlvs =
-            List.map (fun (x,ty) -> {v_quantum = quantum; v_name = symbol_of_pv x; v_type = ty}) lvs in
+            List.map
+              (fun (x,ty) ->
+                { ov_quantum = quantum; ov_name = Some (symbol_of_pv x); ov_type = ty})
+              lvs in
           let me, auxs = EcMemory.bindall_fresh vlvs me in
-          let auxs = List.map (fun v -> pv_loc v.v_quantum v.v_name, v.v_type) auxs in
+          let auxs = List.map (fun v -> pv_loc v.ov_quantum (oget v.ov_name), v.ov_type) auxs in
           let s1 =
             let doit i auxi = i_asgn(LvVar auxi, e_proj_simpl r i (snd auxi)) in
             List.mapi doit auxs in

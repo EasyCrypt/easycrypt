@@ -6,8 +6,10 @@ clone import ZModField as ZP.
 import ZP.ZModpField.
 
 (* We define the square matrix : size * size *)
+print Matrix.
+
 clone import Matrix as M with 
-  type R <- zmod,
+  type ZR.t <- zmod,
   op ZR.zeror <- ZP.zero,
   op ZR.( + ) <- ZP.( + ),
   op ZR.([-]) <- ZP.([-]),
@@ -29,18 +31,6 @@ realize ZR.mulVr by apply mulVr.
 realize ZR.unitP by apply unitP.
 realize ZR.unitout by apply unitout.
 realize ZR.mulf_eq0 by apply mulf_eq0.
-realize Big.CR.addrA by apply addrA.
-realize Big.CR.addrC by apply addrC.
-realize Big.CR.add0r by apply add0r.
-realize Big.CR.addNr by apply addNr.
-realize Big.CR.oner_neq0 by apply oner_neq0.
-realize Big.CR.mulrA by apply mulrA.
-realize Big.CR.mulrC by apply mulrC.
-realize Big.CR.mul1r by apply mul1r.
-realize Big.CR.mulrDl by apply mulrDl.
-realize Big.CR.mulVr by apply mulVr.
-realize Big.CR.unitP by apply unitP.
-realize Big.CR.unitout by apply unitout.
 
 
 (* This is equivalent to e <- BS_m; bit_inj(e) *)

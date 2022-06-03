@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcTypes
@@ -23,14 +15,21 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 let extend_body fsig body =
   let doit arg names ty =
+    let names =
+      let named_arg ov =
+        match ov.ov_name with
+        | None   -> assert false; (* only called on concrete procedures *)
+        | Some v -> { v_quantum = ov.ov_quantum; v_name = v; v_type = ov.ov_type }
+      in List.map named_arg names in
+
     match names with
-    | None | Some [] -> []
+    | []  ->
+       []
 
-    | Some [v] ->
-        [i_asgn (LvVar (pv_loc v.v_quantum v.v_name, v.v_type),
-                 e_var arg ty)]
+    | [v] ->
+        [i_asgn (LvVar (pv_loc v.v_quantum v.v_name, v.v_type), e_var arg ty)]
 
-    | Some lv ->
+    | lv ->
         let lv = List.map (fun v -> pv_loc v.v_quantum v.v_name, v.v_type) lv in
         [i_asgn (LvTuple lv, e_var arg ty)]
 
@@ -324,7 +323,7 @@ and f_eqobs_in fl fr sim eqO =
 
         let argl, qargl, bodyl = extend_body sigl funl.f_body in
         let argr, qargr, bodyr = extend_body sigr funr.f_body in
-        let sim, eqi    = s_eqobs_in_full bodyl bodyr sim local eqo' in
+        let sim, eqi = s_eqobs_in_full bodyl bodyr sim local eqo' in
 
         let eqi = Mpv2.remove sim.sim_env argl argr eqi in
         let eqi = if qargl = None then eqi else Mpv2.remove sim.sim_env (oget qargl) (oget qargr) eqi in
@@ -482,7 +481,6 @@ let process_eqobs_inF info tc =
   let defl = Fun.by_xpath fl env in
   let defr = Fun.by_xpath fr env in
   let sigl, sigr = defl.f_sig, defr.f_sig in
-
   let eqo = Mpv2.remove env (pv_res sigl) (pv_res sigr) eqo in
   let sim = init_sim env spec inv in
   let _, eqi =

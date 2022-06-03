@@ -1,13 +1,5 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
-require import AllCore List StdBigop StdOrder IntDiv Distr.
+require import AllCore List StdBigop StdOrder IntDiv Distr Finite.
 (*---*) import IntOrder Bigint MUniform Range.
 
 (* -------------------------------------------------------------------- *)
@@ -32,11 +24,33 @@ lemma supp_dinter (i j : int) x:
   x \in (dinter i j) <=> i <= x <= j.
 proof. by rewrite /support /in_supp dinter1E; case (i <= x <= j)=> //= /#. qed.
 
+lemma supp_dinter1E (x : int) (i j : int) :
+  x \in (dinter i j) => mu1 (dinter i j) x = 1%r / (j - i + 1)%r.
+proof. by rewrite supp_dinter dinter1E => ->. qed.
+
 lemma dinter_ll (i j : int): i <= j => is_lossless (dinter i j).
 proof. move=> Hij;apply /drange_ll => /#. qed.
 
 lemma dinter_uni (i j : int): is_uniform (dinter i j).
 proof. apply drange_uni. qed.
+
+lemma finite_dinter (i j : int) : is_finite (support (dinter i j)).
+proof.
+rewrite is_finiteE; exists (range i (j+1)).
+by rewrite range_uniq /= => x; rewrite mem_range supp_dinter /#.
+qed.
+
+lemma perm_eq_dinter (i j : int) : 
+  perm_eq (to_seq (support (dinter i j))) (range i (j+1)).
+proof. 
+apply: uniq_perm_eq; first exact/uniq_to_seq/finite_dinter.
+- exact: range_uniq.
+by move=> x; rewrite mem_to_seq ?finite_dinter // supp_dinter mem_range /#.
+qed.
+
+lemma perm_eq_dinter_pred (i j : int) : 
+    perm_eq (to_seq (support (dinter i (j-1)))) (range i j).
+proof. by have /# := perm_eq_dinter i (j-1). qed.  
 
 (* -------------------------------------------------------------------- *)
 lemma duni_range_dvd (p q : int) : 0 < p => 0 < q => q %| p =>
@@ -88,8 +102,12 @@ by rewrite RField.mulrCA RField.divff // eq_fromint gtr_eqF.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op cdinterval : int -> int.
-axiom ge0_cdinterval m : 0 <= cdinterval m.
-
-schema cost_dinterval {i j : int} (k:int) : cost [ i <= j <= k - i : dinter i (j - 1)] = cost [true : i] + cost [true : j] + N (cdinterval k).
-hint simplify cost_dinterval.
+abstract theory Cost.
+  op cdinterval : int -> int.
+  axiom ge0_cdinterval m : 0 <= cdinterval m.
+  
+  schema cost_dinterval {i j : int} (k:int) : 
+    cost [ i <= j <= k - i : dinter i (j - 1)] = 
+    cost [true : i] + cost [true : j] + N (cdinterval k).
+  hint simplify cost_dinterval.
+end Cost.

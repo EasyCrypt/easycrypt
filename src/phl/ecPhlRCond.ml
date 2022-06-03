@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
@@ -179,14 +171,17 @@ module LowMatch = struct
     let me, pvs =
       let cvars =
         List.map
-          (fun (x, xty) -> { v_quantum = `Classical; v_name = EcIdent.name x; v_type = xty; })
-          cvars in
+          (fun (x, xty) -> {
+             ov_quantum = `Classical;
+             ov_name    = Some (EcIdent.name x);
+             ov_type    = xty;
+          }) cvars in
       EcMemory.bindall_fresh cvars me0 in
 
     let subst, pvs =
       let s, pvs =
         List.fold_left_map (fun s ((x, xty), name) ->
-            let pv = pv_loc name.v_quantum name.v_name in
+            let pv = pv_loc name.ov_quantum (oget name.ov_name) in
             let s  = Mid.add x (e_var pv xty) s in
             (s, (pv, xty)))
           Mid.empty (List.combine cvars pvs) in

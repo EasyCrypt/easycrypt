@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore List FSet Distr DProd StdBigop.
 (*---*) import Bigreal Bigreal.BRM MUnit.
@@ -314,7 +306,7 @@ abstract theory Program.
   }.
 
   lemma pr_Sample _n &m xs: Pr[Sample.sample(_n) @ &m: res = xs] = mu (dlist d _n) (pred1 xs).
-  proof. by byphoare (_: n = _n ==> res = xs)=> //=; proc; rnd. qed.
+  proof. by byphoare (_: n = _n ==> res = xs) => //=; proc; rnd. qed.
 
   equiv Sample_SampleCons_eq: Sample.sample ~ SampleCons.sample: 0 < n{1} /\ ={n} ==> ={res}.
   proof.

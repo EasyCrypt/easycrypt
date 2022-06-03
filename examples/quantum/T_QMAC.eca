@@ -94,7 +94,7 @@ module B (A:AdvEUF, R:QRO) = {
 
 section.
 
-declare module A: AdvEUF{-PRF, -QRO, -EUF_qCMA}.
+declare module A <: AdvEUF{-PRF, -QRO, -EUF_qCMA}.
 
 local module C(R:QRO) = { 
   proc main(q:int) = {
@@ -125,7 +125,7 @@ proof.
     proc; inline *; wp.
     while{1} (exists l1, 
                  l1 ++ l{1} = ms{1} /\
-                 b0{1} =  all (fun (p : msg * tag) => QRO.h{1} p.`1 = p.`2) l1{2}) (size l{1}).
+                 b0{1} =  all (fun (p : msg * tag) => QRO.h{1} p.`1 = p.`2) l1) (size l{1}).
     + move=> _ z; auto => /> &1 l1; case: (l{1}) => //= -[] m h l0.
       split; last smt().
       by exists (l1 ++ [(m,h)]); rewrite all_cat -catA /=.

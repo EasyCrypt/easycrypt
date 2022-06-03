@@ -198,31 +198,34 @@ module B (A:AdvIDCPA_QROM) : AdvCPA = {
     
 }.
 
+clone import SemiConstDistr with
+    op k <- qe.
+
 section.
 
-declare module E: EncScheme0 {-IDCPA, -QRO, -B, -Wrap}.
+declare module E <: EncScheme0 {-IDCPA, -QRO, -B, -Wrap, -SCD}.
 
-declare module A : 
-  AdvIDCPA_QROM { -IDCPA, -QRO, -E, -B, -Wrap}.
+declare module A <: 
+  AdvIDCPA_QROM { -IDCPA, -QRO, -E, -B, -Wrap, -SCD}.
 
-axiom A_wf : hoare [ IDCPA_QROM(A,GPV(E)).main : true ==> !IDCPA.id \in IDCPA.log /\
+declare axiom A_wf : hoare [ IDCPA_QROM(A,GPV(E)).main : true ==> !IDCPA.id \in IDCPA.log /\
                                                           uniq IDCPA.log /\
                                                           size IDCPA.log = qe].
 
-axiom choose_ll (H <: QRO{-A}) (O <: OrclIBE{-A}) :
+declare axiom choose_ll (H <: QRO{-A}) (O <: OrclIBE{-A}) :
    islossless O.extract => islossless H.h => islossless A(H, O).choose.
 
-axiom guess_ll (H <: QRO{-A}) (O <: OrclIBE{-A}) :
+declare axiom guess_ll (H <: QRO{-A}) (O <: OrclIBE{-A}) :
   islossless O.extract => islossless H.h => islossless A(H, O).guess.
 
-axiom hoare_bound_c (H<:QRO{-A,-Wrap}) (O<:OrclIBE{-A,-Wrap}) : 
+declare axiom hoare_bound_c (H<:QRO{-A,-Wrap}) (O<:OrclIBE{-A,-Wrap}) : 
   hoare [Wrap(A, H, O).choose : true  ==> Wrap.ce <= cqe /\ Wrap.ch <= cqh].
 
-axiom hoare_bound_g (H<:QRO{-A,-Wrap}) (O<:OrclIBE{-A,-Wrap}) ke kh: 
+declare axiom hoare_bound_g (H<:QRO{-A,-Wrap}) (O<:OrclIBE{-A,-Wrap}) ke kh: 
   hoare [Wrap(A, H, O).guess : Wrap.ce = ke /\ Wrap.ch = kh  ==> 
                                Wrap.ce <= ke + gqe /\ Wrap.ch <= kh + gqh].
 
-axiom enc_ll : islossless E.enc.
+declare axiom enc_ll : islossless E.enc.
 
 module type Init = {
   proc * init (h: identity -> pkey, lam_: real) : (identity -> bool) * (identity -> pkey)
@@ -235,14 +238,14 @@ local module G(I:Init) = {
   proc main0(lam_:real) = {
     var b2;
     QRO.init();
-    (bf, QRO.h) <- I.init(QRO.h, lam_);
+    (bf, QRO.h) <@ I.init(QRO.h, lam_);
     b2 <@ IDCPA(Wrap(A,QRO), GPV(E,QRO)).main();
     return b2;
   }
 
   proc main(lam_:real) = {
     var b1;
-    b1 <- main0(lam_);
+    b1 <@ main0(lam_);
     if (bf IDCPA.id /\ forall id', id' \in log => !bf id') b1 <- IDCPA.b = IDCPA.b';
     else b1 <$ {0,1};
     return b1 ;
@@ -401,9 +404,6 @@ local module Init2 = {
     return (bf, h);
   }
 }.
-
-local clone import SemiConstDistr with
-    op k <- qe.
 
 local hoare hoare_choose : 
    Wrap(A, QRO, IDCPA(Wrap(A, QRO), GPV(E, QRO)).E).choose :

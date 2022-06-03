@@ -1676,13 +1676,15 @@ section PROOFS.
       + move=> &2 _; islossless.
         while true (size p).
         + move=> z; wp; conseq (_: true) => />; 2: by islossless.
+          move => &hr; elim (p{hr}) => //.
           smt (size_drop size_eq0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0).         
       + move=> _; proc; inline *; sp; if => //.
         swap 13 9; wp; conseq (_: true) => />; 1: smt(); islossless.
         while true (size p2).
         + move=> z; wp; conseq (_: true) => //=; 2: by islossless.
-          move=> &h.
+          move => &hr; elim (p2{hr}) => //. 
+          clear &hr.
           smt (size_drop size_eq0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0 dpoly_out_ll). 
       + by proc; inline *; sp 1 1; if; auto => /> *; smt(get_setE mem_set).
@@ -2401,7 +2403,7 @@ section PROOFS.
   smt(count_eq0 has_pred1).
   qed.
 
-  lemma make_lbad1_size_cons3 log lc lenc n a c t:
+  lemma make_lbad1_size_cons3 (log : (_, _) fmap) lc lenc n a c t:
       uniq lenc =>
       ! n \in lenc =>
       size (make_lbad1 log.[n <- (a,c,t)] lc (n::lenc)) =
@@ -2463,8 +2465,10 @@ section PROOFS.
     - by conseq(:_==> true)=> />; while(true); auto.
     rcondf{2} 5; 1: auto=> />.
     - by conseq(:_==> true)=> />; while(true); auto.
-    wp -7 -7=> />; 1: smt(get_setE).
-    conseq(:_==> ={c1, t, RO.m, Mem.log, t, c1}); 2:(sim=> /#).
+    wp -7 -7=> />.
+    move => />; smt (get_setE).
+    conseq (: ={c1, t, RO.m, Mem.log}); [2:sim=> /> /#].
+    move => />.
     smt(get_setE leq_make_lbad1 make_lbad1_size_cons3 size_ge0).
   inline*; sp.
   rcondt{1} 5; 1: auto=> />.
@@ -2475,7 +2479,7 @@ section PROOFS.
     by while(true); auto.
   swap 3 1; swap [4..6] 12; wp -10 -10=> /=.
   swap 4 4; wp -1 -1.
-  conseq(:_==> ={c1, t0, RO.m, Mem.log, Mem.lc}); 2:(sim=> /#).
+  conseq(:_==> ={c1, t0, RO.m, Mem.log, Mem.lc}); [2:sim=> /> /#].
   move=> /> &1 &2 *; do ! split => />.
   - smt().  
   - smt().  
@@ -2625,13 +2629,13 @@ section PROOFS.
     - rcondf{1} 9; 1: by auto=> />; while(true); auto.
       rcondf{2} 9; 1: by auto=> />; while(true); auto.
       wp -9 -9=> /> /=.
-      by conseq(:_==> ={c1, t0, RO.m}); 2:(sim=> /#); 1: smt(make_lbad1_size_cons3 leq_make_lbad1 size_ge0).
+      by conseq(:_==> ={c1, t0, RO.m}); [2:sim=> /> /#]; 1: smt(make_lbad1_size_cons3 leq_make_lbad1 size_ge0).
     rcondt{1} 9; 1: by auto=> />; while(true); auto.
     rcondt{2} 9; 1: by auto=> />; while(true); auto.
     case: (size UFCMA_l.lbad1{2} + size lt{2} <= UFCMA_li.i{2}).
     + rcondf{2} 9; 1: by auto=> />; while(true); auto; smt().
       wp -11 -11=> /> /=.
-      conseq(:_==> ={c1, t0, RO.m}); 2: (sim=> /#).
+      conseq(:_==> ={c1, t0, RO.m}); [2:sim=> /> /#].
       move=> &1 &2 /> *.
       rewrite !size_cat !size_map //= => {&1}; split; 1: smt(size_map size_ge0).
       rewrite nth_cat; split. 
@@ -2648,7 +2652,7 @@ section PROOFS.
     case: (size UFCMA_l.lbad1{2} <= UFCMA_li.i{2}); last first.
     + rcondf{2} 9; 1: by auto=> />; while(true); auto; smt().
       wp -11 -11=> /> /=.
-      conseq(:_==> ={c1, t0, RO.m}); 2: (sim=> /#).
+      conseq(:_==> ={c1, t0, RO.m}); [2:sim=> /> /#].
       move=> &1 &2 /> *.
       rewrite !size_cat !size_map //= => {&1}; split; 1: smt(size_map size_ge0).
       rewrite nth_cat; split. 

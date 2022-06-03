@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcModules
@@ -18,27 +10,18 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let to_args fun_ m =
-  let arg =
-    let arg = f_pvarg fun_.f_sig.fs_arg m in
-    match fun_.f_sig.fs_anames with
-    | None     -> arg
-    | Some [_] -> arg
-    | Some lv  -> f_tuple (List.mapi (fun i v -> f_proj arg i v.v_type) lv) in
-  let qarg =
-    match fun_.f_sig.fs_qarg with
-    | None -> None
-    | Some ty ->
-      let arg = f_pvqarg ty m in
-      Some (match fun_.f_sig.fs_qnames with
-        | None     -> arg
-        | Some [_] -> arg
-        | Some lv  -> f_tuple (List.mapi (fun i v -> f_proj arg i v.v_type) lv)) in
-  arg, qarg
+let to_args1 argty names =
+  match names with
+  | []  -> f_tt
+  | [_] -> argty
+  | lv  -> f_tuple (List.mapi (fun i v -> f_proj argty i v.ov_type) lv)
 
-
-
-
+let to_args { f_sig } m =
+  let args  = to_args1 (f_pvarg f_sig.fs_arg m) f_sig.fs_anames in
+  let qargs =
+    f_sig.fs_qarg |>
+      omap (fun qarg -> to_args1 (f_pvqarg qarg m) f_sig.fs_qnames) in
+  (args, qargs)
 
 (* -------------------------------------------------------------------- *)
 let t_bdhoare_ppr_r tc =

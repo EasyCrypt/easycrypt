@@ -199,7 +199,7 @@ move => xys.
 pose P := (fun (fx : from -> hash) => all (fun (xr : from * hash) => fx xr.`1 = xr.`2) xy).
 case: (forall p p', p \in xy => p' \in xy => p.`1 = p'.`1 => p = p'); last first.
 + move=> /negb_forall [p] /= /negb_forall [p'] /= h.
-  by do 2! rewrite mu0_false 1:[smt (allP)].
+  by do 2! rewrite mu0_false 1:#smt:(allP).
 move=> hxy.
 pose fxy := fun x => oget (assoc xy x).
 pose xs := undup (unzip1 xy) ++ cundup (unzip1 xy).

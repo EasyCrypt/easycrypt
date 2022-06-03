@@ -1,24 +1,17 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 let copyright = [
-  "Copyright (c) - 2012-2016 - IMDEA Software Institute";
-  "Copyright (c) - 2012-2021 - Inria";
-  "Copyright (c) - 2017-2021 - Ecole Polytechnique";
+  "Copyright (c) 2012 IMDEA Software Institute";
+  "Copyright (c) 2012 Inria";
+  "Copyright (c) 2017 Ecole Polytechnique";
+  "Copyright (c) EasyCrypt contributors (see AUTHORS)";
 ]
 
 let url  = "https://www.easycrypt.info/"
 let app  = "easycrypt"
 
 module License = struct
-  let engine = "Distributed under the terms of the CeCILL-C license"
-  let stdlib = "Distributed under the terms of the CeCILL-B license"
+  let engine = "Distributed under the terms of the MIT license"
+  let stdlib = "Distributed under the terms of the MIT license"
 end
 
 let hash =

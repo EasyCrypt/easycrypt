@@ -463,12 +463,12 @@ theory NONDUMMY_EQUIV_DUMMY.
     exists S; split.
     + (split; last split) => kBb kBs FB ??.
       + by proc true : time []. 
-      + proc true : time [FB.step : [N kBs], FB.backdoor : [N kBb]] => //=.
-
+      + proc true : time [FB.step : [N kBs],FB.backdoor :[N kBb]] => //=.
+        + have cS_pos := hcS cdA _; 1: done.
           by rewrite !bigi_constz /#. 
         + by move=> *; proc true : time [].
         by move=> *; proc true : time [].
-      proc true : time [FB.step : [N kBs], FB.backdoor : [N kBb]] => //=.
+      proc true : time [FB.step : [N kBs],FB.backdoor :[N kBb]] => //=.
       + have cS_pos := hcS cdA _; 1: done.
         by rewrite !bigi_constz /#. 
       + by move=> *; proc true : time [].

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore List FSet Distr DProd DList StdBigop StdOrder RealFLub.
 require import Hybrid.
 (*---*) import Bigreal RealSeries RealOrder RField BRA MRat.
@@ -242,6 +234,14 @@ elim: n => [|n ? IHn]; 1: by rewrite !dlist0 // sdistdd.
 rewrite !dlistS //. 
 apply (ler_trans _ _ _ (sdist_dmap _ _ _)).
 apply (ler_trans _ _ _ (sdist_dprod _ _ _ _ )); smt().
+qed.
+
+lemma sdist_dopt (d1 d2 : 'a distr) : 
+  sdist (dopt d1) (dopt d2) = sdist d1 d2.
+proof.
+rewrite !sdist_tvd !dopt_ll normr0 /=; congr.
+rewrite sumD1_None ?summable_sdist addrC /=; congr; 2: by rewrite !dopt1E /= /#.
+by apply eq_sum => x /=; rewrite /(\o) !dopt1E.
 qed.
 
 (*----------------------------------------------------------------------------*)

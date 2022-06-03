@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcLocation
 open EcParsetree
@@ -24,7 +16,8 @@ open EcCoreGoal
 exception InvalidProofTerm         (* invalid proof term *)
 
 type side    = [`Left|`Right]
-type lazyred = [`Full of bool | `NoDelta | `None]
+type lazyred = [`Full | `NoDelta | `None]
+
 
 (* -------------------------------------------------------------------- *)
 val (@!) : FApi.backward -> FApi.backward -> FApi.backward

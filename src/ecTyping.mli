@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
@@ -40,14 +32,12 @@ type 'a mismatch_sets = [`Eq of 'a * 'a | `Sub of 'a ]
 type 'a suboreq       = [`Eq of 'a | `Sub of 'a ]
 
 type mismatch_funsig =
-| MF_targs  of ty * ty                               (* expected, got *)
-| MF_tres   of ty * ty                               (* expected, got *)
-| MF_restr  of EcEnv.env * Sx.t mismatch_sets
-| MF_compl  of EcEnv.env *
-                  ((form * form) option
-                   * (form * form) Mx.t) suboreq
+| MF_targs     of ty * ty                               (* expected, got *)
+| MF_tres      of ty * ty                               (* expected, got *)
+| MF_restr     of EcEnv.env * Sx.t mismatch_sets
+| MF_compl     of EcEnv.env * ((form * form) option * (form * form) Mx.t) suboreq
+| MF_quantum   of quantum * quantum (* expected, got *)
 | MF_unbounded
-| MF_quantum of quantum * quantum (* expected, got *)
 
 type restr_failure = Sx.t * Sm.t
 
@@ -125,6 +115,7 @@ type tyerror =
 | FreeTypeVariables
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed    of symbol option
+| NoConcreteAnonParams
 | UnboundTypeParameter   of symbol
 | UnknownTypeName        of qsymbol
 | UnknownTypeClass       of qsymbol
@@ -182,12 +173,15 @@ type tyerror =
 | LvMapOnNonAssign
 | QuantumProcType        of symbol * ty
 | QuantumProcFinite      of symbol * ty
-| ModTypeQuantumRestr of EcPath.mpath list
+| ModTypeQuantumRestr    of EcPath.mpath list
 | QuantumSigNoArg
 | ClassicalSigArg
 | ClassicalExprNeeded    of EcSymbols.symbol
 | ClassicalFormNeeded
 | QuantumLvar            of quantum * prog_var
+| NoDefaultMemRestr
+| ProcAssign             of qsymbol
+
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * env * tyerror
 
@@ -263,14 +257,12 @@ val trans_prop     :
 val trans_pattern  : env -> ptnmap -> EcUnify.unienv -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
-val trans_memtype :
-  env -> EcUnify.unienv -> EcIdent.t -> pmemtype -> EcMemory.memenv
+val trans_memtype : env -> EcUnify.unienv -> pmemtype -> EcMemory.memtype
 
 (* -------------------------------------------------------------------- *)
 val trans_restr_for_modty :
   env -> EcLocation.t -> module_type -> pmod_restr option -> module_type
 
-(* -------------------------------------------------------------------- *)
 val transmodsig  : env -> goals -> pinterface -> top_module_sig
 val transmodtype : env -> pmodule_type -> module_type * module_sig
 val transmod     : attop:bool -> env -> goals -> pmodule_def -> module_expr

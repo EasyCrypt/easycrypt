@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcPath
@@ -85,7 +77,7 @@ type reduction_info = {
 and deltap      = [`Yes | `No | `Force]
 and rlogic_info = [`Full | `ProductCompat] option
 
-val full_red     : opaque:bool -> reduction_info
+val full_red     : reduction_info
 val full_compat  : reduction_info
 val no_red       : reduction_info
 val beta_red     : reduction_info

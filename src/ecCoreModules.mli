@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcPath
@@ -102,20 +94,20 @@ val is_assert : instr -> bool
 val get_uninit_read : stmt -> Sx.t
 
 (* -------------------------------------------------------------------- *)
-
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
   fs_qarg   : EcTypes.ty option;
-  fs_anames : variable list option;
-  fs_qnames : variable list option;
+  fs_anames : ovariable list;
+  fs_qnames : ovariable list;
   fs_ret    : EcTypes.ty;
 }
 
-val fs_equal : funsig -> funsig -> bool
-
+val fs_equal   : funsig -> funsig -> bool
 val fs_quantum : funsig -> quantum
+
 val pv_res : funsig -> prog_var
+
 (* -------------------------------------------------------------------- *)
 type 'a use_restr = {
   ur_pos : 'a option;   (* If not None, can use only element in this set. *)
@@ -158,7 +150,6 @@ module PreOI : sig
 end
 
 (* -------------------------------------------------------------------- *)
-
 type mr_xpaths = EcPath.Sx.t use_restr
 
 type mr_mpaths = EcPath.Sm.t use_restr
@@ -179,17 +170,18 @@ val p_mr_hash : ('a -> int) -> 'a p_mod_restr -> int
 
 val has_compl_restriction : 'a p_mod_restr -> bool
 
+val mr_is_empty  : 'a p_mod_restr -> bool
 val mr_xpaths_fv : mr_xpaths -> int EcIdent.Mid.t
 val mr_mpaths_fv : mr_mpaths -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)
 type 'a p_module_type = {          (* Always in eta-normal form *)
-  mt_quantum: quantum;
-  mt_params : (EcIdent.t * 'a p_module_type) list;
-  mt_name   : EcPath.path;
-  mt_args   : EcPath.mpath list;
-  mt_restr  : 'a p_mod_restr;
+  mt_quantum : quantum;
+  mt_params  : (EcIdent.t * 'a p_module_type) list;
+  mt_name    : EcPath.path;
+  mt_args    : EcPath.mpath list;
+  mt_restr   : 'a p_mod_restr;
 }
 
 type module_sig_body_item = Tys_function of funsig
@@ -198,9 +190,9 @@ type module_sig_body = module_sig_body_item list
 
 type 'a p_module_sig = {
   mis_quantum : quantum;
-  mis_params : (EcIdent.t * 'a p_module_type) list;
-  mis_body   : module_sig_body;
-  mis_restr  : 'a p_mod_restr;
+  mis_params  : (EcIdent.t * 'a p_module_type) list;
+  mis_body    : module_sig_body;
+  mis_restr   : 'a p_mod_restr;
 }
 
 type 'a p_top_module_sig = {

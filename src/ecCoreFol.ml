@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
@@ -1232,7 +1224,6 @@ let f_iter g f =
   | Fcoe      coe -> g coe.coe_pre;
   | Fpr       pr  -> g pr.pr_args; oiter g pr.pr_qargs; g pr.pr_event
 
-
 (* -------------------------------------------------------------------- *)
 let form_exists g f =
   match f.f_node with
@@ -1897,11 +1888,13 @@ module Fsubst = struct
         FSmart.f_glob (fp, (mp, m)) (mp', m')
 
     | FhoareF hf ->
-      assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
+      let pr', po' =
+        let s   = f_rem_mem s mhr in
         let pr' = f_subst ~tx s hf.hf_pr in
         let po' = f_subst ~tx s hf.hf_po in
-        let mp' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp hf.hf_f in
-        FSmart.f_hoareF (fp, hf) { hf_pr = pr'; hf_po = po'; hf_f = mp'; }
+        (pr', po') in
+      let mp' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp hf.hf_f in
+      FSmart.f_hoareF (fp, hf) { hf_pr = pr'; hf_po = po'; hf_f = mp'; }
 
     | FhoareS hs ->
         assert (not (Mid.mem (fst hs.hs_m) s.fs_mem));
@@ -1936,11 +1929,13 @@ module Fsubst = struct
         { chs_pr = pr'; chs_po = po'; chs_s = st'; chs_m = me'; chs_co = c'; }
 
     | FbdHoareF bhf ->
-      assert (not (Mid.mem mhr s.fs_mem) && not (Mid.mem mhr s.fs_mem));
-      let pr' = f_subst ~tx s bhf.bhf_pr in
-      let po' = f_subst ~tx s bhf.bhf_po in
+      let pr', po', bd' =
+        let s = f_rem_mem s mhr in
+        let pr' = f_subst ~tx s bhf.bhf_pr in
+        let po' = f_subst ~tx s bhf.bhf_po in
+        let bd' = f_subst ~tx s bhf.bhf_bd in
+        (pr', po', bd') in
       let mp' = EcPath.x_substm s.fs_sty.ts_p s.fs_mp bhf.bhf_f in
-      let bd' = f_subst ~tx s bhf.bhf_bd in
       FSmart.f_bdHoareF (fp, bhf)
         { bhf with bhf_pr = pr'; bhf_po = po';
                    bhf_f  = mp'; bhf_bd = bd'; }
@@ -1959,10 +1954,13 @@ module Fsubst = struct
                    bhs_bd = bd'; bhs_m  = me'; }
 
     | FequivF ef ->
-      assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
       let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
-      let pr' = f_subst ~tx s ef.ef_pr in
-      let po' = f_subst ~tx s ef.ef_po in
+      let pr', po' =
+        let s = f_rem_mem s mleft in
+        let s = f_rem_mem s mright in
+        let pr' = f_subst ~tx s ef.ef_pr in
+        let po' = f_subst ~tx s ef.ef_po in
+        (pr', po') in
       let fl' = m_subst ef.ef_fl in
       let fr' = m_subst ef.ef_fr in
       FSmart.f_equivF (fp, ef)
@@ -1987,10 +1985,13 @@ module Fsubst = struct
           es_sl = sl'; es_sr = sr'; }
 
     | FeagerF eg ->
-      assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
       let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
-      let pr' = f_subst ~tx s eg.eg_pr in
-      let po' = f_subst ~tx s eg.eg_po in
+      let pr', po' =
+        let s = f_rem_mem s mleft in
+        let s = f_rem_mem s mright in
+        let pr' = f_subst ~tx s eg.eg_pr in
+        let po' = f_subst ~tx s eg.eg_po in
+        (pr', po') in
       let fl' = m_subst eg.eg_fl in
       let fr' = m_subst eg.eg_fr in
 
@@ -2036,11 +2037,11 @@ module Fsubst = struct
         { coe_pre = pr'; coe_mem = me'; coe_e = e'; }
 
     | Fpr pr ->
-      assert (not (Mid.mem mhr s.fs_mem));
       let pr_mem   = Mid.find_def pr.pr_mem pr.pr_mem s.fs_mem in
       let pr_fun   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp pr.pr_fun in
       let pr_args  = f_subst ~tx s pr.pr_args in
       let pr_qargs = OSmart.omap (f_subst ~tx s) pr.pr_qargs in
+      let s        = f_rem_mem s mhr in
       let pr_event = f_subst ~tx s pr.pr_event in
 
       FSmart.f_pr (fp, pr) { pr_mem; pr_fun; pr_args; pr_qargs; pr_event; }
@@ -2132,10 +2133,10 @@ module Fsubst = struct
     let sm = s.fs_sty.ts_mp in
 
     let mt_quantum = mty.mt_quantum in
-    let mt_params = List.map (snd_map (subst_mty ~tx s)) mty.mt_params in
-    let mt_name   = s.fs_sty.ts_p mty.mt_name in
-    let mt_args   = List.map sm mty.mt_args in
-    let mt_restr  = mr_subst ~tx s mty.mt_restr in
+    let mt_params  = List.map (snd_map (subst_mty ~tx s)) mty.mt_params in
+    let mt_name    = s.fs_sty.ts_p mty.mt_name in
+    let mt_args    = List.map sm mty.mt_args in
+    let mt_restr   = mr_subst ~tx s mty.mt_restr in
     { mt_quantum; mt_params; mt_name; mt_args; mt_restr; }
 
   and subst_gty ~tx s gty =

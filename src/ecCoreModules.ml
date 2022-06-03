@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2018 - Inria
- * Copyright (c) - 2012--2018 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
@@ -107,11 +99,11 @@ module Hinstr = Why3.Hashcons.Make (struct
     | Srnd (lv1, e1), Srnd (lv2, e2) ->
         (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
 
-    | Scall (lv1, f1, es1, qe1), Scall (lv2, f2, es2, qe2) ->
+    | Scall (lv1, f1, es1, qes1), Scall (lv2, f2, es2, qes2) ->
            (EcUtils.opt_equal lv_equal lv1 lv2)
         && (EcPath.x_equal f1 f2)
-        && (List.all2 EcTypes.e_equal es1  es2)
-        && (opt_equal (List.all2 EcTypes.e_equal) qe1 qe2)
+        && (List.all2 EcTypes.e_equal es1 es2)
+        && (opt_equal (List.all2 EcTypes.e_equal) qes1 qes2)
 
     | Sif (c1, s1, r1), Sif (c2, s2, r2) ->
            (EcTypes.e_equal c1 c2)
@@ -177,7 +169,7 @@ module Hinstr = Why3.Hashcons.Make (struct
 
     | Sabstract id -> EcIdent.id_hash id
 
-  let i_fv   = function
+  let i_fv = function
     | Sasgn (lv, e) ->
         EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
 
@@ -255,14 +247,14 @@ let stmt s = Hstmt.hashcons
 let rstmt s = stmt (List.rev s)
 
 (* --------------------------------------------------------------------- *)
-let i_asgn     (lv, e)      = mk_instr (Sasgn (lv, e))
-let i_rnd      (lv, e)      = mk_instr (Srnd (lv, e))
+let i_asgn     (lv, e)          = mk_instr (Sasgn (lv, e))
+let i_rnd      (lv, e)          = mk_instr (Srnd (lv, e))
 let i_call     (lv, m, es, qes) = mk_instr (Scall (lv, m, es, qes))
-let i_if       (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
-let i_while    (c, s)       = mk_instr (Swhile (c, s))
-let i_match    (e, b)       = mk_instr (Smatch (e, b))
-let i_assert   e            = mk_instr (Sassert e)
-let i_abstract id           = mk_instr (Sabstract id)
+let i_if       (c, s1, s2)      = mk_instr (Sif (c, s1, s2))
+let i_while    (c, s)           = mk_instr (Swhile (c, s))
+let i_match    (e, b)           = mk_instr (Smatch (e, b))
+let i_assert   e                = mk_instr (Sassert e)
+let i_abstract id               = mk_instr (Sabstract id)
 
 let s_seq      s1 s2        = stmt (s1.s_node @ s2.s_node)
 let s_empty                 = stmt []
@@ -478,17 +470,20 @@ module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
   let e_pv e =
     let rec e_pv sid e =
       match e.e_node with
-      | Evar (PVglob _) -> sid
-      | Evar (PVloc(_,id)) -> Ssym.add id sid
-      | _               -> e_fold e_pv sid e in
+      | Evar (PVglob _) ->
+         sid
+      | Evar (PVloc (_, id)) ->
+         Ssym.add id sid
+      | _ ->
+         e_fold e_pv sid e in
 
     e_pv Ssym.empty e
 end
 
 let rec lv_get_uninit_read (w : Ssym.t) (lv : lvalue) =
   let sx_of_pv pv = match pv with
-    | PVloc (_,v) -> Ssym.singleton v
-    | PVglob _ -> Ssym.empty
+    | PVloc  (_, v) -> Ssym.singleton v
+    | PVglob _      -> Ssym.empty
   in
 
   match lv with
@@ -714,9 +709,11 @@ let p_mr_equal a_equal mr1 mr2 =
   && Msym.equal (PreOI.equal a_equal) mr1.mr_oinfos mr2.mr_oinfos
 
 let has_compl_restriction mr =
-  Msym.exists (fun _ oi ->
-      (PreOI.costs oi) <> `Unbounded
-    ) mr.mr_oinfos
+  Msym.exists (fun _ oi -> (PreOI.costs oi) <> `Unbounded) mr.mr_oinfos
+
+let mr_is_empty mr =
+     not (has_compl_restriction mr)
+  && Msym.for_all (fun _ oi -> [] = PreOI.allowed oi && PreOI.is_in oi) mr.mr_oinfos
 
 let mr_xpaths_fv (m : mr_xpaths) : int Mid.t =
   EcPath.Sx.fold
@@ -738,19 +735,18 @@ let mr_mpaths_fv (m : mr_mpaths) : int Mid.t =
 type quantum = [`Quantum | `Classical]
 
 (* -------------------------------------------------------------------- *)
-
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
   fs_qarg   : EcTypes.ty option;
-  fs_anames : variable list option; (* only classical variables *)
-  fs_qnames: variable list option; (* only quantum variables *)
+  fs_anames : ovariable list; (* only classical variables *)
+  fs_qnames : ovariable list; (* only quantum variables *)
   fs_ret    : EcTypes.ty;
 }
 
 let fs_equal f1 f2 =
-    (EcUtils.opt_equal (List.all2 EcTypes.v_equal) f1.fs_anames f2.fs_anames)
-    && (EcUtils.opt_equal (List.all2 EcTypes.v_equal) f1.fs_qnames f2.fs_qnames)
+       List.all2 EcTypes.ov_equal f1.fs_anames f2.fs_anames
+    && List.all2 EcTypes.ov_equal f1.fs_qnames f2.fs_qnames
     && (EcTypes.ty_equal f1.fs_ret f2.fs_ret)
     && (EcTypes.ty_equal f1.fs_arg f2.fs_arg)
     && (EcUtils.opt_equal EcTypes.ty_equal f1.fs_qarg f2.fs_qarg)
@@ -758,13 +754,14 @@ let fs_equal f1 f2 =
 
 let fs_quantum f = if f.fs_qarg = None then `Classical else `Quantum
 let pv_res f = pv_res (fs_quantum f)
+
 (* -------------------------------------------------------------------- *)
 type 'a p_module_type = {
-  mt_quantum: quantum;
-  mt_params : (EcIdent.t * 'a p_module_type) list;
-  mt_name   : EcPath.path;
-  mt_args   : EcPath.mpath list;
-  mt_restr  : 'a p_mod_restr;
+  mt_quantum : quantum;
+  mt_params  : (EcIdent.t * 'a p_module_type) list;
+  mt_name    : EcPath.path;
+  mt_args    : EcPath.mpath list;
+  mt_restr   : 'a p_mod_restr;
 }
 
 type module_sig_body_item = Tys_function of funsig
@@ -773,9 +770,9 @@ type module_sig_body = module_sig_body_item list
 
 type 'a p_module_sig = {
   mis_quantum : quantum;
-  mis_params : (EcIdent.t * 'a p_module_type) list;
-  mis_body   : module_sig_body;
-  mis_restr  : 'a p_mod_restr;
+  mis_params  : (EcIdent.t * 'a p_module_type) list;
+  mis_body    : module_sig_body;
+  mis_restr   : 'a p_mod_restr;
 }
 
 type 'a p_top_module_sig = {
@@ -937,10 +934,17 @@ let get_uninit_read_of_fun (f : _ p_function_) =
 
   | FBdef fd ->
       let w =
-        let toloc { v_name = x } = x in
+        let toloc ov =
+          (* We don't allow anonymous parameters on concrete procedures *)
+          assert (is_some ov.ov_name);
+          oget ov.ov_name
+        in
+
         let doit l s = List.fold_left (fun s x -> Ssym.add (toloc x) s) s l in
-        let w = ofold doit Ssym.empty f.f_sig.fs_anames in
-        ofold doit w f.f_sig.fs_qnames
+        let w = Ssym.empty in
+        let w = doit f.f_sig.fs_anames w in
+        let w = doit f.f_sig.fs_qnames w in
+        w
       in
 
       let w, r  = s_get_uninit_read w fd.f_body in

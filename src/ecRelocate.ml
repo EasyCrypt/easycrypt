@@ -8,8 +8,8 @@ let eclocal =
 let sourceroot =
   if eclocal then
     if   Filename.basename mydir = "src"
-    then Some mydir
-    else Some (Filename.concat mydir "src")
+    then Some (Filename.dirname mydir)
+    else Some mydir
   else None
 
 let resource name =

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import Bool Core Int Xint List.
 require (*--*) FinType Word Ring.
@@ -22,10 +14,7 @@ clone include Word with
   op   n             <- n,
   op   dchar         <- false
 
-proof Alphabet.* by case, ge0_n by apply/ltzW/gt0_n
-
-rename [op] "oflist"  as "bits2w"
-       [op] "tolist"  as "w2bits".
+proof Alphabet.* by case, ge0_n by apply/ltzW/gt0_n.
 
 (* -------------------------------------------------------------------- *)
 op zerow: word = offun (fun i => false).
@@ -33,10 +22,6 @@ op onew : word = offun (fun i => true ).
 
 op (+^) (w1 w2 : word): word =
   offun (fun i => w1.[i] ^^ w2.[i]).
-
-op cxor : {int | 0 <= cxor } as ge0_cxor.
-schema cost_xor `{P} {w1 w2: word} : cost [P: w1 +^ w2] = cost[P:w1] + cost[P:w2] + N cxor.
-hint simplify cost_xor.
 
 op andw (w1 w2:word): word =
   offun (fun i => w1.[i] /\ w2.[i]).
@@ -155,3 +140,11 @@ proof.
 move=> x y; rewrite /unitw !wordP => + i Hi -/(_ i Hi).
 by rewrite andwE onewE Hi /#.
 qed.
+
+(* -------------------------------------------------------------------- *)
+abstract theory Cost.
+  op cxor : {int | 0 <= cxor } as ge0_cxor.
+  schema cost_cxor `{P} {w1 w2: word} : 
+    cost [P: w1 +^ w2] = cost[P:w1] + cost[P:w2] + N cxor.
+  hint simplify cost_cxor.
+end Cost.

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 %{
   open EcUtils
   open EcLocation
@@ -179,6 +171,7 @@
     | `WANTEDLEMMAS   of EcParsetree.pdbhint
     | `VERBOSE        of int option
     | `VERSION        of [ `Full | `Lazy ]
+    | `DUMPIN         of string located
     | `SELECTED
     | `DEBUG
   ]
@@ -214,6 +207,7 @@
            "lazy"          ;
            "full"          ;
            "iterate"       ;
+           "dumpin"        ;
            "selected"      ;
            "debug"         ]
 
@@ -289,6 +283,7 @@
       let verbose  = ref None in
       let version  = ref None in
       let iterate  = ref None in
+      let dumpin   = ref None in
       let selected = ref None in
       let debug    = ref None in
 
@@ -333,6 +328,7 @@
         | `VERSION        v -> version  := Some v
         | `ITERATE          -> iterate  := Some true
         | `PROVER         p -> List.iter add_prover p
+        | `DUMPIN         f -> dumpin   := Some f
         | `SELECTED         -> selected := Some true
         | `DEBUG            -> debug    := Some true
       in
@@ -355,6 +351,7 @@
         plem_iterate    = !iterate;
         plem_wanted     = !wanted;
         plem_unwanted   = !unwanted;
+        plem_dumpin     = !dumpin;
         plem_selected   = !selected;
         psmt_debug      = !debug;
       }
@@ -1417,7 +1414,11 @@ pgtybinding1:
     { [[mk_loc (loc x) (Some x)], PGTY_ModTy mi] }
 
 | pn=mident
-    { [[mk_loc (loc pn) (Some pn)], PGTY_Mem] }
+    { [[mk_loc (loc pn) (Some pn)], PGTY_Mem None] }
+
+| LPAREN pn=mident COLON mt=memtype RPAREN
+    { [[mk_loc (loc pn) (Some pn)], PGTY_Mem (Some mt)] }
+
 
 pgtybindings:
 | x=pgtybinding1+ { List.flatten x }
@@ -1444,30 +1445,31 @@ type_exp:
 
 (* -------------------------------------------------------------------- *)
 (* Parameter declarations                                              *)
+var_or_anon:
+| x=loc(UNDERSCORE)
+    { mk_loc x.pl_loc None }
 
-typed_vars:
-| xs=ident+ COLON ty=loc(type_exp)
+| x=ident
+    { mk_loc x.pl_loc (Some x) }
+
+typed_vars_or_anons:
+| xs=var_or_anon+ COLON ty=loc(type_exp)
    { List.map (fun v -> (v, ty)) xs }
 
-| xs=ident+
+| xs=var_or_anon+
     { List.map (fun v -> (v, mk_loc v.pl_loc PTunivar)) xs }
 
-%inline param_decl1:
-| aout=plist0(typed_vars, COMMA)
-    { Fparams_exp (List.flatten aout )}
-
-| UNDERSCORE COLON ty=loc(type_exp)
-    { Fparams_imp ty }
-
 param_decl:
-| LPAREN p=param_decl1 RPAREN { p }
+| LPAREN aout=plist0(typed_vars_or_anons, COMMA) RPAREN
+    { List.flatten aout }
 
 qparam_decl:
-| LBRACE p=param_decl1 RBRACE { p }
+| LBRACE aout=plist0(typed_vars_or_anons, COMMA) RBRACE
+    { List.flatten aout }
 
 cqparam_decl:
-| p=param_decl q=qparam_decl? { p, q}
-| q=qparam_decl               {Fparams_exp [], Some q}
+| p=param_decl q=qparam_decl? { (p , q     ) }
+| q=qparam_decl               { ([], Some q) }
 
 (* -------------------------------------------------------------------- *)
 (* Statements                                                           *)
@@ -1608,7 +1610,7 @@ fun_def_body:
         pfb_return = rs  ; }
     }
 
-%inline fun_decl:
+fun_decl:
 | q=quantum PROC x=lident cqpd=cqparam_decl ty=prefix(COLON, loc(type_exp))?
     { let frestr = { pmre_in    = true;
 		     pmre_name  = x;
@@ -1636,11 +1638,13 @@ mod_item:
 
 | decl=loc(fun_decl) EQ body=fun_def_body {
     let { pl_loc = loc; pl_desc = decl; } = decl in
-    let check = function
-      | Fparams_imp _ ->
+    let check1 (param, _) =
+      if is_none (unloc param) then
         let msg = "implicite declaration of parameters not allowed" in
         parse_error loc (Some msg)
-      | _ -> () in
+    in
+    let check params = List.iter check1 params in
+
     check decl.pfd_tyargs;
     oiter check decl.pfd_qtyargs;
     Pst_fun (decl, body)
@@ -1695,6 +1699,7 @@ mod_params:
 mem_restr_el:
   | PLUS  el=f_or_mod_ident { PMPlus el }
   | MINUS el=f_or_mod_ident { PMMinus el }
+  |       el=f_or_mod_ident { PMDefault el }
 
 mem_restr:
   | ol=rlist0(mem_restr_el,COMMA) { ol }
@@ -1778,11 +1783,14 @@ mod_restr:
 sig_def:
 | pi_locality=loc(locality) q=quantum MODULE TYPE pi_name=uident args=sig_params* mr=mod_restr? EQ i=sig_body
     { let pi_sig =
-        Pmty_struct { pmsig_quantum = q;
-                      pmsig_params  = List.flatten args;
-                      pmsig_body    = i;
-			                pmsig_restr   = mr; } in
-      { pi_name; pi_sig; pi_locality = locality_as_local pi_locality; } }
+        Pmty_struct {
+          pmsig_quantum = q;
+	  pmsig_params  = List.flatten args;
+          pmsig_body      = i;
+	  pmsig_restr     = mr;
+	}
+      in { pi_name; pi_sig; pi_locality = locality_as_local pi_locality; }
+    }
 
 sig_body:
 | body=sig_struct_body { body }
@@ -1816,8 +1824,8 @@ signature_item:
 
       `FunctionDecl
           { pfd_quantum  = q;
-            pfd_name     = x;
-            pfd_tyargs   = fst cqpd;
+	    pfd_name     = x;
+	    pfd_tyargs   = fst cqpd;
             pfd_qtyargs  = snd cqpd;
             pfd_tyresult = ty;
             pfd_uses     = frestr; } }
@@ -3870,6 +3878,9 @@ smt_info1:
 
 | PROVER EQ p=prover_kind
     { `PROVER p }
+
+| DUMP IN EQ file=loc(STRING)
+    { `DUMPIN file }
 
 | x=lident po=prefix(EQ, smt_option)?
     { SMT.mk_pi_option x po }

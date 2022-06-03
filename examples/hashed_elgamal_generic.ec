@@ -14,6 +14,11 @@ rename
   "dunifin" as "dbits".
 import DWord.
 
+op cdbits : { int | 0 <= cdbits } as ge0_cdbits.
+
+schema cost_cdbits `{P} : cost [P: dbits] = N cdbits.
+hint simplify cost_cdbits.
+
 (* Upper bound on complexity of the adversary *)
 type adv_cost = {
   cchoose : int; (* cost *)
@@ -34,7 +39,14 @@ clone import DiffieHellman.List_CDH as LCDHT with
   proof gt0_n by apply gt0_qH.
 import DiffieHellman G FDistr.
 
-clone import LCDHT.C as C1.
+clone import LCDHT.Cost as C1.
+
+clone include AllCore.Cost.
+clone include Bool.Cost.
+clone include Bits.Cost.
+clone include DBool.Cost.
+clone include List.Cost.
+clone include G.Cost.
 
 type pkey = group.
 type skey = t.
@@ -86,7 +98,9 @@ clone import ROM as RO with
   type d_in_t  <- unit,
   type d_out_t <- bool,
   op   dout _  <- dbits.
+
 import Lazy.
+
 clone import ROM_BadCall as ROC with
   op qH <- qH.
 
@@ -188,28 +202,38 @@ section.
 
   local lemma cost_ALCDH : 
     choare [ALCDH.solve : true ==> 0 < size res <= cA.`ochoose + cA.`oguess] 
-    time [N (6 + cunifin + (3 + cunifin + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose)].
+    time [N (6 + cdbits + (3 + cdbits + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose)].
   proof.
     proc; wp.
     call (_: size H.qs- cA.`ochoose <= k /\ bounded LRO.m (size H.qs);
            time
-           [H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)]]).
+           [H.o k : [N(3 + cdbits + cget qH + cset qH + cin qH)]]).
     + move=> zo hzo; proc; inline *.
       wp := (bounded LRO.m qH).
-      rnd; auto => &hr />; rewrite dbits_ll /= => *; split => *.
-      + have ? := bounded_set LRO.m{hr} (qH - 1) x{hr}.
-        have ? := bounded_set LRO.m{hr} (size H.qs{hr}).
-        smt().
-      smt(cset_pos).
+      rnd; auto => &hr />; rewrite dbits_ll /=.
+      progress; 1,2,4,6,7,8,9: smt (cset_pos bounded_set).
+      * have -> : (qH = qH - 1 + 1) by smt ().
+        apply bounded_set. 
+        smt ().
+
+      * rewrite addzC.
+        apply bounded_set. 
+        smt ().
+
     wp; rnd; call (_: size H.qs = k /\ bounded LRO.m (size H.qs);
-           time [H.o k : [N(3 + cunifin + cget qH + cset qH + cin qH)]]).
+           time [H.o k : [N(3 + cdbits + cget qH + cset qH + cin qH)]]).
     + move=> zo hzo; proc; inline *.
       wp := (bounded LRO.m qH).
-      rnd;auto => &hr />; rewrite dbits_ll /= => *; split => *.
-      + have ? := bounded_set LRO.m{hr} (qH - 1) x{hr}.
-        have ? := bounded_set LRO.m{hr} (size H.qs{hr}).
-        smt(cA_pos).
-      smt(cset_pos).
+      rnd;auto => &hr />; rewrite dbits_ll /=.
+      progress; 1,2,4,6,7,8,9: 
+      smt(cset_pos bounded_set cA_pos).
+      * have -> : (qH = qH - 1 + 1) by smt ().
+        apply bounded_set. 
+        smt (cA_pos).
+
+      * rewrite addzC.
+        apply bounded_set. 
+        smt ().
     inline *; auto => />.
     split => *.
     + smt (bounded_empty dbits_ll size_ge0 size_eq0 cA_pos).
@@ -234,8 +258,8 @@ section.
   lemma ex_reduction &m : 
     exists (B<:CDH.Adversary 
       [solve : `{ N(C1.cduniform_n + 
-                  6 + cunifin + 
-                  (3 + cunifin + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose)}]
+                  6 + cdbits + 
+                  (3 + cdbits + cget qH + cset qH + cin qH) * (cA.`oguess + cA.`ochoose) + cA.`cguess + cA.`cchoose)}]
                {+A, +H}),
     Pr[CPA(S,A(LRO)).main() @ &m: res] - 1%r/2%r <= 
     qH%r * Pr[CDH.CDH(B).main() @ &m: res].

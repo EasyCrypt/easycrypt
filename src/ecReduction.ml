@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
@@ -635,15 +627,14 @@ let is_alpha_eq hyps f1 f2 =
       | Some f1, Some f2 -> aux env subst f1 f2
       | _, _ -> error()
       end;
-      aux env subst pr1.pr_event pr2.pr_event;
-
+      aux env subst pr1.pr_event pr2.pr_event
 
     | Fcoe coe1, Fcoe coe2 ->
       check_e env subst coe1.coe_e coe2.coe_e;
       let bd1 = fst coe1.coe_mem, GTmem (snd coe1.coe_mem) in
       let bd2 = fst coe2.coe_mem, GTmem (snd coe2.coe_mem) in
       let env, subst = check_bindings test env subst [bd1] [bd2] in
-      aux env subst coe1.coe_pre coe2.coe_pre;
+      aux env subst coe1.coe_pre coe2.coe_pre
 
     | _, _ -> error ()
 
@@ -673,9 +664,9 @@ and deltap      = [`Yes | `No | `Force]
 and rlogic_info = [`Full | `ProductCompat] option
 
 (* -------------------------------------------------------------------- *)
-let full_red ~opaque = {
+let full_red = {
   beta    = true;
-  delta_p = (fun _ -> if opaque then `Force else `Yes);
+  delta_p = (fun _ -> `Yes);
   delta_h = EcUtils.predT;
   zeta    = true;
   iota    = true;
@@ -703,15 +694,13 @@ let beta_red     = { no_red with beta = true; }
 let betaiota_red = { no_red with beta = true; iota = true; }
 
 let nodelta =
-  { (full_red ~opaque:false) with
+  { full_red with
       delta_h = EcUtils.pred0;
       delta_p = (fun _ -> `No); }
 
 let delta = { no_red with delta_p = (fun _ -> `Yes); }
 
-let full_compat = {
-  (full_red ~opaque:false) with
-    logic = Some `ProductCompat; }
+let full_compat = { full_red with logic = Some `ProductCompat; }
 
 (* -------------------------------------------------------------------- *)
 type not_reducible = NoHead | NeedSubTerm
@@ -1781,7 +1770,7 @@ let reduce_cost ri env coe =
   | NotRed _ -> raise NotReducible
 
 (* -------------------------------------------------------------------- *)
-let is_conv ?(ri = full_red ~opaque:false) hyps f1 f2 =
+let is_conv ?(ri = full_red) hyps f1 f2 =
   if f_equal f1 f2 then true
   else
     let ri, env = init_redinfo ri hyps in

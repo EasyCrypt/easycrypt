@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcUid
@@ -306,6 +298,9 @@ end = struct
     | TypeVarNotAllowed ->
         msg "type variables not allowed"
 
+    | NoConcreteAnonParams ->
+        msg "parameters to concrete procedures must be named"
+
     | OnlyMonoTypeAllowed s ->
         msg "%s, %s%a"
           "only monomorphic types are allowed"
@@ -589,14 +584,32 @@ end = struct
       msg "quantum module type cannot have negative restrictions over quantum modules: %a"
       (EcPrinting.pp_list " " (EcPrinting.pp_topmod env)) mps
 
-    | QuantumSigNoArg -> msg "quantum procedure expects quantum arguments"
-    | ClassicalSigArg -> msg "classical procedure does not expect quantum arguments"
-    | ClassicalExprNeeded s -> msg "only classical expression are allowed (%s is quantum)" s
-    | ClassicalFormNeeded -> msg "only classical formula are allowed"
-    | QuantumLvar (q,pv) -> msg "the variable %a should be %s"
-                              (EcPrinting.pp_pv env) pv
-                              (EcPrinting.string_of_quantum q)
+    | QuantumSigNoArg ->
+       msg "quantum procedure expects quantum arguments"
 
+    | ClassicalSigArg ->
+       msg "classical procedure does not expect quantum arguments"
+
+    | ClassicalExprNeeded s ->
+       msg "only classical expression are allowed (%s is quantum)" s
+
+    | ClassicalFormNeeded ->
+       msg "only classical formula are allowed"
+
+    | QuantumLvar (q,pv) ->
+       msg "the variable %a should be %s"
+         (EcPrinting.pp_pv env) pv
+         (EcPrinting.string_of_quantum q)
+
+    | NoDefaultMemRestr ->
+       msg "no default sign for memory restriction. Use '+' or '-', or \
+            set the %s pragma to retrieve the old behaviour"
+         EcGState.old_mem_restr
+
+    | ProcAssign q ->
+        msg "the right-hand side of this assignment cannot be typed as an expression;
+             if you meant to call procedure `%a', assign its result using `<@' rather than `<-'"
+            pp_qsymbol q
 
   let pp_restr_error env fmt (w, e) =
     let ppe = EcPrinting.PPEnv.ofenv env in

@@ -2,6 +2,8 @@
 (using menhir 2.0)
 (using dune_site 0.1)
 
+(wrapped_executables false)
+
 (name easycrypt)
 
 (generate_opam_files true)
@@ -17,7 +19,7 @@
   dune-site
   (ocaml-inifiles (>= 1.2))
   (pcre (>= 7))
-  (why3 (and (>= 1.4.0) (< 1.5)))
+  (why3 (and (>= 1.5.0) (< 1.6)))
   yojson
   (zarith (>= 1.10))
 ))

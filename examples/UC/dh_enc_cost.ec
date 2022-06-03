@@ -368,9 +368,14 @@ end FKE.
 
 require import DiffieHellman.
 
-schema cost_dapply : cost[true : dapply (fun (x : t) => g ^ x) FDistr.dt] = 
-                          N (FDistr.cdt + cgpow).
+clone include AllCore.Cost.
+clone include G.Cost.
+clone include G.FD.Cost.
+clone include G.FD.FDistr.Cost.
+clone include Bool.Cost.
 
+schema cost_dapply : cost[true : dapply (fun (x : t) => g ^ x) FDistr.dt] = 
+                          N (cdt + cgpow).
 op adv_ddh : int -> real.
 
 axiom adv_ddh_max cddh : 
@@ -1052,8 +1057,7 @@ wp; call (_:
 
 (* INPUTS *)
 (* PY: SMT doesn't catch this without rewrite *)
-+ proc; inline *;wp;skip; rewrite /staterel => &1 &2 />. 
-  case: (FKE.st{2}.`kst) => />. smt(pkgid). 
++ by proc; inline *;wp;skip; rewrite /staterel; smt(pkgid). 
 
 (* OUTPUTS *)
 + by proc;inline *;auto => />; rewrite /staterel => /#. 
@@ -1064,7 +1068,9 @@ wp; call (_:
   (* We step Rho *)
   + by move => m1 p; inline *;wp;skip; smt(). 
   (* We step F2Auth *)
-  by move => m2 p;inline *; auto => /> &1 &2; rewrite /staterel /leak oget_some /unblock /kstp /#.
+    move => m2 p;inline *; auto => /> &1 &2.
+    rewrite /staterel /leak oget_some /unblock /kstp.
+    by case (FKE.st{2}.`kst) => /> /#. 
 
 (* BACKDOOR *)
 + proc.
@@ -1072,7 +1078,9 @@ wp; call (_:
   (* Backdoor Rho *)
   + by move => *; inline *;auto => /#.   
   (* Backdoor F2Auth *)
-  by move=> m2 p; inline *; auto => /> &1 &2; rewrite /staterel /leak oget_some /unblock /kstp /rcv /#.
+  move=> m2 p; inline *; auto => /> &1 &2.
+  rewrite /staterel /leak oget_some /unblock /kstp /rcv. 
+  by case (FKE.st{2}.`kst) => /> /#. 
 
 (* WRAP-UP CALL *)
 by auto => /#.
@@ -1093,7 +1101,7 @@ abstract theory C.
 
 clone FKEWorlds.C as RC
   with op csi = {|
-    cinit     = 2 * (1 + cgpow + FDistr.cdt);
+    cinit     = 2 * (1 + cgpow + cdt);
     cstep     = 26; 
     cs_s      = 1; 
     cs_b      = 1;
@@ -1101,7 +1109,7 @@ clone FKEWorlds.C as RC
     cb_s      = 0;
     cb_b      = 1; 
   |}
-  proof csi_pos by smt (ge0_cg ge0_cf) .
+  proof csi_pos by smt (ge0_cg ge0_cf ge0_cdt) .
 
 op cddh =  8 + RC.c.`cd + RC.c.`ci * 29 + RC.c.`co * 2 + RC.c.`cs * 23 + RC.c.`cb * 5.
 
@@ -1119,7 +1127,7 @@ proof.
       + match Left 1; [1: by auto; smt() | 2: done].
         seq 1 : true time [ N 25; FB.backdoor : 0; FB.step : 1 ]; 1: done.
         + by call (:true); auto => />. 
-        if => //.
+        if => //. 
         + exlim (oget lk) => -[|i|i|i|i].
           + by match KE_Init 1 => //=; auto => /> /#.
           + by match KE_Blocked1 1 => //=; auto => /> /#. 
@@ -1585,7 +1593,7 @@ module (OTPLazy : RHO) (KEAuth: Pi.REAL.IO) = {
    }
 }.
 
-declare module Z : REAL.ENV {-FKE, -FSC, -FChan.FAuth.FAuth, -OTP_SIM, 
+declare module Z <: REAL.ENV {-FKE, -FSC, -FChan.FAuth.FAuth, -OTP_SIM, 
                              -OTP, -DHKE.FKE.FKEAuth.FChan.FAuth.FAuth, -OTPLazy}.
 
 (* To prove that our change of sampling in OTP is sound we use a generic
@@ -1660,7 +1668,8 @@ proof.
             (DHKE.FKE.FKEAuth.FChan.FAuth.FAuth.st{2} <> Ch_Init => 
                    FKE.st{2}.`key = oget RO.m{2}.[()])
              ); conseq />.
-    + proc => /=; inline *; wp; skip => /> &1 &2; rewrite /party_start /kstp /= /#.
+    + proc => /=; inline *; wp; skip => /> &1 &2; rewrite /party_start /kstp /=. 
+      progress; smt (). 
     + proc => /=; inline *; wp; skip => /> &1 &2; rewrite /party_output /kstp /= /#.    
     + proc; match; 1,2 : smt().
       + move=> m1 m2.      
@@ -1810,6 +1819,13 @@ proof.
 rewrite /enc; rewrite log_bij !(Ring.rw_algebra, inv_def); ring. 
 qed.
 
+lemma aux ['a] (b : bool) (u v : 'a) :
+  b => (if b then u else v) = u
+by case b. 
+lemma aux2 ['a] (b : bool) (u v : 'a) :
+  !b => (if b then u else v) = v
+by case b.
+
 lemma OTPAdv2 &m :
       Pr[ REAL.UC_emul(Z,CompRF(OTPLazy,DHKE.FKE.FKEAuth.FKEAuth)).main() @ &m : res] =
          Pr[ REAL.UC_emul(Z,CompS(FSC, OTP_SIM)).main() @ &m : res].
@@ -1832,7 +1848,28 @@ call (_: invotp OTP.Initiator.p{1}
 
 (* OUTPUTS *)
 + proc;inline *.
-  by wp; skip => /> &1 &2; rewrite /rcv /= /party_output /invotp /kstp /=; smt (correctness). 
+  wp; skip => /> &1 &2; rewrite /rcv /= /party_output /invotp /kstp /=.
+
+  (* MERGE-COST: old proof *)
+  (* smt (correctness). *)
+
+  (* MERGE-COST: new proof *)
+  progress; 1,3: smt ().
+  move :H; case (FSC.st{2}); case (FKE.st{1}.`kst) => />.
+  smt (correctness).
+  smt (correctness).
+  smt (correctness).
+  smt (correctness).
+  smt (correctness).
+  smt (correctness).
+  smt (correctness).
+  smt (correctness).  
+  smt (correctness).
+  move :H0 H1.
+  case (OTP.Initiator.p{1}); case (p{2}) => />. 
+  rewrite /leakpkg /pld /rcv /snd /=. 
+  smt(correctness).
+  (* MERGE-COST: end *)
 
 (* Step *)
 + proc;inline *.
@@ -1881,7 +1918,23 @@ call (_: invotp OTP.Initiator.p{1}
                        fresh1 * (pld OTP.Initiator.p{1}) * (inv (g ^ F.zero))) 
                     (fun (fresh2 : group) => 
                        fresh2 * (inv (pld OTP.Initiator.p{1})) * (g ^ F.zero)).
-            by wp;skip;smt(alg_lem1 sup_lem1 sup_lem2 alg_lem2 enc_lem).
+
+            (* MERGE-COST: old proof *)
+            (* by wp;skip;smt(alg_lem1 sup_lem1 sup_lem2 alg_lem2 enc_lem). *)
+
+            (* MERGE-COST: new proof *)
+            wp;skip. 
+            move => />. 
+            progress.
+            smt(alg_lem1 alg_lem2 enc_lem). 
+            by apply sup_lem1.
+            by apply sup_lem2.
+            smt(alg_lem1 alg_lem2 enc_lem).
+            smt(alg_lem1 alg_lem2 enc_lem).
+            smt(alg_lem1 alg_lem2 enc_lem).
+            smt(alg_lem1 alg_lem2 enc_lem).
+            (* MERGE-COST: end *)
+
           by wp;skip;rewrite /invotp;smt().
         seq 0 3 : (#pre /\ (oget (getl (oget lfa{2}))) <> Ch_Init); 
           first by wp;skip;smt().
@@ -1971,7 +2024,7 @@ clone PARA_IR.C as PIC with
     cpbackdoor = 1;
   |},
   op cs2 = {|
-    cinit     = 2 * (1 + cgpow + FDistr.cdt);
+    cinit     = 2 * (1 + cgpow + cdt);
     cstep     = 26; 
     cs_s      = 1; 
     cs_b      = 1;
@@ -1981,7 +2034,7 @@ clone PARA_IR.C as PIC with
   |}
   proof cz_pos by smt (cz_pos ge0_cg)
   proof cf1_pos by done
-  proof cs2_pos by smt (ge0_cg ge0_cf).
+  proof cs2_pos by smt (ge0_cg ge0_cf ge0_cdt).
 
 clone DHKE.C as DHKEC with
   op RC.c <- PIC.CPi2.c
@@ -2117,8 +2170,8 @@ call (:true; time [ CompR_I(OTP, I0).inputs  : [N 9; I0.inputs : 1],
   match Right 1; [auto; smt() | done |].
   by wp; call (:true); auto.  
 inline *; auto => />.
-rewrite !bigi_constz 1..4:[smt(cz_pos)] /=.
-rewrite !StdBigop.Bigint.bigi_constz; smt (cz_pos).
+rewrite !bigi_constz; 1..4:smt(cz_pos). 
+rewrite /= !StdBigop.Bigint.bigi_constz; smt (cz_pos).
 qed.
 
 import DHKE.
@@ -2138,8 +2191,8 @@ clone C_OTP.TRANS.C as COTPTC with
   op cz   <- cz,
   op cs12 <- csi,
   op cs23 <- {|
-    cinit     = 3 + FDistr.cdt + cgpow;
-    cstep     = 34 + cgmul + 2 * cgpow + FDistr.cdt;
+    cinit     = 3 + cdt + cgpow;
+    cstep     = 34 + cgmul + 2 * cgpow + cdt;
     cs_s      = 1;
     cs_b      = 1;
     cbackdoor = 25;
@@ -2148,7 +2201,7 @@ clone C_OTP.TRANS.C as COTPTC with
     |}
   proof cz_pos by apply cz_pos
   proof cs12_pos by smt (PIC.CRI.csi_pos)
-  proof cs23_pos by smt (ge0_cf ge0_cg).
+  proof cs23_pos by smt (ge0_cf ge0_cg ge0_cdt).
  
 (* add proof *)
 
@@ -2185,16 +2238,16 @@ have [S1 hS1]:= COTPTC.ex_uc_transitivity
   proc. 
   exlim (s) => -[]mi.
   + match Left 1;[auto; smt() | done |].
-    seq 1 : true time [N (33 + cgmul + 2 * cgpow + FDistr.cdt)] => //.
+    seq 1 : true time [N (33 + cgmul + 2 * cgpow + cdt)] => //.
     + by call (:true); auto => /> /#. 
     inline *; wp.
     exlim (oget lsc) => -[|p|p|p|p].
     + match Ch_Init 1; [auto; smt() | done |].
-      by auto => />; smt(ge0_cf ge0_cg).
+      by auto => />; smt(ge0_cf ge0_cg ge0_cdt).
     + match Ch_Blocked1 1; [auto; smt() | done |].
-      by auto => />; smt(ge0_cf ge0_cg).
+      by auto => />; smt(ge0_cf ge0_cg ge0_cdt).
     + match Ch_Wait 1; [auto; smt() | done |].
-      auto => />; smt(ge0_cf ge0_cg).
+      auto => />; smt(ge0_cf ge0_cg ge0_cdt).
     + match Ch_Blocked2 1; [auto; smt() | done |].
       if => //.
       + sp => //.
@@ -2207,13 +2260,13 @@ have [S1 hS1]:= COTPTC.ex_uc_transitivity
           sp => //.
           exlim (oget (getr (oget lke))) => -[|p1|p1|p1|p1].
           + match KE_Init 1; [auto; smt() | done |].
-            auto; smt(ge0_cf ge0_cg).
+            auto; smt(ge0_cf ge0_cg ge0_cdt).
           + match KE_Blocked1 1; [auto; smt() | done |].
-            auto => />; smt(ge0_cf ge0_cg).
+            auto => />; smt(ge0_cf ge0_cg ge0_cdt).
           + match KE_Wait 1; [auto; smt() | done |].
-            auto => />; smt(ge0_cf ge0_cg).
+            auto => />; smt(ge0_cf ge0_cg ge0_cdt).
           + match KE_Blocked2 1; [auto; smt() | done |].
-            auto => />; smt(ge0_cf ge0_cg).
+            auto => />; smt(ge0_cf ge0_cg ge0_cdt).
           match KE_Available 1; [auto; smt() | done |].
           seq 2 : (i =  Left (I, (snd p2, rcv p2, enc (g ^ F.zero) fresh))) time [N 4] => //.
           + instantiate h := (cost_dapply {m2, m3 : unit, r3, r4 : role, p0, p1, p2 : unit pkg, fresh : group, 
@@ -2225,16 +2278,16 @@ have [S1 hS1]:= COTPTC.ex_uc_transitivity
              auto => /> *; rewrite h dmap_ll 1:FDistr.dt_ll /=; smt(ge0_cf ge0_cg).
           by match Left 1; [auto; smt() | done | auto => />].
         + match Ch_Blocked1 1; [auto; smt() | done |].
-          auto; smt(ge0_cf ge0_cg).
+          auto; smt(ge0_cf ge0_cg ge0_cdt).
         + match Ch_Wait 1; [auto; smt() | done |].
-          auto; smt(ge0_cf ge0_cg).
+          auto; smt(ge0_cf ge0_cg ge0_cdt).
         + match Ch_Blocked2 1; [auto; smt() | done |].
-          auto; smt(ge0_cf ge0_cg).
+          auto; smt(ge0_cf ge0_cg ge0_cdt).
         match Ch_Available 1; [auto; smt() | done |].
-        auto; smt(ge0_cf ge0_cg).
-      auto; smt(ge0_cf ge0_cg).
+        auto; smt(ge0_cf ge0_cg ge0_cdt).
+      auto; smt(ge0_cf ge0_cg ge0_cdt).
     match Ch_Available 1; [auto; smt() | done |].
-    auto; smt(ge0_cf ge0_cg).
+    auto; smt(ge0_cf ge0_cg ge0_cdt).
   match Right 1;[auto; smt() | done |].
   inline *.
   exlim m2 => -[] m2i.
@@ -2246,18 +2299,18 @@ have [S1 hS1]:= COTPTC.ex_uc_transitivity
     sp => //.
     exlim (oget (getl (oget lfa))) => -[|p'|p'|p'|p'].
     + match Ch_Init 1; [auto; smt() | done |].
-      by auto => /=; smt(ge0_cf ge0_cg).
-    + by match Ch_Blocked1 1; auto; smt(ge0_cf ge0_cg).
-    + by match Ch_Wait 1; auto; smt(ge0_cf ge0_cg).
-    + by match Ch_Blocked2 1; auto; smt(ge0_cf ge0_cg).
+      by auto => /=; smt(ge0_cf ge0_cg ge0_cdt).
+    + by match Ch_Blocked1 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
+    + by match Ch_Wait 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
+    + by match Ch_Blocked2 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
     match Ch_Available 1; [auto; smt() | done |].
-    by call (:true); auto; smt(ge0_cf ge0_cg).
+    by call (:true); auto; smt(ge0_cf ge0_cg ge0_cdt).
   match Right 1; [auto; smt() | done |].
   seq 1 : true time [N 28; FB.step : 1] => //.
-  + by call(:true); auto => />; smt(ge0_cf ge0_cg).
+  + by call(:true); auto => />; smt(ge0_cf ge0_cg ge0_cdt).
   seq 1 : true time [N 4] => //; last by sp 1 => //; match Right 1; auto.
   exlim (oget lsc) => -[|p'|p'|p'|p'].
-  + match Ch_Init 1; auto; smt(ge0_cf ge0_cg).
+  + match Ch_Init 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
   + match Ch_Blocked1 1;[auto; smt() | done |].
     sp 1 => //; match Right 1; [auto; smt() | done |].
     sp 4 => //.
@@ -2265,14 +2318,14 @@ have [S1 hS1]:= COTPTC.ex_uc_transitivity
     + match KE_Init 1; [auto; smt() | done |].
       sp 1 => //; match Right 1; [auto; smt() | done |].
       by call (:true); auto => />. 
-    + by match KE_Blocked1 1; auto; smt(ge0_cf ge0_cg).
-    + by match KE_Wait 1; auto; smt(ge0_cf ge0_cg).
-    + by match KE_Blocked2 1; auto; smt(ge0_cf ge0_cg).
-    by match KE_Available 1; auto; smt(ge0_cf ge0_cg).
-  + by match Ch_Wait 1; auto; smt(ge0_cf ge0_cg).
+    + by match KE_Blocked1 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
+    + by match KE_Wait 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
+    + by match KE_Blocked2 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
+    by match KE_Available 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
+  + by match Ch_Wait 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
   + match Ch_Blocked2 1; [auto; smt() | done |].
-    by sp 1 => //; match Right 1; auto; smt(ge0_cf ge0_cg).
-  by match Ch_Available 1; auto; smt(ge0_cf ge0_cg).
+    by sp 1 => //; match Right 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
+  by match Ch_Available 1; auto; smt(ge0_cf ge0_cg ge0_cdt).
 + move=> kb ks FB *.                  
   proc.
   inline *.

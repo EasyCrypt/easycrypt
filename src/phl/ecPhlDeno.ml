@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
@@ -103,7 +95,8 @@ let t_phoare_deno_r pre post tc =
 let cond_pre env prl prr pre =
   (* building the substitution for the pre *)
   (* we substitute param by args and left by ml and right by mr *)
-  let sargs = build_subst_pre env mleft  prl PVM.empty in
+ let  sargs = PVM.empty in
+  let sargs = build_subst_pre env mleft  prl sargs in
   let sargs = build_subst_pre env mright prr sargs in
   let smem  = Fsubst.f_subst_id in
   let smem  = Fsubst.f_bind_mem smem mleft  prl.pr_mem in

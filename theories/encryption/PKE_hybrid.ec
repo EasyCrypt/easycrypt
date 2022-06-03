@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore List FSet Finite Distr DInterval.
 require import Indist.
 require import CHoareTactic.
@@ -238,7 +230,10 @@ qed.
 end section.
 
 (* ==================================================================== *)
-abstract theory WithCost.
+abstract theory Cost.
+clone include AllCore.Cost.
+clone import DInterval.Cost.
+
 module K = {
   var pk : pkey
   var sk : skey
@@ -624,3 +619,4 @@ proof.
   by rewrite !bigi1 /= /#.
 qed.
 end section.
+end Cost.

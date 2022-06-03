@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 type command = [
 | `Compile of cmp_option
@@ -25,6 +17,7 @@ and cmp_option = {
   cmpo_gcstats : bool;
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
+  cmpo_script  : bool;
 }
 
 and cli_option = {

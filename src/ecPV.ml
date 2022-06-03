@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
@@ -1098,21 +1090,18 @@ and eqobs_inF_refl env f' eqo =
     let eqi = s_eqobs_in_refl env fdef.f_body eqo in
     let local = PV.local eqi in
     let params =
-      match ffun.f_sig.fs_anames with
-      | None -> PV.add env pv_arg ffun.f_sig.fs_arg PV.empty
-      | Some lv ->
-        List.fold_left (fun fv v -> PV.add env (pv_loc v.v_quantum v.v_name) v.v_type fv)
-          PV.empty lv in
-    let qparams =
-      match ffun.f_sig.fs_qarg with
-      | None -> PV.empty
-      | Some ty ->
-        match ffun.f_sig.fs_qnames with
-        | None -> PV.add env pv_qarg ty PV.empty
-        | Some lv ->
-          List.fold_left (fun fv v -> PV.add env (pv_loc v.v_quantum v.v_name) v.v_type fv)
-            PV.empty lv in
-    let params = PV.union params qparams in
+      let add fv ov =
+        match ov.ov_name with
+        (* This is only called on concrete procedures *)
+        | None   -> assert false;
+        | Some v -> PV.add env (pv_loc ov.ov_quantum v) ov.ov_type fv
+      in
+      let params = PV.empty in
+      let params = List.fold_left add params ffun.f_sig.fs_anames in
+      let params = List.fold_left add params ffun.f_sig.fs_qnames in
+      params
+    in
+
     if PV.subset local params then PV.global eqi
     else
       let diff = PV.diff local params in

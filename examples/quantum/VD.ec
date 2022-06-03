@@ -1,4 +1,4 @@
-require import AllCore List Distr DList StdOrder Ring IntDiv.
+require import AllCore List Distr DList StdOrder Ring IntDiv RealSeries.
 require FinType.
 
 (* We assume that a have a finite type (with p elements) and 
@@ -17,7 +17,7 @@ by move=> x _; apply enumP.
 qed.
 
 clone import Bigalg.BigComRing as Big with
-  type t <- t,
+  type CR.t <- t,
   pred CR.unit (x : t)  <- x <> zeror,
     op CR.zeror  <- zeror,
     op CR.oner   <- oner,
@@ -113,9 +113,8 @@ lemma dletC ['a 'b] (da : 'a distr) (db : 'b distr) :
   is_lossless da => dlet da (fun _ => db) = db.
 proof.
 move=> ll; apply: eq_distr=> b; rewrite dlet1E /=.
-rewrite RealSeries.sumZr -(RealSeries.eq_sum (mass da)).
-- by move=> a; rewrite massE.
-- by rewrite -weightE ll.
+rewrite RealSeries.sumZr -(RealSeries.eq_sum (mu1 da)) //.
+by rewrite -weightE ll.
 qed.
 
 lemma mask0s ['a] (s : 'a list) : mask [] s = [].
@@ -342,7 +341,7 @@ congr; have ->: dout s = dmap (dlist dunifin k) F.
   - by apply/dunifin_ll.
   by rewrite dmap_id.
 rewrite /dsim {1}(_ : n = k + (n - k)) 1:#ring.
-rewrite dlist_add /= 1,2:[smt(size_ge0)] dmap_comp dmap_dprodE_swap /(\o) /=.
+rewrite dlist_add /= 1,2:#smt:(size_ge0) dmap_comp dmap_dprodE_swap /(\o) /=.
 pose G y c :=
   map (fun i => nth zeror c i +
     BAdd.bigi predT (fun j => exp (nth zeror (s ++ t) i) j * nth zeror y (j - k)

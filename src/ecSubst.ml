@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcTypes
@@ -119,6 +111,9 @@ let subst_form (s : _subst) =
     fun f -> Fsubst.f_subst s f
 
 (* -------------------------------------------------------------------- *)
+let subst_ovariable (s : _subst) (x : ovariable) =
+  { x with ov_type = s.s_ty x.ov_type; }
+
 let subst_variable (s : _subst) (x : variable) =
   { x with v_type = s.s_ty x.v_type; }
 
@@ -138,18 +133,30 @@ let subst_oracle_info (s:_subst) =
 
 (* -------------------------------------------------------------------- *)
 let subst_funsig (s : _subst) (funsig : funsig) =
-  let fs_arg = s.s_ty funsig.fs_arg in
+  let fs_arg  = s.s_ty funsig.fs_arg in
   let fs_qarg = omap s.s_ty funsig.fs_qarg in
-  let fs_ret = s.s_ty funsig.fs_ret in
-  let fs_anames = funsig.fs_anames |> omap (List.map (subst_variable s)) in
-  let fs_qnames = funsig.fs_qnames |> omap (List.map (subst_variable s)) in
+  let fs_ret  = s.s_ty funsig.fs_ret in
+  let fs_anm  = List.map (subst_ovariable s) funsig.fs_anames in
+  let fs_qnm  = List.map (subst_ovariable s) funsig.fs_qnames in
 
   { fs_name    = funsig.fs_name;
-    fs_arg    = fs_arg;
-    fs_anames = fs_anames;
-    fs_qarg   = fs_qarg;
-    fs_qnames = fs_qnames;
-    fs_ret     = fs_ret; }
+    fs_arg     = fs_arg ;
+    fs_qarg    = fs_qarg;
+    fs_anames  = fs_anm ;
+    fs_qnames  = fs_qnm ;
+    fs_ret     = fs_ret ; }
+
+(* -------------------------------------------------------------------- *)
+let subst_mod_restr (s : _subst) (mr : mod_restr) =
+  let rx = ur_app (fun set -> EcPath.Sx.fold (fun x r ->
+      EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r
+    ) set EcPath.Sx.empty) mr.mr_xpaths in
+  let r = ur_app (fun set -> EcPath.Sm.fold (fun x r ->
+      EcPath.Sm.add (s.s_fmp x) r
+    ) set EcPath.Sm.empty) mr.mr_mpaths in
+  let ois = EcSymbols.Msym.map (fun oi ->
+      subst_oracle_info s oi) mr.mr_oinfos in
+  { mr_xpaths = rx; mr_mpaths = r; mr_oinfos = ois }
 
 (* -------------------------------------------------------------------- *)
 let subst_mod_restr (s : _subst) (mr : mod_restr) =
@@ -204,10 +211,9 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
 
   let comps =
     { mis_quantum = comps.mis_quantum;
-      mis_params  = newparams;
-      mis_body    = subst_modsig_body sbody comps.mis_body;
-      mis_restr   = subst_mod_restr sbody comps.mis_restr;
-    }
+      mis_params = newparams;
+      mis_body   = subst_modsig_body sbody comps.mis_body;
+      mis_restr  = subst_mod_restr sbody comps.mis_restr; }
   in
     (sbody, comps)
 
@@ -242,6 +248,7 @@ let subst_function (s : _subst) (f : function_) =
   { f_name    = f.f_name;
     f_sig     = sig';
     f_def     = def' }
+
 
 
 (* -------------------------------------------------------------------- *)
@@ -492,6 +499,7 @@ let subst_schema (s : _subst) (ax : ax_schema) =
   { axs_tparams = params;
     axs_pparams = ax.axs_pparams;
     axs_params  = List.map (snd_map s.s_ty) ax.axs_params;
+    axs_loca    = ax.axs_loca;
     axs_spec    = spec; }
 
 (* -------------------------------------------------------------------- *)

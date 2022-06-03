@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (*
  * This file contains a formalization of (discrete) distributions
  *
@@ -766,11 +758,6 @@ clone import FinType as Support with type t <- t.
 
 op dunifin : t distr = MUniform.duniform enum.
 
-op cunifin : { int | 0 <= cunifin } as ge0_cunifin.
-
-schema cost_cunifin `{P} : cost [P: dunifin] = N cunifin.
-hint simplify cost_cunifin.
-
 lemma dunifin1E (x : t) : mu1 dunifin x = 1%r / card%r.
 proof. by rewrite MUniform.duniform1E enumP /= undup_id // enum_uniq. qed.
 
@@ -1015,6 +1002,7 @@ move=> ll_d1; apply: eq_distr => x; rewrite dlet1E /=.
 by rewrite sumZr -weightE ll_d1.
 qed.
 
+
 (* -------------------------------------------------------------------- *)
 op dfold ['a] (f : int -> 'a -> 'a distr) (x : 'a) (i : int) =
   iteri i (fun k d => dlet d (f k)) (dunit x).
@@ -1052,6 +1040,17 @@ proof.
 move=> can_fg can_gf; rewrite dmap1E &(mu_eq_support).
 move=> a ad @/(\o) @/pred1; apply/eq_iff; split; last exact: canLR.
 by move=> faE; move/can_gf: ad; rewrite faE.
+qed.
+
+lemma nosmt in_dmap1E_can (d: 'a distr) (f: 'a -> 'b) (g: 'b -> 'a) (x: 'b):
+  f (g x) = x =>
+  (forall (y: 'a), y \in d => f y = x => y = g x) => 
+  mu1 (dmap d f) x = mu1 d (g x). 
+proof.
+rewrite dmap1E /= => can_fg local_can_gf.
+apply mu_eq_support => y y_in_d @/(\o) @/pred1; apply/eq_iff.
+split => [|->//].
+by apply local_can_gf.
 qed.
 
 lemma dmapE (d : 'a distr) (f : 'a -> 'b) (P : 'b -> bool):
@@ -1314,6 +1313,25 @@ rewrite -(@eq_sum (fun x => k * if E x then mu1 d x else 0%r)).
 by rewrite sumZ.
 qed.
 
+lemma dscalar0r ['a] k : k \cdot dnull<:'a> = dnull.
+proof.
+apply/eq_distr=> a; rewrite muK; last by rewrite /mscalar !dnull1E.
+split => /=.
+- by move=> {a}a @/mscalar; rewrite dnull1E.
+- move=> s _; rewrite (@BRA.eq_bigr _ _ (fun _ => 0%r)).
+  - by move=> a' /= _ @/mscalar; rewrite dnull1E.
+  - by rewrite Bigreal.sumr_const.
+qed.
+
+lemma dscalar1 ['a] (d : 'a distr) : 1%r \cdot d = d.
+proof.
+case: (d = dnull) => [->|nz_d]; first by rewrite dscalar0r.
+apply/eq_distr=> x; rewrite dscalar1E //=.
+have nz_wd: weight d <> 0%r.
+- by apply: contra nz_d; apply: weight_eq0_dnull.
+by apply: invr_ge1 => //; rewrite ltr_neqAle eq_sym ge0_weight.
+qed.
+
 lemma weight_dscalar (k : real) (d : 'a distr):
   0%r <= k => k <= inv (weight d) =>
   weight (k \cdot d) = k * weight d.
@@ -1345,6 +1363,19 @@ qed.
 
 end DScalar.
 export DScalar.
+
+(* -------------------------------------------------------------------- *)
+lemma dlet_cst_weight ['a 'b] da db :
+  dlet<:'a, 'b> da (fun _ => db) = weight da \cdot db.
+proof.
+apply/eq_distr=> b; rewrite dlet1E /= sumZr -weightE.
+case: (db = dnull) => [->|nz_db]; first by rewrite dscalar0r !dnull1E.
+rewrite dscalar1E // ge0_weight /=; apply: (@ler_trans 1%r).
+- by apply: le1_mu.
+suff ?: weight db <> 0%r.
+- by apply/invr_ge1/le1_mu => //; rewrite ltr_neqAle eq_sym ge0_weight.
+by apply: contra nz_db; apply: weight_eq0_dnull.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op dscale ['a] (d : 'a distr) = dscalar (inv (weight d)) d.
@@ -1385,6 +1416,40 @@ proof.
 case: (weight d = 0%r) => Hw.
 + by move=> _ x y _ _; rewrite !dscale1E Hw.
 apply dscalar_uni =>//; smt (ge0_weight @Real).
+qed.
+
+(* -------------------------------------------------------------------- *)
+
+op mopt (d : 'a distr) = oapp (mu1 d) (1%r - weight d).
+op dopt (d : 'a distr) : 'a option distr = mk (mopt d).
+
+lemma isdistr_mopt (d : 'a distr) : isdistr (mopt d).
+proof.
+have sum_mopt : summable (mopt d) by apply/summable_oapp/summable_mu1.
+have mopt_ge0 : forall x, 0%r <= oapp (mu1 d) (1%r - weight d) x.
+  by case; smt(mu_bounded).
+split => [//|s uniq_s].
+suff S: sum (mopt d) <= 1%r by apply: ler_trans S; apply ler_big_sum.
+by rewrite /mopt sumD1_None // /(\o) /= -weightE /#.
+qed.
+
+lemma dopt1E (d : 'a distr) x : mu1 (dopt d) x = oapp (mu1 d) (1%r - weight d) x.
+proof. by rewrite muK ?isdistr_mopt. qed.
+
+lemma doptE (d : 'a distr) E :
+  mu (dopt d) E =
+  mu d (E \o Some) + (if E None then 1%r - weight d else 0%r).
+proof.
+rewrite !muE sumD1_None ?summable_cond ?summable_mu1 /= addrC; congr.
+  by apply eq_sum => /= x; rewrite /(\o) dopt1E.
+by case (E None) => @/predT //=; by rewrite dopt1E -weightE.
+qed.
+
+lemma dopt_ll (d : 'a distr) : is_lossless (dopt d).
+proof.
+rewrite /is_lossless muE /predT /= sumD1_None ?(summable_mu1) /=.
+rewrite dopt1E /= (@eq_sum _ (mu1 d)) //=; 2: by rewrite -weightE /#.
+by move => ?; rewrite /(\o) dopt1E.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1533,6 +1598,15 @@ rewrite big_seq1 /= dlet1E  (@sumE_fin _ [b]) //= => [b'|].
 by rewrite big_seq1 /= dunitE.
 qed.
 
+lemma finite_dprod (da : 'a distr) (db : 'b distr) : 
+     is_finite (support da) 
+  => is_finite (support db) 
+  => is_finite (support (da `*` db)).
+proof.
+move=> *; rewrite dprod_dlet finite_dlet // => *.
+by apply finite_dlet => // *; apply finite_dunit.
+qed.
+
 lemma dmap_dprod ['a1 'a2 'b1 'b2]
   (d1 : 'a1 distr ) (d2 : 'a2 distr )
   (f1 : 'a1 -> 'b1) (f2 : 'a2 -> 'b2)
@@ -1541,7 +1615,7 @@ lemma dmap_dprod ['a1 'a2 'b1 'b2]
   = dmap (d1 `*` d2) (fun xy : _ * _ => (f1 xy.`1, f2 xy.`2)).
 proof.
 apply/eq_distr=> -[b1 b2]; rewrite !dprod1E !dmap1E /(\o) /=.
-by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1 /=; rewrite andaE.
+by rewrite -dprodE &(mu_eq) /= => -[a1 a2] @/pred1 /=.
 qed.
 
 lemma dprod_partition
@@ -1653,8 +1727,7 @@ elim: ds xs => [|d ds ih] xs /=; 1: rewrite djoin_nil dunitE.
 + by case: xs => [|x xs] /=; [rewrite BRM.big_nil | rewrite add1z_neqC0 1:size_ge0].
 rewrite djoin_cons /= dmap1E /(\o) /=; case: xs => [|x xs] /=.
 + by rewrite add1z_neq0 1:size_ge0 /= mu0_false.
-rewrite -(@mu_eq _ (pred1 (x, xs))).
-+ by case=> y ys @/pred1 /=; rewrite andaE.
+rewrite -(@mu_eq _ (pred1 (x, xs))); first by case.
 rewrite dprod1E ih BRM.big_cons /predT /=; pose B := BRM.big _ _ _.
 by rewrite (@fun_if (( * ) (mu1 d x))) /= /#.
 qed.
@@ -2043,6 +2116,70 @@ rewrite -(dfunE_mem_uniq d_ll hdc) ?undup_uniq.
 by apply mu_le => /= f _; smt (mem_undup).
 qed.
 
+lemma dfun1E_fix1 ['u] (d : t -> 'u distr) x0 f :
+  mu1 (dfun d) f = mu1 (d x0) (f x0) * mu1 (dfun d.[x0 <- dunit (f x0)]) f.
+proof.
+apply/eq_sym; rewrite dfun1E (@BRM.bigD1 _ _ x0) ?(FinT.enumP, FinT.enum_uniq) /=.
+rewrite !fupdate_eq dunit1E /= -(@BRM.eq_bigr _ (fun x => mu1 (d x) (f x))) /=.
+- by move=> x @/predC1 ne_x_x0; rewrite !fupdate_neq 1,2:eq_sym.
+have /= <- := (BRM.bigD1 (fun x => mu1 (d x) (f x)) FinT.enum x0 _ _).
+- by apply: FinT.enumP.
+- by apply: FinT.enum_uniq.
+- by rewrite -dfun1E.
+qed.
+
+lemma dlet_dfun_fupdate_ll ['u] (d : t -> 'u distr) x0 v :
+  dlet
+    (dfun d.[x0 <- dunit v])
+    (fun f => dmap (d x0) (fun y => f.[x0 <- y]))
+  = dfun d.
+proof.
+pose F (fy : (t -> 'u) * _) := fy.`1.[x0 <- fy.`2].
+rewrite -(@dmap_dprodE _ _ F) dmap_dprodE_swap /F /= => {F}.
+apply/eq_distr=> f; rewrite dlet1E dfun1E /=.
+rewrite (@sumD1 _ (f x0)) /=; first apply: summable_mu1_wght => /=.
+- by move=> u; rewrite ge0_mu1 le1_mu1.
+rewrite sum0_eq => /= [u|].
+- case: (u = f x0) => //= ne_u_fx0; rewrite mulf_eq0; right.
+  rewrite dmap1E &(mu0_false) => g /dfun_supp /(_ x0).
+  rewrite fupdate_eq supp_dunit /(\o) /pred1 => gx0E.
+  by apply/negP => /fun_ext /(_ x0); rewrite fupdate_eq.
+rewrite (@in_dmap1E_can _ _ (fun g => g.[x0 <- v])) /=.
+- by apply/fun_ext=> x @/"_.[_<-_]"; case: (x0 = x).
+- move=> g /dfun_supp /(_ x0) @{1}/"_.[_<-_]" /=.
+  rewrite supp_dunit => gx0E <-; apply/fun_ext=> x.
+  by rewrite /"_.[_<-_]"; case: (x0 = x).
+rewrite dfun1E (@BRM.bigD1 _ _ x0) ?(FinT.enumP, FinT.enum_uniq) /=.
+rewrite !fupdate_eq dunit1E /= -(@BRM.eq_bigr _ (fun x => mu1 (d x) (f x))) /=.
+- by move=> x @/predC1 ne_x_x0; rewrite !fupdate_neq 1,2:eq_sym.
+by rewrite (@BRM.bigD1 _ _ x0) ?(FinT.enumP, FinT.enum_uniq).
+qed.
+
+lemma dfunE_dlet_fix1 ['u] (d : t -> 'u distr) x0 :
+  dfun d = dlet (d x0) (fun v => dfun d.[x0 <- dunit v]).
+proof.
+apply/eq_distr=> g; rewrite muE (@sum_partition (fun f => f x0)) /=.
+- by apply/summable_mu1_cond.
+rewrite dletE &(eq_sum) => u /=; rewrite (@sumE_fin _ [g]) //=.
+- by move=> h; case: (u = h x0) => // _ @/pred1; case: (h = g).
+rewrite BRA.big_seq1 {1}/pred1 /=; case: (u = g x0).
+- by move=> ->; apply: dfun1E_fix1.
+move=> ne_u_gx0; apply/eq_sym; rewrite mulf_eq0; right.
+apply/supportPn; rewrite dfun_supp negb_forall; exists x0 => /=.
+by rewrite fupdate_eq supp_dunit eq_sym.
+qed.
+
+lemma dlet_dfun_update ['u] (d : t -> 'u distr) x0 :
+  dlet
+    (dfun d)
+    (fun f => dmap (d x0) (fun y => f.[x0 <- y]))
+  = weight (d x0) \cdot dfun d.
+proof.
+rewrite {1}(@dfunE_dlet_fix1 _ x0) dlet_dlet.
+rewrite (@eq_dlet _ (fun _ => dfun d) _ (d x0)) //=.
+- by apply/dlet_dfun_fupdate_ll.
+- by apply/dlet_cst_weight.
+qed.
 end MUniFinFun.
 
 (* -------------------------------------------------------------------- *)

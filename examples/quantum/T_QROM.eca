@@ -165,7 +165,6 @@ axiom advantage q lambda (A<:AdvSCD{-SCD,-QRO}) &m:
   hoare [SCD(A)._F0 : p = lambda ==> QRO.ch <= q] =>
   `| Pr[SCD(A)._F0(lambda) @ &m : res] - Pr[SCD(A)._F1(lambda) @ &m: res] | 
    <= (2%r * q%r + k%r + 1%r)/ 6%r * lambda^2.
-
 end SemiConstDistr.
 
 (* -------------------------------------------------------------------------- *)
@@ -398,7 +397,7 @@ end T_PRF.
 abstract theory T_Distinct.
 
 (* This assume that the type hash is finite and contains "card" elements *)
-clone export FinType with 
+clone export FinType.FinType with 
   type t <- hash.
 
 quantum module type Adv_DistinctQueries (H:QRO) = {

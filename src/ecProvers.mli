@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcPath
 
@@ -46,6 +38,7 @@ type prover_infos = {
   pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
+  pr_dumpin    : string EcLocation.located option;
   pr_selected  : bool;
   gn_debug     : bool;
 }

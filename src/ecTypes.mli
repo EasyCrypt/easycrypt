@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcBigInt
 open EcMaps
@@ -143,17 +135,35 @@ val lp_fv    : lpattern -> EcIdent.Sid.t
 (* -------------------------------------------------------------------- *)
 type quantum = [`Quantum | `Classical]
 
+(* -------------------------------------------------------------------- *)
+type ovariable = {
+  ov_quantum : quantum;
+  ov_name    : symbol option;
+  ov_type    : ty;
+}
+
+val ov_quantum : ovariable -> quantum
+val ov_name    : ovariable -> symbol option
+val ov_type    : ovariable -> ty
+val ov_hash    : ovariable -> int
+val ov_equal   : ovariable -> ovariable -> bool
+
+(* -------------------------------------------------------------------- *)
 type variable = {
-    v_quantum : quantum;
-    v_name    : symbol;   (* can be "_" *)
-    v_type    : ty;
-  }
+  v_quantum : quantum;
+  v_name : symbol;   (* can be "_" *)
+  v_type : ty;
+}
 
 val v_quantum : variable -> quantum
-val v_name  : variable -> symbol
-val v_type  : variable -> ty
-val v_hash  : variable -> int
-val v_equal : variable -> variable -> bool
+val v_name    : variable -> symbol
+val v_type    : variable -> ty
+val v_hash    : variable -> int
+val v_equal   : variable -> variable -> bool
+
+(* -------------------------------------------------------------------- *)
+val ovar_of_var: variable  -> ovariable
+val var_of_ovar: ovariable -> variable
 
 (* -------------------------------------------------------------------- *)
 type pvar_kind =
@@ -193,6 +203,7 @@ val xp_glob : EcPath.xpath -> EcPath.xpath
 val qarg_symbol : symbol
 val arg_symbol  : symbol
 val res_symbol  : symbol
+
 val pv_res  : quantum -> prog_var
 val pv_arg  : prog_var
 val pv_qarg : prog_var
