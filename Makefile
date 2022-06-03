@@ -25,6 +25,7 @@ default: build
 	@true
 
 build:
+<<<<<<< HEAD
 	rm -f src/ec.exe ec.native
 	$(DUNE) build
 	ln -sf src/ec.exe ec.native
