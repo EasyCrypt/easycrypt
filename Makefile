@@ -4,7 +4,7 @@
 DUNE      ?= dune
 ECARGS    ?=
 ECTOUT    ?= 10
-ECJOBS    ?= 1
+ECJOBS    ?= 0
 ECEXTRA   ?= --report=report.log
 ECPROVERS ?= Alt-Ergo Z3 CVC4
 CHECKPY   ?=
