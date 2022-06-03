@@ -1882,6 +1882,30 @@ rewrite supp_djoin size_map; congr; apply/eq_iff.
 by rewrite zip_mapl all_map &(eq_all).
 qed.
 
+(* -------------------------------------------------------------------- *)
+op madd ['a] (df dg : 'a distr) = fun x => mu1 df x + mu1 dg x.
+
+lemma isdistr_madd (df dg : 'a distr) :
+  weight df + weight dg <= 1%r => isdistr (madd df dg).
+proof.
+move=> le1_wD; split; first by move=> x @/madd; rewrite addr_ge0.
+move=> s uq_s @/madd; rewrite big_split.
+apply/(ler_trans _ _ le1_wD)/ler_add;
+  by rewrite !muE &(ler_big_sum) // &(summable_mu1).
+qed.
+
+op (+) ['a] (df dg : 'a distr) = mk (madd df dg).
+
+lemma dadd1E ['a] (df dg : 'a distr) x :
+  weight df + weight dg <= 1%r => mu1 (df + dg) x = mu1 df x + mu1 dg x.
+proof. by move=> le1_wD; rewrite muK // &(isdistr_madd). qed.
+
+lemma daddE ['a] (df dg : 'a distr) x :
+  weight df + weight dg <= 1%r => mu1 (df + dg) x = mu1 df x + mu1 dg x.
+proof. 
+move=> le1_wD; rewrite !muE -sumD 1,2:&(summable_mu1_cond) /=.
+by apply: eq_sum=> y /=; case: (pred1 x y) => // _; rewrite dadd1E.
+qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory MUniFinFun.
@@ -2244,6 +2268,164 @@ proof.
 move=> ll1 ll2 eq x; apply/eq_distr=> y.
 have := eq x; rewrite !dfun_projE.
 by rewrite !dfun_ll // !(ll1, ll2) /= !dscalar1 => ->.
+qed.
+
+lemma dfun_prod1E ['u] (df dg : t -> 'u distr) f g :
+    mu1 (dfun (fun x => df x `*` dg x)) (fun x => (f x, g x))
+  = mu1 (dfun df) f * mu1 (dfun dg) g.
+proof.
+pose F x := mu1 (df x) (f x) * mu1 (dg x) (g x).
+rewrite dfun1E /= -(@BRM.eq_bigr _ F) //= /F => {F}.
+- by move=> x _; rewrite dprod1E.
+- by rewrite BRM.big_split -!dfun1E.
+qed.
+
+lemma dfun_prodE ['u] (df dg : t -> 'u distr) :
+  dfun df `*` dfun dg =
+    dmap
+      (dfun (fun x => df x `*` dg x))
+      (fun fg => (fst \o fg, snd \o fg)).
+proof.
+apply/eq_distr; case=> f g; rewrite dprod1E dmap1E /(\o) /=.
+pose E := pred1 (fun x : t => (f x, g x)).
+rewrite -(@mu_eq _ E) /E 1:/pred1 => [h /=|].
+- apply/eq_iff; split=> [->|[<- <-]] //=.
+  by apply/fun_ext=> x; case: (h x).
+- by rewrite dfun_prod1E.
+qed.
+
+lemma dfun_condE ['u] (X : t -> bool) (dt df : t -> 'u distr) :
+     (forall x, is_lossless (dt x))
+  => (forall x, is_lossless (df x))
+  =>
+       dmap
+         (dfun dt `*` dfun df)
+         (fun tf : _ * _ => fun x => if X x then tf.`1 x else tf.`2 x)
+     = dfun (fun x => if X x then dt x else df x).
+proof.
+move=> llt llf; rewrite dfun_prodE dmap_comp /(\o) /=.
+apply/eq_distr => f; rewrite dmap1E {1}/pred1 /(\o) /=.
+pose p x (y : _ * _) := (if X x then y.`1 else y.`2) = f x.
+rewrite -(@mu_eq _ (fun g : _ -> _ * _ => forall x, p x (g x))).
+- by move=> h; rewrite fun_ext.
+rewrite dfunE dfun1E /= !(@BRM.bigID predT _ X) !predTI; congr.
+- apply: BRM.eq_bigr => x @/p /= -> /=.
+  by rewrite (@dprodE (fun y => y = f x) predT) llf /=.
+- apply: BRM.eq_bigr => x @/p /= -> /=.
+  by rewrite (@dprodE predT (fun y => y = f x)) llt /=.
+qed.
+
+lemma dlet1E_bool ['u] (d : bool distr) (F : bool -> 'u distr) x :
+  mu1 (dlet d F) x = mu1 d true * mu1 (F true) x + mu1 d false * mu1 (F false) x.
+proof. by rewrite dlet1E (@sumE_fin _ [true; false]) //=; case. qed.
+
+op ondomainb (f : t -> bool) (r : t -> bool) =
+  forall x, r x \/ f x = false.
+
+lemma prodrDl_r (f g : t -> real) (r : t list) : uniq r =>
+    BRM.big predT (fun x => f x + g x) r
+  = sum (fun sigma => if ondomainb sigma (mem r) then
+      BRM.big predT (fun x => if sigma x then f x else g x) r
+    else 0%r).
+proof.
+elim: r => /= [|x r ih [x_notin_r uq_r]].
+- rewrite BRM.big_nil (@sumE_fin _ [(fun _ => false)]) //= => sg.
+  by case _: (ondomainb _ _) => //= + _ - @/ondomainb /= /fun_ext.
+rewrite BRM.big_cons {1}/predT /= ih //; pose S := sum _; apply/eq_sym.
+rewrite (@sum_split _ (fun sigma => sigma x)) /=.
+- apply: (@summable_fin _ (to_seq<:t -> bool> predT)) => sg _.
+  apply/mem_to_seq => //; apply/finite_type_fun.
+  - by apply/FinT.is_finite. - by apply/finite_bool.
+rewrite mulrDl; congr.
+- pose M s sg := BRM.big predT (fun x => if sg x then f x else g x) s.
+  pose F s1 s2 sg := if sg x /\ ondomainb sg (mem s1) then M s2 sg else 0%r.
+  rewrite -(@eq_sum (F (x :: r) (x :: r))) => /= [sg @/F|].
+  - by case: (sg x) => _ //=; case: (ondomainb _ _).
+  rewrite -(@eq_sum (fun sg => f x * F (x :: r) r sg)).
+  - move=> sg /= @/F; case _: (_ /\ _) => //= @/M.
+    by case=> [sgx _]; rewrite BRM.big_consT /= sgx.
+  rewrite sumZ; congr => @/S @/F.
+  pose h (sg : t -> bool) := sg.[x <- !(sg x)].
+  rewrite -(@sum_reindex h).
+  - exists h; rewrite andbb => sg @/h; apply/fun_ext => y.
+    by rewrite !fupdateE /=; case: (x = y).
+  - apply: (@summable_fin _ (to_seq<:t -> bool> predT)) => sg _.
+    apply/mem_to_seq => //; apply/finite_type_fun.
+    - by apply/FinT.is_finite. - by apply/finite_bool.
+  rewrite /(\o) /=; apply: eq_sum => sg /=; congr.
+  rewrite /h fupdateE /=; apply/eq_iff; split.
+  - case=> ^sgx -> /= ond y; have := ond y.
+    case: (y = x) => [->>//|ne_xy]; last first.
+    - by rewrite ne_xy /= fupdate_neq 1:eq_sym.
+    - by move=> _; right; apply/negbTE.
+  - move=> ^ond /(_ x); rewrite x_notin_r /= => ^sgx ->//=.
+    move=> y /=; case: (y = x) => [->>//|ne_yx] /=.
+    by rewrite fupdate_neq 1:eq_sym //; apply: ond.
+  rewrite /M !BRM.big_seq &(BRM.eq_bigr) /= => y y_in_r.
+  by congr => // @/h; rewrite fupdateE; case: (x = y).
+- pose M s sg := BRM.big predT (fun x => if sg x then f x else g x) s.
+  pose F s1 s2 sg := if !sg x /\ ondomainb sg (mem s1) then M s2 sg else 0%r.
+  rewrite -(@eq_sum (F (x :: r) (x :: r))) => /= [sg @/F|].
+  - by case: (sg x) => _ //=; case: (ondomainb _ _) => //=.
+  rewrite -(@eq_sum (fun sg => g x * F (x :: r) r sg)).
+  - move=> sg /= @/F; case _: (_ /\ _) => //= @/M.
+    by case=> [sgx _]; rewrite BRM.big_consT /= sgx.
+  rewrite sumZ; congr => @/S @/F.
+  rewrite /(\o) /=; apply: eq_sum => sg /=; congr => //.
+  apply/eq_iff; split.
+  - case=> sgx /= ond y; have //= := ond y.
+    by case=> [|->//]; case=> [->>|->] //; right; apply/negbTE.
+  - move=> ^ond /(_ x); rewrite x_notin_r /= => ^sgx ->//=.
+    move=> y /=; case: (y = x) => [->>//|ne_yx] /=; apply: ond.
+qed.
+
+lemma prodrDl (f g : t -> real) :
+    BRM.big predT (fun x => f x + g x) FinT.enum
+  = sum (fun sigma => BRM.big predT (fun x => if sigma x then f x else g x) FinT.enum).
+proof.
+rewrite (@prodrDl_r _ _ FinT.enum) 1:FinT.enum_uniq.
+apply: eq_sum=> sigma @/ondomainb /=; rewrite ifT //.
+by move=> x; rewrite FinT.enumP.
+qed.
+
+lemma dlet_dfun_cond ['u] (dX : t -> bool distr) (dt df : t -> 'u distr) :
+     (forall x, is_lossless (dX x))
+  => (forall x, is_lossless (dt x))
+  => (forall x, is_lossless (df x))
+  =>   dlet (dfun dX) (fun X => dfun (fun x => if X x then dt x else df x))
+     = dfun (fun x => dlet (dX x) (fun b => if b then dt x else df x)).
+proof.
+move=> llX llt llf; apply/eq_distr=> f; apply/eq_sym.
+pose p (x : t) :=
+     mu1 (dX x) true  * mu1 (dt x) (f x)
+   + mu1 (dX x) false * mu1 (df x) (f x).
+rewrite dfun1E /= -(@BRM.eq_bigr _ p) //=.
+- by move=> x _; rewrite dlet1E_bool.
+rewrite dlet1E prodrDl; apply: eq_sum => X /=.
+rewrite !dfun1E -BRM.big_split /=; apply: BRM.eq_bigr.
+by move=> /= x _; case: (X x).
+qed.
+
+lemma dfun_dcondE ['u] (dX : t -> bool distr) (dt df : t -> 'u distr) :
+     (forall x, is_lossless (dX x))
+  => (forall x, is_lossless (dt x))
+  => (forall x, is_lossless (df x))
+  => 
+       dlet (dfun dX) (fun X : t -> bool =>
+         dmap
+           (dfun dt `*` dfun df)
+           (fun tf : _ * _ => (fun x => if X x then tf.`1 x else tf.`2 x)))
+     = dfun (fun x => (mu1 (dX x) true \cdot dt x) + (mu1 (dX x) false \cdot df x)).
+proof.
+pose D X := dfun (fun x => if X x then dt x else df x).
+move=> llX llt llf; rewrite -(@eq_dlet D _ (dfun dX)) //.
+- by move=> X; apply/eq_sym/dfun_condE.
+rewrite dlet_dfun_cond //; congr; apply/fun_ext => x /=.
+apply/eq_distr=> u; rewrite dlet1E_bool /= dadd1E -1:!dscalar1E //.
+- rewrite !weight_dscalar // ?(llt, llf) /= ?le1_mu.
+  by rewrite -mu_disjoint ?le1_mu //; case.
+- by rewrite ge0_mu1 /= llt /= le1_mu1.
+- by rewrite ge0_mu1 /= llf /= le1_mu1.
 qed.
 end MUniFinFun.
 
