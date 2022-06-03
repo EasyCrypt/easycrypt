@@ -2049,13 +2049,16 @@ rewrite -(@mu_eq_support _ Q) => [us /supp_djoin_cons|].
 by rewrite (@djoin_consE _ _ _ (p x) (P xs)) ih.
 qed.
 
+lemma weight_dfun ['u] (df : t -> 'u distr) :
+  weight (dfun df) = BRM.big predT (fun x => weight (df x)) FinT.enum.
+proof. by have /= -> := dfunE df (fun _ _ => true). qed.
+
+
 lemma dfun_ll ['u] (d : t -> 'u distr) :
   (forall x, is_lossless (d x)) => is_lossless (dfun d).
 proof.
- rewrite /is_lossless => d_ll.
- pose p := fun (_:t) (_:'u) => true.
- rewrite (@mu_eq _ _ (fun f => forall x, p x (f x))) 1:// dfunE /=.
- apply BRM.big1_seq => /> ???;apply d_ll.
+move=> ll_d; rewrite /is_lossless weight_dfun BRM.big1_seq //.
+by move=> x _ /=; apply/ll_d.
 qed.
 
 lemma dfun_allE c (d: t -> 'u distr) (pT pF : t -> bool) (e : t -> 'u -> bool) :
@@ -2082,6 +2085,7 @@ rewrite mulr_const_cond -(@BRM.eq_bigr _ (fun _ => 1%r)).
 by rewrite mulr_const_cond expr1z mulr1; congr; apply: eq_count => /#.
 qed.
 
+(* FIXME: cleanup *)
 lemma dfun_allE_cond c (d: t -> 'u distr) (pT pF : t -> bool) (e : t -> 'u -> bool) :
   (forall x, is_lossless (d x)) => 
   (forall x, pT x \/ pF x => mu (d x) (e x) = c) =>
@@ -2089,7 +2093,6 @@ lemma dfun_allE_cond c (d: t -> 'u distr) (pT pF : t -> bool) (e : t -> 'u -> bo
   mu (dfun d) (fun f =>
          (forall x, pT x =>  e x (f x))
       /\ (forall x, pF x => !e x (f x))) =
-
     (      c) ^ (count pT FinT.enum)
   * (1%r - c) ^ (count pF FinT.enum).
 proof.
@@ -2203,6 +2206,44 @@ rewrite {1}(@dfunE_dlet_fix1 _ x0) dlet_dlet.
 rewrite (@eq_dlet _ (fun _ => dfun d) _ (d x0)) //=.
 - by apply/dlet_dfun_fupdate_ll.
 - by apply/dlet_cst_weight.
+qed.
+
+lemma dfun_projE ['u] (df : t -> 'u distr)  x :
+    dmap (dfun df) (fun f => f x)
+  = (weight (dfun df) / weight (df x)) \cdot df x.
+proof.
+apply: eq_distr=> y; rewrite dscalar1E.
+- rewrite divr_ge0 ?ge0_weight /=; have := ge0_weight (df x).
+  case/ler_eqVlt => [<-//|nz_dfx].
+  by rewrite ler_pdivr_mulr // mulVf // gtr_eqF.
+pose c := _ / _; rewrite dmap1E /(\o) {1}/pred1.
+pose p x' y' := x <> x' \/ y = y'.
+rewrite -(@mu_eq _ (fun f => forall x, p x (f x))).
+- move=> f @/p /=; apply: eq_iff; split; first by move/(_ x) => /= <-.
+  by move=> /eq_sym yE x'; case: (x = x').
+rewrite dfunE (@BRM.bigD1 _ _ x) ?(FinT.enumP, FinT.enum_uniq) /=.
+rewrite mulrC; case/ler_eqVlt: (ge0_weight (df x)).
+- by move/eq_sym/weight_eq0_dnull => ->; rewrite !dnullE.
+move=> dfx_gt0; congr; last first.
+- by apply: mu_eq => @/p @/pred1 z /=; rewrite [z = y]eq_sym.
+apply/eq_sym=> @/c; rewrite weight_dfun.
+rewrite (@BRM.bigD1 _ _ x) ?(FinT.enumP, FinT.enum_uniq) /=.
+rewrite mulrAC divff 1:gtr_eqF //=; apply: BRM.eq_bigr.
+move=> x' @/predC1 ne_x /=; apply: mu_eq => @/predT.
+by move=> y' @/p /=; rewrite [x = x']eq_sym ne_x.
+qed.
+
+lemma eq_from_dfun_proj_eq ['u] (df1 df2 : t -> 'u distr) :
+     (forall x, is_lossless (df1 x))
+  => (forall x, is_lossless (df2 x))
+  => (forall x,
+         dmap (dfun df1) (fun f => f x)
+       = dmap (dfun df2) (fun f => f x))
+  => df1 == df2.
+proof.
+move=> ll1 ll2 eq x; apply/eq_distr=> y.
+have := eq x; rewrite !dfun_projE.
+by rewrite !dfun_ll // !(ll1, ll2) /= !dscalar1 => ->.
 qed.
 end MUniFinFun.
 
