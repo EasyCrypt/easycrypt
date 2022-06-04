@@ -849,6 +849,10 @@ lemma dlet1E (d : 'a distr) (f : 'a -> 'b distr) (b : 'b):
   mu1 (dlet d f) b = sum<:'a> (fun a => mu1 d a * mu1 (f a) b).
 proof. by rewrite muK 1:isdistr_mlet. qed.
 
+lemma dlet1E_bool ['u] (d : bool distr) (F : bool -> 'u distr) x :
+  mu1 (dlet d F) x = mu1 d true * mu1 (F true) x + mu1 d false * mu1 (F false) x.
+proof. by rewrite dlet1E (@sumE_fin _ [true; false]) //=; case. qed.
+
 lemma dlet_muE (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
   mu (dlet d f) P
   = sum<:'b> (fun b =>
@@ -2315,79 +2319,6 @@ rewrite dfunE dfun1E /= !(@BRM.bigID predT _ X) !predTI; congr.
   by rewrite (@dprodE predT (fun y => y = f x)) llt /=.
 qed.
 
-lemma dlet1E_bool ['u] (d : bool distr) (F : bool -> 'u distr) x :
-  mu1 (dlet d F) x = mu1 d true * mu1 (F true) x + mu1 d false * mu1 (F false) x.
-proof. by rewrite dlet1E (@sumE_fin _ [true; false]) //=; case. qed.
-
-op ondomainb (f : t -> bool) (r : t -> bool) =
-  forall x, r x \/ f x = false.
-
-lemma prodrDl_r (f g : t -> real) (r : t list) : uniq r =>
-    BRM.big predT (fun x => f x + g x) r
-  = sum (fun sigma => if ondomainb sigma (mem r) then
-      BRM.big predT (fun x => if sigma x then f x else g x) r
-    else 0%r).
-proof.
-elim: r => /= [|x r ih [x_notin_r uq_r]].
-- rewrite BRM.big_nil (@sumE_fin _ [(fun _ => false)]) //= => sg.
-  by case _: (ondomainb _ _) => //= + _ - @/ondomainb /= /fun_ext.
-rewrite BRM.big_cons {1}/predT /= ih //; pose S := sum _; apply/eq_sym.
-rewrite (@sum_split _ (fun sigma => sigma x)) /=.
-- apply: (@summable_fin _ (to_seq<:t -> bool> predT)) => sg _.
-  apply/mem_to_seq => //; apply/finite_type_fun.
-  - by apply/FinT.is_finite. - by apply/finite_bool.
-rewrite mulrDl; congr.
-- pose M s sg := BRM.big predT (fun x => if sg x then f x else g x) s.
-  pose F s1 s2 sg := if sg x /\ ondomainb sg (mem s1) then M s2 sg else 0%r.
-  rewrite -(@eq_sum (F (x :: r) (x :: r))) => /= [sg @/F|].
-  - by case: (sg x) => _ //=; case: (ondomainb _ _).
-  rewrite -(@eq_sum (fun sg => f x * F (x :: r) r sg)).
-  - move=> sg /= @/F; case _: (_ /\ _) => //= @/M.
-    by case=> [sgx _]; rewrite BRM.big_consT /= sgx.
-  rewrite sumZ; congr => @/S @/F.
-  pose h (sg : t -> bool) := sg.[x <- !(sg x)].
-  rewrite -(@sum_reindex h).
-  - exists h; rewrite andbb => sg @/h; apply/fun_ext => y.
-    by rewrite !fupdateE /=; case: (x = y).
-  - apply: (@summable_fin _ (to_seq<:t -> bool> predT)) => sg _.
-    apply/mem_to_seq => //; apply/finite_type_fun.
-    - by apply/FinT.is_finite. - by apply/finite_bool.
-  rewrite /(\o) /=; apply: eq_sum => sg /=; congr.
-  rewrite /h fupdateE /=; apply/eq_iff; split.
-  - case=> ^sgx -> /= ond y; have := ond y.
-    case: (y = x) => [->>//|ne_xy]; last first.
-    - by rewrite ne_xy /= fupdate_neq 1:eq_sym.
-    - by move=> _; right; apply/negbTE.
-  - move=> ^ond /(_ x); rewrite x_notin_r /= => ^sgx ->//=.
-    move=> y /=; case: (y = x) => [->>//|ne_yx] /=.
-    by rewrite fupdate_neq 1:eq_sym //; apply: ond.
-  rewrite /M !BRM.big_seq &(BRM.eq_bigr) /= => y y_in_r.
-  by congr => // @/h; rewrite fupdateE; case: (x = y).
-- pose M s sg := BRM.big predT (fun x => if sg x then f x else g x) s.
-  pose F s1 s2 sg := if !sg x /\ ondomainb sg (mem s1) then M s2 sg else 0%r.
-  rewrite -(@eq_sum (F (x :: r) (x :: r))) => /= [sg @/F|].
-  - by case: (sg x) => _ //=; case: (ondomainb _ _) => //=.
-  rewrite -(@eq_sum (fun sg => g x * F (x :: r) r sg)).
-  - move=> sg /= @/F; case _: (_ /\ _) => //= @/M.
-    by case=> [sgx _]; rewrite BRM.big_consT /= sgx.
-  rewrite sumZ; congr => @/S @/F.
-  rewrite /(\o) /=; apply: eq_sum => sg /=; congr => //.
-  apply/eq_iff; split.
-  - case=> sgx /= ond y; have //= := ond y.
-    by case=> [|->//]; case=> [->>|->] //; right; apply/negbTE.
-  - move=> ^ond /(_ x); rewrite x_notin_r /= => ^sgx ->//=.
-    move=> y /=; case: (y = x) => [->>//|ne_yx] /=; apply: ond.
-qed.
-
-lemma prodrDl (f g : t -> real) :
-    BRM.big predT (fun x => f x + g x) FinT.enum
-  = sum (fun sigma => BRM.big predT (fun x => if sigma x then f x else g x) FinT.enum).
-proof.
-rewrite (@prodrDl_r _ _ FinT.enum) 1:FinT.enum_uniq.
-apply: eq_sum=> sigma @/ondomainb /=; rewrite ifT //.
-by move=> x; rewrite FinT.enumP.
-qed.
-
 lemma dlet_dfun_cond ['u] (dX : t -> bool distr) (dt df : t -> 'u distr) :
      (forall x, is_lossless (dX x))
   => (forall x, is_lossless (dt x))
@@ -2401,9 +2332,9 @@ pose p (x : t) :=
    + mu1 (dX x) false * mu1 (df x) (f x).
 rewrite dfun1E /= -(@BRM.eq_bigr _ p) //=.
 - by move=> x _; rewrite dlet1E_bool.
-rewrite dlet1E prodrDl; apply: eq_sum => X /=.
-rewrite !dfun1E -BRM.big_split /=; apply: BRM.eq_bigr.
-by move=> /= x _; case: (X x).
+rewrite dlet1E prodrDl2; first by apply: FinT.is_finite_for.
+apply: eq_sum => X /=; rewrite !dfun1E -BRM.big_split /=.
+by apply: BRM.eq_bigr => /= x _; case: (X x).
 qed.
 
 lemma dfun_dcondE ['u] (dX : t -> bool distr) (dt df : t -> 'u distr) :
