@@ -207,6 +207,7 @@
     "why3"        , WHY3       ;        (* KW: global *)
     "dump"        , DUMP       ;        (* KW: global *)
     "remove"      , REMOVE     ;        (* KW: global *)
+    "exit"        , EXIT       ;        (* KW: global *)
 
     "time"        , TIME       ;        (* KW: internal *)
     "undo"        , UNDO       ;        (* KW: internal *)

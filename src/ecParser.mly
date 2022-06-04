@@ -443,6 +443,7 @@
 %token EXACT
 %token EXFALSO
 %token EXIST
+%token EXIT
 %token EXLIM
 %token EXPECT
 %token EXPORT
@@ -670,6 +671,7 @@ _lident:
 | EXLIM      { "exlim"      }
 | ECALL      { "ecall"      }
 | FROM       { "from"       }
+| EXIT       { "exit"       }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -4019,6 +4021,9 @@ prog_r:
 
 | UNDO d=word FINAL
    { P_Undo d }
+
+| EXIT FINAL
+   { P_Exit }
 
 | error
    { parse_error (EcLocation.make $startpos $endpos) None }

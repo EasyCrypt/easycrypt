@@ -408,6 +408,8 @@ let main () =
 
           | EP.P_Undo i ->
               EcCommands.undo i
+          | EP.P_Exit ->
+              terminate := true
         end;
         EcTerminal.finish `ST_Ok terminal;
         if !terminate then begin
