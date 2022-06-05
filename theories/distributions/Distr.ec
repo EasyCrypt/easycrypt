@@ -849,10 +849,6 @@ lemma dlet1E (d : 'a distr) (f : 'a -> 'b distr) (b : 'b):
   mu1 (dlet d f) b = sum<:'a> (fun a => mu1 d a * mu1 (f a) b).
 proof. by rewrite muK 1:isdistr_mlet. qed.
 
-lemma dlet1E_bool ['u] (d : bool distr) (F : bool -> 'u distr) x :
-  mu1 (dlet d F) x = mu1 d true * mu1 (F true) x + mu1 d false * mu1 (F false) x.
-proof. by rewrite dlet1E (@sumE_fin _ [true; false]) //=; case. qed.
-
 lemma dlet_muE (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
   mu (dlet d f) P
   = sum<:'b> (fun b =>
@@ -892,6 +888,10 @@ rewrite (@eq_sum _ (fun b => mu1 d a * if  E b then mu1 (F a) b else 0%r)).
   by move => x /=; case: (E x).
 by rewrite sumZ -muE.
 qed.
+
+lemma dletE_bool ['u] (d : bool distr) (F : bool -> 'u distr) E :
+  mu (dlet d F) E = mu1 d true * mu (F true) E + mu1 d false * mu (F false) E.
+proof. by rewrite dletE (@sumE_fin _ [true; false]) //=; case. qed.
 
 lemma const_weight_dlet r (d : 'a distr) (F : 'a -> 'b distr) : 
   (forall x, weight (F x) = r) => weight (dlet d F) = r * weight d.
@@ -2284,7 +2284,7 @@ rewrite dfun1E /= -(@BRM.eq_bigr _ F) //= /F => {F}.
 - by rewrite BRM.big_split -!dfun1E.
 qed.
 
-lemma dfun_prodE ['u] (df dg : t -> 'u distr) :
+lemma dprod_funE ['u] (df dg : t -> 'u distr) :
   dfun df `*` dfun dg =
     dmap
       (dfun (fun x => df x `*` dg x))
@@ -2298,6 +2298,18 @@ rewrite -(@mu_eq _ E) /E 1:/pred1 => [h /=|].
 - by rewrite dfun_prod1E.
 qed.
 
+lemma dfun_prodE ['u] (df dg : t -> 'u distr) :
+    dfun (fun x => df x `*` dg x)
+  = dmap
+      (dfun df `*` dfun dg)
+      (fun fg : _ * _ => fun x => (fg.`1 x, fg.`2 x)).
+proof.
+pose F (fg : (t -> 'u) * (t -> 'u)) x := (fg.`1 x, fg.`2 x).
+have /(congr1 (dapply F)) /= -> := dprod_funE df dg.
+rewrite dmap_comp dmap_id_eq_in // /(\o) /F /=.
+by move=> h _; apply/fun_ext=> x; case: (h x).
+qed.
+
 lemma dfun_condE ['u] (X : t -> bool) (dt df : t -> 'u distr) :
      (forall x, is_lossless (dt x))
   => (forall x, is_lossless (df x))
@@ -2307,7 +2319,7 @@ lemma dfun_condE ['u] (X : t -> bool) (dt df : t -> 'u distr) :
          (fun tf : _ * _ => fun x => if X x then tf.`1 x else tf.`2 x)
      = dfun (fun x => if X x then dt x else df x).
 proof.
-move=> llt llf; rewrite dfun_prodE dmap_comp /(\o) /=.
+move=> llt llf; rewrite dprod_funE dmap_comp /(\o) /=.
 apply/eq_distr => f; rewrite dmap1E {1}/pred1 /(\o) /=.
 pose p x (y : _ * _) := (if X x then y.`1 else y.`2) = f x.
 rewrite -(@mu_eq _ (fun g : _ -> _ * _ => forall x, p x (g x))).
@@ -2331,7 +2343,7 @@ pose p (x : t) :=
      mu1 (dX x) true  * mu1 (dt x) (f x)
    + mu1 (dX x) false * mu1 (df x) (f x).
 rewrite dfun1E /= -(@BRM.eq_bigr _ p) //=.
-- by move=> x _; rewrite dlet1E_bool.
+- by move=> x _; rewrite dletE_bool.
 rewrite dlet1E prodrDl2; first by apply: FinT.is_finite_for.
 apply: eq_sum => X /=; rewrite !dfun1E -BRM.big_split /=.
 by apply: BRM.eq_bigr => /= x _; case: (X x).
@@ -2352,7 +2364,7 @@ pose D X := dfun (fun x => if X x then dt x else df x).
 move=> llX llt llf; rewrite -(@eq_dlet D _ (dfun dX)) //.
 - by move=> X; apply/eq_sym/dfun_condE.
 rewrite dlet_dfun_cond //; congr; apply/fun_ext => x /=.
-apply/eq_distr=> u; rewrite dlet1E_bool /= dadd1E -1:!dscalar1E //.
+apply/eq_distr=> u; rewrite dletE_bool /= dadd1E -1:!dscalar1E //.
 - rewrite !weight_dscalar // ?(llt, llf) /= ?le1_mu.
   by rewrite -mu_disjoint ?le1_mu //; case.
 - by rewrite ge0_mu1 /= llt /= le1_mu1.

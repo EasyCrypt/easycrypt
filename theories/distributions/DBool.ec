@@ -2,7 +2,7 @@
 require import AllCore List Distr Ring Number.
 require import StdRing StdOrder StdBigop RealSeq RealSeries.
 require (*--*) Bigop Bigalg.
-(*---*) import RField RealOrder Bigreal.BRA.
+(*---*) import RField RealOrder Bigreal Bigreal.BRA.
 
 (* -------------------------------------------------------------------- *)
 clone include Distr.MFinite with
@@ -79,6 +79,45 @@ by move=> ??;rewrite supp_dbiased.
 qed.
 
 end Biased.
+
+(* -------------------------------------------------------------------- *)
+abstract theory DFunBiased.
+type t.
+
+clone import MUniFinFun with type t <- t.
+(*-*) import Biased.
+
+op dfun_biased (ps : t -> real) =
+  dfun (fun x => dbiased (ps x)).
+
+op dfun_biased0 (c : real) =
+  dfun_biased (fun _ => c).
+
+lemma dfun_biased_biased (lambda : real) (ps : t -> real) :
+     (0%r < lambda < 1%r)
+  => (forall x, 0%r <= ps x <= lambda)
+  =>   dfun_biased ps
+     = dmap
+         (dfun_biased0 lambda `*` dfun_biased (fun x => ps x / lambda))
+         (fun (fg : _ * _) => fun x => fg.`1 x /\ fg.`2 x).
+proof.
+pose F (fg : (t -> bool) * (t -> bool)) := fun x => (fg.`1 x, fg.`2 x).
+pose G (bb : t -> bool * bool) := fun x => (bb x).`1 /\ (bb x).`2.
+move=> rg_l rg_ps; rewrite -(@eq_dmap _ (G \o F)); first by apply/fun_ext.
+rewrite -dmap_comp /F -dfun_prodE /= /G => {F G}.
+apply/eq_distr=> h; rewrite dmap1E /(\o) /pred1 /=.
+pose p (x : t) (bb : _ * _) := (bb.`1 /\ bb.`2) = h x.
+rewrite -(mu_eq _ (fun F => forall x, p x (F x))) /=.
+- move=> F; apply: eq_iff; split.
+  - by move=> hp; apply/fun_ext/hp.
+  - by move/fun_ext; apply.
+rewrite dfunE dfun1E; apply: BRM.eq_bigr => /= x _ @/p.
+rewrite dprod_dlet dletE_bool /= !dletE_bool /= !dunitE /=.
+rewrite !mulrDr !mulrA; case: (h x) => //= _;
+  rewrite !dbiased1E /= !clamp_id;
+  by rewrite ?(ler_pdivl_mulr, ler_pdivr_mulr) /#.
+qed.
+end DFunBiased.
 
 (* -------------------------------------------------------------------- *)
 abstract theory FixedBiased.
