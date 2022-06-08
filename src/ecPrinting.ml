@@ -3174,7 +3174,7 @@ let rec pp_instr_r (ppe : PPEnv.t) fmt i =
       (pp_proc_args ppe) (args, qargs)
 
   | Scall (Some lv, xp, args, qargs) ->
-    Format.fprintf fmt "@[<hov 2>%a <@@@ %a%a;"
+    Format.fprintf fmt "@[<hov 2>%a <@@@ %a%a@];"
       (pp_lvalue ppe) lv
       (pp_funname ppe) xp
       (pp_proc_args ppe) (args, qargs)
