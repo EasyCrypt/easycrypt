@@ -99,3 +99,206 @@ qed.
 lemma size_allperms_uniq (s : 'a list) :
   uniq s => size (allperms s) = fact (size s).
 proof. by apply/size_allperms_uniq_r; rewrite size_nseq ler_maxr ?size_ge0. qed.
+
+(* -------------------------------------------------------------------- *)
+(*TODO: why is \subset not in List?*)
+(*require import FSet.*)
+(*TODO: also where does this 'a comes from?*)
+
+op subset (s t : 'a list) = forall x , x \in s => x \in t.
+
+lemma subsetA (s t u : 'a list) : subset s t => subset t u => subset s u.
+proof. by move => subset_s_t subset_t_u x mem_x_s; apply/subset_t_u/subset_s_t. qed.
+
+lemma perm_eq_pred1 (s1 s2 : 'a list) : perm_eq s1 s2 <=> (forall x , count (pred1 x) s1 = count (pred1 x) s2).
+proof.
+  split; [by move => /perm_eqP eq_count x; rewrite eq_count|].
+  by move => eq_count; rewrite /perm_eq; apply/allP => x _ /=; apply/eq_count.
+qed.
+
+lemma range_iota m n : iota_ m n = range m (m + n).
+proof. by rewrite /range addrAC. qed.
+
+(* -------------------------------------------------------------------- *)
+(*Represents the permutation: k -> p[k]*)
+pred is_perm (n : int) (p : int list) =
+  perm_eq p (range 0 n).
+
+lemma size_is_perm n p :
+  0 <= n =>
+  is_perm n p =>
+  size p = n.
+proof. by rewrite /is_perm => le0n /perm_eq_size; rewrite size_range ler_maxr. qed.
+
+op id_perm n = range 0 n.
+
+lemma is_perm_id n : is_perm n (id_perm n).
+proof. by rewrite /is_perm /id_perm perm_eq_refl. qed.
+
+(* -------------------------------------------------------------------- *)
+op permute (dflt : 'a) (p : int list) (s : 'a list) =
+  mkseq (fun n => nth dflt s (nth (-1) p n)) (size s).
+
+lemma permute_is_perm dflt n (p : int list) :
+  is_perm n p =>
+  permute dflt p (range 0 n) = p.
+proof.
+  rewrite /is_perm /permute => perm_eq_p; apply/(eq_from_nth (-1)).
+  + by rewrite size_mkseq ler_maxr ?size_ge0 // eq_sym; apply/perm_eq_size.
+  move => k; rewrite size_mkseq ler_maxr ?size_ge0 // => mem_k.
+  rewrite nth_mkseq //= nth_range //= -mem_range.
+  move: (all_nthP (fun i => i \in range 0 n) p (-1)) => [_ /= imp].
+  apply/imp => {imp}; [by apply/allP => x mem_x; rewrite -(perm_eq_mem _ _ perm_eq_p)|].
+  by rewrite (perm_eq_size _ _ perm_eq_p).
+qed.
+
+lemma permuteP (dflt : 'a) (p : int list) (s : 'a list) :
+  is_perm (size s) p =>
+  perm_eq s (permute dflt p s).
+proof.
+  rewrite /permute => is_perm_p; move: (is_perm_p); rewrite /is_perm => /perm_eqP eq_count.
+  apply/perm_eq_pred1 => x; rewrite /mkseq count_map /preim /=.
+  rewrite range_iota /=; rewrite -{1}(map_nth_range dflt s) count_map /preim /=.
+  rewrite -eq_count -(permute_is_perm (-1) (size s)) //.
+  rewrite /permute /mkseq count_map /preim /= range_iota /= size_range /= ler_maxr ?size_ge0 //.
+  apply/eq_in_count => n mem_n /=; rewrite (nth_map (-1)) /=.
+  + by rewrite -mem_range size_range /= ler_maxr ?size_ge0.
+  by rewrite (nth_range n (size s) 0 (-1)) //= -mem_range.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op perm_of_lists (dflt : 'a) (s t : 'a list) =
+  mkseq (fun n => index (nth dflt t n) s) (size s).
+
+lemma permute_perm_of_lists (dflt : 'a) (s t : 'a list) :
+  uniq s =>
+  perm_eq s t =>
+  permute dflt (perm_of_lists dflt s t) s = t.
+proof.
+  admit.
+qed.
+
+lemma perm_of_lists_permute (dflt : 'a) (p : int list) (s : 'a list) :
+  is_perm (size s) p =>
+  uniq s =>
+  perm_of_lists dflt s (permute dflt p s) = p.
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op (\c) = permute (-1).
+
+lemma compA n p1 p2 p3 :
+  is_perm n p1 =>
+  is_perm n p2 =>
+  is_perm n p3 =>
+  p1 \c p2 \c p3 = p1 \c (p2 \c p3).
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op inv (n : int) (p : int list) : int list.
+
+lemma invK n p :
+  is_perm n p =>
+  (inv n p) \c p = id_perm n.
+proof.
+  admit.
+qed.
+
+lemma invrK n p :
+  is_perm n p =>
+  p \c (inv n p) = id_perm n.
+proof.
+  admit.
+qed.
+
+lemma invC n p q :
+  is_perm n p =>
+  is_perm n q =>
+  inv n (p \c q) = inv n q \c inv n p.
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op conj n u p = u \c p \c (inv n u).
+
+lemma conjA n u v p :
+  is_perm n u =>
+  is_perm n v =>
+  is_perm n p =>
+  conj n u (conj n v p) = conj n (u \c v) p.
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op is_cycle n p y = subset (zip y (rot 1 y)) (zip (range 0 n) p).
+
+op cycles (n : int) (p : int list) : int list list.
+
+lemma cyclesP n p :
+  is_perm n p =>
+  perm_eq (range 0 n) (flatten (cycles n p)) /\
+  all (is_cycle n p) (cycles n p).
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op shape (n : int) (p : int list) = mkseq (fun n => count (fun c => size c = n + 1) (cycles n p)) (size p).
+
+lemma shape_eq n p q :
+  is_perm n p =>
+  is_perm n q =>
+  shape n p = shape n q <=> (exists u , conj n u p = q).
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+pred is_shape (n : int) (s : int list) = true. (*TODO*)
+
+lemma is_shapeP n s :
+  is_shape n s <=> (exists p , is_perm n p /\ shape n p = s).
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op allperms_shape (n : int) (s : int list) : int list list.
+
+lemma allperms_shapeP n s :
+  is_shape n s =>
+  perm_eq (allperms_shape n s) (filter (fun p => shape n p = s) (allperms (range 0 n))).
+proof.
+  admit.
+qed.
+
+lemma size_allperms_shape n s :
+  is_shape n s =>
+  size (allperms_shape n s) = 0. (*TODO*)
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op allshapes (n : int) : int list list.
+
+lemma allshapesP n s :
+  is_shape n s <=> s \in allshapes n.
+proof.
+  admit.
+qed.
+
+lemma size_allshapes n :
+  size (allshapes n) = 0. (*TODO*)
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(*TODO: need a big clone to bring everything together.*)
