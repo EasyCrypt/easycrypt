@@ -71,29 +71,6 @@ abstract theory Field_Characteristic.
 
   (*TODO: I am bad at clones, check.*)
   clone include IDomain_Characteristic with
-    (*theory ID <- F *)
-    type ID.t <- F.t,
-    op ID.zeror <- F.zeror,
-    op ID.oner <- F.oner,
-    op ID.(+) <- F.(+),
-    op ID.([-]) <- F.([-]),
-    op ID.( * ) <- F.( * ),
-    op ID.invr <- F.invr,
-    pred ID.unit <- (fun x => x <> F.zeror)
-  proof *.
-
-  realize ID.addrA by exact F.addrA.
-  realize ID.addrC by exact F.addrC.
-  realize ID.add0r by exact F.add0r.
-  realize ID.addNr by exact F.addNr.
-  realize ID.oner_neq0 by exact F.oner_neq0.
-  realize ID.mulrA by exact F.mulrA.
-  realize ID.mulrC by exact F.mulrC.
-  realize ID.mul1r by exact F.mul1r.
-  realize ID.mulrDl by exact F.mulrDl.
-  realize ID.mulVr by exact F.mulVr.
-  realize ID.unitP by exact F.unitP.
-  realize ID.unitout by exact F.unitout.
-  realize ID.mulf_eq0 by exact F.mulf_eq0.
+    theory ID <- F.
 
 end Field_Characteristic.
