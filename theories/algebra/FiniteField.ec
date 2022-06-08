@@ -1,18 +1,12 @@
 require import AllCore List Ring Int IntDiv Characteristic Finite ZModP.
+require FinType.
 
 
 abstract theory FiniteField.
 
   clone include Field.
 
-  op enum : t list.
-
-  axiom enumP : is_finite_for predT enum.
-
-  print Finite.
-  (*TODO: a bunch of stuff is missing to talk about cardinals*)
-
-  op card = size enum.
+  clone import FinType.FinType with type t <= t.
 
   op in_subfield d x = exp x d = x.
 
@@ -45,8 +39,6 @@ abstract theory FiniteField.
   proof.
     admit.
   qed.
-
-  (*TODO: any way to define a subtype using clones?*)
 
 end FiniteField.
 

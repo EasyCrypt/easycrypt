@@ -2,15 +2,12 @@ require import AllCore List Ring Int IntDiv FiniteField Poly Ideal.
 
 
 abstract theory PolyFF.
+
+  type coeff.
    
-  clone import FiniteField as FF.
+  clone import FiniteField as FF with type t <= coeff.
 
-  (*TODO*)
-  print Poly.Poly.
-  (*clone include Poly.Poly with theory IDCoeff <- FF.*)
-
-  (*TODO: some stuff about irreducible polynomials should be added in Poly.Poly directly.*)
-  (*TODO: prove that there are infinitely many irreducible polynomials of arbitrairly large degree.*)
+  clone include Poly.Poly with type coeff <- coeff, theory IDCoeff <- FF.
 
 end PolyFF.
 

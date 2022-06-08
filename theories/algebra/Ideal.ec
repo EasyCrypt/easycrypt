@@ -280,7 +280,21 @@ qed.
 
 lemma in_idgen_mem xs x : x \in xs => idgen xs x.
 proof.
-admitted.
+  move => /(splitPr _) [s1 s2] ->>; exists (nseq (size s1) zeror ++ oner :: nseq (size s2) zeror).
+  rewrite size_cat /= (range_cat (size s1)) ?ler_addl ?addr_ge0 ?size_ge0 //.
+  rewrite addrA (range_cat (size s1 + 1) (size s1)) ?ler_addl // rangeSr //.
+  rewrite (range_geq (size s1) (size s1)) //= BAdd.big_cat BAdd.big_consT BAdd.big_seq BAdd.big1.
+  + move => n /= mem_n_range; rewrite nth_cat size_nseq ler_maxr ?size_ge0 //.
+    by rewrite nth_nseq -?mem_range //; move: mem_n_range => /mem_range [_ ->] /=; rewrite mul0r.
+  rewrite add0r /= !nth_cat size_nseq ler_maxr ?size_ge0 //= mul1r.
+  rewrite BAdd.big_seq BAdd.big1 ?addr0 //.
+  move => n /= mem_n_range; rewrite nth_cat size_nseq ler_maxr ?size_ge0 //=.
+  rewrite ltrNge subr_eq0; have ->/=: (size s1 <= n).
+  + by apply/ltzW/ltzE; move/mem_range: mem_n_range => [].
+  have ->/=: !(n = size s1) by apply/gtr_eqF/ltzE; move/mem_range: mem_n_range => [].
+  rewrite nth_nseq ?mul0r //; move/mem_range: mem_n_range => [? ?].
+  by rewrite -addrA -opprD subr_ge0 ; split => // _; rewrite ltr_subl_addl.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma dvdrr x : x %| x.
@@ -398,8 +412,58 @@ proof. by rewrite /eqv -mulrBr &(idealMl) ideal_p. qed.
 lemma eqvMr x1 x2 y : eqv x1 x2 => eqv (x1 * y) (x2 * y).
 proof. by rewrite !(mulrC _ y) &(eqvMl). qed.
 
-lemma eqvX x y n : eqv x y => eqv (exp x n) (exp y n).
-proof. admitted.
+lemma eqvM x1 x2 y1 y2 : eqv x1 x2 => eqv y1 y2 => eqv (x1 * y1) (x2 * y2).
+proof. by move => eqvx eqvy; apply/(eqv_trans (x1 * y2)); [apply/eqvMl|apply/eqvMr]. qed.
+
+(*TODO: eqvX was not true in the case of x unit and y not unit.*)
+lemma eqvUI x y :
+  unit x =>
+  unit y =>
+  eqv x y =>
+  eqv (invr x) (invr y).
+proof.
+  move => unitx unity; rewrite /eqv => pxy.
+  move: (idealMl _ (- invr x * invr y) _ ideal_p pxy).
+  rewrite mulNr -mulrN opprD opprK (addrC _ x) mulrDr.
+  rewrite mulrAC (mulrC _ x) divrr // div1r mulrN.
+  by rewrite -mulrA (mulrC _ y) divrr // mulr1.
+qed.
+
+lemma eqvI x y :
+  !unit x =>
+  !unit y =>
+  eqv x y =>
+  eqv (invr x) (invr y).
+proof. by move => unitx unity eqvxy; rewrite !invr_out //. qed.
+
+lemma eqvUX x y n :
+  unit x =>
+  unit y =>
+  eqv x y =>
+  eqv (exp x n) (exp y n).
+proof.
+  move => unitx unity; wlog: n / 0 <= n => [wlog|].
+  + move => eqvxy; case: (0 <= n) => [le0n|/ltzNge/oppr_gt0/ltzW le0Nn]; [by apply/wlog|].
+    by rewrite -(oppzK n) exprN eqv_sym exprN eqv_sym; apply/eqvUI; rewrite ?unitrX //; apply/wlog.
+  elim: n => [|n le0n IHn eqvxy]; [by rewrite !expr0 eqvxx|].
+  by rewrite !exprS //; apply/eqvM => //; apply/IHn.
+qed.
+
+lemma eqvX x y n :
+  !unit x =>
+  !unit y =>
+  eqv x y =>
+  eqv (exp x n) (exp y n).
+proof.
+  move => unitx unity; wlog: n / 0 <= n => [wlog|].
+  + move => eqvxy; case: (0 <= n) => [le0n|/ltzNge/oppr_gt0 lt0Nn]; [by apply/wlog|].
+    rewrite -(oppzK n) exprN eqv_sym exprN eqv_sym; apply/eqvI.
+    - by move: unitx; apply/contra/unitrX_neq0/gtr_eqF.
+    - by move: unity; apply/contra/unitrX_neq0/gtr_eqF.
+    by apply/wlog => //; apply/ltzW.
+  elim: n => [|n le0n IHn eqvxy]; [by rewrite !expr0 eqvxx|].
+  by rewrite !exprS //; apply/eqvM => //; apply/IHn.
+qed.
 
 (* -------------------------------------------------------------------- *)
 clone include Quotient.EquivQuotient
