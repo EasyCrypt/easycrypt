@@ -99,6 +99,10 @@ let print_config config =
 
 (* -------------------------------------------------------------------- *)
 let main () =
+  (* When started from Emacs28 on Apple M1, the set of blocks signals *
+   * disallows Why3 server to detect external provers completion      *)
+  let _ : int list = Unix.sigprocmask Unix.SIG_SETMASK [] in
+
   let theories = EcRelocate.Sites.theories in
 
   (* Parse command line arguments *)
