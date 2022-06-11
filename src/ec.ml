@@ -330,6 +330,14 @@ let main () =
   (* Initialize PRNG *)
   Random.self_init ();
 
+  (* Connect to external Why3 server if requested *)
+  prvopts.prvo_why3server |> oiter (fun server ->
+    try
+      Why3.Prove_client.connect_external server
+    with Why3.Prove_client.ConnectionError e ->
+      Format.eprintf "cannot connect to Why3 server `%s': %s" server e;
+      exit 1);
+
   (* Display Copyright *)
   if EcTerminal.interactive terminal then
     EcTerminal.notice ~immediate:true `Warning copyright terminal;

@@ -26,15 +26,16 @@ and cli_option = {
 }
 
 and prv_options = {
-  prvo_maxjobs   : int;
-  prvo_timeout   : int;
-  prvo_cpufactor : int;
-  prvo_provers   : string list option;
-  prvo_pragmas   : string list;
-  prvo_ppwidth   : int option;
-  prvo_checkall  : bool;
-  prvo_profile   : bool;
-  prvo_iterate   : bool;
+  prvo_maxjobs    : int;
+  prvo_timeout    : int;
+  prvo_cpufactor  : int;
+  prvo_provers    : string list option;
+  prvo_pragmas    : string list;
+  prvo_ppwidth    : int option;
+  prvo_checkall   : bool;
+  prvo_profile    : bool;
+  prvo_iterate    : bool;
+  prvo_why3server : string option;
 }
 
 and ldr_options = {
