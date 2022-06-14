@@ -1259,6 +1259,7 @@ type global = {
 
 type prog_r =
   | P_Prog of global list * bool
+  | P_Exit
   | P_Undo of int
 
 type prog = prog_r located

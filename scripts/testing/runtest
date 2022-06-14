@@ -112,8 +112,8 @@ def _options():
             parser.error('timeout must be positive')
 
     if cmdopt.jobs is not None:
-        if cmdopt.jobs <= 0:
-            parse.error('jobs must be positive')
+        if cmdopt.jobs < 0:
+            parser.error('jobs must be non-negative')
 
     options = Object(scenarios = dict())
     options.timeout  = cmdopt.timeout

@@ -99,6 +99,10 @@ let print_config config =
 
 (* -------------------------------------------------------------------- *)
 let main () =
+  (* When started from Emacs28 on Apple M1, the set of blocks signals *
+   * disallows Why3 server to detect external provers completion      *)
+  let _ : int list = Unix.sigprocmask Unix.SIG_SETMASK [] in
+
   let theories = EcRelocate.Sites.theories in
 
   (* Parse command line arguments *)
@@ -326,6 +330,14 @@ let main () =
   (* Initialize PRNG *)
   Random.self_init ();
 
+  (* Connect to external Why3 server if requested *)
+  prvopts.prvo_why3server |> oiter (fun server ->
+    try
+      Why3.Prove_client.connect_external server
+    with Why3.Prove_client.ConnectionError e ->
+      Format.eprintf "cannot connect to Why3 server `%s': %s" server e;
+      exit 1);
+
   (* Display Copyright *)
   if EcTerminal.interactive terminal then
     EcTerminal.notice ~immediate:true `Warning copyright terminal;
@@ -408,6 +420,8 @@ let main () =
 
           | EP.P_Undo i ->
               EcCommands.undo i
+          | EP.P_Exit ->
+              terminate := true
         end;
         EcTerminal.finish `ST_Ok terminal;
         if !terminate then begin

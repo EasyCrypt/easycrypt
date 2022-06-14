@@ -50,6 +50,31 @@ let check_independence (pf, hyps) b init c1 c2 c3 =
   List.iter (check_disjoint rd_c3) [wr_c1; wr_c2]
 
 (* -------------------------------------------------------------------- *)
+let check_dslc pf =
+  let error () =
+    tc_error pf
+      "epilog must be deterministic and loop/procedure-call free" in
+
+  let rec doit_i c =
+    match c.i_node with
+    | Sasgn _ ->
+       ()
+
+    | Sif (_, c1, c2) ->
+       List.iter doit_s [c1; c2]
+
+    | Smatch (_, bs) ->
+       List.iter (doit_s |- snd) bs
+
+    | Srnd _ | Scall _ | Swhile _ | Sassert _  | Sabstract _ ->
+       error ()
+
+  and doit_s c =
+    List.iter doit_i c.s_node
+
+  in fun c -> List.iter doit_i c
+
+(* -------------------------------------------------------------------- *)
 let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
   if d2 < d1 then
     tc_error pf "%s, %s"
@@ -77,6 +102,7 @@ let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
   in
 
   check_independence (pf, hyps) b init s1 s2 s3;
+  check_dslc pf s3;
 
   let wl1 = i_while (b, stmt (s1 @ s3)) in
   let wl2 = i_while (b, stmt (s2 @ s3)) in
@@ -130,11 +156,12 @@ let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
   if not (EcReduction.EqTest.for_stmt env (stmt init1) (stmt init2)) then
     tc_error pf "in loop-fusion, preludes do not match";
   if not (EcReduction.EqTest.for_stmt env (stmt fini1) (stmt fini2)) then
-    tc_error pf "in loop-fusion, finalizers do not match";
+    tc_error pf "in loop-fusion, epilogs do not match";
   if not (EcReduction.EqTest.for_expr env b1 b2) then
     tc_error pf "in loop-fusion, while conditions do not match";
 
   check_independence (pf, hyps) b1 init1 sw1 sw2 fini1;
+  check_dslc pf fini1;
 
   let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
   let fus = List.rev_append init1 [wl] in
