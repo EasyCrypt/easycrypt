@@ -187,7 +187,28 @@ abstract theory ZModule.
     by rewrite mulrNz addzC wlog 1:/# !mulrNz -opprD opprK.
   elim: m => /= [|m ge0_m ih]; first by rewrite mulr0z addr0.
   by rewrite addzA !mulrSz ih addrCA.
-qed.
+  qed.
+
+  lemma mul0i n : intmul zeror n = zeror.
+  proof.
+    wlog: n / (0 <= n) => [wlog|].
+    + case: (0 <= n) => [|/ltzNge]; [by apply/wlog|].
+      rewrite -oppz_gt0 => /ltzW le0Nn.
+      by rewrite -(@mulNrNz zeror) oppr0 wlog.
+    elim: n => [|n le0n IHn]; [by rewrite mulr0z|].
+    by rewrite !mulrSz IHn addr0.
+  qed.
+
+  lemma mulrDi x y n : intmul (x + y) n = intmul x n + intmul y n.
+  proof.
+    wlog: n x y / (0 <= n) => [wlog|].
+    + case: (0 <= n) => [|/ltzNge]; [by apply/wlog|].
+      rewrite -oppz_gt0 => /ltzW le0Nn.
+      rewrite -(@mulNrNz (x + y)) -(@mulNrNz x) -(@mulNrNz y).
+      by rewrite -wlog // opprD.
+    elim: n => [|n le0n IHn]; [by rewrite !mulr0z addr0|].
+    by rewrite !mulrSz IHn !addrA (@addrAC x _ y).
+  qed.
 
 end ZModule.
 
@@ -428,6 +449,26 @@ abstract theory ComRing.
   lemma ofintN (i : int): ofint (-i) = - (ofint i).
   proof. by apply/mulrNz. qed.
 
+  lemma add1r1z (i : int): ofint (i+1) = ofint i + oner.
+  proof.
+    case: (0 <= i) => [|/ltzNge]; [by rewrite addrC; apply/ofintS|].
+    rewrite addrC -oppz_gt0 => /ltzE le1Ni.
+    move: (ofintS (- i - 1) _) => /=; [by rewrite subz_ge0|].
+    rewrite -(@subz_add2r (-i) 1 i) addNz /= addzC !ofintN.
+    by rewrite eq_sym subr_eq addrC -subr_eq eq_sym opprK addrC.
+  qed.
+
+  lemma addrz (x y : int) : ofint (x + y) = ofint x + ofint y.
+  proof.
+    wlog: y x / (0 <= y) => [wlog|le0y].
+    + case: (0 <= y) => [|/ltzNge]; [by apply/wlog|].
+      rewrite -oppz_gt0 => /ltzW le0Ny.
+      rewrite -(opprK (_ + _)) opprD -!ofintN -wlog //.
+      by rewrite -ofintN -(@subz_add2r (-x) y x) addNz /= addzC.
+    elim: y le0y x => [|y le0y IHy] x; [by rewrite ofint0 addr0|].
+    by rewrite addzA addzAC IHy !add1r1z addrAC addrA.
+  qed.
+
   lemma mul1r0z x: x * ofint 0 = zeror.
   proof. by rewrite ofint0 mulr0. qed.
 
@@ -442,6 +483,25 @@ abstract theory ComRing.
 
   lemma mulr_intr x z : x * (ofint z) = intmul x z.
   proof. by rewrite mulrzAr mulr1. qed.
+
+  lemma intmul_ofint x y : intmul (ofint x) y = ofint (x * y).
+  proof.
+    wlog: x y / (0 <= x) => [wlog|].
+    + case: (0 <= x) => [|/ltzNge]; [by apply/wlog|].
+      rewrite -oppz_gt0 => /ltzW le0Nx.
+      rewrite -mulNrNz -ofintN wlog // -{2}(@oppzK x).
+      elim: (-x) le0Nx => {x} [|x le0x IHx] //=.
+      rewrite mulzDl /= addrz IHx.
+      have ->: - (x + 1) = - x - 1.
+      - admit.
+      rewrite mulzDl addrz /=.
+      admit.
+    elim: x => [|x le0x IHx]; [by rewrite /= ofint0 mul0i|].
+    by rewrite mulzDl /= !addrz ofint1 mulrDi IHx.
+  qed.
+
+  lemma mulrz m n : ofint m * ofint n = ofint (m * n).
+  proof. by rewrite mulr_intr intmul_ofint. qed.
 
   op exp (x : t) (n : int) =
     if   n < 0
