@@ -811,6 +811,19 @@ proof. by case. qed.
 lemma gt0_prime p : prime p => 0 < p.
 proof. by move/gt1_prime/(ltr_trans _ _ _ ltr01). qed.
 
+lemma prime_or_2_odd p : prime p => p = 2 \/ odd p.
+proof.
+  move => primep; case (p=2) => [->//|neqp2] /=.
+  move/ltzE/ler_eqVlt: (gt1_prime _ primep) => /=.
+  rewrite eq_sym neqp2 /= => /ltzE/lez_eqVlt.
+  case => [<<-|/ltzE /= lep4]; apply/oddP/negP => modp2.
+  + by rewrite //= (modzMDl 1 1 2) modz_small in modp2.
+  move: primep; rewrite (divz_eq _ 2) modp2 /=.
+  apply/negP => -[_] /(_ 2); rewrite dvdz_mull ?dvdzz //=.
+  case: (normr_idP 2) => [_] -> //=; apply/ltr_eqF/ltz_divLR/ltzE => //.
+  by apply/lez_divRL => //=; rewrite divzz /b2i.
+qed.
+
 lemma nosmt prime_coprime p : prime p =>
   forall a, a %% p <> 0 => coprime p a.
 proof.
@@ -841,6 +854,117 @@ lemma mulmV p a : prime p => a %% p <> 0 => (a * invm a p) %% p = 1.
 proof.
 move=> ^/gt1_prime gt1_p + nz_a - /prime_coprime.
 by move=> /(_ a nz_a); apply/invmP.
+qed.
+
+(* -------------------------------------------------------------------- *)
+require import List.
+
+op is_pd n p = prime p /\ p %| n.
+op is_pds n = all (is_pd n).
+op is_pdec n ps = is_pds n ps /\ n = foldr ( * ) 1 ps.
+op spd n = argmin idfun (is_pd n).
+
+lemma spd1 : spd 1 = 0.
+proof.
+rewrite /spd; apply/argmin_out => i /=; rewrite /idfun /is_pd /= dvdz1.
+rewrite /CoreInt.absz; apply/negP => -[/gt1_prime lt1i].
+by case (0 <= i) => [le0i ->> //|/ltrNge lti0]; rewrite eqr_oppLR => ->>.
+qed.
+
+lemma spdN n : spd (-n) = spd n.
+proof.
+rewrite /spd.
+search _ argmin.
+(*TODO: hakyber-eclib*)
+admit.
+qed.
+
+lemma spdP n :
+  1 < n =>
+  is_pd n (spd n) /\
+  (forall m , 0 < m < spd n => !(is_pd n m)).
+proof.
+move => lt1n; rewrite /spd.
+search _ argmin.
+(*TODO: hakyber-eclib*)
+admit.
+qed.
+
+lemma is_pd_spd n :
+  1 < n =>
+  is_pd n (spd n).
+proof. by move => /spdP []. qed.
+
+lemma spd_min n :
+  1 < n =>
+  (forall m , 0 < m < spd n => !(is_pd n m)).
+proof. by move => /spdP []. qed.
+
+lemma prime_divisor n :
+  1 < n =>
+  exists p , is_pd n p.
+proof. by move => lt1n; exists (spd n); apply/is_pd_spd. qed.
+
+lemma is_pdec_dvd n p ps :
+  0 < n =>
+  is_pd n p =>
+  is_pdec (n %/ p) ps =>
+  is_pdec n (p :: ps).
+proof.
+move => lt0n is_pd_p [is_pds_ps eq_ps].
+split; [move: is_pds_ps; rewrite /is_pds /= is_pd_p /=|].
++ apply/all_imp_in/allP => q mem_q /=; rewrite /is_pd => -[prime_q /dvdzP [r eq_r]]; split => //.
+  apply/dvdzP; exists (p * r); rewrite -mulrA (mulrC p); move: is_pd_p => [prime_p dvd_p].
+  by apply/eqz_mul => //; apply/gtr_eqF/gt0_prime.
+by move: is_pd_p => [prime_p dvd_p] /=; rewrite mulrC eq_sym -eq_ps -dvdz_eq.
+qed.
+
+lemma prime_divisors n :
+  0 < n =>
+  exists ps , is_pdec n ps.
+proof.
+move => lt0n; move: (ltzW _ _ lt0n) {1 2 4}(n) (lt0n) (lerr n) => {lt0n}.
+elim: n => [|n le0n IHn] m lt0m lemn; [by move: (ltr_le_trans _ _ _ lt0m lemn)|].
+case/ler_eqVlt: lemn => [->> {lt0m}|/ltzS]; [|by apply/IHn].
+case/ler_eqVlt: le0n => [<<-|lt0n]; [by exists []; rewrite /is_pds|].
+case: (prime_divisor (n + 1) _) => [|p is_pd_p]; [by rewrite -ltr_subl_addr|].
+case: (IHn ((n + 1) %/ p) _ _).
++ by case: is_pd_p => prime_p dvd_p; apply/ltz_divRL => //=; [apply/gt0_prime|apply/ltzS/ltzW].
++ case: is_pd_p => prime_p dvd_p; apply/ltzS/ltz_divLR; [by apply/gt0_prime|].
+  rewrite -subr_gt0 -{2}(mul1r (n + 1)) -mulNr mulrC -mulrDl.
+  by rewrite mulr_gt0; [apply/subr_gt0/gt1_prime|apply/ltzS/ltzW].
+by move => ps is_pdec_ps; exists (p :: ps); apply/is_pdec_dvd => //; apply/ltzS/ltzW.
+qed.
+
+lemma perm_eq_prime_divisors n ps1 ps2 :
+  perm_eq ps1 ps2 =>
+  is_pdec n ps1 =>
+  is_pdec n ps2.
+proof.
+move => perm_eq_ [/allP is_pds_ps1 eq_1]; split.
++ by apply/allP => x mem_x; apply/is_pds_ps1/(perm_eq_mem _ _ perm_eq_).
+by rewrite eq_1; apply/(foldr_perm _ _ _ _ _ perm_eq_) => x y z; rewrite !mulrA (mulrC x).
+qed.
+
+lemma spd_pdec n ps :
+  1 < n =>
+  is_pdec n ps =>
+  ohead (sort Int.(<=) ps) = Some (spd n).
+proof.
+admit.
+qed.
+
+lemma prime_divisors_perm_eq n ps1 ps2 :
+  is_pdec n ps1 =>
+  is_pdec n ps2 =>
+  perm_eq ps1 ps2.
+proof.
+move => is_pdec1 is_pdec2; apply/(perm_sortP Int.(<=)); [by apply/ler_total|by apply/ler_trans| |].
++ by move => ????; rewrite eqz_leq; split.
+move/perm_eq_sym: (perm_sort Int.(<=) ps1) => perm_eq1; move: (perm_eq_prime_divisors _ _ _ perm_eq1 is_pdec1).
+move/perm_eq_sym: (perm_sort Int.(<=) ps2) => perm_eq2; move: (perm_eq_prime_divisors _ _ _ perm_eq2 is_pdec2).
+move => {perm_eq1 is_pdec1 perm_eq2 is_pdec2} is_pdec2 is_pdec1.
+admit.
 qed.
 
 (* ==================================================================== *)

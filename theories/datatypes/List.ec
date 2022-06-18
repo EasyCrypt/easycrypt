@@ -535,6 +535,11 @@ proof. by rewrite all_count count_predT. qed.
 lemma all_predC p (s : 'a list): all (predC p) s = ! has p s.
 proof. by elim: s => //= x s ->; rewrite /predC; case: (p x). qed.
 
+lemma all_imp_in p q (s : 'a list): all (fun x => (p x => q x)) s => all p s => all q s.
+proof.
+by move => /allP himp /allP hp; apply/allP => x mem_x; move: (himp x _) => //= -> //; apply/hp.
+qed.
+
 lemma eq_filter_in p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => filter p1 s = filter p2 s.
 proof.
@@ -1540,6 +1545,13 @@ lemma uniq_map (f : 'a -> 'b) (s : 'a list):
 proof.
   elim: s=> //= x s ih [x1_notin_fs /ih] -> /=.
   by apply/negP => /(map_f f).
+qed.
+
+lemma uniq_map_injective (f : 'a -> 'b) (s : 'a list):
+  injective f => uniq s => uniq (map f s).
+proof.
+  move => inj_f; elim: s => //= x s ih [x1_notin_fs /ih] -> /=.
+  by move: x1_notin_fs; apply/contra => /mapP [y] [mem_y /inj_f ->>].
 qed.
 
 lemma map_cons (f : 'a -> 'b) x s: map f (x :: s) = f x :: map f s.
