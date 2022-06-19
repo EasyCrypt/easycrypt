@@ -1,4 +1,4 @@
-require import AllCore List Ring Int IntDiv Characteristic FinType ZModP Bigalg.
+require import AllCore List Ring Int IntDiv Characteristic FinType ZModP Bigalg SubRing.
 require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
@@ -56,229 +56,125 @@ abstract theory SubFiniteField.
 
   clone import FiniteField as FF.
 
+  clone include SubField with
+    theory F <- FF.
+
+  op senum = (map Sub.insubd (filter in_sub FF.FinType.enum)).
+
+  clone import FiniteField as SFF with
+    type t          <- st,
+    op zeror        <- zeror,
+    op (+)          <- (+),
+    op [-]          <- ([-]),
+    op oner         <- oner,
+    op ( * )        <- ( * ),
+    op invr         <- invr,
+    op FinType.enum <- senum
+    proof *.
+
+  realize addrA     by exact SF.addrA.
+  realize addrC     by exact SF.addrC.
+  realize add0r     by exact SF.add0r.
+  realize addNr     by exact SF.addNr.
+  realize oner_neq0 by exact SF.oner_neq0.
+  realize mulrA     by exact SF.mulrA.
+  realize mulrC     by exact SF.mulrC.
+  realize mul1r     by exact SF.mul1r.
+  realize mulrDl    by exact SF.mulrDl.
+  realize mulVr     by exact SF.mulVr.
+  realize unitP     by exact SF.unitP.
+  realize unitout   by exact SF.unitout.
+  realize mulf_eq0  by exact SF.mulf_eq0.
+
+  realize FinType.enum_spec.
+  proof.
+    move => x; rewrite /senum count_map count_filter /predI /preim.
+    rewrite -(FF.FinType.enum_spec (Sub.val x)); apply/eq_count.
+    move => y; rewrite /pred1 /=; split => [[<<- in_sub_y]|->>].
+    + by rewrite Sub.val_insubd in_sub_y.
+    by rewrite Sub.valKd /= Sub.valP.
+  qed.
+
   clone import FiniteField_Characteristic as FFC with theory FF <- FF.
 
   clone import BigFiniteField as BigFF with theory FF <- FF.
 
-  op d : int.
-
-  axiom d_spec : exists n , FF.FinType.card = d ^ n.
-
-  op in_subfield x = FF.exp x d = x.
-
-  lemma in_subfield_0 d :
-    in_subfield d zeror.
-  proof.
-    (*by rewrite /in_subfield expr0z => ->.*)
-    admit.
-  qed.
-
-  lemma in_subfield_1 d :
-    in_subfield d oner.
-  proof.
-    (*by rewrite /in_subfield expr1z.*)
-    admit.
-  qed.
-
-
-  qed.
-
-  lemma in_subfield_add d x y : in_subfield d x => in_subfield d y => in_subfield d (x + y).
+  lemma sub_card :
+    exists d , 0 < d /\ FF.FinType.card = SFF.FinType.card ^ d.
   proof.
     admit.
   qed.
-
-  lemma in_subfield_mul d x y : in_subfield d x => in_subfield d y => in_subfield d (x * y).
-  proof.
-    admit.
-  qed.
-
-  type sff.
-
-  clone Subtype as Sub with
-    type T <- FF.t, type sT <- sff,
-    pred P <- in_subfield.
-
-  clone import FiniteField as SFF with
-    type t       <- sff,
-    op zeror     <- Sub.insubd zeror,
-    op (+) x y   <- Sub.insubd (Sub.val x + Sub.val y),
-    op ( * ) x y <- Sub.insubd (Sub.val x * Sub.val y)
-    proof *.
 
 end SubFiniteField.
 
 
-abstract theory SubFiniteField.
+abstract theory SubFiniteField_Card.
+
+  clone import FiniteField as FF.
+
+  op scard : int.
+
+  axiom scard_spec : exists d , FF.FinType.card = scard ^ d.
+
+  op in_sub x = FF.exp x scard = x.
+
+  clone import SubFiniteField with
+    theory FF <- FF,
+    op w      <- FF.zeror,
+    op wu     <- FF.oner
+  proof sub_w, sub_add, sub_opp, unit_wu, sub_wu, sub_mul, sub_inv.
+
+  realize sub_w.
+  proof.
+    admit.
+  qed.
+
+  realize sub_add.
+  proof.
+    admit.
+  qed.
+
+  realize sub_opp.
+  proof.
+    admit.
+  qed.
+
+  realize unit_wu.
+  proof.
+    admit.
+  qed.
+
+  realize sub_wu.
+  proof.
+    admit.
+  qed.
+
+  realize sub_mul.
+  proof.
+    admit.
+  qed.
+
+  realize sub_inv.
+  proof.
+    admit.
+  qed.
+
+end SubFiniteField_Card.
+
+
+abstract theory ZModP_SubFiniteField.
 
   clone import FiniteField as FF.
 
   clone import FiniteField_Characteristic as FFC with theory FF <- FF.
 
-  clone import BigFiniteField as BigFF with theory FF <- FF.
-
-  op d : int.
-
-  axiom d_spec : exists n , FF.FinType.card = d ^ n.
-
-  op in_subfield x = FF.exp x d = x.
-
-  lemma in_subfield_0 d :
-    in_subfield d zeror.
-  proof.
-    (*by rewrite /in_subfield expr0z => ->.*)
-    admit.
-  qed.
-
-  lemma in_subfield_1 d :
-    in_subfield d oner.
-  proof.
-    (*by rewrite /in_subfield expr1z.*)
-    admit.
-  qed.
-
-
-  qed.
-
-  lemma in_subfield_add d x y : in_subfield d x => in_subfield d y => in_subfield d (x + y).
-  proof.
-    admit.
-  qed.
-
-  lemma in_subfield_mul d x y : in_subfield d x => in_subfield d y => in_subfield d (x * y).
-  proof.
-    admit.
-  qed.
-
-  type sff.
-
-  clone Subtype as Sub with
-    type T <- FF.t, type sT <- sff,
-    pred P <- in_subfield.
-
-  clone import FiniteField as SFF with
-    type t       <- sff,
-    op zeror     <- Sub.insubd zeror,
-    op (+) x y   <- Sub.insubd (Sub.val x + Sub.val y),
-    op ( * ) x y <- Sub.insubd (Sub.val x * Sub.val y)
-    proof *.
-
-  realize addrA.
-  proof.
-    move => x y z.
-    search _ Sub.insubd Sub.val.
-  qed.
-
-  realize addrC.
-  proof.
-    admit.
-  qed.
-
-  realize addr0r.
-  proof.
-    admit.
-  qed.
-
-  realize addrNr.
-  proof.
-    admit.
-  qed.
-
-  realize oner_neq0.
-  proof.
-    admit.
-  qed.
-
-  realize mulrA.
-  proof.
-    admit.
-  qed.
-
-  realize mulrC.
-  proof.
-    admit.
-  qed.
-
-  realize mul1r.
-  proof.
-    admit.
-  qed.
-
-  realize mulrDl.
-  proof.
-    admit.
-  qed.
-
-  realize mulVr.
-  proof.
-    admit.
-  qed.
-
-  realize unitP.
-  proof.
-    admit.
-  qed.
-
-  realize unitout.
-  proof.
-    admit.
-  qed.
-
-  realize mulf_eq0.
-  proof.
-    admit.
-  qed.
-
-  realize FinType.enum_spec.
-  proof.
-    admit.
-  qed.
-
-(*
-  lemma in_subfield_imp x (d n : int) :
-    (exists (k : int) , k <> 0 /\ n = d ^ k) =>
-    in_subfield d x =>
-    in_subfield n x.
-  proof.
-    move => [k] [neqk0 ->>]; rewrite /in_subfield.
-    (*TODO: hakyber-eclib*)
-    print pow_normr.
-    have ->: forall (d k : int), d ^ k = d ^ `|k| by admit.
-    move/normr_gt0: neqk0; move: `|k| => {k} k lt0k.
-    move/subr_eq0 => eq_; apply/subr_eq0.
-    
-
-
-    rewrite ltzE /= -(IntID.subrK k 1) ler_addr.
-    move: (k - 1) => {k}; elim => [|k le0k IHk] x; [by rewrite IntID.expr1|].
-    rewrite -(IntID.subrK k (-1)) opprK in le0k.
-    move: (k + 1) le0k IHk => {k} k; rewrite ler_subr_addl /= => le1k IHk.
-    
-  qed.
-
-  lemma in_subfield_card x :
-    in_subfield card x.
-  proof.
-    search _ card.
-    search _ Finite.to_seq.
-    search _ enum.
-    rewrite /card; move: enum_uniq enumP.
-    admit.
-  qed.
-*)
-
-end SubFiniteField.
-
-
-abstract theory ZModP_SubFiniteField.
-
   clone import ZModField as Fp with
-    op p <- char,
-    axiom prime_p <- prime_char.
+    op p          <- FFC.char,
+    axiom prime_p <- FFC.prime_char.
 
   op ofzmod (x : zmod) = ofint (Fp.Sub.val x).
 
-end ZModP_SubFIniteField.
+end ZModP_SubFiniteField.
 
 
 abstract theory ZModField_Finite.
