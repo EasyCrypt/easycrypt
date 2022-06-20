@@ -31,10 +31,10 @@ abstract theory SubZModule.
   op ([-]) x = Sub.insubd (- Sub.val x).
 
   clone import ZModule as SZMod with
-    type t    <- st,
-    op zeror  <- zeror,
-    op (+)    <- (+),
-    op [-]  <- ([-])
+    type t    <= st,
+    op zeror  <= zeror,
+    op (+)    <= (+),
+    op [-]    <= ([-])
     proof *.
 
   realize addrA.
@@ -54,7 +54,7 @@ abstract theory SubZModule.
 
   realize addNr.
   proof.
-    move => x; rewrite /zeror /([-]); apply/Sub.val_inj.
+    move => x; rewrite /zeror /SZMod.([-]); apply/Sub.val_inj.
     rewrite !Sub.val_insubd sub_add ?sub_opp ?Sub.valP ?sub_0 //=.
     + by apply/sub_opp/Sub.valP.
     by apply/ZMod.addNr.
@@ -87,14 +87,14 @@ abstract theory SubComRing.
 
   (*TODO: can I do this with a clone with theory?*)
   clone import ComRing as SCR with
-    type t    <- st,
-    op zeror  <- zeror,
-    op (+)    <- (+),
-    op [-]    <- ([-]),
-    op oner   <- oner,
-    op ( * )  <- ( * ),
-    op invr   <- invr,
-    pred unit <- unit
+    type t    <= st,
+    op zeror  <= zeror,
+    op (+)    <= (+),
+    op [-]    <= ([-]),
+    op oner   <= oner,
+    op ( * )  <= ( * ),
+    op invr   <= invr,
+    pred unit <= unit
     proof *.
 
   realize addrA by exact SZMod.addrA.
@@ -151,14 +151,14 @@ abstract theory SubIDomain.
     theory CR <- ID.
 
   clone import IDomain as SID with
-    type t    <- st,
-    op zeror  <- zeror,
-    op (+)    <- (+),
-    op [-]    <- ([-]),
-    op oner   <- oner,
-    op ( * )  <- ( * ),
-    op invr   <- invr,
-    pred unit <- unit
+    type t    <= st,
+    op zeror  <= zeror,
+    op (+)    <= (+),
+    op [-]    <= ([-]),
+    op oner   <= oner,
+    op ( * )  <= ( * ),
+    op invr   <= invr,
+    pred unit <= unit
     proof *.
 
   realize addrA     by exact SCR.addrA.
@@ -194,13 +194,13 @@ abstract theory SubField.
     theory ID <- F.
 
   clone import Field as SF with
-    type t    <- st,
-    op zeror  <- zeror,
-    op (+)    <- (+),
-    op [-]    <- ([-]),
-    op oner   <- oner,
-    op ( * )  <- ( * ),
-    op invr   <- invr
+    type t    <= st,
+    op zeror  <= zeror,
+    op (+)    <= (+),
+    op [-]    <= ([-]),
+    op oner   <= oner,
+    op ( * )  <= ( * ),
+    op invr   <= invr
     proof *.
 
   realize addrA     by exact SID.addrA.
