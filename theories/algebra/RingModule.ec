@@ -1,22 +1,22 @@
+(* -------------------------------------------------------------------- *)
 require import AllCore List Ring Int SubRing.
 
-
+(* -------------------------------------------------------------------- *)
 abstract theory ComRingModule.
+  type scalar, t.
 
-  clone import ComRing as CR.
+  clone import ComRing as Scalar with type t <= scalar.
+  clone import ZModule with type t <- t.
 
-  clone include ZModule.
+  op ( ** ) : scalar -> t -> t.
 
-  op ( ** ) : CR.t -> t -> t.
-
-  axiom compat_addl (x y : CR.t) (a : t) : (x + y) ** a = x ** a + y ** a.
-  axiom compat_addr (x : CR.t) (a b : t) : x ** (a + b) = x ** a + x ** b.
-  axiom compat_mul (x y : CR.t) (a : t) : (x * y) ** a = x ** (y ** a).
-  axiom compat_one (a : t) : CR.oner ** a = a.
-
+  axiom scaleDl (x y : scalar) (a : t) : (x + y) ** a = x ** a + y ** a.
+  axiom scaleDr (x : scalar) (a b : t) : x ** (a + b) = x ** a + x ** b.
+  axiom scaleM (x y : scalar) (a : t) : (x * y) ** a = x ** (y ** a).
+  axiom scale1r (a : t) : oner ** a = a.
 end ComRingModule.
 
-
+(*
 abstract theory IDomainModule.
 
   clone import IDomain as ID.
@@ -36,44 +36,32 @@ abstract theory VectorSpace.
 
 end VectorSpace.
 
+*)
 
+
+(* -------------------------------------------------------------------- *)
 abstract theory SubComRingModule.
+  type t, st.
 
-  clone include SubComRing.
+  clone import ComRing as CR with type t <= t.
 
-  clone include ComRingModule with
-    theory CR <- SCR.
+  clone import SubComRing
+    with type t <= t, type st <= st, theory CR <- CR.
 
-  clone import ZModule as ZMod.
+  op ( ** ) (x : st) (a : t) : t =
+    Sub.val x * a.
 
-  type st.
+  clone ComRingModule with
+    type scalar    <- st,
+    type t         <- t,
+    theory Scalar  <- SubComRing.SCR,
+    theory ZModule <- CR,
+    op     ( ** )  <- ( ** )
 
-  op w : ZMod.t.
-
-  (*TODO: issue in FiniteField if this is a pred.*)
-  op in_sub : ZMod.t -> bool.
-
-  axiom sub_w : in_sub w.
-  axiom sub_add x y : in_sub x => in_sub y => in_sub (x + y).
-  axiom sub_opp x : in_sub x => in_sub (-x).
-
-  lemma sub_0 : in_sub zeror.
-  proof. by rewrite -(subrr w); apply/sub_add; [apply/sub_w|apply/sub_opp/sub_w]. qed.
-
-  clone Subtype as Sub with
-    type T <- ZMod.t,
-    type sT <- st,
-    pred P <- in_sub.
-
-  op zeror = Sub.insubd zeror.
-  op (+) x y = Sub.insubd (Sub.val x + Sub.val y).
-  op ([-]) x = Sub.insubd (- Sub.val x).
-
-  clone import ZModule as SZMod with
-    type t    <- st,
-    op zeror  <- zeror,
-    op (+)    <- (+),
-    op [-]  <- ([-])
     proof *.
 
+  realize scaleDl. admit. qed.
+  realize scaleDr. admit. qed.
+  realize scaleM . admit. qed.
+  realize scale1r. admit. qed.
 end SubComRingModule.

@@ -1,32 +1,95 @@
+(* -------------------------------------------------------------------- *)
 require import AllCore List Ring Int IntDiv Characteristic Bigalg.
 require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
+(* -------------------------------------------------------------------- *)
+theory ZModPred.
+  type t.
 
+  clone import ZModule with type t <= t.
+
+  inductive zmodpred (p : t -> bool) =
+  | ZModPred of
+        (p zeror)
+      & (forall x, p x => p (-x))
+      & (forall x y, p x => p y => p (x + y)).
+
+  lemma zmod0 p : zmodpred p => p zeror.
+  proof. by case. qed.
+
+  lemma zmodN p x : zmodpred p => p x => p (-x).
+  proof. by case=> _ + _; apply. qed.
+
+  lemma zmodD p x y : zmodpred p => p x => p y => p (x + y).
+  proof. by case=> _ _; apply. qed.
+  
+  lemma zmodB p x y : zmodpred p => p x => p y => p (x - y).
+  proof. by move=> zmodp px py; apply/zmodD/zmodN. qed.
+end ZModPred.
+
+(* -------------------------------------------------------------------- *)
+theory ComRingPred.
+  type t.
+
+  clone import ComRing with type t <= t.
+
+  clone import ZModPred with
+    type t <= t, theory ZModule <- ComRing.
+
+  inductive ringpred (p : t -> bool) =
+  | RingPred of
+        (zmodpred p)
+      & (p oner)
+      & (forall x y, p x => p y => p (x * y))
+      & (forall x, p x => p (invr x)).
+
+  lemma ringpred_zmod p : ringpred p => zmodpred p.
+  proof. by case. qed.
+
+  hint exact : ringpred_zmod.
+
+  lemma ring0 p : ringpred p => p zeror.
+  proof. by move/ringpred_zmod; exact: zmod0. qed.
+
+  lemma ringN p x : ringpred p => p x => p (-x).
+  proof. by move/ringpred_zmod; exact: zmodN. qed.
+
+  lemma ringD p x y : ringpred p => p x => p y => p (x + y).
+  proof. by move/ringpred_zmod; exact: zmodD. qed.
+  
+  lemma ringB p x y : ringpred p => p x => p y => p (x - y).
+  proof. by move/ringpred_zmod; exact: zmodB. qed.
+
+  lemma ring1 p : ringpred p => p oner.
+  proof. by case. qed.
+  
+ lemma ringM p x y : ringpred p => p x => p y => p (x * y).
+  proof. by case=> _ _ + _; apply. qed.
+
+  lemma ringV p x : ringpred p => p x => p (invr x).
+  proof. by case=> _ _ _; apply. qed.
+end ComRingPred.
+
+(* -------------------------------------------------------------------- *)
 abstract theory SubZModule.
+  type t, st.
 
-  clone import ZModule as ZMod.
+  clone import ZModule as ZMod with type t <= t.
+  clone import ZModPred with type t <= t, theory ZModule <- ZMod.
 
-  type st.
+  op p : t -> bool.
 
-  op w : ZMod.t.
+  axiom zmodp : zmodpred p.
 
-  (*TODO: issue in FiniteField if this is a pred.*)
-  op in_sub : ZMod.t -> bool.
+  hint exact : zmodp.
 
-  axiom sub_w : in_sub w.
-  axiom sub_add x y : in_sub x => in_sub y => in_sub (x + y).
-  axiom sub_opp x : in_sub x => in_sub (-x).
-
-  lemma sub_0 : in_sub zeror.
-  proof. by rewrite -(subrr w); apply/sub_add; [apply/sub_w|apply/sub_opp/sub_w]. qed.
-
-  clone Subtype as Sub with
-    type T <- ZMod.t,
+  clone import Subtype as Sub with
+    type T  <- t ,
     type sT <- st,
-    pred P <- in_sub.
+    pred P  <- p .
 
-  op zeror = Sub.insubd zeror.
+  op zeror   = Sub.insubd zeror.
   op (+) x y = Sub.insubd (Sub.val x + Sub.val y).
   op ([-]) x = Sub.insubd (- Sub.val x).
 
@@ -38,54 +101,67 @@ abstract theory SubZModule.
     proof *.
 
   realize addrA.
-  proof. by move => x y z; rewrite /(+) !Sub.val_insubd !sub_add ?Sub.valP //= ZMod.addrA. qed.
+  proof.
+  by move=> x y z; rewrite /(+) !val_insubd !zmodD ?valP //= addrA.
+  qed.
 
   realize addrC.
   proof.
-    move => x y; apply/Sub.val_inj.
-    by rewrite !Sub.val_insubd !sub_add ?Sub.valP //= ZMod.addrC.
+  move=> x y; apply/Sub.val_inj.
+  by rewrite !Sub.val_insubd !zmodD ?Sub.valP //= addrC.
   qed.
 
   realize add0r.
   proof.
-    move => x; rewrite /zeror; apply/Sub.val_inj.
-    by rewrite !Sub.val_insubd sub_add ?Sub.valP //= ?sub_0 //= ?sub_0 //= ZMod.add0r.
+  move=> x; rewrite /zeror; apply/val_inj.
+  by rewrite !val_insubd zmodD ?Sub.valP //= !zmod0 // ?add0r.
   qed.
 
   realize addNr.
   proof.
-    move => x; rewrite /zeror /SZMod.([-]); apply/Sub.val_inj.
-    rewrite !Sub.val_insubd sub_add ?sub_opp ?Sub.valP ?sub_0 //=.
-    + by apply/sub_opp/Sub.valP.
-    by apply/ZMod.addNr.
+  move=> x; rewrite /zeror /SZMod.([-]); apply/val_inj.
+  rewrite !val_insubd !(zmodD, zmodN, zmod0) ?Sub.valP  //=.
+  + by apply/zmodN/Sub.valP.
+  + by apply/addNr.
   qed.
-
 end SubZModule.
 
-
+(* -------------------------------------------------------------------- *)
 abstract theory SubComRing.
+  type t, st.
 
-  clone import ComRing as CR.
+  clone import ComRing as CR with type t <= t.
+  clone import ComRingPred with type t <= t, theory ComRing <- CR.
+
+  import ComRingPred.ZModPred.
+
+  op p : t -> bool.
+
+  axiom ringp : ringpred p.
+
+  hint exact : ringp.
 
   clone include SubZModule with
-    theory ZMod <- CR.
+    type t  <- t ,
+    type st <- st,
+    op    p <- p ,
 
-  op wu : CR.t.
+    theory ZMod     <- CR,
+    theory ZModPred <- ComRingPred.ZModPred
 
-  axiom unit_wu : unit wu.
-  axiom sub_wu : in_sub wu.
-  axiom sub_mul x y : in_sub x => in_sub y => in_sub (x * y).
-  axiom sub_inv x : in_sub x => in_sub (invr x).
+    proof zmodp.
 
-  lemma sub_1 : in_sub oner.
-  proof. by rewrite -(mulVr _ unit_wu); apply/sub_mul; [apply/sub_inv/sub_wu|apply/sub_wu]. qed.
+  realize zmodp. by apply/ringpred_zmod. qed.
 
-  op oner = Sub.insubd oner.
+  clear [SZMod.* SZMod.AddMonoid.*].
+
+  op oner      = Sub.insubd oner.
   op ( * ) x y = Sub.insubd (Sub.val x * Sub.val y).
-  op invr x = Sub.insubd (invr (Sub.val x)).
-  pred unit x = unit (Sub.val x).
+  op invr x    = Sub.insubd (invr (Sub.val x)).
+  pred unit x  = unit (Sub.val x).
 
-  (*TODO: can I do this with a clone with theory?*)
+  import Sub.
+
   clone import ComRing as SCR with
     type t    <= st,
     op zeror  <= zeror,
@@ -94,6 +170,7 @@ abstract theory SubComRing.
     op oner   <= oner,
     op ( * )  <= ( * ),
     op invr   <= invr,
+    op intmul <= SZMod.intmul,
     pred unit <= unit
     proof *.
 
@@ -104,47 +181,56 @@ abstract theory SubComRing.
 
   realize oner_neq0.
   proof.
-    apply/negP; rewrite /zeror /oner; move/(congr1 Sub.val).
-    by rewrite !Sub.val_insubd sub_0 sub_1 /= CR.oner_neq0.
+  apply/negP; rewrite /zeror /oner; move/(congr1 Sub.val).
+  by rewrite !val_insubd !(ring0, ring1) // CR.oner_neq0.
   qed.
 
   realize mulrA.
-  proof. by move => x y z; rewrite /( * ) !Sub.val_insubd !sub_mul ?Sub.valP //= CR.mulrA. qed.
+  proof.
+  move=> x y z; rewrite /( * ) !val_insubd.
+  by rewrite !ringM ?valP //= CR.mulrA.
+  qed.
 
   realize mulrC.
   proof.
-    move => x y; apply/Sub.val_inj.
-    by rewrite !Sub.val_insubd !sub_mul ?Sub.valP //= CR.mulrC.
+  move=> x y; apply/val_inj; rewrite !val_insubd.
+  by rewrite !ringM ?valP //= CR.mulrC.
   qed.
 
   realize mul1r.
   proof.
-    move => x; rewrite /oner; apply/Sub.val_inj.
-    by rewrite !Sub.val_insubd sub_mul ?Sub.valP //= ?sub_1 //= ?sub_1 //= CR.mul1r.
+  move=> x; rewrite /oner; apply/val_inj.
+  by rewrite !val_insubd ringM ?Sub.valP //= !ring1 //= CR.mul1r.
   qed.
 
   realize mulrDl.
   proof.
-    by move => x y z; rewrite /(+) /( * ) !Sub.val_insubd !sub_add ?sub_mul ?Sub.valP //= CR.mulrDl.
+  move=> x y z; rewrite /(+) /( * ) !val_insubd.
+  by rewrite !(ringD, ringM) ?valP //= CR.mulrDl.
   qed.
 
   realize mulVr.
-  proof. by move => x unit_x; rewrite /( * ) /invr /oner Sub.val_insubd sub_inv ?Sub.valP //= mulVr. qed.
+  proof.
+  move=> x unit_x; rewrite /( * ) /invr /oner.
+  by rewrite val_insubd ringV ?Sub.valP //= mulVr.
+  qed.
 
   realize unitP.
   proof.
-    move => x y; rewrite /( * ) /oner /unit; move/(congr1 Sub.val); rewrite !Sub.val_insubd.
-    by rewrite sub_mul ?Sub.valP //= sub_1 /=; apply/unitP.
+  move=> x y; rewrite /( * ) /oner /unit; move/(congr1 Sub.val).
+  by rewrite !val_insubd ringM ?valP //= ring1 //; apply/unitP.
   qed.
 
   realize unitout.
-  proof. by move => x; rewrite /unit /invr -{3}(Sub.valKd x) => hnu; apply/congr1/unitout. qed.
-
+  proof.
+  move=> x; rewrite /unit /invr -{3}(valKd x).
+  by move=> hnu; apply/congr1/unitout.
+  qed.
 end SubComRing.
 
-
+(*
 abstract theory SubIDomain.
-
+>>>>>>> 445de07b561cf6ac01cb1e5eb28f5c1604c8829e
   clone import IDomain as ID.
 
   clone include SubComRing with
@@ -297,3 +383,6 @@ abstract theory UZMod_Field.
     theory ID <- F.
 
 end UZMod_Field.
+<<<<<<< HEAD
+=======
+*)
