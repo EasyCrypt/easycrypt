@@ -1029,73 +1029,17 @@ elim: ps1 ps2 n => [|p1 ps1 IHps1] ps2 n lt0n //=; rewrite ?is_pdec_nil ?is_pdec
 + by move => ->> /is_pdec_1 /= ->.
 move => [is_pd_p is_pdec_ps1] is_pdec_ps2; move: (IHps1 (rem p1 ps2) (n %/ p1) _ _ _) => //.
 + by move: is_pd_p => [/gt0_prime lt0p1 dvd_p]; apply/ltz_divRL.
-+ move: is_pdec_ps1.
-  print is_pdec_cons.
-  print perm_eq_prime_divisors.
-  admit.
++ move: (IHps1 (rem p1 ps2) (n %/ p1) _ _ _) => //.
+  - case: is_pd_p => prime_p dvd_p; apply/ltzE/lez_divRL; [by apply/gt0_prime|].
+    move: (dvdz_le _ _ _ dvd_p); [by apply/gtr_eqF|].
+    by rewrite !gtr0_norm // ?gt0_prime //.
+  - move/(is_pdec_ps _ _ _ is_pdec_ps2): {is_pdec_ps1} (is_pd_p) => mem_p1.
+    move: (perm_eq_prime_divisors _ _ _ (perm_to_rem _ _ mem_p1) is_pdec_ps2).
+    by rewrite is_pdec_cons; case.
+  by move => perm_eq_; move: perm_eq_ is_pdec_ps1; apply/perm_eq_prime_divisors.
 rewrite -(perm_cons p1) => perm_eq_; apply/(perm_eq_trans _ _ _ perm_eq_) => {perm_eq_}.
 by apply/perm_eq_sym/perm_to_rem/(is_pdec_ps _ _ _ is_pdec_ps2).
 qed.
-
-(* -------------------------------------------------------------------- *)
-(*
-op spd n = argmin idfun (is_pd n).
-
-lemma spd1 : spd 1 = 0.
-proof.
-rewrite /spd; apply/argmin_out => i /=; rewrite /idfun /is_pd /= dvdz1.
-rewrite /CoreInt.absz; apply/negP => -[/gt1_prime lt1i].
-by case (0 <= i) => [le0i ->> //|/ltrNge lti0]; rewrite eqr_oppLR => ->>.
-qed.
-
-lemma spdN n : spd (-n) = spd n.
-proof.
-rewrite /spd.
-search _ argmin.
-(*TODO: hakyber-eclib*)
-admit.
-qed.
-
-lemma spdP n :
-  1 < n =>
-  is_pd n (spd n) /\
-  (forall m , 0 < m < spd n => !(is_pd n m)).
-proof.
-move => lt1n; rewrite /spd.
-search _ argmin.
-(*TODO: hakyber-eclib*)
-admit.
-qed.
-
-lemma is_pd_spd n :
-  1 < n =>
-  is_pd n (spd n).
-proof. by move => /spdP []. qed.
-
-lemma spd_min n :
-  1 < n =>
-  (forall m , 0 < m < spd n => !(is_pd n m)).
-proof. by move => /spdP []. qed.
-
-lemma spd_pdec n ps :
-  0 < n =>
-  is_pdec n ps =>
-  ohead (sort Int.(<=) ps) = if n = 1 then None else Some (spd n).
-proof.
-move => lt0n is_pdec_ps; move/perm_eq_sym: (perm_sort Int.(<=) ps) => perm_eq_ps.
-move: (perm_eq_prime_divisors _ _ _ perm_eq_ps is_pdec_ps) => {perm_eq_ps is_pdec_ps}.
-move: lt0n (sort Int.(<=) ps) (sort_sorted _ ps ler_total) => {ps}.
-case/ltzE/ler_eqVlt => /= [<<-|lt1n] [|p ps] //=; [move => _|by rewrite /is_pdec /= => -[_ ->>]| ].
-+ by rewrite /is_pdec /is_pds /=; apply/negP => -[[[/gt1_prime prime_p /dvdz1 /eqr_norml [[->>|->>] _]]]].
-rewrite gtr_eqF //= => /(order_path_min _ ler_trans) all_ [[]] => is_pd_p; move: (spd_min _ lt1n p); rewrite is_pd_p /=.
-move: is_pd_p => [/gt0_prime -> _] /= /lerNgt.
-search _ prime.
-search _ coprime.
-search _ path.
-print order_path_min.
-admit.
-qed.
-*)
 
 (* ==================================================================== *)
 (* FIXME: should be supersed by IntDiv                                  *)
