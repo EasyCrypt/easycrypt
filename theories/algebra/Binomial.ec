@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List Ring StdBigop StdOrder.
+require import AllCore List Ring StdBigop StdOrder IntDiv.
 (*---*) import Bigint IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -100,6 +100,22 @@ proof.
 move=> lt_nk; rewrite /bin; case _: (_ \/ _) => //=.
 rewrite negb_or -!lerNgt => -[ge0_n ge0_k].
 by rewrite nth_out // size_bin //= ltzS ge0_k lerNgt.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(*TODO: the whole theory.*)
+lemma eq_bin_div n k :
+  bin n k = (fact n) %/ (fact k).
+proof.
+admit.
+qed.
+
+lemma prime_dvd_bin p k :
+  prime p =>
+  0 < k < p =>
+  p %| bin p k.
+proof.
+admit.
 qed.
 
 (* -------------------------------------------------------------------- *)

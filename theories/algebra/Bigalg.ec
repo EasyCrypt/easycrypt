@@ -112,6 +112,21 @@ proof.
 move=> uqJ; rewrite (@sum_pair_dep u (fun _ => v)) // &(eq_bigr) /=.
 by move=> a _ /=; congr; rewrite big_map predT_comp /(\o).
 qed.
+
+lemma geo_sum n (x : t) :
+  0 <= n =>
+  (oner - exp x n) =
+  (oner - x) * (bigi predT (exp x) 0 n).
+proof.
+move => le0n; rewrite mulrDl mul1r mulNr mulr_sumr.
+rewrite (@eq_big_int _ _ (fun (i : int) => x * exp x i) ((exp x) \o ((+) 1))).
++ by move => i [? _]; rewrite /(\o) /= addrC exprS.
+rewrite -big_mapT -range_add /=; case/lez_eqVlt: le0n => [<<-|lt0n].
++ by rewrite !range_geq // big_nil expr0 !subrr.
+rewrite /= range_ltn // big_consT expr0 rangeSr -?ltzS -?ltr_subl_addr //.
++ by apply/ltzS; move/ltzE: lt0n.
+by rewrite big_rcons /predT /= (addrC (big _ _ _)) subr_add2r.
+qed.
 end BAdd.
 
 (* -------------------------------------------------------------------- *)

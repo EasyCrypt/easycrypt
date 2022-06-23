@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List Finite.
+require import AllCore Int List Finite.
 
 (* ==================================================================== *)
 abstract theory FinType.
@@ -47,6 +47,17 @@ qed.
 
 lemma card_size_to_seq : card = size (Finite.to_seq<:t> predT).
 proof. by apply/perm_eq_size/perm_eq_enum_to_seq. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma not_injective_int (f : int -> t) :
+  !(injective f).
+proof.
+  apply/negP => inj_f.
+  move: (uniq_map_injective _ (range 0 (size FinType.enum + 1)) inj_f).
+  rewrite range_uniq /=; apply/negP => uniq_; move: (uniq_leq_size _ enum uniq_).
+  rewrite size_map size_range /max /= ltzS size_ge0 /= -negP -ltzE /=.
+  by move => ? _; apply/enumP.
+qed.
 end FinType.
 
 (* ==================================================================== *)

@@ -210,6 +210,19 @@ abstract theory ZModule.
     by rewrite !mulrSz IHn !addrA (@addrAC x _ y).
   qed.
 
+  lemma mulrM (x : t) (m n : int) : intmul x (m * n) = intmul (intmul x m) n.
+  proof.
+    wlog: m n / 0 <= n => [wlog|].
+    + case (0 <= n); [by apply/wlog|].
+      rewrite -ltzNge => gt0_n.
+      move: wlog => /(_ (-m) (-n) _).
+      - by rewrite oppz_ge0; apply/ltzW.
+      move: (addzI (m * (-n)) ((-m) * (-n)) (m * n)); rewrite -mulzDl -mulzDr /=.
+      by move => ->; rewrite !mulrNz mulNrz opprK.
+    elim: n => //= [|n le0n]; [by rewrite !mulr0z|].
+    by rewrite mulzDr /= mulrSz mulrDz addrC => ->.
+  qed.
+
 end ZModule.
 
 (* -------------------------------------------------------------------- *)
