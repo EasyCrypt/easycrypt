@@ -2010,7 +2010,7 @@ mcptn(BOP):
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x]) }
 
 | x1=bdident op=loc(NE) tvi=tvars_app? x2=bdident
-    { PPApp ((pqsymb_of_symb op.pl_loc "[!]", tvi), [x1; x2]) }
+    { PPApp ((pqsymb_of_symb op.pl_loc "<>", tvi), [x1; x2]) }
 
 | x1=bdident op=loc(BOP) tvi=tvars_app? x2=bdident
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x1; x2]) }
