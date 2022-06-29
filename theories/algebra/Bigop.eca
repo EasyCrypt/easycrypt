@@ -410,6 +410,7 @@ by rewrite flatten_cons big_cat big_cons -ih.
 qed.
 
 (* -------------------------------------------------------------------- *)
+(*TODO: useless hypothesis.*)
 lemma nosmt big_pair ['a 'b] F (s : ('a * 'b) list) : uniq s =>
   big predT F s =
     big predT (fun a =>
@@ -417,6 +418,28 @@ lemma nosmt big_pair ['a 'b] F (s : ('a * 'b) list) : uniq s =>
       (undup (map fst s)).
 proof.
 move=> /perm_eq_pair /eq_big_perm /(_ predT F) ->.
+by rewrite big_flatten big_map.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_pairl ['a 'b] F (s : ('a * 'b) list) :
+  big predT F s =
+    big predT (fun a =>
+        big predT F (filter (fun xy : _ * _ => xy.`1 = a) s))
+      (undup (map fst s)).
+proof.
+move/eq_big_perm /(_ predT F): (perm_eq_pairl s) => ->.
+by rewrite big_flatten big_map.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_pairr ['a 'b] F (s : ('a * 'b) list) :
+  big predT F s =
+    big predT (fun b =>
+        big predT F (filter (fun xy : _ * _ => xy.`2 = b) s))
+      (undup (map snd s)).
+proof.
+move/eq_big_perm /(_ predT F): (perm_eq_pairr s) => ->.
 by rewrite big_flatten big_map.
 qed.
 

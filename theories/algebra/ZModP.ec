@@ -259,7 +259,7 @@ by move: nz_x; rewrite -asint_eq zeroE pmod_small // rg_asint.
 qed.
 
 clone import Ring.Field as ZModpField with
-  type t     <- zmod,
+  type t     <= zmod,
   op   zeror <- zero,
   op   oner  <- one,
   op   ( + ) <- ( + ),

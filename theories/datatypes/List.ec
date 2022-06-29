@@ -540,6 +540,15 @@ proof.
 by move => /allP himp /allP hp; apply/allP => x mem_x; move: (himp x _) => //= -> //; apply/hp.
 qed.
 
+lemma all_predI p1 p2 (s : 'a list): all (predI p1 p2) s <=> (all p1 s /\ all p2 s).
+proof.
+split => [all_|[/allP all1 /allP all2]]; [split; move: all_; apply/all_imp_in|].
++ by apply/allP => ? _ /=; rewrite /predI; case.
++ by apply/allP => ? _ /=; rewrite /predI; case.
+apply/allP => x mem_x; move: (all1 _ mem_x) (all2 _ mem_x).
+by rewrite /predI => -> ->.
+qed.
+
 lemma eq_filter_in p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => filter p1 s = filter p2 s.
 proof.
@@ -980,6 +989,17 @@ proof.
   by rewrite !cnt_a' (eq_cnt1 x) // (IHi a') //; smt.
 qed.
 
+lemma perm_eqP1 (s1 s2 : 'a list):
+  perm_eq s1 s2 <=> (forall x, count (pred1 x) s1 = count (pred1 x) s2).
+proof.
+  rewrite /perm_eq; split => [/allP eq_|eq_]; [|apply/allP] => x.
+  + case: (x \in s1 ++ s2) => [?|]; [by apply/eq_|].
+    rewrite mem_cat negb_or => -[Nmem_1 Nmem_2]; rewrite !count_pred0_eq_in //.
+    - by move => y; rewrite /pred1; case: (y = x).
+    by move => y; rewrite /pred1; case: (y = x).
+  by move => _ /=; apply/eq_.
+qed.
+
 lemma perm_eq_refl (s : 'a list): perm_eq s s.
 proof. by apply perm_eqP. qed.
 
@@ -1053,6 +1073,13 @@ proof. by move: (perm_cat2l [x]) => /= h; apply h. qed.
 lemma perm_eq_mem (s1 s2 : 'a list):
   perm_eq s1 s2 => forall x, mem s1 x <=> mem s2 x.
 proof. by rewrite perm_eqP => h x; rewrite -!has_pred1 !has_count h. qed.
+
+lemma perm_eq_nil (s : 'a list) :
+  perm_eq s [] <=> s = [].
+proof.
+split; [|by apply/perm_eq_refl_eq]; move => /perm_eq_mem.
+by case: s => // x ? /(_ x); rewrite in_nil.
+qed.
 
 lemma perm_eq_size (s1 s2 : 'a list):
   perm_eq s1 s2 => size s1 = size s2.
@@ -1573,6 +1600,12 @@ proof. by elim: s => //= x s ->. qed.
 
 lemma id_map f (s : 'a list): (forall x, f x = x) => map f s = s.
 proof. by move=> h; rewrite -{2}(@map_id s); apply/eq_map. qed.
+
+lemma map_involutive (f : 'a -> 'a) : involutive f => involutive (map f).
+proof. by move => inv_f s; rewrite -map_comp id_map. qed.
+
+lemma map_pswapK (s : ('a * 'b) list) : map pswap (map pswap s) = s.
+proof. by rewrite -map_comp id_map //; apply/pswapK. qed.
 
 lemma nth_map x1 x2 (f : 'a -> 'b) n s:
   0 <= n < size s => nth x2 (map f s) n = f (nth x1 s n).
@@ -2377,6 +2410,10 @@ rewrite -flattenP; split; case=> [x [sx]|s' [/mapP[x [sx ->]]]] Axy.
   by exists (A x); rewrite map_f. by exists x.
 qed.
 
+lemma map_flatten (f : 'a -> 'b) s :
+  map f (flatten s) = flatten (map (map f) s).
+proof. by elim: s => // x s; rewrite /= !flatten_cons map_cat => ->. qed.
+
 op sumz (sz : int list) = foldr Int.(+) 0 sz.
 
 lemma size_flatten (ss : 'a list list) :
@@ -2440,6 +2477,7 @@ rewrite (_ : max 0 k = k) 1:/#  //; elim: k ge0_k => [|k ge0_k ih].
 by rewrite nseqS // flatten_cons count_cat /#.
 qed.
 
+(*TODO: useless hypothesis.*)
 lemma nosmt perm_eq_pair ['a 'b] (s : ('a * 'b) list) : uniq s => perm_eq s
   (flatten
      (map (fun a => filter (fun xy : _ * _ => xy.`1 = a) s)
@@ -2457,6 +2495,50 @@ case=> a b; split => [ab_in_s|].
   by rewrite ab_in_s /= &(mapP); exists (a, b).
 case/flatten_mapP=> a'; rewrite mem_undup => -[] /mapP[].
 by case=> a2 b2 /= [_ ->>]; rewrite mem_filter /=.
+qed.
+
+lemma perm_eq_pairl ['a 'b] (s : ('a * 'b) list) :
+  perm_eq s
+  (flatten
+     (map (fun a => filter (fun xy : _ * _ => xy.`1 = a) s)
+          (undup (map fst s)))).
+proof.
+move: {-1}(undup (map fst s)) (perm_eq_refl (undup (map fst s))) => t.
+elim: t s => [s /perm_eq_nil /undup_nilp eqs|x t ih s eqs].
+  have ->: s = []; last by apply/perm_eq_refl.
+  by apply/mem_eq0=> a; apply/negP => /(map_f fst); rewrite /= eqs in_nil.
+pose s' := filter (predC (pred1 x \o fst)) s; have/perm_eq_uniq := eqs.
+rewrite undup_uniq cons_uniq /= => -[tx uqt]; have {ih} := ih s' _.
+  apply/uniq_perm_eq=> //; first by apply/undup_uniq.
+  move=> y; have/perm_eq_mem/(_ y) := eqs; rewrite !mem_undup /=.
+  case: (y = x) => [->>|neqyx /= eq_] //=.
+    rewrite tx /= /s' => /mapP -[[x1 x2]] /= [? ->>].
+    rewrite mapP negb_exists => -[y1 y2]; rewrite mem_filter.
+    by rewrite /predC /pred1 /(\o) /= eq_sym; case: (x1 = y1).
+  rewrite -eq_ /s' !mapP; apply/exists_eq => -[x1 x2] /=; rewrite mem_filter.
+  by rewrite /(\o) /predC /pred1 /=; case: (y = x1) => // ->>; rewrite neqyx.
+move/perm_cat2l/(_ (filter (pred1 x \o fst) s)); pose s1:= (_ ++ _); pose s2:= (_ ++ _).
+move => /perm_eq_sym perm_eq_2; move: (perm_filterC (pred1 x \o fst) s); rewrite -/s1.
+move => perm_eq_1; move: (perm_eq_trans _ _ _ perm_eq_2 perm_eq_1) => perm_eq_.
+rewrite perm_eq_sym => {s1 perm_eq_1 perm_eq_2}; move: perm_eq_; apply/perm_eq_trans.
+rewrite flatten_cons /s2 => {s2}. apply/perm_cat2l/perm_eq_refl_eq; congr; apply/eq_in_map.
+move=> a ta /=; case: (x = a)=> [->>//|] ne_xa; rewrite /s' => {s'}.
+rewrite -filter_predI; apply/eq_in_filter => -[x1 x2] mem_x /=.
+rewrite /predI /predC /pred1 /(\o) /=; rewrite eq_sym in ne_xa.
+by case: (x1 = a) => // ->>.
+qed.
+
+lemma perm_eq_pairr ['a 'b] (s : ('a * 'b) list) :
+  perm_eq s
+  (flatten
+     (map (fun b => filter (fun xy : _ * _ => xy.`2 = b) s)
+          (undup (map snd s)))).
+proof.
+rewrite -(map_pswapK s); move: (map pswap s) => {s} s.
+rewrite -map_comp (eq_map _ fst); [by move => -[? ?]; rewrite /(\o) /pswap|].
+apply/(perm_eq_trans _ _ _ (perm_eq_map pswap _ _ (perm_eq_pairl s)))/perm_eq_refl_eq.
+rewrite map_flatten -!map_comp; congr; apply/eq_in_map => y1; rewrite mem_undup.
+by move => /mapP -[[? x1]] /= [mem_p <<-]; rewrite /(\o) /= filter_map; apply/eq_in_map.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -2661,6 +2743,10 @@ abbrev unzip2 ['a 'b] (s : ('a * 'b) list) = map snd s.
 abbrev amap ['a 'b 'c] (f : 'a -> 'b -> 'c) (xs : ('a * 'b) list) =
   map (fun xy => (fst xy, f (fst xy) (snd xy))) xs.
 
+lemma map_pswap_zip ['a 'b] (s : 'a list) (t : 'b list) :
+  map pswap (zip s t) = zip t s.
+proof. by elim: s t => [|x s ih] [|y t] //=; rewrite ih. qed.
+
 lemma zip_unzip ['a 'b] (s : ('a * 'b) list) :
   zip (unzip1 s) (unzip2 s) = s.
 proof. by elim: s => // -[x y s]. qed.
@@ -2765,9 +2851,21 @@ lemma zipss ['a] (s : 'a list) :
   zip s s = map (fun x => (x, x)) s.
 proof. by elim: s. qed.
 
+lemma zip_mapl_ss ['a 'b] (f : 'a -> 'b) (s : 'a list) :
+  zip (map f s) s = map (fun x => (f x, x)) s.
+proof. by rewrite zip_mapl zipss -map_comp; apply/eq_map => x; rewrite /(\o). qed.
+
+lemma zip_mapr_ss ['a 'b] (f : 'a -> 'b) (s : 'a list) :
+  zip s (map f s) = map (fun x => (x, f x)) s.
+proof. by rewrite zip_mapr zipss -map_comp; apply/eq_map => x; rewrite /(\o). qed.
+
+lemma mem_zip_mapl ['a 'b] (f : 'a -> 'b) (s : 'a list) x y :
+  (x, y) \in zip (map f s) s <=> (x = f y /\ y \in s).
+proof. by rewrite zip_mapl_ss mapP; split => [[?] /= [?] [->> ->>]|[->> ?]] //; exists y. qed.
+
 lemma mem_zip_mapr ['a 'b] (f : 'a -> 'b) (s : 'a list) x y :
   (x, y) \in zip s (map f s) <=> (x \in s /\ y = f x).
-proof. by elim: s => //= x' xs -> /#. qed.
+proof. by rewrite zip_mapr_ss mapP; split => [[?] /= [?] [->> ->>]|[? ->>]] //; exists x. qed.
 
 lemma assoc_zip ['a, 'b] (ks : 'a list) (vs : 'b list) k:
  size ks = size vs => assoc (zip ks vs) k = onth vs (index k ks).
