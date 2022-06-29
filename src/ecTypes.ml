@@ -466,6 +466,11 @@ let string_of_pvar (p : prog_var) =
   Printf.sprintf "%s[%s]"
     sp (string_of_pvar_kind (pv_kind p))
 
+let name_of_pvar pv =
+  match pv with
+  | PVloc x -> x
+  | PVglob xp -> EcPath.xbasename xp
+
 let pv_loc id = PVloc id
 
 let arg_symbol = "arg"

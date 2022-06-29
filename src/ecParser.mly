@@ -2752,6 +2752,17 @@ s_codepos1:
 | n1=codepos1 n2=codepos1
     { Double (n1, n2) }
 
+semrndpos1:
+| b=boption(STAR) c=codepos1
+    { (b, c) }
+
+semrndpos:
+| n=semrndpos1
+    { Single n }
+
+| n1=semrndpos1 n2=semrndpos1
+    { Double (n1, n2) }
+
 while_tac_info:
 | inv=sform
     { { wh_inv = inv; wh_vrnt = None; wh_bds = None; } }
@@ -3149,7 +3160,7 @@ phltactic:
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
 
-| RND s=side? info=rnd_info c=prefix(COLON, s_codepos1)? 
+| RND s=side? info=rnd_info c=prefix(COLON, semrndpos)? 
     { Prnd (s, c, info) }
 
 | RNDSEM s=side? c=codepos1

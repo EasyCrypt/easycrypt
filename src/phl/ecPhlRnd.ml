@@ -278,21 +278,15 @@ module Core = struct
     FApi.xmutate1 tc `Rnd subgoals
 
   (* -------------------------------------------------------------------- *)
-  let name_of_pvar pv =
-    match pv with
-    | PVloc x -> x
-    | PVglob xp -> EcPath.xbasename xp
-
-  let name_of_lvalue lv =
-    match lv with
-    | LvVar (pv, _) -> name_of_pvar pv
-    | LvTuple pvs -> String.concat "_" (List.map (name_of_pvar |- fst) pvs)
-
-  let t_semrnd tc (s : instr list) : instr list =
+  let semrnd tc mem used (s : instr list) : EcMemory.memenv * instr list =
     let error () = tc_error !!tc "semrnd" in
 
     let env = FApi.tc1_env tc in
     let wr, gwr = PV.elements (is_write env s) in
+    let wr =
+      match used with
+      | None -> wr
+      | Some used -> List.filter (fun (pv, _) -> PV.mem_pv env pv used) wr in
 
     if not (List.is_empty gwr) then
       error ();
@@ -324,7 +318,7 @@ module Core = struct
       | { i_node = Srnd (lv, d) } :: s ->
          let d = form_of_expr mhr d in
          let d = PVM.subst env subst d in
-         let x = EcIdent.create (name_of_lvalue lv) in
+         let x = EcIdent.create (name_of_lv lv) in
          let subst, xty =
            match lv with
            | LvVar (pv, ty) ->
@@ -355,35 +349,57 @@ module Core = struct
     let distr = do1 PVM.empty s in
     let distr = expr_of_form mhr distr in
 
-    [i_rnd (oget (lv_of_list wr), distr)]
+    match lv_of_list wr with
+    | None ->
+       let x =  { ov_name = Some "x"; ov_type = tunit; } in
+       let mem, x = EcMemory.bind_fresh x mem in
+       let x, xty = pv_loc (oget x.ov_name), x.ov_type in
+       (mem, [i_rnd (LvVar (x, xty), distr)])
+    | Some wr ->
+       (mem, [i_rnd (wr, distr)])
 
   (* -------------------------------------------------------------------- *)
-  let t_hoare_rndsem_r pos tc =
+  let t_hoare_rndsem_r reduce pos tc =
     let hs = tc1_as_hoareS tc in
     let s1, s2 = o_split (Some pos) hs.hs_s in
-    let s2 = t_semrnd tc s2 in
-    let concl = { hs with hs_s = stmt (s1 @ s2) } in
+    let fv =
+      if reduce then
+        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) hs.hs_po)
+      else None in
+    let m, s2 = semrnd tc hs.hs_m fv s2 in
+    let concl = { hs with hs_s = stmt (s1 @ s2); hs_m = m; } in
     FApi.xmutate1 tc (`RndSem pos) [f_hoareS_r concl]
 
  (* -------------------------------------------------------------------- *)
-  let t_bdhoare_rndsem_r pos tc =
+  let t_bdhoare_rndsem_r reduce pos tc =
     let bhs = tc1_as_bdhoareS tc in
     let s1, s2 = o_split (Some pos) bhs.bhs_s in
-    let s2 = t_semrnd tc s2 in
-    let concl = { bhs with bhs_s = stmt (s1 @ s2) } in
+    let fv =
+      if reduce then
+        Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) bhs.bhs_po)
+      else None in
+    let m, s2 = semrnd tc bhs.bhs_m fv s2 in
+    let concl = { bhs with bhs_s = stmt (s1 @ s2); bhs_m = m; } in
     FApi.xmutate1 tc (`RndSem pos) [f_bdHoareS_r concl]
 
  (* -------------------------------------------------------------------- *)
-  let t_equiv_rndsem_r side pos tc =
+  let t_equiv_rndsem_r reduce side pos tc =
     let es = tc1_as_equivS tc in
-    let s = match side with `Left -> es.es_sl | `Right -> es.es_sr in
+    let s, m =
+      match side with
+      | `Left  -> es.es_sl, es.es_ml
+      | `Right -> es.es_sr, es.es_mr in
     let s1, s2 = o_split (Some pos) s in
-    let s2 = t_semrnd tc s2 in
+    let fv =
+      if reduce then
+        Some (PV.fv (FApi.tc1_env tc) (fst m) es.es_po)
+      else None in
+    let m, s2 = semrnd tc m fv s2 in
     let s = stmt (s1 @ s2) in
     let concl =
       match side with
-      | `Left  -> { es with es_sl = s }
-      | `Right -> { es with es_sr = s } in
+      | `Left  -> { es with es_sl = s; es_ml = m; }
+      | `Right -> { es with es_sr = s; es_mr = m; } in
     FApi.xmutate1 tc (`RndSem pos) [f_equivS_r concl]
 
 end (* Core *)
@@ -540,10 +556,10 @@ let t_equiv_rnd_r side pos bij_info tc =
         match pos with
         | None ->
            t_id tc
-        | Some (il, ir) ->
+        | Some ((bl, il), (br, ir)) ->
            FApi.t_seq
-             (Core.t_equiv_rndsem_r `Left il)
-             (Core.t_equiv_rndsem_r `Right ir)
+             (Core.t_equiv_rndsem_r bl `Left il)
+             (Core.t_equiv_rndsem_r br `Right ir)
              tc in
 
       let bij =
@@ -634,9 +650,9 @@ let process_rnd side pos tac_info tc =
   | _ -> tc_error !!tc "invalid arguments"
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_rndsem   = FApi.t_low1 "hoare-rndsem"   Core.t_hoare_rndsem_r
-let t_bdhoare_rndsem = FApi.t_low1 "bdhoare-rndsem" Core.t_bdhoare_rndsem_r
-let t_equiv_rndsem   = FApi.t_low2 "equiv-rndsem"   Core.t_equiv_rndsem_r
+let t_hoare_rndsem   = FApi.t_low1 "hoare-rndsem"   (Core.t_hoare_rndsem_r   false)
+let t_bdhoare_rndsem = FApi.t_low1 "bdhoare-rndsem" (Core.t_bdhoare_rndsem_r false)
+let t_equiv_rndsem   = FApi.t_low2 "equiv-rndsem"   (Core.t_equiv_rndsem_r   false)
 
 (* -------------------------------------------------------------------- *)
 let process_rndsem side pos tc =

@@ -563,6 +563,8 @@ type ('a, 'b, 'c) rnd_tac_info =
 type rnd_tac_info_f =
   (pformula, pformula option, pformula) rnd_tac_info
 
+type semrndpos = (bool * codepos1) doption
+
 type tac_dir = Backs | Fwds
 
 type pfel_spec_preds = (pgamepath * pformula) list
@@ -722,7 +724,7 @@ type phltactic =
   | Pinline        of inline_info
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
-  | Prnd           of oside * docodepos1 * rnd_tac_info_f
+  | Prnd           of oside * semrndpos option * rnd_tac_info_f
   | Prndsem        of oside * codepos1
   | Palias         of (oside * codepos * osymbol_r)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
