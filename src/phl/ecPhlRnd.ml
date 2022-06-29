@@ -280,7 +280,7 @@ module Core = struct
   (* -------------------------------------------------------------------- *)
   let name_of_pvar pv =
     match pv with
-    | PVloc x -> x
+    | PVloc (_, x) -> x
     | PVglob xp -> EcPath.xbasename xp
 
   let name_of_lvalue lv =
