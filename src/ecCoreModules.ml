@@ -52,6 +52,14 @@ let lv_of_list = function
   | [(pv, ty)] -> Some (LvVar (pv, ty))
   | pvs -> Some (LvTuple pvs)
 
+
+let name_of_lv lv =
+  match lv with
+  | LvVar (pv, _) ->
+     EcTypes.name_of_pvar pv
+  | LvTuple pvs ->
+     String.concat "_" (List.map (EcTypes.name_of_pvar |- fst) pvs)
+
 (* -------------------------------------------------------------------- *)
 type instr = {
   i_node : instr_node;

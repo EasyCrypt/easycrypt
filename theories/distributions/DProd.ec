@@ -116,19 +116,12 @@ qed.
 equiv SampleDepDLet :
   SampleDep.sample ~ SampleDLet.sample : ={dt, du} ==> ={res}.
 proof.
-transitivity SampleDep.sample2
-  (={dt, du} ==> res{1} = res{2}.`2)
-  (={dt, du} ==> res{2} = res{1}.`2) => //.
-+ by move=> &1 &2 [<- <-]; exists (dt{1}, du{1}).
-+ exact SampleDep.
-transitivity SampleDLet.sample2
-  (={dt, du} ==> ={res})
-  (={dt, du} ==> res{2} = res{1}.`2) => //.
-+ by move=> &1 &2 [<- <-]; exists (dt{1}, du{1}).
-+ exact SampleDepDLet2.
-+ symmetry.
-conseq (_ : ={dt, du} ==> _); 1: by move=> ?? [<- <-].
-exact SampleDLet.
+proc; rnd : *0 *0 => /=; auto=> /> &2.
+suff ->:
+    dlet dt{2} (fun (t : t) => dmap (du{2} t) (fun (u0 : u) => u0))
+  = dlet dt{2} du{2}
+  by rewrite dmap_id => />.
+by apply: eq_dlet => // t; rewrite dmap_id.
 qed.
 
 end DLetSampling.
