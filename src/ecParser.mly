@@ -2775,9 +2775,6 @@ rnd_info:
 | empty
     { PNoRndParams }
 
-| CEQ f=sform
-    { PSingleRndParam f }
-
 | f=sform
     { PSingleRndParam f }
 
