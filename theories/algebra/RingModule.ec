@@ -63,14 +63,6 @@ abstract theory ComRingModule.
   abbrev lin ss vs : t =
     big predT idfun (map (fun (x : scalar * t) => fst x ** snd x) (zip ss vs)).
 
-  op free p =
-    forall ss vs ,
-      size ss = size vs =>
-      all p vs =>
-      uniq vs =>
-      lin ss vs = ZMod.zeror =>
-      ss = nseq (size vs) CRScalar.zeror.
-
   op gen p v =
     exists ss vs ,
       size ss = size vs /\
@@ -81,6 +73,14 @@ abstract theory ComRingModule.
     forall v ,
       gen p v.
 
+  op free p =
+    forall ss vs ,
+      size ss = size vs =>
+      all p vs =>
+      uniq vs =>
+      lin ss vs = ZMod.zeror =>
+      ss = nseq (size vs) CRScalar.zeror.
+
   op basis p =
     (free p) /\ (gen_t p).
 
@@ -88,27 +88,6 @@ abstract theory ComRingModule.
 
   op finite_vf p =
     exists vs , forall v , p v <=> vf_oflist vs v.
-
-  (*TODO: this should be /=.*)
-  lemma zip_nil1 ['a, 'b] s :
-    zip<:'a,'b> [] s = [].
-  proof.
-    admit.
-  qed.
-
-  (*TODO: this should be /=.*)
-  lemma zip_nil2 ['a, 'b] s :
-    zip<:'a,'b> s [] = [].
-  proof.
-    admit.
-  qed.
-
-  (*TODO: this should be /=.*)
-  lemma zip_cons ['a, 'b] (x1 : 'a) (x2 : 'b) (s1 : 'a list) (s2 : 'b list) :
-    zip (x1 :: s1) (x2 :: s2) = (x1, x2) :: zip s1 s2.
-  proof.
-    admit.
-  qed.
 
   lemma lin_nil1 vs :
     lin [] vs = ZMod.zeror.
@@ -120,7 +99,7 @@ abstract theory ComRingModule.
 
   lemma lin_cons s ss v vs :
     lin (s :: ss) (v :: vs) = (s ** v) + lin ss vs.
-  proof. by rewrite zip_cons /= BigZMod.big_cons /predT /idfun. qed.
+  proof. by rewrite /= BigZMod.big_cons /predT /idfun. qed.
 
   lemma lin_cat ss1 ss2 vs1 vs2 :
     size ss1 = size vs1 =>
@@ -134,24 +113,37 @@ abstract theory ComRingModule.
     by rewrite mem_nseq => -[_ <<-] ->; rewrite scale0r /idfun.
   qed.
 
-  lemma free_pred0 :
-    free pred0.
-  proof. by move => ss vs eq_size /all_pred0 /size_eq0 ->> /= _; rewrite nseq0; apply/size_eq0. qed.
-
-  lemma free_gen p v :
-    free p => p v => gen p v.
+  lemma lin_scaleM s ss vs :
+    s ** lin ss vs = lin (map (( * ) s) ss) vs.
   proof.
-    by move => free_p p_v; exists [CRScalar.oner] [v]; rewrite /= p_v /= scale1r big_seq1 /idfun.
+    rewrite scalel_sumr zip_mapl !BigZMod.big_mapT.
+    apply/BigZMod.eq_big_seq => -[s' v] /mem_zip [mem_s' mem_v].
+    by rewrite /idfun /(\o) /= scaleM.
   qed.
 
-  lemma free_imp p1 p2 :
-    (p1 <= p2)%Core =>
-    free p2 =>
-    free p1.
+  lemma lin_split p ss vs :
+    exists ss1 ss2 vs1 vs2 ,
+      (mem vs1 <= mem vs) /\
+      (mem vs2 <= mem vs) /\
+      all p vs1         /\
+      all (predC p) vs2 /\
+      lin ss vs = lin ss1 vs1 + lin ss2 vs2.
   proof.
-    move => imp_ free_p1 ss vs eq_size all_p1.
-    move: (all_imp_in _ p2 _ _ all_p1); [|by apply/free_p1].
-    by apply/allP => ? _ /=; apply/imp_.
+    exists (unzip1 (filter (p \o snd)         (zip ss vs)))
+           (unzip1 (filter (predC (p \o snd)) (zip ss vs)))
+           (unzip2 (filter (p \o snd)         (zip ss vs)))
+           (unzip2 (filter (predC (p \o snd)) (zip ss vs))).
+    do!split.
+    + move => v /mapP [[s ?]] /= [] + <<-; move => /mem_filter; rewrite /(\o) /=.
+      by move => [_] /mem_zip [].
+    + move => v /mapP [[s ?]] /= [] + <<-; move => /mem_filter; rewrite /(\o) /=.
+      by move => [_] /mem_zip [].
+    + rewrite all_map; apply/all_filterP; rewrite -filter_predI; apply/eq_in_filter => -[s v].
+      by move => /mem_zip [mem_s mem_v]; rewrite /predI /preim /(\o).
+    + rewrite all_map; apply/all_filterP; rewrite -filter_predI; apply/eq_in_filter => -[s v].
+      by move => /mem_zip [mem_s mem_v]; rewrite /predI /predC /preim /(\o).
+    rewrite !zip_unzip !big_mapT -big_cat.
+    by apply/eq_big_perm/perm_eq_sym/perm_filterC.
   qed.
 
   lemma genP p v :
@@ -181,6 +173,140 @@ abstract theory ComRingModule.
     by move => /mem_zip [mem_s _] /= ->>; rewrite /predI /predT.
   qed.
 
+  lemma gen_pred0 v :
+    gen pred0 v =>
+    v = ZMod.zeror.
+  proof. by move => [ss vs] |>; rewrite all_pred0 size_eq0 => + ->> /=; rewrite lin_nil2. qed.
+
+  lemma gen_lin p ss vs :
+    all p vs =>
+    gen p (lin ss vs).
+  proof.
+    move => all_; exists (unzip1 (zip ss vs)) (unzip2 (zip ss vs)) => /=.
+    rewrite !size_map zip_unzip /= zip_take unzip2_zip.
+    + rewrite !size_take.
+      - by rewrite /min; case (_ < _)%Int => /=; rewrite size_ge0.
+      - by rewrite /min; case (_ < _)%Int => /=; rewrite size_ge0.
+      rewrite /min; case: (size ss < size vs) => [->|] //=.
+      by case/lerNgt/ler_eqVlt => ->.
+    by apply/allP => x /mem_take; move/allP: all_ => all_; apply/all_.
+  qed.
+
+  lemma gen_add p v1 v2 :
+    gen p v1 =>
+    gen p v2 =>
+    gen p (v1 + v2).
+  proof.
+    move => [ss1 vs1] [? [? ?]] [ss2 vs2] [? [? ?]].
+    exists (ss1 ++ ss2) (vs1 ++ vs2); do!split.
+    + by rewrite !size_cat; congr.
+    + by apply/all_cat.
+    by rewrite lin_cat //; congr.
+  qed.
+
+  lemma gen_scale p s v :
+    gen p v =>
+    gen p (s ** v).
+  proof.
+    move => [ss vs] [? [? ?]]; exists (map (( * ) s) ss) vs.
+    by rewrite size_map /=; do!split => //; rewrite -lin_scaleM; congr.
+  qed.
+
+  lemma gen_opp p v :
+    gen p v =>
+    gen p (-v).
+  proof. by move => /(gen_scale _ (-CRScalar.oner) _); rewrite scaleN. qed.
+
+  lemma gen_imp p1 p2 v :
+    (p1 <= p2)%Core =>
+    gen p1 v =>
+    gen p2 v.
+  proof.
+    move => imp_ -[ss vs] [? [all_ ?]].
+    exists ss vs; do!split => //; move: all_; apply/all_imp_in/allP.
+    by move => ? _ /=; apply/imp_.
+  qed.
+
+  lemma gen_eq p1 p2 v :
+    (forall x , p1 x <=> p2 x) =>
+    gen p1 v <=> gen p2 v.
+  proof. by move => eq_ ; split; apply/gen_imp => ? /eq_. qed.
+
+  lemma gen_predI1 p1 p2 v :
+    gen (predI p1 p2) v =>
+    gen p1 v.
+  proof. by apply/gen_imp => ?; rewrite /predI. qed.
+
+  lemma gen_predI2 p1 p2 v :
+    gen (predI p1 p2) v =>
+    gen p2 v.
+  proof. by apply/gen_imp => ?; rewrite /predI. qed.
+
+  lemma gen_predU p1 p2 v :
+    gen (predU p1 p2) v <=>
+    (exists s1 s2 v1 v2 , gen p1 v1 /\ gen p2 v2 /\ v = s1 ** v1 + s2 ** v2).
+  proof.
+    split => [[ss vs] [eq_size [all_ eq_v]]|]; last first.
+    + move => [s1 s2 v1 v2] [] [ss1 vs1] [eq_size1 [all_1 <<-]].
+      move => [] [ss2 vs2] [eq_size2 [all_2 <<-]] ->>.
+      rewrite !lin_scaleM -lin_cat ?size_map //; apply/gen_lin.
+      by rewrite all_cat; split; [apply/all_predU1|apply/all_predU2].
+    pose ssvs  := filter (p1 \o snd)         (zip ss vs).
+    pose ssvsC := filter (predC (p1 \o snd)) (zip ss vs).
+    exists CRScalar.oner CRScalar.oner
+           (lin (map fst ssvs) (map snd ssvs)) (lin (map fst ssvsC) (map snd ssvsC)).
+    rewrite !scale1r -eq_v => {v eq_v}; split; [|split].
+    + apply/gen_lin; rewrite all_map.
+      by rewrite /ssvs /(\o) /preim /= filter_all.
+    + apply/gen_lin; rewrite all_map.
+      apply/all_filterP; rewrite -filter_predI; apply/eq_in_filter => -[s v].
+      move => /mem_zip [mem_s mem_v]; move/allP/(_ _ mem_v): all_.
+      by rewrite /predI /predU /predC /preim /(\o) /=; case: (p1 v).
+    rewrite -lin_cat ?size_map // zip_cat ?size_map // !zip_unzip.
+    by apply/eq_big_perm/perm_eq_map/perm_eq_sym/perm_filterC.
+  qed.
+
+  lemma gen_split p2 p1 v :
+    gen p1 v <=>
+    ( exists s1 s2 v1 v2 ,
+        gen (predI p1 p2)         v1 /\
+        gen (predI p1 (predC p2)) v2 /\
+        v = s1 ** v1 + s2 ** v2).
+  proof.
+    rewrite -gen_predU; apply/gen_eq => ?; rewrite /predU /predI /predC /=.
+    by case: (p1 _); case: (p2 _).
+  qed.
+
+  lemma gen_t_imp p1 p2 :
+    (p1 <= p2)%Core =>
+    gen_t p1 =>
+    gen_t p2.
+  proof.
+    move => imp_ gen_t1 v; move: gen_t1 => /(_ v) [ss vs] |> ? all_.
+    exists ss vs; do!split => //; move: all_; apply/all_imp_in/allP.
+    by move => ? _ /=; apply/imp_.
+  qed.
+
+  lemma free_pred0 :
+    free pred0.
+  proof. by move => ss vs eq_size /all_pred0 /size_eq0 ->> /= _; rewrite nseq0; apply/size_eq0. qed.
+
+  lemma free_gen p v :
+    free p => p v => gen p v.
+  proof.
+    by move => free_p p_v; exists [CRScalar.oner] [v]; rewrite /= p_v /= scale1r big_seq1 /idfun.
+  qed.
+
+  lemma free_imp p1 p2 :
+    (p1 <= p2)%Core =>
+    free p2 =>
+    free p1.
+  proof.
+    move => imp_ free_p1 ss vs eq_size all_p1.
+    move: (all_imp_in _ p2 _ _ all_p1); [|by apply/free_p1].
+    by apply/allP => ? _ /=; apply/imp_.
+  qed.
+
   lemma free_predU p1 p2 :
     free (predU p1 p2) <=>
     ( (forall v , gen p1 v => gen p2 v => gen (predI p1 p2) v) /\
@@ -188,52 +314,38 @@ abstract theory ComRingModule.
       free p2 ).
   proof.
     split => [free_U|[imp_gen] [free_p1 free_p2]]; [split; [|split]|].
-    + move => v /genP [ss1 vs1] [eq_size1] [all_p1] [uniq_vs1 eq_v1].
-      move => /genP [ss2 vs2] [eq_size2] [all_p2] [uniq_vs2 eq_v2].
-      pose ssvs1C:= filter (predC (p2 \o snd)) (zip ss1 vs1).
-      pose ssvs2C:= filter (predC (p1 \o snd)) (zip ss2 vs2).
-      pose ssvs1 := filter (p2 \o snd)         (zip ss1 vs1).
-      pose ssvs2 := filter (p1 \o snd)         (zip ss2 vs2).
-      pose ssvs :=
-        map
-          (fun p =>
-            (fst p - fst (nth (CRScalar.zeror, ZMod.zeror) ssvs2 (find (pred1 (snd p) \o snd) ssvs2)),
-             snd p))
-          ssvs1.
-      exists (map fst ssvs1) (map snd ssvs1).
-      rewrite !size_map /=; split.
-      - rewrite !all_predI.
-        admit.
-      move: (free_U ((map fst ssvs1C) ++ (map fst ssvs2C) ++ (map fst ssvs))
-                    ((map snd ssvs1C) ++ (map snd ssvs2C) ++ (map snd ssvs))
-                    _ _ _ _).
-      - by rewrite !size_cat !size_map.
-      - admit.
-      - admit.
-      - admit.
+    + move => v /(gen_split p2) [s11 s21 v11 v21] [gen1 [gen1C eq_v1]].
+      move =>   /(gen_split p1) [s12 s22 v12 v22] [gen2 [gen2C eq_v2]].
+      rewrite (gen_eq _ (predI p1 p2)) in gen2; [by move => ?; rewrite predIC|].
+      move/(gen_scale _ s11): gen1  => gen1;  move/(gen_scale _ s12)/gen_opp: gen2  => gen2.
+      move/(gen_scale _ s21): gen1C => gen1C; move/(gen_scale _ s22)/gen_opp: gen2C => gen2C.
+      move: (gen_add _ _ _ gen1 gen2) gen1C gen2C => {gen2}.
+      move => /genP [ss vs]   [size_eq  [all_  [uniq_  eq_lin]]].
+      move => /genP [ss1 vs1] [size_eq1 [all_1 [uniq_1 eq_lin1]]].
+      move => /genP [ss2 vs2] [size_eq2 [all_2 [uniq_2 eq_lin2]]].
+      move/(_ (ss ++ ss1 ++ ss2) (vs ++ vs1 ++ vs2) _ _ _ _): free_U.
+      - by rewrite !size_cat size_eq size_eq1 size_eq2.
+      - by rewrite !all_cat; do!split; [move: all_|move: all_1|move: all_2];
+        apply/all_imp_in/allP => x mem_x; rewrite /predI /predU /predC /=;
+        case: (p1 x).
+      - rewrite !cat_uniq uniq_ uniq_1 uniq_2 /=; split.
+        * apply/negP => /hasP [?] [mem_1 mem_]; move/allP/(_ _ mem_): all_.
+          by move/allP/(_ _ mem_1): all_1; rewrite /predI /predC => -[-> ->].
+        apply/negP => /hasP [?] [mem_2 /mem_cat mem_or]; move/allP/(_ _ mem_2): all_2.
+        by case: mem_or => [mem_|mem_1]; [move/allP/(_ _ mem_): all_|move/allP/(_ _ mem_1): all_1];
+        rewrite /predI /predC => -[-> ->].
+      - rewrite !lin_cat ?size_cat ?size_eq ?size_eq1 // eq_lin eq_lin1 eq_lin2.
+        by rewrite (addrAC (s11 ** v11)) -eq_v1 -addrA -opprD -eq_v2 subrr.
       rewrite !size_cat -!cat_nseq ?addr_ge0 ?size_ge0 // !eqseq_cat.
-      - by rewrite !size_cat !size_nseq !ler_maxr ?size_ge0 // !size_map.
-      - by rewrite size_nseq ler_maxr ?size_ge0 // !size_map.
-      move => [[eq_1C_0 eq_2C_0] eq_0].
-      admit.
+      - by rewrite !size_cat !size_nseq !ler_maxr ?size_ge0 // size_eq size_eq1.
+      - by rewrite size_nseq ler_maxr // size_ge0.
+      move => [[->> ->>] ->>] {size_eq size_eq1 size_eq2 eq_lin eq_lin2 eq_v2}.
+      by move: eq_lin1 eq_v1; rewrite lin0 => <- ->; rewrite addr0.
     + by move: free_U; apply/free_imp => v; apply/(subpredUl p1 p2 v).
     + by move: free_U; apply/free_imp => v; apply/(subpredUr p1 p2 v).
-    move => ss vs eq_size all_ uniq_vs eq_0.
-    admit.
-  qed.
-
-  lemma gen_t_incl p1 p2 :
-    (p1 <= p2)%Core =>
-    gen_t p1 =>
-    gen_t p2.
-  proof.
-    admit.
-  qed.
-
-  lemma gen_cons p1 p2 v :
-    gen (predU p1 p2) v <=>
-    (exists s1 s2 v1 v2 , gen p1 v1 /\ gen p2 v2 /\ v = s1 ** v1 + s2 ** v2).
-  proof.
+    move => ss vs eq_size all_ uniq_vs; case: (lin_split p1 ss vs).
+    move => ss1 ss2 vs1 vs2 |> imp_1 imp_2 all_1 all_2 ->.
+    print free.
     admit.
   qed.
 end ComRingModule.

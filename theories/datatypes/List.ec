@@ -549,6 +549,12 @@ apply/allP => x mem_x; move: (all1 _ mem_x) (all2 _ mem_x).
 by rewrite /predI => -> ->.
 qed.
 
+lemma all_predU1 p1 p2 (s : 'a list): all p1 s => all (predU p1 p2) s.
+proof. by apply/all_imp_in/allP => ? _; rewrite /predU /= => ->. qed.
+
+lemma all_predU2 p1 p2 (s : 'a list): all p2 s => all (predU p1 p2) s.
+proof. by apply/all_imp_in/allP => ? _; rewrite /predU /= => ->. qed.
+
 lemma eq_filter_in p1 p2 (s : 'a list):
   (forall x, x \in s => p1 x <=> p2 x) => filter p1 s = filter p2 s.
 proof.
@@ -2743,6 +2749,14 @@ abbrev unzip2 ['a 'b] (s : ('a * 'b) list) = map snd s.
 abbrev amap ['a 'b 'c] (f : 'a -> 'b -> 'c) (xs : ('a * 'b) list) =
   map (fun xy => (fst xy, f (fst xy) (snd xy))) xs.
 
+lemma zip_nil1 ['a, 'b] s :
+  zip<:'a,'b> [] s = [].
+proof. by case: s. qed.
+
+lemma zip_nil2 ['a, 'b] s :
+  zip<:'a,'b> s [] = [].
+proof. by case: s. qed.
+
 lemma map_pswap_zip ['a 'b] (s : 'a list) (t : 'b list) :
   map pswap (zip s t) = zip t s.
 proof. by elim: s t => [|x s ih] [|y t] //=; rewrite ih. qed.
@@ -2894,6 +2908,19 @@ lemma nosmt onth_zip_some ['a 'b] (xs : 'a list) (ys : 'b list) n xy:
 proof.
 elim: xs ys n => [|x xs ih] [|y ys] n //=; case: xy ih => [x' y'] ih.
 by case: (n = 0) => // _; apply/ih.
+qed.
+
+lemma zip_take ['a, 'b] (s : 'a list) (t : 'b list):
+  zip s t =
+  zip
+    (take (min (size s) (size t)) s)
+    (take (min (size s) (size t)) t).
+proof.
+  rewrite /min; case: (size s < size t) => [/ltzW|/lezNgt] le_size; rewrite take_size.
+  + elim: t s le_size => [|y t IHt] [|x s]; rewrite /= ?zip_nil1 ?zip_nil2 //.
+    by move => /lez_add2l le_size; rewrite lezNgt addrC ltzS size_ge0 /=; apply/IHt.
+  elim: s t le_size => [|x s IHs] [|y t]; rewrite /= ?zip_nil1 ?zip_nil2 //.
+  by move => /lez_add2l le_size; rewrite lezNgt addrC ltzS size_ge0 /=; apply/IHs.
 qed.
 
 lemma nosmt eq_keys_amap ['a, 'b1, 'b2, 'c]
