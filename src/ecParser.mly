@@ -542,6 +542,7 @@
 %token REWRITE
 %token RIGHT
 %token RND
+%token RNDSEM
 %token RPAREN
 %token RPBRACE
 %token RRARROW
@@ -3148,8 +3149,11 @@ phltactic:
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
 
-| RND s=side? info=rnd_info
-    { Prnd (s, info) }
+| RND s=side? info=rnd_info c=prefix(COLON, s_codepos1)? 
+    { Prnd (s, c, info) }
+
+| RNDSEM s=side? c=codepos1
+    { Prndsem (s, c) }
 
 | INLINE s=side? u=inlineopt? o=occurences? f=plist1(loc(fident), empty)
     { Pinline (`ByName (s, u, (f, o))) }
