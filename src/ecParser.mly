@@ -543,6 +543,7 @@
 %token REWRITE
 %token RIGHT
 %token RND
+%token RNDSEM
 %token RPAREN
 %token RPBRACE
 %token RRARROW
@@ -823,6 +824,7 @@ f_or_mod_ident:
 
 %inline sbinop:
 | EQ        { "="   }
+| NE        { "<>"  }
 | PLUS      { "+"   }
 | MINUS     { "-"   }
 | STAR      { "*"   }
@@ -980,10 +982,6 @@ expr_u:
 
 | e=expr_chained_orderings %prec prec_below_order
     { fst e }
-
-| e1=expr op=loc(NE) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc "[!]" None
-      [ mk_loc op.pl_loc (peapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=expr op=loc(binop) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -1284,10 +1282,6 @@ form_u(P):
 
 | f=form_chained_orderings(P) %prec prec_below_order
     { fst f }
-
-| e1=form_r(P) op=loc(NE) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc "[!]" None
-      [ mk_loc op.pl_loc (pfapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=form_r(P) op=loc(binop) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -2049,9 +2043,6 @@ mcptn(BOP):
 
 | op=loc(uniop) tvi=tvars_app? x=bdident
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x]) }
-
-| x1=bdident op=loc(NE) tvi=tvars_app? x2=bdident
-    { PPApp ((pqsymb_of_symb op.pl_loc "[!]", tvi), [x1; x2]) }
 
 | x1=bdident op=loc(BOP) tvi=tvars_app? x2=bdident
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x1; x2]) }
@@ -2826,9 +2817,6 @@ rnd_info:
 | empty
     { PNoRndParams }
 
-| CEQ f=sform
-    { PSingleRndParam f }
-
 | f=sform
     { PSingleRndParam f }
 
@@ -3202,8 +3190,11 @@ phltactic:
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
 
-| RND s=side? info=rnd_info
-    { Prnd (s, info) }
+| RND s=side? info=rnd_info c=prefix(COLON, s_codepos1)? 
+    { Prnd (s, c, info) }
+
+| RNDSEM s=side? c=codepos1
+    { Prndsem (s, c) }
 
 | INLINE s=side? u=inlineopt? o=occurences? f=plist1(loc(fident), empty)
     { Pinline (`ByName (s, u, (f, o))) }

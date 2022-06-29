@@ -142,6 +142,7 @@
     "swap"        , SWAP       ;        (* KW: tactic *)
     "cfold"       , CFOLD      ;        (* KW: tactic *)
     "rnd"         , RND        ;        (* KW: tactic *)
+    "rndsem"      , RNDSEM     ;        (* KW: tactic *)
     "pr_bounded"  , PRBOUNDED  ;        (* KW: tactic *)
     "bypr"        , BYPR       ;        (* KW: tactic *)
     "byphoare"    , BYPHOARE   ;        (* KW: tactic *)

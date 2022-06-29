@@ -155,6 +155,9 @@ module CI_Distr = struct
   let p_dbool      = EcPath.extend p_top ["DBool"; "dbool"]
   let p_dbitstring = EcPath.extend p_Distr ["Dbitstring"; "dbitstring"]
   let p_dinter     = EcPath.extend p_top ["DInterval"; "dinter"]
+  let p_dunit      = EcPath.extend p_Distr ["MUnit"; "dunit"]
+  let p_dmap       = EcPath.extend p_Distr ["dmap"]
+  let p_dlet       = EcPath.extend p_Distr ["dlet"]
 
   let p_support  = _Distr "support"
   let p_mu       = _Pervasive "mu"
