@@ -7,7 +7,7 @@ abstract theory IdealComRing.
 (* -------------------------------------------------------------------- *)
 type t.
 
-clone include Ring.ComRing.
+clone import Ring.ComRing  as IComRing with type t <- t.
 
 clear [IComRing.* IComRing.AddMonoid.* IComRing.MulMonoid.*].
 

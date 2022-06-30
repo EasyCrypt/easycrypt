@@ -1,13 +1,16 @@
-require import AllCore List Ring Int IntDiv FiniteField Poly Ideal.
+require import AllCore List Ring Int IntDiv FiniteRing Poly Ideal.
 
 
 abstract theory PolyFF.
 
   type coeff.
    
-  clone import FiniteField as FF with type t <= coeff.
+  clone import FiniteField as FF with
+    type t <= coeff.
 
-  clone include Poly.Poly with type coeff <- coeff, theory IDCoeff <- FF.
+  clone include Poly.Poly with
+    type coeff <- coeff,
+    theory IDCoeff <- FF.F.
 
 end PolyFF.
 
@@ -18,7 +21,7 @@ abstract theory FFQuotient.
   clone import PolyFF as PFF.
 
   print IdealComRing.
-  clone include IdealComRing with type t <- poly, theory IComRing <- PolyComRing.
+  (*clone include IdealComRing with type t <- poly, theory IComRing <- PolyComRing.*)
 
   print IdealComRing. print RingQuotient.
 
