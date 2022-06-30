@@ -3041,6 +3041,14 @@ move/perm_eq_trans; apply; elim: s3 => [|y s3 {ih} ih] /=.
 by rewrite catA perm_catCA -catA; apply/perm_cat2l/ih.
 qed.
 
+lemma allpairs_mapl ['a, 'b, 'c, 'd] (f : 'a -> 'b -> 'c) (g : 'd -> 'a) (s : 'd list) (t : 'b list) :
+  allpairs f (map g s) t =
+  allpairs (fun x y => f (g x) y) s t.
+proof.
+elim: s => [|x s IHs]; [by rewrite /= !allpairs0l|].
+by rewrite /= !allpairs_consl; congr; apply/eq_map => ?.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                         Sequence sorting                             *)
 (* -------------------------------------------------------------------- *)

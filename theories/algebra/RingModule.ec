@@ -46,6 +46,14 @@ abstract theory ComRingModule.
     a = ZMod.zeror.
   proof. by move => /unitrP [y] eq1 eq0; rewrite -scale1r -eq1 scaleM eq0 scaler0. qed.
 
+  lemma scale_unit_injective (x : scalar) :
+    unit x =>
+    injective (( ** ) x).
+  proof.
+    move => unit_x a b; move: (scale_unit _ (a - b) unit_x).
+    by rewrite scaleDr scalerN !subr_eq0.
+  qed.
+
   clone import BigZModule as BigZMod with
     theory ZM <- ZMod.
 

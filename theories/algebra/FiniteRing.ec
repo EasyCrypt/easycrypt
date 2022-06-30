@@ -345,22 +345,14 @@ abstract theory SubFiniteComRing.
   lemma enum_linP vs v :
     (v \in enum_lin vs) <=> (gen (vf_oflist vs) v).
   proof.
-    elim: vs => [|v' vs IHvs].
-    + rewrite enum_lin_nil.
-      admit.
-    admit.
-(*
-    rewrite /enum_lin /gen mapP; apply/exists_eq => ss /=.
-    rewrite (eq_sym _ v); congr; apply/eq_iff => {v}; split.
-    + elim: vs ss => [|v vs IHvs] ss /=; [by rewrite nseq0 /= => ->|].
-      rewrite {1}(IntID.addrC 1) nseqS ?size_ge0 //=. allpairsP => -[p].
-      by rewrite SFZMod.FinType.enumP /= => -[/IHvs <- ->>].
-    elim: vs ss => [|v vs IHvs] ss /=; [by rewrite nseq0 /= size_eq0|].
-    case: ss => [|s ss /= /IntID.addrI /IHvs mem_ss {IHvs}] /=.
-    + by rewrite addrC -subr_eq eq_sym /= => eq_size; move: (size_ge0 vs); rewrite eq_size.
-    rewrite addrC nseqS ?size_ge0 //=; apply/allpairsP; exists (s, ss) => /=.
-    by rewrite SFZMod.FinType.enumP.
-*)
+    elim: vs v => [|v vs IHvs] w.
+    + by rewrite enum_lin_nil gen_vf_oflist_nil.
+    rewrite enum_lin_cons gen_vf_oflist_cons allpairsP; split.
+    + case => -[v1 v2] /= |> /mapP [s] |> mem_s /IHvs gen_v2.
+      by exists s SCR.oner v2; rewrite gen_v2 scale1r.
+    case => [s1 s2 w2] /= |> /(gen_scale _ s2) /IHvs mem_w2.
+    exists (s1 ** v, s2 ** w2); rewrite mem_w2 /=.
+    by apply/mapP; exists s1 => /=; apply/SFT.enumP.
   qed.
 
   lemma enum_lin0 :
@@ -368,35 +360,75 @@ abstract theory SubFiniteComRing.
   proof. by rewrite /enum_lin /= nseq0 /= BigZMod.big_nil. qed.
 
   lemma size_enum_lin vs :
-    size (enum_lin vs) = (size senum) ^ (size vs).
+    size (enum_lin vs) = SFCR.FinType.card ^ (size vs).
   proof.
     elim: vs => [|v vs IHvs] /=.
     + by rewrite expr0 enum_lin0.
-    admit.
+    rewrite addrC exprS ?size_ge0 // -IHvs => {IHvs}.
+    rewrite /enum_lin !size_map /= addrC nseqS ?size_ge0 //=.
+    by rewrite size_allpairs /SFCR.FinType.card size_map.
   qed.
 
   lemma free_uniq_enum_lin vs :
+    uniq vs =>
     free (vf_oflist vs) =>
     uniq (enum_lin vs).
   proof.
-    admit.
+    elim: vs => [|v vs IHvs]; [by rewrite enum_lin_nil|].
+    rewrite free_vf_oflist_cons enum_lin_cons /=.
+    move => |> Nmem_v uniq_ imp_eq0 free_.
+    rewrite allpairs_mapl; apply/allpairs_uniq.
+    + by apply/SFT.enum_uniq.
+    + by apply/IHvs.
+    move => s1 s2 v1 v2 mem_s1 mem_s2 /enum_linP gen1 /enum_linP gen2 /=.
+    rewrite addrC -eqr_sub -scaleNr -scaleDl => eq_.
+    (*TODO: what?*)
+    move/(_ (s2 + (-s1))%SCR _): imp_eq0.
+    + by rewrite -eq_; apply/gen_add => //; apply/gen_opp.
+    by rewrite SCR.subr_eq0 => ->>; move: eq_; rewrite /= SCR.subrr scale0r CR.subr_eq0.
   qed.
 
-  lemma gent_enum_lin vs :
+  lemma gen_t_enum_lin vs :
     (gen_t (vf_oflist vs)) <=> (forall v , v \in enum_lin vs).
-  proof.
-    admit.
-  qed.
+  proof. by rewrite /gen_t; apply/forall_eq => v /=; apply/eqboolP; rewrite enum_linP. qed.
 
   lemma finite_basis_exists :
-    exists vs , basis (vf_oflist vs).
+    exists vs , uniq vs /\ basis (vf_oflist vs).
   proof.
+    have /(_ FCR.FinType.card):
+      forall n , 0 <= n => n <= FCR.FinType.card =>
+      exists vs , uniq vs /\ free (vf_oflist vs) /\ n <= size (enum_lin vs);
+    last first.
+    + rewrite size_ge0 /= => -[vs] |> uniq_ free_ lecn.
+      exists vs; rewrite uniq_ /basis free_ /= gen_t_enum_lin => v.
+      move: (uniq_leq_size (enum_lin vs) FCR.FinType.enum _ _).
+      - by apply/free_uniq_enum_lin.
+      - by move => ? _; apply/FCR.FinType.enumP.
+      move => lenc; move: (eqz_leq FCR.FinType.card (size (enum_lin vs))).
+      rewrite lecn lenc /= => {lecn lenc} eq_.
+      admit.
+    elim => [_|n le0n IHn /ltzE ltnc].
+    + by exists []; rewrite free_vf_oflist_nil size_ge0.
+    case/(_ _): IHn => [|vs |> uniq_ free_]; [by apply/ltzW|].
+    move => /ler_eqVlt [->>|ltnp]; [|by exists vs; rewrite -ltzE].
     admit.
   qed.
 
-  lemma eq_card_pow :
-    exists n , (0 < n) /\ (FCR.FinType.card = SFCR.FinType.card ^ n).
+  op n = ilog SFCR.FinType.card FCR.FinType.card.
+
+  lemma lt0n :
+    0 < n.
   proof.
+    rewrite /n.
+    admit.
+  qed.
+
+  lemma eq_card_pow_n :
+    FCR.FinType.card = SFCR.FinType.card ^ n.
+  proof.
+    case: finite_basis_exists => vs [uniq_ [free_ /gen_t_enum_lin mem_e]].
+    move: (free_uniq_enum_lin _ uniq_ free_) => uniq_e.
+    move: (size_enum_lin vs).
     admit.
   qed.
 end SubFiniteComRing.
@@ -664,27 +696,6 @@ abstract theory SubFiniteField_ZMod.
 
   lemma eq_char_zmodcard :
     char = SFF.FinType.card.
-  proof.
-    admit.
-  qed.
-
-  lemma eq_card_pow_char :
-    exists n , (0 < n) /\ (FF.FinType.card = char ^ n).
-  proof.
-    rewrite eq_char_zmodcard.
-    move: eq_card_pow.
-    admit.
-  qed.
-
-  op n = ilog char FF.FinType.card.
-
-  lemma lt0n : 0 < n.
-  proof.
-    admit.
-  qed.
-
-  lemma eq_card_char :
-    FF.FinType.card = char ^ n.
   proof.
     admit.
   qed.
