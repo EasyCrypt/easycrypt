@@ -123,8 +123,9 @@ abstract theory ComRingModule.
 
   lemma lin_split p ss vs :
     exists ss1 ss2 vs1 vs2 ,
-      (mem vs1 <= mem vs) /\
-      (mem vs2 <= mem vs) /\
+      size ss1 = size vs1 /\
+      size ss2 = size vs2 /\
+      perm_eq (zip ss vs) (zip ss1 vs1 ++ zip ss2 vs2) /\
       all p vs1         /\
       all (predC p) vs2 /\
       lin ss vs = lin ss1 vs1 + lin ss2 vs2.
@@ -134,10 +135,9 @@ abstract theory ComRingModule.
            (unzip2 (filter (p \o snd)         (zip ss vs)))
            (unzip2 (filter (predC (p \o snd)) (zip ss vs))).
     do!split.
-    + move => v /mapP [[s ?]] /= [] + <<-; move => /mem_filter; rewrite /(\o) /=.
-      by move => [_] /mem_zip [].
-    + move => v /mapP [[s ?]] /= [] + <<-; move => /mem_filter; rewrite /(\o) /=.
-      by move => [_] /mem_zip [].
+    + by rewrite !size_map.
+    + by rewrite !size_map.
+    + by rewrite !zip_unzip perm_eq_sym perm_filterC.
     + rewrite all_map; apply/all_filterP; rewrite -filter_predI; apply/eq_in_filter => -[s v].
       by move => /mem_zip [mem_s mem_v]; rewrite /predI /preim /(\o).
     + rewrite all_map; apply/all_filterP; rewrite -filter_predI; apply/eq_in_filter => -[s v].
@@ -343,10 +343,40 @@ abstract theory ComRingModule.
       by move: eq_lin1 eq_v1; rewrite lin0 => <- ->; rewrite addr0.
     + by move: free_U; apply/free_imp => v; apply/(subpredUl p1 p2 v).
     + by move: free_U; apply/free_imp => v; apply/(subpredUr p1 p2 v).
-    move => ss vs eq_size all_ uniq_vs; case: (lin_split p1 ss vs).
-    move => ss1 ss2 vs1 vs2 |> imp_1 imp_2 all_1 all_2 ->.
-    print free.
-    admit.
+    move => ss vs eq_size all_ uniq_; case: (lin_split p1 ss vs).
+    move => ss1 ss2 vs1 vs2 |> eq_size1 eq_size2 perm_eq_ all_1 all_2 -> /addr_eq0.
+    move: (perm_eq_); rewrite -zip_cat // => /(perm_eq_map snd).
+    rewrite !unzip2_zip ?size_cat ?eq_size ?eq_size1 ?eq_size2 // => perm_eq_vs.
+    move: (perm_eq_vs) => /perm_eq_mem eq_mem.
+    move: (all_predI (predU p1 p2) (predC p1) vs2); rewrite all_2 /= => -[_] /(_ _).
+    + by apply/allP => x mem_x; move/allP/(_ x): all_ => -> //; rewrite eq_mem mem_cat mem_x.
+    move => all_2'; move: (all_imp_in _ p2 _ _ all_2') => /=.
+    + by apply/allP => x mem_x; rewrite /predI /predU /predC /=; case: (p1 x).
+    move => {all_2'} all_2'; rewrite -scaleN lin_scaleM => eq_lin; move: (imp_gen (lin ss1 vs1) _ _).
+    + by apply/gen_lin.
+    + rewrite eq_lin; apply/gen_lin; move: (all_predI (predU p1 p2) (predC p1) vs2).
+      rewrite all_2 /= => -[_] /(_ _).
+      - by apply/allP => x mem_x; move/allP/(_ x): all_ => -> //; rewrite eq_mem mem_cat mem_x.
+      by apply/all_imp_in/allP => x mem_x; rewrite /predI /predU /predC /=; case: (p1 x).
+    move => /genP [ss0 vs0] |> eq_size0 all_0 uniq_0 eq_lin0; move: (eq_lin); rewrite -eq_lin0.
+    rewrite -lin_scaleM scaleN -addr_eq0 -lin_cat // => eq_lin2; move: (free_p2 _ _ _ _ _ eq_lin2).
+    + by rewrite !size_cat eq_size0 eq_size2.
+    + rewrite all_cat; split => //; move: all_0.
+      by apply/all_imp_in/allP => x mem_x; rewrite /predI /predU /predC /=; case: (p1 x).
+    + rewrite cat_uniq uniq_0 /=; split.
+      - apply/negP => /hasP [x] [mem_x2 mem_x0]; move: all_2 all_0.
+        move => /allP /(_ _ mem_x2) + /allP /(_ _ mem_x0).
+        by rewrite /predI /predC /=; case: (p1 x).
+      by move: (perm_eq_uniq _ _ perm_eq_vs); rewrite uniq_ /= cat_uniq.
+    rewrite size_cat -cat_nseq ?size_ge0 // eqseq_cat ?size_nseq ?ler_maxr ?size_ge0 //.
+    move => [->> ->>]; move: {eq_size0 eq_size2 eq_lin eq_lin2} eq_lin0.
+    rewrite lin0 eq_sym => eq_lin; move: (free_p1 _ _ _ _ _ eq_lin) => //.
+    + by move: (perm_eq_uniq _ _ perm_eq_vs); rewrite uniq_ /= cat_uniq.
+    move => ->>; move: perm_eq_; rewrite -zip_cat ?size_nseq ?ler_maxr ?size_ge0 //.
+    move => /(perm_eq_map fst).
+    rewrite !unzip1_zip ?size_cat ?size_nseq ?eq_size ?ler_maxr ?size_ge0 //.
+    rewrite cat_nseq ?size_ge0 //; move/perm_eq_size: perm_eq_vs; rewrite size_cat => <-.
+    by move => /(perm_eq_nseq predT).
   qed.
 end ComRingModule.
 

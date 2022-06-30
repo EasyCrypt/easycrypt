@@ -1101,6 +1101,23 @@ proof.
   by move=> h; have := h x => /= ->.
 qed.
 
+lemma perm_eq_nseq (p : 'a -> bool) (s : 'a list) n (x : 'a):
+  perm_eq s (nseq n x) <=> s = nseq n x.
+proof.
+split => [perm_eq_|->>]; [|by apply/perm_eq_refl].
+move/perm_eq_mem: (perm_eq_); move/perm_eq_size: perm_eq_.
+rewrite size_nseq /max.
+case (0 < n) => [lt0n <<- eq_|/lezNgt /(nseq0_le n x) -> _ eq_]; last first.
++ by apply/mem_eq0 => y; rewrite eq_ in_nil.
+have {eq_ lt0n}: forall y, y \in s => x = y.
++ by move => y; move/(_ y): eq_ => ->; rewrite mem_nseq lt0n.
+elim: s => [|y s IHs] eq_ //=.
++ by rewrite nseq0.
+rewrite addrC nseqS ?size_ge0 // -IHs.
++ by move => z mem_z; apply/eq_ => /=; rewrite mem_z.
+by congr; apply/eq_sym/eq_.
+qed.
+
 lemma perm_eq_filter (p : 'a -> bool) (s1 s2 : 'a list):
   perm_eq s1 s2 => perm_eq (filter p s1) (filter p s2).
 proof.
