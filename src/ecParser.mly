@@ -1772,9 +1772,9 @@ signature_item:
     { let qs = omap (List.map (fun x -> { inp_in_params = false;
 					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
-| PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
+| PROC x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
-      let frestr = { pmre_in    = not i;
+      let frestr = { pmre_in    = true;
 		     pmre_name  = x;
 		     pmre_orcls = orcl;
 		     pmre_compl = compl; } in
