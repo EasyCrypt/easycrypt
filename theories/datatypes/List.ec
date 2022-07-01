@@ -24,6 +24,9 @@ hint exact : size_ge0.
 lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case: s => //=; smt. qed.
 
+lemma size_le0 (s : 'a list): size s <= 0 <=> s = [].
+proof. by rewrite -size_eq0 eqz_leq size_ge0. qed.
+
 lemma size_eq1 ['a] (xs : 'a list) :
   (size xs = 1) <=> (exists x, xs = [x]).
 proof.
@@ -1056,6 +1059,10 @@ lemma perm_cat2r (s1 s2 s3 : 'a list):
   perm_eq (s2 ++ s1) (s3 ++ s1) <=> perm_eq s2 s3.
 proof. by do 2! rewrite perm_eq_sym perm_catCl; apply perm_cat2l. qed.
 
+lemma perm_cat2 (s1 s2 s3 s4 : 'a list):
+  perm_eq s1 s2 => perm_eq s3 s4 => perm_eq (s1 ++ s3) (s2 ++ s4).
+proof. by move => ? ?; apply/(perm_eq_trans (s1 ++ s4)); [apply/perm_cat2l|apply/perm_cat2r]. qed.
+
 lemma perm_catCAl (s1 s2 s3 : 'a list):
   forall s, perm_eq (s1 ++ s2 ++ s3) s <=> perm_eq (s2 ++ s1 ++ s3) s.
 proof. by rewrite -!perm_eqlP perm_cat2r perm_catC. qed.
@@ -1479,6 +1486,21 @@ proof.
   rewrite IHs //=; move: le_s31; apply contraL; rewrite -ltzNge => s3x.
   rewrite -lez_add1r; have := uniq_leq_size (x::s1) s3 _ => //= -> //.
   by apply (allP (mem s3)); rewrite /= s3x /= allP.
+qed.
+
+lemma uniq_leq_size_perm_eq (s1 s2 : 'a list):
+    uniq s1 => uniq s2 => mem s1 <= mem s2 => size s2 <= size s1 <=> perm_eq s1 s2.
+proof.
+  elim: s1 s2 => [|x s1 IHs1] s2 |>.
+    by rewrite size_le0 perm_eq_sym perm_eq_nil.
+  move => Nmem1 uniq1 uniq2 lemem.
+  move: (perm_to_rem x s2 _); [by apply/lemem|move => perm_eq2].
+  split => [lesize|]; [move: perm_eq2; rewrite perm_eq_sym|move => perm_eq1].
+    apply/perm_eq_trans/perm_cons/IHs1 => //; [by apply/rem_uniq| |].
+      by move => y mem1; rewrite mem_rem_neq; [by apply/negP => ->>|apply/lemem => /=; right].
+    by rewrite size_rem; [apply/lemem|rewrite -subz_ge0 opprB addrA subz_ge0 addrC].
+  move/perm_cons/perm_eq_size: (perm_eq_trans _ _ _ perm_eq1 perm_eq2) => ->.
+  by rewrite size_rem; [apply/lemem|rewrite addrA addrAC].
 qed.
 
 lemma uniq_size_uniq (s1 s2 : 'a list):

@@ -19,3 +19,5 @@
 
 .merlin
 *.install
+
+report.log

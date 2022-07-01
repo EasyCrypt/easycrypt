@@ -60,6 +60,13 @@ abstract theory FiniteComRing.
   clone include FiniteZModule with
     type t      <- t,
     theory ZMod <- CR.
+
+  lemma card_gt1: 1 < FinType.card.
+  proof.
+    rewrite /FinType.card ltzE /=; have <-: size [CR.zeror; CR.oner] = 2 by trivial.
+    apply/uniq_leq_size => //=; [by rewrite eq_sym; apply/CR.oner_neq0|].
+    by move => ? _; apply/FinType.enumP.
+  qed.
 end FiniteComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -391,46 +398,6 @@ abstract theory SubFiniteComRing.
   lemma gen_t_enum_lin vs :
     (gen_t (vf_oflist vs)) <=> (forall v , v \in enum_lin vs).
   proof. by rewrite /gen_t; apply/forall_eq => v /=; apply/eqboolP; rewrite enum_linP. qed.
-
-  lemma finite_basis_exists :
-    exists vs , uniq vs /\ basis (vf_oflist vs).
-  proof.
-    have /(_ FCR.FinType.card):
-      forall n , 0 <= n => n <= FCR.FinType.card =>
-      exists vs , uniq vs /\ free (vf_oflist vs) /\ n <= size (enum_lin vs);
-    last first.
-    + rewrite size_ge0 /= => -[vs] |> uniq_ free_ lecn.
-      exists vs; rewrite uniq_ /basis free_ /= gen_t_enum_lin => v.
-      move: (uniq_leq_size (enum_lin vs) FCR.FinType.enum _ _).
-      - by apply/free_uniq_enum_lin.
-      - by move => ? _; apply/FCR.FinType.enumP.
-      move => lenc; move: (eqz_leq FCR.FinType.card (size (enum_lin vs))).
-      rewrite lecn lenc /= => {lecn lenc} eq_.
-      admit.
-    elim => [_|n le0n IHn /ltzE ltnc].
-    + by exists []; rewrite free_vf_oflist_nil size_ge0.
-    case/(_ _): IHn => [|vs |> uniq_ free_]; [by apply/ltzW|].
-    move => /ler_eqVlt [->>|ltnp]; [|by exists vs; rewrite -ltzE].
-    admit.
-  qed.
-
-  op n = ilog SFCR.FinType.card FCR.FinType.card.
-
-  lemma lt0n :
-    0 < n.
-  proof.
-    rewrite /n.
-    admit.
-  qed.
-
-  lemma eq_card_pow_n :
-    FCR.FinType.card = SFCR.FinType.card ^ n.
-  proof.
-    case: finite_basis_exists => vs [uniq_ [free_ /gen_t_enum_lin mem_e]].
-    move: (free_uniq_enum_lin _ uniq_ free_) => uniq_e.
-    move: (size_enum_lin vs).
-    admit.
-  qed.
 end SubFiniteComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -518,6 +485,66 @@ abstract theory SubFiniteField.
     proof *.
 
   realize FinType.enum_spec by exact SFID.FinType.enum_spec.
+
+  import SCRM.ComRingModule.
+
+  lemma finite_basis_exists :
+    exists vs , uniq vs /\ basis (vf_oflist vs).
+  proof.
+    have /(_ FF.FinType.card):
+      forall n , 0 <= n => n <= FF.FinType.card =>
+      exists vs , uniq vs /\ free (vf_oflist vs) /\ n <= size (enum_lin vs);
+    last first.
+    + rewrite size_ge0 /= => -[vs] |> uniq_ free_ lecn.
+      exists vs; rewrite uniq_ /basis free_ /= gen_t_enum_lin => v.
+      move: lecn; rewrite uniq_leq_size_perm_eq.
+      - by apply/free_uniq_enum_lin.
+      - by apply/FF.FinType.enum_uniq.
+      - by move => ? _; apply/FF.FinType.enumP.
+      by move => /perm_eq_mem ->; apply/FF.FinType.enumP.
+    elim => [_|n le0n IHn /ltzE ltnc].
+    + by exists []; rewrite free_vf_oflist_nil size_ge0.
+    case/(_ _): IHn => [|vs |> uniq_ free_]; [by apply/ltzW|].
+    move => /ler_eqVlt [->>|ltnp]; [|by exists vs; rewrite -ltzE].
+    move/ltzNge: ltnc; rewrite uniq_leq_size_perm_eq.
+    + by apply/free_uniq_enum_lin.
+    + by apply/FF.FinType.enum_uniq.
+    + by move => ? _; apply/FF.FinType.enumP.
+    move => Nperm_eq_; move: (uniq_perm_eq (enum_lin vs) FF.FinType.enum _ _).
+    + by apply/free_uniq_enum_lin.
+    + by apply/FF.FinType.enum_uniq.
+    rewrite Nperm_eq_ /= negb_forall /= => -[v]; rewrite FF.FinType.enumP /= => Nmemv.
+    exists (v :: vs); rewrite /= free_vf_oflist_cons uniq_ free_ /=; do!split.
+    + by move: Nmemv; apply/contra => memv; apply/enum_linP/gen_p.
+    + right => s; case: (s = SCR.zeror) => [->> //=|neqs0].
+      - (*TODO: bad clone.*)
+        admit.
+      rewrite -gen_scale_unit -?enum_linP //.
+      (*TODO: bad clone.*)
+      admit.
+    rewrite !size_enum_lin /= -ltzE addrC exprSr ?size_ge0 //.
+    rewrite -subr_gt0 -IntID.mulN1r mulrC -IntID.mulrDl; apply/mulr_gt0.
+    + by rewrite subr_gt0; apply/card_gt1.
+    by apply/expr_gt0/SFF.FinType.card_gt0.
+  qed.
+
+  op n = ilog SFCR.FinType.card FF.FinType.card.
+
+  lemma lt0n :
+    0 < n.
+  proof.
+    rewrite /n.
+    admit.
+  qed.
+
+  lemma eq_card_pow_n :
+    FF.FinType.card = SFF.FinType.card ^ n.
+  proof.
+    case: finite_basis_exists => vs [uniq_ [free_ /gen_t_enum_lin mem_e]].
+    move: (free_uniq_enum_lin _ uniq_ free_) => uniq_e.
+    move: (size_enum_lin vs).
+    admit.
+  qed.
 end SubFiniteField.
 
 
