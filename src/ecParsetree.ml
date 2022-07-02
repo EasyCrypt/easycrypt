@@ -264,7 +264,6 @@ and poracles = qident_inparam list
 and pcompl = PCompl of pformula * (qident_inparam * pformula) list
 
 and pmod_restr_el = {
-  pmre_in    : bool;
 	pmre_name  : psymbol;
   pmre_orcls : poracles option;  (* None means no restriction *)
   pmre_compl : pcompl option;    (* None means no restriction *)

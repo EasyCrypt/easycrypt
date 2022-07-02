@@ -2107,7 +2107,6 @@ module Fsubst = struct
 
     PreOI.mk
       (List.map sx (PreOI.allowed oi))
-      (PreOI.is_in oi)
       costs
 
   and mr_subst ~tx s mr : form p_mod_restr =

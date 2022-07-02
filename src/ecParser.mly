@@ -1588,8 +1588,7 @@ fun_def_body:
 
 fun_decl:
 | x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
-    { let frestr = { pmre_in    = true;
-		     pmre_name  = x;
+    { let frestr = { pmre_name  = x;
 		     pmre_orcls = None;
 		     pmre_compl = None;	} in
 
@@ -1710,10 +1709,9 @@ fun_restr:
     { (None, Some cl) }
 
 mod_restr_el:
-  | i=iboption(STAR) f=lident COLON fr=fun_restr
+  | f=lident COLON fr=fun_restr
     { let orcl, cmpl = fr in
-      { pmre_in = not i;
-	pmre_name = f;
+      { pmre_name = f;
 	pmre_orcls = orcl;
 	pmre_compl = cmpl; } }
 
@@ -1774,8 +1772,7 @@ signature_item:
       `Include (i, xs, qs) }
 | PROC x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
-      let frestr = { pmre_in    = true;
-		     pmre_name  = x;
+      let frestr = { pmre_name  = x;
 		     pmre_orcls = orcl;
 		     pmre_compl = compl; } in
 

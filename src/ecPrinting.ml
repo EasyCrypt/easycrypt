@@ -1850,8 +1850,7 @@ and pp_orclinfo_bare ppe fmt oi =
     (pp_costs ppe) costs
 
 and pp_orclinfo ppe fmt (sym, oi) =
-  Format.fprintf fmt "@[<hv>%s%a : %a@]"
-    (if OI.is_in oi then "" else " *")
+  Format.fprintf fmt "@[<hv>%a : %a@]"
     pp_symbol sym
     (pp_orclinfo_bare ppe) oi
 
