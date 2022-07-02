@@ -940,9 +940,7 @@ let restr_proof_obligation env (mp_in : mpath) sym (mt : module_type) : form lis
             | `Unbounded ->
               let k_id = mk_ident () in
               let k = f_N (f_local k_id tint) in
-              let oi' =
-                OI.mk (OI.allowed oi) (OI.is_in oi)
-                  (`Bounded (k,Mx.empty)) in
+              let oi' = OI.mk (OI.allowed oi) (`Bounded (k,Mx.empty)) in
               let param_restr' = add_oinfo param_restr' fn.fs_name oi' in
               (param_restr', k_id :: ints)
           ) (param_restr,ints) param_ms.mis_body in
@@ -2274,17 +2272,16 @@ and trans_restr_fun env env_in (params : Sm.t) (r_el : pmod_restr_el) =
                   |> List.filter_map (fun (f,_) ->
                      if List.mem f r_orcls then None else Some f)) in
 
-  let r_in =  r_el.pmre_in in
-  ( r_in, name, c_compl, r_orcls )
+  ( name, c_compl, r_orcls )
 
 (* See [trans_restr_fun] for the requirements on [env], [env_in], [params]. *)
 and transmod_restr env env_in (params : Sm.t) (mr : pmod_restr) =
   let r_mem = trans_restr_mem env mr.pmr_mem in
 
   let r_procs = List.fold_left (fun r_procs r_elem ->
-      let r_in, name, c_compl, r_orcls =
+      let name, c_compl, r_orcls =
         trans_restr_fun env env_in params r_elem in
-      Msym.add name (OI.mk r_orcls r_in c_compl) r_procs
+      Msym.add name (OI.mk r_orcls c_compl) r_procs
     ) Msym.empty mr.pmr_procs in
 
   { mr_xpaths = fst r_mem;
@@ -2379,11 +2376,11 @@ and transmodsig_body
 
       let resty = transty_for_decl env f.pfd_tyresult in
 
-      let uin, rname, compl, calls = trans_restr_fun env env sa f.pfd_uses in
+      let rname, compl, calls = trans_restr_fun env env sa f.pfd_uses in
 
       assert (rname = name.pl_desc);
 
-      let oi = OI.mk calls uin compl in
+      let oi = OI.mk calls compl in
 
       let sig_ = { fs_name   = name.pl_desc;
                    fs_arg    = ttuple (List.map ov_type tyargs);
