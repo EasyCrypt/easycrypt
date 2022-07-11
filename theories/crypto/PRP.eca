@@ -293,8 +293,8 @@ qed.
 lemma collision_stable (m:(D,D) fmap) y y':
   collision m =>
   y \notin m =>
-  collision m.[y <- y']
-by smt(collision_add).
+  collision m.[y <- y'].
+proof. by move=> h /collision_add /= ->; rewrite h. qed.
 
 (** To factor out the difficult step, we parameterize the PRP by a
     procedure that samples its output, and provide two instantiations
