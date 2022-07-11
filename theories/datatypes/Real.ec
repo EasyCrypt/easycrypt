@@ -23,8 +23,12 @@ lemma nosmt fromint0 : 0%r = CoreReal.zero by [].
 lemma nosmt fromint1 : 1%r = CoreReal.one  by [].
 
 lemma nosmt fromintN (z     : int) : (-z)%r = - z%r by smt().
+
 lemma nosmt fromintD (z1 z2 : int) : (z1 + z2)%r = z1%r + z2%r by smt().
-lemma nosmt fromintB (z1 z2 : int) : (z1 - z2)%r = z1%r - z2%r by smt().
+
+lemma nosmt fromintB (z1 z2 : int) : (z1 - z2)%r = z1%r - z2%r.
+proof. by rewrite fromintD fromintN. qed.
+
 lemma nosmt fromintM (z1 z2 : int) : (z1 * z2)%r = z1%r * z2%r by smt().
 
 lemma nosmt eq_fromint (z1 z2 : int) :
