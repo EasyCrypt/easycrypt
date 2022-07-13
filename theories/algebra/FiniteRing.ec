@@ -1,5 +1,5 @@
 (* ==================================================================== *)
-require import AllCore List Ring Int IntDiv RingStruct FinType ZModP.
+require import AllCore List Ring Int IntMin IntDiv RingStruct FinType ZModP.
 require import Bigalg SubRing RingModule Real RealExp.
 require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.

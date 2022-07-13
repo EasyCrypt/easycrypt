@@ -1,5 +1,5 @@
 (* ==================================================================== *)
-require import AllCore List Ring Int IntDiv Bigalg Binomial Finite.
+require import AllCore List Ring Int IntMin IntDiv Bigalg Binomial Finite.
 (*---*) import StdOrder.IntOrder IntID.
 
 
