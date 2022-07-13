@@ -1,5 +1,5 @@
 (* ==================================================================== *)
-require import AllCore List Ring Int IntDiv Bigalg Binomial.
+require import AllCore List Ring Int IntDiv Bigalg Binomial Finite.
 (*---*) import StdOrder.IntOrder IntID.
 
 
@@ -210,6 +210,18 @@ abstract theory IDomainStruct.
     lemma frobenius_inj :
       injective frobenius.
     proof. by move => x y /subr_eq0; rewrite -frobeniusB => /eq_frobenius_0 /subr_eq0. qed.
+
+    lemma iter_frobenius n x :
+      0 <= n =>
+      iter n frobenius x =
+      exp x (char ^ n).
+    proof.
+      elim: n => [|n le0n IHn]; [by rewrite iter0 // expr0 expr1|].
+      by rewrite iterS // IHn exprSr // exprM.
+    qed.
+
+    op iter_frobenius_fixed n x =
+      iter n frobenius x = x.
   
   end section Frobenius.
 end IDomainStruct.
@@ -224,4 +236,19 @@ abstract theory FieldStruct.
   clone include IDomainStruct with
     type t <- t,
     theory ID <- F.
+
+  lemma is_finite_iter_frobenius n :
+    0 <= n =>
+    is_finite (iter_frobenius_fixed n).
+  proof.
+    admit.
+  qed.
+
+  lemma size_to_seq_iter_frobenius n :
+    0 <= n =>
+    size (to_seq (iter_frobenius_fixed n)) <= char ^ n.
+  proof.
+    admit.
+  qed.
+
 end FieldStruct.

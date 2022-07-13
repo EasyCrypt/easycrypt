@@ -507,8 +507,8 @@ abstract theory ComRing.
       rewrite mulzDl /= addrz IHx.
       have ->: - (x + 1) = - x - 1.
       - admit.
-      rewrite mulzDl addrz /=.
-      admit.
+      rewrite mulzDl addrz /=; congr; rewrite eq_sym -subr_eq0.
+      by rewrite -ofintN oppzK -addrz -{2}(@mul1z y) -mulzDl /= ofint0.
     elim: x => [|x le0x IHx]; [by rewrite /= ofint0 mul0i|].
     by rewrite mulzDl /= !addrz ofint1 mulrDi IHx.
   qed.

@@ -174,8 +174,39 @@ abstract theory FiniteIDomainStruct.
     theory CRStr <- IDStr,
     theory FCR   <- FID.
 
-  lemma prime_char : prime char.
+  lemma prime_char :
+    prime char.
   proof. by case: char_integral => // eq0; move: gt0_char; rewrite eq0. qed.
+
+  lemma bij_surj ['a,'b] (f : 'a -> 'b) :
+    bijective f => 
+    surjective f.
+  proof. by move => [g] [fgK gfK] x; exists (g x); rewrite gfK. qed.
+
+  lemma bij_inj_surj ['a,'b] (f : 'a -> 'b) :
+    bijective f <=>
+    (injective f) /\ (surjective f).
+  proof.
+    split => [bij_|[inj_ surj_]]; [by split; [apply/bij_inj|apply/bij_surj]|].
+    exists (fun y => choiceb (fun x => y = f x) witness); split => [x|y].
+    + rewrite (eq_choice _ (pred1 x)).
+      - by move => x' /=; split => [|->//]; move => /inj_ ->.
+      by rewrite (choicebP (pred1 x) witness) //; exists x.
+    rewrite -(choicebP (fun x => y = f x) witness) //.
+    by case: (surj_ y) => x ->>; exists x.
+  qed.
+
+  lemma frobenius_bij :
+    prime char =>
+    bijective frobenius.
+  proof.
+    move => prime_char; move: (frobenius_inj prime_char) => inj_; apply/bij_inj_surj.
+    rewrite inj_ /= => x; move: (uniq_map_injective _ _ inj_ FID.FinType.enum_uniq) => uniq_.
+    move: (uniq_leq_size_perm_eq _ _ uniq_ FID.FinType.enum_uniq _).
+    + by move => ? _; apply/FID.FinType.enumP.
+    rewrite size_map /= => /perm_eq_mem /(_ x); rewrite FID.FinType.enumP /=.
+    by move => /mapP [y] [_ ->>]; exists y.
+  qed.
 end FiniteIDomainStruct.
 
 (* -------------------------------------------------------------------- *)
@@ -723,6 +754,18 @@ abstract theory SubFiniteField_ZMod.
 
   lemma eq_char_zmodcard :
     char = SFF.FinType.card.
+  proof.
+    admit.
+  qed.
+
+  lemma exists_generator :
+    exists (g : t) ,
+      iter_frobenius_fixed n g /\
+      forall d ,
+        0 <= d =>
+        d %| n =>
+        iter_frobenius_fixed d g =>
+        d = n.
   proof.
     admit.
   qed.
