@@ -276,6 +276,158 @@ module Core = struct
     in
 
     FApi.xmutate1 tc `Rnd subgoals
+
+  (* -------------------------------------------------------------------- *)
+  let semrnd tc mem used (s : instr list) : EcMemory.memenv * instr list =
+    let error () = tc_error !!tc "semrnd" in
+
+    let env = FApi.tc1_env tc in
+    let wr, gwr = PV.elements (is_write env s) in
+    let wr =
+      match used with
+      | None -> wr
+      | Some used -> List.filter (fun (pv, _) -> PV.mem_pv env pv used) wr in
+
+    if not (List.is_empty gwr) then
+      error ();
+
+    let open EcPV in
+
+    let wr =
+      let add (m, idx) pv =
+        if   is_some (PVMap.find pv m)
+        then (m, idx)
+        else (PVMap.add pv idx m, idx+1) in
+
+      let m, idx =
+        List.fold_left (fun (m, idx) { i_node = i } ->
+          match i with
+          | Sasgn (lv, _) | Srnd (lv, _) ->
+             List.fold_left add (m, idx) (lv_to_list lv)
+          | _ -> (m, idx)
+        )
+        (PVMap.create env, 0) s in
+
+      let m, _ =
+        List.fold_left
+          (fun (m, idx) (pv, _) -> add (m, idx) pv)
+          (m, idx)
+          wr in
+
+      List.sort
+        (fun (pv1, _) (pv2, _) ->
+          compare (PVMap.find pv1 m) (PVMap.find pv2 m))
+        wr in
+
+    let rec do1 (subst : PVM.subst) (s : instr list) =
+      match s with
+      | [] ->
+         let tuple =
+           List.map (fun (pv, _) ->
+             PVM.find env pv mhr subst) wr in
+         f_dunit (f_tuple tuple)
+
+      | { i_node = Sasgn (lv, e) } :: s ->
+         let e = form_of_expr mhr e in
+         let e = PVM.subst env subst e in
+         let subst =
+           match lv with
+           | LvVar (pv, _) ->
+              PVM.add env pv mhr e subst
+           | LvTuple pvs ->
+              List.fold_lefti (fun subst i (pv, ty) ->
+                PVM.add env pv mhr (f_proj e i ty) subst
+              ) subst pvs
+         in
+         do1 subst s
+
+      | { i_node = Srnd (lv, d) } :: s ->
+         let d = form_of_expr mhr d in
+         let d = PVM.subst env subst d in
+         let x = EcIdent.create (name_of_lv lv) in
+         let subst, xty =
+           match lv with
+           | LvVar (pv, ty) ->
+              let x = f_local x ty in
+              (PVM.add env pv mhr x subst, ty)
+           | LvTuple pvs ->
+              let ty = ttuple (List.snd pvs) in
+              let x = f_local x ty in
+              let subst =
+                List.fold_lefti (fun subst i (pv, ty) ->
+                  PVM.add env pv mhr (f_proj x i ty) subst
+                ) subst pvs in
+              (subst, ty)
+         in
+         let body = do1 subst s in
+
+         f_dlet_simpl
+           xty
+           (ttuple (List.snd wr))
+           d
+           (f_lambda [(x, GTty xty)] body)
+
+      | _ :: _ ->
+         error ()
+
+    in
+
+    let distr = do1 PVM.empty s in
+    let distr = expr_of_form mhr distr in
+
+    match lv_of_list wr with
+    | None ->
+       let x =  { ov_name = Some "x"; ov_type = tunit; } in
+       let mem, x = EcMemory.bind_fresh x mem in
+       let x, xty = pv_loc (oget x.ov_name), x.ov_type in
+       (mem, [i_rnd (LvVar (x, xty), distr)])
+    | Some wr ->
+       (mem, [i_rnd (wr, distr)])
+
+  (* -------------------------------------------------------------------- *)
+  let t_hoare_rndsem_r reduce pos tc =
+    let hs = tc1_as_hoareS tc in
+    let s1, s2 = o_split (Some pos) hs.hs_s in
+    let fv =
+      if reduce then
+        Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) hs.hs_po)
+      else None in
+    let m, s2 = semrnd tc hs.hs_m fv s2 in
+    let concl = { hs with hs_s = stmt (s1 @ s2); hs_m = m; } in
+    FApi.xmutate1 tc (`RndSem pos) [f_hoareS_r concl]
+
+ (* -------------------------------------------------------------------- *)
+  let t_bdhoare_rndsem_r reduce pos tc =
+    let bhs = tc1_as_bdhoareS tc in
+    let s1, s2 = o_split (Some pos) bhs.bhs_s in
+    let fv =
+      if reduce then
+        Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) bhs.bhs_po)
+      else None in
+    let m, s2 = semrnd tc bhs.bhs_m fv s2 in
+    let concl = { bhs with bhs_s = stmt (s1 @ s2); bhs_m = m; } in
+    FApi.xmutate1 tc (`RndSem pos) [f_bdHoareS_r concl]
+
+ (* -------------------------------------------------------------------- *)
+  let t_equiv_rndsem_r reduce side pos tc =
+    let es = tc1_as_equivS tc in
+    let s, m =
+      match side with
+      | `Left  -> es.es_sl, es.es_ml
+      | `Right -> es.es_sr, es.es_mr in
+    let s1, s2 = o_split (Some pos) s in
+    let fv =
+      if reduce then
+        Some (PV.fv (FApi.tc1_env tc) (fst m) es.es_po)
+      else None in
+    let m, s2 = semrnd tc m fv s2 in
+    let s = stmt (s1 @ s2) in
+    let concl =
+      match side with
+      | `Left  -> { es with es_sl = s; es_ml = m; }
+      | `Right -> { es with es_sr = s; es_mr = m; } in
+    FApi.xmutate1 tc (`RndSem pos) [f_equivS_r concl]
+
 end (* Core *)
 
 (* -------------------------------------------------------------------- *)
@@ -415,38 +567,60 @@ let wp_equiv_rnd_r bij tc =
       subtc)
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_rnd_r side bij_info tc =
-  match side with
-  | Some side -> wp_equiv_disj_rnd_r side tc
-  | None ->
+let t_equiv_rnd_r side pos bij_info tc =
+  match side, pos with
+  | Some side, None ->
+     wp_equiv_disj_rnd_r side tc
+  | None, _ -> begin
+      let pos =
+        match pos with
+        | None -> None
+        | Some (Single i) -> Some (i, i)
+        | Some (Double (il, ir)) -> Some (il, ir) in
+
+      let tc =
+        match pos with
+        | None ->
+           t_id tc
+        | Some ((bl, il), (br, ir)) ->
+           FApi.t_seq
+             (Core.t_equiv_rndsem_r bl `Left il)
+             (Core.t_equiv_rndsem_r br `Right ir)
+             tc in
+
       let bij =
         match bij_info with
         | Some f, Some finv ->  Some (f, finv)
         | Some bij, None | None, Some bij -> Some (bij, bij)
         | None, None -> None
       in
-        wp_equiv_rnd_r bij tc
+      FApi.t_first (wp_equiv_rnd_r bij) tc
+    end
 
+  | _ ->
+     tc_error !!tc "invalid argument"
 
 (* -------------------------------------------------------------------- *)
 let wp_equiv_disj_rnd = FApi.t_low1 "wp-equiv-disj-rnd" wp_equiv_disj_rnd_r
-let wp_equiv_rnd      = FApi.t_low1 "wp-equiv-rnd"      wp_equiv_rnd_r
+let wp_equiv_rnd      = FApi.t_low1 "wp-equiv-rnd" wp_equiv_rnd_r
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_rnd   = FApi.t_low0 "hoare-rnd"   Core.t_hoare_rnd_r
 let t_choare_rnd  = FApi.t_low1 "choare-rnd"  Core.t_choare_rnd_r
 let t_bdhoare_rnd = FApi.t_low1 "bdhoare-rnd" Core.t_bdhoare_rnd_r
-let t_equiv_rnd   = FApi.t_low2 "equiv-rnd"   t_equiv_rnd_r
+
+let t_equiv_rnd ?pos side bij_info =
+  (FApi.t_low3 "equiv-rnd" t_equiv_rnd_r) side pos bij_info
 
 (* -------------------------------------------------------------------- *)
-let process_rnd side tac_info tc =
+let process_rnd side pos tac_info tc =
   let concl = FApi.tc1_goal tc in
 
-  match side, tac_info with
-  | None, PNoRndParams when is_hoareS concl ->
+  match side, pos, tac_info with
+  | None, None, PNoRndParams when is_hoareS concl ->
       t_hoare_rnd tc
 
-  | None, _ when is_cHoareS concl ->
+  | None, None, _ when is_cHoareS concl ->
     let tac_info =
       match tac_info with
       | PNoRndParams ->
@@ -462,7 +636,7 @@ let process_rnd side tac_info tc =
                     [EcLowGoal.t_trivial; EcLowGoal.t_id]
         tc
 
-  | None, _ when is_bdHoareS concl ->
+  | None, None, _ when is_bdHoareS concl ->
     let tac_info =
       match tac_info with
       | PNoRndParams ->
@@ -485,7 +659,7 @@ let process_rnd side tac_info tc =
     in
       t_bdhoare_rnd tac_info tc
 
-  | _, _ when is_equivS concl ->
+  | _, _, _ when is_equivS concl ->
     let process_form f ty1 ty2 =
       TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
 
@@ -497,6 +671,24 @@ let process_rnd side tac_info tc =
       | _ -> tc_error !!tc "invalid arguments"
 
     in
-      t_equiv_rnd side bij_info tc
+      t_equiv_rnd side ?pos bij_info tc
 
+  | _ -> tc_error !!tc "invalid arguments"
+
+(* -------------------------------------------------------------------- *)
+let t_hoare_rndsem   = FApi.t_low1 "hoare-rndsem"   (Core.t_hoare_rndsem_r   false)
+let t_bdhoare_rndsem = FApi.t_low1 "bdhoare-rndsem" (Core.t_bdhoare_rndsem_r false)
+let t_equiv_rndsem   = FApi.t_low2 "equiv-rndsem"   (Core.t_equiv_rndsem_r   false)
+
+(* -------------------------------------------------------------------- *)
+let process_rndsem side pos tc =
+  let concl = FApi.tc1_goal tc in
+
+  match side with
+  | None when is_hoareS concl ->
+     t_hoare_rndsem pos tc
+  | None when is_bdHoareS concl ->
+     t_bdhoare_rndsem pos tc
+  | Some side when is_equivS concl ->
+     t_equiv_rndsem side pos tc
   | _ -> tc_error !!tc "invalid arguments"

@@ -64,6 +64,12 @@ val f_mu      : EcEnv.env -> form -> form -> form
 val f_mu_x    : form -> form -> form
 val f_weight   : EcTypes.ty -> form -> form
 val f_lossless : EcTypes.ty -> form -> form
+val f_dunit    : form -> form
+
+(* f_dlet tya tyb (d : tya distr) (f : tya -> tyb distr) = dlet d f *)
+val f_dlet : ty -> ty -> form -> form -> form
+val f_dlet_simpl : ty -> ty -> form -> form -> form
+val f_dmap : ty -> ty -> form -> form -> form
 
 (* common functions *)
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form

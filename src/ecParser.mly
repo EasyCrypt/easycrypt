@@ -542,6 +542,7 @@
 %token REWRITE
 %token RIGHT
 %token RND
+%token RNDSEM
 %token RPAREN
 %token RPBRACE
 %token RRARROW
@@ -822,6 +823,7 @@ f_or_mod_ident:
 
 %inline sbinop:
 | EQ        { "="   }
+| NE        { "<>"  }
 | PLUS      { "+"   }
 | MINUS     { "-"   }
 | STAR      { "*"   }
@@ -979,10 +981,6 @@ expr_u:
 
 | e=expr_chained_orderings %prec prec_below_order
     { fst e }
-
-| e1=expr op=loc(NE) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc "[!]" None
-      [ mk_loc op.pl_loc (peapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=expr op=loc(binop) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -1283,10 +1281,6 @@ form_u(P):
 
 | f=form_chained_orderings(P) %prec prec_below_order
     { fst f }
-
-| e1=form_r(P) op=loc(NE) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc "[!]" None
-      [ mk_loc op.pl_loc (pfapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=form_r(P) op=loc(binop) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -1594,8 +1588,7 @@ fun_def_body:
 
 fun_decl:
 | x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
-    { let frestr = { pmre_in    = true;
-		     pmre_name  = x;
+    { let frestr = { pmre_name  = x;
 		     pmre_orcls = None;
 		     pmre_compl = None;	} in
 
@@ -1716,10 +1709,9 @@ fun_restr:
     { (None, Some cl) }
 
 mod_restr_el:
-  | i=iboption(STAR) f=lident COLON fr=fun_restr
+  | f=lident COLON fr=fun_restr
     { let orcl, cmpl = fr in
-      { pmre_in = not i;
-	pmre_name = f;
+      { pmre_name = f;
 	pmre_orcls = orcl;
 	pmre_compl = cmpl; } }
 
@@ -1778,10 +1770,9 @@ signature_item:
     { let qs = omap (List.map (fun x -> { inp_in_params = false;
 					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
-| PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
+| PROC x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
-      let frestr = { pmre_in    = not i;
-		     pmre_name  = x;
+      let frestr = { pmre_name  = x;
 		     pmre_orcls = orcl;
 		     pmre_compl = compl; } in
 
@@ -2008,9 +1999,6 @@ mcptn(BOP):
 
 | op=loc(uniop) tvi=tvars_app? x=bdident
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x]) }
-
-| x1=bdident op=loc(NE) tvi=tvars_app? x2=bdident
-    { PPApp ((pqsymb_of_symb op.pl_loc "[!]", tvi), [x1; x2]) }
 
 | x1=bdident op=loc(BOP) tvi=tvars_app? x2=bdident
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x1; x2]) }
@@ -2761,6 +2749,17 @@ s_codepos1:
 | n1=codepos1 n2=codepos1
     { Double (n1, n2) }
 
+semrndpos1:
+| b=boption(STAR) c=codepos1
+    { (b, c) }
+
+semrndpos:
+| n=semrndpos1
+    { Single n }
+
+| n1=semrndpos1 n2=semrndpos1
+    { Double (n1, n2) }
+
 while_tac_info:
 | inv=sform
     { { wh_inv = inv; wh_vrnt = None; wh_bds = None; } }
@@ -2784,9 +2783,6 @@ async_while_tac_info:
 rnd_info:
 | empty
     { PNoRndParams }
-
-| CEQ f=sform
-    { PSingleRndParam f }
 
 | f=sform
     { PSingleRndParam f }
@@ -3161,8 +3157,11 @@ phltactic:
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
 
-| RND s=side? info=rnd_info
-    { Prnd (s, info) }
+| RND s=side? info=rnd_info c=prefix(COLON, semrndpos)? 
+    { Prnd (s, c, info) }
+
+| RNDSEM s=side? c=codepos1
+    { Prndsem (s, c) }
 
 | INLINE s=side? u=inlineopt? o=occurences? f=plist1(loc(fident), empty)
     { Pinline (`ByName (s, u, (f, o))) }

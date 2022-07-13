@@ -311,10 +311,10 @@ let t_call side ax tc =
 let mk_inv_spec (_pf : proofenv) env inv fl fr =
   match NormMp.is_abstract_fun fl env with
   | true ->
-    let (topl, _, oil, sigl),
+    let (topl, _, _, sigl),
       (topr, _, _  , sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
     let eqglob = f_eqglob topl mleft topr mright in
-    let lpre = if OI.is_in oil then [eqglob;inv] else [inv] in
+    let lpre = [eqglob;inv] in
     let eq_params =
       f_eqparams
         sigl.fs_arg sigl.fs_anames mleft
@@ -465,11 +465,11 @@ let process_call side info tc =
         let (_,fl,_) = fst (tc1_last_call tc es.es_sl) in
         let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
         let bad,invP,invQ = EcPhlFun.process_fun_upto_info info tc in
-        let (topl,fl,oil,sigl),
+        let (topl,fl,_,sigl),
             (topr,fr,_  ,sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
         let bad2 = Fsubst.f_subst_mem mhr mright bad in
         let eqglob = f_eqglob topl mleft topr mright in
-        let lpre = if OI.is_in oil then [eqglob;invP] else [invP] in
+        let lpre = [eqglob;invP] in
         let eq_params =
           f_eqparams
             sigl.fs_arg sigl.fs_anames mleft

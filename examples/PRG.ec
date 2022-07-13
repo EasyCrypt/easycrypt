@@ -25,14 +25,14 @@ hint exact random: dout_ll.
 (** We use a public RF that, on input a seed, produces a seed and
     an output...                                                        *)
 module type RF = {
-  proc * init() : unit
+  proc init() : unit
   proc f(x:seed): seed * output
 }.
 
 (** ...to build a PRG that produces random outputs... **)
 (** We let our PRG have internal state, which we need to initialize **)
 module type PRG = {
-  proc * init(): unit
+  proc init(): unit
   proc prg()   : output
 }.
 

@@ -369,7 +369,7 @@ module FunAbsLow = struct
           if   EcPath.x_equal o_l o_r
           then check_oracle_use pf env topl o_r;
           false
-        with _ when OI.is_in oil -> true
+        with _ -> true
       in
 
       let fo_l = EcEnv.Fun.by_xpath o_l env in
@@ -397,7 +397,7 @@ module FunAbsLow = struct
         sigr.fs_arg sigr.fs_anames mr in
 
     let eq_res = f_eqres sigl.fs_ret ml sigr.fs_ret mr in
-    let lpre   = if OI.is_in oil then [eqglob;inv] else [inv] in
+    let lpre   = [eqglob;inv] in
     let pre    = f_ands (eq_params::lpre) in
     let post   = f_ands [eq_res; eqglob; inv] in
 
@@ -519,7 +519,7 @@ module UpToLow = struct
 
     let eq_res = f_eqres sigl.fs_ret ml sigr.fs_ret mr in
 
-    let pre  = if OI.is_in oil then [eqglob;invP] else [invP] in
+    let pre  = [eqglob;invP] in
     let pre  = f_if_simpl bad2 invQ (f_ands (eq_params::pre)) in
     let post = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
 

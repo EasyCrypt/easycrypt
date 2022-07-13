@@ -1413,12 +1413,13 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
             (List.map (fun i tc -> aux (omap ((+) (i-1)) imax) tc) ntop)
             tc
         with InvalidGoalShape ->
-          let id = EcIdent.create "_" in
           try
-            t_seq
-              (aux (omap ((+) (-1)) imax))
-              (t_generalize_hyps ~clear:`Yes [id])
-              (EcLowGoal.t_intros_i_1 [id] tc)
+            tc |> EcLowGoal.t_intro_sx_seq
+              `Fresh
+              (fun id ->
+                t_seq
+                  (aux (omap ((+) (-1)) imax))
+                  (t_generalize_hyps ~clear:`Yes [id]))
           with
           | EcCoreGoal.TcError _ when EcUtils.is_some imax ->
               tc_error !!tc "not enough top-assumptions"

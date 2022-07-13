@@ -52,6 +52,17 @@ let lv_of_list = function
   | [(pv, ty)] -> Some (LvVar (pv, ty))
   | pvs -> Some (LvTuple pvs)
 
+let lv_to_list = function
+  | LvVar (pv, _) -> [pv]
+  | LvTuple pvs -> List.fst pvs
+
+let name_of_lv lv =
+  match lv with
+  | LvVar (pv, _) ->
+     EcTypes.name_of_pvar pv
+  | LvTuple pvs ->
+     String.concat "_" (List.map (EcTypes.name_of_pvar |- fst) pvs)
+
 (* -------------------------------------------------------------------- *)
 type instr = {
   i_node : instr_node;
@@ -580,8 +591,6 @@ module PreOI : sig
   val hash : ('a -> int) -> 'a t -> int
   val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
-  val is_in : 'a t -> bool
-
   val cost_self : 'a t -> [`Bounded of 'a | `Unbounded]
   val cost : 'a t -> xpath -> [`Bounded of 'a | `Zero | `Unbounded]
   val cost_calls : 'a t -> [`Bounded of 'a Mx.t | `Unbounded]
@@ -590,7 +599,7 @@ module PreOI : sig
   val allowed : 'a t -> xpath list
   val allowed_s : 'a t -> Sx.t
 
-  val mk : xpath list -> bool -> [`Bounded of 'a * 'a Mx.t | `Unbounded] -> 'a t
+  val mk : xpath list -> [`Bounded of 'a * 'a Mx.t | `Unbounded] -> 'a t
   (* val change_calls : 'a t -> xpath list -> 'a t *)
   val filter : (xpath -> bool) -> 'a t -> 'a t
 end = struct
@@ -605,11 +614,8 @@ end = struct
    * Remark: there is redundancy between oi_calls and oi_costs. *)
   type 'a t = {
     oi_calls : xpath list;
-    oi_in    : bool;
     oi_costs : ('a * 'a Mx.t) option;
   }
-
-  let is_in t = t.oi_in
 
   let allowed oi = oi.oi_calls
 
@@ -628,11 +634,11 @@ end = struct
 
   let costs oi = omap_dfl (fun x -> `Bounded x) `Unbounded oi.oi_costs
 
-  let mk oi_calls oi_in oi_costs = match oi_costs with
+  let mk oi_calls oi_costs = match oi_costs with
     | `Bounded oi_costs ->
-      { oi_calls; oi_in; oi_costs = Some (oi_costs) ; }
+      { oi_calls; oi_costs = Some (oi_costs) ; }
     | `Unbounded ->
-      { oi_calls; oi_in; oi_costs = None; }
+      { oi_calls; oi_costs = None; }
 
   (* let change_calls oi calls =
    *   mk calls oi.oi_in
@@ -642,7 +648,7 @@ end = struct
     let costs = match oi.oi_costs with
       | Some (self,costs) -> `Bounded (self, Mx.filter (fun x _ -> f x) costs)
       | None -> `Unbounded in
-    mk (List.filter f oi.oi_calls) oi.oi_in costs
+    mk (List.filter f oi.oi_calls) costs
 
   let equal a_equal oi1 oi2 =
     let check_costs_eq c1 c2 =
@@ -659,8 +665,7 @@ end = struct
           a_equal s1 s2
         with Not_equal -> false in
 
-    oi1.oi_in = oi2.oi_in
-    && List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
+    List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
     && check_costs_eq oi1.oi_costs oi2.oi_costs
 
   let hash ahash oi =
@@ -670,8 +675,7 @@ end = struct
              (Why3.Hashcons.combine_pair EcPath.x_hash ahash)
              (ahash self) (Mx.bindings costs))) oi.oi_costs in
 
-    Why3.Hashcons.combine2
-      (if oi.oi_in then 0 else 1)
+    Why3.Hashcons.combine
       (Why3.Hashcons.combine_list EcPath.x_hash 0
          (List.sort EcPath.x_compare oi.oi_calls))
       costs_hash
@@ -698,7 +702,7 @@ let has_compl_restriction mr =
 
 let mr_is_empty mr =
      not (has_compl_restriction mr)
-  && Msym.for_all (fun _ oi -> [] = PreOI.allowed oi && PreOI.is_in oi) mr.mr_oinfos
+  && Msym.for_all (fun _ oi -> [] = PreOI.allowed oi) mr.mr_oinfos
 
 let mr_xpaths_fv (m : mr_xpaths) : int Mid.t =
   EcPath.Sx.fold

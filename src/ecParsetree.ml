@@ -264,7 +264,6 @@ and poracles = qident_inparam list
 and pcompl = PCompl of pformula * (qident_inparam * pformula) list
 
 and pmod_restr_el = {
-  pmre_in    : bool;
 	pmre_name  : psymbol;
   pmre_orcls : poracles option;  (* None means no restriction *)
   pmre_compl : pcompl option;    (* None means no restriction *)
@@ -504,17 +503,20 @@ type preduction = {
 }
 
 (* -------------------------------------------------------------------- *)
+type 'a doption =
+  | Single of 'a
+  | Double of ('a * 'a)
+
+(* -------------------------------------------------------------------- *)
 type cp_match = [ `If | `While | `Assign | `Sample | `Call ]
 type cp_base  = [ `ByPos of int | `ByMatch of int option * cp_match ]
 
 type codepos1 = int * cp_base
 type codepos  = (codepos1 * int) list * codepos1
 
-(* -------------------------------------------------------------------- *)
-type 'a doption =
-  | Single of 'a
-  | Double of ('a * 'a)
+type docodepos1 = codepos1 doption option
 
+(* -------------------------------------------------------------------- *)
 type swap_kind =
   | SKbase      of int * int * int
   | SKmove      of int
@@ -557,9 +559,14 @@ type ('a, 'b, 'c) rnd_tac_info =
   | PTwoRndParams   of 'a * 'a
   | PMultRndParams  of ('a tuple5) * 'b
 
+type rnd_tac_info_f =
+  (pformula, pformula option, pformula) rnd_tac_info
+
+type semrndpos = (bool * codepos1) doption
+
 type tac_dir = Backs | Fwds
 
-type pfel_spec_preds = (pgamepath*pformula) list
+type pfel_spec_preds = (pgamepath * pformula) list
 
 (* -------------------------------------------------------------------- *)
 type pim_repeat_kind =
@@ -698,8 +705,8 @@ type phltactic =
   | Prepl_stmt     of trans_info
   | Pfun           of fun_info
   | Papp           of app_info
-  | Pwp            of codepos1 doption option * pformula option
-  | Psp            of codepos1 doption option
+  | Pwp            of docodepos1 * pformula option
+  | Psp            of docodepos1
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info
   | Pfission       of (oside * codepos * (int * (int * int)))
@@ -716,7 +723,8 @@ type phltactic =
   | Pinline        of inline_info
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
-  | Prnd           of oside * (pformula, pformula option, pformula) rnd_tac_info
+  | Prnd           of oside * semrndpos option * rnd_tac_info_f
+  | Prndsem        of oside * codepos1
   | Palias         of (oside * codepos * osymbol_r)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))

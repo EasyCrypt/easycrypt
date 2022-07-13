@@ -180,6 +180,7 @@ val get_glob    : prog_var -> EcPath.xpath
 
 val symbol_of_pv   : prog_var -> symbol
 val string_of_pvar : prog_var -> string
+val name_of_pvar   : prog_var -> string
 
 val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var
 

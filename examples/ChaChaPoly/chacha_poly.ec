@@ -415,7 +415,7 @@ module type CC = {
 }.
 
 module type FCC = {
-  proc * init () : unit
+  proc init () : unit
   include CC
 }.
 
@@ -1104,7 +1104,9 @@ section PROOFS.
       + by proc; inline *; auto => /> &2; case: (p{2}).
       proc; inline *; auto => /> &2; case: (c{2}) => /> n a c t.
       by rewrite /dec /get /= => ->.
-    by apply (CCA_CPA_UFCMA St _ A _ &m) => //; apply A_ll.
+    apply (CCA_CPA_UFCMA St _ _ A _ &m) => //.
+    + by proc *; inline *; sim.
+    by apply A_ll.
   qed.
 
   local module G3 (S:SKE) = CPA_game(CCA_CPA_Adv(A), RealOrcls(S)).

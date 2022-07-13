@@ -22,7 +22,15 @@ op inzmod (z : int)  = Sub.insubd (z %% p).
 op asint  (z : zmod) = Sub.val z.
 
 lemma inzmodK (z : int): asint (inzmod z) = z %% p.
-proof. smt ml=1. qed.
+proof.
+rewrite /asint /inzmod Sub.insubdK //.
+rewrite modz_ge0 /= 1:&(gtr_eqF); first by smt(ge2_p).
+by apply: ltz_pmod; smt(ge2_p).
+qed.
+
+lemma inzmod_mod z :
+  inzmod z = inzmod (z %% p).
+proof. by rewrite /inzmod modz_mod. qed.
 
 lemma asint_inj: injective asint by apply/Sub.val_inj.
 
@@ -192,6 +200,23 @@ lemma inzmodB (a b : int):
 proof. by rewrite inzmodD inzmodN. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma inzmodD_mod (a b : int):
+  inzmod ((a + b) %% p) = inzmod a + inzmod b.
+proof. by rewrite -inzmod_mod inzmodD. qed.
+
+lemma inzmodM_mod (a b : int):
+  inzmod ((a * b) %% p) = inzmod a * inzmod b.
+proof. by rewrite -inzmod_mod inzmodM. qed.
+
+lemma inzmodN_mod (n : int):
+  inzmod ((- n) %% p) = -(inzmod n).
+proof. by rewrite -inzmod_mod inzmodN. qed.
+
+lemma inzmodB_mod (a b : int):
+  inzmod ((a - b) %% p) = (inzmod a) + (- (inzmod b)).
+proof. by rewrite -inzmod_mod inzmodB. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma intmul_asint (x : zmod) : x = intmul one (asint x).
 proof.
 rewrite /intmul ltrNge ge0_asint /= AddMonoid.iteropE -{1}(asintK x).
@@ -318,4 +343,101 @@ instance field with zmod
   proof expr0     by apply/ZModpField.expr0
   proof exprS     by apply/ZModpField.exprS
   proof exprN     by (move=> ?? _; apply/ZModpField.exprN).
+
+(* -------------------------------------------------------------------- *)
+lemma exp_inzmod m n :
+  exp (inzmod m) n =
+  if 0 <= n
+  then inzmod (exp m n)
+  else inv (inzmod (exp m (-n))).
+proof.
+  case: (0 <= n) => [|/ltzNge].
+  + elim: n => [|n le0n]; [by rewrite !expr0|].
+    by rewrite exprS // exprS // inzmodM => ->.
+  rewrite -oppr_gt0 => /ltzW le0Nn.
+  rewrite -(Ring.IntID.opprK n) exprN opprK.
+  apply congr1; move: (-n) le0Nn => {n} n.
+  elim n => [|n le0n]; [by rewrite !expr0|].
+  by rewrite exprS // exprS // inzmodM => ->.
+qed.
+
+lemma inzmod_exp (m n : int) :
+  inzmod (exp m n) =
+  if 0 <= n
+  then exp (inzmod m) n
+  else exp (inzmod m) (-n).
+proof.
+  move: (exp_inzmod m n); case: (0 <= n) => [_ -> //|/ltzNge ltn0].
+  by rewrite !exprN => ->; rewrite invrK.
+qed.
+
+lemma inzmod_exp_mod (m n k : int) :
+  inzmod (exp m k) = one =>
+  inzmod (exp m n) =
+  if 0 <= n
+  then inzmod (exp m (n %% k))
+  else inzmod (exp m ((-n) %% k)).
+proof.
+  case: (k = 0) => [->>|]; [by rewrite !modz0 exprN; case: (0 <= n)|].
+  rewrite -normr_gt0 pow_normr -modz_abs inzmod_exp normr_ge0 /=.
+  move => lt0normr eq_inzmod_one; case: (0 <= n) => [le0n|Nle0n].
+  + rewrite inzmod_exp le0n /= {1}(divz_eq n `|k|) exprD_nneg.
+    - by rewrite mulr_ge0; [rewrite divz_ge0|rewrite normr_ge0].
+    - by rewrite modz_ge0 gtr_eqF.
+    rewrite Ring.IntID.mulrC exprM eq_inzmod_one expr1z.
+    by rewrite mul1r exp_inzmod modz_ge0 // gtr_eqF.
+  move: Nle0n => /ltrNge; rewrite -exprN -oppr_gt0 => /ltzW le0Nn.
+  rewrite inzmod_exp le0Nn /= {1}(divz_eq (-n) `|k|) exprD_nneg.
+  + by rewrite mulr_ge0; [rewrite divz_ge0|rewrite normr_ge0].
+  + by rewrite modz_ge0 gtr_eqF.
+  rewrite Ring.IntID.mulrC exprM eq_inzmod_one expr1z.
+  rewrite mul1r exp_inzmod modz_ge0 /=; [by rewrite gtr_eqF|].
+  by rewrite modz_abs.
+qed.
+
+lemma exp_mod (x : zmod) n k :
+  exp x k = one =>
+  exp x n = exp x (n %% k).
+proof.
+  case: (k = 0) => [->>|neqk0]; [by rewrite modz0|].
+  rewrite -(asintK x) => eq_exp_one; rewrite exp_inzmod.
+  case: (0 <= n) => [le0n|Nle0n].
+  + rewrite (inzmod_exp_mod (asint x) n k).
+    - move: eq_exp_one; rewrite exp_inzmod.
+      by case (0 <= k) => // _; rewrite exprN invr_eq1.
+    by rewrite le0n /= inzmod_exp modz_ge0.
+  rewrite -(invrK (exp (inzmod _) _)); apply congr1.
+  rewrite -exprN -(mul1r (ZModField.ZModpField.exp _ _)).
+  rewrite -(expr1z (- n %/ k)) -eq_exp_one -exprM mulrN Ring.IntID.mulrC -exprD.
+  + apply/negP => eq_inzmod_zero; move: eq_inzmod_zero eq_exp_one => ->.
+    by rewrite expr0z neqk0 /= eq_sym oner_neq0.
+  by rewrite -opprD -divz_eq inzmod_exp oppr_ge0 ltzW //= ltrNge.
+qed.
+
+(*FIXME*)
+lemma exp_sub_p_1 (x : zmod) :
+  unit x =>
+  exp x (p - 1) = one.
+proof.
+admitted.
+
+lemma exp_p (x : zmod) :
+  exp x p = x.
+proof.
+  case: (unit x) => [unitx|].
+  + by rewrite -(Ring.IntID.subrK p 1) exprD -?unitE // expr1 exp_sub_p_1 // mul1r.
+  rewrite unitE /= => ->; rewrite expr0z.
+  by move: prime_p; rewrite /prime; case (p = 0) => // ->.
+qed.
+
+lemma inv_exp_sub_p_2 x :
+  unit x =>
+  inv x = exp x (p - 2).
+proof.
+  move => unitx; rewrite -div1r; move: (eqf_div one x (exp x (p - 2)) one).
+  rewrite -unitE unitx oner_neq0 -div1r !mul1r divr1 /= -exprSr /=.
+  + by rewrite subr_ge0 ge2_p.
+  by rewrite exp_sub_p_1.
+qed.
+
 end ZModField.
