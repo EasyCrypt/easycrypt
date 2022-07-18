@@ -16,23 +16,38 @@ abstract theory ZModuleStruct.
     0 <= order x.
   proof. by rewrite/order; apply ge0_argmin. qed.
 
-  (*TODO: merge the hakyber proofs, argmin stuff needed.*)
   lemma intmul_order x :
     intmul x (order x) = zeror.
   proof.
-    admit.
+    rewrite /order; pose p:= (fun (n : int) => _ < n /\ _ _ n = _).
+    case: (exists i, 0 <= i /\ p (idfun i)) => [[i] [le0i p_i]|].
+    + move: (argminP _ _ _ le0i p_i); pose m:= argmin _ _.
+      by move: m => m []; rewrite /idfun.
+    rewrite negb_exists /= => forall_; rewrite argmin_out ?mulr0z //.
+    by move => i le0i; apply/negP => p_i; move: (forall_ i).
   qed.
 
-  (*TODO: merge the hakyber proofs, argmin stuff needed.*)
   lemma dvd_order x n :
     order x %| n <=> intmul x n = zeror.
   proof.
     split => [/dvdzP [q] ->>|]; [by rewrite mulrC mulrM intmul_order mul0i|].
     rewrite {1}(divz_eq n (order x)) mulrDz mulrC mulrM intmul_order mul0i add0r.
-    move => eq_intmul; apply/dvdzE.
-    print modz_ge0.
-    print ltz_pmod.
-    admit.
+    move => eq_intmul; apply/dvdzE; move: eq_intmul; rewrite /order.
+    pose p:= (fun (n : int) => _ < n /\ _ _ n = _); move => eq_intmul.
+    case: (exists n , 0 < n /\ intmul x n = zeror).
+    + move => [i] [lt0i eq0]; move: (mem_range_mod n (argmin idfun p) _).
+      - apply/gtr_eqF; move: (argminP idfun p i _); [by apply/ltzW|].
+        pose m:= argmin idfun p; move: m => m; rewrite /p /idfun /=.
+        by rewrite lt0i eq0 /=; case.
+      rewrite ger0_norm ?ge0_argmin //; move/mem_range/argmin_min.
+      move: eq_intmul; move: (argminP idfun p i _); [by apply/ltzW|].
+      pose m:= argmin idfun p; move: m => m; rewrite /p /idfun /= => {p}.
+      rewrite lt0i eq0 /= => -[lt0m _] -> /= /lerNgt /ler_eqVlt [] // /ltrNge.
+      by rewrite modz_ge0 //; apply/gtr_eqF.
+    move => /negb_exists /= /(_ (`|n %% argmin idfun p|)).
+    rewrite normr_gt0; case: (n %% argmin idfun p = 0) => //= _.
+    rewrite normE; case: (0 <= n %% argmin idfun p) => _ //.
+    by rewrite mulrNz eq_intmul oppr0.
   qed.
 
   lemma order0 :
@@ -237,6 +252,7 @@ abstract theory FieldStruct.
     type t <- t,
     theory ID <- F.
 
+  (*TODO: polynomial result.*)
   lemma is_finite_iter_frobenius n :
     0 <= n =>
     is_finite (iter_frobenius_fixed n).
@@ -244,6 +260,7 @@ abstract theory FieldStruct.
     admit.
   qed.
 
+  (*TODO: polynomial result.*)
   lemma size_to_seq_iter_frobenius n :
     0 <= n =>
     size (to_seq (iter_frobenius_fixed n)) <= char ^ n.

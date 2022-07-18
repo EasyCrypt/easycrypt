@@ -14,8 +14,48 @@ move=> ge1n; rewrite /fact BIM.big_int_recr //=.
 by apply/ler_addr. by rewrite IntID.mulrC.
 qed.
 
-lemma fact1 (n : int) : fact 1 = 1.
+lemma fact1 : fact 1 = 1.
 proof. by rewrite -{1}IntID.add0r factS //= fact0. qed.
+
+lemma fact_ge0 n : 0 <= fact n.
+proof.
+case: (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite fact0].
+elim: n => [|n le0n IHn]; [by rewrite fact0|rewrite factS //].
+by apply/mulr_ge0 => //; apply/addr_ge0.
+qed.
+
+lemma fact_gt0 n : 0 < fact n.
+proof.
+case: (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite fact0].
+elim: n => [|n le0n IHn]; [by rewrite fact0|rewrite factS //].
+by apply/mulr_gt0 => //; apply/ltzS.
+qed.
+
+lemma fact_incr (m n : int) :
+  m <= n =>
+  fact m <= fact n.
+proof.
+rewrite -(subrK n m); move: (n - m) => {n} n; rewrite ler_addr.
+elim: n => //= n le0n IHn; rewrite addrAC; apply/(ler_trans (fact (n + m))) => //.
+move: (n + m) => {m n le0n IHn} n; case: (0 <= n) => [le0n|/ltrNge ltn0].
++ by rewrite factS // mulrDl /= ler_addr mulr_ge0 // fact_ge0.
+by rewrite !fact0 //; [apply/ltzW|apply/ltzE].
+qed.
+
+lemma fact_sincr (m n : int) :
+  0 < m < n =>
+  fact m < fact n.
+proof.
+move => [/ltzE lt0m ltmn]; apply/(ler_lt_trans (fact (n - 1))); [by apply/fact_incr/ltzS|].
+move: (ler_lt_trans _ _ _ lt0m ltmn) => {lt0m ltmn}; rewrite -(subrK n 1).
+move: (n - 1) => {n} n /= /ltr_addr lt0n; rewrite factS //; [by apply/ltzW|].
+by rewrite mulrDl /= ltr_addr mulr_gt0 // fact_gt0.
+qed.
+
+lemma fact_gt1 n :
+  1 < n =>
+  1 < fact n.
+proof. by move => lt1n; move: (fact_sincr 1 n); rewrite /= lt1n /= fact1. qed.
 
 (* -------------------------------------------------------------------- *)
 op bin1 (s : int list) =
@@ -105,9 +145,36 @@ qed.
 (* -------------------------------------------------------------------- *)
 (*TODO: the whole theory.*)
 lemma eq_bin_div n k :
-  bin n k = (fact n) %/ (fact k).
+  0 <= k <= n =>
+  fact k * fact (n - k) * bin n k = fact n.
 proof.
-admit.
+move => [le0k lekn]; move: (ler_trans _ _ _ le0k lekn) => le0n.
+elim: n le0n k le0k lekn => [k le0k lek0|n le0n IHn k].
++ by move: (eqz_leq 0 k); rewrite le0k lek0 /= => <- /=; rewrite fact0 // bin0.
+case/ler_eqVlt => [<<- ? /=|]; [by rewrite fact0 // bin0|].
+rewrite -(subrK k 1); move: (k - 1) => {k} k /ltzS le0k /ler_add2r lekn.
+rewrite opprD addrA addrAC /=; case/ler_eqVlt: lekn => [->> /=|ltkn].
++ by rewrite binn ?addr_ge0 //= mulrC fact0.
+rewrite binSn // mulrDr; move: (IHn (k + 1) _ _) => //; [by apply/addr_ge0|by apply/ltzE|].
+move/(_ k _ _): IHn => //; [by apply/ltzW|]; move => eq1 eq2.
+rewrite {2}factS // -(mulrA (_ + 1)) -(mulrA _ (_ * _)%Int) eq1 => {eq1}.
+move: le0k ltkn eq2; rewrite -(subrK k (-1)) opprK; move: (k + 1) => {k} k /=.
+move => /ltzS /= lt0k /ltzE /= lekn eq_; rewrite opprD /= addrA factS; [by apply/subr_ge0|].
+rewrite !mulrA (mulrC _ (_ + 1)) -(mulrA (_ + 1)) -(mulrA _ (_ * _)%Int) eq_ => {eq_}.
+by rewrite -mulrDl addrAC subrK factS.
+qed.
+
+lemma prime_Ndvd_fact p k :
+  prime p =>
+  k < p =>
+  ! p %| fact k.
+proof.
+move => prime_p; case: (0 <= k) => [|/ltrNge/ltzW ? _]; last first.
++ by rewrite fact0 // dvdz1; apply/gtr_eqF/ltr_normr; rewrite gt1_prime.
+elim: k => [|k le0k IHk]; [by rewrite fact0 // => _; rewrite dvdz1; apply/gtr_eqF/ltr_normr; rewrite gt1_prime|].
+rewrite factS // => lt_p; rewrite dvd_prime_mul // negb_or IHk /=; [by apply/ltzE/ltzW|].
+apply/negP => dvd_; move: (dvdz_le _ _ _ dvd_) => {dvd_ IHk} /=; [by apply/gtr_eqF/ltzS|].
+by rewrite -ltrNge !ger0_norm //; [apply/addr_ge0|apply/ltzW/gt0_prime].
 qed.
 
 lemma prime_dvd_bin p k :
@@ -115,7 +182,10 @@ lemma prime_dvd_bin p k :
   0 < k < p =>
   p %| bin p k.
 proof.
-admit.
+move => prime_p [lt0k ltkp]; move: (eq_bin_div p k _); [by rewrite !ltzW|].
+rewrite eq_sym -{1}(subrK p 1) factS ?subr_ge0 ?ltzW ?gt1_prime //= => eq_.
+move: eq_ (dvdz_mulr _ _ (fact (p - 1)) (dvdzz p)) => ->; rewrite !dvd_prime_mul //.
+by case => //; rewrite prime_Ndvd_fact //= prime_Ndvd_fact // gtr_addl ltr_oppl.
 qed.
 
 (* -------------------------------------------------------------------- *)
