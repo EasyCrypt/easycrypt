@@ -509,7 +509,9 @@ abstract theory ComRing.
       elim: (-x) le0Nx => {x} [|x le0x IHx] //=.
       rewrite mulzDl /= addrz IHx.
       have ->: - (x + 1) = - x - 1.
-      - admit.
+        have: 0 = x + 1 - x - 1.
+          by rewrite (@addzC (_ + 1) (-x)) addzA addNz.
+        by rewrite -(@addz0 (-(_ + 1))) => ->; rewrite 2!addzA addNz.
       rewrite mulzDl addrz /=; congr; rewrite eq_sym -subr_eq0.
       by rewrite -ofintN oppzK -addrz -{2}(@mul1z y) -mulzDl /= ofint0.
     elim: x => [|x le0x IHx]; [by rewrite /= ofint0 mul0i|].

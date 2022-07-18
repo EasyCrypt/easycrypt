@@ -414,30 +414,4 @@ proof.
   by rewrite -opprD -divz_eq inzmod_exp oppr_ge0 ltzW //= ltrNge.
 qed.
 
-(*FIXME*)
-lemma exp_sub_p_1 (x : zmod) :
-  unit x =>
-  exp x (p - 1) = one.
-proof.
-admitted.
-
-lemma exp_p (x : zmod) :
-  exp x p = x.
-proof.
-  case: (unit x) => [unitx|].
-  + by rewrite -(Ring.IntID.subrK p 1) exprD -?unitE // expr1 exp_sub_p_1 // mul1r.
-  rewrite unitE /= => ->; rewrite expr0z.
-  by move: prime_p; rewrite /prime; case (p = 0) => // ->.
-qed.
-
-lemma inv_exp_sub_p_2 x :
-  unit x =>
-  inv x = exp x (p - 2).
-proof.
-  move => unitx; rewrite -div1r; move: (eqf_div one x (exp x (p - 2)) one).
-  rewrite -unitE unitx oner_neq0 -div1r !mul1r divr1 /= -exprSr /=.
-  + by rewrite subr_ge0 ge2_p.
-  by rewrite exp_sub_p_1.
-qed.
-
 end ZModField.
