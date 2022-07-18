@@ -1,6 +1,6 @@
 (* ==================================================================== *)
 require import AllCore List Ring Int IntMin IntDiv RingStruct FinType ZModP.
-require import Bigalg SubRing RingModule Real RealExp.
+require import Bigalg SubRing RingModule Real RealExp Quotient.
 require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
@@ -116,10 +116,44 @@ abstract theory FiniteZModuleStruct.
     by have //: false; move: inj_intmul => /=; apply/FinType.not_injective_int.
   qed.
 
+  import StdBigop.Bigint.
+
   lemma dvd_order_card x :
     order x %| FinType.card.
   proof.
-    admit.
+    have /(_ FinType.enum):
+      forall s , exists c ,
+        uniq c /\
+        (forall y z , y \in c => z \in c => eqv_orbit x y z => y = z) /\
+        (mem s <= mem (flatten (map (fun y => map (ZMod.(+) y) (orbit_list x)) c))).
+    + elim => [|y s [c] IHs]; [by exists [] => /=; rewrite flatten_nil|].
+      move: IHs; pose l:= flatten _; case (y \in l) => [mem_y|Nmem_y]; move => [uniq_ [forall_ mem_incl]].
+      - by exists c; split => //; split => // z /= [->>|]; [apply/mem_y|apply/mem_incl].
+      exists (y :: c); do!split => // [|z t|z] /=; [|move => [->>|mem_z] [->>|mem_t] //|].
+      - move: Nmem_y; apply/contra; rewrite /l => {l mem_incl} mem_y; apply/flatten_mapP.
+        exists y; split => //=; apply/mapP; exists zeror; rewrite addr0 /=.
+        by apply/orbit_listP; rewrite ?gt0_order // orbit0.
+      - rewrite /eqv_orbit orbit_listP ?gt0_order //; move: Nmem_y; rewrite /l -flatten_mapP.
+        rewrite negb_exists => /= /(_ t); rewrite mem_t /= mapP negb_exists /= => /(_ (y - t)).
+        by rewrite addrA addrAC subrr /= add0r.
+      - rewrite eqv_orbit_sym /eqv_orbit orbit_listP ?gt0_order //; move: Nmem_y; rewrite /l -flatten_mapP.
+        rewrite negb_exists => /= /(_ z); rewrite mem_z /= mapP negb_exists /= => /(_ (y - z)).
+        by rewrite addrA addrAC subrr /= add0r.
+      - by apply/forall_.
+      rewrite flatten_cons -/l mem_cat; case => [->>|?]; [left|by right; apply/mem_incl].
+      apply/mapP; exists zeror; rewrite addr0 /=.
+      by apply/orbit_listP; rewrite ?gt0_order // orbit0.
+    case => c; pose l:= flatten _; move => [uniq_ [forall_ mem_incl]].
+    rewrite /card (perm_eq_size _ l).
+    + apply/uniq_perm_eq; [by apply/FinType.enum_uniq| |by move => ?; split; [apply/mem_incl|move => _; apply/FinType.enumP]].
+      rewrite /l => {mem_incl l}; apply/uniq_flatten_map => //.
+      - by move => y /=; rewrite map_inj_in_uniq; [move => ? ? _ _; apply/addrI|apply/uniq_orbit_list].
+      move => y z mem_y mem_z /= /hasP [?] [] /mapP [t] [mem_t ->>] /mapP [u] [mem_u] eq_.
+      apply/forall_ => //; move: eq_; rewrite /eqv_orbit addrC -eqr_sub => <-.
+      by apply/orbitB; apply/orbit_listP => //; apply/gt0_order.
+    rewrite /l size_flatten sumzE (BIA.eq_big_seq _ (fun _ => order x)) /=.
+    + by move => ? /mapP [?] [+ ->>]; move => /mapP [?] /= [_ ->>]; rewrite size_map size_orbit_list.
+    by rewrite BIA.sumr_const count_predT !size_map intmulz; apply/dvdz_mulr/dvdzz.
   qed.
 end FiniteZModuleStruct.
 

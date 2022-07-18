@@ -65,6 +65,73 @@ abstract theory ZModuleStruct.
     + by rewrite eq_order_0 => /dvd0z /IntID.subr_eq0.
     by move: (dvd2_order x (order x) 0); rewrite /= dvdzz /=; apply/inj_intmul.
   qed.
+
+  op orbit (x y : t) = exists n , y = intmul x n.
+
+  op orbit_list (x : t) = mkseq (fun n => intmul x n) (order x).
+
+  op eqv_orbit (x y z : t) = orbit x (y - z).
+
+  lemma orbit0 x:
+    orbit x zeror.
+  proof. by exists 0; rewrite mulr0z. qed.
+
+  lemma orbitD x y z:
+    orbit x y =>
+    orbit x z =>
+    orbit x (y + z).
+  proof. by move => [m] ->> [n] ->>; exists (m + n); rewrite mulrDz. qed.
+
+  lemma orbitN x y:
+    orbit x y =>
+    orbit x (-y).
+  proof. by move => [n] ->>; exists (-n); rewrite mulrNz. qed.
+
+  lemma orbitB x y z:
+    orbit x y =>
+    orbit x z =>
+    orbit x (y - z).
+  proof. by move => ? ?; apply/orbitD => //; apply/orbitN. qed.
+
+  lemma orbit_listP x y:
+    0 < order x =>
+    orbit x y <=> (y \in orbit_list x).
+  proof.
+    rewrite mkseqP; move => lt0ord; split => [[n] ->>|[n] [mem_n_range ->>]]; [|by exists n].
+    exists (n %% (order x)); move: (mem_range_mod n (order x) _); rewrite ?gtr_eqF // -mem_range /=.
+    by rewrite ger0_norm ?ltzW // => -> /=; apply/dvd2_order; rewrite -divzE; apply/dvdz_mull/dvdzz.
+  qed.
+
+  lemma size_orbit_list x:
+    size (orbit_list x) = order x.
+  proof. by rewrite size_mkseq ler_maxr // ge0_order. qed.
+
+  lemma iota_range m n:
+    iota_ m n = range m (m + n).
+  proof. by rewrite /range addrAC. qed.
+
+  lemma uniq_orbit_list x:
+    uniq (orbit_list x).
+  proof.
+    apply/map_inj_in_uniq; [|by rewrite iota_range range_uniq].
+    move => y z /=; rewrite !iota_range /= => mem_y mem_z /dvd2_order.
+    rewrite -(IntID.opprK z) mem_range_opp in mem_z; rewrite -subr_eq0.
+    move: (mem_range_add2 _ _ _ _ _ _ mem_y mem_z) => /= {mem_y mem_z} mem_.
+    rewrite dvdzP => -[q] eq_; move: eq_ mem_ => ->; case/ler_eqVlt: (ge0_order x) => [<- //|].
+    move => gt0_order; rewrite mem_range_mulr // opprD /= divz_small /=.
+    + by rewrite -ltzS /= gt0_order /= ltzE /= ler_norm.
+    rewrite -(mulN1r (order _)) mulzK /=; [by apply/gtr_eqF|].
+    by rewrite rangeS /= => ->.
+  qed.
+
+  lemma eqv_orbit_refl x : reflexive (eqv_orbit x).
+  proof. by move => y; rewrite /eqv_orbit subrr orbit0. qed.
+
+  lemma eqv_orbit_sym x : symmetric (eqv_orbit x).
+  proof. by move => y z; apply/eqboolP; rewrite /eqv_orbit; split => ?; rewrite -opprB orbitN. qed.
+
+  lemma eqv_orbit_trans x : transitive (eqv_orbit x).
+  proof. by move => y z t; rewrite /eqv_orbit => orbit1 orbit2; move: (orbitD _ _ _ orbit1 orbit2); rewrite addrA subrK. qed.
 end ZModuleStruct.
 
 (* -------------------------------------------------------------------- *)
