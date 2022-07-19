@@ -82,10 +82,11 @@ let trans_abbrev_r (env : env) (at : pabbrev located) =
   if not (EcUnify.UniEnv.closed ue) then
     nterror gloc env NTE_TyNotClosed;
 
-  let uni     = EcUnify.UniEnv.close ue in
-  let body    = e_mapty (Tuni.offun uni) body in
-  let codom   = Tuni.offun uni codom in
-  let xs      = List.map (snd_map (Tuni.offun uni)) xs in
+  let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+  let es = e_subst { e_subst_id with es_ty = ts } in
+  let body    = es body in
+  let codom   = ty_subst ts codom in
+  let xs      = List.map (snd_map (ty_subst ts)) xs in
   let tparams = EcUnify.UniEnv.tparams ue in
   let ponly   = trans_abbrev_opts at.ab_opts in
   let tyat    = EcDecl.mk_abbrev ~ponly

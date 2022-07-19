@@ -161,7 +161,7 @@ let sc_instantiate
     ty_params pr_params sc_params
     ty_args memtype (pr_args : mem_pr list) sc_args f =
   let fs = EcTypes.Tvar.init (List.map fst ty_params) ty_args in
-  let sty = { ty_subst_id with ts_v = EcIdent.Mid.find_opt^~ fs } in
+  let sty = { ty_subst_id with ts_v = fs } in
 
 
   (* We substitute the predicate variables. *)

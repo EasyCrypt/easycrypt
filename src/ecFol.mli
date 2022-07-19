@@ -240,3 +240,5 @@ val cost_op       : EcEnv.env -> (form -> form -> form ) -> cost -> cost -> cost
 val cost_app      : cost -> form list -> cost
 
 val cost_flatten  : cost -> form *)
+
+val dump_f : form -> string

@@ -255,13 +255,21 @@ let close (uf : UF.t) =
   in
     fun t -> doit t
 
+
+
 (* -------------------------------------------------------------------- *)
 let subst_of_uf (uf : UF.t) =
   let close = close uf in
-    fun id ->
-      match close (tuni id) with
-      | { ty_node = Tunivar id' } when uid_equal id id' -> None
-      | t -> Some t
+  let uids = UF.domain uf in
+  List.fold_left
+    (fun m uid ->
+      match close (tuni uid) with
+      | { ty_node = Tunivar uid' } when uid_equal uid uid' -> m
+      | t -> Muid.add uid t m
+    )
+    Muid.empty
+    uids
+
 
 (* -------------------------------------------------------------------- *)
 type unienv_r = {
@@ -352,16 +360,16 @@ module UniEnv = struct
     List.map (fun (tv, _) -> subst (tvar tv)) params
 
   let openty_r ue params tvi =
-    let subst = Tvar.subst (opentvi ue params tvi) in
-      (subst, subst_tv subst params)
+    let subst = { ty_subst_id with ts_v = (opentvi ue params tvi) } in
+      (subst, subst_tv (ty_subst subst) params)
 
   let opentys ue params tvi tys =
     let (subst, tvs) = openty_r ue params tvi in
-      (List.map subst tys, tvs)
+      (List.map (ty_subst subst) tys, tvs)
 
   let openty ue params tvi ty =
     let (subst, tvs) = openty_r ue params tvi in
-      (subst ty, tvs)
+      (ty_subst subst ty, tvs)
 
   let repr (ue : unienv) (t : ty) : ty =
     match t.ty_node with
@@ -452,7 +460,7 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
       end;
 
       let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
-      let top = tip op.D.op_ty in
+      let top = ty_subst tip op.D.op_ty in
       let texpected = tfun_expected subue psig in
 
       (try  unify env subue top texpected
@@ -462,8 +470,9 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
         match op.D.op_kind with
         | OB_nott nt ->
            let substnt () =
-             let xs = List.map (snd_map tip) nt.D.ont_args in
-             let bd = EcTypes.e_mapty tip nt.D.ont_body in
+             let xs = List.map (snd_map (ty_subst tip)) nt.D.ont_args in
+             let es = e_subst { e_subst_id with es_ty = tip } in
+             let bd = es nt.D.ont_body in
              (xs, bd)
            in Some (Lazy.from_fun substnt)
 

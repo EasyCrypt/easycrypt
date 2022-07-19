@@ -129,7 +129,7 @@ and concretize_e_head (CPTEnv subst) head =
   | PTCut    f        -> PTCut    (Fsubst.f_subst subst f)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
-  | PTGlobal (p, tys) -> PTGlobal (p, List.map subst.fs_ty tys)
+  | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst.fs_ty) tys)
   | PTSchema _ -> assert false
 
 and concretize_e_pt cptenv { pt_head; pt_args } =
@@ -506,7 +506,7 @@ let process_named_schema pe (tvi, sn) =
 
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
-  let sty = { ty_subst_id with ts_v = Mid.find_opt^~ fs } in
+  let sty = { ty_subst_id with ts_v = fs } in
 
   let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
 
@@ -575,17 +575,17 @@ let process_sc_instantiation pe inst =
   if not (EcUnify.UniEnv.closed pe.pte_ue) then
     assert false;
 
-  let eus = EcUnify.UniEnv.close pe.pte_ue in
-  let sty = { ty_subst_id with ts_u = eus } in
-  let se = EcTypes.e_uni eus in
+  let uidmap = EcUnify.UniEnv.assubst pe.pte_ue in
+  let ts = Tuni.subst uidmap in
+  let es = e_subst { e_subst_id with es_ty = ts } in
 
-  let typ = List.map (EcTypes.ty_subst sty) typ in
-  let memtype = EcMemory.mt_subst (EcTypes.ty_subst sty) memtype in
+  let typ = List.map (ty_subst ts) typ in
+  let memtype = EcMemory.mt_subst (ty_subst ts) memtype in
   let mpreds = List.map (fun (id, (m,p)) ->
-      let fs = Fsubst.f_subst_init ~sty () in
+      let fs = Fsubst.f_subst_init ~sty:ts () in
       let p = Fsubst.f_subst fs p in
       id, (m,p)) mpreds in
-  let exprs = List.map (fun (id, e) -> id, se e) exprs in
+  let exprs = List.map (fun (id, e) -> id, es e) exprs in
 
   (* We instantiate the schema. *)
   (* FIXME: instantiating and substituting in schema is ugly. *)
@@ -604,7 +604,7 @@ let process_sc_instantiation pe inst =
     | _ -> f_new in
 
   let fs =
-    Fsubst.f_subst_init ~sty
+    Fsubst.f_subst_init ~sty:ts
       ~esloc:(Mid.of_list exprs)
       ~mempred:(Mid.of_list mpreds)
       ~mt:memtype () in
@@ -812,8 +812,8 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
       | PVAModule (mp, mt) -> begin
           try
             let obl = EcTyping.check_modtype env mp mt emt in
-
-            let f = Fsubst.f_subst_mod x mp f in
+            let ms = EcSubst.add_module EcSubst.empty x mp in
+            let f = EcSubst.subst_form ms f in
             let f = match obl with
               | `Ok ->  f
               | `ProofObligation obl -> f_imps obl f in

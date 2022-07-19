@@ -119,7 +119,7 @@ let tydecl_compatible env tyd1 tyd2 =
 (* -------------------------------------------------------------------- *)
 let expr_compatible exn env s e1 e2 =
   let f1 = EcFol.form_of_expr EcFol.mhr e1 in
-  let f2 = EcFol.Fsubst.f_subst s (EcFol.form_of_expr EcFol.mhr e2) in
+  let f2 = EcSubst.subst_form s (EcFol.form_of_expr EcFol.mhr e2) in
   let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
   error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
 
@@ -133,7 +133,7 @@ let get_open_oper exn env p tys =
 let rec oper_compatible exn env ob1 ob2 =
   match ob1, ob2 with
   | OP_Plain(e1,_), OP_Plain(e2,_)  ->
-    expr_compatible exn env EcFol.Fsubst.f_subst_id e1 e2
+    expr_compatible exn env EcSubst.empty e1 e2
   | OP_Plain({e_node = Eop(p,tys)},_), _ ->
     let ob1 = get_open_oper exn env p tys  in
     oper_compatible exn env ob1 ob2
@@ -152,7 +152,7 @@ let rec oper_compatible exn env ob1 ob2 =
   | _, _ -> raise exn
 
 and opfix_compatible exn env f1 f2 =
-  let s = params_compatible exn env EcFol.Fsubst.f_subst_id f1.opf_args f2.opf_args in
+  let s = params_compatible exn env EcSubst.empty f1.opf_args f2.opf_args in
   error_body exn (EcReduction.EqTest.for_type env f1.opf_resty f2.opf_resty);
   error_body exn (f1.opf_struct = f2.opf_struct);
   opbranches_compatible exn env s f1.opf_branches f2.opf_branches
@@ -161,7 +161,7 @@ and params_compatible exn env s p1 p2 =
   error_body exn (List.length p1 = List.length p2);
   let doit s (id1,ty1) (id2,ty2) =
     error_body exn (EcReduction.EqTest.for_type env ty1 ty2);
-    EcFol.Fsubst.f_bind_local s id2 (EcFol.f_local id1 ty1) in
+    EcSubst.add_flocal s id2 (EcFol.f_local id1 ty1) in
   List.fold_left2 doit s p1 p2
 
 and opbranches_compatible exn env s ob1 ob2 =
@@ -203,7 +203,7 @@ let rec pred_compatible exn env pb1 pb2 =
   | _, _ -> raise exn
 
 and ind_compatible exn env pi1 pi2 =
-  let s = params_compatible exn env EcFol.Fsubst.f_subst_id pi1.pri_args pi2.pri_args in
+  let s = params_compatible exn env EcSubst.empty pi1.pri_args pi2.pri_args in
   error_body exn (List.length pi1.pri_ctors = List.length pi2.pri_ctors);
   List.iter2 (prctor_compatible exn env s) pi1.pri_ctors pi2.pri_ctors
 
@@ -212,11 +212,11 @@ and prctor_compatible exn env s prc1 prc2 =
   let env, s = EcReduction.check_bindings exn [] env s prc1.prc_bds prc2.prc_bds in
   error_body exn (List.length prc1.prc_spec = List.length prc2.prc_spec);
   let doit f1 f2 =
-    error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 (EcFol.Fsubst.f_subst s f2)) in
+    error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 (EcSubst.subst_form s f2)) in
   List.iter2 doit prc1.prc_spec prc2.prc_spec
 
 let nott_compatible exn env nb1 nb2 =
-  let s = params_compatible exn env EcFol.Fsubst.f_subst_id nb1.ont_args nb2.ont_args in
+  let s = params_compatible exn env EcSubst.empty nb1.ont_args nb2.ont_args in
   (* We do not check ont_resty because it is redundant *)
   expr_compatible exn env s nb1.ont_body nb2.ont_body
 
@@ -461,9 +461,9 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                 ove.ovre_hooks.herr
                   ~loc "this operator body contains free type variables";
 
-              let uni     = EcTypes.Tuni.offun (EcUnify.UniEnv.close ue) in
-              let body    = body |> EcTypes.e_mapty uni in
-              let ty      = uni ty in
+              let sty     = Tuni.subst (EcUnify.UniEnv.close ue) in
+              let body    = e_subst { e_subst_id with es_ty = sty } body in
+              let ty      = ty_subst sty ty in
               let tparams = EcUnify.UniEnv.tparams ue in
               let newop   =
                 mk_op
@@ -570,8 +570,9 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
               ove.ovre_hooks.herr
                 ~loc "this predicate body contains free type variables";
 
-            let uni     = EcUnify.UniEnv.close ue in
-            let body    = EcFol.Fsubst.uni uni body in
+            let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+            let fs = EcFol.Fsubst.f_subst_init ~sty:ts () in
+            let body    = EcFol.Fsubst.f_subst fs body in
             let tparams = EcUnify.UniEnv.tparams ue in
             let newpr   =
               { op_tparams  = tparams;
@@ -729,7 +730,7 @@ and replay_modtype
         match mode with
         | `Alias -> rename ove subst (`Module, x)
         | `Inline _ ->
-          let subst = EcSubst.add_modtydef subst ~src:(xpath ove x) ~dst:np in
+          let subst = EcSubst.add_path subst ~src:(xpath ove x) ~dst:np in
           subst, x in
 
       let modty = EcSubst.subst_top_modsig subst modty in
@@ -1042,7 +1043,7 @@ let replay (hooks : 'a ovrhooks)
   ~abstract ~local ~incl ~clears ~renames
   ~opath ~npath ovrds (scope : 'a) (name, items)
 =
-  let subst = EcSubst.add_path (EcSubst.empty ()) ~src:opath ~dst:npath in
+  let subst = EcSubst.add_path EcSubst.empty ~src:opath ~dst:npath in
   let ove   = {
     ovre_ovrd     = ovrds;
     ovre_rnms     = renames;

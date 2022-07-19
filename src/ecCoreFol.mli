@@ -353,6 +353,10 @@ val f_xmax  : form -> form -> form
 val f_x0 : form
 val f_x1 : form
 
+val f_xadd_simpl  : form -> form -> form
+val f_xmul_simpl  : form -> form -> form
+val f_xmuli_simpl : form -> form -> form
+
 (* -------------------------------------------------------------------- *)
 exception DestrError of string
 
@@ -461,13 +465,9 @@ type mem_pr = EcMemory.memory * form
 type f_subst = private {
   fs_freshen  : bool; (* true means realloc local *)
   fs_loc      : form Mid.t;
-  fs_mem      : EcIdent.t Mid.t;
-  fs_sty      : ty_subst;
-  fs_ty       : ty -> ty;
-  fs_opdef    : (EcIdent.t list * expr) Mp.t;
-  fs_pddef    : (EcIdent.t list * form) Mp.t;
-  fs_modtydef : path Mp.t;
   fs_esloc    : expr Mid.t;
+  fs_ty      : ty_subst;
+  fs_mem      : EcIdent.t Mid.t;
   fs_memtype  : EcMemory.memtype option; (* Only substituted in Fcoe *)
   fs_mempred  : mem_pr Mid.t;  (* For predicates over memories,
                                  only substituted in Fcoe *)
@@ -481,9 +481,6 @@ module Fsubst : sig
   val f_subst_init :
        ?freshen:bool
     -> ?sty:ty_subst
-    -> ?opdef:(EcIdent.t list * expr) Mp.t
-    -> ?prdef:(EcIdent.t list * form) Mp.t
-    -> ?modtydef:path Mp.t
     -> ?esloc:expr Mid.t
     -> ?mt:EcMemory.memtype
     -> ?mempred:(mem_pr Mid.t)
@@ -498,10 +495,9 @@ module Fsubst : sig
 
   val f_subst_local : EcIdent.t -> form -> form -> form
   val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form
-  val f_subst_mod   : EcIdent.t -> mpath -> form -> form
 
-  val uni_subst : (EcUid.uid -> ty option) -> f_subst
-  val uni : (EcUid.uid -> ty option) -> form -> form
+  (* val uni_subst : (EcUid.uid -> ty option) -> f_subst *)
+  (* val uni : (EcUid.uid -> ty option) -> form -> form *)
   val subst_tvar :
     ?es_loc:(EcTypes.expr EcIdent.Mid.t) ->
     EcTypes.ty EcIdent.Mid.t ->

@@ -909,7 +909,9 @@ module Ax = struct
     if not (EcUnify.UniEnv.closed ue) then
       hierror "the formula contains free type variables";
 
-    let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
+    let uidmap = EcUnify.UniEnv.close ue in
+    let fs = EcFol.Fsubst.f_subst_init ~sty:(Tuni.subst uidmap) () in
+    let concl   = EcFol.Fsubst.f_subst fs concl in
     let tparams = EcUnify.UniEnv.tparams ue in
 
     if ax.pa_kind <> PSchema then
@@ -1185,13 +1187,15 @@ module Op = struct
             | _  -> false) then
       hierror ~loc ("[nosmt] is not supported for pure abstract operators");
 
-    let uni     = Tuni.offun (EcUnify.UniEnv.close ue) in
-    let ty      = uni ty in
+    let uidmap  = EcUnify.UniEnv.close ue in
+    let ts      = Tuni.subst uidmap in
+    let es      = e_subst { e_subst_id with es_ty = ts } in
+    let ty      = ty_subst ts ty in
     let tparams = EcUnify.UniEnv.tparams ue in
     let body    =
       match body with
       | `Abstract -> None
-      | `Plain e  -> Some (OP_Plain (e_mapty uni e, nosmt))
+      | `Plain e  -> Some (OP_Plain (es e, nosmt))
       | `Fix opfx ->
           Some (OP_Fix {
             opf_args     = opfx.EHI.mf_args;
@@ -1248,10 +1252,15 @@ module Op = struct
             let opargs  = List.map (fun (x, xty) -> e_local x xty) xs in
             let opapp   = List.map (tvar |- fst) tparams in
             let opapp   = e_app (e_op opname opapp ty) opargs codom in
-            let tyuni   = { ty_subst_id with ts_u = EcUnify.UniEnv.close ue } in
-            let subst   = Mp.singleton opname ([], opapp) in
-            let subst   = Fsubst.f_subst_init ~sty:tyuni ~opdef:subst () in
-            Fsubst.f_subst subst ax
+
+            let subst   = EcSubst.add_opdef EcSubst.empty opname ([], opapp) in
+            let ax = EcSubst.subst_form subst ax in
+
+            let uidmap  = EcUnify.UniEnv.close ue in
+            let subst   = Fsubst.f_subst_init ~sty:(Tuni.subst uidmap) () in
+            let ax = Fsubst.f_subst subst ax in
+
+            ax
           in
 
           let ax, axpm =
@@ -1629,7 +1638,8 @@ module Ty = struct
         let check1 (x, ty) =
           let ue = EcUnify.UniEnv.create (Some []) in
           let ty = transty tp_tydecl scenv ue ty in
-          let ty = Tuni.offun (EcUnify.UniEnv.close ue) ty in
+          let uidmap = EcUnify.UniEnv.close ue in
+          let ty = ty_subst (Tuni.subst uidmap) ty in
             (EcIdent.create (unloc x), ty)
         in
           tcd.ptc_ops |> List.map check1 in
@@ -1640,7 +1650,9 @@ module Ty = struct
         let check1 (x, ax) =
           let ue = EcUnify.UniEnv.create (Some []) in
           let ax = trans_prop scenv ue ax in
-          let ax = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ax in
+          let uidmap = EcUnify.UniEnv.close ue in
+          let fs = EcFol.Fsubst.f_subst_init ~sty:(Tuni.subst uidmap) () in
+          let ax = EcFol.Fsubst.f_subst fs ax in
             (unloc x, ax)
         in
           tcd.ptc_axs |> List.map check1 in
@@ -1791,8 +1803,9 @@ module Ty = struct
     let ty =
       let ue = TT.transtyvars env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl env ue (snd tci.pti_type) in
-        assert (EcUnify.UniEnv.closed ue);
-        (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
+      assert (EcUnify.UniEnv.closed ue);
+      let uidmap = EcUnify.UniEnv.close ue in
+        (EcUnify.UniEnv.tparams ue, ty_subst (Tuni.subst uidmap) ty)
     in
     if not (List.is_empty (fst ty)) then
       hierror "ring instances cannot be polymorphic";
@@ -1833,8 +1846,9 @@ module Ty = struct
     let ty =
       let ue = TT.transtyvars env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl env ue (snd tci.pti_type) in
-        assert (EcUnify.UniEnv.closed ue);
-        (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
+      assert (EcUnify.UniEnv.closed ue);
+      let uidmap = EcUnify.UniEnv.close ue in
+        (EcUnify.UniEnv.tparams ue, ty_subst (Tuni.subst uidmap) ty)
     in
     if not (List.is_empty (fst ty)) then
       hierror "field instances cannot be polymorphic";
@@ -1862,9 +1876,9 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
-    let subst = { ty_subst_id with ts_def = Mp.of_list [tcp, ([], ty)] } in
+    let subst = EcSubst.add_tydef EcSubst.empty tcp ([], ty) in
       List.map (fun (x, opty) ->
-        (EcIdent.name x, (true, ty_subst subst opty)))
+        (EcIdent.name x, (true, EcSubst.subst_ty subst opty)))
         tc.tc_ops
 
 (*
@@ -2286,9 +2300,10 @@ module Search = struct
                     let ps  = ref Mid.empty in
                     let ue  = EcUnify.UniEnv.create None in
                     let tip = EcUnify.UniEnv.opentvi ue decl.op_tparams None in
-                    let tip = Tvar.subst tip in
-                    let xs  = List.map (snd_map tip) nt.ont_args in
-                    let bd  = EcFol.form_of_expr EcFol.mhr (EcTypes.e_mapty tip nt.ont_body) in
+                    let tip = {ty_subst_id with ts_v = tip} in
+                    let es = e_subst {e_subst_id with es_ty = tip } in
+                    let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
+                    let bd  = EcFol.form_of_expr EcFol.mhr (es nt.ont_body) in
                     let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
 
                     match fp.f_node with
