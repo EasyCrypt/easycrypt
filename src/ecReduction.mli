@@ -104,9 +104,9 @@ val is_conv    : ?ri:reduction_info -> LDecl.hyps -> form -> form -> bool
 val check_conv : ?ri:reduction_info -> LDecl.hyps -> form -> form -> unit
 
 val check_bindings :
-  exn -> EcDecl.ty_params -> EcEnv.env -> EcFol.f_subst ->
+  exn -> EcDecl.ty_params -> EcEnv.env -> EcSubst.subst ->
   (EcIdent.t * EcFol.gty) list -> (EcIdent.t * EcFol.gty) list ->
-  EcEnv.env * EcFol.f_subst
+  EcEnv.env * EcSubst.subst
 (* -------------------------------------------------------------------- *)
 type xconv = [`Eq | `AlphaEq | `Conv]
 

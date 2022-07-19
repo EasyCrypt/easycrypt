@@ -18,7 +18,8 @@ exception InconsistentSubst
 (* -------------------------------------------------------------------- *)
 type subst
 
-val empty : ?freshen:bool -> unit -> subst
+val empty : subst
+val is_empty : subst -> bool
 
 (* -------------------------------------------------------------------- *)
 val add_module   : subst -> EcIdent.t -> mpath -> subst
@@ -27,7 +28,11 @@ val add_tydef    : subst -> path -> (EcIdent.t list * ty) -> subst
 val add_opdef    : subst -> path -> (EcIdent.t list * expr) -> subst
 val add_pddef    : subst -> path -> (EcIdent.t list * form) -> subst
 val add_moddef   : subst -> src:path -> dst:path -> subst
-val add_modtydef : subst -> src:path -> dst:path -> subst
+val add_memory   : subst -> EcIdent.t -> EcIdent.t -> subst
+
+val add_flocal : subst -> EcIdent.t -> form -> subst
+val add_elocals : subst -> EcIdent.t list -> expr list -> subst
+val rename_flocal : subst -> EcIdent.t -> EcIdent.t -> ty -> subst
 
 (* -------------------------------------------------------------------- *)
 val freshen_type : (ty_params * ty) -> (ty_params * ty)
@@ -45,6 +50,7 @@ val subst_branches : subst -> opbranches -> opbranches
 (* -------------------------------------------------------------------- *)
 val subst_path         : subst -> path  -> path
 val subst_mpath        : subst -> mpath -> mpath
+val subst_xpath        : subst -> xpath -> xpath
 val subst_function     : subst -> function_ -> function_
 val subst_module       : subst -> module_expr -> module_expr
 val subst_top_module   : subst -> top_module_expr -> top_module_expr
@@ -55,10 +61,18 @@ val subst_modsig       : ?params:(ident list) -> subst -> module_sig -> module_s
 val subst_top_modsig   : subst -> top_module_sig -> top_module_sig
 val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
 val subst_mod_restr    : subst -> mod_restr -> mod_restr
+
 (* -------------------------------------------------------------------- *)
+val subst_gty   : subst -> gty -> gty
 val subst_genty : subst -> (ty_params * ty) -> (ty_params * ty)
 val subst_ty    : subst -> ty   -> ty
 val subst_form  : subst -> form -> form
+val subst_expr  : subst -> expr -> expr
+val subst_stmt  : subst -> stmt -> stmt
+
+val subst_progvar : subst -> prog_var -> prog_var
+val subst_mem : subst -> EcIdent.t -> EcIdent.t
+val subst_flocal : subst -> form -> form
 
 (* -------------------------------------------------------------------- *)
 val open_oper : operator -> ty list -> ty * operator_kind

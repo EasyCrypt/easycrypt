@@ -74,11 +74,9 @@ val ty_check_uni : ty -> unit
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.smsubst;
-  ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : EcUid.uid -> ty option;
-  ts_v   : EcIdent.t -> ty option;
+  ts_u  : ty Muid.t;
+  ts_v  : ty Mid.t;
 }
 
 val ty_subst_id    : ty_subst
@@ -89,11 +87,8 @@ val ty_subst : ty_subst -> ty -> ty
 module Tuni : sig
   val univars : ty -> Suid.t
 
-  val offun     : (uid -> ty option) -> ty  -> ty
-  val offun_dom : (uid -> ty option) -> dom -> dom
-
-  val subst1    : (uid * ty) -> ty -> ty
-  val subst     : ty Muid.t -> ty -> ty
+  val subst1    : (uid * ty) -> ty_subst
+  val subst     : ty Muid.t -> ty_subst
   val subst_dom : ty Muid.t -> dom -> dom
   val occurs    : uid -> ty -> bool
   val fv        : ty -> Suid.t
@@ -281,10 +276,7 @@ val e_iter : (expr -> unit) -> expr -> unit
 (* -------------------------------------------------------------------- *)
 type e_subst = {
   es_freshen : bool; (* true means realloc local *)
-  es_p       : EcPath.path -> EcPath.path;
-  es_ty      : ty -> ty;
-  es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
-  es_mp      : EcPath.smsubst;
+  es_ty      : ty_subst;
   es_loc     : expr Mid.t;
 }
 
@@ -294,10 +286,7 @@ val is_e_subst_id : e_subst -> bool
 
 val e_subst_init :
      bool
-  -> (EcPath.path -> EcPath.path)
-  -> (ty -> ty)
-  -> (EcIdent.t list * expr) EcPath.Mp.t
-  -> EcPath.smsubst
+  -> ty_subst
   -> expr Mid.t
   -> e_subst
 
@@ -307,5 +296,6 @@ val add_locals : e_subst -> (EcIdent.t * ty) list -> e_subst * (EcIdent.t * ty) 
 val e_subst_closure : e_subst -> closure -> closure
 val e_subst : e_subst -> expr -> expr
 
-val e_mapty : (ty -> ty) -> expr -> expr
-val e_uni   : (uid -> ty option) -> expr -> expr
+(* val e_mapty : (ty -> ty) -> expr -> expr *)
+
+(* val e_uni   : (uid -> ty option) -> expr -> expr *)

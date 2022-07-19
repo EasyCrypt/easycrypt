@@ -911,15 +911,12 @@ module MC = struct
 
       let self = EcIdent.create "'self" in
 
-      let tsubst =
-        { ty_subst_id with
-            ts_def = Mp.add mypath ([], tvar self) Mp.empty }
-      in
+      let tsubst =EcSubst.add_tydef EcSubst.empty mypath ([], tvar self) in
 
       let operators =
         let on1 (opid, optype) =
           let opname = EcIdent.name opid in
-          let optype = ty_subst tsubst optype in
+          let optype = EcSubst.subst_ty tsubst optype in
           let opdecl =
             mk_op ~opaque:false [(self, Sp.singleton mypath)]
               optype (Some OP_TC) loca
@@ -932,15 +929,15 @@ module MC = struct
         List.fold_left
           (fun s (x, xp, xty, _) ->
             let fop = EcCoreFol.f_op xp [tvar self] xty in
-              Fsubst.f_bind_local s x fop)
-          (Fsubst.f_subst_init ~sty:tsubst ())
+              EcSubst.add_flocal s x fop)
+          tsubst
           operators
       in
 
       let axioms =
         List.map
           (fun (x, ax) ->
-            let ax = Fsubst.f_subst fsubst ax in
+            let ax = EcSubst.subst_form fsubst ax in
               (x, { ax_tparams    = [(self, Sp.singleton mypath)];
                     ax_spec       = ax;
                     ax_kind       = `Axiom (Ssym.empty, false);
@@ -1603,7 +1600,7 @@ module Fun = struct
              let s =
                List.fold_left2
                  (fun s (x, _) a -> EcSubst.add_module s x a)
-                 (EcSubst.empty ()) params args
+                 EcSubst.empty params args
              in
              EcSubst.subst_function s o
       end
@@ -1842,7 +1839,7 @@ module Mod = struct
     let s =
       List.fold_left2
         (fun s (x, _) a -> EcSubst.add_module s x a)
-        (EcSubst.empty ()) params args
+        EcSubst.empty params args
     in
       f s o
 
@@ -1990,7 +1987,7 @@ module Mod = struct
         | Some x -> x
       in
       EcSubst.subst_modsig
-        ~params:(List.map fst modty.mt_params) (EcSubst.empty ()) modsig.tms_sig
+        ~params:(List.map fst modty.mt_params) EcSubst.empty modsig.tms_sig
     in
     module_expr_of_module_sig name modty modsig
 
@@ -2130,7 +2127,7 @@ module NormMp = struct
           let s =
             List.fold_left2
               (fun s (x, _) a -> EcSubst.add_module s x a)
-              (EcSubst.empty ()) params args in
+              EcSubst.empty params args in
           let mp = EcSubst.subst_mpath s mp in
           let args' = mp.EcPath.m_args in
           let args2 = if extra = [] then args' else args' @ extra in
@@ -2667,7 +2664,7 @@ module ModTy = struct
           let p2 = EcSubst.subst_modtype subst p2 in
             mod_type_equiv f_equiv env p1 p2;
             EcSubst.add_module subst x1 (EcPath.mident x2))
-        (EcSubst.empty ()) mty1.mt_params mty2.mt_params
+        EcSubst.empty mty1.mt_params mty2.mt_params
     in
 
     if not (
@@ -2690,7 +2687,7 @@ module ModTy = struct
     let { tms_sig = sig_ } = by_path mt.mt_name env in
     let subst =
       List.fold_left2 (fun s (x1,_) a ->
-        EcSubst.add_module s x1 a) (EcSubst.empty ()) sig_.mis_params mt.mt_args in
+        EcSubst.add_module s x1 a) EcSubst.empty sig_.mis_params mt.mt_args in
     let items =
       EcSubst.subst_modsig_body subst sig_.mis_body in
     let params = mt.mt_params in
@@ -3527,10 +3524,10 @@ module LDecl = struct
   let ld_subst s ld =
     match ld with
     | LD_var (ty, body) ->
-        LD_var (s.fs_ty ty, body |> omap (Fsubst.f_subst s))
+        LD_var (ty_subst s.fs_ty ty, body |> omap (Fsubst.f_subst s))
 
     | LD_mem mt ->
-        let mt = EcMemory.mt_subst s.fs_ty mt
+        let mt = EcMemory.mt_subst (ty_subst s.fs_ty) mt
         in LD_mem mt
 
     | LD_modty p ->

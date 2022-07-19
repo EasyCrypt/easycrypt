@@ -799,7 +799,7 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
       | `Concrete _ | `Abstract _ ->
         EcSubst.add_tydef to_gen.tg_subst path tosubst, tydecl.tyd_type
       | `Record (f, prs) ->
-        let subst    = EcSubst.empty ~freshen:false () in
+        let subst    = EcSubst.empty in
         let tg_subst = to_gen.tg_subst in
         let subst    = EcSubst.add_tydef subst path tosubst in
         let tg_subst = EcSubst.add_tydef tg_subst path tosubst in
@@ -817,7 +817,7 @@ let generalize_tydecl to_gen prefix (name, tydecl) =
         let f = EcSubst.subst_form !rsubst f in
         !rtg_subst, `Record (f, prs)
       | `Datatype dt ->
-        let subst    = EcSubst.empty ~freshen:false () in
+        let subst    = EcSubst.empty in
         let tg_subst = to_gen.tg_subst in
         let subst    = EcSubst.add_tydef subst path tosubst in
         let tg_subst = EcSubst.add_tydef tg_subst path tosubst in
@@ -905,7 +905,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
           | OP_Plain (e,nosmt) ->
             OP_Plain (e_lam extra_a e, nosmt)
           | OP_Fix opfix ->
-            let subst = EcSubst.add_opdef (EcSubst.empty ~freshen:false ()) path tosubst in
+            let subst = EcSubst.add_opdef EcSubst.empty path tosubst in
             let nb_extra = List.length extra_a in
             let opf_struct =
               let (l,i) = opfix.opf_struct in
@@ -1155,7 +1155,7 @@ let generalize_lc_items scenv =
       tg_env    = scenv.sc_env;
       tg_params = [];
       tg_binds  = [];
-      tg_subst  = (EcSubst.empty ~freshen:false ());
+      tg_subst  = EcSubst.empty;
       tg_clear  = empty_locals;
     } in
   generalize_lc_items to_gen (EcEnv.root scenv.sc_env) (List.rev scenv.sc_items)

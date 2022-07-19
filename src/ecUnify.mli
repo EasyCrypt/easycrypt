@@ -29,8 +29,8 @@ module UniEnv : sig
   val openty     : unienv -> ty_params -> tvi -> ty -> ty * ty list
   val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * ty list
   val closed     : unienv -> bool
-  val close      : unienv -> uidmap
-  val assubst    : unienv -> uidmap
+  val close      : unienv -> ty Muid.t
+  val assubst    : unienv -> ty Muid.t
   val tparams    : unienv -> ty_params
 end
 

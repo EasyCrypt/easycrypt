@@ -236,69 +236,44 @@ let fresh_id_of_ty (ty : ty) =
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.smsubst;
-  ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : EcUid.uid -> ty option;
-  ts_v   : EcIdent.t -> ty option;
+  ts_u  : ty Muid.t;
+  ts_v   : ty Mid.t;
 }
 
 let ty_subst_id =
-  { ts_p   = identity;
-    ts_mp  = EcPath.sms_identity;
-    ts_def = Mp.empty;
-    ts_u   = funnone ;
-    ts_v   = funnone ; }
+  { ts_mp  = EcPath.sms_identity;
+    ts_u  = Muid.empty;
+    ts_v  = Mid.empty;
+  }
 
 let is_ty_subst_id s =
-     s.ts_p  == identity
-  && EcPath.sms_is_identity s.ts_mp
-  && s.ts_u  == funnone
-  && s.ts_v  == funnone
-  && Mp.is_empty s.ts_def
+  EcPath.sms_is_identity s.ts_mp
+  && Muid.is_empty s.ts_u
+  && Mid.is_empty s.ts_v
 
 let rec ty_subst s =
   if is_ty_subst_id s then identity
   else
-    Hty.memo_rec 107 (fun aux ty ->
+    fun ty ->
       match ty.ty_node with
-      | Tglob m       -> tglob (EcPath.m_subst s.ts_mp m)
-      | Tunivar id    -> odfl ty (s.ts_u id)
-      | Tvar id       -> odfl ty (s.ts_v id)
-      | Ttuple lty    -> ttuple (List.Smart.map aux lty)
-      | Tfun (t1, t2) -> tfun (aux t1) (aux t2)
-
-      | Tconstr(p, lty) -> begin
-        match Mp.find_opt p s.ts_def with
-        | None ->
-            let p   = s.ts_p p in
-            let lty = List.Smart.map aux lty in
-              tconstr p lty
-
-        | Some (args, body) ->
-            let s =
-              try  Mid.of_list (List.combine args (List.map aux lty))
-              with Failure _ -> assert false
-            in
-              ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s; } body
-      end)
+      | Tglob ({m_top = `Local _} as m)       ->
+         tglob (EcPath.m_subst s.ts_mp m)
+      | Tunivar id    -> Muid.find_def ty id s.ts_u
+      | Tvar id       -> Mid.find_def ty id s.ts_v
+      | _ -> ty_map (ty_subst s) ty
 
 (* -------------------------------------------------------------------- *)
 module Tuni = struct
-  let offun uidmap =
-    ty_subst { ty_subst_id with ts_u = uidmap }
-
-  let offun_dom uidmap dom =
-    List.map (offun uidmap) dom
 
   let subst (uidmap : ty Muid.t) =
-    ty_subst { ty_subst_id with ts_u = Muid.find_opt^~ uidmap }
+    { ty_subst_id with ts_u = uidmap }
 
   let subst1 ((id, t) : uid * ty) =
     subst (Muid.singleton id t)
 
   let subst_dom uidmap dom =
-    List.map (subst uidmap) dom
+    List.map (ty_subst (subst uidmap)) dom
 
   let occurs u =
     let rec aux t =
@@ -326,7 +301,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Tvar = struct
   let subst (s : ty Mid.t) =
-    ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s }
+    ty_subst { ty_subst_id with ts_v = s}
 
   let subst1 (id,t) =
     subst (Mid.singleton id t)
@@ -863,44 +838,32 @@ module He = MSHe.H
 (* -------------------------------------------------------------------- *)
 type e_subst = {
     es_freshen : bool; (* true means realloc local *)
-    es_p       : EcPath.path -> EcPath.path;
-    es_ty      : ty -> ty;
-    es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
-    es_mp      : smsubst;
+    es_ty      : ty_subst;
     es_loc     : expr Mid.t;
 }
 
 let e_subst_id = {
     es_freshen = false;
-    es_p       = identity;
-    es_ty      = identity;
-    es_opdef   = Mp.empty;
-    es_mp      = sms_identity;
+    es_ty     = ty_subst_id;
     es_loc     = Mid.empty;
 }
 
 (* -------------------------------------------------------------------- *)
 let is_e_subst_id s =
      not s.es_freshen
-  && s.es_p  == identity
-  && s.es_ty == identity
-  && Mp.is_empty s.es_opdef
-  && sms_is_identity s.es_mp
+  && is_ty_subst_id s.es_ty
   && Mid.is_empty s.es_loc
 
 (* -------------------------------------------------------------------- *)
-let e_subst_init freshen on_path on_ty opdef on_mpath esloc =
+let e_subst_init freshen on_ty esloc =
   { es_freshen = freshen;
-    es_p       = on_path;
     es_ty      = on_ty;
-    es_opdef   = opdef;
-    es_mp      = on_mpath;
     es_loc     = esloc; }
 
 (* -------------------------------------------------------------------- *)
 let add_local s ((x, t) as xt) =
   let x' = if s.es_freshen then EcIdent.fresh x else x in
-  let t' = s.es_ty t in
+  let t' = ty_subst s.es_ty t in
 
     if   x == x' && t == t'
     then (s, xt)
@@ -928,7 +891,7 @@ let subst_lpattern (s: e_subst) (lp:lpattern) =
           (fun s ((x, t) as xt) ->
             match x with
             | None ->
-                let t' = s.es_ty t in
+                let t' = ty_subst s.es_ty t in
                   if t == t' then (s, xt) else (s, (x, t'))
             | Some x ->
                 let (s, (x', t')) = add_local s (x, t) in
@@ -937,7 +900,7 @@ let subst_lpattern (s: e_subst) (lp:lpattern) =
                   else (s, (Some x', t')))
           s xs
       in
-        (s, LRecord (s.es_p p, xs'))
+        (s, LRecord (p, xs'))
 
 (* -------------------------------------------------------------------- *)
 let rec e_subst (s: e_subst) e =
@@ -948,31 +911,18 @@ let rec e_subst (s: e_subst) e =
       | None    ->
 (* FIXME schema *)
 (*        assert (not s.es_freshen); *)
-        e_local id (s.es_ty e.e_ty)
+        e_local id (ty_subst s.es_ty e.e_ty)
   end
 
   | Evar pv ->
-      let pv' = pv_subst (x_subst s.es_mp) pv in
-      let ty' = s.es_ty e.e_ty in
+      let pv' = pv_subst (x_subst s.es_ty.ts_mp) pv in
+      let ty' = ty_subst s.es_ty e.e_ty in
         e_var pv' ty'
 
-  | Eapp ({ e_node = Eop (p, tys) }, args) when Mp.mem p s.es_opdef ->
-      let tys  = List.Smart.map s.es_ty tys in
-      let ty   = s.es_ty e.e_ty in
-      let body = oget (Mp.find_opt p s.es_opdef) in
-        e_subst_op ~freshen:s.es_freshen ty tys (List.map (e_subst s) args) body
-
-  | Eop (p, tys) when Mp.mem p s.es_opdef ->
-      let tys  = List.Smart.map s.es_ty tys in
-      let ty   = s.es_ty e.e_ty in
-      let body = oget (Mp.find_opt p s.es_opdef) in
-        e_subst_op ~freshen:s.es_freshen ty tys [] body
-
   | Eop (p, tys) ->
-      let p'   = s.es_p p in
-      let tys' = List.Smart.map s.es_ty tys in
-      let ty'  = s.es_ty e.e_ty in
-        e_op p' tys' ty'
+      let tys' = List.Smart.map (ty_subst s.es_ty) tys in
+      let ty'  = ty_subst s.es_ty e.e_ty in
+        e_op p tys' ty'
 
   | Elet (lp, e1, e2) ->
       let e1' = e_subst s e1 in
@@ -985,34 +935,7 @@ let rec e_subst (s: e_subst) e =
       let e1' = e_subst s e1 in
         e_quantif q b' e1'
 
-  | _ -> e_map s.es_ty (e_subst s) e
-
-and e_subst_op ~freshen ety tys args (tyids, e) =
-  (* FIXME: factor this out *)
-  (* FIXME: is es_freshen value correct? *)
-
-  let e =
-    let sty = Tvar.init tyids tys in
-    let sty = ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ sty; } in
-    let sty = { e_subst_id with
-                  es_freshen = freshen;
-                  es_ty      = sty } in
-      e_subst sty e
-  in
-
-  let (sag, args, e) =
-    match e.e_node with
-    | Equant (`ELambda, largs, lbody) when args <> [] ->
-        let largs1, largs2 = List.takedrop (List.length args  ) largs in
-        let  args1,  args2 = List.takedrop (List.length largs1)  args in
-          (Mid.of_list (List.combine (List.map fst largs1) args1),
-           args2, e_lam largs2 lbody)
-
-    | _ -> (Mid.of_list [], args, e)
-  in
-
-  let sag = { e_subst_id with es_loc = sag } in
-    e_app (e_subst sag e) args ety
+  | _ -> e_map (ty_subst s.es_ty) (e_subst s) e
 
 (* -------------------------------------------------------------------- *)
 let e_subst_closure s (args, e) =
@@ -1025,14 +948,6 @@ let e_subst s =
   else
     if s.es_freshen then e_subst s
     else He.memo 107 (e_subst s)
-
-(* -------------------------------------------------------------------- *)
-let e_mapty onty =
-  e_subst { e_subst_id with es_ty = onty; }
-
-(* -------------------------------------------------------------------- *)
-let e_uni uidmap =
-  e_mapty (Tuni.offun uidmap)
 
 (* -------------------------------------------------------------------- *)
 let is_local e =

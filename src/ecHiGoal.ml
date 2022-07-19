@@ -898,7 +898,9 @@ let process_rewrite1_r ttenv ?target ri tc =
           | EcUnify.UninstanciateUni ->
             EcTyping.tyerror ri.pl_loc env EcTyping.FreeTypeVariables in
 
-        (List.map (EcTypes.e_uni subs) args, EcTypes.e_uni subs res)
+        let sty = { ty_subst_id with ts_u = subs } in
+        let es = e_subst { e_subst_id with es_ty = sty } in
+        (List.map es args, es res)
       in
 
       (* Construct a left value from an expression *)
@@ -1218,7 +1220,7 @@ let process_view1 pe tc =
 
                         let y, yty =
                           let CPTEnv subst = PT.concretize_env pe.PT.ptev_env in
-                          snd_map subst.fs_ty (oget pre) in
+                          snd_map (ty_subst subst.fs_ty) (oget pre) in
                         let fy = EcIdent.fresh y in
 
                         pe.PT.ptev_env.pte_ev := MEV.set

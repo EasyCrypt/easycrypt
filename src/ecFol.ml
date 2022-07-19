@@ -1060,3 +1060,45 @@ let rec one_sided_vs mem fp =
 
   | Fapp (f, args) -> one_sided_vs mem f @ List.concat_map (one_sided_vs mem) args
   | _ -> []
+
+let rec dump_f f =
+  let dump_quant q =
+    match q with
+    | Lforall -> "ALL"
+    | Lexists -> "EXI"
+    | Llambda -> "LAM"
+  in
+
+  match f.f_node with
+  | Fquant (q, bs, f) -> dump_quant q ^ " ( " ^ String.concat ", " (List.map EcIdent.tostring (List.fst bs)) ^ " )" ^ "." ^ dump_f f (* of quantif * bindings * form *)
+  | Fif    (c, t, f) -> "IF " ^ dump_f c ^ " THEN " ^ dump_f t ^ " ELSE " ^ dump_f f
+  | Fmatch _ -> "MATCH"
+  | Flet   (_, f, g) -> "LET _ = " ^ dump_f f ^ " IN " ^ dump_f g
+  | Fint    x -> BI.to_string x
+  | Flocal  x -> EcIdent.tostring x
+  | Fpvar   (pv, x) -> EcTypes.string_of_pvar pv ^ "{" ^ EcIdent.tostring x ^ "}"
+  | Fglob   (mp, x) -> EcPath.m_tostring mp ^ "{" ^ EcIdent.tostring x ^ "}"
+  | Fop     (p, _) -> EcPath.tostring p
+  | Fapp    (f, a) -> "APP " ^ dump_f f ^ " ( " ^ String.concat ", " (List.map dump_f a) ^ " )"
+  | Ftuple  f -> " ( " ^ String.concat ", " (List.map dump_f f) ^ " )"
+  | Fproj   (f, x) -> dump_f f ^ "." ^ string_of_int x
+  | Fpr {pr_args = a; pr_event = e} -> "PR [ARG = " ^ dump_f a ^ " ; EV = " ^ dump_f e ^ "]"
+  | FhoareF _ -> "HoareF"
+  | FhoareS _ -> "HoareS"
+  | FcHoareF _ -> "cHoareF"
+  | FcHoareS _ -> "cHoareS"
+  | FbdHoareF _ -> "bdHoareF"
+  | FbdHoareS {bhs_pr = pr; bhs_po = po; bhs_bd = bd; bhs_m = (m, _)} ->
+     "bdHoareS [ ME = " ^ EcIdent.tostring m
+     ^ "; PR = " ^ dump_f pr
+     ^ "; PO = " ^ dump_f po
+     ^ "; BD = " ^ dump_f bd ^ "]"
+  | FequivF _ -> "equivF"
+  | FequivS {es_ml = (ml, _); es_mr = (mr, _); es_po = po; es_pr = pr } ->
+     "equivS [ ML = " ^ EcIdent.tostring ml
+     ^ "; MR = " ^ EcIdent.tostring mr
+     ^ "; PR = " ^ dump_f pr
+     ^ "; PO = " ^ dump_f po
+     ^ "]"
+  | FeagerF _ -> "eagerF"
+  | Fcoe _ -> "Fcoe"

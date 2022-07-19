@@ -500,7 +500,7 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
         let id = tg_map (function
           | None    -> EcEnv.LDecl.fresh_id hyps (EcIdent.name x)
           | Some id -> id) id in
-        let xty  = sbt.fs_ty xty in
+        let xty  = ty_subst sbt.fs_ty xty in
         let xe   = Fsubst.f_subst sbt xe in
         let sbt  = Fsubst.f_bind_rename sbt x (tg_val id) xty in
         let hyps = add_ld id (LD_var (xty, Some xe)) hyps in

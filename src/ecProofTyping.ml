@@ -22,7 +22,9 @@ let process_form_opt ?mv hyps pf oty =
   try
     let ue  = unienv_of_hyps hyps in
     let ff  = EcTyping.trans_form_opt ?mv (LDecl.toenv hyps) ue pf oty in
-    EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
+    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let fs = EcFol.Fsubst.f_subst_init ~sty:ts () in
+    EcFol.Fsubst.f_subst fs ff
 
   with EcUnify.UninstanciateUni ->
     EcTyping.tyerror pf.EcLocation.pl_loc
@@ -47,8 +49,10 @@ let process_cost ?mv hyps (EcParsetree.PC_costs (self, calls)) tys =
 let process_exp hyps mode oty e =
   let env = LDecl.toenv hyps in
   let ue  = unienv_of_hyps hyps in
-  let e   =  EcTyping.transexpcast_opt env mode ue oty e in
-    EcTypes.e_uni (EcUnify.UniEnv.close ue) e
+  let e   = EcTyping.transexpcast_opt env mode ue oty e in
+  let ts  = Tuni.subst (EcUnify.UniEnv.close ue)  in
+  let es  = e_subst { e_subst_id with es_ty = ts } in
+    es e
 
 let process_pattern hyps fp =
   let ps = ref Mid.empty in
@@ -115,14 +119,14 @@ let tc1_process_prhl_formula tc pf =
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_stmt  ?map tc mt c =
-  let hyps = FApi.tc1_hyps tc in
-  let hyps = LDecl.push_active (mhr,mt) hyps in
-  let env  = LDecl.toenv hyps in
-  let ue   = unienv_of_hyps hyps in
-  let c    = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt ?map env ue c) in
-  let esub = Exn.recast_pe !!tc hyps (fun () -> Tuni.offun (EcUnify.UniEnv.close ue)) in
-  let esub = { e_subst_id with es_ty = esub; } in
-  EcModules.s_subst esub c
+  let hyps   = FApi.tc1_hyps tc in
+  let hyps   = LDecl.push_active (mhr,mt) hyps in
+  let env    = LDecl.toenv hyps in
+  let ue     = unienv_of_hyps hyps in
+  let c      = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt ?map env ue c) in
+  let uidmap = Exn.recast_pe !!tc hyps (fun () -> EcUnify.UniEnv.close ue) in
+  let es     = { e_subst_id with es_ty = Tuni.subst uidmap } in
+  EcModules.s_subst es c
 
 
 let tc1_process_prhl_stmt ?map tc side c =
