@@ -84,6 +84,7 @@ clone Number.RealField as RealOrder
   op   Field.([-])  <- Real.([-]),
   op   Field.( * )  <- Real.( * ),
   op   Field.invr   <- Real.inv,
+  pred Field.unit   <- (fun x => x <> 0%r),
   op   Field.intmul <- RField.intmul,
   op   Field.ofint  <- RField.ofint,
   op   Field.exp    <- RField.exp,
