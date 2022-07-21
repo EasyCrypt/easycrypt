@@ -15,8 +15,8 @@ abstract theory SubFinite.
     type t <= t.
 
   clone import Subtype as Sub with
-    type T  <- t ,
-    type sT <- st,
+    type T  <= t ,
+    type sT <= st,
     pred P  <- p.
 
   import Sub.
@@ -25,7 +25,7 @@ abstract theory SubFinite.
 
   clone import FinType as SFT with
     type t  <= st,
-    op enum <- senum
+    op enum <= senum
     proof *.
 
   realize enum_spec.
@@ -212,11 +212,13 @@ abstract theory FiniteIDomainStruct.
     prime char.
   proof. by case: char_integral => // eq0; move: gt0_char; rewrite eq0. qed.
 
+  (*TODO: move where it should be.*)
   lemma bij_surj ['a,'b] (f : 'a -> 'b) :
     bijective f => 
     surjective f.
   proof. by move => [g] [fgK gfK] x; exists (g x); rewrite gfK. qed.
 
+  (*TODO: move where it should be.*)
   lemma bij_inj_surj ['a,'b] (f : 'a -> 'b) :
     bijective f <=>
     (injective f) /\ (surjective f).
@@ -265,15 +267,15 @@ abstract theory FiniteFieldStruct.
     theory FID   <- FF.
 
   clone import UZMod_Field as UF with
-    type t   <- t,
-    type uz  <- ut,
+    type t   <= t,
+    type uz  <= ut,
     theory F <- F.
 
   print UF.
 
   clone import SubFinite as SFU with
-    type t    <- t,
-    type st   <- ut,
+    type t    <= t,
+    type st   <= ut,
     op p      <- (fun x => x <> zeror),
     theory FT <- FF.FinType.
 
@@ -329,16 +331,10 @@ abstract theory SubFiniteZModule.
     theory FT  <- FinType,
     theory Sub <- Sub.
 
-  (*TODO: clone with theory not working here, and neither clone with axiom later..*)
   clone import FiniteZModule as SFZMod with
     type t                  <= st,
     theory ZMod             <- SZMod,
-    (*theory FinType          <- SFT.*)
-    op FinType.enum         <- senum
-    (*axiom FinType.enum_spec <- SFT.enum_spec.*)
-    proof *.
-
-  realize FinType.enum_spec by exact SFT.enum_spec.
+    theory FinType          <- SFT.
 end SubFiniteZModule.
 
 (* -------------------------------------------------------------------- *)
@@ -348,10 +344,15 @@ abstract theory SubFiniteComRing.
   clone import ComRing as CR with
     type t <= t.
 
-  clone import SubComRing with
+  clone import ComRingPred as CRPr with
     type t    <= t,
-    type st   <= st,
     theory CR <- CR.
+
+  clone import SubComRing with
+    type t      <= t,
+    type st     <= st,
+    theory CR   <- CR,
+    theory CRPr <- CRPr.
 
   clone import FiniteComRing as FCR with
     type t    <= t,
@@ -371,6 +372,7 @@ abstract theory SubFiniteComRing.
     type t            <= t,
     type st           <= st,
     theory CR         <- CR,
+    theory CRPr       <- SubFiniteComRing.CRPr,
     theory SubComRing <- SubComRing.
 
   clone include SubFiniteZModule with
@@ -381,18 +383,12 @@ abstract theory SubFiniteComRing.
     theory ZModStr  <- CRStr,
     theory FZModStr <- FCRStr.
 
-  (*TODO: clone with axiom, or theory.*)
   clone import FiniteComRing as SFCR with
     type t          <= st,
     theory CR       <- SCR,
-    (*theory FinType  <- SFZMod.FinType.*)
-    op FinType.enum <- senum
-    (*axiom FinType.enum_spec <- SFZMod.FinType.enum_spec*)
-    proof *.
+    theory FinType  <- SFT.
 
-  realize FinType.enum_spec by exact SFZMod.FinType.enum_spec.
-
-  import ComRingModule.
+  import SCRM.CRM.
 
   op enum_lin (vs : t list) =
     map
@@ -432,13 +428,13 @@ abstract theory SubFiniteComRing.
   proof. by rewrite /enum_lin /= nseq0 /= BigZMod.big_nil. qed.
 
   lemma size_enum_lin vs :
-    size (enum_lin vs) = SFCR.FinType.card ^ (size vs).
+    size (enum_lin vs) = SFT.card ^ (size vs).
   proof.
     elim: vs => [|v vs IHvs] /=.
     + by rewrite expr0 enum_lin0.
     rewrite addrC exprS ?size_ge0 // -IHvs => {IHvs}.
     rewrite /enum_lin !size_map /= addrC nseqS ?size_ge0 //=.
-    by rewrite size_allpairs /SFCR.FinType.card size_map.
+    by rewrite size_allpairs /SFT.card size_map.
   qed.
 
   lemma free_uniq_enum_lin vs :
@@ -472,10 +468,15 @@ abstract theory SubFiniteIDomain.
   clone import IDomain as ID with
     type t <= t.
 
-  clone import SubIDomain with
+  clone import IDomainPred as IDPr with
     type t    <= t,
-    type st   <= st,
     theory ID <- ID.
+
+  clone import SubIDomain with
+    type t      <= t,
+    type st     <= st,
+    theory ID   <- ID,
+    theory IDPr <- IDPr.
 
   clone import FiniteIDomain as FID with
     type t    <= t,
@@ -491,21 +492,28 @@ abstract theory SubFiniteIDomain.
     theory IDStr <- IDStr,
     theory FID   <- FID.
 
+  clone import SubIDomainModule as SIDM with
+    type t            <= t,
+    type st           <= st,
+    theory ID         <- ID,
+    theory IDPr       <- SubFiniteIDomain.IDPr,
+    theory SubIDomain <- SubFiniteIDomain.SubIDomain.
+
   clone include SubFiniteComRing with
-    type t        <- t,
-    type st       <- st,
-    theory CR     <- ID,
-    theory FCR    <- FID,
-    theory CRStr  <- IDStr,
-    theory FCRStr <- FIDStr.
+    type t            <- t,
+    type st           <- st,
+    theory CR         <- ID,
+    theory CRPr       <- SubFiniteIDomain.IDPr,
+    theory SubComRing <- SubFiniteIDomain.SubIDomain,
+    theory FCR        <- FID,
+    theory CRStr      <- IDStr,
+    theory FCRStr     <- FIDStr,
+    theory SCRM.CRM   <- SIDM.IDM.
 
   clone import FiniteIDomain as SFID with
     type t          <= st,
     theory ID       <- SID,
-    op FinType.enum <- senum
-    proof *.
-
-  realize FinType.enum_spec by exact SFCR.FinType.enum_spec.
+    theory FinType  <- SFT.
 end SubFiniteIDomain.
 
 (* -------------------------------------------------------------------- *)
@@ -515,10 +523,15 @@ abstract theory SubFiniteField.
   clone import Field as F with
     type t <= t.
 
-  clone import SubField with
+  clone import FieldPred as FPr with
     type t   <= t,
-    type st  <= st,
     theory F <- F.
+
+  clone import SubField with
+    type t     <= t,
+    type st    <= st,
+    theory F   <- F,
+    theory FPr <- FPr.
 
   clone import FiniteField as FF with
     type t   <= t,
@@ -535,23 +548,30 @@ abstract theory SubFiniteField.
     theory FStr <- FStr,
     theory FF   <- FF.
 
+  clone import SubVectorSpace as SVS with
+    type t          <= t,
+    type st         <= st,
+    theory F        <- F,
+    theory FPr      <- SubFiniteField.FPr,
+    theory SubField <- SubField.
+
   clone include SubFiniteIDomain with
-    type t        <- t,
-    type st       <- st,
-    theory ID     <- F,
-    theory FID    <- FF,
-    theory IDStr  <- FStr,
-    theory FIDStr <- FFStr.
+    type t            <- t,
+    type st           <- st,
+    theory ID         <- F,
+    theory IDPr       <- SubFiniteField.FPr,
+    theory SubIDomain <- SubFiniteField.SubField,
+    theory FID        <- FF,
+    theory IDStr      <- FStr,
+    theory FIDStr     <- FFStr,
+    theory SIDM.IDM   <- SVS.VS.
 
   clone import FiniteField as SFF with
     type t          <= st,
     theory F        <- SF,
-    op FinType.enum <- senum
-    proof *.
+    theory FinType  <- SFT.
 
-  realize FinType.enum_spec by exact SFID.FinType.enum_spec.
-
-  import SCRM.ComRingModule.
+  import SVS.VS.
 
   lemma finite_basis_exists :
     exists vs , uniq vs /\ basis (vf_oflist vs).
@@ -582,18 +602,15 @@ abstract theory SubFiniteField.
     exists (v :: vs); rewrite /= free_vf_oflist_cons uniq_ free_ /=; do!split.
     + by move: Nmemv; apply/contra => memv; apply/enum_linP/gen_p.
     + right => s; case: (s = SCR.zeror) => [->> //=|neqs0].
-      - (*TODO: bad clone.*)
-        admit.
-      rewrite -gen_scale_unit -?enum_linP //.
-      (*TODO: bad clone.*)
-      admit.
+      rewrite -gen_scale_unit -?enum_linP //; apply/unitfP.
+      by move: neqs0; apply/contra => ?; apply/Sub.val_inj; rewrite val0.
     rewrite !size_enum_lin /= -ltzE addrC exprSr ?size_ge0 //.
     rewrite -subr_gt0 -IntID.mulN1r mulrC -IntID.mulrDl; apply/mulr_gt0.
     + by rewrite subr_gt0; apply/card_gt1.
-    by apply/expr_gt0/SFF.FinType.card_gt0.
+    by apply/expr_gt0/SFT.card_gt0.
   qed.
 
-  op n = ilog SFCR.FinType.card FF.FinType.card.
+  op n = ilog SFT.card FinType.card.
 
   lemma lt0n :
     0 < n.
@@ -603,7 +620,7 @@ abstract theory SubFiniteField.
   qed.
 
   lemma eq_card_pow_n :
-    FF.FinType.card = SFF.FinType.card ^ n.
+    FinType.card = SFT.card ^ n.
   proof.
     case: finite_basis_exists => vs [uniq_ [free_ /gen_t_enum_lin mem_e]].
     move: (free_uniq_enum_lin _ uniq_ free_) => uniq_e.
@@ -635,6 +652,7 @@ abstract theory ZModP_FiniteField.
     op [-]          <= ZModP.([-]),
     op ( * )        <= ZModP.( * ),
     op invr         <= ZModP.inv,
+    pred unit       <= ZModP.unit,
     lemma addrA     <= ZModP.ZModpField.addrA,
     lemma addrC     <= ZModP.ZModpField.addrC,
     lemma add0r     <= ZModP.ZModpField.add0r,
@@ -650,8 +668,18 @@ abstract theory ZModP_FiniteField.
     lemma mulf_eq0  <= ZModP.ZModpField.mulf_eq0.
 
   clone import FiniteField as FF with
-    type t   <= t,
-    theory F <- F.
+    type t          <= t,
+    theory F        <- F,
+    op FinType.enum <- map inzmod (range 0 p)
+    proof *.
+
+  realize FinType.enum_spec.
+  proof.
+    move => x; rewrite count_uniq_mem ?b2i_eq1.
+    + rewrite map_inj_in_uniq ?range_uniq // => m n range_m range_n /eq_inzmod.
+      by rewrite !modz_small -?mem_range ?gtr0_norm ?gt0_prime ?prime_p.
+    by apply/mapP; exists (asint x); rewrite asintK /=; apply/mem_range/rg_asint.
+  qed.
 end ZModP_FiniteField.
 
 
@@ -682,25 +710,13 @@ abstract theory SubFiniteField_ZMod.
     op p          <- FStr.char,
     axiom prime_p <- FFStr.prime_char.
 
-(*TODO: the finite import from ZModP_FiniteField is incompatible with the finite from subfinitefield.*)
-(*
   clone import ZModP_FiniteField as ZModPFF with
     type t        <= st,
     op p          <- FStr.char,
     axiom prime_p <- FFStr.prime_char,
     theory ZModP  <- ZModP.
-*)
 
-  (*TODO: what?*)
-(*
-  print ofint.
-  print F.ofint.
-  print ZModPFF.F.ofint.
-  print Sub.val.
-  print ZModP.Sub.val.
-*)
-
-  op is_ofint (x : t) n = (x = F.ofint n).
+  op is_ofint (x : t) n = (x = ofint n).
 
   op in_zmodP x = exists n , is_ofint x n.
 
@@ -716,11 +732,11 @@ abstract theory SubFiniteField_ZMod.
   clone import SubField as SF with
     type t       <= t,
     type st      <= st,
+    theory F     <- SubFiniteField_ZMod.F,
     op p         <- in_zmodP,
     op Sub.insub <- insub,
     op Sub.val   <- val,
-    op Sub.wsT   <- wsT,
-    theory F     <- F
+    op Sub.wsT   <- wsT
     proof *.
 
   realize fieldp.
@@ -736,9 +752,9 @@ abstract theory SubFiniteField_ZMod.
     + by exists 0; move: (dvd_char nx); rewrite dvdzE eq_0 /= => ->; rewrite invr0 ofint0.
     exists (invm nx char); move: (dvdzE char (nx * invm nx char)); rewrite eq_1 /= => Ndvd.
     apply/(mulrI (ofint nx)).
-    + by rewrite -dvd_char; apply/negP => dvd_; apply/Ndvd/dvdz_mulr.
+    + by rewrite -unitfE -dvd_char; apply/negP => dvd_; apply/Ndvd/dvdz_mulr.
     rewrite mulrz divrr //.
-    + by rewrite -dvd_char; apply/negP => dvd_; apply/Ndvd/dvdz_mulr.
+    + by rewrite -unitfE -dvd_char; apply/negP => dvd_; apply/Ndvd/dvdz_mulr.
     rewrite eq_sym -ofint1 -dvd2_char dvdzE -modzDm eq_1 -{1}(modz_small 1 char).
     + by rewrite /= ltr_normr; left; apply/gt1_char.
     by rewrite modzDm.
@@ -755,13 +771,13 @@ abstract theory SubFiniteField_ZMod.
   qed.
 
   realize Sub.valP.
-  proof. by rewrite /in_zmodP /val; move => x; exists (ZModP.Sub.val x). qed.
+  proof. by rewrite /in_zmodP /val; move => x; exists (SubFiniteField_ZMod.ZModP.Sub.val x). qed.
 
   realize Sub.valK.
   proof.
     rewrite /pcancel /insub => x.
-    have in_x: (in_zmodP (ofint (ZModP.Sub.val x))).
-    + by exists (ZModP.Sub.val x).
+    have in_x: (in_zmodP (ofint (SubFiniteField_ZMod.ZModP.Sub.val x))).
+    + by exists (SubFiniteField_ZMod.ZModP.Sub.val x).
     rewrite in_x /=; case: in_x => n is_ofint_.
     move: (argminP idfun (is_ofint (val x)) n _ _).
     + admit.
@@ -776,18 +792,17 @@ abstract theory SubFiniteField_ZMod.
     admit.
   qed.
 
-  (*TODO: include.*)
   clone import SubFiniteField as SFF with
     type t       <- t,
     type ut      <- ut,
     type st      <- st,
-    theory F     <- F,
-    theory FF    <- FF,
+    theory F     <- SubFiniteField_ZMod.F,
+    theory FF    <- SubFiniteField_ZMod.FF,
     theory FStr  <- FStr,
     theory FFStr <- FFStr.
 
   lemma eq_char_zmodcard :
-    char = SFF.FinType.card.
+    char = FinType.card.
   proof.
     admit.
   qed.

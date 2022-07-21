@@ -771,22 +771,27 @@ end IDomain.
 
 (* -------------------------------------------------------------------- *)
 abstract theory Field.
-  clone include IDomain with pred unit (x : t) <= x <> zeror.
+  clone include IDomain.
+
+  axiom unitfP (x : t) : (x <> zeror) => unit x.
+
+  lemma unitfE (x : t) : (x <> zeror) <=> unit x.
+  proof. by split=> [|unit_]; [apply/unitfP|apply/negP => ->>; move: unit_ => /=; apply/unitr0]. qed.
 
   lemma mulfV (x : t): x <> zeror => x * (invr x) = oner.
-  proof. by apply/mulrV. qed.
+  proof. by move/unitfE; apply/mulrV. qed.
 
   lemma mulVf (x : t): x <> zeror => (invr x) * x = oner.
-  proof. by apply/mulVr. qed.
+  proof. by move/unitfE; apply/mulVr. qed.
 
   lemma nosmt divff (x : t): x <> zeror => x / x = oner.
-  proof. by apply/divrr. qed.
+  proof. by move/unitfE; apply/divrr. qed.
 
   lemma nosmt invfM (x y : t) : invr (x * y) = invr x * invr y.
   proof.
   case: (x = zeror) => [->|nz_x]; first by rewrite !(mul0r, invr0).
   case: (y = zeror) => [->|nz_y]; first by rewrite !(mulr0, invr0).
-  by rewrite invrM // mulrC.
+  by rewrite invrM ?unitfP // mulrC.
   qed.
 
   lemma invf_div x y : invr (x / y) = y / x.
@@ -795,8 +800,8 @@ abstract theory Field.
   lemma eqf_div (x1 y1 x2 y2 : t) : y1 <> zeror => y2 <> zeror =>
     (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
   proof.                          (* FIXME: views *)
-  move=> nz_y1 nz_y2; rewrite -{1}(@mulrK y2 _ x1) //.
-  rewrite  -{1}(@mulrK y1 _ x2) // -!mulrA (@mulrC (invr y1)) !mulrA.
+  move=> nz_y1 nz_y2; rewrite -{1}(@mulrK y2 _ x1) ?unitfP //.
+  rewrite  -{1}(@mulrK y1 _ x2) ?unitfP // -!mulrA (@mulrC (invr y1)) !mulrA.
   split=> [|->] //;
     (have nz_Vy1: invr y1 <> zeror by rewrite invr_eq0);
     (have nz_Vy2: invr y2 <> zeror by rewrite invr_eq0).

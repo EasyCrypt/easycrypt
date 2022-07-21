@@ -592,7 +592,8 @@ end ComRingModule.
 abstract theory IDomainModule.
   type scalar, t.
 
-  clone import IDomain as IDScalar with type t <= scalar.
+  clone import IDomain as IDScalar with
+    type t <= scalar.
 
   clone include ComRingModule with
     type scalar     <- scalar,
@@ -604,7 +605,8 @@ end IDomainModule.
 abstract theory VectorSpace.
   type scalar, t.
 
-  clone import Field as FScalar with type t <= scalar.
+  clone import Field as FScalar with
+    type t <= scalar.
 
   clone include IDomainModule with
     type scalar     <- scalar,
@@ -620,17 +622,22 @@ abstract theory SubComRingModule.
   clone import ComRing as CR with
     type t <= t.
 
-  clone import SubComRing
-    with type t <= t,
-    type st <= st,
+  clone import ComRingPred as CRPr with
+    type t    <= t,
     theory CR <- CR.
+
+  clone import SubComRing with
+    type t      <= t,
+    type st     <= st,
+    theory CR   <- CR,
+    theory CRPr <- CRPr.
 
   import Sub.
 
   op ( ** ) (x : st) (a : t) : t =
     val x * a.
 
-  clone ComRingModule with
+  clone import ComRingModule as CRM with
     type scalar     <- st,
     type t          <- t,
     theory CRScalar <- SubComRing.SCR,
@@ -658,10 +665,37 @@ abstract theory SubIDomainModule.
   clone import IDomain as ID with
     type t <= t.
 
+  clone import IDomainPred as IDPr with
+    type t    <= t,
+    theory ID <- ID.
+
+  clone import SubIDomain with
+    type t      <= t,
+    type st     <= st,
+    theory ID   <- ID,
+    theory IDPr <- IDPr.
+
+  import Sub.
+
+  op ( ** ) (x : st) (a : t) : t =
+    val x * a.
+
+  clone import IDomainModule as IDM with
+    type scalar     <- st,
+    type t          <- t,
+    theory IDScalar <- SubIDomain.SID,
+    theory ZMod     <- ID,
+    op     ( ** )   <- ( ** ).
+
+  (*TODO: why must I use SubIDomainModule.IDPr?*)
   clone include SubComRingModule with
-    type t    <- t,
-    type st   <- st,
-    theory CR <- ID.
+    type t            <- t,
+    type st           <- st,
+    theory CR         <- ID,
+    theory CRPr       <- SubIDomainModule.IDPr,
+    theory SubComRing <- SubIDomain,
+    op ( ** )         <- ( ** ),
+    theory CRM        <- IDM.
 end SubIDomainModule.
 
 (* -------------------------------------------------------------------- *)
@@ -671,8 +705,34 @@ abstract theory SubVectorSpace.
   clone import Field as F with
     type t <= t.
 
+  clone import FieldPred as FPr with
+    type t   <= t,
+    theory F <- F.
+
+  clone import SubField with
+    type t     <= t,
+    type st    <= st,
+    theory F   <- F,
+    theory FPr <- FPr.
+
+  import Sub.
+
+  op ( ** ) (x : st) (a : t) : t =
+    val x * a.
+
+  clone import VectorSpace as VS with
+    type scalar    <- st,
+    type t         <- t,
+    theory FScalar <- SubField.SF,
+    theory ZMod    <- F,
+    op     ( ** )  <- ( ** ).
+
   clone include SubIDomainModule with
-    type t    <- t,
-    type st   <- st,
-    theory ID <- F.
+    type t            <- t,
+    type st           <- st,
+    theory ID         <- F,
+    theory IDPr       <- SubVectorSpace.FPr,
+    theory SubIDomain <- SubField,
+    op ( ** )         <- ( ** ),
+    theory IDM        <- VS.
 end SubVectorSpace.

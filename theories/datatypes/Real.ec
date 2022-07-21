@@ -49,6 +49,8 @@ hint rewrite lte_fromint : le_fromint lt_fromint.
 
 (* -------------------------------------------------------------------- *)
 theory RField.
+
+print Ring.Field.
   clone include Ring.Field with
     type t <- real,
     op   zeror <- 0%r,
@@ -56,7 +58,8 @@ theory RField.
     op   ( + ) <- CoreReal.add,
     op   [ - ] <- CoreReal.opp,
     op   ( * ) <- CoreReal.mul,
-    op   invr  <- CoreReal.inv
+    op   invr  <- CoreReal.inv,
+    pred unit  <- (fun x => x <> 0%r)
     proof *
   remove abbrev (-) remove abbrev (/).
   realize addrA     by smt().
@@ -68,10 +71,11 @@ theory RField.
   realize mulrC     by smt().
   realize mul1r     by smt().
   realize mulrDl    by smt().
-  realize mulVr     by rewrite /left_inverse_in /#.
+  realize mulVr by rewrite /left_inverse_in /#.
   realize unitP     by smt().
-  realize unitout   by move=> x /= ->. 
+  realize unitout   by move=> x /= ->.
   realize mulf_eq0  by smt().
+  realize unitfP    by smt().
 
   lemma nosmt ofintR (i : int): ofint i = i%r.
   proof.

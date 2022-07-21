@@ -290,7 +290,8 @@ clone import Ring.Field as ZModpField with
   op   ( + ) <- ( + ),
   op   [ - ] <- ([-]),
   op   ( * ) <- ( * ),
-  op   invr  <- inv
+  op   invr  <- inv,
+  pred unit  <- unit
   proof *.
 
 realize addrA.     proof. by apply/ZModule.addrA. qed.
@@ -304,13 +305,13 @@ realize mulrDl.    proof. by apply/ComRing.mulrDl. qed.
 realize oner_neq0. proof. by apply/ComRing.oner_neq0. qed.
 
 realize mulVr.
-proof. by move=> x nz_x; rewrite &(ComRing.mulVr) unitE. qed.
+proof. by move=> x nz_x; rewrite &(ComRing.mulVr). qed.
 
 realize unitP.
-proof. by move=> x y h; rewrite -unitE &(ComRing.unitP _ y). qed.
+proof. by move=> x y h; rewrite &(ComRing.unitP _ y). qed.
 
 realize unitout.
-proof. by move=> x; rewrite -unitE &(ComRing.unitout). qed.
+proof. by move=> x; rewrite &(ComRing.unitout). qed.
 
 realize mulf_eq0.
 proof.                          (* FIXME: should be generic *)
@@ -319,6 +320,9 @@ move=> nz_x; split=> [|->]; last by rewrite ZModpRing.mulr0.
 move=> h; apply: (ZModpRing.mulrI x); last by rewrite ZModpRing.mulr0.
 by rewrite unitE.
 qed.
+
+realize unitfP.
+proof. by move=> ?; rewrite unitE. qed.
 
 (* -------------------------------------------------------------------- *)
 instance field with zmod
@@ -339,7 +343,7 @@ instance field with zmod
   proof mulrA     by apply/ZModpField.mulrA
   proof mulrC     by apply/ZModpField.mulrC
   proof mulrDl    by apply/ZModpField.mulrDl
-  proof mulrV     by apply/ZModpField.mulrV
+  proof mulrV     by (move=> ? /unitE; apply/ZModpField.mulrV)
   proof expr0     by apply/ZModpField.expr0
   proof exprS     by apply/ZModpField.exprS
   proof exprN     by (move=> ?? _; apply/ZModpField.exprN).
@@ -409,7 +413,7 @@ proof.
   rewrite -(invrK (exp (inzmod _) _)); apply congr1.
   rewrite -exprN -(mul1r (ZModField.ZModpField.exp _ _)).
   rewrite -(expr1z (- n %/ k)) -eq_exp_one -exprM mulrN Ring.IntID.mulrC -exprD.
-  + apply/negP => eq_inzmod_zero; move: eq_inzmod_zero eq_exp_one => ->.
+  + apply/unitE/negP => eq_inzmod_zero; move: eq_inzmod_zero eq_exp_one => ->.
     by rewrite expr0z neqk0 /= eq_sym oner_neq0.
   by rewrite -opprD -divz_eq inzmod_exp oppr_ge0 ltzW //= ltrNge.
 qed.

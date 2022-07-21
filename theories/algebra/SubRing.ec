@@ -3,7 +3,8 @@ require import AllCore List Ring Int IntDiv Bigalg.
 require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
-(* -------------------------------------------------------------------- *)
+
+(* ==================================================================== *)
 theory ZModulePred.
   type t.
 
@@ -36,8 +37,8 @@ theory ComRingPred.
   clone import ComRing as CR with
     type t <= t.
 
-  clone import ZModulePred with
-    type t      <= t,
+  clone include ZModulePred with
+    type t      <- t,
     theory ZMod <- CR.
 
   inductive comringpred (p : t -> bool) =
@@ -81,8 +82,8 @@ theory IDomainPred.
   clone import IDomain as ID with
     type t <= t.
 
-  clone import ComRingPred with
-    type t    <= t,
+  clone include ComRingPred with
+    type t    <- t,
     theory CR <- ID.
 
   inductive idomainpred (p : t -> bool) =
@@ -123,8 +124,8 @@ theory FieldPred.
   clone import Field as F with
     type t <= t.
 
-  clone import IDomainPred with
-    type t    <= t,
+  clone include IDomainPred with
+    type t    <- t,
     theory ID <- F.
 
   inductive fieldpred (p : t -> bool) =
@@ -166,7 +167,7 @@ abstract theory SubZModule.
   clone import ZModule as ZMod with
     type t <= t.
 
-  clone import ZModulePred with
+  clone import ZModulePred as ZModPr with
     type t      <= t,
     theory ZMod <- ZMod.
 
@@ -221,11 +222,9 @@ abstract theory SubComRing.
   clone import ComRing as CR with
     type t <= t.
 
-  clone import ComRingPred with
+  clone import ComRingPred as CRPr with
     type t    <= t,
     theory CR <- CR.
-
-  import ComRingPred.ZModulePred.
 
   op p : t -> bool.
 
@@ -237,21 +236,17 @@ abstract theory SubComRing.
     type t  <- t ,
     type st <- st,
     op    p <- p ,
-
-    theory ZMod        <- CR,
-    theory ZModulePred <- ComRingPred.ZModulePred
-
+    theory ZMod   <- CR,
+    theory ZModPr <- CRPr
     proof zmodulep.
 
   realize zmodulep. by apply/comringpred_zmodule. qed.
-
-  clear [SZMod.* SZMod.AddMonoid.*].
 
   import Sub.
 
   op oner      = insubd oner.
   op ( * ) x y = insubd (val x * val y).
-  op invr x    = insubd (invr (val x)).
+  op invr x    = insubd (invr (val x)). print unit.
   pred unit x  = unit (val x).
 
   lemma val1 : val oner = CR.oner.
@@ -299,13 +294,13 @@ abstract theory SubComRing.
   proof. by move=> x y z; apply/val_inj; rewrite valD !valM valD mulrDl. qed.
 
   realize mulVr.
-  proof. by move=> x unit_x; apply/val_inj; rewrite valM valV val1 mulVr. qed.
+  proof. by move=> x ?; apply/val_inj; rewrite valM valV val1 mulVr. qed.
 
   realize unitP.
-  proof. by move=> x y eq_1; rewrite /unit; apply/(unitP _ (val y)); rewrite -valM -val1 eq_1. qed.
+  proof. by move=> x y /(congr1 val); rewrite valM val1 => /unitP. qed.
 
   realize unitout.
-  proof. by move => x ?; apply/val_inj; rewrite valV unitout. qed.
+  proof. by move=> x ?; apply/val_inj; rewrite valV unitout. qed.
 end SubComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -315,11 +310,9 @@ abstract theory SubIDomain.
   clone import IDomain as ID with
     type t <= t.
 
-  clone import IDomainPred with
+  clone import IDomainPred as IDPr with
     type t    <= t,
     theory ID <- ID.
-
-  import IDomainPred.ComRingPred.
 
   op p : t -> bool.
 
@@ -331,15 +324,11 @@ abstract theory SubIDomain.
     type t  <- t ,
     type st <- st,
     op    p <- p ,
-
-    theory CR          <- ID,
-    theory ComRingPred <- IDomainPred.ComRingPred
-
+    theory CR   <- ID,
+    theory CRPr <- IDPr
     proof comringp.
 
   realize comringp. by apply/idomainpred_comring. qed.
-
-  clear [SCR.* SCR.AddMonoid.* SCR.MulMonoid.*].
 
   import Sub.
 
@@ -381,11 +370,9 @@ abstract theory SubField.
   clone import Field as F with
     type t <= t.
 
-  clone import FieldPred with
+  clone import FieldPred as FPr with
     type t   <= t,
     theory F <- F.
-
-  import FieldPred.IDomainPred.
 
   op p : t -> bool.
 
@@ -397,15 +384,11 @@ abstract theory SubField.
     type t  <- t ,
     type st <- st,
     op    p <- p ,
-
-    theory ID          <- F,
-    theory IDomainPred <- FieldPred.IDomainPred
-
+    theory ID   <- F,
+    theory IDPr <- FPr
     proof idomainp.
 
   realize idomainp. by apply/fieldpred_idomain. qed.
-
-  clear [SID.* SID.AddMonoid.* SID.MulMonoid.*].
 
   import Sub.
 
@@ -416,7 +399,8 @@ abstract theory SubField.
     op [-]    <= ([-]),
     op oner   <= oner,
     op ( * )  <= ( * ),
-    op invr   <= invr
+    op invr   <= invr,
+    pred unit <= unit
     proof *.
 
   realize addrA     by exact SID.addrA.
@@ -428,16 +412,16 @@ abstract theory SubField.
   realize mulrC     by exact SID.mulrC.
   realize mul1r     by exact SID.mul1r.
   realize mulrDl    by exact SID.mulrDl.
+  realize mulVr     by exact SID.mulVr.
+  realize unitP     by exact SID.unitP.
+  realize unitout   by exact SID.unitout.
   realize mulf_eq0  by exact SID.mulf_eq0.
 
-  realize mulVr.
-  proof. by move => x ?; apply/SID.mulVr; rewrite /unit -val0; apply/negP => /val_inj. qed.
-
-  realize unitP.
-  proof. by move => x y /SID.unitP; rewrite /unit -val0; apply/contra => ->. qed.
-
-  realize unitout.
-  proof. by move => x /= ->>; apply/SID.unitout; rewrite /unit val0. qed.
+  realize unitfP.
+  proof.
+    move => x; apply/contraLR => /= neg_unit; apply/val_inj; rewrite val0.
+    by move: neg_unit; apply/contraLR => /= /unitfP.
+  qed.
 end SubField.
 
 
@@ -467,7 +451,7 @@ abstract theory UZMod_ComRing.
   proof. by rewrite /invr val_insubd unitrV valP. qed.
 
   clone import ZModule as UZMod with
-    type t    <- uz,
+    type t    <= uz,
     op zeror  <- oner,
     op (+)    <- ( * ),
     op [-]  <- invr
