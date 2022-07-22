@@ -224,10 +224,23 @@ elim: (asint x) (ge0_asint x) => [|i ge0_i ih]; first by rewrite iter0.
 by rewrite iterS //= inzmodD -ih addrC.
 qed.
 
+lemma ofint_asint x : x = ofint (asint x).
+proof. by rewrite /ofint -intmul_asint. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma inzmodW (P : zmod -> bool) :
   (forall i, 0 <= i < p => P (inzmod i)) => forall n, P n.
 proof. by move=> ih n; rewrite -(asintK n) &(ih) rg_asint. qed.
+
+lemma ofint_inzmod z :
+  ofint z = inzmod z.
+proof.
+wlog: z / (0 <= z) => [/(_ _ (normr_ge0 z))|].
++ rewrite normE; case: (0 <= z) => // _.
+  by rewrite ofintN inzmodN eqr_opp.
+elim: z => [|n le0n IHn]; [by rewrite ofint0|].
+by rewrite ofintS // inzmodD IHn addrC.
+qed.
 
 (* -------------------------------------------------------------------- *)
 theory DZmodP.

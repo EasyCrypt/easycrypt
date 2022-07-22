@@ -579,6 +579,14 @@ qed.
 lemma nosmt divzDr m n d : d %| n => (m + n) %/ d = (m %/ d) + (n %/ d).
 proof. by move=> dv_n; rewrite addrC divzDl // addrC. qed.
 
+lemma eq_mod m n d : d %| (m - n) <=> m %% d = n %% d.
+proof.
+split => [/dvdzP [q] /subr_eq ->>|]; [by apply/modzMDl|].
+move => eq_mod; apply/dvdzP; exists ((m - n) %/ d).
+rewrite {1}(divz_eq (m - n) d) addrC eq_sym -subr_eq /= eq_sym.
+by rewrite -modzDm eq_mod modzDm /= mod0z.
+qed.
+
 lemma divz_mulp (n d1 d2 : int) : 
   0 < d1 =>
   0 < d2 =>

@@ -615,8 +615,9 @@ abstract theory SubFiniteField.
   lemma lt0n :
     0 < n.
   proof.
-    rewrite /n.
-    admit.
+    rewrite /n ltzE /=; move: (ilog_mono SFT.card SFT.card FinType.card).
+    rewrite ilog_b SFCR.card_gt1 SFT.card_gt0 /= => -> //.
+    by rewrite /SFT.card /FinType.card /senum size_map size_filter count_size.
   qed.
 
   lemma eq_card_pow_n :
@@ -624,8 +625,10 @@ abstract theory SubFiniteField.
   proof.
     case: finite_basis_exists => vs [uniq_ [free_ /gen_t_enum_lin mem_e]].
     move: (free_uniq_enum_lin _ uniq_ free_) => uniq_e.
-    move: (size_enum_lin vs).
-    admit.
+    move: (size_enum_lin vs); rewrite (perm_eq_size _ FinType.enum).
+    + apply/uniq_perm_eq => // [|x]; [by apply/FinType.enum_uniq|].
+      by rewrite FinType.enumP mem_e.
+    by rewrite -/FinType.card /n => ->; rewrite ilog_powK // SFCR.card_gt1.
   qed.
 end SubFiniteField.
 
@@ -680,6 +683,10 @@ abstract theory ZModP_FiniteField.
       by rewrite !modz_small -?mem_range ?gtr0_norm ?gt0_prime ?prime_p.
     by apply/mapP; exists (asint x); rewrite asintK /=; apply/mem_range/rg_asint.
   qed.
+
+  lemma eq_card_p :
+    FinType.card = p.
+  proof. by rewrite /FinType.card size_map size_range ler_maxr //=; apply/ltzW/gt0_prime/prime_p. qed.
 end ZModP_FiniteField.
 
 
@@ -727,7 +734,7 @@ abstract theory SubFiniteField_ZMod.
 
   op val (x : st) = ofint (Sub.val x).
 
-  op wsT = zeror.
+  op wsT = ofint (asint witness).
 
   clone import SubField as SF with
     type t       <= t,
@@ -767,7 +774,17 @@ abstract theory SubFiniteField_ZMod.
   proof.
     rewrite /insub; move => x in_x; rewrite in_x /=.
     case: in_x => nx; rewrite /is_ofint => ->>.
-    admit.
+    rewrite (argmin_eq _ _ (nx %% char)) //=.
+    + by apply/modz_ge0/gtr_eqF/gt0_char.
+    + by rewrite /idfun /= -dvd2_char -divzE dvdz_mull dvdzz.
+    + move => j /mem_range mem_j_range; rewrite /idfun /=.
+      rewrite -dvd2_char dvdzE; apply/gtr_eqF.
+      move/mem_range: mem_j_range => [le0j ltj_].
+      rewrite (divz_eq nx char) -addrA modzMDl modz_small; [|by apply/subr_gt0].
+      rewrite subr_ge0 ltzW //= (ltr_le_sub _ `|char| _ 0) //.
+      by apply/ltz_mod/gtr_eqF/gt0_char.
+    rewrite /val -dvd2_char -/asint ofint_inzmod -inzmod_mod inzmodK.
+    by rewrite -opprB dvdzN -divzE dvdz_mull dvdzz.
   qed.
 
   realize Sub.valP.
@@ -779,17 +796,38 @@ abstract theory SubFiniteField_ZMod.
     have in_x: (in_zmodP (ofint (SubFiniteField_ZMod.ZModP.Sub.val x))).
     + by exists (SubFiniteField_ZMod.ZModP.Sub.val x).
     rewrite in_x /=; case: in_x => n is_ofint_.
-    move: (argminP idfun (is_ofint (val x)) n _ _).
-    + admit.
-    + by rewrite /val.
-    rewrite /val {1}/is_ofint /idfun /= => ?.
-    admit.
+    move: (argminP idfun (is_ofint (val x)) (n %% char) _ _).
+    + by apply/modz_ge0/gtr_eqF/gt0_char.
+    + by rewrite /val /idfun /= is_ofint_ /is_ofint -dvd2_char -divzE dvdz_mull dvdzz.
+    rewrite /val {1}/is_ofint /idfun /= => ?; rewrite (argmin_eq _ _ (n %% char)) /=.
+    + by apply/modz_ge0/gtr_eqF/gt0_char.
+    + by rewrite is_ofint_ /is_ofint -dvd2_char -divzE dvdz_mull dvdzz.
+    + move => j /mem_range mem_j_range; rewrite /idfun /=.
+      rewrite is_ofint_ /is_ofint -dvd2_char dvdzE; apply/gtr_eqF.
+      move/mem_range: mem_j_range => [le0j ltj_].
+      rewrite (divz_eq n char) -addrA modzMDl modz_small; [|by apply/subr_gt0].
+      rewrite subr_ge0 ltzW //= (ltr_le_sub _ `|char| _ 0) //.
+      by apply/ltz_mod/gtr_eqF/gt0_char.
+    move: is_ofint_; rewrite -/asint /is_ofint ofint_inzmod -inzmod_mod.
+    move/dvd2_char => dvd_; apply/asint_inj; rewrite inzmodK.
+    rewrite eq_sym -(modz_small (asint x) char); [|by apply/eq_mod].
+    by rewrite ger0_norm ?rg_asint // ge0_char.
   qed.
 
   realize Sub.insubW.
   proof.
-    rewrite /insub /wsT.
-    admit.
+    rewrite /insub /wsT ifT; [by exists (asint witness)|congr].
+    rewrite ofint_inzmod; apply/asint_inj; rewrite inzmodK.
+    rewrite (argmin_eq _ _ (asint witness)) //; [by apply/ge0_asint| |].
+    + move => j /mem_range mem_j_range; rewrite /idfun /=.
+      rewrite /is_ofint -dvd2_char dvdzE; apply/gtr_eqF.
+      move/mem_range: mem_j_range => [le0j ltj_].
+      rewrite (divz_eq (asint witness) char) -addrA modzMDl modz_small.
+      - rewrite subr_ge0 ltzW //=.
+        * by rewrite modz_small //; rewrite ger0_norm ?rg_asint // ge0_char.
+        by rewrite (ltr_le_sub _ `|char| _ 0) //; apply/ltz_mod/gtr_eqF/gt0_char.
+      by apply/subr_gt0; rewrite modz_small //; rewrite ger0_norm ?rg_asint // ge0_char.
+    by rewrite modz_small //; rewrite ger0_norm ?rg_asint // ge0_char.
   qed.
 
   clone import SubFiniteField as SFF with
@@ -800,12 +838,6 @@ abstract theory SubFiniteField_ZMod.
     theory FF    <- SubFiniteField_ZMod.FF,
     theory FStr  <- FStr,
     theory FFStr <- FFStr.
-
-  lemma eq_char_zmodcard :
-    char = FinType.card.
-  proof.
-    admit.
-  qed.
 
   lemma exists_generator :
     exists (g : t) ,
