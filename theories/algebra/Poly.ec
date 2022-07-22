@@ -716,7 +716,46 @@ import BigPoly.
 
 (* -------------------------------------------------------------------- *)
 op peval (p : poly) (a : coeff) =
-  BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p + 1).
+  BCA.bigi predT (fun i => p.[i] * exp a i) 0 (deg p).
+
+lemma peval_extend n p a :
+  deg p <= n =>
+  peval p a = BCA.bigi predT (fun i => p.[i] * exp a i) 0 n.
+proof.
+move => le_n; rewrite /peval (BCA.big_cat_int (deg p) 0 n) ?ge0_deg //.
+rewrite addrC -subr_eq subrr eq_sym BCA.big1_seq // => k [_] /=.
+by move => /mem_range [le_k _]; rewrite gedeg_coeff // mul0r.
+qed.
+
+lemma peval0 a : peval poly0 a = Coeff.zeror.
+proof. by rewrite /peval deg0 range_geq // BCA.big_nil. qed.
+
+lemma peval1 a : peval poly1 a = Coeff.oner.
+proof. by rewrite /peval deg1 rangeS BCA.big_seq1 /= polyCE expr0 mulr1. qed.
+
+lemma pevalX a : peval polyX a = a.
+proof.
+rewrite /peval degX 2?range_ltn //= range_geq // BCA.big_consT BCA.big_seq1 /=.
+by rewrite expr0 expr1 mulr1 !polyXE /= add0r mul1r.
+qed.
+
+lemma pevalD p q a : peval (p + q) a = peval p a + peval q a.
+proof.
+rewrite !(peval_extend (max (deg (p + q)) (max (deg p) (deg q)))).
++ by apply/maxrl.
++ by apply/ger_maxrP; right; apply/maxrl.
++ by apply/ger_maxrP; right; apply/maxrr.
+by rewrite -BCA.big_split; apply/BCA.eq_big_int => ? _ /=; rewrite polyDE mulrDl.
+qed.
+
+lemma pevalN p a : peval (-p) a = - peval p a.
+proof. by rewrite /peval BCA.sumrN degN; apply/BCA.eq_big_int => ? _ /=; rewrite polyNE mulNr. qed.
+
+(*TODO: this, additionnal lemmas and basic root properties.*)
+lemma pevalM p q a : peval (p * q) a = peval p a * peval q a.
+proof.
+admit.
+qed.
 
 (* -------------------------------------------------------------------- *)
 abbrev root p a = peval p a = Coeff.zeror.

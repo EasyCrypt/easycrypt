@@ -334,5 +334,4 @@ abstract theory FieldStruct.
   proof.
     admit.
   qed.
-
 end FieldStruct.

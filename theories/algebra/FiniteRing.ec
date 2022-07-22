@@ -848,6 +848,7 @@ abstract theory SubFiniteField_ZMod.
         iter_frobenius_fixed d g =>
         d = n.
   proof.
+    print size_to_seq_iter_frobenius.
     admit.
   qed.
 end SubFiniteField_ZMod.

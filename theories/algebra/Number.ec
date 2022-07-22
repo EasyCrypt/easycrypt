@@ -1311,7 +1311,23 @@ rewrite maxrE; case: (n2 <= n1).
   by rewrite (ltr_trans _ lt_12 lt_n1m).
 qed.
 
+lemma ger_maxrP m n1 n2 : (m <= maxr n1 n2) <=> (m <= n1) \/ (m <= n2).
+proof. by rewrite -iff_negb negb_or -!ltrNge; apply/ltr_maxrP. qed.
+
+lemma gtr_maxrP m n1 n2 : (m < maxr n1 n2) <=> (m < n1) \/ (m < n2).
+proof. by rewrite -iff_negb negb_or -!lerNgt; apply/ler_maxrP. qed.
+
 (* -------------------------------------------------------------------- *)
+lemma minr_maxr x y : minr x y = - maxr (-x) (-y).
+proof.
+rewrite minrE; case (x <= y) => [lexy|/ltrNge/ltrW ltyx].
++ by rewrite ler_maxl ?ler_opp2 // opprK.
+by rewrite ler_maxr ?ler_opp2 // opprK.
+qed.
+
+lemma maxr_minr x y : maxr x y = - minr (-x) (-y).
+proof. by rewrite minr_maxr !opprK. qed.
+
 lemma minrC (x y : t) : minr x y = minr y x.
 proof. by rewrite !minrE lerNgt ler_eqVlt; case: (y = x); case: (y < x). qed.
 
@@ -1329,6 +1345,18 @@ proof. by rewrite minrC &(ler_minl). qed.
 
 lemma minr_lb (x y : t) : minr x y <= x /\ minr x y <= y.
 proof. by rewrite minrl minrr. qed.
+
+lemma ler_minrP m n1 n2 : (minr n1 n2 <= m) <=> (n1 <= m) \/ (n2 <= m).
+proof. by rewrite minr_maxr ler_oppl ger_maxrP !ler_opp2. qed.
+
+lemma ltr_minrP m n1 n2 : (minr n1 n2 < m) <=> (n1 < m) \/ (n2 < m).
+proof. by rewrite minr_maxr ltr_oppl gtr_maxrP !ltr_opp2. qed.
+
+lemma ger_minrP m n1 n2 : (m <= minr n1 n2) <=> (m <= n1) /\ (m <= n2).
+proof. by rewrite minr_maxr ler_oppr ler_maxrP !ler_opp2. qed.
+
+lemma gtr_minrP m n1 n2 : (m < minr n1 n2) <=> (m < n1) /\ (m < n2).
+proof. by rewrite minr_maxr ltr_oppr ltr_maxrP !ltr_opp2. qed.
 end RealDomain.
 
 (* -------------------------------------------------------------------- *)
