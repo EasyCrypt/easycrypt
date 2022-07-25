@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List Ring Int IntDiv Bigalg.
+require import AllCore List Ring Int IntDiv Bigalg RingStruct.
 require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
@@ -452,9 +452,9 @@ abstract theory UZMod_ComRing.
 
   clone import ZModule as UZMod with
     type t    <= uz,
-    op zeror  <- oner,
-    op (+)    <- ( * ),
-    op [-]  <- invr
+    op zeror  <= oner,
+    op (+)    <= ( * ),
+    op [-]    <= invr
     proof *.
 
   realize addrA.
@@ -468,6 +468,10 @@ abstract theory UZMod_ComRing.
 
   realize addNr.
   proof. by move => x; apply/val_inj; rewrite valM valV val1 mulVr // valP. qed.
+
+  clone import ZModuleStruct as UZModStr with
+    type t      <= uz,
+    theory ZMod <- UZMod.
 end UZMod_ComRing.
 
 (* -------------------------------------------------------------------- *)

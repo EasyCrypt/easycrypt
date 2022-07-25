@@ -153,6 +153,8 @@ abbrev ( ** ) = polyZ.
 
 abbrev ( - ) p q = p + (-q).
 
+abbrev polyNXC c = X - polyC c.
+
 (* -------------------------------------------------------------------- *)
 lemma coeffE p k : ispoly p => (to_polyd p).[k] = p k.
 proof. by move=> ?; rewrite /"_.[_]" to_polydK. qed.
@@ -161,6 +163,9 @@ lemma polyCE c k : (polyC c).[k] = if k = 0 then c else zeror.
 proof. by rewrite coeffE 1:ispolyC. qed.
 
 lemma polyXE k : X.[k] = if k = 1 then oner else zeror.
+proof. by rewrite coeffE 1:ispolyXn. qed.
+
+lemma polyXnE_ n k : (polyXn n).[k] = if (0 <= n /\ k = n) then oner else zeror.
 proof. by rewrite coeffE 1:ispolyXn. qed.
 
 lemma poly0E k : poly0.[k] = zeror.
@@ -188,8 +193,47 @@ move=> i @/predC1 nei /=; rewrite polyXE subr_eq.
 by rewrite (IntID.addrC 1) -subr_eq (eq_sym _ i) nei /= mulr0.
 qed.
 
+lemma polyMXnE p n k : (p * (polyXn n)).[k] = if 0 <= n then p.[k - n] else Coeff.zeror.
+proof.
+rewrite coeffE 1:ispolyM /prepolyM; case ((0 <= n) /\ (k - n \in range 0 (deg p))) => [|]; last first.
++ case/negb_and/or_andr => [Nle0n|[/= le0n]].
+  - rewrite Nle0n /=; move: Nle0n => /ltrNge ltn0; apply/BCA.big1_seq.
+    by move => i [_] /= mem_i_range; rewrite polyXnE_ lerNgt ltn0 /= mulr0.
+  rewrite mem_range andaE negb_and; case => [/ltrNge lt_0|/lerNgt ltdp_].
+  + rewrite le0n /= lt0_coeff //; apply/BCA.big1_seq.
+    move => i [_] /= mem_i_range; rewrite polyXnE_ le0n /= ltr_eqF /= ?mulr0 //.
+    apply/ltr_subl_addr/ltr_subl_addl/(ltr_le_trans 0) => //.
+    by move: mem_i_range; apply/mem_range_le.
+  rewrite le0n /= gedeg_coeff //; apply/BCA.big1_seq.
+  move => i [_] /= mem_i_range; case: (deg p <= i) => [ledpi|/ltrNge ltidp].
+  - by rewrite gedeg_coeff // mul0r.
+  rewrite (gedeg_coeff (polyXn _)) ?mulr0 // deg_leP.
+  - by rewrite subr_ge0; move: mem_i_range; apply/mem_range_ge.
+  move => j le_j; rewrite polyXnE_ le0n /=; rewrite gtr_eqF //.
+  move: le_j; apply/ltr_le_trans/ltr_subr_addr/ltr_subr_addl.
+  by move: ltidp ltdp_; apply/ltr_le_trans.
+move => [le0n mem_subkn_range]; rewrite le0n /=.
+rewrite (BCA.big_cat_int (k - n)).
++ by move: mem_subkn_range; apply/mem_range_le.
++ by apply/ler_add2l/ler_oppl/ltzW/ltzE.
+rewrite BCA.big1_seq ?add0r.
++ move => i [_] /= mem_i_range; rewrite polyXnE_ le0n /= gtr_eqF /= ?mulr0 //.
+  by apply/ltr_subr_addr/ltr_subr_addl; move: mem_i_range; apply/mem_range_gt.
+rewrite BCA.big_int_recl /=; [by apply/ler_subl_addr/ler_subl_addl|].
+rewrite opprD /= addrA /= polyXnE_ le0n /= mulr1 BCA.big1_seq ?addr0 //.
+move => i [_] /= mem_i_range; rewrite polyXnE_ le0n /= ltr_eqF /= ?mulr0 //.
+by apply/ltr_subl_addr/ltr_subl_addl/ltzS; move: mem_i_range; apply/mem_range_le.
+qed.
+
 lemma polyZE z p k : (z ** p).[k] = z * p.[k].
 proof. by rewrite coeffE 1:ispolyZ. qed.
+
+lemma polyNXCE c k :
+  (polyNXC c).[k] = if k = 0 then -c else if k = 1 then Coeff.oner else Coeff.zeror.
+proof.
+by rewrite polyDE polyNE polyXE polyCE; case: (k = 0) => [->>/=|_]; [|case (k = 1) => _];
+[rewrite add0r|rewrite subr0|rewrite subr0].
+qed.
 
 hint rewrite coeffpE : poly0E polyDE polyNE polyME polyZE.
 
@@ -327,6 +371,13 @@ lemma degX : deg X = 2.
 proof.
 apply/degP=> //=; first by rewrite polyXE /= oner_neq0.
 by move=> c ge2_c; rewrite polyXE gtr_eqF //#.
+qed.
+
+lemma degNXC c : deg (polyNXC c) = 2.
+proof.
+apply/degP => //; [by rewrite polyNXCE /= oner_neq0|].
+move => i le2i; rewrite polyNXCE gtr_eqF 1?(ltr_le_trans 2) //=.
+by rewrite gtr_eqF 1?(ltr_le_trans 2).
 qed.
 
 lemma nz_polyX : X <> poly0.
@@ -540,6 +591,15 @@ case: (j < deg p) => [lt_jp|/lerNgt le_pk].
 - by rewrite gedeg_coeff ?mul0r //#.
 qed.
 
+lemma degM_le_or p q : p <> poly0 \/ q <> poly0 =>
+  deg (p * q) + 1 <= deg p + deg q.
+proof.
+case (p = poly0) => [->>|neqp0]; (case (q = poly0) => [->>|neqq0] //=).
++ by rewrite mul0r deg0 /= deg_ge1.
++ by rewrite mulr0 deg0 /= deg_ge1.
+by apply/degM_le.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma degM_proper p q :
   lc p * lc q <> Coeff.zeror => deg (p * q) = (deg p + deg q) - 1.
@@ -733,6 +793,12 @@ proof. by rewrite /peval deg0 range_geq // BCA.big_nil. qed.
 lemma peval1 a : peval poly1 a = Coeff.oner.
 proof. by rewrite /peval deg1 rangeS BCA.big_seq1 /= polyCE expr0 mulr1. qed.
 
+lemma pevalC c a : peval (polyC c) a = c.
+proof.
+case: (c = Coeff.zeror) => [->>|negc0]; [by apply/peval0|].
+by rewrite /peval degC negc0 rangeS BCA.big_seq1 /= polyCE expr0 mulr1.
+qed.
+
 lemma pevalX a : peval polyX a = a.
 proof.
 rewrite /peval degX 2?range_ltn //= range_geq // BCA.big_consT BCA.big_seq1 /=.
@@ -751,14 +817,152 @@ qed.
 lemma pevalN p a : peval (-p) a = - peval p a.
 proof. by rewrite /peval BCA.sumrN degN; apply/BCA.eq_big_int => ? _ /=; rewrite polyNE mulNr. qed.
 
-(*TODO: this, additionnal lemmas and basic root properties.*)
+lemma pevalB p q a : peval (p - q) a = peval p a - peval q a.
+proof. by rewrite pevalD pevalN. qed.
+
 lemma pevalM p q a : peval (p * q) a = peval p a * peval q a.
 proof.
-admit.
+case: (p = poly0) => [->>|neqp0]; (case: (q = poly0) => [->>|neqq0]).
++ by rewrite mul0r !peval0 mul0r.
++ by rewrite mul0r !peval0 mul0r.
++ by rewrite mulr0 !peval0 mulr0.
+rewrite (peval_extend (deg p + deg q - 1)) ?BigCf.mulr_big /=.
++ by apply/ler_subr_addr/degM_le.
+rewrite (BCA.eq_big_seq _
+          (fun i =>
+            BCA.bigi predT
+              (fun j =>
+                (((fun (ij : int * int) => p.[ij.`1] * q.[ij.`2] * exp a (ij.`1 + ij.`2)) \o
+                  (fun (ij : int * int) => (ij.`2, ij.`1 - ij.`2)))
+                   ((fun i j => (i, j)) i j)))
+              0 (deg p + deg q - 1))).
++ move => i mem_i_range /=; rewrite polyME BCA.mulr_suml.
+  rewrite (BCA.big_cat_int (i + 1) 0 (deg p + deg q - 1)).
+  - by rewrite addr_ge0 //; move: mem_i_range; apply/mem_range_le.
+  - by apply/ltzE; move: mem_i_range; apply/mem_range_gt.
+  rewrite (BCA.big1_seq _ _ (range (i + 1) _)).
+  - move => j [_] mem_j_range; rewrite /idfun /(\o) /= addrA addrAC /=.
+    rewrite (lt0_coeff q) ?mulr0 ?mul0r //.
+    by apply/subr_lt0/ltzE; move: mem_j_range; apply/mem_range_le.
+  by rewrite addr0; apply/BCA.eq_big_seq => ? _; rewrite /(\o) /= addrA addrAC.
+rewrite -(BCA.big_allpairs _ ((\o) _ _)).
+rewrite (BCA.eq_big_seq _
+          (fun i =>
+            BCA.bigi predT
+              (fun j => ((fun (ij : int * int) => p.[ij.`1] * q.[ij.`2] * exp a (ij.`1 + ij.`2)) ((fun i j => (i, j)) i j)))
+              0 (deg q))).
++ move => i mem_i_range /=; apply/BCA.eq_big_seq => j mem_j_range /=.
+  rewrite /idfun /= exprD_nneg.
+  - by move: mem_i_range; apply/mem_range_le.
+  - by move: mem_j_range; apply/mem_range_le.
+  by rewrite !mulrA (Coeff.mulrAC (_.[_])).
+rewrite -BCA.big_allpairs (BCA.bigEM (fun (ij : int * int) => ij.`2 \in range 0 (deg p) /\ ij.`1 - ij.`2 \in range 0 (deg q))).
+rewrite -BCA.big_filter (BCA.big1_seq (predC _)) ?addr0.
++ move => [i j]; rewrite /predC /= => -[] /negb_and or_ /allpairsP [] [? ?] /=.
+  move => [mem_i_range] [mem_j_range] [<<- <<-]; rewrite /(\o) /= addrA addrAC /=; move: or_.
+  rewrite !mem_range !andaE !negb_and; case => [[/ltrNge|/lerNgt]|[/ltrNge|/lerNgt]] ?.
+  - by rewrite (lt0_coeff p) // !mul0r.
+  - by rewrite (gedeg_coeff p) // !mul0r.
+  - by rewrite (lt0_coeff q) // mulr0 mul0r.
+  by rewrite (gedeg_coeff q) // mulr0 mul0r.
+rewrite -BCA.big_mapT; apply/BCA.eq_big_perm/uniq_perm_eq.
++ apply/uniq_map_injective; [|apply/filter_uniq/allpairs_uniq => //=].
+  - by move => [i j] [k l] /= [<<-] /=; apply/IntID.addIr.
+  - by apply/range_uniq.
+  by apply/range_uniq.
++ apply/allpairs_uniq => //=.
+  - by apply/range_uniq.
+  by apply/range_uniq.
+move => [? ?]; split.
++ move => /mapP [] [i j] [] /mem_filter /= [] [mem_j_range mem_subij_range] _ [->> ->>].
+  by apply/allpairsP; exists (j, i - j) => /=; split.
+move => /allpairsP [] [i j] /= [mem_i_range] [mem_j_range] [->> ->>].
+apply/mapP; exists (i + j, i) => /=; rewrite (IntID.addrAC i) /=.
+apply/mem_filter => /=; rewrite (IntID.addrAC i) /= mem_i_range mem_j_range /=.
+apply/allpairsP; exists (i + j, i) => /=; split.
++ by move: (mem_range_add2 _ _ _ _ _ _ mem_i_range mem_j_range).
+move: mem_i_range; apply/mem_range_incl => //.
+by rewrite -addrA -ler_subl_addl /= subr_ge0 deg_ge1.
 qed.
+
+lemma pevalZ c p a : peval (c ** p) a = c * peval p a.
+proof. by rewrite scalepE pevalM pevalC. qed.
 
 (* -------------------------------------------------------------------- *)
 abbrev root p a = peval p a = Coeff.zeror.
+
+lemma root0 a :
+  root poly0 a.
+proof. by rewrite peval0. qed.
+
+lemma root1 a :
+  ! root poly1 a.
+proof. by rewrite peval1 oner_neq0. qed.
+
+lemma rootC c a :
+  root (polyC c) a <=> c = Coeff.zeror.
+proof. by rewrite pevalC. qed.
+
+lemma rootNXC c a :
+  root (polyNXC c) a <=> c = a.
+proof. by rewrite pevalB pevalX pevalC subr_eq0 eq_sym. qed.
+
+lemma rootD p q a :
+  root p a =>
+  root q a =>
+  root (p + q) a.
+proof. by rewrite pevalD => -> ->; rewrite addr0. qed.
+lemma rootN p a :
+  root p a =>
+  root (-p) a.
+proof. by rewrite pevalN => ->; rewrite oppr0. qed.
+
+lemma rootB p q a :
+  root p a =>
+  root q a =>
+  root (p - q) a.
+proof. by rewrite pevalB => -> ->; rewrite subr0. qed.
+
+lemma rootMl p q a :
+  root p a =>
+  root (p * q) a.
+proof. by rewrite pevalM => ->; rewrite mul0r. qed.
+
+lemma rootMr p q a :
+  root q a =>
+  root (p * q) a.
+proof. by rewrite mulrC; apply/rootMl. qed.
+
+lemma rootZl c p a :
+  c = Coeff.zeror =>
+  root (c ** p) a.
+proof. by move => ->>; rewrite scalepE; apply/rootMl/root0. qed.
+
+lemma rootZr c p a :
+  root p a =>
+  root (c ** p) a.
+proof. by rewrite scalepE; apply/rootMr. qed.
+
+lemma root_fact p a :
+  root p a =>
+  exists q , p = (polyNXC a) * q.
+proof.
+move: {1 3}(deg p) (ge0_deg p) (lerr (deg p)) => n le0n; elim: n le0n p => [|n le0n IHn] p ledp_.
++ move: (ge0_deg p) => le0dp; move: (eqz_leq (deg p) 0); rewrite le0dp ledp_ /=.
+  by move => /deg_eq0 ->> _; exists poly0; rewrite mulr0.
+move/ler_eqVlt: ledp_ => [/IntID.subr_eq <<-|/ltzS]; [|by apply/IHn].
+case/ler_eqVlt: (ge0_deg p) => [/eq_sym /deg_eq0 ->> _|/ltzE /= /ler_eqVlt [/eq_sym /deg_eq1|lt1dp]].
++ by exists poly0; rewrite mulr0.
++ by move => [c] [neqc0 ->>] /rootC ->>; exists poly0; rewrite mulr0.
+move => rootpa; move/(_ (p - (lc p) ** (polyNXC a * polyXn (deg p - 2))) _ _): IHn.
++ apply/deg_leP => // n le_n {le0n}; rewrite polyDE polyNE polyZE polyMXnE polyNXCE.
+  rewrite subr_ge0 -ltzS -ltr_subl_addr lt1dp /= gtr_eqF /=; [by apply/subr_gt0/ltzE|].
+  case/ler_eqVlt: le_n => [<<- /=| lt_n]; [by rewrite opprD !addrA (IntID.addrAC (deg _)) /= mulr1 subrr|].
+  by rewrite gtr_eqF ?ltr_subr_addr //= mulr0 subr0; move/ltzE: lt_n => /= ?; apply/gedeg_coeff.
++ by rewrite rootB // rootZr // rootMl // rootNXC.
+move => [q] /subr_eq ->; exists (q + polyC (lc p) * polyXn (deg p - 2)).
+by rewrite mulrDr scalepE (mulrC (polyC _)) !mulrA mulrAC.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op prepolyL (a : coeff list) = fun i => nth Coeff.zeror a i.
@@ -998,5 +1202,49 @@ lemma degV (p : poly) : deg (polyV p) = deg p.
 proof.
 rewrite /polyV; case: (deg p = 1); last done.
 by case/deg_eq1=> c [nz_c ->>]; rewrite !degC polyCE /= invr_eq0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma rootM p q a :
+  root (p * q) a <=> (root p a \/ root q a).
+proof.
+split => [|[|]]; [|by apply/rootMl|by apply/rootMr].
+by rewrite pevalM; apply/contraLR => /negb_or []; apply/IDCoeff.mulf_neq0.
+qed.
+
+lemma is_finite_root p : p <> poly0 => is_finite (root p).
+proof.
+move => neqp0; move/deg_ge1/subr_ge0: (neqp0) => le0_; move: {1 3}(deg p - 1) le0_ (eq_refl (deg p - 1)).
+move => n le0n; elim: n le0n p neqp0 => [|n le0n IHn] p; [rewrite subr_eq0 deg_eq1 => _|].
++ by case => c [neqc0 ->>]; apply/finiteP; exists [] => a /=; rewrite rootC.
+move => neqp0 eq_; case: (exists a , root p a); last first.
++ by move/negb_exists => /= forall_; apply/finiteP; exists [] => a /=; apply/forall_.
+case => a rootpa; case: (root_fact _ _ rootpa) => q ->>; rewrite mulf_eq0 negb_or in neqp0.
+case: neqp0 => neqNXC0 neqq0; move: eq_; rewrite degM // degNXC /= => eqdq_.
+move/(_ q _): IHn => //; rewrite eqdq_ /= => /finiteP [s] /= forall_.
+by apply/finiteP; exists (a :: s) => x /= /rootM [/rootNXC ->//|/forall_] ->.
+qed.
+
+lemma size_roots p : p <> poly0 => size (to_seq (root p)) <= deg p - 1.
+proof.
+move => neqp0; move/deg_ge1/subr_ge0: (neqp0) => le0_; move: {1 3}(deg p - 1) le0_ (eq_refl (deg p - 1)).
+move => n le0n; elim: n le0n p neqp0 => [|n le0n IHn] p; [rewrite subr_eq0 deg_eq1 => _|].
++ case => c [neqc0 ->>]; rewrite degC neqc0 /= size_le0 /to_seq; pose P:= (fun s => _ _ s).
+  move: (choicebP P [] _); rewrite /P => {P}; [by exists []; rewrite /is_finite_for /= => ?; rewrite pevalC|].
+  by pose s:= choiceb _ _; move: s => s; rewrite /is_finite_for => -[? forall_]; apply/mem_eq0 => a; rewrite forall_ pevalC.
+move => neqp0 eq_; case: (exists a , root p a); last first.
++ move/negb_exists => /= forall_; apply/(ler_trans 0); [|by apply/subr_ge0/deg_ge1].
+  rewrite size_le0 /to_seq; pose P:= (fun s => _ _ s).
+  move: (choicebP P [] _); rewrite /P => {P}; [by exists []; rewrite /is_finite_for /= => ?; apply/forall_|].
+  by pose s:= choiceb _ _; move: s => s; rewrite /is_finite_for => -[? forall_']; apply/mem_eq0 => a; rewrite forall_' forall_.
+case => a rootpa; case: (root_fact _ _ rootpa) => q ->>; rewrite mulf_eq0 negb_or in neqp0.
+case: neqp0 => neqNXC0 neqq0; move: eq_; rewrite degM // degNXC /= => eqdq_; move/(_ q _): IHn => //; rewrite eqdq_ /=.
+pose s:= to_seq _; move => le_n; rewrite (perm_eq_size _ (a :: rem a s)); last first.
++ by rewrite /= /rem; case: (a \in s) => ?; [rewrite size_rem // addrA addrAC /= ltzW ltzS|rewrite addrC rem_id // ler_add2r].
+apply/uniq_perm_eq; [by apply/uniq_to_seq/is_finite_root/mulf_neq0| |].
++ by rewrite /= rem_uniq /= ?rem_filter; [apply/uniq_to_seq/is_finite_root|apply/uniq_to_seq/is_finite_root|rewrite mem_filter /predC1].
+move => c; rewrite mem_to_seq /=; [by apply/is_finite_root/mulf_neq0|]; rewrite rootM rootNXC eq_sym.
+rewrite rem_filter; [by apply/uniq_to_seq/is_finite_root|]; rewrite mem_filter mem_to_seq; [by apply/is_finite_root|].
+by rewrite /= /predC1; case (c = a).
 qed.
 end Poly.

@@ -132,6 +132,55 @@ abstract theory ZModuleStruct.
 
   lemma eqv_orbit_trans x : transitive (eqv_orbit x).
   proof. by move => y z t; rewrite /eqv_orbit => orbit1 orbit2; move: (orbitD _ _ _ orbit1 orbit2); rewrite addrA subrK. qed.
+
+  pred is_zmod_automorph (f : t -> t) =
+    bijective f /\
+    f zeror = zeror /\
+    forall (x y : t) , f (x + y) = f x + f y.
+
+  lemma zmod_automorph_idfun :
+    is_zmod_automorph idfun.
+  proof. by rewrite /is_zmod_automorph bij_idfun /idfun. qed.
+
+  lemma zmod_automorphism_comp f g :
+    is_zmod_automorph f =>
+    is_zmod_automorph g =>
+    is_zmod_automorph (f \o g).
+  proof.
+    rewrite /is_zmod_automorph /(\o) => |> ?? fD ?-> gD.
+    by rewrite bij_comp //=; split => // ??; rewrite gD fD.
+  qed.
+
+  lemma zmod_automorph_bij f :
+    is_zmod_automorph f =>
+    bijective f.
+  proof. by case. qed.
+
+  lemma zmod_automorph_inv f :
+    is_zmod_automorph f =>
+    exists g ,
+      cancel f g /\
+      is_zmod_automorph g.
+  proof.
+    rewrite /is_zmod_automorph => |> bijf; move: bijf (bijf) => /bij_inj injf.
+    move => /> g canfg cangf f0 fD; exists g; rewrite canfg /=; split; [by exists f; split|].
+    by rewrite -{1}f0 canfg /= => x y; apply/injf; rewrite fD !cangf.    
+  qed.
+
+  lemma zmod_automorph0 f :
+    is_zmod_automorph f =>
+    f zeror = zeror.
+  proof. by case => _ []. qed.
+
+  lemma zmod_automorphD f x y :
+    is_zmod_automorph f =>
+    f (x + y)%ZMod = f x + f y.
+  proof. by case => _ [_ ->]. qed.
+
+  lemma zmod_automorphN f x :
+    is_zmod_automorph f =>
+    f (-x)%ZMod = - f x.
+  proof. by rewrite -addr_eq0 => -[_ [? <-]]; rewrite addNr. qed.
 end ZModuleStruct.
 
 (* -------------------------------------------------------------------- *)
@@ -179,6 +228,94 @@ abstract theory ComRingStruct.
   proof.
     rewrite dvd_order -(mulr1 x) -mulrzAr.
     by move: ofint_char; rewrite /ofint => ->; rewrite mulr0.
+  qed.
+
+  pred is_comring_automorph (f : t -> t) =
+    is_zmod_automorph f /\
+    f oner = oner /\
+    forall (x y : t) , f (x * y) = f x * f y.
+
+  lemma comring_zmod_automorph f:
+    is_comring_automorph f =>
+    is_zmod_automorph f.
+  proof. by case. qed.
+
+  lemma comring_automorph_idfun :
+    is_comring_automorph idfun.
+  proof. by rewrite /is_comring_automorph zmod_automorph_idfun /idfun. qed.
+
+  lemma comring_automorphism_comp f g :
+    is_comring_automorph f =>
+    is_comring_automorph g =>
+    is_comring_automorph (f \o g).
+  proof.
+    rewrite /is_comring_automorph => |> ? f0 fM ? g0 gM.
+    rewrite zmod_automorphism_comp //= /(\o) g0 f0 /= => ??.
+    by rewrite gM fM.
+  qed.
+
+  lemma comring_automorph_bij f :
+    is_comring_automorph f =>
+    bijective f.
+  proof. by move/comring_zmod_automorph/zmod_automorph_bij. qed.
+
+  lemma comring_automorph_inv f :
+    is_comring_automorph f =>
+    exists g ,
+      cancel f g /\
+      is_comring_automorph g.
+  proof.
+    rewrite /is_comring_automorph /is_zmod_automorph => |> bijf.
+    move: bijf (bijf) => /bij_inj injf /> g canfg cangf f0 fD f1 fM; exists g.
+    rewrite canfg /=; split; [split; [by exists f; split|]|].
+    + by rewrite -{1}f0 canfg /= => x y; apply/injf; rewrite fD !cangf.
+    by rewrite -{1}f1 canfg /= => x y; apply/injf; rewrite fM !cangf.  
+  qed.
+
+  lemma comring_automorph0 f :
+    is_comring_automorph f =>
+    f zeror = zeror.
+  proof. by move/comring_zmod_automorph/zmod_automorph0. qed.
+
+  lemma comring_automorphD f x y :
+    is_comring_automorph f =>
+    f (x + y)%CR = f x + f y.
+  proof. by move/comring_zmod_automorph/zmod_automorphD => ->. qed.
+
+  lemma comring_automorphN f x :
+    is_comring_automorph f =>
+    f (-x)%CR = - f x.
+  proof. by move/comring_zmod_automorph/zmod_automorphN => ->. qed.
+
+  lemma comring_automorph1 f :
+    is_comring_automorph f =>
+    f oner = oner.
+  proof. by case => _ []. qed.
+
+  lemma comring_automorphM f x y :
+    is_comring_automorph f =>
+    f (x * y)%CR = f x * f y.
+  proof. by case => _ [_ ->]. qed.
+
+  lemma comring_automorphU f x :
+    is_comring_automorph f =>
+    unit (f x) <=> unit x.
+  proof.
+    move => iscraf; move: iscraf (iscraf) => /comring_automorph_inv.
+    move => [g] [canfg iscrag] [_] [f1 fM]; rewrite !unitrP.
+    split => -[y] eq_; [|by exists (f y); rewrite -fM eq_ f1].
+    by move: iscrag => [_] [g1 gM]; exists (g y); rewrite -(canfg x) -gM eq_.
+  qed.
+
+  lemma comring_automorphV f x :
+    is_comring_automorph f =>
+    f (invr x) = invr (f x).
+  proof.
+    move => iscraf; move: (iscraf) => [_] [f1 fM]; case: (unit x) => [ux|Nux].
+    + move/(congr1 f): (mulVr _ ux); rewrite fM f1.
+      rewrite -(mulVr (f x)); [by apply/comring_automorphU|].
+      by apply/mulIr/comring_automorphU.
+    by rewrite !unitout // comring_automorphU.
   qed.
 end ComRingStruct.
 	      
@@ -229,83 +366,80 @@ abstract theory IDomainStruct.
     theory R <- ID,
     theory BCR <- BID.
 
-  section Frobenius.
+  op frobenius x = ID.exp x char.
 
-    declare axiom prime_char : prime char.
+  lemma frobenius0 :
+    prime char =>
+    frobenius zeror = zeror.
+  proof. by rewrite /frobenius expr0z => /gt0_prime /gtr_eqF ->. qed.
 
-    op frobenius x = ID.exp x char.
+  lemma frobenius1 :
+    frobenius oner = oner.
+  proof. by rewrite /frobenius expr1z. qed.
 
-    lemma frobenius0 :
-      frobenius zeror = zeror.
-    proof. by rewrite /frobenius expr0z; move: prime_char => /gt0_prime /gtr_eqF ->. qed.
+  lemma frobeniusD (x y : t) :
+    prime char =>
+    frobenius (x + y) = frobenius x + frobenius y.
+  proof.
+    move => prime_char; rewrite /frobenius Bin.binomial ?ge0_char //.
+    rewrite BAdd.big_int_recr ?ge0_char //= expr0 mulr1 binn ?ge0_char // mulr1z addrC; congr.
+    rewrite BAdd.big_ltn ?gt0_prime ?prime_char //= expr0 mul1r bin0 ?ge0_char //.
+    rewrite mulr1z addrC eq_sym -subr_eq eq_sym subrr (BAdd.eq_big_seq _ (fun _ => zeror)); last by apply/BAdd.big1_eq.
+    move => k mem_k /=; rewrite -mulr_intr; case: (dvd_char (bin char k)) => + _; move => ->; [|by rewrite mulr0].
+    by apply/prime_dvd_bin; [apply/prime_char|case/mem_range: mem_k => le1k -> //=; apply/ltzE].
+  qed.
 
-    lemma frobenius1 :
-      frobenius oner = oner.
-    proof. by rewrite /frobenius expr1z. qed.
+  lemma frobeniusN (x : t) :
+    prime char =>
+    frobenius (-x) = - frobenius x.
+  proof. by move => prime_char; rewrite -addr_eq0 -frobeniusD // addNr frobenius0. qed.
 
-    lemma frobeniusD (x y : t) :
-      frobenius (x + y) = frobenius x + frobenius y.
-    proof.
-      rewrite /frobenius Bin.binomial ?ge0_char // BAdd.big_int_recr ?ge0_char //=.
-      rewrite expr0 mulr1 binn ?ge0_char // mulr1z addrC; congr.
-      rewrite BAdd.big_ltn ?gt0_prime ?prime_char //= expr0 mul1r bin0 ?ge0_char //.
-      rewrite mulr1z addrC eq_sym -subr_eq eq_sym subrr (BAdd.eq_big_seq _ (fun _ => zeror)); last by apply/BAdd.big1_eq.
-      move => k mem_k /=; rewrite -mulr_intr; case: (dvd_char (bin char k)) => + _; move => ->; [|by rewrite mulr0].
-      by apply/prime_dvd_bin; [apply/prime_char|case/mem_range: mem_k => le1k -> //=; apply/ltzE].
-    qed.
+  lemma frobeniusB (x y : t) :
+    prime char =>
+    frobenius (x - y) = frobenius x - frobenius y.
+  proof. by move => prime_char; rewrite frobeniusD // frobeniusN. qed.
 
-    lemma frobeniusN (x : t) :
-      frobenius (-x) = - frobenius x.
-    proof.
-      rewrite /frobenius -{1}(mul1r x) -mulNr exprMn ?ge0_char // -signr_odd ?ge0_char //.
-      case: (prime_or_2_odd _ prime_char) => [eq_char|->]; rewrite /b2i ?odd2 ?expr1 ?mulNr ?mul1r //=.
-      by rewrite eq_char odd2 /= expr0 mul1r -addr_eq0 -mul1r2z -eq_char ofint_char mulr0.
-    qed.
+  lemma frobeniusM (x y : t) :
+    frobenius (x * y) = frobenius x * frobenius y.
+  proof. by rewrite /frobenius; apply/exprMn/ge0_char. qed.
 
-    lemma frobeniusB (x y : t) :
-      frobenius (x - y) = frobenius x - frobenius y.
-    proof. by rewrite frobeniusD frobeniusN. qed.
+  lemma frobeniusV (x : t) :
+    frobenius (invr x) = invr (frobenius x).
+  proof. by rewrite /frobenius exprV exprN. qed.
 
-    lemma frobeniusM (x y : t) :
-      frobenius (x * y) = frobenius x * frobenius y.
-    proof. by rewrite /frobenius; apply/exprMn/ge0_char. qed.
+  lemma frobenius_unit (x : t) :
+    prime char =>
+    unit x <=> unit (frobenius x).
+  proof.
+    move => prime_char; rewrite /frobenius; split => [|/unitrP [y] eq_]; [by apply/unitrX|apply/unitrP].
+    by exists (y * exp x (char - 1)); rewrite -mulrA -exprSr // subr_ge0; apply/ltzW/gt1_prime/prime_char.
+  qed.
 
-    lemma frobeniusV (x : t) :
-      frobenius (invr x) = invr (frobenius x).
-    proof. by rewrite /frobenius exprV exprN. qed.
+  lemma eq_frobenius_0 (x : t) :
+    prime char =>
+    frobenius x = zeror <=> x = zeror.
+  proof.
+    move => prime_char; split => [|->>]; [rewrite /frobenius; move/gt0_prime: prime_char|by apply/frobenius0].
+    elim: char ge0_char => // n le0n IHn _; case/ler_eqVlt: (le0n) => [<<-/=|lt0n]; [by rewrite expr1|].
+    by rewrite exprSr // => /mulf_eq0 [|] //; apply/IHn.
+  qed.
 
-    lemma frobenius_unit (x : t) :
-      unit x <=> unit (frobenius x).
-    proof.
-      rewrite /frobenius; split => [|/unitrP [y] eq_]; [by apply/unitrX|apply/unitrP].
-      by exists (y * exp x (char - 1)); rewrite -mulrA -exprSr // subr_ge0; apply/ltzW/gt1_prime/prime_char.
-    qed.
+  lemma frobenius_inj :
+    prime char =>
+    injective frobenius.
+  proof. by move => prime_char x y /subr_eq0; rewrite -frobeniusB // eq_frobenius_0 // => /subr_eq0. qed.
 
-    lemma eq_frobenius_0 (x : t) :
-      frobenius x = zeror <=> x = zeror.
-    proof.
-      split => [|->>]; [rewrite /frobenius; move/gt0_prime: prime_char|by apply/frobenius0].
-      elim: char ge0_char => // n le0n IHn _; case/ler_eqVlt: (le0n) => [<<-/=|lt0n]; [by rewrite expr1|].
-      by rewrite exprSr // => /mulf_eq0 [|] //; apply/IHn.
-    qed.
+  lemma iter_frobenius n x :
+    0 <= n =>
+    iter n frobenius x =
+    exp x (char ^ n).
+  proof.
+    elim: n => [|n le0n IHn]; [by rewrite iter0 // expr0 expr1|].
+    by rewrite iterS // IHn exprSr // exprM.
+  qed.
 
-    lemma frobenius_inj :
-      injective frobenius.
-    proof. by move => x y /subr_eq0; rewrite -frobeniusB => /eq_frobenius_0 /subr_eq0. qed.
-
-    lemma iter_frobenius n x :
-      0 <= n =>
-      iter n frobenius x =
-      exp x (char ^ n).
-    proof.
-      elim: n => [|n le0n IHn]; [by rewrite iter0 // expr0 expr1|].
-      by rewrite iterS // IHn exprSr // exprM.
-    qed.
-
-    op iter_frobenius_fixed n x =
-      iter n frobenius x = x.
-  
-  end section Frobenius.
+  op iter_frobenius_fixed n x =
+    iter n frobenius x = x.
 end IDomainStruct.
 
 (* -------------------------------------------------------------------- *)

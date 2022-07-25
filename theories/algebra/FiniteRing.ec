@@ -212,36 +212,23 @@ abstract theory FiniteIDomainStruct.
     prime char.
   proof. by case: char_integral => // eq0; move: gt0_char; rewrite eq0. qed.
 
-  (*TODO: move where it should be.*)
-  lemma bij_surj ['a,'b] (f : 'a -> 'b) :
-    bijective f => 
-    surjective f.
-  proof. by move => [g] [fgK gfK] x; exists (g x); rewrite gfK. qed.
-
-  (*TODO: move where it should be.*)
-  lemma bij_inj_surj ['a,'b] (f : 'a -> 'b) :
-    bijective f <=>
-    (injective f) /\ (surjective f).
-  proof.
-    split => [bij_|[inj_ surj_]]; [by split; [apply/bij_inj|apply/bij_surj]|].
-    exists (fun y => choiceb (fun x => y = f x) witness); split => [x|y].
-    + rewrite (eq_choice _ (pred1 x)).
-      - by move => x' /=; split => [|->//]; move => /inj_ ->.
-      by rewrite (choicebP (pred1 x) witness) //; exists x.
-    rewrite -(choicebP (fun x => y = f x) witness) //.
-    by case: (surj_ y) => x ->>; exists x.
-  qed.
-
   lemma frobenius_bij :
-    prime char =>
     bijective frobenius.
   proof.
-    move => prime_char; move: (frobenius_inj prime_char) => inj_; apply/bij_inj_surj.
+    move: (frobenius_inj prime_char) => inj_; apply/bij_inj_surj.
     rewrite inj_ /= => x; move: (uniq_map_injective _ _ inj_ FID.FinType.enum_uniq) => uniq_.
     move: (uniq_leq_size_perm_eq _ _ uniq_ FID.FinType.enum_uniq _).
     + by move => ? _; apply/FID.FinType.enumP.
     rewrite size_map /= => /perm_eq_mem /(_ x); rewrite FID.FinType.enumP /=.
     by move => /mapP [y] [_ ->>]; exists y.
+  qed.
+
+  lemma is_comring_automorph_frobenius :
+    is_comring_automorph frobenius.
+  proof.
+    do!split; [by apply/frobenius_bij|by apply/frobenius0/prime_char| |by apply/frobenius1|].
+    + by move => ??; apply/frobeniusD/prime_char.
+    by move => ??; apply/frobeniusM.
   qed.
 end FiniteIDomainStruct.
 
@@ -839,7 +826,7 @@ abstract theory SubFiniteField_ZMod.
     theory FStr  <- FStr,
     theory FFStr <- FFStr.
 
-  lemma exists_generator :
+  lemma exists_iter_frobenius_unfixed :
     exists (g : t) ,
       iter_frobenius_fixed n g /\
       forall d ,
@@ -849,6 +836,15 @@ abstract theory SubFiniteField_ZMod.
         d = n.
   proof.
     print size_to_seq_iter_frobenius.
+    admit.
+  qed.
+
+  (*TODO: actually does not need all that stuff, derives from simple polynomial result.*)
+  lemma exists_generator :
+    exists (g : t) ,
+      FFStr.UF.UZModStr.order (FFStr.UF.Sub.insubd g) = FF.FinType.card - 1.
+  proof.
+    case: exists_iter_frobenius_unfixed => g [iterng Niterdg]; exists g.
     admit.
   qed.
 end SubFiniteField_ZMod.

@@ -76,6 +76,9 @@ lemma comp_eqE ['a 'b 'c] (f f' : 'b -> 'a) (g g' : 'c -> 'b):
 proof. by do 2! (move/fun_ext=> ->). qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt can_idfun: cancel idfun<:'a> idfun<:'a>.
+proof. by move => ?; rewrite /idfun. qed.
+
 lemma nosmt can_pcan (f:'a -> 'b) g: cancel f g => pcancel f (Some \o g).
 proof. by move=> fK x; rewrite /(\o) fK. qed.
 
@@ -151,7 +154,26 @@ lemma nosmt bij_can_eq (f:'b -> 'a) f' f'':
   bijective f => cancel f f' => cancel f f'' => f' == f''.
 proof.
 move=> big_j fK fK'; apply/(inj_can_eq _ _ f);
-  by rewrite 1?bij_can_sym //; apply/bij_inj.
+by rewrite 1?bij_can_sym //; apply/bij_inj.
+qed.
+
+lemma bij_idfun: bijective idfun<:'a>.
+proof. by exists idfun; rewrite can_idfun. qed.
+
+lemma bij_surj (f : 'a -> 'b):
+  bijective f => surjective f.
+proof. by move => [g] [fgK gfK] x; exists (g x); rewrite gfK. qed.
+
+lemma bij_inj_surj (f : 'a -> 'b):
+    bijective f <=> (injective f) /\ (surjective f).
+proof.
+split => [bij_|[inj_ surj_]]; [by split; [apply/bij_inj|apply/bij_surj]|].
+exists (fun y => choiceb (fun x => y = f x) witness); split => [x|y].
++ rewrite (eq_choice _ (pred1 x)).
+  - by move => x' /=; split => [|->//]; move => /inj_ ->.
+  by rewrite (choicebP (pred1 x) witness) //; exists x.
+rewrite -(choicebP (fun x => y = f x) witness) //.
+by case: (surj_ y) => x ->>; exists x.
 qed.
 
 (* -------------------------------------------------------------------- *)
