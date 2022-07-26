@@ -254,8 +254,15 @@ lemma nosmt eqVneq (x y : 'a) : x = y \/ x <> y by case: (x = y).
 
 lemma nosmt predT_comp ['a 'b] (p : 'a -> 'b) : predT \o p = predT by [].
 
+lemma nosmt predUC (p1 p2 : 'a -> bool) : predU p1 p2 = predU p2 p1.
+proof. by apply fun_ext=> x; rewrite /predU orbC. qed.
+
 lemma nosmt predIC (p1 p2 : 'a -> bool) : predI p1 p2 = predI p2 p1.
 proof. by apply fun_ext=> x; rewrite /predI andbC. qed.
+
+lemma nosmt predU0 ['a] p : predU<:'a> p pred0 = p by [].
+
+lemma nosmt pred0U ['a] p : predU<:'a> pred0 p = p by [].
 
 lemma nosmt predIT ['a] p : predI<:'a> p predT = p by [].
 
@@ -266,6 +273,24 @@ proof. by apply/fun_ext=> x /=; delta => /=; rewrite andNb. qed.
 
 lemma nosmt predCU (p : 'a -> bool) : predU (predC p) p = predT.
 proof. by apply/fun_ext=> x /=; delta => /=; case: (p x). qed.
+
+lemma nosmt predUI : right_distributive predU<:'a> predI<:'a>.
+proof. by move => ???; apply/fun_ext=> x /=; delta => /=; apply/orb_andr. qed.
+
+lemma nosmt predIU : right_distributive predI<:'a> predU<:'a>.
+proof. by move=> ???; apply/fun_ext=> x /=; delta => /=; apply/andb_orr. qed.
+
+lemma nosmt predUA : associative predU<:'a>.
+proof. by move=> ???; apply/fun_ext=> x /=; delta => /=; apply/orbA. qed.
+
+lemma nosmt predIA : associative predI<:'a>.
+proof. by move=> ???; apply/fun_ext=> x /=; delta => /=; apply/andbA. qed.
+
+lemma nosmt predUU : idempotent predU<:'a>.
+proof. by move=> ?; apply/fun_ext=> x /=; delta => /=; apply/orbb. qed.
+
+lemma nosmt predII : idempotent predI<:'a>.
+proof. by move=> ?; apply/fun_ext=> x /=; delta => /=; apply/andbb. qed.
 
 lemma nosmt subpredUl (p1 p2 : 'a -> bool):
   p1 <= predU p1 p2.
@@ -282,6 +307,26 @@ proof. by move=> x @/predI [] ->. qed.
 lemma nosmt predIsubpredr (p1 p2 : 'a -> bool):
   predI p1 p2 <= p2.
 proof. by move=> x @/predI [] _ ->. qed.
+
+lemma nosmt predUsubl (p1 p2 : 'a -> bool):
+  p2 <= p1 =>
+  predU p1 p2 = p1.
+proof. by move=> imp_; apply/fun_ext=> x /=; delta => /=; move/(_ x): imp_; case: (p1 x); case: (p2 x). qed.
+
+lemma nosmt predUsubr (p1 p2 : 'a -> bool):
+  p1 <= p2 =>
+  predU p1 p2 = p2.
+proof. by rewrite predUC; apply/predUsubl. qed.
+
+lemma nosmt predIsubl (p1 p2 : 'a -> bool):
+  p1 <= p2 =>
+  predI p1 p2 = p1.
+proof. by move=> imp_; apply/fun_ext=> x /=; delta => /=; move/(_ x): imp_; case: (p1 x); case: (p2 x). qed.
+
+lemma nosmt predIsubr (p1 p2 : 'a -> bool):
+  p2 <= p1 =>
+  predI p1 p2 = p2.
+proof. by rewrite predIC; apply/predIsubl. qed.
 
 lemma nosmt predTofV (f : 'a -> 'b): predT \o f = predT.
 proof. by apply/fun_ext=> x. qed.

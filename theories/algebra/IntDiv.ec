@@ -775,6 +775,12 @@ proof. by rewrite gcdC gcdNz gcdC. qed.
 
 hint simplify gcdNz, gcdzN.
 
+lemma gcdnormz a b : gcd `|a| b = gcd a b.
+proof. by rewrite /(`|_|); case (0 <= a) => //; rewrite gcdNz. qed.
+
+lemma gcdznorm a b : gcd a `|b| = gcd a b.
+proof. by rewrite gcdC gcdnormz gcdC. qed.
+
 lemma gcd_modr a b : gcd a (b %% a) = gcd a b.
 proof.
 case: ((a, b) = (0, 0)) => [[-> ->]|nz_ab]; 1: by rewrite modz0.
@@ -905,6 +911,24 @@ move=> pm_p a nz_a; have h := dvdz_gcdl p a.
 case: pm_p => gt1_p /(_ _ h) => {h}; rewrite ger0_norm ?ge0_gcd.
 case=> // /eq_sym pE; have: p %| a  by rewrite {1}pE dvdz_gcdr.
 by rewrite dvdzE nz_a.
+qed.
+
+lemma nosmt primeP p :
+  prime p <=> (1 < p /\ forall a , a \in range 1 p => coprime p a).
+proof.
+split => [prime_p|]; [split|].
++ by apply/gt1_prime.
++ move => a mem_; apply/prime_coprime => //.
+  rewrite modz_small ?gtr0_norm ?gt0_prime // -?mem_range.
+  - by move: mem_; apply/mem_range_incl.
+  by apply/gtr_eqF; move: mem_; apply/mem_range_lt.
+move => [lt1p forall_]; split => // q dvdqp.
+move: (dvdz_le _ _ _ dvdqp); [by rewrite gtr_eqF //; apply/(ler_lt_trans 1)|].
+rewrite (gtr0_norm p) 1?(ler_lt_trans 1) // => /ler_eqVlt [<<-|lt_p] //=; left.
+move/(_ `|q| _): forall_; [apply/mem_range; split => //|].
++ case/ler_eqVlt: (normr_ge0 q) => [/eq_sym/normr0P ->>|/ltzE] //.
+  by move/dvd0z: dvdqp => ->>.
+by move/dvdzP: dvdqp => [r] ->>; rewrite /coprime -gcdnormz normrM gcdC gcdMl normr_id.
 qed.
 
 lemma dvd_prime p a :

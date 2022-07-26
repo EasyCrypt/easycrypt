@@ -25,6 +25,10 @@ lemma to_seq_finite (P : 'a -> bool):
   is_finite P => uniq (to_seq P) /\ (forall x, x \in to_seq P <=> P x).
 proof. by move/is_finiteE/choicebP/(_ []); apply. qed.
 
+lemma to_seq_infinite ['a] (P : 'a -> bool):
+  ! is_finite P => to_seq P = [].
+proof. by move=> Nisf; apply/choiceb_dfl=> ? /=; move: Nisf; apply/contra/finite_for_finite. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma mkfinite ['a] (p : 'a -> bool) :
   (exists (s : 'a list), forall x, p x => x \in s) => is_finite p.
@@ -36,8 +40,8 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma uniq_to_seq (P : 'a -> bool):
-  is_finite P => uniq (to_seq P).
-proof. by move=>/to_seq_finite [-> _]. qed.
+  uniq (to_seq P).
+proof. by case: (is_finite P)=> [/to_seq_finite [-> _]|/to_seq_infinite ->]. qed.
 
 lemma mem_to_seq (P : 'a -> bool) x:
   is_finite P => mem (to_seq P) x <=> P x.
@@ -107,6 +111,70 @@ qed.
 lemma finiteD (A B : 'a -> bool):
   is_finite A => is_finite (predD A B).
 proof. by move=> fin_A; apply/(finite_leq A)=> //= x @/predD. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mk_to_seq (A : 'a -> bool) s:
+  is_finite A =>
+  uniq s =>
+  (forall x , mem s x <=> A x) =>
+  perm_eq (to_seq A) s.
+proof.
+move => finA uniqs eqmemsA; apply/uniq_perm_eq; rewrite ?uniq_to_seq // => x.
+by rewrite eqmemsA mem_to_seq.
+qed.
+
+lemma perm_eq_filter_to_seq (A B : 'a -> bool):
+  is_finite A =>
+  perm_eq (to_seq (predI A B)) (filter B (to_seq A)).
+proof.
+move=> finA; apply/uniq_perm_eq; [by apply/uniq_to_seq|by apply/filter_uniq/uniq_to_seq|].
+by move=> x; rewrite mem_filter !mem_to_seq ?finiteIl // /predI.
+qed.
+
+lemma perm_eq_to_seqC (A B : 'a -> bool):
+  is_finite A =>
+  perm_eq (to_seq A) (to_seq (predI A B) ++ to_seq (predI A (predC B))).
+proof.
+move => finA; apply/perm_eq_sym/(perm_eq_trans _ _ _ _ (perm_filterC B _)).
+by apply/perm_cat2; apply/perm_eq_filter_to_seq.
+qed.
+
+lemma perm_eq_to_seqUI (A B : 'a -> bool):
+  is_finite A =>
+  is_finite B =>
+  perm_eq
+    (to_seq (predU A B) ++ to_seq (predI A B))
+    (to_seq A ++ to_seq B).
+proof.
+move=> finA finB; apply/(perm_eq_trans
+  (to_seq (predI A B) ++ to_seq (predI A (predC B)) ++ to_seq (predI (predC A) B) ++ to_seq (predI A B))).
++ apply/perm_cat2; rewrite ?perm_eq_refl //; apply/(perm_eq_trans _ _ _ (perm_eq_to_seqC _ A _)).
+  - by apply/finiteU.
+  apply/perm_cat2; [by rewrite predIsubr ?subpredUl //; apply/perm_eq_to_seqC|].
+  by rewrite predIC predIU predCI pred0U perm_eq_refl.
+rewrite -catA; apply/perm_cat2.
++ by apply/perm_eq_sym/perm_eq_to_seqC.
+rewrite perm_eq_sym; apply/(perm_eq_trans _ _ _ (perm_eq_to_seqC B A _)) => //.
+by apply/(perm_eq_trans _ _ _ (perm_catC _ _))/perm_cat2; rewrite predIC; apply/perm_eq_refl.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_size_filter_to_seq (A B : 'a -> bool):
+  is_finite A =>
+  size (to_seq (predI A B)) = size (filter B (to_seq A)).
+proof. by move=> finA; apply/perm_eq_size/perm_eq_filter_to_seq. qed.
+
+lemma eq_size_to_seqC (A B : 'a -> bool):
+  is_finite A =>
+  size (to_seq A) = size (to_seq (predI A B)) + size (to_seq (predI A (predC B))).
+proof. by move => finA; rewrite -size_cat; apply/perm_eq_size/perm_eq_to_seqC. qed.
+
+lemma eq_size_to_seqUI (A B : 'a -> bool):
+  is_finite A =>
+  is_finite B =>
+  size (to_seq (predU A B)) + size (to_seq (predI A B)) =
+  size (to_seq A) + size (to_seq B).
+proof. by move=> finA finB; rewrite -!size_cat; apply/perm_eq_size/perm_eq_to_seqUI. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eq_is_finite_for ['a] (p q : 'a -> bool) s :

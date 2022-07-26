@@ -1,5 +1,5 @@
 (* ==================================================================== *)
-require import AllCore List Ring Int IntMin IntDiv Bigalg Binomial Finite.
+require import AllCore List Ring Int IntMin IntDiv Bigalg Binomial Finite Poly.
 (*---*) import StdOrder.IntOrder IntID.
 
 
@@ -66,7 +66,56 @@ abstract theory ZModuleStruct.
     by move: (dvd2_order x (order x) 0); rewrite /= dvdzz /=; apply/inj_intmul.
   qed.
 
+  lemma gt0_order_intmul (x : t) n :
+    0 < order x =>
+    0 < order (intmul x n).
+  proof.
+    case/ler_eqVlt: (ge0_order (intmul x n)) => // /eq_sym.
+    move => eq_0; move/order0P: eq_0 (eq_0) => inj_ ->.
+    move/gtr_eqF; rewrite order0P /= => y z.
+    by move => eq_; apply/inj_; rewrite -!mulrM !(mulrC n) !mulrM eq_.
+  qed.
+
+  lemma dvd_order_intmul (x : t) n :
+    order (intmul x n) %| order x.
+  proof. by apply/dvd_order; rewrite -mulrM mulrC mulrM intmul_order mul0i. qed.
+
+  lemma order_intmul (x : t) n :
+    0 < order x =>
+    order (intmul x n) = (order x) %/ gcd (order x) n.
+  proof.
+    move => lt0_; apply/(mulIf (gcd (order x) n)).
+    + by rewrite gcd_eq0 /= gtr_eqF.
+    rewrite divzK ?dvdz_gcdl // mulrC {2}(divz_eq (order x) (order (intmul x n))).
+    case: (dvdzE (order (intmul x n)) (order x)) => + _; move => -> /=; [by apply/dvd_order_intmul|].
+    congr; apply/eq_sym/gcd_uniq.
+    + by rewrite /= gtr_eqF.
+    + by apply/divz_ge0; [apply/gt0_order_intmul|apply/ltzW].
+    + by apply/dvdz_div; [apply/gtr_eqF/gt0_order_intmul|apply/dvd_order_intmul].
+    + apply/dvdzP; exists (n * order (intmul x n) %/ order x).
+      apply/(mulIf (order (intmul x n))); [by apply/gtr_eqF/gt0_order_intmul|].
+      rewrite -mulrA divzK ?dvd_order_intmul // divzK //.
+      by apply/dvd_order; rewrite mulrM intmul_order.
+    move => y dvdy_ dvdyn; apply/lez_divRL; [by apply/gt0_order_intmul|].
+    rewrite mulrC; case (0 < y) => [lt0y|/lerNgt ley0]; last first.
+    + by apply/(ler_trans 0); [apply/mulr_ge0_le0 => //|]; apply/ge0_order.
+    apply/lez_divRL => //; rewrite -(ger0_norm (order _)); [by apply/ge0_order|].
+    rewrite -(ger0_norm (_ %/ _)); [by apply/divz_ge0 => //; apply/ge0_order|].
+    apply/dvdz_le; [apply/gtr_eqF; rewrite ltzE /=; apply/lez_divRL => //=|].
+    + rewrite -(ger0_norm y) 1:ltzW // -(ger0_norm (order _)); [by apply/ge0_order|].
+      by apply/dvdz_le => //; apply/gtr_eqF.
+    by apply/dvd_order; rewrite -mulrM divzpMr // mulrC -divzpMr // mulrM intmul_order mul0i.
+  qed.
+
+  lemma order_intmul_coprime (x : t) n :
+    0 < order x =>
+    coprime (order x) n =>
+    order (intmul x n) = order x.
+  proof. by move => /order_intmul -> ->; rewrite divz1. qed.
+
   op orbit (x y : t) = exists n , y = intmul x n.
+
+  op is_generator g = forall x , orbit g x.
 
   op orbit_list (x : t) = mkseq (fun n => intmul x n) (order x).
 
@@ -321,7 +370,7 @@ end ComRingStruct.
 	      
 (* -------------------------------------------------------------------- *)	      
 abstract theory IDomainStruct.
-  type t.
+  type t, pt.
 
   clone import IDomain as ID with
     type t <= t.
@@ -361,6 +410,44 @@ abstract theory IDomainStruct.
 
   clone import BigComRing as BID with
     theory CR <- ID.
+
+  clone import Poly as IDPoly with
+    type coeff <= t,
+    type poly <= pt,
+    theory IDCoeff <- ID.
+
+  op eq_pow_1 n x = ID.exp x n = oner.
+
+  lemma eq_pow_1_poly n :
+    0 <= n =>
+    eq_pow_1 n = root (polyXn n - poly1).
+  proof. by move => le0n; apply/fun_ext => x; rewrite eqboolP /eq_pow_1; rewrite pevalB pevalXn peval1 le0n /= subr_eq0. qed.
+
+  lemma is_finite_eq_pow_1 n :
+    0 < n =>
+    is_finite (eq_pow_1 n).
+  proof.
+    move => lt0n; move: (finite_root (polyXn n - poly1) _).
+    + by rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
+    by apply/finite_leq => x; rewrite eq_pow_1_poly // ltzW.
+  qed.
+
+  lemma size_to_seq_eq_pow_1 n :
+    0 < n =>
+    size (to_seq (eq_pow_1 n)) <= n.
+  proof.
+    move => lt0n; move: (size_roots (polyXn n - poly1) _).
+    + by rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
+    move => le__; apply/(ler_trans (deg (polyXn n - poly1) - 1)); [move: le__; apply/ler_trans|].
+    + apply/lerr_eq/perm_eq_size/uniq_perm_eq; [by apply/uniq_to_seq/is_finite_eq_pow_1| |].
+      - by apply/uniq_to_seq/is_finite_root; rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
+      move => x; rewrite !mem_to_seq /=; [by apply/is_finite_eq_pow_1| |].
+      - by apply/finite_root; rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
+      by rewrite eq_pow_1_poly //; apply/ltzW.
+    apply/ler_subl_addr; apply/(ler_trans _ _ _ (degB (polyXn n) poly1)).
+    rewrite degXn deg1; apply/ler_maxrP; rewrite -(ler_subl_addr 1 1 n) /= (ltzW 0) //=.
+    by apply/ler_maxrP => /=; apply/addr_ge0 => //; apply/ltzW.
+  qed.
 
   clone import BinomialCoeffs as Bin with
     theory R <- ID,
@@ -440,6 +527,61 @@ abstract theory IDomainStruct.
 
   op iter_frobenius_fixed n x =
     iter n frobenius x = x.
+
+  lemma frobenius_polyXchar x :
+    frobenius x = peval (polyXn char) x.
+  proof. by rewrite pevalXn ge0_char. qed.
+
+  lemma iter_frobenius_fixed_poly n :
+    0 <= n =>
+    iter_frobenius_fixed n = root (polyXn (char ^ n) - X).
+  proof.
+    move => le0n; apply/fun_ext => x; rewrite eqboolP /iter_frobenius_fixed iter_frobenius //.
+    by rewrite pevalB pevalXn pevalX expr_ge0 ?ge0_char //= subr_eq0.
+  qed.
+
+  lemma eq_poly_iter_frobenius_fixed_eq_pow_1 n :
+    0 < n =>
+    polyXn n - X = X * (polyXn (n - 1) - poly1).
+  proof.
+    move => lt0n; rewrite -{1}(IDPoly.mulr1 X) -{1}(IntID.subrK n 1).
+    move: (polyMXXn (n - 1)); rewrite -ltzS lt0n /= => <-.
+    by rewrite -IDPoly.mulrN -IDPoly.mulrDr.
+  qed.
+
+  lemma is_finite_iter_frobenius n :
+    prime char =>
+    0 < n =>
+    is_finite (iter_frobenius_fixed n).
+  proof.
+    move => prime_char lt0n; move: (finite_root (polyXn (char ^ n) - X) _).
+    + rewrite IDPoly.subr_eq0 eq_polyXnX gtr_eqF //.
+      apply/(ltr_le_trans char); [by apply/gt1_prime|].
+      rewrite -{1}(expr1) ler_weexpn2l /=; [by apply/ltzW/gt1_prime|].
+      by move/ltzE: lt0n.
+    by apply/finite_leq => x; rewrite iter_frobenius_fixed_poly // ltzW.
+  qed.
+
+  lemma size_to_seq_iter_frobenius n :
+    prime char =>
+    0 < n =>
+    size (to_seq (iter_frobenius_fixed n)) <= char ^ n.
+  proof.
+    move => prime_char lt0n; rewrite iter_frobenius_fixed_poly; [by apply/ltzW|].
+    rewrite eq_poly_iter_frobenius_fixed_eq_pow_1.
+    + by apply/expr_gt0/gt0_prime.
+    apply/(ler_trans _ _ _ (size_rootsM _ _ _ _)).
+    + by rewrite eq_polyXn0.
+    + rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF //.
+      apply/subr_gt0/(ltr_le_trans char); [by apply/gt1_prime|].
+      rewrite -{1}expr1; apply/ler_weexpn2l => /=; [|by move: lt0n; rewrite ltzE].
+      by move: (gt0_prime _ prime_char); rewrite ltzE.
+    rewrite size_rootsX -ler_subr_addl -eq_pow_1_poly.
+    + by apply/ltzS => /=; apply/expr_gt0/gt0_prime.
+    apply/size_to_seq_eq_pow_1/subr_gt0/(ltr_le_trans char); [by apply/gt1_prime|].
+    rewrite -{1}expr1; apply/ler_weexpn2l => /=; [|by move: lt0n; rewrite ltzE].
+    by move: (gt0_prime _ prime_char); rewrite ltzE.
+  qed.
 end IDomainStruct.
 
 (* -------------------------------------------------------------------- *)
@@ -452,20 +594,4 @@ abstract theory FieldStruct.
   clone include IDomainStruct with
     type t <- t,
     theory ID <- F.
-
-  (*TODO: polynomial result.*)
-  lemma is_finite_iter_frobenius n :
-    0 <= n =>
-    is_finite (iter_frobenius_fixed n).
-  proof.
-    admit.
-  qed.
-
-  (*TODO: polynomial result.*)
-  lemma size_to_seq_iter_frobenius n :
-    0 <= n =>
-    size (to_seq (iter_frobenius_fixed n)) <= char ^ n.
-  proof.
-    admit.
-  qed.
 end FieldStruct.

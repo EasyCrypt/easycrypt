@@ -476,6 +476,19 @@ qed.
 lemma size_filter p (s : 'a list): size (filter p s) = count p s.
 proof. by elim: s => //= x s; case: (p x) => _ ->. qed.
 
+lemma le_size_filter p (s : 'a list): size (filter p s) <= size s.
+proof. by rewrite size_filter count_size. qed.
+
+lemma eq_size_filter p (s : 'a list): size (filter p s) = size s <=> (mem s <= p).
+proof.
+elim: s => [|x s IHs] //=; case: (p x) => [px|Npx].
++ split => [/addrI/IHs mem_ y /= [->>|] //|]; [by apply/mem_|].
+  by move => mem_; congr; apply/IHs => y memy; apply/mem_; right.
+have ->/=: size (filter p s) <> 1 + size s.
++ by apply/negP => eq_; move: (le_size_filter p s); rewrite eq_ lez_add1r.
+by move: Npx; apply/contra => ->.
+qed.
+
 lemma filter_pred0 (s : 'a list): filter pred0 s = [].
 proof. by elim: s. qed.
 
