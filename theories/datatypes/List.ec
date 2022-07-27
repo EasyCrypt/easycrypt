@@ -2853,6 +2853,26 @@ rewrite map_flatten -!map_comp; congr; apply/eq_in_map => y1; rewrite mem_undup.
 by move => /mapP -[[? x1]] /= [mem_p <<-]; rewrite /(\o) /= filter_map; apply/eq_in_map.
 qed.
 
+lemma perm_to_rem_flatten ['a] (s : 'a list) (ss : 'a list list):
+  s \in ss =>
+  perm_eq (flatten ss) (s ++ flatten (rem s ss)).
+proof.
+elim: ss => [|t ss IHss] //= /or_andr [<<-/=|[neqst] /IHss eq_]; [by rewrite flatten_cons perm_eq_refl|].
+by rewrite eq_sym neqst /= !flatten_cons catA perm_eq_sym perm_catCA perm_eq_sym -catA perm_cat2l.
+qed.
+
+lemma perm_eq_flatten ['a] (ss1 ss2 : 'a list list):
+  perm_eq ss1 ss2 => perm_eq (flatten ss1) (flatten ss2).
+proof.
+move: {1 2}(size ss1) (size_ge0 ss1) (eq_refl (size ss1)) => n le0n; move: n le0n ss1 ss2.
+elim => [??/eq_sym/size_eq0 ->> /perm_eq_sym/perm_eq_nil ->>|n le0n IHn + ss2]; [by rewrite flatten_nil|].
+case => [|s1 ss1] /=; [by rewrite addz1_neq0|]; rewrite (addrC 1) => /addIr ->> {le0n}.
+move => eq_; move/perm_eq_mem/(_ s1): (eq_) => /= mem_; move/perm_to_rem: (mem_) => eq_rem.
+move: (perm_eq_trans _ _ _ eq_ eq_rem) => {eq_ eq_rem} /perm_cons eq_; move: (IHn _ _ _ eq_) => //.
+rewrite flatten_cons => /(perm_cat2l s1) eq_f; apply/(perm_eq_trans _ _ _ eq_f) => {IHn eq_ eq_f}.
+by apply/perm_eq_sym/perm_to_rem_flatten.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                               Mask                                   *)
 (* -------------------------------------------------------------------- *)
