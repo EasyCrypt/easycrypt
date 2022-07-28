@@ -1487,13 +1487,13 @@ move=> le_qp; rewrite drestrictE &(mu_eq).
 by move=> x @/predI; apply/eq_iff/andb_idl/le_qp.
 qed.
 
+lemma weight_drestrict ['a] (d:'a distr) P:
+  weight (drestrict d P) = mu d P.
+proof. by rewrite drestrictE (@mu_eq _ (predI _ _) P). qed.
+
 theory DConditional.
 
 op dcond (d : 'a distr) (p : 'a -> bool) = dscale (drestrict d p).
-
-lemma weight_drestrict (d: 'a distr) (p: 'a -> bool) :
-  weight (drestrict d p) = mu d p.
-admitted. (* in PR 235 *)
 
 lemma dcond_supp (d: 'a distr) (p: 'a -> bool) (x: 'a):
   x \in dcond d p <=> x \in d /\ p x.
