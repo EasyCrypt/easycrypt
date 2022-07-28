@@ -429,6 +429,9 @@ op filter (p : 'a -> bool) xs =
   with xs = []      => []
   with xs = y :: ys => if p y then y :: filter p ys else filter p ys.
 
+lemma count_rcons (p : 'a -> bool) s x: count p (rcons s x) = count p s + b2i (p x).
+proof. by elim: s => // y s /= ->; rewrite addrA. qed.
+
 lemma count_ge0 (p : 'a -> bool) s: 0 <= count p s.
 proof. by elim: s=> //= x s; smt. qed.
 
@@ -840,6 +843,13 @@ lemma drop_cat n (s1 s2 : 'a list):
     if n < size s1 then drop n s1 ++ s2 else drop (n - size s1) s2.
 proof. by elim: s1 n => /= [|x s ih] n; smt ml=0 w=(drop_le0 size_ge0). qed.
 
+lemma drop_rcons n (s : 'a list) x:
+  drop n (rcons s x) = if n <= size s then rcons (drop n s) x else [].
+proof.
+rewrite -!cats1 drop_cat /= subz_le0 lez_eqVlt.
+by case: (n = size s) => [->>|_] /=; [rewrite drop_size|case: (n < size s)].
+qed.
+
 lemma drop_size_cat n (s1 s2 : 'a list):
   size s1 = n => drop n (s1 ++ s2) = s2.
 proof. by move=> <-; rewrite drop_cat subzz ltzz drop0. qed.
@@ -895,6 +905,13 @@ lemma take_cat n (s1 s2 : 'a list):
    take n (s1 ++ s2) =
      if n < size s1 then take n s1 else s1 ++ take (n - size s1) s2.
 proof. by elim: s1 n => //=; smt ml=0 w=(take_le0 size_ge0). qed.
+
+lemma take_rcons n (s : 'a list) x:
+   take n (rcons s x) = if n <= size s then take n s else rcons s x.
+proof.
+rewrite -!cats1 take_cat /= subz_le0 lez_eqVlt.
+by case: (n = size s) => [->>|_] //=; [rewrite take_size cats0|case: (n < size s)].
+qed.
 
 lemma take_size_cat n (s1 s2 : 'a list):
   size s1 = n => take n (s1 ++ s2) = s1.
@@ -1212,6 +1229,10 @@ proof. by move=> /allP h; apply/allP=> y /mem_rem /h. qed.
 lemma count_rem ['a] (p : 'a -> bool) (s : 'a list) x : x \in s =>
   count p s = b2i (p x) + count p (rem x s).
 proof. by move/perm_to_rem/perm_eqP/(_ p)=> ->. qed.
+
+lemma count_rem_if ['a] (p : 'a -> bool) (s : 'a list) x :
+  count p (rem x s) = count p s - b2i (x \in s /\ p x).
+proof. by case (x \in s) => ? /=; [rewrite (count_rem _ s x) // addzAC|rewrite rem_id]. qed.
 
 lemma count_gt0 ['a] (p : 'a -> bool) s :
   0 < count p s => exists x,
@@ -2610,6 +2631,18 @@ lemma eq_in_filter_pred0 (P : 'a -> bool) s:
   (forall x, mem s x => !P x) => filter P s = [].
 proof. by move=> Ps; rewrite (@eq_in_filter P pred0) ?filter_pred0. qed.
 
+lemma eq_in_filter_predC1_map (f : 'a -> 'b) x y s:
+  uniq s => mem s x => (forall z, mem s z => y = f z <=> x <> z) => filter (predC1 y) (map f s) = [f x].
+proof.
+move=> + /splitPr [s1 s2] ->>; rewrite cat_uniq /= !negb_or /= => |> _ Nmem1 _ Nmem2 _ eq_.
+rewrite -cat1s catA !map_cat !filter_cat /=; move/(_ x): (eq_).
+rewrite mem_cat /= eq_sym {2}/predC1 => -> /=; rewrite !eq_in_filter_pred0 //.
++ move=> ? /mapP [z] [mem_ ->>]; rewrite /predC1 eq_sym; move: (congr1 (mem s1) x z).
+  by rewrite mem_ Nmem1 /= => neq_; rewrite eq_ ?mem_cat //= mem_.
+move=> ? /mapP [z] [mem_ ->>]; rewrite /predC1 eq_sym; move: (congr1 (mem s2) x z).
+by rewrite mem_ Nmem2 /= => neq_; rewrite eq_ ?mem_cat //= mem_.
+qed.
+
 lemma eq_in_has (p1 p2 : 'a -> bool) (s : 'a list):
   (forall x, mem s x => p1 x <=> p2 x) => has p1 s <=> has p2 s.
 proof. by move=> h; rewrite !has_count (eq_in_count _ p2). qed.
@@ -2683,6 +2716,86 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
+(*                          Sum and Product                             *)
+(* -------------------------------------------------------------------- *)
+op sumz (sz : int list) = foldr Int.(+) 0 sz.
+
+lemma sumz_nil :
+  sumz [] = 0.
+proof. by []. qed.
+
+lemma sumz_cons z sz :
+  sumz (z :: sz) = z + sumz sz.
+proof. by []. qed.
+
+lemma sumz_cat sz1 sz2 :
+  sumz (sz1 ++ sz2) = sumz sz1 + sumz sz2.
+proof. by elim: sz1 => // z sz1 /=; rewrite !sumz_cons => ->; rewrite addrA. qed.
+
+lemma sumz_catC sz1 sz2 :
+  sumz (sz1 ++ sz2) = sumz (sz2 ++ sz1).
+proof. by rewrite !sumz_cat addrC. qed.
+
+lemma sumz_perm sz1 sz2 :
+  perm_eq sz1 sz2 =>
+  sumz sz1 = sumz sz2.
+proof. by apply/(foldr_perm Int.( + ) 0)/addrCA. qed.
+
+lemma sumz_nseq m n :
+  sumz (nseq m n) = if 0 <= m then m * n else 0.
+proof.
+case (0 <= m) => [|/ltzNge/ltzW ltm0]; [|by rewrite nseq0_le].
+elim: m => [|m le0m IHm]; [by rewrite nseq0 mul0r|].
+by rewrite nseqS // sumz_cons IHm mulrDl /= addrC.
+qed.
+
+lemma sumz_filter0 sz :
+  sumz sz = sumz (filter (predC1 0) sz).
+proof.
+elim: sz => // z sz IHsz; rewrite sumz_cons /= {1}/predC1.
+by case (z = 0) => [->>|_] //=; rewrite sumz_cons IHsz.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op prodz sz = foldr Int.( * ) 1 sz.
+
+lemma prodz_nil :
+  prodz [] = 1.
+proof. by []. qed.
+
+lemma prodz_cons z sz :
+  prodz (z :: sz) = z * prodz sz.
+proof. by []. qed.
+
+lemma prodz_cat sz1 sz2 :
+  prodz (sz1 ++ sz2) = prodz sz1 * prodz sz2.
+proof. by elim: sz1 => // z sz1 /=; rewrite !prodz_cons => ->; rewrite mulrA. qed.
+
+lemma prodz_catC sz1 sz2 :
+  prodz (sz1 ++ sz2) = prodz (sz2 ++ sz1).
+proof. by rewrite !prodz_cat mulrC. qed.
+
+lemma prodz_perm sz1 sz2 :
+  perm_eq sz1 sz2 =>
+  prodz sz1 = prodz sz2.
+proof. by apply/(foldr_perm Int.( * ) 1)/mulrCA. qed.
+
+lemma prodz_nseq m n :
+  prodz (nseq m n) = if 0 <= m then n ^ m else 1.
+proof.
+case (0 <= m) => [|/ltzNge/ltzW ltm0]; [|by rewrite nseq0_le].
+elim: m => [|m le0m IHm]; [by rewrite nseq0 expr0|].
+by rewrite nseqS // prodz_cons exprS // IHm.
+qed.
+
+lemma prodz_filter1 sz :
+  prodz sz = prodz (filter (predC1 1) sz).
+proof.
+elim: sz => // z sz IHsz; rewrite prodz_cons /= {1}/predC1.
+by case (z = 1) => [->>|_] //=; rewrite prodz_cons IHsz.
+qed.
+
+(* -------------------------------------------------------------------- *)
 (*                            Flattening                                *)
 (* -------------------------------------------------------------------- *)
 op flatten ['a] = foldr (++) [<:'a>].
@@ -2726,13 +2839,25 @@ lemma map_flatten (f : 'a -> 'b) s :
   map f (flatten s) = flatten (map (map f) s).
 proof. by elim: s => // x s; rewrite /= !flatten_cons map_cat => ->. qed.
 
-op sumz (sz : int list) = foldr Int.(+) 0 sz.
-
 lemma size_flatten (ss : 'a list list) :
   size (flatten ss) = sumz (map size ss).
 proof.
   elim: ss=> [|s ss ih] /=; first by rewrite flatten_nil.
   by rewrite flatten_cons size_cat /sumz /= ih.
+qed.
+
+lemma sumz_flatten ssz :
+  sumz (flatten ssz) = sumz (map sumz ssz).
+proof.
+elim: ssz => [|sz ssz IHssz]; [by rewrite flatten_nil|].
+by rewrite flatten_cons sumz_cat /= sumz_cons IHssz.
+qed.
+
+lemma prodz_flatten ssz :
+  prodz (flatten ssz) = prodz (map prodz ssz).
+proof.
+elim: ssz => [|sz ssz IHssz]; [by rewrite flatten_nil|].
+by rewrite flatten_cons prodz_cat /= prodz_cons IHssz.
 qed.
 
 lemma count_flatten (p : 'a -> bool) (ss : 'a list list) :
@@ -2886,6 +3011,9 @@ op mask ['a] m (s : 'a list) =
 lemma mask0 m : mask m [] = [<:'a>].
 proof. by case: m. qed.
 
+lemma mask_nil s : mask [] s = [<:'a>].
+proof. by case: s. qed.
+
 lemma mask_false s n : mask (nseq n false) s = [<:'a>].
 proof.
 elim: s n => [|x s ih] n; first by rewrite mask0.
@@ -2917,6 +3045,13 @@ lemma mask_cat m1 m2 s1 s2 : size m1 = size s1 =>
   mask<:'a> (m1 ++ m2) (s1 ++ s2) = mask m1 s1 ++ mask m2 s2.
 proof. by move: m1 s1; apply/seq2_ind=> //= -[]. qed.
 
+lemma mask_rcons m b s x : size m = size s =>
+  mask<:'a> (rcons m b) (rcons s x) = if b then rcons (mask m s) x else mask m s.
+proof.
+move=> ?; rewrite -!cats1 mask_cat // mask_cons mask0 cats0 /b2i /=.
+by case: b => _ //=; [rewrite nseq1|rewrite nseq0 cats0].
+qed.
+
 lemma all_mask a m s : all a s => all a (mask<:'a> m s).
 proof. by elim: s m => [|x s ih] [|[] m] //= [ax /ih->]. qed.
 
@@ -2933,6 +3068,35 @@ lemma mask_uniq (s : 'a list) m : uniq s => uniq (mask m s).
 proof.
 elim: s m => [m|x s IHs [|b m] Uxs] //=; 1: by rewrite mask0.
 case: b Uxs => //= -[s'x Us]; smt(mem_mask).
+qed.
+
+lemma count_mask x P (s : 'a list) m1 m2 :
+  (forall n , n \in range 0 (size s) => P (nth x s n) => nth false m1 n <=> nth false m2 n) =>
+  count P (mask m1 s) = count P (mask m2 s).
+proof.
+elim: s m1 m2 => [??|y s IHs [|b1 m1] [|b2 m2]] /=; rewrite ?mask0 ?mask_cons // addrC => eq_.
++ move/(_ 0 _): (eq_) => /=; [by apply/mem_range => /=; apply/ltzS|].
+  case: b2 => _ /=; [move => ->; rewrite /b2i /=|]; rewrite -(IHs []) ?mask_nil //=.
+  - move => n /mem_range [le0n ltn_]; move/(_ (n + 1) _): eq_; [|by rewrite /= addz1_neq0].
+    by apply/mem_range; rewrite ltz_add2r addz_ge0.
+  move => n /mem_range [le0n ltn_]; move/(_ (n + 1) _): eq_; [|by rewrite /= addz1_neq0].
+  by apply/mem_range; rewrite ltz_add2r addz_ge0.
++ move/(_ 0 _): (eq_) => /=; [by apply/mem_range => /=; apply/ltzS|].
+  case: b1 => _ /=; [move => ->; rewrite /b2i /=|]; rewrite -(IHs []) ?mask_nil //=.
+  - move => n /mem_range [le0n ltn_]; move/(_ (n + 1) _): eq_; [|by rewrite /= addz1_neq0].
+    by apply/mem_range; rewrite ltz_add2r addz_ge0.
+  move => n /mem_range [le0n ltn_]; move/(_ (n + 1) _): eq_; [|by rewrite /= addz1_neq0].
+  by apply/mem_range; rewrite ltz_add2r addz_ge0.
+move/(_ 0 _): (eq_) => /=; [by apply/mem_range => /=; apply/ltzS|].
+case: b1; case: b2 => _ _ /=; [congr|move=> ->|move=> ->|]; rewrite /b2i /=; apply/IHs.
++ move => n /mem_range [le0n ltn_]; move/(_ (n + 1) _): eq_; [|by rewrite /= addz1_neq0].
+  by apply/mem_range; rewrite ltz_add2r addz_ge0.
++ move => n /mem_range [le0n ltn_]; move/(_ (n + 1) _): eq_; [|by rewrite /= addz1_neq0].
+  by apply/mem_range; rewrite ltz_add2r addz_ge0.
++ move => n /mem_range [le0n ltn_]; move/(_ (n + 1) _): eq_; [|by rewrite /= addz1_neq0].
+  by apply/mem_range; rewrite ltz_add2r addz_ge0.
+move => n /mem_range [le0n ltn_]; move/(_ (n + 1) _): eq_; [|by rewrite /= addz1_neq0].
+by apply/mem_range; rewrite ltz_add2r addz_ge0.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -3003,6 +3167,22 @@ qed.
 lemma subseq_refl (s : 'a list) : subseq s s.
 proof. by elim: s => //= x s IHs; rewrite eqxx. qed.
 
+lemma catl_subseq (s1 s2 s3 : 'a list) :
+  subseq s2 s3 => subseq (s1 ++ s2) (s1 ++ s3).
+proof. by apply/cat_subseq/subseq_refl. qed.
+
+lemma catr_subseq (s1 s2 s3 : 'a list) :
+  subseq s1 s2 => subseq (s1 ++ s3) (s2 ++ s3).
+proof. by move=>?; apply/(cat_subseq _ _ _ _ _ (subseq_refl _)). qed.
+
+lemma cat_subseql (s1 s2 : 'a list) :
+  subseq s1 (s1 ++ s2).
+proof. by rewrite -{1}cats0; apply/catl_subseq/sub0seq. qed.
+
+lemma cat_subseqr (s1 s2 : 'a list) :
+  subseq s2 (s1 ++ s2).
+proof. by rewrite -{1}cat0s; apply/catr_subseq/sub0seq. qed.
+
 lemma subseq_trans (s2 s1 s3 : 'a list) :
   subseq s1 s2 => subseq s2 s3 => subseq s1 s3.
 proof.
@@ -3059,6 +3239,32 @@ proof. by case/subseqP=> m [_ -> Us2]; apply: mask_uniq. qed.
 lemma subseq_map_uniq (s1 s2 : 'a list) (f : 'a -> 'b) :
   subseq s1 s2 => uniq (map f s2) => uniq (map f s1).
 proof. by move/(map_subseq f); apply: subseq_uniq. qed.
+
+lemma cons_subseq x (s1 s2 : 'a list) :
+  subseq (x :: s1) s2 => exists s3 s4 , s2 = s3 ++ x :: s4 /\ subseq s1 s4.
+proof.
+elim: s2 => // y s2 IHs2 /=; case (y = x) => [->> ?|_].
++ by exists [] s2; rewrite cat0s.
+by case/IHs2 => [s3 s4] [->> ?]; exists (y :: s3) s4; rewrite -cat_cons.
+qed.
+
+lemma subseq_flatten (ss1 ss2 : 'a list list) :
+  subseq ss1 ss2 => subseq (flatten ss1) (flatten ss2).
+proof.
+elim: ss1 ss2 => [|s1 ss1 IHss1] [|s2 ss2] //=; [by rewrite flatten_nil sub0seq|].
+rewrite !flatten_cons; case: (s2 = s1) => [->> /IHss1|neq_]; [by apply/cat_subseq/subseq_refl|].
+case/cons_subseq => ss3 ss4 [->>]; rewrite flatten_cat flatten_cons !catA => /IHss1.
+by apply/cat_subseq/cat_subseqr.
+qed.
+
+lemma subseq_nseq n1 n2 (x1 x2 : 'a) :
+  subseq (nseq n1 x1) (nseq n2 x2) <=> (n1 <= 0 \/ (n1 <= n2 /\ x1 = x2)).
+proof.
+case (n1 <= 0) => [len10|/ltzNge lt0n]; [by rewrite nseq0_le // sub0seq|].
+move: lt0n (lt0n) n2 => /ltzW; elim: n1 => // n1 le0n1 /= IHn1 _ n2.
+rewrite nseqS //=.
+admit.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)
@@ -3295,6 +3501,145 @@ lemma foldl_zip_nseq ['a,'b,'c] (f : 'a -> 'c -> 'b -> 'c) x z s :
 proof.
   elim s z => [|hs ts IHs z] /=; first by rewrite nseq0.
   by rewrite addrC nseqS ?size_ge0 //= IHs.
+qed.
+
+lemma mask_filter_zip ['a] m (s : 'a list) :
+  mask m s = unzip2 (filter fst (zip m s)).
+proof. by elim: m s => [|b m IHm] [|x s] //=; case: b => _; rewrite IHm. qed.
+
+lemma subseq_flatten_zip (ss1 ss2 : 'a list list) :
+  size ss1 <= size ss2 =>
+  all (fun p : 'a list * 'a list => subseq p.`1 p.`2) (zip ss1 ss2) =>
+  subseq (flatten ss1) (flatten ss2).
+proof.
+elim: ss1 ss2 => [|s1 ss1 IHss1] [|s2 ss2]; rewrite ?flatten_nil ?flatten_cons ?sub0seq //=.
++ by rewrite lezNgt addrC ltzS size_ge0.
+by move => /lez_add2l /IHss1 {IHss1} IHss1 [?] /IHss1 {IHss1} ?; apply/cat_subseq.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(*                   Subsequence up to permutation                      *)
+(* -------------------------------------------------------------------- *)
+op subseq_perm ['a] (s1 s2 : 'a list) =
+  all (fun x, count (pred1 x) s1 <= count (pred1 x) s2) (s1 ++ s2).
+
+lemma subseq_permP (s1 s2 : 'a list) :
+  subseq_perm s1 s2 <=> forall P , count P s1 <= count P s2.
+proof.
+rewrite /subseq_perm allP; split; last by move=> h x _ /=; apply h.
+move=> /= leq_cnt1 P; move: {1 3 4}P (lezz (count P (s1 ++ s2))).
+move=> Q /ltzS; move: (count_ge0 P (s1 ++ s2)) Q => /ltzS/ltzW.
+elim: (_ + 1) => {P} [Q /ltzNge|n le0n IHn Q]; [by rewrite count_ge0|].
+move=> /ltzS/lez_eqVlt [<<-|]; [move: le0n|by apply/IHn].
+move=> /lez_eqVlt [/eq_sym/count_eq0/hasPn NQ_|].
++ rewrite count_pred0_eq_in ?count_ge0 //.
+  by move => ??; apply/NQ_/mem_cat; left.
+move=> /has_count /has_cat /or_andr [|[/hasPn NQ_]]; last first.
++ by rewrite count_pred0_eq_in // count_ge0.
+case/hasP=> x [? ?]; rewrite (countID _ (pred1 x) s1) (countID _ (pred1 x) s2).
+rewrite !(eq_count (predI Q (pred1 x)) (pred1 x)).
++ by move=> ?; rewrite /predI /pred1.
++ by move=> ?; rewrite /predI /pred1.
+apply/(lez_trans (count (pred1 x) s2 + count (predI Q (predC (pred1 x))) s1)).
++ by apply/lez_add2r/leq_cnt1/mem_cat; left.
+apply/lez_add2l/IHn; rewrite (countID Q (pred1 x) (s1 ++ s2)) ltz_addr.
+rewrite (eq_count (predI Q (pred1 x)) (pred1 x)).
++ by move=> ?; rewrite /predI /pred1.
+by apply/mem_count/mem_cat; left.
+qed.
+
+lemma subseq_permP1 (s1 s2 : 'a list) :
+  subseq_perm s1 s2 <=> forall x , count (pred1 x) s1 <= count (pred1 x) s2.
+proof. by split=> [/subseq_permP + ?|]; [|rewrite /subseq_perm allP => + ? _ /=]; move=> ->. qed.
+
+lemma subseq_permP1_mem (s1 s2 : 'a list) :
+  subseq_perm s1 s2 <=> forall x , mem s1 x => count (pred1 x) s1 <= count (pred1 x) s2.
+proof.
+split=> [/subseq_permP + ? _|]; [by move => ->|rewrite subseq_permP1 => + x; move/(_ x)].
+by case (x \in s1) => //= ?; rewrite count_pred0_eq_in ?count_ge0 // /pred1 => ? ?; apply/negP => ->>.
+qed.
+
+lemma subseq_permE ['a] (s1 s2 : 'a list) :
+  subseq_perm s1 s2 <=> (exists s , subseq s1 s /\ perm_eq s s2).
+proof.
+split=> [/subseq_permP le_|[s] [/count_subseq le_ /perm_eqP eq_]]; [|by apply/subseq_permP=> ?; rewrite -eq_ le_].
+pose s:= s1 ++ (flatten (map (fun x => nseq (count (pred1 x) s2 - count (pred1 x) s1) x) (undup s2))).
+exists s; split; [by rewrite -{1}cats0; apply/cat_subseq; rewrite ?subseq_refl // sub0seq|].
+rewrite /s => {s}; apply/perm_eqP1=> x; rewrite count_cat count_flatten sumz_filter0 -map_comp.
+case/lez_eqVlt: (le_ (pred1 x)) => [eq_|lt_]; [rewrite eq_ eq_in_filter_pred0 ?sumz_nil //|].
++ move=> ? /mapP [y] [+ ->>]; rewrite mem_undup /predC1 /(\o) /= => ?; apply/count_pred0_eq_in.
+  by move=> ?; rewrite mem_nseq => -[lt_ ->>]; rewrite /pred1; apply/negP => ->>;  move: lt_; rewrite eq_.
+rewrite (eq_in_filter_predC1_map _ x) ?undup_uniq ?mem_undup //.
++ by apply/mem_count/ltzE/(lez_trans (count (pred1 x) s1 + 1)); [rewrite -subz_ge0 /= count_ge0|apply/ltzE].
++ by move=> z; rewrite mem_undup /(\o) eq_sym -count_eq0 iff_negb has_nseq subz_gt0 {3}/pred1 eq_sym => mem_; split.
+rewrite /(\o) sumz_cons sumz_nil eq_sym addrC -subr_eq eq_sym /= count_predT_eq_in ?size_nseq ?lez_maxr ?subz_ge0 ?ltzW //.
+by move => ?; rewrite mem_nseq => -[_ <<-]; rewrite /pred1.
+qed.
+
+lemma perm_subseqE ['a] (s1 s2 : 'a list) :
+  subseq_perm s1 s2 <=> (exists s , perm_eq s1 s /\ subseq s s2).
+proof.
+split=> [/subseq_permP1 le_|[s] [/perm_eqP eq_ /count_subseq le_]]; [|by apply/subseq_permP=> ?; rewrite eq_ le_].
+pose m:= (mkseq (fun n => count (pred1 (nth witness s2 n)) (take n s2) < count (pred1 (nth witness s2 n)) s1) (size s2)).
+pose s:= mask m s2; exists s; split; [apply/perm_eqP1=> x|by apply/subseqP; exists m; rewrite /s /= size_mkseq lez_maxr].
+rewrite /s /m; move: le_ => {s m} /(_ x); elim/last_ind: s2 s1 => [s1|s2 y IHs2 s1].
++ by move => /lezNgt /= Nlt_; rewrite mask0 /=; apply/count_eq0; rewrite has_count.
+rewrite -!cats1 size_cat /= mkseqS //= !count_cat /= -cats1 mask_cat ?size_mkseq ?lez_maxr //=.
+rewrite !count_cat !nth_cat take_cat cats0 (fun_if (count (pred1 x))) /= /(pred1 x y) /b2i.
+case: (y = x) => [->>|neq_] //=; last first.
++ move=> le_; move: IHs2 => -> //; apply/(count_mask witness) => n /mem_range [le0n ltn_].
+  by rewrite !nth_mkseq //= nth_cat take_cat ltn_.
+case/lez_eqVlt => [eq_|/ltzS le_]; [|move/lezNgt: (le_) => -> /=]; last first.
++ move: IHs2 => -> //; apply/(count_mask witness) => n /mem_range [le0n ltn_].
+  by rewrite !nth_mkseq //= nth_cat take_cat ltn_.
+rewrite eq_ /= ltz_addl /=; congr; rewrite -{1}(mask_true s2 (size s2)) //.
+apply/(count_mask witness) => n /mem_range [le0n ltn_].
+rewrite nth_mkseq //= nth_cat take_cat ltn_ nth_nseq //=.
+rewrite /(pred1 _ (nth _ _ _)) => -> /=; rewrite eq_ ltzS; apply/count_subseq.
+rewrite -{2}(cat_take_drop n) -{1}(cats0 (take _ _)).
+by apply/cat_subseq; rewrite ?sub0seq // subseq_refl.
+qed.
+
+lemma subseq_perm_refl ['a] : reflexive subseq_perm<:'a>.
+proof. by move=> s; apply/subseq_permE; exists s; rewrite subseq_refl perm_eq_refl. qed.
+
+lemma subseq_perm_anti ['a] (s1 s2 : 'a list):
+  subseq_perm s1 s2 =>
+  subseq_perm s2 s1 =>
+  perm_eq s1 s2.
+proof. by move=> /subseq_permP le1 /subseq_permP le2; apply/perm_eqP => P; rewrite eqz_leq le1 le2. qed.
+
+lemma subseq_perm_trans ['a] : transitive subseq_perm<:'a>.
+proof. by move=> s t u; rewrite !subseq_permP => lets lesu P; apply/(lez_trans (count P s)); [apply/lets|apply/lesu]. qed.
+
+lemma subseq_subseq_perm ['a] (s1 s2 : 'a list) :
+  subseq s1 s2 => 
+  subseq_perm s1 s2.
+proof. by move=> /count_subseq ?; apply/subseq_permP. qed.
+
+lemma perm_subseq_perm ['a] (s1 s2 : 'a list) :
+  perm_eq s1 s2 => 
+  subseq_perm s1 s2.
+proof. by move=> /perm_eqP eq_; apply/subseq_permP => P; rewrite eq_. qed.
+
+lemma subset_perm_undup_count_le ['a] f (s : 'a list):
+  (forall x , x \in s => f x <= count (pred1 x) s) =>
+  subseq_perm (flatten (map (fun x => nseq (f x) x) (undup s))) s.
+proof.
+move=> le_; move/perm_subseq_perm: (perm_undup_count s).
+apply/subseq_perm_trans/subseq_subseq_perm/subseq_flatten_zip; [by rewrite !size_map|].
+rewrite zip_map zipss -map_comp /(\o); apply/allP => -[? ?] /mapP [x] [+ [->> ->>]] /=.
+by rewrite mem_undup => /le_ {le_} le_; apply/subseq_nseq; right.
+qed.
+
+lemma subset_perm_undup_count_ge ['a] f (s : 'a list):
+  (forall x , x \in s => count (pred1 x) s <= f x) =>
+  subseq_perm s (flatten (map (fun x => nseq (f x) x) (undup s))).
+proof.
+move=> le_; move/perm_eq_sym/perm_subseq_perm: (perm_undup_count s) => le__.
+apply/(subseq_perm_trans _ _ _ le__)/subseq_subseq_perm/subseq_flatten_zip => {le__}; [by rewrite !size_map|].
+rewrite zip_map zipss -map_comp /(\o); apply/allP => -[? ?] /mapP [x] [+ [->> ->>]] /=.
+by rewrite mem_undup => /le_ {le_} le_; apply/subseq_nseq; right.
 qed.
 
 (* -------------------------------------------------------------------- *)

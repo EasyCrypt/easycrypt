@@ -428,6 +428,24 @@ qed.
 lemma nosmt dvdzN d m : d %| m => d %| -m.
 proof. by move/dvdzP=> [q ->]; rewrite -mulNr &(dvdz_mull) dvdzz. qed.
 
+lemma dvdNz d n : d %| n => -d %| n.
+proof. by case/dvdzP => q ->>; apply/dvdzP; exists (-q); rewrite mulrNN. qed.
+
+lemma dvdz_norml (d n : int) : `|d| %| n <=> d %| n.
+proof.
+case: (0 <= d) => [|/ltrNge] ?; [by rewrite ger0_norm|].
+by rewrite ltr0_norm //; split => /dvdNz.
+qed.
+
+lemma dvdz_normr (d n : int) : d %| `|n| <=> d %| n.
+proof.
+case: (0 <= n) => [|/ltrNge] ?; [by rewrite ger0_norm|].
+by rewrite ltr0_norm //; split => /dvdzN.
+qed.
+
+lemma dvdz_norm (d n : int) : `|d| %| `|n| <=> d %| n.
+proof. by rewrite dvdz_norml dvdz_normr. qed.
+
 lemma nosmt dvdzB d m1 m2 : d %| m1 => d %| m2 => d %| (m1 - m2).
 proof. by move=> h1 h2; apply/dvdzD/dvdzN. qed.
 
@@ -963,6 +981,25 @@ move/(_ `|q| _): forall_; [apply/mem_range; split => //|].
 by move/dvdzP: dvdqp => [r] ->>; rewrite /coprime -gcdnormz normrM gcdC gcdMl normr_id.
 qed.
 
+lemma compositeP n :
+  1 < n =>
+  ! prime n =>
+  exists a b , 1 < a /\ 1 < b /\ n = a * b.
+proof.
+move => lt1n; rewrite /prime; rewrite lt1n /= negb_forall /=.
+case => a; rewrite negb_imply negb_or => -[dvdan] [neq_1 neq_n].
+exists `|a| (n %/ `|a|); rewrite mulrC divzE modz_abs !ltrNge.
+move/dvdzE: (dvdan) => -> /=; rewrite -negb_or !ler_norml.
+rewrite !le2_mem_range /= 3?range_ltn //= range_geq //=.
+apply/negP; case => [[|[|]] ->> //=|]; [by move/dvd0z: dvdan => ->>|].
+rewrite lez_divLR ?dvdzE ?modz_abs -?dvdzE //= ?ltrNge.
++ apply/negP => le_0; move: (eqz_leq 0 `|a|); rewrite le_0 normr_ge0 /=.
+  by rewrite eq_sym normr0P; apply/negP => ->>; move/dvd0z: dvdan => ->>.
+move: (dvdz_le _ _ _ dvdan); [by apply/gtr_eqF/ltzE/ltzW|].
+rewrite (ger0_norm n); [by apply/ltzW/ltzE/ltzW|move => ?; apply/negP => ?].
+by move: neq_n; rewrite eqz_leq /=; split.
+qed.
+
 lemma prime2 :
   prime 2.
 proof. by apply/primeP => /=; rewrite range_ltn // range_geq. qed.
@@ -1336,6 +1373,14 @@ lemma is_pdec_nseq p n :
 proof.
 move => ? lt0n; rewrite /is_pdec mulz_nseq ltzW //= is_pds_nseq //.
 by split => //; rewrite -{1}expr1; apply/dvdz_exp2l => /=; move/ltzE: lt0n.
+qed.
+
+lemma is_pdec_dvd d n psd psn :
+  is_pdec d psd =>
+  is_pdec n psn =>
+  d %| n <=> true.
+proof.
+fail.
 qed.
 
 (* -------------------------------------------------------------------- *)

@@ -4,6 +4,34 @@ require import AllCore Ring List Int IntMin IntDiv Bigalg Binomial Finite Poly S
 
 
 (* ==================================================================== *)
+(*TODO: can I use this with elim, and how?*)
+(*
+inductive prime_spec n =
+  | Le1 of (n <= 1)
+  | Prime of (prime n)
+  | Composite a b of (1 < a) & (1 < b) & (n = a * b).
+
+lemma primeW n :
+  prime_spec n.
+proof.
+case (n <= 1) => [len1|/ltrNge lt1n]; [by apply/Le1|].
+case (prime n) => [prime_n|]; [by apply/Prime|].
+rewrite /prime lt1n /= negb_forall /=; case => a.
+rewrite negb_imply negb_or => -[dvdan] [neq_1 neq_n].
+apply/(Composite n `|a| (n %/ `|a|)).
++ rewrite ltrNge; apply/negP => le_1; move: (le2_mem_range 0 1 `|a|).
+  rewrite normr_ge0 le_1 /= 2?range_ltn //= range_geq //= neq_1 /=.
+  by apply/gtr_eqF/normr_gt0/negP => ->>; move/dvd0z: dvdan => ->>.
++ rewrite ltz_divRL /=; [|by apply/dvdz_norml|].
+  - by apply/normr_gt0/negP => ->>; move/dvd0z: dvdan => ->>.
+  move: (dvdz_le _ _ _ dvdan); [by apply/gtr_eqF/ltzE/ltzW|].
+  by rewrite (gtr0_norm n) 1:ltzE 1:ltzW // => /ler_eqVlt [|//]; rewrite neq_n.
+by rewrite mulrC divzK // dvdz_norml.
+qed.
+*)
+
+
+(* ==================================================================== *)
 (*TODO: surely some of this is done elsewhere, and move where appropriate.*)
 lemma le_ind P (m : int) :
   P m =>
@@ -55,25 +83,6 @@ lemma add_ind P :
   (forall n , 0 < n => P n).
 proof. by move => P1 IHA; apply/lt_ind => // n lt0n Pn; apply/IHA. qed.
 
-lemma compositeP n :
-  1 < n =>
-  ! prime n =>
-  exists a b , 1 < a /\ 1 < b /\ n = a * b.
-proof.
-  move => lt1n; rewrite /prime; rewrite lt1n /= negb_forall /=.
-  case => a; rewrite negb_imply negb_or => -[dvdan] [neq_1 neq_n].
-  exists `|a| (n %/ `|a|); rewrite mulrC divzE modz_abs !ltrNge.
-  move/dvdzE: (dvdan) => -> /=; rewrite -negb_or !ler_norml.
-  rewrite !le2_mem_range /= 3?range_ltn //= range_geq //=.
-  apply/negP; case => [[|[|]] ->> //=|]; [by move/dvd0z: dvdan => ->>|].
-  rewrite lez_divLR ?dvdzE ?modz_abs -?dvdzE //= ?ltrNge.
-  + apply/negP => le_0; move: (eqz_leq 0 `|a|); rewrite le_0 normr_ge0 /=.
-    by rewrite eq_sym normr0P; apply/negP => ->>; move/dvd0z: dvdan => ->>.
-  move: (dvdz_le _ _ _ dvdan); [by apply/gtr_eqF/ltzE/ltzW|].
-  rewrite (ger0_norm n); [by apply/ltzW/ltzE/ltzW|move => ?; apply/negP => ?].
-  by move: neq_n; rewrite eqz_leq /=; split.
-qed.
-
 lemma mul_ind P :
   (forall p , prime p => P p) =>
   (forall m n , 1 < m => 1 < n => P m => P n => P (m * n)) =>
@@ -86,6 +95,26 @@ proof.
     by rewrite -mulN1r mulrC -mulrDl; apply/mulr_gt0; [apply/subr_gt0|apply/ltzE/ltzW].
   apply/IHn/mem_range; rewrite -ltzS -ltr_subl_addr lt1b /=; apply/subr_gt0.
   by rewrite -mulN1r -mulrDl; apply/mulr_gt0; [apply/subr_gt0|apply/ltzE/ltzW].
+qed.
+
+fail.
+
+lemma dvd_pow_prime p k a :
+  prime p =>
+  0 <= k =>
+  0 <= a =>
+  a %| p ^ k <=> (exists l , 0 <= l <= k /\ a = p ^ l).
+proof.
+move => prime_p le0k le0a; split => [|[l] [? ->>]]; [|by apply/dvdz_exp2l].
+elim: k le0k => [|k le0k IHk]; [by rewrite expr0 dvdz1 ger0_norm // => ->>; exists 0; rewrite expr0|].
+
+
+
+move => prime_p le0k /ler_eqVlt [<<-|].
++ rewrite dvd0z gtr_eqF /=; [by apply/expr_gt0/gt0_prime|].
+  by rewrite negb_exists /= => l; rewrite ltr_eqF //; apply/expr_gt0/gt0_prime.
+move => lt0a; case: (pow_prime_divisors _ lt0a) => pps is_ppdec_.
+case: (p \in unzip1 pps).
 qed.
 
 lemma coprime_ind P :
