@@ -508,7 +508,7 @@ abstract theory ComRingModule.
     move => /(perm_eq_map fst).
     rewrite !unzip1_zip ?size_cat ?size_nseq ?eq_size ?ler_maxr ?size_ge0 //.
     rewrite cat_nseq ?size_ge0 //; move/perm_eq_size: perm_eq_vs; rewrite size_cat => <-.
-    by move => /(perm_eq_nseq predT).
+    by move/perm_eq_nseq.
   qed.
 
   lemma free_split p1 p2 :
