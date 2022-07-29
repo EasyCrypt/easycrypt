@@ -65,7 +65,7 @@ lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool):
 proof.
 move=> Fsup /=.
 have:= introOrs A &m ev _=> //= ->.
-elim: (to_seq (support d)) (uniq_to_seq _ Fsup)=> //= => [|v vs ih [] v_notin_vs uniq_vs].
+elim: (to_seq (support d)) (uniq_to_seq (support d))=> //= => [|v vs ih [] v_notin_vs uniq_vs].
 + by rewrite big_nil; byphoare (: true ==> false).
 rewrite big_cons {2}/predT /=.
 have ->:   Pr[Rand(A).main() @ &m:

@@ -237,6 +237,21 @@ move=> ge0_n1 ge0_n2; elim: n1 ge0_n1 => [|n1 ge0_n1 ih].
 + by rewrite -addzAC !nseqS // 1:addz_ge0.
 qed.
 
+lemma eq_nseq0 n (x : 'a) :
+  nseq n x = [] <=> n <= 0.
+proof. by split=> [/(congr1 size)|?]; [rewrite size_nseq /= /max; case (0 < n) => [? ->>//|] /lezNgt|rewrite nseq0_le]. qed.
+
+lemma eq_nseq n1 n2 (x1 x2 : 'a) :
+  nseq n1 x1 = nseq n2 x2 <=> ((n1 <= 0 /\ n2 <= 0) \/ (n1 = n2 /\ x1 = x2)).
+proof.
+split=> [eq_|[[??]|[->>->>]]] //; [|by rewrite !nseq0_le].
+move/(congr1 size): eq_ (eq_); rewrite !size_nseq => eq_.
+case (n1 <= 0) => [len10|/ltzNge lt0n1] /=; [rewrite nseq0_le //|].
++ by rewrite eq_sym eq_nseq0 => ->.
+move: eq_; rewrite /max lt0n1 /=; case (0 < n2) => [_ <<- /=|_ ->> //].
+by rewrite -(subrK n1 1) !nseqS // -ltzS.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                        Sequence indexing                             *)
 (* -------------------------------------------------------------------- *)
@@ -729,6 +744,14 @@ qed.
 lemma mem_nseq n (x y: 'a): mem (nseq n x) y = (0 < n /\ x = y).
 proof. by rewrite -has_pred1 has_nseq. qed.
 
+lemma count_nseq p n (x : 'a):
+  count p (nseq n x) = max 0 n * b2i (p x).
+proof.
+case: (p x) => px; rewrite /b2i /=.
++ by rewrite count_predT_eq_in ?size_nseq // => ?; rewrite mem_nseq.
+by rewrite count_pred0_eq_in // => ?; rewrite mem_nseq.
+qed.
+
 lemma all_pred1P (x : 'a) s :
   (s = nseq (size s) x) <=> (all (pred1 x) s).
 proof.
@@ -861,6 +884,21 @@ elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
 by elim: n => [|n ge0_n _] /=; rewrite ?drop0 //= #smt.
 qed.
 
+lemma drop_nseq m n (x : 'a):
+  drop m (nseq n x) = nseq (max 0 (n - max 0 m)) x.
+proof.
+case (m <= 0) => [lem0|/ltzNge/ltzW le0m]; [rewrite (lez_maxl 0 m) //|rewrite (lez_maxr 0 m) //].
++ by rewrite drop_le0 //; case (0 <= n) => [le0n|/ltzNge/ltzW len0]; [rewrite lez_maxr|rewrite lez_maxl // !nseq0_le].
+case (n <= m) => [lenm|/ltzNge/ltzW lemn]; [rewrite lez_maxl ?subz_le0 //|rewrite lez_maxr ?subz_ge0 //].
++ by rewrite nseq0 drop_oversize // size_nseq /max; case: (0 < n).
+move: (lez_trans _ _ _ le0m lemn) => le0n; move: n le0n m le0m lemn.
+elim => [|n le0n IHn] m le0m lemn; [by rewrite !nseq0_le // subz_le0|].
+case/lez_eqVlt: lemn => [->>/=|]; [by rewrite nseq0 drop_oversize // size_nseq lez_maxr // addz_ge0|].
+move => /ltzS lemn; case/lez_eqVlt: le0m => [<<-/=|lt0m]; [by rewrite drop0|].
+rewrite nseqS //= lezNgt lt0m /= IHn; [by apply/ltzS|by apply/ltzW/ltzE|].
+by rewrite opprD addrA /= (addzAC _ 1).
+qed.
+
 op take n (xs : 'a list) =
   with xs = []      => []
   with xs = y :: ys =>
@@ -922,6 +960,19 @@ lemma take_nth (z0 : 'a) n s: 0 <= n < size s =>
 proof.
 elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
 by elim: n => [|n ge0_n _] /=; rewrite ?take0 //= /#.
+qed.
+
+lemma take_nseq m n (x : 'a):
+  take m (nseq n x) = nseq (min m n) x.
+proof.
+case (n <= m) => [lenm|/ltzNge/ltzW lemn]; [rewrite lez_minr ?subz_le0 //|rewrite lez_minl ?subz_ge0 //].
++ by case (n <= 0) => [len0|/ltzNge/ltzW le0n]; [rewrite nseq0_le|rewrite take_oversize // size_nseq lez_maxr].
+case (n <= 0) => [len0|/ltzNge/ltzW le0n]; [by rewrite !nseq0_le //; apply/(lez_trans n)|].
+elim: n le0n m lemn => [|n le0n IHn] m lemn; [by rewrite !nseq0_le|].
+case (m <= 0) => [lem0|/ltzNge lt0m]; [by rewrite take_le0 // nseq0_le|].
+case/lez_eqVlt: lemn => [->>/=|]; [by rewrite take_oversize // size_nseq lez_maxr // addz_ge0|].
+move => /ltzS lemn; rewrite nseqS //= lezNgt lt0m /= IHn ?ltzW ?ltzE //.
+by rewrite -{2}(subrK m 1) nseqS // subz_ge0; move/ltzE: lt0m.
 qed.
 
 lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
@@ -3099,6 +3150,38 @@ move => n /mem_range [le0n ltn_]; move/(_ (n + 1) _): eq_; [|by rewrite /= addz1
 by apply/mem_range; rewrite ltz_add2r addz_ge0.
 qed.
 
+lemma drop_mask n (s : 'a list) :
+  drop n s = mask (nseq (min (size s) n) false ++ nseq (size s - max 0 n) true) s.
+proof.
+rewrite -{4}(cat_take_drop n s) mask_cat.
++ rewrite size_nseq; case (0 <= n) => [le0n|/ltzNge/ltzW len0].
+  - rewrite size_take //; case: (n < size s) => [|/lezNgt].
+    * by move => /ltzW ?; rewrite lez_minr // lez_maxr.
+    by move => ?; rewrite lez_minl // lez_maxr.
+  by rewrite take_le0 //= lez_minr ?lez_maxl //; apply/(lez_trans 0).
+rewrite mask_false cat0s; case (n <= size s) => [len_|/ltzNge/ltzW le_n].
++ rewrite mask_true //; case: (0 <= n) => [|/ltzNge].
+  - by move => ?; rewrite size_drop // lez_maxr ?subz_ge0 // lez_maxr.
+  by move => /ltzW ?; rewrite lez_maxl // drop_le0.
+by rewrite drop_oversize // mask0.
+qed.
+
+lemma take_mask n (s : 'a list) :
+  take n s = mask (nseq (min (size s) n) true ++ nseq (size s - max 0 n) false) s.
+proof.
+rewrite -{4}(cat_take_drop n s) mask_cat.
++ rewrite size_nseq; case (0 <= n) => [le0n|/ltzNge/ltzW len0].
+  - rewrite size_take //; case: (n < size s) => [|/lezNgt].
+    * by move => /ltzW ?; rewrite lez_minr // lez_maxr.
+    by move => ?; rewrite lez_minl // lez_maxr.
+  by rewrite take_le0 //= lez_minr ?lez_maxl //; apply/(lez_trans 0).
+rewrite mask_false cats0; case (0 <= n) => [le0n|/ltzNge/ltzW len0].
++ rewrite mask_true // size_take //; case: (n < size s) => [|/lezNgt].
+  - by move => /ltzW ?; rewrite lez_minr // lez_maxr.
+  by move => ?; rewrite lez_minl // lez_maxr.
+by rewrite take_le0 //= mask0.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                             Subseq                                   *)
 (* -------------------------------------------------------------------- *)
@@ -3155,6 +3238,10 @@ rewrite lastI cat_rcons !mask_cat ?size_nseq ?size_belast.
 rewrite !mask_false (drop_nth true) ?index_ge0 //.
 by rewrite nth_index -?index_mem.
 qed.
+
+lemma subseq_size (s1 s2 : 'a list) :
+  subseq s1 s2 => size s1 <= size s2.
+proof. by case/subseqP => ? [eq_ ->>]; rewrite size_mask // -eq_ count_size. qed.
 
 lemma cat_subseq (s1 s2 s3 s4 : 'a list) :
   subseq s1 s3 => subseq s2 s4 => subseq (s1 ++ s2) (s3 ++ s4).
@@ -3257,13 +3344,62 @@ case/cons_subseq => ss3 ss4 [->>]; rewrite flatten_cat flatten_cons !catA => /IH
 by apply/cat_subseq/cat_subseqr.
 qed.
 
+lemma subseq_drop n (s : 'a list) :
+  subseq (drop n s) s.
+proof.
+rewrite drop_mask; apply/subseqP; pose m:= (_ ++ _); exists m; rewrite /= /m => {m}.
+rewrite size_cat !size_nseq; case (n <= size s) => [len_|/ltzNge/ltzW le_n].
++ rewrite lez_minr // (addzC (max _ _)) (lez_maxr _ (_ - max _ _)) ?subrK //.
+  by rewrite subz_ge0; case (0 <= n) => [|/ltzNge/ltzW] ?; [rewrite lez_maxr|rewrite lez_maxl].
+rewrite lez_minl // lez_maxr // lez_maxl // subz_le0; apply/(lez_trans n) => //.
+by case (0 <= n) => [|/ltzNge/ltzW] ?; [rewrite lez_maxr|rewrite lez_maxl].
+qed.
+
+lemma subseq_take n (s : 'a list) :
+  subseq (take n s) s.
+proof.
+rewrite take_mask; apply/subseqP; pose m:= (_ ++ _); exists m; rewrite /= /m => {m}.
+rewrite size_cat !size_nseq; case (n <= size s) => [len_|/ltzNge/ltzW le_n].
++ rewrite lez_minr // (addzC (max _ _)) (lez_maxr _ (_ - max _ _)) ?subrK //.
+  by rewrite subz_ge0; case (0 <= n) => [|/ltzNge/ltzW] ?; [rewrite lez_maxr|rewrite lez_maxl].
+rewrite lez_minl // lez_maxr // lez_maxl // subz_le0; apply/(lez_trans n) => //.
+by case (0 <= n) => [|/ltzNge/ltzW] ?; [rewrite lez_maxr|rewrite lez_maxl].
+qed.
+
+lemma subseq_nseql n (x : 'a) s :
+  subseq (nseq n x) s <=> n <= count (pred1 x) s.
+proof.
+split => [/count_subseq/(_ (pred1 x))|].
++ rewrite count_nseq {1}/pred1 /b2i /= /max.
+  by case (0 < n) => // /lezNgt; apply/lez_trans.
+move => le_; apply/(subseq_trans (nseq (count (pred1 x) s) x)).
++ move: (take_nseq n (count (pred1 x) s) x); rewrite lez_minl //.
+  by move => <-; apply/subseq_take.
+by rewrite -filter_pred1 filter_subseq.
+qed.
+
+lemma subseq_nseqr n (x : 'a) s :
+  subseq s (nseq n x) <=> (exists m , m <= max 0 n /\ s = nseq m x).
+proof.
+split => [|[m] [lemn ->>]]; [|]; [|by apply/subseq_nseql; rewrite count_nseq /pred1 /b2i].
+elim: s => [_|y s IHs]; [by exists 0; rewrite nseq0; case (0 <= n) => [|/ltzNge/ltzW] ?; [rewrite lez_maxr|rewrite lez_maxl]|].
+case (n <= 0) => [len0|/ltzNge lt0n le_]; [by rewrite nseq0_le|].
+move/subseq_mem/(_ y): (le_); rewrite /= mem_nseq => -[_ <<-]; move: le_ IHs.
+rewrite lez_maxr 1:ltzW // => le_ /(_ _); [by move: le_; apply/subseq_trans/subseq_cons|].
+case => [m] [lemn ->>]; exists (max 0 m + 1); rewrite nseqS.
++ by case (0 <= m) => [|/ltzNge/ltzW] ?; [rewrite lez_maxr|rewrite lez_maxl].
+case (0 <= m) => [|/ltzNge/ltzW] ?; [rewrite lez_maxr //|by rewrite lez_maxl // !nseq0_le //=; move/ltzE: lt0n].
+by move/subseq_size: le_; rewrite /= !size_nseq addrC !lez_maxr // ltzW.
+qed.
+
 lemma subseq_nseq n1 n2 (x1 x2 : 'a) :
   subseq (nseq n1 x1) (nseq n2 x2) <=> (n1 <= 0 \/ (n1 <= n2 /\ x1 = x2)).
 proof.
-case (n1 <= 0) => [len10|/ltzNge lt0n]; [by rewrite nseq0_le // sub0seq|].
-move: lt0n (lt0n) n2 => /ltzW; elim: n1 => // n1 le0n1 /= IHn1 _ n2.
-rewrite nseqS //=.
-admit.
+rewrite subseq_nseqr; split => [[m] []|[len10|[len12 <<-]]].
++ rewrite eq_nseq => le_ [[->] //|] [->> ->>] /=.
+  by move: le_; rewrite /max; case (0 < n2) => _ ->.
++ by exists 0; rewrite !nseq0_le //= /max; case (0 < n2) => //; apply/ltzW.
+by exists n1 => /=; rewrite /max; case (0 < n2) => // /lezNgt; apply/lez_trans.
 qed.
 
 (* -------------------------------------------------------------------- *)

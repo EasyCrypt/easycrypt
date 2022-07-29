@@ -1165,107 +1165,17 @@ lemma is_pds_nseq n p k :
 proof. by move => ?; rewrite /is_pds all_nseq; right. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma sumz_nil :
-  sumz [] = 0.
-proof. by []. qed.
-
-lemma sumz_cons z sz :
-  sumz (z :: sz) = z + sumz sz.
-proof. by []. qed.
-
-lemma sumz_cat sz1 sz2 :
-  sumz (sz1 ++ sz2) = sumz sz1 + sumz sz2.
-proof. by elim: sz1 => // z sz1 /=; rewrite !sumz_cons => ->; rewrite addrA. qed.
-
-lemma sumz_flatten ssz :
-  sumz (flatten ssz) = sumz (map sumz ssz).
-proof.
-elim: ssz => [|sz ssz IHssz]; [by rewrite flatten_nil|].
-by rewrite flatten_cons sumz_cat /= sumz_cons IHssz.
-qed.
-
-lemma sumz_catC sz1 sz2 :
-  sumz (sz1 ++ sz2) = sumz (sz2 ++ sz1).
-proof. by rewrite !sumz_cat addrC. qed.
-
-lemma sumz_perm sz1 sz2 :
-  perm_eq sz1 sz2 =>
-  sumz sz1 = sumz sz2.
-proof. by apply/(foldr_perm ( + ) 0)/addrCA. qed.
-
-lemma sumz_nseq m n :
-  sumz (nseq m n) = if 0 <= m then m * n else 0.
-proof.
-case (0 <= m) => [|/ltrNge/ltzW ltm0]; [|by rewrite nseq0_le].
-elim: m => [|m le0m IHm]; [by rewrite nseq0 mul0r|].
-by rewrite nseqS // sumz_cons IHm mulrDl /= addrC.
-qed.
-
-lemma sumz_filter0 sz :
-  sumz sz = sumz (filter (predC1 0) sz).
-proof.
-elim: sz => // z sz IHsz; rewrite sumz_cons /= {1}/predC1.
-by case (z = 0) => [->>|_] //=; rewrite sumz_cons IHsz.
-qed.
-
-(* -------------------------------------------------------------------- *)
-op mulz sz = foldr ( * ) 1 sz.
-
-lemma mulz_nil :
-  mulz [] = 1.
-proof. by []. qed.
-
-lemma mulz_cons z sz :
-  mulz (z :: sz) = z * mulz sz.
-proof. by []. qed.
-
-lemma mulz_cat sz1 sz2 :
-  mulz (sz1 ++ sz2) = mulz sz1 * mulz sz2.
-proof. by elim: sz1 => // z sz1 /=; rewrite !mulz_cons => ->; rewrite mulrA. qed.
-
-lemma mulz_flatten ssz :
-  mulz (flatten ssz) = mulz (map mulz ssz).
-proof.
-elim: ssz => [|sz ssz IHssz]; [by rewrite flatten_nil|].
-by rewrite flatten_cons mulz_cat /= mulz_cons IHssz.
-qed.
-
-lemma mulz_catC sz1 sz2 :
-  mulz (sz1 ++ sz2) = mulz (sz2 ++ sz1).
-proof. by rewrite !mulz_cat mulrC. qed.
-
-lemma mulz_perm sz1 sz2 :
-  perm_eq sz1 sz2 =>
-  mulz sz1 = mulz sz2.
-proof. by apply/(foldr_perm ( * ) 1)/mulrCA. qed.
-
-lemma mulz_nseq m n :
-  mulz (nseq m n) = if 0 <= m then n ^ m else 1.
-proof.
-case (0 <= m) => [|/ltrNge/ltzW ltm0]; [|by rewrite nseq0_le].
-elim: m => [|m le0m IHm]; [by rewrite nseq0 expr0|].
-by rewrite nseqS // mulz_cons exprS // IHm.
-qed.
-
-lemma mulz_filter1 sz :
-  mulz sz = mulz (filter (predC1 1) sz).
-proof.
-elim: sz => // z sz IHsz; rewrite mulz_cons /= {1}/predC1.
-by case (z = 1) => [->>|_] //=; rewrite mulz_cons IHsz.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma primes_is_pds_mulz ps :
+lemma primes_is_pds_prodz ps :
   all prime ps =>
-  is_pds (mulz ps) ps.
+  is_pds (prodz ps) ps.
 proof.
-elim: ps => // p ps IHps /= [?] /IHps; rewrite is_pds_cons mulz_cons /= => is_pds_ps; split.
+elim: ps => // p ps IHps /= [?] /IHps; rewrite is_pds_cons prodz_cons /= => is_pds_ps; split.
 + by apply/is_pd_mulr/is_pd_p.
 by apply/is_pds_mull.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op is_pdec n ps = is_pds n ps /\ n = mulz ps.
+op is_pdec n ps = is_pds n ps /\ n = prodz ps.
 
 lemma is_pdec_1 n ps :
   is_pdec n ps =>
@@ -1284,11 +1194,11 @@ lemma is_pdec_cons n p ps :
   is_pdec n (p :: ps) <=>
   (is_pd n p /\ is_pdec (n %/ p) ps).
 proof.
-rewrite /is_pdec is_pds_cons mulz_cons -andbA; apply/andb_id2l => is_pd_p.
+rewrite /is_pdec is_pds_cons prodz_cons -andbA; apply/andb_id2l => is_pd_p.
 rewrite eqboolP; split => [[is_pds_ps ->>]|[is_pds_ps eq_]].
 + rewrite mulrC mulzK /=; [by apply/gtr_eqF/gt0_prime; move: is_pd_p; apply/is_pd_prime|].
   move: is_pds_ps; apply/all_imp_in/allP => x mem_ /= [? ?]; split => //.
-  by rewrite (mulz_perm _ (x :: rem x ps)) ?mulz_cons ?dvdz_mulr; [apply/perm_to_rem|apply/dvdzz].
+  by rewrite (prodz_perm _ (x :: rem x ps)) ?prodz_cons ?dvdz_mulr; [apply/perm_to_rem|apply/dvdzz].
 rewrite mulrC -eq_ divzK /=; [by case: is_pd_p|]; rewrite -(divzK p n); [by case: is_pd_p|].
 by move: is_pds_ps; apply/all_imp_in/allP => x _ /= [? ?]; split => //; rewrite dvdz_mulr.
 qed.
@@ -1297,8 +1207,8 @@ lemma is_pdec_cat n ps1 ps2 :
   is_pdec n (ps1 ++ ps2) <=>
   (exists n1 n2 , is_pdec n1 ps1 /\ is_pdec n2 ps2 /\ n = n1 * n2).
 proof.
-rewrite /is_pdec is_pds_cat mulz_cat; split => [[] [is_pds1 is_pds2] ->>|[n1 n2] [] [is_pds1 ->>] [] [is_pds2 ->>] ->>].
-+ exists (mulz ps1) (mulz ps2); rewrite !primes_is_pds_mulz //.
+rewrite /is_pdec is_pds_cat prodz_cat; split => [[] [is_pds1 is_pds2] ->>|[n1 n2] [] [is_pds1 ->>] [] [is_pds2 ->>] ->>].
++ exists (prodz ps1) (prodz ps2); rewrite !primes_is_pds_prodz //.
   - by move: is_pds1; apply/is_pds_primes.
   by move: is_pds2; apply/is_pds_primes.
 by rewrite is_pds_mulr // is_pds_mull.
@@ -1325,7 +1235,7 @@ lemma perm_eq_prime_divisors n ps1 ps2 :
   perm_eq ps1 ps2 =>
   is_pdec n ps1 =>
   is_pdec n ps2.
-proof. by move => eq_; rewrite /is_pdec; apply/andb_id2; [by apply/is_pds_perm/perm_eq_sym|rewrite (mulz_perm _ _ eq_)]. qed.
+proof. by move => eq_; rewrite /is_pdec; apply/andb_id2; [by apply/is_pds_perm/perm_eq_sym|rewrite (prodz_perm _ _ eq_)]. qed.
 
 lemma is_pdec_ps n p ps :
   is_pdec n ps =>
@@ -1371,16 +1281,16 @@ lemma is_pdec_nseq p n :
   0 < n =>
   is_pdec (p ^ n) (nseq n p).
 proof.
-move => ? lt0n; rewrite /is_pdec mulz_nseq ltzW //= is_pds_nseq //.
+move => ? lt0n; rewrite /is_pdec prodz_nseq ltzW //= is_pds_nseq //.
 by split => //; rewrite -{1}expr1; apply/dvdz_exp2l => /=; move/ltzE: lt0n.
 qed.
 
 lemma is_pdec_dvd d n psd psn :
   is_pdec d psd =>
   is_pdec n psn =>
-  d %| n <=> true.
+  d %| n <=> subseq_perm psd psn.
 proof.
-fail.
+admit.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1414,7 +1324,7 @@ lemma is_ppdec_cons n p k pps :
 proof.
 rewrite /is_ppdec /= flatten_cons is_pdec_cat; split.
 + move => |> Nmem_ uniq_ lt0k all_ n1 n2 [is_pds_ ->>] is_pdec2.
-  rewrite mulz_nseq ltzW //= dvdz_mulr ?dvdzz //=; move: is_pds_.
+  rewrite prodz_nseq ltzW //= dvdz_mulr ?dvdzz //=; move: is_pds_.
   rewrite -{2}(subrK k 1) nseqS -?ltzS // => /is_pds_cons [[prime_p _] _].
   rewrite mulKz ?gtr_eqF ?expr_gt0 ?gt0_prime //= is_pdec2 /=; split; last first.
   - move: (is_pdec_ps _ p _ is_pdec2); rewrite -flattenP -iff_negb negb_exists /=.
@@ -1448,7 +1358,7 @@ rewrite /is_ppdec; do!split.
 + apply/allP => p /flatten_mapP [] [? k] /= []; rewrite mem_nseq => + [lt0k ->>].
   move => /mapP [?] /= [] + [<<- ->>]; rewrite mem_undup => mem_.
   by rewrite (is_pdec_ps _ _ _ is_pdec_).
-case: is_pdec_ => _ ->>; apply/mulz_perm/perm_eqP1 => p.
+case: is_pdec_ => _ ->>; apply/prodz_perm/perm_eqP1 => p.
 rewrite count_flatten -!map_comp; pose f:= (_ \o _).
 case: (eq_in_map f (fun q => if p = q then count (pred1 p) ps else 0) (undup ps)) => [+ _].
 move => ->; rewrite /f => {f}; [|rewrite sumz_filter0].

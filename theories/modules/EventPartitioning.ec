@@ -88,7 +88,7 @@ abstract theory FPredPartitioning.
                    Pr[M.f(i) @ &m: E i (glob M) res /\ phi i (glob M) res = a]) (to_seq P)
       + Pr[M.f(i) @ &m: E i (glob M) res /\ !P (phi i (glob M) res)].
   proof.
-  move=> ^/mem_to_seq <- /uniq_to_seq.
+  move=> ^/mem_to_seq <- _; move: (uniq_to_seq P).
   exact/(@list_partitioning M i E phi (to_seq P) &m).
   qed.
   end section.

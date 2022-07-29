@@ -82,6 +82,9 @@ clone include Bigalg.BigOrder with
 lemma nosmt sumzE ss : sumz ss = BIA.big predT (fun x => x) ss.
 proof. by elim: ss=> [|s ss ih] //=; rewrite BIA.big_cons -ih. qed.
 
+lemma nosmt prodzE ss : prodz ss = BIM.big predT (fun x => x) ss.
+proof. by elim: ss=> [|s ss ih] //=; rewrite BIM.big_cons -ih. qed.
+
 lemma nosmt big_constz (P : 'a -> bool) x s:
   BIA.big P (fun i => x) s = x * (count P s).
 proof. by rewrite BIA.sumr_const -IntID.intmulz. qed.

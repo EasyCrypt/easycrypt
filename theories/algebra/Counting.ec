@@ -97,8 +97,6 @@ proof.
   by rewrite -mulN1r -mulrDl; apply/mulr_gt0; [apply/subr_gt0|apply/ltzE/ltzW].
 qed.
 
-fail.
-
 lemma dvd_pow_prime p k a :
   prime p =>
   0 <= k =>
@@ -109,12 +107,14 @@ move => prime_p le0k le0a; split => [|[l] [? ->>]]; [|by apply/dvdz_exp2l].
 elim: k le0k => [|k le0k IHk]; [by rewrite expr0 dvdz1 ger0_norm // => ->>; exists 0; rewrite expr0|].
 
 
-
+(*
 move => prime_p le0k /ler_eqVlt [<<-|].
 + rewrite dvd0z gtr_eqF /=; [by apply/expr_gt0/gt0_prime|].
   by rewrite negb_exists /= => l; rewrite ltr_eqF //; apply/expr_gt0/gt0_prime.
 move => lt0a; case: (pow_prime_divisors _ lt0a) => pps is_ppdec_.
 case: (p \in unzip1 pps).
+*)
+admit.
 qed.
 
 lemma coprime_ind P :

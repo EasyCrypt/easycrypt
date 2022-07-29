@@ -492,9 +492,9 @@ abstract theory SubFiniteIDomain.
     theory CR         <- ID,
     theory CRPr       <- SubFiniteIDomain.IDPr,
     theory SubComRing <- SubFiniteIDomain.SubIDomain,
-    theory FCR        <- FID,
-    theory CRStr      <- IDStr,
-    theory FCRStr     <- FIDStr,
+    theory FCR        <- SubFiniteIDomain.FID,
+    theory CRStr      <- SubFiniteIDomain.IDStr,
+    theory FCRStr     <- SubFiniteIDomain.FIDStr,
     theory SCRM.CRM   <- SIDM.IDM.
 
   clone import FiniteIDomain as SFID with
@@ -548,9 +548,9 @@ abstract theory SubFiniteField.
     theory ID         <- F,
     theory IDPr       <- SubFiniteField.FPr,
     theory SubIDomain <- SubFiniteField.SubField,
-    theory FID        <- FF,
-    theory IDStr      <- FStr,
-    theory FIDStr     <- FFStr,
+    theory FID        <- SubFiniteField.FF,
+    theory IDStr      <- SubFiniteField.FStr,
+    theory FIDStr     <- SubFiniteField.FFStr,
     theory SIDM.IDM   <- SVS.VS.
 
   clone import FiniteField as SFF with
@@ -701,14 +701,14 @@ abstract theory SubFiniteField_ZMod.
 
   clone import ZModField as ZModP with
     type zmod     <= st,
-    op p          <- FStr.char,
-    axiom prime_p <- FFStr.prime_char.
+    op p          <- SubFiniteField_ZMod.FStr.char,
+    axiom prime_p <- SubFiniteField_ZMod.FFStr.prime_char.
 
   clone import ZModP_FiniteField as ZModPFF with
     type t        <= st,
-    op p          <- FStr.char,
-    axiom prime_p <- FFStr.prime_char,
-    theory ZModP  <- ZModP.
+    op p          <- SubFiniteField_ZMod.FStr.char,
+    axiom prime_p <- SubFiniteField_ZMod.FFStr.prime_char,
+    theory ZModP  <- SubFiniteField_ZMod.ZModP.
 
   op is_ofint (x : t) n = (x = ofint n).
 
@@ -823,8 +823,8 @@ abstract theory SubFiniteField_ZMod.
     type st      <- st,
     theory F     <- SubFiniteField_ZMod.F,
     theory FF    <- SubFiniteField_ZMod.FF,
-    theory FStr  <- FStr,
-    theory FFStr <- FFStr.
+    theory FStr  <- SubFiniteField_ZMod.FStr,
+    theory FFStr <- SubFiniteField_ZMod.FFStr.
 
   lemma exists_iter_frobenius_unfixed :
     exists (g : t) ,
@@ -842,7 +842,7 @@ abstract theory SubFiniteField_ZMod.
   (*TODO: actually does not need all that stuff, derives from simple polynomial result.*)
   lemma exists_generator :
     exists (g : t) ,
-      FFStr.UF.UZModStr.order (FFStr.UF.Sub.insubd g) = FF.FinType.card - 1.
+      SubFiniteField_ZMod.FFStr.UF.UZModStr.order (SubFiniteField_ZMod.FFStr.UF.Sub.insubd g) = FF.FinType.card - 1.
   proof.
     case: exists_iter_frobenius_unfixed => g [iterng Niterdg]; exists g.
     admit.
