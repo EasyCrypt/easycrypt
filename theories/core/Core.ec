@@ -263,3 +263,13 @@ proof. by move=> x @/predI [] _ ->. qed.
 
 lemma nosmt predTofV (f : 'a -> 'b): predT \o f = predT.
 proof. by apply/fun_ext=> x. qed.
+
+lemma nosmt predIpp (p: 'a -> bool) :
+  predI p p = p.
+proof.
+by apply/fun_ext=> x; rewrite /predI; case (p x) => //. qed.
+
+lemma nosmt predUpp (p: 'a -> bool) :
+  predU p p = p.
+proof.
+by apply/fun_ext=> x; rewrite /predU; case (p x) => //. qed.

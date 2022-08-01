@@ -77,3 +77,43 @@ case: (lub_adherent _ hlE (lub E - z) _); 1: by rewrite subr_gt0.
 move=> e [eE]; rewrite opprB addrCA subrr addr0.
 by rewrite ltrNge /=; apply: ub_Ez.
 qed.
+
+lemma lub1 c :
+  lub (fun x => x = c) = c.
+proof.
+apply eqr_le; split => [|_].
+- apply lub_le_ub; smt().
+- apply lub_upper_bound; smt().
+qed.
+
+op scale_rset (E: real -> bool) c x =
+  exists x0, E x0 /\ c * x0 = x.
+
+lemma has_lub_scale E c :
+  c > 0%r =>
+  has_lub E =>
+  has_lub (scale_rset E c).
+proof.
+move => gt0_c has_lubE; split; 1: smt().
+exists (c * lub E) => cx; smt(lub_upper_bound).
+qed.
+
+lemma lub_scale0 E :
+  nonempty E =>
+  lub (scale_rset E 0%r) = 0%r.
+proof. smt(lub1). qed.
+
+lemma lub_scaleE E c :
+  has_lub E =>
+  c >= 0%r =>
+  lub (scale_rset E c) = c * lub E.
+proof.
+move => has_lubE ge0_c; case (c > 0%r) => [gt0_c|]; last by smt(lub_scale0).
+apply eqr_le; split => [|_].
+- apply lub_le_ub; first by apply has_lub_scale.
+  smt(lub_upper_bound).
+- rewrite -ler_pdivl_mull //.
+  apply lub_le_ub => // x Ex.
+  rewrite ler_pdivl_mull //.
+  smt(lub_upper_bound has_lub_scale). 
+qed.

@@ -239,6 +239,21 @@ qed.
 lemma logM (a x y : real) : 0%r < x => 0%r < y => log a (x * y) = log a x + log a y.
 proof. by move => lt0x lt0y; rewrite -mulrDl -lnM. qed.
 
+lemma log_le1 b x :
+  b >= 1%r => 0%r < x <= 1%r => log b x <= 0%r.
+proof.
+rewrite /log => ge1_b bound_x.
+case (ln b = 0%r); first (move => -> /#).
+smt(lnV ln_ge0).
+qed.
+
+lemma le0_log b x :
+  x <= 0%r => log b x = 0%r.
+proof.
+move => le0_x; suff: (ln x = 0%r) by smt().
+exact ln_le0.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma rpowK (b x : real) : 0%r < b => b <> 1%r => 0%r < x =>
   b ^ (log b x) = x.
