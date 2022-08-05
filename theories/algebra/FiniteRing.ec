@@ -1,6 +1,6 @@
 (* ==================================================================== *)
-require import AllCore List Ring Int IntMin IntDiv RingStruct FinType ZModP.
-require import Bigalg SubRing RingModule Real RealExp Quotient.
+require import AllCore List Ring Int IntMin IntDiv RingStruct Finite FinType ZModP.
+require import Bigalg SubRing RingModule Real RealExp Quotient Counting.
 require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
@@ -154,6 +154,36 @@ abstract theory FiniteZModuleStruct.
     rewrite /l size_flatten sumzE (BIA.eq_big_seq _ (fun _ => order x)) /=.
     + by move => ? /mapP [?] [+ ->>]; move => /mapP [?] /= [_ ->>]; rewrite size_map size_orbit_list.
     by rewrite BIA.sumr_const count_predT !size_map intmulz; apply/dvdz_mulr/dvdzz.
+  qed.
+
+  lemma isgeneratorP g :
+    is_generator g <=> order g = FinType.card.
+  proof.
+    rewrite /is_generator -size_orbit_list; split => [orbit_|]. search _ size perm_eq.
+    + apply/perm_eq_size/uniq_perm_eq; [by apply/uniq_orbit_list|by apply/FinType.enum_uniq|].
+      by move => x; rewrite -orbit_listP ?gt0_order // orbit_ FinType.enumP.
+    move => eq_ x; move: (uniq_leq_size_perm_eq (orbit_list g) FinType.enum).
+    rewrite orbit_listP ?gt0_order // uniq_orbit_list FinType.enum_uniq eq_ /FinType.card /= => /(_ _).
+    + by move => ? _; apply/FinType.enumP.
+    by move/perm_eq_mem => ->; apply/FinType.enumP.
+  qed.
+
+  op eq_order d x = order x = d.
+
+  print ZModStr.
+
+  lemma finite_eq_order d :
+    is_finite (eq_order d).
+  proof. by move: FZMod.FinType.is_finite; apply/finite_leq => ?. qed.
+
+  lemma few_small_order_exists_generator :
+    (forall d , 0 <= d => d %| FinType.card =>
+      size (to_seq (fun x => ZMod.intmul x d = zeror)) <= d) =>
+    exists g , is_generator g.
+  proof.
+    move => forall_.
+    have: forall d , 0 <= d => d %| FinType.card => size (to_seq (eq_order d)) <= phi (d).
+    admit.
   qed.
 end FiniteZModuleStruct.
 

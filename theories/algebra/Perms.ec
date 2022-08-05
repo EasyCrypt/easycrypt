@@ -110,15 +110,6 @@ op subset (s t : 'a list) = forall x , x \in s => x \in t.
 lemma subsetA (s t u : 'a list) : subset s t => subset t u => subset s u.
 proof. by move => subset_s_t subset_t_u x mem_x_s; apply/subset_t_u/subset_s_t. qed.
 
-lemma perm_eq_pred1 (s1 s2 : 'a list) : perm_eq s1 s2 <=> (forall x , count (pred1 x) s1 = count (pred1 x) s2).
-proof.
-  split; [by move => /perm_eqP eq_count x; rewrite eq_count|].
-  by move => eq_count; rewrite /perm_eq; apply/allP => x _ /=; apply/eq_count.
-qed.
-
-lemma range_iota m n : iota_ m n = range m (m + n).
-proof. by rewrite /range addrAC. qed.
-
 (* -------------------------------------------------------------------- *)
 (*Represents the permutation: k -> p[k]*)
 pred is_perm (n : int) (p : int list) =
@@ -157,7 +148,7 @@ lemma permuteP (dflt : 'a) (p : int list) (s : 'a list) :
   perm_eq s (permute dflt p s).
 proof.
   rewrite /permute => is_perm_p; move: (is_perm_p); rewrite /is_perm => /perm_eqP eq_count.
-  apply/perm_eq_pred1 => x; rewrite /mkseq count_map /preim /=.
+  apply/perm_eqP1 => x; rewrite /mkseq count_map /preim /=.
   rewrite range_iota /=; rewrite -{1}(map_nth_range dflt s) count_map /preim /=.
   rewrite -eq_count -(permute_is_perm (-1) (size s)) //.
   rewrite /permute /mkseq count_map /preim /= range_iota /= size_range /= ler_maxr ?size_ge0 //.

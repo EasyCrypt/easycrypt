@@ -1,6 +1,6 @@
 (* ==================================================================== *)
 require import AllCore Ring List Int IntMin IntDiv Bigalg Binomial Finite Poly StdBigop.
-(*---*) import StdOrder.IntOrder IntID Bigint.BIA.
+(*---*) import StdOrder.IntOrder IntID Bigint.
 
 
 (* ==================================================================== *)
@@ -97,26 +97,6 @@ proof.
   by rewrite -mulN1r -mulrDl; apply/mulr_gt0; [apply/subr_gt0|apply/ltzE/ltzW].
 qed.
 
-lemma dvd_pow_prime p k a :
-  prime p =>
-  0 <= k =>
-  0 <= a =>
-  a %| p ^ k <=> (exists l , 0 <= l <= k /\ a = p ^ l).
-proof.
-move => prime_p le0k le0a; split => [|[l] [? ->>]]; [|by apply/dvdz_exp2l].
-elim: k le0k => [|k le0k IHk]; [by rewrite expr0 dvdz1 ger0_norm // => ->>; exists 0; rewrite expr0|].
-
-
-(*
-move => prime_p le0k /ler_eqVlt [<<-|].
-+ rewrite dvd0z gtr_eqF /=; [by apply/expr_gt0/gt0_prime|].
-  by rewrite negb_exists /= => l; rewrite ltr_eqF //; apply/expr_gt0/gt0_prime.
-move => lt0a; case: (pow_prime_divisors _ lt0a) => pps is_ppdec_.
-case: (p \in unzip1 pps).
-*)
-admit.
-qed.
-
 lemma coprime_ind P :
   (forall p n , prime p => 0 < n => P (p ^ n)) =>
   (forall m n , 1 < m => 1 < n => coprime m n => P m => P n => P (m * n)) =>
@@ -156,6 +136,14 @@ lemma coprimesP n k :
   k \in coprimes n <=> (coprime n k /\ k \in range 1 (n + 1)).
 proof. by rewrite mem_filter. qed.
 
+lemma coprimes_uniq n :
+  uniq (coprimes n).
+proof. by apply/filter_uniq/range_uniq. qed.
+
+lemma coprimes_sorted n :
+  sorted Int.(<=) (coprimes n).
+proof. by apply/sorted_filter; [apply/ler_trans|apply/sorted_range]. qed.
+
 lemma coprimes_nil n :
   n <= 0 =>
   coprimes n = [].
@@ -174,8 +162,9 @@ lemma coprimes_subseq n :
   subseq (coprimes n) (range 1 n).
 proof.
   move => lt1n; rewrite /coprimes rangeSr ?ltzW //.
-  rewrite filter_rcons /coprime.
-  admit.
+  rewrite filter_rcons /coprime gcdzz eqr_norml /=.
+  case (n = -1) => [->>|_] //=; case (n = 1) => [->>|_] //=.
+  by apply/filter_subseq.
 qed.
 
 lemma coprimes_prime p :
@@ -183,16 +172,154 @@ lemma coprimes_prime p :
   coprimes p = range 1 p.
 proof.
   move => /primeP [lt1p mem_]; rewrite /coprimes rangeSr ?ltzW //.
-  rewrite filter_rcons eq_in_filter_predT // /coprime.
-  admit.
+  rewrite filter_rcons eq_in_filter_predT // /coprime gcdzz.
+  by rewrite gtr_eqF // ltr_normr lt1p.
 qed.
 
 lemma coprimes_pow_prime p n :
   prime p =>
-  0 <= n =>
-  coprimes (p ^ (n + 1)) = flatten (mkseq (fun k => map (Int.(+) k) (coprimes (p ^ n))) p).
+  0 < n =>
+  coprimes (p ^ (n + 1)) =
+  flatten (mkseq (fun k => map (Int.(+) (k * p ^ n)) (coprimes (p ^ n))) p).
 proof.
-  move => prime_p le0n.
+  move => prime_p lt0n; move/ltzW: (lt0n) => le0n; apply/(eq_sorted Int.(<=)) => //.
+  + by apply/ler_trans.
+  + by move => ? ? ? ?; apply/ler_anti; split.
+  + by apply/coprimes_sorted.
+  + apply/(sorted_flatten _ _ ler_trans); split.
+    - apply/allP => ? /mapP [x] [+ ->>]; rewrite range_iota /= => mem_.
+      apply/sorted_map; [|by apply/coprimes_sorted].
+      by move => ? ? ?; apply/ler_add2l.
+    rewrite eq_in_filter_predT.
+    - move => ? /mapP [?] [? eq_]; rewrite /predC1; apply/negP => ->>.
+      move/(congr1 size): eq_ => /=; rewrite size_map; apply/negP.
+      move => /eq_sym /size_eq0 eq_; move: (coprimes_mem1 (p ^ n)).
+      by rewrite eq_ /=; apply/ltzS/ltr_subl_addr/expr_gt0/gt0_prime.
+    rewrite /mkseq range_iota /= -(subrr p); move/ltzW: (gt0_prime _ prime_p).
+    elim: {1 5} p => [|k le0k IHk]; [by rewrite range_geq|].
+    rewrite range_ltn; [by apply/ltr_subl_addr/ltr_subl_addl/ltzS|].
+    rewrite map_cons sorted_cons; [|rewrite opprD !addrA /= IHk /=].
+    - move => [|x2 s2] s1 s3 |> neq1 le12 neq3 le23 x1 x3 mem1 mem3.
+      by apply/(ler_trans x2); [apply/le12|apply/le23].
+    move => {IHk} ? /mapP [i] [mem_ ->>]; split; [|split].
+    - rewrite -size_eq0 size_map size_eq0; apply/negP => eq_; move: (coprimes_mem1 (p ^ n)).
+      by rewrite eq_ /=; apply/ltzS/ltr_subl_addr/expr_gt0/gt0_prime.
+    - rewrite -size_eq0 size_map size_eq0; apply/negP => eq_; move: (coprimes_mem1 (p ^ n)).
+      by rewrite eq_ /=; apply/ltzS/ltr_subl_addr/expr_gt0/gt0_prime.
+    move => ? ? /mapP [x1] [/coprimesP [_ mem1] ->>] /mapP [x2] [/coprimesP [_ mem2] ->>].
+    apply/(ler_trans ((p - k) * p ^ n)).
+    - apply/ler_subr_addl; rewrite -mulNr -mulrDl opprD addrA /=.
+      by move: mem1; apply/mem_range_ge.
+    apply/(ler_trans (i * p ^ n)).
+    - by apply/ler_pmul2r; [apply/expr_gt0/gt0_prime|move: mem_; apply/mem_range_le].
+    by apply/ler_subl_addl => /=; move: mem2; apply/mem_range_le.
+  apply/uniq_perm_eq.
+  + by apply/coprimes_uniq.
+  + apply/uniq_flatten_map => //=.
+    - by move => ?; apply/uniq_map_injective; [apply/addrI|apply/coprimes_uniq].
+    - rewrite range_iota /=; move => x y memx memy /hasP [?] [].
+      move => /mapP [z] [/coprimesP [_ memz] ->>] /mapP [t] [/coprimesP [_ memt] eq_].
+      move/(congr1 (transpose Int.(-) 1)): eq_ => /=; rewrite -!addrA.
+      move: (mem_range_addr 0 (p ^ n) z (-1)) (mem_range_addr 0 (p ^ n) t (-1)) memz memt.
+      move => <- <-; move: (z - 1) (t - 1) => {z t} z t memz memt eq_.
+      move: (euclideU _ _ _ _ _ eq_); rewrite -!mem_range gtr0_norm ?expr_gt0 ?gt0_prime //.
+      by rewrite memz memt /= => [].
+    by rewrite range_iota; apply/range_uniq.
+  move => x; rewrite coprimesP -flatten_mapP range_iota /=; split.
+  + move => [cpx]; rewrite rangeSr; [by apply/ltzS/ltr_subl_addr/expr_gt0/gt0_prime|].
+    rewrite mem_rcons /=; case => [->>|memx].
+    - move: cpx; rewrite /coprime gcdzz gtr_eqF // ltr_normr; left.
+      apply/(ltr_le_trans p); [by apply/gt1_prime|rewrite -{1}expr1].
+      by apply/ler_weexpn2l; [apply/ltzW/gt1_prime|rewrite /= -ler_subl_addr].
+    exists (x %/ (p ^ n)); split.
+    - apply/range_div_range; [by apply/expr_gt0/gt0_prime|].
+      by rewrite /= -exprS //; move: memx; apply/mem_range_incl.
+    apply/mapP; exists (x %% (p ^ n)); rewrite -divz_eq /=.
+    apply/coprimesP; split.
+    - move: cpx; rewrite /coprime gcd_modr => eq_.
+      move: (dvdz_gcd (p ^ n) (p ^ (n + 1)) x _).
+      * by apply/le_dvd_pow; rewrite ger0_norm // gtr0_norm ?ltzS //; apply/ltzW/ltzS.
+      by move: eq_ => -> /dvdz1; rewrite ger0_norm // ge0_gcd.
+    move: (mem_range_mod x (p ^ n)); rewrite gtr_eqF /=; [by apply/expr_gt0/gt0_prime|].
+    rewrite gtr0_norm; [by apply/expr_gt0/gt0_prime|].
+    rewrite range_ltn /=; [by apply/expr_gt0/gt0_prime|].
+    case; [|by apply/mem_range_incl => //; apply/ltzW/ltzS].
+    rewrite -dvdzE => dvd_; move: (gcd_dvd (p ^ (n + 1)) _ _ _ dvd_).
+    - by apply/le_dvd_pow; rewrite ger0_norm // gtr0_norm ?ltzS //; apply/ltzW/ltzS.
+    move: cpx => -> /dvdz1; rewrite gtr0_norm; [by apply/expr_gt0/gt0_prime|].
+    rewrite ieexprn_weq1 // ?ltzW ?gt0_prime //; case => [->> //|_ ->>].
+    by move/gt1_prime: prime_p.
+  move => [y] [mem_ /mapP [z] [/coprimesP [cpz mem_z] ->>]]; split.
+  + move: cpz; rewrite /coprime -(gcdMDl y).
+    admit.
+  move: mem_z; rewrite -{1 3}(add0r 1) -!mem_range_subr -!addrA => mem_z.
+  move: (mem_range_add_mul _ _ _ _ _ mem_z mem_); rewrite /= -exprS //.
+  by rewrite (addrC (_ - 1)) (mulrC _ y).
+qed.
+
+(*TODO: move*)
+lemma coprime_dvd d1 d2 n :
+  coprime d1 d2 =>
+  d1 %| n =>
+  d2 %| n =>
+  d1 * d2 %| n.
+proof.
+case/Bezout => u v eq1 /dvdzP [q1] ->> /dvdzP [q2] eq_.
+apply/dvdzP; exists (u * q2 + v * q1).
+by rewrite mulrA mulrAC mulrDl -!mulrA -eq_ !mulrA !(mulrAC _ q1) -mulrDl eq1.
+qed.
+
+(*TODO: move*)
+lemma chinese_remainder_theorem m n :
+  coprime m n =>
+  forall x y, (x %% (m * n) = y %% (m * n) <=> (x %% m = y %% m /\ x %% n = y %% n)).
+proof.
+move => copmn x y; rewrite -!eq_mod; split => [eq_|[eqm eqn]].
++ by split; apply/(dvdz_trans _ _ _ _ eq_); [apply/dvdz_mulr/dvdzz|apply/dvdz_mull/dvdzz].
+by apply/coprime_dvd.
+qed.
+
+lemma coprimes_coprime m n :
+  1 < m =>
+  1 < n =>
+  coprime m n =>
+  perm_eq (map (fun k => (k %% m, k %% n)) (coprimes (m * n))) (allpairs (fun a b => (a, b)) (coprimes m) (coprimes n)).
+proof.
+  move => lt1m lt1n copmn; apply/uniq_perm_eq.
+  + rewrite map_inj_in_uniq; [|by apply/coprimes_uniq].
+    move => x y; move: (coprimes_subseq (m * n)).
+    rewrite mulr_egt1 //= => subseq_ memx memy.
+    move: (subseq_mem _ _ _ subseq_ memx) (subseq_mem _ _ _ subseq_ memy).
+    move => {memx memy} memx memy [].
+    case: (Bezout _ _ copmn) => u v eq1 eqm eqn.
+    rewrite -(modz_small x (m * n)).
+    - apply/mem_range; rewrite normrM gtr0_norm ?ltzE ?ltzW //.
+      by rewrite gtr0_norm ?ltzE ?ltzW //; move: memx; apply/mem_range_incl.
+    rewrite -(modz_small y (m * n)).
+    - apply/mem_range; rewrite normrM gtr0_norm ?ltzE ?ltzW //.
+      by rewrite gtr0_norm ?ltzE ?ltzW //; move: memy; apply/mem_range_incl.
+    by rewrite chinese_remainder_theorem.
+  + apply/allpairs_uniq; [by apply/coprimes_uniq|by apply/coprimes_uniq|].
+    by move => ? ? ? ?.
+  move => [x y]; rewrite mapP allpairsP; split => [[z] /= [mem_ [->> ->>]]|].
+  + exists (z %% m, z %% n) => /=; move: mem_; rewrite !coprimesP.
+    move => [cop_ mem_]; move: (mem_range_mod z m) (mem_range_mod z n).
+    rewrite gtr_eqF ?ltzE ?ltzW // gtr_eqF ?ltzE ?ltzW //=.
+    rewrite gtr0_norm ?ltzE ?ltzW // gtr0_norm ?ltzE ?ltzW //.
+    rewrite (range_ltn _ m) ?ltzE ?ltzW // (range_ltn _ n) ?ltzE ?ltzW //=.
+    rewrite -!dvdzE; case => [dvdm|memm].
+    - move: (gcd_dvd (m * n) z m); rewrite dvdz_mulr ?dvdzz //=.
+      by move => /(_ _) //; rewrite cop_ => /dvdz1; rewrite gtr0_norm ?ltzE ?ltzW // => ->>.
+    case => [dvdn|memn].
+    - move: (gcd_dvd (m * n) z n); rewrite dvdz_mull ?dvdzz //=.
+      by move => /(_ _) //; rewrite cop_ => /dvdz1; rewrite gtr0_norm ?ltzE ?ltzW // => ->>.
+    move: cop_; rewrite /coprime !gcd_modr => eq1.
+    move: (dvdz_gcd m (m * n) z); rewrite dvdz_mulr ?dvdzz // eq1 /=.
+    move => /dvdz1; rewrite ger0_norm ?ge0_gcd // => -> /=.
+    move: (dvdz_gcd n (m * n) z); rewrite dvdz_mull ?dvdzz // eq1 /=.
+    move => /dvdz1; rewrite ger0_norm ?ge0_gcd // => -> /=.
+    by split; [move: memm|move: memn]; apply/mem_range_incl => //; apply/ltzW/ltzS.
+  move => [] [? ?] /= [memx] [memy] [<<- <<-].
   admit.
 qed.
 
@@ -221,10 +348,8 @@ lemma phi_ltid n :
   1 < n =>
   phi n < n.
 proof.
-move => /coprimes_subseq; rewrite /phi.
-(*TODO: missing*)
-search _ subseq size.
-admit.
+move => lt1n; move/coprimes_subseq/subseq_size: (lt1n); rewrite /phi size_range.
+by move => le_; apply/(ler_lt_trans _ _ _ le_)/ltr_maxrP; rewrite ltzE ltzW //= ltzE.
 qed.
 
 lemma phi_prime p :
@@ -240,7 +365,14 @@ lemma phi_pow_prime p n :
   0 < n =>
   phi (p ^ n) = p ^ n - p ^ (n - 1).
 proof.
-  admit.
+  move => prime_p; rewrite /phi -{1 2 3}(subrK n 1); move: (n - 1) => {n} n /ltzS.
+  elim: n => [|n le0n IHn].
+  + by rewrite expr1 expr0 coprimes_prime // size_range ler_maxr // -ltzS; apply/gt0_prime.
+  rewrite coprimes_pow_prime ?addr_ge0 //= size_flatten sumzE !BIA.big_mapT.
+  rewrite (BIA.eq_big _ predT _ (fun _ => p ^ (n + 1) - p ^ n)) //.
+  + by move => i _; rewrite /(\o) /= size_map.
+  rewrite big_constz count_predT size_iota ler_maxr ?ltzW ?gt0_prime //.
+  by rewrite mulrDl mulNr -!exprSr // addr_ge0.
 qed.
 
 lemma phi_coprime m n :
@@ -249,7 +381,8 @@ lemma phi_coprime m n :
   coprime m n =>
   phi (m * n) = phi m * phi n.
 proof.
-  admit.
+  move => lt0m lt0n copmn; rewrite /phi; move: (coprimes_coprime _ _ lt0m lt0n copmn).
+  by move/perm_eq_size; rewrite size_map size_allpairs.
 qed.
 
 (* ==================================================================== *)
@@ -260,10 +393,21 @@ lemma divisors_nil n :
   divisors n = [].
 proof. by move => len0; rewrite /divisors range_geq // -ler_subr_addr. qed.
 
-lemma divisors_mem n :
+lemma divisors_mem n k :
+  0 < n =>
+  k \in divisors n <=> (0 < k /\ k %| n).
+proof.
+  move => lt0n; rewrite /divisors mem_filter /= andbC; apply/andb_id2r.
+  rewrite mem_range ltzS ltzE /= => dvd_; case (1 <= k) => //= le1k; rewrite eqT.
+  by move: (dvdz_le _ _ _ dvd_); [apply/gtr_eqF|rewrite !gtr0_norm // ltzE].
+qed.
+
+lemma divisors_id n :
   0 < n =>
   n \in divisors n.
-proof. by move => lt0n; rewrite /divisors rangeSr ?filter_rcons /= ?dvdzz /= ?mem_rcons //; move/ltzE: lt0n. qed.
+proof.
+  by move => lt0n; rewrite /divisors rangeSr ?filter_rcons /= ?dvdzz /= ?mem_rcons //; move/ltzE: lt0n.
+qed.
 
 lemma divisors1 :
   divisors 1 = [1].
@@ -300,18 +444,24 @@ qed.
 
 lemma sum_phi n :
   0 < n =>
-  big predT phi (divisors n) = n.
+  BIA.big predT phi (divisors n) = n.
 proof.
-  case/ltzE/ler_eqVlt => [<<-|/=]; [by rewrite divisors1 big_seq1 phi1|].
-  pose P n:= big predT phi (divisors n) = n; apply/(coprime_ind P); rewrite /P => {P}.
-  + move => p k prime_p lt0k; rewrite divisors_pow_prime ?ltzW // big_mapT.
-    rewrite big_ltn; [by apply/addr_gt0|]; rewrite {1}/(\o) expr0 phi1 //=.
-    rewrite (eq_big_int _ _ _ (fun n => p ^ n - p ^ (n - 1))).
+  case/ltzE/ler_eqVlt => [<<-|/=]; [by rewrite divisors1 BIA.big_seq1 phi1|].
+  pose P n:= BIA.big predT phi (divisors n) = n; apply/(coprime_ind P); rewrite /P => {P n}.
+  + move => p k prime_p lt0k; rewrite divisors_pow_prime ?ltzW // BIA.big_mapT.
+    rewrite BIA.big_ltn; [by apply/addr_gt0|]; rewrite {1}/(\o) expr0 phi1 //=.
+    rewrite (BIA.eq_big_int _ _ _ (fun n => p ^ n - p ^ (n - 1))).
     - by move => ? [?] _; rewrite /(\o) /= phi_pow_prime // ltzE.
-    rewrite -sumrB; move: (range_add 0 k 1) => /= {2}->.
-    rewrite big_mapT (eq_big_int 0 _ _ ((^) p)); [by move => ?|].
-    rewrite (big_ltn 0) // expr0 opprD !addrA (addrAC 1) /=.
+    rewrite -BIA.sumrB; move: (range_add 0 k 1) => /= {2}->.
+    rewrite BIA.big_mapT (BIA.eq_big_int 0 _ _ ((^) p)); [by move => ?|].
+    rewrite (BIA.big_ltn 0) // expr0 opprD !addrA (addrAC 1) /=.
     move: (rangeSr 1 k _) => /=; [by move/ltzE: lt0k|move => ->].
-    by rewrite big_rcons {1}/predT /= addrAC.
+    by rewrite BIA.big_rcons {1}/predT /= addrAC.
+  move => m n lt1m lt1n copmn {2}<- {2}<-.
+  move: (divisors_coprime _ _ _ _ copmn); [by apply/ltzE/ltzW|by apply/ltzE/ltzW|].
+  move => eq_; rewrite (BIA.eq_big_perm _ _ _ _ eq_) BIA.big_allpairs mulr_big.
+  apply/BIA.eq_big_seq => km memm /=; apply/BIA.eq_big_seq => kn memn /=.
+  move: memm memn; rewrite !divisors_mem; [by apply/ltzE/ltzW|by apply/ltzE/ltzW|].
+  move => [lt0km dvdm] [lt0kn dvdn]; rewrite phi_coprime //.
   admit.
 qed.

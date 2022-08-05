@@ -180,7 +180,10 @@ abstract theory ZModuleStruct.
   proof. by move => y z; apply/eqboolP; rewrite /eqv_orbit; split => ?; rewrite -opprB orbitN. qed.
 
   lemma eqv_orbit_trans x : transitive (eqv_orbit x).
-  proof. by move => y z t; rewrite /eqv_orbit => orbit1 orbit2; move: (orbitD _ _ _ orbit1 orbit2); rewrite addrA subrK. qed.
+  proof.
+    by move => y z t; rewrite /eqv_orbit => orbit1 orbit2;
+    move: (orbitD _ _ _ orbit1 orbit2); rewrite addrA subrK.
+  qed.
 
   pred is_zmod_automorph (f : t -> t) =
     bijective f /\

@@ -455,6 +455,9 @@ proof. by rewrite dvdz_norml dvdz_normr. qed.
 lemma nosmt dvdzB d m1 m2 : d %| m1 => d %| m2 => d %| (m1 - m2).
 proof. by move=> h1 h2; apply/dvdzD/dvdzN. qed.
 
+lemma nosmt dvdz_mod d m : d %| m => d %| (m %% d).
+proof. by case/dvdzP => [q] ->>; apply/dvdzP; exists 0; rewrite modzMl mul0r. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt dvdz_eq d m : (d %| m) <=> (m %/ d * d = m).
 proof. by rewrite dvdzE modzE subr_eq0 eq_sym. qed.
@@ -853,17 +856,29 @@ proof. by rewrite gcdC gcd_modr gcdC. qed.
 lemma gcdMDl q a b : gcd a (q * a + b)%Int = gcd a b.
 proof. by rewrite -gcd_modr modzMDl gcd_modr. qed.
 
+lemma gcdMDr q a b : gcd (q * b + a)%Int b = gcd a b.
+proof. by rewrite gcdC gcdMDl gcdC. qed.
+
 lemma gcdDl a b : gcd a (a + b)%Int = gcd a b.
 proof. by rewrite -{2}(mul1r a) gcdMDl. qed.
 
 lemma gcdDr a b : gcd a (b + a)%Int = gcd a b.
 proof. by rewrite addrC gcdDl. qed.
 
+lemma gcdBl a b : gcd a (b - a)%Int = gcd a b.
+proof. by rewrite -mulN1r addrC gcdMDl. qed.
+
+lemma gcdBr a b : gcd a (a - b)%Int = gcd a b.
+proof. by rewrite -gcdzN opprD addrC /= gcdBl. qed.
+
 lemma gcdMl b a : gcd b (a * b)%Int = `|b|.
 proof. by rewrite -(addr0 (a * b)) gcdMDl gcdz0. qed.
 
 lemma gcdMr b a : gcd b (b * a)%Int = `|b|.
 proof. by rewrite mulrC gcdMl. qed.
+
+lemma gcdzz a : gcd a a = `|a|.
+proof. by rewrite -gcdBl. qed.
 
 lemma nosmt Bachet_Bezout (a b : int) :
   exists u v, u * a + v * b = gcd a b.
@@ -898,6 +913,19 @@ exists a0 b0; apply: gcd_uniq; rewrite ?nz_a // -?d0E.
 + move=>z za zb; rewrite &(ler_trans `|z|) 1:ler_norm.
   rewrite -(gtr0_norm d0) // dvdz_le 1:gtr_eqF //.
   by rewrite d0E &(dvdzD) dvdz_mull.
+qed.
+
+lemma gcd_dvd a b z :
+  z %| a => z %| b => z %| gcd a b.
+proof.
+move=> za zb; case: (Bachet_Bezout a b) => u v <-.
+by apply/dvdzD; apply/dvdz_mull.
+qed.
+
+lemma dvdz_gcd d m n :
+  d %| m => gcd d n %| gcd m n.
+proof.
+by move => dvddm; apply/gcd_dvd; [apply/(dvdz_trans _ _ _ _ dvddm)/dvdz_gcdl|apply/dvdz_gcdr].
 qed.
 
 (* ==================================================================== *)
@@ -1166,9 +1194,8 @@ lemma is_pds_mull m n ps :
 proof. by rewrite mulrC; apply/is_pds_mulr. qed.
 
 lemma is_pds_nseq n p k :
-  is_pd n p =>
-  is_pds n (nseq k p).
-proof. by move => ?; rewrite /is_pds all_nseq; right. qed.
+  is_pds n (nseq k p) <=> (k <= 0 \/ is_pd n p).
+proof. by rewrite /is_pds all_nseq. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma primes_is_pds_prodz ps :
@@ -1339,13 +1366,14 @@ lemma is_pdec_pow_count_Ndvd p n ps :
   ! p ^ (count (pred1 p) ps + 1) %| n.
 proof. by move => prime_p is_pdec_; rewrite (is_pdec_count_dvd _ _ _ _ _ _ is_pdec_) -?ltzE // addr_ge0 // count_ge0. qed.
 
-lemma is_pdec_nseq p n :
-  prime p =>
-  0 < n =>
-  is_pdec (p ^ n) (nseq n p).
+lemma is_pdec_nseq n p k :
+  is_pdec n (nseq k p) <=> ((k <= 0 /\ n = 1) \/ (prime p /\ 0 < k /\ n = p ^ k)).
 proof.
-move => ? lt0n; rewrite /is_pdec prodz_nseq ltzW //= is_pds_nseq //.
-by split => //; rewrite -{1}expr1; apply/dvdz_exp2l => /=; move/ltzE: lt0n.
+rewrite /is_pdec is_pds_nseq; case (k <= 0) => [lek0|/ltrNge lt0k] /=.
++ by rewrite nseq0_le // prodz_nil ltrNge lek0.
+rewrite lt0k prodz_nseq 1:ltzW //=; apply/andb_id2r => ->>.
+rewrite eqboolP; split => [[]|] // prime_p; split => //.
+by rewrite -{1}expr1; apply/dvdz_exp2l; move/ltzE: lt0k.
 qed.
 
 lemma is_pdec_dvd d n psd psn :
@@ -1370,6 +1398,53 @@ lemma is_ppdec_uniq n pps :
   is_ppdec n pps =>
   uniq pps.
 proof. by case => |> + _ _; apply/uniq_map. qed.
+
+lemma is_ppdec_pow_gt0 n p k pps :
+  is_ppdec n pps =>
+  (p, k) \in pps =>
+  0 < k.
+proof. by case => _ [/allP all_ _] /all_. qed.
+
+lemma is_ppdec_pdec n pps :
+  is_ppdec n pps =>
+  is_pdec n (flatten (map (fun (p : int * int) => nseq p.`2 p.`1) pps)).
+proof. by case => _ []. qed.
+
+lemma is_pdec_ppdec n ps :
+  is_pdec n ps =>
+  is_ppdec n (map (fun p => (p, count (pred1 p) ps)) (undup ps)).
+proof.
+move => is_pdec_; rewrite /is_ppdec; do!split.
++ rewrite -map_comp (eq_map _ idfun).
+  - by move => ?; rewrite /(\o) /idfun.
+  by rewrite map_id undup_uniq.
++ apply/allP => -[p k] /mapP [?] []; rewrite mem_undup.
+  by move => mem_ /= [<<- ->>]; apply/has_count/hasP; exists p.
++ apply/allP => p /flatten_mapP [] [? k] /= []; rewrite mem_nseq => + [lt0k ->>].
+  move => /mapP [?] /= [] + [<<- ->>]; rewrite mem_undup => mem_.
+  by rewrite (is_pdec_ps _ _ _ is_pdec_).
+case: is_pdec_ => _ ->>; apply/prodz_perm/perm_eqP1 => p.
+rewrite count_flatten -!map_comp; pose f:= (_ \o _).
+case: (eq_in_map f (fun q => if p = q then count (pred1 p) ps else 0) (undup ps)) => [+ _].
+move => ->; rewrite /f => {f}; [|rewrite sumz_filter0].
++ move => q mem_; rewrite /(\o) /=; rewrite -filter_pred1 count_filter.
+  case (p = q) => [<<-|neqpq]; [by apply/eq_count => ?; rewrite /predI /pred1|].
+  by apply/count_pred0_eq => ?; rewrite /predI /pred1 negb_and; apply/implybE => ->>.
+case: (p \in ps) => [mem_|Nmem_]; [move: (mem_) (undup_uniq ps)|].
++ rewrite -mem_undup => /splitPr [ps1 ps2] eq_; rewrite eq_ map_cat /=.
+  rewrite cat_uniq /= => |>; rewrite !negb_or => |> _ Nmem1 _ Nmem2 _.
+  rewrite -cat1s !filter_cat !sumz_cat filter_cons /=.
+  rewrite eq_in_filter_pred0; [by move => ? /mapP [q] /= [+ ->>]; rewrite /predC1 => memq; case (p = q)|].
+  rewrite eq_in_filter_pred0; [by move => ? /mapP [q] /= [+ ->>]; rewrite /predC1 => memq; case (p = q)|].
+  by rewrite sumz_nil /predC1 /=; move/ler_eqVlt: (count_ge0 (pred1 p) ps) => [<-|lt0_] //=; rewrite (gtr_eqF _ 0).
+rewrite eq_in_filter_pred0; [by move => ? /mapP [q] /= [+ ->>]; rewrite mem_undup /predC1 => mem_; case (p = q)|].
+by rewrite count_pred0_eq_in; [move => ? ?; rewrite /pred1; apply/negP => ->>|rewrite sumz_nil].
+qed.
+
+lemma is_ppdec_gt0 n pps :
+  is_ppdec n pps =>
+  0 < n.
+proof. by case=> _ [_] /is_pdec_gt0. qed.
 
 lemma is_ppdec_1 n pps :
   is_ppdec n pps =>
@@ -1406,41 +1481,16 @@ move => |> is_pd_ lt0k dvd_n Ndvdp_ uniq_ all_ is_pdec_; split.
   move/(is_pdec_ps _ p): is_pdec_; rewrite -flatten_mapP.
   rewrite /is_pd (is_pd_prime _ _ is_pd_) Ndvdp_ /=.
   by exists (p, l); rewrite mem_nseq /=.
-exists (p ^ k) (n %/ p ^ k); rewrite is_pdec_ /= is_pdec_nseq //=; [by move: is_pd_; apply/is_pd_prime|].
-by rewrite mulrC divzK.
+exists (p ^ k) (n %/ p ^ k); rewrite is_pdec_ /= is_pdec_nseq //=.
+by rewrite lt0k; move/is_pd_prime: is_pd_ => -> /=; rewrite mulrC divzK.
 qed.
 
 lemma pow_prime_divisors n :
   0 < n =>
   exists pps , is_ppdec n pps.
 proof.
-case/prime_divisors => ps is_pdec_.
-exists (map (fun p => (p, count (pred1 p) ps)) (undup ps)).
-rewrite /is_ppdec; do!split.
-+ rewrite -map_comp (eq_map _ idfun).
-  - by move => ?; rewrite /(\o) /idfun.
-  by rewrite map_id undup_uniq.
-+ apply/allP => -[p k] /mapP [?] []; rewrite mem_undup.
-  by move => mem_ /= [<<- ->>]; apply/has_count/hasP; exists p.
-+ apply/allP => p /flatten_mapP [] [? k] /= []; rewrite mem_nseq => + [lt0k ->>].
-  move => /mapP [?] /= [] + [<<- ->>]; rewrite mem_undup => mem_.
-  by rewrite (is_pdec_ps _ _ _ is_pdec_).
-case: is_pdec_ => _ ->>; apply/prodz_perm/perm_eqP1 => p.
-rewrite count_flatten -!map_comp; pose f:= (_ \o _).
-case: (eq_in_map f (fun q => if p = q then count (pred1 p) ps else 0) (undup ps)) => [+ _].
-move => ->; rewrite /f => {f}; [|rewrite sumz_filter0].
-+ move => q mem_; rewrite /(\o) /=; rewrite -filter_pred1 count_filter.
-  case (p = q) => [<<-|neqpq]; [by apply/eq_count => ?; rewrite /predI /pred1|].
-  by apply/count_pred0_eq => ?; rewrite /predI /pred1 negb_and; apply/implybE => ->>.
-case: (p \in ps) => [mem_|Nmem_]; [move: (mem_) (undup_uniq ps)|].
-+ rewrite -mem_undup => /splitPr [ps1 ps2] eq_; rewrite eq_ map_cat /=.
-  rewrite cat_uniq /= => |>; rewrite !negb_or => |> _ Nmem1 _ Nmem2 _.
-  rewrite -cat1s !filter_cat !sumz_cat filter_cons /=.
-  rewrite eq_in_filter_pred0; [by move => ? /mapP [q] /= [+ ->>]; rewrite /predC1 => memq; case (p = q)|].
-  rewrite eq_in_filter_pred0; [by move => ? /mapP [q] /= [+ ->>]; rewrite /predC1 => memq; case (p = q)|].
-  by rewrite sumz_nil /predC1 /=; move/ler_eqVlt: (count_ge0 (pred1 p) ps) => [<-|lt0_] //=; rewrite (gtr_eqF _ 0).
-rewrite eq_in_filter_pred0; [by move => ? /mapP [q] /= [+ ->>]; rewrite mem_undup /predC1 => mem_; case (p = q)|].
-by rewrite count_pred0_eq_in; [move => ? ?; rewrite /pred1; apply/negP => ->>|rewrite sumz_nil].
+case/prime_divisors => ps /is_pdec_ppdec is_ppdec_.
+by exists (map (fun p => (p, count (pred1 p) ps)) (undup ps)).
 qed.
 
 lemma perm_eq_pow_prime_divisors n pps1 pps2 :
@@ -1483,15 +1533,95 @@ by apply/dvdz_exp2l; rewrite addr_ge0 1:ltzW // -ltzE.
 qed.
 
 lemma pow_prime_divisors_perm_eq n pps1 pps2 :
-  0 < n =>
   is_ppdec n pps1 =>
   is_ppdec n pps2 =>
   perm_eq pps1 pps2.
 proof.
-move => lt0n is_ppdec1 is_ppdec2; apply/uniq_perm_eq.
+move => is_ppdec1 is_ppdec2; move/is_ppdec_gt0: (is_ppdec1) => lt0n; apply/uniq_perm_eq.
 + by move: is_ppdec1; apply/is_ppdec_uniq.
 + by move: is_ppdec2; apply/is_ppdec_uniq.
 by move => [p k]; rewrite -(is_ppdec_mem _ _ _ _ is_ppdec1) -(is_ppdec_mem _ _ _ _ is_ppdec2).
+qed.
+
+lemma is_ppdec_dvd d n ppsd ppsn :
+  is_ppdec d ppsd =>
+  is_ppdec n ppsn =>
+  d %| n <=> forall p k , (p, k) \in ppsd => k <= odflt 0 (assoc ppsn p).
+proof.
+move => is_ppdec1 is_ppdec2; move: (is_ppdec1) (is_ppdec2).
+move => /is_ppdec_pdec is_pdec1 /is_ppdec_pdec is_pdec2.
+rewrite (is_pdec_dvd _ _ _ _ is_pdec1 is_pdec2) subseq_permP1.
+split => [+ p k memk|+ p]; move => /(_ p).
++ rewrite !count_flatten -!map_comp sumz_filter0.
+  rewrite (eq_in_filter_predC1_map _ (p, k)) //.
+  - by apply/(is_ppdec_uniq _ _ is_ppdec1).
+  - move => [q l] meml; rewrite /(\o) /= eq_sym count_nseq mulf_eq0 b2i_eq0.
+    rewrite -negb_eqbr -eq_iff eq_sym eq_iff negb_eqbr negb_or /= /pred1.
+    rewrite (eq_sym q) andbC; apply/andb_id2r; rewrite eqboolP => <<-.
+    rewrite /max (is_ppdec_pow_gt0 _ _ _ _ is_ppdec1 meml) /= (gtr_eqF _ 0) /=.
+    * by apply/(is_ppdec_pow_gt0 _ _ _ _ is_ppdec1 meml).
+    move: (mem_assoc_uniq ppsd p k _); [by case: is_ppdec1|].
+    move: (mem_assoc_uniq ppsd p l _); [by case: is_ppdec1|].
+    by rewrite memk meml /= => -> /someI ->>.
+  rewrite {1}/(\o) /= count_nseq {1}/pred1 /b2i /= /max.
+  rewrite (is_ppdec_pow_gt0 _ _ _ _ is_ppdec1 memk) /= sumz_cons sumz_nil /=.
+  move => le_; apply/(ler_trans _ _ _ le_); rewrite sumz_filter0 => {le_}.
+  case: (assocP ppsn p) => [|> _ l meml ->| |> Nmem_ ->] /=.
+  - rewrite (eq_in_filter_predC1_map _ (p, l)) //.
+    * by apply/(is_ppdec_uniq _ _ is_ppdec2).
+    * move => [q m] memm; rewrite /(\o) /= eq_sym count_nseq mulf_eq0 b2i_eq0.
+      rewrite -negb_eqbr -eq_iff eq_sym eq_iff negb_eqbr negb_or /= /pred1.
+      rewrite (eq_sym q) andbC; apply/andb_id2r; rewrite eqboolP => <<-.
+      rewrite /max (is_ppdec_pow_gt0 _ _ _ _ is_ppdec2 memm) /= (gtr_eqF _ 0) /=.
+      + by apply/(is_ppdec_pow_gt0 _ _ _ _ is_ppdec2 memm).
+      move: (mem_assoc_uniq ppsn p l _); [by case: is_ppdec2|].
+      move: (mem_assoc_uniq ppsn p m _); [by case: is_ppdec2|].
+      by rewrite meml memm /= => -> /someI ->>.
+    rewrite /(\o) count_nseq /= sumz_cons sumz_nil /b2i /pred1 /=.
+    by apply/ler_maxrP => /=; apply/ltzW/(is_ppdec_pow_gt0 _ _ _ _ is_ppdec2 meml).
+  rewrite eq_in_filter_pred0 // => ? /mapP [] [q l] [meml] ->>.
+  rewrite /(\o) /predC1 count_nseq /= mulf_eq0 b2i_eq0 /pred1; right.
+  by move: Nmem_; apply/contra => ->>; apply/mem_map_fst; exists l.
+move => forall_; rewrite !count_flatten -!map_comp sumz_filter0.
+case: (p \in unzip1 ppsd) => [/mapP [] [? k] [memk /= <<-]|Nmem_].
++ move/(_ _ memk): forall_; rewrite (eq_in_filter_predC1_map _ (p, k)) //.
+  - by apply/(is_ppdec_uniq _ _ is_ppdec1).
+  - move => [q l] meml; rewrite /(\o) /= eq_sym count_nseq mulf_eq0 b2i_eq0.
+    rewrite -negb_eqbr -eq_iff eq_sym eq_iff negb_eqbr negb_or /= /pred1.
+    rewrite (eq_sym q) andbC; apply/andb_id2r; rewrite eqboolP => <<-.
+    rewrite /max (is_ppdec_pow_gt0 _ _ _ _ is_ppdec1 meml) /= (gtr_eqF _ 0) /=.
+    * by apply/(is_ppdec_pow_gt0 _ _ _ _ is_ppdec1 meml).
+    move: (mem_assoc_uniq ppsd p k _); [by case: is_ppdec1|].
+    move: (mem_assoc_uniq ppsd p l _); [by case: is_ppdec1|].
+    by rewrite memk meml /= => -> /someI ->>.
+  rewrite /(\o) count_nseq /= sumz_cons sumz_nil /b2i /pred1 /= sumz_filter0.
+  case: (assocP ppsn p) => [|> _ l meml ->| |> Nmem_ ->] /=; last first.
+  - rewrite eq_in_filter_pred0.
+    * move => ? /mapP [] [q l] [mem_ ->>]; rewrite /(\o) count_nseq /= /predC1 /=.
+      rewrite mulf_eq0 b2i_eq0 /pred1; right; move: Nmem_; apply/contra => ->>.
+      by apply/mapP; exists (p, l).
+    by rewrite sumz_nil => ?; rewrite ler_maxl.
+  rewrite (eq_in_filter_predC1_map _ (p, l)) //.
+  - by apply/(is_ppdec_uniq _ _ is_ppdec2).
+  - move => [q m] memm; rewrite /(\o) /= eq_sym count_nseq mulf_eq0 b2i_eq0.
+    rewrite -negb_eqbr -eq_iff eq_sym eq_iff negb_eqbr negb_or /= /pred1.
+    rewrite (eq_sym q) andbC; apply/andb_id2r; rewrite eqboolP => <<-.
+    rewrite /max (is_ppdec_pow_gt0 _ _ _ _ is_ppdec2 memm) /= (gtr_eqF _ 0) /=.
+    * by apply/(is_ppdec_pow_gt0 _ _ _ _ is_ppdec2 memm).
+    move: (mem_assoc_uniq ppsn p l _); [by case: is_ppdec2|].
+    move: (mem_assoc_uniq ppsn p m _); [by case: is_ppdec2|].
+    by rewrite meml memm /= => -> /someI ->>.
+  rewrite sumz_cons sumz_nil /= count_nseq /b2i /= ler_maxr.
+  - by apply/ltzW/(is_ppdec_pow_gt0 _ _ _ _ is_ppdec1 memk).
+  by move => le_; apply/(ler_trans _ _ _ le_ (maxrr 0 l)).
+rewrite eq_in_filter_pred0.
++ move => ? /mapP [] [q k] [mem_ ->>]; rewrite /(\o) count_nseq /= /predC1 /=.
+  rewrite mulf_eq0 b2i_eq0 /pred1; right; move: Nmem_; apply/contra => ->>.
+  by apply/mapP; exists (p, k).
+rewrite sumz_nil => {forall_ is_ppdec2 is_pdec2}; elim: ppsn => [|[q l] ppsn IHppsn] /=.
++ by rewrite sumz_nil.
+rewrite sumz_cons addr_ge0 // /(\o) count_nseq /= mulr_ge0 ?maxrl //.
+by rewrite /b2i; case: (pred1 _ _).
 qed.
 
 (* ==================================================================== *)

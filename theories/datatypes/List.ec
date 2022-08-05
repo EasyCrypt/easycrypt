@@ -2305,6 +2305,9 @@ theory Range.
 
   lemma range_uniq m n: uniq (range m n).
   proof. by apply/iota_uniq. qed.
+  
+  lemma range_iota m n : iota_ m n = range m (m + n).
+  proof. by rewrite /range addrAC. qed.
 
   lemma size_range m n: size (range m n) = max 0 (n - m).
   proof. by apply/size_iota. qed.
@@ -4009,6 +4012,15 @@ proof.
 by move=> e_tr a s; apply/(subseq_sorted e e_tr _ _ (filter_subseq a s)).
 qed.
 
+lemma sorted_map (e : 'a -> 'a -> bool) f :
+  (forall x y, e x y => e (f x) (f y)) =>
+  forall s,
+  sorted e s =>
+  sorted e (map f s).
+proof.
+by move=> incr_; elim => [|x [|y s]] //= IHs [e_ p_]; split; [apply/incr_|apply/IHs].
+qed.
+
 lemma sorted_rem (e : 'a -> 'a -> bool) :
      (forall y x z, e x y => e y z => e x z)
   => forall x s, sorted e s => sorted e (rem x s).
@@ -4112,6 +4124,73 @@ apply/(@eq_sorted e)=> //; try by apply/sort_sorted.
 apply/perm_eqlP=> s'; rewrite !perm_sortl; apply/perm_eqlP.
 rewrite -(perm_cat2l [x]) perm_eq_sym perm_catCl perm_catAC -catA /=.
 by rewrite -eqss (@perm_eq_trans s) // perm_sort.
+qed.
+
+lemma nosmt sorted_range m n :
+  sorted Int.(<=) (range m n).
+proof.
+case (n <= m) => [?|/ltzNge/ltzW]; [by rewrite range_geq|rewrite -subz_ge0].
+move: (range_add 0 (n - m) m); rewrite subrK => -> le_.
+move: (n - m) le_ {1}m => {m n}; elim => [|n le0n IHn] m.
++ by rewrite range_geq.
+rewrite range_ltn ?ltzS //= -range_add -addrA (addrC 1) -{1}(add0r (_ + 1)) range_add /=.
+case/lez_eqVlt: le0n (IHn (m + 1)) => {IHn} [<<-|lt0n]; [by rewrite range_geq|].
+by rewrite range_ltn //= => -> /=; apply/ltzW/ltzS.
+qed.
+
+lemma sorted_cons (e : 'a -> 'a -> bool) x s :
+  transitive e =>
+  sorted e (x :: s) <=> ((forall y , y \in s => e x y) /\ (sorted e s)).
+proof.
+move => e_trans; rewrite /=; case: s => [|y s] //=; split => [[e_ ps_]|[forall_ ps_]]; split => //.
++ move => z [->>|] // mem_; apply/(e_trans y) => // {x e_}; case/splitPr: mem_ => s1 s2 ->>.
+  elim: s1 ps_ => //= x s1 IHs1 [eyx ps_]; apply/IHs1; move: (_ ++ _) ps_ => {z IHs1}.
+  by elim => //= z s _ [exz ->] /=; apply/(e_trans x).
+by apply/forall_.
+qed.
+
+lemma sorted_cat (e : 'a -> 'a -> bool) s1 s2 :
+  transitive e =>
+  sorted e (s1 ++ s2) <=>
+  ((forall x1 x2 , x1 \in s1 => x2 \in s2 => e x1 x2) /\
+    (sorted e s1) /\
+    (sorted e s2)).
+proof.
+move => e_trans; elim: s1 => [//|x s1 IHs1]; rewrite cat_cons !sorted_cons // IHs1.
+rewrite !andbA; apply/andb_id2r => sorted2; apply/eqboolP/andb_id2r => sorted1.
+apply/eqboolP; split => [[ec_ e_]|[e_ ec_]]; split => [x1 x2|y|y|x1 x2] /=.
++ by case => [->>|] mem2; [apply/ec_/mem_cat; right|move => mem1; apply/e_].
++ by move => mem_; apply/ec_/mem_cat; left.
++ by case/mem_cat => mem_; [apply/ec_|apply/e_].
+by move => mem1 mem2; apply/e_ => //=; right.
+qed.
+
+lemma sorted_flatten (e : 'a -> 'a -> bool) ss :
+  transitive e =>
+  sorted e (flatten ss) <=>
+  (all (sorted e) ss /\
+   sorted (fun s1 s2 =>
+            s1 <> [] /\
+            s2 <> [] /\
+            forall x1 x2 ,
+              x1 \in s1 =>
+              x2 \in s2 =>
+              e x1 x2)
+          (filter (predC1 []) ss)).
+proof.
+move => e_trans; elim: ss => [|s ss IHss]; [by rewrite flatten_nil|].
+rewrite flatten_cons sorted_cat //= /(predC1 [] s) IHss => {IHss}.
+case (s = []) => [->>//|neqs]; rewrite ifT // sorted_cons //=.
++ move => s2 s1 s3 |> neqs1 + + neqs3; case: s2 => // x2 s2 _ ee12 ee23 x1 x3 mem1 mem3.
+  by apply/(e_trans x2); [apply/ee12|apply/ee23].
+rewrite !andbA; apply/andb_id2r => sorted_ss; apply/eqboolP.
+rewrite andbAC andbC -!andbA; apply/andb_id2l => sorted_s; apply/eqboolP.
+rewrite andbC; apply/andb_id2l => all_sorted; apply/eqboolP.
+split => [e_ s' /mem_filter [+ mem_]|a_ x1 x2 mem1 /flattenP [s'] [mem_ mem2]].
++ rewrite /predC1 => neqs'; rewrite neqs neqs' /= => x1 x2 mem1 mem2.
+  by apply/e_ => //; apply/flattenP; exists s'; split.
+case/(_ s' _): a_ => [|_ [_] -> //]; apply/mem_filter; split => //.
+by rewrite /predC1; apply/negP => ->>.
 qed.
 
 (* -------------------------------------------------------------------- *)
