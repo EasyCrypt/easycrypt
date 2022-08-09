@@ -1300,7 +1300,7 @@ module Op = struct
       in
 
       let bds = List.combine (List.map EcTypes.fresh_id_of_ty aty) aty in
-      let ax  = EcFol.f_op oppath (List.map tvar nparams) rty in
+      let ax  = EcFol.f_op oppath (List.map tvar nparams) ty in
       let ax  = EcFol.f_app ax (List.map (curry f_local) bds) rty in
       let ax  = EcFol.f_app (EcFol.f_op pred [dty] (tfun rty tbool)) [ax] tbool in
       let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in
