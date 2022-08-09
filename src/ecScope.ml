@@ -1295,7 +1295,7 @@ module Op = struct
 
       let dty =
         match EcTypes.as_tdistr (EcEnv.ty_hnorm rty (env scope)) with
-        | None -> hierror ~loc "[lossless] can only be applied to distributions"
+        | None -> hierror ~loc "[%s] can only be applied to distributions" tag
         | Some dty -> dty
       in
 
