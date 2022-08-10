@@ -407,8 +407,8 @@ abstract theory IDomainStruct.
     + case: (order0P x) => _ ->; [|by rewrite eqchar0].
       move => y z; rewrite -!mulr_intr => eq_; move: (mulfI _ neqx0 _ _ eq_).
       by apply/char0P.
-    move: (dvd_prime _ _ prime_char (ge0_order x) (dvd_order_char x)).
-    by rewrite neq1_order neqx0.
+    move: (prime_dvd _ _ prime_char (ge0_order x)).
+    by rewrite dvd_order_char neq1_order neqx0.
   qed.
 
   clone import BigComRing as BID with
@@ -424,7 +424,10 @@ abstract theory IDomainStruct.
   lemma eq_pow_1_poly n :
     0 <= n =>
     eq_pow_1 n = root (polyXn n - poly1).
-  proof. by move => le0n; apply/fun_ext => x; rewrite eqboolP /eq_pow_1; rewrite pevalB pevalXn peval1 le0n /= subr_eq0. qed.
+  proof.
+    move => le0n; apply/fun_ext => x; rewrite eqboolP /eq_pow_1.
+    by rewrite pevalB pevalXn peval1 le0n /= subr_eq0.
+  qed.
 
   lemma is_finite_eq_pow_1 n :
     0 < n =>
@@ -509,15 +512,20 @@ abstract theory IDomainStruct.
     prime char =>
     frobenius x = zeror <=> x = zeror.
   proof.
-    move => prime_char; split => [|->>]; [rewrite /frobenius; move/gt0_prime: prime_char|by apply/frobenius0].
-    elim: char ge0_char => // n le0n IHn _; case/ler_eqVlt: (le0n) => [<<-/=|lt0n]; [by rewrite expr1|].
+    move => prime_char; split => [|->>]; [|by apply/frobenius0].
+    rewrite /frobenius; move/gt0_prime: prime_char.
+    elim: char ge0_char => // n le0n IHn _.
+    case/ler_eqVlt: (le0n) => [<<-/=|lt0n]; [by rewrite expr1|].
     by rewrite exprSr // => /mulf_eq0 [|] //; apply/IHn.
   qed.
 
   lemma frobenius_inj :
     prime char =>
     injective frobenius.
-  proof. by move => prime_char x y /subr_eq0; rewrite -frobeniusB // eq_frobenius_0 // => /subr_eq0. qed.
+  proof.
+    move => prime_char x y /subr_eq0.
+    by rewrite -frobeniusB // eq_frobenius_0 // => /subr_eq0.
+  qed.
 
   lemma iter_frobenius n x :
     0 <= n =>

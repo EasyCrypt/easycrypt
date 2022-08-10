@@ -112,7 +112,7 @@ proof.
     by move => /ler_eqVlt; rewrite eq_sym neq.
   + apply/(ltr_le_trans p); [by apply/gt1_prime|]; rewrite -{1}expr1.
     by apply/ler_weexpn2l => /=; [apply/ltzW/gt1_prime|move/ltzE: lt0k].
-  + admit.
+  + by apply/coprimeC/coprime_pow_prime => //; rewrite prime_gcd.
   + apply/IHn/mem_range; rewrite ltz_divLR; [by apply/expr_gt0/gt0_prime|].
     rewrite -subr_gt0 -mulN1r mulrC -mulrDl mulr_gt0 /=; [|by apply/ltzE/ltzW| ].
     - apply/subr_gt0/(ltr_le_trans p); [by apply/gt1_prime|]; rewrite -{1}expr1.
@@ -255,8 +255,7 @@ proof.
     move => eq_; move: eq_ dvd_ => <-; rewrite ieexprn_weq1 // ?ltzW ?gt0_prime //.
     by case => [->> //|_ ->>]; move/gt1_prime: prime_p.
   move => [y] [mem_ /mapP [z] [/coprimesP [cpz mem_z] ->>]]; split.
-  + move: cpz; rewrite /coprime -(gcdMDl y).
-    admit.
+  + by move: cpz; rewrite -(coprimeMDl y) !coprime_pow_prime //; apply/ltzS.
   move: mem_z; rewrite -{1 3}(add0r 1) -!mem_range_subr -!addrA => mem_z.
   move: (mem_range_add_mul _ _ _ _ _ mem_z mem_); rewrite /= -exprS //.
   by rewrite (addrC (_ - 1)) (mulrC _ y).
@@ -308,8 +307,18 @@ proof.
   rewrite eqm eqn (modz_small x) ?(modz_small y) -?mem_range ?gtr0_norm ?ltzE ?ltzW //=.
   + by move/(coprimes_incl _ lt1m): memx; apply/mem_range_incl.
   + by move/(coprimes_incl _ lt1n): memy; apply/mem_range_incl.
-  apply/coprimesP; rewrite /coprime gcd_modr.
-  admit.
+  apply/coprimesP; rewrite coprime_modr coprimeMl_and.
+  rewrite -coprime_modr eqm coprime_modr; move: memx => /coprimesP => -[copx _]; rewrite copx /=.
+  rewrite -coprime_modr eqn coprime_modr; move: memy => /coprimesP => -[copy _]; rewrite copy /=.
+  move: (mem_range_mod z (m * n)); rewrite normrM mulf_neq0 /=.
+  + by apply/gtr_eqF/ltzE/ltzW.
+  + by apply/gtr_eqF/ltzE/ltzW.
+  rewrite !gtr0_norm ?ltzE ?ltzW // range_ltn /=.
+  + by apply/mulr_gt0; apply/ltzE/ltzW.
+  case; [|by apply/mem_range_incl => //; apply/ltzW/ltzS].
+  rewrite -dvdzE => /mulz_dvdl dvd_; move: copx.
+  rewrite -coprime_modr -eqm coprime_modr => /(dvdr_coprime _ _ _ dvd_).
+  by rewrite coprimezz gtr_eqF // ltr_normr lt1m.
 qed.
 
 (* ------------------------------------------------------------------- *)
@@ -379,6 +388,10 @@ qed.
 (* ==================================================================== *)
 op divisors n = filter (transpose (%|) n) (range 1 (n + 1)).
 
+lemma divisorsP d n :
+  d \in divisors n <=> (d %| n /\ d \in range 1 (n + 1)).
+proof. by rewrite /divisors mem_filter. qed.
+
 lemma divisors_nil n :
   n <= 0 =>
   divisors n = [].
@@ -404,6 +417,14 @@ lemma divisors1 :
   divisors 1 = [1].
 proof. by rewrite /divisors range_ltn // range_geq. qed.
 
+lemma sorted_divisors n :
+  sorted Int.(<=) (divisors n).
+proof. by apply/(sorted_filter _ ler_trans)/sorted_range. qed.
+
+lemma uniq_divisors n :
+  uniq (divisors n).
+proof. by apply/filter_uniq/range_uniq. qed.
+
 lemma divisors_prime p :
   prime p =>
   divisors p = [1; p].
@@ -421,7 +442,25 @@ lemma divisors_pow_prime p n :
   0 <= n =>
   divisors (p ^ n) = map (exp p) (range 0 (n + 1)).
 proof.
-  admit.
+  move => prime_p le0n; apply/(eq_sorted _ ler_trans).
+  + by move => ? ? ? ?; apply/ler_anti.
+  + by apply/sorted_divisors.
+  + apply/sorted_map_in; [|by apply/sorted_range].
+    move => x y memx memy le_; apply/ler_weexpn2l; [by apply/ltzW/gt1_prime|].
+    by split => //; move: memx; apply/mem_range_le.
+  apply/uniq_perm_eq; [by apply/uniq_divisors| |].
+  + rewrite map_inj_in_uniq; [|by apply/range_uniq].
+    move => x y memx memy; apply/ieexprIn; [by apply/gt0_prime| | |].
+    - by apply/gtr_eqF/gt1_prime.
+    - by move: memx; apply/mem_range_le.
+    by move: memy; apply/mem_range_le.
+  move => x; rewrite divisorsP mapP; split.
+  + move => [+ mem_range]; rewrite pow_prime_dvd //.
+    - by move: mem_range; apply/mem_range_le.
+    by case => l; rewrite le2_mem_range => ?; exists l.
+  case => l [mem_ ->>]; split; [by apply/dvdz_exp2l/le2_mem_range|].
+  apply/mem_range; split; [by apply/ltzS/ltr_subl_addr/expr_gt0/gt0_prime|].
+  by move => _; apply/ltzS/ler_weexpn2l; [apply/ltzW/gt1_prime|apply/le2_mem_range].
 qed.
 
 lemma divisors_coprime m n :
@@ -430,7 +469,28 @@ lemma divisors_coprime m n :
   coprime m n =>
   perm_eq (divisors (m * n)) (allpairs Int.( * ) (divisors m) (divisors n)).
 proof.
-  admit.
+  move => lt0m lt0n copmn; apply/uniq_perm_eq.
+  + by apply/uniq_divisors.
+  + apply/allpairs_uniq; [by apply/uniq_divisors|by apply/uniq_divisors|].
+    move => x1 x2 y1 y2 /divisorsP [dvdx1 memx1] /divisorsP [dvdx2 memx2].
+    move => /divisorsP [dvdy1 memy1] /divisorsP [dvdy2 memy2].
+    search _ coprime.
+    admit.
+  move => d; rewrite divisorsP dvdz_mulP allpairsP.
+  split => [[[dm dn] [dvdm [dvdn ->>]] mem_]|].
+  + exists (`|dm|, `|dn|) => /=; rewrite !divisorsP !dvdz_norml dvdm dvdn /=.
+    rewrite -normrM (gtr0_norm (_ * _)%Int) /=; [by move: mem_; apply/mem_range_lt|].
+    rewrite !mem_range !ltzS -(gtr0_norm _ lt0m) -(gtr0_norm _ lt0n).
+    rewrite !dvdz_le //=; [by apply/gtr_eqF|by apply/gtr_eqF|].
+    case/mem_range: (mem_) => + _; rewrite -(gtr0_norm (_ * _)%Int) /=.
+    - by move: mem_; apply/mem_range_lt.
+    rewrite normrM; case/ler_eqVlt: (normr_ge0 dm) => [/eq_sym/normr0P ->>|lt0_].
+    - by rewrite normr0.
+    by move/ltzS/ltr_subl_addr/(pmulr_rgt0 _ _ lt0_); move: lt0_; rewrite !ltzE.
+  move => [] [dm dn] /= [/divisorsP [dvdm memm]] [/divisorsP [dvdn memn]] ->>.
+  split; [by exists dm dn; rewrite dvdm dvdn|].
+  move: (mem_range_mul _ _ _ _ _ _ _ _ memm memn) => //=.
+  by apply/mem_range_incl => //; apply/lerr_eq; ring.
 qed.
 
 lemma sum_phi n :
@@ -454,5 +514,5 @@ proof.
   apply/BIA.eq_big_seq => km memm /=; apply/BIA.eq_big_seq => kn memn /=.
   move: memm memn; rewrite !divisors_mem; [by apply/ltzE/ltzW|by apply/ltzE/ltzW|].
   move => [lt0km dvdm] [lt0kn dvdn]; rewrite phi_coprime //.
-  admit.
+  by apply/(dvdl_coprime _ _ _ dvdm)/(dvdr_coprime _ _ _ dvdn).
 qed.

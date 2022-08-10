@@ -1209,6 +1209,57 @@ lemma Ncoprime00 :
   ! coprime 0 0.
 proof. by rewrite /coprime gcd00. qed.
 
+lemma coprime1z a : coprime 1 a.
+proof. by rewrite /coprime gcd1z. qed.
+
+lemma coprimez1 a : coprime a 1.
+proof. by rewrite /coprime gcdz1. qed.
+
+lemma coprimeNz a b : coprime (- a)%Int b <=> coprime a b.
+proof. by rewrite /coprime gcdNz. qed.
+
+lemma coprimezN a b : coprime a (- b)%Int = coprime a b.
+proof. by rewrite /coprime gcdzN. qed.
+
+lemma coprimenormz a b : coprime `|a| b <=> coprime a b.
+proof. by rewrite /coprime gcdnormz. qed.
+
+lemma coprimeznorm a b : coprime a `|b| = coprime a b.
+proof. by rewrite /coprime gcdznorm. qed.
+
+lemma coprime_modr a b : coprime a (b %% a) <=> coprime a b.
+proof. by rewrite /coprime gcd_modr. qed.
+
+lemma coprime_modl a b : coprime (a %% b) b = coprime a b.
+proof. by rewrite /coprime gcd_modl. qed.
+
+lemma coprimeMDl q a b : coprime a (q * a + b)%Int <=> coprime a b.
+proof. by rewrite /coprime gcdMDl. qed.
+
+lemma coprimeMDr q a b : coprime (q * b + a)%Int b <=> coprime a b.
+proof. by rewrite /coprime gcdMDr. qed.
+
+lemma coprimeDl a b : coprime a (a + b)%Int <=> coprime a b.
+proof. by rewrite /coprime gcdDl. qed.
+
+lemma coprimeDr a b : coprime a (b + a)%Int <=> coprime a b.
+proof. by rewrite /coprime gcdDr. qed.
+
+lemma coprimeBl a b : coprime a (b - a)%Int <=> coprime a b.
+proof. by rewrite /coprime gcdBl. qed.
+
+lemma coprimeBr a b : coprime a (a - b)%Int = coprime a b.
+proof. by rewrite /coprime gcdBr. qed.
+
+lemma coprimeMl b a : coprime b (a * b)%Int <=> `|b| = 1.
+proof. by rewrite /coprime gcdMl. qed.
+
+lemma coprimeMr b a : coprime b (b * a)%Int <=> `|b| = 1.
+proof. by rewrite /coprime gcdMr. qed.
+
+lemma coprimezz a : coprime a a <=> `|a| = 1.
+proof. by rewrite /coprime gcdzz. qed.
+
 lemma Ncoprime_mull d a b :
   `|d| <> 1 =>
   ! coprime (d * a) (d * b).
@@ -1251,7 +1302,7 @@ lemma coprimeC (a b : int) :
   coprime a b <=> coprime b a.
 proof. by rewrite /coprime gcdC. qed.
 
-lemma coprimeMl (a b c : int) :
+lemma coprimeMl_and (a b c : int) :
   coprime (a * b) c <=> (coprime a c /\ coprime b c).
 proof.
 rewrite /coprime; split => [eq1|[eqa1 eqb1]].
@@ -1261,9 +1312,9 @@ move: (dvdz_gcd2M2lr a c b) (dvdz_gcdr (a * b) c); rewrite eqa1 /= => dvdb dvdc.
 by move: (dvdz_gcd b c (gcd (a * b) c)); rewrite dvdb dvdc eqb1 dvdz1 ger0_norm // ge0_gcd.
 qed.
 
-lemma coprimeMr (a b c : int) :
+lemma coprimeMr_and (a b c : int) :
   coprime a (b * c) <=> (coprime a b /\ coprime a c).
-proof. by rewrite coprimeC coprimeMl !(coprimeC a). qed.
+proof. by rewrite coprimeC coprimeMl_and !(coprimeC a). qed.
 
 lemma coprime_dvd d1 d2 n :
   coprime d1 d2 =>

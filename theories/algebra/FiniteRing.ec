@@ -183,6 +183,7 @@ abstract theory FiniteZModuleStruct.
   proof.
     move => forall_.
     have: forall d , 0 <= d => d %| FinType.card => size (to_seq (eq_order d)) <= phi (d).
+    + admit.
     admit.
   qed.
 end FiniteZModuleStruct.

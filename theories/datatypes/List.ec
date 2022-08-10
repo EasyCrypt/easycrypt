@@ -4021,6 +4021,16 @@ proof.
 by move=> incr_; elim => [|x [|y s]] //= IHs [e_ p_]; split; [apply/incr_|apply/IHs].
 qed.
 
+lemma sorted_map_in (e : 'a -> 'a -> bool) f s :
+  (forall x y, x \in s => y \in s => e x y => e (f x) (f y)) =>
+  sorted e s =>
+  sorted e (map f s).
+proof.
+elim: s => [|x [|y s]] //= IHs incr_ [e_ p_].
+split; [by apply/incr_|]; apply/IHs => //.
+by move => z t ? ?; apply/incr_; right.
+qed.
+
 lemma sorted_rem (e : 'a -> 'a -> bool) :
      (forall y x z, e x y => e y z => e x z)
   => forall x s, sorted e s => sorted e (rem x s).
