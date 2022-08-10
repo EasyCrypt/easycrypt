@@ -72,6 +72,64 @@ rewrite -exprD_nneg ?b2i_ge0 -signr_odd ?addr_ge0 ?b2i_ge0.
 by rewrite -mul1r2z oddM /ofint_id intmulz odd2 expr0.
 qed.
 
+lemma signz_proj (z : int) : signz (signz z) = signz z.
+proof.
+rewrite /signz /b2i; case (z < 0); [|case (z <> 0)]; move => //=.
++ by move => ltz0; rewrite (ltr_eqF z) //= !expr1.
+by rewrite -lerNgt ler_eqVlt eq_sym => -> /= lt0z; rewrite !expr0.
+qed.
+
+lemma signz_norm (z : int) : signz (`|z|) = b2i (z <> 0).
+proof. by rewrite /signz /b2i normr_lt0 normr0P expr0. qed.
+
+lemma signzM (a b : int) : signz (a * b) = signz a * signz b.
+proof.
+case (a < 0) => [lta0|/lerNgt/ler_eqVlt [<<-|lt0a]];
+(case (b < 0) => [ltb0|/lerNgt/ler_eqVlt [<<-|lt0b]] //=).
++ by rewrite signz_gt0 ?nmulr_rgt0 // !signz_lt0.
++ by rewrite signz_lt0 ?nmulr_rlt0 // signz_lt0 // signz_gt0.
++ by rewrite signz_lt0 ?pmulr_rlt0 // signz_gt0 // signz_lt0.
+by rewrite signz_gt0 ?pmulr_rgt0 // !signz_gt0.
+qed.
+
+lemma signz_eq0 a :
+  signz a = 0 <=> a = 0.
+proof.
+case (a < 0) => [lta0|/lerNgt/ler_eqVlt [<<-|lt0a]].
++ by rewrite signz_lt0 //= ltr_eqF.
++ by rewrite signz0.
+by rewrite signz_gt0 //= gtr_eqF.
+qed.
+
+lemma signz_eq1 a :
+  signz a = 1 <=> 0 < a.
+proof.
+case (a < 0) => [lta0|/lerNgt/ler_eqVlt [<<-|lt0a]].
++ by rewrite signz_lt0 //= -lerNgt ltzW.
++ by rewrite signz0.
+by rewrite lt0a signz_gt0.
+qed.
+
+lemma signz_eqN1 a :
+  signz a = -1 <=> a < 0.
+proof.
+case (a < 0) => [lta0|/lerNgt/ler_eqVlt [<<-|lt0a]].
++ by rewrite signz_lt0.
++ by rewrite signz0.
+by rewrite signz_gt0.
+qed.
+
+lemma signz_normr_bij a b :
+  (signz a = signz b /\ `|a| = `|b|) <=> (a = b).
+proof.
+split => [|<<-//]; case (a < 0) => [lta0|/lerNgt/ler_eqVlt [<<-|lt0a]].
++ rewrite signz_lt0 // eq_sym signz_eqN1 => -[ltb0].
+  by rewrite !ltr0_norm //; apply/oppr_inj.
++ by rewrite signz0 eq_sym signz_eq0 => -[->>].
+rewrite signz_gt0 // eq_sym signz_eq1 => -[lt0b].
+by rewrite !gtr0_norm.
+qed.
+
 end IntOrder.
 
 (* -------------------------------------------------------------------- *)

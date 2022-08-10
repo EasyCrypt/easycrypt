@@ -167,6 +167,11 @@ proof.
   by apply/filter_subseq.
 qed.
 
+lemma coprimes_incl n :
+  1 < n =>
+  mem (coprimes n) <= mem (range 1 n).
+proof. by move/coprimes_subseq/subseq_mem. qed.
+
 lemma coprimes_prime p :
   prime p =>
   coprimes p = range 1 p.
@@ -237,46 +242,24 @@ proof.
     apply/mapP; exists (x %% (p ^ n)); rewrite -divz_eq /=.
     apply/coprimesP; split.
     - move: cpx; rewrite /coprime gcd_modr => eq_.
-      move: (dvdz_gcd (p ^ n) (p ^ (n + 1)) x _).
+      move: (dvdz_gcd2 (p ^ n) (p ^ (n + 1)) x _).
       * by apply/le_dvd_pow; rewrite ger0_norm // gtr0_norm ?ltzS //; apply/ltzW/ltzS.
       by move: eq_ => -> /dvdz1; rewrite ger0_norm // ge0_gcd.
     move: (mem_range_mod x (p ^ n)); rewrite gtr_eqF /=; [by apply/expr_gt0/gt0_prime|].
     rewrite gtr0_norm; [by apply/expr_gt0/gt0_prime|].
     rewrite range_ltn /=; [by apply/expr_gt0/gt0_prime|].
     case; [|by apply/mem_range_incl => //; apply/ltzW/ltzS].
-    rewrite -dvdzE => dvd_; move: (gcd_dvd (p ^ (n + 1)) _ _ _ dvd_).
-    - by apply/le_dvd_pow; rewrite ger0_norm // gtr0_norm ?ltzS //; apply/ltzW/ltzS.
-    move: cpx => -> /dvdz1; rewrite gtr0_norm; [by apply/expr_gt0/gt0_prime|].
-    rewrite ieexprn_weq1 // ?ltzW ?gt0_prime //; case => [->> //|_ ->>].
-    by move/gt1_prime: prime_p.
+    rewrite -dvdzE => dvd_; move: (dvdz_gcd (p ^ (n + 1)) x (p ^ n)).
+    rewrite le_dvd_pow /=; [by rewrite ger0_norm // gtr0_norm ?ltzS //; apply/ltzW/ltzS|].
+    move: cpx => ->; rewrite dvdz1 gtr0_norm; [by apply/expr_gt0/gt0_prime|].
+    move => eq_; move: eq_ dvd_ => <-; rewrite ieexprn_weq1 // ?ltzW ?gt0_prime //.
+    by case => [->> //|_ ->>]; move/gt1_prime: prime_p.
   move => [y] [mem_ /mapP [z] [/coprimesP [cpz mem_z] ->>]]; split.
   + move: cpz; rewrite /coprime -(gcdMDl y).
     admit.
   move: mem_z; rewrite -{1 3}(add0r 1) -!mem_range_subr -!addrA => mem_z.
   move: (mem_range_add_mul _ _ _ _ _ mem_z mem_); rewrite /= -exprS //.
   by rewrite (addrC (_ - 1)) (mulrC _ y).
-qed.
-
-(*TODO: move*)
-lemma coprime_dvd d1 d2 n :
-  coprime d1 d2 =>
-  d1 %| n =>
-  d2 %| n =>
-  d1 * d2 %| n.
-proof.
-case/Bezout => u v eq1 /dvdzP [q1] ->> /dvdzP [q2] eq_.
-apply/dvdzP; exists (u * q2 + v * q1).
-by rewrite mulrA mulrAC mulrDl -!mulrA -eq_ !mulrA !(mulrAC _ q1) -mulrDl eq1.
-qed.
-
-(*TODO: move*)
-lemma chinese_remainder_theorem m n :
-  coprime m n =>
-  forall x y, (x %% (m * n) = y %% (m * n) <=> (x %% m = y %% m /\ x %% n = y %% n)).
-proof.
-move => copmn x y; rewrite -!eq_mod; split => [eq_|[eqm eqn]].
-+ by split; apply/(dvdz_trans _ _ _ _ eq_); [apply/dvdz_mulr/dvdzz|apply/dvdz_mull/dvdzz].
-by apply/coprime_dvd.
 qed.
 
 lemma coprimes_coprime m n :
@@ -298,7 +281,7 @@ proof.
     rewrite -(modz_small y (m * n)).
     - apply/mem_range; rewrite normrM gtr0_norm ?ltzE ?ltzW //.
       by rewrite gtr0_norm ?ltzE ?ltzW //; move: memy; apply/mem_range_incl.
-    by rewrite chinese_remainder_theorem.
+    by rewrite chinese_remainder_theorem_unicity.
   + apply/allpairs_uniq; [by apply/coprimes_uniq|by apply/coprimes_uniq|].
     by move => ? ? ? ?.
   move => [x y]; rewrite mapP allpairsP; split => [[z] /= [mem_ [->> ->>]]|].
@@ -308,18 +291,24 @@ proof.
     rewrite gtr0_norm ?ltzE ?ltzW // gtr0_norm ?ltzE ?ltzW //.
     rewrite (range_ltn _ m) ?ltzE ?ltzW // (range_ltn _ n) ?ltzE ?ltzW //=.
     rewrite -!dvdzE; case => [dvdm|memm].
-    - move: (gcd_dvd (m * n) z m); rewrite dvdz_mulr ?dvdzz //=.
-      by move => /(_ _) //; rewrite cop_ => /dvdz1; rewrite gtr0_norm ?ltzE ?ltzW // => ->>.
+    - move: (dvdz_gcd (m * n) z m); rewrite dvdz_mulr ?dvdzz //= => eq_; move: eq_ dvdm => <-.
+      by rewrite cop_ => /dvdz1; rewrite gtr0_norm ?ltzE ?ltzW // => ->>.
     case => [dvdn|memn].
-    - move: (gcd_dvd (m * n) z n); rewrite dvdz_mull ?dvdzz //=.
-      by move => /(_ _) //; rewrite cop_ => /dvdz1; rewrite gtr0_norm ?ltzE ?ltzW // => ->>.
+    - move: (dvdz_gcd (m * n) z n); rewrite dvdz_mull ?dvdzz //= => eq_; move: eq_ dvdn => <-.
+      by rewrite cop_ => /dvdz1; rewrite gtr0_norm ?ltzE ?ltzW // => ->>.
     move: cop_; rewrite /coprime !gcd_modr => eq1.
-    move: (dvdz_gcd m (m * n) z); rewrite dvdz_mulr ?dvdzz // eq1 /=.
+    move: (dvdz_gcd2 m (m * n) z); rewrite dvdz_mulr ?dvdzz // eq1 /=.
     move => /dvdz1; rewrite ger0_norm ?ge0_gcd // => -> /=.
-    move: (dvdz_gcd n (m * n) z); rewrite dvdz_mull ?dvdzz // eq1 /=.
+    move: (dvdz_gcd2 n (m * n) z); rewrite dvdz_mull ?dvdzz // eq1 /=.
     move => /dvdz1; rewrite ger0_norm ?ge0_gcd // => -> /=.
     by split; [move: memm|move: memn]; apply/mem_range_incl => //; apply/ltzW/ltzS.
   move => [] [? ?] /= [memx] [memy] [<<- <<-].
+  case: (chinese_remainder_theorem_exists _ _ copmn x y) => z [eqm eqn].
+  exists (z %% (m * n)); rewrite !modz_dvd; [by apply/dvdz_mulr/dvdzz|by apply/dvdz_mull/dvdzz|].
+  rewrite eqm eqn (modz_small x) ?(modz_small y) -?mem_range ?gtr0_norm ?ltzE ?ltzW //=.
+  + by move/(coprimes_incl _ lt1m): memx; apply/mem_range_incl.
+  + by move/(coprimes_incl _ lt1n): memy; apply/mem_range_incl.
+  apply/coprimesP; rewrite /coprime gcd_modr.
   admit.
 qed.
 
@@ -368,7 +357,7 @@ proof.
   move => prime_p; rewrite /phi -{1 2 3}(subrK n 1); move: (n - 1) => {n} n /ltzS.
   elim: n => [|n le0n IHn].
   + by rewrite expr1 expr0 coprimes_prime // size_range ler_maxr // -ltzS; apply/gt0_prime.
-  rewrite coprimes_pow_prime ?addr_ge0 //= size_flatten sumzE !BIA.big_mapT.
+  rewrite coprimes_pow_prime ?ltzS //= size_flatten sumzE !BIA.big_mapT.
   rewrite (BIA.eq_big _ predT _ (fun _ => p ^ (n + 1) - p ^ n)) //.
   + by move => i _; rewrite /(\o) /= size_map.
   rewrite big_constz count_predT size_iota ler_maxr ?ltzW ?gt0_prime //.
@@ -381,7 +370,9 @@ lemma phi_coprime m n :
   coprime m n =>
   phi (m * n) = phi m * phi n.
 proof.
-  move => lt0m lt0n copmn; rewrite /phi; move: (coprimes_coprime _ _ lt0m lt0n copmn).
+  move => /ltzE /ler_eqVlt [<<-|] /=; [by rewrite phi1|move => lt1m].
+  move => /ltzE /ler_eqVlt [<<-|] /=; [by rewrite phi1|move => lt1n].
+  move => copmn; rewrite /phi; move: (coprimes_coprime _ _ lt1m lt1n copmn).
   by move/perm_eq_size; rewrite size_map size_allpairs.
 qed.
 
