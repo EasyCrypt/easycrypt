@@ -966,6 +966,12 @@ proof. by rewrite -(addr0 (a * b)) gcdMDl gcdz0. qed.
 lemma gcdMr b a : gcd b (b * a)%Int = `|b|.
 proof. by rewrite mulrC gcdMl. qed.
 
+lemma gcd_dvdl d a : d %| a => gcd d a = `|d|.
+proof. by move => /dvdzP [q] ->>; rewrite gcdMl. qed.
+
+lemma gcd_dvdr d a : d %| a => gcd a d = `|d|.
+proof. by rewrite gcdC; apply/gcd_dvdl. qed.
+
 lemma gcdzz a : gcd a a = `|a|.
 proof. by rewrite -gcdBl. qed.
 
@@ -1301,6 +1307,22 @@ proof. by rewrite mulrC; apply/coprime_dvdl. qed.
 lemma coprimeC (a b : int) :
   coprime a b <=> coprime b a.
 proof. by rewrite /coprime gcdC. qed.
+
+lemma coprime_gcd_mull d a b :
+  coprime d b =>
+  gcd (d * a) b = gcd a b.
+proof.
+  case/Bezout => u v eq_; rewrite -(ger0_norm (gcd a _)) ?ge0_gcd //.
+  rewrite -(ger0_norm (gcd (_ * a) _)) ?ge0_gcd //; apply/dvdz_anti.
+  + rewrite -{2}(mul1r a) -eq_ mulrDl (mulrAC v) addrC gcdMDr -mulrA.
+    by apply/dvdz_gcd2Mll.
+  by apply/dvdz_gcd2Mll.
+qed.
+
+lemma coprime_gcd_mulr d a b :
+  coprime d b =>
+  gcd (a * d) b = gcd a b.
+proof. by rewrite mulrC; apply/coprime_gcd_mull. qed.
 
 lemma coprimeMl_and (a b c : int) :
   coprime (a * b) c <=> (coprime a c /\ coprime b c).

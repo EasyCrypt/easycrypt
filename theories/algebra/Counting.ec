@@ -473,9 +473,19 @@ proof.
   + by apply/uniq_divisors.
   + apply/allpairs_uniq; [by apply/uniq_divisors|by apply/uniq_divisors|].
     move => x1 x2 y1 y2 /divisorsP [dvdx1 memx1] /divisorsP [dvdx2 memx2].
-    move => /divisorsP [dvdy1 memy1] /divisorsP [dvdy2 memy2].
-    search _ coprime.
-    admit.
+    move => /divisorsP [dvdy1 memy1] /divisorsP [dvdy2 memy2] eq_.
+    move: (coprime_gcd_mull x1 y1 n) (coprime_gcd_mull x2 y2 n).
+    move: (coprime_gcd_mulr y1 x1 m) (coprime_gcd_mulr y2 x2 m).
+    rewrite -eq_ !(coprimeC _ m) (dvdl_coprime _ _ _ dvdx1 copmn).
+    rewrite (dvdl_coprime _ _ _ dvdx2 copmn) (dvdr_coprime _ _ _ dvdy1 copmn).
+    rewrite (dvdr_coprime _ _ _ dvdy2 copmn) /= => -> + ->.
+    rewrite (gcd_dvdl _ _ dvdx1) (gcd_dvdl _ _ dvdx2).
+    rewrite (gcd_dvdl _ _ dvdy1) (gcd_dvdl _ _ dvdy2).
+    rewrite !ger0_norm //=.
+    - by move: memx1; apply/mem_range_le.
+    - by move: memx2; apply/mem_range_le.
+    - by move: memy1; apply/mem_range_le.
+    by move: memy2; apply/mem_range_le.
   move => d; rewrite divisorsP dvdz_mulP allpairsP.
   split => [[[dm dn] [dvdm [dvdn ->>]] mem_]|].
   + exists (`|dm|, `|dn|) => /=; rewrite !divisorsP !dvdz_norml dvdm dvdn /=.

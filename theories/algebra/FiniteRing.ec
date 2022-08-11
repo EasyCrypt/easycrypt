@@ -183,7 +183,22 @@ abstract theory FiniteZModuleStruct.
   proof.
     move => forall_.
     have: forall d , 0 <= d => d %| FinType.card => size (to_seq (eq_order d)) <= phi (d).
-    + admit.
+    + move => d /ler_eqVlt [<<- _|lt0d dvdd_]; [rewrite phi_eq0 //|].
+      - apply/size_le0/mem_eq0 => x; rewrite mem_to_seq; [by apply/finite_eq_order|].
+        by rewrite /eq_order; apply/gtr_eqF/gt0_order.
+      move: (size_ge0 (to_seq (eq_order d))).
+      case /ler_eqVlt => [/eq_sym/size_eq0 ->/=|]; [by apply/phi_ge0|].
+      rewrite -has_predT hasP => -[x] [mem_ _]; move: (sum_phi _ lt0d) => eq_d.
+      move: (forall_ _ _ dvdd_); [by apply/ltzW|].
+      move: mem_; rewrite mem_to_seq; [by apply/finite_eq_order|].
+      move => eq_order_x; move: (size_orbit_list x); rewrite eq_order_x.
+      move => eq_size_d; rewrite -{2}eq_size_d uniq_leq_size_perm_eq.
+      - by apply/uniq_orbit_list.
+      - by apply/uniq_to_seq.
+      - move => ?; rewrite -orbit_listP ?gt0_order // => -[n] ->>.
+        rewrite mem_to_seq /=; [by apply/(finite_leq _ _ _ FinType.is_finite) => ?|].
+        by rewrite -mulrM mulrC mulrM -eq_order_x intmul_order mul0i.
+      admit.
     admit.
   qed.
 end FiniteZModuleStruct.
