@@ -211,6 +211,19 @@ apply: (@BAdd.big_ind2 (fun (x y : t) => x <= y)) => //=.
   by apply/ler_add.
 qed.
 
+lemma nosmt ler_ge_sum_eq (P : 'a -> bool) (F1 F2 :'a -> t) s :
+     (forall a, P a => F1 a <= F2 a)
+  => (BAdd.big P F2 s <= BAdd.big P F1 s)
+  => (forall a, mem s a => P a => F1 a = F2 a).
+proof.
+move => forall_; elim: s => [|x s IHs] //=.
+rewrite !BAdd.big_cons; case: (P x) => [Px|NPx]; last first.
+  by move/IHs => + a + Pa; move => /(_ a); rewrite Pa /= => ?; case.
+move => + a + Pa; move: (forall_ _ Px) (ler_sum _ _ _ s forall_).
+move => le1 le2; rewrite (ler_ge_add_eq le1 le2) => -[eqx eqs].
+by case => [<<-//|] mema; apply/IHs => //; rewrite eqs.
+qed.
+
 lemma nosmt sumr_ge0 (P : 'a -> bool) (F : 'a -> t) s:
      (forall a, P a => zeror <= F a)
   => zeror <= BAdd.big P F s.
@@ -257,6 +270,17 @@ lemma nosmt ler_sum_seq (P : 'a -> bool) (F1 F2 :'a -> t) s:
 proof.
 move=> h; rewrite !(@BAdd.big_seq_cond P).
 by rewrite ler_sum=> //= x []; apply/h.
+qed.
+
+lemma nosmt ler_ge_sum_eq_seq (P : 'a -> bool) (F1 F2 :'a -> t) s :
+     (forall a, mem s a => P a => F1 a <= F2 a)
+  => (BAdd.big P F2 s <= BAdd.big P F1 s)
+  => (forall a, mem s a => P a => F1 a = F2 a).
+proof.
+move=> h; rewrite !(@BAdd.big_seq_cond P) => le_.
+move: (ler_ge_sum_eq _ _ _ _ _ le_).
++ by move=> a /= [mema Pa]; apply/h.
+by move => + a mema Pa; move => ->.
 qed.
 
 lemma nosmt sumr_ge0_seq (P : 'a -> bool) (F : 'a -> t) s:

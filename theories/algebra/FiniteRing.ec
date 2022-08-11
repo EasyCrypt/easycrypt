@@ -198,8 +198,49 @@ abstract theory FiniteZModuleStruct.
       - move => ?; rewrite -orbit_listP ?gt0_order // => -[n] ->>.
         rewrite mem_to_seq /=; [by apply/(finite_leq _ _ _ FinType.is_finite) => ?|].
         by rewrite -mulrM mulrC mulrM -eq_order_x intmul_order mul0i.
-      admit.
-    admit.
+      move => eq_; move/perm_eq_size: eq_ (eq_); rewrite size_orbit_list eq_sym.
+      move => eq_; move: eq_ (gt0_order x) => <-; rewrite ltrNge size_le0.
+      pose P y := _ y _ = _; move => neq_; move: (to_seq_infinite P).
+      move: neq_ => -> /=; rewrite /P => {P} is_finite_.
+      move/(perm_eq_filter (eq_order d))/perm_eq_sym => eq_.
+      move: (perm_eq_trans _ (to_seq (eq_order d)) _ _ eq_).
+      - apply/uniq_perm_eq.
+        * by apply/uniq_to_seq.
+        * by apply/filter_uniq/uniq_to_seq.
+        move => y; rewrite mem_to_seq ?finite_eq_order // mem_filter.
+        rewrite -{1}(andbT (eq_order _ _)); apply/andb_id2l.
+        rewrite eq_sym eqT => eq_order_y; rewrite mem_to_seq //=.
+        by rewrite -eq_order_y; apply/intmul_order.
+      move/perm_eq_size => ->; apply/lerr_eq; rewrite /phi.
+      rewrite -(size_map (intmul x)); apply/perm_eq_size/uniq_perm_eq.
+      - by apply/filter_uniq/uniq_orbit_list.
+      - rewrite map_inj_in_uniq; [|by apply/coprimes_uniq].
+        move => y z /coprimesP [copdy memy] /coprimesP [copdz memz].
+        move/dvd2_order; rewrite -(IntID.subr_add2r (-1)) => /eq_mod.
+        rewrite !modz_small ?gtr0_norm ?gt0_order // ?eq_order_x -?mem_range ?mem_range_subr //.
+        by apply/IntID.addIr.
+      move => y; rewrite mem_filter !mapP /=; split => [[eq_order_z] [z] [+ ->>]|].
+      - rewrite range_iota /= => mem_; exists ((z - 1) %% d + 1); rewrite -eq_order_x.
+        rewrite mulrSz intmul_modz_order -mulrSz /=; apply/coprimesP; rewrite mem_range_addr /=.
+        split; [|by rewrite -{1}(gtr0_norm _ (gt0_order x)); apply/mem_range_mod/gtr_eqF/gt0_order].
+        case/ltzE/ler_eqVlt: (gt0_order x) => [<-|gt1_orderx]; [by apply/coprime1z|].
+        rewrite modz_small /=.
+        * apply/mem_range; rewrite gtr0_norm ?gt0_order //; apply/mem_range_subr => /=.
+          move: mem_; rewrite range_ltn ?gt0_order //=; case => [->>|]; last first.
+          + by apply/mem_range_incl => //; apply/ltzW/ltzS.
+          move: eq_order_z eq_order_x; rewrite mulr0z /eq_order order0 => <<-.
+          by rewrite gtr_eqF.
+        move: eq_order_z; rewrite /eq_order order_intmul ?gt0_order // -eq_order_x.
+        rewrite -eqz_mul ?gcd_eq0 //=; [by apply/negb_and; rewrite gtr_eqF //; apply/gt0_order|].
+        rewrite eq_sym -subr_eq0 -mulN1r mulrC -mulrDl mulf_eq0 subr_eq0.
+        by rewrite (gtr_eqF _ _ (gt0_order x)) /coprime.
+      move => [z] [/coprimesP [coprimedz memz] ->>]; split.
+      - by rewrite /eq_order order_intmul_coprime ?gt0_order // eq_order_x.
+      exists (z %% d); rewrite range_iota /= -eq_order_x -{1}(gtr0_norm _ (gt0_order x)).
+      by rewrite mem_range_mod ?gtr_eqF ?gt0_order //= intmul_modz_order.
+    move => {forall_} forall_; move: (sum_phi _ FinType.card_gt0).
+    print ler_ge_sum_eq_seq.
+    fail.
   qed.
 end FiniteZModuleStruct.
 

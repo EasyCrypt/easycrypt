@@ -638,6 +638,45 @@ lemma nosmt addr_ss_eq0 (x y : t):
   (x + y = zeror) <=> (x = zeror) /\ (y = zeror).
 proof. by case=> -[]; [apply: paddr_eq0 | apply: naddr_eq0]. qed.
 
+lemma nosmt addr_ss_eq (x y z t : t):
+  (x <= y) /\ (z <= t) \/
+  (y <= x) /\ (t <= z) =>
+  (x + z = y + t) <=> (x = y) /\ (z = t).
+proof.
+rewrite -(@subr_ge0 y) -(@subr_ge0 t) -(@subr_le0 x) -(@subr_le0 z).
+move/addr_ss_eq0; rewrite !addrA (addrAC y) -addrA -opprD !subr_eq0.
+by rewrite eq_sym => ->; rewrite (@eq_sym y) (@eq_sym t).
+qed.
+
+lemma nosmt ger_le_add_eq0 (x y : t):
+  (zeror <= x) => (zeror <= y) =>
+  (x + y <= zeror) <=> (x = zeror) /\ (y = zeror).
+proof.
+move=> le0x le0y; split=> [le_0|[->> ->>]]; [|by rewrite addr0].
+move/(ler_add2r y): (le0x); rewrite add0r => ley_.
+move: (ler_trans _ _ _ ley_ le_0) => ley0.
+move: (ler_anti y zeror); rewrite ley0 le0y /= => ->> /=.
+by move: le_0 le0x (ler_anti x zeror); rewrite addr0 => -> ->.
+qed.
+
+lemma nosmt ler_ge_add_eq0 (x y : t):
+  (x <= zeror) => (y <= zeror) =>
+  (zeror <= x + y) <=> (x = zeror) /\ (y = zeror).
+proof.
+rewrite -!oppr_ge0 -(@oppr_le0 (_ + _)%Domain) opprD -(@oppr_eq0 x) -(@oppr_eq0 y).
+by apply/ger_le_add_eq0.
+qed.
+
+lemma nosmt ler_ge_add_eq (x y z t : t):
+  (x <= y) => (z <= t) =>
+  (y + t <= x + z) <=> (x = y) /\ (z = t).
+proof.
+rewrite -(@subr_ge0 y) -(@subr_ge0 t) => le1 le2.
+move: (ger_le_add_eq0 _ _ le1 le2); rewrite !subr_eq0.
+rewrite !addrA (addrAC y) -addrA -opprD subr_le0 => ->.
+by rewrite (@eq_sym y) (@eq_sym t).
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt ler_pmul2l x :
   zeror < x => forall y z, (x * y <= x * z) <=> (y <= z).

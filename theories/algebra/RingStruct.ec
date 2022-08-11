@@ -58,6 +58,12 @@ abstract theory ZModuleStruct.
 
   lemma dvd2_order x (m n : int) : order x %| (m - n) <=> intmul x m = intmul x n.
   proof. by rewrite dvd_order mulrDz mulrNz subr_eq0. qed.
+
+  lemma intmul_modz_order x n : intmul x (n %% order x) = intmul x n.
+  proof.
+    apply/dvd2_order; rewrite -opprB; apply/dvdzN; rewrite -divzE.
+    by apply/dvdz_mull/dvdzz.
+  qed.
 	      
   lemma order0P x : order x = 0 <=> injective (intmul x).
   proof.
