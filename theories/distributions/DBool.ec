@@ -79,6 +79,15 @@ proof.
 by move=> ??;rewrite supp_dbiased.
 qed.
 
+lemma dmap_pred (d: 'a distr) (p: 'a -> bool) :
+  is_lossless d =>
+  dmap d p = dbiased (mu d p).
+proof.
+move => d_ll; apply eq_distr => x.
+rewrite dbiased1E clamp_id; first by smt(ge0_mu le1_mu).
+rewrite dmap1E /(\o) /pred1; smt(mu_not).
+qed.
+
 end Biased.
 
 (* -------------------------------------------------------------------- *)
