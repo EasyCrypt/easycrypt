@@ -1305,7 +1305,25 @@ move=> c' c'_in_s ne; move: hc; rewrite h /=.
 move/count_eq0; apply contra => pc'; apply/hasP.
 exists c'; rewrite pc' /=; have: c' \in c :: rem c s.
 + by move/perm_eq_mem: eqs => <-.
-+ by rewrite /= ne.
+by rewrite /= ne.
+qed.
+
+lemma count_eq1_eq ['a] (p : 'a -> bool) s :
+  count p s = 1 <=>
+  exists x,
+    x \in s /\
+    p x /\
+    forall y, y \in rem x s => !p y.
+proof.
+split=> [h|].
++ move: (count_gt0 p s); rewrite h /= => -[c] |>.
+  move=> eqs pc hc; exists c; do! split=> //.
+  - by move/perm_eq_mem: eqs => ->.
+  move=> c' c'_in_rem_c_s ; move: hc.
+  move/count_eq0; apply contra => pc'; apply/hasP.
+  by exists c'; rewrite pc'.
+case=> x [memx] [px forall_]; rewrite (count_rem _ _ _ memx) px b2i1.
+by rewrite eq_sym addrC -subr_eq eq_sym /=; apply/count_pred0_eq_in.
 qed.
 
 lemma mem_rem_neq ['a] (x : 'a) (s : 'a list) y :
@@ -1781,6 +1799,13 @@ proof. by elim: s => [// | x s /= ->]. qed.
 lemma map_comp (f1 : 'b -> 'c) (f2 : 'a -> 'b) s:
   map (f1 \o f2) s = map f1 (map f2 s).
 proof. by elim: s => //= x s ->. qed.
+
+lemma map_nseq (f : 'a -> 'b) n x:
+  map f (nseq n x) = nseq n (f x).
+proof.
+case (n <= 0) => [len0|/ltzNge/ltzW]; [by rewrite !nseq0_le|].
+by elim: n => [|n le0n IHn]; [rewrite !nseq0_le|rewrite !nseqS].
+qed.
 
 lemma map_id (s : 'a list): map idfun s = s.
 proof. by elim: s => //= x s ->. qed.
@@ -3050,6 +3075,39 @@ move => eq_; move/perm_eq_mem/(_ s1): (eq_) => /= mem_; move/perm_to_rem: (mem_)
 move: (perm_eq_trans _ _ _ eq_ eq_rem) => {eq_ eq_rem} /perm_cons eq_; move: (IHn _ _ _ eq_) => //.
 rewrite flatten_cons => /(perm_cat2l s1) eq_f; apply/(perm_eq_trans _ _ _ eq_f) => {IHn eq_ eq_f}.
 by apply/perm_eq_sym/perm_to_rem_flatten.
+qed.
+
+lemma perm_eq_flatten_filter ['a 'b] (P : 'a -> 'b -> bool) (s : 'b list) (t : 'a list) :
+  (forall x, x \in s => count (transpose P x) t = 1) =>
+  perm_eq s (flatten (map (fun x => filter (P x) s) t)).
+proof.
+move => forallx; pose f x:= _ (_ x) _; move/(perm_eq_map f)/perm_eq_flatten: (perm_undup_count t).
+apply/perm_eq_trans; rewrite /f => {f}; rewrite map_flatten -!map_comp; pose f:= (_ \o _).
+apply/perm_eqP1 => x; rewrite count_flatten map_flatten sumz_flatten -!map_comp /f => {f}.
+rewrite sumz_filter0; pose f:= (_ \o _).
+case (x \in s) => [memx|Nmemx]; last first.
++ rewrite count_pred0_eq_in; [by move => ? ?; rewrite /pred1; apply/negP => ->>|].
+  rewrite eq_in_filter_pred0 ?sumz_nil // /(\o) => ? /mapP [y] [+ /= ->>].
+  rewrite mem_undup => memy; rewrite /predC1 /= /f => {f}; rewrite /(\o) /=.
+  rewrite -map_comp /(\o) /= map_nseq sumz_nseq count_ge0 /= mulf_eq0; right.
+  by apply/count_eq0; rewrite has_pred1 mem_filter negb_and Nmemx.
+move/(_ _ memx): (forallx) => /count_eq1_eq [y] [memy] /= [Pyx forally].
+rewrite -(predII (predC1 0)) filter_predI filter_map /f => {f}.
+rewrite (eq_in_filter_predC1_map _ y) //.
++ by apply/filter_uniq/undup_uniq.
++ apply/mem_filter; rewrite /preim /(\o) mem_undup memy /predC1 /= !map_nseq sumz_nseq.
+  rewrite count_ge0 /=; apply/mulf_neq0; rewrite neq_ltz; right; apply/has_count/hasP.
+  - by exists y; rewrite /pred1.
+  by exists x; rewrite /pred1 /= mem_filter.
++ move => z /mem_filter; rewrite /preim /(\o) /predC1 /= mem_undup !map_nseq sumz_nseq.
+  rewrite count_ge0 /= => -[neq_ memz]; rewrite eq_sym neq_ /=; move: neq_.
+  rewrite mulf_eq0 negb_or !neq_ltz !(ltzNge _ 0) !count_ge0 /= -!mem_count => -[_].
+  rewrite mem_filter => -[Pzx _]; move: (forally z); rewrite Pzx /=; apply/contraR.
+  by move => ?; rewrite mem_rem_neq.
+rewrite /(\o) sumz_cons sumz_nil !map_nseq sumz_nseq count_ge0 /=.
+case: (count_eq1_eq (pred1 y) t) => _ -> /=.
++ by exists y; rewrite memy /pred1 /= => z memz; move: (forally _ memz); apply/contraLR => /= ->>.
+by rewrite count_filter; apply/eq_count => z; rewrite /predI /pred1; split.
 qed.
 
 (* -------------------------------------------------------------------- *)

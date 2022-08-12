@@ -170,12 +170,6 @@ abstract theory FiniteZModuleStruct.
 
   op eq_order d x = order x = d.
 
-  print ZModStr.
-
-  lemma finite_eq_order d :
-    is_finite (eq_order d).
-  proof. by move: FZMod.FinType.is_finite; apply/finite_leq => ?. qed.
-
   lemma few_small_order_exists_generator :
     (forall d , 0 <= d => d %| FinType.card =>
       size (to_seq (fun x => ZMod.intmul x d = zeror)) <= d) =>
@@ -184,19 +178,19 @@ abstract theory FiniteZModuleStruct.
     move => forall_.
     have: forall d , 0 <= d => d %| FinType.card => size (to_seq (eq_order d)) <= phi (d).
     + move => d /ler_eqVlt [<<- _|lt0d dvdd_]; [rewrite phi_eq0 //|].
-      - apply/size_le0/mem_eq0 => x; rewrite mem_to_seq; [by apply/finite_eq_order|].
+      - apply/size_le0/mem_eq0 => x; rewrite mem_to_seq; [by apply/FinType.is_finite_pred|].
         by rewrite /eq_order; apply/gtr_eqF/gt0_order.
       move: (size_ge0 (to_seq (eq_order d))).
       case /ler_eqVlt => [/eq_sym/size_eq0 ->/=|]; [by apply/phi_ge0|].
       rewrite -has_predT hasP => -[x] [mem_ _]; move: (sum_phi _ lt0d) => eq_d.
       move: (forall_ _ _ dvdd_); [by apply/ltzW|].
-      move: mem_; rewrite mem_to_seq; [by apply/finite_eq_order|].
+      move: mem_; rewrite mem_to_seq; [by apply/FinType.is_finite_pred|].
       move => eq_order_x; move: (size_orbit_list x); rewrite eq_order_x.
       move => eq_size_d; rewrite -{2}eq_size_d uniq_leq_size_perm_eq.
       - by apply/uniq_orbit_list.
       - by apply/uniq_to_seq.
       - move => ?; rewrite -orbit_listP ?gt0_order // => -[n] ->>.
-        rewrite mem_to_seq /=; [by apply/(finite_leq _ _ _ FinType.is_finite) => ?|].
+        rewrite mem_to_seq /=; [by apply/FinType.is_finite_pred|].
         by rewrite -mulrM mulrC mulrM -eq_order_x intmul_order mul0i.
       move => eq_; move/perm_eq_size: eq_ (eq_); rewrite size_orbit_list eq_sym.
       move => eq_; move: eq_ (gt0_order x) => <-; rewrite ltrNge size_le0.
@@ -207,7 +201,7 @@ abstract theory FiniteZModuleStruct.
       - apply/uniq_perm_eq.
         * by apply/uniq_to_seq.
         * by apply/filter_uniq/uniq_to_seq.
-        move => y; rewrite mem_to_seq ?finite_eq_order // mem_filter.
+        move => y; rewrite mem_to_seq ?FinType.is_finite_pred // mem_filter.
         rewrite -{1}(andbT (eq_order _ _)); apply/andb_id2l.
         rewrite eq_sym eqT => eq_order_y; rewrite mem_to_seq //=.
         by rewrite -eq_order_y; apply/intmul_order.
@@ -239,8 +233,30 @@ abstract theory FiniteZModuleStruct.
       exists (z %% d); rewrite range_iota /= -eq_order_x -{1}(gtr0_norm _ (gt0_order x)).
       by rewrite mem_range_mod ?gtr_eqF ?gt0_order //= intmul_modz_order.
     move => {forall_} forall_; move: (sum_phi _ FinType.card_gt0).
-    print ler_ge_sum_eq_seq.
-    fail.
+    move: (perm_eq_flatten_filter (fun d x => eq_order d x) FinType.enum (divisors FinType.card) _).
+    + move => x _; rewrite count_filter; apply/count_eq1_eq; rewrite /predI.
+      exists (order x) => /=; do!split.
+      - apply/mem_range; rewrite -ltzS -ltr_subl_addr gt0_order /= ltzS.
+        rewrite -(gtr0_norm (order _)) ?gt0_order // -(gtr0_norm FinType.card) ?FinType.card_gt0 //.
+        by apply/dvdz_le; [apply/gtr_eqF/FinType.card_gt0|apply/dvd_order_card].
+      - by apply/dvd_order_card.
+      by move => y; rewrite rem_filter ?range_uniq // mem_filter /predC1 /eq_order eq_sym; case => ->.
+    move/perm_eq_size; rewrite {3}/FinType.card => ->; rewrite size_flatten sumzE.
+    rewrite !BIA.big_mapT; move/lerr_eq => le_; move: (ler_ge_sum_eq_seq _ _ _ _ _ le_).
+    + move => d /divisorsP [dvdd_ memd] _; rewrite /(\o) /=; move: (forall_ _ _ dvdd_).
+      - by move:memd; apply/mem_range_le.
+      apply/ler_trans/lerr_eq/perm_eq_size/uniq_perm_eq.
+      - by apply/filter_uniq/FinType.enum_uniq.
+      - by apply/uniq_to_seq.
+      move => x; rewrite mem_filter /= mem_to_seq; [by apply/FinType.is_finite_pred|].
+      by rewrite FinType.enumP.
+    move => /(_ FinType.card _ _).
+    + by apply/divisors_id/FinType.card_gt0.
+    + by rewrite /predT.
+    rewrite /(\o) /= => eq_; move: (phi_gt0 FinType.card _).
+    + by apply/ltzS/ltr_subl_addr/FinType.card_gt0.
+    move: eq_ => <- /has_predT; rewrite has_filter predTI => /hasP [g] [_] /= eq_.
+    by exists g; apply/isgeneratorP; move: eq_; rewrite /eq_order.
   qed.
 end FiniteZModuleStruct.
 
@@ -345,13 +361,21 @@ abstract theory FiniteFieldStruct.
     type uz  <= ut,
     theory F <- F.
 
-  print UF.
-
+  (*TODO: this could be done in FiniteIDomainStruct, if only unit was an op and not a pred.*)
   clone import SubFinite as SFU with
     type t    <= t,
     type st   <= ut,
     op p      <- (fun x => x <> zeror),
     theory FT <- FF.FinType.
+
+  (*TODO: two equivalent FinType.*)
+  print SFU.Sub.
+  print UF.Sub.
+
+  clone import FiniteZModuleStruct as UFStr with
+    type t <= ut,
+    theory ZMod <- UF.UZMod,
+    theory FZMod.FinType <- SFU.SFT.
 
   lemma card_unit :
     FF.FinType.card = SFU.SFT.card + 1.
@@ -368,6 +392,28 @@ abstract theory FiniteFieldStruct.
       by rewrite map_id mem_filter /= rem_filter ?FinType.enum_uniq // mem_filter /predC1.
     rewrite mem_rem_neq // 1?eq_sym // FinType.enumP /=; apply/mapP.
     by exists (Sub.insubd x); rewrite SFT.enumP /= Sub.val_insubd neqx0.
+  qed.
+
+  lemma exists_generator :
+    exists (g : ut), UFStr.ZModStr.is_generator g.
+  proof.
+    apply/few_small_order_exists_generator => d.
+    case/ler_eqVlt => [<<- /dvd0z|lt0d]; [by move => eq_; move: SFT.card_gt0; rewrite eq_|].
+    move => dvdd_; move: (size_to_seq_eq_pow_1 _ lt0d); apply/ler_trans/lerr_eq.
+    rewrite -(size_map UF.Sub.insubd); apply/perm_eq_size/uniq_perm_eq.
+    + by apply/uniq_to_seq.
+    + rewrite map_inj_in_uniq; [|by apply/uniq_to_seq].
+      move => x y; rewrite !mem_to_seq ?FinType.is_finite_pred //.
+      move => eqx eqy /(congr1 UF.Sub.val); rewrite !UF.Sub.insubdK //.
+      - by apply/(unitrX_neq0 _ d); [apply/gtr_eqF|rewrite eqx unitr1].
+      by apply/(unitrX_neq0 _ d); [apply/gtr_eqF|rewrite eqy unitr1].
+    move => x; rewrite mapP mem_to_seq ?SFT.is_finite_pred //=.
+    rewrite /eq_pow_1; split => [eq_|[y] [+ ->>]].
+    + exists (UF.Sub.val x); rewrite UF.Sub.valKd /= mem_to_seq ?FinType.is_finite_pred //=.
+      by rewrite -UF.val_intmul eq_ val1.
+    rewrite mem_to_seq ?FinType.is_finite_pred //= => eq_.
+    apply/UF.Sub.val_inj; rewrite UF.val_intmul val1 UF.Sub.insubdK //.
+    by apply/(unitrX_neq0 _ d); [apply/gtr_eqF|rewrite eq_ unitr1].
   qed.
 end FiniteFieldStruct.
 
@@ -923,15 +969,6 @@ abstract theory SubFiniteField_ZMod.
         d = n.
   proof.
     print size_to_seq_iter_frobenius.
-    admit.
-  qed.
-
-  (*TODO: actually does not need all that stuff, derives from simple polynomial result.*)
-  lemma exists_generator :
-    exists (g : t) ,
-      SubFiniteField_ZMod.FFStr.UF.UZModStr.order (SubFiniteField_ZMod.FFStr.UF.Sub.insubd g) = FF.FinType.card - 1.
-  proof.
-    case: exists_iter_frobenius_unfixed => g [iterng Niterdg]; exists g.
     admit.
   qed.
 end SubFiniteField_ZMod.

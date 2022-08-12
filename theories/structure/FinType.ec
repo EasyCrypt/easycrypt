@@ -37,6 +37,9 @@ qed.
 lemma is_finite : is_finite predT<:t>.
 proof. by exists enum; split=> [|x]; [apply: enum_uniq | rewrite enumP]. qed.
 
+lemma is_finite_pred (P : t -> bool) : is_finite P.
+proof. by move: is_finite; apply/finite_leq => ?; rewrite /predT. qed.
+
 lemma perm_eq_enum_to_seq : perm_eq enum (Finite.to_seq predT).
 proof.
 apply: uniq_perm_eq.

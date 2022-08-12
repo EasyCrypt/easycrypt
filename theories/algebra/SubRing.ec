@@ -472,6 +472,14 @@ abstract theory UZMod_ComRing.
   clone import ZModuleStruct as UZModStr with
     type t      <= uz,
     theory ZMod <- UZMod.
+
+  lemma val_intmul_ge0 x n :
+    0 <= n =>
+    val (UZMod.intmul x n) = exp (val x) n.
+  proof.
+    elim n => [|n le0n IHn]; [by rewrite mulr0z expr0 val1|].
+    by rewrite mulrSz valM IHn exprS.
+  qed.
 end UZMod_ComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -498,4 +506,12 @@ abstract theory UZMod_Field.
     type t    <- t,
     type uz   <- uz,
     theory ID <- F.
+
+  lemma val_intmul x n :
+    Sub.val (UZMod.intmul x n) = exp (Sub.val x) n.
+  proof.
+    case (0 <= n) => [|/ltrNge/ltzW]; [by apply/val_intmul_ge0|].
+    rewrite -(IntID.opprK n) oppr_le0 => le0_.
+    by rewrite UZMod.mulrNz valV exprN; congr; apply/val_intmul_ge0.
+  qed.
 end UZMod_Field.
