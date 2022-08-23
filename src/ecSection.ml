@@ -40,7 +40,12 @@ let pp_cbarg env fmt (who : cbarg) =
   | `Op   p -> Format.fprintf fmt "operator %a" (EcPrinting.pp_opname ppe) p
   | `Ax   p -> Format.fprintf fmt "lemma/axiom %a" (EcPrinting.pp_axname ppe) p
   | `Sc   p -> Format.fprintf fmt "schema %a" (EcPrinting.pp_scname ppe) p
-  | `Module mp -> Format.fprintf fmt "module %a" (EcPrinting.pp_topmod ppe) mp
+  | `Module mp ->
+    let ppe =
+      match mp.m_top with
+      | `Local id -> EcPrinting.PPEnv.add_locals ppe [id]
+      | _ -> ppe in
+    Format.fprintf fmt "module %a" (EcPrinting.pp_topmod ppe) mp
   | `ModuleType p ->
     let mty = EcEnv.ModTy.modtype p env in
     Format.fprintf fmt "module type %a" (EcPrinting.pp_modtype1 ppe) mty
@@ -1594,20 +1599,25 @@ and add_items (items : theory) (scenv : scenv) =
   let add scenv item = add_item item scenv in
   List.fold_left add scenv items
 
-
 let add_decl_mod id mt scenv =
   match scenv.sc_name with
   | Th _ | Top ->
     hierror "declare module are only allowed inside section"
   | Sc _ ->
+    let cd = {
+      d_ty    = [`Global];
+      d_op    = [`Global];
+      d_ax    = [];
+      d_sc    = [];
+      d_mod   = [`Declare; `Global];
+      d_modty = [`Global];
+      d_tc    = [`Global];
+    } in
+    let from = `Declare, `Module (mpath_abs id []) in
+    on_modty (cb scenv from cd) mt;
     { scenv with
       sc_env = EcEnv.Mod.declare_local id mt scenv.sc_env;
       sc_items = SC_decl_mod (id, mt) :: scenv.sc_items }
-
-let add (item:sc_item) (scenv:scenv) =
-  match item with
-  | SC_th_item item -> add_item item scenv
-  | SC_decl_mod (id, mt) -> add_decl_mod id mt scenv
 
 (* -----------------------------------------------------------*)
 let enter_section (name : symbol option) (scenv : scenv) =
