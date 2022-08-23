@@ -839,18 +839,27 @@ and replay_reduction
   (import, rules : _ * (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list)
 =
   let for1 (p, opts, rule) =
+    let exception Removed in
+
     let p = EcSubst.subst_path subst p in
 
     (* TODO: A: schema are not replayed for now, but reduction rules can use a
        schema. Fix this. *)
     let rule =
       obind (fun rule ->
+        let env = EcSection.env (ove.ovre_hooks.henv scope) in
+
+        if not (
+          match opts.ur_mode with
+          | `Ax -> is_some (EcEnv.Ax.by_path_opt p env)
+          | `Sc -> is_some (EcEnv.Schema.by_path_opt p env)
+        ) then raise Removed;
+
         try
           Some (EcReduction.User.compile
                   ~opts ~prio:rule.rl_prio
-                  (EcSection.env (ove.ovre_hooks.henv scope))
-                  opts.ur_mode p)
-        with EcReduction.User.InvalidUserRule _ -> None) rule
+                  env opts.ur_mode p)
+        with EcReduction.User.InvalidUserRule _ | Removed -> None) rule
 
     in (p, opts, rule) in
 
