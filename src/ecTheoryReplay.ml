@@ -370,10 +370,17 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             | `Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
                 match (EcEnv.Ty.by_path np env).tyd_type with
                 | `Datatype { tydt_ctors = _ } ->
-                  List.fold_left (fun subst (name, _) ->
-                      EcSubst.add_path subst
-                        ~src:(xpath ove name)
-                        ~dst:(EcPath.pqoname (EcPath.prefix np) name))
+                  let newtparams = List.fst newtyd.tyd_params in
+                  let newtparams_ty = List.map tvar newtparams in
+                  let newdtype = tconstr np newtparams_ty in
+                  let tysubst = EcTypes.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
+
+                  List.fold_left (fun subst (name, tyargs) ->
+                      let np = EcPath.pqoname (EcPath.prefix np) name in
+                      let newtyargs = List.map (Tvar.subst tysubst) tyargs in
+                      EcSubst.add_opdef subst
+                        (xpath ove name)
+                        (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)))
                     subst octors
                 | _ -> subst
               end
@@ -724,7 +731,7 @@ and replay_modtype
         match mode with
         | `Alias -> rename ove subst (`Module, x)
         | `Inline _ ->
-          let subst = EcSubst.add_path subst ~src:(xpath ove x) ~dst:np in
+          let subst = EcSubst.add_modtydef subst ~src:(xpath ove x) ~dst:np in
           subst, x in
 
       let modty = EcSubst.subst_top_modsig subst modty in
@@ -763,7 +770,7 @@ and replay_mod
         | _ -> assert false
       in
 
-      let substme = EcSubst.add_path subst ~src:(xpath ove name) ~dst:np in
+      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:np in
 
       let me    = EcSubst.subst_top_module substme me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
