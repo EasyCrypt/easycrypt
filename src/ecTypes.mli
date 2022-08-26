@@ -75,7 +75,7 @@ val ty_check_uni : ty -> unit
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
-  ts_mp  : EcPath.mpath -> EcPath.mpath;
+  ts_mp  : EcPath.smsubst;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
   ts_u   : EcUid.uid -> ty option;
   ts_v   : EcIdent.t -> ty option;
@@ -282,8 +282,7 @@ type e_subst = {
   es_p       : EcPath.path -> EcPath.path;
   es_ty      : ty -> ty;
   es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
-  es_mp      : EcPath.mpath -> EcPath.mpath;
-  es_xp      : EcPath.xpath -> EcPath.xpath;
+  es_mp      : EcPath.smsubst;
   es_loc     : expr Mid.t;
 }
 
@@ -296,7 +295,7 @@ val e_subst_init :
   -> (EcPath.path -> EcPath.path)
   -> (ty -> ty)
   -> (EcIdent.t list * expr) EcPath.Mp.t
-  -> EcPath.mpath EcIdent.Mid.t
+  -> EcPath.smsubst
   -> expr Mid.t
   -> e_subst
 

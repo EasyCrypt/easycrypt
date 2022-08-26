@@ -407,7 +407,7 @@ let rec s_subst_top (s : EcTypes.e_subst) =
   if e_subst == identity then identity else
 
   let pvt_subst (pv,ty as p) =
-    let pv' = EcTypes.pv_subst s.EcTypes.es_xp pv in
+    let pv' = EcTypes.pv_subst (EcPath.x_subst s.es_mp) pv in
     let ty' = s.EcTypes.es_ty ty in
 
     if pv == pv' && ty == ty' then p else (pv', ty') in
@@ -433,7 +433,7 @@ let rec s_subst_top (s : EcTypes.e_subst) =
 
     | Scall (olv, mp, args) ->
         let olv'  = olv |> OSmart.omap lv_subst in
-        let mp'   = s.EcTypes.es_xp mp in
+        let mp'   = EcPath.x_subst s.es_mp mp in
         let args' = List.Smart.map e_subst args in
 
         ISmart.i_call (i, (olv, mp, args)) (olv', mp', args')

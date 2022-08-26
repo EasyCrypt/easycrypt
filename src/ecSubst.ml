@@ -23,26 +23,27 @@ exception InconsistentSubst
 
 (* -------------------------------------------------------------------- *)
 type subst = {
-  sb_freshen : bool;
-  sb_modules : EcPath.mpath Mid.t;
-  sb_path    : EcPath.path Mp.t;
-  sb_tydef   : (EcIdent.t list * ty) Mp.t;
-  sb_opdef   : (EcIdent.t list * expr) Mp.t;
-  sb_pddef   : (EcIdent.t list * form) Mp.t;
+  sb_freshen  : bool;
+  sb_modules  : EcPath.mpath Mid.t;
+  sb_path     : EcPath.path Mp.t;
+  sb_tydef    : (EcIdent.t list * ty) Mp.t;
+  sb_opdef    : (EcIdent.t list * expr) Mp.t;
+  sb_pddef    : (EcIdent.t list * form) Mp.t;
+  sb_moddef   : EcPath.path Mp.t;
+  sb_modtydef : EcPath.path Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
 let empty ?(freshen = true) () : subst = {
-  sb_freshen = freshen;
-  sb_modules = Mid.empty;
-  sb_path    = Mp.empty;
-  sb_tydef   = Mp.empty;
-  sb_opdef   = Mp.empty;
-  sb_pddef   = Mp.empty;
+  sb_freshen  = freshen;
+  sb_modules  = Mid.empty;
+  sb_path     = Mp.empty;
+  sb_tydef    = Mp.empty;
+  sb_opdef    = Mp.empty;
+  sb_pddef    = Mp.empty;
+  sb_moddef   = Mp.empty;
+  sb_modtydef = Mp.empty;
 }
-
-let is_empty s =
-  Mp.is_empty s.sb_path && Mid.is_empty s.sb_modules
 
 let add_module (s : subst) (x : EcIdent.t) (m : EcPath.mpath) =
   let merger = function
@@ -67,20 +68,33 @@ let add_pddef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_pddef = None);
   { s with sb_pddef = Mp.add p (ids, f) s.sb_pddef }
 
+let add_moddef (s : subst) ~(src : EcPath.path) ~(dst : EcPath.path) =
+  assert (Mp.find_opt src s.sb_moddef = None);
+  { s with sb_moddef = Mp.add src dst s.sb_moddef }
+
+let add_modtydef (s : subst) ~(src : EcPath.path) ~(dst : EcPath.path) =
+  assert (Mp.find_opt src s.sb_modtydef = None);
+  { s with sb_modtydef = Mp.add src dst s.sb_modtydef }
+
 (* -------------------------------------------------------------------- *)
 type _subst = {
   s_s   : subst;
   s_p   : (EcPath.path -> EcPath.path);
-  s_fmp : (EcPath.mpath -> EcPath.mpath);
+  s_fmp : EcPath.smsubst;
   s_sty : ty_subst;
   s_ty  : (ty -> ty);
   s_op  : (EcIdent.t list * expr) Mp.t;
   s_pd  : (EcIdent.t list * form) Mp.t;
+  s_mt  : EcPath.path Mp.t;
 }
 
 let _subst_of_subst s =
   let sp  = EcPath.p_subst s.sb_path in
-  let sm  = EcPath.Hm.memo 107 (EcPath.m_subst sp s.sb_modules) in
+  let sm  = EcPath.{
+    sms_crt = Mp.union (fun _ _ x -> Some x) s.sb_path s.sb_moddef;
+    sms_id = s.sb_modules;
+  }
+  in
   let sty = { ty_subst_id with ts_p = sp; ts_mp = sm; ts_def = s.sb_tydef; } in
   let st  = EcTypes.ty_subst sty in
     { s_s   = s;
@@ -89,7 +103,8 @@ let _subst_of_subst s =
       s_sty = sty;
       s_ty  = st;
       s_op  = s.sb_opdef;
-      s_pd  = s.sb_pddef; }
+      s_pd  = s.sb_pddef;
+      s_mt  = s.sb_modtydef; }
 
 let e_subst_of_subst (s:_subst) =
   { es_freshen = s.s_s.sb_freshen;
@@ -97,13 +112,16 @@ let e_subst_of_subst (s:_subst) =
     es_ty      = s.s_ty;
     es_opdef   = s.s_op;
     es_mp      = s.s_fmp;
-    es_xp      = EcPath.x_subst s.s_fmp;
     es_loc     = Mid.empty; }
 
 let f_subst_of_subst (s:_subst) =
   Fsubst.f_subst_init
-    ~freshen:s.s_s.sb_freshen ~mods:s.s_s.sb_modules ~sty:s.s_sty
-    ~opdef:s.s_op ~prdef:s.s_pd ()
+    ~freshen:s.s_s.sb_freshen
+    ~sty:s.s_sty
+    ~opdef:s.s_op
+    ~prdef:s.s_pd
+    ~modtydef:s.s_mt
+    ()
 
 (* -------------------------------------------------------------------- *)
 let subst_form (s : _subst) =
@@ -148,7 +166,7 @@ let subst_mod_restr (s : _subst) (mr : mod_restr) =
       EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r
     ) set EcPath.Sx.empty) mr.mr_xpaths in
   let r = ur_app (fun set -> EcPath.Sm.fold (fun x r ->
-      EcPath.Sm.add (s.s_fmp x) r
+      EcPath.Sm.add (EcPath.m_subst s.s_fmp x) r
     ) set EcPath.Sm.empty) mr.mr_mpaths in
   let ois = EcSymbols.Msym.map (fun oi ->
       subst_oracle_info s oi) mr.mr_oinfos in
@@ -204,8 +222,8 @@ and subst_modsig ?params (s : _subst) (comps : module_sig) =
 (* -------------------------------------------------------------------- *)
 and subst_modtype (s : _subst) (modty : module_type) =
   { mt_params = List.map (snd_map (subst_modtype s)) modty.mt_params;
-    mt_name   = s.s_p modty.mt_name;
-    mt_args   = List.map s.s_fmp modty.mt_args;
+    mt_name   = ofdfl (fun () -> s.s_p modty.mt_name) (Mp.find_opt modty.mt_name s.s_mt);
+    mt_args   = List.map (EcPath.m_subst s.s_fmp) modty.mt_args;
     mt_restr = subst_mod_restr s modty.mt_restr; }
 
 let subst_top_modsig (s : _subst) (ms: top_module_sig) =
@@ -245,7 +263,7 @@ let rec subst_module_item (s : _subst) (item : module_item) =
       MI_Variable x'
 
   | MI_Function f ->
-      let f'     = subst_function s f in
+      let f' = subst_function s f in
       MI_Function f'
 
 (* -------------------------------------------------------------------- *)
@@ -254,13 +272,13 @@ and subst_module_items (s : _subst) (items : module_item list) =
 
 (* -------------------------------------------------------------------- *)
 and subst_module_struct (s : _subst) (bstruct : module_structure) =
-    { ms_body   = subst_module_items s bstruct.ms_body; }
+    { ms_body = subst_module_items s bstruct.ms_body; }
 
 (* -------------------------------------------------------------------- *)
 and subst_module_body (s : _subst) (body : module_body) =
   match body with
   | ME_Alias (arity,m) ->
-      ME_Alias (arity, s.s_fmp m)
+      ME_Alias (arity, EcPath.m_subst s.s_fmp m)
 
   | ME_Structure bstruct ->
       ME_Structure (subst_module_struct s bstruct)
@@ -612,7 +630,7 @@ let subst_top_modsig   s = subst_top_modsig (_subst_of_subst s)
 let subst_modsig_body  s = subst_modsig_body (_subst_of_subst s)
 let subst_mod_restr    s = subst_mod_restr (_subst_of_subst s)
 
-let subst_mpath        s = (_subst_of_subst s).s_fmp
+let subst_mpath        s = EcPath.m_subst (_subst_of_subst s).s_fmp
 let subst_path         s = (_subst_of_subst s).s_p
 
 let subst_form         s = fun f -> (Fsubst.f_subst (f_subst_of_subst (_subst_of_subst s)) f)

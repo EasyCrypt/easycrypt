@@ -130,8 +130,16 @@ module Sx : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val p_subst : path Mp.t -> path -> path
+type smsubst = {
+  sms_crt : path Mp.t;
+  sms_id  : mpath Mid.t;
+}
 
-val m_subst : (path -> path) -> mpath Mid.t -> mpath -> mpath
-val x_subst : (mpath -> mpath) -> xpath -> xpath
-val x_substm : (path -> path) -> mpath Mid.t -> xpath -> xpath
+val sms_identity : smsubst
+val sms_is_identity : smsubst -> bool
+
+val sms_bind_abs : ident -> mpath -> smsubst -> smsubst
+
+val p_subst : path Mp.t -> path -> path
+val m_subst : smsubst -> mpath -> mpath
+val x_subst : smsubst -> xpath -> xpath
