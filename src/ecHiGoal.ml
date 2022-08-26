@@ -435,11 +435,15 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
   let pt = PT.tc1_process_full_pterm ~implicits tc ff in
 
   try
-    let aout = EcLowGoal.Apply.t_apply_bwd_r pt tc in
-
     match mode with
-    | `Apply -> aout
+    | `Alpha ->
+        assert (PT.can_concretize pt.PT.ptev_env);
+        let pt, _ = PT.concretize pt in
+        EcLowGoal.t_apply pt tc
+    | `Apply ->
+        EcLowGoal.Apply.t_apply_bwd_r pt tc
     | `Exact ->
+        let aout = EcLowGoal.Apply.t_apply_bwd_r pt tc in
         let aout = FApi.t_onall process_trivial aout in
         if not (FApi.tc_done aout) then
           tc_error !!tc "cannot close goal";
@@ -1798,6 +1802,9 @@ let process_apply ~implicits ((infos, orv) : apply_t * prevert option) tc =
           t_last (process_apply_bwd ~implicits `Apply pe) tc in
         let tc = List.fold_left for1 (tcenv_of_tcenv1 tc) pe in
         if mode = `Exact then t_onall process_done tc else tc
+
+    | `Alpha pe ->
+        process_apply_bwd ~implicits `Alpha pe tc
 
     | `Top mode ->
         let tc = process_apply_top tc in
