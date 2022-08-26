@@ -330,7 +330,7 @@ end = struct
     let loc = axd.pl_loc in
     let tc = FPNamed (axd, None) in
     let tc = { fp_mode = `Explicit; fp_head = tc; fp_args = []; } in
-    let tc = Papply (`Apply ([tc], `Exact), None) in
+    let tc = Papply (`Alpha tc, None) in
     let tc = mk_loc loc (Plogic tc) in
     let pr = { pthp_mode   = `Named (name, mode);
                pthp_tactic = Some tc; } in

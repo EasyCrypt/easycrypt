@@ -917,8 +917,9 @@ type pcaseoptions = (bool * pcaseoption) list
 (* -------------------------------------------------------------------- *)
 type apply_info = [
   | `ApplyIn of ppterm * psymbol
-  | `Apply   of ppterm list * [`Apply|`Exact]
-  | `Top     of [`Apply|`Exact]
+  | `Apply   of ppterm list * [`Apply|`Exact|`Alpha]
+  | `Top     of [`Apply|`Exact|`Alpha]
+  | `Alpha   of ppterm
 ]
 
 (* -------------------------------------------------------------------- *)
