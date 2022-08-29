@@ -674,7 +674,7 @@ qed.
 lemma filter_pred1 x (s : 'a list) :
   filter (pred1 x) s = nseq (count (pred1 x) s) x.
 proof.
-elim: s=> /= @/pred1 [|y s ih]; first by rewrite nseq0.
+elim: s=> /= [|y s ih @/pred1]; first by rewrite nseq0.
 by case: (y = x)=> //; rewrite addzC nseqS ?count_ge0.
 qed.
 
@@ -1814,7 +1814,7 @@ proof.
 elim: s => //= x s ih inj_f [xs uqs]; case _: (f x) => /= [|v] E.
 - by rewrite ih // => x' y' v' x's y's; apply/inj_f; right.
 rewrite ih //; 1: by move => x' y' v' x's y's; apply/inj_f; right.
-rewrite /oget /= pmap_map; apply/negP => /mapP.
+rewrite /= pmap_map; apply/negP => /mapP.
 case=> -[|v']; rewrite mem_filter // => -[[_ vs] @/oget /=].
 apply/negP=> <<-; move: vs; rewrite -E => /mapP.
 case=> y [ys eq_f]; suff <<-//: x = y.

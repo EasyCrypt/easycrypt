@@ -1081,7 +1081,7 @@ wp; call (_:
   + by move => *; inline *;auto => /#.   
   (* Backdoor F2Auth *)
   move=> m2 p; inline *; auto => /> &1 &2.
-  rewrite /staterel /leak oget_some /unblock /kstp /rcv. 
+  rewrite /staterel /leak oget_some /rcv. 
   by case (FKE.st{2}.`kst) => /> /#. 
 
 (* WRAP-UP CALL *)

@@ -218,7 +218,7 @@ lemma finite_fun ['a 'b] :
   => is_finite<:'b> predT
   => is_finite<: 'a -> 'b> predT.
 proof.
-case=> [sa [uqa @/predT /= ha]] [sb [uqb @/predT /= hb]]; apply/finiteP.
+case=> [sa [uqa @/predT /= ha]] [sb [uqb /= hb]]; apply/finiteP.
 pose F (s : ('a * 'b) list) (a : 'a) := odflt witness (assoc s a).
 exists (map F (fingraph sa sb)) => /= f.
 apply/mapP; pose s := map (fun a => (a, f a)) sa.

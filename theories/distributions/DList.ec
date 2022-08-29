@@ -39,7 +39,7 @@ lemma dlist_add (d:'a distr) n1 n2:
     dmap (dlist d n1 `*` dlist d n2) (fun (p:'a list * 'a list) => p.`1 ++ p.`2).
 proof.
 elim: n1 => [hn2|n1 hn1 IHn1 hn2].
-  by rewrite (dlist0 d 0) //= /(\o) dmap_dprodE dlet_unit /= dmap_id_eq_in.
+  by rewrite (dlist0 d 0) //= dmap_dprodE dlet_unit /= dmap_id_eq_in.
 rewrite addzAC !dlistS 1:/# //= IHn1 //.
 rewrite !dmap_dprodE /= dlet_dlet; apply eq_dlet => //= x.
 rewrite dmap_dlet dlet_dmap; apply eq_dlet => //= x1.

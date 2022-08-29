@@ -197,7 +197,7 @@ move=> dD_fu.
 proc; if=> //=; auto=> /> &m h.
 have [] x0 x0_notinr_m:= endo_dom_rng RP.m{m} _.
 + by exists x{m}.
-rewrite -/predT weight_dexcepted /b2r.
+rewrite -/predT weight_dexcepted.
 case: {-1}(mu _ _ = mu _ _)
         (eq_refl (mu dD predT = mu dD (rng RP.m{m})))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.
@@ -215,7 +215,7 @@ move=> dD_fu.
 proc; if=> //=; auto=> /> &m h.
 have [] y0 y0_notinr_mi:= endo_dom_rng RP.mi{m} _.
 + by exists y{m}.
-rewrite -/predT weight_dexcepted /b2r.
+rewrite -/predT weight_dexcepted.
 case: {-1}(mu _ _ = mu _ _)
         (eq_refl (mu dD predT = mu dD (rng RP.mi{m})))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.

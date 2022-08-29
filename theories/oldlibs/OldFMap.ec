@@ -93,7 +93,7 @@ lemma reduce_reduced (s : ('a * 'b) list):
 proof.
 elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
 rewrite reduce_cons /= => -[x_notin_s /ih ->].
-rewrite (@eq_in_filter _ predT) ?filter_predT /predT //=.
+rewrite (@eq_in_filter _ predT) ?filter_predT 1:/predT //=.
 case=> x' y' /(map_f fst) x'_in_s; apply/negP => <<-.
 by move: x_notin_s.
 qed.

@@ -919,18 +919,16 @@ qed.
 
 lemma nosmt dlet_d_unit (d:'a distr) : dlet d MUnit.dunit = d.
 proof.
-apply/eq_distr=> x; rewrite dlet1E /mlet /=.
-rewrite (@sumE_fin _ [x]) //=.
+apply/eq_distr=> x; rewrite dlet1E /= (@sumE_fin _ [x]) //=.
 + by move=> x0; rewrite MUnit.dunit1E /=; case (x0 = x).
-by rewrite big_consT big_nil /= MUnit.dunit1E.
++ by rewrite big_consT big_nil /= MUnit.dunit1E.
 qed.
 
 lemma nosmt dlet_unit (F:'a -> 'b distr) a : dlet (MUnit.dunit a) F = F a.
 proof.
-apply/eq_distr=> x; rewrite dlet1E /mlet /=.
-rewrite (@sumE_fin _ [a]) //=.
+apply/eq_distr=> x; rewrite dlet1E /= (@sumE_fin _ [a]) //=.
 + by move=> a0; rewrite MUnit.dunit1E (@eq_sym a); case (a0 = a).
-by rewrite big_consT big_nil /= MUnit.dunit1E.
++ by rewrite big_consT big_nil /= MUnit.dunit1E.
 qed.
 
 lemma dlet_dlet (d1:'a distr) (F1:'a -> 'b distr) (F2: 'b -> 'c distr):
@@ -1029,7 +1027,7 @@ lemma dmap1E (d : 'a distr) (f : 'a -> 'b) (b : 'b):
   mu1 (dmap d f) b = mu d ((pred1 b) \o f).
 proof.
 rewrite dlet1E muE; apply/eq_sum=> x /=.
-by rewrite MUnit.dunit1E /preim /pred1 /(\o); case: (f x = b).
+by rewrite MUnit.dunit1E /pred1 /(\o); case: (f x = b).
 qed.
 
 lemma dmap1E_can ['a 'b] (d : 'a distr) (f : 'a -> 'b) (g : 'b -> 'a) (b : 'b) :
@@ -1058,8 +1056,8 @@ lemma dmapE (d : 'a distr) (f : 'a -> 'b) (P : 'b -> bool):
 proof.
 rewrite dlet_muE_swap muE.
 apply/eq_sum=> a /=; rewrite (@sumE_fin _ [f a]) //=.
-+ by move=> b; rewrite (@eq_sym b) MUnit.dunit1E;case: (f a = b);rewrite /b2r.
-by rewrite big_seq1 /= MUnit.dunit1E.
++ by move=> b; rewrite (@eq_sym b) MUnit.dunit1E; case: (f a = b).
++ by rewrite big_seq1 /= MUnit.dunit1E.
 qed.
 
 lemma supp_dmap (d : 'a distr) (f : 'a -> 'b) (b : 'b):
@@ -1441,8 +1439,8 @@ lemma doptE (d : 'a distr) E :
   mu d (E \o Some) + (if E None then 1%r - weight d else 0%r).
 proof.
 rewrite !muE sumD1_None ?summable_cond ?summable_mu1 /= addrC; congr.
-  by apply eq_sum => /= x; rewrite /(\o) dopt1E.
-by case (E None) => @/predT //=; by rewrite dopt1E -weightE.
+- by apply eq_sum => /= x; rewrite /(\o) dopt1E.
+- by case (E None) => //=; rewrite dopt1E /predT /= -weightE.
 qed.
 
 lemma dopt_ll (d : 'a distr) : is_lossless (dopt d).
@@ -1501,7 +1499,7 @@ move=> isa isb; split=> [x|s uqs].
 (* FIXME: This instance should be in bigops *)
 rewrite (@partition_big ofst _ predT _ _ (undup (unzip1 s))).
 + by apply/undup_uniq.
-+ by case=> a b ab_in_s _; rewrite mem_undup map_f /mprod.
++ by case=> a b ab_in_s _; rewrite mem_undup map_f.
 pose P := fun x ab => ofst<:'a, 'b> ab = x.
 pose F := fun (ab : 'a * 'b) => mb ab.`2.
 rewrite -(@eq_bigr _ (fun x => ma x * big (P x) F s)) => /= [x _|].
@@ -1510,7 +1508,7 @@ pose s' := undup _; apply/(@ler_trans (big predT (fun x => ma x) s')).
 + apply/ler_sum=> a _ /=; apply/ler_pimulr; first by apply/ge0_isdistr.
   rewrite -big_filter -(@big_map snd predT) le1_sum_isdistr //.
   rewrite map_inj_in_uniq ?filter_uniq //; case=> [a1 b1] [a2 b2].
-  by rewrite !mem_filter => @/P @/ofst @/osnd |>.
+  by rewrite !mem_filter => @/P @/ofst |>.
 by apply/le1_sum_isdistr/undup_uniq.
 qed.
 
@@ -2397,7 +2395,7 @@ move=>h; pose s (a : 'a) (b : 'b) := f b * mu1 (df a) b * mu1 d a.
 rewrite /E -(@eq_sum (fun a => sum (s a))) /=; 1: by move=> a; rewrite sumZr.
 rewrite (@sum_swap (fun ab : _ * _ => s ab.`1 ab.`2)).
 - exists (psum (fun x => f x * mu1 (dlet d df) x)).
-  move=> J uqJ @/E; pose K := undup (unzip2 J).
+  move=> J uqJ; pose K := undup (unzip2 J).
   have uqK: uniq K by apply: undup_uniq.
   have le := ler_big_psum (fun x => f x * mu1 (dlet d df) x) K h uqK.
   apply: (ler_trans _ _ le) => {le}.
@@ -2409,9 +2407,9 @@ rewrite (@sum_swap (fun ab : _ * _ => s ab.`1 ab.`2)).
   move/BRA.eq_big_perm=> ->; apply: Bigreal.ler_sum => /=.
   move=> b _ @/s => {s}; pose s a := `|f b| * (mu1 (df a) b * mu1 d a).
   rewrite BRA.big_filter -(@BRA.eq_bigr _ (fun ba : _ * _ => s ba.`2)) /=.
-  - case=> b' a' /= ->> @/(\o) @/pswap /= @/s.
+  - case=> b' a' /= ->> @/pswap /= @/s.
     by rewrite -!mulrA !normrM; congr; rewrite !ger0_norm.
-  rewrite /(\o) {1}/pswap /s /= -BRA.mulr_sumr normrM.
+  rewrite {1}/pswap /s /= -BRA.mulr_sumr normrM.
   rewrite ler_wpmul2l 1:normr_ge0 BRA.big_map /(\o) /= -BRA.big_filter.
   rewrite ger0_norm //; pose L := List.filter _ _.
   rewrite (@BRA.sum_pair (fun x => mu1 (df x) b * mu1 d x) (fun _ => 1%r)) /=.

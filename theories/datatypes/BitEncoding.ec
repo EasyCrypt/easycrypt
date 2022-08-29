@@ -557,7 +557,7 @@ op chunk r (bs : 'a list) =
 lemma nosmt chunk_le0 r (s : 'a list) : r <= 0 => chunk r s = [].
 proof.
 move/ler_eqVlt=> [->|gt0_r] @/chunk; 1: by rewrite mkseq0.
-rewrite /chunk mkseq0_le // -oppr_ge0 -divzN.
+rewrite mkseq0_le // -oppr_ge0 -divzN.
 by rewrite divz_ge0 ?size_ge0 oppr_gt0.
 qed.
 
