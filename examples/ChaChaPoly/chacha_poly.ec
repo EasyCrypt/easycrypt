@@ -935,10 +935,10 @@ proof.
   move=> /(congr1 bytes_of_poly_in); rewrite insubdK=> // ->.
   move=> /(congr1 bytes_of_poly_out); rewrite insubdK=> // ->.
   rewrite insubdK.
-  + rewrite size_drop 1:ge0_poly_in_size valP /block_size /poly_size.
+  + rewrite size_drop 1:ge0_poly_in_size valP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
   rewrite insubdK.
-  + rewrite size_take 1:ge0_poly_in_size valP /poly_size /block_size.
+  + rewrite size_take 1:ge0_poly_in_size valP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
   by rewrite cat_take_drop valKd.
 qed.
@@ -1781,7 +1781,7 @@ section PROOFS.
     + case: (forged{2}) => //; case: ((UFCMA.bad1\/UFCMA.bad2){2}) => //= H12 H13.
       - have[|]->//=:=H12.
       have:=H12; rewrite negb_or => /> *.
-      rewrite /test_poly /= /poly1305 /= /test_bad.
+      rewrite /test_poly /= /poly1305 /=.
       pose f := fun (c : ciphertext) => c.`4 - poly1305_eval r3 (topol c.`2 c.`3).
       pose m := List.filter _ _.
       rewrite  hasP /=.
@@ -2246,7 +2246,7 @@ section PROOFS.
       + by rewrite /n1 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r 1:ge0_pr_zeropol -sumr_ofint le_fromint IntOrder.lerr_eq.
       rewrite hn1 eq_sym  -big_count -BIA.big_filter /= /l1 //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
-      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 /transpose //==> [#] * /=.
+      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 //==> [#] * /=.
       by rewrite count_map.
 
     case: (0 < size l2)=> * />; last first.
@@ -2281,8 +2281,8 @@ section PROOFS.
       + by rewrite /n2 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r; 1:smt(mu_bounded).
       rewrite -sumr_ofint le_fromint IntOrder.lerr_eq.
-      rewrite hn2 eq_sym  -big_count -BIA.big_filter /= /l1 //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
-      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 /transpose //==> [#] * /=.
+      rewrite hn2 eq_sym  -big_count -BIA.big_filter /= //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
+      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 //==> [#] * /=.
       by rewrite count_map.
 
   move=> &h /> ? H0 *.

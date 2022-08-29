@@ -37,7 +37,7 @@ seq 1: (v = x) (mu1 d v) pr 1%r 0%r ((glob A) = (glob A){m})=> //.
           ==> ev v (glob A) res)=> //.
   rewrite /pr; bypr=> /> &0 eqGlob <<-.
   by byequiv (: ={glob A, x} ==> ={res, glob A})=> //; proc true.
-by hoare; rewrite /fst /snd /=; call (: true); auto=> /#.
+by hoare => /=; call (: true); auto=> /#.
 qed.
 
 lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):

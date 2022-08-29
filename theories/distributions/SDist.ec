@@ -355,7 +355,7 @@ lemma distinguisher_ll (A <: Distinguisher) &m x :
   islossless A.guess => 
   is_lossless (mk (fun (z : bool) => Pr[A.guess(x) @ &m : res = z])).
 proof.
-move => A_ll; rewrite /F /is_lossless muE {1}/predT /=. 
+move => A_ll; rewrite /is_lossless muE {1}/predT /=. 
 have <- : Pr[A.guess(x) @ &m : res = true \/ res = false] = 1%r. 
   by byphoare => //; conseq (:_ ==> true) => // /#.  
 rewrite (eq_sum _ (fun (z : bool) => Pr[A.guess(x) @ &m : res = z])) => [z /=|].

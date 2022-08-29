@@ -47,7 +47,7 @@ lemma degP p c :
   => (forall i, c <= i => p.[i] = zeror)
   => deg p = c.
 proof.
-move=> ge0_c nz_p_cB1 degc @/deg; apply: argmin_eq => @/idfun /=.
+move=> ge0_c nz_p_cB1 degc @/deg; apply: argmin_eq => /=.
 - by apply/ltrW. - by apply: degc.
 move=> j [ge0_j lt_jc]; rewrite negb_forall /=.
 by exists (c-1); apply/negP => /(_ _); first by move=> /#.
@@ -64,7 +64,7 @@ lemma gedeg_coeff (p : poly) (c : int) : deg p <= c => p.[c] = zeror.
 proof.
 move=> le_p_c; pose P p i := forall j, (i <= j)%Int => p.[j] = zeror.
 case: (of_polyP p) => [wf_p [d hd]]; move: (argminP idfun (P p)).
-move/(_ (max (d+1) 0) _ _) => @/P @/idfun /=; first exact: maxrr.
+move/(_ (max (d+1) 0) _ _) => /=; first exact: maxrr.
 - by move=> j le_d_j; apply: hd => /#.
 by apply; apply: le_p_c.
 qed.
@@ -290,7 +290,7 @@ proof.
 case: (c = zeror) => [->|nz_c]; last first.
 - apply: degP => //=; first by rewrite polyCE.
   by move=> i ge1_i; rewrite polyCE gtr_eqF //#.
-rewrite /deg; apply: argmin_eq => @/idfun //=.
+rewrite /deg; apply: argmin_eq => //=.
 - by move=> j _; rewrite poly0E.
 - by move=> j; apply: contraL => _ /#.
 qed.
