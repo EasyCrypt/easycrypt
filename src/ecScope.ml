@@ -1143,20 +1143,21 @@ module Ax = struct
       scope prealize
 
   (* ------------------------------------------------------------------ *)
-  let add_defer_goals (scope : scope) (mode : mode) (goals : EcTyping.goal1 list) =
-    (*let do1 i = function
+  let add_defer_goals (scope : scope) (lc : locality) (mode : mode) (goals : EcTyping.goal1 list) =
+    let do1 i = function
       | `Finite ty ->
 
           let ax =
             (* FIXME: how to ensure that finite is required *)
             let op, _ =
-              EcEnv.Op.lookup (["Finite"], "finite_type") scope.sc_env in
+              EcEnv.Op.lookup (["Finite"], "finite_type") (env scope) in
             EcFol.f_op op [ty] tbool in
           let ax = EcDecl.{
-            ax_tparams = [];
-            ax_spec    = ax;
-            ax_kind    = `Lemma;
-            ax_nosmt   = false;
+            ax_tparams    = [];
+            ax_spec       = ax;
+            ax_kind       = `Lemma;
+            ax_visibility = `NoSmt;
+            ax_loca       = lc;
           } in
           let name = Format.sprintf "typing__%d" i in
           (None, ax), EcPath.psymbol name, scope.sc_env in
@@ -1164,7 +1165,7 @@ module Ax = struct
     let goals = List.mapi do1 goals in
     let scope = add_defer scope goals in
 
-    try_kill_goals scope mode *) scope
+    try_kill_goals scope mode
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1485,7 +1486,7 @@ module Mod = struct
     end;
 
     let scope =  bind scope { tme_expr = m; tme_loca = lc; } in
-    Ax.add_defer_goals scope mode goals
+    Ax.add_defer_goals scope lc mode goals
 
   let declare (scope : scope) (m : pmodule_decl) =
     let modty = m.ptm_modty in
@@ -1529,7 +1530,7 @@ module ModType = struct
       tysig, !goals
     in
     let scope = bind scope (unloc intf.pi_name, tysig) in
-    Ax.add_defer_goals scope mode goals
+    Ax.add_defer_goals scope `Global mode goals
 end
 
 (* -------------------------------------------------------------------- *)
