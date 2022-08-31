@@ -170,7 +170,7 @@ let subst_mod_restr (s : _subst) (mr : mod_restr) =
       EcPath.Sx.add (EcPath.x_subst s.s_fmp x) r
     ) set EcPath.Sx.empty) mr.mr_xpaths in
   let r = ur_app (fun set -> EcPath.Sm.fold (fun x r ->
-      EcPath.Sm.add (s.s_fmp x) r
+      EcPath.Sm.add (EcPath.m_subst s.s_fmp x) r
     ) set EcPath.Sm.empty) mr.mr_mpaths in
   let ois = EcSymbols.Msym.map (fun oi ->
       subst_oracle_info s oi) mr.mr_oinfos in
