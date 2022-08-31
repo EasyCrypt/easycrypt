@@ -156,13 +156,13 @@ by ringeq.
 
 import Int.
 lemma nosmt toint_pos (x:t): 0 <= toint x
-by [].
+by smt.
 
 lemma nosmt toint_lt (x:t): toint x < q
-by [].
+by smt.
 
 lemma nosmt toint_le (x:t): toint x <= q - 1
-by [].
+by smt.
 
 lemma nosmt toofint (x:int): 0 <= x => x < q => toint (ofint x) = x.
 proof.
@@ -170,7 +170,7 @@ proof.
 qed.
 
 lemma nosmt ofint1_: ofint 1 = F.one
-by [].
+by smt.
 
 theory FDistr.
 

@@ -293,6 +293,32 @@ module Core = struct
 
     let open EcPV in
 
+    let wr =
+      let add (m, idx) pv =
+        if   is_some (PVMap.find pv m)
+        then (m, idx)
+        else (PVMap.add pv idx m, idx+1) in
+
+      let m, idx =
+        List.fold_left (fun (m, idx) { i_node = i } ->
+          match i with
+          | Sasgn (lv, _) | Srnd (lv, _) ->
+             List.fold_left add (m, idx) (lv_to_list lv)
+          | _ -> (m, idx)
+        )
+        (PVMap.create env, 0) s in
+
+      let m, _ =
+        List.fold_left
+          (fun (m, idx) (pv, _) -> add (m, idx) pv)
+          (m, idx)
+          wr in
+
+      List.sort
+        (fun (pv1, _) (pv2, _) ->
+          compare (PVMap.find pv1 m) (PVMap.find pv2 m))
+        wr in
+
     let rec do1 (subst : PVM.subst) (s : instr list) =
       match s with
       | [] ->

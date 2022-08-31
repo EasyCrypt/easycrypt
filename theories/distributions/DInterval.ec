@@ -18,11 +18,11 @@ proof. by rewrite duniformE undup_id 1:range_uniq size_range size_filter /#. qed
 
 lemma weight_dinter (i j : int):
   weight (dinter i j) = b2r (i <= j).
-proof. by rewrite /weight dinterE filter_predT size_range /#. qed.
+proof. by rewrite dinterE filter_predT size_range /#. qed.
 
 lemma supp_dinter (i j : int) x:
   x \in (dinter i j) <=> i <= x <= j.
-proof. by rewrite /support /in_supp dinter1E; case (i <= x <= j)=> //= /#. qed.
+proof. by rewrite /support dinter1E; case (i <= x <= j)=> //= /#. qed.
 
 lemma supp_dinter1E (x : int) (i j : int) :
   x \in (dinter i j) => mu1 (dinter i j) x = 1%r / (j - i + 1)%r.

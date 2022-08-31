@@ -62,7 +62,7 @@ qed.
 lemma supp_dfilter ['a] (d : 'a distr) P x:
   x \in (dfilter d P) <=> (x \in d /\ !P x).
 proof.
-by rewrite /support /in_supp dfilter1E; case: (P x).
+by rewrite /support dfilter1E; case: (P x).
 qed.
 
 (* -------------------------------------------------------------------- *)

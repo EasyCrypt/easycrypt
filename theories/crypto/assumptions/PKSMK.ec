@@ -637,7 +637,7 @@ abstract theory UF1_UF.
           inline *. 
         + rcondt{2} 3; 1: by auto; smt().
         auto => /> &m1 &m2 hpki _ hpk _ _ h.
-        have := hpk pk{m2}; rewrite h /= => -[->> ->] /=; rewrite /oget /= /= => s -> /=.
+        have := hpk pk{m2}; rewrite h /= => -[->> ->] /=; rewrite /= => s -> /=.
           split; first by smt(emptyE get_setE).
           by rewrite imageU image1 /= fsetUA.
         inline *. sp 0 3. 

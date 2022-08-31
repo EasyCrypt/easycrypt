@@ -1608,7 +1608,7 @@ fun_def_body:
 
 fun_decl:
 | q=quantum PROC x=lident cqpd=cqparam_decl ty=prefix(COLON, loc(type_exp))?
-    { let frestr = { pmre_in    = true;
+    { let frestr = {
 		     pmre_name  = x;
 		     pmre_orcls = None;
 		     pmre_compl = None;	} in
@@ -1741,10 +1741,9 @@ fun_restr:
     { (None, Some cl) }
 
 mod_restr_el:
-  | i=iboption(STAR) f=lident COLON fr=fun_restr
+  | f=lident COLON fr=fun_restr
     { let orcl, cmpl = fr in
-      { pmre_in = not i;
-	pmre_name = f;
+      { pmre_name = f;
 	pmre_orcls = orcl;
 	pmre_compl = cmpl; } }
 
@@ -1811,20 +1810,21 @@ signature_item:
 					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
 
-| q=quantum PROC i=boption(STAR) x=lident cqpd=cqparam_decl COLON ty=loc(type_exp) fr=fun_restr?
+| q=quantum PROC x=lident cqpd=cqparam_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
-      let frestr = { pmre_in    = not i;
-		     pmre_name  = x;
-		     pmre_orcls = orcl;
-		     pmre_compl = compl; } in
+      let frestr = {
+        pmre_name  = x;
+        pmre_orcls = orcl;
+	      pmre_compl = compl;
+      } in
 
-      `FunctionDecl
-          { pfd_quantum  = q;
-	    pfd_name     = x;
-	    pfd_tyargs   = fst cqpd;
-            pfd_qtyargs  = snd cqpd;
-            pfd_tyresult = ty;
-            pfd_uses     = frestr; } }
+      `FunctionDecl {
+          pfd_quantum  = q;
+	        pfd_name     = x;
+	        pfd_tyargs   = fst cqpd;
+          pfd_qtyargs  = snd cqpd;
+          pfd_tyresult = ty;
+          pfd_uses     = frestr; } }
 
 (* -------------------------------------------------------------------- *)
 %inline locality:
@@ -3201,7 +3201,7 @@ phltactic:
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
 
-| RND s=side? info=rnd_info c=prefix(COLON, semrndpos)? 
+| RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
 
 | RNDSEM s=side? c=codepos1

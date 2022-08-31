@@ -12,6 +12,7 @@ val lv_equal     : lvalue -> lvalue -> bool
 val symbol_of_lv : lvalue -> symbol
 val ty_of_lv     : lvalue -> EcTypes.ty
 val lv_of_list   : (prog_var * ty) list -> lvalue option
+val lv_to_list   : lvalue -> prog_var list
 val name_of_lv   : lvalue -> string
 
 (* --------------------------------------------------------------------- *)
@@ -135,8 +136,6 @@ module PreOI : sig
   val hash : ('a -> int) -> 'a t -> int
   val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
-  val is_in : 'a t -> bool
-
   val cost_self : 'a t -> [`Bounded of 'a | `Unbounded]
   val cost : 'a t -> xpath -> [`Bounded of 'a | `Zero | `Unbounded]
   val cost_calls : 'a t -> [`Bounded of 'a Mx.t | `Unbounded]
@@ -145,7 +144,7 @@ module PreOI : sig
   val allowed : 'a t -> xpath list
   val allowed_s : 'a t -> Sx.t
 
-  val mk : xpath list -> bool -> [`Bounded of 'a * 'a Mx.t | `Unbounded] -> 'a t
+  val mk : xpath list -> [`Bounded of 'a * 'a Mx.t | `Unbounded] -> 'a t
   (* val change_calls : 'a t -> xpath list -> 'a t *)
   val filter : (xpath -> bool) -> 'a t -> 'a t
 end

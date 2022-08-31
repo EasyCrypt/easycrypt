@@ -620,6 +620,7 @@ have -> :
   apply fun_ext => y.
   case (wfr y x) => [wfr_y_x | not_wfr_y_x].
   by rewrite /grel_restr /predecs wfr_y_x.
-  by rewrite eq_sym choiceb_dfl /grel_restr /predecs 1:not_wfr_y_x.
-rewrite least_result.
+  rewrite eq_sym choiceb_dfl //.
+  - by rewrite /grel_restr /predecs 1:not_wfr_y_x.
+  - by rewrite least_result.
 qed.

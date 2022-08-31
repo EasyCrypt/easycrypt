@@ -195,4 +195,3 @@ end
 (* -------------------------------------------------------------------- *)
 val i_eqobs_in_refl : env -> instr -> PV.t -> PV.t
 val eqobs_inF_refl  : env -> EcPath.xpath -> PV.t -> PV.t
-val check_module_in : env -> mpath -> module_type -> unit

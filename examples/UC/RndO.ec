@@ -184,7 +184,7 @@ equiv RO_FRO_get : RO.get ~ FRO.get :
    ={x} /\ RO.m{1} = noflags FRO.m{2} ==> ={res} /\ RO.m{1} = noflags FRO.m{2}.
 proof.
   proc; auto=> &1 &2 [] 2!-> /= ? -> /=.
-  rewrite /noflags mem_map !map_set /fst /= get_set_sameE oget_some => |>; progress.
+  rewrite /noflags mem_map !map_set /= get_set_sameE oget_some => |>; progress.
   + by rewrite mapE oget_omap_some 1:-domE.
   + by rewrite eq_sym set_eq 1:mapE /= 1:get_some.
 qed.
@@ -514,7 +514,7 @@ proof.
     rewrite get_set_sameE /mx2 /= eq_except_setr.
     rewrite -fmap_eqP=> z; rewrite get_setE; case (z = x{2})=> [-> |].
     by rewrite m_R_x2_eq.
-    move=> ne_z_x2; rewrite eq_exceptP in eq_exc; by rewrite eq_exc /pred1.
+    by move=> ne_z_x2; rewrite eq_exceptP in eq_exc; rewrite eq_exc.
 qed.
 
 lemma eager_rem :
@@ -538,7 +538,7 @@ proof.
               (FRO.m.[x] = None){2}).
     + inline *; auto=> &1 &2 [#] 2-> Hidm /=.
       split=> [| _ c _]; first apply sampleto_ll.
-      rewrite (eq_except_rem _ FRO.m{2} (pred1 x{2}) x{2}) /pred1 //
+      rewrite (eq_except_rem _ FRO.m{2} (pred1 x{2}) x{2}) //
               1:eq_except_setl /= remE -memE in_fsetD1 negb_and /=
               restr_rem Hidm /=.
       congr; by rewrite fdom_rem.
@@ -570,7 +570,7 @@ proof.
   rewrite -fmap_eqP=> z; rewrite remE.
   case (z = x{mr})=> [-> | ne_z_xmr];
     [by rewrite m_R_x |
-     by rewrite eq_exceptP in Heqx; rewrite Heqx /pred1].
+     by rewrite eq_exceptP in Heqx; rewrite Heqx].
 qed.
 
 lemma eager_sample :
@@ -625,7 +625,7 @@ proof.
     by rewrite get_set_sameE m_R_x /mx2.
     rewrite get_setE ne_z_xmr /=.
     rewrite eq_exceptP in Hex'.
-    by rewrite Hex' /pred1.
+    by rewrite Hex'.
   rcondf{2} 2; 1:by auto. 
   swap{1} 2 -1; inline*; auto.
   while (={l, FRO.m} /\ (dom FRO.m x){1}); auto.
@@ -806,7 +806,7 @@ proof.
     + move=> &mr [] _ ->; apply mem_eq0=> z;
         rewrite -memE mem_fdom dom_restr /in_dom_with mapE mem_map domE.
      by case (RO.m{m}.[_]).
-     by move=> ? &mr [] 2!-> /=; rewrite /noflags map_comp /fst /= map_id.
+     by move=> ? &mr [] 2!-> /=; rewrite /noflags map_comp /= map_id.
   transitivity M.main2
      (={glob D, FRO.m} ==> ={res, glob D})
      (={glob D} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>

@@ -9,7 +9,7 @@ op (\) (d : 'a distr) (P : 'a -> bool) : 'a distr = dscale (dfilter d P).
 
 lemma supp_dexcepted (x:'a) d P :
   support (d \ P) x <=> (support d x /\ !P x).
-proof. by rewrite supp_dscale supp_dfilter /predI /predC. qed.
+proof. by rewrite supp_dscale supp_dfilter. qed.
 
 lemma dexcepted1E d P (x : 'a) :
   mu1 (d \ P) x
@@ -34,7 +34,7 @@ proof. by rewrite dscaleE weight_dfilter dfilterE. qed.
 lemma nosmt weight_dexcepted (d:'a distr) P :
   weight (d \ P) = b2r (weight d <> mu d (P)).
 proof.
-rewrite weight_dscale weight_dfilter /b2r subr_eq0.
+rewrite weight_dscale weight_dfilter subr_eq0.
 by case: (weight d = mu d (P)).
 qed.
 

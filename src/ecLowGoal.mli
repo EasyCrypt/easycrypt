@@ -235,15 +235,20 @@ type inames = [`Symbol of symbol list | `Ident of EcIdent.t list]
 
 val t_intros   : ident mloc list -> FApi.backward
 val t_intro_i  : ident -> FApi.backward
+val t_intro_sx : iname -> tcenv1 -> tcenv * ident
 val t_intro_s  : iname -> FApi.backward
 
-val t_intros_i : ident list -> FApi.backward
-val t_intros_s : inames -> FApi.backward
+val t_intros_i  : ident list -> FApi.backward
+val t_intros_sx : inames -> tcenv1 -> tcenv * ident list
+val t_intros_s  : inames -> FApi.backward
 
 val t_intros_i_1 : ident list -> tcenv1 -> tcenv1
 
-val t_intros_i_seq : ?clear:bool -> ident list -> FApi.backward -> FApi.backward
-val t_intros_s_seq : inames -> FApi.backward -> FApi.backward
+val t_intro_sx_seq : iname -> (ident -> FApi.backward) -> FApi.backward
+
+val t_intros_i_seq  : ?clear:bool -> ident list -> FApi.backward -> FApi.backward
+val t_intros_sx_seq : inames -> (ident list -> FApi.backward) -> FApi.backward
+val t_intros_s_seq  : inames -> FApi.backward -> FApi.backward
 
 val t_intros_n : int -> FApi.backward
 

@@ -17,8 +17,6 @@ module OI : sig
   val hash : t -> int
   val equal : t -> t -> bool
 
-  val is_in : t -> bool
-
   val cost_self : t -> [`Bounded of form | `Unbounded]
   val cost : t -> xpath -> [`Bounded of form | `Zero | `Unbounded]
   val cost_calls : t -> [`Bounded of form Mx.t | `Unbounded]
@@ -27,13 +25,12 @@ module OI : sig
   val allowed : t -> xpath list
   val allowed_s : t -> Sx.t
 
-  val mk : xpath list -> bool -> [`Bounded of form * form Mx.t | `Unbounded] -> t
+  val mk : xpath list -> [`Bounded of form * form Mx.t | `Unbounded] -> t
   (* val change_calls : t -> xpath list -> t *)
   val filter : (xpath -> bool) -> t -> t
 end = struct
   type t = EcCoreFol.form PreOI.t
 
-  let is_in        = PreOI.is_in
   let allowed      = PreOI.allowed
   let allowed_s    = PreOI.allowed_s
   let cost_self    = PreOI.cost_self
@@ -94,7 +91,7 @@ let change_oicalls restr f ocalls =
     | oi ->
       let filter x = List.mem x ocalls in
       OI.filter filter oi
-    | exception Not_found -> OI.mk ocalls true `Unbounded in
+    | exception Not_found -> OI.mk ocalls `Unbounded in
   add_oinfo restr f oi
 
 (* -------------------------------------------------------------------- *)
