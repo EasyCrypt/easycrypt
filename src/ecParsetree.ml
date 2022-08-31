@@ -206,7 +206,6 @@ and pformula_r =
   | PFChoareF  of pformula * pgamepath * pformula * pcost
   | PFChoareFT of pgamepath * pcost
   | PFCoe      of osymbol * pmemtype option * pformula * pexpr * pty option
-  | PFWP       of pgamepath * pexpr list * pformula
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = pmemtype_el list
