@@ -209,7 +209,6 @@ and pformula_r =
   | PFChoareF  of pformula * pgamepath * pformula * pcost
   | PFChoareFT of pgamepath * pcost
   | PFCoe      of osymbol * pmemtype option * pformula * pexpr * pty option
-  | PFWP       of pgamepath * pexpr list * pformula
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = (quantum * pmemtype_el) list
@@ -923,8 +922,9 @@ type pcaseoptions = (bool * pcaseoption) list
 (* -------------------------------------------------------------------- *)
 type apply_info = [
   | `ApplyIn of ppterm * psymbol
-  | `Apply   of ppterm list * [`Apply|`Exact]
-  | `Top     of [`Apply|`Exact]
+  | `Apply   of ppterm list * [`Apply|`Exact|`Alpha]
+  | `Top     of [`Apply|`Exact|`Alpha]
+  | `Alpha   of ppterm
 ]
 
 (* -------------------------------------------------------------------- *)

@@ -1537,6 +1537,30 @@ pose F  := fun a => Fa a * sum Fb; rewrite (@eq_sum _ F) /= => [a|].
 by rewrite /F sumZr !muE.
 qed.
 
+lemma dprodEl (da : 'a distr) (db : 'b distr) Pa : 
+  mu (da `*` db) (fun (ab : 'a * 'b) => Pa ab.`1) = mu da Pa * weight db.
+proof.
+rewrite (@mu_eq _ _ (fun (ab : 'a * 'b) => Pa ab.`1 /\ predT ab.`2)) 1:/#.
+by rewrite dprodE.
+qed.
+
+lemma dprodEr (da : 'a distr) (db : 'b distr) Pb : 
+  mu (da `*` db) (fun (ab : 'a * 'b) => Pb ab.`2) = mu db Pb * weight da.
+proof.
+rewrite (@mu_eq _ _ (fun (ab : 'a * 'b) => predT ab.`1 /\ Pb ab.`2)) 1:/#.
+by rewrite dprodE RField.mulrC.
+qed.
+
+lemma le_dprod_or (da : 'a distr) (db : 'b distr) Pa Pb : 
+   mu (da `*` db) (fun (ab : 'a * 'b) => Pa ab.`1 \/ Pb ab.`2) <= 
+   mu da Pa * weight db + mu db Pb * weight da.
+proof.
+pose Pa' (p : 'a * 'b) := Pa p.`1.
+pose Pb' (p : 'a * 'b) := Pb p.`2.
+rewrite (@mu_eq _ _ (predU Pa' Pb')) 1:/# mu_or dprodEl dprodEr.
+smt(mu_bounded).
+qed.
+
 lemma supp_dprod (da : 'a distr) (db : 'b distr) ab:
   ab \in da `*` db <=> ab.`1 \in da /\ ab.`2 \in db.
 proof.
@@ -1884,6 +1908,22 @@ rewrite supp_djoin size_map; congr; apply/eq_iff.
 by rewrite zip_mapl all_map &(eq_all).
 qed.
 
+lemma le_djoin_size (ds : 'a distr list) (x : 'a) r: 
+  (forall d y, d \in ds => mu1 d y <= r) =>
+  mu (djoin ds) (fun s : 'a list => x \in s) <= (size ds)%r * r.
+proof.
+elim: ds => [|d ds IHds bound_ds]; first by rewrite djoin_nil dunitE.
+rewrite djoin_cons /= dmapE /(\o). 
+rewrite (@mu_eq _ _ (fun (p : 'a * 'a list) => p.`1 = x \/ x \in p.`2)) 1:/#.
+have E := le_dprod_or d (djoin ds) (pred1 x) (fun xs : 'a list => x \in xs).
+apply (@ler_trans _ _ _ E) => {E}. 
+apply (ler_trans (mu1 d x + mu (djoin ds) (fun (xs : 'a list) => x \in xs))). 
+- (* FIXME: smt(mu_bounded) should be enough? *)
+  apply ler_add; apply ler_pimulr; smt(mu_bounded). 
+rewrite fromintD mulrDl /=; apply ler_add; first by apply bound_ds.
+by apply IHds => /#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op madd ['a] (df dg : 'a distr) = fun x => mu1 df x + mu1 dg x.
 
@@ -1907,7 +1947,6 @@ lemma daddE ['a] (df dg : 'a distr) x :
 proof. 
 move=> le1_wD; rewrite !muE -sumD 1,2:&(summable_mu1_cond) /=.
 by apply: eq_sum=> y /=; case: (pred1 x y) => // _; rewrite dadd1E.
-qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory MUniFinFun.
