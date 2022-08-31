@@ -1947,6 +1947,7 @@ lemma daddE ['a] (df dg : 'a distr) x :
 proof. 
 move=> le1_wD; rewrite !muE -sumD 1,2:&(summable_mu1_cond) /=.
 by apply: eq_sum=> y /=; case: (pred1 x y) => // _; rewrite dadd1E.
+qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory MUniFinFun.
