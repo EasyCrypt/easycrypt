@@ -5,13 +5,23 @@
 *)
 
 require import List.
+(*
 require import Map.
+*)
 require import FSet.
+(* No more ISet?
+   https://github.com/EasyCrypt/easycrypt/blob/3706bfe621c4a4ff6f41062a5183f9d76198d76b/theories/ISet.ec
+*)
+(*
 require import ISet.
   import ISet.Finite.
+*)
 require import Real.
 require import Int.
+(*
 require import OldDistr.
+*)
+require import Distr.
 
 theory RandOracle.
 
