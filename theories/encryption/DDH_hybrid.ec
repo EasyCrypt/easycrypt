@@ -1,7 +1,20 @@
 require import Real.
 require import Int IntDiv.
-require import Prime_field.
-require import Cyclic_group_prime.
+
+require import Group.
+
+clone CyclicGroup as G.
+
+axiom prime_p : IntDiv.prime G.order.
+
+clone G.PowZMod as GP with
+  lemma prime_order <- prime_p.
+
+clone GP.FDistr as FD.
+
+clone GP.ZModE as ZP.
+
+import G GP FD ZP.
 
 require Hybrid.
 
@@ -12,25 +25,25 @@ clone import Hybrid as H with
   type inleaks <- unit,
   type outleaks <- unit,
   type outputA <- bool,
-  op q <- n 
+  op q <- n
   proof* by smt(n_pos).
 
 module DDHl = {
   proc orcl () : group * group * group = {
-    var x, y: gf_q;
-    x <$ Dgf_q.dgf_q;
-    y <$ Dgf_q.dgf_q;
-    return (g^x, g^y, g^(x * y));
+    var x, y: exp;
+    x <$ FD.dt;
+    y <$ FD.dt;
+    return (g ^ x, g ^ y, g ^ (x * y));
   }
 }.
 
 module DDHr = {
   proc orcl () : group * group * group = {
-    var x, y, z: gf_q;
-    x <$ Dgf_q.dgf_q;
-    y <$ Dgf_q.dgf_q;
-    z <$ Dgf_q.dgf_q;
-    return (g^x, g^y, g^z);
+    var x, y, z: exp;
+    x <$ FD.dt;
+    y <$ FD.dt;
+    z <$ FD.dt;
+    return (g ^ x, g ^ y, g ^ z);
   }
 }.
 
@@ -40,14 +53,14 @@ module DDHb : H.Orclb = {
   proc orclR = DDHr.orcl
 }.
 
-lemma islossless_leaks : islossless DDHb.leaks.
-proof. proc;auto. qed.
+lemma islossless_leaks : islossless DDHb.leaks
+  by proc; auto.
 
-lemma islossless_orcl1 : islossless DDHb.orclL.
-proof. proc;auto;progress;smt. qed.
+lemma islossless_orcl1 : islossless DDHb.orclL
+  by proc; auto; progress; smt.
 
-lemma islossless_orcl2 : islossless DDHb.orclR.
-proof. proc;auto;progress;smt. qed.
+lemma islossless_orcl2 : islossless DDHb.orclR
+  by proc; auto; progress; smt.
 
 section.
 
@@ -73,4 +86,5 @@ section.
    apply islossless_leaks. apply islossless_orcl1. apply islossless_orcl2. apply losslessA.
    smt(n_pos).
   qed.
+
 end section.
