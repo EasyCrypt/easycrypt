@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import List Distr Int IntDiv.
+require import AllCore List Distr Int IntDiv.
 require (*--*) Subtype Ring StdOrder.
 (*---*) import Ring.IntID StdOrder.IntOrder.
 
@@ -439,5 +439,34 @@ proof.
   + by rewrite subr_ge0 ge2_p.
   by rewrite exp_sub_p_1.
 qed.
+
+abstract theory Cost.
+  op cfeq  : int.
+  op cfadd : int.
+  op cfsub : int.
+  op cfmul : int.
+  op cfdiv : int.
+
+  axiom ge0_cf : 0 <= cfeq /\ 0 <= cfadd /\ 0 <= cfsub /\ 0 <= cfmul /\ 0 <= cfdiv.
+
+  schema cost_F0 `{P} : cost[P:ZModField.zero] = '0.
+
+  schema cost_feq `{P} {x y : zmod} :
+    cost [P: x = y] = cost[P:x] + cost[P:y] + N cfeq.
+
+  schema cost_fadd `{P} {x1 x2 : zmod} :
+    cost[P:x1 + x2] = cost[P:x1] + cost[P:x2] + N cfadd.
+
+  schema cost_fsub `{P} {x y : zmod} :
+    cost [P:x - y] = cost[P:x] + cost[P:y] + N cfsub.
+
+  schema cost_fmul `{P} {x1 x2 : zmod} :
+    cost[P:x1 * x2] = cost[P:x1] + cost[P:x2] + N cfmul.
+
+  schema cost_fdiv `{P} {x y : zmod} : cost [P:x / y] =
+    cost[P:x] + cost[P:y] + N cfdiv.
+
+  hint simplify cost_F0, cost_feq, cost_fadd, cost_fsub, cost_fmul, cost_fdiv.
+end Cost.
 
 end ZModField.

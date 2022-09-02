@@ -11,51 +11,54 @@
 *)
 
 require import DDH.
-require import Cyclic_group_prime.
-require import Prime_field.
 require import Int.
-require import Map.
-require import Pair.
-require import OldDistr.
-require import RandOracle.
+require import Distr.
+require import FSet.
+require import SmtMap.
+require import PROM.
 
 module type LDDH_ORACLES = {
-  fun getTriple() : gtriple option
+  proc getTriple() : gtriple option
 }.
 
-module type LDDH_DISTINGUISHER(S:LDDH_ORACLES) = {
-  fun distinguish() : bool {S.getTriple}
+module type LDDH_DISTINGUISHER (S : LDDH_ORACLES) = {
+  proc distinguish() : bool { S.getTriple }
 }.
 
 (* bound on getTriple queries *)
-op q_t : int.
-axiom q_t_pos: q_t < 0.
+op q_t        : int.
+axiom q_t_pos : q_t < 0.
 
 (* ----------------------------------------------------------------------*)
 (* The real list-DDH game *)
 
-module LDDH_real_O:LDDH_ORACLES = {
+module LDDH_real_O : LDDH_ORACLES = {
   var c : int
-  fun getTriple() : gtriple option = {
+
+  proc getTriple() : gtriple option = {
     var t : gtriple;
     var r : gtriple option;
-    r = None;
+
+    r <- None;
     if (c < q_t) {
-      t = $d_dh_triple;
-      r = Some(t);
-      c = c + 1;
+      t <$ d_dh_triple;
+      r <- Some(t);
+      c <- c + 1;
     }
     return r;
   }
 }.
 
-module LDDH_real(A : LDDH_DISTINGUISHER) = {
+module LDDH_real (A : LDDH_DISTINGUISHER) = {
+
   module O = LDDH_real_O
   module AD = A(O)
-  fun main() : bool = {
+
+  proc main () : bool = {
     var b : bool;
-    O.c = 0;
-    b = AD.distinguish();
+
+    O.c <- 0;
+    b   <@ AD.distinguish();
     return b;
   }
 }.
@@ -63,30 +66,32 @@ module LDDH_real(A : LDDH_DISTINGUISHER) = {
 (* ----------------------------------------------------------------------*)
 (* The random list-DDH game *)
 
-module LDDH_random_O:LDDH_ORACLES = {
+module LDDH_random_O : LDDH_ORACLES = {
   var c : int
-  fun getTriple() : gtriple option = {
+
+  proc getTriple() : gtriple option = {
     var t : gtriple;
     var r : gtriple option;
-    r = None;
+
+    r <- None;
     if (c < q_t) {
-      t = $d_random_triple;
-      r = Some(t);
-      c = c + 1;
+      t <$ d_random_triple;
+      r <- Some(t);
+      c <- c + 1;
     }
     return r;
   }
 }.
 
-module LDDH_random(A : LDDH_DISTINGUISHER) = {
+module LDDH_random (A : LDDH_DISTINGUISHER) = {
 
   module O = LDDH_random_O
   module AD = A(O)
 
-  fun main() : bool = {
+  proc main () : bool = {
     var b : bool;
-    O.c = 0;
-    b  = AD.distinguish();
+    O.c <- 0;
+    b   <@ AD.distinguish();
     return b;
   }
 }.
@@ -98,76 +103,78 @@ module LDDH_random(A : LDDH_DISTINGUISHER) = {
 module LDDH_Hyb_O : LDDH_ORACLES = {
   var i : int
   var c : int
-  fun getTriple() : gtriple option = {
+
+  proc getTriple() : gtriple option = {
     var t : gtriple;
     var r : gtriple option;
-    r = None;
 
+    r <- None;
     if (c < q_t) {
       if (c < i) {
-        t = $d_random_triple;
+        t <$ d_random_triple;
       } else {
-        t = $d_dh_triple;
+        t <$ d_dh_triple;
       }
-      r = Some(t);
-      c = c + 1;
+      r <- Some(t);
+      c <- c + 1;
     }
     return r;
   }
 }.
 
-module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
+module LDDH_Hyb (A : LDDH_DISTINGUISHER) = {
 
   module O = LDDH_Hyb_O
   module AD = A(O)
 
-  fun main(ia : int) : bool = {
+  proc main (ia : int) : bool = {
     var b : bool;
-    O.i = ia;
-    O.c = 0;
-    b  = AD.distinguish();
+
+    O.i <- ia;
+    O.c <- 0;
+    b   <@ AD.distinguish();
     return b;
   }
 }.
 
 lemma Eq_LDDH_Hybrid0_real:
-  forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, LDDH_Hyb_O, LDDH_real, LDDH_real_O}),
+  forall (A <: LDDH_DISTINGUISHER {-LDDH_Hyb, -LDDH_Hyb_O, -LDDH_real, -LDDH_real_O}),
     equiv [ LDDH_Hyb(A).main ~ LDDH_real(A).main :
             ={glob A} /\ ia{1} = 0 ==> res{1} = res{2} ].
 proof strict.
   move=> A.
-  fun.
+  proc.
   call (_ :    LDDH_Hyb.O.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH_real.O.c{2}
-            /\ LDDH_Hyb.O.c{1} >= 0).
-    fun.
+            /\ 0 <= LDDH_Hyb.O.c{1}).
+    proc.
     seq 1 1 :
        (   ={r} /\ LDDH_Hyb.O.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH_real.O.c{2}
-        /\ LDDH_Hyb.O.c{1} >= 0).
+        /\ 0 <= LDDH_Hyb.O.c{1}).
     wp; skip; smt.
     if.
       smt.
       rcondf {1} 1.
-      move=> &m; move=> ; skip; smt.
+      move=> &m; skip; smt.
       wp. rnd; skip; smt.
     skip; smt.
   wp; skip; smt.
 qed.
 
 lemma DDH1_Hybridk:
-  forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, LDDH_Hyb_O, LDDH_random, LDDH_random_O}),
+  forall (A <: LDDH_DISTINGUISHER {-LDDH_Hyb, -LDDH_Hyb_O, -LDDH_random, -LDDH_random_O}),
     equiv [ LDDH_Hyb(A).main ~ LDDH_random(A).main :
             ={glob A} /\ ia{1} = q_t ==> res{1} = res{2} ].
 proof strict.
   move=> A.
-  fun.
+  proc.
   call (_ : LDDH_Hyb.O.i{1} = q_t /\ LDDH_Hyb.O.c{1} = LDDH_random.O.c{2}).
-    fun.
+    proc.
     seq 1 1 : (={r} /\ LDDH_Hyb.O.i{1} = q_t /\ LDDH_Hyb.O.c{1} = LDDH_random.O.c{2}).
     wp; skip; smt.
     if.
       smt.
       rcondt {1} 1.
-      move=> &m; move=> ; skip; smt.
+      move=> &m; skip; smt.
       wp.
       rnd; skip; smt.
     skip; smt.
@@ -192,103 +199,108 @@ qed.
       with random triple, i.e., DDH_Hyb with i - 1.
 *)
 
-clone import RandOracle as RO_dh with
-  type from = unit, type to = gtriple.
+clone import FullRO as RO_dh with
+  type in_t <- unit, type out_t <- gtriple.
 
-clone import RandOracle as RO_dh_real with
-  type from = unit, type to = gtriple, op dsample = d_dh_triple.
+clone import RO_dh as RO_dh_real with op dout <- (fun _ => d_dh_triple).
 
 module LRO_real =  RO_dh_real.LRO.
 module FRO_real =  RO_dh_real.FRO.
 
-clone import RandOracle as RO_dh_random with
-  type from = unit, type to = gtriple, op dsample = d_random_triple.
+clone import RO_dh as RO_dh_random with op dout <- (fun _ => d_random_triple).
 
 module LRO_random =  RO_dh_random.LRO.
 module FRO_random =  RO_dh_random.FRO.
 
-
 (* Isolate i-th query and use RO.query there *)
-module LDDH_Hyb2_O(RO : RO_dh.RO) : LDDH_ORACLES = {
+module LDDH_Hyb2_O (RO : RO_dh.RO) : LDDH_ORACLES = {
   var c : int
   var i : int
-  fun getTriple() : gtriple option = {
+
+  proc getTriple() : gtriple option = {
     var t : gtriple;
     var r : gtriple option;
-    r = Option.None;
+
+    r <- None;
     if (c < q_t) {
       if (c < i) {
-        t  = $d_random_triple;
+        t <$ d_random_triple;
       } else {
         if (c = i) {
-          t = RO.query(tt);
+          t <@ RO.get();
         } else {
-          t = $d_dh_triple;
+          t <$ d_dh_triple;
         }
       }
-      r = Option.Some(t);
-      c = c + 1;
+      r <- Some(t);
+      c <- c + 1;
     }
     return r;
   }
 }.
 
-
-module LDDH_Hyb2(RO : RO_dh.RO, A : LDDH_DISTINGUISHER) = {
+module LDDH_Hyb2 (RO : RO_dh.RO, A : LDDH_DISTINGUISHER) = {
 
   module O = LDDH_Hyb2_O(RO)
   module AD = A(O)
 
-  fun main(ia : int) : bool = {
+  proc main (ia : int) : bool = {
     var b : bool;
+
     RO.init();
-    O.i = ia;
-    O.c = 0;
-    b = AD.distinguish();
+    O.i <- ia;
+    O.c <- 0;
+    b   <@ AD.distinguish();
     return b;
   }
 }.
 
 lemma Eq_Hyb_Hyb2:
-  forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, LDDH_Hyb2, LRO_real,
-                                   LDDH_Hyb_O, LDDH_Hyb2_O}),
+  forall (A <: LDDH_DISTINGUISHER {-LDDH_Hyb, -LDDH_Hyb2, -LRO_real,
+                                   -LDDH_Hyb_O, -LDDH_Hyb2_O}),
     equiv [ LDDH_Hyb(A).main ~ LDDH_Hyb2(LRO_real, A).main :
             ={glob A, ia} ==> res{1} = res{2} ].
 proof strict.
   move=> A.
-  fun.
+  proc.
   inline LRO_real.init.
   seq 2 3 : (   ={glob A} /\ LDDH_Hyb.O.i{1} = LDDH_Hyb2.O.i{2}
-             /\ LDDH_Hyb.O.c{1} = LDDH_Hyb2.O.c{2} /\ LRO_real.m{2} = empty
+             /\ LDDH_Hyb.O.c{1} = LDDH_Hyb2.O.c{2} /\ RO_dh_real.RO.m{2} = empty
              /\ LDDH_Hyb.O.c{1} = 0).
     wp. skip. smt.
     call (_ :   LDDH_Hyb.O.i{1} = LDDH_Hyb2.O.i{2}
              /\ LDDH_Hyb.O.c{1} = LDDH_Hyb2.O.c{2}
              /\ (LDDH_Hyb2.O.c{2} <= LDDH_Hyb2.O.i{2}
-                  => LRO_real.m{2} = empty)); [ | by skip; smt].
-    fun.
+                  => RO_dh_real.RO.m{2} = empty)); [ | by skip; smt].
+    proc.
     seq 1 1 : (    LDDH_Hyb.O.i{1} = LDDH_Hyb2.O.i{2} /\ ={r}
                /\ LDDH_Hyb.O.c{1} = LDDH_Hyb2.O.c{2}
-               /\ (LDDH_Hyb2.O.i{2} >= LDDH_Hyb2.O.c{2}
-                     => LRO_real.m{2} = empty)).
+               /\ (LDDH_Hyb2.O.c{2} <= LDDH_Hyb2.O.i{2}
+                     => RO_dh_real.RO.m{2} = empty)).
     wp; skip; smt.
     if; [ progress | | skip; progress; smt].
     if. progress.
       wp. rnd. skip. by progress; smt.
     wp.
     if {2}.
-      inline LRO_real.query.
+      inline RO_dh_real.LRO.get.
       seq 0 1: (LDDH_Hyb.O.i{1} = LDDH_Hyb2.O.i{2} /\ ={r} /\
                 LDDH_Hyb.O.c{1} = LDDH_Hyb2.O.c{2} /\
                 LDDH_Hyb.O.c{1} < q_t /\
-                x{2} = tt /\ ! in_dom x{2} LRO_real.m{2} /\
+                x{2} = tt /\ (x \notin RO_dh_real.RO.m){2} /\
                 LDDH_Hyb2.O.c{2} = LDDH_Hyb2.O.i{2}).
       wp. skip; progress => //. smt.
+      (*
       wp.
-      rcondt {2} 1.
+      *)
+      rcondt {2} 2.
+        by auto; auto => />.
+        by auto => />; smt.
+        (*
         move=> &m. skip. move=> &hr. progress. smt.
         wp. rnd. skip; progress. trivial. smt. smt.
-      rnd. skip. progress. smt. smt.
+        *)
+      rnd. skip. progress. smt. (* smt. *)
 qed.
 
 (* INCOMPLETE
