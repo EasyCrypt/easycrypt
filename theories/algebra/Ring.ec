@@ -463,6 +463,9 @@ abstract theory ComRing.
     by rewrite !MulMonoid.iteropE iterS.
   qed.
 
+  lemma expr_pred (x : t) i : 0 < i => exp x i = x * (exp x (i - 1)).
+  proof. smt(exprS). qed.
+
   lemma exprSr (x : t) i: 0 <= i => exp x (i+1) = (exp x i) * x.
   proof. by move=> ge0_i; rewrite exprS // mulrC. qed.
 

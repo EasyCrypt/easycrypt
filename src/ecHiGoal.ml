@@ -437,9 +437,15 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
   try
     match mode with
     | `Alpha ->
-        assert (PT.can_concretize pt.PT.ptev_env);
-        let pt, _ = PT.concretize pt in
-        EcLowGoal.t_apply pt tc
+        begin try
+          PT.pf_form_match
+            pt.ptev_env
+            ~mode:fmrigid
+            ~ptn:pt.ptev_ax
+            (FApi.tc1_goal tc)
+        with EcMatching.MatchFailure ->
+          tc_error !!tc "proof-term is not alpha-convertible to conclusion" end;
+        EcLowGoal.t_apply (fst (PT.concretize pt)) tc
     | `Apply ->
         EcLowGoal.Apply.t_apply_bwd_r pt tc
     | `Exact ->

@@ -89,10 +89,28 @@ have ->:
 + byphoare (_: true ==> res = x)=> //.
   by proc; rnd (pred1 x \o fst); skip=> />.
 byphoare (_: true ==> res = x)=> //; proc; sp.
+conseq (: _: =(if b = b' then mu dvn (pred1 x \o fst) else b2r (b = x)))=> //.
+conseq (: true ==> _).
 while true (b2i (b = b')) 1 (2%r * p * (1%r - p))=> />.
 + by move=> /#.
-+ move=> ih; seq 2: true 1%r (mu dvn (pred1 x \o fst)) 0%r _ => //.
-  by auto=> />; rewrite dbiased_ll.
++ move=> ih.
+  seq 1: (b = x) (mu1 dbiased x) (mu1 dbiased (!x) + mu1 dbiased x * mu dvn (pred1 x \o fst))
+                 (mu1 dbiased (!x)) (mu1 dbiased (!x) * mu dvn (pred1 x \o fst))=> //.
+  + by rnd (pred1 x); auto=> />; rewrite dbiased.
+  + seq 1: (b' = !x) (mu1 dbiased (!x)) 1%r (mu1 dbiased x) (mu dvn (pred1 x \o fst)) (b = x)=> //.
+    + by auto.
+    + by rnd (pred1 (!x)); auto.
+    + by conseq ih=> />; rewrite negbLR.
+    + by rnd (pred1 x); auto=> /#.
+    by conseq ih=> /> &0 /negbRL /=.
+  + by rnd (pred1 (!x)); auto=> /#.
+  + seq 1: (b' = x) _ 0%r (mu1 dbiased (!x)) (mu dvn (pred1 x \o fst)) (b <> x)=> //.
+    + by auto.
+    + by conseq ih=> /> &0 /negbRL ->; rewrite negbLR.
+    + by rnd (pred1 (!x)); auto=> /#.
+    by conseq ih=> /> &0 /negbRL -> /negbRL ->.
+  move=> {ih} _ -> /=; rewrite !vnE /svn /(\o)/ pred1 /= /b2i /=.
+  by move: x=> [] /=; rewrite !dbiased1E /#.
 + by auto=> />; rewrite dbiased_ll.
 split => //= [|z]; first by smt w=(in01_p).
 conseq (_: true ==> b <> b'); first by move=> /#.

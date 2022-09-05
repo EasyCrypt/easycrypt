@@ -5,7 +5,7 @@ require (*--*) Subtype Monoid Ring Subtype Bigalg StdOrder StdBigop.
 import StdOrder.IntOrder StdBigop.Bigreal.
 
 (* -------------------------------------------------------------------- *)
-clone import Ring.IDomain as ZR.
+clone import Ring.ComRing as ZR.
 
 (* -------------------------------------------------------------------- *)
 clone import Bigalg.BigComRing as Big with theory CR <- ZR.
