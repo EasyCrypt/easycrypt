@@ -22,6 +22,7 @@ let why3 = why3_local; in
       ocaml
       findlib
       batteries
+      camlp-streams
       dune_2
       dune-build-info
       dune-site
