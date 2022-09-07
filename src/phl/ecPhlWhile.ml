@@ -218,7 +218,7 @@ let t_bdhoare_while_rev_r inv tc =
 let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
 
-  let bhs    = tc1_as_bdhoareS tc in
+  let bhs = tc1_as_bdhoareS tc in
 
   if bhs.bhs_cmp = FHle then
     tc_error !!tc "only judgments with an lower/eq-bounded are supported";
@@ -228,6 +228,11 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
   let mem    = bhs.bhs_m in
 
   let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in
+
+  if not (PV.indep env (s_write env lp_body) (PV.fv env (EcMemory.memory mem) eps)) then
+    tc_error !!tc
+      "The variant decreasing rate lower-bound cannot "
+      "depend on variables written by the loop body";
 
   if not (List.is_empty rem_s.s_node) then
     tc_error !!tc  "only single loop statements are accepted";
