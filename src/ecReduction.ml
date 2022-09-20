@@ -1604,6 +1604,18 @@ let rec conv ri env f1 f2 stk =
   | Fproj(f1', i1), Fproj(f2',i2) when i1 = i2 ->
     conv ri env f1' f2' (zproj i1 f1.f_ty stk)
 
+  | Fpvar(pv1, m1), Fpvar(pv2, m2)
+      when EcEnv.NormMp.pv_equal env pv1 pv2 && EcMemory.mem_equal m1 m2 ->
+      conv_next ri env f1 stk
+
+  | Fglob (m1, mem1), Fglob (m2, mem2)
+      when
+        EcPath.m_equal
+          (EcEnv.NormMp.norm_mpath env m1)
+          (EcEnv.NormMp.norm_mpath env m2)
+        && EcMemory.mem_equal mem1 mem2 ->
+      conv_next ri env f1 stk
+
   | FhoareF hf1, FhoareF hf2 when EqTest_i.for_xp env hf1.hf_f hf2.hf_f ->
     conv ri env hf1.hf_pr hf2.hf_pr (zhl f1 [hf1.hf_po] [hf2.hf_po] stk)
 
