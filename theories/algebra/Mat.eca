@@ -8,7 +8,7 @@
 (* malformed input, but not all, so checking the output is not a reliable way *)
 (* to check that the parameters are valid.                                    *)
 
-require import AllCore List Distr DBool.
+require import AllCore List Distr DBool DList.
 import StdBigop.Bigreal StdOrder.IntOrder.
 
 (* -------------------------------------------------------------------------- *)
@@ -454,36 +454,49 @@ rewrite 2!mulvsE.
 smt(mulrA mulrC).
 qed.
 
+(* List-vector isomorphism *)
+op oflist (s : R list): vector = offunv (nth witness s, size s).
+
+lemma size_oflist l: size (oflist l) = size l.
+proof. rewrite size_offunv; 1: smt(List.size_ge0). qed.
+
+lemma oflistE  w (l: R list) i: 0 <= i < size l => (oflist l).[i] = nth w l i.
+proof. by move => bound; rewrite offunvE // (nth_change_dfl w). qed.
+
+op tolist (v : vector): R list = map (fun i => v.[i]) (range 0 (size v)).
+
+lemma size_tolist v: size (tolist v) = size v.
+proof. rewrite size_map size_range /#. qed.
+
+lemma nth_tolist w v i: 0 <= i < size v => nth w (tolist v) i = v.[i].
+proof.
+move => bound; rewrite (nth_map witness w) 1:size_range; 1: smt(List.size_ge0).
+by rewrite /= nth_range.
+qed.
+
+lemma oflistK: cancel oflist tolist.
+proof.
+move => l; apply (eq_from_nth witness); rewrite size_tolist size_oflist //.
+by move => i bound; rewrite nth_tolist 1:size_oflist // (oflistE witness).
+qed.
+
+lemma tolistK: cancel tolist oflist.
+proof.
+move => l; apply eq_vectorP.
+rewrite size_oflist size_tolist /= => i bound.
+rewrite (oflistE witness) 1:size_tolist // nth_tolist //.
+qed.
+
+lemma oflist_inj: injective oflist.
+proof. smt(oflistK). qed.
+
 (* Distribution of length n vectors sampled using d element-wise *)
-op dvector (d : R distr) (n: int) =
-  dmap (djoin (nseq n d)) (fun xs => offunv (nth witness xs, n)).
+op dvector (d: R distr) (n: int) = dmap (dlist d (max 0 n)) oflist.
 
 lemma size_dvector d n v: v \in dvector d n => size v = max 0 n. 
-proof. by rewrite /dvector supp_dmap => -[l [H0 -> /=]]. qed.
-
-lemma dvector1E (d : R distr) (v : vector) : mu1 (dvector d (size v)) v =
-  BRM.bigi predT (fun i => mu1 d v.[i]) 0 (size v).
 proof.
-pose g (w: vector) := mkseq (fun i => w.[i]) (size v).
-rewrite (in_dmap1E_can _ _ g) /= => [| l y_size eq |].
-- apply eq_vectorP => /= i i_bound.
-  by rewrite offunvE // /g /= nth_mkseq.
-- rewrite -eq /g /=.
-  apply supp_djoin_size in y_size.
-  rewrite size_nseq max0size in y_size.
-  apply (eq_from_nth witness) => [| i bound].
-  + by rewrite size_mkseq.
-  rewrite nth_mkseq 1:/# offunvE /#.
-- rewrite /g djoin1E size_nseq size_mkseq /= (BRM.big_nth witness) predTofV.
-  have szE: size (zip (nseq (size v) d) (g v)) = size v.
-  + by rewrite size_zip size_nseq size_mkseq minrE max0size.
-  rewrite szE !BRM.big_seq &(BRM.eq_bigr) => /= i /mem_range rgi @/(\o). 
-  congr.
-  + rewrite (nth_change_dfl (witness, witness)) 1:szE //.  
-    by rewrite nth_zip 1:size_nseq 1:size_mkseq //= nth_nseq.
-  + congr. 
-    rewrite (nth_change_dfl (witness, witness)) 1:szE //.
-    by rewrite nth_zip ?(size_nseq, size_mkseq) //= nth_mkseq // szE.
+move => /supp_dmap[a [a_in ->]]; rewrite size_oflist.
+rewrite supp_dlist /# in a_in.
 qed.
 
 lemma dvector0E (d: R distr) (v: vector) n: size v <> max 0 n => 
@@ -494,6 +507,14 @@ rewrite -implybF => /size_dvector v_in.
 by apply size_ineq.
 qed.
 
+lemma dvector1E (d : R distr) (v : vector) : mu1 (dvector d (size v)) v =
+  BRM.bigi predT (fun i => mu1 d v.[i]) 0 (size v).
+proof.
+rewrite -{2}[v]tolistK dmapE /(\o) /pred1. 
+rewrite (@mu_eq _ _ (pred1 (tolist v))); 1: smt(oflist_inj).
+rewrite dlist1E 1:/# size_tolist max0size /=.
+by rewrite BRM.big_mapT /(\o) &BRM.eq_big.
+qed.
 
 lemma mu1_dvector_split d i (v: vector): 0 <= i <= size v => 
   mu1 (dvector d i) (subv v 0 i) * 
@@ -518,34 +539,19 @@ qed.
 
 lemma dvector_uni d n: is_uniform d => is_uniform (dvector d n).
 proof.
-move=> uni_d; apply/dmap_uni_in_inj/djoin_uni => [xs ys | d'].
-- move=> /supp_djoin[+ xsin] /supp_djoin[+ ysin] /=.
-  rewrite !size_nseq => nxs_eq nys_eq.
-  move/(congr1 tofunv); rewrite !offunvK => eqv.
-  apply/(eq_from_nth witness) => /#. 
-- by rewrite mem_nseq => -[_ <-].
+move => uni_d; apply dmap_uni; 1: apply/(can_inj _ tolist)/oflistK.
+by apply dlist_uni.
 qed.
 
 lemma dvector_ll d n: is_lossless d => is_lossless (dvector d n).
-proof.
-move=> ll_d; apply/dmap_ll/djoin_ll => d'.
-by rewrite mem_nseq => -[_ <-].
-qed.
-
+proof. by move => ll_d; apply/dmap_ll/dlist_ll. qed.
 
 lemma dvector_fu d (v: vector): is_full d => v \in dvector d (size v).
 proof.
 move=> full_d; rewrite supp_dmap.
-exists (map (fun i => v.[i]) (range 0 (size v))); split=> /=.
-- apply/supp_djoin; rewrite size_nseq ler_maxr //; 1: apply size_ge0. 
-  rewrite size_map size_range /= allP => -[/= d' x /mem_zip[]]. 
-  rewrite mem_nseq => -[_ <- _]. 
-  apply full_d.
-- apply eq_vectorP => [i bound]. 
-  rewrite offunvE // (nth_map witness) 1:size_range 1:ler_maxr; first 2 smt(). 
-  by rewrite nth_range /#. 
+exists (tolist v).
+rewrite tolistK /= -size_tolist dlist_fu => x /#.
 qed.
-
 
 lemma mu1_dvector_fu (d: R distr) (v: vector): is_funiform d =>
     mu1 (dvector d (size v)) v = (mu1 d witness)^(size v).
@@ -622,6 +628,8 @@ lemma nosmt cols_ge0 m: 0 <= cols m by smt().
 lemma rows_offunm f r c: rows (offunm (f, r, c)) = max 0 r by done. 
 
 lemma cols_offunm f r c: cols (offunm (f, r, c)) = max 0 c by done.
+
+lemma size_offunm f r c: size (offunm (f, r, c)) = (max 0 r, max 0 c) by done.
 
 hint simplify rows_offunm, cols_offunm.
 
@@ -1742,44 +1750,12 @@ qed.
 
 (* Distribution of matrices sampled using d element-wise *)
 op dmatrix (d : R distr) (r c: int) =
-  dmap(djoin (nseq c (djoin (nseq r d))))
-    (fun xs : R list list => offunm (fun i j =>
-      nth witness (nth witness xs j) i, r, c)).
+  dmap (dlist (dvector d r) (max 0 c)) (fun cs : vector list => 
+    offunm (fun i j => (nth witness cs j).[i],r,c)).
 
 lemma size_dmatrix d r c m: m \in dmatrix d r c => 
   0 <= r => 0 <= c => size m = (r, c). 
 proof. rewrite supp_dmap => -[l [H0 -> /=]] /#. qed.
-
-lemma dmatrix_dvector d r c: dmatrix d r c =
-  dmap (djoin (nseq c (dvector d r))) 
-    (fun vs : vector list => offunm (fun i j => 
-      (nth witness vs j).[i], r, size vs)).
-proof.
-apply/eq_distr=> m; rewrite 2!dmap1E.
-pose F (xs : R list list) :=
-  offunm (fun i j => nth witness (nth witness xs j) i, r, c).
-pose G (vs : vector list) :=
-  offunm (fun i j => (nth witness vs j).[i], r, size vs).
-pose H (vs : vector list) :=
-  map (fun v : vector => map (fun i => v.[i]) (range 0 r)) vs.
-have eq: forall (xs: vector list), size xs = max 0 c => G xs = (F \o H) xs.
-- move=> xs eq_sz @/F @/G @/H @/(\o) /=; apply/eq_matrixP => /=.
-  rewrite -eq_sz. 
-  split => [/# | i j [] bound_i bound_j].
-  rewrite !offunmE /=; first 2 smt().
-  rewrite (nth_map witness) /= 1:/# (nth_map witness) 1:size_range 1:/#.
-  rewrite nth_range /#. 
-rewrite -(@mu_eq_support _ (pred1 m \o (F \o H))).
-- move=> xs /supp_djoin [+ _]; rewrite size_nseq //.
-  by rewrite eq_sym => /eq @/(\o) <-.
-rewrite -(dmap1E _ (F \o H)) -dmap_comp dmap1E; congr.
-rewrite djoin_dmap_nseq; do 2! congr; rewrite /dvector.
-rewrite dmap_comp /(\o) /= dmap_id_eq_in // => xs.
-move=> /supp_djoin [+ _]; rewrite size_nseq //= => sz_xs.
-apply/(eq_from_nth witness) => [| i]; 1: by rewrite size_map size_range.
-rewrite size_map size_range => /= rg_i.
-rewrite (nth_map witness) 1:size_range // nth_range 1:/# offunvE /#.
-qed.
 
 lemma dmatrix0E (d: R distr) (m: matrix) r c: 
   size m <> (r, c) => 0 <= r => 0 <= c => mu1 (dmatrix d r c) m = 0%r.
@@ -1794,72 +1770,51 @@ lemma dmatrix1E d m : mu1 (dmatrix d (rows m) (cols m)) m =
   BRM.bigi predT (fun i => 
     BRM.bigi predT (fun j => mu1 d m.[i, j]) 0 (cols m)) 0 (rows m).
 proof.
-rewrite dmatrix_dvector.
 pose g (m: matrix) := mkseq (fun i => col m i) (cols m).
 rewrite (in_dmap1E_can _ _ g).
-- rewrite /g eq_matrixP /= size_mkseq. 
-  split => [/# | i j bound].
+- rewrite /g eq_matrixP /= => i j bound.
   by rewrite offunmE /= 1:/# nth_mkseq 1:/# colE.
 - rewrite /g => y y_in <- /=.
-  apply (eq_from_nth witness) => [| i i_bound].
-  + rewrite size_mkseq; smt(List.size_ge0).
+  rewrite supp_dlist 1:/# in y_in.
+  apply (eq_from_nth witness) => [| i i_bound]; 1: rewrite size_mkseq /#. 
   rewrite nth_mkseq /= 1:/# eq_vectorP size_col rows_offunm.
-  rewrite supp_djoin size_nseq -(all_nthP _ _ witness) in y_in.
+  rewrite -(all_nthP _ _ witness) in y_in.
   elim y_in => size_y.
-  rewrite size_zip ler_minl 1:size_nseq 1:lerr_eq // size_nseq size_y. 
   move => cont; have i_bound': 0 <= i && i < size y by done.
   apply cont in i_bound'; clear cont; move: i_bound'.
-  rewrite nth_zip_cond size_zip ler_minl 1:size_nseq 1:lerr_eq // size_nseq.
-  have -> /=: i < max 0 (cols m) by smt().
-  rewrite (nth_change_dfl witness _ y) // nth_nseq 1:/#.
   move => nth_y_size; apply size_dvector in nth_y_size.
   split => [/# | j j_bound].
-  rewrite offunmE /#.
-- rewrite djoin1E size_nseq size_mkseq /= (BRM.big_nth witness) predTofV.
-  rewrite size_zip ler_minl 1:size_nseq 1:size_mkseq 1:lerr_eq // size_nseq /=.
-  rewrite BRM.exchange_big /(\o) /= 2!BRM.big_seq /=.
+  rewrite colE offunmE /= /#.  
+- rewrite dlist1E 1:/# size_mkseq /= (BRM.big_nth witness) predTofV.
+  rewrite BRM.exchange_big /(\o) /= 2!BRM.big_seq /= size_mkseq max0cols. 
   apply BRM.eq_big => i // i_bound /=.
   rewrite mem_range in i_bound.
-  rewrite nth_zip_cond size_zip ler_minl 1:size_nseq 1:size_mkseq 1:lerr_eq //.
-  rewrite size_nseq.
-  have -> /=: i < max 0 (cols m) by smt().
-  rewrite nth_nseq // /g nth_mkseq //=.
-  have ->: rows m = size (col m i) by done.
+  have ->: rows m = size (nth witness (g m) i) by rewrite nth_mkseq //.
   rewrite dvector1E.
   congr; apply fun_ext => j.
-  by rewrite colE.
+  by rewrite nth_mkseq.
 qed.
 
 lemma dmatrix_uni d r c: is_uniform d => is_uniform (dmatrix d r c).
 proof.
-move=> uni_d; apply/dmap_uni_in_inj/djoin_uni.
-- move=> xs ys /supp_djoin [+ xsin] /supp_djoin[+ ysin] /=.
-  rewrite !size_nseq // => sz_xs sz_ys.
-  move/(congr1 tofunm); rewrite !offunmK => eqv.
-  apply/(eq_from_nth witness) => [/#|j rg_j].
-  pose xss := nth witness xs j; pose yss := nth witness ys j.
-  pose ds  := djoin (nseq r d).
-  move/allP/(_ (ds, xss) _): xsin => /= => [|xss_ds].
-  + by rewrite -nseq_max0 {1}sz_xs; apply/mem_zip_nseqL/mem_nth.
-  move/allP/(_ (ds, yss) _): ysin => /= => [|yss_ds].
-  + by rewrite -nseq_max0 {1}sz_ys; apply/mem_zip_nseqL/mem_nth => /#.
-  move/supp_djoin: xss_ds => [+ /allP ?].
-  move/supp_djoin: yss_ds => [+ /allP ?].
-  rewrite !size_nseq // => sz_yss sz_xss.
-  apply/(eq_from_nth witness) => [/#|i rg_i].
-  rewrite /mclamp /= in eqv.
-  move/fun_ext2/(_ i j): eqv => @/mclamp /=.
-  rewrite -sz_xs in rg_j; rewrite -sz_xss in rg_i => /#. 
-- move=> ds; rewrite mem_nseq => -[_ <-].
-  by apply/djoin_uni=> ?; rewrite mem_nseq => -[_ <-].
+move=> uni_d; apply/dmap_uni_in_inj/dlist_uni/dvector_uni => //.
+move=> xs ys xsin ysin /= eq_offunm.
+apply/(eq_from_nth witness); 1: smt(supp_dlist). 
+move => i i_bound; rewrite eq_vectorP. 
+rewrite supp_dlist 1:/# -(all_nthP _ _ witness) in xsin.
+rewrite supp_dlist 1:/# -(all_nthP _ _ witness) in ysin.
+move: xsin ysin => [size_xs in_size_xs] [size_ys in_size_ys].
+have ->: size (nth witness xs i) = max 0 r.
+- by apply/(size_dvector d)/in_size_xs.
+have -> /=: size (nth witness ys i) = max 0 r.
+- by apply/(size_dvector d)/in_size_ys => /#.
+move => j j_bound; apply (congr1 (fun m => m.[j, i])) in eq_offunm.
+rewrite /= offunmE /= 1:/# in eq_offunm.
+rewrite offunmE /= /# in eq_offunm.
 qed.
 
 lemma dmatrix_ll d r c: is_lossless d => is_lossless (dmatrix d r c).
-proof.
-move=> ll_d; apply/dmap_ll/djoin_ll.
-move=> ds; rewrite mem_nseq => -[_ <-].
-by apply/djoin_ll=> ?; rewrite mem_nseq => -[_ <-].
-qed.
+proof. by move=> ll_d; apply/dmap_ll/dlist_ll/dvector_ll. qed.
 
 lemma mu1_dmatrix_fu (d: R distr) (m: matrix): is_funiform d =>
     mu1 (dmatrix d (rows m) (cols m)) m = (mu1 d witness)^((rows m)*(cols m)).
