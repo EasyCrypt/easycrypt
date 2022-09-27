@@ -333,19 +333,34 @@ case (0 <= i < size v1 + size v2) => range.
 - rewrite !getv0E 4:addr0 /#.
 qed.
 
-hint simplify size_concat, concatE.
+lemma get_catv (v1 v2: vector) i : 
+  (v1 || v2).[i] = if i < size v1 then v1.[i] else v2.[i - size v1].
+proof.
+case (0 <= i < size v1 + size v2) => range; last first.
+- rewrite !getv0E ?size_concat //; smt(size_ge0).
+rewrite offunvE //=; case (i < size v1) => ?.
+- by rewrite [v2.[_]]getv0E //= 1:/# addr0.
+- by rewrite [v1.[_]]getv0E //= 1:/# add0r.
+qed.
+
+lemma get_catv_l (v1 v2: vector) i : 
+  i < size v1 => (v1 || v2).[i] = v1.[i].
+proof. smt(get_catv). qed. 
+
+lemma get_catv_r (v1 v2: vector) i : 
+  size v1 <= i => (v1 || v2).[i] = v2.[i - size v1].
+proof. smt(get_catv). qed. 
+
+hint simplify size_concat.
 
 lemma dotp_concat v1 v2 v3 v4: size v1 = size v3 => size v2 = size v4 =>
   dotp (v1 || v2) (v3 || v4) = (dotp v1 v3) + (dotp v2 v4).
 proof.
 move => size_eq1 size_eq2; rewrite /dotp !size_concat size_eq1 size_eq2 /=.
-rewrite (range_cat (size v3)) 1:/# 1:/# big_cat.
-congr.
-- apply eq_big_seq => i /mem_range bound /=.
-  by rewrite (getv0E v2) 1:/# addr0 (getv0E v4) 1:/# addr0.
+rewrite (range_cat (size v3)) 1:/# 1:/# big_cat; congr.
+- by apply eq_big_seq => i /mem_range ? /=; smt(get_catv_l).
 rewrite (big_addn 0 (size v3 + size v4) (size v3)) addzAC /=.
-apply eq_big_seq => i /mem_range bound /=.
-rewrite /= size_eq1 /= (getv0E v1) 1:/# (getv0E v3) 1:/# !add0r /#. 
+apply eq_big_seq => i /mem_range bound /=; smt(get_catv_r).
 qed.
 
 lemma addv_concat (v1 v2 v3 v4: vector): 
@@ -353,17 +368,13 @@ lemma addv_concat (v1 v2 v3 v4: vector):
   (v1 || v2) + (v3 || v4) = ((v1 + v3) || (v2 + v4)).
 proof.
 move => size_eq1 size_eq2; apply eq_vectorP. 
-rewrite size_addv 3!size_concat size_eq1 size_eq2 /=. 
-split => [| i bound]; 1: by rewrite size_eq1 size_eq2.
-rewrite !getvD /= 1:/# // size_eq1 2!addrA /=.
-congr.
-rewrite -2!addrA.
-congr.
-apply addrC.
+rewrite size_addv 3!size_concat /= !size_eq1 size_eq2 /= => i bound.
+rewrite !getvD ?size_concat 1:/#. 
+by rewrite !get_catv size_eq1 !getvD // /#.
 qed.
 
 lemma negv_concat (v1 v2: vector): - (v1 || v2) = (-v1 || -v2).
-proof. apply eq_vectorP => /= i bound. apply opprD. qed.
+proof. by apply eq_vectorP => i bound /=; rewrite !concatE opprD. qed.
 
 (* Splitting apart vectors *)
 op subv (v: vector) (n m: int) = offunv ((fun i => v.[i+n]), m - n).
@@ -394,11 +405,10 @@ qed.
 lemma concat_subvC v i: 0 <= i <= size v => 
   (subv v 0 i || subv v i (size v)) = v.
 proof.
-move => i_bound; rewrite eq_vectorP size_concat !size_subv /=. 
-split => [/# | k k_bound]. 
-case (k < i) => lti_k.
-- rewrite (getv0E (subv _ i _)) 1:/# addr0 subvE /#.
-- rewrite (getv0E (subv _ 0 _)) /= 1:/# add0r subvE /#.
+move => i_bound; rewrite eq_vectorP size_concat !size_subv /= -andaE. 
+split => [/#|-> k k_bound]; case (k < i) => lt_i_k.
+- rewrite get_catv_l; smt(subvE).
+- rewrite get_catv_r; smt(subvE).
 qed.
  
 lemma subv_addv v1 v2 a b: size v1 = size v2 => 
@@ -1405,7 +1415,7 @@ lemma row_concat_side m1 m2 i: rows m1 = rows m2 =>
 proof.
 move => rows_eq; rewrite eq_vectorP /=. 
 rewrite cols_concat_side 1:// /= => j bound.
-by rewrite concat_sideE.
+by rewrite concat_sideE // concatE.
 qed.
 
 lemma concat_side_empty: (emptym || emptym) = emptym.
