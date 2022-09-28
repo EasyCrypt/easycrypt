@@ -60,7 +60,7 @@ by rewrite -{2}[v]reprK -eqv_pi /eqv vclamp_idemp.
 qed.
 
 lemma offunvK pv: tofunv (offunv pv) = vclamp pv.
-proof. rewrite /tofunv /offunv eqv_repr /#. qed.
+proof. by rewrite /tofunv /offunv eqv_repr vclamp_idemp. qed.
 
 lemma vectorW (P : vector -> bool): 
   (forall pv, P (offunv pv)) => forall v, P v by smt(tofunvK).
