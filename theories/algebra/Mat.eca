@@ -732,7 +732,7 @@ hint simplify get_diagc.
 (* n by n identity matrix *)
 abbrev onem n = diagc n oner.
 
-lemma getv_onem i j n: mrange (onem n) i j => (onem n).[i, j] =
+lemma get_onem i j n: mrange (onem n) i j => (onem n).[i, j] =
   if i = j then oner else zeror.
 proof. 
 rewrite get_diagc => bound.
@@ -1547,7 +1547,7 @@ lemma col_catmr m1 m2 i: cols m1 = cols m2 =>
   col (m1 / m2) i = (col m1 i || col m2 i).
 proof. move => rows_eq; by rewrite -row_trmx /= row_catmc. qed.
 
-lemma catmr_empty: (emptym || emptym) = emptym.
+lemma catmr_empty: (emptym / emptym) = emptym.
 proof. apply emptym_unique. smt(size_emptym size_catmr). qed.
 
 hint simplify catmr_empty.
@@ -1560,7 +1560,7 @@ lemma catmrDl m1 m2 m3: cols m1 = cols m2 =>
   (m1 / m2) * m3 = (m1 * m3) / (m2 * m3).
 proof. move => cols_eq; apply trmx_inj => /=. exact catmcDr. qed.
 
-lemma colmx_catmr (v1 v2: vector): colmx (v1 || v2) = (colmx v1 / colmx v2).
+lemma colmx_catmc (v1 v2: vector): colmx (v1 || v2) = (colmx v1 / colmx v2).
 proof. apply trmx_inj => /=. exact rowmx_catmc. qed.
 
 lemma addm_catmr (m1 m2 m3 m4: matrix): 
