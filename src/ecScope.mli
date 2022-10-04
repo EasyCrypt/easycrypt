@@ -194,6 +194,7 @@ module Prover : sig
     pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
+    pl_dumpin     : string located option;
     pl_selected   : bool option;
     gn_debug      : bool option;
   }

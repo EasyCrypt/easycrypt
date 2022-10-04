@@ -21,6 +21,7 @@ and cmp_option = {
   cmpo_gcstats : bool;
   cmpo_tstats  : string option;
   cmpo_noeco   : bool;
+  cmpo_script  : bool;
 }
 
 and cli_option = {
@@ -29,15 +30,16 @@ and cli_option = {
 }
 
 and prv_options = {
-  prvo_maxjobs   : int;
-  prvo_timeout   : int;
-  prvo_cpufactor : int;
-  prvo_provers   : string list option;
-  prvo_pragmas   : string list;
-  prvo_ppwidth   : int option;
-  prvo_checkall  : bool;
-  prvo_profile   : bool;
-  prvo_iterate   : bool;
+  prvo_maxjobs    : int;
+  prvo_timeout    : int;
+  prvo_cpufactor  : int;
+  prvo_provers    : string list option;
+  prvo_pragmas    : string list;
+  prvo_ppwidth    : int option;
+  prvo_checkall   : bool;
+  prvo_profile    : bool;
+  prvo_iterate    : bool;
+  prvo_why3server : string option;
 }
 
 and ldr_options = {
@@ -225,9 +227,10 @@ let specs = {
     ("compile", "Check an EasyCrypt file", [
       `Group "loader";
       `Group "provers";
-      `Spec  ("gcstats", `Flag, "Display GC statistics");
-      `Spec  ("tstats", `String, "Save timing statistics to <file>");
-      `Spec  ("no-eco", `Flag, "Do not cache verification results")]);
+      `Spec  ("gcstats", `Flag  , "Display GC statistics");
+      `Spec  ("tstats" , `String, "Save timing statistics to <file>");
+      `Spec  ("script" , `Flag  , "Computer-friendly output");
+      `Spec  ("no-eco" , `Flag  , "Do not cache verification results")]);
 
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
@@ -250,6 +253,7 @@ let specs = {
       `Spec ("pp-width"   , `Int   , "pretty-printing width");
       `Spec ("profile"    , `Flag  , "Collect some profiling informations");
       `Spec ("iterate"    , `Flag  , "Force to iterate smt call");
+      `Spec ("server"     , `String, "Connect to an external Why3 server");
     ]);
 
 
@@ -352,9 +356,10 @@ let prv_options_of_values ?ini values =
         | None -> obind (fun x -> x.ini_ppwidth) ini
         | Some i -> Some i
       end;
-      prvo_checkall  = get_flag "check-all" values;
-      prvo_profile   = get_flag "profile" values;
-      prvo_iterate   = get_flag "iterate" values;
+      prvo_checkall   = get_flag "check-all" values;
+      prvo_profile    = get_flag "profile" values;
+      prvo_iterate    = get_flag "iterate" values;
+      prvo_why3server = get_string "why3server" values;
     }
 
 let cli_options_of_values ?ini values =
@@ -366,7 +371,8 @@ let cmp_options_of_values ?ini values input =
     cmpo_provers = prv_options_of_values ?ini values;
     cmpo_gcstats = get_flag "gcstats" values;
     cmpo_tstats  = get_string "tstats" values;
-    cmpo_noeco   = get_flag "no-eco" values; }
+    cmpo_noeco   = get_flag "no-eco" values;
+    cmpo_script  = get_flag "script" values; }
 
 (* -------------------------------------------------------------------- *)
 let parse ?ini argv =

@@ -254,22 +254,22 @@ let fresh_id_of_ty (ty : ty) =
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
-  ts_mp  : EcPath.mpath -> EcPath.mpath;
+  ts_mp  : EcPath.smsubst;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
   ts_u   : EcUid.uid -> ty option;
   ts_v   : ty Mid.t;
 }
 
 let ty_subst_id =
-  { ts_p   = identity ;
-    ts_mp  = identity ;
-    ts_def = Mp.empty ;
-    ts_u   = funnone  ;
-    ts_v   = Mid.empty; }
+  { ts_p   = identity;
+    ts_mp  = EcPath.sms_identity;
+    ts_def = Mp.empty;
+    ts_u   = funnone ;
+    ts_v   = funnone ; }
 
 let is_ty_subst_id s =
      s.ts_p  == identity
-  && s.ts_mp == identity
+  && EcPath.sms_is_identity s.ts_mp
   && s.ts_u  == funnone
   && Mid.is_empty s.ts_v
   && Mp.is_empty s.ts_def
@@ -279,7 +279,7 @@ let rec ty_subst s =
   else
     Hty.memo_rec 107 (fun aux ty ->
       match ty.ty_node with
-      | Tglob m       -> TySmart.tglob (ty, m) (s.ts_mp m)
+      | Tglob m       -> TySmart.tglob (ty, m) (EcPath.m_subst s.ts_mp m)
       | Tunivar id    -> odfl ty (s.ts_u id)
       | Tvar id       -> Mid.find_def ty id s.ts_v
       | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.Smart.map aux lty)
@@ -361,6 +361,23 @@ module Tvar = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type ovariable = {
+  ov_name : EcSymbols.symbol option;
+  ov_type : ty;
+}
+
+let ov_name { ov_name = x } = x
+let ov_type { ov_type = x } = x
+
+let ov_hash v =
+  Why3.Hashcons.combine
+    (Hashtbl.hash v.ov_name)
+    (ty_hash v.ov_type)
+
+let ov_equal vd1 vd2 =
+  EcUtils.opt_equal (=) vd1.ov_name vd2.ov_name &&
+  ty_equal vd1.ov_type vd2.ov_type
+
 type variable = {
   v_name : EcSymbols.symbol;   (* can be "_" *)
   v_type : ty;
@@ -377,6 +394,9 @@ let v_hash v =
 let v_equal vd1 vd2 =
   vd1.v_name = vd2.v_name &&
   ty_equal vd1.v_type vd2.v_type
+
+let ovar_of_var { v_name = n; v_type = t } =
+  { ov_name = Some n; ov_type = t }
 
 let ty_fv_and_tvar (ty : ty) =
   EcIdent.fv_union ty.ty_fv (Mid.map (fun () -> 1) (Tvar.fv ty))
@@ -449,6 +469,11 @@ let string_of_pvar (p : prog_var) =
 
   Printf.sprintf "%s[%s]"
     sp (string_of_pvar_kind (pv_kind p))
+
+let name_of_pvar pv =
+  match pv with
+  | PVloc x -> x
+  | PVglob xp -> EcPath.xbasename xp
 
 let pv_loc id = PVloc id
 
@@ -922,8 +947,7 @@ type e_subst = {
     es_p       : EcPath.path -> EcPath.path;
     es_ty      : ty -> ty;
     es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
-    es_mp      : EcPath.mpath -> EcPath.mpath;
-    es_xp      : EcPath.xpath -> EcPath.xpath;
+    es_mp      : smsubst;
     es_loc     : expr Mid.t;
 }
 
@@ -932,32 +956,25 @@ let e_subst_id = {
     es_p       = identity;
     es_ty      = identity;
     es_opdef   = Mp.empty;
-    es_mp      = identity;
-    es_xp      = identity;
+    es_mp      = sms_identity;
     es_loc     = Mid.empty;
 }
 
 (* -------------------------------------------------------------------- *)
 let is_e_subst_id s =
-  not s.es_freshen && s.es_p == identity &&
-    s.es_ty == identity && s.es_mp == identity &&
-    s.es_xp == identity && Mid.is_empty s.es_loc
+     not s.es_freshen
+  && s.es_p  == identity
+  && s.es_ty == identity
+  && sms_is_identity s.es_mp
+  && Mid.is_empty s.es_loc
 
 (* -------------------------------------------------------------------- *)
 let e_subst_init freshen on_path on_ty opdef on_mpath esloc =
-  let on_mp =
-    let f = EcPath.m_subst on_path on_mpath in
-    if f == identity then f else EcPath.Hm.memo 107 f in
-  let on_xp =
-    let f = EcPath.x_subst on_mp in
-    if f == identity then f else EcPath.Hx.memo 107 f in
-
   { es_freshen = freshen;
     es_p       = on_path;
     es_ty      = on_ty;
     es_opdef   = opdef;
-    es_mp      = on_mp;
-    es_xp      = on_xp;
+    es_mp      = on_mpath;
     es_loc     = esloc; }
 
 (* -------------------------------------------------------------------- *)
@@ -1015,7 +1032,7 @@ let rec e_subst (s: e_subst) e =
   end
 
   | Evar pv ->
-      let pv' = pv_subst s.es_xp pv in
+      let pv' = pv_subst (x_subst s.es_mp) pv in
       let ty' = s.es_ty e.e_ty in
         ExprSmart.e_var (e, (pv, e.e_ty)) (pv', ty')
 

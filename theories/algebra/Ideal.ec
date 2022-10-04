@@ -354,7 +354,7 @@ hint exact : ideal_p.
 op eqv (x y : t) = p (y - x).
 
 lemma eqvxx : reflexive eqv.
-proof. by move=> x @/eqv; rewrite /eqv subrr ideal0 ideal_p. qed.
+proof. by move=> x @/eqv; rewrite subrr ideal0 ideal_p. qed.
 
 lemma eqv_sym : symmetric eqv.
 proof. by move=> x y @/eqv; rewrite -opprB idealNP // ideal_p. qed.
@@ -438,7 +438,7 @@ qed.
 
 lemma mulE x y : (pi x) * (pi y) = pi (x * y).
 proof.
-rewrite /(+) &(eqv_pi) /eqv; pose z := repr (pi x).
+rewrite &(eqv_pi) /eqv; pose z := repr (pi x).
 have ->: x = x - z + z by rewrite subrK.
 rewrite mulrDl -addrA -mulrBr (mulrC _ y) {1}/z.
 by rewrite &(idealD) ?ideal_p // idealMl ?ideal_p &(eqv_repr).
@@ -449,14 +449,14 @@ axiom unitP   : forall (x y : qT), y * x = oner => unit x.
 axiom unitout : forall (x : qT), !unit x => invr x = x.
 
 clone import ComRing with
-  type t     <- qT   ,
-  op   zeror <- zeror,
-  op   ( + ) <- (+)  ,
-  op   [ - ] <- [-]  ,
-  op   oner  <- oner ,
-  op   ( * ) <- ( * ),
-  op   invr  <- invr ,
-  pred unit  <- unit
+  type t     <= qT   ,
+  op   zeror <= zeror,
+  op   ( + ) <= (+)  ,
+  op   [ - ] <= [-]  ,
+  op   oner  <= oner ,
+  op   ( * ) <= ( * ),
+  op   invr  <= invr ,
+  pred unit  <= unit
 
   proof *.
 

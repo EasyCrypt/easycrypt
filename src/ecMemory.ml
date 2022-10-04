@@ -21,7 +21,7 @@ type proj_arg =
 
 type local_memtype = {
     mt_name : symbol option;      (* provides access to the full local memory *)
-    mt_decl : variable list;
+    mt_decl : ovariable list;
     mt_proj : (int * ty) Msym.t;  (* where to find the symbol in mt_decl and its type *)
     mt_ty   : ty;                 (* ttuple (List.map v_type mt_decl) *)
     mt_n    : int;                (* List.length mt_decl *)
@@ -31,7 +31,7 @@ let mk_lmt mt_name mt_decl mt_proj =
   { mt_name;
     mt_decl;
     mt_proj;
-    mt_ty = ttuple (List.map v_type mt_decl);
+    mt_ty = ttuple (List.map ov_type mt_decl);
     mt_n  = List.length mt_decl;
   }
 
@@ -49,7 +49,7 @@ let lmem_hash lmem =
   let mt_proj_hash =
     Why3.Hashcons.combine_list el_hash 0 (Msym.bindings lmem.mt_proj) in
   let mt_name_hash = Why3.Hashcons.combine_option Hashtbl.hash lmem.mt_name in
-  let mt_decl_hash = Why3.Hashcons.combine_list EcTypes.v_hash 0 lmem.mt_decl in
+  let mt_decl_hash = Why3.Hashcons.combine_list EcTypes.ov_hash 0 lmem.mt_decl in
   Why3.Hashcons.combine_list
     (fun i -> i)
     (EcTypes.ty_hash lmem.mt_ty)
@@ -63,7 +63,7 @@ let mt_fv = function
   | Lmt_concrete None       -> EcIdent.Mid.empty
   | Lmt_concrete (Some lmt) ->
     List.fold_left (fun fv v ->
-        EcIdent.fv_union fv v.v_type.ty_fv
+        EcIdent.fv_union fv v.ov_type.ty_fv
       ) EcIdent.Mid.empty lmt.mt_decl
 
 let lmt_equal ty_equal mt1 mt2 =
@@ -75,10 +75,7 @@ let lmt_equal ty_equal mt1 mt2 =
           ty_equal ty1 ty2
         ) mt1.mt_proj mt2.mt_proj
     else
-      List.all2 (fun v1 v2 ->
-          v1.v_name = v2.v_name
-          && ty_equal v1.v_type v2.v_type)
-        mt1.mt_decl mt2.mt_decl
+      List.all2 ov_equal mt1.mt_decl mt2.mt_decl
 
 let mt_equal_gen ty_equal mt1 mt2 =
   match mt1, mt2 with
@@ -95,7 +92,7 @@ let mt_equal = mt_equal_gen ty_equal
 let mt_iter_ty f mt = match mt with
   | Lmt_schema -> ()
   | Lmt_concrete mt ->
-    oiter (fun lmt -> List.iter (fun v -> f v.v_type) lmt.mt_decl) mt
+    oiter (fun lmt -> List.iter (fun v -> f v.ov_type) lmt.mt_decl) mt
 
 (* -------------------------------------------------------------------- *)
 type memenv = memory * memtype
@@ -173,47 +170,48 @@ let is_bound_pv pv me = match pv with
   | PVloc id -> is_bound id me
 
 (* -------------------------------------------------------------------- *)
-let bindall_lmt (vs:variable list) lmt =
+let bindall_lmt (vs : ovariable list) lmt =
   let n = List.length lmt.mt_decl in
   let add_proj mt_proj i v =
-    let x = v.v_name in
-    if lmt.mt_name = Some x then raise (DuplicatedMemoryBinding x);
-    if x = "_" then mt_proj
-    else
-      let merger = function
-        | Some _ -> raise (DuplicatedMemoryBinding x)
-        | None   -> Some (n + i,v.v_type) in
-    Msym.change merger x mt_proj in
+    match v.ov_name with
+    | None -> mt_proj
+    | Some x ->
+        if lmt.mt_name = Some x then raise (DuplicatedMemoryBinding x);
+        let merger = function
+          | Some _ -> raise (DuplicatedMemoryBinding x)
+          | None   -> Some (n + i,v.ov_type)
+        in Msym.change merger x mt_proj
+  in
   let mt_decl = lmt.mt_decl @ vs in
   let mt_proj = List.fold_lefti add_proj lmt.mt_proj vs in
   mk_lmt lmt.mt_name mt_decl mt_proj
 
-let bindall_mt (vs:variable list) (mt : memtype) : memtype =
+let bindall_mt (vs : ovariable list) (mt : memtype) : memtype =
   match mt with
   | Lmt_schema | Lmt_concrete None -> assert false
   | Lmt_concrete (Some lmt) -> Lmt_concrete (Some (bindall_lmt vs lmt))
 
-let bindall (vs:variable list) ((m,mt) : memenv) : memenv =
+let bindall (vs : ovariable list) ((m,mt) : memenv) : memenv =
   m, bindall_mt vs mt
 
-let bindall_fresh (vs:variable list) ((m,mt) : memenv) =
+let bindall_fresh (vs : ovariable list) ((m,mt) : memenv) =
   match mt with
   | Lmt_schema | Lmt_concrete None -> assert false
   | Lmt_concrete (Some lmt) ->
     let is_bound x m = Some x = lmt.mt_name || Msym.mem x m in
     let fresh_pv m v =
-      let name = v.v_name in
-      if name = "_" then m, v
-      else
-        let name =
-          if not(is_bound name m) then name
-          else
-            let rec for_idx idx =
-              let x = Printf.sprintf "%s%d" name idx in
-              if is_bound x m then for_idx (idx+1)
-              else x in
-            for_idx 0 in
-        Msym.add name (-1,v.v_type) m, {v with v_name = name } in
+      match v.ov_name with
+      | None   -> m, v
+      | Some name ->
+          let name =
+            if not(is_bound name m) then name
+            else
+              let rec for_idx idx =
+                let x = Printf.sprintf "%s%d" name idx in
+                if is_bound x m then for_idx (idx+1)
+                else x in
+              for_idx 0 in
+          Msym.add name (-1,v.ov_type) m, { v with ov_name = Some name } in
     let _, vs = List.map_fold fresh_pv lmt.mt_proj vs in
     let lmt = bindall_lmt vs lmt in
     (m, Lmt_concrete (Some lmt)), vs
@@ -234,8 +232,8 @@ let mt_subst st o =
       if st == identity then decl
       else
         List.Smart.map (fun vty ->
-            let ty' = st vty.v_type in
-            if ty_equal vty.v_type ty' then vty else {vty with v_type = ty'}) decl in
+            let ty' = st vty.ov_type in
+            if ty_equal vty.ov_type ty' then vty else {vty with ov_type = ty'}) decl in
     if decl == decl' then o
     else
       let lmt = mk_lmt
@@ -255,7 +253,6 @@ let for_printing mt =
   | Lmt_concrete None -> None
   | Lmt_concrete (Some mt) -> Some (mt.mt_name, mt.mt_decl)
 
-
 (* -------------------------------------------------------------------- *)
 let rec pp_list sep pp fmt xs =
   let pp_list = pp_list sep pp in
@@ -270,7 +267,9 @@ let dump_memtype mt =
   | Lmt_concrete None -> "abstract"
   | Lmt_concrete (Some mt) ->
     let pp_vd fmt v =
-      Format.fprintf fmt "@[%s: %s@]" v.v_name (EcTypes.dump_ty v.v_type)
+      Format.fprintf fmt "@[%s: %s@]"
+        (odfl "_" v.ov_name)
+        (EcTypes.dump_ty v.ov_type)
     in
     Format.asprintf "@[{@[%a@]}@]" (pp_list ",@ " pp_vd) mt.mt_decl
 
@@ -281,16 +280,7 @@ let get_name s p (_,mt) =
   | Lmt_concrete None -> None
   | Lmt_concrete (Some mt) ->
     match p with
-    | None ->
-      if Some s = mt.mt_name then
-        match mt.mt_decl with
-        | [v] when v.v_name <> "_" -> Some v.v_name
-        | _ -> Some s
-      else
-        begin match Msym.find_opt s mt.mt_proj with
-        | Some _ -> Some s
-        | None   -> None
-        end
+    | None -> Some s
     | Some i ->
       if Some s = mt.mt_name then
         omap fst (List.find_opt (fun (_,(i',_)) -> i = i') (Msym.bindings mt.mt_proj))
@@ -303,7 +293,7 @@ let local_type mt =
   match mt with
   | Lmt_schema -> assert false
   | Lmt_concrete None -> None
-  | Lmt_concrete (Some mt) -> Some (ttuple (List.map v_type mt.mt_decl))
+  | Lmt_concrete (Some mt) -> Some (ttuple (List.map ov_type mt.mt_decl))
 
 let has_locals mt = match mt with
   | Lmt_concrete (Some _) -> true

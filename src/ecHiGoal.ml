@@ -32,6 +32,7 @@ type ttenv = {
   tt_implicits : bool;
   tt_oldip     : bool;
   tt_redlogic  : bool;
+  tt_und_delta : bool;
 }
 
 type engine = ptactic_core -> FApi.backward
@@ -435,11 +436,21 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
   let pt = PT.tc1_process_full_pterm ~implicits tc ff in
 
   try
-    let aout = EcLowGoal.Apply.t_apply_bwd_r pt tc in
-
     match mode with
-    | `Apply -> aout
+    | `Alpha ->
+        begin try
+          PT.pf_form_match
+            pt.ptev_env
+            ~mode:fmrigid
+            ~ptn:pt.ptev_ax
+            (FApi.tc1_goal tc)
+        with EcMatching.MatchFailure ->
+          tc_error !!tc "proof-term is not alpha-convertible to conclusion" end;
+        EcLowGoal.t_apply (fst (PT.concretize pt)) tc
+    | `Apply ->
+        EcLowGoal.Apply.t_apply_bwd_r pt tc
     | `Exact ->
+        let aout = EcLowGoal.Apply.t_apply_bwd_r pt tc in
         let aout = FApi.t_onall process_trivial aout in
         if not (FApi.tc_done aout) then
           tc_error !!tc "cannot close goal";
@@ -546,7 +557,7 @@ let process_rewrite1_core ?mode ?(close = true) ?target (s, p, o) pt tc =
           tc_error !!tc "r-pattern does not match the rewriting rule"
 
 (* -------------------------------------------------------------------- *)
-let process_delta ?target (s, o, p) tc =
+let process_delta ~und_delta ?target (s, o, p) tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let o = norm_rwocc o in
 
@@ -566,9 +577,14 @@ let process_delta ?target (s, o, p) tc =
       { EcReduction.no_red with
           EcReduction.delta_p = check_op;
           EcReduction.delta_h = check_id; } in
-    let target = EcReduction.simplify ri hyps target in
+    let redform = EcReduction.simplify ri hyps target in
 
-    t_change ~ri ?target:idtg target tc
+    if und_delta then begin
+      if EcFol.f_equal target redform then
+        EcEnv.notify env `Warning "unused unfold: /%s" x
+    end;
+
+    t_change ~ri ?target:idtg redform tc
 
   | _ ->
 
@@ -696,6 +712,7 @@ let process_delta ?target (s, o, p) tc =
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_r ttenv ?target ri tc =
   let implicits = ttenv.tt_implicits in
+  let und_delta = ttenv.tt_und_delta in
 
   match unloc ri with
   | RWDone simpl ->
@@ -717,7 +734,7 @@ let process_rewrite1_r ttenv ?target ri tc =
       if Option.is_some px then
         tc_error !!tc "cannot use pattern selection in delta-rewrite rules";
 
-      let do1 tc = process_delta ?target (s, o, p) tc in
+      let do1 tc = process_delta ~und_delta ?target (s, o, p) tc in
 
       match r with
       | None -> do1 tc
@@ -1418,12 +1435,13 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
             (List.map (fun i tc -> aux (omap ((+) (i-1)) imax) tc) ntop)
             tc
         with InvalidGoalShape ->
-          let id = EcIdent.create "_" in
           try
-            t_seq
-              (aux (omap ((+) (-1)) imax))
-              (t_generalize_hyps ~clear:`Yes [id])
-              (EcLowGoal.t_intros_i_1 [id] tc)
+            tc |> EcLowGoal.t_intro_sx_seq
+              `Fresh
+              (fun id ->
+                t_seq
+                  (aux (omap ((+) (-1)) imax))
+                  (t_generalize_hyps ~clear:`Yes [id]))
           with
           | EcCoreGoal.TcError _ when EcUtils.is_some imax ->
               tc_error !!tc "not enough top-assumptions"
@@ -1446,7 +1464,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     in t_seqs [t_intros_i [h]; rwt; t_clear h] tc
 
   and intro1_unfold (_ : ST.state) (s, o) p tc =
-    process_delta (s, o, p) tc
+    process_delta ~und_delta:ttenv.tt_und_delta (s, o, p) tc
 
   and intro1_view (_ : ST.state) pe tc =
     process_view1 pe tc
@@ -1795,6 +1813,9 @@ let process_apply ~implicits ((infos, orv) : apply_t * prevert option) tc =
           t_last (process_apply_bwd ~implicits `Apply pe) tc in
         let tc = List.fold_left for1 (tcenv_of_tcenv1 tc) pe in
         if mode = `Exact then t_onall process_done tc else tc
+
+    | `Alpha pe ->
+        process_apply_bwd ~implicits `Alpha pe tc
 
     | `Top mode ->
         let tc = process_apply_top tc in

@@ -93,7 +93,7 @@ lemma reduce_reduced (s : ('a * 'b) list):
 proof.
 elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
 rewrite reduce_cons /= => -[x_notin_s /ih ->].
-rewrite (@eq_in_filter _ predT) ?filter_predT /predT //=.
+rewrite (@eq_in_filter _ predT) ?filter_predT 1:/predT //=.
 case=> x' y' /(map_f fst) x'_in_s; apply/negP => <<-.
 by move: x_notin_s.
 qed.
@@ -181,7 +181,7 @@ lemma set_set (m : ('a,'b) fmap) x x' y y':
    m.[x <- y].[x' <- y'] = if x = x' then m.[x' <- y']
                            else m.[x' <- y'].[x <- y].
 proof.
-rewrite fmapP=> a; case (x = x')=> [<<- {x'} | ne_x_x']; rewrite !getP.
+rewrite fmapP=> a; case (x = x')=> [<<- | ne_x_x']; rewrite !getP.
 + by case (a = x).
 by case (a = x')=> //; case (a = x)=> // ->;rewrite ne_x_x'.
 qed.
@@ -295,7 +295,7 @@ proof.
 rewrite allE allP; split=> [h a|h [a b] /= ^ab_in_m].
 + rewrite mem_domE mem_map_fst=> -[b] ^ab_in_m+.
   by rewrite mem_assoc_uniq 1:uniq_keys -getE /oget=> ->; apply (@h (a,b)).
-rewrite mem_assoc_uniq 1:uniq_keys -getE=> /(@congr1 oget) <-.
+rewrite mem_assoc_uniq 1:uniq_keys -getE=> /(@congr1 oget) /= <-.
 by apply/h; rewrite mem_domE mem_map_fst; exists b.
 qed.
 
@@ -701,11 +701,11 @@ qed.
 
 lemma set_eq_except x b (m : ('a, 'b) fmap):
   eq_except m.[x <- b] m (pred1 x).
-proof. by rewrite eq_exceptP=> x'; rewrite !getP=> ->. qed.
+proof. by rewrite eq_exceptP=> x'; rewrite !getP /pred1 /= => ->. qed.
 
 lemma set2_eq_except x b b' (m : ('a, 'b) fmap):
   eq_except m.[x <- b] m.[x <- b'] (pred1 x).
-proof. by rewrite eq_exceptP=> x'; rewrite !getP=> ->. qed.
+proof. by rewrite eq_exceptP=> x'; rewrite !getP /pred1 /= => ->. qed.
 
 lemma eq_except_set_eq (m1 m2 : ('a, 'b) fmap) x:
   mem (dom m1) x =>

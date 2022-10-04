@@ -373,10 +373,17 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             | `Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
                 match (EcEnv.Ty.by_path np env).tyd_type with
                 | `Datatype { tydt_ctors = _ } ->
-                  List.fold_left (fun subst (name, _) ->
-                      EcSubst.add_path subst
-                        ~src:(xpath ove name)
-                        ~dst:(EcPath.pqoname (EcPath.prefix np) name))
+                  let newtparams = List.fst newtyd.tyd_params in
+                  let newtparams_ty = List.map tvar newtparams in
+                  let newdtype = tconstr np newtparams_ty in
+                  let tysubst = EcTypes.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
+
+                  List.fold_left (fun subst (name, tyargs) ->
+                      let np = EcPath.pqoname (EcPath.prefix np) name in
+                      let newtyargs = List.map (Tvar.subst tysubst) tyargs in
+                      EcSubst.add_opdef subst
+                        (xpath ove name)
+                        (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)))
                     subst octors
                 | _ -> subst
               end
@@ -727,7 +734,7 @@ and replay_modtype
         match mode with
         | `Alias -> rename ove subst (`Module, x)
         | `Inline _ ->
-          let subst = EcSubst.add_path subst ~src:(xpath ove x) ~dst:np in
+          let subst = EcSubst.add_modtydef subst ~src:(xpath ove x) ~dst:np in
           subst, x in
 
       let modty = EcSubst.subst_top_modsig subst modty in
@@ -766,7 +773,7 @@ and replay_mod
         | _ -> assert false
       in
 
-      let substme = EcSubst.add_path subst ~src:(xpath ove name) ~dst:np in
+      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:np in
 
       let me    = EcSubst.subst_top_module substme me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
@@ -842,18 +849,27 @@ and replay_reduction
   (import, rules : _ * (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list)
 =
   let for1 (p, opts, rule) =
+    let exception Removed in
+
     let p = EcSubst.subst_path subst p in
 
     (* TODO: A: schema are not replayed for now, but reduction rules can use a
        schema. Fix this. *)
     let rule =
       obind (fun rule ->
+        let env = EcSection.env (ove.ovre_hooks.henv scope) in
+
+        if not (
+          match opts.ur_mode with
+          | `Ax -> is_some (EcEnv.Ax.by_path_opt p env)
+          | `Sc -> is_some (EcEnv.Schema.by_path_opt p env)
+        ) then raise Removed;
+
         try
           Some (EcReduction.User.compile
                   ~opts ~prio:rule.rl_prio
-                  (EcSection.env (ove.ovre_hooks.henv scope))
-                  opts.ur_mode p)
-        with EcReduction.User.InvalidUserRule _ -> None) rule
+                  env opts.ur_mode p)
+        with EcReduction.User.InvalidUserRule _ | Removed -> None) rule
 
     in (p, opts, rule) in
 

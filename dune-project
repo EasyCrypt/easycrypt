@@ -14,6 +14,7 @@
  (depends
   (ocaml (>= 4.08.0))
   (batteries (>= 3))
+  (camlp-streams (>= 5))
   camlzip
   dune-build-info
   dune-site

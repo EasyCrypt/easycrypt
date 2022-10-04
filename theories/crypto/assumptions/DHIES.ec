@@ -64,11 +64,10 @@ theory DHIES.
     pkl = map (snd \o snd) kk =>
     menc pkl tag ptxt = dmap (mencDHIES tag ptxt kk) (List.map (snd \o snd)).
   proof.
-  rewrite /mencDHIES /menc /dlistmap /zipks /encDHIES /=. 
-  rewrite djoin_dmap.
+  rewrite /mencDHIES /menc /encDHIES /= djoin_dmap.
   move=> ->; rewrite -map_comp /(\o) /=.
   congr; congr; apply fun_ext => x.
-  by rewrite dmap_comp /(\o) /= /menc dmap_id.
+  by rewrite dmap_comp /(\o) /= dmap_id.
   qed.
 
   module DHIES = {
@@ -180,7 +179,7 @@ theory DHIES.
   lemma nosmt mencDHIES_eq : equiv [MEnc.mencDHIES1 ~ MEnc.mencDHIES2: ={tag,ptxt,kks} ==> ={res}].
   proof.
   proc.
-  transitivity{1} { mcph <- MEncDHIES_loop.S.loop(encDHIES tag ptxt, kks); }
+  transitivity{1} { mcph <@ MEncDHIES_loop.S.loop(encDHIES tag ptxt, kks); }
                   ( ={tag, ptxt, kks} ==> ={mcph} )
                   ( ={tag, ptxt, kks} ==> mcph{1}=cphl{2} ).
   + by move=> *; exists kks{2} ptxt{2} tag{2}.
@@ -193,7 +192,7 @@ theory DHIES.
     - by inline*; wp; rnd; wp.
     - by call MEncDHIES_loop.Sample_Loop_eq.
   transitivity{2} { skeys <- map (snd \o snd) kks;
-                    cs <- MEnc_loop.S.loop(fun k=> enc k tag ptxt, skeys); 
+                    cs <@ MEnc_loop.S.loop(fun k=> enc k tag ptxt, skeys); 
                     cphl <- map (fun x:(_*(_*_))*_ => (x.`1.`1, (x.`1.`2.`1, x.`2)))
                                 (zip kks cs); }
                   ( ={tag, ptxt, kks} ==> mcph{1}=cphl{2} )
@@ -519,7 +518,7 @@ module Adv1(A : MRPKE_Adv, O : ODH_OrclT) = {
       var b,b' : bool;
       b <$ {0,1};
       Adv1_Procs(O).init(b);
-      b' <- A.guess();
+      b' <@ A.guess();
       return (MRPKE_lor.b = b');
    }    
 }.
@@ -534,8 +533,7 @@ proof.
 move=> /eq_sym *.
 rewrite -(@map_fst_zip _ (elems s) l) // /(\o) /=.
 rewrite amap_assoc_zip //; first by apply uniq_elems.
-rewrite /map_assoc; congr.
-apply fun_ext => x; smt().
+by congr; apply: fun_ext => x /#.
 qed.
 
 lemma pkmem_foldenc pk t c pks tag mctxt:
@@ -840,7 +838,7 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
          ==> ={keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor})
         (={ro, pks, tag, m0, m1, glob MRPKErnd_lor}
          ==> ={keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor}).
-     - rewrite /inv /=; clear inv; progress.
+     - clear inv; progress.
        by exists MRPKErnd_lor.skeys{2} MRPKE_lor.b{2} MRPKE_lor.count_dec{2} MRPKE_lor.count_gen{2}
                  MRPKE_lor.count_lor{2}
                  MRPKE_lor.lorlist{2} MRPKE_lor.pklist{2} m0{2} m1{2} pks{2} ro{2} tag{2}.
@@ -849,7 +847,7 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
      - by call mrndkeys_def.
    + inline*; wp; rnd; rnd; wp; skip; rewrite /inv /=; clear inv; progress.
        by rewrite H2.
-      rewrite H2 /map_assoc -map_comp /(\o) /= unzip1_zip //.
+      rewrite H2 -map_comp /(\o) /= unzip1_zip //.
       by rewrite (supp_dlist_size _ _ _ _ H9) ?size_ge0.
      rewrite -map_comp /(\o) H2 /=.
      by rewrite -(map_fst_zip _ _ ksL) // (supp_dlist_size _ _ _ _ H9) ?size_ge0.
@@ -952,7 +950,7 @@ module Adv2(A : MRPKE_Adv, O : AEADmul_OraclesT) = {
    proc guess() : bool = {
       var b' : bool;
       Adv2_Procs(O).init();
-      b' <- A.guess();
+      b' <@ A.guess();
       return b';
    }    
 }.
@@ -1087,7 +1085,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
          ==> ={keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor})
         (={ro, pks, tag, m0, m1, glob MRPKErnd_lor}
          ==> ={keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor}).
-     - rewrite /inv /= => /> *.
+     - move=> /= /> *.
        by exists MRPKErnd_lor.skeys{2} MRPKE_lor.b{2} MRPKE_lor.count_dec{2}
                  MRPKE_lor.count_gen{2} MRPKE_lor.count_lor{2} MRPKE_lor.lorlist{2}
                  MRPKE_lor.pklist{2} m0{2} m1{2} pks{2} ro{2} tag{2}.
@@ -1095,7 +1093,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
      - by inline*; wp; rnd; wp; skip.
      - by call mrndkeys_def.
    + inline*; wp; rnd; wp; rnd; wp; skip; rewrite /inv /=; clear inv; progress.
-      by rewrite zip_mapr /map_assoc /(\o).
+           by rewrite zip_mapr.
      smt (supp_dlist_size size_ge0).
   seq 1 4: (#pre /\ enclist{1} = (zip (elems pks) (map (fun k=>(g^x,k)) lctxt)){2} /\
             (size lctxt = size (elems pks) /\ aad = tag){2}).
@@ -1128,7 +1126,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
          ==> ={enclist, keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor})
         (={keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor}
          ==> ={enclist, keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor}).
-     - rewrite /inv /=; clear inv; progress.
+     - clear inv; progress.
        by exists MRPKErnd_lor.skeys{2} MRPKE_lor.b{2} MRPKE_lor.count_dec{2}
                  MRPKE_lor.count_gen{2} MRPKE_lor.count_lor{2} MRPKE_lor.lorlist{2}
                  MRPKE_lor.pklist{2} keys{2} m0{2} m1{2} pks{2} ro{2} tag{2}.

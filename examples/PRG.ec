@@ -25,14 +25,14 @@ hint exact random: dout_ll.
 (** We use a public RF that, on input a seed, produces a seed and
     an output...                                                        *)
 module type RF = {
-  proc * init() : unit
+  proc init() : unit
   proc f(x:seed): seed * output
 }.
 
 (** ...to build a PRG that produces random outputs... **)
 (** We let our PRG have internal state, which we need to initialize **)
 module type PRG = {
-  proc * init(): unit
+  proc init(): unit
   proc prg()   : output
 }.
 
@@ -453,6 +453,32 @@ section.
     by apply AaL.
   qed.
 
+  lemma pr_newbad (log : seed list) (m : (seed, seed * output) fmap):
+       !Bad log m
+    => mu dseed (fun x=> Bad (x :: log) m) = (card (fdom m) + size log)%r / Support.card%r.
+  proof.
+  rewrite (negBadE A AaL)=> //= -[uniq_log log_disj_domF].
+  rewrite -(@mu_eq _ (fun x=> x \in log \/ x \in m)).
+  + move=> x; rewrite eq_iff; split.
+    + by case=> H; [by apply: Cycle=> /=; rewrite H|by apply: (Collision x)].
+    case=> /=.
+    + by rewrite uniq_log=> /= ->.
+    move=> r; case=> [/>|].
+    by move: (log_disj_domF r); case.
+  have ->: dom m = mem (fdom m).
+  + by apply/fun_ext=> x; rewrite mem_fdom.
+  rewrite mu_or (@mu_mem (fdom m) dseed (inv (Support.card%r))).
+  + by move=> x _; rewrite dseed1E.
+  rewrite (@mu_mem_card log dseed (inv (Support.card%r))).
+  + by move=> x _; rewrite dseed1E.
+  rewrite (@cardE (oflist log)) (@perm_eq_size _ log) 1:perm_eq_sym 1:oflist_uniq //.
+  have -> /=: mu dseed (predI (mem log) (mem (fdom m))) = 0%r.
+  + have ->: mem (fdom m) = dom m.
+    + by apply/fun_ext=> x; rewrite mem_fdom.
+    by rewrite -(@mu0 dseed) /predI; apply/mu_eq=> x; move: (log_disj_domF x)=> [] ->.
+  by rewrite -mulrDl fromintD addrC.
+  qed.
+
   local lemma Bad_bound:
     phoare [Exp'(C(A)).main : true ==>
       Bad P.logP F.m] <= ((qP * qF + (qP - 1) * qP %/ 2)%r / Support.card%r).
@@ -498,37 +524,20 @@ section.
     rewrite sumidE ?size_ge0 leq_div2r // mulrC.
     move: (size_ge0 logP) szlog_le_qP => /IntOrder.ler_eqVlt [<- /#|gt0_sz le].
     by apply/IntOrder.ler_pmul => // /#.
-  while{1} (n <= qP /\ card (fdom F.m) <= qF).
-  + move=> Hw; exists* P.logP, F.m, n; elim* => logPw m n0.
+  while (n <= qP /\ card (fdom F.m) <= qF).
+  + move=> Hw; exists* P.logP, F.m; elim* => logPw m.
     case: (Bad P.logP F.m).
     + by conseq (_ : _ : <= (1%r))=> // /#.
     seq 2: (Bad P.logP F.m)
            ((qF + size logPw)%r / Support.card%r) 1%r 1%r
            ((sumid (qF + (size logPw + 1)) (qF + n))%r / Support.card%r)
-           (n = n0 /\ F.m = m /\ r::logPw = P.logP /\
+           (F.m = m /\ r::logPw = P.logP /\
             n <= qP /\ card (fdom F.m) <= qF)=> //.
     + by wp; rnd=> //.
-    + wp; rnd; auto=> /> _ /le_fromint domF_le_qF _.
-      rewrite (negBadE A AaL)=> //= -[uniq_logP logP_disj_domF].
-      apply (ler_trans (mu dseed (predU (dom m)
-                                        (mem logPw)))).
-      + by apply mu_sub=> x [] /#.
-      have ->: dom m = mem (fdom m).
-      + by apply/fun_ext=> x; rewrite mem_fdom.
-      rewrite mu_or (@mu_mem (fdom m) dseed (inv (Support.card%r))).
-      + by move=> x _; rewrite dseed1E.
-      rewrite (@mu_mem_card (logPw) dseed (inv (Support.card%r))).
-      + by move=> x _; rewrite dseed1E.
-      rewrite (@cardE (oflist logPw)) (@perm_eq_size _ (logPw)) 1:perm_eq_sym 1:oflist_uniq //.
-      have -> /=: mu dseed (predI (mem (fdom m)) (mem logPw)) = 0%r.
-      + have ->: mem (fdom m) = dom m.
-        + by apply/fun_ext=> x; rewrite mem_fdom.
-        by rewrite -(@mu0 dseed) /predI; apply/mu_eq=> x; move: (logP_disj_domF x)=> [] ->.
-      rewrite -mulrDl fromintD.
-      have: (card (fdom m))%r + (size logPw)%r <= qF%r + (size logPw)%r.
-      + exact/ler_add.
-      have: 0%r <= Support.card%r by smt(@Support). 
-      by move => /invr_ge0 h1; apply: ler_wpmul2r.
+    + wp; rnd; auto=> /> &0 _ /le_fromint domF_le_qF _ /pr_newbad ->.
+      apply: ler_wpmul2r.
+      + by apply: invr_ge0; smt(Support.card_gt0).
+      by rewrite !fromintD ler_add2r.
     + conseq Hw; progress=> //.
       by rewrite H1 /= (Ring.IntID.addrC 1) lerr.
     progress=> //; rewrite H2 /= -mulrDl addrA -fromintD.

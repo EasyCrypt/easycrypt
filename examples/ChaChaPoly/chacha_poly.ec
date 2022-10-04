@@ -415,7 +415,7 @@ module type CC = {
 }.
 
 module type FCC = {
-  proc * init () : unit
+  proc init () : unit
   include CC
 }.
 
@@ -935,10 +935,10 @@ proof.
   move=> /(congr1 bytes_of_poly_in); rewrite insubdK=> // ->.
   move=> /(congr1 bytes_of_poly_out); rewrite insubdK=> // ->.
   rewrite insubdK.
-  + rewrite size_drop 1:ge0_poly_in_size valP /block_size /poly_size.
+  + rewrite size_drop 1:ge0_poly_in_size valP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
   rewrite insubdK.
-  + rewrite size_take 1:ge0_poly_in_size valP /poly_size /block_size.
+  + rewrite size_take 1:ge0_poly_in_size valP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
   by rewrite cat_take_drop valKd.
 qed.
@@ -1104,7 +1104,9 @@ section PROOFS.
       + by proc; inline *; auto => /> &2; case: (p{2}).
       proc; inline *; auto => /> &2; case: (c{2}) => /> n a c t.
       by rewrite /dec /get /= => ->.
-    by apply (CCA_CPA_UFCMA St _ A _ &m) => //; apply A_ll.
+    apply (CCA_CPA_UFCMA St _ _ A _ &m) => //.
+    + by proc *; inline *; sim.
+    by apply A_ll.
   qed.
 
   local module G3 (S:SKE) = CPA_game(CCA_CPA_Adv(A), RealOrcls(S)).
@@ -1779,7 +1781,7 @@ section PROOFS.
     + case: (forged{2}) => //; case: ((UFCMA.bad1\/UFCMA.bad2){2}) => //= H12 H13.
       - have[|]->//=:=H12.
       have:=H12; rewrite negb_or => /> *.
-      rewrite /test_poly /= /poly1305 /= /test_bad.
+      rewrite /test_poly /= /poly1305 /=.
       pose f := fun (c : ciphertext) => c.`4 - poly1305_eval r3 (topol c.`2 c.`3).
       pose m := List.filter _ _.
       rewrite  hasP /=.
@@ -2244,7 +2246,7 @@ section PROOFS.
       + by rewrite /n1 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r 1:ge0_pr_zeropol -sumr_ofint le_fromint IntOrder.lerr_eq.
       rewrite hn1 eq_sym  -big_count -BIA.big_filter /= /l1 //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
-      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 /transpose //==> [#] * /=.
+      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 //==> [#] * /=.
       by rewrite count_map.
 
     case: (0 < size l2)=> * />; last first.
@@ -2279,8 +2281,8 @@ section PROOFS.
       + by rewrite /n2 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r; 1:smt(mu_bounded).
       rewrite -sumr_ofint le_fromint IntOrder.lerr_eq.
-      rewrite hn2 eq_sym  -big_count -BIA.big_filter /= /l1 //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
-      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 /transpose //==> [#] * /=.
+      rewrite hn2 eq_sym  -big_count -BIA.big_filter /= //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
+      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 //==> [#] * /=.
       by rewrite count_map.
 
   move=> &h /> ? H0 *.
@@ -2403,7 +2405,7 @@ section PROOFS.
   smt(count_eq0 has_pred1).
   qed.
 
-  lemma make_lbad1_size_cons3 log lc lenc n a c t:
+  lemma make_lbad1_size_cons3 (log : (_, _) fmap) lc lenc n a c t:
       uniq lenc =>
       ! n \in lenc =>
       size (make_lbad1 log.[n <- (a,c,t)] lc (n::lenc)) =
@@ -2467,7 +2469,7 @@ section PROOFS.
     - by conseq(:_==> true)=> />; while(true); auto.
     wp -7 -7=> />.
     move => />; smt (get_setE).
-    conseq(:_==> ={c1, t, RO.m, Mem.log, t, c1}); 2:(sim=> /#).
+    conseq (: ={c1, t, RO.m, Mem.log}); [2:sim=> /> /#].
     move => />.
     smt(get_setE leq_make_lbad1 make_lbad1_size_cons3 size_ge0).
   inline*; sp.
@@ -2479,7 +2481,7 @@ section PROOFS.
     by while(true); auto.
   swap 3 1; swap [4..6] 12; wp -10 -10=> /=.
   swap 4 4; wp -1 -1.
-  conseq(:_==> ={c1, t0, RO.m, Mem.log, Mem.lc}); 2:(sim=> /#).
+  conseq(:_==> ={c1, t0, RO.m, Mem.log, Mem.lc}); [2:sim=> /> /#].
   move=> /> &1 &2 *; do ! split => />.
   - smt().  
   - smt().  
@@ -2629,13 +2631,13 @@ section PROOFS.
     - rcondf{1} 9; 1: by auto=> />; while(true); auto.
       rcondf{2} 9; 1: by auto=> />; while(true); auto.
       wp -9 -9=> /> /=.
-      by conseq(:_==> ={c1, t0, RO.m}); 2:(sim=> /#); 1: smt(make_lbad1_size_cons3 leq_make_lbad1 size_ge0).
+      by conseq(:_==> ={c1, t0, RO.m}); [2:sim=> /> /#]; 1: smt(make_lbad1_size_cons3 leq_make_lbad1 size_ge0).
     rcondt{1} 9; 1: by auto=> />; while(true); auto.
     rcondt{2} 9; 1: by auto=> />; while(true); auto.
     case: (size UFCMA_l.lbad1{2} + size lt{2} <= UFCMA_li.i{2}).
     + rcondf{2} 9; 1: by auto=> />; while(true); auto; smt().
       wp -11 -11=> /> /=.
-      conseq(:_==> ={c1, t0, RO.m}); 2: (sim=> /#).
+      conseq(:_==> ={c1, t0, RO.m}); [2:sim=> /> /#].
       move=> &1 &2 /> *.
       rewrite !size_cat !size_map //= => {&1}; split; 1: smt(size_map size_ge0).
       rewrite nth_cat; split. 
@@ -2652,7 +2654,7 @@ section PROOFS.
     case: (size UFCMA_l.lbad1{2} <= UFCMA_li.i{2}); last first.
     + rcondf{2} 9; 1: by auto=> />; while(true); auto; smt().
       wp -11 -11=> /> /=.
-      conseq(:_==> ={c1, t0, RO.m}); 2: (sim=> /#).
+      conseq(:_==> ={c1, t0, RO.m}); [2:sim=> /> /#].
       move=> &1 &2 /> *.
       rewrite !size_cat !size_map //= => {&1}; split; 1: smt(size_map size_ge0).
       rewrite nth_cat; split. 

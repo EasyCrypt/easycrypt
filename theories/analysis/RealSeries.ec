@@ -190,7 +190,7 @@ case=> [Mf smf] [Mg smg]; exists (Mf * Mg) => J uqJ.
 pose J1 := undup (unzip1 J).
 pose F (ab : 'a * 'b) := `|f ab.`1| * `|g ab.`1 ab.`2|.
 rewrite (@eq_bigr _ _ F) /= => [ab _|]; 1: by rewrite normrM.
-rewrite /F (@sum_pair_dep ("`|_|"%Real \o f) ("`|_|"%Real \o2 g)) /(\o) /(\o2) //=.
+rewrite /F (@sum_pair_dep ("`|_|"%Real \o f) ("`|_|"%Real \o2 g)) //=.
 apply: (@ler_trans (big predT (fun i => `|f i| * Mg) J1)); last first.
 + rewrite -mulr_suml ler_wpmul2r; 1: by apply: (@smg witness [] _).
   by apply/smf/undup_uniq.
@@ -452,7 +452,7 @@ move=> J p enm sm sbl; rewrite /sum sbl /=.
 pose G f n := big predT f (pmap J (range 0 n)).
 rewrite -/(G s); have ->: G s = fun n =>
   G (fun x => `|pos s x|) n - G (fun x => `|neg s x|) n.
-+ apply/fun_ext=> i @/G @/f; rewrite sumrB; apply/eq_bigr.
++ apply/fun_ext=> i @/G; rewrite sumrB; apply/eq_bigr.
   by move=> x _ /=; rewrite !ger0_norm ?(pos_ge0, neg_ge0) pos_neg_id.
 apply/cnvtoB; apply/(@summable_pos_cnvto _ _ p) => //.
 + move=> x @/support @/pos; case: (s x < 0%r) => //.
@@ -522,10 +522,10 @@ move=> uqJ sJ; rewrite (@sumE _ (nth None (map Some J))); 1: split.
 + exists (big predT (fun x => `|s x|) (filter (fun x => s x <> 0%r) J))=> J' uniq_J'.
   rewrite -(eq_big_perm (:@perm_filterC (fun x => s x <> 0%r) J')).
   rewrite big_cat (@big1_seq _ _ (filter (fun (x : 'a) => s x = 0%r) J')) /=.
-  * by move=> x @/predT; rewrite mem_filter /abs_s /= =>- [] ->.
+  * by move=> x @/predT; rewrite mem_filter /= =>- [] ->.
   rewrite -(eq_big_perm (:@perm_filterC (fun x => mem J' x) (filter _ J))).
   rewrite -!filter_predI /predC /predI /= big_cat; apply/ler_paddr.
-  * by apply/sumr_ge0=> a //=; rewrite /abs_s normr_ge0.
+  * by apply/sumr_ge0=> a //=; rewrite normr_ge0.
   rewrite -(@eq_big_perm _ _ (filter (fun x => mem J' x /\ s x <> 0%r) J)).
   * apply/uniq_perm_eq=> [| |x]; 1,2: exact/filter_uniq.
     by rewrite !mem_filter /=; split=> //= -[] ^/sJ.

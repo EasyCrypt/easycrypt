@@ -65,11 +65,13 @@ let lossless_hyps env top sub =
 
 (* -------------------------------------------------------------------- *)
 let subst_pre env fs (m : memory) s =
-  match fs.fs_anames with
-  | Some lv ->
-      let v = List.map (fun v -> f_pvloc v m) lv in
-        PVM.add env pv_arg m (f_tuple v) s
-  | None -> s
+  let fresh ov =
+    match ov.ov_name with
+    | None   -> assert false;
+    | Some v -> { v_name = v; v_type = ov.ov_type }
+  in
+  let v = List.map (fun v -> f_pvloc (fresh v) m) fs.fs_anames in
+  PVM.add env pv_arg m (f_tuple v) s
 
 (* ------------------------------------------------------------------ *)
 let t_hoareF_fun_def_r tc =
@@ -264,7 +266,12 @@ module FunAbsLow = struct
     let pr = f_app_simpl inv kargs_pr tbool in
 
     let ospec o_called =
-      let k_called = Mx.find o_called mks in
+      let k_called =
+        try Mx.find o_called mks with
+        | Not_found ->
+          tc_error pf_ "missing cost invariant for %a"
+            (EcPrinting.pp_funname ppe) o_called
+      in
       let kargs_po =
         List.map (fun (x,_) ->
             let f = f_local x tint in
@@ -362,7 +369,7 @@ module FunAbsLow = struct
           if   EcPath.x_equal o_l o_r
           then check_oracle_use pf env topl o_r;
           false
-        with _ when OI.is_in oil -> true
+        with _ -> true
       in
 
       let fo_l = EcEnv.Fun.by_xpath o_l env in
@@ -390,7 +397,7 @@ module FunAbsLow = struct
         sigr.fs_arg sigr.fs_anames mr in
 
     let eq_res = f_eqres sigl.fs_ret ml sigr.fs_ret mr in
-    let lpre   = if OI.is_in oil then [eqglob;inv] else [inv] in
+    let lpre   = [eqglob;inv] in
     let pre    = f_ands (eq_params::lpre) in
     let post   = f_ands [eq_res; eqglob; inv] in
 
@@ -512,7 +519,7 @@ module UpToLow = struct
 
     let eq_res = f_eqres sigl.fs_ret ml sigr.fs_ret mr in
 
-    let pre  = if OI.is_in oil then [eqglob;invP] else [invP] in
+    let pre  = [eqglob;invP] in
     let pre  = f_if_simpl bad2 invQ (f_ands (eq_params::pre)) in
     let post = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in
 
@@ -540,27 +547,31 @@ module ToCodeLow = struct
     let me = EcMemory.empty_local ~witharg:false m in
 
     let args =
-      match fd.f_sig.fs_anames with
-      | None ->
-         [{ v_name = arg_symbol; v_type = fd.f_sig.fs_arg; }]
+      let freshen_arg i ov =
+        match ov.ov_name with
+        | None   -> { ov with ov_name = Some (Printf.sprintf "arg%d" (i + 1)) }
+        | Some _ -> ov
+      in List.mapi freshen_arg fd.f_sig.fs_anames
+    in
 
-      | Some params ->
-         params in
+    let (me, args) = EcMemory.bindall_fresh args me in
 
-    let me = EcMemory.bindall args me in
-
-    let res = { v_name = "r"; v_type = fd.f_sig.fs_ret; } in
+    let res = { ov_name = Some "r"; ov_type = fd.f_sig.fs_ret; } in
 
     let me, res = EcMemory.bind_fresh res me in
 
-    let eargs = List.map (fun v -> e_var (pv_loc v.v_name) v.v_type) args in
+    let eargs = List.map (fun v -> e_var (pv_loc (oget v.ov_name)) v.ov_type) args in
+    let args =
+      let var ov = { v_name = oget ov.ov_name; v_type = ov.ov_type } in
+      List.map var args
+    in
 
     let icall =
-      i_call (Some (LvVar (pv_loc res.v_name, res.v_type)), f, eargs)
+      i_call (Some (LvVar (pv_loc (oget res.ov_name), res.ov_type)), f, eargs)
     in (me, stmt [icall], res, args)
 
   let add_var env vfrom mfrom v me s =
-    PVM.add env vfrom mfrom (f_pvar (pv_loc v.v_name) v.v_type (fst me)) s
+    PVM.add env vfrom mfrom (f_pvar (pv_loc (oget v.ov_name)) v.ov_type (fst me)) s
 
   let add_var_tuple env vfrom mfrom vs me s =
     let vs =

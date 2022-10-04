@@ -14,6 +14,7 @@ type ttenv = {
   tt_implicits : bool;
   tt_oldip     : bool;
   tt_redlogic  : bool;
+  tt_und_delta : bool;
 }
 
 type engine  = ptactic_core -> backward
@@ -74,7 +75,7 @@ val process_move        : ?doeq:bool -> ppterm list -> prevert -> backward
 val process_clear       : psymbol list -> backward
 val process_smt         : ?loc:EcLocation.t -> ttenv -> pprover_infos -> backward
 val process_apply       : implicits:bool -> apply_t * prevert option -> backward
-val process_delta       : ?target:psymbol -> (rwside * rwocc * pformula) -> backward
+val process_delta       : und_delta:bool -> ?target:psymbol -> (rwside * rwocc * pformula) -> backward
 val process_rewrite     : ttenv -> ?target:psymbol -> rwarg list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : ?mode:cutmode -> engine -> ttenv -> cut_t -> backward

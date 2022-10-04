@@ -18,25 +18,14 @@ let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
     if List.length vs = 1 then [arg]
     else
       let t = Array.of_list vs in
-      let t = Array.mapi (fun i vd -> f_proj arg i vd.v_type) t in
+      let t = Array.mapi (fun i vd -> f_proj arg i vd.ov_type) t in
       Array.to_list t
   in
 
-  match vs1, vs2 with
-  | Some vs1, Some vs2 ->
-      if   List.length vs1 = List.length vs2
-      then f_eqs (f_pvlocs ty1 vs1 m1) (f_pvlocs ty2 vs2 m2)
-      else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
-                 (f_tuple (f_pvlocs ty2 vs2 m2))
-
-  | Some vs1, None ->
-      f_eq (f_tuple (f_pvlocs ty1 vs1 m1)) (f_pvarg ty2 m2)
-
-  | None, Some vs2 ->
-      f_eq (f_pvarg ty1 m1) (f_tuple (f_pvlocs ty2 vs2 m2))
-
-  | None, None ->
-      f_eq (f_pvarg ty1 m1) (f_pvarg ty2 m2)
+  if   List.length vs1 = List.length vs2
+  then f_eqs (f_pvlocs ty1 vs1 m1) (f_pvlocs ty2 vs2 m2)
+  else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
+             (f_tuple (f_pvlocs ty2 vs2 m2))
 
 let f_eqres ty1 m1 ty2 m2 =
   f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
@@ -165,6 +154,29 @@ let f_weight ty d =
 
 let f_lossless ty d =
   f_app (fop_lossless ty) [d] tbool
+
+(* -------------------------------------------------------------------- *)
+let fop_dunit ty =
+  f_op EcCoreLib.CI_Distr.p_dunit [ty] (tfun ty (tdistr ty))
+
+let f_dunit f =
+  f_app (fop_dunit f.f_ty) [f] (tdistr f.f_ty)
+
+(* -------------------------------------------------------------------- *)
+let fop_dmap tya tyb =
+  f_op EcCoreLib.CI_Distr.p_dmap [tya; tyb]
+    (toarrow [tdistr tya; tfun tya tyb] (tdistr tyb))
+
+let f_dmap tya tyb d f =
+  f_app (fop_dmap tya tyb) [d; f] (tdistr tyb)
+
+(* -------------------------------------------------------------------- *)
+let fop_dlet tya tyb =
+  f_op EcCoreLib.CI_Distr.p_dlet [tya; tyb]
+    (toarrow [tdistr tya; tfun tya (tdistr tyb)] (tdistr tyb))
+
+let f_dlet tya tyb d f =
+  f_app (fop_dlet tya tyb) [d; f] (tdistr tyb)
 
 (* -------------------------------------------------------------------- *)
 let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
@@ -911,6 +923,20 @@ let f_real_lt_simpl f1 f2 =
   match opair real_of_form f1 f2 with
   | Some (x1, x2) -> f_bool (BI.compare x1 x2 < 0)
   | _ -> f_real_lt f1 f2
+
+(* -------------------------------------------------------------------- *)
+let f_dlet_simpl tya tyb d f =
+  match f.f_node with
+  | Fquant (Llambda, ([(_, GTty _)] as bd), f') -> begin
+     match sform_of_form f' with
+     | SFop ((p, _), [body])
+          when EcPath.p_equal p EcCoreLib.CI_Distr.p_dunit ->
+        f_dmap tya tyb d (f_lambda bd body)
+     | _ ->
+        f_dlet tya tyb d f
+    end
+  | _ ->
+     f_dlet tya tyb d f
 
 (* -------------------------------------------------------------------- *)
 (* destr_exists_prenex destructs recursively existentials in a formula

@@ -350,6 +350,25 @@ proof. by rewrite ltr_neqAle normr_le0 normr0P; case: (_ = _). qed.
 lemma nosmt normr_gt0 (x : t): (zeror < `|x|) <=> (x <> zeror).
 proof. by rewrite ltr_def normr0P normr_ge0; case: (_ = _). qed.
 
+lemma nosmt unit_normr (x : t): unit (`|x|) => unit x.
+proof.
+case: (real_axiom x) => [le0n|len0].
+  by move: (normr_idP x); rewrite le0n /= => ->.
+by rewrite ler0_norm // unitrN.
+qed.
+
+lemma nosmt normrX n (x : t) : `|exp x n| = exp `|x| n.
+proof.
+case (0 <= n); [by apply normrX_nat|].
+rewrite -ltzNge -{1}(invrK x) exprV => ltn0.
+rewrite normrX_nat; [by rewrite oppz_ge0 ltzW|].
+case: (unit x) => [unitx|Nunitx].
+  by rewrite normrV // exprV.
+move: (unit_normr x) => /contra; rewrite Nunitx /=.
+move => unitNx; rewrite invr_out //.
+by rewrite -{1}(@invr_out `|_|) // exprV.
+qed.
+
 (*-------------------------------------------------------------------- *)
 hint rewrite normrE : normr_id normr0 normr1 normrN1.
 hint rewrite normrE : normr_ge0 normr_lt0 normr_le0 normr_gt0.
@@ -729,7 +748,10 @@ proof. by rewrite ltrNge. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma leVge x y : (x <= y) \/ (y <= x).
-proof. by case: (x <= y) => // /ltrNge /ltrW. qed.
+proof. exact ler_total. qed.
+
+lemma leVgt x y : (x <= y) \/ (y < x).
+proof. by case: (x <= y) => // /ltrNge. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt ltrN10: -oner < zeror.
@@ -1099,6 +1121,14 @@ rewrite exprD_nneg 1:subz_ge0 // ler_pemull ?(expr_ge0, exprn_ege1) //.
 + by rewrite (@ler_trans oner). + by rewrite subz_ge0.
 qed.
 
+lemma ler_weexpn2r x : oner < x =>
+  forall m n, 0 <= m => 0 <= n => exp x m <= exp x n => m <= n.
+proof.
+move => lt1x m n le0m le0n; rewrite -implybNN -ltrNge -ltzNge ltzE => le_m; apply (ltr_le_trans (exp x (n + 1))).
++ by rewrite exprS //; apply ltr_pmull => //; apply/expr_gt0/(ler_lt_trans oner).
+by apply ler_weexpn2l; [apply ltrW|split => //; apply addz_ge0].
+qed.
+
 lemma nosmt ieexprn_weq1 x n : 0 <= n => zeror <= x =>
   (exp x n = oner) <=> (n = 0 || x = oner).
 proof.
@@ -1188,6 +1218,14 @@ proof. by rewrite ger0_def. qed.
 
 lemma nosmt eqr_normN (x : t): (`|x| = - x) <=> (x <= zeror).
 proof. by rewrite ler0_def. qed.
+
+lemma nosmt normE n :
+  `|n| = if zeror <= n then n else -n.
+proof.
+move: (real_axiom n); rewrite or_andr => -[le0n|[Nle0n len0]].
++ by rewrite le0n /= eqr_norm_id.
+by rewrite Nle0n /= eqr_normN.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma ler_norm x : x <= `|x|.

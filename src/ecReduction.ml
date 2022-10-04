@@ -404,7 +404,7 @@ let check_cost_l env subst co1 co2 =
         ) co1.c_calls EcPath.Mx.empty
     and calls2 =
       EcPath.Mx.fold (fun f c calls ->
-          let f' = EcPath.x_substm subst.fs_sty.ts_p subst.fs_mp f in
+          let f' = Fsubst.subst_xpath subst f in
           let f' = NormMp.norm_xfun env f' in
           EcPath.Mx.change (fun old -> assert (old = None); Some c) f' calls
         ) co2.c_calls EcPath.Mx.empty in
@@ -428,7 +428,7 @@ let check_cost test env subst co1 co2 =
 
 let check_e env s e1 e2 =
   let es = e_subst_init s.fs_freshen s.fs_sty.ts_p
-             s.fs_ty Mp.empty s.fs_mp s.fs_esloc in
+             s.fs_ty Mp.empty s.fs_sty.ts_mp s.fs_esloc in
   let e2 = EcTypes.e_subst es e2 in
   if not (EqTest_i.for_expr env e1 e2) then raise NotConv
 
@@ -453,20 +453,20 @@ let is_alpha_eq hyps f1 f2 =
     ensure (EcIdent.id_equal m1 m2) in
 
   let check_pv env subst pv1 pv2 =
-    let pv2 = pv_subst (EcPath.x_substm subst.fs_sty.ts_p subst.fs_mp) pv2 in
+    let pv2 = pv_subst (Fsubst.subst_xpath subst) pv2 in
     ensure (EqTest_i.for_pv env pv1 pv2) in
 
   let check_mp env subst mp1 mp2 =
-    let mp2 = EcPath.m_subst subst.fs_sty.ts_p subst.fs_mp mp2 in
+    let mp2 = EcPath.m_subst subst.fs_sty.ts_mp mp2 in
     ensure (EqTest_i.for_mp env mp1 mp2) in
 
   let check_xp env subst xp1 xp2 =
-    let xp2 = EcPath.x_substm subst.fs_sty.ts_p subst.fs_mp xp2 in
+    let xp2 = Fsubst.subst_xpath subst xp2 in
     ensure (EqTest_i.for_xp env xp1 xp2) in
 
   let check_s env s s1 s2 =
     let es = e_subst_init s.fs_freshen s.fs_sty.ts_p
-                          s.fs_ty Mp.empty s.fs_mp s.fs_esloc in
+                          s.fs_ty Mp.empty s.fs_sty.ts_mp s.fs_esloc in
     let s2 = EcModules.s_subst es s2 in
     ensure (EqTest_i.for_stmt env s1 s2) in
 
@@ -1594,6 +1594,18 @@ let rec conv ri env f1 f2 stk =
 
   | Fproj(f1', i1), Fproj(f2',i2) when i1 = i2 ->
     conv ri env f1' f2' (zproj i1 f1.f_ty stk)
+
+  | Fpvar(pv1, m1), Fpvar(pv2, m2)
+      when EcEnv.NormMp.pv_equal env pv1 pv2 && EcMemory.mem_equal m1 m2 ->
+      conv_next ri env f1 stk
+
+  | Fglob (m1, mem1), Fglob (m2, mem2)
+      when
+        EcPath.m_equal
+          (EcEnv.NormMp.norm_mpath env m1)
+          (EcEnv.NormMp.norm_mpath env m2)
+        && EcMemory.mem_equal mem1 mem2 ->
+      conv_next ri env f1 stk
 
   | FhoareF hf1, FhoareF hf2 when EqTest_i.for_xp env hf1.hf_f hf2.hf_f ->
     conv ri env hf1.hf_pr hf2.hf_pr (zhl f1 [hf1.hf_po] [hf2.hf_po] stk)

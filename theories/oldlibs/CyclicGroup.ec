@@ -13,25 +13,12 @@ op ( ^ ): group -> t -> group.       (* exponentiation *)
 op log  : group -> t.                (* discrete logarithm *)
 op g1 = g ^ F.zero.
 
-op cgpow :  int.
-op cgmul: int.
-op cgdiv: int.
-op cgeq : int.
-axiom ge0_cg : 0 <= cgpow /\ 0 <= cgmul /\ 0 <= cgdiv /\ 0 <= cgeq.
-
-schema cost_gen `{P} : cost [P:g] = '0.
-schema cost_pow `{P} {g:group, x:t} : cost[P: g ^ x] = cost[P:g] + cost[P:x] + N cgpow.
-schema cost_gmul `{P} {g1 g2:group} : cost[P:g1 * g2] = cost[P:g1] + cost[P:g2] + N cgmul.
-schema cost_geq  `{P} {g1 g2:group} : cost[P:g1 = g2] = cost[P:g1] + cost[P:g2] + N cgeq.
-schema cost_gdiv `{P} {g1 g2:group} : cost[P:g1 / g2] = cost[P:g1] + cost[P:g2] + N cgdiv.
-
-hint simplify cost_gen, cost_pow, cost_gmul, cost_gdiv, cost_geq.
-
 axiom gpow_log (a:group): g ^ (log a) = a.
 axiom log_gpow x : log (g ^ x) = x.
+axiom nosmt log_g : log g = F.one.
 
 lemma nosmt log_bij x y: x = y <=> log x = log y by smt (gpow_log).
-lemma nosmt pow_bij (x y:F.t): x = y <=> g^x =g^y by [].
+lemma nosmt pow_bij (x y:F.t): x = y <=> g^x =g^y by smt.
 
 
 axiom inv_def (a:group): inv a = g ^ (-log a).
@@ -41,9 +28,9 @@ axiom mul_pow g (x y:t): g ^ x * g ^ y = g ^ (x + y).
 
 axiom pow_pow g (x y:t): (g ^ x) ^ y = g ^ (x * y).
 
-lemma nosmt log_pow (g1:group) x: log (g1 ^ x) = log g1 * x by [].
+lemma nosmt log_pow (g1:group) x: log (g1 ^ x) = log g1 * x by smt.
 
-lemma nosmt log_mul (g1 g2:group): log (g1 * g2) = log g1 + log g2 by [].
+lemma nosmt log_mul (g1 g2:group): log (g1 * g2) = log g1 + log g2 by smt.
 
 lemma nosmt pow_mul (g1 g2:group) x: g1^x * g2^x = (g1*g2)^x.
 proof.
@@ -79,12 +66,6 @@ proof strict.
   by rewrite -div_def sub_def addfN.
 qed.
 
-lemma nosmt log_g : log g = F.one.
-proof strict.
- have H: log g - log g = F.one + -log g by smt.
- have H1: log g = log g + F.one + -log g; smt.
-qed.
-
 lemma nosmt g_neq0 : g1 <> g.
 proof.
   rewrite /g1 -{2}(gpow_log g) log_g -pow_bij;smt.
@@ -100,3 +81,28 @@ lemma inj_gpow_log (a:group): a = g ^ (log a) by smt.
 hint rewrite Ring.inj_algebra : inj_gpow_log.
 hint rewrite Ring.rw_algebra : log_g log_pow log_mul log_bij.
 
+
+(* -------------------------------------------------------------------- *)
+abstract theory Cost.
+  op cgpow : int.
+  op cgmul: int.
+  op cgdiv: int.
+  op cgeq : int.
+  axiom ge0_cg : 0 <= cgpow /\ 0 <= cgmul /\ 0 <= cgdiv /\ 0 <= cgeq.
+  
+  schema cost_gen `{P} : cost [P:g] = '0.
+  
+  schema cost_pow `{P} {g:group, x:t} : 
+    cost[P: g ^ x] = cost[P:g] + cost[P:x] + N cgpow.
+  
+  schema cost_gmul `{P} {g1 g2:group} : 
+    cost[P:g1 * g2] = cost[P:g1] + cost[P:g2] + N cgmul.
+  
+  schema cost_geq  `{P} {g1 g2:group} :
+    cost[P:g1 = g2] = cost[P:g1] + cost[P:g2] + N cgeq.
+  
+  schema cost_gdiv `{P} {g1 g2:group} : 
+    cost[P:g1 / g2] = cost[P:g1] + cost[P:g2] + N cgdiv.
+  
+  hint simplify cost_gen, cost_pow, cost_gmul, cost_gdiv, cost_geq.
+end Cost.

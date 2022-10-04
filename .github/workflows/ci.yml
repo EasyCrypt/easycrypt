@@ -2,26 +2,26 @@ name: EasyCrypt compilation & check
 
 on: [push,pull_request]
 
+env:
+  HOME: /home/charlie
+  OPAMYES: true
+  OPAMJOBS: 2
+
 jobs:
   compile:
     name: EasyCrypt compilation
     runs-on: ubuntu-20.04
     container:
       image: easycryptpa/ec-build-box
-      options: --user root
     steps:
-    - uses: actions/checkout@v2
-    - name: Set ownership
-      run: |
-        sudo chown opam:opam -R .
-        sudo chown opam:opam -R ~
+    - uses: actions/checkout@v3
     - name: Update OPAM & EasyCrypt dependencies
       run: |
-        sudo -u opam opam update
-        sudo -u opam opam pin add -n easycrypt .
-        sudo -u opam opam install --deps-only easycrypt
+        opam update
+        opam pin add -n easycrypt .
+        opam install --deps-only easycrypt
     - name: Compile EasyCrypt
-      run: sudo -u opam opam config exec -- make
+      run: opam config exec -- make
 
   check:
     name: Check EasyCrypt Libraries
@@ -29,32 +29,27 @@ jobs:
     runs-on: ubuntu-20.04
     container:
       image: easycryptpa/ec-build-box
-      options: --user root
     strategy:
       fail-fast: false
       matrix:
         target: [stdlib, examples]
     steps:
-    - uses: actions/checkout@v2
-    - name: Set ownership
-      run: |
-        sudo chown opam:opam -R .
-        sudo chown opam:opam -R ~
+    - uses: actions/checkout@v3
     - name: Update OPAM & EasyCrypt dependencies
       run: |
-        sudo -u opam opam update
-        sudo -u opam opam pin add -n easycrypt .
-        sudo -u opam opam install --deps-only easycrypt
+        opam update
+        opam pin add -n easycrypt .
+        opam install --deps-only easycrypt
     - name: Compile EasyCrypt
-      run: sudo -u opam opam config exec -- make
+      run: opam config exec -- make
     - name: Detect SMT provers
       run: |
-        sudo -u opam rm -f ~/.why3.conf
-        sudo -u opam opam config exec -- ./ec.native why3config -why3 ~/.why3.conf
+        rm -f ~/.why3.conf
+        opam config exec -- ./ec.native why3config -why3 ~/.why3.conf
     - name: Compile Library (${{ matrix.target }})
       env:
         TARGET: ${{ matrix.target }}
-      run: sudo -u opam opam config exec -- make $TARGET
+      run: opam config exec -- make $TARGET
     - uses: actions/upload-artifact@v2
       name: Upload report.log
       if: always()
@@ -63,9 +58,49 @@ jobs:
         path: report.log
         if-no-files-found: ignore
 
+  external:
+    name: Check EasyCrypt External Projects
+    needs: compile
+    runs-on: ubuntu-20.04
+    container:
+      image: easycryptpa/ec-build-box
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ [ 'jasmin-eclib', 'jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin' ] ]
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: 'easycrypt'
+    - uses: actions/checkout@v3
+      with:
+        path: 'project'
+        repository: ${{ matrix.target[1] }}
+    - name: Update OPAM & EasyCrypt dependencies
+      run: |
+        opam update
+        opam pin add -n easycrypt easycrypt
+        opam install --deps-only easycrypt
+    - name: Compile & Install EasyCrypt
+      run: opam config exec -- make -C easycrypt build install
+    - name: Detect SMT provers
+      run: |
+        rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
+        opam config exec -- easycrypt why3config
+    - name: Compile project
+      working-directory: project/${{ matrix.target[2] }}
+      run: opam config exec -- ec-runtest ${{ matrix.target[3] }} ${{ matrix.target[4] }}
+    - uses: actions/upload-artifact@v2
+      name: Upload report.log
+      if: always()
+      with:
+        name: report.log (${{ matrix.target[0] }})
+        path: report.log
+        if-no-files-found: ignore
+
   notification:
     name: Notification
-    needs: [compile, check]
+    needs: [compile, check, external]
     if: |
       (github.event_name == 'push') ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)

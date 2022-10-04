@@ -104,7 +104,7 @@ module PV : sig
   val mem_pv   : env -> prog_var -> t -> bool
   val mem_glob : env -> mpath -> t -> bool
 
-  val fv : env -> EcIdent.t -> form -> t
+  val fv : env -> EcMemory.memory -> form -> t
 
   val pp : env -> Format.formatter -> t -> unit
 
@@ -195,4 +195,3 @@ end
 (* -------------------------------------------------------------------- *)
 val i_eqobs_in_refl : env -> instr -> PV.t -> PV.t
 val eqobs_inF_refl  : env -> EcPath.xpath -> PV.t -> PV.t
-val check_module_in : env -> mpath -> module_type -> unit

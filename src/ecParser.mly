@@ -181,6 +181,7 @@
     | `WANTEDLEMMAS   of EcParsetree.pdbhint
     | `VERBOSE        of int option
     | `VERSION        of [ `Full | `Lazy ]
+    | `DUMPIN         of string located
     | `SELECTED
     | `DEBUG
   ]
@@ -216,6 +217,7 @@
            "lazy"          ;
            "full"          ;
            "iterate"       ;
+           "dumpin"        ;
            "selected"      ;
            "debug"         ]
 
@@ -291,6 +293,7 @@
       let verbose  = ref None in
       let version  = ref None in
       let iterate  = ref None in
+      let dumpin   = ref None in
       let selected = ref None in
       let debug    = ref None in
 
@@ -335,6 +338,7 @@
         | `VERSION        v -> version  := Some v
         | `ITERATE          -> iterate  := Some true
         | `PROVER         p -> List.iter add_prover p
+        | `DUMPIN         f -> dumpin   := Some f
         | `SELECTED         -> selected := Some true
         | `DEBUG            -> debug    := Some true
       in
@@ -357,6 +361,7 @@
         plem_iterate    = !iterate;
         plem_wanted     = !wanted;
         plem_unwanted   = !unwanted;
+        plem_dumpin     = !dumpin;
         plem_selected   = !selected;
         psmt_debug      = !debug;
       }
@@ -448,6 +453,7 @@
 %token EXACT
 %token EXFALSO
 %token EXIST
+%token EXIT
 %token EXLIM
 %token EXPECT
 %token EXPORT
@@ -546,6 +552,7 @@
 %token REWRITE
 %token RIGHT
 %token RND
+%token RNDSEM
 %token RPAREN
 %token RPBRACE
 %token RRARROW
@@ -674,6 +681,7 @@ _lident:
 | EXLIM      { "exlim"      }
 | ECALL      { "ecall"      }
 | FROM       { "from"       }
+| EXIT       { "exit"       }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -825,6 +833,7 @@ f_or_mod_ident:
 
 %inline sbinop:
 | EQ        { "="   }
+| NE        { "<>"  }
 | PLUS      { "+"   }
 | MINUS     { "-"   }
 | STAR      { "*"   }
@@ -982,10 +991,6 @@ expr_u:
 
 | e=expr_chained_orderings %prec prec_below_order
     { fst e }
-
-| e1=expr op=loc(NE) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc "[!]" None
-      [ mk_loc op.pl_loc (peapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=expr op=loc(binop) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -1262,11 +1267,6 @@ sform_u(P):
   RBRACKET
     { PFprob (mp, args, pn, event) }
 
-| WP LBRACKET
-    mp=loc(fident) args=paren(plist0(expr, COMMA)) COLON f=form_r(P)
-  RBRACKET
-    { PFWP (mp, args, f) }
-
 | r=loc(RBOOL)
     { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
 
@@ -1286,10 +1286,6 @@ form_u(P):
 
 | f=form_chained_orderings(P) %prec prec_below_order
     { fst f }
-
-| e1=form_r(P) op=loc(NE) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc "[!]" None
-      [ mk_loc op.pl_loc (pfapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=form_r(P) op=loc(binop) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -1449,20 +1445,23 @@ type_exp:
 
 (* -------------------------------------------------------------------- *)
 (* Parameter declarations                                              *)
+var_or_anon:
+| x=loc(UNDERSCORE)
+    { mk_loc x.pl_loc None }
 
-typed_vars:
-| xs=ident+ COLON ty=loc(type_exp)
+| x=ident
+    { mk_loc x.pl_loc (Some x) }
+
+typed_vars_or_anons:
+| xs=var_or_anon+ COLON ty=loc(type_exp)
    { List.map (fun v -> (v, ty)) xs }
 
-| xs=ident+
+| xs=var_or_anon+
     { List.map (fun v -> (v, mk_loc v.pl_loc PTunivar)) xs }
 
 param_decl:
-| LPAREN aout=plist0(typed_vars, COMMA) RPAREN
-    { Fparams_exp (List.flatten aout )}
-
-| LPAREN UNDERSCORE COLON ty=loc(type_exp) RPAREN
-    { Fparams_imp ty }
+| LPAREN aout=plist0(typed_vars_or_anons, COMMA) RPAREN
+    { List.flatten aout }
 
 (* -------------------------------------------------------------------- *)
 (* Statements                                                           *)
@@ -1594,8 +1593,7 @@ fun_def_body:
 
 fun_decl:
 | x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
-    { let frestr = { pmre_in    = true;
-		     pmre_name  = x;
+    { let frestr = { pmre_name  = x;
 		     pmre_orcls = None;
 		     pmre_compl = None;	} in
 
@@ -1617,12 +1615,8 @@ mod_item:
     { Pst_mod (x, odfl [] c, m) }
 
 | PROC decl=loc(fun_decl) EQ body=fun_def_body {
-    let { pl_loc = loc; pl_desc = decl; } = decl in
-        match decl.pfd_tyargs with
-        | Fparams_imp _ ->
-            let msg = "implicite declaration of parameters not allowed" in
-              parse_error loc (Some msg)
-        | _ -> Pst_fun (decl, body)
+    let { pl_desc = decl; } = decl in
+    Pst_fun (decl, body)
   }
 
 | PROC x=lident EQ f=loc(fident)
@@ -1720,10 +1714,9 @@ fun_restr:
     { (None, Some cl) }
 
 mod_restr_el:
-  | i=iboption(STAR) f=lident COLON fr=fun_restr
+  | f=lident COLON fr=fun_restr
     { let orcl, cmpl = fr in
-      { pmre_in = not i;
-	pmre_name = f;
+      { pmre_name = f;
 	pmre_orcls = orcl;
 	pmre_compl = cmpl; } }
 
@@ -1782,10 +1775,9 @@ signature_item:
     { let qs = omap (List.map (fun x -> { inp_in_params = false;
 					  inp_qident    = x;     })) qs in
       `Include (i, xs, qs) }
-| PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
+| PROC x=lident pd=param_decl COLON ty=loc(type_exp) fr=fun_restr?
     { let orcl, compl = odfl (None,None) fr in
-      let frestr = { pmre_in    = not i;
-		     pmre_name  = x;
+      let frestr = { pmre_name  = x;
 		     pmre_orcls = orcl;
 		     pmre_compl = compl; } in
 
@@ -2004,9 +1996,6 @@ mcptn(BOP):
 
 | op=loc(uniop) tvi=tvars_app? x=bdident
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x]) }
-
-| x1=bdident op=loc(NE) tvi=tvars_app? x2=bdident
-    { PPApp ((pqsymb_of_symb op.pl_loc "[!]", tvi), [x1; x2]) }
 
 | x1=bdident op=loc(BOP) tvi=tvars_app? x2=bdident
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x1; x2]) }
@@ -2758,6 +2747,17 @@ s_codepos1:
 | n1=codepos1 n2=codepos1
     { Double (n1, n2) }
 
+semrndpos1:
+| b=boption(STAR) c=codepos1
+    { (b, c) }
+
+semrndpos:
+| n=semrndpos1
+    { Single n }
+
+| n1=semrndpos1 n2=semrndpos1
+    { Double (n1, n2) }
+
 while_tac_info:
 | inv=sform
     { { wh_inv = inv; wh_vrnt = None; wh_bds = None; } }
@@ -2781,9 +2781,6 @@ async_while_tac_info:
 rnd_info:
 | empty
     { PNoRndParams }
-
-| CEQ f=sform
-    { PSingleRndParam f }
 
 | f=sform
     { PSingleRndParam f }
@@ -3158,8 +3155,11 @@ phltactic:
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
 
-| RND s=side? info=rnd_info
-    { Prnd (s, info) }
+| RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
+    { Prnd (s, c, info) }
+
+| RNDSEM s=side? c=codepos1
+    { Prndsem (s, c) }
 
 | INLINE s=side? u=inlineopt? o=occurences? f=plist1(loc(fident), empty)
     { Pinline (`ByName (s, u, (f, o))) }
@@ -3837,6 +3837,9 @@ smt_info1:
 | PROVER EQ p=prover_kind
     { `PROVER p }
 
+| DUMP IN EQ file=loc(STRING)
+    { `DUMPIN file }
+
 | x=lident po=prefix(EQ, smt_option)?
     { SMT.mk_pi_option x po }
 
@@ -3974,6 +3977,9 @@ prog_r:
 
 | UNDO d=word FINAL
    { P_Undo d }
+
+| EXIT FINAL
+   { P_Exit }
 
 | error
    { parse_error (EcLocation.make $startpos $endpos) None }

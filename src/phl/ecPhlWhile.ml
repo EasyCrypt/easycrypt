@@ -136,6 +136,7 @@ let t_choare_while_r inv qdec n (lam_cost : cost) tc =
 
 
 (* -------------------------------------------------------------------- *)
+(* rule >=, <=, =, with a stricly decreasing variant *)
 let t_bdhoare_while_r inv vrnt tc =
   let env = FApi.tc1_env tc in
   let bhs = tc1_as_bdhoareS tc in
@@ -167,6 +168,7 @@ let t_bdhoare_while_r inv vrnt tc =
   FApi.xmutate1 tc `While [b_concl; concl]
 
 (* -------------------------------------------------------------------- *)
+(* Rule for <= *)
 let t_bdhoare_while_rev_r inv tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
   let bhs = tc1_as_bdhoareS tc in
@@ -189,10 +191,8 @@ let t_bdhoare_while_rev_r inv tc =
   (* 1. Sub-goal *)
   let body_concl =
     let while_s  = EcModules.stmt [EcModules.i_abstract w] in
-    let while_s' = EcModules.i_if (lp_guard_exp, while_s, EcModules.stmt []) in
-    let while_s' = EcModules.stmt [while_s'] in
-    let unfolded_while_s = EcModules.s_seq lp_body while_s' in
-    let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s'; } in
+    let unfolded_while_s = EcModules.s_seq lp_body while_s in
+    let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s; } in
     let unfolded_while_jgmt = f_bdHoareS_r
       { bhs with bhs_pr = f_and inv lp_guard; bhs_s = unfolded_while_s; }
     in
@@ -213,15 +213,26 @@ let t_bdhoare_while_rev_r inv tc =
   FApi.xmutate1_hyps tc `While [(hyps', body_concl); (hyps, rem_concl)]
 
 (* -------------------------------------------------------------------- *)
+(* Rule for = or >= *)
+
 let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
 
-  let bhs    = tc1_as_bdhoareS tc in
+  let bhs = tc1_as_bdhoareS tc in
+
+  if bhs.bhs_cmp = FHle then
+    tc_error !!tc "only judgments with an lower/eq-bounded are supported";
+
   let b_pre  = bhs.bhs_pr in
   let b_post = bhs.bhs_po in
   let mem    = bhs.bhs_m in
 
   let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in
+
+  if not (PV.indep env (s_write env lp_body) (PV.fv env (EcMemory.memory mem) eps)) then
+    tc_error !!tc
+      "The variant decreasing rate lower-bound cannot "
+      "depend on variables written by the loop body";
 
   if not (List.is_empty rem_s.s_node) then
     tc_error !!tc  "only single loop statements are accepted";
@@ -235,8 +246,12 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
 
   (* 2. Pre-bound *)
   let pre_bound_concl =
-    let term_post = [b_pre; f_not lp_guard; f_not b_post] in
-    let term_post = f_imps term_post (f_eq bound f_r0) in
+    let term_post = [b_pre; f_not lp_guard] in
+    let concl =
+      if bhs.bhs_cmp = FHeq then
+        f_eq bound (f_if b_post f_r1 f_r0)
+      else f_imp (f_not b_post) (f_eq bound f_r0) in
+    let term_post = f_imps term_post concl in
     let term_post = generalize_mod env (EcMemory.memory mem) modi term_post in
       f_forall_mems [mem] term_post
   in
@@ -283,13 +298,11 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
 
   let body_concl =
     let while_s1 = EcModules.stmt [EcModules.i_abstract w] in
-    let while_s2 = EcModules.i_if (lp_guard_exp, while_s1, EcModules.stmt []) in
-    let while_s2 = EcModules.stmt [while_s2] in
 
-    let unfolded_while_s = EcModules.s_seq lp_body while_s2 in
-    let while_jgmt = f_bdHoareS_r { bhs with bhs_pr=inv; bhs_s=while_s2; } in
+    let unfolded_while_s = EcModules.s_seq lp_body while_s1 in
+    let while_jgmt = f_bdHoareS_r { bhs with bhs_pr=b_pre; bhs_s=while_s1; } in
     let unfolded_while_jgmt = f_bdHoareS_r
-      { bhs with bhs_pr=f_and inv lp_guard; bhs_s=unfolded_while_s; }
+      { bhs with bhs_pr=f_and b_pre lp_guard; bhs_s=unfolded_while_s; }
     in
     f_imp while_jgmt unfolded_while_jgmt
   in

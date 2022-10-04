@@ -129,7 +129,7 @@ type pregoal = {
 type validation =
 | VSmt                               (* SMT call *)
 | VAdmit                             (* admit *)
-| VIntros  of (handle * ident option list) (* intros *)
+| VIntros  of (handle * ident list)  (* intros *)
 | VConv    of (handle * Sid.t)       (* weakening + conversion *)
 | VLConv   of (handle * ident)       (* hypothesis conversion *)
 | VRewrite of (handle * rwproofterm) (* rewrite *)

@@ -9,7 +9,7 @@ op (\) (d : 'a distr) (P : 'a -> bool) : 'a distr = dscale (dfilter d P).
 
 lemma supp_dexcepted (x:'a) d P :
   support (d \ P) x <=> (support d x /\ !P x).
-proof. by rewrite supp_dscale supp_dfilter /predI /predC. qed.
+proof. by rewrite supp_dscale supp_dfilter. qed.
 
 lemma dexcepted1E d P (x : 'a) :
   mu1 (d \ P) x
@@ -34,7 +34,7 @@ proof. by rewrite dscaleE weight_dfilter dfilterE. qed.
 lemma nosmt weight_dexcepted (d:'a distr) P :
   weight (d \ P) = b2r (weight d <> mu d (P)).
 proof.
-rewrite weight_dscale weight_dfilter /b2r subr_eq0.
+rewrite weight_dscale weight_dfilter subr_eq0.
 by case: (weight d = mu d (P)).
 qed.
 
@@ -296,33 +296,38 @@ case @[ambient]: (mu (dt x) (X x) = weight (dt x))=> Hpt.
   while (X x r /\ i = x /\ test = X)=> //=.
   auto=> &m' [#] _ -> -> _ r; move: (mu_in_weight (X x) (dt x) r).
   by rewrite Hpt.
+conseq (: _: =(if X x r then mu (dt x \ X x) P else b2r (P r))).
++ by move=> />; rewrite y_in_Xx.
+conseq (_ : i = x /\ test = X ==> _) => //.
 while (i = x /\ test = X) (if test x r then 1 else 0) 1 (mu (dt x) (predC (X x)))=> //=.
++ smt().
 + smt().
 + move=> ih. alias 2 r0 = r.
   (** TRANSITIVITY FOR PHOARE!! **)
   phoare split (mu (dt x) (predI P (predC (X x))))
                (mu (dt x) (X x) * mu (dt x \ X x) P)
                : (P r0 /\ !X x r0).
-  + move=> &m' [#] -> -> _ /=; rewrite dexceptedE.
+  + move=> &m' [#] -> -> -> /=; rewrite dexceptedE.
     rewrite -{1}(mulr1 (mu (dt x) (predI _ _))).
     rewrite -(@divrr (weight (dt x) - mu (dt x) (X x))).
     + smt().
     rewrite mulrA mulrA -mulrDl; congr.
-    by rewrite mulrDr mulrC mulrN (mulrC (_ _ (X x))) subrK dt_ll. (* dt_ll *)
+    by rewrite mulrDr mulrC mulrN (mulrC (_ _ (X x))) subrK dt_ll. 
   + seq  2: (P r0 /\ !X x r0)
             (mu (dt x) (predI P (predC (X x)))) 1%r
                                               _ 0%r
             (r0 = r /\ i = x /\ test = X)=> //=.
     + by auto.
     + by wp; rnd (predI P (predC (X x))); auto=> />.
-    + by rcondf 1.
+    + by conseq ih=> />.
     by hoare; conseq (: _ ==> true)=> // /#.
   seq 2: (!X x r0)
                          _ 0%r
          (mu (dt x) (X x)) (mu (dt x \ X x) P)
          (r0 = r /\ i = x /\ test = X)=> //=.
   + by auto.
-  + by hoare; rcondf 1=> //; auto=> /#.
+  + case: (P r0); last by conseq ih=> />.
+    by hoare; conseq (: true)=> />.
   + by wp; rnd.
   by conseq ih=> &m' />; rewrite dexceptedE.
 + by auto.

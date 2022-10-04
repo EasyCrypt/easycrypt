@@ -19,6 +19,7 @@ op cdbits : { int | 0 <= cdbits } as ge0_cdbits.
 schema cost_cdbits `{P} : cost [P: dbits] = N cdbits.
 hint simplify cost_cdbits.
 
+
 (* Upper bound on complexity of the adversary *)
 type adv_cost = {
   cchoose : int; (* cost *)
@@ -39,7 +40,14 @@ clone import DiffieHellman.List_CDH as LCDHT with
   proof gt0_n by apply gt0_qH.
 import DiffieHellman G FDistr.
 
-clone import LCDHT.C as C1.
+clone import LCDHT.Cost as C1.
+
+clone include AllCore.Cost.
+clone include Bool.Cost.
+clone include Bits.Cost.
+clone include DBool.Cost.
+clone include List.Cost.
+clone include G.Cost.
 
 type pkey = group.
 type skey = t.

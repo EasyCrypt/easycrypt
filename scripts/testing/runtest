@@ -1,12 +1,26 @@
 #! /usr/bin/env python3
 
 # --------------------------------------------------------------------
-import sys, os, errno, re, glob, shutil, itertools, logging
-import subprocess as sp, time, datetime, socket, io
+import abc
+import asyncio
+import collections
+import contextlib as clib
+import curses
+import datetime
+import glob
+import itertools
+import math
+import multiprocessing as mp
+import os
+import re
+import signal
+import socket
+import sys
+import termios
+import time
+import yaml
 
 # --------------------------------------------------------------------
-import collections as cl, yaml
-
 class folded_unicode(str):
     pass
 
@@ -22,42 +36,28 @@ yaml.add_representer(folded_unicode , folded_unicode_representer)
 yaml.add_representer(literal_unicode, literal_unicode_representer)
 
 # --------------------------------------------------------------------
+@clib.asynccontextmanager
+async def awaitable(the):
+    try:
+        yield the
+    finally:
+        await the.wait()
+
+clib.awaitable = awaitable
+
+# --------------------------------------------------------------------
 class Object:
     def __init__(self, **kw):
         self.__dict__.update(kw)
 
 # --------------------------------------------------------------------
-class ANSIColor:
-    BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
+class Singleton(type):
+    _instances = {}
 
-    @staticmethod
-    def _hascolors():
-        if not hasattr(sys.stdout, "isatty"):
-            return False
-        if not sys.stdout.isatty():
-            return False
-
-        try:
-            import curses
-
-            curses.setupterm()
-            return curses.tigetnum("colors") > 2
-        except:
-            return False
-
-    @staticmethod
-    def color(txt, color):
-        if ANSIColor.hascolors:
-            return "\x1b[1;%dm%s\x1b[0m" % (30+color, txt)
-        return txt
-
-ANSIColor.hascolors = ANSIColor._hascolors()
-
-def red  (txt): return ANSIColor.color(txt, ANSIColor.RED  )
-def green(txt): return ANSIColor.color(txt, ANSIColor.GREEN)
-
-def rcolor(txt, b):
-    return (green if b else red)(txt)
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
 
 # --------------------------------------------------------------------
 def _options():
@@ -84,7 +84,7 @@ def _options():
     parser.add_option(
         '', '--jobs',
         action  = 'store',
-        default = 1,
+        default = None,
         metavar = 'JOBS',
         type    = 'int',
         help    = 'number of maximum parallel test jobs')
@@ -107,12 +107,13 @@ def _options():
     if len(args) < 1:
         parser.error('this program takes at least one argument')
 
-    if cmdopt.timeout:
+    if cmdopt.timeout is not None:
         if cmdopt.timeout <= 0:
             parser.error('timeout must be positive')
 
-    if cmdopt.jobs <= 0:
-        parse.error('jobs must be positive')
+    if cmdopt.jobs is not None:
+        if cmdopt.jobs < 0:
+            parser.error('jobs must be non-negative')
 
     options = Object(scenarios = dict())
     options.timeout  = cmdopt.timeout
@@ -122,7 +123,7 @@ def _options():
 
     defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
 
-    config = cp.SafeConfigParser(defaults)
+    config = cp.ConfigParser(defaults)
     config.read(args[0])
 
     def resolve_targets(names):
@@ -164,119 +165,147 @@ def _options():
     return options
 
 # --------------------------------------------------------------------
-def _dump_report(config, results, out):
-    totaltime = sum([x.time for x in results])
-    grouped   = dict()
-    aout      = []
+class Listener(abc.ABC):
+    REFRESH = None
 
-    for result in results:
-        grouped.setdefault(result.config.group, []).append(result)
+    @abc.abstractmethod
+    def file_check_start(self, filename):
+        pass
 
-    for gname, group in grouped.items():
-        ok   = [x for x in group if     x.success]
-        ko   = [x for x in group if not x.success]
-        node = cl.OrderedDict()
+    @abc.abstractmethod
+    def file_check_progress(self, handle, status):
+        pass
 
-        node['name']      = gname
-        node['hostname']  = config.hostname
-        node['timestamp'] = config.timestamp.isoformat()
-        node['tests']     = len(group)
-        node['failures']  = len(ko)
-        node['time']      = '%.3f' % totaltime
-        node['details']   = []
+    @abc.abstractmethod
+    def file_check_done(self, handle, status):
+        pass
 
-        for result in group:
-            subnode = cl.OrderedDict()
+    @abc.abstractmethod
+    def error(self, handle, level, msg):
+        pass
 
-            name = os.path.basename(result.config.filename)
-            name = os.path.splitext(name)[0]
-            name = '%s (%s)' % (name, result.config.filename)
+    @abc.abstractmethod
+    def tick(self):
+        pass
 
-            subnode['name']       = name
-            subnode['time']       = '%.3f' % (result.time,)
-            subnode['success']    = result.success
-            subnode['shouldpass'] = result.config.isvalid
-            subnode['output']     = literal_unicode(result.stderr.rstrip('\r\n'))
-
-            node['details'].append(subnode)
-
-        aout.append(node)
-
-    opts = dict(default_flow_style = None, encoding = 'utf-8')
-
-    out.write(yaml.dump(aout, **opts))
+    @abc.abstractmethod
+    def start(self):
+        pass
 
 # --------------------------------------------------------------------
-TIMING_DIR = 'timing'
+class CurseWrapper(metaclass = Singleton):
+    COLOR_RED    = curses.COLOR_RED
+    COLOR_GREEN  = curses.COLOR_GREEN
+    COLOR_YELLOW = curses.COLOR_YELLOW
+    COLOR_BLUE   = curses.COLOR_BLUE
 
-def _run_test(config, options):
-    logging.info("running ec on `%s' [valid: %s]" % \
-                     (config.filename, config.isvalid))
+    COLOR_CODES = (
+        COLOR_RED   ,
+        COLOR_GREEN ,
+        COLOR_YELLOW,
+        COLOR_BLUE  ,
+    )
 
-    timestamp = time.time()
-    try:
-        command = [options.bin] + options.args + config.args
-        if options.timeout:
-            command.extend(['-timeout', str(options.timeout)])
-        if options.timing:
-            tfilename = os.path.join(
-                TIMING_DIR, os.path.splitext(config.filename)[0] + '.stats')
-            os.makedirs(os.path.dirname(tfilename), exist_ok = True)
-            command.extend(['-tstats', tfilename])
-            
-        command.extend([config.filename])
+    def __init__(self):
+        curses.setupterm()
+        self._codes = dict(
+            cup   = curses.tigetstr('cuu1' ),
+            cdw   = curses.tigetstr('cud1' ),
+            sv    = curses.tigetstr('sc'   ),
+            cr    = curses.tigetstr('rc'   ),
+            el    = curses.tigetstr('el'   ),
+            setaf = curses.tigetstr('setaf'),
+            sgr0  = curses.tigetstr('sgr0' ),
+        )
 
-        logging.info('command: %r' % (command,))
-        process = sp.Popen(command, stdout = sp.PIPE, stderr = sp.PIPE)
+        self._colors = {
+            x: curses.tparm(self.codes['setaf'], x) for x in self.COLOR_CODES
+        }
 
+        self._autoflush = 0
+        self._stream    = sys.stdout
+
+    codes  = property(lambda self : self._codes)
+    colors = property(lambda self : self._colors)
+
+    def acquire(self):
+        self._autoflush += 1
+
+    def release(self):
+        assert (self._autoflush > 0)
+
+        self._autoflush -= 1
+        if self._autoflush == 0:
+            self._stream.flush()
+
+    def rawwrite(self, data, flush = None):
+        self._stream.buffer.write(data)
+        if flush or self._autoflush == 0:
+            self._stream.flush()
+
+    def write(self, data, flush = None):
+        self.rawwrite(data.encode('utf-8'), flush)
+
+    def cup(self, n = 1):
+        self.rawwrite(self.codes['cup'] * n)
+
+    def cdown(self, n = 1):
+        self.rawwrite(self.codes['cdw'] * n)
+
+    def csave(self):
+        self.rawwrite(self.codes['sv'])
+
+    def crestore(self):
+        self.rawwrite(self.codes['cr'])
+
+    def clearline(self):
+        self.rawwrite(self.codes['el'])
+
+    def colored(self, txt, color):
+        icolor = self.colors[color].decode('ascii')
+        ocolor = self.codes['sgr0'].decode('ascii')
+        return f'{icolor}{txt}{ocolor}'
+
+    @clib.contextmanager
+    def cursor(self):
+        self.csave()
         try:
-            out, err = process.communicate()
-            status   = process.poll()
+            yield
         finally:
-            try   : sp.kill()
-            except: pass
+           self.crestore()
 
-    except OSError as e:
-        logging.error("cannot run `%s': %s" % (options.bin, e))
-        exit (1)
+    def echooff(self):
+        fdesc = self._stream.fileno()
+        attrs = termios.tcgetattr(fdesc)
+        attrs[3] &= ~termios.ECHO
+        termios.tcsetattr(fdesc, termios.TCSADRAIN, attrs)
 
-    timestamp = time.time() - timestamp
-    success   = (bool(status) != bool(config.isvalid))
-    out       = out.decode('utf-8', errors='ignore')
-    err       = err.decode('utf-8', errors='ignore')
-
-    logging.info("result for `%s': success: %s" % \
-                     (config.filename, rcolor(success, success)))
-
-    return Object(success = success  ,
-                  config  = config   ,
-                  time    = timestamp,
-                  stderr  = err      )
+    def echoon(self):
+        fdesc = self._stream.fileno()
+        attrs = termios.tcgetattr(fdesc)
+        attrs[3] |= termios.ECHO
+        termios.tcsetattr(fdesc, termios.TCSADRAIN, attrs)
 
 # --------------------------------------------------------------------
-def _main():
-    # ------------------------------------------------------------------
-    options = _options()
+class Gather:
+    @staticmethod
+    def is_excluded(src, excludes):
+        for path in excludes:
+            if path.startswith('!'):
+                if src.startswith(path[1:]):
+                    return True
+            elif src == path:
+                return True
+        return False
 
-    logfmt = '%(asctime)-15s - %(levelname)s - %(message)s'
-    if options.jobs > 1:
-        logfmt = '%s %s' % ('[%(threadName)s]', logfmt)
-        
-    logging.basicConfig(
-        stream = sys.stderr,
-        level  = logging.DEBUG,
-        format = logfmt)
-
-    # ------------------------------------------------------------------
-    def gather(obj, scenario):
-        logging.debug("gathering scripts in `%s'" % (obj.src,))
+    @classmethod
+    def gather(cls, obj, scenario):
         try:
             scripts = os.listdir(obj.src)
         except OSError as e:
             logging.warning("cannot scan `%s': %s" % (obj.src, e))
             return []
         scripts = sorted([x for x in scripts if re.search(r'\.eca?$', x)])
-        logging.debug("%.4d script(s) found in `%s'" % (len(scripts), obj.src))
 
         def config(filename):
             fullname = os.path.join(obj.src, filename)
@@ -287,16 +316,8 @@ def _main():
 
         return [config(x) for x in scripts]
 
-    def is_excluded(src,excludes):
-        for path in excludes:
-            if path.startswith('!'):
-                if src.startswith(path[1:]):
-                    return True
-            elif src == path:
-                return True
-        return False
-
-    def gather_for_scenario(scenario):
+    @classmethod
+    def gather_for_scenario(cls, scenario):
         def expand(dirs):
             def for1(x):
                 aout = []
@@ -316,58 +337,429 @@ def _main():
                          for x in expand(scenario.okdirs)])
         dirs.extend([Object(src = x, valid = False, args = scenario.args) \
                          for x in expand(scenario.kodirs)])
-        dirs = [x for x in dirs if not is_excluded(x.src,scenario.exclude)]
-        dirs = map(lambda x : gather(x, scenario), dirs)
+        dirs = [x for x in dirs if not cls.is_excluded(x.src,scenario.exclude)]
+        dirs = map(lambda x : cls.gather(x, scenario), dirs)
         return list(itertools.chain.from_iterable(dirs))
 
-    def gatherall():
-        dirs = [options.scenarios[x] for x in options.targets]
-        dirs = map(lambda x : gather_for_scenario(x), dirs)
+    @classmethod
+    def gatherall(cls, scenarios, targets):
+        dirs = [scenarios[x] for x in targets]
+        dirs = map(lambda x : cls.gather_for_scenario(x), dirs)
         return list(itertools.chain.from_iterable(dirs))
 
-    allscripts = gatherall()
+# ---------------------------------------------------------------------
+def format_delta(delta, hprec=2, prec=0, subprec=0):
+    if prec > 0:
+        frac, delta = math.modf(delta)
+        delta, frac = int(delta), int(10 ** prec * frac)        
+        if subprec > 0:
+            subprec = 10 ** prec // subprec
+            frac = frac // subprec * subprec
+        return '{1:{0}d}:{2:02d}.{4:0{3}d}'.format(
+            hprec, delta // 60, delta % 60, prec, frac)
 
-    logging.debug("%.4d script(s) in total" % (len(allscripts,)))
+    return '{1:{0}d}:{2:02d}'.format(hprec, int(delta) // 60, int(delta) % 60)
 
-    # --------------------------------------------------------------------
+# ---------------------------------------------------------------------
+class MBar:
+    def __init__(self, ntasks):
+        self.bars      = []
+        self.term      = CurseWrapper()
+        self.ntasks    = ntasks
+        self.stats     = dict(success = 0, failure = 0, running = 0, waiting = ntasks)
+        self.timestamp = time.time()
+
+        with self.term.cursor():
+            self.term.rawwrite(self.headline())
+        self.term.cdown()
+
+    def headline(self):
+        headline = '⁕ [{}] Success: {}, Failure: {}, Running: {}, Waiting: {}'
+        headline = headline.format(
+            format_delta(time.time() - self.timestamp),
+            *[self.term.colored(str(self.stats[x]), c) for x, c in [
+                ('success', CurseWrapper.COLOR_GREEN ),
+                ('failure', CurseWrapper.COLOR_RED   ),
+                ('running', CurseWrapper.COLOR_YELLOW),
+                ('waiting', CurseWrapper.COLOR_BLUE  ),
+            ]])
+        return headline.encode('utf-8')
+
+    def create(self, name):
+        with self:
+            assert (self.stats['waiting'] > 0)
+
+            self._clear_bars_display()
+            self.stats['waiting'] -= 1
+            self.stats['running'] += 1
+            self.bars.append(MBarLine(self, name))
+            self._create_bars_display()
+
+            return self.bars[-1]
+
+    def write_for(self, bar):
+        with self:
+            index = self.bars.index(bar)
+            txt   = self.render(bar)
+            with self.term.cursor():
+                self.term.cup(len(self.bars) - index)
+                self.term.clearline()
+                self.term.rawwrite(txt)
+
+    def write(self, txt):
+        with self:
+            self._clear_bars_display()
+            self.term.rawwrite(('▶ ' + txt).encode('utf-8') + b'\n')
+            self._create_bars_display()
+
+    def log(self, mark, txt, color):
+        self.write('[{}] {}'.format(self.term.colored(mark, color), txt))
+
+    def remove(self, bar, success):
+        with self:
+            assert (self.stats['running'] > 0)
+
+            self._clear_bars_display()
+            self.stats['running'] -= 1
+            self.stats['success' if success else 'failure'] += 1
+            self.bars[:] = [x for x in self.bars if x is not bar]
+            self._create_bars_display()
+
+    def render(self, bar):
+        return '⚙ '.encode('utf-8') + bar.render()
+
+    def refresh(self):
+        with self:
+            self._clear_bars_display()
+            self._create_bars_display()
+
+    def __enter__(self):
+        self.term.acquire()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.term.release()
+
+    def _clear_bars_display(self):
+        for _ in range(len(self.bars)+1):
+            self.term.cup()
+            self.term.clearline()
+
+    def _create_bars_display(self):
+        with self.term.cursor():
+            self.term.rawwrite(self.headline())
+        self.term.cdown()
+        for bar in self.bars:
+            with self.term.cursor():
+                self.term.rawwrite(self.render(bar))
+            self.term.cdown()
+
+# --------------------------------------------------------------------
+class MBarLine:
+    BLACK = '█'
+    BLANK = '-'
+    WIDTH = 50
+
+    def __init__(self, mbar, name):
+        self.mbar  = mbar
+        self.value = 0.0
+        self.name  = name
+        self.now   = time.time()
+        self.last  = time.time()
+
+    def update(self, value):
+        self.value = max(min(float(value), 1.0), 0.0)
+        self.last  = time.time()
+        self.mbar.write_for(self)
+
+    def render(self):
+        wtg = time.time() - self.last
+        wtg = ' ' * 7 if wtg < 1.0 else ('+' + format_delta(wtg, hprec=0, prec=1))
+        bar = round(self.WIDTH * self.value)
+        bar = (self.BLACK * bar) + (self.BLANK * (self.WIDTH - bar))
+        bar = '[{:6.2f}%] {} [{} {}] [{}]'.format(
+            100 * self.value, bar,
+            format_delta(self.last - self.now), wtg, self.name)
+
+        return bar.encode('utf-8')
+
+    def finish(self, success):
+        self.mbar.remove(self, success)
+
+# --------------------------------------------------------------------
+MARKS = {
+    0:
+        ('✓', CurseWrapper.COLOR_GREEN),
+    -signal.SIGINT:
+        ('ϟ', CurseWrapper.COLOR_YELLOW),
+    -signal.SIGTERM:
+        ('ϟ', CurseWrapper.COLOR_YELLOW),
+    None:
+        ('✗', CurseWrapper.COLOR_RED),
+}
+
+# --------------------------------------------------------------------
+LOGMARKS = {
+    'critical':
+        ('✗', CurseWrapper.COLOR_RED),
+    'warning':
+        ('ϟ', CurseWrapper.COLOR_YELLOW),
+    'info':
+        ('ⓘ', CurseWrapper.COLOR_BLUE),
+    'debug':
+        ('ⓘ', CurseWrapper.COLOR_BLUE),
+    None:
+        ('✗', CurseWrapper.COLOR_RED),
+}
+
+# --------------------------------------------------------------------
+class TermListener(Listener):
+    REFRESH = 0.1
+
+    def __init__(self, allscripts):
+        self._mbar = MBar(len(allscripts))
+        self._handles = {}
+
+    def file_check_start(self, filename):
+        handle = Object(
+            filename  = filename,
+            timestamp = time.time(),
+            bar       = self._mbar.create(filename),
+        )
+
+        self._handles[id(handle)] = handle
+        return id(handle)
+
+    def file_check_progress(self, handle, progress):
+        handle = self._handles[handle]
+        handle.bar.update(progress)
+
+    def file_check_done(self, handle, status, success):
+        handle = self._handles[handle]
+
+        mark, color = MARKS.get(status, MARKS[None])
+        self._mbar.log(mark, '[{}] {}'.format(
+            format_delta(time.time() - handle.timestamp, prec=1), handle.filename
+        ), color)
+        handle.bar.finish(success = success)
+
+        del self._handles[id(handle)]
+
+    def tick(self):
+        self._mbar.refresh()
+
+    def error(self, handle, level, msg):
+        handle = self._handles[handle]
+        mark, color = LOGMARKS.get(level, LOGMARKS[None])
+        self._mbar.log(mark, '{}: {}'.format(handle.filename, msg), color)
+
+    @clib.contextmanager
+    def start(self):
+        self._mbar.term.echooff()
+        yield
+        self._mbar.term.echoon()
+
+
+# --------------------------------------------------------------------
+class RawListener(Listener):
+    def __init__(self, allscripts):
+        self._handles = {}
+        self._total   = len(allscripts)
+        self._checked = 0
+        self.log(f'[ ] number of files to check: {self._total}')
+
+    def log(self, msg):
+        sys.stdout.write(msg + '\n')
+        sys.stdout.flush()
+
+    def file_check_start(self, filename):
+        handle = Object(
+            filename  = filename,
+            timestamp = time.time(),
+        )
+
+        self._handles[id(handle)] = handle
+        return id(handle)
+
+    def file_check_progress(self, handle, progress):
+        pass
+
+    def file_check_done(self, handle, status, success):
+        handle = self._handles[handle]
+        self._checked += 1
+        mark, _ = MARKS.get(status, MARKS[None])
+        delta = format_delta(time.time() - handle.timestamp, prec=1)
+        self.log(f'[{mark}] [{self._checked:04d}/{self._total:04d}] [{delta}] {handle.filename}')
+        del self._handles[id(handle)]
+
+    def error(self, handle, level, msg):
+        handle, (mark, _) = self._handles[handle], LOGMARKS.get(level, LOGMARKS[None])
+        self.log('[{}] {}: {}'.format(mark, handle.filename, msg))
+
+    def tick(self):
+        pass
+
+    @clib.contextmanager
+    def start(self):
+        yield
+
+# --------------------------------------------------------------------
+async def _run_all(options, allscripts, listener : Listener):
+    semaphore = asyncio.Semaphore(options.jobs or mp.cpu_count())
+
+    async def runcheck(config):
+        async with semaphore:
+            command = [options.bin] + options.args + config.args
+            if options.timeout:
+                command.extend(['-timeout', str(options.timeout)])
+            if options.timing:
+                tfilename = os.path.join(
+                    TIMING_DIR, os.path.splitext(config.filename)[0] + '.stats')
+                os.makedirs(os.path.dirname(tfilename), exist_ok = True)
+                command.extend(['-tstats', tfilename])
+
+            handle = listener.file_check_start(config.filename)
+                
+            command.extend(['-script', '-no-eco', config.filename])
+    
+            args = dict(
+                stdout = asyncio.subprocess.DEVNULL,
+                stderr = asyncio.subprocess.PIPE,
+            )
+    
+            time0  = time.time()
+            proc   = await asyncio.create_subprocess_exec(*command, **args)
+            errors = []
+
+            try:
+                async with clib.awaitable(proc) as proc:
+                    async for line in proc.stderr:
+                        if re.match(rb'P\b', line):
+                            listener.file_check_progress(handle, float(line.split()[3]))
+                        elif re.match(rb'E\b', line):
+                            error = line[1:].decode('utf-8').strip()
+                            error = error.split(None, 1)
+                            if not error:
+                                continue
+                            if len(error) < 2:
+                                error = [None, error]
+                            listener.error(handle, *error)
+                            errors.append(error)
+    
+            finally:
+                try:
+                    status = await asyncio.wait_for(proc.wait(), 2.0)
+
+                except asyncio.TimeoutError:
+                    proc.kill(); status = await proc.wait()
+
+                success = (bool(status) != bool(config.isvalid))
+
+                listener.file_check_done(handle, status, success)
+        
+            return Object(success  = success,
+                          config   = config ,
+                          errors   = errors ,
+                          duration = time.time() - time0)
+
+    with listener.start():
+        log  = []
+        jobs = [asyncio.ensure_future(runcheck(cfg)) for cfg in allscripts]
+
+        while jobs:
+            done, jobs = await asyncio.wait(
+                jobs,
+                timeout = listener.REFRESH,
+                return_when = asyncio.FIRST_COMPLETED)
+
+            listener.tick()
+
+            for aout in done:
+                try:
+                    log.append(aout.result())
+                except KeyboardInterrupt:
+                    pass
+
+    return log
+
+# --------------------------------------------------------------------
+def _dump_report(config, results, stream):
+    duration = sum([x.duration for x in results])
+    grouped  = dict()
+    aout     = []
+
+    for result in results:
+        grouped.setdefault(result.config.group, []).append(result)
+
+    for gname, group in grouped.items():
+        ok   = [x for x in group if     x.success]
+        ko   = [x for x in group if not x.success]
+        node = {}
+
+        node['name']      = gname
+        node['hostname']  = config.hostname
+        node['timestamp'] = config.timestamp.isoformat()
+        node['tests']     = len(group)
+        node['failures']  = len(ko)
+        node['time']      = '%.3f' % duration
+        node['details']   = []
+
+        for result in group:
+            subnode = {}
+
+            name = os.path.basename(result.config.filename)
+            name = os.path.splitext(name)[0]
+            name = '%s (%s)' % (name, result.config.filename)
+
+            subnode['name']       = name
+            subnode['time']       = '%.3f' % (result.duration,)
+            subnode['success']    = result.success
+            subnode['shouldpass'] = result.config.isvalid
+            subnode['errors']     = [literal_unicode(x) for x in result.errors]
+
+            node['details'].append(subnode)
+
+        aout.append(node)
+
+    opts = dict(
+        default_flow_style = None   ,
+        encoding           = 'utf-8',
+        sort_keys          = False  ,
+    )
+
+    stream.write(yaml.dump(aout, **opts))
+
+# --------------------------------------------------------------------
+async def _main():
     mainconfig = Object()
 
     mainconfig.hostname  = socket.gethostname()
     mainconfig.timestamp = datetime.datetime.utcnow()
 
-    if options.jobs > 1:
-        import concurrent.futures as futures
+    options    = _options()
+    allscripts = Gather.gatherall(options.scenarios, options.targets)
 
-    if options.jobs > 1:
-        with futures.ThreadPoolExecutor(options.jobs, thread_name_prefix = 'Thread') \
-             as executor:
+    listener = None
+    if sys.stdout.isatty:
+        try:
+            listener = TermListener(allscripts)
+        except curses.error:
+            pass
+    if listener is None:
+        listener = RawListener(allscripts)
 
-            result = list(executor.map(
-                lambda config : _run_test(config, options),
-                allscripts))
-
-    else:
-        result = []
-        for config in allscripts:
-            result.append(_run_test(config, options))
-
-    errors = [x for x in result if not x.success]
-    nerrs  = len(errors)
-
-    logging.info(rcolor("# of failed scripts: %d" % (nerrs,), nerrs == 0))
-    if errors:
-        logging.info("--- BEGIN FAILING SCRIPTS ---")
-        for error in errors:
-            logging.info(error.config.filename)
-        logging.info("--- END FAILING SCRIPTS ---")
-        logging.critical("some tests did NOT pass")
+    log = await _run_all(options, allscripts, listener)
 
     if options.report is not None:
         with open(options.report, 'wb') as output:
-            _dump_report(mainconfig, result, output)
+            _dump_report(mainconfig, log, output)
 
-    exit (2 if errors else 0)
+    haserrors = any(not x.success for x in log)
+
+    exit(2 if haserrors else 0)
 
 # --------------------------------------------------------------------
 if __name__ == '__main__':
-    _main()
+    try:
+        asyncio.run(_main())
+    except KeyboardInterrupt:
+        pass

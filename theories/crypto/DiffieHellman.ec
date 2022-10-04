@@ -149,7 +149,7 @@ theory List_CDH.
     qed.
   end section.
 
-  abstract theory C.
+  abstract theory Cost.
 
     op cduniform_n : { int | 0 <= cduniform_n } as ge0_cduniform_n.
 
@@ -176,7 +176,7 @@ theory List_CDH.
       by case: t => // ? /#.
     qed.
 
-  end C.
+  end Cost.
 
 end List_CDH.
 

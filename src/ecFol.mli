@@ -11,8 +11,8 @@ include module type of struct include EcCoreFol end
 val f_losslessF: xpath -> form
 
 val f_eqparams:
-     EcTypes.ty -> variable list option -> memory
-  -> EcTypes.ty -> variable list option -> memory
+     EcTypes.ty -> ovariable list -> memory
+  -> EcTypes.ty -> ovariable list -> memory
   -> form
 
 val f_eqres:
@@ -64,6 +64,12 @@ val f_mu      : EcEnv.env -> form -> form -> form
 val f_mu_x    : form -> form -> form
 val f_weight   : EcTypes.ty -> form -> form
 val f_lossless : EcTypes.ty -> form -> form
+val f_dunit    : form -> form
+
+(* f_dlet tya tyb (d : tya distr) (f : tya -> tyb distr) = dlet d f *)
+val f_dlet : ty -> ty -> form -> form -> form
+val f_dlet_simpl : ty -> ty -> form -> form -> form
+val f_dmap : ty -> ty -> form -> form -> form
 
 (* common functions *)
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form

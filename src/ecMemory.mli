@@ -48,11 +48,11 @@ val is_schema : memtype -> bool
 
 exception DuplicatedMemoryBinding of symbol
 
-val bindall    : variable list -> memenv -> memenv
-val bindall_mt : variable list -> memtype -> memtype
+val bindall    : ovariable list -> memenv -> memenv
+val bindall_mt : ovariable list -> memtype -> memtype
 
-val bind_fresh : variable -> memenv -> memenv * variable
-val bindall_fresh : variable list -> memenv -> memenv * variable list
+val bind_fresh : ovariable -> memenv -> memenv * ovariable
+val bindall_fresh : ovariable list -> memenv -> memenv * ovariable list
 
 (* -------------------------------------------------------------------- *)
 val lookup :
@@ -73,7 +73,7 @@ val mt_subst : (ty -> ty) -> memtype -> memtype
 val me_subst : memory EcIdent.Mid.t -> (ty -> ty) -> memenv -> memenv
 
 (* -------------------------------------------------------------------- *)
-val for_printing : memtype -> (symbol option * variable list) option
+val for_printing : memtype -> (symbol option * ovariable list) option
 
 val dump_memtype : memtype -> string
 

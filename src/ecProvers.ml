@@ -314,6 +314,7 @@ type prover_infos = {
   pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
+  pr_dumpin    : string EcLocation.located option;
   pr_selected  : bool;
   gn_debug     : bool;
 }
@@ -331,6 +332,7 @@ let dft_prover_infos = {
   pr_max       = 50;
   pr_wanted    = Hints.empty;
   pr_unwanted  = Hints.empty;
+  pr_dumpin    = None;
   pr_selected  = false;
   gn_debug     = false;
 }
@@ -343,7 +345,7 @@ type notify = EcGState.loglevel -> string Lazy.t -> unit
 let run_prover
   ?(notify : notify option) (pi : prover_infos) (prover : string) task
 =
-  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
+(*  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in*)
 
   EcUtils.try_finally (fun () ->
     try
@@ -389,8 +391,8 @@ let run_prover
         Buffer.contents buf)));
       None)
 
-  (fun () ->
-     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ())
+  (fun () -> ()) (*
+     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ()) *)
 
 (* -------------------------------------------------------------------- *)
 let execute_task ?(notify : notify option) (pi : prover_infos) task =

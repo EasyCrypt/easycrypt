@@ -7,6 +7,13 @@ exception Unexpected
 let unexpected () = raise Unexpected
 
 (* -------------------------------------------------------------------- *)
+let rec makedirs (x : string) =
+  if not (Sys.file_exists x) then begin
+    makedirs (Filename.dirname x);
+    Unix.mkdir x 0o755
+  end
+
+(* -------------------------------------------------------------------- *)
 type 'data cb = Cb : 'a * ('data -> 'a -> unit) -> 'data cb
 
 (* -------------------------------------------------------------------- *)

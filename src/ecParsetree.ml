@@ -208,7 +208,6 @@ and pformula_r =
   | PFChoareF  of pformula * pgamepath * pformula * pcost
   | PFChoareFT of pgamepath * pcost
   | PFCoe      of osymbol * pmemtype option * pformula * pexpr * pty option
-  | PFWP       of pgamepath * pexpr list * pformula
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = pmemtype_el list
@@ -266,7 +265,6 @@ and poracles = qident_inparam list
 and pcompl = PCompl of pformula * (qident_inparam * pformula) list
 
 and pmod_restr_el = {
-  pmre_in    : bool;
 	pmre_name  : psymbol;
   pmre_orcls : poracles option;  (* None means no restriction *)
   pmre_compl : pcompl option;    (* None means no restriction *)
@@ -304,9 +302,7 @@ and pvariable_decl = {
   pvd_type : pty;
 }
 
-and fun_params =
- | Fparams_exp of (psymbol * pty) list
- | Fparams_imp of pty
+and fun_params = (osymbol * pty) list
 
 and pfunction_decl = {
   pfd_name     : psymbol;
@@ -506,17 +502,20 @@ type preduction = {
 }
 
 (* -------------------------------------------------------------------- *)
+type 'a doption =
+  | Single of 'a
+  | Double of ('a * 'a)
+
+(* -------------------------------------------------------------------- *)
 type cp_match = [ `If | `While | `Assign | `Sample | `Call ]
 type cp_base  = [ `ByPos of int | `ByMatch of int option * cp_match ]
 
 type codepos1 = int * cp_base
 type codepos  = (codepos1 * int) list * codepos1
 
-(* -------------------------------------------------------------------- *)
-type 'a doption =
-  | Single of 'a
-  | Double of ('a * 'a)
+type docodepos1 = codepos1 doption option
 
+(* -------------------------------------------------------------------- *)
 type swap_kind =
   | SKbase      of int * int * int
   | SKmove      of int
@@ -559,9 +558,14 @@ type ('a, 'b, 'c) rnd_tac_info =
   | PTwoRndParams   of 'a * 'a
   | PMultRndParams  of ('a tuple5) * 'b
 
+type rnd_tac_info_f =
+  (pformula, pformula option, pformula) rnd_tac_info
+
+type semrndpos = (bool * codepos1) doption
+
 type tac_dir = Backs | Fwds
 
-type pfel_spec_preds = (pgamepath*pformula) list
+type pfel_spec_preds = (pgamepath * pformula) list
 
 (* -------------------------------------------------------------------- *)
 type pim_repeat_kind =
@@ -700,8 +704,8 @@ type phltactic =
   | Prepl_stmt     of trans_info
   | Pfun           of fun_info
   | Papp           of app_info
-  | Pwp            of codepos1 doption option * pformula option
-  | Psp            of codepos1 doption option
+  | Pwp            of docodepos1 * pformula option
+  | Psp            of docodepos1
   | Pwhile         of (oside * while_info)
   | Pasyncwhile    of async_while_info
   | Pfission       of (oside * codepos * (int * (int * int)))
@@ -718,7 +722,8 @@ type phltactic =
   | Pinline        of inline_info
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
-  | Prnd           of oside * (pformula, pformula option, pformula) rnd_tac_info
+  | Prnd           of oside * semrndpos option * rnd_tac_info_f
+  | Prndsem        of oside * codepos1
   | Palias         of (oside * codepos * osymbol_r)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
@@ -787,6 +792,7 @@ type pprover_infos = {
   plem_iterate    : bool option;
   plem_wanted     : pdbhint option;
   plem_unwanted   : pdbhint option;
+  plem_dumpin     : string located option;
   plem_selected   : bool option;
   psmt_debug      : bool option;
 }
@@ -804,6 +810,7 @@ let empty_pprover = {
   plem_iterate    = None;
   plem_wanted     = None;
   plem_unwanted   = None;
+  plem_dumpin     = None;
   plem_selected   = None;
   psmt_debug      = None;
 }
@@ -909,8 +916,9 @@ type pcaseoptions = (bool * pcaseoption) list
 (* -------------------------------------------------------------------- *)
 type apply_info = [
   | `ApplyIn of ppterm * psymbol
-  | `Apply   of ppterm list * [`Apply|`Exact]
-  | `Top     of [`Apply|`Exact]
+  | `Apply   of ppterm list * [`Apply|`Exact|`Alpha]
+  | `Top     of [`Apply|`Exact|`Alpha]
+  | `Alpha   of ppterm
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -1260,6 +1268,7 @@ type global = {
 
 type prog_r =
   | P_Prog of global list * bool
+  | P_Exit
   | P_Undo of int
 
 type prog = prog_r located

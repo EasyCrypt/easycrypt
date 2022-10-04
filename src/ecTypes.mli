@@ -76,7 +76,7 @@ val ty_check_uni : ty -> unit
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
-  ts_mp  : EcPath.mpath -> EcPath.mpath;
+  ts_mp  : EcPath.smsubst;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
   ts_u   : (uid -> ty option);
   ts_v   : ty Mid.t;
@@ -135,6 +135,15 @@ val lp_ids   : lpattern -> EcIdent.t list
 val lp_fv    : lpattern -> EcIdent.Sid.t
 
 (* -------------------------------------------------------------------- *)
+type ovariable = {
+  ov_name : symbol option;
+  ov_type : ty;
+}
+val ov_name  : ovariable -> symbol option
+val ov_type  : ovariable -> ty
+val ov_hash  : ovariable -> int
+val ov_equal : ovariable -> ovariable -> bool
+
 type variable = {
     v_name : symbol;   (* can be "_" *)
     v_type : ty;
@@ -143,6 +152,8 @@ val v_name  : variable -> symbol
 val v_type  : variable -> ty
 val v_hash  : variable -> int
 val v_equal : variable -> variable -> bool
+
+val ovar_of_var: variable -> ovariable
 
 (* -------------------------------------------------------------------- *)
 type pvar_kind =
@@ -173,6 +184,7 @@ val get_glob    : prog_var -> EcPath.xpath
 
 val symbol_of_pv   : prog_var -> symbol
 val string_of_pvar : prog_var -> string
+val name_of_pvar   : prog_var -> string
 
 val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var
 
@@ -274,8 +286,7 @@ type e_subst = {
   es_p       : EcPath.path -> EcPath.path;
   es_ty      : ty -> ty;
   es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
-  es_mp      : EcPath.mpath -> EcPath.mpath;
-  es_xp      : EcPath.xpath -> EcPath.xpath;
+  es_mp      : EcPath.smsubst;
   es_loc     : expr Mid.t;
 }
 
@@ -288,7 +299,7 @@ val e_subst_init :
   -> (EcPath.path -> EcPath.path)
   -> (ty -> ty)
   -> (EcIdent.t list * expr) EcPath.Mp.t
-  -> EcPath.mpath EcIdent.Mid.t
+  -> EcPath.smsubst
   -> expr Mid.t
   -> e_subst
 
