@@ -30,6 +30,8 @@ let why3 = why3_local; in
       menhir
       menhirLib
       merlin
+      ppxlib
+      ppx_deriving
       yojson
       zarith
     ]);

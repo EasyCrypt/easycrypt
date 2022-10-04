@@ -265,7 +265,7 @@ let ty_subst_id =
     ts_mp  = EcPath.sms_identity;
     ts_def = Mp.empty;
     ts_u   = funnone ;
-    ts_v   = funnone ; }
+    ts_v   = Mid.empty ; }
 
 let is_ty_subst_id s =
      s.ts_p  == identity
