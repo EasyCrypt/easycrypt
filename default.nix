@@ -21,6 +21,7 @@ let why3 = why3_local; in
     buildInputs = [ why3 ] ++ (with ocamlPackages; [
       ocaml
       findlib
+      camlp-streams 
       batteries
       dune_2
       dune-build-info
@@ -28,7 +29,6 @@ let why3 = why3_local; in
       inifiles
       menhir
       menhirLib
-      merlin
       yojson
       zarith
     ]);
