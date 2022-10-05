@@ -747,6 +747,15 @@ lemma nosmt lerNgt (x y : t): (x <= y) <=> !(y < x).
 proof. by rewrite ltrNge. qed.
 
 (* -------------------------------------------------------------------- *)
+
+lemma pmulr_gt0 x y : zeror <= x => zeror <= y => 
+  zeror < x * y <=> zeror < x /\ zeror < y. 
+proof. 
+move=> x_ge0 y_ge0; split; last by smt(pmulr_rgt0).
+smt (pmulr_rgt0 ltrNge ler_anti mul0r ltrr).
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma leVge x y : (x <= y) \/ (y <= x).
 proof. exact ler_total. qed.
 

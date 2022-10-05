@@ -146,6 +146,17 @@ proof. case (0 < n) => [/# | bd]. rewrite 2!(emptyv_unique (vectc _ _)) /#. qed.
 lemma size_zerov2 n: zerov (size (zerov n)) = zerov n.
 proof. rewrite /zerov. apply size_vectc2. qed.
 
+
+(* lifting functions to vectors *)
+op mapv (f : R -> R) (v : vector) : vector = 
+  offunv (fun i => f v.[i], size v).
+
+lemma size_mapv f v : size (mapv f v) = size v by [].
+
+lemma get_mapv f (v : vector) i : 
+  (0 <= i < size v) => (mapv f v).[i] = f v.[i].
+proof. by move => ?; rewrite get_offunv. qed.
+
 (* Vector addition *)
 op (+) (v1 v2 : vector) = if size v1 = size v2 then 
   offunv ((fun i => v1.[i] + v2.[i]), size v1) else emptyv.
@@ -177,13 +188,19 @@ hint simplify addv_emptyl, addv_emptyr.
 (* Additive inverse of vector *)
 op [-] (v: vector) = offunv ((fun i => -v.[i]), size v).
 
+lemma nosmt size_oppv v: size (-v) = size v by done.
+
 lemma getvN (v : vector) i : (-v).[i] = - v.[i].
 proof.
 case: (0 <= i < size v) => bound; 1: by rewrite /([-]) get_offunv. 
 by rewrite !getv0E /([-]) //= oppr0.
 qed.
 
-lemma nosmt size_oppv v: size (-v) = size v by done.
+lemma offunvN (f : int -> R) k : - offunv (f, k) = offunv (fun x => - f x, k).
+proof. 
+apply eq_vectorP => //= i; rewrite size_oppv /= => Hi.
+by rewrite getvN !get_offunv 1,2:/#.
+qed.
 
 hint simplify getvN, size_oppv.
 
@@ -378,6 +395,11 @@ qed.
 lemma oppv_catv (v1 v2: vector): - (v1 || v2) = (-v1 || -v2).
 proof. by apply eq_vectorP => i bound /=; rewrite !get_catv' opprD. qed.
 
+lemma sub_eqv (x y z : vector) : 
+  size x = size z => size y = size z => 
+  x - z = y <=> x = y + z.
+proof. smt(addvA addvC addvN addv0). qed.
+
 (* Splitting apart vectors *)
 op subv (v: vector) (n m: int) = offunv ((fun i => v.[i+n]), m - n).
 lemma size_subv (v: vector) (n m: int): size (subv v n m) = max 0 (m - n).
@@ -487,6 +509,9 @@ move => bound; rewrite (nth_map witness w) 1:size_range; 1: smt(List.size_ge0).
 by rewrite /= nth_range.
 qed.
 
+lemma mem_tolist x v : x \in tolist v <=> exists i, 0 <= i < size v /\ x = v.[i].
+proof. by rewrite mapP; smt(mem_range). qed.
+
 lemma oflistK: cancel oflist tolist.
 proof.
 move => l; apply (eq_from_nth witness); rewrite size_tolist size_oflist //.
@@ -502,8 +527,48 @@ qed.
 
 lemma oflist_inj: injective oflist by smt(oflistK).
 
+lemma tolist_inj: injective tolist by smt(tolistK).
+
+lemma tolist_catv (v1 v2 : vector) : 
+  tolist (v1 || v2) = (tolist v1) ++ (tolist v2).
+proof.
+rewrite /tolist size_catv (range_cat (size v1)); 1,2: smt(size_ge0).
+rewrite map_cat; congr.
+- apply/eq_in_map => i /mem_range /=; smt(get_catv_l).
+rewrite addzC range_addr /= -map_comp /(\o).
+apply/eq_in_map => i /mem_range /=; smt(get_catv_r).
+qed.
+
+lemma catvA : associative Vectors.(||).
+proof.
+move => v1 v2 v3; have <- := tolistK (v1 || v2 || v3).
+by rewrite !tolist_catv catA -!tolist_catv tolistK.
+qed.
+
+lemma tolist_vectc n c : tolist (vectc n c) = nseq n c. 
+proof. 
+apply oflist_inj; rewrite tolistK; apply eq_vectorP.
+rewrite size_vectc size_oflist size_nseq /= => i i_bound. 
+by rewrite get_vectc 1:/# (get_oflist c) ?size_nseq // ?nth_nseq /#.
+qed.
+
 (* Distribution of length n vectors sampled using d element-wise *)
 op dvector (d: R distr) (n: int) = dmap (dlist d (max 0 n)) oflist.
+
+lemma supp_dvector d v k : 
+  0 <= k =>
+  (v \in dvector d k) <=> 
+  size v = k /\ forall i, 0 <= i < k => v.[i] \in d.
+proof.
+move=> k_ge0; rewrite supp_dmap; split => [[s []]|[s_v] supp_v].
+- rewrite ler_maxr // supp_dlist 1:/# => -[s_s /allP supp_s ->]. 
+  rewrite size_oflist s_s /=; smt(get_oflist mem_nth). 
+exists (tolist v); rewrite ler_maxr // tolistK /=.
+apply/supp_dlist => //; rewrite size_tolist s_v /=; apply/allP => x x_v.
+rewrite -(nth_index x _ _ x_v) nth_tolist.
+- by rewrite index_ge0 -size_tolist index_mem x_v.
+by rewrite supp_v index_ge0 -s_v -size_tolist index_mem.
+qed.
 
 lemma size_dvector d n v: v \in dvector d n => size v = max 0 n. 
 proof.
@@ -853,6 +918,10 @@ qed.
 
 hint simplify getmN.
 
+lemma offunmN (f : int -> int -> R) r c : 
+  - offunm (f, r, c) = offunm (fun i j => - f i j, r, c).
+proof. by apply eq_matrixP => //= i j Hi; rewrite !get_offunm /#. qed.
+
 lemma emptymN: -emptym = emptym by apply emptym_unique.
 
 hint simplify emptymN.
@@ -1024,6 +1093,9 @@ proof.
 case (0 <= i < rows m) => bound; 1: by apply get_offunv.
 rewrite getv0E // getm0E /#.
 qed.
+
+lemma colN (m : matrix) i : - (col m i) = col (-m) i. 
+proof. by rewrite /col offunvN. qed.
 
 hint simplify size_col, get_col.
 
@@ -1227,6 +1299,9 @@ proof.
 case (0 <= i < size v) => bound; first rewrite get_offunm //= /#.
 by rewrite getm0E //= getv0E.
 qed.
+
+lemma colmxN (v : vector) : - (colmx v) = colmx (-v).
+proof. by rewrite /colmx /= offunmN. qed.
 
 hint simplify get_colmx.
 
@@ -1487,6 +1562,19 @@ split => [| i j bound].
 - by rewrite !get_catmc // /= opprD. 
 qed.
 
+lemma mulmxv_cat (m1 m2 : matrix) (v1 v2 : vector) : 
+  cols m1 = size v1 => cols m2 = size v2 => rows m1 = rows m2 => 
+  (m1 || m2) *^ (v1 || v2) = (m1 *^ v1) + (m2 *^ v2).
+proof. 
+move => m1_v1 m2_v2 eq_r; apply/eq_vectorP.
+have -> : size ((m1 || m2) *^ (v1 || v2)) = rows m1. 
+- rewrite size_mulmxv ?cols_catmc // ?size_catv 1:/#.
+  by rewrite rows_catmc.
+split => [|i Hi]; first by rewrite size_addv !size_mulmxv /#.
+rewrite get_mulmxv get_addv ?size_mulmxv //. 
+by rewrite row_catmc // dotp_catv // !get_mulmxv.
+qed.
+
 (* Downwards matrix concatenation *)
 op catmr (m1 m2: matrix) = if cols m1 = cols m2 then 
   offunm ((fun i j => m1.[i, j] + m2.[i-rows m1, j]), 
@@ -1659,6 +1747,13 @@ case (j < n) => j_bound.
   rewrite add0r get_subm; smt(size_catmc size_subm).
 qed.
 
+lemma subm_colmx (A : matrix) l : 
+  0 <= l => cols A = l + 1 => 
+  (subm A 0 (rows A) 0 l || colmx (col A l)) = A.
+proof.
+by move => l_ge0 c_A; rewrite colmx_col_eq_subm -c_A catmc_subm /#.
+qed.
+
 lemma catmr_subm m n: 0 <= n < rows m => 
   subm m 0 n 0 (cols m) / subm m n (rows m) 0 (cols m) = m.
 proof. move => n_bound; apply trmx_inj => /=. by apply catmc_subm. qed.
@@ -1765,14 +1860,34 @@ split => [| i j bound]; 1: rewrite size_addm !size_mulmxs //.
 by rewrite get_addm 1:!size_mulmxs 1:// !get_mulmxs // mulrDr.
 qed.
 
+(* dmatrix helper function: construct matrix from list of (column) vectors *)
+op ofcols r c (vs : vector list) =
+  offunm (fun (i j : int) => (nth witness vs j).[i], r, c).
+
+lemma ofcols_cat k l1 l2 (vs1 vs2 : vector list) :
+  size vs1 = l1 => size vs2 = l2 => 
+  ofcols k (l1 + l2) (vs1 ++ vs2) = (ofcols k l1 vs1 || ofcols k l2 vs2).
+proof.
+move => s_vs1 s_vs2.
+apply eq_matrixP; rewrite /ofcols size_catmc //=. 
+rewrite 3?ler_maxr /=; 1..3: smt(List.size_ge0).
+move => i j [i_bound j_bound]. 
+rewrite get_catmc //= ler_maxr; 1: smt(List.size_ge0).
+rewrite get_offunm /= ?nth_cat; 1: smt(List.size_ge0).
+case (j < size vs1) => j_vs1. 
+- rewrite get_offunm. smt(List.size_ge0). rewrite offunm0E. smt(List.size_ge0). 
+  by rewrite addr0.
+- rewrite offunm0E. smt(List.size_ge0). rewrite get_offunm. smt(List.size_ge0). 
+  by rewrite /= s_vs1 add0r.
+qed.
+
 (* Distribution of matrices sampled using d element-wise *)
 op dmatrix (d : R distr) (r c: int) =
-  dmap (dlist (dvector d r) (max 0 c)) (fun cs : vector list => 
-    offunm (fun i j => (nth witness cs j).[i],r,c)).
+  dmap (dlist (dvector d r) (max 0 c)) (ofcols r c).
 
 lemma size_dmatrix d r c m: m \in dmatrix d r c => 
   0 <= r => 0 <= c => size m = (r, c). 
-proof. rewrite supp_dmap => -[l [H0 -> /=]] /#. qed.
+proof. rewrite supp_dmap /ofcols => -[l [H0 -> /=]] /#. qed.
 
 lemma dmatrix0E (d: R distr) (m: matrix) r c: 
   size m <> (r, c) => 0 <= r => 0 <= c => mu1 (dmatrix d r c) m = 0%r.
@@ -1788,7 +1903,7 @@ lemma dmatrix1E d m : mu1 (dmatrix d (rows m) (cols m)) m =
     BRM.bigi predT (fun j => mu1 d m.[i, j]) 0 (cols m)) 0 (rows m).
 proof.
 pose g (m: matrix) := mkseq (fun i => col m i) (cols m).
-rewrite (in_dmap1E_can _ _ g).
+rewrite (in_dmap1E_can _ _ g) /ofcols.
 - rewrite /g eq_matrixP /= => i j bound.
   by rewrite get_offunm /= 1:/# nth_mkseq 1:/# get_col.
 - rewrite /g => y y_in <- /=.
@@ -1857,6 +1972,109 @@ have ->: (fun (i : int) => (BRM.bigi predT
   + rewrite BRM.big_int_recr // RField.exprM RField.exprS // RField.mulrC.
     by rewrite RField.exprMn 1:/# /= IH // RField.exprM.
 qed.
+
+lemma dmatrix1r d k : 0 <= k => 
+  dmatrix d k 1 = dmap (dvector d k) colmx. 
+proof.
+move => k_ge0; rewrite /dmatrix /ofcols ler_maxr // dlist1 dmap_comp /(\o).
+apply eq_dmap_in => v /size_dvector; rewrite ler_maxr //= => s_v.
+rewrite /colmx s_v; apply/eq_matrixP => /= i j [i_bound j_bound]. 
+by rewrite /ofcols !get_offunm /#.
+qed.
+
+lemma supp_dmatrix d m r c : 
+  0 <= r => 0 <= c => 
+  (m \in dmatrix d r c) <=> 
+  size m = (r,c) /\ forall i j, mrange m i j => m.[i,j] \in d.
+proof.
+move => r_ge0 c_ge0; split => [m_supp|]; last first.
+- case => -[r_m c_m] m_d; rewrite /support -r_m -c_m dmatrix1E.
+  apply prodr_gt0_seq => i i_row _ /=.
+  by apply prodr_gt0_seq => j j_col _ /=; apply m_d; smt(mem_iota).
+have [r_m c_m] : size m = (r,c) by smt(size_dmatrix). 
+split => [//|i j range_ij]; move: m_supp. 
+rewrite -r_m -c_m /support dmatrix1E => gt0_big.
+pose G i0 := (fun (j0 : int) => mu1 d m.[i0, j0]).
+pose F := fun i0 : int => BRM.bigi predT (G i0) 0 (cols m).
+have /(_ i _ _) := gt0_prodr_seq predT F (range 0 (rows m)) _ gt0_big => //.
+- by move => a _ _; apply prodr_ge0.
+- smt(mem_iota).
+move => gt0_F.
+have /(_ j _ _) := gt0_prodr_seq predT (G i) (range 0 (cols m)) _ gt0_F => //.
+smt(mem_iota). 
+qed.
+
+lemma dmatrix_add_r d k l1 l2 : 0 <= k => 0 <= l1 => 0 <= l2 =>
+  dmatrix d k (l1 + l2) = 
+  dmap (dmatrix d k l1 `*` dmatrix d k l2) 
+       (fun mv : matrix * matrix => mv.`1 || mv.`2).
+proof.
+move => k_ge0 l1_ge0 l2_ge0; rewrite {1}/dmatrix ler_maxr 1:/# dlist_add //.
+pose catp (p : vector list * vector list) := p.`1 ++ p.`2.
+pose catm (m : matrix * matrix) := m.`1 || m.`2.
+pose stichp (p : vector list * vector list) := 
+  (ofcols k l1 p.`1,ofcols k l2 p.`2).
+rewrite dmap_comp -/catp -/catm (eq_dmap_in _ _ (catm \o stichp)).
+- case => vs1 vs2 /supp_dprod /= ?.
+  have [? ?] : size vs1 = l1 /\ size vs2 = l2 by smt(supp_dlist).
+  exact ofcols_cat.
+rewrite -dmap_comp -(dmap_dprod _ _ (ofcols k l1) (ofcols k l2)). 
+have {1}-> : l1 = max 0 l1 by smt().
+have {1}-> : l2 = max 0 l2 by smt().
+done.
+qed.
+
+lemma dmatrixSrr d k l : 0 <= k => 0 <= l => 
+  dmatrix d k (l + 1) = 
+  dmap (dmatrix d k l `*` dvector d k) 
+       (fun mv : matrix * vector => mv.`1 || colmx mv.`2).
+proof.
+move => k_ge0 l_ge0; rewrite dmatrix_add_r // dmatrix1r //.
+by rewrite dmap_dprodR dmap_comp.
+qed.
+
+lemma dmatrixRSr1E d (A : matrix) k l : 
+  0 <= k => 0 <= l => size A = (k,l+1) =>
+  mu1 (dmatrix d k (l + 1)) A =
+  mu1 (dmatrix d k l `*` dvector d k) (subm A 0 k 0 l, col A l).
+proof.
+move => k_ge0 l_ge0 [r_A c_A]; rewrite dmatrixSrr // dmapE /(\o) /pred1. 
+apply mu_eq_support => -[B v] /supp_dprod /=.
+case => /size_dmatrix /(_ _ _) //= [r_B c_B] /size_dvector s_v.
+apply/eq_iff; split => [<-|[-> ->]]; last by rewrite -r_A subm_colmx.
+rewrite -r_B -c_B subm_catmcCl /= 1:/#.
+by rewrite col_catmcR //= /#.
+qed.
+
+lemma supp_dmatrix_full m d r c : 
+  0 <= r => 0 <= c =>
+  is_full d => m \in dmatrix d r c <=> size m = (r,c).
+proof. smt(supp_dmatrix). qed.
+
+lemma dvector_rnd_funi (d : R distr) (v1 v2 : vector) l :
+  is_funiform d => size v1 = size v2 => 
+  mu1 (dvector d l) v1 = mu1 (dvector d l) v2.
+proof. 
+move=> d_funi s_v1_v2; case (l = size v1) => [->|?]. 
+- by rewrite mu1_dvector_fu // s_v1_v2 mu1_dvector_fu.
+smt(get_dvector0E emptyv_unique).
+qed.
+
+lemma supp_dmatrix_catmc d (m1 m2 : matrix) r c1 c2 : 
+  0 <= r => 0 <= c1 => 0 <= c2 =>
+  m1 \in dmatrix d r c1 => m2 \in dmatrix d r c2 => 
+  (m1 || m2) \in dmatrix d r (c1 + c2).
+proof.
+move => r_ge0 c1_ge0 c2_ge0 m1_dm m2_dm; rewrite dmatrix_add_r //.
+rewrite (dmap_dprod_comp _ _ (fun x => x) (fun x => x) catmc).
+rewrite /support !dmap_id dmapE /(\o) /pred1. 
+apply (StdOrder.RealOrder.ltr_le_trans 
+      (mu1 (dmatrix d r c1 `*` dmatrix d r c2) (m1,m2))).
+- smt(supp_dprod).
+- by apply mu_le => /#.
+qed.
+
+
 
 end Matrices.
 
