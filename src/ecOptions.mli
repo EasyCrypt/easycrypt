@@ -1,9 +1,10 @@
 (* -------------------------------------------------------------------- *)
 type command = [
-| `Compile of cmp_option
-| `Cli     of cli_option
-| `Config
-| `Why3Config
+  | `Compile of cmp_option
+  | `Cli     of cli_option
+  | `Config
+  | `Runtest of run_option
+  | `Why3Config
 ]
 
 and options = {
@@ -23,6 +24,11 @@ and cmp_option = {
 and cli_option = {
   clio_emacs   : bool;
   clio_provers : prv_options;
+}
+
+and run_option = {
+  runo_input     : string;
+  runo_scenarios : string list;
 }
 
 and prv_options = {

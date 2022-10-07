@@ -132,6 +132,24 @@ let main () =
 
     in (conffile, EcOptions.parse_cmdline ?ini Sys.argv) in
 
+  (* Execution of eager commands *)
+  begin
+    match options.o_command with
+    | `Runtest input -> begin
+        let root =
+          match EcRelocate.sourceroot with
+          | Some root ->
+              List.fold_left Filename.concat root ["scripts"; "testing"]
+          | None ->
+              EcRelocate.resource ["commands"] in
+        let cmd = Filename.concat root "runtest" in
+        Format.eprintf "Executing: %s %s@." cmd input.runo_input;
+        Unix.execv cmd [| "runtest"; input.runo_input |]
+      end
+
+    | _ -> ()
+  end;
+
   (* chrdir_$PATH if in reloc mode (FIXME / HACK) *)
   let relocdir =
     match options.o_options.o_reloc with
@@ -266,6 +284,10 @@ let main () =
            Some name, terminal, false, cmpopts.cmpo_noeco)
 
       end
+
+    | `Runtest _ ->
+        (* Eagerly executed *)
+        assert false
   in
 
   (match input with
