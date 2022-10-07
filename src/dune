@@ -9,7 +9,7 @@
  (public_name easycrypt)
  (name ec)
  (promote (until-clean))
- (libraries batteries camlp-streams dune-build-info inifiles why3 yojson zarith))
+ (libraries batteries camlp-streams cmdliner dune-build-info inifiles why3 yojson zarith))
 
 (ocamllex ecLexer)
 

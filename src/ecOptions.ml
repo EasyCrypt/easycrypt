@@ -4,11 +4,12 @@ open EcMaps
 
 (* -------------------------------------------------------------------- *)
 type command = [
-| `Compile of cmp_option
-| `Cli     of cli_option
-| `Config
-| `Why3Config
-  ]
+  | `Compile of cmp_option
+  | `Cli     of cli_option
+  | `Config
+  | `Runtest of run_option
+  | `Why3Config
+]
 
 and options = {
   o_options : glb_options;
@@ -27,6 +28,11 @@ and cmp_option = {
 and cli_option = {
   clio_emacs   : bool;
   clio_provers : prv_options;
+}
+
+and run_option = {
+  runo_input     : string;
+  runo_scenarios : string list;
 }
 
 and prv_options = {
@@ -222,8 +228,8 @@ let specs = {
 
     `Group "loader";
   ];
-  xp_commands = [
 
+  xp_commands = [
     ("compile", "Check an EasyCrypt file", [
       `Group "loader";
       `Group "provers";
@@ -238,6 +244,8 @@ let specs = {
       `Spec  ("emacs", `Flag, "Output format set to <emacs>")]);
 
     ("config", "Print EasyCrypt configuration", []);
+
+    ("runtest", "Run a test-suite", []);
 
     ("why3config", "Configure why3", []);
   ];
@@ -386,17 +394,23 @@ let parse ?ini argv =
     end
 
     | "cli" ->
-        if anons != [] then
+        if not (List.is_empty anons) then
           raise (Arg.Bad "this command does not take arguments");
         `Cli (cli_options_of_values ?ini values)
 
     | "config" ->
-        if anons != [] then
+        if not (List.is_empty anons) then
           raise (Arg.Bad "this command does not take arguments");
         `Config
 
+    | "runtest" -> begin
+        match anons with
+        | runo_input :: runo_scenarios -> `Runtest { runo_input; runo_scenarios; }
+        | _ -> raise (Arg.Bad "this command expects at least one positional argument")
+      end
+
     | "why3config" ->
-        if anons != [] then
+        if not (List.is_empty anons) then
           raise (Arg.Bad "this command does not take arguments");
         `Why3Config
 
