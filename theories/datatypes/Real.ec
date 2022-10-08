@@ -7,6 +7,7 @@ abbrev ( + ) = CoreReal.add.
 abbrev ([-]) = CoreReal.opp.
 abbrev ( * ) = CoreReal.mul.
 abbrev inv   = CoreReal.inv.
+abbrev (%r)  = CoreReal.from_int.
 
 abbrev ( - ) (x y : real) = x + (-y).
 abbrev ( / ) (x y : real) = x * (inv y).

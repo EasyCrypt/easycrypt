@@ -652,6 +652,10 @@ let is_binop name =
   (priority_of_binop name) <> None
 
 (* -------------------------------------------------------------------- *)
+let is_pstop name =
+  String.length name > 0 && name.[0] = '%'
+
+(* -------------------------------------------------------------------- *)
 let rec pp_type_r ppe outer fmt ty =
   match ty.ty_node with
   | Tglob m -> Format.fprintf fmt "(glob %a)" (pp_topmod ppe) m
@@ -742,7 +746,9 @@ let pp_opname fmt (nm, op) =
       if op.[0] = '*' || op.[String.length op - 1] = '*'
       then Format.sprintf "( %s )" op
       else Format.sprintf "(%s)" op
-    end else op
+    end else if is_pstop op then
+      Format.sprintf "(%s)" op
+    else op
 
   in EcSymbols.pp_qsymbol fmt (nm, op)
 
@@ -1036,7 +1042,22 @@ let pp_opapp
             Some pp
 
     end
+
     | _ -> None
+
+  and try_pp_as_post () =
+    match es with
+    | [e] when is_pstop opname -> begin
+        let pp fmt () =
+          let subpp = pp_sub ppe (fst outer, (e_uni_prio_rint, `NonAssoc)) in
+          Format.fprintf fmt "%a%s" subpp e opname
+        in
+          Some pp
+
+      end
+
+    | _ ->
+       None
 
   and try_pp_special () =
     let qs = P.toqsymbol op in
@@ -1048,13 +1069,6 @@ let pp_opapp
         let pp fmt () =
           Format.fprintf fmt "{0,1}~%a"
             (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) e
-        in
-          Some pp
-
-    | [e] when qs = EcCoreLib.s_real_of_int ->
-        let pp fmt () =
-          Format.fprintf fmt "%a%%r"
-            (pp_sub ppe (fst outer, (e_uni_prio_rint, `NonAssoc))) e
         in
           Some pp
 
@@ -1164,6 +1178,7 @@ let pp_opapp
        (List.fpick [try_pp_special ;
                     try_pp_as_uniop;
                     try_pp_as_binop;
+                    try_pp_as_post ;
                     try_pp_record  ;
                     try_pp_proj    ;])) fmt ()
 
