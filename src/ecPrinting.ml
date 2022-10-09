@@ -1047,13 +1047,14 @@ let pp_opapp
 
   and try_pp_as_post () =
     match es with
-    | [e] when is_pstop opname -> begin
-        let pp fmt () =
+    | e :: es when is_pstop opname -> begin
+        let pp_head _ _ fmt opname =
           let subpp = pp_sub ppe (fst outer, (e_uni_prio_rint, `NonAssoc)) in
-          Format.fprintf fmt "%a%s" subpp e opname
-        in
-          Some pp
+          Format.fprintf fmt "%a%s" subpp e opname in
 
+        let pp_subs = (pp_head, pp_sub) in
+        let pp fmt () = pp_app ppe pp_subs outer fmt (opname, es) in
+        Some (maybe_paren outer (inm, max_op_prec) pp)
       end
 
     | _ ->
