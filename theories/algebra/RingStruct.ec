@@ -194,7 +194,7 @@ abstract theory ZModuleStruct.
   pred is_zmod_automorph (f : t -> t) =
     bijective f /\
     f zeror = zeror /\
-    forall (x y : t) , f (x + y) = f x + f y.
+    morphism_2 f ZMod.(+) ZMod.(+).
 
   lemma zmod_automorph_idfun :
     is_zmod_automorph idfun.
@@ -291,7 +291,7 @@ abstract theory ComRingStruct.
   pred is_comring_automorph (f : t -> t) =
     is_zmod_automorph f /\
     f oner = oner /\
-    forall (x y : t) , f (x * y) = f x * f y.
+    morphism_2 f CR.( * ) CR.( * ).
 
   lemma comring_zmod_automorph f:
     is_comring_automorph f =>

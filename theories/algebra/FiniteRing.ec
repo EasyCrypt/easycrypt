@@ -333,6 +333,14 @@ abstract theory FiniteIDomainStruct.
     + by move => ??; apply/frobeniusD/prime_char.
     by move => ??; apply/frobeniusM.
   qed.
+
+  lemma is_comring_automorph_iter_frobenius n :
+    is_comring_automorph (iter n frobenius).
+  proof.
+    case (n <= 0) => [len0|/ltrNge/ltzW le0n].
+    + admit.
+    admit.
+  qed.
 end FiniteIDomainStruct.
 
 (* -------------------------------------------------------------------- *)
@@ -519,7 +527,6 @@ abstract theory SubFiniteComRing.
     enum_lin [] = [CR.zeror].
   proof. by rewrite /enum_lin /= nseq0 /= BigZMod.big_nil. qed.
 
-  (*TODO: missing stuff about map and allpairs, in hakyber-eclib?*)
   lemma enum_lin_cons v vs :
     enum_lin (v :: vs) =
     allpairs CR.( + ) (map (transpose SCRM.( ** ) v) senum) (enum_lin vs).
@@ -570,7 +577,6 @@ abstract theory SubFiniteComRing.
     + by apply/IHvs.
     move => s1 s2 v1 v2 mem_s1 mem_s2 /enum_linP gen1 /enum_linP gen2 /=.
     rewrite addrC -eqr_sub -scaleNr -scaleDl => eq_.
-    (*TODO: what?*)
     move/(_ (s2 + (-s1))%SCR _): imp_eq0.
     + by rewrite -eq_; apply/gen_add => //; apply/gen_opp.
     by rewrite SCR.subr_eq0 => ->>; move: eq_; rewrite /= SCR.subrr scale0r CR.subr_eq0.
@@ -959,16 +965,11 @@ abstract theory SubFiniteField_ZMod.
     theory FStr  <- SubFiniteField_ZMod.FStr,
     theory FFStr <- SubFiniteField_ZMod.FFStr.
 
-  lemma exists_iter_frobenius_unfixed :
-    exists (g : t) ,
-      iter_frobenius_fixed n g /\
-      forall d ,
-        0 <= d =>
-        d %| n =>
-        iter_frobenius_fixed d g =>
-        d = n.
+  lemma is_comringautomorphP f :
+    is_comring_automorph f <=>
+    (exists k, k \in range 0 n /\ f == iter k frobenius).
   proof.
-    print size_to_seq_iter_frobenius.
+    print is_comring_automorph_frobenius.
     admit.
   qed.
 end SubFiniteField_ZMod.

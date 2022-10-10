@@ -97,6 +97,9 @@ op (\o2) ['a 'b 'c 'd] (f : 'c -> 'd) (g : 'a -> 'b -> 'c) =
   fun a b => f (g a b).
 
 (* -------------------------------------------------------------------- *)
+pred morphism_0 (f : 'a -> 'b) aF rF =
+  f aF = rF.
+
 pred morphism_1 (f : 'a -> 'b) aF rF =
   forall x, f (aF x) = rF (f x).
 
