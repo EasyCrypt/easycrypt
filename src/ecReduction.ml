@@ -18,6 +18,7 @@ exception IncompatibleExpr of env * (expr * expr)
 (* -------------------------------------------------------------------- *)
 type 'a eqtest  = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
+type 'a eqantest = env -> ?alpha:(EcIdent.t * ty) Mid.t -> ?norm:bool -> 'a -> 'a -> bool
 
 module EqTest_base = struct
   let rec for_type env t1 t2 =
@@ -2165,11 +2166,12 @@ module EqTest = struct
    end)
 
   let for_pv    = fun env ?(norm = true) -> for_pv    env ~norm
+  let for_lv    = fun env ?(norm = true) -> for_lv    env ~norm
   let for_xp    = fun env ?(norm = true) -> for_xp    env ~norm
   let for_mp    = fun env ?(norm = true) -> for_mp    env ~norm
-  let for_instr = fun env ?(norm = true) -> for_instr env Mid.empty ~norm
-  let for_stmt  = fun env ?(norm = true) -> for_stmt  env Mid.empty ~norm
-  let for_expr  = fun env ?(norm = true) -> for_expr  env Mid.empty ~norm
+  let for_instr = fun env ?(alpha = Mid.empty) ?(norm = true) -> for_instr env alpha ~norm
+  let for_stmt  = fun env ?(alpha = Mid.empty) ?(norm = true) -> for_stmt  env alpha ~norm
+  let for_expr  = fun env ?(alpha = Mid.empty) ?(norm = true) -> for_expr  env alpha ~norm
 
   let for_msig  = fun env ?(norm = true) -> for_module_sig  env ~norm
   let for_mexpr = fun env ?(norm = true) -> for_module_expr env ~norm
