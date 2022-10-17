@@ -1344,12 +1344,17 @@ lemma colmxc n c: colmx (vectc n c) = matrixc n 1 c by apply trmx_inj.
 hint simplify colmxc.
 
 (* Matrix and vector multiplication *)
-abbrev ( *^ ) (m : matrix) (v : vector) : vector = col (m * colmx v) 0.
+op mulmxv m v = col (m * colmx v) 0.
+
+abbrev ( *^ ) (m : matrix) (v : vector) : vector = mulmxv m v.
+
+lemma mulmxvE m v: m *^ v = col (m * colmx v) 0 by done.
 
 lemma size_mulmxv m (v: vector): cols m = size v => size (m *^ v) = rows m.
-proof. by move => cols_eq; rewrite /= rows_mulmx. qed.
+proof. by move => cols_eq; rewrite mulmxvE /= rows_mulmx. qed.
 
-lemma get_mulmxv m v i: (m *^ v).[i] = dotp (row m i) v by rewrite /= get_mulmx.
+lemma get_mulmxv m v i: (m *^ v).[i] = dotp (row m i) v.
+proof. by rewrite mulmxvE /= get_mulmx. qed.
 
 lemma colmx_mulmxv (m : matrix) (v : vector) : 
   cols m = size v => colmx (m *^ v) = m * colmx v.
@@ -1358,45 +1363,52 @@ proof. by move => cols_eq; rewrite colmx_col 2:// cols_mulmx. qed.
 lemma mulmxvDl (m1 m2 : matrix) (v : vector) :
  size m1 = size m2 =>
   (m1 + m2) *^ v = m1 *^ v + m2 *^ v.
-proof. move => sz_eq; rewrite -colD 2:mulmxDl; smt(size_mulmx size_colmx). qed.
+proof. 
+move => sz_eq; rewrite -colD 2:mulmxvE 2:mulmxDl; smt(size_mulmx size_colmx). 
+qed.
 
 lemma mulmxvDr (m : matrix) (v1 v2 : vector) :
   size v1 = size v2 => m *^ (v1 + v2) = m *^ v1 + m *^ v2.
 proof.
 move => size_eq; rewrite -colD; 1: smt(size_mulmx size_colmx).
-by rewrite colmxD 1:// mulmxDr.
+by rewrite mulmxvE colmxD 1:// mulmxDr.
 qed.
 
 lemma mulmxvA (m1 m2 : matrix) (v : vector) :
   cols m1 = rows m2 => cols m2 = size v => m1 *^ (m2 *^ v) = (m1 * m2) *^ v.
-proof. move => cols_eq cols_eq1; by rewrite colmx_mulmxv 1:// mulmxA. qed.
+proof. move => cols_eq cols_eq1; by rewrite mulmxvE colmx_mulmxv // mulmxA. qed.
 
 lemma mulmxv0 (m : matrix) : m *^ (zerov (cols m)) = zerov (rows m).
-proof. by rewrite colmxc /= mulmxm0 col_matrixc. qed.
+proof. by rewrite mulmxvE colmxc /= mulmxm0 col_matrixc. qed.
 
 lemma mulmx1v (v : vector): onem (size v) *^ v = v.
 proof.
-rewrite -{3}colK.
+rewrite -{3}colK mulmxvE.
 congr.
 have ->: size v = rows (colmx v) by done.
 by rewrite mul1mx.
 qed.
 
 (* Vector and matrix multiplication *)
-abbrev ( ^* ) (v : vector) (m : matrix) : vector = row (rowmx v * m) 0.
+op mulvmx v m = row (rowmx v * m) 0.
+
+abbrev ( ^* ) (v : vector) (m : matrix) : vector = mulvmx v m.
+
+lemma mulvmxE v m: v ^* m = row (rowmx v * m) 0 by done.
 
 lemma size_mulvmx (v: vector) m: size v = rows m => size (v ^* m) = cols m.
-proof. move => size_eq; by rewrite /= cols_mulmx. qed.
+proof. by move => size_eq; rewrite /mulvmx /= cols_mulmx. qed.
 
-lemma get_mulvmx v m i: (v ^* m).[i] = dotp v (col m i) by rewrite /= get_mulmx.
+lemma get_mulvmx v m i: (v ^* m).[i] = dotp v (col m i).
+proof. by rewrite /mulvmx /= get_mulmx. qed.
 
 lemma mulmxTv (m : matrix) (v : vector) : (trmx m) *^ v = v ^* m.
-proof. by rewrite -col_trmx trmxM. qed.
+proof. by rewrite mulvmxE -col_trmx trmxM. qed.
 
 hint simplify mulmxTv.
 
 lemma mulvmxT (v : vector) (m : matrix) : v ^* (trmx m) = m *^ v.
-proof. by rewrite -{2}(trmxK m) /#. qed.
+proof. by rewrite mulvmxE-{2}(trmxK m) /#. qed.
 
 hint simplify mulvmxT.
 
