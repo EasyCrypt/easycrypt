@@ -856,13 +856,13 @@ and replay_reduction
       obind (fun rule ->
         let env = EcSection.env (ove.ovre_hooks.henv scope) in
 
-        if not (
-          match opts.ur_mode with
-          | `Ax -> is_some (EcEnv.Ax.by_path_opt p env)
-          | `Sc -> is_some (EcEnv.Schema.by_path_opt p env)
-        ) then raise Removed;
-
         try
+          if not (
+            match opts.ur_mode with
+            | `Ax -> is_some (EcEnv.Ax.by_path_opt p env)
+            | `Sc -> is_some (EcEnv.Schema.by_path_opt p env)
+          ) then raise Removed;
+
           Some (EcReduction.User.compile
                   ~opts ~prio:rule.rl_prio
                   env opts.ur_mode p)
