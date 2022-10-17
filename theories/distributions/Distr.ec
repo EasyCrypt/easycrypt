@@ -1491,6 +1491,73 @@ move=> le_qp; rewrite drestrictE &(mu_eq).
 by move=> x @/predI; apply/eq_iff/andb_idl/le_qp.
 qed.
 
+theory DConditional.
+
+op dcond (d : 'a distr) (p : 'a -> bool) = dscale (drestrict d p).
+
+lemma weight_drestrict (d: 'a distr) (p: 'a -> bool) :
+  weight (drestrict d p) = mu d p.
+admitted. (* in PR 235 *)
+
+lemma dcond_supp (d: 'a distr) (p: 'a -> bool) (x: 'a):
+  x \in dcond d p <=> x \in d /\ p x.
+proof.
+rewrite supp_dscale supp_drestrict => //.
+qed.
+
+lemma dcond_ll (d: 'a distr) (p: 'a -> bool):
+  mu d p > 0%r => is_lossless (dcond d p).
+proof.
+move => ?; apply dscale_ll; smt(weight_drestrict).
+qed.
+
+(* Chain rule of probability *)
+lemma dcondE (d : 'a distr) (p : 'a -> bool) (p' : 'a -> bool) :
+  mu (dcond d p) p' = mu d (predI p p') / mu d p.
+proof.
+by rewrite dscaleE drestrictE weight_drestrict.
+qed.
+
+lemma dcond1E (d : 'a distr) (p : 'a -> bool) (x : 'a):
+  mu1 (dcond d p) x = if p x then mu1 d x / mu d p else 0%r.
+proof.
+rewrite dcondE; case: (p x) => [pxT|pxF]; last by rewrite mu0_false /#.
+by congr; apply mu_eq => /#.
+qed.
+
+lemma dcondZ (d: 'a distr) (P: 'a -> bool) :
+  mu d P = 0%r <=> dcond d P = dnull.
+proof.
+split => ?.
+- apply eq_distr => a; rewrite dnull1E.
+  suff: a \notin (dcond d P) by smt(ge0_mu).
+  rewrite dcond_supp; smt(mu_sub).
+- have H: (mu (dcond d P) P = 0%r) by smt(dnullE).
+  rewrite dcondE // in H.
+  (* Looks stupid but somehow speeds up smt... *)
+  suff: predI P P = P by smt().
+  smt().
+qed.
+
+lemma dcond_dnull (P: 'a -> bool) :
+  dcond dnull P = dnull.
+proof.
+apply eq_distr; smt(dnull1E dcond_supp supp_dnull ge0_mu).
+qed.
+
+lemma marginal_sampling (d : 'a distr) (f : 'a -> 'b) :
+  d = dlet (dmap d f) (fun b => dcond d (fun a => f a = b)).
+proof.
+apply eq_distr => a; rewrite dlet1E /=.
+rewrite (@sumE_fin _ [f a]) ?big_seq1 //=; 1: smt(dcond1E).
+rewrite dcond1E dmap1E /(\o) /pred1 -/(pred1 a) /=.
+case (a \in d) => [a_d|]; 2: smt(ge0_mu).
+suff : mu d (fun (a0 : 'a) => f a0 = f a) > 0%r; smt(mu_sub).
+qed.
+
+end DConditional.
+export DConditional.
+
 (* -------------------------------------------------------------------- *)
 op mprod ['a,'b] (ma : 'a -> real) (mb : 'b -> real) (ab : 'a * 'b) =
   (ma ab.`1) * (mb ab.`2).

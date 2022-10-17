@@ -18,6 +18,7 @@ exception IncompatibleExpr of env * (expr * expr)
 (* -------------------------------------------------------------------- *)
 type 'a eqtest  = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
+type 'a eqantest = env -> ?alpha:(EcIdent.t * ty) Mid.t -> ?norm:bool -> 'a -> 'a -> bool
 
 module EqTest_base = struct
   let rec for_type env t1 t2 =
@@ -1612,6 +1613,18 @@ let rec conv ri env f1 f2 stk =
   | Fproj(f1', i1), Fproj(f2',i2) when i1 = i2 ->
     conv ri env f1' f2' (zproj i1 f1.f_ty stk)
 
+  | Fpvar(pv1, m1), Fpvar(pv2, m2)
+      when EcEnv.NormMp.pv_equal env pv1 pv2 && EcMemory.mem_equal m1 m2 ->
+      conv_next ri env f1 stk
+
+  | Fglob (m1, mem1), Fglob (m2, mem2)
+      when
+        EcPath.m_equal
+          (EcEnv.NormMp.norm_mpath env m1)
+          (EcEnv.NormMp.norm_mpath env m2)
+        && EcMemory.mem_equal mem1 mem2 ->
+      conv_next ri env f1 stk
+
   | FhoareF hf1, FhoareF hf2 when EqTest_i.for_xp env hf1.hf_f hf2.hf_f ->
     conv ri env hf1.hf_pr hf2.hf_pr (zhl f1 [hf1.hf_po] [hf2.hf_po] stk)
 
@@ -2162,11 +2175,12 @@ module EqTest = struct
    end)
 
   let for_pv    = fun env ?(norm = true) -> for_pv    env ~norm
+  let for_lv    = fun env ?(norm = true) -> for_lv    env ~norm
   let for_xp    = fun env ?(norm = true) -> for_xp    env ~norm
   let for_mp    = fun env ?(norm = true) -> for_mp    env ~norm
-  let for_instr = fun env ?(norm = true) -> for_instr env Mid.empty ~norm
-  let for_stmt  = fun env ?(norm = true) -> for_stmt  env Mid.empty ~norm
-  let for_expr  = fun env ?(norm = true) -> for_expr  env Mid.empty ~norm
+  let for_instr = fun env ?(alpha = Mid.empty) ?(norm = true) -> for_instr env alpha ~norm
+  let for_stmt  = fun env ?(alpha = Mid.empty) ?(norm = true) -> for_stmt  env alpha ~norm
+  let for_expr  = fun env ?(alpha = Mid.empty) ?(norm = true) -> for_expr  env alpha ~norm
 
   let for_msig  = fun env ?(norm = true) -> for_module_sig  env ~norm
   let for_mexpr = fun env ?(norm = true) -> for_module_expr env ~norm

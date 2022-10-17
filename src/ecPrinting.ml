@@ -603,7 +603,7 @@ let e_uni_prio_lsless = 10000
 let e_uni_prio_uminus = fst e_bin_prio_lop2
 let e_app_prio        = (10000, `Infix `Left)
 let e_get_prio        = (20000, `Infix `Left)
-let e_uni_prio_rint   = (100, `Postfix)
+let e_uni_prio_rint   = (15000, `Postfix)
 
 let min_op_prec = (-1     , `Infix `NonAssoc)
 let max_op_prec = (max_int, `Infix `NonAssoc)
@@ -659,6 +659,10 @@ let priority_of_unop =
 (* -------------------------------------------------------------------- *)
 let is_binop name =
   (priority_of_binop name) <> None
+
+(* -------------------------------------------------------------------- *)
+let is_pstop name =
+  String.length name > 0 && name.[0] = '%'
 
 (* -------------------------------------------------------------------- *)
 let rec pp_type_r ppe outer fmt ty =
@@ -781,7 +785,9 @@ let pp_opname fmt (nm, op) =
       if op.[0] = '*' || op.[String.length op - 1] = '*'
       then Format.sprintf "( %s )" op
       else Format.sprintf "(%s)" op
-    end else op
+    end else if is_pstop op then
+      Format.sprintf "(%s)" op
+    else op
 
   in EcSymbols.pp_qsymbol fmt (nm, op)
 
@@ -1075,7 +1081,23 @@ let pp_opapp
             Some pp
 
     end
+
     | _ -> None
+
+  and try_pp_as_post () =
+    match es with
+    | e :: es when is_pstop opname -> begin
+        let pp_head _ _ fmt opname =
+          let subpp = pp_sub ppe (fst outer, (e_uni_prio_rint, `NonAssoc)) in
+          Format.fprintf fmt "%a%s" subpp e opname in
+
+        let pp_subs = (pp_head, pp_sub) in
+        let pp fmt () = pp_app ppe pp_subs outer fmt (opname, es) in
+        Some (maybe_paren outer (inm, max_op_prec) pp)
+      end
+
+    | _ ->
+       None
 
   and try_pp_special () =
     let qs = P.toqsymbol op in
@@ -1087,13 +1109,6 @@ let pp_opapp
         let pp fmt () =
           Format.fprintf fmt "{0,1}~%a"
             (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) e
-        in
-          Some pp
-
-    | [e] when qs = EcCoreLib.s_real_of_int ->
-        let pp fmt () =
-          Format.fprintf fmt "%a%%r"
-            (pp_sub ppe (fst outer, (e_uni_prio_rint, `NonAssoc))) e
         in
           Some pp
 
@@ -1203,6 +1218,7 @@ let pp_opapp
        (List.fpick [try_pp_special ;
                     try_pp_as_uniop;
                     try_pp_as_binop;
+                    try_pp_as_post ;
                     try_pp_record  ;
                     try_pp_proj    ;])) fmt ()
 

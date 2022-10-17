@@ -147,6 +147,7 @@
     "bypr"        , BYPR       ;        (* KW: tactic *)
     "byphoare"    , BYPHOARE   ;        (* KW: tactic *)
     "byequiv"     , BYEQUIV    ;        (* KW: tactic *)
+    "byupto"      , BYUPTO     ;        (* KW: tactic *)
     "fel"         , FEL        ;        (* KW: tactic *)
 
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
@@ -345,6 +346,7 @@ let nop = '\\' ichar+
 let uniop = nop | ['-' '+']+ | '!'
 let binop = sop | nop
 let numop = '\'' digit+
+let pstop = '%' lident
 
 (* -------------------------------------------------------------------- *)
 rule main = parse
@@ -364,6 +366,7 @@ rule main = parse
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { [PBINOP s] }
   | '(' blank* (numop as s) blank* ')' { [PNUMOP s] }
+  | '(' blank* (pstop as s) blank* ')' { [PPSTOP s] }
 
   | '[' blank* (uniop as s) blank* ']' {
       let name = Printf.sprintf "[%s]" s in

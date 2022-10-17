@@ -15,17 +15,19 @@ exception IncompatibleExpr of env * (expr * expr)
 
 type 'a eqtest = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
+type 'a eqantest = env -> ?alpha:(EcIdent.t * ty) Mid.t -> ?norm:bool -> 'a -> 'a -> bool
 
 module EqTest : sig
   val for_type_exn : env -> ty -> ty -> unit
 
   val for_type  : ty          eqtest
   val for_pv    : prog_var    eqntest
+  val for_lv    : lvalue      eqntest
   val for_xp    : xpath       eqntest
   val for_mp    : mpath       eqntest
-  val for_instr : instr       eqntest
-  val for_stmt  : stmt        eqntest
-  val for_expr  : expr        eqntest
+  val for_instr : instr       eqantest
+  val for_stmt  : stmt        eqantest
+  val for_expr  : expr        eqantest
   val for_msig  : module_sig  eqntest
   val for_mexpr : module_expr eqntest
 

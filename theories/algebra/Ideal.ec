@@ -449,14 +449,14 @@ axiom unitP   : forall (x y : qT), y * x = oner => unit x.
 axiom unitout : forall (x : qT), !unit x => invr x = x.
 
 clone import ComRing with
-  type t     <- qT   ,
-  op   zeror <- zeror,
-  op   ( + ) <- (+)  ,
-  op   [ - ] <- [-]  ,
-  op   oner  <- oner ,
-  op   ( * ) <- ( * ),
-  op   invr  <- invr ,
-  pred unit  <- unit
+  type t     <= qT   ,
+  op   zeror <= zeror,
+  op   ( + ) <= (+)  ,
+  op   [ - ] <= [-]  ,
+  op   oner  <= oner ,
+  op   ( * ) <= ( * ),
+  op   invr  <= invr ,
+  pred unit  <= unit
 
   proof *.
 

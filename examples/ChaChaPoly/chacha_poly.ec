@@ -1157,7 +1157,7 @@ section PROOFS.
     case: (mk_rs (oget RO.m{2}.[(n, C.ofint 0)])) => r s /=.
     case: (t = poly1305 r s (topol a c)) => // heq _.
     apply List.hasP; exists (topol a c, t) => /=;split; 2:by rewrite heq.
-    by apply mapP; exists (n, a, c, t) => /=; apply mem_filter.
+    by apply mapP; exists (n, a, c, t) => /=; apply List.mem_filter.
   qed.
 
   local lemma step2_3 &m : 
@@ -1251,7 +1251,7 @@ proof.
   case: (valid_topol a m) => hv /=;last by rewrite mu0; smt (ge0_qdec size_ge0 ge0_pr_zeropol).
   pose lc' := List.map _ _; apply (ler_trans ((size lc')%r*pr_zeropol));
    last by rewrite size_map size_filter //= ler_wpmul2r //= 1: ge0_pr_zeropol; smt (count_size size_ge0).
-  apply mu_has_leM => /= ? /mapP [] [n' a' m' t'] /> /mem_filter |> ??.
+  apply mu_has_leM => /= ? /mapP [] [n' a' m' t'] /> /List.mem_filter |> ??.
   case: (topol a' m' <> topol a m) => ? /=; last by rewrite mu0; smt (ge0_pr_zeropol).
   by apply pr_zeropol_spec.
 qed.
@@ -2494,7 +2494,7 @@ section PROOFS.
     have:= H16; rewrite mapP /= => [#][] t2 [#] h <<- <<-; have:=h.
     rewrite mapP /==> [#] [][] x1 x2 x3 x4 /=; rewrite mem_filter /= => [#] <<- ? ->>.
     smt(get_setE).
-  smt(mem_filter mem_cat mapP).
+  smt(List.mem_filter mem_cat mapP).
   qed.
 
   local clone EventPartitioning as EP with 
