@@ -110,9 +110,9 @@ op vectc n c = offunv ((fun _ => c), n).
 
 lemma size_vectc n c: size (vectc n c) = max 0 n by done.
 
-lemma get_vectc n c i: 0 <= i < n => (vectc n c).[i] = c by smt(get_offunv).
-
 hint simplify size_vectc.
+
+lemma get_vectc n c i: 0 <= i < n => (vectc n c).[i] = c by smt(get_offunv).
 
 (* Zero-vector of dimension n *)
 op zerov n = vectc n zeror.
@@ -562,7 +562,8 @@ lemma supp_dvector d v k :
 proof.
 move=> k_ge0; rewrite supp_dmap; split => [[s []]|[s_v] supp_v].
 - rewrite ler_maxr // supp_dlist 1:/# => -[s_s /allP supp_s ->]. 
-  rewrite size_oflist s_s /=; smt(get_oflist mem_nth). 
+  rewrite size_oflist s_s /= -s_s => i bound. 
+  rewrite (get_oflist witness) // supp_s mem_nth //.
 exists (tolist v); rewrite ler_maxr // tolistK /=.
 apply/supp_dlist => //; rewrite size_tolist s_v /=; apply/allP => x x_v.
 rewrite -(nth_index x _ _ x_v) nth_tolist.
@@ -2070,11 +2071,11 @@ rewrite (dmap_dprod_comp _ _ (fun x => x) (fun x => x) catmc).
 rewrite /support !dmap_id dmapE /(\o) /pred1. 
 apply (StdOrder.RealOrder.ltr_le_trans 
       (mu1 (dmatrix d r c1 `*` dmatrix d r c2) (m1,m2))).
-- smt(supp_dprod).
+- rewrite witness_support.
+  exists (m1, m2).
+  by rewrite supp_dprod /= m1_dm m2_dm.
 - by apply mu_le => /#.
 qed.
-
-
 
 end Matrices.
 
