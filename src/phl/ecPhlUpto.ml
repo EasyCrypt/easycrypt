@@ -55,11 +55,12 @@ and i_upto env alpha bad i1 i2 =
     check_not_bad env bad lv2 &&
     EqTest.for_instr env ~alpha i1 i2
 
-  | Scall (lv1, f1, e1), Scall (lv2, f2, e2) ->
+  | Scall (lv1, f1, e1, qe1), Scall (lv2, f2, e2, qe2) ->
     omap_dfl (check_not_bad env bad) true lv1 &&
     omap_dfl (check_not_bad env bad) true lv2 &&
     oall2 (EqTest.for_lv env) lv1 lv2 &&
     List.all2 (EqTest.for_expr env ~alpha) e1 e2 &&
+    oall2 (List.all2 (EqTest.for_expr env ~alpha)) qe1 qe2 &&
     f_upto env bad f1 f2
 
   | Sif (a1, b1, c1), Sif(a2, b2, c2) ->
@@ -107,7 +108,7 @@ and f_upto env bad f1 f2 =
   | FBalias _, _ | _, FBalias _ -> assert false
   | FBdef fd1, FBdef fd2 ->
     let check_param x1 x2 =
-      x1.v_name = x2.v_name && EqTest.for_type env x1.v_type x2.v_type in
+      x1.v_quantum = x2.v_quantum && x1.v_name = x2.v_name && EqTest.for_type env x1.v_type x2.v_type in
     List.all2 check_param fd1.f_locals fd2.f_locals &&
     oall2 (EqTest.for_expr env) fd1.f_ret fd2.f_ret &&
     s_upto env EcIdent.Mid.empty bad fd1.f_body fd2.f_body
@@ -138,7 +139,7 @@ let f_upto_init env bad f1 f2 =
   | FBalias _, _ | _, FBalias _ -> assert false
   | FBdef fd1, FBdef fd2 ->
     let check_param x1 x2 =
-      x1.v_name = x2.v_name && EqTest.for_type env x1.v_type x2.v_type in
+      x1.v_quantum = x2.v_quantum && x1.v_name = x2.v_name && EqTest.for_type env x1.v_type x2.v_type in
     let alpha = EcIdent.Mid.empty in
     let body1 = fd1.f_body and body2 = fd2.f_body in
     List.all2 check_param fd1.f_locals fd2.f_locals &&
