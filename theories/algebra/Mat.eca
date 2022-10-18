@@ -452,40 +452,52 @@ lemma get_updv (v: vector) (n i: int) (m: t): (0 <= i < size v) =>
 proof. rewrite /updv => i_bound. by rewrite get_offunv. qed.
 
 (* Multiplying vector by a scalar *)
-op mulvs (v: vector) (s: t) = offunv(fun i => v.[i] * s, size v).
+op scalarv (s: t) (v: vector) = offunv(fun i => s * v.[i], size v).
 
-abbrev ( ** ) v s = mulvs v s.
+abbrev ( ** ) s v = scalarv s v.
 
-lemma size_mulvs (v: vector) (s: t): size (mulvs v s) = size v by done.
+lemma size_scalarv (v: vector) (s: t): size (s ** v) = size v by done.
 
-lemma get_mulvs (v: vector) (s: t) (i: int): (mulvs v s).[i] = v.[i] * s.
+lemma get_scalarv (v: vector) (s: t) (i: int): (s ** v).[i] = s * v.[i].
 proof.
 case (0 <= i < size v) => bound; 1: by rewrite get_offunv.
-by rewrite offunv0E // getv0E // mul0r.
+by rewrite offunv0E // getv0E // mulr0.
 qed.
 
-lemma mulvs0 (v: vector): mulvs v zeror = zerov (size v).
+lemma scalar0v (v: vector): zeror ** v = zerov (size v).
 proof.
 rewrite eq_vectorP. 
-split => [| i bound]; 1: rewrite size_mulvs /#.
-by rewrite get_zerov get_mulvs mulr0.
+split => [| i bound]; 1: rewrite size_scalarv /#.
+by rewrite get_zerov get_scalarv mul0r.
 qed.
 
-lemma mulvs1 (v: vector): mulvs v oner = v.
+lemma scalar1v (v: vector): oner ** v = v.
 proof.
 rewrite eq_vectorP.
-split => [| i bound]; 1: by rewrite size_mulvs.    
-by rewrite get_mulvs mulr1.
+split => [| i bound]; 1: by rewrite size_scalarv.    
+by rewrite get_scalarv mul1r.
 qed.
 
-lemma dotp_mulvs (v1 v2: vector) (s1 s2: t):
-    (dotp v1 v2) * (s1 * s2) = dotp (mulvs v1 s1) (mulvs v2 s2).
+lemma scalarvN a (v : vector): a ** -v = - (a ** v).
+proof. 
+rewrite eq_vectorP size_oppv 2!size_scalarv size_oppv /= => i bound.
+by rewrite !get_scalarv getvN mulrN.
+qed.
+
+lemma scalarNv (a : R) (v : vector): (-a) ** v = - (a ** v).
 proof.
-rewrite 2!dotpE 2!size_mulvs.
+rewrite eq_vectorP size_oppv 2!size_scalarv /= => i bound.
+by rewrite !get_scalarv mulNr.
+qed.
+
+lemma dotp_scalarv (v1 v2: vector) (s1 s2: t):
+    (dotp v1 v2) * (s1 * s2) = dotp (s1 ** v1) (s2 ** v2).
+proof.
+rewrite 2!dotpE 2!size_scalarv.
 case (size v1 = size v2) => size_eq; last apply mul0r.
 rewrite mulr_suml. 
 apply eq_bigr => i _ /=.
-rewrite 2!get_mulvs.
+rewrite 2!get_scalarv.
 smt(mulrA mulrC).
 qed.
 
@@ -1389,6 +1401,13 @@ have ->: size v = rows (colmx v) by done.
 by rewrite mul1mx.
 qed.
 
+lemma mul_colmxc (v:vector) c: (colmx v) *^ vectc 1 c = c ** v.
+proof.
+rewrite eq_vectorP size_scalarv size_mulmxv /= /max 1:// => i bound.
+rewrite get_scalarv get_mulmxv dotpE /= /max /=.
+by rewrite Big.BAdd.big_int1 /= get_vectc // mulrC.
+qed.
+
 (* Vector and matrix multiplication *)
 op mulvmx v m = row (rowmx v * m) 0.
 
@@ -1451,6 +1470,9 @@ rewrite colmx_col; first rewrite cols_mulmx /#.
 rewrite rowmx_row; first rewrite rows_mulmx /#.
 apply mulmxA => /#.
 qed.
+
+lemma mul_rowmxc (v:vector) c: vectc 1 c ^* (rowmx v) = c ** v.
+proof. by rewrite -(trmxK (rowmx v)) mulvmxT /= mul_colmxc. qed.
 
 (* Sideways matrix concatenation *)
 op catmc (m1 m2: matrix) = if rows m1 = rows m2 then
@@ -1793,84 +1815,89 @@ case (i = r) => /= [-> | neq_r bound1 bound2].
 qed.
 
 (* Multplication with scalar for matrices and vectors *)
-op mulmxs (m: matrix) (s: t) = m * diagc (cols m) s.
+op scalarm (s: t) (m: matrix) = diagc (rows m) s * m.
 
-lemma rows_mulmxs (m: matrix) (s: t): rows (mulmxs m s) = rows m.
+abbrev ( *** ) s m = scalarm s m.
+
+lemma scalarmE s m: s *** m = diagc (rows m) s * m by done.
+
+lemma rows_scalarm (m: matrix) (s: t): rows (s *** m) = rows m.
 proof. by rewrite rows_mulmx. qed.
 
-lemma cols_mulmxs (m: matrix) (s: t): cols (mulmxs m s) = cols m.
+lemma cols_scalarm (m: matrix) (s: t): cols (s *** m) = cols m.
 proof. by rewrite cols_mulmx. qed.
 
-lemma mulmxs_mrange m s i j: mrange (mulmxs m s) i j = mrange m i j.
+lemma scalarm_mrange m s i j: mrange (s *** m) i j = mrange m i j.
 proof. by rewrite rows_mulmx // cols_mulmx. qed.
 
-lemma size_mulmxs (m: matrix) (s: t): size (mulmxs m s) = size m.
-proof. by rewrite rows_mulmxs cols_mulmxs. qed.
+lemma size_scalarm (m: matrix) (s: t): size (s *** m) = size m.
+proof. by rewrite rows_scalarm cols_scalarm. qed.
     
-lemma get_mulmxs (m: matrix) (s: t) (i j: int): mrange m i j =>
-    (mulmxs m s).[i, j] = m.[i, j] * s.
+lemma get_scalarm (m: matrix) (s: t) (i j: int): mrange m i j =>
+    (s *** m).[i, j] = m.[i, j] * s.
 proof.
-move => bound; rewrite get_mulmx /dotp 2!size_offunv rows_diagmx size_vectc.
-rewrite 2!max0cols /= (bigD1 _ _ j) 1:mem_range 1:/# 1:range_uniq.
-rewrite big1 /= 2:get_vectc 2:/# 2:addr0 2:// => k.
-rewrite /predC1 => -> /=.
-apply mulr0.
+move => bound; rewrite get_mulmx /dotp 2!size_offunv /=.
+rewrite (bigD1 _ _ i) 1:mem_range 1:/# 1:range_uniq.
+rewrite big1 /= 2:get_vectc 2:/# 2:addr0 2:mulrC 2:// => k.
+rewrite /predC1 eq_sym => -> /=.
+apply mul0r.
 qed.
 
-lemma mulmxs_empty (s: t): mulmxs emptym s = emptym.
+lemma scalarm_empty (s: t): s *** emptym = emptym.
 proof. apply emptym_unique. by rewrite cols_mulmx // rows_mulmx. qed.
 
-hint simplify mulmxs_empty.
+hint simplify scalarm_empty.
 
-lemma mulmxs0 (m: matrix): mulmxs m zeror = zerom (rows m) (cols m).
+lemma scalar0m (m: matrix): zeror *** m = zerom (rows m) (cols m).
 proof.
 rewrite eq_matrixP.
-split => [| i j bound]; 1: rewrite size_mulmxs /#.
-rewrite get_zerom get_mulmxs; 1: smt(size_mulmxs).
+split => [| i j bound]; 1: rewrite size_scalarm /#.
+rewrite get_zerom get_scalarm; 1: smt(size_scalarm).
 apply mulr0.
 qed.
 
-lemma mulmxs1 (m: matrix): mulmxs m oner = m.
+lemma scalar1m (m: matrix): oner *** m = m.
 proof.
 rewrite eq_matrixP.
-split => [| i j bound]; 1: by rewrite size_mulmxs.    
-rewrite get_mulmxs; 1: smt(size_mulmxs).
+split => [| i j bound]; 1: by rewrite size_scalarm.    
+rewrite get_scalarm; 1: smt(size_scalarm).
 apply mulr1.
 qed.
 
-lemma mulmxsN (m: matrix): mulmxs m (- oner) = - m.
+lemma scalarNm (m: matrix) (s: t): (- s) *** m = - (s *** m).
 proof.
 rewrite eq_matrixP.
-split => [| i j bound]; 1: by rewrite size_mulmxs.    
-rewrite get_mulmxs; 1: smt(size_mulmxs).
-by rewrite getmN mulrN mulr1.
+split => [| i j bound]; 1: rewrite !size_scalarm /=; 1: smt(size_scalarm).
+rewrite /= !get_scalarm /=; 1,2: smt(size_scalarm).
+by rewrite mulrN.
 qed.
 
-lemma mulmxsAs m s1 s2: mulmxs (mulmxs m s1) s2 = (mulmxs m (s1 * s2)).
+lemma scalarmAs s1 s2 m: s1 *** (s2 *** m) = (s1 * s2) *** m.
 proof.
 apply eq_matrixP. 
-split => [| i j bound]; 1: by rewrite !size_mulmxs. 
-rewrite 2!mulmxs_mrange in bound.
-rewrite !get_mulmxs 4:mulrA; smt(rows_mulmxs cols_mulmxs).
+split => [| i j bound]; 1: by rewrite !size_scalarm. 
+rewrite 2!scalarm_mrange in bound.
+rewrite !get_scalarm 4:mulrA //. smt(size_scalarm).
+by rewrite -[_ * s1 * _]mulrA [s1 * _]mulrC mulrA.
 qed.
 
-lemma mulmxsDmx m1 m2 s: mulmxs (m1 + m2) s = (mulmxs m1 s) + (mulmxs m2 s).
+lemma scalarmD m1 m2 s: s *** (m1 + m2) = s *** m1 + s *** m2.
 proof.
 case (size m1 = size m2) => [size_eq | size_neq].
 - apply eq_matrixP.
-  rewrite rows_mulmxs rows_addm 1:// cols_mulmxs rows_addm 1:!size_mulmxs 1://.
-  rewrite !cols_addm 1:// 1:!size_mulmxs 1:// size_mulmxs /= => i j bound.
-  rewrite get_addm 1:!size_mulmxs // !get_mulmxs 1:rows_addm 1:// 1:cols_addm // 1:/#.
+  rewrite rows_scalarm rows_addm 1:// cols_scalarm rows_addm 1:!size_scalarm 1://.
+  rewrite !cols_addm 1:// 1:!size_scalarm 1:// size_scalarm /= => i j bound.
+  rewrite get_addm 1:!size_scalarm // !get_scalarm 1:rows_addm 1:// 1:cols_addm // 1:/#.
   by rewrite get_addm // mulrDl.
-- by rewrite !size_addm_diff 2:2!size_mulmxs.
+- by rewrite !size_addm_diff 2:2!size_scalarm.
 qed.
 
-lemma mulmxsDs m (s1 s2: t): mulmxs m (s1 + s2) = (mulmxs m s1) + (mulmxs m s2).
+lemma scalarDm m (s1 s2: t): (s1 + s2) *** m = s1 *** m + s2 *** m.
 proof.
 apply eq_matrixP.
-rewrite rows_mulmxs cols_mulmxs.
-split => [| i j bound]; 1: rewrite size_addm !size_mulmxs //.
-by rewrite get_addm 1:!size_mulmxs 1:// !get_mulmxs // mulrDr.
+rewrite rows_scalarm cols_scalarm.
+split => [| i j bound]; 1: rewrite size_addm !size_scalarm //.
+by rewrite get_addm 1:!size_scalarm 1:// !get_scalarm // mulrDr.
 qed.
 
 (* dmatrix helper function: construct matrix from list of (column) vectors *)
