@@ -196,12 +196,6 @@ case: (0 <= i < size v) => bound; 1: by rewrite /([-]) get_offunv.
 by rewrite !getv0E /([-]) //= oppr0.
 qed.
 
-lemma offunvN (f : int -> R) k : - offunv (f, k) = offunv (fun x => - f x, k).
-proof. 
-apply eq_vectorP => //= i; rewrite size_oppv /= => Hi.
-by rewrite getvN !get_offunv 1,2:/#.
-qed.
-
 hint simplify getvN, size_oppv.
 
 (* Simplifications for some special vectors *)
@@ -942,10 +936,6 @@ by rewrite getm0E // getm0E // oppr0.
 qed.
 
 hint simplify getmN.
-
-lemma offunmN (f : int -> int -> R) r c : 
-  - offunm (f, r, c) = offunm (fun i j => - f i j, r, c).
-proof. by apply eq_matrixP => //= i j Hi; rewrite !get_offunm /#. qed.
 
 lemma emptymN: -emptym = emptym by apply emptym_unique.
 
