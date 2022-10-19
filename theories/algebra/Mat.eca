@@ -272,6 +272,11 @@ split => [|i bound]; 1: by rewrite 2!size_oppv.
 by rewrite 2!getvN opprK.
 qed.
 
+lemma sub_eqv (x y z : vector) : 
+  size x = size z => size y = size z => 
+  x - z = y <=> x = y + z.
+proof. smt(addvA addvC addvN addv0). qed.
+
 (* Inner product *)
 op dotp (v1 v2 : vector) = if size v1 = size v2 then 
   bigi predT (fun i => v1.[i] * v2.[i]) 0 (size v1) else zeror.
@@ -394,11 +399,6 @@ qed.
 
 lemma oppv_catv (v1 v2: vector): - (v1 || v2) = (-v1 || -v2).
 proof. by apply eq_vectorP => i bound /=; rewrite !get_catv' opprD. qed.
-
-lemma sub_eqv (x y z : vector) : 
-  size x = size z => size y = size z => 
-  x - z = y <=> x = y + z.
-proof. smt(addvA addvC addvN addv0). qed.
 
 (* Splitting apart vectors *)
 op subv (v: vector) (n m: int) = offunv ((fun i => v.[i+n]), m - n).
@@ -852,6 +852,16 @@ apply eq_matrixP => /=.
 rewrite rows_m cols_m /= => i j /#.
 qed.
 
+(* lifting functions to matrices *)
+op mapm (f : R -> R) (m : matrix) : matrix = 
+  offunm (fun i j => f m.[i, j], rows m, cols m).
+
+lemma size_mapm f v : size (mapv f v) = size v by [].
+
+lemma get_mapm f (v : vector) i : 
+  (0 <= i < size v) => (mapv f v).[i] = f v.[i].
+proof. by move => bound; rewrite get_offunv. qed.
+
 (* Matrix addition *)
 op (+) (m1 m2 : matrix) = if size m1 = size m2 then 
   offunm (fun i j => m1.[i, j] + m2.[i, j], rows m1, cols m1) else emptym.
@@ -1002,6 +1012,11 @@ rewrite eq_matrixP.
 split => [| i j bound]; 1: by rewrite !size_neg.
 by rewrite !getmN opprK.
 qed.
+
+lemma sub_eqm (x y z : matrix): 
+   size x = size z => size y = size z => 
+   x - z = y <=> x = y + z.
+proof. smt(addmA addmC addNm add0m). qed.
 
 (* matrix transposition *)
 op trmx (m : matrix) = offunm (fun i j => m.[j, i], cols m, rows m).
