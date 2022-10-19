@@ -375,7 +375,13 @@ proof. smt(get_catv). qed.
 
 lemma get_catv_r (v1 v2: vector) i : 
   size v1 <= i => (v1 || v2).[i] = v2.[i - size v1].
-proof. smt(get_catv). qed. 
+proof. smt(get_catv). qed.
+
+lemma catvA : associative Vectors.(||).
+proof.
+move => v1 v2 v3. rewrite eq_vectorP !size_catv addrA /= => i bound. 
+by rewrite !get_catv' size_catv opprD !addrA.
+qed.
 
 lemma dotp_catv v1 v2 v3 v4: size v1 = size v3 => size v2 = size v4 =>
   dotp (v1 || v2) (v3 || v4) = (dotp v1 v3) + (dotp v2 v4).
@@ -549,12 +555,6 @@ rewrite map_cat; congr.
 - apply/eq_in_map => i /mem_range /=; smt(get_catv_l).
 rewrite addzC range_addr /= -map_comp /(\o).
 apply/eq_in_map => i /mem_range /=; smt(get_catv_r).
-qed.
-
-lemma catvA : associative Vectors.(||).
-proof.
-move => v1 v2 v3; have <- := tolistK (v1 || v2 || v3).
-by rewrite !tolist_catv catA -!tolist_catv tolistK.
 qed.
 
 lemma tolist_vectc n c : tolist (vectc n c) = nseq n c. 
