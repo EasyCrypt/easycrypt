@@ -987,12 +987,15 @@ qed.
 
 abbrev (-) (m1 m2: matrix) = m1 + (-m2).
 
-lemma addNm (m: matrix) : m - m = zerom (rows m) (cols m).
+lemma addmN (m: matrix) : m - m = zerom (rows m) (cols m).
 proof.
 apply eq_matrixP. 
 split => [| i j bound]; 1: by rewrite size_addm.
 by rewrite get_addm //= addrN.
 qed.
+
+lemma addNm (m: matrix): (-m) + m = zerom (rows m) (cols m).
+proof. by rewrite addmC addmN. qed.
 
 lemma oppmD (m1 m2: matrix): -(m1 + m2) = -m1 + -m2.
 proof.
@@ -1096,6 +1099,8 @@ hint simplify size_row, get_row.
 lemma row0E m i: !(0 <= i < rows m) => row m i = zerov (cols m). 
 proof. move => n_bound; rewrite eq_vectorP => j bd /=. rewrite getm0E /#. qed.
 
+lemma rowN m i: - (row m i) = row (-m) i by rewrite eq_vectorP.
+
 lemma rowD m1 m2 n: size m1 = size m2 => 
   (row (m1 + m2) n) = row m1 n + row m2 n.
 proof. 
@@ -1122,9 +1127,6 @@ case (0 <= i < rows m) => bound; 1: by apply get_offunv.
 rewrite getv0E // getm0E /#.
 qed.
 
-lemma colN (m : matrix) i : - (col m i) = col (-m) i. 
-proof. by rewrite /col offunvN. qed.
-
 hint simplify size_col, get_col.
 
 lemma row_trmx m n: row (trmx m) n = col m n by rewrite eq_vectorP.
@@ -1146,6 +1148,8 @@ proof.
 rewrite -(trmxK (m1 + m2)) -{4}(trmxK m1) -{4}(trmxK m2) => bound.
 rewrite !col_trmx trmxD rowD /#.
 qed.
+
+lemma colN (m : matrix) i : - (col m i) = col (-m) i by rewrite eq_vectorP.
 
 lemma col_matrixc m n c i: 0 <= i < n => col (matrixc m n c) i = vectc m c.
 proof.
@@ -1302,6 +1306,9 @@ rewrite -(rowmx_row (rowmx (v1 + v2))) 1://.
 by rewrite -(rowmx_row (rowmx v1 + rowmx v2)) 1:rows_addm 3:rowD.
 qed.
 
+lemma rowmxN (v : vector) : - (rowmx v) = rowmx (-v).
+proof. rewrite eq_matrixP /= => i j; case (i = 0) => [->// | /#]. qed.
+
 lemma rowmxc n c: rowmx (vectc n c) = matrixc 1 n c.
 proof.
 apply eq_matrixP => /= i j bound. 
@@ -1327,9 +1334,6 @@ proof.
 case (0 <= i < size v) => bound; first rewrite get_offunm //= /#.
 by rewrite getm0E //= getv0E.
 qed.
-
-lemma colmxN (v : vector) : - (colmx v) = colmx (-v).
-proof. by rewrite /colmx /= offunmN. qed.
 
 hint simplify get_colmx.
 
@@ -1365,6 +1369,9 @@ proof. move => rws; apply trmx_inj => /=. by rewrite trmxK rowmx_row. qed.
 lemma colmxD (v1 v2: vector): size v1 = size v2 => 
     colmx (v1 + v2) = colmx v1 + colmx v2.
 proof. move => size_eq; apply trmx_inj => /=. exact rowmxD. qed.
+
+lemma colmxN (v : vector) : - (colmx v) = colmx (-v).
+proof. rewrite eq_matrixP /= => i j; case (j = 0) => [->// | /#]. qed.
 
 lemma colmxc n c: colmx (vectc n c) = matrixc n 1 c by apply trmx_inj.
 
