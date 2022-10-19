@@ -246,6 +246,8 @@ qed.
 
 hint simplify add0v.
 
+lemma lin_add0v v n: n = size v => zerov n + v = v by subst.
+
 lemma addv0 v: v + zerov (size v) = v by rewrite addvC.
 
 abbrev (-) v1 v2 = v1 + (-v2).
@@ -984,6 +986,16 @@ rewrite size_addm /= 1://.
 move => i j bound; rewrite get_addm //=.
 apply add0r.
 qed.
+
+lemma lin_add0m m r c: 
+  r = rows m => c = cols m => zerom r c + m = m. 
+proof. move => -> ->; apply add0m. qed.
+
+lemma addm0 m: m + zerom (rows m) (cols m) = m by rewrite addmC add0m.
+
+lemma lin_addm0 m r c: 
+  r = rows m => c = cols m => m + zerom r c = m. 
+proof. move => -> ->; apply addm0. qed.
 
 abbrev (-) (m1 m2: matrix) = m1 + (-m2).
 
