@@ -1722,27 +1722,33 @@ lemma oppm_catmc (m1 m2: matrix):
   cols m1 = cols m2 => - (m1 / m2) = ((-m1) / -m2).
 proof. move => cols_eq; apply trmx_inj => /=. by apply oppm_catmr. qed.
 
-(* Taking a matrix from inside a matrix *)
-op subm (m: matrix) (a b c d: int) = 
-  offunm ((fun i j => m.[i+a,j+c]), b-a, d-c).
+(* Taking a submatrix from row r1 (inclusive) to r2 (exclusive) and
+   colum c1 (inclusive) to column c2 (exclusive). 
+   That is m = subm 0 (rows m) 0 (cols m) *)
 
-lemma rows_subm m a b c d: rows (subm m a b c d) = max 0 (b - a) by done.
+op subm (m: matrix) (r1 r2 c1 c2: int) = 
+  offunm ((fun i j => m.[i+r1,j+c1]), r2-r1, c2-c1).
 
-lemma cols_subm m a b c d: cols (subm m a b c d) = max 0 (d - c) by done.
+lemma rows_subm m r1 r2 c1 c2: 
+  rows (subm m r1 r2 c1 c2) = max 0 (r2 - r1) by done.
+
+lemma cols_subm m r1 r2 c1 c2: 
+  cols (subm m r1 r2 c1 c2) = max 0 (c2 - c1) by done.
 
 hint simplify rows_subm, cols_subm.
 
-lemma size_subm m a b c d: 
-   size (subm m a b c d) = (max 0 (b - a), max 0 (d - c)) by done.
+lemma size_subm m r1 r2 c1 c2: 
+   size (subm m r1 r2 c1 c2) = (max 0 (r2 - r1), max 0 (c2 - c1)) by done.
 
-lemma get_subm (m: matrix) (a b c d i j: int): 0 <= i < b - a => 0 <= j < d -c => 
-  (subm m a b c d).[i,j] = m.[i+a,j+c].
-proof. move => i_range j_range; rewrite /subm get_offunm /#. qed.
+lemma get_subm (m: matrix) (r1 r2 c1 c2 i j: int): 
+  0 <= i < r2 - r1 => 0 <= j < c2 -c1 => 
+  (subm m r1 r2 c1 c2).[i,j] = m.[i+r1,j+c1].
+proof. by move => i_range j_range; rewrite /subm get_offunm /#. qed.
 
 lemma subm_id m: subm m 0 (rows m) 0 (cols m) = m.
-proof. rewrite eq_matrixP /= => i j bound. rewrite get_subm /#. qed.
+proof. by rewrite eq_matrixP /= => i j bound; rewrite get_subm /#. qed.
 
-lemma submT m a b c d: trmx (subm m a b c d) = subm (trmx m) c d a b.
+lemma submT m r1 r2 c1 c2: trmx (subm m r1 r2 c1 c2) = subm (trmx m) c1 c2 r1 r2.
 proof.
 apply eq_matrixP => i j bound /=. 
 rewrite !get_subm; smt(size_tr size_subm).
