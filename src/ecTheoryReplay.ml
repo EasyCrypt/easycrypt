@@ -777,7 +777,7 @@ and replay_mod
       let newme = { newme with me_name = name } in
       let newme = { tme_expr = newme; tme_loca = Option.get newlc; } in
 
-      if not (EcReduction.EqTest.for_mexpr env me.tme_expr newme.tme_expr) then
+      if not (EcReduction.EqTest.for_mexpr ~body:false env me.tme_expr newme.tme_expr) then
         clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
 
       let (subst, _) =
