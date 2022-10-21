@@ -1723,7 +1723,7 @@ lemma oppm_catmc (m1 m2: matrix):
 proof. move => cols_eq; apply trmx_inj => /=. by apply oppm_catmr. qed.
 
 (* Taking a submatrix from row r1 (inclusive) to r2 (exclusive) and
-   colum c1 (inclusive) to column c2 (exclusive). 
+   column c1 (inclusive) to c2 (exclusive). 
    That is m = subm 0 (rows m) 0 (cols m) *)
 
 op subm (m: matrix) (r1 r2 c1 c2: int) = 
