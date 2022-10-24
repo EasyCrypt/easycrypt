@@ -239,6 +239,17 @@ abstract theory ZModuleStruct.
     is_zmod_automorph f =>
     f (-x)%ZMod = - f x.
   proof. by rewrite -addr_eq0 => -[_ [? <-]]; rewrite addNr. qed.
+
+  lemma zmod_automorphI f (x : t) n :
+    is_zmod_automorph f =>
+    f (intmul x n) = intmul (f x) n.
+  proof.
+    move => iszma_f; wlog: x n / 0 <= n => [wlog|].
+    + case (0 <= n) => [|/ltrNge /ltzW /oppr_ge0]; [by apply/wlog|].
+      by move => /wlog /(_ (-x)); rewrite zmod_automorphN // !mulNrNz.
+    elim: n => [|n le0n IHn]; [by rewrite !mulr0z zmod_automorph0|].
+    by rewrite !mulrS // zmod_automorphD // IHn.
+  qed.
 end ZModuleStruct.
 
 (* -------------------------------------------------------------------- *)
@@ -374,6 +385,25 @@ abstract theory ComRingStruct.
       rewrite -(mulVr (f x)); [by apply/comring_automorphU|].
       by apply/mulIr/comring_automorphU.
     by rewrite !unitout // comring_automorphU.
+  qed.
+
+  lemma comring_automorphI f (x : t) n :
+    is_comring_automorph f =>
+    f (intmul x n) = intmul (f x) n.
+  proof. by move/comring_zmod_automorph/zmod_automorphI => ->. qed.
+
+  lemma comring_automorphZ f n :
+    is_comring_automorph f =>
+    f (ofint n) = ofint n.
+  proof. by move => iscra_f; rewrite /ofint comring_automorphI // comring_automorph1. qed.
+
+  lemma comring_automorphX_le0 f x n :
+    is_comring_automorph f =>
+    0 <= n =>
+    f (CR.exp x n) = CR.exp (f x) n.
+  proof.
+    move => iscra_f; elim n => [|n le0n]; [by rewrite !expr0 comring_automorph1|].
+    by rewrite !exprS // comring_automorphM // => ->.
   qed.
 end ComRingStruct.
 	      
@@ -611,4 +641,13 @@ abstract theory FieldStruct.
   clone include IDomainStruct with
     type t <- t,
     theory ID <- F.
+
+  lemma comring_automorphX f x n :
+    is_comring_automorph f =>
+    f (F.exp x n) = F.exp (f x) n.
+  proof.
+    move => iscra_f; wlog: x n / 0 <= n => [wlog|]; [|by apply/comring_automorphX_le0].
+    case (0 <= n) => [|/ltrNge /ltzW /oppr_ge0]; [by apply/wlog|].
+    by move => /wlog /(_ (invr x)); rewrite comring_automorphV // !exprV.
+  qed.
 end FieldStruct.

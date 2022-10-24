@@ -337,9 +337,19 @@ abstract theory FiniteIDomainStruct.
   lemma is_comring_automorph_iter_frobenius n :
     is_comring_automorph (iter n frobenius).
   proof.
-    case (n <= 0) => [len0|/ltrNge/ltzW le0n].
-    + admit.
-    admit.
+    case (n <= 0) => [len0|/ltrNge/ltzW]; [split; split|].
+    + by exists idfun; split => ?; rewrite /idfun /= iter0.
+    + by rewrite iter0 //= => x y; rewrite !iter0.
+    + by rewrite iter0.
+    + by move => x y; rewrite !iter0.
+    elim n => [|n le0n IHn]; [split; split|].
+    + by exists idfun; split => ?; rewrite /idfun /= iter0.
+    + by rewrite iter0 //= => x y; rewrite !iter0.
+    + by rewrite iter0.
+    + by move => x y; rewrite !iter0.
+    move: (comring_automorphism_comp _ _ is_comring_automorph_frobenius IHn).
+    move: (fun_ext (iter (n + 1) frobenius) (frobenius \o iter n frobenius)).
+    by move => [_ ->] // x; rewrite iterS.
   qed.
 end FiniteIDomainStruct.
 
@@ -965,11 +975,36 @@ abstract theory SubFiniteField_ZMod.
     theory FStr  <- SubFiniteField_ZMod.FStr,
     theory FFStr <- SubFiniteField_ZMod.FFStr.
 
+  lemma is_comringautomorph_exp f :
+    is_comring_automorph f =>
+    (exists k , 0 < k /\ forall x , f x = exp x k).
+  proof.
+    case: exists_generator => g isg_g iscra_f.
+    move: (isg_g (SubFiniteField_ZMod.FFStr.UF.Sub.insubd (f (SubFiniteField_ZMod.FFStr.UF.Sub.val g)))).
+    case => k eq_; exists (k %% SubFiniteField_ZMod.FFStr.SFU.SFT.card + SubFiniteField_ZMod.FFStr.SFU.SFT.card).
+    apply/and_impr; split; [apply/ltzE/ler_add|].
+    + by apply/modz_ge0/gtr_eqF/SFU.SFT.card_gt0.
+    + by apply/ltzS/ltr_subl_addr/SFU.SFT.card_gt0.
+    move => lt0_ x; case (SubFiniteField_ZMod.F.unit x) => [unitx|]; last first.
+    + rewrite -SubFiniteField_ZMod.F.unitfE /= => ->>; rewrite comring_automorph0 //.
+      by rewrite expr0z gtr_eqF.
+    move/(congr1 UF.Sub.val): eq_; rewrite UF.Sub.insubdK.
+    + apply/unitrE. rewrite -comring_automorphV // -comring_automorphM //.
+      by rewrite divrr; [apply/UF.Sub.valP|apply/comring_automorph1].
+    rewrite -UFStr.ZModStr.intmul_modz_order -modz_mod -modzDr UFStr.ZModStr.intmul_modz_order.
+    move/UFStr.isgeneratorP: (isg_g) => ->; rewrite UF.val_intmul.
+    case/(_ (UF.Sub.insubd x)): isg_g => i /(congr1 UF.Sub.val).
+    rewrite UF.Sub.insubdK // UF.val_intmul => ->>.
+    by rewrite comring_automorphX // => ->; rewrite -!exprM mulrC.
+  qed.
+
   lemma is_comringautomorphP f :
     is_comring_automorph f <=>
     (exists k, k \in range 0 n /\ f == iter k frobenius).
   proof.
-    print is_comring_automorph_frobenius.
+    split => [|[k] [_ /fun_ext ->>]]; last first.
+    + by apply/is_comring_automorph_iter_frobenius.
+    move => iscra_f.
     admit.
   qed.
 end SubFiniteField_ZMod.
