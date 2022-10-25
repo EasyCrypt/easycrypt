@@ -1,15 +1,19 @@
 require import AllCore List Distr DBool DProd DList DInterval CHoareTactic IntDiv.
+require import FunSamplingLib.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
-require (*  *) Matrix Tuple (* FinType *).
+require (*  *) Matrix Tuple FinType.
 
 type from.
 
 clone import MUniFinFun as MUFF with
-  type t <- from.   (* This assume that the type of from is finite *)
+  type t <- from.   (* This assumes that the type of from is finite *)
+
 
 type hash.
 
-(* Remark : this implies that hash is a finite type *)
+clone  MUniFinFun as MUFFH with
+  type t <- hash.   (* This assumes that the type of hash is finite *)
+
 op [lossless uniform full ] dhash : hash distr.
 
 (* Uniform distribution over from -> hash *)
@@ -28,8 +32,9 @@ hint solve 0 random : dfhash_ll dfhash_uni dfhash_fu.
 
 module type QRO_i = {
   proc init () : unit
-  quantum proc h {_:from} : hash    
+  quantum proc h {_:from} : hash 
 }.
+
 
 module type QRO = {
   include QRO_i [h]
@@ -42,7 +47,6 @@ module QRO : QRO_i = {
   proc init() = { ch <- 0; h <$ dfhash; }
 
   quantum proc h {x:from} = { ch <- ch + 1; return h x; }
-
 }.
  
 abstract theory Collision.
@@ -73,56 +77,15 @@ end Collision.
 (* -------------------------------------------------------------------------- *)
 (* Biased distribution over boolean return true with probability p *)   
 
-op dbfun lam = dfun (fun _ => Biased.dbiased lam).
-
-lemma dbfun_ll lam : is_lossless (dbfun lam).
-proof. apply/dfun_ll => /=; apply/Biased.dbiased_ll. qed.
-hint solve 0 random : dbfun_ll.
-
-lemma pr_dbfun_l_eq lam x (l:from list) :
-  0%r <= lam <= 1%r =>
-  !x \in l => uniq l =>
-  mu (dbfun lam) (fun (t : from -> bool) => t x /\ forall x', x' \in l => ! t x') =
-    lam * (1%r - lam) ^ size l.
-proof.
-  move=> lam_bound hx hl; apply (eq_trans _ (lam ^ (size [x]) * (1%r - lam) ^ size l)); last first.
-  + by rewrite /= RField.expr1.
-  rewrite -(dfunE_mem_uniq lam (fun _ => Biased.dbiased lam) [x] l (fun _ => pred1 true)) //=.
-  + by apply Biased.dbiased_ll. + by rewrite Biased.dbiased1E /= Biased.clamp_id. + smt().
-  by apply mu_eq => /#.
-qed.
-
-lemma pr_dbfun_l_pow lam x (l:from list) q : 
-  0%r <= lam <= 1%r =>
-  !x \in l => size l <= q =>  
-  lam*(1%r-lam)^q <= 
-    mu (dbfun lam) (fun t => t x /\ forall x', x' \in l => !t x').
-proof.
-  move=> lam_bound hm hl.
-  apply (ler_trans (lam ^ 1 * (1%r - lam) ^ size l)).
-  + rewrite RField.expr1; apply ler_wpmul2l; 1: by case: lam_bound.
-    apply ler_wiexpn2l; [1:smt ()| 2: smt(size_ge0)].
-  apply (ler_trans _ _ _ 
-    (dfunE_mem_le lam (fun _ => Biased.dbiased lam) [x] l (fun _ => pred1 true) _ _ _)) => /=.
-  + by apply Biased.dbiased_ll. + by rewrite Biased.dbiased1E /= Biased.clamp_id. + smt().
-  by apply mu_le => /#.
-qed.
-
-lemma pr_dbfun_l lam x (l:from list) q : 
-  0%r <= lam <= 1%r =>
-  !x \in l => size l <= q =>  
-  lam*(1%r-q%r * lam) <= 
-    mu (dbfun lam) (fun t => t x /\ forall x', x' \in l => !t x').
-proof.
-  move=> lam_bound hm hl.
-  apply: ler_trans (pr_dbfun_l_pow _ _ _ _ lam_bound hm hl).
-  apply ler_wpmul2l; 1: by case: lam_bound.
-  apply le_binomial => //; smt(size_ge0).
-qed.
 
 (* -------------------------------------------------------------------------- *)
 (* Semi Constant Definition Property *)
 abstract theory SemiConstDistr.
+
+clone import DFunBiasedSingle with
+   type X <- from,
+   theory MUFF <- MUFF
+   proof *.
 
 op k : int.
 
@@ -165,46 +128,27 @@ axiom advantage q lambda (A<:AdvSCD{-SCD,-QRO}) &m:
   hoare [SCD(A)._F0 : p = lambda ==> QRO.ch <= q] =>
   `| Pr[SCD(A)._F0(lambda) @ &m : res] - Pr[SCD(A)._F1(lambda) @ &m: res] | 
    <= (2%r * q%r + k%r + 1%r)/ 6%r * lambda^2.
+
 end SemiConstDistr.
-
-(* -------------------------------------------------------------------------- *)
-(* Small Range Definition Property                                            *)
-
-op difun r = dfun (fun _ => [0..r-1]).
-
-lemma pr_difun_l_pow r x (l:from list) q i :
-  0 <= i < r =>  
-  !x \in l => size l <= q =>  
-  1.0/r%r * (1.0 - 1.0 / r%r)^q <= 
-    mu (difun r) (fun fr => fr x = i /\ forall m', m' \in l => fr m' <> i).
-proof.
-  move=> hi hm hl.
-  pose lam := 1.0/r%r.
-  apply (ler_trans (lam ^ 1 * (1%r - lam) ^ size l)).
-  + rewrite RField.expr1; apply ler_wpmul2l; 1: smt().
-    apply ler_wiexpn2l; [1:smt ()| 2: smt(size_ge0)].
-  apply (ler_trans _ _ _ 
-    (dfunE_mem_le lam (fun _ => [0..r-1]) [x] l (fun _ => pred1 i) _ _ _)) => /=.
-  + by apply dinter_ll => /#. + by rewrite dinter1E /#. + smt().
-  by apply mu_le => /#.
-qed.
-
-lemma pr_difun_l r x (l:from list) q i :
-  0 <= i < r =>  
-  !x \in l => size l <= q =>  
-  1.0/r%r * (1.0 - q%r / r%r) <= 
-    mu (difun r) (fun fr => fr x = i /\ forall m', m' \in l => fr m' <> i).
-proof.
-  move=> i_bound hm hl.
-  apply: ler_trans (pr_difun_l_pow _ _ _ _ _ i_bound hm hl).
-  apply ler_wpmul2l; 1: smt(). 
-  apply le_binomial => //; smt(size_ge0).
-qed.
 
 abstract theory SmallRange.
 
+clone import DFunSmallRange with 
+    type X <- from,
+    theory MUFF <- MUFF
+    proof *.
+
+type R.
+
+clone import MFinite as Rt with
+  type t <- R.
+
+op _r =  Rt.Support.card.
+
+op r2i(r : R) = find (pred1 r) Rt.Support.enum.
+
 module type SR_i = {
-  proc init (r: int) : unit
+  proc init () : unit
   quantum proc h {_:from} : hash    
 }.
 
@@ -214,25 +158,28 @@ module type SR = {
 
 
 quantum module type AdvSR (H:SR) = {
-  proc main(r:int) : bool
+  proc main() : bool
 }.
+
+
+op difun_R = dfun (fun _=> dunifin).
 
 module SR : SR_i = {
   var rh : hash list
-  var fr : from -> int
-  proc init (r:int) = {
-    rh <$ dlist dhash r;
-    fr <$ difun r; 
+  var fr : from -> R
+  proc init () = {
+    rh <$ dlist dhash _r;
+    fr <$ difun_R; 
     QRO.ch <- 0;
-    QRO.h <- fun x => nth witness rh (fr x); 
+    QRO.h <- fun x => nth witness rh (r2i (fr x)); 
   } 
 
   include QRO [h]
 }.
 
 module SRO : SR_i = {
-  proc init (r:int) = {
-    SR.fr <$ difun r; 
+  proc init () = {
+    SR.fr <$ difun_R; 
     QRO.init();
   } 
 
@@ -240,26 +187,34 @@ module SRO : SR_i = {
 }.
 
 module IND_SR (H:SR_i, A:AdvSR) = {
-  proc main(r:int) : bool = {
+  proc main() : bool = {
     var b;
 
-    H.init(r);
-    b <@ A(H).main(r);
+    H.init();
+    b <@ A(H).main();
     return b;
   }
 }.
 
 (* This bound comes from Corollary 4.15 of Mark Zhandry's thesis *)
-axiom advantage (q:int) r_ (A<:AdvSR{-SR,-QRO}) &m:
-  0 < r_ => 
-  hoare [IND_SR(SRO,A).main : r = r_ ==> QRO.ch <= q] => 
-  `| Pr[IND_SR(SRO,A).main(r_) @ &m : res] - Pr[IND_SR(SR,A).main(r_) @ &m : res] | <= 
-      (27 * q^3)%r / r_%r.
+axiom advantage (q:int)  (A<:AdvSR{-SR,-QRO}) &m:
+  0 < _r => 
+  hoare [IND_SR(SRO,A).main : true ==> QRO.ch <= q] => 
+  `| Pr[IND_SR(SRO,A).main() @ &m : res] - Pr[IND_SR(SR,A).main() @ &m : res] | <= 
+      (27 * q^3)%r / _r%r.
+
+
 
 module type SRr_i = {
-  proc init (r: int) : unit
-  quantum proc h {_:from} : int * hash    
+  proc init () : unit
+  quantum proc h {_:from} : R * hash    
 }.
+
+realize typing__0.
+apply Finite.finite_type_pair. 
++ apply Rt.Support.is_finite.
+apply MUFFH.FinT.is_finite.
+qed.
 
 module type SRr = {
   include SRr_i [-init]
@@ -267,11 +222,11 @@ module type SRr = {
 
 module SRr: SRr_i = {
   import var SR
-  proc init (r:int) = {
-    rh <$ dlist dhash r;
-    fr <$ difun r; 
+  proc init () = {
+    rh <$ dlist dhash _r;
+    fr <$ difun_R; 
     QRO.ch <- 0;
-    QRO.h <- fun x => nth witness rh (fr x); 
+    QRO.h <- fun x => nth witness rh (r2i (fr x)); 
   } 
 
   quantum proc h {x:from} = {
@@ -280,10 +235,17 @@ module SRr: SRr_i = {
   }
 }.
 
+realize typing__0.
+apply Finite.finite_type_pair. 
++ apply Rt.Support.is_finite.
+apply MUFFH.FinT.is_finite.
+qed.
+
+
 module SROr : SRr_i = {
   import var SR
-  proc init (r:int) = {
-    fr <$ difun r; 
+  proc init () = {
+    fr <$ difun_R; 
     QRO.init();
   } 
 
@@ -292,15 +254,15 @@ module SROr : SRr_i = {
 }.
 
 quantum module type AdvSRr (H:SRr) = {
-  proc main(r:int) : bool
+  proc main() : bool
 }.
 
 module IND_SRr (H:SRr_i, A:AdvSRr) = {
-  proc main(r:int) : bool = {
+  proc main() : bool = {
     var b;
 
-    H.init(r);
-    b <@ A(H).main(r);
+    H.init();
+    b <@ A(H).main();
     return b;
   }
 }.
@@ -308,11 +270,11 @@ module IND_SRr (H:SRr_i, A:AdvSRr) = {
 (* The proof of Theorem 4.16  gives a bound that is the summation
    of that in Corollary 4.15 and that in Theorem 4.9
    ( C(q + 2)^3/N) where C <= 27 is a constant and N=r. *)
-axiom advantage_r (q:int) r_ (A<:AdvSRr{-SR,-QRO}) &m:
-  0 < r_ => 
-  hoare [IND_SRr(SROr,A).main : r = r_ ==> QRO.ch <= q] => 
-  `| Pr[IND_SRr(SROr,A).main(r_) @ &m : res] - Pr[IND_SRr(SRr,A).main(r_) @ &m : res] | <= 
-      (54 * q^3)%r / r_%r.
+axiom advantage_r (q:int)  (A<:AdvSRr{-SR,-QRO}) &m:
+  0 < _r => 
+  hoare [IND_SRr(SROr,A).main : true ==> QRO.ch <= q] => 
+  `| Pr[IND_SRr(SROr,A).main() @ &m : res] - Pr[IND_SRr(SRr,A).main() @ &m : res] | <= 
+      (54 * q^3)%r / _r%r.
 
 end SmallRange.
 
@@ -354,16 +316,15 @@ axiom dA_split q (A<:AdvRO{-QRO}) &m:
 
 end QROM_Fundamental_Lemma.
 
-
-quantum module type AdvRO (H:QRO) = {
-  proc main() : bool
-}.
-
 abstract theory T_PRF.
 
 type key.
 op dkey : key distr.
 op F : key -> from -> hash.
+
+quantum module type AdvRO (H:QRO) = {
+  proc main() : bool
+}.
 
 module PRF : QRO_i = {
   var k : key
@@ -499,6 +460,5 @@ axiom advantage q (A <: AdvPRG[main: `{Inf, #G.sample : q}]) &m:
 end T_StandardSecurePRG.
 
 end T_PRG.
-
 
 *)
