@@ -797,7 +797,7 @@ mod_ident1:
     { (mk_loc (EcLocation.make $startpos(_l) $endpos(_l))
          EcCoreLib.i_self, None) :: x }
 
-fident:
+%inline fident:
 | nm=mod_qident DOT x=lident { (nm, x) }
 | x=lident { ([], x) }
 
@@ -809,6 +809,26 @@ f_or_mod_ident:
     { let fv = mk_loc (EcLocation.make $startpos(x) $endpos(x)) ([], x) in
       FM_FunOrVar fv}
 | m=loc(mod_qident) { FM_Mod m }
+
+
+inlinesubpat:
+| m=rlist1(uident, DOT) { m, None }
+| m=rlist1(uident, DOT) DOT f=lident { m, Some f}
+| f=lident { [], Some f}
+
+inlinepat1:
+| nm=loc(mod_qident)  {  `InlinePat(nm, ([], None)) }
+| f=loc(fident) {
+   let f0 = unloc f in
+   if fst f0 = [] then `InlinePat(mk_loc (loc f) [], ([], Some (snd f0)))
+   else `InlineXpath f
+}
+| nm=loc(mod_qident) SLASH sub=inlinesubpat { `InlinePat(nm, sub) }
+| u=loc(UNDERSCORE) SLASH sub=inlinesubpat { `InlinePat(mk_loc (loc u) [], sub) }
+| STAR { `InlineAll }
+
+inlinepat:
+| sign=iboption(MINUS) p=inlinepat1 { (if sign then `DIFF else `UNION), p }
 
 (* -------------------------------------------------------------------- *)
 %inline ordering_op:
@@ -3168,14 +3188,14 @@ phltactic:
 | RNDSEM s=side? c=codepos1
     { Prndsem (s, c) }
 
-| INLINE s=side? u=inlineopt? o=occurences? f=plist1(loc(fident), empty)
-    { Pinline (`ByName (s, u, (f, o))) }
+| INLINE s=side? u=inlineopt? o=occurences?
+  { Pinline (`ByName(s, u, ([], o))) }
+
+| INLINE s=side? u=inlineopt? o=occurences? f1=inlinepat1 f=plist0(inlinepat, empty)
+  { Pinline (`ByName(s, u, ((`UNION, f1)::f, o))) }
 
 | INLINE s=side? u=inlineopt? p=codepos
     { Pinline (`CodePos (s, u, p)) }
-
-| INLINE s=side? u=inlineopt? STAR
-    { Pinline (`All (s, u)) }
 
 | KILL s=side? o=codepos
     { Pkill (s, o, Some 1) }
