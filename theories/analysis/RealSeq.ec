@@ -351,3 +351,55 @@ proof.
 case=> [l1 h1] [l2 h2]; rewrite (lim_cnvto h1) (lim_cnvto h2).
 by have := cnvtoM _ _ _ _ h1 h2 => /lim_cnvto ->.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma convergeto_sum
+  (P : 'a -> bool)
+  (F : 'a -> int -> real)
+  (l : 'a -> real)
+  (s : 'a list)
+:
+     (forall x, P x => convergeto (F x) (l x))
+  => convergeto
+       (fun n => big P (fun x => (F x n)) s)
+       (big P (fun x => l x) s).
+proof.
+move=> cvg; elim: s => /= [|x s ih].
+- by rewrite !big_nil &(@eq_cnvto (fun _ => 0%r)) //= &(cnvtoC).
+rewrite big_cons; case: (P x) => [Px|NPx]; last first.
+- rewrite &(@eq_cnvto (fun n => big P (fun y => F y n) s)) /=.
+  - by move=> n; rewrite big_cons NPx.
+  - apply: ih.
+pose G (n : int) := F x n + big P (fun y => F y n) s.
+rewrite &(eq_cnvto G) => /= [n|].
+- by rewrite /G big_cons Px.
+by apply: cnvtoD => //; apply: cvg.
+qed.
+
+lemma converge_sum
+  (P : 'a -> bool)
+  (F : 'a -> int -> real)
+  (s : 'a list)
+:
+     (forall x, P x => converge (F x))
+  => converge (fun n => big P (fun x => (F x n)) s).
+proof.
+move=> cvg; pose l := big P (fun x => lim (F x)) s.
+apply/(cnvP l)/convergeto_sum => /= x Px.
+by apply/limP/cvg.
+qed.
+
+lemma lim_sum 
+  (P : 'a -> bool)
+  (F : 'a -> int -> real)
+  (s : 'a list)
+:
+     (forall x, P x => converge (F x))
+  => big P (fun x => lim (F x)) s
+     = lim (fun n => big P (fun x => F x n) s).
+proof.
+move=> cvg; pose l := fun x => lim (F x).
+have {cvg}cvg: forall x, P x => convergeto (F x) (l x).
+- by move=> x Px; apply/limP/cvg.
+by move/convergeto_sum: cvg => /(_ s) /lim_cnvto => <-.
+qed.
