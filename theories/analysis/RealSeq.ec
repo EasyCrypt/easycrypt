@@ -188,6 +188,28 @@ move=> @/a1; apply/cnvtoM_boundedr; first by apply/cnvtoBlim.
 by apply/(@bounded_cnvto l2).
 qed.
 
+lemma cnvto_pow p : -1%r < p < 1%r => convergeto (fun (n : int) => p ^ n) 0%r.
+proof.
+move=> [h0p hp1] eps he /=.
+case: (p = 0%r) => [-> | ?].
++ by exists 1 => n hn; rewrite RField.expr0n /#.
+pose P := `|p|.
+have [# 4?] : 0%r < P < 1%r /\ P <> 0%r /\ 0%r <= P by smt().  
+case: (1%r <= eps) => h1e.
++  exists 1 => n hn; apply (ler_lt_trans (`|p|^1)).
+   + rewrite normrX; smt(ler_wiexpn2l expr_ge0).
+   smt(RField.expr1).
+pose N := ceil (-log (inv P) eps) + 1; exists N => n hn.
+rewrite normrX -/P.
+have ? : 1%r < inv P by apply invr_gt1.
+have ? : 0 < N by smt (log_le0 ceil_bound).
+apply (ler_lt_trans (P ^ N)); 1: by apply ler_wiexpn2l => /#. 
+rewrite -(RField.invrK P) -RField.exprN1 -RField.exprM /= mulN1r.
+rewrite -(@log_mono_ltr (inv P)) //; 1: by apply/expr_gt0/invr_gt0.
+rewrite -rpow_int 1:invr_ge0 // logK 1:invr_gt0 1:// 1:/#.
+smt(ceil_bound). 
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma le_cnvto_from s1 s2 l1 l2:
      (exists N, forall n, (N <= n)%Int => (s1 n <= s2 n)%Real)
@@ -233,6 +255,9 @@ by apply/(@cnvto_lub_bmono_from _ M N).
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma cnvC (x:real) : converge (fun _ => x).
+proof. by exists x => eps he; exists 0. qed.
+
 lemma cnvD (s1 s2 : int -> real) :
   converge s1 => converge s2 => converge (fun x => s1 x + s2 x).
 proof. by case=> [l1 h1] [l2 h2]; exists (l1 + l2); apply/cnvtoD. qed.
@@ -255,6 +280,9 @@ proof. by move/(@cnvZ (-1)%r) => /#. qed.
 lemma cnvB s1 s2 :
   converge s1 => converge s2 => converge (fun x => s1 x - s2 x).
 proof.  by move=> h1 h2; rewrite cnvD // cnvN. qed.
+
+lemma cnv_pow p : -1%r < p < 1%r => converge (fun (n : int) => p ^ n).
+proof. by move=> ?; exists 0%r; apply cnvto_pow. qed.
 
 (* -------------------------------------------------------------------- *)
 op lim (s : int -> real) =
@@ -353,26 +381,7 @@ by have := cnvtoM _ _ _ _ h1 h2 => /lim_cnvto ->.
 qed.
 
 lemma lim_pow p : -1%r < p < 1%r => lim (fun (n:int) => p ^ n) = 0%r.
-proof.
-move=> [h0p hp1]; apply lim_cnvto => eps he /=.
-case: (p = 0%r) => [-> | ?].
-+ by exists 1 => n hn; rewrite RField.expr0n /#.
-pose P := `|p|.
-have [# 4?] : 0%r < P < 1%r /\ P <> 0%r /\ 0%r <= P by smt().  
-case: (1%r <= eps) => h1e.
-+  exists 1 => n hn; apply (ler_lt_trans (`|p|^1)).
-   + rewrite normrX; smt(ler_wiexpn2l expr_ge0).
-   smt(RField.expr1).
-pose N := ceil (-log (inv P) eps) + 1; exists N => n hn.
-rewrite normrX -/P.
-have ? : 1%r < inv P by apply invr_gt1.
-have ? : 0 < N by smt (log_le0 ceil_bound).
-apply (ler_lt_trans (P ^ N)); 1: by apply ler_wiexpn2l => /#. 
-rewrite -(RField.invrK P) -RField.exprN1 -RField.exprM /= mulN1r.
-rewrite -(@log_mono_ltr (inv P)) //; 1: by apply/expr_gt0/invr_gt0.
-rewrite -rpow_int 1:invr_ge0 // logK 1:invr_gt0 1:// 1:/#.
-smt(ceil_bound).
-qed.
+proof. by move=> h; apply/lim_cnvto/cnvto_pow. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma convergeto_sum
