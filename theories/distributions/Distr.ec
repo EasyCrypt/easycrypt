@@ -1417,7 +1417,6 @@ apply dscalar_uni =>//; smt (ge0_weight @Real).
 qed.
 
 (* -------------------------------------------------------------------- *)
-
 op mopt (d : 'a distr) = oapp (mu1 d) (1%r - weight d).
 op dopt (d : 'a distr) : 'a option distr = mk (mopt d).
 
@@ -2224,6 +2223,34 @@ qed.
 lemma supp_dbin p n k : 0%r <= p <= 1%r => k \in dbin p n => 0 <= k <= n.
 proof.
 by move=> rg_p /supportP; rewrite dbin1E // => /mbin_support.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op mdlim (df : int -> 'a distr) =
+  fun x => lim (fun n => mass (df n) x).
+
+lemma isdistr_dlim (df : int -> 'a distr) : isdistr (mdlim df).
+proof.
+pose F x := fun n : int => mass (df n) x.
+split=> @/mdlim /= [x|s uq_s].
+- case: (converge (F x))%RealSeq => [|/lim_Ncnv ->//].
+  apply: (geC_lim_from 0) => n _.
+  by rewrite /s /F massE ge0_mu1.
+rewrite (@bigID _ _ (fun x => RealSeq.converge (F x))).
+rewrite addrC big1 -1:add0r.
+- by move=> x [_ @/predC] /lim_Ncnv /=; apply.
+rewrite predTI -big_filter; pose t := filter _ _.
+have: uniq t by rewrite filter_uniq.
+have: forall x, x \in t => RealSeq.converge (F x).
+- by move=> x; rewrite mem_filter.
+move: t => {s uq_s} s cvg_s uq_s.
+rewrite big_seq lim_sum // &(leC_lim_from 0) /=.
+- move=> n _ /=; rewrite -(@big_seq _ s).
+  apply: le1_sum_isdistr => //.
+  rewrite -(@eq_isdistr (mu1 (df n))) /=.
+  - by move=> x /=; rewrite massE.
+  - by apply: isdistr_mu1.
+- by apply: converge_sum => x x_s /=; apply: cvg_s.
 qed.
 
 (* -------------------------------------------------------------------- *)
