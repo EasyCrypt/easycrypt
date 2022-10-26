@@ -284,6 +284,30 @@ by apply/(@eq_cnvto_from N)=> n leNn; apply/eq_sym/eq.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma geC_lim_from (N : int) (s : int -> real) (c : real) :
+     (forall n, N <= n => c <= s n)
+  => converge s
+  => c <= lim s.
+proof.
+move=> le cvg; apply: (@le_cnvto_from (fun _ => c) s c (lim s)).
+- by exists N.
+- by apply: cnvtoC.
+- by apply/limP.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma leC_lim_from (N : int) (s : int -> real) (c : real) :
+     (forall n, N <= n => s n <= c)
+  => converge s
+  => lim s <= c.
+proof.
+move=> le cvg; apply: (@le_cnvto_from s (fun _ => c) (lim s) c).
+- by exists N.
+- by apply/limP.
+- by apply: cnvtoC.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma limC_eq_from (N : int) c (s : int -> real) :
    (forall n, N <= n => s n = c) => lim s = c.
 proof. by move/lim_eq=> ->; have /lim_cnvto := cnvtoC c. qed.
@@ -319,3 +343,11 @@ lemma limB (s1 s2 : int -> real) :
   converge s1 => converge s2 =>
     lim (fun x => s1 x - s2 x) = lim s1 - lim s2.
 proof. by move=> h1 h2; rewrite limD // 1:cnvN // limN. qed.
+
+lemma limM (s1 s2 : int -> real) :
+  converge s1 => converge s2 =>
+    lim (fun x => s1 x * s2 x) = lim s1 * lim s2.
+proof.
+case=> [l1 h1] [l2 h2]; rewrite (lim_cnvto h1) (lim_cnvto h2).
+by have := cnvtoM _ _ _ _ h1 h2 => /lim_cnvto ->.
+qed.
