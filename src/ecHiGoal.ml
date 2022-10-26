@@ -1034,7 +1034,7 @@ let process_rewrite1_r ttenv ?target ri tc =
       let tc =
         t_onselect
           p
-          (t_seq (EcPhlInline.process_inline (`All (None, None))) ((t_try (t_seq EcPhlAuto.t_auto process_done))))
+          (t_seq (EcPhlInline.process_inline (`ByName (None, None, ([], None)))) ((t_try (t_seq EcPhlAuto.t_auto process_done))))
           tc
       in
 

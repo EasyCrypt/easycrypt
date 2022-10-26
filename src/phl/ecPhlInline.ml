@@ -2,6 +2,8 @@
 open EcParsetree
 open EcUtils
 open EcMaps
+open EcLocation
+open EcPath
 open EcTypes
 open EcModules
 open EcFol
@@ -216,19 +218,9 @@ let t_inline_equiv ~use_tuple =
 (* -------------------------------------------------------------------- *)
 module HiInternal = struct
   (* ------------------------------------------------------------------ *)
-  let pat_all env fs s =
-    let test f =
-      let is_defined = function FBdef _ -> true | _ -> false in
+  let pat_all cond s =
 
-      match fs with
-      | Some fs -> EcPath.Sx.mem (EcEnv.NormMp.norm_xfun env f) fs
-      | None    ->
-          let f = EcEnv.NormMp.norm_xfun env f in
-          let f = EcEnv.Fun.by_xpath f env in
-          is_defined f.f_def
-    in
-
-    let test = EcPath.Hx.memo 0 test in
+    let test = EcPath.Hx.memo 0 cond in
 
     let rec aux_i i =
       match i.i_node with
@@ -334,62 +326,57 @@ module HiInternal = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let rec process_inline_all ~use_tuple side fs tc =
-  let env, _, concl = FApi.tc1_eflat tc in
+let rec process_inline_all ~use_tuple side cond tc =
+  let concl = FApi.tc1_goal tc in
 
   match concl.f_node, side with
   | FequivS _, None ->
       FApi.t_seq
-        (process_inline_all ~use_tuple (Some `Left ) fs)
-        (process_inline_all ~use_tuple (Some `Right) fs)
+        (process_inline_all ~use_tuple (Some `Left ) cond)
+        (process_inline_all ~use_tuple (Some `Right) cond)
         tc
 
   | FequivS es, Some b -> begin
       let st = sideif b es.es_sl es.es_sr in
-      match HiInternal.pat_all env fs st with
+      match HiInternal.pat_all cond st with
       | [] -> t_id tc
       | sp -> FApi.t_seq
                 (t_inline_equiv ~use_tuple b sp)
-                (process_inline_all ~use_tuple  side fs)
+                (process_inline_all ~use_tuple  side cond)
                 tc
   end
 
   | FhoareS hs, None -> begin
-      match HiInternal.pat_all env fs hs.hs_s with
+      match HiInternal.pat_all cond hs.hs_s with
       | [] -> t_id tc
       | sp -> FApi.t_seq
                 (t_inline_hoare ~use_tuple sp)
-                (process_inline_all ~use_tuple side fs)
+                (process_inline_all ~use_tuple side cond)
                 tc
   end
 
   | FcHoareS chs, None -> begin
-    match HiInternal.pat_all env fs chs.chs_s with
+    match HiInternal.pat_all cond chs.chs_s with
       | [] -> t_id tc
       | sp -> FApi.t_seq
                 (t_inline_choare ~use_tuple sp)
-                (process_inline_all ~use_tuple side fs)
+                (process_inline_all ~use_tuple side cond)
                 tc
    end
 
   | FbdHoareS bhs, None -> begin
-      match HiInternal.pat_all env fs bhs.bhs_s with
+      match HiInternal.pat_all cond bhs.bhs_s with
       | [] -> t_id tc
       | sp -> FApi.t_seq
                 (t_inline_bdhoare ~use_tuple sp)
-                (process_inline_all ~use_tuple side fs)
+                (process_inline_all ~use_tuple side cond)
                 tc
   end
 
   | _, _ -> tc_error !!tc "invalid arguments"
 
 (* -------------------------------------------------------------------- *)
-let process_inline_occs ~use_tuple side fs occs tc =
-  let env = FApi.tc1_env tc in
-  let cond =
-    if   EcPath.Sx.is_empty fs
-    then fun _ -> true
-    else fun f -> EcPath.Sx.mem (EcEnv.NormMp.norm_xfun env f) fs in
+let process_inline_occs ~use_tuple side cond occs tc =
   let occs  = Sint.of_list occs in
   let concl = FApi.tc1_goal tc in
 
@@ -442,26 +429,85 @@ let process_inline_codepos ~use_tuple side pos tc =
     tc_error !!tc "invalid position"
 
 (* -------------------------------------------------------------------- *)
+let process_info tc infos =
+  let env = FApi.tc1_env tc in
+  let doit (dir, pat) =
+    let pat =
+      match pat with
+      | `InlineXpath f ->
+        let f = EcTyping.trans_gamepath env f in
+        `InlineXpath (EcEnv.NormMp.norm_xfun env f)
+      | `InlinePat (pm, (sub, f)) ->
+        let pm =
+          List.rev_map (fun (p, o) ->
+            if o <> None then tc_error !!tc ~loc:(loc p) "can not provide functor arguments";
+            unloc p) (unloc pm) in
+        let sub = List.rev_map unloc sub in
+        let f = omap unloc f in
+        `InlinePat(pm, sub, f)
+      | `InlineAll -> `InlineAll in
+     (dir, pat) in
+  List.map doit infos
+
+
+(* -------------------------------------------------------------------- *)
+let test_match pm sub fx f =
+
+  let rec test_path ids p =
+    match ids, p.p_node with
+    | [], _ -> true
+    | [id], EcPath.Psymbol id' -> EcSymbols.sym_equal id id'
+    | id::ids, EcPath.Pqname(p, id') -> EcSymbols.sym_equal id id' && test_path ids p
+    | _, _ -> false
+    in
+
+  begin match fx with None -> true | Some sym -> EcSymbols.sym_equal sym f.x_sub end
+  && match f.x_top.m_top with
+  | `Local a ->
+    sub = [] &&
+    begin match pm with
+    | [] -> true
+    | [id] -> EcSymbols.sym_equal id (EcIdent.name a)
+    | _ -> false
+    end
+
+  | `Concrete (p, sp) -> ofold (fun sp b -> b && test_path sub sp) (test_path pm p) sp
+
+
+let test_pat for_occ env infos f =
+  let fn = EcEnv.NormMp.norm_xfun env f in
+
+  let test_pat1 all pat =
+    match pat with
+    | `InlineXpath fn' -> EcPath.x_equal fn fn'
+    | `InlinePat (pm, sub, fx) -> test_match pm sub fx f
+    | `InlineAll ->
+      all ||
+      match (EcEnv.Fun.by_xpath fn env).f_def with
+      | FBdef _ -> true | _ -> false in
+
+  let rec aux b infos =
+    match infos with
+    | [] -> b
+    | (`UNION, pat) :: infos -> aux (b || test_pat1 for_occ pat) infos
+    | (`DIFF, pat) :: infos -> aux (b && not(test_pat1 true pat)) infos in
+
+  aux false infos
+
+(* -------------------------------------------------------------------- *)
 let process_inline infos tc =
   let use_tuple use =
     odfl true (omap (function `UseTuple b -> b) use) in
-
   match infos with
-  | `ByName (side, use, (fs, occs)) -> begin
-      let env = FApi.tc1_env tc in
-      let use_tuple = use_tuple use in
-      let fs  =
-        List.fold_left (fun fs f ->
-          let f = EcTyping.trans_gamepath env f in
-            EcPath.Sx.add (EcEnv.NormMp.norm_xfun env f) fs)
-          EcPath.Sx.empty fs
-      in
-        match occs with
-        | None      -> process_inline_all ~use_tuple side (Some fs) tc
-        | Some occs -> process_inline_occs ~use_tuple side fs occs tc
+  | `ByName (side, use, (infos, occs)) ->
+    let infos = process_info tc infos in
+    let infos = if infos = [] then [`UNION, `InlineAll] else infos in
+    let env = FApi.tc1_env tc in
+    let use_tuple = use_tuple use in
+    begin match occs with
+    | None      -> process_inline_all ~use_tuple side (test_pat false env infos) tc
+    | Some occs -> process_inline_occs ~use_tuple side (test_pat true env infos) occs tc
     end
 
   | `CodePos (side, use, pos) ->
-       process_inline_codepos ~use_tuple:(use_tuple use) side pos tc
-
-  | `All (side, use) -> process_inline_all ~use_tuple:(use_tuple use) side None tc
+    process_inline_codepos ~use_tuple:(use_tuple use) side pos tc

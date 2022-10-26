@@ -659,10 +659,19 @@ type async_while_info = {
 (* -------------------------------------------------------------------- *)
 type inlineopt = [`UseTuple of bool] option
 
+type inline_pat1 = [
+  | `InlineXpath of pgamepath
+  | `InlinePat of pmsymbol located * (psymbol list * psymbol option)
+  | `InlineAll
+]
+
+
+type inline_pat = ([ `DIFF | `UNION] * inline_pat1) list
+
 type inline_info = [
-  | `ByName    of oside * inlineopt * (pgamepath list * int list option)
+  | `ByName    of oside * inlineopt * (inline_pat * int list option)
   | `CodePos   of (oside * inlineopt * codepos)
-  | `All       of oside * inlineopt
+ (* | `All       of oside * inlineopt *)
 ]
 
 (* -------------------------------------------------------------------- *)
