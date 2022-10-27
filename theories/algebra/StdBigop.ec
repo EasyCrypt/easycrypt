@@ -197,6 +197,53 @@ proof.
 rewrite BRA.sumr_undup; apply/BRA.eq_bigr=> x _ /=.
 by rewrite intmulr mulrC.
 qed.
+
+lemma sum_pow (p:real) (n : int) : 0 <= n => p <> 1%r =>
+  BRA.bigi predT (fun i => p^i) 0 n = (1%r - p^n) / (1%r - p).
+proof.
+  move=> hn hp; have := subrXX 1%r p n hn.
+  rewrite RField.expr1z -(@BRA.eq_big_int _ _(fun (i : int) => p ^ i)).
+  + by move=> i hi /=; rewrite RField.expr1z.
+  move=> ->; field => /#.
+qed.
+
+lemma sum_pow_le (p:real) (n : int) : 0 <= n => 0%r <= p < 1%r =>
+  BRA.bigi predT (fun i => p^i) 0 n <= 1%r / (1%r - p).
+proof.
+  move=> hn hp; rewrite sum_pow // 1:/#.
+  smt(RealOrder.expr_ge0  RealOrder.exprn_ilt1 sum_pow).
+qed.
+
+lemma sum_ipow_le (p:real) (n : int) : 0%r <= p < 1%r =>
+  BRA.bigi predT (fun (i:int) => i%r*p^i) 0 n <= 1%r / (1%r - p)^2.
+proof.
+  move=> hp.
+  have ? : 0%r < (1%r - p) by smt(). 
+  have ? : 0%r < (1%r - p)^2 by smt(RField.expr2). 
+  have ? : 0%r < 1%r / (1%r - p)^2 by smt().
+  elim/natind: n.
+  + by move=> *; rewrite big_geq /#.
+  move=> n hn hrec; rewrite big_ltn 1:/# /=.
+  case: (p = 0%r) => [-> | ?]. 
+  + by rewrite RField.expr2 big1_seq //= => i [_ /mem_range]; smt(RField.expr0z).
+  rewrite (@BRA.eq_big_int _ _ _ (fun (i0:int) => p^i0 + p * ((i0 - 1)%r * p^(i0 - 1)))).
+  + move=> /= i hi; rewrite (RField.mulrC p) -RField.mulrA. 
+    by rewrite -{4}(@RField.expr1 p) -RField.exprD 1:// /=; ring.
+  rewrite -sumrD -mulr_sumr.
+  apply (RealOrder.ler_trans (1%r / (1%r - p) + p / (1%r - p)^2));
+    last by apply RealOrder.lerr_eq; field; smt(RField.expr2). 
+  apply RealOrder.ler_add.
+  + have -> : BRA.bigi predT (fun (i:int) => p^i) 1 (n+1) = BRA.bigi predT (fun (i:int) => p^i) 0 (n+1) - 1%r.
+    + by rewrite (@BRA.big_ltn 0) 1:/# /= RField.expr0; ring.
+    by have /# := sum_pow_le p (n+1).
+  apply RealOrder.ler_wpmul2l; 1: smt().
+  rewrite (@BRA.big_reindex _ _ (fun x=> x + 1) (fun x=> x - 1) (range 1 (n + 1))) //=.
+  apply (RealOrder.ler_trans _ _ hrec).
+  have -> : n + 1 = n - (-1) by ring.
+  have ->: (fun (x:int) => x - 1) = ((+) (-1)) by apply fun_ext => ?; ring.
+  by rewrite -(@range_addl 1 n (-1)).
+qed.
+
 end Bigreal.
 
 import Bigreal.

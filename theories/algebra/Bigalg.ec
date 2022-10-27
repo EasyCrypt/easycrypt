@@ -52,6 +52,29 @@ proof.
 rewrite big_undup; apply/eq_bigr=> x _ /=.
 by rewrite intmulpE ?count_ge0 ZM.AddMonoid.iteropE.
 qed.
+
+lemma telescoping_sum (F: int -> t) (m n:int) : m <= n =>
+  F m - F n = bigi predT (fun i => F i - F (i+1)) m n.
+proof.
+move=> /IntOrder.ler_eqVlt [<<- | hmn].
++ by rewrite big_geq 1:// subrr.
+rewrite -sumrB (@big_ltn m n F) 1:// /=.
+have heq: n = n - 1 + 1 by ring.
+rewrite heq (@big_int_recr (n-1) m) 1:/# -heq /=. 
+rewrite (@big_reindex _ _ (fun x=> x - 1) (fun x=> x + 1) (range m (n - 1))) //.
+have ->: (transpose Int.(+) 1) = ((+) 1).
++ by apply: fun_ext=> x; ring.
+have ->: predT \o transpose Int.(+) (-1) = predT by done.
+by rewrite /(\o) /= -(@range_addl m n 1) (@addrC _ (F n)) subr_add2r.
+qed. 
+
+lemma telescoping_sum_down (F: int -> t) (m n:int) : m <= n =>
+  F n - F m = bigi predT (fun i => F (i+1) - F i) m n.
+proof.
+move=> hmn; have /= := telescoping_sum (fun i => -F i) _ _ hmn.
+by rewrite opprK addrC => ->; apply eq_big => //= i _; rewrite opprK addrC.
+qed.
+
 end BigZModule.
 
 (* -------------------------------------------------------------------- *)
