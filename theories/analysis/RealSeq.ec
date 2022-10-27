@@ -9,6 +9,14 @@ op convergeto (s : int -> real) (x : real) =
   forall epsilon, 0%r < epsilon => exists N,
     forall n, (N <= n)%Int => `|s n - x| < epsilon.
 
+op convergetopi (s : int -> real) =
+  forall M, exists N, forall n,
+    (N <= n)%Int => M < s n.
+
+op convergetoni (s : int -> real) =
+  forall M, exists N, forall n,
+    (N <= n)%Int => s n < M.
+
 op converge (s : int -> real) =
   exists l, convergeto s l.
 
@@ -18,6 +26,7 @@ op bounded_by (s : int -> real) (M : real) =
 op bounded (s : int -> real) =
   exists M, bounded_by s M.
 
+(*TODO: should be called increasing, not monotone.*)
 op monotone (s : int -> real) =
   forall n, 0 <= n => s n <= s (n+1).
 
@@ -46,6 +55,32 @@ apply/(ler_trans (`|s n - l| + `|l|)); 1: by apply/ler_norm_add.
 by rewrite ler_add2r.
 qed.
 
+lemma bounded_cnv (s : int -> real) :
+  converge s => bounded s.
+proof. by case=> l; apply/bounded_cnvto. qed.
+
+lemma bounded_cnvtopi (s : int -> real) :
+  convergetopi s => !bounded s.
+proof.
+move=> lim_s; apply/negP=> -[M] [N1] bnd_s.
+case/(_ M): lim_s => N2; move: bnd_s.
+move=> /(_ (max N1 N2)) /(_ _); [by apply/IntOrder.maxrl|move=> bnd_s].
+move=> /(_ (max N1 N2)) /(_ _); [by apply/IntOrder.maxrr|move=> lim_s].
+move: (ler_lt_trans _ _ _ bnd_s lim_s) => /=.
+by rewrite -lerNgt; apply/ler_norm.
+qed.
+
+lemma bounded_cnvtoni (s : int -> real) :
+  convergetopi s => !bounded s.
+proof.
+move=> lim_s; apply/negP=> -[M] [N1] bnd_s.
+case/(_ M): lim_s => N2; move: bnd_s.
+move=> /(_ (max N1 N2)) /(_ _); [by apply/IntOrder.maxrl|move=> bnd_s].
+move=> /(_ (max N1 N2)) /(_ _); [by apply/IntOrder.maxrr|move=> lim_s].
+move: (ler_lt_trans _ _ _ bnd_s lim_s) => /=.
+by rewrite -lerNgt; apply/ler_norm.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma monotoneP (s : int -> real):
   monotone s <=> (forall m n, 0 <= m <= n => s m <= s n).
@@ -55,6 +90,27 @@ split=> [h m n|h n]; last first.
 case=> ge0m; rewrite -IntOrder.subr_ge0 -{2}(@IntID.subrK n m).
 elim: (n - m)=> // i ge0i ih; rewrite addrAC (ler_trans _ ih) //.
 by rewrite h ?addr_ge0.
+qed.
+
+lemma monotone_cnv (s : int -> real):
+  monotone s => converge s \/ convergetopi s.
+proof.
+move/monotoneP=> mono_s; case: (convergetopi s) => //=.
+rewrite negb_forall /= => -[M]; rewrite negb_exists /=.
+move=> ltM_; pose S:= (fun x => exists n, 0 <= n /\ x = s n).
+exists (lub S) => e lt0e; have lubS: has_lub S.
++ split; [by exists (s 0); exists 0|].
+  exists M => x [n] [le0n ->>]; move/(_ n): ltM_.
+  rewrite negb_forall => -[m] /=; rewrite negb_imply.
+  by rewrite -lerNgt => -[lenm]; apply/ler_trans/mono_s; split.
+case: (lub_adherent _ lubS _ lt0e) => ? [[N] [le0N ->>]].
+move/ltr_subl_addl/ltr_subl_addr=> lt_e; exists N.
+move=> n leNn; apply/ltr_norml; rewrite -ltr_subl_addr /=; split.
++ move: (mono_s N n); rewrite le0N leNn /=; apply/ltr_le_trans.
+  by rewrite addrC; apply/ltr_subl_addl/ltr_subl_addr.
+move=> _; move: lt0e; apply/ler_lt_trans/subr_le0.
+move: (lub_upper_bound _ lubS (s n) _) => //.
+by exists n; split => //; apply/(IntOrder.ler_trans N).
 qed.
 
 lemma uniq_cnvto s x y: convergeto s x => convergeto s y => x = y.
@@ -68,6 +124,45 @@ case: (IntOrder.maxr_ub Nx Ny); (pose N := max _ _).
 move=> /lim_sx {lim_sx} lim_sx /lim_sy {lim_sy} lim_sy.
 have := ltr_add _ _ _ _ lim_sx lim_sy; rewrite ltrNge.
 by rewrite /e double_half (@distrC (s N)) ler_dist_add.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_bounded_by_from N s1 s2 M:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
+  => bounded_by s1 M => bounded_by s2 M.
+proof.
+move=> eq_s [N'] bb_s1N'; exists (max N N') => n /IntOrder.ler_maxrP [leNn leN'n].
+by rewrite -eq_s // bb_s1N'.
+qed.
+
+lemma eq_bounded_by s1 s2 M:
+  (forall n, s1 n = s2 n) => bounded_by s1 M => bounded_by s2 M.
+proof. by move=> eq; apply/(@eq_bounded_by_from 0)=> n _; apply/eq. qed.
+
+lemma eq_bounded_by_fromP N s1 s2 M:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
+  => bounded_by s1 M <=> bounded_by s2 M.
+proof.
+move=> eq; split; apply/(eq_bounded_by_from N)=> // n leNn.
+by rewrite eq_sym eq.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_bounded_from N s1 s2:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
+  => bounded s1 => bounded s2.
+proof. by move=> eq_s [M] bb_s; exists M; move: eq_s bb_s; apply/eq_bounded_by_from. qed.
+
+lemma eq_bounded s1 s2:
+  (forall n, s1 n = s2 n) => bounded s1 => bounded s2.
+proof. by move=> eq; apply/(@eq_bounded_from 0)=> n _; apply/eq. qed.
+
+lemma eq_bounded_fromP N s1 s2:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
+  => bounded s1 <=> bounded s2.
+proof.
+move=> eq; split; apply/(eq_bounded_from N)=> // n leNn.
+by rewrite eq_sym eq.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -93,6 +188,50 @@ by rewrite eq_sym eq.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma eq_cnvtopi_from N s1 s2:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
+  => convergetopi s1 => convergetopi s2.
+proof.
+move=> eq_s lim_s1 M; case: (lim_s1 M)=> Ns lim_s1N.
+exists (max N Ns)=> n /IntOrder.ler_maxrP [leN leNs].
+by rewrite -eq_s // lim_s1N.
+qed.
+
+lemma eq_cnvtopi s1 s2:
+  (forall n, s1 n = s2 n) => convergetopi s1 => convergetopi s2.
+proof. by move=> eq; apply/(@eq_cnvtopi_from 0)=> n _; apply/eq. qed.
+
+lemma eq_cnvtopi_fromP N s1 s2:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
+  => convergetopi s1 <=> convergetopi s2.
+proof.
+move=> eq; split; apply/(eq_cnvtopi_from N)=> // n leNn.
+by rewrite eq_sym eq.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_cnvtoni_from N s1 s2:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
+  => convergetoni s1 => convergetoni s2.
+proof.
+move=> eq_s lim_s1 M; case: (lim_s1 M)=> Ns lim_s1N.
+exists (max N Ns)=> n /IntOrder.ler_maxrP [leN leNs].
+by rewrite -eq_s // lim_s1N.
+qed.
+
+lemma eq_cnvtoni s1 s2:
+  (forall n, s1 n = s2 n) => convergetoni s1 => convergetoni s2.
+proof. by move=> eq; apply/(@eq_cnvtoni_from 0)=> n _; apply/eq. qed.
+
+lemma eq_cnvtoni_fromP N s1 s2:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
+  => convergetoni s1 <=> convergetoni s2.
+proof.
+move=> eq; split; apply/(eq_cnvtoni_from N)=> // n leNn.
+by rewrite eq_sym eq.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma eq_cnv_fromP N s1 s2:
      (forall n, (N <= n)%Int => s1 n = s2 n)
   => converge s1 <=> converge s2.
@@ -101,6 +240,62 @@ move=> eq; split; case=> l h; exists l; move: h.
   by apply/(@eq_cnvto_from N).
 by apply/(@eq_cnvto_from N)=> n leNn; apply/eq_sym/eq.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma bounded_byC (c : real): bounded_by (fun x => c) `|c|.
+proof. by trivial. qed.
+
+lemma bounded_byD s1 s2 M1 M2: bounded_by s1 M1 => bounded_by s2 M2 =>
+  bounded_by (fun x => s1 x + s2 x) (M1 + M2).
+proof.
+move=> [N1] le_1 [N2] le_2; exists (max N1 N2) => n.
+move=> /IntOrder.ler_maxrP [leN1n leN2n].
+move: le_1 le_2 => /(_ _ leN1n) le_1 /(_ _ leN2n) le_2.
+by move: (ler_add _ _ _ _ le_1 le_2); apply/ler_trans/ler_norm_add.
+qed.
+
+lemma bounded_byN s M: bounded_by s M => bounded_by (fun x => -(s x)) M.
+proof. by move=> [N] le_; exists N => n; rewrite normrN; apply/le_. qed.
+
+lemma bounded_byB s1 s2 M1 M2:
+  bounded_by s1 M1 => bounded_by s2 M2 =>
+  bounded_by (fun x => s1 x - s2 x) (M1 + M2).
+proof. by move=> bb1 /bounded_byN bb2; apply/bounded_byD. qed.
+
+lemma bounded_byZ c s M: bounded_by s M => bounded_by (fun x => c * s x) (`|c| * M).
+proof.
+move=> [N] le_; exists N => n leNn; move/(_ _ leNn): le_.
+by rewrite normrM; apply/ler_wpmul2l/normr_ge0.
+qed.
+
+lemma bounded_byM s1 s2 M1 M2: bounded_by s1 M1 => bounded_by s2 M2 =>
+  bounded_by (fun x => s1 x * s2 x) (M1 * M2).
+proof.
+move=> [N1] le_1 [N2] le_2; exists (max N1 N2) => n.
+move=> /IntOrder.ler_maxrP [leN1n leN2n].
+move: le_1 le_2 => /(_ _ leN1n) le_1 /(_ _ leN2n) le_2.
+by rewrite normrM; apply/ler_pmul => //; apply/normr_ge0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma boundedD s1 s2: bounded s1 => bounded s2 =>
+  bounded (fun x => s1 x + s2 x).
+proof. by move=> [M1] bb1 [M2] bb2; exists (M1 + M2); apply/bounded_byD. qed.
+
+lemma boundedN s: bounded s => bounded (fun x => -(s x)).
+proof. by move=> [M] bb_; exists M; apply/bounded_byN. qed.
+
+lemma boundedB s1 s2:
+  bounded s1 => bounded s2 =>
+  bounded (fun x => s1 x - s2 x).
+proof. by move=> [M1] bb1 [M2] bb2; exists (M1 + M2); apply/bounded_byB. qed.
+
+lemma boundedZ c s: bounded s => bounded (fun x => c * s x).
+proof. by move=> [M] bb_; exists (`|c| * M); apply/bounded_byZ. qed.
+
+lemma boundedM s1 s2: bounded s1 => bounded s2 =>
+  bounded (fun x => s1 x * s2 x).
+proof. by move=> [M1] bb1 [M2] bb2; exists (M1 * M2); apply/bounded_byM. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma cnvtoC c: convergeto (fun x => c) c.
@@ -187,6 +382,90 @@ apply/cnvtoDr0/cnvtoDr0/cnvtoC; last first.
 move=> @/a1; apply/cnvtoM_boundedr; first by apply/cnvtoBlim.
 by apply/(@bounded_cnvto l2).
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma cnvtopiN s: convergetopi s <=> convergetoni (fun n => - s n).
+proof.
+by split=> cnv_ M; case/(_ (-M)): cnv_ => N lt_; exists N;
+move=> n le_; move/(_ _ le_)/ltr_oppl: lt_.
+qed.
+
+lemma cnvtoniN s: convergetoni s <=> convergetopi (fun n => - s n).
+proof. by rewrite cnvtopiN -eq_iff; congr; apply/fun_ext=> ?. qed.
+
+lemma cnvtopiD s1 s2: convergetopi s1 => convergetopi s2 =>
+  convergetopi (fun x => s1 x + s2 x).
+proof.
+move=> cnv1 cnv2 M; case/(_ (M / 2%r)): cnv1 => N1 lt_1.
+case/(_ (M / 2%r)): cnv2 => N2 lt_2; exists (max N1 N2).
+move=> n /IntOrder.ler_maxrP [leN1n leN2n].
+move: lt_1 lt_2 => /(_ _ leN1n) lt_1 /(_ _ leN2n) lt_2.
+move: (ltr_add _ _ _ _ lt_1 lt_2); apply/ler_lt_trans.
+by rewrite double_half.
+qed.
+
+lemma cnvtopiD_boundedr s1 s2: convergetopi s1 => bounded s2 =>
+  convergetopi (fun x => s1 x + s2 x).
+proof.
+move=> cnv1 [M2] [N2 bb_] M1; case/(_ (M1 + M2)): cnv1 => N1 lt_.
+exists (max N1 N2) => n /IntOrder.ler_maxrP [leN1n leN2n].
+move/(_ _ leN1n): lt_; rewrite -ltr_subl_addr -!ltr_subr_addl.
+by apply/ler_lt_trans; case/(_ _ leN2n)/ler_norml: bb_; move/ler_oppl.
+qed.
+
+lemma cnvtopiD_boundedl s1 s2: convergetopi s2 => bounded s1 =>
+  convergetopi (fun x => s1 x + s2 x).
+proof.
+move=> cnv2 b1; move: (cnvtopiD_boundedr _ _ cnv2 b1).
+by apply/eq_cnvtopi => n /=; apply/addrC.
+qed.
+
+lemma cnvtopiD_cnvr s1 s2: convergetopi s1 => converge s2 =>
+  convergetopi (fun x => s1 x + s2 x).
+proof. by move=> cnv1 /bounded_cnv; apply/cnvtopiD_boundedr. qed.
+
+lemma cnvtopiD_cnvl s1 s2: convergetopi s2 => converge s1 =>
+  convergetopi (fun x => s1 x + s2 x).
+proof. by move=> cnv2 /bounded_cnv; apply/cnvtopiD_boundedl. qed.
+
+lemma cnvtoniD s1 s2: convergetoni s1 => convergetoni s2 =>
+  convergetoni (fun x => s1 x + s2 x).
+proof.
+move=> /cnvtoniN cnv1 /cnvtoniN cnv2; move: (cnvtopiD _ _ cnv1 cnv2).
+by move/cnvtopiN; apply/eq_cnvtoni => n /=; rewrite opprD.
+qed.
+
+lemma cnvtoniD_boundedr s1 s2: convergetoni s1 => bounded s2 =>
+  convergetoni (fun x => s1 x + s2 x).
+proof.
+move=> /cnvtoniN cnv1 /boundedN b2; move: (cnvtopiD_boundedr _ _ cnv1 b2).
+by move/cnvtopiN; apply/eq_cnvtoni => n /=; rewrite opprD.
+qed.
+
+lemma cnvtoniD_boundedl s1 s2: convergetoni s2 => bounded s1 =>
+  convergetoni (fun x => s1 x + s2 x).
+proof.
+move=> cnv2 b1; move: (cnvtoniD_boundedr _ _ cnv2 b1).
+by apply/eq_cnvtoni => n /=; apply/addrC.
+qed.
+
+lemma cnvtoniD_cnvr s1 s2: convergetoni s1 => converge s2 =>
+  convergetoni (fun x => s1 x + s2 x).
+proof. by move=> cnv1 /bounded_cnv; apply/cnvtoniD_boundedr. qed.
+
+lemma cnvtoniD_cnvl s1 s2: convergetoni s2 => converge s1 =>
+  convergetoni (fun x => s1 x + s2 x).
+proof. by move=> cnv2 /bounded_cnv; apply/cnvtoniD_boundedl. qed.
+
+lemma cnvtopiB s1 s2:
+  convergetopi s1 => convergetoni s2 =>
+  convergetopi (fun x => s1 x - s2 x).
+proof. by move=> cv1 /cnvtoniN cvN2; have:= (cnvtopiD _ _ cv1 cvN2); apply/eq_cnvtopi. qed.
+
+lemma cnvtoniB s1 s2:
+  convergetoni s1 => convergetopi s2 =>
+  convergetoni (fun x => s1 x - s2 x).
+proof. by move=> cv1 /cnvtopiN cvN2; have:= (cnvtoniD _ _ cv1 cvN2); apply/eq_cnvtoni. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma le_cnvto_from s1 s2 l1 l2:
