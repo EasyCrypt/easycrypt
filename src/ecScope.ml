@@ -1080,6 +1080,24 @@ module Ax = struct
 
   (* ------------------------------------------------------------------ *)
   let realize (scope : scope) (mode : mode) (rl : prealize located) =
+    let scope =
+      if Option.is_none scope.sc_pr_uc then begin
+        let ax = EcDecl.{
+          ax_tparams    = [];
+          ax_spec       = EcFol.f_true;
+          ax_kind       = `Lemma;
+          ax_visibility = `NoSmt;
+          ax_loca       = `Global
+        } in
+
+        let name = unloc (unloc rl).pr_name in
+        let name = EcPath.fromqsymbol name in
+          { scope with sc_pr_uc = Some {
+              puc_active = None;
+              puc_cont   = ([(None, ax), name, scope.sc_env], Some scope.sc_env);
+              puc_init   = scope.sc_env; } }
+      end else scope in
+
     check_state `InProof "activate" scope;
 
     let loc = rl.pl_loc and rl = rl.pl_desc in
@@ -1146,7 +1164,6 @@ module Ax = struct
   let add_defer_goals (scope : scope) (lc : locality) (mode : mode) (goals : EcTyping.goal1 list) =
     let do1 i = function
       | `Finite ty ->
-
           let ax =
             (* FIXME: how to ensure that finite is required *)
             let op, _ =
