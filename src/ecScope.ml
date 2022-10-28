@@ -1080,30 +1080,17 @@ module Ax = struct
 
   (* ------------------------------------------------------------------ *)
   let realize (scope : scope) (mode : mode) (rl : prealize located) =
-    let scope =
-      if Option.is_none scope.sc_pr_uc then begin
-        let ax = EcDecl.{
-          ax_tparams    = [];
-          ax_spec       = EcFol.f_true;
-          ax_kind       = `Lemma;
-          ax_visibility = `NoSmt;
-          ax_loca       = `Global
-        } in
-
-        let name = unloc (unloc rl).pr_name in
-        let name = EcPath.fromqsymbol name in
-          { scope with sc_pr_uc = Some {
-              puc_active = None;
-              puc_cont   = ([(None, ax), name, scope.sc_env], Some scope.sc_env);
-              puc_init   = scope.sc_env; } }
-      end else scope in
-
-    check_state `InProof "activate" scope;
+    (* check_state `InProof "activate" scope; *)
 
     let loc = rl.pl_loc and rl = rl.pl_desc in
     let qn  = EcPath.fromqsymbol (unloc rl.pr_name) in
 
-    let puc = oget scope.sc_pr_uc in
+    let puc =
+      let puc0 =
+        { puc_active = None;
+          puc_cont   = ([], None);
+          puc_init   = scope.sc_env; } in
+      odfl puc0 scope.sc_pr_uc in
     let _ =
       match puc.puc_active with
       | Some _ -> hierror "a lemma is already active"
@@ -1113,7 +1100,19 @@ module Ax = struct
     let (((axname, ax), _, axenv) as st, proofs) =
       let rec doit past proofs =
         match proofs with
-        | [] -> hierror "no such lemma: `%s'" (EcPath.tostring qn)
+        | [] -> begin
+           let ax = EcDecl.{
+             ax_tparams    = [];
+             ax_spec       = EcFol.f_true;
+             ax_kind       = `Lemma;
+             ax_visibility = `NoSmt;
+             ax_loca       = `Global
+           } in
+
+           let name = unloc rl.pr_name in
+           let name = EcPath.fromqsymbol name in
+           ((None, ax), name, scope.sc_env), []
+        end
         | (((_, _), p, _) as st) :: proofs ->
             match EcPath.p_equal p qn with
             | false -> doit (st :: past) proofs
