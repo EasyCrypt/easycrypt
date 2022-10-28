@@ -966,6 +966,15 @@ apply: eq_sum => a /=; case: (mu1 d a = 0%r) => [->//|].
 by move/supportP => /eq_F ->.
 qed.
 
+lemma mu_dlet_le ['a 'b 'c]
+  (d : 'a distr) (F1 : 'a -> 'b distr) (F2 : 'a -> 'c distr) P1 P2 :
+  (forall x, x \in d => mu (F1 x) P1 <= mu (F2 x) P2) =>
+  mu (dlet d F1) P1 <= mu (dlet d F2) P2.
+proof.
+rewrite !dletE => h; apply ler_sum_pos => /=; 1: smt(mu_bounded).
+by apply (@summable_le_pos _ (mu1 d)); [apply summable_mu1 | smt(mu_bounded)].
+qed.
+
 lemma dlet_ll ['a 'b] d f :
      is_lossless d => (forall x, x \in d => is_lossless (f x))
   => is_lossless (dlet<:'a, 'b> d f).
