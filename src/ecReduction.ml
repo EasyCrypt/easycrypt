@@ -256,9 +256,10 @@ end) = struct
     for_type env fs1.fs_ret fs2.fs_ret
 
   (* -------------------------------------------------------------------- *)
-  let add_modules p1 p2 : EcSubst.subst =
-    List.fold_left2 (fun s (id1,_) (id2,_) ->
-        EcSubst.add_module s id1 (EcPath.mident id2)) (EcSubst.empty ()) p1 p2
+  let add_modules env p1 p2 : EcEnv.env * EcSubst.subst =
+    List.fold_left2 (fun (env, s) (id1,_) (id2,mt) ->
+        let env = EcEnv.Mod.bind_local id2 mt env in
+        env, EcSubst.add_module s id1 (EcPath.mident id2)) (env, EcSubst.empty ()) p1 p2
 
   (* ------------------------------------------------------------------ *)
   let rec for_module_type env ~norm mt1 mt2 =
@@ -267,7 +268,7 @@ end) = struct
       let p2 = mt2.mt_params in
       List.for_all2
         (fun (_,mt1) (_,mt2) -> for_module_type env ~norm mt1 mt2) p1 p2 &&
-        let s = add_modules p2 p1 in
+        let env, s = add_modules env p2 p1 in
         let args1 = mt1.mt_args in
         let args2 = List.map (EcSubst.subst_mpath s) mt2.mt_args in
         List.for_all2 (for_mp env ~norm) args1 args2
@@ -294,7 +295,7 @@ end) = struct
     let p2 = ms2.mis_params in
     List.for_all2
       (fun (_,mt1) (_,mt2) -> for_module_type env ~norm mt1 mt2) p1 p2 &&
-    let s = add_modules p2 p1 in
+    let env, s = add_modules env p2 p1 in
     let body1 = ms1.mis_body in
     let body2 = EcSubst.subst_modsig_body s ms2.mis_body in
     for_module_sig_body env body1 body2
@@ -310,7 +311,7 @@ end) = struct
     let locals2 = List.sort cmp_v fd2.f_locals in
     List.for_all2 (for_variable env) locals1 locals2 &&
     for_stmt env Mid.empty ~norm fd1.f_body fd2.f_body &&
-      oall2 (for_expr env Mid.empty ~norm) fd1.f_ret fd2.f_ret
+    oall2 (for_expr env Mid.empty ~norm) fd1.f_ret fd2.f_ret
 
   (* ------------------------------------------------------------------ *)
   let for_function_body env ~norm fb1 fb2 =
@@ -319,10 +320,12 @@ end) = struct
       for_function_def env ~norm fd1 fd2
 
     | FBalias xp1, FBalias xp2 ->
-      for_xp env ~norm xp1 xp2
+       for_xp env ~norm xp1 xp2
 
     | FBabs _, _ | _, FBabs _ -> assert false
+
     | _, _ -> false
+
 
   let for_function env ~norm f1 f2 =
     f1.f_name = f2.f_name &&
@@ -333,7 +336,7 @@ end) = struct
   let rec for_module_expr env ~norm ~body me1 me2 =
     me1.me_name = me2.me_name &&
       for_module_sig_body env me1.me_sig_body me2.me_sig_body &&
-    let s = add_modules me2.me_params me1.me_params in
+    let env, s = add_modules env me2.me_params me1.me_params in
     let comps1 = me1.me_comps in
     let comps2 = EcSubst.subst_module_comps s me2.me_comps in
 
@@ -2035,14 +2038,11 @@ let check_bindings exn tparams env s bd1 bd2 =
 let rec conv_oper env ob1 ob2 =
   match ob1, ob2 with
   | OP_Plain(e1,_), OP_Plain(e2,_)  ->
-    Format.eprintf "[W]: ICI1@.";
     conv_expr env Fsubst.f_subst_id e1 e2
   | OP_Plain({e_node = Eop(p,tys)},_), _ ->
-    Format.eprintf "[W]: ICI2@.";
     let ob1 = get_open_oper env p tys  in
     conv_oper env ob1 ob2
   | _, OP_Plain({e_node = Eop(p,tys)}, _) ->
-    Format.eprintf "[W]: ICI3@.";
     let ob2 = get_open_oper env p tys in
     conv_oper env ob1 ob2
   | OP_Constr(p1,i1), OP_Constr(p2,i2) ->
