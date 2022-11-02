@@ -262,6 +262,9 @@ by rewrite ne0_i /= mulr0.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma eq_polyC0 c : polyC c = poly0 <=> c = zeror.
+proof. by rewrite poly_eqP; split => [/(_ 0 _)|->>] //; rewrite polyCE poly0E. qed.
+
 lemma eq_polyXn0 n : polyXn n = poly0 <=> n < 0.
 proof.
 rewrite poly_eqP; split => [/(_ n)|/ltrNge Nle0n c le0c]; rewrite polyXnE poly0E.
@@ -833,6 +836,23 @@ move=> ge0_c le; elim: r => [|x r ih]; 1: by rewrite PCA.big_nil deg0.
 rewrite PCA.big_cons; case: (P x) => // Px.
 by rewrite &(ler_trans _ _ _ (degD _ _)) ler_maxrP ih le.
 qed.
+
+lemma deg_prod_le ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
+     all (predC (predI P (fun x => F x = poly0))) r
+  => deg (PCM.big P F r) <= StdBigop.Bigint.BIA.big P ((fun p => deg p - 1) \o F) r + 1.
+proof.
+elim: r => [_|x r IHr]; [by rewrite PCM.big_nil StdBigop.Bigint.BIA.big_nil deg1|].
+case; rewrite {1}/predC {1}/predI /= negb_and or_andr PCM.big_cons StdBigop.Bigint.BIA.big_cons /=.
+case=> [NPx all_p|[Px neqFx0]]; [by rewrite NPx /= IHr|rewrite Px /= => all_p; move/IHr: (all_p)].
+move => le_; rewrite {1}/(\o) /= -(ler_add2r 1) /=; case: (PCM.big P F r = poly0) => [eq_0|neq_0].
++ rewrite eq_0 mulr0 deg0 addrAC /= addrAC ler_addr; apply/addr_ge0; [by apply/ge0_deg|].
+  move=> {x Px IHr neqFx0 le_ eq_0}; elim: r all_p => [|x r IHr] /=; [by rewrite BIA.big_nil|].
+  rewrite {1}/predC {1}/predI /= negb_and or_andr /= BIA.big_cons; case => + /IHr le0_ {IHr}.
+  case=> [NPx|[Px neqh0]]; [by rewrite NPx|rewrite Px {1}/(\o) /=; apply/addr_ge0 => //].
+  by apply/subr_ge0/deg_ge1.
+by apply/(ler_trans _ _ _ (degM_le _ _ neqFx0 neq_0)); rewrite -!addrA ler_add2l !addrA addrC /= addrC.
+qed.
+
 end BigPoly.
 
 import BigPoly.
@@ -1368,4 +1388,16 @@ apply/ler_paddr; [by apply/size_ge0|]; apply/lerr_eq/perm_eq_size/uniq_perm_eq; 
 move => x; rewrite !mem_to_seq /=; [by apply/finite_root/mulf_neq0|by apply/finiteU; apply/finite_root|].
 by rewrite /predU /=; apply/rootM.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma prodf_neq0 ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
+      all (predC (predI P (fun x => F x = poly0))) r
+  <=> BigPoly.PCM.big P F r <> poly0.
+proof.
+elim: r => [|x r IHr]; [by rewrite BigPoly.PCM.big_nil oner_neq0|].
+rewrite BigPoly.PCM.big_cons /= IHr {1}/predC {1}/predI /=.
+case (P x) => //= _; split=> [[]|]; [by apply/mulf_neq0|].
+by rewrite -negb_or implybNN; case=> ->; [rewrite mul0r|rewrite mulr0].
+qed.
+
 end Poly.
