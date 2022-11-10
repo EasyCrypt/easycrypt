@@ -191,6 +191,9 @@ let main () =
       ldropts.ldro_idirs;
   end;
 
+  (* Initialize printer *)
+  EcCorePrinting.Registry.register (module EcPrinting);
+
   (* Register user messages printers *)
   begin let open EcUserMessages in register () end;
 

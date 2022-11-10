@@ -695,6 +695,18 @@ abstract theory IDomain.
 
   lemma lregP x : lreg x <=> x <> zeror.
   proof. by split=> [/lreg_neq0//|/mulfI]. qed.
+
+  lemma eqr_div (x1 y1 x2 y2 : t) : unit y1 => unit y2 =>
+    (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
+  proof.
+  move=> Nut1 Nut2; rewrite -{1}(@mulrK y2 _ x1) //.
+  rewrite  -{1}(@mulrK y1 _ x2) // -!mulrA (@mulrC (invr y1)) !mulrA.
+  split=> [|->] //;
+    (have nz_Vy1: unit (invr y1) by rewrite unitrV);
+    (have nz_Vy2: unit (invr y2) by rewrite unitrV).
+  by move/(mulIr _ nz_Vy1)/(mulIr _ nz_Vy2).
+  qed.
+
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
@@ -722,14 +734,7 @@ abstract theory Field.
 
   lemma eqf_div (x1 y1 x2 y2 : t) : y1 <> zeror => y2 <> zeror =>
     (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
-  proof.                          (* FIXME: views *)
-  move=> nz_y1 nz_y2; rewrite -{1}(@mulrK y2 _ x1) //.
-  rewrite  -{1}(@mulrK y1 _ x2) // -!mulrA (@mulrC (invr y1)) !mulrA.
-  split=> [|->] //;
-    (have nz_Vy1: invr y1 <> zeror by rewrite invr_eq0);
-    (have nz_Vy2: invr y2 <> zeror by rewrite invr_eq0).
-  by move/(mulIf _ nz_Vy1)/(mulIf _ nz_Vy2).
-  qed.
+  proof. by apply: eqr_div. qed.
 
   lemma expfM x y n : exp (x * y) n = exp x n * exp y n.
   proof.

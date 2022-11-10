@@ -12,7 +12,6 @@ exception IncompatibleForm of env * (form * form)
 exception IncompatibleExpr of env * (expr * expr)
 
 (* -------------------------------------------------------------------- *)
-
 type 'a eqtest = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 type 'a eqantest = env -> ?alpha:(EcIdent.t * ty) Mid.t -> ?norm:bool -> 'a -> 'a -> bool
@@ -29,7 +28,7 @@ module EqTest : sig
   val for_stmt  : stmt        eqantest
   val for_expr  : expr        eqantest
   val for_msig  : module_sig  eqntest
-  val for_mexpr : module_expr eqntest
+  val for_mexpr : env -> ?norm:bool -> ?body:bool -> module_expr -> module_expr -> bool
 
   val is_unit : env -> ty -> bool
   val is_bool : env -> ty -> bool

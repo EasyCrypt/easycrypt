@@ -2293,6 +2293,10 @@ proof.
 by elim: xs => // -[a b] xs ih /=; rewrite assoc_cons; case: (k = a).
 qed.
 
+lemma assoc_none ['a, 'b] (xs : ('a * 'b) list) (k : 'a) :
+  assoc xs k <> None <=> exists (s:'b), (k,s) \in xs.
+proof. by rewrite assocTP  mem_map_fst. qed.
+
 lemma perm_eq_assoc (s1 s2 : ('a * 'b) list) x:
      uniq (map fst s2)
   => perm_eq s1 s2 => assoc s1 x = assoc s2 x.

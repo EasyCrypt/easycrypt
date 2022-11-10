@@ -234,11 +234,11 @@ elim: sa gr => [|a sa ih] gr.
 rewrite fingraph_cons; split.
 - case/flatten_mapP=> [/= s [s_in_fg]] /mapP[b [/= b_sb ->]] /=.
   by case/(_ s): ih => + _ - /(_ s_in_fg) [->/=] ih b' [->>//|/ih].
-- case: gr => // [[a' b'] gr] /= [] [->> gr1E] gr2E.
-  case/(_ gr): ih => _ /(_ _).
-  - by rewrite gr1E /= => ??; apply: gr2E; right.
-  move=> gr_mem /=; apply/flatten_mapP; exists gr.
-  by rewrite gr_mem /=; apply/mapP=> /=; exists b'; rewrite gr2E.
+case: gr => // [[a' b'] gr] /= [] [->> gr1E] gr2E.
+case/(_ gr): ih => _ /(_ _).
+- by rewrite gr1E /= => ??; apply: gr2E; right.
+move=> gr_mem /=; apply/flatten_mapP; exists gr.
+by rewrite gr_mem /=; apply/mapP=> /=; exists b'; rewrite gr2E.
 qed.
 
 lemma finite_fixfinfun ['a 'b] dom codom :
@@ -259,7 +259,7 @@ exists s; split=> [@/s|]; last first.
   rewrite mem_assoc_uniq => [|->//]; apply/map_inj_in_uniq.
   - case=> [/= a1 b1] [/= a2 b2] /mapP[/= ? [# _ ->> ->>]].
     by case/mapP=> /= ? [# _ ->> ->> ->].
-  - by apply/map_inj_in_uniq.
+  by apply/map_inj_in_uniq.
 apply/mem_fingraph; split; first by rewrite -map_comp map_id.
 move=> x; rewrite -map_comp /(\o) /= => /mapP[a [/= a_sa ->]].
 by move/(_ a): hfix; rewrite -ha a_sa /= hb.

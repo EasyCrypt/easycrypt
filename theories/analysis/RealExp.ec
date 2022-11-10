@@ -227,6 +227,15 @@ lemma log_ge0 (b x : real) : 1%r <= b => 1%r <= x => 0%r <= log b x.
 proof. by move=> ge1_b ge1_x; rewrite /log divr_ge0 ?ln_ge0. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma log_le0 b x :
+  1%r <= b => 0%r < x <= 1%r => log b x <= 0%r.
+proof.
+rewrite /log => ge1_b bound_x.
+case (ln b = 0%r); first (move => -> /#).
+smt(lnV ln_ge0).
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma log_mono (b x y : real) :
   1%r < b => 0%r < x => 0%r < y => (log b x <= log b y) <=> x <= y.
 proof.
@@ -234,6 +243,10 @@ move=> gt1_b gt0_x gt0_y @/log; rewrite ler_pmul2r.
 - by rewrite invr_gt0 ln_gt0.
 - by apply/ln_mono.
 qed.
+(* -------------------------------------------------------------------- *)
+lemma log_mono_ltr (b x y : real) :
+  1%r < b => 0%r < x => 0%r < y => (log b x < log b y) <=> x < y.
+proof. move=> h1 h2 h3; smt (log_mono inj_log). qed.
 
 (*-----------------------------------------------------------------------------*)
 lemma logM (a x y : real) : 0%r < x => 0%r < y => log a (x * y) = log a x + log a y.
