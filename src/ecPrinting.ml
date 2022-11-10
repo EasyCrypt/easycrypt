@@ -723,22 +723,19 @@ let pp_mem (ppe : PPEnv.t) fmt x =
     Format.fprintf fmt "%s" x
 
 let pp_memtype ppe fmt mt =
-  ()
-  (*
   match EcMemory.for_printing mt with
-<<<<<<< HEAD
-  | None -> ()
+  | None -> Format.fprintf fmt "{}"
   | Some (c, q) ->
     let doit fmt (arg, decl) =
       match arg with
       | Some arg ->
         let pp_vd fmt v =
-          Format.fprintf fmt "@[%s: %a@]" v.v_name (pp_type ppe) v.v_type in
+          Format.fprintf fmt "@[%s: %a@]" (odfl "_" v.ov_name) (pp_type ppe) v.ov_type in
         Format.fprintf fmt "@[{%s: {@[%a@]}}@]" arg (pp_list ",@ " pp_vd) decl
       | None ->
         let add mty v =
-          let ids = Mty.find_def [] v.v_type mty in
-          Mty.add v.v_type (v.v_name::ids) mty in
+          let ids = Mty.find_def [] v.ov_type mty in
+          Mty.add v.ov_type (odfl "_" v.ov_name :: ids) mty in
         let mty = List.fold_left add Mty.empty decl in
         let pp_bind fmt (ty, ids) =
           Format.fprintf fmt "@[%a :@ %a@]"
@@ -751,30 +748,6 @@ let pp_memtype ppe fmt mt =
       "@[%a@ %a@]"
       doit c
       (fun fmt -> oiter (Format.fprintf fmt "quantum%a" doit)) q
-=======
-  | None -> Format.fprintf fmt "{}"
-  | Some (arg, decl) ->
-    match arg with
-    | Some arg ->
-      let pp_vd fmt v =
-        Format.fprintf fmt "@[%s: %a@]"
-          (odfl "_" v.ov_name)
-          (pp_type ppe) v.ov_type
-      in
-      Format.fprintf fmt "@[{%s: {@[%a@]}}@]" arg (pp_list ",@ " pp_vd) decl
-    | None ->
-      let add mty v =
-        let ids = Mty.find_def [] v.ov_type mty in
-        Mty.add v.ov_type (odfl "_" v.ov_name::ids) mty in
-      let mty = List.fold_left add Mty.empty decl in
-      let pp_bind fmt (ty, ids) =
-        Format.fprintf fmt "@[%a :@ %a@]"
-          (pp_list ",@ " (fun fmt s -> Format.fprintf fmt "%s" s))
-          (List.rev ids) (pp_type ppe) ty in
-      let lty = Mty.bindings mty in
-      Format.fprintf fmt "@[{%a}@]" (pp_list ",@ " pp_bind) lty
->>>>>>> main
- *)
 
 (* -------------------------------------------------------------------- *)
 let pp_opname fmt (nm, op) =
