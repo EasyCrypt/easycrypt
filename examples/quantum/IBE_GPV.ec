@@ -1,6 +1,26 @@
-require import AllCore List Distr DBool CHoareTactic.
+require import AllCore List Distr DBool CHoareTactic FunSamplingLib.
 require (*  *) T_QROM T_PERM T_CPA T_IBE.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal.
+(* --------------------------------------------------------------------------- *)
+
+(* Maximal number of queries to the extract/hash oracle *)
+op cqe : { int | 0 <= cqe } as ge0_cqe.
+op cqh : { int | 0 <= cqh } as ge0_cqh.
+
+op gqe : { int | 0 <= gqe } as ge0_gqe.
+op gqh : { int | 0 <= gqh } as ge0_gqh.
+
+op qe = cqe + gqe.
+op qh = cqh + gqh.
+
+lemma ge0_qe : 0 <= qe.
+proof. smt(ge0_cqe ge0_gqe). qed.
+
+lemma ge0_qh : 0 <= qh.
+proof. smt(ge0_cqh ge0_gqh). qed.
+
+op q = qe + qh + 1.
+
 (* --------------------------------------------------------------------------- *)
 
 clone import T_IBE as IBE.
@@ -18,6 +38,11 @@ clone import T_QROM as QROM with
   type hash <- pkey
   rename "hash" as "pkey".
 
+clone import SemiConstDistr with
+    op k <- qe.
+
+import DFunBiasedSingle.
+
 clone include T_CPA with
    type msg    <- msg,
    type cipher <- cipher,
@@ -25,7 +50,7 @@ clone include T_CPA with
    type skey   <- skey,
    type input  <- real.
 
-import MUFF.
+import QROM.MUFF.
 (* --------------------------------------------------------------------------*)
 op [lossless uniform full] dskey : skey distr.
 (* FIXME: this should be provable because f is bijective *)
@@ -144,24 +169,6 @@ module GPV (E:EncScheme0) (H:QRO) = {
     
 }.
 
-(* --------------------------------------------------------------------------- *)
-(* Maximal number of queries to the extract/hash oracle *)
-op cqe : { int | 0 <= cqe } as ge0_cqe.
-op cqh : { int | 0 <= cqh } as ge0_cqh.
-
-op gqe : { int | 0 <= gqe } as ge0_gqe.
-op gqh : { int | 0 <= gqh } as ge0_gqh.
-
-op qe = cqe + gqe.
-op qh = cqh + gqh.
-
-lemma ge0_qe : 0 <= qe.
-proof. smt(ge0_cqe ge0_gqe). qed.
-
-lemma ge0_qh : 0 <= qh.
-proof. smt(ge0_cqh ge0_gqh). qed.
-
-op q = qe + qh + 1.
 
 (* --------------------------------------------------------------------------- *)
 
@@ -198,9 +205,6 @@ module B (A:AdvIDCPA_QROM) : AdvCPA = {
     
 }.
 
-clone import SemiConstDistr with
-    op k <- qe.
-
 section.
 
 declare module E <: EncScheme0 {-IDCPA, -QRO, -B, -Wrap, -SCD}.
@@ -228,7 +232,7 @@ declare axiom hoare_bound_g (H<:QRO{-A,-Wrap}) (O<:OrclIBE{-A,-Wrap}) ke kh:
 declare axiom enc_ll : islossless E.enc.
 
 module type Init = {
-  proc * init (h: identity -> pkey, lam_: real) : (identity -> bool) * (identity -> pkey)
+  proc init (h: identity -> pkey, lam_: real) : (identity -> bool) * (identity -> pkey)
 }.
 
 local module G(I:Init) = {
@@ -284,7 +288,8 @@ proof.
                              (<:Wrap(A, QRO, IDCPA(Wrap(A, QRO), GPV(E, QRO)).E).Oc)); islossless.
       call (: (glob A, glob E) = (glob A, glob E){m} /\ lam_ = lam ==> 
                G.bf IDCPA.id /\ forall (id' : identity), id' \in IDCPA.log => ! G.bf id'); 2: by auto.
-      by bypr => &m0 h; rewrite /r; byequiv => //; sim; move: h => />.  
+      bypr => &m0 h. rewrite /r; byequiv => //.
+      by proc; sim 2 2; call hI => />; inline *; auto => /> /#. 
     by rcondf 1 => //; conseq />; rnd (pred1 true); skip => /> *; rewrite dbool1E /= /pred1.
   byequiv (: _ ==> (res /\ G.bf IDCPA.id /\ forall (id' : identity), id' \in IDCPA.log => ! G.bf id'){1} =
                  (res /\ G.bf IDCPA.id /\ forall (id' : identity), id' \in IDCPA.log => ! G.bf id'){2}) => //;
@@ -481,7 +486,7 @@ local module ASCDt (H:QRO) = {
     return (true, IDCPA.id, IDCPA.log);
   }
 }.
- 
+
 local lemma l2 &m lam :
   0.0 <= lam <= 1.0 => 
   `|Pr[G(Init2).main(lam) @ &m : res] - Pr[G(Init1).main(lam) @ &m : res] | <=
@@ -502,7 +507,7 @@ proof.
   have -> : Pr[G(Init1).main0(lam) @ &m : res /\ good G.bf IDCPA.id IDCPA.log] =
             Pr[SCD(ASCDr)._F0(lam) @ &m : res].
   + byequiv => //; proc; inline ASCDr(QRO).main Init1.init; swap{2} 3 2; swap{2} 1 1.
-    by rnd{2}; wp; conseq (_: ={IDCPA.id, IDCPA.log} /\ G.bf{1} = SCD.bf{2} /\ b2{1} = b{2}) => //; sim.
+    rnd{2}; wp; conseq (_: ={IDCPA.id, IDCPA.log} /\ G.bf{1} = SCD.bf{2} /\ b2{1} = b{2}) => //; sim.
   have ->: Pr[G(Init2).main0(lam) @ &m : res /\ good G.bf IDCPA.id IDCPA.log] =
          Pr[SCD(ASCDr)._F1(lam) @ &m : res].
   + byequiv => //; proc; inline ASCDr(QRO).main Init2.init. swap{2} 1 2. 

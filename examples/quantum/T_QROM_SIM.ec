@@ -13,9 +13,11 @@ clone include T_QROM with
    type from = FT.t,
    type hash = FT.t,
    op MUFF.FinT.enum <- FT.Support.enum,
-   op dhash <- FT.dunifin
+   op dhash <- FT.dunifin,
+   op MUFFH.FinT.enum <- FT.Support.enum
 proof *.
 realize MUFF.FinT.enum_spec. by apply FT.Support.enum_spec. qed.
+realize MUFFH.FinT.enum_spec. by apply FT.Support.enum_spec. qed.
 realize dhash_ll. by apply FT.dunifin_ll. qed.
 realize dhash_uni. by apply FT.dunifin_uni. qed.
 realize dhash_fu. by apply FT.dunifin_fu. qed.

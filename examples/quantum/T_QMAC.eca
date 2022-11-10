@@ -13,9 +13,15 @@ module type QMACScheme = {
   proc verify(sk:skey, m:msg, s:tag) : bool
 }.
 
+realize typing_0 by done.
+realize typing_1 by done.
+
 module type OrclSign = {
   quantum proc sign {m: msg} : tag   
 }.
+
+realize typing_0 by done.
+realize typing_1 by done.
 
 quantum module type AdvEUF (O:OrclSign) = {
   proc choose() : (msg * tag) list  
@@ -47,6 +53,9 @@ module EUF_qCMA(A:AdvEUF) (O:QMACScheme) = {
     return b /\ size ms = q + 1; 
   }
 }.
+
+realize typing_0 by done.
+realize typing_1 by done.
 
 clone import T_QROM as QROM with
   type from <- msg,

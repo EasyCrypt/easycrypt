@@ -1,4 +1,4 @@
-require import AllCore List Distr DBool DList DProd CHoareTactic.
+require import AllCore List Distr DBool DList DProd CHoareTactic FunSamplingLib.
 require (*  *) T_QROM T_EUF T_PERM.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal DInterval.
 
@@ -8,6 +8,10 @@ clone import T_EUF as EUF.
 
 clone import T_QROM as QROM with
   type from <- msg.
+
+clone import DFunBiasedSingle with
+   type X <- msg,
+   theory MUFF <- MUFF.
 
 clone include T_PERM with 
    type pkey  <- pkey,
@@ -181,7 +185,7 @@ qed.
 end section.
 end START.
 
-import MUFF.
+import QROM.MUFF.
 (* --------------------------------------------------------------------------*)
 op [lossless uniform full] dsign : sign distr.
 (* FIXME: this should be provable because f is bijective *)
@@ -435,7 +439,7 @@ proof.
   swap{1}6 -5. swap{1} 5 -3; wp.
   rnd (fun (h:msg -> hash) => fun m => finv EUF.sk{1} (h m))
       (fun (h:msg -> sign) => fun m => f EUF.pk{1} (h m)).
-  rewrite /good; auto => /> &2 k hk h _ bf _; split.
+  rewrite /good; auto => /> &2 *; split.
   + by move=> *; apply fun_ext => ?; smt(finv_f).
   smt(dfsign_dfhash f_finv finv_f).
 qed.
@@ -743,6 +747,9 @@ clone import T_OW with
   type init <- int, 
   op dcodom <- dhash.
 
+clone import SmallRange.
+import DFunSmallRange.
+
 module B (A:AdvEUF_QROM) : AdvOW = {
   import var EUF
   var hs : msg -> sign
@@ -762,15 +769,13 @@ module B (A:AdvEUF_QROM) : AdvOW = {
     rs2 <$ dlist dsign (r-i-1);
     rs  <- rs1 ++ witness :: rs2;
     rh  <- map (f pk_) rs1 ++ y :: map (f pk_) rs2;
-    fr  <$ difun r; 
-    hs <- fun x => nth witness rs (fr x); 
-    QRO.h <- fun x => nth witness rh (fr x);
+    fr  <$ difun_R; 
+    hs <- fun x => nth witness rs (r2i (fr x)); 
+    QRO.h <- fun x => nth witness rh (r2i (fr x));
     (m,s) <@ A(QRO, Os).main(pk_);
     return s; 
   }
 }.
-
-clone import SmallRange.
 
 clone import Collision with 
   type input <- unit.
@@ -876,21 +881,20 @@ proof.
 qed.
 
 local module G2(H:SR) = {
-  proc main (r:int) = {
+  proc main () = {
      var b;
      b <@ G1(H).main();
      return b /\ !(G1.hm \in unzip1 G1.logs); 
   }  
 }.
 
-local lemma G1_SRO r &m :
-  0 < r =>  
+local lemma G1_SRO &m :
   Pr[IND_QRO(QRO,G1).main() @ &m : res /\ ! (G1.hm \in unzip1 G1.logs) ] = 
-  Pr[IND_SR (SRO,G2).main(r) @ &m : res].
+  Pr[IND_SR (SRO,G2).main() @ &m : res].
 proof.
-  move=> hr; byequiv => //; proc; inline G2(SRO).main; wp.
-  sim : (b{1} = b0{2} /\ ={G1.hm, G1.logs}).
-  inline *; auto => />; apply dfun_ll => /=; apply DInterval.dinter_ll => /#.
+  byequiv => //; proc; inline G2(SRO).main; wp.
+  sim 1 1 : (b{1} = b0{2} /\ ={G1.hm, G1.logs}).
+  inline *; auto => />; apply dfun_ll => //=;  apply Rt.dunifin_ll.
 qed.
 
 local hoare hoare_bound2 : Wrap(A, SRO, EUF(Wrap(A, SRO), G1(SRO).FDH).Os).main : 
@@ -907,13 +911,11 @@ proof.
     by auto.
   by apply (hoare_bound SRO (<: EUF(Wrap(A, SRO), G1(SRO).FDH).Os)).
 qed.
-
-local lemma SRO_SR r0 &m : 
-  0 < r0 => 
-  `| Pr[IND_SR (SRO,G2).main(r0) @ &m : res] - Pr[IND_SR (SR,G2).main(r0) @ &m : res] | <=
-  (27 * q^3)%r / r0%r.
+local lemma SRO_SR &m : 
+  `| Pr[IND_SR (SRO,G2).main() @ &m : res] - Pr[IND_SR (SR,G2).main() @ &m : res] | <=
+  (27 * q^3)%r / _r%r.
 proof.
-  move=> hr; apply (advantage q r0 G2 &m hr).
+  apply (advantage q G2 &m Rt.Support.card_gt0).
   proc.
   inline G2(SRO).main G1(SRO).main EUF(Wrap(A, SRO), G1(SRO).FDH).main
              G1(SRO).FDH.verify QRO.h; wp.
@@ -922,33 +924,30 @@ qed.
 
 local module G3 = {
   var i : int
-  proc main (r:int) = {
+  proc main () = {
     var b;
-    b <@ IND_SR (SR,G2).main(r);
-    i <$ [0..r-1];
-    return b /\ SR.fr EUF.m = i;
+    b <@ IND_SR (SR,G2).main();
+    i <$ [0.._r-1];
+    return b /\ r2i (SR.fr EUF.m) = i;
   }
 }.
 
-local lemma G3_SR r0 &m : 
-  0 < r0 =>
-  Pr[G3.main(r0) @ &m : res] = 1.0/r0%r * Pr[IND_SR (SR,G2).main(r0) @ &m : res].
+local lemma G3_SR &m : 
+  Pr[G3.main() @ &m : res] = 1.0/_r%r * Pr[IND_SR (SR,G2).main() @ &m : res].
 proof.
-move=> hr.
-byphoare (:(glob A){m} = glob A /\ r = r0 ==> _) => //.
+byphoare (:(glob A){m} = glob A ==> _) => //.
 proc.
-seq 1 : b Pr[IND_SR(SR,G2).main(r0) @ &m : res] (inv r0%r)
-          _ 0%r (r = r0 /\ 0 <= SR.fr EUF.m < r).
+seq 1 : b Pr[IND_SR(SR,G2).main() @ &m : res] (inv _r%r)
+          _ 0%r (0 <= r2i (SR.fr EUF.m) < _r).
 + inline *; wp.
-  conseq (: forall x, 0 <= SR.fr x < r).
+  conseq (: forall x, 0 <= r2i (SR.fr x) < _r).
   + by move=> /> ? m0 /(_ m0.`1) />.
-  call (: true) => //; auto => /> rh _ fr /dfun_supp /= h _ _ x. 
-  by have /DInterval.supp_dinter /# := h x.
-+ call (: (glob A){m} = glob A /\ r = r0 ==> res); 2: by auto.
+  call (: true) => //; auto => /> rh _ fr /dfun_supp /= h _ _ x; 1: by smt(r2i_range).
++ call (: (glob A){m} = glob A ==> res); 2: by auto.
   bypr => &m0 h.
   byequiv (: ={glob A, arg} ==> ={res, EUF.m, EUF.log, SR.fr}) => //; 1: by sim.
   by move: h => />.
-+ by conseq />; rnd (pred1 (SR.fr EUF.m)); skip => />; smt (DInterval.dinter1E).
++ by conseq />; rnd (pred1 (r2i (SR.fr EUF.m))); skip => />;  smt (DInterval.dinter1E).
 + by conseq (:false) => /> //.
 smt().
 qed.
@@ -965,17 +964,16 @@ local module S = {
   }
 }.
 
-local lemma G3_OW r_ &m:
-  0 < r_ =>
-  Pr[G3.main(r_) @ &m : res] <= Pr[OW(B(A)).main(r_) @ &m : res].
+local lemma G3_OW &m:
+  Pr[G3.main() @ &m : res] <= Pr[OW(B(A)).main(_r) @ &m : res].
 proof.
-  move=> h0r; byequiv=> //; proc; inline *.
-  swap{1} -27; wp.
+  byequiv=> //; proc; inline *.
+  swap{1} -24; wp.
   symmetry.
-  call (_: exists m', m' \in EUF.log /\ SR.fr m' = G3.i, 
+  call (_: exists m', m' \in EUF.log /\ r2i (SR.fr m') = G3.i, 
            ={QRO.h, EUF.log} /\ 
            (G1.logs = map (fun m => (QRO.h m, m)) EUF.log){2} /\
-           (forall m, SR.fr{2} m <> G3.i{2} => 
+           (forall m, r2i (SR.fr{2} m) <> G3.i{2} => 
               B.hs{1} m = (finv EUF.sk (QRO.h m)){2}),
           (G1.logs = map (fun m => (QRO.h m, m)) EUF.log){2}) => //.
   + by apply A_ll.
@@ -985,31 +983,33 @@ proof.
   + by proc; inline *; auto.
   + by move=> *; proc; auto. 
   + by move=> *; proc; inline *; auto.
-  swap{2} 10 -9; wp.
+  swap{2} 7 -6; wp.
   swap{1} [10..11] 1.
   swap{1} 5 -4.
   swap{1} [4..6] 4; wp.
-  swap{2} [3..4] -2; sp.
+  swap{2} [2..2] -2; sp.
   swap{1} 2 2.
   rnd.
-  seq 2 2 : (#pre /\ k{2} = (pk,sk){1} /\ G3.i{2} = i0{1} /\ 0 <= G3.i{2} < r_ /\
+  seq 2 2 : (#pre /\ k{2} = (pk,sk){1} /\ G3.i{2} = i0{1} /\ 0 <= G3.i{2} < _r /\
           k{2} \in kg).
   + by auto => />; smt(DInterval.supp_dinter).
   conseq (: SR.rh{2} = (map (f pk) rs1 ++ y :: map (f pk) rs2){1} /\ 
             size rs1{1} = i0{1} /\ size rs2{1} = r{1} - i0{1} - 1).
   + move=> /> &1 h0i hir hk rs1 rs2 y <<- ? fr /dfun_supp /= hfr; split.
     + move=> m' hm'; rewrite !nth_cat size_map /=.
-      have /DInterval.supp_dinter hfrm' := hfr m'.
-      case: (fr m' < size rs1) => ?.
-      + by rewrite (nth_map witness witness (f pk{1}) (fr m')) 1:/# (finv_f _ _ hk). 
-      rewrite (nth_map witness witness (f pk{1})); smt(finv_f).
+      have  hfrm' := hfr m'.
+      case: (r2i (fr m') < size rs1) => ?.
+      + rewrite (nth_map witness witness (f pk{1}) (r2i (fr m'))); 1: by smt(r2i_range). 
+         by rewrite (finv_f _ _ hk) //. 
+      rewrite (nth_map witness witness (f pk{1})); 1: by smt(r2i_range).
+      by smt(finv_f).
     smt (finv_f f_finv nth_cat size_map mapP map_comp).
-  transitivity * {2} { SR.rh <@ Sample.sample(r1); } => //; 1:smt(); last by inline *;auto.
-  transitivity {2} { SR.rh <@ S.sample2(G3.i, r - G3.i - 1); } 
-    (={r} /\ i0{1} = G3.i{2} /\ (pk,sk){1} \in kg /\ 0 <= G3.i{2} < r{2} ==> 
+  transitivity * {2} { SR.rh <@ Sample.sample(_r); } => //; 1:smt(); last by inline *;auto.
+  transitivity {2} { SR.rh <@ S.sample2(G3.i, _r - G3.i - 1); } 
+    (r{1} = _r /\ i0{1} = G3.i{2} /\ (pk,sk){1} \in kg /\ 0 <= G3.i{2} < _r ==> 
        SR.rh{2} = map (f pk{1}) rs1{1} ++ y{1} :: map (f pk{1}) rs2{1} /\
        size rs1{1} = i0{1} /\ size rs2{1} = r{1} - i0{1} - 1)
-    (r1{2} = r{1} /\ 0 <= r{1} /\ 0 <= G3.i{1} < r{1} ==> ={SR.rh}) => //;1: smt(); last first.
+    (0 <= G3.i{1} < _r ==> ={SR.rh}) => //;1: smt(); last first.
   + symmetry; inline S.sample2; wp; ecall (Sample_Sample2 n1{2} n2{2}); wp; skip => /> /#.
   inline *; wp; sp.
   rnd (map (f pk{1})) (map (finv sk{1})); rnd; rnd (map (f pk{1})) (map (finv sk{1})); skip => />.
@@ -1031,7 +1031,7 @@ proof.
     by move=> x; rewrite /(\o) (f_finv _ _ hk).
   move=> _; split.
   + move=> rs hrs. rewrite !dlist1E 1,2:/# size_map.
-    case: (r{2} - size rs1 - 1 = size rs) => // hsz.
+    case: (_r - size rs1 - 1 = size rs) => // hsz.
     rewrite BRM.big_map; apply BRM.eq_big => //= h _. 
     by rewrite /(\o); apply dhash_dsign.
   move=> _ rs2; rewrite supp_dlist 1:/# => -[] hrs2 ?; split.
@@ -1052,21 +1052,20 @@ qed.
 lemma conclusion &m : 
   let eps = Pr[EUF_QROM(A,FDH).main() @ &m : res] in
   let k = 54 * (q + 2)^3 in
-  let r = 3 * floor (k%r / eps) in 
+  _r = 3 * floor (k%r / eps) =>
   let rhash = mu1 dhash witness in
   (3 * k)%r * rhash <= eps =>
-  eps ^2 / (6 * k)%r <= Pr[OW(B(A)).main(r) @ &m : res].
+  eps ^2 / (6 * k)%r <= Pr[OW(B(A)).main(_r) @ &m : res].
 proof.
-  move=> eps k r rhash hhe.
-  have h0rhash: 0.0 < rhash.
-  + admit.
+  move=> eps k Hr rhash hhe.
+  have h0rhash: 0.0 < rhash by smt(dhash_fu).
   have gt0_q3 : 1 <= (q + 2) ^ 3 by apply IntOrder.exprn_ege1 => //; smt (gt0_qs ge0_qh).
   have heps : 0%r < eps by smt().
-  have gt0_r : 0 < r. 
+  have gt0_r : 0 < _r. 
   + smt(floor_bound mu_bounded).
-  apply: ler_trans (G3_OW r &m gt0_r).
-  rewrite (G3_SR r &m gt0_r).
-  apply (ler_trans (eps/(3*k)%r * Pr[IND_SR(SR, G2).main(r) @ &m : res])); last first.
+  apply: ler_trans (G3_OW  &m).
+  rewrite (G3_SR &m).
+  apply (ler_trans (eps/(3*k)%r * Pr[IND_SR(SR, G2).main() @ &m : res])); last first.
   + apply ler_wpmul2r; 1: smt(mu_bounded).
     have h0k: 0%r < k%r by smt().
     have hepsk : 0%r <= eps/k%r by smt().
@@ -1074,23 +1073,23 @@ proof.
     by rewrite /= lef_pinv; smt (floor_bound).
   have -> : eps ^ 2 / (6 * k)%r = eps / (3 * k)%r * (eps/2%r) by field => //; smt(). 
   apply ler_wpmul2l; 1: smt().
-  apply (ler_trans (Pr[IND_SR(SRO, G2).main(r) @ &m : res] - (27*(q+2)^3)%r/r%r)); last first.
-  + by have := SRO_SR r &m gt0_r; smt (IntOrder.ler_pexp gt0_qs ge0_qh).
-  apply (ler_trans (eps - (27 * (q + 2) ^ 3)%r / r%r - (27 * (q + 2) ^ 3)%r / r%r));
+  apply (ler_trans (Pr[IND_SR(SRO, G2).main() @ &m : res] - (27*(q+2)^3)%r/_r%r)); last first.
+  + by have := SRO_SR &m; smt (IntOrder.ler_pexp gt0_qs ge0_qh).
+  apply (ler_trans (eps - (27 * (q + 2) ^ 3)%r / _r%r - (27 * (q + 2) ^ 3)%r / _r%r));
     last first.
   + rewrite ler_add2r.
     have := EUF_G1 &m; rewrite -/eps => ->.
     have /= := G1_split &m. rewrite -/rhash.
-    have -> := G1_SRO r &m gt0_r.
-    have /#: (27 * (q + 2) ^ 3)%r * rhash <=  (27 * (q + 2) ^ 3)%r / r%r.
+    have -> := G1_SRO &m.
+    have /#: (27 * (q + 2) ^ 3)%r * rhash <=  (27 * (q + 2) ^ 3)%r / _r%r.
     apply ler_wpmul2l; 1:smt().
     apply (ler_trans (eps / (3*k)%r)). 
     + by apply ler_pdivl_mulr; [ smt() | rewrite mulrC].
     have -> : eps/(3*k)%r = inv((3*k)%r/eps) by smt().
     by rewrite /= lef_pinv; smt (floor_bound).
-  have -> : eps - (27 * (q + 2) ^ 3)%r / r%r - (27 * (q + 2) ^ 3)%r / r%r =
-            eps - k%r/r%r by smt().
-  have /# : k%r / r%r <= eps/2%r.
+  have -> : eps - (27 * (q + 2) ^ 3)%r / _r%r - (27 * (q + 2) ^ 3)%r / _r%r =
+            eps - k%r/_r%r by smt().
+  have /# : k%r / _r%r <= eps/2%r.
   rewrite -/k ler_pdivl_mulr 1:// mulrC mulrA ler_pdivr_mulr 1:/#.
   rewrite (mulrC eps) -ler_pdivr_mulr 1:// -mulrA mulrC -ler_pdivl_mulr 1://. 
   have : 3%r <= k%r / eps.

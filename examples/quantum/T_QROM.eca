@@ -147,6 +147,12 @@ op _r =  Rt.Support.card.
 
 op r2i(r : R) = find (pred1 r) Rt.Support.enum.
 
+lemma r2i_range x : 0 <= r2i x < _r.
+rewrite /r2i;split; first by smt(find_ge0). 
+move => *;have <- := has_find (pred1 x) Support.enum. 
+rewrite has_pred1; apply Support.enumP.
+qed.
+
 module type SR_i = {
   proc init () : unit
   quantum proc h {_:from} : hash    

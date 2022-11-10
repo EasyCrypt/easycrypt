@@ -30,8 +30,6 @@ realize ZR.mulrDl by apply mulrDl.
 realize ZR.mulVr by apply mulVr.
 realize ZR.unitP by apply unitP.
 realize ZR.unitout by apply unitout.
-realize ZR.mulf_eq0 by apply mulf_eq0.
-
 
 (* This is equivalent to e <- BS_m; bit_inj(e) *)
 op sample_e = dvector (duniform [zero; one]).  
