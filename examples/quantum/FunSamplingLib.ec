@@ -360,13 +360,13 @@ proof.
   have /= <- // := dfun_dmap_up (fun _ => dy) xstar{2}; apply dy_ll.
 qed.
 
-(* End Indirect proof *)
 end PointResampling.
 
 (****************   
 Helper theory for proving that the constructed function is a random function 
 ********************)
 abstract theory LambdaReprogram.
+
 
 type X.
 type Y.
@@ -508,36 +508,119 @@ qed.
 
 import StdBigop.Bigreal.BRA Finite.
 
-(* Add to lib ??? 
-
-lemma dadd_weight (d1 d2 : 'a distr) :
-    weight d1 + weight d2 <= 1%r => weight (d1 + d2) = weight d1 + weight d2.
-
-
-*)
-
-lemma needed (df1 df2 :  (X -> Y) distr)  :
-         (forall x, dmap df1 (fun h => h x) =
-                   dmap df2 (fun h => h x)) => df1 = df2.
-admitted.
 (************************** hard equiv **********************)
+
+lemma dy1E y : mu1 dy y = eps_y.
+proof.
+admitted.
+
+lemma foo y1 : 
+  lambda = eps_y =>
+  dlet dbiased (fun b => dmap (dy \ pred1 y1) (fun y2 => if b then y1 else y2)) = dy.
+proof.
+move=> hlambda.
+apply eq_distr => y. 
+rewrite dlet1E /=.
+rewrite (sumE_fin _ [true; false]) //; 1: by case.
+rewrite !big_cons big_nil /predT /=.
+rewrite dmap_id dmap_cst.
++ admit.
+rewrite dexcepted1E !dbiased1E /= hlambda dunitE.
+rewrite !dy1E dy_ll /pred1 (eq_sym y1); case (y = y1) => //= _.
+field; have := yprob_lt1 y; rewrite dy1E /#.
+qed.
+
+import StdBigop.Bigreal.
+lemma djoinmap_dlet (d1 : 'a -> 'b distr) (d2: 'a -> 'b -> 'c distr) xs : 
+djoinmap (fun x => dlet (d1 x) (d2 x)) xs = 
+dlet (djoinmap d1 xs) (fun x1s => djoinmap (fun (p:_*_) => d2 p.`1 p.`2) (zip xs x1s)).
+proof.
+elim: xs.
++ by rewrite !djoin_nil dlet_unit /= djoin_nil.
+move=> x l hrec /=.
+rewrite !djoin_cons dprod_dlet dlet_dmap dprod_dlet !dlet_dlet /= dmap_dlet.
+apply eq_dlet => // b /=.
+rewrite dlet_dunit dlet_dmap dmap_dlet /=.
+have -> : (fun (a : 'b list) =>
+            djoin (d2 x b :: map (fun (p : 'a * 'b) => d2 p.`1 p.`2) (zip l a))) = 
+          (fun (a : 'b list) =>
+            dlet (d2 x b) (fun xy1 => dmap (djoin (map (fun (p : 'a * 'b) => d2 p.`1 p.`2) (zip l a)))
+                             (fun xy2 => xy1::xy2))).
++ by apply fun_ext => lb; rewrite djoin_cons /= dmap_dprodE. 
+rewrite dlet_swap; apply eq_dlet => //= xy1.
+rewrite dmap_dlet hrec dlet_dlet; apply eq_dlet => //= lb.
+by apply eq_dlet => //= xy2; rewrite dmap_dunit.
+qed.
+
+lemma dlet_dfun (d1 : X -> 'u distr) (d2 : X -> 'u -> 'v distr) : 
+  dlet (dfun d1) (fun f1 => dfun (fun (x:X) => d2 x (f1 x))) = 
+  dfun (fun x => dlet (d1 x) (fun x1 => d2 x x1)).
+proof.
+rewrite !dfun_dmap /= dlet_dmap djoinmap_dlet dmap_dlet.
+apply in_eq_dlet => //= l /supp_djoinmap [hsz hall].
+rewrite dfun_dmap; apply eq_dlet => //.
+congr; apply (eq_from_nth witness); 1: by rewrite !size_map size_zip hsz.
+move=> i; rewrite size_map => hi.
+rewrite (nth_map witness) 1:// /=.
+rewrite (nth_map (witness, witness)) 1:size_zip 1:-hsz 1:// /=.
+rewrite (nth_zip witness witness) //= /tofun index_uniq // FinT.enum_uniq.
+qed.
+
+lemma dfun_unit (f : X -> 'u) : dfun (fun x => dunit (f x)) = dunit f. 
+proof.
+apply eq_distr => g; rewrite dunit1E dfun1E /=.
+case (f = g) => [<- | ?].
++ by rewrite BRM.big1 // => x _ /=; rewrite dunit1E.
+have [x hx]: exists x, f x <> g x by smt(). 
+by rewrite (BRM.bigD1 _ _ x) 1:FinT.enumP 1:FinT.enum_uniq /= dunit1E hx.
+qed.
+
+lemma dmap_dfun (d : X -> 'u distr) (F: X -> 'u -> 'v) :  
+  dmap (dfun d) (fun f x => F x (f x)) =
+  dfun (fun x => dmap (d x) (fun fx => F x fx)).
+proof. 
+by rewrite /dmap -dlet_dfun /=; apply eq_dlet => // f; rewrite dfun_unit.
+qed.
+
 lemma equal_distrs _xstar:
-    lambda = eps_y =>
   (dlet dy
         (fun (ystar0 : Y) =>
            dlet dboolf
              (fun (bf0 : X -> bool) =>
                 dmap (dfun (fun (_ : X) => dy \ pred1 ystar0))
-                  (fun (gy0 : X -> Y) (x : X) => 
-                     if ! bf0 x /\ x <> _xstar then gy0 x else ystar0))) =
+                  (fun (gy0 : X -> Y) (x : X) => if ! bf0 x /\ x <> _xstar then gy0 x else ystar0))) =
     (dmap dh (fun (h0 : X -> Y) => h0))).
-
-move => ly.
-rewrite -/idfun dmap_id /dh.
-apply  needed => x. 
-apply eq_distr => y. 
-admitted.
-
+proof.
+  rewrite dmap_id.
+  rewrite /dh /dfhash (dfun_dmap_up _ _xstar).
+  + by apply dy_ll.
+  rewrite dmap_dprodE_swap.
+  apply eq_dlet => // ystar.
+  have -> : (fun (bf0 : X -> bool) =>
+     dmap (dfun (fun (_ : X) => dy \ pred1 ystar))
+       (fun (gy0 : X -> Y) (x : X) =>
+          if ! bf0 x /\ x <> _xstar then gy0 x else ystar)) = 
+    (fun (bf0 : X -> bool) =>
+       dfun (fun x => dmap (dy \ pred1 ystar) (fun fx => if ! bf0 x /\ x <> _xstar then fx else ystar))).
+  + by apply fun_ext => bf; rewrite -dmap_dfun.
+ rewrite /dboolf.
+ rewrite (dlet_dfun _ (fun x b => dmap (dy \ pred1 ystar) (fun (fx : Y) => if !b /\ x <> _xstar then fx else ystar))) /=.
+ rewrite (dmap_dfun _ (fun x' fx => if _xstar = x' then ystar else fx)).
+ congr; apply fun_ext => x /=.
+ rewrite (eq_sym x).
+ case (_xstar = x) => /= [<<- | ?].
+ + rewrite dmap_cst. 
+   + by apply dexcepted_ll;[apply/dy_ll | apply/yprob_lt1].
+   by rewrite dlet_cst ?dbiased_ll dmap_cst ?dy_ll.
+ have -> : 
+    (fun (b : bool) =>
+       dmap (dy \ pred1 ystar) (fun (fx : Y) => if !b then fx else ystar)) = 
+    (fun (b : bool) =>
+       dmap (dy \ pred1 ystar) (fun (fx : Y) => if b then ystar else fx)).
+ + by apply fun_ext => -[].
+ rewrite foo. admit.
+ by rewrite dmap_id.
+qed.
 
 lemma left_right : 
     lambda = eps_y =>
