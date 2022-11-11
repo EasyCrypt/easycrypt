@@ -106,6 +106,9 @@
       (prelude/Logic.ec                as prelude/Logic.ec)
       (prelude/Pervasive.ec            as prelude/Pervasive.ec)
       (prelude/Tactics.ec              as prelude/Tactics.ec)
+      (quantum/T_QROM.eca              as quantum/T_QROM.eca)
+      (quantum/FunSamplingLib.ec       as quantum/FunSamplingLib.ec)
+
       (query_counting/Counter.eca      as query_counting/Counter.eca)
       (query_counting/OracleBounds.ec  as query_counting/OracleBounds.ec)
       (structure/Discrete.ec           as structure/Discrete.ec)
