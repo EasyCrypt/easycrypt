@@ -853,6 +853,18 @@ move => le_; rewrite {1}/(\o) /= -(ler_add2r 1) /=; case: (PCM.big P F r = poly0
 by apply/(ler_trans _ _ _ (degM_le _ _ neqFx0 neq_0)); rewrite -!addrA ler_add2l !addrA addrC /= addrC.
 qed.
 
+lemma lc_prod_proper ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
+     BCM.big P (lc \o F) r <> Coeff.zeror
+  => lc (PCM.big P F r) = BCM.big P (lc \o F) r.
+proof.
+elim: r => [_|x r IHr]; [by rewrite PCM.big_nil BCM.big_nil lc1|].
+rewrite PCM.big_cons BCM.big_cons; case: (P x) => //= Px.
+rewrite {1 3}/(\o) /= => neq_0; rewrite -IHr.
++ by move: neq_0; apply/contra => ->; rewrite mulr0.
+apply/lcM_proper; rewrite IHr //.
+by move: neq_0; apply/contra => ->; rewrite mulr0.
+qed.
+
 end BigPoly.
 
 import BigPoly.
@@ -980,6 +992,22 @@ qed.
 
 lemma pevalZ c p a : peval (c ** p) a = c * peval p a.
 proof. by rewrite scalepE pevalM pevalC. qed.
+
+lemma peval_sum ['a] (P : 'a -> bool) (f : 'a -> poly) (r : 'a list) a :
+  peval (PCA.big P f r) a = BCA.big P (fun x => peval (f x) a) r.
+proof.
+elim: r => [|x r IHr]; [by rewrite PCA.big_nil BCA.big_nil peval0|].
+rewrite PCA.big_cons BCA.big_cons; case: (P x) => // Px.
+by rewrite pevalD IHr.
+qed.
+
+lemma peval_prod ['a] (P : 'a -> bool) (f : 'a -> poly) (r : 'a list) a :
+  peval (PCM.big P f r) a = BCM.big P (fun x => peval (f x) a) r.
+proof.
+elim: r => [|x r IHr]; [by rewrite PCM.big_nil BCM.big_nil peval1|].
+rewrite PCM.big_cons BCM.big_cons; case: (P x) => // Px.
+by rewrite pevalM IHr.
+qed.
 
 (* -------------------------------------------------------------------- *)
 abbrev root p a = peval p a = Coeff.zeror.

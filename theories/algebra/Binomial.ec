@@ -164,6 +164,14 @@ rewrite !mulrA (mulrC _ (_ + 1)) -(mulrA (_ + 1)) -(mulrA _ (_ * _)%Int) eq_ => 
 by rewrite -mulrDl addrAC subrK factS.
 qed.
 
+lemma bin1 (n : int) : 0 < n => bin n 1 = n.
+proof.
+move=> lt0n; move: (eq_bin_div n 1) => /=.
+move/ltzE: (lt0n) => /= -> /=; rewrite fact1 mul1r.
+rewrite -(subrK n 1) factS /= -?ltzS // mulrC => eq_.
+by move: (mulIf (fact (n - 1)) _ _ _ eq_) => //; apply/gtr_eqF/fact_gt0.
+qed.
+
 lemma prime_Ndvd_fact p k :
   prime p =>
   k < p =>
