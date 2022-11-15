@@ -141,10 +141,9 @@ module type Adv (O:OT) = {
   proc main () : int 
 }.
 
-lemma test (A<:Adv) &m : 
+lemma test (A<:Adv {-M} ) &m : 
    Pr[A(M).main () @ &m : res = 100 /\ !M.bad] = Pr[A(M').main () @ &m : res = 100 /\ !M.bad].
 proof. byupto. qed.
-
 
 (* ------------------------------------------- *)
 

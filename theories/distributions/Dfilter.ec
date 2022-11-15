@@ -1,6 +1,10 @@
 require import AllCore Distr FSet StdRing StdOrder StdBigop.
 (*---*) import RField RealOrder Bigreal BRA.
 
+(******* THIS THEORY IS DEPRECATED *****************)
+(** Instead of dfilter, please use Distr.drestrict *)
+(***************************************************)
+
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)

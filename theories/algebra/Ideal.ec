@@ -280,7 +280,14 @@ qed.
 
 lemma in_idgen_mem xs x : x \in xs => idgen xs x.
 proof.
-admitted.
+move => x_xs; pose n := index x xs; pose cs := rcons (nseq n zeror) oner. 
+have get_cs : forall i, cs.[i] = if i = n then oner else zeror. 
+- by move => i; rewrite nth_rcons size_nseq !ler_maxr ?index_ge0 nth_nseq_if /#.
+exists cs; rewrite (BAdd.bigD1 _ _ n) ?BAdd.big1 ?range_uniq /=.
+- by rewrite mem_range index_ge0 index_mem.
+- by move => i Hi; rewrite get_cs ifF // mul0r.
+- by rewrite get_cs /= mul1r addr0 nth_index.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma dvdrr x : x %| x.
@@ -398,8 +405,12 @@ proof. by rewrite /eqv -mulrBr &(idealMl) ideal_p. qed.
 lemma eqvMr x1 x2 y : eqv x1 x2 => eqv (x1 * y) (x2 * y).
 proof. by rewrite !(mulrC _ y) &(eqvMl). qed.
 
-lemma eqvX x y n : eqv x y => eqv (exp x n) (exp y n).
-proof. admitted.
+lemma eqvX x y n : 0 <= n => eqv x y => eqv (exp x n) (exp y n).
+proof. 
+move => ge0_n eqv_x_y.
+elim: n ge0_n => [|n ge0_n IHn]; rewrite ?expr0 ?exprSr //.
+by apply (eqv_trans (exp x n * y)); [exact eqvMl|exact eqvMr].
+qed.
 
 (* -------------------------------------------------------------------- *)
 clone include Quotient.EquivQuotient

@@ -331,26 +331,30 @@ end) = struct
         for_function_body env ~norm f1.f_def f2.f_def
 
   (* ------------------------------------------------------------------ *)
-  let rec for_module_expr env ~norm me1 me2 =
+  let rec for_module_expr env ~norm ~body me1 me2 =
     me1.me_name = me2.me_name &&
       for_module_sig_body env me1.me_sig_body me2.me_sig_body &&
     let s = add_modules me2.me_params me1.me_params in
     let comps1 = me1.me_comps in
     let comps2 = EcSubst.subst_module_comps s me2.me_comps in
-    let body1 = me1.me_body in
-    let body2 = EcSubst.subst_module_body s me2.me_body in
-    for_module_comps env ~norm comps1 comps2 &&
-    for_module_body env ~norm body1 body2
+
+    if not (for_module_comps env ~norm ~body comps1 comps2) then
+      false
+    else if body then
+      let body1 = me1.me_body in
+      let body2 = EcSubst.subst_module_body s me2.me_body in
+      for_module_body env ~norm ~body body1 body2
+    else true
 
   (* ------------------------------------------------------------------ *)
-  and for_module_comps env ~norm mc1 mc2 =
-    List.for_all2 (for_module_item env ~norm) mc1 mc2
+  and for_module_comps env ~norm ~body mc1 mc2 =
+    List.for_all2 (for_module_item env ~norm ~body) mc1 mc2
 
   (* ------------------------------------------------------------------ *)
-  and for_module_item env ~norm i1 i2 =
+  and for_module_item env ~norm ~body i1 i2 =
     match i1, i2 with
     | MI_Module me1, MI_Module me2 ->
-      for_module_expr env ~norm me1 me2
+      for_module_expr env ~norm ~body me1 me2
 
     | MI_Variable v1, MI_Variable v2 ->
       for_variable env v1 v2
@@ -361,13 +365,13 @@ end) = struct
     | _, _ -> false
 
   (* ------------------------------------------------------------------ *)
-  and for_module_body env ~norm mb1 mb2 =
+  and for_module_body env ~norm ~body mb1 mb2 =
     match mb1, mb2 with
-    | ME_Alias(i1,mp1), ME_Alias(i2,mp2) ->
+    | ME_Alias(i1, mp1), ME_Alias(i2, mp2) ->
       i1 = i2 && for_mp env ~norm mp1 mp2
 
     | ME_Structure {ms_body = mc1}, ME_Structure {ms_body = mc2} ->
-      for_module_comps env ~norm mc1 mc2
+      for_module_comps env ~norm ~body mc1 mc2
 
     | ME_Decl _, _ | _, ME_Decl _ -> assert false
     | _, _ -> false
@@ -2183,5 +2187,5 @@ module EqTest = struct
   let for_expr  = fun env ?(alpha = Mid.empty) ?(norm = true) -> for_expr  env alpha ~norm
 
   let for_msig  = fun env ?(norm = true) -> for_module_sig  env ~norm
-  let for_mexpr = fun env ?(norm = true) -> for_module_expr env ~norm
+  let for_mexpr = fun env ?(norm = true) ?(body = true) -> for_module_expr env ~norm ~body
 end
