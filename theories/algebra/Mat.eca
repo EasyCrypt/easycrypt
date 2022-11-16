@@ -158,32 +158,18 @@ lemma get_mapv f (v : vector) i :
 proof. by move => ?; rewrite get_offunv. qed.
 
 (* Vector addition *)
-op (+) (v1 v2 : vector) = if size v1 = size v2 then 
-  offunv ((fun i => v1.[i] + v2.[i]), size v1) else emptyv.
+op (+) (v1 v2 : vector) = 
+  offunv ((fun i => v1.[i] + v2.[i]), max (size v1) (size v2)).
 
-lemma size_addv v1 v2: size (v1 + v2) = 
-  if size v1 = size v2 then size v1 else 0.
-proof. rewrite /(+). by case (size v1 = size v2). qed.
+lemma size_addv v1 v2: size (v1 + v2) = max (size v1) (size v2).
+proof. rewrite /(+) size_offunv /#. qed.
 
-lemma size_addv_neq v1 v2: size v1 <> size v2 => v1 + v2 = emptyv. 
-proof. by rewrite /(+) => ->. qed.
-
-lemma get_addv (v1 v2 : vector) i :
-  size v1 = size v2 => (v1 + v2).[i] = v1.[i] + v2.[i].
+lemma get_addv (v1 v2 : vector) i: (v1 + v2).[i] = v1.[i] + v2.[i].
 proof.
-case (0 <= i < size v2) => bound size_eq. 
-- by rewrite /(+) size_eq /= get_offunv.
-- by rewrite !getv0E ?size_addv ?size_eq //= addr0.
+case (0 <= i < max (size v1) (size v2)) => bound. 
+- by rewrite /(+) /= get_offunv.
+- rewrite !getv0E ?size_addv ?size_eq 4:addr0 /#.
 qed.
-
-(* Addition for some special vectors *)
-lemma addv_emptyl v: emptyv + v = emptyv.
-proof. apply emptyv_unique; smt(size_emptyv size_addv). qed.
-
-lemma addv_emptyr v: v + emptyv = emptyv.
-proof. apply emptyv_unique; smt(size_emptyv size_addv). qed.
-
-hint simplify addv_emptyl, addv_emptyr.
 
 (* Additive inverse of vector *)
 op [-] (v: vector) = offunv ((fun i => -v.[i]), size v).
@@ -209,27 +195,18 @@ hint simplify oppv_zerov, oppv_emptyv.
 (* Module-like properties of vectors *)
 lemma addvA: associative Vectors.(+).
 proof.
-move => v1 v2 v3; case (size v1 = size v2) => size_eq1.
-- case (size v2 = size v3) => size_eq2.
-  + apply eq_vectorP => /=. 
-    rewrite !size_addv size_eq1 size_eq2 /= => i bound.
-    rewrite !get_addv /= ?size_addv ?size_eq1 ?size_eq2 //.
-    apply addrA.
-  + rewrite (size_addv_neq _ v3) //= eq_sym.
-    apply emptyv_unique.
-    by rewrite 2!size_addv size_eq1 size_eq2.
-- rewrite (size_addv_neq v1 v2) //=.
-  apply emptyv_unique.
-  rewrite 2!size_addv.
-  case (size v2 = size v3) => /#. 
+move => v1 v2 v3; apply eq_vectorP.
+rewrite !size_addv.
+split => [/# | i _].
+by rewrite !get_addv addrA.
 qed.
 
 lemma addvC: commutative Vectors.(+).
 proof.
-move => v1 v2; case (size v1 = size v2) => size_eq; last first.
-- by rewrite !size_addv_neq /#. 
-apply eq_vectorP; rewrite !size_addv ?size_eq /= => i bound.
-by rewrite !get_addv 1,2:/# addrC.
+move => v1 v2; apply eq_vectorP.
+rewrite !size_addv.
+split => [/# | i _].
+by rewrite !get_addv addrC.
 qed.
 
 lemma add0v v: zerov (size v) + v = v.
@@ -256,9 +233,10 @@ hint simplify addv0.
 
 lemma oppvD (v1 v2: vector): -(v1 + v2) = -v1 + -v2.
 proof.
-case (size v1 = size v2) => size_eq; last by rewrite !size_addv_neq.
-rewrite eq_vectorP; rewrite !(size_oppv, size_addv) size_eq /= => i bound.
-by rewrite !(get_negv,get_addv) // opprD.
+apply eq_vectorP.
+split => [| i _].
+- by rewrite /= 2!size_addv /=.
+by rewrite /= 2!get_addv opprD.
 qed.
 
 lemma oppvK (v: vector): - (- v) = v.
@@ -274,32 +252,23 @@ lemma sub_eqv (x y z : vector) :
 proof. smt(addvA addvC addvN addv0). qed.
 
 (* Inner product *)
-op dotp (v1 v2 : vector) = if size v1 = size v2 then 
-  bigi predT (fun i => v1.[i] * v2.[i]) 0 (size v1) else zeror.
+op dotp (v1 v2 : vector) =
+  bigi predT (fun i => v1.[i] * v2.[i]) 0 (max (size v1) (size v2)).
 
-lemma dotp_size_diff (v1 v2: vector): size v1 <> size v2 =>
-    dotp v1 v2 = zeror.
-proof. by rewrite /dotp => ->. qed.
-
-lemma dotpE v1 v2: dotp v1 v2 = if size v1 = size v2 then 
-  bigi predT (fun i => v1.[i] * v2.[i]) 0 (size v1) else zeror by done.
+lemma dotpE v1 v2: dotp v1 v2 = 
+  bigi predT (fun i => v1.[i] * v2.[i]) 0 (max (size v1) (size v2)) by done.
 
 lemma dotpC : commutative dotp.
-proof.
-move => v1 v2. 
-case (size v1 = size v2) => [size_eq | size_neq].
-- rewrite 2!dotpE size_eq /=. 
-  apply eq_bigr => /= i _. 
-  by rewrite mulrC.
-- by rewrite 2!dotpE size_neq //= (eq_sym (size v2)) size_neq. 
+proof. 
+move => v1 v2; rewrite 2!dotpE maxrC. 
+apply eq_bigr => i _ /=.
+by rewrite mulrC.
 qed.
 
 lemma dotpNv v1 v2: dotp (-v1) v2 = - dotp v1 v2.
 proof.
-rewrite 2!dotpE /=.
-case (size v1 = size v2) => _; last by rewrite oppr0.
-rewrite sumrN.
-apply eq_bigr => /= i _.
+rewrite 2!dotpE /= sumrN.
+apply eq_bigr => i _ /=.
 by rewrite mulNr.
 qed.
 
@@ -307,29 +276,30 @@ lemma dotpvN v1 v2: dotp v1 (-v2) = - dotp v1 v2 by rewrite dotpC dotpNv dotpC.
 
 hint simplify dotpNv, dotpvN.
 
-lemma dotpDr v1 v2 v3 : size v2 = size v3 => 
-  dotp v1 (v2 + v3) = dotp v1 v2 + dotp v1 v3.
+lemma dotpDr v1 v2 v3: dotp v1 (v2 + v3) = dotp v1 v2 + dotp v1 v3.
 proof.
-move => size_eq1; rewrite 3!dotpE.
-case (size v1 = size v2) => size_eq2.
-- rewrite size_addv size_eq2 size_eq1 /= -big_split /=. 
-  apply eq_bigr => /= i _.  
-  by rewrite get_addv // mulrDr.
-- by rewrite size_addv -size_eq1 /= size_eq2 /= addr0.
+rewrite 3!dotpE.
+have ->: (fun (i : int) => v1.[i] * (v2 + v3).[i]) =
+      (fun (i : int) => v1.[i] * v2.[i] + v1.[i] * v3.[i]).
+- apply fun_ext => i /=.
+  by rewrite get_addv mulrDr.
+rewrite -sumrD size_addv (big_cat_int (max (size v1) (size v2))) 1,2:/# -addrA.
+congr.
+rewrite big1_seq => [i [_ /mem_range] bound /=|].
+- by rewrite getv0E 1:/# mul0r.
+rewrite add0r (big_cat_int (max (size v1) (size v3))) 1,2:/#.
+rewrite [bigi _ _ _ (max _ (max _ _))]big1_seq => [i [_ /mem_range] bound /=|].
+- by rewrite getv0E 1:/# mul0r.
+by rewrite addr0.
 qed.
 
-lemma dotpDl v1 v2 v3 : size v1 = size v2 => 
-  dotp (v1 + v2) v3 = dotp v1 v3 + dotp v2 v3.
-proof. move => size_eq; by rewrite dotpC (dotpC v1) (dotpC v2) dotpDr. qed.
+lemma dotpDl v1 v2 v3: dotp (v1 + v2) v3 = dotp v1 v3 + dotp v2 v3.
+proof. by rewrite dotpC (dotpC v1) (dotpC v2) dotpDr. qed.
 
 lemma dotp0v v n: dotp (zerov n) v = zeror.
 proof.
-case (size (zerov n) = size v) => size_eq; last by rewrite dotpE size_eq.
-rewrite dotpE size_eq /=.
-have ->: (fun (i : int) => zeror * v.[i]) = fun (_: int) => zeror.
-- apply fun_ext => i. 
-  apply mul0r.
-apply big1_eq.
+rewrite dotpE big1 // => i _ /=.
+by rewrite mul0r.
 qed.
 
 hint simplify dotp0v.
@@ -379,24 +349,35 @@ move => v1 v2 v3. rewrite eq_vectorP !size_catv addrA /= => i bound.
 by rewrite !get_catv' size_catv opprD !addrA.
 qed.
 
-lemma dotp_catv v1 v2 v3 v4: size v1 = size v3 => size v2 = size v4 =>
+lemma dotp_catv v1 v2 v3 v4: size v1 = size v3 =>
   dotp (v1 || v2) (v3 || v4) = (dotp v1 v3) + (dotp v2 v4).
 proof.
-move => size_eq1 size_eq2; rewrite /dotp !size_catv size_eq1 size_eq2 /=.
+move => size_eq; rewrite !dotpE !size_catv size_eq /=.
 rewrite (range_cat (size v3)) 1:/# 1:/# big_cat; congr.
 - by apply eq_big_seq => i /mem_range ? /=; smt(get_catv_l).
-rewrite (big_addn 0 (size v3 + size v4) (size v3)) addzAC /=.
-apply eq_big_seq => i /mem_range bound /=; smt(get_catv_r).
+have ->:max (size v3 + size v2) (size v3 + size v4) =
+  size v3 + max (size v2) (size v4) by smt().
+search (bigi _ _ _ _).
+have {1}->: size v3 = 0 + size v3 by smt().
+rewrite big_addn.
+rewrite addrC addrA [_ + size v3]Ring.IntID.addrC subrr.
+apply eq_big_seq => i /mem_range [l_bound u_bound] /=.
+by rewrite !get_catv size_eq gtr_addr ler_gtF //= -addrA subrr.
 qed.
 
 lemma addv_catv (v1 v2 v3 v4: vector): 
-  size v1 = size v3 => size v2 = size v4 =>
+  size v1 = size v3 =>
   (v1 || v2) + (v3 || v4) = ((v1 + v3) || (v2 + v4)).
 proof.
-move => size_eq1 size_eq2; apply eq_vectorP. 
-rewrite !(size_addv,size_catv) size_eq1 size_eq2 /= => i bound.
-rewrite !get_addv ?size_catv 1:/#. 
-by rewrite !get_catv ?size_addv ?size_eq1 /= !get_addv // /#.
+move => size_eq; apply eq_vectorP.
+rewrite size_addv 3!size_catv 2!size_addv. 
+split => [/# | i bound].
+rewrite get_addv 3!get_catv' 2!get_addv size_addv size_eq /max /=.
+rewrite 2!addrA. 
+congr.
+rewrite -2!addrA. 
+congr.
+by rewrite addrC.
 qed.
 
 lemma oppv_catv (v1 v2: vector): - (v1 || v2) = (-v1 || -v2).
@@ -404,6 +385,7 @@ proof. by apply eq_vectorP => i bound /=; rewrite !get_catv' opprD. qed.
 
 (* Splitting apart vectors *)
 op subv (v: vector) (n m: int) = offunv ((fun i => v.[i+n]), m - n).
+
 lemma size_subv (v: vector) (n m: int): size (subv v n m) = max 0 (m - n).
 proof. by done. qed.
 
@@ -496,7 +478,6 @@ lemma dotp_scalarv (v1 v2: vector) (s1 s2: t):
     (dotp v1 v2) * (s1 * s2) = dotp (s1 ** v1) (s2 ** v2).
 proof.
 rewrite 2!dotpE 2!size_scalarv.
-case (size v1 = size v2) => size_eq; last apply mul0r.
 rewrite mulr_suml. 
 apply eq_bigr => i _ /=.
 rewrite 2!get_scalarv.
@@ -859,64 +840,27 @@ lemma get_mapm f (v : vector) i :
 proof. by move => bound; rewrite get_offunv. qed.
 
 (* Matrix addition *)
-op (+) (m1 m2 : matrix) = if size m1 = size m2 then 
-  offunm (fun i j => m1.[i, j] + m2.[i, j], rows m1, cols m1) else emptym.
+op (+) (m1 m2 : matrix) =
+  offunm (fun i j => m1.[i, j] + m2.[i, j], 
+         max (rows m1) (rows m2), 
+         max (cols m1) (cols m2)).
 
-lemma size_addm_diff (m1 m2: matrix): size m1 <> size m2 => m1 + m2 = emptym.
-proof. by smt(). qed.
+lemma rows_addm (m1 m2: matrix): rows (m1 + m2) = max (rows m1) (rows m2).
+proof. rewrite /(+) rows_offunm /#. qed.
 
-lemma rows_addm (m1 m2: matrix): size m1 = size m2 => rows (m1 + m2) = rows m1.
-proof. by rewrite /(+) => ->. qed.
-
-lemma cols_addm (m1 m2: matrix): size m1 = size m2 => cols (m1 + m2) = cols m1.
-proof. by rewrite /(+) => ->. qed.
+lemma cols_addm (m1 m2: matrix): cols (m1 + m2) = max (cols m1) (cols m2).
+proof. rewrite /(+) cols_offunm /#. qed.
 
 lemma size_addm (m1 m2: matrix): size m1 = size m2 => size (m1 + m2) = size m1.
-proof. move => size_eq; by rewrite 1:rows_addm 2:cols_addm. qed.
+proof. move => size_eq; rewrite rows_addm cols_addm /#. qed.
 
-lemma add_emptyR (m: matrix): m + emptym = emptym.
-proof. 
-case (size m = size emptym) => size_eq; last by rewrite size_addm_diff.
-apply emptym_unique.
-by rewrite size_addm. 
-qed.
-
-lemma add_emptyL (m: matrix): emptym + m = emptym.
+lemma get_addm (m1 m2 : matrix) i j: (m1 + m2).[i, j] = m1.[i, j] + m2.[i, j].
 proof.
-case (size m = size emptym) => size_eq. 
-- apply emptym_unique.
-  by rewrite size_addm eq_sym.
-- apply size_addm_diff.
-  by rewrite eq_sym.
-qed.
-
-hint simplify add_emptyR, add_emptyL.
-
-lemma add_mrangeR (m1 m2: matrix) i j: mrange (m1 + m2) i j => mrange m2 i j.
-proof.
-case (size m1 = size m2) => size_eq; last rewrite size_addm_diff /#.
-rewrite rows_addm // cols_addm /#.
-qed.
-
-lemma add_mrangeL (m2 m1: matrix) i j: mrange (m1 + m2) i j => mrange m1 i j.
-proof.
-case (size m1 = size m2) => size_eq; last rewrite size_addm_diff /#.
-rewrite rows_addm // cols_addm /#.
-qed.
-
-lemma mrange_addm_size_eq i j (m1 m2: matrix): 
-  mrange (m1 + m2) i j => size m1 = size m2.
-proof. case (size m1 = size m2) => [// | sz_nq]. rewrite size_addm_diff /#. qed.
-
-lemma get_addm (m1 m2 : matrix) i j : size m1 = size m2 =>
-  (m1 + m2).[i, j] = m1.[i, j] + m2.[i, j].
-proof.
-move => [rows_eq cols_eq]; case: (mrange m1 i j) => rg_i. 
-- by rewrite /(+) -rows_eq -cols_eq /= get_offunm.
+case: (mrange (m1 + m2) i j) => rg_i. 
+- rewrite /(+) /= get_offunm 2:/#; 1:smt(rows_addm cols_addm).
 - rewrite !getm0E; first 3 smt(rows_addm cols_addm). 
   by rewrite addr0.
 qed.
-
 
 (* Matrix additive inverse *)
 op [-] (m: matrix) = offunm (fun i j => -m.[i, j], rows m, cols m).
@@ -946,27 +890,17 @@ lemma addmA: associative Matrices.( + ).
 proof. 
 move => m1 m2 m3; apply eq_matrixP.
 split => [| i j bound].
-- case (size m1 = size m2); last smt(size_addm add_emptyR size_addm_diff).
-  case (size m2 = size m3); smt(size_addm add_emptyR size_addm_diff).
-have size_eq0: size m2 = size m3.
-- apply add_mrangeR in bound. 
-  by apply mrange_addm_size_eq in bound.
-have size_eq2: size m1 = size m2.
-- apply mrange_addm_size_eq in bound.
-  rewrite bound.
-  by apply size_addm.
-rewrite !get_addm; first 4 smt(size_addm).
-apply addrA.
+- rewrite !(rows_addm, cols_addm) 1:/#.
+by rewrite !get_addm addrA.
 qed.
 
 lemma addmC: commutative Matrices.( + ).
 proof.
 move => m1 m2.
 apply eq_matrixP. 
-case (size m1 = size m2) => size_eq; last smt(size_addm_diff).
-split => [| i j]; 1: smt(size_addm).
-rewrite rows_addm 1:// cols_addm 1://.
-by move => bound; rewrite get_addm 1:// get_addm 1:eq_sym 2:addrC.
+rewrite !rows_addm !cols_addm.
+split => [/# | i j _].
+by rewrite 2!get_addm addrC.
 qed.
 
 lemma add0m m: zerom (rows m) (cols m) + m = m.
@@ -1001,14 +935,9 @@ proof. by rewrite addmC addmN. qed.
 
 lemma oppmD (m1 m2: matrix): -(m1 + m2) = -m1 + -m2.
 proof.
-case (size m1 = size m2) => eq_size; last by rewrite !size_addm_diff.
 rewrite eq_matrixP; split => [| i j bound].
-- rewrite size_neg size_addm 1:// rows_addm; 1: by rewrite size_neg eq_size.
-  rewrite cols_addm; 1: by rewrite size_neg eq_size.
-  by rewrite rows_neg cols_neg.
-- rewrite getmN get_addm 1:eq_size 1://.
-  rewrite get_addm; 1: by rewrite 2!size_neg eq_size.
-  by rewrite opprD.
+- by rewrite /= 2!rows_addm 2!cols_addm.
+- by rewrite /= 2!get_addm opprD.
 qed.
 
 lemma oppmK (m: matrix): - (- m) = m.
@@ -1053,13 +982,9 @@ lemma trmx_inj: injective trmx by apply inv_inj; apply trmxK.
 
 lemma trmxD (m1 m2 : matrix) : trmx (m1 + m2) = trmx m1 + trmx m2.
 proof.
-case (size m1 = size m2) => size_eq.
-- apply eq_matrixP. 
-  split => [/= | i j bound]; 1: smt(rows_addm cols_addm cols_tr rows_tr).
-  rewrite trmxE !get_addm /#. 
-- rewrite size_addm_diff // eq_sym. 
-  apply emptym_unique.
-  rewrite size_addm_diff /#.
+apply eq_matrixP. 
+split => [/= | i j bound]; 1: smt(rows_addm cols_addm cols_tr rows_tr).
+rewrite trmxE !get_addm /#. 
 qed.
 
 hint simplify trmxD.
@@ -1103,13 +1028,11 @@ proof. move => n_bound; rewrite eq_vectorP => j bd /=. rewrite getm0E /#. qed.
 
 lemma rowN m i: - (row m i) = row (-m) i by rewrite eq_vectorP.
 
-lemma rowD m1 m2 n: size m1 = size m2 => 
-  (row (m1 + m2) n) = row m1 n + row m2 n.
+lemma rowD m1 m2 n: (row (m1 + m2) n) = row m1 n + row m2 n.
 proof. 
-move => size_eq; rewrite eq_vectorP /=. 
-rewrite cols_addm 1:// size_addv /=.
-have ->: cols m1 = cols m2 by elim size_eq.
-move => i bound; rewrite get_addm // get_addv /#.
+apply eq_vectorP.
+rewrite size_row cols_addm size_addv 2!size_row /= => i _.
+by rewrite get_addv get_addm /=.
 qed.
 
 lemma row_matrixc m n c i: 0 <= i < m => row (matrixc m n c) i = vectc n c.
@@ -1144,12 +1067,8 @@ rewrite rows_tr.
 by apply row0E.
 qed.
 
-lemma colD m1 m2 i: size m1 = size m2 => 
-  (col (m1 + m2) i) = col m1 i + col m2 i.
-proof. 
-rewrite -(trmxK (m1 + m2)) -{4}(trmxK m1) -{4}(trmxK m2) => bound.
-rewrite !col_trmx trmxD rowD /#.
-qed.
+lemma colD m1 m2 i: (col (m1 + m2) i) = col m1 i + col m2 i.
+proof. smt(trmxK col_trmx trmxD rowD). qed.
 
 lemma colN (m : matrix) i : - (col m i) = col (-m) i by rewrite eq_vectorP.
 
@@ -1160,96 +1079,90 @@ by apply row_matrixc.
 qed.
 
 (* Matrix multiplication *)
-op ( * ) (m1 m2 : matrix) = if cols m1 = rows m2 then
-  offunm (fun i j => dotp (row m1 i) (col m2 j), rows m1, cols m2) else 
-  emptym.
+op ( * ) (m1 m2 : matrix) =
+  offunm (fun i j => dotp (row m1 i) (col m2 j), rows m1, cols m2).
 
-lemma rows_mulmx m1 m2: cols m1 = rows m2 => rows (m1 * m2) = rows m1.
-proof. move => cols_eq; by rewrite /( * ) cols_eq. qed.
+lemma rows_mulmx m1 m2: rows (m1 * m2) = rows m1 by done.
 
-lemma cols_mulmx m1 m2: cols m1 = rows m2 => cols (m1 * m2) = cols m2.
-proof. move => cols_eq; by rewrite /( * ) cols_eq. qed.
+lemma cols_mulmx m1 m2: cols (m1 * m2) = cols m2 by done.
 
-lemma size_mulmx m1 m2: cols m1 = rows m2 => 
-  size (m1 * m2) = (rows m1, cols m2).
-proof. move => cols_eq; by rewrite rows_mulmx // cols_mulmx. qed.
+hint simplify rows_mulmx, cols_mulmx.
 
-lemma size_mulmx_diff m1 m2: cols m1 <> rows m2 => m1 * m2 = emptym.
-proof. by rewrite /( * ) /#. qed.
+lemma size_mulmx m1 m2: size (m1 * m2) = (rows m1, cols m2) by done.
 
 lemma get_mulmx m1 m2 i j: (m1 * m2).[i,j] = dotp (row m1 i) (col m2 j).
 proof.
-case (cols m1 = rows m2) => cols_eq.
-- case (mrange (m1 * m2) i j) => /=.
-  + rewrite rows_mulmx 1:// cols_mulmx 1:// => bound. 
-    by rewrite /( * ) cols_eq /= get_offunm.
-  + move => bound.
-    rewrite getm0E 1://.
-    rewrite andaE negb_and rows_mulmx 1:// cols_mulmx 1:// in bound.
-    elim bound => boundN.
-    * suff: row m1 i = zerov (cols m1) by move => ->. 
-      rewrite row0E /#.
-    * suff: col m2 j = zerov (rows m2) by move => ->. 
-      rewrite col0E /#.
-- rewrite getm0E 1:size_mulmx_diff 3:dotpE /#.
+case (mrange (m1 * m2) i j) => /= [bound | /negb_and bound].
+- by rewrite /( * ) /= get_offunm.
+rewrite getm0E 1:/#.
+elim bound => boundN.
+- suff: row m1 i = zerov (cols m1) by move => ->. 
+  rewrite row0E /#.
+- suff: col m2 j = zerov (rows m2) by move => ->. 
+  rewrite col0E /#.
 qed.
 
 lemma mulmx_emptym: emptym * emptym = emptym by apply/emptym_unique/size_mulmx.
 
 hint simplify mulmx_emptym.
 
-lemma trmxM (m1 m2 : matrix) : trmx (m1 * m2) = trmx m2 * trmx m1.
+lemma trmxM (m1 m2 : matrix): trmx (m1 * m2) = trmx m2 * trmx m1.
 proof.
-case (cols m1 = rows m2) => cols_eq; last by rewrite !size_mulmx_diff /#.
 apply eq_matrixP.
-rewrite size_mulmx /= 1:/# cols_mulmx 1:// rows_mulmx 1:// /= => i j bound.
+rewrite size_mulmx /= => i j bound.
 by rewrite !get_mulmx dotpC.
 qed.
 
 hint simplify trmxM.
 
-lemma mulmxDl (m1 m2 m : matrix) :
-  size m1 = size m2 => (m1 + m2) * m = (m1 * m) + (m2 * m).
+lemma mulmxDl (m1 m2 m : matrix): (m1 + m2) * m = (m1 * m) + (m2 * m).
 proof.
-case (cols m1 = rows m) => cols_eq => size_eq_add.
-- apply eq_matrixP. 
-  split => [| i j bound]; 1: smt(cols_addm rows_addm size_mulmx).
-  rewrite get_addm /=; 1: smt(cols_addm rows_addm cols_mulmx rows_mulmx).
-  rewrite 3!get_mulmx rowD 1:// dotpDl /#.
-- rewrite !size_mulmx_diff; smt(cols_addm rows_addm cols_mulmx rows_mulmx).
+apply eq_matrixP. 
+split => [| i j bound]; 1: smt(cols_addm rows_addm rows_mulmx cols_mulmx).
+by rewrite get_addm 3!get_mulmx rowD dotpDl.
 qed.
 
-lemma mulmxDr (m1 m2 m : matrix) :
-  size m1 = size m2 => m * (m1 + m2) = (m * m1) + (m * m2).
-proof. move => bound; apply trmx_inj => /=. apply mulmxDl => /#. qed.
+lemma mulmxDr (m1 m2 m : matrix): m * (m1 + m2) = (m * m1) + (m * m2).
+proof. apply trmx_inj => /=. apply mulmxDl => /#. qed.
 
-lemma mulmxA m1 m2 m3: cols m1 = rows m2 => cols m2 = rows m3 => 
-  m1 * (m2 * m3) = m1 * m2 * m3.
+lemma mulmxA m1 m2 m3: m1 * (m2 * m3) = m1 * m2 * m3.
 proof.
-move => cols_eq0 cols_eq1; apply eq_matrixP. 
+apply eq_matrixP. 
 split => [| i j bound]; 1: smt(rows_mulmx cols_mulmx).
 rewrite !get_mulmx !dotpE /=.
-have -> /=: cols m1 = rows (m2 * m3) by smt(rows_mulmx cols_mulmx).
-have -> /=: cols (m1 * m2) = rows m3 by smt(rows_mulmx cols_mulmx).
 have ->: (fun (i0 : int) => m1.[i, i0] * (m2 * m3).[i0, j]) = 
          (fun (i0 : int) => bigi predT (fun (j0 : int) => 
               m1.[i, i0] * (m2.[i0,j0] * m3.[j0,j])) 0 (rows m3)).
 - apply fun_ext => /= k.
-  rewrite get_mulmx /dotp /= cols_eq1 /= mulr_sumr.
+  rewrite get_mulmx /dotp /= mulr_sumr (big_cat_int (rows m3)) 1,2:/#.
+  rewrite [bigi _ _ (rows m3) _]big1_seq /= => [l [_ /mem_range bound2]|].
+  + by rewrite [_ m3 _]getm0E 1:/# 2!mulr0.
+  rewrite addr0. 
   by apply eq_bigr.
 have ->: (fun (i0 : int) => (m1 * m2).[i,i0] * m3.[i0,j]) = 
          (fun (i0 : int) => bigi predT 
           (fun (j0 : int) => m1.[i,j0] * (m2.[j0,i0] * m3.[i0,j])) 0 (rows m2)).
 - apply fun_ext => /= k.
-  rewrite get_mulmx /dotp /= cols_eq0 /= mulr_suml.
-  apply eq_bigr => l /= _.
+  rewrite get_mulmx /dotp /= mulr_suml (big_cat_int (rows m2)) 1,2:/#.
+  rewrite [bigi _ _ (rows m2) _]big1_seq /= => [l [_ /mem_range bound2]|].
+  + by rewrite [_ m2 _]getm0E 1:/# mulr0 mul0r.
+  rewrite addr0. 
+  apply eq_bigr => l _ /=.
   by rewrite mulrA.
-- by rewrite exchange_big rows_mulmx.
+- rewrite (big_cat_int (rows m2)) 1,2:/#.
+  rewrite [bigi _ _ (rows m2) _]big1_seq /= => [k [_ /mem_range bound2]|].
+  + rewrite big1 => [l _/= | //]. 
+    by rewrite [_ m2 _]getm0E 1:/# mul0r mulr0.
+  rewrite [bigi _ _ _ (max (cols m2) _)](big_cat_int (rows m3)) 1,2:/#.
+  rewrite [bigi _ _ (rows m3) _]big1_seq /= => [k [_ /mem_range bound2]|].
+  + rewrite big1 => [l _/= | //]. 
+    by rewrite [_ m3 _]getm0E 1:/# 2!mulr0.
+  by rewrite 2!addr0 exchange_big.
 qed.
 
 lemma mulmxm0 n m: m * zerom (cols m) n = zerom (rows m) n.
 proof.
-rewrite eq_matrixP /= rows_mulmx 1:// cols_mulmx 1:// => i j /= bound.
+rewrite eq_matrixP /= => i j /= bound.
 by rewrite get_mulmx /= col_matrixc 1:/# dotpv0.
 qed.
 
@@ -1260,7 +1173,6 @@ lemma mulmx1 m: m * onem (cols m) = m.
 proof.
 apply eq_matrixP. 
 rewrite size_mulmx 1:// /= => i j bound.
-rewrite rows_mulmx // cols_mulmx //= in bound.
 rewrite get_mulmx dotpE (bigD1 _ _ j) 1:mem_range 1:/# 1:range_uniq.
 rewrite big1 /= => [k |]; last by rewrite get_vectc 1:/# mulr1 addr0.
 rewrite /predC1 => -> /=. 
@@ -1300,12 +1212,10 @@ case (i = 0) => [->//| i_neq0].
 rewrite !getm0E /#.
 qed.
 
-lemma rowmxD (v1 v2: vector): size v1 = size v2 => 
-    rowmx (v1 + v2) = rowmx v1 + rowmx v2.
+lemma rowmxD (v1 v2: vector): rowmx (v1 + v2) = rowmx v1 + rowmx v2.
 proof.
-move => size_eq.
 rewrite -(rowmx_row (rowmx (v1 + v2))) 1://. 
-by rewrite -(rowmx_row (rowmx v1 + rowmx v2)) 1:rows_addm 3:rowD.
+by rewrite -(rowmx_row (rowmx v1 + rowmx v2)) 1:rows_addm //= rowD.
 qed.
 
 lemma rowmxN (v : vector) : - (rowmx v) = rowmx (-v).
@@ -1368,9 +1278,9 @@ proof. move => rws; apply trmx_inj => /=. by rewrite trmxK colmx_col. qed.
 lemma colmx_row m: rows m = 1 => colmx (row m 0) = trmx m.
 proof. move => rws; apply trmx_inj => /=. by rewrite trmxK rowmx_row. qed.
 
-lemma colmxD (v1 v2: vector): size v1 = size v2 => 
+lemma colmxD (v1 v2: vector):
     colmx (v1 + v2) = colmx v1 + colmx v2.
-proof. move => size_eq; apply trmx_inj => /=. exact rowmxD. qed.
+proof. apply trmx_inj => /=. exact rowmxD. qed.
 
 lemma colmxN (v : vector) : - (colmx v) = colmx (-v).
 proof. rewrite eq_matrixP /= => i j; case (j = 0) => [->// | /#]. qed.
@@ -1386,33 +1296,26 @@ abbrev ( *^ ) (m : matrix) (v : vector) : vector = mulmxv m v.
 
 lemma mulmxvE m v: m *^ v = col (m * colmx v) 0 by done.
 
-lemma size_mulmxv m (v: vector): cols m = size v => size (m *^ v) = rows m.
-proof. by move => cols_eq; rewrite mulmxvE /= rows_mulmx. qed.
+lemma size_mulmxv m (v: vector): size (m *^ v) = rows m by done.
 
 lemma get_mulmxv m v i: (m *^ v).[i] = dotp (row m i) v.
 proof. by rewrite mulmxvE /= get_mulmx. qed.
 
 lemma colmx_mulmxv (m : matrix) (v : vector) : 
-  cols m = size v => colmx (m *^ v) = m * colmx v.
-proof. by move => cols_eq; rewrite colmx_col 2:// cols_mulmx. qed.
+  colmx (m *^ v) = m * colmx v.
+proof. by rewrite colmx_col. qed.
 
 lemma mulmxvDl (m1 m2 : matrix) (v : vector) :
- size m1 = size m2 =>
   (m1 + m2) *^ v = m1 *^ v + m2 *^ v.
-proof. 
-move => sz_eq; rewrite -colD 2:mulmxvE 2:mulmxDl; smt(size_mulmx size_colmx). 
-qed.
+proof. by rewrite -colD mulmxvE mulmxDl. qed.
 
 lemma mulmxvDr (m : matrix) (v1 v2 : vector) :
-  size v1 = size v2 => m *^ (v1 + v2) = m *^ v1 + m *^ v2.
-proof.
-move => size_eq; rewrite -colD; 1: smt(size_mulmx size_colmx).
-by rewrite mulmxvE colmxD 1:// mulmxDr.
-qed.
+  m *^ (v1 + v2) = m *^ v1 + m *^ v2.
+proof. by rewrite -colD mulmxvE colmxD 1:// mulmxDr. qed.
 
 lemma mulmxvA (m1 m2 : matrix) (v : vector) :
-  cols m1 = rows m2 => cols m2 = size v => m1 *^ (m2 *^ v) = (m1 * m2) *^ v.
-proof. move => cols_eq cols_eq1; by rewrite mulmxvE colmx_mulmxv // mulmxA. qed.
+  m1 *^ (m2 *^ v) = (m1 * m2) *^ v.
+proof. by rewrite mulmxvE colmx_mulmxv // mulmxA. qed.
 
 lemma mulmxv0 (m : matrix) : m *^ (zerov (cols m)) = zerov (rows m).
 proof. by rewrite mulmxvE colmxc /= mulmxm0 col_matrixc. qed.
@@ -1439,8 +1342,7 @@ abbrev ( ^* ) (v : vector) (m : matrix) : vector = mulvmx v m.
 
 lemma mulvmxE v m: v ^* m = row (rowmx v * m) 0 by done.
 
-lemma size_mulvmx (v: vector) m: size v = rows m => size (v ^* m) = cols m.
-proof. by move => size_eq; rewrite /mulvmx /= cols_mulmx. qed.
+lemma size_mulvmx (v: vector) m: size (v ^* m) = cols m by done.
 
 lemma get_mulvmx v m i: (v ^* m).[i] = dotp v (col m i).
 proof. by rewrite /mulvmx /= get_mulmx. qed.
@@ -1456,87 +1358,68 @@ proof. by rewrite mulvmxE-{2}(trmxK m) /#. qed.
 hint simplify mulvmxT.
 
 lemma mulvmxDr (v : vector) (m1 m2 : matrix) :
-  size m1 = size m2 => v ^* (m1 + m2) = v ^* m1 + v ^* m2.
-proof. move => size_eq; rewrite -mulmxTv trmxD mulmxvDl /#. qed.
+  v ^* (m1 + m2) = v ^* m1 + v ^* m2.
+proof. rewrite -mulmxTv trmxD mulmxvDl /#. qed.
 
 lemma mulvmxDl (v1 v2 : vector) (m : matrix) :
-  size v1 = size v2 => (v1 + v2) ^* m = v1 ^* m + v2 ^* m.
-proof. move => size_eq; by rewrite -mulmxTv mulmxvDr. qed.
+  (v1 + v2) ^* m = v1 ^* m + v2 ^* m.
+proof. by rewrite -mulmxTv mulmxvDr. qed.
 
 lemma mulvmxA (v : vector) (m1 m2 : matrix) :
-  cols m1 = rows m2 => size v = rows m1 => v ^* (m1 * m2) = (v ^* m1) ^* m2.
-proof. move => s1 s2; rewrite -(trmxK (m1 * m2)) trmxM mulvmxT -mulmxvA /#. qed.
+  v ^* (m1 * m2) = (v ^* m1) ^* m2.
+proof. rewrite -(trmxK (m1 * m2)) trmxM mulvmxT -mulmxvA /#. qed.
 
 lemma mulv0mx (m : matrix): zerov (rows m) ^* m = zerov (cols m).
 proof. by rewrite -mulmxTv -{2}trmxK rows_tr mulmxv0 -cols_tr trmxK. qed.
 
 lemma rowmx_mulvmx (v : vector) (m : matrix) : 
-  rows m = size v => rowmx (v ^* m) = rowmx v * m.
-proof. 
-by move => rows_eq; rewrite -trmx_colmx -mulmxTv colmx_mulmxv 1:// trmxM trmxK. 
-qed.
+  rowmx (v ^* m) = rowmx v * m.
+proof. by rewrite -trmx_colmx -mulmxTv colmx_mulmxv 1:// trmxM trmxK. qed.
 
 lemma mulvmx1 (v : vector) : v ^* onem (size v) = v.
 proof. by rewrite -mulmxTv trmx1 mulmx1v. qed.
 
 lemma dotp_eqv_mul v1 v2 : dotp v1 v2 = (rowmx v1 * colmx v2).[0,0].
-proof.
-case (size v1 = size v2) => [size_eq | size_neq]; 1: by rewrite get_mulmx.
-rewrite size_mulmx_diff /= 1:// dotpE /#.
-qed.
+proof. by rewrite get_mulmx. qed.
 
-lemma dotp_mulmxv m (v1 v2: vector) : rows m = size v1 => cols m = size v2 =>
-  dotp v1 (m *^ v2) = dotp (v1 ^* m) v2.
-proof.
-move => cols_eq rows_eq; rewrite 2!dotp_eqv_mul.
-congr.
-rewrite colmx_col; first rewrite cols_mulmx /#.
-rewrite rowmx_row; first rewrite rows_mulmx /#.
-apply mulmxA => /#.
-qed.
+lemma dotp_mulmxv m (v1 v2: vector): dotp v1 (m *^ v2) = dotp (v1 ^* m) v2.
+proof. by rewrite 2!dotp_eqv_mul colmx_col 1:// rowmx_row 1:// mulmxA. qed.
 
 lemma mul_rowmxc (v:vector) c: vectc 1 c ^* (rowmx v) = c ** v.
 proof. by rewrite -(trmxK (rowmx v)) mulvmxT /= mul_colmxc. qed.
 
 (* Sideways matrix concatenation - aka row block matrices *)
-op catmr (m1 m2: matrix) = if rows m1 = rows m2 then
+op catmr (m1 m2: matrix) = 
   offunm ((fun i j => m1.[i, j] + m2.[i, j-cols m1]), 
-          rows m1, cols m1 + cols m2) else 
-  emptym.
+          max (rows m1) (rows m2), cols m1 + cols m2).
 
 abbrev ( || ) m1 m2 = catmr m1 m2.
 
-lemma rows_catmr (m1 m2: matrix): 
-  rows m1 = rows m2 => rows (m1 || m2) = rows m1.
-proof. by rewrite /catmr => ->. qed.
+lemma rows_catmr (m1 m2: matrix): rows (m1 || m2) = max (rows m1) (rows m2).
+proof. rewrite rows_offunm /#. qed.
 
-lemma cols_catmr (m1 m2: matrix): rows m1 = rows m2 =>
-  cols (m1 || m2) = cols m1 + cols m2.
-proof. rewrite /catmr => -> /= /#. qed.
+lemma cols_catmr (m1 m2: matrix): cols (m1 || m2) = cols m1 + cols m2.
+proof. rewrite cols_offunm /#. qed.
 
-lemma size_catmr (m1 m2: matrix): rows m1 = rows m2 => 
-  size (m1 || m2) = (rows m1, cols m1 + cols m2).
-proof. rewrite /catmr => -> /= /#. qed.
+lemma size_catmr (m1 m2: matrix): 
+  size (m1 || m2) = (max (rows m1) (rows m2), cols m1 + cols m2).
+proof. rewrite rows_offunm cols_offunm /#. qed.
 
-lemma get_catmr (m1 m2: matrix) i j: rows m1 = rows m2 =>
+lemma get_catmr (m1 m2: matrix) i j: 
   (m1 || m2).[i, j] = m1.[i, j] + m2.[i, j-cols m1].
 proof.
-rewrite /catmr => rows_eq. 
-rewrite rows_eq /=.
+rewrite /catmr /=. 
 case (mrange (m1 || m2) i j) => range.
-- rewrite get_offunm /=; smt(size_catmr).
+- rewrite get_offunm //.
 - rewrite !getm0E /=; first 3 smt(size_catmr).
   by rewrite addr0.
 qed.
-
-lemma catmr_diff m1 m2: rows m1 <> rows m2 => (m1 || m2) = emptym.
-proof. by smt(). qed.
 
 lemma col_catmrL m1 m2 i: rows m1 = rows m2 => i < cols m1 =>
   col (m1 || m2) i = col m1 i.
 proof.
 move => rows_eq bound1; rewrite eq_vectorP /=. 
-split => [| j bound2]; 1: by rewrite rows_catmr.
+split => [| j bound2]; 1: by rewrite rows_catmr /#.
 rewrite get_catmr // (getm0E m2) 2:addr0; smt(rows_catmr).
 qed.
 
@@ -1544,47 +1427,46 @@ lemma col_catmrR m1 m2 i: rows m1 = rows m2 => cols m1 <= i =>
   col (m1 || m2) i = col m2 (i - cols m1).
 proof.
 move => rows_eq bound; rewrite eq_vectorP /=. 
-split => [| j bound2]; 1: by rewrite rows_catmr.
+split => [| j bound2]; 1: by rewrite rows_catmr /#.
 rewrite get_catmr // (getm0E m1) 2:add0r; smt(rows_catmr).
 qed.
 
-lemma row_catmr m1 m2 i: rows m1 = rows m2 =>
-  row (m1 || m2) i = (row m1 i || row m2 i).
+lemma row_catmr m1 m2 i: row (m1 || m2) i = (row m1 i || row m2 i).
 proof.
-move => rows_eq; rewrite eq_vectorP /=. 
+rewrite eq_vectorP /=. 
 rewrite cols_catmr // size_catv /= => j bound.
 by rewrite get_catmr // get_catv'.
 qed.
 
-lemma catmr_empty: (emptym || emptym) = emptym.
-proof. apply emptym_unique. smt(size_catmr size_emptym). qed.
-
-hint simplify catmr_empty.
-
-lemma catmrA (m1 m2 m3: matrix): rows m1 = rows m2 => rows m2 = rows m3 =>
-  ((m1 || m2) || m3) = (m1 || (m2 || m3)).
+lemma catmrA (m1 m2 m3: matrix): ((m1 || m2) || m3) = (m1 || (m2 || m3)).
 proof. 
-move => rows_eq0 rows_eq1; rewrite eq_matrixP. 
+rewrite eq_matrixP. 
 split => [| i j bound]; 1: smt(size_catmr).
-rewrite !get_catmr; first 4 smt(rows_catmr).
-rewrite cols_catmr // addrA. 
+rewrite 4!get_catmr cols_catmr // addrA. 
 algebra.
 qed.
 
-lemma catmrDr (m1 m2 m3: matrix): rows m2 = rows m3 =>
-  m1 * (m2 || m3) = ((m1 * m2) || (m1 * m3)).
+lemma catmrDr (m1 m2 m3: matrix): m1 * (m2 || m3) = ((m1 * m2) || (m1 * m3)).
 proof.
-move => rows_eq; case (cols m1 = rows m2) => cols_eq.
-- rewrite eq_matrixP.
-  split => [| i j bound].
-  + smt(size_mulmx size_catmr).
-  rewrite get_catmr 2:!get_mulmx; 1:smt(rows_mulmx).
-  case (j < cols m2) => bound2.
-  + rewrite col_catmrL // (col0E m3); 1: smt(cols_mulmx).
-    by rewrite dotpv0 addr0.
-  + rewrite col_catmrR 1:/# 1:/# (col0E m2) 1:/# dotpv0 add0r.
-    smt(cols_mulmx).
-- by rewrite !size_mulmx_diff // 2:/# rows_catmr.
+rewrite eq_matrixP.
+rewrite rows_mulmx cols_mulmx cols_catmr.
+split => [| i j bound]; 1: smt(size_mulmx size_catmr).
+rewrite get_catmr 3!get_mulmx. 
+case (j < cols m2) => bound2.
+- rewrite [col m3 _]col0E 1:/# dotpv0 addr0 !dotpE 2!size_col rows_catmr.
+  rewrite (big_cat_int (max (cols m1) (rows m2))) 1:/# size_row 1:/#.
+  rewrite [bigi _ _ (max _ _) _]big1_seq => [k [_ /mem_range bound3] /=|].
+  + by rewrite get_catmr [_ m2 _]getm0E 1:/# add0r [_ m3 _]getm0E 1:/# mulr0.
+  rewrite addr0.
+  apply eq_bigr => k _ /=.
+  by rewrite get_catmr [_ m3 _]getm0E 1:/# addr0.
+- rewrite [col m2 _]col0E 1:/# dotpv0 add0r !dotpE 2!size_col rows_catmr.
+  rewrite (big_cat_int (max (cols m1) (rows m3))) 1:/# size_row 1:/#.
+  rewrite [bigi _ _ (max _ _) _]big1_seq => [k [_ /mem_range bound3] /=|].
+  + by rewrite get_catmr [_ m3 _]getm0E 1:/# addr0 [_ m2 _]getm0E 1:/# mulr0.
+  rewrite addr0.
+  apply eq_bigr => k _ /=.
+  by rewrite get_catmr [_ m2 _]getm0E 1:/# add0r.
 qed.
 
 lemma rowmx_catmr (v1 v2: vector): rowmx (v1 || v2) = (rowmx v1 || rowmx v2).
@@ -1597,82 +1479,61 @@ have ->: (i = 0) by smt().
 by rewrite !get_rowmx get_catv' cols_rowmx. 
 qed.
 
-lemma addm_catmr (m1 m2 m3 m4: matrix): 
-  size m1 = size m3 => size m2 = size m4 =>
+lemma addm_catmr (m1 m2 m3 m4: matrix): cols m1 = cols m3 =>
   (m1 || m2) + (m3 || m4) = ((m1 + m3) || (m2 + m4)).
 proof.
-move => size_eq1 size_eq2; case (rows m1 = rows m2) => rows_eq1.
-- rewrite eq_matrixP. 
-  split => [| i j bound]. 
-  + smt(size_catmr rows_addm cols_addm).
-  rewrite get_addm; 1: smt(size_catmr).
-  rewrite !get_catmr; first 3 smt(rows_addm cols_addm).
-  rewrite !get_addm // cols_addm //; smt(addrA addrC).
-- rewrite !catmr_diff /=; smt(rows_addm).
+move => cols_eq.
+rewrite eq_matrixP. rewrite size_catmr 3!rows_addm 3!cols_addm 2!rows_catmr.
+rewrite 2!cols_catmr.
+split => [/# | i j bound].
+rewrite get_addm 3!get_catmr 2!get_addm cols_addm /max cols_eq /=.
+smt(addrA addrC).
 qed.
 
-lemma oppm_catmr (m1 m2: matrix): 
-  rows m1 = rows m2 => - (m1 || m2) = (-m1 || -m2).
+lemma oppm_catmr (m1 m2: matrix): - (m1 || m2) = (-m1 || -m2).
 proof.
-move => rows_eq.
 apply eq_matrixP => /=.
-split => [| i j bound].
-- rewrite !rows_catmr // !cols_catmr /#.
-- by rewrite !get_catmr // /= opprD. 
+split => [// | i j bound].
+by rewrite 2!get_catmr // /= opprD. 
 qed.
 
-lemma mulmxv_cat (m1 m2 : matrix) (v1 v2 : vector) : 
-  cols m1 = size v1 => cols m2 = size v2 => rows m1 = rows m2 => 
+lemma mulmxv_cat (m1 m2 : matrix) (v1 v2 : vector): cols m1 = size v1 => 
   (m1 || m2) *^ (v1 || v2) = (m1 *^ v1) + (m2 *^ v2).
 proof. 
-move => m1_v1 m2_v2 eq_r; apply/eq_vectorP.
-have -> : size ((m1 || m2) *^ (v1 || v2)) = rows m1. 
-- rewrite size_mulmxv ?cols_catmr // ?size_catv 1:/#.
-  by rewrite rows_catmr.
-split => [|i Hi]; first by rewrite size_addv !size_mulmxv /#.
-rewrite get_mulmxv get_addv ?size_mulmxv //. 
-by rewrite row_catmr // dotp_catv // !get_mulmxv.
+move => cols_eq_size; apply eq_vectorP.
+rewrite size_addv 3!size_mulmxv rows_catmr /= => i bound.
+by rewrite get_addv 3!get_mulmxv row_catmr dotp_catv.
 qed.
 
 (* Downwards matrix concatenation - aka column block matrices *)
-op catmc (m1 m2: matrix) = if cols m1 = cols m2 then 
+op catmc (m1 m2: matrix) =
   offunm ((fun i j => m1.[i, j] + m2.[i-rows m1, j]), 
-          rows m1 + rows m2, cols m1) else 
-  emptym.
+          rows m1 + rows m2, max (cols m1) (cols m2)).
 
 abbrev ( / ) m1 m2 = catmc m1 m2.
 
-lemma cols_catmc (m1 m2: matrix): cols m1 = cols m2 => cols (m1 / m2) = cols m1.
-proof. by rewrite /catmc => ->. qed.
+lemma cols_catmc (m1 m2: matrix): cols (m1 / m2) = max (cols m1) (cols m2).
+proof. rewrite cols_offunm /#. qed.
 
-lemma rows_catmc (m1 m2: matrix): cols m1 = cols m2 =>
-  rows (m1 / m2) = rows m1 + rows m2.
-proof. rewrite /catmc => -> /= /#. qed.
+lemma rows_catmc (m1 m2: matrix): rows (m1 / m2) = rows m1 + rows m2.
+proof. rewrite rows_offunm /#. qed.
 
-lemma size_catmc (m1 m2: matrix): cols m1 = cols m2 => 
-  size (m1 / m2) = (rows m1 + rows m2, cols m1).
-proof. move => cols_eq; by rewrite cols_catmc // rows_catmc. qed.
+lemma size_catmc (m1 m2: matrix):
+  size (m1 / m2) = (rows m1 + rows m2, max (cols m1) (cols m2)).
+proof. rewrite cols_offunm rows_offunm /#. qed.
 
-lemma get_catmc (m1 m2: matrix) i j: cols m1 = cols m2 =>
+lemma get_catmc (m1 m2: matrix) i j:
   (m1 / m2).[i, j] = m1.[i, j] + m2.[i-rows m1, j].
 proof.
-rewrite /catmc => cols_eq. 
-rewrite cols_eq /=.
 case (mrange (m1 / m2) i j) => range.
 - rewrite get_offunm /=; smt(size_catmc).
 - rewrite !getm0E /= 4:addr0; smt(size_catmc).
 qed.
 
-lemma catmc_diff m1 m2: cols m1 <> cols m2 => (m1 / m2) = emptym by smt().
-
 lemma catmcT (m1 m2: matrix): trmx (m1 / m2) = (trmx m1 || trmx m2).
 proof.
-case (cols m1 = cols m2) => cols_eq.
-- rewrite eq_matrixP /=.
-  split => [| i j bound]. 
-  + smt(size_tr size_catmc size_catmr).
-  + by rewrite get_catmr // get_catmc.
-- by rewrite catmr_diff // catmc_diff.
+rewrite eq_matrixP /= cols_catmc rows_catmc rows_catmr cols_catmr /= => i j bnd.
+by rewrite get_catmr get_catmc.
 qed.
 
 hint simplify catmcT.
@@ -1690,37 +1551,30 @@ lemma row_catmcR m1 m2 i: cols m1 = cols m2 => rows m1 <= i =>
   row (m1 / m2) i = row m2 (i - rows m1).
 proof. move => cols_eq bound; by rewrite -col_trmx /= col_catmrR. qed.
 
-lemma col_catmc m1 m2 i: cols m1 = cols m2 =>
+lemma col_catmc m1 m2 i:
   col (m1 / m2) i = (col m1 i || col m2 i).
-proof. move => rows_eq; by rewrite -row_trmx /= row_catmr. qed.
-
-lemma catmc_empty: (emptym / emptym) = emptym.
-proof. apply emptym_unique. smt(size_emptym size_catmc). qed.
-
-hint simplify catmc_empty.
+proof. by rewrite -row_trmx /= row_catmr. qed.
 
 lemma catmcA (m1 m2 m3: matrix): 
-  cols m1 = cols m2 => cols m2 = cols m3 => ((m1 / m2) / m3) = (m1 / (m2 / m3)).
-proof. move => cols_eq0 cols_eq1; apply trmx_inj => /=. exact catmrA. qed.
+  ((m1 / m2) / m3) = (m1 / (m2 / m3)).
+proof. apply trmx_inj => /=. exact catmrA. qed.
 
-lemma catmcDl m1 m2 m3: cols m1 = cols m2 => 
+lemma catmcDl m1 m2 m3:
   (m1 / m2) * m3 = (m1 * m3) / (m2 * m3).
-proof. move => cols_eq; apply trmx_inj => /=. exact catmrDr. qed.
+proof. apply trmx_inj => /=. exact catmrDr. qed.
 
 lemma colmx_catmr (v1 v2: vector): colmx (v1 || v2) = (colmx v1 / colmx v2).
 proof. apply trmx_inj => /=. exact rowmx_catmr. qed.
 
-lemma addm_catmc (m1 m2 m3 m4: matrix): 
-  size m1 = size m3 => size m2 = size m4 =>
+lemma addm_catmc (m1 m2 m3 m4: matrix): rows m1 = rows m3  =>
   (m1 / m2) + (m3 / m4) = ((m1 + m3) / (m2 + m4)).
 proof.
-move => size_eq1 size_eq2; apply trmx_inj => /=. 
+move => cols_eq; apply trmx_inj => /=. 
 rewrite addm_catmr /#.
 qed.
 
-lemma oppm_catmc (m1 m2: matrix): 
-  cols m1 = cols m2 => - (m1 / m2) = ((-m1) / -m2).
-proof. move => cols_eq; apply trmx_inj => /=. by apply oppm_catmr. qed.
+lemma oppm_catmc (m1 m2: matrix): - (m1 / m2) = ((-m1) / -m2).
+proof. apply trmx_inj => /=. by apply oppm_catmr. qed.
 
 (* Taking a submatrix from row r1 (inclusive) to r2 (exclusive) and
    column c1 (inclusive) to c2 (exclusive). 
@@ -1756,30 +1610,28 @@ qed.
 
 hint simplify submT.
 
-lemma subm_catmrCl m1 m2: rows m1 = rows m2 => 
-  subm (m1 || m2) 0 (rows m1) 0 (cols m1) = m1.
+lemma subm_catmrCl m1 m2: subm (m1 || m2) 0 (rows m1) 0 (cols m1) = m1.
 proof.
-rewrite eq_matrixP => rows_eq i j bound.
+rewrite eq_matrixP => i j bound.
 rewrite get_subm; first 2 smt(size_subm).
 rewrite get_catmr // (getm0E m2) /= 2:addr0; smt(cols_subm). 
 qed.
 
-lemma subm_catmcCl m1 m2: cols m1 = cols m2 => 
-  subm (m1 / m2) 0 (rows m1) 0 (cols m1) = m1.
-proof. move => cols_eq; apply trmx_inj => /=. exact subm_catmrCl. qed.
+lemma subm_catmcCl m1 m2: subm (m1 / m2) 0 (rows m1) 0 (cols m1) = m1.
+proof. apply trmx_inj => /=. exact subm_catmrCl. qed.
 
-lemma subm_catmrCr m1 m2: rows m1 = rows m2 => 
-  subm (m1 || m2) 0 (rows m1) (cols m1) (cols m1 + cols m2) = m2.
+lemma subm_catmrCr m1 m2:
+  subm (m1 || m2) 0 (rows m2) (cols m1) (cols m1 + cols m2) = m2.
 proof.
-rewrite eq_matrixP => rows_eq. 
+rewrite eq_matrixP.
 split => [/# | i j bound].
 rewrite get_subm; first 2 smt(size_subm).
 rewrite get_catmr //= (getm0E m1) /= 2:add0r; smt(cols_subm).
 qed.
 
-lemma subm_catmcCr m1 m2: cols m1 = cols m2 => 
-  subm (m1 / m2) (rows m1) (rows m1 + rows m2) 0 (cols m1) = m2.
-proof. move => cols_eq; apply trmx_inj => /=. exact subm_catmrCr. qed.
+lemma subm_catmcCr m1 m2:
+  subm (m1 / m2) (rows m1) (rows m1 + rows m2) 0 (cols m2) = m2.
+proof. apply trmx_inj => /=. exact subm_catmrCr. qed.
 
 lemma rowmx_row_eq_subm r m: rowmx (row m r) = subm m r (r+1) 0 (cols m).
 proof.
@@ -1790,11 +1642,7 @@ rewrite get_rowmx get_subm 3:get_row /#.
 qed.
 
 lemma colmx_col_eq_subm c m: colmx (col m c) = subm m 0 (rows m) c (c+1).
-proof.
-apply trmx_inj => /=. 
-rewrite -row_trmx.
-apply rowmx_row_eq_subm.
-qed.
+proof. apply trmx_inj => /=. rewrite -row_trmx. apply rowmx_row_eq_subm. qed.
 
 lemma catmr_subm m n: 0 <= n < cols m => 
   (subm m 0 (rows m) 0 n || subm m 0 (rows m) n (cols m)) = m.
@@ -1812,12 +1660,10 @@ case (j < n) => j_bound.
   rewrite add0r get_subm; smt(size_catmr size_subm).
 qed.
 
-lemma subm_colmx (A : matrix) l : 
-  0 <= l => cols A = l + 1 => 
-  (subm A 0 (rows A) 0 l || colmx (col A l)) = A.
-proof.
-by move => l_ge0 c_A; rewrite colmx_col_eq_subm -c_A catmr_subm /#.
-qed.
+lemma subm_colmx (m: matrix) l : 
+  0 <= l => cols m = l + 1 => 
+  (subm m 0 (rows m) 0 l || colmx (col m l)) = m.
+proof. by move => l_ge0 c_m; rewrite colmx_col_eq_subm -c_m catmr_subm /#. qed.
 
 lemma catmc_subm m n: 0 <= n < rows m => 
   subm m 0 n 0 (cols m) / subm m n (rows m) 0 (cols m) = m.
@@ -1863,63 +1709,54 @@ proof. by rewrite rows_mulmx // cols_mulmx. qed.
 lemma size_scalarm (m: matrix) (s: t): size (s *** m) = size m.
 proof. by rewrite rows_scalarm cols_scalarm. qed.
     
-lemma get_scalarm (m: matrix) (s: t) (i j: int): mrange m i j =>
+lemma get_scalarm (m: matrix) (s: t) (i j: int):
     (s *** m).[i, j] = m.[i, j] * s.
-proof.
-move => bound; rewrite get_mulmx /dotp 2!size_offunv /=.
-rewrite (bigD1 _ _ i) 1:mem_range 1:/# 1:range_uniq.
-rewrite big1 /= 2:get_vectc 2:/# 2:addr0 2:mulrC 2:// => k.
-rewrite /predC1 eq_sym => -> /=.
-apply mul0r.
+proof. 
+rewrite get_mulmx /dotp 2!size_offunv /=.
+case (0 <= i < rows m) => bound.
+- rewrite (bigD1 _ _ i) 1:mem_range 1:/# 1:range_uniq.
+  rewrite big1 /= 2:get_vectc 2:/# 2:addr0 2:mulrC 2:// => k.
+  rewrite /predC1 eq_sym => -> /=.
+  apply mul0r.
+- rewrite big1 => [k _ /=|].
+  + by rewrite getv0E // mul0r.
+  by rewrite getm0E 1:/# mul0r.
 qed.
-
-lemma scalarm_empty (s: t): s *** emptym = emptym.
-proof. apply emptym_unique. by rewrite cols_mulmx // rows_mulmx. qed.
-
-hint simplify scalarm_empty.
 
 lemma scalar0m (m: matrix): zeror *** m = zerom (rows m) (cols m).
 proof.
 rewrite eq_matrixP.
 split => [| i j bound]; 1: rewrite size_scalarm /#.
-rewrite get_zerom get_scalarm; 1: smt(size_scalarm).
-apply mulr0.
+by rewrite get_zerom get_scalarm mulr0.
 qed.
 
 lemma scalar1m (m: matrix): oner *** m = m.
 proof.
 rewrite eq_matrixP.
 split => [| i j bound]; 1: by rewrite size_scalarm.    
-rewrite get_scalarm; 1: smt(size_scalarm).
-apply mulr1.
+by rewrite get_scalarm mulr1.
 qed.
 
 lemma scalarNm (m: matrix) (s: t): (- s) *** m = - (s *** m).
 proof.
 rewrite eq_matrixP.
 split => [| i j bound]; 1: rewrite !size_scalarm /=; 1: smt(size_scalarm).
-rewrite /= !get_scalarm /=; 1,2: smt(size_scalarm).
-by rewrite mulrN.
+by rewrite /= !get_scalarm /= mulrN.
 qed.
 
 lemma scalarmAs s1 s2 m: s1 *** (s2 *** m) = (s1 * s2) *** m.
 proof.
 apply eq_matrixP. 
-split => [| i j bound]; 1: by rewrite !size_scalarm. 
-rewrite 2!scalarm_mrange in bound.
-rewrite !get_scalarm 4:mulrA //. smt(size_scalarm).
-by rewrite -[_ * s1 * _]mulrA [s1 * _]mulrC mulrA.
+split => [| i j _]; 1: by rewrite !size_scalarm. 
+by rewrite 3!get_scalarm -mulrA [s2 * s1]mulrC.
 qed.
 
 lemma scalarmD m1 m2 s: s *** (m1 + m2) = s *** m1 + s *** m2.
 proof.
-case (size m1 = size m2) => [size_eq | size_neq].
-- apply eq_matrixP.
-  rewrite rows_scalarm rows_addm 1:// cols_scalarm rows_addm 1:!size_scalarm 1://.
-  rewrite !cols_addm 1:// 1:!size_scalarm 1:// size_scalarm /= => i j bound.
-  rewrite get_addm 1:!size_scalarm // !get_scalarm 1:rows_addm 1:// 1:cols_addm // 1:/#.
-  by rewrite get_addm // mulrDl.
-- by rewrite !size_addm_diff 2:2!size_scalarm.
+apply eq_matrixP.
+rewrite rows_scalarm rows_addm cols_scalarm rows_addm. 
+rewrite 2!cols_addm /= => i j bound.
+by rewrite get_addm get_scalarm get_addm !get_scalarm mulrDl.
 qed.
 
 lemma scalarDm m (s1 s2: t): (s1 + s2) *** m = s1 *** m + s2 *** m.
@@ -1927,7 +1764,7 @@ proof.
 apply eq_matrixP.
 rewrite rows_scalarm cols_scalarm.
 split => [| i j bound]; 1: rewrite size_addm !size_scalarm //.
-by rewrite get_addm 1:!size_scalarm 1:// !get_scalarm // mulrDr.
+by rewrite get_addm 3!get_scalarm // mulrDr.
 qed.
 
 (* dmatrix helper function: construct matrix from list of (column) vectors *)
@@ -1939,9 +1776,9 @@ lemma ofcols_cat k l1 l2 (vs1 vs2 : vector list) :
   ofcols k (l1 + l2) (vs1 ++ vs2) = (ofcols k l1 vs1 || ofcols k l2 vs2).
 proof.
 move => s_vs1 s_vs2.
-apply eq_matrixP; rewrite /ofcols size_catmr //=. 
-rewrite 3?ler_maxr /=; 1..3: smt(List.size_ge0).
-move => i j [i_bound j_bound]. 
+apply eq_matrixP; rewrite /ofcols size_catmr //=.
+rewrite -s_vs1 -s_vs2.
+split => [|i j [i_bound j_bound]]; 1:smt(List.size_ge0).
 rewrite get_catmr //= ler_maxr; 1: smt(List.size_ge0).
 rewrite get_offunm /= ?nth_cat; 1: smt(List.size_ge0).
 case (j < size vs1) => j_vs1. 
@@ -2103,16 +1940,16 @@ move => k_ge0 l_ge0; rewrite dmatrix_add_r // dmatrix1r //.
 by rewrite dmap_dprodR dmap_comp.
 qed.
 
-lemma dmatrixRSr1E d (A : matrix) k l : 
-  0 <= k => 0 <= l => size A = (k,l+1) =>
-  mu1 (dmatrix d k (l + 1)) A =
-  mu1 (dmatrix d k l `*` dvector d k) (subm A 0 k 0 l, col A l).
+lemma dmatrixRSr1E d (m : matrix) k l : 
+  0 <= k => 0 <= l => size m = (k,l+1) =>
+  mu1 (dmatrix d k (l + 1)) m =
+  mu1 (dmatrix d k l `*` dvector d k) (subm m 0 k 0 l, col m l).
 proof.
-move => k_ge0 l_ge0 [r_A c_A]; rewrite dmatrixSrr // dmapE /(\o) /pred1. 
-apply mu_eq_support => -[B v] /supp_dprod /=.
-case => /size_dmatrix /(_ _ _) //= [r_B c_B] /size_dvector s_v.
-apply/eq_iff; split => [<-|[-> ->]]; last by rewrite -r_A subm_colmx.
-rewrite -r_B -c_B subm_catmrCl /= 1:/#.
+move => k_ge0 l_ge0 [r_m c_m]; rewrite dmatrixSrr // dmapE /(\o) /pred1. 
+apply mu_eq_support => -[m2 v] /supp_dprod /=.
+case => /size_dmatrix /(_ _ _) //= [r_m2 c_m2] /size_dvector s_v.
+apply/eq_iff; split => [<-|[-> ->]]; last by rewrite -r_m subm_colmx.
+rewrite -r_m2 -c_m2 subm_catmrCl /=. 
 by rewrite col_catmrR //= /#.
 qed.
 
