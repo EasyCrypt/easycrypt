@@ -1999,6 +1999,29 @@ rewrite fromintD mulrDl /=; apply ler_add; first by apply bound_ds.
 by apply IHds => /#.
 qed.
 
+lemma djoinmap_dlet (d1 : 'a -> 'b distr) (d2: 'a -> 'b -> 'c distr) xs : 
+djoinmap (fun x => dlet (d1 x) (d2 x)) xs = 
+dlet (djoinmap d1 xs) (fun x1s => djoinmap (fun (p:_*_) => d2 p.`1 p.`2) (zip xs x1s)).
+proof.
+elim: xs.
++ by rewrite !djoin_nil dlet_unit /= djoin_nil.
+move=> x l hrec /=.
+rewrite !djoin_cons dprod_dlet dlet_dmap dprod_dlet !dlet_dlet /= dmap_dlet.
+apply eq_dlet => // b /=.
+rewrite dlet_dunit dlet_dmap dmap_dlet /=.
+have -> : 
+  (fun (a : 'b list) =>
+     djoin (d2 x b :: map (fun (p : 'a * 'b) => d2 p.`1 p.`2) (zip l a))) = 
+  (fun (a : 'b list) =>
+     dlet (d2 x b) 
+       (fun xy1 => dmap (djoin (map (fun (p : 'a * 'b) => d2 p.`1 p.`2) (zip l a)))
+                        (fun xy2 => xy1::xy2))).
++ by apply fun_ext => lb; rewrite djoin_cons /= dmap_dprodE. 
+rewrite dlet_swap; apply eq_dlet => //= xy1.
+rewrite dmap_dlet hrec dlet_dlet; apply eq_dlet => //= lb.
+by apply eq_dlet => //= xy2; rewrite dmap_dunit.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op madd ['a] (df dg : 'a distr) = fun x => mu1 df x + mu1 dg x.
 
@@ -2281,6 +2304,36 @@ apply (@ler_trans (c ^ (size (undup lT)) * (1%r - c) ^ (size (undup lF)))).
 rewrite -(dfunE_mem_uniq d_ll hdc) ?undup_uniq. 
 + by move=> x; rewrite !mem_undup h.
 by apply mu_le => /= f _; smt (mem_undup).
+qed.
+
+lemma dlet_dfun (d1 : t -> 'u distr) (d2 : t -> 'u -> 'v distr) : 
+  dlet (dfun d1) (fun f1 => dfun (fun (x:t) => d2 x (f1 x))) = 
+  dfun (fun x => dlet (d1 x) (fun x1 => d2 x x1)).
+proof.
+rewrite !dfun_dmap /= dlet_dmap djoinmap_dlet dmap_dlet.
+apply in_eq_dlet => //= l /supp_djoinmap [hsz hall].
+rewrite dfun_dmap; apply eq_dlet => //.
+congr; apply (eq_from_nth witness); 1: by rewrite !size_map size_zip hsz.
+move=> i; rewrite size_map => hi.
+rewrite (@nth_map witness) 1:// /=.
+rewrite (@nth_map (witness, witness)) 1:size_zip 1:-hsz 1:// /=.
+rewrite (@nth_zip witness witness) //= /tofun index_uniq // FinT.enum_uniq.
+qed.
+
+lemma dfun_unit (f : t -> 'u) : dfun (fun x => dunit (f x)) = dunit f. 
+proof.
+apply eq_distr => g; rewrite dunit1E dfun1E /=.
+case (f = g) => [<- | ?].
++ by rewrite BRM.big1 // => x _ /=; rewrite dunit1E.
+have [x hx]: exists x, f x <> g x by smt(). 
+by rewrite (@BRM.bigD1 _ _ x) 1:FinT.enumP 1:FinT.enum_uniq /= dunit1E hx.
+qed.
+
+lemma dmap_dfun (d : t -> 'u distr) (F: t -> 'u -> 'v) :  
+  dmap (dfun d) (fun f x => F x (f x)) =
+  dfun (fun x => dmap (d x) (fun fx => F x fx)).
+proof. 
+by rewrite /dmap -dlet_dfun /=; apply eq_dlet => // f; rewrite dfun_unit.
 qed.
 
 lemma dfun1E_fix1 ['u] (d : t -> 'u distr) x0 f :
