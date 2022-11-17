@@ -133,6 +133,13 @@ module CI_Real = struct
   let p_real_lt     = _Real "lt"
   let p_real_of_int = _Real "from_int"
   let p_real_abs    = EcPath.extend p_top ["Real"; "`|_|"]
+
+  let real_lemma name =
+    EcPath.pqname p_RealExtra name
+
+  let real_order_lemma name =
+    EcPath.pqname p_RealOrder name
+
 end
 
 (* -------------------------------------------------------------------- *)

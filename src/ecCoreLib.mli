@@ -123,6 +123,10 @@ module CI_Real : sig
   val p_real_lt     : path
   val p_real_of_int : path
   val p_real_abs    : path
+
+  val real_lemma    : string -> path
+  val real_order_lemma : string -> path
+
 end
 
 (* -------------------------------------------------------------------- *)

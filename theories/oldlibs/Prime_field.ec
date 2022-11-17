@@ -92,7 +92,7 @@ qed.
 
 lemma nosmt gf_q_minus_minus (x:gf_q):
   -(-x) = x
-by [].
+by smt.
 
 lemma gf_q_minus_distr (x y z:gf_q):
   x * (y - z) = x * y - x * z.

@@ -206,7 +206,6 @@ and pformula_r =
   | PFChoareF  of pformula * pgamepath * pformula * pcost
   | PFChoareFT of pgamepath * pcost
   | PFCoe      of osymbol * pmemtype option * pformula * pexpr * pty option
-  | PFWP       of pgamepath * pexpr list * pformula
 
 and pmemtype_el = ([`Single|`Tuple] * (psymbol list)) located * pty
 and pmemtype    = pmemtype_el list
@@ -264,7 +263,6 @@ and poracles = qident_inparam list
 and pcompl = PCompl of pformula * (qident_inparam * pformula) list
 
 and pmod_restr_el = {
-  pmre_in    : bool;
 	pmre_name  : psymbol;
   pmre_orcls : poracles option;  (* None means no restriction *)
   pmre_compl : pcompl option;    (* None means no restriction *)
@@ -741,6 +739,7 @@ type phltactic =
   | Pexfalso
   | Pbydeno        of ([`PHoare | `Equiv ] * (deno_ppterm * bool * pformula option))
   | PPr            of (pformula * pformula) option
+  | Pbyupto
   | Pfel           of (codepos1 * fel_info)
   | Phoare
   | Pprbounded
@@ -923,8 +922,9 @@ type pcaseoptions = (bool * pcaseoption) list
 (* -------------------------------------------------------------------- *)
 type apply_info = [
   | `ApplyIn of ppterm * psymbol
-  | `Apply   of ppterm list * [`Apply|`Exact]
-  | `Top     of [`Apply|`Exact]
+  | `Apply   of ppterm list * [`Apply|`Exact|`Alpha]
+  | `Top     of [`Apply|`Exact|`Alpha]
+  | `Alpha   of ppterm
 ]
 
 (* -------------------------------------------------------------------- *)

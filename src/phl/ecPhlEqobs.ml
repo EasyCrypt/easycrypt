@@ -294,8 +294,7 @@ and f_eqobs_in fl fr sim eqO =
             PV.check_depend env fvr topr
           with TcError _ -> raise EqObsInError
         end;
-        let eqi = if OI.is_in oil then Mpv2.add_glob env top top eqi else eqi in
-        sim, eqi
+        sim, (Mpv2.add_glob env top top eqi)
 
       | FBdef funl, FBdef funr ->
         let local = Mpv2.empty_local in

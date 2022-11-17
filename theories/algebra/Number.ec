@@ -1311,6 +1311,25 @@ rewrite maxrE; case: (n2 <= n1).
   by rewrite (ltr_trans _ lt_12 lt_n1m).
 qed.
 
+lemma ler_maxr_trans (x1 x2 y1 y2 : t) : 
+  x1 <= x2 => y1 <= y2 => maxr x1 y1 <= maxr x2 y2.
+proof. 
+  by move=> hx hy; rewrite ler_maxrP; case (maxr_ub x2 y2) => hx' hy'; split;
+   [apply: ler_trans hx' | apply: ler_trans hy'].
+qed.
+
+lemma ler_norm_maxr x1 x2 :
+  zeror <= x1 =>
+  zeror <= x2 =>
+  `| x1 - x2 | <= maxr x1 x2.
+proof.
+  rewrite maxrE normE; case: (x2 <= x1).
+  + rewrite subr_ge0 => -> /= *; apply ler_subr_addr.
+    by rewrite opprK ler_addl.
+  rewrite ler_subr_addr add0r => -> /=.
+  by rewrite opprB -ler_subr_addr opprK ler_addl.
+qed.
+     
 (* -------------------------------------------------------------------- *)
 lemma minrC (x y : t) : minr x y = minr y x.
 proof. by rewrite !minrE lerNgt ler_eqVlt; case: (y = x); case: (y < x). qed.

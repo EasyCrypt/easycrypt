@@ -190,7 +190,7 @@ case=> [Mf smf] [Mg smg]; exists (Mf * Mg) => J uqJ.
 pose J1 := undup (unzip1 J).
 pose F (ab : 'a * 'b) := `|f ab.`1| * `|g ab.`1 ab.`2|.
 rewrite (@eq_bigr _ _ F) /= => [ab _|]; 1: by rewrite normrM.
-rewrite /F (@sum_pair_dep ("`|_|"%Real \o f) ("`|_|"%Real \o2 g)) /(\o) /(\o2) //=.
+rewrite /F (@sum_pair_dep ("`|_|"%Real \o f) ("`|_|"%Real \o2 g)) //=.
 apply: (@ler_trans (big predT (fun i => `|f i| * Mg) J1)); last first.
 + rewrite -mulr_suml ler_wpmul2r; 1: by apply: (@smg witness [] _).
   by apply/smf/undup_uniq.
@@ -452,7 +452,7 @@ move=> J p enm sm sbl; rewrite /sum sbl /=.
 pose G f n := big predT f (pmap J (range 0 n)).
 rewrite -/(G s); have ->: G s = fun n =>
   G (fun x => `|pos s x|) n - G (fun x => `|neg s x|) n.
-+ apply/fun_ext=> i @/G @/f; rewrite sumrB; apply/eq_bigr.
++ apply/fun_ext=> i @/G; rewrite sumrB; apply/eq_bigr.
   by move=> x _ /=; rewrite !ger0_norm ?(pos_ge0, neg_ge0) pos_neg_id.
 apply/cnvtoB; apply/(@summable_pos_cnvto _ _ p) => //.
 + move=> x @/support @/pos; case: (s x < 0%r) => //.
@@ -522,10 +522,10 @@ move=> uqJ sJ; rewrite (@sumE _ (nth None (map Some J))); 1: split.
 + exists (big predT (fun x => `|s x|) (filter (fun x => s x <> 0%r) J))=> J' uniq_J'.
   rewrite -(eq_big_perm (:@perm_filterC (fun x => s x <> 0%r) J')).
   rewrite big_cat (@big1_seq _ _ (filter (fun (x : 'a) => s x = 0%r) J')) /=.
-  * by move=> x @/predT; rewrite mem_filter /abs_s /= =>- [] ->.
+  * by move=> x @/predT; rewrite mem_filter /= =>- [] ->.
   rewrite -(eq_big_perm (:@perm_filterC (fun x => mem J' x) (filter _ J))).
   rewrite -!filter_predI /predC /predI /= big_cat; apply/ler_paddr.
-  * by apply/sumr_ge0=> a //=; rewrite /abs_s normr_ge0.
+  * by apply/sumr_ge0=> a //=; rewrite normr_ge0.
   rewrite -(@eq_big_perm _ _ (filter (fun x => mem J' x /\ s x <> 0%r) J)).
   * apply/uniq_perm_eq=> [| |x]; 1,2: exact/filter_uniq.
     by rewrite !mem_filter /=; split=> //= -[] ^/sJ.
@@ -634,6 +634,14 @@ lemma nosmt summable_cond (s : 'a -> real) (p : 'a -> bool) :
 proof.
 move=> sbl_s; apply/(summable_le _ sbl_s) => x /=.
 by case: (p x) => // _; rewrite normr0 normr_ge0.
+qed.
+
+(* --------------------------------------------------------------------- *)
+lemma summable_cond_fin ['a] (s : 'a -> real) (p : 'a -> bool) :
+  is_finite p => summable (fun x => if p x then s x else 0%r).
+proof.
+move=> fin_p; apply: (@summable_fin _ (to_seq p)) => /= x.
+by case: (p x) => // px _; rewrite mem_to_seq.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1057,3 +1065,61 @@ have E sum_s : s = oapp (s \o Some) (s None) by apply/fun_ext => -[|].
 rewrite {1}E sum_oapp //; exact summable_inj.
 qed.
 
+(* -------------------------------------------------------------------- *)
+lemma prodrDl ['t 'u] (F : 't -> 'u -> real) (r : 't list) (s : 'u list) :
+  uniq r => uniq s =>
+
+    BRM.big predT (fun x => big predT (F x) s) r
+  = sum (fun sigma => if fixfinfun (mem r) (mem s) sigma then
+      BRM.big predT (fun x => F x (sigma x)) r
+    else 0%r).
+proof.
+move=> + uq_s; elim: r => /= [|x r ih [x_notin_r uq_r]].
+- rewrite BRM.big_nil (@sumE_fin _ [fun _ => witness]) //=.
+  move=> sg; rewrite (@eqL_fixfinfun pred0) //.
+  by case _: (fixfinfun _ _ _) => //= /fixfinfun0 /fun_ext + _.
+rewrite BRM.big_consT /= ih // => {ih}; pose S := sum _; apply/eq_sym.
+pose P (sg : 't -> 'u) := sg x; rewrite (@sum_partition P).
+- by apply/summable_cond_fin/finite_fixfinfun; apply/finite_mem.
+rewrite (@sumE_fin _ s) //= => [u @/P|].
+- apply/contraR => u_notin_s; apply: sum0_eq => /= sg.
+  by case: (u = sg x) => // ->>; case _: (fixfinfun _ _ _) => // /(_ x).
+rewrite mulr_suml !big_seq &(eq_bigr) /= => u u_in_s @/S @/P.
+pose M w sg := BRM.big predT (fun x => F x (sg x)) w.
+pose G w1 w2 sg :=
+  if u = sg x /\ fixfinfun (mem w1) (mem s) sg then M w2 sg else 0%r.
+rewrite -(@eq_sum (G (x :: r) (x :: r))) => /= [sg @/G|].
+- by case: (u = sg x).
+rewrite -(@eq_sum (fun sg => F x u * G (x :: r) r sg)).
+- by move=> sg /= @/G; case _: (_ /\ _).
+rewrite sumZ; congr => @/G @/M => {S P M G}.
+rewrite -(@sum_reindex (swap_codom x witness u)) /(\o) /=.
+- by apply: bij_swap_codom.
+- by apply/summable_cond_fin/finiteIr/finite_fixfinfun; apply/finite_mem.
+apply: eq_sum=> /= sg; congr; last first.
+- rewrite !BRM.big_seq &(BRM.eq_bigr) => /= y y_in_r.
+  by case: (x = y) => [->>//|ne_xy]; rewrite swap_codom_neq.
+apply: eq_iff; split.
+- case=> sgx ond y; have /= := ond y; case: (y = x) => [->>|] /=.
+  - move=> _; rewrite x_notin_r /=; move: sgx.
+    rewrite /swap_codom /=; case _: (sg x = _) => //= ?.
+    by rewrite [sg x = u]eq_sym; case: (u = sg x).
+  - by move=> ne_yx; rewrite swap_codom_neq //= eq_sym.
+- move=> ^ond /(_ x); rewrite x_notin_r /= => sgx; split.
+  - by rewrite /swap_codom /= sgx.
+  - move=> y /=; case: (y = x) => [->>|] /=.
+    - by rewrite /swap_codom /= sgx.
+    - by move=> ne_yx; rewrite swap_codom_neq -1:&(ond) eq_sym.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma prodrDl2 (f g : 't -> real) r : is_finite_for predT r =>
+    BRM.big predT (fun x => f x + g x) r
+  = sum (fun sigma => BRM.big predT (fun x => if sigma x then f x else g x) r).
+proof.
+case=> [uq_r mem_r]; pose F x b := if b then f x else g x.
+have eq := prodrDl F r [true; false] _ _ => //.
+apply: (eq_trans _ eq); apply: eq_sum => /= sg.
+have ->: mem r = predT by apply/fun_ext=> ?; rewrite mem_r.
+by have ->: mem [true; false] = predT by apply/fun_ext; case.
+qed.

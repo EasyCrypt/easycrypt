@@ -783,9 +783,9 @@ end = struct
          msg "expecting a `%s', not a `%s'"
            (string_of_argkind dst) (string_of_argkind src)
 
-    | AE_CannotInfer     -> msg "%s" "cannot infer this place-holder"
+    | AE_CannotInfer     -> msg "%s" "cannot infer this placeholder"
     | AE_CannotInferMod  -> msg "%s" "cannot infer module arguments"
-    | AE_NotFunctional   -> msg "%s" "too many argument"
+    | AE_NotFunctional   -> msg "%s" "too many arguments"
 
     | AE_InvalidArgForm (IAF_Mismatch (src, dst)) ->
        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in

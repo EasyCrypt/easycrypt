@@ -168,7 +168,6 @@ module LowApply = struct
           (* FIXME: poor API ==> poor error recovery *)
           try
             let obl = EcTyping.check_modtype env mp mt emt in
-            EcPV.check_module_in env mp emt;
 
             let f = match obl with
               | `Ok ->  f

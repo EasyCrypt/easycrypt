@@ -201,15 +201,19 @@ proof.
     + by apply fsetP=> z;rewrite /restr !inE mem_oflist mem_iota /#.
   conseq (_ : _ ==> oflist PIR.s = restr x j) (_: _ ==> j = N) => //;1:smt().
   + while(0 <= j <= N);auto;smt (N_pos).
-  while (0 <= j <= N /\ is_restr (oflist PIR.s) j) (N-j) N 1%r;2,3:smt(N_pos).
-  + by move=> &hr /> _;rewrite -set0E N_pos /=; apply is_restr_fset0.
+  conseq (: (0 <= j <= N /\ is_restr (oflist PIR.s) j) ==> _) => //.
+  + move=> />; smt(N_pos set0E is_restr_fset0).
+  while (0 <= j <= N /\ is_restr (oflist PIR.s) j) (N-j) N 1%r => //.
+  + move=> /> s j *; have ->>: j = N by smt(). 
+    by rewrite subzz expr0. 
+  + smt(N_pos).
   + move=> H.
     case (oflist PIR.s = restr x j);first last.
     + seq 3 : true _ 0%r 0%r _ (0 <= j <= N /\ is_restr (oflist PIR.s) j /\ oflist PIR.s <> restr x j).
       + auto => /> &hr H0j ???? b ?.    
         rewrite restrS //= oflist_cons. 
         smt (is_restr_addS is_restrS is_restr_Ueq  is_restr_diff fset0U is_restr_restr).
-        by conseq H => /#.
+        by conseq H=> /#.
       + by hoare;auto.
       smt().      
     conseq (_ : _ : = (1%r / 2%r ^ (N - j))) => [/#|].
@@ -219,19 +223,16 @@ proof.
          is_restr (oflist s0) j0 /\ oflist s0 = restr x j0).
     + by auto => /> /#.
     + by wp => /=;rnd (pred1 (j0 \in x));skip => /> &hr;rewrite dbool1E.
-    + conseq H => />.
+    + conseq H=> />.
       + case: (j0 \in x) => Hjx ?? His Hof.
         + by rewrite oflist_cons restrS 1:/# Hjx Hof.
         by rewrite restrS 1:/# Hjx Hof /= fset0U.
       smt (is_restrS is_restr_addS oflist_cons).
-    + conseq H => />.
-      + move=> &hr ?? His Hof Hb.
-        rewrite restrS 1:/# (negbRL _ _ Hb).    
-        case (j0 \in x) => /= Hj0x.
-        + by rewrite (eq_sym (oflist s0)) (is_restr_diff j0 (restr x j0) _ His). 
-        by rewrite fset0U oflist_cons -Hof (is_restr_diff j0 (oflist s0) _ His).
-      smt (is_restrS is_restr_addS oflist_cons).
+    + conseq H=> /> &0 />.
+      + smt(restrS oflist_cons fset0U in_fsetU in_fset1 nin_is_restr).
+      smt(is_restr_addS oflist_cons is_restrS fset0U).
     move=> &hr /> ?????; rewrite -exprS 1:/#; congr;congr;ring.
+
   + wp;rnd predT;skip => /> &hr.
     smt (dbool_ll oflist_cons is_restrS is_restr_addS).
   move=> z;auto=> />;smt (dbool_ll).
@@ -254,16 +255,20 @@ proof.
     + by apply fsetP=> z;rewrite /restr !inE mem_oflist mem_iota /#.
   conseq (_ : _ ==> oflist PIR.s' = restr x j) (_: _ ==> j = N) => //;1:smt().
   + while(0 <= j <= N);auto;smt (N_pos).
-  while (0 <= j <= N /\ is_restr (oflist PIR.s') j) (N-j) N 1%r;2,3:smt(N_pos).
-  + by move=> &hr /> _;rewrite -set0E N_pos /=; apply is_restr_fset0.
+  conseq (: (0 <= j <= N /\ is_restr (oflist PIR.s') j) ==> _). 
+  + move=> />; smt(N_pos set0E is_restr_fset0).
+  while (0 <= j <= N /\ is_restr (oflist PIR.s') j) (N-j) N 1%r => //.
+  + move=> /> s j *; have ->>: j = N by smt(). 
+    by rewrite subzz expr0. 
+  + smt(N_pos).
   + move=> H.
     case (oflist PIR.s' = restr x j);first last.
     + seq 3 : true _ 0%r 0%r _ (0 <= j <= N /\ is_restr (oflist PIR.s') j /\ oflist PIR.s' <> restr x j).
       + auto => /> &hr 5? b _.
-       case: (j{hr}=i{hr}) => />; rewrite restrS //= oflist_cons;
+        case: (j{hr}=i{hr}) => />; rewrite restrS //= oflist_cons;
           smt (is_restr_addS is_restrS is_restr_Ueq  is_restr_diff fset0U is_restr_restr).
         by conseq H => /#.
-      + by hoare;auto.
+      + by hoare; auto.
       smt().      
     conseq (_ : _ : = (1%r / 2%r ^ (N - j))) => [/#|].
     exists * j, PIR.s';elim * => j0 s0.    

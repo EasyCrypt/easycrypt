@@ -67,7 +67,7 @@ qed.
 lemma supp_dbiased (p : real) b :
   0%r < p < 1%r => b \in (dbiased p).
 proof.
-case=> gt0_p lt1_p; rewrite /support /in_supp dbiased1E /#.
+case=> gt0_p lt1_p; rewrite /support dbiased1E /#.
 qed.
 
 lemma dbiased_ll (p : real) : is_lossless (dbiased p).
@@ -77,6 +77,15 @@ lemma dbiased_fu (p : real) :
   0%r < p < 1%r => is_full (dbiased p).
 proof.
 by move=> ??;rewrite supp_dbiased.
+qed.
+
+lemma dmap_pred (d: 'a distr) (p: 'a -> bool) :
+  is_lossless d =>
+  dmap d p = dbiased (mu d p).
+proof.
+move => d_ll; apply eq_distr => x.
+rewrite dbiased1E clamp_id; first by smt(ge0_mu le1_mu).
+rewrite dmap1E /(\o) /pred1; smt(mu_not).
 qed.
 
 end Biased.
@@ -107,9 +116,7 @@ lemma dbiased_ll : is_lossless dbiased.
 proof. by apply dbiased_ll;apply in01_p. qed.
 
 lemma dbiased_fu : is_full (dbiased p).
-proof.
-by move=> ?;rewrite /is_full supp_dbiased.
-qed.
+proof. by move=> ?;rewrite supp_dbiased. qed.
 
 end FixedBiased.
 

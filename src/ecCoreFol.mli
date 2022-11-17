@@ -498,17 +498,17 @@ type mem_pr = EcMemory.memory * form
 
 (* -------------------------------------------------------------------- *)
 type f_subst = private {
-  fs_freshen : bool; (* true means realloc local *)
-  fs_mp      : mpath Mid.t;
-  fs_loc     : form Mid.t;
-  fs_mem     : EcIdent.t Mid.t;
-  fs_sty     : ty_subst;
-  fs_ty      : ty -> ty;
-  fs_opdef   : (EcIdent.t list * expr) Mp.t;
-  fs_pddef   : (EcIdent.t list * form) Mp.t;
-  fs_esloc   : expr Mid.t;
-  fs_memtype : EcMemory.memtype option; (* Only substituted in Fcoe *)
-  fs_mempred : mem_pr Mid.t;  (* For predicates over memories,
+  fs_freshen  : bool; (* true means realloc local *)
+  fs_loc      : form Mid.t;
+  fs_mem      : EcIdent.t Mid.t;
+  fs_sty      : ty_subst;
+  fs_ty       : ty -> ty;
+  fs_opdef    : (EcIdent.t list * expr) Mp.t;
+  fs_pddef    : (EcIdent.t list * form) Mp.t;
+  fs_modtydef : path Mp.t;
+  fs_esloc    : expr Mid.t;
+  fs_memtype  : EcMemory.memtype option; (* Only substituted in Fcoe *)
+  fs_mempred  : mem_pr Mid.t;  (* For predicates over memories,
                                  only substituted in Fcoe *)
 }
 
@@ -519,10 +519,10 @@ module Fsubst : sig
 
   val f_subst_init :
        ?freshen:bool
-    -> ?mods:mpath Mid.t
     -> ?sty:ty_subst
     -> ?opdef:(EcIdent.t list * expr) Mp.t
     -> ?prdef:(EcIdent.t list * form) Mp.t
+    -> ?modtydef:path Mp.t
     -> ?esloc:expr Mid.t
     -> ?mt:EcMemory.memtype
     -> ?mempred:(mem_pr Mid.t)

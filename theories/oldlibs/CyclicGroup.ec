@@ -15,9 +15,10 @@ op g1 = g ^ F.zero.
 
 axiom gpow_log (a:group): g ^ (log a) = a.
 axiom log_gpow x : log (g ^ x) = x.
+axiom nosmt log_g : log g = F.one.
 
 lemma nosmt log_bij x y: x = y <=> log x = log y by smt (gpow_log).
-lemma nosmt pow_bij (x y:F.t): x = y <=> g^x =g^y by [].
+lemma nosmt pow_bij (x y:F.t): x = y <=> g^x =g^y by smt.
 
 
 axiom inv_def (a:group): inv a = g ^ (-log a).
@@ -27,9 +28,9 @@ axiom mul_pow g (x y:t): g ^ x * g ^ y = g ^ (x + y).
 
 axiom pow_pow g (x y:t): (g ^ x) ^ y = g ^ (x * y).
 
-lemma nosmt log_pow (g1:group) x: log (g1 ^ x) = log g1 * x by [].
+lemma nosmt log_pow (g1:group) x: log (g1 ^ x) = log g1 * x by smt.
 
-lemma nosmt log_mul (g1 g2:group): log (g1 * g2) = log g1 + log g2 by [].
+lemma nosmt log_mul (g1 g2:group): log (g1 * g2) = log g1 + log g2 by smt.
 
 lemma nosmt pow_mul (g1 g2:group) x: g1^x * g2^x = (g1*g2)^x.
 proof.
@@ -63,12 +64,6 @@ qed.
 lemma nosmt divK (a:group): a / a = g1.
 proof strict.
   by rewrite -div_def sub_def addfN.
-qed.
-
-lemma nosmt log_g : log g = F.one.
-proof strict.
- have H: log g - log g = F.one + -log g by smt.
- have H1: log g = log g + F.one + -log g; smt.
 qed.
 
 lemma nosmt g_neq0 : g1 <> g.

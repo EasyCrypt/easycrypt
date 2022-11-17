@@ -52,6 +52,29 @@ proof.
 rewrite big_undup; apply/eq_bigr=> x _ /=.
 by rewrite intmulpE ?count_ge0 ZM.AddMonoid.iteropE.
 qed.
+
+lemma telescoping_sum (F: int -> t) (m n:int) : m <= n =>
+  F m - F n = bigi predT (fun i => F i - F (i+1)) m n.
+proof.
+move=> /IntOrder.ler_eqVlt [<<- | hmn].
++ by rewrite big_geq 1:// subrr.
+rewrite -sumrB (@big_ltn m n F) 1:// /=.
+have heq: n = n - 1 + 1 by ring.
+rewrite heq (@big_int_recr (n-1) m) 1:/# -heq /=. 
+rewrite (@big_reindex _ _ (fun x=> x - 1) (fun x=> x + 1) (range m (n - 1))) //.
+have ->: (transpose Int.(+) 1) = ((+) 1).
++ by apply: fun_ext=> x; ring.
+have ->: predT \o transpose Int.(+) (-1) = predT by done.
+by rewrite /(\o) /= -(@range_addl m n 1) (@addrC _ (F n)) subr_add2r.
+qed. 
+
+lemma telescoping_sum_down (F: int -> t) (m n:int) : m <= n =>
+  F n - F m = bigi predT (fun i => F (i+1) - F i) m n.
+proof.
+move=> hmn; have /= := telescoping_sum (fun i => -F i) _ _ hmn.
+by rewrite opprK addrC => ->; apply eq_big => //= i _; rewrite opprK addrC.
+qed.
+
 end BigZModule.
 
 (* -------------------------------------------------------------------- *)
@@ -320,6 +343,45 @@ elim: s => [|x s ih]; first by rewrite !BAdd.big_nil normr0.
 rewrite !BAdd.big_cons /=; case: (P x) => // Px.
 have /ler_trans := ler_norm_add (F x) (BAdd.big P F s); apply.
 by rewrite ler_add2l.
+qed.
+
+lemma sum_expr p n : 0 <= n =>
+  (oner - p) * BAdd.bigi predT (fun i => exp p i) 0 n = oner - exp p n.
+proof.
+move=> hn; have /eq_sym := subrXX oner p n hn.
+rewrite expr1z // => <-; congr.
+by apply: BAdd.eq_big_int => i _ /=; rewrite expr1z mul1r.
+qed.
+
+lemma sum_expr_le p n :
+     0 <= n
+  => zeror <= p < oner
+  => (oner - p) * BAdd.bigi predT (fun i => exp p i) 0 n <= oner.
+proof.
+move=> ge0_n [ge0_p lt1_p]; rewrite sum_expr //.
+by rewrite ler_subl_addr ler_paddr // expr_ge0.
+qed.
+
+lemma sum_iexpr_le p n : zeror <= p < oner =>
+  exp (oner - p) 2 * BAdd.bigi predT (fun i => ofint i * exp p i) 0 n <= oner.
+proof.
+case=> [ge0_p lt1_p]; elim/natind: n => [n le0_n|n ge0_n ih].
++ by rewrite BAdd.big_geq // mulr0.
+rewrite BAdd.big_ltn 1:/# /= ofint0 mul0r add0r.
+pose F := fun j => exp p j + p * ((ofint j - oner) * exp p (j - 1)).
+rewrite (@BAdd.eq_big_int _ _ _ F) => /= [i [gt0_i lti]|].
+- by rewrite /F mulrCA -expr_pred 1:/# mulrBl mul1r addrC subrK.
+rewrite -BAdd.sumrD -BAdd.mulr_sumr mulrDr.
+apply: (ler_trans ((oner - p) + p)); last by rewrite lerr_eq subrK.
+apply: ler_add.
+- rewrite expr2 -mulrA ler_pimulr 1:subr_ge0 1:ltrW //.
+  have le := sum_expr_le p (n+1) _ _ => //; first move=> /#.
+  rewrite &(ler_trans _ _ le) ler_wpmul2l 1:subr_ge0 1:ltrW //.
+  by rewrite (@BAdd.big_ltn 0) 1:/# /= expr0 ler_paddl.
+rewrite mulrCA ler_pimulr // &(ler_trans _ _ ih).
+rewrite ler_wpmul2l; first by rewrite expr_ge0 subr_ge0 ltrW.
+rewrite &(lerr_eq) (@BAdd.big_addn 0 _ 1) &BAdd.eq_big_int /=.
+by move=> i [ge0_i _]; rewrite ofintS // addrAC subrr add0r.
 qed.
 
 end BigOrder.

@@ -5,7 +5,7 @@ require (*--*) Subtype Monoid Ring Subtype Bigalg StdOrder StdBigop.
 import StdOrder.IntOrder StdBigop.Bigreal.
 
 (* -------------------------------------------------------------------- *)
-clone import Ring.IDomain as ZR.
+clone import Ring.ComRing as ZR.
 
 (* -------------------------------------------------------------------- *)
 clone import Bigalg.BigComRing as Big with theory CR <- ZR.
@@ -134,6 +134,38 @@ qed.
 
 lemma dotpDl v1 v2 v3 : dotp (v1 + v2) v3 = dotp v1 v3 + dotp v2 v3.
 proof. by rewrite dotpC dotpDr !(dotpC v3). qed.
+
+op scalev a v = offunv (fun i => a * v.[i]).
+
+abbrev ( ** ) = scalev.
+
+lemma scalevE a v i : (a ** v).[i] = a * v.[i].
+proof.
+case: (0 <= i < size) => ?; first smt(offunvK tofunvK).
+by rewrite !getv_out // mulr0.
+qed.
+
+lemma scalevDl (a b : t) (v : vector) :
+  (a + b) ** v = a ** v + b ** v.
+proof.
+by apply/eq_vectorP=> *; rewrite offunD !scalevE // mulrDl.
+qed.
+
+lemma scalevDr (a : t) (v w : vector) :
+  a ** (v + w) = a ** v + a ** w.
+proof.
+by apply/eq_vectorP=> *; rewrite !(offunD, scalevE) mulrDr.
+qed.
+
+lemma scalevA (a b : t) (v : vector) :
+  (a * b) ** v = a ** (b ** v).
+proof.
+by apply/eq_vectorP => *; rewrite !scalevE mulrA.
+qed.
+
+lemma scalevAC (a b : t) (v : vector) :
+  a ** (b ** v) = b ** (a ** v).
+proof. by rewrite -!scalevA [b*a]mulrC. qed.
 end Vector.
 
 export Vector.

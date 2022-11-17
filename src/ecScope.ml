@@ -236,11 +236,13 @@ module KnownFlags = struct
   let implicits = "implicits"
   let oldip     = "oldip"
   let redlogic  = "redlogic"
+  let und_delta = "und_delta"
 
   let flags = [
     (implicits, false);
     (oldip    , false);
     (redlogic , true );
+    (und_delta, false);
   ]
 end
 
@@ -439,6 +441,12 @@ module Options = struct
 
   let set_redlogic scope value =
     set scope KnownFlags.redlogic value
+
+  let get_und_delta scope =
+    get scope KnownFlags.und_delta
+
+  let set_und_delta scope value =
+    set scope KnownFlags.und_delta value
 end
 
 (* -------------------------------------------------------------------- *)
@@ -731,7 +739,8 @@ module Tactics = struct
           EcHiGoal.tt_smtmode    = htmode;
           EcHiGoal.tt_implicits  = Options.get_implicits scope;
           EcHiGoal.tt_oldip      = Options.get_oldip scope;
-          EcHiGoal.tt_redlogic   = Options.get_redlogic scope; } in
+          EcHiGoal.tt_redlogic   = Options.get_redlogic scope;
+          EcHiGoal.tt_und_delta  = Options.get_und_delta scope; } in
 
         let (hds, juc) =
           try  TTC.process ttenv tac juc
@@ -1039,10 +1048,8 @@ module Ax = struct
       match tc with
       | Some tc -> tc
       | None    ->
-          let dtc = Plogic (Psmt empty_pprover) in
-          let dtc = { pl_loc = loc; pl_desc = dtc } in
-          let dtc = { pt_core = dtc; pt_intros = []; } in
-          [dtc]
+          let dtc = { pl_loc = loc; pl_desc = Pby None; } in
+          [{ pt_core = dtc; pt_intros = []; }]
     in
 
     let tc = { pl_loc = loc; pl_desc = Pby (Some tc) } in
@@ -1297,12 +1304,12 @@ module Op = struct
 
       let dty =
         match EcTypes.as_tdistr (EcEnv.ty_hnorm rty (env scope)) with
-        | None -> hierror ~loc "[lossless] can only be applied to distributions"
+        | None -> hierror ~loc "[%s] can only be applied to distributions" tag
         | Some dty -> dty
       in
 
       let bds = List.combine (List.map EcTypes.fresh_id_of_ty aty) aty in
-      let ax  = EcFol.f_op oppath (List.map tvar nparams) rty in
+      let ax  = EcFol.f_op oppath (List.map tvar nparams) ty in
       let ax  = EcFol.f_app ax (List.map (curry f_local) bds) rty in
       let ax  = EcFol.f_app (EcFol.f_op pred [dty] (tfun rty tbool)) [ax] tbool in
       let ax  = EcFol.f_forall (List.map (snd_map gtty) bds) ax in

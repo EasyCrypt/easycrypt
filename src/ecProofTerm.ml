@@ -812,7 +812,6 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
       | PVAModule (mp, mt) -> begin
           try
             let obl = EcTyping.check_modtype env mp mt emt in
-            EcPV.check_module_in env mp emt;
 
             let f = Fsubst.f_subst_mod x mp f in
             let f = match obl with

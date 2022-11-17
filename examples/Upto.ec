@@ -25,7 +25,7 @@ module type Oracle = {
 }.
 
 module type A (O : Oracle) ={
-  proc * run () : ret_adv { O.f}
+  proc run () : ret_adv { O.f}
 }.
 
 module Experiment (O : Oracle) (AdvF : A) = {
@@ -95,7 +95,7 @@ move=> hg hbnd hinint hinit2 hf hf2 hbound_bad hll1 hll2 hlladv hIm.
 apply (ler_trans (Pr [Experiment(O2, Adv).main() @ &m : P res \/ (Experiment.WO.bad /\
                                                                   Experiment.WO.cO <= qO /\
                                                                   Experiment.WO.cO = m (glob O2))]) _).
-+ byequiv (: true ==>
++ byequiv (: ={glob Adv} ==>
              (!Experiment.WO.bad{2} => ={res}) /\
               Experiment.WO.cO{2} <= qO /\
               Experiment.WO.cO{2} = m (glob O2){2})=> //.

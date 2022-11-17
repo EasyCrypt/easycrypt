@@ -5,7 +5,7 @@ type plaintext.
 type ciphertext.
 
 module type Scheme = {
-  proc * init(): unit {}
+  proc init(): unit {}
   proc kg(): key
   proc enc(k:key,p:plaintext): ciphertext
   proc dec(k:key,c:ciphertext): plaintext option
@@ -99,21 +99,23 @@ module INDCCA (S:Scheme, A:Adv_INDCCA) = {
   }
 }.
 
-module ToCCA (A:Adv_INDCPA, O:CCA_Oracles) = A(O).
+module ToCCA (A : Adv_INDCPA) (O : CCA_Oracles) = A(O).
 
 lemma CCA_implies_CPA (S <: Scheme {-INDCPA}) (A <: Adv_INDCPA {-S, -INDCPA}) &m:
-  Pr[INDCPA(S,A).main() @ &m: res] = Pr[INDCCA(S,ToCCA(A)).main() @ &m: res].
-proof strict.
-byequiv (_: ={glob A} ==> ={res})=> //; proc.
-call{2} (_: Wrap.qs = [] ==> !res); first by proc; skip; smt.
-conseq [-frame] (_: _ ==> Wrap.qs{2} = [] /\ (b = b'){1} = (b = b'){2}); first smt.
-call (_: ={glob Wrap, glob S} /\ Wrap.qs{2} = []);
-  first by proc; call (_: true).
-call (_: ={glob Wrap, glob S});
-  first by call (_: true).
+     equiv [S.init ~ S.init: true ==> ={glob S}]
+  => Pr[INDCPA(S,A).main() @ &m: res] = Pr[INDCCA(S,ToCCA(A)).main() @ &m: res].
+proof.
+move=> init_is_init.
+byequiv (: ={glob A} ==> ={res})=> //; proc.
+call{2} (: Wrap.qs = [] ==> !res); first by proc; skip; smt.
+conseq (: _ ==> Wrap.qs{2} = [] /\ (b = b'){1} = (b = b'){2}); first smt.
+call (: ={glob Wrap, glob S} /\ Wrap.qs{2} = []).
++ by proc; call (: true).
+call (: ={glob Wrap, glob S}).
++ by call (: true).
 wp; rnd.
-call (_: ={glob Wrap, glob S} /\ Wrap.qs{2} = []);
-  first by proc; call (_: true).
-by call (_: true ==> ={glob Wrap, glob S} /\ Wrap.qs{2} = []);
-     first by proc; wp; sim.
+call (_: ={glob Wrap, glob S} /\ Wrap.qs{2} = []).
++ by proc; call (: true).
+call (: ={glob A} ==> ={glob Wrap, glob S} /\ Wrap.qs{2} = [])=> //.
+by proc; wp; call (: true); call init_is_init.
 qed.

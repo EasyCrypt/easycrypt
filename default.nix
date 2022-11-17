@@ -15,20 +15,26 @@ let why3_local =
   else why3
 ; in
 let why3 = why3_local; in
+
+let merlin = 
+    ocamlPackages.merlin.overrideAttrs (o: {
+    doCheck = false;
+    }); in
+
   stdenv.mkDerivation {
     name = "easycrypt-1.0";
     src = ./.;
-    buildInputs = [ why3 ] ++ (with ocamlPackages; [
+    buildInputs = [ why3 merlin] ++ (with ocamlPackages; [
       ocaml
       findlib
       batteries
+      camlp-streams
       dune_2
       dune-build-info
       dune-site
       inifiles
       menhir
       menhirLib
-      merlin
       yojson
       zarith
     ]);

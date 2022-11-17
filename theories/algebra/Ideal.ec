@@ -280,7 +280,14 @@ qed.
 
 lemma in_idgen_mem xs x : x \in xs => idgen xs x.
 proof.
-admitted.
+move => x_xs; pose n := index x xs; pose cs := rcons (nseq n zeror) oner. 
+have get_cs : forall i, cs.[i] = if i = n then oner else zeror. 
+- by move => i; rewrite nth_rcons size_nseq !ler_maxr ?index_ge0 nth_nseq_if /#.
+exists cs; rewrite (BAdd.bigD1 _ _ n) ?BAdd.big1 ?range_uniq /=.
+- by rewrite mem_range index_ge0 index_mem.
+- by move => i Hi; rewrite get_cs ifF // mul0r.
+- by rewrite get_cs /= mul1r addr0 nth_index.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma dvdrr x : x %| x.
@@ -354,7 +361,7 @@ hint exact : ideal_p.
 op eqv (x y : t) = p (y - x).
 
 lemma eqvxx : reflexive eqv.
-proof. by move=> x @/eqv; rewrite /eqv subrr ideal0 ideal_p. qed.
+proof. by move=> x @/eqv; rewrite subrr ideal0 ideal_p. qed.
 
 lemma eqv_sym : symmetric eqv.
 proof. by move=> x y @/eqv; rewrite -opprB idealNP // ideal_p. qed.
@@ -398,8 +405,12 @@ proof. by rewrite /eqv -mulrBr &(idealMl) ideal_p. qed.
 lemma eqvMr x1 x2 y : eqv x1 x2 => eqv (x1 * y) (x2 * y).
 proof. by rewrite !(mulrC _ y) &(eqvMl). qed.
 
-lemma eqvX x y n : eqv x y => eqv (exp x n) (exp y n).
-proof. admitted.
+lemma eqvX x y n : 0 <= n => eqv x y => eqv (exp x n) (exp y n).
+proof. 
+move => ge0_n eqv_x_y.
+elim: n ge0_n => [|n ge0_n IHn]; rewrite ?expr0 ?exprSr //.
+by apply (eqv_trans (exp x n * y)); [exact eqvMl|exact eqvMr].
+qed.
 
 (* -------------------------------------------------------------------- *)
 clone include Quotient.EquivQuotient
@@ -438,7 +449,7 @@ qed.
 
 lemma mulE x y : (pi x) * (pi y) = pi (x * y).
 proof.
-rewrite /(+) &(eqv_pi) /eqv; pose z := repr (pi x).
+rewrite &(eqv_pi) /eqv; pose z := repr (pi x).
 have ->: x = x - z + z by rewrite subrK.
 rewrite mulrDl -addrA -mulrBr (mulrC _ y) {1}/z.
 by rewrite &(idealD) ?ideal_p // idealMl ?ideal_p &(eqv_repr).
@@ -449,14 +460,14 @@ axiom unitP   : forall (x y : qT), y * x = oner => unit x.
 axiom unitout : forall (x : qT), !unit x => invr x = x.
 
 clone import ComRing with
-  type t     <- qT   ,
-  op   zeror <- zeror,
-  op   ( + ) <- (+)  ,
-  op   [ - ] <- [-]  ,
-  op   oner  <- oner ,
-  op   ( * ) <- ( * ),
-  op   invr  <- invr ,
-  pred unit  <- unit
+  type t     <= qT   ,
+  op   zeror <= zeror,
+  op   ( + ) <= (+)  ,
+  op   [ - ] <= [-]  ,
+  op   oner  <= oner ,
+  op   ( * ) <= ( * ),
+  op   invr  <= invr ,
+  pred unit  <= unit
 
   proof *.
 
