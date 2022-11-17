@@ -409,6 +409,11 @@ type poperator = {
   po_locality : locality;
 }
 
+and pprocop = {
+  ppo_name   : psymbol;
+  ppo_target : pgamepath;
+}
+
 type ppred_def =
   | PPabstr of pty list
   | PPconcr of ptybindings * pformula
@@ -1229,6 +1234,7 @@ type global_action =
   | Gmodule      of pmodule_def_or_decl
   | Ginterface   of pinterface
   | Goperator    of poperator
+  | Gprocop      of pprocop
   | Gpredicate   of ppredicate
   | Gnotation    of pnotation
   | Gabbrev      of pabbrev
