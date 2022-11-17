@@ -838,19 +838,19 @@ by rewrite &(ler_trans _ _ _ (degD _ _)) ler_maxrP ih le.
 qed.
 
 lemma deg_prod_le ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
-     all (predC (predI P (fun x => F x = poly0))) r
-  => deg (PCM.big P F r) <= StdBigop.Bigint.BIA.big P ((fun p => deg p - 1) \o F) r + 1.
+  deg (PCM.big P F r) <=
+  if all (predC (predI P (fun x => F x = poly0))) r
+  then StdBigop.Bigint.BIA.big P ((fun p => deg p - 1) \o F) r + 1
+  else 0.
 proof.
-elim: r => [_|x r IHr]; [by rewrite PCM.big_nil StdBigop.Bigint.BIA.big_nil deg1|].
-case; rewrite {1}/predC {1}/predI /= negb_and or_andr PCM.big_cons StdBigop.Bigint.BIA.big_cons /=.
-case=> [NPx all_p|[Px neqFx0]]; [by rewrite NPx /= IHr|rewrite Px /= => all_p; move/IHr: (all_p)].
-move => le_; rewrite {1}/(\o) /= -(ler_add2r 1) /=; case: (PCM.big P F r = poly0) => [eq_0|neq_0].
-+ rewrite eq_0 mulr0 deg0 addrAC /= addrAC ler_addr; apply/addr_ge0; [by apply/ge0_deg|].
-  move=> {x Px IHr neqFx0 le_ eq_0}; elim: r all_p => [|x r IHr] /=; [by rewrite BIA.big_nil|].
-  rewrite {1}/predC {1}/predI /= negb_and or_andr /= BIA.big_cons; case => + /IHr le0_ {IHr}.
-  case=> [NPx|[Px neqh0]]; [by rewrite NPx|rewrite Px {1}/(\o) /=; apply/addr_ge0 => //].
-  by apply/subr_ge0/deg_ge1.
-by apply/(ler_trans _ _ _ (degM_le _ _ neqFx0 neq_0)); rewrite -!addrA ler_add2l !addrA addrC /= addrC.
+case: (all (predC (predI P (fun x => F x = poly0))) r); last first.
++ rewrite allP negb_forall /=; case => x; rewrite negb_imply {1}/predC {1}/predI /=.
+  by case=> mem_x [Px eqFx0]; apply/lerr_eq/deg_eq0/prodr0; exists x; do!split.
+elim: r => [_|x r IHr]; [by rewrite PCM.big_nil /= BIA.big_nil deg1|].
+rewrite /= {1}/predC {1}/predI /= negb_and PCM.big_cons StdBigop.Bigint.BIA.big_cons /=.
+case (P x) => //= Px [NeqFx0 all_]; move/IHr: (all_) => {IHr} le_.
+rewrite -(ler_add2r 1); apply/(ler_trans _ _ _ (degM_le_or _ _ _)); [by left|].
+by rewrite {1}/(\o) /= addrAC /= -addrA ler_add2l addrC.
 qed.
 
 lemma lc_prod_proper ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :

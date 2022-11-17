@@ -165,6 +165,18 @@ rewrite -addrA BAdd.sumrB /= BAdd.big_seq BAdd.big1 ?addr0 //=.
 move=> i /mem_range rg_i; rewrite mulrA -exprS 1:/# mulrCA. 
 by rewrite -exprS 1:/# subr_eq0; do 2! congr => /#.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma prodr0 P F s:
+      (exists x, P x /\ x \in s /\ F x = zeror)
+  => BMul.big<:'a> P F s = zeror.
+proof.
+elim: s => [|x s IHs] [y] [Py] //= [+ eq_0].
+rewrite BMul.big_cons /=; case => [->>|mem_y].
++ by rewrite Py /= eq_0 mul0r.
+rewrite IHs; [by exists y; do!split|].
+by rewrite mulr0; case: (P x).
+qed.
 end BigComRing.
 
 (* -------------------------------------------------------------------- *)
