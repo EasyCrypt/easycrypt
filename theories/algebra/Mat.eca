@@ -25,6 +25,16 @@ import BAdd.
 
 (* -------------------------------------------------------------------------- *)
 
+(* TOTHINK: This lemma is very useful in mulrxA, other uses? *)
+lemma big_range0 (j' j i : int) P F : i <= j' <= j =>
+  (forall x, j' <= x <= j => P x => F x = zeror) =>
+   bigi P F i j = bigi P F i j'.
+proof.
+move => le_j'_j F0E.
+rewrite (big_cat_int j') 1,2:/# [bigi P F j' j]big1_seq ?addr0 //. 
+smt(mem_range).
+qed.
+
 theory Vectors.
 
 type vector.
@@ -357,7 +367,6 @@ rewrite (range_cat (size v3)) 1:/# 1:/# big_cat; congr.
 - by apply eq_big_seq => i /mem_range ? /=; smt(get_catv_l).
 have ->:max (size v3 + size v2) (size v3 + size v4) =
   size v3 + max (size v2) (size v4) by smt().
-search (bigi _ _ _ _).
 have {1}->: size v3 = 0 + size v3 by smt().
 rewrite big_addn.
 rewrite addrC addrA [_ + size v3]Ring.IntID.addrC subrr.
@@ -1129,35 +1138,20 @@ lemma mulmxA m1 m2 m3: m1 * (m2 * m3) = m1 * m2 * m3.
 proof.
 apply eq_matrixP. 
 split => [| i j bound]; 1: smt(rows_mulmx cols_mulmx).
-rewrite !get_mulmx !dotpE /=.
-have ->: (fun (i0 : int) => m1.[i, i0] * (m2 * m3).[i0, j]) = 
-         (fun (i0 : int) => bigi predT (fun (j0 : int) => 
-              m1.[i, i0] * (m2.[i0,j0] * m3.[j0,j])) 0 (rows m3)).
-- apply fun_ext => /= k.
-  rewrite get_mulmx /dotp /= mulr_sumr (big_cat_int (rows m3)) 1,2:/#.
-  rewrite [bigi _ _ (rows m3) _]big1_seq /= => [l [_ /mem_range bound2]|].
-  + by rewrite [_ m3 _]getm0E 1:/# 2!mulr0.
-  rewrite addr0. 
-  by apply eq_bigr.
-have ->: (fun (i0 : int) => (m1 * m2).[i,i0] * m3.[i0,j]) = 
-         (fun (i0 : int) => bigi predT 
-          (fun (j0 : int) => m1.[i,j0] * (m2.[j0,i0] * m3.[i0,j])) 0 (rows m2)).
-- apply fun_ext => /= k.
-  rewrite get_mulmx /dotp /= mulr_suml (big_cat_int (rows m2)) 1,2:/#.
-  rewrite [bigi _ _ (rows m2) _]big1_seq /= => [l [_ /mem_range bound2]|].
-  + by rewrite [_ m2 _]getm0E 1:/# mulr0 mul0r.
-  rewrite addr0. 
-  apply eq_bigr => l _ /=.
-  by rewrite mulrA.
-- rewrite (big_cat_int (rows m2)) 1,2:/#.
-  rewrite [bigi _ _ (rows m2) _]big1_seq /= => [k [_ /mem_range bound2]|].
-  + rewrite big1 => [l _/= | //]. 
-    by rewrite [_ m2 _]getm0E 1:/# mul0r mulr0.
-  rewrite [bigi _ _ _ (max (cols m2) _)](big_cat_int (rows m3)) 1,2:/#.
-  rewrite [bigi _ _ (rows m3) _]big1_seq /= => [k [_ /mem_range bound2]|].
-  + rewrite big1 => [l _/= | //]. 
-    by rewrite [_ m3 _]getm0E 1:/# 2!mulr0.
-  by rewrite 2!addr0 exchange_big.
+rewrite !get_mulmx dotpE /= (big_range0 (rows m2)) 1:/#. 
+- smt(getm0E mulr0 mul0r rows_mulmx cols_mulmx row0E).
+rewrite (eq_bigr _ _ (fun k =>
+    bigi predT (fun (l : int) => m1.[i,k] * (m2.[k,l] * m3.[l,j])) 0 (rows m3))).
+- move => k /= _.
+  rewrite get_mulmx dotpE mulr_sumr /= (big_range0 (rows m3)) // 1:/#.
+  smt(getm0E mulr0 mul0r).
+rewrite exchange_big /= dotpE /=.
+rewrite [bigi _ _ _ (max _ _)](big_range0 (rows m3)) // 1:/#. 
+- smt(getm0E mulr0 mul0r).
+apply eq_bigr => k _ /=; rewrite get_mulmx dotpE mulr_suml /=.
+rewrite [bigi _ _ _ (max _ _)](big_range0 (rows m2)) 1:/#.
+- smt(getm0E mulr0 mul0r).
+by apply eq_bigr => l _ /=; rewrite mulrA.
 qed.
 
 lemma mulmxm0 n m: m * zerom (cols m) n = zerom (rows m) n.
