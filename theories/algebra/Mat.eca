@@ -26,13 +26,16 @@ import BAdd.
 (* -------------------------------------------------------------------------- *)
 
 (* TOTHINK: This lemma is very useful in mulrxA, other uses? *)
-lemma big_range0 (j' j i : int) P F : i <= j' <= j =>
-  (forall x, j' <= x <= j => P x => F x = zeror) =>
-   bigi P F i j = bigi P F i j'.
+lemma big_range0r (j' j i : int) P F : j' <= j =>
+  (forall x, j' <= x < j => P x => F x = zeror) =>
+  bigi P F i j = bigi P F i j'.
 proof.
-move => le_j'_j F0E.
-rewrite (big_cat_int j') 1,2:/# [bigi P F j' j]big1_seq ?addr0 //. 
-smt(mem_range).
+move => le_j'_j F0E; case (i <= j') => [le_i_j'|gt_i_j'].
+- rewrite (big_cat_int j') 1,2:/# [bigi P F j' j]big1_seq ?addr0 //. 
+  smt(mem_range).
+rewrite [bigi P F i j']big_geq 1:/#. 
+case (i <= j) => [le_i_j|gt_i_j]; last by smt(big_geq).
+by apply big1_seq; smt(mem_range).
 qed.
 
 theory Vectors.
@@ -288,19 +291,11 @@ hint simplify dotpNv, dotpvN.
 
 lemma dotpDr v1 v2 v3: dotp v1 (v2 + v3) = dotp v1 v2 + dotp v1 v3.
 proof.
-rewrite 3!dotpE.
-have ->: (fun (i : int) => v1.[i] * (v2 + v3).[i]) =
-      (fun (i : int) => v1.[i] * v2.[i] + v1.[i] * v3.[i]).
-- apply fun_ext => i /=.
-  by rewrite get_addv mulrDr.
-rewrite -sumrD size_addv (big_cat_int (max (size v1) (size v2))) 1,2:/# -addrA.
-congr.
-rewrite big1_seq => [i [_ /mem_range] bound /=|].
-- by rewrite getv0E 1:/# mul0r.
-rewrite add0r (big_cat_int (max (size v1) (size v3))) 1,2:/#.
-rewrite [bigi _ _ _ (max _ (max _ _))]big1_seq => [i [_ /mem_range] bound /=|].
-- by rewrite getv0E 1:/# mul0r.
-by rewrite addr0.
+rewrite !dotpE size_addv; pose m := max _ (max _ _).
+(* FIXME: (max _ _) should be precise enough, but this matches m! *)
+rewrite -[bigi _ _ 0 (max _ (size v2))](big_range0r _ m); 1,2: smt(getv0E mul0r).
+rewrite -[bigi _ _ 0 (max _ (size v3))](big_range0r _ m); 1,2: smt(getv0E mul0r).
+by rewrite sumrD /= &(eq_bigr) /= => i _; rewrite get_addv mulrDr.
 qed.
 
 lemma dotpDl v1 v2 v3: dotp (v1 + v2) v3 = dotp v1 v3 + dotp v2 v3.
@@ -484,13 +479,25 @@ by rewrite !get_scalarv mulNr.
 qed.
 
 lemma dotp_scalarv (v1 v2: vector) (s1 s2: t):
-    (dotp v1 v2) * (s1 * s2) = dotp (s1 ** v1) (s2 ** v2).
+  dotp (s1 ** v1) (s2 ** v2) = (s1 * s2) * (dotp v1 v2).
 proof.
-rewrite 2!dotpE 2!size_scalarv.
-rewrite mulr_suml. 
-apply eq_bigr => i _ /=.
-rewrite 2!get_scalarv.
-smt(mulrA mulrC).
+rewrite 2!dotpE 2!size_scalarv !mulr_sumr &(eq_bigr) /= => i _.
+rewrite 2!get_scalarv; smt(mulrA mulrC).
+qed.
+
+lemma dotp_scalarv_l (v1 v2: vector) (s : t):
+  dotp (s ** v1) v2 = s * dotp v1 v2.
+proof. by rewrite -[v2]scalar1v dotp_scalarv scalar1v mulr1. qed.
+
+lemma dotp_scalarv_r (v1 v2: vector) (s: t):
+  dotp v1 (s ** v2) = s * dotp v1 v2.
+proof. by rewrite -[v1]scalar1v dotp_scalarv scalar1v mul1r. qed.
+
+lemma scalarvDr s (v1 v2 : vector) :
+  s ** (v1 + v2) = s ** v1 + s ** v2.
+proof.
+apply eq_vectorP; rewrite 5!(size_addv,size_scalarv) /= => i Hi.
+by rewrite !(get_scalarv,get_addv) mulrDr.
 qed.
 
 (* List-vector isomorphism *)
@@ -1138,18 +1145,18 @@ lemma mulmxA m1 m2 m3: m1 * (m2 * m3) = m1 * m2 * m3.
 proof.
 apply eq_matrixP. 
 split => [| i j bound]; 1: smt(rows_mulmx cols_mulmx).
-rewrite !get_mulmx dotpE /= (big_range0 (rows m2)) 1:/#. 
+rewrite !get_mulmx dotpE /= (big_range0r (rows m2)) 1:/#. 
 - smt(getm0E mulr0 mul0r rows_mulmx cols_mulmx row0E).
 rewrite (eq_bigr _ _ (fun k =>
     bigi predT (fun (l : int) => m1.[i,k] * (m2.[k,l] * m3.[l,j])) 0 (rows m3))).
 - move => k /= _.
-  rewrite get_mulmx dotpE mulr_sumr /= (big_range0 (rows m3)) // 1:/#.
+  rewrite get_mulmx dotpE mulr_sumr /= (big_range0r (rows m3)) // 1:/#.
   smt(getm0E mulr0 mul0r).
 rewrite exchange_big /= dotpE /=.
-rewrite [bigi _ _ _ (max _ _)](big_range0 (rows m3)) // 1:/#. 
+rewrite [bigi _ _ _ (max _ _)](big_range0r (rows m3)) // 1:/#. 
 - smt(getm0E mulr0 mul0r).
 apply eq_bigr => k _ /=; rewrite get_mulmx dotpE mulr_suml /=.
-rewrite [bigi _ _ _ (max _ _)](big_range0 (rows m2)) 1:/#.
+rewrite [bigi _ _ _ (max _ _)](big_range0r (rows m2)) 1:/#.
 - smt(getm0E mulr0 mul0r).
 by apply eq_bigr => l _ /=; rewrite mulrA.
 qed.
@@ -1327,6 +1334,13 @@ proof.
 rewrite eq_vectorP size_scalarv size_mulmxv /= /max 1:// => i bound.
 rewrite get_scalarv get_mulmxv dotpE /= /max /=.
 by rewrite Big.BAdd.big_int1 /= get_vectc // mulrC.
+qed.
+
+lemma mulmx_scalarv (m : matrix) (s : t) (v : vector) :
+  m *^ (s ** v) = s ** (m *^ v).
+proof.
+apply eq_vectorP; rewrite size_mulmxv size_scalarv size_mulmxv => /= i Hi.
+by rewrite get_scalarv !get_mulmxv dotp_scalarv_r.
 qed.
 
 (* Vector and matrix multiplication *)
