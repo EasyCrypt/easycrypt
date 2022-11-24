@@ -1,0 +1,334 @@
+require import AllCore RealExp List Distr Real FinType.
+
+type X.
+type Y.
+type Z.
+type W.
+type Ev = W -> bool.
+
+clone FinType as FinX with 
+  type t <- X.
+
+clone FinType as FinY with 
+  type t <- Y.
+
+(* Joint distribution 
+        G : X -> Y
+        Rep : X -> Y
+        S : X -> bool
+        z : Z
+
+        H(x) := if S x then Rep x else G x
+
+        W is output type of adv.
+      
+        Ev is an event that may depend on I; this is described
+        as "any classical event" so this is modelled as a boolean
+        function produced by I (which can therefore depend on
+        everything I generates) that checks if the adversary's
+        output caused the event.
+*)
+module type Init = {
+    proc prm() : (X -> Y) * (X -> Y) * (X -> bool) * Z * Ev
+}.
+
+module type Gi_t = {
+    proc init() : Z * Ev
+    quantum proc o{x : X} : Y
+}.
+
+module type G_t = {
+    include Gi_t [o]
+}.
+
+(* We use G for the original random function *)
+module G(I : Init) : Gi_t = {
+    var g : X -> Y
+    var rep : X -> Y
+    var inS  : X -> bool
+    proc init() : Z * Ev = { 
+       var z,ev;
+       (g,rep,inS,z,ev) <@ I.prm();
+       return (z,ev);
+    }
+    quantum proc o{x : X} = { return g x; }
+}.
+
+(* We use H for the function that differs from G
+   on points inS. The replacement outputs are
+   given by rep. *)
+module H(I : Init) : Gi_t = {
+    include G(I) [-o]
+    quantum proc o{x : X} = { 
+        return if G.inS x then G.rep x else G.g x; 
+    }
+}.
+
+(* The game describing A interacting with O=G or O=H *)
+quantum module type A_t(O : G_t) = {
+   proc run(z : Z) : W
+}.
+
+module A_O(A : A_t, O : Gi_t) = {
+   proc main() : bool = {
+      var w, z, ev;
+      (z,ev) <@ O.init();
+      w <@ A(O).run(z);
+      return ev w;
+   }
+}.
+
+theory TwoSided.
+
+(* 
+Define B^{G,H} (z) => true iff B outputs X in S
+*)
+module type GHi_t = {
+    proc init() : Z * Ev
+    quantum proc oG{x : X} : Y
+    quantum proc oH{x : X} : Y
+}.
+
+module type GH_t = {
+    include GHi_t [oG, oH]
+}.
+
+quantum module type B_t(O : GH_t, A : A_t) = {
+   proc find(z : Z) : X
+}.
+
+module GH(I : Init) : GHi_t = {
+    include G(I) [init]
+    proc oG = G(I).o
+    proc oH = H(I).o
+}.
+
+module B_O(O : GHi_t, B : B_t, A : A_t) = {
+   proc main() : bool = {
+      var x, z, ev;
+      (z, ev) <@ O.init();
+      x <@ B(O,A).find(z);
+      return G.inS x;
+   }
+}.
+
+(* [BHHHP19] Lemma 5:
+   
+   S is a singleton =>
+
+   Exists B,
+
+   | Pr [ev : A^G ] - Pr[ev : A^H] | <= 2 * sqrt (Pr[ B^{GH} : x in S ])
+
+   Here we generalize the theorem to the case where S may turn out not
+   to be a singleton with probability at most epsilon. 
+
+   Note that the theorem is as permissive as possible for A so that
+   we can map any game to it: it cannot touch the inner states of the
+   oracles nor use any internal information kept by I. 
+
+   To do: restrict complexity of A to some cost and number of queries.
+   It is crucial that A is efficient, and so its inputs must also be
+   small. This means that z must be small.
+
+   Conversely, the theorem is as restrictive as possible to B.
+   we limit its access the inner state of A (ideally it would be
+   to nothing except the internal state of B itself).
+   To Do: The complexity of B should also be small.
+*)
+
+axiom ow2h_2sided (I <: Init) 
+           (A <: A_t  {-I,-G,-H}) &m (epsilon : real) :
+   phoare [ I.prm : true ==> exists xstar, forall x,
+              let (g,rep,inS,z,aux) = res in inS x => x = xstar ] >= (1%r - epsilon) =>
+   (forall (O <: G_t), 
+            islossless O.o => islossless A(O).run) =>
+   exists (B <: B_t {+A}),
+       (forall (O <: GH_t), 
+            islossless O.oG => islossless O.oH => islossless B(O, A).find) /\
+      `| Pr[ A_O(A,G(I)).main() @ &m : res ] - 
+         Pr[ A_O(A,H(I)).main() @ &m : res ] | 
+           <= 2%r * sqrt (Pr[ B_O(GH(I),B,A).main() @ &m : res ] + epsilon).
+
+end TwoSided.
+
+theory SemiClassical.
+
+quantum module type B_t(O : G_t, A : A_t) = {
+   proc find(z : Z) : X
+}.
+
+module B_O(O : Gi_t, B : B_t, A : A_t) = {
+   var x : X
+   proc main() : bool = {
+      var z, ev;
+      (z,ev) <@ O.init();
+      x <@ B(O,A).find(z);
+      return G.inS x;
+   }
+}.
+
+
+op cA : int.
+op d : int.
+
+axiom d_ge0 : 0 <= d.
+
+(* [BHHHP19] Lemma 3 = [AHU19] Theorem 1
+   
+   | Pr [ev : A^G ] - Pr[ev : A^H] | <= 2 * sqrt (d * Pr[ A^{H/S} : find ])
+
+   We can't capture find in EC, so we must plug in 
+   [BHHHP19] Lemma 3 = [AHU19] Theorem 2
+   
+   Exists B,  (* todo add the complexity of B *)
+
+   Pr[ A^{H/S} : find ] <= 4dPr[ B^{H,A} => x s.t x in S
+
+   Note that we assume B outputs a single element rather
+   than a list, which would be the case if we considered
+   parallel queries to the oracle. 
+
+   Same observations as above wrt restrictions and complexity. *)
+
+axiom ow2hsc1h (I <: Init) 
+           (A <: A_t {-I, -G, -H} [ run : `{N cA, #O.o : d} ]) &m:
+       (forall (O <: G_t), islossless O.o => islossless A(O).run) =>
+       exists (B <: B_t {+A}),
+       (forall (O <: G_t), islossless O.o => islossless B(O, A).find) /\
+      `| Pr[ A_O(A,G(I)).main() @ &m : res ] - 
+         Pr[ A_O(A,H(I)).main() @ &m : res ] | 
+           <= 4%r * d%r * sqrt Pr[ B_O(H(I),B,A).main() @ &m : res ].
+
+end SemiClassical.
+
+theory SemiClassicalSQRT.
+
+module type Gi_t = {
+    include Gi_t
+    proc oC(x : X) : Y
+}.
+
+module type G_t = {
+    include Gi_t [o,oC]
+}.
+
+(* We make explicit that it is possible to make
+   classical queries and log them *)
+module G(I : Init) : Gi_t = {
+    var g : X -> Y
+    var rep : X -> Y
+    var inS  : X -> bool
+    var xs : X list
+    proc init() : Z * Ev = { 
+       var z,ev;
+       xs <- [];
+       (g,rep,inS,z,ev) <@ I.prm();
+       return (z,ev);
+    }
+    quantum proc o{x : X} = { return g x; }
+    proc oC(x : X) = { xs <- x :: xs; return g x; }
+}.
+
+module H(I : Init) : Gi_t = {
+    include G(I) [-o, oC]
+    quantum proc o{x : X} = { 
+        return if G.inS x then G.rep x else G.g x; 
+    }
+    proc oC(x : X) = { 
+        G.xs <- x :: G.xs;
+        return if G.inS x then G.rep x else G.g x; 
+    }
+}.
+
+quantum module type A_t(O : G_t) = {
+   proc run(z : Z) : W
+}.
+
+module A_O(A : A_t, O : Gi_t) = {
+   proc main() : bool = {
+      var w, z, ev;
+      (z,ev) <@ O.init();
+      w <@ A(O).run(z);
+      return ev w;
+   }
+}.
+
+quantum module type B_t(O : G_t, A : A_t) = {
+   proc find(z : Z) : X
+}.
+
+module B_O(O : Gi_t, B : B_t, A : A_t) = {
+   var x : X
+   proc main() : bool = {
+      var z, ev;
+      (z,ev) <@ O.init();
+      x <@ B(O,A).find(z);
+      return G.inS x;
+   }
+}.
+
+op cA : int.
+op d : int.
+
+axiom d_ge0 : 0 <= d.
+
+(* [BHHHP19] Lemma 3 = [AHU19] Theorem 1
+   
+   | sqrt(Pr [ev : A^G ]) - sqrt(Pr[ev /\ !Find : A^{H/S} ] | 
+                         <=  sqrt ((d+1) * Pr[ A^{H/S} : find ])
+
+   We can't capture find in EC, so we must plug in 
+   [BHHHP19] Lemma 3 = [AHU19] Theorem 2
+   
+   Exists B,  (* todo add the complexity of B *)
+
+   Pr[ A^{H/S} : find ] <= 4dPr[ B^{H,A} => x s.t x in S
+
+   Note that we assume B outputs a single element rather
+   than a list, which would be the case if we considered
+   parallel queries to the oracle. 
+
+   Still we are not done, as we need the right-hand side
+   to talk about not find. Crucially in the proof we use
+   this theorem, we force find to occur due to a classical
+   query. So we have: 
+
+   Pr[ev /\ !Find : A^{H/S} ] = 
+    Pr[ev /\ !Find /\ FindC : A^{H/S} ] +  ===> 0
+    Pr[ev /\ !Find /\ !FindC : A^{H/S} ] <=  
+          Pr[ev /\ !FindC : A^{H/S} ] =?=
+          Pr[ev /\ !FindC : A^H ] 
+   This is useful because we are going to prove that
+   it is actually zero.
+
+   Is this the best bound we can have?
+
+   FIX ME: Check this and try to formalize all SC lemmas
+   with abstract semi classical oracles.
+
+
+   | sqrt(Pr[ev /\ !Find : A^{H/S} ] -
+     sqrt(Pr[ev /\ !FindC : A^{H} ] | <=
+           sqrt ((d+1) * Pr[ A^{H/S} : find ]
+
+    | sqrt(Pr [ev : A^G ]) - sqrt(Pr[ev /\ !Find : A^{H/S} ] | 
+                         <=  sqrt ((d+1) * Pr[ A^{H/S} : find ])
+
+   *)
+
+axiom ow2hsqrt (I <: Init) 
+           (A <: A_t {-I, -G, -H} [ run : `{N cA, #O.o : d} ]) &m:
+       (forall (O <: G_t), 
+            islossless O.o => 
+            islossless O.oC =>
+            islossless A(O).run) => 
+       exists (B <: B_t {+A}),
+       (forall (O <: G_t), 
+            islossless B(O, A).find) /\
+        sqrt(Pr[ A_O(A,G(I)).main() @ &m : res ]) <= 
+         sqrt(Pr[ A_O(A,H(I)).main() @ &m : res /\ 
+                   (forall x, G.inS x => ! x \in G.xs) ]) + 
+    4%r * (d%r + 1%r) * sqrt  Pr[ B_O(H(I),B,A).main() @ &m : res ].
+
+end SemiClassicalSQRT.
