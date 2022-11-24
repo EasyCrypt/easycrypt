@@ -123,7 +123,8 @@ let tydecl_compatible env tyd1 tyd2 =
 let expr_compatible exn env s e1 e2 =
   let f1 = EcFol.form_of_expr EcFol.mhr e1 in
   let f2 = EcFol.Fsubst.f_subst s (EcFol.form_of_expr EcFol.mhr e2) in
-  error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 f2)
+  let ri = { EcReduction.full_red with delta_p = (fun _ -> `Force) } in
+  error_body exn (EcReduction.is_conv ~ri (EcEnv.LDecl.init env []) f1 f2)
 
 let get_open_oper exn env p tys =
   let oper = EcEnv.Op.by_path p env in
