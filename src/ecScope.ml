@@ -1355,6 +1355,74 @@ module Op = struct
       else scope in
 
     tyop, List.rev !axs, scope
+
+  module Sem = struct
+    type senv = {
+      env     : EcEnv.env;
+      subst   : EcPV.PVM.subst;
+      written : EcPV.PV.t;
+    }
+
+    module Env = struct
+      let empty (env : EcEnv.env) =
+        let subst   = EcPV.PVM.empty in
+        let written = EcPV.PV.empty in
+        { env; subst; written; }
+
+      let merge (env1 : senv) (env2 : senv) =
+        assert false
+
+      let scope (env : senv) =
+        { env with written = EcPV.PV.empty }
+    end
+
+    let rec translate_i (env : senv) (i : instr) =
+      match i.i_node with
+      | Sasgn (lv, e) ->
+          let e  = translate_e env e in
+          let env, lv = translate_lv env lv in
+          env, `Unit (lv, e)
+
+      | Srnd (lv, e) ->
+          let e = translate_e env e in
+          let env, lv = translate_lv env lv in
+          env, `Rnd (lv, e)
+
+      | Sif (e, bt, bf) ->
+          let e = translate_e env e in
+          let envt, bt = translate_s (Env.scope env) bt in
+          let envf, bf = translate_s (Env.scope env) bf in
+          let env = Env.merge envt envf in
+          env, `Split (e, (envt, bt), (envf, bf))
+
+      | Swhile (e, b) ->
+          assert false
+
+      | Smatch    _
+      | Sassert   _
+      | Sabstract _
+      | Scall     _ ->
+          assert false (* FIXME *)
+
+    and translate_s (env : senv) (s : stmt) =
+      List.fold_left_map translate_i env s.s_node
+
+    and translate_e (env : senv) (e : expr) =
+      EcPV.PVM.subst
+        env.env
+        env.subst
+        (EcFol.form_of_expr mhr e)
+
+    and translate_lv (env : senv) (lv : lvalue) =
+      let vars =
+        match lv with
+        | LvVar (pv, _) -> [pv]
+        | LvTuple pvs -> List.fst pvs
+      in assert false
+  end
+
+  let add_opsem (scope : scope) (op : pprocop located) =
+    assert false
 end
 
 (* -------------------------------------------------------------------- *)

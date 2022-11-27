@@ -341,8 +341,9 @@ and process_operator (scope : EcScope.scope) (pop : poperator located) =
   scope
 
 (* -------------------------------------------------------------------- *)
-and process_procop (scope : EcScope.scope) (ppop : pprocop located) =
-  assert false
+and process_procop (scope : EcScope.scope) (pop : pprocop located) =
+  EcScope.check_state `InTop "operator" scope;
+  EcScope.Op.add_opsem scope pop
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
