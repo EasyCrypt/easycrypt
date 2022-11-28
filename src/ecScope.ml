@@ -1563,7 +1563,7 @@ module Op = struct
 
          let wr = List.filter (fun (z, _) -> z <> x) wr in
 
-         let mode, body =
+         let mode, body, _ =
            let env', ids =
              List.fold_left_map
                (fun env (x, _) -> Env.fresh env x)
@@ -1597,7 +1597,7 @@ module Op = struct
 
            let body = e_lam [(x, tint)] body in
 
-           bmode, body in
+           bmode, body, ids in
 
          let env', ids =
            List.fold_left_map
@@ -1626,17 +1626,33 @@ module Op = struct
          let mode, aout =
            match mode with
            | `Det ->
+              let args =
+                List.map
+                  (fun (z, zty) ->
+                    match Msym.find_opt z env.subst with
+                    | None -> e_op EcCoreLib.CI_Witness.p_witness [zty] zty
+                    | Some z -> e_local z zty)
+                  wr in
+              let args = e_tuple args in
               let cmode, c = cont env' in
               let aout = e_op EcCoreLib.CI_Int.p_iteri [aty] in
               let aout = aout (toarrow [tint; (toarrow [tint; aty] aty); aty] aty) in
-              let aout = e_app aout [translate_e env bd; assert false; body] aty in
+              let aout = e_app aout [translate_e env bd; args; body] aty in
               (cmode, e_let lv aout c)
 
            | `Distr ->
+              let args =
+                List.map
+                  (fun (z, zty) ->
+                    match Msym.find_opt z env.subst with
+                    | None -> e_op EcCoreLib.CI_Witness.p_witness [zty] zty
+                    | Some z -> e_local z zty)
+                  wr in
+              let args = e_tuple args in
               let cmode, c = cont env' in
-              let aout = e_op EcCoreLib.CI_Distr.p_dfold [tdistr aty] in
+              let aout = e_op EcCoreLib.CI_Distr.p_dfold [aty] in
               let aout = aout (toarrow [toarrow [tint; aty] (tdistr aty); aty; tint] (tdistr aty)) in
-              let aout = e_app aout [body; assert false; translate_e env bd] (tdistr aty) in
+              let aout = e_app aout [body; args; translate_e env bd] (tdistr aty) in
 
               let arg = EcIdent.create "arg" in
 
@@ -1647,7 +1663,7 @@ module Op = struct
 
               let aout =
                 ctor
-                  aty aty
+                  aty c.e_ty
                   (form_of_expr mhr aout)
                   (f_lambda
                      [(arg, GTty aty)]
@@ -1689,7 +1705,42 @@ module Op = struct
   end
 
   let add_opsem (scope : scope) (op : pprocop located) =
-    assert false
+    let op = unloc op in
+    let f  = EcTyping.trans_gamepath (env scope) op.ppo_target  in
+    let sig_, body =
+      let f = EcEnv.Fun.by_xpath f (env scope) in
+      let body =
+        match f.f_def with
+        | FBdef body -> body
+        | _ -> raise Sem.SemNotSupported in
+
+        (f.f_sig, body) in
+    let ret = oget ~exn:Sem.SemNotSupported body.f_ret in
+
+    let params =
+      let for1 (v : ovariable) =
+        (oget ~exn:Sem.SemNotSupported v.ov_name, v.ov_type) in
+      List.map for1 sig_.fs_anames in
+
+    let env = Sem.Env.empty (env scope) in
+    let env, ids = List.fold_left_map Sem.Env.fresh env (List.fst params) in
+
+    let cont (env : Sem.senv) =
+      (`Det, Sem.translate_e env ret) in
+
+    let _, aout = Sem.translate_s env cont body.f_body in
+    let aout = e_lam (List.map2 (fun (_, ty) x -> (x, ty)) params ids) aout in
+
+    let opdecl = EcDecl.{
+      op_tparams  = [];
+      op_ty       = aout.e_ty;
+      op_kind     = OB_oper (Some (OP_Plain (aout, false)));
+      op_loca     = `Global;
+      op_opaque   = false;
+      op_clinline = false;
+    } in
+
+    bind scope (unloc op.ppo_name, opdecl)
 end
 
 (* -------------------------------------------------------------------- *)
