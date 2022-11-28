@@ -1357,68 +1357,335 @@ module Op = struct
     tyop, List.rev !axs, scope
 
   module Sem = struct
+    exception SemNotSupported
+
     type senv = {
-      env     : EcEnv.env;
-      subst   : EcPV.PVM.subst;
-      written : EcPV.PV.t;
+      env   : EcEnv.env;
+      subst : EcIdent.t MSym.t;
     }
 
     module Env = struct
       let empty (env : EcEnv.env) =
-        let subst   = EcPV.PVM.empty in
-        let written = EcPV.PV.empty in
-        { env; subst; written; }
+        { env; subst = MSym.empty; }
 
-      let merge (env1 : senv) (env2 : senv) =
-        assert false
-
-      let scope (env : senv) =
-        { env with written = EcPV.PV.empty }
+      let fresh (env : senv) (x : symbol) =
+        let idx = EcIdent.create x in
+        let env = { env with subst = MSym.add x idx env.subst } in
+        (env, idx)
     end
 
-    let rec translate_i (env : senv) (i : instr) =
+    type mode = [`Det | `Distr]
+
+    let e_dunit (e : expr) : expr =
+      expr_of_form mhr (f_dunit (form_of_expr mhr e))
+
+    let rec translate_i (env : senv) (cont : senv -> mode * expr) (i : instr) =
+      EcPV.PV.iter
+        (fun pv _ -> if not (is_loc pv) then raise SemNotSupported)
+        (fun _ -> raise SemNotSupported)
+        (EcPV.i_read env.env i);
+
+      let wr =
+        let do1 (pv, ty) =
+          match pv with
+          | PVglob _ -> raise SemNotSupported
+          | PVloc  x -> (x, ty) in
+
+        let wr, mods = EcPV.PV.elements (EcPV.i_write env.env i) in
+
+        if not (List.is_empty mods) then
+          raise SemNotSupported;
+        List.map do1 wr
+      in
+
+      let env', ids =
+        List.fold_left_map
+          (fun env (x, _) -> Env.fresh env x)
+          env wr in
+
+      let ids = List.combine wr ids in
+
       match i.i_node with
       | Sasgn (lv, e) ->
-          let e  = translate_e env e in
-          let env, lv = translate_lv env lv in
-          env, `Unit (lv, e)
+         let e = translate_e env e in
+         let lv = translate_lv env' lv in
+         let mode, body = cont env' in
+         (mode, (e_let lv e body))
 
-      | Srnd (lv, e) ->
-          let e = translate_e env e in
-          let env, lv = translate_lv env lv in
-          env, `Rnd (lv, e)
+      | Srnd (lv, d) -> begin
+         let d = translate_e env d in
+         let lv = translate_lv env' lv in
+         let mode, body = cont env' in
+
+         let tya = oget (as_tdistr (EcEnv.Ty.hnorm d.e_ty env.env)) in
+         let tyb = body.e_ty in
+
+         let aout =
+           let d    = form_of_expr mhr d in
+           let body = form_of_expr mhr body in
+           let body =
+             let arg  = EcIdent.create "arg" in
+             let body = f_let lv (f_local arg tya) body in
+             f_lambda [(arg, GTty tya)] body in
+
+           match mode with
+           | `Det   -> f_dmap tya tyb d body
+           | `Distr -> f_dlet_simpl tya tyb d body
+
+         in (`Distr, expr_of_form mhr aout)
+        end
 
       | Sif (e, bt, bf) ->
-          let e = translate_e env e in
-          let envt, bt = translate_s (Env.scope env) bt in
-          let envf, bf = translate_s (Env.scope env) bf in
-          let env = Env.merge envt envf in
-          env, `Split (e, (envt, bt), (envf, bf))
+         let cont (fenv : senv) : mode * expr =
+           let do1 ((x, ty), _) =
+             e_local (MSym.find x fenv.subst) ty in
+           let vars = List.map do1 ids in
+           (`Det, e_tuple vars) in
 
-      | Swhile (e, b) ->
-          assert false
+         let e  = translate_e env e in
+         let bt = translate_s env cont bt in
+         let bf = translate_s env cont bf in
 
+         let mode, (bt, bf) =
+           match bt, bf with
+           | (`Det, bt), (`Det, bf) ->
+              (`Det, (bt, bf))
+
+           | (`Distr, bt), (`Distr, bf) ->
+              (`Distr, (bt, bf))
+
+           | (`Det, bt), (`Distr, bf) ->
+              (`Distr, (e_dunit bt, bf))
+
+           | (`Distr, bt), (`Det, bf) ->
+              (`Distr, (bt, e_dunit bf)) in
+
+         let lv =
+           let ids =
+             let do1 ((x, ty), _) =
+               (MSym.find x env'.subst, ty) in
+             List.map do1 ids in
+
+           match ids with
+           | [] ->
+              LSymbol (EcIdent.create "_", tunit)
+           | [x, ty] ->
+              LSymbol (x, ty)
+           | ids ->
+              LTuple ids in
+
+         let cmode, c = (cont env') in
+
+         (mode, e_let lv (e_if e bt bf) c) (* FIXME *)
+
+      | Swhile    _
       | Smatch    _
       | Sassert   _
       | Sabstract _
       | Scall     _ ->
           assert false (* FIXME *)
 
-    and translate_s (env : senv) (s : stmt) =
-      List.fold_left_map translate_i env s.s_node
+    and translate_s (env : senv) (cont : senv -> mode * expr) (s : stmt) =
+      match translate_forloop env cont s with
+      | Some e ->
+         e
+      | None ->
+         match s.s_node with
+         | [] ->
+            cont env
+         | i :: s ->
+            translate_i env (fun env -> translate_s env cont (stmt s)) i
+
+    and translate_forloop (env : senv) (cont : senv -> mode * expr) (s : stmt) =
+      let module ET = EcReduction.EqTest in
+
+      match s.s_node with
+      | { i_node = Sasgn (LvVar (PVloc x, xty), e) } :: { i_node = Swhile (c, body) } :: _ ->
+         if not (ET.for_type env.env xty tint) then
+           raise SemNotSupported;
+
+         if not (ET.for_expr env.env e (e_int EcBigInt.zero)) then
+           raise SemNotSupported;
+
+         let body =
+           let inc, body =
+             match List.rev body.s_node with
+             | inc :: body -> inc, List.rev body
+             | _ -> raise SemNotSupported in
+
+           match inc.i_node with
+           | Sasgn (LvVar (PVloc y, _), ic) ->
+              if x <> y then
+                raise SemNotSupported
+              else begin
+                match ic.e_node with
+                | Eapp ({ e_node = Eop (op, []) }, [{ e_node = Evar (PVloc y') }; z])
+                     when    y = y'
+                          && ET.for_expr env.env z (e_int EcBigInt.one)
+                          && EcPath.p_equal op EcCoreLib.CI_Int.p_int_add
+                  -> body
+                | _ -> raise SemNotSupported
+              end;
+           | _ -> raise SemNotSupported in
+
+         let bd =
+           match c.e_node with
+           | Eapp ({ e_node = Eop (op, []) }, [{ e_node = Evar (PVloc y) }; bd])
+                when    x = y
+                     && EcPath.p_equal op EcCoreLib.CI_Int.p_int_lt -> bd
+           | _ -> raise SemNotSupported in
+
+         let wr = EcPV.s_write env.env (EcModules.stmt body) in
+
+         if EcPV.PV.mem_pv env.env (pv_loc x) wr then
+           raise SemNotSupported;
+
+         if not (EcPV.PV.indep env.env (EcPV.e_read env.env bd) wr) then
+           raise SemNotSupported;
+
+         EcPV.PV.iter
+           (fun pv _ -> if not (is_loc pv) then raise SemNotSupported)
+           (fun _ -> raise SemNotSupported)
+           (EcPV.is_read env.env body);
+
+         let wr =
+           let do1 (pv, ty) =
+             match pv with
+             | PVglob _ -> raise SemNotSupported
+             | PVloc  z -> (z, ty) in
+
+           let wr, mods = EcPV.PV.elements (EcPV.is_write env.env body) in
+
+           if not (List.is_empty mods) then
+             raise SemNotSupported;
+           List.map do1 wr
+         in
+
+         let wr = List.filter (fun (z, _) -> z <> x) wr in
+
+         let mode, body =
+           let env', ids =
+             List.fold_left_map
+               (fun env (x, _) -> Env.fresh env x)
+               env wr in
+
+           let ids = List.combine wr ids in
+
+           let env', x = Env.fresh env' x in
+
+           let cont_body (fenv : senv) : mode * expr =
+             let do1 ((x, ty), _) =
+               e_local (MSym.find x fenv.subst) ty in
+             let vars = List.map do1 ids in
+             (`Det, e_tuple vars) in
+
+           let bmode, body = translate_s env' cont_body (stmt body) in
+
+           let body =
+             match ids with
+             | [] ->
+                e_lam [(EcIdent.create "_", tunit)] body
+             | [((_, ty), z)] ->
+                e_lam [(z, ty)] body
+             | ids ->
+                let arg = EcIdent.create "arg" in
+                let aty = ttuple (List.map (fun ((_, ty), _) -> ty) ids) in
+                let lv  = LTuple (List.map (fun ((_, ty), z) -> (z, ty)) ids) in
+                e_lam
+                  [(arg, aty)]
+                  (e_let lv (e_local arg aty) body) in
+
+           let body = e_lam [(x, tint)] body in
+
+           bmode, body in
+
+         let env', ids =
+           List.fold_left_map
+             (fun env (x, _) -> Env.fresh env x)
+             env wr in
+
+         let ids = List.combine wr ids in
+         let aty = ttuple (List.map (fun ((_, ty), _) -> ty) ids) in
+
+         let env', x = Env.fresh env' x in
+
+         let lv =
+           let ids =
+             let do1 ((x, ty), _) =
+               (MSym.find x env'.subst, ty) in
+             List.map do1 ids in
+
+           match ids with
+           | [] ->
+              LSymbol (EcIdent.create "_", tunit)
+           | [x, ty] ->
+              LSymbol (x, ty)
+           | ids ->
+              LTuple ids in
+
+         let mode, aout =
+           match mode with
+           | `Det ->
+              let cmode, c = cont env' in
+              let aout = e_op EcCoreLib.CI_Int.p_iteri [aty] in
+              let aout = aout (toarrow [tint; (toarrow [tint; aty] aty); aty] aty) in
+              let aout = e_app aout [translate_e env bd; assert false; body] aty in
+              (cmode, e_let lv aout c)
+
+           | `Distr ->
+              let cmode, c = cont env' in
+              let aout = e_op EcCoreLib.CI_Distr.p_dfold [tdistr aty] in
+              let aout = aout (toarrow [toarrow [tint; aty] (tdistr aty); aty; tint] (tdistr aty)) in
+              let aout = e_app aout [body; assert false; translate_e env bd] (tdistr aty) in
+
+              let arg = EcIdent.create "arg" in
+
+              let ctor =
+                match cmode with
+                | `Det   -> f_dmap
+                | `Distr -> f_dlet_simpl in
+
+              let aout =
+                ctor
+                  aty aty
+                  (form_of_expr mhr aout)
+                  (f_lambda
+                     [(arg, GTty aty)]
+                     (f_let lv (f_local arg aty) (form_of_expr mhr c))) in
+              (`Distr, expr_of_form mhr aout)
+
+         in Some (mode, e_let (LSymbol (x, tint)) (translate_e env bd) aout)
+
+      | _ ->
+         None
 
     and translate_e (env : senv) (e : expr) =
-      EcPV.PVM.subst
-        env.env
-        env.subst
-        (EcFol.form_of_expr mhr e)
+      match e.e_node with
+      | Evar (PVloc x) ->
+         e_local (oget (MSym.find_opt x env.subst)) e.e_ty
 
-    and translate_lv (env : senv) (lv : lvalue) =
-      let vars =
-        match lv with
-        | LvVar (pv, _) -> [pv]
-        | LvTuple pvs -> List.fst pvs
-      in assert false
+      | Evar (PVglob _) ->
+         raise SemNotSupported
+
+      | _ ->
+         e_map (fun x -> x) (translate_e env) e
+
+    and translate_lv (env : senv) (lv : lvalue) : lpattern =
+      match lv with
+      | LvVar (pv, ty) ->
+         LSymbol (translate_pv env pv, ty)
+
+      | LvTuple pvs ->
+         let do1 (pv, ty) =
+           (translate_pv env pv, ty)
+         in LTuple (List.map do1 pvs)
+
+    and translate_pv (env : senv) (pv : prog_var) =
+      match pv with
+      | PVglob _ ->
+         raise SemNotSupported
+      | PVloc x ->
+          oget (MSym.find_opt x env.subst)
   end
 
   let add_opsem (scope : scope) (op : pprocop located) =
