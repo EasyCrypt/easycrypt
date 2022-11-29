@@ -171,7 +171,7 @@ lemma get_mapv f (v : vector) i :
 proof. by move => ?; rewrite get_offunv. qed.
 
 (* Vector addition *)
-op (+) (v1 v2 : vector) = 
+op[opaque] (+) (v1 v2 : vector) = 
   offunv ((fun i => v1.[i] + v2.[i]), max (size v1) (size v2)).
 
 lemma size_addv v1 v2: size (v1 + v2) = max (size v1) (size v2).
@@ -1095,12 +1095,12 @@ by apply row_matrixc.
 qed.
 
 (* Matrix multiplication *)
-op ( * ) (m1 m2 : matrix) =
+op[opaque] ( * ) (m1 m2 : matrix) =
   offunm (fun i j => dotp (row m1 i) (col m2 j), rows m1, cols m2).
 
-lemma rows_mulmx m1 m2: rows (m1 * m2) = rows m1 by done.
+lemma rows_mulmx m1 m2: rows (m1 * m2) = rows m1 by rewrite /( * ).
 
-lemma cols_mulmx m1 m2: cols (m1 * m2) = cols m2 by done.
+lemma cols_mulmx m1 m2: cols (m1 * m2) = cols m2 by rewrite /( * ).
 
 hint simplify rows_mulmx, cols_mulmx.
 
