@@ -393,6 +393,9 @@ qed.
 lemma degC_le c : deg (polyC c) <= 1.
 proof. by rewrite degC; case: (c = zeror). qed.
 
+lemma lcP p n : deg p = n + 1 => lc p = p.[n].
+proof. by rewrite -subr_eq => <-. qed.
+
 lemma lcC c : lc (polyC c) = c.
 proof. by rewrite polyCE degC; case: (c = zeror) => [->|]. qed.
 

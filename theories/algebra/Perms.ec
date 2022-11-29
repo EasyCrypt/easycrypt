@@ -126,6 +126,15 @@ op id_perm n = range 0 n.
 lemma is_perm_id n : is_perm n (id_perm n).
 proof. by rewrite /is_perm /id_perm perm_eq_refl. qed.
 
+op cc_perm n = if 0 < n then rcons (range 1 n) 0 else [].
+
+lemma is_perm_cc n : is_perm n (cc_perm n).
+proof.
+rewrite /is_perm /cc_perm -cats1; case (0 < n) => [lt0n|/lerNgt len0].
++ by rewrite (range_ltn 0) // -(cat1s _ (range _ _)) perm_catC.
+by rewrite range_geq.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op permute (dflt : 'a) (p : int list) (s : 'a list) =
   mkseq (fun n => nth dflt s (nth (-1) p n)) (size s).
@@ -250,11 +259,24 @@ proof.
   admit.
 qed.
 
+lemma nth_shape_ge0 x k n p :
+  k \in range 0 (size p) =>
+  0 <= nth x (shape n p) k.
+proof. by move=> mem_k; rewrite /shape nth_mkseq -?mem_range //= count_ge0. qed.
+
 (* -------------------------------------------------------------------- *)
 pred is_shape (n : int) (s : int list) = true. (*TODO*)
 
 lemma is_shapeP n s :
   is_shape n s <=> (exists p , is_perm n p /\ shape n p = s).
+proof.
+  admit.
+qed.
+
+lemma is_shape_sum n s :
+  0 <= n =>
+  is_shape n s =>
+  BIA.bigi predT (fun i => i * nth 0 s (i - 1)) 1 (n + 1) = n.
 proof.
   admit.
 qed.
@@ -281,6 +303,12 @@ op allshapes (n : int) : int list list.
 
 lemma allshapesP n s :
   is_shape n s <=> s \in allshapes n.
+proof.
+  admit.
+qed.
+
+lemma allshapes_uniq n :
+  uniq (allshapes n).
 proof.
   admit.
 qed.

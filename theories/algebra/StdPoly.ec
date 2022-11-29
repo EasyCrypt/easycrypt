@@ -21,6 +21,8 @@ theory PolyInt.
     op   IDCoeff.exp     <- IntID.exp,
     op   IDCoeff.lreg    <- IntID.lreg
 
+    remove abbrev IDCoeff.(/)
+
     rename [theory] "BCA" as "BIA"
            [theory] "BCM" as "BIM".
 

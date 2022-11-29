@@ -228,6 +228,9 @@ axiom ceil_bound  (x:real) : x <= (ceil x)%r < x + 1%r.
 axiom from_int_floor n : floor n%r = n.
 axiom from_int_ceil  n : ceil  n%r = n.
 
+lemma from_int_inj : injective from_int.
+proof. by move=> x y eq_; rewrite -from_int_floor eq_ from_int_floor. qed.
+
 lemma floor_gt x : x - 1%r < (floor x)%r.
 proof. by case: (floor_bound x). qed.
 
