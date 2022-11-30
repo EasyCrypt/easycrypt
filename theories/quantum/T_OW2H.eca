@@ -46,12 +46,14 @@ module G(I : Init) : Gi_t = {
     var g : X -> Y
     var rep : X -> Y
     var inS  : X -> bool
+    var ch : int
     proc init() : Z * Ev = { 
        var z,ev;
+       ch <- 0;
        (g,rep,inS,z,ev) <@ I.prm();
        return (z,ev);
     }
-    quantum proc o{x : X} = { return g x; }
+    quantum proc o{x : X} = { ch <- ch + 1; return g x; }
 }.
 
 (* We use H for the function that differs from G
@@ -60,6 +62,7 @@ module G(I : Init) : Gi_t = {
 module H(I : Init) : Gi_t = {
     include G(I) [-o]
     quantum proc o{x : X} = { 
+        G.ch <- G.ch + 1;
         return if G.inS x then G.rep x else G.g x; 
     }
 }.
@@ -168,18 +171,12 @@ module B_O(O : Gi_t, B : B_t, A : A_t) = {
    }
 }.
 
-
-op cA : int.
-op d : int.
-
-axiom d_ge0 : 0 <= d.
-
 (* [BHHHP19] Lemma 3 = [AHU19] Theorem 1
    
    | Pr [ev : A^G ] - Pr[ev : A^H] | <= 2 * sqrt (d * Pr[ A^{H/S} : find ])
 
    We can't capture find in EC, so we must plug in 
-   [BHHHP19] Lemma 3 = [AHU19] Theorem 2
+   [BHHHP19] Lemma 4 = [AHU19] Theorem 2
    
    Exists B,  (* todo add the complexity of B *)
 
@@ -192,8 +189,9 @@ axiom d_ge0 : 0 <= d.
    Same observations as above wrt restrictions and complexity. *)
 
 axiom ow2hsc1h (I <: Init) 
-           (A <: A_t {-I, -G, -H} [ run : `{N cA, #O.o : d} ]) &m:
+           (A <: A_t {-I, -G, -H}) &m d:
        (forall (O <: G_t), islossless O.o => islossless A(O).run) =>
+       (forall (O <: Gi_t), hoare [A_O(A,O).main : true ==> G.ch <= d]) =>
        exists (B <: B_t {+A}),
        (forall (O <: G_t), islossless O.o => islossless B(O, A).find) /\
       `| Pr[ A_O(A,G(I)).main() @ &m : res ] - 
@@ -220,22 +218,25 @@ module G(I : Init) : Gi_t = {
     var rep : X -> Y
     var inS  : X -> bool
     var xs : X list
+    var ch : int
     proc init() : Z * Ev = { 
        var z,ev;
-       xs <- [];
+       ch <- 0; xs <- [];
        (g,rep,inS,z,ev) <@ I.prm();
        return (z,ev);
     }
-    quantum proc o{x : X} = { return g x; }
-    proc oC(x : X) = { xs <- x :: xs; return g x; }
+    quantum proc o{x : X} = { ch <- ch + 1; return g x; }
+    proc oC(x : X) = {  ch <- ch + 1; xs <- x :: xs; return g x; }
 }.
 
 module H(I : Init) : Gi_t = {
     include G(I) [-o, oC]
     quantum proc o{x : X} = { 
+        G.ch <- G.ch + 1;
         return if G.inS x then G.rep x else G.g x; 
     }
     proc oC(x : X) = { 
+        G.ch <- G.ch + 1; 
         G.xs <- x :: G.xs;
         return if G.inS x then G.rep x else G.g x; 
     }
@@ -268,11 +269,6 @@ module B_O(O : Gi_t, B : B_t, A : A_t) = {
    }
 }.
 
-op cA : int.
-op d : int.
-
-axiom d_ge0 : 0 <= d.
-
 (* [BHHHP19] Lemma 3 = [AHU19] Theorem 1
    
    | sqrt(Pr [ev : A^G ]) - sqrt(Pr[ev /\ !Find : A^{H/S} ] | 
@@ -290,45 +286,49 @@ axiom d_ge0 : 0 <= d.
    parallel queries to the oracle. 
 
    Still we are not done, as we need the right-hand side
-   to talk about not find. Crucially in the proof we use
+   to talk about not findC. Crucially in the proof we use
    this theorem, we force find to occur due to a classical
-   query. So we have: 
+   query. 
 
-   Pr[ev /\ !Find : A^{H/S} ] = 
-    Pr[ev /\ !Find /\ FindC : A^{H/S} ] +  ===> 0
-    Pr[ev /\ !Find /\ !FindC : A^{H/S} ] <=  
-          Pr[ev /\ !FindC : A^{H/S} ] =?=
-          Pr[ev /\ !FindC : A^H ] 
-   This is useful because we are going to prove that
-   it is actually zero.
-
-   Is this the best bound we can have?
-
-   FIX ME: Check this and try to formalize all SC lemmas
-   with abstract semi classical oracles.
-
+   Claim:
 
    | sqrt(Pr[ev /\ !Find : A^{H/S} ] -
      sqrt(Pr[ev /\ !FindC : A^{H} ] | <=
            sqrt ((d+1) * Pr[ A^{H/S} : find ]
 
+
+    Proof.
+
+    !Find => !FindC in Theorem 1, so we have:
+ 
+    sqrt(Pr[ev /\ !Find : A^{H/S} ] = sqrt(Pr[ev /\ !FindC /\ !Find : A^{H/S} ]
+
+    But now we set Ev' = Ev /\ !FindC which is classical
+    Pr_left = Pr[E' : A^{H}]
+    Pr_right = Pr[E' /\ !Find : A^{H/S} ]
+    And apply the theorem again to get the lemma.
+
+    Now if we combine the above Claim with the main theorem
+
     | sqrt(Pr [ev : A^G ]) - sqrt(Pr[ev /\ !Find : A^{H/S} ] | 
                          <=  sqrt ((d+1) * Pr[ A^{H/S} : find ])
 
+    We have 
+
+    | sqrt(Pr [ev : A^G ]) - sqrt(Pr[ev /\ !FindC : A^{H} ] | <=
+       sqrt ((d+1) * 4*d * Pr[ B_O(H(I),B,A).main() @ &m : res ])
+
+    And from here we get the following theorem.
    *)
 
-axiom ow2hsqrt (I <: Init) 
-           (A <: A_t {-I, -G, -H} [ run : `{N cA, #O.o : d} ]) &m:
-       (forall (O <: G_t), 
-            islossless O.o => 
-            islossless O.oC =>
-            islossless A(O).run) => 
+axiom ow2hsqrt (I <: Init) (A <: A_t {-I, -G, -H}) d &m:
+       (forall (O <: G_t), islossless O.o => islossless O.oC => islossless A(O).run) => 
+       (forall (O <: Gi_t), hoare [  A_O(A,O).main : true ==> G.ch <= d]) =>
        exists (B <: B_t {+A}),
-       (forall (O <: G_t), 
-            islossless B(O, A).find) /\
+       (forall (O <: G_t), islossless B(O, A).find) /\
         sqrt(Pr[ A_O(A,G(I)).main() @ &m : res ]) <= 
          sqrt(Pr[ A_O(A,H(I)).main() @ &m : res /\ 
                    (forall x, G.inS x => ! x \in G.xs) ]) + 
-    4%r * (d%r + 1%r) * sqrt  Pr[ B_O(H(I),B,A).main() @ &m : res ].
+    2%r * (d%r + 1%r) * sqrt  Pr[ B_O(H(I),B,A).main() @ &m : res ].
 
 end SemiClassicalSQRT.
