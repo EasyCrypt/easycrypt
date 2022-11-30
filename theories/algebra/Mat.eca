@@ -230,9 +230,11 @@ qed.
 
 hint simplify add0v.
 
-lemma lin_add0v v n: n = size v => zerov n + v = v by subst.
+lemma lin_add0v v n: n = size v => zerov n + v = v by done.
 
 lemma addv0 v: v + zerov (size v) = v by rewrite addvC.
+
+lemma lin_addv0 v n: n = size v => v + zerov n = v by move => ->; rewrite addv0.
 
 abbrev (-) v1 v2 = v1 + (-v2).
 
