@@ -24,7 +24,6 @@ clone import Bigalg.BigComRing as Big with theory CR <- ZR proof *.
 import BAdd.
 
 (* -------------------------------------------------------------------------- *)
-
 (* TOTHINK: This lemma is very useful in mulrxA, other uses? *)
 lemma big_range0r (j' j i : int) P F : j' <= j =>
   (forall x, j' <= x < j => P x => F x = zeror) =>
@@ -33,9 +32,7 @@ proof.
 move => le_j'_j F0E; case (i <= j') => [le_i_j'|gt_i_j'].
 - rewrite (big_cat_int j') 1,2:/# [bigi P F j' j]big1_seq ?addr0 //. 
   smt(mem_range).
-rewrite [bigi P F i j']big_geq 1:/#. 
-case (i <= j) => [le_i_j|gt_i_j]; last by smt(big_geq).
-by apply big1_seq; smt(mem_range).
+rewrite !big1_seq; smt(mem_range).
 qed.
 
 theory Vectors.
@@ -387,7 +384,7 @@ by rewrite addrC.
 qed.
 
 lemma oppv_catv (v1 v2: vector): - (v1 || v2) = (-v1 || -v2).
-proof. by apply eq_vectorP => i bound /=; rewrite !get_catv' opprD. qed.
+proof. by apply eq_vectorP => i bound /=; rewrite 2!get_catv' opprD. qed.
 
 (* Splitting apart vectors *)
 op subv (v: vector) (n m: int) = offunv ((fun i => v.[i+n]), m - n).
@@ -471,7 +468,7 @@ qed.
 lemma scalarvN a (v : vector): a ** -v = - (a ** v).
 proof. 
 rewrite eq_vectorP size_oppv 2!size_scalarv size_oppv /= => i bound.
-by rewrite !get_scalarv getvN mulrN.
+by rewrite 2!get_scalarv getvN mulrN.
 qed.
 
 lemma scalarNv (a : R) (v : vector): (-a) ** v = - (a ** v).
@@ -909,7 +906,7 @@ proof.
 move => m1 m2 m3; apply eq_matrixP.
 split => [| i j bound].
 - rewrite !(rows_addm, cols_addm) 1:/#.
-by rewrite !get_addm addrA.
+by rewrite 4!get_addm addrA.
 qed.
 
 lemma addmC: commutative Matrices.( + ).
@@ -1002,7 +999,7 @@ lemma trmxD (m1 m2 : matrix) : trmx (m1 + m2) = trmx m1 + trmx m2.
 proof.
 apply eq_matrixP. 
 split => [/= | i j bound]; 1: smt(rows_addm cols_addm cols_tr rows_tr).
-rewrite trmxE !get_addm /#. 
+rewrite trmxE 2!get_addm /#. 
 qed.
 
 hint simplify trmxD.
