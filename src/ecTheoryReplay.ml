@@ -790,8 +790,13 @@ and replay_mod
 
       let newme =
         if mode = `Alias || mode = `Inline `Keep then
-          { newme with tme_expr = { newme.tme_expr with
-              me_body = ME_Alias (List.length newme.tme_expr.me_params, mp) } }
+          let alias = ME_Alias (
+              List.length newme.tme_expr.me_params,
+              EcPath.m_apply
+                mp
+                (List.map (fun (id, _) -> EcPath.mident id) newme.tme_expr.me_params)
+          )
+          in { newme with tme_expr = { newme.tme_expr with me_body = alias } }
         else newme in
 
       let scope =
