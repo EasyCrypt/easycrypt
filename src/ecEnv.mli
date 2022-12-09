@@ -47,6 +47,8 @@ type lookup_error = [
   | `AbsStmt of EcIdent.t
 ]
 
+val pp_lookup_failure : Format.formatter -> lookup_error -> unit
+
 exception LookupFailure of lookup_error
 exception DuplicatedBinding of symbol
 

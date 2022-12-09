@@ -313,13 +313,18 @@ end) = struct
       oall2 (for_expr env Mid.empty ~norm) fd1.f_ret fd2.f_ret
 
   (* ------------------------------------------------------------------ *)
-  let for_function_body env ~norm fb1 fb2 =
+  (* FIXME: FBalias FBdef *)
+  let for_function_body env ~norm (fb1 : function_body) fb2 =
     match fb1, fb2 with
     | FBdef fd1, FBdef fd2 ->
       for_function_def env ~norm fd1 fd2
 
     | FBalias xp1, FBalias xp2 ->
       for_xp env ~norm xp1 xp2
+
+    | FBabs restr1, FBabs restr2 ->
+       (* Should we use PreOI.equal (for_form env ~norm) *)
+       OI.equal restr1 restr2
 
     | FBabs _, _ | _, FBabs _ -> assert false
     | _, _ -> false

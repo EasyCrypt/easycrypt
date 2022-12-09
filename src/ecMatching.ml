@@ -615,10 +615,9 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           if not (EcReduction.EqTest.for_xp env pr1.pr_fun pr2.pr_fun) then
             failure ();
           doit_mem env mxs pr1.pr_mem pr2.pr_mem;
+          doit env (subst, mxs) pr1.pr_args pr2.pr_args;
           let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
-          List.iter2
-            (doit env (subst, mxs))
-            [pr1.pr_args; pr1.pr_event] [pr2.pr_args; pr2.pr_event]
+          doit env (subst, mxs) pr1.pr_event pr2.pr_event;
       end
 
       | _, _ -> default ()
