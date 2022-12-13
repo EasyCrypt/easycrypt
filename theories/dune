@@ -109,6 +109,7 @@
       (quantum/T_QROM.eca              as quantum/T_QROM.eca)
       (quantum/T_OW2H.eca              as quantum/T_OW2H.eca)
       (quantum/FunSamplingLib.ec       as quantum/FunSamplingLib.ec)
+      (quantum/QLorR.eca               as quantum/QLorR.eca)
       (quantum/QMeans.ec               as quantum/QMeans.ec)
       (query_counting/Counter.eca      as query_counting/Counter.eca)
       (query_counting/OracleBounds.ec  as query_counting/OracleBounds.ec)
