@@ -318,4 +318,9 @@ type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_solve : ?canfail:bool -> ?bases:symbol list -> ?depth:int -> FApi.backward
+val t_solve :
+     ?canfail:bool
+  -> ?bases:symbol list
+  -> ?mode:EcMatching.fmoptions
+  -> ?depth:int
+  -> FApi.backward
