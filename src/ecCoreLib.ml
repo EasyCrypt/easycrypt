@@ -82,7 +82,7 @@ module CI_Int = struct
   let p_int_lt    = _Int "lt"
   let p_int_edivz = _IntDiv "edivz"
   let p_int_max   = _IntDiv "max"
-  let p_iteri     = _Int "iteri"
+  let p_iteri     = EcPath.extend p_top ["Int"; "IterOp"; "iteri"]
 end
 
 (* -------------------------------------------------------------------- *)

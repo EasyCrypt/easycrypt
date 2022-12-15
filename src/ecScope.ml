@@ -1645,7 +1645,7 @@ module Op = struct
               let cmode, c = cont env' in
               let aout = e_op EcCoreLib.CI_Int.p_iteri [aty] in
               let aout = aout (toarrow [tint; (toarrow [tint; aty] aty); aty] aty) in
-              let aout = e_app aout [niter; args; body] aty in
+              let aout = e_app aout [niter; body; args] aty in
               (cmode, e_let lv aout c)
 
            | `Distr ->
