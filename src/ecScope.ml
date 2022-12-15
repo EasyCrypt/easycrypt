@@ -1507,7 +1507,7 @@ module Op = struct
          if not (ET.for_expr env.env e (e_int EcBigInt.zero)) then
            raise SemNotSupported;
 
-         let body =
+         let inc, body =
            let inc, body =
              match List.rev body.s_node with
              | inc :: body -> inc, List.rev body
@@ -1519,11 +1519,11 @@ module Op = struct
                 raise SemNotSupported
               else begin
                 match ic.e_node with
-                | Eapp ({ e_node = Eop (op, []) }, [{ e_node = Evar (PVloc y') }; z])
+                | Eapp ({ e_node = Eop (op, []) }, [{ e_node = Evar (PVloc y') }; { e_node = Eint inc }])
                      when    y = y'
-                          && ET.for_expr env.env z (e_int EcBigInt.one)
+                          && EcBigInt.lt EcBigInt.zero inc
                           && EcPath.p_equal op EcCoreLib.CI_Int.p_int_add
-                  -> body
+                  -> inc, body
                 | _ -> raise SemNotSupported
               end;
            | _ -> raise SemNotSupported in
@@ -1623,6 +1623,14 @@ module Op = struct
            | ids ->
               LTuple ids in
 
+         let niter = form_of_expr mhr (translate_e env bd) in
+         let niter = f_proj_simpl (f_int_edivz_simpl niter (f_int inc)) 0 tint in
+         let rem   = f_proj_simpl (f_int_edivz_simpl niter (f_int inc)) 1 tint in
+         let outv  = f_int_add_simpl (f_int_mul_simpl niter (f_int inc)) rem in
+
+         let niter = expr_of_form mhr niter in
+         let outv  = expr_of_form mhr outv in
+
          let mode, aout =
            match mode with
            | `Det ->
@@ -1637,7 +1645,7 @@ module Op = struct
               let cmode, c = cont env' in
               let aout = e_op EcCoreLib.CI_Int.p_iteri [aty] in
               let aout = aout (toarrow [tint; (toarrow [tint; aty] aty); aty] aty) in
-              let aout = e_app aout [translate_e env bd; args; body] aty in
+              let aout = e_app aout [niter; args; body] aty in
               (cmode, e_let lv aout c)
 
            | `Distr ->
@@ -1652,7 +1660,7 @@ module Op = struct
               let cmode, c = cont env' in
               let aout = e_op EcCoreLib.CI_Distr.p_dfold [aty] in
               let aout = aout (toarrow [toarrow [tint; aty] (tdistr aty); aty; tint] (tdistr aty)) in
-              let aout = e_app aout [body; args; translate_e env bd] (tdistr aty) in
+              let aout = e_app aout [body; args; niter] (tdistr aty) in
 
               let arg = EcIdent.create "arg" in
 
@@ -1670,7 +1678,7 @@ module Op = struct
                      (f_let lv (f_local arg aty) (form_of_expr mhr c))) in
               (`Distr, expr_of_form mhr aout)
 
-         in Some (mode, e_let (LSymbol (x, tint)) (translate_e env bd) aout)
+         in Some (mode, e_let (LSymbol (x, tint)) outv aout)
 
       | _ ->
          None
