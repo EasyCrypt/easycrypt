@@ -1,4 +1,4 @@
-require import AllCore FSet CoreMap SmtMap CyclicGroup List.
+require import AllCore FSet CoreMap SmtMap List.
 require import Distr DList DJoin DMap StdOrder.
 require import AEAD.
 require (*--*) MRPKE.
@@ -14,35 +14,46 @@ op dlet_locked ['a, 'b] = dlet<:'a, 'b> axiomatized by dlet_lockedE.
 theory DHIES.
 
   clone import ODH with
-    op genRange <- gen,
-    type range <- K,
-    op q_ror <- q_lor.
+    op   genRange <- gen,
+    type range    <- K,
+    op   q_ror    <- q_lor.
 
-  type CTxt = group * Cph.
-  type PTxt = Msg.
-  type Pk = group.
-  type Sk = t.
-  type Rand = t.
-  type MPk = Pk fset.
+  clone GP.ZModE.ZModpField as ZPF.
+
+  type group   = ODH.G.group.
+  type exp     = ODH.GP.exp.
+  abbrev dt    = ODH.FD.dt.
+  abbrev g     = ODH.G.g.
+  abbrev ( ^ ) = ODH.GP.( ^ ).
+
+  type CTxt  = group * Cph.
+  type PTxt  = Msg.
+  type Pk    = group.
+  type Sk    = exp.
+  type Rand  = exp.
+  type MPk   = Pk fset.
   type MCTxt = (Pk, CTxt) fmap.
-  type Tag = AData.
+  type Tag   = AData.
 
   (* DH keypair sampling distr *)
-  op genDH : (Sk*Pk) distr = dmap FDistr.dt (fun x=> (x, g^x)).
+  op genDH : (Sk * Pk) distr =
+    dmap dt (fun x => (x, g ^ x)).
 
   (* mrDHIES up to key derivation distr *)
-  op mkeyDHIES (pkl: Pk list) : (Pk*(group*K)) list distr =
-    dmap FDistr.dt (fun x => map (fun pk => (pk, (g^x, hash (pk^x)))) pkl).
+  op mkeyDHIES (pkl : Pk list) : (Pk * (group * K)) list distr =
+    dmap dt (fun x =>
+               map (fun pk => (pk, (g ^ x, hash (pk ^ x)))) pkl).
 
   (* DHIES symmetric encryption part distr *)
-  op encDHIES tag ptxt (kk: Pk * (group * K)) : (Pk * (group * Cph)) distr =
+  op encDHIES tag ptxt (kk: Pk * (group * K)) :
+                       (Pk * (group * Cph)) distr =
     dmap (enc kk.`2.`2 tag ptxt) (fun c => (kk.`1, (kk.`2.`1, c))).
 
   (* mrDHIES symmetric encryption part distr *)
   op mencDHIES tag ptxt (kks: (Pk * (group * K)) list) =
     djoinmap (encDHIES tag ptxt) kks.
 
-  (* mrDHIES encryption (list version) *)  
+  (* mrDHIES encryption (list version) *)
   op menclist pkl tag ptxt : (Pk * CTxt) list distr =
     dlet (mkeyDHIES pkl) (mencDHIES tag ptxt).
 
@@ -51,20 +62,23 @@ theory DHIES.
     dapply ofassoc (menclist (elems pks) tag ptxt).
 
   (* DHIES decryption *)
-  op decrypt( sk : Sk, tag : Tag, ctxt : CTxt) : PTxt option =
+  op decrypt (sk : Sk, tag : Tag, ctxt : CTxt) : PTxt option =
     dec (hash(ctxt.`1 ^ sk)) tag ctxt.`2.
 
   (* mrndDHIES up to key derivation, but random independent symmetric keys *)
-  op mrndkeyDHIES (pkl: Pk list) : (Pk*(group*K)) list distr =
-    dlet_locked FDistr.dt
-                        (fun x => dmap (dlist gen (size pkl))
-                        (fun ks => amap (fun pk k => (g^x, k)) (zip pkl ks))).
+  op mrndkeyDHIES (pkl: Pk list) : (Pk * (group * K)) list distr =
+    dlet_locked dt (fun x =>
+                      dmap (dlist gen (size pkl))
+                           (fun ks =>
+                              amap (fun pk k =>
+                                   (g ^ x, k)) (zip pkl ks))).
 
-  lemma nosmt mencDHIES_menc pkl (kk: (Pk * (group * K)) list) tag ptxt:
+  lemma nosmt mencDHIES_menc pkl (kk : (Pk * (group * K)) list) tag ptxt :
     pkl = map (snd \o snd) kk =>
     menc pkl tag ptxt = dmap (mencDHIES tag ptxt kk) (List.map (snd \o snd)).
   proof.
-  rewrite /mencDHIES /menc /encDHIES /= djoin_dmap.
+  rewrite /mencDHIES /menc /dlistmap /zipks /encDHIES /=.
+  rewrite djoin_dmap.
   move=> ->; rewrite -map_comp /(\o) /=.
   congr; congr; apply fun_ext => x.
   by rewrite dmap_comp /(\o) /= dmap_id.
@@ -74,17 +88,17 @@ theory DHIES.
     proc gen () : (Sk * Pk) = {
       var y, gy;
 
-      y  <$ FDistr.dt;
+      y  <$ dt;
       gy <- g ^ y;
-      return (y,gy);
+      return (y, gy);
     }
 
     proc mencrypt (mpk : MPk, tag : Tag, ptxt : PTxt) : MCTxt = {
       var cphList,scph,x,gx,pkl,i;
 
-      x       <$ FDistr.dt;
+      x       <$ dt;
       gx      <- g ^ x;
-      pkl     <- map (fun pk => (pk,(gx, hash(pk^x)))) (elems mpk);
+      pkl     <- map (fun pk => (pk,(gx, hash(pk ^ x)))) (elems mpk);
       i       <- size pkl-1;
       cphList <- [];
       while (0 <= i){
@@ -105,7 +119,7 @@ theory DHIES.
     }
   }.
 
-  clone import MRPKE with 
+  clone import MRPKE with
     type Pk <- Pk,
     type Sk <- Sk,
     type CTxt <- CTxt,
@@ -121,19 +135,18 @@ theory DHIES.
 
 (*axiom bound : q_maxpks = q_maxn /\ MRPKE.q_dec = AEAD.q_dec.*)
 
-
   (* decomposing [mencrypt] *)
 
   module MEnc = {
     proc mencrypt (mpk : MPk, tag : Tag, ptxt : PTxt) : MCTxt = {
       var pkl, eph, keys, cphs, cph;
-      pkl <- elems mpk;
+      pkl  <- elems mpk;
       (* keys : (Pk * (group * K)) list *)
-      eph <$ FDistr.dt;
+      eph  <$ dt;
       keys <- map (fun pk => (pk, (g ^ eph, hash (pk ^ eph)))) pkl;
       (* cphs : (Pk * (group * Cph)) *)
       cphs <$ mencDHIES tag ptxt keys;
-      cph <- SmtMap.ofassoc cphs;
+      cph  <- SmtMap.ofassoc cphs;
       return cph;
     }
     proc mencDHIES1(tag : AData, ptxt : Msg, kks : (Pk * (group * K)) list)
@@ -146,8 +159,8 @@ theory DHIES.
                 : (Pk * (group * Cph)) list = {
       var skeys, cs, cphl;
       skeys <- map (snd \o snd) kks;
-      cs <$ menc skeys tag ptxt;
-      cphl <- map (fun x:(_*(_*_))*_ => (x.`1.`1, (x.`1.`2.`1,x.`2))) (zip kks cs);
+      cs    <$ menc skeys tag ptxt;
+      cphl  <- map (fun x:(_*(_*_))*_ => (x.`1.`1, (x.`1.`2.`1,x.`2))) (zip kks cs);
       return cphl;
     }
     proc mrndkeys1 (pkl : Pk list) : (Pk * (group * K)) list = {
@@ -157,16 +170,16 @@ theory DHIES.
     }
     proc mrndkeys2 (pkl : Pk list) : (Pk * (group * K)) list = {
       var x, ks, keys;
-      x <$ FDistr.dt;
-      ks <$ dlist gen (size pkl);
-      keys <- amap (fun pk k => (g^x, k)) (zip pkl ks);
+      x    <$ dt;
+      ks   <$ dlist gen (size pkl);
+      keys <- amap (fun pk k => (g ^ x, k)) (zip pkl ks);
       return keys;
     }
   }.
 
   clone JoinMapSampling as MEncDHIES_loop
-  with type ta <- (Pk*(group*K)),
-       type tb <- (Pk*(group*Cph)).
+  with type ta <- (Pk * (group * K)),
+       type tb <- (Pk * (group * Cph)).
 
   clone JoinMapSampling as MEnc_loop
   with type ta <- K,
@@ -174,7 +187,7 @@ theory DHIES.
 
   clone import DMapSampling as EncDHIES_map
   with type t1 <- Cph,
-       type t2 <- Pk * (group*Cph).
+       type t2 <- Pk * (group * Cph).
 
   lemma nosmt mencDHIES_eq : equiv [MEnc.mencDHIES1 ~ MEnc.mencDHIES2: ={tag,ptxt,kks} ==> ={res}].
   proof.
@@ -192,7 +205,7 @@ theory DHIES.
     - by inline*; wp; rnd; wp.
     - by call MEncDHIES_loop.Sample_Loop_eq.
   transitivity{2} { skeys <- map (snd \o snd) kks;
-                    cs <@ MEnc_loop.S.loop(fun k=> enc k tag ptxt, skeys); 
+                    cs <@ MEnc_loop.S.loop(fun k=> enc k tag ptxt, skeys);
                     cphl <- map (fun x:(_*(_*_))*_ => (x.`1.`1, (x.`1.`2.`1, x.`2)))
                                 (zip kks cs); }
                   ( ={tag, ptxt, kks} ==> mcph{1}=cphl{2} )
@@ -200,7 +213,7 @@ theory DHIES.
   + by move=> *; exists kks{2} ptxt{2} tag{2}.
   + done.
   + inline*; wp.
-    while ( ={i,kks,tag,ptxt} /\ 
+    while ( ={i,kks,tag,ptxt} /\
            (d = encDHIES tag ptxt /\ xs = kks /\ i < size kks){1} /\
            (d = (fun k => enc k tag ptxt) /\ xs = map (snd \o snd) kks){2} /\
            l{1} = map (fun x:(_*(_*_))*_ => (x.`1.`1, (x.`1.`2.`1, x.`2)))
@@ -209,11 +222,11 @@ theory DHIES.
      transitivity{1} { r <@ EncDHIES_map.S.map(enc (nth witness xs i).`2.`2 tag ptxt,
                                                         fun c => ((nth witness xs i).`1,
                                                                   ((nth witness xs i).`2.`1,c))); }
-                     ( ={d, xs, i, kks, tag, ptxt, l} /\ 
+                     ( ={d, xs, i, kks, tag, ptxt, l} /\
                        (d = encDHIES tag ptxt /\ xs = kks /\ 0 <= i < size kks){1}
                      ==> ={r, d, xs, i, kks, tag, ptxt, l} /\
                          (d = encDHIES tag ptxt /\ xs = kks /\ 0 <= i < size kks){1} )
-                     ( ={i, kks, tag, ptxt} /\ 
+                     ( ={i, kks, tag, ptxt} /\
                        (d = encDHIES tag ptxt /\ xs = kks /\ 0 <= i < size kks){1} /\
                        (d = (fun k => enc k tag ptxt) /\ xs = map (snd \o snd) kks){2} /\
                        l{1} = map (fun x:(_*(_*_))*_ => (x.`1.`1, (x.`1.`2.`1, x.`2)))
@@ -243,7 +256,7 @@ theory DHIES.
        + apply eq_distr; rewrite /(\o) /=; congr;
          by rewrite (nth_map witness witness (snd \o snd)) /#.
        by rewrite (nth_map witness witness (snd \o snd)) /#.
-    by wp; skip => />; smt (drop_le0 size_map). 
+    by wp; skip => />; smt (drop_le0 size_map).
   + wp; sp.
     transitivity{1} { cs <@ MEnc_loop.S.sample(fun k => enc k tag ptxt, skeys); }
                     ( ={tag, ptxt, skeys, kks} ==> ={cs, kks} )
@@ -255,34 +268,39 @@ theory DHIES.
   qed.
 
   clone import DProd.DLetSampling as MRnd_let
-  with type t <- t,
-       type u <- (Pk * (group*K)) list.
+  with type t <- exp,
+       type u <- (Pk * (group * K)) list.
 
   clone import DMapSampling as MRnd_map
   with type t1 <- K list,
-       type t2 <- (Pk * (group*K)) list.
+       type t2 <- (Pk * (group * K)) list.
 
   lemma nosmt mrndkeys_def : equiv [MEnc.mrndkeys1 ~ MEnc.mrndkeys2: ={pkl} ==> ={res}].
   proof.
   proc.
-  transitivity{1} { keys <$ dlet_locked FDistr.dt
-                                 (fun x => dmap (dlist gen (size pkl))
-                                 (fun ks => amap (fun pk k => (g^x,k))
-                                 (zip pkl ks))); }
+  transitivity{1} { keys <$ dlet_locked dt
+                              (fun x =>
+                                 dmap (dlist gen (size pkl))
+                                      (fun ks =>
+                                         amap (fun pk k => (g ^ x,k))
+                                              (zip pkl ks))); }
                (={pkl} ==> ={keys})
                (={pkl} ==> ={keys});
   first 2 by progress; exists pkl{2}.
-  (* PY: rnd is very long *) 
+  (* PY: rnd is very long *)
   + by rnd; skip.
-  transitivity{1} { keys <@ MRnd_let.SampleDep.sample(FDistr.dt,
+  transitivity{1} { keys <@ MRnd_let.SampleDep.sample(dt,
                       fun x => dmap (dlist gen (size pkl))
-                      (fun ks => amap (fun pk k => (g^x,k)) (zip pkl ks))); }
+                                    (fun ks =>
+                                       amap (fun pk k => (g ^ x, k))
+                                            (zip pkl ks))); }
                   (={pkl} ==> ={keys})
                   (={pkl} ==> ={keys});
   first 2 by progress; exists pkl{2}.
-  transitivity{1} { keys <@ MRnd_let.SampleDLet.sample(FDistr.dt,
+  transitivity{1} { keys <@ MRnd_let.SampleDLet.sample(dt,
                       fun x => dmap (dlist gen (size pkl))
-                      (fun ks => amap (fun pk k => (g^x,k)) (zip pkl ks))); }
+                                    (fun ks => amap (fun pk k => (g ^ x, k))
+                                                    (zip pkl ks))); }
                   (={pkl} ==> ={keys})
                   (={pkl} ==> ={keys});
   first 2 by progress; exists pkl{2}.
@@ -292,13 +310,15 @@ theory DHIES.
   seq 2 1: (={pkl} && t{1}=x{2}); first by rnd; wp; skip.
   transitivity{1} { keys <@ MRnd_map.S.map(
                       dlist gen (size pkl),
-                      fun (ks:K list) => amap (fun pk k => (g^t,k)) (zip pkl ks)); }
+                      fun (ks:K list) => amap (fun pk k => (g ^ t, k))
+                                              (zip pkl ks)); }
                   (={pkl, t} ==> ={t,keys})
                   (={pkl} && t{1}=x{2} ==> ={keys});
   first 2 by progress; exists pkl{2} x{2}.
   transitivity{1} { keys <@ MRnd_map.S.sample(
                       dlist gen (size pkl),
-                      fun (ks:K list) => amap (fun pk k => (g^t,k)) (zip pkl ks)); }
+                      fun (ks:K list) => amap (fun pk k => (g ^ t, k))
+                                              (zip pkl ks)); }
                   (={pkl, t} ==> ={t,keys})
                   (={pkl, t} ==> ={t,keys});
   first 2 by progress; exists pkl{2} t{2}.
@@ -308,16 +328,16 @@ theory DHIES.
   qed.
 
   clone import DMapSampling as MKey_map
-  with type t1 <- t,
-       type t2 <- (Pk * (group*K)) list.
+  with type t1 <- exp,
+       type t2 <- (Pk * (group * K)) list.
 
   clone import DMapSampling as MEncrypt_map
-  with type t1 <- (Pk * (group*Cph)) list,
-       type t2 <- (Pk, group*Cph) fmap.
+  with type t1 <- (Pk * (group * Cph)) list,
+       type t2 <- (Pk, group * Cph) fmap.
 
   clone import DProd.DLetSampling as MEncDHIES_let
-  with type t <- (Pk * (group*K)) list,
-       type u <- (Pk * (group*Cph)) list.
+  with type t <- (Pk * (group * K)) list,
+       type u <- (Pk * (group * Cph)) list.
 
   lemma nosmt mencrypt_def1: equiv [MEnc.mencrypt ~ Scheme.mencrypt: ={mpk, tag, ptxt} ==> ={res}].
   proof.
@@ -329,16 +349,16 @@ theory DHIES.
   first 2 by progress; exists mpk{1} ptxt{1} tag{1}.
    by rnd; skip; progress; rewrite dlet_lockedE.
   transitivity{1} { cph <@ MEncrypt_map.S.map
-                      (dlet_locked (mkeyDHIES (elems mpk)) 
+                      (dlet_locked (mkeyDHIES (elems mpk))
                        (mencDHIES tag ptxt),
-                       SmtMap.ofassoc <: Pk, group*Cph> ); }
+                       SmtMap.ofassoc <: Pk, group * Cph> ); }
                (={mpk, tag, ptxt} ==> ={cph})
                (={mpk, tag, ptxt} ==> ={cph});
   first 2 by progress; exists mpk{2} ptxt{2} tag{2}.
    transitivity{1} { cph <@ MEncrypt_map.S.sample(
                        dlet_locked (mkeyDHIES (elems mpk))
                        (mencDHIES tag ptxt),
-                       SmtMap.ofassoc <: Pk, group*Cph> ); }
+                       SmtMap.ofassoc <: Pk, group * Cph> ); }
                (={mpk, tag, ptxt} ==> ={cph})
                (={mpk, tag, ptxt} ==> ={cph});
    first 2 by progress; exists mpk{2} ptxt{2} tag{2}.
@@ -357,17 +377,22 @@ theory DHIES.
    by symmetry; call MEncDHIES_let.SampleDepDLet.
   inline*; wp; rnd; swap{1} 2 1; wp.
   transitivity{1} {t <@ MKey_map.S.map(
-                          FDistr.dt,
-                          (fun x => map (fun pk => (pk, (g^x, hash (pk^x)))) (elems mpk))); }
+                          FD.dt,
+                          (fun x => map (fun pk => (pk, (g ^ x, hash (pk ^ x))))
+                                        (elems mpk))); }
                    (={mpk,tag,ptxt} ==> ={mpk,tag,ptxt, t})
                    (={mpk,tag,ptxt} ==> ={mpk,tag,ptxt} &&
-            t{1}= map (fun (pk : group) => (pk, (g ^ eph{2}, hash (pk ^ eph{2})))) pkl{2});
+                    t{1}= map (fun (pk : group) =>
+                                 (pk, (g ^ eph{2}, hash (pk ^ eph{2}))))
+                              pkl{2});
    first 2 by progress; exists mpk{2} ptxt{2} tag{2}.
     transitivity{1} {t <@ MKey_map.S.sample(
-                            FDistr.dt,
-                            (fun x => map (fun pk => (pk, (g^x, hash (pk^x)))) (elems mpk))); }
-                   (={mpk,tag,ptxt} ==> ={mpk,tag,ptxt, t})
-                   (={mpk,tag,ptxt} ==> ={mpk,tag,ptxt, t});
+                            FD.dt,
+                            (fun x =>
+                               map (fun pk => (pk, (g ^ x, hash (pk ^ x))))
+                                   (elems mpk))); }
+                   (={mpk, tag, ptxt} ==> ={mpk, tag,ptxt, t})
+                   (={mpk, tag, ptxt} ==> ={mpk, tag,ptxt, t});
    first 2 by progress; exists mpk{2} ptxt{2} tag{2}.
      inline*; wp; rnd; wp; skip; progress.
     by call MKey_map.sample.
@@ -376,12 +401,12 @@ theory DHIES.
 
   clone import DMapSampling as Enc_map
   with type t1 <- Cph,
-       type t2 <- (Pk * (group*Cph)).
+       type t2 <- (Pk * (group * Cph)).
 
   (* we axiomatize operators based on the above module *)
   lemma nosmt gendef: equiv [DHIES.gen ~ Scheme.gen : true ==>  ={res}].
   proof.
-  proc; wp; rnd (fun x=> (x, g^x)) (fun (x:t*group)=> x.` 1); skip; progress.
+  proc; wp; rnd (fun x => (x, g ^ x)) (fun (x : exp * group)=> x.` 1); skip; progress.
     by move: H; rewrite /genDH supp_dmap; move => [x [Hx ->]].
    rewrite /genDH dmap1E /(\o) /=.
    move: H0; rewrite /genDH supp_dmap; move => [x [Hx ->]] /=.
@@ -437,15 +462,15 @@ theory DHIES.
       by symmetry; call Enc_map.sample.
     + by inline*; wp; rnd; wp; skip; progress.
    by symmetry; call MEncDHIES_loop.Sample_Loop_eq.
-  by inline*; wp; rnd; wp; skip; progress. 
+  by inline*; wp; rnd; wp; skip; progress.
   qed.
 
   lemma nosmt decryptdef: equiv [DHIES.decrypt ~ Scheme.decrypt : ={sk, tag, ctxt} ==>  ={res}].
   proof. by proc; wp; skip. qed.
-  
+
 (** FIRST HOP: MULTIPLE ORACLE DIFFIE HELLMAN ASSUMPTION *****)
 
- 
+
 (****** Adversary for the first hop ************)
 module Adv1_Procs (ODHOrcl : ODH_OrclT) : MRPKE_OrclT = {
   include MRPKE_lor [-gen,lor,dec,init]
@@ -460,7 +485,7 @@ module Adv1_Procs (ODHOrcl : ODH_OrclT) : MRPKE_OrclT = {
       pk <- witness;
       if (MRPKE_lor.count_gen < q_gen) {
          pk <@ ODH_Orcl.gen();
-         if( pk \notin MRPKE_lor.pklist) { 
+         if( pk \notin MRPKE_lor.pklist) {
                MRPKE_lor.pklist.[pk] <- witness;
          }
          MRPKE_lor.count_gen <- MRPKE_lor.count_gen + 1;
@@ -496,14 +521,14 @@ module Adv1_Procs (ODHOrcl : ODH_OrclT) : MRPKE_OrclT = {
     if (MRPKE_lor.count_dec < q_dec) {
        if ((pk \in fdom MRPKE_lor.pklist) &&
         (!((pk,tag,ctxt) \in MRPKE_lor.lorlist))) {
-           if ((pk,ctxt.`1) \notin skeys) { 
+           if ((pk,ctxt.`1) \notin skeys) {
                 okey <@ ODHOrcl.hash(pk,ctxt.`1);
                 key <- oget okey;
-           } 
-           else { 
-                key <- oget skeys.[(pk,ctxt.`1)]; 
            }
-           msg <- dec key tag (snd ctxt);  
+           else {
+                key <- oget skeys.[(pk,ctxt.`1)];
+           }
+           msg <- dec key tag (snd ctxt);
        }
        MRPKE_lor.count_dec <- MRPKE_lor.count_dec + 1;
     }
@@ -520,13 +545,13 @@ module Adv1(A : MRPKE_Adv, O : ODH_OrclT) = {
       Adv1_Procs(O).init(b);
       b' <@ A.guess();
       return (MRPKE_lor.b = b');
-   }    
+   }
 }.
 
 lemma nosmt L1 ['a,'b,'c,'d] (f: 'a->'b->('c*'d)) (s: 'a fset) (l: 'b list):
  size l = size (elems s) =>
  amap f (zip (elems s) l)
- = 
+ =
  map (fun x=> (x, ((f x (nth witness l (index x (elems s)))).`1,
                    (f x (nth witness l (index x (elems s)))).`2))) (elems s).
 proof.
@@ -577,35 +602,35 @@ rewrite -(assoc_amap (fun pk => fst)) -Hmap assoc_amap Core.oget_omap_some /=.
 by rewrite (ctxt1mem_foldenc _ _ _ _ _ _ H).
 qed.
 
-lemma hop1false &m 
+lemma hop1false &m
     (A <: MRPKE_Adv {-MRPKE_lor, -Adv1_Procs, -ODH_Orcl}):
-       Pr [MRPKE_Sec(A).main() @ &m : res ] = 
+       Pr [MRPKE_Sec(A).main() @ &m : res ] =
        Pr [ODH_Sec(Adv1(A)).game(false) @ &m : !res].
 proof.
 byequiv (_: !b{2} /\ ={glob A} ==> res{1} = !res{2}) => //.
 proc; inline *.
-pose inv (gPKE1:glob MRPKE_lor) (gPKE2:glob MRPKE_lor) (gODH2:glob ODH_Orcl)
-         (skeys2:(Pk*group,K) fmap) :=
+pose inv (gPKE1 : glob MRPKE_lor) (gPKE2 : glob MRPKE_lor) (gODH2 : glob ODH_Orcl)
+         (skeys2:(Pk * group, K) fmap) :=
   !gODH2.`5 /\
   gPKE1.`1=gPKE2.`1 /\ gPKE1.`2=gPKE2.`2 /\ gPKE1.`3=gPKE2.`3 /\ gPKE1.`4=gPKE2.`4 /\
   gPKE1.`6=gPKE2.`6  /\  fdom gPKE2.`5 = fdom gODH2.`4 /\ fdom skeys2 = gODH2.`3 /\
   gODH2.`1 <= gPKE1.`2 /\
   gODH2.`2 = gPKE2.`3 /\ gODH2.`4 = gPKE1.`5 /\
-  (forall pk sk, gPKE1.`5.[pk] = Some sk => pk = g^sk) /\
-  (forall pk gx k, skeys2.[(pk,gx)] = Some k => pk \in gPKE2.`5 && exists x, gx=g^x && k=hash(pk^x)) /\
-  (forall pk sk, gPKE1.`5.[pk] = Some sk => pk = g^sk) /\
+  (forall pk sk, gPKE1.`5.[pk] = Some sk => pk = g ^ sk) /\
+  (forall pk gx k, skeys2.[(pk,gx)] = Some k => pk \in gPKE2.`5 && exists (x : exp), gx = g ^ x && k = hash(pk ^ x)) /\
+  (forall pk sk, gPKE1.`5.[pk] = Some sk => pk = g ^ sk) /\
   (forall pk tag cph,
-    ((pk,tag,cph) \in gPKE1.`4)%List => pk \in gPKE1.`5 && (pk,cph.`1) \in skeys2)  /\
-  (forall pk sk gx k, gPKE1.`5.[pk] = Some sk => skeys2.[(pk,gx)] = Some k => k = hash(gx^sk)).
+    ((pk, tag, cph) \in gPKE1.`4)%List => pk \in gPKE1.`5 && (pk, cph.`1) \in skeys2)  /\
+  (forall pk sk gx k, gPKE1.`5.[pk] = Some sk => skeys2.[(pk, gx)] = Some k => k = hash(gx ^ sk)).
 wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1_Procs.skeys{2}); last first.
  wp; rnd; wp; skip; rewrite /inv /=; clear inv => />; smt (fdom0 emptyE).
 + proc; inline*.
    sp; if; first by rewrite /inv.
-   rcondt {2} 3; first by auto => />. 
+   rcondt {2} 3; first by auto => />.
   seq 2 3: (#[/3:]pre /\ k{1}.`1=y{2} /\ k{1}.`2=gy{2} /\ (gy = g^y){2}).
    wp; rnd (fun (x:_*_) => x.`1) (fun x => (x, g^x)); skip; rewrite /inv /=; clear inv; progress.
    + rewrite /genDH dmap1E /(\o) /pred1 /=.
-     by apply mu_eq => /= x /#. 
+     by apply mu_eq => /= x /#.
    + by move: H9; rewrite /genDH supp_dmap; move => [x [Hx ->]] /=.
    by move: H9; rewrite /genDH supp_dmap; move => [x [Hx ->]] /=.
   if; first by rewrite /inv.
@@ -621,7 +646,7 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
     (={pks, tag, m0, m1} && MRPKE_lor.count_lor{1} < q_lor &&
      pks{2} \subset fdom MRPKE_lor.pklist{1} &&
      inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1_Procs.skeys{2}
-     ==> r{1}=SmtMap.ofassoc enclist{2} && 
+     ==> r{1}=SmtMap.ofassoc enclist{2} &&
          inv (MRPKE_lor.count_dec{1}, MRPKE_lor.count_lor{1} + 1,
               MRPKE_lor.count_gen{1},
               MRPKE_lor.lorlist{1} ++ fold_encs pks{1} tag{1} r{1},
@@ -633,7 +658,7 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
              (ODH_Orcl.count_ror{2}, ODH_Orcl.count_gen{2}, ODH_Orcl.rorList{2},
               ODH_Orcl.genMap{2}, ODH_Orcl.b{2})
              (Adv1_Procs.skeys{2} + SmtMap.ofassoc skeylist{2})).
-  + rewrite /inv /=; clear inv; progress. 
+  + rewrite /inv /=; clear inv; progress.
     by exists MRPKE_lor.b{2} MRPKE_lor.count_dec{2} MRPKE_lor.count_gen{2} MRPKE_lor.count_lor{2}
               MRPKE_lor.lorlist{2} MRPKE_lor.pklist{1} m0{2} m1{2} pks{2} tag{2}.
   + done.
@@ -682,8 +707,8 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
       rewrite (ephmem_foldenc _ _ _ _ _ _ _ _ T H16 H17) /=.
       have ? : 0 <= index pk (elems pks{2}) < size (elems pks{2}).
       + smt(index_ge0 index_mem map_comp mapP).
-      rewrite /assoc onth_nth_map -!map_comp /(\o) /= map_id 
-              (nth_map witness) //=. 
+      rewrite /assoc onth_nth_map -!map_comp /(\o) /= map_id
+              (nth_map witness) //=.
     + move: H15 H16 H18; rewrite !H1 /= (L1 (fun k v => (g^ephL, hash(k^ephL))) pks{2} keys00) //.
        by apply/(supp_dlist_size _ _ _ _ H11)/size_ge0.
       move=> /= ? ?.
@@ -692,7 +717,7 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
       move: (assoc_some _ _ _ H19) => /mapP [v [? /= [[? ?] ?]]].
       rewrite H23 H22 -H21.
       move: (H6 _ _ H17) => ->; congr.
-      by rewrite !pow_pow FD.F.mulC.
+      by rewrite -!GP.expM ZPF.mulrC.
   by wp; skip; rewrite /inv /=; clear inv => />; smt().
 + proc; inline*.
   sp 1 1 ; if; first by rewrite /inv.
@@ -701,7 +726,7 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
      rcondf {2} 1; first by auto => />.
      wp; skip; rewrite /inv /=; clear inv => /> *.
      rewrite /decrypt; congr.
-     move: (eq_refl (MRPKE_lor.pklist{1}.[pk{2}])); case: {2}(MRPKE_lor.pklist{1}.[pk{2}]). 
+     move: (eq_refl (MRPKE_lor.pklist{1}.[pk{2}])); case: {2}(MRPKE_lor.pklist{1}.[pk{2}]).
       by smt(mem_fdom).
      move=> sk Hpk; rewrite Hpk /=; smt (mem_fdom).
     rcondt {2} 1; first by auto => />.
@@ -713,7 +738,7 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
 qed.
 
 module MRPKErnd_lor = {
-  
+
   include MRPKE_lor [-init,lor,dec]
 
   var skeys : ((Pk * group),K) fmap
@@ -730,7 +755,7 @@ module MRPKErnd_lor = {
     ro <- None;
 
     if (MRPKE_lor.count_lor < q_lor) {
-      if (pks \subset fdom MRPKE_lor.pklist  /\ size (elems pks) < q_maxn) { 
+      if (pks \subset fdom MRPKE_lor.pklist  /\ size (elems pks) < q_maxn) {
         keys <$ mrndkeyDHIES (elems pks);
         enclist <$ mencDHIES tag (if MRPKE_lor.b then m1 else m0) keys;
         cph <- SmtMap.ofassoc enclist;
@@ -755,7 +780,7 @@ module MRPKErnd_lor = {
           r <- dec key tag ctxt.`2;
        }
        MRPKE_lor.count_dec <- MRPKE_lor.count_dec + 1;
-    }    
+    }
     return r;
   }
 }.
@@ -776,9 +801,9 @@ module MRPKErnd_Sec (A:MRPKE_Adv) = {
   }
 }.
 
-lemma hop1true &m 
+lemma hop1true &m
     (A <: MRPKE_Adv {-MRPKErnd_lor, -Adv1_Procs, -ODH_Orcl}):
-       Pr [MRPKErnd_Sec(A).main() @ &m : res ] = 
+       Pr [MRPKErnd_Sec(A).main() @ &m : res ] =
        Pr [ODH_Sec(Adv1(A)).game(true) @ &m : res].
 proof.
 byequiv (_: b{2} /\ ={glob A} ==> res{1} = res{2}) => //.
@@ -790,7 +815,7 @@ pose inv (gPKE1:glob MRPKErnd_lor) (gPKE2:glob MRPKE_lor) (gODH2:glob ODH_Orcl)
   gODH2.`2 = gPKE2.`3 /\ gODH2.`4 = gPKE1.`6 /\ gPKE1.`1 = skeys2 /\ gODH2.`3 = fdom skeys2 /\
   (forall pk cph tag, ((pk,cph,tag) \in gPKE1.`5)%List => pk \in gPKE1.`6) /\
   (forall pk tag (ctxt : CTxt), (pk, tag, ctxt) \in gPKE1.`5 => (pk,ctxt.`1) \in skeys2).
-wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1_Procs.skeys{2}); 
+wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1_Procs.skeys{2});
  last by wp; rnd; wp; skip => /> *; smt(fdom0).
 + proc;inline*.
   sp; if; first by rewrite /inv.
@@ -798,14 +823,14 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
    seq 2 3: (#[/3:]pre /\ k.`1{1}=y{2} /\ k.`2{1}=gy{2}).
     wp; rnd (fun (x:_*_) => x.`1) (fun x => (x, g^x)); skip; rewrite /inv /=; clear inv; progress.
     + rewrite /genDH dmap1E /(\o) /pred1 /=.
-      by apply mu_eq => /= x /#. 
+      by apply mu_eq => /= x /#.
     + by move: H6; rewrite /genDH supp_dmap; move => [x [Hx ->]].
     + by move: H6; rewrite /genDH supp_dmap; move => [x [Hx ->]].
-   if; first by rewrite /inv. 
+   if; first by rewrite /inv.
     wp; skip; rewrite /inv => />; smt (fdom_set mem_fdom in_fsetU).
    by wp; skip; rewrite /inv => />; smt (fdom_set mem_fdom in_fsetU).
   by skip; rewrite /inv.
-+ proc. 
++ proc.
   sp; if; 1: (by rewrite /inv; progress; smt); 2: (by wp;skip;progress;smt).
   if => //=; 1: by smt ().
   inline *.
@@ -819,7 +844,7 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
         ==> ={keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor})
        (={ro, pks, tag, m0, m1} && ro{2}=None && MRPKE_lor.count_lor{1} < q_lor &&
         pks{1} \subset fdom MRPKE_lor.pklist{1} && size (elems pks{1}) < q_maxn &&
-        keys{1} = hs{2} && 
+        keys{1} = hs{2} &&
         inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2}
             (glob ODH_Orcl){2} Adv1_Procs.skeys{2}
         ==> ={ro, pks, tag, m0, m1} && ro{2}=None && MRPKE_lor.count_lor{1} < q_lor &&
@@ -828,11 +853,11 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
                                    (glob ODH_Orcl){2} Adv1_Procs.skeys{2} &&
             (map fst hs = elems pks){2} &&
             (gygxlist = amap (fun pk (x:_*_) => x.`1) hs){2}).
-   + rewrite /inv /=; clear inv; progress. 
+   + rewrite /inv /=; clear inv; progress.
      by exists Adv1_Procs.skeys{2} MRPKE_lor.b{2} MRPKE_lor.count_dec{2} MRPKE_lor.count_gen{2}
                MRPKE_lor.count_lor{2} MRPKE_lor.lorlist{2} MRPKE_lor.pklist{1} hs{2} m0{2} m1{2}
                pks{2} None tag{2}.
-   + by rewrite /inv. 
+   + by rewrite /inv.
    + transitivity{1} { keys <@ MEnc.mrndkeys1(elems pks); }
         (={ro, pks, tag, m0, m1, glob MRPKErnd_lor}
          ==> ={keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor})
@@ -859,7 +884,7 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
   + move: H10; rewrite mem_cat mem_join; move=> [?|?]; first smt().
     right; rewrite mem_ofassoc -!map_comp /(\o) /=.
     have T: pk \in map fst hs{2} by smt.
-    rewrite (ephmem_foldenc _ _ _ _ _ _ _ _ T H9 H10) /=. 
+    rewrite (ephmem_foldenc _ _ _ _ _ _ _ _ T H9 H10) /=.
     have ?: (pk \in map fst hs{2})%List by smt.
     have ?: uniq (map fst hs{2}) by smt.
     apply/mapP => /=.
@@ -883,38 +908,38 @@ qed.
 
 module Adv2_Procs (AEADmul_Orcl : AEADmul_OraclesT) : MRPKE_OrclT = {
   include MRPKErnd_lor [-init, lor, dec]
-  
+
   var kindex : ((Pk * Pk), int) fmap
 
   proc init() = {
-     MRPKE_lor.pklist <- empty;          
-     MRPKE_lor.lorlist <- [];          
-     MRPKE_lor.count_gen <- 0;            
-     MRPKE_lor.count_lor <- 0;           
+     MRPKE_lor.pklist    <- empty;
+     MRPKE_lor.lorlist   <- [];
+     MRPKE_lor.count_gen <- 0;
+     MRPKE_lor.count_lor <- 0;
      MRPKE_lor.count_dec <- 0;
-     MRPKErnd_lor.skeys <- empty;
-     kindex <- empty;
-  } 
+     MRPKErnd_lor.skeys  <- empty;
+     kindex              <- empty;
+  }
 
   proc lor (pks: MPk, tag : Tag, m0:PTxt, m1: PTxt) : MCTxt option = {
-    var ro, pkl,x,gx,aeadcph;
+    var ro, pkl, x, gx, aeadcph;
 
     ro <- None;
 
     if (MRPKE_lor.count_lor < q_lor) {
       if (pks \subset fdom MRPKE_lor.pklist /\ size (elems pks) < q_maxn) {
         pkl <- elems pks;
-        x <$ FDistr.dt;
+        x <$ dt;
         gx  <- g ^ x;
         aeadcph <@ AEADmul_Orcl.lor(size (elems pks),tag,m0,m1);
         if (aeadcph <> None) {
           (* (pk, gx), kidx *)
-          kindex <- kindex + SmtMap.ofassoc (zip (map (fun pk => (pk,gx)) (elems pks))
+          kindex <- kindex + SmtMap.ofassoc (zip (map (fun pk => (pk, gx)) (elems pks))
                                              (map fst (oget aeadcph)));
           ro <- Some (SmtMap.ofassoc (zip (elems pks)
                                       ((map (fun cph => (gx,snd cph)) (oget aeadcph)))));
           MRPKErnd_lor.skeys <- MRPKErnd_lor.skeys +
-            SmtMap.ofassoc (map (fun pk => ((pk,gx),witness)) (elems pks));
+            SmtMap.ofassoc (map (fun pk => ((pk, gx),witness)) (elems pks));
         }
         MRPKE_lor.lorlist <- MRPKE_lor.lorlist ++ (fold_encs pks tag (oget ro));
       }
@@ -929,13 +954,13 @@ module Adv2_Procs (AEADmul_Orcl : AEADmul_OraclesT) : MRPKE_OrclT = {
     if (MRPKE_lor.count_dec < q_dec) {
        if ((pk \in fdom MRPKE_lor.pklist)&&
            (!((pk,tag,ctxt) \in MRPKE_lor.lorlist))) {
-              if ((pk,ctxt.`1) \in MRPKErnd_lor.skeys) { 
+              if ((pk,ctxt.`1) \in MRPKErnd_lor.skeys) {
                    keyidx <- oget kindex.[(pk,ctxt.`1)];
                    msg <@ AEADmul_Orcl.dec(keyidx,tag,snd ctxt);
-              } 
-              else { 
+              }
+              else {
                    key <- hash ((fst ctxt) ^ (oget MRPKE_lor.pklist.[pk]));
-                   msg <- dec key tag (snd ctxt);  
+                   msg <- dec key tag (snd ctxt);
               }
       }
       MRPKE_lor.count_dec <- MRPKE_lor.count_dec + 1;
@@ -952,7 +977,7 @@ module Adv2(A : MRPKE_Adv, O : AEADmul_OraclesT) = {
       Adv2_Procs(O).init();
       b' <@ A.guess();
       return b';
-   }    
+   }
 }.
 
 lemma nosmt mem_fold_encs pk tag x pks l:
@@ -980,15 +1005,15 @@ rewrite {2}E iota_addl -map_comp /(\o) /=.
 apply eq_in_map => y /mem_iota [? ?] /#.
 qed.
 
-lemma hop2 &m 
+lemma hop2 &m
     (A <: MRPKE_Adv { -Adv2_Procs, -MRPKErnd_lor, -AEADmul_Oracles }):
-       Pr [MRPKErnd_Sec(A).main() @ &m : res ] = 
+       Pr [MRPKErnd_Sec(A).main() @ &m : res ] =
        Pr [AEADmul_Sec(Adv2(A)).main() @ &m : res].
-proof. 
+proof.
 byequiv; first proc; inline *.
 seq 5 1 : (#pre /\ b{1} = MRPKE_lor.b{1} /\ b0{1} = b{1} /\
-           MRPKE_lor.b{1} = AEADmul_Oracles.b{2}); 
-           first by wp;rnd;skip. 
+           MRPKE_lor.b{1} = AEADmul_Oracles.b{2});
+           first by wp;rnd;skip.
 (* print glob MRPKErnd_lor.
 Prog. variables [# = 7]:
 1  MRPKErnd_lor.skeys : (Pk * group, K) fmap
@@ -1043,7 +1068,7 @@ pose inv (gPKE1:glob MRPKErnd_lor) (gAdv2:glob Adv2_Procs) (gAEAD2:glob AEADmul_
              gAdv2.`1.[(pk,eph)] = Some i =>
              gPKE1.`1.[(pk,eph)] = Some (nth witness gAEAD2.`5 i)).
 wp; call (_: inv (glob MRPKErnd_lor){1} (glob Adv2_Procs){2} (glob AEADmul_Oracles){2});
-last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE). 
+last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
 + proc;inline *.
   seq 1 1 : (#pre /\ ={pk}); first by auto => />.
   if => //; first by rewrite /inv /=.
@@ -1051,7 +1076,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
   if => //; first (by rewrite /inv /=).
    by wp; skip; rewrite /inv /=; clear inv => />.
   by wp; skip; rewrite /inv /=; clear inv => />.
-+ proc. 
++ proc.
   seq 1 1 : (#pre /\ ={ro}); first by auto => />.
   if => //; first by rewrite /inv /= => />.
   if; 1: (by rewrite /inv /=; clear inv);
@@ -1075,11 +1100,11 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
             inv (glob MRPKErnd_lor){1} (glob Adv2_Procs){2} (glob AEADmul_Oracles){2} &&
             keys{1} = (zip (elems pks) (map (fun k=>(g^x,k)) new_keys)){2} &&
             (n = size (elems pks) /\ n = size new_keys){2}).
-   + rewrite /inv /=; clear inv; progress. 
+   + rewrite /inv /=; clear inv; progress.
      by exists MRPKErnd_lor.skeys{1} AEADmul_Oracles.b{2} MRPKE_lor.count_dec{2}
                MRPKE_lor.count_gen{2} MRPKE_lor.count_lor{2} MRPKE_lor.lorlist{2}
                MRPKE_lor.pklist{2} m0{2} m1{2} pks{2} ro{2} tag{2}.
-   + by rewrite /inv. 
+   + by rewrite /inv.
    + transitivity{1} { keys <@ MEnc.mrndkeys1(elems pks); }
         (={ro, pks, tag, m0, m1, glob MRPKErnd_lor}
          ==> ={keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor})
@@ -1114,13 +1139,13 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
             inv (glob MRPKErnd_lor){1} (glob Adv2_Procs){2} (glob AEADmul_Oracles){2} &&
             enclist{1} = (zip (elems pks) (map (fun k=>(g^x,k)) lctxt)){2} &&
             (size lctxt = size (elems pks) /\ aad = tag){2}).
-   + rewrite /inv /=; clear inv; progress. 
+   + rewrite /inv /=; clear inv; progress.
      by exists MRPKErnd_lor.skeys{1} AEADmul_Oracles.b{2} MRPKE_lor.count_dec{2}
                MRPKE_lor.count_gen{2} MRPKE_lor.count_lor{2} MRPKE_lor.lorlist{2}
                MRPKE_lor.pklist{2}
                (zip (elems pks{2}) (map (fun (k : K) => (g ^ x{2}, k)) new_keys{2}))
                m0{2} m1{2} pks{2} ro{2} tag{2}.
-   + by rewrite /inv. 
+   + by rewrite /inv.
    + transitivity{1} { enclist <@ MEnc.mencDHIES1(tag,if MRPKE_lor.b then m1 else m0,keys); }
         (={keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor}
          ==> ={enclist, keys, ro, pks, tag, m0, m1, glob MRPKErnd_lor})
@@ -1139,15 +1164,15 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
        by rewrite -map_comp /(\o) map_id.
      - by move: H12; rewrite zip_mapr -map_comp /(\o)/= unzip2_zip /#.
      - rewrite !zip_mapr !(map_zip_nth witness witness) /= 1,3:/#.
-          rewrite size_map size_iota H2. 
+          rewrite size_map size_iota H2.
            move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap).
-          rewrite H2. 
-           move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap). 
-       rewrite size_map /range /= size_iota ler_maxr 1:size_ge0. 
+          rewrite H2.
+           move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap).
+       rewrite size_map /range /= size_iota ler_maxr 1:size_ge0.
        apply eq_in_map => y /mem_iota /= [? ?] /=.
        by rewrite (nth_map witness) /= 1:#smt:(size_iota) nth_iota.
-     - rewrite H2. 
-           move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap). 
+     - rewrite H2.
+           move : H12; rewrite /menc. smt(size_ge0 supp_djoinmap).
   wp; skip; rewrite /inv /=; clear inv; progress.
   + rewrite /=; congr; congr.
     have ->: (fun (cph : int * Cph) => (g ^ x{2}, cph.`2))
@@ -1170,8 +1195,8 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     rewrite -!map_comp /(\o) /= unzip1_zip //.
     rewrite !size_map size_zip size_iota. smt (size_ge0).
   + smt (size_cat).
-  + move: H12; rewrite mem_cat; move=> [? /#|].  
-    move=> /mapP [[y1 y2] /=] /> /mem_zip_fst; smt (size_ge0 mem_iota). 
+  + move: H12; rewrite mem_cat; move=> [? /#|].
+    move=> /mapP [[y1 y2] /=] /> /mem_zip_fst; smt (size_ge0 mem_iota).
   + move: H12; rewrite mem_cat; move=> [?|]. smt (size_ge0).
     move=> /mapP [[y1 y2] /=] /> /mem_zip_fst; smt (size_ge0 mem_iota).
   + move: H12; rewrite /= joinE.
@@ -1202,7 +1227,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     rewrite assoc_zip. smt (size_map size_zip size_iota size_ge0).
     apply/onth_map_some; exists (size AEADmul_Oracles.keys{2} + idx', c')=> /=.
     apply onth_zip_some => /=; split; last smt().
-    apply/onth_iota_some; smt(). 
+    apply/onth_iota_some; smt().
   + move: H12; rewrite /= !joinE => ?.
     pose L:= map _ (zip _ _).
     have ->: L = zip (map (fun pk=>(pk,g^x{2})) (elems (pks{2}))) new_keys{2}.
@@ -1213,7 +1238,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
      rewrite (map_comp snd snd) unzip2_zip 1:size_map 1:/#.
      by rewrite -map_comp /(\o) /= map_id.
     move: H12; pose E:= ((pk, eph) \in _)%SmtMap; case: E => ? ?; last first.
-     pose E':= ((pk, eph) \in _)%SmtMap; case: E' => ?; last first. 
+     pose E':= ((pk, eph) \in _)%SmtMap; case: E' => ?; last first.
       rewrite (H6 pk eph i) //; smt (nth_cat).
      move: H12 H14; rewrite /E /E' !mem_ofassoc !unzip1_zip;
        smt (size_iota size_ge0 size_map).
@@ -1224,7 +1249,7 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
     move=> /onth_map_some => [[pk']]; progress.
     move: H15 => /onth_map_some [[i' c']]; progress.
     move: H15 => /onth_zip_some [] /onth_iota_some; progress.
-    rewrite assoc_zip 1:#smt:(size_map) (onth_nth witness). 
+    rewrite assoc_zip 1:#smt:(size_map) (onth_nth witness).
     + smt (index_map onth_some index_uniq uniq_elems).
     congr.
     rewrite nth_cat.
@@ -1244,16 +1269,16 @@ last by wp; skip; rewrite /inv /= => />; smt (fdom0 emptyE).
      smt ().
     wp; skip; rewrite /inv /=; clear inv; progress;
     (have: exists i, Adv2_Procs.kindex{2}.[(pk{2}, ctxt{2}.`1)] = Some i by smt (mem_fdom)); smt ().
-   wp; skip; rewrite /inv /= /#. 
-  wp; skip; rewrite /inv /#. 
+   wp; skip; rewrite /inv /= /#.
+  wp; skip; rewrite /inv /#.
 + by auto => />.
 + by auto => />.
 qed.
 
-lemma reduction &m 
+lemma reduction &m
   (A <: MRPKE_Adv {  -Adv2_Procs, -Adv1_Procs, -ODH_Orcl, -MRPKE_lor, -AEADmul_Oracles, -MRPKErnd_lor }):
-     Pr [MRPKE_Sec(A).main() @ &m : res ] <= 
-     `| Pr[ODH_Sec(Adv1(A)).game(false) @ &m : !res] - 
+     Pr [MRPKE_Sec(A).main() @ &m : res ] <=
+     `| Pr[ODH_Sec(Adv1(A)).game(false) @ &m : !res] -
         Pr[ODH_Sec(Adv1(A)).game(true) @ &m : res] | +
      Pr [AEADmul_Sec(Adv2(A)).main() @ &m : res].
 proof.

@@ -79,6 +79,7 @@ module type PrinterAPI = sig
   val pp_modtype1    : PPEnv.t -> (module_type                    ) pp
   val pp_modtype     : PPEnv.t -> (module_type                    ) pp
   val pp_modexp      : PPEnv.t -> (mpath * module_expr            ) pp
+  val pp_moditem     : PPEnv.t -> (mpath * module_item            ) pp
   val pp_modsig      : ?long:bool -> PPEnv.t -> (path * module_sig) pp
   val pp_modsig_smpl : PPEnv.t -> (path * module_smpl_sig         ) pp
 
