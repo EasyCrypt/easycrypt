@@ -193,7 +193,7 @@ axiom ow2hsc1h (I <: Init)
        (forall (O <: G_t), islossless O.o => islossless A(O).run) =>
        (forall (O <: Gi_t), hoare [A_O(A,O).main : true ==> G.ch <= d]) =>
        exists (B <: B_t {+A}),
-       (forall (O <: G_t), islossless O.o => islossless B(O, A).find) /\
+       (forall (O <: G_t), islossless O.o => islossless A(O).run => islossless B(O, A).find) /\
       `| Pr[ A_O(A,G(I)).main() @ &m : res ] - 
          Pr[ A_O(A,H(I)).main() @ &m : res ] | 
            <= 4%r * d%r * sqrt Pr[ B_O(H(I),B,A).main() @ &m : res ].
@@ -325,7 +325,7 @@ axiom ow2hsqrt (I <: Init) (A <: A_t {-I, -G, -H}) d &m:
        (forall (O <: G_t), islossless O.o => islossless O.oC => islossless A(O).run) => 
        (forall (O <: Gi_t), hoare [  A_O(A,O).main : true ==> G.ch <= d]) =>
        exists (B <: B_t {+A}),
-       (forall (O <: G_t), islossless B(O, A).find) /\
+       (forall (O <: G_t), islossless O.o => islossless A(O).run => islossless B(O, A).find) /\
         sqrt(Pr[ A_O(A,G(I)).main() @ &m : res ]) <= 
          sqrt(Pr[ A_O(A,H(I)).main() @ &m : res /\ 
                    (forall x, G.inS x => ! x \in G.xs) ]) + 
