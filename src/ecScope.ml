@@ -1528,6 +1528,16 @@ module Op = struct
               end;
            | _ -> raise SemNotSupported in
 
+         let body =
+           if BI.gt inc BI.one then begin
+             let mx =
+               e_app
+                 (e_op EcCoreLib.CI_Int.p_int_mul [] (toarrow [tint; tint] tint))
+                 [e_int inc; e_var (pv_loc x) tint] tint in
+             let subst = EcPV.Mpv.add env.env (pv_loc x) mx EcPV.Mpv.empty in
+             EcPV.Mpv.issubst env.env subst body
+           end else body in
+
          let bd =
            match c.e_node with
            | Eapp ({ e_node = Eop (op, []) }, [{ e_node = Evar (PVloc y) }; bd])
