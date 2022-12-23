@@ -1500,7 +1500,7 @@ module Op = struct
       let module ET = EcReduction.EqTest in
 
       match s.s_node with
-      | { i_node = Sasgn (LvVar (PVloc x, xty), e) } :: { i_node = Swhile (c, body) } :: _ ->
+      | { i_node = Sasgn (LvVar (PVloc x, xty), e) } :: { i_node = Swhile (c, body) } :: s_tail ->
          if not (ET.for_type env.env xty tint) then
            raise SemNotSupported;
 
@@ -1652,7 +1652,7 @@ module Op = struct
                     | Some z -> e_local z zty)
                   wr in
               let args = e_tuple args in
-              let cmode, c = cont env' in
+              let cmode, c = translate_s env' cont (stmt s_tail) in
               let aout = e_op EcCoreLib.CI_Int.p_iteri [aty] in
               let aout = aout (toarrow [tint; (toarrow [tint; aty] aty); aty] aty) in
               let aout = e_app aout [niter; body; args] aty in
@@ -1667,7 +1667,7 @@ module Op = struct
                     | Some z -> e_local z zty)
                   wr in
               let args = e_tuple args in
-              let cmode, c = cont env' in
+              let cmode, c = translate_s env' cont (stmt s_tail) in
               let aout = e_op EcCoreLib.CI_Distr.p_dfold [aty] in
               let aout = aout (toarrow [toarrow [tint; aty] (tdistr aty); aty; tint] (tdistr aty)) in
               let aout = e_app aout [body; args; niter] (tdistr aty) in
