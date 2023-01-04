@@ -142,9 +142,10 @@ let main () =
               List.fold_left Filename.concat root ["scripts"; "testing"]
           | None ->
               EcRelocate.resource ["commands"] in
-        let cmd = Filename.concat root "runtest" in
-        Format.eprintf "Executing: %s %s@." cmd input.runo_input;
-        Unix.execv cmd [| "runtest"; input.runo_input |]
+        let cmd  = Filename.concat root "runtest" in
+        let args = ["runtest"; input.runo_input] @ input.runo_scenarios in
+        Format.eprintf "Executing: %s@." (String.concat " " (cmd :: args));
+        Unix.execv cmd (Array.of_list args)
       end
 
     | _ -> ()
