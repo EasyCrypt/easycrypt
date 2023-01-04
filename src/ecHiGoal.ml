@@ -444,7 +444,9 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
             ~ptn:pt.ptev_ax
             (FApi.tc1_goal tc)
         with EcMatching.MatchFailure ->
-          tc_error !!tc "proof-term is not alpha-convertible to conclusion" end;
+          tc_error !!tc "@[<v>proof-term is not alpha-convertible to conclusion@ @[%a@]@]"
+              (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (EcEnv.LDecl.toenv pt.ptev_env.pte_hy))) pt.ptev_ax
+        end;
         EcLowGoal.t_apply (fst (PT.concretize pt)) tc
     | `Apply ->
         EcLowGoal.Apply.t_apply_bwd_r pt tc
@@ -457,6 +459,19 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
 
   with (EcLowGoal.Apply.NoInstance _) as err ->
     tc_error_exn !!tc err
+
+(* -------------------------------------------------------------------- *)
+let process_exacttype qs (tc : tcenv1) =
+  let env, hyps, _ = FApi.tc1_eflat tc in
+  let p =
+    try EcEnv.Ax.lookup_path (EcLocation.unloc qs) env
+    with LookupFailure cause ->
+      tc_error !!tc "%a" EcEnv.pp_lookup_failure cause
+  in
+  let tys =
+    List.map (fun (a,_) -> EcTypes.tvar a)
+      (EcEnv.LDecl.tohyps hyps).h_tvar in
+  EcLowGoal.t_apply_s p tys ~args:[] ~sk:0 tc
 
 (* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
@@ -1811,6 +1826,9 @@ let process_apply ~implicits ((infos, orv) : apply_t * prevert option) tc =
 
     | `Alpha pe ->
         process_apply_bwd ~implicits `Alpha pe tc
+
+    | `ExactType qs ->
+        process_exacttype qs tc
 
     | `Top mode ->
         let tc = process_apply_top tc in

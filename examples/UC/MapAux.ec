@@ -105,9 +105,9 @@ move: m.
 elim /fmapW=> [| m k v k_notin_m IH].
 by rewrite frng0 fdom0 2!fcards0.
 rewrite mem_fdom in k_notin_m.
-rewrite frng_set rem_id // fdom_set (fcardUI_indep _ (fset1 k))
+rewrite frng_set rem_id // fdom_set (@fcardUI_indep _ (fset1 k))
         1:fsetI1 1:mem_fdom 1:k_notin_m // fcard1 fcardU fcard1
-        -addzA ler_add // -{2}(addz0 1) ler_add // oppz_le0 fcard_ge0.
+        -addzA ler_add // -{2}(@addz0 1) ler_add // oppz_le0 fcard_ge0.
 qed.
 
 lemma fdom_frng_prop (X : 'a fset, m : ('a, 'a) fmap) :
@@ -122,7 +122,7 @@ have card_fdom_m_lt_card_X : card (fdom m) < card X.
   by rewrite subset_leq_fcard.
 have card_X_le_card_fdom_m : card X <= card (fdom m)
   by rewrite -eq_frng_m_X le_card_frng_fdom.
-by rewrite /= -(ltzz (card X)) (ler_lt_trans (card (fdom m))).
+by rewrite /= -(@ltzz (card X)) (ler_lt_trans (card (fdom m))).
 qed.
 
 lemma fdom_frng_prop_type (m : ('a, 'a) fmap) :

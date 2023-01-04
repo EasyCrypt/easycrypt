@@ -328,9 +328,7 @@ end = struct
   (* ------------------------------------------------------------------ *)
   let ax_ovrd _oc ((proofs, evc) : state) name ((axd, mode) : ax_override) =
     let loc = axd.pl_loc in
-    let tc = FPNamed (axd, None) in
-    let tc = { fp_mode = `Explicit; fp_head = tc; fp_args = []; } in
-    let tc = Papply (`Alpha tc, None) in
+    let tc = Papply (`ExactType axd, None) in
     let tc = mk_loc loc (Plogic tc) in
     let pr = { pthp_mode   = `Named (name, mode);
                pthp_tactic = Some tc; } in
