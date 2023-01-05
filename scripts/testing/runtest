@@ -644,8 +644,17 @@ class RawListener(Listener):
         yield
 
 # --------------------------------------------------------------------
+def get_njobs():
+    try:
+        njobs = max(int(os.environ.get('ECRJOBS', 0)), 0)
+    except ValueError:
+        return 0
+
+    return njobs or mp.cpu_count()
+
+# --------------------------------------------------------------------
 async def _run_all(options, allscripts, listener : Listener):
-    semaphore = asyncio.Semaphore(options.jobs or mp.cpu_count())
+    semaphore = asyncio.Semaphore(options.jobs or get_njobs())
 
     async def runcheck(config):
         async with semaphore:
