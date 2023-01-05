@@ -960,6 +960,7 @@ let is_e_subst_id s =
      not s.es_freshen
   && s.es_p  == identity
   && s.es_ty == identity
+  && Mp.is_empty s.es_opdef
   && sms_is_identity s.es_mp
   && Mid.is_empty s.es_loc
 
