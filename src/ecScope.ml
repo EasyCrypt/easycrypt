@@ -1478,6 +1478,18 @@ module Op = struct
 
          (mode, e_let lv (e_if e bt bf) c) (* FIXME *)
 
+      | Scall (Some lv, ({ x_top = { m_top = `Concrete (p, _) }; x_sub = f } as xp), args)  ->
+          let fd   = oget (EcEnv.Fun.by_xpath_opt xp env.env) in
+          let args = translate_e env (e_tuple args) in
+          let op   = EcPath.pqname (oget (EcPath.prefix p)) f in
+          let op   = e_op op [] (tfun fd.f_sig.fs_arg fd.f_sig.fs_ret) in
+          let op   = e_app op [args] fd.f_sig.fs_ret in
+          let lv   = translate_lv env' lv  in
+
+          let cmode, c = cont env' in
+
+          (cmode, e_let lv op c)
+
       | Swhile    _
       | Smatch    _
       | Sassert   _
