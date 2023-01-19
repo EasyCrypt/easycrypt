@@ -542,8 +542,9 @@ type iname  = [
 type inames = [`Symbol of symbol list | `Ident of EcIdent.t list]
 
 (* -------------------------------------------------------------------- *)
-let t_intros_n (n : int) (tc : tcenv1) =
-  fst (t_intros_x (EcUtils.List.make n (notag None)) tc)
+let t_intros_n ?(clear = false) (n : int) (tc : tcenv1) =
+  let tc, xs = t_intros_x (EcUtils.List.make n (notag None)) tc in
+  if clear then FApi.t_first (t_clears xs) tc else tc
 
 (* -------------------------------------------------------------------- *)
 let t_intro_i_x (id : EcIdent.t option) (tc : tcenv1) =

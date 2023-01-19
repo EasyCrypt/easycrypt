@@ -2982,6 +2982,9 @@ logtactic:
 | POSE o=rwocc? x=ident xs=ptybindings? CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, odfl [] xs, o, p) }
 
+| POSE x=mident
+   { Pmemory x }
+
 | WLOG b=boption(SUFF) COLON ids=loc(ipcore_name)* SLASH f=form
    { Pwlog (ids, b, f) }
 
