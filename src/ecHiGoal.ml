@@ -1810,6 +1810,22 @@ let process_pose xsym bds o p (tc : tcenv1) =
     (t_intros [Tagged (x, Some xsym.pl_loc)]) tc
 
 (* -------------------------------------------------------------------- *)
+let process_memory (xsym : psymbol) tc =
+  let x = EcIdent.create (unloc xsym) in
+  let m = EcMemory.empty_local_mt ~witharg:false in
+
+  FApi.t_sub
+    [
+      t_trivial;
+      FApi.t_seqs [
+        t_elim_exists ~reduce:`None;
+        t_intros [Tagged (x, Some xsym.pl_loc)];
+        t_intros_n ~clear:true 1;
+      ]
+    ]
+    (t_cut (f_exists [x, GTmem m] f_true) tc)
+
+(* -------------------------------------------------------------------- *)
 type apply_t = EcParsetree.apply_info
 
 let process_apply ~implicits ((infos, orv) : apply_t * prevert option) tc =
