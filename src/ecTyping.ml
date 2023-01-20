@@ -1536,9 +1536,20 @@ let trans_if_match ~loc env ue (gindty, gind) (c, b1, b2) =
 
   List.map
     (fun (x, xargs) ->
-      if   sym_equal c x
-      then (cargs, Some b1)
-      else (List.map (fun ty -> (EcIdent.create "_", ty)) xargs), b2)
+      if sym_equal c x then 
+        (cargs, Some b1)
+      else 
+        (* Create a pattern C _ _ ... for each constructor *)
+        let wilds = List.map (fun _ -> EcLocation.mk_loc loc None) xargs in 
+        let pat = PPApp ((EcLocation.mk_loc loc ([], x), None), wilds) in
+        let b2 = 
+          (match b2 with
+          | None -> []
+          | Some b2 -> b2
+        ) in
+        let (_, (xargs, b2)) = trans_branch ~loc env ue gindty (pat, b2) in
+        (xargs, Some b2)
+    )
     gind.tydt_ctors
 
 (*-------------------------------------------------------------------- *)
