@@ -651,6 +651,29 @@ abstract theory ComRing.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
+abstract theory ComRingDflInv.
+  clone include ComRing with
+    pred unit (x : t) = exists y, y * x = oner,
+    op   invr (x : t) = choiceb (fun y => y * x = oner) x
+
+    proof mulVr, unitP, unitout.
+
+  realize mulVr.
+  proof.
+  move=> x ^ un_x [y ^ -> <-] @/invr_.
+  by have /= -> := choicebP _ x un_x.
+  qed.
+
+  realize unitP.
+  proof. by move=> x y eq; exists y. qed.
+
+  realize unitout.
+  proof.
+  by move=> x; rewrite /unit_ negb_exists => /choiceb_dfl /(_ x).
+  qed.
+end ComRingDflInv.
+
+(* -------------------------------------------------------------------- *)
 abstract theory BoolRing.
   clone include ComRing.
 
