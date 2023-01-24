@@ -343,7 +343,7 @@ lemma eqp_trans y x z : x %= y => y %= z => x %= z.
 proof. by case=> [xy yx] [yz zy]; split; apply: (dvdr_trans y). qed.
 
 (* ==================================================================== *)
-abstract theory RingQuotient.
+abstract theory RingQuotientBase.
 type qT.
 
 (* -------------------------------------------------------------------- *)
@@ -455,6 +455,78 @@ rewrite mulrDl -addrA -mulrBr (mulrC _ y) {1}/z.
 by rewrite &(idealD) ?ideal_p // idealMl ?ideal_p &(eqv_repr).
 qed.
 
+lemma addrA : associative (+).
+proof.
+elim/quotW=> x; elim/quotW=> y; elim/quotW=> z.
+by rewrite !addE &(eqv_pi) !addrA !eqvD // 1:eqv_sym &(eqv_repr).
+qed.
+
+lemma addrC : commutative (+).
+proof.
+by elim/quotW=> x; elim/quotW=> y; rewrite !addE addrC.
+qed.
+
+lemma add0r : left_id zeror (+).
+proof. by elim/quotW=> x; rewrite !addE add0r. qed.
+
+lemma addNr : left_inverse zeror [-] (+).
+proof.
+elim/quotW=> x; rewrite !addE &(eqv_pi) addrC.
+by apply/eqv0r/eqv_repr.
+qed.
+
+lemma oner_neq0 : oner <> zeror.
+proof. by rewrite -eqv_pi eqv0r; apply/ideal_Ntriv/unitr1. qed.
+
+lemma mulrA : associative ( * ).
+proof.
+elim/quotW=> x; elim/quotW=> y; elim/quotW=> z.
+rewrite !mulE &(eqv_pi) !mulrA.
+apply: (eqv_trans (x * (repr (pi y)) * z)).
+- by apply/eqvMl/eqv_repr.
+- by apply/eqvMr/eqvMr; rewrite eqv_sym &(eqv_repr).
+qed.
+
+lemma mulrC : commutative ( * ).
+proof. by elim/quotW=> x; elim/quotW=> y; rewrite !mulE mulrC. qed.
+
+lemma mul1r: left_id oner ( * ).
+proof. by elim/quotW=> x; rewrite mulE mul1r. qed.
+
+lemma mulrDl : left_distributive ( * ) ( + ).
+proof.
+elim/quotW=> x1; elim/quotW=> x2; elim/quotW=> y.
+rewrite !(addE, mulE) &(eqv_pi) -mulrDl.
+apply: (eqv_trans ((x1 + x2) * (repr (pi y)))).
+- by apply/eqvMl; rewrite eqv_sym &(eqv_repr).
+- by apply/eqvMr/eqvD; rewrite eqv_sym &(eqv_repr).
+qed.
+
+end RingQuotientBase.
+
+abstract theory RingQuotientDflInv.
+clone include RingQuotientBase.
+clone import ComRingDflInv with
+  type t     <= qT   ,
+  op   zeror <= zeror,
+  op   ( + ) <= (+)  ,
+  op   [ - ] <= [-]  ,
+  op   oner  <= oner ,
+  op   ( * ) <= ( * )
+  proof *.
+realize addrA by exact addrA.
+realize addrC by exact addrC.
+realize add0r by exact add0r.
+realize addNr by exact addNr.
+realize oner_neq0 by exact oner_neq0.
+realize mulrA by exact mulrA.
+realize mulrC by exact mulrC.
+realize mul1r by exact mul1r.
+realize mulrDl by exact mulrDl.
+end RingQuotientDflInv.
+
+abstract theory RingQuotient.
+clone include RingQuotientBase.
 axiom mulVr   : left_inverse_in unit oner invr ( * ).
 axiom unitP   : forall (x y : qT), y * x = oner => unit x.
 axiom unitout : forall (x : qT), !unit x => invr x = x.
@@ -468,60 +540,21 @@ clone import ComRing with
   op   ( * ) <= ( * ),
   op   invr  <= invr ,
   pred unit  <= unit
-
   proof *.
-
-realize addrA.
-proof.
-elim/quotW=> x; elim/quotW=> y; elim/quotW=> z.
-by rewrite !addE &(eqv_pi) !addrA !eqvD // 1:eqv_sym &(eqv_repr).
-qed.
-
-realize addrC.
-proof.
-by elim/quotW=> x; elim/quotW=> y; rewrite !addE addrC.
-qed.
-
-realize add0r.
-proof. by elim/quotW=> x; rewrite !addE add0r. qed.
-
-realize addNr.
-proof.
-elim/quotW=> x; rewrite !addE &(eqv_pi) addrC.
-by apply/eqv0r/eqv_repr.
-qed.
-
-realize oner_neq0.
-proof. by rewrite -eqv_pi eqv0r; apply/ideal_Ntriv/unitr1. qed.
-
-realize mulrA.
-proof.
-elim/quotW=> x; elim/quotW=> y; elim/quotW=> z.
-rewrite !mulE &(eqv_pi) !mulrA.
-apply: (eqv_trans (x * (repr (pi y)) * z)).
-- by apply/eqvMl/eqv_repr.
-- by apply/eqvMr/eqvMr; rewrite eqv_sym &(eqv_repr).
-qed.
-
-realize mulrC.
-proof. by elim/quotW=> x; elim/quotW=> y; rewrite !mulE mulrC. qed.
-
-realize mul1r.
-proof. by elim/quotW=> x; rewrite mulE mul1r. qed.
-
-realize mulrDl.
-proof.
-elim/quotW=> x1; elim/quotW=> x2; elim/quotW=> y.
-rewrite !(addE, mulE) &(eqv_pi) -mulrDl.
-apply: (eqv_trans ((x1 + x2) * (repr (pi y)))).
-- by apply/eqvMl; rewrite eqv_sym &(eqv_repr).
-- by apply/eqvMr/eqvD; rewrite eqv_sym &(eqv_repr).
-qed.
-
+realize addrA by exact addrA.
+realize addrC by exact addrC.
+realize add0r by exact add0r.
+realize addNr by exact addNr.
+realize oner_neq0 by exact oner_neq0.
+realize mulrA by exact mulrA.
+realize mulrC by exact mulrC.
+realize mul1r by exact mul1r.
+realize mulrDl by exact mulrDl.
 realize mulVr   by apply: mulVr.
 realize unitP   by apply: unitP.
 realize unitout by apply: unitout.
 end RingQuotient.
+
 end IdealComRing.
 
 (* ==================================================================== *)
