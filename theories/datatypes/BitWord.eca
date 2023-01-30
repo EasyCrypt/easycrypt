@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
-require import Bool Core Int Xint List.
+require import AllCore Bool Int Xint List BitEncoding.
+import (*---*) BS2Int.
 require (*--*) FinType Word Ring.
 
 pragma +implicits.
@@ -141,6 +142,14 @@ move=> x y; rewrite /unitw !wordP => + i Hi -/(_ i Hi).
 by rewrite andwE onewE Hi /#.
 qed.
 
+(* -------------------------------------------------------------------- *)
+lemma zerow_int:
+  bs2int (ofword zerow) = 0.
+proof. by rewrite ofwordKmkseq mkseq_nseq bs2int_nseq_false. qed.
+
+lemma onew_int:
+  bs2int (ofword onew) = 2 ^ n - 1.
+proof. by rewrite ofwordKmkseq mkseq_nseq bs2int_nseq_true 1:ge0_n. qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory Cost.
