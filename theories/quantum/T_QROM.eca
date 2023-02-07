@@ -1,7 +1,7 @@
 require import AllCore List Distr DBool DProd DList DInterval CHoareTactic IntDiv SmtMap.
 require import FunSamplingLib.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
-require (*  *) Matrix Tuple FinType.
+require (*  *) Matrix Tuple FinType ROM.
 
 type from.
 
@@ -15,6 +15,15 @@ clone  MUniFinFun as MUFFH with
   type t <- hash.   (* This assumes that the type of hash is finite *)
 
 op [lossless uniform full ] dhash : hash distr.
+
+clone ROM as ROM_ with
+  type in_t <- from,
+  type out_t <- hash,
+  op dout <- fun _ => dhash.
+
+clone ROM_.LazyEager as LE with 
+  theory FinType <- MUFF.FinT.
+
 
 (* Uniform distribution over from -> hash *)
 op dfhash : (from -> hash) distr = dfun (fun _ => dhash).
@@ -73,16 +82,8 @@ abstract theory Collision.
     Pr[Col(A).main(i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
 
 theory CLASSICAL.
-
-require ROM.
-
-clone import ROM as ROM_ with
-  type in_t <- from,
-  type out_t <- hash,
-  op dout <- fun _ => dhash.
-
-clone import LazyEager with 
-  theory FinType <- MUFF.FinT.
+  import ROM_.
+  import LE.
 
   module type AdvCol_C (H: POracle) = {
     proc main(i:input) : from * from
