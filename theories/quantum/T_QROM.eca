@@ -1,4 +1,4 @@
-require import AllCore List Distr DBool DProd DList DInterval CHoareTactic IntDiv.
+require import AllCore List Distr DBool DProd DList DInterval CHoareTactic IntDiv SmtMap.
 require import FunSamplingLib.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
 require (*  *) Matrix Tuple FinType.
@@ -71,6 +71,42 @@ abstract theory Collision.
     let r = mu1 dhash witness in
     hoare [Col(A).main : i = i_ ==> QRO.ch <= q] =>
     Pr[Col(A).main(i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
+
+theory CLASSICAL.
+
+require ROM.
+
+clone import ROM as ROM_ with
+  type in_t <- from,
+  type out_t <- hash,
+  op dout <- fun _ => dhash.
+
+clone import LazyEager with 
+  theory FinType <- MUFF.FinT.
+
+  module type AdvCol_C (H: POracle) = {
+    proc main(i:input) : from * from
+  }.
+  
+  module Col_C(A:AdvCol_C) = {
+    proc main(i:input) = {
+      var xx;
+      QRO.init();
+      xx <@ A(ERO).main(i);
+      return (xx.`1 <> xx.`2 && ERO.m.[xx.`1] = ERO.m.[xx.`2]);
+    }
+  }.
+
+  lemma pr_col i_ q (A<:AdvCol_C{-ERO}) &m:
+    let r = mu1 dhash witness in
+    hoare [Col_C(A).main : i = i_ ==> QRO.ch <= q] =>
+    Pr[Col_C(A).main(i_) @ &m : res] <= q%r^2*r. 
+  (* Proof strategy: 
+     -> Move to LRO
+     -> Use whatever bound we have already *)
+  admitted.
+
+end CLASSICAL.
 
 end Collision.
 
@@ -322,6 +358,8 @@ axiom dA_split q (A<:AdvRO{-QRO}) &m:
 
 end QROM_Fundamental_Lemma.
 
+(* This is a PRF assumption against quantum adversaries,
+   with quantum access to the prf *)
 abstract theory T_PRF.
 
 type key.
