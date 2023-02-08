@@ -92,7 +92,7 @@ theory CLASSICAL.
   module Col_C(A:AdvCol_C) = {
     proc main(i:input) = {
       var xx;
-      QRO.init();
+      ERO.init();
       xx <@ A(ERO).main(i);
       return (xx.`1 <> xx.`2 && ERO.m.[xx.`1] = ERO.m.[xx.`2]);
     }
