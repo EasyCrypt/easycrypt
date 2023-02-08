@@ -39,7 +39,8 @@ type w3ty = WTy.tysymbol
 
 type w3op_ho =
   [ `HO_DONE of WTerm.lsymbol
-  | `HO_TODO of string * WTy.ty list * WTy.ty option ]
+  | `HO_TODO of string * WTy.ty list * WTy.ty option
+  | `HO_FIX  of WTerm.lsymbol * WDecl.decl * WDecl.decl * bool ref ]
 
 type w3op = {
   (*---*) w3op_fo : w3op_fo;
@@ -504,10 +505,13 @@ let trans_lvars genv lenv bds =
 
 (* -------------------------------------------------------------------- *)
 (* build the higher-order symbol and add the corresponding axiom.       *)
-let mk_highorder_func ids dom codom mk =
+let mk_highorder_symb ids dom codom =
   let pid = WIdent.id_fresh (ids ^ "_ho") in
   let ty = List.fold_right WTy.ty_func dom (odfl WTy.ty_bool codom) in
-  let ls' = WTerm.create_fsymbol pid [] ty in
+  WTerm.create_fsymbol pid [] ty, ty
+
+let mk_highorder_func ids dom codom mk =
+  let ls', ty = mk_highorder_symb ids dom codom in
   let decl' = WDecl.create_param_decl ls' in
   let pid_spec = WIdent.id_fresh (ids ^ "_ho_spec") in
   let pr = WDecl.create_prsymbol pid_spec in
@@ -535,6 +539,9 @@ let w3op_ho_lsymbol genv wop =
       genv.te_task <- WTask.add_decl genv.te_task decl;
       genv.te_task <- WTask.add_decl genv.te_task decl_s;
       wop.w3op_ho <- `HO_DONE ls; ls
+
+  | `HO_FIX (ls, _, _, r) ->
+      r := true; ls
 
 (* -------------------------------------------------------------------- *)
 let rec highorder_type targs tres =
@@ -1064,9 +1071,18 @@ and create_op ?(body = false) (genv : tenv) p =
 
   let w3op =
     let name = ls.WTerm.ls_name.WIdent.id_string in
+    let w3op_ho =
+      if EcDecl.is_fix op then
+        let ls, decl, decl_s =
+          mk_highorder_func name (textra@wdom) wcodom (WTerm.t_app ls)
+        in
+          `HO_FIX (ls, decl, decl_s, ref false)
+      else
+        `HO_TODO (name, textra@wdom, wcodom) in
+
     { w3op_fo = `LDecl ls;
       w3op_ta = instantiate wparams ~textra wdom wcodom;
-      w3op_ho = `HO_TODO (name, textra@wdom, wcodom); }
+      w3op_ho = w3op_ho; }
   in
 
   let register = OneShot.mk (fun () -> Hp.add genv.te_op p w3op) in
@@ -1091,11 +1107,28 @@ and create_op ?(body = false) (genv : tenv) p =
           let wparams, wbody = trans_body (genv, lenv) wdom None body in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
-      | _, _ -> WDecl.create_param_decl ls
+      | _, _ ->
+          WDecl.create_param_decl ls
 
     in
       OneShot.now register;
-      genv.te_task <- WTask.add_decl genv.te_task decl
+
+      match w3op.w3op_ho with
+      | `HO_FIX (ls, ho_decl, ho_decl_s, r) -> begin
+          if !r then begin
+            List.iter
+              (fun d -> genv.te_task <- WTask.add_decl genv.te_task d)
+              [ho_decl; decl; ho_decl_s];
+            w3op.w3op_ho <- `HO_DONE ls
+          end else begin
+            genv.te_task <- WTask.add_decl genv.te_task decl;
+            w3op.w3op_ho <-
+              let name = ls.WTerm.ls_name.WIdent.id_string in
+              `HO_TODO (name, textra@wdom, wcodom)
+          end
+        end
+      | _ ->
+          genv.te_task <- WTask.add_decl genv.te_task decl
   end;
 
   w3op
