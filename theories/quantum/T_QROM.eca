@@ -88,12 +88,26 @@ theory CLASSICAL.
   module type AdvCol_C (H: POracle) = {
     proc main(i:input) : from * from
   }.
+
+  module WrapC(O : Oracle) : Oracle = {
+    proc init() : unit = {
+        O.init();
+        QRO.ch <- 0;
+    }
+
+    proc o(x : from) : hash = {
+        var r;
+        r <@ O.o(x);
+        QRO.ch <- QRO.ch + 1;
+        return r;
+    }
+  }.
   
   module Col_C(A:AdvCol_C) = {
     proc main(i:input) = {
       var xx;
-      ERO.init();
-      xx <@ A(ERO).main(i);
+      WrapC(ERO).init();
+      xx <@ A(WrapC(ERO)).main(i);
       return (xx.`1 <> xx.`2 && ERO.m.[xx.`1] = ERO.m.[xx.`2]);
     }
   }.
