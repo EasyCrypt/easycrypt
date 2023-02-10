@@ -78,7 +78,7 @@ abstract theory Collision.
   (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
   axiom pr_col i_ q (A<:AdvCol{-QRO}) &m:
     let r = mu1 dhash witness in
-    hoare [Col(A).main : i = i_ ==> QRO.ch <= q] =>
+    hoare [Col(A).main : i = i_ /\ QRO.ch = 0 ==> QRO.ch <= q] =>
     Pr[Col(A).main(i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
 
 theory CLASSICAL.
@@ -100,7 +100,7 @@ theory CLASSICAL.
 
   lemma pr_col i_ q (A<:AdvCol_C{-ERO}) &m:
     let r = mu1 dhash witness in
-    hoare [Col_C(A).main : i = i_ ==> QRO.ch <= q] =>
+    hoare [Col_C(A).main : i = i_ /\ QRO.ch = 0 ==> QRO.ch <= q] =>
     Pr[Col_C(A).main(i_) @ &m : res] <= q%r^2*r. 
   (* Proof strategy: 
      -> Move to LRO
