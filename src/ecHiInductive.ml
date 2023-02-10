@@ -277,7 +277,7 @@ let trans_matchfix
   let branches =
     let pbs =
       let trans_b ((body, pbmap) : _ * pop_pattern Msym.t) =
-        let trans1 ((_, x, xty) : _ * EcIdent.t * ty) =
+        let trans1 ((xpos, x, xty) : _ * EcIdent.t * ty) =
           let pb     = oget (Msym.find_opt (EcIdent.name x) pbmap) in
           let filter = fun _ op -> EcDecl.is_ctor op in
           let PPApp ((cname, tvi), cargs) = pb.pop_pattern in
@@ -326,21 +326,45 @@ let trans_matchfix
               let pvars = List.map (create |- unloc) cargs in
               let pvars = List.combine pvars ctorty in
 
-              (pb, (indp, ind, (ctorsym, ctoridx)), pvars)
+              (pb, (indp, ind, (ctorsym, ctoridx)), pvars, xpos)
         in
 
         let ptns = List.map trans1 mpty in
         let env  =
-          List.fold_left (fun env (_, _, pvars) ->
+          List.fold_left (fun env (_, _, pvars, _) ->
             EcEnv.Var.bind_locals pvars env)
             env ptns
         in
-            (ptns, TT.transexpcast env `InOp ue codom body)
+
+        let body = TT.transexpcast env `InOp ue codom body in
+
+        let rec check_body =
+          let (_, _, pvars, pos) =
+            List.max
+              ~cmp:(fun p1 p2 -> Stdlib.compare (proj4_4 p1) (proj4_4 p2))
+              ptns in
+          let pvars = Sid.of_list (List.fst pvars) in
+
+          fun (e : expr) ->
+            match destr_app e with
+            | ({ e_node = Elocal x }, args) when x = opname -> begin
+                match List.nth_opt args pos with
+                | Some { e_node = Elocal a } when Sid.mem a pvars ->
+                    ()
+                | _ ->
+                    fxerror loc env TT.FXE_SynCheckFailure
+              end
+
+            | _ ->
+                EcTypes.e_iter check_body e in
+
+        check_body body;
+        (ptns, body)
       in
         List.map trans_b pbsmap
     in
 
-    let inds = (fun (_, (indp, ind, _), _) -> (indp, ind)) in
+    let inds = (fun (_, (indp, ind, _), _, _) -> (indp, ind)) in
     let inds = List.map inds (fst (oget (List.ohead pbs))) in
     let inds =
       List.map (fun (indp, ctors) ->
@@ -354,7 +378,7 @@ let trans_matchfix
 
     List.iter
       (fun (ptns, be) ->
-         let ptns = List.map (fun (_, (_, _, (_, ctor)), pvars) ->
+         let ptns = List.map (fun (_, (_, _, (_, ctor)), pvars, _) ->
            (ctor, pvars)) ptns
          in
            if not (CaseMap.add ptns be casemap) then

@@ -100,6 +100,7 @@ type fxerror =
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
 | FXE_CtorInvalidArity of (symbol * int * int)
+| FXE_SynCheckFailure
 
 type filter_error =
 | FE_InvalidIndex of int
