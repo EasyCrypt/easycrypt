@@ -276,6 +276,8 @@ val e_map :
 val e_fold :
   ('state -> expr -> 'state) -> 'state -> expr -> 'state
 
+val e_iter : (expr -> unit) -> expr -> unit
+
 (* -------------------------------------------------------------------- *)
 type e_subst = {
   es_freshen : bool; (* true means realloc local *)

@@ -917,7 +917,7 @@ let e_map fty fe e =
       let bd' = fe bd in
       ExprSmart.e_quant (e, (q, b, bd)) (q, b', bd')
 
-let e_fold fe state e =
+let e_fold (fe : 'a -> expr -> 'a) (state : 'a) (e : expr) =
   match e.e_node with
   | Eint _                -> state
   | Elocal _              -> state
@@ -930,6 +930,9 @@ let e_fold fe state e =
   | Eif (e1, e2, e3)      -> List.fold_left fe state [e1; e2; e3]
   | Ematch (e, es, _)     -> List.fold_left fe state (e :: es)
   | Equant (_, _, e1)     -> fe state e1
+
+let e_iter (fe : expr -> unit) (e : expr) =
+  e_fold (fun () e -> fe e) () e
 
 module MSHe = EcMaps.MakeMSH(struct type t = expr let tag e = e.e_tag end)
 module Me = MSHe.M

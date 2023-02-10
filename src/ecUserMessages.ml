@@ -275,6 +275,9 @@ end = struct
           "the constructor %s expects %d argument(s) (%d argument(s) given)"
           cname i j
 
+    | FXE_SynCheckFailure ->
+        msg "syntactic termination check failure"
+
   let pp_tyerror env1 fmt error =
     let env   = EcPrinting.PPEnv.ofenv env1 in
     let msg x = Format.fprintf fmt x in
