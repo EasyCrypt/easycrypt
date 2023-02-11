@@ -7,6 +7,7 @@ require (*  *) T_QROM T_EUF T_PERM.
 clone import T_EUF as EUF.
 
 clone import T_QROM as QROM with
+  type input <- unit,
   type from <- msg.
 
 clone import DFunBiasedSingle with
@@ -777,8 +778,7 @@ module B (A:AdvEUF_QROM) : AdvOW = {
   }
 }.
 
-clone import Collision with 
-  type input <- unit.
+clone import Collision.
 
 section OW.
 

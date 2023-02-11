@@ -16,10 +16,13 @@ clone  MUniFinFun as MUFFH with
 
 op [lossless uniform full ] dhash : hash distr.
 
+type input.
 clone ROM as ROM_ with
   type in_t <- from,
   type out_t <- hash,
-  op dout <- fun _ => dhash.
+  op dout <- fun _ => dhash,
+  type d_in_t <- input,
+  type d_out_t <- bool.
 
 clone ROM_.LazyEager as LE with 
   theory FinType <- MUFF.FinT.
@@ -59,9 +62,7 @@ module QRO : QRO_i = {
 }.
  
 abstract theory Collision.
- 
-  type input.
-  
+   
   quantum module type AdvCol (H:QRO) = {
     proc main(i:input) : from * from
   }.
@@ -111,6 +112,30 @@ theory CLASSICAL.
       return (xx.`1 <> xx.`2 && ERO.m.[xx.`1] = ERO.m.[xx.`2]);
     }
   }.
+
+module (D(A : AdvCol_C): Distinguisher) ( H : POracle)   = {
+
+  module HC = {
+    proc o(x : from) : hash = {
+        var r;
+        r <@ H.o(x);
+        QRO.ch <- QRO.ch + 1;
+        return r;
+    }
+  }
+
+
+  proc run(i : input): bool = {
+      var xx,h1,h2;
+      QRO.ch <- 0;
+      xx <@ A(HC).main(i);
+      h1 <@ H.o(xx.`1);
+      h2 <@ H.o(xx.`2);
+      return (xx.`1 <> xx.`2 && h1 = h2);
+
+  } 
+}.
+
 
   lemma pr_col i_ q (A<:AdvCol_C{-ERO}) &m:
     let r = mu1 dhash witness in
