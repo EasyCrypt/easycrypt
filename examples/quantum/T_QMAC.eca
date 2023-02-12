@@ -117,7 +117,7 @@ lemma advantage_euf &m:
   hoare [A(S(QRO)).choose : QRO.ch = 0 ==> QRO.ch <= q ] =>
   Pr[EUF_qCMA (A, PRF_MAC).main() @ &m : res] <= 
     `| Pr[IND_QRO(PRF, B(A)).main() @ &m : res] - Pr[IND_QRO(QRO, B(A)).main() @ &m : res] | + 
-     (q + 1)%r / card%r.
+     (q + 1)%r / MUFF.FinT.card%r.
 proof.
   have -> : 
     Pr[EUF_qCMA (A, PRF_MAC).main() @ &m : res] = Pr[IND_QRO(PRF, B(A)).main() @ &m : res].
@@ -142,7 +142,8 @@ proof.
     auto => /> hL _ ms; split; 1: by exists [].
     move=> l; split; 1: smt(size_eq0 size_ge0).
     by move=> l1; rewrite cats0 /#.
-  have /# := bound_distinct q C &m _.
-  proc; inline *; wp.
-  call hq; auto.
+  have := bound_distinct q C &m _. 
+  + proc; inline *; wp.
+    by call hq; auto.
+  by smt().
 qed.

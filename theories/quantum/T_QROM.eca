@@ -1,5 +1,5 @@
 require import AllCore List Distr DBool DProd DList DInterval CHoareTactic IntDiv SmtMap.
-require import FunSamplingLib.
+require import FunSamplingLib Birthday FSet.
 (*   *) import StdOrder RField RealOrder StdBigop Bigreal BRA.
 require (*  *) Matrix Tuple FinType ROM.
 
@@ -136,15 +136,248 @@ module (D(A : AdvCol_C): Distinguisher) ( H : POracle)   = {
   } 
 }.
 
+  (* We shoul d have a version of Birthday with no q *)
+  op q : int.
+  axiom ge0_q :0 <= q.
 
-  lemma pr_col i_ q (A<:AdvCol_C{-ERO}) &m:
+section CollisionProbability.
+  declare module A <:AdvCol_C{-ERO, -QRO, -Lazy.LRO}.
+
+
+  declare axiom A_ll (O <: POracle): islossless O.o => islossless A(O).main.
+  declare axiom A_Bounded : hoare [A(D(A, Lazy.LRO).HC).main : QRO.ch = 0 ==> QRO.ch <= q].
+
+  local clone import Birthday as BBound with
+    op   q <- q + 2,
+    type T <- hash,
+    op   uT <- dhash,
+    op maxu <- witness
+  proof *.
+  realize ge0_q by smt(ge0_q).
+  realize maxuP by smt(dhash_fu dhash_ll dhash_uni is_full_funiform). 
+
+  (* We construct a Birthday Bound adversary from the Coll
+     experiment. *)
+  local module (AB:Adv) (S:ASampler) = {
+    var i  : input
+    (* We simulate an f-oracle using the s-oracle *)
+    module HC = {
+      proc init = Lazy.LRO.init
+
+      proc o(x:from): hash = {
+        var r;
+        if (x \notin Lazy.LRO.m) {
+          r <@ S.s();
+          Lazy.LRO.m.[x] <- r;
+        }
+        return oget Lazy.LRO.m.[x];
+      }
+    }
+
+    proc a(): unit = {
+      var xx,h1,h2;
+      HC.init();
+      xx <@ A(HC).main(i);
+      h1 <@ HC.o(xx.`1);
+      h2 <@ HC.o(xx.`2);
+    }
+  }.
+
+pred collision (m:(from,hash) fmap) = exists x x',
+  x' <> x /\
+  x \in m /\ x' \in m /\ m.[x] = m.[x'].
+
+
+(* Some useful facts about the bad event *)
+lemma no_collision (m:(from,hash) fmap):
+  !collision m <=>
+  forall x x',
+    x' = x \/
+    !x \in m  \/
+    !x' \in m \/
+    m.[x] <> m.[x'].
+proof.
+rewrite /collision negb_exists /=; apply/forall_iff=> /= x.
+by rewrite negb_exists /=; apply/forall_iff=> /= x'; rewrite !negb_and.
+qed.
+
+lemma collision_add (m:(from,hash) fmap) x y:
+  !x \in m =>
+  collision m.[x <- y] <=> collision m \/ rng m y.
+proof.
+move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
++ rewrite mem_set=> -[z_in_m] [z'_in_m] mz_eq_mz'.
+  case (rng m y)=> //= y_notin_rngm.
+  by exists z z'; smt(@SmtMap).
+move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|].
++ exists z z'; rewrite z'_neq_z !mem_set !get_setE mz_eq_mz' z_in_m z'_in_m /=.
+  move/contra: (congr1 (dom m) z x); rewrite x_notin_m z_in_m=> -> //=.
+  by move/contra: (congr1 (dom m) z' x); rewrite x_notin_m z'_in_m=> -> //=.
+rewrite rngE=> - /= [x'] mx'_y.
+by exists x x'; smt(@SmtMap).
+qed.
+
+lemma collision_stable (m:(from,hash) fmap) y y':
+  collision m =>
+  y \notin m =>
+  collision m.[y <- y'].
+proof. by move=> h /collision_add /= ->; rewrite h. qed.
+
+  local equiv Col_Exp i_ : 
+     AB(Sample).a ~ ROM_.Exp(Lazy.LRO, D(A)).main : 
+       AB.i{1} = i_ /\ arg{2} = i_ /\ ={glob A} /\ size Sample.l{1} = 0 ==>
+         (res{2} => !uniq Sample.l{1}) /\
+         size Sample.l{1} = card (fdom Lazy.LRO.m){2}.
+  proof.
+  proc; inline*.
+  sp;seq 1 1:  (={Lazy.LRO.m, glob A,xx} /\
+           size Sample.l{1} = card (fdom Lazy.LRO.m){2} /\
+           (forall x, mem (frng Lazy.LRO.m) x <=> mem Sample.l x){1} /\
+           (collision Lazy.LRO.m{2} => !uniq Sample.l{1})).
+  + call (_: ={Lazy.LRO.m} /\
+           size Sample.l{1} = card (fdom Lazy.LRO.m){2} /\
+           (forall x, mem (frng Lazy.LRO.m) x <=> mem Sample.l x){1} /\
+           (collision Lazy.LRO.m{2} => !uniq Sample.l{1})).
+    + proc; inline*;wp;if{1}.
+      + auto => /> &1 &2 h1 h2 h3 h4 r _.
+        rewrite fdom_set fcardUI_indep 2:fcard1; 1: by rewrite fsetI1 mem_fdom h4.
+        + by do split;smt(get_setE mem_frng rngE collision_add).
+        by auto; smt (size_eq0 fdom0 fcards0 frng0 in_fset0 mem_empty).
+    by auto => />; smt (size_eq0 fdom0 fcards0 frng0 in_fset0 mem_empty).
+  sp; if{1}.
+  + rcondt{2} 2; 1: by auto => />. 
+    seq 1 1 : (#pre /\ r1{1} = r0{2}); 1 : by auto.
+    seq 4 2 : (#{/~x{1}}pre /\ xx.`1{2} \in Lazy.LRO.m{2} /\ h1{2} = oget (Lazy.LRO.m{2}.[xx{2}.`1])); 
+       1: by auto => /> &1 &2 *; do split;smt(@SmtMap @FSet get_setE mem_frng rngE collision_add).   
+    sp; if{1}.
+    + rcondt{2} 2; 1: by auto => />. 
+      seq 1 1 : (#pre /\ r2{1} = r1{2}); 1 : by auto.
+      seq 4 2 : (#{/~x0{1}}pre /\ xx.`2{2}  \in Lazy.LRO.m{2} /\ h2{2} = oget (Lazy.LRO.m{2}.[xx{2}.`2])); 
+       1: by auto => /> &1 &2 *; do split;smt(@SmtMap @FSet get_setE mem_frng rngE collision_add).
+      by auto => /> &1 &2  /> /#. 
+    rcondf{2} 2; 1: by auto => />. 
+    seq 0 1 : (#pre); 1 : by auto.
+    by auto => /> &1 &2  /> /#. 
+  rcondf{2} 2; 1: by auto => />. 
+  seq 0 1 : (#pre); 1 : by auto.
+  seq 1 1 : (#{/~x{1}}pre /\ xx.`1{2} \in Lazy.LRO.m{2} /\ h1{2} = oget (Lazy.LRO.m{2}.[xx{2}.`1])); 
+       1: by auto => /> &1 &2 *; do split;smt(@SmtMap @FSet get_setE mem_frng rngE collision_add).   
+    sp; if{1}.
+    + rcondt{2} 2; 1: by auto => />. 
+      seq 1 1 : (#pre /\ r2{1} = r1{2}); 1 : by auto.
+      seq 4 2 : (#{/~x0{1}}pre /\ xx.`2{2}  \in Lazy.LRO.m{2} /\ h2{2} = oget (Lazy.LRO.m{2}.[xx{2}.`2])); 
+       1: by auto => /> &1 &2 *; do split;smt(@SmtMap @FSet get_setE mem_frng rngE collision_add).
+      by auto => /> &1 &2  /> /#. 
+    rcondf{2} 2; 1: by auto => />. 
+    seq 0 1 : (#pre); 1 : by auto.
+    by auto => /> &1 &2  /> /#. 
+ qed.
+
+  local lemma HCo_ll (S <: ASampler{-AB}) : 
+    islossless S.s =>
+    islossless AB(S).HC.o by 
+      move => S_ll; proc;  if; wp; [call (_: true) => /= | auto] =>//. 
+
+  local lemma AB_ll (S <: ASampler {-AB}): islossless S.s => islossless AB(S).a.
+  proof.
+  move=> S_ll; proc; inline*; wp.
+ seq 1 : true  => //; 1: by auto. 
+ seq 1 : true => //.
+ + call(_: true) => //. 
+   + move => H Hl; apply (A_ll H Hl).  
+     by apply (HCo_ll S);apply S_ll.
+ seq 1 : true  => //; 1: by auto.
+ seq 1 : true => //.
++  if; auto => />; 1: by conseq(_: true ==> _)=> //; call S_ll => />.
+ seq 2 : true => //; 1: by auto.
++  if; auto => />;1: by conseq(_: true ==> _)=> //; call S_ll => />.
+  qed.
+
+
+
+  local hoare LRO_bounded : ROM_.Exp(Lazy.LRO, D(A)).main : 
+       true ==> card (fdom Lazy.LRO.m) <= q + 2.
+  proof. proc; inline *;wp;rnd;wp;rnd;wp.
+    call (_:  Lazy.LRO.m = empty /\ QRO.ch = 0 ==> QRO.ch <= q /\ card (fdom Lazy.LRO.m) <= QRO.ch). 
+  conseq (:  QRO.ch = 0 ==> QRO.ch <= q)
+          (_: card (fdom Lazy.LRO.m) <= QRO.ch ==> card (fdom Lazy.LRO.m) <= QRO.ch). 
+    smt(@SmtMap). 
+    + proc(  card (fdom Lazy.LRO.m) <= QRO.ch); 1,2: smt().
+      by proc; inline *; auto => />;smt(@SmtMap).
+    apply (A_Bounded).
+    auto => /> ; smt(@SmtMap).
+  qed.
+
+  lemma pr_collision &m i_:
+    Pr[ROM_.Exp(Lazy.LRO, D(A)).main(i_) @ &m: res]
+        <= ((q+2)*(q+1))%r/2%r * mu1 dhash witness.
+  proof.
+  have Hm2: exists &m2, AB.i{m2} = i_ /\ (glob A){m2} = (glob A){m}. admit.
+  elim Hm2 => &m2 Hi.
+  apply (ler_trans (Pr[Exp(Sample,AB).main() @ &m2: !uniq Sample.l])).
+  + byequiv => //. 
+    symmetry; proc *; inline Exp(Sample, AB).main.
+    call (Col_Exp i_); 1: by inline *; auto.
+  have /=  := (pr_collision AB _ _ &m2); last by smt().
+  + by move => S S_ll; apply (AB_ll S S_ll).
+  conseq (Col_Exp i_) (LRO_bounded); last by smt(). 
+  move => &1 ?; exists  (glob A){1} => />. exists i_; do split.
+  admit. smt(). 
+  qed.
+
+  lemma Conclusion &m i_:
+    `|Pr[ROM_.Exp(Lazy.LRO, D(A)).main(i_) @ &m: res]|
+      <= ((q+2)*(q+1))%r/2%r * mu1 dhash witness.
+  proof.
+    by move:  (pr_collision &m i_);smt(mu_bounded).
+  qed.
+
+end section CollisionProbability.
+
+
+  lemma pr_col i_ (A<:AdvCol_C{-ERO, -QRO, -Lazy.LRO}) &m:
+    (forall (O <: POracle), islossless O.o => islossless A(O).main) =>
+    (hoare [A(D(A, Lazy.LRO).HC).main : QRO.ch = 0 ==> QRO.ch <= q]) =>
     let r = mu1 dhash witness in
     hoare [Col_C(A).main : i = i_ /\ QRO.ch = 0 ==> QRO.ch <= q] =>
-    Pr[Col_C(A).main(i_) @ &m : res] <= q%r^2*r. 
-  (* Proof strategy: 
-     -> Move to LRO
-     -> Use whatever bound we have already *)
-  admitted.
+    Pr[Col_C(A).main(i_) @ &m : res] <= ((q+2)*(q+1))%r/2%r * mu1 dhash witness.
+move => A_ll A_Bounded r Hh.
+have ->  : Pr[Col_C(A).main(i_) @ &m : res] =
+          Pr[ Exp(Lazy.LRO, D(A)).main(i_) @ &m : res].
++ have -> : Pr[Col_C(A).main(i_) @ &m : res] =
+          Pr[ Exp(ERO, D(A)).main(i_) @ &m : res].
+  byequiv => //.
+  proc; inline *;wp;call(_: ={glob ERO}); 1: by sim.
+  wp;conseq (_: _ ==> ={glob ERO} /\ forall x, x \in ERO.m{1}); 1: by smt(). 
+  while (w{1} = drop (FinT.card - size w{1}) FinT.enum /\
+         ={glob ERO, w} /\ forall x, x \in ERO.m{2} <=> 
+              x \in drop (size w{2}) FinT.enum); last first.
+  + auto => />; do split.
+    + by rewrite /FinT.card /= drop0.
+    + move => x2; by rewrite drop_size /= mem_empty. 
+    by move => mr; rewrite drop0 /= => Hx;  smt(FinT.enumP).
+  auto => /> &2 Hs Hx Hl y ym; rewrite Hs;split.
+  + have -> /= : size (behead (drop (FinT.card - size w{2}) FinT.enum)) = 
+              size (drop (FinT.card - size w{2}) FinT.enum) -1 by smt().
+    have -> : FinT.card - (size (drop (FinT.card - size w{2}) FinT.enum) - 1) = 
+              ( FinT.card - (size (drop (FinT.card - size w{2}) FinT.enum))) + 1 by ring.
+    rewrite (drop_nth witness  (FinT.card - size w{2}) FinT.enum) /=; 1:  by smt(size_ge0).
+    by smt(@List). 
+  + (* 
+     move => x; rewrite -(head_behead w{2} witness Hl) /=. smt.
+    rewrite (drop_nth witness (size (behead w{2}))) /=; 1: by rewrite size_ge0 /= /#. 
+  + split.
+    + case (x = (head witness w{2})).  
+      + move => ->>; rewrite mem_set /=.*)
+  admit.
+  byequiv  (: ={QRO.ch, glob A} /\ ={arg}  ==> ={res}) => //.
+  symmetry; conseq (: ={QRO.ch, glob A} /\ ={arg}  ==> ={res}) => //.
+  by apply (eq_eager_sampling (D(A)) _);1:by move => *;apply dhash_ll.
+  move:  (Conclusion A _ _ &m i_).
+  + by move => O Oll; apply (A_ll O Oll). 
+  + apply A_Bounded.
+  by smt(mu_bounded).
+qed.
 
 end CLASSICAL.
 
@@ -460,7 +693,7 @@ module DistinctQueries(A:Adv_DistinctQueries) = {
 
 axiom bound_distinct (q_:int) (A<:Adv_DistinctQueries{-QRO}) &m :  
   hoare [DistinctQueries(A).main : q = q_ ==> QRO.ch <= q_] => 
-    Pr[DistinctQueries(A).main(q_) @ &m : res] <= (q_ + 1)%r / card%r.
+    Pr[DistinctQueries(A).main(q_) @ &m : res] <= (q_ + 1)%r / FinT.card%r.
 
 end T_Distinct.
 
