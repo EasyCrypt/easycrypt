@@ -7,7 +7,6 @@ require (*  *) T_QROM T_EUF T_PERM.
 clone import T_EUF as EUF.
 
 clone import T_QROM as QROM with
-  type input <- unit,
   type from <- msg.
 
 clone import DFunBiasedSingle with
@@ -778,7 +777,7 @@ module B (A:AdvEUF_QROM) : AdvOW = {
   }
 }.
 
-clone import Collision.
+clone import Collision  with op q <- q.
 
 section OW.
 
@@ -873,7 +872,7 @@ proof.
     + by proc; inline *; auto.
     + by sim />.
     auto => />; smt(assocP mapP).
-  have /# := pr_col () q G1_col &m _.
+  have /# := pr_col  G1_col &m _.
   proc. 
   inline G1_col(QRO).main G1(QRO).main EUF(Wrap(A, QRO), G1(QRO).FDH).main
              G1(QRO).FDH.verify QRO.h; wp.

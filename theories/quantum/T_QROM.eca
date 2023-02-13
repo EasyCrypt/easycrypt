@@ -16,13 +16,11 @@ clone  MUniFinFun as MUFFH with
 
 op [lossless uniform full ] dhash : hash distr.
 
-type input.
 clone ROM as ROM_ with
   type in_t <- from,
   type out_t <- hash,
   op dout <- fun _ => dhash,
-  type d_in_t <- input,
-  type d_out_t <- bool.
+  type d_out_t <- bool. (* FIX-ME: FIX LATER? *)
 
 clone ROM_.LazyEager as LE with 
   theory FinType <- MUFF.FinT.
@@ -60,37 +58,11 @@ module QRO : QRO_i = {
 
   quantum proc h {x:from} = { ch <- ch + 1; return h x; }
 }.
- 
-abstract theory Collision.
-   
-  quantum module type AdvCol (H:QRO) = {
-    proc main(i:input) : from * from
-  }.
-  
-  module Col(A:AdvCol) = {
-    proc main(i:input) = {
-      var xx;
-      QRO.init();
-      xx <@ A(QRO).main(i);
-      return (xx.`1 <> xx.`2 && QRO.h xx.`1 = QRO.h xx.`2);
-    }
-  }.
-
-  (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
-  axiom pr_col i_ q (A<:AdvCol{-QRO}) &m:
-    let r = mu1 dhash witness in
-    hoare [Col(A).main : i = i_ /\ QRO.ch = 0 ==> QRO.ch <= q] =>
-    Pr[Col(A).main(i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
 
 theory CLASSICAL.
-  import ROM_.
-  import LE.
 
-  module type AdvCol_C (H: POracle) = {
-    proc main(i:input) : from * from
-  }.
-
-  module WrapC(O : Oracle) : Oracle = {
+  (* Counting oracle calls using QRO.ch *)
+  module WrapCtr(O : ROM_.Oracle) : ROM_.Oracle = {
     proc init() : unit = {
         O.init();
         QRO.ch <- 0;
@@ -103,17 +75,90 @@ theory CLASSICAL.
         return r;
     }
   }.
+
+  (* Lowering QRO to classical queries. *)
+  module CWrap(O : QRO_i) : ROM_.Oracle = {
+     proc init = O.init
+
+     proc o(x : from) : hash = {
+         var r;
+         r <@ O.h{x};
+         return r;
+     }
+  }.
+
+  equiv init_eager : CWrap(QRO).init ~ LE.ERO.init :
+       true ==> forall x, x \in LE.ERO.m{2} /\
+                 oget (LE.ERO.m{2}.[x]) = QRO.h{1} x.
+  admitted. (* @Benjamin *)
   
-  module Col_C(A:AdvCol_C) = {
+end CLASSICAL.
+
+
+abstract theory Collision.
+   
+  op q : { int | 0 <= q } as ge0_q.  
+  type input.
+
+  quantum module type AdvCol_Aux (H:QRO) = {
+    proc main(i:input) : from * from
+  }.
+
+  quantum module type AdvCol (H:QRO) = {
+    proc main() : from * from
+  }.
+  
+  module Col_Aux(A:AdvCol_Aux) = {
     proc main(i:input) = {
       var xx;
-      WrapC(ERO).init();
-      xx <@ A(WrapC(ERO)).main(i);
+      QRO.init();
+      xx <@ A(QRO).main(i);
+      return (xx.`1 <> xx.`2 && QRO.h xx.`1 = QRO.h xx.`2);
+    }
+  }.
+
+  module Col(A:AdvCol) = {
+    proc main() = {
+      var xx;
+      QRO.init();
+      xx <@ A(QRO).main();
+      return (xx.`1 <> xx.`2 && QRO.h xx.`1 = QRO.h xx.`2);
+    }
+  }.
+
+  (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
+  (* This version allows auxilliary information and q
+     to be set interdependently *)
+  axiom pr_col_aux i_ q (A<:AdvCol_Aux{-QRO}) &m:
+    let r = mu1 dhash witness in
+    hoare [Col_Aux(A).main : i = i_ /\ QRO.ch = 0 ==> QRO.ch <= q] =>
+    Pr[Col_Aux(A).main(i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
+
+  (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
+  axiom pr_col (A<:AdvCol{-QRO}) &m:
+    let r = mu1 dhash witness in
+    hoare [Col(A).main :QRO.ch = 0 ==> QRO.ch <= q] =>
+    Pr[Col(A).main() @ &m : res] <= (27 *(q +2)^3)%r * r. 
+
+theory CLASSICAL.
+  import ROM_.
+  import LE.
+  import CLASSICAL.
+
+  module type AdvCol_C (H: POracle) = {
+    proc main() : from * from
+  }.
+  
+  module Col_C(A:AdvCol_C) = {
+    proc main() = {
+      var xx;
+      WrapCtr(ERO).init();
+      xx <@ A(WrapCtr(ERO)).main();
       return (xx.`1 <> xx.`2 && ERO.m.[xx.`1] = ERO.m.[xx.`2]);
     }
   }.
 
-module (D(A : AdvCol_C): Distinguisher) ( H : POracle)   = {
+module (D(A : AdvCol_C): Distinguisher) (H : POracle)   = {
 
   module HC = {
     proc o(x : from) : hash = {
@@ -124,11 +169,10 @@ module (D(A : AdvCol_C): Distinguisher) ( H : POracle)   = {
     }
   }
 
-
-  proc run(i : input): bool = {
+  proc run(i : d_in_t): bool = {
       var xx,h1,h2;
       QRO.ch <- 0;
-      xx <@ A(HC).main(i);
+      xx <@ A(HC).main();
       h1 <@ H.o(xx.`1);
       h2 <@ H.o(xx.`2);
       return (xx.`1 <> xx.`2 && h1 = h2);
@@ -136,10 +180,7 @@ module (D(A : AdvCol_C): Distinguisher) ( H : POracle)   = {
   } 
 }.
 
-  (* We shoul d have a version of Birthday with no q *)
-  op q : int.
-  axiom ge0_q :0 <= q.
-
+(* The following was a dirty copy from RP_RF *)
 section CollisionProbability.
   declare module A <:AdvCol_C{-ERO, -QRO, -Lazy.LRO}.
 
@@ -159,7 +200,6 @@ section CollisionProbability.
   (* We construct a Birthday Bound adversary from the Coll
      experiment. *)
   local module (AB:Adv) (S:ASampler) = {
-    var i  : input
     (* We simulate an f-oracle using the s-oracle *)
     module HC = {
       proc init = Lazy.LRO.init
@@ -177,55 +217,54 @@ section CollisionProbability.
     proc a(): unit = {
       var xx,h1,h2;
       HC.init();
-      xx <@ A(HC).main(i);
+      xx <@ A(HC).main();
       h1 <@ HC.o(xx.`1);
       h2 <@ HC.o(xx.`2);
     }
   }.
 
-pred collision (m:(from,hash) fmap) = exists x x',
-  x' <> x /\
-  x \in m /\ x' \in m /\ m.[x] = m.[x'].
+  pred collision (m:(from,hash) fmap) = exists x x',
+    x' <> x /\
+    x \in m /\ x' \in m /\ m.[x] = m.[x'].
 
+  (* Some useful facts about the bad event *)
+  lemma no_collision (m:(from,hash) fmap):
+    !collision m <=>
+    forall x x',
+      x' = x \/
+      !x \in m  \/
+      !x' \in m \/
+      m.[x] <> m.[x'].
+  proof.
+  rewrite /collision negb_exists /=; apply/forall_iff=> /= x.
+  by rewrite negb_exists /=; apply/forall_iff=> /= x'; rewrite !negb_and.
+  qed.
 
-(* Some useful facts about the bad event *)
-lemma no_collision (m:(from,hash) fmap):
-  !collision m <=>
-  forall x x',
-    x' = x \/
-    !x \in m  \/
-    !x' \in m \/
-    m.[x] <> m.[x'].
-proof.
-rewrite /collision negb_exists /=; apply/forall_iff=> /= x.
-by rewrite negb_exists /=; apply/forall_iff=> /= x'; rewrite !negb_and.
-qed.
+  lemma collision_add (m:(from,hash) fmap) x y:
+    !x \in m =>
+    collision m.[x <- y] <=> collision m \/ rng m y.
+  proof.
+  move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
+  + rewrite mem_set=> -[z_in_m] [z'_in_m] mz_eq_mz'.
+    case (rng m y)=> //= y_notin_rngm.
+    by exists z z'; smt(@SmtMap).
+  move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|].
+  + exists z z'; rewrite z'_neq_z !mem_set !get_setE mz_eq_mz' z_in_m z'_in_m /=.
+    move/contra: (congr1 (dom m) z x); rewrite x_notin_m z_in_m=> -> //=.
+    by move/contra: (congr1 (dom m) z' x); rewrite x_notin_m z'_in_m=> -> //=.
+  rewrite rngE=> - /= [x'] mx'_y.
+  by exists x x'; smt(@SmtMap).
+  qed.
 
-lemma collision_add (m:(from,hash) fmap) x y:
-  !x \in m =>
-  collision m.[x <- y] <=> collision m \/ rng m y.
-proof.
-move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
-+ rewrite mem_set=> -[z_in_m] [z'_in_m] mz_eq_mz'.
-  case (rng m y)=> //= y_notin_rngm.
-  by exists z z'; smt(@SmtMap).
-move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|].
-+ exists z z'; rewrite z'_neq_z !mem_set !get_setE mz_eq_mz' z_in_m z'_in_m /=.
-  move/contra: (congr1 (dom m) z x); rewrite x_notin_m z_in_m=> -> //=.
-  by move/contra: (congr1 (dom m) z' x); rewrite x_notin_m z'_in_m=> -> //=.
-rewrite rngE=> - /= [x'] mx'_y.
-by exists x x'; smt(@SmtMap).
-qed.
+  lemma collision_stable (m:(from,hash) fmap) y y':
+    collision m =>
+    y \notin m =>
+    collision m.[y <- y'].
+  proof. by move=> h /collision_add /= ->; rewrite h. qed.
 
-lemma collision_stable (m:(from,hash) fmap) y y':
-  collision m =>
-  y \notin m =>
-  collision m.[y <- y'].
-proof. by move=> h /collision_add /= ->; rewrite h. qed.
-
-  local equiv Col_Exp i_ : 
+  local equiv Col_Exp : 
      AB(Sample).a ~ ROM_.Exp(Lazy.LRO, D(A)).main : 
-       AB.i{1} = i_ /\ arg{2} = i_ /\ ={glob A} /\ size Sample.l{1} = 0 ==>
+       ={glob A} /\ size Sample.l{1} = 0 ==>
          (res{2} => !uniq Sample.l{1}) /\
          size Sample.l{1} = card (fdom Lazy.LRO.m){2}.
   proof.
@@ -312,17 +351,13 @@ proof. by move=> h /collision_add /= ->; rewrite h. qed.
     Pr[ROM_.Exp(Lazy.LRO, D(A)).main(i_) @ &m: res]
         <= ((q+2)*(q+1))%r/2%r * mu1 dhash witness.
   proof.
-  have Hm2: exists &m2, AB.i{m2} = i_ /\ (glob A){m2} = (glob A){m}. admit.
-  elim Hm2 => &m2 Hi.
-  apply (ler_trans (Pr[Exp(Sample,AB).main() @ &m2: !uniq Sample.l])).
+  apply (ler_trans (Pr[Exp(Sample,AB).main() @ &m: !uniq Sample.l])).
   + byequiv => //. 
     symmetry; proc *; inline Exp(Sample, AB).main.
-    call (Col_Exp i_); 1: by inline *; auto.
-  have /=  := (pr_collision AB _ _ &m2); last by smt().
+    call (Col_Exp); 1: by inline *; auto.
+  have /=  := (pr_collision AB _ _ &m); last by smt().
   + by move => S S_ll; apply (AB_ll S S_ll).
-  conseq (Col_Exp i_) (LRO_bounded); last by smt(). 
-  move => &1 ?; exists  (glob A){1} => />. exists i_; do split.
-  admit. smt(). 
+  conseq (Col_Exp ) (LRO_bounded); by smt(). 
   qed.
 
   lemma Conclusion &m i_:
@@ -335,45 +370,44 @@ proof. by move=> h /collision_add /= ->; rewrite h. qed.
 end section CollisionProbability.
 
 
-  lemma pr_col i_ (A<:AdvCol_C{-ERO, -QRO, -Lazy.LRO}) &m:
+  lemma pr_col (A<:AdvCol_C{-ERO, -QRO, -Lazy.LRO}) &m:
     (forall (O <: POracle), islossless O.o => islossless A(O).main) =>
     (hoare [A(D(A, Lazy.LRO).HC).main : QRO.ch = 0 ==> QRO.ch <= q]) =>
-    let r = mu1 dhash witness in
-    hoare [Col_C(A).main : i = i_ /\ QRO.ch = 0 ==> QRO.ch <= q] =>
-    Pr[Col_C(A).main(i_) @ &m : res] <= ((q+2)*(q+1))%r/2%r * mu1 dhash witness.
-move => A_ll A_Bounded r Hh.
-have ->  : Pr[Col_C(A).main(i_) @ &m : res] =
-          Pr[ Exp(Lazy.LRO, D(A)).main(i_) @ &m : res].
-+ have -> : Pr[Col_C(A).main(i_) @ &m : res] =
-          Pr[ Exp(ERO, D(A)).main(i_) @ &m : res].
+    Pr[Col_C(A).main() @ &m : res] <= ((q+2)*(q+1))%r/2%r * mu1 dhash witness.
+move => A_ll A_Bounded.
+have ->  : Pr[Col_C(A).main() @ &m : res] =
+          Pr[ Exp(Lazy.LRO, D(A)).main(witness) @ &m : res].
++ have -> : Pr[Col_C(A).main() @ &m : res] =
+          Pr[ Exp(ERO, D(A)).main(witness) @ &m : res].
   byequiv => //.
   proc; inline *;wp;call(_: ={glob ERO}); 1: by sim.
   wp;conseq (_: _ ==> ={glob ERO} /\ forall x, x \in ERO.m{1}); 1: by smt(). 
   while (w{1} = drop (FinT.card - size w{1}) FinT.enum /\
          ={glob ERO, w} /\ forall x, x \in ERO.m{2} <=> 
-              x \in drop (size w{2}) FinT.enum); last first.
+              x \in take (FinT.card - size w{1}) FinT.enum); last first.
   + auto => />; do split.
     + by rewrite /FinT.card /= drop0.
-    + move => x2; by rewrite drop_size /= mem_empty. 
-    by move => mr; rewrite drop0 /= => Hx;  smt(FinT.enumP).
-  auto => /> &2 Hs Hx Hl y ym; rewrite Hs;split.
-  + have -> /= : size (behead (drop (FinT.card - size w{2}) FinT.enum)) = 
+    + by move => x2;  rewrite mem_empty /= /#. 
+    by move => mr ?;  smt(take_size FinT.enumP).
+  auto => /> &2 Hs Hx Hl y ym; rewrite Hs.
+  have H1 /= : size (behead (drop (FinT.card - size w{2}) FinT.enum)) = 
               size (drop (FinT.card - size w{2}) FinT.enum) -1 by smt().
-    have -> : FinT.card - (size (drop (FinT.card - size w{2}) FinT.enum) - 1) = 
+  have H2 /= : FinT.card - (size (drop (FinT.card - size w{2}) FinT.enum) - 1) = 
               ( FinT.card - (size (drop (FinT.card - size w{2}) FinT.enum))) + 1 by ring.
-    rewrite (drop_nth witness  (FinT.card - size w{2}) FinT.enum) /=; 1:  by smt(size_ge0).
-    by smt(@List). 
-  + (* 
-     move => x; rewrite -(head_behead w{2} witness Hl) /=. smt.
-    rewrite (drop_nth witness (size (behead w{2}))) /=; 1: by rewrite size_ge0 /= /#. 
-  + split.
-    + case (x = (head witness w{2})).  
-      + move => ->>; rewrite mem_set /=.*)
-  admit.
+  split; 1: by rewrite H1 H2 {1}(drop_nth witness  (FinT.card - size w{2}) FinT.enum) /=;  smt(size_ge0).
+  move => xx; rewrite !H1;rewrite 
+     (drop_nth witness  (FinT.card - size w{2}) FinT.enum) /=; 1: by smt(size_ge0). 
+  have -> : (FinT.card - size (drop (FinT.card - size w{2} + 1) FinT.enum))  = 
+            FinT.card - size w{2} +1  by smt(size_drop).  
+  rewrite mem_set; split. 
+  + move => H; elim H;  smt(@List) . 
+  rewrite (take_nth witness) /=; 1: smt(size_ge0). 
+  by rewrite mem_rcons /=; smt(@List).
+   
   byequiv  (: ={QRO.ch, glob A} /\ ={arg}  ==> ={res}) => //.
   symmetry; conseq (: ={QRO.ch, glob A} /\ ={arg}  ==> ={res}) => //.
   by apply (eq_eager_sampling (D(A)) _);1:by move => *;apply dhash_ll.
-  move:  (Conclusion A _ _ &m i_).
+  move:  (Conclusion A _ _ &m).
   + by move => O Oll; apply (A_ll O Oll). 
   + apply A_Bounded.
   by smt(mu_bounded).
