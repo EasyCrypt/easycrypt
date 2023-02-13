@@ -76,22 +76,27 @@ theory CLASSICAL.
     }
   }.
 
-  (* Lowering QRO to classical queries. *)
-  module CWrap(O : QRO_i) : ROM_.Oracle = {
-     proc init = O.init
-
-     proc o(x : from) : hash = {
-         var r;
-         r <@ O.h{x};
-         return r;
-     }
-  }.
-
-  equiv init_eager : CWrap(QRO).init ~ LE.ERO.init :
-       true ==> forall x, x \in LE.ERO.m{2} /\
+  equiv init_eager : QRO.init ~ LE.ERO.init :
+       true ==> 
+          forall x, x \in LE.ERO.m{2} /\
                  oget (LE.ERO.m{2}.[x]) = QRO.h{1} x.
   admitted. (* @Benjamin *)
-  
+
+  equiv init_eager_ctr : QRO.init ~ WrapCtr(LE.ERO).init :
+       true ==> ={QRO.ch} /\ QRO.ch{1} = 0 /\
+          forall x, x \in LE.ERO.m{2} /\
+                 oget (LE.ERO.m{2}.[x]) = QRO.h{1} x.
+  conseq (_: true ==> 
+          forall x, x \in LE.ERO.m{2} /\
+                 oget (LE.ERO.m{2}.[x]) = QRO.h{1} x) 
+          (_: true ==> QRO.ch = 0) 
+          (_: true ==> QRO.ch = 0).  
+  + by smt().
+  + by proc; auto => />.
+  + by proc; auto => />.
+  + by proc*; inline{2} 1; wp; conseq />; call init_eager => />.
+  qed.
+
 end CLASSICAL.
 
 
