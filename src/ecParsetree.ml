@@ -960,6 +960,7 @@ type logtactic =
   | Pcbv        of preduction
   | Pchange     of pformula
   | Ppose       of (psymbol * ptybinding list * rwocc * pformula)
+  | Pmemory     of psymbol
   | Pgenhave    of pgenhave
   | Pwlog       of (psymbol list * bool * pformula)
 

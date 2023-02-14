@@ -234,7 +234,9 @@ and app_red st f1 args =
 
   (* ι-reduction (records projection) *)
   | Fop (p, _) when
-      st.st_ri.iota && EcEnv.Op.is_projection st.st_env p
+         st.st_ri.iota
+      && EcEnv.Op.is_projection st.st_env p
+      && not (Args.isempty args)
     -> begin
 
     let mk, args1 = oget (Args.pop args) in

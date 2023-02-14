@@ -150,6 +150,12 @@ qed.
 lemma offunE f i: 0 <= i < n => (offun f).[i] = f i.
 proof. by move=> lt_in; rewrite offunifE lt_in. qed.
 
+lemma ofwordKmkseq (f : int -> t):
+  ofword (offun f) = mkseq f n.
+proof.
+by rewrite ofwordK 1:size_mkseq 1:StdOrder.IntOrder.ler_maxr 1:ge0_n.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op map (f : t -> t) (w : word) : word = mkword (map f (ofword w)).
 
