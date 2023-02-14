@@ -291,6 +291,17 @@ move=> h; rewrite !(@BMul.big_seq_cond P).
 by rewrite prodr_gt0=> //= x []; apply/h.
 qed.
 
+lemma gt0_prodr_seq (P : 'a -> bool) (F : 'a -> t) (s : 'a list) : 
+  (forall (a : 'a), a \in s => P a => zeror <= F a) => 
+  zeror < BMul.big P F s => 
+  (forall (a : 'a), a \in s => P a => zeror < F a).
+proof.
+elim: s => // x s IHs F_ge0; rewrite BMul.big_cons. 
+have {IHs} IHs := IHs _; first by smt().
+case: (P x) => [Px F_big_gt0 a a_x_s Pa| nPx /IHs]; 2:smt().
+smt(pmulr_gt0 prodr_ge0_seq).
+qed.
+
 lemma nosmt ler_prod_seq (P : 'a -> bool) (F1 F2 : 'a -> t) s:
      (forall a, mem s a => P a => zeror <= F1 a <= F2 a)
   => (BMul.big P F1 s <= BMul.big P F2 s).
