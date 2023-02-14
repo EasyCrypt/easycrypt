@@ -59,6 +59,8 @@ module QRO : QRO_i = {
   quantum proc h {x:from} = { ch <- ch + 1; return h x; }
 }.
 
+require import DJoin.
+
 theory CLASSICAL.
 
   (* Counting oracle calls using QRO.ch *)
@@ -76,11 +78,92 @@ theory CLASSICAL.
     }
   }.
 
+  section.
+
+  local clone import JoinMapSampling with 
+    type ta <- from, type tb <- hash
+   proof *.
+
+  local module M = { 
+    proc init() = { 
+      var l; 
+      l <$ djoinmap (fun (_ : from) => dhash) FinT.enum;    
+      QRO.h <- tofun l;  
+    }
+    
+    proc init1() = {
+      var l;
+      l <@ S.sample((fun (_ : from) => dhash), FinT.enum);
+      QRO.h <- tofun l;
+    }
+
+    proc init2() = {
+      var l;
+      l <@ S.loop_first((fun (_ : from) => dhash), FinT.enum);
+      QRO.h <- tofun l;
+    }
+
+  }.
+
   equiv init_eager : QRO.init ~ LE.ERO.init :
        true ==> 
           forall x, x \in LE.ERO.m{2} /\
                  oget (LE.ERO.m{2}.[x]) = QRO.h{1} x.
-  admitted. (* @Benjamin *)
+  proof.
+    transitivity M.init 
+      (true ==> ={QRO.h} )
+      (true ==> forall x, x \in LE.ERO.m{2} /\ oget (LE.ERO.m{2}.[x]) = QRO.h{1} x) => //.
+    + proc.
+      sp 1 0; rndsem{2} 0.
+      rnd (fun f => (map f (FinT.enum), f)) (fun lf: _ * _ => lf.`2); skip.
+      move=> &1 _ _; split.
+      + move=> lh /supp_dmap [l] /= [/supp_djoinmap [hsz /allP /= hall]] -> /=.
+        apply (eq_from_nth witness); 1: by rewrite size_map hsz.
+        move=> i hi; rewrite (nth_map witness) 1:hsz 1://.
+        by rewrite /tofun index_uniq 1:hsz // FinT.enum_uniq.
+      move=> _; split. 
+      + move=> [l f] /supp_dmap [l1 ] /= [] /supp_djoinmap [hsz /allP /= hall] [<<- ->>].
+        rewrite (in_dmap1E_can _ _ (fun lf: _ * _ => lf.`1)) //.
+        rewrite /dfhash dfun1E_djoin; congr; apply fun_ext => x /=.
+        rewrite /pred1 /tofun; congr.
+        rewrite -{2}(map_nth_range witness FinT.enum)  -{1}(map_nth_range witness l).
+        rewrite -map_comp /(\o) /= hsz; apply eq_in_map => i /mem_range hi /=.
+        rewrite index_uniq 1:hsz // FinT.enum_uniq.
+      move=> _ f /dfun_supp /= hin; apply/supp_dmap => /=; exists (map f FinT.enum) => /=; split.
+      + apply/supp_djoinmap; rewrite size_map /=; apply /allP.
+        by move=> [x y] /mem_zip /= [? /mapP [x' [? ->]]]; apply hin.
+      rewrite /tofun; apply fun_ext => x.
+      rewrite (nth_map witness); 1: by rewrite index_mem index_ge0 FinT.enumP.
+      by rewrite nth_index // FinT.enumP.
+    transitivity M.init1 
+      (true ==> ={QRO.h} )
+      (true ==> forall x, x \in LE.ERO.m{2} /\ oget (LE.ERO.m{2}.[x]) = QRO.h{1} x) => //.
+    + by proc; inline *; auto.
+    transitivity M.init2 
+      (true ==> ={QRO.h} )
+      (true ==> forall x, x \in LE.ERO.m{2} /\ oget (LE.ERO.m{2}.[x]) = QRO.h{1} x) => //.
+    + by proc; wp; call Sample_Loop_first_eq; auto.
+    proc; inline *; wp.
+    while (xs{1} = w{2} /\ d{1} = (fun _ => dhash) /\
+           exists hd, 
+             FinT.enum = hd ++ xs{1} /\ 
+             (forall x, x \in hd <=> x \in LE.ERO.m{2}) /\
+             map (fun x => oget LE.ERO.m{2}.[x]) hd = l0{1}).
+    + wp; auto => |> &2; case: (w{2}) => //= x w hd heq hin r _.
+      exists (rcons hd x); rewrite heq cat_rcons /= map_rcons /=; split.
+      + by move=> x'; rewrite mem_rcons /= mem_set /#.
+      congr.
+      + apply eq_in_map => /= x' hx'; rewrite get_set_neqE //.
+        by apply/negP => ->>; have := FinT.enum_uniq; rewrite heq cat_uniq => />; rewrite hx'.
+      by rewrite get_set_eqE. 
+    auto => />; split; 1: by exists [] => /= x; rewrite mem_empty.
+    move=> m ?; rewrite cats0 => <<- hin x.
+    rewrite -hin FinT.enumP /= /tofun (nth_map witness) /=.
+    + by rewrite index_mem index_ge0 FinT.enumP.
+    rewrite nth_index // FinT.enumP.
+  qed.
+
+  end section.
 
   equiv init_eager_ctr : QRO.init ~ WrapCtr(LE.ERO).init :
        true ==> ={QRO.ch} /\ QRO.ch{1} = 0 /\
@@ -98,7 +181,6 @@ theory CLASSICAL.
   qed.
 
 end CLASSICAL.
-
 
 abstract theory Collision.
    
