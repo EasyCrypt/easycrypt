@@ -747,7 +747,6 @@ lemma nosmt lerNgt (x y : t): (x <= y) <=> !(y < x).
 proof. by rewrite ltrNge. qed.
 
 (* -------------------------------------------------------------------- *)
-
 lemma pmulr_gt0 x y : zeror <= x => zeror <= y => 
   zeror < x * y <=> zeror < x /\ zeror < y. 
 proof. 
