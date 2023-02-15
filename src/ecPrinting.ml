@@ -1818,7 +1818,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       Format.fprintf fmt "Pr[@[%a@[(%a)%a@] @@ %a :@ %a@]]"
         (pp_funname ppe) pr.pr_fun
         (pp_args) pr.pr_args
-        (pp_opt (fun fmt -> Format.fprintf fmt "@ {%a}" pp_args)) pr.pr_qargs
+        (pp_option (fun fmt -> Format.fprintf fmt "@ {%a}" pp_args)) pr.pr_qargs
         (pp_local ppe) pr.pr_mem
         (pp_form ppep) pr.pr_event
 
