@@ -29,7 +29,7 @@ let merlin =
       findlib
       batteries
       camlp-streams
-      dune_2
+      dune_3
       dune-build-info
       dune-site
       inifiles
