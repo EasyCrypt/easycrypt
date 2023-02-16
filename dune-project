@@ -1,4 +1,4 @@
-(lang dune 2.8)
+(lang dune 3.6)
 (using menhir 2.0)
 (using dune_site 0.1)
 
@@ -16,6 +16,7 @@
   (batteries (>= 3))
   (camlp-streams (>= 5))
   camlzip
+  (dune (>= 3.6))
   dune-build-info
   dune-site
   (ocaml-inifiles (>= 1.2))

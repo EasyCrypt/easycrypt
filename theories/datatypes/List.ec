@@ -3439,7 +3439,7 @@ op lex (e : 'a -> 'a -> bool) s1 s2 =
   with s1 = []      , s2 = y2 :: s2 => true
   with s1 = y1 :: s1, s2 = []       => false
   with s1 = y1 :: s1, s2 = y2 :: s2 =>
-    if e y1 y2 then if e y2 y1 then lex e s1 s1 else true else false.
+    if e y1 y2 then if e y2 y1 then lex e s1 s2 else true else false.
 
 lemma lex_total (e : 'a -> 'a -> bool):
      (forall x y, e x y \/ e y x)
