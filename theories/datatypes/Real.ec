@@ -50,7 +50,6 @@ hint rewrite lte_fromint : le_fromint lt_fromint.
 (* -------------------------------------------------------------------- *)
 theory RField.
 
-print Ring.Field.
   clone include Ring.Field with
     type t <- real,
     op   zeror <- 0%r,

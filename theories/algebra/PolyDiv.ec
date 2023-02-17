@@ -10,9 +10,17 @@ abstract theory RingPseudoDivision.
 
 type coeff, poly.
 
-clone include PolyComRing with
-  type coeff <- coeff,
-  type poly  <- poly.
+clone ComRing as CR with type t <= coeff.
+
+clone PolyComRing as PCR with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory Coeff <- CR.
+
+clone RingPseudoDivision.PCR.PolyComRing as PS.
+
+import CR.
+import PCR.
 
 (* It will go through useless loops once "deg r < sq" since iter is needed
    as recursive calls are currently not allowed. *)
@@ -81,13 +89,13 @@ by move => degP; rewrite iter_id //= /redivp_rec_it /= degP.
 qed.
 
 lemma degXn i : 0 <= i => deg (polyXn i) = i + 1
-  by move => ge0_i; apply: degP; smt(coeffE Coeff.oner_neq0 ispolyXn).
+  by move => ge0_i; apply: degP; smt(coeffE oner_neq0 ispolyXn).
 
-lemma lcXn i : 0 <= i => lc (polyXn i) = Coeff.oner
+lemma lcXn i : 0 <= i => lc (polyXn i) = oner
   by smt(coeffE degXn ispolyXn).
 
 lemma coeff_polyXn i j :
-  0 <= i => (polyXn i).[j] = if i = j then Coeff.oner else Coeff.zeror
+  0 <= i => (polyXn i).[j] = if i = j then oner else zeror
   by smt(coeffE ispolyXn).
 
 lemma polyXn0 : polyXn 0 = poly1 by smt(coeff_polyXn polyCE poly_eqP).
@@ -108,12 +116,12 @@ move => k k_ge0 /= kh knP nqP; rewrite redivp_recS //.
 pose qq1 := let (s, d, r) = redivp_rec 0 poly0 p k q in d.
 pose r1  := let (s, d, r) = redivp_rec 0 poly0 p k q in r.
 rewrite /redivp_rec_it; case: (deg r1 < deg q) => [/#|r1qP].
-have qqP : qq1 * polyC (lc q) = lc q ** qq1 by smt(PolyComRing.mulrC scalepE).
-have rP : r1 * polyC (lc q) = lc q ** r1 by smt(PolyComRing.mulrC scalepE).
+have qqP : qq1 * polyC (lc q) = lc q ** qq1 by rewrite scalepE PS.mulrC.
+have rP : r1 * polyC (lc q) = lc q ** r1 by rewrite scalepE PS.mulrC.
 pose m := polyXn (deg r1 - deg q); suff: deg m <= n /\ deg (m * q) <= n
-  by smt(degB degD degZ_le PolyComRing.mulrA scalepE).
-suff: deg (m * q) <= n by smt(Coeff.mul1r degM_proper deg_gt0 lcXn lc_eq0).
-by rewrite degM_proper; smt(Coeff.mul1r degXn lcXn lc_eq0).
+  by smt(degB degD degZ_le PS.mulrA scalepE).
+suff: deg (m * q) <= n by smt(mul1r degM_proper deg_gt0 lcXn lc_eq0).
+by rewrite degM_proper; smt(mul1r degXn lcXn lc_eq0).
 qed.
 
 lemma rmod0p p : rmodp poly0 p = poly0 by smt(deg0 iter0).
@@ -147,20 +155,19 @@ case: (deg r < deg q); 1: by smt(iter_id).
 rewrite redivp_recSr // => degqrP.
 suff /# : deg (redivp_rec_it (k, qq, r, q, deg q, lc q)).`3 <= n.
 rewrite /redivp_rec_it /= degqrP /=; apply: deg_leP => // i iP.
-rewrite polyDE polyNE PolyComRing.mulrC scalepE -PolyComRing.mulrA -!scalepE.
+rewrite polyDE polyNE PS.mulrC scalepE -PS.mulrA -!scalepE.
 rewrite !polyZE polyME (BigCf.BCA.big_rem _ _ _ (deg r - deg q)) /predT /=;
   1: by smt(deg_gt0 mem_range).
-rewrite coeff_polyXn /= ?Coeff.mul1r ?BigCf.BCA.big1_seq ?Coeff.addr0;
-  1, 2: by smt(coeff_polyXn mem_filter mem_range
-               Coeff.mul0r range_uniq rem_filter).
-by smt(Coeff.mulrC Coeff.mulr0 Coeff.subrr gedeg_coeff).
+rewrite coeff_polyXn /= ?mul1r ?BigCf.BCA.big1_seq ?addr0;
+  1, 2: by smt(coeff_polyXn mem_filter mem_range mul0r range_uniq rem_filter).
+by smt(mulrC mulr0 subrr gedeg_coeff).
 qed.
 
 lemma ltn_rmodpN0 p q : q <> poly0 => deg (rmodp p q) < deg q
   by smt(ltn_rmodp).
 
 lemma rmodp1 p : rmodp p poly1 = poly0
-  by smt(deg1 deg_eq0 ge0_deg ltn_rmodp PolyComRing.oner_neq0).
+  by smt(deg1 deg_eq0 ge0_deg ltn_rmodp oner_neq0).
 
 lemma rmodp_small p q : deg p < deg q => rmodp p q = p.
 proof.
@@ -171,14 +178,15 @@ qed.
 lemma leq_rmodp m d : deg (rmodp m d) <= deg m
   by smt(ltn_rmodpN0 rmodp0 rmodp_small).
 
-lemma rmodpC p c : c <> Coeff.zeror => rmodp p (polyC c) = poly0
+lemma rmodpC p c : c <> zeror => rmodp p (polyC c) = poly0
   by smt(degC deg_gt0 ge0_deg ltn_rmodpN0).
 
 lemma rdvdp0 d : rdvdp d poly0 by smt(rmod0p).
 
 lemma rdvd0p n : rdvdp poly0 n = (n = poly0) by smt(rmodp0).
 
-(* rdvd0pP skipped *)
+(* skip? *)
+lemma rdvd0pP n : (n = poly0) = rdvdp poly0 n by smt(rdvd0p).
 
 lemma rdvdpN0 p q : rdvdp p q => q <> poly0 => p <> poly0 by smt(rdvd0p).
 
@@ -263,54 +271,51 @@ op redivp_spec (m d : poly) (i : int * poly * poly) =
   let (k, q, r) = i in
   (d <> poly0 => deg r < deg d) /\
   (d * polyC (lc d) = polyC (lc d) * d =>
-   m * polyC (Coeff.exp (lc d) k) = q * d + r).
+   m * polyC (exp (lc d) k) = q * d + r).
 
 (* PolyComRing.mulrC used! *)
 lemma redivpP m d : redivp_spec m d (redivp m d).
 proof.
-rewrite /redivp_spec; case: (d = poly0) =>[|d_neq0 /=].
-- move => -> /= _; rewrite PolyComRing.mulr0 PolyComRing.add0r.
-  by rewrite Coeff.expr0 PolyComRing.mulr1.
+rewrite /redivp_spec; case: (d = poly0) => [|d_neq0 /=];
+  1: by move => -> /= _; rewrite PS.mulr0 PS.add0r expr0 PS.mulr1.
 case: (d * polyC (lc d) = polyC (lc d) * d) =>[dP /=|]; 2: by smt(ltn_rmodpN0).
 suff: let (k, q, r) = redivp m d in
-      m * polyC (Coeff.exp (lc d) k) = q * d + r by smt(ltn_rmodpN0).
+      m * polyC (exp (lc d) k) = q * d + r by smt(ltn_rmodpN0).
 suff: forall n i i' k qq r,
         i = (k, qq, r, d, deg d, lc d) => deg r <= n =>
-        0 <= k => m * polyC (Coeff.exp (lc d) k) = qq * d + r =>
+        0 <= k => m * polyC (exp (lc d) k) = qq * d + r =>
         i' = iter n redivp_rec_it (k, qq, r, d, deg d, lc d) =>
         forall k' qq' r' d' sq' cq', i' = (k', qq', r', d', sq', cq') =>
-          m * polyC (Coeff.exp (lc d) k') = qq' * d + r'.
+          m * polyC (exp (lc d) k') = qq' * d + r'.
 - move => nP; pose i := (0, poly0, m, d, deg d, lc d).
   pose i' := iter (deg m) redivp_rec_it i; move: (nP (deg m) i i').
   have -> : redivp m d = let (k, qq, r, q, sq, cq) = i' in (k, qq, r) by smt().
-  suff /# : m * polyC (Coeff.exp (lc d) 0) = poly0 * d + m.
-  by smt(Coeff.expr0 PolyComRing.mulr1 PolyComRing.mul0r PolyComRing.add0r).
+  suff /# : m * polyC (exp (lc d) 0) = poly0 * d + m.
+  by smt(expr0 PS.mulr1 PS.mul0r PS.add0r).
 apply: natind => [|n n_ge0 /= nh i i'' k qq r iP nP k_ge0 mP]; 1: by smt(iter0).
 rewrite iterSr // => i''P; pose i' := redivp_rec_it i.
 case: (deg r < deg d) => degdrP; 1: by by smt(iter_id).
 suff /# : let (k', qq', r', q', sq', cq') = i' in
-          deg r' <= n /\ m * polyC (Coeff.exp (lc d) k') = qq' * d + r'.
+          deg r' <= n /\ m * polyC (exp (lc d) k') = qq' * d + r'.
 pose k'  := let (k, qq, r, q, sq, cq) = i' in k.
 pose qq' := let (k, qq, r, q, sq, cq) = i' in qq.
 pose r'  := let (k, qq, r, q, sq, cq) = i' in r.
 pose p := (lc r) ** polyXn (deg r - deg d).
 have rP : r' = r  * polyC (lc d) - p * d by smt().
-suff: deg r' <= n; 1: suff /# : m * polyC (Coeff.exp (lc d) k') = qq' * d + r'.
+suff: deg r' <= n; 1: suff /# : m * polyC (exp (lc d) k') = qq' * d + r'.
 - case: (deg r < deg d) => [/#|degP].
   have [-> ->] : k'  = k + 1 /\ qq' = qq * polyC (lc d) + p by smt().
-  rewrite rP Coeff.exprSr // polyCM PolyComRing.mulrA mP !PolyComRing.mulrDl.
-  rewrite -PolyComRing.mulrA dP PolyComRing.mulrA.
-  by smt(PolyComRing.addrCA PolyComRing.addr0 PolyComRing.subrr).
+  rewrite rP exprSr // polyCM PS.mulrA mP !PS.mulrDl -PS.mulrA dP.
+  by smt(PS.addrCA PS.addr0 PS.mulrA PS.subrr).
 rewrite rP deg_leP // => j jP; rewrite polyDE polyNE.
-rewrite PolyComRing.mulrC /p scalepE -PolyComRing.mulrA -!scalepE !polyZE.
+rewrite PS.mulrC /p scalepE -PS.mulrA -!scalepE !polyZE.
 rewrite polyME (BigCf.BCA.big_rem _ _ _ (deg r - deg d)) /predT /=;
   1: by smt(deg_gt0 mem_range).
-rewrite coeff_polyXn /= ?Coeff.mul1r ?BigCf.BCA.big1_seq ?Coeff.addr0;
-  1, 2: by smt(coeff_polyXn mem_filter mem_range
-               Coeff.mul0r range_uniq rem_filter).
+rewrite coeff_polyXn /= ?mul1r ?BigCf.BCA.big1_seq ?addr0;
+  1, 2: by smt(coeff_polyXn mem_filter mem_range mul0r range_uniq rem_filter).
 have {nP} : deg r <= n \/ deg r = n + 1 by smt().
-move =>[|nP]; 1: by smt(Coeff.add0r Coeff.mulr0 Coeff.oppr0 gedeg_coeff).
-by smt(Coeff.add0r Coeff.mulrC Coeff.mulr0 Coeff.oppr0 Coeff.subrr gedeg_coeff).
+move =>[|nP]; 1: by smt(add0r mulr0 oppr0 gedeg_coeff).
+by smt(add0r mulrC mulr0 oppr0 subrr gedeg_coeff).
 qed.
 
 lemma rmodpp p :
@@ -320,8 +325,8 @@ case: (p = poly0) => p_neq0; 1: by smt(rmodp0).
 rewrite /rmodp /redivp p_neq0 /= /redivp_rec /redivp_rec_it.
 have [d [dP d_ge0]] : exists d, deg p = d + 1 /\ 0 <= d by smt(deg_gt0).
 rewrite dP /= iterSr //= dP subrr -addrA subrr addr0 !scalepE polyXn0.
-rewrite PolyComRing.mul0r PolyComRing.mulr1 PolyComRing.add0r => ->.
-rewrite PolyComRing.subrr /= iter_id; smt(deg0).
+rewrite PS.mul0r PS.mulr1 PS.add0r => ->.
+by rewrite PS.subrr /= iter_id; smt(deg0).
 qed.
 
 op rcoprimep p q = deg (rgcdp p q) = 1.
@@ -347,171 +352,181 @@ abstract theory ComRegDivisor.
 
 type coeff, poly.
 
-clone import RingPseudoDivision with
-  type coeff <- coeff,
-  type poly  <- poly.
+clone ComRing as CR with type t <= coeff.
 
-(*
-op d : poly.
+clone PolyComRing as PCR with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory Coeff <- ComRegDivisor.CR.
 
-axiom Cdl : d * polyC (lc d) = polyC (lc d) * d.
+clone ComRegDivisor.PCR.PolyComRing as PS.
 
-axiom Rreg : injective (transpose Coeff.( * ) (lc d)).
-*)
+clone RingPseudoDivision as RPD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- ComRegDivisor.CR,
+  theory PCR   <- ComRegDivisor.PCR,
+  theory PS    <- ComRegDivisor.PS.
+
+import ComRegDivisor.CR.
+import ComRegDivisor.PCR.
+import ComRegDivisor.RPD.
 
 (* To backport *)
 lemma commrX (p q : poly) (n : int) :
-  0 <= n => p * q = q * p => p * PolyComRing.exp q n = PolyComRing.exp q n * p.
+  0 <= n => p * q = q * p => p * PS.exp q n = PS.exp q n * p.
 proof.
-move: n; apply: intind; 2: by smt(PolyComRing.exprS PolyComRing.mulrA).
-by rewrite /= PolyComRing.expr0 PolyComRing.mulr1 PolyComRing.mul1r.
+move: n; apply: intind; 2: by smt(PS.exprS PS.mulrA).
+by rewrite /= PS.expr0 PS.mulr1 PS.mul1r.
 qed.
 
 lemma rreg_div0 q r d :
-  injective (transpose Coeff.( * ) (lc d)) => deg r < deg d =>
+  injective (transpose CR.( * ) (lc d)) => deg r < deg d =>
   (q * d + r = poly0) = (q = poly0 && r = poly0).
 proof.
-move => rreg_d lt_r_d; rewrite PolyComRing.addrC PolyComRing.addr_eq0.
-case: (q = poly0) => [|q_neq0]; 1: by smt(PolyComRing.mul0r PolyComRing.oppr0).
+move => rreg_d lt_r_d; rewrite PS.addrC PS.addr_eq0.
+case: (q = poly0) => [|q_neq0]; 1: by smt(PS.mul0r PS.oppr0).
 suff: deg d <= deg (q * d) by smt(degN).
-by rewrite degM_proper; smt(deg_ge1 lc_eq0 Coeff.mul0r).
+by rewrite degM_proper; smt(deg_ge1 lc_eq0 mul0r).
+qed.
+
+(* Fix so that one can use polyCX from Poly.ec *)
+lemma polyCX c i : 0 <= i => PS.exp (polyC c) i = polyC (exp c i).
+proof.
+elim: i => [|i ge0_i ih]; first by rewrite expr0 PS.expr0.
+by rewrite exprS ?PS.exprS // ih polyCM.
 qed.
 
 lemma redivp_eq d q r :
   d * polyC (lc d) = polyC (lc d) * d =>
-  injective (transpose Coeff.( * ) (lc d)) =>
+  injective (transpose CR.( * ) (lc d)) =>
   deg r < deg d =>
   let k = rscalp (q * d + r) d in
-  let c = polyC (Coeff.exp (lc d) k) in
+  let c = polyC (CR.exp (lc d) k) in
   redivp (q * d + r) d = (k, q * c, r * c).
 proof.
 move => Cdl Rreg degrdP; have d_neq0 : d <> poly0 by smt(deg_gt0).
-pose k := rscalp (q * d + r) d; pose c := polyC (Coeff.exp (lc d) k).
+pose k := rscalp (q * d + r) d; pose c := polyC (CR.exp (lc d) k).
 pose qq := rdivp (q * d + r) d; pose rr := rmodp (q * d + r) d.
 suff /# : qq = q * c /\ rr = r * c.
 have e : (q * d + r) * c = qq * d + rr by smt(redivpP ltn_rmodpN0).
 have e' : q * d * c = q * c * d
-  by smt(commrX PolyComRing.mulrA rscalp_ge0 polyCX).
-suff: qq = q * c by smt(PolyComRing.addrI PolyComRing.mulrDl).
+  by smt(commrX PS.mulrA polyCX rscalp_ge0).
+suff: qq = q * c by smt(PS.addrI PS.mulrDl).
 have {e'} : (qq - q * c) * d = r * c - rr.
-- rewrite PolyComRing.mulrBl PolyComRing.subr_eq -e' PolyComRing.addrAC.
-  by smt(PolyComRing.addrC PolyComRing.mulrDl PolyComRing.subr_eq).
-rewrite -PolyComRing.subr_eq0 PolyComRing.opprB.
-suff: deg (rr - r * c) < deg d by smt(rreg_div0 PolyComRing.subr_eq0).
+- rewrite PS.mulrBl PS.subr_eq -e' PS.addrAC.
+  by smt(PS.addrC PS.mulrDl PS.subr_eq).
+rewrite -PS.subr_eq0 PS.opprB.
+suff: deg (rr - r * c) < deg d by smt(rreg_div0 PS.subr_eq0).
 suff: deg (r * c) < deg d by smt(redivpP degB).
-by smt(degC degM_le deg0 deg_gt0 PolyComRing.mulr0 PolyComRing.mul0r).
+by smt(degC degM_le deg0 deg_gt0 PS.mulr0 PS.mul0r).
 qed.
 
 lemma rdivp_eq d p :
   d * polyC (lc d) = polyC (lc d) * d =>
-  p * polyC (Coeff.exp (lc d) (rscalp p d)) = (rdivp p d) * d + (rmodp p d)
+  p * polyC (exp (lc d) (rscalp p d)) = (rdivp p d) * d + (rmodp p d)
   by smt(redivpP).
 
-lemma rreg_lead0 p : injective (transpose Coeff.( * ) (lc p)) => p <> poly0
-  by smt(lc_eq0 Coeff.mulr0 Coeff.oner_neq0).
+lemma rreg_lead0 p : injective (transpose CR.( * ) (lc p)) => p <> poly0
+  by smt(lc_eq0 mulr0 oner_neq0).
 
 lemma rreg_deg c p :
-  injective (transpose Coeff.( * ) c) => deg (p * polyC c) = deg p.
-proof.
-case: (p = poly0); 1: by smt(PolyComRing.mul0r).
-by smt(Coeff.mulr0 Coeff.oner_neq0 degC degM_proper lcC lc_eq0 Coeff.mul0r).
-qed.
+  injective (transpose CR.( * ) c) => deg (p * polyC c) = deg p
+  by smt(mulr0 oner_neq0 degC degM_proper lcC lc_eq0 mul0r PS.mul0r).
 
 lemma rreg_polyMC_eq0 c p :
-  injective (transpose Coeff.( * ) c) => (p * polyC c = poly0) = (p = poly0)
+  injective (transpose CR.( * ) c) => (p * polyC c = poly0) = (p = poly0)
   by smt(deg_eq0 rreg_deg).
 
 (* TODO: Prove other rreg lemmas using lemmas about lreg *)
 lemma rregX c n :
-  0 <= n => injective (transpose Coeff.( * ) c) =>
-  injective (transpose Coeff.( * ) (Coeff.exp c n))
-  by smt(Coeff.lregXn Coeff.mulrC).
+  0 <= n => injective (transpose CR.( * ) c) =>
+  injective (transpose CR.( * ) (exp c n)) by smt(lregXn mulrC).
 
 lemma eq_rdvdp d k q1 p :
   d * polyC (lc d) = polyC (lc d) * d =>
-  injective (transpose Coeff.( * ) (lc d)) =>
-  0 <= k => p * polyC (Coeff.exp (lc d) k) = q1 * d => rdvdp d p.
+  injective (transpose CR.( * ) (lc d)) =>
+  0 <= k => p * polyC (CR.exp (lc d) k) = q1 * d => rdvdp d p.
 proof.
 move => Cdl; pose ld := lc d; pose v := rscalp p d; pose m := max v k.
-pose ld_mMv := polyC (Coeff.exp ld (m - v)); move => Rreg k_ge0 he.
-pose ld_mMk := polyC (Coeff.exp ld (m - k)).
+pose ld_mMv := polyC (exp ld (m - v)); move => Rreg k_ge0 he.
+pose ld_mMk := polyC (exp ld (m - k)).
 rewrite /rdvdp -(rreg_polyMC_eq0 _ _ (rregX _ (m - v) _ Rreg)) => [/#|].
 suff: ((rdivp p d) * ld_mMv - q1 * ld_mMk) * d + (rmodp p d) * ld_mMv = poly0
   by rewrite rreg_div0 // rreg_deg ?ltn_rmodp ?rreg_lead0 //; smt(rregX).
 suff: rdivp p d * ld_mMv * d + rmodp p d * ld_mMv = q1 * ld_mMk * d
-  by smt(PolyComRing.addrA PolyComRing.addrC
-         PolyComRing.mulrBl PolyComRing.subr_eq0).
+  by smt(PS.addrA PS.addrC PS.mulrBl PS.subr_eq0).
 have -> : q1 * ld_mMk * d = q1 * d * ld_mMk
-  by smt(commrX PolyComRing.mulrA polyCX).
+  by smt(commrX PS.mulrA polyCX).
 have -> : rdivp p d * ld_mMv * d = rdivp p d * d * ld_mMv
-  by smt(commrX PolyComRing.mulrA polyCX).
-rewrite -he -PolyComRing.mulrDl -rdivp_eq ?Cdl // -!PolyComRing.mulrA.
-by rewrite -!polyCM -!Coeff.exprD_nneg; smt(rscalp_ge0).
+  by smt(commrX PS.mulrA polyCX).
+rewrite -he -PS.mulrDl -rdivp_eq ?Cdl //.
+by rewrite -!PS.mulrA -!polyCM -!exprD_nneg; smt(rscalp_ge0).
 qed.
 
 op rdvdp_spec (p q r : poly) (b : bool) : bool =
-  (exists k q1, p * polyC (Coeff.exp (lc q) k) = q1 * q) && r = poly0 && b ||
+  (exists k q1, p * polyC (exp (lc q) k) = q1 * q) && r = poly0 && b ||
   r = rmodp p q && r <> poly0 && ! b.
 
 lemma rdvdp_eqP d p :
   d * polyC (lc d) = polyC (lc d) * d =>
-  injective (transpose Coeff.( * ) (lc d)) =>
+  injective (transpose CR.( * ) (lc d)) =>
   rdvdp_spec p d (rmodp p d) (rdvdp d p).
 proof.
 case: (rdvdp d p) => [hdvd Cdl|]; 2: by smt(rreg_lead0).
-suff /# : p * polyC (Coeff.exp (lc d) (rscalp p d)) = rdivp p d * d.
-by rewrite rdivp_eq; smt(PolyComRing.addr0 rmodp_eq0P).
+suff /# : p * polyC (exp (lc d) (rscalp p d)) = rdivp p d * d.
+by rewrite rdivp_eq; smt(PS.addr0 rmodp_eq0P).
 qed.
 
 lemma rdvdp_mull d p :
   d * polyC (lc d) = polyC (lc d) * d =>
-  injective (transpose Coeff.( * ) (lc d)) =>
+  injective (transpose CR.( * ) (lc d)) =>
   rdvdp d (p * d)
-  by move => 2?; rewrite (eq_rdvdp d 0 p) ?Coeff.expr0 ?PolyComRing.mulr1 /#.
+  by move => 2?; rewrite (eq_rdvdp d 0 p) ?expr0 ?PS.mulr1 /#.
 
 lemma rmodp_mull d p :
   d * polyC (lc d) = polyC (lc d) * d =>
-  injective (transpose Coeff.( * ) (lc d)) =>
+  injective (transpose CR.( * ) (lc d)) =>
   rmodp (p * d) d = poly0 by smt(rdvdp_mull).
 
 lemma rmodpp d :
   d * polyC (lc d) = polyC (lc d) * d =>
-  injective (transpose Coeff.( * ) (lc d)) =>
-  rmodp d d = poly0 by smt(PolyComRing.mul1r rmodp_mull).
+  injective (transpose CR.( * ) (lc d)) =>
+  rmodp d d = poly0 by smt(PS.mul1r rmodp_mull).
 
 lemma mulrI0_rreg (p : poly) :
   (forall q, q * p = poly0 => q = poly0) =>
-  injective (transpose PolyComRing.( * ) p).
+  injective (transpose PS.( * ) p).
 proof.
-move=> reg_p q r qrP; rewrite -PolyComRing.subr_eq0 &(reg_p).
-by rewrite PolyComRing.mulrBl; smt(PolyComRing.subrr).
+move=> reg_p q r qrP; rewrite -PS.subr_eq0 &(reg_p).
+by rewrite PS.mulrBl; smt(PS.subrr).
 qed.
 
 lemma rreg_lead p :
-  injective (transpose Coeff.( * )       (lc p)) =>
-  injective (transpose PolyComRing.( * ) p)
-  by smt(lcM_proper lc_eq0 mulrI0_rreg Coeff.mul0r).
+  injective (transpose CR.( * ) (lc p)) =>
+  injective (transpose PS.( * )     p)
+  by smt(lcM_proper lc_eq0 mulrI0_rreg mul0r).
 
 lemma rdivpp d :
   d * polyC (lc d) = polyC (lc d) * d =>
-  injective (transpose Coeff.( * ) (lc d)) =>
-  rdivp d d = polyC (Coeff.exp (lc d) (rscalp d d)).
+  injective (transpose CR.( * ) (lc d)) =>
+  rdivp d d = polyC (exp (lc d) (rscalp d d)).
 proof.
 move => Cdl Rreg; move: (rdivp_eq d d Cdl); rewrite rmodpp ?Cdl //.
-by rewrite PolyComRing.addr0 -polyCX ?commrX ?polyCX; smt(rscalp_ge0 rreg_lead).
+by rewrite PS.addr0 -polyCX ?commrX ?polyCX; smt(rscalp_ge0 rreg_lead).
 qed.
 
 lemma rdvdpp d :
   d * polyC (lc d) = polyC (lc d) * d =>
-  injective (transpose Coeff.( * ) (lc d)) =>
+  injective (transpose CR.( * ) (lc d)) =>
   rdvdp d d by smt(rmodpp).
 
 lemma rdivpK d p :
   d * polyC (lc d) = polyC (lc d) * d =>
-  injective (transpose Coeff.( * ) (lc d)) =>
+  injective (transpose CR.( * ) (lc d)) =>
   rdvdp d p =>
-  rdivp p d * d = p * polyC (Coeff.exp (lc d) (rscalp p d))
-  by smt(PolyComRing.addr0 rdivp_eq).
+  rdivp p d * d = p * polyC (CR.exp (lc d) (rscalp p d))
+  by smt(PS.addr0 rdivp_eq).
 
 end ComRegDivisor.
 
@@ -519,155 +534,123 @@ abstract theory RingMonic.
 
 type coeff, poly.
 
-clone import RingPseudoDivision as RPD with
-  type coeff <- coeff,
-  type poly  <- poly.
+clone ComRing as CR with type t <= coeff.
+
+clone PolyComRing as PCR with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory Coeff <- RingMonic.CR.
+
+clone RingMonic.PCR.PolyComRing as PS.
+
+clone RingPseudoDivision as RPD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- RingMonic.CR,
+  theory PCR   <- RingMonic.PCR,
+  theory PS    <- RingMonic.PS.
+
+clone ComRegDivisor as CRD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- RingMonic.CR,
+  theory PCR   <- RingMonic.PCR,
+  theory PS    <- RingMonic.PS,
+  theory RPD   <- RingMonic.RPD.
+
+import RingMonic.CR.
+import RingMonic.PCR.
+import RingMonic.RPD.
+import RingMonic.CRD.
 
 lemma monic_comreg p :
-  lc p = Coeff.oner =>
+  lc p = oner =>
   p * polyC (lc p) = polyC (lc p) * p /\
-  injective (transpose Coeff.( * ) (lc p))
-  by smt(Coeff.mulr1 PolyComRing.mulr1 PolyComRing.mul1r).
-
-(*
-lemma Cdl : d * polyC (lc d) = polyC (lc d) * d by smt(mond monic_comreg).
-
-lemma Rreg : injective (transpose Coeff.( * ) (lc d)) by smt(mond monic_comreg).
-*)
-
-clone import ComRegDivisor with
-  type   coeff              <- coeff,
-  type   poly               <- poly,
-  theory RingPseudoDivision <- RPD. (*,
-  op     d                  <- d
-
-  proof Cdl  by apply Cdl
-  proof Rreg by apply Rreg.
-*)
+  injective (transpose CR.( * ) (lc p))
+  by smt(mulr1 PS.mulr1 PS.mul1r).
 
 lemma redivp_eq d q r :
-  lc d = Coeff.oner =>
+  lc d = oner =>
   deg r < deg d =>
   let k = rscalp (q * d + r) d in
   redivp (q * d + r) d = (k, q, r)
-  by smt(Coeff.expr1z monic_comreg PolyComRing.mulr1 redivp_eq).
+  by smt(expr1z monic_comreg PS.mulr1 redivp_eq).
 
-lemma rdivp_eq d p : lc d = Coeff.oner => p = rdivp p d * d + rmodp p d
-  by smt(Coeff.expr1z monic_comreg PolyComRing.mulr1 rdivp_eq).
+lemma rdivp_eq d p : lc d = oner => p = rdivp p d * d + rmodp p d
+  by smt(expr1z monic_comreg PS.mulr1 rdivp_eq).
 
-lemma rdivpp d : lc d = Coeff.oner => rdivp d d = poly1
-  by smt(Coeff.expr1z monic_comreg rdivpp).
+lemma rdivpp d : lc d = oner => rdivp d d = poly1
+  by smt(expr1z monic_comreg rdivpp).
 
 lemma rdivp_addl_mul_small d q r :
-  lc d = Coeff.oner => deg r < deg d => rdivp (q * d + r) d = q
+  lc d = oner => deg r < deg d => rdivp (q * d + r) d = q
   by smt(monic_comreg redivp_eq).
 
 lemma rdivp_addl_mul d q r :
-  lc d = Coeff.oner => rdivp (q * d + r) d = q + rdivp r d.
+  lc d = oner => rdivp (q * d + r) d = q + rdivp r d.
 proof.
 move => mond; move: (monic_comreg d mond) => [Cdl Rreg].
-rewrite {1}(rdivp_eq d r) // PolyComRing.addrA -PolyComRing.mulrDl.
+rewrite {1}(rdivp_eq d r) // PS.addrA -PS.mulrDl.
 by rewrite rdivp_addl_mul_small; smt(ltn_rmodp rreg_lead0).
 qed.
 
 lemma rdivpDl d q r :
-  lc d = Coeff.oner => rdvdp d q => rdivp (q + r) d = rdivp q d + rdivp r d.
+  lc d = oner => rdvdp d q => rdivp (q + r) d = rdivp q d + rdivp r d.
 proof.
 move => mond; move: (monic_comreg d mond) => [Cdl Rreg].
-rewrite {1}(rdivp_eq d r) // PolyComRing.addrA {2}(rdivp_eq d q) // -rmodp_eq0P.
-move => ->; rewrite PolyComRing.addr0 -PolyComRing.mulrDl.
+rewrite {1}(rdivp_eq d r) // PS.addrA {2}(rdivp_eq d q) // -rmodp_eq0P.
+move => ->; rewrite PS.addr0 -PS.mulrDl.
 by rewrite rdivp_addl_mul_small // ltn_rmodp rreg_lead0 // Rreg.
 qed.
 
 lemma rdivpDr d q r :
-  lc d = Coeff.oner => rdvdp d r => rdivp (q + r) d = rdivp q d + rdivp r d
-  by smt(PolyComRing.addrC rdivpDl).
+  lc d = oner => rdvdp d r => rdivp (q + r) d = rdivp q d + rdivp r d
+  by smt(PS.addrC rdivpDl).
 
-lemma rdivp_mull d p : lc d = Coeff.oner => rdivp (p * d) d = p
-  by smt(PolyComRing.addr0 rdiv0p rdivp_addl_mul).
+lemma rdivp_mull d p : lc d = oner => rdivp (p * d) d = p
+  by smt(PS.addr0 rdiv0p rdivp_addl_mul).
 
-lemma rmodp_mull d p : lc d = Coeff.oner => rmodp (p * d) d = poly0
+lemma rmodp_mull d p : lc d = oner => rmodp (p * d) d = poly0
   by smt(monic_comreg rmodp_mull).
 
-lemma rmodpp d : lc d = Coeff.oner => rmodp d d = poly0
+lemma rmodpp d : lc d = oner => rmodp d d = poly0
   by smt(monic_comreg rmodpp).
 
 lemma rmodp_addl_mul_small d q r :
-  lc d = Coeff.oner => deg r < deg d => rmodp (q * d + r) d = r
+  lc d = oner => deg r < deg d => rmodp (q * d + r) d = r
   by smt(monic_comreg redivp_eq).
 
 lemma rmodpD (d p q : poly) :
-  lc d = Coeff.oner => rmodp (p + q) d = rmodp p d + rmodp q d.
+  lc d = oner => rmodp (p + q) d = rmodp p d + rmodp q d.
 proof.
 move => mond; move: (monic_comreg d mond) => [Cdl Rreg].
-rewrite {1}(rdivp_eq d p) // {1}(rdivp_eq d q) // PolyComRing.addrACA.
-rewrite  -PolyComRing.mulrDl rmodp_addl_mul_small;
-by smt(degD ltn_rmodpN0 rreg_lead0).
+rewrite {1}(rdivp_eq d p) // {1}(rdivp_eq d q) // PS.addrACA.
+by rewrite  -PS.mulrDl rmodp_addl_mul_small; smt(degD ltn_rmodpN0 rreg_lead0).
 qed.
 
 lemma rmodp_mulmr d p q :
-  lc d = Coeff.oner => rmodp (p * rmodp q d) d = rmodp (p * q) d.
+  lc d = oner => rmodp (p * rmodp q d) d = rmodp (p * q) d.
 proof.
 move => mond; move: (monic_comreg d mond) => [Cdl Rreg].
-rewrite {2}(rdivp_eq d q) // PolyComRing.mulrDr rmodpD //.
-by rewrite PolyComRing.mulrA rmodp_mull // PolyComRing.add0r.
+rewrite {2}(rdivp_eq d q) // PS.mulrDr rmodpD //.
+by rewrite PS.mulrA rmodp_mull // PS.add0r.
 qed.
 
-lemma rdvdpp d : lc d = Coeff.oner => rdvdp d d by smt(monic_comreg rdvdpp).
+lemma rdvdpp d : lc d = oner => rdvdp d d by smt(monic_comreg rdvdpp).
 
-lemma eq_rdvdp d q1 p : lc d = Coeff.oner => p = q1 * d => rdvdp d p
-  by smt(eq_rdvdp Coeff.expr1z monic_comreg PolyComRing.mulr1).
+lemma eq_rdvdp d q1 p : lc d = oner => p = q1 * d => rdvdp d p
+  by smt(eq_rdvdp expr1z monic_comreg PS.mulr1).
 
-lemma rdvdp_mull d p : lc d = Coeff.oner => rdvdp d (p * d)
+lemma rdvdp_mull d p : lc d = oner => rdvdp d (p * d)
   by smt(monic_comreg rdvdp_mull).
 
-lemma rdivpK d p : lc d = Coeff.oner => rdvdp d p => (rdivp p d) * d = p
-  by smt(PolyComRing.addr0 rdivp_eq rmodp_eq0).
+lemma rdivpK d p : lc d = oner => rdvdp d p => (rdivp p d) * d = p
+  by smt(PS.addr0 rdivp_eq rmodp_eq0).
 
-(*
-end RingMonic.
-
-abstract theory ExtraMonicDivisor.
-
-type coeff, poly.
-
-clone import RingPseudoDivision as RPD with
-  type coeff <- coeff,
-  type poly  <- poly.
-
-section Poly1.
-
-clone import RingMonic as RM1 with
-  type   coeff              <- coeff,
-  type   poly               <- poly,
-  theory RPD                <- RPD,
-  op     d                  <- poly1
-
-  proof mond  by apply lc1.
-*)
-
-lemma rdivp1 p : rdivp p poly1 = p by smt(lc1 PolyComRing.mulr1 rdivp_mull).
-
-(*
-end section Poly1.
-
-section PolyXn.
-
-op n : int.
-
-axiom n_ge0 : 0 <= n.
-
-clone import RingMonic as RMXn with
-  type   coeff              <- coeff,
-  type   poly               <- poly,
-  theory RPD                <- RPD,
-  op     d                  <- polyXn n
-
-  proof mond  by apply (lcXn _ n_ge0).
-*)
+lemma rdivp1 p : rdivp p poly1 = p by smt(lc1 PS.mulr1 rdivp_mull).
 
 op prepolyDrop (k : int) (p : poly) =
-  fun i => if 0 <= i < deg p - k /\ 0 <= k then p.[i + k] else Coeff.zeror.
+  fun i => if 0 <= i < deg p - k /\ 0 <= k then p.[i + k] else zeror.
 
 lemma ispolyDrop (k : int) (p : poly) : ispoly (prepolyDrop k p)
   by split => @/prepolyDrop; smt(gedeg_coeff).
@@ -678,7 +661,7 @@ lemma drop_poly_lt0 n p : n < 0 => drop_poly n p = poly0
   by rewrite poly_eqP => n_lt0 i iP; rewrite coeffE ?ispolyDrop poly0E /#.
 
 op prepolyTake (k : int) (p : poly) =
-  fun i => if 0 <= i < k then p.[i] else Coeff.zeror.
+  fun i => if 0 <= i < k then p.[i] else zeror.
 
 lemma ispolyTake (k : int) (p : poly) : ispoly (prepolyTake k p)
   by split => @/prepolyTake; smt(gedeg_coeff).
@@ -695,15 +678,14 @@ lemma poly_take_drop n p :
   0 <= n => take_poly n p + drop_poly n p * (polyXn n) = p.
 proof.
 rewrite poly_eqP => n_ge0 i i_ge0; rewrite polyDE polyME; case: (i < n) => inP.
-- rewrite BigCf.BCA.big1_seq; 2: by smt(Coeff.addr0 coeffE ispolyTake).
+- rewrite BigCf.BCA.big1_seq; 2: by smt(addr0 coeffE ispolyTake).
   rewrite /predT /= => j; rewrite !coeffE; 1, 2: by smt(ispolyDrop ispolyXn).
-  by smt(Coeff.mulr0 mem_range).
-- have -> : (take_poly n p).[i] = Coeff.zeror by smt(coeffE ispolyTake).
-  rewrite Coeff.add0r (BigCf.BCA.big_rem _ _ _ (i - n)); 1: smt(mem_range).
+  by smt(mulr0 mem_range).
+- have -> : (take_poly n p).[i] = zeror by smt(coeffE ispolyTake).
+  rewrite add0r (BigCf.BCA.big_rem _ _ _ (i - n)); 1: smt(mem_range).
   rewrite /predT /= coeff_polyXn //=; have {3}-> /= : n = i - (i - n) by smt().
-  rewrite BigCf.BCA.big1_seq ?Coeff.addr0 ?Coeff.mulr1;
-    1: by smt(coeff_polyXn mem_filter mem_range
-              Coeff.mulr0 range_uniq rem_filter).
+  rewrite BigCf.BCA.big1_seq ?addr0 ?mulr1;
+    1: by smt(coeff_polyXn mem_filter mem_range mulr0 range_uniq rem_filter).
   by rewrite coeffE ?ispolyDrop /prepolyDrop; smt(gedeg_coeff).
 qed.
 
@@ -712,75 +694,50 @@ proof.
 case: (0 <= n) => [n_ge0|]; last first.
 - suff: n < 0 => polyXn n = poly0 by smt(drop_poly_lt0 rdivp0).
   by smt(coeffE ispolyXn poly0E poly_eqP).
-- have mond: lc (polyXn n) = Coeff.oner by apply (lcXn _ n_ge0).
-  rewrite -{2}(poly_take_drop n p n_ge0) PolyComRing.addrC rdivp_addl_mul //.
-  by rewrite rdivp_small ?PolyComRing.addr0// degXn; smt(size_take_poly).
+- have mond: lc (polyXn n) = oner by apply (lcXn _ n_ge0).
+  rewrite -{2}(poly_take_drop n p n_ge0) PS.addrC rdivp_addl_mul //.
+  by rewrite rdivp_small ?PS.addr0 // degXn; smt(size_take_poly).
 qed.
 
 lemma take_poly_rmodp n p : 0 <= n => take_poly n p = rmodp p (polyXn n).
 proof.
-move => n_ge0; have mond: lc (polyXn n) = Coeff.oner by apply (lcXn _ n_ge0).
+move => n_ge0; have mond: lc (polyXn n) = oner by apply (lcXn _ n_ge0).
 rewrite -{2}(poly_take_drop n p n_ge0) rmodpD // rmodp_small ?rmodp_mull;
-by smt(degXn size_take_poly PolyComRing.addr0).
+by smt(degXn size_take_poly PS.addr0).
 qed.
 
-(*
-end section PolyXn.
+lemma peval0 x : peval poly0 x = zeror
+  by rewrite /peval deg0 range_geq.
 
-section Root.
-
-op x : coeff.
-
-op Xx = polyX - polyC x.
-
-clone import RingMonic as RMXx with
-  type   coeff              <- coeff,
-  type   poly               <- poly,
-  theory RPD                <- RPD,
-  op     d                  <- Xx
-
-  proof mond  by rewrite lcDr ?lcX // degN degC degX /#.
-*)
-
-op peval' (p : poly) (a : coeff) =
-  BigCf.BCA.bigi predT (fun i => Coeff.( * ) p.[i] (Coeff.exp a i)) 0 (deg p).
-
-lemma peval_too_much p a : peval p a = peval' p a.
-proof.
-rewrite /peval BigCf.BCA.big_int_recr ?ge0_deg /= gedeg_coeff //.
-by rewrite Coeff.mul0r Coeff.addr0.
-qed.
-
-lemma peval0 x : peval poly0 x = Coeff.zeror
-  by rewrite peval_too_much /peval' deg0 range_geq.
-
-lemma pevalC c x : peval (polyC c) x = c.
-proof.
-admitted.
+lemma pevalC c x : peval (polyC c) x = c
+  by rewrite /peval degC; smt(BigCf.BCA.big_int1 expr0 mulr1 polyCE range_geq).
 
 lemma pevalX x : peval X x = x.
 proof.
-admitted.
+rewrite /peval degX; have -> : range 0 2 = [0; 1] by smt(rangeS rangeSr).
+rewrite !BigCf.BCA.big_cons BigCf.BCA.big_nil /predT /= addr0 !polyXE.
+by rewrite expr0 expr1 /= mul0r mul1r add0r.
+qed.
 
 lemma pevalD (p q : poly) x :
-  peval (p + q) x = Coeff.( + ) (peval p x) (peval q x).
+  peval (p + q) x = peval p x + peval q x.
 proof.
-pose pf := fun (i : int) => Coeff.( * ) p.[i] (Coeff.exp x i).
+pose pf := fun (i : int) => p.[i] * (exp x i).
 have -> : peval p x = BigCf.BCA.bigi predT pf 0 (max (deg p) (deg q)).
-  rewrite peval_too_much /peval' eq_sym (BigCf.BCA.big_cat_int (deg p));
-  smt(Coeff.addr0 BigCf.BCA.big1_seq gedeg_coeff ge0_deg mem_range Coeff.mul0r).
-pose qf := fun (i : int) => Coeff.( * ) q.[i] (Coeff.exp x i).
+- rewrite /peval eq_sym (BigCf.BCA.big_cat_int (deg p));
+  smt(addr0 BigCf.BCA.big1_seq gedeg_coeff ge0_deg mem_range mul0r).
+pose qf := fun (i : int) => q.[i] * (exp x i).
 have -> : peval q x = BigCf.BCA.bigi predT qf 0 (max (deg p) (deg q)).
-  rewrite peval_too_much /peval' eq_sym (BigCf.BCA.big_cat_int (deg q));
-  smt(Coeff.addr0 BigCf.BCA.big1_seq gedeg_coeff ge0_deg mem_range Coeff.mul0r).
-rewrite -BigCf.BCA.big_split peval_too_much /peval' eq_sym.
-case: (deg (p + q) < max (deg p) (deg q)); 2: by smt(degD Coeff.mulrDl polyDE).
+- rewrite /peval eq_sym (BigCf.BCA.big_cat_int (deg q));
+  smt(addr0 BigCf.BCA.big1_seq gedeg_coeff ge0_deg mem_range mul0r).
+rewrite -BigCf.BCA.big_split /peval eq_sym.
+case: (deg (p + q) < max (deg p) (deg q)); 2: by smt(degD mulrDl polyDE).
 move => ?; rewrite (BigCf.BCA.big_cat_int (deg (p + q))); 1, 2: by smt(ge0_deg).
-have -> : (fun i => Coeff.( * ) (p + q).[i] (Coeff.exp x i)) =
-          (fun i => Coeff.( + ) (pf i) (qf i)) by smt(Coeff.mulrDl polyDE).
-rewrite -Coeff.subr_eq0 Coeff.addrAC Coeff.subrr Coeff.add0r.
+have -> : (fun i => (p + q).[i] * (exp x i)) =
+          (fun i => (pf i) + (qf i)) by smt(mulrDl polyDE).
+rewrite -subr_eq0 addrAC subrr add0r.
 rewrite BigCf.BCA.big1_seq //= => i [_ ]; rewrite mem_range /pf /qf.
-by rewrite -Coeff.mulrDl -polyDE; smt(gedeg_coeff Coeff.mul0r).
+by rewrite -mulrDl -polyDE; smt(gedeg_coeff mul0r).
 qed.
 
 lemma drop_polyn0 n : 0 <= n => drop_poly n poly0 = poly0
@@ -817,140 +774,132 @@ by smt(coef_drop_poly deg_eq0 gedeg_coeff lc_eq0).
 qed.
 
 lemma pevalMX (p : poly) x :
-  peval (p * X) x = Coeff.( * ) (peval p x) x.
+  peval (p * X) x = (peval p x) * x.
 proof.
-rewrite !peval_too_much /peval' BigCf.BCA.big_distrl ?Coeff.mul0r ?Coeff.mulrDl.
-case: (p = poly0) => [->|p_neq0]; 1: by smt(deg0 PolyComRing.mul0r range_geq).
-rewrite range_ltn; 1: by smt(degM_proper degX ge0_deg lcX lc_eq0 Coeff.mulr1).
+rewrite /peval BigCf.BCA.big_distrl ?mul0r ?mulrDl.
+case: (p = poly0) => [->|p_neq0]; 1: by smt(deg0 PS.mul0r range_geq).
+rewrite range_ltn; 1: by smt(degM_proper degX ge0_deg lcX lc_eq0 mulr1).
 have -> : deg (p * X) = deg p + 1
-  by rewrite degM_proper ?lcX ?degX // Coeff.mulr1 lc_eq0.
-rewrite BigCf.BCA.big_cons /predT /= polyMXE lt0_coeff // Coeff.mul0r.
-rewrite Coeff.add0r -/predT (range_add 0 (deg p) 1) BigCf.BCA.big_map.
-apply BigCf.BCA.eq_big_seq => i iP /=; rewrite /(\o) -Coeff.mulrA.
-by rewrite -Coeff.exprSr ?polyMXE; smt(mem_range).
+  by rewrite degM_proper ?lcX ?degX // mulr1 lc_eq0.
+rewrite BigCf.BCA.big_cons /predT /= polyMXE lt0_coeff // mul0r.
+rewrite add0r -/predT (range_add 0 (deg p) 1) BigCf.BCA.big_map.
+apply BigCf.BCA.eq_big_seq => i iP /=; rewrite /(\o) -mulrA.
+by rewrite -exprSr ?polyMXE; smt(mem_range).
 qed.
 
 lemma pevalZ (c : coeff) (p : poly) x :
-  peval (c ** p) x = Coeff.( * ) c (peval p x).
+  peval (c ** p) x = c * (peval p x).
 proof.
 suff: forall n c p x, deg p <= n =>
-        peval (c ** p) x = Coeff.( * ) c (peval p x) by smt(ge0_deg).
-apply: natind; 1: by smt(deg_eq0 ge0_deg Coeff.mulr0 scalep0 peval0).
+        peval (c ** p) x = c * (peval p x) by smt(ge0_deg).
+apply: natind; 1: by smt(deg_eq0 ge0_deg mulr0 scalep0 peval0).
 move => /= n n_ge0 nh {c p x} c p x degnpP.
 rewrite -{1}(poly_take_drop 1 p) //.
-rewrite scalepDr pevalD (scalepE _ (_ * X)) PolyComRing.mulrA -scalepE pevalMX.
-have -> : peval (c ** take_poly 1 p) x = Coeff.( * ) c (p.[0]).
+rewrite scalepDr pevalD (scalepE _ (_ * X)) PS.mulrA -scalepE pevalMX.
+have -> : peval (c ** take_poly 1 p) x = c * p.[0].
 - have -> : take_poly 1 p = polyC p.[0]
     by rewrite poly_eqP => i i_ge0; rewrite !coeffE ?ispolyTake ?ispolyC /#.
-  rewrite scalepE -polyCM peval_too_much /peval' degC.
-  case: (Coeff.( * ) c p.[0] = Coeff.zeror); 1: by smt(BigCf.BCA.big_geq).
-  by rewrite rangeS BigCf.BCA.big_seq1 /= Coeff.expr0 Coeff.mulr1 polyCE.
+  rewrite scalepE -polyCM /peval degC.
+  case: (c * p.[0] = zeror); 1: by smt(BigCf.BCA.big_geq).
+  by rewrite rangeS BigCf.BCA.big_seq1 /= expr0 mulr1 polyCE.
 case: (p = poly0) => [->|p_neq0].
-- by rewrite poly0E drop_polyn0 // scalep0 !peval0 Coeff.mul0r Coeff.addr0.
-- rewrite nh ?deg_drop_poly -?Coeff.mulrA -?Coeff.mulrDr //; 1: by smt().
-  rewrite -Coeff.subr_eq0 -Coeff.mulrBr -pevalMX.
+- by rewrite poly0E drop_polyn0 // scalep0 !peval0 mul0r addr0.
+- rewrite nh ?deg_drop_poly -?mulrA -?mulrDr //; 1: by smt().
+  rewrite -subr_eq0 -mulrBr -pevalMX.
   suff -> : p.[0] = peval (take_poly 1 p) x
-    by rewrite -pevalD poly_take_drop // Coeff.subrr Coeff.mulr0.
-  case: (p.[0] = Coeff.zeror) => [?|p0_neq0]; rewrite peval_too_much /peval'.
+    by rewrite -pevalD poly_take_drop // subrr mulr0.
+  case: (p.[0] = zeror) => [?|p0_neq0]; rewrite /peval.
   + suff -> : deg (take_poly 1 p) = 0 by rewrite range_geq.
     by rewrite deg_eq0 poly_eqP => i iP; rewrite poly0E coeffE; smt(ispolyTake).
   + have -> : deg (take_poly 1 p) = 1 by apply degP; smt(coeffE ispolyTake).
-    by smt(BigCf.BCA.big_seq1 coeffE Coeff.expr0 ispolyTake Coeff.mulr1 rangeS).
+    by smt(BigCf.BCA.big_seq1 coeffE expr0 ispolyTake mulr1 rangeS).
 qed.
 
-lemma pevalN (p : poly) x : peval (-p) x = Coeff.([ - ]) (peval p x).
+lemma pevalN (p : poly) x : peval (-p) x = - peval p x.
 proof.
-suff -> : -p = (Coeff.([ - ]) Coeff.oner) ** p by rewrite pevalZ Coeff.mulN1r.
-by rewrite scaleNp scalepE PolyComRing.mul1r.
+suff -> : -p = (- oner) ** p by rewrite pevalZ mulN1r.
+by rewrite scaleNp scalepE PS.mul1r.
 qed.
 
 lemma pevalB (p q : poly) x :
-  peval (p - q) x = Coeff.( - ) (peval p x) (peval q x) by smt(pevalD pevalN).
+  peval (p - q) x = peval p x - peval q x by smt(pevalD pevalN).
 
 lemma pevalM (p q : poly) x :
-  peval (p * q) x = Coeff.( * ) (peval p x) (peval q x).
+  peval (p * q) x = peval p x * peval q x.
 proof.
 suff: forall n p q x, deg p <= n =>
-        peval (p * q) x = Coeff.( * ) (peval p x) (peval q x) by smt(ge0_deg).
-apply: natind; 1: by smt(deg_eq0 ge0_deg Coeff.mul0r PolyComRing.mul0r peval0).
+        peval (p * q) x = peval p x * peval q x by smt(ge0_deg).
+apply: natind; 1: by smt(deg_eq0 ge0_deg mul0r PS.mul0r peval0).
 move => /= n n_ge0 nh {p q x} p q x pP; rewrite -{1}(poly_take_drop 1 p) //.
 have cP : take_poly 1 p = polyC p.[0]
   by rewrite poly_eqP => i i_ge0; rewrite !coeffE ?ispolyTake ?ispolyC /#.
-rewrite cP PolyComRing.mulrDl pevalD -scalepE pevalZ -PolyComRing.mulrA.
-rewrite (PolyComRing.mulrC X) nh ?pevalMX; 1: by smt(deg_drop_poly).
-rewrite Coeff.mulrCA (Coeff.mulrC (peval q x)) -Coeff.mulrDl -pevalMX.
-suff /# : Coeff.( + ) p.[0] (peval (drop_poly 1 p * X) x) = peval p x.
+rewrite cP PS.mulrDl pevalD -scalepE pevalZ -PS.mulrA.
+rewrite (PS.mulrC X) nh ?pevalMX; 1: by smt(deg_drop_poly).
+rewrite mulrCA (mulrC (peval q x)) -mulrDl -pevalMX.
+suff /# : p.[0] + peval (drop_poly 1 p * X) x = peval p x.
 suff -> : p.[0] = peval (take_poly 1 p) x by rewrite -pevalD poly_take_drop.
-case: (p.[0] = Coeff.zeror) => p0P; rewrite peval_too_much /peval'.
+case: (p.[0] = zeror) => p0P; rewrite /peval.
 - suff -> : deg (take_poly 1 p) = 0 by rewrite range_geq.
   by rewrite deg_eq0 poly_eqP => i iP; rewrite poly0E coeffE; smt(ispolyTake).
 - have -> : deg (take_poly 1 p) = 1 by apply degP; smt(coeffE ispolyTake).
-  by smt(BigCf.BCA.big_seq1 coeffE Coeff.expr0 ispolyTake Coeff.mulr1 rangeS).
+  by smt(BigCf.BCA.big_seq1 coeffE expr0 ispolyTake mulr1 rangeS).
 qed.
 
 lemma root_XsubC a x : root (X - polyC a) x = (x = a).
 proof.
-rewrite peval_too_much /peval'; have -> : deg (X - polyC a) = 0 + 1 + 1.
+rewrite /peval; have -> : deg (X - polyC a) = 0 + 1 + 1.
 - apply degP; 1, 3: by smt(degB degX degC_le gedeg_coeff).
-  by rewrite polyDE polyXE polyNE polyCE /= Coeff.subr0 Coeff.oner_neq0.
+  by rewrite polyDE polyXE polyNE polyCE /= subr0 oner_neq0.
 rewrite !BigCf.BCA.big_int_recr ?range_geq ?BigCf.BCA.big_nil //=.
-rewrite !polyDE !polyXE !polyNE !polyCE /= !Coeff.add0r Coeff.subr0.
-rewrite Coeff.expr0 Coeff.expr1 Coeff.mulr1 Coeff.mul1r.
-by rewrite Coeff.addrC Coeff.subr_eq0.
+rewrite !polyDE !polyXE !polyNE !polyCE /= !add0r subr0.
+rewrite expr0 expr1 mulr1 mul1r.
+by rewrite addrC subr_eq0.
 qed.
 
 lemma rootMl (p q : poly) r : root p r => root (p * q) r
-  by smt(Coeff.mul0r pevalM).
+  by smt(mul0r pevalM).
 
 lemma rootMr (p q : poly) r : root q r => root (p * q) r
-  by smt(Coeff.mulr0 pevalM).
+  by smt(mulr0 pevalM).
 
 lemma factor_theorem p r : root p r = exists q, p = q * (polyX - polyC r).
 proof.
 rewrite eqboolP; split => [prP|]; 2: by smt(rootMr root_XsubC).
-search drop_poly.
 pose preQ := fun i => if 0 <= i < deg p then peval (drop_poly (i + 1) p) r
-                                        else Coeff.zeror.
+                                        else zeror.
 have isprepolyQ : ispoly preQ by split => @/prepolyTake; smt(gedeg_coeff).
-exists (to_polyd preQ); rewrite PolyComRing.mulrBr poly_eqP => i iP.
-rewrite polyDE polyNE polyMXE PolyComRing.mulrC -scalepE polyZE !coeffE //.
+exists (to_polyd preQ); rewrite PS.mulrBr poly_eqP => i iP.
+rewrite polyDE polyNE polyMXE PS.mulrC -scalepE polyZE !coeffE //.
 rewrite /preQ; case: (i < deg p); last first.
-- by smt(drop_poly_eq0 gedeg_coeff Coeff.mulr0 peval0 Coeff.subr0).
+- by smt(drop_poly_eq0 gedeg_coeff mulr0 peval0 subr0).
 - move => degipP; have -> /= : i - 1 < deg p by smt().
   case: (i = 0) => [i_eq0|i_neq0]; rewrite ?i_eq0 /=.
-  + rewrite Coeff.add0r Coeff.mulrC -pevalMX -Coeff.subr_eq0 Coeff.opprK.
+  + rewrite add0r mulrC -pevalMX -subr_eq0 opprK.
     suff -> : p.[0] = peval (take_poly 1 p) r by smt(pevalD poly_take_drop).
-    rewrite peval_too_much /peval'; case: (p.[0] = Coeff.zeror) => p0P.
+    rewrite /peval; case: (p.[0] = zeror) => p0P.
     * suff -> : deg (take_poly 1 p) = 0 by rewrite range_geq.
       by rewrite deg_eq0 poly_eqP; smt(coeffE ispolyTake poly0E).
     * have -> : deg (take_poly 1 p) = 1 by apply degP; smt(coeffE ispolyTake).
-      by smt(BigCf.BCA.big_seq1 coeffE Coeff.expr0
-             ispolyTake Coeff.mulr1 rangeS).
+      by smt(BigCf.BCA.big_seq1 coeffE expr0 ispolyTake mulr1 rangeS).
   + rewrite iP; have -> /= : 0 <= i - 1 by smt().
-    rewrite Coeff.mulrC -pevalMX -pevalB addrC -drop_polyD //.
-    rewrite -{1}(poly_take_drop 1 (drop_poly i p)) // -PolyComRing.addrA.
-    rewrite PolyComRing.subrr PolyComRing.addr0 peval_too_much /peval'.
-    case: (p.[i] = Coeff.zeror) => piP; rewrite ?piP.
+    rewrite mulrC -pevalMX -pevalB addrC -drop_polyD //.
+    rewrite -{1}(poly_take_drop 1 (drop_poly i p)) // -PS.addrA.
+    rewrite PS.subrr PS.addr0 /peval.
+    case: (p.[i] = zeror) => piP; rewrite ?piP.
     * suff -> : deg (take_poly 1 (drop_poly i p)) = 0 by rewrite range_geq.
       rewrite deg_eq0 poly_eqP; smt(coeffE coef_drop_poly ispolyTake poly0E).
     * have -> : deg (take_poly 1 (drop_poly i p)) = 1
         by apply degP; smt(coeffE coef_drop_poly ispolyTake).
       by smt(BigCf.BCA.big_seq1 coeffE coef_drop_poly
-             Coeff.expr0 ispolyTake Coeff.mulr1 rangeS).
+             expr0 ispolyTake mulr1 rangeS).
 qed.
 
-lemma rdvdp_XsubCl_extra_monic x p : rdvdp (polyX - polyC x) p = root p x.
+lemma rdvdp_XsubCl x p : rdvdp (polyX - polyC x) p = root p x.
 proof.
-have mond : lc (polyX - polyC x) = Coeff.oner
+have mond : lc (polyX - polyC x) = oner
   by rewrite lcDr ?lcX // degN degC degX /#.
-by smt(PolyComRing.addr0 eq_rdvdp factor_theorem rdivp_eq).
+by smt(PS.addr0 eq_rdvdp factor_theorem rdivp_eq).
 qed.
-
-(*
-end section Root.
-
-end ExtraMonicDivisor.
-*)
 
 end RingMonic.
 
@@ -958,50 +907,73 @@ abstract theory ComRing.
 
 type coeff, poly.
 
-clone import RingPseudoDivision as RPD with
-  type coeff <- coeff,
-  type poly  <- poly.
+clone ComRing as CR with type t <= coeff.
 
-clone import ComRegDivisor as CRD with
-  type   coeff              <- coeff,
-  type   poly               <- poly,
-  theory RingPseudoDivision <- RPD.
+clone PolyComRing as PCR with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory Coeff <- ComRing.CR.
 
-clone import RingMonic with
-  type   coeff              <- coeff,
-  type   poly               <- poly,
-  theory RPD                <- RPD,
-  theory ComRegDivisor      <- CRD.
+clone ComRing.PCR.PolyComRing as PS.
+
+clone RingPseudoDivision as RPD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- ComRing.CR,
+  theory PCR   <- ComRing.PCR,
+  theory PS    <- ComRing.PS.
+
+clone ComRegDivisor as CRD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- ComRing.CR,
+  theory PCR   <- ComRing.PCR,
+  theory PS    <- ComRing.PS,
+  theory RPD   <- ComRing.RPD.
+
+clone RingMonic as RM with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- ComRing.CR,
+  theory PCR   <- ComRing.PCR,
+  theory PS    <- ComRing.PS,
+  theory RPD   <- ComRing.RPD,
+  theory CRD   <- ComRing.CRD.
+
+import ComRing.CR.
+import ComRing.PCR.
+import ComRing.RPD.
+import ComRing.CRD.
+import ComRing.RM.
 
 op redivp_spec (m d : poly) (i : int * poly * poly) =
   let (k, q, r) = i in
-  Coeff.exp (lc d) k ** m = q * d + r && (d <> poly0 => deg r < deg d).
+  exp (lc d) k ** m = q * d + r && (d <> poly0 => deg r < deg d).
 
 lemma redivpP m d : redivp_spec m d (redivp m d)
-  by smt(redivpP scalepE PolyComRing.mulrC).
+  by smt(redivpP scalepE PS.mulrC).
 
 lemma rdivp_eq d p :
-  Coeff.exp (lc d) (rscalp p d) ** p = rdivp p d * d + rmodp p d
-  by smt(redivpP).
+  exp (lc d) (rscalp p d) ** p = rdivp p d * d + rmodp p d by smt(redivpP).
 
 lemma rdvdp_eqP d p : rdvdp_spec p d (rmodp p d) (rdvdp d p).
 proof.
 case: (rdvdp d p) => [hdvd|/#]; move: (rmodp_eq0P p d); rewrite {2}hdvd.
 move => _; rewrite /rdvdp_spec /=; exists (rscalp p d) (rdivp p d).
-by rewrite rdivp_eq 1?PolyComRing.mulrC; smt(PolyComRing.addr0).
+by rewrite rdivp_eq 1?PS.mulrC; smt(PS.addr0).
 qed.
 
 lemma rdvdp_eq q p :
-  rdvdp q p = (Coeff.exp (lc q) (rscalp p q) ** p = rdivp p q * q)
-  by smt(PolyComRing.addr0 PolyComRing.addrI rdivp_eq).
+  rdvdp q p = (exp (lc q) (rscalp p q) ** p = rdivp p q * q)
+  by smt(PS.addr0 PS.addrI rdivp_eq).
 
 (* Coeff.unit is a pred and not an op *)
 op unit : coeff -> bool.
 
-axiom unitP x : unit x = Coeff.unit x.
+axiom unitP x : unit x = CR.unit x.
 
-op diff_roots (x y : coeff) = unit (Coeff.( - ) x y).
-  (* && (Coeff.( * ) x y = Coeff.( * ) y x). *)
+op diff_roots (x y : coeff) = unit (x - y).
+  (* && x * y = y * x). *)
 
 op uniq_roots (rs : coeff list) =
   with rs = []      => true
@@ -1011,17 +983,17 @@ lemma uniq_roots_prod_XsubC p rs :
   all (root p) rs => uniq_roots rs =>
   exists q, p = q * BigPoly.PCM.big predT (fun z => polyX - polyC z) rs.
 proof.
-elim rs; 1: by exists p; rewrite BigPoly.PCM.big_nil PolyComRing.mulr1.
+elim rs; 1: by exists p; rewrite BigPoly.PCM.big_nil PS.mulr1.
 move => z rs rsP [rpz rprs] [drs urs]; move: (rsP rprs urs) => {rsP} [q pqP].
 move: (factor_theorem q z); suff -> : root q z.
 - rewrite eq_sym eqT; move => [q' qq'P]; exists q'.
-  by rewrite pqP qq'P; rewrite -PolyComRing.mulrA BigPoly.PCM.big_cons.
+  by rewrite pqP qq'P; rewrite -PS.mulrA BigPoly.PCM.big_cons.
 - move => {rprs urs}; move: drs rpz; rewrite pqP /=; move => {p pqP}.
-  elim rs; 1: by rewrite BigPoly.PCM.big_nil PolyComRing.mulr1.
+  elim rs; 1: by rewrite BigPoly.PCM.big_nil PS.mulr1.
   move => t rs rsP /= [tzP urs].
-  rewrite BigPoly.PCM.big_cons /predT /= -/predT PolyComRing.mulrCA pevalM.
-  have: peval (X - polyC t) z = Coeff.( - ) z t by smt(pevalB pevalC pevalX).
-  by smt(Coeff.mulIr Coeff.mulrC Coeff.mul0r unitP).
+  rewrite BigPoly.PCM.big_cons /predT /= -/predT PS.mulrCA pevalM.
+  have: peval (X - polyC t) z = z - t by smt(pevalB pevalC pevalX).
+  by smt(mulIr mulrC mul0r unitP).
 qed.
 
 lemma uniq_roots_rdvdp p rs :
@@ -1030,535 +1002,924 @@ lemma uniq_roots_rdvdp p rs :
 proof.
 move => har hur; move: (uniq_roots_prod_XsubC _ _ har hur) => [r ->].
 pose qf := fun z => polyX - polyC z; pose q := BigPoly.PCM.big predT qf rs.
-suff: lc q = Coeff.oner by smt(rdvdp_mull).
-suff /# : forall rs, lc (BigPoly.PCM.big predT qf rs) = Coeff.oner.
+suff: lc q = oner by smt(rdvdp_mull).
+suff /# : forall rs, lc (BigPoly.PCM.big predT qf rs) = oner.
 move => {rs har hur r q} rs; elim rs; 1: by rewrite BigPoly.PCM.big_nil lc1.
 move => r rs rsh; rewrite BigPoly.PCM.big_cons.
-suff: lc (qf r) = Coeff.oner by smt(lcM_proper Coeff.mulr1 Coeff.oner_neq0).
+suff: lc (qf r) = oner by smt(lcM_proper mulr1 oner_neq0).
 by rewrite lcDl ?degN ?degC degX ?polyXE /#.
 qed.
 
 end ComRing.
 
-abstract theory IdomainDefs.
+abstract theory Idomain. (* Defs. *)
 
 type coeff, poly.
 
-clone include Poly with
-  type coeff <- coeff,
-  type poly  <- poly.
+clone IDomain as IDC with type t <= coeff.
 
-clone import ComRing with
-  type   coeff <- coeff,
-  type   poly  <- poly.
+clone Poly as P with
+  type coeff         <= coeff,
+  type poly          <= poly,
+  theory IDCoeff     <- Idomain.IDC.
+
+clone Idomain.P.IDPoly as PS.
+
+clone RingPseudoDivision as RPD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- Idomain.IDC,
+  theory PCR   <- Idomain.P,
+  theory PS    <- Idomain.PS.
+
+clone ComRegDivisor as CRD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- Idomain.IDC,
+  theory PCR   <- Idomain.P,
+  theory PS    <- Idomain.PS,
+  theory RPD   <- Idomain.RPD.
+
+clone RingMonic as RM with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- Idomain.IDC,
+  theory PCR   <- Idomain.P,
+  theory PS    <- Idomain.PS,
+  theory RPD   <- Idomain.RPD,
+  theory CRD   <- Idomain.CRD.
+
+clone ComRing as CR with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- Idomain.IDC,
+  theory PCR   <- Idomain.P,
+  theory PS    <- Idomain.PS,
+  theory RPD   <- Idomain.RPD,
+  theory CRD   <- Idomain.CRD,
+  theory RM    <- Idomain.RM.
+
+import Idomain.IDC.
+import Idomain.P.
+import Idomain.RPD.
+import Idomain.CRD.
+import Idomain.RM.
+import Idomain.CR.
 
 op edivp (p q : poly) =
-  let (k, d, r) = RPD.redivp p q in
+  let (k, d, r) = redivp p q in
   if ! unit (lc q) then (k, d, r) else
-  let c = IDCoeff.exp (lc q) (- k) in (0, c ** d, c ** r).
+  let c = exp (lc q) (- k) in (0, c ** d, c ** r).
 
 op divp p q = let (scal, div, mod) = edivp p q in div.
 op modp p q = let (scal, div, mod) = edivp p q in mod.
 op scalp p q = let (scal, div, mod) = edivp p q in scal.
-op dvdp p q = (RPD.rmodp q p = poly0).
+op dvdp p q = (modp q p = poly0).
 op eqp p q = (dvdp p q) && (dvdp q p).
 
+(*
 end IdomainDefs.
 
 abstract theory WeakIdomain.
 
 type coeff, poly.
 
-clone import IdomainDefs as IDD with
-  type   coeff <- coeff,
-  type   poly  <- poly.
+clone IDomain as IDC with type t <= coeff.
 
-clone import IDD.ComRing as CR.
+clone Poly as P with
+  type coeff         <= coeff,
+  type poly          <= poly,
+  theory IDCoeff     <- WeakIdomain.IDC.
+
+clone WeakIdomain.P.IDPoly as PCR'.
+
+clone RingPseudoDivision as RPD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- WeakIdomain.IDC,
+  theory PCR   <- WeakIdomain.P,
+  theory PCR'  <- WeakIdomain.PCR'.
+
+clone ComRegDivisor as CRD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- WeakIdomain.IDC,
+  theory PCR   <- WeakIdomain.P,
+  theory PCR'  <- WeakIdomain.PCR',
+  theory RPD   <- WeakIdomain.RPD.
+
+clone RingMonic as RM with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- WeakIdomain.IDC,
+  theory PCR   <- WeakIdomain.P,
+  theory PCR'  <- WeakIdomain.PCR',
+  theory RPD   <- WeakIdomain.RPD,
+  theory CRD   <- WeakIdomain.CRD.
+
+clone ComRing as CR with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- WeakIdomain.IDC,
+  theory PCR   <- WeakIdomain.P,
+  theory PCR'  <- WeakIdomain.PCR',
+  theory RPD   <- WeakIdomain.RPD,
+  theory CRD   <- WeakIdomain.CRD,
+  theory RM    <- WeakIdomain.RM.
+
+clone import IdomainDefs as ID with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory IDC   <- WeakIdomain.IDC,
+  theory P     <- WeakIdomain.P,
+  theory PCR'  <- WeakIdomain.PCR',
+  theory RPD   <- WeakIdomain.RPD,
+  theory CRD   <- WeakIdomain.CRD,
+  theory RM    <- WeakIdomain.RM.
+(*
+  theory CR    <- WeakIdomain.CR.
+  anomaly: File "src/ecUtils.ml", line 233, characters 24-30: Assertion failed
+*)
+
+import IDC.
+import P.
+import RPD.
+import CRD.
+import RM.
+import CR.
+import ID.
+*)
 
 lemma edivp_def p q : edivp p q = (scalp p q, divp p q, modp p q) by smt().
 
-lemma edivp_redivp p q : ! IDCoeff.unit (lc q) => edivp p q = RPD.redivp p q.
-proof.
-admitted.
+lemma edivp_redivp p q :
+  ! CR.unit (lc q) => edivp p q = redivp p q by smt().
 
 lemma divpE p q :
-  divp p q = if IDCoeff.unit (lc q)
-    then IDCoeff.exp (lc q) (- RPD.rscalp p q) ** RPD.rdivp p q
-    else RPD.rdivp p q.
-proof.
-admitted.
+  divp p q = if CR.unit (lc q)
+    then exp (lc q) (- rscalp p q) ** rdivp p q
+    else rdivp p q by smt().
 
 lemma modpE p q :
-  modp p q = if IDCoeff.unit (lc q)
-    then IDCoeff.exp (lc q) (- RPD.rscalp p q) ** RPD.rmodp p q
-    else RPD.rmodp p q.
-proof.
-admitted.
+  modp p q = if CR.unit (lc q)
+    then exp (lc q) (- rscalp p q) ** rmodp p q
+    else rmodp p q by smt().
 
 lemma scalpE p q :
-  scalp p q = if IDCoeff.unit (lc q) then 0 else RPD.rscalp p q.
-proof.
-admitted.
+  scalp p q = if CR.unit (lc q) then 0 else rscalp p q by smt().
 
-lemma dvdpE p q : dvdp p q = RPD.rdvdp p q.
+lemma dvdpE p q : dvdp p q = rdvdp p q.
 proof.
-admitted.
+rewrite /dvdp modpE /rdvdp; case: (CR.unit (lc p)) => // lcU.
+rewrite -!deg_eq0 degZ_lreg // lregP; smt(expf_eq0 CR.unitP unitr0).
+qed.
 
-lemma lc_expn_scalp_neq0 p q : IDCoeff.exp (lc q) (scalp p q) <> IDCoeff.zeror.
+lemma lc_expn_scalp_neq0 p q : exp (lc q) (scalp p q) <> zeror.
 proof.
-admitted.
+rewrite scalpE; case: (lc q = zeror) => qP; 2: by smt(expf_eq0).
+have -> /= : ! CR.unit (lc q) by smt(CR.unitP unitr0).
+have {qP} -> : q = poly0 by smt(lc_eq0).
+by rewrite lc0 /rscalp /redivp /= expr0 oner_neq0.
+qed.
 
 op edivp_spec (m d : poly) (i : int * poly * poly) (b : bool) =
   let (k, q, r) = i in
-  IDCoeff.exp (lc d) k ** m = q * d + r && ! unit (lc d) &&
+  exp (lc d) k ** m = q * d + r && ! CR.unit (lc d) &&
   (d <> poly0 => deg r < deg d) && ! b ||
-  m = q * d + r && unit (lc d) && (d <> poly0 => deg r < deg d) && k = 0 && b.
+  m = q * d + r && CR.unit (lc d) &&
+  (d <> poly0 => deg r < deg d) && k = 0 && b.
 
-lemma edivpP m d : edivp_spec m d (edivp m d) (IDCoeff.unit (lc d)).
+lemma edivpP m d : edivp_spec m d (edivp m d) (CR.unit (lc d)).
 proof.
-admitted.
+case: (CR.unit (lc d)) => lcP; 2: by smt(edivp_redivp redivpP).
+have d_neq0 : d <> poly0 by smt(lc0 CR.unitP unitr0).
+suff: m = divp m d * d + modp m d /\ deg (modp m d) < deg d by smt(scalpE).
+rewrite divpE modpE lcP /=; split; 2: by smt(degZ_le ltn_rmodpN0).
+rewrite scalepE -PS.mulrA- scalepE -scalepDr.
+have: exp (lc d) (rscalp m d) ** m = rdivp m d * d + rmodp m d by smt(redivpP).
+move => <-; rewrite scalepA mulrC -exprD -?CR.unitP //.
+by rewrite subrr expr0 scalepE PS.mul1r.
+qed.
 
-lemma edivp_eq d q r : deg r < deg d => IDCoeff.unit (lc d) =>
-  edivp (q * d + r) d = (0, q, r).
+lemma edivp_eq d q r :
+  deg r < deg d => CR.unit (lc d) => edivp (q * d + r) d = (0, q, r).
 proof.
-admitted.
+move => hsrd hu; move: (Idomain.CRD.redivp_eq d q r).
+have -> : injective (fun (x : coeff) => x * lc d) by smt(mulIr CR.unitP).
+rewrite PS.mulrC hsrd /edivp hu /= => -> /=.
+rewrite !scalepE PS.mulrCA -polyCM PS.mulrCA -polyCM.
+by rewrite -exprD -?CR.unitP; smt(expr0 opprK subrr PS.mulr1).
+qed.
 
-lemma divp_eq p q :
-  IDCoeff.exp (lc q) (scalp p q) ** p = (divp p q) * q + (modp p q).
+lemma divp_eq p q : exp (lc q) (scalp p q) ** p = (divp p q) * q + (modp p q).
 proof.
-admitted.
+rewrite scalpE divpE modpE; case: (CR.unit (lc q)); 2: by rewrite rdivp_eq.
+move => lcP; rewrite expr0 scalepE PS.mul1r scalepE -PS.mulrA.
+rewrite -scalepE -scalepDr -rdivp_eq scalepA mulrC -exprD -?CR.unitP //.
+by rewrite subrr expr0 scalepE PS.mul1r.
+qed.
 
-lemma dvdp_eq q p :
-  dvdp q p = (IDCoeff.exp (lc q) (scalp p q) ** p = (divp p q) * q).
+lemma dvdp_eq q p : dvdp q p = (exp (lc q) (scalp p q) ** p = (divp p q) * q).
 proof.
-admitted.
+rewrite dvdpE rdvdp_eq scalpE divpE; case: (CR.unit (lc q)) => // lcP.
+rewrite expr0 eq_iff; split => [E|].
+- rewrite scalepE PS.mul1r scalepE -PS.mulrA -E -scalepE.
+  rewrite scalepA mulrC -exprD -?CR.unitP //.
+  by rewrite subrr expr0 scalepE PS.mul1r.
+- rewrite scalepE PS.mul1r => {2}->; rewrite !scalepE.
+  rewrite !PS.mulrA -polyCM -exprD -?CR.unitP //.
+  by rewrite subrr expr0 PS.mul1r.
+qed.
 
-lemma divpK d p : dvdp d p => divp p d * d = IDCoeff.exp (lc d) (scalp p d) ** p.
+lemma divpK d p : dvdp d p => divp p d * d = exp (lc d) (scalp p d) ** p
+  by smt(dvdp_eq).
+
+lemma divpKC d p : dvdp d p => d * (divp p d) = exp (lc d) (scalp p d) ** p
+  by smt(divpK PS.mulrC).
+
+lemma scalerAl (k : coeff) (x y : poly) : k ** (x * y) = k ** x * y
+  by smt(PS.mulrA scalepE).
+
+lemma scalerAr (k : coeff) (x y : poly) : k ** (x * y) = x * (k ** y)
+  by smt(PS.mulrC scalerAl).
+
+lemma dvdpP q p :
+  (exists (c : coeff) (r : poly), c <> zeror /\ c ** p = r * q) = dvdp q p.
 proof.
-admitted.
-
-lemma divpKC d p :
-  dvdp d p => d * (divp p d) = IDCoeff.exp (lc d) (scalp p d) ** p.
-proof.
-admitted.
-
-(* dvdpP skipped *)
+rewrite eqboolP iffE; split; 2: by smt(dvdp_eq lc_expn_scalp_neq0).
+move => [c r] [c_neq0 pqP]; rewrite dvdpE.
+case: (p = poly0) => [|p_neq0]; 1: by smt(rdvdp0).
+have E : c ** rmodp p q = (exp (lc q) (rscalp p q) ** r - c ** (rdivp p q)) * q.
+- rewrite PS.mulrDl PS.mulNr -scalerAl -pqP scalepA mulrC -scalepA -scalerAl.
+  by rewrite -scalepBr rdivp_eq PS.addrC PS.addKr.
+suff: (exp (lc q) (rscalp p q) ** r - c ** (rdivp p q)) * q = poly0
+  by rewrite -E scalepE PS.mulf_eq0 eq_polyC0 /#.
+smt(degM_proper degZ_lreg deg_gt0 lc_eq0 lregP ltn_rmodp mulf_eq0 PS.mulf_eq0).
+qed.
 
 lemma mulpK p q :
-  q <> poly0 => divp (p * q) q = IDCoeff.exp (lc q) (scalp (p * q) q) ** p.
+  q <> poly0 => divp (p * q) q = exp (lc q) (scalp (p * q) q) ** p.
 proof.
-admitted.
+move => q_neq0; apply (IDPoly.mulIf q); rewrite // scalepE -PS.mulrA.
+rewrite -scalepE divp_eq; suff -> : modp (p * q) q = poly0
+  by rewrite PS.addr0.
+rewrite modpE Idomain.CRD.rmodp_mull ?scalep0 1?PS.mulrC //.
+by rewrite mulIf lc_eq0.
+qed.
 
 lemma mulKp p q :
-  q <> poly0 => divp (q * p) q = IDCoeff.exp (lc q) (scalp (p * q) q) ** p.
-proof.
-admitted.
+  q <> poly0 => divp (q * p) q = exp (lc q) (scalp (p * q) q) ** p
+  by smt(PS.mulrC mulpK).
 
-lemma divpp p : p <> poly0 => divp p p = polyC (IDCoeff.exp (lc p) (scalp p p)).
+lemma divpp p : p <> poly0 => divp p p = polyC (exp (lc p) (scalp p p)).
 proof.
-admitted.
+move => p_neq0; have := divp_eq p p.
+suff -> : modp p p = poly0
+   by rewrite PS.addr0 scalepE; smt(IDPoly.mulIf).
+by rewrite modpE Idomain.RPD.rmodpp ?scalep0 // PS.mulrC.
+qed.
 
+(*
 end WeakIdomain.
 
 abstract theory CommonIdomain.
 
 type coeff, poly.
 
-clone import WeakIdomain as WID with
-  type   coeff <- coeff,
-  type   poly  <- poly.
+clone IDomain as IDC with type t <= coeff.
 
-clone import WID.IDD as IDD.
+clone Poly as P with
+  type coeff         <= coeff,
+  type poly          <= poly,
+  theory IDCoeff     <- IDC.
 
-lemma scalp0 p : scalp p poly0 = 0.
-proof.
-admitted.
+clone P.IDPoly as PolyComRing.
 
-lemma divp_small p q : deg p < deg q => divp p q = poly0.
-proof.
-admitted.
+clone RingPseudoDivision as RPD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- IDC,
+  theory PCR   <- P,
+  theory PCR'  <- PCR'.
 
-lemma leq_divp p q : deg (divp p q) <= deg p.
-proof.
-admitted.
+clone ComRegDivisor as CRD with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- IDC,
+  theory PCR   <- P,
+  theory PCR'  <- PCR',
+  theory RPD   <- RPD.
 
-lemma div0p p : divp poly0 p = poly0.
-proof.
-admitted.
+clone RingMonic as RM with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- IDC,
+  theory PCR   <- P,
+  theory PCR'  <- PCR',
+  theory RPD   <- RPD,
+  theory CRD   <- CRD.
 
-lemma divp0 p : divp p poly0 = poly0.
-proof.
-admitted.
+clone ComRing as CR with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory CR    <- IDC,
+  theory PCR   <- P,
+  theory PCR'  <- PCR',
+  theory RPD   <- RPD,
+  theory CRD   <- CRD,
+  theory RM    <- RM.
 
-lemma divp1 m : divp m poly1 = m.
-proof.
-admitted.
+clone IdomainDefs as ID with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory IDC   <- IDC,
+  theory P     <- P,
+  theory PCR'  <- PCR',
+  theory RPD   <- RPD,
+  theory CRD   <- CRD,
+  theory RM    <- RM.
+(*
+  theory CR    <- CR.
+  anomaly: File "src/ecUtils.ml", line 233, characters 24-30: Assertion failed
+*)
 
-lemma modp0 p : modp p poly0 = p.
-proof.
-admitted.
+clone WeakIdomain as WID with
+  type   coeff <= coeff,
+  type   poly  <= poly,
+  theory IDC   <- IDC,
+  theory P     <- P,
+  theory PCR'  <- PCR',
+  theory RPD   <- RPD,
+  theory CRD   <- CRD,
+  theory RM    <- RM.
+(*
+  theory CR    <- CR,
+  theory ID    <- ID.
+  anomaly: File "src/ecUtils.ml", line 233, characters 24-30: Assertion failed
+*)
 
-lemma mod0p p : modp poly0 p = poly0.
-proof.
-admitted.
+import IDC.
+import P.
+import RPD.
+import CRD.
+import RM.
+import CR.
+import ID.
+import WID.
+*)
 
-lemma modp1 p : modp p poly1 = poly0.
-proof.
-admitted.
+lemma scalp0 p : scalp p poly0 = 0
+  by rewrite /scalp /edivp /redivp lc0 CR.unitP unitr0.
+
+lemma divp_small p q : deg p < deg q => divp p q = poly0
+  by move => spq; rewrite divpE rdivp_small // scalep0.
+
+lemma leq_divp p q : deg (divp p q) <= deg p by smt(degZ_le divpE leq_rdivp).
+
+lemma div0p p : divp poly0 p = poly0 by rewrite divpE rdiv0p scalep0.
+
+lemma divp0 p : divp p poly0 = poly0  by rewrite divpE rdivp0 scalep0.
+
+lemma divp1 m : divp m poly1 = m
+  by rewrite divpE rdivp1 lc1 expr1z scalepE PS.mul1r.
+
+lemma modp0 p : modp p poly0 = p by rewrite modpE rmodp0 lc0 CR.unitP unitr0.
+
+lemma mod0p p : modp poly0 p = poly0 by rewrite modpE rmod0p scalep0.
+
+lemma modp1 p : modp p poly1 = poly0 by rewrite modpE rmodp1 scalep0.
 
 lemma modp_small p q : deg p < deg q => modp p q = p.
 proof.
-admitted.
+move => spq; rewrite modpE rmodp_small //; case: (CR.unit (lc q)) => // lcP.
+by rewrite rscalp_small // oppr0 expr0 scalepE PS.mul1r.
+qed.
 
-lemma modpC p c : c <> IDCoeff.zeror => modp p (polyC c) = poly0.
-proof.
-admitted.
+lemma modpC p c : c <> zeror => modp p (polyC c) = poly0
+  by move => c_neq0; rewrite modpE rmodpC // scalep0.
+
+lemma neq0_rreg p : p <> poly0 => injective (fun (x : coeff) => x * lc p)
+  by move => p_neq0 y z; rewrite -subr_eq0 -mulrBl mulf_eq0 subr_eq0 lc_eq0 /#.
 
 lemma modp_mull (p q : poly) : modp (p * q) q = poly0.
 proof.
-admitted.
+case: (q = poly0) => [|q_neq0]; 1: by smt(mod0p PS.mulr0).
+rewrite modpE Idomain.CRD.rmodp_mull;
+by rewrite ?scalep0 1?PS.mulrC // neq0_rreg.
+qed.
 
-lemma modp_mulr (d p : poly) : modp (d * p) d = poly0.
-proof.
-admitted.
+lemma modp_mulr (d p : poly) : modp (d * p) d = poly0
+  by rewrite PS.mulrC modp_mull.
 
-lemma modpp d : modp d d = poly0.
-proof.
-admitted.
+lemma modpp d : modp d d = poly0 by smt(PS.mul1r modp_mull).
 
 lemma ltn_modp p q : (deg (modp p q) < deg q) = (q <> poly0).
 proof.
-admitted.
+rewrite modpE; case: (CR.unit (lc q)) => lcP; 2: by smt(ltn_rmodp).
+by rewrite degZ_lreg ?ltn_rmodp // lregP expf_eq0; smt(CR.unitP unitr0).
+qed.
 
-lemma ltn_divpl d q p : d <> poly0 =>
-  (deg (divp q d) < deg p) = (deg q < deg (p * d)).
+lemma ltn_divpl d q p :
+  d <> poly0 => (deg (divp q d) < deg p) = (deg q < deg (p * d)).
 proof.
-admitted.
+move => d_neq0; rewrite -(degZ_lreg (exp (lc d) (scalp q d)) q);
+rewrite ?lregP ?lc_expn_scalp_neq0 // divp_eq.
+case: (divp q d = poly0) => [->|div_qd_neq0].
+- rewrite deg0 deg_gt0 PS.mul0r PS.add0r.
+  case: (p = poly0) => [->|p_neq0];
+    1: by rewrite PS.mul0r deg0; smt(ge0_deg).
+  rewrite /= eq_sym eqT degM_proper; 2: by smt(deg_gt0 ltn_modp).
+  by rewrite mulf_eq0 !lc_eq0 p_neq0 d_neq0.
+- rewrite degDl; 1: by smt(degM_proper deg_gt0 lc_eq0 ltn_modp mulf_eq0).
+  case: (p = poly0) => [->|];
+    1: by smt(deg0 deg_gt0 PS.mul0r IDPoly.mulf_eq0).
+  by move => p_neq0; rewrite !degM_proper ?mulf_eq0 ?lc_eq0 /#.
+qed.
 
-lemma leq_divpr d p q : d <> poly0 =>
-  (deg p <= deg (divp q d)) = (deg (p * d) <= deg q).
+lemma leq_divpr d p q :
+  d <> poly0 => (deg p <= deg (divp q d)) = (deg (p * d) <= deg q)
+  by smt(ler_gtF ltn_divpl).
+
+lemma divpN0 d p : d <> poly0 => (divp p d <> poly0) = (deg d <= deg p)
+  by move => d_neq0; rewrite -{2}(PS.mul1r d) -leq_divpr;
+     smt(deg1 deg_gt0).
+
+lemma size_divp p q :
+  q <> poly0 => deg (divp p q) = max 0 (deg p - (deg q - 1)).
 proof.
-admitted.
+move => q_neq0; case: (deg p < deg q) => dpq; 1: by smt(deg0 divp_small).
+have {dpq} dpq : deg q <= deg p by smt().
+have p_neq0 : p <> poly0 by smt(deg_gt0).
+move: (congr1 deg _ _ (divp_eq p q)).
+rewrite degZ_lreg ?lregP ?lc_expn_scalp_neq0 //.
+case: (divp p q = poly0);
+  1: by smt(PS.add0r deg0 ltn_modp PS.mul0r).
+move => dpq_neq0; rewrite degDl; 2: by smt(degM_proper ge0_deg lc_eq0 mulf_eq0).
+by rewrite degM_proper; smt(deg_gt0 lc_eq0 ltn_modp mulf_eq0).
+qed.
 
-lemma divpN0 d p : d <> poly0 => (divp p d <> poly0) = (deg d <= deg p).
-proof.
-admitted.
+lemma ltn_modpN0 p q : q <> poly0 => deg (modp p q) < deg q by rewrite ltn_modp.
 
-lemma size_divp p q : q <> poly0 => deg (divp p q) = deg p - deg q - 1.
-proof.
-admitted.
+lemma modp_mod p q : modp (modp p q) q = modp p q
+  by smt(ltn_modp modp0 modp_small).
 
-lemma ltn_modpN0 p q : q <> poly0 => deg (modp p q) < deg q.
-proof.
-admitted.
+lemma leq_modp m d : deg (modp m d) <= deg m by smt(degZ_le leq_rmodp modpE).
 
-lemma modp_mod p q : modp (modp p q) q = modp p q.
-proof.
-admitted.
+lemma dvdp0 d : dvdp d poly0 by rewrite /dvdp mod0p.
 
-lemma leq_modp m d : deg (modp m d) <= deg m.
-proof.
-admitted.
+lemma dvd0p p : (dvdp poly0 p) = (p = poly0) by rewrite /dvdp modp0.
 
-lemma dvdp0 d : dvdp d poly0.
-proof.
-admitted.
+(* skip? *)
+lemma dvd0pP p : (p = poly0) = dvdp poly0 p by smt(dvd0p).
 
-lemma dvd0p p : (dvdp poly0 p) = (p = poly0).
-proof.
-admitted.
-
-(* dvd0pP skipped *)
-
-lemma dvdpN0 p q : dvdp p q => q <> poly0 => p <> poly0.
-proof.
-admitted.
+lemma dvdpN0 p q : dvdp p q => q <> poly0 => p <> poly0 by smt(dvd0p).
 
 lemma dvdp1 d : dvdp d poly1 = (deg d = 1).
 proof.
-admitted.
+rewrite /dvdp modpE; case: (CR.unit (lc d)) => lcP; 2: by smt(rdvdp1).
+rewrite -deg_eq0 degZ_lreg ?deg_eq0 -?rdvdp1 // lregP.
+by rewrite -invr_eq0 -exprN opprK; smt(expf_eq0 CR.unitP unitr0).
+qed.
 
-lemma dvd1p m : dvdp poly1 m.
-proof.
-admitted.
+lemma dvd1p m : dvdp poly1 m by rewrite /dvdp modp1.
 
-lemma gtNdvdp p q : p <> poly0 => deg p < deg q => dvdp q p = false.
-proof.
-admitted.
+lemma gtNdvdp p q : p <> poly0 => deg p < deg q => dvdp q p = false
+  by smt(modp_small).
 
-(* modp_eq0P skipped *)
+(* skip? *)
+lemma modp_eq0P p q : (modp p q = poly0) = dvdp q p by [].
 
-lemma modp_eq0 p q : dvdp q p => modp p q = poly0.
-proof.
-admitted.
+lemma modp_eq0 p q : dvdp q p => modp p q = poly0 by [].
 
 lemma leq_divpl d p q :
-  dvdp d p => (deg (divp p d) <= deg q) = (deg p <= deg (q * d)).
+  dvdp d p => deg (divp p d) <= deg q = deg p <= deg (q * d).
 proof.
-admitted.
+case: (d = poly0) => [->|d_neq0]; 1: by rewrite dvd0p divp0; smt(deg0 ge0_deg).
+move => ddp; rewrite ler_eqVlt ltn_divpl // (ler_eqVlt (deg p)).
+case: (deg p < deg (q * d)) => //= lhs.
+rewrite -(degZ_lreg (exp (lc d) (scalp p d)) p) ?lregP ?lc_expn_scalp_neq0 //.
+rewrite divp_eq (modp_eq0 _ _ ddp) PS.addr0.
+case: (divp p d = poly0) => [->|];
+  1: by smt(deg_eq0 IDPoly.mulf_eq0 PS.mul0r).
+case: (q = poly0) => 2?; 1: by smt(deg_eq0 IDPoly.mulf_eq0 PS.mul0r).
+by rewrite !degM_proper; smt(lc_eq0 mulf_eq0).
+qed.
 
-lemma dvdp_leq p q : q <> poly0 => dvdp p q => deg p <= deg q.
-proof.
-admitted.
+lemma dvdp_leq p q : q <> poly0 => dvdp p q => deg p <= deg q
+  by smt(modp_eq0 modp_small).
 
-lemma eq_dvdp c (quo q p : poly) :
-  c <> IDCoeff.zeror => c ** p = quo * q => dvdp q p.
+lemma eq_dvdp c (quo q p : poly) : c <> zeror => c ** p = quo * q => dvdp q p.
 proof.
-admitted.
+move => c_neq0; case: (p = poly0) => [|p_neq0 def_quo]; 1: by smt(dvdp0).
+pose p1 := exp (lc q) (scalp p q) ** quo - c ** divp p q.
+have E1 : c ** modp p q = p1 * q.
+- rewrite PS.mulrBl (scalepE _ quo) -PS.mulrA -scalepE.
+  rewrite -def_quo scalepA mulrC -scalepA divp_eq -PS.subr_eq.
+  rewrite PS.opprK PS.addrC.
+  by rewrite scalepE -PS.mulrA -scalepE scalepDr.
+apply contraT; rewrite /dvdp => m_neq0.
+have: p1 * q <> poly0 by rewrite -E1 scalepE IDPoly.mulf_eq0 eq_polyC0 /#.
+rewrite IDPoly.mulf_eq0 negb_or; move => [p1_neq0 q_neq0].
+move: (ltn_modp p q); rewrite q_neq0 -(degZ_lreg c) ?lregP // E1.
+by smt(degM_proper deg_gt0 mulf_eq0 lc_eq0).
+qed.
 
-lemma dvdpp d : dvdp d d.
-proof.
-admitted.
+lemma dvdpp d : dvdp d d by rewrite /dvdp modpp.
 
-lemma divp_dvd p q : dvdp p q => dvdp (divp q p) q.
-proof.
-admitted.
+lemma divp_dvd p q : dvdp p q => dvdp (divp q p) q
+  by smt(dvdp_eq eq_dvdp expf_eq0 lc_eq0 PS.mulrC).
 
 lemma dvdp_mull m d n : dvdp d n => dvdp d (m * n).
 proof.
-admitted.
+case: (d = poly0) => [|d_neq0 e]; 1: by smt(dvd0p PS.mulr0).
+move: (eq_dvdp (exp (lc d) (scalp n d)) (m * divp n d)).
+by smt(dvdp_eq expf_eq0 lc_eq0 PS.mulrA scalerAr).
+qed.
 
-lemma dvdp_mulr n d m : dvdp d m => dvdp d (m * n).
-proof.
-admitted.
+lemma dvdp_mulr n d m : dvdp d m => dvdp d (m * n)
+  by move => dmP; rewrite PS.mulrC dvdp_mull.
 
 lemma dvdp_mul d1 d2 m1 m2 :
   dvdp d1 m1 => dvdp d2 m2 => dvdp (d1 * d2) (m1 * m2).
 proof.
-admitted.
+case: (d1 = poly0) => [|d1_neq0]; 1: by smt(dvd0p PS.mul0r).
+case: (d2 = poly0) => [|d2_neq0]; 1: by smt(dvd0p PS.mulr0).
+move: (eq_dvdp ((exp (lc d1) (scalp m1 d1)) * (exp (lc d2) (scalp m2 d2)))
+               (divp m1 d1 * divp m2 d2)).
+by smt(dvdp_eq expf_eq0 lc_eq0 mulf_eq0 PS.mulrA
+       PS.mulrC scalepA scalerAl scalerAr).
+qed.
 
 lemma dvdp_addr m d n : dvdp d m => dvdp d (m + n) = dvdp d n.
 proof.
-admitted.
+case: (d = poly0) => [|d_neq0]; 1: by smt(dvd0p PS.add0r).
+rewrite dvdp_eq eqboolP iffE {1}dvdp_eq {2}dvdp_eq => e1; split => e2.
+- apply: (eq_dvdp (exp (lc d) (scalp m d) * exp (lc d) (scalp (m + n) d))
+                  (exp (lc d) (scalp m       d) ** divp (m + n) d -
+                   exp (lc d) (scalp (m + n) d) ** divp m       d));
+    1: by smt(mulf_eq0 expf_eq0 lc_eq0).
+  rewrite PS.mulrDl -scaleNp -!scalerAl -e1 -e2 !scalepA mulNr mulrC.
+  rewrite scaleNp -scalepBr PS.addrAC.
+  by rewrite PS.subrr PS.add0r.
+- apply: (eq_dvdp (exp (lc d) (scalp m d) * exp (lc d) (scalp n d))
+                  (exp (lc d) (scalp m d) ** divp n d +
+                   exp (lc d) (scalp n d) ** divp m d));
+    1: by smt(mulf_eq0 expf_eq0 lc_eq0).
+  rewrite PS.mulrDl -!scalerAl -e1 -e2 !scalepA.
+  by rewrite mulrC PS.addrC scalepDr.
+qed.
 
-lemma dvdp_addl n d m : dvdp d n => dvdp d (m + n) = dvdp d m.
-proof.
-admitted.
+lemma dvdp_addl n d m : dvdp d n => dvdp d (m + n) = dvdp d m
+  by smt(PS.addrC dvdp_addr).
 
-lemma dvdp_add d m n : dvdp d m => dvdp d n => dvdp d (m + n).
-proof.
-admitted.
+lemma dvdp_add d m n : dvdp d m => dvdp d n => dvdp d (m + n) by smt(dvdp_addr).
 
-lemma dvdp_add_eq (d m n : poly) : dvdp d (m + n) => dvdp d m = dvdp d n.
-proof.
-admitted.
+lemma dvdp_add_eq (d m n : poly) : dvdp d (m + n) => dvdp d m = dvdp d n
+  by smt(dvdp_addl dvdp_addr).
 
-lemma dvdp_subr d m n : dvdp d m => dvdp d (m - n) = dvdp d n.
-proof.
-admitted.
+lemma dvdp_subr d m n : dvdp d m => dvdp d (m - n) = dvdp d n
+  by move=> ?; apply: dvdp_add_eq; rewrite -PS.addrA;
+     rewrite PS.addNr PS.addr0.
 
-lemma dvdp_subl d m n : dvdp d n => dvdp d (m - n) = dvdp d m.
-proof.
-admitted.
+lemma dvdp_subl d m n : dvdp d n => dvdp d (m - n) = dvdp d m
+  by move => dnP; rewrite -(dvdp_addl n d (m - n)) // PS.subrK.
 
-lemma dvdp_sub d m n : dvdp d m => dvdp d n => dvdp d (m - n).
-proof.
-admitted.
+lemma dvdp_sub d m n : dvdp d m => dvdp d n => dvdp d (m - n)
+  by move => *; rewrite dvdp_subl.
 
 lemma dvdp_mod d n m : dvdp d n => dvdp d m = dvdp d (modp m n).
 proof.
-admitted.
+case: (n = poly0) => [|n_neq0]; 1: by smt(modp0).
+case: (d = poly0) => [|d_neq0]; 1: by smt(modp0).
+rewrite dvdp_eq eqboolP iffE {1}dvdp_eq {2}dvdp_eq => e1; split => e2.
+- apply: (eq_dvdp (exp (lc d) (scalp n d) * exp (lc d) (scalp m d))
+                  ((exp (lc d) (scalp n d) *
+                    exp (lc n)  (scalp m n)) ** divp m d -
+                   exp (lc d) (scalp m d) ** divp m n * divp n d));
+    1: by smt(expf_eq0 lc_eq0 mulf_eq0).
+  rewrite PS.mulrDl PS.mulNr -!scalerAl -PS.mulrA.
+  rewrite -e1 -e2 -scalerAr  scalepA mulrC -mulrA.
+  rewrite (mulrC (exp (lc n) (scalp m n))) mulrCA mulrA -!scalepA.
+  by rewrite divp_eq !scalepA -scalepBr PS.addrC PS.addKr.
+- apply: (eq_dvdp (exp (lc d) (scalp n d) * exp (lc d) (scalp (modp m n) d) *
+                   exp (lc n) (scalp m n))
+                  (exp (lc d) (scalp (modp m n) d) ** divp m n * divp n d +
+                   exp (lc d) (scalp n d) ** divp (modp m n) d));
+    1: by smt(expf_eq0 lc_eq0 mulf_eq0).
+  rewrite -scalepA divp_eq scalepDr -!scalepA e2 scalerAl scalerAr e1.
+  by rewrite scalerAl PS.mulrDl PS.mulrA.
+qed.
 
 lemma dvdp_trans : transitive dvdp.
 proof.
-admitted.
+move => n d m; case: (d = poly0); case: (n = poly0); 1..3: by smt(dvd0p).
+rewrite 2!dvdp_eq => n_neq0 d_neq0 e1 e2.
+apply: (eq_dvdp (exp (lc d) (scalp n d) * exp (lc n) (scalp m n))
+                (divp n d * divp m n)); 1: by smt(expf_eq0 lc_eq0 mulf_eq0).
+by rewrite -scalepA e2 scalerAr e1 PS.mulrCA PS.mulrA.
+qed.
 
-lemma dvdp_mulIl (p q : poly) : dvdp p (p * q).
-proof.
-admitted.
+lemma dvdp_mulIl (p q : poly) : dvdp p (p * q) by smt(dvdpp dvdp_mulr).
 
-lemma dvdp_mulIr (p q : poly) : dvdp q (p * q).
-proof.
-admitted.
+lemma dvdp_mulIr (p q : poly) : dvdp q (p * q) by smt(dvdpp dvdp_mull).
 
 lemma dvdp_mul2r r p q : r <> poly0 => dvdp (p * r) (q * r) = dvdp p q.
 proof.
-admitted.
+case: (p = poly0) => [|p_neq0 r_neq0]; 1: by smt(dvd0p IDPoly.mulf_eq0).
+case: (q = poly0) => [|q_neq0]; 1: by smt(dvdp0 PS.mul0r).
+rewrite eqboolP iffE; split; 2: by move => ?; rewrite dvdp_mul ?dvdpp.
+rewrite dvdp_eq => e.
+apply: (eq_dvdp (exp (lc (p * r)) (scalp (q * r) (p * r)))
+                (divp (q * r) (p * r))); 1: by smt(expf_eq0 lc_eq0 mulf_eq0).
+by smt(IDPoly.mulIf PS.mulrA scalerAl).
+qed.
 
-lemma dvdp_mul2l r p q: r <> poly0 => dvdp (r * p) (r * q) = dvdp p q.
-proof.
-admitted.
+lemma dvdp_mul2l r p q: r <> poly0 => dvdp (r * p) (r * q) = dvdp p q
+  by smt(dvdp_mul2r PS.mulrC).
 
 lemma ltn_divpr d p q :
-  dvdp d q => deg p < deg (divp q d) = (deg (p * d) < deg q).
-proof.
-admitted.
+  dvdp d q => deg p < deg (divp q d) = (deg (p * d) < deg q)
+  by smt(ler_eqVlt leq_divpl).
 
-lemma dvdp_exp d k p : 0 < k => dvdp d p => dvdp d (PolyComRing.exp p k).
+lemma dvdp_exp d k p : 0 < k => dvdp d p => dvdp d (PS.exp p k).
 proof.
-admitted.
+move: k d p; apply: natind => [/#|k k_ge0 kP d p _].
+case: (k = 0) => [->|k_neq0]; 1: by rewrite PS.expr1.
+have {k_ge0 k_neq0} k_gt0 : 0 < k by smt().
+by smt(dvdp_mulr PS.exprSr).
+qed.
 
+(* 0 <= k is required
+   take k to be - (oner + oner), l be oner and p be X
+   then k <= l is true but PS.exp d k = polyXn 2 and PS.exp d l = X
+   so deg (PS.exp d l) < deg (PS.exp d k) and from gtNdvdp we get
+   ! dvdp (PS.exp d k) (PS.exp d l) *)
 lemma dvdp_exp2l d (k l : int) :
-  k <= l => dvdp (PolyComRing.exp d k) (PolyComRing.exp d l).
+  0 <= k <= l => dvdp (PS.exp d k) (PS.exp d l).
 proof.
-admitted.
+move => klP; have -> : l = l - k + k by rewrite addrAC -addrA subrr addr0.
+by rewrite PS.exprD_nneg ?dvdp_mull ?dvdpp /#.
+qed.
 
+lemma degXn_proper (p : poly) i :
+  lreg (lc p) => 0 <= i => deg (PS.exp p i) = i * (deg p - 1) + 1.
+proof.
+move=> lreg_p; elim: i => [|i ge0_i ih]; first by rewrite PS.expr0 deg1.
+rewrite PS.exprS // degM_proper; last by rewrite ih #ring.
+by rewrite mulrI_eq0 // lc_eq0 PS.expf_eq0 -lc_eq0; smt(lregP).
+qed.
+
+(* 0 <= k and 0 <= l are required
+   take k to be - (oner + oner), l be - oner and p be X
+   then k <= l is true but PS.exp d k = polyXn 2 and PS.exp d l = X
+   so deg (PS.exp d l) < deg (PS.exp d k) and from gtNdvdp we get
+   ! dvdp (PS.exp d k) (PS.exp d l)
+   similarly the statement is wrong when k is oner, l is - oner and p is X
+   indeed ! k <= l but dvdp (PS.exp d k) (PS.exp d l) = dvdp X X = true (dvdpp),
+   or when k is - (oner + oner), l is oner and p is X
+   indeed k <= l but dvdp (PS.exp d k) (PS.exp d l) = dvdp (polyXn 2) X = false
+   since 2 = deg X < deg (polyXn 2) = 3 (gtNdvdp) *)
 lemma dvdp_Pexp2l d k l :
-  1 < deg d => dvdp (PolyComRing.exp d k) (PolyComRing.exp d l) = (k <= l).
+  0 <= k => 0 <= l => 1 < deg d =>
+  dvdp (PS.exp d k) (PS.exp d l) = (k <= l).
 proof.
-admitted.
+case: (k <= l) => [|klP k_ge0 l_ge0 dP]; 1: by smt(dvdp_exp2l).
+have d_neq0 : d <> poly0 by smt(deg_ge1).
+rewrite gtNdvdp ?PS.expf_eq0 ?d_neq0; 1, 3: by smt(PS.expf_eq0).
+by rewrite !degXn_proper ?lregP ?lc_eq0 /#.
+qed.
 
+(* provable even k is negative *)
 lemma dvdp_exp2r p q k :
-  dvdp p q => dvdp (PolyComRing.exp p k) (PolyComRing.exp q k).
+  dvdp p q => dvdp (PS.exp p k) (PS.exp q k).
 proof.
-admitted.
+case: (p = poly0) => [|p_neq0]; 1: by smt(dvdpp dvd0p PS.expr0z).
+case: (q = poly0) => [|q_neq0]; 1: by smt(dvdp0 dvd1p PS.expr0 PS.expr0z).
+wlog: k / 0 <= k => [kP|k_ge0].
+- case: (0 <= k) => [/#|k_nge0 pqP].
+  have [k' [k'_ge0 ->]] {k k_nge0} : exists k', 0 <= k' /\ k = -k' by smt().
+  case: (deg p = 1); 1: smt(degC degV deg_eq1 expf_eq0 PS.exprV modpC polyCX).
+  move => pP; have pnu: ! (PS.unit p) by smt().
+  have qnu : ! PS.unit q by smt(deg_eq0 dvdp_leq ge0_deg).
+  by rewrite -!PS.exprV !PS.invr_out /#.
+- rewrite dvdp_eq => e.
+  apply: (eq_dvdp (exp (exp (lc p) (scalp q p)) k) (PS.exp (divp q p) k));
+    1: by smt(expf_eq0 lc_eq0 mulf_eq0).
+  by rewrite -PS.exprMn // -e (scalepE _ q) PS.exprMn // polyCX // -scalepE.
+qed.
 
-lemma dvdp_exp_sub p q k l: p <> poly0 =>
-  dvdp (PolyComRing.exp p k) (q * (PolyComRing.exp p l)) =
-  dvdp (PolyComRing.exp p (k - l)) q.
+(* 0 <= k - l and 0 <= l are required
+   take k to be oner, l be oner + oner, p be X and q be poly1,
+   here 0 <= l but ! 0 <= k - l and
+   then PS.exp d k = X, PS.exp d l = polyXn 2 and PS.exp p (k - l) = X
+   so since q = poly1 but deg (PS.exp p (k - l)) = 2
+   then ! dvdp (PS.exp p (k - l)) q from dvdp1
+   but PS.exp p k = X and q * (PS.exp p l) = X * X so
+   dvdp (PS.exp p k) (q * (PS.exp p l)) from dvdp_mulIl
+   similarly the statement is wrong when
+   k is - oner, l is - (oner + oner), p is X and q is poly1,
+   here 0 <= k - l but ! 0 <= l and
+   indeed ! dvdp (PS.exp p (k - l)) q from dvdp1 as
+   q = poly1 but deg (PS.exp p (k - l)) = 2
+   but PS.exp p k = X and q * (PS.exp p l) = X * X so
+   dvdp (PS.exp p k) (q * (PS.exp p l)) from dvdp_mulIl,
+   or when k is - oner, l is - (oner + oner), p is X and q is poly1,
+   here ! 0 <= k - l as well as ! 0 <= l and
+   indeed  ! dvdp (PS.exp p (k - l)) q from dvdp1 as
+   q = poly1 but deg (PS.exp p (k - l)) = 2
+   but PS.exp p k = X and q * (PS.exp p l) = X * X so
+   dvdp (PS.exp p k) (q * (PS.exp p l)) from dvdp_mulIl
+*)
+lemma dvdp_exp_sub p q (k l : int) :
+  0 <= k - l => 0 <= l => p <> poly0 =>
+  dvdp (PS.exp p k) (q * (PS.exp p l)) = dvdp (PS.exp p (k - l)) q.
 proof.
-admitted.
+have {2}-> klP lP p_neq0 : k = k - l + l by smt().
+by rewrite PS.exprD_nneg // dvdp_mul2r // PS.expf_eq0 p_neq0.
+qed.
 
-lemma dvdp_XsubCl p x : dvdp (polyX - polyC x) p = root p x.
-proof.
-admitted.
+lemma dvdp_XsubCl p x : dvdp (polyX - polyC x) p = root p x
+  by rewrite dvdpE rdvdp_XsubCl.
 
-(* polyXsubCP skipped *)
+(* skip? *)
+lemma polyXsubCP p x : (peval p x = zeror) = dvdp (polyX - polyC x) p
+  by smt(dvdp_XsubCl).
 
 lemma eqp_div_XsubC p c :
-  (p = divp p (polyX - polyC c) * (polyX - polyC c)) = dvdp (polyX - polyC c) p.
-proof.
-admitted.
+  (p = divp p (polyX - polyC c) * (polyX - polyC c)) = dvdp (polyX - polyC c) p
+  by rewrite dvdp_eq lcDl; smt(degC degN degX expr1z PS.mul1r lcX scalepE).
 
-lemma root_factor_theorem p x : root p x = dvdp (polyX - polyC x) p.
-proof.
-admitted.
+lemma root_factor_theorem p x : root p x = dvdp (polyX - polyC x) p
+  by rewrite dvdp_XsubCl.
 
-lemma uniq_roots_dvdp p rs : all (root p) rs => uniq rs =>
+lemma uniq_roots_dvdp p rs :
+  all (root p) rs => uniq_roots rs =>
   dvdp (BigPoly.PCM.big predT (fun z => polyX - polyC z) rs) p.
 proof.
-admitted.
+move => rrs urs; move: (uniq_roots_prod_XsubC _ _ rrs urs) => [q ->].
+by rewrite dvdp_mull dvdpp.
+qed.
 
 lemma root_bigmul x ps :
   ! root (BigPoly.PCM.big predT idfun ps) x = all (fun p => ! root p x) ps.
 proof.
-admitted.
+elim ps => [|p ps ihp]; 1: by rewrite BigPoly.PCM.big_nil root1.
+by rewrite BigPoly.PCM.big_cons /predT /= rootM /#.
+qed.
 
-(* eqpP skipped *)
+lemma eqpP m n :
+  (exists c1 c2, c1 <> zeror && c2 <> zeror && c1 ** m = c2 ** n) =
+  (eqp m n).
+proof.
+rewrite eqboolP iffE; split; 1: by smt(eq_dvdp scalepE).
+case: (m = poly0) => [|m_neq0]; 1: by smt(dvd0p oner_neq0 scalep0).
+case: (n = poly0) => [|n_neq0]; 1: by smt(dvd0p oner_neq0 scalep0).
+rewrite /eqp !dvdp_eq; move => [e1 e2].
+have c1_neq0 : exp (lc m) (scalp n m) <> zeror by smt(expf_eq0 lc_eq0 mulf_eq0).
+have c2_neq0 : exp (lc n) (scalp m n) <> zeror by smt(expf_eq0 lc_eq0 mulf_eq0).
+have def_q12 : divp n m * divp m n = polyC (exp (lc m) (scalp n m) *
+                                            exp (lc n) (scalp m n)).
+- apply: (PS.mulIf m); rewrite // PS.mulrAC PS.mulrC -e1 -scalerAr -e2.
+  by rewrite scalepA scalepE.
+have: divp n m * divp m n <> poly0 by rewrite def_q12 eq_polyC0 mulf_eq0 /#.
+rewrite PS.mulf_eq0 negb_or; move => [q1_neq0 q2_neq0].
+have q2P : deg (divp m n) <= 1.
+- move: (degM_proper (divp n m) (divp m n)); rewrite mulf_eq0 !lc_eq0.
+  rewrite q1_neq0 q2_neq0 /= def_q12 degC mulf_eq0 c1_neq0 c2_neq0.
+  by rewrite -addrA addrCA; smt(deg_gt0 ler_addl).
+have {q2P} : deg (divp m n) = 1 by smt(deg_gt0).
+rewrite deg_eq1; move => [c [c_neq0 cq2e]]; exists (exp (lc n) (scalp m n)) c.
+by rewrite c2_neq0 c_neq0 /= e2 scalepE -cq2e.
+qed.
 
 lemma eqp_eq p q: eqp p q => (lc q) ** p = (lc p) ** q.
 proof.
-admitted.
+rewrite -eqpP; move => [c1 c2] [c1_neq0 [c2_neq0 e]].
+move: (congr1 lc _ _ e); rewrite /= !lcZ_lreg ?lregP // => eqC.
+by apply: (PS.mulfI (polyC c2)); rewrite ?eq_polyC0; smt(mulrC scalepA scalepE).
+qed.
 
-lemma eqpxx : reflexive eqp.
-proof.
-admitted.
+lemma eqpxx : reflexive eqp by smt(dvdpp).
 
 lemma eqp_sym : symmetric eqp by smt().
 
-lemma eqp_trans : transitive eqp.
-proof.
-admitted.
+lemma eqp_trans : transitive eqp by smt(dvdp_trans).
 
-lemma eqp_ltrans : left_transitive eqp.
-proof.
-admitted.
+lemma eqp_ltrans : left_transitive eqp by smt(eqp_sym eqp_trans).
 
-lemma eqp_rtrans : right_transitive eqp.
-proof.
-admitted.
+lemma eqp_rtrans : right_transitive eqp by smt(eqp_sym eqp_trans).
 
-lemma eqp0 p : eqp p poly0 = (p = poly0).
-proof.
-admitted.
+lemma eqp0 p : eqp p poly0 = (p = poly0) by smt(dvd0p).
 
-lemma eqp01 : eqp poly0 poly1 = false.
-proof.
-admitted.
+lemma eqp01 : eqp poly0 poly1 = false by rewrite eqp_sym eqp0 PS.oner_neq0.
 
-lemma eqp_scale p c : c <> IDCoeff.zeror => eqp (c ** p) p.
+lemma eqp_scale p c : c <> zeror => eqp (c ** p) p.
 proof.
-admitted.
+move => c_neq0; rewrite -eqpP; exists oner c; rewrite c_neq0 oner_neq0 /=.
+by rewrite scalepE PS.mul1r.
+qed.
 
-lemma eqp_size p q : eqp p q => deg p = deg q.
-proof.
-admitted.
+lemma eqp_size p q : eqp p q => deg p = deg q
+  by smt(deg0 dvdp_leq eqp0 eqp_sym ler_anti).
 
-lemma size_poly_eq1 p : (deg p = 1) = eqp p poly1.
-proof.
-admitted.
+lemma size_poly_eq1 p : (deg p = 1) = eqp p poly1 by smt(dvdp1 dvd1p).
 
-lemma polyXsubC_eqp1 x : eqp (polyX - polyC x) poly1 = false.
-proof.
-admitted.
+lemma polyXsubC_eqp1 x : eqp (polyX - polyC x) poly1 = false
+  by rewrite -size_poly_eq1 degNXC.
 
-lemma dvdp_eqp1 p q : dvdp p q => eqp q poly1 => eqp p poly1.
-proof.
-admitted.
+lemma dvdp_eqp1 p q : dvdp p q => eqp q poly1 => eqp p poly1
+  by smt(deg_gt0 dvd0p dvdp_leq size_poly_eq1).
 
-lemma eqp_dvdr q p d: eqp p q => dvdp d p = dvdp d q.
-proof.
-admitted.
+lemma eqp_dvdr q p d: eqp p q => dvdp d p = dvdp d q by smt(eqp_sym dvdp_trans).
 
-lemma eqp_dvdl d2 d1 p : eqp d1 d2 => dvdp d1 p = dvdp d2 p.
-proof.
-admitted.
+lemma eqp_dvdl d2 d1 p : eqp d1 d2 => dvdp d1 p = dvdp d2 p
+  by smt(eqp_sym dvdp_trans).
 
-lemma dvdpZr c m n : c <> IDCoeff.zeror => dvdp m (c ** n) = dvdp m n.
-proof.
-admitted.
+lemma dvdpZr c m n : c <> zeror => dvdp m (c ** n) = dvdp m n
+  by smt(eqp_dvdr eqp_scale).
 
-lemma dvdpZl c m n : c <> IDCoeff.zeror => dvdp (c ** m) n = dvdp m n.
-proof.
-admitted.
+lemma dvdpZl c m n : c <> zeror => dvdp (c ** m) n = dvdp m n
+  by smt(eqp_dvdl eqp_scale).
 
-lemma dvdpNl (d p : poly) : dvdp (- d) p = dvdp d p.
-proof.
-admitted.
+lemma scale1r : left_id oner polyZ by smt(PS.mul1r scalepE).
 
-lemma dvdpNr (d p : poly) : dvdp d (- p) = dvdp d p.
-proof.
-admitted.
+lemma scaleN1r p : (- oner) ** p = - p by smt(scaleNp scale1r).
 
-lemma eqp_mul2r r p q : r <> poly0 => eqp (p * r) (q * r) = eqp p q.
-proof.
-admitted.
+lemma dvdpNl (d p : poly) : dvdp (- d) p = dvdp d p
+  by rewrite -scaleN1r; apply/eqp_dvdl/eqp_scale; rewrite oppr_eq0 oner_neq0.
 
-lemma eqp_mul2l r p q: r <> poly0 => eqp (r * p) (r * q) = eqp p q.
-proof.
-admitted.
+lemma dvdpNr (d p : poly) : dvdp d (- p) = dvdp d p
+  by apply: eqp_dvdr; rewrite -scaleN1r eqp_scale oppr_eq0 oner_neq0.
 
-lemma eqp_mull r p q: eqp q r => eqp (p * q) (p * r).
-proof.
-admitted.
+lemma eqp_mul2r r p q : r <> poly0 => eqp (p * r) (q * r) = eqp p q
+  by smt(dvdp_mul2r).
 
-lemma eqp_mulr q p r : eqp p q => eqp (p * r) (q * r).
-proof.
-admitted.
+lemma eqp_mul2l r p q: r <> poly0 => eqp (r * p) (r * q) = eqp p q
+  by smt(dvdp_mul2l).
 
-lemma eqp_exp p q k :
-  eqp p q => eqp (PolyComRing.exp p k) (PolyComRing.exp q k).
-proof.
-admitted.
+lemma eqp_mull r p q: eqp q r => eqp (p * q) (p * r) by smt(eqpP scalerAr).
 
-lemma polyC_eqp1 c : eqp (polyC c) poly1 = (c <> IDCoeff.zeror).
-proof.
-admitted.
+lemma eqp_mulr q p r : eqp p q => eqp (p * r) (q * r) by smt(eqp_mull PS.mulrC).
 
-lemma dvdUp d p: eqp d poly1 => dvdp d p.
+lemma eqp_exp p q k : eqp p q => eqp (PS.exp p k) (PS.exp q k).
 proof.
-admitted.
+move: k; apply: natind => /= [n n_le0|n n_ge0 nh pqP]; rewrite ?PS.exprS //;
+  2: by apply: (eqp_trans (q * PS.exp p n)); smt(eqpxx eqp_mull eqp_mulr).
+have [m [m_ge0 ->]] {n n_le0} : exists m, 0 <= m /\ n = -m by smt().
+move: m m_ge0; apply: natind => /= [|n n_ge0 nh _]; 1: by smt(eqpxx PS.expr0).
+move => pqP; move: (nh n_ge0 pqP); rewrite -!PS.exprV !PS.exprS // => {nh} nh.
+suff pqVP: eqp (polyV p) (polyV q)
+  by apply: (eqp_trans (polyV q * PS.exp (polyV p) n));
+     smt(eqpxx eqp_mull eqp_mulr).
+suff: forall p q, unitp p => eqp p q => eqp (polyV p) (polyV q)
+  by smt(eqp_sym PS.invr_out).
+move => {p q n n_ge0 pqP nh} p q pP pqP; rewrite /polyV.
+have [dp dq] /= : deg p = 1 /\ deg q = 1 by smt(eqp_size).
+move: (deg_eq1 p) (deg_eq1 q); rewrite dp dq /=.
+move => [cp [cp_neq0 cpP]] [cq [cq_neq0 cqP]].
+rewrite cpP cqP !polyCE /=; pose c := cp / cq.
+suff: c <> zeror /\ polyC (invr cq) = c ** polyC (invr cp) by smt(eqp_scale).
+rewrite /c mulf_eq0 cp_neq0 invr_neq0 //=.
+by rewrite scalepE polyCM PS.mulrAC -polyCM divrr ?PS.mul1r; smt(polyCE).
+qed.
+
+lemma polyC_eqp1 c : eqp (polyC c) poly1 = (c <> zeror)
+  by rewrite /eqp dvd1p /= dvdp1 degC /#.
+
+lemma dvdUp d p: eqp d poly1 => dvdp d p by smt(dvd1p eqp_dvdl).
 
 lemma dvdp_size_eqp p q : dvdp p q => (deg p = deg q) = eqp p q.
 proof.
-admitted.
+move => pqP; rewrite eqboolP iffE; split; 2: by exact: eqp_size.
+case: (p = poly0) => [|p_neq0]; 1: by smt(deg_eq0).
+case: (q = poly0) => [|q_neq0]; 1: by smt(deg_eq0).
+move: pqP; rewrite dvdp_eq => e.
+have c_neq0 : exp (lc p) (scalp q p) <> zeror by smt(expf_eq0 mulf_eq0 lc_eq0).
+move: (congr1 deg _ _ e); rewrite degZ_lreg ?lregP //.
+rewrite degM; 1, 2: by smt(eq_polyC0 PS.mulf_eq0 PS.mul0r scalepE).
+rewrite -eqpP; move => eC pqP; have {eC} : deg (divp q p) = 1 by smt().
+rewrite deg_eq1; move => [y [y_neq0 yP]]; exists y (exp (lc p) (scalp q p)).
+by rewrite c_neq0 y_neq0 /= e yP scalepE.
+qed.
 
 lemma eqp_root p q : eqp p q => root p = root q.
 proof.
-admitted.
+rewrite -eqpP; move => [c1 c2] [c1nz [c2nz cP]].
+suff /# : forall x, (false \/ root p x) = (false \/ root q x).
+have [{2}-> ->] : false = (c1 = zeror) /\ false = (c2 = zeror) by smt().
+by move => x; rewrite -mulf_eq0 -P.pevalZ cP P.pevalZ mulf_eq0.
+qed.
 
-lemma eqp_rmod_mod p q : eqp (IDD.ComRing.RPD.rmodp p q) (modp p q).
-proof.
-admitted.
+lemma eqp_rmod_mod p q : eqp (rmodp p q) (modp p q)
+  by smt(eqpxx eqp_scale eqp_sym expf_eq0 modpE unitP unitr0).
 
-lemma eqp_rdiv_div p q : eqp (IDD.ComRing.RPD.rdivp p q) (divp p q).
-proof.
-admitted.
+lemma eqp_rdiv_div p q : eqp (rdivp p q) (divp p q)
+  by smt(divpE eqpxx eqp_scale eqp_sym expf_eq0 unitP unitr0).
 
 lemma dvd_eqp_divl d p q :
-  dvdp d q => eqp p q => eqp (divp p d) (divp q d).
-proof.
-admitted.
+  dvdp d q => eqp p q => eqp (divp p d) (divp q d)
+  by smt(divpK dvd0p eqp0 eqpxx eqp_dvdr eqp_ltrans
+         eqp_mul2r eqp_scale lc_expn_scalp_neq0).
 
 (* It will go through useless loops once "r = poly0"
    since iter is needed as recursive calls are currently not allowed. *)
@@ -1571,368 +1932,543 @@ op gcdp_rec_it (i : poly * poly) =
 op gcdp (p q : poly) =
   let (pp, qq) = if deg p < deg q then (q, p) else (p, q) in
   if pp = poly0 then qq else
-  let (ppp, qqq) = iter (deg pp) gcdp_rec_it (pp, qq) in qq.
+  let (ppp, qqq) = iter (deg pp) gcdp_rec_it (pp, qq) in qqq.
 
 lemma gcd0p : left_id poly0 gcdp.
 proof.
-admitted.
+move => p; rewrite /gcdp /gcdp_rec_it /= deg0 deg_gt0.
+case: (p = poly0) => //= p_neq0; rewrite p_neq0 /=.
+have [n [-> n_ge0]] : exists n, deg p = n + 1 /\ 0 <= n by smt(deg_gt0).
+by rewrite iterSr // iter_id /= modp0 p_neq0 /= ?mod0p.
+qed.
 
 lemma gcdp0 : right_id poly0 gcdp.
 proof.
-admitted.
+move => p; rewrite /gcdp /gcdp_rec_it deg0; have: ! deg p < 0 by smt(ge0_deg).
+case: (p = poly0) => // p_neq0 -> /=.
+have [n [-> n_ge0]] : exists n, deg p = n + 1 /\ 0 <= n by smt(deg_gt0).
+by rewrite p_neq0 /= iterSr // iter_id /= modp0 p_neq0 /= ?mod0p.
+qed.
 
 lemma gcdpE p q :
   gcdp p q = if deg p < deg q
     then gcdp (modp q p) p else gcdp (modp p q) q.
 proof.
-admitted.
+have Irec : forall k l i, deg (snd i) <= k => deg (snd i) <= l =>
+                          deg (snd i) < deg (fst i) => (snd i) <> poly0 =>
+                          iter k gcdp_rec_it i = iter l gcdp_rec_it i.
+- apply: natind => /= {p q} [|k k_ge0 kh]; 1: by smt(deg_eq0 ge0_deg).
+  by apply: natind; smt(deg_eq0 ge0_deg iterSr iter_id ltn_modpN0).
+case: (p = poly0) => [->|pnz]; 1: by rewrite modp0 mod0p gcdp0 gcd0p.
+case: (q = poly0) => [->|qnz]; 1: by rewrite modp0 mod0p gcdp0 gcd0p.
+rewrite /gcdp !ltn_modp pnz qnz /= pnz qnz /=.
+case: (deg p < deg q) => /= [ltpq|leqp].
+- rewrite qnz /=; case: (modp q p = poly0) => modP.
+  + rewrite modP /= iter_id /=; 1: by smt().
+    have [d [d_ge0 ->]] : exists d, 0 <= d /\ deg p = d + 1 by smt(deg_gt0).
+    by rewrite iterSr // {2}/gcdp_rec_it /= modp0 pnz /= iter_id; smt(mod0p).
+  + have [d [d_ge0 ->]] : exists d, 0 <= d /\ deg q = deg p + d + 1 by smt().
+    rewrite iterSr; 1: by smt(ge0_deg).
+    by rewrite {2}/gcdp_rec_it /= modP; smt(ltn_modpN0).
+- rewrite pnz /=; case: (modp p q = poly0) => modP.
+  + rewrite modP /= iter_id /=; 1: by smt().
+    have [d [d_ge0 ->]] : exists d, 0 <= d /\ deg q = d + 1 by smt(deg_gt0).
+    by rewrite iterSr // {2}/gcdp_rec_it /= modp0 qnz /= iter_id; smt(mod0p).
+  + have [d [d_ge0 dE]] : exists d, 0 <= d /\ deg p = d + 1 by smt(deg_gt0).
+    rewrite dE iterSr; 1: by smt(ge0_deg).
+    by rewrite {2}/gcdp_rec_it /= modP; smt(ltn_modpN0).
+qed.
 
-lemma size_gcd1p p : deg (gcdp poly1 p) = 1.
-proof.
-admitted.
+lemma size_gcd1p p : deg (gcdp poly1 p) = 1
+  by smt(deg1 deg_eq1 deg_gt0 gcdpE gcdp0 gcd0p modpC modp0 modp1).
 
-lemma size_gcdp1 p : deg (gcdp p poly1) = 1.
-proof.
-admitted.
+lemma size_gcdp1 p : deg (gcdp p poly1) = 1
+  by smt(deg1 deg_eq1 deg_gt0 gcdpE gcdp0 gcd0p modpC modp0 modp1).
 
-lemma gcdpp : idempotent gcdp.
-proof.
-admitted.
+lemma gcdpp : idempotent gcdp by move=> p; rewrite gcdpE /= modpp gcd0p.
 
 lemma dvdp_gcdlr p q : dvdp (gcdp p q) p && dvdp (gcdp p q) q.
 proof.
-admitted.
+have [r ]: exists r, min (deg p) (deg q) < r by smt().
+move: r p q; apply: natind; 1: by smt(deg_eq0 dvdpp gcdp0 ge0_deg).
+by smt(dvdpp dvdp0 dvdp_mod gcdpE gcd0p ltn_modp).
+qed.
 
-lemma dvdp_gcdl p q : dvdp (gcdp p q) p.
-proof.
-admitted.
+lemma dvdp_gcdl p q : dvdp (gcdp p q) p by smt(dvdp_gcdlr).
 
-lemma dvdp_gcdr p q : dvdp (gcdp p q) q.
-proof.
-admitted.
+lemma dvdp_gcdr p q : dvdp (gcdp p q) q by smt(dvdp_gcdlr).
 
-lemma leq_gcdpl p q : p <> poly0 => deg (gcdp p q) <= deg p.
-proof.
-admitted.
+lemma leq_gcdpl p q : p <> poly0 => deg (gcdp p q) <= deg p
+  by smt(dvdp_gcdl dvdp_leq).
 
-lemma leq_gcdpr p q : q <> poly0 => deg (gcdp p q) <= deg q.
-proof.
-admitted.
+lemma leq_gcdpr p q : q <> poly0 => deg (gcdp p q) <= deg q
+  by smt(dvdp_gcdr dvdp_leq).
 
-lemma dvdp_gcd p m n : dvdp p (gcdp m n) = dvdp p m && dvdp p n.
+lemma dvdp_gcd p m n : dvdp p (gcdp m n) = (dvdp p m && dvdp p n).
 proof.
-admitted.
+rewrite eqboolP iffE; split => [|[]]; 1: by smt(dvdp_trans dvdp_gcdl dvdp_gcdr).
+have [r ] : exists r, min (deg m) (deg n) < r by smt().
+move: r m n; apply: natind; 1: by smt(deg_eq0 dvdp0 gcdp0 ge0_deg).
+by smt(dvdp_mod gcdpE gcdp0 gcd0p ltn_modp).
+qed.
 
-lemma gcdpC p q : eqp (gcdp p q) (gcdp q p).
-proof.
-admitted.
+lemma gcdpC p q : eqp (gcdp p q) (gcdp q p)
+  by smt(dvdp_gcd dvdp_gcdl dvdp_gcdr).
 
 lemma gcd1p p : eqp (gcdp poly1 p) poly1.
 proof.
-admitted.
+rewrite -size_poly_eq1 gcdpE deg1.
+by smt(degC deg1 deg_eq0 deg_eq1 gcdp0 gcd0p ge0_deg modpC modp0 modp1).
+qed.
 
-lemma gcdp1 p : eqp (gcdp p poly1) poly1.
-proof.
-admitted.
+lemma gcdp1 p : eqp (gcdp p poly1) poly1 by smt(eqp_ltrans gcdpC gcd1p).
 
-lemma gcdp_addl_mul (p q r : poly) : eqp (gcdp r (p * r + q)) (gcdp r q).
-proof.
-admitted.
+lemma gcdp_addl_mul (p q r : poly) : eqp (gcdp r (p * r + q)) (gcdp r q)
+  by smt(PS.addKr dvdp_addr dvdp_gcd dvdp_gcdl dvdp_gcdr dvdp_mull PS.mulNr).
 
-lemma gcdp_addl (m n : poly) : eqp (gcdp m (m + n)) (gcdp m n).
-proof.
-admitted.
+lemma gcdp_addl (m n : poly) : eqp (gcdp m (m + n)) (gcdp m n)
+  by rewrite -{2}PS.mul1r gcdp_addl_mul.
 
-lemma gcdp_addr (m n : poly) : eqp (gcdp m (n + m)) (gcdp m n).
-proof.
-admitted.
+lemma gcdp_addr (m n : poly) : eqp (gcdp m (n + m)) (gcdp m n)
+  by rewrite PS.addrC gcdp_addl.
 
 lemma gcdp_mull (m n : poly) : eqp (gcdp n (m * n)) n.
 proof.
-admitted.
+case: (n = poly0) => [->|n_neq0]; 1: by rewrite gcd0p PS.mulr0 eqpxx.
+case: (m = poly0) => [->|m_neq0]; 1: by rewrite PS.mul0r gcdp0 eqpxx.
+rewrite gcdpE modp_mull gcd0p degM_proper; 1: by smt(lc_eq0 mulf_eq0).
+by smt(deg_eq0 deg_eq1 dvdpZl eqpxx eqp_scale gcd0p ge0_deg modp_eq0 scalepE).
+qed.
 
-lemma gcdp_mulr (m n : poly) : eqp (gcdp n (n * m)) n.
-proof.
-admitted.
+lemma gcdp_mulr (m n : poly) : eqp (gcdp n (n * m)) n
+  by rewrite PS.mulrC gcdp_mull.
 
-lemma gcdp_scalel c m n :
-  c <> IDCoeff.zeror => eqp (gcdp (c ** m) n) (gcdp m n).
-proof.
-admitted.
+lemma gcdp_scalel c m n : c <> zeror => eqp (gcdp (c ** m) n) (gcdp m n)
+  by smt(dvdp_gcd dvdp_gcdl dvdp_gcdr dvdp_trans dvdpZl dvdpZr).
 
-lemma gcdp_scaler c m n :
-  c <> IDCoeff.zeror => eqp (gcdp m (c ** n)) (gcdp m n).
-proof.
-admitted.
+lemma gcdp_scaler c m n : c <> zeror => eqp (gcdp m (c ** n)) (gcdp m n)
+  by smt(eqp_trans gcdpC gcdp_scalel).
 
 lemma dvdp_gcd_idl m n : dvdp m n => eqp (gcdp m n) m.
 proof.
-admitted.
+case: (m = poly0); 1: by smt(dvd0p eqpxx gcd0p).
+by smt(dvdp_eq eqp_sym eqp_trans expf_eq0 gcdp_mull gcdp_scaler lc_eq0).
+qed.
 
-lemma dvdp_gcd_idr m n : dvdp n m => eqp (gcdp m n) n.
-proof.
-admitted.
+lemma dvdp_gcd_idr m n : dvdp n m => eqp (gcdp m n) n
+  by smt(dvdp_gcd_idl eqp_trans gcdpC).
 
 lemma gcdp_exp p k l :
-  eqp (gcdp (PolyComRing.exp p k) (PolyComRing.exp p l))
-      (PolyComRing.exp p (min k l)).
+  eqp (gcdp (PS.exp p k) (PS.exp p l)) (PS.exp p (min `|k| `|l|)).
 proof.
-admitted.
+suff: forall k l, 0 <= k /\ 0 <= l =>
+                  eqp (gcdp (PS.exp p k) (PS.exp p l)) (PS.exp p (min k l)).
+- case: (unitp p) => [up _|nup]; 2: by wlog: k l / 0 <= k /\ 0 <= l;
+                                       smt(PS.exprV PS.unitout).
+  suff: (eqp (gcdp (PS.exp p k) (PS.exp p l)) poly1)
+    by smt(deg_eq1 eqp_trans polyC_eqp1 PS.unitrX).
+  suff: exists c, c <> zeror /\ PS.exp p k = c ** poly1
+    by smt(eqp_trans gcdp_scalel gcd1p).
+  by smt(deg_eq1 mulr1 polyCM scalepE PS.unitrX).
+move => {k l} k l [k_ge0 l_ge0]; case: (k <= l) => klP.
+- rewrite lez_minl //; have -> : l = l - k + k by smt().
+  by rewrite PS.exprD_nneg ?gcdp_mull /#.
+- rewrite lez_minr => [/#|]; have -> : k = k - l + l by smt().
+  by rewrite PS.exprD_nneg; smt(eqp_trans gcdpC gcdp_mull).
+qed.
 
-lemma gcdp_eq0 p q : (gcdp p q = poly0) = (p = poly0) && (q = poly0).
-proof.
-admitted.
+lemma gcdp_eq0 p q : (gcdp p q = poly0) = (p = poly0 && q = poly0)
+  by smt(dvd0p dvdp_gcdl dvdp_gcdr).
 
-lemma eqp_gcdr p q r : eqp q r => eqp (gcdp p q) (gcdp p r).
-proof.
-admitted.
+lemma eqp_gcdr p q r : eqp q r => eqp (gcdp p q) (gcdp p r)
+  by smt(dvdp_gcd dvdp_gcdl dvdp_gcdr eqp_dvdr).
 
-lemma eqp_gcdl r p q : eqp p q => eqp (gcdp p r) (gcdp q r).
-proof.
-admitted.
+lemma eqp_gcdl r p q : eqp p q => eqp (gcdp p r) (gcdp q r)
+  by smt(dvdp_gcd dvdp_gcdl dvdp_gcdr eqp_dvdr).
 
 lemma eqp_gcd p1 p2 q1 q2 :
-  eqp p1 p2 => eqp q1 q2 => eqp (gcdp p1 q1) (gcdp p2 q2).
-proof.
-admitted.
+  eqp p1 p2 => eqp q1 q2 => eqp (gcdp p1 q1) (gcdp p2 q2)
+  by move => e1 e2; apply: (eqp_trans (gcdp p1 q2)); smt(eqp_gcdl eqp_gcdr).
 
-lemma eqp_rgcd_gcd p q : eqp (IDD.ComRing.RPD.rgcdp p q) (gcdp p q).
+lemma eqp_rgcd_gcd p q : eqp (rgcdp p q) (gcdp p q).
 proof.
-admitted.
+have [n ] : exists n, min (deg p) (deg q) <= n by smt().
+move: n p q; apply natind; 1: by smt(deg_eq0 eqpxx ge0_deg gcdp0 rgcdp0).
+move => /= n n_ge0 nh p q degP.
+case: (p = poly0) => [->|p_neq0]; 1: by rewrite gcd0p rgcd0p eqpxx.
+case: (q = poly0) => [->|q_neq0]; 1: by rewrite gcdp0 rgcdp0 eqpxx.
+by rewrite gcdpE rgcdpE; smt(eqp_gcdl eqp_rmod_mod eqp_size eqp_trans ltn_modp).
+qed.
 
-lemma gcdp_modl m n : eqp (gcdp (modp m n) n) (gcdp m n).
-proof.
-admitted.
+lemma gcdp_modl m n : eqp (gcdp (modp m n) n) (gcdp m n)
+  by smt(eqpxx eqp_sym gcdpE modp_small).
 
-lemma gcdp_modr m n : eqp (gcdp m (modp n m)) (gcdp m n).
-proof.
-admitted.
+lemma gcdp_modr m n : eqp (gcdp m (modp n m)) (gcdp m n)
+  by smt(eqp_trans gcdpC gcdp_modl).
 
 lemma gcdp_def d m n :
   dvdp d m => dvdp d n => (forall d', dvdp d' m => dvdp d' n => dvdp d' d) =>
-  eqp (gcdp m n) d.
-proof.
-admitted.
+  eqp (gcdp m n) d by smt(dvdp_gcd dvdp_gcd dvdp_gcdr eqpxx).
 
 op coprimep p q = deg (gcdp p q) = 1.
 
-lemma coprimep_size_gcd p q : coprimep p q => deg (gcdp p q) = 1.
-proof.
-admitted.
+lemma coprimep_size_gcd p q : coprimep p q => deg (gcdp p q) = 1 by smt().
 
-lemma coprimep_def p q : coprimep p q = (deg (gcdp p q) = 1).
-proof.
-admitted.
+lemma coprimep_def p q : coprimep p q = (deg (gcdp p q) = 1) by smt().
 
 lemma coprimepZl c m n :
-  c <> IDCoeff.zeror => coprimep (c ** m) n = coprimep m n.
-proof.
-admitted.
+  c <> zeror => coprimep (c ** m) n = coprimep m n by smt(eqp_size gcdp_scalel).
 
 lemma coprimepZr c m n:
-  c <> IDCoeff.zeror => coprimep m (c ** n) = coprimep m n.
-proof.
-admitted.
+  c <> zeror => coprimep m (c ** n) = coprimep m n by smt(eqp_size gcdp_scaler).
 
-lemma coprimepp p : coprimep p p = (deg p = 1).
-proof.
-admitted.
+lemma coprimepp p : coprimep p p = (deg p = 1) by smt(gcdpp).
 
-lemma gcdp_eqp1 p q : eqp (gcdp p q) poly1 = coprimep p q.
-proof.
-admitted.
+lemma gcdp_eqp1 p q : eqp (gcdp p q) poly1 = coprimep p q by smt(size_poly_eq1).
 
-lemma coprimep_sym p q : coprimep p q = coprimep q p.
-proof.
-admitted.
+lemma coprimep_sym p q : coprimep p q = coprimep q p
+  by smt(eqp_ltrans gcdpC gcdp_eqp1).
 
-lemma coprime1p p : coprimep poly1 p.
-proof.
-admitted.
+lemma coprime1p p : coprimep poly1 p by smt(deg1 eqp_size gcd1p).
 
-lemma coprimep1 p : coprimep p poly1.
-proof.
-admitted.
+lemma coprimep1 p : coprimep p poly1 by smt(coprime1p coprimep_sym).
 
-lemma coprimep0 p : coprimep p poly0 = eqp p poly1.
-proof.
-admitted.
+lemma coprimep0 p : coprimep p poly0 = eqp p poly1 by smt(gcdp0 size_poly_eq1).
 
-lemma coprime0p p : coprimep poly0 p = eqp p poly1.
-proof.
-admitted.
+lemma coprime0p p : coprimep poly0 p = eqp p poly1
+  by smt(coprimep0 coprimep_sym).
 
-(* coprimepP and coprimepPn skipped *)
+lemma coprimepP p q :
+  (forall d, dvdp d p => dvdp d q => eqp d poly1) = coprimep p q
+  by smt(dvdp_eqp1 dvdp_gcd dvdp_gcdlr size_poly_eq1).
 
-lemma coprimep_dvdl q p r : dvdp r q => coprimep p q => coprimep p r.
-proof.
-admitted.
+lemma coprimepPn p q :
+  p <> poly0 =>
+  (exists d, (dvdp d (gcdp p q)) /\ ! eqp d poly1) = ! coprimep p q
+  by smt(dvdpp dvdp1 eqp_dvdr gcdp_eqp1 size_poly_eq1).
 
-lemma coprimep_dvdr p q r : dvdp r p => coprimep p q => coprimep r q.
-proof.
-admitted.
+lemma coprimep_dvdl q p r : dvdp r q => coprimep p q => coprimep p r
+  by smt(coprimepP dvdp_trans).
 
-lemma coprimep_modl p q : coprimep (modp p q) q = coprimep p q.
-proof.
-admitted.
+lemma coprimep_dvdr p q r : dvdp r p => coprimep p q => coprimep r q
+  by smt(coprimep_dvdl coprimep_sym).
 
-lemma coprimep_modr q p : coprimep q (modp p q) = coprimep q p.
-proof.
-admitted.
+lemma coprimep_modl p q : coprimep (modp p q) q = coprimep p q
+  by smt(gcdpE modp_small).
 
-lemma rcoprimep_coprimep q p : IDD.ComRing.RPD.rcoprimep q p = coprimep q p.
-proof.
-admitted.
+lemma coprimep_modr q p : coprimep q (modp p q) = coprimep q p
+  by smt(coprimep_modl coprimep_sym).
 
-lemma eqp_coprimepr p q r : eqp q r => coprimep p q = coprimep p r.
-proof.
-admitted.
+lemma rcoprimep_coprimep q p : rcoprimep q p = coprimep q p
+  by smt(eqp_rgcd_gcd eqp_size).
 
-lemma eqp_coprimepl p q r : eqp q r => coprimep q p = coprimep r p.
-proof.
-admitted.
+lemma eqp_coprimepr p q r : eqp q r => coprimep p q = coprimep p r
+  by smt(gcdp_eqp1 eqp_gcdr eqp_ltrans).
 
-(* To define *)
-op egcdp_rec ((* i *) p q : poly (* * poly *)) (k : int) : poly * poly.
+lemma eqp_coprimepl p q r : eqp q r => coprimep q p = coprimep r p
+  by smt(eqp_coprimepr coprimep_sym).
+
+(* It will go through useless loops once "rp = poly0" since iter is needed
+   as recursive calls are currently not allowed. *)
+op egcdp_rec_it (i : poly * poly * poly * poly * poly * poly) =
+  let (r, rp, u, v, up, vp) = i in
+  if rp = poly0 then i else
+    let rpp = modp r rp in
+(*
+    let upp = exp (lc rp) (scalp r rp) ** vp in
+*)
+    let upp = exp (lc rp) (scalp r rp) ** u - up * divp r rp in
+    let vpp = exp (lc rp) (scalp r rp) ** v - vp * divp r rp in
+    (rp, rpp, up, vp, upp, vpp).
+
+op egcdp_rec p q k =
+  let i = (p, q, poly1, poly0, poly0, poly1) in
+  let (r, rp, u, v, up, vp) = iter k egcdp_rec_it i in (u, v).
 
 op egcdp p q =
   if deg q <= deg p then egcdp_rec p q (deg q)
-    else let (u, v) = egcdp_rec q p (deg p) in (v, u).
+  else let (u, v) = egcdp_rec q p (deg p) in (v, u).
 
-lemma egcdp0 p : egcdp p poly0 = (poly1, poly0).
-proof.
-admitted.
+lemma egcdp0 p : egcdp p poly0 = (poly1, poly0) by smt(deg0 ge0_deg iter0).
 
-lemma egcdp_recP :
-  forall k p q, q <> poly0 => deg q <= k => deg q <= deg p =>
+lemma egcdp_recP k p q :
+  q <> poly0 => deg q <= k => deg q <= deg p =>
   let (u, v) = (egcdp_rec p q k) in
-  deg u <= deg v && deg v <= deg p && eqp (gcdp p q) (u * p + v * q).
+  deg u <= deg q /\ deg v <= deg p /\ eqp (gcdp p q) (u * p + v * q).
 proof.
-admitted.
+suff: forall k r rp u v up vp, let s = exp (lc rp) (scalp r rp) in
+        rp <> poly0 => deg rp <= k => deg rp < deg r =>
+        deg up <= deg q - deg r + 1 => deg vp <= deg p - deg r + 1 =>
+        deg (s ** u - up * divp r rp) <= deg q - deg rp + 1 =>
+        deg (s ** v - vp * divp r rp) <= deg p - deg rp + 1 =>
+        r = u * p + v * q => rp = up * p + vp * q =>
+        eqp (gcdp p q) (gcdp r rp) =>
+        let i = iter k egcdp_rec_it (r, rp, u, v, up, vp) in
+        let (r', rp', u', v', up', vp') = i in
+        deg u' <= deg q /\ deg v' <= deg p /\
+        eqp (gcdp r rp) (u' * p + v' * q).
+- move: k p q; apply: natind; 1: by smt(deg_eq0 ge0_deg).
+  move => /= k k_ge0 _ p q P q_neq0; rewrite /egcdp_rec /= iterSr //.
+  rewrite {2}/egcdp_rec_it /= q_neq0 /= PS.mul0r PS.subr0 scalep0 scalepE.
+  rewrite PS.mulr1 PS.add0r PS.mul1r; case: (modp p q = poly0) => [|mP kqP pqP].
+  + move => mP; rewrite iter_id /egcdp_rec_it ?mP //= deg0 deg1 ge0_deg /=.
+    by rewrite PS.mul0r PS.add0r PS.mul1r; smt(deg_ge1 dvdp_gcd_idr).
+  + pose up := polyC (exp (lc q) (scalp p q)); pose vp := - divp p q.
+    pose s := exp (lc (modp p q)) (scalp q (modp p q)).
+    pose d := divp q (modp p q); have vpP : deg vp <= deg p - deg q + 1
+      by smt(degN ler_maxr ltn_modp size_divp).
+    have uppP : deg (s ** poly0 - up * d) <= deg q - deg (modp p q) + 1
+      by rewrite scalep0 PS.add0r degN; smt(degZ_le ltn_modp scalepE size_divp).
+    have vppP : deg (s ** poly1 - vp * d) <= deg p - deg (modp p q) + 1
+      by smt(degB degC  degM divpN0 ltn_modp PS.mul0r polyCM scalepE size_divp).
+    move: (P k q (modp p q) poly0 poly1 up vp).
+    suff: q = poly0 * p + poly1 * q /\
+          modp p q = polyC (exp (lc q) (scalp p q)) * p + (- divp p q) * q /\
+          eqp (gcdp p q) (gcdp q (modp p q))
+      by smt(deg0 deg1 degC eqp_trans ltn_modp).
+    suff: modp p q = polyC (exp (lc q) (scalp p q)) * p + (- divp p q) * q
+      by rewrite PS.mul0r PS.add0r PS.mul1r;
+         smt(eqp_sym eqp_trans gcdpC gcdp_modr).
+    by rewrite -scalepE divp_eq PS.mulNr PS.addrAC PS.subrr PS.add0r.
+- move => {k}; apply: natind; 1: by smt(deg_eq0 ge0_deg).
+  move => /= k k_ge0 kh r rp u v up vp rp_neq0 krpP rrpP uP vP upP vpP.
+  move => rP rpP gcdpP; rewrite iterSr // {2}/egcdp_rec_it /= rp_neq0 /=.
+  case: (modp r rp = poly0) => [|rpp_neq0];
+    1: by smt(deg0 dvdp_gcd_idr eqp_trans iter_id ltn_modp subr0).
+  pose s := exp (lc rp) (scalp r rp); pose d := divp r rp.
+  have mP : modp r rp = (s ** u - up * d) * p + (s ** v - vp * d) * q.
+  + rewrite /s /d !PS.mulrBl PS.addrACA -!scalerAl -scalepDr -rP.
+    rewrite !(PS.mulrAC _ (divp r rp)) -PS.opprD -PS.mulrDl -rpP.
+    by rewrite divp_eq PS.mulrC PS.addrAC PS.subrr PS.add0r.
+  pose rq := modp r rp; pose t := exp (lc rq) (scalp rp rq).
+  suff: deg (t ** up - (s ** u - up * d) * divp rp rq) <= deg q - deg rq + 1 /\
+        deg (t ** vp - (s ** v - vp * d) * divp rp rq) <= deg p - deg rq + 1
+    by smt(gcdpC gcdpE ltn_modp).
+  suff: deg ((s ** u - up * d) * divp rp rq) <= deg q - deg rq + 1 /\
+        deg ((s ** v - vp * d) * divp rp rq) <= deg p - deg rq + 1
+    by smt(degB degZ_le ltn_modp).
+  by smt(degM divpN0 ltn_modp PS.mul0r size_divp).
+qed.
 
 lemma egcdpP p q :
   p <> poly0 => q <> poly0 => forall u v, (u, v) = egcdp p q =>
-  deg u <= deg q && deg v <= deg p && eqp (gcdp p q) (u * p + v * q).
-proof.
-admitted.
+  deg u <= deg q && deg v <= deg p && eqp (gcdp p q) (u * p + v * q)
+  by smt(PS.addrC egcdp_recP eqp_trans gcdpC).
 
 lemma egcdpE p q :
   forall u v, (u, v) = egcdp p q => eqp (gcdp p q) (u * p + v * q).
 proof.
-admitted.
+move => u v uvP; case: (q = poly0) => [|q_neq0];
+  1: smt(PS.addr0 egcdp0 eqpxx gcdp0 PS.mulr0 PS.mul1r).
+case: (p = poly0) =>[pE0|]; 2: by smt(egcdpP).
+move: uvP; rewrite pE0 gcd0p PS.mulr0 PS.add0r /egcdp deg0.
+smt(deg_eq0 eqpxx ge0_deg iter0 PS.mul1r).
+qed.
 
 lemma Bezoutp (p q : poly) : exists u v, eqp (u * p + v * q) (gcdp p q).
 proof.
-admitted.
+case: (p = poly0) => [|pnz]; 1: by smt(PS.add0r eqpxx gcd0p PS.mul0r PS.mul1r).
+case: (q = poly0) => [|qnz]; 1: by smt(PS.addr0 eqpxx gcdp0 PS.mul0r PS.mul1r).
+by pose e := (egcdp p q); exists (fst e) (snd e); smt(egcdpP eqp_sym).
+qed.
 
-(* Bezout_coprimepP skipped *)
+lemma Bezout_coprimepP p q :
+   (exists (u v : poly), eqp (u * p + v * q) poly1) = coprimep p q.
+proof.
+rewrite -gcdp_eqp1 eqboolP iffE; split; 2: by smt(Bezoutp eqp_trans).
+by smt(eqp_dvdr dvdp_addr dvdp_gcdl dvdp_gcdr dvdp_mull dvd1p eqp_sym).
+qed.
 
 lemma coprimep_root p q x :
-  coprimep p q => root p x => peval q x <> IDCoeff.zeror.
+  coprimep p q => root p x => peval q x <> zeror.
 proof.
-admitted.
+rewrite -Bezout_coprimepP; move => [u v uvP] rpx.
+move: uvP; rewrite -eqpP; move => [c1 c2] [c1_neq0 [c2_neq0 cP]].
+have: peval (c1 ** (u * p + v * q)) x <> zeror
+  by smt(pevalC pevalD pevalM pevalZ mulr1).
+by rewrite pevalZ pevalD !pevalM rpx mulr0 add0r; smt(mulf_eq0).
+qed.
 
 lemma Gauss_dvdpl p q d: coprimep d q => dvdp d (p * q) = dvdp d p.
 proof.
-admitted.
+rewrite -Bezout_coprimepP; move => [u v uvP].
+rewrite eqboolP iffE; split; 2: smt(dvdp_mulr).
+move: (eqp_mull _ p _ uvP); rewrite PS.mulr1 PS.mulrDr eqp_sym => {uvP} peq dpq.
+rewrite (eqp_dvdr _ _ _ peq) dvdp_addr; 1: by smt(dvdpp dvdp_mull PS.mulrA).
+by rewrite PS.mulrA PS.mulrAC dvdp_mulr.
+qed.
 
-lemma Gauss_dvdpr p q d: coprimep d q => dvdp d (q * p) = dvdp d p.
-proof.
-admitted.
+lemma Gauss_dvdpr p q d: coprimep d q => dvdp d (q * p) = dvdp d p
+  by smt(Gauss_dvdpl PS.mulrC).
 
-lemma Gauss_dvdp m n p : coprimep m n => dvdp (m * n) p = dvdp m p && dvdp n p.
+lemma Gauss_dvdp m n p :
+  coprimep m n => dvdp (m * n) p = (dvdp m p && dvdp n p).
 proof.
-admitted.
+case: (m = poly0) => [|m_neq0]; 1: by smt(coprime0p dvdUp dvd0p PS.mul0r).
+case: (n = poly0) => [|n_neq0]; 1: by smt(coprimep0 dvdUp dvd0p PS.mulr0).
+move => hc; rewrite eqboolP iffE; split => [mnmp|[dmp dnp]].
+- have: dvdp (m * n) (m * p) /\ dvdp (m * n) (p * n)
+    by smt(dvdp_mull dvdp_mulr).
+  by smt(dvdp_mul2l dvdp_mul2r).
+- have: dvdp m (divp p n) = dvdp m (divp p n * n) by smt(Gauss_dvdpl).
+  move: (dnp); rewrite dvdp_eq => e2; rewrite -e2 dvdpZr ?lc_expn_scalp_neq0 //.
+  rewrite dmp eqT dvdp_eq => e3.
+  apply: (eq_dvdp (exp (lc m) (scalp (divp p n) m) * exp (lc n) (scalp p n))
+                  (divp (divp p n) m)); 1: by smt(lc_expn_scalp_neq0 mulf_eq0).
+  by rewrite PS.mulrA -e3 -scalerAl -e2 scalepA.
+qed.
 
 lemma Gauss_gcdpr p m n : coprimep p m => eqp (gcdp p (m * n)) (gcdp p n).
 proof.
-admitted.
+rewrite /eqp  !dvdp_gcd !dvdp_gcdl /= dvdp_mull ?dvdp_gcdr //=.
+by smt(coprimepP dvdp_gcd dvdp_gcdr Gauss_dvdpl PS.mulrC).
+qed.
 
-lemma Gauss_gcdpl p m n : coprimep p n => eqp (gcdp p (m * n)) (gcdp p m).
-proof.
-admitted.
+lemma Gauss_gcdpl p m n : coprimep p n => eqp (gcdp p (m * n)) (gcdp p m)
+  by smt(Gauss_gcdpr PS.mulrC).
 
 lemma coprimepMr (p q r : poly) :
-  coprimep p (q * r) = (coprimep p q && coprimep p r).
-proof.
-admitted.
+  coprimep p (q * r) = (coprimep p q && coprimep p r)
+  by smt(coprimepP coprimep_dvdr dvdp_mull dvdp_mulr Gauss_dvdpl).
 
 lemma coprimepMl (p q r : poly) :
-  coprimep (q * r) p = (coprimep q p && coprimep r p).
-proof.
-admitted.
+  coprimep (q * r) p = (coprimep q p && coprimep r p)
+  by smt(coprimepMr coprimep_sym).
 
 lemma modp_coprime k u n :
   k <> poly0 => eqp (modp (k * u) n) poly1 => coprimep k n.
 proof.
-admitted.
+move=> k_neq0 hmod; rewrite -Bezout_coprimepP.
+exists (exp (lc n) (scalp (k * u) n) ** u) (- divp ( k * u) n).
+rewrite -scalerAl PS.mulrC (divp_eq (u * k) n) PS.mulNr -PS.addrAC PS.subrr.
+by rewrite PS.add0r PS.mulrC.
+qed.
 
 lemma coprimep_pexpl k m n :
-  0 < k => coprimep (PolyComRing.exp m k) n = coprimep m n.
-proof.
-admitted.
+  0 < k => coprimep (PS.exp m k) n = coprimep m n
+  by move: k; apply: natind; smt(coprimepMl PS.expr1 PS.exprS).
 
 lemma coprimep_pexpr k m n :
-  0 < k => coprimep m (PolyComRing.exp n k) = coprimep m n.
-proof.
-admitted.
+  0 < k => coprimep m (PS.exp n k) = coprimep m n
+  by smt(coprimep_pexpl coprimep_sym).
 
-lemma coprimep_expl k m n : coprimep m n => coprimep (PolyComRing.exp m k) n.
+lemma coprimep_expl k m n : coprimep m n => coprimep (PS.exp m k) n.
 proof.
-admitted.
+have kgzP : forall k m n, 0 <= k => coprimep m n => coprimep (PS.exp m k) n
+  by apply: natind; smt(coprime1p coprimep_pexpl PS.expr0).
+case: (unitp m) => [up|nup]; 2: by wlog: k / 0 <= k; smt(PS.exprV PS.unitout).
+have [c [c_neq0 ->]] : exists c, c <> zeror /\ PS.exp m k = c ** poly1
+  by smt(deg_eq1 mulr1 polyCM scalepE PS.unitrX).
+by rewrite coprimepZl // coprime1p.
+qed.
 
-lemma coprimep_expr k m n : coprimep m n => coprimep m (PolyComRing.exp n k).
-proof.
-admitted.
+lemma coprimep_expr k m n : coprimep m n => coprimep m (PS.exp n k)
+  by smt(coprimep_expl coprimep_sym).
 
 lemma gcdp_mul2l (p q r : poly) : eqp (gcdp (p * q) (p * r)) (p * gcdp q r).
 proof.
-admitted.
+case: (p = poly0) => [|p_neq0]; 1: by smt(eqpxx gcdp0 PS.mul0r).
+rewrite /eqp !dvdp_gcd !dvdp_mul2l // dvdp_gcdr dvdp_gcdl /=.
+move: (Bezoutp q r) => [u v] huv; rewrite eqp_sym in huv.
+rewrite (eqp_dvdr _ _ _ (eqp_mull _ _ _ huv)).
+rewrite PS.mulrDr (PS.mulrCA p u) (PS.mulrCA p v).
+by smt(dvdp_add dvdp_mull dvdp_gcdr dvdp_gcdl).
+qed.
 
-lemma gcdp_mul2r (q r p : poly) : eqp (gcdp (q * p) (r * p)) (gcdp q r * p).
-proof.
-admitted.
+lemma gcdp_mul2r (q r p : poly) : eqp (gcdp (q * p) (r * p)) (gcdp q r * p)
+  by smt(gcdp_mul2l PS.mulrC).
 
-lemma mulp_gcdr p q r : eqp (r * (gcdp p q)) (gcdp (r * p) (r * q)).
-proof.
-admitted.
+lemma mulp_gcdr p q r : eqp (r * (gcdp p q)) (gcdp (r * p) (r * q))
+  by rewrite eqp_sym gcdp_mul2l.
 
-lemma mulp_gcdl p q r : eqp ((gcdp p q) * r) (gcdp (p * r) (q * r)).
-proof.
-admitted.
+lemma mulp_gcdl p q r : eqp ((gcdp p q) * r) (gcdp (p * r) (q * r))
+  by rewrite eqp_sym gcdp_mul2r.
 
 lemma coprimep_div_gcd p q :
   (p <> poly0) || (q <> poly0) =>
   coprimep (divp p (gcdp p q)) (divp q (gcdp p q)).
 proof.
-admitted.
+rewrite oraE -negb_and -andaE -gcdp_eq0 -gcdp_eqp1 => gpq0.
+rewrite -(eqp_mul2r (gcdp p q)) // PS.mul1r.
+by smt(dvdp_eq dvdp_gcdl dvdp_gcdr eqp_gcd eqp_ltrans
+       eqp_scale expf_eq0 lc_eq0 mulp_gcdl).
+qed.
 
 lemma divp_eq0 p q :
   (divp p q = poly0) = (p = poly0 || q = poly0 || deg p < deg q).
 proof.
-admitted.
+rewrite eqboolP iffE; split; 2: by smt(divp0 div0p divp_small).
+by smt(PS.add0r degZ_lreg divp_eq lc_expn_scalp_neq0 lregP ltn_modp PS.mul0r).
+qed.
 
-lemma dvdp_div_eq0 p q : dvdp q p => (divp p q = poly0) = (p = poly0).
+lemma dvdp_div_eq0 p q : dvdp q p => (divp p q = poly0) = (p = poly0)
+  by smt(divp_eq0 div0p dvdp_leq dvd0p eqpxx).
+
+lemma Bezout_coprimepPn p q :
+  p <> poly0 => q <> poly0 =>
+  (exists u v, 0 < deg u < deg q /\ 0 < deg v < deg p /\ u * p = v * q) =
+  ! coprimep p q.
 proof.
-admitted.
-
-(* Bezout_coprimepPn skipped *)
+move => p_neq0 q_neq0; rewrite eqboolP iffE; split.
+- move => [u v] [[ps1 s1] [[ps2 s2] e]].
+  have: ! deg (q * p) <= deg (u * p)
+    by smt(degM_proper deg_eq0 mulf_eq0 lc_eq0).
+  apply: contra => hc; apply: dvdp_leq; 1: by smt(deg_gt0 PS.mulf_eq0).
+  by rewrite PS.mulrC Gauss_dvdp // dvdp_mull ?dvdpp /= e dvdp_mull dvdpp.
+- move => hc; have {hc} : 1 < deg (gcdp p q) by smt(deg_eq0 gcdp_eq0 ge0_deg).
+  have [n nP] : exists n, deg (gcdp p q) = n by smt().
+  move: n p q p_neq0 q_neq0 nP; apply natind => [/#|/=]; apply: natind => [/#|].
+  move => /= n n_ge0 _ _ _ p q p_neq0 q_neq0 degE degP.
+  move: (dvdp_gcdl p q) (dvdp_gcdr p q); rewrite !dvdp_eq => hu1 hv1.
+  exists (exp (lc (gcdp p q)) (scalp p (gcdp p q)) ** divp q (gcdp p q)).
+  exists (exp (lc (gcdp p q)) (scalp q (gcdp p q)) ** divp p (gcdp p q)).
+  rewrite -!scalerAl !scalerAr hu1 hv1 PS.mulrCA /=.
+  rewrite !degZ_lreg ?lregP ?lc_expn_scalp_neq0 // !deg_gt0 !divp_eq0 gcdp_eq0.
+  rewrite p_neq0 q_neq0 /= -!lerNgt leq_gcdpl //  leq_gcdpr //=.
+  rewrite !ltn_divpl ?gcdp_eq0 ?p_neq0 ?q_neq0 //.
+  by rewrite !degM_proper; smt(gcdp_eq0 lc_eq0 mulf_eq0).
+qed.
 
 lemma dvdp_pexp2r m n k :
-  0 < k => dvdp (PolyComRing.exp m k) (PolyComRing.exp n k) = dvdp m n.
+  0 < k => dvdp (PS.exp m k) (PS.exp n k) = dvdp m n.
 proof.
-admitted.
+move => k_gt0; rewrite eqboolP iffE; split; 2: by exact: dvdp_exp2r.
+case: (n = poly0) => [|n_neq0]; 1: by smt(dvdp0).
+case: (m = poly0) => [|m_neq0]; 1: by smt(dvd0pP PS.expf_eq0 PS.expr0n).
+move: (dvdp_gcdl m n)(dvdp_gcdr m n); rewrite 2!dvdp_eq => def_m def_n.
+have gcdp_neq0 : gcdp m n <> poly0 by smt(gcdp_eq0).
+rewrite -(dvdpZr (exp (exp (lc (gcdp m n)) (scalp n (gcdp m n))) k));
+  1: by smt(expf_eq0 lc_eq0).
+rewrite -(dvdpZl (exp (exp (lc (gcdp m n)) (scalp m (gcdp m n))) k));
+  1: by smt(expf_eq0 lc_eq0).
+rewrite !scalepE -!(polyCX _ k) -?PS.exprMn -?scalepE; 1..4: by smt().
+rewrite def_m def_n !PS.exprMn; 1, 2: by smt().
+rewrite dvdp_mul2r ?PS.expf_eq0 ?gcdp_neq0 //.
+have: coprimep (PS.exp (divp m (gcdp m n)) k) (PS.exp (divp n (gcdp m n)) k)
+  by smt(coprimep_div_gcd coprimep_pexpl coprimep_pexpr).
+rewrite -coprimepP => hc hd; suff: deg (divp m (gcdp m n)) = 1.
+- rewrite -(dvdpZl (exp (lc (gcdp m n)) (scalp m (gcdp m n))));
+    1: by smt(expf_eq0 lc_eq0).
+  rewrite -(dvdpZr (exp (lc (gcdp m n)) (scalp n (gcdp m n))));
+    1: by smt(expf_eq0 lc_eq0).
+  rewrite deg_eq1; move => [c [c_neq0 cP]]; rewrite def_m def_n cP -scalepE.
+  by rewrite dvdpZl // dvdp_mull ?dvdpp.
+- case: (divp m (gcdp m n) = poly0) => [|m'_neq0];
+    1: by smt(eq_polyC0 expf_eq0 lc_eq0 PS.mulf_eq0 PS.mul0r scalepE).
+  move: (hc (PS.exp (divp m (gcdp m n)) k)); rewrite dvdpp hd /= -size_poly_eq1.
+  by rewrite degXn_proper ?lregP ?lc_eq0; smt(expf_eq0).
+qed.
 
-lemma root_gcd p q x : root (gcdp p q) x = root p x && root q x.
+lemma root_gcd p q x : root (gcdp p q) x = (root p x && root q x).
 proof.
-admitted.
+rewrite /= !root_factor_theorem eqboolP iffE.
+split; 1: by smt(dvdp_trans dvdp_gcdl dvdp_gcdr).
+by smt(Bezoutp dvdp_addl dvdp_mull eqp_dvdr eqp_sym).
+qed.
 
 lemma root_biggcd x ps :
-  root (foldr gcdp poly0 ps) x = all (fun p => root p x) ps.
-proof.
-elim ps; 2: by smt(root_gcd).
-by smt(IDCoeff.addr0 IDCoeff.mul0r deg0 poly0E rangeS).
-qed.
+  root (foldr gcdp poly0 ps) x = all (fun p => root p x) ps
+  by elim ps; smt(root0 root_gcd).
 
 (* It will go through useless loops once "coprimep p q"
    since iter is needed as recursive calls are currently not allowed. *)
@@ -1941,70 +2477,152 @@ op gdcop_rec_it (i : poly * poly) =
   if coprimep p q then i else (q, divp p (gcdp p q)).
 
 op gdcop_rec (q p : poly) (k : int) =
-  let (pp, qq) = iter k gdcop_rec_it (q, p) in
-  if coprimep pp qq then pp else IDD.ComRing.RPD.eqpoly0p qq.
+  if k <= 0 then eqpoly0p q else let (pp, qq) = iter k gdcop_rec_it (q, p) in qq.
 
-op gdcop (q p : poly) =
-  let (pp, qq) = iter (deg p) gdcop_rec_it (q, p) in
-  if coprimep pp qq then pp else IDD.ComRing.RPD.eqpoly0p qq.
+op gdcop (q p : poly) = gdcop_rec q p (deg p).
 
 op gdcop_spec (q p r : poly) =
   dvdp r p && (coprimep r q || p = poly0) &&
   (forall d, dvdp d p => coprimep d q => dvdp d r).
 
-lemma gdcop0 q : gdcop q poly0 = IDD.ComRing.RPD.eqpoly0p q.
-proof.
-admitted.
+lemma gdcop0 q : gdcop q poly0 = eqpoly0p q by smt(deg0).
 
 lemma gdcop_recP q p k : deg p <= k => gdcop_spec q p (gdcop_rec q p k).
 proof.
-admitted.
+rewrite /gdcop_spec; move: k p q; apply: natind;
+  1: by smt(coprimep0 deg0 deg_eq0 dvdp0 dvdUp ge0_deg).
+move => /= k k_ge0 kP p q kpP; case: (coprimep p q); 1: by smt(dvdpp iter_id).
+case: (p = poly0) => [|/= p_neq0]; 1: by smt(div0p dvdp0 iter_id).
+case: (q = poly0) => [-> pqP|q_neq0 cop].
+- rewrite /gdcop_rec; have -> /= : ! k + 1 <= 0 by smt().
+  suff: iter (k + 1) gdcop_rec_it (poly0, p) =
+        (poly0, polyC (exp (lc p) (scalp p p)))
+    by smt(coprimep0 dvdUp lc_expn_scalp_neq0 polyC_eqp1).
+  rewrite iterSr // iter_id; 2: by smt(divpp gcdp0).
+  by smt(coprimep0 divpp gcdp0 iterSr iter_id lc_expn_scalp_neq0 polyC_eqp1).
+- move: (dvdp_gcdl p q); rewrite dvdp_eq => e.
+  have dgp : deg (gcdp p q) <= deg p by smt(dvdp_gcdl dvdp_leq gcdp_eq0).
+  have p'_neq0 : divp p (gcdp p q) <> poly0
+    by smt(dvdpN0 dvdp_mulIl eq_polyC0 PS.mulf_eq0 lc_expn_scalp_neq0 scalepE).
+  have g_neq0 : gcdp p q <> poly0 by smt(gcdp_eq0).
+  have dp' : deg (divp p (gcdp p q)) <= k by smt(deg_gt0 size_divp).
+  suff: gdcop_spec q p (gdcop_rec q (divp p (gcdp p q)) k)
+    by smt(deg_eq0 ge0_deg iterSr).
+  move: (kP (divp p (gcdp p q)) q dp'); rewrite /gdcop_spec /gdcop_rec.
+  have -> /= : ! k <= 0 by smt(deg_eq0 ge0_deg).
+  rewrite p_neq0 p'_neq0 /=; move => [dr'p' [cr'q maxr']]; rewrite cr'q /=.
+  split => [|_ d dp cdq]; 1: smt(divp_dvd dvdp_gcdl dvdp_trans).
+  apply: maxr' => //.
+  case: (dvdp d (gcdp p q)); 1: by smt(coprimepPn dvdpp dvdUp dvd0p dvdp_gcd).
+  by smt(coprimep_dvdl dvdp_gcdr eqp_dvdr eqp_scale
+         Gauss_dvdpl lc_expn_scalp_neq0).
+qed.
 
-lemma gdcopP q p : gdcop_spec q p (gdcop q p).
-proof.
-admitted.
+lemma gdcopP q p : gdcop_spec q p (gdcop q p) by smt(gdcop_recP).
 
-lemma coprimep_gdco p q : q <> poly0 => coprimep (gdcop p q) p.
-proof.
-admitted.
+lemma coprimep_gdco p q : q <> poly0 => coprimep (gdcop p q) p by smt(gdcopP).
 
 lemma size2_dvdp_gdco p q d :
   p <> poly0 => deg d = 2 =>
-  (dvdp d (gdcop q p)) = (dvdp d p) && ! (dvdp d q).
+  dvdp d (gdcop q p) = (dvdp d p && ! (dvdp d q)).
 proof.
-admitted.
+case: (d = poly0) =>[|d_neq0 p_neq0 degdP]; 1: by smt(deg0).
+rewrite eqboolP iffE; split.
+- move: (gdcopP q p); rewrite /gdcop_spec; pose r := gdcop q p.
+  rewrite p_neq0 /=; move => [rp [crq maxr]] dr; rewrite (dvdp_trans r) //=.
+  suff /# : dvdp d q => ! coprimep r q.
+  move => dq; rewrite -coprimepPn; 1: by smt(dvd0p).
+  by exists d; rewrite dvdp_gcd dr dq /= -size_poly_eq1 degdP.
+- move: (gdcopP q p); rewrite /gdcop_spec; pose r := gdcop q p.
+  rewrite p_neq0 /=; move => [rp [crq maxr]] [dp dq]; apply: maxr => //.
+  rewrite -coprimepP => x xd xq; move: (dvdp_leq x d d_neq0 xd).
+  by rewrite -size_poly_eq1; smt(deg_eq0 dvd0p dvdp_size_eqp eqp_dvdl ge0_deg).
+qed.
 
-lemma dvdp_gdco p q : dvdp (gdcop p q) q.
-proof.
-admitted.
+lemma dvdp_gdco p q : dvdp (gdcop p q) q by smt(gdcopP).
 
 lemma root_gdco p q x :
-  p <> poly0 => root (gdcop q p) x = root p x && ! root q x.
+  p <> poly0 => root (gdcop q p) x = (root p x && ! root q x).
+proof.
+move => p_neq0; rewrite !root_factor_theorem.
+by apply: size2_dvdp_gdco; rewrite ?p0 // degNXC.
+qed.
+
+op comp_poly (p q : poly) =
+  BigPoly.PCA.bigi predT (fun i => p.[i] ** PS.exp q i) 0 (deg p).
+
+lemma comp_poly0 p : comp_poly poly0 p = poly0
+  by rewrite /comp_poly deg0 range_geq // BigPoly.PCA.big_nil.
+
+lemma comp_polyC c p : comp_poly (polyC c) p = polyC c.
+proof.
+case: (c = zeror) => [|c_neq0]; 1: by smt(comp_poly0).
+rewrite /comp_poly degC c_neq0 /= BigPoly.PCA.big_int1 /=.
+by rewrite polyCE /= PS.expr0 scalepE -polyCM mulr1.
+qed.
+
+lemma comp_polyD (p q r : poly) :
+  comp_poly (p + q) r = comp_poly p r + comp_poly q r.
+proof.
+pose P := fun i => p.[i] ** PS.exp r i; pose Q := fun i => q.[i] ** PS.exp r i.
+have <- : BigPoly.PCA.bigi predT (fun i => P i + Q i) 0 (deg (p + q)) =
+          comp_poly (p + q) r by smt(polyDE scalepDl).
+rewrite /comp_poly -BigPoly.PCA.sumrD.
+have -> : BigPoly.PCA.bigi predT P 0 (deg p) =
+          BigPoly.PCA.bigi predT P 0 (max (deg p) (deg q)).
+- rewrite eq_sym (BigPoly.PCA.big_cat_int (deg p));
+  by smt(PS.addr0 BigPoly.PCA.big1_seq gedeg_coeff ge0_deg mem_range scale0p).
+have -> : BigPoly.PCA.bigi predT Q 0 (deg q) =
+          BigPoly.PCA.bigi predT Q 0 (max (deg p) (deg q)).
+- rewrite eq_sym (BigPoly.PCA.big_cat_int (deg q));
+  by smt(PS.addr0 BigPoly.PCA.big1_seq gedeg_coeff ge0_deg mem_range scale0p).
+rewrite !BigPoly.PCA.sumrD.
+case: (deg (p + q) < max (deg p) (deg q)) => pqP; 2: by smt(degD mulrDl polyDE).
+rewrite eq_sym (BigPoly.PCA.big_cat_int (deg (p + q))); 1, 2: by smt(ge0_deg).
+rewrite -PS.subr_eq0 PS.addrAC PS.subrr PS.add0r.
+rewrite BigPoly.PCA.big1_seq //= => i [_ ]; rewrite mem_range /P /Q.
+by rewrite -scalepDl -polyDE; smt(gedeg_coeff scale0p).
+qed.
+
+lemma comp_polyM (p q r : poly) :
+  comp_poly (p * q) r = comp_poly p r * comp_poly q r.
 proof.
 admitted.
 
-op comp_poly (p q : poly) =
-  BigPoly.PCM.bigi predT (fun i => p.[i] ** PolyComRing.exp q i) 0 (deg p).
+lemma comp_polyZ c (p q : poly) : comp_poly (c ** p) q = c ** comp_poly p q.
+proof.
+case: (c = zeror) => [->|c_neq0]; 1: by rewrite !scale0p comp_poly0.
+rewrite /comp_poly degZ_lreg ?lregP //.
+by smt(PS.mulrA BigPoly.PCA.mulr_sumr polyCM polyZE scalepE).
+qed.
 
 lemma dvdp_comp_poly r p q : dvdp p q => dvdp (comp_poly p r) (comp_poly q r).
 proof.
-admitted.
+case: (p = poly0) => [|p_neq0 pqP]; 1: by smt(comp_poly0 dvd0p).
+apply: (eq_dvdp (exp (lc p) (scalp q p)) (comp_poly (divp q p) r));
+by smt(comp_polyM comp_polyZ dvdp_eq expf_eq0 lc_eq0).
+qed.
 
 lemma gcdp_comp_poly r p q :
-  eqp (gcdp p (comp_poly q r)) (gcdp (comp_poly p r) (comp_poly q r)).
+  eqp (comp_poly (gcdp p q) r) (gcdp (comp_poly p r) (comp_poly q r)).
 proof.
-admitted.
+split; 1: by rewrite dvdp_gcd !dvdp_comp_poly ?dvdp_gcdl ?dvdp_gcdr.
+move: (Bezoutp p q) => [u v] [H _]; move: (dvdp_comp_poly r _ _ H) => {H} Huv _.
+rewrite (dvdp_trans _ _ _ _ Huv) comp_polyD !comp_polyM.
+by rewrite dvdp_add dvdp_mull ?dvdp_gcdl dvdp_gcdr.
+qed.
 
 lemma coprimep_comp_poly r p q :
   coprimep p q => coprimep (comp_poly p r) (comp_poly q r).
 proof.
-admitted.
+rewrite -!gcdp_eqp1 -!size_poly_eq1 -!dvdp1 => H.
+by move: (dvdp_comp_poly r _ _ H); smt(comp_polyC dvdp_trans gcdp_comp_poly).
+qed.
 
-lemma coprimep_addl_mul (p q r : poly) : coprimep r (p * r + q) = coprimep r q.
-proof.
-admitted.
+lemma coprimep_addl_mul (p q r : poly) : coprimep r (p * r + q) = coprimep r q
+  by smt(eqp_size gcdp_addl_mul).
 
 op irreducible_poly p =
   (1 < deg p) && (forall q, deg q <> 1 => dvdp q p => eqp q p).
 
-end CommonIdomain.
+end Idomain.

@@ -602,7 +602,7 @@ abstract theory ComRing.
     exp x (m + n) = exp x m * exp x n.
   proof.
     move=> ge0_m ge0_n; elim: m ge0_m => [|m ge0_m ih].
-      by rewrite expr0 mul1r.    
+      by rewrite expr0 mul1r.
     by rewrite addzAC !exprS ?addz_ge0 // ih mulrA.
   qed.
 
@@ -625,7 +625,7 @@ abstract theory ComRing.
   by rewrite addzA exprS 1:/# ih 1,2:/# exprS // mulrCA.
   qed.
 
-  lemma exprM x (m n : int) : 
+  lemma exprM x (m n : int) :
     exp x (m * n) = exp (exp x m) n.
   proof.
   wlog : n / 0 <= n.
