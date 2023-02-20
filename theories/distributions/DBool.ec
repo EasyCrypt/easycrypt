@@ -88,6 +88,21 @@ rewrite dbiased1E clamp_id; first by smt(ge0_mu le1_mu).
 rewrite dmap1E /(\o) /pred1; smt(mu_not).
 qed.
 
+lemma dbiased1 : dbiased 1%r = dunit true.
+proof. by rewrite eq_distr => b; rewrite dbiased1E dunit1E /#. qed.
+
+lemma dbiased0 : dbiased 0%r = dunit false.
+proof. by rewrite eq_distr => b; rewrite dbiased1E dunit1E /#. qed.
+
+lemma marginal_sampling_pred (d : 'a distr) (p : 'a -> bool) :
+  is_lossless d =>
+  d = dlet (dbiased (mu d p)) 
+           (fun b => if b then (dcond d p) else (dcond d (predC p))).
+proof.
+move => d_ll; rewrite -dmap_pred // {1}(marginal_sampling d p).
+by congr; apply fun_ext => -[|] /=; congr => /#.
+qed.
+
 end Biased.
 
 (* -------------------------------------------------------------------- *)
