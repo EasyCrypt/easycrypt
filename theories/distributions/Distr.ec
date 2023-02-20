@@ -1533,6 +1533,30 @@ rewrite dcondE; case: (p x) => [pxT|pxF]; last by rewrite mu0_false /#.
 by congr; apply mu_eq => /#.
 qed.
 
+lemma dcond_uni (d: 'a distr) P :
+  is_uniform d => is_uniform (dcond d P).
+proof.
+move => d_uni x y /dcond_supp [xd px] /dcond_supp [yd py].
+by rewrite !dcond1E px py /= (@d_uni x y).
+qed.
+
+lemma eq_dcond (d : 'a distr) (p q : 'a -> bool) : 
+  (forall x, x \in d => p x = q x) => dcond d p = dcond d q.
+proof.
+move => eq_p_q; apply/eq_distr => x; rewrite !dcond1E.
+case (x \in d) => [xd|xnd]; last by rewrite !(@mu0_false _ (pred1 x)) /#.
+by rewrite eq_p_q // (mu_eq_support eq_p_q).
+qed.
+
+lemma mu_dcond_ge (d : 'a distr) (p : 'a -> bool) x :
+  p x => mu1 d x <= mu1 (dcond d p) x.
+proof.
+move => p_x; rewrite dcond1E p_x /=. 
+case (x \in d) => [x_d|]; last by move/supportPn => -> /#.
+suff muP : 0%r < mu d p by rewrite ler_pdivl_mulr //; smt(mu_bounded).
+by apply/witness_support; exists x.
+qed.
+
 lemma dcondZ (d: 'a distr) (P: 'a -> bool) :
   mu d P = 0%r <=> dcond d P = dnull.
 proof.
@@ -1561,6 +1585,14 @@ rewrite (@sumE_fin _ [f a]) ?big_seq1 //=; 1: smt(dcond1E).
 rewrite dcond1E dmap1E /(\o) /pred1 -/(pred1 a) /=.
 case (a \in d) => [a_d|]; 2: smt(ge0_mu).
 suff : mu d (fun (a0 : 'a) => f a0 = f a) > 0%r; smt(mu_sub).
+qed.
+
+lemma dcond_dmap (d : 'a distr) (f : 'a -> 'b) (p : 'b -> bool) : 
+  dcond (dmap d f) p = dmap (dcond d (p \o f)) f.
+proof.
+apply/eq_distr => y. rewrite dmap1E dcond1E dcondE !dmapE.
+case (p y) => [py|npy]; last by rewrite mu0_false // /#.
+by congr; apply mu_eq; smt().
 qed.
 
 end DConditional.
