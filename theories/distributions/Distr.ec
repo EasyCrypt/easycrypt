@@ -430,6 +430,15 @@ move=> le; apply/(ler_trans (big predT (fun (x : 'a) => r) s)).
 by rewrite Bigreal.sumr_const count_predT.
 qed.
 
+lemma fin_muE (d : 'a distr) (E : 'a -> bool) : is_finite (support d) =>
+  mu d E = big E (mu1 d) (to_seq (support d)).
+proof.
+move => fin_d.
+rewrite (@mu_eq_support d _ (mem (filter E (to_seq (support d))))).
+- by move => x x_d; rewrite mem_filter mem_to_seq // x_d.
+by rewrite mu_mem_uniq ?filter_uniq ?uniq_to_seq // big_filter.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma uniform_finite ['a] (d : 'a distr) :
   is_uniform d => is_finite (support d).
@@ -2602,6 +2611,15 @@ move=> Edf @/hasE; rewrite -(@eq_summable F) /=.
 - by apply: summable_cond.
 qed.
 
+lemma hasE_dcond (d : 'a distr) (p : 'a -> bool) (f : 'a -> real) :
+  hasE d f => hasE (dcond d p) f.
+proof.
+rewrite /hasE => Edf.
+apply (@summable_le (fun x => inv (mu d p) * (f x * mu1 d x))) => [|x /=].
+- exact/summableZ.
+- rewrite dcond1E /#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma eq_expL ['a] (d1 d2 : 'a distr) f : d1 = d2 => E d1 f = E d2 f.
 proof. by move=> ->. qed.
@@ -2905,6 +2923,13 @@ move=> Edf; rewrite exp_dlet -/(dmap _ _) 1://.
 by apply: eq_exp=> a _ /=; rewrite exp_dunit.
 qed.
 
+(* TOTHINK: should this be the defintion of Ec *)
+lemma exp_dcond (d : 'a distr) (p : 'a -> bool) (f : 'a -> real) :
+  E (dcond d p) f = Ec d f p.
+proof.
+by rewrite /Ec /E -sumZr &(eq_sum) /= => x; rewrite dcond1E /#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma in_ler_exp ['a] (d : 'a distr) (f g : 'a -> real) :
      hasE d f => hasE d g
@@ -3103,6 +3128,15 @@ apply/(ltr_le_trans _ _ le)/ltr_addl; rewrite ltr_neqAle ge0_mu /=.
 by rewrite eq_sym; apply/supportP.
 qed.
 
+(* -------------------------------------------------------------------- *)
+
+lemma fin_expE (d : 'a distr) (f : 'a -> real) : is_finite (support d) =>
+  E d f = big predT (fun x => f x * mu1 d x) (to_seq (support d)).
+proof.
+move => fin_d; rewrite /E (@sumE_fin _ (to_seq (support d))) ?uniq_to_seq //.
+by move => x; rewrite mem_to_seq //; smt(supportP).
+qed.
+
 (* ==================================================================== *)
 lemma Jensen_fin ['a] (d : 'a distr) f g :
      is_finite (support d)
@@ -3110,12 +3144,7 @@ lemma Jensen_fin ['a] (d : 'a distr) f g :
   => (forall a b, convex g a b)
   => g (E d f) <= E d (g \o f).
 proof.
-move=> fin_d ll_d cvx_g; rewrite /E /(\o); pose s := to_seq (support d).
-rewrite !(@sumE_fin _ s) ?uniq_to_seq //=.
-- move=> a; rewrite mulf_eq0 negb_or => -[_].
-  by rewrite -supportP mem_to_seq.
-- move=> a; rewrite mulf_eq0 negb_or => -[_].
-  by rewrite -supportP mem_to_seq.
+move=> fin_d ll_d cvx_g; rewrite !fin_expE /(\o) //; pose s := to_seq _.
 move: ll_d; rewrite /is_lossless weightE !(@sumE_fin _ s) ?uniq_to_seq //=.
 - by move=> a; rewrite -supportP mem_to_seq.
 move=> {fin_d}; case: s => [|i s]; first by rewrite BRA.big_nil.
@@ -3137,4 +3166,16 @@ rewrite /t !(@mulrC _ c1) !(@mulrC _ c2) !(@mulrC _ (_ * _)%Real).
 rewrite !(@mulrAC _ c) -mulrDl ler_wpmul2r 1:addr_ge0 //.
 rewrite c2E &(cvx_g) /c1 mulr_ge0 ?invr_ge0 // 1:addr_ge0 //=.
 by rewrite ler_pdivr_mulr /= ?ler_addl // (ler_lt_trans _ ge0_l) ltr_addl.
+qed.
+
+lemma Jensen_fin_concave ['a] (d : 'a distr) f (g : real -> real) :
+     is_finite (support d)
+  => is_lossless d
+  => (forall a b, convex (fun x => - g x) a b)
+  => E d (g \o f) <= g (E d f).
+proof.
+move => d_fin d_ll g_concave.
+have /= J := Jensen_fin d f (fun x => - g x) d_fin d_ll g_concave.
+rewrite -ler_opp2; apply (@ler_trans _ _ _ J).
+by rewrite -mulN1r -expZ lerr_eq &(eq_exp) => x x_d @/(\o) /=; rewrite mulN1r.
 qed.
