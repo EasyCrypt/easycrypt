@@ -109,6 +109,17 @@ lemma finiteD (A B : 'a -> bool):
 proof. by move=> fin_A; apply/(finite_leq A)=> //= x @/predD. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma sub_size_to_seq (p q : 'a -> bool) : 
+  p <= q => is_finite q =>
+  size (to_seq p) <= size (to_seq q).
+proof.
+move => sub_p_q fin_q.
+have fin_p : is_finite p by apply (finite_leq _ _ sub_p_q).
+apply uniq_leq_size; 1: exact uniq_to_seq.
+by move => x; rewrite !mem_to_seq //; exact sub_p_q.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma eq_is_finite_for ['a] (p q : 'a -> bool) s :
   (forall x, p x <=> q x) => is_finite_for p s => is_finite_for q s.
 proof. by move=> eq_pq [uqs h]; split=> // x; rewrite -eq_pq &(h). qed.

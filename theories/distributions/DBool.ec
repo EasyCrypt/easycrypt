@@ -59,10 +59,7 @@ lemma dbiasedE (p : real) (E : bool -> bool) :
   mu (dbiased p) E =
       (if E true  then       clamp p else 0%r)
     + (if E false then 1%r - clamp p else 0%r).
-proof.
-rewrite muE (@sumE_fin _ [true; false]) => [|[]|] //.
-by rewrite 2!big_cons big_nil => @/predT /=; rewrite !dbiased1E.
-qed.
+proof. by rewrite muE sum_bool /= !dbiased1E. qed.
 
 lemma supp_dbiased (p : real) b :
   0%r < p < 1%r => b \in (dbiased p).

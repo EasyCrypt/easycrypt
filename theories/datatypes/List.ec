@@ -2404,6 +2404,17 @@ proof.
   by rewrite addrA addrAC /= => ->; rewrite take_size_cat // size_mkseq lez_maxr.
 qed.
 
+lemma map_mkseq (f : 'a -> 'b) (g: int -> 'a) (n : int) :
+  map f (mkseq g n) = mkseq (f \o g) n.
+proof.
+case (0 <= n); last by move => ?; rewrite !mkseq0_le /#.
+move => ge0_n; apply (eq_from_nth witness) => [|i rg_i].
+- by rewrite size_map !size_mkseq.
+rewrite size_map size_mkseq lez_maxr // in rg_i.
+by rewrite (nth_map witness) ?size_mkseq ?lez_maxr // !nth_mkseq. 
+qed.
+
+
 (* -------------------------------------------------------------------- *)
 (*                         Sequence folding                             *)
 (* -------------------------------------------------------------------- *)

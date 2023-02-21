@@ -227,6 +227,17 @@ move=> h; apply: (@BAdd.big_ind (fun x => zeror <= x)) => //=.
   by apply/addr_ge0.
 qed.
 
+lemma nosmt sub_ler_sum (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s : 
+  (forall x, P1 x => P2 x) => 
+  (forall x, P1 x => F1 x <= F2 x) =>
+  (forall x, P2 x => !P1 x => zeror <= F2 x) =>
+  BAdd.big P1 F1 s <= BAdd.big P2 F2 s.
+proof.
+move => sub_P1_P2 le_F1_F2 pos_F2; rewrite (@BAdd.bigID P2 _ P1).
+have -> : predI P2 P1 = P1 by smt().
+by rewrite -(addr0 (BAdd.big P1 F1 s)) ler_add ?ler_sum // sumr_ge0 /#.
+qed.
+
 lemma sumr_norm P F s :
   (forall x, P x => zeror <= F x) =>
     BAdd.big<:'a> P (fun x => `|F x|) s = BAdd.big P F s.
