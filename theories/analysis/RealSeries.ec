@@ -543,6 +543,10 @@ qed.
 lemma sum0 ['a]: sum<:'a> (fun _ => 0%r) = 0%r.
 proof. by rewrite (@sumE_fin _ []). qed.
 
+lemma sum_bool (f : bool -> real):
+  sum f = f true + f false.
+proof. by rewrite (@sumE_fin _ [true; false]) //= => -[]. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt lerfin_sum (s : 'a -> real) M:
      summable s
