@@ -69,6 +69,13 @@ move/(_ (max (d+1) 0) _ _) => @/P @/idfun /=; first exact: maxrr.
 by apply; apply: le_p_c.
 qed.
 
+lemma ltdeg_neq0coeff (p : poly) (c : int) :
+  deg p <= c + 1 => p.[c] <> zeror => deg p = c + 1.
+proof.
+move=> /ler_eqVlt or_; apply/contraR => neq_.
+by apply/gedeg_coeff; move: or_; rewrite neq_ /= ltzS.
+qed.
+
 lemma ge0_deg p : 0 <= deg p.
 proof. rewrite /deg &(ge0_argmin). qed.
 
@@ -468,6 +475,21 @@ exists p.[0]; split; last first.
 apply: contraL eq1_degp => z_p0; suff ->: p = poly0 by rewrite deg0.
 apply/poly_eqP=> c; rewrite poly0E => /ler_eqVlt [<<-//|].
 by move=> gt0_c; apply: pC => /#.
+qed.
+
+lemma deg_le1 p : (deg p <= 1) <=> (exists c, p = polyC c).
+proof.
+move: (orb_id2l (deg p = 0) (deg p = 1) (exists c, c <> zeror /\ p = polyC c) _).
++ by move=> _; apply/eq_iff/deg_eq1.
+rewrite {2} deg_eq0; have <-: ((deg p <= 1) <=> (deg p = 0 \/ deg p = 1)).
++ move/ler_eqVlt: (ge0_deg p); rewrite eq_sym or_andr; case=> [-> //|[->]].
+  move/ltzE/ler_eqVlt; rewrite eq_sym or_andr; case=> [-> //|[->]].
+  by rewrite /=; apply/ltr_geF.
+move=> ->; split; [case=> [->>|]|].
++ by exists zeror.
++ by case=> c [? ?]; exists c.
+case=> c ->>; case (c = zeror) => [->> //|?].
+by right; exists c.
 qed.
 
 lemma lc_eq0 p : (lc p = zeror) <=> (p = poly0).
@@ -1429,6 +1451,33 @@ elim: r => [|x r IHr]; [by rewrite BigPoly.PCM.big_nil oner_neq0|].
 rewrite BigPoly.PCM.big_cons /= IHr {1}/predC {1}/predI /=.
 case (P x) => //= _; split=> [[]|]; [by apply/mulf_neq0|].
 by rewrite -negb_or implybNN; case=> ->; [rewrite mul0r|rewrite mulr0].
+qed.
+
+lemma deg_prod ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
+  deg (BigPoly.PCM.big P F r) =
+  if all (predC (predI P (fun x => F x = poly0))) r
+  then StdBigop.Bigint.BIA.big P ((fun p => deg p - 1) \o F) r + 1
+  else 0.
+proof.
+case: (all (predC (predI P (fun x => F x = poly0))) r); last first.
++ rewrite allP negb_forall /=; case => x; rewrite negb_imply {1}/predC {1}/predI /=.
+  by case=> mem_x [Px eqFx0]; apply/deg_eq0/BigPoly.prodr0; exists x; do!split.
+elim: r => [_|x r IHr]; [by rewrite BigPoly.PCM.big_nil /= BIA.big_nil deg1|].
+rewrite /= {1}/predC {1}/predI /= negb_and BigPoly.PCM.big_cons StdBigop.Bigint.BIA.big_cons /=.
+case (P x) => //= Px [NeqFx0 all_]; move/IHr: (all_) => {IHr} eq_.
+rewrite degM //; [|by rewrite /(\o) /= eq_ addrAC !addrA].
+rewrite -deg_eq0 eq_; apply/gtr_eqF/ltzE/ler_subl_addr => /=.
+apply/sumr_ge0_seq => y mem_y Py; rewrite /(\o) subr_ge0.
+move/allP/(_ y mem_y): all_; rewrite /predC /predI Py /=.
+by case/ler_eqVlt: (ge0_deg (F y)) => [/eq_sym/deg_eq0|/ltzE].
+qed.
+
+lemma lc_prod['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
+     lc (BigPoly.PCM.big P F r) = BCM.big P (lc \o F) r.
+proof.
+elim: r => [|x r IHr]; [by rewrite BigPoly.PCM.big_nil BCM.big_nil lcC|].
+rewrite BigPoly.PCM.big_cons BCM.big_cons -IHr; case (P x) => // Px.
+by rewrite lcM /(\o).
 qed.
 
 end Poly.

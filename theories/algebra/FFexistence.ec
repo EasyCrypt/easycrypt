@@ -1,5 +1,5 @@
 (* ==================================================================== *)
-require import AllCore List Ring Int IntMin IntDiv Poly.
+require import AllCore List Ring Int IntMin IntDiv Real RealExp Poly.
 require import StdBigop StdPoly Binomial Counting Perms.
 (*---*) import StdOrder.IntOrder.
 
@@ -57,7 +57,7 @@ theory Counting_Argument.
   op sPI k m =
     polyXn k -
     PCA.big predT
-      (poly_prod_bin k (fun i => if 0 <= i <= k then m i else poly1))
+      (poly_prod_bin k m)
       (rem (shape k (cc_perm k)) (allshapes k)).
 
   op PI (n : int) = siter n sPI poly1.
@@ -154,10 +154,14 @@ theory Counting_Argument.
   qed.
 
   lemma poly_bin_int k p n :
-    is_fromint (peval p k%r) =>
+    (n = 0) \/ is_fromint (peval p k%r) =>
     is_fromint (peval (poly_bin p n) k%r).
   proof.
-    move=> all_; rewrite pevalM peval_prod pevalC /=.
+    case=> [->>|all_].
+    + rewrite /poly_bin /poly_prod_conseq range_geq //.
+      rewrite PCM.big_nil PolyComRing.mul1r fact0 //.
+      by rewrite StdOrder.RealOrder.Domain.divrr // peval1 is_fromint_fromint.
+    rewrite pevalM peval_prod pevalC /=.
     pose F:= idfun \o ((+) (floor (peval p k%r))).
     rewrite (Bigreal.BRM.eq_big_seq _ (fun y => (F y)%r) _); last first.
     + rewrite -Bigreal.prodr_ofint -fromint_div ?is_fromint_fromint //.
@@ -169,30 +173,34 @@ theory Counting_Argument.
 
   lemma poly_prod_bin_int n k m s :
     0 <= n =>
-    (forall j , j \in range 0 (n + 2) => is_fromint (peval (m j) k%r)) =>
-    is_fromint (peval (poly_prod_bin (n + 1) m s) k%r).
+    (forall j , j \in range 1 (n + 1) => (nth 0 s (j - 1) = 0) \/ is_fromint (peval (m j) k%r)) =>
+    is_fromint (peval (poly_prod_bin n m s) k%r).
   proof.
     move=> le0n all_; rewrite peval_prod.
-    apply/is_fromint_prod/allP => i /= mem_i _.
-    by apply/poly_bin_int/all_; move: mem_i; apply/mem_range_incl.
+    apply/is_fromint_prod/allP => j /= mem_j _.
+    by apply/poly_bin_int/all_.
   qed.
 
   lemma PI_int (n k : int) :
     is_fromint (peval (PI n) k%r).
   proof.
-    rewrite/PI; case (n <= 0) => [ltn0|/ltrNge/ltzW].
+    rewrite/PI; case (n <= 0) => [ltn0|/ltrNge].
     + by rewrite siter0 // peval1 is_fromint_fromint.
-    elim/sintind: n => n /ler_eqVlt [<<- _|].
-    + by rewrite siter0 // peval1 is_fromint_fromint.
-    rewrite -(subrK n 1); pose m:= n - 1; move: m => {n} n.
-    move/ltzS => le0n IHn; rewrite siterS //= {1}/sPI.
+    rewrite -(subrK n 1); move: (n - 1) => {n} n /ltzS.
+    elim/sintind: n => n le0n IHn; rewrite siterS //= /(sPI (n + 1)).
     rewrite pevalB pevalXn peval_sum is_fromintB.
     + by case (0 <= n + 1) => [le_|_]; [apply/is_fromint_exp => //|]; apply/is_fromint_fromint.
     apply/is_fromint_sum/allP => /= s mem_s _ /=.
-    apply/poly_prod_bin_int => // j /= mem_j; rewrite !le2_mem_range mem_j /=.
-    move: mem_j; rewrite (rangeSr 0 (n + 1)) ?addr_ge0 // mem_rcons /=.
-    case=> [->>|mem_j]; [|by rewrite mem_j /=; apply/IHn/mem_range].
-    by rewrite mem_range ltrNge /= peval1 is_fromint_fromint.
+    apply/poly_prod_bin_int; [by apply/addr_ge0|].
+    move=> j /= mem_j; rewrite le2_mem_range.
+    move: mem_j; rewrite (rangeSr 1 (n + 1)); [by apply/ler_subl_addr|].
+    rewrite mem_rcons /=; case => [->>|mem_j].
+    + left => /=.
+      (*TODO: permutations lemma.*)
+      admit.
+    rewrite range_ltn /=; [by apply/ltzS|rewrite mem_j /=].
+    right; move: mem_j; rewrite -(subrK j 1); move: (j - 1) => {j} j.
+    by rewrite mem_range_addr /= => mem_j; apply/IHn/mem_range.
   qed.
 
   lemma ledeg_poly_prod_conseq p k n :
@@ -227,100 +235,284 @@ theory Counting_Argument.
   lemma ledeg_poly_prod_bin n m s :
     0 <= n =>
     is_shape (n + 1) s =>
-    (forall j , j \in range 0 (n + 2) => deg (m j) <= j + 1) =>
+    (forall j , j \in range 1 (n + 2) => deg (m j) <= j + 1) =>
     deg (poly_prod_bin (n + 1) m s) <= n + 2.
   proof.
     move=> le0n is_s_s le_; apply/(ler_trans _ _ _ (BigPoly.deg_prod_le _ _ _)) => /=.
     case: (all _ _) => /=; [apply/ler_subr_addr => /=|by apply/addr_ge0].
     apply/(ler_trans _ _ _ (Bigint.ler_sum_seq _ _ (fun i => i * (nth 0 s (i - 1))) _ _)).
     + move=> k mem_k _; rewrite {1}/(\o) /= -(ler_add2r 1) /=.
-      apply/ledeg_poly_bin; [by move: mem_k; apply/mem_range_lt| |].
-      - case/is_shapeP: is_s_s => p [is_p_p <<-]; apply/nth_shape_ge0.
-        by rewrite (size_is_perm _ _ _ is_p_p) ?addr_ge0 //; apply/mem_range_subr.
-      by apply/le_; move: mem_k; apply/mem_range_incl.
+      apply/ledeg_poly_bin; [by move: mem_k; apply/mem_range_lt| |by apply/le_].
+      case/is_shapeP: is_s_s => p [is_p_p <<-].
+      apply/nth_shape_ge0; move: (size_is_perm _ _ _ is_p_p); [by apply/addr_ge0|].
+      by move=> ->; apply/mem_range_subr.
     by apply/lerr_eq; rewrite (is_shape_sum _ _ _ is_s_s) // addr_ge0.
   qed.
 
-  lemma ledegPI n :
+  lemma ledeg_PI n :
     0 <= n =>
-    deg (PI n) <= n + 1.
+    deg (PI (n + 1)) <= n + 2.
   proof.
-    rewrite/PI; elim/sintind: n => n /ler_eqVlt [<<- _|].
-    + by rewrite siter0 // deg1.
-    rewrite -(subrK n 1); pose m:= n - 1; move: m => {n} n.
-    move/ltzS => le0n IHn; rewrite siterS //= {1}/sPI.
+    rewrite/PI; elim/sintind: n => n le0n IHn.
+    rewrite siterS //= {1}/sPI.
     apply/(ler_trans _ _ _ (degB _ _)); rewrite degXn /= (ler_maxr 0); [by apply/addr_ge0|].
     apply/ler_maxrP => /=; rewrite PCA.big_seq; apply/BigPoly.deg_sum; [by apply/addr_ge0|].
     move=> s; rewrite /= rem_filter; [by apply/allshapes_uniq|].
     move=> /mem_filter; rewrite {1}/predC1 /= => -[neqp /allshapesP is_shape_p].
-    apply/ledeg_poly_prod_bin => // j /= mem_j; rewrite !le2_mem_range mem_j /=.
-    move: mem_j; rewrite (rangeSr 0 (n + 1)) ?addr_ge0 //= mem_rcons /=.
-    case=> [->>|mem_j]; [|by rewrite mem_j /=; apply/IHn/mem_range].
-    by rewrite mem_range ltrNge /= deg1 -subr_ge0 /= addr_ge0.
+    apply/ledeg_poly_prod_bin => // j /= mem_j; rewrite !le2_mem_range.
+    move: mem_j; rewrite (rangeSr 1 (n + 1)); [by apply/ler_subl_addr|].
+    rewrite mem_rcons /=; case=> [->>|mem_j].
+    + by rewrite mem_range /= deg1 -ler_subl_addr; move: le0n; apply/ler_trans.
+    rewrite range_ltn /=; [by apply/ltzS|].
+    rewrite mem_j /=; move: mem_j.
+    rewrite -(subrK j 1); move: (j - 1) => {j} j /=.
+    by rewrite mem_range_addr /= => mem_j; apply/IHn/mem_range.
   qed.
 
-  lemma lcPI n :
+  lemma lc_poly_prod_conseq p n :
     0 <= n =>
-    (PI n).[n] = if n = 0 then 1%r else 1%r / n%r.
+    lc (poly_prod_conseq p n) =
+    if 1 < deg p
+    then (lc p) ^ n
+    else Bigreal.BRM.bigi predT (fun (j : int) => lc p + j%r) 0 n.
   proof.
-    rewrite/PI; elim/sintind: n => n /ler_eqVlt [<<- _|].
-    + by rewrite siter0 // polyCE.
-    rewrite -(subrK n 1); pose m:= n - 1; move: m => {n} n.
-    move/ltzS => le0n IHn; rewrite siterS //= {1}/sPI.
-    rewrite gtr_eqF ?ltzS //= polyDE polyXnE /= addr_ge0 //= polyNE.
-    rewrite PrePolyReal.IDCoeff.subr_eq eq_sym BigPoly.polysumE.
-    rewrite (Bigreal.BRA.eq_big_seq _
-              (fun s => Bigreal.BRM.bigi predT
-                          (fun k => 1%r / (fact (nth 0 s k) * (k ^ nth 0 s k))%r) 1 (n + 2))).
-    + move=> s; rewrite /= rem_filter.
-      - (*TODO: permutations lemma.*)
-        admit.
-      move=> /mem_filter; rewrite {1}/predC1 /= => -[neqs mem_s].
-      rewrite -lcP /=; [apply/ler_anti; split|].
-      - apply/(ler_trans _ _ _ (deg_prod_le _ _ _)).
-        rewrite ifT.
-        * apply/allP => i /= mem_i; rewrite {1}/predC {1}/predI {1}/predT /=.
-          apply/IDPoly.mulf_neq0; [|by rewrite eq_polyC0 RField.div1r RField.unitrV eq_fromint gtr_eqF // fact_gt0].
-          rewrite -prodf_neq0; apply/allP => j mem_j; rewrite {1}/predC {1}/predI {1}/predT /= le2_mem_range.
-          rewrite range_ltn ?ltzS //=; move: mem_i; rewrite (rangeSr 1 (n + 1)) -?ler_subl_addr //.
-(*
-          + by move=> _; apply/(ler_trans _ _ _ _ le0n).
-          rewrite mem_rcons => /= -[->>/=|mem_i].
-          + rewrite gtr_eqF ?ltzS //= mem_range ler_gtF //= -polyCD eq_polyC0.
-            by rewrite -fromintD eq_fromint gtr_eqF // addrC ltzS; move: mem_j; apply/mem_range_le.
-          rewrite mem_i /=; apply/negP => /(congr1 (transpose ("_.[_]") i)) /=.
-          rewrite polyDE polyCE poly0E gtr_eqF /=; [by move: mem_i; apply/mem_range_lt|].
-          rewrite IHn; [by apply/mem_range; move: mem_i; apply/mem_range_incl|].
-          rewrite gtr_eqF /=; [by move: mem_i; apply/mem_range_lt|].
-          by rewrite RField.unitrV eq_fromint gtr_eqF //; move: mem_i; apply/mem_range_lt.
-        rewrite -ler_subr_addr /=.
-        apply/(ler_trans _ _ _ (Bigint.ler_sum_seq _ _ (fun i => i * (nth 0 (shape (n + 1) s) i)) _ _)).
-        * move=> i mem_i _; rewrite {1}/(\o) /= -(ler_add2r 2) /=.
-          apply/(ler_trans _ _ _ (degM_le_or _ _ _)) => /=.
-          - by right; rewrite eq_polyC0 RField.invr_eq0 eq_fromint gtr_eqF // fact_gt0.
-          rewrite degC RField.invr_eq0 eq_fromint gtr_eqF ?fact_gt0 //=; apply/ler_subr_addr => /=.
-          apply/(ler_trans _ _ _ (BigPoly.deg_prod_le _ _ _)) => /=.
-          case: (all _ _) => /=; last first.
-          - apply/addr_ge0 => //; apply/mulr_ge0; [by move: mem_i; apply/mem_range_le|].
-            (*TODO: permutations lemma.*)
-            admit.
-          apply/ler_add2r; move: (Bigint.bigi_constz i 0 (nth 0 (shape (n + 1) s) i) _) => /=.
-          - (*TODO: permutations lemma.*)
-            admit.
-          move=> <-; apply/ler_sum_seq => j mem_j _; rewrite /(\o) /=.
-          apply/ler_subl_addr/(ler_trans _ _ _ (degD _ _))/ler_maxrP.
-          split; [|by rewrite degC -ler_subl_addr; move: mem_k; apply/mem_range_le; case (_ = _)].
-          case: (0 <= k && k <= n) => ?; [by apply/IHn; rewrite ltzS|].
-          by rewrite deg1 -ler_subl_addr; move: mem_k; apply/mem_range_le.
-
-        (*TODO: permutations lemma.*)
-        apply/lerr_eq.
-        admit.
-      - admit.
-      rewrite lc_prod_proper. admit. admit. admit.
-*)
-admit. admit. admit. admit. admit. admit.
+    rewrite /poly_prod_conseq lc_prod => le0n.
+    move: (deg_le1 p); rewrite ltrNge; case (deg p <= 1) => //=.
+    + move=> ledeg1 [c] ->>; rewrite lcC.
+      apply/Bigreal.BRM.eq_big_int => i /mem_range mem_i.
+      by rewrite /(\o) -polyCD lcC.
+    move/ltrNge=> lt1deg _.
+    rewrite (Bigreal.BRM.eq_big_int _ _ _ (fun _ => lc p)); last first.
+    + by rewrite Bigreal.mulr_const size_range ler_maxr.
+    move=> i _; rewrite /(\o) /= lcDr // degC.
+    by move: lt1deg; apply/ler_lt_trans; case (_ = _).
   qed.
+
+  lemma eqdeg_poly_prod_conseq p n :
+    0 <= n =>
+    deg (poly_prod_conseq p n) =
+    if (all (fun c => p + polyC c%r <> poly0) (range 0 n))
+    then n * (deg p - 1) + 1
+    else 0.
+  proof.
+    move=> le0n; rewrite /poly_prod_conseq deg_prod.
+    pose b1:= all _ _; pose b2:= all _ _; have: b1 = b2.
+    + rewrite /b1 /b2 eq_iff; apply/eq_all_in => c mem_c.
+      by rewrite /predC /predI /predT.
+    move=> <- {b2}; case: b1; rewrite /b1 => {b1} //.
+    move=> all_; congr.
+    rewrite (BIA.eq_big_int _ _ _ (fun _ => deg p - 1)); last first.
+    + by rewrite big_constz count_predT size_range mulrC ler_maxr.
+    move=> i /mem_range mem_i; rewrite /(\o) /=; congr.
+    move: all_ (all_) => /allP /(_ 0) + /allP /(_ _ mem_i).
+    rewrite /predC /predI /predT /= mem_range /= PolyComRing.addr0.
+    case/ler_eqVlt: le0n => [<<-|lt0n]; [by move: mem_i; rewrite range_geq|].
+    rewrite lt0n /=; move: (deg_le1 p); case: (deg p <= 1) => /=.
+    + by move=> _ [c] ->>; rewrite -polyCD !eq_polyC0 !degC => -> ->.
+    move=> /ltrNge lt1deg _ _ _; rewrite degDl // degC.
+    by move: lt1deg; apply/ler_lt_trans => //; case (_ = _).
+  qed.
+
+  lemma neqpoly0_poly_prod_conseq p n :
+    0 <= n =>
+    (all (fun c => p + polyC c%r <> poly0) (range 0 n)) =>
+    poly_prod_conseq p n <> poly0.
+  proof.
+    move=> le0n all_; rewrite -deg_eq0 eqdeg_poly_prod_conseq //.
+    rewrite all_ //=; apply/gtr_eqF/ltzS; case/ler_eqVlt: le0n => [<<- //|lt0n].
+    apply/mulr_ge0; [by apply/ltzW|]; apply/subr_ge0; move: all_.
+    move => /allP /(_ 0); rewrite mem_range lt0n /= PolyComRing.addr0.
+    by rewrite -deg_eq0; case/ler_eqVlt: (ge0_deg p) => [<-//|/ltzE].
+  qed.
+
+  lemma lc_poly_bin p n :
+    0 <= n =>
+    lc (poly_bin p n) =
+    if 1 < deg p
+    then ((lc p) ^ n) / (fact n)%r
+    else Bigreal.BRM.bigi predT (fun (j : int) => lc p + j%r) 0 n / (fact n)%r.
+  proof.
+    by move=> le0n; rewrite /poly_bin lcM lc_poly_prod_conseq // lcC; case (1 < deg p).
+  qed.
+
+  lemma eqdeg_poly_bin p n :
+    0 <= n =>
+    deg (poly_bin p n) =
+    if (all (fun c => p + polyC c%r <> poly0) (range 0 n))
+    then n * (deg p - 1) + 1
+    else 0.
+  proof.
+    move=> le0n; rewrite /poly_bin; pose b:= all _ _; case: b; rewrite /b => {b}.
+    + move=> all_; rewrite degM.
+      - by apply/neqpoly0_poly_prod_conseq.
+      - rewrite eq_polyC0 RField.mul1r RField.unitrV eq_fromint.
+        by apply/gtr_eqF/fact_gt0.
+      rewrite degC RField.mul1r StdOrder.RealOrder.Domain.invr_eq0.
+      rewrite eq_fromint (gtr_eqF _ 0) //=; [by rewrite fact_gt0|].
+      by rewrite eqdeg_poly_prod_conseq // all_.
+    move=> Nall_; move: (eqdeg_poly_prod_conseq p _ le0n); rewrite Nall_ /=.
+    by rewrite deg_eq0 => ->; rewrite PolyComRing.mul0r deg0.
+  qed.
+
+  lemma neqpoly0_poly_bin p n :
+    0 <= n =>
+    (all (fun c => p + polyC c%r <> poly0) (range 0 n)) =>
+    poly_bin p n <> poly0.
+  proof.
+    move=> le0n all_; rewrite /poly_bin; apply/IDPoly.mulf_neq0.
+    + by apply/neqpoly0_poly_prod_conseq.
+    rewrite eq_polyC0 RField.mul1r RField.unitrV eq_fromint.
+    by apply/gtr_eqF/fact_gt0.
+  qed.
+
+  lemma lc_poly_prod_bin n m s :
+    0 <= n =>
+    is_shape (n + 1) s =>
+    (forall j , j \in range 1 (n + 2) => (nth 0 s (j - 1) = 0) \/ 1 < deg (m j)) =>
+    lc (poly_prod_bin (n + 1) m s) =
+    Bigreal.BRM.bigi predT
+      (fun j => ((lc (m j)) ^ (nth 0 s (j - 1))) / (fact (nth 0 s (j - 1)))%r)
+      1 (n + 2).
+  proof.
+    move=> le0n is_shape_ or_.
+    rewrite /poly_prod_bin lc_prod /=.
+    apply/Bigreal.BRM.eq_big_seq => j mem_j; rewrite /(\o) /=.
+    rewrite lc_poly_bin; last first.
+    + move: or_ => /(_ _ mem_j) /or_andl; case=> [[-> ->] /=|-> //].
+      by rewrite range_geq // Bigreal.BRM.big_nil fact0 // RField.expr0.
+    (*TODO: permutations lemma.*)
+    admit.
+  qed.
+
+  lemma eqdeg_poly_prod_bin n m s :
+    0 <= n =>
+    is_shape (n + 1) s =>
+    deg (poly_prod_bin (n + 1) m s) =
+    if (all (fun j => all (fun c => m j + polyC c%r <> poly0) (range 0 (nth 0 s (j - 1)))) (range 1 (n + 2)))
+    then BIA.bigi predT (fun j => (nth 0 s (j - 1)) * (deg (m j) - 1)) 1 (n + 2) + 1
+    else 0.
+  proof.
+    move=> le0n is_shape_; rewrite /poly_prod_bin.
+    pose b:= (all _ _); case: b; rewrite /b => {b}.
+    + move=> /allP all_; rewrite deg_prod /=.
+      pose b:= (all _ _); have: b; rewrite /b => {b}.
+      - apply/allP => j mem_j; rewrite /predC /predI /predT /=.
+        apply/neqpoly0_poly_bin; [|by apply/all_].
+        (*TODO: permutations lemma.*)
+        admit.
+      move=> -> /=; congr; apply/BIA.eq_big_seq => j mem_j.
+      rewrite /(\o) /= eqdeg_poly_bin; [|by move/(_ _ mem_j): all_ => /= ->].
+      (*TODO: permutations lemma.*)
+      admit.
+    rewrite -has_predC => /hasP [j] [mem_j]; rewrite /predC /=.
+    rewrite -has_predC => /hasP [c] [mem_c]; rewrite /predC /= => eq_.
+    apply/deg_eq0/BigPoly.prodr0; exists j; rewrite /predT mem_j /=.
+    apply/deg_eq0; rewrite eqdeg_poly_bin; last first.
+    + pose b:= all _ _; have: !b; rewrite /b => {b}; [|by move=> ->].
+      by rewrite -has_predC; apply/hasP; exists c; split.
+    (*TODO: this lemma needs to be changed.*)
+    admit.
+  qed.
+
+  lemma coeff_PI n :
+    0 <= n =>
+    (PI (n + 1)).[(n + 1)] = 1%r / (n + 1)%r.
+  proof.
+    rewrite/PI; elim/sintind: n => n le0n IHn; rewrite siterS // /(sPI (n + 1)).
+    have {IHn} IHn: forall (j : int), j \in range 1 (n + 1) =>
+                                      (siter j sPI poly1).[j] = (1%r / j%r) /\
+                                      lc (siter j sPI poly1) = (1%r / j%r) /\
+                                      deg (siter j sPI poly1) = j + 1.
+    + move=> j mem_j; move: (IHn (j - 1)); rewrite /= -mem_range mem_range_subr mem_j /=.
+      move=> coeff_; rewrite coeff_ /= and_impl; split => [->//|]; apply/ltdeg_neq0coeff.
+      - move: (ledeg_PI (j - 1) _); [|by rewrite /PI].
+        by apply/ler_subr_addr; move: mem_j; apply/mem_range_le.
+      by rewrite coeff_ RField.unitrV eq_fromint gtr_eqF //; move: mem_j; apply/mem_range_lt.
+    rewrite polyDE polyNE polyXnE /= addr_ge0 // /b2i /= polysumE.
+    rewrite rem_filter; [by apply/allshapes_uniq|].
+    rewrite (Bigreal.BRA.eq_big_seq _
+              (fun s =>
+                Bigreal.BRM.bigi predT
+                  (fun j => 1%r / ( j ^ nth 0 s (j - 1) * fact (nth 0 s (j - 1)) )%r )
+                  1 (n + 2)) ).
+    + move=> s /=; case/mem_filter; rewrite /predC1.
+      move=> neqs_ /allshapesP is_s_s; rewrite -lcP /=.
+      - rewrite eqdeg_poly_prod_bin //.
+        pose b:= all _ _; have: b; rewrite /b => {b} [|all_].
+        * apply/allP => j mem_j /=; apply/allP => c mem_c /=.
+          rewrite le2_mem_range range_ltn /=; [by apply/ltzS|].
+          move: mem_j; rewrite (rangeSr _ (n + 1)); [by apply/ler_subl_addr|].
+          rewrite mem_rcons /=; case=> [->>|mem_j].
+          + rewrite gtr_eqF /=; [by apply/ltzS|].
+            rewrite mem_range /= -polyCD eq_polyC0.
+            rewrite -fromintD eq_fromint gtr_eqF //.
+            by apply/ltr_subl_addl; move: mem_c; apply/mem_range_lt.
+          rewrite mem_j /=; case/(_ _ mem_j): IHn => _ [_ deg_]; rewrite -deg_eq0; apply/gtr_eqF.
+          by rewrite degDl deg_ ?degC -ltr_subl_addr; move: mem_j; apply/mem_range_lt => //; case (_ = _).
+        rewrite all_ /= -subr_eq0 addrAC opprD !addrA /= -addrA -opprD subr_eq0.
+        rewrite -(is_shape_sum _ _ _ is_s_s) /=; [by apply/addr_ge0|].
+        apply/BIA.eq_big_seq => j mem_j /=; rewrite le2_mem_range mulrC.
+        rewrite range_ltn /=; [by apply/ltzS|]; move: mem_j.
+        rewrite (rangeSr _ (n + 1)); [by apply/ler_subl_addr|].
+        rewrite mem_rcons /=; case=> [->>|mem_j]; last first.
+        * by rewrite mem_j /=; case/(_ _ mem_j): IHn => _ [_ ->].
+        rewrite /= mem_range /= (gtr_eqF _ 0) /=; [by apply/ltzS|].
+        rewrite deg1 /= eq_sym mulrI_eq0; [by apply/lregP/gtr_eqF/ltzS|].
+        (*TODO: permutations lemma.*)
+        move: neqs_.
+        admit.
+      rewrite lc_poly_prod_bin //.
+      - move=> j mem_j /=; rewrite le2_mem_range.
+        rewrite range_ltn /=; [by apply/ltzS|]; move: mem_j.
+        rewrite (rangeSr _ (n + 1)); [by apply/ler_subl_addr|].
+        rewrite mem_rcons /=; case=> [->>/=|mem_j]; last first.
+        * rewrite mem_j /=; case/(_ _ mem_j): IHn => _ [_ ->].
+          by rewrite -ltr_subl_addr; right; move: mem_j; apply/mem_range_lt.
+        rewrite mem_range /= (gtr_eqF (_ + 1) 0) /=; [by apply/ltzS|].
+        rewrite deg1 /=.
+        (*TODO: permutations lemma.*)
+        move: neqs_.
+        admit.
+      apply/Bigreal.BRM.eq_big_seq => j mem_j /=; rewrite le2_mem_range.
+      rewrite range_ltn /=; [by apply/ltzS|]; move: mem_j.
+      rewrite (rangeSr _ (n + 1)); [by apply/ler_subl_addr|].
+      rewrite mem_rcons /=; case=> [->>/=|mem_j]; last first.
+      - rewrite mem_j /=; case/(_ _ mem_j): IHn => _ [-> _].
+        rewrite -rpow_int.
+        * apply/StdOrder.RealOrder.divr_ge0 => //.
+          by rewrite le_fromint; move: mem_j; apply/mem_range_le.
+        rewrite rpowMVr //; [by rewrite lt_fromint //; move: mem_j; apply/mem_range_lt|].
+        rewrite rpow1r RField.mul1r fromintM RField.invfM rpow_int.
+        * by rewrite le_fromint; move: mem_j; apply/mem_range_le.
+        rewrite -RField.fromintXn //.
+        (*TODO: permutations lemma.*)
+        admit.
+      rewrite mem_range /= (gtr_eqF (_ + 1) 0) /=; [by apply/ltzS|].
+      rewrite lc1 /= RField.expr1z RField.mul1r fromintM RField.invfM.
+      apply/(RField.mulrI (fact (nth 0 s n))%r).
+      - by rewrite eq_fromint; apply/gtr_eqF/fact_gt0.
+      rewrite RField.mulrA RField.mulrAC RField.divff.
+      - by rewrite eq_fromint; apply/gtr_eqF/fact_gt0.
+      rewrite RField.mul1r eq_sym RField.invr_eq1.
+      (*TODO: permutations lemma.*)
+      move: neqs_.
+      admit.
+    admit.
+  qed.
+
+  lemma eqdeg_PI n :
+    0 <= n =>
+    deg (PI (n + 1)) = n + 2.
+  proof.
+    move=> le0n; apply/(ltdeg_neq0coeff (PI (n + 1)) (n + 1)).
+    + by apply/ledeg_PI.
+    by rewrite coeff_PI // RField.mul1r RField.unitrV eq_fromint gtr_eqF //; apply/ltzS.
+  qed.
+
+  lemma lc_PI n :
+    0 <= n =>
+    lc (PI (n + 1)) = 1%r / (n + 1)%r.
+  proof. by move=> le0n; rewrite eqdeg_PI //= coeff_PI. qed.
 
   op I n q = floor (peval (PI n) q%r).
 
