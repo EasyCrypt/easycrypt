@@ -1,9 +1,6 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore Finite Distr DList List.
 require import Poly Ring IntMin Bigalg StdBigop StdOrder.
-(*
-require (*--*) Subtype.
-*)
 (*---*) import Bigint IntID IntOrder.
 
 abstract theory RingPseudoDivision.
@@ -1077,79 +1074,6 @@ op scalp p q = let (scal, div, mod) = edivp p q in scal.
 op dvdp p q = (modp q p = poly0).
 op eqp p q = (dvdp p q) && (dvdp q p).
 
-(*
-end IdomainDefs.
-
-abstract theory WeakIdomain.
-
-type coeff, poly.
-
-clone IDomain as IDC with type t <= coeff.
-
-clone Poly as P with
-  type coeff         <= coeff,
-  type poly          <= poly,
-  theory IDCoeff     <- WeakIdomain.IDC.
-
-clone WeakIdomain.P.IDPoly as PCR'.
-
-clone RingPseudoDivision as RPD with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory CR    <- WeakIdomain.IDC,
-  theory PCR   <- WeakIdomain.P,
-  theory PCR'  <- WeakIdomain.PCR'.
-
-clone ComRegDivisor as CRD with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory CR    <- WeakIdomain.IDC,
-  theory PCR   <- WeakIdomain.P,
-  theory PCR'  <- WeakIdomain.PCR',
-  theory RPD   <- WeakIdomain.RPD.
-
-clone RingMonic as RM with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory CR    <- WeakIdomain.IDC,
-  theory PCR   <- WeakIdomain.P,
-  theory PCR'  <- WeakIdomain.PCR',
-  theory RPD   <- WeakIdomain.RPD,
-  theory CRD   <- WeakIdomain.CRD.
-
-clone ComRing as CR with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory CR    <- WeakIdomain.IDC,
-  theory PCR   <- WeakIdomain.P,
-  theory PCR'  <- WeakIdomain.PCR',
-  theory RPD   <- WeakIdomain.RPD,
-  theory CRD   <- WeakIdomain.CRD,
-  theory RM    <- WeakIdomain.RM.
-
-clone import IdomainDefs as ID with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory IDC   <- WeakIdomain.IDC,
-  theory P     <- WeakIdomain.P,
-  theory PCR'  <- WeakIdomain.PCR',
-  theory RPD   <- WeakIdomain.RPD,
-  theory CRD   <- WeakIdomain.CRD,
-  theory RM    <- WeakIdomain.RM.
-(*
-  theory CR    <- WeakIdomain.CR.
-  anomaly: File "src/ecUtils.ml", line 233, characters 24-30: Assertion failed
-*)
-
-import IDC.
-import P.
-import RPD.
-import CRD.
-import RM.
-import CR.
-import ID.
-*)
-
 lemma edivp_def p q : edivp p q = (scalp p q, divp p q, modp p q) by smt().
 
 lemma edivp_redivp p q :
@@ -1278,95 +1202,6 @@ suff -> : modp p p = poly0
    by rewrite PS.addr0 scalepE; smt(IDPoly.mulIf).
 by rewrite modpE Idomain.RPD.rmodpp ?scalep0 // PS.mulrC.
 qed.
-
-(*
-end WeakIdomain.
-
-abstract theory CommonIdomain.
-
-type coeff, poly.
-
-clone IDomain as IDC with type t <= coeff.
-
-clone Poly as P with
-  type coeff         <= coeff,
-  type poly          <= poly,
-  theory IDCoeff     <- IDC.
-
-clone P.IDPoly as PolyComRing.
-
-clone RingPseudoDivision as RPD with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory CR    <- IDC,
-  theory PCR   <- P,
-  theory PCR'  <- PCR'.
-
-clone ComRegDivisor as CRD with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory CR    <- IDC,
-  theory PCR   <- P,
-  theory PCR'  <- PCR',
-  theory RPD   <- RPD.
-
-clone RingMonic as RM with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory CR    <- IDC,
-  theory PCR   <- P,
-  theory PCR'  <- PCR',
-  theory RPD   <- RPD,
-  theory CRD   <- CRD.
-
-clone ComRing as CR with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory CR    <- IDC,
-  theory PCR   <- P,
-  theory PCR'  <- PCR',
-  theory RPD   <- RPD,
-  theory CRD   <- CRD,
-  theory RM    <- RM.
-
-clone IdomainDefs as ID with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory IDC   <- IDC,
-  theory P     <- P,
-  theory PCR'  <- PCR',
-  theory RPD   <- RPD,
-  theory CRD   <- CRD,
-  theory RM    <- RM.
-(*
-  theory CR    <- CR.
-  anomaly: File "src/ecUtils.ml", line 233, characters 24-30: Assertion failed
-*)
-
-clone WeakIdomain as WID with
-  type   coeff <= coeff,
-  type   poly  <= poly,
-  theory IDC   <- IDC,
-  theory P     <- P,
-  theory PCR'  <- PCR',
-  theory RPD   <- RPD,
-  theory CRD   <- CRD,
-  theory RM    <- RM.
-(*
-  theory CR    <- CR,
-  theory ID    <- ID.
-  anomaly: File "src/ecUtils.ml", line 233, characters 24-30: Assertion failed
-*)
-
-import IDC.
-import P.
-import RPD.
-import CRD.
-import RM.
-import CR.
-import ID.
-import WID.
-*)
 
 lemma scalp0 p : scalp p poly0 = 0
   by rewrite /scalp /edivp /redivp lc0 CR.unitP unitr0.
@@ -2174,9 +2009,6 @@ op egcdp_rec_it (i : poly * poly * poly * poly * poly * poly) =
   let (r, rp, u, v, up, vp) = i in
   if rp = poly0 then i else
     let rpp = modp r rp in
-(*
-    let upp = exp (lc rp) (scalp r rp) ** vp in
-*)
     let upp = exp (lc rp) (scalp r rp) ** u - up * divp r rp in
     let vpp = exp (lc rp) (scalp r rp) ** v - vp * divp r rp in
     (rp, rpp, up, vp, upp, vpp).
@@ -2584,16 +2416,53 @@ rewrite BigPoly.PCA.big1_seq //= => i [_ ]; rewrite mem_range /P /Q.
 by rewrite -scalepDl -polyDE; smt(gedeg_coeff scale0p).
 qed.
 
-lemma comp_polyM (p q r : poly) :
-  comp_poly (p * q) r = comp_poly p r * comp_poly q r.
-proof.
-admitted.
-
 lemma comp_polyZ c (p q : poly) : comp_poly (c ** p) q = c ** comp_poly p q.
 proof.
 case: (c = zeror) => [->|c_neq0]; 1: by rewrite !scale0p comp_poly0.
 rewrite /comp_poly degZ_lreg ?lregP //.
 by smt(PS.mulrA BigPoly.PCA.mulr_sumr polyCM polyZE scalepE).
+qed.
+
+lemma comp_polyM (p q r : poly) :
+  comp_poly (p * q) r = comp_poly p r * comp_poly q r.
+proof.
+suff /# : forall n, deg p <= n =>
+                    comp_poly (p * q) r = comp_poly p r * comp_poly q r.
+move => n; move: n p q r; apply natind => [|/= n n_ge0 nh p q r npP];
+  1: smt(comp_poly0 deg_eq0 ge0_deg PS.mul0r).
+have pP : forall n p, deg p <= n + 1 =>
+                      p = p - p.[n] ** polyXn n + p.[n] ** polyXn n
+  by move => *; rewrite PS.addrAC -PS.addrA PS.subrr PS.addr0.
+pose plt := p.[n] ** polyXn n; pose pr := p - plt.
+rewrite (pP n p) // PS.mulrDl comp_polyD -/plt -/pr; have prP : deg pr <= n.
+- have {pP} pltP : deg plt <= n + 1 by smt(degXn degZ_le).
+  suff: pr.[n] = zeror by smt(degB deg_leP gedeg_coeff).
+  by rewrite /pr /plt polyDE polyNE polyZE polyXnE n_ge0 /= mulr1 subrr.
+suff: comp_poly (plt * q) r = comp_poly plt r * comp_poly q r
+  by smt(comp_polyD PS.mulrDl).
+rewrite /plt -scalerAl !comp_polyZ.
+case: (p.[n] = zeror) => [|pnP]; 1: by smt(PS.mul0r scale0p).
+rewrite -PS.subr_eq0 -scalerAl -scalepBr scalepE PS.mulf_eq0 eq_polyC0 pnP /=.
+rewrite PS.subr_eq0 => {nh p npP plt pr prP pnP}; move: n n_ge0 q r.
+suff /# : forall n m p q, 0 <= m => deg p <= n =>
+                          comp_poly (polyXn m * p) q =
+                          comp_poly (polyXn m) q * comp_poly p q.
+apply natind; 1: by smt(comp_poly0 deg_eq0 ge0_deg PS.mulr0).
+move => /= n n_ge0 nh m p q m_ge0 pnP; rewrite (pP n p) //; pose Xm := polyXn m.
+pose plt := p.[n] ** polyXn n; pose pr := p - plt; rewrite PS.mulrDr comp_polyD.
+have -> : comp_poly (Xm * plt) q = comp_poly Xm q * comp_poly plt q.
+- rewrite /plt -scalerAr !comp_polyZ -scalerAr; pose Xn := polyXn n.
+  suff /# : comp_poly (Xm * Xn) q = comp_poly Xm q * comp_poly Xn q.
+  have mDn_ge0 : 0 <= m + n by smt().
+  rewrite /comp_poly polyMXn2 m_ge0 n_ge0 /= !degXn //.
+  rewrite !BigPoly.PCA.big_int_recr_cond //.
+  rewrite !BigPoly.PCA.big1_seq; 1..3: by smt(mem_range polyXnE scale0p).
+  rewrite !PS.add0r /predT /= !polyXnE m_ge0 n_ge0 mDn_ge0 /=.
+  by rewrite !scalepE !PS.mul1r PS.exprD_nneg.
+suff: deg pr <= n by smt(comp_polyD PS.mulrDr).
+have {pP} pltP : deg plt <= n + 1 by smt(degXn degZ_le).
+suff: pr.[n] = zeror by smt(degB deg_leP gedeg_coeff).
+by rewrite /pr /plt polyDE polyNE polyZE polyXnE n_ge0 /= mulr1 subrr.
 qed.
 
 lemma dvdp_comp_poly r p q : dvdp p q => dvdp (comp_poly p r) (comp_poly q r).
