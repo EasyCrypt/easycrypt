@@ -30,6 +30,12 @@ op bounded (s : int -> real) =
 op monotone (s : int -> real) =
   forall n, 0 <= n => s n <= s (n+1).
 
+op bigO (s : int -> real) (t : int -> real) =
+  bounded (fun n => t n / s n).
+
+op smallo (s : int -> real) (t : int -> real) =
+  convergeto (fun n => t n / s n) 0%r.
+
 (* -------------------------------------------------------------------- *)
 lemma boundedP (s : int -> real):
   (exists M, 0%r <= M /\ bounded_by s M) <=> bounded s.
@@ -598,3 +604,203 @@ lemma limB (s1 s2 : int -> real) :
   converge s1 => converge s2 =>
     lim (fun x => s1 x - s2 x) = lim s1 - lim s2.
 proof. by move=> h1 h2; rewrite limD // 1:cnvN // limN. qed.
+
+
+(* -------------------------------------------------------------------- *)
+lemma eq_bigO_from (N : int) s1 s2 t1 t2 :
+  (forall n , N <= n => s1 n = s2 n /\ t1 n = t2 n) =>
+  bigO s1 t1 =>
+  bigO s2 t2.
+proof.
+  move=> eq_; rewrite /bigO.
+  apply/(eq_bounded_from N) => n leNn /=.
+  by case: (eq_ _ leNn) => -> ->.
+qed.
+
+lemma bigO0 s :
+  bigO s (fun _ => 0%r).
+proof.
+  rewrite /bigO; move: (boundedC 0%r).
+  by apply/(eq_bounded_from 0) => n le0n.
+qed.
+
+lemma bigO_id s :
+  (exists (N : int) , forall n , N <= n => s n <> 0%r) =>
+  bigO s s.
+proof.
+  case=> N neq0_; rewrite /bigO; move: (boundedC 1%r).
+  apply/(eq_bounded_from N) => n leNn /=.
+  by rewrite divrr //; apply/neq0_.
+qed.
+
+lemma bigOD s t1 t2 :
+  bigO s t1 =>
+  bigO s t2 =>
+  bigO s (fun n => t1 n + t2 n).
+proof.
+  rewrite /bigO => O1 O2; move: (boundedD _ _ O1 O2).
+  apply/(eq_bounded_from 0) => n le0n /=.
+  by rewrite mulrDl.
+qed.
+
+lemma bigON s t :
+  bigO s t =>
+  bigO s (fun n => - t n).
+proof.
+  rewrite /bigO => /boundedN.
+  apply/(eq_bounded_from 0) => n le0n /=.
+  by rewrite mulNr.
+qed.
+
+lemma bigOM s1 s2 t1 t2 :
+  bigO s1 t1 =>
+  bigO s2 t2 =>
+  bigO (fun n => s1 n * s2 n) (fun n => t1 n * t2 n).
+proof.
+  rewrite /bigO => O1 O2; move: (boundedM _ _ O1 O2).
+  by apply/(eq_bounded_from 0) => n le0n.
+qed.
+
+lemma bigO_sum ['a] s (P : 'a -> bool) F xs :
+  all (predU (predC P) ((bigO s) \o F)) xs =>
+  bigO s (fun n => Bigreal.BRA.big P (fun x => F x n) xs).
+proof.
+  elim: xs => [|x xs IHxs] /=.
+  + move: (bigO0 s); apply/(eq_bigO_from 0) => n le0n /=.
+    by rewrite Bigreal.BRA.big_nil.
+  case=> + /IHxs; rewrite /predU /(\o) or_andr /predC /=.
+  case=> [NPx|[Px Ox] Oxs].
+  + apply/(eq_bigO_from 0) => n le0n /=.
+    by rewrite Bigreal.BRA.big_cons /= NPx.
+  move: (bigOD _ _ _ Ox Oxs).
+  apply/(eq_bigO_from 0) => n le0n /=.
+  by rewrite Bigreal.BRA.big_cons /= Px.
+qed.
+
+lemma bigO_prod ['a] (P : 'a -> bool) F G xs :
+  all (fun x => !(P x) \/ bigO (F x) (G x)) xs =>
+  bigO (fun n => Bigreal.BRM.big P (fun x => F x n) xs)
+       (fun n => Bigreal.BRM.big P (fun x => G x n) xs).
+proof.
+  elim: xs => [|x xs IHxs] /=.
+  + move: (bigO_id (fun _ => 1%r) _); rewrite /bigO.
+    - by exists 0 => n le0n.
+    apply/(eq_bounded_from 0) => n le0n /=.
+    by rewrite !Bigreal.BRM.big_nil.
+  case=> + /IHxs; rewrite /(\o) or_andr /=.
+  case=> [NPx|[Px Ox] Oxs].
+  + apply/(eq_bigO_from 0) => n le0n /=.
+    by rewrite !Bigreal.BRM.big_cons /= NPx.
+  move: (bigOM _ _ _ _ Ox Oxs).
+  apply/(eq_bigO_from 0) => n le0n /=.
+  by rewrite !Bigreal.BRM.big_cons /= Px.
+qed.
+
+
+(* -------------------------------------------------------------------- *)
+lemma eq_smallo_from (N : int) s1 s2 t1 t2 :
+  (forall n , N <= n => s1 n = s2 n /\ t1 n = t2 n) =>
+  smallo s1 t1 =>
+  smallo s2 t2.
+proof.
+  move=> eq_; rewrite /smallo.
+  apply/(eq_cnvto_from N) => n leNn /=.
+  by case: (eq_ _ leNn) => -> ->.
+qed.
+
+lemma smallo0 s :
+  smallo s (fun _ => 0%r).
+proof.
+  rewrite /smallo; move: (cnvtoC 0%r).
+  by apply/(eq_cnvto_from 0) => n le0n.
+qed.
+
+lemma smalloD s t1 t2 :
+  smallo s t1 =>
+  smallo s t2 =>
+  smallo s (fun n => t1 n + t2 n).
+proof.
+  rewrite /smallo => o1 o2; move: (cnvtoD _ _ _ _ o1 o2).
+  apply/(eq_cnvto_from 0) => n le0n /=.
+  by rewrite mulrDl.
+qed.
+
+lemma smalloN s t :
+  smallo s t =>
+  smallo s (fun n => - t n).
+proof.
+  rewrite /smallo => /cnvtoN.
+  apply/(eq_cnvto_from 0) => n le0n /=.
+  by rewrite mulNr.
+qed.
+
+lemma smalloM s1 s2 t1 t2 :
+  smallo s1 t1 =>
+  smallo s2 t2 =>
+  smallo (fun n => s1 n * s2 n) (fun n => t1 n * t2 n).
+proof.
+  rewrite /smallo => o1 o2; move: (cnvtoM _ _ _ _ o1 o2).
+  by apply/(eq_cnvto_from 0) => n le0n.
+qed.
+
+lemma smallo_sum ['a] s (P : 'a -> bool) F xs :
+  all (predU (predC P) ((smallo s) \o F)) xs =>
+  smallo s (fun n => Bigreal.BRA.big P (fun x => F x n) xs).
+proof.
+  elim: xs => [|x xs IHxs] /=.
+  + move: (smallo0 s); apply/(eq_smallo_from 0) => n le0n /=.
+    by rewrite Bigreal.BRA.big_nil.
+  case=> + /IHxs; rewrite /predU /(\o) or_andr /predC /=.
+  case=> [NPx|[Px ox] oxs].
+  + apply/(eq_smallo_from 0) => n le0n /=.
+    by rewrite Bigreal.BRA.big_cons /= NPx.
+  move: (smalloD _ _ _ ox oxs).
+  apply/(eq_smallo_from 0) => n le0n /=.
+  by rewrite Bigreal.BRA.big_cons /= Px.
+qed.
+
+lemma smallo_prod ['a] (P : 'a -> bool) F G xs :
+  has P xs =>
+  all (fun x => !(P x) \/ smallo (F x) (G x)) xs =>
+  smallo (fun n => Bigreal.BRM.big P (fun x => F x n) xs)
+         (fun n => Bigreal.BRM.big P (fun x => G x n) xs).
+proof.
+  elim: xs => [|x xs IHxs] //=; rewrite or_andl.
+  case=> [[Px NhasPxs]|hasPxs].
+  + rewrite Px /=; case=> + all_.
+    apply/(eq_smallo_from 0) => n le0n /=.
+    by rewrite !Bigreal.BRM.big_cons Px /= !Bigreal.BRM.big1_seq //;
+    move=> ? [? mem_]; move/hasPn/(_ _ mem_): NhasPxs.
+  case=> or_ all_; move: IHxs; rewrite hasPxs all_ /=; move: or_; rewrite or_andr /=.
+  case=> [NPx|[Px ox] oxs].
+  + apply/(eq_smallo_from 0) => n le0n /=.
+    by rewrite !Bigreal.BRM.big_cons /= NPx.
+  move: (smalloM _ _ _ _ ox oxs).
+  apply/(eq_smallo_from 0) => n le0n /=.
+  by rewrite !Bigreal.BRM.big_cons /= Px.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma smallo_bigO s t :
+  smallo s t =>
+  bigO s t.
+proof. by apply/bounded_cnvto. qed.
+
+lemma smallo_bigOM s1 s2 t1 t2 :
+  smallo s1 t1 =>
+  bigO s2 t2 =>
+  smallo (fun n => s1 n * s2 n) (fun n => t1 n * t2 n).
+proof.
+  rewrite /smallo /bigO => o1 O2; move: (cnvtoM_boundedr _ _ o1 O2).
+  by apply/(eq_cnvto_from 0) => n le0n.
+qed.
+
+lemma big0_smalloM s1 s2 t1 t2 :
+  bigO s1 t1 =>
+  smallo s2 t2 =>
+  smallo (fun n => s1 n * s2 n) (fun n => t1 n * t2 n).
+proof.
+  move=> O1 o2; move: (smallo_bigOM _ _ _ _ o2 O1).
+  apply/(eq_cnvto_from 0) => n le0n.
+  by rewrite /= (mulrC (s1 _)) (mulrC (t1 _)).
+qed.

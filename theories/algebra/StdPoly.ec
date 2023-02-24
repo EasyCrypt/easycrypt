@@ -61,6 +61,99 @@ theory PolyReal.
 
   import BigCf.
   import BigPoly.
+  import RealSeq.
+
+  
+  lemma bigOC c1 c2 :
+    bigO (fun k => peval (polyC c1) k%r) (fun k => peval (polyC c2) k%r).
+  proof. by exists `|c2 /c1| 0 => n le1n; rewrite !pevalC. qed.
+
+  lemma bigOXC c :
+    bigO (fun k => peval polyX k%r) (fun k => peval (polyC c) k%r).
+  proof.
+    exists `|c| 1 => n le1n; rewrite pevalC pevalX normrM.
+    apply/ler_pimulr; [by apply/normr_ge0|].
+    rewrite normrV; [by apply/gtr_eqF/lt_fromint/ltzE|].
+    rewrite gtr0_norm; [by apply/lt_fromint/ltzE|].
+    by apply/invr_le1; [apply/gtr_eqF/lt_fromint/ltzE|apply/lt_fromint/ltzE|apply/le_fromint].
+  qed.
+
+  lemma bigO_pevalXn n c :
+    0 <= n =>
+    bigO (fun k => peval (polyXn n) k%r) (fun k => peval (polyC c) k%r).
+  proof.
+    move=> le0n; move: (bigOC 1%r c) => Oc.
+    move: (bigO_prod predT (fun _ k => peval polyX k%r) (fun c k => peval (polyC c) k%r) (nseq n 1%r) _).
+    + by apply/allP => ? _; rewrite /predT /=; apply/bigOXC.
+    move=> OXn; move: (bigOM _ _ _ _ Oc OXn).
+    apply/(eq_bigO_from 0) => m le0m /= {Oc OXn}.
+    rewrite !pevalC !pevalXn le0n !Bigreal.BRM.big_nseq RField.expr1 /=.
+    elim: n le0n => [|n le0n] //=; [by rewrite !iter0 // RField.expr0|].
+    by rewrite !iterS //= pevalC => -[-> ?]; rewrite RField.exprS.
+  qed.
+
+  lemma bigO_pevalXn2 (m n : int) (p : poly) :
+    0 <= n <= m =>
+    bigO (fun k => peval (polyXn m) k%r) (fun k => peval (polyXn n) k%r).
+  proof.
+    case=> le0n lenm; move: (lenm); rewrite -subr_ge0; move=> le0_.
+    move: (bigO_id (fun k => peval (polyXn n) k%r) _) (bigO_pevalXn (m - n) 1%r le0_).
+    + by exists 1 => k le1k /=; rewrite pevalXn le0n /=; apply/gtr_eqF/expr_gt0/lt_fromint/ltzE.
+    move=> O1 O2; move: (bigOM _ _ _ _ O1 O2); apply/(eq_bigO_from 0) => k le0k /= {O1 O2}.
+    rewrite !pevalXn pevalC le0n le0_ (IntOrder.ler_trans _ _ _ le0n lenm) /=.
+    by rewrite -RField.exprD_nneg //= addrC -addrA.
+  qed.
+
+  lemma bigO_peval_deg (n : int) (p : poly) :
+    deg p < n =>
+    bigO (fun k => peval (polyXn n) k%r) (fun k => peval p k%r).
+  proof.
+    move=> lt_; rewrite polyE; pose s:= (fun k => _ _ k%r).
+    print bigO_sum.
+    move: (bigO_sum s predT (fun i k => p.[i] * peval (polyXn i) k%r) (range 0 (deg p)) _).
+    + apply/allP => i mem_i; rewrite /predU /predC /predT /(\o) /=.
+      admit.
+    apply/(eq_bigO_from 0) => m le0m /=; rewrite peval_sum.
+    apply/Bigreal.BRA.eq_big_seq => i /= mem_i.
+    rewrite pevalZ pevalXn peval_exp; [by move: mem_i; apply/mem_range_le|].
+    by rewrite pevalX; have ->//: 0 <= i; move: mem_i; apply/mem_range_le.
+  qed.
+
+  lemma smalloXC c :
+    smallo (fun k => peval polyX k%r) (fun k => peval (polyC c) k%r).
+  proof.
+    move=> e lt0e; exists (floor (`|c| / e) + 1) => n.
+    rewrite -le_fromint fromintD -ler_subr_addr => le_.
+    move: (floor_gt (`|c| / e)) => lt_; move: (ltr_le_trans _ _ _ lt_ le_).
+    move=> /ltr_add2r {le_ lt_}; rewrite pevalC pevalX /= normrM => lt_.
+    have lt0n: 0%r < n%r by apply/(ler_lt_trans _ _ _ _ lt_)/mulr_ge0; [apply/normr_ge0|apply/invr_ge0/ltrW].
+    rewrite normrV; [by apply/gtr_eqF|]; rewrite (gtr0_norm n%r) //.
+    by apply/ltr_pdivr_mulr => //; apply/ltr_pdivr_mull.
+  qed.
+
+  lemma smallo_pevalXn n c :
+    0 < n =>
+    smallo (fun k => peval (polyXn n) k%r) (fun k => peval (polyC c) k%r).
+  proof.
+    move=> lt0n.
+    move: (smallo_prod predT (fun _ k => peval polyX k%r) (fun c k => peval (polyC c) k%r) (c :: nseq (n - 1) 1%r) _ _).
+    + admit.
+    + admit.
+    apply/(eq_smallo_from 0) => m le0m /=.
+    rewrite !Bigreal.BRM.big_cons /(predT c) !pevalXn pevalC RField.expr1 /=.
+    rewrite ltzW //= !Bigreal.BRM.big_nseq; move: lt0n.
+    rewrite -(subrK n 1); move: (n - 1) => {n} n /ltzS le0n /=.
+    rewrite RField.exprS // pevalC.
+    elim: n le0n => [|n le0n] //=; [by rewrite !iter0 // RField.expr0|].
+    by rewrite !iterS //= pevalC => -[-> ?]; rewrite RField.exprS.
+  qed.
+
+  lemma smallo_pevalXn2 (m n : int) (p : poly) :
+    n < m =>
+    smallo (fun k => peval (polyXn m) k%r) (fun k => peval (polyXn n) k%r).
+  proof.
+    admit.
+  qed.
 
   lemma lc_lt0_lim p :
     (0%r < lc p /\ 1 < deg p) <=>
