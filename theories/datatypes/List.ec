@@ -3433,6 +3433,18 @@ qed.
 
 end section ListMax.
 
+lemma maxr_seq (f : 'a -> real) (s : 'a list) x0 : 
+  x0 \in s => exists x, x \in s /\ forall y, y \in s => f y <= f x.
+proof.
+by case: s => // x s _; elim: s x => {x0} [|y s IHs] x; smt().
+qed.
+
+lemma maxz_seq (f : 'a -> int) (s : 'a list) x0 : 
+  x0 \in s => exists x, x \in s /\ forall y, y \in s => f y <= f x.
+proof.
+by case: s => // x s _; elim: s x => {x0} [|y s IHs] x; smt().
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                          Order lifting                               *)
 (* -------------------------------------------------------------------- *)

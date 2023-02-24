@@ -24,7 +24,7 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List Binomial.
 require import Ring StdRing StdOrder StdBigop Discrete.
-require import RealFun RealSeq RealSeries.
+require import RealFun RealSeq RealSeries RealFLub.
 (*---*) import IterOp Bigint Bigreal Bigreal.BRA.
 (*---*) import IntOrder RealOrder RField.
 require import Finite FinType.
@@ -440,25 +440,30 @@ by rewrite mu_mem_uniq ?filter_uniq ?uniq_to_seq // big_filter.
 qed.
 
 (* -------------------------------------------------------------------- *)
+
+lemma mu_pos_fin (d : 'a distr) eps :
+  0%r < eps => is_finite (fun x => eps <= mu1 d x).
+proof.
+move => eps_gt0; pose E x := eps <= mu1 d x.
+suff: !is_finite E => 1%r < mu d E by smt(mu_bounded).
+move => nFE; have := NfiniteP (ceil (inv eps) + 1) E _ nFE; 1: smt(ceil_ge).
+case => L /> size_L L_uniq sub_L_E.
+apply (ltr_le_trans (mu d (mem L))); last by apply mu_le => /#.
+rewrite mu_mem_uniq //.
+apply (ltr_le_trans (big predT (fun (x : 'a) => eps) L));
+  last by apply ler_sum_seq.
+rewrite sumr_const count_predT intmulr.
+apply (ltr_le_trans (eps * (ceil (inv eps) + 1)%r)); last smt().
+apply (ltr_le_trans (eps * ((inv eps) + 1%r))); first smt().
+by rewrite ler_pmul2l //; smt(ceil_ge).
+qed.
+
 lemma uniform_finite ['a] (d : 'a distr) :
   is_uniform d => is_finite (support d).
 proof.
-move=> uf_d; case: (is_finite (support d)) => //.
-(* FIXME: not having the explicit proof arg leads to InvalidGoalShape *)
-move=> ^h /(NfiniteP 1 _ lez01) [] [//|x s [_] xsd].
-have {xsd s} xd: x \in d by apply/xsd.
-pose r := 1 + ceil (1%r / mu1 d x).
-have ge0_cr: 0 <= r by smt(ceil_bound).
-case/(NfiniteP _ _ ge0_cr): h => s [[sz_s uq_s] les].
-have := le1_mu d (mem s); rewrite mu_mem_uniq //.
-rewrite big_seq -(@eq_bigr _ (fun _ => mu1 d x)).
-+ by move=> y /= /les yd; apply/uf_d.
-rewrite -big_seq Bigreal.sumr_const count_predT negP -ltrNge.
-apply/(@ltr_le_trans (r%r * mu1 d x)); last first.
-+ by apply/ler_wpmul2r/le_fromint => //; apply/ge0_mu1.
-have h: 0%r <> mu1 d x by rewrite ltr_eqF.
-apply (ltr_le_trans ((1%r + 1%r/mu1 d x) * mu1 d x)); 1: smt.
-smt (ceil_bound).
+case (exists x, x \in d) => [[x x_d] d_uni|]; last smt(finite0).
+have -> : support d = (fun y => mu1 d x <= mu1 d y) by smt().
+exact mu_pos_fin.
 qed.
 
 lemma mu1_uni ['a] (d : 'a distr) x : is_uniform d => mu1 d x =
@@ -506,6 +511,56 @@ by move=> funi1 ll1 funi2 ll2; apply: eq_funi => //; rewrite ll1 ll2.
 qed.
 
 (* -------------------------------------------------------------------- *)
+
+(* probability of the most likely output *)
+op p_max (p: 'a distr) = flub (mu1 p).
+
+lemma has_fub_mu1 (d: 'a distr) : has_fub (mu1 d).
+proof. by apply (@ler_has_fub _ (fun _ => 1%r)) => // /#. qed.
+
+lemma pmax_ge0 (p: 'a distr) :
+  0%r <= p_max p.
+proof.
+suff: mu1 p witness <= p_max p by smt(ge0_mu).
+apply (@flub_upper_bound (mu1 p)); smt(le1_mu).
+qed.
+
+lemma pmax_gt0 (p: 'a distr) x :
+  x \in p => 0%r < p_max p.
+proof.
+move => in_xp; suff: p_max p >= mu1 p x by smt(ge0_mu).
+apply (@flub_upper_bound (mu1 p)); smt(le1_mu).
+qed.
+
+lemma pmax_le1 (p: 'a distr) :
+  p_max p <= 1%r.
+proof. by rewrite flub_le_ub. qed.
+
+lemma pmax_upper_bound (d: 'a distr) (x: 'a) :
+  mu1 d x <= p_max d.
+proof.
+apply (@flub_upper_bound (mu1 d) x); exists 1%r => /=.
+by move => ?; apply le1_mu.
+qed.
+
+lemma uniform_pmaxE (d: 'a distr) :
+  is_uniform d =>
+  p_max d = weight d / (size (to_seq (support d)))%r.
+proof.
+move => unif_d; apply eqr_le; split.
+- apply flub_le_ub => /= x.
+  rewrite mu1_uni //.
+  case (x \in d) => _; first by trivial.
+  apply divr_ge0; first exact ge0_weight.
+  smt(size_ge0).
+- move => _; case (weight d = 0%r) => ?; first by smt(pmax_ge0).
+  have [x in_xd]: exists x, x \in d by smt(witness_support ge0_mu).
+  have <-: mu1 d x = weight d / (size (to_seq (support d)))%r by smt(mu1_uni).
+  apply (@flub_upper_bound (mu1 d)) => /=; smt(le1_mu).
+qed.
+
+(* -------------------------------------------------------------------- *)
+
 op mnull ['a] = fun (x : 'a) => 0%r.
 op dnull ['a] = mk mnull<:'a>.
 
@@ -545,6 +600,20 @@ lemma weight_eq0_dnull ['a] (d : 'a distr) : weight d = 0%r => d = dnull.
 proof.
 by move=> /weight_eq0 dx_eq0; apply/eq_distr=> x; rewrite dnull1E dx_eq0.
 qed.
+
+lemma distr_0Vmem (d : 'a distr) : d = dnull \/ exists x, x \in d.
+proof.
+have := pred_0Vmem (support d); smt(support_eq0 supportP).
+qed.
+
+lemma pmax_dnull ['a] : p_max dnull<:'a> = 0%r.
+proof.
+rewrite /p_max.
+have ->: (mu1 dnull<:'a>) = fun _ => 0%r by smt(dnull1E).
+exact flub_const.
+qed.
+
+
 
 (* -------------------------------------------------------------------- *)
 theory MRat.
@@ -702,6 +771,15 @@ proof. by move=> x1 x2;rewrite !supp_dunit => -> ->. qed.
 
 lemma finite_dunit ['a] (x : 'a) : is_finite (support (dunit x)).
 proof. by apply/uniform_finite/dunit_uni. qed.
+
+lemma pmax_dunit (x: 'a) :
+  p_max (dunit x) = 1%r.
+proof.
+rewrite eqr_le pmax_le1 /=.
+apply: ler_trans (pmax_upper_bound (dunit x) x).
+by rewrite dunit1E.
+qed.
+
 end MUnit.
 export MUnit.
 
@@ -833,6 +911,20 @@ proof. apply MUniform.duniform_uni. qed.
 end MIntUniform.
 
 export MIntUniform.
+
+
+(* -------------------------------------------------------------------- *)
+
+(* Even though p_max is defined as a lub, the maximum is always attained*)
+lemma pmaxE (d : 'a distr) : exists x, p_max d = mu1 d x.
+proof.
+have [->|[x x_d]] := distr_0Vmem d.
+- by exists witness; rewrite pmax_dnull dnullE.
+have [L memL] := mu_pos_fin d (mu1 d x) _; 1: smt(ge0_mu).
+have [y /= [y_L y_max]] := maxr_seq (mu1 d) L x _; 1: smt().
+exists y; rewrite eqr_le pmax_upper_bound /=.
+by apply flub_le_ub => z /#.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op mlet ['a 'b] (d : 'a distr) (f : 'a -> 'b distr) =
@@ -1565,6 +1657,11 @@ case (x \in d) => [x_d|]; last by move/supportPn => -> /#.
 suff muP : 0%r < mu d p by rewrite ler_pdivl_mulr //; smt(mu_bounded).
 by apply/witness_support; exists x.
 qed.
+
+lemma finite_dcond (d : 'a distr) (p : 'a -> bool) : 
+  is_finite (support d) => is_finite (support (dcond d p)).
+proof. by apply finite_leq => x /dcond_supp. qed.
+
 
 lemma dcondZ (d: 'a distr) (P: 'a -> bool) :
   mu d P = 0%r <=> dcond d P = dnull.
