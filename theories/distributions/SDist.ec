@@ -25,8 +25,8 @@ op sdist (d1 d2 : 'a distr) = flub (fun E => `|mu d1 E - mu d2 E|).
 lemma sdist_upper_bound (d1 d2 : 'a distr) E : 
   `|mu d1 E - mu d2 E| <= sdist d1 d2.
 proof.
-apply (flub_upper_bound 1%r (fun E => `|mu d1 E - mu d2 E|)).
-move => {E} E /=; smt(mu_bounded).
+apply (flub_upper_bound (fun E => `|mu d1 E - mu d2 E|)).
+by exists 1%r; smt(mu_bounded).
 qed.
  
 lemma sdist_le_ub (d1 d2 : 'a distr) r :
@@ -121,7 +121,8 @@ have <- : `| Sp - Sn | = `|weight d1 - weight d2|.
   by congr; apply eq_sum => x /= /#.
 suff : flub F = Sp by rewrite /sdist -/F; smt(ler_def).
 apply ler_anti; split => [|_]; last first. 
-- apply (ler_trans (F pos)); 2: by apply (flub_upper_bound 1%r); smt(mu_bounded).
+- apply (ler_trans (F pos)); last first.
+  + by apply (flub_upper_bound); exists 1%r; rewrite /is_fub; smt(mu_bounded).
   rewrite /Sp /F /f !muE -sumB /=; 1,2: exact summable_mu1_cond.
   apply (ler_trans _ _ _ _ (ler_norm _)). 
   apply ler_sum;  [smt()|apply/summable_cond/summable_sdist|].

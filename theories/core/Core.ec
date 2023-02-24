@@ -300,3 +300,5 @@ proof. by move=> x @/predI [] _ ->. qed.
 
 lemma nosmt predTofV (f : 'a -> 'b): predT \o f = predT.
 proof. by apply/fun_ext=> x. qed.
+
+lemma pred_0Vmem (p : 'a -> bool) : p = pred0 \/ exists x, p x by smt().
