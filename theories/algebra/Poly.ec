@@ -816,7 +816,7 @@ theory BigPoly.
 clone include BigComRing with theory CR <- PolyComRing
 
   remove abbrev CR.(-)
-  remove abbrev CR.(/) 
+  remove abbrev CR.(/)
 
   rename [theory] "BAdd" as "PCA"
          [theory] "BMul" as "PCM".
@@ -1238,7 +1238,7 @@ proof. move=> ge0_n; split.
 - case/supp_dmap=> xs [/(supp_dlist _ _ _ ge0_n)].
   case=> ^szxs <- /allP hcf ->; rewrite degL_le /=.
   by move=> i [ge0_i lei]; rewrite polyLE; apply/hcf/mem_nth.
-- case=> degp hcf; apply/supp_dmap; case: (surj_polyL _ _ degp).  
+- case=> degp hcf; apply/supp_dmap; case: (surj_polyL _ _ degp).
   move=> xs [^szxs <- ^pE ->]; exists xs => //=; apply/supp_dlist => /=.
   - by apply/size_ge0.
   apply/allP=> c ^c_in_xs /(nth_index Coeff.zeror) <-.
@@ -1278,7 +1278,9 @@ clone include PolyComRing with
   type poly         <- poly,
   theory Coeff      <- IDCoeff.
 
+(*
 clear [PolyComRing.AddMonoid.* PolyComRing.MulMonoid.*].
+*)
 
 import BigCf.
 
@@ -1299,14 +1301,14 @@ op polyV (p : poly) =
 
 (* -------------------------------------------------------------------- *)
 clone import Ring.IDomain as IDPoly with
-  type t      <- poly ,
-    op zeror  <- poly0,
-    op oner   <- poly1,
-    op ( + )  <- polyD,
-    op [ - ]  <- polyN,
-    op ( * )  <- polyM,
-    op invr   <- polyV,
-  pred unit   <- unitp
+  type t      <= poly ,
+    op zeror  <= poly0,
+    op oner   <= poly1,
+    op ( + )  <= polyD,
+    op [ - ]  <= polyN,
+    op ( * )  <= polyM,
+    op invr   <= polyV,
+  pred unit   <= unitp
 
   proof *
 
