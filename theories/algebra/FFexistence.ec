@@ -632,7 +632,15 @@ theory Counting_Argument.
     0 < n =>
     exists (q : int) , forall r , q <= r => 0 < I n r.
   proof.
-    admit.
+    move=> lt0n; move: (gt0lc_cnvtopi (PI n) _ _).
+    + rewrite (eqdeg_PI (n - 1)) /=; [by apply/ltzS|].
+      by apply/ltr_subl_addr.
+    + rewrite (lc_PI (n - 1)) /=; [by apply/ltzS|].
+      by apply/StdOrder.RealOrder.invr_gt0/lt_fromint.
+    case/(_ 1%r) => q lt_; exists q => r leqr.
+    move/(_ _ leqr): lt_; rewrite /I; pose x:= peval _ _; move=> lt_.
+    apply/lt_fromint/(StdOrder.RealOrder.ler_lt_trans _ _ _ _ (floor_gt x)).
+    by apply/StdOrder.RealOrder.subr_ge0/StdOrder.RealOrder.ltrW.
   qed.
 
 end Counting_Argument.

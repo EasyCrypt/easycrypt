@@ -92,7 +92,7 @@ theory PolyReal.
     by rewrite !iterS //= pevalC => -[-> ?]; rewrite RField.exprS.
   qed.
 
-  lemma bigO_pevalXn2 (m n : int) (p : poly) :
+  lemma bigO_pevalXn2 (m n : int) :
     0 <= n <= m =>
     bigO (fun k => peval (polyXn m) k%r) (fun k => peval (polyXn n) k%r).
   proof.
@@ -105,14 +105,15 @@ theory PolyReal.
   qed.
 
   lemma bigO_peval_deg (n : int) (p : poly) :
-    deg p < n =>
+    deg p <= n + 1 =>
     bigO (fun k => peval (polyXn n) k%r) (fun k => peval p k%r).
   proof.
     move=> lt_; rewrite polyE; pose s:= (fun k => _ _ k%r).
-    print bigO_sum.
     move: (bigO_sum s predT (fun i k => p.[i] * peval (polyXn i) k%r) (range 0 (deg p)) _).
     + apply/allP => i mem_i; rewrite /predU /predC /predT /(\o) /=.
-      admit.
+      move: (bigOM _ _ _ _ (bigOC 1%r p.[i]) (bigO_pevalXn2 n i _)).
+      - by apply/le2_mem_range; move: mem_i; apply/mem_range_incl.
+      by apply/(eq_bigO_from 0) => m le0m /=; rewrite /s !pevalC.
     apply/(eq_bigO_from 0) => m le0m /=; rewrite peval_sum.
     apply/Bigreal.BRA.eq_big_seq => i /= mem_i.
     rewrite pevalZ pevalXn peval_exp; [by move: mem_i; apply/mem_range_le|].
@@ -135,67 +136,74 @@ theory PolyReal.
     0 < n =>
     smallo (fun k => peval (polyXn n) k%r) (fun k => peval (polyC c) k%r).
   proof.
-    move=> lt0n.
-    move: (smallo_prod predT (fun _ k => peval polyX k%r) (fun c k => peval (polyC c) k%r) (c :: nseq (n - 1) 1%r) _ _).
-    + admit.
-    + admit.
-    apply/(eq_smallo_from 0) => m le0m /=.
-    rewrite !Bigreal.BRM.big_cons /(predT c) !pevalXn pevalC RField.expr1 /=.
-    rewrite ltzW //= !Bigreal.BRM.big_nseq; move: lt0n.
-    rewrite -(subrK n 1); move: (n - 1) => {n} n /ltzS le0n /=.
-    rewrite RField.exprS // pevalC.
-    elim: n le0n => [|n le0n] //=; [by rewrite !iter0 // RField.expr0|].
-    by rewrite !iterS //= pevalC => -[-> ?]; rewrite RField.exprS.
+    move=> lt0n; move: (smallo_bigOM _ _ _ _ (smalloXC 1%r) (bigO_pevalXn (n - 1) c _)).
+    + by apply/ltzS.
+    apply/(eq_smallo_from 0) => m le0m /=; rewrite pevalC !pevalXn /=.
+    by rewrite RField.expr1 -ltzS /= lt0n ltzW //= -RField.exprS // -ltzS.
   qed.
 
   lemma smallo_pevalXn2 (m n : int) (p : poly) :
-    n < m =>
+    0 <= n < m =>
     smallo (fun k => peval (polyXn m) k%r) (fun k => peval (polyXn n) k%r).
   proof.
-    admit.
+    move=> [le0n ltnm]; move: (smallo_bigOM _ _ _ _ (smalloXC 1%r) (bigO_pevalXn2 (m - 1) n _)).
+    + by split => // _; apply/ltzS.
+    apply/(eq_smallo_from 0) => k le0k /=; rewrite pevalC !pevalXn /=.
+    rewrite RField.expr1 -ltzS /=; move: (IntOrder.ler_lt_trans _ _ _ le0n ltnm).
+    by move=> lt0m; rewrite lt0m ltzW //= -RField.exprS // -ltzS.
   qed.
 
-  lemma lc_lt0_lim p :
-    (0%r < lc p /\ 1 < deg p) <=>
-    (forall M , exists x , forall (y : real) , x < y => M < peval p y).
+  lemma smallo_peval_deg (n : int) (p : poly) :
+    deg p <= n =>
+    smallo (fun k => peval (polyXn n) k%r) (fun k => peval p k%r).
   proof.
-    case/IntOrder.ler_eqVlt: (ge0_deg p) => [/eq_sym /deg_eq0 ->>|].
-    + rewrite lc0 deg0 /= negb_forall /=; exists 1%r.
-      rewrite negb_exists /= => a; rewrite negb_forall /=.
-      by exists (a + 1%r); rewrite peval0 negb_imply ltr_addl -lerNgt ler01 ltr01.
-    case/ltzE/IntOrder.ler_eqVlt => /= [/eq_sym /deg_eq1 [c] [neqc0 ->>]|lt1d].
-    + rewrite degC neqc0 /= negb_forall /=; exists (c + 1%r).
-      rewrite negb_exists /= => a; rewrite negb_forall /=; exists (a + 1%r).
-      by rewrite negb_imply ltr_addl ltr01 /= pevalC -lerNgt ler_addl ler01.
-    rewrite lt1d /=; move: (lc_eq0 p); rewrite -deg_eq0 IntOrder.gtr_eqF /=.
-    + by apply/(IntOrder.ler_lt_trans _ _ _ _ lt1d).
-    move/ltr_total => [ltlc0|lt0lc]; [rewrite ltrNge ltrW //=|rewrite lt0lc /= => C].
-    + rewrite negb_forall /=; exists 0%r; rewrite negb_exists /= => a; rewrite negb_forall /=.
-      pose M:= maxr (maxr 0%r a) (- BRA.bigi predT (fun k => `|p.[k]|) 0 (deg p - 1) / lc p).
-      exists (M + 1%r); rewrite negb_imply; split.
-      - apply/(ler_lt_trans M); [rewrite /M => {M}|by apply/ltr_addl].
-        by apply/ger_maxrP; left; apply/ger_maxrP; right.
-      rewrite -lerNgt (peval_extend (deg p)) // -(subrK (deg p) 1) rangeSr.
-      - by rewrite subr_ge0 ltzW.
-      rewrite Bigreal.BRA.big_rcons {1}/predT /= -ler_subr_addr /=.
-      apply/(ler_trans _ _ _ (ler_sum_seq _ _ (fun i => `|p.[i]| * (M + 1%r) ^ i) _ _) _).
-      - move=> k mem_k _ /=; rewrite ler_pmul2r ?ler_norm // expr_gt0.
-        apply/(ler_lt_trans M); [rewrite /M => {M}|by apply/ltr_addl].
-        by apply/ger_maxrP; left; apply/ger_maxrP; left.
-      apply/(ler_trans _ _ _ (ler_sum_seq _ _ (fun i => `|p.[i]| * (M + 1%r) ^ (deg p - 2)) _ _) _).
-      - move=> k mem_k _ /=; apply/ler_wpmul2l; [by apply/normr_ge0|].
-        apply/ler_weexpn2l; [|by apply/le2_mem_range; move: mem_k; apply/mem_range_incl].
-        by apply/ler_subl_addr => /=; apply/ger_maxrP; left; apply/ger_maxrP; left.
-      rewrite -Bigreal.BRA.mulr_suml -RField.mulNr -(subrK (deg p - 1) 1) RField.exprS /=.
-      - by rewrite -ltzS /= subr_gt0.
-      rewrite RField.mulrA ler_pmul2r; [apply/expr_gt0|].
-      - apply/(ler_lt_trans M); [rewrite /M => {M}|by apply/ltr_addl].
-        by apply/ger_maxrP; left; apply/ger_maxrP; left.
-      rewrite RField.mulrC -ler_pdivr_mulr ?oppr_gt0 // RField.invrN RField.mulrN.
-      by apply/(ler_trans M); [rewrite /M => {M}; apply/ger_maxrP; right|apply/ler_addl].
-    pose M:=
-      maxr 0%r (- (`|p.[0] - C| + BRA.bigi predT (fun k => `|p.[k]|) 1 (deg p - 1)) / lc p).
-    exists M; move=> y; apply/contraLR; rewrite -!lerNgt.
-    admit.
+    move=> le_n; case/IntOrder.ler_eqVlt: (ge0_deg p) => [|lt0_].
+    + move/eq_sym/deg_eq0 => ->>; move: le_n; rewrite deg0 => le0n.
+      pose s:= (fun k => _ _ k%r); move: (smallo0 s).
+      by apply/(eq_smallo_from 0) => k le0k /=; rewrite pevalC.
+    move: (smallo_bigOM _ _ _ _ (smalloXC 1%r) (bigO_peval_deg (n - 1) p le_n)).
+    apply/(eq_smallo_from 0) => k le0k /=; rewrite pevalC !pevalXn /=.
+    rewrite RField.expr1 -ltzS /=; move: (IntOrder.ltr_le_trans _ _ _ lt0_ le_n).
+    by move=> lt0n; rewrite lt0n ltzW //= -RField.exprS // -ltzS.
+  qed.
+
+  lemma gt0lc_cnvtopi p :
+    1 < deg p =>
+    0%r < lc p =>
+    convergetopi (fun k => peval p k%r).
+  proof.
+    move=> lt1_ lt0lc M.
+    move: (smallo_peval_deg (deg p - 1) (p - lc p ** polyXn (deg p - 1)) _).
+    + apply/deg_leP => [|i /IntOrder.ler_eqVlt [<<-|/ltzE /= le_i]].
+      - by apply/ltzW/ltzE/ltzS.
+      - rewrite polyDE polyNE polyZE polyXnE /= ltzW //.
+        by apply/ltzE/ltzS.
+      rewrite polyDE polyNE polyZE polyXnE /= (IntOrder.gtr_eqF i) /=.
+      - by apply/ltzE.
+      by apply/gedeg_coeff.
+    move=> /(_ (lc p / 2%r) _); [by apply/divr_gt0|].
+    case=> N le_; exists (max (max 1 (floor (2%r * M / lc p) + 1)) N).
+    move=> n /IntOrder.ler_maxrP [/IntOrder.ler_maxrP []].
+    move=> /ltzS/IntOrder.ltr_subl_addr /= lt0n.
+    move=> /IntOrder.ler_subr_addr /le_fromint le_floor leNn.
+    move: (ltr_le_trans _ _ _ (floor_gt (2%r * M / lc p)) le_floor).
+    move=> {le_floor}; rewrite fromintB ltr_add2r.
+    rewrite ltr_pdivr_mulr // -ltr_pdivl_mull // => lt_.
+    apply/(ltr_le_trans _ _ _ lt_) => {lt_}.
+    move/(_ _ leNn): le_.
+    rewrite pevalB pevalZ pevalXn ltzW /=.
+    + by apply/ltzE/ltzS.
+    rewrite ltr_norml.
+    case=> + _; rewrite ltr_pdivl_mulr.
+    + by apply/expr_gt0/lt_fromint.
+    move/ltr_subr_addr; rewrite -RField.mulrDl.
+    move/ltrW; rewrite (RField.addrC _ (lc p)).
+    rewrite -{1}(RField.mulr1 (lc p)) -RField.mulrN -RField.mulrDr.
+    apply/ler_trans; rewrite (RField.mulrC n%r) -!RField.mulrA ler_pmul2l //.
+    rewrite (RField.mulrC n%r); apply/ler_pmul.
+    + by apply/invr_ge0.
+    + by apply/le_fromint/ltzW.
+    + by apply/(ler_pmul2l 2%r).
+    by apply/ler_eexpr; [apply/IntOrder.subr_gt0|apply/le_fromint/IntOrder.subr_ge0/ltzS].
   qed.
 end PolyReal.

@@ -715,6 +715,13 @@ proof.
   by apply/(eq_cnvto_from 0) => n le0n.
 qed.
 
+lemma smallo_id s :
+  smallo s (fun _ => 0%r).
+proof.
+  rewrite /smallo; move: (cnvtoC 0%r).
+  by apply/(eq_cnvto_from 0) => n le0n.
+qed.
+
 lemma smalloD s t1 t2 :
   smallo s t1 =>
   smallo s t2 =>
@@ -795,7 +802,7 @@ proof.
   by apply/(eq_cnvto_from 0) => n le0n.
 qed.
 
-lemma big0_smalloM s1 s2 t1 t2 :
+lemma bigO_smalloM s1 s2 t1 t2 :
   bigO s1 t1 =>
   smallo s2 t2 =>
   smallo (fun n => s1 n * s2 n) (fun n => t1 n * t2 n).
