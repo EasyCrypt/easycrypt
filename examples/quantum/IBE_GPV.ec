@@ -490,7 +490,7 @@ local module ASCDt (H:QRO) = {
 local lemma l2 &m lam :
   0.0 <= lam <= 1.0 => 
   `|Pr[G(Init2).main(lam) @ &m : res] - Pr[G(Init1).main(lam) @ &m : res] | <=
-   (2%r * q%r + qe%r + 1%r) / 4.0 * lam ^2.
+   (2%r * q%r + qe%r + 1%r)^4 / 4.0 * lam ^2.
 proof.
   move=> lam_bound.
   rewrite (pr_split lam Init2).
@@ -675,24 +675,32 @@ qed.
 local lemma l4 &m lam: 
   0.0 < lam <= 1.0 =>
   lam * `|Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res] - 0.5|
-    - (2%r * q%r + 5.0* qe%r + 1%r) / 4.0 * lam ^2
+    - ((2%r * q%r + qe%r + 1%r)^4 + 4%r*qe%r) / 4.0 * lam ^2
     <= `|Pr[CPA(B(A), ES(E)).main(lam) @ &m : res]- 0.5|.
-proof. move: (l1 &m) (l2 &m) (l3 &m) => /#. qed.
+proof. 
+move => Hl.
+move: (l1 &m lam Hl) (l2 &m lam _) (l3 &m lam)  => *; 1: by smt().
+by smt().
+qed.
 
 local lemma conclusion &m:
   let eps = `|Pr[IDCPA_QROM(A,GPV(E)).main() @ &m : res] - 0.5| in
-  let lam = (2.0 * eps) / (2%r * q%r + 5.0*qe%r + 1%r) in 
-  eps^2 / (2%r * q%r + 5.0*qe%r + 1%r) <=
+  let lam = (2.0 * eps) / ((2%r * q%r + qe%r + 1%r)^4 + 4%r*qe%r) in 
+  eps^2 / ((2%r * q%r + qe%r + 1%r)^4 + 4%r*qe%r) <=
      `|Pr[CPA(B(A), ES(E)).main(lam) @ &m : res]- 0.5|.
 proof.
   move=> eps; case: (eps = 0%r).
   + by move: eps => />; rewrite expr2 /= /#.
-  move=> heps lam.
-  have h1 : 0%r < (2%r * q%r + 5%r * qe%r + 1%r) by smt(ge0_qh ge0_qe).
+  move=> heps lam.  search exp (0%r <= _).
+  have h1 : 0%r < ((2%r * q%r + qe%r + 1%r)^4 + 4%r*qe%r) by smt(ge0_qe ge0_qh expr_gt0). 
   have := l4 &m lam _.
-  + rewrite ler_pdivr_mulr => //; smt(mu_bounded ge0_qe ge0_qh).
-  apply/ler_trans/lerr_eq; rewrite -/eps /lam;field => //.
-  smt(). 
+  + rewrite ler_pdivr_mulr => //;smt(mu_bounded ge0_qe ge0_qh exprn_ege1).
+  apply/ler_trans/lerr_eq; rewrite -/eps /lam;field => //. 
+  move : ge0_qh ge0_qe => *; have  ge0_q : 0< q by smt().
+  have  H: forall n qq, 0 < n => 0 <= qq => qq%r^n = qq%r^(n-1)*qq%r by smt(exprS). 
+  do !(rewrite H 1,2:/# /= ?expr0 /=). 
+  rewrite -!addrA; pose xx := 8%r * qe%r + _.
+  have ?: 0%r <= xx;  by smt().
 qed.
 
 end section.

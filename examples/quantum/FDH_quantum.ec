@@ -407,7 +407,7 @@ local lemma l4 lam &m :
   0.0 <= lam <= 1.0 => 
   `| Pr[SCD(ASCD)._F0(lam) @ &m : res] - 
      Pr[SCD(ASCD)._F1(lam) @ &m: res] | 
-   <= (2%r * q%r + qs%r + 1%r)/ 6%r * lam^2.
+   <= (2%r * q%r + qs%r + 1%r)^4/ 6%r * lam^2.
 proof.
   move=> lam_bound.
   apply (advantage q lam ASCD &m lam_bound _).
@@ -444,15 +444,16 @@ proof.
   smt(dfsign_dfhash f_finv finv_f).
 qed.
 
+(* Fixed: not sure if this is the best bound *)
 lemma conclusion lam &m :
   0.0 < lam < 1.0 => 
   Pr[EUF_QROM(A,FDH).main() @ &m : res] <=
   Pr[OW(B(A)).main(lam) @ &m : res] / (lam * (1%r - lam) ^ qs) + 
-   (2*qh + 3*qs + 3)%r/ 6%r * lam / (1%r - lam) ^ qs. 
+   (2*qh + 3*qs + 3)%r^4/ 6%r * lam / (1%r - lam) ^ qs. 
 proof. 
   move=> lam_bound.
   have : lam * (1%r - lam) ^ qs * Pr[EUF_QROM(A,FDH).main() @ &m : res] <=
-         Pr[OW(B(A)).main(lam) @ &m : res] + (2%r * q%r + qs%r + 1%r)/ 6%r * lam^2. 
+         Pr[OW(B(A)).main(lam) @ &m : res] + (2%r * q%r + qs%r + 1%r)^4/ 6%r * lam^2. 
   + by move: (l1 A hoare_bound lam &m) lam_bound (l3 lam &m) (l4 lam &m) (l5 lam &m) => /#. 
   rewrite /q !fromintD -ler_pdivl_mull; 1: smt (expr_gt0).
   move=> h; apply/(ler_trans _ _ _ h)/lerr_eq; field => //; smt (expr_gt0).
@@ -461,7 +462,7 @@ qed.
 (* Proof of the Zhandry's bound *)
 lemma conclusion_z &m :
   let eps = Pr[EUF_QROM(A,FDH).main() @ &m : res] in
-  let k = (2.0*qh%r + 9.0 * qs%r + 3.0)/6.0 in
+  let k = ((2.0*qh%r + 3.0 * qs%r + 3.0)^4 + 6.0*qs%r)/6.0 in
   let lam = eps / (2.0 * k) in 
   eps ^ 2 / (4.0 * k) <= Pr[OW(B(A)).main(lam) @ &m : res].
 proof.
@@ -470,22 +471,24 @@ proof.
   + by move=> -> /=; rewrite expr0z /=; smt(mu_bounded).
   rewrite -/eps => h0eps.
   apply: ler_trans (l5 lam &m).
-  have : Pr[SCD(ASCD)._F0(lam) @ &m : res] - (2%r * q%r + qs%r + 1%r)/ 6%r * lam^2 <= 
+  have : Pr[SCD(ASCD)._F0(lam) @ &m : res] - (2%r * q%r + qs%r + 1%r)^4/ 6%r * lam^2 <= 
              Pr[SCD(ASCD)._F1(lam) @ &m : res].
-  + by have := l4 lam &m; smt (mu_bounded gt0_qs ge0_qh).
+  + by have := l4 lam &m; smt (mu_bounded gt0_qs ge0_qh expr_ge0).
   apply: ler_trans.
   rewrite -(l3 lam &m).
   apply (ler_trans 
-     (lam * (1%r - lam) ^ qs * eps - (2%r * q%r + qs%r + 1%r) / 6%r * lam ^ 2)); last first.
-  + by have := l1 A hoare_bound lam &m;smt(mu_bounded gt0_qs ge0_qh).
+     (lam * (1%r - lam) ^ qs * eps - (2%r * q%r + qs%r + 1%r)^4 / 6%r * lam ^ 2)); last first.    + have := l1 A hoare_bound lam &m _ ; by smt(mu_bounded  gt0_qs ge0_qh expr_ge0).
   apply (@ler_trans
-    (lam * eps - qs%r * lam ^2 - (2%r * q%r + qs%r + 1%r) / 6%r * lam ^ 2)).
-  + by apply lerr_eq; rewrite /lam /q /k !fromintD; field => //; smt(gt0_qs ge0_qh).
+    (lam * eps - qs%r * lam ^2 - (2%r * q%r + qs%r + 1%r)^4 / 6%r * lam ^ 2)).
+  have  H: forall n qq, 0 < n => 0 <= qq => qq%r^n = qq%r^(n-1)*qq%r by smt(exprS). 
+  move : gt0_qs ge0_qh  => *; have Hq : 0 < q by smt().
+  + apply lerr_eq; rewrite /lam /q /k !fromintD; field => //;
+      do !(rewrite H 1,2:/# /= ?expr0 /=); 1,2: by smt().
   rewrite ler_add2.
   apply (ler_trans (lam * (1%r -qs%r*lam) * eps)); last first.
   + apply ler_wpmul2r; 1: smt(mu_bounded).
-    apply ler_wpmul2l; 1: smt(mu_bounded gt0_qs ge0_qh).
-    smt (le_binomial mu_bounded gt0_qs ge0_qh).
+    apply ler_wpmul2l; 1: smt(mu_bounded gt0_qs ge0_qh expr_ge0).
+    smt (le_binomial mu_bounded gt0_qs ge0_qh expr_ge0).
   rewrite expr2. 
   have /# :  qs%r * (lam * lam) * eps <= qs%r * (lam * lam).
   rewrite -{2}(mulr1 (qs%r * (lam * lam))).
