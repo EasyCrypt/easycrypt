@@ -216,12 +216,14 @@ abstract theory Collision.
   (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
   (* This version allows auxilliary information and q
      to be set interdependently *)
+  (* Thm 2.1 in qrom_axioms.pdf *)
   axiom pr_col_aux i_ q (A<:AdvCol_Aux{-QRO}) &m:
     let r = mu1 dhash witness in
     hoare [Col_Aux(A).main : i = i_ /\ QRO.ch = 0 ==> QRO.ch <= q] =>
     Pr[Col_Aux(A).main(i_) @ &m : res] <= (27 *(q +2)^3)%r * r. 
 
   (* Thm 3.9 in MZ Thesis: N is the card of hash type. *)
+  (* Thm 2.1 in qrom_axioms.pdf *)
   axiom pr_col (A<:AdvCol{-QRO}) &m:
     let r = mu1 dhash witness in
     hoare [Col(A).main :QRO.ch = 0 ==> QRO.ch <= q] =>
@@ -553,6 +555,7 @@ module SCD (A:AdvSCD) = {
   }
 }.
 
+  (* Thm 4.1 in qrom_axioms.pdf *)
 axiom advantage q lambda (A<:AdvSCD{-SCD,-QRO}) &m:
   0%r <= lambda <= 1%r =>
   hoare [SCD(A)._F0 : p = lambda ==> QRO.ch <= q] =>
@@ -633,6 +636,7 @@ module IND_SR (H:SR_i, A:AdvSR) = {
 }.
 
 (* This bound comes from Corollary 4.15 of Mark Zhandry's thesis *)
+  (* Thm 5.1 in qrom_axioms.pdf *)
 axiom advantage (q:int)  (A<:AdvSR{-SR,-QRO}) &m:
   0 < _r => 
   hoare [IND_SR(SRO,A).main : true ==> QRO.ch <= q] => 
@@ -706,11 +710,13 @@ module IND_SRr (H:SRr_i, A:AdvSRr) = {
 (* The proof of Theorem 4.16  gives a bound that is the summation
    of that in Corollary 4.15 and that in Theorem 4.9
    ( C(q + 2)^3/N) where C <= 27 is a constant and N=r. *)
+  (* Thm 5.2 in qrom_axioms.pdf *)
+
 axiom advantage_r (q:int)  (A<:AdvSRr{-SR,-QRO}) &m:
   0 < _r => 
   hoare [IND_SRr(SROr,A).main : true ==> QRO.ch <= q] => 
   `| Pr[IND_SRr(SROr,A).main() @ &m : res] - Pr[IND_SRr(SRr,A).main() @ &m : res] | <= 
-      (54 * q^3)%r / _r%r.
+      (54 * (q+2)^3)%r / _r%r.
 
 end SmallRange.
 
@@ -719,7 +725,6 @@ end SmallRange.
     Secure Identity-Based Encryption in the Quantum Random Oracle Model
     https://eprint.iacr.org/2012/076.pdf
     Theorem 3.1.  *)
-
 abstract theory QROM_Fundamental_Lemma.
 
 clone import Tuple as TupleXY with 
@@ -741,6 +746,7 @@ module QRO_main_D(A : AdvRO) = {
   }
 }.
 
+(* Thm 3.1 in qrom_axioms.pdf *)
 axiom dA_split q (A<:AdvRO{-QRO}) &m:
    hoare [ QRO_main_D(A).main : true ==> QRO.ch <= q] => 
    exists (C : (from * hash) list -> result -> real),
@@ -812,6 +818,7 @@ module DistinctQueries(A:Adv_DistinctQueries) = {
   }
 }.
 
+  (* Thm 6.1 in qrom_axioms.pdf *)
 axiom bound_distinct (q_:int) (A<:Adv_DistinctQueries{-QRO}) &m :  
   hoare [DistinctQueries(A).main : q = q_ ==> QRO.ch <= q_] => 
     Pr[DistinctQueries(A).main(q_) @ &m : res] <= (q_ + 1)%r / FinT.card%r.
