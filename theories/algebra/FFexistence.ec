@@ -643,4 +643,254 @@ theory Counting_Argument.
     by apply/StdOrder.RealOrder.subr_ge0/StdOrder.RealOrder.ltrW.
   qed.
 
+  require import PolyDiv.
+  require import FiniteRing.
+
+  type coeff.
+
+  clone import FiniteRing.FiniteField as FF with
+    type t <= coeff.
+
+  clone import Idomain as PID with
+    type coeff <= coeff,
+    theory IDC <- FF.F.
+
+  op enum_ledeg_r (nps : int * poly list) =
+    let (n, ps) = nps in
+    (n + 1, allpairs (fun (p : poly) x => P.(+) (P.( ** ) x (P.polyXn n)) p) ps FF.FinType.enum).
+
+  op enum_ledeg n =
+    if 0 <= n
+    then (iter n enum_ledeg_r (0, [P.poly0])).`2
+    else [].
+
+  op enum_deg n = filter (fun p => P.deg p = n) (enum_ledeg n).
+
+  (*TODO: add this and relevant lemmas to polydiv.*)
+  op unitary (p : P.poly) = P.lc p = F.oner.
+
+  lemma unitary_exp_scalp p q :
+    unitary q =>
+    F.exp (P.lc q) (scalp p q) = F.oner.
+  proof. by move=> ->; rewrite F.expr1z. qed.
+
+  op enum_udeg n = filter unitary (enum_deg n).
+
+  op enum_iudeg n = filter irreducible_poly (enum_udeg n).
+  
+  lemma enum_ledeg_rP n :
+    0 <= n =>
+    (iter n enum_ledeg_r (0, [P.poly0])).`1 = n.
+  proof.
+    elim: n => [|n le0n]; [by rewrite iter0|].
+    rewrite iterS //; pose nps:= iter _ _ _; move: nps => [? ps] /= ->>.
+    by rewrite /enum_ledeg_r.
+  qed.
+
+  lemma enum_ledegP n p :
+    p \in enum_ledeg n <=>
+    (P.deg p <= n).
+  proof.
+    rewrite /enum_ledeg; case: (0 <= n) => [le0n|/ltrNge ltn0] /=; last first.
+    + by apply/ltrNge/(ltr_le_trans _ _ _ ltn0)/P.ge0_deg.
+    elim: n le0n p => [|n le0n +] p.
+    + rewrite iter0 //= -P.deg_eq0; split=> [-> //|le_0].
+      by apply/eqz_leq; rewrite le_0 P.ge0_deg.
+    rewrite iterS //=; move: (enum_ledeg_rP _ le0n).
+    pose nps:= iter _ _ _; move: nps => [? ps] /= ->>.
+    rewrite /enum_ledeg_r /= => IHn; rewrite allpairsP /=.
+    split=> [[] [q x] /= [/IHn le_] [_] ->> {IHn}|].
+    + apply/(ler_trans _ _ _ (P.degD _ _))/ler_maxrP.
+      split; [|by apply/ltzW/ltzS].
+      apply/(ler_trans _ _ _ (P.degZ_le _ _)).
+      by rewrite P.degXn; apply/ler_maxrP => /=; apply/addr_ge0.
+    move=> le_; exists (P.(-) p (P.( ** ) (P."_.[_]" p n) (P.polyXn n)), P."_.[_]" p n) => /=.
+    rewrite FinType.enumP /= P.PolyComRing.addrA P.PolyComRing.addrAC.
+    rewrite P.PolyComRing.subrr P.PolyComRing.add0r /= IHn => {IHn}.
+    apply/P.deg_leP => // i leni; rewrite P.polyDE P.polyNE P.polyZE.
+    rewrite P.polyXnE le0n /=; case/ler_eqVlt: leni => [<<- /=|ltni].
+    + by rewrite F.mulr1 F.subrr.
+    rewrite gtr_eqF //= F.mulr0 F.subr0; apply/P.gedeg_coeff.
+    by apply/(ler_trans _ _ _ le_)/ltzE.
+  qed.
+
+  lemma uniq_enum_ledeg n :
+    uniq (enum_ledeg n).
+  proof.
+    rewrite /enum_ledeg; case: (0 <= n) => [le0n|/ltrNge //].
+    elim: n le0n => [|n le0n]; [by rewrite iter0|].
+    rewrite iterS //=; move: (enum_ledeg_rP _ le0n) (enum_ledegP n).
+    rewrite /enum_ledeg; pose nps:= iter _ _ _; move: nps => [? ps] /= ->>.
+    rewrite le0n /= => mem_ps; rewrite /enum_ledeg_r /= => IHn.
+    rewrite allpairs_uniq //=; [by apply/FinType.enum_uniq|].
+    move=> p q x y /mem_ps le_p /mem_ps le_q _ _ {mem_ps} eq_.
+    move: (congr1 (fun p => P."_.[_]" p n) _ _ eq_) => /=.
+    rewrite !P.polyDE !P.polyZE P.polyXnE le0n /= !F.mulr1.
+    rewrite !P.gedeg_coeff // !F.addr0 => <<- /=.
+    by move: (P.PolyComRing.addrI _ _ _ eq_).
+  qed.
+
+  lemma size_enum_ledeg n :
+    0 <= n =>
+    size (enum_ledeg n) = FinType.card ^ n.
+  proof.
+    move=> le0n; rewrite /card_ledeg /enum_ledeg le0n /=.
+    elim: n le0n => [|n le0n]; [by rewrite iter0 //= expr0|].
+    rewrite iterS //=; move: (enum_ledeg_rP _ le0n).
+    pose nps:= iter _ _ _; move: nps => [? ps] /= ->>.
+    move=> eq_; rewrite /enum_ledeg_r /= size_allpairs eq_.
+    by rewrite /FinType.card exprSr.
+  qed.
+
+  lemma enum_degP n p :
+    p \in enum_deg n <=>
+    (P.deg p = n).
+  proof. by rewrite /enum_deg mem_filter /= enum_ledegP; split. qed.
+
+  lemma uniq_enum_deg n :
+    uniq (enum_deg n).
+  proof. by rewrite /enum_deg; apply/filter_uniq/uniq_enum_ledeg. qed.
+
+  lemma perm_eq_enum_deg n :
+    perm_eq (enum_ledeg n) ((enum_ledeg (n - 1)) ++ (enum_deg n)).
+  proof.
+    apply/uniq_perm_eq.
+    + by apply/uniq_enum_ledeg.
+    + rewrite cat_uniq uniq_enum_ledeg uniq_enum_deg hasPn /=.
+      by move=> p /enum_degP <<-; rewrite enum_ledegP -ltzS.
+    move=> p; rewrite mem_cat !enum_ledegP enum_degP.
+    by rewrite -(ltzS _ (n - 1)) /= orbC -ler_eqVlt.
+  qed.
+
+  lemma size_enum_deg n :
+    0 < n =>
+    size (enum_deg n) = (FinType.card - 1) * FinType.card ^ (n - 1).
+  proof.
+    move=> lt0n; rewrite /card_deg.
+    move/perm_eq_size: (perm_eq_enum_deg n).
+    rewrite size_cat !size_enum_ledeg; [by apply/ltzW|by apply/ltzS|].
+    rewrite (addrC _ (size _)) -subr_eq => <-.
+    by rewrite mulrDl -exprS; [apply/ltzS|rewrite /= mulNr].
+  qed.
+
+  lemma enum_udegP n p :
+    p \in enum_udeg n <=>
+    (unitary p /\ P.deg p = n).
+  proof. by rewrite /enum_udeg mem_filter enum_degP. qed.
+
+  lemma uniq_enum_udeg n :
+    uniq (enum_udeg n).
+  proof. by rewrite filter_uniq; apply/uniq_enum_deg. qed.
+
+  lemma perm_eq_enum_udeg n :
+    0 < n =>
+    perm_eq (enum_udeg n) (map (fun p => P.(+) (P.polyXn (n - 1)) p) (enum_ledeg (n - 1))).
+  proof.
+    move=> lt0n; apply/uniq_perm_eq.
+    + by apply/uniq_enum_udeg.
+    + apply/map_inj_in_uniq; [|by apply/uniq_enum_ledeg].
+      move=> p q /enum_ledegP le_p /enum_ledegP le_q /=.
+      by apply/P.PolyComRing.addrI.
+    move=> p; rewrite enum_udegP /= mapP.
+    split=> [[up eq_p]|].
+    + exists (P.(-) p (P.polyXn (n - 1))).
+      rewrite enum_ledegP P.PolyComRing.addrA P.PolyComRing.addrAC.
+      rewrite P.PolyComRing.subrr P.PolyComRing.add0r /=.
+      apply/P.deg_leP; [by apply/ltzS|].
+      move=> i; rewrite P.polyDE P.polyNE P.polyXnE -(ltzS _ (n - 1)) lt0n /=.
+      case/ler_eqVlt => [<<-/=|lt_]; [by rewrite F.subr_eq0 -eq_p up|].
+      rewrite gtr_eqF //= F.subr0; apply/P.gedeg_coeff; rewrite eq_p.
+      by move/ltzE: lt_.
+    case=> q [/enum_ledegP le_ ->>]; rewrite /unitary P.degDl.
+    + by rewrite P.degXn ler_maxr //=; [apply/ltzW|move/ltzS: le_].
+    rewrite P.degXn /= ler_maxr; [by apply/ltzW|].
+    rewrite P.polyDE P.polyXnE /= -ltzS lt0n /= F.addrC -F.subr_eq0.
+    by rewrite -F.addrA F.subrr F.addr0; apply/P.gedeg_coeff.
+  qed.
+
+  lemma size_enum_udeg n :
+    0 < n =>
+    size (enum_udeg n) = FinType.card ^ (n - 1).
+  proof.
+    move=> lt0n; rewrite /card_udeg.
+    move/perm_eq_size: (perm_eq_enum_udeg _ lt0n) => ->.
+    by rewrite size_map size_enum_ledeg // -ltzS.
+  qed.
+
+  lemma enum_iudegP n p :
+    p \in enum_iudeg n <=>
+    (irreducible_poly p /\ unitary p /\ P.deg p = n).
+  proof. by rewrite /enum_iudeg mem_filter enum_udegP. qed.
+
+  lemma uniq_enum_iudeg n :
+    uniq (enum_iudeg n).
+  proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
+
+(*
+  op unitary (p : poly) = P.lc p = F.oner.
+
+  op all_unitaries_deg_r (ps : poly list) =
+    allpairs (fun (p : poly) x => P.(+) (P.( * ) p P.X) (P.polyC x)) ps FF.FinType.enum.
+
+  op all_unitaries_deg (n : int) =
+    if 0 <= n
+    then iter n all_unitaries_deg_r [P.poly1]
+    else [].
+
+  lemma all_unitaries_degP n p :
+    p \in all_unitaries_deg n <=>
+    (unitary p /\ P.deg p = n + 1).
+  proof.
+    rewrite /all_unitaries_deg; case: (0 <= n) => [le0n|/ltrNge] /=; last first.
+    + move=> ltn0; apply/negP => -[+ eq_].
+      by rewrite /unitary eq_ /= P.lt0_coeff // eq_sym F.oner_neq0.
+    elim: n le0n p => [|n le0n IHn] p.
+    + rewrite iter0 //= P.deg_eq1; split=> [->>|[up [c] [neqc0 ->>]]].
+      - by rewrite /unitary P.lc1 /=; exists F.oner; rewrite F.oner_neq0.
+      apply/P.PolyComRing.subr_eq0; rewrite -P.polyCN -P.polyCD.
+      by apply/P.eq_polyC0/F.subr_eq0; move: up; rewrite /unitary P.lcC.
+    rewrite iterS //= allpairsP; move: IHn; rewrite /unitary.
+    pose ps:= iter _ _ _; move: ps => ps psP; split=> [[] [q x] /=|].
+    + move=> [mem_q [mem_x ->>]]; move/(_ q): psP; rewrite mem_q /=.
+      case=> eq_ deg_; rewrite P.degDl; [rewrite P.degC P.degM|].
+      - by apply/P.deg_gt0; rewrite deg_ ltzS.
+      - by apply/P.deg_gt0; rewrite P.degX.
+      - rewrite deg_ P.degX ltzE /= -ler_subl_addr.
+        by apply/(ler_trans _ _ _ _ le0n); case (_ = _).
+      rewrite P.degM.
+      - by apply/P.deg_gt0; rewrite deg_ ltzS.
+      - by apply/P.deg_gt0; rewrite P.degX.
+      rewrite P.degX deg_ /= P.polyDE P.polyCE.
+      rewrite (gtr_eqF _ 0) /=; [by apply/ltzS|].
+      by rewrite -deg_ P.polyMXE eq_ F.addr0.
+    case=> eq_ deg_; exists (divp p P.X, P."_.[_]" p 0) => /=.
+    rewrite FinType.enumP /= psP size_divp; [by rewrite -P.deg_eq0 P.degX|].
+    rewrite P.degX deg_ /= ler_maxr /=; [by apply/addr_ge0|].
+    move: (divp_eq p P.X); rewrite P.lcX F.expr1z scale1r.
+    (*TODO: polydiv lemmas.*)
+    admit.
+  qed.
+
+  lemma uniq_all_unitaries_deg n :
+    uniq (all_unitaries_deg n).
+  proof.
+    rewrite /all_unitaries_deg; case: (0 <= n) => [|/ltrNge //].
+    elim: n => [|n le0n IHn]; [by rewrite iter0|].
+    rewrite iterS //; move: IHn; pose ps:= iter _ _ _; move: ps => ps ups.
+    rewrite /all_unitaries_deg_r; apply/allpairs_uniq => //.
+    + by apply/FinType.enum_uniq.
+    move=> p q x y mem_p mem_q mem_x mem_y /= eq_.
+    move: (congr1 (fun p => P."_.[_]" p 0) _ _ eq_) => /=.
+    rewrite !P.polyDE !P.polyMXE !P.polyCE !P.lt0_coeff //= !F.add0r.
+    move=> <<- /=; move/P.PolyComRing.addIr: eq_.
+    move/(congr1 (fun p => divp p P.X)) => /=.
+    rewrite mulpK; [by rewrite -P.deg_eq0 P.degX|].
+    rewrite mulpK; [by rewrite -P.deg_eq0 P.degX|].
+    by rewrite !scalpE P.lcX CR.unitP F.unitr1 /= F.expr0 !scale1r.
+  qed.
+
+  op ui_dec ps = all irreducible_poly ps.
+
+  print PID.
+*)
 end Counting_Argument.
