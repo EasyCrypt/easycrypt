@@ -314,7 +314,17 @@ theory PolyFF.
         by move=> inj_; apply/inj_.
       rewrite -(perm_cons q1) =>  perm_; apply/(perm_eq_trans _ _ _ perm_) => {perm_}.
       by apply/perm_eq_sym/perm_to_rem.
-    admit.
+    move: eq_ => {IHqs1 all1}; pose r:= BigPoly.PCM.big _ _ _.
+    pose q:= BigPoly.PCM.big _ _ _; move: r => r {qs1} eq_.
+    move: (eq_dvdp F.oner r q1 q); rewrite F.oner_neq0.
+    rewrite scalepE PolyComRing.mul1r PolyComRing.mulrC eq_ /= /q => {eq_ q}.
+    elim: qs2 all2 => [|q2 qs2 IHqs2] /=.
+    + by rewrite BigPoly.PCM.big_nil dvdp1 gtr_eqF; case: irr1.
+    case=> [] [] irr2 u2 /IHqs2 {IHqs2} mem_.
+    rewrite BigPoly.PCM.big_cons /(predT q2) /(idfun q2) /=.
+    rewrite Gauss_dvdpor //; case=> [|_ /mem_ -> //] {mem_} dvdp12.
+    case: irr2 => _ /(_ _ _ dvdp12) //; [by apply/gtr_eqF; case: irr1|].
+    by move/eqp_eq; rewrite u1 u2 !scalepE !PolyComRing.mul1r.
   qed.
   (*TODO: end of rename and move this to polydiv*)
 
