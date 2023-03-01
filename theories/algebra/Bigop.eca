@@ -155,6 +155,11 @@ proof.                          (* FIXME: big_rec2 *)
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt big_predT_idfun ['a] (F : 'a -> t) s:
+  big predT F s = big predT idfun (map F s).
+proof. by rewrite big_mapT; apply/eq_bigr => ? _; rewrite /idfun /(\o). qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt big_distrl ['a] (op_ : t -> t -> t) (P : 'a -> bool) F s t:
      left_zero idm op_
   => left_distributive op_ Support.(+)

@@ -485,7 +485,7 @@ lemma bsrev_range_pow2_perm_eq K N :
     (map (bsrev N)             (range 0 (2 ^ K)))
     (map (( * ) (2 ^ (N - K))) (range 0 (2 ^ K))).
 proof.
-  move => [le0K leKN]; rewrite perm_eqP_pred1 => x.
+  move => [le0K leKN]; rewrite perm_eqP1 => x.
   rewrite !count_uniq_mem.
   + rewrite map_inj_in_uniq ?range_uniq // => {x} x y Hx_range Hy_range.
     apply/bsrev_injective; first last.

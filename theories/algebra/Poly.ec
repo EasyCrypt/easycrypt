@@ -492,6 +492,9 @@ case=> c ->>; case (c = zeror) => [->> //|?].
 by right; exists c.
 qed.
 
+lemma deg_le0 p : (deg p <= 0) <=> (p = poly0).
+proof. by rewrite -deg_eq0 eqz_leq ge0_deg. qed.
+
 lemma lc_eq0 p : (lc p = zeror) <=> (p = poly0).
 proof.
 case: (p = poly0) => [->|] /=; first by rewrite lc0.
@@ -540,7 +543,7 @@ qed.
 lemma degDr p q : deg p < deg q => deg (p + q) = deg q.
 proof. by move/degDl; rewrite addrC. qed.
 
-lemma lcDr p q : deg q < deg p => lc (p + q) = lc p.
+lemma lcDr p q : deg p < deg q => lc (p + q) = lc q.
 proof. by move/lcDl; rewrite addrC. qed.
 
 (* -------------------------------------------------------------------- *)
