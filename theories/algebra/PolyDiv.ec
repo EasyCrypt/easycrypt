@@ -475,21 +475,21 @@ suff /# : p * polyC (exp (lc d) (rscalp p d)) = rdivp p d * d.
 by rewrite rdivp_eq; smt(PS.addr0 rmodp_eq0P).
 qed.
 
-lemma rdvdp_mull d p :
+lemma rdvdp_mulr d p :
   d * polyC (lc d) = polyC (lc d) * d =>
   injective (transpose CR.( * ) (lc d)) =>
   rdvdp d (p * d)
   by move => 2?; rewrite (eq_rdvdp d 0 p) ?expr0 ?PS.mulr1 /#.
 
-lemma rmodp_mull d p :
+lemma rmodp_mulr d p :
   d * polyC (lc d) = polyC (lc d) * d =>
   injective (transpose CR.( * ) (lc d)) =>
-  rmodp (p * d) d = poly0 by smt(rdvdp_mull).
+  rmodp (p * d) d = poly0 by smt(rdvdp_mulr).
 
 lemma rmodpp d :
   d * polyC (lc d) = polyC (lc d) * d =>
   injective (transpose CR.( * ) (lc d)) =>
-  rmodp d d = poly0 by smt(PS.mul1r rmodp_mull).
+  rmodp d d = poly0 by smt(PS.mul1r rmodp_mulr).
 
 lemma mulrI0_rreg (p : poly) :
   (forall q, q * p = poly0 => q = poly0) =>
@@ -608,7 +608,7 @@ lemma rdivp_mull d p : lc d = oner => rdivp (p * d) d = p
   by smt(PS.addr0 rdiv0p rdivp_addl_mul).
 
 lemma rmodp_mull d p : lc d = oner => rmodp (p * d) d = poly0
-  by smt(monic_comreg rmodp_mull).
+  by smt(monic_comreg rmodp_mulr).
 
 lemma rmodpp d : lc d = oner => rmodp d d = poly0
   by smt(monic_comreg rmodpp).
@@ -638,8 +638,8 @@ lemma rdvdpp d : lc d = oner => rdvdp d d by smt(monic_comreg rdvdpp).
 lemma eq_rdvdp d q1 p : lc d = oner => p = q1 * d => rdvdp d p
   by smt(eq_rdvdp expr1z monic_comreg PS.mulr1).
 
-lemma rdvdp_mull d p : lc d = oner => rdvdp d (p * d)
-  by smt(monic_comreg rdvdp_mull).
+lemma rdvdp_mulr d p : lc d = oner => rdvdp d (p * d)
+  by smt(monic_comreg rdvdp_mulr).
 
 lemma rdivpK d p : lc d = oner => rdvdp d p => (rdivp p d) * d = p
   by smt(PS.addr0 rdivp_eq rmodp_eq0).
@@ -999,7 +999,7 @@ lemma uniq_roots_rdvdp p rs :
 proof.
 move => har hur; move: (uniq_roots_prod_XsubC _ _ har hur) => [r ->].
 pose qf := fun z => polyX - polyC z; pose q := BigPoly.PCM.big predT qf rs.
-suff: lc q = oner by smt(rdvdp_mull).
+suff: lc q = oner by smt(rdvdp_mulr).
 suff /# : forall rs, lc (BigPoly.PCM.big predT qf rs) = oner.
 move => {rs har hur r q} rs; elim rs; 1: by rewrite BigPoly.PCM.big_nil lc1.
 move => r rs rsh; rewrite BigPoly.PCM.big_cons.
@@ -1187,7 +1187,7 @@ proof.
 move => q_neq0; apply (IDPoly.mulIf q); rewrite // scalepE -PS.mulrA.
 rewrite -scalepE divp_eq; suff -> : modp (p * q) q = poly0
   by rewrite PS.addr0.
-rewrite modpE Idomain.CRD.rmodp_mull ?scalep0 1?PS.mulrC //.
+rewrite modpE Idomain.CRD.rmodp_mulr ?scalep0 1?PS.mulrC //.
 by rewrite mulIf lc_eq0.
 qed.
 
@@ -1239,7 +1239,7 @@ lemma neq0_rreg p : p <> poly0 => injective (fun (x : coeff) => x * lc p)
 lemma modp_mull (p q : poly) : modp (p * q) q = poly0.
 proof.
 case: (q = poly0) => [|q_neq0]; 1: by smt(mod0p PS.mulr0).
-rewrite modpE Idomain.CRD.rmodp_mull;
+rewrite modpE Idomain.CRD.rmodp_mulr;
 by rewrite ?scalep0 1?PS.mulrC // neq0_rreg.
 qed.
 
@@ -1364,15 +1364,15 @@ lemma dvdpp d : dvdp d d by rewrite /dvdp modpp.
 lemma divp_dvd p q : dvdp p q => dvdp (divp q p) q
   by smt(dvdp_eq eq_dvdp expf_eq0 lc_eq0 PS.mulrC).
 
-lemma dvdp_mull m d n : dvdp d n => dvdp d (m * n).
+lemma dvdp_mulr m d n : dvdp d n => dvdp d (m * n).
 proof.
 case: (d = poly0) => [|d_neq0 e]; 1: by smt(dvd0p PS.mulr0).
 move: (eq_dvdp (exp (lc d) (scalp n d)) (m * divp n d)).
 by smt(dvdp_eq expf_eq0 lc_eq0 PS.mulrA scalerAr).
 qed.
 
-lemma dvdp_mulr n d m : dvdp d m => dvdp d (m * n)
-  by move => dmP; rewrite PS.mulrC dvdp_mull.
+lemma dvdp_mull n d m : dvdp d m => dvdp d (m * n)
+  by move => dmP; rewrite PS.mulrC dvdp_mulr.
 
 lemma dvdp_mul d1 d2 m1 m2 :
   dvdp d1 m1 => dvdp d2 m2 => dvdp (d1 * d2) (m1 * m2).
@@ -1454,9 +1454,9 @@ apply: (eq_dvdp (exp (lc d) (scalp n d) * exp (lc n) (scalp m n))
 by rewrite -scalepA e2 scalerAr e1 PS.mulrCA PS.mulrA.
 qed.
 
-lemma dvdp_mulIl (p q : poly) : dvdp p (p * q) by smt(dvdpp dvdp_mulr).
+lemma dvdp_mulIl (p q : poly) : dvdp p (p * q) by smt(dvdpp dvdp_mull).
 
-lemma dvdp_mulIr (p q : poly) : dvdp q (p * q) by smt(dvdpp dvdp_mull).
+lemma dvdp_mulIr (p q : poly) : dvdp q (p * q) by smt(dvdpp dvdp_mulr).
 
 lemma dvdp_mul2r r p q : r <> poly0 => dvdp (p * r) (q * r) = dvdp p q.
 proof.
@@ -1493,7 +1493,7 @@ lemma dvdp_exp2l d (k l : int) :
   0 <= k <= l => dvdp (PS.exp d k) (PS.exp d l).
 proof.
 move => klP; have -> : l = l - k + k by rewrite addrAC -addrA subrr addr0.
-by rewrite PS.exprD_nneg ?dvdp_mull ?dvdpp /#.
+by rewrite PS.exprD_nneg ?dvdp_mulr ?dvdpp /#.
 qed.
 
 lemma degXn_proper (p : poly) i :
@@ -1592,7 +1592,7 @@ lemma uniq_roots_dvdp p rs :
   dvdp (BigPoly.PCM.big predT (fun z => polyX - polyC z) rs) p.
 proof.
 move => rrs urs; move: (uniq_roots_prod_XsubC _ _ rrs urs) => [q ->].
-by rewrite dvdp_mull dvdpp.
+by rewrite dvdp_mulr dvdpp.
 qed.
 
 lemma root_bigmul x ps :
@@ -1859,7 +1859,7 @@ qed.
 lemma gcdp1 p : eqp (gcdp p poly1) poly1 by smt(eqp_ltrans gcdpC gcd1p).
 
 lemma gcdp_addl_mul (p q r : poly) : eqp (gcdp r (p * r + q)) (gcdp r q)
-  by smt(PS.addKr dvdp_addr dvdp_gcd dvdp_gcdl dvdp_gcdr dvdp_mull PS.mulNr).
+  by smt(PS.addKr dvdp_addr dvdp_gcd dvdp_gcdl dvdp_gcdr dvdp_mulr PS.mulNr).
 
 lemma gcdp_addl (m n : poly) : eqp (gcdp m (m + n)) (gcdp m n)
   by rewrite -{2}PS.mul1r gcdp_addl_mul.
@@ -2108,7 +2108,7 @@ lemma Bezout_coprimepP p q :
    (exists (u v : poly), eqp (u * p + v * q) poly1) = coprimep p q.
 proof.
 rewrite -gcdp_eqp1 eqboolP iffE; split; 2: by smt(Bezoutp eqp_trans).
-by smt(eqp_dvdr dvdp_addr dvdp_gcdl dvdp_gcdr dvdp_mull dvd1p eqp_sym).
+by smt(eqp_dvdr dvdp_addr dvdp_gcdl dvdp_gcdr dvdp_mulr dvd1p eqp_sym).
 qed.
 
 lemma coprimep_root p q x :
@@ -2121,16 +2121,16 @@ have: peval (c1 ** (u * p + v * q)) x <> zeror
 by rewrite pevalZ pevalD !pevalM rpx mulr0 add0r; smt(mulf_eq0).
 qed.
 
-lemma Gauss_dvdpl p q d: coprimep d q => dvdp d (p * q) = dvdp d p.
+lemma Gauss_dvdpl p q d : coprimep d q => dvdp d (p * q) = dvdp d p.
 proof.
 rewrite -Bezout_coprimepP; move => [u v uvP].
-rewrite eqboolP iffE; split; 2: smt(dvdp_mulr).
+rewrite eqboolP iffE; split; 2: smt(dvdp_mull).
 move: (eqp_mull _ p _ uvP); rewrite PS.mulr1 PS.mulrDr eqp_sym => {uvP} peq dpq.
-rewrite (eqp_dvdr _ _ _ peq) dvdp_addr; 1: by smt(dvdpp dvdp_mull PS.mulrA).
-by rewrite PS.mulrA PS.mulrAC dvdp_mulr.
+rewrite (eqp_dvdr _ _ _ peq) dvdp_addr; 1: by smt(dvdpp dvdp_mulr PS.mulrA).
+by rewrite PS.mulrA PS.mulrAC dvdp_mull.
 qed.
 
-lemma Gauss_dvdpr p q d: coprimep d q => dvdp d (q * p) = dvdp d p
+lemma Gauss_dvdpr p q d : coprimep d q => dvdp d (q * p) = dvdp d p
   by smt(Gauss_dvdpl PS.mulrC).
 
 lemma Gauss_dvdp m n p :
@@ -2152,7 +2152,7 @@ qed.
 
 lemma Gauss_gcdpr p m n : coprimep p m => eqp (gcdp p (m * n)) (gcdp p n).
 proof.
-rewrite /eqp  !dvdp_gcd !dvdp_gcdl /= dvdp_mull ?dvdp_gcdr //=.
+rewrite /eqp  !dvdp_gcd !dvdp_gcdl /= dvdp_mulr ?dvdp_gcdr //=.
 by smt(coprimepP dvdp_gcd dvdp_gcdr Gauss_dvdpl PS.mulrC).
 qed.
 
@@ -2204,7 +2204,7 @@ rewrite /eqp !dvdp_gcd !dvdp_mul2l // dvdp_gcdr dvdp_gcdl /=.
 move: (Bezoutp q r) => [u v] huv; rewrite eqp_sym in huv.
 rewrite (eqp_dvdr _ _ _ (eqp_mull _ _ _ huv)).
 rewrite PS.mulrDr (PS.mulrCA p u) (PS.mulrCA p v).
-by smt(dvdp_add dvdp_mull dvdp_gcdr dvdp_gcdl).
+by smt(dvdp_add dvdp_mulr dvdp_gcdr dvdp_gcdl).
 qed.
 
 lemma gcdp_mul2r (q r p : poly) : eqp (gcdp (q * p) (r * p)) (gcdp q r * p)
@@ -2246,7 +2246,7 @@ move => p_neq0 q_neq0; rewrite eqboolP iffE; split.
   have: ! deg (q * p) <= deg (u * p)
     by smt(degM_proper deg_eq0 mulf_eq0 lc_eq0).
   apply: contra => hc; apply: dvdp_leq; 1: by smt(deg_gt0 PS.mulf_eq0).
-  by rewrite PS.mulrC Gauss_dvdp // dvdp_mull ?dvdpp /= e dvdp_mull dvdpp.
+  by rewrite PS.mulrC Gauss_dvdp // dvdp_mulr ?dvdpp /= e dvdp_mulr dvdpp.
 - move => hc; have {hc} : 1 < deg (gcdp p q) by smt(deg_eq0 gcdp_eq0 ge0_deg).
   have [n nP] : exists n, deg (gcdp p q) = n by smt().
   move: n p q p_neq0 q_neq0 nP; apply natind => [/#|/=]; apply: natind => [/#|].
@@ -2284,7 +2284,7 @@ rewrite -coprimepP => hc hd; suff: deg (divp m (gcdp m n)) = 1.
   rewrite -(dvdpZr (exp (lc (gcdp m n)) (scalp n (gcdp m n))));
     1: by smt(expf_eq0 lc_eq0).
   rewrite deg_eq1; move => [c [c_neq0 cP]]; rewrite def_m def_n cP -scalepE.
-  by rewrite dvdpZl // dvdp_mull ?dvdpp.
+  by rewrite dvdpZl // dvdp_mulr ?dvdpp.
 - case: (divp m (gcdp m n) = poly0) => [|m'_neq0];
     1: by smt(eq_polyC0 expf_eq0 lc_eq0 PS.mulf_eq0 PS.mul0r scalepE).
   move: (hc (PS.exp (divp m (gcdp m n)) k)); rewrite dvdpp hd /= -size_poly_eq1.
@@ -2295,7 +2295,7 @@ lemma root_gcd p q x : root (gcdp p q) x = (root p x && root q x).
 proof.
 rewrite /= !root_factor_theorem eqboolP iffE.
 split; 1: by smt(dvdp_trans dvdp_gcdl dvdp_gcdr).
-by smt(Bezoutp dvdp_addl dvdp_mull eqp_dvdr eqp_sym).
+by smt(Bezoutp dvdp_addl dvdp_mulr eqp_dvdr eqp_sym).
 qed.
 
 lemma root_biggcd x ps :
@@ -2478,7 +2478,7 @@ proof.
 split; 1: by rewrite dvdp_gcd !dvdp_comp_poly ?dvdp_gcdl ?dvdp_gcdr.
 move: (Bezoutp p q) => [u v] [H _]; move: (dvdp_comp_poly r _ _ H) => {H} Huv _.
 rewrite (dvdp_trans _ _ _ _ Huv) comp_polyD !comp_polyM.
-by rewrite dvdp_add dvdp_mull ?dvdp_gcdl dvdp_gcdr.
+by rewrite dvdp_add dvdp_mulr ?dvdp_gcdl dvdp_gcdr.
 qed.
 
 lemma coprimep_comp_poly r p q :
@@ -2493,5 +2493,15 @@ lemma coprimep_addl_mul (p q r : poly) : coprimep r (p * r + q) = coprimep r q
 
 op irreducible_poly p =
   (1 < deg p) && (forall q, deg q <> 1 => dvdp q p => eqp q p).
+
+lemma Gauss_dvdpor (p q d : poly) :
+  irreducible_poly d => dvdp d (p * q) = (dvdp d p || dvdp d q).
+proof.
+move => dP; case: (dvdp d p) => [|/= dpP]; 1: by smt(dvdp_mull).
+rewrite eqboolP iffE; split => [dpqP|]; 2: by smt(dvdp_mulr).
+suff: coprimep d p by smt(Gauss_dvdpr).
+rewrite -coprimepP => r; case: (deg r = 1) => [|rP]; 1: by smt(size_poly_eq1).
+move: dP => [ddP E] rdP rpP; move: (E r rP rdP); smt(dvdp_trans).
+qed.
 
 end Idomain.
