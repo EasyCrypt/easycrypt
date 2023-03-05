@@ -272,6 +272,12 @@ qed.
 lemma eq_polyC0 c : polyC c = poly0 <=> c = zeror.
 proof. by rewrite poly_eqP; split => [/(_ 0 _)|->>] //; rewrite polyCE poly0E. qed.
 
+lemma polyC_inj : injective polyC.
+proof.
+move=> c1 c2; rewrite /polyC; move/(congr1 of_poly).
+by rewrite !to_polydK ?ispolyC // /prepolyC /= fun_ext => /(_ 0).
+qed.
+
 lemma eq_polyXn0 n : polyXn n = poly0 <=> n < 0.
 proof.
 rewrite poly_eqP; split => [/(_ n)|/ltrNge Nle0n c le0c]; rewrite polyXnE poly0E.
@@ -348,6 +354,17 @@ proof. by apply/poly_eqP=> i ge0_i; rewrite !coeffpE mul0r. qed.
 (* -------------------------------------------------------------------- *)
 lemma scalep0 c : c ** poly0 = poly0.
 proof. by apply/poly_eqP=> i ge0_i; rewrite !coeffpE mulr0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma scale1p p : oner ** p = p.
+proof. by apply/poly_eqP=> i ge0_i; rewrite !coeffpE mul1r. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma scalep1 c : c ** poly1 = polyC c.
+proof.
+apply/poly_eqP=> i ge0_i; rewrite !coeffpE !polyCE.
+by case (_ = 0) => //=; rewrite ?mulr1 ?mulr0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma scaleNp (c : coeff) p : (-c) ** p = - (c ** p).

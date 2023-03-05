@@ -720,6 +720,13 @@ abstract theory ComRing.
   - by rewrite expr0 &(lreg1).
   - by rewrite exprS // &(lregM).
   qed.
+
+  lemma unit_lreg x :
+    unit x => lreg x.
+  proof.
+    move=> ux y z /(congr1 (( * ) (invr x))).
+    by rewrite !mulrA !mulVr // !mul1r.
+  qed.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)

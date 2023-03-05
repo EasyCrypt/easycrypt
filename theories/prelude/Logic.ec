@@ -285,9 +285,6 @@ pred symmetric ['a] (R : 'a -> 'a -> bool) = forall x y, R x y = R y x.
 pred antisymmetric ['a] (R : 'a -> 'a -> bool) =
   forall x y, R x y /\ R y x => x = y.
 
-pred pre_symmetric ['a] (R : 'a -> 'a -> bool) =
-  forall x y, R x y => R y x.
-
 (* -------------------------------------------------------------------- *)
 pred reflexive ['a] (R : 'a -> 'a -> bool) = forall x, R x x.
 
