@@ -46,14 +46,12 @@ module G(I : Init) : Gi_t = {
     var g : X -> Y
     var rep : X -> Y
     var inS  : X -> bool
-    var ch : int
     proc init() : Z * Ev = { 
        var z,ev;
-       ch <- 0;
        (g,rep,inS,z,ev) <@ I.prm();
        return (z,ev);
     }
-    quantum proc o{x : X} = { ch <- ch + 1; return g x; }
+    quantum proc o{x : X} = { return g x; }
 }.
 
 (* We use H for the function that differs from G
@@ -62,7 +60,6 @@ module G(I : Init) : Gi_t = {
 module H(I : Init) : Gi_t = {
     include G(I) [-o]
     quantum proc o{x : X} = { 
-        G.ch <- G.ch + 1;
         return if G.inS x then G.rep x else G.g x; 
     }
 }.
@@ -78,6 +75,23 @@ module A_O(A : A_t, O : Gi_t) = {
       (z,ev) <@ O.init();
       w <@ A(O).run(z);
       return ev w;
+   }
+}.
+
+module Count(O : Gi_t) : Gi_t = {
+   var ch : int
+   proc init() = {
+      var r;
+      ch <- 0;
+      r <@ O.init();
+      return r;
+   }
+
+   quantum proc o{x : X} = {
+      quantum var r;
+      ch <- ch + 1;
+      r <@ O.o{x};
+      return r;
    }
 }.
 
@@ -147,8 +161,10 @@ axiom ow2h_2sided (I <: Init)
    (forall (O <: G_t), 
             islossless O.o => islossless A(O).run) =>
    exists (B <: B_t {+A}),
-       (forall (O <: GH_t), 
-            islossless O.oG => islossless O.oH => islossless B(O, A).find) /\
+       (forall (O <: GH_t) (A0 <: A_t), 
+            islossless O.oG => islossless O.oH => 
+            (forall (O0 <: G_t), islossless O0.o => islossless A0(O0).run) =>
+            islossless B(O, A0).find) /\
       `| Pr[ A_O(A,G(I)).main() @ &m : res ] - 
          Pr[ A_O(A,H(I)).main() @ &m : res ] | 
            <= 2%r * sqrt (Pr[ B_O(GH(I),B,A).main() @ &m : res ] + epsilon).
@@ -191,9 +207,11 @@ module B_O(O : Gi_t, B : B_t, A : A_t) = {
 axiom ow2hsc1h (I <: Init) 
            (A <: A_t {-I, -G, -H}) &m d:
        (forall (O <: G_t), islossless O.o => islossless A(O).run) =>
-       (forall (O <: Gi_t), hoare [A_O(A,O).main : true ==> G.ch <= d]) =>
+       (forall (O <: Gi_t), hoare [A_O(A,Count(O)).main : true ==> Count.ch <= d]) =>
        exists (B <: B_t {+A}),
-       (forall (O <: G_t), islossless O.o => islossless A(O).run => islossless B(O, A).find) /\
+       (forall (O <: G_t) (A0 <: A_t), islossless O.o => 
+         (forall (O0 <: G_t), islossless O0.o => islossless A0(O0).run) =>
+         islossless B(O, A0).find) /\
       `| Pr[ A_O(A,G(I)).main() @ &m : res ] - 
          Pr[ A_O(A,H(I)).main() @ &m : res ] | 
            <= 4%r * d%r * sqrt Pr[ B_O(H(I),B,A).main() @ &m : res ].
@@ -218,25 +236,22 @@ module G(I : Init) : Gi_t = {
     var rep : X -> Y
     var inS  : X -> bool
     var xs : X list
-    var ch : int
     proc init() : Z * Ev = { 
        var z,ev;
-       ch <- 0; xs <- [];
+       xs <- [];
        (g,rep,inS,z,ev) <@ I.prm();
        return (z,ev);
     }
-    quantum proc o{x : X} = { ch <- ch + 1; return g x; }
-    proc oC(x : X) = {  ch <- ch + 1; xs <- x :: xs; return g x; }
+    quantum proc o{x : X} = { return g x; }
+    proc oC(x : X) = {  xs <- x :: xs; return g x; }
 }.
 
 module H(I : Init) : Gi_t = {
     include G(I) [-o, oC]
     quantum proc o{x : X} = { 
-        G.ch <- G.ch + 1;
         return if G.inS x then G.rep x else G.g x; 
     }
     proc oC(x : X) = { 
-        G.ch <- G.ch + 1; 
         G.xs <- x :: G.xs;
         return if G.inS x then G.rep x else G.g x; 
     }
@@ -252,6 +267,30 @@ module A_O(A : A_t, O : Gi_t) = {
       (z,ev) <@ O.init();
       w <@ A(O).run(z);
       return ev w;
+   }
+}.
+
+module Count(O : Gi_t) : Gi_t = {
+   var ch : int
+   proc init() = {
+      var r;
+      ch <- 0;
+      r <@ O.init();
+      return r;
+   }
+
+   quantum proc o{x : X} = {
+      quantum var r;
+      ch <- ch + 1;
+      r <@ O.o{x};
+      return r;
+   }
+
+   proc oC(x : X) = {
+      var r;
+      ch <- ch + 1;
+      r <@ O.o{x};
+      return r;
    }
 }.
 
@@ -323,12 +362,15 @@ module B_O(O : Gi_t, B : B_t, A : A_t) = {
 
 axiom ow2hsqrt (I <: Init) (A <: A_t {-I, -G, -H}) d &m:
        (forall (O <: G_t), islossless O.o => islossless O.oC => islossless A(O).run) => 
-       (forall (O <: Gi_t), hoare [  A_O(A,O).main : true ==> G.ch <= d]) =>
+       (forall (O <: Gi_t), hoare [  A_O(A,Count(O)).main : true ==> Count.ch <= d]) =>
        exists (B <: B_t {+A}),
-       (forall (O <: G_t), islossless O.o => islossless A(O).run => islossless B(O, A).find) /\
+       (forall (O <: G_t) (A0 <: A_t), islossless O.o => islossless O.oC => 
+         (forall (O0 <: G_t), islossless O0.o => islossless O0.oC => islossless A0(O0).run) =>
+            islossless B(O, A0).find) /\
         sqrt(Pr[ A_O(A,G(I)).main() @ &m : res ]) <= 
          sqrt(Pr[ A_O(A,H(I)).main() @ &m : res /\ 
                    (forall x, G.inS x => ! x \in G.xs) ]) + 
     2%r * (d%r + 1%r) * sqrt  Pr[ B_O(H(I),B,A).main() @ &m : res ].
 
 end SemiClassicalSQRT.
+
