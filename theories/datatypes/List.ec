@@ -1239,6 +1239,12 @@ elim: s => //= x s ih; case: (p x)=> @/predC -> //=;
 by rewrite perm_cons. by rewrite perm_cons.
 qed.
 
+lemma perm_eq_all (p : 'a -> bool) s1 s2 :
+  perm_eq s1 s2 =>
+  all p s1 =>
+  all p s2.
+proof. by rewrite !allP => /perm_eq_mem eq_ all_ x /eq_ /all_. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                         Element removal                              *)
 (* -------------------------------------------------------------------- *)

@@ -1502,4 +1502,96 @@ rewrite BigPoly.PCM.big_cons BCM.big_cons -IHr; case (P x) => // Px.
 by rewrite lcM /(\o).
 qed.
 
+(* -------------------------------------------------------------------- *)
+lemma scaler_eq0 c p : (c = IDCoeff.zeror \/ p = poly0) <=> (c ** p = poly0).
+proof.
+split=> [[->>|->>]|]; [by rewrite scale0p|by rewrite scalep0|].
+by rewrite scalepE IDPoly.mulf_eq0 eq_polyC0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma unitpP p :
+  PolyComRing.unit p <=> (exists c , IDCoeff.unit c /\ p = polyC c).
+proof.
+rewrite PolyComRing.unitrP; split=>[[q] eq_|[c] [uc ->>]]; last first.
++ by exists (polyC (IDCoeff.invr c)); rewrite -polyCM IDCoeff.mulVr.
+have neqp0: p <> poly0.
++ by apply/negP => ->>; move: eq_; rewrite PolyComRing.mulr0 eq_sym /= onep_neq0.
+have neqq0: q <> poly0.
++ by apply/negP => ->>; move: eq_; rewrite PolyComRing.mul0r eq_sym /= onep_neq0.
+move/(congr1 deg): (eq_); rewrite deg1 degM //.
+move/IntID.subr_eq0 => /=; move/IntID.subr_eq0; move: neqp0 neqq0.
+rewrite -!deg_eq0 !neq_ltz !(ltrNge _ 0) !ge0_deg !ltzE /=.
+move=> lep leq /eqz_leq [le_ _]; move: (ler_trans _ (1 + deg p) _ _ le_).
++ by apply/ler_add2r.
+move/ler_subr_addl => /= le_p; move: (eqz_leq (deg p) 1).
+rewrite lep le_p /= deg_eq1 => -[c] [neqc0 ->>]; exists c => /= {lep le_p}.
+move/ler_subr_addr: le_; rewrite degC neqc0 /= => /deg_le1 [d] ->>.
+move: eq_; rewrite -polyCM -PolyComRing.subr_eq0 -polyCN -polyCD.
+by rewrite eq_polyC0 IDCoeff.subr_eq0 => ?; apply/IDCoeff.unitrP; exists d.
+qed.
+
+lemma unit_deg p : PolyComRing.unit p => deg p = 1.
+proof.
+rewrite unitpP deg_eq1=> -[c] [uc ->>].
+exists c => /=; move: uc; apply/implybN => ->>.
+by rewrite IDCoeff.unitr0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op monic (p : poly) = lc p = IDCoeff.oner.
+
+lemma monic_invrZ p :
+  unit (lc p) =>
+  monic ((invr (lc p)) ** p).
+proof.
+move=> ulcp; rewrite /monic lcZ_lreg.
++ by apply/IDCoeff.unit_lreg/IDCoeff.unitrV.
+by apply/IDCoeff.mulVr.
+qed.
+
+lemma monic1 :
+  monic poly1.
+proof. by rewrite /monic lcC. qed.
+
+lemma monicC c :
+  monic (polyC c) <=> c = IDCoeff.oner.
+proof. by rewrite /monic lcC. qed.
+
+lemma monicM p q :
+  monic p =>
+  monic q =>
+  monic (p * q).
+proof. by rewrite /monic lcM => -> ->; rewrite IDCoeff.mulr1. qed.
+
+lemma monic_prod ['a] (P : 'a -> bool) F s :
+  all (fun x => P x => monic (F x)) s =>
+  monic (BigPoly.PCM.big P F s).
+proof.
+elim: s => [|x s IHs /= [+ /IHs u_ {IHs}]] /=.
++ by rewrite BigPoly.PCM.big_nil monic1.
+rewrite BigPoly.PCM.big_cons; case (P x) => //= _ ?.
+by apply/monicM.
+qed.
+
+lemma monic_exp p n :
+  monic p =>
+  monic (PolyComRing.exp p n).
+proof.
+move=> up; wlog: n / 0 <= n => [wlog|].
++ case (0 <= n) => [le0n|/ltrNge/oppr_gt0 lt0_].
+  - by apply/wlog.
+  move/ltzW: (lt0_) => le0_.
+  rewrite -(IntID.opprK n) PolyComRing.exprN.
+  case (deg p <= 1) => [/deg_le1 [c] ->>|].
+  - rewrite polyCX //; move: up; rewrite /monic lcC => ->>.
+    by rewrite IDCoeff.expr1z PolyComRing.invr1 lcC.
+  move=> /ltrNge lt1_; rewrite PolyComRing.unitout; [|by apply/wlog].
+  apply/negP => unit_exp; move: (PolyComRing.unitrX_neq0 _ _ _ unit_exp).
+  - by apply/gtr_eqF.
+  by move/unit_deg => eq_; move: lt1_; rewrite eq_.
+elim: n => [|n le0n IHn]; [by rewrite PolyComRing.expr0 monic1|].
+by rewrite PolyComRing.exprSr // monicM.
+qed.
+
 end Poly.
