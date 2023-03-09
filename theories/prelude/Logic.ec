@@ -646,6 +646,17 @@ axiom nosmt funchoice ['a 'b] (P : 'a -> 'b -> bool):
      (forall x, exists y, P x y)
   => (exists f, forall x, P x (f x)).
 
+lemma partial_funchoice ['a, 'b] (P : 'a -> bool) (Q : 'a -> 'b -> bool) :
+     (forall (x : 'a), P x => exists (y : 'b), Q x y)
+  => exists (f : 'a -> 'b), forall (x : 'a), P x => Q x (f x).
+proof.
+move=> forall_; move: (funchoice (fun x y => P x => Q x y) _).
++ move=> x; move/(_ x): forall_; case: (P x) => [Px|NPx] /=.
+  - by case=> y Qxy; exists y.
+  by exists witness.
+by case=> f {forall_} forall_; exists f => x Px; move/(_ x Px): forall_.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op sempty ['a] (E : 'a -> bool) =
   forall x, !E x.

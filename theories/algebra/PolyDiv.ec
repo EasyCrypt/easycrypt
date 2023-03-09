@@ -1696,6 +1696,19 @@ lemma eqp_mull r p q: eqp q r => eqp (p * q) (p * r) by smt(eqpP scalerAr).
 
 lemma eqp_mulr q p r : eqp p q => eqp (p * r) (q * r) by smt(eqp_mull PS.mulrC).
 
+lemma eqp_mul p q r s : eqp p q => eqp r s => eqp (p * r) (q * s).
+proof. by move/(eqp_mulr _ _ r) => + /(eqp_mull _ q); apply/eqp_trans. qed.
+
+lemma eqp_prod ['a] P F G (s : 'a list) :
+  all (fun x => P x => eqp (F x) (G x)) s =>
+  eqp (BigPoly.PCM.big P F s) (BigPoly.PCM.big P G s).
+proof.
+elim: s => [|x s IHs].
++ by rewrite !BigPoly.PCM.big_nil /=; apply/eqpxx.
+rewrite !BigPoly.PCM.big_cons /= => -[] + /IHs eqp__.
+by case (P x) => //= Px eqp_; apply/eqp_mul.
+qed.
+
 lemma eqp_exp p q k : eqp p q => eqp (PS.exp p k) (PS.exp q k).
 proof.
 move: k; apply: natind => /= [n n_le0|n n_ge0 nh pqP]; rewrite ?PS.exprS //;
@@ -2491,6 +2504,7 @@ qed.
 lemma coprimep_addl_mul (p q r : poly) : coprimep r (p * r + q) = coprimep r q
   by smt(eqp_size gcdp_addl_mul).
 
+(*-----------------------------------------------------------*)
 (*TODO: put at the right place in PolyDiv.*)
 lemma dvd_eqp_divr d p q :
   dvdp p d =>
@@ -2537,16 +2551,12 @@ proof. by move=> uc; apply/unit_eqp/unitpP; exists c. qed.
 (*TODO: end of put at the right place in PolyDiv.*)
 
 
+(*-----------------------------------------------------------*)
 (*TODO: change every relevant thing to use the monic operator and put at the right place in PolyDiv.*)
-lemma monicW p :
-  IDC.unit (lc p) =>
-  exists q , monic q /\ eqp p q.
-proof.
-move=> ulcp; exists ((IDC.invr (lc p)) ** p).
-rewrite eqp_sym eqp_scale /=; [|by apply/monic_invrZ].
-rewrite IDC.invr_eq0; apply/negP => eq_.
-by move: ulcp; rewrite eq_ IDC.unitr0.
-qed.
+lemma monic_deg p :
+  monic p =>
+  0 < deg p.
+proof. by rewrite deg_gt0 -lc_eq0 => ->; rewrite oner_neq0. qed.
 
 lemma monic_exp_scalp p q :
   monic q =>
@@ -2574,6 +2584,51 @@ qed.
 (*TODO: end of change every relevant thing to use the monic operator and put at the right place in PolyDiv.*)
 
 
+(*-----------------------------------------------------------*)
+(*TODO: put at the right place in PolyDiv.*)
+op scaled_monic p = exists c r , c <> zeror /\ monic r /\ p = c ** r.
+
+lemma scaled_monic_eqp p :
+  scaled_monic p <=>
+  exists q , monic q /\ eqp p q.
+proof.
+split=> [[c r] [] neqc0 [] m_ ->>|[q] [] m_ eqp_].
++ by exists r; rewrite m_ /= eqp_scale.
+exists (lc p) q; rewrite m_ lc_eq0; move/eqp_eq: (eqp_).
+rewrite m_ scale1r => <- /=; apply/negP=> ->>; move: eqp_.
+by rewrite eqp_sym eqp0 => ->>; move: m_; rewrite monicC eq_sym oner_neq0.
+qed.
+
+lemma scaled_monicC c : scaled_monic (polyC c) <=> c <> zeror.
+proof.
+split=> [[d r] [] neqd0 [] m_|neqc0]; [|by exists c poly1; rewrite neqc0 monic1 scalep1].
+move/(congr1 deg); rewrite degZ_lreg ?lregP // degC; case (c = zeror) => //.
+by move=> ->> /eq_sym /deg_eq0 ->>; move: m_; rewrite monicC eq_sym oner_neq0.
+qed.
+
+lemma scaled_monicM p q :
+  scaled_monic (p * q)%P <=>
+  (scaled_monic p /\ scaled_monic q).
+proof.
+split=> [[c r] [] neqc0 [] m_ eq_|[] [cp rp] [] neqcp0 [] m_p ->> [cq rq] [] neqcq0 [] m_q ->>]; last first.
++ rewrite -scalerAl -scalerAr scalepA; exists (cp * cq) (rp * rq).
+  by rewrite mulf_eq0 negb_or neqcp0 neqcq0 /=; apply/monicM.
+pose ip := argmax ("_.[_]" p) (fun x => forall y, x <> (lc p) * y).
+pose iq := argmax ("_.[_]" q) (fun x => forall y, x <> (lc q) * y).
+admit.
+qed.
+
+lemma scaled_monic_prod ['a] P F (s : 'a list) :
+  scaled_monic (BigPoly.PCM.big P F s) <=>
+  all (fun x => P x => scaled_monic (F x)) s.
+proof.
+elim: s => [|x s IHs]; [by rewrite BigPoly.PCM.big_nil scaled_monicC oner_neq0|].
+by rewrite BigPoly.PCM.big_cons /=; case: (P x) => //= Px; rewrite scaled_monicM IHs.
+qed.
+(*TODO: end of put at the right place in PolyDiv.*)
+
+
+(*-----------------------------------------------------------*)
 op irreducible_poly p =
   (1 < deg p) && (forall q, deg q <> 1 => dvdp q p => eqp q p).
 
@@ -2585,6 +2640,18 @@ rewrite eqboolP iffE; split => [dpqP|]; 2: by smt(dvdp_mulr).
 suff: coprimep d p by smt(Gauss_dvdpr).
 rewrite -coprimepP => r; case: (deg r = 1) => [|rP]; 1: by smt(size_poly_eq1).
 move: dP => [ddP E] rdP rpP; move: (E r rP rdP); smt(dvdp_trans).
+qed.
+
+lemma irreducible_poly_scale c p :
+  c <> zeror =>
+  irreducible_poly p <=>
+  irreducible_poly (c ** p).
+proof.
+move=> neqc0; rewrite /irreducible_poly degZ_lreg ?lregP // !andaE.
+apply/andb_id2l => _; apply/eq_iff/forall_eq => q /=.
+rewrite dvdpZr //; apply/eq_iff/implyb_id2l => _.
+apply/implyb_id2l => _; move: (eqp_scale p _ neqc0) => eqp_.
+by rewrite !(eqp_sym q); split; apply/eqp_trans => //; rewrite eqp_sym.
 qed.
 
 lemma irreducible_poly0 :
@@ -2655,23 +2722,8 @@ exists r. rewrite (dvdp_trans _ _ _ dvdp__ dvdp_) /=.
 by move: irr_; rewrite /irreducible_poly.
 qed.
 
-(*
-lemma poly1_or_dvdp_iu p :
-  monic p =>
-  deg p = 1 \/ exists q , irreducible_poly q /\ monic q /\ dvdp q p.
-proof.
-move=> mp; case: (poly1_or_dvdp_i p) => [-> //|].
-case=> q [irr_ dvdp_]; right; move: (monicW q _).
-+ move: dvdp_; rewrite -dvdpP; case=> c r [neqc0 /(congr1 lc) /=].
-  rewrite lcM lcZ_lreg; [by apply/IDC.lregP|].
-  rewrite mp IDC.mulr1 => ->>; apply/IDC.unitfE; move: neqc0.
-  by apply/implybNN => ->; rewrite F.mulr0.
-case=> r [mr eqp_]; exists r; rewrite mr /=; split.
-+ by move: irr_; apply/irreducible_poly_eqp.
-by rewrite -(eqp_dvdl _ _ _ eqp_).
-qed.
-*)
 
+(*-----------------------------------------------------------*)
 op irreducible_dec p qs =
   all irreducible_poly qs /\
   eqp p (BigPoly.PCM.big predT idfun qs).
@@ -2683,6 +2735,17 @@ lemma eqp_irreducible_dec p q qs :
 proof.
 move=> eqp_ [] all_ eqp__; split=> //.
 by move: eqp__; apply/eqp_trans; rewrite eqp_sym.
+qed.
+
+lemma irreducible_dec_scale c p qs :
+  c <> zeror =>
+  irreducible_dec p qs <=>
+  irreducible_dec (c ** p) qs.
+proof.
+move=> neqc0; rewrite /irreducible_dec; apply/andb_id2 => //.
+move: (eqp_scale p _ neqc0) => eq_; split=> eq__.
++ by move: (eqp_trans _ _ _ eq_ eq__).
+by rewrite eqp_sym in eq_; move: (eqp_trans _ _ _ eq_ eq__).
 qed.
 
 lemma perm_eq_irreducible_dec p qs rs :
@@ -2726,6 +2789,15 @@ move/(dvd_eqp_divl _ _ _ dvdp_); rewrite eqp_sym => eqp_.
 apply/(eqp_trans _ _ _ eqp_) => {eqp_}; rewrite mulKp.
 + by rewrite -deg_eq0 gtr_eqF // ltzE ltzW //; case: irr_.
 by apply/eqp_scale/lc_expn_scalp_neq0.
+qed.
+
+lemma irreducible_dec_cat p1 p2 qs1 qs2 :
+  irreducible_dec p1 qs1 =>
+  irreducible_dec p2 qs2 =>
+  irreducible_dec (p1 * p2) (qs1 ++ qs2).
+proof.
+case=> all1 eqp1 [] all2 eqp2; split; [by rewrite all_cat|].
+by rewrite BigPoly.PCM.big_cat; apply/eqp_mul.
 qed.
 
 lemma irreducible_dec0 qs :
@@ -2782,34 +2854,6 @@ rewrite eqp_sym => eqp__; move/(eqp_irreducible_dec _ _ _ eqp__): dec_.
 by case/irreducible_decC.
 qed.
 
-lemma irreducible_decW p :
-  p <> poly0 <=>
-  exists qs , irreducible_dec p qs.
-proof.
-split=> [neqp0|[qs] [all_ eqp_]]; last first.
-+ apply/negP => ->>; move: eqp_; rewrite eqp_sym eqp0 /=.
-  apply/prodf_neq0; move: all_; apply/all_imp_in/allP.
-  move=> q mem_q /= [lt1_ _]; rewrite /predC /predI /predT /idfun /=.
-  by apply/deg_ge1/ltzW.
-move: (P.ge0_deg p) (lerr (P.deg p)); move: {1 3}(P.deg p) => n le0n.
-elim: n le0n p neqp0 => [p|n le0n IHn p neqp0].
-+ by move/deg_gt0/ltrNge.
-move/ler_eqVlt=> [eq_|/ltzS/(IHn _ neqp0) //].
-move/ler_eqVlt: le0n => [<<-|lt0n].
-+ case/P.deg_eq1: eq_ => ? [neqc0 ->>] {neqp0}.
-  by exists []; apply/irreducible_decC.
-case: (poly1_or_dvdp_i p); [by rewrite eq_ -subr_eq0 /= => ->>|].
-case=> q [irr_ dvdp_]; move/(_ (divp p q) _ _): IHn.
-+ by rewrite dvdp_div_eq0.
-+ rewrite size_divp.
-  - rewrite -P.deg_eq0; apply/negP => eq__.
-    by move: irr_; rewrite /irreducible_poly eq__.
-  rewrite eq_; apply/ler_maxrP; rewrite ltzW //=.
-  apply/ltzS/ltr_subl_addr/ltr_subl_addl => /=.
-  by apply/subr_gt0; case: irr_.
-by case=> qs dec_; exists (q :: qs); apply/irreducible_dec_cons.
-qed.
-
 lemma irreducible_dec_mem_divp p q (qs : poly list) :
   q \in qs =>
   irreducible_dec p qs =>
@@ -2839,6 +2883,34 @@ rewrite dvd_qp eq_sym eqT; case=> [dvd_qr|_ dvd_q_].
   by apply/gtr_eqF; case: irr_q.
 case/(_ dvd_q_): IHqs => o [] mem_o [] eqp_qo {dec_} dec_.
 by exists o; split; [right|split].
+qed.
+
+lemma irreducible_decW p :
+  p <> poly0 <=>
+  exists qs , irreducible_dec p qs.
+proof.
+split=> [neqp0|[qs] [all_ eqp_]]; last first.
++ apply/negP => ->>; move: eqp_; rewrite eqp_sym eqp0 /=.
+  apply/prodf_neq0; move: all_; apply/all_imp_in/allP.
+  move=> q mem_q /= [lt1_ _]; rewrite /predC /predI /predT /idfun /=.
+  by apply/deg_ge1/ltzW.
+move: (P.ge0_deg p) (lerr (P.deg p)); move: {1 3}(P.deg p) => n le0n.
+elim: n le0n p neqp0 => [p|n le0n IHn p neqp0].
++ by move/deg_gt0/ltrNge.
+move/ler_eqVlt=> [eq_|/ltzS/(IHn _ neqp0) //].
+move/ler_eqVlt: le0n => [<<-|lt0n].
++ case/P.deg_eq1: eq_ => ? [neqc0 ->>] {neqp0}.
+  by exists []; apply/irreducible_decC.
+case: (poly1_or_dvdp_i p); [by rewrite eq_ -subr_eq0 /= => ->>|].
+case=> q [irr_ dvdp_]; move/(_ (divp p q) _ _): IHn.
++ by rewrite dvdp_div_eq0.
++ rewrite size_divp.
+  - rewrite -P.deg_eq0; apply/negP => eq__.
+    by move: irr_; rewrite /irreducible_poly eq__.
+  rewrite eq_; apply/ler_maxrP; rewrite ltzW //=.
+  apply/ltzS/ltr_subl_addr/ltr_subl_addl => /=.
+  by apply/subr_gt0; case: irr_.
+by case=> qs dec_; exists (q :: qs); apply/irreducible_dec_cons.
 qed.
 
 lemma irreducible_dec_perm_eq p qs1 qs2 :
@@ -2872,10 +2944,12 @@ rewrite eq_size eqp_ all_ /=; move/perm_eq_sym: (perm_to_rem _ _ mem_q2).
 by apply/perm_eq_trans/perm_cons.
 qed.
 
+
+(*-----------------------------------------------------------*)
 op irreducible_monic_dec p qs =
   irreducible_dec p qs /\ all monic qs.
 
-lemma irreducible_monic_decP p qs :
+lemma irreducible_monic_dec_and p qs :
   irreducible_monic_dec p qs <=>
   ( all (predI irreducible_poly monic) qs /\
     p <> poly0 /\
@@ -2889,5 +2963,165 @@ rewrite all_predI; split=> [[] dec_ monic_|]; [case: (dec_) => irr_ /eqp_eq <-|]
 case=> [] [] irr_ monic_ [] neq_ eq_; split=> //; split=> //.
 by rewrite eq_; apply/eqp_scale; rewrite lc_eq0.
 qed.
+
+lemma eqp_irreducible_monic_dec p q qs :
+  eqp p q =>
+  irreducible_monic_dec p qs =>
+  irreducible_monic_dec q qs.
+proof.
+rewrite /irreducible_monic_dec; move/(eqp_irreducible_dec _ _ qs).
+by move=> imp_ [/imp_] -> ->.
+qed.
+
+lemma irreducible_monic_dec_scale c p qs :
+  c <> zeror =>
+  irreducible_monic_dec p qs <=>
+  irreducible_monic_dec (c ** p) qs.
+proof.
+by move=> neqc0; rewrite /irreducible_monic_dec (irreducible_dec_scale _ _ _ neqc0).
+qed.
+
+lemma perm_eq_irreducible_monic_dec p qs rs :
+  perm_eq qs rs =>
+  irreducible_monic_dec p qs =>
+  irreducible_monic_dec p rs.
+proof.
+rewrite /irreducible_monic_dec => eq_ [dec_ all_].
+move/(perm_eq_irreducible_dec p): (eq_) => -> //=.
+by move: eq_ all_; apply/perm_eq_all.
+qed.
+
+lemma irreducible_monic_dec_mem p q (qs : poly list) :
+  q \in qs =>
+  irreducible_monic_dec p qs =>
+  irreducible_poly q /\ monic q /\ dvdp q p.
+proof.
+move=> mem_ [ ] /(irreducible_dec_mem _ _ _ mem_) [] -> ->.
+by move/allP/(_ _ mem_).
+qed.
+
+lemma irreducible_monic_dec_nil p :
+  (deg p = 1) <=>
+  irreducible_monic_dec p [].
+proof. by rewrite /irreducible_monic_dec /= irreducible_dec_nil. qed.
+
+lemma irreducible_monic_dec_cons p q qs :
+  (dvdp q p /\ irreducible_poly q /\ monic q /\ irreducible_monic_dec (divp p q) qs) <=>
+  irreducible_monic_dec p (q :: qs).
+proof. by rewrite /irreducible_monic_dec -irreducible_dec_cons /=; split=> |>. qed.
+
+lemma irreducible_monic_dec_cat p1 p2 qs1 qs2 :
+  irreducible_monic_dec p1 qs1 =>
+  irreducible_monic_dec p2 qs2 =>
+  irreducible_monic_dec (p1 * p2) (qs1 ++ qs2).
+proof.
+by case=> m1 dec1 [] m2 dec2; split; [apply/irreducible_dec_cat|apply/all_cat].
+qed.
+
+lemma irreducible_monic_dec0 qs :
+  ! irreducible_monic_dec poly0 qs.
+proof. by rewrite /irreducible_monic_dec irreducible_dec0. qed.
+
+lemma irreducible_monic_decC c qs :
+  (c <> IDC.zeror /\ qs = []) <=>
+  irreducible_monic_dec (polyC c) qs.
+proof. by rewrite /irreducible_monic_dec -irreducible_decC; split=> |>. qed.
+
+lemma irreducible_monic_dec_deg2 p qs:
+  deg p = 2 =>
+  (exists c0 c1 , c1 <> zeror /\ p = c1 ** (X + polyC c0) /\ qs = [X + polyC c0]) <=>
+  irreducible_monic_dec p qs.
+proof.
+move=> deg_; rewrite /irreducible_monic_dec -irreducible_dec_deg2 //.
+split=> [[] c0 c1 [] neqc10 [] ->> ->> /=|[] [q] [] ->> eqp_ /= m_]; [split|].
++ by exists (X + polyC c0) => /=; rewrite eqp_scale.
++ by rewrite /monic lcDl ?degX ?polyXE // degC; case (_ = _).
+exists q.[0] (lc p); move: m_ (eqp_); rewrite /monic => eq_ /eqp_eq.
+rewrite lc_eq0 -deg_eq0 deg_ eq_ /= scale1r.
+have {eq_} eq_: q = X + polyC q.[0].
++ move/eqp_size: eqp_; rewrite deg_ eq_sym => deg_q.
+  apply/poly_eqP => i /ler_eqVlt [<<-|/ltzE/ler_eqVlt [<<-|/ltzE le2i]] /=.
+  - by rewrite polyDE polyXE polyCE /= add0r.
+  - by rewrite polyDE polyXE polyCE /= addr0; move: eq_; rewrite deg_q.
+  rewrite gedeg_coeff ?deg_q // polyDE polyXE polyCE.
+  by rewrite gtr_eqF ?ltzE //= add0r gtr_eqF // ltzE ltzW ltzE.
+by rewrite -eq_.
+qed.
+
+lemma irreducible_monic_dec_mem_divp p q (qs : poly list) :
+  q \in qs =>
+  irreducible_monic_dec p qs =>
+  irreducible_monic_dec (divp p q) (rem q qs).
+proof.
+rewrite /irreducible_monic_dec => mem_ [] /(irreducible_dec_mem_divp _ _ _ mem_).
+by move=> -> /=; apply/all_rem.
+qed.
+
+lemma irreducible_monic_dec_dvdp q p qs :
+  irreducible_poly q =>
+  monic q =>
+  dvdp q p =>
+  irreducible_monic_dec p qs =>
+  q \in qs.
+proof.
+move=> irr_ m_ dvdp_ [] dec_ all_.
+case: (irreducible_dec_dvdp _ _ _ irr_ dvdp_ dec_).
+move=> r [] mem_ /eqp_eq; move/allP/(_ _ mem_): all_ m_.
+by rewrite /monic => -> ->; rewrite !scale1r => <<-.
+qed.
+
+lemma irreducible_monic_decW p :
+  scaled_monic p <=>
+  exists qs , irreducible_monic_dec p qs.
+proof.
+split=> [[c r] [] neqc0 [] m_ ->>|[qs] [] + m_]; last first.
++ move=> dec_; case: (dec_)=> irr_ /eqp_eq; rewrite lc_prod (BigCf.BCM.eq_big_seq _ (fun _ => oner)).
+  - by move=> q mem_; rewrite /(\o) /idfun /=; move/allP/(_ _ mem_): m_; rewrite /monic.
+  rewrite BigCf.BCM.big1_eq scale1r => eq_; exists (lc p) (BigPoly.PCM.big predT idfun qs).
+  rewrite -eq_ monic_prod /=; [by move: m_; apply/all_imp_in/allP=> q mem_ /=; rewrite /idfun|].
+  by rewrite lc_eq0 irreducible_decW; exists qs.
+move: (irreducible_decW r); rewrite -lc_eq0 m_ oner_neq0 /= => -[qs] [] irr_ eqp_.
+move/eqp_eq: (eqp_); rewrite m_ scale1r eq_sym lc_prod /= => eq_.
+have/scaled_monic_prod all_: scaled_monic (BigPoly.PCM.big predT idfun qs).
++ exists (BigCf.BCM.big predT lc qs) r; move: eq_ => ->; rewrite m_ /=.
+  split; [|by congr; apply/BigCf.BCM.eq_big_seq => ? ?; rewrite /(\o) /idfun].
+  rewrite -lc_prod lc_eq0 -prodf_neq0; apply/allP => p mem_; rewrite /predI /predC /predT /=.
+  by rewrite -deg_eq0; apply/gtr_eqF/ltzE/ltzW; case/allP/(_ _ mem_): irr_.
+case: (all_funchoice (fun (p : poly) (cq : coeff * poly) =>
+                        let (c, q)= cq in
+                        c <> zeror /\ monic q /\ p = c ** q) qs _).
++ move: all_; apply/all_imp_in/allP => q mem_; rewrite /predT /idfun /=.
+  by case=> d s [] neqd0 [] m_s ->>; exists (d, s).
+move=> f {all_} all_; exists (unzip2 (map f qs)).
+apply/irreducible_monic_dec_scale => //; split; [split|]; last first.
++ rewrite !all_map; move: all_; apply/all_imp_in/allP => q mem_ /=.
+  by rewrite /preim; case: (f q) => ? ?.
++ rewrite !all_map; move: all_; apply/all_imp_in/allP => q mem_ /=.
+  rewrite /preim; move: (eq_refl (f q)); case: {2 3 4}(f q) => d s.
+  move=> eqf_ /= [] neqd0 [] m_s ->>; move/allP/(_ _ mem_): irr_.
+  by rewrite -irreducible_poly_scale.
+apply/(eqp_trans _ _ _ eqp_); rewrite -map_comp BigPoly.PCM.big_mapT.
+apply/eqp_prod/allP => q mem_ ; rewrite /predT /(\o) /idfun /=.
+move/allP/(_ _ mem_): all_ => /=; move: (eq_refl (f q)); case: {2 3 4}(f q) => d s.
+by move=> {eq_} eq_ /= [] neqd0 [] _ ->>; apply/eqp_scale.
+qed.
+
+lemma irreducible_monic_dec_perm_eq p qs1 qs2 :
+  irreducible_monic_dec p qs1 =>
+  irreducible_monic_dec p qs2 =>
+  perm_eq qs1 qs2.
+proof.
+case=> dec1 all1 [] dec2 all2; case: (irreducible_dec_perm_eq _ _ _ dec1 dec2).
+move=> qs [] eq_ [] all_ perm_; move: (perm_); apply/perm_eq_trans/perm_eq_refl_eq/eq_fromzip.
+rewrite eq_ /=; move: all_; apply/all_imp_in/allP => -[] q1 q /mem_zip [] mem_q1 mem_q /= /eqp_eq.
+move/perm_eq_sym: perm_ => perm_; move: all1 (perm_eq_all _ _ _ perm_ all2).
+by move/allP/(_ _ mem_q1) => + /allP/(_ _ mem_q); rewrite /monic => -> ->; rewrite !scale1r.
+qed.
+
+(*TODO: some clone issue somewhere:*)
+(*
+print IDC.unit.
+print CR.unit.
+*)
 
 end Idomain.

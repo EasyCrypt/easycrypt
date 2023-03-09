@@ -3717,6 +3717,25 @@ elim: ss1 ss2 => [|s1 ss1 IHss1] [|s2 ss2]; rewrite ?flatten_nil ?flatten_cons ?
 by move => /lez_add2l /IHss1 {IHss1} IHss1 [?] /IHss1 {IHss1} ?; apply/cat_subseq.
 qed.
 
+lemma eq_fromzip (s1 s2 : 'a list) :
+  s1 = s2 <=> (size s1 = size s2 /\ all (fun (p : 'a * 'a) => p.`1 = p.`2) (zip s1 s2)).
+proof.
+split=> [<<-/=|]; [by elim: s1|]; elim: s1 s2 => [s2|x1 s1 IHs1 [|x2 s2]].
++ by rewrite zip_nil1 /= eq_sym size_eq0 => ->.
++ by rewrite size_eq0.
+by move=> /= [] /addrI eq_ [] <<- all_; move/(_ s2): IHs1; rewrite eq_ all_.
+qed.
+
+lemma all_funchoice ['a, 'b] (P : 'a -> 'b -> bool) s :
+  all (fun x => exists y , P x y) s =>
+  exists f , all (fun x => P x (f x)) s.
+proof.
+elim: s => [|x s IHs /=]; [by exists (fun _ => witness)|].
+case=> -[y] Pxy /IHs [f] all_; exists (fun z => if z = x then y else f z) => /=.
+rewrite Pxy /=; move: all_; apply/all_imp_in/allP => z mem_ /= Pz_.
+by case (z = x).
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                   Subsequence up to permutation                      *)
 (* -------------------------------------------------------------------- *)
