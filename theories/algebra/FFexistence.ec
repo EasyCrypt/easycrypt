@@ -62,7 +62,7 @@ theory PolyFF.
       rewrite mp F.mulr1 => ->>; apply/F.unitfE; move: neqc0.
       by apply/implybNN => ->; rewrite F.mulr0.
     case=> r [mr eqp_]; exists r; rewrite mr /=; split.
-    + by move: irr_; apply/irreducible_poly_eqp.
+    + by move: irr_; apply/irredp_eqp.
     by rewrite -(eqp_dvdl _ _ _ eqp_).
   qed.
 
