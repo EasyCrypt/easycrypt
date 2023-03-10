@@ -21,7 +21,7 @@
   dune-site
   (ocaml-inifiles (>= 1.2))
   (pcre (>= 7))
-  (why3 (and (>= 1.5.0) (< 1.6)))
+  (why3 (and (>= 1.6.0) (< 1.7)))
   yojson
   (zarith (>= 1.10))
 ))
