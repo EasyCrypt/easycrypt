@@ -1,4 +1,4 @@
-FROM easycryptpa/ec-base-box:latest
+FROM ghcr.io/easycrypt/ec-base-box:latest
 
 MAINTAINER Pierre-Yves Strub <pierre-yves@strub.nu>
 
@@ -15,7 +15,7 @@ RUN \
 	opam install --deps-only easycrypt && \
 	opam clean
 
-ENV ALTERGO=2.4.0 CVC4V=1.8 Z3V=4.8.10 Z3SV= Z3A=ubuntu-18.04
+ENV ALTERGO=2.4.2 CVC4V=1.8 Z3V=4.8.10 Z3SV= Z3A=ubuntu-18.04
 
 RUN \
 	opam pin add -n alt-ergo ${ALTERGO} && \

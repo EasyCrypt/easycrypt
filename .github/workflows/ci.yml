@@ -12,7 +12,7 @@ jobs:
     name: EasyCrypt compilation (opam)
     runs-on: ubuntu-20.04
     container:
-      image: easycryptpa/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box
     steps:
     - uses: actions/checkout@v3
     - name: Update OPAM & EasyCrypt dependencies
@@ -48,7 +48,7 @@ jobs:
     needs: compile-opam
     runs-on: ubuntu-20.04
     container:
-      image: easycryptpa/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box
     strategy:
       fail-fast: false
       matrix:
@@ -83,7 +83,7 @@ jobs:
     needs: compile-opam
     runs-on: ubuntu-20.04
     container:
-      image: easycryptpa/ec-build-box
+      image: ghcr.io/easycrypt/ec-build-box
     strategy:
       fail-fast: false
       matrix:
