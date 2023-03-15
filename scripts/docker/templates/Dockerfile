@@ -1,4 +1,4 @@
-FROM easycryptpa/ec-build-box:latest
+FROM ghcr.io/easycrypt/ec-build-box:latest
 
 RUN \
 	opam pin add -n easycrypt https://github.com/EasyCrypt/easycrypt.git#BRANCH && \

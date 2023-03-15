@@ -2,7 +2,7 @@
 
 # --------------------------------------------------------------------
 # docker.com account name
-DNAME ?= easycryptpa
+DNAME ?= ghcr.io/easycrypt
 BBOX  := build-box test-box
 
 # --------------------------------------------------------------------
