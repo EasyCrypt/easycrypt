@@ -26,7 +26,7 @@ clone include Number.RealDomain
   op   ( <= ) <- Int.(<=),
   op   ( <  ) <- Int.(< )
 
-  proof Domain.* by smt, Axioms.* by smt
+  proof Domain.* by smt(invr0), Axioms.* by smt()
 
   remove abbrev Domain.(-)
   remove abbrev Domain.(/).
@@ -96,7 +96,7 @@ clone include Number.RealField
   op   ( <= ) <- Real.(<=),
   op   ( <  ) <- Real.(< )
 
-  proof Field.* by smt, Axioms.* by smt full
+  proof Field.* by smt(RField.invr0), Axioms.* by smt()
 
   remove abbrev Field.(-)
   remove abbrev Field.(/).

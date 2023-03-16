@@ -143,7 +143,7 @@ clone include Bigalg.BigOrder with
     op Num.minr    = fun (x y : real), if x <= y then x else y,
     op Num.maxr    = fun (x y : real), if y <= x then x else y
 
-    proof Num.Domain.* by smt, Num.Axioms.* by smt
+    proof Num.Domain.* by smt(RField.invr0), Num.Axioms.* by smt()
 
     rename [theory] "BAdd" as "BRA"
            [theory] "BMul" as "BRM"
@@ -234,7 +234,7 @@ clone Bigop as BBA with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Bool.( ^^ )
-  proof Support.Axioms.* by (delta; smt).
+  proof Support.Axioms.* by (delta; smt()).
 
 (* -------------------------------------------------------------------- *)
 theory BBM.
@@ -242,7 +242,7 @@ clone include Bigop with
   type t <- bool,
   op Support.idm <- true,
   op Support.(+) <- Pervasive.( /\ )
-  proof Support.Axioms.* by (delta; smt).
+  proof Support.Axioms.* by (delta; smt()).
 
 lemma bigP (P : 'a -> bool) (s : 'a list):
   big predT P s <=> (forall a, mem s a => P a).
@@ -259,7 +259,7 @@ clone include Bigop with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Pervasive.( || )
-  proof Support.Axioms.* by (delta; smt).
+  proof Support.Axioms.* by (delta; smt()).
 
 lemma bigP (P : 'a -> bool) (s : 'a list):
   big predT P s <=> (exists a, mem s a /\ P a).
