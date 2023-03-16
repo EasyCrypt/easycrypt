@@ -34,7 +34,7 @@ EasyCrypt uses the following third-party tools/libraries:
 
  * OCamlbuild
 
- * Why3 (= 1.5.x)
+ * Why3 (= 1.6.x)
 
      Available at <http://why3.lri.fr/>
 
@@ -202,15 +202,15 @@ Why3 and SMT solvers are independent pieces of software with their
 own version-specific interactions. Obtaining a working SMT setup may
 require installing specific versions of some of the provers.
 
-At the time of writing, we depend on Why3 1.5.x, which supports the
+At the time of writing, we depend on Why3 1.6.x, which supports the
 following prover versions:
 
- * Alt-Ergo 2.4.1
+ * Alt-Ergo 2.4.2
  * CVC4 1.8
- * Z3 4.8.10
+ * Z3 4.12.1
 
 `alt-ergo` can be installed using opam, if you do you can use pins to
-select a specific version (e.g, `opam pin alt-ergo 2.4.1`). T
+select a specific version (e.g, `opam pin alt-ergo 2.4.1`).
 
 Development branches use `dune-3.x` and which is incompatible with
 `alt-ergo-2.4.1`. In this case, you can use `alt-ergo-2.4.2`. The
