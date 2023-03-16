@@ -43,7 +43,7 @@ op zeros: block.
 op (+): block -> block -> block.
 
 axiom add0b (x : block)    : zeros + x = x.
-axiom addbA (y x z : block): x + (y + z) = (x + y) + z.
+axiom addbA (x y z : block): x + (y + z) = (x + y) + z.
 axiom addbC (x y : block)  : x + y = y + x.
 axiom addbK (x : block)    : x + x = zeros.
 
