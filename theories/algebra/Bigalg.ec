@@ -127,6 +127,22 @@ rewrite /= range_ltn // big_consT expr0 rangeSr -?ltzS -?ltr_subl_addr //.
 + by apply/ltzS; move/ltzE: lt0n.
 by rewrite big_rcons /predT /= (addrC (big _ _ _)) subr_add2r.
 qed.
+
+lemma nosmt big_debundle (P : 'a -> bool) F bs :
+  all ((<) 0) (unzip2 bs) =>
+  big P F (debundle bs) =
+  big (P \o fst) (fun xn => let (x, n) = xn in CR.intmul (F x) n) bs.
+proof.
+move=> all_; rewrite big_debundle_iter; apply/congr_big_seq => // -[x n] mem_ _ _ /=.
+rewrite intmulpE ?AddMonoid.iteropE // ltzW; move/allP: all_ => -> //.
+by apply/mapP; exists (x, n).
+qed.
+
+lemma nosmt big_debundleT (F : 'a -> t) bs :
+  all ((<) 0) (unzip2 bs) =>
+  big predT F (debundle bs) =
+  big predT (fun xn => let (x, n) = xn in CR.intmul (F x) n) bs.
+proof. by move=> all_; rewrite big_debundle. qed.
 end BAdd.
 
 (* -------------------------------------------------------------------- *)
@@ -141,6 +157,22 @@ clone include Bigop with
 realize Support.Axioms.addmA. by apply/mulrA. qed.
 realize Support.Axioms.addmC. by apply/mulrC. qed.
 realize Support.Axioms.add0m. by apply/mul1r. qed.
+
+lemma nosmt big_debundle (P : 'a -> bool) F bs :
+  all ((<) 0) (unzip2 bs) =>
+  big P F (debundle bs) =
+  big (P \o fst) (fun xn => let (x, n) = xn in CR.exp (F x) n) bs.
+proof.
+move=> all_; rewrite big_debundle_iter; apply/congr_big_seq => // -[x n] mem_ _ _ /=.
+rewrite /exp IntOrder.ltrNge ltzW /=; [|by rewrite MulMonoid.iteropE].
+by move/allP: all_ => -> //; apply/mapP; exists (x, n).
+qed.
+
+lemma nosmt big_debundleT (F : 'a -> t) bs :
+  all ((<) 0) (unzip2 bs) =>
+  big predT F (debundle bs) =
+  big predT (fun xn => let (x, n) = xn in CR.exp (F x) n) bs.
+proof. by move=> all_; rewrite big_debundle. qed.
 end BMul.
 
 (* -------------------------------------------------------------------- *)
@@ -167,7 +199,7 @@ by rewrite -exprS 1:/# subr_eq0; do 2! congr => /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma prodr0 P F s:
+lemma prodr_eq0 P F s:
       (exists x, P x /\ x \in s /\ F x = zeror)
   => BMul.big<:'a> P F s = zeror.
 proof.
@@ -177,6 +209,18 @@ rewrite BMul.big_cons /=; case => [->>|mem_y].
 rewrite IHs; [by exists y; do!split|].
 by rewrite mulr0; case: (P x).
 qed.
+
+lemma nosmt mulr_const_cond p s c:
+  BMul.big<:'a> p (fun _ => c) s = exp c (count p s).
+proof.
+rewrite BMul.big_const -MulMonoid.iteropE /exp.
+by rewrite IntOrder.ltrNge count_ge0.
+qed.
+
+lemma nosmt mulr_const s c:
+  BMul.big<:'a> predT (fun _ => c) s = exp c (size s).
+proof. by rewrite mulr_const_cond count_predT. qed.
+
 end BigComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -326,30 +370,6 @@ proof.
 move=> h; rewrite !(@BMul.big_seq_cond P).
 by rewrite ler_prod=> //= x []; apply/h.
 qed.
-
-lemma nosmt prodr_eq0 P F s:
-      (exists x, P x /\ x \in s /\ F x = zeror)
-  <=> BMul.big<:'a> P F s = zeror.
-proof. split.
-+ case=> x [# Px x_in_s z_Fx]; rewrite (@BMul.big_rem _ _ _ x) //.
-  by rewrite Px /= z_Fx Num.Domain.mul0r.
-+ elim: s => [|x s ih] /=; 1: by rewrite BMul.big_nil oner_neq0.
-  rewrite BMul.big_cons /=; case: (P x) => Px; last first.
-  - by move/ih; case=> y [# Py ys z_Fy]; exists y; rewrite Py ys z_Fy.
-  rewrite mulf_eq0; case=> [z_Fx|]; first by exists x.
-  by move/ih; case=> y [# Py ys z_Fy]; exists y; rewrite Py ys z_Fy.
-qed.
-
-lemma nosmt mulr_const_cond p s c:
-  BMul.big<:'a> p (fun _ => c) s = exp c (count p s).
-proof.
-rewrite BMul.big_const -MulMonoid.iteropE /exp.
-by rewrite IntOrder.ltrNge count_ge0.
-qed.
-
-lemma nosmt mulr_const s c:
-  BMul.big<:'a> predT (fun _ => c) s = exp c (size s).
-proof. by rewrite mulr_const_cond count_predT. qed.
 
 lemma ler_pexpn2r n x y :
   0 < n => zeror <= x => zeror <= y => (exp x n <= exp y n) <=> (x <= y).

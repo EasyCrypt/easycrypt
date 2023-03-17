@@ -61,23 +61,6 @@ theory PolyFF.
     by rewrite scalepA F.mulrV ?scale1r // F.unitfP lc_eq0.
   qed.
 
-(*
-  lemma poly1_or_dvdp_iu p :
-    monic p =>
-    deg p = 1 \/ exists q , irreducible_poly q /\ monic q /\ dvdp q p.
-  proof.
-    move=> mp; case: (poly1_or_dvdp_i p) => [-> //|].
-    case=> q [irr_ dvdp_]; right; move: (monicW q _).
-    + move: dvdp_; rewrite -dvdpP; case=> c r [neqc0 /(congr1 lc) /=].
-      rewrite lcM lcZ_lreg; [by apply/F.lregP|].
-      rewrite mp F.mulr1 => ->>; apply/F.unitfE; move: neqc0.
-      by apply/implybNN => ->; rewrite F.mulr0.
-    case=> r [mr eqp_]; exists r; rewrite mr /=; split.
-    + by move: irr_; apply/irredp_eqp.
-    by rewrite -(eqp_dvdl _ _ _ eqp_).
-  qed.
-*)
-
   op enum_ledeg n =
     if 0 <= n
     then map polyL (alltuples n FinType.enum)
@@ -87,8 +70,25 @@ theory PolyFF.
 
   op enum_udeg n = filter monic (enum_deg n).
 
+  op enum_udeg_irr_shape n s =
+    filter
+      ( fun p =>
+          exists qs ,
+            irreducible_monic_dec p qs /\
+            s = mkseq (fun k => count (fun q => deg q = k + 2) qs) n )
+      (enum_udeg n).
+
+  op enum_udeg_irr_deg k d =
+    filter
+      ( fun p =>
+          exists qs ,
+            irreducible_monic_dec p qs /\
+            size qs = k /\
+            all (fun q => deg q = d) qs )
+      (enum_udeg (k * (d - 1) + 1)).
+
   op enum_iudeg n = filter irreducible_poly (enum_udeg n).
-  
+
   lemma enum_ledegP n p :
     p \in enum_ledeg n <=>
     (P.deg p <= n).
@@ -195,6 +195,74 @@ theory PolyFF.
     by rewrite size_map size_enum_ledeg // -ltzS.
   qed.
 
+  lemma enum_udeg_irr_shapeP n s p :
+    p \in enum_udeg_irr_shape n s <=>
+    ( monic p /\
+      deg p = n /\
+      exists qs ,
+        irreducible_monic_dec p qs /\
+        s = mkseq (fun k => count (fun q => deg q = k + 2) qs) n ).
+  proof.
+    rewrite /enum_udeg_irr_shape mem_filter enum_udegP /=.
+    by split=> />.
+  qed.
+
+  lemma uniq_enum_udeg_irr_shape n s :
+    uniq (enum_udeg_irr_shape n s).
+  proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
+
+  lemma perm_eq_enum_udeg_irr_shape n :
+    0 < n =>
+    perm_eq (enum_udeg n) (flatten (map (enum_udeg_irr_shape n) (allshapes n))).
+  proof.
+    move=> lt0n; apply/uniq_perm_eq.
+    + by apply/uniq_enum_udeg.
+    + apply/uniq_flatten_map; last first.
+      - by apply/allshapes_uniq.
+      - by move=> ?; apply/uniq_enum_udeg_irr_shape.
+      move=> p1 p2 mem1 mem2 /hasP [p] [].
+      case/enum_udeg_irr_shapeP => m_ [] eq_ [qs2] [] dec2 ->>.
+      case/enum_udeg_irr_shapeP => _ [] _ [qs1] [] dec1 ->>.
+      apply/eq_in_mkseq => i /mem_range mem_ /=.
+      by apply/perm_eqP/(irredp_monic_dec_perm_eq p).
+    move=> p; rewrite enum_udegP -flattenP; split.
+    + admit.
+    admit.
+  qed.
+
+  lemma size_enum_udeg_irr_shape n :
+    0 < n =>
+    Bigint.BIA.big predT (fun s => size (enum_udeg_irr_shape n s)) (allshapes n) =
+    FinType.card ^ (n - 1).
+  proof.
+    move=> lt0n; rewrite -size_enum_udeg //.
+    move/perm_eq_size: (perm_eq_enum_udeg_irr_shape _ lt0n) => ->.
+    rewrite size_flatten Bigint.sumzE !Bigint.BIA.big_mapT.
+    apply/Bigint.BIA.eq_big_seq => s mem_ /=.
+    by rewrite /(\o).
+  qed.
+
+  lemma enum_udeg_irr_degP k d p :
+    p \in enum_udeg_irr_deg k d <=>
+    ( monic p /\
+      exists qs ,
+            irreducible_monic_dec p qs /\
+            size qs = k /\
+            all (fun q => deg q = d) qs ).
+  proof.
+    rewrite /enum_iudeg mem_filter enum_udegP /=.
+    split=> |> m_ qs dec_ all_.
+    admit.
+  qed.
+
+  lemma uniq_enum_udeg_irr_deg k d :
+    uniq (enum_udeg_irr_deg k d).
+  proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
+
+
+fail.
+
+
   lemma enum_iudegP n p :
     p \in enum_iudeg n <=>
     (irreducible_poly p /\ monic p /\ deg p = n).
@@ -204,7 +272,83 @@ theory PolyFF.
     uniq (enum_iudeg n).
   proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
 
+
+
+
+
+
+(*TODO: move to list*)
+op alltuples_list ['a] (xss : 'a list list) = iteri (size xss) (fun n ys => allpairs (::) (nth [] xss (size xss - 1 - n)) ys) [[]].
+
+lemma alltuples_list_nil ['a] :
+  alltuples_list<:'a> [] = [[]].
+proof. by rewrite /alltuples_list /= iteri0. qed.
+
+lemma alltuples_list_cons ['a] (xs : 'a list) xss :
+  alltuples_list (xs :: xss) = allpairs (::) xs (alltuples_list xss).
+proof.
+rewrite /alltuples_list /= (addrC 1) iteriS ?size_ge0 //=.
+congr; apply/eq_iteri => i tss [] le0i lti_ /=; congr.
+by rewrite subr_eq0 gtr_eqF //= addrAC.
+qed.
+
+lemma size_alltuples_list ['a] (xss : 'a list list) :
+  size (alltuples_list xss) = Bigint.BIM.big predT size xss.
+proof.
+elim: xss => [|xs xss IHxss].
++ by rewrite alltuples_list_nil Bigint.BIM.big_nil.
+by rewrite alltuples_list_cons size_allpairs Bigint.BIM.big_cons /(predT xs) /= IHxss.
+qed.
+
+lemma alltuples_list_uniq ['a] (xss : 'a list list) :
+  all uniq xss =>
+  uniq (alltuples_list xss).
+proof.
+elim: xss => [|xs xss IHxss]; [by rewrite alltuples_list_nil|].
+rewrite alltuples_list_cons /= => -[] u_ /IHxss u__.
+by apply/allpairs_uniq.
+qed.
+
+lemma alltuples_listP ['a] (ts : 'a list) xss :
+  ts \in alltuples_list xss <=>
+  size ts = size xss /\ all (fun (p : 'a * 'a list) => p.`1 \in p.`2) (zip ts xss).
+proof.
+elim: xss ts => [|xs xss IHxss] ts.
++ by rewrite alltuples_list_nil /= size_eq0 zip_nil2.
+rewrite alltuples_list_cons allpairsP /=; split.
++ case=> -[x ys] /= [] mem_ [] + ->>; rewrite IHxss.
+  by case=> eq_ all_; rewrite -eq_.
+case: ts => [|x ts] /=; [by rewrite ltr_eqF // addrC ltzS size_ge0|].
+case=> /addrI eq_ [] mem_ all_; exists (x, ts) => /=.
+by rewrite mem_ IHxss.
+qed.
+
+op choice_list ['a] (r : 'a -> 'a -> bool) (s : 'a list) : 'a list =
+  with s = "[]" => []
+  with s = (::) h t => h :: (choice_list r (filter (r h) t)).
+
+lemma choice_listP ['a] (r : 'a -> 'a -> bool) s x :
+  x \in choice_list r s <=> true.
+
+(*TODO: end of move to list*)
+
+(*
+    0 < n =>
+    1 < q =>
+    BIA.big
+      predT
+      (fun a =>
+        BIM.bigi
+          predT
+          (fun d => BIM.bigi predT ((+) (I d q)) 0 (nth 0 a (d - 1)) %/ fact (nth 0 a (d - 1)))
+          1 (n + 1))
+      (allshapes n) =
+    q ^ n.
+*)
+
 end PolyFF.
+
+
 
 
 

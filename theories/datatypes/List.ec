@@ -459,6 +459,9 @@ proof.
   by case (hs = x) => /= _ //; rewrite addrC ltzS count_ge0.
 qed.
 
+lemma mem_count_eq0 ['a] x (s : 'a list) : !(x \in s) <=> (count (pred1 x) s = 0).
+proof. by rewrite mem_count -lezNgt lez_eqVlt ltzNge count_ge0. qed.
+
 op has (p : 'a -> bool) xs =
   with xs = []      => false
   with xs = y :: ys => (p y) \/ (has p ys).
@@ -489,6 +492,14 @@ proof.
     by elim=> ? h y []; [move=> -> // | apply IH1].
   move=> h; split; [by apply h | apply IH2].
   by move=> y y_in_s; apply h; right.
+qed.
+
+lemma all_eq_mem p (s1 s2 : 'a list):
+  mem s1 == mem s2 =>
+  all p s1 <=> all p s2.
+proof.
+move=> eq_; rewrite !allP; apply/forall_eq.
+by move=> x /=; rewrite eq_.
 qed.
 
 lemma size_filter p (s : 'a list): size (filter p s) = count p s.
@@ -1605,9 +1616,19 @@ proof. by elim: s => //= x s IHs; case: (mem s x); smt. qed.
 lemma undup_id (s : 'a list): uniq s => undup s = s.
 proof. by elim: s => //= x s IHs; smt. qed.
 
+lemma undup_nseq n (x : 'a): 0 < n => undup (nseq n x) = [x].
+proof.
+rewrite -(subrK n 1); pose m:= (n-1); move: m => {n} n /ltzS le0n.
+by rewrite nseqS //=; elim: n le0n => [|n le0n IHn]; [rewrite nseq0|rewrite nseqS].
+qed.
+
 lemma count_uniq_mem s (x : 'a):
   uniq s => count (pred1 x) s = b2i (mem s x).
 proof. elim: s; smt. qed.
+
+lemma all_undup p (s : 'a list):
+  all p (undup s) <=> all p s.
+proof. by apply/all_eq_mem=> ?; apply/mem_undup. qed.
 
 lemma uniq_leq_size (s1 s2 : 'a list):
   uniq s1 => (mem s1 <= mem s2) => size s1 <= size s2.
@@ -2837,6 +2858,11 @@ proof.
 by elim: s => // x s /=; rewrite sumz_cons => ->.
 qed.
 
+lemma sumz_eq0 sz :
+  all (pred1 0) sz =>
+  sumz sz = 0.
+proof. by elim: sz => // z sz /= imp_ []; rewrite /pred1 => ->> /imp_; rewrite sumz_cons. qed.
+
 (* -------------------------------------------------------------------- *)
 op prodz sz = foldr Int.( * ) 1 sz.
 
@@ -2875,6 +2901,11 @@ proof.
 elim: sz => // z sz IHsz; rewrite prodz_cons /= {1}/predC1.
 by case (z = 1) => [->>|_] //=; rewrite prodz_cons IHsz.
 qed.
+
+lemma prodz_eq1 sz :
+  all (pred1 1) sz =>
+  prodz sz = 1.
+proof. by elim: sz => // z sz /= imp_ []; rewrite /pred1 => ->> /imp_; rewrite prodz_cons. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            Flattening                                *)
@@ -4419,15 +4450,21 @@ end Cost.
 (* -------------------------------------------------------------------- *)
 (*                     Bundling and debundling                          *)
 (* -------------------------------------------------------------------- *)
-  print perm_undup_count.
-
-op bundle ['a] (s : 'a list) : ('a * int) list =
+op bundle (s : 'a list) : ('a * int) list =
   map (fun x => (x, count (pred1 x) s)) (undup s).
 
-op debundle ['a] (s : ('a * int) list) : 'a list =
+op debundle (s : ('a * int) list) : 'a list =
   flatten (map (fun (x : ('a * int)) => nseq x.`2 x.`1) s).
 
-lemma mem_bundle ['a] (s : 'a list) x n :
+lemma bundle_nil :
+  bundle<:'a> [] = [].
+proof. by trivial. qed.
+
+lemma eq_bundle_nil (s : 'a list) :
+  bundle s = [] <=> s = [].
+proof. by rewrite -size_eq0 size_map size_eq0 undup_nilp. qed.
+
+lemma mem_bundle (s : 'a list) x n :
   (x , n) \in bundle s <=> (0 < n /\ count (pred1 x) s = n).
 proof.
 rewrite mapP; split=> [[?] []|[lt0_ <<-]].
@@ -4436,28 +4473,71 @@ rewrite mapP; split=> [[?] []|[lt0_ <<-]].
 by exists x; rewrite mem_undup mem_count lt0_.
 qed.
 
-lemma uniq_bundle ['a] (s : 'a list) :
+lemma uniq_bundle (s : 'a list) :
   uniq (bundle s).
 proof.
 apply/map_inj_in_uniq; [|by apply/undup_uniq].
 by move=> x y; rewrite !mem_undup => mem_x mem_y /= [<<-].
 qed.
 
-lemma uniq_unzip1_bundle ['a] (s : 'a list) :
-  uniq (unzip1 (bundle s)).
+lemma bundle_nseq n (x : 'a) :
+  0 < n =>
+  bundle (nseq n x) = [(x, n)].
+proof. by move=> lt0n; rewrite /bundle undup_nseq //= count_nseq /pred1 /b2i /max lt0n. qed.
+
+lemma bundle_cat (s1 s2 : 'a list) :
+  (forall x , !(x \in s1 /\ x \in s2)) =>
+  perm_eq (bundle (s1 ++ s2)) (bundle s1 ++ bundle s2).
+proof.
+move=> Neq_; apply/uniq_perm_eq => /=.
++ by apply/uniq_bundle.
++ rewrite cat_uniq !uniq_bundle /= hasPn => -[x n].
+  rewrite !mem_bundle => -[] lt0n <<-; rewrite lt0n /=.
+  move/mem_count: (lt0n) (Neq_ x) => -> /=.
+  by apply/implybNN => eq_; move: lt0n; rewrite -eq_ mem_count.
+case=> x n; rewrite mem_cat !mem_bundle; case (0 < n) => //= lt0n.
+move/(_ x): Neq_; rewrite negb_and count_cat => Nmem_.
+split; [|case]; move=> <<-; first last.
++ by move/mem_count: lt0n Nmem_ => -> /= /mem_count_eq0 ->.
++ by move/mem_count: lt0n Nmem_ => -> /= /mem_count_eq0 ->.
+by case: Nmem_ => /mem_count_eq0 ->.
+qed.
+
+lemma bundle_cons n x (s : 'a list) :
+  0 < n =>
+  ! x \in s =>
+  perm_eq (bundle (nseq n x ++ s)) ((x, n) :: bundle s).
+proof.
+move=> lt0n Nmem_; apply/(perm_eq_trans _ _ _ (bundle_cat _ _ _)).
++ by move=> y; rewrite mem_nseq lt0n /= negb_and -implybE => <<-.
+by rewrite -cat1s; apply/perm_cat2r; rewrite bundle_nseq.
+qed.
+
+lemma unzip1_bundle (s : 'a list) :
+  unzip1 (bundle s) = undup s.
 proof.
 rewrite -map_comp; pose f:= _ \o _.
 case: (eq_in_map f idfun (undup s)) => /(_ _) // -> _.
-by rewrite  map_id undup_uniq.
+by rewrite map_id.
 qed.
 
-lemma lt0_bundle ['a] (s : 'a list) :
+lemma uniq_unzip1_bundle (s : 'a list) :
+  uniq (unzip1 (bundle s)).
+proof. by rewrite unzip1_bundle undup_uniq. qed.
+
+lemma lt0_bundle (s : 'a list) :
   all ((<) 0) (unzip2 (bundle s)).
 proof.
 by apply/allP => n /mapP [] [x ?] [] /mem_bundle [] lt0n <<- ->>.
 qed.
 
-lemma bundle_assoc ['a] (s : 'a list) x :
+lemma all_bundle p (s : 'a list) :
+  all p (bundle s) <=> all (fun x => p (x, count (pred1 x) s)) s.
+proof.
+by rewrite all_map all_undup; apply/eq_in_all => x mem_; rewrite /preim.
+qed.
+
+lemma bundle_assoc (s : 'a list) x :
   let c = count (pred1 x) s in
   assoc (bundle s) x = if 0 < c then Some c else None.
 proof.
@@ -4467,7 +4547,20 @@ case=> + ->; rewrite mapP negb_exists => /= /(_ (x, c)) /=.
 by rewrite mem_bundle -/c /= => ->.
 qed.
 
-lemma mem_debundle ['a] (s : ('a * int) list) x :
+lemma debundle_nil :
+  debundle<:'a> [] = [].
+proof. by trivial. qed.
+
+lemma eq_debundle_nil (s : ('a * int) list) :
+  all (fun (x : 'a * int) => x.`2 <= 0) s =>
+  debundle s = [].
+proof.
+rewrite -size_eq0 size_flatten => all_; apply/sumz_eq0.
+rewrite !all_map; move: all_; apply/all_imp_in/allP => -[x n] mem_ /= len0.
+by rewrite /preim /pred1 /= size_nseq lez_maxl.
+qed.
+
+lemma mem_debundle (s : ('a * int) list) x :
   x \in debundle s <=> (exists n , 0 < n /\ (x, n) \in s).
 proof.
 rewrite -flattenP; split=> [[l] [] /mapP [] [y n] [] mem_ ->> /=|].
@@ -4476,7 +4569,23 @@ case=> n [] lt0n mem_; exists (nseq n x).
 by rewrite mem_nseq lt0n /= mapP; exists (x, n).
 qed.
 
-lemma count_debundle ['a] (s : ('a * int) list) x :
+lemma all_debundle p (s : ('a * int) list) :
+  all p (debundle s) <=> all (fun xn => let (x, n) = xn in (0 < n) => p x) s.
+proof.
+rewrite !allP; split=> [+ [x n] mem_ /= lt0n|+ x /mem_debundle [n] [] lt0n mem_].
++ by move=> -> //; apply/mem_debundle; exists n.
+by move/(_ _ mem_) => /= ->.
+qed.
+
+lemma debundle_cons (x : 'a) n s :
+  debundle ((x, n) :: s) = nseq n x ++ debundle s.
+proof. by rewrite /debundle /= flatten_cons. qed.
+
+lemma debundle_cat (s1 s2 : ('a * int) list) :
+  debundle (s1 ++ s2) = debundle s1 ++ debundle s2.
+proof. by rewrite /debundle map_cat flatten_cat. qed.
+
+lemma count_debundle (s : ('a * int) list) x :
   uniq (unzip1 s) =>
   all ((<) 0) (unzip2 s) =>
    x \in unzip1 s =>
@@ -4498,7 +4607,7 @@ rewrite /(\o) /= count_nseq /b2i /pred1 /=.
 by move/allP/(_ n _): all_; [apply/mapP; exists (x, n)|rewrite /max => ->].
 qed.
 
-lemma perm_eq_bundle_debundle ['a] (s : ('a * int) list) :
+lemma perm_eq_bundle_debundle (s : ('a * int) list) :
   uniq (unzip1 s) =>
   all ((<) 0) (unzip2 s) =>
   perm_eq (bundle (debundle s)) s.
@@ -4517,7 +4626,7 @@ move=> -> /=; move: mem_ (count_debundle s x uniq_ all_ _).
 by rewrite !(mem_assoc_uniq _ _ _ uniq_) => -> /someI.
 qed.
 
-lemma perm_eq_debundle_bundle ['a] (s : 'a list) :
+lemma perm_eq_debundle_bundle (s : 'a list) :
   perm_eq (debundle (bundle s)) s.
 proof.
 apply/perm_eqP1 => x; case (x \in s) => [mem_x|Nmem_x].
@@ -4535,7 +4644,7 @@ move: lt0n; rewrite /pred1 /= -mem_count => mem_y.
 by apply/negP => ->>.
 qed.
 
-lemma perm_eq_debundle ['a] (s1 s2 : ('a * int) list) :
+lemma perm_eq_debundle (s1 s2 : ('a * int) list) :
   uniq (unzip1 s1) =>
   uniq (unzip1 s2) =>
   all ((<) 0) (unzip2 s1) =>
@@ -4571,7 +4680,7 @@ move=> mem2; move/(mem_assoc_uniq _ _ _ uniq2): mem2.
 by move/(mem_assoc_uniq _ _ _ uniq2): mem1 => -> /someI; rewrite -/c2 -eq_.
 qed.
 
-lemma perm_eq_bundle ['a] (s1 s2 : 'a list) :
+lemma perm_eq_bundle (s1 s2 : 'a list) :
   perm_eq (bundle s1) (bundle s2) <=> perm_eq s1 s2.
 proof.
 move: (perm_eq_debundle_bundle s1) (perm_eq_debundle_bundle s2) => eq1 eq2.
@@ -4592,4 +4701,16 @@ apply/perm_eq_debundle => //.
 + by apply/uniq_unzip1_bundle.
 + by apply/lt0_bundle.
 by apply/lt0_bundle.
+qed.
+
+lemma debundle_perm_eq bs (s : 'a list) :
+  perm_eq bs (bundle s) =>
+  perm_eq (debundle bs) s.
+proof.
+move=> eq_; move: (eq_); rewrite -perm_eq_debundle.
++ by move/(perm_eq_map fst)/perm_eq_uniq: eq_ => -> //; apply/uniq_unzip1_bundle.
++ by apply/uniq_unzip1_bundle.
++ by move/(perm_eq_map snd)/perm_eq_sym/perm_eq_all: eq_ => imp_; apply/imp_/lt0_bundle.
++ by apply/lt0_bundle.
+by move=> {eq_} eq_; apply/(perm_eq_trans _ _ _ eq_)/perm_eq_debundle_bundle.
 qed.
