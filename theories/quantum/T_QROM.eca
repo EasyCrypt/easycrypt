@@ -274,7 +274,7 @@ section CollisionProbability.
   declare module A <:AdvCol_C{-ERO, -QRO, -Lazy.LRO}.
 
 
-  declare axiom A_ll (O <: POracle {-A}): islossless O.o => islossless A(O).main.
+  declare axiom A_ll (O <: POracle): islossless O.o => islossless A(O).main.
   declare axiom A_Bounded : hoare [A(D(A, Lazy.LRO).HC).main : QRO.ch = 0 ==> QRO.ch <= q].
 
   local clone import Birthday as BBound with
@@ -460,7 +460,7 @@ end section CollisionProbability.
 
 
   lemma pr_col (A<:AdvCol_C{-ERO, -QRO, -Lazy.LRO}) &m:
-    (forall (O <: POracle {-A}), islossless O.o => islossless A(O).main) =>
+    (forall (O <: POracle), islossless O.o => islossless A(O).main) =>
     (hoare [A(D(A, Lazy.LRO).HC).main : QRO.ch = 0 ==> QRO.ch <= q]) =>
     Pr[Col_C(A).main() @ &m : res] <= ((q+2)*(q+1))%r/2%r * mu1 dhash witness.
 move => A_ll A_Bounded.
