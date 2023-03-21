@@ -186,15 +186,10 @@ section Random_Ideal.
 
   equiv Random_Ideal: Random.enc ~ Ideal.enc: size p{1} = size p{2} ==> ={res}.
   proof.
-    transitivity Sampling.LoopSnoc.sample
-                 (size p{1} + 1 = n{2} ==> ={res})
-                 (n{1} = size p{2} + 1 ==> ={res})=> //=; 1:smt ml=0.
-      by proc; inline *; while (={i} /\ c{1} = l{2} /\ size p{1} + 1 = n{2}); auto=> /#.
-    transitivity Sampling.Sample.sample
-                 (n{1} = n{2} ==> ={res})
-                 (n{1} = size p{2} + 1 ==> ={res})=> //=; 1:smt ml=0.
-      by symmetry=> //=; conseq Sampling.Sample_LoopSnoc_eq.
-    by proc; auto.
+  proc.
+  rewrite equiv [{2} Sampling.Sample_LoopSnoc_eq (size p + 1)  r (size p + 1) c].
+  + auto=> /#.
+  by wp; while (i0{1} = i{2} /\ c{2} = l{1} /\ size p{2} + 1 = n{1}); auto=> /#.
   qed.
 end section Random_Ideal.
 

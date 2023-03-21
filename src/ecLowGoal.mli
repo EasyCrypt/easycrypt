@@ -243,6 +243,7 @@ val t_intros_sx : inames -> tcenv1 -> tcenv * ident list
 val t_intros_s  : inames -> FApi.backward
 
 val t_intros_i_1 : ident list -> tcenv1 -> tcenv1
+val t_intros_s_1 : inames -> tcenv1 -> tcenv1
 
 val t_intro_sx_seq : iname -> (ident -> FApi.backward) -> FApi.backward
 

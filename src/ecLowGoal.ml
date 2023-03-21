@@ -588,6 +588,10 @@ let t_intros_i_1 (ids : EcIdent.t list) (tc : tcenv1) =
   FApi.as_tcenv1 (t_intros_i ids tc)
 
 (* -------------------------------------------------------------------- *)
+let t_intros_s_1 (ids : inames) (tc : tcenv1) =
+  FApi.as_tcenv1 (t_intros_s ids tc)
+
+(* -------------------------------------------------------------------- *)
 let t_intros_i_seq ?(clear = false) ids tt tc =
   let tt = if clear then FApi.t_seq tt (t_clears ids) else tt in
   FApi.t_focus tt (t_intros_i ids tc)

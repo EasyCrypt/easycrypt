@@ -67,16 +67,8 @@ section.
     Iter(O').iter_12 ~ Iter(O').iter_21 :
             ={glob O', t1, t2} ==> ={glob O'}.
   proof.
-  transitivity Fold(O).fold_12
-    (={glob O,t1,t2} /\ s{2} = O'.s{1} ==> ={glob O} /\ res{2} = O'.s{1})
-    (={glob O,t1,t2} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2})=> //.
-  + by move=> /> &1 &2 <- <-; exists ((glob O){2}) (O'.s{2},t1{1},t2{1}).
-  + by proc;inline *;sim.
-  transitivity Fold(O).fold_21
-    (={glob O,s,t1,t2} ==> ={glob O, res})
-    (={glob O,t1,t2} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2})=> [/#|//||].
-  + by conseq fold_swap12.
-  by proc;inline *;sim.
+  proc.
+  rewrite equiv [{1} fold_swap12 (O'.s, t1, t2) O'.s (O'.s, t1, t2) O'.s]; inline*; sim.
   qed.
 
   equiv fold_perm : Fold(O).fold ~ Fold(O).fold :

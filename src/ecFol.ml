@@ -1001,3 +1001,59 @@ let destr_ands ~deep =
     with DestrError _ -> [f]
 
   in fun f -> doit f
+
+
+(*---------------------------------------------*)
+
+let rec one_sided mem fp =
+  match fp.f_node with
+  | Fint   _      -> true
+  | Flocal _      -> true
+  | Fpvar (_, me) -> EcIdent.id_equal mem me
+  | Fglob (_, me) -> EcIdent.id_equal mem me
+
+  | Fif    (c, f1, f2)  -> one_sided mem c && one_sided mem f1 && one_sided mem f2
+  | Fmatch (b, fs, _)  -> one_sided mem b && List.for_all (one_sided mem) fs
+  | Flet   (_, f1, f2) -> one_sided mem f1 && one_sided mem f2
+  | Ftuple fs           -> List.for_all (one_sided mem) fs
+  | Fproj (f, _)        -> one_sided mem f
+
+  | Fquant (_, _, f) -> one_sided mem f
+
+  | Fop _ -> true
+  | Fapp (f, args) -> one_sided mem f && List.for_all (one_sided mem) args
+  | _ -> false
+
+let rec split_sided mem fp =
+  if one_sided mem fp then
+    Some fp
+  else
+    if is_and fp then
+      let (l, r) = destr_and fp in
+      let fl = split_sided mem l in
+      let fr = split_sided mem r in
+      if is_none fr then 
+        fl
+      else
+        (match fl with
+        | Some f -> Some (f_and f (oget fr))
+        | None -> fr
+        )
+    else
+      None
+
+let rec one_sided_vs mem fp =
+  match fp.f_node with
+  | Fpvar (_, me) -> if EcIdent.id_equal mem me then [fp] else []
+  | Fglob (_, me) -> if EcIdent.id_equal mem me then [fp] else []
+
+  | Fif    (c, f1, f2)  -> one_sided_vs mem c @ one_sided_vs mem f1 @ one_sided_vs mem f2
+  | Fmatch (b, fs, _)  -> one_sided_vs mem b @ List.concat_map (one_sided_vs mem) fs
+  | Flet   (_, f1, f2) -> one_sided_vs mem f1 @ one_sided_vs mem f2
+  | Ftuple fs           -> List.concat_map (one_sided_vs mem) fs
+  | Fproj (f, _)        -> one_sided_vs mem f
+
+  | Fquant (_, _, f) -> one_sided_vs mem f
+
+  | Fapp (f, args) -> one_sided_vs mem f @ List.concat_map (one_sided_vs mem) args
+  | _ -> []

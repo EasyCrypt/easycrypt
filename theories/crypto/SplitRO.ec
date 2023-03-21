@@ -185,16 +185,12 @@ section PROOFS.
        smt (get_setE map_set set_pair_map mem_map mem_pair_map mem_set mapE mergeE ofpairK topairK).
     + by proc; inline *; auto; smt (map_rem rem_merge mem_map mem_pair_map mem_rem).
     + proc *.
-      alias{1} 1 y = witness <:to>; alias{2} 1 y = witness <:to>. 
-      transitivity*{1} { y <@ RO.get(x); } => //;1: smt().
-      + by inline *; sim.
-      transitivity*{2} { y <@  RO_Pair(I1.RO, I2.RO).get(x); } => //; 1:smt().
-      + by call RO_get.
-      by inline *; sim.
+      alias{1} 1 y = witness <:to>; alias{2} 1 y = witness <:to>.
+      rewrite equiv [{1} RO_get (x) y (x) y].
     inline *; auto => />.
     have hn := o_pair_none <: from, to1, to2>. 
     by rewrite /pair_map merge_empty // map_empty /= => ?; rewrite !mem_empty.
-  qed.
+  qed.      
 
   lemma pr_RO_split (p: glob D -> output -> bool) &m x0: 
     Pr[ MainD(D,RO).distinguish(x0) @ &m : p (glob D) res] =

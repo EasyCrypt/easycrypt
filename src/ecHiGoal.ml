@@ -856,6 +856,179 @@ let process_rewrite1_r ttenv ?target ri tc =
   | RWTactic `Field ->
       process_algebra `Solve `Field [] tc
 
+  | RWEquiv (side, name, (argsl, resl), (argsr, resr)) ->
+      (* Check which direction we wish to go in *)
+      let tc = match side with
+        | `Left  -> tc
+        | `Right -> as_tcenv1 (EcPhlSym.t_equiv_sym tc)
+      in
+
+      (* Extract the context *)
+      let env, hyps, goal = FApi.tc1_eflat tc in
+      let goal = EcFol.destr_equivS goal in
+
+      (* Get the symbol of name and retrieve it's equiv *)
+      let sym_of_name = string_of_qsymbol (unloc name) in
+      let equiv =
+        let f =
+          (* Check if the name is in the local context *)
+          if LDecl.hyp_exists sym_of_name hyps then
+            let _, f = LDecl.hyp_by_name sym_of_name hyps in
+            f
+          else
+            let _, lem = EcEnv.Ax.lookup (unloc name) env in
+            assert (List.is_empty lem.ax_tparams);
+            lem.ax_spec
+        in
+        (* TODO: how do we handle errors? *)
+        try EcFol.destr_equivF f with
+          | DestrError _ -> raise (LowRewrite.RewriteError LRW_NothingToRewrite)
+      in
+      (* Type our res and args in the given memory *)
+      let sided_env m (p : EcModules.function_) args res =
+        let subenv = EcEnv.Memory.push_active m env in
+        let ue = EcUnify.UniEnv.create (Some []) in
+
+        let args, ret_ty =
+          EcTyping.trans_args subenv ue (loc args) p.f_sig (unloc args) in
+        let res =
+          EcTyping.transexpcast subenv `InProc ue ret_ty res in
+
+        let subs = try EcUnify.UniEnv.close ue with
+          | EcUnify.UninstanciateUni ->
+            EcTyping.tyerror ri.pl_loc env EcTyping.FreeTypeVariables in
+
+        (List.map (EcTypes.e_uni subs) args, EcTypes.e_uni subs res)
+      in
+
+      (* Construct a left value from an expression *)
+      let lv res =
+        let as_pvar e =
+          match e.e_node with
+          | Evar pv -> (pv, e_ty e)
+          | _ -> assert false in
+
+        match res.e_node with
+        | Evar pv ->
+          EcModules.LvVar (pv, e_ty res)
+        | Etuple pvs ->
+          EcModules.LvTuple (List.map as_pvar pvs)
+        | _ -> assert false
+      in
+
+      let meml = goal.es_ml in
+      let procl = EcEnv.Fun.by_xpath equiv.ef_fl env in
+      let argsl, resl = sided_env meml procl argsl resl in
+      let lvl = lv resl in
+
+      let memr = goal.es_mr in
+      let procr = EcEnv.Fun.by_xpath equiv.ef_fr env in
+      let argsr, resr = sided_env memr procr argsr resr in
+      let lvr = lv resr in
+
+      (* Construct minimal pre/post conditions for the new intermediate memory *)
+      (* Note: this only allows overwriting existing memories instead of creating new ones *)
+      let prpo ml mr args =
+        let ml_pr = split_sided ml goal.es_pr in
+        let pr =
+          f_eq
+            (EcFol.form_of_expr ml (e_tuple args))
+            (EcFol.form_of_expr mr (e_tuple args)) in
+        let pr = f_and (odfl f_true ml_pr) pr in
+
+        let eqs_pr = EcFol.one_sided_vs ml goal.es_pr in
+        let eqs_po = EcFol.one_sided_vs ml goal.es_po in
+
+        let eqs_pr = List.unique (eqs_pr @ eqs_po) in
+        let eqs_pr = List.map (fun v -> f_eq (Fsubst.f_subst_mem ml mr v) v) eqs_pr in
+        let eqs_pr = f_ands eqs_pr in
+
+        let eqs_po = List.unique eqs_po in
+        let eqs_po = List.map (fun v -> f_eq (Fsubst.f_subst_mem ml mr v) v) eqs_po in
+        let eqs_po = f_ands eqs_po in
+
+        f_and eqs_pr pr, eqs_po
+      in
+
+      (* Construct the proc calls that we want in each transitivity *)
+      let progl = EcModules.s_call (Some lvl, equiv.ef_fl, argsl) in
+      let progr = EcModules.s_call (Some lvr, equiv.ef_fr, argsr) in
+
+      (* Here we build the chain of transitivity calls, and discharge intermediate goals when possible*)
+      let tc =
+        EcPhlTrans.t_equivS_trans
+           (EcMemory.memtype meml, progl)
+           (prpo (EcMemory.memory meml) mright argsl)
+           (goal.es_pr, goal.es_po)
+           tc in
+      let p = process_tfocus tc (Some [Some 4,Some 4], None) in
+      let tc =
+        t_onselect
+          p
+          (EcPhlTrans.t_equivS_trans
+             (EcMemory.memtype memr, progr)
+             (goal.es_pr, goal.es_po)
+             (prpo (EcMemory.memory memr) mleft argsr))
+          tc in
+
+      (* Two more goals (1 and 4) can be solved in general (with the same proof):
+          - by move=> &1 &2 H; exists var1{1} var2{1} ... varn{1}; move: H => //.
+          for 4 we use {2}.
+      *)
+
+      let tc =
+        let ongoal (b : bool) (tc : tcenv1) =
+          let pl = EcIdent.create "&p1" in
+          let pr = EcIdent.create "&p2" in
+          let h  = EcIdent.create "__" in
+          let tc = t_intros_i_1 [pl; pr; h] tc in
+
+          let mem, p = if b then (meml, pl) else (memr, pr) in
+
+          (* Pairing up the correct variables for the exists intro *)
+          let vs, fm = EcFol.destr_exists (FApi.tc1_goal tc) in
+          let eqsprfm, _ =
+            let l, r = EcFol.destr_and fm in
+            if b then l, r else r, l
+          in
+          let eqsfm, _ = destr_and eqsprfm in
+          let eqsfm = destr_ands ~deep:false eqsfm in
+          let eqsmp = List.map destr_eq eqsfm in
+          let eqsmp = List.map (fst_map destr_local) eqsmp in
+          let exvs = List.map (fun v -> List.assoc v eqsmp) (List.fst vs) in
+          let exvs = List.map (Fsubst.f_subst_mem (EcMemory.memory mem) p) exvs in
+
+          let tc = FApi.as_tcenv1 (t_exists_intro_s (List.map paformula exvs) tc) in
+          t_generalize_hyp ?clear:(Some `Yes) h tc
+        in
+
+        t_onselecti
+          (fun _ -> true)
+          (function 0 -> ongoal true | 3 -> ongoal false | _ -> t_id)
+          tc
+      in
+
+      let p = process_tfocus tc (Some [Some 6,Some 6], None) in
+      let pterm =
+        { fp_mode = `Implicit;
+          fp_head = FPNamed (name, None);
+          fp_args = []; } in
+      let tc =
+        t_onselect
+          p
+          (t_seq (EcPhlCall.process_call None pterm) EcPhlAuto.t_auto)
+          tc in
+
+      let p = process_tfocus tc (Some [Some 3, Some 3; Some (-1), Some (-1)], None) in
+      let tc =
+        t_onselect
+          p
+          (t_seq (EcPhlInline.process_inline (`All (None, None))) ((t_try (t_seq EcPhlAuto.t_auto process_done))))
+          tc
+      in
+
+      t_onall process_trivial tc
+
 (* -------------------------------------------------------------------- *)
 let process_rewrite1 ttenv ?target ri tc =
   EcCoreGoal.reloc (loc ri) (process_rewrite1_r ttenv ?target ri) tc
