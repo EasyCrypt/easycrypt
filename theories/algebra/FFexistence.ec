@@ -225,8 +225,17 @@ theory PolyFF.
       case/enum_udeg_irr_shapeP => _ [] _ [qs1] [] dec1 ->>.
       apply/eq_in_mkseq => i /mem_range mem_ /=.
       by apply/perm_eqP/(irredp_monic_dec_perm_eq p).
-    move=> p; rewrite enum_udegP -flattenP; split.
-    + admit.
+    move=> p; rewrite enum_udegP -flattenP; split; last first.
+    + case=> ? [] /mapP [s] [] /allshapesP is_s_ ->>.
+      by case/enum_udeg_irr_shapeP => m_ [] <<- [?] [] dec_ ->>.
+    case=> m_ <<-; move: (irredp_monic_decW p).
+    rewrite scaled_monicP -deg_gt0 lt0n /= => -[qs] dec_.
+    pose s:= mkseq (fun k => count (fun q => deg q = k + 2) qs) (deg p).
+    pose ps:= enum_udeg_irr_shape (deg p) s; exists ps; split; last first.
+    + rewrite /ps => {ps}; apply/enum_udeg_irr_shapeP; rewrite m_ /=.
+      by exists qs; rewrite -/s.
+    apply/mapP; exists s; rewrite -/ps /= => {ps}; apply/allshapesP.
+    (*TODO: use a not yet done lemma about shapes.*)
     admit.
   qed.
 
@@ -259,6 +268,23 @@ theory PolyFF.
     uniq (enum_udeg_irr_deg k d).
   proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
 
+  lemma perm_eq_enum_udeg_irr_deg n :
+    0 < n =>
+    perm_eq (enum_udeg_irr_shape n) (flatten (map (enum_udeg_irr_deg n) (allshapes n))).
+  proof.
+  qed.
+
+  lemma size_enum_udeg_irr_shape n :
+    0 < n =>
+    Bigint.BIA.big predT (fun s => size (enum_udeg_irr_shape n s)) (allshapes n) =
+    FinType.card ^ (n - 1).
+  proof.
+    move=> lt0n; rewrite -size_enum_udeg //.
+    move/perm_eq_size: (perm_eq_enum_udeg_irr_shape _ lt0n) => ->.
+    rewrite size_flatten Bigint.sumzE !Bigint.BIA.big_mapT.
+    apply/Bigint.BIA.eq_big_seq => s mem_ /=.
+    by rewrite /(\o).
+  qed.
 
 fail.
 
@@ -332,19 +358,6 @@ lemma choice_listP ['a] (r : 'a -> 'a -> bool) s x :
 
 (*TODO: end of move to list*)
 
-(*
-    0 < n =>
-    1 < q =>
-    BIA.big
-      predT
-      (fun a =>
-        BIM.bigi
-          predT
-          (fun d => BIM.bigi predT ((+) (I d q)) 0 (nth 0 a (d - 1)) %/ fact (nth 0 a (d - 1)))
-          1 (n + 1))
-      (allshapes n) =
-    q ^ n.
-*)
 
 end PolyFF.
 

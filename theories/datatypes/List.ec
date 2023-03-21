@@ -3,7 +3,7 @@
 
 
 (* -------------------------------------------------------------------- *)
-require import AllCore.
+require import AllCore Int.
 
 (* -------------------------------------------------------------------- *)
 type 'a list = [
@@ -34,12 +34,45 @@ split=> [|[x ->//]]; case: xs => // x [|y xs] sz.
 - by exists x. - smt(size_ge0).
 qed.
 
+lemma sizeind ['a] (P : 'a list -> bool) :
+  P [] =>
+  (forall s , (forall t , size s = size t + 1 => P t) => P s) =>
+  (forall s , P s).
+proof.
+move=> P0 P_ s; move: (size_ge0 s) (eq_refl (size s)).
+move: {1 3}(size s) => n le0n eq_; elim: n le0n s eq_ => [s /size_eq0 //|].
+move=> n le0n IHn [|x s] //=; rewrite (addrC 1) => /addIr <<-.
+by apply/P_ => t /=; rewrite (addrC 1) => /addIr /eq_sym; apply/IHn.
+qed.
+
+lemma sizesind ['a] (P : 'a list -> bool) :
+  (forall s , (forall t , size t < size s => P t) => P s) =>
+  (forall s , P s).
+proof.
+move=> P_ s; move: (size_ge0 s) (lezz (size s)).
+move: {1 3}(size s) => n le0n eq_; elim: n le0n s eq_.
++ by move=> s /size_le0 ->; apply/P_ => t /= /ltzNge; rewrite size_ge0.
+move=> n le0n IHn [|x s] //=.
++ by move=> _; apply/P_ => t /= /ltzNge; rewrite size_ge0.
+move=> le_; apply/P_ => t /=; move: le_.
+rewrite (addrC 1) => /lez_add2r le2 /ltzS le1.
+by move: (lez_trans _ _ _ le1 le2); apply/IHn.
+qed.
+
 lemma seq2_ind ['a 'b] (P : 'a list -> 'b list -> bool) :
   P [] [] => (forall x1 x2 s1 s2, P s1 s2 => P (x1 :: s1) (x2 :: s2)) =>
     forall s1 s2, size s1 = size s2 => P s1 s2.
 proof.
 move=> Pnil Pcons; elim=> [|x s ih] [|y s'] //=; 1,2:smt(size_ge0).
 by move=> /addzI/ih/Pcons; apply.
+qed.
+
+lemma seq2_sind ['a 'b] (P : 'a list -> 'b list -> bool) :
+  (forall s1 s2 , size s1 = size s2 => (forall t1 t2 , size t1 = size t2 => size t1 < size s1 => P t1 t2) => P s1 s2) =>
+  forall s1 s2, size s1 = size s2 => P s1 s2.
+proof.
+move=> P_; apply/sizesind => s1 /= IHs1 s2 eq_s.
+by apply/P_ => // t1 t2 eq_t le_; apply/IHs1.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -3215,6 +3248,21 @@ elim: s m => [m|x s IHs [|b m] Uxs] //=; 1: by rewrite mask0.
 case: b Uxs => //= -[s'x Us]; smt(mem_mask).
 qed.
 
+lemma uniq_mask m1 m2 (s : 'a list) :
+  size m1 = size s =>
+  size m2 = size s =>
+  uniq s =>
+  mask m1 s = mask m2 s =>
+  m1 = m2.
+proof.
+elim: s m1 m2 => //= [|x s IHs] m1 m2; [by rewrite !size_eq0 => ->> ->>|].
+case m1 => /= [|b1 m1 /addrI eq1]; [by rewrite addrC; move: (neq_ltz 0 (size s + 1)); rewrite ltzS size_ge0|].
+case m2 => /= [|b2 m2 /addrI eq2]; [by rewrite addrC; move: (neq_ltz 0 (size s + 1)); rewrite ltzS size_ge0|].
+case=> Nmem_ uniq_; move/(_ _ _ eq1 eq2 uniq_): IHs => IHs.
+by case b1; case b2 => //= _ _; apply/negP => /(congr1 (transpose mem x)) /=;
+rewrite ?(eq_sym true) eqT; move: Nmem_; apply/implybNN/mem_mask.
+qed.
+
 lemma count_mask x P (s : 'a list) m1 m2 :
   (forall n , n \in range 0 (size s) => P (nth x s n) => nth false m1 n <=> nth false m2 n) =>
   count P (mask m1 s) = count P (mask m2 s).
@@ -4431,6 +4479,55 @@ move=> uq_xs; apply: uniq_flatten_map => /=.
 qed.
 
 (* -------------------------------------------------------------------- *)
+op alltuples_list ['a] (xss : 'a list list) =
+  iteri (size xss) (fun n ys => allpairs (::) (nth [] xss (size xss - 1 - n)) ys) [[]].
+
+lemma alltuples_list_nil ['a] :
+  alltuples_list<:'a> [] = [[]].
+proof. by rewrite /alltuples_list /= iteri0. qed.
+
+lemma alltuples_list_cons ['a] (xs : 'a list) xss :
+  alltuples_list (xs :: xss) = allpairs (::) xs (alltuples_list xss).
+proof.
+rewrite /alltuples_list /= (addrC 1) iteriS ?size_ge0 //=.
+congr; apply/eq_iteri => i tss [] le0i lti_ /=; congr.
+rewrite subr_eq0; move: (neq_ltz (size xss) i).
+by rewrite lti_ /= => -> /=; rewrite addrAC.
+qed.
+
+lemma size_alltuples_list ['a] (xss : 'a list list) :
+  size (alltuples_list xss) = prodz (map size xss).
+proof.
+elim: xss => [|xs xss IHxss].
++ by rewrite alltuples_list_nil /= prodz_nil.
+by rewrite alltuples_list_cons size_allpairs /= prodz_cons IHxss.
+qed.
+
+lemma alltuples_list_uniq ['a] (xss : 'a list list) :
+  all uniq xss =>
+  uniq (alltuples_list xss).
+proof.
+elim: xss => [|xs xss IHxss]; [by rewrite alltuples_list_nil|].
+rewrite alltuples_list_cons /= => -[] u_ /IHxss u__.
+by apply/allpairs_uniq.
+qed.
+
+lemma alltuples_listP ['a] (ts : 'a list) xss :
+  ts \in alltuples_list xss <=>
+  size ts = size xss /\ all (fun (p : 'a * 'a list) => p.`1 \in p.`2) (zip ts xss).
+proof.
+elim: xss ts => [|xs xss IHxss] ts.
++ by rewrite alltuples_list_nil /= size_eq0 zip_nil2.
+rewrite alltuples_list_cons allpairsP /=; split.
++ case=> -[x ys] /= [] mem_ [] + ->>; rewrite IHxss.
+  by case=> eq_ all_; rewrite -eq_.
+case: ts => [|x ts] /=; [by rewrite neq_ltz addrC ltzS size_ge0|].
+case=> /addrI eq_ [] mem_ all_; exists (x, ts) => /=.
+by rewrite mem_ IHxss.
+qed.
+
+
+(* -------------------------------------------------------------------- *)
 (*                          Cost on list                                *)
 (* -------------------------------------------------------------------- *)
 abstract theory Cost.
@@ -4445,6 +4542,113 @@ abstract theory Cost.
 
   hint simplify cost_drop, cost_head.
 end Cost.
+
+
+(* -------------------------------------------------------------------- *)
+(*        Choosing a representative of an equivalence class             *)
+(* -------------------------------------------------------------------- *)
+op undup_eqv r (s : 'a list) =
+  with s = []      => []
+  with s = x :: s' => if has (r x) s' then undup_eqv r s' else x :: undup_eqv r s'.
+
+lemma size_undup_eqv r (s : 'a list): size (undup_eqv r s) <= size s.
+proof.
+elim: s => //= x s /(lez_add2l 1); apply/lez_trans.
+by case: (has _ _) => //=; apply/ltzW/ltzE; rewrite addrC.
+qed.
+
+lemma has_undup_eqv (r : 'a -> 'a -> bool) p:
+  reflexive r =>
+  symmetric r =>
+  transitive r =>
+  (forall x y, r x y => p x => p y) =>
+  forall s, has (fun x => exists y , r x y /\ p y) (undup_eqv r s) = has p s.
+proof.
+move=> refl_ sym_ trans_ + s; elim: s p => //= x s IHs p imp_.
+rewrite (fun_if (has _)) /= -!IHs.
++ by move=> ? ? + ?; apply/trans_.
++ by apply/imp_.
+move: (undup_eqv r s) => {s IHs} s.
+pose b:= has _ _; case b; rewrite /b => {b} /=.
++ case/hasP => y /= [] mem_ [z] [] ryz rxz.
+  case (p x) => //= px; rewrite eqT; apply/hasP.
+  exists y; rewrite mem_ /=; exists x; rewrite px /=.
+  by move: rxz; rewrite sym_; apply/trans_.
+move/hasPn => Nhas1; pose b:= has _ _; case b; rewrite /b => {b} //=.
+move/hasPn => Nhas2; rewrite eq_iff; split=> [[y] []|px].
++ by rewrite sym_; apply/imp_.
+by exists x; rewrite refl_.
+qed.
+
+lemma has_r_undup_eqv (r : 'a -> 'a -> bool):
+  reflexive r =>
+  symmetric r =>
+  transitive r =>
+  forall s x, has (r x) (undup_eqv r s) = has (r x) s.
+proof.
+move=> refl_ sym_ trans_ s x.
+rewrite -(has_undup_eqv _ (r x) refl_ _ _ _ s) //.
++ by move=> ? ? + ?; apply/trans_.
+apply/eq_iff/eq_in_has => y _ /=; split=> [?|[?] [] + ?].
++ by exists y; rewrite refl_.
+by rewrite sym_; apply/trans_.
+qed.
+
+lemma mem_undup_eqv (r : 'a -> 'a -> bool):
+  reflexive r =>
+  symmetric r =>
+  transitive r =>
+  forall s x, x \in (undup_eqv r s) => has (r x) s.
+proof.
+move=> refl_ sym_ trans_ s x mem_; rewrite -has_r_undup_eqv //.
+by apply/hasP; exists x; rewrite refl_.
+qed.
+
+lemma undup_eqv_mem (r : 'a -> 'a -> bool):
+  reflexive r =>
+  symmetric r =>
+  transitive r =>
+  forall s x, x \in s => has (r x) (undup_eqv r s).
+proof.
+move=> refl_ sym_ trans_ s x mem_.
+by rewrite has_r_undup_eqv // hasP; exists x; rewrite refl_.
+qed.
+
+lemma undup_eqv_uniq r (s : 'a list):
+  reflexive r =>
+  symmetric r =>
+  transitive r =>
+  uniq (undup_eqv r s).
+proof.
+move=> refl_ sym_ trans_; elim: s => //= x s IHs.
+by rewrite fun_if /= IHs /=; apply/implybNN/mem_undup_eqv.
+qed.
+
+lemma mem_undup_eqv_inj r (s : 'a list) x y:
+  reflexive r =>
+  symmetric r =>
+  transitive r =>
+  x \in undup_eqv r s =>
+  y \in undup_eqv r s =>
+  r x y =>
+  x = y.
+proof.
+move=> refl_ sym_ trans_ + + rxy; elim: s => //= z s IHs.
+rewrite !fun_if /=; case (has (r z) s) => [has_ //|/hasPn Nhas_].
+case=> [->>|]; [|move=> memx; move: (memx) => /(mem_undup_eqv _ refl_ sym_ trans_) // hasx];
+(case=> [->>|]; [|move=> memy; move: (memy) => /(mem_undup_eqv _ refl_ sym_ trans_) // hasy]; rewrite //=).
++ by case/hasP: hasy => t [] /Nhas_ + ryt; move: (trans_ _ _ _ rxy ryt).
++ case/hasP: hasx => t [] /Nhas_ + rxt; move: rxy; rewrite sym_ => rzx.
+  by move: (trans_ _ _ _ rzx rxt).
+by apply/IHs.
+qed.
+
+lemma undup_eqv_eq ['a] (s : 'a list) :
+  undup_eqv (=) s = undup s.
+proof.
+elim: s => //= x s ->; rewrite -has_pred1.
+by rewrite -(eq_has (pred1 x)) // => ?; rewrite pred1E.
+qed.
 
 
 (* -------------------------------------------------------------------- *)

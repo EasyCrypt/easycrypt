@@ -526,3 +526,294 @@ proof.
   move => [lt0km dvdm] [lt0kn dvdn]; rewrite phi_coprime //.
   by apply/(dvdl_coprime _ _ _ dvdm)/(dvdr_coprime _ _ _ dvdn).
 qed.
+
+(* ==================================================================== *)
+lemma eq_sizeb_bin n k :
+  0 <= k <= n =>
+  size (filter (fun t => count idfun t = k) (alltuples n [true; false])) = bin n k.
+proof.
+case=> le0k lekn; move: (ler_trans _ _ _ le0k lekn) => le0n.
+elim: n le0n k le0k lekn => [k le0k lek0|n le0n IHs k le0k lek_].
++ rewrite alltuples_le0 // bin0n; move: (eqz_leq k 0).
+  by rewrite le0k lek0 /= => ->> /=; rewrite b2i1.
+rewrite alltuplesS //= /allpairs /= cats0 filter_cat size_cat !filter_map !size_map.
+case/ler_eqVlt: le0k => [<<-|]; [|move: lek_].
++ move/(_ 0 _ _): IHs => //; rewrite !bin0 // => <-; rewrite eq_in_filter_pred0 /=.
+  - by move=> s _; rewrite /preim /idfun /= b2i1 addrC; apply/gtr_eqF/ltzS/count_ge0.
+  by congr; apply/eq_filter => ?; rewrite /preim /idfun /= b2i0.
+rewrite -(subrK k 1); move: (k - 1) => {k} k /ler_add2r lekn /ltzS le0k.
+rewrite binSn // addrC; congr; last first.
++ move: IHs => <- //; congr; apply/eq_filter => ?.
+  by rewrite /preim /idfun /= b2i1 addrC; split=> // /addIr.
+case/ler_eqVlt: lekn => [->>|ltkn].
++ rewrite bin_gt ?ltzS ?lerr // eq_in_filter_pred0 // => s.
+  case/alltuplesP; rewrite ler_maxr // => <<- _.
+  by rewrite /preim /= /idfun b2i0 /=; apply/ltr_eqF/ltzS/count_size.
+by move: IHs => <- //; [apply/addr_ge0|apply/ltzE].
+qed.
+
+lemma perm_eq_subseqs_countb_bin ['a] k (s : 'a list) :
+  0 <= k =>
+  uniq s =>
+  perm_eq
+    (filter (transpose subseq s) (alltuples k s))
+    (map (transpose mask s) (filter (fun t => count idfun t = k) (alltuples (size s) [true; false]))).
+proof.
+move=> le0k uniq; case: (leVgt k (size s)) => [lek_|lt_k]; last first.
++ rewrite !eq_in_filter_pred0 //=.
+  - move=> t /alltuplesP [] + _; rewrite ler_maxr // => <<-.
+    by apply/negP => /subseq_size /lerNgt.
+  move=> bs /alltuplesP [] + _; rewrite ler_maxr // => eq_.
+  by apply/ltr_eqF/(ler_lt_trans _ _ _ _ lt_k); rewrite -eq_ count_size.
+apply/uniq_perm_eq.
++ by apply/filter_uniq/alltuples_uniq.
++ rewrite map_inj_in_uniq; [|by apply/filter_uniq/alltuples_uniq].
+  move=> bs1 bs2 /mem_filter /= [] <<- /alltuplesP [] + _.
+  rewrite ler_maxr ?size_ge0 // => eq1.
+  case/mem_filter => /= /eq_sym eq_ /alltuplesP [] + _.
+  by rewrite ler_maxr ?size_ge0 // => eq2; apply/uniq_mask.
+move=> t; rewrite mem_filter /= alltuplesP ler_maxr // -subseqP mapP.
+split=> [[] [m] [] eq_ ->> [] <<- _ {le0k lek_}|[m] /= []].
++ exists m => /=; rewrite mem_filter /= size_mask //=.
+  apply/alltuplesP; rewrite ler_maxr ?size_ge0 // eq_ /=.
+  by apply/allP => b _; case: b.
+case/mem_filter => /= <<- /alltuplesP; rewrite ler_maxr ?size_ge0 //.
+case=> eq_ _ ->>; split; [by exists m|]; split; [by apply/size_mask|].
+by apply/allP => ?; apply/mem_mask.
+qed.
+
+op mask_to_decr m =
+  (foldr (fun b (p : int list * int) => if b then (p.`1, p.`2 + b2i b) else (p.`2 :: p.`1, p.`2)) ([], 0) m).`1.
+
+lemma mask_to_decr_aux_snd m :
+  (foldr (fun b (p : int list * int) => if b then (p.`1, p.`2 + b2i b) else (p.`2 :: p.`1, p.`2)) ([], 0) m).`2 =
+  count idfun m.
+proof.
+elim m => //= b m; pose k:= foldr _ _ _; move: k => k ->.
+by case b => //= _; rewrite /idfun b2i1 addrC.
+qed.
+
+lemma mask_to_decr_nil :
+  mask_to_decr [] = [].
+proof. by rewrite /mask_to_decr. qed.
+
+lemma mask_to_decr_cons b m :
+  mask_to_decr (b :: m) =
+  if b
+  then mask_to_decr m
+  else count idfun m :: mask_to_decr m.
+proof. by rewrite /mask_to_decr -mask_to_decr_aux_snd /=; case b; rewrite ?b2i1 ?b2i0. qed.
+
+lemma mask_to_decr_cat m1 m2 :
+  mask_to_decr (m1 ++ m2) =
+  map ((+) (count idfun m2)) (mask_to_decr m1) ++ mask_to_decr m2.
+proof.
+elim: m1 => //= b1 m1; rewrite !mask_to_decr_cons /= => ->.
+by case b1 => _ //=; rewrite count_cat addrC.
+qed.
+
+lemma mask_to_decr_nseqF n :
+  mask_to_decr (nseq n false) = nseq n 0.
+proof.
+case (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite !nseq0_le].
+elim: n => [|n IHn]; [by rewrite !nseq0|].
+by rewrite !nseqS // mask_to_decr_cons /= count_nseq /idfun b2i0.
+qed.
+
+lemma mask_to_decr_nseqT n :
+  mask_to_decr (nseq n true) = [].
+proof.
+case (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite nseq0_le].
+by elim: n => [|n IHn]; [rewrite nseq0|rewrite nseqS].
+qed.
+
+lemma maskS m :
+  exists n ,
+  0 <= n /\
+  ( m = nseq n true \/ exists m' , m = nseq n true ++ [false] ++ m').
+proof.
+elim: m => [|b m]; [by exists 0 => /=; rewrite nseq0|].
+case=> n [] le0n; case=> [->>|[m'] ->>].
++ case: b => _; [by exists (n + 1); split; [by apply/addr_ge0|]; left; rewrite nseqS|].
+  by exists 0; split=> //; right; exists (nseq n true); rewrite nseq0.
+case: b => _; [by exists (n + 1); split; [by apply/addr_ge0|]; right; exists m'; rewrite nseqS|].
+by exists 0; split=> //; right; exists (nseq n true ++ [false] ++ m'); rewrite nseq0.
+qed.
+
+lemma maskSr m :
+  exists n ,
+  0 <= n /\
+  ( m = nseq n true \/ exists m' , m = m' ++ [false] ++ nseq n true).
+proof.
+elim/last_ind: m => [|m b]; [by exists 0 => /=; rewrite nseq0|].
+case=> n [] le0n; case=> [->>|[m'] ->>].
++ case: b => _; [by exists (n + 1); split; [by apply/addr_ge0|]; left; rewrite nseqSr|].
+  by exists 0; split=> //; right; exists (nseq n true); rewrite nseq0 cats0 cats1.
+case: b => _; [by exists (n + 1); split; [by apply/addr_ge0|]; right; exists m'; rewrite nseqSr // -!cats1 !catA|].
+by exists 0; split=> //; right; exists (m' ++ [false] ++ nseq n true); rewrite nseq0 cats0 -!cats1.
+qed.
+
+lemma size_mask_to_decr m :
+  size (mask_to_decr m) = size m - count idfun m.
+proof.
+elim: m => //= b m; rewrite mask_to_decr_cons /= fun_if /= => ->.
+by rewrite /(idfun b); case b => _; rewrite ?b2i1 ?b2i0; ring.
+qed.
+
+lemma le0_mem_mask_to_decr m k :
+  k \in mask_to_decr m => 0 <= k.
+proof.
+elim: m => //= [|b m]; [by rewrite mask_to_decr_nil|].
+rewrite mask_to_decr_cons /=.
+by case: b => //= _ IHm; case=> // ->>; apply/count_ge0.
+qed.
+
+lemma le_mem_mask_to_decr_range m :
+  mem (mask_to_decr m) <= mem (range 0 (count idfun m + 1)).
+proof.
+move=> k1 mem_; rewrite mem_range (le0_mem_mask_to_decr m) //=.
+move: mem_; elim: m => //= [|b m]; [by rewrite mask_to_decr_nil|].
+rewrite /(idfun b) mask_to_decr_cons /= => IHm.
+case b => [_ /IHm lt_|]; [by apply/(ltr_le_trans _ _ _ lt_); rewrite b2i1 (addrC 1); apply/ltzW/ltzS|].
+by move=> _; rewrite b2i0 /=; case=> // ->>; apply/ltzS.
+qed.
+
+lemma sorted_mask_to_decr m :
+  sorted (transpose Int.(<=)) (mask_to_decr m).
+proof.
+elim: m => //= b m; rewrite -cat1s mask_to_decr_cat; case b => // _.
+move=> sorted_; apply/sorted_cat; [|split].
++ by move=> ? ? ? + ?; apply/ler_trans.
++ move=> x1 x2; rewrite mask_to_decr_cons mask_to_decr_nil /=.
+  by move=> ->> /= /le_mem_mask_to_decr_range /mem_range [] _ /ltzS.
+by rewrite mask_to_decr_cons mask_to_decr_nil /=.
+qed.
+
+lemma inv_mask_to_decr s :
+  all ((<=) 0) s =>
+  sorted (transpose Int.(<=)) s =>
+  exists m , s = mask_to_decr m.
+proof.
+move=> all_ sorted_.
+have: exists k m , s = map (Int.(+) k) (mask_to_decr m); last first.
++ case=> k mm ->>; case: (maskSr mm) => n [] le0n; case=> [->>|[m] ->>].
+  - by rewrite mask_to_decr_nseqT /=; exists [].
+  rewrite -catA cat1s mask_to_decr_cat mask_to_decr_cons /=.
+  rewrite count_nseq /(idfun true) /(idfun false) b2i1 b2i0 /=.
+  rewrite mask_to_decr_nseqT ler_maxr // map_cat /=.
+  exists (m ++ [false] ++ nseq (k + n) true).
+  rewrite -catA cat1s mask_to_decr_cat mask_to_decr_cons /=.
+  rewrite count_nseq /(idfun true) /(idfun false) b2i1 b2i0 /=.
+  rewrite mask_to_decr_nseqT /= ler_maxr.
+  - move/allP/(_ (k + n)): all_ => -> //; apply/mapP; exists n => /=.
+    rewrite -catA cat1s mask_to_decr_cat mask_to_decr_cons /=.
+    rewrite count_nseq /(idfun true) /(idfun false) b2i1 b2i0 /=.
+    by rewrite ler_maxr //= mem_cat.
+  by congr; rewrite -map_comp; apply/eq_map => ?; rewrite /(\o); ring.
+move: sorted_ => {all_}.
+elim: s => [|x s IHs /= path_]; [by exists 0 []|].
+case/path_sorted/IHs: (path_) => k m ->> {IHs}; move: path_.
+case: (maskS m) => n [] le0n; case=> [->> _|].
++ by rewrite mask_to_decr_nseqT; exists x [false].
+move: m => ? [m] ->>; rewrite -catA cat1s.
+rewrite mask_to_decr_cat mask_to_decr_cons /=.
+rewrite mask_to_decr_nseqT /= => -[] le_ _.
+exists k (false :: nseq (x - k - count idfun m) true ++ false :: m) => /=.
+rewrite mask_to_decr_cons mask_to_decr_cat mask_to_decr_cons /=.
+rewrite count_cat /= count_nseq /(idfun true) /(idfun false) ?b2i1 ?b2i0 /=.
+rewrite (addrCA k) -addrA -opprD ler_maxr ?subr_ge0 // subrK /=.
+by rewrite mask_to_decr_nseqT.
+qed.
+
+lemma inj_mask_to_decr m1 m2 :
+  size m1 = size m2 =>
+  mask_to_decr m1 = mask_to_decr m2 =>
+  m1 = m2.
+proof.
+move=> size_; pose P m1 m2:= mask_to_decr m1 = mask_to_decr m2 => m1 = m2.
+apply/(seq2_sind P) => // {m1 m2 size_} mm1 mm2 size_; rewrite /P => {P} /= IHm.
+case: (maskS mm1) => n1 [] le0n1; case=> [->>|[m1] ->>];
+(case: (maskS mm2) => n2 [] le0n2; case=> [->>|[m2] ->>]).
++ rewrite !mask_to_decr_nseqT !eq_nseq /=; move: size_.
+  by rewrite !size_nseq !ler_maxr.
++ by rewrite -catA cat1s mask_to_decr_cat mask_to_decr_cons /= !mask_to_decr_nseqT.
++ by rewrite -catA cat1s mask_to_decr_cat mask_to_decr_cons /= !mask_to_decr_nseqT.
+move: size_; rewrite -!catA !cat1s !mask_to_decr_cat !mask_to_decr_cons /=.
+rewrite !mask_to_decr_nseqT /= !size_cat !size_nseq /= !addrA !(addrAC _ 1).
+rewrite !ler_maxr // => /addIr + [] count_ mask_; move/(congr1 size): (mask_).
+rewrite !size_mask_to_decr count_ => /addIr size_; rewrite size_ => /addIr <<-.
+congr; congr; apply/IHm => //; rewrite -catA cat1s size_cat size_nseq /=.
+by rewrite ler_maxr // addrA (addrAC _ 1) ltzS; apply/ler_subl_addr.
+qed.
+
+lemma perm_eq_undup_perm_eq_countb_bin k n :
+  0 <= k =>
+  0 < n =>
+  perm_eq
+    (map (sort (transpose Int.(<=))) (undup_eqv perm_eq (alltuples k (range 0 n))))
+    (map mask_to_decr (filter (fun t => count idfun t = n - 1) (alltuples (n + k - 1) [true; false]))).
+proof.
+move=> le0k lt0n; move: perm_eq_refl<:int> => eq_refl_.
+have eq_sym_: symmetric perm_eq<:int> by move=> ??; rewrite perm_eq_sym.
+move: perm_eq_trans<:int> => eq_trans_; apply/uniq_perm_eq.
++ rewrite map_inj_in_uniq; [|by apply/undup_eqv_uniq]; move=> s1 s2 mem1 mem2 eq_.
+  apply/(mem_undup_eqv_inj _ _ _ _ _ _ _ mem1 mem2) => //.
+  - move: eq_; rewrite -perm_sortP //=.
+    * by move=> ? ?; apply/ler_total.
+    * by move=> ? ? ? + ?; apply/ler_trans.
+    by move=> ? ? ? ?; apply/ler_anti.
+  rewrite map_inj_in_uniq; [|by apply/filter_uniq/alltuples_uniq].
+  move=> m1 m2 /mem_filter /= [] count1 /alltuplesP [] eq1 _.
+  move=> /mem_filter /= [] count2 /alltuplesP [] eq2 _.
+  by apply/inj_mask_to_decr; rewrite eq1 eq2.
+move=> s; rewrite !mapP; split=> [[t] [] + ->>|[m] [] + ->>].
++ case/(mem_undup_eqv _ eq_refl_ eq_sym_ eq_trans_)/hasP => s.
+  case=> /alltuplesP [] + all_ perm_; rewrite ler_maxr // => <<- {le0k}.
+  case: (inv_mask_to_decr (sort (transpose Int.(<=)) t) _ _).
+  - move/perm_eq_sym/perm_eq_all: (perm_sort (transpose Int.(<=)) t) => -> //.
+    move/perm_eq_sym/perm_eq_all: perm_ => -> //.
+    by move: all_; apply/all_imp_in/allP => ? /= _ /mem_range [].
+  - by apply/sort_sorted => ? ? /=; apply/ler_total.
+  move=> mm; case: (maskS mm) => i [] le0i; case=> [->>|[m] ->>].
+  - rewrite mask_to_decr_nseqT => /(congr1 size); rewrite size_sort size_eq0 => ->> /=.
+    exists (nseq (n + size s - 1) true); rewrite mask_to_decr_nseqT /sort /=.
+    rewrite mem_filter /= count_nseq /(idfun true) b2i1 /=.
+    move/perm_eq_size: perm_ => <- /=; rewrite ler_maxr -?ltzS //=.
+    by apply/alltuplesP; rewrite size_nseq /=; apply/allP; case.
+  move=> eq_; rewrite eq_; move/(congr1 size): eq_.
+  rewrite size_sort size_mask_to_decr !count_cat count_nseq.
+  rewrite !size_cat size_nseq /= ler_maxr // /(idfun true) /(idfun false) b2i1 b2i0 /=.
+  rewrite opprD !addrA !(addrAC _ _ (-i)) /= -(addrA 1) (addrC 1) => size_.
+  exists (nseq (n - count idfun m - 1) true ++ [false] ++ m).
+  rewrite -!catA !cat1s !mask_to_decr_cat !mask_to_decr_cons /=.
+  rewrite !mask_to_decr_nseqT mem_filter /= count_cat count_nseq /=.
+  rewrite /(idfun true) /(idfun false) b2i1 b2i0 /= alltuplesP (eq_all _ predT).
+  - by case.
+  rewrite all_predT size_cat /= size_nseq (ler_maxr _ (_ + size _ - _)).
+  - by rewrite addrAC; apply/addr_ge0; [apply/ltzS|apply/size_ge0].
+  move/perm_eq_size: perm_ size_ => -> ->; rewrite ler_maxr; last by split; ring.
+  (*TODO: hypothesis missing.*)
+  admit.
+rewrite mem_filter /= => -[] count_ /alltuplesP [] + _; rewrite ler_maxr.
++ by rewrite addrAC; apply/addr_ge0 => //; apply/ltzS.
+move=> size_; pose ss:= undup_eqv _ _.
+exists (nth [] ss (find (perm_eq (mask_to_decr m)) ss)).
+have has_: has (perm_eq (mask_to_decr m)) ss.
++ rewrite /ss => {ss}.
+  rewrite has_r_undup_eqv // hasP; exists (mask_to_decr m).
+  rewrite perm_eq_refl /= alltuplesP ler_maxr //.
+  rewrite size_mask_to_decr size_ count_; split; [by ring|].
+  by apply/allP => x /le_mem_mask_to_decr_range; rewrite count_.
+rewrite mem_nth /=; [by rewrite find_ge0 -has_find|].
+move/nth_find/(_ []): has_; pose s:= nth _ _ _; move: s => s {ss}.
+rewrite (perm_sortP (transpose Int.(<=))) //=.
++ by move=> ? ?; apply/ler_total.
++ by move=> ? ? ? + ?; apply/ler_trans.
++ by move=> ? ? ? ?; apply/ler_anti.
+move=> <-; rewrite eq_sym; apply/sort_id => /=.
++ by move=> ? ?; apply/ler_total.
++ by move=> ? ? ? + ?; apply/ler_trans.
++ by move=> ? ? ? ?; apply/ler_anti.
+by apply/sorted_mask_to_decr.
+qed.
+
