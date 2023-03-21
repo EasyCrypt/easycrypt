@@ -800,7 +800,7 @@ proof.
         ={res, glob D})
      (={glob D} /\ FRO.m{1} = map (fun _ c => (c, Known)) RO.m{2} ==>
         ={res, glob D})=> //.
-  + by move=> ? &mr [] 2!->;
+  + by move=> ? &mr [] 2!->; 
       exists (glob D){mr} (map (fun _ c =>(c, Known)) RO.m{mr}).
   + proc*; inline M.main1; wp; call (RO_FRO_D D); inline *; rcondf{2} 2; auto.
     + move=> &mr [] _ ->; apply mem_eq0=> z;

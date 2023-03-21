@@ -517,14 +517,11 @@ section PRPi_PRPi'_Indirect.
        forall a, Pr[Direct.sample: res = a] = Pr[Indirect.sample: res = a]. *)
   equiv eq_Direct_Indirect: Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
   proof.
-  transitivity S.direct (X{2} = fun _=> X{1} ==> ={res}) (X{1} = fun _ => X{2} ==> ={res})=> />.
-  + by move=> &2; exists ((), fun _=> X{2}).
-  + by proc; rnd.
-  transitivity S.indirect (={x,X} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> />.
-  + by move=> &1 &2 ->; exists ((),fun _=> X{2}).
-  + by conseq (@ll_direct_indirect_eq); smt(uD_uf_fu).
-  proc. seq 1 1: (#pre /\ ={r}); auto.
-  by if; auto.
+  proc.
+  rewrite equiv [{1} ll_direct_indirect_eq ((), fun _ => X) r ((), fun _ => X) r]. 
+  + smt(uD_uf_fu).
+  sp; seq 1 1: ((X0 = fun _ => X){1} /\ ={X} /\ r0{1} = r{2}); auto=> />.
+  by if; auto=> /#.
   qed.
 
   (* The rest is easy *)
