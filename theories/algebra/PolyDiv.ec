@@ -2741,6 +2741,16 @@ move=> eqp_ [] all_ eqp__; split=> //.
 by move: eqp__; apply/eqp_trans; rewrite eqp_sym.
 qed.
 
+lemma deg_irredp_dec p qs :
+  irreducible_dec p qs =>
+  deg p = BIA.big predT (fun q => deg q - 1) qs + 1.
+proof.
+case=> all_ /eqp_size ->; rewrite deg_prod.
+pose f:= predC _; have ->//: all f qs; rewrite /f => {f}.
+move: all_; apply/all_imp_in/allP => q mem_ /=.
+by rewrite /predC /predI /predT /idfun /=; apply/irredp_neq0.
+qed.
+
 lemma irredp_dec_scale c p qs :
   c <> zeror =>
   irreducible_dec p qs <=>
@@ -3000,6 +3010,11 @@ proof.
 rewrite /irreducible_monic_dec; move/(eqp_irredp_dec _ _ qs).
 by move=> imp_ [/imp_] -> ->.
 qed.
+
+lemma deg_irredp_monic_dec p qs :
+  irreducible_monic_dec p qs =>
+  deg p = BIA.big predT (fun q => deg q - 1) qs + 1.
+proof. by case=> /deg_irredp_dec. qed.
 
 lemma irredp_monic_dec_scale c p qs :
   c <> zeror =>

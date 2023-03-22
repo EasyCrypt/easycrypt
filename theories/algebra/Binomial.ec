@@ -164,6 +164,17 @@ rewrite !mulrA (mulrC _ (_ + 1)) -(mulrA (_ + 1)) -(mulrA _ (_ * _)%Int) eq_ => 
 by rewrite -mulrDl addrAC subrK factS.
 qed.
 
+lemma bin_sym n k :
+  0 <= k <= n =>
+  bin n k = bin n (n - k).
+proof.
+case=> le0k lekn; apply/(mulfI (fact k * fact (n - k))).
++ by apply/gtr_eqF/mulr_gt0; apply/fact_gt0.
+rewrite eq_bin_div // -(eq_bin_div n (n - k)).
++ by rewrite subr_ge0 lekn /= ler_subl_addr -ler_subl_addl.
+by rewrite opprD addrA /= (mulrC (fact _)).
+qed.
+
 lemma bin1 (n : int) : 0 < n => bin n 1 = n.
 proof.
 move=> lt0n; move: (eq_bin_div n 1) => /=.

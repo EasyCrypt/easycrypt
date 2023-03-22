@@ -50,6 +50,7 @@ theory PolyFF.
     theory IDC <- FF.F.
 
   import P.
+  import BigPoly.
 
   lemma scaled_monicP p :
     scaled_monic p <=> p <> poly0.
@@ -255,39 +256,73 @@ theory PolyFF.
     p \in enum_udeg_irr_deg k d <=>
     ( monic p /\
       exists qs ,
-            irreducible_monic_dec p qs /\
-            size qs = k /\
-            all (fun q => deg q = d) qs ).
+        irreducible_monic_dec p qs /\
+        size qs = k /\
+        all (fun q => deg q = d) qs ).
   proof.
     rewrite /enum_iudeg mem_filter enum_udegP /=.
-    split=> |> m_ qs dec_ all_.
-    admit.
+    split=> |> m_ qs dec_ all_; rewrite (deg_irredp_monic_dec _ _ dec_).
+    rewrite (Bigint.BIA.eq_big_seq _ (fun _ => d - 1)) /=.
+    + by move=> q mem_; move/allP/(_ _ mem_): all_ => ->.
+    by rewrite Bigint.BIA.sumr_const intmulz mulrC count_predT.
   qed.
 
   lemma uniq_enum_udeg_irr_deg k d :
     uniq (enum_udeg_irr_deg k d).
   proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
 
-  lemma perm_eq_enum_udeg_irr_deg n :
+  lemma perm_eq_enum_udeg_irr_deg n s :
     0 < n =>
-    perm_eq (enum_udeg_irr_shape n) (flatten (map (enum_udeg_irr_deg n) (allshapes n))).
+    perm_eq (enum_udeg_irr_shape n s) (map (PCM.big predT idfun) (alltuples_list (mapi enum_udeg_irr_deg s))).
   proof.
+    move=> lt0n; apply/uniq_perm_eq; [by apply/uniq_enum_udeg_irr_shape| |].
+    + rewrite map_inj_in_uniq; last first.
+      - apply/alltuples_list_uniq/allP => qs /(mapiP 0) [i] [] /mem_range mem_ ->>.
+        by apply/uniq_enum_udeg_irr_deg.
+      move=> qs1 qs2 /alltuples_listP [] + all1 /alltuples_listP [] + all2.
+      rewrite !size_mapi => size1 size2 eq_; apply/(eq_from_nth poly0).
+      - by rewrite size1 size2.
+      move=> i /mem_range; rewrite size1 => mem_.
+      have: exists qqs1 ,
+              qs1 = map (PCM.big predT idfun) qqs1 /\
+              all (fun (p : poly * poly list) => irreducible_monic_dec p.`1 p.`2) (zip qs1 qqs1).
+      - admit.
+      case=> qqs1 [] ->>.
+      admit.
+    move=> p; rewrite enum_udeg_irr_shapeP mapP; split=> [[] m_ [] <<- [qs] [] dec_ ->>|].
+    + admit.
+    case=> qs [] /alltuples_listP.
+    admit.
   qed.
 
-  lemma size_enum_udeg_irr_shape n :
+  lemma mapi_map ['a 'b] (f : int -> 'a -> 'b) s :
+    mapi f s = map (fun (p : int * 'a) => f p.`1 p.`2) (zip (range 0 (size s)) s).
+  proof.
+    apply/(eq_from_nth witness); [by rewrite size_mapi size_map size_zip size_range ler_maxr|].
+    move=> i /mem_range; rewrite size_mapi => mem_; rewrite (nth_mapi witness) -?mem_range //.
+    rewrite (nth_map (witness, witness)) /=; [by rewrite size_zip size_range ler_maxr //= ler_minr // -mem_range|].
+    rewrite (nth_zip witness witness) /=; [by rewrite size_range ler_maxr|].
+    by rewrite nth_range // -mem_range.
+  qed.
+
+  lemma size_enum_udeg_irr_deg n :
     0 < n =>
-    Bigint.BIA.big predT (fun s => size (enum_udeg_irr_shape n s)) (allshapes n) =
+    Bigint.BIA.big predT (fun s => Bigint.BIM.bigi predT (fun i => size (enum_udeg_irr_deg i (nth 0 s i))) 0 n) (allshapes n) =
     FinType.card ^ (n - 1).
   proof.
-    move=> lt0n; rewrite -size_enum_udeg //.
-    move/perm_eq_size: (perm_eq_enum_udeg_irr_shape _ lt0n) => ->.
-    rewrite size_flatten Bigint.sumzE !Bigint.BIA.big_mapT.
+    move=> lt0n; rewrite -size_enum_udeg_irr_shape //.
     apply/Bigint.BIA.eq_big_seq => s mem_ /=.
-    by rewrite /(\o).
+    move/perm_eq_size: (perm_eq_enum_udeg_irr_deg _ s lt0n) => ->.
+    rewrite size_map size_alltuples_list Bigint.prodzE.
+    rewrite mapi_map !Bigint.BIM.big_mapT (Bigint.BIM.big_nth (witness, 0) _ _ (zip _ _)).
+    rewrite size_zip size_range ler_maxr // ler_minr //.
+    have <<-: size s = n.
+    + (*TODO: permutation lemma.*)
+      admit.
+    apply/Bigint.BIM.eq_big_int => i /mem_range memi /=.
+    rewrite /(\o) (nth_zip witness 0) /=; [by rewrite size_range ler_maxr|].
+    by rewrite nth_range // -mem_range.
   qed.
-
-fail.
-
 
   lemma enum_iudegP n p :
     p \in enum_iudeg n <=>
@@ -298,66 +333,40 @@ fail.
     uniq (enum_iudeg n).
   proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
 
+  lemma perm_eq_enum_iudeg k d :
+    0 <= k =>
+    1 < d =>
+    perm_eq (enum_udeg_irr_deg k d) (map (PCM.big predT idfun) (undup_eqv perm_eq (alltuples k (enum_iudeg d)))).
+  proof.
+    admit.
+  qed.
 
-
-
-
-
-(*TODO: move to list*)
-op alltuples_list ['a] (xss : 'a list list) = iteri (size xss) (fun n ys => allpairs (::) (nth [] xss (size xss - 1 - n)) ys) [[]].
-
-lemma alltuples_list_nil ['a] :
-  alltuples_list<:'a> [] = [[]].
-proof. by rewrite /alltuples_list /= iteri0. qed.
-
-lemma alltuples_list_cons ['a] (xs : 'a list) xss :
-  alltuples_list (xs :: xss) = allpairs (::) xs (alltuples_list xss).
-proof.
-rewrite /alltuples_list /= (addrC 1) iteriS ?size_ge0 //=.
-congr; apply/eq_iteri => i tss [] le0i lti_ /=; congr.
-by rewrite subr_eq0 gtr_eqF //= addrAC.
-qed.
-
-lemma size_alltuples_list ['a] (xss : 'a list list) :
-  size (alltuples_list xss) = Bigint.BIM.big predT size xss.
-proof.
-elim: xss => [|xs xss IHxss].
-+ by rewrite alltuples_list_nil Bigint.BIM.big_nil.
-by rewrite alltuples_list_cons size_allpairs Bigint.BIM.big_cons /(predT xs) /= IHxss.
-qed.
-
-lemma alltuples_list_uniq ['a] (xss : 'a list list) :
-  all uniq xss =>
-  uniq (alltuples_list xss).
-proof.
-elim: xss => [|xs xss IHxss]; [by rewrite alltuples_list_nil|].
-rewrite alltuples_list_cons /= => -[] u_ /IHxss u__.
-by apply/allpairs_uniq.
-qed.
-
-lemma alltuples_listP ['a] (ts : 'a list) xss :
-  ts \in alltuples_list xss <=>
-  size ts = size xss /\ all (fun (p : 'a * 'a list) => p.`1 \in p.`2) (zip ts xss).
-proof.
-elim: xss ts => [|xs xss IHxss] ts.
-+ by rewrite alltuples_list_nil /= size_eq0 zip_nil2.
-rewrite alltuples_list_cons allpairsP /=; split.
-+ case=> -[x ys] /= [] mem_ [] + ->>; rewrite IHxss.
-  by case=> eq_ all_; rewrite -eq_.
-case: ts => [|x ts] /=; [by rewrite ltr_eqF // addrC ltzS size_ge0|].
-case=> /addrI eq_ [] mem_ all_; exists (x, ts) => /=.
-by rewrite mem_ IHxss.
-qed.
-
-op choice_list ['a] (r : 'a -> 'a -> bool) (s : 'a list) : 'a list =
-  with s = "[]" => []
-  with s = (::) h t => h :: (choice_list r (filter (r h) t)).
-
-lemma choice_listP ['a] (r : 'a -> 'a -> bool) s x :
-  x \in choice_list r s <=> true.
-
-(*TODO: end of move to list*)
-
+  lemma size_enum_iudeg n :
+    0 < n =>
+    Bigint.BIA.big
+      predT
+      (fun s =>
+        Bigint.BIM.bigi
+          predT
+          (fun i => bin (size (enum_iudeg (nth 0 s i)) + i - 1) i)
+          0 n)
+      (allshapes n) =
+    FinType.card ^ (n - 1).
+  proof.
+    move=> lt0n; rewrite -size_enum_udeg_irr_deg //.
+    apply/Bigint.BIA.eq_big_seq => s mems /=.
+    apply/Bigint.BIM.eq_big_seq => i memi /=.
+    move: (perm_eq_enum_iudeg i (nth 0 s i) _ _).
+    + by move: memi; apply/mem_range_le.
+    + (*TODO: is false, change previous lemma.*)
+      admit.
+    move/perm_eq_size => ->; rewrite size_map uniq_size_undup_perm_eq.
+    + by apply/uniq_enum_iudeg.
+    + (*TODO: same issue*)
+      admit.
+    + by move: memi; apply/mem_range_le.
+    by congr; ring.
+  qed.
 
 end PolyFF.
 
