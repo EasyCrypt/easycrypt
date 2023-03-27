@@ -515,7 +515,7 @@ local module G0' (D : Dist) (H : Oracle) = {
   }
 }.
 
-lemma ROM_BadCall &m i r:
+lemma ROM_BadCall_tight &m i r:
      `|  Pr[G0(D,LRO).main(i) @ &m: res = r]
        - Pr[G1(D,LRO).main(i) @ &m: res = r]|
   <= Pr[G_bad(D,LRO).main(i) @ &m: res].
@@ -563,6 +563,12 @@ inline Log(LRO).init LRO.init; auto=> />; split=> [x1|_ a qs m eq_qs_m y _].
 + by rewrite in_fset0 mem_empty.
 by rewrite get_set_eqE //= eq_except_setl /= eq_qs_m=> /> /#.
 qed.
+
+lemma ROM_BadCall &m i r:
+     Pr[G0(D,LRO).main(i) @ &m: res = r]
+  <=   Pr[G1(D,LRO).main(i) @ &m: res = r]
+     + Pr[G_bad(D,LRO).main(i) @ &m: res].
+proof. by move: (ROM_BadCall_tight &m i r)=> /#. qed.
 end section.
 end OnLog.
 
@@ -636,7 +642,7 @@ local module G0' (D : Dist) (H : Oracle) = {
   }
 }.
 
-lemma ROM_BadCall &m i r:
+lemma ROM_BadCall_tight &m i r:
      `|  Pr[G0(D,LRO).main(i) @ &m: res = r]
        - Pr[G1(D,LRO).main(i) @ &m: res = r]|
   <= Pr[G_bad(D,LRO).main(i) @ &m: res].
@@ -684,6 +690,12 @@ inline Log(LRO).init LRO.init; auto=> />; split=> [x1|_ a qs m eq_qs_m y _].
 + by rewrite in_fset0 mem_empty.
 by rewrite get_set_eqE //= eq_except_setl /= eq_qs_m /#.
 qed.
+
+lemma ROM_BadCall &m i r:
+     Pr[G0(D,LRO).main(i) @ &m: res = r]
+  <=   Pr[G1(D,LRO).main(i) @ &m: res = r]
+     + Pr[G_bad(D,LRO).main(i) @ &m: res].
+proof. by move: (ROM_BadCall_tight &m i r)=> /#. qed.
 end section.
 end OnBound.
 end ROM_BadCall.
