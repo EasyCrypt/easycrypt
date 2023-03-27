@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List IntDiv Binomial Ring StdOrder.
+require import AllCore List IntDiv Binomial Ring StdOrder IntMin.
 (*---*) import IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -113,62 +113,60 @@ proof. by move => subset_s_t subset_t_u x mem_x_s; apply/subset_t_u/subset_s_t. 
 (* -------------------------------------------------------------------- *)
 (*Represents the permutation: k -> p[k]*)
 pred is_perm (n : int) (p : int list) =
-  perm_eq p (range 0 n).
+  0 < n /\ perm_eq p (range 0 n).
+
+lemma is_perm_lt0 n p :
+  is_perm n p =>
+  0 < n.
+proof. by case. qed.
 
 lemma size_is_perm n p :
-  0 <= n =>
   is_perm n p =>
   size p = n.
-proof. by rewrite /is_perm => le0n /perm_eq_size; rewrite size_range ler_maxr. qed.
+proof. by case=> /ltzW le0n /perm_eq_size; rewrite size_range ler_maxr. qed.
 
 op id_perm n = range 0 n.
 
-lemma is_perm_id n : is_perm n (id_perm n).
+lemma is_perm_id n : 0 < n => is_perm n (id_perm n).
 proof. by rewrite /is_perm /id_perm perm_eq_refl. qed.
 
 op cc_perm n = if 0 < n then rcons (range 1 n) 0 else [].
 
-lemma is_perm_cc n : is_perm n (cc_perm n).
+lemma is_perm_cc n : 0 < n => is_perm n (cc_perm n).
 proof.
-rewrite /is_perm /cc_perm -cats1; case (0 < n) => [lt0n|/lerNgt len0].
-+ by rewrite (range_ltn 0) // -(cat1s _ (range _ _)) perm_catC.
-by rewrite range_geq.
+move=> lt0n; rewrite /is_perm /cc_perm -cats1 lt0n /=.
+by rewrite (range_ltn 0) // -(cat1s _ (range _ _)) perm_catC.
 qed.
 
 (* -------------------------------------------------------------------- *)
 op permute (dflt : 'a) (p : int list) (s : 'a list) =
-  mkseq (fun n => nth dflt s (nth (-1) p n)) (size s).
+  map (fun n => nth dflt s n) p.
 
 lemma permute_is_perm dflt n (p : int list) :
   is_perm n p =>
   permute dflt p (range 0 n) = p.
 proof.
-  rewrite /is_perm /permute => perm_eq_p; apply/(eq_from_nth (-1)).
-  + by rewrite size_mkseq ler_maxr ?size_ge0 // eq_sym; apply/perm_eq_size.
-  move => k; rewrite size_mkseq ler_maxr ?size_ge0 // => mem_k.
-  rewrite nth_mkseq //= nth_range //= -mem_range.
+  rewrite /is_perm /permute => -[] lt0n perm_eq_p; apply/(eq_from_nth (-1)).
+  + by rewrite size_map.
+  move => k; rewrite size_map => mem_k.
+  rewrite (nth_map (-1)) //= nth_range //= -mem_range.
   move: (all_nthP (fun i => i \in range 0 n) p (-1)) => [_ /= imp].
-  apply/imp => {imp}; [by apply/allP => x mem_x; rewrite -(perm_eq_mem _ _ perm_eq_p)|].
-  by rewrite (perm_eq_size _ _ perm_eq_p).
+  by apply/imp => {imp} //; apply/allP => x mem_x; rewrite -(perm_eq_mem _ _ perm_eq_p).
 qed.
 
 lemma permuteP (dflt : 'a) (p : int list) (s : 'a list) :
   is_perm (size s) p =>
   perm_eq s (permute dflt p s).
 proof.
-  rewrite /permute => is_perm_p; move: (is_perm_p); rewrite /is_perm => /perm_eqP eq_count.
-  apply/perm_eqP1 => x; rewrite /mkseq count_map /preim /=.
-  rewrite range_iota /=; rewrite -{1}(map_nth_range dflt s) count_map /preim /=.
-  rewrite -eq_count -(permute_is_perm (-1) (size s)) //.
-  rewrite /permute /mkseq count_map /preim /= range_iota /= size_range /= ler_maxr ?size_ge0 //.
-  apply/eq_in_count => n mem_n /=; rewrite (nth_map (-1)) /=.
-  + by rewrite -mem_range size_range /= ler_maxr ?size_ge0.
-  by rewrite (nth_range n (size s) 0 (-1)) //= -mem_range.
+  rewrite /permute => -[] lt0n is_perm_p; move: (is_perm_p).
+  rewrite /is_perm => /perm_eqP eq_count.
+  apply/perm_eqP1 => x; rewrite count_map /preim /= eq_count.
+  by rewrite -{1}(map_nth_range dflt s) count_map /preim.
 qed.
 
 (* -------------------------------------------------------------------- *)
 op perm_of_lists (dflt : 'a) (s t : 'a list) =
-  mkseq (fun n => index (nth dflt t n) s) (size s).
+  map (fun x => index x t) s.
 
 lemma permute_perm_of_lists (dflt : 'a) (s t : 'a list) :
   uniq s =>
@@ -189,6 +187,20 @@ qed.
 (* -------------------------------------------------------------------- *)
 op (\c) = permute (-1).
 
+lemma compr1 n p :
+  is_perm n p =>
+  p \c (id_perm n) = p.
+proof.
+  admit.
+qed.
+
+lemma comp1r n p :
+  is_perm n p =>
+  (id_perm n) \c p = p.
+proof.
+  admit.
+qed.
+
 lemma compA n p1 p2 p3 :
   is_perm n p1 =>
   is_perm n p2 =>
@@ -199,18 +211,19 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op inv (n : int) (p : int list) : int list.
+op inv (p : int list) =
+  mkseq (fun i => index i p) (size p).
 
 lemma invK n p :
   is_perm n p =>
-  (inv n p) \c p = id_perm n.
+  (inv p) \c p = id_perm n.
 proof.
   admit.
 qed.
 
 lemma invrK n p :
   is_perm n p =>
-  p \c (inv n p) = id_perm n.
+  p \c (inv p) = id_perm n.
 proof.
   admit.
 qed.
@@ -218,82 +231,216 @@ qed.
 lemma invC n p q :
   is_perm n p =>
   is_perm n q =>
-  inv n (p \c q) = inv n q \c inv n p.
+  inv (p \c q) = inv q \c inv p.
 proof.
   admit.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op conj n u p = u \c p \c (inv n u).
+op exp p n =
+  if n < 0
+  then iterop (-n) (\c) (inv p) (id_perm (size p))
+  else iterop n (\c) p (id_perm (size p)).
+
+(* -------------------------------------------------------------------- *)
+op conj u p = u \c p \c (inv u).
 
 lemma conjA n u v p :
   is_perm n u =>
   is_perm n v =>
   is_perm n p =>
-  conj n u (conj n v p) = conj n (u \c v) p.
+  conj u (conj v p) = conj (u \c v) p.
 proof.
   admit.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op is_cycle n p y = subset (zip y (rot 1 y)) (zip (range 0 n) p).
+op is_fixed p i =
+  forall dflt , nth dflt p i = i.
 
-op cycles (n : int) (p : int list) : int list list.
+(* -------------------------------------------------------------------- *)
+op order p i = argmin idfun (fun n => 0 < n /\ is_fixed (exp p n) i).
 
-lemma cyclesP n p :
+lemma dvd_order n p i :
   is_perm n p =>
-  perm_eq (range 0 n) (flatten (cycles n p)) /\
-  all (is_cycle n p) (cycles n p).
+  order p i %| n.
 proof.
   admit.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op shape (n : int) (p : int list) = mkseq (fun n => count (fun c => size c = n + 1) (cycles n p)) (size p).
+op is_cycle p c = c <> [] /\ subset (zip c (rot 1 c)) (zip (range 0 (size p)) p).
+
+lemma is_cycle_size n p c i :
+  is_perm n p =>
+  is_cycle p c =>
+  i \in c =>
+  size c = order p i.
+proof.
+  admit.
+qed.
+
+lemma is_cycle_dvd_size n p c :
+  is_perm n p =>
+  is_cycle p c =>
+  size c %| n.
+proof.
+  move=> is_p_p is_c_c.
+  rewrite (is_cycle_size _ _ _ (head (-1) c) is_p_p is_c_c).
+  + by case: is_c_c => + _; case: c.
+  by apply/dvd_order.
+qed.
+
+lemma is_cycle_rot n p c k :
+  is_perm n p =>
+  is_cycle p c =>
+  is_cycle p (rot k c).
+proof.
+  admit.
+qed.
+
+lemma is_cycle_mem_rot_inj n p c1 c2 i :
+  is_perm n p =>
+  is_cycle p c1 =>
+  is_cycle p c2 =>
+  i \in c1 =>
+  i \in c2 =>
+  exists k , c1 = rot k c2.
+proof.
+  admit.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op cycles (p : int list) =
+  undup_eqv
+    (fun c1 c2 => exists k , c1 = rot k c2)
+    (mkseq
+      (fun i =>
+        take
+          (order p i)
+          (mkseq
+            (fun j => nth (-1) (exp p j) i)
+            (size p)))
+      (size p)).
+
+lemma is_cycle_cycles n p :
+  is_perm n p =>
+  all (is_cycle p) (cycles p).
+proof.
+  admit.
+qed.
+
+lemma cyclesP n p c :
+  is_perm n p =>
+  is_cycle p c <=>
+  (exists k, rot k c \in cycles p).
+proof.
+  admit.
+qed.
+
+lemma cycles_perm_eq n p :
+  is_perm n p =>
+  perm_eq (flatten (cycles p)) (range 0 n).
+proof.
+  admit.
+qed.
+
+lemma cycles_sum n p :
+  is_perm n p =>
+  BIA.big predT size (cycles p) = n.
+proof.
+  move=> is_p_p; move/is_perm_lt0: is_p_p (is_p_p) => lt0n.
+  move/cycles_perm_eq/perm_eq_size.
+  by rewrite size_flatten sumzE BIA.big_mapT size_range ler_maxr // ltzW.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op shape (p : int list) =
+  mkseq (fun n => count (fun c => size c = n + 1) (cycles p)) (size p).
+
+lemma size_shape p :
+  size (shape p) = size p.
+proof. by rewrite /shape size_mkseq ler_maxr // size_ge0. qed.
 
 lemma shape_eq n p q :
   is_perm n p =>
   is_perm n q =>
-  shape n p = shape n q <=> (exists u , conj n u p = q).
+  shape p = shape q <=> (exists u , conj u p = q).
 proof.
   admit.
 qed.
 
-lemma nth_shape_ge0 x k n p :
-  k \in range 0 (size p) =>
-  0 <= nth x (shape n p) k.
-proof. by move=> mem_k; rewrite /shape nth_mkseq -?mem_range //= count_ge0. qed.
+lemma shape_ge0 p :
+  all ((<=) 0) (shape p).
+proof.
+  by apply/allP => ? /mapP [] i [] _ ->>; apply/count_ge0.
+qed.
+
+lemma shape_sum dflt n p :
+  is_perm n p =>
+  BIA.bigi predT (fun i => i * nth dflt (shape p) (i - 1)) 1 (n + 1) = n.
+proof.
+  move=> is_p_p; rewrite -{2}(cycles_sum n p) // /shape.
+  rewrite eq_sym (big_mcount _ _ 1 (size p + 1)).
+  + move=> ? /mapP [] c [] mem_ ->>.
+    move/allP/(_ _ mem_): (is_cycle_cycles _ _ is_p_p) => is_c_c.
+    move: (is_cycle_dvd_size _ _ _ is_p_p is_c_c) => dvd_.
+    move: (dvdz_le _ _ _ dvd_); [by apply/gtr_eqF; case: is_p_p|].
+    rewrite ger0_norm ?size_ge0 // gtr0_norm; [by case: is_p_p|].
+    rewrite mem_range ltzS => le_; split=> [|_].
+    - case/ler_eqVlt: (size_ge0 c) => [/eq_sym/size_eq0 ->>|/ltzE //].
+      by move/dvd0z: dvd_ => ->>; case: is_p_p.
+    apply/(ler_trans _ _ _ le_); case: is_p_p => lt0n.
+    by move/perm_eq_size => ->; rewrite size_range; apply/maxrr.
+  case: (is_p_p) => lt0n /perm_eq_size; rewrite size_range ler_maxr ?ltzW //= => ->.
+  apply/BIA.eq_big_seq => i memi /=; rewrite nth_mkseq /=.
+  + by rewrite -mem_range mem_range_subr.
+  by rewrite count_map /preim /pred1.
+qed.
 
 (* -------------------------------------------------------------------- *)
-pred is_shape (n : int) (s : int list) = true. (*TODO*)
+op is_shape (n : int) (s : int list) : bool =
+  all ((<=) 0) s /\
+  forall dflt , BIA.bigi predT (fun i => i * nth dflt s (i - 1)) 1 (n + 1) = n.
+
+lemma is_shape_ge0 n s :
+  is_shape n s =>
+  all ((<=) 0) s.
+proof. by case. qed.
+
+lemma is_shape_sum dflt n s :
+  is_shape n s =>
+  BIA.bigi predT (fun i => i * nth dflt s (i - 1)) 1 (n + 1) = n.
+proof. by case=> _ => ->. qed.
+
+lemma is_shapeW n s :
+  all ((<=) 0) s =>
+  (forall dflt , BIA.bigi predT (fun i => i * nth dflt s (i - 1)) 1 (n + 1) = n) =>
+  is_shape n s.
+proof. by move=> ? ?; split. qed.
 
 lemma is_shapeP n s :
-  is_shape n s <=> (exists p , is_perm n p /\ shape n p = s).
-proof.
-  admit.
-qed.
-
-lemma is_shape_sum n s :
-  0 <= n =>
-  is_shape n s =>
-  BIA.bigi predT (fun i => i * nth 0 s (i - 1)) 1 (n + 1) = n.
+  is_shape n s <=> (exists p , is_perm n p /\ shape p = s).
 proof.
   admit.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op allperms_shape (n : int) (s : int list) : int list list.
+op allperms_shape (s : int list) =
+  filter (fun p => shape p = s) (allperms (range 0 (size s))).
 
 lemma allperms_shapeP n s :
   is_shape n s =>
-  perm_eq (allperms_shape n s) (filter (fun p => shape n p = s) (allperms (range 0 n))).
+  perm_eq (allperms_shape s) (filter (fun p => shape p = s) (allperms (range 0 n))).
 proof.
-  admit.
+  case/is_shapeP => p [] [] lt0n /perm_eq_size.
+  rewrite size_range ler_maxr ?ltzW //= => <<- <<-.
+  by rewrite /allperms_shape size_shape perm_eq_refl.
 qed.
 
 lemma size_allperms_shape n s :
   is_shape n s =>
-  size (allperms_shape n s) = 0. (*TODO*)
+  size (allperms_shape s) = 0. (*TODO*)
 proof.
   admit.
 qed.

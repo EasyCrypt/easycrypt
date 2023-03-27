@@ -108,6 +108,24 @@ case: (P x)=> [Px|NPx]; last rewrite count_pred0_eq //.
 + by move=> y @/predI @/pred1; case: (y = x).
 qed.
 
+lemma nosmt big_mcount (F : 'a -> int) (s : 'a list) m n :
+  mem (map F s) <= mem (range m n) =>
+  BIA.big predT F s =
+  BIA.bigi predT (fun (x : int) => x * count (pred1 x) (map F s)) m n.
+proof.
+  elim: s => [_|x s IHs /=].
+  + by rewrite BIA.big_nil /= BIA.big1_eq.
+  move=> le_; rewrite BIA.big_cons /(predT x) /= IHs.
+  + by move=> y mem_; apply/le_ => /=; right.
+  rewrite !(BIA.big_rem _ _ (range m n) (F x)).
+  + by apply/le_.
+  + by apply/le_.
+  rewrite /(predT (F x)) /= !addrA rem_filter ?range_uniq //; congr.
+  + by rewrite /(pred1 _ (F x)) /= b2i1 mulrDr.
+  apply/BIA.eq_big_seq => i; rewrite mem_filter /predC1 /= /(pred1 _ (F x)) eq_sym /=.
+  by case=> -> _; rewrite b2i0.
+qed.
+
 abbrev sumid i j = BIA.bigi predT (fun n => n) i j.
 
 lemma sumidE_r n : 0 <= n =>

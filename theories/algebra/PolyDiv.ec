@@ -2923,6 +2923,34 @@ rewrite (eqp_trans _ _ _ _ eq_) // divpKC // eqp_sym.
 by apply/eqp_scale/lc_expn_scalp_neq0.
 qed.
 
+lemma irredp_dec_flatten p qss :
+  (exists ps ,
+     size ps = size qss /\
+     all (fun (pqs : poly * poly list) => irreducible_dec pqs.`1 pqs.`2) (zip ps qss) /\
+     eqp p (BigPoly.PCM.big predT idfun ps)) <=>
+  irreducible_dec p (flatten qss).
+proof.
+elim: qss p => [|qs qss IHqss] r //=.
++ rewrite flatten_nil -irredp_dec_nil size_poly_eq1.
+  split=> [[ps] [] /size_eq0 ->>|?]; [by rewrite BigPoly.PCM.big_nil|].
+  by exists []; rewrite BigPoly.PCM.big_nil.
+rewrite flatten_cons -irredp_dec_cat; split=> [[[|p ps]]|] //=.
++ by rewrite addrC ltr_eqF // ltzS.
++ case=> /IntID.addrI size_ [] [] dec_ all_; rewrite BigPoly.PCM.big_cons.
+  rewrite /(predT p) /(idfun p) /= => eqp_; exists p (divp r p).
+  rewrite dec_ divpKC 1?eqp_sym ?eqp_scale ?lc_expn_scalp_neq0 //=.
+  - by case: eqp_ => _; apply/dvdp_trans/dvdp_mulIl.
+  apply/IHqss; exists ps; rewrite size_ all_ /=.
+  move: (dvd_eqp_divl p _ _ _ eqp_); [by apply/dvdp_mulIl|].
+  rewrite mulKp; [by apply/negP => ->>; move: dec_; apply/irredp_dec0|].
+  rewrite !(eqp_sym (divp _ _)); apply/eqp_trans; rewrite eqp_sym.
+  by apply/eqp_scale/lc_expn_scalp_neq0.
+case=> p pp; rewrite -IHqss => {IHqss} [] [] dec_ [] [ps] [] size_.
+case=> all_ eqp_pp eqp_r; exists (p :: ps); rewrite /= size_ /=.
+rewrite dec_ all_ BigPoly.PCM.big_cons /(predT p) /(idfun p) /=.
+by apply/(eqp_trans _ _ _ eqp_r)/eqp_mull.
+qed.
+
 lemma irredp_decW p :
   p <> poly0 <=>
   exists qs , irreducible_dec p qs.
@@ -3060,6 +3088,26 @@ proof.
 rewrite /irreducible_monic_dec -irredp_dec_cat; split=> [[p1 p2]|[] [p1 p2]] |>.
 + by move=> irr1 all1 irr2 all2 eq_; rewrite all_cat; split=> //; exists p1 p2.
 by move=> irr1 irr2 eq_ /all_cat [] all1 all2; exists p1 p2.
+qed.
+
+lemma irredp_monic_dec_flatten p qss :
+  (exists ps ,
+     size ps = size qss /\
+     all (fun (pqs : poly * poly list) => irreducible_monic_dec pqs.`1 pqs.`2) (zip ps qss) /\
+     eqp p (BigPoly.PCM.big predT idfun ps)) <=>
+  irreducible_monic_dec p (flatten qss).
+proof.
+rewrite /irreducible_monic_dec -irredp_dec_flatten all_flatten.
+split=> [[ps] [] size_ [] all_ eqp_|[] [ps]]; [split|].
++ exists ps; rewrite size_ eqp_ /=; move: all_; apply/all_imp_in.
+  by apply/allP => -[].
++ rewrite (all_zip2 (all monic) ps qss) ?size_ //.
+  by move: all_; apply/all_imp_in/allP => -[].
+case=> size_ [] all_dec eqp_ all_m; exists ps; rewrite size_ eqp_ /=.
+move: all_m; rewrite (all_zip2 (all monic) ps qss) ?size_ //; move: all_dec.
+pose p1:= (fun (pqs : poly * poly list) => _ pqs.`1 pqs.`2); pose p2:= _ \o _.
+move=> all1 all2; move: (all_predI p1 p2 (zip ps qss)); rewrite all1 all2.
+by rewrite /p1 /p2 /predI /=; apply/all_imp_in/allP => -[].
 qed.
 
 lemma irredp_monic_dec0 qs :

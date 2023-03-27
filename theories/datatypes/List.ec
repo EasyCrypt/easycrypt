@@ -458,6 +458,19 @@ proof. by move=> x; rewrite -cats1 /= !mem_cat /= orbC. qed.
 lemma mem_nth (x0 : 'a) s n : 0 <= n < size s => mem s (nth x0 s n).
 proof. by elim: s n => [|x s ih] //= n; smt. qed.
 
+lemma nth_mem (x0 : 'a) s (x : 'a) :
+  (exists n , 0 <= n < size s /\ x = nth x0 s n) =>
+  mem s x.
+proof.
+elim/last_ind: s => [|s y IHs [n]] //=.
+- rewrite negb_exists => i /=; rewrite negb_and; left.
+  by rewrite andaE negb_and lezNgt; case (Int.(<) _ _).
+case=> -[] le0n; rewrite size_rcons nth_rcons => /ltzS /=.
+case/lez_eqVlt => [->> /= <<-|ltn_]; [by rewrite mem_rcons|].
+rewrite ltn_ mem_rcons /= => ->>; right; apply/IHs.
+by exists n.
+qed.
+
 lemma onth_some_mem ['a] (xs : 'a list) (n : int) x:
   onth xs n = Some x => x \in xs.
 proof. by move/onth_some => [? <-]; apply/mem_nth. qed.
@@ -1289,6 +1302,7 @@ lemma perm_eq_all (p : 'a -> bool) s1 s2 :
   all p s2.
 proof. by rewrite !allP => /perm_eq_mem eq_ all_ x /eq_ /all_. qed.
 
+
 (* -------------------------------------------------------------------- *)
 (*                         Element removal                              *)
 (* -------------------------------------------------------------------- *)
@@ -1629,6 +1643,22 @@ proof.                          (* FIXME: subseq *)
   case: (y = x)=> // ne_xy; rewrite ih //=.
   by move: y_notin_s; apply/contra => /mem_rem.
 qed.
+
+lemma uniq_nth_inj_in ['a] (xi xj : 'a) s i j :
+     uniq s
+  => 0 <= i < size s
+  => 0 <= j < size s
+  => nth xi s i = nth xj s j
+  => i = j.
+proof.
+elim/last_ind: s => [|s x IHs]; [by rewrite ltzNge|].
+rewrite rcons_uniq size_rcons !nth_rcons => -[] Nmem_ uniq_ -[] le0i /ltzS + [] le0j /ltzS.
+case/lez_eqVlt => [->>/=|lti_]; (case/lez_eqVlt => [->>/=|ltj_] //).
+- by rewrite ltj_ /= => ->>; move: (mem_nth xj s j _).
+- by rewrite lti_ /= => <<-; move: (mem_nth xi s i _).
+by rewrite lti_ ltj_ /=; apply/IHs.
+qed.
+
 
 (* -------------------------------------------------------------------- *)
 (*                       Removing duplicates                            *)
@@ -2126,6 +2156,7 @@ lemma mapiP x0 (f : int -> 'a -> 'b) (s : 'a list) y :
     y \in mapi f s <=>
     exists n, (0 <= n && n < size s) /\ y = f n (nth x0 s n).
 proof. exact: mapi_recP. qed.
+
 
 (* -------------------------------------------------------------------- *)
 (*                          Element Replacement                         *)
@@ -3008,8 +3039,15 @@ qed.
 lemma count_flatten (p : 'a -> bool) (ss : 'a list list) :
   count p (flatten ss) = sumz (map (count p) ss).
 proof.
-  elim: ss=> [|s ss ih] /=; first by rewrite flatten_nil.
-  by rewrite flatten_cons count_cat /sumz /= ih.
+elim: ss=> [|s ss ih] /=; first by rewrite flatten_nil.
+by rewrite flatten_cons count_cat /sumz /= ih.
+qed.
+
+lemma all_flatten (p : 'a -> bool) (ss : 'a list list) :
+  all p (flatten ss) = all (all p) ss.
+proof.
+elim: ss => [|s ss IHss]; [by rewrite flatten_nil|].
+by rewrite flatten_cons all_cat /= IHss.
 qed.
 
 lemma nosmt perm_undup_count (s : 'a list) :
@@ -3813,6 +3851,77 @@ elim: s => [|x s IHs /=]; [by exists (fun _ => witness)|].
 case=> -[y] Pxy /IHs [f] all_; exists (fun z => if z = x then y else f z) => /=.
 rewrite Pxy /=; move: all_; apply/all_imp_in/allP => z mem_ /= Pz_.
 by case (z = x).
+qed.
+
+lemma mapi_map ['a 'b] (f : int -> 'a -> 'b) s :
+  mapi f s = map (fun (p : int * 'a) => f p.`1 p.`2) (zip (range 0 (size s)) s).
+proof.
+apply/(eq_from_nth witness); [by rewrite size_mapi size_map size_zip size_range lez_maxr|].
+move=> i /mem_range; rewrite size_mapi => mem_; rewrite (nth_mapi witness) -?mem_range //.
+rewrite (nth_map (witness, witness)) /=; [by rewrite size_zip size_range lez_maxr //= lez_minr // -mem_range|].
+rewrite (nth_zip witness witness) /=; [by rewrite size_range lez_maxr|].
+by rewrite nth_range // -mem_range.
+qed.
+
+lemma flatten_perm_eq ['a 'b] (f : 'a -> 'b) s (ss1 ss2 : 'a list list) :
+  uniq s =>
+  size s = size ss1 =>
+  size s = size ss2 =>
+  all (fun (sx : 'a list * 'b) => all (fun y => f y = sx.`2) sx.`1) (zip ss1 s) =>
+  all (fun (sx : 'a list * 'b) => all (fun y => f y = sx.`2) sx.`1) (zip ss2 s) =>
+  perm_eq (flatten ss1) (flatten ss2) =>
+  all (fun (p : 'a list * 'a list) => perm_eq p.`1 p.`2) (zip ss1 ss2).
+proof.
+move=> uniq_ size1 size2 all1 all2 eq_; apply/(all_nthP _ _ (witness, witness)).
+move=> i /mem_range /=; rewrite size_zip -size1 -size2 lez_minr // => memi.
+rewrite !nth_zip -?size1 -?size2 //=; apply/perm_eqP1 => x.
+move: (all2) => /allP /(_ (nth (witness, witness) (zip ss2 s) i) _) /=.
+- by apply/mem_nth/mem_range; rewrite size_zip -size2 lez_minr.
+move=> /allP /(_ x); rewrite nth_zip -?size2 //=.
+move: (all1) => /allP /(_ (nth (witness, witness) (zip ss1 s) i) _) /=.
+- by apply/mem_nth/mem_range; rewrite size_zip -size1 lez_minr.
+move=> /allP /(_ x); rewrite nth_zip -?size1 //=.
+case (f x = nth witness s i) => [eqi|_ /=]; last first.
+- by move=> /mem_count_eq0 -> /mem_count_eq0 ->.
+move/perm_eqP1/(_ x): eq_; rewrite !count_flatten.
+rewrite -{1}(map_nth_range witness ss1) -{1}(map_nth_range witness ss2).
+rewrite -size1 -size2 -!map_comp; move/perm_to_rem: (memi) => eq_.
+pose f1:= _ \o _; pose f2:= _ \o _.
+move/(perm_eq_map f1): (eq_) => eq1; move/(perm_eq_map f2): eq_ => eq2.
+rewrite (sumz_perm _ _ eq1) (sumz_perm _ _ eq2) /f1 /f2 /= => {f1 f2 eq1 eq2}.
+rewrite /(predT i) /(\o) /= !sumz_cons !sumz_eq0 //.
+- apply/allP => ? /= /mapP [j] [] + ->>; rewrite /pred1.
+  rewrite rem_filter ?range_uniq // mem_filter /predC1 eq_sym.
+  case=> neq_ memj; rewrite -mem_count_eq0; apply/negP => mem_.
+  move: all1 => /allP /(_ (nth (witness, witness) (zip ss1 s) j) _) /=.
+  - by apply/mem_nth/mem_range; rewrite size_zip -size1 lez_minr.
+  apply/negP => /allP /(_ x); rewrite nth_zip -?size1 // => /(_ mem_) /=.
+  by rewrite eqi; move: neq_; apply/implybNN/uniq_nth_inj_in => //; apply/mem_range.
+apply/allP => ? /= /mapP [j] [] + ->>; rewrite /pred1.
+rewrite rem_filter ?range_uniq // mem_filter /predC1 eq_sym.
+case=> neq_ memj; rewrite -mem_count_eq0; apply/negP => mem_.
+move: all2 => /allP /(_ (nth (witness, witness) (zip ss2 s) j) _) /=.
+- by apply/mem_nth/mem_range; rewrite size_zip -size2 lez_minr.
+apply/negP => /allP /(_ x); rewrite nth_zip -?size2 // => /(_ mem_) /=.
+by rewrite eqi; move: neq_; apply/implybNN/uniq_nth_inj_in => //; apply/mem_range.
+qed.
+
+lemma all_zip1 (p : 'a -> bool) s1 (s2 : 'b list) :
+  size s1 <= size s2 =>
+  all p s1 = all (p \o fst) (zip s1 s2).
+proof.
+elim: s1 s2 => [|x1 s1 IHs1] [|x2 s2] //=.
++ by rewrite addrC -ltzE ltzNge size_ge0.
+by move/lez_add2l/IHs1 => <-; rewrite /(\o).
+qed.
+
+lemma all_zip2 (p : 'b -> bool) (s1 : 'a list) s2 :
+  size s2 <= size s1 =>
+  all p s2 = all (p \o snd) (zip s1 s2).
+proof.
+elim: s2 s1 => [|x2 s2 IHs2] [|x1 s1] //=.
++ by rewrite addrC -ltzE ltzNge size_ge0.
+by move/lez_add2l/IHs2 => <-; rewrite /(\o).
 qed.
 
 (* -------------------------------------------------------------------- *)
