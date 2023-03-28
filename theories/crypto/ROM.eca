@@ -260,27 +260,12 @@ qed.
 equiv eq_eager_sampling:
   Exp(Lazy.LRO, D).main ~ Exp(ERO, D).main: ={glob D, arg} ==> ={res}.
 proof.
-  (*
-  have eq_LRO_RO': equiv[Exp'(H.LRO).main ~ Exp'(H.RO).main: ={glob D, arg} ==> ={res}].
-  + symmetry; proc; call (FullEager.RO_LRO_D D' dout_ll).
-  by inline *; auto.
-  proc*.
-  rewrite equiv [{1} eq_LRO_RO' (x) r (x) r]=> [/#||/#|].
-  + rewrite equiv [{1} eq_LRO_RO (x) r (x) r]=> [/#||/#|]; sim.
-  rewrite equiv [{2} eq_ERO_RO (x) r (x) r]=> [/#||/#|]; sim.
-  *)
-transitivity Exp'(H.LRO).main
-             (={glob D, arg} ==> ={res})
-             (={glob D, arg} ==> ={res})=> />.
-+ by move=> &2; exists (glob D){2} (x{2}).
-+ exact/eq_LRO_RO.
-transitivity Exp'(RO).main
-             (={glob D, arg} ==> ={res})
-             (={glob D, arg} ==> ={res})=> />.
-+ by move=> &2; exists (glob D){2} (x{2}).
-+ symmetry; proc; call (FullEager.RO_LRO_D D' dout_ll).
-  by inline *; auto.
-by symmetry; conseq eq_ERO_RO.
+have eq_RO_LRO': equiv[Exp'(H.RO).main ~ Exp'(H.LRO).main: ={glob D, arg} ==> ={res}].
++ by proc; call (FullEager.RO_LRO_D D' dout_ll); inline*; auto.
+proc*.
+rewrite equiv [{1} eq_LRO_RO (x) r (x) r]; sim.
+rewrite equiv [{2} eq_ERO_RO (x) r0 (x) r1]; 1: sim.
+rewrite equiv [{1} eq_RO_LRO' (x) r1 (x) r1]; sim.
 qed.
 
 end section.

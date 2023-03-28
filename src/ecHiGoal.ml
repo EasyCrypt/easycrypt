@@ -929,16 +929,20 @@ let process_rewrite1_r ttenv ?target ri tc =
       (* Construct minimal pre/post conditions for the new intermediate memory *)
       (* Note: this only allows overwriting existing memories instead of creating new ones *)
       let prpo ml mr args =
+        (* Extract the conjuncts of the pre-condition that are specific to the left memory *)
         let ml_pr = split_sided ml goal.es_pr in
-        let pr =
+        let ml_pr = odfl f_true ml_pr in
+
+        let eq_args =
           f_eq
             (EcFol.form_of_expr ml (e_tuple args))
             (EcFol.form_of_expr mr (e_tuple args)) in
-        let pr = f_and (odfl f_true ml_pr) pr in
 
-        let eqs_pr = EcFol.one_sided_vs ml goal.es_pr in
+        (* Extract all used variables from the pre/post conditions *)
+        let eqs_pr = EcFol.one_sided_vs ml (f_and goal.es_pr eq_args) in
         let eqs_po = EcFol.one_sided_vs ml goal.es_po in
 
+        (* Construct equalities between variables in the left memory and the intermediate memory *)
         let eqs_pr = List.unique (eqs_pr @ eqs_po) in
         let eqs_pr = List.map (fun v -> f_eq (Fsubst.f_subst_mem ml mr v) v) eqs_pr in
         let eqs_pr = f_ands eqs_pr in
@@ -947,7 +951,7 @@ let process_rewrite1_r ttenv ?target ri tc =
         let eqs_po = List.map (fun v -> f_eq (Fsubst.f_subst_mem ml mr v) v) eqs_po in
         let eqs_po = f_ands eqs_po in
 
-        f_and eqs_pr pr, eqs_po
+        f_and eqs_pr (f_and eq_args ml_pr) , eqs_po
       in
 
       (* Construct the proc calls that we want in each transitivity *)
@@ -975,7 +979,6 @@ let process_rewrite1_r ttenv ?target ri tc =
           - by move=> &1 &2 H; exists var1{1} var2{1} ... varn{1}; move: H => //.
           for 4 we use {2}.
       *)
-
       let tc =
         let ongoal (b : bool) (tc : tcenv1) =
           let pl = EcIdent.create "&p1" in
@@ -985,20 +988,28 @@ let process_rewrite1_r ttenv ?target ri tc =
 
           let mem, p = if b then (meml, pl) else (memr, pr) in
 
-          (* Pairing up the correct variables for the exists intro *)
-          let vs, fm = EcFol.destr_exists (FApi.tc1_goal tc) in
-          let eqsprfm, _ =
-            let l, r = EcFol.destr_and fm in
-            if b then l, r else r, l
-          in
-          let eqsfm, _ = destr_and eqsprfm in
-          let eqsfm = destr_ands ~deep:false eqsfm in
-          let eqsmp = List.map destr_eq eqsfm in
-          let eqsmp = List.map (fst_map destr_local) eqsmp in
-          let exvs = List.map (fun v -> List.assoc v eqsmp) (List.fst vs) in
-          let exvs = List.map (Fsubst.f_subst_mem (EcMemory.memory mem) p) exvs in
+          let goal = FApi.tc1_goal tc in
 
-          let tc = FApi.as_tcenv1 (t_exists_intro_s (List.map paformula exvs) tc) in
+          let tc =
+            if EcFol.is_exists goal then
+              (* Pairing up the correct variables for the exists intro *)
+              let vs, fm = EcFol.destr_exists (FApi.tc1_goal tc) in
+              let eqsprfm, _ =
+                let l, r = EcFol.destr_and fm in
+                if b then l, r else r, l
+              in
+              let eqsfm, _ = destr_and eqsprfm in
+              let eqsfm = destr_ands ~deep:false eqsfm in
+              let eqsmp = List.map destr_eq eqsfm in
+              let eqsmp = List.map (fst_map destr_local) eqsmp in
+              let exvs = List.map (fun v -> List.assoc v eqsmp) (List.fst vs) in
+              let exvs = List.map (Fsubst.f_subst_mem (EcMemory.memory mem) p) exvs in
+
+              FApi.as_tcenv1 (t_exists_intro_s (List.map paformula exvs) tc)
+            else
+              tc
+          in
+
           t_generalize_hyp ?clear:(Some `Yes) h tc
         in
 
