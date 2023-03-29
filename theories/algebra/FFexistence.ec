@@ -237,25 +237,26 @@ theory PolyFF.
       by exists qs; rewrite -/s.
     apply/mapP; exists s; rewrite -/ps /= => {ps}; apply/allshapesP.
     apply/is_shapeW.
+    + by rewrite size_mkseq ler_maxr // -ltzS /= ltzE ltzW.
     + rewrite all_map range_iota /preim /=; apply/allP.
       by move=> i memi /=; apply/count_ge0.
     move=> dflt /=; rewrite (Bigint.BIA.eq_big_seq _ (fun k => k * count (fun q => deg q = k + 1) qs)).
     + by move=> k memk /=; rewrite nth_mkseq // -mem_range mem_range_subr.
     rewrite eq_sym {1}(deg_irredp_monic_dec _ _ dec_) /=.
     rewrite (Bigint.big_mcount _ _ 1 (deg p)).
-    + move=> ? /mapP [] q [] memq ->>.
-      admit.
+    + move=> ? /mapP [] q [] memq ->>; apply/mem_range_subr.
+      by rewrite /=; move: (degs_irredp_monic_dec _ _ _ dec_ memq).
     apply/Bigint.BIA.eq_big_seq => i memi /=; rewrite count_map /preim /pred1 /=.
     by congr; apply/eq_count => q /=; split=> [<-|->].
   qed.
 
   lemma size_enum_udeg_irr_shape n :
-    0 < n =>
-    Bigint.BIA.big predT (fun s => size (enum_udeg_irr_shape n s)) (allshapes n) =
+    1 < n =>
+    Bigint.BIA.big predT (fun s => size (enum_udeg_irr_shape n s)) (allshapes (n - 1)) =
     FinType.card ^ (n - 1).
   proof.
-    move=> lt0n; rewrite -size_enum_udeg //.
-    move/perm_eq_size: (perm_eq_enum_udeg_irr_shape _ lt0n) => ->.
+    move=> lt1n; rewrite -size_enum_udeg ?ltzE ?ltzW //.
+    move/perm_eq_size: (perm_eq_enum_udeg_irr_shape _ lt1n) => ->.
     rewrite size_flatten Bigint.sumzE !Bigint.BIA.big_mapT.
     apply/Bigint.BIA.eq_big_seq => s mem_ /=.
     by rewrite /(\o).
@@ -281,14 +282,14 @@ theory PolyFF.
   proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
 
   lemma perm_eq_enum_udeg_irr_deg n s :
-    0 < n =>
-    is_shape n s =>
+    1 < n =>
+    is_shape (n - 1) s =>
     perm_eq
       (enum_udeg_irr_shape n s)
       (map (PCM.big predT idfun)
            (alltuples_list (mapi ((transpose enum_udeg_irr_deg) \o (transpose Int.(+) 2)) s))).
   proof.
-    move=> lt0n is_s_s; apply/uniq_perm_eq; [by apply/uniq_enum_udeg_irr_shape| |].
+    move=> lt1n is_s_s; apply/uniq_perm_eq; [by apply/uniq_enum_udeg_irr_shape| |].
     + rewrite map_inj_in_uniq; last first.
       - apply/alltuples_list_uniq/allP => qs /(mapiP 0) [i] [] /mem_range mem_ ->>.
         by rewrite /(\o) /=; apply/uniq_enum_udeg_irr_deg.
@@ -369,14 +370,78 @@ theory PolyFF.
       case/(_ _ memi): f2P => m2 [] /irredp_monic_decP [] _ [] _ -> _.
       by rewrite m1 m2 !scale1r; apply/PCM.eq_big_perm.
     move=> p; rewrite enum_udeg_irr_shapeP mapP; split=> [[] m_ [] <<- [qs] [] dec_ ->>|].
-    + pose bqs:= mkseq (fun k => PCM.big (fun q => deg q = k + 2) idfun qs) (deg p).
-      exists bqs; rewrite alltuples_listP size_mapi !size_mkseq /=.
-      rewrite (PCM.partition_big deg _ predT _ _ (range 2 (deg p + 2))).
+    + pose bqs:= mkseq (fun k => PCM.big (fun q => deg q = k + 2) idfun qs) (deg p - 1).
+      exists bqs; rewrite alltuples_listP size_mapi !size_mkseq /(\o) /=; split.
+      - apply/(all_nthP _ _ (witness, witness)) => i; rewrite size_zip size_mapi !size_mkseq.
+        rewrite -mem_range ler_maxr -?ltzS ?ltzE ?ltzW // ler_minr //= => memi.
+        rewrite nth_zip /=; [by rewrite size_mapi !size_mkseq|].
+        rewrite nth_mkseq -?mem_range //= (nth_mapi witness) /=.
+        * by rewrite -mem_range size_mkseq ler_maxr // -ltzS ltzE ltzW.
+        apply/enum_udeg_irr_degP; rewrite monic_prod /=.
+        * case/irredp_monic_decP: dec_ => + _.
+          by apply/all_imp_in/allP => q mem_ /= []; rewrite /idfun.
+        rewrite nth_mkseq -?mem_range //=; exists (filter (fun q => deg q = i + 2) qs).
+        rewrite size_filter filter_all /=; apply/irredp_monic_decP.
+        case/irredp_monic_decP: dec_ => all_ _; rewrite -prodf_neq0.
+        rewrite lc_prod PCM.big_filter BigCf.BCM.big1_seq ?scale1r /=.
+        * move=> q [] _ mem_; rewrite /(\o) /idfun /=.
+          by case/allP/(_ _ mem_): all_.
+        rewrite all_filter -all_predI; move: all_; apply/all_imp_in/allP => q mem_.
+        rewrite /predA /predI /predC /idfun /= negb_and -implyNb /=.
+        by case=> irr_ mq; split=> _ //; apply/irredp_neq0.
+      case/irredp_monic_decP: (dec_) => _ [] _ ->; rewrite m_ scale1r.
+      rewrite (PCM.partition_big deg _ predT _ _ (range 2 (deg p + 1))).
       - by apply/range_uniq.
-      - move=> bq mem_ _ /=.
-        admit.
-      admit.
+      - by move=> q; rewrite /predT /=; apply/degs_irredp_monic_dec.
+      rewrite PCM.big_mapT range_iota /= (range_addr 2 (deg p - 1) 2) /=.
+      rewrite PCM.big_mapT; apply/PCM.eq_big_seq => i memi.
+      by rewrite /(\o) /idfun /=; apply/PCM.eq_big => //; move=> q; rewrite /predT /= addrC.
     case=> qs [] /alltuples_listP []; rewrite size_mapi => size_ all_ ->>.
+    rewrite monic_prod /=; [apply/(all_nthP _ _ witness) => i /mem_range /= + _|].
+    + move=> memi; move/(all_nthP _ _ (witness, witness))/(_ i): all_.
+      rewrite -mem_range size_zip size_mapi -size_ ler_minr // memi /=.
+      rewrite nth_zip ?size_mapi //= (nth_mapi witness) -?mem_range -?size_ //.
+      by rewrite /(\o) /idfun /= => /enum_udeg_irr_degP.
+    move: (partial_funchoice
+            (mem (range 0 (n - 1)))
+            (fun i rs =>
+              monic (nth witness qs i) /\
+              irreducible_monic_dec (nth witness qs i) rs /\
+              size rs = nth witness s i /\
+              all (fun r => deg r = i + 2) rs)
+            _).
+    + move=> i memi /=; move/(all_nthP _ _ (witness, witness))/(_ i): all_.
+      rewrite size_zip size_mapi size_ ler_minr // -mem_range (is_shape_size _ _ is_s_s) memi /=.
+      rewrite nth_zip ?size_mapi //= (nth_mapi witness) -?mem_range ?(is_shape_size _ _ is_s_s) //.
+      by rewrite /(\o) /= => /enum_udeg_irr_degP [] ? [rs] ?; exists rs.
+    case=> f /= {all_} forall_; have ->: qs = map (fun i => PCM.big predT idfun (f i)) (range 0 (n - 1)).
+    + apply/(eq_from_nth witness); [rewrite size_map size_range size_ (is_shape_size _ _ is_s_s)|].
+      - by rewrite ler_maxr //= -ltzS ltzE ltzW.
+      move=> i /mem_range; rewrite size_ (is_shape_size _ _ is_s_s) => memi.
+      rewrite (nth_map witness) ?size_range -?mem_range ?ler_maxr // -?ltzS ?ltzE ?ltzW //=.
+      rewrite nth_range -?mem_range //=; case/(_ _ memi): forall_ => m_ [] dec_ _.
+      by case/irredp_monic_decP: dec_ => _ [] _ ->; rewrite m_ scale1r.
+    rewrite PCM.big_mapT deg_prod; pose b:= all _ _; have ->: b; rewrite /b => {b} /=.
+    + apply/allP => i memi; rewrite /predI /predC /(predT i) /(\o) /(idfun (PCM.big _ _ _)) /=.
+      case/(_ _ memi): forall_ => _ [] /irredp_monic_decP [] all_ _ _.
+      apply/prodf_neq0; move: all_; apply/all_imp_in/allP => r memr /=.
+      by rewrite /predI /predC /predT /idfun /= => -[] _; rewrite -lc_eq0 => ->; apply/F.oner_neq0.
+    split; [rewrite eq_sym -subr_eq -{1}(is_shape_sum witness _ _ is_s_s) /=|].
+    + move: (range_addr 1 (n - 1) 1) => /= ->; rewrite Bigint.BIA.big_map /=.
+      rewrite (Bigint.BIA.eq_bigl _ predT); [by move=> ?; rewrite /(\o) /predT|].
+      apply/Bigint.BIA.eq_big_seq => i memi; rewrite /(\o) /idfun /=.
+      case/(_ _ memi): forall_ => m_ [] dec_ [] eq_ all_.
+      rewrite deg_prod; pose b:= all _ _; have ->: b; rewrite /b => {b} /=.
+      - apply/allP => r memr; rewrite /predI /predC /predT /=.
+        case/irredp_monic_decP: dec_ => /allP /(_ _ memr) [] _ + _.
+        by rewrite -lc_eq0 => ->; apply/F.oner_neq0.
+      rewrite -eq_ (addrC 1) (Bigint.BIA.eq_big_seq _ (fun _ => i + 1)) ?Bigint.big_constz ?count_predT //.
+      by move=> r memr; rewrite /(\o) /=; move/allP/(_ _ memr): all_ => ->.
+    exists (flatten (map f (range 0 (n - 1)))); rewrite irredp_monic_decP; do!split.
+    + apply/allP => r /flattenP [?] [] /mapP [i] [] memi ->> memr; case/(_ _ memi): forall_.
+      by move=> _ [] /irredp_monic_decP [] /allP /(_ _ memr).
+    + admit.
+    + admit.
     admit.
   qed.
 
@@ -474,7 +539,7 @@ theory Counting_Argument.
     polyXn k -
     PCA.big predT
       (poly_prod_bin k m)
-      (rem (shape k (cc_perm k)) (allshapes k)).
+      (rem (shape (cc_perm (range 0 k))) (allshapes k)).
 
   op PI (n : int) = siter n sPI poly1.
 
@@ -611,9 +676,13 @@ theory Counting_Argument.
     move=> j /= mem_j; rewrite le2_mem_range.
     move: mem_j; rewrite (rangeSr 1 (n + 1)); [by apply/ler_subl_addr|].
     rewrite mem_rcons /=; case => [->>|mem_j].
-    + left => /=.
-      (*TODO: permutations lemma.*)
-      admit.
+    + left => /=; move: mem_s; rewrite rem_filter ?allshapes_uniq // mem_filter.
+      rewrite /predC1 => -[] neq_ /allshapesP => is_s_s.
+      move: (cc_is_shapeW 0 _ _ is_s_s) => /=.
+      move/allP/(_ (nth 0 s n)): (is_shape_ge0 _ _ is_s_s).
+      rewrite mem_nth /=; [by rewrite le0n ltzE /= (is_shape_size _ _ is_s_s)|].
+      case/ler_eqVlt => [/eq_sym eq_ //|lt_]; rewrite lt_ /= => ->>.
+      by move: neq_; rewrite (cc_shapeP (n + 1)) ?ltzS // perm_eq_refl.
     rewrite range_ltn /=; [by apply/ltzS|rewrite mem_j /=].
     right; move: mem_j; rewrite -(subrK j 1); move: (j - 1) => {j} j.
     by rewrite mem_range_addr /= => mem_j; apply/IHn/mem_range.
@@ -660,8 +729,9 @@ theory Counting_Argument.
     + move=> k mem_k _; rewrite {1}/(\o) /= -(ler_add2r 1) /=.
       apply/ledeg_poly_bin; [by move: mem_k; apply/mem_range_lt| |by apply/le_].
       case/is_shapeP: is_s_s => p [is_p_p <<-].
-      apply/nth_shape_ge0; move: (size_is_perm _ _ _ is_p_p); [by apply/addr_ge0|].
-      by move=> ->; apply/mem_range_subr.
+      move/allP/(_ (nth 0 (shape p) (k - 1))): (shape_ge0 p); rewrite (nth_mem 0) //.
+      exists (k - 1) => /=; rewrite -mem_range mem_range_subr size_shape.
+      by rewrite (size_is_perm _ _ is_p_p).
     by apply/lerr_eq; rewrite (is_shape_sum _ _ _ is_s_s) // addr_ge0.
   qed.
 
@@ -796,8 +866,10 @@ theory Counting_Argument.
     rewrite lc_poly_bin; last first.
     + move: or_ => /(_ _ mem_j) /or_andl; case=> [[-> ->] /=|-> //].
       by rewrite range_geq // Bigreal.BRM.big_nil fact0 // RField.expr0.
-    (*TODO: permutations lemma.*)
-    admit.
+    case/is_shapeP: is_shape_ => p [is_p_p <<-].
+    move/allP/(_ (nth 0 (shape p) (j - 1))): (shape_ge0 p); rewrite (nth_mem 0) //.
+    exists (j - 1) => /=; rewrite -mem_range mem_range_subr size_shape.
+    by rewrite (size_is_perm _ _ is_p_p).
   qed.
 
   lemma eqdeg_poly_prod_bin n m s :
@@ -814,20 +886,26 @@ theory Counting_Argument.
       pose b:= (all _ _); have: b; rewrite /b => {b}.
       - apply/allP => j mem_j; rewrite /predC /predI /predT /=.
         apply/neqpoly0_poly_bin; [|by apply/all_].
-        (*TODO: permutations lemma.*)
-        admit.
+        case/is_shapeP: is_shape_ => p [is_p_p <<-].
+        move/allP/(_ (nth 0 (shape p) (j - 1))): (shape_ge0 p); rewrite (nth_mem 0) //.
+        exists (j - 1) => /=; rewrite -mem_range mem_range_subr size_shape.
+        by rewrite (size_is_perm _ _ is_p_p).
       move=> -> /=; congr; apply/BIA.eq_big_seq => j mem_j.
       rewrite /(\o) /= eqdeg_poly_bin; [|by move/(_ _ mem_j): all_ => /= ->].
-      (*TODO: permutations lemma.*)
-      admit.
+      case/is_shapeP: is_shape_ => p [is_p_p <<-].
+      move/allP/(_ (nth 0 (shape p) (j - 1))): (shape_ge0 p); rewrite (nth_mem 0) //.
+      exists (j - 1) => /=; rewrite -mem_range mem_range_subr size_shape.
+      by rewrite (size_is_perm _ _ is_p_p).
     rewrite -has_predC => /hasP [j] [mem_j]; rewrite /predC /=.
     rewrite -has_predC => /hasP [c] [mem_c]; rewrite /predC /= => eq_.
     apply/deg_eq0/BigPoly.prodr_eq0; exists j; rewrite /predT mem_j /=.
     apply/deg_eq0; rewrite eqdeg_poly_bin; last first.
     + pose b:= all _ _; have: !b; rewrite /b => {b}; [|by move=> ->].
       by rewrite -has_predC; apply/hasP; exists c; split.
-    (*TODO: this lemma needs to be changed.*)
-    admit.
+    case/is_shapeP: is_shape_ => p [is_p_p <<-].
+    move/allP/(_ (nth 0 (shape p) (j - 1))): (shape_ge0 p); rewrite (nth_mem 0) //.
+    exists (j - 1) => /=; rewrite -mem_range mem_range_subr size_shape.
+    by rewrite (size_is_perm _ _ is_p_p).
   qed.
 
   lemma coeff_PI n :
@@ -866,7 +944,7 @@ theory Counting_Argument.
           rewrite mem_j /=; case/(_ _ mem_j): IHn => _ [_ deg_]; rewrite -deg_eq0; apply/gtr_eqF.
           by rewrite degDl deg_ ?degC -ltr_subl_addr; move: mem_j; apply/mem_range_lt => //; case (_ = _).
         rewrite all_ /= -subr_eq0 addrAC opprD !addrA /= -addrA -opprD subr_eq0.
-        rewrite -(is_shape_sum _ _ _ is_s_s) /=; [by apply/addr_ge0|].
+        rewrite -(is_shape_sum 0 _ _ is_s_s) /=.
         apply/BIA.eq_big_seq => j mem_j /=; rewrite le2_mem_range mulrC.
         rewrite range_ltn /=; [by apply/ltzS|]; move: mem_j.
         rewrite (rangeSr _ (n + 1)); [by apply/ler_subl_addr|].
@@ -874,9 +952,11 @@ theory Counting_Argument.
         * by rewrite mem_j /=; case/(_ _ mem_j): IHn => _ [_ ->].
         rewrite /= mem_range /= (gtr_eqF _ 0) /=; [by apply/ltzS|].
         rewrite deg1 /= eq_sym mulrI_eq0; [by apply/lregP/gtr_eqF/ltzS|].
-        (*TODO: permutations lemma.*)
-        move: neqs_.
-        admit.
+        move: (cc_is_shapeW 0 _ _ is_s_s) => /=.
+        move/allP/(_ (nth 0 s n)): (is_shape_ge0 _ _ is_s_s).
+        rewrite mem_nth /=; [by rewrite le0n ltzE /= (is_shape_size _ _ is_s_s)|].
+        case/ler_eqVlt => [/eq_sym eq_ //|lt_]; rewrite lt_ /= => ->>.
+        by move: neqs_; rewrite (cc_shapeP (n + 1)) ?ltzS // perm_eq_refl.
       rewrite lc_poly_prod_bin //.
       - move=> j mem_j /=; rewrite le2_mem_range.
         rewrite range_ltn /=; [by apply/ltzS|]; move: mem_j.
@@ -885,10 +965,11 @@ theory Counting_Argument.
         * rewrite mem_j /=; case/(_ _ mem_j): IHn => _ [_ ->].
           by rewrite -ltr_subl_addr; right; move: mem_j; apply/mem_range_lt.
         rewrite mem_range /= (gtr_eqF (_ + 1) 0) /=; [by apply/ltzS|].
-        rewrite deg1 /=.
-        (*TODO: permutations lemma.*)
-        move: neqs_.
-        admit.
+        rewrite deg1 /=; move: (cc_is_shapeW 0 _ _ is_s_s) => /=.
+        move/allP/(_ (nth 0 s n)): (is_shape_ge0 _ _ is_s_s).
+        rewrite mem_nth /=; [by rewrite le0n ltzE /= (is_shape_size _ _ is_s_s)|].
+        case/ler_eqVlt => [/eq_sym eq_ //|lt_]; rewrite lt_ /= => ->>.
+        by move: neqs_; rewrite (cc_shapeP (n + 1)) ?ltzS // perm_eq_refl.
       apply/Bigreal.BRM.eq_big_seq => j mem_j /=; rewrite le2_mem_range.
       rewrite range_ltn /=; [by apply/ltzS|]; move: mem_j.
       rewrite (rangeSr _ (n + 1)); [by apply/ler_subl_addr|].
@@ -901,8 +982,11 @@ theory Counting_Argument.
         rewrite rpow1r RField.mul1r fromintM RField.invfM rpow_int.
         * by rewrite le_fromint; move: mem_j; apply/mem_range_le.
         rewrite -RField.fromintXn //.
-        (*TODO: permutations lemma.*)
-        admit.
+        case/is_shapeP: is_s_s => p [is_p_p <<-].
+        move/allP/(_ (nth 0 (shape p) (j - 1))): (shape_ge0 p); rewrite (nth_mem 0) //.
+        exists (j - 1) => /=; rewrite -mem_range mem_range_subr size_shape.
+        rewrite (size_is_perm _ _ is_p_p); move: mem_j; apply/mem_range_incl => //.
+        by apply/ltzW/ltzE.
       rewrite mem_range /= (gtr_eqF (_ + 1) 0) /=; [by apply/ltzS|].
       rewrite lc1 /= RField.expr1z RField.mul1r fromintM RField.invfM.
       apply/(RField.mulrI (fact (nth 0 s n))%r).
@@ -910,10 +994,12 @@ theory Counting_Argument.
       rewrite RField.mulrA RField.mulrAC RField.divff.
       - by rewrite eq_fromint; apply/gtr_eqF/fact_gt0.
       rewrite RField.mul1r eq_sym RField.invr_eq1.
-      (*TODO: permutations lemma.*)
-      move: neqs_.
-      admit.
-    rewrite Bigreal.BRA.big_filter (Bigreal.BRA.eq_bigl _ (predC (pred1 (shape (n + 1) (cc_perm (n + 1)))))).
+      move: (cc_is_shapeW 0 _ _ is_s_s) => /=.
+      move/allP/(_ (nth 0 s n)): (is_shape_ge0 _ _ is_s_s).
+      rewrite mem_nth /=; [by rewrite le0n ltzE /= (is_shape_size _ _ is_s_s)|].
+      case/ler_eqVlt => [/eq_sym eq_ //|lt_]; [by rewrite eq_ expr0|].
+      by rewrite lt_ /= => ->>; move: neqs_; rewrite (cc_shapeP (n + 1)) ?ltzS // perm_eq_refl.
+    rewrite Bigreal.BRA.big_filter (Bigreal.BRA.eq_bigl _ (predC (pred1 (shape (cc_perm (range 0 (n + 1))))))).
     + by move=> ?; rewrite /predC1 /predC /pred1.
     rewrite -RField.subr_eq0 -RField.addrA -RField.opprD RField.subr_eq0 eq_sym RField.addrC.
     pose P:= pred1 _; pose s:= allshapes _.
@@ -922,10 +1008,16 @@ theory Counting_Argument.
     + rewrite -Bigreal.BRA.big_filter /P => {P}; rewrite filter_pred1 count_uniq_mem /s => {s}.
       - by apply/allshapes_uniq.
       pose b:=(_ \in _); have: b; rewrite /b => {b} [|->].
-      - by rewrite -allshapesP is_shapeP; exists (cc_perm (n + 1)) => /=; apply/is_perm_cc.
+      - rewrite -allshapesP is_shapeP; exists (cc_perm (range 0 (n + 1))) => /=.
+        by apply/is_perm_cc; [apply/ltzS|apply/perm_eq_refl].        
       rewrite b2i1 nseq1 Bigreal.BRA.big_seq1 /f => {f}.
-      (*TODO: permutations lemma.*)
-      admit.
+      rewrite (cc_shapeP (n + 1)) /=; [by apply/ltzS|by apply/perm_eq_refl|].
+      rewrite (rangeSr 1 (n + 1)); [by apply/subr_ge0|].
+      rewrite BRM.big_rcons /(predT (n + 1)) /= nth_rcons size_nseq ler_maxr //=.
+      rewrite expr1 fact1 /= BRM.big1_seq //= => i [] _ memi.
+      rewrite nth_rcons size_nseq ler_maxr // ltr_subl_addr nth_nseq.
+      - by apply/mem_range/mem_range_subr.
+      by case/mem_range: memi => _ -> /=; rewrite expr0 fact0.
     move=> <-; rewrite /P /f /s => {P f s}.
     (*TODO: permutations lemma.*)
     admit.
@@ -970,6 +1062,7 @@ theory Counting_Argument.
 
   lemma peval_poly_prod_bin n m s x :
     0 <= n =>
+    is_shape n s =>
     all (fun j => is_fromint (peval (m j) x)) (range 1 (n + 1)) =>
     peval (poly_prod_bin n m s) x =
     BRM.bigi predT
@@ -977,12 +1070,14 @@ theory Counting_Argument.
                 (fact (nth 0 s (j - 1)))%r )
       1 (n + 1).
   proof.
-    move=> le0n is_fromint_; rewrite /poly_prod_bin peval_prod.
+    move=> le0n is_s_s is_fromint_; rewrite /poly_prod_bin peval_prod.
     apply/BRM.eq_big_int => j /mem_range mem_j /=.
     rewrite peval_poly_bin //; last first.
     + by move/allP: is_fromint_ => ->.
-    (*TODO: permutations lemma.*)
-    admit.
+    case/is_shapeP: is_s_s => p [is_p_p <<-].
+    move/allP/(_ (nth 0 (shape p) (j - 1))): (shape_ge0 p); rewrite (nth_mem 0) //.
+    exists (j - 1) => /=; rewrite -mem_range mem_range_subr size_shape.
+    by rewrite (size_is_perm _ _ is_p_p).
   qed.
 
   op I n q = floor (peval (PI n) q%r).
@@ -1000,31 +1095,25 @@ theory Counting_Argument.
       (allshapes n) =
     q ^ n.
   proof.
-    move=> lt0n lt1q; rewrite (BIA.eq_big_perm _ _ _ _ (perm_to_rem (shape n (cc_perm n)) _ _)).
-    + (*TODO: permutations lemma.*)
-      admit.
+    move=> lt0n lt1q; rewrite (BIA.eq_big_perm _ _ _ _ (perm_to_rem (shape (cc_perm (range 0 n))) _ _)).
+    + by apply/allshapesP/is_shapeP; exists (cc_perm (range 0 n)) => /=; apply/is_perm_cc => //; apply/perm_eq_refl.
     rewrite BIA.big_cons {1}/predT /= eq_sym {1}rangeSr; [by move/ltzE: lt0n|].
-    rewrite BIM.big_rcons {1}/predT /= mulrC.
-    have ->: nth 0 (shape n (cc_perm n)) (n - 1) = 1.
-    + (*TODO: permutations lemma.*)
-      admit.
-    rewrite BIM.big_int1 fact1 divz1 /= BIM.big1_seq /=.
-    + move=> k [_ mem_k] /=.
-      have ->: nth 0 (shape n (cc_perm n)) (k - 1) = 0.
-      - (*TODO: permutations lemma.*)
-        admit.
-      by rewrite fact0 // divz1 range_geq // BIM.big_nil.
+    rewrite BIM.big_rcons {1}/predT /= mulrC (cc_shapeP n) //; [by apply/perm_eq_refl|].
+    rewrite nth_rcons size_nseq ler_maxr -?ltzS //= fact1 /= range_ltn // range_geq //=.
+    rewrite BIM.big_seq1 /= BIM.big1_seq /= => [i [] _ memi|].
+    + rewrite nth_rcons size_nseq ler_maxr -?ltzS // ltr_subl_addr /= nth_nseq.
+      - by apply/mem_range/mem_range_subr.
+      by case/mem_range: memi => _ -> /=; rewrite range_geq // fact0.
     rewrite -subr_eq eq_sym; apply/from_int_inj; rewrite fromintB.
     rewrite {1}/I; move/(_ n q)/is_fromintP: PI_int => ->.
     rewrite {1}/PI; move: lt0n; rewrite -(subrK n 1); pose m:= n - 1; move: m => {n} n.
     move/ltzS => le0n; rewrite siterS //= {1}/sPI pevalB pevalXn addr_ge0 //=.
-    rewrite RField.fromintXn ?addr_ge0 //=; congr; congr; rewrite peval_sum Bigreal.sumr_ofint.
-    apply/Bigreal.BRA.eq_big_seq => p; rewrite rem_filter /=.
-    + (*TODO: permutations lemma.*)
-      admit.
-    rewrite mem_filter /predC1 => -[neqp_ mem_p].
-    rewrite peval_poly_prod_bin /=.
-    + by apply/addr_ge0.
+    rewrite RField.fromintXn ?addr_ge0 //=; congr; congr; rewrite peval_sum.
+    rewrite Bigreal.sumr_ofint (cc_shapeP (n + 1)) /=; [by apply/ltzS|by apply/perm_eq_refl|].
+    apply/Bigreal.BRA.eq_big_seq => s; rewrite rem_filter /=.
+    + by apply/allshapes_uniq.
+    rewrite mem_filter /predC1 => -[] neqp_ /allshapesP is_s_s.
+    rewrite peval_poly_prod_bin //=; [by apply/addr_ge0| |].
     + apply/allP => j /= mem_j; rewrite le2_mem_range.
       by pose b:= mem _ _; case: b => _; [rewrite PI_int|rewrite peval1 is_fromint_fromint].
     rewrite prodr_ofint; apply/BRM.eq_big_int => j /mem_range mem_j /=.
@@ -1038,9 +1127,10 @@ theory Counting_Argument.
     rewrite mem_rcons /=; case=> [->>|mem_j]; last first.
     + by rewrite mem_j /=; apply/BIM.eq_big_seq => c mem_c; rewrite /I /PI.
     rewrite mem_range /= (gtr_eqF _ 0) /=; [by apply/ltzS|].
-    have->: nth 0 p n = 0; [|by rewrite range_geq].
-    (*TODO: permutations lemma.*)
-    admit.
+    move: (cc_is_shapeW 0 _ _ is_s_s); rewrite neqp_ /=.
+    move/is_shape_ge0/allP/(_ (nth 0 s n)): (is_s_s).
+    rewrite mem_nth ?(is_shape_size _ _ is_s_s) ?ltzS //=.
+    by case/ler_eqVlt => // <- /=; rewrite range_geq.
   qed.
 
   lemma lt0I n :

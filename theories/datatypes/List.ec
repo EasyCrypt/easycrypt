@@ -745,6 +745,13 @@ lemma mem_filter (p : 'a -> bool) x s:
   mem (filter p s) x <=> p x /\ (mem s x).
 proof. by elim: s => //= y s IHs; smt. qed.
 
+lemma all_filter p1 p2 (s : 'a list): all p1 (filter p2 s) <=> all (predA p2 p1) s.
+proof.
+rewrite !allP; split=> + x; move/(_ x); rewrite mem_filter /predA.
++ by move=> + mem_ p2_; rewrite mem_ p2_.
+by move=> + [] p2_ mem_; rewrite mem_ p2_.
+qed.
+
 lemma find_eq_in (q p : 'a -> bool) (xs : 'a list) :
   (forall x, x \in xs => p x <=> q x)
   => find p xs = find q xs.
@@ -1659,6 +1666,19 @@ case/lez_eqVlt => [->>/=|lti_]; (case/lez_eqVlt => [->>/=|ltj_] //).
 by rewrite lti_ ltj_ /=; apply/IHs.
 qed.
 
+lemma uniq_index_inj_in ['a] (s : 'a list) x y :
+     uniq s
+  => x \in s
+  => y \in s
+  => index x s = index y s
+  => x = y.
+proof.
+elim: s => // z s /= IHs [] Nmemz uniq_; rewrite !index_cons.
+case/or_andr=> [->>|[] Neqx memx]; (case/or_andr=> [->>|[] Neqy memy] //=).
++ by rewrite Neqy /=; move: (neq_ltz 0 (index y s + 1)); rewrite ltzS index_ge0.
++ by rewrite Neqx /=; move: (neq_ltz (index x s + 1) 0); rewrite ltzS index_ge0.
+by rewrite Neqx Neqy /= => /addIr; apply/IHs.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                       Removing duplicates                            *)

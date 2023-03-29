@@ -243,6 +243,7 @@ op predI  ['a] = fun (p1 p2 : 'a -> bool) x => p1 x /\ p2 x.
 op predU  ['a] = fun (p1 p2 : 'a -> bool) x => p1 x \/ p2 x.
 op predC  ['a] = fun (p : 'a -> bool) x => ! (p x).
 op predD  ['a] = fun (p1 p2 : 'a -> bool) x => !p2 x /\ p1 x.
+op predA  ['a] = fun (p1 p2 : 'a -> bool) x => p1 x => p2 x.
 
 op pred1  ['a] = fun (c x : 'a) => x = c.
 op predU1 ['a] = fun (c : 'a) (p : 'a -> bool) (x : 'a) => x = c \/ p x.

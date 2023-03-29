@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List IntDiv Binomial Ring StdOrder IntMin.
+require import AllCore List IntDiv Binomial Ring StdOrder IntMin IntDiv.
 (*---*) import IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -130,12 +130,44 @@ op id_perm n = range 0 n.
 lemma is_perm_id n : 0 < n => is_perm n (id_perm n).
 proof. by rewrite /is_perm /id_perm perm_eq_refl. qed.
 
-op cc_perm n = if 0 < n then rcons (range 1 n) 0 else [].
+op cc_perm c = mkseq (fun i => nth (-1) c ((index i c + 1) %% (size c))) (size c).
 
-lemma is_perm_cc n : 0 < n => is_perm n (cc_perm n).
+lemma is_perm_cc n c :
+  0 < n =>
+  perm_eq c (range 0 n) =>
+  is_perm n (cc_perm c).
 proof.
-move=> lt0n; rewrite /is_perm /cc_perm -cats1 lt0n /=.
-by rewrite (range_ltn 0) // -(cat1s _ (range _ _)) perm_catC.
+move=> lt0n eq_; move/perm_eq_size: (eq_); rewrite size_range ler_maxr ?ltzW //= => <<-.
+split=> //; apply/uniq_perm_eq; [|by apply/range_uniq|].
++ rewrite map_inj_in_uniq range_iota ?range_uniq //=.
+  move=> i j memi memj eq_nth; move: (uniq_nth_inj_in _ _ _ _ _ _ _ _ eq_nth).
+  - by rewrite (perm_eq_uniq _ _ eq_) range_uniq.
+  - apply/mem_range; move: (mem_range_mod (index i c + 1) (size c)).
+    by rewrite gtr_eqF // gtr0_norm.
+  - apply/mem_range; move: (mem_range_mod (index j c + 1) (size c)).
+    by rewrite gtr_eqF // gtr0_norm.
+  rewrite -eq_mod opprD !addrA (addrAC _ _ (-1)) /= eq_mod !modz_small.
+  - by rewrite index_ge0 gtr0_norm // index_mem /= (perm_eq_mem _ _ eq_).
+  - by rewrite index_ge0 gtr0_norm // index_mem /= (perm_eq_mem _ _ eq_).
+  apply/uniq_index_inj_in.
+  - by rewrite (perm_eq_uniq _ _ eq_) range_uniq.
+  - by rewrite (perm_eq_mem _ _ eq_).
+  by rewrite (perm_eq_mem _ _ eq_).
+move=> i; rewrite mkseqP; split=> [[j] [] /mem_range memj /= ->>|memi /=].
++ rewrite -(perm_eq_mem _ _ eq_); apply/mem_nth/mem_range.
+  move: (mem_range_mod (index j c + 1) (size c)).
+  by rewrite gtr_eqF // gtr0_norm.
+exists (nth witness c ((index i c - 1) %% size c)).
+rewrite -mem_range -(perm_eq_mem _ _ eq_) mem_nth /=.
++ rewrite -mem_range; move: (mem_range_mod (index i c - 1) (size c)).
+  by rewrite gtr_eqF // gtr0_norm.
+rewrite index_uniq //.
++ rewrite -mem_range; move: (mem_range_mod (index i c - 1) (size c)).
+  by rewrite gtr_eqF // gtr0_norm.
++ by rewrite (perm_eq_uniq _ _ eq_) range_uniq.
+rewrite modzDml /= modz_small.
++ by rewrite index_ge0 gtr0_norm // index_mem /= (perm_eq_mem _ _ eq_).
+by rewrite nth_index // (perm_eq_mem _ _ eq_).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -144,9 +176,9 @@ op permute (dflt : 'a) (p : int list) (s : 'a list) =
 
 lemma permute_is_perm dflt n (p : int list) :
   is_perm n p =>
-  permute dflt p (range 0 n) = p.
+  permute dflt p (id_perm n) = p.
 proof.
-  rewrite /is_perm /permute => -[] lt0n perm_eq_p; apply/(eq_from_nth (-1)).
+  rewrite /di_perm /is_perm /permute => -[] lt0n perm_eq_p; apply/(eq_from_nth (-1)).
   + by rewrite size_map.
   move => k; rewrite size_map => mem_k.
   rewrite (nth_map (-1)) //= nth_range //= -mem_range.
@@ -264,6 +296,22 @@ op order p i = argmin idfun (fun n => 0 < n /\ is_fixed (exp p n) i).
 lemma dvd_order n p i :
   is_perm n p =>
   order p i %| n.
+proof.
+  admit.
+qed.
+
+lemma order_id_perm n p :
+  is_perm n p =>
+  (forall i , i \in range 0 n => order p i = 1) <=>
+  (p = id_perm n).
+proof.
+  admit.
+qed.
+
+lemma order_cc_perm n p :
+  is_perm n p =>
+  (forall i , i \in range 0 n => order p i = n) <=>
+  (exists c , perm_eq c (range 0 n) /\ p = cc_perm c).
 proof.
   admit.
 qed.
@@ -398,29 +446,67 @@ proof.
   by rewrite count_map /preim /pred1.
 qed.
 
+lemma id_shapeP n :
+  0 < n =>
+  shape (id_perm n) = n :: nseq (n - 1) 0.
+proof.
+  admit.
+qed.
+
+lemma cc_shapeP n c :
+  0 < n =>
+  perm_eq c (range 0 n) =>
+  shape (cc_perm c) = rcons (nseq (n - 1) 0) 1.
+proof.
+  admit.
+qed.
+
+lemma cc_shapeW dflt n p :
+  is_perm n p =>
+  0 < nth dflt (shape p) (n - 1) <=>
+  (exists c , perm_eq c (range 0 n) /\ p = cc_perm c).
+proof.
+  admit.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op is_shape (n : int) (s : int list) : bool =
+  size s = n /\
   all ((<=) 0) s /\
   forall dflt , BIA.bigi predT (fun i => i * nth dflt s (i - 1)) 1 (n + 1) = n.
+
+lemma is_shape_size n s :
+  is_shape n s =>
+  size s = n.
+proof. by case. qed.
 
 lemma is_shape_ge0 n s :
   is_shape n s =>
   all ((<=) 0) s.
-proof. by case. qed.
+proof. by case=> _ []. qed.
 
 lemma is_shape_sum dflt n s :
   is_shape n s =>
   BIA.bigi predT (fun i => i * nth dflt s (i - 1)) 1 (n + 1) = n.
-proof. by case=> _ => ->. qed.
+proof. by case=> _ [] _ => ->. qed.
 
 lemma is_shapeW n s :
+  size s = n =>
   all ((<=) 0) s =>
   (forall dflt , BIA.bigi predT (fun i => i * nth dflt s (i - 1)) 1 (n + 1) = n) =>
   is_shape n s.
-proof. by move=> ? ?; split. qed.
+proof. by move=> ? ? ?; split. qed.
 
 lemma is_shapeP n s :
   is_shape n s <=> (exists p , is_perm n p /\ shape p = s).
+proof.
+  admit.
+qed.
+
+lemma cc_is_shapeW dflt n s :
+  is_shape n s =>
+  0 < nth dflt s (n - 1) <=>
+  s = rcons (nseq (n - 1) 0) 1.
 proof.
   admit.
 qed.

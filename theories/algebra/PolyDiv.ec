@@ -2639,6 +2639,11 @@ qed.
 op irreducible_poly p =
   (1 < deg p) && (forall q, deg q <> 1 => dvdp q p => eqp q p).
 
+lemma irredp_poly_deg p :
+  irreducible_poly p =>
+  1 < deg p.
+proof. by case. qed.
+
 lemma Gauss_dvdpor (p q d : poly) :
   irreducible_poly d => dvdp d (p * q) = (dvdp d p || dvdp d q).
 proof.
@@ -2749,6 +2754,19 @@ case=> all_ /eqp_size ->; rewrite deg_prod.
 pose f:= predC _; have ->//: all f qs; rewrite /f => {f}.
 move: all_; apply/all_imp_in/allP => q mem_ /=.
 by rewrite /predC /predI /predT /idfun /=; apply/irredp_neq0.
+qed.
+
+lemma degs_irredp_dec p q qs :
+  irreducible_dec p qs =>
+  q \in qs =>
+  deg q \in range 2 (deg p + 1).
+proof.
+move=> dec_ mem_; rewrite (deg_irredp_dec _ _ dec_); case: dec_ => all_ _.
+move/allP/(_ _ mem_)/irredp_poly_deg/ltzE: (all_) => /= le2_.
+apply/mem_range; rewrite le2_ -ltr_subl_addr ltzE /=.
+rewrite (BIA.big_rem _ _ _ _ mem_) /(predT q) /= -ler_subl_addl /=.
+apply/sumr_ge0_seq => r /mem_rem memr _ /=; apply/subr_ge0/ltzW.
+by move/allP/(_ _ memr)/irredp_poly_deg: all_.
 qed.
 
 lemma irredp_dec_scale c p qs :
@@ -3043,6 +3061,12 @@ lemma deg_irredp_monic_dec p qs :
   irreducible_monic_dec p qs =>
   deg p = BIA.big predT (fun q => deg q - 1) qs + 1.
 proof. by case=> /deg_irredp_dec. qed.
+
+lemma degs_irredp_monic_dec p q qs :
+  irreducible_monic_dec p qs =>
+  q \in qs =>
+  deg q \in range 2 (deg p + 1).
+proof. by case=> /degs_irredp_dec imp_ _; apply/imp_. qed.
 
 lemma irredp_monic_dec_scale c p qs :
   c <> zeror =>
