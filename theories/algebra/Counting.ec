@@ -919,12 +919,18 @@ qed.
 
 lemma uniq_size_undup_perm_eq ['a] (s : 'a list) k :
   uniq s =>
-  0 < size s =>
   0 <= k =>
+  !(k = 0 /\ s = []) =>
   size (undup_eqv perm_eq (alltuples k s)) = bin (size s - 1 + k) k.
 proof.
-move=> uniq_ lt0_ le0k; move: (perm_eq_undup_perm_eq_uniq _ _ uniq_ le0k).
+move=> uniq_ le0k.
+move: (perm_eq_undup_perm_eq_uniq _ _ uniq_ le0k).
 move/perm_eq_size; rewrite !size_map => ->.
+case/ler_eqVlt: (size_ge0 s) => [/eq_sym /size_eq0 ->>|lt0_ _] /=.
++ rewrite range_geq //; case/ler_eqVlt: le0k => [<<- //|lt0k _].
+  move: (alltuples_nil<:int> k []); rewrite lt0k /= => ->.
+  rewrite addrC bin_gt; [by apply/ltzE|rewrite size_eq0].
+  by apply/undup_eqv_nil.
 move: (perm_eq_undup_perm_eq_countb_bin _ _ le0k lt0_).
 move/perm_eq_size; rewrite !size_map => ->; rewrite eq_sizeb_bin.
 + by rewrite addrAC -ltzS lt0_ /= -ler_subl_addl.

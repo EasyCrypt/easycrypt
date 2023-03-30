@@ -526,8 +526,9 @@ qed.
 
 lemma size_allperms_shape dflt n s :
   is_shape n s =>
-  size (allperms_shape s) =
-  fact n %/ Bigint.BIM.bigi predT (fun j => j ^ nth dflt s j * fact (nth dflt s j)) 0 n.
+  size (allperms_shape s) *
+  Bigint.BIM.bigi predT (fun j => (j + 1) ^ nth dflt s j * fact (nth dflt s j)) 0 n =
+  fact n.
 proof.
   admit.
 qed.

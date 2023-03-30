@@ -4584,6 +4584,16 @@ move=> n ge0_n ih; rewrite /max ltzS ge0_n /=.
 by rewrite exprS // alltuplesS // size_allpairs ih /#.
 qed.
 
+lemma alltuples_nil ['a] (n : int) (xs : 'a list) :
+  alltuples n xs = [] <=> (0 < n /\ xs = []).
+proof.
+rewrite -size_eq0 size_alltuples expf_eq0 size_eq0.
+apply/andb_id2r => _; apply/eq_iff.
+case (0 < n) => [lt0n|/lezNgt len0].
++ by rewrite /max lt0n /= neq_ltz lt0n.
+by rewrite lez_maxl.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op allsubtuples ['a] (n : int) (xs : 'a list) =
   flatten (map (fun i => alltuples i xs) (range 0 (max 0 n + 1))).
@@ -4686,6 +4696,12 @@ elim: s => //= x s /(lez_add2l 1); apply/lez_trans.
 by case: (has _ _) => //=; apply/ltzW/ltzE; rewrite addrC.
 qed.
 
+lemma undup_eqv_nil r (s : 'a list): undup_eqv r s = [] <=> s = [].
+proof.
+elim: s => //= x s IHs; case (has (r x) s) => //= has_.
+by rewrite IHs; apply/negP => ->>; move: has_.
+qed.
+
 lemma has_undup_eqv (r : 'a -> 'a -> bool) p:
   reflexive r =>
   symmetric r =>
@@ -4731,6 +4747,18 @@ lemma mem_undup_eqv (r : 'a -> 'a -> bool):
 proof.
 move=> refl_ sym_ trans_ s x mem_; rewrite -has_r_undup_eqv //.
 by apply/hasP; exists x; rewrite refl_.
+qed.
+
+lemma mem_undup_eqv_mem (r : 'a -> 'a -> bool):
+  reflexive r =>
+  symmetric r =>
+  transitive r =>
+  forall s x, x \in (undup_eqv r s) => x \in s.
+proof.
+move=> refl_ sym_ trans_ s x.
+elim: s => //= y s IHs; case: (has (r y) s).
++ by move=> _ /IHs ->.
+by move=> _; case=> [<<-|/IHs ->].
 qed.
 
 lemma undup_eqv_mem (r : 'a -> 'a -> bool):

@@ -207,6 +207,50 @@ move: eq_ (dvdz_mulr _ _ (fact (p - 1)) (dvdzz p)) => ->; rewrite !dvd_prime_mul
 by case => //; rewrite prime_Ndvd_fact //= prime_Ndvd_fact // gtr_addl ltr_oppl.
 qed.
 
+lemma dvd_fact_prod_range (m n d : int) :
+  d <= n - m =>
+  fact d %| BIM.bigi predT idfun m n.
+proof.
+move=> led_; case (0 < d) => [lt0d|/lerNgt led0]; [|by rewrite fact0].
+case (0 < m) => [lt0m|/lerNgt lem0].
++ rewrite (range_cat (n - d)); [by apply/ler_subr_addr/ler_subr_addl| |].
+  - by apply/ler_subl_addr/ler_subl_addl/ltzW.
+  rewrite BIM.big_cat dvdz_mull; have ledn {m led_ lt0m}: d < n.
+  - by apply/(ltr_le_trans (m + d)); [apply/ltr_subl_addr|apply/ler_subr_addl].
+  apply/dvdzP; exists (bin (n - 1) d); rewrite eq_sym mulrC.
+  apply/(mulfI (fact (n - 1 - d))); [by apply/gtr_eqF/fact_gt0|].
+  rewrite mulrA (mulrC (fact _)) eq_bin_div.
+  - by split=> [|_]; [apply/ltzW|apply/ltzS].
+  rewrite addrAC /fact /= -BIM.big_cat_int //.
+  - by apply/ltzS/ltr_subl_addr => /=; apply/subr_gt0.
+  by apply/ler_subl_addr/ler_subl_addl/ltzW.
+case (0 < n) => [lt0n|/lerNgt len0]. print Bigint.prodr_eq0.
++ rewrite (Bigint.prodr_eq0 predT idfun (range m n)).
+  - by exists 0; rewrite /predT /idfun mem_range lem0 lt0n.
+  by apply/dvdz0.
+rewrite (range_cat (m + d)); [by apply/ler_subl_addl/ltzW| |].
++ by apply/ler_subr_addl.
+rewrite BIM.big_cat dvdz_mulr; have {n led_ len0} led_: d <= -m.
++ by apply/(ler_trans _ _ _ led_)/ler_subr_addr.
+apply/dvdzP; exists ((-1) ^ d * bin (-m) d); rewrite eq_sym mulrC.
+apply/(mulfI (fact (-m - d))); [by apply/gtr_eqF/fact_gt0|].
+rewrite !mulrA (mulrAC _ _ (bin _ _)) (mulrC (fact _)) eq_bin_div.
++ by split=> //; apply/ltzW.
+rewrite /fact (range_cat (-m - d + 1)).
++ by apply/ler_subl_addr/subr_ge0.
++ by apply/ler_add2r/ler_subl_addl/ler_subl_addr/ltzW.
+rewrite Bigint.BIM.big_cat -mulrA; congr.
+move: (Bigint.mulr_const (range ((-m) - d + 1) ((-m) + 1)) (-1)).
+rewrite size_range opprD (addrAC _ 1) !addrA /= opprD addrA /= ler_maxr ?ltzW // => <-.
+rewrite -BIM.big_split (BIM.eq_big_perm _ idfun _ (map Int.([-]) (range (-m - d + 1) (-m + 1)))).
++ apply/uniq_leq_size_perm_eq; [by apply/range_uniq| | |].
+  - by apply/uniq_map_injective; [apply/oppr_inj|apply/range_uniq].
+  - by move=> k mem_k; apply/mapP; exists (-k) => /=; apply/mem_range_opp; rewrite !opprD /=.
+  by rewrite size_map !size_range !opprD !addrA !(addrAC _ 1) /= addrAC.
+by rewrite BIM.big_mapT; apply/BIM.eq_big_seq => k mem_k; rewrite /(\o) /idfun /= mulrN1.
+qed.
+
+
 (* -------------------------------------------------------------------- *)
 abstract theory BinomialCoeffs.
 clone import Ring.ComRing as R.
