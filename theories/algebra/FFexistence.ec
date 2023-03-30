@@ -440,31 +440,53 @@ theory PolyFF.
     exists (flatten (map f (range 0 (n - 1)))); rewrite irredp_monic_decP; do!split.
     + apply/allP => r /flattenP [?] [] /mapP [i] [] memi ->> memr; case/(_ _ memi): forall_.
       by move=> _ [] /irredp_monic_decP [] /allP /(_ _ memr).
-    + admit.
-    + admit.
-    admit.
+    + apply/prodf_neq0/allP => i memi; rewrite /predI /predC /predT /(\o) /idfun /=.
+      apply/prodf_neq0/allP => r memr; rewrite /predI /predC /=.
+      case/(_ _ memi): forall_ => _ [] /irredp_monic_decP [] /allP /(_ _ memr) [] _ + _ _.
+      by rewrite -lc_eq0 => ->; rewrite F.oner_neq0.
+    + rewrite lc_prod (BigCf.BCM.eq_big_seq _ (fun _ => F.oner)); last first.
+      - rewrite BigCf.BCM.big1_eq scale1r PCM.big_flatten PCM.big_map.
+        by apply/PCM.eq_big_seq => i memi; rewrite /(\o) /idfun.
+      move=> i memi; rewrite /(\o) /idfun /= lc_prod (BigCf.BCM.eq_big_seq _ (fun _ => F.oner)).
+      - move=> r memr; rewrite /(\o) /=; case/(_ _ memi): forall_ => _ [] /irredp_monic_decP.
+        by case=> /allP /(_ _ memr) [] _ ->.
+      by rewrite BigCf.BCM.big1_eq.
+    apply/(eq_from_nth witness) => [|i /mem_range]; rewrite (is_shape_size _ _ is_s_s).
+    + by rewrite size_mkseq ler_maxr // -ltzS ltzE ltzW.
+    move=> memi; rewrite nth_mkseq -?mem_range //= count_flatten Bigint.sumzE.
+    rewrite !Bigint.BIA.big_mapT (Bigint.BIA.big_rem _ _ _ _ memi) /(predT i) /(\o) /=.
+    rewrite rem_filter ?range_uniq //Bigint.BIA.big_filter Bigint.BIA.big1_seq /=.
+    + move=> j []; rewrite /predC1 eq_sym => neqij memj.
+      case/(_ _ memj): forall_ => _ [] _ [] _ all_.
+      apply/count_pred0_eq_in => r memr /=.
+      move/allP/(_ _ memr): all_ => /= ->.
+      by rewrite eq_sym; move: neqij; apply/implybNN/addIr.
+    by case/(_ _ memi): forall_ => _ [] _ [] <-; rewrite eq_sym => /all_count_in ->.
   qed.
 
   lemma size_enum_udeg_irr_deg n :
     0 < n =>
-    Bigint.BIA.big predT (fun s => Bigint.BIM.bigi predT (fun i => size (enum_udeg_irr_deg i (nth 0 s i))) 0 n) (allshapes n) =
-    FinType.card ^ (n - 1).
+    Bigint.BIA.big predT
+      (fun s => Bigint.BIM.bigi predT
+                  (fun i => size (enum_udeg_irr_deg (nth 0 s i) (i + 2)))
+                  0 n)
+      (allshapes n) =
+    FinType.card ^ n.
   proof.
-    (*
-    move=> lt0n; rewrite -size_enum_udeg_irr_shape //.
-    apply/Bigint.BIA.eq_big_seq => s mem_ /=.
-    move/perm_eq_size: (perm_eq_enum_udeg_irr_deg _ s lt0n) => ->.
+    rewrite -(subrK n (-1)); pose m:= n - - 1; move: m => {n} n /ltzE /ltzS /=.
+    move=> lt1n; rewrite -size_enum_udeg_irr_shape //.
+    apply/Bigint.BIA.eq_big_seq => s /allshapesP is_s_s /=.
+    move/perm_eq_size: (perm_eq_enum_udeg_irr_deg _ _ lt1n is_s_s) => ->.
     rewrite size_map size_alltuples_list Bigint.prodzE.
-    rewrite mapi_map !Bigint.BIM.big_mapT (Bigint.BIM.big_nth (witness, 0) _ _ (zip _ _)).
-    rewrite size_zip size_range ler_maxr // ler_minr //.
-    have <<-: size s = n.
-    + (*TODO: permutation lemma.*)
-      admit.
+    rewrite mapi_map !Bigint.BIM.big_mapT (is_shape_size _ _ is_s_s) /=.
+    rewrite (Bigint.BIM.big_nth (witness, 0) _ _ (zip _ _)).
+    rewrite size_zip size_range ler_maxr -?ltzS ?ltzE ?ltzW //.
+    rewrite (is_shape_size _ _ is_s_s) ler_minr //.
     apply/Bigint.BIM.eq_big_int => i /mem_range memi /=.
-    rewrite /(\o) (nth_zip witness 0) /=; [by rewrite size_range ler_maxr|].
+    rewrite /(\o) (nth_zip witness 0) /=; [rewrite size_range ler_maxr|].
+    + by rewrite -ltzS ltzE ltzW.
+    + by rewrite (is_shape_size _ _ is_s_s).
     by rewrite nth_range // -mem_range.
-    *)
-    admit.
   qed.
 
   lemma enum_iudegP n p :
@@ -479,7 +501,9 @@ theory PolyFF.
   lemma perm_eq_enum_iudeg k d :
     0 <= k =>
     1 < d =>
-    perm_eq (enum_udeg_irr_deg k d) (map (PCM.big predT idfun) (undup_eqv perm_eq (alltuples k (enum_iudeg d)))).
+    perm_eq
+      (enum_udeg_irr_deg k d)
+      (map (PCM.big predT idfun) (undup_eqv perm_eq (alltuples k (enum_iudeg d)))).
   proof.
     admit.
   qed.
@@ -494,8 +518,9 @@ theory PolyFF.
           (fun i => bin (size (enum_iudeg (nth 0 s i)) + i - 1) i)
           0 n)
       (allshapes n) =
-    FinType.card ^ (n - 1).
+    FinType.card ^ n.
   proof.
+(*
     move=> lt0n; rewrite -size_enum_udeg_irr_deg //.
     apply/Bigint.BIA.eq_big_seq => s mems /=.
     apply/Bigint.BIM.eq_big_seq => i memi /=.
@@ -509,6 +534,8 @@ theory PolyFF.
       admit.
     + by move: memi; apply/mem_range_le.
     by congr; ring.
+*)
+    admit.
   qed.
 
 end PolyFF.

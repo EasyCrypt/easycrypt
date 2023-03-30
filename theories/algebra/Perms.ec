@@ -524,9 +524,10 @@ proof.
   by rewrite /allperms_shape size_shape perm_eq_refl.
 qed.
 
-lemma size_allperms_shape n s :
+lemma size_allperms_shape dflt n s :
   is_shape n s =>
-  size (allperms_shape s) = 0. (*TODO*)
+  size (allperms_shape s) =
+  fact n %/ Bigint.BIM.bigi predT (fun j => j ^ nth dflt s j * fact (nth dflt s j)) 0 n.
 proof.
   admit.
 qed.
@@ -546,8 +547,9 @@ proof.
   admit.
 qed.
 
-lemma size_allshapes n :
-  size (allshapes n) = 0. (*TODO*)
+lemma size_sum_allshapes n :
+  Bigint.BIA.big predT (size \o allperms_shape) (allshapes n) =
+  fact n.
 proof.
   admit.
 qed.
