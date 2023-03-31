@@ -787,7 +787,7 @@ have ge0_pE: 0 <= `|a * b| - 1.
 + have := normr_ge0 (a * b); rewrite subr_ge0 ler_eqVlt.
   rewrite ltzE /= => -[] //; rewrite eq_sym.
   by rewrite normrM mulf_eq0 !normr0P !(nz_a, nz_b).
-have pE: E (`|a * b| - 1); first move=> @/pcap @/E /=; do! split.
+have pE: E (`|a * b| - 1); first move=> @/E /=; do! split.
 + by rewrite opprB addrCA subrr /= dvd1z.
 + by rewrite opprB addrCA subrr /= dvd1z.
 have nzE: !sempty (pcap E); 1: by apply/semptyNP; exists (`|a * b| - 1).

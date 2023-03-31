@@ -935,10 +935,10 @@ proof.
   move=> /(congr1 bytes_of_poly_in); rewrite insubdK=> // ->.
   move=> /(congr1 bytes_of_poly_out); rewrite insubdK=> // ->.
   rewrite insubdK.
-  + rewrite size_drop 1:ge0_poly_in_size valP /block_size /poly_size.
+  + rewrite size_drop 1:ge0_poly_in_size valP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
   rewrite insubdK.
-  + rewrite size_take 1:ge0_poly_in_size valP /poly_size /block_size.
+  + rewrite size_take 1:ge0_poly_in_size valP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
   by rewrite cat_take_drop valKd.
 qed.
@@ -1157,7 +1157,7 @@ section PROOFS.
     case: (mk_rs (oget RO.m{2}.[(n, C.ofint 0)])) => r s /=.
     case: (t = poly1305 r s (topol a c)) => // heq _.
     apply List.hasP; exists (topol a c, t) => /=;split; 2:by rewrite heq.
-    by apply mapP; exists (n, a, c, t) => /=; apply mem_filter.
+    by apply mapP; exists (n, a, c, t) => /=; apply List.mem_filter.
   qed.
 
   local lemma step2_3 &m : 
@@ -1251,7 +1251,7 @@ proof.
   case: (valid_topol a m) => hv /=;last by rewrite mu0; smt (ge0_qdec size_ge0 ge0_pr_zeropol).
   pose lc' := List.map _ _; apply (ler_trans ((size lc')%r*pr_zeropol));
    last by rewrite size_map size_filter //= ler_wpmul2r //= 1: ge0_pr_zeropol; smt (count_size size_ge0).
-  apply mu_has_leM => /= ? /mapP [] [n' a' m' t'] /> /mem_filter |> ??.
+  apply mu_has_leM => /= ? /mapP [] [n' a' m' t'] /> /List.mem_filter |> ??.
   case: (topol a' m' <> topol a m) => ? /=; last by rewrite mu0; smt (ge0_pr_zeropol).
   by apply pr_zeropol_spec.
 qed.
@@ -1781,7 +1781,7 @@ section PROOFS.
     + case: (forged{2}) => //; case: ((UFCMA.bad1\/UFCMA.bad2){2}) => //= H12 H13.
       - have[|]->//=:=H12.
       have:=H12; rewrite negb_or => /> *.
-      rewrite /test_poly /= /poly1305 /= /test_bad.
+      rewrite /test_poly /= /poly1305 /=.
       pose f := fun (c : ciphertext) => c.`4 - poly1305_eval r3 (topol c.`2 c.`3).
       pose m := List.filter _ _.
       rewrite  hasP /=.
@@ -2246,7 +2246,7 @@ section PROOFS.
       + by rewrite /n1 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r 1:ge0_pr_zeropol -sumr_ofint le_fromint IntOrder.lerr_eq.
       rewrite hn1 eq_sym  -big_count -BIA.big_filter /= /l1 //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
-      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 /transpose //==> [#] * /=.
+      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 //==> [#] * /=.
       by rewrite count_map.
 
     case: (0 < size l2)=> * />; last first.
@@ -2281,8 +2281,8 @@ section PROOFS.
       + by rewrite /n2 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r; 1:smt(mu_bounded).
       rewrite -sumr_ofint le_fromint IntOrder.lerr_eq.
-      rewrite hn2 eq_sym  -big_count -BIA.big_filter /= /l1 //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
-      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 /transpose //==> [#] * /=.
+      rewrite hn2 eq_sym  -big_count -BIA.big_filter /= //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
+      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 //==> [#] * /=.
       by rewrite count_map.
 
   move=> &h /> ? H0 *.
@@ -2494,7 +2494,7 @@ section PROOFS.
     have:= H16; rewrite mapP /= => [#][] t2 [#] h <<- <<-; have:=h.
     rewrite mapP /==> [#] [][] x1 x2 x3 x4 /=; rewrite mem_filter /= => [#] <<- ? ->>.
     smt(get_setE).
-  smt(mem_filter mem_cat mapP).
+  smt(List.mem_filter mem_cat mapP).
   qed.
 
   local clone EventPartitioning as EP with 

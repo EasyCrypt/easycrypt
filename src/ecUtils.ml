@@ -628,12 +628,6 @@ module String = struct
 
   let split_lines = split_on_string ~by:"\n"
 
-  let trim (s : string) =
-    let aout = BatString.trim s in
-    if s == aout then BatString.copy aout else s
-
-  let rev (s:string) = init (length s) (fun i -> s.[length s - 1 - i])
-
   (* ------------------------------------------------------------------ *)
   module OptionMatching = struct
     let all_matching tomatch s =

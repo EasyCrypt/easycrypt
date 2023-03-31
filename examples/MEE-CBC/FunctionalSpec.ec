@@ -4,6 +4,9 @@ require import BitEncoding.
 require (*--*) BitWord MAC_then_Pad_then_CBC.
 (*---*) import BS2Int BitChunking IntID IntOrder Bigint BIA.
 
+(** Add some simplification rules *)
+hint simplify expr_pred, expr0.
+
 (** A type for octets and its structure **)
 clone import BitWord as Octet with
   op n <- 8
@@ -330,7 +333,7 @@ have -> /=: bs2os (pad m t)
 + by rewrite /pad /= os2bsK // size_padded #smt:(@IntDiv).
 rewrite !last_cat last_padding int2oK.
 + split=> [|_]; first by smt (size_ge0 @IntDiv).
-  by apply/(ler_lt_trans 16); [smt (size_ge0 @IntDiv)|smt (exprS expr0)].
+  by apply/(ler_lt_trans 16) => //; by smt (size_ge0 @IntDiv).
 rewrite drop_size_cat.
 + by rewrite !size_cat size_padding /#.
 rewrite {1}/pad_length /=.

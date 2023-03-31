@@ -376,47 +376,98 @@ let x_tostring x =
     (m_tostring x.x_top) x.x_sub
 
 (* -------------------------------------------------------------------- *)
+module Smart : sig
+  type a_psymbol   = symbol
+  type a_pqname    = path * symbol
+  type a_mpath_abs = ident * mpath list
+  type a_mpath_crt = path * mpath list * path option
+  type a_xpath     = mpath * symbol
+
+  val psymbol   : (path * a_psymbol   ) -> a_psymbol   -> path
+  val pqname    : (path * a_pqname    ) -> a_pqname    -> path
+  val mpath_abs : (mpath * a_mpath_abs) -> a_mpath_abs -> mpath
+  val mpath_crt : (mpath * a_mpath_crt) -> a_mpath_crt -> mpath
+  val xpath     : xpath                 -> a_xpath     -> xpath
+end = struct
+  type a_psymbol   = symbol
+  type a_pqname    = path * symbol
+  type a_mpath_abs = ident * mpath list
+  type a_mpath_crt = path * mpath list * path option
+  type a_xpath     = mpath * symbol
+
+  let psymbol (p, x) x' =
+    if x == x' then p else psymbol x'
+
+  let pqname (p, (q, x)) (q', x') =
+    if x == x' && q == q' then p else pqname q' x'
+
+  let mpath_abs (mp, (id, args)) (id', args') =
+    if id == id' && args == args' then mp else mpath_abs id' args'
+
+  let mpath_crt (mp, (p, args, sp)) (p', args', sp') =
+    if p == p' && args == args' && sp == sp' then
+      mp
+    else
+      mpath_crt p' args' sp'
+
+  let xpath xp (mp', x') =
+    if xp.x_top == mp' && xp.x_sub == x' then xp else xpath mp' x'
+end
+
+(* -------------------------------------------------------------------- *)
+type smsubst = {
+  sms_crt : path Mp.t;
+  sms_id  : mpath Mid.t;
+}
+
+(* -------------------------------------------------------------------- *)
+let sms_identity : smsubst =
+  { sms_crt = Mp.empty; sms_id = Mid.empty; }
+
+(* -------------------------------------------------------------------- *)
+let sms_is_identity (s : smsubst) =
+  Mp.is_empty s.sms_crt && Mid.is_empty s.sms_id
+
+(* -------------------------------------------------------------------- *)
+let sms_bind_abs (x : ident) (mp : mpath) (s : smsubst) =
+  { s with sms_id = Mid.add x mp s.sms_id }
+
+(* -------------------------------------------------------------------- *)
 let p_subst (s : path Mp.t) =
-  if Mp.is_empty s then identity
-  else
-    let p_subst aux p =
-      try  Mp.find p s
-      with Not_found ->
-        match p.p_node with
-        | Psymbol _ -> p
-        | Pqname(p1, id) ->
-          let p1' = aux p1 in
-          if p1 == p1' then p else pqname p1' id in
-    Hp.memo_rec 107 p_subst
+  if Mp.is_empty s then identity else
+
+  let doit (aux : path -> path) (p : path) =
+    match p.p_node with
+    | Psymbol _ -> p
+    | Pqname(q, x) -> Smart.pqname (p, (q, x)) (aux q, x) in
+
+  let p_subst (aux : path -> path) (p : path) =
+    ofdfl (fun () -> doit aux p) (Mp.find_opt p s)
+
+  in Hp.memo_rec 107 p_subst
 
 (* -------------------------------------------------------------------- *)
-let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
-  let args = List.Smart.map (m_subst sp sm) m.m_args in
-  match m.m_top with
-  | `Concrete(p,sub) ->
-    let p' = sp p in
-    let top = if p == p' then m.m_top else `Concrete(p',sub) in
-    if m.m_top == top && m.m_args == args then m else
-      mpath top args
-  | `Local id ->
-    try
-      let m' = EcIdent.Mid.find id sm in
-      m_apply m' args
-    with Not_found ->
-      if m.m_args == args then m else
-        mpath m.m_top args
+let m_subst (s : smsubst) =
+  let doit (aux : mpath -> mpath) (mp : mpath) =
+    match mp.m_top with
+    | `Concrete (p, sub) ->
+        let p'    = p_subst s.sms_crt p in
+        let args' = List.Smart.map aux mp.m_args in
+        Smart.mpath_crt (mp, (p, mp.m_args, sub)) (p', args', sub)
 
-let m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) =
-  if sp == identity && EcIdent.Mid.is_empty sm then identity
-  else m_subst sp sm
+    | `Local id ->
+        let args' = List.Smart.map aux mp.m_args in
+        match Mid.find_opt id s.sms_id with
+        | None -> Smart.mpath_abs (mp, (id, mp.m_args)) (id, args')
+        | Some mp' -> m_apply mp' args'
+  in Hm.memo_rec 127 doit
+
+let m_subst (s : smsubst) =
+  if sms_is_identity s then identity else m_subst s
 
 (* -------------------------------------------------------------------- *)
-let x_subst (sm : mpath -> mpath) =
-  if sm == identity then identity
-  else fun x ->
-    let top = sm x.x_top in
-    if x.x_top == top then x
-    else xpath top x.x_sub
+let x_subst (s : smsubst) (xp : xpath) =
+  Smart.xpath xp (m_subst s xp.x_top, xp.x_sub)
 
-let x_substm sp sm =
-  x_subst (m_subst sp sm)
+let x_subst (s : smsubst) =
+  if sms_is_identity s then identity else x_subst s

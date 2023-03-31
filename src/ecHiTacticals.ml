@@ -152,6 +152,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Pcbv ri             -> process_cbv ri
     | Pchange pf          -> process_change pf
     | Ppose (x, xs, o, p) -> process_pose x xs o p
+    | Pmemory m           -> process_memory m
     | Pwlog (ids, b, f)   -> process_wlog ~suff:b ids f
     | Pgenhave gh         -> process_genhave ttenv gh
     | Prwnormal _         -> assert false
@@ -202,6 +203,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Phecall (oside, x)        -> EcPhlExists.process_ecall oside x
     | Pexfalso                  -> EcPhlAuto.t_exfalso
     | Pbydeno (mode, info)      -> EcPhlDeno.process_deno mode info
+    | Pbyupto                   -> EcPhlUpto.process_uptobad
     | PPr pr                    -> EcPhlPr.process_ppr pr
     | Pfel (pos, info)          -> EcPhlFel.process_fel pos info
     | Phoare                    -> EcPhlBdHoare.t_hoare_bd_hoare

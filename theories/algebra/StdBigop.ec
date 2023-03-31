@@ -164,7 +164,7 @@ clone include Bigalg.BigOrder with
     op Num.minr    = fun (x y : real), if x <= y then x else y,
     op Num.maxr    = fun (x y : real), if y <= x then x else y
 
-    proof Num.Domain.* by smt, Num.Axioms.* by smt
+    proof Num.Domain.* by smt(RField.invr0), Num.Axioms.* by smt()
 
     rename [theory] "BAdd" as "BRA"
            [theory] "BMul" as "BRM"
@@ -218,6 +218,31 @@ proof.
 rewrite BRA.sumr_undup; apply/BRA.eq_bigr=> x _ /=.
 by rewrite intmulr mulrC.
 qed.
+
+lemma sum_pow (p : real) (n : int) : 0 <= n => p <> 1%r =>
+  BRA.bigi predT (fun i => p^i) 0 n = (1%r - p^n) / (1%r - p).
+proof.
+move=> ge0_n neq1_p; have <- := sum_expr p n ge0_n.
+by rewrite mulrAC divff 1:/#.
+qed.
+
+lemma sum_pow_le (p : real) (n : int) : 0 <= n => 0%r <= p < 1%r =>
+  BRA.bigi predT (fun i => p^i) 0 n <= 1%r / (1%r - p).
+proof.
+move=> ge0_n rg_p; have h := sum_expr_le p n ge0_n rg_p.
+by rewrite &(RealOrder.ler_pdivl_mulr) 1:/# mulrC.
+qed.
+
+lemma sum_ipow_le (p : real) (n : int) : 0%r <= p < 1%r =>
+  BRA.bigi predT (fun (i:int) => i%r*p^i) 0 n <= 1%r / (1%r - p)^2.
+proof.
+move=> rg_p; have h := sum_iexpr_le p n rg_p.
+rewrite &(RealOrder.ler_pdivl_mulr) -1:mulrC //.
+- by rewrite RealOrder.expr_gt0 /#.
+rewrite &(RealOrder.ler_trans _ _ _ _ h) RealOrder.lerr_eq.
+by congr; apply: BRA.eq_bigr => /= i _; rewrite ofintR.
+qed.
+
 end Bigreal.
 
 import Bigreal.
@@ -230,7 +255,7 @@ clone Bigop as BBA with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Bool.( ^^ )
-  proof Support.Axioms.* by (delta; smt).
+  proof Support.Axioms.* by (delta; smt()).
 
 (* -------------------------------------------------------------------- *)
 theory BBM.
@@ -238,7 +263,7 @@ clone include Bigop with
   type t <- bool,
   op Support.idm <- true,
   op Support.(+) <- Pervasive.( /\ )
-  proof Support.Axioms.* by (delta; smt).
+  proof Support.Axioms.* by (delta; smt()).
 
 lemma bigP (P : 'a -> bool) (s : 'a list):
   big predT P s <=> (forall a, mem s a => P a).
@@ -255,7 +280,7 @@ clone include Bigop with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Pervasive.( || )
-  proof Support.Axioms.* by (delta; smt).
+  proof Support.Axioms.* by (delta; smt()).
 
 lemma bigP (P : 'a -> bool) (s : 'a list):
   big predT P s <=> (exists a, mem s a /\ P a).

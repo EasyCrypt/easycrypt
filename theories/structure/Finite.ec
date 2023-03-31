@@ -177,6 +177,17 @@ lemma eq_size_to_seqUI (A B : 'a -> bool):
 proof. by move=> finA finB; rewrite -!size_cat; apply/perm_eq_size/perm_eq_to_seqUI. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma sub_size_to_seq (p q : 'a -> bool) : 
+  p <= q => is_finite q =>
+  size (to_seq p) <= size (to_seq q).
+proof.
+move => sub_p_q fin_q.
+have fin_p : is_finite p by apply (finite_leq _ _ sub_p_q).
+apply uniq_leq_size; 1: exact uniq_to_seq.
+by move => x; rewrite !mem_to_seq //; exact sub_p_q.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma eq_is_finite_for ['a] (p q : 'a -> bool) s :
   (forall x, p x <=> q x) => is_finite_for p s => is_finite_for q s.
 proof. by move=> eq_pq [uqs h]; split=> // x; rewrite -eq_pq &(h). qed.
@@ -204,6 +215,17 @@ move=> surj_f /finiteP [s hs]; apply/finiteP.
 exists (map f s) => b /surj_f [a [pa_a ->]].
 by apply/mapP; exists a => /=; apply/hs.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma finite_for_mem (s : 'a list) : is_finite_for (mem s) (undup s).
+proof.
+split; first by apply: undup_uniq.
+by move=> x; rewrite mem_undup.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma finite_mem (s : 'a list) : is_finite (mem s).
+proof. exact: (finite_for_finite _ _ (finite_for_mem s)). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma finite_for_unit (p : unit -> bool):
@@ -281,26 +303,54 @@ lemma fingraph_cons ['a 'b] (a : 'a) (sa : 'a list) (sb : 'b list) :
     flatten (map (fun g1 => map (fun b => (a, b) :: g1) sb) (fingraph sa sb)).
 proof. by []. qed.
 
+lemma mem_fingraph ['a 'b] (sa : 'a list) (sb : 'b list) gr :
+  (gr \in fingraph sa sb) <=>
+    (unzip1 gr = sa /\ (forall x , x \in (unzip2 gr) => x \in sb)).
+proof.
+elim: sa gr => [|a sa ih] gr.
+- rewrite fingraph_nil /=; split => [->//|].
+  by case=> /size_eq0; rewrite size_map => /size_eq0.
+rewrite fingraph_cons; split.
+- case/flatten_mapP=> [/= s [s_in_fg]] /mapP[b [/= b_sb ->]] /=.
+  by case/(_ s): ih => + _ - /(_ s_in_fg) [->/=] ih b' [->>//|/ih].
+case: gr => // [[a' b'] gr] /= [] [->> gr1E] gr2E.
+case/(_ gr): ih => _ /(_ _).
+- by rewrite gr1E /= => ??; apply: gr2E; right.
+move=> gr_mem /=; apply/flatten_mapP; exists gr.
+by rewrite gr_mem /=; apply/mapP=> /=; exists b'; rewrite gr2E.
+qed.
+
+lemma finite_fixfinfun ['a 'b] dom codom :
+     is_finite<:'a> dom
+  => is_finite<:'b> codom
+  => is_finite<: 'a -> 'b> (fixfinfun dom codom).
+proof.
+case=> [sa [uqa @/predT /= ha]] [sb [uqb @/predT /= hb]]; apply/finiteP.
+pose F (s : ('a * 'b) list) (a : 'a) := odflt witness (assoc s a).
+exists (map F (fingraph sa sb)) => /= f hfix.
+apply/mapP; pose s := map (fun a => (a, f a)) sa.
+exists s; split=> [@/s|]; last first.
+- apply/fun_ext=> a @/F; case: (dom a) => [da|dNa]; last first.
+  - move/(_ a): hfix; rewrite dNa /= => ->.
+    have: !(a \in unzip1 s) by rewrite /s -map_comp map_id ha.
+    by rewrite -assocTP negbK => ->.
+  have: (a, f a) \in s by apply/mapP; exists a => /=; apply/ha.
+  rewrite mem_assoc_uniq => [|->//]; apply/map_inj_in_uniq.
+  - case=> [/= a1 b1] [/= a2 b2] /mapP[/= ? [# _ ->> ->>]].
+    by case/mapP=> /= ? [# _ ->> ->> ->].
+  by apply/map_inj_in_uniq.
+apply/mem_fingraph; split; first by rewrite -map_comp map_id.
+move=> x; rewrite -map_comp /(\o) /= => /mapP[a [/= a_sa ->]].
+by move/(_ a): hfix; rewrite -ha a_sa /= hb.
+qed.
+
 lemma finite_fun ['a 'b] :
      is_finite<:'a> predT
   => is_finite<:'b> predT
   => is_finite<: 'a -> 'b> predT.
 proof.
-case=> [sa [uqa @/predT /= ha]] [sb [uqb @/predT /= hb]]; apply/finiteP.
-pose F (s : ('a * 'b) list) (a : 'a) := odflt witness (assoc s a).
-exists (map F (fingraph sa sb)) => /= f.
-apply/mapP; pose s := map (fun a => (a, f a)) sa.
-exists s; split=> [@/s|]; last first.
-- apply/fun_ext=> a @/F; have: (a, f a) \in s.
-  - by apply/mapP; exists a => /=; apply/ha.
-  rewrite mem_assoc_uniq => [|->//]; apply/map_inj_in_uniq.
-  - case=> [/= a1 b1] [/= a2 b2] /mapP[/= ? [# _ ->> ->>]].
-    by case/mapP=> /= ? [# _ ->> ->> ->].
-  - by apply/map_inj_in_uniq.
-elim: {s ha} sa uqa => //= a sa ih [a_notin_sa /ih {ih}ih].
-rewrite fingraph_cons; apply/flatten_mapP.
-exists (map (fun a => (a, f a)) sa); rewrite ih /=.
-by apply/mapP; exists (f a); rewrite hb.
+have ->: predT = fixfinfun<: 'a, 'b> predT predT by done.
+by move=> fina finb; apply: finite_fixfinfun.
 qed.
 
 (* -------------------------------------------------------------------- *)

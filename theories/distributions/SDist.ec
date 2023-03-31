@@ -355,13 +355,12 @@ lemma distinguisher_ll (A <: Distinguisher) &m x :
   islossless A.guess => 
   is_lossless (mk (fun (z : bool) => Pr[A.guess(x) @ &m : res = z])).
 proof.
-move => A_ll; rewrite /F /is_lossless muE {1}/predT /=. 
+move => A_ll; rewrite /is_lossless muE {1}/predT /=. 
 have <- : Pr[A.guess(x) @ &m : res = true \/ res = false] = 1%r. 
   by byphoare => //; conseq (:_ ==> true) => // /#.  
 rewrite (eq_sum _ (fun (z : bool) => Pr[A.guess(x) @ &m : res = z])) => [z /=|].
   by rewrite muK; 1: exact: (adv_isdistr A).
-rewrite (sumE_fin _ [true; false]) // 1:/# !big_cons big_nil /predT/=.
-by rewrite Pr[mu_disjoint] 1:/#. 
+by rewrite sum_bool /= Pr[mu_disjoint] // /#.
 qed.
 
 lemma adv_sdist (A <: Distinguisher) &m d1 d2 : 
@@ -532,24 +531,22 @@ suff <-: Pr[Game(A, O1).main(d') @ &m : res] = Pr[Game(A, Os).main(d') @ &m : re
 + byequiv => //; proc; inline *; wp. 
   by call(: Var.x{1} = B1.x'{2}); [proc; inline *|]; auto. 
 byequiv => //.
-transitivity Game(A,O1e).main 
-  (={arg,glob A} /\ d{1} = d' ==> ={res}) 
-  (={arg,glob A} /\ d{1} = d' ==> ={res}); 1,2: smt().
-  by proc; inline *; rcondt{2} 7; auto; call(: ={Var.x}); 1: sim; auto => />.
-transitivity Gr(O1l).main 
-  (={arg,glob A} /\ d{1} = d' ==> ={res}) 
-  (={arg,glob A} /\ d{1} = d' ==> ={res}); 1,2: smt().
-  proc; inline *.
-  seq 6 6 : (={glob Var, glob A}); 1: by auto.
-  eager (H : if (Var.b) Var.x <$ Var.d; ~  if (Var.b) Var.x <$ Var.d; 
+have eq_main_O1e_O1l: equiv[Game(A, O1e).main ~ Gr(O1l).main:
+  ={arg, glob A} /\ arg{1} = d' ==> ={res}].
++ proc; inline *.
+    seq 6 6 : (={glob Var, glob A}); 1: by auto.
+    eager (H : if (Var.b) Var.x <$ Var.d; ~  if (Var.b) Var.x <$ Var.d; 
     : ={glob Var} ==> ={glob Var} )
     : (={glob A,glob Var} ) => //; 1: by sim. 
-  eager proc H (={glob Var}) => //; 2: by sim.
-  proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
-proc; inline*. 
-seq 7 5 : (={r} /\ Var.d{1} = d'); last by if{1}; auto => />.
+eager proc H (={glob Var}) => //; 2: by sim.
+    proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
+proc.
+rewrite equiv [{1} eq_main_O1e_O1l (d) r (d) r].
++ inline *; rcondt{2} 8; auto; call(: ={Var.x}); 1: sim; auto => />.
+inline*. 
+seq 8 5 : (r0{1} = r{2} /\ Var.d{1} = d'); last by if{1}; auto => />.
 conseq (_ : _ ==> Count.n{1} <= 1 /\ Count.n{2} <= 1 => 
-                  ={Count.n,r} /\ Var.d{1} = d')
+                  ={Count.n} /\ r0{1} = r{2} /\ Var.d{1} = d' /\ ={d, glob A})
        (_ : _ ==> Count.n <= 1) (_ : _ ==> Count.n <= 1); 1: smt().
 + by call (A_bound O1l); auto.
 + by call (A_bound Os); auto.

@@ -100,6 +100,7 @@ type fxerror =
 | FXE_CtorUnk
 | FXE_CtorAmbiguous
 | FXE_CtorInvalidArity of (symbol * int * int)
+| FXE_SynCheckFailure
 
 type filter_error =
 | FE_InvalidIndex of int
@@ -260,6 +261,14 @@ val trans_msymbol    : env -> pmsymbol located -> mpath * module_smpl_sig
 val trans_gamepath   : env -> pgamepath -> xpath
 val trans_oracle     : env -> psymbol * psymbol -> xpath * form
 val trans_restr_mem : env -> pmod_restr_mem -> Sx.t use_restr * Sm.t use_restr
+
+val trans_args :
+     EcEnv.env
+  -> EcUnify.unienv
+  -> EcLocation.t
+  -> EcModules.funsig
+  -> pexpr list
+  -> expr list * EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
 

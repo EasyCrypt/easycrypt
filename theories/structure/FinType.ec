@@ -34,8 +34,11 @@ move=> eq_xs; rewrite count_swap // 1:&(enum_uniq).
 by rewrite count_predT_eq // &(enumP).
 qed.
 
-lemma is_finite : is_finite predT<:t>.
-proof. by exists enum; split=> [|x]; [apply: enum_uniq | rewrite enumP]. qed.
+lemma is_finite_for : is_finite_for predT enum.
+proof. by split=> [|x]; [apply: enum_uniq | rewrite enumP]. qed.
+
+lemma is_finite : finite_type<:t>.
+proof. exact: (finite_for_finite _ _ is_finite_for). qed.
 
 lemma is_finite_pred (P : t -> bool) : is_finite P.
 proof. by move: is_finite; apply/finite_leq => ?; rewrite /predT. qed.

@@ -30,7 +30,7 @@ op zeros: block.
 op (+): block -> block -> block.
 
 axiom add0b (x : block)    : zeros + x = x.
-axiom addbA (y x z : block): x + (y + z) = (x + y) + z.
+axiom addbA (x y z : block): x + (y + z) = (x + y) + z.
 axiom addbC (x y : block)  : x + y = y + x.
 axiom addbK (x : block)    : x + x = zeros.
 
@@ -38,8 +38,11 @@ clone Ring.ZModule as Block with
   type t               <- block,
   op   zeror           <- zeros,
   op   (+)             <- (+),
-  op   [-] (x : block) <- x
-proof * by smt.
+  op   [-] (x : block) <- x,
+  lemma addrA          <- addbA,
+  lemma addrC          <- addbC,
+  lemma add0r          <- add0b,
+  lemma addNr          <- addbK.
 
 (* -------------------------------------------------------------------- *)
 (** Let P, Pi: key -> block -> block be a PRP and its inverse **)
@@ -183,15 +186,10 @@ section Random_Ideal.
 
   equiv Random_Ideal: Random.enc ~ Ideal.enc: size p{1} = size p{2} ==> ={res}.
   proof.
-    transitivity Sampling.LoopSnoc.sample
-                 (size p{1} + 1 = n{2} ==> ={res})
-                 (n{1} = size p{2} + 1 ==> ={res})=> //=; 1:smt ml=0.
-      by proc; inline *; while (={i} /\ c{1} = l{2} /\ size p{1} + 1 = n{2}); auto=> /#.
-    transitivity Sampling.Sample.sample
-                 (n{1} = n{2} ==> ={res})
-                 (n{1} = size p{2} + 1 ==> ={res})=> //=; 1:smt ml=0.
-      by symmetry=> //=; conseq Sampling.Sample_LoopSnoc_eq.
-    by proc; auto.
+  proc.
+  rewrite equiv [{2} Sampling.Sample_LoopSnoc_eq (size p + 1)  r (size p + 1) c].
+  + auto=> /#.
+  by wp; while (i0{1} = i{2} /\ c{2} = l{1} /\ size p{2} + 1 = n{1}); auto=> /#.
   qed.
 end section Random_Ideal.
 
@@ -514,8 +512,8 @@ section Reduce.
       split=> [|_]; 1:smt (dBlock_uffu).
       split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
 split.
-      by move=> h; rewrite -Block.addrA Block.subrr Block.addr0 /= /#.
-      by move=> h; rewrite -Block.addrA Block.subrr Block.addr0 /= /#.
+      by move=> h; rewrite -addbA Block.subrr Block.addr0 /= /#.
+      by move=> h; rewrite -addbA Block.subrr Block.addr0 /= /#.
     wp; rnd (fun x => x + pi{2}).
     auto=> /> &2 szp_neq_0; split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
     split=> [|_ s _]; 1:smt (dBlock_uffu).

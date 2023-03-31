@@ -74,6 +74,9 @@ val f_dmap : ty -> ty -> form -> form -> form
 (* common functions *)
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
 
+val split_sided : memory -> form -> form option
+val one_sided_vs : memory -> form -> form list
+
 (* -------------------------------------------------------------------- *)
 (* "typed" soft-constructors                                            *)
 val f_ty_app : EcEnv.env -> form -> form list -> form

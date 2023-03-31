@@ -72,7 +72,7 @@ exists f; split=> [i j x fiE fjE|x /h {h} [i hi]].
 + by move/fQ: fjE; move/fQ: fiE => [h1 ->] [h2 ->].
 exists (minz (transpose P x)); rewrite ge0_argmin /=.
 have hP: P (minz (transpose P x)) x.
-+ apply/(@argminP idfun (transpose P x) (int2nat i)) => @/idfun /=.
++ apply/(@argminP idfun (transpose P x) (int2nat i)) => /=.
   * by apply/ge0_int2nat. * by exists i.
 have hR: R (minz (transpose P x)) (Some x) by done.
 have h: exists x', R (minz (transpose P x)) x' by exists (Some x).
@@ -136,7 +136,7 @@ theory IntPair.
   have {ge0_p1 ge0_p2} [o1 o2] : odd x1 /\ odd x2 by rewrite !oddX // odd3.
   wlog: n1 n2 ge0_n1 ge0_n2 neq_n x1 x2 o1 o2 / (n1 <= n2)%Int.
   + move=> ih; case: (lez_total n1 n2); first by apply: ih.
-    by move=> h @/P *; rewrite eq_sym &(ih) 1?eq_sym.
+    by move=> h *; rewrite eq_sym &(ih) 1?eq_sym.
   move=> le_n; have lt_n: n1 < n2 by rewrite ltr_neqAle le_n.
   rewrite (_ : n2 = n1 + (n2 - n1)) 1:#ring exprD_nneg ?subr_ge0 //.
   apply/negP; rewrite -mulrA; have h/h := mulfI (exp 2 n1) _.

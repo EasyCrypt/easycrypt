@@ -307,7 +307,7 @@ have ->:   Pr[INDb(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c]
              ==>    ={glob A,glob O, Count.c}
                  /\ res{1} = (fst res = snd res){2})=> //.
   proc.
-  inline Count.init WA.work=> @/fst @/snd //=.
+  inline Count.init WA.work=> //=.
   by swap{1} 2 -1; sim; proc (={Orclb.b, Count.c}).
 have He: equiv [INDR(O, A).main ~ WA.work:
                      x{2} = false

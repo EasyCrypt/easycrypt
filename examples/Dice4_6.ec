@@ -60,27 +60,19 @@ lemma D4_D6 (f finv : int -> int) :
     equiv [D4.sample ~ D6.sample : true ==> res{1} = finv res{2}].
 proof.
 move=> Hbound Hbij.
-transitivity D4_6.SampleE.sample (true ==> ={res})
-                                 (true ==> res{1} = finv res{2})=> //.
-+ exact/D4_Sample.
-transitivity D4_6.SampleWi.sample (r{2} = 5 ==> res{1} = finv res{2})
-                                  (r{1} = 5 ==> res{2} = res{1})=> //.
-+ by move=> />; exists ((),5).
-transitivity D4_6.SampleE.sample (true ==> res{1} = finv res{2})
-                                 (r{2} = 5 ==> ={res})=> //.
-(* TODO: This is generic and should be extracted in a clean way. *)
+transitivity D4.sample (true ==> res{1} = finv res{2})
+                       (true ==> ={res})=> //.
 + proc; rnd f finv; auto=> />; split=> [r|_].
-  + by rewrite supp_dexcepted supp_dinter /#.
+  + by rewrite supp_dinter /#.
   split=> [r|_ r].
-  + rewrite supp_dexcepted supp_dinter=> - /= [] _ r_bounds.
-    apply/dexcepted_uni.
-    + exact/dinter_uni.
-    + by rewrite supp_dexcepted supp_dinter /#.
-    by rewrite supp_dexcepted supp_dinter /#.
-  by rewrite 2!supp_dexcepted 2!supp_dinter/#.
-+ conseq D4_6.sampleE_sampleWi=> //=.
-  by move=> &2 ->; rewrite dinter_ll //= /predC mem_oflist mem_range.
-by symmetry; exact/D6_Sample.
+  + rewrite supp_dinter=> - /= r_bounds.
+    by apply: dinter_uni; rewrite supp_dinter /#.
+  by rewrite !supp_dinter /#.
+proc *.
+rewrite equiv [{1} D4_Sample () r () r].
+rewrite equiv [{1} D4_6.sampleE_sampleWi () r ((), 5) r].
++ by auto=> />; exact: dinter_ll.
+rewrite equiv [{2} D6_Sample () r ((), 5) r]; sim.
 qed.
 
 lemma prD6 : forall k &m, Pr[D6.sample() @ &m : res = k] =

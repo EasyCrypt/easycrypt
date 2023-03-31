@@ -59,7 +59,7 @@ clone import Plug_and_Pray as PnP with
   type tval    <- int,
   type tin     <- unit,
   op   indices <- range 0 q
-proof indices_not_nil by smt(@List gt0_q).
+proof indices_not_nil by smt(size_range gt0_q).
 
 (*
    We first apply the general Lemma that yields
@@ -79,7 +79,7 @@ have:= PBound (G0(A)) phi psi tt &m _.
 have ->: card = q by rewrite undup_id 1:range_uniq size_range #smt:(gt0_q).
 have -> //=: Pr[Guess(G0(A)).main() @ &m: phi (glob G0(A)) res.`2 /\ res.`1 = psi (glob G0(A)) res.`2]
              = Pr[Guess(G0(A)).main() @ &m: G0.b /\ res.`1 = G0.k].
-byequiv (: ={glob G0(A)} ==> _)=> @/phi @/psi //=.
+byequiv (: ={glob G0(A)} ==> _)=> //=.
 conseq (: _ ==> ={glob G0, res} /\ 0 <= G0.k{1} < q); first by smt().
 proc; rnd; inline *; wp.
 conseq (: ={glob G0})=> //=.

@@ -7,11 +7,13 @@ import collections
 import contextlib as clib
 import curses
 import datetime
+import fnmatch
 import glob
 import itertools
 import math
 import multiprocessing as mp
 import os
+import pathlib
 import re
 import signal
 import socket
@@ -44,6 +46,10 @@ async def awaitable(the):
         await the.wait()
 
 clib.awaitable = awaitable
+
+# --------------------------------------------------------------------
+def is_tuple_prefix(prefix, subject):
+    return subject[:len(prefix)] == prefix
 
 # --------------------------------------------------------------------
 class Object:
@@ -121,7 +127,13 @@ def _options():
     options.jobs     = cmdopt.jobs
     options.report   = cmdopt.report
 
-    defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
+    defaults = dict(
+        args         = '',
+        exclude      = '',
+        file_exclude = '',
+        okdirs       = '',
+        kodirs       = '',
+    )
 
     config = cp.ConfigParser(defaults)
     config.read(args[0])
@@ -152,10 +164,11 @@ def _options():
 
     for test in [x for x in config.sections() if x.startswith('test-')]:
         scenario = Object()
-        scenario.args    = config.get(test, 'args').split()
-        scenario.okdirs  = config.get(test, 'okdirs')
-        scenario.kodirs  = config.get(test, 'kodirs')
-        scenario.exclude = config.get(test, 'exclude').split()
+        scenario.args     = config.get(test, 'args').split()
+        scenario.okdirs   = config.get(test, 'okdirs')
+        scenario.kodirs   = config.get(test, 'kodirs')
+        scenario.dexclude = config.get(test, 'exclude').split()
+        scenario.fexclude = config.get(test, 'file_exclude').split()
         options.scenarios[test[5:]] = scenario
 
     for x in options.targets:
@@ -289,12 +302,22 @@ class CurseWrapper(metaclass = Singleton):
 # --------------------------------------------------------------------
 class Gather:
     @staticmethod
-    def is_excluded(src, excludes):
+    def is_dir_excluded(src, excludes):
+        src = pathlib.Path(src).parts
         for path in excludes:
+            rec = False
             if path.startswith('!'):
-                if src.startswith(path[1:]):
-                    return True
-            elif src == path:
+                rec, path = True, path[1:]
+            path = pathlib.Path(path).parts
+            if (is_tuple_prefix(path, src) if rec else path == src):
+                return True
+        return False
+
+    @staticmethod
+    def is_file_excluded(src, excludes):
+        for exclude in excludes:
+            print(os.path.basename(src), exclude)
+            if fnmatch.fnmatch(src, exclude):
                 return True
         return False
 
@@ -337,9 +360,13 @@ class Gather:
                          for x in expand(scenario.okdirs)])
         dirs.extend([Object(src = x, valid = False, args = scenario.args) \
                          for x in expand(scenario.kodirs)])
-        dirs = [x for x in dirs if not cls.is_excluded(x.src,scenario.exclude)]
+        dirs = [x for x in dirs if not cls.is_dir_excluded(x.src, scenario.dexclude)]
         dirs = map(lambda x : cls.gather(x, scenario), dirs)
-        return list(itertools.chain.from_iterable(dirs))
+
+        files = list(itertools.chain.from_iterable(dirs))
+        files = [x for x in files if not cls.is_file_excluded(x.filename, scenario.fexclude)]
+
+        return files
 
     @classmethod
     def gatherall(cls, scenarios, targets):
@@ -406,14 +433,21 @@ class MBar:
                 self.term.clearline()
                 self.term.rawwrite(txt)
 
-    def write(self, txt):
+    def write(self, txt, mark = True):
         with self:
             self._clear_bars_display()
-            self.term.rawwrite(('▶ ' + txt).encode('utf-8') + b'\n')
+            self.term.rawwrite(
+                (('▶ ' if mark else '  ') + txt).encode('utf-8') + b'\n'
+            )
             self._create_bars_display()
 
     def log(self, mark, txt, color):
-        self.write('[{}] {}'.format(self.term.colored(mark, color), txt))
+        with self:
+            if isinstance(txt, str):
+                txt = [txt]
+            self.write('[{}] {}'.format(self.term.colored(mark, color), txt[0]))
+            for subtxt in txt[1:]:
+                self.write('    {}'.format(subtxt), mark = False)
 
     def remove(self, bar, success):
         with self:
@@ -550,7 +584,8 @@ class TermListener(Listener):
     def error(self, handle, level, msg):
         handle = self._handles[handle]
         mark, color = LOGMARKS.get(level, LOGMARKS[None])
-        self._mbar.log(mark, '{}: {}'.format(handle.filename, msg), color)
+        msg = msg.replace('\\n', '\n').split('\n')
+        self._mbar.log(mark, [handle.filename] + msg, color)
 
     @clib.contextmanager
     def start(self):
@@ -593,7 +628,13 @@ class RawListener(Listener):
 
     def error(self, handle, level, msg):
         handle, (mark, _) = self._handles[handle], LOGMARKS.get(level, LOGMARKS[None])
-        self.log('[{}] {}: {}'.format(mark, handle.filename, msg))
+        msg = msg.strip('\n').split('\n') or ['']
+        if len(msg) > 1:
+            self.log('[{}] {}:'.format(mark, handle.filename))
+            for submsg in msg:
+                self.log('    {}'.format(submsg))
+        else:
+            self.log('[{}] {}: {}'.format(mark, handle.filename, msg[0]))
 
     def tick(self):
         pass
@@ -603,8 +644,17 @@ class RawListener(Listener):
         yield
 
 # --------------------------------------------------------------------
+def get_njobs():
+    try:
+        njobs = max(int(os.environ.get('ECRJOBS', 0)), 0)
+    except ValueError:
+        return 0
+
+    return njobs or mp.cpu_count()
+
+# --------------------------------------------------------------------
 async def _run_all(options, allscripts, listener : Listener):
-    semaphore = asyncio.Semaphore(options.jobs or mp.cpu_count())
+    semaphore = asyncio.Semaphore(options.jobs or get_njobs())
 
     async def runcheck(config):
         async with semaphore:
@@ -637,12 +687,13 @@ async def _run_all(options, allscripts, listener : Listener):
                             listener.file_check_progress(handle, float(line.split()[3]))
                         elif re.match(rb'E\b', line):
                             error = line[1:].decode('utf-8').strip()
-                            error = error.split(None, 1)
                             if not error:
                                 continue
-                            if len(error) < 2:
-                                error = [None, error]
-                            listener.error(handle, *error)
+                            if (m := re.search('^(\S+)\s+(.+)$', error)):
+                                code, error = m.group(1), m.group(2)
+                            else:
+                                code = None
+                            listener.error(handle, code, error)
                             errors.append(error)
     
             finally:

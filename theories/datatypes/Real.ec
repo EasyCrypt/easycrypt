@@ -7,6 +7,7 @@ abbrev ( + ) = CoreReal.add.
 abbrev ([-]) = CoreReal.opp.
 abbrev ( * ) = CoreReal.mul.
 abbrev inv   = CoreReal.inv.
+abbrev (%r)  = CoreReal.from_int.
 
 abbrev ( - ) (x y : real) = x + (-y).
 abbrev ( / ) (x y : real) = x * (inv y).
@@ -281,3 +282,25 @@ lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
 
 lemma nosmt upto_bad_sub (ev bad:bool) :
   ev /\ ! bad => ev by [].
+
+lemma eq_upto (E1 E1b E1nb E2 E2b E2nb: real) :
+  E1 = E1b + E1nb =>
+  E2 = E2b + E2nb =>
+  E1nb = E2nb =>
+  E1 - E2 = E1b - E2b.
+proof. smt(). qed.
+
+lemma upto_abs (E1 E1b E1nb E2 E2b E2nb: real) :
+  E1 = E1b + E1nb =>
+  E2 = E2b + E2nb =>
+  E1nb = E2nb =>
+  `| E1 - E2 | <= `|E1b - E2b|.
+proof. by move=> h1 h2 h3; rewrite (eq_upto _ _ _ _ _ _ h1 h2 h3). qed.
+
+lemma upto_le (E1 E1b E1nb E2nb E2nb' E1b' : real) : 
+  E1 = E1b + E1nb =>
+  E1nb = E2nb =>
+  E1b <= E1b' => 
+  E2nb <= E2nb' => 
+  E1 <= E2nb' + E1b'.
+proof. smt(). qed.

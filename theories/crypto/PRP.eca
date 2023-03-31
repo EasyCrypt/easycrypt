@@ -197,7 +197,7 @@ move=> dD_fu.
 proc; if=> //=; auto=> /> &m h.
 have [] x0 x0_notinr_m:= endo_dom_rng RP.m{m} _.
 + by exists x{m}.
-rewrite -/predT weight_dexcepted /b2r.
+rewrite -/predT weight_dexcepted.
 case: {-1}(mu _ _ = mu _ _)
         (eq_refl (mu dD predT = mu dD (rng RP.m{m})))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.
@@ -215,7 +215,7 @@ move=> dD_fu.
 proc; if=> //=; auto=> /> &m h.
 have [] y0 y0_notinr_mi:= endo_dom_rng RP.mi{m} _.
 + by exists y{m}.
-rewrite -/predT weight_dexcepted /b2r.
+rewrite -/predT weight_dexcepted.
 case: {-1}(mu _ _ = mu _ _)
         (eq_refl (mu dD predT = mu dD (rng RP.mi{m})))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.
@@ -494,13 +494,10 @@ section PRPi_PRPi'_Indirect.
        forall a, Pr[Direct.sample: res = a] = Pr[Indirect.sample: res = a]. *)
   equiv eq_Direct_Indirect: Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
   proof.
-  transitivity S.direct (X{2} = fun _=> X{1} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
-  + by move=> &2; exists ((),fun _=> X{2}).
-  + by proc; rnd.
-  transitivity S.indirect (={x,X} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
-  + by move=> &1 &2 ->; exists ((),fun _=> X{2}).
-  + by conseq (@ll_direct_indirect_eq); rewrite dD_ll.
-  proc. seq 1 1: (#pre /\ ={r}); auto.
+  proc.
+  rewrite equiv [{1} ll_direct_indirect_eq ((), fun _ => X) r ((), fun _ => X) r].
+  + move=> />; exact dD_ll.
+  sp; seq 1 1: ((X0 = fun _ => X){1} /\ ={X} /\ r0{1} = r{2}); auto.
   by if; auto.
   qed.
 

@@ -123,7 +123,8 @@ let tydecl_compatible env tyd1 tyd2 =
 let expr_compatible exn env s e1 e2 =
   let f1 = EcFol.form_of_expr EcFol.mhr e1 in
   let f2 = EcFol.Fsubst.f_subst s (EcFol.form_of_expr EcFol.mhr e2) in
-  error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 f2)
+  let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
+  error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
 
 let get_open_oper exn env p tys =
   let oper = EcEnv.Op.by_path p env in
@@ -370,10 +371,17 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             | `Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
                 match (EcEnv.Ty.by_path np env).tyd_type with
                 | `Datatype { tydt_ctors = _ } ->
-                  List.fold_left (fun subst (name, _) ->
-                      EcSubst.add_path subst
-                        ~src:(xpath ove name)
-                        ~dst:(EcPath.pqoname (EcPath.prefix np) name))
+                  let newtparams = List.fst newtyd.tyd_params in
+                  let newtparams_ty = List.map tvar newtparams in
+                  let newdtype = tconstr np newtparams_ty in
+                  let tysubst = EcTypes.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
+
+                  List.fold_left (fun subst (name, tyargs) ->
+                      let np = EcPath.pqoname (EcPath.prefix np) name in
+                      let newtyargs = List.map (Tvar.subst tysubst) tyargs in
+                      EcSubst.add_opdef subst
+                        (xpath ove name)
+                        (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)))
                     subst octors
                 | _ -> subst
               end
@@ -724,7 +732,7 @@ and replay_modtype
         match mode with
         | `Alias -> rename ove subst (`Module, x)
         | `Inline _ ->
-          let subst = EcSubst.add_path subst ~src:(xpath ove x) ~dst:np in
+          let subst = EcSubst.add_modtydef subst ~src:(xpath ove x) ~dst:np in
           subst, x in
 
       let modty = EcSubst.subst_top_modsig subst modty in
@@ -763,14 +771,14 @@ and replay_mod
         | _ -> assert false
       in
 
-      let substme = EcSubst.add_path subst ~src:(xpath ove name) ~dst:np in
+      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:np in
 
       let me    = EcSubst.subst_top_module substme me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
       let newme = { newme with me_name = name } in
       let newme = { tme_expr = newme; tme_loca = Option.get newlc; } in
 
-      if not (EcReduction.EqTest.for_mexpr env me.tme_expr newme.tme_expr) then
+      if not (EcReduction.EqTest.for_mexpr ~body:false env me.tme_expr newme.tme_expr) then
         clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
 
       let (subst, _) =
@@ -782,8 +790,13 @@ and replay_mod
 
       let newme =
         if mode = `Alias || mode = `Inline `Keep then
-          { newme with tme_expr = { newme.tme_expr with
-              me_body = ME_Alias (List.length newme.tme_expr.me_params, mp) } }
+          let alias = ME_Alias (
+              List.length newme.tme_expr.me_params,
+              EcPath.m_apply
+                mp
+                (List.map (fun (id, _) -> EcPath.mident id) newme.tme_expr.me_params)
+          )
+          in { newme with tme_expr = { newme.tme_expr with me_body = alias } }
         else newme in
 
       let scope =
@@ -839,18 +852,27 @@ and replay_reduction
   (import, rules : _ * (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list)
 =
   let for1 (p, opts, rule) =
+    let exception Removed in
+
     let p = EcSubst.subst_path subst p in
 
     (* TODO: A: schema are not replayed for now, but reduction rules can use a
        schema. Fix this. *)
     let rule =
       obind (fun rule ->
+        let env = EcSection.env (ove.ovre_hooks.henv scope) in
+
         try
+          if not (
+            match opts.ur_mode with
+            | `Ax -> is_some (EcEnv.Ax.by_path_opt p env)
+            | `Sc -> is_some (EcEnv.Schema.by_path_opt p env)
+          ) then raise Removed;
+
           Some (EcReduction.User.compile
                   ~opts ~prio:rule.rl_prio
-                  (EcSection.env (ove.ovre_hooks.henv scope))
-                  opts.ur_mode p)
-        with EcReduction.User.InvalidUserRule _ -> None) rule
+                  env opts.ur_mode p)
+        with EcReduction.User.InvalidUserRule _ | Removed -> None) rule
 
     in (p, opts, rule) in
 

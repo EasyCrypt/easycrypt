@@ -79,6 +79,42 @@ proof. by do 2! (move/fun_ext=> ->). qed.
 lemma nosmt can_idfun: cancel idfun<:'a> idfun<:'a>.
 proof. by move => ?; rewrite /idfun. qed.
 
+op fixfinfun ['t 'u] (dom : 't -> bool) (codom : 'u -> bool) (f : 't -> 'u) =
+  forall x, (if dom x then codom (f x) else f x = witness).
+
+lemma fixfinfun0 ['t 'u] (codom : 'u -> bool) (f : 't -> 'u) :
+  fixfinfun pred0 codom f => forall x, f x = witness.
+proof. by move=> + x - /(_ x). qed.
+
+lemma eqL_fixfinfun ['t 'u] r1 r2 s (f : 't -> 'u) :
+  r1 == r2 => fixfinfun r2 s f <=> fixfinfun r1 s f.
+proof. by move/fun_ext => ->. qed.
+
+lemma eqR_fixfinfun ['t 'u] r s1 s2 (f : 't -> 'u) :
+  s1 == s2 => fixfinfun r s1 f <=> fixfinfun r s2 f.
+proof. by move/fun_ext => ->. qed.
+
+(* -------------------------------------------------------------------- *)
+op swap_codom ['t 'u] x y1 y2 (f : 't -> 'u) =
+  fun x' => if x = x' then
+    (if f x = y1 then y2 else if f x = y2 then y1 else f x)
+  else f x'.
+
+lemma swap_codom_neq ['t 'u] x y1 y2 (f : 't -> 'u) z :
+  x <> z => swap_codom x y1 y2 f z = f z.
+proof. by move=> ne_xz @/swap_codom; rewrite ne_xz. qed.
+
+lemma bij_swap_codom ['t 'u] x y1 y2 :
+  bijective (swap_codom<:'t, 'u> x y1 y2).
+proof.
+exists (swap_codom x y1 y2); rewrite andbb => f.
+apply/fun_ext=> x' @/swap_codom /=.
+case: (x = x') => // <<-; case: (f x = y1) => /= [->|].
+- by case: (y2 = y1).
+- move=> ne_fx_y1; case: (f x = y2) => //=.
+  by move/negbTE=> ->; move/negbTE: ne_fx_y1=> ->.
+qed.
+
 lemma nosmt can_pcan (f:'a -> 'b) g: cancel f g => pcancel f (Some \o g).
 proof. by move=> fK x; rewrite /(\o) fK. qed.
 

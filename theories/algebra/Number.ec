@@ -786,6 +786,14 @@ lemma nosmt lerNgt (x y : t): (x <= y) <=> !(y < x).
 proof. by rewrite ltrNge. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma pmulr_gt0 x y : zeror <= x => zeror <= y => 
+  zeror < x * y <=> zeror < x /\ zeror < y. 
+proof. 
+move=> x_ge0 y_ge0; split; last by smt(pmulr_rgt0).
+smt (pmulr_rgt0 ltrNge ler_anti mul0r ltrr).
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma leVge x y : (x <= y) \/ (y <= x).
 proof. exact ler_total. qed.
 
@@ -1355,6 +1363,25 @@ proof. by rewrite -iff_negb negb_or -!ltrNge; apply/ltr_maxrP. qed.
 
 lemma gtr_maxrP m n1 n2 : (m < maxr n1 n2) <=> (m < n1) \/ (m < n2).
 proof. by rewrite -iff_negb negb_or -!lerNgt; apply/ler_maxrP. qed.
+
+lemma ler_maxr_trans (x1 x2 y1 y2 : t) : 
+  x1 <= x2 => y1 <= y2 => maxr x1 y1 <= maxr x2 y2.
+proof. 
+  by move=> hx hy; rewrite ler_maxrP; case (maxr_ub x2 y2) => hx' hy'; split;
+   [apply: ler_trans hx' | apply: ler_trans hy'].
+qed.
+
+lemma ler_norm_maxr x1 x2 :
+  zeror <= x1 =>
+  zeror <= x2 =>
+  `| x1 - x2 | <= maxr x1 x2.
+proof.
+  rewrite maxrE normE; case: (x2 <= x1).
+  + rewrite subr_ge0 => -> /= *; apply ler_subr_addr.
+    by rewrite opprK ler_addl.
+  rewrite ler_subr_addr add0r => -> /=.
+  by rewrite opprB -ler_subr_addr opprK ler_addl.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma minr_maxr x y : minr x y = - maxr (-x) (-y).

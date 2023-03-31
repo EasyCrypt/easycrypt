@@ -137,6 +137,44 @@ let rec t_equiv_cond side tc =
           tc
 
 (* -------------------------------------------------------------------- *)
+let t_hoare_match tc =
+  let hyps = FApi.tc1_hyps tc in
+  let env  = LDecl.toenv hyps in
+  let hs   = tc1_as_hoareS tc in
+
+  let me, st = hs.hs_m, hs.hs_s in
+
+  let sets st = { hs with hs_s = st } in
+
+  let (e, bs), tl = tc1_first_match tc st in
+  let indp, indt, tyinst = oget (EcEnv.Ty.get_top_decl e.e_ty env) in
+  let indt = oget (EcDecl.tydecl_as_datatype indt) in
+  let f = form_of_expr (EcMemory.memory me) e in
+
+  let do1 ((ids, b), (cname, _)) =
+    let subst, lvars =
+      add_locals e_subst_id ids in
+
+    let cop = EcPath.pqoname (EcPath.prefix indp) cname in
+    let cop = f_op cop tyinst (toarrow (List.snd ids) f.f_ty) in
+    let cop =
+      let args = List.map (curry f_local) lvars in
+      f_app cop args f.f_ty in
+    let cop = f_eq f cop in
+
+    f_forall
+      (List.map (snd_map gtty) lvars)
+      (f_hoareS_r
+         { (sets (stmt ((s_subst subst b).s_node @ tl.s_node)))
+             with hs_pr = f_and_simpl cop hs.hs_pr })
+
+  in
+
+  let concl = List.map do1 (List.combine bs indt.EcDecl.tydt_ctors) in
+
+  FApi.xmutate1 tc `Match concl
+
+(* -------------------------------------------------------------------- *)
 let t_equiv_match s tc =
   let hyps = FApi.tc1_hyps tc in
   let env  = LDecl.toenv hyps in

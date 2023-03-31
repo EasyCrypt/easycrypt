@@ -1,4 +1,4 @@
-FROM easycryptpa/ec-build-box:latest
+FROM ghcr.io/easycrypt/ec-build-box:latest
 
 ARG SOURCE_BRANCH=r2022.04
 

@@ -132,6 +132,25 @@ let main () =
 
     in (conffile, EcOptions.parse_cmdline ?ini Sys.argv) in
 
+  (* Execution of eager commands *)
+  begin
+    match options.o_command with
+    | `Runtest input -> begin
+        let root =
+          match EcRelocate.sourceroot with
+          | Some root ->
+              List.fold_left Filename.concat root ["scripts"; "testing"]
+          | None ->
+              EcRelocate.resource ["commands"] in
+        let cmd  = Filename.concat root "runtest" in
+        let args = ["runtest"; input.runo_input] @ input.runo_scenarios in
+        Format.eprintf "Executing: %s@." (String.concat " " (cmd :: args));
+        Unix.execv cmd (Array.of_list args)
+      end
+
+    | _ -> ()
+  end;
+
   (* chrdir_$PATH if in reloc mode (FIXME / HACK) *)
   let relocdir =
     match options.o_options.o_reloc with
@@ -190,6 +209,9 @@ let main () =
           ~recursive:isrec name)
       ldropts.ldro_idirs;
   end;
+
+  (* Initialize printer *)
+  EcCorePrinting.Registry.register (module EcPrinting);
 
   (* Register user messages printers *)
   begin let open EcUserMessages in register () end;
@@ -263,6 +285,10 @@ let main () =
            Some name, terminal, false, cmpopts.cmpo_noeco)
 
       end
+
+    | `Runtest _ ->
+        (* Eagerly executed *)
+        assert false
   in
 
   (match input with

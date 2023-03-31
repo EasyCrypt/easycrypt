@@ -365,6 +365,7 @@
 %token <EcSymbols.symbol> PUNIOP
 %token <EcSymbols.symbol> PBINOP
 %token <EcSymbols.symbol> PNUMOP
+%token <EcSymbols.symbol> PPSTOP
 
 %token <EcBigInt.zint> UINT
 %token <EcBigInt.zint * (int * EcBigInt.zint)> DECIMAL
@@ -402,6 +403,7 @@
 %token BYEQUIV
 %token BYPHOARE
 %token BYPR
+%token BYUPTO
 %token CALL
 %token CASE
 %token CBV
@@ -748,6 +750,7 @@ genqident(X):
 | x=PUNIOP  { x }
 | x=PBINOP  { x }
 | x=PNUMOP  { x }
+| x=PPSTOP  { x }
 
 | x=loc(STRING)   {
     if not (EcCoreLib.is_mixfix_op (unloc x)) then
@@ -758,7 +761,6 @@ genqident(X):
 %inline _oident:
 | x=_boident      { x }
 | x=paren(PUNIOP) { x }
-
 
 %inline boident: x=loc(_boident) { x }
 %inline  oident: x=loc( _oident) { x }
@@ -903,17 +905,12 @@ sexpr_u:
 | e=sexpr PCENT p=uqident
    { PEscope (p, e) }
 
-| e=sexpr p=loc(prefix(PCENT, lident))
-   { let { pl_loc = lc; pl_desc = p; } = p in
-     if unloc p = "r" then
-       let id =
-         PEident (mk_loc lc EcCoreLib.s_real_of_int, None)
-       in PEapp (mk_loc lc id, [e])
-     else begin
-       if unloc p <> "top" then
-         parse_error p.pl_loc (Some "invalid scope name");
+| e=sexpr p=loc(prefix(PCENT, _lident))
+   { if unloc p = "top" then
        PEscope (pqsymb_of_symb p.pl_loc "<top>", e)
-     end }
+     else
+       let p = lmap (fun x -> "%" ^ x) p in
+       PEapp (mk_loc (loc p) (PEident (pqsymb_of_psymb p, None)), [e]) }
 
 | LPAREN e=expr COLONTILD ty=loc(type_exp) RPAREN
    { PEcast (e, ty) }
@@ -1173,17 +1170,13 @@ sform_u(P):
 | f=sform_r(P) PCENT p=uqident
    { PFscope (p, f) }
 
-| f=sform_r(P) p=loc(prefix(PCENT, lident))
-   { let { pl_loc = lc; pl_desc = p; } = p in
-     if unloc p = "r" then
-       let id =
-         PFident (mk_loc lc EcCoreLib.s_real_of_int, None)
-       in PFapp (mk_loc lc id, [f])
-     else begin
-       if unloc p <> "top" then
-         parse_error p.pl_loc (Some "invalid scope name");
+| f=sform_r(P) p=loc(prefix(PCENT, _lident))
+
+   { if unloc p = "top" then
        PFscope (pqsymb_of_symb p.pl_loc "<top>", f)
-     end }
+     else
+       let p = lmap (fun x -> "%" ^ x) p in
+       PFapp (mk_loc (loc p) (PFident (pqsymb_of_psymb p, None)), [f]) }
 
 | SHARP pf=pffilter* x=ident
    { PFref (x, pf) }
@@ -1256,11 +1249,6 @@ sform_u(P):
     COLON event=form_r(P)
   RBRACKET
     { PFprob (mp, args, pn, event) }
-
-| WP LBRACKET
-    mp=loc(fident) args=paren(plist0(expr, COMMA)) COLON f=form_r(P)
-  RBRACKET
-    { PFWP (mp, args, f) }
 
 | r=loc(RBOOL)
     { PFident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
@@ -2607,6 +2595,14 @@ rwarg1:
         parse_error (loc x) (Some msg)
   }
 
+| EQUIV aout=bracket(
+    s=side x=qident
+    argsl=paren(loc(plist0(expr, COMMA))) resl=sexpr
+    argsr=paren(loc(plist0(expr, COMMA))) resr=sexpr {
+      RWEquiv (s, x, (argsl, resl), (argsr, resr))
+    }
+  ) { aout }
+
 rwpterms:
 | f=pterm
     { [(`LtoR, f)] }
@@ -2994,6 +2990,9 @@ logtactic:
 | POSE o=rwocc? x=ident xs=ptybindings? CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, odfl [] xs, o, p) }
 
+| POSE x=mident
+   { Pmemory x }
+
 | WLOG b=boption(SUFF) COLON ids=loc(ipcore_name)* SLASH f=form
    { Pwlog (ids, b, f) }
 
@@ -3157,7 +3156,7 @@ phltactic:
 | CFOLD s=side? c=codepos
     { Pcfold (s, c, None) }
 
-| RND s=side? info=rnd_info c=prefix(COLON, semrndpos)? 
+| RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
 
 | RNDSEM s=side? c=codepos1
@@ -3216,6 +3215,9 @@ phltactic:
 
 | BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)? COLON bad1=sform
     { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, Some bad1)) }
+
+| BYUPTO
+    { Pbyupto }
 
 | CONSEQ cq=cqoptions?
     { Pconseq (odfl [] cq, (None, None, None)) }

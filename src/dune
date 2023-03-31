@@ -1,6 +1,6 @@
 (env
- (dev     (flags :standard -rectypes -warn-error -a+31 -w +28+33-9-23-32-58))
- (release (flags :standard -rectypes -warn-error -a+31 -w +28+33-9-23-32-58)
+ (dev     (flags :standard -rectypes -warn-error -a+31 -w +28+33-9-23-32-58-67-69))
+ (release (flags :standard -rectypes -warn-error -a+31 -w +28+33-9-23-32-58-67-69)
           (ocamlopt_flags -O3 -unbox-closures)))
 
 (include_subdirs unqualified)
@@ -9,7 +9,7 @@
  (public_name easycrypt)
  (name ec)
  (promote (until-clean))
- (libraries batteries dune-build-info inifiles why3 yojson zarith))
+ (libraries batteries camlp-streams dune-build-info inifiles why3 yojson zarith))
 
 (ocamllex ecLexer)
 

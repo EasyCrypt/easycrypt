@@ -538,6 +538,9 @@ abstract theory ComRing.
     by rewrite !MulMonoid.iteropE iterS.
   qed.
 
+  lemma expr_pred (x : t) i : 0 < i => exp x i = x * (exp x (i - 1)).
+  proof. smt(exprS). qed.
+
   lemma exprSr (x : t) i: 0 <= i => exp x (i+1) = (exp x i) * x.
   proof. by move=> ge0_i; rewrite exprS // mulrC. qed.
 
@@ -730,6 +733,29 @@ abstract theory ComRing.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
+abstract theory ComRingDflInv.
+  clone include ComRing with
+    pred unit (x : t) = exists y, y * x = oner,
+    op   invr (x : t) = choiceb (fun y => y * x = oner) x
+
+    proof mulVr, unitP, unitout.
+
+  realize mulVr.
+  proof.
+  move=> x ^ un_x [y ^ -> <-] @/invr_.
+  by have /= -> := choicebP _ x un_x.
+  qed.
+
+  realize unitP.
+  proof. by move=> x y eq; exists y. qed.
+
+  realize unitout.
+  proof.
+  by move=> x; rewrite /unit_ negb_exists => /choiceb_dfl /(_ x).
+  qed.
+end ComRingDflInv.
+
+(* -------------------------------------------------------------------- *)
 abstract theory BoolRing.
   clone include ComRing.
 
@@ -774,6 +800,18 @@ abstract theory IDomain.
 
   lemma lregP x : lreg x <=> x <> zeror.
   proof. by split=> [/lreg_neq0//|/mulfI]. qed.
+
+  lemma eqr_div (x1 y1 x2 y2 : t) : unit y1 => unit y2 =>
+    (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
+  proof.
+  move=> Nut1 Nut2; rewrite -{1}(@mulrK y2 _ x1) //.
+  rewrite  -{1}(@mulrK y1 _ x2) // -!mulrA (@mulrC (invr y1)) !mulrA.
+  split=> [|->] //;
+    (have nz_Vy1: unit (invr y1) by rewrite unitrV);
+    (have nz_Vy2: unit (invr y2) by rewrite unitrV).
+  by move/(mulIr _ nz_Vy1)/(mulIr _ nz_Vy2).
+  qed.
+
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
@@ -806,14 +844,7 @@ abstract theory Field.
 
   lemma eqf_div (x1 y1 x2 y2 : t) : y1 <> zeror => y2 <> zeror =>
     (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
-  proof.                          (* FIXME: views *)
-  move=> nz_y1 nz_y2; rewrite -{1}(@mulrK y2 _ x1) ?unitfP //.
-  rewrite  -{1}(@mulrK y1 _ x2) ?unitfP // -!mulrA (@mulrC (invr y1)) !mulrA.
-  split=> [|->] //;
-    (have nz_Vy1: invr y1 <> zeror by rewrite invr_eq0);
-    (have nz_Vy2: invr y2 <> zeror by rewrite invr_eq0).
-  by move/(mulIf _ nz_Vy1)/(mulIf _ nz_Vy2).
-  qed.
+  proof. by move=> ? ?; apply: eqr_div; apply/unitfE. qed.
 
   lemma expfM x y n : exp (x * y) n = exp x n * exp y n.
   proof.

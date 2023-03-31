@@ -789,7 +789,7 @@ qed.
 lemma filter_pred1 x (s : 'a list) :
   filter (pred1 x) s = nseq (count (pred1 x) s) x.
 proof.
-elim: s=> /= @/pred1 [|y s ih]; first by rewrite nseq0.
+elim: s=> /= [|y s ih @/pred1]; first by rewrite nseq0.
 by case: (y = x)=> //; rewrite addzC nseqS ?count_ge0.
 qed.
 
@@ -2111,7 +2111,7 @@ proof.
 elim: s => //= x s ih inj_f [xs uqs]; case _: (f x) => /= [|v] E.
 - by rewrite ih // => x' y' v' x's y's; apply/inj_f; right.
 rewrite ih //; 1: by move => x' y' v' x's y's; apply/inj_f; right.
-rewrite /oget /= pmap_map; apply/negP => /mapP.
+rewrite /= pmap_map; apply/negP => /mapP.
 case=> -[|v']; rewrite mem_filter // => -[[_ vs] @/oget /=].
 apply/negP=> <<-; move: vs; rewrite -E => /mapP.
 case=> y [ys eq_f]; suff <<-//: x = y.
@@ -2585,6 +2585,10 @@ proof.
 by elim: xs => // -[a b] xs ih /=; rewrite assoc_cons; case: (k = a).
 qed.
 
+lemma assoc_none ['a, 'b] (xs : ('a * 'b) list) (k : 'a) :
+  assoc xs k <> None <=> exists (s:'b), (k,s) \in xs.
+proof. by rewrite assocTP  mem_map_fst. qed.
+
 lemma perm_eq_assoc (s1 s2 : ('a * 'b) list) x:
      uniq (map fst s2)
   => perm_eq s1 s2 => assoc s1 x = assoc s2 x.
@@ -2700,6 +2704,17 @@ proof.
   move => [le0k lekn]; move: (mkseq_add f k (n - k) _ _) => //; first by smt().
   by rewrite addrA addrAC /= => ->; rewrite take_size_cat // size_mkseq lez_maxr.
 qed.
+
+lemma map_mkseq (f : 'a -> 'b) (g: int -> 'a) (n : int) :
+  map f (mkseq g n) = mkseq (f \o g) n.
+proof.
+case (0 <= n); last by move => ?; rewrite !mkseq0_le /#.
+move => ge0_n; apply (eq_from_nth witness) => [|i rg_i].
+- by rewrite size_map !size_mkseq.
+rewrite size_map size_mkseq lez_maxr // in rg_i.
+by rewrite (nth_map witness) ?size_mkseq ?lez_maxr // !nth_mkseq. 
+qed.
+
 
 (* -------------------------------------------------------------------- *)
 (*                         Sequence folding                             *)
@@ -4491,6 +4506,56 @@ by rewrite /predC1; apply/negP => ->>.
 qed.
 
 (* -------------------------------------------------------------------- *)
+(*                    retrieving a maximal element                      *)
+(* -------------------------------------------------------------------- *)
+section ListMax.
+
+declare type t.
+
+(* get max relative to this transitive and strongly connective relation *)
+declare op rel: t -> t -> bool.
+
+declare axiom nosmt rel_trans: transitive rel. 
+
+declare axiom nosmt rel_conn (a b: t): rel a b \/ rel b a.
+
+lemma nosmt rel_refl: reflexive rel by move => x; elim (rel_conn x x).
+
+(* returns the greater of x and a maximal element in the list *)
+op listmax_bounded (x: t) (xs: t list): t =
+  with xs = [] => x
+  with xs = x'::xs' => listmax_bounded (if rel x x' then x' else x) xs'.
+
+(* returns dfl if empty, and a maximal element in the list otherwise *)
+op listmax (dfl: t) (xs: t list): t =
+  with xs = [] => dfl
+  with xs = x::xs' => listmax_bounded x xs'.
+
+lemma nosmt listmax_gt_in (dfl: t) (xs: t list): forall x, x \in xs => rel x (listmax dfl xs).
+proof.
+case xs => [x| x xs]; 1: by rewrite in_nil.
+move: x; elim xs => /= [x y ->| x xs indH y z]; 1: exact rel_refl.
+case (rel y x) => rel_y_x [->|]; 2,3: by apply indH.
+- apply (rel_trans x) => //.
+  by apply indH.
+have rel_x_y :rel x y by case (rel_conn x y).
+elim => [->| z_in_xs].
+- apply (rel_trans y) => //.
+  by apply indH.
+- by apply indH; right.
+qed.
+
+lemma nosmt listmax_in (dfl: t) (xs: t list): size xs <> 0 => listmax dfl xs \in xs.
+proof.
+case xs => [//|x xs _ /=].
+move: x; elim xs => // x xs indH y /=.
+case (rel y x) => _; 1: (right; apply indH).
+by elim (indH y) => ->.
+qed.
+
+end section ListMax.
+
+(* -------------------------------------------------------------------- *)
 (*                          Order lifting                               *)
 (* -------------------------------------------------------------------- *)
 op lex (e : 'a -> 'a -> bool) s1 s2 =
@@ -4498,7 +4563,7 @@ op lex (e : 'a -> 'a -> bool) s1 s2 =
   with s1 = []      , s2 = y2 :: s2 => true
   with s1 = y1 :: s1, s2 = []       => false
   with s1 = y1 :: s1, s2 = y2 :: s2 =>
-    if e y1 y2 then if e y2 y1 then lex e s1 s1 else true else false.
+    if e y1 y2 then if e y2 y1 then lex e s1 s2 else true else false.
 
 lemma lex_total (e : 'a -> 'a -> bool):
      (forall x y, e x y \/ e y x)

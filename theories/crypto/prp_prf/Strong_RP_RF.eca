@@ -141,10 +141,10 @@ qed.
 phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !X x ==> true] = 1%r.
 proof.
 proc; seq  1: (exists x, support uD x /\ !X x)=> //=.
-+ by rnd (predT); skip; smt ml=0 w=uD_uf_fu.
++ by rnd (predT); skip; smt(uD_uf_fu).
 if=> //=.
 + rnd (predT); skip.
-  by progress [-split]; split=> //=; smt.
+  progress [-split]; split=> //=; smt.
 by hoare; rnd=> //=; skip=> &hr ->.
 qed.
 
@@ -153,7 +153,7 @@ proof.
 proc; if=> //=; auto; call Indirect_ll.
 skip=> /> &hr x_notin_m.
 have [x0] x0_notinr_m := endo_dom_rng PRPi.m{hr} _; first by exists x{hr}.
-by exists x0; rewrite x0_notinr_m /=; smt w=uD_uf_fu.
+by exists x0; rewrite x0_notinr_m /=; smt(uD_uf_fu).
 qed.
 
 lemma PRPi'_Indirect_fi_ll: islossless PRPi'(Indirect).fi.
@@ -161,7 +161,7 @@ proof.
 proc; if=> //=; auto; call Indirect_ll.
 skip=> /> &hr x_notin_mi.
 have [x0] x0_notinr_mi := endo_dom_rng PRPi.mi{hr} _; first by exists x{hr}.
-by exists x0; rewrite x0_notinr_mi; smt w=uD_uf_fu.
+by exists x0; rewrite x0_notinr_mi; smt(uD_uf_fu).
 qed.
 
 (** The proof is cut into 3 parts (sections):
@@ -237,7 +237,7 @@ section Upto.
     <= Pr[IND(ARP,D).main() @ &m: ARP.coll].
   proof.
   rewrite (PRPi'_Indirect_eq &m).
-  byequiv: PRP_indirect_bad.bad=> //=; 2:smt ml=0.
+  byequiv: PRP_indirect_bad.bad=> //=; 2:smt().
   proc.
   call (_: ARP.coll,
              !PRP_indirect_bad.bad{1} /\ ={m,mi}(PRPi,ARP),
@@ -253,7 +253,8 @@ section Upto.
       by auto=> /#.
     sp; if{1}.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
-      auto; progress [-split]; split=> //= [|_]; 1:smt.
+      auto; progress [-split]; split=> //= [|_].
+        by apply/excepted_lossless => /#.
       by progress; right.
     by auto; progress [-split]; rewrite H0 /= => -> /=; rewrite get_setE.
   + move=> &2 bad; conseq (_: true ==> true: =1%r)
@@ -261,11 +262,11 @@ section Upto.
       by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.
     seq  2: (X = rng PRPi.m /\ x \notin PRPi.m) 1%r 1%r 0%r _ => //=.
-      by auto; rewrite -/predT; smt ml=0 w=uD_uf_fu. (* predT should be an abbreviation *)
-      by if=> //=; auto; smt.
+      by auto; rewrite -/predT; smt(uD_uf_fu).
+      by if=> //=; auto=> /> *; apply/excepted_lossless => /#.
       by hoare; auto.
   + move=> &1.
-    proc; if; auto; progress [-split]; rewrite -/predT; split=> //= [|_]; 1:smt ml=0 w=uD_uf_fu.
+    proc; if; auto; progress [-split]; rewrite -/predT; split=> //= [|_]; 1:smt(uD_uf_fu).
     by progress [-split]; rewrite H.
   + proc. if=> //=; inline *.
     swap{1} 1.
@@ -277,7 +278,8 @@ section Upto.
       by auto=> /#.
     sp; if{1}.
       conseq (_: PRP_indirect_bad.bad{1} /\ ARP.coll{2})=> //=.
-      auto; progress [-split]; split=> //= [|_]; 1:smt.
+      auto; progress [-split]; split=> //= [|_].
+        by apply/excepted_lossless => /#.
       by progress; right.
     by auto; progress [-split]; rewrite H0 => /= ->; rewrite get_setE.
   + move=> &2 bad; conseq (_: true ==> true: =1%r)
@@ -285,13 +287,13 @@ section Upto.
       by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.
     seq  2: (X = rng PRPi.mi /\ y \notin PRPi.mi) 1%r 1%r 0%r _ => //=.
-      by auto; rewrite -/predT; smt ml=0 w=uD_uf_fu. (* predT should be an abbreviation *)
-      by if=> //=; auto; smt.
+      by auto; rewrite -/predT; smt(uD_uf_fu).
+      by if=> //=; auto=> /> *; apply/excepted_lossless => /#.
       by hoare; auto.
   + move=> &1.
-    proc; if; auto; progress [-split]; rewrite -/predT; split=> //= [|_]; 1:smt ml=0 w=uD_uf_fu.
+    proc; if; auto; progress [-split]; rewrite -/predT; split=> //= [|_]; 1:smt(uD_uf_fu).
     by progress [-split]; rewrite H.
-  by inline *; auto; progress; smt.
+  by inline *; auto; progress => /#.
   qed.
 end section Upto.
 
@@ -408,13 +410,13 @@ section CollisionProbability.
             apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
             rewrite get_setE; case: (x0 = x{2})=> [<<- /= ->|_ mx0] //.
             by left; exists x0.
-          smt.
+          by rewrite fcardU fcard1; smt(fcard_ge0).
         + apply/(ler_trans (card (frng ARP.mi{2} `|` fset1 x{2}))).
             apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
             rewrite get_setE; case: (x0 = yL)=> [<<- //|_ mx0].
             by left; exists x0.
-          smt.
-      - smt ml=0.
+          by rewrite fcardU fcard1; smt(fcard_ge0).
+      - smt().
     * proc; sp; if=> //=. rcondt{2} 1; first by auto=> /#.
       inline *; sp; if=> //=; auto.
       - progress.
@@ -422,13 +424,13 @@ section CollisionProbability.
             apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
             rewrite get_setE; case: (x0 = x0L)=> [<<- //|_ mx0].
             by left; exists x0.
-          smt.
+          by rewrite fcardU fcard1; smt(fcard_ge0).
         + apply/(ler_trans (card (frng ARP.mi{2} `|` fset1 x0L))).
             apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
             rewrite get_setE; case: (x0 = x{2})=> [<<- //|_ mx0].
             by left; exists x0.
-          smt.
-      - smt ml=0.
+          by rewrite fcardU fcard1; smt(fcard_ge0).
+      - smt().
     by auto=> />; rewrite frng0 fcards0.
   fel 2 FEL.c (fun x, x%r * mu uD (pred1 witness)) q (ARP.coll) 
            [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]
@@ -441,7 +443,7 @@ section CollisionProbability.
     proc; sp; rcondt 1=> //.
     inline *; sp; if=> //=; last first.
     * hoare; auto=> // /> &hr 6?.
-      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
+      by apply/RealOrder.mulr_ge0; smt(mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (rng ARP.m); skip.
       progress.
@@ -450,9 +452,9 @@ section CollisionProbability.
         + by apply/fun_ext=> x; rewrite mem_frng.
         apply/mu_mem_le; move=> x _; have [] uD_suf [] ? uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
-        by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW leq_card_rng_dom).
+        by apply/RealOrder.ler_wpmul2r; smt(mu_bounded lt_fromint ltrW leq_card_rng_dom).
       - by move: H9;rewrite H1.
-    * by hoare; auto=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
+    * by hoare; auto=> //=; smt(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc. rcondt 2; 1:by auto.
     sp; if=> //=.
     * inline*;sp;if;auto; 2:smt().
@@ -463,7 +465,7 @@ section CollisionProbability.
   + exists*FEL.c;elim*=> c.
     conseq(:_==>_ : (c%r * mu1 uD witness));progress.
     proc; sp; rcondt 1=> //=.
-    inline *; sp; if=> //=; last by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
+    inline *; sp; if=> //=; last by hoare; auto; smt(RealOrder.mulr_ge0 mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (rng ARP.mi); skip.
       progress.
@@ -472,9 +474,9 @@ section CollisionProbability.
         + by apply/fun_ext=> x; rewrite mem_frng.
         apply/mu_mem_le; move=> x _; have [] uD_suf [] _ uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
-        smt w=(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW leq_card_rng_dom).
+        smt(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW leq_card_rng_dom).
       - by move: H9; rewrite H1.
-    * by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
+    * by hoare; auto; smt(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc; rcondt 2; 1:by auto.
     sp; if=> //=.
     * inline*;sp;if;auto; 2:smt().
@@ -517,14 +519,11 @@ section PRPi_PRPi'_Indirect.
        forall a, Pr[Direct.sample: res = a] = Pr[Indirect.sample: res = a]. *)
   equiv eq_Direct_Indirect: Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
   proof.
-  transitivity S.direct (X{2} = fun _=> X{1} ==> ={res}) (X{1} = fun _ => X{2} ==> ={res})=> />.
-  + by move=> &2; exists ((), fun _=> X{2}).
-  + by proc; rnd.
-  transitivity S.indirect (={x,X} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> />.
-  + by move=> &1 &2 ->; exists ((),fun _=> X{2}).
-  + by conseq (@ll_direct_indirect_eq); smt(uD_uf_fu).
-  proc. seq 1 1: (#pre /\ ={r}); auto.
-  by if; auto.
+  proc.
+  rewrite equiv [{1} ll_direct_indirect_eq ((), fun _ => X) r ((), fun _ => X) r]. 
+  + smt(uD_uf_fu).
+  sp; seq 1 1: ((X0 = fun _ => X){1} /\ ={X} /\ r0{1} = r{2}); auto=> />.
+  by if; auto=> /#.
   qed.
 
   (* The rest is easy *)

@@ -18,6 +18,20 @@ open EcCoreGoal.FApi
  * The actual rule is in this core rule + conseq.
  *)
 
+
+(* -------------------------------------------------------------------- *)
+val t_equivS_trans :
+     EcMemory.memtype * EcModules.stmt
+  -> EcFol.form * EcFol.form
+  -> EcFol.form * EcFol.form
+  -> EcCoreGoal.FApi.backward
+
+val t_equivF_trans :
+     EcPath.xpath
+  -> EcFol.form * EcFol.form
+  -> EcFol.form * EcFol.form
+  -> EcCoreGoal.FApi.backward
+
 (* -------------------------------------------------------------------- *)
 val process_equiv_trans :
   trans_kind * trans_formula -> backward
