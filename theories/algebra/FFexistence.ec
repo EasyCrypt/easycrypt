@@ -1,7 +1,7 @@
 (* ==================================================================== *)
 require import AllCore List Ring Int IntMin IntDiv Real RealExp Poly.
 require import StdBigop StdPoly Binomial Counting Perms.
-require import PolyDiv FiniteRing.
+require import PolyDiv FiniteRing Ideal.
 (*---*) import StdOrder.IntOrder.
 
 
@@ -639,8 +639,7 @@ theory Counting_Argument.
 end Counting_Argument.
 
 
-
-theory PolyFF.
+abstract theory PolyFF.
 
   type coeff.
 
@@ -1273,8 +1272,8 @@ theory PolyFF.
 
 end PolyFF.
 
-(*
-theory FFIrrPolyExt.
+
+abstract theory FFIrrPolyExt.
 
   type coeff.
 
@@ -1287,6 +1286,54 @@ theory FFIrrPolyExt.
 
   import P.
   import BigPoly.
-*)
 
+  op p : poly.
 
+  axiom irredp_p : irreducible_poly p.
+
+  clone import Ideal as IDQ with
+    type t <- PID.poly,
+    theory IDomain <- IDPoly,
+    theory BigDom.BAdd <- BigPoly.PCA,
+    theory BigDom.BMul <- BigPoly.PCM.
+
+  clone import IDQ.FieldQuotient as FQ with
+    op p <- IDQ.idgen [p]
+    proof MaximalIdealAxioms.*.
+
+  realize MaximalIdealAxioms.ideal_p by apply/ideal_idgen.
+
+  realize MaximalIdealAxioms.neq_p_idT.
+  proof.
+    apply/negP => /fun_ext /(_ poly1); rewrite mem_idT eqT.
+    rewrite mem_idgen1 /= negb_exists => q /=; apply/negP.
+    move/(congr1 deg); rewrite deg1 eq_sym.
+    case: (q = poly0) => [->>|neqq0]; [by rewrite PolyComRing.mul0r deg0|].
+    rewrite degM //=; [by apply/irredp_neq0/irredp_p|].
+    apply/gtr_eqF/ltr_subr_addr => /=; apply/ltzE.
+    move/deg_gt0/ltzE: neqq0 irredp_p => le1 /irredp_poly_deg /ltzE le2.
+    by move: (ler_add _ _ _ _ le1 le2).
+  qed.
+
+  realize MaximalIdealAxioms.max_p.
+  proof.
+    split; [by apply/ideal_idgen|split; [by apply/MaximalIdealAxioms.neq_p_idT|]].
+    move=> I iI neqIT forall_; apply/fun_ext => q; rewrite eq_iff; split.
+    + by apply/forall_.
+    move=> Iq; apply/mem_idgen1; move/(_ _ (mem_idgen1_gen p)): forall_ => Ip.
+    case: irredp_p => lt1_ /(_ (gcdp p q) _ (dvdp_gcdl p q)).
+    + move: neqIT; apply/implybNN; rewrite deg_eq1 => -[c] [] neqc0 eqc_.
+      rewrite -(ideal_eq1P _ (gcdp p q)) //.
+      - rewrite eqc_; split; [by rewrite degC neqc0|].
+        by rewrite polyCE /= -F.unitfE.
+      case: (Bezoutp p q) => u v eqp_; move: eqp_ (eqp_).
+      move/eqp_size; rewrite {1}eqc_ degC neqc0 /= deg_eq1.
+      case=> d [] neqd0 eqd_/eqp_eq /(congr1 (P.( ** ) (F.invr (lc (u * p + v * q))))).
+      rewrite !scalepA F.mulVr; [by apply/F.unitfE; rewrite eqd_ lcC|].
+      rewrite scale1r => <-; rewrite scalepDr !scalerAl.
+      by apply/idealD => //; apply/idealMl.
+    case=> _ dvdp_; move: (dvdp_trans _ _ _ dvdp_ (dvdp_gcdr p q)).
+    by rewrite -ulc_dvdpP // -F.unitfE lc_eq0 irredp_neq0 // irredp_p.
+  qed.
+
+end FFIrrPolyExt.
