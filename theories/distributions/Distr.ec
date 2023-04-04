@@ -1886,7 +1886,9 @@ rewrite supportP djoin1E; case: (size ds = size xs) => //= eq_sz; split.
 + apply: contraR; rewrite -has_predC => /hasP[] @/predC [d x] /=.
   case=> hmem xNd; apply/prodr_eq0; exists (d, x) => @/predT /=.
   by rewrite hmem /= -supportPn.
-+ apply: contraL => /prodr_eq0[] @/predT [d x] /= [hmem xNd].
+print eq0_prodr. print mulf_eq0.
++ apply: contraL; rewrite -eq0_prodr; [by exact mulf_eq0|].
+  case=> @/predT -[d x] /= [hmem xNd].
   rewrite -has_predC &(hasP); exists (d, x).
   by rewrite hmem /predC /= supportPn.
 qed.
@@ -2159,7 +2161,8 @@ qed.
 lemma dfun_supp ['u] (d : t -> 'u distr) (f : t -> 'u) :
   f \in dfun d <=> (forall x, f x \in d x).
 proof.
-rewrite supportP dfun1E -prodr_eq0 negb_exists /=; split;
+rewrite supportP dfun1E -eq0_prodr; [by exact mulf_eq0|].
+rewrite negb_exists /=; split;
   by move=> + x - /(_ x); rewrite FinT.enumP /predT /= supportP.
 qed.
 

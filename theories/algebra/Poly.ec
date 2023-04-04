@@ -890,7 +890,7 @@ lemma deg_prod_le ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
 proof.
 case: (all (predC (predI P (fun x => F x = poly0))) r); last first.
 + rewrite allP negb_forall /=; case => x; rewrite negb_imply {1}/predC {1}/predI /=.
-  by case=> mem_x [Px eqFx0]; apply/lerr_eq/deg_eq0/prodr0; exists x; do!split.
+  by case=> mem_x [Px eqFx0]; apply/lerr_eq/deg_eq0/prodr_eq0; exists x; do!split.
 elim: r => [_|x r IHr]; [by rewrite PCM.big_nil /= BIA.big_nil deg1|].
 rewrite /= {1}/predC {1}/predI /= negb_and PCM.big_cons StdBigop.Bigint.BIA.big_cons /=.
 case (P x) => //= Px [NeqFx0 all_]; move/IHr: (all_) => {IHr} le_.
@@ -1483,7 +1483,7 @@ lemma deg_prod ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
 proof.
 case: (all (predC (predI P (fun x => F x = poly0))) r); last first.
 + rewrite allP negb_forall /=; case => x; rewrite negb_imply {1}/predC {1}/predI /=.
-  by case=> mem_x [Px eqFx0]; apply/deg_eq0/BigPoly.prodr0; exists x; do!split.
+  by case=> mem_x [Px eqFx0]; apply/deg_eq0/BigPoly.prodr_eq0; exists x; do!split.
 elim: r => [_|x r IHr]; [by rewrite BigPoly.PCM.big_nil /= BIA.big_nil deg1|].
 rewrite /= {1}/predC {1}/predI /= negb_and BigPoly.PCM.big_cons StdBigop.Bigint.BIA.big_cons /=.
 case (P x) => //= Px [NeqFx0 all_]; move/IHr: (all_) => {IHr} eq_.

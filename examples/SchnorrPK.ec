@@ -145,7 +145,7 @@ section SchnorrPKSecurity.
     auto; rewrite /R /R_DL /oget => &hr /> hne 2!-> /=.
     rewrite expM !expB accepting_transcript_1 accepting_transcript_2.
     rewrite invM (mulcC m{hr}) -mulcA (mulcA m{hr}) mulcV mulcA mulc1 -expB -expM.
-    by rewrite ZPF.divrr ?ZPF.subr_eq0 // exp1.
+    by rewrite ZPF.divrr ?ZPF.subr_eq0 // ?exp1 // ZPF.unitfP ZPF.subr_eq0.
   qed.
 
   (* Special honest verifier zero knowledge *)

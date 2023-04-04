@@ -233,6 +233,19 @@ rewrite IHs; [by exists y; do!split|].
 by rewrite mulr0; case: (P x).
 qed.
 
+lemma nosmt eq0_prodr (P : 'a -> bool) (F : 'a -> t) (s : 'a list) :
+  (forall (x y : t) , x * y = zeror <=> x = zeror \/ y = zeror) =>
+  (exists x , P x /\ (x \in s ) /\ F x = zeror) <=>
+  BMul.big P F s = zeror.
+proof.
+move=> mulf_; split; [by exact prodr_eq0|].
+elim: s => [|z s IHs]; [by rewrite BMul.big_nil oner_neq0|].
+rewrite BMul.big_cons; case (P z) => [Pz|NPz]; [case/mulf_|].
++ by move=> eq_; exists z.
++ by case/IHs => x [] Px [] memx eqx; exists x; rewrite Px memx eqx.
+by case/IHs => x [] Px [] memx eqx; exists x; rewrite Px memx eqx.
+qed.
+
 lemma nosmt mulr_const_cond p s c:
   BMul.big<:'a> p (fun _ => c) s = exp c (count p s).
 proof.
