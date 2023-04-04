@@ -1,7 +1,7 @@
 (* ==================================================================== *)
 require import AllCore List Ring Int IntMin IntDiv Real RealExp Poly.
 require import StdBigop StdPoly Binomial Counting Perms.
-require import PolyDiv FiniteRing Ideal.
+require import RingStruct PolyDiv FiniteRing Ideal.
 (*---*) import StdOrder.IntOrder.
 
 
@@ -644,10 +644,10 @@ abstract theory PolyFF.
   type coeff.
 
   clone import FiniteRing.FiniteField as FF with
-    type t <= coeff.
+    type t <- coeff.
 
   clone import Idomain as PID with
-    type coeff <= coeff,
+    type coeff <- coeff,
     theory IDC <- FF.F.
 
   import P.
@@ -1270,20 +1270,49 @@ abstract theory PolyFF.
     by rewrite fact1 !divz1 range_ltn // range_geq.
   qed.
 
+  lemma exists_iu_le_deg (n : int) :
+    exists p , n < deg p /\ irreducible_poly p /\ monic p.
+  proof.
+    rewrite -negbK negb_exists /=; apply/negP => forall_.
+    case: (irredp_monic_decW (PCM.big predT idfun (rem poly0 (enum_ledeg n)) * X + poly1)) => + _.
+    rewrite rem_filter ?uniq_enum_ledeg //; rewrite scaled_monicP.
+    pose r:= (PCM.big _ _ _); have: r <> poly0; rewrite /r => {r}.
+    + rewrite -prodf_neq0; apply/allP => q /mem_filter [] + _.
+      by rewrite /predC1 /predC /predI /predT /idfun.
+    move=> neq_0; pose r:= (_ + poly1); have: r <> poly0; rewrite /r => {r}.
+    + apply/negP => /(congr1 deg); rewrite deg0 degDl.
+      - by rewrite deg1 degM ?nz_polyX // degX /= -ltr_subl_addr deg_gt0.
+      rewrite /=; apply/gtr_eqF; rewrite deg_gt0.
+      by apply/IDPoly.mulf_neq0 => //; apply/nz_polyX.
+    move=> neq_0_; rewrite neq_0_ /=; apply/negP.
+    case; case=> [|q qs]; [rewrite -irredp_monic_dec_nil /= gtr_eqF //|].
+    + rewrite degDl; [by rewrite deg1 degM ?nz_polyX // degX /= -ltr_subl_addr deg_gt0|].
+      by rewrite degM ?nz_polyX // degX /= -ltr_subl_addr deg_gt0.
+    rewrite -irredp_monic_dec_cons => -[] dvdp_ [] irr_ [] m_ dec_.
+    case: (deg q <= n) => [le_n|/ltrNge ltn_]; [move: dvdp_; rewrite (PCM.big_rem _ _ _ q)|].
+    + by rewrite mem_filter enum_ledegP le_n /predC1 irredp_neq0.
+    + rewrite /(predT q) /(idfun q) /=; apply/negP => /dvdp_add_eq.
+      rewrite -PolyComRing.mulrA dvdp_mulIl eq_sym eqT dvdp1 /=.
+      by rewrite gtr_eqF // irredp_poly_deg.
+    by move: forall_ => /(_ q).
+  qed.
+
 end PolyFF.
 
 
 abstract theory FFIrrPolyExt.
 
-  type coeff.
+  type t, pt.
 
   clone import FiniteRing.FiniteField as FF with
-    type t <= coeff.
+    type t <- t.
 
-  clone import Idomain as PID with
-    type coeff <= coeff,
-    theory IDC <- FF.F.
+  clone import PolyFF as PFF with
+    type coeff <- t,
+    theory FF <- FF.
 
+
+  import PFF.PID.
   import P.
   import BigPoly.
 
@@ -1297,9 +1326,10 @@ abstract theory FFIrrPolyExt.
     theory BigDom.BAdd <- BigPoly.PCA,
     theory BigDom.BMul <- BigPoly.PCM.
 
-  clone import IDQ.FieldQuotient as FQ with
+  clone import IDQ.FieldQuotient as IFQ with
+    type qT <- pt,
     op p <- IDQ.idgen [p]
-    proof MaximalIdealAxioms.*.
+  proof MaximalIdealAxioms.*.
 
   realize MaximalIdealAxioms.ideal_p by apply/ideal_idgen.
 
@@ -1336,4 +1366,234 @@ abstract theory FFIrrPolyExt.
     by rewrite -ulc_dvdpP // -F.unitfE lc_eq0 irredp_neq0 // irredp_p.
   qed.
 
+  clone import FiniteField as FFQ with
+    type t <- pt,
+    theory F <= IFQ.FQ,
+    op FinType.enum <= map pi (enum_ledeg (deg p - 1))
+  proof *.
+
+  realize FinType.enum_spec.
+  proof.
+    move=> x; rewrite (count_rem _ _ x) -(reprK x).
+    + apply/mapP; exists (modp (repr x) p).
+      rewrite enum_ledegP -ltzS /= ltn_modp irredp_neq0 ?irredp_p //=.
+      rewrite -eqv_pi eqv_sym /eqv mem_idgen1; exists (divp (repr x) p).
+      rewrite PolyComRing.subr_eq -ulc_divp_eq // -FF.F.unitfE.
+      by rewrite lc_eq0 irredp_neq0 // irredp_p.
+    rewrite /(pred1 _ _) /= b2i1 eq_sym addrC -subr_eq eq_sym /=.
+    rewrite rem_filter ?map_inj_in_uniq ?uniq_enum_ledeg //.
+    + move=> q r /enum_ledegP /ltzS /= ltq_ /enum_ledegP /ltzS /= ltr_.
+      move/eqv_pi; rewrite eqv_sym /eqv => /mem_idgen1 [u].
+      rewrite PolyComRing.subr_eq => /(congr1 (transpose modp p)) /=.
+      rewrite ulc_modp_addl_mul_small // ?modp_small //.
+      by rewrite -FF.F.unitfE lc_eq0 irredp_neq0 // irredp_p.
+    by rewrite -mem_count_eq0 mem_filter mapP /predC1.
+  qed.
+
+  lemma cardP :
+    FFQ.FinType.card = FF.FinType.card ^ (deg p - 1).
+  proof.
+    rewrite /FFQ.FinType.card size_map size_enum_ledeg //.
+    by apply/ltzS => /=; apply/deg_gt0/irredp_neq0/irredp_p.
+  qed.
+
 end FFIrrPolyExt.
+
+
+abstract theory FFexistence.
+
+type t, et.
+
+op n : int.
+
+axiom lt0n: 0 < n.
+
+clone import FiniteField as FF with
+  type t <- t.
+
+clone import PolyFF as PFF with
+  type coeff <- t,
+  theory FF <- FF.
+
+import Counting_Argument.
+
+op is_extension_params1 (mp : int * PID.poly) =
+  0 < mp.`1 /\
+  PID.irreducible_poly mp.`2 /\
+  PID.P.monic mp.`2 /\
+  0 < I n (FF.FinType.card ^ (PID.P.deg mp.`2 - 1)).
+
+op m = (choiceb (is_extension_params1) (0, PID.P.poly0)).`1.
+
+op p = (choiceb (is_extension_params1) (0, PID.P.poly0)).`2.
+
+lemma mpP :
+  0 < m /\
+  PID.irreducible_poly p /\
+  PID.P.monic p /\
+  0 < I n (FF.FinType.card ^ (PID.P.deg p - 1)).
+proof.
+move: (choicebP is_extension_params1 (0, PID.P.poly0) _); last first.
++ by rewrite /m /p; pose c:= choiceb _ _; move: c => c; rewrite /is_extension_params1.
+rewrite /is_extension_params1; case: (lt0I _ lt0n) => q.
+move: (ilog_eq _ (max 1 q) (ilog FF.FinType.card (max 1 q)) card_gt1 _ _) => /=.
++ by apply/gtr_maxrP.
++ by apply/ilog_ge0; [apply/ltzW/card_gt1|apply/ger_maxrP].
+case=> _ /ltr_maxrP [] _ /ltzW leq_ lt0I_.
+case: (exists_iu_le_deg (ilog FinType.card (max 1 q) + 1)) => p.
+case=> /ltr_subr_addr /ltzE le_ [] irr_ m_; exists (n, p) => /=.
+rewrite lt0n irr_ m_ /=; apply/lt0I_/(ler_trans _ _ _ leq_)/ler_weexpn2l.
++ by apply/ltzW/card_gt1.
+rewrite le_ /=; apply/addr_ge0 => //.
+by apply/ilog_ge0; [apply/ltzW/card_gt1|apply/ger_maxrP].
+qed.
+
+lemma lt0m : 0 < m.
+proof. by case: mpP. qed.
+
+lemma irredp_p : PID.irreducible_poly p.
+proof. by case: mpP. qed.
+
+lemma monic_p : PID.P.monic p.
+proof. by case: mpP. qed.
+
+lemma lt0In_ : 0 < I n (FF.FinType.card ^ (PID.P.deg p - 1)).
+proof. by case: mpP. qed.
+
+print PID.poly.
+
+clone import FFIrrPolyExt as Ext1 with
+  type t <- t,
+  theory FF <- FF,
+  type PFF.PID.poly <- FFexistence.PFF.PID.poly,
+  theory PFF.PID.P <- PFF.PID.P,
+  theory PFF.PID.PS <- PFF.PID.PS,
+  theory PFF.PID.RPD <- PFF.PID.RPD,
+  theory PFF.PID.CRD <- PFF.PID.CRD,
+  theory PFF.PID.RM <- PFF.PID.RM,
+  theory PFF.PID.CR.PCR <- PFF.PID.CR.PCR,
+  theory PFF.PID.CR.RPD <- PFF.PID.CR.RPD,
+  theory PFF.PID.CR.CRD <- PFF.PID.CR.CRD,
+  theory PFF.PID.CR.RM <- PFF.PID.CR.RM,
+  op PFF.PID.CR.unit <- FFexistence.PFF.PID.CR.unit,
+  op PFF.PID.irreducible_poly <- FFexistence.PFF.PID.irreducible_poly,
+  op p <- p
+proof PFF.PID.CR.unitP, irredp_p.
+(*TODO: anomaly here if using the big clone with theory.*)
+(*theory PFF <- PFF*)
+(*theory PFF.PID.CR <- PFF.PID.CR*)
+
+realize PFF.PID.CR.unitP by exact FFexistence.PFF.PID.CR.unitP.
+realize irredp_p by exact irredp_p.
+
+(*TODO: what are hidden lemmas?*)
+(*print Ext1.FFQ.*)
+
+clone import PolyFF as PFFE with
+  type coeff <- Ext1.pt,
+  theory FF <- Ext1.FFQ.
+
+op is_extension_params2 (q : PFFE.PID.poly) =
+  PFFE.PID.P.deg q = n + 1 /\
+  PFFE.PID.irreducible_poly q /\
+  PFFE.PID.P.monic q.
+
+op q = choiceb is_extension_params2 PFFE.PID.P.poly0.
+
+lemma qP : is_extension_params2 q.
+proof.
+rewrite /q; apply/choicebP; rewrite /is_extension_params2.
+move: (PFFE.eqI_size_enum_iudeg _ lt0n) lt0In_.
+rewrite -cardP => -> /has_predT /hasP [q] [] + _.
+by case/enum_iudegP => irr_ [] m_ eq_; exists q.
+qed.
+
+lemma eq_degq : PFFE.PID.P.deg q = n + 1.
+proof. by case: qP. qed.
+
+lemma irredp_q : PFFE.PID.irreducible_poly q.
+proof. by case: qP. qed.
+
+lemma monic_q : PFFE.PID.P.monic q.
+proof. by case: qP. qed.
+
+clone import FFIrrPolyExt as Ext2 with
+  type t <- pt,
+  theory FF <- Ext1.FFQ,
+  type PFF.PID.poly <- FFexistence.PFFE.PID.poly,
+  theory PFF.PID.P <- PFFE.PID.P,
+  theory PFF.PID.PS <- PFFE.PID.PS,
+  theory PFF.PID.RPD <- PFFE.PID.RPD,
+  theory PFF.PID.CRD <- PFFE.PID.CRD,
+  theory PFF.PID.RM <- PFFE.PID.RM,
+  theory PFF.PID.CR.PCR <- PFFE.PID.CR.PCR,
+  theory PFF.PID.CR.RPD <- PFFE.PID.CR.RPD,
+  theory PFF.PID.CR.CRD <- PFFE.PID.CR.CRD,
+  theory PFF.PID.CR.RM <- PFFE.PID.CR.RM,
+  op PFF.PID.CR.unit <- FFexistence.PFFE.PID.CR.unit,
+  op PFF.PID.irreducible_poly <- FFexistence.PFFE.PID.irreducible_poly,
+  op p <- q
+proof PFF.PID.CR.unitP, irredp_p.
+(*TODO: anomaly here if using the big clone with theory.*)
+(*theory PFF <- PFF*)
+(*theory PFF.PID.CR <- PFF.PID.CR*)
+
+realize PFF.PID.CR.unitP by exact FFexistence.PFFE.PID.CR.unitP.
+realize irredp_p by exact irredp_q.
+
+clone import FieldStruct as FStr with
+  type t <= Ext2.pt,
+  theory F <- Ext2.FFQ.F.
+
+clone import FiniteFieldStruct as FFStr with
+  type t <= Ext2.pt,
+  theory F <- Ext2.FFQ.F,
+  theory FStr <- FStr,
+  theory FF.FinType <- Ext2.FFQ.FinType.
+
+clone import SubFiniteField as SubFF with
+  type t <- Ext2.pt,
+  type st <- et,
+  theory F <- Ext2.FFQ.F,
+  theory FStr <- FFexistence.FStr,
+  theory FF.FinType <- Ext2.FFQ.FinType,
+  op SubF.p <- FFexistence.FStr.iter_frobenius_fixed n
+proof SubF.fieldp.
+
+realize SubF.fieldp.
+proof.
+rewrite /iter_frobenius_fixed.
+split; split; split; [split| | |] => /=.
++ rewrite iter_frobenius ?ltzW ?lt0n // IFQ.FQ.expr0z gtr_eqF //.
+  by apply/expr_gt0/gt0_char.
++ move=> x; rewrite !iter_frobenius ?ltzW ?lt0n.
+  rewrite -(IFQ.FQ.mulN1r x) FFQ.F.expfM => ->.
+  congr; rewrite -FFQ.F.signr_odd ?ltzW ?expr_gt0 ?gt0_char //.
+  rewrite poddX ?lt0n //; case/prime_or_2_odd: prime_char.
+  - move=> eq_; rewrite eq_ oddP /= b2i0 IFQ.FQ.expr0.
+    rewrite -IFQ.FQ.subr_eq0 IFQ.FQ.opprK -IFQ.FQ.mul1r2z IFQ.FQ.mul1r.
+    by move: ofint_char; rewrite eq_.
+  by move=> ->; rewrite b2i1 IFQ.FQ.expr1.
++ move=> x y; have ->: iter n frobenius (IFQ.(+) x y) = IFQ.(+) (iter n frobenius x) (iter n frobenius y).
+  - case (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite !iter0].
+    elim: n => [|n le0n IHn]; [by rewrite !iter0|].
+    by rewrite !iterS //; move: IHn => ->; rewrite frobeniusD // prime_char.
+  by move=> -> ->.
++ by rewrite iter_frobenius ?ltzW ?lt0n // FFQ.F.expr1z.
++ move=> x y; have ->: iter n frobenius (IFQ.( * ) x y) = IFQ.( * ) (iter n frobenius x) (iter n frobenius y).
+  - case (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite !iter0].
+    elim: n => [|n le0n IHn]; [by rewrite !iter0|].
+    by rewrite !iterS //; move: IHn => ->; rewrite frobeniusM // prime_char.
+  by move=> -> ->.
+move=> x {2}<-; rewrite !iter_frobenius ?ltzW ?lt0n //; apply/IFQ.FQ.exprVn.
+by apply/ltzW/expr_gt0/gt0_char.
+qed.
+
+(*TODO: false, but a bunch of such lemmas are needed.*)
+lemma eqn : n = SubFF.n.
+proof.
+move: eq_card_pow_n; rewrite Ext2.cardP Ext1.cardP eq_degq /=.
+abort.
+
+end FFexistence.
+

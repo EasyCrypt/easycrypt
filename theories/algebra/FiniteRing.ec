@@ -486,7 +486,7 @@ abstract theory SubFiniteComRing.
     type t    <= t,
     theory CR <- CR.
 
-  clone import SubComRing with
+  clone import SubComRing as SubCR with
     type t      <= t,
     type st     <= st,
     theory CR   <- CR,
@@ -511,7 +511,7 @@ abstract theory SubFiniteComRing.
     type st           <= st,
     theory CR         <- CR,
     theory CRPr       <- SubFiniteComRing.CRPr,
-    theory SubComRing <- SubComRing.
+    theory SubComRing <- SubCR.
 
   clone include SubFiniteZModule with
     type t          <- t,
@@ -519,7 +519,20 @@ abstract theory SubFiniteComRing.
     theory ZMod     <- CR,
     theory FZMod    <- FCR,
     theory ZModStr  <- CRStr,
-    theory FZModStr <- FCRStr.
+    theory FZModStr <- FCRStr,
+    theory SubZModule.ZModPr <- SubFiniteComRing.CRPr,
+    op SubZModule.p <- SubCR.p,
+    op SubZModule.Sub.insub <- SubFiniteComRing.SubCR.Sub.insub,
+    op SubZModule.Sub.val <- SubFiniteComRing.SubCR.Sub.val,
+    op SubZModule.Sub.wsT <- SubFiniteComRing.SubCR.Sub.wsT
+  proof *.
+
+  realize SubZModule.zmodulep by exact SubCR.zmodulep.
+  realize SubZModule.Sub.insubN by exact SubCR.Sub.insubN.
+  realize SubZModule.Sub.insubT by exact SubCR.Sub.insubT.
+  realize SubZModule.Sub.valP by exact SubCR.Sub.valP.
+  realize SubZModule.Sub.valK by exact SubCR.Sub.valK.
+  realize SubZModule.Sub.insubW by exact SubCR.Sub.insubW.
 
   clone import FiniteComRing as SFCR with
     type t          <= st,
@@ -608,7 +621,7 @@ abstract theory SubFiniteIDomain.
     type t    <= t,
     theory ID <- ID.
 
-  clone import SubIDomain with
+  clone import SubIDomain as SubID with
     type t      <= t,
     type st     <= st,
     theory ID   <- ID,
@@ -633,14 +646,14 @@ abstract theory SubFiniteIDomain.
     type st           <= st,
     theory ID         <- ID,
     theory IDPr       <- SubFiniteIDomain.IDPr,
-    theory SubIDomain <- SubFiniteIDomain.SubIDomain.
+    theory SubIDomain <- SubFiniteIDomain.SubID.
 
   clone include SubFiniteComRing with
     type t            <- t,
     type st           <- st,
     theory CR         <- ID,
     theory CRPr       <- SubFiniteIDomain.IDPr,
-    theory SubComRing <- SubFiniteIDomain.SubIDomain,
+    theory SubCR      <- SubFiniteIDomain.SubID,
     theory FCR        <- SubFiniteIDomain.FID,
     theory CRStr      <- SubFiniteIDomain.IDStr,
     theory FCRStr     <- SubFiniteIDomain.FIDStr,
@@ -663,7 +676,7 @@ abstract theory SubFiniteField.
     type t   <= t,
     theory F <- F.
 
-  clone import SubField with
+  clone import SubField as SubF with
     type t     <= t,
     type st    <= st,
     theory F   <- F,
@@ -689,14 +702,14 @@ abstract theory SubFiniteField.
     type st         <= st,
     theory F        <- F,
     theory FPr      <- SubFiniteField.FPr,
-    theory SubField <- SubField.
+    theory SubField <- SubF.
 
   clone include SubFiniteIDomain with
     type t            <- t,
     type st           <- st,
     theory ID         <- F,
     theory IDPr       <- SubFiniteField.FPr,
-    theory SubIDomain <- SubFiniteField.SubField,
+    theory SubID      <- SubFiniteField.SubF,
     theory FID        <- SubFiniteField.FF,
     theory IDStr      <- SubFiniteField.FStr,
     theory FIDStr     <- SubFiniteField.FFStr,

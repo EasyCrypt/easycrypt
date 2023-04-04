@@ -549,12 +549,12 @@ by rewrite &(idealD) ?ideal_p // idealMl ?ideal_p &(eqv_repr).
 qed.
 
 clone import ComRing as CRQ with
-  type t   <- qT,
-  op zeror <- zeror,
-  op oner  <- oner,
-  op ( + ) <- ( + ),
-  op [ - ] <- [ - ],
-  op ( * ) <- ( * )
+  type t   <= qT,
+  op zeror <= zeror,
+  op oner  <= oner,
+  op ( + ) <= ( + ),
+  op [ - ] <= [ - ],
+  op ( * ) <= ( * )
   proof addrA, addrC, add0r, addNr, oner_neq0, mulrA, mulrC, mul1r, mulrDl.
 
 
@@ -626,14 +626,14 @@ clone include ComRingQuotient with
   theory IdealAxioms <- PrimeIdealAxioms.
 
 clone import IDomain as IDQ with
-  type t     <- qT   ,
-  op   zeror <- zeror,
-  op   ( + ) <- (+)  ,
-  op   [ - ] <- [-]  ,
-  op   oner  <- oner ,
-  op   ( * ) <- ( * ),
-  op   invr  <- CRQ.invr ,
-  pred unit  <- CRQ.unit
+  type t     <= qT   ,
+  op   zeror <= zeror,
+  op   ( + ) <= (+)  ,
+  op   [ - ] <= [-]  ,
+  op   oner  <= oner ,
+  op   ( * ) <= ( * ),
+  op   invr  <= CRQ.invr ,
+  pred unit  <= CRQ.unit
   proof *.
 
 realize addrA by exact CRQ.addrA.
@@ -656,6 +656,8 @@ rewrite -(reprK x) -(reprK y) mulE -!eqv_pi !eqv0r.
 by case: PrimeIdealAxioms.prime_p => _ /(_ (repr x) (repr y)).
 qed.
 
+clear [CRQ.AddMonoid.* CRQ.MulMonoid.* CRQ.*].
+
 end IDomainQuotient.
 
 
@@ -677,15 +679,15 @@ clone include IDomainQuotient with
   op p <- p,
   theory PrimeIdealAxioms <- MaximalIdealAxioms.
 
-clone import Field with
-  type t     <- qT   ,
-  op   zeror <- zeror,
-  op   ( + ) <- (+)  ,
-  op   [ - ] <- [-]  ,
-  op   oner  <- oner ,
-  op   ( * ) <- ( * ),
-  op   invr  <- CRQ.invr ,
-  pred unit  <- CRQ.unit
+clone import Field as FQ with
+  type t     <= qT   ,
+  op   zeror <= zeror,
+  op   ( + ) <= (+)  ,
+  op   [ - ] <= [-]  ,
+  op   oner  <= oner ,
+  op   ( * ) <= ( * ),
+  op   invr  <= CRQ.invr ,
+  pred unit  <= CRQ.unit
   proof *.
 
 realize addrA by exact IDQ.addrA.
@@ -709,14 +711,16 @@ case: MaximalIdealAxioms.max_p => ip [] neqpT /(_ (idD p (idgen [repr x])) _ _ _
 + by apply/ideal_idD => //; apply/ideal_idgen.
 + apply/negP => /fun_ext /(_ IComRing.oner); rewrite mem_idT eqT.
   case=> ? ? [] [] + /mem_idgen1 [a] ->>; rewrite -subr_eq => + <<-.
-  by move/eqv_pi; rewrite -mulE reprK -/oner /=; apply/forall_.
+  by move/eqv_pi; rewrite -mulE reprK -/FQ.oner /=; apply/forall_.
 + move=> a pa; exists a IComRing.zeror; rewrite pa addr0 /=.
   by apply/mem_idgen1; exists IComRing.zeror; rewrite mul0r.
 move/fun_ext/(_ (repr x)) => eq_; have: p (repr x).
 + move: eq_ => ->; exists IComRing.zeror (repr x).
   by rewrite ideal0 // mem_idgen1_gen add0r.
-by rewrite -eqv0r eqv_pi reprK -/zeror.
+by rewrite -eqv0r eqv_pi reprK -/FQ.zeror.
 qed.
+
+clear [IDQ.AddMonoid.* IDQ.MulMonoid.* IDQ.*].
 
 end FieldQuotient.
 

@@ -725,7 +725,20 @@ abstract theory SubVectorSpace.
     type t         <- t,
     theory FScalar <- SubField.SF,
     theory ZMod    <- F,
-    op     ( ** )  <- ( ** ).
+    op     ( ** )  <- ( ** )
+  proof *.
+
+  realize scaleDl.
+  proof. by move=> ? ? ?; rewrite /( ** ) valD mulrDl. qed.
+
+  realize scaleDr.
+  proof. by move=> ? ? ?; rewrite /( ** ) mulrDr. qed.
+
+  realize scaleM.
+  proof. by move=> ? ? ?; rewrite /( ** ) valM mulrA. qed.
+
+  realize scale1r.
+  proof. by move=> ?; rewrite /( ** ) val1 mul1r. qed.
 
   clone include SubIDomainModule with
     type t            <- t,
