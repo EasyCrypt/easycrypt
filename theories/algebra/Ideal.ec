@@ -557,7 +557,6 @@ clone import ComRing as CRQ with
   op ( * ) <= ( * )
   proof addrA, addrC, add0r, addNr, oner_neq0, mulrA, mulrC, mul1r, mulrDl.
 
-
 realize addrA.
 proof.
 elim/quotW=> x; elim/quotW=> y; elim/quotW=> z.
