@@ -1462,8 +1462,6 @@ abstract theory FFIrrPolyExt.
     op SubF.Sub.insub <= (fun x => if (exists c , x = pi (polyC c)) then Some ((modp (repr x) FFIrrPolyExt.p).[0]) else None),
     op SubF.Sub.val <= (fun c => pi (polyC c)),
     op SubF.Sub.wsT <= pi (polyC witness)
-    (*,
-    theory SFF <= FF*)
   proof SubF.*.
 
   realize SubF.fieldp.
@@ -1577,17 +1575,22 @@ abstract theory FFIrrPolyExt.
     by move=> ->.
   qed.
 
-clone import SubFieldStruct as SubFStr with
-  type t <= FFIrrPolyExt.pt,
-  type st <= FFIrrPolyExt.t,
-  theory SubZMod <= FFIrrPolyExt.SubFF.SubF,
-  theory SubCR <= FFIrrPolyExt.SubFF.SubF,
-  theory SubID <= FFIrrPolyExt.SubFF.SubF,
-  theory SubF <= FFIrrPolyExt.SubFF.SubF,
-  theory ZModStr <= FFIrrPolyExt.SubFF.FStr,
-  theory CRStr <= FFIrrPolyExt.SubFF.FStr,
-  theory IDStr <= FFIrrPolyExt.SubFF.FStr,
-  theory FStr <= FFIrrPolyExt.SubFF.FStr.
+  clone import SubFieldStruct as SubFStr with
+    type t <= FFIrrPolyExt.pt,
+    type st <= FFIrrPolyExt.t,
+    theory SubZMod <= FFIrrPolyExt.SubFF.SubF,
+    theory SubCR <= FFIrrPolyExt.SubFF.SubF,
+    theory SubID <= FFIrrPolyExt.SubFF.SubF,
+    theory SubF <= FFIrrPolyExt.SubFF.SubF,
+    theory ZModStr <= FFIrrPolyExt.SubFF.FStr,
+    theory CRStr <= FFIrrPolyExt.SubFF.FStr,
+    theory IDStr <= FFIrrPolyExt.SubFF.FStr,
+    theory FStr <= FFIrrPolyExt.SubFF.FStr.
+
+  (*TODO: FF.F and SubFF.SubF.F must be shown to be isomorphic: needs isomorphism theory.*)
+  print FF.F.zeror.
+  print SubFF.SubF.zeror.
+  print SubFF.SubF.F.zeror.
 
 end FFIrrPolyExt.
 
@@ -1665,6 +1668,9 @@ proof. by case: mpP. qed.
 clone import FFIrrPolyExt as Ext1 with
   type t <= t,
   theory FF <= FF,
+  (*FIXME: Pierre-Yves: anomaly here if using the big clone with theory.*)
+  (*theory PFF <- PFF.*)
+  (*theory PFF.PID.CR <- PFF.PID.CR.*)
   type PFF.PID.poly <= FFexistence.PFF.PID.poly,
   theory PFF.PID.P <= PFF.PID.P,
   theory PFF.PID.PS <= PFF.PID.PS,
@@ -1679,10 +1685,6 @@ clone import FFIrrPolyExt as Ext1 with
   op PFF.PID.irreducible_poly <= FFexistence.PFF.PID.irreducible_poly,
   op p <= p
 proof PFF.PID.CR.unitP, irredp_p.
-(*TODO: anomaly here if using the big clone with theory.*)
-(*theory PFF <- PFF*)
-(*theory PFF.PID.CR <- PFF.PID.CR*)
-(*fail.*)
 
 realize PFF.PID.CR.unitP by exact FFexistence.PFF.PID.CR.unitP.
 realize irredp_p by exact irredp_p.
@@ -1769,20 +1771,16 @@ split; split; split; [split| | |] => /=.
 + move=> x; case (0 < n) => [lt0n|/lerNgt len0]; [|by rewrite !iter0].
   rewrite !iter_frobenius; [by apply/ltzW|by apply/ltzW|].
   rewrite -(IFQ.FQ.mulN1r x).
-  (*TODO: what are hidden lemmas?*)
-  print FFQ.F.expfM.
-  print IFQ.FQ.expfM.
-  (*rewrite IFQ.FQ.expfM.*)
-  (*
-  move=> ->.
-  congr; rewrite -FFQ.F.signr_odd ?ltzW ?expr_gt0 ?gt0_char //.
+  move: (IFQ.FQ.expfM (IFQ.([-]) IFQ.oner) x (char ^ n)).
+  (*FIXME: Pierre-Yves: the following should not hang:*)
+  (*move=> ->.*)
+  move=> + eq_; move=> ->; congr => // {eq_}.
+  rewrite -FFQ.F.signr_odd ?ltzW ?expr_gt0 ?gt0_char //.
   rewrite poddX ?lt0n //; case/prime_or_2_odd: prime_char.
   - move=> eq_; rewrite eq_ oddP /= b2i0 IFQ.FQ.expr0.
     rewrite -IFQ.FQ.subr_eq0 IFQ.FQ.opprK -IFQ.FQ.mul1r2z IFQ.FQ.mul1r.
     by move: ofint_char; rewrite eq_.
   by move=> ->; rewrite b2i1 IFQ.FQ.expr1.
-  *)
-  admit.
 + move=> x y; have ->: iter n frobenius (IFQ.(+) x y) = IFQ.(+) (iter n frobenius x) (iter n frobenius y).
   - case (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite !iter0].
     elim: n => [|n le0n IHn]; [by rewrite !iter0|].

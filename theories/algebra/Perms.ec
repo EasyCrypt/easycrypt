@@ -554,6 +554,3 @@ lemma size_sum_allshapes n :
 proof.
   admit.
 qed.
-
-(* -------------------------------------------------------------------- *)
-(*TODO: need a big clone to bring everything together.*)
