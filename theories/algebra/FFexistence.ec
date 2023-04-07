@@ -1453,7 +1453,7 @@ abstract theory FFIrrPolyExt.
     by apply/ltzS => /=; apply/deg_gt0/irredp_neq0/irredp_p.
   qed.
 
-  clone import SubFiniteField as SFF with
+  clone import SubFiniteField as SubFF with
     type t <= FFIrrPolyExt.pt,
     type st <= FFIrrPolyExt.t,
     theory F <= FFQ.F,
@@ -1462,6 +1462,8 @@ abstract theory FFIrrPolyExt.
     op SubF.Sub.insub <= (fun x => if (exists c , x = pi (polyC c)) then Some ((modp (repr x) FFIrrPolyExt.p).[0]) else None),
     op SubF.Sub.val <= (fun c => pi (polyC c)),
     op SubF.Sub.wsT <= pi (polyC witness)
+    (*,
+    theory SFF <= FF*)
   proof SubF.*.
 
   realize SubF.fieldp.
@@ -1534,22 +1536,22 @@ abstract theory FFIrrPolyExt.
     by rewrite polyCE.
   qed.
 
-  lemma eq0 : FFIrrPolyExt.SFF.SubF.zeror = FFIrrPolyExt.FF.F.zeror.
+  lemma eq0 : FFIrrPolyExt.SubFF.SubF.zeror = FFIrrPolyExt.FF.F.zeror.
   proof. by rewrite -(SubF.Sub.valKd FFIrrPolyExt.FF.F.zeror). qed.
 
-  lemma eqN x : FFIrrPolyExt.SFF.SubF.([-]) x = FFIrrPolyExt.FF.F.([-]) x.
+  lemma eqN x : FFIrrPolyExt.SubFF.SubF.([-]) x = FFIrrPolyExt.FF.F.([-]) x.
   proof. by rewrite -(SubF.Sub.valKd (FFIrrPolyExt.FF.F.([-]) x)) polyCN -oppE. qed.
 
-  lemma eqD x y: FFIrrPolyExt.SFF.SubF.( + ) x y = FFIrrPolyExt.FF.F.( + ) x y.
+  lemma eqD x y: FFIrrPolyExt.SubFF.SubF.( + ) x y = FFIrrPolyExt.FF.F.( + ) x y.
   proof. by rewrite -(SubF.Sub.valKd (FFIrrPolyExt.FF.F.( + ) x y)) polyCD -addE. qed.
 
-  lemma eq1 : FFIrrPolyExt.SFF.SubF.oner = FFIrrPolyExt.FF.F.oner.
+  lemma eq1 : FFIrrPolyExt.SubFF.SubF.oner = FFIrrPolyExt.FF.F.oner.
   proof. by rewrite -(SubF.Sub.valKd FFIrrPolyExt.FF.F.oner). qed.
 
-  lemma eqM x y: FFIrrPolyExt.SFF.SubF.( * ) x y = FFIrrPolyExt.FF.F.( * ) x y.
+  lemma eqM x y: FFIrrPolyExt.SubFF.SubF.( * ) x y = FFIrrPolyExt.FF.F.( * ) x y.
   proof. by rewrite -(SubF.Sub.valKd (FFIrrPolyExt.FF.F.( * ) x y)) polyCM -mulE. qed.
 
-  lemma eqV x : FFIrrPolyExt.SFF.SubF.invr x = FFIrrPolyExt.FF.F.invr x.
+  lemma eqV x : FFIrrPolyExt.SubFF.SubF.invr x = FFIrrPolyExt.FF.F.invr x.
   proof.
     case (x = SubF.zeror) => [->>|neqx0]; [|apply/(SubF.SID.mulIf _ neqx0)].
     + by rewrite SubF.SCR.invr0 eq0 FFIrrPolyExt.FF.F.invr0.
@@ -1557,7 +1559,7 @@ abstract theory FFIrrPolyExt.
     by apply/FFIrrPolyExt.FF.F.unitfE; rewrite -eq0.
   qed.
 
-  lemma eqn : FFIrrPolyExt.SFF.n = deg FFIrrPolyExt.p - 1.
+  lemma eqn : FFIrrPolyExt.SubFF.n = deg FFIrrPolyExt.p - 1.
   proof.
     move: eq_card_pow_n; rewrite /FFStr.FF.FinType.card /FinType.card.
     rewrite size_map size_enum_ledeg.
@@ -1578,14 +1580,14 @@ abstract theory FFIrrPolyExt.
 clone import SubFieldStruct as SubFStr with
   type t <= FFIrrPolyExt.pt,
   type st <= FFIrrPolyExt.t,
-  theory SubZMod <= FFIrrPolyExt.SFF.SubF,
-  theory SubCR <= FFIrrPolyExt.SFF.SubF,
-  theory SubID <= FFIrrPolyExt.SFF.SubF,
-  theory SubF <= FFIrrPolyExt.SFF.SubF,
-  theory ZModStr <= FFIrrPolyExt.SFF.FStr,
-  theory CRStr <= FFIrrPolyExt.SFF.FStr,
-  theory IDStr <= FFIrrPolyExt.SFF.FStr,
-  theory FStr <= FFIrrPolyExt.SFF.FStr.
+  theory SubZMod <= FFIrrPolyExt.SubFF.SubF,
+  theory SubCR <= FFIrrPolyExt.SubFF.SubF,
+  theory SubID <= FFIrrPolyExt.SubFF.SubF,
+  theory SubF <= FFIrrPolyExt.SubFF.SubF,
+  theory ZModStr <= FFIrrPolyExt.SubFF.FStr,
+  theory CRStr <= FFIrrPolyExt.SubFF.FStr,
+  theory IDStr <= FFIrrPolyExt.SubFF.FStr,
+  theory FStr <= FFIrrPolyExt.SubFF.FStr.
 
 end FFIrrPolyExt.
 
@@ -1680,12 +1682,10 @@ proof PFF.PID.CR.unitP, irredp_p.
 (*TODO: anomaly here if using the big clone with theory.*)
 (*theory PFF <- PFF*)
 (*theory PFF.PID.CR <- PFF.PID.CR*)
+(*fail.*)
 
 realize PFF.PID.CR.unitP by exact FFexistence.PFF.PID.CR.unitP.
 realize irredp_p by exact irredp_p.
-
-(*TODO: what are hidden lemmas?*)
-(*print Ext1.FFQ.*)
 
 clone import PolyFF as PFFE with
   type coeff <= Ext1.pt,
@@ -1769,9 +1769,11 @@ split; split; split; [split| | |] => /=.
 + move=> x; case (0 < n) => [lt0n|/lerNgt len0]; [|by rewrite !iter0].
   rewrite !iter_frobenius; [by apply/ltzW|by apply/ltzW|].
   rewrite -(IFQ.FQ.mulN1r x).
-  (*fail.*)
+  (*TODO: what are hidden lemmas?*)
+  print FFQ.F.expfM.
+  print IFQ.FQ.expfM.
+  (*rewrite IFQ.FQ.expfM.*)
   (*
-  rewrite FFQ.F.expfM.
   move=> ->.
   congr; rewrite -FFQ.F.signr_odd ?ltzW ?expr_gt0 ?gt0_char //.
   rewrite poddX ?lt0n //; case/prime_or_2_odd: prime_char.
@@ -1822,24 +1824,24 @@ clone import SubFieldStruct as SubFStrExt2 with
 
 op p_ x =
   let y = SubFFExt2.SubF.Sub.val x in
-  Ext2.SFF.SubF.p y /\
-  let z = Ext2.SFF.SubF.Sub.insubd y in
-  Ext1.SFF.SubF.p z.
+  Ext2.SubFF.SubF.p y /\
+  let z = Ext2.SubFF.SubF.Sub.insubd y in
+  Ext1.SubFF.SubF.p z.
 
 op insub_ x =
   let y = SubFFExt2.SubF.Sub.val x in
-  if Ext2.SFF.SubF.p y
+  if Ext2.SubFF.SubF.p y
   then
-    let z = Ext2.SFF.SubF.Sub.insubd y in
-    if Ext1.SFF.SubF.p z
-    then Some (Ext1.SFF.SubF.Sub.insubd z)
+    let z = Ext2.SubFF.SubF.Sub.insubd y in
+    if Ext1.SubFF.SubF.p z
+    then Some (Ext1.SubFF.SubF.Sub.insubd z)
     else None
   else None.
 
 op val_ =
   SubFFExt2.SubF.Sub.insubd \o
-  Ext2.SFF.SubF.Sub.val \o
-  Ext1.SFF.SubF.Sub.val.
+  Ext2.SubFF.SubF.Sub.val \o
+  Ext1.SubFF.SubF.Sub.val.
 
 op wsT_ = val_ witness.
 
@@ -1857,21 +1859,21 @@ proof SubF.fieldp, SubF.Sub.*.
 
 realize SubF.fieldp.
 proof.
-move: Ext1.SFF.SubF.fieldp Ext2.SFF.SubF.fieldp.
-rewrite -/Ext1.SFF.SubF.p -/Ext2.SFF.SubF.p /p_.
+move: Ext1.SubFF.SubF.fieldp Ext2.SubFF.SubF.fieldp.
+rewrite -/Ext1.SubFF.SubF.p -/Ext2.SubFF.SubF.p /p_.
 case; case; case=> [] [] p10 p1N p1D p11 p1M p1V.
 case; case; case=> [] [] p20 p2N p2D p21 p2M p2V.
 split; split; split; [split| | |] => /=.
-+ by rewrite SubFFExt2.SubF.val0 p20 Ext2.SFF.SubF.insubd0 Ext2.eq0 p10.
++ by rewrite SubFFExt2.SubF.val0 p20 Ext2.SubFF.SubF.insubd0 Ext2.eq0 p10.
 + move=> x; rewrite SubFFExt2.SubF.valN => -[] p2x p1x; rewrite p2N //.
-  by rewrite Ext2.SFF.SubF.insubdN // Ext2.eqN p1N.
+  by rewrite Ext2.SubFF.SubF.insubdN // Ext2.eqN p1N.
 + move=> x y; rewrite SubFFExt2.SubF.valD => -[] p2x p1x [] p2y p1y; rewrite p2D //.
-  by rewrite Ext2.SFF.SubF.insubdD // Ext2.eqD p1D.
-+ by rewrite SubFFExt2.SubF.val1 p21 Ext2.SFF.SubF.insubd1 Ext2.eq1 p11.
+  by rewrite Ext2.SubFF.SubF.insubdD // Ext2.eqD p1D.
++ by rewrite SubFFExt2.SubF.val1 p21 Ext2.SubFF.SubF.insubd1 Ext2.eq1 p11.
 + move=> x y; rewrite SubFFExt2.SubF.valM => -[] p2x p1x [] p2y p1y; rewrite p2M //.
-  by rewrite Ext2.SFF.SubF.insubdM // Ext2.eqM p1M.
+  by rewrite Ext2.SubFF.SubF.insubdM // Ext2.eqM p1M.
 move=> x; rewrite SubFFExt2.SubF.valV => -[] p2x p1x; rewrite p2V //.
-by rewrite Ext2.SFF.SubF.insubdV // Ext2.eqV p1V.
+by rewrite Ext2.SubFF.SubF.insubdV // Ext2.eqV p1V.
 qed.
 
 realize SubF.Sub.insubN.
@@ -1882,10 +1884,10 @@ qed.
 realize SubF.Sub.insubT.
 proof.
 move=> x; rewrite /p_ /val_ /insub_ /(\o) /= => -[] p2 p1; rewrite p2 p1 /=.
-rewrite /Ext1.SFF.SubF.Sub.val Ext1.SFF.SubF.Sub.val_insubd.
-move: p1; rewrite /Ext1.SFF.SubF.p => -> /=.
-rewrite /Ext2.SFF.SubF.Sub.val Ext2.SFF.SubF.Sub.val_insubd.
-move: p2; rewrite /Ext2.SFF.SubF.p => -> /=.
+rewrite /Ext1.SubFF.SubF.Sub.val Ext1.SubFF.SubF.Sub.val_insubd.
+move: p1; rewrite /Ext1.SubFF.SubF.p => -> /=.
+rewrite /Ext2.SubFF.SubF.Sub.val Ext2.SubFF.SubF.Sub.val_insubd.
+move: p2; rewrite /Ext2.SubFF.SubF.p => -> /=.
 by apply/SubFFExt2.SubF.Sub.valKd.
 qed.
 
@@ -1893,7 +1895,7 @@ realize SubF.Sub.valP.
 proof.
 move=> x; rewrite /p_ /val_ /(\o) /=.
 rewrite SubFFExt2.SubF.Sub.val_insubd.
-rewrite /Ext2.SFF.SubF.Sub.val.
+rewrite /Ext2.SubFF.SubF.Sub.val.
 rewrite -/Ext2.SubFStr.FStr.iter_frobenius_fixed.
 (*TODO: all these last admits are straightforward once the FieldStructure clones in Ext1, Ext2 ans SubFF are matched.*)
 (*
@@ -1916,7 +1918,7 @@ qed.
 
 lemma eqn : FFexistence.n = FFexistence.SubFF.n.
 proof.
-move: Ext1.SFF.eq_card_pow_n Ext2.SFF.eq_card_pow_n SubFFExt2.eq_card_pow_n.
+move: Ext1.SubFF.eq_card_pow_n Ext2.SubFF.eq_card_pow_n SubFFExt2.eq_card_pow_n.
 (*
 print Ext1.SFF.FFStr.FF.FinType.card.
 search _  Ext2.SFF.SFT.card.
