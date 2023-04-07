@@ -261,7 +261,7 @@ abstract theory ComRingStruct.
 
   clone include ZModuleStruct with
     type t <- t,
-    theory ZMod <- CR.
+    theory ZMod <= CR.
 
   op char = order oner.
 
@@ -416,7 +416,8 @@ abstract theory IDomainStruct.
 
   clone include ComRingStruct with
     type t <- t,
-    theory CR <- ID.
+    theory ZMod <= ID,
+    theory CR <= ID.
 
   lemma char_integral : char = 0 \/ prime char.
   proof.
@@ -448,12 +449,12 @@ abstract theory IDomainStruct.
   qed.
 
   clone import BigComRing as BID with
-    theory CR <- ID.
+    theory CR <= ID.
 
   clone import Poly as IDPoly with
     type coeff <= t,
     type poly <= pt,
-    theory IDCoeff <- ID.
+    theory IDCoeff <= ID.
 
   op eq_pow_1 n x = ID.exp x n = oner.
 
@@ -492,8 +493,8 @@ abstract theory IDomainStruct.
   qed.
 
   clone import BinomialCoeffs as Bin with
-    theory R <- ID,
-    theory BCR <- BID.
+    theory R <= ID,
+    theory BCR <= BID.
 
   op frobenius x = ID.exp x char.
 
@@ -635,12 +636,14 @@ end IDomainStruct.
 abstract theory FieldStruct.
   type t.
 
-  clone import Field as F
-    with type t <= t.
+  clone import Field as F with
+    type t <= t.
 
   clone include IDomainStruct with
     type t <- t,
-    theory ID <- F.
+    theory ZMod <= F,
+    theory CR <= F,
+    theory ID <= F.
 
   lemma comring_automorphX f x n :
     is_comring_automorph f =>
@@ -651,3 +654,4 @@ abstract theory FieldStruct.
     by move => /wlog /(_ (invr x)); rewrite comring_automorphV // !exprV.
   qed.
 end FieldStruct.
+

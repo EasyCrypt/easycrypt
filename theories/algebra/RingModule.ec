@@ -55,10 +55,10 @@ abstract theory ComRingModule.
   qed.
 
   clone import BigZModule as BigZMod with
-    theory ZM <- ZMod.
+    theory ZM <= ZMod.
 
   clone import BigComRing as BigCR with
-    theory CR <- CRScalar.
+    theory CR <= CRScalar.
 
   lemma scaler_suml ['a] (P : 'a -> bool) (F : 'a -> CRScalar.t) (ss : 'a list) v :
     BigCR.BAdd.big P F ss ** v = BigZMod.big P (fun s => F s ** v) ss.
@@ -598,7 +598,7 @@ abstract theory IDomainModule.
   clone include ComRingModule with
     type scalar     <- scalar,
     type t          <- t,
-    theory CRScalar <- IDScalar.
+    theory CRScalar <= IDScalar.
 end IDomainModule.
 
 (* -------------------------------------------------------------------- *)
@@ -611,7 +611,8 @@ abstract theory VectorSpace.
   clone include IDomainModule with
     type scalar     <- scalar,
     type t          <- t,
-    theory IDScalar <- FScalar.
+    theory CRScalar <= FScalar,
+    theory IDScalar <= FScalar.
 end VectorSpace.
 
 
@@ -624,13 +625,13 @@ abstract theory SubComRingModule.
 
   clone import ComRingPred as CRPr with
     type t    <= t,
-    theory CR <- CR.
+    theory CR <= CR.
 
-  clone import SubComRing with
+  clone import SubComRing as SubCR with
     type t      <= t,
     type st     <= st,
-    theory CR   <- CR,
-    theory CRPr <- CRPr.
+    theory CR   <= CR,
+    theory CRPr <= CRPr.
 
   import Sub.
 
@@ -638,11 +639,11 @@ abstract theory SubComRingModule.
     val x * a.
 
   clone import ComRingModule as CRM with
-    type scalar     <- st,
-    type t          <- t,
-    theory CRScalar <- SubComRing.SCR,
-    theory ZMod     <- CR,
-    op     ( ** )   <- ( ** )
+    type scalar     <= st,
+    type t          <= t,
+    theory CRScalar <= SCR,
+    theory ZMod     <= CR,
+    op     ( ** )   <= ( ** )
     proof *.
 
   realize scaleDl.
@@ -667,13 +668,13 @@ abstract theory SubIDomainModule.
 
   clone import IDomainPred as IDPr with
     type t    <= t,
-    theory ID <- ID.
+    theory ID <= ID.
 
-  clone import SubIDomain with
+  clone import SubIDomain as SubID with
     type t      <= t,
     type st     <= st,
-    theory ID   <- ID,
-    theory IDPr <- IDPr.
+    theory ID   <= ID,
+    theory IDPr <= IDPr.
 
   import Sub.
 
@@ -681,21 +682,21 @@ abstract theory SubIDomainModule.
     val x * a.
 
   clone import IDomainModule as IDM with
-    type scalar     <- st,
-    type t          <- t,
-    theory IDScalar <- SubIDomain.SID,
-    theory ZMod     <- ID,
-    op     ( ** )   <- ( ** ).
+    type scalar     <= st,
+    type t          <= t,
+    theory IDScalar <= SID,
+    theory ZMod     <= ID,
+    op     ( ** )   <= ( ** ).
 
   (*TODO: why must I use SubIDomainModule.IDPr?*)
   clone include SubComRingModule with
     type t            <- t,
     type st           <- st,
-    theory CR         <- ID,
-    theory CRPr       <- SubIDomainModule.IDPr,
-    theory SubComRing <- SubIDomain,
+    theory CR         <= ID,
+    theory CRPr       <= IDPr,
+    theory SubCR      <= SubID,
     op ( ** )         <- ( ** ),
-    theory CRM        <- IDM.
+    theory CRM        <= IDM.
 end SubIDomainModule.
 
 (* -------------------------------------------------------------------- *)
@@ -707,13 +708,13 @@ abstract theory SubVectorSpace.
 
   clone import FieldPred as FPr with
     type t   <= t,
-    theory F <- F.
+    theory F <= F.
 
-  clone import SubField with
+  clone import SubField as SubF with
     type t     <= t,
     type st    <= st,
-    theory F   <- F,
-    theory FPr <- FPr.
+    theory F   <= F,
+    theory FPr <= FPr.
 
   import Sub.
 
@@ -721,11 +722,11 @@ abstract theory SubVectorSpace.
     val x * a.
 
   clone import VectorSpace as VS with
-    type scalar    <- st,
-    type t         <- t,
-    theory FScalar <- SubField.SF,
-    theory ZMod    <- F,
-    op     ( ** )  <- ( ** )
+    type scalar    <= st,
+    type t         <= t,
+    theory FScalar <= SubF.SF,
+    theory ZMod    <= F,
+    op     ( ** )  <= ( ** )
   proof *.
 
   realize scaleDl.
@@ -743,9 +744,13 @@ abstract theory SubVectorSpace.
   clone include SubIDomainModule with
     type t            <- t,
     type st           <- st,
-    theory ID         <- F,
-    theory IDPr       <- SubVectorSpace.FPr,
-    theory SubIDomain <- SubField,
+    theory CR         <= F,
+    theory ID         <= F,
+    theory CRPr       <= SubVectorSpace.FPr,
+    theory IDPr       <= SubVectorSpace.FPr,
+    theory SubCR      <= SubF,
+    theory SubID      <= SubF,
     op ( ** )         <- ( ** ),
-    theory IDM        <- VS.
+    theory IDM        <= VS.
 end SubVectorSpace.
+

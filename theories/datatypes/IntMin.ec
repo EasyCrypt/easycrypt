@@ -88,6 +88,17 @@ move=> [j [le0j qj]]; exists (argmin f p); rewrite ge0_argmin /=.
 by apply le_pq; [rewrite ge0_argmin|move: pj => [k [le0k pk]]; apply (argminP _ _ k)].
 qed.
 
+lemma eq_argmin ['a] f p q :
+  (forall i, 0 <= i => p (f i) <=> q (f i)) =>
+  argmin<:'a> f p = argmin<:'a> f q.
+proof.
+move=> eq_; rewrite /argmin; apply/eq_choice => x /=.
+apply/andb_id2l => le0x; apply/eq_iff/andb_id2.
++ by apply/eq_.
+apply/forall_eq => i /=; apply/eq_iff/implyb_id2l.
+by case=> le0i _; apply/iff_negb/eq_.
+qed.
+
 (* -------------------------------------------------------------------- *)
 abbrev minz = argmin (fun (i : int) => i).
 
