@@ -1,47 +1,20 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List Ring Int IntDiv Bigalg RingStruct.
-require (*--*) Subtype.
+require import AllCore List Ring Int IntDiv Bigalg RingStruct FinType.
 (*---*) import StdOrder.IntOrder.
 
-(*
 (* ==================================================================== *)
-theory ZModuleIso.
+theory Iso.
   type t1, t2.
-
-  clone import ZModule as ZMod1 with
-    type t <= t1.
-
-  clone import ZModule as ZMod2 with
-    type t <= t2.
 
   op f : t1 -> t2.
 
   axiom bij_f : bijective f.
-
-  axiom fD (x y : t1) : f (x + y) = f x + f y.
-
-  axiom fN (x : t1) : f (-x) = - f x.
 
   lemma inj_f : injective f.
   proof. by apply/bij_inj/bij_f. qed.
 
   lemma surj_f : surjective f.
   proof. by apply/bij_surj/bij_f. qed.
-
-  lemma fB (x y : t1) : f (x - y) = f x - f y.
-  proof. by rewrite fD fN. qed.
-
-  lemma f0 : f ZMod1.zeror = ZMod2.zeror.
-  proof. by rewrite -(ZMod1.subrr ZMod1.zeror) fB ZMod2.subrr. qed.
-
-  lemma fMz (x : t1) n : f (intmul x n) = intmul (f x) n.
-  proof.
-    wlog: n / 0 <= n => [wlog_|].
-    + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2] /wlog_ //.
-      by rewrite ZMod1.mulrNz ZMod2.mulrNz fN; apply/ZMod2.oppr_inj.
-    elim: n => [|n le0n IHn]; [by rewrite ZMod1.mulr0z ZMod2.mulr0z f0|].
-   by rewrite ZMod1.mulrSz ZMod2.mulrSz fD IHn.
-  qed.
 
   op g = choiceb (fun (g : t2 -> t1) => f \o g = idfun /\ g \o f = idfun) (fun _ => witness).
 
@@ -71,8 +44,47 @@ theory ZModuleIso.
 
   lemma surj_g : surjective g.
   proof. by apply/bij_surj/bij_g. qed.
+end Iso.
 
-  lemma g0 : g ZMod2.zeror = ZMod1.zeror.
+(* ==================================================================== *)
+theory ZModuleIso_.
+  type t1, t2.
+
+  clone include Iso with
+    type t1 <- t1,
+    type t2 <- t2.
+
+  clone import ZModuleStruct as ZMod1Str with
+    type t <= t1.
+
+  clone import ZModuleStruct as ZMod2Str with
+    type t <= t2.
+
+  import ZMod1Str ZMod2Str ZMod1Str.R ZMod2Str.R.
+
+  axiom f0 : f ZMod1Str.R.zeror = ZMod2Str.R.zeror.
+
+  axiom fD (x y : t1) : f (x + y) = f x + f y.
+
+  lemma fN (x : t1) : f (-x) = - f x.
+  proof.
+    rewrite eq_sym -ZMod2Str.R.subr_eq0 -ZMod2Str.R.opprD -fD.
+    by rewrite ZMod1Str.R.subrr f0 ZMod2Str.R.oppr0.
+  qed.
+
+  lemma fB (x y : t1) : f (x - y) = f x - f y.
+  proof. by rewrite fD fN. qed.
+
+  lemma fMz (x : t1) n : f (intmul x n) = intmul (f x) n.
+  proof.
+    wlog: n / 0 <= n => [wlog_|].
+    + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2] /wlog_ //.
+      by rewrite ZMod1Str.R.mulrNz ZMod2Str.R.mulrNz fN; apply/ZMod2Str.R.oppr_inj.
+    elim: n => [|n le0n IHn]; [by rewrite ZMod1Str.R.mulr0z ZMod2Str.R.mulr0z f0|].
+   by rewrite ZMod1Str.R.mulrSz ZMod2Str.R.mulrSz fD IHn.
+  qed.
+
+  lemma g0 : g ZMod2Str.R.zeror = ZMod1Str.R.zeror.
   proof. by apply/inj_f; rewrite f0 cangf. qed.
 
   lemma gD (x y : t2) : g (x + y) = g x + g y.
@@ -87,156 +99,241 @@ theory ZModuleIso.
   lemma gMz (x : t2) n : g (intmul x n) = intmul (g x) n.
   proof. by apply/inj_f; rewrite fMz !cangf. qed.
 
-end ZModuleIso.
+end ZModuleIso_.
 
 (* -------------------------------------------------------------------- *)
-theory ComRingIso.
+theory ComRingIso_.
   type t1, t2.
 
-  clone import ComRing as CR1 with
+  clone import ComRingStruct as CRng1Str with
     type t <= t1.
 
-  clone import ComRing as CR2 with
+  clone import ComRingStruct as CRng2Str with
     type t <= t2.
 
-  clone include ZModuleIso with
+  clone include ZModuleIso_ with
     type t1      <- t1,
     type t2      <- t2,
-    theory ZMod1 <= CR1,
-    theory ZMod2 <= CR2.
+    theory ZMod1Str <- CRng1Str,
+    theory ZMod2Str <- CRng2Str.
 
-  axiom f1 : f CR1.oner = CR2.oner.
+  import CRng1Str CRng2Str CRng1Str.R CRng2Str.R.
+
+  axiom f1 : f CRng1Str.R.oner = CRng2Str.R.oner.
 
   axiom fM (x y : t1) : f (x * y) = f x * f y.
 
-  axiom fV (x : t1) : f (invr x) = invr (f x).
+  lemma g1 : g CRng2Str.R.oner = CRng1Str.R.oner.
+  proof. by apply/inj_f; rewrite f1 cangf. qed.
 
-  lemma fU (x : t1) : unit x <=> unit (f x).
+  lemma gM (x y : t2) : g (x * y) = g x * g y.
+  proof. by apply/inj_f; rewrite fM !cangf. qed.
+
+  lemma fU (x : t1) : unit (f x) = unit x.
   proof.
-    rewrite CR1.unitrP CR2.unitrP; split=> [[y]|[y]].
-    + by rewrite -f1 => <-; exists (f y); rewrite fM.
-    move/(congr1 g); rewrite gM.
+    apply/eq_iff; rewrite CRng1Str.R.unitrP CRng2Str.R.unitrP; split=> [[y]|[y]].
+    + by move/(congr1 g); rewrite gM g1 canfg => <-; exists (g y).
+    by rewrite -f1 => <-; exists (f y); rewrite fM.
+  qed.
+
+  lemma fV (x : t1) : f (invr x) = invr (f x).
+  proof.
+    case: (unit x) => [ux|Nux].
+    + apply/(CRng2Str.R.mulIr (f x)); [by rewrite fU|].
+      by rewrite -fM CRng1Str.R.mulVr // CRng2Str.R.mulVr ?f1 ?fU.
+    by rewrite CRng1Str.R.unitout // CRng2Str.R.unitout // fU.
   qed.
 
   lemma fX (x : t1) n : f (exp x n) = exp (f x) n.
   proof.
     wlog: n / 0 <= n => [wlog_|].
     + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2] /wlog_ //.
-      by rewrite CR1.exprN CR2.exprN fV; apply/CR2.invr_inj.
-    elim: n => [|n le0n IHn]; [by rewrite CR1.expr0 CR2.expr0 f1|].
-   by rewrite CR1.exprS // CR2.exprS // fM IHn.
+      by rewrite CRng1Str.R.exprN CRng2Str.R.exprN fV; apply/CRng2Str.R.invr_inj.
+    elim: n => [|n le0n IHn]; [by rewrite CRng1Str.R.expr0 CRng2Str.R.expr0 f1|].
+   by rewrite CRng1Str.R.exprS // CRng2Str.R.exprS // fM IHn.
   qed.
 
-  lemma g1 : g CR2.oner = CR1.oner.
-  proof. by apply/inj_f; rewrite f1 cangf. qed.
-
-  lemma gM (x y : t2) : g (x * y) = g x * g y.
-  proof. by apply/inj_f; rewrite fM !cangf. qed.
+  lemma gU (x : t2) : unit (g x) = unit x.
+  proof. by rewrite -fU cangf. qed.
 
   lemma gV (x : t2) : g (invr x) = invr (g x).
   proof. by apply/inj_f; rewrite fV !cangf. qed.
 
   lemma gX (x : t2) n : g (exp x n) = exp (g x) n.
   proof. by apply/inj_f; rewrite fX !cangf. qed.
+end ComRingIso_.
+
+(* -------------------------------------------------------------------- *)
+theory IDomainIso_.
+  type t1, t2.
+
+  clone import IDomainStruct as IDom1Str with
+    type t <= t1.
+
+  clone import IDomainStruct as IDom2Str with
+    type t <= t2.
+
+  clone include ComRingIso_ with
+    type t1       <- t1,
+    type t2       <- t2,
+    theory CRng1Str <- IDom1Str,
+    theory CRng2Str <- IDom2Str.
+end IDomainIso_.
+
+(* -------------------------------------------------------------------- *)
+theory FieldIso_.
+  type t1, t2.
+
+  clone import FieldStruct as Fld1Str with
+    type t <= t1.
+
+  clone import FieldStruct as Fld2Str with
+    type t <= t2.
+
+  clone include IDomainIso_ with
+    type t1       <- t1,
+    type t2       <- t2,
+    theory IDom1Str <- Fld1Str,
+    theory IDom2Str <- Fld2Str.
+end FieldIso_.
+
+
+(* ==================================================================== *)
+theory ZModuleIso.
+  clone include ZModuleIso_
+    rename [theory] "ZMod1Str" as "R1Str"
+           [theory] "ZMod2Str" as "R2Str".
+end ZModuleIso.
+
+(* -------------------------------------------------------------------- *)
+theory ComRingIso.
+  clone include ComRingIso_
+    rename [theory] "CRng1Str" as "R1Str"
+           [theory] "CRng2Str" as "R2Str".
 end ComRingIso.
 
 (* -------------------------------------------------------------------- *)
-theory IDomainPred.
-  type t.
-
-  clone import IDomain as ID with
-    type t <= t.
-
-  clone include ComRingPred with
-    type t    <- t,
-    theory ZMod <= ID,
-    theory CR <= ID.
-
-  inductive idomainpred (p : t -> bool) =
-  | IDomainPred of
-        (comringpred p).
-
-  lemma idomainpred_comring p : idomainpred p => comringpred p.
-  proof. by case. qed.
-
-  hint exact : idomainpred_comring.
-
-  lemma idomain0 p : idomainpred p => p zeror.
-  proof. by move/idomainpred_comring; exact: comring0. qed.
-
-  lemma idomainD p x y : idomainpred p => p x => p y => p (x + y).
-  proof. by move/idomainpred_comring; exact: comringD. qed.
-
-  lemma idomainN p x : idomainpred p => p x => p (-x).
-  proof. by move/idomainpred_comring; exact: comringN. qed.
-  
-  lemma idomainB p x y : idomainpred p => p x => p y => p (x - y).
-  proof. by move/idomainpred_comring; exact: comringB. qed.
-
-  lemma idomainMz p x n : idomainpred p => p x => p (intmul x n).
-  proof. by move/idomainpred_comring; exact: comringMz. qed.
-
-  lemma idomain1 p : idomainpred p => p oner.
-  proof. by move/idomainpred_comring; exact: comring1. qed.
-  
- lemma idomainM p x y : idomainpred p => p x => p y => p (x * y).
-  proof. by move/idomainpred_comring; exact: comringM. qed.
-
-  lemma idomainV p x : idomainpred p => p x => p (invr x).
-  proof. by move/idomainpred_comring; exact: comringV. qed.
-
-  lemma idomainX p x n : idomainpred p => p x => p (exp x n).
-  proof. by move/idomainpred_comring; exact: comringX. qed.
-end IDomainPred.
+theory IDomainIso.
+  clone include IDomainIso_
+    rename [theory] "IDom1Str" as "R1Str"
+           [theory] "IDom2Str" as "R2Str".
+end IDomainIso.
 
 (* -------------------------------------------------------------------- *)
-theory FieldPred.
-  type t.
+theory FieldIso.
+  clone include FieldIso_
+    rename [theory] "Fld1Str" as "R1Str"
+           [theory] "Fld2Str" as "R2Str".
+end FieldIso.
 
-  clone import Field as F with
-    type t <= t.
 
-  clone include IDomainPred with
-    type t    <- t,
-    theory ZMod <= F,
-    theory CR <= F,
-    theory ID <= F.
+(* ==================================================================== *)
+theory FinIso.
+  type t1, t2.
 
-  inductive fieldpred (p : t -> bool) =
-  | FieldPred of
-        (idomainpred p).
+  clone import Iso with
+    type t1 <= t1,
+    type t2 <= t2.
 
-  lemma fieldpred_idomain p : fieldpred p => idomainpred p.
-  proof. by case. qed.
+  clone import FinType as Fin1 with
+    type t <= t1.
 
-  hint exact : fieldpred_idomain.
+  clone import FinType as Fin2 with
+    type t <= t2.
 
-  lemma field0 p : fieldpred p => p zeror.
-  proof. by move/fieldpred_idomain; exact: idomain0. qed.
+  lemma f_enum : perm_eq (map f Fin1.enum) Fin2.enum.
+  proof.
+    apply/uniq_perm_eq => [| |x]; [|by apply/Fin2.enum_uniq|].
+    + by apply/uniq_map_injective; [apply/inj_f|apply/Fin1.enum_uniq].
+    by rewrite mapP Fin2.enumP /=; exists (g x); rewrite Fin1.enumP cangf.
+  qed.
 
-  lemma fieldD p x y : fieldpred p => p x => p y => p (x + y).
-  proof. by move/fieldpred_idomain; exact: idomainD. qed.
+  lemma g_enum : perm_eq (map g Fin2.enum) Fin1.enum.
+  proof.
+    move/(perm_eq_map g)/perm_eq_sym: f_enum => eq_.
+    apply/(perm_eq_trans _ _ _ eq_); rewrite -map_comp.
+    rewrite (eq_map _ idfun) ?map_id ?perm_eq_refl //.
+    by move=> ?; rewrite /(\o) /idfun canfg.
+  qed.
+end FinIso.
 
-  lemma fieldidomainN p x : fieldpred p => p x => p (-x).
-  proof. by move/fieldpred_idomain; exact: idomainN. qed.
-  
-  lemma fieldB p x y : fieldpred p => p x => p y => p (x - y).
-  proof. by move/fieldpred_idomain; exact: idomainB. qed.
 
-  lemma fieldMz p x n : fieldpred p => p x => p (intmul x n).
-  proof. by move/fieldpred_idomain; exact: idomainMz. qed.
+(* ==================================================================== *)
+theory FinZModuleIso_.
+  type t1, t2.
 
-  lemma field1 p : fieldpred p => p oner.
-  proof. by move/fieldpred_idomain; exact: idomain1. qed.
-  
- lemma fieldM p x y : fieldpred p => p x => p y => p (x * y).
-  proof. by move/fieldpred_idomain; exact: idomainM. qed.
+  clone import ZModuleIso as ZModIso with
+    type t1 <= t1,
+    type t2 <= t2.
 
-  lemma fieldV p x : fieldpred p => p x => p (invr x).
-  proof. by move/fieldpred_idomain; exact: idomainV. qed.
+  clone include FinIso with
+    type t1 <- t1,
+    type t2 <- t2.
+end FinZModuleIso_.
 
-  lemma fieldX p x n : fieldpred p => p x => p (exp x n).
-  proof. by move/fieldpred_idomain; exact: idomainX. qed.
-end FieldPred.
+(* -------------------------------------------------------------------- *)
+theory FinComRingIso_.
+  type t1, t2.
 
-*)
+  clone import ComRingIso as CRngIso with
+    type t1 <= t1,
+    type t2 <= t2.
+
+  clone include FinZModuleIso_ with
+    type t1 <- t1,
+    type t2 <- t2,
+    theory ZModIso <- CRngIso.
+end FinComRingIso_.
+
+(* -------------------------------------------------------------------- *)
+theory FinIDomainIso_.
+  type t1, t2.
+
+  clone import IDomainIso as IDomIso with
+    type t1 <= t1,
+    type t2 <= t2.
+
+  clone include FinComRingIso_ with
+    type t1 <- t1,
+    type t2 <- t2,
+    theory CRngIso <- IDomIso.
+end FinIDomainIso_.
+
+(* -------------------------------------------------------------------- *)
+theory FinFieldIso_.
+  type t1, t2.
+
+  clone import FieldIso as FldIso with
+    type t1 <= t1,
+    type t2 <= t2.
+
+  clone include FinIDomainIso_ with
+    type t1 <- t1,
+    type t2 <- t2,
+    theory IDomIso <- FldIso.
+end FinFieldIso_.
+
+
+(* ==================================================================== *)
+theory FinZModuleIso.
+  clone include FinZModuleIso_
+    rename [theory] "ZModIso" as "RIso".
+end FinZModuleIso.
+
+(* -------------------------------------------------------------------- *)
+theory FinComRingIso.
+  clone include FinComRingIso_
+    rename [theory] "CRngIso" as "RIso".
+end FinComRingIso.
+
+(* -------------------------------------------------------------------- *)
+theory FinIDomainIso.
+  clone include FinIDomainIso_
+    rename [theory] "IDomIso" as "RIso".
+end FinIDomainIso.
+
+(* -------------------------------------------------------------------- *)
+theory FinFieldIso.
+  clone include FinFieldIso_
+    rename [theory] "FldIso" as "RIso".
+end FinFieldIso.

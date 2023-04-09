@@ -4,39 +4,459 @@ require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
 
+
+(* ==================================================================== *)
+abstract theory SubZModule.
+  type t, st.
+
+  clone import ZModuleStruct as RStr with
+    type t <= t.
+
+  clone import ZModuleStruct as SRStr with
+    type t <= st.
+
+  clone import Subtype as Sub with
+    type T  <= t ,
+    type sT <= st.
+
+  axiom val0 : val SRStr.R.zeror = RStr.R.zeror.
+
+  axiom valD x y : val (SRStr.R.( + ) x y) = RStr.R.( + ) (val x) (val y).
+
+  lemma valN x : val (SRStr.R.([-]) x) = RStr.R.([-]) (val x).
+  proof. by apply/(RStr.R.addrI (val x)); rewrite -valD SRStr.R.subrr RStr.R.subrr val0. qed.
+
+  lemma valB x y : val (SRStr.R.( - ) x y) = RStr.R.( - ) (val x) (val y).
+  proof. by rewrite valD valN. qed.
+
+  lemma valMz x n : val (SRStr.R.intmul x n) = RStr.R.intmul (val x) n.
+  proof.
+    wlog: n / 0 <= n => [wlogn|].
+    + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn // => {wlogn}.
+      by rewrite SRStr.R.mulrNz RStr.R.mulrNz valN => /RStr.R.oppr_inj.
+    elim: n => [|n le0n IHn]; [by rewrite SRStr.R.mulr0z RStr.R.mulr0z val0|].
+    by rewrite SRStr.R.mulrSz RStr.R.mulrSz -IHn valD.
+  qed.
+
+  lemma P0 : P RStr.R.zeror.
+  proof. by rewrite -val0 valP. qed.
+
+  lemma PD x y : P x => P y => P (RStr.R.( + ) x y).
+  proof.
+    move=> Px Py; move: (val_insubd x) (val_insubd y).
+    by rewrite Px Py /= => <- <-; rewrite -valD valP.
+  qed.
+
+  lemma PN x : P x => P (RStr.R.([-]) x).
+  proof.
+    move=> Px; move: (val_insubd x).
+    by rewrite Px /= => <-; rewrite -valN valP.
+  qed.
+
+  lemma PB x y : P x => P y => P (RStr.R.( - ) x y).
+  proof. by move=> Px Py; apply/PD/PN. qed.
+
+  lemma PMz x n : P x => P (RStr.R.intmul x n).
+  proof.
+    move=> Px; move: (val_insubd x).
+    by rewrite Px /= => <-; rewrite -valMz valP.
+  qed.
+
+  lemma insubd0 : insubd RStr.R.zeror = SRStr.R.zeror.
+  proof. by rewrite -val0 valKd. qed.
+
+  lemma insubdD x y :
+    P x =>
+    P y =>
+    insubd (RStr.R.( + ) x y) =
+    SRStr.R.( + ) (insubd x) (insubd y).
+  proof.
+    move=> Px Py; apply/val_inj; rewrite valD !val_insubd //.
+    by rewrite Px Py PD.
+  qed.
+
+  lemma insubdN x :
+    P x =>
+    insubd (RStr.R.([-]) x) =
+    SRStr.R.([-]) (insubd x).
+  proof.
+    move=> Px; apply/val_inj; rewrite valN !val_insubd //.
+    by rewrite Px PN.
+  qed.
+
+  lemma insubdB x y :
+    P x =>
+    P y =>
+    insubd (RStr.R.( - ) x y) =
+    SRStr.R.( - ) (insubd x) (insubd y).
+  proof.
+    move=> Px Py; apply/val_inj; rewrite valB !val_insubd //.
+    by rewrite Px Py PB.
+  qed.
+
+  lemma insubdMz x n :
+    P x =>
+    insubd (RStr.R.intmul x n) =
+    SRStr.R.intmul (insubd x) n.
+  proof.
+    move=> Px; apply/val_inj; rewrite valMz !val_insubd //.
+    by rewrite Px PMz.
+  qed.
+
+  lemma val_order x : order (val x) = order x.
+  proof.
+    rewrite /order; apply/IntMin.eq_argmin => i le0i /=.
+    rewrite /idfun /= -valMz -val0; apply/andb_id2l => lt0i.
+    by apply/eq_iff; split=> [|->] //; apply/val_inj.
+  qed.
+
+  lemma val_orbit x y : orbit (val x) (val y) = orbit x y.
+  proof.
+    apply/eq_iff/exists_eq => n /=; apply/eq_iff.
+    by rewrite -valMz; split=> [|->] // /val_inj.
+  qed.
+
+  lemma val_orbit_list x : orbit_list (val x) = map val (orbit_list x).
+  proof.
+    rewrite map_mkseq -val_order; apply/eq_in_mkseq.
+    by move=> i _ ; rewrite /(\o) /= valMz.
+  qed.
+
+  lemma val_eqv_orbit x y z : eqv_orbit (val x) (val y) (val z) = eqv_orbit x y z.
+  proof. by rewrite /eqv_orbit -valB val_orbit. qed.
+
+  lemma P_orbit_list x : P x => all P (orbit_list x).
+  proof.
+    case/ler_eqVlt: (RStr.ge0_order x) => [|lt0_ Px].
+    + by rewrite -size_orbit_list eq_sym size_eq0 => ->.
+    apply/allP => y; rewrite -orbit_listP // => -[n] ->>.
+    by apply/PMz.
+  qed.
+
+  lemma insubd_order x : P x => order (insubd x) = order x.
+  proof. by move=> Px; rewrite -val_order val_insubd Px. qed.
+
+  lemma insubd_orbit x y : P x => P y => orbit (insubd x) (insubd y) = orbit x y.
+  proof. by move=> Px Py; rewrite -val_orbit !val_insubd Px Py. qed.
+
+  lemma insubd_orbit_list x : P x => orbit_list (insubd x) = map insubd (orbit_list x).
+  proof.
+    move=> Px; apply/(inj_map _ val_inj); rewrite -val_orbit_list val_insubd Px /=.
+    rewrite -map_comp -{1}(map_id (orbit_list x)) -eq_in_map => y.
+    rewrite /idfun /(\o) /= val_insubd => memy.
+    by move/(_ _ Px)/allP/(_ _ memy): P_orbit_list => ->.
+  qed.
+
+  lemma insubd_eqv_orbit x y z :
+    P x =>
+    P y =>
+    P z =>
+    eqv_orbit (insubd x) (insubd y) (insubd z) =
+    eqv_orbit x y z.
+  proof. by move=> Px Py Pz; rewrite -val_eqv_orbit !val_insubd Px Py Pz. qed.
+end SubZModule.
+
+(* -------------------------------------------------------------------- *)
+abstract theory SubComRing.
+  type t, st.
+
+  clone import ComRingStruct as RStr with
+    type t <= t.
+
+  clone import ComRingStruct as SRStr with
+    type t <= st.
+
+  clone include SubZModule with
+    type t       <- t,
+    type st      <- st,
+    theory RStr  <- RStr,
+    theory SRStr <- SRStr
+    rename [theory] "SRStr" as "Gone"
+           [theory] "RStr"  as "Gone".
+
+  import Sub.
+
+  axiom val1 : val SRStr.R.oner = RStr.R.oner.
+
+  axiom valM x y : val (SRStr.R.( * ) x y) = RStr.R.( * ) (val x) (val y).
+
+  lemma valUR x : SRStr.R.unit x => RStr.R.unit (val x).
+  proof.
+    rewrite RStr.R.unitrP SRStr.R.unitrP -val1 => -[y] <-.
+    by exists (val y); rewrite valM.
+  qed.
+
+  lemma valVR x :
+    val (SRStr.R.invr x) =
+    if SRStr.R.unit x
+    then RStr.R.invr (val x)
+    else val x.
+  proof.
+    case:(SRStr.R.unit x) => [ux|Nux].
+    + apply/(RStr.R.mulIr _ (valUR _ ux)).
+      rewrite -valM SRStr.R.mulVr // RStr.R.mulVr ?val1 //.
+      by apply/valUR.
+    by rewrite SRStr.R.unitout.
+  qed.
+
+  lemma valXR x n :
+    val (SRStr.R.exp x n) =
+    if SRStr.R.unit x
+    then RStr.R.exp (val x) n
+    else RStr.R.exp (val x) `|n|.
+  proof.
+    have wlogn: forall x n , 0 <= n => val (SRStr.R.exp x n) = RStr.R.exp (val x) n.
+    + move=> {x n} x; elim=> [|n le0n IHn]; [by rewrite SRStr.R.expr0 RStr.R.expr0 val1|].
+      by rewrite SRStr.R.exprS // RStr.R.exprS // -IHn valM.
+    case (0 <= n) => [le0n|/ltrNge ltn0].
+    + by rewrite wlogn // ger0_norm.
+    rewrite ltr0_norm //; move: ltn0; rewrite -(opprK n).
+    move: (-n) => {n} n /oppr_lt0 /=; rewrite SRStr.R.exprN RStr.R.exprN.
+    move=> lt0n; move/ltzW: (lt0n).
+    move=> /wlogn {wlogn}; rewrite valVR => ->.
+    case: (SRStr.R.unit x) => [ux|Nux_].
+    + by rewrite ifT //; apply/SRStr.R.unitrX.
+    case (n = 0) => [->> //|].
+    by move/(SRStr.R.unitrX_neq0 x); rewrite Nux_ /= => ->.
+  qed.
+
+  lemma P1 : P RStr.R.oner.
+  proof. by rewrite -val1 valP. qed.
+
+  lemma PM x y : P x => P y => P (RStr.R.( * ) x y).
+  proof.
+    move=> Px Py; move: (val_insubd x) (val_insubd y).
+    by rewrite Px Py /= => <- <-; rewrite -valM valP.
+  qed.
+
+  lemma PXR x n : P x => 0 <= n => P (RStr.R.exp x n).
+  proof.
+    move=> Px; elim: n => [|n le0n IHn].
+    + by rewrite RStr.R.expr0 P1.
+    by rewrite RStr.R.exprS // PM.
+  qed.
+
+  lemma insubd1 : insubd RStr.R.oner = SRStr.R.oner.
+  proof. by rewrite -val1 valKd. qed.
+
+  lemma insubdM x y :
+    P x =>
+    P y =>
+    insubd (RStr.R.( * ) x y) =
+    SRStr.R.( * ) (insubd x) (insubd y).
+  proof.
+    move=> Px Py; apply/val_inj; rewrite valM !val_insubd //.
+    by rewrite Px Py PM.
+  qed.
+
+  lemma insubdVR x :
+    P x =>
+    insubd (RStr.R.invr x) =
+    if P (RStr.R.invr x)
+    then SRStr.R.invr (insubd x)
+    else witness.
+  proof.
+    move=> Px; case: (RStr.R.unit x)=> [ux|Nux]; last first.
+    + rewrite RStr.R.unitout // Px /=; move: (valUR (insubd x)).
+      rewrite val_insubd Px /= Nux /= => Nu_.
+      by rewrite SRStr.R.unitout.
+    apply/val_inj; rewrite fun_if valVR !val_insubd Px /=.
+    case: (P (RStr.R.invr x)) => //= P_; rewrite ifT //.
+    apply/SRStr.R.unitrP; exists (insubd (RStr.R.invr x)).
+    by rewrite -insubdM // RStr.R.mulVr // insubd1.
+  qed.
+
+  lemma insubdXR x n :
+    P x =>
+    insubd (RStr.R.exp x n) =
+    if 0 <= n \/ P (RStr.R.invr x)
+    then SRStr.R.exp (insubd x) n
+    else witness.
+  proof.
+    move=> Px; case (0 <= n) => [le0n|/ltrNge] /=.
+    + apply/val_inj; rewrite valXR !val_insubd Px /=.
+      by rewrite PXR //= ger0_norm.
+    rewrite -(opprK n); move: (-n) => {n} n /oppr_lt0 lt0n.
+    rewrite SRStr.R.exprN RStr.R.exprN -SRStr.R.exprVn ?ltzW //.
+    rewrite -RStr.R.exprVn ?ltzW //; move: (insubdVR _ Px).
+    case: (P (RStr.R.invr x)) => //= [PV <-|NPV _].
+    + apply/val_inj; rewrite valXR !val_insubd PV /=.
+      by rewrite PXR ?ltzW //= gtr0_norm.
+    apply/val_inj; rewrite val_insubd; rewrite ifF //.
+    move: NPV; apply/implybNN => PE.
+    case: (RStr.R.unit x) => [ux|Nux]; last by rewrite RStr.R.unitout.
+    move: (PM _ (RStr.R.exp x (n - 1)) PE _).
+    + by apply/PXR => //; apply/ltzS.
+    rewrite (RStr.R.exprS (RStr.R.invr x) (n - 1)).
+    + by apply/ltzS.
+    rewrite -RStr.R.mulrA -RStr.R.exprMn.
+    + by apply/ltzS.
+    by rewrite RStr.R.mulVr // RStr.R.expr1z RStr.R.mulr1.
+  qed.
+
+  lemma eq_char : RStr.char = SRStr.char.
+  proof. by rewrite /char -val_order val1. qed.
+end SubComRing.
+
+(* -------------------------------------------------------------------- *)
+abstract theory SubIDomain.
+  type t, st.
+
+  clone import IDomainStruct as RStr with
+    type t <= t.
+
+  clone import IDomainStruct as SRStr with
+    type t <= st.
+
+  clone include SubComRing with
+    type t       <- t,
+    type st      <- st,
+    theory RStr  <- RStr,
+    theory SRStr <- SRStr
+    rename [theory] "SRStr" as "Gone"
+           [theory] "RStr"  as "Gone".
+
+  import Sub.
+
+  lemma val_frobenius x : frobenius (val x) = val (frobenius x).
+  proof. by rewrite /frobenius valXR eq_char ger0_norm // SRStr.ge0_char. qed.
+
+  lemma val_iter_frobenius_fixed n x :
+    iter_frobenius_fixed n (val x) =
+    iter_frobenius_fixed n x.
+  proof.
+    rewrite /iter_frobenius_fixed.
+    have ->: iter n RStr.frobenius (val x) = val (iter n SRStr.frobenius x).
+    + case (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite !iter0].
+      by elim: n => [|n le0n IHn]; [rewrite !iter0|rewrite !iterS // IHn val_frobenius].
+    by apply/eq_iff; split=> [|->] //; apply/val_inj.
+  qed.
+
+  lemma P_frobenius x : P x => P (frobenius x).
+  proof. by move=> Px; rewrite /frobenius PXR // RStr.ge0_char. qed.
+
+  lemma insubd_frobenius x : P x => frobenius (insubd x) = insubd (frobenius x).
+  proof.
+    by move=> Px; apply/val_inj; rewrite -val_frobenius !val_insubd Px P_frobenius.
+  qed.
+
+  lemma insubd_iter_frobenius_fixed n x :
+    P x =>
+    iter_frobenius_fixed n (insubd x) =
+    iter_frobenius_fixed n x.
+  proof.
+    by move=> Px; rewrite -val_iter_frobenius_fixed val_insubd Px.
+  qed.
+end SubIDomain.
+
+(* -------------------------------------------------------------------- *)
+abstract theory SubField.
+  type t, st.
+
+  clone import FieldStruct as RStr with
+    type t <= t.
+
+  clone import FieldStruct as SRStr with
+    type t <= st.
+
+  clone include SubIDomain with
+    type t       <- t,
+    type st      <- st,
+    theory RStr  <- RStr,
+    theory SRStr <- SRStr
+    rename [theory] "SRStr" as "SGone"
+           [theory] "RStr"  as "Gone".
+
+  import Sub.
+
+  lemma valU x : RStr.R.unit (val x) = SRStr.R.unit x.
+  proof.
+    case (x = SRStr.R.zeror) => [->>|neqx0].
+    + by rewrite val0 SRStr.R.unitr0 RStr.R.unitr0.
+    rewrite SRStr.R.unitfP // eqT; apply/RStr.R.unitfP.
+    by move: neqx0; rewrite -val0; apply/implybNN/val_inj.
+  qed.
+
+  lemma valV x :
+    val (SRStr.R.invr x) =
+    RStr.R.invr (val x).
+  proof.
+    case (x = SRStr.R.zeror) => [->>|neqx0].
+    + by rewrite SRStr.R.invr0 val0 RStr.R.invr0.
+    by rewrite valVR SRStr.R.unitfP.
+  qed.
+
+  lemma valX x n :
+    val (SRStr.R.exp x n) =
+    RStr.R.exp (val x) n.
+  proof.
+    case (x = SRStr.R.zeror) => [->>|neqx0].
+    + by rewrite SRStr.R.expr0z val0 RStr.R.expr0z fun_if val1 val0.
+    by rewrite valXR SRStr.R.unitfP.
+  qed.
+
+  lemma PV x : P x => P (RStr.R.invr x).
+  proof.
+    move=> Px; move: (val_insubd x).
+    by rewrite Px /= => <-; rewrite -valV valP.
+  qed.
+
+  lemma PX x n : P x => P (RStr.R.exp x n).
+  proof.
+    move=> Px; case (0 <= n) => [le0n|/ltrNge/ltzW/ler_opp2/=].
+    + by apply/PXR.
+    rewrite -(opprK n); move: (-n) => {n} n /= le0n.
+    by rewrite -RStr.R.exprV; apply/PXR => //; apply/PV.
+  qed.
+
+  lemma insubdV x :
+    P x =>
+    insubd (RStr.R.invr x) =
+    SRStr.R.invr (insubd x).
+  proof.
+    move=> Px; case (x = RStr.R.zeror) => [->>|neqx0].
+    + by rewrite RStr.R.invr0 insubd0 SRStr.R.invr0.
+    by rewrite insubdVR // PV.
+  qed.
+
+  lemma insubdX x n :
+    P x =>
+    insubd (RStr.R.exp x n) =
+    SRStr.R.exp (insubd x) n.
+  proof.
+    move=> Px; case (x = RStr.R.zeror) => [->>|neqx0].
+    + by rewrite RStr.R.expr0z insubd0 SRStr.R.expr0z fun_if insubd1 insubd0.
+    by rewrite insubdXR // PV.
+  qed.
+end SubField.
+
+
 (* ==================================================================== *)
 theory ZModulePred.
   type t.
 
-  clone import ZModule as ZMod with
+  clone import ZModule as R with
     type t <= t.
 
-  inductive zmodulepred (p : t -> bool) =
-  | ZModulePred of
-        (p zeror)
-      & (forall x, p x => p (-x))
-      & (forall x y, p x => p y => p (x + y)).
+  op Rpred (P : t -> bool) : bool.
 
-  lemma zmodule0 p : zmodulepred p => p zeror.
-  proof. by case. qed.
+  axiom Rpred0 P : Rpred P => P zeror.
 
-  lemma zmoduleD p x y : zmodulepred p => p x => p y => p (x + y).
-  proof. by case=> _ _; apply. qed.
+  axiom RpredD P : Rpred P => forall x y , P x => P y => P (x + y).
 
-  lemma zmoduleN p x : zmodulepred p => p x => p (-x).
-  proof. by case=> _ + _; apply. qed.
+  axiom RpredN P : Rpred P => forall x , P x => P (-x).
   
-  lemma zmoduleB p x y : zmodulepred p => p x => p y => p (x - y).
-  proof. by move=> zmodulep px py; apply/zmoduleD/zmoduleN. qed.
+  lemma RpredB P : Rpred P => forall x y , P x => P y => P (x - y).
+  proof. by move=> RpredP x y Px Py; apply/RpredD/RpredN. qed.
 
-  lemma zmoduleMz p x n : zmodulepred p => p x => p (intmul x n).
+  lemma RpredMz P : Rpred P => forall x n , P x => P (intmul x n).
   proof.
-    move=> zmodulep; wlog: n / 0 <= n => [wlogn|].
-    + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn // + px.
-      move/(_ px); rewrite ZMod.mulrNz=> /(zmoduleN p _ zmodulep).
+    move=> RpredP x n; wlog: n / 0 <= n => [wlogn|].
+    + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn // + Px.
+      move/(_ Px); rewrite R.mulrNz=> /(RpredN _ RpredP).
       by rewrite opprK.
-    elim: n => [|n le0n IHn]; [by rewrite ZMod.mulr0z zmodule0|].
-    by rewrite ZMod.mulrSz => px; move/(_ px): IHn => p_; apply/zmoduleD.
+    elim: n => [|n le0n IHn]; [by rewrite R.mulr0z Rpred0|].
+    by rewrite R.mulrSz => Px; move/(_ Px): IHn => P_; apply/RpredD.
   qed.
 end ZModulePred.
 
@@ -44,57 +464,22 @@ end ZModulePred.
 theory ComRingPred.
   type t.
 
-  clone import ComRing as CR with
+  clone import ComRing as R with
     type t <= t.
 
   clone include ZModulePred with
     type t      <- t,
-    theory ZMod <= CR.
+    theory R <- R
+    rename [theory] "R" as "Gone".
 
-  inductive comringpred (p : t -> bool) =
-  | ComRingPred of
-        (zmodulepred p)
-      & (p oner)
-      & (forall x y, p x => p y => p (x * y))
-      & (forall x, p x => p (invr x)).
-
-  lemma comringpred_zmodule p : comringpred p => zmodulepred p.
-  proof. by case. qed.
-
-  hint exact : comringpred_zmodule.
-
-  lemma comring0 p : comringpred p => p zeror.
-  proof. by move/comringpred_zmodule; exact: zmodule0. qed.
-
-  lemma comringD p x y : comringpred p => p x => p y => p (x + y).
-  proof. by move/comringpred_zmodule; exact: zmoduleD. qed.
-
-  lemma comringN p x : comringpred p => p x => p (-x).
-  proof. by move/comringpred_zmodule; exact: zmoduleN. qed.
+  axiom Rpred1 P : Rpred P => P oner.
   
-  lemma comringB p x y : comringpred p => p x => p y => p (x - y).
-  proof. by move/comringpred_zmodule; exact: zmoduleB. qed.
+  axiom RpredM P : Rpred P => forall x y , P x => P y => P (x * y).
 
-  lemma comringMz p x n : comringpred p => p x => p (intmul x n).
-  proof. by move/comringpred_zmodule; exact: zmoduleMz. qed.
-
-  lemma comring1 p : comringpred p => p oner.
-  proof. by case. qed.
-  
- lemma comringM p x y : comringpred p => p x => p y => p (x * y).
-  proof. by case=> _ _ + _; apply. qed.
-
-  lemma comringV p x : comringpred p => p x => p (invr x).
-  proof. by case=> _ _ _; apply. qed.
-
-  lemma comringX p x n : comringpred p => p x => p (exp x n).
+  lemma RpredXR P : Rpred P => forall x n , P x => 0 <= n => P (exp x n).
   proof.
-    move=> comringp; wlog: n / 0 <= n => [wlogn|].
-    + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn // + px.
-      move/(_ px); rewrite exprN => /(comringV _ _ comringp).
-      by rewrite invrK.
-    elim: n => [|n le0n IHn]; [by rewrite CR.expr0 comring1|].
-    by rewrite CR.exprS // => px; move/(_ px): IHn => p_; apply/comringM.
+    move=> RpredP x n Px; elim: n => [|n le0n IHn]; [by rewrite R.expr0 Rpred1|].
+    by rewrite R.exprS //; apply/RpredM.
   qed.
 end ComRingPred.
 
@@ -102,220 +487,138 @@ end ComRingPred.
 theory IDomainPred.
   type t.
 
-  clone import IDomain as ID with
+  clone import IDomain as R with
     type t <= t.
 
   clone include ComRingPred with
-    type t    <- t,
-    theory ZMod <= ID,
-    theory CR <= ID.
-
-  inductive idomainpred (p : t -> bool) =
-  | IDomainPred of
-        (comringpred p).
-
-  lemma idomainpred_comring p : idomainpred p => comringpred p.
-  proof. by case. qed.
-
-  hint exact : idomainpred_comring.
-
-  lemma idomain0 p : idomainpred p => p zeror.
-  proof. by move/idomainpred_comring; exact: comring0. qed.
-
-  lemma idomainD p x y : idomainpred p => p x => p y => p (x + y).
-  proof. by move/idomainpred_comring; exact: comringD. qed.
-
-  lemma idomainN p x : idomainpred p => p x => p (-x).
-  proof. by move/idomainpred_comring; exact: comringN. qed.
-  
-  lemma idomainB p x y : idomainpred p => p x => p y => p (x - y).
-  proof. by move/idomainpred_comring; exact: comringB. qed.
-
-  lemma idomainMz p x n : idomainpred p => p x => p (intmul x n).
-  proof. by move/idomainpred_comring; exact: comringMz. qed.
-
-  lemma idomain1 p : idomainpred p => p oner.
-  proof. by move/idomainpred_comring; exact: comring1. qed.
-  
- lemma idomainM p x y : idomainpred p => p x => p y => p (x * y).
-  proof. by move/idomainpred_comring; exact: comringM. qed.
-
-  lemma idomainV p x : idomainpred p => p x => p (invr x).
-  proof. by move/idomainpred_comring; exact: comringV. qed.
-
-  lemma idomainX p x n : idomainpred p => p x => p (exp x n).
-  proof. by move/idomainpred_comring; exact: comringX. qed.
+    type t   <- t,
+    theory R <- R
+    rename [theory] "R" as "Gone".
 end IDomainPred.
 
 (* -------------------------------------------------------------------- *)
 theory FieldPred.
   type t.
 
-  clone import Field as F with
+  clone import Field as R with
     type t <= t.
 
   clone include IDomainPred with
-    type t    <- t,
-    theory ZMod <= F,
-    theory CR <= F,
-    theory ID <= F.
-
-  inductive fieldpred (p : t -> bool) =
-  | FieldPred of
-        (idomainpred p).
-
-  lemma fieldpred_idomain p : fieldpred p => idomainpred p.
-  proof. by case. qed.
-
-  hint exact : fieldpred_idomain.
-
-  lemma field0 p : fieldpred p => p zeror.
-  proof. by move/fieldpred_idomain; exact: idomain0. qed.
-
-  lemma fieldD p x y : fieldpred p => p x => p y => p (x + y).
-  proof. by move/fieldpred_idomain; exact: idomainD. qed.
-
-  lemma fieldidomainN p x : fieldpred p => p x => p (-x).
-  proof. by move/fieldpred_idomain; exact: idomainN. qed.
-  
-  lemma fieldB p x y : fieldpred p => p x => p y => p (x - y).
-  proof. by move/fieldpred_idomain; exact: idomainB. qed.
-
-  lemma fieldMz p x n : fieldpred p => p x => p (intmul x n).
-  proof. by move/fieldpred_idomain; exact: idomainMz. qed.
-
-  lemma field1 p : fieldpred p => p oner.
-  proof. by move/fieldpred_idomain; exact: idomain1. qed.
-  
- lemma fieldM p x y : fieldpred p => p x => p y => p (x * y).
-  proof. by move/fieldpred_idomain; exact: idomainM. qed.
-
-  lemma fieldV p x : fieldpred p => p x => p (invr x).
-  proof. by move/fieldpred_idomain; exact: idomainV. qed.
-
-  lemma fieldX p x n : fieldpred p => p x => p (exp x n).
-  proof. by move/fieldpred_idomain; exact: idomainX. qed.
+    type t   <- t,
+    theory R <- R
+    rename [theory] "R" as "Gone".
 end FieldPred.
 
 
 (* ==================================================================== *)
-abstract theory SubZModule.
+abstract theory SubZModulePred.
   type t, st.
 
-  clone import ZModule as ZMod with
+  clone import ZModuleStruct as RStr with
     type t <= t.
 
-  clone import ZModulePred as ZModPr with
-    type t      <= t,
-    theory ZMod <= ZMod.
-
-  op p : t -> bool.
-
-  axiom zmodulep : zmodulepred p.
-
-  hint exact : zmodulep.
+  clone import ZModulePred as RPr with
+    type t   <= t,
+    theory R <= RStr.R.
 
   clone import Subtype as Sub with
-    type T  <= t ,
-    type sT <= st,
-    pred P  <= p.
+    type T  <= t,
+    type sT <= st.
 
-  op zeror   = insubd zeror.
-  op (+) x y = insubd (val x + val y).
-  op ([-]) x = insubd (- val x).
+  import Sub.
 
-  lemma insubd0 : insubd ZMod.zeror = zeror.
-  proof. by rewrite /zeror. qed.
+  axiom RpredP : Rpred P.
 
-  lemma insubdD x y : p x => p y => insubd (x + y) = insubd x + insubd y.
+  clone import SubZModule as SubR with
+    type t           <= t,
+    type st          <= st,
+    theory RStr      <= RStr,
+    theory Sub       <= Sub,
+    op SRStr.R.zeror <= insubd RStr.R.zeror,
+    op SRStr.R.( + ) <= (fun x y => insubd (RStr.R.( + ) (val x) (val y))),
+    op SRStr.R.([-]) <= (fun x => insubd (RStr.R.([-]) (val x)))
+  proof *.
+
+  realize SRStr.R.addrA.
   proof.
-    move=> px py; rewrite /insubd; move: (insubT _ px) (insubT _ py).
-    by case: (insub x) => // ox /= <<-; case: (insub y) => // oy /= <<-.
+    move=> x y z; rewrite /( + ); apply/val_inj.
+    rewrite !val_insubd (RPr.RpredD _ RpredP (val x) (val y)) ?valP //=.
+    rewrite (RPr.RpredD _ RpredP (val y) (val z)) ?valP //=.
+    by rewrite RStr.R.addrA.
   qed.
 
-  lemma insubdN x : p x => insubd (-x) = - insubd x.
+  realize SRStr.R.addrC.
   proof.
-    move=> px; rewrite /insubd; move: (insubT _ px).
-    by case: (insub x) => // ox /= <<-.
+    move=> x y; rewrite /( + ); apply/val_inj.
+    rewrite !val_insubd !(RPr.RpredD _ RpredP) ?valP //=.
+    by rewrite RStr.R.addrC.
   qed.
 
-  lemma val0 : val zeror = ZMod.zeror.
-  proof. by rewrite /zeror val_insubd zmodule0. qed.
-
-  lemma valD x y : val (x + y) = val x + val y.
-  proof. by rewrite /(+) val_insubd zmoduleD // valP. qed.
-
-  lemma valN x : val (-x) = - val x.
-  proof. by rewrite /(-) val_insubd zmoduleN // valP. qed.
-
-  clone import ZModule as SZMod with
-    type t    <= st,
-    op zeror  <= zeror,
-    op (+)    <= (+),
-    op [-]    <= ([-])
-    proof *.
-
-  realize addrA.
-  proof. by move=> x y z; apply/val_inj; rewrite !valD addrA. qed.
-
-  realize addrC.
-  proof. by move=> x y; apply/val_inj; rewrite !valD addrC. qed.
-
-  realize add0r.
-  proof. by move=> x; apply/val_inj; rewrite valD val0 add0r. qed.
-
-  realize addNr.
-  proof. by move=> x; apply/val_inj; rewrite valD valN val0 addNr. qed.
-
-  lemma insubdB x y : p x => p y => insubd (x - y) = insubd x - insubd y.
+  realize SRStr.R.add0r.
   proof.
-    move=> px py; rewrite insubdD //; [by apply/zmoduleN|].
-    by rewrite insubdN.
+    move=> x; rewrite /zeror /( + ); apply/val_inj.
+    by rewrite !val_insubd (RPr.Rpred0 _ RpredP) /= RStr.R.add0r valP.
   qed.
 
-  lemma insubdMz x n : p x => insubd (intmul x n) = intmul (insubd x) n.
+  realize SRStr.R.addNr.
   proof.
-    wlog: n / 0 <= n => [wlogn|].
-    + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn // + px.
-      by move/(_ px); rewrite ZMod.mulrNz SZMod.mulrNz insubdN ?zmoduleMz // => /SZMod.oppr_inj.
-    elim: n => [|n le0n IHn]; [by rewrite ZMod.mulr0z SZMod.mulr0z|].
-    by rewrite ZMod.mulrSz SZMod.mulrSz => px; rewrite -IHn // insubdD // zmoduleMz.
+    move=> x; rewrite /zeror /( + ) /([-]); apply/val_inj; rewrite !val_insubd.
+    by rewrite (RPr.RpredN _ RpredP) ?valP //= RStr.R.addNr (RPr.Rpred0 _ RpredP).
   qed.
 
-  lemma valB (x y : st) : val (x - y) = val x - val y.
-  proof. by rewrite valD valN. qed.
+  realize val0.
+  proof. by rewrite /zeror val_insubd (RPr.Rpred0 _ RpredP). qed.
 
-  lemma valMz (x : st) n : val (intmul x n) = intmul (val x) n.
+  realize valD.
   proof.
-    rewrite -valKd -insubdMz ?valP //.
-    by rewrite valKd val_insubd zmoduleMz // valP.
+    move=> x y; rewrite /( + ) val_insubd.
+    by rewrite (RPr.RpredD _ RpredP) // valP.
   qed.
-end SubZModule.
+end SubZModulePred.
 
 (* -------------------------------------------------------------------- *)
-abstract theory SubComRing.
+abstract theory SubComRingPred.
   type t, st.
 
-  clone import ComRing as CR with
+  clone import ComRingStruct as RStr with
     type t <= t.
 
-  clone import ComRingPred as CRPr with
-    type t    <= t,
-    theory CR <= CR.
+  clone import ComRingPred as RPr with
+    type t   <= t,
+    theory R <= RStr.R.
 
-  op p : t -> bool.
+  clone import Subtype as Sub with
+    type T  <= t,
+    type sT <= st.
 
-  axiom comringp : comringpred p.
+  import Sub.
 
-  hint exact : comringp.
+  axiom RpredP : Rpred P.
 
-  clone include SubZModule with
-    type t  <- t ,
-    type st <- st,
-    op    p <- p ,
-    theory ZMod   <= CR,
-    theory ZModPr <= CRPr
-    proof zmodulep.
+  clone import SubComRing as SubR with
+    type t            <= t,
+    type st           <= st,
+    theory RStr       <= RStr,
+    theory Sub        <= Sub,
+    op SRStr.R.zeror  <= insubd RStr.R.zeror,
+    op SRStr.R.( + )  <= (fun x y => insubd (RStr.R.( + ) (val x) (val y))),
+    op SRStr.R.([-])  <= (fun x => insubd (RStr.R.([-]) (val x))),
+    op SRStr.R.oner   <= insubd RStr.R.oner,
+    op SRStr.R.( * )  <= (fun x y => insubd (RStr.R.( * ) (val x) (val y))),
+    pred SRStr.R.unit <= (fun x => RStr.R.unit (val x)),
+    op SRStr.R.invr   <= (fun x => insubd (RStr.R.invr (val x))).
+
+  clone include SubZModulePred with
+    type t       <- t ,
+    type st      <- st,
+    theory RStr  <- RStr,
+    theory RPr   <- RPr,
+    theory Sub   <- Sub,
+    axiom RpredP <- RpredP
+    rename [theory] "RStr" as "RStrGone"
+           [theory] "RPr"  as "RPrGone"
+           [theory] "Sub"  as "SubGone"
+    proof RpredP.
 
   realize zmodulep. by apply/comringpred_zmodule. qed.
 
@@ -631,140 +934,8 @@ abstract theory UZMod_Field.
 end UZMod_Field.
 
 
-(* ==================================================================== *)
-abstract theory SubZModuleStruct.
-  type t, st.
 
-  clone import SubZModule as SubZMod with
-    type t <= t,
-    type st <= st.
 
-  clone import ZModuleStruct as ZModStr with
-    type t <= t,
-    theory ZMod <= SubZMod.ZMod.
 
-  clone import ZModuleStruct as SZModStr with
-    type t <= st,
-    theory ZMod <= SubZMod.SZMod.
 
-  lemma eq_order x : order (SubZMod.Sub.val x) = order x.
-  proof.
-    rewrite /order; apply/IntMin.eq_argmin => i le0i /=.
-    rewrite /idfun /= -valMz -/ZModPr.ZMod.zeror -val0; apply/andb_id2l => lt0i.
-    by apply/eq_iff; split=> [|->] //; apply/SubZMod.Sub.val_inj.
-  qed.
-
-  lemma eq_orbit x y : orbit (SubZMod.Sub.val x) (SubZMod.Sub.val y) = orbit x y.
-  proof.
-    apply/eq_iff/exists_eq => n /=; apply/eq_iff.
-    by rewrite -valMz; split=> [|->] // /SubZMod.Sub.val_inj.
-  qed.
-
-  lemma eq_orbit_list x : orbit_list (SubZMod.Sub.val x) = map SubZMod.Sub.val (orbit_list x).
-  proof.
-    rewrite map_mkseq -eq_order; apply/eq_in_mkseq.
-    by move=> i _ ; rewrite /(\o) /= valMz.
-  qed.
-
-  lemma eq_eqv_orbit x y z : eqv_orbit (SubZMod.Sub.val x) (SubZMod.Sub.val y) (SubZMod.Sub.val z) = eqv_orbit x y z.
-  proof. by rewrite /eqv_orbit -valB eq_orbit. qed.
-
-end SubZModuleStruct.
-
-(* -------------------------------------------------------------------- *)
-abstract theory SubComRingStruct.
-  type t, st.
-
-  clone import SubComRing as SubCR with
-    type t <= t,
-    type st <= st.
-
-  clone import ComRingStruct as CRStr with
-    type t <= t,
-    theory CR <= SubCR.CR.
-
-  clone import ComRingStruct as SCRStr with
-    type t <= st,
-    theory CR <= SubCR.SCR.
-
-  clone include SubZModuleStruct with
-    type t <- t,
-    type st <- st,
-    theory SubZMod <= SubCR,
-    theory ZModStr <= CRStr,
-    theory SZModStr <= SCRStr.
-
-  lemma eq_char : CRStr.char = SCRStr.char.
-  proof. by rewrite /char -eq_order val1. qed.
-
-end SubComRingStruct.
-
-(* -------------------------------------------------------------------- *)
-abstract theory SubIDomainStruct.
-  type t, st.
-
-  clone import SubIDomain as SubID with
-    type t <= t,
-    type st <= st.
-
-  clone import IDomainStruct as IDStr with
-    type t <= t,
-    theory ID <= SubID.ID.
-
-  clone import IDomainStruct as SIDStr with
-    type t <= st,
-    theory ID <= SubID.SID.
-
-  clone include SubComRingStruct with
-    type t <- t,
-    type st <- st,
-    theory SubZMod <= SubID,
-    theory SubCR <= SubID,
-    theory ZModStr <= IDStr,
-    theory CRStr <= IDStr,
-    theory SZModStr <= SIDStr,
-    theory SCRStr <= SIDStr.
-
-  lemma eq_frobenius x : frobenius (SubZMod.Sub.val x) = SubZMod.Sub.val (frobenius x).
-  proof. by rewrite /frobenius -valX eq_char. qed.
-
-  lemma eq_iter_frobenius_fixed n x : iter_frobenius_fixed n (SubZMod.Sub.val x) = iter_frobenius_fixed n x.
-  proof.
-    rewrite /iter_frobenius_fixed.
-    have ->: iter n IDStr.frobenius (SubZMod.Sub.val x) = SubZMod.Sub.val (iter n SIDStr.frobenius x).
-    + case (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite !iter0].
-      by elim: n => [|n le0n IHn]; [rewrite !iter0|rewrite !iterS // IHn eq_frobenius].
-    by apply/eq_iff; split=> [|->] //; apply/SubZMod.Sub.val_inj.
-  qed.
-end SubIDomainStruct.
-
-(* -------------------------------------------------------------------- *)
-abstract theory SubFieldStruct.
-  type t, st.
-
-  clone import SubField as SubF with
-    type t <= t,
-    type st <= st.
-
-  clone import FieldStruct as FStr with
-    type t <= t,
-    theory F <= SubF.F.
-
-  clone import FieldStruct as SFStr with
-    type t <= st,
-    theory F <= SubF.SF.
-
-  clone include SubIDomainStruct with
-    type t <- t,
-    type st <- st,
-    theory SubZMod <= SubF,
-    theory SubCR <= SubF,
-    theory SubID <= SubF,
-    theory ZModStr <= FStr,
-    theory CRStr <= FStr,
-    theory IDStr <= FStr,
-    theory SZModStr <= SFStr,
-    theory SCRStr <= SFStr,
-    theory SIDStr <= SFStr.
-end SubFieldStruct.
 
