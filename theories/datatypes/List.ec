@@ -4505,6 +4505,17 @@ case/(_ s' _): a_ => [|_ [_] -> //]; apply/mem_filter; split => //.
 by rewrite /predC1; apply/negP => ->>.
 qed.
 
+lemma range_flatten m n s :
+  sorted Int.(<=) (m :: rcons s n) =>
+  range m n = flatten (map (fun (p : int * int) => range p.`1 p.`2) (zip (m :: s) (rcons s n))).
+proof.
+elim: s m n => [|z s IHs] m n //=; [by rewrite flatten_seq1|].
+case=> lemz path_; rewrite flatten_cons (range_cat z m n) //.
++ move: (order_path_min _ _ _ _ path_); [by move=> ? ? ?; apply/lez_trans|].
+  by move/allP/(_ n); rewrite mem_rcons.
+by rewrite -IHs.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                    retrieving a maximal element                      *)
 (* -------------------------------------------------------------------- *)

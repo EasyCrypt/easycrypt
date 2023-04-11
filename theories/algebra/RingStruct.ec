@@ -134,6 +134,10 @@ abstract theory ZModuleStruct.
       orbit x zeror.
     proof. by exists 0; rewrite mulr0z. qed.
 
+    lemma orbit_refl x:
+      orbit x x.
+    proof. by exists 1; rewrite mulr1z. qed.
+
     lemma orbitD x y z:
       orbit x y =>
       orbit x z =>
@@ -171,6 +175,10 @@ abstract theory ZModuleStruct.
       size (orbit_list x) = order x.
     proof. by rewrite size_mkseq ler_maxr // ge0_order. qed.
 
+    lemma orbit_list_nil x:
+      order x = 0 <=> orbit_list x = [].
+    proof. by rewrite -size_orbit_list size_eq0. qed.
+
     lemma uniq_orbit_list x:
       uniq (orbit_list x).
     proof.
@@ -183,6 +191,17 @@ abstract theory ZModuleStruct.
       + by rewrite -ltzS /= gt0_order /= ltzE /= ler_norm.
       rewrite -(mulN1r (order _)) mulzK /=; [by apply/gtr_eqF|].
       by rewrite rangeS /= => ->.
+    qed.
+
+    lemma nth_orbit_list x0 n x:
+      nth x0 (orbit_list x) n =
+      if n \in range 0 (order x)
+      then intmul x n
+      else x0.
+    proof.
+      case: (n \in range 0 (order x)) => [mem_|Nmem_].
+      + by rewrite nth_mkseq // -mem_range.
+      by rewrite nth_out // -mem_range size_orbit_list.
     qed.
 
     lemma eqv_orbit_refl x : reflexive (eqv_orbit x).
@@ -199,11 +218,54 @@ abstract theory ZModuleStruct.
       move: (orbitD _ _ _ orbit1 orbit2); rewrite addrA subrK.
     qed.
 
-    pred zmod_endo (f : t -> t) =
+    op subzmod (P : t -> bool) =
+      P zeror /\
+      (forall x y , P x => P y => P (x + y)) /\
+      (forall x , P x => P (-x)).
+
+    lemma subzmodT : subzmod predT.
+    proof. by rewrite /predT. qed.
+
+    lemma subzmodI P1 P2 : subzmod P1 => subzmod P2 => subzmod (predI P1 P2).
+    proof.
+      case=> P10 [] P1D P1N [] P20 [] P2D P2N; do!split => //.
+      + by move=> x y; rewrite /predI => /> ? ? ? ?; rewrite P1D // P2D.
+      by move=> x; rewrite /predI => /> ? ?; rewrite P1N // P2N.
+    qed.
+
+    lemma subzmod_pred10 : subzmod (pred1 zeror).
+    proof. by rewrite /pred1; do!split => // [? ? ->> ->>| ? ->>]; [rewrite addr0|rewrite oppr0]. qed.
+
+    lemma subzmod_orbit x : subzmod (orbit x).
+    proof. do!split; [by apply/orbit0|apply/orbitD|apply/orbitN]. qed.
+
+    lemma subzmod0 P : subzmod P => P zeror.
+    proof. by case. qed.
+
+    lemma subzmodD P : subzmod P => forall x y , P x => P y => P (x + y).
+    proof. by case. qed.
+
+    lemma subzmodN P : subzmod P => forall x , P x => P (-x).
+    proof. by case. qed.
+  
+    lemma subzmodB P : subzmod P => forall x y , P x => P y => P (x - y).
+    proof. by move=> szmP x y Px Py; apply/subzmodD/subzmodN. qed.
+
+    lemma subzmodMz P : subzmod P => forall x n , P x => P (intmul x n).
+    proof.
+      move=> szmP x n; wlog: n / 0 <= n => [wlogn|].
+      + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn // + Px.
+        move/(_ Px); rewrite RL.mulrNz => /(subzmodN _ szmP).
+        by rewrite opprK.
+      elim: n => [|n le0n IHn]; [by rewrite RL.mulr0z subzmod0|].
+      by rewrite RL.mulrSz => Px; move/(_ Px): IHn => P_; apply/subzmodD.
+    qed.
+
+    pred zmod_endo f =
       morphism_0 f zeror zeror /\
       morphism_2 f RL.(+) RL.(+).
 
-    lemma zmod_endo_idfun :
+    lemma zmod_endo_id :
       zmod_endo idfun.
     proof. by rewrite /zmod_endo /idfun. qed.
 
@@ -215,6 +277,21 @@ abstract theory ZModuleStruct.
       rewrite /zmod_endo /(\o) => |> f0 fD g0 gD /=; split.
       + by rewrite /morphism_0 g0 f0.
       by move=> ? ?; rewrite gD fD.
+    qed.
+
+    lemma zmod_endo_iter f :
+      zmod_endo f =>
+      forall n ,
+        zmod_endo (iter n f).
+    proof.
+      move=> ef n; case (0 <= n) => [|/ltrNge/ltzW len0]; last first.
+      + have ->: iter n f = idfun; [|by apply/zmod_endo_id].
+        by apply/fun_ext => x; rewrite iter0.
+      elim: n => [|n le0n IHn].
+      + have ->: iter 0 f = idfun; [|by apply/zmod_endo_id].
+        by apply/fun_ext => x; rewrite iter0.
+      have ->: iter (n + 1) f = f \o (iter n f); [|by apply/zmod_endo_comp].
+      by apply/fun_ext => x; rewrite iterS.
     qed.
 
     lemma zmod_endo0 f :
@@ -232,115 +309,348 @@ abstract theory ZModuleStruct.
       morphism_1 f RL.([-]) RL.([-]).
     proof. by move=> ef x; rewrite -addr_eq0 -zmod_endoD // addNr zmod_endo0. qed.
 
-    lemma zmod_autoB f (x y : t) :
-      is_zmod_auto f =>
-      f (x - y) = f x - f y.
-    proof. by move=> iszma_f; rewrite -zmod_autoN // zmod_autoD. qed.
+    lemma zmod_endoB f :
+      zmod_endo f =>
+      morphism_2 f RL.( - ) RL.( - ).
+    proof. by move=> ef x y; rewrite zmod_endoD // zmod_endoN. qed.
 
-    lemma zmod_autoMz f (x : t) n :
-      is_zmod_auto f =>
-      f (intmul x n) = intmul (f x) n.
+    lemma zmod_endoMz f :
+      zmod_endo f =>
+      forall (x : t) n , f (intmul x n) = intmul (f x) n.
     proof.
-      move => iszma_f; wlog: x n / 0 <= n => [wlog|].
+      move => ef x n; wlog: x n / 0 <= n => [wlog|].
       + case (0 <= n) => [|/ltrNge/ltzW/oppr_ge0]; [by apply/wlog|].
-        by move => /wlog /(_ (-x)); rewrite zmod_autoN // !mulNrNz.
-      elim: n => [|n le0n IHn]; [by rewrite !mulr0z zmod_auto0|].
-      by rewrite !mulrS // zmod_autoD // IHn.
+        by move => /wlog /(_ (-x)); rewrite zmod_endoN // !mulNrNz.
+      elim: n => [|n le0n IHn]; [by rewrite !mulr0z zmod_endo0|].
+      by rewrite !mulrS // zmod_endoD // IHn.
     qed.
 
+    lemma zmod_endo_order f :
+      zmod_endo f =>
+      forall x , order (f x) %| order x.
+    proof. by move=> ef x; rewrite dvd_order -zmod_endoMz // intmul_order zmod_endo0. qed.
 
-
-    pred is_zmod_auto (f : t -> t) =
-      bijective f /\
-      f zeror = zeror /\
-      morphism_2 f RL.(+) RL.(+).
-
-    lemma zmod_auto_idfun :
-      is_zmod_auto idfun.
-    proof. by rewrite /is_zmod_auto bij_idfun /idfun. qed.
-
-    lemma zmod_auto_comp f g :
-      is_zmod_auto f =>
-      is_zmod_auto g =>
-      is_zmod_auto (f \o g).
+    lemma zmod_endo_orbit f :
+      zmod_endo f =>
+      forall x y ,
+        orbit x y => orbit (f x) (f y).
     proof.
-      rewrite /is_zmod_auto /(\o) => |> ?? fD ?-> gD.
-      by rewrite bij_comp //=; split => // ??; rewrite gD fD.
+      move=> ef x y [n] ->>; rewrite zmod_endoMz //.
+      by apply/orbitMz/orbit_refl.
+    qed.
+  
+    lemma zmod_endo_orbit_list f :
+      zmod_endo f =>
+      forall x ,
+        0 < order (f x) =>
+        flatten (nseq (order x %/ order (f x)) (orbit_list (f x))) = map f (orbit_list x).
+    proof.
+      move=> ef x lt0__; case/ler_eqVlt: (ge0_order x) => [/eq_sym eq_|lt0_].
+      + by move/orbit_list_nil: (eq_) => ->; rewrite eq_ /= nseq0 flatten_nil.
+      case/dvdzP: (zmod_endo_order _ ef x) => q eq_; move: (lt0_); rewrite eq_.
+      rewrite pmulr_lgt0 // => lt0q; rewrite mulzK; [by apply/gtr_eqF|].
+      rewrite /orbit_list eq_; move/ltzW: lt0q => {eq_}.
+      elim: q => [|n le0n IHn]; [rewrite /= !mkseq0 /=|].
+      + by rewrite nseq0 flatten_nil.
+      rewrite nseqSr // -cats1 flatten_cat flatten_seq1.
+      rewrite mulrDl /= mkseq_add; [|by apply/ge0_order|].
+      + by apply/mulr_ge0 => //; apply/ge0_order.
+      rewrite map_cat IHn; congr; [by apply/eq_in_map|].
+      rewrite map_mkseq; apply/eq_in_mkseq => i /mem_range memi.
+      by rewrite /(\o) /= zmod_endoMz // mulrDz mulrC mulrM intmul_order mul0i add0r.
+    qed.
+  
+    lemma zmod_endo_eqv_orbit f :
+      zmod_endo f =>
+      forall x y z ,
+        eqv_orbit x y z =>
+        eqv_orbit (f x) (f y) (f z).
+    proof. by move=> ef x y z; rewrite /eqv_orbit -zmod_endoB //; apply/zmod_endo_orbit. qed.
+
+    lemma zmod_endo_ker_subzmod f :
+      zmod_endo f =>
+      subzmod (fun x => f x = zeror).
+    proof.
+      move=> ef; split; [by rewrite zmod_endo0|split].
+      + by move=> x y; rewrite zmod_endoD // => -> ->; rewrite addr0.
+      by move=> x; rewrite zmod_endoN // => ->; rewrite oppr0.
     qed.
 
-    lemma zmod_auto_bij f :
-      is_zmod_auto f =>
-      bijective f.
+    lemma zmod_endo_fixed_subzmod f :
+      zmod_endo f =>
+      subzmod (fun x => f x = x).
+    proof.
+      move=> ef; split; [by rewrite zmod_endo0|split].
+      + by move=> x y; rewrite zmod_endoD // => -> ->.
+      by move=> x; rewrite zmod_endoN // => ->.
+    qed.
+
+    pred zmod_mono_endo f =
+      injective f /\
+      zmod_endo f.
+
+    lemma zmod_mono_endo_inj f :
+      zmod_mono_endo f => injective f.
     proof. by case. qed.
 
-    lemma zmod_auto_inv f :
-      is_zmod_auto f =>
-      exists g ,
-        cancel f g /\
-        is_zmod_auto g.
+    lemma zmod_mono_endo_endo f :
+      zmod_mono_endo f => zmod_endo f.
+    proof. by case. qed.
+
+    lemma zmod_mono_endo_id :
+      zmod_mono_endo idfun<:t>.
+    proof. by split; [rewrite inj_idfun<:t>|rewrite zmod_endo_id]. qed.
+
+    lemma zmod_mono_endo_comp f g :
+      zmod_mono_endo f =>
+      zmod_mono_endo g =>
+      zmod_mono_endo (f \o g).
     proof.
-    rewrite /is_zmod_auto => |> bijf; move: bijf (bijf) => /bij_inj injf.
-    move => /> g canfg cangf f0 fD; exists g; rewrite canfg /=; split; [by exists f; split|].
-    by rewrite -{1}f0 canfg /= => x y; apply/injf; rewrite fD !cangf.    
+      by case=> injf ef [] injg eg; split; [apply/inj_comp|apply/zmod_endo_comp].
+    qed.
+
+    lemma zmod_mono_endo_iter f :
+      zmod_mono_endo f =>
+      forall n ,
+        zmod_mono_endo (iter n f).
+    proof.
+      move=> ef n; case (0 <= n) => [|/ltrNge/ltzW len0]; last first.
+      + have ->: iter n f = idfun; [|by apply/zmod_mono_endo_id].
+        by apply/fun_ext => x; rewrite iter0.
+      elim: n => [|n le0n IHn].
+      + have ->: iter 0 f = idfun; [|by apply/zmod_mono_endo_id].
+        by apply/fun_ext => x; rewrite iter0.
+      have ->: iter (n + 1) f = f \o (iter n f); [|by apply/zmod_mono_endo_comp].
+      by apply/fun_ext => x; rewrite iterS.
+    qed.
+
+    lemma zmod_mono_endo0 f :
+      zmod_mono_endo f =>
+      morphism_0 f zeror zeror.
+    proof. by move/zmod_mono_endo_endo/zmod_endo0. qed.
+
+    lemma zmod_mono_endoD f :
+      zmod_mono_endo f =>
+      morphism_2 f RL.(+) RL.(+).
+    proof. by move/zmod_mono_endo_endo/zmod_endoD. qed.
+
+    lemma zmod_mono_endoN f :
+      zmod_mono_endo f =>
+      morphism_1 f RL.([-]) RL.([-]).
+    proof. by move/zmod_mono_endo_endo/zmod_endoN. qed.
+
+    lemma zmod_mono_endoB f :
+      zmod_mono_endo f =>
+      morphism_2 f RL.( - ) RL.( - ).
+    proof. by move/zmod_mono_endo_endo/zmod_endoB. qed.
+
+    lemma zmod_mono_endoMz f :
+      zmod_mono_endo f =>
+      forall (x : t) n , f (intmul x n) = intmul (f x) n.
+    proof. by move/zmod_mono_endo_endo/zmod_endoMz. qed.
+
+    lemma zmod_mono_endo_eq0 f :
+      zmod_mono_endo f =>
+      forall x , f x = zeror <=> x = zeror.
+    proof.
+      move=> ief x; split=> [|->>]; [|by apply/zmod_mono_endo0].
+      by move/zmod_mono_endo_inj/(_ x zeror): (ief); rewrite zmod_mono_endo0.
+    qed.
+
+    lemma zmod_mono_endoP0 f :
+      zmod_mono_endo f <=>
+      ( (forall x , f x = zeror => x = zeror) /\
+        zmod_endo f ).
+    proof.
+      split=> [ief|[eq0 ef]]; [by split=> [x|]; [rewrite zmod_mono_endo_eq0|apply/zmod_mono_endo_endo]|].
+      by split=> // x y; rewrite -subr_eq0 -zmod_endoB // => /eq0 /subr_eq0.
+    qed.
+
+    lemma zmod_mono_endo_order f :
+      zmod_mono_endo f =>
+      forall x , order (f x) = order x.
+    proof.
+      move=> ef x; move: (dvdz_anti (order (f x)) (order x) _ _).
+      + by apply/zmod_endo_order/zmod_mono_endo_endo.
+      + rewrite dvd_order -(zmod_mono_endo_eq0 _ ef) zmod_mono_endoMz //.
+        by rewrite intmul_order.
+      by rewrite !ger0_norm // ge0_order.
+    qed.
+
+    lemma zmod_mono_endo_orbit f :
+      zmod_mono_endo f =>
+      forall x y ,
+        orbit (f x) (f y) = orbit x y.
+    proof.
+      move=> ef x y; apply/eq_iff; split; [|by apply/zmod_endo_orbit/zmod_mono_endo_endo].
+      case=> n; rewrite -zmod_mono_endoMz // => /(zmod_mono_endo_inj _ ef) ->>.
+      by apply/orbitMz/orbit_refl.
+    qed.
+  
+    lemma zmod_mono_endo_orbit_list f :
+      zmod_mono_endo f =>
+      forall x ,
+        orbit_list (f x) = map f (orbit_list x).
+    proof.
+      move=> ef x; case/ler_eqVlt: (ge0_order x) => [/eq_sym eq_|lt0_].
+      + move/orbit_list_nil: (eq_) => ->; move: eq_; rewrite -(zmod_mono_endo_order _ ef).
+        by move/orbit_list_nil => ->.
+      rewrite -zmod_endo_orbit_list ?zmod_mono_endo_endo ?zmod_mono_endo_order //.
+      by rewrite divzz gtr_eqF //= b2i1 nseq1 flatten_seq1.
+    qed.
+  
+    lemma zmod_mono_endo_eqv_orbit f :
+      zmod_mono_endo f =>
+      forall x y z ,
+        eqv_orbit (f x) (f y) (f z) =
+        eqv_orbit x y z.
+    proof. by move=> ef x y z; rewrite /eqv_orbit -zmod_mono_endoB // zmod_mono_endo_orbit. qed.
+
+    lemma zmod_mono_endo_ker_subzmod f :
+      zmod_mono_endo f =>
+      subzmod (fun x => f x = zeror).
+    proof. by move/zmod_mono_endo_endo/zmod_endo_ker_subzmod. qed.
+
+    lemma zmod_mono_endo_fixed_subzmod f :
+      zmod_mono_endo f =>
+      subzmod (fun x => f x = x).
+    proof. by move/zmod_mono_endo_endo/zmod_endo_fixed_subzmod. qed.
+
+    pred zmod_auto f =
+      surjective f /\
+      zmod_mono_endo f.
+
+    lemma zmod_auto_inj f :
+      zmod_auto f => injective f.
+    proof. by case=> _ /zmod_mono_endo_inj. qed.
+
+    lemma zmod_auto_surj f :
+      zmod_auto f => surjective f.
+    proof. by case. qed.
+
+    lemma zmod_auto_bij f :
+      zmod_auto f => bijective f.
+    proof. by move=> af; apply/bij_inj_surj; rewrite zmod_auto_inj // zmod_auto_surj. qed.
+
+    lemma zmod_auto_mono_endo f :
+      zmod_auto f => zmod_mono_endo f.
+    proof. by case. qed.
+
+    lemma zmod_auto_endo f :
+      zmod_auto f => zmod_endo f.
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endo_endo. qed.
+
+    lemma zmod_autoP f :
+      zmod_auto f <=> (bijective f /\ zmod_endo f).
+    proof.
+      split=> [af|[/bij_inj_surj [injf surjf] ef]]; split=> //.
+      + by apply/zmod_auto_bij.
+      by apply/zmod_auto_endo.
+    qed.
+
+    lemma zmod_auto_id :
+      zmod_auto idfun<:t>.
+    proof. by split; [apply/bij_surj; rewrite bij_idfun<:t>|rewrite zmod_mono_endo_id]. qed.
+
+    lemma zmod_auto_comp f g :
+      zmod_auto f =>
+      zmod_auto g =>
+      zmod_auto (f \o g).
+    proof.
+      by case/zmod_autoP=> bijf ef /zmod_autoP [] bijg eg; apply/zmod_autoP; split; [apply/bij_comp|apply/zmod_endo_comp].
+    qed.
+
+    lemma zmod_auto_iter f :
+      zmod_auto f =>
+      forall n ,
+        zmod_auto (iter n f).
+    proof.
+      move=> ef n; case (0 <= n) => [|/ltrNge/ltzW len0]; last first.
+      + have ->: iter n f = idfun; [|by apply/zmod_auto_id].
+        by apply/fun_ext => x; rewrite iter0.
+      elim: n => [|n le0n IHn].
+      + have ->: iter 0 f = idfun; [|by apply/zmod_auto_id].
+        by apply/fun_ext => x; rewrite iter0.
+      have ->: iter (n + 1) f = f \o (iter n f); [|by apply/zmod_auto_comp].
+      by apply/fun_ext => x; rewrite iterS.
     qed.
 
     lemma zmod_auto0 f :
-      is_zmod_auto f =>
-      f zeror = zeror.
-    proof. by case => _ []. qed.
+      zmod_auto f =>
+      morphism_0 f zeror zeror.
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endo0. qed.
 
-    lemma zmod_autoD f (x y : t) :
-      is_zmod_auto f =>
-      f (x + y) = f x + f y.
-    proof. by case => _ [_ ->]. qed.
+    lemma zmod_autoD f :
+      zmod_auto f =>
+      morphism_2 f RL.(+) RL.(+).
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endoD. qed.
 
-    lemma zmod_autoN f (x : t) :
-      is_zmod_auto f =>
-      f (-x) = - f x.
-    proof. by rewrite -addr_eq0 => -[_ [? <-]]; rewrite addNr. qed.
+    lemma zmod_autoN f :
+      zmod_auto f =>
+      morphism_1 f RL.([-]) RL.([-]).
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endoN. qed.
 
-    lemma zmod_autoB f (x y : t) :
-      is_zmod_auto f =>
-      f (x - y) = f x - f y.
-    proof. by move=> iszma_f; rewrite -zmod_autoN // zmod_autoD. qed.
+    lemma zmod_autoB f :
+      zmod_auto f =>
+      morphism_2 f RL.( - ) RL.( - ).
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endoB. qed.
 
-    lemma zmod_autoMz f (x : t) n :
-      is_zmod_auto f =>
-      f (intmul x n) = intmul (f x) n.
+    lemma zmod_autoMz f :
+      zmod_auto f =>
+      forall (x : t) n , f (intmul x n) = intmul (f x) n.
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endoMz. qed.
+
+    lemma zmod_auto_eq0 f :
+      zmod_auto f =>
+      forall x , f x = zeror <=> x = zeror.
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endo_eq0. qed.
+
+    lemma zmod_auto_inv f :
+      zmod_auto f =>
+      exists g ,
+        cancel f g /\
+        cancel g f /\
+        zmod_auto g.
     proof.
-      move => iszma_f; wlog: x n / 0 <= n => [wlog|].
-      + case (0 <= n) => [|/ltrNge/ltzW/oppr_ge0]; [by apply/wlog|].
-        by move => /wlog /(_ (-x)); rewrite zmod_autoN // !mulNrNz.
-      elim: n => [|n le0n IHn]; [by rewrite !mulr0z zmod_auto0|].
-      by rewrite !mulrS // zmod_autoD // IHn.
+      rewrite zmod_autoP => |> bijf; move: (bijf) => [] g [] canfg cangf ef.
+      exists g; rewrite canfg cangf /= zmod_autoP; split; [by exists f; split|].
+      split; [by rewrite -{1}(zmod_endo0 f) // /morphism_0 canfg|].
+      by move=> x y; apply/(bij_inj _ bijf); rewrite (zmod_endoD _ ef) !cangf.    
     qed.
 
-    op is_subzmod (P : t -> bool) =
-      P zeror /\
-      (forall x y , P x => P y => P (x + y)) /\
-      (forall x , P x => P (-x)).
+    lemma zmod_auto_order f :
+      zmod_auto f =>
+      forall x , order (f x) = order x.
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endo_order. qed.
 
-    lemma subzmod0 P : is_subzmod P => P zeror.
-    proof. by case. qed.
-
-    lemma subzmodD P : is_subzmod P => forall x y , P x => P y => P (x + y).
-    proof. by case. qed.
-
-    lemma subzmodN P : is_subzmod P => forall x , P x => P (-x).
-    proof. by case. qed.
+    lemma zmod_auto_orbit f :
+      zmod_auto f =>
+      forall x y ,
+        orbit (f x) (f y) = orbit x y.
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endo_orbit. qed.
   
-    lemma subzmodB P : is_subzmod P => forall x y , P x => P y => P (x - y).
-    proof. by move=> szmP x y Px Py; apply/subzmodD/subzmodN. qed.
+    lemma zmod_auto_orbit_list f :
+      zmod_auto f =>
+      forall x ,
+        orbit_list (f x) = map f (orbit_list x).
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endo_orbit_list. qed.
+  
+    lemma zmod_auto_eqv_orbit f :
+      zmod_auto f =>
+      forall x y z ,
+        eqv_orbit (f x) (f y) (f z) =
+        eqv_orbit x y z.
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endo_eqv_orbit. qed.
 
-    lemma subzmodMz P : is_subzmod P => forall x n , P x => P (intmul x n).
-    proof.
-      move=> szmP x n; wlog: n / 0 <= n => [wlogn|].
-      + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn // + Px.
-        move/(_ Px); rewrite RL.mulrNz => /(subzmodN _ szmP).
-        by rewrite opprK.
-      elim: n => [|n le0n IHn]; [by rewrite RL.mulr0z subzmod0|].
-      by rewrite RL.mulrSz => Px; move/(_ Px): IHn => P_; apply/subzmodD.
-    qed.
+    lemma zmod_auto_ker_subzmod f :
+      zmod_auto f =>
+      subzmod (fun x => f x = zeror).
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endo_ker_subzmod. qed.
+
+    lemma zmod_auto_fixed_subzmod f :
+      zmod_auto f =>
+      subzmod (fun x => f x = x).
+    proof. by move/zmod_auto_mono_endo/zmod_mono_endo_fixed_subzmod. qed.
   end ZModStr.
 end ZModuleStruct.
 
@@ -394,160 +704,577 @@ abstract theory ComRingStruct.
       rewrite dvd_order -(mulr1 x) -mulrzAr.
       by move: ofint_char; rewrite /ofint => ->; rewrite mulr0.
     qed.
-  
-    pred is_cr_auto (f : t -> t) =
-      is_zmod_auto f /\
-      f oner = oner /\
-      morphism_2 f RL.( * ) RL.( * ).
-  
-    lemma cr_zmod_auto f:
-      is_cr_auto f =>
-      is_zmod_auto f.
-    proof. by case. qed.
-  
-    lemma cr_auto_idfun :
-      is_cr_auto idfun.
-    proof. by rewrite /is_cr_auto zmod_auto_idfun /idfun. qed.
-  
-    lemma cr_auto_comp f g :
-      is_cr_auto f =>
-      is_cr_auto g =>
-      is_cr_auto (f \o g).
-    proof.
-      rewrite /is_cr_auto => |> ? f0 fM ? g0 gM.
-      rewrite zmod_auto_comp //= /(\o) g0 f0 /= => ??.
-      by rewrite gM fM.
-    qed.
-  
-    lemma cr_auto_bij f :
-      is_cr_auto f =>
-      bijective f.
-    proof. by move/cr_zmod_auto/zmod_auto_bij. qed.
-  
-    lemma cr_auto_inv f :
-      is_cr_auto f =>
-      exists g ,
-        cancel f g /\
-        is_cr_auto g.
-    proof.
-      rewrite /is_cr_auto /is_zmod_auto => |> bijf.
-      move: bijf (bijf) => /bij_inj injf /> g canfg cangf f0 fD f1 fM; exists g.
-      rewrite canfg /=; split; [split; [by exists f; split|]|].
-      + by rewrite -{1}f0 canfg /= => x y; apply/injf; rewrite fD !cangf.
-      by rewrite -{1}f1 canfg /= => x y; apply/injf; rewrite fM !cangf.  
-    qed.
-  
-    lemma cr_auto0 f :
-      is_cr_auto f =>
-      f zeror = zeror.
-    proof. by move/cr_zmod_auto/zmod_auto0. qed.
-  
-    lemma cr_autoD f (x y : t) :
-      is_cr_auto f =>
-      f (x + y) = f x + f y.
-    proof. by move/cr_zmod_auto/zmod_autoD => ->. qed.
-  
-    lemma cr_autoN f (x : t) :
-      is_cr_auto f =>
-      f (-x) = - f x.
-    proof. by move/cr_zmod_auto/zmod_autoN => ->. qed.
-  
-    lemma cr_autoB f (x y : t) :
-      is_cr_auto f =>
-      f (x - y) = f x - f y.
-    proof. by move/cr_zmod_auto/zmod_autoB => ->. qed.
-  
-    lemma cr_autoMz f (x : t) n :
-      is_cr_auto f =>
-      f (intmul x n) = intmul (f x) n.
-    proof. by move/cr_zmod_auto/zmod_autoMz => ->. qed.
-  
-    lemma cr_auto1 f :
-      is_cr_auto f =>
-      f oner = oner.
-    proof. by case => _ []. qed.
-  
-    lemma cr_autoM f x y :
-      is_cr_auto f =>
-      f (x * y)%RL = f x * f y.
-    proof. by case => _ [_ ->]. qed.
-  
-    lemma cr_autoU f x :
-      is_cr_auto f =>
-      unit (f x) = unit x.
-    proof.
-      move => iscraf; move: iscraf (iscraf) => /cr_auto_inv.
-      move => [g] [canfg iscrag] [_] [f1 fM]; rewrite !unitrP.
-      rewrite eq_iff; split => -[y] eq_; [|by exists (f y); rewrite -fM eq_ f1].
-      by move: iscrag => [_] [g1 gM]; exists (g y); rewrite -(canfg x) -gM eq_.
-    qed.
-  
-    lemma cr_autoV f x :
-      is_cr_auto f =>
-      f (invr x) = invr (f x).
-    proof.
-      move => iscraf; move: (iscraf) => [_] [f1 fM]; case: (unit x) => [ux|Nux].
-      + move/(congr1 f): (mulVr _ ux); rewrite fM f1.
-        rewrite -(mulVr (f x)); [by rewrite cr_autoU|].
-        by apply/mulIr; rewrite cr_autoU.
-      by rewrite !unitout // cr_autoU.
-    qed.
-  
-    lemma cr_autoZ f n :
-      is_cr_auto f =>
-      f (ofint n) = ofint n.
-    proof. by move => iscra_f; rewrite /ofint cr_autoMz // cr_auto1. qed.
-  
-    lemma cr_autoX f x n :
-      is_cr_auto f =>
-      f (RL.exp x n) = RL.exp (f x) n.
-    proof.
-      move => iscra_f; wlog: n x / 0 <= n => [wlogn|].
-      + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn {wlogn} //.
-        - by move/(_ x).
-        (*TODO: Pierre-Yves: 2! should be able to only be a !, but hangs.*)
-        by move/(_ (invr x)); rewrite cr_autoV // -!exprV 2!invrK.
-      elim n => [|n le0n]; [by rewrite !expr0 cr_auto1|].
-      by rewrite !exprS // cr_autoM // => ->.
-    qed.
 
-    op is_subcr P =
-      is_subzmod P /\
+    op subcr P =
+      subzmod P /\
       P oner /\
       (forall x y , P x => P y => P (x * y)).
 
-    lemma subcr_zmod P : is_subcr P => is_subzmod P.
+    lemma subcr_zmod P : subcr P => subzmod P.
     proof. by case. qed.
 
-    lemma subcr0 P : is_subcr P => P zeror.
+    lemma subcrT : subcr predT.
+    proof. by rewrite /predT. qed.
+
+    lemma subcrI P1 P2 : subcr P1 => subcr P2 => subcr (predI P1 P2).
+    proof.
+      case=> P1_ [] P11 P1M [] P2_ [] P21 P2M; split; [|split].
+      + by apply/subzmodI/subcr_zmod.
+      + by split.
+      by move=> x y; rewrite /predI => /> ? ? ? ?; rewrite P1M // P2M.
+    qed.
+
+    lemma subcr_orbit1 : subcr (orbit oner).
+    proof.
+      split; [by apply/subzmod_orbit|split; [by apply/orbit_refl|]].
+      move=> x y [nx] ->> [ny] ->>; rewrite mulrz.
+      by exists (nx * ny).
+    qed.
+
+    lemma subcr0 P : subcr P => P zeror.
     proof. by move/subcr_zmod; apply/subzmod0. qed.
 
-    lemma subcrD P : is_subcr P => forall x y , P x => P y => P (x + y).
+    lemma subcrD P : subcr P => forall x y , P x => P y => P (x + y).
     proof. by move/subcr_zmod; apply/subzmodD. qed.
 
-    lemma subcrN P : is_subcr P => forall x , P x => P (-x).
+    lemma subcrN P : subcr P => forall x , P x => P (-x).
     proof. by move/subcr_zmod; apply/subzmodN. qed.
   
-    lemma subcrB P : is_subcr P => forall x y , P x => P y => P (x - y).
+    lemma subcrB P : subcr P => forall x y , P x => P y => P (x - y).
     proof. by move/subcr_zmod; apply/subzmodB. qed.
 
-    lemma subcrMz P : is_subcr P => forall x n , P x => P (intmul x n).
+    lemma subcrMz P : subcr P => forall x n , P x => P (intmul x n).
     proof. by move/subcr_zmod; apply/subzmodMz. qed.
 
-    lemma subcr1 P : is_subcr P => P oner.
+    lemma subcr1 P : subcr P => P oner.
     proof. by case. qed.
   
-    lemma subcrM P : is_subcr P => forall x y , P x => P y => P (x * y).
+    lemma subcrM P : subcr P => forall x y , P x => P y => P (x * y).
     proof. by case. qed.
 
-    lemma subcrZ P n : is_subcr P => P (ofint n).
+    lemma subcrZ P n : subcr P => P (ofint n).
     proof. by move=> subcrP; apply/subcrMz/subcr1. qed.
 
-    lemma subcrXR P : is_subcr P => forall x n , P x => 0 <= n => P (exp x n).
+    lemma subcrXR P : subcr P => forall x n , P x => 0 <= n => P (exp x n).
     proof.
       move=> subcrP x n Px; elim: n => [|n le0n IHn]; [by rewrite RL.expr0 subcr1|].
       by rewrite RL.exprS //; apply/subcrM.
     qed.
+
+    pred cr_endo f =
+      zmod_endo f /\
+      morphism_0 f oner oner /\
+      morphism_2 f RL.( * ) RL.( * ).
+
+    lemma cr_endo_zmod f :
+      cr_endo f => zmod_endo f.
+    proof. by case. qed.
+
+    lemma cr_endo_id :
+      cr_endo idfun.
+    proof. by rewrite /cr_endo /idfun. qed.
+
+    lemma cr_endo_comp f g :
+      cr_endo f =>
+      cr_endo g =>
+      cr_endo (f \o g).
+    proof.
+      case=> ef [] f1 fM [] eg [] g1 gM; split; [by apply/zmod_endo_comp|].
+      by rewrite /(\o) /morphism_0 /= g1 f1 /= => x y; rewrite gM fM.
+    qed.
+
+    lemma cr_endo_iter f :
+      cr_endo f =>
+      forall n ,
+        cr_endo (iter n f).
+    proof.
+      move=> ef n; case (0 <= n) => [|/ltrNge/ltzW len0]; last first.
+      + have ->: iter n f = idfun; [|by apply/cr_endo_id].
+        by apply/fun_ext => x; rewrite iter0.
+      elim: n => [|n le0n IHn].
+      + have ->: iter 0 f = idfun; [|by apply/cr_endo_id].
+        by apply/fun_ext => x; rewrite iter0.
+      have ->: iter (n + 1) f = f \o (iter n f); [|by apply/cr_endo_comp].
+      by apply/fun_ext => x; rewrite iterS.
+    qed.
+
+    lemma cr_endo0 f :
+      cr_endo f =>
+      morphism_0 f zeror zeror.
+    proof. by move/cr_endo_zmod/zmod_endo0. qed.
+
+    lemma cr_endoD f :
+      cr_endo f =>
+      morphism_2 f RL.(+) RL.(+).
+    proof. by move/cr_endo_zmod/zmod_endoD. qed.
+
+    lemma cr_endoN f :
+      cr_endo f =>
+      morphism_1 f RL.([-]) RL.([-]).
+    proof. by move/cr_endo_zmod/zmod_endoN. qed.
+
+    lemma cr_endoB f :
+      cr_endo f =>
+      morphism_2 f RL.( - ) RL.( - ).
+    proof. by move/cr_endo_zmod/zmod_endoB. qed.
+
+    lemma cr_endoMz f :
+      cr_endo f =>
+      forall (x : t) n , f (intmul x n) = intmul (f x) n.
+    proof. by move/cr_endo_zmod/zmod_endoMz. qed.
+
+    lemma cr_endo1 f :
+      cr_endo f =>
+      morphism_0 f oner oner.
+    proof. by case => _ []. qed.
+  
+    lemma cr_endoM f :
+      cr_endo f =>
+      morphism_2 f RL.( * ) RL.( * ).
+    proof. by case => _ []. qed.
+  
+    lemma cr_endoUR f :
+      cr_endo f =>
+      forall x ,
+        unit x =>
+        unit (f x).
+    proof.
+      move=> ef x /unitrP [y] eq_; apply/unitrP; exists (f y).
+      by rewrite -cr_endoM // eq_ cr_endo1.
+    qed.
+  
+    lemma cr_endoVR f :
+      cr_endo f =>
+      forall x ,
+        f (invr x) =
+        if unit x
+        then invr (f x)
+        else f x.
+    proof.
+      move=> ef x; case (unit x) => [ux|Nux].
+      + apply/(mulIr (f x)); [by apply/cr_endoUR|].
+        by rewrite -cr_endoM // !mulVr ?cr_endo1 // cr_endoUR.
+      by rewrite unitout.
+    qed.
+  
+    lemma cr_endoZ f :
+      cr_endo f =>
+      forall n , f (ofint n) = ofint n.
+    proof. by move=> ef n; rewrite /ofint cr_endoMz // cr_endo1. qed.
+  
+    lemma cr_endoXR f :
+      cr_endo f =>
+      forall x n ,
+        f (RL.exp x n) =
+        if unit x
+        then RL.exp (f x) n
+        else RL.exp (f x) `|n|.
+    proof.
+      move=> ef x n; wlog: n x / 0 <= n => [wlogn|].
+      + case (0 <= n) => [/wlogn -> //|/ltrNge/ltzW].
+        move=> len0; move/ler_opp2: (len0) => /= /wlogn {wlogn} /(_ (invr x)).
+        rewrite (ler0_norm n) // ger0_norm; [by apply/ler_opp2|].
+        by rewrite -!exprV invrK unitrV (cr_endoVR _ ef) => ->; case: (unit x) => //; rewrite invrK.
+      move=> le0n; rewrite ger0_norm //; elim: n le0n => [|n le0n IHn]; [by rewrite !expr0 cr_endo1|].
+      by rewrite !exprS // cr_endoM // IHn; case (unit x).
+    qed.
+
+    lemma cr_endo_order f :
+      cr_endo f =>
+      forall x , order (f x) %| order x.
+    proof. by move/cr_endo_zmod/zmod_endo_order. qed.
+
+    lemma cr_endo_orbit f :
+      cr_endo f =>
+      forall x y ,
+        orbit x y => orbit (f x) (f y).
+    proof. by move/cr_endo_zmod/zmod_endo_orbit. qed.
+  
+    lemma cr_endo_orbit_list f :
+      cr_endo f =>
+      forall x ,
+        0 < order (f x) =>
+        flatten (nseq (order x %/ order (f x)) (orbit_list (f x))) = map f (orbit_list x).
+    proof. by move/cr_endo_zmod/zmod_endo_orbit_list. qed.
+  
+    lemma cr_endo_eqv_orbit f :
+      cr_endo f =>
+      forall x y z ,
+        eqv_orbit x y z =>
+        eqv_orbit (f x) (f y) (f z).
+    proof. by move/cr_endo_zmod/zmod_endo_eqv_orbit. qed.
+
+    lemma cr_endo_ker_subzmod f :
+      cr_endo f =>
+      subzmod (fun x => f x = zeror).
+    proof. by move/cr_endo_zmod/zmod_endo_ker_subzmod. qed.
+
+    lemma cr_endo_fixed_subcr f :
+      cr_endo f =>
+      subcr (fun x => f x = x).
+    proof.
+      move=> ef; split; [by apply/zmod_endo_fixed_subzmod/cr_endo_zmod|split].
+      + by rewrite cr_endo1.
+      by move=> x y; rewrite cr_endoM // => -> ->.
+    qed.
+
+    pred cr_mono_endo f =
+      injective f /\
+      cr_endo f.
+
+    lemma cr_mono_endo_inj f :
+      cr_mono_endo f => injective f.
+    proof. by case. qed.
+
+    lemma cr_mono_endo_endo f :
+      cr_mono_endo f => cr_endo f.
+    proof. by case. qed.
+
+    lemma cr_mono_endo_zmod f :
+      cr_mono_endo f => zmod_mono_endo f.
+    proof.
+      by move=> ef; split; [apply/cr_mono_endo_inj|apply/cr_endo_zmod/cr_mono_endo_endo].
+    qed.
+
+    lemma cr_mono_endo_zmod_endo f :
+      cr_mono_endo f => zmod_endo f.
+    proof. by move/cr_mono_endo_endo/cr_endo_zmod. qed.
+
+    lemma cr_mono_endo_id :
+      cr_mono_endo idfun<:t>.
+    proof. by split; [rewrite inj_idfun<:t>|rewrite cr_endo_id]. qed.
+
+    lemma cr_mono_endo_comp f g :
+      cr_mono_endo f =>
+      cr_mono_endo g =>
+      cr_mono_endo (f \o g).
+    proof.
+      by case=> injf ef [] injg eg; split; [apply/inj_comp|apply/cr_endo_comp].
+    qed.
+
+    lemma cr_mono_endo_iter f :
+      cr_mono_endo f =>
+      forall n ,
+        cr_mono_endo (iter n f).
+    proof.
+      move=> ef n; case (0 <= n) => [|/ltrNge/ltzW len0]; last first.
+      + have ->: iter n f = idfun; [|by apply/cr_mono_endo_id].
+        by apply/fun_ext => x; rewrite iter0.
+      elim: n => [|n le0n IHn].
+      + have ->: iter 0 f = idfun; [|by apply/cr_mono_endo_id].
+        by apply/fun_ext => x; rewrite iter0.
+      have ->: iter (n + 1) f = f \o (iter n f); [|by apply/cr_mono_endo_comp].
+      by apply/fun_ext => x; rewrite iterS.
+    qed.
+
+    lemma cr_mono_endo0 f :
+      cr_mono_endo f =>
+      morphism_0 f zeror zeror.
+    proof. by move/cr_mono_endo_endo/cr_endo0. qed.
+
+    lemma cr_mono_endoD f :
+      cr_mono_endo f =>
+      morphism_2 f RL.(+) RL.(+).
+    proof. by move/cr_mono_endo_endo/cr_endoD. qed.
+
+    lemma cr_mono_endoN f :
+      cr_mono_endo f =>
+      morphism_1 f RL.([-]) RL.([-]).
+    proof. by move/cr_mono_endo_endo/cr_endoN. qed.
+
+    lemma cr_mono_endoB f :
+      cr_mono_endo f =>
+      morphism_2 f RL.( - ) RL.( - ).
+    proof. by move/cr_mono_endo_endo/cr_endoB. qed.
+
+    lemma cr_mono_endoMz f :
+      cr_mono_endo f =>
+      forall (x : t) n , f (intmul x n) = intmul (f x) n.
+    proof. by move/cr_mono_endo_endo/cr_endoMz. qed.
+
+    lemma cr_mono_endo1 f :
+      cr_mono_endo f =>
+      morphism_0 f oner oner.
+    proof. by move/cr_mono_endo_endo/cr_endo1. qed.
+  
+    lemma cr_mono_endoM f :
+      cr_mono_endo f =>
+      morphism_2 f RL.( * ) RL.( * ).
+    proof. by move/cr_mono_endo_endo/cr_endoM. qed.
+  
+    lemma cr_mono_endoUR f :
+      cr_mono_endo f =>
+      forall x ,
+        unit x =>
+        unit (f x).
+    proof. by move/cr_mono_endo_endo/cr_endoUR. qed.
+  
+    lemma cr_mono_endoVR f :
+      cr_mono_endo f =>
+      forall x ,
+        f (invr x) =
+        if unit x
+        then invr (f x)
+        else f x.
+    proof. by move/cr_mono_endo_endo/cr_endoVR. qed.
+  
+    lemma cr_mono_endoZ f :
+      cr_mono_endo f =>
+      forall n , f (ofint n) = ofint n.
+    proof. by move/cr_mono_endo_endo/cr_endoZ. qed.
+  
+    lemma cr_mono_endoXR f :
+      cr_mono_endo f =>
+      forall x n ,
+        f (RL.exp x n) =
+        if unit x
+        then RL.exp (f x) n
+        else RL.exp (f x) `|n|.
+    proof. by move/cr_mono_endo_endo/cr_endoXR. qed.
+
+    lemma cr_mono_endo_eq0 f :
+      cr_mono_endo f =>
+      forall x , f x = zeror <=> x = zeror.
+    proof. by move/cr_mono_endo_zmod/zmod_mono_endo_eq0. qed.
+
+    lemma cr_mono_endoP0 f :
+      cr_mono_endo f <=>
+      ( (forall x , f x = zeror => x = zeror) /\
+        cr_endo f ).
+    proof. by rewrite /cr_endo 2!andbA -zmod_mono_endoP0 /cr_mono_endo /cr_endo -!andbA. qed.
+
+    lemma cr_mono_endo_order f :
+      cr_mono_endo f =>
+      forall x , order (f x) = order x.
+    proof. by move/cr_mono_endo_zmod/zmod_mono_endo_order. qed.
+
+    lemma cr_mono_endo_orbit f :
+      cr_mono_endo f =>
+      forall x y ,
+        orbit (f x) (f y) = orbit x y.
+    proof. by move/cr_mono_endo_zmod/zmod_mono_endo_orbit. qed.
+  
+    lemma cr_mono_endo_orbit_list f :
+      cr_mono_endo f =>
+      forall x ,
+        orbit_list (f x) = map f (orbit_list x).
+    proof. by move/cr_mono_endo_zmod/zmod_mono_endo_orbit_list. qed.
+  
+    lemma cr_mono_endo_eqv_orbit f :
+      cr_mono_endo f =>
+      forall x y z ,
+        eqv_orbit (f x) (f y) (f z) =
+        eqv_orbit x y z.
+    proof. by move/cr_mono_endo_zmod/zmod_mono_endo_eqv_orbit. qed.
+
+    lemma cr_mono_endo_ker_subzmod f :
+      cr_mono_endo f =>
+      subzmod (fun x => f x = zeror).
+    proof. by move/cr_mono_endo_zmod/zmod_mono_endo_ker_subzmod. qed.
+
+    lemma cr_mono_endo_fixed_subcr f :
+      cr_mono_endo f =>
+      subcr (fun x => f x = x).
+    proof. by move/cr_mono_endo_endo/cr_endo_fixed_subcr. qed.
+
+    pred cr_auto (f : t -> t) =
+      surjective f /\
+      cr_mono_endo f.
+
+    lemma cr_auto_inj f :
+      cr_auto f => injective f.
+    proof. by case=> _ /cr_mono_endo_inj. qed.
+
+    lemma cr_auto_surj f :
+      cr_auto f => surjective f.
+    proof. by case. qed.
+
+    lemma cr_auto_bij f :
+      cr_auto f => bijective f.
+    proof. by move=> af; apply/bij_inj_surj; rewrite cr_auto_inj // cr_auto_surj. qed.
+
+    lemma cr_auto_mono_endo f :
+      cr_auto f => cr_mono_endo f.
+    proof. by case. qed.
+
+    lemma cr_auto_endo f :
+      cr_auto f => cr_endo f.
+    proof. by move/cr_auto_mono_endo/cr_mono_endo_endo. qed.
+
+    lemma cr_auto_zmod f :
+      cr_auto f => zmod_auto f.
+    proof.
+      move=> ef; split.
+      + by apply/cr_auto_surj.
+      by apply/cr_mono_endo_zmod/cr_auto_mono_endo.
+    qed.
+
+    lemma cr_auto_zmod_mono_endo f :
+      cr_auto f => zmod_mono_endo f.
+    proof. by move/cr_auto_zmod/zmod_auto_mono_endo. qed.
+
+    lemma cr_auto_zmod_endo f :
+      cr_auto f => zmod_endo f.
+    proof. by move/cr_auto_zmod/zmod_auto_endo. qed.
+
+    lemma cr_autoP f :
+      cr_auto f <=> (bijective f /\ cr_endo f).
+    proof.
+      split=> [af|[/bij_inj_surj [injf surjf] ef]]; split=> //.
+      + by apply/cr_auto_bij.
+      by apply/cr_auto_endo.
+    qed.
+
+    lemma cr_auto_id :
+      cr_auto idfun<:t>.
+    proof. by split; [apply/bij_surj; rewrite bij_idfun<:t>|rewrite cr_mono_endo_id]. qed.
+
+    lemma cr_auto_comp f g :
+      cr_auto f =>
+      cr_auto g =>
+      cr_auto (f \o g).
+    proof.
+      by case/cr_autoP=> bijf ef /cr_autoP [] bijg eg; apply/cr_autoP; split; [apply/bij_comp|apply/cr_endo_comp].
+    qed.
+
+    lemma cr_auto_iter f :
+      cr_auto f =>
+      forall n ,
+        cr_auto (iter n f).
+    proof.
+      move=> ef n; case (0 <= n) => [|/ltrNge/ltzW len0]; last first.
+      + have ->: iter n f = idfun; [|by apply/cr_auto_id].
+        by apply/fun_ext => x; rewrite iter0.
+      elim: n => [|n le0n IHn].
+      + have ->: iter 0 f = idfun; [|by apply/cr_auto_id].
+        by apply/fun_ext => x; rewrite iter0.
+      have ->: iter (n + 1) f = f \o (iter n f); [|by apply/cr_auto_comp].
+      by apply/fun_ext => x; rewrite iterS.
+    qed.
+
+    lemma cr_auto0 f :
+      cr_auto f =>
+      morphism_0 f zeror zeror.
+    proof. by move/cr_auto_mono_endo; apply/cr_mono_endo0. qed.
+
+    lemma cr_autoD f :
+      cr_auto f =>
+      morphism_2 f RL.(+) RL.(+).
+    proof. by move/cr_auto_mono_endo; apply/cr_mono_endoD. qed.
+
+    lemma cr_autoN f :
+      cr_auto f =>
+      morphism_1 f RL.([-]) RL.([-]).
+    proof. by move/cr_auto_mono_endo; apply/cr_mono_endoN. qed.
+
+    lemma cr_autoB f :
+      cr_auto f =>
+      morphism_2 f RL.( - ) RL.( - ).
+    proof. by move/cr_auto_mono_endo; apply/cr_mono_endoB. qed.
+
+    lemma cr_autoMz f :
+      cr_auto f =>
+      forall (x : t) n , f (intmul x n) = intmul (f x) n.
+    proof. by move/cr_auto_mono_endo; apply/cr_mono_endoMz. qed.
+
+    lemma cr_auto1 f :
+      cr_auto f =>
+      morphism_0 f oner oner.
+    proof. by move/cr_auto_mono_endo/cr_mono_endo1. qed.
+  
+    lemma cr_autoM f :
+      cr_auto f =>
+      morphism_2 f RL.( * ) RL.( * ).
+    proof. by move/cr_auto_mono_endo/cr_mono_endoM. qed.
+
+    lemma cr_autoU f :
+      cr_auto f =>
+      forall x ,
+        unit (f x) = unit x.
+    proof.
+      move=> ef x; apply/eq_iff; split; [|by apply/cr_mono_endoUR/cr_auto_mono_endo].
+      move/cr_auto_bij: (ef) => [g] [] canfg cangf; rewrite !unitrP => -[y] eq_.
+      by exists (g y); apply/(cr_auto_inj _ ef); rewrite cr_auto1 // cr_autoM // cangf.
+    qed.
+  
+    lemma cr_autoV f :
+      cr_auto f =>
+      morphism_1 f RL.invr RL.invr.
+    proof.
+      move=> ef x; rewrite cr_mono_endoVR ?cr_auto_mono_endo //.
+      by case (unit x) => // Nux; rewrite -eq_sym unitout // cr_autoU.
+    qed.
+  
+    lemma cr_autoZ f :
+      cr_auto f =>
+      forall n , f (ofint n) = ofint n.
+    proof. by move/cr_auto_mono_endo/cr_mono_endoZ. qed.
+  
+    lemma cr_autoX f :
+      cr_auto f =>
+      forall x n ,
+        f (RL.exp x n) =
+        RL.exp (f x) n.
+    proof.
+      move=> ef x n; rewrite cr_mono_endoXR ?cr_auto_mono_endo //.
+      case (unit x) => // Nux; case (0 <= n) => [le0n|/ltrNge/ltzW len0].
+      + by rewrite ger0_norm.
+      by rewrite ler0_norm // -exprV unitout // cr_autoU.
+    qed.
+
+    lemma cr_auto_eq0 f :
+      cr_auto f =>
+      forall x , f x = zeror <=> x = zeror.
+    proof. by move/cr_auto_mono_endo; apply/cr_mono_endo_eq0. qed.
+
+    lemma cr_auto_inv f :
+      cr_auto f =>
+      exists g ,
+        cancel f g /\
+        cancel g f /\
+        cr_auto g.
+    proof.
+      rewrite cr_autoP => |> bijf; move: (bijf) => [] g [] canfg cangf ef.
+      exists g; rewrite canfg cangf /= cr_autoP; split; [by exists f; split|].
+      split; split; [by rewrite -{1}(cr_endo0 f) // /morphism_0 canfg| | |].
+      + by move=> x y; apply/(bij_inj _ bijf); rewrite (cr_endoD _ ef) !cangf.
+      + by rewrite -{1}(cr_endo1 f) // /morphism_0 canfg.
+      by move=> x y; apply/(bij_inj _ bijf); rewrite (cr_endoM _ ef) !cangf.
+    qed.
+
+    lemma cr_auto_order f :
+      cr_auto f =>
+      forall x , order (f x) = order x.
+    proof. by move/cr_auto_zmod/zmod_auto_order. qed.
+
+    lemma cr_auto_orbit f :
+      cr_auto f =>
+      forall x y ,
+        orbit (f x) (f y) = orbit x y.
+    proof. by move/cr_auto_zmod/zmod_auto_orbit. qed.
+  
+    lemma cr_auto_orbit_list f :
+      cr_auto f =>
+      forall x ,
+        orbit_list (f x) = map f (orbit_list x).
+    proof. by move/cr_auto_zmod/zmod_auto_orbit_list. qed.
+  
+    lemma cr_auto_eqv_orbit f :
+      cr_auto f =>
+      forall x y z ,
+        eqv_orbit (f x) (f y) (f z) =
+        eqv_orbit x y z.
+    proof. by move/cr_auto_zmod/zmod_auto_eqv_orbit. qed.
+
+    lemma cr_auto_ker_subzmod f :
+      cr_auto f =>
+      subzmod (fun x => f x = zeror).
+    proof. by move/cr_auto_zmod/zmod_auto_ker_subzmod. qed.
+
+    lemma cr_auto_fixed_subcr f :
+      cr_auto f =>
+      subcr (fun x => f x = x).
+    proof. by move/cr_auto_mono_endo/cr_mono_endo_fixed_subcr. qed.
   end CRStr.
 end ComRingStruct.
 
@@ -603,104 +1330,115 @@ abstract theory IDomainStruct.
       theory BCR <- Big.
   
     op frobenius x = RL.exp x char.
+
+    lemma frobenius_cr_mono_endo :
+      prime char =>
+      cr_mono_endo frobenius.
+    proof.
+      move=> prime_char; apply/cr_mono_endoP0; do!split.
+      + rewrite /frobenius; move/gt0_prime: prime_char.
+        elim: char ge0_char => // n le0n IHn _ x.
+        case/ler_eqVlt: (le0n) => [<<-/=|lt0n]; [by rewrite expr1|].
+        by rewrite exprSr // => /mulf_eq0 [|] //; apply/IHn.
+      + by rewrite /frobenius /morphism_0 expr0z; move/gt0_prime/gtr_eqF: prime_char => ->.
+      + move=> x y; rewrite /frobenius Bin.binomial ?ge0_char //.
+        rewrite BAdd.big_int_recr ?ge0_char //= expr0 mulr1 binn ?ge0_char // mulr1z addrC; congr.
+        rewrite BAdd.big_ltn ?gt0_prime ?prime_char //= expr0 mul1r bin0 ?ge0_char //.
+        rewrite mulr1z addrC eq_sym -subr_eq eq_sym subrr.
+        rewrite (BAdd.eq_big_seq _ (fun _ => zeror)); last by apply/BAdd.big1_eq.
+        move => k mem_k /=; rewrite -mulr_intr; case: (dvd_char (bin char k)) => + _.
+        move => ->; [|by rewrite mulr0].
+        apply/prime_dvd_bin; [by apply/prime_char|].
+        by case/mem_range: mem_k => le1k -> //=; apply/ltzE.
+      + by rewrite /frobenius /morphism_0 expr1z.
+      by move=> x y; rewrite /frobenius; apply/exprMn/ge0_char.
+    qed.
+
+    lemma frobenius_inj :
+      prime char =>
+      injective frobenius.
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endo_inj. qed.
+
+    lemma frobenius_cr_endo :
+      prime char =>
+      cr_endo frobenius.
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endo_endo. qed.
+
+    lemma frobenius_zmod_mono_endo :
+      prime char =>
+      zmod_mono_endo frobenius.
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endo_zmod. qed.
+
+    lemma cr_mono_endo_zmod_endo :
+      prime char =>
+      zmod_endo frobenius.
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endo_zmod_endo. qed.
   
     lemma frobenius0 :
       prime char =>
-      frobenius zeror = zeror.
-    proof. by rewrite /frobenius expr0z => /gt0_prime /gtr_eqF ->. qed.
+      morphism_0 frobenius zeror zeror.
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endo0. qed.
   
-    lemma frobeniusD (x y : t) :
+    lemma frobeniusD :
       prime char =>
-      frobenius (x + y) = frobenius x + frobenius y.
-    proof.
-      move => prime_char; rewrite /frobenius Bin.binomial ?ge0_char //.
-      rewrite BAdd.big_int_recr ?ge0_char //= expr0 mulr1 binn ?ge0_char // mulr1z addrC; congr.
-      rewrite BAdd.big_ltn ?gt0_prime ?prime_char //= expr0 mul1r bin0 ?ge0_char //.
-      rewrite mulr1z addrC eq_sym -subr_eq eq_sym subrr.
-      rewrite (BAdd.eq_big_seq _ (fun _ => zeror)); last by apply/BAdd.big1_eq.
-      move => k mem_k /=; rewrite -mulr_intr; case: (dvd_char (bin char k)) => + _.
-      move => ->; [|by rewrite mulr0].
-      apply/prime_dvd_bin; [by apply/prime_char|].
-      by case/mem_range: mem_k => le1k -> //=; apply/ltzE.
-    qed.
+      morphism_2 frobenius RL.( + ) RL.( + ).
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endoD. qed.
   
-    lemma frobeniusN (x : t) :
+    lemma frobeniusN :
       prime char =>
-      frobenius (-x) = - frobenius x.
-    proof. by move => prime_char; rewrite -addr_eq0 -frobeniusD // addNr frobenius0. qed.
+      morphism_1 frobenius RL.([-]) RL.([-]).
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endoN. qed.
   
-    lemma frobeniusB (x y : t) :
+    lemma frobeniusB :
       prime char =>
-      frobenius (x - y) = frobenius x - frobenius y.
-    proof. by move => prime_char; rewrite frobeniusD // frobeniusN. qed.
-  
-    lemma frobeniusMz (x : t) n :
+      morphism_2 frobenius RL.( - ) RL.( - ).
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endoB. qed.
+
+    lemma frobeniusMz :
       prime char =>
-      frobenius (intmul x n) = intmul (frobenius x) n.
-    proof.
-      move=> prime_char; wlog: n / 0 <= n => [wlogn|].
-      + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn //.
-        by rewrite !mulrNz frobeniusN // => /oppr_inj.
-      elim: n => [|n le0n IHn]; [by rewrite !mulr0z frobenius0|].
-      by rewrite !mulrSz -IHn frobeniusD.
-    qed.
-  
+      forall (x : t) n , frobenius (intmul x n) = intmul (frobenius x) n.
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endoMz. qed.
+
     lemma frobenius1 :
       frobenius oner = oner.
     proof. by rewrite /frobenius expr1z. qed.
   
-    lemma frobeniusM (x y : t) :
-      frobenius (x * y) = frobenius x * frobenius y.
-    proof. by rewrite /frobenius; apply/exprMn/ge0_char. qed.
-  
-    lemma frobeniusU (x : t) :
+    lemma frobeniusM :
       prime char =>
-      unit (frobenius x) = unit x.
+      morphism_2 frobenius RL.( * ) RL.( * ).
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endoM. qed.
+  
+    lemma frobeniusU :
+      prime char =>
+      forall x , unit (frobenius x) = unit x.
     proof.
-      move => prime_char; rewrite /frobenius eq_iff; split => [/unitrP [y] eq_|].
-      + apply/unitrP; exists (y * exp x (char - 1)); rewrite -mulrA -exprSr //.
-        by rewrite subr_ge0; apply/ltzW/gt1_prime/prime_char.
-      by apply/unitrX.
+      move=> prime_char x; apply/eq_iff; split; [|by apply/cr_mono_endoUR/frobenius_cr_mono_endo].
+      by rewrite /frobenius; apply/unitrX_neq0/gtr_eqF/gt0_prime.
     qed.
   
-    lemma frobeniusV (x : t) :
-      frobenius (invr x) = invr (frobenius x).
-    proof. by rewrite /frobenius exprV exprN. qed.
-  
-    lemma frobeniusZ n :
+    lemma frobeniusV :
       prime char =>
-      frobenius (ofint n) = ofint n.
-    proof. by move=> prime_char; rewrite frobeniusMz // frobenius1 /ofint. qed.
-  
-    lemma frobeniusX (x : t) n :
-      frobenius (exp x n) = exp (frobenius x) n.
+      morphism_1 frobenius RL.invr RL.invr.
     proof.
-      wlog: n / 0 <= n => [wlogn|].
-      + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn //.
-        by rewrite !exprN frobeniusV => /invr_inj.
-      elim: n => [|n le0n IHn]; [by rewrite !expr0 frobenius1|].
-      by rewrite !exprS // -IHn frobeniusM.
+      move=> prime_char x; rewrite cr_mono_endoVR ?frobenius_cr_mono_endo //.
+      by case (unit x) => //; rewrite -frobeniusU // => Nu_; rewrite unitout.
     qed.
-  
-    lemma eq_frobenius_0 (x : t) :
+
+    lemma frobeniusZ :
       prime char =>
-      frobenius x = zeror <=> x = zeror.
-    proof.
-      move => prime_char; split => [|->>]; [|by apply/frobenius0].
-      rewrite /frobenius; move/gt0_prime: prime_char.
-      elim: char ge0_char => // n le0n IHn _.
-      case/ler_eqVlt: (le0n) => [<<-/=|lt0n]; [by rewrite expr1|].
-      by rewrite exprSr // => /mulf_eq0 [|] //; apply/IHn.
-    qed.
-  
-    lemma frobenius_inj :
+      forall n , frobenius (ofint n) = ofint n.
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endoZ. qed.
+
+    lemma frobeniusX x n :
+      frobenius (RL.exp x n) =
+      RL.exp (frobenius x) n.
+    proof. by rewrite /frobenius -!exprM mulrC. qed.
+
+    lemma frobenius_eq0 :
       prime char =>
-      injective frobenius.
-    proof.
-      move => prime_char x y /subr_eq0.
-      by rewrite -frobeniusB // eq_frobenius_0 // => /subr_eq0.
-    qed.
-  
+      forall x , frobenius x = zeror <=> x = zeror.
+    proof. by move/frobenius_cr_mono_endo/cr_mono_endo_eq0. qed.
+
     lemma iter_frobenius n x :
       0 <= n =>
       iter n frobenius x =
@@ -817,6 +1555,141 @@ abstract theory IDomainStruct.
       rewrite -{1}expr1; apply/ler_weexpn2l => /=; [|by move: lt0n; rewrite ltzE].
       by move: (gt0_prime _ prime_char); rewrite ltzE.
     qed.
+
+    lemma subcr_iter_frobenius_fixed :
+      prime char =>
+      forall n , subcr (iter_frobenius_fixed n).
+    proof.
+      rewrite /iter_frobenius_fixed => prime_char n.
+      by apply/cr_endo_fixed_subcr/cr_endo_iter/frobenius_cr_endo.
+    qed.
+
+    lemma iter_frobenius_fixed0 :
+      prime char =>
+      forall n ,
+        iter_frobenius_fixed n zeror.
+    proof. by move/subcr_iter_frobenius_fixed => + n; move/(_ n)/subcr0. qed.
+
+    lemma iter_frobenius_fixedD :
+      prime char =>
+      forall n x y ,
+        iter_frobenius_fixed n x =>
+        iter_frobenius_fixed n y =>
+        iter_frobenius_fixed n (x + y).
+    proof. by move/subcr_iter_frobenius_fixed => + n; move/(_ n)/subcrD. qed.
+
+    lemma iter_frobenius_fixedN :
+      prime char =>
+      forall n x ,
+        iter_frobenius_fixed n x =>
+        iter_frobenius_fixed n (-x).
+    proof. by move/subcr_iter_frobenius_fixed => + n; move/(_ n)/subcrN. qed.
+
+    lemma iter_frobenius_fixedB :
+      prime char =>
+      forall n x y ,
+        iter_frobenius_fixed n x =>
+        iter_frobenius_fixed n y =>
+        iter_frobenius_fixed n (x - y).
+    proof. by move/subcr_iter_frobenius_fixed => + n; move/(_ n)/subcrB. qed.
+
+    lemma iter_frobenius_fixedMz :
+      prime char =>
+      forall n x m ,
+        iter_frobenius_fixed n x =>
+        iter_frobenius_fixed n (intmul x m).
+    proof. by move/subcr_iter_frobenius_fixed => + n; move/(_ n)/subcrMz. qed.
+
+    lemma iter_frobenius_fixed1 :
+      forall n ,
+        iter_frobenius_fixed n oner.
+    proof.
+      rewrite /iter_frobenius_fixed => n; case (0 <= n) => [le0n|/ltrNge/ltzW len0].
+      + by rewrite iter_frobenius // expr1z.
+      by rewrite iter0.
+    qed.
+
+    lemma iter_frobenius_fixedM :
+      prime char =>
+      forall n x y ,
+        iter_frobenius_fixed n x =>
+        iter_frobenius_fixed n y =>
+        iter_frobenius_fixed n (x * y).
+    proof. by move/subcr_iter_frobenius_fixed => + n; move/(_ n)/subcrM. qed.
+
+    lemma iter_frobenius_fixedZ :
+      prime char =>
+      forall n m ,
+        iter_frobenius_fixed n (ofint m).
+    proof. by move/subcr_iter_frobenius_fixed => + n; move/(_ n)/subcrZ. qed.
+
+    lemma iter_frobenius_fixedV :
+      forall n x ,
+        iter_frobenius_fixed n x =>
+        iter_frobenius_fixed n (invr x).
+    proof.
+      rewrite /iter_frobenius_fixed => n x; case (0 <= n) => [le0n|/ltrNge/ltzW len0].
+      + by rewrite !iter_frobenius // exprVn ?expr_ge0 ?ge0_char // => ->.
+      by rewrite !iter0.
+    qed.
+
+    lemma iter_frobenius_fixedX :
+      forall n x m ,
+        iter_frobenius_fixed n x =>
+        iter_frobenius_fixed n (exp x m).
+    proof.
+      rewrite /iter_frobenius_fixed => n x m; case (0 <= n) => [le0n|/ltrNge/ltzW len0].
+      + by rewrite !iter_frobenius // -exprM mulrC exprM => ->.
+      by rewrite !iter0.
+    qed.
+
+    lemma cr_endo_frobenius f :
+      cr_endo f =>
+      forall x ,
+        f (frobenius x) = frobenius (f x).
+    proof. by rewrite /frobenius => ef x; rewrite cr_endoXR // ger0_norm ?ge0_char. qed.
+
+    lemma cr_endo_iter_frobenius_fixed f :
+      cr_endo f =>
+      forall n x ,
+        iter_frobenius_fixed n x =>
+        iter_frobenius_fixed n (f x).
+    proof.
+      rewrite /iter_frobenius_fixed => ef n x; case: (0 <= n) => [le0n|/ltrNge/ltzW len0].
+      + rewrite !iter_frobenius //; move: (cr_endoXR _ ef x (char ^ n)).
+        by rewrite ger0_norm ?expr_ge0 ?ge0_char // if_same => <- ->.
+      by rewrite !iter0.
+    qed.
+
+    lemma cr_mono_endo_frobenius f :
+      cr_mono_endo f =>
+      forall x ,
+        f (frobenius x) = frobenius (f x).
+    proof. by move/cr_mono_endo_endo/cr_endo_frobenius. qed.
+
+    lemma cr_mono_endo_iter_frobenius_fixed f :
+      cr_mono_endo f =>
+      forall n x ,
+        iter_frobenius_fixed n (f x) = iter_frobenius_fixed n x.
+    proof.
+      rewrite /iter_frobenius_fixed => ef n x; case: (0 <= n) => [le0n|/ltrNge/ltzW len0].
+      + rewrite !iter_frobenius //; move: (cr_mono_endoXR _ ef x (char ^ n)).
+        rewrite ger0_norm ?expr_ge0 ?ge0_char // if_same => <-.
+        by apply/eq_iff/inj_eq/cr_mono_endo_inj.
+      by rewrite !iter0.
+    qed.
+
+    lemma cr_auto_frobenius f :
+      cr_auto f =>
+      forall x ,
+        f (frobenius x) = frobenius (f x).
+    proof. by move/cr_auto_mono_endo/cr_mono_endo_frobenius. qed.
+
+    lemma cr_auto_iter_frobenius_fixed f :
+      cr_auto f =>
+      forall n x ,
+        iter_frobenius_fixed n (f x) = iter_frobenius_fixed n x.
+    proof. by move/cr_auto_mono_endo/cr_mono_endo_iter_frobenius_fixed. qed.
   
     (*TODO: this clear should remove everything once subtypes are introduced without axioms. *)
     clear [ Bin.* Big.BAdd.* Big.BMul.* Big.*
@@ -846,49 +1719,150 @@ abstract theory FieldStruct.
   theory FStr.
     import ZModStr CRStr IDStr.
 
-    op is_subf P =
-      is_subcr P /\
+    op subf P =
+      subcr P /\
       (forall x , P x => P (invr x)).
 
-    lemma subf_cr P : is_subf P => is_subcr P.
+    lemma subf_cr P : subf P => subcr P.
     proof. by case. qed.
 
-    lemma subf_zmod P : is_subf P => is_subzmod P.
+    lemma subf_zmod P : subf P => subzmod P.
     proof. by move/subf_cr; apply/subcr_zmod. qed.
 
-    lemma subf0 P : is_subf P => P zeror.
+    lemma subfT : subf predT.
+    proof. by rewrite /predT. qed.
+
+    lemma subfI P1 P2 : subf P1 => subf P2 => subf (predI P1 P2).
+    proof.
+      case=> P1_ P1V [] P2_ P2V; split.
+      + by apply/subcrI/subf_cr.
+      by move=> x; rewrite /predI => /> ? ?; rewrite P1V // P2V.
+    qed.
+
+    lemma subf0 P : subf P => P zeror.
     proof. by move/subf_cr; apply/subcr0. qed.
 
-    lemma subfD P : is_subf P => forall x y , P x => P y => P (x + y).
+    lemma subfD P : subf P => forall x y , P x => P y => P (x + y).
     proof. by move/subf_cr; apply/subcrD. qed.
 
-    lemma subfN P : is_subf P => forall x , P x => P (-x).
+    lemma subfN P : subf P => forall x , P x => P (-x).
     proof. by move/subf_cr; apply/subcrN. qed.
   
-    lemma subfB P : is_subf P => forall x y , P x => P y => P (x - y).
+    lemma subfB P : subf P => forall x y , P x => P y => P (x - y).
     proof. by move/subf_cr; apply/subcrB. qed.
 
-    lemma subfMz P : is_subf P => forall x n , P x => P (intmul x n).
+    lemma subfMz P : subf P => forall x n , P x => P (intmul x n).
     proof. by move/subf_cr; apply/subcrMz. qed.
 
-    lemma subf1 P : is_subf P => P oner.
+    lemma subf1 P : subf P => P oner.
     proof. by move/subf_cr; apply/subcr1. qed.
   
-    lemma subfM P : is_subf P => forall x y , P x => P y => P (x * y).
+    lemma subfM P : subf P => forall x y , P x => P y => P (x * y).
     proof. by move/subf_cr; apply/subcrM. qed.
 
-    lemma subfZ P n : is_subf P => P (ofint n).
+    lemma subfZ P n : subf P => P (ofint n).
     proof. by move/subf_cr; apply/subcrZ. qed.
 
-    lemma subfV P : is_subf P => forall x , P x => P (invr x).
+    lemma subfV P : subf P => forall x , P x => P (invr x).
     proof. by case. qed.
 
-    lemma subfX P : is_subf P => forall x n , P x => P (exp x n).
+    lemma subfX P : subf P => forall x n , P x => P (exp x n).
     proof.
       move=> subfP x n Px; case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=].
       + by apply/subcrXR => //; apply/subf_cr/subfP.
       move/(subcrXR _ (subf_cr _ subfP) _ _ (subfV _ subfP _ Px)).
       by rewrite exprV.
+    qed.
+
+    lemma cr_endoU f :
+      cr_endo f =>
+      forall x ,
+        unit (f x) = unit x.
+    proof.
+      move=> ef x; apply/eq_iff; split; [|by apply/cr_endoUR].
+      by rewrite -!unitfE; apply/implybNN => ->>; apply/cr_endo0.
+    qed.
+  
+    lemma cr_endoV f :
+      cr_endo f =>
+      morphism_1 f RL.invr RL.invr.
+    proof.
+      move=> ef x; rewrite cr_endoVR //; case (unit x) => //.
+      by rewrite -(cr_endoU _ ef) => Nu_; rewrite unitout.
+    qed.
+  
+    lemma cr_endoX f :
+      cr_endo f =>
+      forall x n ,
+        f (RL.exp x n) =
+        RL.exp (f x) n.
+    proof.
+      move=> ef x n; rewrite cr_endoXR //; case (unit x) => //.
+      case (0 <= n) => [le0n|/ltrNge/ltzW len0].
+      + by rewrite ger0_norm.
+      by rewrite ler0_norm // -exprV -(cr_endoU _ ef) => Nu_; rewrite unitout.
+    qed.
+
+    lemma cr_endo_fixed_subf f :
+      cr_endo f =>
+      subf (fun x => f x = x).
+    proof.
+      move=> ef; split; [by apply/cr_endo_fixed_subcr|].
+      by move=> x; rewrite cr_endoV // => ->.
+    qed.
+
+    lemma cr_mono_endoU f :
+      cr_mono_endo f =>
+      forall x ,
+        unit (f x) = unit x.
+    proof. by move/cr_mono_endo_endo/cr_endoU. qed.
+  
+    lemma cr_mono_endoV f :
+      cr_mono_endo f =>
+      morphism_1 f RL.invr RL.invr.
+    proof. by move/cr_mono_endo_endo/cr_endoV. qed.
+  
+    lemma cr_mono_endoX f :
+      cr_mono_endo f =>
+      forall x n ,
+        f (RL.exp x n) =
+        RL.exp (f x) n.
+    proof. by move/cr_mono_endo_endo/cr_endoX. qed.
+
+    lemma cr_mono_endo_fixed_subf f :
+      cr_mono_endo f =>
+      subf (fun x => f x = x).
+    proof. by move/cr_mono_endo_endo/cr_endo_fixed_subf. qed.
+
+    lemma cr_autoU f :
+      cr_auto f =>
+      forall x ,
+        unit (f x) = unit x.
+    proof. by move/cr_auto_mono_endo/cr_mono_endoU. qed.
+  
+    lemma cr_autoV f :
+      cr_auto f =>
+      morphism_1 f RL.invr RL.invr.
+    proof. by move/cr_auto_mono_endo/cr_mono_endoV. qed.
+  
+    lemma cr_autoX f :
+      cr_auto f =>
+      forall x n ,
+        f (RL.exp x n) =
+        RL.exp (f x) n.
+    proof. by move/cr_auto_mono_endo/cr_mono_endoX. qed.
+
+    lemma cr_auto_fixed_subf f :
+      cr_auto f =>
+      subf (fun x => f x = x).
+    proof. by move/cr_auto_mono_endo/cr_mono_endo_fixed_subf. qed.
+
+    lemma subf_iter_frobenius_fixed n :
+      prime char =>
+      subf (iter_frobenius_fixed n).
+    proof.
+      rewrite /iter_frobenius_fixed => prime_char.
+      by apply/cr_endo_fixed_subf/cr_endo_iter/frobenius_cr_endo.
     qed.
   end FStr.
 end FieldStruct.

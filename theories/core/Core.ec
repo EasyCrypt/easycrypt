@@ -124,6 +124,14 @@ proof. by move=> fK x y /(congr1 g); rewrite !fK. qed.
 lemma nosmt can_inj (f : 'a -> 'b) g: cancel f g => injective f.
 proof. by move/can_pcan/pcan_inj. qed.
 
+lemma nosmt inj_exists_can (f : 'a -> 'b): injective f => exists g , cancel f g.
+proof.
+move=> injf; pose P:= (fun y => exists x , y = f x); pose Q:= (fun y x => y = f x).
+move: (partial_funchoice P Q _); rewrite /P /Q => {P Q}.
++ by move=> ? [x] ->>; exists x.
+by case=> g forall_; exists g => x; apply/injf; rewrite -forall_ //; exists x.
+qed.
+
 lemma nosmt canLR (f:'a -> 'b) g x y: cancel f g => x = f y => g x = y.
 proof. by move=> fK ->; rewrite fK. qed.
 
