@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore List Ring Int IntDiv Bigalg RingStruct.
+require import AllCore List Ring Int IntDiv Bigalg RingStruct RingMorph.
 require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
@@ -19,42 +19,75 @@ abstract theory SubZModule.
     rename [theory] "RL"  as "SRL"
            [theory] "Str" as "SStr".
 
+  clone include ZModuleMorph with
+    type t1 <- st,
+    type t2 <- t,
+    theory RL1 <- SRL,
+    theory RL2 <- TRL,
+    theory ZModStr1 <- ZModSStr,
+    theory ZModStr2 <- ZModTStr.
+
   clone import Subtype as Sub with
     type T  <= t ,
     type sT <= st.
 
   theory SZMod.
-    import Sub TRL SRL ZModTStr ZModSStr.
+    import Sub TRL SRL ZModTStr ZModSStr ZModMorph.
 
-    axiom val0 : val SRL.zeror = TRL.zeror.
+    axiom val0 : morphism_0 val SRL.zeror TRL.zeror.
+
+    axiom valD : morphism_2 val SRL.(+) TRL.(+).
+
+    lemma val_zmod_homo : zmod_homo val.
+    proof. by split; [apply/val0|apply/valD]. qed.
+
+    lemma val_zmod_mono : zmod_mono val.
+    proof. by split; [apply/val_inj|apply/val_zmod_homo]. qed.
+
+    lemma valN :
+      morphism_1 val SRL.([-]) TRL.([-]).
+    proof. by apply/zmod_monoN/val_zmod_mono. qed.
+
+    lemma valB :
+      morphism_2 val SRL.( - ) TRL.( - ).
+    proof. by apply/zmod_monoB/val_zmod_mono. qed.
+
+    lemma valMz :
+      forall x n , val (SRL.intmul x n) = intmul (val x) n.
+    proof. by apply/zmod_monoMz/val_zmod_mono. qed.
+
+    lemma val_eq0 :
+      forall x , val x = TRL.zeror <=> x = SRL.zeror.
+    proof. by apply/zmod_mono_eq0/val_zmod_mono. qed.
+
+    lemma val_order :
+      forall x , order (val x) = order x.
+    proof. by apply/zmod_mono_order/val_zmod_mono. qed.
+
+    lemma val_orbit :
+      forall x y ,
+        orbit (val x) (val y) = orbit x y.
+    proof. by apply/zmod_mono_orbit/val_zmod_mono. qed.
   
-    axiom valD x y : val (SRL.( + ) x y) = TRL.( + ) (val x) (val y).
+    lemma val_orbit_list :
+      forall x ,
+        orbit_list (val x) = map val (orbit_list x).
+    proof. by apply/zmod_mono_orbit_list/val_zmod_mono. qed.
   
-    lemma valN x : val (SRL.([-]) x) = TRL.([-]) (val x).
-    proof. by apply/(TRL.addrI (val x)); rewrite -valD SRL.subrr TRL.subrr val0. qed.
-  
-    lemma valB x y : val (SRL.( - ) x y) = TRL.( - ) (val x) (val y).
-    proof. by rewrite valD valN. qed.
-  
-    lemma valMz x n : val (SRL.intmul x n) = TRL.intmul (val x) n.
+    lemma val_eqv_orbit :
+      forall x y z ,
+        eqv_orbit (val x) (val y) (val z) =
+        eqv_orbit x y z.
+    proof. by apply/zmod_mono_eqv_orbit/val_zmod_mono. qed.
+
+    lemma subzmodP : subzmod P.
     proof.
-      wlog: n / 0 <= n => [wlogn|].
-      + case (0 <= n) => [|/ltrNge/ltzW/ler_opp2/=] /wlogn // => {wlogn}.
-        by rewrite SRL.mulrNz TRL.mulrNz valN => /TRL.oppr_inj.
-      elim: n => [|n le0n IHn]; [by rewrite SRL.mulr0z TRL.mulr0z val0|].
-      by rewrite SRL.mulrSz TRL.mulrSz -IHn valD.
+      move: (subzmod_zmod_mono_subzmod _ _ val_zmod_mono subzmodT).
+      apply/eq_ind/fun_ext => y; apply/eq_iff; split=> [[x] [] <<- _|Py].
+      + by apply/valP.
+      by exists (insubd y); rewrite val_insubd Py.
     qed.
 
-    lemma subzmodP : ZModTStr.is_subzmod P.
-    proof.
-      do!split.
-      + by rewrite -val0 valP.
-      + move=> x y Px Py; move: (val_insubd x) (val_insubd y).
-        by rewrite Px Py /= => <- <-; rewrite -valD valP.
-      move=> x Px; move: (val_insubd x).
-      by rewrite Px /= => <-; rewrite -valN valP.
-    qed.
-  
     lemma P0 : P TRL.zeror.
     proof. by apply/ZModTStr.subzmod0/subzmodP. qed.
   
@@ -69,6 +102,19 @@ abstract theory SubZModule.
   
     lemma PMz x n : P x => P (TRL.intmul x n).
     proof. by move: x n; apply/ZModTStr.subzmodMz/subzmodP. qed.
+  
+    lemma P_mem_orbit : forall x y , ZModTStr.orbit x y => P x => P y.
+    proof. by apply/ZModTStr.subzmod_mem_orbit/subzmodP. qed.
+  
+    lemma P_mem_orbit_list : forall x y , y \in ZModTStr.orbit_list x => P x => P y.
+    proof. by apply/ZModTStr.subzmod_mem_orbit_list/subzmodP. qed.
+  
+    lemma P_eqv_orbit :
+      forall x y z ,
+        ZModTStr.eqv_orbit x y z =>
+        P x =>
+        P y <=> P z.
+    proof. by apply/ZModTStr.subzmod_eqv_orbit/subzmodP. qed.
   
     lemma insubd0 : insubd TRL.zeror = SRL.zeror.
     proof. by rewrite -val0 valKd. qed.
@@ -111,36 +157,6 @@ abstract theory SubZModule.
       by rewrite Px PMz.
     qed.
   
-    lemma val_order x : order (val x) = order x.
-    proof.
-      rewrite /order; apply/IntMin.eq_argmin => i le0i /=.
-      rewrite /idfun /= -valMz -val0; apply/andb_id2l => lt0i.
-      by apply/eq_iff; split=> [|->] //; apply/val_inj.
-    qed.
-  
-    lemma val_orbit x y : orbit (val x) (val y) = orbit x y.
-    proof.
-      apply/eq_iff/exists_eq => n /=; apply/eq_iff.
-      by rewrite -valMz; split=> [|->] // /val_inj.
-    qed.
-  
-    lemma val_orbit_list x : orbit_list (val x) = map val (orbit_list x).
-    proof.
-      rewrite map_mkseq -val_order; apply/eq_in_mkseq.
-      by move=> i _ ; rewrite /(\o) /= valMz.
-    qed.
-  
-    lemma val_eqv_orbit x y z : eqv_orbit (val x) (val y) (val z) = eqv_orbit x y z.
-    proof. by rewrite /eqv_orbit -valB val_orbit. qed.
-  
-    lemma P_orbit_list x : P x => all P (orbit_list x).
-    proof.
-      case/ler_eqVlt: (ZModTStr.ge0_order x) => [|lt0_ Px].
-      + by rewrite -size_orbit_list eq_sym size_eq0 => ->.
-      apply/allP => y; rewrite -orbit_listP // => -[n] ->>.
-      by apply/PMz.
-    qed.
-  
     lemma insubd_order x : P x => order (insubd x) = order x.
     proof. by move=> Px; rewrite -val_order val_insubd Px. qed.
   
@@ -152,7 +168,7 @@ abstract theory SubZModule.
       move=> Px; apply/(inj_map _ val_inj); rewrite -val_orbit_list val_insubd Px /=.
       rewrite -map_comp -{1}(map_id (orbit_list x)) -eq_in_map => y.
       rewrite /idfun /(\o) /= val_insubd => memy.
-      by move/(_ _ Px)/allP/(_ _ memy): P_orbit_list => ->.
+      by move/(_ _ _ memy Px): P_mem_orbit_list => ->.
     qed.
   
     lemma insubd_eqv_orbit x y z :
@@ -179,71 +195,79 @@ abstract theory SubComRing.
     rename [theory] "RL"  as "SRL"
            [theory] "Str" as "SStr".
 
+  clone include ComRingMorph with
+    type t1 <- st,
+    type t2 <- t,
+    theory RL1 <- SRL,
+    theory RL2 <- TRL,
+    theory ZModStr1 <- ZModSStr,
+    theory ZModStr2 <- ZModTStr,
+    theory CRStr1   <- CRSStr,
+    theory CRStr2   <- CRTStr.
+
   clone include SubZModule with
-    type t          <- t,
-    type st         <- st,
-    theory TRL      <- TRL,
-    theory SRL      <- SRL,
-    theory ZModTStr <- ZModTStr,
-    theory ZModSStr <- ZModSStr
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    theory SRL       <- SRL,
+    theory ZModTStr  <- ZModTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory ZModMorph <- ZModMorph
     rename [theory] "TRL"  as "Gone"
            [theory] "SRL"  as "Gone"
            [theory] "TStr" as "Gone"
-           [theory] "SStr" as "Gone".
+           [theory] "SStr" as "Gone"
+           [theory] "Morph" as "Gone".
 
   theory SCR.
-    import Sub TRL SRL ZModTStr ZModSStr CRTStr CRSStr SZMod.
+    import Sub TRL SRL ZModTStr ZModSStr CRTStr CRSStr SZMod ZModMorph CRMorph.
 
     axiom val1 : val SRL.oner = TRL.oner.
   
     axiom valM x y : val (SRL.( * ) x y) = TRL.( * ) (val x) (val y).
-  
-    lemma valUR x : SRL.unit x => TRL.unit (val x).
-    proof.
-      rewrite TRL.unitrP SRL.unitrP -val1 => -[y] <-.
-      by exists (val y); rewrite valM.
-    qed.
-  
-    lemma valVR x :
-      val (SRL.invr x) =
-      if SRL.unit x
-      then TRL.invr (val x)
-      else val x.
-    proof.
-      case: (SRL.unit x) => [ux|Nux].
-      + apply/(TRL.mulIr _ (valUR _ ux)).
-        rewrite -valM SRL.mulVr // TRL.mulVr ?val1 //.
-        by apply/valUR.
-      by rewrite SRL.unitout.
-    qed.
-  
-    lemma valXR x n :
-      val (SRL.exp x n) =
-      if SRL.unit x
-      then TRL.exp (val x) n
-      else TRL.exp (val x) `|n|.
-    proof.
-      have wlogn: forall x n , 0 <= n => val (SRL.exp x n) = TRL.exp (val x) n.
-      + move=> {x n} x; elim=> [|n le0n IHn]; [by rewrite SRL.expr0 TRL.expr0 val1|].
-        by rewrite SRL.exprS // TRL.exprS // -IHn valM.
-      case (0 <= n) => [le0n|/ltrNge ltn0].
-      + by rewrite wlogn // ger0_norm.
-      rewrite ltr0_norm //; move: ltn0; rewrite -(IntID.opprK n).
-      move: (-n) => {n} n /oppr_lt0 /=; rewrite SRL.exprN TRL.exprN.
-      move=> lt0n; move/ltzW: (lt0n).
-      move=> /wlogn {wlogn}; rewrite valVR => ->.
-      case: (SRL.unit x) => [ux|Nux_].
-      + by rewrite ifT //; apply/SRL.unitrX.
-      case (n = 0) => [->> //|].
-      by move/(SRL.unitrX_neq0 x); rewrite Nux_ /= => ->.
-    qed.
 
-    lemma subcrP : CRTStr.is_subcr P.
+    lemma val_cr_homo : cr_homo val.
+    proof. by split; [apply/val_zmod_homo|split; [apply/val1|apply/valM]]. qed.
+
+    lemma val_cr_mono : cr_mono val.
+    proof. by split; [apply/val_inj|apply/val_cr_homo]. qed.
+  
+    lemma valUR :
+      forall x ,
+        SRL.unit x =>
+        TRL.unit (val x).
+    proof. by apply/cr_monoUR/val_cr_mono. qed.
+  
+    lemma valVR :
+      forall x ,
+        val (SRL.invr x) =
+        if SRL.unit x
+        then TRL.invr (val x)
+        else val x.
+    proof. by apply/cr_monoVR/val_cr_mono. qed.
+  
+    lemma valZ :
+      forall n , val (SRL.ofint n) = TRL.ofint n.
+    proof. by apply/cr_monoZ/val_cr_mono. qed.
+  
+    lemma valXR :
+      forall x n ,
+        val (SRL.exp x n) =
+        if unit x
+        then TRL.exp (val x) n
+        else TRL.exp (val x) `|n|.
+    proof. by apply/cr_monoXR/val_cr_mono. qed.
+
+    lemma eq_char :
+      CRSStr.char = CRTStr.char.
+    proof. by apply/(cr_mono_char _ val_cr_mono). qed.
+
+    lemma subcrP : subcr P.
     proof.
-      split; [by apply/SZMod.subzmodP|split].
-      + by rewrite -val1 valP.
-      move=> x y Px Py; move: (val_insubd x) (val_insubd y).
-      by rewrite Px Py /= => <- <-; rewrite -valM valP.
+      move: (subcr_cr_mono_subcr _ _ val_cr_mono subcrT).
+      apply/eq_ind/fun_ext => y; apply/eq_iff; split=> [[x] [] <<- _|Py].
+      + by apply/valP.
+      by exists (insubd y); rewrite val_insubd Py.
     qed.
 
     lemma P1 : P TRL.oner.
@@ -312,9 +336,6 @@ abstract theory SubComRing.
       + by apply/ltzS.
       by rewrite TRL.mulVr // TRL.expr1z TRL.mulr1.
     qed.
-  
-    lemma eq_char : CRTStr.char = CRSStr.char.
-    proof. by rewrite /char -val_order val1. qed.
   end SCR.
 end SubComRing.
 
@@ -332,43 +353,59 @@ abstract theory SubIDomain.
     rename [theory] "RL"  as "SRL"
            [theory] "Str" as "SStr".
 
+  clone include IDomainMorph with
+    type t1 <- st,
+    type t2 <- t,
+    theory RL1 <- SRL,
+    theory RL2 <- TRL,
+    theory ZModStr1 <- ZModSStr,
+    theory ZModStr2 <- ZModTStr,
+    theory CRStr1   <- CRSStr,
+    theory CRStr2   <- CRTStr,
+    theory IDStr1   <- IDSStr,
+    theory IDStr2   <- IDTStr.
+
   clone include SubComRing with
-    type t          <- t,
-    type st         <- st,
-    theory TRL      <- TRL,
-    theory SRL      <- SRL,
-    theory ZModTStr <- ZModTStr,
-    theory ZModSStr <- ZModSStr,
-    theory CRTStr   <- CRTStr,
-    theory CRSStr   <- CRSStr
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    theory SRL       <- SRL,
+    theory ZModTStr  <- ZModTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory ZModMorph <- ZModMorph,
+    theory CRTStr    <- CRTStr,
+    theory CRSStr    <- CRSStr,
+    theory CRMorph   <- CRMorph
     rename [theory] "TRL"  as "Gone"
            [theory] "SRL"  as "Gone"
            [theory] "TStr" as "Gone"
-           [theory] "SStr" as "Gone".
+           [theory] "SStr" as "Gone"
+           [theory] "Morph" as "Gone".
 
   theory SID.
     import Sub TRL SRL ZModTStr ZModSStr CRTStr CRSStr IDTStr IDSStr SZMod SCR.
+    import ZModMorph CRMorph IDMorph.
 
-    lemma val_frobenius x : frobenius (val x) = val (frobenius x).
-    proof. by rewrite /frobenius valXR eq_char ger0_norm // ge0_char. qed.
-  
-    lemma val_iter_frobenius_fixed n x :
-      iter_frobenius_fixed n (val x) =
-      iter_frobenius_fixed n x.
-    proof.
-      rewrite /iter_frobenius_fixed.
-      have ->: iter n IDTStr.frobenius (val x) = val (iter n IDSStr.frobenius x).
-      + case (0 <= n) => [|/ltrNge/ltzW len0]; [|by rewrite !iter0].
-        by elim: n => [|n le0n IHn]; [rewrite !iter0|rewrite !iterS // IHn val_frobenius].
-      by apply/eq_iff; split=> [|->] //; apply/val_inj.
-    qed.
-  
-    lemma P_frobenius x : P x => P (frobenius x).
-    proof. by move=> Px; rewrite /frobenius PXR // ge0_char. qed.
-  
+    lemma val_frobenius :
+      forall x ,
+        val (IDSStr.frobenius x) = IDTStr.frobenius (val x).
+    proof. by apply/cr_mono_frobenius/val_cr_mono. qed.
+
+    lemma val_iter_frobenius_fixed :
+      forall n x ,
+        IDTStr.iter_frobenius_fixed n (val x) =
+        IDSStr.iter_frobenius_fixed n x.
+    proof. by apply/cr_mono_iter_frobenius_fixed/val_cr_mono. qed.
+
+    lemma P_frobenius :
+      forall x ,
+        P x =>
+        P (frobenius x).
+    proof. by apply/IDTStr.subcr_frobenius/subcrP. qed.
+
     lemma insubd_frobenius x : P x => frobenius (insubd x) = insubd (frobenius x).
     proof.
-      by move=> Px; apply/val_inj; rewrite -val_frobenius !val_insubd Px P_frobenius.
+      by move=> Px; apply/val_inj; rewrite val_frobenius !val_insubd Px P_frobenius.
     qed.
   
     lemma insubd_iter_frobenius_fixed n x :
@@ -395,17 +432,34 @@ abstract theory SubField.
     rename [theory] "RL"  as "SRL"
            [theory] "Str" as "SStr".
 
+  clone include FieldMorph with
+    type t1 <- st,
+    type t2 <- t,
+    theory RL1 <- SRL,
+    theory RL2 <- TRL,
+    theory ZModStr1 <- ZModSStr,
+    theory ZModStr2 <- ZModTStr,
+    theory CRStr1   <- CRSStr,
+    theory CRStr2   <- CRTStr,
+    theory IDStr1   <- IDSStr,
+    theory IDStr2   <- IDTStr,
+    theory FStr1    <- FSStr,
+    theory FStr2    <- FTStr.
+
   clone include SubIDomain with
-    type t          <- t,
-    type st         <- st,
-    theory TRL      <- TRL,
-    theory SRL      <- SRL,
-    theory ZModTStr <- ZModTStr,
-    theory ZModSStr <- ZModSStr,
-    theory CRTStr   <- CRTStr,
-    theory CRSStr   <- CRSStr,
-    theory IDTStr   <- IDTStr,
-    theory IDSStr   <- IDSStr
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    theory SRL       <- SRL,
+    theory ZModTStr  <- ZModTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory ZModMorph <- ZModMorph,
+    theory CRTStr    <- CRTStr,
+    theory CRSStr    <- CRSStr,
+    theory CRMorph   <- CRMorph,
+    theory IDTStr    <- IDTStr,
+    theory IDSStr    <- IDSStr,
+    theory IDMorph   <- IDMorph
     rename [theory] "TRL"  as "Gone"
            [theory] "SRL"  as "Gone"
            [theory] "ZModTStr" as "Gone"
@@ -414,50 +468,44 @@ abstract theory SubField.
            [theory] "CRSStr" as "Gone"
            (*TODO: Pierre-Yves: declare rewrite not cleared.*)
            [theory] "IDTStr" as "SubIDomainIDTStrGone"
-           [theory] "IDSStr" as "SubIDomainIDSStrGone".
+           [theory] "IDSStr" as "SubIDomainIDSStrGone"
+           [theory] "IDStr1" as "SubIDomainIDStr1Gone"
+           [theory] "IDStr2" as "SubIDomainIDStr2Gone"
+           [theory] "Morph" as "Gone".
 
   theory SF.
     import Sub TRL SRL ZModTStr ZModSStr CRTStr CRSStr IDTStr IDSStr FTStr FSStr SZMod SCR SID.
+    import ZModMorph CRMorph IDMorph FMorph.
+
+    lemma valU :
+      forall x ,
+        unit (val x) = unit x.
+    proof. by apply/cr_monoU/val_cr_mono. qed.
   
-    lemma valU x : TRL.unit (val x) = SRL.unit x.
-    proof.
-      case (x = SRL.zeror) => [->>|neqx0].
-      + by rewrite val0 SRL.unitr0 TRL.unitr0.
-      rewrite SRL.unitfP // eqT; apply/TRL.unitfP.
-      by move: neqx0; rewrite -val0; apply/implybNN/val_inj.
-    qed.
+    lemma valV :
+      morphism_1 val SRL.invr TRL.invr.
+    proof. by apply/cr_monoV/val_cr_mono. qed.
   
-    lemma valV x :
-      val (SRL.invr x) =
-      TRL.invr (val x).
+    lemma valX :
+      forall x n ,
+        val (SRL.exp x n) =
+        TRL.exp (val x) n.
+    proof. by apply/cr_monoX/val_cr_mono. qed.
+
+    lemma subfP : subf P.
     proof.
-      case (x = SRL.zeror) => [->>|neqx0].
-      + by rewrite SRL.invr0 val0 TRL.invr0.
-      by rewrite valVR SRL.unitfP.
-    qed.
-  
-    lemma valX x n :
-      val (SRL.exp x n) =
-      TRL.exp (val x) n.
-    proof.
-      case (x = SRL.zeror) => [->>|neqx0].
-      + by rewrite SRL.expr0z val0 TRL.expr0z fun_if val1 val0.
-      by rewrite valXR SRL.unitfP.
+      move: (subf_cr_mono_subf _ _ val_cr_mono subfT).
+      apply/eq_ind/fun_ext => y; apply/eq_iff; split=> [[x] [] <<- _|Py].
+      + by apply/valP.
+      by exists (insubd y); rewrite val_insubd Py.
     qed.
 
-    lemma subfP : FTStr.is_subf P.
-    proof.
-      split; [by apply/SCR.subcrP|].
-      move=> x Px; move: (val_insubd x).
-      by rewrite Px /= => <-; rewrite -valV valP.
-    qed.
-  
-    lemma PV x : P x => P (TRL.invr x).
-    proof. by move: x; apply/FTStr.subfV/subfP. qed.
-  
-    lemma PX x n : P x => P (TRL.exp x n).
-    proof. by move: x n; apply/FTStr.subfX/subfP. qed.
-  
+    lemma PV : forall x , P x => P (invr x).
+    proof. by apply/FTStr.subfV/subfP. qed.
+
+    lemma PX : forall x n , P x => P (TRL.exp x n).
+    proof. by apply/FTStr.subfX/subfP. qed.
+
     lemma insubdV x :
       P x =>
       insubd (TRL.invr x) =
@@ -494,7 +542,7 @@ abstract theory SubZModulePred.
     type T  <= t ,
     type sT <= st.
 
-  axiom subzmodP : ZModTStr.is_subzmod P.
+  axiom subzmodP : ZModTStr.subzmod P.
 
   clone include SubZModule with
     type t          <- t,
@@ -538,7 +586,7 @@ abstract theory SubZModulePred.
   qed.
 
   realize SZMod.val0.
-  proof. by rewrite /zeror val_insubd (ZModTStr.subzmod0 _ subzmodP). qed.
+  proof. by rewrite /zeror /morphism_0 val_insubd (ZModTStr.subzmod0 _ subzmodP). qed.
 
   realize SZMod.valD.
   proof.
@@ -560,7 +608,7 @@ abstract theory SubComRingPred.
     type T  <= t ,
     type sT <= st.
 
-  axiom subcrP : CRTStr.is_subcr P.
+  axiom subcrP : CRTStr.subcr P.
 
   clone include SubZModulePred with
     type t          <- t,
@@ -582,28 +630,30 @@ abstract theory SubComRingPred.
   import Sub TRL ZModTStr ZModSStr CRTStr SZMod.
 
   clone include SubComRing with
-    type t          <- t,
-    type st         <- st,
-    theory TRL      <- TRL,
-    op SRL.zeror    <= insubd TRL.zeror,
-    op SRL.( + )    <= (fun x y => insubd (TRL.( + ) (val x) (val y))),
-    op SRL.([-])    <= (fun x => insubd (TRL.([-]) (val x))),
-    op SRL.oner     <= insubd TRL.oner,
-    op SRL.( * )    <= (fun x y => insubd (TRL.( * ) (val x) (val y))),
-    pred SRL.unit   <= (fun x => exists y , TRL.( * ) (val y) (val x) = TRL.oner),
-    op SRL.invr     <= (fun x => if (exists y , TRL.( * ) (val y) (val x) = TRL.oner)
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    op SRL.zeror     <= insubd TRL.zeror,
+    op SRL.( + )     <= (fun x y => insubd (TRL.( + ) (val x) (val y))),
+    op SRL.([-])     <= (fun x => insubd (TRL.([-]) (val x))),
+    op SRL.oner      <= insubd TRL.oner,
+    op SRL.( * )     <= (fun x y => insubd (TRL.( * ) (val x) (val y))),
+    pred SRL.unit    <= (fun x => exists y , TRL.( * ) (val y) (val x) = TRL.oner),
+    op SRL.invr      <= (fun x => if (exists y , TRL.( * ) (val y) (val x) = TRL.oner)
                                  then insubd (TRL.invr (val x))
                                  else x),
-    theory ZModTStr <- ZModTStr,
-    theory CRTStr   <- CRTStr,
-    theory ZModSStr <- ZModSStr,
-    theory SZMod    <- SZMod,
-    theory Sub      <- Sub
-    rename [theory] "TRL"      as "Gone"
-           [theory] "TStr"     as "Gone"
-           [theory] "ZModSStr" as "Gone"
-           [theory] "SZMod"    as "Gone"
-           [theory] "Sub"      as "Gone"
+    theory ZModTStr  <- ZModTStr,
+    theory CRTStr    <- CRTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory SZMod     <- SZMod,
+    theory ZModMorph <- ZModMorph,
+    theory Sub       <- Sub
+    rename [theory] "TRL"       as "Gone"
+           [theory] "TStr"      as "Gone"
+           [theory] "ZModSStr"  as "Gone"
+           [theory] "SZMod"     as "Gone"
+           [theory] "ZModMorph" as "Gone"
+           [theory] "Sub"       as "Gone"
   proof *.
 
   realize SRL.addrA by exact SubZModulePredSRL.addrA.
@@ -699,40 +749,46 @@ type t, st.
            [theory] "TStr" as "Gone"
            [theory] "SRL"  as "SubComRingPredSRL".
 
+  print SubComRingPred.
+
   clear [SubComRingPredSRL.AddMonoid.* SubComRingPredSRL.MulMonoid.* SubComRingPredSRL.*].
 
   import Sub TRL ZModTStr ZModSStr CRTStr CRSStr IDTStr SZMod SCR.
 
   clone include SubIDomain with
-    type t          <- t,
-    type st         <- st,
-    theory TRL      <- TRL,
-    op SRL.zeror    <= insubd TRL.zeror,
-    op SRL.( + )    <= (fun x y => insubd (TRL.( + ) (val x) (val y))),
-    op SRL.([-])    <= (fun x => insubd (TRL.([-]) (val x))),
-    op SRL.oner     <= insubd TRL.oner,
-    op SRL.( * )    <= (fun x y => insubd (TRL.( * ) (val x) (val y))),
-    pred SRL.unit   <= (fun x => exists y , TRL.( * ) (val y) (val x) = TRL.oner),
-    op SRL.invr     <= (fun x => if (exists y , TRL.( * ) (val y) (val x) = TRL.oner)
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    op SRL.zeror     <= insubd TRL.zeror,
+    op SRL.( + )     <= (fun x y => insubd (TRL.( + ) (val x) (val y))),
+    op SRL.([-])     <= (fun x => insubd (TRL.([-]) (val x))),
+    op SRL.oner      <= insubd TRL.oner,
+    op SRL.( * )     <= (fun x y => insubd (TRL.( * ) (val x) (val y))),
+    pred SRL.unit    <= (fun x => exists y , TRL.( * ) (val y) (val x) = TRL.oner),
+    op SRL.invr      <= (fun x => if (exists y , TRL.( * ) (val y) (val x) = TRL.oner)
                                  then insubd (TRL.invr (val x))
                                  else x),
-    theory ZModTStr <- ZModTStr,
-    theory CRTStr   <- CRTStr,
-    theory IDTStr   <- IDTStr,
-    theory ZModSStr <- ZModSStr,
-    theory CRSStr   <- CRSStr,
-    theory SZMod    <- SZMod,
-    theory SCR      <- SCR,
-    theory Sub      <- Sub
-    rename [theory] "TRL"      as "Gone"
-           [theory] "ZModTStr" as "Gone"
-           [theory] "CRTStr"   as "Gone"
-           [theory] "IDTStr"   as "SubIDomainPredIDTStrGone"
-           [theory] "ZModSStr" as "Gone"
-           [theory] "CRSStr"   as "Gone"
-           [theory] "SZMod"    as "Gone"
-           [theory] "SCR"      as "Gone"
-           [theory] "Sub"      as "Gone"
+    theory ZModTStr  <- ZModTStr,
+    theory CRTStr    <- CRTStr,
+    theory IDTStr    <- IDTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory CRSStr    <- CRSStr,
+    theory SZMod     <- SZMod,
+    theory SCR       <- SCR,
+    theory ZModMorph <- ZModMorph,
+    theory CRMorph   <- CRMorph,
+    theory Sub       <- Sub
+    rename [theory] "TRL"       as "Gone"
+           [theory] "ZModTStr"  as "Gone"
+           [theory] "CRTStr"    as "Gone"
+           [theory] "IDTStr"    as "SubIDomainPredIDTStrGone"
+           [theory] "ZModSStr"  as "Gone"
+           [theory] "CRSStr"    as "Gone"
+           [theory] "SZMod"     as "Gone"
+           [theory] "SCR"       as "Gone"
+           [theory] "ZModMorph" as "Gone"
+           [theory] "CRMorph"   as "Gone"
+           [theory] "Sub"       as "Gone"
   proof SRL.*.
 
   realize SRL.addrA     by exact SubComRingPredSRL.addrA.
@@ -774,7 +830,7 @@ type t, st.
     type T  <= t ,
     type sT <= st.
 
-  axiom subfP : FTStr.is_subf P.
+  axiom subfP : FTStr.subf P.
 
   clone include SubIDomainPred with
     type t          <- t,
@@ -798,39 +854,48 @@ type t, st.
   import Sub TRL ZModTStr ZModSStr CRTStr CRSStr IDTStr SZMod SCR.
 
   clone include SubField with
-    type t          <- t,
-    type st         <- st,
-    theory TRL      <- TRL,
-    op SRL.zeror    <= insubd TRL.zeror,
-    op SRL.( + )    <= (fun x y => insubd (TRL.( + ) (val x) (val y))),
-    op SRL.([-])    <= (fun x => insubd (TRL.([-]) (val x))),
-    op SRL.oner     <= insubd TRL.oner,
-    op SRL.( * )    <= (fun x y => insubd (TRL.( * ) (val x) (val y))),
-    pred SRL.unit   <= (fun x => exists y , TRL.( * ) (val y) (val x) = TRL.oner),
-    op SRL.invr     <= (fun x => if (exists y , TRL.( * ) (val y) (val x) = TRL.oner)
-                                 then insubd (TRL.invr (val x))
-                                 else x),
-    theory ZModTStr <- ZModTStr,
-    theory CRTStr   <- CRTStr,
-    theory ZModSStr <- ZModSStr,
-    theory CRSStr   <- CRSStr,
-    theory IDSStr   <- IDSStr,
-    theory SZMod    <- SZMod,
-    theory SCR      <- SCR,
-    theory SID      <- SID,
-    theory Sub      <- Sub
-    rename [theory] "TRL"      as "Gone"
-           [theory] "ZModTStr" as "Gone"
-           [theory] "CRTStr"   as "Gone"
-           [theory] "IDTStr"   as "SubFieldPredIDTStrGone"
-           [theory] "FTStr"    as "SubFieldPredFTStrGone"
-           [theory] "ZModSStr" as "Gone"
-           [theory] "CRSStr"   as "Gone"
-           [theory] "IDSStr"   as "SubFieldPredIDSStrGone"
-           [theory] "SZMod"    as "Gone"
-           [theory] "SCR"      as "Gone"
-           [theory] "SID"      as "Gone"
-           [theory] "Sub"      as "Gone"
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    op SRL.zeror     <= insubd TRL.zeror,
+    op SRL.( + )     <= (fun x y => insubd (TRL.( + ) (val x) (val y))),
+    op SRL.([-])     <= (fun x => insubd (TRL.([-]) (val x))),
+    op SRL.oner      <= insubd TRL.oner,
+    op SRL.( * )     <= (fun x y => insubd (TRL.( * ) (val x) (val y))),
+    pred SRL.unit    <= (fun x => exists y , TRL.( * ) (val y) (val x) = TRL.oner),
+    op SRL.invr      <= (fun x => if (exists y , TRL.( * ) (val y) (val x) = TRL.oner)
+                                  then insubd (TRL.invr (val x))
+                                  else x),
+    theory ZModTStr  <- ZModTStr,
+    theory CRTStr    <- CRTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory CRSStr    <- CRSStr,
+    theory IDSStr    <- IDSStr,
+    theory SZMod     <- SZMod,
+    theory SCR       <- SCR,
+    theory SID       <- SID,
+    theory ZModMorph <- ZModMorph,
+    theory CRMorph   <- CRMorph,
+    theory IDMorph   <- IDMorph,
+    theory Sub       <- Sub
+    rename [theory] "TRL"       as "Gone"
+           [theory] "ZModTStr"  as "Gone"
+           [theory] "CRTStr"    as "Gone"
+           [theory] "IDTStr"    as "SubFieldPredIDTStrGone"
+           [theory] "FTStr"     as "SubFieldPredFTStrGone"
+           [theory] "ZModSStr"  as "Gone"
+           [theory] "CRSStr"    as "Gone"
+           [theory] "IDSStr"    as "SubFieldPredIDSStrGone"
+           [theory] "IDStr1"    as "SubFieldPredIDStr1Gone"
+           [theory] "IDStr2"    as "SubFieldPredIDStr2Gone"
+           [theory] "FStr2"     as "SubFieldPredFStr2Gone"
+           [theory] "SZMod"     as "Gone"
+           [theory] "SCR"       as "Gone"
+           [theory] "SID"       as "Gone"
+           [theory] "ZModMorph" as "Gone"
+           [theory] "CRMorph"   as "Gone"
+           [theory] "IDMorph"   as "Gone"
+           [theory] "Sub"       as "Gone"
   proof SRL.*.
 
   realize SRL.addrA     by exact SubIDomainPredSRL.addrA.
@@ -865,15 +930,10 @@ type t, st.
   qed.
 end SubFieldPred.
 
-print SubFieldPred.
-
 
 (* ==================================================================== *)
 theory SubIDomainFrobenius.
   type t, st.
-
-  op n : int.
-  axiom le0n : 0 <= n.
 
   clone include IDomainStruct with
     type t <- t
@@ -882,6 +942,7 @@ theory SubIDomainFrobenius.
 
   import CRTStr IDTStr.
 
+  op n : int.
   axiom prime_char : prime char.
 
   clone include SubIDomainPred with
@@ -897,7 +958,40 @@ theory SubIDomainFrobenius.
   proof subcrP.
 
   realize subcrP.
-  proof.
-    admit.
-  qed.
+  proof. by apply/subcr_iter_frobenius_fixed/prime_char. qed.
 end SubIDomainFrobenius.
+
+(* -------------------------------------------------------------------- *)
+theory SubFieldFrobenius.
+  type t, st.
+
+  clone include FieldStruct with
+    type t <- t
+    rename [theory] "RL"  as "TRL"
+           [theory] "Str" as "TStr".
+
+  import CRTStr IDTStr.
+
+  op n : int.
+  axiom prime_char : prime char.
+
+  print FieldMorph.
+
+  clone include SubFieldPred with
+    type t          <- t,
+    type st         <- st,
+    theory TRL      <- TRL,
+    theory ZModTStr <- ZModTStr,
+    theory CRTStr   <- CRTStr,
+    theory IDTStr   <- IDTStr,
+    theory FTStr    <- FTStr,
+    pred Sub.P      <- iter_frobenius_fixed n
+    rename [theory] "TRL"    as "Gone"
+           [theory] "TStr"   as "Gone"
+           [theory] "IDGone" as "SubFieldFrobeniusIDGone"
+  proof subcrP.
+
+  realize subcrP.
+  proof. by apply/subcr_iter_frobenius_fixed/prime_char. qed.
+end SubFieldFrobenius.
+

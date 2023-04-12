@@ -234,7 +234,9 @@ abstract theory ZModuleStruct.
     qed.
 
     lemma subzmod_pred10 : subzmod (pred1 zeror).
-    proof. by rewrite /pred1; do!split => // [? ? ->> ->>| ? ->>]; [rewrite addr0|rewrite oppr0]. qed.
+    proof.
+      by rewrite /pred1; do!split => // [? ? ->> ->>| ? ->>]; [rewrite addr0|rewrite oppr0].
+    qed.
 
     lemma subzmod_orbit x : subzmod (orbit x).
     proof. do!split; [by apply/orbit0|apply/orbitD|apply/orbitN]. qed.
@@ -259,6 +261,24 @@ abstract theory ZModuleStruct.
         by rewrite opprK.
       elim: n => [|n le0n IHn]; [by rewrite RL.mulr0z subzmod0|].
       by rewrite RL.mulrSz => Px; move/(_ Px): IHn => P_; apply/subzmodD.
+    qed.
+  
+    lemma subzmod_mem_orbit P : subzmod P => forall x y , orbit x y => P x => P y.
+    proof. by move=> szmP x y [n] ->>; apply/subzmodMz. qed.
+  
+    lemma subzmod_mem_orbit_list P : subzmod P => forall x y , y \in orbit_list x => P x => P y.
+    proof. by move=> szmP x y /mapP [n] [] _ /= => ->; apply/subzmodMz. qed.
+  
+    lemma subzmod_eqv_orbit P :
+      subzmod P =>
+      forall x y z ,
+        eqv_orbit x y z =>
+        P x =>
+        P y <=> P z.
+    proof.
+      move=> szmP x y z [n] /(congr1 P) + Px; rewrite subzmodMz // eqT => P_; split=> [Py|Pz].
+      + by move: (subzmodB _ _ _ _ Py P_); rewrite // opprD addrA opprK subrr add0r.
+      by move: (subzmodD _ _ _ _ P_ Pz); rewrite // -addrA addNr addr0.
     qed.
 
     pred zmod_endo f =
@@ -367,13 +387,28 @@ abstract theory ZModuleStruct.
         eqv_orbit (f x) (f y) (f z).
     proof. by move=> ef x y z; rewrite /eqv_orbit -zmod_endoB //; apply/zmod_endo_orbit. qed.
 
-    lemma zmod_endo_ker_subzmod f :
+    lemma subzmod_subzmod_zmod_endo f P :
       zmod_endo f =>
-      subzmod (fun x => f x = zeror).
+      subzmod P =>
+      subzmod (P \o f).
     proof.
-      move=> ef; split; [by rewrite zmod_endo0|split].
-      + by move=> x y; rewrite zmod_endoD // => -> ->; rewrite addr0.
-      by move=> x; rewrite zmod_endoN // => ->; rewrite oppr0.
+      move=> ef sP; rewrite /(\o); split; [|split].
+      + by rewrite zmod_endo0 // subzmod0.
+      + by move=> x y; rewrite zmod_endoD //; apply/subzmodD.
+      by move=> x; rewrite zmod_endoN //; apply/subzmodN.
+    qed.
+
+    lemma subzmod_zmod_endo_subzmod f P :
+      zmod_endo f =>
+      subzmod P =>
+      subzmod (fun y => exists x , f x = y /\ P x).
+    proof.
+      move=> ef sP; split; [|split].
+      + by exists zeror; rewrite zmod_endo0 // subzmod0.
+      + move=> ? ? [x] [] <<- Px [y] [] <<- Py; exists (x + y).
+        by rewrite zmod_endoD // subzmodD.
+      move=> ? [x] [] <<- Px; exists (-x).
+      by rewrite zmod_endoN // subzmodN.
     qed.
 
     lemma zmod_endo_fixed_subzmod f :
@@ -462,7 +497,8 @@ abstract theory ZModuleStruct.
       ( (forall x , f x = zeror => x = zeror) /\
         zmod_endo f ).
     proof.
-      split=> [ief|[eq0 ef]]; [by split=> [x|]; [rewrite zmod_mono_endo_eq0|apply/zmod_mono_endo_endo]|].
+      split=> [ief|[eq0 ef]].
+      + by split=> [x|]; [rewrite zmod_mono_endo_eq0|apply/zmod_mono_endo_endo].
       by split=> // x y; rewrite -subr_eq0 -zmod_endoB // => /eq0 /subr_eq0.
     qed.
 
@@ -506,10 +542,17 @@ abstract theory ZModuleStruct.
         eqv_orbit x y z.
     proof. by move=> ef x y z; rewrite /eqv_orbit -zmod_mono_endoB // zmod_mono_endo_orbit. qed.
 
-    lemma zmod_mono_endo_ker_subzmod f :
+    lemma subzmod_subzmod_zmod_mono_endo f P :
       zmod_mono_endo f =>
-      subzmod (fun x => f x = zeror).
-    proof. by move/zmod_mono_endo_endo/zmod_endo_ker_subzmod. qed.
+      subzmod P =>
+      subzmod (P \o f).
+    proof. by move/zmod_mono_endo_endo/subzmod_subzmod_zmod_endo/(_ P). qed.
+
+    lemma subzmod_zmod_mono_endo_subzmod f P :
+      zmod_mono_endo f =>
+      subzmod P =>
+      subzmod (fun y => exists x , f x = y /\ P x).
+    proof. by move/zmod_mono_endo_endo/subzmod_zmod_endo_subzmod/(_ P). qed.
 
     lemma zmod_mono_endo_fixed_subzmod f :
       zmod_mono_endo f =>
@@ -557,7 +600,8 @@ abstract theory ZModuleStruct.
       zmod_auto g =>
       zmod_auto (f \o g).
     proof.
-      by case/zmod_autoP=> bijf ef /zmod_autoP [] bijg eg; apply/zmod_autoP; split; [apply/bij_comp|apply/zmod_endo_comp].
+      case/zmod_autoP=> bijf ef /zmod_autoP [] bijg eg; apply/zmod_autoP.
+      by split; [apply/bij_comp|apply/zmod_endo_comp].
     qed.
 
     lemma zmod_auto_iter f :
@@ -642,10 +686,17 @@ abstract theory ZModuleStruct.
         eqv_orbit x y z.
     proof. by move/zmod_auto_mono_endo/zmod_mono_endo_eqv_orbit. qed.
 
-    lemma zmod_auto_ker_subzmod f :
+    lemma subzmod_subzmod_zmod_auto f P :
       zmod_auto f =>
-      subzmod (fun x => f x = zeror).
-    proof. by move/zmod_auto_mono_endo/zmod_mono_endo_ker_subzmod. qed.
+      subzmod P =>
+      subzmod (P \o f).
+    proof. by move/zmod_auto_mono_endo/subzmod_subzmod_zmod_mono_endo/(_ P). qed.
+
+    lemma subzmod_zmod_auto_subzmod f P :
+      zmod_auto f =>
+      subzmod P =>
+      subzmod (fun y => exists x , f x = y /\ P x).
+    proof. by move/zmod_auto_mono_endo/subzmod_zmod_mono_endo_subzmod/(_ P). qed.
 
     lemma zmod_auto_fixed_subzmod f :
       zmod_auto f =>
@@ -745,6 +796,20 @@ abstract theory ComRingStruct.
 
     lemma subcrMz P : subcr P => forall x n , P x => P (intmul x n).
     proof. by move/subcr_zmod; apply/subzmodMz. qed.
+
+    lemma subcr_mem_orbit P : subcr P => forall x y , orbit x y => P x => P y.
+    proof. by move/subcr_zmod; apply/subzmod_mem_orbit. qed.
+  
+    lemma subcr_mem_orbit_list P : subcr P => forall x y , y \in orbit_list x => P x => P y.
+    proof. by move/subcr_zmod; apply/subzmod_mem_orbit_list. qed.
+  
+    lemma subcr_eqv_orbit P :
+      subcr P =>
+      forall x y z ,
+        eqv_orbit x y z =>
+        P x =>
+        P y <=> P z.
+    proof. by move/subcr_zmod; apply/subzmod_eqv_orbit. qed.
 
     lemma subcr1 P : subcr P => P oner.
     proof. by case. qed.
@@ -874,8 +939,10 @@ abstract theory ComRingStruct.
       + case (0 <= n) => [/wlogn -> //|/ltrNge/ltzW].
         move=> len0; move/ler_opp2: (len0) => /= /wlogn {wlogn} /(_ (invr x)).
         rewrite (ler0_norm n) // ger0_norm; [by apply/ler_opp2|].
-        by rewrite -!exprV invrK unitrV (cr_endoVR _ ef) => ->; case: (unit x) => //; rewrite invrK.
-      move=> le0n; rewrite ger0_norm //; elim: n le0n => [|n le0n IHn]; [by rewrite !expr0 cr_endo1|].
+        rewrite -!exprV invrK unitrV (cr_endoVR _ ef) => ->.
+        by case: (unit x) => //; rewrite invrK.
+      move=> le0n; rewrite ger0_norm //; elim: n le0n => [|n le0n IHn].
+      + by rewrite !expr0 cr_endo1.
       by rewrite !exprS // cr_endoM // IHn; case (unit x).
     qed.
 
@@ -904,10 +971,28 @@ abstract theory ComRingStruct.
         eqv_orbit (f x) (f y) (f z).
     proof. by move/cr_endo_zmod/zmod_endo_eqv_orbit. qed.
 
-    lemma cr_endo_ker_subzmod f :
+    lemma subcr_subcr_cr_endo f P :
       cr_endo f =>
-      subzmod (fun x => f x = zeror).
-    proof. by move/cr_endo_zmod/zmod_endo_ker_subzmod. qed.
+      subcr P =>
+      subcr (P \o f).
+    proof.
+      move=> ef sP; rewrite /(\o); split; [|split].
+      + by apply/subzmod_subzmod_zmod_endo; [apply/cr_endo_zmod|apply/subcr_zmod].
+      + by rewrite cr_endo1 // subcr1.
+      by move=> x y; rewrite cr_endoM //; apply/subcrM.
+    qed.
+
+    lemma subcr_cr_endo_subcr f P :
+      cr_endo f =>
+      subcr P =>
+      subcr (fun y => exists x , f x = y /\ P x).
+    proof.
+      move=> ef sP; rewrite /(\o); split; [|split].
+      + by apply/subzmod_zmod_endo_subzmod; [apply/cr_endo_zmod|apply/subcr_zmod].
+      + by exists oner; rewrite cr_endo1 // subcr1.
+      move=> ? ? [x] [] <<- Px [y] [] <<- Py; exists (x * y).
+      by rewrite cr_endoM // subcrM.
+    qed.
 
     lemma cr_endo_fixed_subcr f :
       cr_endo f =>
@@ -1067,10 +1152,17 @@ abstract theory ComRingStruct.
         eqv_orbit x y z.
     proof. by move/cr_mono_endo_zmod/zmod_mono_endo_eqv_orbit. qed.
 
-    lemma cr_mono_endo_ker_subzmod f :
+    lemma subcr_subcr_cr_mono_endo f P :
       cr_mono_endo f =>
-      subzmod (fun x => f x = zeror).
-    proof. by move/cr_mono_endo_zmod/zmod_mono_endo_ker_subzmod. qed.
+      subcr P =>
+      subcr (P \o f).
+    proof. by move/cr_mono_endo_endo/subcr_subcr_cr_endo/(_ P). qed.
+
+    lemma subcr_cr_mono_endo_subcr f P :
+      cr_mono_endo f =>
+      subcr P =>
+      subcr (fun y => exists x , f x = y /\ P x).
+    proof. by move/cr_mono_endo_endo/subcr_cr_endo_subcr/(_ P). qed.
 
     lemma cr_mono_endo_fixed_subcr f :
       cr_mono_endo f =>
@@ -1134,7 +1226,8 @@ abstract theory ComRingStruct.
       cr_auto g =>
       cr_auto (f \o g).
     proof.
-      by case/cr_autoP=> bijf ef /cr_autoP [] bijg eg; apply/cr_autoP; split; [apply/bij_comp|apply/cr_endo_comp].
+      case/cr_autoP=> bijf ef /cr_autoP [] bijg eg; apply/cr_autoP.
+      by split; [apply/bij_comp|apply/cr_endo_comp].
     qed.
 
     lemma cr_auto_iter f :
@@ -1266,10 +1359,17 @@ abstract theory ComRingStruct.
         eqv_orbit x y z.
     proof. by move/cr_auto_zmod/zmod_auto_eqv_orbit. qed.
 
-    lemma cr_auto_ker_subzmod f :
+    lemma subcr_subcr_cr_auto f P :
       cr_auto f =>
-      subzmod (fun x => f x = zeror).
-    proof. by move/cr_auto_zmod/zmod_auto_ker_subzmod. qed.
+      subcr P =>
+      subcr (P \o f).
+    proof. by move/cr_auto_mono_endo/subcr_subcr_cr_mono_endo/(_ P). qed.
+
+    lemma subcr_cr_auto_subcr f P :
+      cr_auto f =>
+      subcr P =>
+      subcr (fun y => exists x , f x = y /\ P x).
+    proof. by move/cr_auto_mono_endo/subcr_cr_mono_endo_subcr/(_ P). qed.
 
     lemma cr_auto_fixed_subcr f :
       cr_auto f =>
@@ -1342,7 +1442,8 @@ abstract theory IDomainStruct.
         by rewrite exprSr // => /mulf_eq0 [|] //; apply/IHn.
       + by rewrite /frobenius /morphism_0 expr0z; move/gt0_prime/gtr_eqF: prime_char => ->.
       + move=> x y; rewrite /frobenius Bin.binomial ?ge0_char //.
-        rewrite BAdd.big_int_recr ?ge0_char //= expr0 mulr1 binn ?ge0_char // mulr1z addrC; congr.
+        rewrite BAdd.big_int_recr ?ge0_char //= expr0 mulr1.
+        rewrite binn ?ge0_char // mulr1z addrC; congr.
         rewrite BAdd.big_ltn ?gt0_prime ?prime_char //= expr0 mul1r bin0 ?ge0_char //.
         rewrite mulr1z addrC eq_sym -subr_eq eq_sym subrr.
         rewrite (BAdd.eq_big_seq _ (fun _ => zeror)); last by apply/BAdd.big1_eq.
@@ -1373,7 +1474,7 @@ abstract theory IDomainStruct.
       prime char =>
       zmod_endo frobenius.
     proof. by move/frobenius_cr_mono_endo/cr_mono_endo_zmod_endo. qed.
-  
+
     lemma frobenius0 :
       prime char =>
       morphism_0 frobenius zeror zeror.
@@ -1412,7 +1513,8 @@ abstract theory IDomainStruct.
       prime char =>
       forall x , unit (frobenius x) = unit x.
     proof.
-      move=> prime_char x; apply/eq_iff; split; [|by apply/cr_mono_endoUR/frobenius_cr_mono_endo].
+      move=> prime_char x; apply/eq_iff; split; last first.
+      + by apply/cr_mono_endoUR/frobenius_cr_mono_endo.
       by rewrite /frobenius; apply/unitrX_neq0/gtr_eqF/gt0_prime.
     qed.
   
@@ -1643,6 +1745,15 @@ abstract theory IDomainStruct.
       by rewrite !iter0.
     qed.
 
+    lemma subcr_frobenius P :
+      subcr P =>
+      forall x ,
+        P x =>
+        P (frobenius x).
+    proof.
+      by rewrite /frobenius => sP x Px; apply/subcrXR => //; apply/ge0_char.
+    qed.
+
     lemma cr_endo_frobenius f :
       cr_endo f =>
       forall x ,
@@ -1754,6 +1865,20 @@ abstract theory FieldStruct.
     lemma subfMz P : subf P => forall x n , P x => P (intmul x n).
     proof. by move/subf_cr; apply/subcrMz. qed.
 
+    lemma subf_mem_orbit P : subf P => forall x y , orbit x y => P x => P y.
+    proof. by move/subf_cr; apply/subcr_mem_orbit. qed.
+  
+    lemma subf_mem_orbit_list P : subf P => forall x y , y \in orbit_list x => P x => P y.
+    proof. by move/subf_cr; apply/subcr_mem_orbit_list. qed.
+  
+    lemma subf_eqv_orbit P :
+      subf P =>
+      forall x y z ,
+        eqv_orbit x y z =>
+        P x =>
+        P y <=> P z.
+    proof. by move/subf_cr; apply/subcr_eqv_orbit. qed.
+
     lemma subf1 P : subf P => P oner.
     proof. by move/subf_cr; apply/subcr1. qed.
   
@@ -1773,6 +1898,13 @@ abstract theory FieldStruct.
       move/(subcrXR _ (subf_cr _ subfP) _ _ (subfV _ subfP _ Px)).
       by rewrite exprV.
     qed.
+
+    lemma subf_frobenius P :
+      subf P =>
+      forall x ,
+        P x =>
+        P (frobenius x).
+    proof. by move/subf_cr; apply/subcr_frobenius. qed.
 
     lemma cr_endoU f :
       cr_endo f =>
@@ -1864,6 +1996,51 @@ abstract theory FieldStruct.
       rewrite /iter_frobenius_fixed => prime_char.
       by apply/cr_endo_fixed_subf/cr_endo_iter/frobenius_cr_endo.
     qed.
+
+    lemma subf_subf_cr_endo f P :
+      cr_endo f =>
+      subf P =>
+      subf (P \o f).
+    proof.
+      move=> ef sP; rewrite /(\o); split.
+      + by apply/subcr_subcr_cr_endo => //; apply/subf_cr.
+      by move=> x; rewrite cr_endoV //; apply/subfV.
+    qed.
+
+    lemma subf_cr_endo_subf f P :
+      cr_endo f =>
+      subf P =>
+      subf (fun y => exists x , f x = y /\ P x).
+    proof.
+      move=> ef sP; split.
+      + by apply/subcr_cr_endo_subcr => //; apply/subf_cr.
+      move=> ? [x] [] <<- Px; exists (invr x).
+      by rewrite cr_endoV // subfV.
+    qed.
+
+    lemma subf_subf_cr_mono_endo f P :
+      cr_mono_endo f =>
+      subf P =>
+      subf (P \o f).
+    proof. by move/cr_mono_endo_endo/subf_subf_cr_endo/(_ P). qed.
+
+    lemma subf_cr_mono_endo_subf f P :
+      cr_mono_endo f =>
+      subf P =>
+      subf (fun y => exists x , f x = y /\ P x).
+    proof. by move/cr_mono_endo_endo/subf_cr_endo_subf/(_ P). qed.
+
+    lemma subf_subf_cr_auto f P :
+      cr_auto f =>
+      subf P =>
+      subf (P \o f).
+    proof. by move/cr_auto_mono_endo/subf_subf_cr_mono_endo/(_ P). qed.
+
+    lemma subf_cr_auto_subf f P :
+      cr_auto f =>
+      subf P =>
+      subf (fun y => exists x , f x = y /\ P x).
+    proof. by move/cr_auto_mono_endo/subf_cr_mono_endo_subf/(_ P). qed.
   end FStr.
 end FieldStruct.
 

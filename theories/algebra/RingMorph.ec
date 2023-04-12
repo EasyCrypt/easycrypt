@@ -116,13 +116,28 @@ theory ZModuleMorph.
         eqv_orbit (f x) (f y) (f z).
     proof. by move=> ef x y z; rewrite /eqv_orbit -zmod_homoB //; apply/zmod_homo_orbit. qed.
 
-    lemma zmod_homo_ker_subzmod f :
+    lemma subzmod_subzmod_zmod_homo f P :
       zmod_homo f =>
-      subzmod (fun x => f x = RL2.zeror).
+      ZModStr2.subzmod P =>
+      subzmod (P \o f).
     proof.
-      move=> ef; split; [by rewrite zmod_homo0|split].
-      + by move=> x y; rewrite zmod_homoD // => -> ->; rewrite addr0.
-      by move=> x; rewrite zmod_homoN // => ->; rewrite oppr0.
+      move=> ef sP; rewrite /(\o); split; [|split].
+      + by rewrite zmod_homo0 // subzmod0.
+      + by move=> x y; rewrite zmod_homoD //; apply/subzmodD.
+      by move=> x; rewrite zmod_homoN //; apply/subzmodN.
+    qed.
+
+    lemma subzmod_zmod_homo_subzmod f P :
+      zmod_homo f =>
+      ZModStr1.subzmod P =>
+      subzmod (fun y => exists x , f x = y /\ P x).
+    proof.
+      move=> ef sP; split; [|split].
+      + by exists RL1.zeror; rewrite zmod_homo0 // subzmod0.
+      + move=> ? ? [x] [] <<- Px [y] [] <<- Py; exists (x + y).
+        by rewrite zmod_homoD // subzmodD.
+      move=> ? [x] [] <<- Px; exists (-x).
+      by rewrite zmod_homoN // subzmodN.
     qed.
 
     pred zmod_mono f =
@@ -235,10 +250,17 @@ theory ZModuleMorph.
         eqv_orbit x y z.
     proof. by move=> ef x y z; rewrite /eqv_orbit -zmod_monoB // zmod_mono_orbit. qed.
 
-    lemma zmod_mono_ker_subzmod f :
+    lemma subzmod_subzmod_zmod_mono f P :
       zmod_mono f =>
-      subzmod (fun x => f x = RL2.zeror).
-    proof. by move/zmod_mono_homo/zmod_homo_ker_subzmod. qed.
+      ZModStr2.subzmod P =>
+      subzmod (P \o f).
+    proof. by move/zmod_mono_homo/subzmod_subzmod_zmod_homo/(_ P). qed.
+
+    lemma subzmod_zmod_mono_subzmod f P :
+      zmod_mono f =>
+      ZModStr1.subzmod P =>
+      subzmod (fun y => exists x , f x = y /\ P x).
+    proof. by move/zmod_mono_homo/subzmod_zmod_homo_subzmod/(_ P). qed.
 
     pred zmod_iso f =
       surjective f /\
@@ -344,10 +366,17 @@ theory ZModuleMorph.
         eqv_orbit x y z.
     proof. by move/zmod_iso_mono/zmod_mono_eqv_orbit. qed.
 
-    lemma zmod_iso_ker_subzmod f :
+    lemma subzmod_subzmod_zmod_iso f P :
       zmod_iso f =>
-      subzmod (fun x => f x = RL2.zeror).
-    proof. by move/zmod_iso_mono/zmod_mono_ker_subzmod. qed.
+      ZModStr2.subzmod P =>
+      subzmod (P \o f).
+    proof. by move/zmod_iso_mono/subzmod_subzmod_zmod_mono/(_ P). qed.
+
+    lemma subzmod_zmod_iso_subzmod f P :
+      zmod_iso f =>
+      ZModStr1.subzmod P =>
+      subzmod (fun y => exists x , f x = y /\ P x).
+    proof. by move/zmod_iso_mono/subzmod_zmod_mono_subzmod/(_ P). qed.
   end ZModMorph.
 end ZModuleMorph.
 
@@ -515,10 +544,28 @@ theory ComRingMorph.
         ZModStr2.eqv_orbit (f x) (f y) (f z).
     proof. by move/cr_homo_zmod/zmod_homo_eqv_orbit. qed.
 
-    lemma cr_homo_ker_subzmod f :
+    lemma subcr_subcr_cr_homo f P :
       cr_homo f =>
-      subzmod (fun x => f x = RL2.zeror).
-    proof. by move/cr_homo_zmod/zmod_homo_ker_subzmod. qed.
+      CRStr2.subcr P =>
+      subcr (P \o f).
+    proof.
+      move=> ef sP; rewrite /(\o); split; [|split].
+      + by apply/subzmod_subzmod_zmod_homo; [apply/cr_homo_zmod|apply/subcr_zmod].
+      + by rewrite cr_homo1 // subcr1.
+      by move=> x y; rewrite cr_homoM //; apply/subcrM.
+    qed.
+
+    lemma subcr_cr_homo_subcr f P :
+      cr_homo f =>
+      CRStr1.subcr P =>
+      subcr (fun y => exists x , f x = y /\ P x).
+    proof.
+      move=> ef sP; rewrite /(\o); split; [|split].
+      + by apply/subzmod_zmod_homo_subzmod; [apply/cr_homo_zmod|apply/CRStr1.subcr_zmod].
+      + by exists RL1.oner; rewrite cr_homo1 // subcr1.
+      move=> ? ? [x] [] <<- Px [y] [] <<- Py; exists (x * y).
+      by rewrite cr_homoM // subcrM.
+    qed.
 
     lemma cr_homo_char f :
       cr_homo f =>
@@ -663,10 +710,17 @@ theory ComRingMorph.
         eqv_orbit x y z.
     proof. by move/cr_mono_zmod/zmod_mono_eqv_orbit. qed.
 
-    lemma cr_mono_ker_subzmod f :
+    lemma subcr_subcr_cr_mono f P :
       cr_mono f =>
-      subzmod (fun x => f x = RL2.zeror).
-    proof. by move/cr_mono_zmod/zmod_mono_ker_subzmod. qed.
+      CRStr2.subcr P =>
+      subcr (P \o f).
+    proof. by move/cr_mono_homo/subcr_subcr_cr_homo/(_ P). qed.
+
+    lemma subcr_cr_mono_subcr f P :
+      cr_mono f =>
+      CRStr1.subcr P =>
+      subcr (fun y => exists x , f x = y /\ P x).
+    proof. by move/cr_mono_homo/subcr_cr_homo_subcr/(_ P). qed.
 
     lemma cr_mono_char f :
       cr_mono f =>
@@ -838,10 +892,17 @@ theory ComRingMorph.
         eqv_orbit x y z.
     proof. by move/cr_iso_zmod/zmod_iso_eqv_orbit. qed.
 
-    lemma cr_iso_ker_subzmod f :
+    lemma subcr_subcr_cr_iso f P :
       cr_iso f =>
-      subzmod (fun x => f x = RL2.zeror).
-    proof. by move/cr_iso_zmod/zmod_iso_ker_subzmod. qed.
+      CRStr2.subcr P =>
+      subcr (P \o f).
+    proof. by move/cr_iso_mono/subcr_subcr_cr_mono/(_ P). qed.
+
+    lemma subcr_cr_iso_subcr f P :
+      cr_iso f =>
+      CRStr1.subcr P =>
+      subcr (fun y => exists x , f x = y /\ P x).
+    proof. by move/cr_iso_mono/subcr_cr_mono_subcr/(_ P). qed.
 
     lemma cr_iso_char f :
       cr_iso f =>
@@ -1056,5 +1117,51 @@ theory FieldMorph.
         f (RL1.exp x n) =
         RL2.exp (f x) n.
     proof. by move/cr_iso_mono/cr_monoX. qed.
+
+    lemma subf_subf_cr_homo f P :
+      cr_homo f =>
+      FStr2.subf P =>
+      subf (P \o f).
+    proof.
+      move=> ef sP; rewrite /(\o); split.
+      + by apply/subcr_subcr_cr_homo => //; apply/subf_cr.
+      by move=> x; rewrite cr_homoV //; apply/subfV.
+    qed.
+
+    lemma subf_cr_homo_subf f P :
+      cr_homo f =>
+      FStr1.subf P =>
+      subf (fun y => exists x , f x = y /\ P x).
+    proof.
+      move=> ef sP; split.
+      + by apply/subcr_cr_homo_subcr => //; apply/FStr1.subf_cr.
+      move=> ? [x] [] <<- Px; exists (invr x).
+      by rewrite cr_homoV // subfV.
+    qed.
+
+    lemma subf_subf_cr_mono f P :
+      cr_mono f =>
+      FStr2.subf P =>
+      subf (P \o f).
+    proof. by move/cr_mono_homo/subf_subf_cr_homo/(_ P). qed.
+
+    lemma subf_cr_mono_subf f P :
+      cr_mono f =>
+      FStr1.subf P =>
+      subf (fun y => exists x , f x = y /\ P x).
+    proof. by move/cr_mono_homo/subf_cr_homo_subf/(_ P). qed.
+
+    lemma subf_subf_cr_iso f P :
+      cr_iso f =>
+      FStr2.subf P =>
+      subf (P \o f).
+    proof. by move/cr_iso_mono/subf_subf_cr_mono/(_ P). qed.
+
+    lemma subf_cr_iso_subf f P :
+      cr_iso f =>
+      FStr1.subf P =>
+      subf (fun y => exists x , f x = y /\ P x).
+    proof. by move/cr_iso_mono/subf_cr_mono_subf/(_ P). qed.
   end FMorph.
 end FieldMorph.
+
