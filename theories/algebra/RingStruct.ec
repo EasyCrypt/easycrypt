@@ -1552,6 +1552,8 @@ abstract theory IDomainStruct.
   
     op iter_frobenius_fixed n x =
       iter n frobenius x = x.
+
+    op eq_pow_1 n x = RL.exp x n = oner.
   
     theory FrobeniusPoly.
   
@@ -1561,41 +1563,12 @@ abstract theory IDomainStruct.
         theory BigCf.BCM <- Big.BMul,
         theory IDCoeff   <- RL.
   
-      op eq_pow_1 n x = RL.exp x n = oner.
-  
       lemma eq_pow_1_poly n :
         0 <= n =>
         eq_pow_1 n = root (polyXn n - poly1).
       proof.
         move => le0n; apply/fun_ext => x; rewrite eqboolP /eq_pow_1.
         by rewrite pevalB pevalXn peval1 le0n /= subr_eq0.
-      qed.
-  
-      lemma is_finite_eq_pow_1 n :
-        0 < n =>
-        is_finite (eq_pow_1 n).
-      proof.
-        move => lt0n; move: (finite_root (polyXn n - poly1) _).
-        + by rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
-        by apply/finite_leq => x; rewrite eq_pow_1_poly // ltzW.
-      qed.
-  
-      lemma size_to_seq_eq_pow_1 n :
-        0 < n =>
-        size (to_seq (eq_pow_1 n)) <= n.
-      proof.
-        move => lt0n; move: (size_roots (polyXn n - poly1) _).
-        + by rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
-        move => le__; apply/(ler_trans (deg (polyXn n - poly1) - 1)).
-        + move: le__; apply/ler_trans.
-          apply/lerr_eq/perm_eq_size/uniq_perm_eq; [by apply/uniq_to_seq/is_finite_eq_pow_1| |].
-          - by apply/uniq_to_seq/is_finite_root; rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
-          move => x; rewrite !mem_to_seq /=; [by apply/is_finite_eq_pow_1| |].
-          - by apply/finite_root; rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
-          by rewrite eq_pow_1_poly //; apply/ltzW.
-        apply/ler_subl_addr; apply/(ler_trans _ _ _ (degB (polyXn n) poly1)).
-        rewrite degXn deg1; apply/ler_maxrP; rewrite -(ler_subl_addr 1 1 n) /= (ltzW 0) //=.
-        by apply/ler_maxrP => /=; apply/addr_ge0 => //; apply/ltzW.
       qed.
   
       lemma frobenius_polyXchar x :
@@ -1622,6 +1595,33 @@ abstract theory IDomainStruct.
     end FrobeniusPoly.
 
     import FrobeniusPoly Po.
+
+    lemma is_finite_eq_pow_1 n :
+      0 < n =>
+      is_finite (eq_pow_1 n).
+    proof.
+      move => lt0n; move: (finite_root (polyXn n - poly1) _).
+      + by rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
+      by apply/finite_leq => x; rewrite eq_pow_1_poly // ltzW.
+    qed.
+  
+    lemma size_to_seq_eq_pow_1 n :
+      0 < n =>
+      size (to_seq (eq_pow_1 n)) <= n.
+    proof.
+      move => lt0n; move: (size_roots (polyXn n - poly1) _).
+      + by rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
+      move => le__; apply/(ler_trans (deg (polyXn n - poly1) - 1)).
+      + move: le__; apply/ler_trans.
+        apply/lerr_eq/perm_eq_size/uniq_perm_eq; [by apply/uniq_to_seq/is_finite_eq_pow_1| |].
+        - by apply/uniq_to_seq/is_finite_root; rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
+        move => x; rewrite !mem_to_seq /=; [by apply/is_finite_eq_pow_1| |].
+        - by apply/finite_root; rewrite IDPoly.subr_eq0 eq_polyXn1 gtr_eqF.
+        by rewrite eq_pow_1_poly //; apply/ltzW.
+      apply/ler_subl_addr; apply/(ler_trans _ _ _ (degB (polyXn n) poly1)).
+      rewrite degXn deg1; apply/ler_maxrP; rewrite -(ler_subl_addr 1 1 n) /= (ltzW 0) //=.
+      by apply/ler_maxrP => /=; apply/addr_ge0 => //; apply/ltzW.
+    qed.
   
     lemma is_finite_iter_frobenius n :
       prime char =>

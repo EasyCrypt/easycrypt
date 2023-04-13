@@ -64,7 +64,7 @@ abstract theory ComRingModule.
     clone import BigComRing as BigRL with
       theory CR <- RL.
   
-    clear [BigMod.* BigRL.BAdd.* BigRL.BMul.* BigRL.*].
+    clear [BigRL.BAdd.* BigRL.BMul.* BigRL.*].
   
     lemma scaler_suml ['a] (P : 'a -> bool) (F : 'a -> RL.t) (ss : 'a list) v :
       BigRL.BAdd.big P F ss ** v = BigMod.big P (fun s => F s ** v) ss.
