@@ -6,6 +6,8 @@ require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
 
+print FinType.
+
 (* ==================================================================== *)
 abstract theory SubFinite.
   type t, st.
@@ -27,17 +29,38 @@ abstract theory SubFinite.
 
   clone import FinType as SFT with
     type t  <= st,
-    op enum <= map insubd (filter P enum)
+    op enum <= (choiceb (fun e => forall x , count (pred1 x) e = 1) witness)
   proof *.
 
   realize enum_spec.
   proof.
+    pose Q:= (fun e => forall x , count (pred1 x) e = 1).
+    move: (choicebP Q witness _); last first.
+    + (*TODO: Pierre-Yves: spooky, the following asserts false:*)
+      (*rewrite /Q; move=> + x. move/(_ x).*)
+      by move=> + x; move/(_ x).
+    rewrite /Q => {Q}; exists (map insubd (filter P TFT.enum)).
     move => x; rewrite /senum count_map count_filter /predI /preim.
     rewrite -(enum_spec (val x)); apply/eq_count.
     move => y; rewrite /pred1 /=; split => [[<<- in_sub_y]|->>].
     + by rewrite val_insubd in_sub_y.
     by rewrite valKd /= valP.
   qed.
+
+  theory SFin.
+    lemma eq_enum : perm_eq SFT.enum (map insubd (filter P TFT.enum)).
+    proof.
+      apply/uniq_perm_eq; [by apply/SFT.enum_uniq| |].
+      + apply/map_inj_in_uniq; [|by apply/filter_uniq/TFT.enum_uniq].
+        move=> x y; rewrite !mem_filter => -[] Px _ [] Py _.
+        by move/(congr1 val); rewrite !val_insubd Px Py.
+      move=> x; rewrite SFT.enumP /= mapP; exists (val x).
+      by rewrite valKd /= mem_filter valP TFT.enumP.
+    qed.
+
+    lemma eq_card : SFT.card = size (filter P TFT.enum).
+    proof. by move: (perm_eq_size _ _ eq_enum); rewrite size_map. qed.
+  end SFin.
 end SubFinite.
 
 
@@ -323,16 +346,30 @@ abstract theory FiniteField.
 
   clone include FiniteZModule with
     type t         <- uz,
-    theory RL      <- UZ,
-    theory ZModStr <- UStr
+    theory RL      <- UZL,
+    theory ZModStr <- UStr,
+    op FT.enum     <= map USub.insubd (filter (predC1 RL.zeror) FT.enum)
     rename [theory] "RL"      as "Gone"
                     "ZModStr" as "Gone"
                     "FT"      as "FUT"
-                    "FZMod"   as "FUZMod".
+                    "FZMod"   as "FUZMod"
+  proof *.
+
+  realize FUT.enum_spec.
+  proof.
+    move=> u; rewrite count_map count_filter.
+    rewrite (eq_count _ (pred1 (USub.val u))).
+    + move=> x; rewrite /predI /predC1 /pred1 /preim /=.
+      rewrite RL.unitfE; split=> [[] <<- ux|->>].
+      - by rewrite USub.val_insubd ux.
+      by rewrite USub.valKd USub.valP.
+    rewrite count_uniq_mem ?FT.enum_uniq //.
+    by apply/b2i_eq1/FT.enumP.
+  qed.
 
   theory FF.
     import FT RL ZModStr CRStr IDStr FStr FZMod FCR FID.
-    import UZ UStr USub FUT FUZMod.
+    import UZL UStr USub FUT FUZMod.
   
     lemma card_unit :
       FT.card = FUT.card + 1.
@@ -649,18 +686,20 @@ abstract theory SubFiniteField.
     theory FZMod   <- FZModT,
     theory FCR     <- FCRT,
     theory FID     <- FIDT
-    rename [theory] "FZMod" as "Gone"
-                    "FCR"   as "Gone"
-                    "FID"   as "Gone"
-                    "FF"    as "FFT"
-                    "IDStr" as "FiniteFieldTIDStrGone"
-                    "FStr"  as "FiniteFieldTFStrGone"
-                    "UZ"    as "UZT"
-                    "UStr"  as "UTStr"
-                    "UFZMod" as "UFZModT"
-                    "USub"  as "USubT"
-                    "FUT"   as "FUTT"
-           [type]   "uz"    as "uzt".
+    rename [theory] "FZMod"   as "Gone"
+                    "FCR"     as "Gone"
+                    "FID"     as "Gone"
+                    "FF"      as "FFT"
+                    "IDStr"   as "FiniteFieldTIDStrGone"
+                    "FStr"    as "FiniteFieldTFStrGone"
+                    "UZL"     as "UZLT"
+                    "UStr"    as "UTStr"
+                    "UFZMod"  as "UFZModT"
+                    "USub"    as "USubT"
+                    "FUT"     as "FUTT"
+                    "UZModCR" as "UTZModCR"
+                    "FUZMod"  as "FUTZMod"
+           [type]   "uz"      as "uzt".
 
   clone include FiniteField with
     type t         <- st,
@@ -673,22 +712,24 @@ abstract theory SubFiniteField.
     theory FZMod   <- FZModS,
     theory FCR     <- FCRS,
     theory FID     <- FIDS
-    rename [theory] "FZMod" as "Gone"
-                    "FCR"   as "Gone"
-                    "FID"   as "Gone"
-                    "FF"    as "FFS"
-                    "IDStr" as "FiniteFieldSIDStrGone"
-                    "FStr"  as "FiniteFieldSFStrGone"
-                    "UZ"    as "UZS"
-                    "UStr"  as "USStr"
-                    "USub"  as "USubS"
-                    "FUT"   as "FUTS"
-           [type]   "uz"    as "uzs".
+    rename [theory] "FZMod"   as "Gone"
+                    "FCR"     as "Gone"
+                    "FID"     as "Gone"
+                    "FF"      as "FFS"
+                    "IDStr"   as "FiniteFieldSIDStrGone"
+                    "FStr"    as "FiniteFieldSFStrGone"
+                    "UZL"     as "UZLS"
+                    "UStr"    as "USStr"
+                    "USub"    as "USubS"
+                    "FUT"     as "FUTS"
+                    "UZModCR" as "USZModCR"
+                    "FUZMod"  as "FUSZMod"
+           [type]   "uz"      as "uzs".
 
   theory SFF.
     import TRL SRL ZModTStr ZModSStr CRTStr CRSStr IDTStr IDSStr FTStr FSStr.
     import ZModMorph CRMorph IDMorph FMorph SZMod SCR SID SF Sub CRM.
-    import TFT SFT SFCR.
+    import TFT SFT SFCR SFin.
 
     lemma finite_basis_exists :
       exists vs , uniq vs /\ basis (vf_oflist vs).
@@ -734,7 +775,7 @@ abstract theory SubFiniteField.
     proof.
       rewrite /n ltzE /=; move: (ilog_mono SFT.card SFT.card TFT.card).
       rewrite ilog_b FCRS.card_gt1 SFT.card_gt0 /= => -> //.
-      by rewrite /SFT.card /TFT.card size_map size_filter count_size.
+      by rewrite eq_card size_filter count_size.
     qed.
   
     lemma eq_card_pow_n :
@@ -752,22 +793,15 @@ abstract theory SubFiniteField.
   end SFF.
 end SubFiniteField.
 
-
 (* ==================================================================== *)
 abstract theory ZModP_FiniteField.
   type t.
 
-  op p : int.
-
-  axiom prime_p : prime p.
-
   clone import ZModField as ZModP with
-    type zmod     <= t,
-    op p          <= p,
-    axiom prime_p <= prime_p.
+    type zmod <= t.
 
-  (*TODO: issue in ZModP: should be a clone with theory ZModP.ZModpField.*)
-  clone import Field as F with
+  (*TODO: Pierre-Yves: issue in ZModP: should be a clone with theory ZModP.ZModpField.*)
+  clone import Field as RL with
     type t          <= t,
     op zeror        <= ZModP.zero,
     op oner         <= ZModP.one,
@@ -788,177 +822,247 @@ abstract theory ZModP_FiniteField.
     lemma mulVr     <= ZModP.ZModpField.mulVr,
     lemma unitP     <= ZModP.ZModpField.unitP,
     lemma unitout   <= ZModP.ZModpField.unitout,
-    lemma mulf_eq0  <= ZModP.ZModpField.mulf_eq0.
+    lemma mulf_eq0  <= ZModP.ZModpField.mulf_eq0,
+    lemma unitfP    <= ZModP.ZModpField.unitfP.
 
-  clone import FiniteField as FF with
-    type t          <= t,
-    theory F        <= F,
-    op FinType.enum <= map inzmod (range 0 p)
-    proof *.
+  clone include FiniteField with
+    type t     <- t,
+    theory RL  <- RL,
+    op FT.enum <= (choiceb (fun e => forall x , count (pred1 x) e = 1) witness)
+    rename [theory] "RL" as "Gone"
+  proof FT.enum_spec.
 
-  realize FinType.enum_spec.
+  realize FT.enum_spec.
   proof.
+    pose Q:= (fun e => forall x , count (pred1 x) e = 1).
+    move: (choicebP Q witness _); last first.
+    + (*TODO: Pierre-Yves: spooky, the following asserts false:*)
+      (*rewrite /Q; move=> + x. move/(_ x).*)
+      by move=> + x; move/(_ x).
+    rewrite /Q => {Q}; exists (map inzmod (range 0 p)).
     move => x; rewrite count_uniq_mem ?b2i_eq1.
     + rewrite map_inj_in_uniq ?range_uniq // => m n range_m range_n /eq_inzmod.
       by rewrite !modz_small -?mem_range ?gtr0_norm ?gt0_prime ?prime_p.
     by apply/mapP; exists (asint x); rewrite asintK /=; apply/mem_range/rg_asint.
   qed.
 
-  lemma eq_card_p :
-    FinType.card = p.
-  proof. by rewrite /FinType.card size_map size_range ler_maxr //=; apply/ltzW/gt0_prime/prime_p. qed.
-end ZModP_FiniteField.
+  theory ZModEnum.
+    lemma eq_enum : perm_eq FT.enum (map inzmod (range 0 p)).
+    proof.
+      apply/uniq_perm_eq; [by apply/FT.enum_uniq| |].
+      + apply/map_inj_in_uniq; [|by apply/range_uniq].
+        move=> x y memx memy /(congr1 asint); rewrite !inzmodK.
+        by rewrite !pmod_small // -mem_range.
+      move=> x; rewrite FT.enumP /= mapP; exists (asint x).
+      by rewrite asintK mem_range rg_asint.
+    qed.
 
+    lemma eq_card_p :
+      FT.card = p.
+    proof.
+      rewrite /FT.card; move: (perm_eq_size _ _ eq_enum) => ->.
+      by rewrite size_map size_range ler_maxr //=; apply/ltzW/gt0_prime/prime_p.
+    qed.
+
+    lemma eq_char_p : CRStr.char = p.
+    proof.
+      rewrite /CRStr.char -eq_card_p -FZMod.isgeneratorP.
+      move=> x; exists (asint x); move: (perm_eq_mem _ _ eq_enum x).
+      rewrite FT.enumP mapP /= => -[y] [] memy ->>.
+      rewrite inzmodK -ofint_inzmod modz_small //.
+      by rewrite -mem_range gtr0_norm // ltzE ltzW gt1_prime prime_p.
+    qed.
+  end ZModEnum.
+end ZModP_FiniteField.
 
 (* ==================================================================== *)
 abstract theory SubFiniteField_ZMod.
-  type t, ut, st.
+  type t, st.
 
-  clone import Field as F with
-    type t <= t.
+  clone include FiniteField with
+    type t <- t
+    rename [theory] "RL"      as "TRL"
+                    "ZModStr" as "ZModTStr"
+                    "CRStr"   as "CRTStr"
+                    "IDStr"   as "IDTStr"
+                    "FStr"    as "FTStr"
+                    "FT"      as "TFT"
+                    "FZMod"   as "FZModT"
+                    "FCR"     as "FCRT"
+                    "FID"     as "FIDT"
+                    "FF"      as "FFT"
+                    "UZL"     as "UZLT"
+                    "UStr"    as "UTStr"
+                    "USub"    as "USubT"
+                    "FUT"     as "FUTT"
+                    "UZModCR" as "UTZModCR"
+                    "FUZMod"  as "FUTZMod"
+           [type]   "uz"      as "uzt".
 
-  clone import FiniteField as FF with
-    type t   <= t,
-    theory F <= F.
+  clone include ZModP_FiniteField with
+    type t <- st,
+    op ZModP.p <= CRTStr.char
+    rename [theory] "RL"      as "SRL"
+                    "ZModStr" as "ZModSStr"
+                    "CRStr"   as "CRSStr"
+                    "IDStr"   as "IDSStr"
+                    "FStr"    as "FSStr"
+                    "FT"      as "SFT"
+                    "FZMod"   as "FZModS"
+                    "FCR"     as "FCRS"
+                    "FID"     as "FIDS"
+                    "FF"      as "FFS"
+                    "UZL"     as "UZLS"
+                    "UStr"    as "USStr"
+                    "USub"    as "USubS"
+                    "FUT"     as "FUTS"
+                    "UZModCR" as "USZModCR"
+                    "FUZMod"  as "FUSZMod"
+           [type]   "uz"      as "uzs"
+  proof ZModP.prime_p.
 
-  clone import FieldStruct as FStr with
-    type t   <= t,
-    theory F <= F.
+  realize ZModP.prime_p.
+  proof. by apply/FIDT.prime_char. qed.
 
-  clone import FiniteFieldStruct as FFStr with
-    type t      <= t,
-    type ut     <= ut,
-    theory F    <= F,
-    theory FStr <= FStr,
-    theory FF   <= FF.
-
-  clone import ZModField as ZModP with
-    type zmod     <= st,
-    op p          <= SubFiniteField_ZMod.FStr.char,
-    axiom prime_p <= SubFiniteField_ZMod.FFStr.prime_char.
-
-  clone import ZModP_FiniteField as ZModPFF with
-    type t        <= st,
-    op p          <= SubFiniteField_ZMod.FStr.char,
-    axiom prime_p <= SubFiniteField_ZMod.FFStr.prime_char,
-    theory ZModP  <= SubFiniteField_ZMod.ZModP.
-
-  op is_ofint (x : t) n = (x = ofint n).
-
-  op in_zmodP x = exists n , is_ofint x n.
-
-  op insub (x : t) = 
-    if in_zmodP x
-    then Some (ZModpRing.ofint (argmin idfun (is_ofint x))) 
-    else None.
-
-  op val (x : st) = ofint (Sub.val x).
-
-  op wsT = ofint (asint witness).
-
-  clone import SubField as SF with
-    type t       <= t,
-    type st      <= st,
-    theory F     <= SubFiniteField_ZMod.F,
-    op p         <= in_zmodP,
-    op Sub.insub <= insub,
-    op Sub.val   <= val,
-    op Sub.wsT   <= wsT
-    proof *.
-
-  realize fieldp.
-  proof.
-    rewrite /in_zmodP /is_ofint; do 3!split; [split| | |]; rewrite /=.
-    + by exists 0; rewrite ofint0.
-    + by move => x [nx] ->>; exists (-nx); rewrite ofintN.
-    + by move => x y [nx] ->> [ny] ->>; exists (nx + ny); rewrite addrz.
-    + by exists 1; rewrite ofint1.
-    + by move => x y [nx] ->> [ny] ->>; exists (nx * ny); rewrite mulrz.
-    move => x [nx] ->>; move: (mulmV _ nx prime_char).
-    case: (nx %% char = 0) => /= [eq_0|_ eq_1].
-    + by exists 0; move: (dvd_char nx); rewrite dvdzE eq_0 /= => ->; rewrite invr0 ofint0.
-    exists (invm nx char); move: (dvdzE char (nx * invm nx char)); rewrite eq_1 /= => Ndvd.
-    apply/(mulrI (ofint nx)).
-    + by rewrite -unitfE -dvd_char; apply/negP => dvd_; apply/Ndvd/dvdz_mulr.
-    rewrite mulrz divrr //.
-    + by rewrite -unitfE -dvd_char; apply/negP => dvd_; apply/Ndvd/dvdz_mulr.
-    rewrite eq_sym -ofint1 -dvd2_char dvdzE -modzDm eq_1 -{1}(modz_small 1 char).
-    + by rewrite /= ltr_normr; left; apply/gt1_char.
-    by rewrite modzDm.
-  qed.
+  clone include SubFiniteField with
+    type t          <- t,
+    type st         <- st,
+    type uzt        <- uzt,
+    type uzs        <- uzs,
+    theory TRL      <- TRL,
+    theory ZModTStr <- ZModTStr,
+    theory CRTStr   <- CRTStr,
+    theory IDTStr   <- IDTStr,
+    theory FTStr    <- FTStr,
+    theory TFT      <- TFT,
+    theory FZModT   <- FZModT,
+    theory FCRT     <- FCRT,
+    theory FIDT     <- FIDT,
+    theory FFT      <- FFT,
+    theory UZLT     <- UZLT,
+    theory UTStr    <- UTStr,
+    theory USubT    <- USubT,
+    theory FUTT     <- FUTT,
+    theory UTZModCR <- UTZModCR,
+    theory FUTZMod  <- FUTZMod,
+    theory SRL      <- SRL,
+    theory ZModSStr <- ZModSStr,
+    theory CRSStr   <- CRSStr,
+    theory IDSStr   <- IDSStr,
+    theory FSStr    <- FSStr,
+    theory SFT      <- SFT,
+    theory FZModS   <- FZModS,
+    theory FCRS     <- FCRS,
+    theory FIDS     <- FIDS,
+    theory FFS      <- FFS,
+    theory UZLS     <- UZLS,
+    theory USStr    <- USStr,
+    theory USubS    <- USubS,
+    theory USZModCR <- USZModCR,
+    theory FUSZMod  <- FUSZMod,
+    op P            <= (fun x => exists n , x = TRL.ofint n),
+    op Sub.val      <= TRL.ofint \o ZModP.asint,
+    op Sub.insub    <= (fun x => if exists n , x = TRL.ofint n
+                                 then Some (ZModP.inzmod
+                                             (choiceb (fun n => x = TRL.ofint n) witness))
+                                 else None),
+    op Sub.wsT      <= TRL.ofint (ZModP.asint witness)
+    rename [theory] "TRL"      as "Gone"
+                    "ZModTStr" as "Gone"
+                    "CRTStr"   as "Gone"
+                    "IDTStr"   as "IDTStrGone"
+                    "FTStr"    as "FTStrGone"
+                    "TFT"      as "Gone"
+                    "FZModT"   as "Gone"
+                    "FCRT"     as "Gone"
+                    "FIDT"     as "Gone"
+                    "FFT"      as "Gone"
+                    "UZLT"     as "Gone"
+                    "UTStr"    as "Gone"
+                    "USubT"    as "Gone"
+                    "FUTT"     as "Gone"
+                    "UTZModCR" as "Gone"
+                    "FUTZMod"  as "Gone"
+                    "SRL"      as "Gone"
+                    "ZModSStr" as "Gone"
+                    "CRSStr"   as "Gone"
+                    "IDSStr"   as "IDSStrGone"
+                    "FSStr"    as "FSStrGone"
+                    "SFT"      as "Gone"
+                    "FZModS"   as "Gone"
+                    "FCRS"     as "Gone"
+                    "FIDS"     as "Gone"
+                    "FFS"      as "Gone"
+                    "UZLS"     as "Gone"
+                    "USStr"    as "Gone"
+                    "USubS"    as "Gone"
+                    "FUTS"     as "FUTS_"
+                    "USZModCR" as "Gone"
+                    "FUSZMod"  as "Gone"
+  proof Sub.*, SZMod.*, SCR.*.
 
   realize Sub.insubN.
-  proof. by rewrite /insub => x ->. qed.
+  proof. by move=> x ->. qed.
 
   realize Sub.insubT.
   proof.
-    rewrite /insub; move => x in_x; rewrite in_x /=.
-    case: in_x => nx; rewrite /is_ofint => ->>.
-    rewrite (argmin_eq _ _ (nx %% char)) //=.
-    + by apply/modz_ge0/gtr_eqF/gt0_char.
-    + by rewrite /idfun /= -dvd2_char -divzE dvdz_mull dvdzz.
-    + move => j /mem_range mem_j_range; rewrite /idfun /=.
-      rewrite -dvd2_char dvdzE; apply/gtr_eqF.
-      move/mem_range: mem_j_range => [le0j ltj_].
-      rewrite (divz_eq nx char) -addrA modzMDl modz_small; [|by apply/subr_gt0].
-      rewrite subr_ge0 ltzW //= (ltr_le_sub _ `|char| _ 0) //.
-      by apply/ltz_mod/gtr_eqF/gt0_char.
-    rewrite /val -dvd2_char -/asint ofint_inzmod -inzmod_mod inzmodK.
-    by rewrite -opprB dvdzN -divzE dvdz_mull dvdzz.
+    move => x in_x; rewrite in_x /=; case: in_x => n ->; rewrite /(\o) /=.
+    pose P:= (fun x => _ _ = _ x);  move: (choicebP P witness _).
+    + by exists n.
+    pose m:= choiceb _ _; move: m => m; rewrite /P => {P} -> {n}.
+    apply/eq_sym/CRTStr.dvd2_char; rewrite ZModP.inzmodK -divzE.
+    by apply/dvdz_mull; rewrite /ZModP.p dvdzz.
   qed.
 
   realize Sub.valP.
-  proof. by rewrite /in_zmodP /val; move => x; exists (SubFiniteField_ZMod.ZModP.Sub.val x). qed.
+  proof. by rewrite /(\o) /= => x; exists (ZModP.asint x). qed.
 
   realize Sub.valK.
   proof.
     rewrite /pcancel /insub => x.
-    have in_x: (in_zmodP (ofint (SubFiniteField_ZMod.ZModP.Sub.val x))).
-    + by exists (SubFiniteField_ZMod.ZModP.Sub.val x).
-    rewrite in_x /=; case: in_x => n is_ofint_.
-    move: (argminP idfun (is_ofint (SubFiniteField_ZMod.val x)) (n %% char) _ _).
-    + by apply/modz_ge0/gtr_eqF/gt0_char.
-    + by rewrite /val /idfun /= is_ofint_ /is_ofint -dvd2_char -divzE dvdz_mull dvdzz.
-    rewrite /val {1}/is_ofint /idfun /= => ?; rewrite (argmin_eq _ _ (n %% char)) /=.
-    + by apply/modz_ge0/gtr_eqF/gt0_char.
-    + by rewrite is_ofint_ /is_ofint -dvd2_char -divzE dvdz_mull dvdzz.
-    + move => j /mem_range mem_j_range; rewrite /idfun /=.
-      rewrite is_ofint_ /is_ofint -dvd2_char dvdzE; apply/gtr_eqF.
-      move/mem_range: mem_j_range => [le0j ltj_].
-      rewrite (divz_eq n char) -addrA modzMDl modz_small; [|by apply/subr_gt0].
-      rewrite subr_ge0 ltzW //= (ltr_le_sub _ `|char| _ 0) //.
-      by apply/ltz_mod/gtr_eqF/gt0_char.
-    move: is_ofint_; rewrite -/asint /is_ofint ofint_inzmod -inzmod_mod.
-    move/dvd2_char => dvd_; apply/asint_inj; rewrite inzmodK.
-    rewrite eq_sym -(modz_small (asint x) char); [|by apply/eq_mod].
-    by rewrite ger0_norm ?rg_asint // ge0_char.
+    pose P:= (fun n => (\o) TRL.ofint ZModP.asint x = TRL.ofint n).
+    have [n]: exists n , P n.
+    + rewrite /P /(\o) => {P}.
+      admit.
+    move=> eq_; rewrite ifT; [by exists n; rewrite eq_|].
+    move: (choicebP P witness _); [by exists n; rewrite eq_|].
+    rewrite /P => {P eq_ n}; pose y:= choiceb _ _; move: y => y.
+    rewrite /(\o) -CRTStr.dvd2_char -/ZModP.p eq_mod modz_small.
+    + rewrite gtr0_norm; [by apply/ltzE/ltzW/gt1_prime/ZModP.prime_p|].
+      by apply/ZModP.rg_asint.
+    case: (ZModP.eq_inzmod y (y %% ZModP.p)) => + _.
+    move=> ->; [|by move=> <-; rewrite ZModP.asintK].
+    by rewrite modz_mod.
   qed.
 
   realize Sub.insubW.
   proof.
-    rewrite /insub /wsT ifT; [by exists (asint witness)|congr].
-    rewrite ofint_inzmod; apply/asint_inj; rewrite inzmodK.
-    rewrite (argmin_eq _ _ (asint witness)) //; [by apply/ge0_asint| |].
-    + move => j /mem_range mem_j_range; rewrite /idfun /=.
-      rewrite /is_ofint -dvd2_char dvdzE; apply/gtr_eqF.
-      move/mem_range: mem_j_range => [le0j ltj_].
-      rewrite (divz_eq (asint witness) char) -addrA modzMDl modz_small.
-      - rewrite subr_ge0 ltzW //=.
-        * by rewrite modz_small //; rewrite ger0_norm ?rg_asint // ge0_char.
-        by rewrite (ltr_le_sub _ `|char| _ 0) //; apply/ltz_mod/gtr_eqF/gt0_char.
-      by apply/subr_gt0; rewrite modz_small //; rewrite ger0_norm ?rg_asint // ge0_char.
-    by rewrite modz_small //; rewrite ger0_norm ?rg_asint // ge0_char.
+    rewrite ifT; [by exists (ZModP.asint witness)|].
+    congr.
+    admit.
   qed.
 
-  clone import SubFiniteField as SFF with
-    type t       <= t,
-    type ut      <= ut,
-    type st      <= st,
-    theory F     <= SubFiniteField_ZMod.F,
-    theory FF    <= SubFiniteField_ZMod.FF,
-    theory FStr  <= SubFiniteField_ZMod.FStr,
-    theory FFStr <= SubFiniteField_ZMod.FFStr.
+  realize SZMod.val0.
+  proof.
+    admit.
+  qed.
 
+  realize SZMod.valD.
+  proof.
+    admit.
+  qed.
+
+  realize SCR.val1.
+  proof.
+    admit.
+  qed.
+
+  realize SCR.valM.
+  proof.
+    admit.
+  qed.
+
+(*
   lemma is_comringautomorph_exp f :
     is_comring_automorph f =>
     (exists k , 0 < k /\ forall x , f x = exp x k).
@@ -991,4 +1095,5 @@ abstract theory SubFiniteField_ZMod.
     move => iscra_f.
     admit.
   qed.
+*)
 end SubFiniteField_ZMod.

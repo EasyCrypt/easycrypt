@@ -24,50 +24,50 @@ abstract theory UZMod_ComRing.
     op RL.zeror  <= insubd oner,
     op RL.(+)    <= (fun x y => insubd (val x * val y)),
     op RL.([-])  <= (fun x => insubd (invr (val x)))
-    rename [theory] "RL"      as "UZ"
+    rename [theory] "RL"      as "UZL"
                     "ZModStr" as "UStr"
   proof *.
 
-  realize UZ.addrA.
+  realize UZL.addrA.
   proof.
     move=> x y z; rewrite /( + ); apply/val_inj.
     rewrite !val_insubd !unitrM !valP /= !unitrM !valP /=.
     by rewrite mulrA.
   qed.
 
-  realize UZ.addrC.
+  realize UZL.addrC.
   proof.
     move=> x y; rewrite /( + ); apply/val_inj.
     rewrite !val_insubd !unitrM !valP /=.
     by rewrite mulrC.
   qed.
 
-  realize UZ.add0r.
+  realize UZL.add0r.
   proof.
     move=> x; rewrite /zeror /( + ); apply/val_inj.
     by rewrite !val_insubd unitr1 /= mul1r valP.
   qed.
 
-  realize UZ.addNr.
+  realize UZL.addNr.
   proof.
     move=> x; rewrite /zeror /( + ) /([-]); apply/val_inj; rewrite !val_insubd.
     by rewrite unitrV valP /= unitrM unitrV valP unitr1 /= mulVr // valP.
   qed.
 
   theory UZModCR.
-    import USub UZ.
+    import USub UZL.
 
-    lemma val1 : val UZ.zeror = RL.oner.
+    lemma val1 : val UZL.zeror = RL.oner.
     proof. by rewrite val_insubd unitr1. qed.
 
-    lemma valM x y : val (UZ.( + ) x y) = val x * val y.
+    lemma valM x y : val (UZL.( + ) x y) = val x * val y.
     proof. by rewrite /( + ) val_insubd unitrM !valP. qed.
 
-    lemma valV x : val (UZ.([-]) x) = invr (val x).
-    proof. by rewrite /UZ.([-]) val_insubd unitrV valP. qed.
+    lemma valV x : val (UZL.([-]) x) = invr (val x).
+    proof. by rewrite /UZL.([-]) val_insubd unitrV valP. qed.
 
     lemma valX x n :
-      val (UZ.intmul x n) = exp (val x) n.
+      val (UZL.intmul x n) = exp (val x) n.
     proof.
       wlog: n / 0 <= n => [wlogn|].
       + case (0 <= n) => [/wlogn //|] /ltrNge/ltzW/ler_opp2/=/wlogn {wlogn}.
