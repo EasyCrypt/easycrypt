@@ -178,6 +178,29 @@ abstract theory SubZModule.
       eqv_orbit (insubd x) (insubd y) (insubd z) =
       eqv_orbit x y z.
     proof. by move=> Px Py Pz; rewrite -val_eqv_orbit !val_insubd Px Py Pz. qed.
+
+    lemma zmod_endo_sub f :
+      (forall x , P x => P (f x)) =>
+      ZModTStr.zmod_endo f =>
+      ZModSStr.zmod_endo (insubd \o f \o val).
+    proof.
+      move=> imp_ ef; rewrite /(\o); split.
+      + by rewrite /morphism_0 val0 zmod_endo0 // insubd0.
+      move=> x y; rewrite valD zmod_endoD // insubdD //.
+      + by apply/imp_/valP.
+      by apply/imp_/valP.
+    qed.
+
+    lemma zmod_mono_endo_sub f :
+      (forall x , P x => P (f x)) =>
+      ZModTStr.zmod_mono_endo f =>
+      ZModSStr.zmod_mono_endo (insubd \o f \o val).
+    proof.
+      move=> imp_ ef; split; last first.
+      + by apply/zmod_endo_sub => //; apply/ZModTStr.zmod_mono_endo_endo.
+      rewrite /(\o) => x y /(congr1 val); rewrite !val_insubd !imp_ ?valP //=.
+      by move/(ZModTStr.zmod_mono_endo_inj _ ef)/val_inj.
+    qed.
   end SZMod.
 end SubZModule.
 
@@ -335,6 +358,30 @@ abstract theory SubComRing.
       rewrite -TRL.mulrA -TRL.exprMn.
       + by apply/ltzS.
       by rewrite TRL.mulVr // TRL.expr1z TRL.mulr1.
+    qed.
+
+    lemma cr_endo_sub f :
+      (forall x , P x => P (f x)) =>
+      CRTStr.cr_endo f =>
+      CRSStr.cr_endo (insubd \o f \o val).
+    proof.
+      move=> imp_ ef; split; [|split].
+      + by apply/SZMod.zmod_endo_sub => //; apply/CRTStr.cr_endo_zmod.
+      + by rewrite /(\o) /morphism_0 val1 cr_endo1 // insubd1.
+      move=> x y; rewrite /(\o) valM cr_endoM // insubdM //.
+      + by apply/imp_/valP.
+      by apply/imp_/valP.
+    qed.
+
+    lemma cr_mono_endo_sub f :
+      (forall x , P x => P (f x)) =>
+      CRTStr.cr_mono_endo f =>
+      CRSStr.cr_mono_endo (insubd \o f \o val).
+    proof.
+      move=> imp_ ef; split; last first.
+      + by apply/cr_endo_sub => //; apply/CRTStr.cr_mono_endo_endo.
+      rewrite /(\o) => x y /(congr1 val); rewrite !val_insubd !imp_ ?valP //=.
+      by move/(CRTStr.cr_mono_endo_inj _ ef)/val_inj.
     qed.
   end SCR.
 end SubComRing.

@@ -6,8 +6,6 @@ require (*--*) Subtype.
 (*---*) import StdOrder.IntOrder.
 
 
-print FinType.
-
 (* ==================================================================== *)
 abstract theory SubFinite.
   type t, st.
@@ -846,7 +844,9 @@ abstract theory ZModP_FiniteField.
     by apply/mapP; exists (asint x); rewrite asintK /=; apply/mem_range/rg_asint.
   qed.
 
-  theory ZModEnum.
+  theory ZModFin.
+    import RL ZModStr CRStr CRStr IDStr FStr FT FZMod FF.
+
     lemma eq_enum : perm_eq FT.enum (map inzmod (range 0 p)).
     proof.
       apply/uniq_perm_eq; [by apply/FT.enum_uniq| |].
@@ -866,13 +866,20 @@ abstract theory ZModP_FiniteField.
 
     lemma eq_char_p : CRStr.char = p.
     proof.
-      rewrite /CRStr.char -eq_card_p -FZMod.isgeneratorP.
+      rewrite /CRStr.char -eq_card_p -isgeneratorP.
       move=> x; exists (asint x); move: (perm_eq_mem _ _ eq_enum x).
       rewrite FT.enumP mapP /= => -[y] [] memy ->>.
       rewrite inzmodK -ofint_inzmod modz_small //.
       by rewrite -mem_range gtr0_norm // ltzE ltzW gt1_prime prime_p.
     qed.
-  end ZModEnum.
+
+    lemma cr_auto_zmod f : cr_auto f <=> f == idfun.
+    proof.
+      split=> [cra_f x|/fun_ext ->>]; [|by apply/cr_auto_id].
+      rewrite /idfun -(asintK x) -ofint_inzmod.
+      by rewrite (cr_autoZ _ cra_f) /ofint /intmul.
+    qed.
+  end ZModFin.
 end ZModP_FiniteField.
 
 (* ==================================================================== *)
@@ -1022,8 +1029,7 @@ abstract theory SubFiniteField_ZMod.
     rewrite /pcancel /insub => x.
     pose P:= (fun n => (\o) TRL.ofint ZModP.asint x = TRL.ofint n).
     have [n]: exists n , P n.
-    + rewrite /P /(\o) => {P}.
-      admit.
+    + by rewrite /P /(\o) => {P}; exists (ZModP.asint x).
     move=> eq_; rewrite ifT; [by exists n; rewrite eq_|].
     move: (choicebP P witness _); [by exists n; rewrite eq_|].
     rewrite /P => {P eq_ n}; pose y:= choiceb _ _; move: y => y.
@@ -1037,63 +1043,114 @@ abstract theory SubFiniteField_ZMod.
 
   realize Sub.insubW.
   proof.
-    rewrite ifT; [by exists (ZModP.asint witness)|].
-    congr.
-    admit.
+    rewrite ifT; [by exists (ZModP.asint witness)|congr].
+    pose P:= (fun n => (\o) TRL.ofint ZModP.asint witness = TRL.ofint n).
+    move: (choicebP P witness _); rewrite /P /(\o) /= => {P}.
+    + by exists (ZModP.asint witness).
+    pose c := choiceb _ _; move: c => c.
+    rewrite -CRTStr.dvd2_char dvdzP; case=> q.
+    rewrite subr_eq addrC -subr_eq => <<-.
+    by rewrite -mulNr ZModP.inzmod_mod modzMDr -ZModP.inzmod_mod ZModP.asintK.
   qed.
 
   realize SZMod.val0.
-  proof.
-    admit.
-  qed.
+  proof. by rewrite /morphism_0 /(\o) ZModP.zeroE TRL.ofint0. qed.
 
   realize SZMod.valD.
   proof.
-    admit.
+    move=> x y; rewrite /(\o) ZModP.addE -TRL.addrz eq_sym -CRTStr.dvd2_char.
+    by rewrite -divzE dvdz_mull dvdzz.
   qed.
 
   realize SCR.val1.
-  proof.
-    admit.
-  qed.
+  proof. by rewrite /morphism_0 /(\o) ZModP.oneE TRL.ofint1. qed.
 
   realize SCR.valM.
   proof.
-    admit.
+    move=> x y; rewrite /(\o) ZModP.mulE TRL.mulrz eq_sym -CRTStr.dvd2_char.
+    by rewrite -divzE dvdz_mull dvdzz.
   qed.
 
+  theory FinZMod.
+    import TRL SRL ZModTStr ZModSStr CRTStr CRSStr IDTStr IDSStr FTStr FSStr.
+    import ZModMorph CRMorph IDMorph FMorph SZMod SCR SID SF Sub CRM.
+    import TFT SFT SFCR SFin FFT.
+
+    lemma cr_auto_exp f :
+      CRTStr.cr_auto f =>
+      (exists k , 0 < k /\ forall x , f x = exp x k).
+    proof.
+      case: exists_generator => g isg_g cra_f.
+      move: (isg_g (USubT.insubd (f (USubT.val g)))).
+      case => k eq_; exists (k %% FUTT.card + FUTT.card).
+      apply/and_impr; split; [apply/ltzE/ler_add|].
+      + by apply/modz_ge0/gtr_eqF/FUTT.card_gt0.
+      + by apply/ltzS/ltr_subl_addr/FUTT.card_gt0.
+      move => lt0_ x; case (TRL.unit x) => [unitx|]; last first.
+      + rewrite -TRL.unitfE /= => ->>; rewrite cr_auto0 //.
+        by rewrite expr0z gtr_eqF.
+      move/(congr1 USubT.val): eq_; rewrite USubT.insubdK.
+      + apply/TRL.unitrE; rewrite -cr_autoV // -cr_autoM //.
+        by rewrite divrr; [apply/USubT.valP|rewrite cr_auto1].
+      rewrite -UTStr.intmul_modz_order -modz_mod -modzDr UTStr.intmul_modz_order.
+      move/FUTZMod.isgeneratorP: (isg_g) => ->; rewrite UTZModCR.valX.
+      case/(_ (USubT.insubd x)): isg_g => i /(congr1 USubT.val).
+      rewrite USubT.insubdK // UTZModCR.valX => ->>.
+      by rewrite cr_autoX // => ->; rewrite -!exprM mulrC.
+    qed.
+
+(*TODO: must be in PolyFiniteRing, comes after proving existence of irreducible polynomial for any SubField.*)
 (*
-  lemma is_comringautomorph_exp f :
-    is_comring_automorph f =>
-    (exists k , 0 < k /\ forall x , f x = exp x k).
-  proof.
-    case: exists_generator => g isg_g iscra_f.
-    move: (isg_g (SubFiniteField_ZMod.FFStr.UF.Sub.insubd (f (SubFiniteField_ZMod.FFStr.UF.Sub.val g)))).
-    case => k eq_; exists (k %% SubFiniteField_ZMod.FFStr.SFU.SFT.card + SubFiniteField_ZMod.FFStr.SFU.SFT.card).
-    apply/and_impr; split; [apply/ltzE/ler_add|].
-    + by apply/modz_ge0/gtr_eqF/SFU.SFT.card_gt0.
-    + by apply/ltzS/ltr_subl_addr/SFU.SFT.card_gt0.
-    move => lt0_ x; case (SubFiniteField_ZMod.F.unit x) => [unitx|]; last first.
-    + rewrite -SubFiniteField_ZMod.F.unitfE /= => ->>; rewrite comring_automorph0 //.
-      by rewrite expr0z gtr_eqF.
-    move/(congr1 UF.Sub.val): eq_; rewrite UF.Sub.insubdK.
-    + apply/unitrE. rewrite -comring_automorphV // -comring_automorphM //.
-      by rewrite divrr; [apply/UF.Sub.valP|apply/comring_automorph1].
-    rewrite -UFStr.ZModStr.intmul_modz_order -modz_mod -modzDr UFStr.ZModStr.intmul_modz_order.
-    move/UFStr.isgeneratorP: (isg_g) => ->; rewrite UF.val_intmul.
-    case/(_ (UF.Sub.insubd x)): isg_g => i /(congr1 UF.Sub.val).
-    rewrite UF.Sub.insubdK // UF.val_intmul => ->>.
-    by rewrite comring_automorphX // => ->; rewrite -!exprM mulrC.
-  qed.
-
-  lemma is_comringautomorphP f :
-    is_comring_automorph f <=>
-    (exists k, k \in range 0 n /\ f == iter k frobenius).
-  proof.
-    split => [|[k] [_ /fun_ext ->>]]; last first.
-    + by apply/is_comring_automorph_iter_frobenius.
-    move => iscra_f.
-    admit.
-  qed.
+    lemma cr_autoP f :
+      CRTStr.cr_auto f <=>
+      (exists k, k \in range 0 SFF.n /\ f == iter k IDTStr.frobenius).
+    proof.
+      split=> [|[k] [_ /fun_ext ->>]]; last first.
+      + by apply/FIDT.cr_auto_iter_frobenius.
+      move=> cra_f; case/cr_auto_exp: (cra_f) => k [] lt0k eqf_.
+      have:
+        exists k ,
+          k \in range 0 SFF.n /\
+          (forall x , f x = exp x (CRTStr.char ^ k));
+      last first.
+      + case=> {k lt0k eqf_} k [] mem_k eqf_; exists k; split=> // x.
+        by rewrite eqf_ IDTStr.iter_frobenius //; move: mem_k; apply/mem_range_le.
+      case/prime_divisors: (lt0k) => ps kps.
+      move: (is_pdec_pow_count_Ndvd (CRTStr.char) _ _ ZModP.prime_p kps).
+      move: (is_pdec_pow_count_dvd (CRTStr.char) _ _ ZModP.prime_p kps).
+      case/dvdzP => q ->> {kps}; move: lt0k; rewrite pmulr_lgt0.
+      + by apply/expr_gt0/FCRT.gt0_char.
+      move=> lt0q; rewrite exprS ?count_ge0 // dvdz_mulIf.
+      + by apply/gtr_eqF/expr_gt0/FCRT.gt0_char.
+      move=> Ndvd_; move: (FIDT.cr_auto_iter_frobenius (count (pred1 CRTStr.char) ps)).
+      move=> cra_; case/CRTStr.cr_auto_inv: cra_ => g [] can_g [] cang_ cra_g.
+      move: (CRTStr.cr_auto_comp _ _ cra_f cra_g); pose h:= f \o g.
+      move=> cra_h; have eqh_: forall x , h x = exp x q.
+      + move=> x; rewrite /h /(\o) eqf_ mulrC exprM.
+        by move/(_ x): cang_; rewrite iter_frobenius ?count_ge0 // => ->.
+      have: cr_auto (insubd \o h \o val).
+      + split; [|apply/SCR.cr_mono_endo_sub]; first last.
+        - by move=> x; rewrite eqh_; apply/PX.
+        - by apply/CRTStr.cr_auto_mono_endo.
+        move=> x; rewrite /(\o); case: (Bachet_Bezout CRTStr.char q) => u v.
+        case: (gcd_prime _ q FIDT.prime_char); last first.
+        - by move: (dvdz_gcdr CRTStr.char q) => + eq_; rewrite eq_.
+        move=> ->; rewrite addrC eq_sym -IntID.subr_eq eq_sym -mulNr addrC => eq_.
+        exists (exp x v); rewrite /val SF.valX -/val eqh_ -exprM; move: eq_ => ->.
+        move: h eqh_ cra_h => h eqh_ cra_h {g can_g cang_ cra_g}.
+        case: (x = SRL.zeror) => [->>|/SRL.unitfP ux].
+        - rewrite /val SZMod.val0 expr0z ifF; [|by rewrite SZMod.insubd0].
+          apply/negP => /(congr1 (transpose (%%) CRTStr.char)) /=.
+          by rewrite modzMDl modz_small //= ltr_normr FCRT.gt1_char.
+        rewrite exprD ?valU // expr1 SCR.insubdM ?PX /val ?valP // -/val.
+        rewrite valKd; case: FFS.exists_generator => g isg_g; move: (isg_g).
+        case/(_ (USubS.insubd x)) => n /(congr1 USubS.val).
+        rewrite USubS.val_insubd ux /= => ->>; rewrite USZModCR.valX.
+        rewrite -SF.valX -exprM mulrA -!USZModCR.valX -ZModFin.eq_card_p.
+        move/FUSZMod.isgeneratorP: isg_g.
+        admit.
+      admit.
+    qed.
 *)
+  end FinZMod.
 end SubFiniteField_ZMod.
