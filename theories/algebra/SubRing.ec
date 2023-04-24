@@ -1032,9 +1032,10 @@ theory SubFieldFrobenius.
     rename [theory] "TRL"    as "Gone"
            [theory] "TStr"   as "Gone"
            [theory] "IDGone" as "SubFieldFrobeniusIDGone"
-  proof subcrP.
+  (*TODO: pierre-Yves: I can ask to re prove a lemma?*)
+  proof (*subcrP,*) subfP.
 
-  realize subcrP.
-  proof. by apply/subcr_iter_frobenius_fixed/prime_char. qed.
+  realize subfP.
+  proof. by apply/FTStr.subf_iter_frobenius_fixed/prime_char. qed.
 end SubFieldFrobenius.
 

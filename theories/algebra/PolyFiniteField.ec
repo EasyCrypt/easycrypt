@@ -666,658 +666,659 @@ abstract theory PolyFiniteField.
     theory BigDom.BAdd <= P.BigPoly.PCA,
     theory BigDom.BMul <= P.BigPoly.PCM.
 
-  import P.
-  import BigPoly.
-
-  lemma scaled_monicP p :
-    scaled_monic p <=> p <> poly0.
-  proof.
-    split=> [[c r] [] neqc0 [] m_ ->>|neqp0].
-    + by rewrite -scaler_eq0 negb_or neqc0 -lc_eq0 m_ RL.oner_neq0.
-    exists (lc p) ((RL.invr (lc p)) ** p).
-    rewrite lc_eq0 neqp0 /= monic_invrZ ?RL.unitfP ?lc_eq0 //=.
-    by rewrite scalepA RL.mulrV ?scale1r // RL.unitfP lc_eq0.
-  qed.
-
-  op enum_ledeg n =
-    if 0 <= n
-    then map polyL (alltuples n FT.enum)
-    else [].
-
-  op enum_deg n = filter (fun p => deg p = n) (enum_ledeg n).
-
-  op enum_udeg n = filter monic (enum_deg n).
-
-  op enum_udeg_irr_shape n s =
-    filter
-      ( fun p =>
-          exists qs ,
-            irreducible_monic_dec p qs /\
-            s = mkseq (fun k => count (fun q => deg q = k + 2) qs) (n - 1) )
-      (enum_udeg n).
-
-  op enum_udeg_irr_deg k d =
-    filter
-      ( fun p =>
-          exists qs ,
-            irreducible_monic_dec p qs /\
-            size qs = k /\
-            all (fun q => deg q = d) qs )
-      (enum_udeg (k * (d - 1) + 1)).
-
-  op enum_iudeg n = filter irreducible_poly (enum_udeg n).
-
-  lemma enum_ledegP n p :
-    p \in enum_ledeg n <=>
-    (P.deg p <= n).
-  proof.
-    rewrite /enum_ledeg; case (0 <= n) => [le0n|/ltrNge ltn0]; last first.
-    + by rewrite lerNgt (ltr_le_trans _ _ _ ltn0 (ge0_deg p)).
-    rewrite mapP; split=> [[cs]|le_].
-    + rewrite alltuplesP => -[] [] eq_ _ ->>.
-      by apply/(ler_trans _ _ _ (degL_le _)); rewrite eq_ ler_maxrP.
-    case: (surj_polyL _ _ le_) => s [] eq_ ->>; exists s.
-    rewrite alltuplesP eq_ ler_maxr //=.
-    by apply/allP => ? _; apply/FT.enumP.
-  qed.
-
-  lemma uniq_enum_ledeg n :
-    uniq (enum_ledeg n).
-  proof.
-    rewrite /enum_ledeg; case (0 <= n) => // le0n.
-    apply/map_inj_in_uniq; [|by apply/alltuples_uniq/FT.enum_uniq].
-    move=> xs ys /alltuplesP [] + _ /alltuplesP [] + _.
-    by rewrite ler_maxr // => <<- /eq_sym; apply/inj_polyL.
-  qed.
-
-  lemma size_enum_ledeg n :
-    0 <= n =>
-    size (enum_ledeg n) = FT.card ^ n.
-  proof.
-    move=> le0n; rewrite /enum_ledeg le0n /= size_map.
-    by rewrite size_alltuples ler_maxr.
-  qed.
-
-  lemma enum_degP n p :
-    p \in enum_deg n <=>
-    (P.deg p = n).
-  proof. by rewrite /enum_deg mem_filter /= enum_ledegP; split. qed.
-
-  lemma uniq_enum_deg n :
-    uniq (enum_deg n).
-  proof. by rewrite /enum_deg; apply/filter_uniq/uniq_enum_ledeg. qed.
-
-  lemma perm_eq_enum_deg n :
-    perm_eq (enum_ledeg n) ((enum_ledeg (n - 1)) ++ (enum_deg n)).
-  proof.
-    apply/uniq_perm_eq.
-    + by apply/uniq_enum_ledeg.
-    + rewrite cat_uniq uniq_enum_ledeg uniq_enum_deg hasPn /=.
-      by move=> p /enum_degP <<-; rewrite enum_ledegP -ltzS.
-    move=> p; rewrite mem_cat !enum_ledegP enum_degP.
-    by rewrite -(ltzS _ (n - 1)) /= orbC -ler_eqVlt.
-  qed.
-
-  lemma size_enum_deg n :
-    0 < n =>
-    size (enum_deg n) = (FT.card - 1) * FT.card ^ (n - 1).
-  proof.
-    move=> lt0n; rewrite /card_deg.
-    move/perm_eq_size: (perm_eq_enum_deg n).
-    rewrite size_cat !size_enum_ledeg; [by apply/ltzW|by apply/ltzS|].
-    rewrite (IntID.addrC _ (size _)) -subr_eq => <-.
-    by rewrite mulrDl -exprS; [apply/ltzS|rewrite /= mulNr].
-  qed.
-
-  lemma enum_udegP n p :
-    p \in enum_udeg n <=>
-    (monic p /\ deg p = n).
-  proof. by rewrite /enum_udeg mem_filter enum_degP. qed.
-
-  lemma uniq_enum_udeg n :
-    uniq (enum_udeg n).
-  proof. by rewrite filter_uniq; apply/uniq_enum_deg. qed.
-
-  lemma perm_eq_enum_udeg n :
-    0 < n =>
-    perm_eq (enum_udeg n) (map (fun p => (+) (P.polyXn (n - 1)) p) (enum_ledeg (n - 1))).
-  proof.
-    move=> lt0n; apply/uniq_perm_eq.
-    + by apply/uniq_enum_udeg.
-    + apply/map_inj_in_uniq; [|by apply/uniq_enum_ledeg].
-      move=> p q /enum_ledegP le_p /enum_ledegP le_q /=.
-      by apply/P.PolyComRing.addrI.
-    move=> p; rewrite enum_udegP /= mapP.
-    split=> [[up eq_p]|].
-    + exists (P.(-) p (P.polyXn (n - 1))).
-      rewrite enum_ledegP PolyComRing.addrA PolyComRing.addrAC.
-      rewrite PolyComRing.subrr PolyComRing.add0r /=.
-      apply/P.deg_leP; [by apply/ltzS|].
-      move=> i; rewrite polyDE polyNE polyXnE -(ltzS _ (n - 1)) lt0n /=.
-      case/ler_eqVlt => [<<-/=|lt_]; [by rewrite RL.subr_eq0 -eq_p up|].
-      rewrite gtr_eqF //= RL.subr0; apply/P.gedeg_coeff; rewrite eq_p.
-      by move/ltzE: lt_.
-    case=> q [/enum_ledegP le_ ->>]; rewrite /monic degDl.
-    + by rewrite degXn ler_maxr //=; [apply/ltzW|move/ltzS: le_].
-    rewrite degXn /= ler_maxr; [by apply/ltzW|].
-    rewrite polyDE polyXnE /= -ltzS lt0n /= RL.addrC -RL.subr_eq0.
-    by rewrite -RL.addrA RL.subrr RL.addr0; apply/P.gedeg_coeff.
-  qed.
-
-  lemma size_enum_udeg n :
-    0 < n =>
-    size (enum_udeg n) = FT.card ^ (n - 1).
-  proof.
-    move=> lt0n; rewrite /card_udeg.
-    move/perm_eq_size: (perm_eq_enum_udeg _ lt0n) => ->.
-    by rewrite size_map size_enum_ledeg // -ltzS.
-  qed.
-
-  lemma enum_udeg_irr_shapeP n s p :
-    p \in enum_udeg_irr_shape n s <=>
-    ( monic p /\
-      deg p = n /\
-      exists qs ,
-        irreducible_monic_dec p qs /\
-        s = mkseq (fun k => count (fun q => deg q = k + 2) qs) (n - 1) ).
-  proof.
-    rewrite /enum_udeg_irr_shape mem_filter enum_udegP /=.
-    by split=> />.
-  qed.
-
-  lemma uniq_enum_udeg_irr_shape n s :
-    uniq (enum_udeg_irr_shape n s).
-  proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
-
-  lemma perm_eq_enum_udeg_irr_shape n :
-    1 < n =>
-    perm_eq (enum_udeg n) (flatten (map (enum_udeg_irr_shape n) (allshapes (n - 1)))).
-  proof.
-    move=> lt1n; apply/uniq_perm_eq.
-    + by apply/uniq_enum_udeg.
-    + apply/uniq_flatten_map; last first.
-      - by apply/allshapes_uniq.
-      - by move=> ?; apply/uniq_enum_udeg_irr_shape.
-      move=> p1 p2 mem1 mem2 /hasP [p] [].
-      case/enum_udeg_irr_shapeP => m_ [] eq_ [qs2] [] dec2 ->>.
-      case/enum_udeg_irr_shapeP => _ [] _ [qs1] [] dec1 ->>.
-      apply/eq_in_mkseq => i /mem_range mem_ /=.
-      by apply/perm_eqP/(irredp_monic_dec_perm_eq p).
-    move=> p; rewrite enum_udegP -flattenP; split; last first.
-    + case=> ? [] /mapP [s] [] /allshapesP is_s_ ->>.
-      by case/enum_udeg_irr_shapeP => m_ [] <<- [?] [] dec_ ->>.
-    case=> m_ <<-; move: (irredp_monic_decW p).
-    rewrite scaled_monicP -deg_gt0 ltzE ltzW //= => -[qs] dec_.
-    pose s:= mkseq (fun k => count (fun q => deg q = k + 2) qs) (deg p - 1).
-    pose ps:= enum_udeg_irr_shape (deg p) s; exists ps; split; last first.
-    + rewrite /ps => {ps}; apply/enum_udeg_irr_shapeP; rewrite m_ /=.
-      by exists qs; rewrite -/s.
-    apply/mapP; exists s; rewrite -/ps /= => {ps}; apply/allshapesP.
-    apply/is_shapeW.
-    + by rewrite size_mkseq ler_maxr // -ltzS /= ltzE ltzW.
-    + rewrite all_map range_iota /preim /=; apply/allP.
-      by move=> i memi /=; apply/count_ge0.
-    move=> dflt /=.
-    rewrite (Bigint.BIA.eq_big_seq _ (fun k => k * count (fun q => deg q = k + 1) qs)).
-    + by move=> k memk /=; rewrite nth_mkseq // -mem_range mem_range_subr.
-    rewrite eq_sym {1}(deg_irredp_monic_dec _ _ dec_) /=.
-    rewrite (Bigint.big_mcount _ _ 1 (deg p)).
-    + move=> ? /mapP [] q [] memq ->>; apply/mem_range_subr.
-      by rewrite /=; move: (degs_irredp_monic_dec _ _ _ dec_ memq).
-    apply/Bigint.BIA.eq_big_seq => i memi /=; rewrite count_map /preim /pred1 /=.
-    by congr; apply/eq_count => q /=; split=> [<-|->].
-  qed.
-
-  lemma size_enum_udeg_irr_shape n :
-    1 < n =>
-    Bigint.BIA.big predT (fun s => size (enum_udeg_irr_shape n s)) (allshapes (n - 1)) =
-    FT.card ^ (n - 1).
-  proof.
-    move=> lt1n; rewrite -size_enum_udeg ?ltzE ?ltzW //.
-    move/perm_eq_size: (perm_eq_enum_udeg_irr_shape _ lt1n) => ->.
-    rewrite size_flatten Bigint.sumzE !Bigint.BIA.big_mapT.
-    apply/Bigint.BIA.eq_big_seq => s mem_ /=.
-    by rewrite /(\o).
-  qed.
-
-  lemma enum_udeg_irr_degP k d p :
-    p \in enum_udeg_irr_deg k d <=>
-    ( monic p /\
-      exists qs ,
-        irreducible_monic_dec p qs /\
-        size qs = k /\
-        all (fun q => deg q = d) qs ).
-  proof.
-    rewrite /enum_iudeg mem_filter enum_udegP /=.
-    split=> |> m_ qs dec_ all_; rewrite (deg_irredp_monic_dec _ _ dec_).
-    rewrite (Bigint.BIA.eq_big_seq _ (fun _ => d - 1)) /=.
-    + by move=> q mem_; move/allP/(_ _ mem_): all_ => ->.
-    by rewrite Bigint.BIA.sumr_const intmulz mulrC count_predT.
-  qed.
-
-  lemma uniq_enum_udeg_irr_deg k d :
-    uniq (enum_udeg_irr_deg k d).
-  proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
-
-  lemma perm_eq_enum_udeg_irr_deg n s :
-    1 < n =>
-    is_shape (n - 1) s =>
-    perm_eq
-      (enum_udeg_irr_shape n s)
-      (map (PCM.big predT idfun)
-           (alltuples_list (mapi ((transpose enum_udeg_irr_deg) \o (transpose Int.(+) 2)) s))).
-  proof.
-    move=> lt1n is_s_s; apply/uniq_perm_eq; [by apply/uniq_enum_udeg_irr_shape| |].
-    + rewrite map_inj_in_uniq; last first.
-      - apply/alltuples_list_uniq/allP => qs /(mapiP 0) [i] [] /mem_range mem_ ->>.
-        by rewrite /(\o) /=; apply/uniq_enum_udeg_irr_deg.
-      move=> qs1 qs2 /alltuples_listP [] + all1 /alltuples_listP [] + all2.
-      rewrite !size_mapi => size1 size2 eq_; apply/(eq_from_nth witness).
-      - by rewrite size1 size2.
-      move=> i /mem_range; rewrite size1 => memi.
-      pose p:= PCM.big predT idfun qs1; move: (eq_refl p); rewrite {2}/p.
-      move: p => p eq1; move: eq_; rewrite -eq1 => eq2.
+  theory PolyFinF.
+    import P BigPoly.
+  
+    lemma scaled_monicP p :
+      scaled_monic p <=> p <> poly0.
+    proof.
+      split=> [[c r] [] neqc0 [] m_ ->>|neqp0].
+      + by rewrite -scaler_eq0 negb_or neqc0 -lc_eq0 m_ RL.oner_neq0.
+      exists (lc p) ((RL.invr (lc p)) ** p).
+      rewrite lc_eq0 neqp0 /= monic_invrZ ?RL.unitfP ?lc_eq0 //=.
+      by rewrite scalepA RL.mulrV ?scale1r // RL.unitfP lc_eq0.
+    qed.
+  
+    op enum_ledeg n =
+      if 0 <= n
+      then map polyL (alltuples n FT.enum)
+      else [].
+  
+    op enum_deg n = filter (fun p => deg p = n) (enum_ledeg n).
+  
+    op enum_udeg n = filter monic (enum_deg n).
+  
+    op enum_udeg_irr_shape n s =
+      filter
+        ( fun p =>
+            exists qs ,
+              irreducible_monic_dec p qs /\
+              s = mkseq (fun k => count (fun q => deg q = k + 2) qs) (n - 1) )
+        (enum_udeg n).
+  
+    op enum_udeg_irr_deg k d =
+      filter
+        ( fun p =>
+            exists qs ,
+              irreducible_monic_dec p qs /\
+              size qs = k /\
+              all (fun q => deg q = d) qs )
+        (enum_udeg (k * (d - 1) + 1)).
+  
+    op enum_iudeg n = filter irreducible_poly (enum_udeg n).
+  
+    lemma enum_ledegP n p :
+      p \in enum_ledeg n <=>
+      (P.deg p <= n).
+    proof.
+      rewrite /enum_ledeg; case (0 <= n) => [le0n|/ltrNge ltn0]; last first.
+      + by rewrite lerNgt (ltr_le_trans _ _ _ ltn0 (ge0_deg p)).
+      rewrite mapP; split=> [[cs]|le_].
+      + rewrite alltuplesP => -[] [] eq_ _ ->>.
+        by apply/(ler_trans _ _ _ (degL_le _)); rewrite eq_ ler_maxrP.
+      case: (surj_polyL _ _ le_) => s [] eq_ ->>; exists s.
+      rewrite alltuplesP eq_ ler_maxr //=.
+      by apply/allP => ? _; apply/FT.enumP.
+    qed.
+  
+    lemma uniq_enum_ledeg n :
+      uniq (enum_ledeg n).
+    proof.
+      rewrite /enum_ledeg; case (0 <= n) => // le0n.
+      apply/map_inj_in_uniq; [|by apply/alltuples_uniq/FT.enum_uniq].
+      move=> xs ys /alltuplesP [] + _ /alltuplesP [] + _.
+      by rewrite ler_maxr // => <<- /eq_sym; apply/inj_polyL.
+    qed.
+  
+    lemma size_enum_ledeg n :
+      0 <= n =>
+      size (enum_ledeg n) = FT.card ^ n.
+    proof.
+      move=> le0n; rewrite /enum_ledeg le0n /= size_map.
+      by rewrite size_alltuples ler_maxr.
+    qed.
+  
+    lemma enum_degP n p :
+      p \in enum_deg n <=>
+      (P.deg p = n).
+    proof. by rewrite /enum_deg mem_filter /= enum_ledegP; split. qed.
+  
+    lemma uniq_enum_deg n :
+      uniq (enum_deg n).
+    proof. by rewrite /enum_deg; apply/filter_uniq/uniq_enum_ledeg. qed.
+  
+    lemma perm_eq_enum_deg n :
+      perm_eq (enum_ledeg n) ((enum_ledeg (n - 1)) ++ (enum_deg n)).
+    proof.
+      apply/uniq_perm_eq.
+      + by apply/uniq_enum_ledeg.
+      + rewrite cat_uniq uniq_enum_ledeg uniq_enum_deg hasPn /=.
+        by move=> p /enum_degP <<-; rewrite enum_ledegP -ltzS.
+      move=> p; rewrite mem_cat !enum_ledegP enum_degP.
+      by rewrite -(ltzS _ (n - 1)) /= orbC -ler_eqVlt.
+    qed.
+  
+    lemma size_enum_deg n :
+      0 < n =>
+      size (enum_deg n) = (FT.card - 1) * FT.card ^ (n - 1).
+    proof.
+      move=> lt0n; rewrite /card_deg.
+      move/perm_eq_size: (perm_eq_enum_deg n).
+      rewrite size_cat !size_enum_ledeg; [by apply/ltzW|by apply/ltzS|].
+      rewrite (IntID.addrC _ (size _)) -subr_eq => <-.
+      by rewrite mulrDl -exprS; [apply/ltzS|rewrite /= mulNr].
+    qed.
+  
+    lemma enum_udegP n p :
+      p \in enum_udeg n <=>
+      (monic p /\ deg p = n).
+    proof. by rewrite /enum_udeg mem_filter enum_degP. qed.
+  
+    lemma uniq_enum_udeg n :
+      uniq (enum_udeg n).
+    proof. by rewrite filter_uniq; apply/uniq_enum_deg. qed.
+  
+    lemma perm_eq_enum_udeg n :
+      0 < n =>
+      perm_eq (enum_udeg n) (map (fun p => (+) (P.polyXn (n - 1)) p) (enum_ledeg (n - 1))).
+    proof.
+      move=> lt0n; apply/uniq_perm_eq.
+      + by apply/uniq_enum_udeg.
+      + apply/map_inj_in_uniq; [|by apply/uniq_enum_ledeg].
+        move=> p q /enum_ledegP le_p /enum_ledegP le_q /=.
+        by apply/P.PolyComRing.addrI.
+      move=> p; rewrite enum_udegP /= mapP.
+      split=> [[up eq_p]|].
+      + exists (P.(-) p (P.polyXn (n - 1))).
+        rewrite enum_ledegP PolyComRing.addrA PolyComRing.addrAC.
+        rewrite PolyComRing.subrr PolyComRing.add0r /=.
+        apply/P.deg_leP; [by apply/ltzS|].
+        move=> i; rewrite polyDE polyNE polyXnE -(ltzS _ (n - 1)) lt0n /=.
+        case/ler_eqVlt => [<<-/=|lt_]; [by rewrite RL.subr_eq0 -eq_p up|].
+        rewrite gtr_eqF //= RL.subr0; apply/P.gedeg_coeff; rewrite eq_p.
+        by move/ltzE: lt_.
+      case=> q [/enum_ledegP le_ ->>]; rewrite /monic degDl.
+      + by rewrite degXn ler_maxr //=; [apply/ltzW|move/ltzS: le_].
+      rewrite degXn /= ler_maxr; [by apply/ltzW|].
+      rewrite polyDE polyXnE /= -ltzS lt0n /= RL.addrC -RL.subr_eq0.
+      by rewrite -RL.addrA RL.subrr RL.addr0; apply/P.gedeg_coeff.
+    qed.
+  
+    lemma size_enum_udeg n :
+      0 < n =>
+      size (enum_udeg n) = FT.card ^ (n - 1).
+    proof.
+      move=> lt0n; rewrite /card_udeg.
+      move/perm_eq_size: (perm_eq_enum_udeg _ lt0n) => ->.
+      by rewrite size_map size_enum_ledeg // -ltzS.
+    qed.
+  
+    lemma enum_udeg_irr_shapeP n s p :
+      p \in enum_udeg_irr_shape n s <=>
+      ( monic p /\
+        deg p = n /\
+        exists qs ,
+          irreducible_monic_dec p qs /\
+          s = mkseq (fun k => count (fun q => deg q = k + 2) qs) (n - 1) ).
+    proof.
+      rewrite /enum_udeg_irr_shape mem_filter enum_udegP /=.
+      by split=> />.
+    qed.
+  
+    lemma uniq_enum_udeg_irr_shape n s :
+      uniq (enum_udeg_irr_shape n s).
+    proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
+  
+    lemma perm_eq_enum_udeg_irr_shape n :
+      1 < n =>
+      perm_eq (enum_udeg n) (flatten (map (enum_udeg_irr_shape n) (allshapes (n - 1)))).
+    proof.
+      move=> lt1n; apply/uniq_perm_eq.
+      + by apply/uniq_enum_udeg.
+      + apply/uniq_flatten_map; last first.
+        - by apply/allshapes_uniq.
+        - by move=> ?; apply/uniq_enum_udeg_irr_shape.
+        move=> p1 p2 mem1 mem2 /hasP [p] [].
+        case/enum_udeg_irr_shapeP => m_ [] eq_ [qs2] [] dec2 ->>.
+        case/enum_udeg_irr_shapeP => _ [] _ [qs1] [] dec1 ->>.
+        apply/eq_in_mkseq => i /mem_range mem_ /=.
+        by apply/perm_eqP/(irredp_monic_dec_perm_eq p).
+      move=> p; rewrite enum_udegP -flattenP; split; last first.
+      + case=> ? [] /mapP [s] [] /allshapesP is_s_ ->>.
+        by case/enum_udeg_irr_shapeP => m_ [] <<- [?] [] dec_ ->>.
+      case=> m_ <<-; move: (irredp_monic_decW p).
+      rewrite scaled_monicP -deg_gt0 ltzE ltzW //= => -[qs] dec_.
+      pose s:= mkseq (fun k => count (fun q => deg q = k + 2) qs) (deg p - 1).
+      pose ps:= enum_udeg_irr_shape (deg p) s; exists ps; split; last first.
+      + rewrite /ps => {ps}; apply/enum_udeg_irr_shapeP; rewrite m_ /=.
+        by exists qs; rewrite -/s.
+      apply/mapP; exists s; rewrite -/ps /= => {ps}; apply/allshapesP.
+      apply/is_shapeW.
+      + by rewrite size_mkseq ler_maxr // -ltzS /= ltzE ltzW.
+      + rewrite all_map range_iota /preim /=; apply/allP.
+        by move=> i memi /=; apply/count_ge0.
+      move=> dflt /=.
+      rewrite (Bigint.BIA.eq_big_seq _ (fun k => k * count (fun q => deg q = k + 1) qs)).
+      + by move=> k memk /=; rewrite nth_mkseq // -mem_range mem_range_subr.
+      rewrite eq_sym {1}(deg_irredp_monic_dec _ _ dec_) /=.
+      rewrite (Bigint.big_mcount _ _ 1 (deg p)).
+      + move=> ? /mapP [] q [] memq ->>; apply/mem_range_subr.
+        by rewrite /=; move: (degs_irredp_monic_dec _ _ _ dec_ memq).
+      apply/Bigint.BIA.eq_big_seq => i memi /=; rewrite count_map /preim /pred1 /=.
+      by congr; apply/eq_count => q /=; split=> [<-|->].
+    qed.
+  
+    lemma size_enum_udeg_irr_shape n :
+      1 < n =>
+      Bigint.BIA.big predT (fun s => size (enum_udeg_irr_shape n s)) (allshapes (n - 1)) =
+      FT.card ^ (n - 1).
+    proof.
+      move=> lt1n; rewrite -size_enum_udeg ?ltzE ?ltzW //.
+      move/perm_eq_size: (perm_eq_enum_udeg_irr_shape _ lt1n) => ->.
+      rewrite size_flatten Bigint.sumzE !Bigint.BIA.big_mapT.
+      apply/Bigint.BIA.eq_big_seq => s mem_ /=.
+      by rewrite /(\o).
+    qed.
+  
+    lemma enum_udeg_irr_degP k d p :
+      p \in enum_udeg_irr_deg k d <=>
+      ( monic p /\
+        exists qs ,
+          irreducible_monic_dec p qs /\
+          size qs = k /\
+          all (fun q => deg q = d) qs ).
+    proof.
+      rewrite /enum_iudeg mem_filter enum_udegP /=.
+      split=> |> m_ qs dec_ all_; rewrite (deg_irredp_monic_dec _ _ dec_).
+      rewrite (Bigint.BIA.eq_big_seq _ (fun _ => d - 1)) /=.
+      + by move=> q mem_; move/allP/(_ _ mem_): all_ => ->.
+      by rewrite Bigint.BIA.sumr_const intmulz mulrC count_predT.
+    qed.
+  
+    lemma uniq_enum_udeg_irr_deg k d :
+      uniq (enum_udeg_irr_deg k d).
+    proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
+  
+    lemma perm_eq_enum_udeg_irr_deg n s :
+      1 < n =>
+      is_shape (n - 1) s =>
+      perm_eq
+        (enum_udeg_irr_shape n s)
+        (map (PCM.big predT idfun)
+             (alltuples_list (mapi ((transpose enum_udeg_irr_deg) \o (transpose Int.(+) 2)) s))).
+    proof.
+      move=> lt1n is_s_s; apply/uniq_perm_eq; [by apply/uniq_enum_udeg_irr_shape| |].
+      + rewrite map_inj_in_uniq; last first.
+        - apply/alltuples_list_uniq/allP => qs /(mapiP 0) [i] [] /mem_range mem_ ->>.
+          by rewrite /(\o) /=; apply/uniq_enum_udeg_irr_deg.
+        move=> qs1 qs2 /alltuples_listP [] + all1 /alltuples_listP [] + all2.
+        rewrite !size_mapi => size1 size2 eq_; apply/(eq_from_nth witness).
+        - by rewrite size1 size2.
+        move=> i /mem_range; rewrite size1 => memi.
+        pose p:= PCM.big predT idfun qs1; move: (eq_refl p); rewrite {2}/p.
+        move: p => p eq1; move: eq_; rewrite -eq1 => eq2.
+        move: (partial_funchoice
+                 (mem (range 0 (size s)))
+                 (fun j rs => monic (nth witness qs1 j) /\
+                              irreducible_monic_dec (nth witness qs1 j) rs /\
+                              all (fun q => deg q = j + 2) rs)
+                 _).
+        - move=> j memj; move/allP: all1.
+          move/(_ (nth witness qs1 j, enum_udeg_irr_deg (nth witness s j) (j + 2)) _).
+          * apply/(nth_mem (witness, witness)); exists j.
+            rewrite size_zip size_mapi size1 ler_minr // -mem_range memj /=.
+            by rewrite nth_zip ?size_mapi // (nth_mapi witness) //= -mem_range.
+          rewrite /= => /enum_udeg_irr_degP [] m_ [rs] [] dec_ [] index_ all_.
+          by exists rs.
+        case=> f1 f1P; pose qqs1:= map f1 (range 0 (size s)).
+        move: (partial_funchoice
+                 (mem (range 0 (size s)))
+                 (fun j rs => monic (nth witness qs2 j) /\
+                              irreducible_monic_dec (nth witness qs2 j) rs /\
+                              all (fun q => deg q = j + 2) rs)
+                 _).
+        - move=> j memj; move/allP: all2.
+          move/(_ (nth witness qs2 j, enum_udeg_irr_deg (nth witness s j) (j + 2)) _).
+          * apply/(nth_mem (witness, witness)); exists j.
+            rewrite size_zip size_mapi size2 ler_minr // -mem_range memj /=.
+            by rewrite nth_zip ?size_mapi // (nth_mapi witness) //= -mem_range.
+          rewrite /= => /enum_udeg_irr_degP [] m_ [rs] [] dec_ [] index_ all_.
+          by exists rs.
+        case=> f2 f2P; pose qqs2:= map f2 (range 0 (size s)).
+        have dec1: irreducible_monic_dec p (flatten qqs1).
+        - apply/irredp_monic_dec_flatten; exists qs1.
+          rewrite size1 size_map size_range ler_maxr //= -eq1 eqpxx /=.
+          apply/(all_nthP _ _ (witness, witness)) => j /mem_range.
+          rewrite size_zip size1 size_map size_range ler_maxr // ler_minr //=.
+          move=> memj; rewrite nth_zip ?size1 ?size_map ?size_range ?ler_maxr //=.
+          rewrite (nth_map witness) -?mem_range ?size_range ?ler_maxr //.
+          rewrite nth_range -?mem_range ?size_range ?ler_maxr //=.
+          by move/(_ _ memj): f1P.
+        have dec2: irreducible_monic_dec p (flatten qqs2).
+        - apply/irredp_monic_dec_flatten; exists qs2.
+          rewrite size2 size_map size_range ler_maxr //= -eq2 eqpxx /=.
+          apply/(all_nthP _ _ (witness, witness)) => j /mem_range.
+          rewrite size_zip size2 size_map size_range ler_maxr // ler_minr //=.
+          move=> memj; rewrite nth_zip ?size1 ?size_map ?size_range ?ler_maxr //=.
+          rewrite (nth_map witness) -?mem_range ?size_range ?ler_maxr //.
+          rewrite nth_range -?mem_range ?size_range ?ler_maxr //=.
+          by move/(_ _ memj): f2P.
+        move: (irredp_monic_dec_perm_eq _ _ _ dec1 dec2) => eq_.
+        move: (flatten_perm_eq deg (range 2 (size s + 2)) _ _ _ _ _ _ _ eq_).
+        - by apply/range_uniq.
+        - by rewrite size_map !size_range.
+        - by rewrite size_map !size_range.
+        - apply/(all_nthP _ _ (witness, witness)) => j /mem_range.
+          rewrite size_zip size_map !size_range !ler_maxr // ler_minr //= => memj.
+          rewrite nth_zip ?size_map ?size_range ?size1 ?ler_maxr //.
+          rewrite (nth_map witness) -?mem_range ?size_range ?ler_maxr //.
+          rewrite nth_range -?mem_range //=; case/(_ j _): f1P => //= _ [] _.
+          by rewrite nth_range -?mem_range //; apply/all_imp_in/allP => q _ /= ->; ring.
+        - apply/(all_nthP _ _ (witness, witness)) => j /mem_range.
+          rewrite size_zip size_map !size_range !ler_maxr // ler_minr //= => memj.
+          rewrite nth_zip ?size_map ?size_range ?size1 ?ler_maxr //.
+          rewrite (nth_map witness) -?mem_range ?size_range ?ler_maxr //.
+          rewrite nth_range -?mem_range //=; case/(_ j _): f2P => //= _ [] _.
+          by rewrite nth_range -?mem_range //; apply/all_imp_in/allP => q _ /= ->; ring.
+        move/(all_nthP _ _ (witness, witness))/(_ i); rewrite -mem_range.
+        rewrite size_zip !size_map !size_range ler_maxr // ler_minr // memi /=.
+        rewrite nth_zip ?size_map //= !(nth_map witness) -?mem_range ?size_range ?ler_maxr //.
+        rewrite !nth_range -?mem_range //=.
+        case/(_ _ memi): f1P => m1 [] /irredp_monic_decP [] _ [] _ -> _.
+        case/(_ _ memi): f2P => m2 [] /irredp_monic_decP [] _ [] _ -> _.
+        by rewrite m1 m2 !scale1r; apply/PCM.eq_big_perm.
+      move=> p; rewrite enum_udeg_irr_shapeP mapP; split=> [[] m_ [] <<- [qs] [] dec_ ->>|].
+      + pose bqs:= mkseq (fun k => PCM.big (fun q => deg q = k + 2) idfun qs) (deg p - 1).
+        exists bqs; rewrite alltuples_listP size_mapi !size_mkseq /(\o) /=; split.
+        - apply/(all_nthP _ _ (witness, witness)) => i; rewrite size_zip size_mapi !size_mkseq.
+          rewrite -mem_range ler_maxr -?ltzS ?ltzE ?ltzW // ler_minr //= => memi.
+          rewrite nth_zip /=; [by rewrite size_mapi !size_mkseq|].
+          rewrite nth_mkseq -?mem_range //= (nth_mapi witness) /=.
+          * by rewrite -mem_range size_mkseq ler_maxr // -ltzS ltzE ltzW.
+          apply/enum_udeg_irr_degP; rewrite monic_prod /=.
+          * case/irredp_monic_decP: dec_ => + _.
+            by apply/all_imp_in/allP => q mem_ /= []; rewrite /idfun.
+          rewrite nth_mkseq -?mem_range //=; exists (filter (fun q => deg q = i + 2) qs).
+          rewrite size_filter filter_all /=; apply/irredp_monic_decP.
+          case/irredp_monic_decP: dec_ => all_ _; rewrite -prodf_neq0.
+          rewrite lc_prod PCM.big_filter BigCf.BCM.big1_seq ?scale1r /=.
+          * move=> q [] _ mem_; rewrite /(\o) /idfun /=.
+            by case/allP/(_ _ mem_): all_.
+          rewrite all_filter -all_predI; move: all_; apply/all_imp_in/allP => q mem_.
+          rewrite /predA /predI /predC /idfun /= negb_and -implyNb /=.
+          by case=> irr_ mq; split=> _ //; apply/irredp_neq0.
+        case/irredp_monic_decP: (dec_) => _ [] _ ->; rewrite m_ scale1r.
+        rewrite (PCM.partition_big deg _ predT _ _ (range 2 (deg p + 1))).
+        - by apply/range_uniq.
+        - by move=> q; rewrite /predT /=; apply/degs_irredp_monic_dec.
+        rewrite PCM.big_mapT range_iota /= (range_addr 2 (deg p - 1) 2) /=.
+        rewrite PCM.big_mapT; apply/PCM.eq_big_seq => i memi.
+        by rewrite /(\o) /idfun /=; apply/PCM.eq_big => //; move=> q; rewrite /predT /= addrC.
+      case=> qs [] /alltuples_listP []; rewrite size_mapi => size_ all_ ->>.
+      rewrite monic_prod /=; [apply/(all_nthP _ _ witness) => i /mem_range /= + _|].
+      + move=> memi; move/(all_nthP _ _ (witness, witness))/(_ i): all_.
+        rewrite -mem_range size_zip size_mapi -size_ ler_minr // memi /=.
+        rewrite nth_zip ?size_mapi //= (nth_mapi witness) -?mem_range -?size_ //.
+        by rewrite /(\o) /idfun /= => /enum_udeg_irr_degP.
       move: (partial_funchoice
-               (mem (range 0 (size s)))
-               (fun j rs => monic (nth witness qs1 j) /\
-                            irreducible_monic_dec (nth witness qs1 j) rs /\
-                            all (fun q => deg q = j + 2) rs)
-               _).
-      - move=> j memj; move/allP: all1.
-        move/(_ (nth witness qs1 j, enum_udeg_irr_deg (nth witness s j) (j + 2)) _).
-        * apply/(nth_mem (witness, witness)); exists j.
-          rewrite size_zip size_mapi size1 ler_minr // -mem_range memj /=.
-          by rewrite nth_zip ?size_mapi // (nth_mapi witness) //= -mem_range.
-        rewrite /= => /enum_udeg_irr_degP [] m_ [rs] [] dec_ [] index_ all_.
-        by exists rs.
-      case=> f1 f1P; pose qqs1:= map f1 (range 0 (size s)).
-      move: (partial_funchoice
-               (mem (range 0 (size s)))
-               (fun j rs => monic (nth witness qs2 j) /\
-                            irreducible_monic_dec (nth witness qs2 j) rs /\
-                            all (fun q => deg q = j + 2) rs)
-               _).
-      - move=> j memj; move/allP: all2.
-        move/(_ (nth witness qs2 j, enum_udeg_irr_deg (nth witness s j) (j + 2)) _).
-        * apply/(nth_mem (witness, witness)); exists j.
-          rewrite size_zip size_mapi size2 ler_minr // -mem_range memj /=.
-          by rewrite nth_zip ?size_mapi // (nth_mapi witness) //= -mem_range.
-        rewrite /= => /enum_udeg_irr_degP [] m_ [rs] [] dec_ [] index_ all_.
-        by exists rs.
-      case=> f2 f2P; pose qqs2:= map f2 (range 0 (size s)).
-      have dec1: irreducible_monic_dec p (flatten qqs1).
-      - apply/irredp_monic_dec_flatten; exists qs1.
-        rewrite size1 size_map size_range ler_maxr //= -eq1 eqpxx /=.
-        apply/(all_nthP _ _ (witness, witness)) => j /mem_range.
-        rewrite size_zip size1 size_map size_range ler_maxr // ler_minr //=.
-        move=> memj; rewrite nth_zip ?size1 ?size_map ?size_range ?ler_maxr //=.
-        rewrite (nth_map witness) -?mem_range ?size_range ?ler_maxr //.
-        rewrite nth_range -?mem_range ?size_range ?ler_maxr //=.
-        by move/(_ _ memj): f1P.
-      have dec2: irreducible_monic_dec p (flatten qqs2).
-      - apply/irredp_monic_dec_flatten; exists qs2.
-        rewrite size2 size_map size_range ler_maxr //= -eq2 eqpxx /=.
-        apply/(all_nthP _ _ (witness, witness)) => j /mem_range.
-        rewrite size_zip size2 size_map size_range ler_maxr // ler_minr //=.
-        move=> memj; rewrite nth_zip ?size1 ?size_map ?size_range ?ler_maxr //=.
-        rewrite (nth_map witness) -?mem_range ?size_range ?ler_maxr //.
-        rewrite nth_range -?mem_range ?size_range ?ler_maxr //=.
-        by move/(_ _ memj): f2P.
-      move: (irredp_monic_dec_perm_eq _ _ _ dec1 dec2) => eq_.
-      move: (flatten_perm_eq deg (range 2 (size s + 2)) _ _ _ _ _ _ _ eq_).
-      - by apply/range_uniq.
-      - by rewrite size_map !size_range.
-      - by rewrite size_map !size_range.
-      - apply/(all_nthP _ _ (witness, witness)) => j /mem_range.
-        rewrite size_zip size_map !size_range !ler_maxr // ler_minr //= => memj.
-        rewrite nth_zip ?size_map ?size_range ?size1 ?ler_maxr //.
-        rewrite (nth_map witness) -?mem_range ?size_range ?ler_maxr //.
-        rewrite nth_range -?mem_range //=; case/(_ j _): f1P => //= _ [] _.
-        by rewrite nth_range -?mem_range //; apply/all_imp_in/allP => q _ /= ->; ring.
-      - apply/(all_nthP _ _ (witness, witness)) => j /mem_range.
-        rewrite size_zip size_map !size_range !ler_maxr // ler_minr //= => memj.
-        rewrite nth_zip ?size_map ?size_range ?size1 ?ler_maxr //.
-        rewrite (nth_map witness) -?mem_range ?size_range ?ler_maxr //.
-        rewrite nth_range -?mem_range //=; case/(_ j _): f2P => //= _ [] _.
-        by rewrite nth_range -?mem_range //; apply/all_imp_in/allP => q _ /= ->; ring.
-      move/(all_nthP _ _ (witness, witness))/(_ i); rewrite -mem_range.
-      rewrite size_zip !size_map !size_range ler_maxr // ler_minr // memi /=.
-      rewrite nth_zip ?size_map //= !(nth_map witness) -?mem_range ?size_range ?ler_maxr //.
-      rewrite !nth_range -?mem_range //=.
-      case/(_ _ memi): f1P => m1 [] /irredp_monic_decP [] _ [] _ -> _.
-      case/(_ _ memi): f2P => m2 [] /irredp_monic_decP [] _ [] _ -> _.
-      by rewrite m1 m2 !scale1r; apply/PCM.eq_big_perm.
-    move=> p; rewrite enum_udeg_irr_shapeP mapP; split=> [[] m_ [] <<- [qs] [] dec_ ->>|].
-    + pose bqs:= mkseq (fun k => PCM.big (fun q => deg q = k + 2) idfun qs) (deg p - 1).
-      exists bqs; rewrite alltuples_listP size_mapi !size_mkseq /(\o) /=; split.
-      - apply/(all_nthP _ _ (witness, witness)) => i; rewrite size_zip size_mapi !size_mkseq.
-        rewrite -mem_range ler_maxr -?ltzS ?ltzE ?ltzW // ler_minr //= => memi.
-        rewrite nth_zip /=; [by rewrite size_mapi !size_mkseq|].
-        rewrite nth_mkseq -?mem_range //= (nth_mapi witness) /=.
-        * by rewrite -mem_range size_mkseq ler_maxr // -ltzS ltzE ltzW.
-        apply/enum_udeg_irr_degP; rewrite monic_prod /=.
-        * case/irredp_monic_decP: dec_ => + _.
-          by apply/all_imp_in/allP => q mem_ /= []; rewrite /idfun.
-        rewrite nth_mkseq -?mem_range //=; exists (filter (fun q => deg q = i + 2) qs).
-        rewrite size_filter filter_all /=; apply/irredp_monic_decP.
-        case/irredp_monic_decP: dec_ => all_ _; rewrite -prodf_neq0.
-        rewrite lc_prod PCM.big_filter BigCf.BCM.big1_seq ?scale1r /=.
-        * move=> q [] _ mem_; rewrite /(\o) /idfun /=.
-          by case/allP/(_ _ mem_): all_.
-        rewrite all_filter -all_predI; move: all_; apply/all_imp_in/allP => q mem_.
-        rewrite /predA /predI /predC /idfun /= negb_and -implyNb /=.
-        by case=> irr_ mq; split=> _ //; apply/irredp_neq0.
-      case/irredp_monic_decP: (dec_) => _ [] _ ->; rewrite m_ scale1r.
-      rewrite (PCM.partition_big deg _ predT _ _ (range 2 (deg p + 1))).
-      - by apply/range_uniq.
-      - by move=> q; rewrite /predT /=; apply/degs_irredp_monic_dec.
-      rewrite PCM.big_mapT range_iota /= (range_addr 2 (deg p - 1) 2) /=.
-      rewrite PCM.big_mapT; apply/PCM.eq_big_seq => i memi.
-      by rewrite /(\o) /idfun /=; apply/PCM.eq_big => //; move=> q; rewrite /predT /= addrC.
-    case=> qs [] /alltuples_listP []; rewrite size_mapi => size_ all_ ->>.
-    rewrite monic_prod /=; [apply/(all_nthP _ _ witness) => i /mem_range /= + _|].
-    + move=> memi; move/(all_nthP _ _ (witness, witness))/(_ i): all_.
-      rewrite -mem_range size_zip size_mapi -size_ ler_minr // memi /=.
-      rewrite nth_zip ?size_mapi //= (nth_mapi witness) -?mem_range -?size_ //.
-      by rewrite /(\o) /idfun /= => /enum_udeg_irr_degP.
-    move: (partial_funchoice
-            (mem (range 0 (n - 1)))
-            (fun i rs =>
-              monic (nth witness qs i) /\
-              irreducible_monic_dec (nth witness qs i) rs /\
-              size rs = nth witness s i /\
-              all (fun r => deg r = i + 2) rs)
-            _).
-    + move=> i memi /=; move/(all_nthP _ _ (witness, witness))/(_ i): all_.
-      rewrite size_zip size_mapi size_ ler_minr // -mem_range (is_shape_size _ _ is_s_s) memi /=.
-      rewrite nth_zip ?size_mapi //=.
-      rewrite (nth_mapi witness) -?mem_range ?(is_shape_size _ _ is_s_s) //.
-      by rewrite /(\o) /= => /enum_udeg_irr_degP [] ? [rs] ?; exists rs.
-    case=> f /= {all_} forall_.
-    have ->: qs = map (fun i => PCM.big predT idfun (f i)) (range 0 (n - 1)).
-    + apply/(eq_from_nth witness).
-      - rewrite size_map size_range size_ (is_shape_size _ _ is_s_s).
-        by rewrite ler_maxr //= -ltzS ltzE ltzW.
-      move=> i /mem_range; rewrite size_ (is_shape_size _ _ is_s_s) => memi.
-      rewrite (nth_map witness) ?size_range -?mem_range ?ler_maxr // -?ltzS ?ltzE ?ltzW //=.
-      rewrite nth_range -?mem_range //=; case/(_ _ memi): forall_ => m_ [] dec_ _.
-      by case/irredp_monic_decP: dec_ => _ [] _ ->; rewrite m_ scale1r.
-    rewrite PCM.big_mapT deg_prod; pose b:= all _ _; have ->: b; rewrite /b => {b} /=.
-    + apply/allP => i memi; rewrite /predI /predC /(predT i) /(\o) /(idfun (PCM.big _ _ _)) /=.
-      case/(_ _ memi): forall_ => _ [] /irredp_monic_decP [] all_ _ _.
-      apply/prodf_neq0; move: all_; apply/all_imp_in/allP => r memr /=.
-      rewrite /predI /predC /predT /idfun /= => -[] _.
-      by rewrite -lc_eq0 => ->; apply/RL.oner_neq0.
-    split; [rewrite eq_sym -subr_eq -{1}(is_shape_sum witness _ _ is_s_s) /=|].
-    + move: (range_addr 1 (n - 1) 1) => /= ->; rewrite Bigint.BIA.big_map /=.
-      rewrite (Bigint.BIA.eq_bigl _ predT); [by move=> ?; rewrite /(\o) /predT|].
-      apply/Bigint.BIA.eq_big_seq => i memi; rewrite /(\o) /idfun /=.
-      case/(_ _ memi): forall_ => m_ [] dec_ [] eq_ all_.
-      rewrite deg_prod; pose b:= all _ _; have ->: b; rewrite /b => {b} /=.
-      - apply/allP => r memr; rewrite /predI /predC /predT /=.
-        case/irredp_monic_decP: dec_ => /allP /(_ _ memr) [] _ + _.
+              (mem (range 0 (n - 1)))
+              (fun i rs =>
+                monic (nth witness qs i) /\
+                irreducible_monic_dec (nth witness qs i) rs /\
+                size rs = nth witness s i /\
+                all (fun r => deg r = i + 2) rs)
+              _).
+      + move=> i memi /=; move/(all_nthP _ _ (witness, witness))/(_ i): all_.
+        rewrite size_zip size_mapi size_ ler_minr // -mem_range (is_shape_size _ _ is_s_s) memi /=.
+        rewrite nth_zip ?size_mapi //=.
+        rewrite (nth_mapi witness) -?mem_range ?(is_shape_size _ _ is_s_s) //.
+        by rewrite /(\o) /= => /enum_udeg_irr_degP [] ? [rs] ?; exists rs.
+      case=> f /= {all_} forall_.
+      have ->: qs = map (fun i => PCM.big predT idfun (f i)) (range 0 (n - 1)).
+      + apply/(eq_from_nth witness).
+        - rewrite size_map size_range size_ (is_shape_size _ _ is_s_s).
+          by rewrite ler_maxr //= -ltzS ltzE ltzW.
+        move=> i /mem_range; rewrite size_ (is_shape_size _ _ is_s_s) => memi.
+        rewrite (nth_map witness) ?size_range -?mem_range ?ler_maxr // -?ltzS ?ltzE ?ltzW //=.
+        rewrite nth_range -?mem_range //=; case/(_ _ memi): forall_ => m_ [] dec_ _.
+        by case/irredp_monic_decP: dec_ => _ [] _ ->; rewrite m_ scale1r.
+      rewrite PCM.big_mapT deg_prod; pose b:= all _ _; have ->: b; rewrite /b => {b} /=.
+      + apply/allP => i memi; rewrite /predI /predC /(predT i) /(\o) /(idfun (PCM.big _ _ _)) /=.
+        case/(_ _ memi): forall_ => _ [] /irredp_monic_decP [] all_ _ _.
+        apply/prodf_neq0; move: all_; apply/all_imp_in/allP => r memr /=.
+        rewrite /predI /predC /predT /idfun /= => -[] _.
         by rewrite -lc_eq0 => ->; apply/RL.oner_neq0.
-      rewrite -eq_ (IntID.addrC 1).
-      rewrite (Bigint.BIA.eq_big_seq _ (fun _ => i + 1)) ?Bigint.big_constz ?count_predT //.
-      by move=> r memr; rewrite /(\o) /=; move/allP/(_ _ memr): all_ => ->.
-    exists (flatten (map f (range 0 (n - 1)))); rewrite irredp_monic_decP; do!split.
-    + apply/allP => r /flattenP [?] [] /mapP [i] [] memi ->> memr; case/(_ _ memi): forall_.
-      by move=> _ [] /irredp_monic_decP [] /allP /(_ _ memr).
-    + apply/prodf_neq0/allP => i memi; rewrite /predI /predC /predT /(\o) /idfun /=.
-      apply/prodf_neq0/allP => r memr; rewrite /predI /predC /=.
-      case/(_ _ memi): forall_ => _ [] /irredp_monic_decP [] /allP /(_ _ memr) [] _ + _ _.
-      by rewrite -lc_eq0 => ->; rewrite RL.oner_neq0.
-    + rewrite lc_prod (BigCf.BCM.eq_big_seq _ (fun _ => RL.oner)); last first.
-      - rewrite BigCf.BCM.big1_eq scale1r PCM.big_flatten PCM.big_map.
-        by apply/PCM.eq_big_seq => i memi; rewrite /(\o) /idfun.
-      move=> i memi; rewrite /(\o) /idfun /= lc_prod (BigCf.BCM.eq_big_seq _ (fun _ => RL.oner)).
-      - move=> r memr; rewrite /(\o) /=; case/(_ _ memi): forall_ => _ [] /irredp_monic_decP.
-        by case=> /allP /(_ _ memr) [] _ ->.
-      by rewrite BigCf.BCM.big1_eq.
-    apply/(eq_from_nth witness) => [|i /mem_range]; rewrite (is_shape_size _ _ is_s_s).
-    + by rewrite size_mkseq ler_maxr // -ltzS ltzE ltzW.
-    move=> memi; rewrite nth_mkseq -?mem_range //= count_flatten Bigint.sumzE.
-    rewrite !Bigint.BIA.big_mapT (Bigint.BIA.big_rem _ _ _ _ memi) /(predT i) /(\o) /=.
-    rewrite rem_filter ?range_uniq //Bigint.BIA.big_filter Bigint.BIA.big1_seq /=.
-    + move=> j []; rewrite /predC1 eq_sym => neqij memj.
-      case/(_ _ memj): forall_ => _ [] _ [] _ all_.
-      apply/count_pred0_eq_in => r memr /=.
-      move/allP/(_ _ memr): all_ => /= ->.
-      by rewrite eq_sym; move: neqij; apply/implybNN/IntID.addIr.
-    by case/(_ _ memi): forall_ => _ [] _ [] <-; rewrite eq_sym => /all_count_in ->.
-  qed.
-
-  lemma size_enum_udeg_irr_deg n :
-    0 < n =>
-    Bigint.BIA.big predT
-      (fun s => Bigint.BIM.bigi predT
-                  (fun i => size (enum_udeg_irr_deg (nth 0 s i) (i + 2)))
-                  0 n)
-      (allshapes n) =
-    FT.card ^ n.
-  proof.
-    rewrite -(IntID.subrK n (-1)); pose m:= n - - 1; move: m => {n} n /ltzE /ltzS /=.
-    move=> lt1n; rewrite -size_enum_udeg_irr_shape //.
-    apply/Bigint.BIA.eq_big_seq => s /allshapesP is_s_s /=.
-    move/perm_eq_size: (perm_eq_enum_udeg_irr_deg _ _ lt1n is_s_s) => ->.
-    rewrite size_map size_alltuples_list Bigint.prodzE.
-    rewrite mapi_map !Bigint.BIM.big_mapT (is_shape_size _ _ is_s_s) /=.
-    rewrite (Bigint.BIM.big_nth (witness, 0) _ _ (zip _ _)).
-    rewrite size_zip size_range ler_maxr -?ltzS ?ltzE ?ltzW //.
-    rewrite (is_shape_size _ _ is_s_s) ler_minr //.
-    apply/Bigint.BIM.eq_big_int => i /mem_range memi /=.
-    rewrite /(\o) (nth_zip witness 0) /=; [rewrite size_range ler_maxr|].
-    + by rewrite -ltzS ltzE ltzW.
-    + by rewrite (is_shape_size _ _ is_s_s).
-    by rewrite nth_range // -mem_range.
-  qed.
-
-  lemma enum_iudeg0 :
-    enum_iudeg 0 = [].
-  proof.
-    apply/eq_in_filter_pred0 => p /enum_udegP [] + /deg_eq0 ->>.
-    by rewrite /monic lc0 eq_sym RL.oner_neq0.
-  qed.
-
-  lemma enum_iudegP n p :
-    p \in enum_iudeg n <=>
-    (irreducible_poly p /\ monic p /\ deg p = n).
-  proof. by rewrite /enum_iudeg mem_filter enum_udegP. qed.
-
-  lemma uniq_enum_iudeg n :
-    uniq (enum_iudeg n).
-  proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
-
-  lemma perm_eq_enum_iudeg k d :
-    0 <= k =>
-    1 < d =>
-    perm_eq
-      (enum_udeg_irr_deg k d)
-      (map (PCM.big predT idfun) (undup_eqv perm_eq (alltuples k (enum_iudeg d)))).
-  proof.
-    move=> le0k lt1d; apply/uniq_perm_eq.
-    + by apply/uniq_enum_udeg_irr_deg.
-    + rewrite map_inj_in_uniq; last first.
-      - apply/undup_eqv_uniq; [by apply/perm_eq_refl| |by apply/perm_eq_trans].
-        by move=> ? ?; rewrite perm_eq_sym.
-      move=> qs1 qs2 mem1 mem2 eq_.
-      apply/(mem_undup_eqv_inj _ _ _ _ perm_eq_refl _ perm_eq_trans mem1 mem2).
-      - by move=> ? ?; rewrite perm_eq_sym.
-      move: eq_; pose p:= (PCM.big predT idfun qs1).
-      move: {1 3}p (eq_refl p); rewrite /p => {p} p eq1 eq2.
-      move: (mem_undup_eqv_mem _ perm_eq_refl _ perm_eq_trans _ _ mem1).
-      - by move=> ? ?; rewrite perm_eq_sym.
-      case/alltuplesP; rewrite ler_maxr // => size1 all1 {mem1}.
-      move: (mem_undup_eqv_mem _ perm_eq_refl _ perm_eq_trans _ _ mem2).
-      - by move=> ? ?; rewrite perm_eq_sym.
-      case/alltuplesP; rewrite ler_maxr // => size2 all2 {mem2}.
-      apply/(irredp_monic_dec_perm_eq p); apply/irredp_monic_decP; do!split.
-      - by move: all1; apply/all_imp_in/allP => q /= _ /enum_iudegP.
-      - rewrite eq1 -prodf_neq0; move: all1; apply/all_imp_in/allP => q /=.
-        by move=> _ /enum_iudegP [] /irredp_neq0 + _; rewrite /predI /predC /predT /idfun.
-      - rewrite -eq1; have ->: monic p; [|by rewrite scale1r].
-        rewrite eq1 monic_prod; move: all1; apply/all_imp_in/allP => q /=.
+      split; [rewrite eq_sym -subr_eq -{1}(is_shape_sum witness _ _ is_s_s) /=|].
+      + move: (range_addr 1 (n - 1) 1) => /= ->; rewrite Bigint.BIA.big_map /=.
+        rewrite (Bigint.BIA.eq_bigl _ predT); [by move=> ?; rewrite /(\o) /predT|].
+        apply/Bigint.BIA.eq_big_seq => i memi; rewrite /(\o) /idfun /=.
+        case/(_ _ memi): forall_ => m_ [] dec_ [] eq_ all_.
+        rewrite deg_prod; pose b:= all _ _; have ->: b; rewrite /b => {b} /=.
+        - apply/allP => r memr; rewrite /predI /predC /predT /=.
+          case/irredp_monic_decP: dec_ => /allP /(_ _ memr) [] _ + _.
+          by rewrite -lc_eq0 => ->; apply/RL.oner_neq0.
+        rewrite -eq_ (IntID.addrC 1).
+        rewrite (Bigint.BIA.eq_big_seq _ (fun _ => i + 1)) ?Bigint.big_constz ?count_predT //.
+        by move=> r memr; rewrite /(\o) /=; move/allP/(_ _ memr): all_ => ->.
+      exists (flatten (map f (range 0 (n - 1)))); rewrite irredp_monic_decP; do!split.
+      + apply/allP => r /flattenP [?] [] /mapP [i] [] memi ->> memr; case/(_ _ memi): forall_.
+        by move=> _ [] /irredp_monic_decP [] /allP /(_ _ memr).
+      + apply/prodf_neq0/allP => i memi; rewrite /predI /predC /predT /(\o) /idfun /=.
+        apply/prodf_neq0/allP => r memr; rewrite /predI /predC /=.
+        case/(_ _ memi): forall_ => _ [] /irredp_monic_decP [] /allP /(_ _ memr) [] _ + _ _.
+        by rewrite -lc_eq0 => ->; rewrite RL.oner_neq0.
+      + rewrite lc_prod (BigCf.BCM.eq_big_seq _ (fun _ => RL.oner)); last first.
+        - rewrite BigCf.BCM.big1_eq scale1r PCM.big_flatten PCM.big_map.
+          by apply/PCM.eq_big_seq => i memi; rewrite /(\o) /idfun.
+        move=> i memi; rewrite /(\o) /idfun /= lc_prod (BigCf.BCM.eq_big_seq _ (fun _ => RL.oner)).
+        - move=> r memr; rewrite /(\o) /=; case/(_ _ memi): forall_ => _ [] /irredp_monic_decP.
+          by case=> /allP /(_ _ memr) [] _ ->.
+        by rewrite BigCf.BCM.big1_eq.
+      apply/(eq_from_nth witness) => [|i /mem_range]; rewrite (is_shape_size _ _ is_s_s).
+      + by rewrite size_mkseq ler_maxr // -ltzS ltzE ltzW.
+      move=> memi; rewrite nth_mkseq -?mem_range //= count_flatten Bigint.sumzE.
+      rewrite !Bigint.BIA.big_mapT (Bigint.BIA.big_rem _ _ _ _ memi) /(predT i) /(\o) /=.
+      rewrite rem_filter ?range_uniq //Bigint.BIA.big_filter Bigint.BIA.big1_seq /=.
+      + move=> j []; rewrite /predC1 eq_sym => neqij memj.
+        case/(_ _ memj): forall_ => _ [] _ [] _ all_.
+        apply/count_pred0_eq_in => r memr /=.
+        move/allP/(_ _ memr): all_ => /= ->.
+        by rewrite eq_sym; move: neqij; apply/implybNN/IntID.addIr.
+      by case/(_ _ memi): forall_ => _ [] _ [] <-; rewrite eq_sym => /all_count_in ->.
+    qed.
+  
+    lemma size_enum_udeg_irr_deg n :
+      0 < n =>
+      Bigint.BIA.big predT
+        (fun s => Bigint.BIM.bigi predT
+                    (fun i => size (enum_udeg_irr_deg (nth 0 s i) (i + 2)))
+                    0 n)
+        (allshapes n) =
+      FT.card ^ n.
+    proof.
+      rewrite -(IntID.subrK n (-1)); pose m:= n - - 1; move: m => {n} n /ltzE /ltzS /=.
+      move=> lt1n; rewrite -size_enum_udeg_irr_shape //.
+      apply/Bigint.BIA.eq_big_seq => s /allshapesP is_s_s /=.
+      move/perm_eq_size: (perm_eq_enum_udeg_irr_deg _ _ lt1n is_s_s) => ->.
+      rewrite size_map size_alltuples_list Bigint.prodzE.
+      rewrite mapi_map !Bigint.BIM.big_mapT (is_shape_size _ _ is_s_s) /=.
+      rewrite (Bigint.BIM.big_nth (witness, 0) _ _ (zip _ _)).
+      rewrite size_zip size_range ler_maxr -?ltzS ?ltzE ?ltzW //.
+      rewrite (is_shape_size _ _ is_s_s) ler_minr //.
+      apply/Bigint.BIM.eq_big_int => i /mem_range memi /=.
+      rewrite /(\o) (nth_zip witness 0) /=; [rewrite size_range ler_maxr|].
+      + by rewrite -ltzS ltzE ltzW.
+      + by rewrite (is_shape_size _ _ is_s_s).
+      by rewrite nth_range // -mem_range.
+    qed.
+  
+    lemma enum_iudeg0 :
+      enum_iudeg 0 = [].
+    proof.
+      apply/eq_in_filter_pred0 => p /enum_udegP [] + /deg_eq0 ->>.
+      by rewrite /monic lc0 eq_sym RL.oner_neq0.
+    qed.
+  
+    lemma enum_iudegP n p :
+      p \in enum_iudeg n <=>
+      (irreducible_poly p /\ monic p /\ deg p = n).
+    proof. by rewrite /enum_iudeg mem_filter enum_udegP. qed.
+  
+    lemma uniq_enum_iudeg n :
+      uniq (enum_iudeg n).
+    proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
+  
+    lemma perm_eq_enum_iudeg k d :
+      0 <= k =>
+      1 < d =>
+      perm_eq
+        (enum_udeg_irr_deg k d)
+        (map (PCM.big predT idfun) (undup_eqv perm_eq (alltuples k (enum_iudeg d)))).
+    proof.
+      move=> le0k lt1d; apply/uniq_perm_eq.
+      + by apply/uniq_enum_udeg_irr_deg.
+      + rewrite map_inj_in_uniq; last first.
+        - apply/undup_eqv_uniq; [by apply/perm_eq_refl| |by apply/perm_eq_trans].
+          by move=> ? ?; rewrite perm_eq_sym.
+        move=> qs1 qs2 mem1 mem2 eq_.
+        apply/(mem_undup_eqv_inj _ _ _ _ perm_eq_refl _ perm_eq_trans mem1 mem2).
+        - by move=> ? ?; rewrite perm_eq_sym.
+        move: eq_; pose p:= (PCM.big predT idfun qs1).
+        move: {1 3}p (eq_refl p); rewrite /p => {p} p eq1 eq2.
+        move: (mem_undup_eqv_mem _ perm_eq_refl _ perm_eq_trans _ _ mem1).
+        - by move=> ? ?; rewrite perm_eq_sym.
+        case/alltuplesP; rewrite ler_maxr // => size1 all1 {mem1}.
+        move: (mem_undup_eqv_mem _ perm_eq_refl _ perm_eq_trans _ _ mem2).
+        - by move=> ? ?; rewrite perm_eq_sym.
+        case/alltuplesP; rewrite ler_maxr // => size2 all2 {mem2}.
+        apply/(irredp_monic_dec_perm_eq p); apply/irredp_monic_decP; do!split.
+        - by move: all1; apply/all_imp_in/allP => q /= _ /enum_iudegP.
+        - rewrite eq1 -prodf_neq0; move: all1; apply/all_imp_in/allP => q /=.
+          by move=> _ /enum_iudegP [] /irredp_neq0 + _; rewrite /predI /predC /predT /idfun.
+        - rewrite -eq1; have ->: monic p; [|by rewrite scale1r].
+          rewrite eq1 monic_prod; move: all1; apply/all_imp_in/allP => q /=.
+          by move=> _ /enum_iudegP; rewrite /idfun.
+        - by move: all2; apply/all_imp_in/allP => q /= _ /enum_iudegP.
+        - rewrite eq2 -prodf_neq0; move: all2; apply/all_imp_in/allP => q /=.
+          by move=> _ /enum_iudegP [] /irredp_neq0 + _; rewrite /predI /predC /predT /idfun.
+        rewrite -eq2; have ->: monic p; [|by rewrite scale1r].
+        rewrite eq2 monic_prod; move: all2; apply/all_imp_in/allP => q /=.
         by move=> _ /enum_iudegP; rewrite /idfun.
-      - by move: all2; apply/all_imp_in/allP => q /= _ /enum_iudegP.
-      - rewrite eq2 -prodf_neq0; move: all2; apply/all_imp_in/allP => q /=.
-        by move=> _ /enum_iudegP [] /irredp_neq0 + _; rewrite /predI /predC /predT /idfun.
-      rewrite -eq2; have ->: monic p; [|by rewrite scale1r].
-      rewrite eq2 monic_prod; move: all2; apply/all_imp_in/allP => q /=.
-      by move=> _ /enum_iudegP; rewrite /idfun.
-    move=> p; rewrite enum_udeg_irr_degP mapP; split=> [[] m_ [qs]|[qs]].
-    + case=> dec_ [] <<- all_.
-      move: (undup_eqv_mem _ perm_eq_refl _ perm_eq_trans
-              (alltuples (size qs) (enum_iudeg d)) qs _).
-      - by move=> ? ?; rewrite perm_eq_sym.
-      - apply/alltuplesP; rewrite ler_maxr //=.
-        move: all_; apply/all_imp_in/allP => q mem_ /= <<-.
-        apply/enum_iudegP => /=; move/irredp_monic_decP: dec_.
-        by case=> /allP /(_ _ mem_) [] ? ? _.
-      case/hasP => rs [] mem_ eq_; exists rs; rewrite mem_ /=.
-      rewrite -(PCM.eq_big_perm _ _ _ _ eq_) => {rs mem_ eq_}.
-      case/irredp_monic_decP: dec_ => {all_} all_ [] _ ->.
-      by rewrite m_ scale1r.
-    case=> mem_ ->>; move: (mem_undup_eqv_mem _ perm_eq_refl _ perm_eq_trans _ _ mem_).
-    + by move=> ? ?; rewrite perm_eq_sym.
-    case/alltuplesP; rewrite ler_maxr // => [] <<- all_ {le0k mem_}; rewrite monic_prod /=.
-    + by move: all_; apply/all_imp_in/allP => q mem_ /= /enum_iudegP; rewrite /idfun.
-    exists qs => /=; rewrite irredp_monic_decP -prodf_neq0 lc_prod BigCf.BCM.big1_seq.
-    + move=> q; rewrite /predT /(\o) /idfun /= => mem_; move/allP/(_ _ mem_): all_.
-      by case/enum_iudegP => _ [] ->.
-    rewrite scale1r /= -!all_predI; move: all_; apply/all_imp_in/allP.
-    move=> q mem_; rewrite /predI /predC /predT /idfun /=.
-    case/enum_iudegP => irr_ [] m_ <<-; rewrite irr_ m_ /=.
-    by apply/irredp_neq0.
-  qed.
-
-  lemma size_enum_iudeg n :
-    0 < n =>
-    Bigint.BIA.big
-      predT
-      (fun s =>
-        Bigint.BIM.bigi
-          predT
-          (fun i => Bigint.BIM.bigi
-                      predT
-                      ((+) (size (enum_iudeg (i + 1))))
-                      0 (nth 0 s (i - 1))
-                    %/ fact (nth 0 s (i - 1)))
-          1 (n + 1))
-      (allshapes n) =
-    FT.card ^ n.
-  proof.
-    move=> lt0n; rewrite -size_enum_udeg_irr_deg //.
-    apply/Bigint.BIA.eq_big_seq => s /allshapesP is_s_s /=.
-    rewrite (range_addr 1 n 1) Bigint.BIM.big_mapT.
-    apply/Bigint.BIM.eq_big_seq => i memi /=.
-    move/allP/(_ (nth 0 s i) _): (is_shape_ge0 _ _ is_s_s); [|move=> le0_].
-    + by apply/mem_nth/mem_range; rewrite (is_shape_size _ _ is_s_s).
-    move: (perm_eq_enum_iudeg (nth 0 s i) (i + 2) _ _) => //.
-    + by apply/ltr_subl_addr; move: memi; apply/mem_range_lt.
-    move/perm_eq_size => ->; rewrite size_map /(\o) /=.
-    case/ler_eqVlt: le0_ => [/eq_sym eq0_|lt0_].
-    + by rewrite eq0_ alltuples_le0 //= fact0 // divz1 range_geq.
-    rewrite uniq_size_undup_perm_eq //.
-    + by apply/uniq_enum_iudeg.
-    + by apply/ltzW.
-    + by rewrite negb_and gtr_eqF.
-    rewrite (IntID.addrC 2) addrAC; move: (size_ge0 (enum_iudeg (i + 2))) lt0_.
-    pose a:= size _; pose b:= nth _ _ _; move: a b.
-    move=> a b le0a lt0b {n lt0n s is_s_s i memi}.
-    rewrite Bigint.BIM.big_predT_idfun -(range_addr a b a) (IntID.addrC b).
-    case/ler_eqVlt: le0a => [<<-/=|lt0a].
-    + by rewrite bin_gt ?ltzE // range_ltn.
-    apply/(IntID.mulfI (fact b * fact (a - 1))).
-    + by apply/gtr_eqF/mulr_gt0; apply/fact_gt0.
-    move: (eq_bin_div (a + b - 1) b _).
-    + by rewrite ltzW //= -ltzS /= -ltr_subl_addr.
-    rewrite (IntID.addrAC _ (-1)) addrK /= => ->.
-    rewrite (IntID.mulrC (fact _)) mulrAC -mulrA divzK.
-    + by apply/dvd_fact_prod_range; rewrite addrAC.
-    rewrite /fact /= (range_cat a 1 (a + b)).
-    + by move/ltzE: lt0a.
-    + by apply/ler_subl_addl/ltzW.
-    by rewrite Bigint.BIM.big_cat.
-  qed.
-
-  lemma eqI_size_enum_iudeg n :
-    0 < n =>
-    Counting_Argument.I n FT.card = size (enum_iudeg (n + 1)).
-  proof.
-    rewrite -(IntID.subrK n 1); pose m:= n - 1; move: m => {n} n /ltzS.
-    elim/sintind: n => n le0n /= IHn.
-    move: (Counting_Argument.eqI (n + 1) _ _ FCR.card_gt1); [by apply/ltzS|].
-    rewrite -size_enum_iudeg /=; [by apply/ltzS|].
-    rewrite !(Bigint.BIA.big_rem _ _ (allshapes _) (shape (cc_perm (range 0 (n + 1))))).
-    + apply/allshapesP/is_shapeP; exists (cc_perm (range 0 (n + 1))) => /=.
-      by apply/is_perm_cc; [apply/ltzS|apply/perm_eq_refl].
-    + apply/allshapesP/is_shapeP; exists (cc_perm (range 0 (n + 1))) => /=.
-      by apply/is_perm_cc; [apply/ltzS|apply/perm_eq_refl].
-    rewrite /(predT (shape _)) /= !rem_filter ?allshapes_uniq //.
-    pose sI:= Bigint.BIA.big _ _ _; pose sE:= Bigint.BIA.big _ _ _.
-    have ->: sI = sE; [rewrite /sI /sE|move/IntID.addIr]; move=> {sI sE}.
-    + apply/Bigint.BIA.eq_big_seq => s; rewrite mem_filter /predC1.
-      case=> neqs_ /allshapesP is_s_s /=; apply/Bigint.BIM.eq_big_seq.
-      move=> i memi /=; congr; congr; apply/Bigint.BIM.eq_big_seq.
-      move=> j memj; congr; move: memi; rewrite (rangeSr _ (n + 1)).
-      - by apply/ler_subl_addr.
-      rewrite mem_rcons /=; case=> [->>/=|memi]; last first.
-      - by move/( _ (i - 1)): IHn; rewrite -mem_range mem_range_subr memi.
-      move: is_s_s neqs_ memj => /= /is_shapeP [] p [] is_p_p <<-.
-      move/allP/(_ (nth 0 (shape p) n) _): (shape_ge0 p).
-      - by apply/mem_nth; rewrite size_shape (size_is_perm _ _ is_p_p) ltzS.
-      case/ler_eqVlt => [<-|]; [by rewrite (range_geq 0 0)|].
-      rewrite (cc_shapeW _ _ _ is_p_p); case=> c [] eq_ ->>.
-      rewrite (cc_shapeP (n + 1) c) //=; [by apply/ltzS|].
-      rewrite (cc_shapeP (n + 1) (range 0 (n + 1))) //=; [by apply/ltzS|].
-      by apply/perm_eq_refl.
-    rewrite (cc_shapeP (n + 1)) /=; [by apply/ltzS|by apply/perm_eq_refl|].
-    rewrite (rangeSr _ (n + 1)); [by apply/ler_subl_addr|].
-    rewrite !Bigint.BIM.big_rcons /(predT (n + 1)) /=.
-    pose sI:= Bigint.BIM.big _ _ _; pose xI:= _ %/ _.
-    pose sE:= Bigint.BIM.big _ _ _; pose xE:= _ %/ _.
-    have ->/=: sI = 1; rewrite /sI => {sI}.
-    + rewrite Bigint.BIM.big1_seq // => i [] _ memi /=.
-      rewrite nth_rcons size_nseq ler_maxr // ltzE /= -ltzS.
-      case/mem_range: (memi) => _ -> /=.
-      rewrite nth_nseq -?mem_range ?mem_range_subr //.
-      by rewrite range_geq // Bigint.BIM.big_nil fact0.
-    have ->/=: sE = 1; rewrite /sE => {sE}.
-    + rewrite Bigint.BIM.big1_seq // => i [] _ memi /=.
-      rewrite nth_rcons size_nseq ler_maxr // ltzE /= -ltzS.
-      case/mem_range: (memi) => _ -> /=.
-      rewrite nth_nseq -?mem_range ?mem_range_subr //.
-      by rewrite range_geq // Bigint.BIM.big_nil fact0.
-    rewrite /xI /xE; rewrite nth_rcons size_nseq ler_maxr //=.
-    by rewrite fact1 !divz1 range_ltn // range_geq.
-  qed.
-
-  lemma exists_iu_le_deg (n : int) :
-    exists p , n < deg p /\ irreducible_poly p /\ monic p.
-  proof.
-    rewrite -negbK negb_exists /=; apply/negP => forall_.
-    case: (irredp_monic_decW (PCM.big predT idfun (rem poly0 (enum_ledeg n)) * X + poly1)) => + _.
-    rewrite rem_filter ?uniq_enum_ledeg //; rewrite scaled_monicP.
-    pose r:= (PCM.big _ _ _); have: r <> poly0; rewrite /r => {r}.
-    + rewrite -prodf_neq0; apply/allP => q /mem_filter [] + _.
-      by rewrite /predC1 /predC /predI /predT /idfun.
-    move=> neq_0; pose r:= (_ + poly1); have: r <> poly0; rewrite /r => {r}.
-    + apply/negP => /(congr1 deg); rewrite deg0 degDl.
-      - by rewrite deg1 degM ?nz_polyX // degX /= -ltr_subl_addr deg_gt0.
-      rewrite /=; apply/gtr_eqF; rewrite deg_gt0.
-      by apply/IDPoly.mulf_neq0 => //; apply/nz_polyX.
-    move=> neq_0_; rewrite neq_0_ /=; apply/negP.
-    case; case=> [|q qs]; [rewrite -irredp_monic_dec_nil /= gtr_eqF //|].
-    + rewrite degDl; [by rewrite deg1 degM ?nz_polyX // degX /= -ltr_subl_addr deg_gt0|].
-      by rewrite degM ?nz_polyX // degX /= -ltr_subl_addr deg_gt0.
-    rewrite -irredp_monic_dec_cons => -[] dvdp_ [] irr_ [] m_ dec_.
-    case: (deg q <= n) => [le_n|/ltrNge ltn_]; [move: dvdp_; rewrite (PCM.big_rem _ _ _ q)|].
-    + by rewrite mem_filter enum_ledegP le_n /predC1 irredp_neq0.
-    + rewrite /(predT q) /(idfun q) /=; apply/negP => /dvdp_add_eq.
-      rewrite -PolyComRing.mulrA dvdp_mulIl eq_sym eqT dvdp1 /=.
-      by rewrite gtr_eqF // irredp_poly_deg.
-    by move: forall_ => /(_ q).
-  qed.
+      move=> p; rewrite enum_udeg_irr_degP mapP; split=> [[] m_ [qs]|[qs]].
+      + case=> dec_ [] <<- all_.
+        move: (undup_eqv_mem _ perm_eq_refl _ perm_eq_trans
+                (alltuples (size qs) (enum_iudeg d)) qs _).
+        - by move=> ? ?; rewrite perm_eq_sym.
+        - apply/alltuplesP; rewrite ler_maxr //=.
+          move: all_; apply/all_imp_in/allP => q mem_ /= <<-.
+          apply/enum_iudegP => /=; move/irredp_monic_decP: dec_.
+          by case=> /allP /(_ _ mem_) [] ? ? _.
+        case/hasP => rs [] mem_ eq_; exists rs; rewrite mem_ /=.
+        rewrite -(PCM.eq_big_perm _ _ _ _ eq_) => {rs mem_ eq_}.
+        case/irredp_monic_decP: dec_ => {all_} all_ [] _ ->.
+        by rewrite m_ scale1r.
+      case=> mem_ ->>; move: (mem_undup_eqv_mem _ perm_eq_refl _ perm_eq_trans _ _ mem_).
+      + by move=> ? ?; rewrite perm_eq_sym.
+      case/alltuplesP; rewrite ler_maxr // => [] <<- all_ {le0k mem_}; rewrite monic_prod /=.
+      + by move: all_; apply/all_imp_in/allP => q mem_ /= /enum_iudegP; rewrite /idfun.
+      exists qs => /=; rewrite irredp_monic_decP -prodf_neq0 lc_prod BigCf.BCM.big1_seq.
+      + move=> q; rewrite /predT /(\o) /idfun /= => mem_; move/allP/(_ _ mem_): all_.
+        by case/enum_iudegP => _ [] ->.
+      rewrite scale1r /= -!all_predI; move: all_; apply/all_imp_in/allP.
+      move=> q mem_; rewrite /predI /predC /predT /idfun /=.
+      case/enum_iudegP => irr_ [] m_ <<-; rewrite irr_ m_ /=.
+      by apply/irredp_neq0.
+    qed.
+  
+    lemma size_enum_iudeg n :
+      0 < n =>
+      Bigint.BIA.big
+        predT
+        (fun s =>
+          Bigint.BIM.bigi
+            predT
+            (fun i => Bigint.BIM.bigi
+                        predT
+                        ((+) (size (enum_iudeg (i + 1))))
+                        0 (nth 0 s (i - 1))
+                      %/ fact (nth 0 s (i - 1)))
+            1 (n + 1))
+        (allshapes n) =
+      FT.card ^ n.
+    proof.
+      move=> lt0n; rewrite -size_enum_udeg_irr_deg //.
+      apply/Bigint.BIA.eq_big_seq => s /allshapesP is_s_s /=.
+      rewrite (range_addr 1 n 1) Bigint.BIM.big_mapT.
+      apply/Bigint.BIM.eq_big_seq => i memi /=.
+      move/allP/(_ (nth 0 s i) _): (is_shape_ge0 _ _ is_s_s); [|move=> le0_].
+      + by apply/mem_nth/mem_range; rewrite (is_shape_size _ _ is_s_s).
+      move: (perm_eq_enum_iudeg (nth 0 s i) (i + 2) _ _) => //.
+      + by apply/ltr_subl_addr; move: memi; apply/mem_range_lt.
+      move/perm_eq_size => ->; rewrite size_map /(\o) /=.
+      case/ler_eqVlt: le0_ => [/eq_sym eq0_|lt0_].
+      + by rewrite eq0_ alltuples_le0 //= fact0 // divz1 range_geq.
+      rewrite uniq_size_undup_perm_eq //.
+      + by apply/uniq_enum_iudeg.
+      + by apply/ltzW.
+      + by rewrite negb_and gtr_eqF.
+      rewrite (IntID.addrC 2) addrAC; move: (size_ge0 (enum_iudeg (i + 2))) lt0_.
+      pose a:= size _; pose b:= nth _ _ _; move: a b.
+      move=> a b le0a lt0b {n lt0n s is_s_s i memi}.
+      rewrite Bigint.BIM.big_predT_idfun -(range_addr a b a) (IntID.addrC b).
+      case/ler_eqVlt: le0a => [<<-/=|lt0a].
+      + by rewrite bin_gt ?ltzE // range_ltn.
+      apply/(IntID.mulfI (fact b * fact (a - 1))).
+      + by apply/gtr_eqF/mulr_gt0; apply/fact_gt0.
+      move: (eq_bin_div (a + b - 1) b _).
+      + by rewrite ltzW //= -ltzS /= -ltr_subl_addr.
+      rewrite (IntID.addrAC _ (-1)) addrK /= => ->.
+      rewrite (IntID.mulrC (fact _)) mulrAC -mulrA divzK.
+      + by apply/dvd_fact_prod_range; rewrite addrAC.
+      rewrite /fact /= (range_cat a 1 (a + b)).
+      + by move/ltzE: lt0a.
+      + by apply/ler_subl_addl/ltzW.
+      by rewrite Bigint.BIM.big_cat.
+    qed.
+  
+    lemma eqI_size_enum_iudeg n :
+      0 < n =>
+      Counting_Argument.I n FT.card = size (enum_iudeg (n + 1)).
+    proof.
+      rewrite -(IntID.subrK n 1); pose m:= n - 1; move: m => {n} n /ltzS.
+      elim/sintind: n => n le0n /= IHn.
+      move: (Counting_Argument.eqI (n + 1) _ _ FCR.card_gt1); [by apply/ltzS|].
+      rewrite -size_enum_iudeg /=; [by apply/ltzS|].
+      rewrite !(Bigint.BIA.big_rem _ _ (allshapes _) (shape (cc_perm (range 0 (n + 1))))).
+      + apply/allshapesP/is_shapeP; exists (cc_perm (range 0 (n + 1))) => /=.
+        by apply/is_perm_cc; [apply/ltzS|apply/perm_eq_refl].
+      + apply/allshapesP/is_shapeP; exists (cc_perm (range 0 (n + 1))) => /=.
+        by apply/is_perm_cc; [apply/ltzS|apply/perm_eq_refl].
+      rewrite /(predT (shape _)) /= !rem_filter ?allshapes_uniq //.
+      pose sI:= Bigint.BIA.big _ _ _; pose sE:= Bigint.BIA.big _ _ _.
+      have ->: sI = sE; [rewrite /sI /sE|move/IntID.addIr]; move=> {sI sE}.
+      + apply/Bigint.BIA.eq_big_seq => s; rewrite mem_filter /predC1.
+        case=> neqs_ /allshapesP is_s_s /=; apply/Bigint.BIM.eq_big_seq.
+        move=> i memi /=; congr; congr; apply/Bigint.BIM.eq_big_seq.
+        move=> j memj; congr; move: memi; rewrite (rangeSr _ (n + 1)).
+        - by apply/ler_subl_addr.
+        rewrite mem_rcons /=; case=> [->>/=|memi]; last first.
+        - by move/( _ (i - 1)): IHn; rewrite -mem_range mem_range_subr memi.
+        move: is_s_s neqs_ memj => /= /is_shapeP [] p [] is_p_p <<-.
+        move/allP/(_ (nth 0 (shape p) n) _): (shape_ge0 p).
+        - by apply/mem_nth; rewrite size_shape (size_is_perm _ _ is_p_p) ltzS.
+        case/ler_eqVlt => [<-|]; [by rewrite (range_geq 0 0)|].
+        rewrite (cc_shapeW _ _ _ is_p_p); case=> c [] eq_ ->>.
+        rewrite (cc_shapeP (n + 1) c) //=; [by apply/ltzS|].
+        rewrite (cc_shapeP (n + 1) (range 0 (n + 1))) //=; [by apply/ltzS|].
+        by apply/perm_eq_refl.
+      rewrite (cc_shapeP (n + 1)) /=; [by apply/ltzS|by apply/perm_eq_refl|].
+      rewrite (rangeSr _ (n + 1)); [by apply/ler_subl_addr|].
+      rewrite !Bigint.BIM.big_rcons /(predT (n + 1)) /=.
+      pose sI:= Bigint.BIM.big _ _ _; pose xI:= _ %/ _.
+      pose sE:= Bigint.BIM.big _ _ _; pose xE:= _ %/ _.
+      have ->/=: sI = 1; rewrite /sI => {sI}.
+      + rewrite Bigint.BIM.big1_seq // => i [] _ memi /=.
+        rewrite nth_rcons size_nseq ler_maxr // ltzE /= -ltzS.
+        case/mem_range: (memi) => _ -> /=.
+        rewrite nth_nseq -?mem_range ?mem_range_subr //.
+        by rewrite range_geq // Bigint.BIM.big_nil fact0.
+      have ->/=: sE = 1; rewrite /sE => {sE}.
+      + rewrite Bigint.BIM.big1_seq // => i [] _ memi /=.
+        rewrite nth_rcons size_nseq ler_maxr // ltzE /= -ltzS.
+        case/mem_range: (memi) => _ -> /=.
+        rewrite nth_nseq -?mem_range ?mem_range_subr //.
+        by rewrite range_geq // Bigint.BIM.big_nil fact0.
+      rewrite /xI /xE; rewrite nth_rcons size_nseq ler_maxr //=.
+      by rewrite fact1 !divz1 range_ltn // range_geq.
+    qed.
+  
+    lemma exists_iu_le_deg (n : int) :
+      exists p , n < deg p /\ irreducible_poly p /\ monic p.
+    proof.
+      rewrite -negbK negb_exists /=; apply/negP => forall_.
+      case: (irredp_monic_decW (PCM.big predT idfun (rem poly0 (enum_ledeg n)) * X + poly1)) => + _.
+      rewrite rem_filter ?uniq_enum_ledeg //; rewrite scaled_monicP.
+      pose r:= (PCM.big _ _ _); have: r <> poly0; rewrite /r => {r}.
+      + rewrite -prodf_neq0; apply/allP => q /mem_filter [] + _.
+        by rewrite /predC1 /predC /predI /predT /idfun.
+      move=> neq_0; pose r:= (_ + poly1); have: r <> poly0; rewrite /r => {r}.
+      + apply/negP => /(congr1 deg); rewrite deg0 degDl.
+        - by rewrite deg1 degM ?nz_polyX // degX /= -ltr_subl_addr deg_gt0.
+        rewrite /=; apply/gtr_eqF; rewrite deg_gt0.
+        by apply/IDPoly.mulf_neq0 => //; apply/nz_polyX.
+      move=> neq_0_; rewrite neq_0_ /=; apply/negP.
+      case; case=> [|q qs]; [rewrite -irredp_monic_dec_nil /= gtr_eqF //|].
+      + rewrite degDl; [by rewrite deg1 degM ?nz_polyX // degX /= -ltr_subl_addr deg_gt0|].
+        by rewrite degM ?nz_polyX // degX /= -ltr_subl_addr deg_gt0.
+      rewrite -irredp_monic_dec_cons => -[] dvdp_ [] irr_ [] m_ dec_.
+      case: (deg q <= n) => [le_n|/ltrNge ltn_]; [move: dvdp_; rewrite (PCM.big_rem _ _ _ q)|].
+      + by rewrite mem_filter enum_ledegP le_n /predC1 irredp_neq0.
+      + rewrite /(predT q) /(idfun q) /=; apply/negP => /dvdp_add_eq.
+        rewrite -PolyComRing.mulrA dvdp_mulIl eq_sym eqT dvdp1 /=.
+        by rewrite gtr_eqF // irredp_poly_deg.
+      by move: forall_ => /(_ q).
+    qed.
+  end PolyFinF.
 end PolyFiniteField.
 
 
@@ -1338,16 +1339,13 @@ abstract theory FFIrrPolyExt.
                     "FF"      as "FFS"
                     "UZL"     as "UZLS"
                     "UStr"    as "USStr"
-                    "USub"    as "USubS"
+                    "USt"     as "UStS"
                     "FUT"     as "FUTS"
                     "UZModCR" as "USZModCR"
                     "FUZMod"  as "FUSZMod"
            [type]   "uz"      as "uzs".
 
-  import PID.
-  import P.
-  import BigPoly.
-  import IdealP.
+  import PID P BigPoly IdealP PolyFinF.
 
   op p : poly.
 
@@ -1471,7 +1469,7 @@ abstract theory FFIrrPolyExt.
     theory FFS      <- FFS,
     theory UZLS     <- UZLS,
     theory USStr    <- USStr,
-    theory USubS    <- USubS,
+    theory UStS     <- UStS,
     theory USZModCR <- USZModCR,
     theory FUSZMod  <- FUSZMod,
     theory FUTS     <- FUTS,
@@ -1495,7 +1493,7 @@ abstract theory FFIrrPolyExt.
                     "FFS"      as "Gone"
                     "UZLS"     as "Gone"
                     "USStr"    as "Gone"
-                    "USubS"    as "Gone"
+                    "UStS"     as "Gone"
                     "FUTS"     as "Gone"
                     "USZModCR" as "Gone"
                     "FUSZMod"  as "Gone"
@@ -1572,13 +1570,16 @@ abstract theory FFIrrPolyExt.
     by rewrite -mem_count_eq0 mem_filter mapP /predC1.
   qed.
 
-  lemma eqn : SFF.n = deg p - 1.
-  proof.
-    apply/(ieexprIn _ SFT.card_gt0).
-    + by apply/gtr_eqF/FCRS.card_gt1.
-    + by apply/ltzW/SFF.lt0n.
-    + by apply/ltzS/ltzE/ltzW => /=; apply/irredp_poly_deg/irredp_p.
-    rewrite -SFF.eq_card_pow_n /TFT.card size_map size_enum_ledeg //.
-    by apply/ltzS/ltzE/ltzW => /=; apply/irredp_poly_deg/irredp_p.
-  qed.
+  theory FFIrrPolyE.
+    lemma eqn : SFF.n = deg p - 1.
+    proof.
+      apply/(ieexprIn _ SFT.card_gt0).
+      + by apply/gtr_eqF/FCRS.card_gt1.
+      + by apply/ltzW/SFF.lt0n.
+      + by apply/ltzS/ltzE/ltzW => /=; apply/irredp_poly_deg/irredp_p.
+      rewrite -SFF.eq_card_pow_n /TFT.card size_map size_enum_ledeg //.
+      by apply/ltzS/ltzE/ltzW => /=; apply/irredp_poly_deg/irredp_p.
+    qed.
+  end FFIrrPolyE.
 end FFIrrPolyExt.
+

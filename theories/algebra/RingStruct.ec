@@ -1906,6 +1906,14 @@ abstract theory FieldStruct.
         P (frobenius x).
     proof. by move/subf_cr; apply/subcr_frobenius. qed.
 
+    lemma subf_iter_frobenius_fixed :
+      prime char =>
+      forall n , subf (iter_frobenius_fixed n).
+    proof.
+      move=> prime_char n; split; [by apply/subcr_iter_frobenius_fixed|].
+      by apply/iter_frobenius_fixedV.
+    qed.
+
     lemma cr_endoU f :
       cr_endo f =>
       forall x ,
@@ -1988,14 +1996,6 @@ abstract theory FieldStruct.
       cr_auto f =>
       subf (fun x => f x = x).
     proof. by move/cr_auto_mono_endo/cr_mono_endo_fixed_subf. qed.
-
-    lemma subf_iter_frobenius_fixed n :
-      prime char =>
-      subf (iter_frobenius_fixed n).
-    proof.
-      rewrite /iter_frobenius_fixed => prime_char.
-      by apply/cr_endo_fixed_subf/cr_endo_iter/frobenius_cr_endo.
-    qed.
 
     lemma subf_subf_cr_endo f P :
       cr_endo f =>

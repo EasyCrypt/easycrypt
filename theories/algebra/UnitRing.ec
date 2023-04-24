@@ -14,7 +14,7 @@ abstract theory UZMod_ComRing.
 
   import RL.
 
-  clone import Subtype as USub with
+  clone import Subtype as USt with
     type T  <= t,
     type sT <= uz,
     pred P  <= unit.
@@ -55,7 +55,7 @@ abstract theory UZMod_ComRing.
   qed.
 
   theory UZModCR.
-    import USub UZL.
+    import USt UZL.
 
     lemma val1 : val UZL.zeror = RL.oner.
     proof. by rewrite val_insubd unitr1. qed.

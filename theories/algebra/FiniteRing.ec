@@ -363,7 +363,7 @@ abstract theory FiniteField.
     type t         <- uz,
     theory RL      <- UZL,
     theory ZModStr <- UStr,
-    op FT.enum     <= map USub.insubd (filter (predC1 RL.zeror) FT.enum)
+    op FT.enum     <= map USt.insubd (filter (predC1 RL.zeror) FT.enum)
     rename [theory] "RL"      as "Gone"
                     "ZModStr" as "Gone"
                     "FT"      as "FUT"
@@ -373,26 +373,26 @@ abstract theory FiniteField.
   realize FUT.enum_spec.
   proof.
     move=> u; rewrite count_map count_filter.
-    rewrite (eq_count _ (pred1 (USub.val u))).
+    rewrite (eq_count _ (pred1 (USt.val u))).
     + move=> x; rewrite /predI /predC1 /pred1 /preim /=.
       rewrite RL.unitfE; split=> [[] <<- ux|->>].
-      - by rewrite USub.val_insubd ux.
-      by rewrite USub.valKd USub.valP.
+      - by rewrite USt.val_insubd ux.
+      by rewrite USt.valKd USt.valP.
     rewrite count_uniq_mem ?FT.enum_uniq //.
     by apply/b2i_eq1/FT.enumP.
   qed.
 
   theory FF.
     import FT RL ZModStr CRStr IDStr FStr FZMod FCR FID.
-    import UZL UStr USub FUT FUZMod.
+    import UZL UStr USt FUT FUZMod.
   
     lemma card_unit :
       FT.card = FUT.card + 1.
     proof.
       rewrite /card (perm_eq_size  _ _ (perm_to_rem _ _ (FT.enumP RL.zeror))) /=.
-      rewrite addrC; congr; rewrite -(size_map USub.val); apply/perm_eq_size/uniq_perm_eq.
+      rewrite addrC; congr; rewrite -(size_map USt.val); apply/perm_eq_size/uniq_perm_eq.
       + by apply/rem_uniq/FT.enum_uniq.
-      + by apply/uniq_map_injective; [apply/USub.val_inj|apply/FUT.enum_uniq].
+      + by apply/uniq_map_injective; [apply/USt.val_inj|apply/FUT.enum_uniq].
       move => x; case: (x = RL.zeror) => [->>|neqx0].
       + rewrite rem_filter ?FT.enum_uniq // mem_filter /predC1 /= mapP.
         rewrite negb_exists /= => u; rewrite FUT.enumP /= eq_sym.
@@ -407,19 +407,19 @@ abstract theory FiniteField.
       apply/few_small_order_exists_generator => d.
       case/ler_eqVlt => [<<- /dvd0z|lt0d]; [by move => eq_; move: FUT.card_gt0; rewrite eq_|].
       move => dvdd_; move: (size_to_seq_eq_pow_1 _ lt0d); apply/ler_trans/lerr_eq.
-      rewrite -(size_map USub.insubd); apply/perm_eq_size/uniq_perm_eq.
+      rewrite -(size_map USt.insubd); apply/perm_eq_size/uniq_perm_eq.
       + by apply/uniq_to_seq.
       + rewrite map_inj_in_uniq; [|by apply/uniq_to_seq].
         move => x y; rewrite !mem_to_seq ?FT.is_finite_pred //.
-        move => eqx eqy /(congr1 USub.val); rewrite !USub.insubdK //.
+        move => eqx eqy /(congr1 USt.val); rewrite !USt.insubdK //.
         - by apply/(unitrX_neq0 _ d); [apply/gtr_eqF|rewrite eqx unitr1].
         by apply/(unitrX_neq0 _ d); [apply/gtr_eqF|rewrite eqy unitr1].
       move => x; rewrite mapP mem_to_seq ?FUT.is_finite_pred //=.
       rewrite /eq_pow_1; split => [eq_|[y] [+ ->>]].
-      + exists (USub.val x); rewrite USub.valKd /= mem_to_seq ?FT.is_finite_pred //=.
+      + exists (USt.val x); rewrite USt.valKd /= mem_to_seq ?FT.is_finite_pred //=.
         by rewrite -UZModCR.valX eq_ val_insubd unitr1.
       rewrite mem_to_seq ?FT.is_finite_pred //= => eq_.
-      apply/USub.val_inj; rewrite UZModCR.valX UZModCR.val1 USub.insubdK //.
+      apply/USt.val_inj; rewrite UZModCR.valX UZModCR.val1 USt.insubdK //.
       by apply/(unitrX_neq0 _ d); [apply/gtr_eqF|rewrite eq_ unitr1].
     qed.
   end FF.
@@ -694,7 +694,7 @@ abstract theory SubFiniteField.
                     "UZL"     as "UZLT"
                     "UStr"    as "UTStr"
                     "UFZMod"  as "UFZModT"
-                    "USub"    as "USubT"
+                    "USt"    as "UStT"
                     "FUT"     as "FUTT"
                     "UZModCR" as "UTZModCR"
                     "FUZMod"  as "FUTZMod"
@@ -719,7 +719,7 @@ abstract theory SubFiniteField.
                     "FStr"    as "FiniteFieldSFStrGone"
                     "UZL"     as "UZLS"
                     "UStr"    as "USStr"
-                    "USub"    as "USubS"
+                    "USt"    as "UStS"
                     "FUT"     as "FUTS"
                     "UZModCR" as "USZModCR"
                     "FUZMod"  as "FUSZMod"
@@ -901,7 +901,7 @@ abstract theory SubFiniteField_ZMod.
                     "FF"      as "FFT"
                     "UZL"     as "UZLT"
                     "UStr"    as "UTStr"
-                    "USub"    as "USubT"
+                    "USt"    as "UStT"
                     "FUT"     as "FUTT"
                     "UZModCR" as "UTZModCR"
                     "FUZMod"  as "FUTZMod"
@@ -922,7 +922,7 @@ abstract theory SubFiniteField_ZMod.
                     "FF"      as "FFS"
                     "UZL"     as "UZLS"
                     "UStr"    as "USStr"
-                    "USub"    as "USubS"
+                    "USt"    as "UStS"
                     "FUT"     as "FUTS"
                     "UZModCR" as "USZModCR"
                     "FUZMod"  as "FUSZMod"
@@ -949,7 +949,7 @@ abstract theory SubFiniteField_ZMod.
     theory FFT      <- FFT,
     theory UZLT     <- UZLT,
     theory UTStr    <- UTStr,
-    theory USubT    <- USubT,
+    theory UStT    <- UStT,
     theory FUTT     <- FUTT,
     theory UTZModCR <- UTZModCR,
     theory FUTZMod  <- FUTZMod,
@@ -965,7 +965,7 @@ abstract theory SubFiniteField_ZMod.
     theory FFS      <- FFS,
     theory UZLS     <- UZLS,
     theory USStr    <- USStr,
-    theory USubS    <- USubS,
+    theory UStS    <- UStS,
     theory USZModCR <- USZModCR,
     theory FUSZMod  <- FUSZMod,
     theory FUTS     <- FUTS,
@@ -988,7 +988,7 @@ abstract theory SubFiniteField_ZMod.
                     "FFT"      as "Gone"
                     "UZLT"     as "Gone"
                     "UTStr"    as "Gone"
-                    "USubT"    as "Gone"
+                    "UStT"     as "Gone"
                     "FUTT"     as "Gone"
                     "UTZModCR" as "Gone"
                     "FUTZMod"  as "Gone"
@@ -1004,7 +1004,7 @@ abstract theory SubFiniteField_ZMod.
                     "FFS"      as "Gone"
                     "UZLS"     as "Gone"
                     "USStr"    as "Gone"
-                    "USubS"    as "Gone"
+                    "UStS"     as "Gone"
                     "FUTS"     as "Gone"
                     "USZModCR" as "Gone"
                     "FUSZMod"  as "Gone"
@@ -1083,7 +1083,7 @@ abstract theory SubFiniteField_ZMod.
       (exists k , 0 < k /\ forall x , f x = exp x k).
     proof.
       case: exists_generator => g isg_g cra_f.
-      move: (isg_g (USubT.insubd (f (USubT.val g)))).
+      move: (isg_g (UStT.insubd (f (UStT.val g)))).
       case => k eq_; exists (k %% FUTT.card + FUTT.card).
       apply/and_impr; split; [apply/ltzE/ler_add|].
       + by apply/modz_ge0/gtr_eqF/FUTT.card_gt0.
@@ -1091,13 +1091,13 @@ abstract theory SubFiniteField_ZMod.
       move => lt0_ x; case (TRL.unit x) => [unitx|]; last first.
       + rewrite -TRL.unitfE /= => ->>; rewrite cr_auto0 //.
         by rewrite expr0z gtr_eqF.
-      move/(congr1 USubT.val): eq_; rewrite USubT.insubdK.
+      move/(congr1 UStT.val): eq_; rewrite UStT.insubdK.
       + apply/TRL.unitrE; rewrite -cr_autoV // -cr_autoM //.
-        by rewrite divrr; [apply/USubT.valP|rewrite cr_auto1].
+        by rewrite divrr; [apply/UStT.valP|rewrite cr_auto1].
       rewrite -UTStr.intmul_modz_order -modz_mod -modzDr UTStr.intmul_modz_order.
       move/FUTZMod.isgeneratorP: (isg_g) => ->; rewrite UTZModCR.valX.
-      case/(_ (USubT.insubd x)): isg_g => i /(congr1 USubT.val).
-      rewrite USubT.insubdK // UTZModCR.valX => ->>.
+      case/(_ (UStT.insubd x)): isg_g => i /(congr1 UStT.val).
+      rewrite UStT.insubdK // UTZModCR.valX => ->>.
       by rewrite cr_autoX // => ->; rewrite -!exprM mulrC.
     qed.
 
@@ -1146,8 +1146,8 @@ abstract theory SubFiniteField_ZMod.
           by rewrite modzMDl modz_small //= ltr_normr FCRT.gt1_char.
         rewrite exprD ?valU // expr1 SCR.insubdM ?PX /val ?valP // -/val.
         rewrite valKd; case: FFS.exists_generator => g isg_g; move: (isg_g).
-        case/(_ (USubS.insubd x)) => n /(congr1 USubS.val).
-        rewrite USubS.val_insubd ux /= => ->>; rewrite USZModCR.valX.
+        case/(_ (UStS.insubd x)) => n /(congr1 UStS.val).
+        rewrite UStS.val_insubd ux /= => ->>; rewrite USZModCR.valX.
         rewrite -SF.valX -exprM mulrA -!USZModCR.valX -ZModFin.eq_card_p.
         move/FUSZMod.isgeneratorP: isg_g.
         admit.
@@ -1365,15 +1365,16 @@ end SubFiniteFieldPred.
 theory SubFiniteIDomainFrobenius.
   type t, st.
 
-  clone include IDomainStruct with
+  clone include FiniteIDomain with
     type t <- t
-    rename [theory] "RL"  as "TRL"
-           [theory] "Str" as "TStr".
-
-  import CRTStr IDTStr.
+    rename [theory] "RL"      as "TRL"
+                    "Str"     as "TStr"
+                    "FT"      as "TFT"
+                    "FZMod"   as "FZModT"
+                    "FCR"     as "FCRT"
+                    "FID"     as "FIDT".
 
   op n : int.
-  axiom prime_char : prime char.
 
   clone include SubFiniteIDomainPred with
     type t          <- t,
@@ -1382,44 +1383,89 @@ theory SubFiniteIDomainFrobenius.
     theory ZModTStr <- ZModTStr,
     theory CRTStr   <- CRTStr,
     theory IDTStr   <- IDTStr,
-    pred Sub.P      <- iter_frobenius_fixed n
-    rename [theory] "TRL"  as "Gone"
-           [theory] "TStr" as "Gone"
+    theory TFT      <- TFT,
+    theory FZModT   <- FZModT,
+    theory FCRT     <- FCRT,
+    theory FIDT     <- FIDT,
+    pred Sub.P      <- IDTStr.iter_frobenius_fixed n
+    rename [theory] "TRL"      as "Gone"
+                    "TStr"     as "Gone"
+                    "TFT"      as "Gone"
+                    "FZModT"   as "Gone"
+                    "FCRT"     as "Gone"
+                    "FIDT"     as "Gone"
   proof subcrP.
 
   realize subcrP.
-  proof. by apply/subcr_iter_frobenius_fixed/prime_char. qed.
+  proof. by apply/IDTStr.subcr_iter_frobenius_fixed/FIDT.prime_char. qed.
 end SubFiniteIDomainFrobenius.
 
 (* -------------------------------------------------------------------- *)
 theory SubFiniteFieldFrobenius.
   type t, st.
 
-  clone include FieldStruct with
+  clone include FiniteField with
     type t <- t
-    rename [theory] "RL"  as "TRL"
-           [theory] "Str" as "TStr".
-
-  import CRTStr IDTStr.
+    rename [theory] "RL"      as "TRL"
+                    "Str"     as "TStr"
+                    "FT"      as "TFT"
+                    "FZMod"   as "FZModT"
+                    "FCR"     as "FCRT"
+                    "FID"     as "FIDT"
+                    "FF"      as "FFT"
+                    "UZL"     as "UZLT"
+                    "UStr"    as "UTStr"
+                    "USt"     as "UStT"
+                    "FUT"     as "FUTT"
+                    "UZModCR" as "UTZModCR"
+                    "FUZMod"  as "FUTZMod"
+           [type]   "uz"      as "uzt".
 
   op n : int.
-  axiom prime_char : prime char.
 
   clone include SubFiniteFieldPred with
     type t          <- t,
     type st         <- st,
+    type uzt        <- uzt,
     theory TRL      <- TRL,
     theory ZModTStr <- ZModTStr,
     theory CRTStr   <- CRTStr,
     theory IDTStr   <- IDTStr,
     theory FTStr    <- FTStr,
-    pred Sub.P      <- iter_frobenius_fixed n
-    rename [theory] "TRL"    as "Gone"
-           [theory] "TStr"   as "Gone"
-           [theory] "IDGone" as "SubFieldFrobeniusIDGone"
-  proof subcrP.
+    theory TFT      <- TFT,
+    theory FZModT   <- FZModT,
+    theory FCRT     <- FCRT,
+    theory FIDT     <- FIDT,
+    theory FFT      <- FFT,
+    theory UZLT     <- UZLT,
+    theory UTStr    <- UTStr,
+    theory UStT     <- UStT,
+    theory FUTT     <- FUTT,
+    theory UTZModCR <- UTZModCR,
+    theory FUTZMod  <- FUTZMod,
+    pred Sub.P      <- IDTStr.iter_frobenius_fixed n
+    rename [theory] "TRL"      as "Gone"
+                    "ZModTStr" as "Gone"
+                    "CRTStr"   as "Gone"
+                    "IDTStr"   as "SubFiniteFieldFrobeniusIDTStrGone"
+                    "IDStr1"   as "SubFiniteFieldFrobeniusIDStr1Gone"
+                    "IDStr2"   as "SubFiniteFieldFrobeniusIDStr2Gone"
+                    "IDGone"   as "SubFiniteFieldFrobeniusIDGone"
+                    "FTStr"    as "Gone"
+                    "TFT"      as "Gone"
+                    "FZModT"   as "Gone"
+                    "FCRT"     as "Gone"
+                    "FIDT"     as "Gone"
+                    "FFT"      as "Gone"
+                    "UZLT"     as "Gone"
+                    "UTStr"    as "Gone"
+                    "UStT"     as "Gone"
+                    "FUTT"     as "Gone"
+                    "UTZModCR" as "Gone"
+                    "FUTZMod"  as "Gone"
+  proof subfP.
 
-  realize subcrP.
-  proof. by apply/subcr_iter_frobenius_fixed/prime_char. qed.
+  realize subfP.
+  proof. by apply/FTStr.subf_iter_frobenius_fixed/FIDT.prime_char. qed.
 end SubFiniteFieldFrobenius.
 
