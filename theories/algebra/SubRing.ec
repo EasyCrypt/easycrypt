@@ -507,20 +507,20 @@ abstract theory SubField.
     theory IDTStr    <- IDTStr,
     theory IDSStr    <- IDSStr,
     theory IDMorph   <- IDMorph
-    rename [theory] "TRL"  as "Gone"
-           [theory] "SRL"  as "Gone"
+    rename [theory] "TRL"      as "Gone"
+           [theory] "SRL"      as "Gone"
            [theory] "ZModTStr" as "Gone"
            [theory] "ZModSStr" as "Gone"
-           [theory] "CRTStr" as "Gone"
-           [theory] "CRSStr" as "Gone"
+           [theory] "CRTStr"   as "Gone"
+           [theory] "CRSStr"   as "Gone"
            (*TODO: Pierre-Yves: declare rewrite not cleared.*)
-           [theory] "IDTStr" as "SubIDomainIDTStrGone"
-           [theory] "IDSStr" as "SubIDomainIDSStrGone"
-           [theory] "IDStr1" as "SubIDomainIDStr1Gone"
-           [theory] "IDStr2" as "SubIDomainIDStr2Gone"
-           [theory] "Morph" as "Gone".
+           [theory] "IDTStr"   as "SubIDomainIDTStrGone"
+           [theory] "IDSStr"   as "SubIDomainIDSStrGone"
+           [theory] "IDStr1"   as "SubIDomainIDStr1Gone"
+           [theory] "IDStr2"   as "SubIDomainIDStr2Gone"
+           [theory] "Morph"    as "Gone".
 
-  theory SF.
+  theory SFld.
     import Sub TRL SRL ZModTStr ZModSStr CRTStr CRSStr IDTStr IDSStr FTStr FSStr SZMod SCR SID.
     import ZModMorph CRMorph IDMorph FMorph.
 
@@ -572,7 +572,7 @@ abstract theory SubField.
       + by rewrite TRL.expr0z insubd0 SRL.expr0z fun_if insubd1 insubd0.
       by rewrite insubdXR // PV.
     qed.
-  end SF.
+  end SFld.
 end SubField.
 
 
@@ -795,8 +795,6 @@ type t, st.
     rename [theory] "TRL"  as "Gone"
            [theory] "TStr" as "Gone"
            [theory] "SRL"  as "SubComRingPredSRL".
-
-  print SubComRingPred.
 
   clear [SubComRingPredSRL.AddMonoid.* SubComRingPredSRL.MulMonoid.* SubComRingPredSRL.*].
 
@@ -1021,8 +1019,6 @@ theory SubFieldFrobenius.
 
   op n : int.
   axiom prime_char : prime char.
-
-  print FieldMorph.
 
   clone include SubFieldPred with
     type t          <- t,

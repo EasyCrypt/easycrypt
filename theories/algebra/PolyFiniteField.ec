@@ -656,8 +656,8 @@ abstract theory PolyFiniteField.
 
   clone include FiniteRing.FiniteField with
     type t    <- t,
-    theory RL <- RL,
-    theory IDStr.FrobeniusPoly.Po <- PID.P
+    theory RL <- RL
+    (*, theory IDStr.FrobeniusPoly.Po <= PID.P*)
     rename [theory] "RL" as "Gone".
 
   clone import Ideal as IdealP with
@@ -1337,12 +1337,12 @@ abstract theory FFIrrPolyExt.
                     "FID"     as "FIDS"
                     "FF"      as "FFS"
                     "UZL"     as "UZLS"
-                    "UStr"    as "UTStr"
+                    "UStr"    as "USStr"
                     "USub"    as "USubS"
                     "FUT"     as "FUTS"
                     "UZModCR" as "USZModCR"
                     "FUZMod"  as "FUSZMod"
-           [type]   "uz"      as "uzt".
+           [type]   "uz"      as "uzs".
 
   import PID.
   import P.
@@ -1454,20 +1454,113 @@ abstract theory FFIrrPolyExt.
     by move: (ler_add _ _ _ _ le1 le2).
   qed.
 
-(*
-  clone import FiniteField as FFQ with
-    type t     <= t,
-    theory RL  <= IFQ.FQ,
-    op FT.enum <= map pi (enum_ledeg (deg p - 1))
-  proof FT.enum_spec.
+  clone include SubFiniteField with
+    type   t        <- t,
+    type   st       <- st,
+    type uzs        <- uzs,
+    theory TRL      <= IFQ.FQ,
+    theory SRL      <- SRL,
+    theory ZModSStr <- ZModSStr,
+    theory CRSStr   <- CRSStr,
+    theory IDSStr   <- IDSStr,
+    theory FSStr    <- FSStr,
+    theory SFT      <- SFT,
+    theory FZModS   <- FZModS,
+    theory FCRS     <- FCRS,
+    theory FIDS     <- FIDS,
+    theory FFS      <- FFS,
+    theory UZLS     <- UZLS,
+    theory USStr    <- USStr,
+    theory USubS    <- USubS,
+    theory USZModCR <- USZModCR,
+    theory FUSZMod  <- FUSZMod,
+    theory FUTS     <- FUTS,
+    op TFT.enum     <= map pi (enum_ledeg (deg p - 1)),
+    pred Sub.P      <= (fun x => exists c , x = pi (polyC c)),
+    op Sub.insub    <= (fun x =>
+                         if (exists c , x = pi (polyC c))
+                         then Some ((modp (repr x) FFIrrPolyExt.p).[0])
+                         else None),
+    op Sub.val      <= (fun c => pi (polyC c)),
+    op Sub.wsT      <= pi (polyC witness)
+    rename [theory] "SRL"      as "Gone"
+                    "ZModSStr" as "Gone"
+                    "CRSStr"   as "Gone"
+                    "IDSStr"   as "IDSStrGone"
+                    "FSStr"    as "Gone"
+                    "SFT"      as "Gone"
+                    "FZModS"   as "Gone"
+                    "FCRS"     as "Gone"
+                    "FIDS"     as "Gone"
+                    "FFS"      as "Gone"
+                    "UZLS"     as "Gone"
+                    "USStr"    as "Gone"
+                    "USubS"    as "Gone"
+                    "FUTS"     as "Gone"
+                    "USZModCR" as "Gone"
+                    "FUSZMod"  as "Gone"
+  proof Sub.*, SZMod.*, SCR.*, TFT.*.
 
-  realize FT.enum_spec.
+  realize Sub.insubN.
+  proof. by move=> x ->. qed.
+
+  realize Sub.insubT.
+  proof.
+    move=> ? exists_; rewrite exists_ /=; case: exists_ => c ->>.
+    rewrite -eqv_pi eqv_sym /eqv mem_idgen1; exists poly0.
+    rewrite -polyCN -polyCD PolyComRing.mul0r eq_polyC0.
+    rewrite SRL.subr_eq0; move: (eqv_repr (polyC c)).
+    rewrite eqv_sym /eqv mem_idgen1 => -[q].
+    rewrite PolyComRing.subr_eq => ->; rewrite ulc_modp_addl_mul_small.
+    + by rewrite -SRL.unitfE lc_eq0 irredp_neq0 // irredp_p.
+    + by apply/(ler_lt_trans _ _ _ (degC_le _))/irredp_poly_deg/irredp_p.
+    by rewrite polyCE.
+  qed.
+
+  realize Sub.valP.
+  proof. by move=> c; exists c. qed.
+
+  realize Sub.valK.
+  proof.
+    move=> c; rewrite ifT; [by exists c|].
+    congr; move: (eqv_repr (polyC c)).
+    rewrite eqv_sym /eqv mem_idgen1 => -[q].
+    rewrite PolyComRing.subr_eq => ->; rewrite ulc_modp_addl_mul_small.
+    + by rewrite -SRL.unitfE lc_eq0 irredp_neq0 // irredp_p.
+    + by apply/(ler_lt_trans _ _ _ (degC_le _))/irredp_poly_deg/irredp_p.
+    by rewrite polyCE.
+  qed.
+
+  realize Sub.insubW.
+  proof.
+    rewrite ifT; [by exists witness|].
+    congr; move: (eqv_repr (polyC witness)).
+    rewrite eqv_sym /eqv mem_idgen1 => -[q].
+    rewrite PolyComRing.subr_eq => ->; rewrite ulc_modp_addl_mul_small.
+    + by rewrite -SRL.unitfE lc_eq0 irredp_neq0 // irredp_p.
+    + by apply/(ler_lt_trans _ _ _ (degC_le _))/irredp_poly_deg/irredp_p.
+    by rewrite polyCE.
+  qed.
+
+  realize SZMod.val0.
+  proof. by trivial. qed.
+
+  realize SZMod.valD.
+  proof. by move=> ? ?; rewrite polyCD addE. qed.
+
+  realize SCR.val1.
+  proof. by trivial. qed.
+
+  realize SCR.valM.
+  proof. by move=> ? ?; rewrite polyCM mulE. qed.
+
+  realize TFT.enum_spec.
   proof.
     move=> x; rewrite (count_rem _ _ x) -(reprK x).
     + apply/mapP; exists (modp (repr x) p).
       rewrite enum_ledegP -ltzS /= ltn_modp irredp_neq0 ?irredp_p //=.
       rewrite -eqv_pi eqv_sym /eqv mem_idgen1; exists (divp (repr x) p).
-      rewrite PolyComRing.subr_eq -ulc_divp_eq // -FFIrrPolyExt.TRL.unitfE.
+      rewrite PolyComRing.subr_eq -ulc_divp_eq // -SRL.unitfE.
       by rewrite lc_eq0 irredp_neq0 // irredp_p.
     rewrite /(pred1 _ _) /= b2i1 eq_sym addrC -subr_eq eq_sym /=.
     rewrite rem_filter ?map_inj_in_uniq ?uniq_enum_ledeg //.
@@ -1475,171 +1568,17 @@ abstract theory FFIrrPolyExt.
       move/eqv_pi; rewrite eqv_sym /eqv => /mem_idgen1 [u].
       rewrite PolyComRing.subr_eq => /(congr1 (transpose modp p)) /=.
       rewrite ulc_modp_addl_mul_small // ?modp_small //.
-      by rewrite -FFIrrPolyExt.TRL.unitfE lc_eq0 irredp_neq0 // irredp_p.
+      by rewrite -SRL.unitfE lc_eq0 irredp_neq0 // irredp_p.
     by rewrite -mem_count_eq0 mem_filter mapP /predC1.
   qed.
 
-  lemma cardP :
-    FFQ.FT.card = FFIrrPolyExt.TFT.card ^ (deg p - 1).
+  lemma eqn : SFF.n = deg p - 1.
   proof.
-    rewrite /FFQ.FT.card size_map size_enum_ledeg //.
-    by apply/ltzS => /=; apply/deg_gt0/irredp_neq0/irredp_p.
-  qed.
-
-  clone include SubFieldPred with
-    type t   <- FFIrrPolyExt.pt,
-    type st  <- FFIrrPolyExt.t,
-    theory F <= FFQ.F,
-    theory FF.FinType <= FFQ.FinType,
-    op SubF.p <= (fun x => exists c , x = pi (polyC c)),
-    op SubF.Sub.insub <= (fun x =>
-                            if (exists c , x = pi (polyC c))
-                            then Some ((modp (repr x) FFIrrPolyExt.p).[0])
-                            else None),
-    op SubF.Sub.val <= (fun c => pi (polyC c)),
-    op SubF.Sub.wsT <= pi (polyC witness)
-  proof SubF.*.
-
-  clone import SubFiniteField as SubFF with
-    type t   <= FFIrrPolyExt.pt,
-    type st  <= FFIrrPolyExt.t,
-    theory F <= FFQ.F,
-    theory FF.FinType <= FFQ.FinType,
-    op SubF.p <= (fun x => exists c , x = pi (polyC c)),
-    op SubF.Sub.insub <= (fun x =>
-                            if (exists c , x = pi (polyC c))
-                            then Some ((modp (repr x) FFIrrPolyExt.p).[0])
-                            else None),
-    op SubF.Sub.val <= (fun c => pi (polyC c)),
-    op SubF.Sub.wsT <= pi (polyC witness)
-  proof SubF.*.
-
-  realize SubF.fieldp.
-  proof.
-    split; split; split; [split| | |] => /=.
-    + by exists FF.F.zeror.
-    + by move=> ? [c] ->>; exists (FF.F.([-]) c); rewrite oppE polyCN.
-    + by move=> ? ? [c1] ->> [c2] ->>; exists (FF.F.( + ) c1 c2); rewrite addE polyCD.
-    + by exists FF.F.oner.
-    + by move=> ? ? [c1] ->> [c2] ->>; exists (FF.F.( * ) c1 c2); rewrite mulE polyCM.
-    move=> ? [c] ->>; pose P:= (fun y => _ y _ = _); case (c = FF.F.zeror) => [->>|neqc0].
-    + exists FF.F.zeror; apply/(choiceb_dfl P CRQ.zeror).
-      rewrite /P => {P} x; rewrite -(reprK x) /(CRQ.( * )) mulE PolyComRing.mulr0 -eqv_pi.
-      rewrite /eqv mem_idgen1; apply/negP => -[q] /(congr1 deg) /=.
-      rewrite PolyComRing.subr0 deg1; case (q = poly0) => [->>|neqq0].
-      - by rewrite PolyComRing.mul0r deg0.
-      rewrite degM // ?irredp_neq0 ?irredp_p // ltr_eqF // ltzE -ltzS ltzE /=.
-      move: (deg_eq0 q) (irredp_poly_deg _ irredp_p); rewrite neqq0 /= => {neqq0}.
-      move/ltr_total; rewrite ltrNge ge0_deg /= => /ltzE le1 /ltzE le2.
-      by move: (ler_add _ _ _ _ le1 le2).
-    move: (choicebP P CRQ.zeror _); rewrite /P => {P}.
-    + exists (pi (polyC (FF.F.invr c))); rewrite /(CRQ.( * )) mulE -polyCM.
-      by rewrite FF.F.mulVr // -FF.F.unitfE.
-    rewrite /(CRQ.( * ) (choiceb _ _)) -(reprK (choiceb _ _)) mulE.
-    pose x:= repr (choiceb _ _); move: x => x.
-    move=> /(congr1 (IFQ.( * ) (pi (polyC (FF.F.invr c))))).
-    rewrite mulE PolyComRing.mulrA PolyComRing.mulrAC -polyCM.
-    rewrite FF.F.mulVr -?FF.F.unitfE // PolyComRing.mul1r mulE PolyComRing.mulr1.
-    by move=> ->; exists (FF.F.invr c).
-  qed.
-
-  realize SubF.Sub.insubN.
-  proof. by move=> x ->. qed.
-
-  realize SubF.Sub.insubT.
-  proof.
-    move=> ? exists_; rewrite exists_ /=; case: exists_ => c ->>.
-    rewrite -eqv_pi eqv_sym /eqv mem_idgen1; exists poly0.
-    rewrite -polyCN -polyCD PolyComRing.mul0r eq_polyC0.
-    rewrite FF.F.subr_eq0; move: (eqv_repr (polyC c)).
-    rewrite eqv_sym /eqv mem_idgen1 => -[q].
-    rewrite PolyComRing.subr_eq => ->; rewrite ulc_modp_addl_mul_small.
-    + by rewrite -FF.F.unitfE lc_eq0 irredp_neq0 // irredp_p.
-    + by apply/(ler_lt_trans _ _ _ (degC_le _))/irredp_poly_deg/irredp_p.
-    by rewrite polyCE.
-  qed.
-
-  realize SubF.Sub.valP.
-  proof. by move=> c; exists c. qed.
-
-  realize SubF.Sub.valK.
-  proof.
-    move=> c; rewrite ifT; [by exists c|].
-    congr; move: (eqv_repr (polyC c)).
-    rewrite eqv_sym /eqv mem_idgen1 => -[q].
-    rewrite PolyComRing.subr_eq => ->; rewrite ulc_modp_addl_mul_small.
-    + by rewrite -FF.F.unitfE lc_eq0 irredp_neq0 // irredp_p.
-    + by apply/(ler_lt_trans _ _ _ (degC_le _))/irredp_poly_deg/irredp_p.
-    by rewrite polyCE.
-  qed.
-
-  realize SubF.Sub.insubW.
-  proof.
-    rewrite ifT; [by exists witness|].
-    congr; move: (eqv_repr (polyC witness)).
-    rewrite eqv_sym /eqv mem_idgen1 => -[q].
-    rewrite PolyComRing.subr_eq => ->; rewrite ulc_modp_addl_mul_small.
-    + by rewrite -FF.F.unitfE lc_eq0 irredp_neq0 // irredp_p.
-    + by apply/(ler_lt_trans _ _ _ (degC_le _))/irredp_poly_deg/irredp_p.
-    by rewrite polyCE.
-  qed.
-
-  lemma eq0 : FFIrrPolyExt.SubFF.SubF.zeror = FFIrrPolyExt.FF.F.zeror.
-  proof. by rewrite -(SubF.Sub.valKd FFIrrPolyExt.FF.F.zeror). qed.
-
-  lemma eqN x : FFIrrPolyExt.SubFF.SubF.([-]) x = FFIrrPolyExt.FF.F.([-]) x.
-  proof. by rewrite -(SubF.Sub.valKd (FFIrrPolyExt.FF.F.([-]) x)) polyCN -oppE. qed.
-
-  lemma eqD x y: FFIrrPolyExt.SubFF.SubF.( + ) x y = FFIrrPolyExt.FF.F.( + ) x y.
-  proof. by rewrite -(SubF.Sub.valKd (FFIrrPolyExt.FF.F.( + ) x y)) polyCD -addE. qed.
-
-  lemma eq1 : FFIrrPolyExt.SubFF.SubF.oner = FFIrrPolyExt.FF.F.oner.
-  proof. by rewrite -(SubF.Sub.valKd FFIrrPolyExt.FF.F.oner). qed.
-
-  lemma eqM x y: FFIrrPolyExt.SubFF.SubF.( * ) x y = FFIrrPolyExt.FF.F.( * ) x y.
-  proof. by rewrite -(SubF.Sub.valKd (FFIrrPolyExt.FF.F.( * ) x y)) polyCM -mulE. qed.
-
-  lemma eqV x : FFIrrPolyExt.SubFF.SubF.invr x = FFIrrPolyExt.FF.F.invr x.
-  proof.
-    case (x = SubF.zeror) => [->>|neqx0]; [|apply/(SubF.SID.mulIf _ neqx0)].
-    + by rewrite SubF.SCR.invr0 eq0 FFIrrPolyExt.FF.F.invr0.
-    rewrite SubF.SCR.mulVr -?SubF.SF.unitfE // eqM eq1 FFIrrPolyExt.FF.F.mulVr //.
-    by apply/FFIrrPolyExt.FF.F.unitfE; rewrite -eq0.
-  qed.
-
-  lemma eqn : FFIrrPolyExt.SubFF.n = deg FFIrrPolyExt.p - 1.
-  proof.
-    move: eq_card_pow_n; rewrite /FFStr.FF.FinType.card /FinType.card.
-    rewrite size_map size_enum_ledeg.
+    apply/(ieexprIn _ SFT.card_gt0).
+    + by apply/gtr_eqF/FCRS.card_gt1.
+    + by apply/ltzW/SFF.lt0n.
     + by apply/ltzS/ltzE/ltzW => /=; apply/irredp_poly_deg/irredp_p.
-    rewrite /FFIrrPolyExt.FF.FinType.card /SFT.card.
-    have: perm_eq FFIrrPolyExt.FF.FinType.enum senum.
-    + apply/uniq_perm_eq; [by apply/FFIrrPolyExt.FF.FinType.enum_uniq|by apply/SFT.enum_uniq|].
-      by move=> x; rewrite FFIrrPolyExt.FF.FinType.enumP SFT.enumP.
-    move/perm_eq_size=> ->; rewrite -/SFT.card => eq_.
-    move: (ieexprIn _ _ _ _ _ _ _ eq_).
-    + by apply/SFT.card_gt0.
-    + by apply/gtr_eqF/SFF.card_gt1.
-    + by apply/ltzS/ltzE/ltzW => /=; apply/irredp_poly_deg/irredp_p.
-    + by apply/ltzW/lt0n.
-    by move=> ->.
+    rewrite -SFF.eq_card_pow_n /TFT.card size_map size_enum_ledeg //.
+    by apply/ltzS/ltzE/ltzW => /=; apply/irredp_poly_deg/irredp_p.
   qed.
-
-  clone import SubFieldStruct as SubFStr with
-    type t <= FFIrrPolyExt.pt,
-    type st <= FFIrrPolyExt.t,
-    theory SubZMod <= FFIrrPolyExt.SubFF.SubF,
-    theory SubCR <= FFIrrPolyExt.SubFF.SubF,
-    theory SubID <= FFIrrPolyExt.SubFF.SubF,
-    theory SubF <= FFIrrPolyExt.SubFF.SubF,
-    theory ZModStr <= FFIrrPolyExt.SubFF.FStr,
-    theory CRStr <= FFIrrPolyExt.SubFF.FStr,
-    theory IDStr <= FFIrrPolyExt.SubFF.FStr,
-    theory FStr <= FFIrrPolyExt.SubFF.FStr.
-
-  (*TODO: FF.F and SubFF.SubF.F must be shown to be isomorphic: needs isomorphism theory.*)
-  print FF.F.zeror.
-  print SubFF.SubF.zeror.
-  print SubFF.SubF.F.zeror.
-*)
 end FFIrrPolyExt.

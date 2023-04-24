@@ -13,39 +13,18 @@ abstract theory SubFinite.
   clone import FinType as TFT with
     type t <= t.
 
-  (*TODO: Pierre-Yves: this is needed because P is a pred in Sub and
-                       must be used as an op in filter.
-                       we need to replace pred by op everywhere in the StdLib*)
-  op P : t -> bool.
-
   clone import Subtype as Sub with
     type T  <= t ,
-    type sT <= st,
-    pred P  <= P.
+    type sT <= st.
 
   import Sub.
 
   clone import FinType as SFT with
-    type t  <= st,
-    op enum <= (choiceb (fun e => forall x , count (pred1 x) e = 1) witness)
-  proof *.
-
-  realize enum_spec.
-  proof.
-    pose Q:= (fun e => forall x , count (pred1 x) e = 1).
-    move: (choicebP Q witness _); last first.
-    + (*TODO: Pierre-Yves: spooky, the following asserts false:*)
-      (*rewrite /Q; move=> + x. move/(_ x).*)
-      by move=> + x; move/(_ x).
-    rewrite /Q => {Q}; exists (map insubd (filter P TFT.enum)).
-    move => x; rewrite /senum count_map count_filter /predI /preim.
-    rewrite -(enum_spec (val x)); apply/eq_count.
-    move => y; rewrite /pred1 /=; split => [[<<- in_sub_y]|->>].
-    + by rewrite val_insubd in_sub_y.
-    by rewrite valKd /= valP.
-  qed.
+    type t  <= st.
 
   theory SFin.
+    (*TODO: Pierre-Yves: I thought because P is a pred it can't be used as an op in filter.
+                         We need to replace pred by op everywhere in the StdLib anyway. *)
     lemma eq_enum : perm_eq SFT.enum (map insubd (filter P TFT.enum)).
     proof.
       apply/uniq_perm_eq; [by apply/SFT.enum_uniq| |].
@@ -60,6 +39,44 @@ abstract theory SubFinite.
     proof. by move: (perm_eq_size _ _ eq_enum); rewrite size_map. qed.
   end SFin.
 end SubFinite.
+
+
+(* -------------------------------------------------------------------- *)
+abstract theory SubFiniteSub.
+  type t, st.
+
+  clone import FinType as TFT with
+    type t <= t.
+
+  clone import Subtype as Sub with
+    type T  <= t ,
+    type sT <= st.
+
+  clone include SubFinite with
+    type t      <- t,
+    type st     <- st,
+    theory TFT  <- TFT,
+    theory Sub  <- Sub,
+    op SFT.enum <= (choiceb (fun e => forall x , count (pred1 x) e = 1) witness)
+    rename [theory] "TFT" as "Gone"
+                    "Sub" as "Gone"
+  proof SFT.enum_spec.
+
+  realize SFT.enum_spec.
+  proof.
+    pose Q:= (fun e => forall x , count (pred1 x) e = 1).
+    move: (choicebP Q witness _); last first.
+    + (*TODO: Pierre-Yves: spooky, the following asserts false:*)
+      (*rewrite /Q; move=> + x. move/(_ x).*)
+      by move=> + x; move/(_ x).
+    rewrite /Q => {Q}; exists (map insubd (filter P TFT.enum)).
+    move => x; rewrite /senum count_map count_filter /predI /preim.
+    rewrite -(enum_spec (val x)); apply/eq_count.
+    move => y; rewrite /pred1 /=; split => [[<<- in_sub_y]|->>].
+    + by rewrite val_insubd in_sub_y.
+    by rewrite valKd /= valP.
+  qed.
+end SubFiniteSub.
 
 
 (* ==================================================================== *)
@@ -412,16 +429,12 @@ end FiniteField.
 abstract theory SubFiniteZModule.
   type t.
 
-  op P : t -> bool.
-
   clone include SubZModule with
-    type t <- t,
-    pred Sub.P <= P.
+    type t <- t.
 
   clone include SubFinite with
     type t     <- t,
     type st    <- st,
-    op P       <- P,
     theory Sub <- Sub
     rename [theory] "Sub" as "Gone".
 
@@ -444,16 +457,12 @@ end SubFiniteZModule.
 abstract theory SubFiniteComRing.
   type t.
 
-  op P : t -> bool.
-
   clone include SubComRingModule with
-    type t <- t,
-    pred Sub.P <= P.
+    type t <- t.
 
   clone include SubFiniteZModule with
     type t           <- t,
     type st          <- st,
-    op P             <- P,
     theory TRL       <- TRL,
     theory SRL       <- SRL,
     theory ZModTStr  <- ZModTStr,
@@ -564,16 +573,12 @@ end SubFiniteComRing.
 abstract theory SubFiniteIDomain.
   type t.
 
-  op P : t -> bool.
-
   clone include SubIDomainModule with
-    type t <- t,
-    pred Sub.P <= P.
+    type t <- t.
 
   clone include SubFiniteComRing with
     type t           <- t,
     type st          <- st,
-    op P             <- P,
     theory TRL       <- TRL,
     theory SRL       <- SRL,
     theory ZModTStr  <- ZModTStr,
@@ -628,16 +633,12 @@ end SubFiniteIDomain.
 abstract theory SubFiniteField.
   type t.
 
-  op P : t -> bool.
-
   clone include SubVectorSpace with
-    type t <- t,
-    pred Sub.P <= P.
+    type t <- t.
 
   clone include SubFiniteIDomain with
     type t           <- t,
     type st          <- st,
-    op P             <- P,
     theory TRL       <- TRL,
     theory SRL       <- SRL,
     theory ZModTStr  <- ZModTStr,
@@ -726,7 +727,7 @@ abstract theory SubFiniteField.
 
   theory SFF.
     import TRL SRL ZModTStr ZModSStr CRTStr CRSStr IDTStr IDSStr FTStr FSStr.
-    import ZModMorph CRMorph IDMorph FMorph SZMod SCR SID SF Sub CRM.
+    import ZModMorph CRMorph IDMorph FMorph SZMod SCR SID SFld Sub CRM.
     import TFT SFT SFCR SFin.
 
     lemma finite_basis_exists :
@@ -967,7 +968,8 @@ abstract theory SubFiniteField_ZMod.
     theory USubS    <- USubS,
     theory USZModCR <- USZModCR,
     theory FUSZMod  <- FUSZMod,
-    op P            <= (fun x => exists n , x = TRL.ofint n),
+    theory FUTS     <- FUTS,
+    pred Sub.P      <= (fun x => exists n , x = TRL.ofint n),
     op Sub.val      <= TRL.ofint \o ZModP.asint,
     op Sub.insub    <= (fun x => if exists n , x = TRL.ofint n
                                  then Some (ZModP.inzmod
@@ -1003,7 +1005,7 @@ abstract theory SubFiniteField_ZMod.
                     "UZLS"     as "Gone"
                     "USStr"    as "Gone"
                     "USubS"    as "Gone"
-                    "FUTS"     as "FUTS_"
+                    "FUTS"     as "Gone"
                     "USZModCR" as "Gone"
                     "FUSZMod"  as "Gone"
   proof Sub.*, SZMod.*, SCR.*.
@@ -1073,7 +1075,7 @@ abstract theory SubFiniteField_ZMod.
 
   theory FinZMod.
     import TRL SRL ZModTStr ZModSStr CRTStr CRSStr IDTStr IDSStr FTStr FSStr.
-    import ZModMorph CRMorph IDMorph FMorph SZMod SCR SID SF Sub CRM.
+    import ZModMorph CRMorph IDMorph FMorph SZMod SCR SID SFld Sub CRM.
     import TFT SFT SFCR SFin FFT.
 
     lemma cr_auto_exp f :
@@ -1154,3 +1156,270 @@ abstract theory SubFiniteField_ZMod.
 *)
   end FinZMod.
 end SubFiniteField_ZMod.
+
+
+(* ==================================================================== *)
+abstract theory SubFiniteZModulePred.
+  clone include SubZModulePred.
+
+  clone include SubFiniteSub with
+    type t  <- t,
+    type st <- st,
+    theory Sub <- Sub
+    rename [theory] "Sub" as "Gone".
+
+  clone include SubFiniteZModule with
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    theory SRL       <- SRL,
+    theory ZModTStr  <- ZModTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory ZModMorph <- ZModMorph,
+    theory SZMod     <- SZMod,
+    theory TFT       <- TFT,
+    theory SFT       <- SFT,
+    theory Sub       <- Sub,
+    theory SFin      <- SFin
+    rename [theory] "TRL"       as "Gone"
+                    "SRL"       as "Gone"
+                    "ZModTStr"  as "Gone"
+                    "ZModSStr"  as "Gone"
+                    "ZModMorph" as "Gone"
+                    "SZMod"     as "Gone"
+                    "TFT"       as "Gone"
+                    "SFT"       as "Gone"
+                    "Sub"       as "Gone"
+                    "SFin"      as "Gone".
+end SubFiniteZModulePred.
+
+(* -------------------------------------------------------------------- *)
+abstract theory SubFiniteComRingPred.
+  clone include SubComRingPred.
+
+  clone include SubFiniteSub with
+    type t  <- t,
+    type st <- st,
+    theory Sub <- Sub
+    rename [theory] "Sub" as "Gone".
+
+  clone include SubFiniteComRing with
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    theory SRL       <- SRL,
+    theory ZModTStr  <- ZModTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory CRTStr    <- CRTStr,
+    theory CRSStr    <- CRSStr,
+    theory ZModMorph <- ZModMorph,
+    theory CRMorph   <- CRMorph,
+    theory SZMod     <- SZMod,
+    theory SCR       <- SCR,
+    theory TFT       <- TFT,
+    theory SFT       <- SFT,
+    theory Sub       <- Sub,
+    theory SFin      <- SFin
+    rename [theory] "TRL"       as "Gone"
+                    "SRL"       as "Gone"
+                    "ZModTStr"  as "Gone"
+                    "ZModSStr"  as "Gone"
+                    "CRTStr"    as "Gone"
+                    "CRSStr"    as "Gone"
+                    "ZModMorph" as "Gone"
+                    "CRMorph"   as "Gone"
+                    "SZMod"     as "Gone"
+                    "SCR"       as "Gone"
+                    "TFT"       as "Gone"
+                    "SFT"       as "Gone"
+                    "Sub"       as "Gone"
+                    "SFin"      as "Gone".
+end SubFiniteComRingPred.
+
+(* -------------------------------------------------------------------- *)
+abstract theory SubFiniteIDomainPred.
+  clone include SubIDomainPred.
+
+  clone include SubFiniteSub with
+    type t  <- t,
+    type st <- st,
+    theory Sub <- Sub
+    rename [theory] "Sub" as "Gone".
+
+  clone include SubFiniteIDomain with
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    theory SRL       <- SRL,
+    theory ZModTStr  <- ZModTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory CRTStr    <- CRTStr,
+    theory CRSStr    <- CRSStr,
+    theory IDTStr    <- IDTStr,
+    theory IDSStr    <- IDSStr,
+    theory ZModMorph <- ZModMorph,
+    theory CRMorph   <- CRMorph,
+    theory IDMorph   <- IDMorph,
+    theory SZMod     <- SZMod,
+    theory SCR       <- SCR,
+    theory SID       <- SID,
+    theory TFT       <- TFT,
+    theory SFT       <- SFT,
+    theory Sub       <- Sub,
+    theory SFin      <- SFin
+    rename [theory] "TRL"       as "Gone"
+                    "SRL"       as "Gone"
+                    "ZModTStr"  as "Gone"
+                    "ZModSStr"  as "Gone"
+                    "CRTStr"    as "Gone"
+                    "CRSStr"    as "Gone"
+                    "IDTStr"    as "SubFiniteFieldPredIDTStrGone"
+                    "IDSStr"    as "SubFiniteFieldPredIDSStrGone"
+                    "IDStr1"    as "SubFiniteFieldPredIDStr1Gone"
+                    "IDStr2"    as "SubFiniteFieldPredIDStr2Gone"
+                    "IDGone"    as "SubFiniteFieldPredIDGone"
+                    "IDGone1"   as "SubFiniteFieldPredIDGone1"
+                    "IDGone2"   as "SubFiniteFieldPredIDGone2"
+                    "FTStr"     as "Gone"
+                    "FSStr"     as "Gone"
+                    "ZModMorph" as "Gone"
+                    "CRMorph"   as "Gone"
+                    "IDMorph"   as "SubFiniteFieldPredIDMorphGone"
+                    "FMorph"    as "SubFiniteFieldPredFMorphGone"
+                    "SZMod"     as "Gone"
+                    "SCR"       as "Gone"
+                    "SID"       as "Gone"
+                    "SF"        as "Gone"
+                    "TFT"       as "Gone"
+                    "SFT"       as "Gone"
+                    "Sub"       as "Gone"
+                    "SFin"      as "Gone".
+end SubFiniteIDomainPred.
+
+(* -------------------------------------------------------------------- *)
+abstract theory SubFiniteFieldPred.
+  clone include SubFieldPred.
+
+  clone include SubFiniteSub with
+    type t  <- t,
+    type st <- st,
+    theory Sub <- Sub
+    rename [theory] "Sub" as "Gone".
+
+  clone include SubFiniteField with
+    type t           <- t,
+    type st          <- st,
+    theory TRL       <- TRL,
+    theory SRL       <- SRL,
+    theory ZModTStr  <- ZModTStr,
+    theory ZModSStr  <- ZModSStr,
+    theory CRTStr    <- CRTStr,
+    theory CRSStr    <- CRSStr,
+    theory IDTStr    <- IDTStr,
+    theory IDSStr    <- IDSStr,
+    theory FTStr     <- FTStr,
+    theory FSStr     <- FSStr,
+    theory ZModMorph <- ZModMorph,
+    theory CRMorph   <- CRMorph,
+    theory IDMorph   <- IDMorph,
+    theory FMorph    <- FMorph,
+    theory SZMod     <- SZMod,
+    theory SCR       <- SCR,
+    theory SID       <- SID,
+    theory SFld      <- SFld,
+    theory TFT       <- TFT,
+    theory SFT       <- SFT,
+    theory Sub       <- Sub,
+    theory SFin      <- SFin
+    rename [theory] "TRL"       as "Gone"
+                    "SRL"       as "Gone"
+                    "ZModTStr"  as "Gone"
+                    "ZModSStr"  as "Gone"
+                    "CRTStr"    as "Gone"
+                    "CRSStr"    as "Gone"
+                    "IDTStr"    as "SubFiniteFieldPredIDTStrGone"
+                    "IDSStr"    as "SubFiniteFieldPredIDSStrGone"
+                    "IDStr1"    as "SubFiniteFieldPredIDStr1Gone"
+                    "IDStr2"    as "SubFiniteFieldPredIDStr2Gone"
+                    "IDGone"    as "SubFiniteFieldPredIDGone"
+                    "IDGone1"   as "SubFiniteFieldPredIDGone1"
+                    "IDGone2"   as "SubFiniteFieldPredIDGone2"
+                    "FTStr"     as "Gone"
+                    "FSStr"     as "Gone"
+                    "ZModMorph" as "Gone"
+                    "CRMorph"   as "Gone"
+                    "IDMorph"   as "SubFiniteFieldPredIDMorphGone"
+                    "FMorph"    as "SubFiniteFieldPredFMorphGone"
+                    "SZMod"     as "Gone"
+                    "SCR"       as "Gone"
+                    "SID"       as "Gone"
+                    "SF"        as "Gone"
+                    "TFT"       as "Gone"
+                    "SFT"       as "Gone"
+                    "Sub"       as "Gone"
+                    "SFin"      as "Gone".
+end SubFiniteFieldPred.
+
+
+(* ==================================================================== *)
+theory SubFiniteIDomainFrobenius.
+  type t, st.
+
+  clone include IDomainStruct with
+    type t <- t
+    rename [theory] "RL"  as "TRL"
+           [theory] "Str" as "TStr".
+
+  import CRTStr IDTStr.
+
+  op n : int.
+  axiom prime_char : prime char.
+
+  clone include SubFiniteIDomainPred with
+    type t          <- t,
+    type st         <- st,
+    theory TRL      <- TRL,
+    theory ZModTStr <- ZModTStr,
+    theory CRTStr   <- CRTStr,
+    theory IDTStr   <- IDTStr,
+    pred Sub.P      <- iter_frobenius_fixed n
+    rename [theory] "TRL"  as "Gone"
+           [theory] "TStr" as "Gone"
+  proof subcrP.
+
+  realize subcrP.
+  proof. by apply/subcr_iter_frobenius_fixed/prime_char. qed.
+end SubFiniteIDomainFrobenius.
+
+(* -------------------------------------------------------------------- *)
+theory SubFiniteFieldFrobenius.
+  type t, st.
+
+  clone include FieldStruct with
+    type t <- t
+    rename [theory] "RL"  as "TRL"
+           [theory] "Str" as "TStr".
+
+  import CRTStr IDTStr.
+
+  op n : int.
+  axiom prime_char : prime char.
+
+  clone include SubFiniteFieldPred with
+    type t          <- t,
+    type st         <- st,
+    theory TRL      <- TRL,
+    theory ZModTStr <- ZModTStr,
+    theory CRTStr   <- CRTStr,
+    theory IDTStr   <- IDTStr,
+    theory FTStr    <- FTStr,
+    pred Sub.P      <- iter_frobenius_fixed n
+    rename [theory] "TRL"    as "Gone"
+           [theory] "TStr"   as "Gone"
+           [theory] "IDGone" as "SubFieldFrobeniusIDGone"
+  proof subcrP.
+
+  realize subcrP.
+  proof. by apply/subcr_iter_frobenius_fixed/prime_char. qed.
+end SubFiniteFieldFrobenius.
+
