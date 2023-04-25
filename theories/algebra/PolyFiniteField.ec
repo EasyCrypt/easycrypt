@@ -1341,8 +1341,8 @@ abstract theory FFIrrPolyExt.
                     "UStr"    as "USStr"
                     "USt"     as "UStS"
                     "FUT"     as "FUTS"
-                    "UZModCR" as "USZModCR"
-                    "FUZMod"  as "FUSZMod"
+                    "UZModCR" as "UZModCRS"
+                    "FUZMod"  as "FUZModS"
            [type]   "uz"      as "uzs".
 
   import PID P BigPoly IdealP PolyFinF.
@@ -1452,6 +1452,9 @@ abstract theory FFIrrPolyExt.
     by move: (ler_add _ _ _ _ le1 le2).
   qed.
 
+  (*TODO: Pierre-Yves: can be removed if P is turned into a op from a pred.*)
+  op P x = exists c , x = pi (polyC c).
+
   clone include SubFiniteField with
     type   t        <- t,
     type   st       <- st,
@@ -1470,11 +1473,11 @@ abstract theory FFIrrPolyExt.
     theory UZLS     <- UZLS,
     theory USStr    <- USStr,
     theory UStS     <- UStS,
-    theory USZModCR <- USZModCR,
-    theory FUSZMod  <- FUSZMod,
+    theory UZModCRS <- UZModCRS,
+    theory FUZModS  <- FUZModS,
     theory FUTS     <- FUTS,
     op TFT.enum     <= map pi (enum_ledeg (deg p - 1)),
-    pred Sub.P      <= (fun x => exists c , x = pi (polyC c)),
+    pred Sub.P      <= P,
     op Sub.insub    <= (fun x =>
                          if (exists c , x = pi (polyC c))
                          then Some ((modp (repr x) FFIrrPolyExt.p).[0])
@@ -1495,16 +1498,16 @@ abstract theory FFIrrPolyExt.
                     "USStr"    as "Gone"
                     "UStS"     as "Gone"
                     "FUTS"     as "Gone"
-                    "USZModCR" as "Gone"
-                    "FUSZMod"  as "Gone"
+                    "UZModCRS" as "Gone"
+                    "FUZModS"  as "Gone"
   proof Sub.*, SZMod.*, SCR.*, TFT.*.
 
   realize Sub.insubN.
-  proof. by move=> x ->. qed.
+  proof. by rewrite /P; move=> x ->. qed.
 
   realize Sub.insubT.
   proof.
-    move=> ? exists_; rewrite exists_ /=; case: exists_ => c ->>.
+    rewrite /P; move=> ? exists_; rewrite exists_ /=; case: exists_ => c ->>.
     rewrite -eqv_pi eqv_sym /eqv mem_idgen1; exists poly0.
     rewrite -polyCN -polyCD PolyComRing.mul0r eq_polyC0.
     rewrite SRL.subr_eq0; move: (eqv_repr (polyC c)).

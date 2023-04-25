@@ -696,8 +696,8 @@ abstract theory SubFiniteField.
                     "UFZMod"  as "UFZModT"
                     "USt"    as "UStT"
                     "FUT"     as "FUTT"
-                    "UZModCR" as "UTZModCR"
-                    "FUZMod"  as "FUTZMod"
+                    "UZModCR" as "UZModCRT"
+                    "FUZMod"  as "FUZModT"
            [type]   "uz"      as "uzt".
 
   clone include FiniteField with
@@ -721,8 +721,8 @@ abstract theory SubFiniteField.
                     "UStr"    as "USStr"
                     "USt"    as "UStS"
                     "FUT"     as "FUTS"
-                    "UZModCR" as "USZModCR"
-                    "FUZMod"  as "FUSZMod"
+                    "UZModCR" as "UZModCRS"
+                    "FUZMod"  as "FUZModS"
            [type]   "uz"      as "uzs".
 
   theory SFF.
@@ -903,8 +903,8 @@ abstract theory SubFiniteField_ZMod.
                     "UStr"    as "UTStr"
                     "USt"    as "UStT"
                     "FUT"     as "FUTT"
-                    "UZModCR" as "UTZModCR"
-                    "FUZMod"  as "FUTZMod"
+                    "UZModCR" as "UZModCRT"
+                    "FUZMod"  as "FUZModT"
            [type]   "uz"      as "uzt".
 
   clone include ZModP_FiniteField with
@@ -924,8 +924,8 @@ abstract theory SubFiniteField_ZMod.
                     "UStr"    as "USStr"
                     "USt"    as "UStS"
                     "FUT"     as "FUTS"
-                    "UZModCR" as "USZModCR"
-                    "FUZMod"  as "FUSZMod"
+                    "UZModCR" as "UZModCRS"
+                    "FUZMod"  as "FUZModS"
            [type]   "uz"      as "uzs"
   proof ZModP.prime_p.
 
@@ -949,10 +949,10 @@ abstract theory SubFiniteField_ZMod.
     theory FFT      <- FFT,
     theory UZLT     <- UZLT,
     theory UTStr    <- UTStr,
-    theory UStT    <- UStT,
+    theory UStT     <- UStT,
     theory FUTT     <- FUTT,
-    theory UTZModCR <- UTZModCR,
-    theory FUTZMod  <- FUTZMod,
+    theory UZModCRT <- UZModCRT,
+    theory FUZModT  <- FUZModT,
     theory SRL      <- SRL,
     theory ZModSStr <- ZModSStr,
     theory CRSStr   <- CRSStr,
@@ -965,9 +965,9 @@ abstract theory SubFiniteField_ZMod.
     theory FFS      <- FFS,
     theory UZLS     <- UZLS,
     theory USStr    <- USStr,
-    theory UStS    <- UStS,
-    theory USZModCR <- USZModCR,
-    theory FUSZMod  <- FUSZMod,
+    theory UStS     <- UStS,
+    theory UZModCRS <- UZModCRS,
+    theory FUZModS  <- FUZModS,
     theory FUTS     <- FUTS,
     pred Sub.P      <= (fun x => exists n , x = TRL.ofint n),
     op Sub.val      <= TRL.ofint \o ZModP.asint,
@@ -990,8 +990,8 @@ abstract theory SubFiniteField_ZMod.
                     "UTStr"    as "Gone"
                     "UStT"     as "Gone"
                     "FUTT"     as "Gone"
-                    "UTZModCR" as "Gone"
-                    "FUTZMod"  as "Gone"
+                    "UZModCRT" as "Gone"
+                    "FUZModT"  as "Gone"
                     "SRL"      as "Gone"
                     "ZModSStr" as "Gone"
                     "CRSStr"   as "Gone"
@@ -1006,8 +1006,8 @@ abstract theory SubFiniteField_ZMod.
                     "USStr"    as "Gone"
                     "UStS"     as "Gone"
                     "FUTS"     as "Gone"
-                    "USZModCR" as "Gone"
-                    "FUSZMod"  as "Gone"
+                    "UZModCRS" as "Gone"
+                    "FUZModS"  as "Gone"
   proof Sub.*, SZMod.*, SCR.*.
 
   realize Sub.insubN.
@@ -1078,6 +1078,23 @@ abstract theory SubFiniteField_ZMod.
     import ZModMorph CRMorph IDMorph FMorph SZMod SCR SID SFld Sub CRM.
     import TFT SFT SFCR SFin FFT.
 
+    lemma iter_frobenius_fixed_n :
+      IDTStr.iter_frobenius_fixed SFF.n = predT.
+    proof.
+      apply/fun_ext => x; rewrite /predT eqT iter_frobenius_fixedP.
+      + by apply/ltzW/SFF.lt0n.
+      case (x = TRL.zeror) => [->>|/unitfP ux].
+      + by rewrite expr0z gtr_eqF // expr_gt0 FCRT.gt0_char.
+      rewrite -ZModFin.eq_card_p -SFF.eq_card_pow_n card_unit.
+      move: (UStT.val_insubd x); rewrite ux /= => <-.
+      move: (UStT.insubd _) => {x ux} x; rewrite -UZModCRT.valX.
+      rewrite UZLT.mulrSz UZModCRT.valM -{2}(TRL.mulr1 (UStT.val _)).
+      congr; case: (FFT.exists_generator) => g is_g_g.
+      case/(_ x): (is_g_g) => n ->>; rewrite -UZLT.mulrM.
+      rewrite mulrC UZLT.mulrM; move/FUZModT.isgeneratorP: is_g_g => <-.
+      by rewrite UTStr.intmul_order UZLT.mul0i UZModCRT.val1.
+    qed.
+
     lemma cr_auto_exp f :
       CRTStr.cr_auto f =>
       (exists k , 0 < k /\ forall x , f x = exp x k).
@@ -1095,9 +1112,9 @@ abstract theory SubFiniteField_ZMod.
       + apply/TRL.unitrE; rewrite -cr_autoV // -cr_autoM //.
         by rewrite divrr; [apply/UStT.valP|rewrite cr_auto1].
       rewrite -UTStr.intmul_modz_order -modz_mod -modzDr UTStr.intmul_modz_order.
-      move/FUTZMod.isgeneratorP: (isg_g) => ->; rewrite UTZModCR.valX.
+      move/FUZModT.isgeneratorP: (isg_g) => ->; rewrite UZModCRT.valX.
       case/(_ (UStT.insubd x)): isg_g => i /(congr1 UStT.val).
-      rewrite UStT.insubdK // UTZModCR.valX => ->>.
+      rewrite UStT.insubdK // UZModCRT.valX => ->>.
       by rewrite cr_autoX // => ->; rewrite -!exprM mulrC.
     qed.
 
@@ -1289,7 +1306,7 @@ abstract theory SubFiniteIDomainPred.
                     "SZMod"     as "Gone"
                     "SCR"       as "Gone"
                     "SID"       as "Gone"
-                    "SF"        as "Gone"
+                    "SFld"      as "Gone"
                     "TFT"       as "Gone"
                     "SFT"       as "Gone"
                     "Sub"       as "Gone"
@@ -1353,7 +1370,7 @@ abstract theory SubFiniteFieldPred.
                     "SZMod"     as "Gone"
                     "SCR"       as "Gone"
                     "SID"       as "Gone"
-                    "SF"        as "Gone"
+                    "SFld"      as "Gone"
                     "TFT"       as "Gone"
                     "SFT"       as "Gone"
                     "Sub"       as "Gone"
@@ -1417,8 +1434,8 @@ theory SubFiniteFieldFrobenius.
                     "UStr"    as "UTStr"
                     "USt"     as "UStT"
                     "FUT"     as "FUTT"
-                    "UZModCR" as "UTZModCR"
-                    "FUZMod"  as "FUTZMod"
+                    "UZModCR" as "UZModCRT"
+                    "FUZMod"  as "FUZModT"
            [type]   "uz"      as "uzt".
 
   op n : int.
@@ -1441,8 +1458,8 @@ theory SubFiniteFieldFrobenius.
     theory UTStr    <- UTStr,
     theory UStT     <- UStT,
     theory FUTT     <- FUTT,
-    theory UTZModCR <- UTZModCR,
-    theory FUTZMod  <- FUTZMod,
+    theory UZModCRT <- UZModCRT,
+    theory FUZModT  <- FUZModT,
     pred Sub.P      <- IDTStr.iter_frobenius_fixed n
     rename [theory] "TRL"      as "Gone"
                     "ZModTStr" as "Gone"
@@ -1461,8 +1478,8 @@ theory SubFiniteFieldFrobenius.
                     "UTStr"    as "Gone"
                     "UStT"     as "Gone"
                     "FUTT"     as "Gone"
-                    "UTZModCR" as "Gone"
-                    "FUTZMod"  as "Gone"
+                    "UZModCRT" as "Gone"
+                    "FUZModT"  as "Gone"
   proof subfP.
 
   realize subfP.

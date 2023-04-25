@@ -1658,6 +1658,23 @@ abstract theory IDomainStruct.
       by move: (gt0_prime _ prime_char); rewrite ltzE.
     qed.
 
+    lemma iter_frobenius_fixedP n x :
+      0 <= n =>
+      (iter_frobenius_fixed n x) <=> (exp x (char ^ n) = x).
+    proof. by move=> ?; rewrite /iter_frobenius_fixed iter_frobenius. qed.
+
+    lemma iter_frobenius_fixed_imp m n x :
+      0 <= m =>
+      0 <= n =>
+      iter_frobenius_fixed n x =>
+      iter_frobenius_fixed (m * n) x.
+    proof.
+      move=> le0m le0n; rewrite /iter_frobenius_fixed => eq_.
+      elim: m le0m => [|m le0m IHm]; [by rewrite iter0|].
+      rewrite mulrDl /= iterD //; [by apply/mulr_ge0|].
+      by rewrite eq_.
+    qed.
+
     lemma subcr_iter_frobenius_fixed :
       prime char =>
       forall n , subcr (iter_frobenius_fixed n).

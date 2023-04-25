@@ -278,6 +278,14 @@ theory IterOp.
     by move=> n geo0 ih; rewrite (iterS (n+1)) 2:ih ?iterS // addz_ge0.
   qed.
 
+  lemma iterD m n opr (x : 'a):
+    0 <= m => 0 <= n => iter (m + n) opr x = iter m opr (iter n opr x).
+  proof.
+    move=> + le0n; elim: m => [|m le0m IHm]; [by rewrite (iter0 0)|].
+    rewrite -addzA (addzC 1) addzA !iterS //; [by apply/addz_ge0|].
+    by rewrite IHm.
+  qed.
+
   op iterop ['a] (n : int) opr (x z : 'a) : 'a =
     let f = fun i y, if i <= 0 then x else opr x y in
     iteri n f z.

@@ -553,6 +553,13 @@ abstract theory SubField.
     lemma PX : forall x n , P x => P (TRL.exp x n).
     proof. by apply/FTStr.subfX/subfP. qed.
 
+    lemma insubdU x :
+      P x =>
+      unit (insubd x) = unit x.
+    proof.
+      by move=> Px; rewrite -valU val_insubd Px.
+    qed.
+
     lemma insubdV x :
       P x =>
       insubd (TRL.invr x) =

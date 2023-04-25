@@ -30,9 +30,29 @@ abstract theory FFexistence.
                     "UStr"    as "USStr"
                     "USt"     as "UStS"
                     "FUT"     as "FUTS"
-                    "UZModCR" as "USZModCR"
-                    "FUZMod"  as "FUSZMod"
+                    "UZModCR" as "UZModCRS"
+                    "FUZMod"  as "FUZModS"
            [type]   "uz"      as "uzs".
+
+  clone import SubFiniteField_ZMod as SFF_ZMod with
+    type t <- st,
+    theory TRL      <- SRL,
+    theory ZModTStr <- ZModSStr,
+    theory CRTStr   <- CRSStr,
+    theory IDTStr   <- IDSStr,
+    theory FTStr    <- FSStr,
+    theory TFT      <- SFT,
+    theory FZModT   <- FZModS,
+    theory FCRT     <- FCRS,
+    theory FIDT     <- FIDS,
+    type uzt        <- uzs,
+    theory UStT     <- UStS,
+    theory UZLT     <- UZLS,
+    theory UTStr    <- USStr,
+    theory UZModCRT <- UZModCRS,
+    theory FUTT     <- FUTS,
+    theory FUZModT  <- FUZModS,
+    theory FFT      <- FFS.
 
   import Counting_Argument PolyFinF.
 
@@ -40,7 +60,7 @@ abstract theory FFexistence.
     0 < mp.`1 /\
     PID.irreducible_poly mp.`2 /\
     PID.P.monic mp.`2 /\
-    0 < I n (SFT.card ^ (PID.P.deg mp.`2 - 1)).
+    0 < I n (FFexistence.SFT.card ^ (PID.P.deg mp.`2 - 1)).
 
   op m = (choiceb (is_extension_params1) (0, PID.P.poly0)).`1.
 
@@ -50,22 +70,22 @@ abstract theory FFexistence.
     0 < m /\
     PID.irreducible_poly p /\
     PID.P.monic p /\
-    0 < I n (SFT.card ^ (PID.P.deg p - 1)).
+    0 < I n (FFexistence.SFT.card ^ (PID.P.deg p - 1)).
   proof.
     move: (choicebP is_extension_params1 (0, PID.P.poly0) _); last first.
     + by rewrite /m /p; pose c:= choiceb _ _; move: c => c; rewrite /is_extension_params1.
     rewrite /is_extension_params1; case: (lt0I _ lt0n) => q.
-    move: (ilog_eq _ (max 1 q) (ilog SFT.card (max 1 q)) FCRS.card_gt1 _ _) => /=.
+    move: (ilog_eq _ (max 1 q) (ilog FFexistence.SFT.card (max 1 q)) FFexistence.FCRS.card_gt1 _ _) => /=.
     + by apply/gtr_maxrP.
-    + by apply/ilog_ge0; [apply/ltzW/FCRS.card_gt1|apply/ger_maxrP].
-    rewrite /SFT.card /=.
+    + by apply/ilog_ge0; [apply/ltzW/FFexistence.FCRS.card_gt1|apply/ger_maxrP].
+    rewrite /FFexistence.SFT.card /=.
     case=> _ /ltr_maxrP [] _ /ltzW leq_ lt0I_.
-    case: (exists_iu_le_deg (ilog SFT.card (max 1 q) + 1)) => p.
+    case: (exists_iu_le_deg (ilog FFexistence.SFT.card (max 1 q) + 1)) => p.
     case=> /ltr_subr_addr /ltzE le_ [] irr_ m_; exists (n, p) => /=.
     rewrite lt0n irr_ m_ /=; apply/lt0I_/(ler_trans _ _ _ leq_)/ler_weexpn2l.
-    + by apply/ltzW/FCRS.card_gt1.
+    + by apply/ltzW/FFexistence.FCRS.card_gt1.
     rewrite le_ /=; apply/addr_ge0 => //.
-    by apply/ilog_ge0; [apply/ltzW/FCRS.card_gt1|apply/ger_maxrP].
+    by apply/ilog_ge0; [apply/ltzW/FFexistence.FCRS.card_gt1|apply/ger_maxrP].
   qed.
   
   lemma lt0m : 0 < m.
@@ -77,28 +97,28 @@ abstract theory FFexistence.
   lemma monic_p : PID.P.monic p.
   proof. by case: mpP. qed.
   
-  lemma lt0In_ : 0 < I n (SFT.card ^ (PID.P.deg p - 1)).
+  lemma lt0In_ : 0 < I n (FFexistence.SFT.card ^ (PID.P.deg p - 1)).
   proof. by case: mpP. qed.
 
   clone import FFIrrPolyExt as Ext1 with
-    type st         <- st,
-    theory SRL      <- SRL,
-    theory ZModSStr <- ZModSStr,
-    theory CRSStr   <- CRSStr,
-    theory IDSStr   <- IDSStr,
-    theory FSStr    <- FSStr,
-    theory SFT      <- SFT,
-    theory FZModS   <- FZModS,
-    theory FCRS     <- FCRS,
-    theory FIDS     <- FIDS,
-    type uzs        <- uzs,
-    theory UStS     <- UStS,
-    theory UZLS     <- UZLS,
-    theory USStr    <- USStr,
-    theory USZModCR <- USZModCR,
-    theory FUTS     <- FUTS,
-    theory FUSZMod  <- FUSZMod,
-    theory FFS      <- FFS,
+    type st         <- FFexistence.st,
+    theory SRL      <- FFexistence.SRL,
+    theory ZModSStr <- FFexistence.ZModSStr,
+    theory CRSStr   <- FFexistence.CRSStr,
+    theory IDSStr   <- FFexistence.IDSStr,
+    theory FSStr    <- FFexistence.FSStr,
+    theory SFT      <- FFexistence.SFT,
+    theory FZModS   <- FFexistence.FZModS,
+    theory FCRS     <- FFexistence.FCRS,
+    theory FIDS     <- FFexistence.FIDS,
+    type uzs        <- FFexistence.uzs,
+    theory UStS     <- FFexistence.UStS,
+    theory UZLS     <- FFexistence.UZLS,
+    theory USStr    <- FFexistence.USStr,
+    theory UZModCRS <- FFexistence.UZModCRS,
+    theory FUTS     <- FFexistence.FUTS,
+    theory FUZModS  <- FFexistence.FUZModS,
+    theory FFS      <- FFexistence.FFS,
     (*FIXME: Pierre-Yves: anomaly here if using the big clone with theory.*)
     (*theory PID    <- PID.*)
     op PID.CR.unit  <- FFexistence.PID.CR.unit,
@@ -132,9 +152,9 @@ abstract theory FFexistence.
     theory USt     <- Ext1.UStT,
     theory UZL     <- Ext1.UZLT,
     theory UStr    <- Ext1.UTStr,
-    theory UZModCR <- Ext1.UTZModCR,
+    theory UZModCR <- Ext1.UZModCRT,
     theory FUT     <- Ext1.FUTT,
-    theory FUZMod  <- Ext1.FUTZMod,
+    theory FUZMod  <- Ext1.FUZModT,
     theory FF      <- Ext1.FFT.
   
   op is_extension_params2 (q : PFFE.PID.poly) =
@@ -177,9 +197,9 @@ abstract theory FFexistence.
     theory UStS     <- Ext1.UStT,
     theory UZLS     <- Ext1.UZLT,
     theory USStr    <- Ext1.UTStr,
-    theory USZModCR <- Ext1.UTZModCR,
+    theory UZModCRS <- Ext1.UZModCRT,
     theory FUTS     <- Ext1.FUTT,
-    theory FUSZMod  <- Ext1.FUTZMod,
+    theory FUZModS  <- Ext1.FUZModT,
     theory FFS      <- Ext1.FFT,
     (*FIXME: Pierre-Yves: anomaly here if using the big clone with theory.*)
     (*theory PID      <- PFFE.PID.*)
@@ -215,29 +235,33 @@ abstract theory FFexistence.
     theory UStT     <- Ext2.UStT,
     theory UZLT     <- Ext2.UZLT,
     theory UTStr    <- Ext2.UTStr,
-    theory UTZModCR <- Ext2.UTZModCR,
+    theory UZModCRT <- Ext2.UZModCRT,
     theory FUTT     <- Ext2.FUTT,
-    theory FUTZMod  <- Ext2.FUTZMod,
-    theory FFT      <- Ext2.FFT.
-fail.
-  print filter.
-
-  (*TODO: need P to be an op in FFIrr_Ext.*)
-
-  op insub_ x =
-    let y = Ext3.Sub.val x in
-    if Ext2.Sub.P y
-    then
-      let z = Ext2.Sub.insubd y in
-      if Ext1.Sub.P z
-      then Some (Ext1.Sub.insubd z)
-      else None
-    else None.
+    theory FUZModT  <- Ext2.FUZModT,
+    theory FFT      <- Ext2.FFT,
+    op n            <- FFexistence.n * SFF_ZMod.SFF.n.
 
   clone include SubFiniteField with
     type t          <- FFexistence.t,
     type st         <- FFexistence.st,
+    type uzt        <- Ext3.uzs,
     type uzs        <- FFexistence.uzs,
+    theory TRL      <= Ext3.SRL,
+    theory ZModTStr <= Ext3.ZModSStr,
+    theory CRTStr   <= Ext3.CRSStr,
+    theory IDTStr   <= Ext3.IDSStr,
+    theory FTStr    <= Ext3.FSStr,
+    theory TFT      <= Ext3.SFT,
+    theory FZModT   <= Ext3.FZModS,
+    theory FCRT     <= Ext3.FCRS,
+    theory FIDT     <= Ext3.FIDS,
+    theory FFT      <= Ext3.FFS,
+    theory UZLT     <= Ext3.UZLS,
+    theory UTStr    <= Ext3.USStr,
+    theory UStT     <= Ext3.UStS,
+    theory UZModCRT <= Ext3.UZModCRS,
+    theory FUZModT  <= Ext3.FUZModS,
+    theory FUTT     <= Ext3.FUTS,
     theory SRL      <- FFexistence.SRL,
     theory ZModSStr <- FFexistence.ZModSStr,
     theory CRSStr   <- FFexistence.CRSStr,
@@ -251,21 +275,24 @@ fail.
     theory UZLS     <- FFexistence.UZLS,
     theory USStr    <- FFexistence.USStr,
     theory UStS     <- FFexistence.UStS,
-    theory USZModCR <- FFexistence.USZModCR,
-    theory FUSZMod  <- FFexistence.FUSZMod,
+    theory UZModCRS <- FFexistence.UZModCRS,
+    theory FUZModS  <- FFexistence.FUZModS,
     theory FUTS     <- FFexistence.FUTS,
     pred Sub.P      <= (fun x =>
                          let y = Ext3.Sub.val x in
                          Ext2.Sub.P y /\
                          let z = Ext2.Sub.insubd y in
                          Ext1.Sub.P z),
+    op Sub.insub    <= (fun x =>
+                         let y = Ext3.Sub.val x in
+                         if Ext2.P y
+                         then
+                           let z = Ext2.Sub.insubd y in
+                           if Ext1.P z
+                           then Some (Ext1.Sub.insubd z)
+                           else None
+                         else None),
     op Sub.val      <= Ext3.Sub.insubd \o  Ext2.Sub.val \o Ext1.Sub.val,
-(*
-    op Sub.insub    <= (fun x => if exists n , x = TRL.ofint n
-                                 then Some (ZModP.inzmod
-                                             (choiceb (fun n => x = TRL.ofint n) witness))
-                                 else None),
-*)
     op Sub.wsT      <= (Ext3.Sub.insubd \o  Ext2.Sub.val \o Ext1.Sub.val) witness
     rename [theory] "SRL"      as "Gone"
                     "ZModSStr" as "Gone"
@@ -281,59 +308,171 @@ fail.
                     "USStr"    as "Gone"
                     "UStS"     as "Gone"
                     "FUTS"     as "Gone"
-                    "USZModCR" as "Gone"
-                    "FUSZMod"  as "Gone"
+                    "UZModCRS" as "Gone"
+                    "FUZModS"  as "Gone"
   proof Sub.*, SZMod.*, SCR.*.
   
   realize Sub.insubN.
   proof.
-  by move=> x; rewrite /p_ /insub_ /= negb_and; case=> ->.
+    by move=> x; rewrite /P /insub /= negb_and; case=> ->.
   qed.
   
   realize Sub.insubT.
   proof.
-  move=> x; rewrite /p_ /val_ /insub_ /(\o) /= => -[] p2 p1; rewrite p2 p1 /=.
-  rewrite /Ext1.SubFF.SubF.Sub.val Ext1.SubFF.SubF.Sub.val_insubd.
-  move: p1; rewrite /Ext1.SubFF.SubF.p => -> /=.
-  rewrite /Ext2.SubFF.SubF.Sub.val Ext2.SubFF.SubF.Sub.val_insubd.
-  move: p2; rewrite /Ext2.SubFF.SubF.p => -> /=.
-  by apply/SubFFExt2.SubF.Sub.valKd.
+    move=> x; rewrite /P /val /insub /(\o) /= => -[] p2 p1; rewrite p2 p1 /=.
+    rewrite /Ext1.Sub.val Ext1.Sub.val_insubd.
+    move: p1; rewrite /Ext1.P => -> /=.
+    rewrite /Ext2.Sub.val Ext2.Sub.val_insubd.
+    move: p2; rewrite /Ext2.P => -> /=.
+    by apply/Ext3.Sub.valKd.
   qed.
   
   realize Sub.valP.
   proof.
-  move=> x; rewrite /p_ /val_ /(\o) /=.
-  rewrite SubFFExt2.SubF.Sub.val_insubd.
-  rewrite /Ext2.SubFF.SubF.Sub.val.
-  rewrite -/Ext2.SubFStr.FStr.iter_frobenius_fixed.
-  (*TODO: all these last admits are straightforward once the FieldStructure clones in Ext1, Ext2 ans SubFF are matched.*)
-  (*
-  print Ext2.SubFStr.eq_iter_frobenius_fixed.
-  *)
-  admit.
+    move=> x; rewrite /(\o) /= Ext3.Sub.val_insubd ifT.
+    + rewrite Ext2.SID.val_iter_frobenius_fixed Ext1.SID.val_iter_frobenius_fixed.
+      apply/FFexistence.IDSStr.iter_frobenius_fixed_imp.
+      - by apply/ltzW/lt0n.
+      - by apply/ltzW/SFF_ZMod.SFF.lt0n.
+      by rewrite FinZMod.iter_frobenius_fixed_n /predT.
+    split; [by apply/ Ext2.Sub.valP|].
+    by rewrite Ext2.Sub.valKd; apply/Ext1.Sub.valP.
   qed.
   
   realize Sub.valK.
   proof.
-  move=> x; rewrite /val_ /insub_ /(\o) /=.
-  admit.
+    move=> x; rewrite /(\o) /= Ext3.Sub.val_insubd.
+    rewrite Ext2.SID.val_iter_frobenius_fixed Ext1.SID.val_iter_frobenius_fixed.
+    rewrite FFexistence.IDSStr.iter_frobenius_fixed_imp /=.
+    + by apply/ltzW/lt0n.
+    + by apply/ltzW/SFF_ZMod.SFF.lt0n.
+    + by rewrite FinZMod.iter_frobenius_fixed_n /predT.
+    by rewrite Ext2.Sub.valP /= Ext2.Sub.valKd Ext1.Sub.valP /= Ext1.Sub.valKd.
   qed.
   
   realize Sub.insubW.
   proof.
-  rewrite /insub_ /wsT_ /(\o) /=.
-  admit.
+    rewrite /(\o) /= Ext3.Sub.val_insubd.
+    rewrite Ext2.SID.val_iter_frobenius_fixed Ext1.SID.val_iter_frobenius_fixed.
+    rewrite FFexistence.IDSStr.iter_frobenius_fixed_imp /=.
+    + by apply/ltzW/lt0n.
+    + by apply/ltzW/SFF_ZMod.SFF.lt0n.
+    + by rewrite FinZMod.iter_frobenius_fixed_n /predT.
+    by rewrite Ext2.Sub.valP /= Ext2.Sub.valKd Ext1.Sub.valP /= Ext1.Sub.valKd.
   qed.
-  
-  lemma eqn : FFexistence.n = FFexistence.SubFF.n.
+
+  realize SZMod.val0.
+  proof. by rewrite /morphism_0 /(\o) /Ext1.Sub.val Ext1.SZMod.val0 /Ext2.Sub.val Ext2.SZMod.val0. qed.
+
+  realize SZMod.valD.
   proof.
-  move: Ext1.SubFF.eq_card_pow_n Ext2.SubFF.eq_card_pow_n SubFFExt2.eq_card_pow_n.
-  (*
-  print Ext1.SFF.FFStr.FF.FinType.card.
-  search _  Ext2.SFF.SFT.card.
-  search _ FFexistence.SubFF.n.
-  *)
-  admit.
+    move=> x y; rewrite /(\o) /= /Ext1.Sub.val Ext1.SZMod.valD /Ext2.Sub.val Ext2.SZMod.valD.
+    rewrite !Ext3.Sub.val_insubd !Ext2.SID.val_iter_frobenius_fixed !Ext1.SID.val_iter_frobenius_fixed.
+    rewrite !FFexistence.IDSStr.iter_frobenius_fixed_imp //.
+    + by apply/ltzW/lt0n.
+    + by apply/ltzW/SFF_ZMod.SFF.lt0n.
+    + by rewrite FinZMod.iter_frobenius_fixed_n /predT.
+    + by apply/ltzW/lt0n.
+    + by apply/ltzW/SFF_ZMod.SFF.lt0n.
+    by rewrite FinZMod.iter_frobenius_fixed_n /predT.
+  qed.
+
+  realize SCR.val1.
+  proof. by rewrite /morphism_0 /(\o) /Ext1.Sub.val Ext1.SCR.val1 /Ext2.Sub.val Ext2.SCR.val1. qed.
+
+  realize SCR.valM.
+  proof.
+    move=> x y; rewrite /(\o) /= /Ext1.Sub.val Ext1.SCR.valM /Ext2.Sub.val Ext2.SCR.valM.
+    rewrite !Ext3.Sub.val_insubd !Ext2.SID.val_iter_frobenius_fixed !Ext1.SID.val_iter_frobenius_fixed.
+    rewrite !FFexistence.IDSStr.iter_frobenius_fixed_imp //.
+    + by apply/ltzW/lt0n.
+    + by apply/ltzW/SFF_ZMod.SFF.lt0n.
+    + by rewrite FinZMod.iter_frobenius_fixed_n /predT.
+    + by apply/ltzW/lt0n.
+    + by apply/ltzW/SFF_ZMod.SFF.lt0n.
+    by rewrite FinZMod.iter_frobenius_fixed_n /predT.
+  qed.
+
+  lemma generator_extension_enum g :
+    Ext2.UTStr.is_generator g =>
+    perm_eq
+      Ext3.SFT.enum
+      (Ext3.SRL.zeror ::
+       map
+         ( Ext3.Sub.insubd \o
+           Ext2.UStT.val \o
+           (Ext2.UZLT.intmul
+             (Ext2.UZLT.intmul
+               g
+               ( (FFexistence.CRSStr.char ^ (Ext1.SFF.n * (FFexistence.n * SFF_ZMod.SFF.n)) - 1) %/
+                 (FFexistence.CRSStr.char ^ (FFexistence.n * SFF_ZMod.SFF.n) - 1)))))
+         (range 0 (FFexistence.CRSStr.char ^ (FFexistence.n * SFF_ZMod.SFF.n) - 1))).
+  proof.
+    move=> is_g_g; apply/uniq_perm_eq => /=; [|split|].
+    + by apply/FFexistence.TFT.enum_uniq.
+    + rewrite mapP negb_exists => x /=; rewrite negb_and /(\o) /= -Ext2.UZLT.mulrM; right.
+      apply/negP => /(congr1 TRL.unit); rewrite {1}/TRL.unit -FFexistence.TRL.unitfE.
+      rewrite /SRL.zeror /= eq_sym neqF negbK /TRL.unit Ext3.SFld.insubdU; [|by apply/Ext2.UStT.valP].
+      rewrite Ext2.IDTStr.iter_frobenius_fixedP; [by apply/mulr_ge0; apply/ltzW; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n]|].
+      rewrite -Ext2.UZModCRT.valX -Ext2.UZLT.mulrM; congr; apply/Ext2.UTStr.dvd2_order.
+      move/Ext2.FUZModT.isgeneratorP: (is_g_g) => ->; pose y:= _ %/ _ * _.
+      rewrite -{2}(mulr1 y) -mulrN -mulrDr /y => {y}; rewrite -Ext3.SCR.eq_char -SCR.eq_char.
+      rewrite mulrAC; apply/dvdz_mulr; rewrite divzK.
+      - rewrite -!(opprB 1); apply/dvdzN/dvdNz.
+        rewrite (mulrC Ext1.SFF.n) (exprM _ _ Ext1.SFF.n).
+        rewrite (Bigint.BIA.geo_sum Ext1.SFF.n).
+        * by apply/ltzW/Ext1.SFF.lt0n.
+        by apply/dvdz_mulr/dvdzz.
+      rewrite mulrA mulrAC (mulrC _ SFF_ZMod.SFF.n) -mulrA exprM -ZModFin.eq_card_p.
+      rewrite -SFF_ZMod.SFF.eq_card_pow_n exprM -Ext1.SFF.eq_card_pow_n.
+      move: Ext2.SFF.eq_card_pow_n; rewrite FFIrrPolyE.eqn eq_degq /= => <-.
+      by rewrite Ext2.FFT.card_unit /= dvdzz.
+    + apply/map_inj_in_uniq; [|by apply/range_uniq].
+      move=> x y memx memy; rewrite /(\o).
+      admit.
+    admit.
+  qed.
+
+(*
+  lemma generator_extension_enum g :
+    FFexistence.UTStr.is_generator g =>
+    perm_eq FFexistence.TFT.enum (TRL.zeror :: map (UStT.val \o (UZLT.intmul g)) (range 0 FFexistence.FUTT.card)).
+  proof.
+    move=> is_g_g; apply/uniq_perm_eq => /=; [|split|].
+    + by apply/FFexistence.TFT.enum_uniq.
+    + rewrite mapP negb_exists => x /=; rewrite negb_and; right.
+      apply/negP => /(congr1 TRL.unit); rewrite {1}/TRL.unit -FFexistence.TRL.unitfE.
+      by rewrite /TRL.zeror /= eq_sym neqF negbK /(\o) -/TRL.unit; apply/UStT.valP.
+    + apply/map_inj_in_uniq; [|by apply/range_uniq].
+      move=> x y memx memy; rewrite /(\o) => /UStT.val_inj.
+      move/USStr.dvd2_order; move/FUZModS.isgeneratorP: (is_g_g) => ->.
+      by rewrite eq_mod !modz_small -?mem_range ?ger0_norm.
+    move=> x; rewrite FFexistence.TFT.enumP /= -implyNb => /TRL.unitfP ux.
+    move: (UStT.val_insubd x); rewrite ux /= => <- {ux}.
+    rewrite map_comp; apply/map_f; case/(_ (UStS.insubd x)): (is_g_g).
+    move=> n ->; apply/mapP; exists (n %% FUTT.card); split.
+    + apply/mem_range; rewrite modz_ge0 ?ltz_pmod //.
+      - by apply/gtr_eqF/FUTT.card_gt0.
+      by apply/FUTT.card_gt0.
+    apply/USStr.dvd2_order; move/FUZModS.isgeneratorP: is_g_g => ->.
+    by rewrite -divzE; apply/dvdz_mull/dvdzz.
+  qed.
+*)
+
+  lemma eqn : FFexistence.n = FFexistence.SFF.n.
+  proof.
+    move: Ext3.SFF.eq_card_pow_n.
+    rewrite Ext2.SFF.eq_card_pow_n Ext1.SFF.eq_card_pow_n.
+    rewrite Ext2.FFIrrPolyE.eqn eq_degq /= FFexistence.SFF.eq_card_pow_n.
+    rewrite -!exprM => eq_. move: (ieexprIn _ _ _ _ _ _ _ eq_).
+    + by apply/FFexistence.SFT.card_gt0.
+    + by apply/gtr_eqF/FFexistence.FCRS.card_gt1.
+    + by apply/mulr_ge0; apply/ltzW; [apply/Ext1.SFF.lt0n|apply/lt0n].
+    + by apply/mulr_ge0; apply/ltzW; [apply/SFF.lt0n|apply/Ext3.SFF.lt0n].
+    rewrite mulrC; have ->: Ext1.SFF.n = Ext3.SFF.n; last first.
+    + by apply/mulIf/gtr_eqF/Ext3.SFF.lt0n.
+    move=> {eq_}.
+    admit.
   qed.
 end FFexistence.
 
