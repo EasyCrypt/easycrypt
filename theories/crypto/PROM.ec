@@ -938,6 +938,104 @@ lemma pr_RO_FinRO_D &m x (p : d_out_t -> bool):
   Pr[MainD(D,RO).distinguish(x) @ &m : p res] = Pr[MainD(D,FinRO).distinguish(x) @ &m : p res].
 proof. by byequiv RO_FinRO_D. qed. 
 end section PROOFS.
+
+(* FinRO with monolithic sampling *)
+
+clone import MUniFinFun with
+  type t <- in_t,
+  theory FinT <- FinFrom
+proof*.
+
+
+module FunRO : RO = {
+  var f : in_t -> out_t
+
+  proc init() = {
+    f <$ dfun dout;
+  }
+
+  proc get (x) = { return f x; }
+
+  proc set (x,y) = {
+    f <- (fun z => if z = x then y else f z);
+  }
+
+  proc sample(x:in_t) = { }
+
+  (* only to satisfy the RO type,
+     may not be called by the distinguisher *)
+  proc rem (x:in_t) = { }
+}.
+
+require DJoin.
+
+section PROOF.
+
+declare axiom dout_ll x: is_lossless (dout x).
+
+declare module D <: FinRO_Distinguisher{-RO, -FRO,-FunRO}.
+
+local clone import DJoin.JoinMapSampling as DJ with
+  type ta <- in_t,
+  type tb <- out_t
+proof*.
+
+(* used for transitivity* *)
+local module Vars = { var r : out_t list }.
+
+local equiv eqv_init :
+  FinRO.init ~ FunRO.init : true ==> forall x, RO.m.[x]{1} = Some (FunRO.f{2} x).
+proof.
+proc.
+transitivity*{2} {
+  Vars.r <@ S.sample(dout,FinFrom.enum);
+  FunRO.f <- tofun Vars.r;
+}; 1,2: smt(); last first.
+- inline*; rnd : *0 *0; skip => />.
+  by split => *; rewrite dmap_id dfun_dmap.
+transitivity*{2} {
+  Vars.r <@ S.loop_first(dout,FinFrom.enum);
+  FunRO.f <- tofun Vars.r;
+}; 1,2: smt(); last first.
+- by symmetry; wp; call Sample_Loop_first_eq; auto.
+inline*; wp 3 4.
+while (l{1} = xs{2}  /\ d{2} = dout /\
+  exists hd, FinFrom.enum = hd ++ l{1}
+    /\ (forall x, x \in hd <=> x \in RO.m{1})
+    /\ map (fun x => oget RO.m{1}.[x]) hd = l{2}).
+- auto => /> &1 &2 hd hdP1 hdP2.
+  case: (xs{2}) hdP1 => //= x l def_enum r r_d.
+  split => [xNm|x_m]; last first.
+  + by have := FinFrom.enum_uniq; rewrite def_enum cat_uniq; smt(hasP).
+  exists (rcons hd x).
+  rewrite def_enum -cats1 -catA /=; split; 1: smt(mem_cat mem_set).
+  rewrite cats1 map_rcons /= get_set_sameE /=; congr.
+  apply eq_in_map => z z_hd; suff: z <> x by smt(get_setE).
+  by have := FinFrom.enum_uniq; rewrite def_enum cat_uniq; smt(hasP).
+auto => />; split; 1: by exists []; smt(mem_empty).
+move => m hd; rewrite cats0 => <- H x @/tofun.
+rewrite (@nth_map witness) ?nth_index ?FinFrom.enumP;
+  smt(index_ge0 index_mem FinFrom.enumP).
+qed.
+
+equiv FinRO_FunRO_D : MainD(D,FinRO).distinguish ~ MainD(D,FunRO).distinguish :
+  ={glob D, arg} ==> ={res, glob D}.
+proof.
+proc.
+call (: forall x, RO.m.[x]{1} = Some (FunRO.f{2} x)).
+- by conseq eqv_init; auto.
+- by proc; auto => /> /#.
+- by proc; auto => />; smt(get_setE).
+- by proc; auto.
+- by call eqv_init; auto.
+qed.
+
+lemma pr_FinRO_FunRO_D &m x (p : d_out_t -> bool):
+  Pr[MainD(D,FinRO).distinguish(x) @ &m : p res] =
+  Pr[MainD(D,FunRO).distinguish(x) @ &m : p res].
+proof. by byequiv FinRO_FunRO_D. qed.
+
+end section PROOF.
 end FinEager.
 
 end FullRO.
