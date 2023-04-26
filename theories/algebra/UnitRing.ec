@@ -75,6 +75,36 @@ abstract theory UZMod_ComRing.
       elim n => [|n le0n IHn]; [by rewrite mulr0z expr0 val1|].
       by rewrite mulrSz valM IHn exprS.
     qed.
+
+    lemma insubd1 : insubd RL.oner = UZL.zeror.
+    proof.
+      by apply/val_inj; rewrite !val1.
+    qed.
+
+    lemma insubdM x y :
+      unit x =>
+      unit y =>
+      insubd (RL.( * ) x y) = UZL.( + ) (insubd x) (insubd y).
+    proof.
+      move=> ux uy; apply/val_inj; rewrite valM !val_insubd.
+      by rewrite unitrM ux uy.
+    qed.
+
+    lemma insubdV x :
+      unit x =>
+      insubd (RL.invr x) = UZL.([-]) (insubd x).
+    proof.
+      move=> ux; apply/val_inj; rewrite valV !val_insubd.
+      by rewrite unitrV ux.
+    qed.
+
+    lemma insubdX x n :
+      unit x =>
+      insubd (RL.exp x n) = UZL.intmul (insubd x) n.
+    proof.
+      move=> ux; apply/val_inj; rewrite valX !val_insubd.
+      by rewrite unitrX ux.
+    qed.
   end UZModCR.
 end UZMod_ComRing.
 

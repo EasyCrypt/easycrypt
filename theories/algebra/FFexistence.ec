@@ -408,71 +408,153 @@ abstract theory FFexistence.
                  (FFexistence.CRSStr.char ^ (FFexistence.n * SFF_ZMod.SFF.n) - 1)))))
          (range 0 (FFexistence.CRSStr.char ^ (FFexistence.n * SFF_ZMod.SFF.n) - 1))).
   proof.
-    move=> is_g_g; apply/uniq_perm_eq => /=; [|split|].
+    move=> is_g_g.
+    have eq_ucard: Ext2.FUTT.card =
+             (FFexistence.CRSStr.char ^ (Ext1.SFF.n * (FFexistence.n * SFF_ZMod.SFF.n)) - 1).
+    + rewrite mulrA mulrAC (mulrC _ SFF_ZMod.SFF.n) -mulrA exprM -ZModFin.eq_card_p.
+      rewrite -SFF_ZMod.SFF.eq_card_pow_n exprM -Ext1.SFF.eq_card_pow_n.
+      move: Ext2.SFF.eq_card_pow_n; rewrite FFIrrPolyE.eqn eq_degq /= => <-.
+      by rewrite Ext2.FFT.card_unit.
+    have dvdB_1: (FFexistence.CRSStr.char ^ (n * SFF_ZMod.SFF.n) - 1) %|
+          (FFexistence.CRSStr.char ^ (Ext1.SFF.n * (n * SFF_ZMod.SFF.n)) - 1).
+    + rewrite -!(opprB 1); apply/dvdzN/dvdNz.
+      rewrite (mulrC Ext1.SFF.n) (exprM _ _ Ext1.SFF.n).
+      rewrite (Bigint.BIA.geo_sum Ext1.SFF.n).
+      - by apply/ltzW/Ext1.SFF.lt0n.
+      by apply/dvdz_mulr/dvdzz.
+    apply/uniq_perm_eq => /=; [|split|].
     + by apply/FFexistence.TFT.enum_uniq.
     + rewrite mapP negb_exists => x /=; rewrite negb_and /(\o) /= -Ext2.UZLT.mulrM; right.
       apply/negP => /(congr1 TRL.unit); rewrite {1}/TRL.unit -FFexistence.TRL.unitfE.
-      rewrite /SRL.zeror /= eq_sym neqF negbK /TRL.unit Ext3.SFld.insubdU; [|by apply/Ext2.UStT.valP].
-      rewrite Ext2.IDTStr.iter_frobenius_fixedP; [by apply/mulr_ge0; apply/ltzW; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n]|].
+      rewrite /SRL.zeror /= eq_sym neqF negbK /TRL.unit Ext3.SFld.insubdU; last first.
+      - by apply/Ext2.UStT.valP.
+      rewrite Ext2.IDTStr.iter_frobenius_fixedP.
+      - by apply/mulr_ge0; apply/ltzW; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
       rewrite -Ext2.UZModCRT.valX -Ext2.UZLT.mulrM; congr; apply/Ext2.UTStr.dvd2_order.
       move/Ext2.FUZModT.isgeneratorP: (is_g_g) => ->; pose y:= _ %/ _ * _.
       rewrite -{2}(mulr1 y) -mulrN -mulrDr /y => {y}; rewrite -Ext3.SCR.eq_char -SCR.eq_char.
-      rewrite mulrAC; apply/dvdz_mulr; rewrite divzK.
-      - rewrite -!(opprB 1); apply/dvdzN/dvdNz.
-        rewrite (mulrC Ext1.SFF.n) (exprM _ _ Ext1.SFF.n).
-        rewrite (Bigint.BIA.geo_sum Ext1.SFF.n).
-        * by apply/ltzW/Ext1.SFF.lt0n.
-        by apply/dvdz_mulr/dvdzz.
-      rewrite mulrA mulrAC (mulrC _ SFF_ZMod.SFF.n) -mulrA exprM -ZModFin.eq_card_p.
-      rewrite -SFF_ZMod.SFF.eq_card_pow_n exprM -Ext1.SFF.eq_card_pow_n.
-      move: Ext2.SFF.eq_card_pow_n; rewrite FFIrrPolyE.eqn eq_degq /= => <-.
-      by rewrite Ext2.FFT.card_unit /= dvdzz.
+      rewrite mulrAC; apply/dvdz_mulr; rewrite divzK //.
+      by rewrite eq_ucard dvdzz.
     + apply/map_inj_in_uniq; [|by apply/range_uniq].
-      move=> x y memx memy; rewrite /(\o).
-      admit.
-    admit.
+      move=> x y memx memy; rewrite /(\o) /= => /(congr1 Ext3.Sub.val).
+      rewrite !Ext3.Sub.val_insubd !ifT.
+      - apply/Ext2.IDTStr.iter_frobenius_fixedP.
+        * by apply/mulr_ge0; apply/ltzW; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
+        rewrite -Ext2.UZLT.mulrM -Ext2.UZModCRT.valX -Ext2.UZLT.mulrM.
+        congr; apply/Ext2.UTStr.dvd2_order.
+        move/Ext2.FUZModT.isgeneratorP: (is_g_g) => ->; pose z:= _ %/ _ * _.
+        rewrite -{2}(mulr1 z) -mulrN -mulrDr /z => {z}.
+        rewrite -Ext3.SCR.eq_char -SCR.eq_char.
+        rewrite mulrAC; apply/dvdz_mulr; rewrite divzK //.
+        by rewrite eq_ucard dvdzz.
+      - apply/Ext2.IDTStr.iter_frobenius_fixedP.
+        * by apply/mulr_ge0; apply/ltzW; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
+        rewrite -Ext2.UZLT.mulrM -Ext2.UZModCRT.valX -Ext2.UZLT.mulrM.
+        congr; apply/Ext2.UTStr.dvd2_order.
+        move/Ext2.FUZModT.isgeneratorP: (is_g_g) => ->; pose z:= _ %/ _ * _.
+        rewrite -{2}(mulr1 z) -mulrN -mulrDr /z => {z}.
+        rewrite -Ext3.SCR.eq_char -SCR.eq_char.
+        rewrite mulrAC; apply/dvdz_mulr; rewrite divzK //.
+        by rewrite eq_ucard dvdzz.
+      move/Ext2.UStT.val_inj/Ext2.UTStr.dvd2_order.
+      move/Ext2.FUZModT.isgeneratorP: (is_g_g) => eq_.
+      rewrite Ext2.UTStr.order_intmul eq_; [by apply/Ext2.FUTT.card_gt0|].
+      have ->//: forall a b c , 0 < a => 0 < c => a = b => c %| b => a %/ gcd a (b %/ c) = c.
+      - move=> a ? b lt0a lt0b <<- dvdba; rewrite gcd_dvdr.
+        * by apply/dvdz_div => //; apply/gtr_eqF.
+        rewrite gtr0_norm; [by apply/ltz_divRL|].
+        rewrite -mulz_divl //; [by apply/ltzW|].
+        by apply/mulzK/gtr_eqF.
+      - by apply/Ext2.FUTT.card_gt0.
+      - apply/subr_gt0/exprn_egt1.
+        * by apply/mulr_ge0; apply/ltzW; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
+        * by apply/FFexistence.FCRS.gt1_char.
+        by apply/gtr_eqF/mulr_gt0; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
+      by rewrite eq_mod !modz_small -?mem_range ?ger0_norm //;
+      apply/ltzS => /=; apply/expr_gt0/FFexistence.FCRS.gt0_char.
+    move=> x; rewrite SFT.enumP /= -implyNb => /TRL.unitfP ux.
+    rewrite !map_comp -Ext3.Sub.valKd; apply/map_f.
+    move: (Ext2.UStT.val_insubd (Ext3.Sub.val x)).
+    rewrite ifT. apply/negP => eq_; move: ux; rewrite eq_ => /= {eq_}.
+    + by rewrite negb_exists => y /=; rewrite IFQ.FQ.mulr0 eq_sym IFQ.FQ.oner_neq0.
+    move=> <-; apply/map_f; case/(_ (Ext2.UStT.insubd (Ext3.Sub.val x))): (is_g_g).
+    move=> m; rewrite -Ext2.UTStr.intmul_modz_order.
+    move/Ext2.FUZModT.isgeneratorP: (is_g_g) => ->.
+    pose k := m %% Ext2.FUTT.card.
+    have: k \in range 0 Ext2.FUTT.card; rewrite /k => {k}.
+    + apply/mem_range; rewrite modz_ge0 /=.
+      - by apply/gtr_eqF/Ext2.FUTT.card_gt0.
+      by apply/ltz_pmod/Ext2.FUTT.card_gt0.
+    rewrite eq_ucard.
+    pose k := _ %% _; move: k => {m} m mem_m eq_.
+    rewrite eq_; move: eq_.
+    move/(congr1 (transpose Ext2.UZLT.intmul
+                            (FFexistence.CRSStr.char ^ (n * SFF_ZMod.SFF.n) - 1))).
+    rewrite /= -Ext2.UZModCRT.insubdX; [by rewrite Ext3.SFld.valU|].
+    rewrite {1}Ext1.SCR.eq_char {1}Ext2.SCR.eq_char.
+    move: (Ext2.IDTStr.iter_frobenius_fixedP (n * SFF_ZMod.SFF.n) (Ext3.Sub.val x) _).
+    + by apply/ltzW/mulr_gt0; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
+    rewrite Ext3.Sub.valP /=.
+    rewrite IFQ.FQ.exprD; [by rewrite Ext3.SFld.valU|].
+    move=> ->; rewrite -{1}(IFQ.FQ.expr1 (Ext3.Sub.val x)).
+    rewrite -IFQ.FQ.exprD /=; [by rewrite Ext3.SFld.valU|].
+    rewrite IFQ.FQ.expr0 -(Ext2.UZLT.mulr0z g).
+    rewrite -(Ext2.UZLT.mulrM g m (_ - 1)).
+    move/eq_sym/Ext2.UTStr.dvd2_order => /=.
+    move/Ext2.FUZModT.isgeneratorP: is_g_g => ->.
+    rewrite eq_ucard dvdzP => -[q].
+    move/(congr1 (transpose (%/) (FFexistence.CRSStr.char ^ (n * SFF_ZMod.SFF.n) - 1))).
+    rewrite /= mulzK.
+    + apply/gtr_eqF/subr_gt0; rewrite exprn_egt1.
+      - by apply/mulr_ge0; apply/ltzW; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
+      - by apply/FFexistence.FCRS.gt1_char.
+      by apply/gtr_eqF/mulr_gt0; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
+    move=> ->>; move: mem_m; rewrite divMr // mem_range_mulr.
+    + apply/ltz_divRL => //=.
+      - apply/subr_gt0; rewrite exprn_egt1.
+        * by apply/mulr_ge0; apply/ltzW; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
+        * by apply/FFexistence.FCRS.gt1_char.
+        by apply/gtr_eqF/mulr_gt0; [apply/lt0n|apply/SFF_ZMod.SFF.lt0n].
+      apply/subr_gt0; rewrite exprn_egt1.
+      - apply/ltzW/mulr_gt0; [|apply/mulr_gt0].
+        * by apply/Ext1.SFF.lt0n.
+        * by apply/lt0n.
+        by apply/SFF_ZMod.SFF.lt0n.
+      - by apply/FFexistence.FCRS.gt1_char.
+      apply/gtr_eqF/mulr_gt0; [|apply/mulr_gt0].
+      - by apply/Ext1.SFF.lt0n.
+      - by apply/lt0n.
+      by apply/SFF_ZMod.SFF.lt0n.
+    rewrite /=; have ->//: forall a b , a <> 0 => 0 <= b => b %| a => a %\ (a %/ b) = b.
+    + by move=> a b neqa0 le0b dvdba; rewrite -mulz_divl // mulrN -mulNr mulzK.
+    + apply/gtr_eqF/subr_gt0; rewrite exprn_egt1.
+      - apply/ltzW/mulr_gt0; [|apply/mulr_gt0].
+        * by apply/Ext1.SFF.lt0n.
+        * by apply/lt0n.
+        by apply/SFF_ZMod.SFF.lt0n.
+      - by apply/FFexistence.FCRS.gt1_char.
+      apply/gtr_eqF/mulr_gt0; [|apply/mulr_gt0].
+      - by apply/Ext1.SFF.lt0n.
+      - by apply/lt0n.
+      by apply/SFF_ZMod.SFF.lt0n.
+    + by apply/ltzS => /=; apply/expr_gt0/FFexistence.FCRS.gt0_char.
+    move=> mem_q; rewrite (mulrC q) Ext2.UZLT.mulrM.
+    by apply/mapP; exists q.
   qed.
-
-(*
-  lemma generator_extension_enum g :
-    FFexistence.UTStr.is_generator g =>
-    perm_eq FFexistence.TFT.enum (TRL.zeror :: map (UStT.val \o (UZLT.intmul g)) (range 0 FFexistence.FUTT.card)).
-  proof.
-    move=> is_g_g; apply/uniq_perm_eq => /=; [|split|].
-    + by apply/FFexistence.TFT.enum_uniq.
-    + rewrite mapP negb_exists => x /=; rewrite negb_and; right.
-      apply/negP => /(congr1 TRL.unit); rewrite {1}/TRL.unit -FFexistence.TRL.unitfE.
-      by rewrite /TRL.zeror /= eq_sym neqF negbK /(\o) -/TRL.unit; apply/UStT.valP.
-    + apply/map_inj_in_uniq; [|by apply/range_uniq].
-      move=> x y memx memy; rewrite /(\o) => /UStT.val_inj.
-      move/USStr.dvd2_order; move/FUZModS.isgeneratorP: (is_g_g) => ->.
-      by rewrite eq_mod !modz_small -?mem_range ?ger0_norm.
-    move=> x; rewrite FFexistence.TFT.enumP /= -implyNb => /TRL.unitfP ux.
-    move: (UStT.val_insubd x); rewrite ux /= => <- {ux}.
-    rewrite map_comp; apply/map_f; case/(_ (UStS.insubd x)): (is_g_g).
-    move=> n ->; apply/mapP; exists (n %% FUTT.card); split.
-    + apply/mem_range; rewrite modz_ge0 ?ltz_pmod //.
-      - by apply/gtr_eqF/FUTT.card_gt0.
-      by apply/FUTT.card_gt0.
-    apply/USStr.dvd2_order; move/FUZModS.isgeneratorP: is_g_g => ->.
-    by rewrite -divzE; apply/dvdz_mull/dvdzz.
-  qed.
-*)
 
   lemma eqn : FFexistence.n = FFexistence.SFF.n.
   proof.
-    move: Ext3.SFF.eq_card_pow_n.
-    rewrite Ext2.SFF.eq_card_pow_n Ext1.SFF.eq_card_pow_n.
-    rewrite Ext2.FFIrrPolyE.eqn eq_degq /= FFexistence.SFF.eq_card_pow_n.
-    rewrite -!exprM => eq_. move: (ieexprIn _ _ _ _ _ _ _ eq_).
-    + by apply/FFexistence.SFT.card_gt0.
+    case: Ext2.FFT.exists_generator => g is_g_g.
+    move: FFexistence.SFF.eq_card_pow_n.
+    move: (generator_extension_enum _ is_g_g).
+    move/perm_eq_size; rewrite -/SFT.card => -> /=.
+    rewrite size_map size_range /= (addrC 1) ler_maxr /=.
+    + by apply/ltzS => /=; apply/expr_gt0/FFexistence.FCRS.gt0_char.
+    rewrite mulrC exprM -ZModFin.eq_card_p -SFF_ZMod.SFF.eq_card_pow_n.
+    apply/ieexprIn; [by apply/FFexistence.SFT.card_gt0| | |].
     + by apply/gtr_eqF/FFexistence.FCRS.card_gt1.
-    + by apply/mulr_ge0; apply/ltzW; [apply/Ext1.SFF.lt0n|apply/lt0n].
-    + by apply/mulr_ge0; apply/ltzW; [apply/SFF.lt0n|apply/Ext3.SFF.lt0n].
-    rewrite mulrC; have ->: Ext1.SFF.n = Ext3.SFF.n; last first.
-    + by apply/mulIf/gtr_eqF/Ext3.SFF.lt0n.
-    move=> {eq_}.
-    admit.
+    + by apply/ltzW/lt0n.
+    by apply/ltzW/SFF.lt0n.
   qed.
 end FFexistence.
 

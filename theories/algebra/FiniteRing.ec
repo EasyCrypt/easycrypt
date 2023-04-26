@@ -1167,8 +1167,7 @@ abstract theory SubFiniteField_ZMod.
         rewrite UStS.val_insubd ux /= => ->>; rewrite USZModCR.valX.
         rewrite -SF.valX -exprM mulrA -!USZModCR.valX -ZModFin.eq_card_p.
         move/FUSZMod.isgeneratorP: isg_g.
-        admit.
-      admit.
+      fail.
     qed.
 *)
   end FinZMod.
