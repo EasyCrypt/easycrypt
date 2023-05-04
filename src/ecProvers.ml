@@ -461,7 +461,7 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
                         Format.fprintf fmt "success: %s%!" prover;
                       Buffer.contents buf)))
                     end;
-                    incr status
+                    if (0 <= !status) then incr status
 
 
                 | CP.Invalid ->
