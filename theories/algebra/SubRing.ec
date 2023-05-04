@@ -984,7 +984,7 @@ end SubFieldPred.
 
 
 (* ==================================================================== *)
-theory SubIDomainFrobenius.
+abstract theory SubIDomainFrobenius.
   type t, st.
 
   clone include IDomainStruct with
@@ -1014,7 +1014,7 @@ theory SubIDomainFrobenius.
 end SubIDomainFrobenius.
 
 (* -------------------------------------------------------------------- *)
-theory SubFieldFrobenius.
+abstract theory SubFieldFrobenius.
   type t, st.
 
   clone include FieldStruct with
