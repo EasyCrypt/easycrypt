@@ -445,12 +445,13 @@ proof. by rewrite logDr logVr modzDmr. qed.
 
 (* ==================================================================== *)
 abstract theory PowZMod.
-type exp.
 
 axiom prime_order : prime order.
 
-clone ZModP.ZModField as ZModE with type zmod <- exp, op p <- order
+clone ZModP.ZModField as ZModE with op p <- order
+  rename [type] "zmod" as "exp"
   proof prime_p by apply: prime_order.
+type exp = ZModE.exp.
 
 import ZModE.
 
@@ -640,12 +641,12 @@ end CyclicGroup.
 (* ==================================================================== *)
 
 abstract theory ZModPCyclic.
-type zmod.
 
 const order : { int | 2 <= order } as ge2_order.
 
-clone import ZModP.ZModRing with type zmod <- zmod, op p <- order
+clone import ZModP.ZModRing with op p <- order
   proof ge2_p by apply: ge2_order.
+type zmod = ZModRing.zmod.
 
 import ZModpRing.
 

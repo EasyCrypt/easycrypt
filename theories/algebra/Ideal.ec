@@ -344,7 +344,6 @@ proof. by case=> [xy yx] [yz zy]; split; apply: (dvdr_trans y). qed.
 
 (* ==================================================================== *)
 abstract theory RingQuotientBase.
-type qT.
 
 (* -------------------------------------------------------------------- *)
 op p : t -> bool.
@@ -415,10 +414,9 @@ qed.
 (* -------------------------------------------------------------------- *)
 clone include Quotient.EquivQuotient
   with type T   <- t,
-       type qT  <- qT,
          op eqv <- eqv
 
-   proof EqvEquiv.*.
+   proof *.
 
 realize EqvEquiv.eqv_refl  by apply: eqvxx.
 realize EqvEquiv.eqv_sym   by apply: eqv_sym.

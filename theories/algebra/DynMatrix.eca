@@ -37,8 +37,6 @@ qed.
 
 theory Vectors.
 
-type vector.
-
 type prevector = (int -> R) * int.
 
 op vclamp (pv: prevector): prevector =
@@ -55,9 +53,11 @@ proof. by rewrite /eqv vclamp_idemp. qed.
 
 clone import Quotient.EquivQuotient as QuotientVec with
   type T <- prevector,
-  type qT <- vector,
   op eqv <- eqv
-  proof EqvEquiv.* by smt().
+  rename [type] "qT" as "vector"
+  proof * by smt().
+
+type vector = QuotientVec.vector.
 
 op tofunv v = vclamp (repr v).
 
@@ -655,7 +655,6 @@ export Vectors.
 
 (* -------------------------------------------------------------------------- *)
 theory Matrices.
-type matrix.
 
 type prematrix = (int -> int -> R) * int * int.
 
@@ -672,9 +671,11 @@ op eqv (pm1 pm2: prematrix) = mclamp pm1 = mclamp pm2.
 
 clone import Quotient.EquivQuotient as QuotientMat with
   type T <- prematrix,
-  type qT <- matrix,
   op eqv <- eqv
-  proof EqvEquiv.* by smt().
+  rename [type] "qT" as "matrix"
+  proof * by smt().
+
+type matrix = QuotientMat.matrix.
 
 op tofunm m = mclamp (repr m).
 
