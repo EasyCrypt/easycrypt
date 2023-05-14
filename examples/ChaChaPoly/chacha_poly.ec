@@ -82,9 +82,12 @@ theory C.
 
   clone include Subtype with 
     type T <- int,
-    pred P <- fun (i:int) => 0 <= i < max_counter + 1
-    rename [type] "sT" as "counter"
-           [op] "insubd" as "ofint".
+    op P <- fun (i:int) => 0 <= i < max_counter + 1
+    rename (* [type] "sT" as "counter" *) (* Gives error. *)
+           [op] "insubd" as "ofint"
+  proof *.
+  realize inhabited. exists 0. smt(gt0_max_counter). qed.
+  type counter = sT.
 
   clone FinType with 
     type t  = counter,
@@ -110,15 +113,19 @@ clone FinProdType as NonceCount with
 (* -------------------------------------------------------------------------- *)
 
 abstract theory GenBlock.
-  type block.
   op block_size : int.
   axiom ge0_block_size : 0 <= block_size.
 
   clone include Subtype with
     type T <- bytes, 
-    type sT <- block,
-    pred P <- fun (l:bytes) => size l = block_size
-    rename [op] "val" as "bytes_of_block".
+    op P <- fun (l:bytes) => size l = block_size
+    rename [op] "val" as "bytes_of_block"
+  proof *.
+  realize inhabited.
+    exists (nseq block_size witness).
+    smt(size_nseq ge0_block_size).
+  qed.
+  type block = sT.
 
   op dblock =  dmap (dlist dbyte block_size) insubd.
 
