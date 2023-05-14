@@ -6,7 +6,7 @@ require (*--*) Subtype.
 
 (* ==================================================================== *)
 abstract theory PolyComRing.
-type coeff, poly.
+type coeff.
 
 clone import ComRing as Coeff with type t <= coeff.
 
@@ -19,18 +19,22 @@ clone import BigComRing as BigCf
 (* -------------------------------------------------------------------- *)
 type prepoly = int -> coeff.
 
-inductive ispoly (p : prepoly) =
-| IsPoly of
+op ispoly (p : prepoly) =
       (forall c, c < 0 => p c = zeror)
-    & (exists d, forall c, (d < c)%Int => p c = zeror).
+    /\ (exists d, forall c, (d < c)%Int => p c = zeror).
 
 clone include Subtype
   with type T   <- prepoly,
-       type sT  <- poly,
-       pred P   <- ispoly,
-         op wsT <- (fun _ => zeror)
+       op P   <- ispoly
   rename "insub" as "to_poly"
-  rename "val"   as "of_poly".
+  rename "val"   as "of_poly"
+proof *.
+realize inhabited.
+  exists (fun _, zeror).
+  rewrite /ispoly.
+  auto.
+qed.
+type poly = sT.
 
 op "_.[_]" (p : poly) (i : int) = (of_poly p) i.
 
@@ -840,13 +844,12 @@ end PolyComRing.
 
 (* ==================================================================== *)
 abstract theory Poly.
-type coeff, poly.
+type coeff.
 
 clone import IDomain as IDCoeff with type t <= coeff.
 
 clone include PolyComRing with
   type coeff        <- coeff,
-  type poly         <- poly,
   theory Coeff      <- IDCoeff.
   
 clear [PolyComRing.* PolyComRing.AddMonoid.* PolyComRing.MulMonoid.*].

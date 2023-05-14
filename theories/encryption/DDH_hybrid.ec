@@ -12,9 +12,10 @@ clone G.PowZMod as GP with
 
 clone GP.FDistr as FD.
 
-clone GP.ZModE as ZP.
+(* Cloning GP.ZModE duplicates the type exp and leads to ambiguities. *)
+(* clone GP.ZModE as ZP. *) 
 
-import G GP FD ZP.
+import G GP FD GP.ZModE.
 
 require Hybrid.
 

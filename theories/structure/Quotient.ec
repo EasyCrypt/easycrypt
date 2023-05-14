@@ -87,13 +87,15 @@ apply/(eqv_trans (canon x)); first by apply/eqv_canon.
 by rewrite eq &(eqv_refl).
 qed.
 
-type qT.
-
 clone import Subtype with
   type T  <- T,
-  type sT <- qT,
-  pred P  <- iscanon,
-  op  wsT <- canon witness.
+  op P  <- iscanon
+proof *.
+realize inhabited.
+smt(canonK).
+qed.
+    
+type qT = sT.
 
 clone include CoreQuotient with
   type T     <- T,
