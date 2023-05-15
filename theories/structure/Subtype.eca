@@ -3,142 +3,105 @@ pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 
-(* TODO: Update comment for new Subtype definition *)
-
 (* -------------------------------------------------------------------- *)
 (* This theory defines the subtype [sT] of [T] defined as {x : T | P x} *)
-(* where P is a predicate over T. This subtype is defined via an        *)
-(* axiomatization of an inversible partial projection from [T] to [sT]  *)
-(* that respects [P].                                                   *)
+(* where P is a nonempty predicate over T. This subtype is defined      *)
+(* using [choiceb] through a global axiom asserting the existence of    *)
+(* the injection from [sT] to [T].                                      *)
 (*                                                                      *)
 (* Injection from [sT] to [T] and (partial) projection of [T] to [sT]   *)
-(*    val   == generic injection from [sT] to [T]                       *)
-(*    insub == generic partial projection from [T] to [sT]              *)
+(*    val    == generic injection from [sT] to [T]                      *)
+(*    insub  == generic partial projection from [T] to [sT]             *)
+(*    insubd == odflt witness (insub x)                                 *)
 (*                                                                      *)
 (*    {x : T | P x} and [sT] are in bijection via val/insub.            *)
 (*       1. insub x = None                  if !(P x)                   *)
 (*       2. insub x = Some y with val y = x if  (P x)                   *)
 (* -------------------------------------------------------------------- *)
 
-(* Contributed by Dominique Unruh. *)
-
 require import Core.
 
 (* These three parameters are to be instantiated by the user. *)
 type T.
-op P : T -> bool. (* Minor incompatibility with previous subtype. It's an op, not a pred now. *)
+op P : T -> bool. 
 axiom inhabited: exists x, P x.
 
-(* This parameter must never be instantiated upon cloning, otherwise unsoundness may ensure. Hence the name. *)
+(* This parameter must never be instantiated upon cloning, otherwise
+   unsoundness may ensure. Hence the name. *)
 type do_not_use_this_type_or_you_get_unsoundness_admit.
+(* TODO: we want a tag to make abstract types uninstantiable *)
 
-(* This lemma is justified by the axiom `inhabited` and the fact that the type `do_not_use_this_type_or_you_get_unsoundness_admit` is unspecified.
-It says that there is an injective function `f` with range `P`.
+(* The lemma below is justified by the axiom [inhabited] and the fact
+  that the type [do_not_use_this_type_or_you_get_unsoundness_admit] is
+  unspecified. It says that there is an injective function [f] with
+  range [P]
 
-The proof contains `admit`, basically this is an axiom of the existence of subtypes.
-We cannot use `axiom` here, though, because this would make it a parameter of the theory instead.
+  The proof is admitted, essentially turning it into a global axiom
+  asserting the existence of subtypes. We cannot use [axiom] here,
+  because this would make the lemma a parameter of the theory *)
 
-TODO: Could there be a special tactic `metatheory` or something that works like `admit` but only works in the prelude?
- *)
-lemma nosmt injection: exists (f : do_not_use_this_type_or_you_get_unsoundness_admit -> T), injective f /\ (forall x, P x <=> exists y, x = f y).
-  admit.
-qed.
+lemma nosmt subtype_injection: 
+  exists (f : do_not_use_this_type_or_you_get_unsoundness_admit -> T), 
+    injective f /\ (forall x, P x <=> exists y, x = f y).
+admitted.
+(* TODO: together with uninstantiable abstract types, we also want
+   global axioms in (abstract) theories.that do not show up in [proof*] *)
 
-(* This is the subtype that the user sees. By making it a type-copy of `do_not_use_this_type_or_you_get_unsoundness_admit`, we make sure that the user cannot do `type sT <- ...` when cloning. *)
+(* This is the subtype that the user sees. By making it a type-copy of
+   [do_not_use_this_type_or_you_get_unsoundness_admit`, we make sure
+   that the user cannot do `type sT <- ...` when cloning. *) 
 type sT = [Wrap of do_not_use_this_type_or_you_get_unsoundness_admit].
 
-(* We define `val` in two steps so that `print val` does not show the ugly internal stuff *)
-op nosmt internal_val = choiceb (fun(f : do_not_use_this_type_or_you_get_unsoundness_admit -> T), injective f /\ (forall (x:T), ((P x) <=> exists y, x = f y))) witness.
+(* We define `val` in two steps so that `print val` does not show the
+   ugly internal stuff *)
+op nosmt internal_val = choiceb 
+   (fun (f : do_not_use_this_type_or_you_get_unsoundness_admit -> T), 
+     injective f /\ (forall (x:T), ((P x) <=> exists y, x = f y))) witness.
 
-(* Injection from `sT` to `T` *)
-op nosmt val (x : sT) : T = with x = Wrap x' => internal_val x'.
+(* -------------------------------------------------------------------- *)
 
-(* Inverse of a partial function. This and its related lemmas might be moved to somewhere else in the stdlib *)
-op pinverse (f : 'a -> 'b) (y : 'b) : 'a option = if exists x, y = f x then Some (choiceb (fun x, y = f x) witness) else None.
+(* Injection from [sT] to [T] *)
+op nosmt [opaque] val (x : sT) : T = with x = Wrap x' => internal_val x'.
 
 lemma val_range x: P x <=> exists y, x = val y.
-  have H: (fun(f : do_not_use_this_type_or_you_get_unsoundness_admit -> T), injective f /\ (forall (x:T), ((P x) <=> exists y, x = f y))) internal_val.
-    apply choicebP. by apply injection.
-  have H1: P x => exists (y : sT), x = val y.
-    move => Px.
-    have exy: exists y, x = internal_val y.
-      smt().
-    elim exy => z xz.
-    exists (Wrap z).
-    smt().
-  have H2: (exists (y : sT), x = val y) => P x.
-    move => ex.
-    elim ex => y.
-    elim y.
-    smt().
-  progress.
+proof.
+have /= := choicebP _ witness subtype_injection; rewrite -/internal_val.
+move => [ival_inj ival_range].
+split => [Px|[[y] ->]]; 2: smt().
+have := ival_range x; rewrite Px /= => -[z ?].
+by exists (Wrap z); smt().
 qed.
 
 lemma val_inj: injective val.
-  have H: (fun(f : do_not_use_this_type_or_you_get_unsoundness_admit -> T), injective f /\ (forall (x:T), ((P x) <=> exists y, x = f y))) internal_val.
-    apply choicebP. by apply injection.
-  have H1: injective internal_val.
-    smt().
-  clear H.
-  rewrite /injective => x y.
-  elim x. elim y.
-  rewrite /val.
-  smt().
+proof.
+have /= := choicebP _ witness subtype_injection; rewrite -/internal_val.
+by move => [ival_inj _] [x] [y] /#.
 qed.
 
-lemma valP (x : sT): P (val x).
-  smt (val_range).
-qed.
+lemma valP (x : sT): P (val x) by smt (val_range).
 
-op nosmt insub : T -> sT option = pinverse val.
+(* -------------------------------------------------------------------- *)
 
-lemma pinverseN (f:'a->'b) x: (!exists y, x = f y) => pinverse f x = None.
-  smt().
-qed.
+op nosmt [opaque] insub : T -> sT option = pinv val.
 
 lemma insubN (x : T): !P x => insub x = None.
-  rewrite /insub => notPx.
-  apply pinverseN.
-  smt(val_range).
-qed.
-
-lemma pinverse_inv (f:'a->'b) x: (exists y, x = f y) => omap f (pinverse f x) = Some x.
-  move => H. elim H => y fy.
-  have H: pinverse f x = Some (choiceb (fun y, x = f y) witness).
-    smt().
-  have H1: (fun y, x = f y) (choiceb (fun y, x = f y) witness).
-    apply choicebP. smt().
-  smt().
-qed.
-
-lemma pcancel_pinverse (f : 'a->'b): injective f => pcancel f (pinverse f).
-  move => inj_f.
-  rewrite /pcancel => x.
-  have H: omap f (pinverse f (f x)) = Some (f x).
-    apply pinverse_inv. smt().
-  smt().
-qed.
+proof. by rewrite /insub => not; apply pinvN; smt(val_range). qed.
 
 lemma valK: pcancel val insub.
-  rewrite /insub. apply pcancel_pinverse. apply val_inj.
-qed.
+proof. by rewrite /insub; apply/pcancel_pinv/val_inj. qed.
 
 lemma insubT (x : T):  P x => omap val (insub x) = Some x.
-  move => Px.
-  rewrite /insub. 
-  apply pinverse_inv.
-  smt(val_range).
-qed.
+proof. by move => Px @/insub; apply pinv_inv; smt(val_range). qed.
 
-(* TODO: Maybe this could be removed, it seems relatively pointless. It's here for compatibility with the previous Subtype implementation *)
+(* -------------------------------------------------------------------- *)
+
+(* TODO: Maybe this could be removed, it seems relatively
+pointless. It's here for compatibility with the previous Subtype
+implementation *) 
 op nosmt wsT = val witness.
 
 lemma insubW: insub wsT = Some witness<:sT>.
-  rewrite /wsT.
-  smt (valK).
-qed.
-
-(* === Below here, the code is unchanged from the previous Subtype implementation === *)
+proof. by rewrite /wsT; smt (valK). qed.
 
 (* -------------------------------------------------------------------- *)
 op insubd (x : T) = odflt witness (insub x).
