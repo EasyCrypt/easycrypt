@@ -642,6 +642,25 @@ axiom nosmt choice_dfl_irrelevant ['a] (P : 'a -> bool) (x0 x1 : 'a):
   (exists x, P x) => choiceb P x0 = choiceb P x1.
 
 (* -------------------------------------------------------------------- *)
+
+(* (Canonical) partial inverse realised using [choiceb] *)
+op pinv (f : 'a -> 'b) (y : 'b) : 'a option = 
+  if exists x, y = f x then Some (choiceb (fun x, y = f x) witness) else None.
+
+lemma pinvN (f:'a->'b) x: 
+  (!exists y, x = f y) => pinv f x = None.
+proof. smt(). qed.
+
+lemma pinv_inv (f:'a->'b) x: 
+  (exists y, x = f y) => omap f (pinv f x) = Some x.
+proof. by move => [y fy] @/pinv; rewrite ifT; smt(choicebP). qed.
+
+lemma pcancel_pinv (f : 'a->'b): 
+  injective f => pcancel f (pinv f).
+proof. by move => inj_f @/pcansel x; smt(pinv_inv). qed.
+
+
+(* -------------------------------------------------------------------- *)
 axiom nosmt funchoice ['a 'b] (P : 'a -> 'b -> bool):
      (forall x, exists y, P x y)
   => (exists f, forall x, P x (f x)).
