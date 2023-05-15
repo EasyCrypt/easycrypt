@@ -567,6 +567,15 @@ let maybe_paren (onm, (outer, side)) (inm, inner) pp =
 let maybe_paren_nosc outer inner pp =
   maybe_paren ([], outer) ([], inner) pp
 
+(* when a construct is bracketed with words, e.g., `match ... end`,
+   only introduce explicit parentheses in an application *)
+let maybe_paren_bracketed_with_words (_, (_, side)) pp =
+  let parens outer =
+    (match side with
+     | `ILeft | `IRight -> true
+     | _                -> false)
+  in pp_maybe_paren (parens side) pp
+
 (* -------------------------------------------------------------------- *)
 let t_prio_fun  = (10, `Infix `Right)
 let t_prio_tpl  = (20, `NonAssoc)
@@ -578,9 +587,6 @@ let e_bin_prio_if     = ( 5, `Prefix)
 let e_bin_prio_letin  = ( 5, `Prefix)
 let e_bin_prio_impl   = (10, `Infix `Right)
 let e_bin_prio_iff    = (12, `NonAssoc)
-(* don't need, as closed with end:
-let e_bin_prio_match  = (15, `Prefix)
-*)
 let e_bin_prio_nop    = (19, `Infix `Left)
 let e_bin_prio_or     = (20, `Infix `Right)
 let e_bin_prio_and    = (25, `Infix `Right)
@@ -838,7 +844,7 @@ let pp_match_form (ppe : PPEnv.t) pp_sub outer fmt (b, bs) =
       (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) b
       (fun fmt -> pp_list "@ " pp_branch fmt bs)
 
-  in pp fmt (b, bs)  (* has end, so don't need maybe_paren *)
+  in maybe_paren_bracketed_with_words outer pp fmt (b, bs)
 
 (* -------------------------------------------------------------------- *)
 let pp_tuple mode (ppe : PPEnv.t) pp_sub osc fmt es =
