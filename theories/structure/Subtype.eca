@@ -19,43 +19,42 @@ pragma +implicits.
 (*       2. insub x = Some y with val y = x if  (P x)                   *)
 (* -------------------------------------------------------------------- *)
 
-require import Core.
+require import AllCore.
 
 (* These three parameters are to be instantiated by the user. *)
 type T.
-op P : T -> bool. 
+op P : T -> bool.
 axiom inhabited: exists x, P x.
 
 (* This parameter must never be instantiated upon cloning, otherwise
    unsoundness may ensure. Hence the name. *)
-type do_not_use_this_type_or_you_get_unsoundness_admit.
+type do_not_instantiate_this_type.
 (* TODO: we want a tag to make abstract types uninstantiable *)
 
 (* The lemma below is justified by the axiom [inhabited] and the fact
-  that the type [do_not_use_this_type_or_you_get_unsoundness_admit] is
-  unspecified. It says that there is an injective function [f] with
-  range [P]
+  that the type [do_not_instantiate_this_type] is unspecified. It says
+  that there is an injective function [f] with range [P]
 
   The proof is admitted, essentially turning it into a global axiom
   asserting the existence of subtypes. We cannot use [axiom] here,
   because this would make the lemma a parameter of the theory *)
 
-lemma nosmt subtype_injection: 
-  exists (f : do_not_use_this_type_or_you_get_unsoundness_admit -> T), 
+lemma nosmt subtype_injection:
+  exists (f : do_not_instantiate_this_type -> T),
     injective f /\ (forall x, P x <=> exists y, x = f y).
 admitted.
 (* TODO: together with uninstantiable abstract types, we also want
    global axioms in (abstract) theories.that do not show up in [proof*] *)
 
 (* This is the subtype that the user sees. By making it a type-copy of
-   [do_not_use_this_type_or_you_get_unsoundness_admit`, we make sure
-   that the user cannot do `type sT <- ...` when cloning. *) 
-type sT = [Wrap of do_not_use_this_type_or_you_get_unsoundness_admit].
+   [do_not_instantiate_this_type], we make sure that the user cannot
+   do `type sT <- ...` when cloning. *)
+type sT = do_not_instantiate_this_type wrapped.
 
 (* We define `val` in two steps so that `print val` does not show the
    ugly internal stuff *)
-op nosmt internal_val = choiceb 
-   (fun (f : do_not_use_this_type_or_you_get_unsoundness_admit -> T), 
+op nosmt [opaque] internal_val = choiceb
+   (fun (f : do_not_instantiate_this_type -> T),
      injective f /\ (forall (x:T), ((P x) <=> exists y, x = f y))) witness.
 
 (* -------------------------------------------------------------------- *)
@@ -97,7 +96,7 @@ proof. by move => Px @/insub; apply pinv_inv; smt(val_range). qed.
 
 (* TODO: Maybe this could be removed, it seems relatively
 pointless. It's here for compatibility with the previous Subtype
-implementation *) 
+implementation *)
 op nosmt wsT = val witness.
 
 lemma insubW: insub wsT = Some witness<:sT>.
