@@ -170,34 +170,19 @@ let as_tdistr (ty : ty) =
 let is_tdistr (ty : ty) = as_tdistr ty <> None
 
 (* -------------------------------------------------------------------- *)
-module TySmart = struct
-  let tglob (ty, mp) (mp') =
-    if mp == mp' then ty else tglob mp'
-
-  let ttuple (ty, tys) (tys') =
-    if tys == tys' then ty else ttuple tys'
-
-  let tconstr (ty, (lp, tys)) (lp', tys') =
-    if lp == lp' && tys == tys' then ty else tconstr lp' tys'
-
-  let tfun (ty, (t1, t2)) (t1', t2') =
-    if t1 == t1' && t2 == t2' then ty else tfun t1' t2'
-end
-
-(* -------------------------------------------------------------------- *)
 let ty_map f t =
   match t.ty_node with
   | Tglob _ | Tunivar _ | Tvar _ -> t
 
   | Ttuple lty ->
-      TySmart.ttuple (t, lty) (List.Smart.map f lty)
+     ttuple (List.Smart.map f lty)
 
   | Tconstr (p, lty) ->
-      let lty' = List.Smart.map f lty in
-        TySmart.tconstr (t, (p, lty)) (p, lty')
+     let lty = List.Smart.map f lty in
+     tconstr p lty
 
   | Tfun (t1, t2) ->
-      TySmart.tfun (t, (t1, t2)) (f t1, f t2)
+      tfun (f t1) (f t2)
 
 let ty_fold f s ty =
   match ty.ty_node with
@@ -277,18 +262,18 @@ let rec ty_subst s =
   else
     Hty.memo_rec 107 (fun aux ty ->
       match ty.ty_node with
-      | Tglob m       -> TySmart.tglob (ty, m) (EcPath.m_subst s.ts_mp m)
+      | Tglob m       -> tglob (EcPath.m_subst s.ts_mp m)
       | Tunivar id    -> odfl ty (s.ts_u id)
       | Tvar id       -> odfl ty (s.ts_v id)
-      | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.Smart.map aux lty)
-      | Tfun (t1, t2) -> TySmart.tfun (ty, (t1, t2)) (aux t1, aux t2)
+      | Ttuple lty    -> ttuple (List.Smart.map aux lty)
+      | Tfun (t1, t2) -> tfun (aux t1) (aux t2)
 
       | Tconstr(p, lty) -> begin
         match Mp.find_opt p s.ts_def with
         | None ->
-            let p'   = s.ts_p p in
-            let lty' = List.Smart.map aux lty in
-              TySmart.tconstr (ty, (p, lty)) (p', lty')
+            let p   = s.ts_p p in
+            let lty = List.Smart.map aux lty in
+              tconstr p lty
 
         | Some (args, body) ->
             let s =
@@ -804,70 +789,6 @@ let e_oget (e : expr) (ty : ty) : expr =
   e_app op [e] ty
 
 (* -------------------------------------------------------------------- *)
-module ExprSmart = struct
-  let l_symbol (lp, x) x' =
-    if x == x' then lp else LSymbol x'
-
-  let l_tuple (lp, xs) xs' =
-    if xs == xs' then lp else LTuple xs'
-
-  let l_record (lp, (p, xs)) (p', xs') =
-    if p == p' && xs == xs' then lp else LRecord (p', xs')
-
-  let e_local (e, (x, ty)) (x', ty') =
-    if   x == x' && ty == ty'
-    then e
-    else e_local x' ty'
-
-  let e_var (e, (pv, ty)) (pv', ty') =
-    if   pv == pv' && ty == ty'
-    then e
-    else e_var pv' ty'
-
-  let e_op (e, (p, tys, ty)) (p', tys', ty') =
-    if   p == p' && tys == tys' && ty == ty'
-    then e
-    else e_op p' tys' ty'
-
-  let e_app (e, (x, args, ty)) (x', args', ty') =
-    if   x == x' && args == args' && ty == ty'
-    then e
-    else e_app x' args' ty'
-
-  let e_let (e, (lp, e1, e2)) (lp', e1', e2') =
-    if   lp == lp' && e1 == e1' && e2 == e2'
-    then e
-    else e_let lp' e1' e2'
-
-  let e_tuple (e, es) es' =
-    if es == es' then e else e_tuple es'
-
-  let e_proj (e, e1, i) (e1', ty') =
-    if   e1 == e1' && e.e_ty == ty'
-    then e
-    else e_proj e1' i ty'
-
-  let e_if (e, (e1, e2, e3)) (e1', e2', e3') =
-    if   e1 == e1' && e2 == e2' && e3 == e3'
-    then e
-    else e_if e1' e2' e3'
-
-  let e_match (e, (b, es, ty)) (b', es', ty') =
-    if   b == b' && es == es' && ty == ty'
-    then e
-    else e_match b' es' ty'
-
-  let e_lam (e, (b, body)) (b', body') =
-    if   b == b' && body == body'
-    then e
-    else e_lam b' body'
-
-  let e_quant (e, (q, b, body)) (q', b', body') =
-    if   q == q' && b == b' && body == body'
-    then e
-    else e_quantif q' b' body'
-end
-
 let e_map fty fe e =
   match e.e_node with
   | Eint _ | Elocal _ | Evar _ -> e
@@ -875,39 +796,39 @@ let e_map fty fe e =
   | Eop (p, tys) ->
       let tys' = List.Smart.map fty tys in
       let ty'  = fty e.e_ty in
-        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p, tys', ty')
+        e_op p tys' ty'
 
   | Eapp (e1, args) ->
       let e1'   = fe e1 in
       let args' = List.Smart.map fe args in
       let ty'   = fty e.e_ty in
-        ExprSmart.e_app (e, (e1, args, e.e_ty)) (e1', args', ty')
+        e_app e1' args' ty'
 
   | Elet (lp, e1, e2) ->
       let e1' = fe e1 in
       let e2' = fe e2 in
-        ExprSmart.e_let (e, (lp, e1, e2)) (lp, e1', e2')
+        e_let lp e1' e2'
 
   | Etuple le ->
       let le' = List.Smart.map fe le in
-        ExprSmart.e_tuple (e, le) le'
+        e_tuple le'
 
   | Eproj (e1, i) ->
       let e' = fe e1 in
       let ty = fty e.e_ty in
-      ExprSmart.e_proj (e,e1,i) (e',ty)
+      e_proj e' i ty
 
   | Eif (e1, e2, e3) ->
       let e1' = fe e1 in
       let e2' = fe e2 in
       let e3' = fe e3 in
-      ExprSmart.e_if (e, (e1, e2, e3)) (e1', e2', e3')
+      e_if e1' e2' e3'
 
   | Ematch (b, es, ty) ->
       let ty' = fty ty in
       let b'  = fe b in
       let es' = List.Smart.map fe es in
-      ExprSmart.e_match (e, (b, es, ty)) (b', es', ty')
+      e_match b' es' ty'
 
   | Equant (q, b, bd) ->
       let dop (x, ty as xty) =
@@ -915,7 +836,7 @@ let e_map fty fe e =
           if ty == ty' then xty else (x, ty') in
       let b'  = List.Smart.map dop b in
       let bd' = fe bd in
-      ExprSmart.e_quant (e, (q, b, bd)) (q, b', bd')
+      e_quantif q b' bd'
 
 let e_fold (fe : 'a -> expr -> 'a) (state : 'a) (e : expr) =
   match e.e_node with
@@ -995,11 +916,11 @@ let subst_lpattern (s: e_subst) (lp:lpattern) =
   match lp with
   | LSymbol x ->
       let (s, x') = add_local s x in
-        (s, ExprSmart.l_symbol (lp, x) x')
+        (s, LSymbol x')
 
   | LTuple xs ->
       let (s, xs') = add_locals s xs in
-        (s, ExprSmart.l_tuple (lp, xs) xs')
+        (s, LTuple xs')
 
   | LRecord (p, xs) ->
       let (s, xs') =
@@ -1016,7 +937,7 @@ let subst_lpattern (s: e_subst) (lp:lpattern) =
                   else (s, (Some x', t')))
           s xs
       in
-        (s, ExprSmart.l_record (lp, (p, xs)) (s.es_p p, xs'))
+        (s, LRecord (s.es_p p, xs'))
 
 (* -------------------------------------------------------------------- *)
 let rec e_subst (s: e_subst) e =
@@ -1027,13 +948,13 @@ let rec e_subst (s: e_subst) e =
       | None    ->
 (* FIXME schema *)
 (*        assert (not s.es_freshen); *)
-        ExprSmart.e_local (e, (id, e.e_ty)) (id, s.es_ty e.e_ty)
+        e_local id (s.es_ty e.e_ty)
   end
 
   | Evar pv ->
       let pv' = pv_subst (x_subst s.es_mp) pv in
       let ty' = s.es_ty e.e_ty in
-        ExprSmart.e_var (e, (pv, e.e_ty)) (pv', ty')
+        e_var pv' ty'
 
   | Eapp ({ e_node = Eop (p, tys) }, args) when Mp.mem p s.es_opdef ->
       let tys  = List.Smart.map s.es_ty tys in
@@ -1051,18 +972,18 @@ let rec e_subst (s: e_subst) e =
       let p'   = s.es_p p in
       let tys' = List.Smart.map s.es_ty tys in
       let ty'  = s.es_ty e.e_ty in
-        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p', tys', ty')
+        e_op p' tys' ty'
 
   | Elet (lp, e1, e2) ->
       let e1' = e_subst s e1 in
       let s, lp' = subst_lpattern s lp in
       let e2' = e_subst s e2 in
-        ExprSmart.e_let (e, (lp, e1, e2)) (lp', e1', e2')
+        e_let lp' e1' e2'
 
   | Equant (q, b, e1) ->
       let s, b' = add_locals s b in
       let e1' = e_subst s e1 in
-        ExprSmart.e_quant (e, (q, b, e1)) (q, b', e1')
+        e_quantif q b' e1'
 
   | _ -> e_map s.es_ty (e_subst s) e
 

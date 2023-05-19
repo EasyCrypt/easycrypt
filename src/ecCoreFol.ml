@@ -948,107 +948,6 @@ let f_xmuli_simpl f1 f2 =
   f_xmul_simpl (f_N f1) f2
 
 (* -------------------------------------------------------------------- *)
-module FSmart = struct
-  type a_local = EcIdent.t * ty
-  type a_pvar  = prog_var * ty * memory
-  type a_quant = quantif * bindings * form
-  type a_if    = form tuple3
-  type a_match = form * form list * ty
-  type a_let   = lpattern * form * form
-  type a_op    = EcPath.path * ty list * ty
-  type a_tuple = form list
-  type a_app   = form * form list * ty
-  type a_proj  = form * ty
-  type a_glob  = EcPath.mpath * memory
-
-  let f_local (fp, (x, ty)) (x', ty') =
-    if   x == x' && ty == ty'
-    then fp
-    else f_local x' ty'
-
-  let f_pvar (fp, (pv, ty, m)) (pv', ty', m') =
-    if   pv == pv' && ty == ty' && m == m'
-    then fp
-    else f_pvar pv' ty' m'
-
-  let f_quant (fp, (q, b, f)) (q', b', f') =
-    if   q == q' && b == b' && f == f'
-    then fp
-    else f_quant q' b' f'
-
-  let f_glob (fp, (mp, m)) (mp', m') =
-    if   mp == mp' && m == m'
-    then fp
-    else f_glob mp' m'
-
-  let f_if (fp, (c, f1, f2)) (c', f1', f2') =
-    if   c == c' && f1 == f1' && f2 == f2'
-    then fp
-    else f_if c' f1' f2'
-
-  let f_match (fp, (b, fs, ty)) (b', fs', ty') =
-    if   b == b' && fs == fs' && ty == ty'
-    then fp
-    else f_match b' fs' ty'
-
-  let f_let (fp, (lp, f1, f2)) (lp', f1', f2') =
-    if   lp == lp' && f1 == f1' && f2 == f2'
-    then fp
-    else f_let lp' f1' f2'
-
-  let f_op (fp, (op, tys, ty)) (op', tys', ty') =
-    if   op == op' && tys == tys' && ty == ty'
-    then fp
-    else f_op op' tys' ty'
-
-  let f_app (fp, (f, fs, ty)) (f', fs', ty') =
-    if   f == f' && fs == fs' && ty == ty'
-    then fp
-    else f_app f' fs' ty'
-
-  let f_tuple (fp, fs) fs' =
-    if fs == fs' then fp else f_tuple fs'
-
-  let f_proj (fp, (f, ty)) (f', ty') i =
-    if   f == f' && ty == ty'
-    then fp
-    else f_proj f' i ty'
-
-  let f_equivF (fp, ef) ef' =
-    if eqf_equal ef ef' then fp else mk_form (FequivF ef') fp.f_ty
-
-  let f_equivS (fp, es) es' =
-    if eqs_equal es es' then fp else f_equivS_r es'
-
-  let f_eagerF (fp, eg) eg' =
-    if egf_equal eg eg' then fp else mk_form (FeagerF eg') fp.f_ty
-
-  let f_hoareF (fp, hf) hf' =
-    if hf_equal hf hf' then fp else mk_form (FhoareF hf') fp.f_ty
-
-  let f_cHoareF (fp, chf) chf' =
-    if chf_equal chf chf' then fp else mk_form (FcHoareF chf') fp.f_ty
-
-  let f_hoareS (fp, hs) hs' =
-    if hs_equal hs hs' then fp else f_hoareS_r hs'
-
-  let f_cHoareS (fp, chs) chs' =
-    if chs_equal chs chs' then fp else f_cHoareS_r chs'
-
-  let f_bdHoareF (fp, bhf) bhf' =
-    if bhf_equal bhf bhf' then fp else mk_form (FbdHoareF bhf') fp.f_ty
-
-  let f_bdHoareS (fp, bhs) bhs' =
-    if bhs_equal bhs bhs' then fp else f_bdHoareS_r bhs'
-
-  let f_coe (fp, coe) coe' =
-    if coe_equal coe coe' then fp else f_coe_r coe'
-
-  let f_pr (fp, pr) pr' =
-    if pr_equal pr pr' then fp else f_pr_r pr'
-end
-
-(* -------------------------------------------------------------------- *)
 let cost_map g cost =
   let calls =
     EcPath.Mx.map (fun cb ->
@@ -1078,116 +977,105 @@ let f_map gt g fp =
       let b' = List.Smart.map map_gty b in
       let f' = g f in
 
-      FSmart.f_quant (fp, (q, b, f)) (q, b', f')
+      f_quant q b' f'
 
   | Fint  _ -> fp
   | Fglob _ -> fp
 
   | Fif (f1, f2, f3) ->
-      FSmart.f_if (fp, (f1, f2, f3)) (g f1, g f2, g f3)
+      f_if (g f1) (g f2) (g f3)
 
   | Fmatch (b, fs, ty) ->
-      FSmart.f_match (fp, (b, fs, ty)) (g b, List.map g fs, gt ty)
+      f_match (g b) (List.map g fs) (gt ty)
 
   | Flet (lp, f1, f2) ->
-      FSmart.f_let (fp, (lp, f1, f2)) (lp, g f1, g f2)
+      f_let lp (g f1) (g f2)
 
   | Flocal id ->
       let ty' = gt fp.f_ty in
-        FSmart.f_local (fp, (id, fp.f_ty)) (id, ty')
+        f_local id ty'
 
   | Fpvar (id, s) ->
       let ty' = gt fp.f_ty in
-        FSmart.f_pvar (fp, (id, fp.f_ty, s)) (id, ty', s)
+        f_pvar id ty' s
 
   | Fop (p, tys) ->
       let tys' = List.Smart.map gt tys in
       let ty'  = gt fp.f_ty in
-        FSmart.f_op (fp, (p, tys, fp.f_ty)) (p, tys', ty')
+        f_op p tys' ty'
 
   | Fapp (f, fs) ->
       let f'  = g f in
       let fs' = List.Smart.map g fs in
       let ty' = gt fp.f_ty in
-        FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', ty')
+        f_app f' fs' ty'
 
   | Ftuple fs ->
       let fs' = List.Smart.map g fs in
-        FSmart.f_tuple (fp, fs) fs'
+        f_tuple fs'
 
   | Fproj (f, i) ->
       let f'  = g f in
       let ty' = gt fp.f_ty in
-        FSmart.f_proj (fp, (f, fp.f_ty)) (f', ty') i
+        f_proj f' i ty'
 
   | FhoareF hf ->
       let pr' = g hf.hf_pr in
       let po' = g hf.hf_po in
-        FSmart.f_hoareF (fp, hf)
-          { hf with hf_pr = pr'; hf_po = po'; }
+        f_hoareF_r { hf with hf_pr = pr'; hf_po = po'; }
 
   | FhoareS hs ->
       let pr' = g hs.hs_pr in
       let po' = g hs.hs_po in
-        FSmart.f_hoareS (fp, hs)
-          { hs with hs_pr = pr'; hs_po = po'; }
+        f_hoareS_r { hs with hs_pr = pr'; hs_po = po'; }
 
   | FcHoareF chf ->
       let pr' = g chf.chf_pr in
       let po' = g chf.chf_po in
       let c'  = cost_map g chf.chf_co in
-        FSmart.f_cHoareF (fp, chf)
-          { chf with chf_pr = pr'; chf_po = po'; chf_co = c' }
+        f_cHoareF_r { chf with chf_pr = pr'; chf_po = po'; chf_co = c' }
 
   | FcHoareS chs ->
       let pr' = g chs.chs_pr in
       let po' = g chs.chs_po in
       let c'  = cost_map g chs.chs_co in
-        FSmart.f_cHoareS (fp, chs)
-          { chs with chs_pr = pr'; chs_po = po'; chs_co = c' }
+        f_cHoareS_r { chs with chs_pr = pr'; chs_po = po'; chs_co = c' }
 
   | FbdHoareF bhf ->
       let pr' = g bhf.bhf_pr in
       let po' = g bhf.bhf_po in
       let bd' = g bhf.bhf_bd in
-        FSmart.f_bdHoareF (fp, bhf)
-          { bhf with bhf_pr = pr'; bhf_po = po'; bhf_bd = bd'; }
+        f_bdHoareF_r { bhf with bhf_pr = pr'; bhf_po = po'; bhf_bd = bd'; }
 
   | FbdHoareS bhs ->
       let pr' = g bhs.bhs_pr in
       let po' = g bhs.bhs_po in
       let bd' = g bhs.bhs_bd in
-        FSmart.f_bdHoareS (fp, bhs)
-          { bhs with bhs_pr = pr'; bhs_po = po'; bhs_bd = bd'; }
+        f_bdHoareS_r { bhs with bhs_pr = pr'; bhs_po = po'; bhs_bd = bd'; }
 
   | FequivF ef ->
       let pr' = g ef.ef_pr in
       let po' = g ef.ef_po in
-        FSmart.f_equivF (fp, ef)
-          { ef with ef_pr = pr'; ef_po = po'; }
+        f_equivF_r { ef with ef_pr = pr'; ef_po = po'; }
 
   | FequivS es ->
       let pr' = g es.es_pr in
       let po' = g es.es_po in
-        FSmart.f_equivS (fp, es)
-          { es with es_pr = pr'; es_po = po'; }
+        f_equivS_r { es with es_pr = pr'; es_po = po'; }
 
   | FeagerF eg ->
       let pr' = g eg.eg_pr in
       let po' = g eg.eg_po in
-        FSmart.f_eagerF (fp, eg)
-          { eg with eg_pr = pr'; eg_po = po'; }
+        f_eagerF_r { eg with eg_pr = pr'; eg_po = po'; }
 
   | Fcoe coe ->
     let pre' = g coe.coe_pre in
-    FSmart.f_coe (fp, coe)
-      { coe with coe_pre = pre'; }
+    f_coe_r { coe with coe_pre = pre'; }
 
   | Fpr pr ->
       let args' = g pr.pr_args in
       let ev'   = g pr.pr_event in
-        FSmart.f_pr (fp, pr)
-          { pr with pr_args = args'; pr_event = ev'; }
+      f_pr_r { pr with pr_args = args'; pr_event = ev'; }
 
 (* -------------------------------------------------------------------- *)
 let f_iter g f =
@@ -1822,20 +1710,20 @@ module Fsubst = struct
     | Fquant (q, b, f) ->
         let s, b' = add_bindings ~tx s b in
         let f'    = f_subst ~tx s f in
-          FSmart.f_quant (fp, (q, b, f)) (q, b', f')
+          f_quant q b' f'
 
     | Flet (lp, f1, f2) ->
         let f1'    = f_subst ~tx s f1 in
         let s, lp' = subst_lpattern s lp in
         let f2'    = f_subst ~tx s f2 in
-          FSmart.f_let (fp, (lp, f1, f2)) (lp', f1', f2')
+          f_let lp' f1' f2'
 
     | Flocal id -> begin
       match Mid.find_opt id s.fs_loc with
       | Some f -> f
       | None ->
           let ty' = s.fs_ty fp.f_ty in
-          FSmart.f_local (fp, (id, fp.f_ty)) (id, ty')
+          f_local id ty'
     end
 
     | Fop (p, tys) when Mp.mem p s.fs_opdef ->
@@ -1866,18 +1754,18 @@ module Fsubst = struct
         let ty'  = s.fs_ty fp.f_ty in
         let tys' = List.Smart.map s.fs_ty tys in
         let p'   = s.fs_sty.ts_p p in
-        FSmart.f_op (fp, (p, tys, fp.f_ty)) (p', tys', ty')
+        f_op p' tys' ty'
 
     | Fpvar (pv, m) ->
         let pv' = pv_subst (subst_xpath s) pv in
         let m'  = Mid.find_def m m s.fs_mem in
         let ty' = s.fs_ty fp.f_ty in
-        FSmart.f_pvar (fp, (pv, fp.f_ty, m)) (pv', ty', m')
+        f_pvar pv' ty' m'
 
     | Fglob (mp, m) ->
         let m'  = Mid.find_def m m s.fs_mem in
         let mp' = EcPath.m_subst s.fs_sty.ts_mp mp in
-        FSmart.f_glob (fp, (mp, m)) (mp', m')
+        f_glob mp' m'
 
     | FhoareF hf ->
       let pr', po' =
@@ -1886,7 +1774,8 @@ module Fsubst = struct
         let po' = f_subst ~tx s hf.hf_po in
         (pr', po') in
       let mp' = subst_xpath s hf.hf_f in
-      FSmart.f_hoareF (fp, hf) { hf_pr = pr'; hf_po = po'; hf_f = mp'; }
+
+      f_hoareF pr' mp' po'
 
     | FhoareS hs ->
         assert (not (Mid.mem (fst hs.hs_m) s.fs_mem));
@@ -1896,8 +1785,8 @@ module Fsubst = struct
         let po' = f_subst ~tx s hs.hs_po in
         let st' = EcCoreModules.s_subst es hs.hs_s in
         let me' = EcMemory.me_subst s.fs_mem s.fs_ty hs.hs_m in
-        FSmart.f_hoareS (fp, hs)
-          { hs_pr = pr'; hs_po = po'; hs_s = st'; hs_m = me'; }
+
+        f_hoareS me' pr' st' po'
 
     | FcHoareF chf ->
       assert (not (Mid.mem mhr s.fs_mem));
@@ -1905,8 +1794,8 @@ module Fsubst = struct
       let po' = f_subst ~tx s chf.chf_po in
       let mp' = subst_xpath s chf.chf_f in
       let c'  = cost_subst ~tx s chf.chf_co in
-      FSmart.f_cHoareF (fp, chf)
-        { chf_pr = pr'; chf_po = po'; chf_f = mp'; chf_co = c'; }
+
+      f_cHoareF pr' mp' po' c'
 
     | FcHoareS chs ->
       assert (not (Mid.mem (fst chs.chs_m) s.fs_mem));
@@ -1917,8 +1806,8 @@ module Fsubst = struct
       let st' = EcCoreModules.s_subst es chs.chs_s in
       let me' = EcMemory.me_subst s.fs_mem s.fs_ty chs.chs_m in
       let c'  = cost_subst ~tx s chs.chs_co in
-      FSmart.f_cHoareS (fp, chs)
-        { chs_pr = pr'; chs_po = po'; chs_s = st'; chs_m = me'; chs_co = c'; }
+
+      f_cHoareS me' pr' st' po' c'
 
     | FbdHoareF bhf ->
       let pr', po', bd' =
@@ -1928,9 +1817,9 @@ module Fsubst = struct
         let bd' = f_subst ~tx s bhf.bhf_bd in
         (pr', po', bd') in
       let mp' = subst_xpath s bhf.bhf_f in
-      FSmart.f_bdHoareF (fp, bhf)
-        { bhf with bhf_pr = pr'; bhf_po = po';
-                   bhf_f  = mp'; bhf_bd = bd'; }
+
+      f_bdHoareF_r { bhf with bhf_pr = pr'; bhf_po = po';
+                              bhf_f  = mp'; bhf_bd = bd'; }
 
     | FbdHoareS bhs ->
       assert (not (Mid.mem (fst bhs.bhs_m) s.fs_mem));
@@ -1941,9 +1830,9 @@ module Fsubst = struct
       let st' = EcCoreModules.s_subst es bhs.bhs_s in
       let me' = EcMemory.me_subst s.fs_mem s.fs_ty bhs.bhs_m in
       let bd' = f_subst ~tx s bhs.bhs_bd in
-      FSmart.f_bdHoareS (fp, bhs)
-        { bhs with bhs_pr = pr'; bhs_po = po'; bhs_s = st';
-                   bhs_bd = bd'; bhs_m  = me'; }
+
+      f_bdHoareS_r { bhs with bhs_pr = pr'; bhs_po = po'; bhs_s = st';
+                              bhs_bd = bd'; bhs_m  = me'; }
 
     | FequivF ef ->
       let pr', po' =
@@ -1954,8 +1843,8 @@ module Fsubst = struct
         (pr', po') in
       let fl' = subst_xpath s ef.ef_fl in
       let fr' = subst_xpath s ef.ef_fr in
-      FSmart.f_equivF (fp, ef)
-        { ef_pr = pr'; ef_po = po'; ef_fl = fl'; ef_fr = fr'; }
+
+      f_equivF pr' fl' fr' po'
 
     | FequivS eqs ->
       assert (not (Mid.mem (fst eqs.es_ml) s.fs_mem) &&
@@ -1970,10 +1859,7 @@ module Fsubst = struct
       let ml' = EcMemory.me_subst s.fs_mem s.fs_ty eqs.es_ml in
       let mr' = EcMemory.me_subst s.fs_mem s.fs_ty eqs.es_mr in
 
-      FSmart.f_equivS (fp, eqs)
-        { es_ml = ml'; es_mr = mr';
-          es_pr = pr'; es_po = po';
-          es_sl = sl'; es_sr = sr'; }
+      f_equivS ml' mr' pr' sl' sr' po'
 
     | FeagerF eg ->
       let pr', po' =
@@ -1991,9 +1877,7 @@ module Fsubst = struct
       let sl' = s_subst eg.eg_sl in
       let sr' = s_subst eg.eg_sr in
 
-      FSmart.f_eagerF (fp, eg)
-        { eg_pr = pr'; eg_sl = sl';eg_fl = fl';
-          eg_fr = fr'; eg_sr = sr'; eg_po = po'; }
+      f_eagerF pr' sl' fl' fr' sr' po'
 
     | Fcoe coe ->
       (* We freshen the binded memory. *)
@@ -2023,8 +1907,7 @@ module Fsubst = struct
         then (fst me', oget s.fs_memtype)
         else me' in
 
-      FSmart.f_coe (fp, coe)
-        { coe_pre = pr'; coe_mem = me'; coe_e = e'; }
+      f_coe pr' me' e'
 
     | Fpr pr ->
       let pr_mem   = Mid.find_def pr.pr_mem pr.pr_mem s.fs_mem in
@@ -2033,7 +1916,7 @@ module Fsubst = struct
       let s = f_rem_mem s mhr in
       let pr_event = f_subst ~tx s pr.pr_event in
 
-      FSmart.f_pr (fp, pr) { pr_mem; pr_fun; pr_args; pr_event; }
+      f_pr pr_mem pr_fun pr_args pr_event
 
     | _ ->
       f_map s.fs_ty (f_subst ~tx s) fp)
