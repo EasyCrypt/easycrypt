@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcUtils
 open EcBigInt
 open EcPath
 open EcMaps
@@ -353,44 +352,6 @@ val f_xmax  : form -> form -> form
 
 val f_x0 : form
 val f_x1 : form
-
-(* -------------------------------------------------------------------- *)
-module FSmart : sig
-  type a_local  = EcIdent.t * ty
-  type a_pvar   = prog_var * ty * memory
-  type a_quant  = quantif * bindings * form
-  type a_if     = form tuple3
-  type a_match  = form * form list * ty
-  type a_let    = lpattern * form * form
-  type a_op     = path * ty list * ty
-  type a_tuple  = form list
-  type a_app    = form * form list * ty
-  type a_proj   = form * ty
-  type a_glob   = mpath * memory
-
-  val f_local    : (form * a_local  ) -> a_local   -> form
-  val f_pvar     : (form * a_pvar   ) -> a_pvar    -> form
-  val f_quant    : (form * a_quant  ) -> a_quant   -> form
-  val f_if       : (form * a_if     ) -> a_if      -> form
-  val f_match    : (form * a_match  ) -> a_match   -> form
-  val f_let      : (form * a_let    ) -> a_let     -> form
-  val f_op       : (form * a_op     ) -> a_op      -> form
-  val f_tuple    : (form * a_tuple  ) -> a_tuple   -> form
-  val f_app      : (form * a_app    ) -> a_app     -> form
-  val f_proj     : (form * a_proj   ) -> a_proj    -> int -> form
-  val f_glob     : (form * a_glob   ) -> a_glob    -> form
-  val f_hoareF   : (form * sHoareF  ) -> sHoareF    -> form
-  val f_hoareS   : (form * sHoareS  ) -> sHoareS    -> form
-  val f_cHoareF  : (form * cHoareF  ) -> cHoareF    -> form
-  val f_cHoareS  : (form * cHoareS  ) -> cHoareS    -> form
-  val f_bdHoareF : (form * bdHoareF ) -> bdHoareF  -> form
-  val f_bdHoareS : (form * bdHoareS ) -> bdHoareS  -> form
-  val f_equivF   : (form * equivF   ) -> equivF    -> form
-  val f_equivS   : (form * equivS   ) -> equivS    -> form
-  val f_eagerF   : (form * eagerF   ) -> eagerF    -> form
-  val f_coe      : (form * coe      ) -> coe       -> form
-  val f_pr       : (form * pr       ) -> pr        -> form
-end
 
 (* -------------------------------------------------------------------- *)
 exception DestrError of string

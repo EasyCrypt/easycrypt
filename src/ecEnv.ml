@@ -2554,7 +2554,7 @@ module NormMp = struct
             coe_mem  = coe.coe_mem;
             coe_pre  = aux coe.coe_pre;
             coe_e    = coe.coe_e;
-          } in FSmart.f_coe (f, coe) coe'
+          } in f_coe_r coe'
 
         | Fpr pr ->
           let pr' = {
@@ -2562,7 +2562,7 @@ module NormMp = struct
             pr_fun   = norm_xfun env pr.pr_fun;
             pr_args  = aux pr.pr_args;
             pr_event = aux pr.pr_event;
-          } in FSmart.f_pr (f, pr) pr'
+          } in f_pr_r pr'
 
         | _ ->
           EcCoreFol.f_map norm_ty1 aux f) in

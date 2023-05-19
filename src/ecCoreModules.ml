@@ -325,82 +325,6 @@ let is_match  = _is_of_get get_match
 let is_assert = _is_of_get get_assert
 
 (* -------------------------------------------------------------------- *)
-module ISmart : sig
-  type lv_var   = EcTypes.prog_var * EcTypes.ty
-  type lv_tuple = lv_var list
-
-  val lv_var   : lvalue * lv_var   -> lv_var   -> lvalue
-  val lv_tuple : lvalue * lv_tuple -> lv_tuple -> lvalue
-
-  type i_asgn     = lvalue * EcTypes.expr
-  type i_rnd      = lvalue * EcTypes.expr
-  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list
-  type i_if       = EcTypes.expr * stmt * stmt
-  type i_while    = EcTypes.expr * stmt
-  type i_match    = EcTypes.expr * ((EcIdent.t * ty) list * stmt) list
-  type i_assert   = EcTypes.expr
-  type i_abstract = EcIdent.t
-
-  val i_asgn     : (instr * i_asgn    ) -> i_asgn     -> instr
-  val i_rnd      : (instr * i_rnd     ) -> i_rnd      -> instr
-  val i_call     : (instr * i_call    ) -> i_call     -> instr
-  val i_if       : (instr * i_if      ) -> i_if       -> instr
-  val i_while    : (instr * i_while   ) -> i_while    -> instr
-  val i_match    : (instr * i_match   ) -> i_match    -> instr
-  val i_assert   : (instr * i_assert  ) -> i_assert   -> instr
-  val i_abstract : (instr * i_abstract) -> i_abstract -> instr
-
-  val s_stmt : stmt -> instr list -> stmt
-end = struct
-  type lv_var   = EcTypes.prog_var * EcTypes.ty
-  type lv_tuple = lv_var list
-
-  type i_asgn     = lvalue * EcTypes.expr
-  type i_rnd      = lvalue * EcTypes.expr
-  type i_call     = lvalue option * EcPath.xpath * EcTypes.expr list
-  type i_if       = EcTypes.expr * stmt * stmt
-  type i_while    = EcTypes.expr * stmt
-  type i_match    = EcTypes.expr * ((EcIdent.t * ty) list * stmt) list
-  type i_assert   = EcTypes.expr
-  type i_abstract = EcIdent.t
-
-  let lv_var (lv, pvt) pvt' =
-    if pvt == pvt' then lv else LvVar pvt'
-
-  let lv_tuple (lv, pvs) pvs' =
-    if pvs == pvs' then lv else LvTuple pvs'
-
-  let i_asgn (i, (lv, e)) (lv', e') =
-    if lv == lv' && e == e' then i else i_asgn (lv', e')
-
-  let i_rnd (i, (lv, e)) (lv', e') =
-    if lv == lv' && e == e' then i else i_rnd (lv', e')
-
-  let i_call (i, (olv, mp, args)) (olv', mp', args') =
-    if   olv == olv' && mp == mp' && args == args'
-    then i else  i_call (olv', mp', args')
-
-  let i_if (i, (e, s1, s2)) (e', s1', s2') =
-    if   e == e' && s1 == s1' && s2 == s2'
-    then i else i_if (e', s1', s2')
-
-  let i_while (i, (e, s)) (e', s') =
-    if e == e' && s == s' then i else i_while (e', s')
-
-  let i_match (i, (e, b)) (e', b') =
-    if e == e' && b == b' then i else i_match (e', b')
-
-  let i_assert (i, e) e' =
-    if e == e' then i else i_assert e'
-
-  let i_abstract (i, x) x' =
-    if x == x' then i else i_abstract x
-
-  let s_stmt s is' =
-    if s.s_node == is' then s else stmt is'
-end
-
-(* -------------------------------------------------------------------- *)
 let rec s_subst_top (s : EcTypes.e_subst) =
   let e_subst = EcTypes.e_subst s in
 
@@ -415,35 +339,34 @@ let rec s_subst_top (s : EcTypes.e_subst) =
   let lv_subst lv =
     match lv with
     | LvVar pvt ->
-        ISmart.lv_var (lv, pvt) (pvt_subst pvt)
+        LvVar (pvt_subst pvt)
 
     | LvTuple pvs ->
         let pvs' = List.Smart.map pvt_subst pvs in
-        ISmart.lv_tuple (lv, pvs) pvs'
+        LvTuple pvs'
 
   in
 
   let rec i_subst i =
     match i.i_node with
     | Sasgn (lv, e) ->
-        ISmart.i_asgn (i, (lv, e)) (lv_subst lv, e_subst e)
+        i_asgn (lv_subst lv, e_subst e)
 
     | Srnd (lv, e) ->
-        ISmart.i_rnd (i, (lv, e)) (lv_subst lv, e_subst e)
+        i_rnd (lv_subst lv, e_subst e)
 
     | Scall (olv, mp, args) ->
         let olv'  = olv |> OSmart.omap lv_subst in
         let mp'   = EcPath.x_subst s.es_mp mp in
         let args' = List.Smart.map e_subst args in
 
-        ISmart.i_call (i, (olv, mp, args)) (olv', mp', args')
+        i_call (olv', mp', args')
 
     | Sif (e, s1, s2) ->
-        ISmart.i_if (i, (e, s1, s2))
-          (e_subst e, s_subst s1, s_subst s2)
+        i_if (e_subst e, s_subst s1, s_subst s2)
 
     | Swhile(e, b) ->
-        ISmart.i_while (i, (e, b)) (e_subst e, s_subst b)
+        i_while (e_subst e, s_subst b)
 
     | Smatch (e, b) ->
         let forb ((xs, subs) as b1) =
@@ -452,16 +375,16 @@ let rec s_subst_top (s : EcTypes.e_subst) =
           if xs == xs' && subs == subs' then b1 else (xs', subs')
         in
 
-        ISmart.i_match (i, (e, b)) (e_subst e, List.Smart.map forb b)
+        i_match (e_subst e, List.Smart.map forb b)
 
     | Sassert e ->
-        ISmart.i_assert (i, e) (e_subst e)
+        i_assert (e_subst e)
 
     | Sabstract _ ->
         i
 
   and s_subst s =
-    ISmart.s_stmt s (List.Smart.map i_subst s.s_node)
+    stmt (List.Smart.map i_subst s.s_node)
 
   in s_subst
 
