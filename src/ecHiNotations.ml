@@ -91,7 +91,7 @@ let trans_abbrev_r (env : env) (at : pabbrev located) =
   let tyat    = EcDecl.mk_abbrev ~ponly
                   tparams xs (codom, body) (at.ab_local :> locality) in
 
-  if EcTypes.is_local body then
+  if not ponly && EcTypes.is_local body then
     nterror gloc env NTE_AbbrevIsVar;
 
   (unloc at.ab_name, tyat)
