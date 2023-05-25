@@ -1355,6 +1355,48 @@ module Op = struct
       else scope in
 
     tyop, List.rev !axs, scope
+
+
+  let add_opsem (scope : scope) (op : pprocop located) =
+    let module Sem = EcProcSem in
+
+    let op = unloc op in
+    let f  = EcTyping.trans_gamepath (env scope) op.ppo_target  in
+    let sig_, body =
+      let f = EcEnv.Fun.by_xpath f (env scope) in
+      let body =
+        match f.f_def with
+        | FBdef body -> body
+        | _ -> raise Sem.SemNotSupported in
+
+        (f.f_sig, body) in
+
+    let ret = oget ~exn:Sem.SemNotSupported body.f_ret in
+
+    let params =
+      let for1 (v : ovariable) =
+        (oget ~exn:Sem.SemNotSupported v.ov_name, v.ov_type) in
+      List.map for1 sig_.fs_anames in
+
+    let env = Sem.Env.empty (env scope) in
+    let env, ids = List.fold_left_map Sem.Env.fresh env (List.fst params) in
+
+    let cont (env : Sem.senv) =
+      (`Det, Sem.translate_e env ret) in
+
+    let _, aout = Sem.translate_s env cont body.f_body in
+    let aout = e_lam (List.map2 (fun (_, ty) x -> (x, ty)) params ids) aout in
+
+    let opdecl = EcDecl.{
+      op_tparams  = [];
+      op_ty       = aout.e_ty;
+      op_kind     = OB_oper (Some (OP_Plain (aout, false)));
+      op_loca     = `Global;
+      op_opaque   = false;
+      op_clinline = false;
+    } in
+
+    bind scope (unloc op.ppo_name, opdecl)
 end
 
 (* -------------------------------------------------------------------- *)

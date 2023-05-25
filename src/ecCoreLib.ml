@@ -82,6 +82,7 @@ module CI_Int = struct
   let p_int_lt    = _Int "lt"
   let p_int_edivz = _IntDiv "edivz"
   let p_int_max   = _IntDiv "max"
+  let p_iteri     = EcPath.extend p_top ["Int"; "IterOp"; "iteri"]
 end
 
 (* -------------------------------------------------------------------- *)
@@ -171,6 +172,7 @@ module CI_Distr = struct
   let p_lossless = _Distr "is_lossless"
   let p_uniform  = _Distr "is_uniform"
   let p_full     = _Distr "is_full"
+  let p_dfold    = _Distr "dfold"
 end
 
 (* -------------------------------------------------------------------- *)

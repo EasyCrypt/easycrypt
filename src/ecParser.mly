@@ -1995,6 +1995,12 @@ mcptn(BOP):
     { PPApp ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x1; x2]) }
 
 (* -------------------------------------------------------------------- *)
+(* Proc operators                                                       *)
+procop:
+| PROC OP x=ident EQ f=loc(fident)
+    { { ppo_name = x; ppo_target = f; } }
+
+(* -------------------------------------------------------------------- *)
 (* Predicate definitions                                                *)
 predicate:
 | locality=locality PRED x=oident
@@ -3929,6 +3935,7 @@ global_action:
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
+| procop           { Gprocop      $1 }
 | predicate        { Gpredicate   $1 }
 | notation         { Gnotation    $1 }
 | abbreviation     { Gabbrev      $1 }

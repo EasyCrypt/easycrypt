@@ -341,6 +341,11 @@ and process_operator (scope : EcScope.scope) (pop : poperator located) =
   scope
 
 (* -------------------------------------------------------------------- *)
+and process_procop (scope : EcScope.scope) (pop : pprocop located) =
+  EcScope.check_state `InTop "operator" scope;
+  EcScope.Op.add_opsem scope pop
+
+(* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
   EcScope.check_state `InTop "predicate" scope;
   let op, scope = EcScope.Pred.add scope p in
@@ -642,6 +647,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gmodule      m    -> `Fct   (fun scope -> process_module     scope  m)
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  scope  i)
       | Goperator    o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
+      | Gprocop      o    -> `Fct   (fun scope -> process_procop     scope  (mk_loc loc o))
       | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
       | Gnotation    n    -> `Fct   (fun scope -> process_notation   scope  (mk_loc loc n))
       | Gabbrev      n    -> `Fct   (fun scope -> process_abbrev     scope  (mk_loc loc n))
