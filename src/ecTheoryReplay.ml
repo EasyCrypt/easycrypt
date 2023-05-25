@@ -75,9 +75,7 @@ let constr_compatible exn env cs1 cs2 =
 
 let datatype_compatible exn hyps ty1 ty2 =
   let env = EcEnv.LDecl.toenv hyps in
-  constr_compatible exn env ty1.tydt_ctors ty2.tydt_ctors;
-  error_body exn (EcReduction.is_conv hyps ty1.tydt_schcase ty2.tydt_schcase);
-  error_body exn (EcReduction.is_conv hyps ty1.tydt_schelim ty2.tydt_schelim)
+  constr_compatible exn env ty1.tydt_ctors ty2.tydt_ctors
 
 let record_compatible exn hyps f1 pr1 f2 pr2 =
   error_body exn (EcReduction.is_conv hyps f1 f2);
@@ -117,7 +115,6 @@ let tydecl_compatible env tyd1 tyd2 =
   match ty_body1, ty_body2 with
   | `Abstract _, _ -> () (* FIXME Sp.t *)
   | _, _ -> tybody_compatible exn hyps ty_body1 ty_body2
-
 
 (* -------------------------------------------------------------------- *)
 let expr_compatible exn env s e1 e2 =
