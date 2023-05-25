@@ -247,6 +247,12 @@ theory IterOp.
   axiom iteriS ['a] n opr (x : 'a):
     0 <= n => iteri (n+1) opr x = opr n (iteri n opr x).
 
+  lemma iteriS_rw ['a] (n : int) (opr : int -> 'a -> 'a) (x : 'a) :
+    0 < n => iteri n opr x = opr (n - 1) (iteri (n - 1) opr x).
+  proof.
+  by move=> gt0_n; rewrite {1}[n](_ : n = n - 1 + 1) // iteriS //#.
+  qed.
+
   lemma eq_iteri (f1 f2 : int -> 'a -> 'a) k a:
        (forall i a, 0 <= i < k => f1 i a = f2 i a)
     => iteri k f1 a = iteri k f2 a.
