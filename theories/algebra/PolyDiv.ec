@@ -3423,9 +3423,7 @@ rewrite eqp_sym => eqp___; apply/(eqp_trans _ _ _ eqp___) => {eqp___}.
 move: (dvd_eqp_divl p1 _ _ _ eqp_); [by apply/dvdp_mulIl|rewrite mulKp]; last first.
 + by move=> eqp___; apply/(eqp_trans _ _ _ eqp___)/eqp_scale/lc_expn_scalp_neq0.
 apply/negP => ->>; move: eqp__; rewrite eqp_sym eqp0.
-(*TODO: bad clone*)
-print IDC.expf_eq0.
-admit.
+by smt(PS.expf_eq0 irredp_neq0).
 qed.
 
 lemma bundled_irredp_monic_decW p :
