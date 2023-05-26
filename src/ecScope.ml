@@ -1456,6 +1456,9 @@ module Mod = struct
   let add_concrete (scope : scope) lc (ptm : pmodule_def) =
     assert (scope.sc_pr_uc = None);
 
+    if lc = `Declare then
+      hierror "cannot use [declare] for concrete modules";
+
     let m = TT.transmod (env scope) ~attop:true ptm in
     let ur = EcModules.get_uninit_read_of_module (path scope) m in
 
