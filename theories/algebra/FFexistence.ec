@@ -5,8 +5,6 @@ require import RingStruct SubRing PolyDiv FiniteRing Ideal.
 require import PolyFiniteField.
 (*---*) import StdOrder.IntOrder.
 
-
-
 abstract theory FFexistence.
   type t, st.
 
@@ -87,16 +85,16 @@ abstract theory FFexistence.
     rewrite le_ /=; apply/addr_ge0 => //.
     by apply/ilog_ge0; [apply/ltzW/FFexistence.FCRS.card_gt1|apply/ger_maxrP].
   qed.
-  
+
   lemma lt0m : 0 < m.
   proof. by case: mpP. qed.
-  
+
   lemma irredp_p : PID.irreducible_poly p.
   proof. by case: mpP. qed.
-  
+
   lemma monic_p : PID.P.monic p.
   proof. by case: mpP. qed.
-  
+
   lemma lt0In_ : 0 < I n (FFexistence.SFT.card ^ (PID.P.deg p - 1)).
   proof. by case: mpP. qed.
 
@@ -156,14 +154,14 @@ abstract theory FFexistence.
     theory FUT     <- Ext1.FUTT,
     theory FUZMod  <- Ext1.FUZModT,
     theory FF      <- Ext1.FFT.
-  
+
   op is_extension_params2 (q : PFFE.PID.poly) =
     PFFE.PID.P.deg q = n + 1 /\
     PFFE.PID.irreducible_poly q /\
     PFFE.PID.P.monic q.
-  
+
   op q = choiceb is_extension_params2 PFFE.PID.P.poly0.
-  
+
   lemma qP : is_extension_params2 q.
   proof.
     rewrite /q; apply/choicebP; rewrite /is_extension_params2.
@@ -172,13 +170,13 @@ abstract theory FFexistence.
     case/has_predT/hasP => q [] + _.
     by case/PolyFinF.enum_iudegP => irr_ [] m_ eq_; exists q.
   qed.
-  
+
   lemma eq_degq : PFFE.PID.P.deg q = n + 1.
   proof. by case: qP. qed.
-  
+
   lemma irredp_q : PFFE.PID.irreducible_poly q.
   proof. by case: qP. qed.
-  
+
   lemma monic_q : PFFE.PID.P.monic q.
   proof. by case: qP. qed.
 
@@ -311,12 +309,12 @@ abstract theory FFexistence.
                     "UZModCRS" as "Gone"
                     "FUZModS"  as "Gone"
   proof Sub.*, SZMod.*, SCR.*.
-  
+
   realize Sub.insubN.
   proof.
     by move=> x; rewrite /P /insub /= negb_and; case=> ->.
   qed.
-  
+
   realize Sub.insubT.
   proof.
     move=> x; rewrite /P /val /insub /(\o) /= => -[] p2 p1; rewrite p2 p1 /=.
@@ -326,7 +324,7 @@ abstract theory FFexistence.
     move: p2; rewrite /Ext2.P => -> /=.
     by apply/Ext3.Sub.valKd.
   qed.
-  
+
   realize Sub.valP.
   proof.
     move=> x; rewrite /(\o) /= Ext3.Sub.val_insubd ifT.
@@ -338,7 +336,7 @@ abstract theory FFexistence.
     split; [by apply/ Ext2.Sub.valP|].
     by rewrite Ext2.Sub.valKd; apply/Ext1.Sub.valP.
   qed.
-  
+
   realize Sub.valK.
   proof.
     move=> x; rewrite /(\o) /= Ext3.Sub.val_insubd.
@@ -349,7 +347,7 @@ abstract theory FFexistence.
     + by rewrite FinZMod.iter_frobenius_fixed_n /predT.
     by rewrite Ext2.Sub.valP /= Ext2.Sub.valKd Ext1.Sub.valP /= Ext1.Sub.valKd.
   qed.
-  
+
   realize Sub.insubW.
   proof.
     rewrite /(\o) /= Ext3.Sub.val_insubd.
@@ -556,5 +554,5 @@ abstract theory FFexistence.
     + by apply/ltzW/lt0n.
     by apply/ltzW/SFF.lt0n.
   qed.
-end FFexistence.
 
+end FFexistence.
