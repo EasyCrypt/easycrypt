@@ -4,7 +4,6 @@ require import StdBigop StdPoly Binomial Counting Perms.
 require import RingStruct SubRing PolyDiv FiniteRing Ideal.
 (*---*) import StdOrder.IntOrder.
 
-
 (*TODO: move somewhere else.*)
 theory SIterOp.
   op siter ['a] (n : int) (f : int -> (int -> 'a) -> 'a) (x : 'a) : 'a =
@@ -492,7 +491,7 @@ theory Counting_Argument.
       - by apply/allshapes_uniq.
       pose b:=(_ \in _); have: b; rewrite /b => {b} [|->].
       - rewrite -allshapesP is_shapeP; exists (cc_perm (range 0 (n + 1))) => /=.
-        by apply/is_perm_cc; [apply/ltzS|apply/perm_eq_refl].        
+        by apply/is_perm_cc; [apply/ltzS|apply/perm_eq_refl].
       rewrite b2i1 nseq1 Bigreal.BRA.big_seq1 /f => {f}.
       rewrite (cc_shapeP (n + 1)) /=; [by apply/ltzS|by apply/perm_eq_refl|].
       rewrite (rangeSr 1 (n + 1)); [by apply/subr_ge0|].
@@ -668,7 +667,7 @@ abstract theory PolyFiniteField.
 
   theory PolyFinF.
     import P BigPoly.
-  
+
     lemma scaled_monicP p :
       scaled_monic p <=> p <> poly0.
     proof.
@@ -678,16 +677,16 @@ abstract theory PolyFiniteField.
       rewrite lc_eq0 neqp0 /= monic_invrZ ?RL.unitfP ?lc_eq0 //=.
       by rewrite scalepA RL.mulrV ?scale1r // RL.unitfP lc_eq0.
     qed.
-  
+
     op enum_ledeg n =
       if 0 <= n
       then map polyL (alltuples n FT.enum)
       else [].
-  
+
     op enum_deg n = filter (fun p => deg p = n) (enum_ledeg n).
-  
+
     op enum_udeg n = filter monic (enum_deg n).
-  
+
     op enum_udeg_irr_shape n s =
       filter
         ( fun p =>
@@ -695,7 +694,7 @@ abstract theory PolyFiniteField.
               irreducible_monic_dec p qs /\
               s = mkseq (fun k => count (fun q => deg q = k + 2) qs) (n - 1) )
         (enum_udeg n).
-  
+
     op enum_udeg_irr_deg k d =
       filter
         ( fun p =>
@@ -704,9 +703,9 @@ abstract theory PolyFiniteField.
               size qs = k /\
               all (fun q => deg q = d) qs )
         (enum_udeg (k * (d - 1) + 1)).
-  
+
     op enum_iudeg n = filter irreducible_poly (enum_udeg n).
-  
+
     lemma enum_ledegP n p :
       p \in enum_ledeg n <=>
       (P.deg p <= n).
@@ -720,7 +719,7 @@ abstract theory PolyFiniteField.
       rewrite alltuplesP eq_ ler_maxr //=.
       by apply/allP => ? _; apply/FT.enumP.
     qed.
-  
+
     lemma uniq_enum_ledeg n :
       uniq (enum_ledeg n).
     proof.
@@ -729,7 +728,7 @@ abstract theory PolyFiniteField.
       move=> xs ys /alltuplesP [] + _ /alltuplesP [] + _.
       by rewrite ler_maxr // => <<- /eq_sym; apply/inj_polyL.
     qed.
-  
+
     lemma size_enum_ledeg n :
       0 <= n =>
       size (enum_ledeg n) = FT.card ^ n.
@@ -737,16 +736,16 @@ abstract theory PolyFiniteField.
       move=> le0n; rewrite /enum_ledeg le0n /= size_map.
       by rewrite size_alltuples ler_maxr.
     qed.
-  
+
     lemma enum_degP n p :
       p \in enum_deg n <=>
       (P.deg p = n).
     proof. by rewrite /enum_deg mem_filter /= enum_ledegP; split. qed.
-  
+
     lemma uniq_enum_deg n :
       uniq (enum_deg n).
     proof. by rewrite /enum_deg; apply/filter_uniq/uniq_enum_ledeg. qed.
-  
+
     lemma perm_eq_enum_deg n :
       perm_eq (enum_ledeg n) ((enum_ledeg (n - 1)) ++ (enum_deg n)).
     proof.
@@ -757,7 +756,7 @@ abstract theory PolyFiniteField.
       move=> p; rewrite mem_cat !enum_ledegP enum_degP.
       by rewrite -(ltzS _ (n - 1)) /= orbC -ler_eqVlt.
     qed.
-  
+
     lemma size_enum_deg n :
       0 < n =>
       size (enum_deg n) = (FT.card - 1) * FT.card ^ (n - 1).
@@ -768,16 +767,16 @@ abstract theory PolyFiniteField.
       rewrite (IntID.addrC _ (size _)) -subr_eq => <-.
       by rewrite mulrDl -exprS; [apply/ltzS|rewrite /= mulNr].
     qed.
-  
+
     lemma enum_udegP n p :
       p \in enum_udeg n <=>
       (monic p /\ deg p = n).
     proof. by rewrite /enum_udeg mem_filter enum_degP. qed.
-  
+
     lemma uniq_enum_udeg n :
       uniq (enum_udeg n).
     proof. by rewrite filter_uniq; apply/uniq_enum_deg. qed.
-  
+
     lemma perm_eq_enum_udeg n :
       0 < n =>
       perm_eq (enum_udeg n) (map (fun p => (+) (P.polyXn (n - 1)) p) (enum_ledeg (n - 1))).
@@ -803,7 +802,7 @@ abstract theory PolyFiniteField.
       rewrite polyDE polyXnE /= -ltzS lt0n /= RL.addrC -RL.subr_eq0.
       by rewrite -RL.addrA RL.subrr RL.addr0; apply/P.gedeg_coeff.
     qed.
-  
+
     lemma size_enum_udeg n :
       0 < n =>
       size (enum_udeg n) = FT.card ^ (n - 1).
@@ -812,7 +811,7 @@ abstract theory PolyFiniteField.
       move/perm_eq_size: (perm_eq_enum_udeg _ lt0n) => ->.
       by rewrite size_map size_enum_ledeg // -ltzS.
     qed.
-  
+
     lemma enum_udeg_irr_shapeP n s p :
       p \in enum_udeg_irr_shape n s <=>
       ( monic p /\
@@ -824,15 +823,17 @@ abstract theory PolyFiniteField.
       rewrite /enum_udeg_irr_shape mem_filter enum_udegP /=.
       by split=> />.
     qed.
-  
+
     lemma uniq_enum_udeg_irr_shape n s :
       uniq (enum_udeg_irr_shape n s).
     proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
-  
+
     lemma perm_eq_enum_udeg_irr_shape n :
       1 < n =>
       perm_eq (enum_udeg n) (flatten (map (enum_udeg_irr_shape n) (allshapes (n - 1)))).
     proof.
+      have FP : forall (c : t), c <> zeror => unit c
+        by move => c c_nz; rewrite unitfP.
       move=> lt1n; apply/uniq_perm_eq.
       + by apply/uniq_enum_udeg.
       + apply/uniq_flatten_map; last first.
@@ -846,7 +847,7 @@ abstract theory PolyFiniteField.
       move=> p; rewrite enum_udegP -flattenP; split; last first.
       + case=> ? [] /mapP [s] [] /allshapesP is_s_ ->>.
         by case/enum_udeg_irr_shapeP => m_ [] <<- [?] [] dec_ ->>.
-      case=> m_ <<-; move: (irredp_monic_decW p).
+      case=> m_ <<-; move: (irredp_monic_decW p FP).
       rewrite scaled_monicP -deg_gt0 ltzE ltzW //= => -[qs] dec_.
       pose s:= mkseq (fun k => count (fun q => deg q = k + 2) qs) (deg p - 1).
       pose ps:= enum_udeg_irr_shape (deg p) s; exists ps; split; last first.
@@ -867,7 +868,7 @@ abstract theory PolyFiniteField.
       apply/Bigint.BIA.eq_big_seq => i memi /=; rewrite count_map /preim /pred1 /=.
       by congr; apply/eq_count => q /=; split=> [<-|->].
     qed.
-  
+
     lemma size_enum_udeg_irr_shape n :
       1 < n =>
       Bigint.BIA.big predT (fun s => size (enum_udeg_irr_shape n s)) (allshapes (n - 1)) =
@@ -879,7 +880,7 @@ abstract theory PolyFiniteField.
       apply/Bigint.BIA.eq_big_seq => s mem_ /=.
       by rewrite /(\o).
     qed.
-  
+
     lemma enum_udeg_irr_degP k d p :
       p \in enum_udeg_irr_deg k d <=>
       ( monic p /\
@@ -894,11 +895,11 @@ abstract theory PolyFiniteField.
       + by move=> q mem_; move/allP/(_ _ mem_): all_ => ->.
       by rewrite Bigint.BIA.sumr_const intmulz mulrC count_predT.
     qed.
-  
+
     lemma uniq_enum_udeg_irr_deg k d :
       uniq (enum_udeg_irr_deg k d).
     proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
-  
+
     lemma perm_eq_enum_udeg_irr_deg n s :
       1 < n =>
       is_shape (n - 1) s =>
@@ -1086,7 +1087,7 @@ abstract theory PolyFiniteField.
         by rewrite eq_sym; move: neqij; apply/implybNN/IntID.addIr.
       by case/(_ _ memi): forall_ => _ [] _ [] <-; rewrite eq_sym => /all_count_in ->.
     qed.
-  
+
     lemma size_enum_udeg_irr_deg n :
       0 < n =>
       Bigint.BIA.big predT
@@ -1111,23 +1112,23 @@ abstract theory PolyFiniteField.
       + by rewrite (is_shape_size _ _ is_s_s).
       by rewrite nth_range // -mem_range.
     qed.
-  
+
     lemma enum_iudeg0 :
       enum_iudeg 0 = [].
     proof.
       apply/eq_in_filter_pred0 => p /enum_udegP [] + /deg_eq0 ->>.
       by rewrite /monic lc0 eq_sym RL.oner_neq0.
     qed.
-  
+
     lemma enum_iudegP n p :
       p \in enum_iudeg n <=>
       (irreducible_poly p /\ monic p /\ deg p = n).
     proof. by rewrite /enum_iudeg mem_filter enum_udegP. qed.
-  
+
     lemma uniq_enum_iudeg n :
       uniq (enum_iudeg n).
     proof. by rewrite filter_uniq; apply/uniq_enum_udeg. qed.
-  
+
     lemma perm_eq_enum_iudeg k d :
       0 <= k =>
       1 < d =>
@@ -1189,7 +1190,7 @@ abstract theory PolyFiniteField.
       case/enum_iudegP => irr_ [] m_ <<-; rewrite irr_ m_ /=.
       by apply/irredp_neq0.
     qed.
-  
+
     lemma size_enum_iudeg n :
       0 < n =>
       Bigint.BIA.big
@@ -1239,7 +1240,7 @@ abstract theory PolyFiniteField.
       + by apply/ler_subl_addl/ltzW.
       by rewrite Bigint.BIM.big_cat.
     qed.
-  
+
     lemma eqI_size_enum_iudeg n :
       0 < n =>
       Counting_Argument.I n FT.card = size (enum_iudeg (n + 1)).
@@ -1291,12 +1292,15 @@ abstract theory PolyFiniteField.
       rewrite /xI /xE; rewrite nth_rcons size_nseq ler_maxr //=.
       by rewrite fact1 !divz1 range_ltn // range_geq.
     qed.
-  
+
     lemma exists_iu_le_deg (n : int) :
       exists p , n < deg p /\ irreducible_poly p /\ monic p.
     proof.
+      have FP : forall (c : t), c <> zeror => unit c
+        by move => c c_nz; rewrite unitfP.
       rewrite -negbK negb_exists /=; apply/negP => forall_.
-      case: (irredp_monic_decW (PCM.big predT idfun (rem poly0 (enum_ledeg n)) * X + poly1)) => + _.
+      case: (irredp_monic_decW (PCM.big predT idfun (rem poly0 (enum_ledeg n)) *
+                                X + poly1) FP) => + _.
       rewrite rem_filter ?uniq_enum_ledeg //; rewrite scaled_monicP.
       pose r:= (PCM.big _ _ _); have: r <> poly0; rewrite /r => {r}.
       + rewrite -prodf_neq0; apply/allP => q /mem_filter [] + _.
@@ -1320,7 +1324,6 @@ abstract theory PolyFiniteField.
     qed.
   end PolyFinF.
 end PolyFiniteField.
-
 
 abstract theory FFIrrPolyExt.
   type t, st.
@@ -1585,4 +1588,3 @@ abstract theory FFIrrPolyExt.
     qed.
   end FFIrrPolyE.
 end FFIrrPolyExt.
-

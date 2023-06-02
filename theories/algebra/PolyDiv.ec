@@ -2590,6 +2590,394 @@ by rewrite lcM eqq IDC.mulr1.
 qed.
 (*TODO: end of change every relevant thing to use the monic operator and put at the right place in PolyDiv.*)
 
+lemma degXsubC c : deg (polyNXC c) = 2
+  by rewrite degDl degX // -polyCN degC; case: (_ = _).
+
+lemma lcXsubC c : lc (polyNXC c) = oner
+  by rewrite lcDl degX ?polyXE //= -polyCN degC; case: (_ = _).
+
+lemma modp_XsubC p c : modp p (polyNXC c) = polyC (peval p c).
+proof.
+pose q := p - polyC (peval p c); have {1}-> : p = q + polyC (peval p c)
+  by rewrite /q PS.addrAC -PS.addrA PS.subrr PS.addr0.
+rewrite modpE lcXsubC unitP unitr1 /= expr1z scale1p.
+have: root q c by rewrite pevalD pevalN pevalC subrr.
+rewrite factor_theorem; move => [? ->].
+rewrite rmodp_addl_mul_small ?lcXsubC //.
+by rewrite degC degXsubC; case (root _ _).
+qed.
+
+lemma coprimep_XsubC p c : coprimep p (polyNXC c) = ! root p c.
+proof.
+rewrite -coprimep_modl modp_XsubC; case: (peval p c = zeror) => cpP.
+- by rewrite cpP coprime0p -deg_eqp degXsubC.
+- rewrite -(eqp_coprimepl _ poly1) ?coprime1p //.
+  by rewrite eqp_sym -size_poly_eq1 degC cpP.
+qed.
+
+lemma coprimep_XsubC2 (a b : coeff) :
+  b - a <> zeror => coprimep (polyNXC a) (polyNXC b)
+  by rewrite coprimep_XsubC pevalD pevalX pevalN pevalC.
+
+lemma coprimepX p : coprimep p X = ! root p zeror
+  by rewrite -(coprimep_XsubC _ zeror) PS.subr0.
+
+lemma eqp_monic p q : monic p => monic q => eqp p q = (p = q).
+proof.
+move => pP qP; rewrite eq_iff iffE; split => [pqP|->]; rewrite ?eqpxx //.
+move: (eqpP p q); rewrite pqP eqT; move => [a b [a_neq0 [b_neq0 abP]]].
+apply (PS.mulfI (polyC a)); rewrite ?eq_polyC0 //.
+rewrite -!scalepE abP; congr; apply (mulIf oner oner_neq0).
+by rewrite -{1}qP -pP -!lcZ_lreg ?lregP // abP.
+qed.
+
+lemma dvdp_mul_XsubC p q c :
+  dvdp p (polyNXC c * q) = dvdp (if root p c then divp p (polyNXC c) else p) q.
+proof.
+case: (root p c) => /= [|?]; 2: by rewrite Gauss_dvdpr // coprimep_XsubC.
+rewrite root_factor_theorem -eqp_div_XsubC PS.mulrC => {1}->.
+by rewrite dvdp_mul2l // -deg_eq0 degXsubC.
+qed.
+
+lemma monic_divpE p q : monic q => divp p q = rdivp p q
+  by move => monq; rewrite divpE monq unitP unitr1 /= expr1z scale1p.
+
+lemma monic_modpE p q : monic q => modp p q = rmodp p q
+  by move => monq; rewrite modpE monq unitP unitr1 /= expr1z scale1p.
+
+lemma monic_scalpE p q : monic q => scalp p q = 0
+  by move => monq; rewrite scalpE monq unitP unitr1.
+
+lemma monic_neq0 p : monic p => p <> poly0
+  by rewrite -lc_eq0 => ->; rewrite oner_neq0.
+
+lemma monic_divpp p : monic p => divp p p = poly1
+  by move => monp; rewrite divpp ?monic_neq0 // monp expr1z.
+
+lemma monic_dvdp_eq p q : monic q => dvdp q p = (p = (divp p q) * q)
+  by rewrite dvdp_eq => ->; rewrite expr1z scale1p.
+
+lemma monic_dvdpP p q : monic q => (exists qq, p = qq * q) = dvdp q p.
+proof.
+move => monq; rewrite eq_iff iffE; split.
+- by move => [qq ->]; rewrite dvdp_mulr dvdpp.
+- by rewrite dvdp_eq monq expr1z scale1p => ?; exists (divp p q).
+qed.
+
+lemma monic_mulpK p q : monic q => divp (p * q) q = p
+  by move => monq; rewrite mulpK ?monic_neq0 // monq expr1z scale1p.
+
+lemma monic_mulKp p q : monic q => divp (q * p) q = p
+  by move => monq; rewrite mulKp ?monic_neq0 // monq expr1z scale1p.
+
+lemma drop_poly_divp n p : 0 <= n => drop_poly n p = divp p (polyXn n).
+proof.
+move => n_ge0; rewrite drop_poly_rdivp divpE lcXn //.
+by rewrite unitP unitr1 /= expr1z scale1p.
+qed.
+
+lemma take_poly_modp n p : 0 <= n => take_poly n p = modp p (polyXn n).
+proof.
+move => n_ge0; rewrite take_poly_rmodp // modpE lcXn //.
+by rewrite unitP unitr1 /= expr1z scale1p.
+qed.
+
+lemma ulc_divp_eq d p : IDC.unit (lc d) => p = (divp p d) * d + modp p d
+  by rewrite -divp_eq scalpE unitP => -> /=; rewrite expr0 scale1p.
+
+lemma ulc_lc_neq0 p : IDC.unit (lc p) => lc p <> zeror
+  by apply contraL => ->; rewrite unitr0.
+
+lemma ulc_edivpP d p q r :
+  IDC.unit (lc d) => p = q * d + r => deg r < deg d =>
+  q = divp p d /\ r = modp p d.
+proof.
+move => ulcd ep srd; move: ( ulc_divp_eq d p ulcd); rewrite {1}ep.
+have lcdn0 : lc d <> zeror by rewrite ulc_lc_neq0.
+rewrite (PS.addrC _ (modp p d)) -PS.subr_eq PS.addrAC -PS.mulrBl => e.
+rewrite -e; move: e; rewrite eq_sym -PS.subr_eq -PS.eqr_opp -PS.mulNr !PS.opprB.
+case: (q = divp p d) => [->|abs] e /=; 1: by rewrite PS.subrr PS.mul0r PS.add0r.
+have hleq /= : deg d <= deg ((divp p d - q) * d).
+- rewrite degM_proper; 1: by rewrite mulf_neq0 // lc_eq0 PS.subr_eq0 eq_sym.
+  by rewrite addrAC ler_paddl // subz_ge0 deg_ge1 PS.subr_eq0 eq_sym.
+suff //= : deg d < deg d; apply (ler_lt_trans _ _ _ hleq); rewrite -e.
+apply (ler_lt_trans (max (deg r) (deg (modp p d)))); rewrite ?degB.
+case: (deg (modp p d) < deg r) => degP; 1: by rewrite lez_maxl ?ltrW.
+by rewrite lez_maxr ?lerNgt // ltn_modp -lc_eq0.
+qed.
+
+lemma ulc_divpP d p q r :
+  IDC.unit (lc d) => p = q * d + r => deg r < deg d =>
+  q = divp p d
+  by move => ulcd e degP; move: (ulc_edivpP d p q r); rewrite ulcd -e degP.
+
+lemma ulc_modpP d p q r :
+  IDC.unit (lc d) => p = q * d + r => deg r < deg d =>
+  r = modp p d
+  by move => ulcd e degP; move: (ulc_edivpP d p q r); rewrite ulcd -e degP.
+
+lemma ulc_eqpP p q :
+  IDC.unit (lc q) => (exists c, c <> zeror /\ p = c ** q) = eqp p q.
+proof.
+move => ulcd; have q_nz : q <> poly0 by rewrite -lc_eq0 ulc_lc_neq0.
+rewrite eq_iff iffE -{1}eqpP; split.
+- by move => [c [c_nz ->]]; exists oner c; rewrite scale1p c_nz oner_neq0.
+- move => eq; have p_nz : p <> poly0
+    by move: q_nz; rewrite -!eqp0; apply /contra/eqp_trans; rewrite eqp_sym.
+  exists (lc p / lc q); rewrite mulf_neq0 ?invr_neq0 ?lc_eq0 //=.
+  by rewrite mulrC -scalepA -(eqp_eq _ _ eq) scalepA mulrC divrr // scale1p.
+qed.
+
+lemma ulc_dvdp_eq d p : IDC.unit (lc d) => dvdp d p = (p = divp p d * d).
+proof.
+move => ulcd; rewrite eq_iff iffE; split => [|->]; rewrite /dvdp ?modp_mull //.
+by move => modP; move: (ulc_divp_eq d p ulcd); rewrite modP PS.addr0.
+qed.
+
+lemma ulc_eqp_eq p q :
+  IDC.unit (lc q) => eqp p q => p = (lc p / lc q) ** q.
+proof.
+move => ulcd /eqp_eq; rewrite mulrC -scalepA => <-.
+by rewrite scalepA mulrC divrr // scale1p.
+qed.
+
+lemma ulc_modpZl c (d p : poly) :
+  IDC.unit (lc d) => modp (c ** p) d = c ** modp p d.
+proof.
+case: (c = zeror) => [->|c_nz] ulcd; 1: by rewrite !scale0p mod0p.
+have e : c ** p = c ** divp p d * d + c ** modp p d
+  by rewrite -scalerAl -scalepDr -ulc_divp_eq.
+suff s: deg (c ** modp p d) < deg d
+  by case: (ulc_edivpP _ _ _ _ ulcd e s) => _ ->.
+by rewrite degZ_lreg ?lregP // ltn_modp -lc_eq0 ulc_lc_neq0.
+qed.
+
+lemma ulc_divpZl c (d p : poly) :
+  IDC.unit (lc d) =>
+  divp (c ** p) d = c ** divp p d.
+proof.
+case: (c = zeror) => [->|c_nz ulcd]; 1: by rewrite !scale0p div0p.
+have e : c ** p = c ** divp p d * d + c ** modp p d
+  by rewrite -scalerAl -scalepDr -ulc_divp_eq.
+suff s: deg (c ** modp p d) < deg d by case (ulc_edivpP _ _ _ _ ulcd e s) => ->.
+by rewrite degZ_lreg ?lregP // ltn_modp -lc_eq0 ulc_lc_neq0.
+qed.
+
+lemma ulc_eqp_modpl d p q :
+  IDC.unit (lc d) => eqp p q =>
+  eqp (modp p d) (modp q d).
+proof.
+rewrite -eqpP. move => ulcd [c1] c2 [c1_nz [c2_nz e]].
+by rewrite -eqpP; exists c1 c2; rewrite c1_nz c2_nz /= -!ulc_modpZl // e.
+qed.
+
+lemma ulc_eqp_divl d p q :
+  IDC.unit (lc d) => eqp p q =>
+  eqp (divp p d) (divp q d).
+proof.
+rewrite -eqpP. move => ulcd [c1] c2 [c1_nz [c2_nz e]].
+by rewrite -eqpP; exists c1 c2; rewrite c1_nz c2_nz /= -!ulc_divpZl // e.
+qed.
+
+lemma ulc_modpN (d p : poly) : IDC.unit (lc d) => modp (- p) d = - modp p d.
+proof.
+move => ?; rewrite -PS.mulN1r -polyCN -scalepE.
+by rewrite ulc_modpZl // scaleNp scale1p.
+qed.
+
+lemma ulc_divpN (d p : poly) : IDC.unit (lc d) => divp (- p) d = - divp p d.
+proof.
+move => ?; rewrite -PS.mulN1r -polyCN -scalepE.
+by rewrite ulc_divpZl // scaleNp scale1p.
+qed.
+
+lemma ulc_modpD (d p q : poly) :
+  IDC.unit (lc d) =>
+  modp (p + q) d = modp p d + modp q d.
+proof.
+move => ulcd; have e: p + q = (divp p d + divp q d) * d + (modp p d + modp q d)
+  by rewrite PS.mulrDl PS.addrACA -!ulc_divp_eq.
+suff degP: deg (modp p d + modp q d) < deg d
+  by case (ulc_edivpP _ _ _ _ ulcd e degP) => _ ->.
+apply (ler_lt_trans _ _ _ (degD (modp p d) (modp q d))).
+by rewrite ltr_maxrP !ltn_modp -lc_eq0 ulc_lc_neq0.
+qed.
+
+lemma ulc_divpD (d p q : poly) :
+  IDC.unit (lc d) =>
+  divp (p + q) d = divp p d + divp q d.
+proof.
+move => ulcd; have e: p + q = (divp p d + divp q d) * d + (modp p d + modp q d)
+  by rewrite PS.mulrDl PS.addrACA -!ulc_divp_eq.
+suff degP: deg (modp p d + modp q d) < deg d
+  by case (ulc_edivpP _ _ _ _ ulcd e degP) => ->.
+apply (ler_lt_trans _ _ _ (degD (modp p d) (modp q d))).
+by rewrite ltr_maxrP !ltn_modp -lc_eq0 ulc_lc_neq0.
+qed.
+
+lemma ulc_mulpK d q : IDC.unit (lc d) => divp (q * d) d = q.
+proof.
+move: (PS.addr0 (q * d)); rewrite eq_sym => e ulcd.
+suff degP: deg poly0 < deg d by case (ulc_edivpP _ _ _ _ ulcd e degP) => <-.
+by rewrite deg0 deg_gt0 -lc_eq0 ulc_lc_neq0.
+qed.
+
+lemma ulc_mulKp d q : IDC.unit (lc d) => divp (d * q) d = q
+  by move => ?; rewrite PS.mulrC ulc_mulpK.
+
+lemma ulc_divp_addl_mul_small d q r :
+  IDC.unit (lc d) => deg r < deg d =>
+  divp (q * d + r) d = q.
+proof.
+move => ulcd srd; rewrite ulc_divpD //.
+by rewrite (divp_small _ _ srd) PS.addr0 ulc_mulpK.
+qed.
+
+lemma ulc_modp_addl_mul_small d q r :
+  IDC.unit (lc d) => deg r < deg d =>
+  modp (q * d + r) d = r
+  by move => ulcd srd; rewrite ulc_modpD // modp_mull PS.add0r modp_small.
+
+lemma ulc_divp_addl_mul d q r :
+  IDC.unit (lc d) =>
+  divp (q * d + r) d = q + divp r d
+  by move => ?; rewrite ulc_divpD ?ulc_mulpK.
+
+lemma ulc_divpp d : IDC.unit (lc d) => divp d d = poly1
+  by move => ?; rewrite -{1}PS.mul1r ulc_mulpK.
+
+lemma ulc_leq_trunc_divp d m : IDC.unit (lc d) => deg (divp m d * d) <= deg m.
+proof.
+case: (divp m d = poly0) => [->|mdP ulcd]; 1: by rewrite PS.mul0r deg0 ge0_deg.
+rewrite {2}(ulc_divp_eq d m) // degDl ?ltn_modp //.
+rewrite degM_proper ?mulf_neq0 ?(ulc_lc_neq0 d) // ?lc_eq0 //.
+by rewrite addrAC ltr_paddl ?subr_ge0 ?deg_ge1 // ltn_modp -lc_eq0 ulc_lc_neq0.
+qed.
+
+lemma ulc_dvdpP d p : IDC.unit (lc d) => (exists q, p = q * d) = dvdp d p.
+proof.
+move => ulcd; rewrite eqboolP iffE {2}ulc_dvdp_eq //; split => [[q ->]|];
+by rewrite /dvdp ?modp_mull // => ->; exists (divp p d).
+qed.
+
+lemma ulc_divpK d p : IDC.unit (lc d) => dvdp d p => divp p d * d = p
+  by move => ?; rewrite ulc_dvdp_eq // => <-.
+
+lemma ulc_divpKC d p : IDC.unit (lc d) => dvdp d p => d * divp p d = p
+  by move => 2?; rewrite PS.mulrC ulc_divpK.
+
+lemma ulc_dvdp_eq_div d p q :
+  IDC.unit (lc d) => dvdp d p =>
+  (q = divp p d) = (q * d = p).
+proof.
+move => ulcd /(ulc_divpK _ p ulcd) => {2}<-; rewrite eqboolP iffE.
+by split => [-> //|]; apply/PS.mulIf; rewrite -lc_eq0 ulc_lc_neq0.
+qed.
+
+lemma ulc_dvdp_eq_mul d p q :
+  IDC.unit (lc d) => dvdp d p =>
+  (p = q * d) = (divp p d = q)
+  by move => ulcd dv_d_p; rewrite (eq_sym p) -ulc_dvdp_eq_div // (eq_sym q).
+
+lemma ulc_divp_mulA d p q :
+  IDC.unit (lc d) => dvdp d q =>
+  p * divp q d = divp (p * q) d.
+proof.
+move => ulcd hdm; rewrite eq_sym -ulc_dvdp_eq_mul // ?dvdp_mulr //.
+by rewrite -PS.mulrA ulc_divpK.
+qed.
+
+lemma ulc_divp_mulAC d m n :
+  IDC.unit (lc d) => dvdp d m =>
+  divp m d * n = divp (m * n) d
+  by move => 2?; rewrite PS.mulrC (PS.mulrC m); apply: ulc_divp_mulA.
+
+lemma ulc_divp_mulCA d p q :
+  IDC.unit (lc d) => dvdp d p=> dvdp d q =>
+  p * divp q d = q * divp p d
+  by move=> 3?; rewrite PS.mulrC ulc_divp_mulAC // ulc_divp_mulA.
+
+lemma ulc_modp_mul d p q :
+  IDC.unit (lc d) =>
+  modp (p * modp q d) d = modp (p * q) d.
+proof.
+move => ulcd; rewrite {2}(ulc_divp_eq d q) // PS.mulrDr ulc_modpD //.
+by rewrite PS.mulrA modp_mull PS.add0r.
+qed.
+
+lemma ulc_expp_sub d (m n : int) :
+  IDC.unit (lc d) => 0 <= n <= m =>
+  PS.exp d (m - n) = divp (PS.exp d m) (PS.exp d n).
+proof.
+have {3}-> 2? : m = m - n + n by ring.
+rewrite (PS.exprD_nneg _ (m - n)) ?ulc_mulpK;
+by smt(lcXn_proper unitrX unit_lreg).
+qed.
+
+lemma ulc_divp_pmul2l d p q :
+  IDC.unit (lc d) => IDC.unit (lc q) =>
+  divp (d * p) (d * q) = divp p q.
+proof.
+move=> uldc uq; rewrite {1}(ulc_divp_eq _ p uq) PS.mulrDr PS.mulrCA.
+rewrite ulc_divp_addl_mul ?lcM ?unitrM //.
+have dq_nz : d * q <> poly0 by rewrite PS.mulf_eq0 -!lc_eq0 !ulc_lc_neq0.
+suff: deg (d * modp p q) < deg (d * q)
+  by rewrite ltrNge -divpN0 // negbK => ->; rewrite PS.addr0.
+case: (modp p q = poly0) => [->|r_nz]; 1: by rewrite PS.mulr0 deg0 deg_gt0.
+by rewrite !degM // ?ltz_add2r ?ltz_add2l ?ltn_modp -lc_eq0 ulc_lc_neq0.
+qed.
+
+lemma ulc_divp_pmul2r d p q :
+  IDC.unit (lc d) => IDC.unit (lc p) =>
+  divp (q * d) (p * d) = divp q p
+  by move => 2?; rewrite -!(PS.mulrC d) ulc_divp_pmul2l.
+
+lemma ulc_divp_divl r p q :
+  IDC.unit (lc r) => IDC.unit (lc p) =>
+  divp (divp q p) r = divp q (p * r).
+proof.
+move=> ulcr ulcp.
+have e : q = divp (divp q p) r * (p * r) + (modp (divp q p) r * p + modp q p).
+  rewrite PS.addrA (PS.mulrC p) PS.mulrA -PS.mulrDl.
+  by rewrite -ulc_divp_eq -?ulc_divp_eq.
+suff s : deg (modp (divp q p) r * p + modp q p) < deg (p * r)
+  by case: (ulc_edivpP _ _ _ _ _ e s) => //; rewrite lcM unitrM.
+have [r_nz p_nz] : r <> poly0 /\ p <> poly0 by rewrite -!lc_eq0 !ulc_lc_neq0.
+case: (modp (divp q p) r = poly0) => [->|modpP].
+- rewrite PS.mul0r PS.add0r degM // -addrA.
+  by rewrite ltr_paddr ?ltn_modp // subz_ge0 deg_ge1.
+- rewrite degDl PS.mulrC !degM //; 2: by rewrite ltz_add2r ltz_add2l ltn_modp.
+  by rewrite -addrA ltr_paddr ?ltn_modp // subz_ge0 deg_ge1.
+qed.
+
+lemma ulc_divpAC d p q :
+  IDC.unit (lc d) => IDC.unit (lc p) =>
+  divp (divp q d) p = divp (divp q p) d
+  by move => 2?; rewrite !ulc_divp_divl // PS.mulrC.
+
+lemma ulc_modpZr c d p :
+  IDC.unit c => IDC.unit (lc d) =>
+  modp p (c ** d) = modp p d.
+proof.
+move => uc ulcd; have e : p = (invr c ** divp p d) * (c ** d) + modp p d.
+- rewrite -scalerAl PS.mulrC -scalerAl scalepA mulVr //.
+  by rewrite scale1p PS.mulrC -ulc_divp_eq.
+suff s : deg (modp p d) < deg (c ** d).
+  by rewrite (ulc_modpP _ _ _ _ _ e s) // lcZ_lreg ?unitrM //; apply unit_lreg.
+by rewrite degZ_lreg ?ltn_modp -?lc_eq0 ?ulc_lc_neq0 //; apply unit_lreg.
+qed.
+
+lemma divpZr c d p :
+  IDC.unit c => IDC.unit (lc d) =>
+  divp p (c ** d) = IDC.invr c ** divp p d.
+proof.
+move => uc ulcd; have e : p = (invr c ** divp p d) * (c ** d) + modp p d.
+- rewrite -scalerAl PS.mulrC -scalerAl scalepA mulVr //.
+  by rewrite scale1p PS.mulrC -ulc_divp_eq.
+suff s : deg (modp p d) < deg (c ** d).
+  by rewrite (ulc_divpP _ _ _ _ _ e s) // lcZ_lreg ?unitrM //; apply unit_lreg.
+by rewrite degZ_lreg ?ltn_modp -?lc_eq0 ?ulc_lc_neq0 //; apply unit_lreg.
+qed.
 
 (*-----------------------------------------------------------*)
 (*TODO: put at the right place in PolyDiv.*)
@@ -2613,24 +3001,105 @@ move/(congr1 deg); rewrite degZ_lreg ?lregP // degC; case (c = zeror) => //.
 by move=> ->> /eq_sym /deg_eq0 ->>; move: m_; rewrite monicC eq_sym oner_neq0.
 qed.
 
+lemma scaled_monicP p :
+  lc p <> zeror =>
+  scaled_monic p <=>
+  forall i, 0 <= i < deg p => exists c, p.[i] = lc p * c.
+proof.
+move => lcP; split.
+- move => [c s] [c_nz [mons e]] i iP; rewrite {1}e; exists s.[i].
+  suff -> : c = lc p by rewrite polyZE.
+  by rewrite e lcZ_lreg ?lregP // mons mulr1.
+move: p lcP; suff: forall n, forall r, deg r <= n =>
+                                       lc r <> zeror =>
+                                       (forall i, 0 <= i < deg r =>
+                                        exists c, r.[i] = lc r * c) =>
+                                        exists s, monic s /\ r = lc r ** s
+  by move => rP r lcrP e; move: (rP (deg r) r _ lcrP e) => /#.
+apply natind; 1: by smt(deg_le0 lc0 oner_neq0).
+move => n n_ge0 /= ih r rP lcrP e; case (1 < deg r) => degP; last first.
+- have {degP} degP : deg r = 1 by smt(deg_ge1 lc_eq0).
+  move: (e 0); rewrite degP /=; move => [c cP].
+  exists (polyC c); rewrite scalepE -polyCM poly_eqP.
+  suff: monic (polyC c) by smt(gedeg_coeff polyCE).
+  rewrite monicC; move: cP; rewrite -subr_eq0 -{1}(mulr1 r.[0]) -mulrBr.
+  by rewrite mulf_eq0; smt(subr_eq0).
+- move: (ih (drop_poly 1 r)).
+  have -> : lc (drop_poly 1 r) = lc r.
+  + rewrite deg_drop_poly // lez_maxr; 1: by smt(deg_ge1 lc_eq0).
+    by rewrite /drop_poly coeffE ?ispolyDrop /prepolyDrop /#.
+  rewrite deg_drop_poly // lez_maxr ?ler_subl_addr => [/#|]; rewrite rP lcrP.
+  move => dP; have {dP}: exists s, monic s /\ (drop_poly 1 r) = lc r ** s
+    by smt(coef_drop_poly).
+  rewrite -{4}(poly_take_drop 1 r) //.
+  move: (e 0); have -> /= [c cP] [s [mons sP]] : 0 < deg r by smt().
+  exists (polyC c + s * X); rewrite scalepDr scalerAl sP; split.
+  + rewrite /monic lcDr; 2: by smt(lcM lcX mulr1).
+    by rewrite degC degM ?nz_polyX // ?degX; smt(deg_gt0 lc_eq0 oner_neq0).
+  + congr; rewrite poly_eqP => i iP; rewrite scalepE -polyCM polyCE -cP.
+    by rewrite /take_poly coeffE ?ispolyTake /prepolyTake /#.
+qed.
+
+(*
+The following lemma is false in some integral domains.
+It would hold in a unique factorization domain,
+a structure not defined in easycrypt.
+The only structure defined in easycrypt it which it holds is a field.
+So we just do the very easy proof that the properties of fields allow us to do.
+Here is an example of two polynomials over an integral domain
+for which the property does not hold.
+
+Let us fix R = \mathbb{Z}[i \sqrt{5}] and \alpha = 1 + i \sqrt{5}.
+We have that \alpha * \overline{\alpha} = 6 = 2 * 3,
+so R is indeed not a unique factorization domain.
+Then we take p = \alpha x + 3 \overline{\alpha} and
+q = \overline{\alpha} x + 3 \alpha.
+Neither are a scaled monic as this would require
+\frac{3 \alpha}{\overline{\alpha}} = \frac{3 (-4 + i \sqrt{5})}{6}
+to be in R and it is not since \frac{1}{2} \not \in R.
+We have p * q = \alpha * \overline{\alpha} x^2 +
+                3 (\alpha^2 + \overline{\alpha}^2) x +
+                9 * \alpha * \overline{\alpha}.
+Now, \alpha * \overline{\alpha} = 6,
+     \alpha^2 = - 4 + i \sqrt{5} and
+     \overline{\alpha}^2 = - 4 - i \sqrt{5},
+so p * q = 6 x^2 - 24 x + 54 = 6 (x^2 - 4 + 9),
+meaning that p * q is a scaled monic.
+In conclusion, we have an example of two polynomials p and q
+in an integral domain (not a unique factorization domain),
+such that their product is a scaled monic when neither are a scaled monic.
+*)
 lemma scaled_monicM p q :
+  (forall c, c <> zeror => IDC.unit c) =>
   scaled_monic (p * q)%P <=>
   (scaled_monic p /\ scaled_monic q).
 proof.
-split=> [[c r] [] neqc0 [] m_ eq_|[] [cp rp] [] neqcp0 [] m_p ->> [cq rq] [] neqcq0 [] m_q ->>]; last first.
-+ rewrite -scalerAl -scalerAr scalepA; exists (cp * cq) (rp * rq).
-  by rewrite mulf_eq0 negb_or neqcp0 neqcq0 /=; apply/monicM.
-pose ip := argmax ("_.[_]" p) (fun x => forall y, x <> (lc p) * y).
-pose iq := argmax ("_.[_]" q) (fun x => forall y, x <> (lc q) * y).
-admit.
+move => IDC_F; split => [pqP|]; last first.
+- move => [] [cp rp] [cpnz [rpP ->>]] [cq rq] [cqnz [rqP ->>]].
+  rewrite -scalerAl -scalerAr scalepA; exists (cp * cq) (rp * rq).
+  by rewrite mulf_eq0 negb_or cpnz cqnz /=; apply/monicM.
+have p_nz : p <> poly0.
+- apply negP => ->>; move: pqP; rewrite PS.mul0r scaled_monic_eqp.
+  move => [r]; rewrite eqp_sym eqp0; move => [rP ->>]; move: rP.
+  by rewrite /monic lc0 eq_sym oner_neq0.
+have q_nz : q <> poly0.
+- apply negP => ->>; move: pqP; rewrite PS.mulr0 scaled_monic_eqp.
+  move => [r]; rewrite eqp_sym eqp0; move => [rP ->>]; move: rP.
+  by rewrite /monic lc0 eq_sym oner_neq0.
+split; apply scaled_monicP; rewrite ?lc_eq0 // => i _.
+- by exists (p.[i] / lc p); rewrite mulrCA divrr ?mulr1 // IDC_F lc_eq0.
+- by exists (q.[i] / lc q); rewrite mulrCA divrr ?mulr1 // IDC_F lc_eq0.
 qed.
 
 lemma scaled_monic_prod ['a] P F (s : 'a list) :
+  (forall c, c <> zeror => IDC.unit c) =>
   scaled_monic (BigPoly.PCM.big P F s) <=>
   all (fun x => P x => scaled_monic (F x)) s.
 proof.
-elim: s => [|x s IHs]; [by rewrite BigPoly.PCM.big_nil scaled_monicC oner_neq0|].
-by rewrite BigPoly.PCM.big_cons /=; case: (P x) => //= Px; rewrite scaled_monicM IHs.
+move => IDC_F; elim: s => [|x s IHs];
+  1: by rewrite BigPoly.PCM.big_nil scaled_monicC oner_neq0.
+rewrite BigPoly.PCM.big_cons /=; case: (P x) => //= Px.
+by rewrite scaled_monicM ?IHs.
 qed.
 (*TODO: end of put at the right place in PolyDiv.*)
 
@@ -3190,10 +3659,11 @@ by rewrite /monic => -> ->; rewrite !scale1r => <<-.
 qed.
 
 lemma irredp_monic_decW p :
+  (forall c, c <> zeror => IDC.unit c) =>
   scaled_monic p <=>
   exists qs , irreducible_monic_dec p qs.
 proof.
-split=> [[c r] [] neqc0 [] m_ ->>|[qs] [] + m_]; last first.
+move => IDC_F; split=> [[c r] [] neqc0 [] m_ ->>|[qs] [] + m_]; last first.
 + move=> dec_; case: (dec_)=> irr_ /eqp_eq; rewrite lc_prod (BigCf.BCM.eq_big_seq _ (fun _ => oner)).
   - by move=> q mem_; rewrite /(\o) /idfun /=; move/allP/(_ _ mem_): m_; rewrite /monic.
   rewrite BigCf.BCM.big1_eq scale1r => eq_; exists (lc p) (BigPoly.PCM.big predT idfun qs).
@@ -3201,7 +3671,8 @@ split=> [[c r] [] neqc0 [] m_ ->>|[qs] [] + m_]; last first.
   by rewrite lc_eq0 irredp_decW; exists qs.
 move: (irredp_decW r); rewrite -lc_eq0 m_ oner_neq0 /= => -[qs] [] irr_ eqp_.
 move/eqp_eq: (eqp_); rewrite m_ scale1r eq_sym lc_prod /= => eq_.
-have/scaled_monic_prod all_: scaled_monic (BigPoly.PCM.big predT idfun qs).
+have/(scaled_monic_prod _ _ _ IDC_F) all_:
+  scaled_monic (BigPoly.PCM.big predT idfun qs).
 + exists (BigCf.BCM.big predT lc qs) r; move: eq_ => ->; rewrite m_ /=.
   split; [|by congr; apply/BigCf.BCM.eq_big_seq => ? ?; rewrite /(\o) /idfun].
   rewrite -lc_prod lc_eq0 -prodf_neq0; apply/allP => p mem_; rewrite /predI /predC /predT /=.
@@ -3427,10 +3898,12 @@ by smt(PS.expf_eq0 irredp_neq0).
 qed.
 
 lemma bundled_irredp_monic_decW p :
+  (forall c, c <> zeror => IDC.unit c) =>
   scaled_monic p <=>
   exists bqs , bundled_irreducible_monic_dec p bqs.
 proof.
-rewrite irredp_monic_decW; split=> [[qs] dec_|[bqs] [qs] [] dec_ eq_].
+move => IDC_F; rewrite irredp_monic_decW //.
+split=> [[qs] dec_|[bqs] [qs] [] dec_ eq_].
 + by exists (bundle qs); exists qs; rewrite perm_eq_refl.
 by exists qs.
 qed.
@@ -3453,62 +3926,6 @@ rewrite perm_eq_debundle //.
 by move/(perm_eq_map snd)/perm_eq_sym/perm_eq_all/(_ ((<) 0)): eq2; rewrite lt0_bundle.
 qed.
 
-(*TODO: some clone issue somewhere:*)
-print IDC.unit.
-print CR.unit.
-
-print polyXsubCP.
-print root.
-
-lemma degXsubC c : deg (polyNXC c) = 2
-  by rewrite degDl degX // -polyCN degC; case: (_ = _).
-
-lemma lcXsubC c : lc (polyNXC c) = oner
-  by rewrite lcDl degX ?polyXE //= -polyCN degC; case: (_ = _).
-
-lemma modp_XsubC p c : modp p (polyNXC c) = polyC (peval p c).
-proof.
-pose q := p - polyC (peval p c); have {1}-> : p = q + polyC (peval p c)
-  by rewrite /q PS.addrAC -PS.addrA PS.subrr PS.addr0.
-rewrite modpE lcXsubC unitP unitr1 /= expr1z scale1p.
-have: root q c by rewrite pevalD pevalN pevalC subrr.
-rewrite factor_theorem; move => [? ->].
-rewrite rmodp_addl_mul_small ?lcXsubC //.
-by rewrite degC degXsubC; case (root _ _).
-qed.
-
-lemma coprimep_XsubC p c : coprimep p (polyNXC c) = ! root p c.
-proof.
-rewrite -coprimep_modl modp_XsubC; case: (peval p c = zeror) => cpP.
-- by rewrite cpP coprime0p -deg_eqp degXsubC.
-- rewrite -(eqp_coprimepl _ poly1) ?coprime1p //.
-  by rewrite eqp_sym -size_poly_eq1 degC cpP.
-qed.
-
-lemma coprimep_XsubC2 (a b : coeff) :
-  b - a <> zeror => coprimep (polyNXC a) (polyNXC b)
-  by rewrite coprimep_XsubC pevalD pevalX pevalN pevalC.
-
-lemma coprimepX p : coprimep p X = ! root p zeror
-  by rewrite -(coprimep_XsubC _ zeror) PS.subr0.
-
-lemma eqp_monic p q : monic p => monic q => eqp p q = (p = q).
-proof.
-move => pP qP; rewrite eq_iff iffE; split => [pqP|->]; rewrite ?eqpxx //.
-move: (eqpP p q); rewrite pqP eqT; move => [a b [a_neq0 [b_neq0 abP]]].
-apply (PS.mulfI (polyC a)); rewrite ?eq_polyC0 //.
-rewrite -!scalepE abP; congr; apply (mulIf oner oner_neq0).
-by rewrite -{1}qP -pP -!lcZ_lreg ?lregP // abP.
-qed.
-
-lemma dvdp_mul_XsubC p q c :
-  dvdp p (polyNXC c * q) = dvdp (if root p c then divp p (polyNXC c) else p) q.
-proof.
-case: (root p c) => /= [|?]; 2: by rewrite Gauss_dvdpr // coprimep_XsubC.
-rewrite root_factor_theorem -eqp_div_XsubC PS.mulrC => {1}->.
-by rewrite dvdp_mul2l // -deg_eq0 degXsubC.
-qed.
-
 lemma irredp_XsubCP d p :
   irreducible_poly p => dvdp d p => eqp d poly1 \/ eqp d p.
 proof.
@@ -3516,344 +3933,11 @@ move=> [_ pP] dvd_dp; case: (eqp d poly1) => //=.
 by rewrite -size_poly_eq1 => degP; rewrite (pP d).
 qed.
 
-lemma monic_divpE p q : monic q => divp p q = rdivp p q
-  by move => monq; rewrite divpE monq unitP unitr1 /= expr1z scale1p.
+(*TODO: some clone issue somewhere:*)
+print IDC.unit.
+print CR.unit.
 
-lemma monic_modpE p q : monic q => modp p q = rmodp p q
-  by move => monq; rewrite modpE monq unitP unitr1 /= expr1z scale1p.
-
-lemma monic_scalpE p q : monic q => scalp p q = 0
-  by move => monq; rewrite scalpE monq unitP unitr1.
-
-lemma monic_neq0 p : monic p => p <> poly0
-  by rewrite -lc_eq0 => ->; rewrite oner_neq0.
-
-lemma monic_divpp p : monic p => divp p p = poly1
-  by move => monp; rewrite divpp ?monic_neq0 // monp expr1z.
-
-lemma monic_dvdp_eq p q : monic q => dvdp q p = (p = (divp p q) * q)
-  by rewrite dvdp_eq => ->; rewrite expr1z scale1p.
-
-lemma monic_dvdpP p q : monic q => (exists qq, p = qq * q) = dvdp q p.
-proof.
-move => monq; rewrite eq_iff iffE; split.
-- by move => [qq ->]; rewrite dvdp_mulr dvdpp.
-- by rewrite dvdp_eq monq expr1z scale1p => ?; exists (divp p q).
-qed.
-
-lemma monic_mulpK p q : monic q => divp (p * q) q = p
-  by move => monq; rewrite mulpK ?monic_neq0 // monq expr1z scale1p.
-
-lemma monic_mulKp p q : monic q => divp (q * p) q = p
-  by move => monq; rewrite mulKp ?monic_neq0 // monq expr1z scale1p.
-
-lemma drop_poly_divp n p : 0 <= n => drop_poly n p = divp p (polyXn n).
-proof.
-move => n_ge0; rewrite drop_poly_rdivp divpE lcXn //.
-by rewrite unitP unitr1 /= expr1z scale1p.
-qed.
-
-lemma take_poly_modp n p : 0 <= n => take_poly n p = modp p (polyXn n).
-proof.
-move => n_ge0; rewrite take_poly_rmodp // modpE lcXn //.
-by rewrite unitP unitr1 /= expr1z scale1p.
-qed.
-
-lemma ulc_divp_eq d p : IDC.unit (lc d) => p = (divp p d) * d + modp p d
-  by rewrite -divp_eq scalpE unitP => -> /=; rewrite expr0 scale1p.
-
-lemma ulc_lc_neq0 p : IDC.unit (lc p) => lc p <> zeror
-  by apply contraL => ->; rewrite unitr0.
-
-lemma ulc_edivpP d p q r :
-  IDC.unit (lc d) => p = q * d + r => deg r < deg d =>
-  q = divp p d /\ r = modp p d.
-proof.
-move => ulcd ep srd; move: ( ulc_divp_eq d p ulcd); rewrite {1}ep.
-have lcdn0 : lc d <> zeror by rewrite ulc_lc_neq0.
-rewrite (PS.addrC _ (modp p d)) -PS.subr_eq PS.addrAC -PS.mulrBl => e.
-rewrite -e; move: e; rewrite eq_sym -PS.subr_eq -PS.eqr_opp -PS.mulNr !PS.opprB.
-case: (q = divp p d) => [->|abs] e /=; 1: by rewrite PS.subrr PS.mul0r PS.add0r.
-have hleq /= : deg d <= deg ((divp p d - q) * d).
-- rewrite degM_proper; 1: by rewrite mulf_neq0 // lc_eq0 PS.subr_eq0 eq_sym.
-  by rewrite addrAC ler_paddl // subz_ge0 deg_ge1 PS.subr_eq0 eq_sym.
-suff //= : deg d < deg d; apply (ler_lt_trans _ _ _ hleq); rewrite -e.
-apply (ler_lt_trans (max (deg r) (deg (modp p d)))); rewrite ?degB.
-case: (deg (modp p d) < deg r) => degP; 1: by rewrite lez_maxl ?ltrW.
-by rewrite lez_maxr ?lerNgt // ltn_modp -lc_eq0.
-qed.
-
-lemma ulc_divpP d p q r :
-  IDC.unit (lc d) => p = q * d + r => deg r < deg d =>
-  q = divp p d
-  by move => ulcd e degP; move: (ulc_edivpP d p q r); rewrite ulcd -e degP.
-
-lemma ulc_modpP d p q r :
-  IDC.unit (lc d) => p = q * d + r => deg r < deg d =>
-  r = modp p d
-  by move => ulcd e degP; move: (ulc_edivpP d p q r); rewrite ulcd -e degP.
-
-lemma ulc_eqpP p q :
-  IDC.unit (lc q) => (exists c, c <> zeror /\ p = c ** q) = eqp p q.
-proof.
-move => ulcd; have q_nz : q <> poly0 by rewrite -lc_eq0 ulc_lc_neq0.
-rewrite eq_iff iffE -{1}eqpP; split.
-- by move => [c [c_nz ->]]; exists oner c; rewrite scale1p c_nz oner_neq0.
-- move => eq; have p_nz : p <> poly0
-    by move: q_nz; rewrite -!eqp0; apply /contra/eqp_trans; rewrite eqp_sym.
-  exists (lc p / lc q); rewrite mulf_neq0 ?invr_neq0 ?lc_eq0 //=.
-  by rewrite mulrC -scalepA -(eqp_eq _ _ eq) scalepA mulrC divrr // scale1p.
-qed.
-
-lemma ulc_dvdp_eq d p : IDC.unit (lc d) => dvdp d p = (p = divp p d * d).
-proof.
-move => ulcd; rewrite eq_iff iffE; split => [|->]; rewrite /dvdp ?modp_mull //.
-by move => modP; move: (ulc_divp_eq d p ulcd); rewrite modP PS.addr0.
-qed.
-
-lemma ulc_eqp_eq p q :
-  IDC.unit (lc q) => eqp p q => p = (lc p / lc q) ** q.
-proof.
-move => ulcd /eqp_eq; rewrite mulrC -scalepA => <-.
-by rewrite scalepA mulrC divrr // scale1p.
-qed.
-
-lemma ulc_modpZl c (d p : poly) :
-  IDC.unit (lc d) => modp (c ** p) d = c ** modp p d.
-proof.
-case: (c = zeror) => [->|c_nz] ulcd; 1: by rewrite !scale0p mod0p.
-have e : c ** p = c ** divp p d * d + c ** modp p d
-  by rewrite -scalerAl -scalepDr -ulc_divp_eq.
-suff s: deg (c ** modp p d) < deg d
-  by case: (ulc_edivpP _ _ _ _ ulcd e s) => _ ->.
-by rewrite degZ_lreg ?lregP // ltn_modp -lc_eq0 ulc_lc_neq0.
-qed.
-
-lemma ulc_divpZl c (d p : poly) :
-  IDC.unit (lc d) =>
-  divp (c ** p) d = c ** divp p d.
-proof.
-case: (c = zeror) => [->|c_nz ulcd]; 1: by rewrite !scale0p div0p.
-have e : c ** p = c ** divp p d * d + c ** modp p d
-  by rewrite -scalerAl -scalepDr -ulc_divp_eq.
-suff s: deg (c ** modp p d) < deg d by case (ulc_edivpP _ _ _ _ ulcd e s) => ->.
-by rewrite degZ_lreg ?lregP // ltn_modp -lc_eq0 ulc_lc_neq0.
-qed.
-
-lemma ulc_eqp_modpl d p q :
-  IDC.unit (lc d) => eqp p q =>
-  eqp (modp p d) (modp q d).
-proof.
-rewrite -eqpP. move => ulcd [c1] c2 [c1_nz [c2_nz e]].
-by rewrite -eqpP; exists c1 c2; rewrite c1_nz c2_nz /= -!ulc_modpZl // e.
-qed.
-
-lemma ulc_eqp_divl d p q :
-  IDC.unit (lc d) => eqp p q =>
-  eqp (divp p d) (divp q d).
-proof.
-rewrite -eqpP. move => ulcd [c1] c2 [c1_nz [c2_nz e]].
-by rewrite -eqpP; exists c1 c2; rewrite c1_nz c2_nz /= -!ulc_divpZl // e.
-qed.
-
-lemma ulc_modpN (d p : poly) : IDC.unit (lc d) => modp (- p) d = - modp p d.
-proof.
-move => ?; rewrite -PS.mulN1r -polyCN -scalepE.
-by rewrite ulc_modpZl // scaleNp scale1p.
-qed.
-
-lemma ulc_divpN (d p : poly) : IDC.unit (lc d) => divp (- p) d = - divp p d.
-proof.
-move => ?; rewrite -PS.mulN1r -polyCN -scalepE.
-by rewrite ulc_divpZl // scaleNp scale1p.
-qed.
-
-lemma ulc_modpD (d p q : poly) :
-  IDC.unit (lc d) =>
-  modp (p + q) d = modp p d + modp q d.
-proof.
-move => ulcd; have e: p + q = (divp p d + divp q d) * d + (modp p d + modp q d)
-  by rewrite PS.mulrDl PS.addrACA -!ulc_divp_eq.
-suff degP: deg (modp p d + modp q d) < deg d
-  by case (ulc_edivpP _ _ _ _ ulcd e degP) => _ ->.
-apply (ler_lt_trans _ _ _ (degD (modp p d) (modp q d))).
-by rewrite ltr_maxrP !ltn_modp -lc_eq0 ulc_lc_neq0.
-qed.
-
-lemma ulc_divpD (d p q : poly) :
-  IDC.unit (lc d) =>
-  divp (p + q) d = divp p d + divp q d.
-proof.
-move => ulcd; have e: p + q = (divp p d + divp q d) * d + (modp p d + modp q d)
-  by rewrite PS.mulrDl PS.addrACA -!ulc_divp_eq.
-suff degP: deg (modp p d + modp q d) < deg d
-  by case (ulc_edivpP _ _ _ _ ulcd e degP) => ->.
-apply (ler_lt_trans _ _ _ (degD (modp p d) (modp q d))).
-by rewrite ltr_maxrP !ltn_modp -lc_eq0 ulc_lc_neq0.
-qed.
-
-lemma ulc_mulpK d q : IDC.unit (lc d) => divp (q * d) d = q.
-proof.
-move: (PS.addr0 (q * d)); rewrite eq_sym => e ulcd.
-suff degP: deg poly0 < deg d by case (ulc_edivpP _ _ _ _ ulcd e degP) => <-.
-by rewrite deg0 deg_gt0 -lc_eq0 ulc_lc_neq0.
-qed.
-
-lemma ulc_mulKp d q : IDC.unit (lc d) => divp (d * q) d = q
-  by move => ?; rewrite PS.mulrC ulc_mulpK.
-
-lemma ulc_divp_addl_mul_small d q r :
-  IDC.unit (lc d) => deg r < deg d =>
-  divp (q * d + r) d = q.
-proof.
-move => ulcd srd; rewrite ulc_divpD //.
-by rewrite (divp_small _ _ srd) PS.addr0 ulc_mulpK.
-qed.
-
-lemma ulc_modp_addl_mul_small d q r :
-  IDC.unit (lc d) => deg r < deg d =>
-  modp (q * d + r) d = r
-  by move => ulcd srd; rewrite ulc_modpD // modp_mull PS.add0r modp_small.
-
-lemma ulc_divp_addl_mul d q r :
-  IDC.unit (lc d) =>
-  divp (q * d + r) d = q + divp r d
-  by move => ?; rewrite ulc_divpD ?ulc_mulpK.
-
-lemma ulc_divpp d : IDC.unit (lc d) => divp d d = poly1
-  by move => ?; rewrite -{1}PS.mul1r ulc_mulpK.
-
-lemma ulc_leq_trunc_divp d m : IDC.unit (lc d) => deg (divp m d * d) <= deg m.
-proof.
-case: (divp m d = poly0) => [->|mdP ulcd]; 1: by rewrite PS.mul0r deg0 ge0_deg.
-rewrite {2}(ulc_divp_eq d m) // degDl ?ltn_modp //.
-rewrite degM_proper ?mulf_neq0 ?(ulc_lc_neq0 d) // ?lc_eq0 //.
-by rewrite addrAC ltr_paddl ?subr_ge0 ?deg_ge1 // ltn_modp -lc_eq0 ulc_lc_neq0.
-qed.
-
-lemma ulc_dvdpP d p : IDC.unit (lc d) => (exists q, p = q * d) = dvdp d p.
-proof.
-move => ulcd; rewrite eqboolP iffE {2}ulc_dvdp_eq //; split => [[q ->]|];
-by rewrite /dvdp ?modp_mull // => ->; exists (divp p d).
-qed.
-
-lemma ulc_divpK d p : IDC.unit (lc d) => dvdp d p => divp p d * d = p
-  by move => ?; rewrite ulc_dvdp_eq // => <-.
-
-lemma ulc_divpKC d p : IDC.unit (lc d) => dvdp d p => d * divp p d = p
-  by move => 2?; rewrite PS.mulrC ulc_divpK.
-
-lemma ulc_dvdp_eq_div d p q :
-  IDC.unit (lc d) => dvdp d p =>
-  (q = divp p d) = (q * d = p).
-proof.
-move => ulcd /(ulc_divpK _ p ulcd) => {2}<-; rewrite eqboolP iffE.
-by split => [-> //|]; apply/PS.mulIf; rewrite -lc_eq0 ulc_lc_neq0.
-qed.
-
-lemma ulc_dvdp_eq_mul d p q :
-  IDC.unit (lc d) => dvdp d p =>
-  (p = q * d) = (divp p d = q)
-  by move => ulcd dv_d_p; rewrite (eq_sym p) -ulc_dvdp_eq_div // (eq_sym q).
-
-lemma ulc_divp_mulA d p q :
-  IDC.unit (lc d) => dvdp d q =>
-  p * divp q d = divp (p * q) d.
-proof.
-move => ulcd hdm; rewrite eq_sym -ulc_dvdp_eq_mul // ?dvdp_mulr //.
-by rewrite -PS.mulrA ulc_divpK.
-qed.
-
-lemma ulc_divp_mulAC d m n :
-  IDC.unit (lc d) => dvdp d m =>
-  divp m d * n = divp (m * n) d
-  by move => 2?; rewrite PS.mulrC (PS.mulrC m); apply: ulc_divp_mulA.
-
-lemma ulc_divp_mulCA d p q :
-  IDC.unit (lc d) => dvdp d p=> dvdp d q =>
-  p * divp q d = q * divp p d
-  by move=> 3?; rewrite PS.mulrC ulc_divp_mulAC // ulc_divp_mulA.
-
-lemma ulc_modp_mul d p q :
-  IDC.unit (lc d) =>
-  modp (p * modp q d) d = modp (p * q) d.
-proof.
-move => ulcd; rewrite {2}(ulc_divp_eq d q) // PS.mulrDr ulc_modpD //.
-by rewrite PS.mulrA modp_mull PS.add0r.
-qed.
-
-lemma ulc_expp_sub d (m n : int) :
-  IDC.unit (lc d) => 0 <= n <= m =>
-  PS.exp d (m - n) = divp (PS.exp d m) (PS.exp d n).
-proof.
-have {3}-> 2? : m = m - n + n by ring.
-rewrite (PS.exprD_nneg _ (m - n)) ?ulc_mulpK;
-by smt(lcXn_proper unitrX unit_lreg).
-qed.
-
-lemma ulc_divp_pmul2l d p q :
-  IDC.unit (lc d) => IDC.unit (lc q) =>
-  divp (d * p) (d * q) = divp p q.
-proof.
-move=> uldc uq; rewrite {1}(ulc_divp_eq _ p uq) PS.mulrDr PS.mulrCA.
-rewrite ulc_divp_addl_mul ?lcM ?unitrM //.
-have dq_nz : d * q <> poly0 by rewrite PS.mulf_eq0 -!lc_eq0 !ulc_lc_neq0.
-suff: deg (d * modp p q) < deg (d * q)
-  by rewrite ltrNge -divpN0 // negbK => ->; rewrite PS.addr0.
-case: (modp p q = poly0) => [->|r_nz]; 1: by rewrite PS.mulr0 deg0 deg_gt0.
-by rewrite !degM // ?ltz_add2r ?ltz_add2l ?ltn_modp -lc_eq0 ulc_lc_neq0.
-qed.
-
-lemma ulc_divp_pmul2r d p q :
-  IDC.unit (lc d) => IDC.unit (lc p) =>
-  divp (q * d) (p * d) = divp q p
-  by move => 2?; rewrite -!(PS.mulrC d) ulc_divp_pmul2l.
-
-lemma ulc_divp_divl r p q :
-  IDC.unit (lc r) => IDC.unit (lc p) =>
-  divp (divp q p) r = divp q (p * r).
-proof.
-move=> ulcr ulcp.
-have e : q = divp (divp q p) r * (p * r) + (modp (divp q p) r * p + modp q p).
-  rewrite PS.addrA (PS.mulrC p) PS.mulrA -PS.mulrDl.
-  by rewrite -ulc_divp_eq -?ulc_divp_eq.
-suff s : deg (modp (divp q p) r * p + modp q p) < deg (p * r)
-  by case: (ulc_edivpP _ _ _ _ _ e s) => //; rewrite lcM unitrM.
-have [r_nz p_nz] : r <> poly0 /\ p <> poly0 by rewrite -!lc_eq0 !ulc_lc_neq0.
-case: (modp (divp q p) r = poly0) => [->|modpP].
-- rewrite PS.mul0r PS.add0r degM // -addrA.
-  by rewrite ltr_paddr ?ltn_modp // subz_ge0 deg_ge1.
-- rewrite degDl PS.mulrC !degM //; 2: by rewrite ltz_add2r ltz_add2l ltn_modp.
-  by rewrite -addrA ltr_paddr ?ltn_modp // subz_ge0 deg_ge1.
-qed.
-
-lemma ulc_divpAC d p q :
-  IDC.unit (lc d) => IDC.unit (lc p) =>
-  divp (divp q d) p = divp (divp q p) d
-  by move => 2?; rewrite !ulc_divp_divl // PS.mulrC.
-
-lemma ulc_modpZr c d p :
-  IDC.unit c => IDC.unit (lc d) =>
-  modp p (c ** d) = modp p d.
-proof.
-move => uc ulcd; have e : p = (invr c ** divp p d) * (c ** d) + modp p d.
-- rewrite -scalerAl PS.mulrC -scalerAl scalepA mulVr //.
-  by rewrite scale1p PS.mulrC -ulc_divp_eq.
-suff s : deg (modp p d) < deg (c ** d).
-  by rewrite (ulc_modpP _ _ _ _ _ e s) // lcZ_lreg ?unitrM //; apply unit_lreg.
-by rewrite degZ_lreg ?ltn_modp -?lc_eq0 ?ulc_lc_neq0 //; apply unit_lreg.
-qed.
-
-lemma divpZr c d p :
-  IDC.unit c => IDC.unit (lc d) =>
-  divp p (c ** d) = IDC.invr c ** divp p d.
-proof.
-move => uc ulcd; have e : p = (invr c ** divp p d) * (c ** d) + modp p d.
-- rewrite -scalerAl PS.mulrC -scalerAl scalepA mulVr //.
-  by rewrite scale1p PS.mulrC -ulc_divp_eq.
-suff s : deg (modp p d) < deg (c ** d).
-  by rewrite (ulc_divpP _ _ _ _ _ e s) // lcZ_lreg ?unitrM //; apply unit_lreg.
-by rewrite degZ_lreg ?ltn_modp -?lc_eq0 ?ulc_lc_neq0 //; apply unit_lreg.
-qed.
+print polyXsubCP.
+print root.
 
 end Idomain.
