@@ -456,6 +456,12 @@ proof. by apply/subsetP=> x; rewrite !inE; case. qed.
 lemma sub0set (A : 'a fset) : fset0 \subset A.
 proof. by apply/subsetP=> x; rewrite !inE. qed.
 
+lemma sub1set x (A : 'a fset) : fset1 x \subset A <=> x \in A.
+proof.
+rewrite subsetP; split => [|x_A y /in_fset1 -> //].
+by apply; rewrite in_fset1.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma fcards0: card fset0<:'a> = 0.
 proof. by rewrite cardE set0E -(perm_eq_size (undup [])) 1:oflistK. qed.
@@ -584,6 +590,13 @@ lemma fcard_eq0 (A : 'a fset) : (card A = 0) <=> (A = fset0).
 proof.
   split=> [z_cA|]; last by move=> ->; apply/fcards0.
   rewrite eq_sym eqEcard z_cA fcards0 //=; apply/sub0set.
+qed.
+
+lemma fcard_eq1 (A : 'a fset) : (card A = 1) <=> (exists a, A = fset1 a).
+proof.
+split=> [o_cA|[a ->]]; last apply/fcard1.
+exists (pick A); rewrite eq_sym eqEcard o_cA fcard1 /= sub1set mem_pick.
+by apply: contraL o_cA => ->; rewrite fcards0.
 qed.
 
 (* -------------------------------------------------------------------- *)
