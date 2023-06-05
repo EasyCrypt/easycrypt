@@ -502,52 +502,6 @@ and f_real_inv_simpl f =
        | _ -> destr_error "destr_rint/inv"
      with DestrError _ -> f_app fop_real_inv [f] treal
 
-(* -------------------------------------------------------------------- *)
-let rec f_let_simpl lp f1 f2 =
-  match lp with
-  | LSymbol (id, _) -> begin
-      match Mid.find_opt id (f_fv f2) with
-      | None   -> f2
-      | Some i ->
-          if   i = 1 || can_subst f1
-          then Fsubst.f_subst_local id f1 f2
-          else f_let lp f1 f2
-    end
-
-  | LTuple ids -> begin
-      match f1.f_node with
-      | Ftuple fs ->
-          let (d, s) =
-            List.fold_left2 (fun (d, s) (id, ty) f1 ->
-              match Mid.find_opt id (f_fv f2) with
-              | None   -> (d, s)
-              | Some i ->
-                  if   i = 1 || can_subst f1
-                  then (d, Mid.add id f1 s)
-                  else (((id, ty), f1) :: d, s))
-              ([], Mid.empty) ids fs
-          in
-            List.fold_left
-              (fun f2 (id, f1) -> f_let (LSymbol id) f1 f2)
-              (Fsubst.subst_locals s f2) d
-      | _ ->
-        let x = EcIdent.create "tpl" in
-        let ty = ttuple (List.map snd ids) in
-        let lpx = LSymbol(x,ty) in
-        let fx = f_local x ty in
-        let tu = f_tuple (List.mapi (fun i (_,ty') -> f_proj fx i ty') ids) in
-        f_let_simpl lpx f1 (f_let_simpl lp tu f2)
-    end
-
-  | LRecord (_, ids) ->
-      let check (id, _) =
-        id |> omap (fun id -> not (Mid.mem id (f_fv f2))) |> odfl true
-      in if List.for_all check ids then f2 else f_let lp f1 f2
-
-let f_lets_simpl =
-  (* FIXME : optimize this *)
-  List.fold_right (fun (lp,f1) f2 -> f_let_simpl lp f1 f2)
-
 let rec f_app_simpl f args ty =
   f_betared (f_app f args ty)
 
@@ -1032,7 +986,7 @@ let rec split_sided mem fp =
       let (l, r) = destr_and fp in
       let fl = split_sided mem l in
       let fr = split_sided mem r in
-      if is_none fr then 
+      if is_none fr then
         fl
       else
         (match fl with

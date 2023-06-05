@@ -89,8 +89,6 @@ val f_betared : form -> form
 
 val f_proj_simpl : form -> int -> EcTypes.ty -> form
 val f_if_simpl   : form -> form -> form -> form
-val f_let_simpl  : EcTypes.lpattern -> form -> form -> form
-val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
 
 val f_forall_simpl : bindings -> form -> form
 val f_exists_simpl : bindings -> form -> form

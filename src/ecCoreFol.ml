@@ -2113,19 +2113,6 @@ module Fsubst = struct
     f_subst (uni_subst uidmap)
 
   (* ------------------------------------------------------------------ *)
-  let subst_locals s =
-    Hf.memo_rec 107 (fun aux f ->
-      match f.f_node with
-      | Flocal id ->
-          (try Mid.find id s with Not_found -> f)
-      | _ ->
-        (* TODO: (Adrien) is thit ok? *)
-        f_map (fun ty -> ty) aux f)
-
-  let subst_local id f1 f2 =
-    subst_locals (Mid.singleton id f1) f2
-
-  (* ------------------------------------------------------------------ *)
   let init_subst_tvar ?es_loc s =
     let sty = { ty_subst_id with ts_v = Mid.find_opt^~ s } in
     { f_subst_id with
