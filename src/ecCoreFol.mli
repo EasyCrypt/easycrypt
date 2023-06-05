@@ -510,8 +510,6 @@ module Fsubst : sig
   val add_binding  : f_subst -> binding  -> f_subst * binding
   val add_bindings : f_subst -> bindings -> f_subst * bindings
 
-  val subst_locals : form Mid.t -> form -> form
-
   val subst_lpattern : f_subst -> lpattern -> f_subst * lpattern
   val subst_xpath    : f_subst -> xpath -> xpath
   val subst_stmt     : f_subst -> stmt  -> stmt
