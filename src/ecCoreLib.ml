@@ -176,6 +176,14 @@ module CI_Distr = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Sum = struct
+  let i_Sum = "RealSeries"
+  let p_Sum = EcPath.pqname p_top i_Sum
+
+  let p_sum = EcPath.extend p_Sum ["sum"]
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Map = struct
   let i_Map = "CoreMap"
   let p_Map = EcPath.pqname p_top i_Map
