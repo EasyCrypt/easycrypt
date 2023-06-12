@@ -64,6 +64,31 @@ let pr_le1 m f args ev =
   let pr = f_pr m f args ev in
   f_eq (f_real_le pr f_r1) f_true
 
+let pr_sum env pr =
+  let prf = EcEnv.Fun.by_xpath pr.pr_fun env in
+  let xty = prf.f_sig.fs_ret in
+  let x   = EcIdent.create "x" in
+  let fx  = f_local x xty in
+
+  let prx =
+    let event =
+      f_and_simpl
+        pr.pr_event
+        (f_eq (f_pvar EcTypes.pv_res xty EcFol.mhr) fx)
+    in f_pr pr.pr_mem pr.pr_fun pr.pr_args event in
+
+  let prx =
+    EcFol.f_app
+      (EcFol.f_op
+         EcCoreLib.CI_Sum.p_sum
+         [xty]
+         (EcTypes.tfun (EcTypes.tfun xty EcTypes.treal) EcTypes.treal))
+      [EcFol.f_lambda [x, GTty xty] prx]
+      EcTypes.treal
+  in
+
+  f_eq (f_pr_r pr) prx
+
 (* -------------------------------------------------------------------- *)
 exception FoundPr of form
 
@@ -114,8 +139,8 @@ let select_pr_le1 sid f =
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
-let pr_rewrite_lemma =
-  ["mu_eq"      , `MuEq;
+let pr_rewrite_lemma = [
+   "mu_eq"      , `MuEq;
    "mu_sub"     , `MuSub;
    "mu_false"   , `MuFalse;
    "mu_not"     , `MuNot;
@@ -123,10 +148,11 @@ let pr_rewrite_lemma =
    "mu_disjoint", `MuDisj;
    "mu_split"   , `MuSplit;
    "mu_ge0"     , `MuGe0;
-   "mu_le1"     , `MuLe1]
+   "mu_le1"     , `MuLe1;
+   "muE"        , `MuSum;
+]
 
 (* -------------------------------------------------------------------- *)
-
 let t_pr_rewrite_low (s,dof) tc =
   let kind =
     try List.assoc s pr_rewrite_lemma with Not_found ->
@@ -150,7 +176,9 @@ let t_pr_rewrite_low (s,dof) tc =
     | `MuDisj  -> select_pr is_or
     | `MuSplit -> select_pr (fun _ev -> true)
     | `MuGe0   -> select_pr_ge0
-    | `MuLe1   -> select_pr_le1 in
+    | `MuLe1   -> select_pr_le1
+    | `MuSum   -> select_pr (fun _ev -> true)
+  in
 
   let select xs fp = if select xs fp then `Accept (-1) else `Continue in
   let env, _, concl = FApi.tc1_eflat tc in
@@ -214,6 +242,9 @@ let t_pr_rewrite_low (s,dof) tc =
             (pr_le1 m f args ev, 0)
       | _ -> assert false
       end
+
+    | `MuSum ->
+        (pr_sum env (destr_pr torw), 0)
 
   in
 

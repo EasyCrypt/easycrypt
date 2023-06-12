@@ -161,6 +161,14 @@ module CI_Distr : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Sum : sig
+  val i_Sum : symbol
+  val p_Sum : path
+
+  val p_sum : path
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Map : sig
   val i_Map  : symbol
   val p_Map  : path
