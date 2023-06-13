@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open Core
 open EcUtils
 open EcOptions
 
@@ -258,8 +259,8 @@ let main () =
     | `Cli cliopts -> begin
         let terminal =
           if   cliopts.clio_emacs
-          then lazy (EcTerminal.from_emacs ())
-          else lazy (EcTerminal.from_tty ())
+          then lazy (T.from_emacs ())
+          else lazy (T.from_tty ())
 
         in (cliopts.clio_provers, None, terminal, true, false)
     end
@@ -279,7 +280,7 @@ let main () =
         let gcstats  = cmpopts.cmpo_gcstats in
         let progress = if cmpopts.cmpo_script then `Script else `Human in
         let terminal =
-          lazy (EcTerminal.from_channel ~name ~gcstats ~progress (open_in name))
+          lazy (T.from_channel ~name ~gcstats ~progress (open_in name))
         in
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false, cmpopts.cmpo_noeco)
@@ -365,11 +366,11 @@ let main () =
       exit 1);
 
   (* Display Copyright *)
-  if EcTerminal.interactive terminal then
-    EcTerminal.notice ~immediate:true `Warning copyright terminal;
+  if T.interactive terminal then
+    T.notice ~immediate:true `Warning copyright terminal;
 
   try
-    if EcTerminal.interactive terminal then Sys.catch_break true;
+    if T.interactive terminal then Sys.catch_break true;
 
     (* Interaction loop *)
     let first = ref `Init in
@@ -401,7 +402,7 @@ let main () =
                EcScope.hierror "invalid pragma: `%s'\n%!" x);
 
             let notifier (lvl : EcGState.loglevel) (lazy msg) =
-              EcTerminal.notice ~immediate:true lvl msg terminal
+              T.notice ~immediate:true lvl msg terminal
             in
 
             EcCommands.addnotifier notifier;
@@ -414,13 +415,13 @@ let main () =
         | `Loop -> ()
         end;
 
-        oiter (EcTerminal.setwidth terminal)
+        oiter (T.setwidth terminal)
           (let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
            match EcGState.getvalue "PP:width" gs with
            | Some (`Int i) -> Some i | _ -> None);
 
         begin
-          match EcLocation.unloc (EcTerminal.next terminal) with
+          match EcLocation.unloc (T.next terminal) with
           | EP.P_Prog (commands, locterm) ->
               terminate := locterm;
               List.iter
@@ -437,7 +438,7 @@ let main () =
                          raise EcCommands.Restart
                      | e -> begin
                        if Printexc.backtrace_status () then begin
-                         if not (EcTerminal.interactive terminal) then
+                         if not (T.interactive terminal) then
                            Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace
                        end;
                        raise (EcScope.toperror_of_exn ~gloc:loc e)
@@ -449,9 +450,9 @@ let main () =
           | EP.P_Exit ->
               terminate := true
         end;
-        EcTerminal.finish `ST_Ok terminal;
+        T.finish `ST_Ok terminal;
         if !terminate then begin
-            EcTerminal.finalize terminal;
+            T.finalize terminal;
             if not eco then
               finalize_input input (EcCommands.current ());
             exit 0
@@ -461,15 +462,15 @@ let main () =
           first := `Restart
 
       | e -> begin
-          EcTerminal.finish
+          T.finish
             (`ST_Failure (EcScope.toperror_of_exn e))
             terminal;
-          if (!first = `Init) || not (EcTerminal.interactive terminal) then
+          if (!first = `Init) || not (T.interactive terminal) then
             exit 1
         end
     done
   with e ->
-    (try EcTerminal.finalize terminal with _ -> ());
+    (try T.finalize terminal with _ -> ());
     raise e
 
 (* -------------------------------------------------------------------- *)
