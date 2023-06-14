@@ -411,6 +411,8 @@ lemma onth_some_mem ['a] (xs : 'a list) (n : int) x:
   onth xs n = Some x => x \in xs.
 proof. by move/onth_some => [? <-]; apply/mem_nth. qed.
 
+lemma nilP (s : 'a list) : s <> [] <=> exists x, x \in s by smt().
+
 (* -------------------------------------------------------------------- *)
 (*                  find, filter, count, has, all                       *)
 (* -------------------------------------------------------------------- *)
@@ -636,6 +638,10 @@ proof. by elim: s1 => //= x s1 IHs; rewrite IHs. qed.
 lemma mem_filter (p : 'a -> bool) x s:
   mem (filter p s) x <=> p x /\ (mem s x).
 proof. by elim: s => //= y s IHs; smt(). qed.
+
+lemma has_filterE p (s : 'a list) : 
+  has p s <=> filter p s <> [].
+proof. by rewrite hasP nilP; smt(mem_filter). qed.
 
 lemma find_eq_in (q p : 'a -> bool) (xs : 'a list) :
   (forall x, x \in xs => p x <=> q x)
