@@ -8,7 +8,7 @@
 (library 
  (name core)
  (public_name easycrypt.core)
- (modules :standard \ ec ecCoreHiPhl)
+ (modules :standard \ ec)
  (libraries batteries camlp-streams dune-build-info inifiles why3 yojson zarith)
 )
 
