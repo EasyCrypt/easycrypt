@@ -87,7 +87,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ [ 'jasmin-eclib', 'https://github.com/jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin' ] ]
+        target: [ [ 'jasmin-eclib', 'https://github.com/jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin' ]
+                , [ 'sha3', 'https://gitlab.com/easycrypt/sha3', '', 'config/tests.config', 'sponge' ] ]
     steps:
     - uses: actions/checkout@v3
       with:
