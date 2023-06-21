@@ -639,7 +639,6 @@ end PowZMod.
 end CyclicGroup.
 
 (* ==================================================================== *)
-
 abstract theory ZModPCyclic.
 
 const order : { int | 2 <= order } as ge2_order.

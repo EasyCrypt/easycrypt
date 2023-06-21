@@ -11,7 +11,6 @@ abstract theory ZModRing.
 const p : { int | 2 <= p } as ge2_p.
 
 (* -------------------------------------------------------------------- *)
-
 clone Subtype as Sub with
   type T <- int,
   op P (x : int) <- 0 <= x < p
@@ -154,7 +153,10 @@ clone import Ring.ComRing as ZModpRing with
   op   ( * ) <= ( * ),
   op   invr  <= inv,
   pred unit  <= unit
-  proof *.
+  proof *
+
+  remove abbrev (-)
+  remove abbrev (/).
 
 realize addrA.     proof. by apply/ZModule.addrA. qed.
 realize addrC.     proof. by apply/ZModule.addrC. qed.
@@ -224,6 +226,13 @@ proof. by rewrite -inzmod_mod inzmodN. qed.
 lemma inzmodB_mod (a b : int):
   inzmod ((a - b) %% p) = (inzmod a) + (- (inzmod b)).
 proof. by rewrite -inzmod_mod inzmodB. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma zmodcgrP (i j : int) : zmodcgr i j <=> p %| (i - j).
+proof. by rewrite dvdzE -[0](mod0z p) !eq_inzmod inzmodB subr_eq0. qed.
+
+lemma inzmod_eq0P (i : int) : inzmod i = zero <=> p %| i.
+proof. by rewrite -[zero]asintK zeroE -eq_inzmod zmodcgrP. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma intmul_asint (x : zmod) : x = intmul one (asint x).
@@ -302,8 +311,11 @@ clone import Ring.Field as ZModpField with
   op   ( + ) <- ( + ),
   op   [ - ] <- ([-]),
   op   ( * ) <- ( * ),
-  op   invr  <- inv
-  proof *.
+  op   invr  <- inv,
+  op   exp   <- ZModpRing.exp
+  proof *
+  remove abbrev (-)
+  remove abbrev (/).
 
 realize addrA.     proof. by apply/ZModule.addrA. qed.
 realize addrC.     proof. by apply/ZModule.addrC. qed.
@@ -332,6 +344,8 @@ move=> h; apply: (ZModpRing.mulrI x); last by rewrite ZModpRing.mulr0.
 by rewrite unitE.
 qed.
 
+abbrev exp = ZModpRing.exp.
+
 (* -------------------------------------------------------------------- *)
 instance field with zmod
   op rzero = ZModField.zero
@@ -340,7 +354,7 @@ instance field with zmod
   op mul   = ZModField.( * )
   op opp   = ZModField.([-])
   op inv   = ZModField.inv
-  op expr  = ZModField.ZModpField.exp
+  op expr  = ZModpRing.exp
 
   proof oner_neq0 by apply/ZModpField.oner_neq0
   proof addr0     by apply/ZModpField.addr0
@@ -419,7 +433,7 @@ proof.
       by case (0 <= k) => // _; rewrite exprN invr_eq1.
     by rewrite le0n /= inzmod_exp modz_ge0.
   rewrite -(invrK (exp (inzmod _) _)); apply congr1.
-  rewrite -exprN -(mul1r (ZModField.ZModpField.exp _ _)).
+  rewrite -exprN -(mul1r (exp _ _)).
   rewrite -(expr1z (- n %/ k)) -eq_exp_one -exprM mulrN Ring.IntID.mulrC -exprD.
   + apply/negP => eq_inzmod_zero; move: eq_inzmod_zero eq_exp_one => ->.
     by rewrite expr0z neqk0 /= eq_sym oner_neq0.
@@ -430,35 +444,9 @@ lemma exp_sub_p_1 (x : zmod) :
   unit x =>
   exp x (p - 1) = one.
 proof.
-rewrite unitE /exp => unit_x.
-have -> /=: !(p - 1 < 0) by smt(ge2_p).
-rewrite (iteropS (p - 2)); first by smt(ge2_p).
-have {2}->: x = x * one by rewrite mulr1.
-rewrite -(iterSr (p - 2) (( * ) x)) /=; first by smt(ge2_p).
-have <-: count predT (range 1 p) = p - 1.
-- rewrite count_predT size_range; smt(ge2_p).
-rewrite -big_const.
-apply (mulfI (big predT inzmod (range 1 p))).
-- rewrite big_seq.
-  apply (big_ind (fun a => a <> zero)); smt(unitrM oner_neq0 mem_range inzmodK).
-rewrite mulr1 -big_split /=.
-rewrite -(big_mapT _ idfun) -(big_mapT inzmod idfun) /=.
-apply eq_big_perm; apply uniq_perm_eq.
-- apply map_inj_in_uniq => /= [a b rg_a rg_b H|]; last exact range_uniq.
-  apply (congr1 (fun m => m / x)) in H.
-  rewrite /= -!mulrA divrr // !mulr1 in H.
-  smt(mem_range inzmodK).
-- apply map_inj_in_uniq => /= [a b rg_a rg_b H|]; last exact range_uniq.
-  smt(mem_range inzmodK).
-move => a; rewrite !mapP; split => [[b [rg_b ->]] | [b [rg_b ->]]] /=.
-- exists (asint (inzmod b * x)).
-  split; last by rewrite asintK.
-  suff: inzmod b * x <> zero by smt(mem_range rg_asint asint_inj zeroE).
-  apply unitrM; smt(mem_range inzmodK).
-- exists (asint (inzmod b / x)).
-  split; last by rewrite asintK -mulrA mulVr // mulr1.
-  suff: inzmod b / x <> zero by smt(mem_range rg_asint asint_inj zeroE).
-  rewrite unitrM; smt(mem_range inzmodK invr_neq0).
+elim/inzmodW: x => x rg_x /unitE; rewrite inzmod_eq0P => N_p_div_x.
+rewrite exp_inzmod ifT; first by smt(ge2_p).
+by rewrite -[one]asintK oneE -eq_inzmod zmodcgrP &(Fermat_little) // prime_p.
 qed.
 
 lemma exp_p (x : zmod) :
