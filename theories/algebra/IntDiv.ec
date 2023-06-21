@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
-require import Core Int IntMin Ring StdOrder List.
-(*---*) import Ring.IntID IntOrder.
+require import Core Int IntMin Ring StdOrder StdBigop List Binomial.
+(*---*) import Ring.IntID IntOrder Bigint.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt euclide_nat m d : 0 <= m => 0 < d =>
@@ -348,6 +348,17 @@ proof. by rewrite modzMml modzMmr. qed.
 lemma nosmt modzNm m d : (- (m %% d)) %% d = (- m) %% d.
 proof. by rewrite -mulN1r modzMmr mulN1r. qed.
 
+lemma nosmt modzBm m n d : (m %% d - n %% d) %% d = (m - n) %% d.
+proof. by rewrite -modzDm -modzNm !modz_mod modzNm modzDm. qed.
+
+lemma nosmt modz_prodm P F (s : 'a list) d :
+  (BIM.big P (fun i => F i %% d) s) %% d = BIM.big P F s %% d.
+proof.
+elim: s => [|x s ih]; first by rewrite !BIM.big_nil.
+rewrite !BIM.big_cons; case: (P x) => //.
+by move=> _; rewrite modzMml -modzMmr ih modzMmr.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt mulz_modr p m d : 0 < p => p * (m %% d) = (p * m) %% (p * d).
 proof. by move=> p_gt0; rewrite !modzE mulrBr divzMpl // mulrCA. qed.
@@ -416,6 +427,9 @@ have := normr_ge0 q; rewrite ler_eqVlt => -[|].
 + by rewrite ltzE.
 qed.
 
+lemma nosmt dvdn_le m n : 0 < n => m %| n => m <= n.
+proof. smt(dvdz_le). qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt dvdzD d m1 m2 : d %| m1 => d %| m2 => d %| (m1 + m2).
 proof.
@@ -445,6 +459,13 @@ proof. by rewrite -modzDml=> /dvdzE ->. qed.
 lemma nosmt dvdz_modzDr (m n d : int) : d %| n => (m + n) %% d = m %% d.
 proof. by rewrite -modzDmr=> /dvdzE ->. qed.
 
+lemma nosmt eqz_mod_dvd a b c : (a %| (b - c)) <=> (b %% a = c %% a).
+proof.
+rewrite dvdzE; split=> heq.
+- by rewrite -(subrK b c) -modzDml heq.
+- by rewrite -modzDml heq modzDml subrr mod0z.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt modz_dvd m p q: q %| p => (m %% p) %% q = m %% q.
 proof.
@@ -465,6 +486,14 @@ qed.
 lemma nosmt modNz m d : 0 < m => 0 < d =>
   (-m) %% d = d - 1 - (m-1) %% d.
 proof. by move=> gt0_m gt0_d; rewrite !modzE !divNz //; ring. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt dvdz_normr (a b : int) : (a %| `|b|) <=> (a %| b).
+proof.
+case: (0 <= b) => [ge0_b|]; first by rewrite ger0_norm.
+move/ltrNge/ltrW => le0_b; rewrite ler0_norm //.
+by split; move/dvdzN; rewrite ?opprK.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt divzK d m : d %| m => m %/ d * d = m.
@@ -827,6 +856,38 @@ exists a0 b0; apply: gcd_uniq; rewrite ?nz_a // -?d0E.
   by rewrite d0E &(dvdzD) dvdz_mull.
 qed.
 
+(* -------------------------------------------------------------------- *)
+lemma nosmt dvdz_gcd (a b c : int) :
+  a %| b => a %| c => a %| gcd b c.
+proof.
+move=> dvd_ab dvd_ac; case: (Bachet_Bezout b c) => u v <-.
+by rewrite dvdzD dvdz_mull.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mulz_gcdr a b c : `|a| * gcd b c = gcd (a * b) (a * c).
+proof.
+wlog: a / (0 <= a) => [wlog|].
+- case: (0 <= a); first by apply: wlog.
+  move/ltrNge/ltrW => le0_a; have := wlog (-a) _; ~-1:smt().
+  by rewrite normrN !mulNr !(gcdNz, gcdzN).
+rewrite ler_eqVlt => -[<<-|gt0_a]; first by rewrite normr0.
+case: (b = 0) => [->> /=|nz_b]; first by rewrite normrM.
+case: (c = 0) => [->> /=|nz_c]; first by rewrite normrM.
+rewrite gtr0_norm //; apply: gcd_uniq; 1,2: smt(ge0_gcd).
+- by rewrite dvdz_mul -1:dvdz_gcdl dvdzz.
+- by rewrite dvdz_mul -1:dvdz_gcdr dvdzz.
+move=> z z_ab z_ac; suff: z %| a * gcd b c.
+- apply/dvdn_le/mulr_gt0 => //.
+  by rewrite ltr_neqAle ge0_gcd /= eq_sym gcd_eq0 /#.
+case: (Bachet_Bezout b c) => u v <-.
+by rewrite mulrDr !(mulrCA a) dvdzD dvdz_mull.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma mulz_gcdl a b c : gcd b c * `|a| = gcd (b * a) (c * a).
+proof. by rewrite mulrC mulz_gcdr ![a * _]mulrC. qed.
+
 (* ==================================================================== *)
 op coprime a b = gcd a b = 1.
 
@@ -890,6 +951,68 @@ lemma mulmV p a : prime p => a %% p <> 0 => (a * invm a p) %% p = 1.
 proof.
 move=> ^/gt1_prime gt1_p + nz_a - /prime_coprime.
 by move=> /(_ a nz_a); apply/invmP.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt Gauss (a b c : int) : a %| (b * c) => coprime a b => a %| c.
+proof.
+move=> a_div_bc eq1_gcd_ab; suff: a %| gcd (a * c) (b * c).
+- by rewrite -mulz_gcdl eq1_gcd_ab /= dvdz_normr.
+by apply: dvdz_gcd => //; apply/dvdz_mulr/dvdzz.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt Euclide (a b c : int) :
+  a %| (b * c) => prime a => a %| b \/ a %| c.
+proof.
+move=> a_div_bc prime_a; case: (a %| b) => //=.
+move=> Ndvd_ab; suff: coprime a b by apply: Gauss.
+by apply: prime_coprime.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt Euclide_prod F (s : 'a list) a :
+  a %| BIM.big predT F s => prime a =>
+    exists x, x \in s /\ a %| F x.
+proof.
+elim: s => [|x s ih]; first by rewrite BIM.big_nil; smt(dvdz_le).
+rewrite BIM.big_cons ifT // => + prime_a - /Euclide /(_ prime_a).
+case=> [dvd_a_Fx|dvd_ih]; first by exists x.
+case: (ih dvd_ih prime_a) => y [y_in_s dvd_a_Fy].
+by exists y; split=> //; rewrite in_cons y_in_s.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma sumidE n : 0 <= n =>
+  sumid 0 n = (n * (n - 1)) %/ 2.
+proof. by move/Bigint.sumidE_r=> <-; rewrite mulKz. qed.
+
+(* -------------------------------------------------------------------- *)
+import Bigint.BIM.
+
+lemma Fermat_little (p a : int) :
+   prime p => ! (p %| a) => p %| (exp a (p - 1) - 1).
+proof.
+move=> prime_p N_p_div_a; pose N := fact (p-1) * exp a (p-1).
+have gt0_p: 0 < p by smt(gt1_prime).
+suff: p %| (fact (p-1) * (exp a (p-1) - 1)).
+- move/Euclide => /(_ prime_p) -[] // /Euclide_prod /(_ prime_p) /=.
+  by case=> x [] /mem_range rg_x @/idfun; smt(dvdz_le).
+rewrite mulrDr mulrN1 eqz_mod_dvd -/N (_ : N = bigi predT (fun i => i * a) 1 p).
+- rewrite /N /fact /= BIM.big_split mulr_const; do 2? congr => //.
+  by rewrite size_range /#.
+move=> {N}; rewrite -modz_prodm /=; do! congr.
+rewrite -(big_mapT _ idfun) &(eq_big_perm) /= uniq_perm_eq_size.
+- apply: map_inj_in_uniq => /=; last by apply: range_uniq.
+  move=> x y /mem_range rgx /mem_range rgy.
+  rewrite -eqz_mod_dvd -mulrBl => /Euclide /(_ prime_p).
+  by rewrite N_p_div_a /= eqz_mod_dvd !modz_small //#.
+- by apply: range_uniq.
+- by rewrite size_map.
+- move=> x /mapP [y] [/mem_range nz_y ->] /=; rewrite mem_range.
+  rewrite ltz_pmod //= (lez_add1r 0) ltr_neqAle.
+  rewrite modz_ge0 1:gtr_eqF //= eq_sym -dvdzE.
+  by apply/negP => /Euclide /(_ prime_p); smt(dvdn_le).
 qed.
 
 (* ==================================================================== *)

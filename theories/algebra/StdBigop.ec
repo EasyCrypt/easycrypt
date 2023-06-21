@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import AllCore IntDiv Ring List StdRing StdOrder.
+require import AllCore Ring List StdRing StdOrder.
 require (*--*) Bigop Bigalg.
 (*---*) import RField IntID IntOrder.
 
@@ -113,10 +113,6 @@ proof.
 elim: n => /= [|n ge0_n ih]; first by rewrite BIA.big_geq // div0z.
 by rewrite BIA.big_int_recr //= mulrDr ih #ring.
 qed.
-
-lemma sumidE n : 0 <= n =>
-  sumid 0 n = (n * (n - 1)) %/ 2.
-proof. by move/sumidE_r=> <-; rewrite mulKz. qed.
 end Bigint.
 
 import Bigint.

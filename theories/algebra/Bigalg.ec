@@ -173,6 +173,19 @@ rewrite -addrA BAdd.sumrB /= BAdd.big_seq BAdd.big1 ?addr0 //=.
 move=> i /mem_range rg_i; rewrite mulrA -exprS 1:/# mulrCA. 
 by rewrite -exprS 1:/# subr_eq0; do 2! congr => /#.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt mulr_const_cond p s c:
+  BMul.big<:'a> p (fun _ => c) s = exp c (count p s).
+proof.
+rewrite BMul.big_const -MulMonoid.iteropE /exp.
+by rewrite IntOrder.ltrNge count_ge0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt mulr_const s c:
+  BMul.big<:'a> predT (fun _ => c) s = exp c (size s).
+proof. by rewrite mulr_const_cond count_predT. qed.
 end BigComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -333,17 +346,6 @@ proof. split.
   rewrite mulf_eq0; case=> [z_Fx|]; first by exists x.
   by move/ih; case=> y [# Py ys z_Fy]; exists y; rewrite Py ys z_Fy.
 qed.
-
-lemma nosmt mulr_const_cond p s c:
-  BMul.big<:'a> p (fun _ => c) s = exp c (count p s).
-proof.
-rewrite BMul.big_const -MulMonoid.iteropE /exp.
-by rewrite IntOrder.ltrNge count_ge0.
-qed.
-
-lemma nosmt mulr_const s c:
-  BMul.big<:'a> predT (fun _ => c) s = exp c (size s).
-proof. by rewrite mulr_const_cond count_predT. qed.
 
 lemma ler_pexpn2r n x y :
   0 < n => zeror <= x => zeror <= y => (exp x n <= exp y n) <=> (x <= y).

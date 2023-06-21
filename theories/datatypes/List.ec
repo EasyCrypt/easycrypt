@@ -1534,6 +1534,18 @@ proof.
   by rewrite !count_uniq_mem // eq12.
 qed.
 
+lemma uniq_perm_eq_size ['a] (s1 s2 : 'a list) :
+     uniq s1
+  => uniq s2
+  => size s1 = size s2
+  => (mem s1 <= mem s2)
+  => perm_eq s1 s2.
+proof.
+move=> uq_s1 uq_s2 eq_sz s1_in_s2; apply: uniq_perm_eq => //.
+have := leq_size_perm s1 s2 uq_s1 s1_in_s2 _.
+- by rewrite eq_sz. - by case=> + _; apply.
+qed.
+
 lemma count_mem_uniq (s : 'a list):
   (forall x, count (pred1 x) s = b2i (mem s x)) => uniq s.
 proof.
