@@ -540,6 +540,24 @@ by move=> x /mem_range lt_xJ /=; rewrite (@nth_map witness).
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma fin_sum_cond (P : 't -> bool) f :
+  is_finite P =>
+  sum (fun z => if P z then f z else 0%r) = big predT f (to_seq P).
+proof.
+move=> P_finite; rewrite (@sumE_fin _ (to_seq P)) /= ?uniq_to_seq //.
+- smt(mem_to_seq).
+by apply eq_big_seq => x; smt(mem_to_seq).
+qed.
+
+lemma fin_sum_const (P : 't -> bool) (v : real) :
+  is_finite P =>
+  sum (fun z => if P z then v else 0%r) = (size (to_seq P))%r * v.
+proof.
+move=> P_finite.
+by rewrite fin_sum_cond // sumr_const RField.intmulr count_predT RField.mulrC.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma sum0 ['a]: sum<:'a> (fun _ => 0%r) = 0%r.
 proof. by rewrite (@sumE_fin _ []). qed.
 
