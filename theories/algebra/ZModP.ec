@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List Distr Int IntDiv.
-require (*--*) Subtype Ring StdOrder.
+require (*--*) Bigalg Subtype Ring StdOrder.
 (*---*) import Ring.IntID StdOrder.IntOrder.
 
 (* ==================================================================== *)
@@ -146,14 +146,14 @@ end ComRing.
 
 (* -------------------------------------------------------------------- *)
 clone import Ring.ComRing as ZModpRing with
-  type t     <- zmod,
-  op   zeror <- zero,
-  op   oner  <- one,
-  op   ( + ) <- ( + ),
-  op   [ - ] <- ([-]),
-  op   ( * ) <- ( * ),
-  op   invr  <- inv,
-  pred unit  <- unit
+  type t     <= zmod,
+  op   zeror <= zero,
+  op   oner  <= one,
+  op   ( + ) <= ( + ),
+  op   [ - ] <= ([-]),
+  op   ( * ) <= ( * ),
+  op   invr  <= inv,
+  pred unit  <= unit
   proof *.
 
 realize addrA.     proof. by apply/ZModule.addrA. qed.
@@ -168,6 +168,10 @@ realize oner_neq0. proof. by apply/ComRing.oner_neq0. qed.
 realize mulVr.     proof. by apply/ComRing.mulVr. qed.
 realize unitP.     proof. by apply/ComRing.unitP. qed.
 realize unitout.   proof. by apply/ComRing.unitout. qed.
+
+clone import Bigalg.BigComRing as BigZMod with
+  theory CR <- ZModpRing
+proof *.
 
 (* -------------------------------------------------------------------- *)
 instance ring with zmod
@@ -277,6 +281,9 @@ const p : { int | prime p } as prime_p.
 clone include ZModRing with
   op    p <- p
   proof ge2_p by smt(gt1_prime prime_p).
+
+import BigZMod.
+import BMul.
 
 lemma unitE (x : zmod) : (unit x) <=> (x <> zero).
 proof.
@@ -419,12 +426,40 @@ proof.
   by rewrite -opprD -divz_eq inzmod_exp oppr_ge0 ltzW //= ltrNge.
 qed.
 
-(*FIXME*)
 lemma exp_sub_p_1 (x : zmod) :
   unit x =>
   exp x (p - 1) = one.
 proof.
-admitted.
+rewrite unitE /exp => unit_x.
+have -> /=: !(p - 1 < 0) by smt(ge2_p).
+rewrite (iteropS (p - 2)); first by smt(ge2_p).
+have {2}->: x = x * one by rewrite mulr1.
+rewrite -(iterSr (p - 2) (( * ) x)) /=; first by smt(ge2_p).
+have <-: count predT (range 1 p) = p - 1.
+- rewrite count_predT size_range; smt(ge2_p).
+rewrite -big_const.
+apply (mulfI (big predT inzmod (range 1 p))).
+- rewrite big_seq.
+  apply (big_ind (fun a => a <> zero)); smt(unitrM oner_neq0 mem_range inzmodK).
+rewrite mulr1 -big_split /=.
+rewrite -(big_mapT _ idfun) -(big_mapT inzmod idfun) /=.
+apply eq_big_perm; apply uniq_perm_eq.
+- apply map_inj_in_uniq => /= [a b rg_a rg_b H|]; last exact range_uniq.
+  apply (congr1 (fun m => m / x)) in H.
+  rewrite /= -!mulrA divrr // !mulr1 in H.
+  smt(mem_range inzmodK).
+- apply map_inj_in_uniq => /= [a b rg_a rg_b H|]; last exact range_uniq.
+  smt(mem_range inzmodK).
+move => a; rewrite !mapP; split => [[b [rg_b ->]] | [b [rg_b ->]]] /=.
+- exists (asint (inzmod b * x)).
+  split; last by rewrite asintK.
+  suff: inzmod b * x <> zero by smt(mem_range rg_asint asint_inj zeroE).
+  apply unitrM; smt(mem_range inzmodK).
+- exists (asint (inzmod b / x)).
+  split; last by rewrite asintK -mulrA mulVr // mulr1.
+  suff: inzmod b / x <> zero by smt(mem_range rg_asint asint_inj zeroE).
+  rewrite unitrM; smt(mem_range inzmodK invr_neq0).
+qed.
 
 lemma exp_p (x : zmod) :
   exp x p = x.
