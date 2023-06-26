@@ -144,7 +144,8 @@ proc; seq  1: (exists x, support uD x /\ !X x)=> //=.
 + by rnd (predT); skip; smt(uD_uf_fu).
 if=> //=.
 + rnd (predT); skip.
-  progress [-split]; split=> //=; smt.
+  move=> /> &0; rewrite dexceptedE predTI mu_not.
+  smt(notin_supportIP).
 by hoare; rnd=> //=; skip=> &hr ->.
 qed.
 
