@@ -74,7 +74,7 @@ have uniq_s: uniq s; first apply: uniq_flatten_map.
 have mem_s: forall x, (x \in s) <=> (x \in range 0 p).
 - move=> x; rewrite mem_range; split.
   - case/flatten_mapP=> j [/= /mem_range rgj] /=.
-    case/mapP => [k [/mem_range rgk]] ->>; smt(@IntDiv).
+    case/mapP => [k [/mem_range rgk]] ->; split; smt(@IntDiv).
   - case=> ge0x lex; apply/flatten_mapP => /=.
     exists (x %/ q); rewrite mem_range.
     rewrite divz_ge0 // ge0x /=; split; 1: smt(@IntDiv).

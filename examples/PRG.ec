@@ -333,7 +333,8 @@ section.
     (* Equality on A's globals *)
   + by move=> &1 &2 A; exists (glob A){1}.
     (* no sampling ~ presampling *)
-  + sim; inline Resample.resample Psample.init F.init.
+  + seq 2 3: (={P.logP, P.seed, F.m, glob A}); 2: by sim.
+    inline Resample.resample Psample.init F.init.
     rcondf{2} 7;
       first by move=> &hr; rnd; wp; conseq (_: _ ==> true) => //.
     by wp; rnd; wp; rnd{2} predT; auto; rewrite dseed_ll.

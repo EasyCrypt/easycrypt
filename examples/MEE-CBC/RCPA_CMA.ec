@@ -571,7 +571,7 @@ theory EtM.
           wp; sp. exists* ek{1}, p0{1}; elim* => _k _p.
           call (_: ={glob E, k, p} /\ k{1} = _k /\ p{1} = _p ==> ={glob E, res} /\ dec _k res{1} = Some _p).
             by conseq (_: ={glob E, k, p} ==> ={glob E, res}) (enc_sem _k _p); proc true.
-          by skip; smt.
+          skip => />; smt(in_fsetU in_fset1).
           (* lossless after win *)
           by move=> &2 win; proc; wp; call (EtM_enc_ll E M E_enc_ll M_tag_ll).
           (* lossless and preservation of win *)
