@@ -1391,7 +1391,7 @@ module Op = struct
       op_tparams  = [];
       op_ty       = aout.e_ty;
       op_kind     = OB_oper (Some (OP_Plain (aout, false)));
-      op_loca     = `Global;
+      op_loca     = op.ppo_locality;
       op_opaque   = false;
       op_clinline = false;
     } in

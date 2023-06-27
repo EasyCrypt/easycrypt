@@ -408,8 +408,9 @@ type poperator = {
 }
 
 and pprocop = {
-  ppo_name   : psymbol;
-  ppo_target : pgamepath;
+  ppo_name     : psymbol;
+  ppo_target   : pgamepath;
+  ppo_locality : locality;
 }
 
 type ppred_def =
