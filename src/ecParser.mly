@@ -2017,8 +2017,8 @@ mcptn(BOP):
 (* -------------------------------------------------------------------- *)
 (* Proc operators                                                       *)
 procop:
-| PROC OP x=ident EQ f=loc(fident)
-    { { ppo_name = x; ppo_target = f; } }
+| locality=locality PROC OP x=ident EQ f=loc(fident)
+    { { ppo_name = x; ppo_target = f; ppo_locality = locality; } }
 
 (* -------------------------------------------------------------------- *)
 (* Predicate definitions                                                *)
