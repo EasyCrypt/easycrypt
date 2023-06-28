@@ -6,8 +6,8 @@
 (include_subdirs unqualified)
 
 (library 
- (name core)
- (public_name easycrypt.core)
+ (name ecLib)
+ (public_name easycrypt.ecLib)
  (modules :standard \ ec)
  (libraries batteries camlp-streams dune-build-info inifiles why3 yojson zarith)
 )
@@ -17,7 +17,7 @@
  (name ec)
  (modules ec)
  (promote (until-clean))
- (libraries batteries camlp-streams dune-build-info inifiles why3 yojson zarith core))
+ (libraries batteries camlp-streams dune-build-info inifiles why3 yojson zarith ecLib))
 
 (ocamllex ecLexer)
 
