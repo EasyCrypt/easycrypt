@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-open Core
+open EcLib
 open EcUtils
 open EcOptions
 
