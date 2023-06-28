@@ -675,18 +675,18 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 op product (A : 'a fset) (B : 'b fset): ('a * 'b) fset =
-  oflist (flatten (map (fun a => map (fun b => (a,b)) (elems B)) (elems A)))
+  oflist (allpairs (fun x y => (x,y)) (elems A) (elems B))
 axiomatized by productE.
 
 lemma productP (A : 'a fset) (B : 'b fset) (a : 'a) (b : 'b):
-  mem (product A B) (a,b) <=> mem A a /\ mem B b.
+  (a, b) \in product A B <=> (a \in A) /\ (b \in B).
+proof. by rewrite productE mem_oflist allpairsP /#. qed.
+
+lemma card_product (A B : 'a fset): 
+  card (product A B) = card A * card B.
 proof.
-  rewrite productE -{2}(elemsK A) -{2}(elemsK B) !mem_oflist /flatten.
-  elim (elems A) (elems B) a b=> {A B} [//=|].
-  move=> a' A ih B a b /=; rewrite mem_cat mapP ih /=.
-  case (a = a')=> [->|] //=.
-  split=> [[[b']|] //=|b_in_B].
-  by left; exists b.
+rewrite productE uniq_card_oflist ?size_allpairs -?cardE //.
+apply allpairs_uniq; smt(uniq_elems).
 qed.
 
 (* -------------------------------------------------------------------- *)
