@@ -219,7 +219,7 @@ have ->:   Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Cou
              ==> ={res,glob A,glob O, Count.c})=> //.
   proc.
   call (: ={glob A,glob O, Count.c} ==> ={glob A,glob O,Count.c,res}).
-  + proc *; inline A'(Orcl2(O), OrclCount(L(Orcl2(O)))).main; sim.
+  + proc *; inline A'(Orcl2(O), OrclCount(L(Orcl2(O)))).main; wp.
     call (: ={glob O, Count.c})=> //.
     + by proc *; wp; call (: true); wp.
     + proc *; inline A'(Orcl2(O), OrclCount(L(Orcl2(O)))).O.orcl Orcl2(O).orclL; wp.
@@ -233,7 +233,7 @@ have ->:   Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Cou
              ==> ={res,glob A,glob O, Count.c})=> //.
   proc.
   call (: ={glob A,glob O, Count.c} ==> ={glob A,glob O,Count.c,res}).
-  + proc *; inline A'(Orcl2(O), OrclCount(R(Orcl2(O)))).main; sim.
+  + proc *; inline A'(Orcl2(O), OrclCount(R(Orcl2(O)))).main; wp.
     call (: ={glob O, Count.c})=> //.
     + by proc *; wp; call (: true); wp.
     + proc *; inline A'(Orcl2(O), OrclCount(R(Orcl2(O)))).O.orcl Orcl2(O).orclL; wp.
