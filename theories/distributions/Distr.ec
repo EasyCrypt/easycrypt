@@ -1672,7 +1672,7 @@ split => ?.
   rewrite dcond_supp; smt(mu_sub).
 - have H: (mu (dcond d P) P = 0%r) by smt(dnullE).
   rewrite dcondE // in H.
-  (* Looks stupid but somehow speeds up smt... *)
+  (* Looks stupid but somehow speeds up smt ... *)
   suff: predI P P = P by smt().
   smt().
 qed.

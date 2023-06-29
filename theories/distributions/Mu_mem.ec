@@ -86,7 +86,7 @@ proof.
   case l=> [//=|x l mu_bound].
     by rewrite (mu_eq _ _ pred0) // mu0.
   have le0_mu: 0%r <= bd.
-    by have := mu_bound x _=> //; smt.
+    by have := mu_bound x _=> //; smt(mu_bounded).
   move: (x::l) mu_bound=> {x l} l mu_bound.
   apply (ler_trans ((card (oflist l))%r * bd)).
     exact/(mu_mem_le_card l d bd mu_bound).
