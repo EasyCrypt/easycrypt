@@ -680,7 +680,9 @@ axiomatized by productE.
 
 lemma productP (A : 'a fset) (B : 'b fset) (a : 'a) (b : 'b):
   (a, b) \in product A B <=> (a \in A) /\ (b \in B).
-proof. by rewrite productE mem_oflist allpairsP /#. qed.
+proof.
+by rewrite productE mem_oflist allpairsP; split => [/#|*]; exists (a,b) => /#. 
+qed.
 
 lemma card_product (A B : 'a fset): 
   card (product A B) = card A * card B.
