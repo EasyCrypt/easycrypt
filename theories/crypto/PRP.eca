@@ -463,8 +463,8 @@ section Upto.
       smt (rngE get_setE).
     sp; if{1}.
     + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
-      auto=> /> &1 &2 x_notin_m coll_def rng_m_r; smt.
-    by auto; smt. (** FIXME: Investigate **)
+      auto=> /> &1 &2 x_notin_m coll_def rng_m_r; smt(dD_ll excepted_lossless).
+    by auto=> /> /#.
     move=> &2 bad; conseq (_: true ==> true: =1%r) (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
     + by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.

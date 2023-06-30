@@ -58,10 +58,10 @@ lemma islossless_leaks : islossless DDHb.leaks
   by proc; auto.
 
 lemma islossless_orcl1 : islossless DDHb.orclL
-  by proc; auto; progress; smt.
+  by proc; auto; smt(dt_ll).
 
 lemma islossless_orcl2 : islossless DDHb.orclR
-  by proc; auto; progress; smt.
+  by proc; auto; smt(dt_ll).
 
 section.
 

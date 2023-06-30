@@ -107,8 +107,8 @@ lemma CCA_implies_CPA (S <: Scheme {-INDCPA}) (A <: Adv_INDCPA {-S, -INDCPA}) &m
 proof.
 move=> init_is_init.
 byequiv (: ={glob A} ==> ={res})=> //; proc.
-call{2} (: Wrap.qs = [] ==> !res); first by proc; skip; smt.
-conseq (: _ ==> Wrap.qs{2} = [] /\ (b = b'){1} = (b = b'){2}); first smt.
+call{2} (: Wrap.qs = [] ==> !res); first by proc; skip => /#.
+conseq (: _ ==> Wrap.qs{2} = [] /\ (b = b'){1} = (b = b'){2}); first smt().
 call (: ={glob Wrap, glob S} /\ Wrap.qs{2} = []).
 + by proc; call (: true).
 call (: ={glob Wrap, glob S}).

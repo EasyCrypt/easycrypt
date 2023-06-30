@@ -985,10 +985,9 @@ proof.
   rewrite /perm_eq allP /=; split; last by move=> h x _; apply h.
   move=> eq_cnt1 a; have ltzSz: forall z, z < z + 1 by smt().
   have {ltzSz} := ltzSz (count a (s1 ++ s2)); move: {-2}a.
-  pose x := _ + 1; have : 0 <= x by smt(count_ge0). move: x => {a}.
-  elim; first by smt.
-  move=> i i_ge0 IHi a le_ai; case: (count a (s1 ++ s2) = 0).
-    by rewrite count_cat; smt(count_ge0).
+  pose x := _ + 1; have : 0 <= x by smt(count_ge0). 
+  elim: x =>  [| {a} i i_ge0 IHi a le_ai]; first by smt(count_ge0).
+  case: (count a (s1 ++ s2) = 0); 1:by rewrite count_cat; smt(count_ge0).
   rewrite neq_ltz ltzNge count_ge0 /=; rewrite -has_count hasP.
   case=> x [s12x a_x]; pose a' := predD1 a x.
   have cnt_a': forall s, count a s = count (pred1 x) s + count a' s.
