@@ -694,7 +694,7 @@ abstract theory IDomain.
     forall (x y : t), x * y = zeror <=> x = zeror \/ y = zeror.
 
   lemma mulf_neq0 (x y : t): x <> zeror => y <> zeror => x * y <> zeror.
-  proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0; smt. qed.
+  proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0 /#. qed.
 
   lemma expf_eq0 x n : (exp x n = zeror) <=> (n <> 0 /\ x = zeror).
   proof.
@@ -832,10 +832,9 @@ abbrev (^) = exp.
 lemma intmulz z c : intmul z c = z * c.
 proof.
 have h: forall cp, 0 <= cp => intmul z cp = z * cp.
-  elim=> /= [|cp ge0_cp ih].
-    by rewrite mulr0z.
+  elim=> /= [|cp ge0_cp ih]; first by rewrite mulr0z.
   by rewrite mulrS // ih mulrDr /= addrC.
-case: (c < 0); 1: rewrite -opprK mulrNz opprK; smt.
+smt(opprK mulrNz opprK).
 qed.
 
 lemma poddX n x : 0 < n => odd (exp x n) = odd x.

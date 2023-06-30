@@ -82,16 +82,16 @@ lemma zeroE: asint zero = 0.
 proof. by rewrite /zero inzmodK mod0z. qed.
 
 lemma oneE: asint one = 1.
-proof. by rewrite /one inzmodK modz_small; smt. qed.
+proof. by rewrite /one inzmodK modz_small; smt(ge2_p). qed.
 
 lemma oppE (x : zmod): asint (-x) = (- (asint x)) %% p.
-proof. by rewrite /[-] /inzmod /asint /= Sub.insubdK; smt. qed.
+proof. by rewrite /[-] /inzmod /asint /= Sub.insubdK; smt(ge2_p). qed.
 
 lemma addE (x y : zmod): asint (x + y) = (asint x + asint y) %% p.
-proof. by rewrite /(+) /inzmod /asint /= Sub.insubdK; smt. qed.
+proof. by rewrite /(+) /inzmod /asint /= Sub.insubdK; smt(ge2_p). qed.
 
 lemma mulE (x y : zmod): asint (x * y) = (asint x * asint y) %% p.
-proof. rewrite /( * ) /inzmod /asint /= Sub.insubdK; smt. qed.
+proof. rewrite /( * ) /inzmod /asint /= Sub.insubdK; smt(ge2_p). qed.
 
 (* -------------------------------------------------------------------- *)
 theory ZModule.
@@ -102,7 +102,9 @@ lemma addrC (x y : zmod): x + y = y + x.
 proof. by apply/asint_inj; rewrite !addE addzC. qed.
 
 lemma add0r (x : zmod): zero + x = x.
-proof. by apply/asint_inj; rewrite !(addE, zeroE) add0z #smt. qed.
+proof. 
+by apply/asint_inj; rewrite !(addE, zeroE) add0z; smt(rg_asint pmod_small ge2_p).
+qed.
 
 lemma addNr (x : zmod): (-x) + x = zero.
 proof.
@@ -113,7 +115,8 @@ end ZModule.
 
 (* -------------------------------------------------------------------- *)
 theory ComRing.
-lemma oner_neq0 : one <> zero by smt.
+lemma oner_neq0 : one <> zero.
+proof. by rewrite -eq_inzmod #smt:(ge2_p). qed.
 
 lemma mulrA (x y z : zmod): x * (y * z) = (x * y) * z.
 proof. by apply/asint_inj; rewrite !mulE modzMml modzMmr mulzA. qed.
@@ -122,7 +125,7 @@ lemma mulrC (x y : zmod): x * y = y * x.
 proof. by apply/asint_inj; rewrite !mulE mulzC. qed.
 
 lemma mul1r (x : zmod): one * x = x.
-proof. by apply/asint_inj; rewrite !(mulE, oneE) mul1z #smt. qed.
+proof.  apply/asint_inj; rewrite !(mulE, oneE) mul1z; smt(rg_asint). qed.
 
 lemma mulrDl (x y z : zmod): (x + y) * z = (x * z) + (y * z).
 proof.

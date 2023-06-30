@@ -422,7 +422,7 @@ section.
   rewrite (GLB_WL &m p') (GRB_WR &m p').
   simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
   have Hint : forall x, support [0..q - 1] x <=> mem (List.Iota.iota_ 0 q) x.
-    by move=> x; rewrite !List.Iota.mem_iota  supp_dinter; smt.
+  by move=> x; rewrite !List.Iota.mem_iota  supp_dinter; smt().
   have Hfin: is_finite (support [0..max 0 (q - 1)]).
     rewrite is_finiteE; exists (range 0 q).
     by rewrite range_uniq=> /= x; rewrite mem_range supp_dinter=> /#.
