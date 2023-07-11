@@ -557,6 +557,14 @@ move=> P_finite.
 by rewrite fin_sum_cond // sumr_const RField.intmulr count_predT RField.mulrC.
 qed.
 
+lemma fin_sum_type (s : 'a -> real) :
+  is_finite predT<:'a> => 
+  sum s = big predT s (to_seq predT<:'a>).
+proof.
+move=> fint; rewrite &(sumE_fin) 1:uniq_to_seq 1:fint.
+by move=> x _; rewrite mem_to_seq. 
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma sum0 ['a]: sum<:'a> (fun _ => 0%r) = 0%r.
 proof. by rewrite (@sumE_fin _ []). qed.
