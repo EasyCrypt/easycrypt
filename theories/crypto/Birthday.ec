@@ -173,7 +173,7 @@ section.
       by proc;sp;if;auto;call HS.     
     proc; call (_: size Sample.l <= Bounder.c <= q).
     + proc;sp;if=>//;inline *;auto=> /#.
-    auto;smt w=ge0_q.
+    auto; smt(ge0_q).
   qed.
 
 end section.

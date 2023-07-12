@@ -133,7 +133,7 @@ lemma excepted_lossless (m:(D,D) fmap):
   mu (uD \ (rng m)) predT = 1%r.
 proof. 
 move=> /endo_dom_rng [x h]; rewrite dexcepted_ll //.
-+ smt w=uD_uf_fu.
++ smt(uD_uf_fu).
 have [?[<- @/is_full Hsupp]]:= uD_uf_fu.
 apply/notin_supportIP;exists x => />;apply Hsupp.
 qed.

@@ -143,29 +143,29 @@ theory EnfPen.
     lemma enf_implies_pen &m:
       Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound] <= Pr[IND(Enforce(Count(O)),A).main() @ &m: res].
     proof strict.
-    byequiv (_: ={glob A, glob O} ==> Counter.c{1} <= bound => res{1} = res{2})=> //; last smt.
+    byequiv (_: ={glob A, glob O} ==> Counter.c{1} <= bound => res{1} = res{2})=> //; last smt().
     symmetry; proc.
     call (_: !Counter.c <= bound, ={glob Counter, glob O}, Counter.c{1} <= bound).
       (* A lossless *)
       by apply A_distinguishL.
       (* Enforce(Count(O)).f ~ Count(O) *)
       proc*; inline Enforce(Count(O)).f; case (Counter.c{2} = bound).
-        rcondf{1} 3; first by progress; wp; skip; smt.
+        rcondf{1} 3; first by progress; wp; skip; smt().
         exists* Counter.c{1}; elim* => c; call{2} (CountO_fC O c _); first by apply O_fL.
-        by wp; skip; smt.
-        rcondt{1} 3; first by progress; wp; skip; smt.
+        by wp; skip; smt().
+        rcondt{1} 3; first by progress; wp; skip; smt().
         wp; exists* Counter.c{2}; elim* => c; call (CountO_fC_E O c).
-        by wp; skip; smt.
+        by wp; skip; smt().
       (* Enforce(Count(O)).f lossless *)
       by progress; proc; sp; if=> //;
-         inline Count(O).f Counter.incr; wp; call O_fL; wp; skip; smt.
+         inline Count(O).f Counter.incr; wp; call O_fL; wp; skip; smt().
       (* Count(O).f preserves bad *)
       move=> &m1 //=; bypr; move=> &m0 bad.
-        apply/ler_anti; rewrite andaE; split; first by smt w=mu_bounded.
+        apply/ler_anti; rewrite andaE; split; first by smt(mu_bounded).
         have lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
           first by conseq [-frame] (CountO_fC O Counter.c{m0} _); apply O_fL.
-        by byphoare lbnd=> //; smt.
-    by inline Counter.init; wp; skip; smt.
+        by byphoare lbnd=> //; smt().
+    inline Counter.init; wp; skip; smt(leq0_bound).
     qed.
   end section.
 end EnfPen.
@@ -231,11 +231,11 @@ theory BndPen.
     lemma enforcedAdv_bounded:
       phoare[EnforcedAdv(A,Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
     proof strict.
-      proc (Counter.c <= bound)=> //; first by smt.
+      proc (Counter.c <= bound)=> //; first by smt(leq0_bound).
         by apply A_distinguishL.
       by proc; sp; if;
            [exists* Counter.c; elim* => c; call (CountO_fC O c _); first apply O_fL |];
-         skip; smt.
+         skip; smt().
     qed.
 
     equiv enforcedAdv_bounded_E:
@@ -243,8 +243,8 @@ theory BndPen.
         ={glob A, glob O, Counter.c} /\ Counter.c{1} = 0 ==>
         ={glob A, glob O, res, Counter.c} /\ Counter.c{1} <= bound.
     proof strict.
-    proc (={glob O, Counter.c} /\ Counter.c{1} <= bound)=> //; first smt.
-    proc; sp; if=> //; inline Count(O).f Counter.incr; wp; call (_: true); wp; skip; smt.
+    proc (={glob O, Counter.c} /\ Counter.c{1} <= bound)=> //; first smt(leq0_bound).
+    proc; sp; if=> //; inline Count(O).f Counter.incr; wp; call (_: true); wp; skip; smt().
     qed.
 
     (* Security against the bounded adversary implies penalty-style security  *)
@@ -252,7 +252,7 @@ theory BndPen.
       Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound] <=
        Pr[IND(Count(O),EnforcedAdv(A)).main() @ &m: res].
     proof strict.
-    byequiv (_: ={glob A, glob O} ==> Counter.c{1} <= bound => ={res, glob Count})=> //; last smt.
+    byequiv (_: ={glob A, glob O} ==> Counter.c{1} <= bound => ={res, glob Count})=> //; last smt().
     symmetry; proc.
     call (_: bound < Counter.c, ={glob Counter, glob Enforce, glob O}).
       (* A lossless *)
@@ -262,20 +262,21 @@ theory BndPen.
         rcondf{1} 3; first by progress; wp.
         exists* Counter.c{2}; elim* => c; call{2} (CountO_fC O c _);
           first apply O_fL.
-        by wp; skip; smt.
-        rcondt{1} 3; first by progress; wp; skip; smt.
+        by wp; skip; smt().
+        rcondt{1} 3; first by progress; wp; skip; smt().
         wp; exists* Counter.c{2}; elim* => c; call (CountO_fC_E O c).
         by wp.
       (* Wrap(O).f lossless *)
       by progress; proc; sp; if; [call (CountO_fL O _); first apply O_fL |].
       (* O.f preserves bad *)
       progress; bypr; move=> &m0 bad.
-      have: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
+      have: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last first.
+        have /#: Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c] <= 1%r by byphoare => /> //.
       have lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
         first by conseq [-frame] (CountO_fC O Counter.c{m0} _); first apply O_fL.
-      by byphoare lbnd; last smt.
+      by byphoare lbnd; last smt().
     inline Counter.init; wp.
-    by skip; smt.
+    by skip; smt().
     qed.
   end section.
 end BndPen.

@@ -638,7 +638,7 @@ wp; call (_: inv (glob MRPKE_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} Adv1
     by wp; skip; rewrite /inv /=; clear inv => />; smt (fdom_set get_setE mem_fdom).
   by skip.
 + proc.
-  sp; if; 1: (by rewrite /inv; progress; smt); 2: (by wp;skip;progress;smt).
+  sp; if; 1: (by rewrite /inv; progress; smt()); 2: (by wp;skip;progress;smt()).
   if => //=.
   + by move=> /> /#.
   wp; transitivity{1} { r <@ MEnc.mencrypt(pks, tag, MRPKE_lor.b ? m1 : m0); }
@@ -835,7 +835,7 @@ wp; call (_: inv (glob MRPKErnd_lor){1} (glob MRPKE_lor){2} (glob ODH_Orcl){2} A
    by wp; skip; rewrite /inv => />; smt (fdom_set mem_fdom in_fsetU).
   by skip; rewrite /inv.
 + proc.
-  sp; if; 1: (by rewrite /inv; progress; smt); 2: (by wp;skip;progress;smt).
+  sp; if; 1: (by rewrite /inv; progress; smt()); 2: (by wp;skip;progress;smt()).
   if => //=; 1: by smt ().
   inline *.
   rcondt {2} 9; 1: by move => *;wp;rnd;rnd;wp;rewrite /inv /=; clear inv;wp;skip => />; smt().

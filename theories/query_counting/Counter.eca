@@ -67,7 +67,7 @@ section.
   move=> S_ll.
   exists* Counter.c; elim*=> c0.
   bypr=> &m0 /= /eq_sym /(D_bounded S c0 &m0 S_ll) pr_E1.
-  apply/ler_anti; split=> [|_]; first by smt w=mu_bounded.
+  apply/ler_anti; split=> [|_]; first by smt(mu_bounded).
   by rewrite -pr_E1 Pr [mu_sub].
   qed.
 

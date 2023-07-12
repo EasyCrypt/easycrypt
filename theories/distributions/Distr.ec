@@ -689,7 +689,7 @@ qed.
 lemma supp_drat (s : 'a list) x : x \in (drat s) <=> x \in s.
 proof.
 rewrite /support dratE -has_pred1 has_count.
-case: (count (pred1 x) s <= 0); [smt w=count_ge0|].
+case: (count (pred1 x) s <= 0); [smt(count_ge0)|].
 move=> /IntOrder.ltrNge ^ + -> /=; rewrite -lt_fromint; case: s=> //=.
 move=> ? s /(@mulr_gt0 _ (inv (1 + size s)%r)) -> //.
 by rewrite invr_gt0 lt_fromint #smt:(size_ge0).
