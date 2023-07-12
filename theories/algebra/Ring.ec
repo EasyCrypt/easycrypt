@@ -822,10 +822,15 @@ clone include IDomain with
   op   [ - ] <- Int.([-]),
   op   ( * ) <- Int.( * ),
   op   invr  <- (fun (z : int) => z)
-  proof * by smt
+  proof unitP
+  proof * by smt()
   remove abbrev (-)
   remove abbrev (/)
   rename "ofint" as "ofint_id".
+
+realize unitP.
+  move => ? y ?; have /# : 1 <= `|y| by smt().
+qed.
 
 abbrev (^) = exp.
 
