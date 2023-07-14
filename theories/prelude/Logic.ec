@@ -400,6 +400,16 @@ lemma ifF (b : bool) (e1 e2 : 'a) :
  !b => (if b then e1 else e2) = e2
 by move=> ->.
 
+lemma ifT_eq b (e1 e2 : 'a) :
+  (b => e1 = e2) =>
+  (if b then e1 else e2) = e2.
+proof. by case b. qed.
+
+lemma ifF_eq b (e1 e2 : 'a) :
+  (!b => e1 = e2) =>
+  (if b then e1 else e2) = e1.
+proof. by case b. qed.
+
 lemma  iffP p q r :
   (r <=> q) => (p => q) => (q => p) => r <=> p
 by [].
