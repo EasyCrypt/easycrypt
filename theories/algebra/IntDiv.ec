@@ -351,6 +351,9 @@ proof. by rewrite -mulN1r modzMmr mulN1r. qed.
 lemma nosmt modzBm m n d : (m %% d - n %% d) %% d = (m - n) %% d.
 proof. by rewrite -modzDm -modzNm !modz_mod modzNm modzDm. qed.
 
+lemma nosmt modzNDmr m n d : (m - n %% d) %% d = (m - n) %% d.
+proof. by rewrite -modzDmr -modzNm !modz_mod modzNm modzDmr. qed.
+
 lemma nosmt modz_prodm P F (s : 'a list) d :
   (BIM.big P (fun i => F i %% d) s) %% d = BIM.big P F s %% d.
 proof.
@@ -651,6 +654,63 @@ lemma nosmt expz_div (x n m : int) :
 proof.
 move=> [ge0_m le_mn] gt0_x; rewrite -{1}(subrK n m).
 by rewrite exprD_nneg 1:subr_ge0 // mulzK // expf_eq0 (@gtr_eqF x).
+qed.
+
+(* ==================================================================== *)
+
+op mod_to_cmod r d = if r <= d %/ 2 then r else r - d.
+op cmod x d = let r = x %% d in mod_to_cmod r d.
+
+pred in_cmod d x = d %/ 2 - d < x <= d %/ 2.
+
+lemma rg_cmod x d :
+  0 < d =>
+  in_cmod d (cmod x d).
+proof. smt(divz_eq modz_ge0 ltz_pmod). qed.
+
+op cmod_to_mod r d =
+  if r < 0 then r + d else r.
+
+lemma rg_cmod_to_mod d x :
+  0 < d =>
+  in_cmod d x =>
+  0 <= cmod_to_mod x d < d.
+proof. smt(divz_eq modz_ge0 ltz_pmod). qed.
+
+lemma mod_to_cmodK x d :
+  0 <= x =>
+  x < d =>
+  cmod_to_mod (mod_to_cmod x d) d = x.
+proof. smt(). qed.
+
+lemma cmod_to_mod_injective d x y :
+  in_cmod d x =>
+  in_cmod d y =>
+  cmod_to_mod x d = cmod_to_mod y d => x = y.
+proof. smt(divz_eq modz_ge0). qed.
+
+lemma cmod_to_mod_correct x d :
+  0 < d =>
+  d %| (x - cmod_to_mod x d).
+proof. smt(divz_eq ltz_pmod modz_ge0). qed.
+
+lemma euclideUl_centered (x x0 d : int) :
+  0 < d =>
+  d %| (x - x0) =>
+  in_cmod d x0 =>
+  x0 = cmod x d.
+proof.
+move => *.
+apply (cmod_to_mod_injective d) => //.
+- exact rg_cmod.
+rewrite /cmod /= mod_to_cmodK; 1,2: smt(divz_eq ltz_pmod modz_ge0).
+suff: (x - (cmod_to_mod x0 d)) %/ d = x %/ d /\
+      (cmod_to_mod x0 d) = x %% d by smt().
+apply euclideUl; last smt(rg_cmod_to_mod).
+rewrite -divz_eq divzK; last smt().
+have ->: x - cmod_to_mod x0 d = (x - x0) + (x0 - cmod_to_mod x0 d) by smt().
+apply dvdzD => //.
+exact cmod_to_mod_correct.
 qed.
 
 (* ==================================================================== *)
