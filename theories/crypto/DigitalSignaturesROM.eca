@@ -1,8 +1,6 @@
 (* --- Require/Import Theories --- *)
 (* -- Built-in (i.e, standard library) -- *)
 require import AllCore List.
-require (*--*) PROM.
-
 
 (* -- Local -- *)
 require (*--*) DigitalSignatures.
@@ -23,15 +21,6 @@ type sk_t.
 type in_t.
 type out_t.
 
-(* Types for input and output of the random oracle distinguisher, respectively *)
-type d_in_t.
-type d_out_t.
-
-
-(* -- Distributions -- *)
-(* Function mapping an oracle's input to a distribution over the oracle's output *)
-op doutm : in_t -> out_t distr.
-
 
 (* -- Clones and imports -- *)
 (* Definitions and properties for digital signatures (in the standard model) *)
@@ -41,17 +30,6 @@ clone import DigitalSignatures as DSS with
   type pk_t <- pk_t,
   type sk_t <- sk_t
   
-  proof *.
-
-(* Definitions and properties for the (programmable) random oracle model *) 
-clone import PROM.FullRO as PRO with
-  type in_t <- in_t,
-  type out_t <- out_t,
-  type d_in_t <- d_in_t,
-  type d_out_t <- d_out_t,
-  
-    op dout <- doutm
-    
   proof *.
 
 
