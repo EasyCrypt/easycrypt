@@ -807,7 +807,7 @@ theory Stateless.
   *)
   abstract theory EUFGCMA.
     (* Number of messages the adversary obtains signatures for in EUF-GCMA game *)
-    const n_eufgcma : { int | 0 <= n_eufgcma } as ge0_negcma.
+    const n_eufgcma : { int | 0 <= n_eufgcma } as ge0_neufgcma.
 
     (* Class of adversaries against EUF-GCMA *)
     module type Adv_EUFGCMA = {
@@ -900,7 +900,7 @@ theory Stateless.
     -
   *)
   abstract theory UBNACMA.
-    (* Number of messages the adversary obtains signatures for in UB-RMA game *)
+    (* Number of messages the adversary obtains signatures for in UB-NACMA game *)
     const n_ubnacma : { int | 0 <= n_ubnacma } as ge0_nubnacma.
 
     (* Class of adversaries against UB-NACMA *)
@@ -971,7 +971,7 @@ theory Stateless.
     (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
     op [lossless] dmsg : msg_t distr.
   
-    (* Number of messages the adversary obtains signatures for in UUF-RMA game *)
+    (* Number of messages the adversary obtains signatures for in UUF-NACMA game *)
     const n_uufnacma : { int | 0 <= n_uufnacma } as ge0_nuufnacma.
 
     (* Class of adversaries against UUF-NACMA *)
@@ -1063,7 +1063,7 @@ theory Stateless.
     (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
     op [lossless] dmsg : msg_t distr.
 
-    (* Number of messages the adversary obtains signatures for in SUF-RMA game *)
+    (* Number of messages the adversary obtains signatures for in SUF-NACMA game *)
     const n_sufnacma : { int | 0 <= n_sufnacma } as ge0_nsufnacma.
 
     (* Class of adversaries against SUF-NACMA *)
@@ -1153,7 +1153,7 @@ theory Stateless.
     -
   *)
   abstract theory EUFNACMA.
-    (* Number of messages the adversary obtains signatures for in EUF-RMA game *)
+    (* Number of messages the adversary obtains signatures for in EUF-NACMA game *)
     const n_eufnacma : { int | 0 <= n_eufnacma } as ge0_neufnacma.
 
     (* Class of adversaries against EUF-NACMA *)
@@ -2441,7 +2441,7 @@ theory KeyUpdating.
   *)
   abstract theory EUFGCMA.
     (* Number of messages the adversary obtains signatures for in EUF-GCMA game *)
-    const n_eufgcma : { int | 0 <= n_eufgcma } as ge0_negcma.
+    const n_eufgcma : { int | 0 <= n_eufgcma } as ge0_neufgcma.
 
     (* Class of adversaries against EUF-GCMA *)
     module type Adv_EUFGCMA = {
@@ -2534,7 +2534,7 @@ theory KeyUpdating.
     -
   *)
   abstract theory UBNACMA.
-    (* Number of messages the adversary obtains signatures for in UB-RMA game *)
+    (* Number of messages the adversary obtains signatures for in UB-NACMA game *)
     const n_ubnacma : { int | 0 <= n_ubnacma } as ge0_nubnacma.
 
     (* Class of adversaries against UB-NACMA *)
@@ -2605,7 +2605,7 @@ theory KeyUpdating.
     (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
     op [lossless] dmsg : msg_t distr.
   
-    (* Number of messages the adversary obtains signatures for in UUF-RMA game *)
+    (* Number of messages the adversary obtains signatures for in UUF-NACMA game *)
     const n_uufnacma : { int | 0 <= n_uufnacma } as ge0_nuufnacma.
 
     (* Class of adversaries against UUF-NACMA *)
@@ -2697,7 +2697,7 @@ theory KeyUpdating.
     (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
     op [lossless] dmsg : msg_t distr.
 
-    (* Number of messages the adversary obtains signatures for in SUF-RMA game *)
+    (* Number of messages the adversary obtains signatures for in SUF-NACMA game *)
     const n_sufnacma : { int | 0 <= n_sufnacma } as ge0_nsufnacma.
 
     (* Class of adversaries against SUF-NACMA *)
@@ -2786,7 +2786,7 @@ theory KeyUpdating.
     -
   *)
   abstract theory EUFNACMA.
-    (* Number of messages the adversary obtains signatures for in EUF-RMA game *)
+    (* Number of messages the adversary obtains signatures for in EUF-NACMA game *)
     const n_eufnacma : { int | 0 <= n_eufnacma } as ge0_neufnacma.
 
     (* Class of adversaries against EUF-NACMA *)
@@ -2986,9 +2986,6 @@ theory KeyUpdating.
   abstract theory UUFCMA.
     (* (Proper) distribution over type of to-be-signed artifacts ('messages') *)
     op [lossless] dmsg : msg_t distr.
-
-    (* Maximum number of oracle queries the adversary is allowed to make in UUF-CMA game *)
-    const q_uufcma : { int | 0 <= q_uufcma } as ge0_quufcma.
 
     (* Class of adversaries against UUF-CMA *)
     module type Adv_UUFCMA(O : SOracle_CMA) = {
