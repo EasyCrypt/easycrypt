@@ -47,6 +47,18 @@ rewrite -(perm_eq_mem _ _ (oflistK s2)).
 by rewrite !mem_undup (perm_eq_mem _ _ peq_s1s2).
 qed.
 
+lemma oflist_perm_eq_undup (s1 s2 : 'a list):
+  perm_eq (undup s1) (undup s2) => oflist s1 = oflist s2.
+proof.
+move=> peq_s1s2; apply/fset_eq /uniq_perm_eq; 1,2: exact/uniq_elems.
+move=> x; rewrite -(perm_eq_mem _ _ (oflistK s1)).
+by rewrite -(perm_eq_mem _ _ (oflistK s2)) (perm_eq_mem _ _ peq_s1s2).
+qed.
+
+lemma perm_eq_oflistP (s1 s2 : 'a list):
+  oflist s1 = oflist s2 <=> perm_eq (undup s1) (undup s2).
+proof. by split; [apply perm_eq_oflist | apply oflist_perm_eq_undup]. qed.
+
 (* -------------------------------------------------------------------- *)
 op card ['a] (s : 'a fset) = size (elems s) axiomatized by cardE.
 

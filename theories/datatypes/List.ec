@@ -1545,6 +1545,13 @@ have := leq_size_perm s1 s2 uq_s1 s1_in_s2 _.
 - by rewrite eq_sz. - by case=> + _; apply.
 qed.
 
+lemma perm_eq_undup (s1 s2 : 'a list):
+  perm_eq s1 s2 => perm_eq (undup s1) (undup s2).
+proof.
+move=> peq_s1s2; rewrite uniq_perm_eq 1,2:undup_uniq => x.
+by rewrite 2!mem_undup &(perm_eq_mem).
+qed.
+
 lemma count_mem_uniq (s : 'a list):
   (forall x, count (pred1 x) s = b2i (mem s x)) => uniq s.
 proof.
