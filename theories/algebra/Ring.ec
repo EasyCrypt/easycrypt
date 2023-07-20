@@ -1,11 +1,12 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Core Int.
+require import Core Int AlgTactic.
 require (*--*) Monoid.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ZModule.
+
   type t.
 
   op zeror : t.
@@ -187,12 +188,13 @@ abstract theory ZModule.
     by rewrite mulrNz addzC wlog 1:/# !mulrNz -opprD opprK.
   elim: m => /= [|m ge0_m ih]; first by rewrite mulr0z addr0.
   by rewrite addzA !mulrSz ih addrCA.
-qed.
+  qed.
 
 end ZModule.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ComRing.
+
   clone include ZModule.
 
   op   oner  : t.
@@ -485,7 +487,7 @@ abstract theory ComRing.
   lemma unitrX x m : unit x => unit (exp x m).
   proof.
   move=> invx; wlog: m / (0 <= m) => [wlog|].
-  + (have [] : (0 <= m \/ 0 <= -m) by move=> /#); first by apply: wlog.    
+  + (have [] : (0 <= m \/ 0 <= -m) by move=> /#); first by apply: wlog.
     by move=> ?; rewrite -oppzK exprN unitrV &(wlog).
   elim: m => [|m ge0_m ih]; first by rewrite expr0 unitr1.
   by rewrite exprS // &(unitrMl).
@@ -530,7 +532,7 @@ abstract theory ComRing.
     exp x (m + n) = exp x m * exp x n.
   proof.
     move=> ge0_m ge0_n; elim: m ge0_m => [|m ge0_m ih].
-      by rewrite expr0 mul1r.    
+      by rewrite expr0 mul1r.
     by rewrite addzAC !exprS ?addz_ge0 // ih mulrA.
   qed.
 
@@ -553,7 +555,7 @@ abstract theory ComRing.
   by rewrite addzA exprS 1:/# ih 1,2:/# exprS // mulrCA.
   qed.
 
-  lemma exprM x (m n : int) : 
+  lemma exprM x (m n : int) :
     exp x (m * n) = exp (exp x m) n.
   proof.
   wlog : n / 0 <= n.
@@ -648,6 +650,32 @@ abstract theory ComRing.
   - by rewrite expr0 &(lreg1).
   - by rewrite exprS // &(lregM).
   qed.
+
+  instance ring with t
+    op rzero = zeror
+    op rone  = oner
+    op add   = ( + )
+    op mul   = ( * )
+    op opp   = [ - ]
+    op expr  = exp
+    op ofint = ofint
+
+    proof oner_neq0 by exact oner_neq0
+    proof addr0     by exact addr0
+    proof addrA     by exact addrA
+    proof addrC     by exact addrC
+    proof addrN     by exact addrN
+    proof mulr1     by exact mulr1
+    proof mulrA     by exact mulrA
+    proof mulrC     by exact mulrC
+    proof mulrDl    by exact mulrDl
+    proof expr0     by exact expr0
+    proof exprS     by exact exprS
+    proof ofint0    by exact ofint0
+    proof ofint1    by exact ofint1
+    proof ofintS    by exact ofintS
+    proof ofintN    by exact ofintN.
+
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -675,6 +703,7 @@ end ComRingDflInv.
 
 (* -------------------------------------------------------------------- *)
 abstract theory BoolRing.
+
   clone include ComRing.
 
   axiom mulrr : forall (x : t), x * x = x.
@@ -684,10 +713,33 @@ abstract theory BoolRing.
     apply (@addrI (x + x)); rewrite addr0 -{1 2 3 4}mulrr.
     by rewrite -mulrDr -mulrDl mulrr.
   qed.
+
+  lemma oppr_id (x : t) : -x = x by rewrite -opprK -addr_eq0 opprK addrr.
+
+  instance bring with t
+    op rzero = zeror
+    op rone  = oner
+    op add   = ( + )
+    op mul   = ( * )
+    op opp   = [ - ]
+
+    proof oner_neq0 by exact oner_neq0
+    proof addr0     by exact addr0
+    proof addrA     by exact addrA
+    proof addrC     by exact addrC
+    proof addrK     by exact addrr
+    proof mulrK     by exact mulrr
+    proof mulr1     by exact mulr1
+    proof mulrA     by exact mulrA
+    proof mulrC     by exact mulrC
+    proof mulrDl    by exact mulrDl
+    proof oppr_id   by exact oppr_id.
+
 end BoolRing.
 
 (* -------------------------------------------------------------------- *)
 abstract theory IDomain.
+
   clone include ComRing.
 
   axiom mulf_eq0:
@@ -734,6 +786,7 @@ end IDomain.
 
 (* -------------------------------------------------------------------- *)
 abstract theory Field.
+
   clone include IDomain with pred unit (x : t) <- x <> zeror.
 
   lemma mulfV (x : t): x <> zeror => x * (invr x) = oner.
@@ -766,10 +819,35 @@ abstract theory Field.
   + by rewrite !expr0 mulr1.
   + by rewrite !exprS // mulrCA -!mulrA -ih mulrCA.
   qed.
+
+  instance field with t
+    op rzero = zeror
+    op rone  = oner
+    op add   = ( + )
+    op mul   = ( * )
+    op opp   = [ - ]
+    op expr  = exp
+    op inv   = invr
+
+    proof oner_neq0 by exact oner_neq0
+    proof addr0     by exact addr0
+    proof addrA     by exact addrA
+    proof addrC     by exact addrC
+    proof addrN     by exact addrN
+    proof mulr1     by exact mulr1
+    proof mulrA     by exact mulrA
+    proof mulrC     by exact mulrC
+    proof mulrDl    by exact mulrDl
+    proof expr0     by exact expr0
+    proof exprS     by exact exprS
+    proof mulrV     by exact mulrV
+    proof exprN     by smt(exprN).
+
 end Field.
 
 (* --------------------------------------------------------------------- *)
 abstract theory Additive.
+
   type t1, t2.
 
   clone import Self.ZModule as ZM1 with type t <- t1.
@@ -791,10 +869,12 @@ abstract theory Additive.
 
   lemma raddfD (x y : t1): f (x + y) = f x + f y.
   proof. by rewrite -{1}(@ZM1.opprK y) raddfB raddfN ZM2.opprK. qed.
+
 end Additive.
 
 (* --------------------------------------------------------------------- *)
 abstract theory Multiplicative.
+
   type t1, t2.
 
   clone import Self.ComRing as ZM1 with type t <- t1.
@@ -803,6 +883,7 @@ abstract theory Multiplicative.
   pred multiplicative (f : t1 -> t2) =
        f ZM1.oner = ZM2.oner
     /\ forall (x y : t1), f (x * y) = f x * f y.
+
 end Multiplicative.
 
 (* --------------------------------------------------------------------- *)
@@ -813,6 +894,7 @@ hint rewrite inj_algebra : .
 
 (* -------------------------------------------------------------------- *)
 theory IntID.
+
 clone include IDomain with
   type t <- int,
   pred unit (z : int) <- (z = 1 \/ z = -1),
@@ -855,4 +937,5 @@ rewrite lez_eqVlt; case: (n = 0) => [->// _|+ h].
 + by rewrite expr0 odd1.
 + by case: h => [<-//|] /poddX ->.
 qed.
+
 end IntID.
