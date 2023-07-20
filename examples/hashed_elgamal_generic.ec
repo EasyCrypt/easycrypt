@@ -176,7 +176,7 @@ section.
     wp; rnd; call (_: ={LRO.m} /\ (forall x, x \in H.qs{2} = x \in LRO.m{2})).
     + by proc; inline *; auto => />; smt (get_setE).
     inline *; auto => /> *; split; 1: by move=> *; rewrite mem_empty.
-    move=> _ ??? hdom ??; split; 1: by move=> *;ring.
+    move=> _ ??? hdom ??; split; 1: by move=> *; ring.
     smt(eq_except_setl get_setE).
   qed.
 

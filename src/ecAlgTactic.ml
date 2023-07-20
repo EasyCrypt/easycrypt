@@ -15,9 +15,7 @@ module Axioms = struct
 
 
   let tmod_and_deps =
-    tmod :: [
-      EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"], "Field")
-    ]
+    tmod :: []
 
   let zero  = "rzero"
   let one   = "rone"
