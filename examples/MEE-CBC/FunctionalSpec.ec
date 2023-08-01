@@ -12,7 +12,10 @@ clone import BitWord as Octet with
   op n <- 8
 rename "word" as "octet"
 rename "Word" as "Octet"
-proof gt0_n by done.
+proof *.
+realize gt0_n by trivial.
+realize getE by rewrite /"_.[_]".
+realize setE by rewrite /"_.[_<-_]".
 
 op o2int (o : octet) : int = bs2int (ofoctet o).
 op int2o (i : int) : octet = mkoctet (int2bs 8 i).
@@ -35,8 +38,11 @@ clone import Word as Block with
   op   n             <- 16
 rename "word" as "block"
 rename "Word" as "Block"
-proof Alphabet.enum_spec, ge0_n by done.
+proof *.
 realize Alphabet.enum_spec by exact/Octet.enum_spec.
+realize ge0_n by trivial.
+realize getE by rewrite /"_.[_]".
+realize setE by rewrite /"_.[_<-_]".
 
 abbrev dblock = DBlock.dunifin.
 
@@ -127,8 +133,11 @@ clone import Word as Tag with
   op   n             <- 32
 rename "word" as "tag"
 rename "Word" as "Tag"
-proof Alphabet.enum_spec, ge0_n by done.
+proof *.
 realize Alphabet.enum_spec by exact/Octet.enum_spec.
+realize ge0_n by trivial.
+realize getE by rewrite /"_.[_]".
+realize setE by rewrite /"_.[_<-_]".
 
 (** Messages are just octet lists **)
 type msg = octet list.
@@ -490,6 +499,7 @@ proof.
                       (size (pad _p (hmac_sha256 _mk _p)))
                       (nth witness (iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)
                                    (size (pad _p (hmac_sha256 _mk _p)))).
+        smt().
       split=> //=.
       split; 1:by rewrite /mee_enc /= size_cbc_enc addzC.
       by rewrite take_size.

@@ -1,35 +1,44 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List Distr StdOrder.
 require import FinType.
-require (*--*) Tuple.
+require (*--*) Subtype Tuple.
 (*---*) import IntOrder RealOrder.
 
 (* -------------------------------------------------------------------- *)
 clone import FinType as Alphabet.
 
 op n : {int | 0 <= n} as ge0_n.
-
-type word.
-
-op mkword : t list -> word.
-op ofword : word -> t list.
-op dchar  : t.
-
+op dchar : t.
 op wordw : t list = mkseq (fun _ => dchar) n.
 
-(* -------------------------------------------------------------------- *)
 lemma nosmt size_wordw: size wordw = n.
 proof. by rewrite size_mkseq ler_maxr ?ge0_n. qed.
 
-axiom nosmt mkwordK : cancel ofword mkword.
+clone include Subtype
+  with type T   <- t list,
+       op P   <- fun w => size w = n
+proof *.
+realize inhabited by exists wordw; exact size_wordw.
 
-axiom nosmt ofwordK :
+type word = sT.
+(* default value chosen for backward compatibility *)
+op mkword x = odflt (insubd wordw) (insub x).
+op ofword = val.
+
+(* -------------------------------------------------------------------- *)
+
+lemma nosmt mkwordK : cancel ofword mkword.
+proof. smt(valK). qed.
+
+lemma nosmt ofwordK :
   forall (s : t list), size s = n =>
     ofword (mkword s) = s.
+proof. smt(insubT). qed.
 
-axiom nosmt mkword_out :
+lemma nosmt mkword_out :
   forall (s : t list), size s <> n =>
     ofword (mkword s) = wordw.
+proof. smt(insubN insubdK size_wordw). qed.
 
 lemma nosmt size_word : forall w, size (ofword w) = n.
 proof.
