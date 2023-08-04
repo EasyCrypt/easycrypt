@@ -152,6 +152,9 @@ def _options():
     options.args    = config.get('default', 'args').split()
     options.targets = resolve_targets(args[1:])
 
+    if options.report is None:
+        options.report = config.get('default', 'report', fallback = None)
+
     if cmdopt.bin_args:
         options.args.extend(itertools.chain.from_iterable( \
           x.split() for x in cmdopt.bin_args))
