@@ -378,7 +378,7 @@ class Gather:
 def format_delta(delta, hprec=2, prec=0, subprec=0):
     if prec > 0:
         frac, delta = math.modf(delta)
-        delta, frac = int(delta), int(10 ** prec * frac)        
+        delta, frac = int(delta), int(10 ** prec * frac)
         if subprec > 0:
             subprec = 10 ** prec // subprec
             frac = frac // subprec * subprec
@@ -668,14 +668,14 @@ async def _run_all(options, allscripts, listener : Listener):
                 command.extend(['-tstats', tfilename])
 
             handle = listener.file_check_start(config.filename)
-                
+
             command.extend(['-script', '-no-eco', config.filename])
-    
+
             args = dict(
                 stdout = asyncio.subprocess.DEVNULL,
                 stderr = asyncio.subprocess.PIPE,
             )
-    
+
             time0  = time.time()
             proc   = await asyncio.create_subprocess_exec(*command, **args)
             errors = []
@@ -695,7 +695,7 @@ async def _run_all(options, allscripts, listener : Listener):
                                 code = None
                             listener.error(handle, code, error)
                             errors.append(error)
-    
+
             finally:
                 try:
                     status = await asyncio.wait_for(proc.wait(), 2.0)
@@ -706,7 +706,7 @@ async def _run_all(options, allscripts, listener : Listener):
                 success = (bool(status) != bool(config.isvalid))
 
                 listener.file_check_done(handle, status, success)
-        
+
             return Object(success  = success,
                           config   = config ,
                           errors   = errors ,
