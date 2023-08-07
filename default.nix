@@ -2,7 +2,30 @@
 
 with import <nixpkgs> {};
 
-let why3_local =
+let alt-ergo-pin =
+  alt-ergo.overrideAttrs (o : rec {
+    version = "2.4.2";
+    src = fetchFromGitHub {
+      owner = "OCamlPro";
+      repo = "alt-ergo";
+      rev = version;
+      hash = "sha256-8pJ/1UAbheQaLFs5Uubmmf5D0oFJiPxF6e2WTZgRyAc=";
+    };
+  });
+in
+
+let cvc4-pin = cvc4; in
+
+let z3-pin = z3_4_12; in
+
+let provers =
+  if withProvers then [
+    alt-ergo-pin
+    cvc4-pin
+    z3-pin
+  ] else []; in
+
+let why3-pin =
   why3.overrideAttrs (o : rec {
     version = "1.6.0";
     src = fetchurl {
@@ -11,13 +34,6 @@ let why3_local =
     };
   });
 in
-let why3 = why3_local; in
-
-let provers =
-  if withProvers then [
-    alt-ergo
-    z3
-  ] else []; in
 
 stdenv.mkDerivation {
   pname = "easycrypt";
@@ -36,11 +52,10 @@ stdenv.mkDerivation {
     menhir
     menhirLib
     yojson
-    why3
     zarith
   ]);
 
-  propagatedBuildInputs = [ why3 ]
+  propagatedBuildInputs = [ why3-pin ]
     ++ devDeps
     ++ provers;
 
