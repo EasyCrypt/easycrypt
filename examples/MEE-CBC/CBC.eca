@@ -818,7 +818,7 @@ section Probability_Collision.
                /\ 0 <= Bounder.c{2} <= Wrap.qC{2} * ell + i{2}
                /\ (Compute.bad{1} <=> !List.uniq Sample.l{2})
                /\ (forall x, mem Compute.qs{1} x <=> mem Sample.l{2} x)).
-        + rcondt{2} 3; first by auto=> /#.
+        + rcondt{2} 3; first auto => />; smt(mulrSl).
           by auto=> /> &1 &2; smt(in_fsetU in_fset1).
         by auto=> />; smt(size_ge0).
       by while (={i, p} /\ r{1} = c{2}); auto.

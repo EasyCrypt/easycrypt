@@ -405,33 +405,31 @@ section CollisionProbability.
   + byequiv=> //=; proc; inline *; wp.
     call (_: ={glob ARP} /\ ={c}(DBounder.FBounder,FEL) /\ card (frng ARP.m){1} <= FEL.c{2} /\ card (frng ARP.mi){1} <= FEL.c{2}).
     * proc; sp; if=> //=. rcondt{2} 1; first by auto=> /#.
-      inline *; sp; if=> //=; auto.
-      - progress.
-        + apply/(ler_trans (card (frng ARP.m{2} `|` fset1 yL))).
-            apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
-            rewrite get_setE; case: (x0 = x{2})=> [<<- /= ->|_ mx0] //.
-            by left; exists x0.
-          by rewrite fcardU fcard1; smt(fcard_ge0).
-        + apply/(ler_trans (card (frng ARP.mi{2} `|` fset1 x{2}))).
-            apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
-            rewrite get_setE; case: (x0 = yL)=> [<<- //|_ mx0].
-            by left; exists x0.
-          by rewrite fcardU fcard1; smt(fcard_ge0).
-      - smt().
+      inline *; sp; if=> //=; auto => [/>|/>/#].
+      progress.
+      - apply/(ler_trans (card (frng ARP.m{2} `|` fset1 yL))).
+        + apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
+          rewrite get_setE; case: (x0 = x{2})=> [<<- /= ->|_ mx0] //.
+          by left; exists x0.
+        by rewrite fcardU fcard1; smt(fcard_ge0).
+      - apply/(ler_trans (card (frng ARP.mi{2} `|` fset1 x{2}))).
+        + apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
+          rewrite get_setE; case: (x0 = yL)=> [<<- //|_ mx0].
+          by left; exists x0.
+        by rewrite fcardU fcard1; smt(fcard_ge0).
     * proc; sp; if=> //=. rcondt{2} 1; first by auto=> /#.
-      inline *; sp; if=> //=; auto.
-      - progress.
-        + apply/(ler_trans (card (frng ARP.m{2} `|` fset1 x{2}))).
-            apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
-            rewrite get_setE; case: (x0 = x0L)=> [<<- //|_ mx0].
-            by left; exists x0.
-          by rewrite fcardU fcard1; smt(fcard_ge0).
-        + apply/(ler_trans (card (frng ARP.mi{2} `|` fset1 x0L))).
-            apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
-            rewrite get_setE; case: (x0 = x{2})=> [<<- //|_ mx0].
-            by left; exists x0.
-          by rewrite fcardU fcard1; smt(fcard_ge0).
-      - smt().
+      inline *; sp; if=> //=; auto  => [/>|/>/#].
+      progress.
+      - apply/(ler_trans (card (frng ARP.m{2} `|` fset1 x{2}))).
+        + apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
+          rewrite get_setE; case: (x0 = x0L)=> [<<- //|_ mx0].
+          by left; exists x0.
+        by rewrite fcardU fcard1; smt(fcard_ge0).
+      - apply/(ler_trans (card (frng ARP.mi{2} `|` fset1 x0L))).
+        + apply/subset_leq_fcard=> x'; rewrite !inE !mem_frng !rngE=> - /= [x0].
+          rewrite get_setE; case: (x0 = x{2})=> [<<- //|_ mx0].
+          by left; exists x0.
+        by rewrite fcardU fcard1; smt(fcard_ge0).
     by auto=> />; rewrite frng0 fcards0.
   fel 2 FEL.c (fun x, x%r * mu uD (pred1 witness)) q (ARP.coll) 
            [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]
