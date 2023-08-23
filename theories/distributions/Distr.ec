@@ -926,6 +926,15 @@ exists y; rewrite eqr_le pmax_upper_bound /=.
 by apply flub_le_ub => z /#.
 qed.
 
+(* one of the elements with the highest probability *)
+op mode (d: 'a distr) = choiceb (fun x => p_max d = mu1 d x) witness.
+
+lemma mode_ge (d: 'a distr) x: mu1 d x <= mu1 d (mode d). 
+proof. 
+  suff <-: p_max d = mu1 d (mode d) by apply pmax_upper_bound.
+  have /choicebP /= /#: exists x, p_max d = mu1 d x by apply pmaxE.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op mlet ['a 'b] (d : 'a distr) (f : 'a -> 'b distr) =
   fun (y : 'b) => sum<:'a> (fun x => mu1 d x * mu1 (f x) y).
