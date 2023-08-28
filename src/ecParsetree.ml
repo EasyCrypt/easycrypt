@@ -958,6 +958,12 @@ type apply_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type clear_info = [
+  | `Exclude of psymbol list
+  | `Include of psymbol list
+]
+
+(* -------------------------------------------------------------------- *)
 type pgenhave = psymbol * intropattern option * psymbol list * pformula
 
 (* -------------------------------------------------------------------- *)
@@ -979,7 +985,7 @@ type logtactic =
   | Pcut        of pcut
   | Pcutdef     of (intropattern * pcutdef)
   | Pmove       of prevertv
-  | Pclear      of psymbol list
+  | Pclear      of clear_info
   | Prewrite    of (rwarg list * osymbol_r)
   | Prwnormal   of pformula * pqsymbol list
   | Psubst      of pformula list

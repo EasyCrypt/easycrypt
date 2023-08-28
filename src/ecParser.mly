@@ -2682,8 +2682,14 @@ logtactic:
 | MOVE vw=prefix(SLASH, pterm)* gp=prefix(COLON, revert)?
    { Pmove { pr_rev = odfl prevert0 gp; pr_view = vw; } }
 
+| CLEAR
+   { Pclear (`Exclude []) }
+
+| CLEAR MINUS l=loc(ipcore_name)+
+   { Pclear (`Exclude l) }
+
 | CLEAR l=loc(ipcore_name)+
-   { Pclear l }
+   { Pclear (`Include l) }
 
 | CONGR
    { Pcongr }

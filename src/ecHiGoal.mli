@@ -71,7 +71,7 @@ val process_mgenintros  : ?cf:bool -> ttenv -> introgenpattern list -> tactical
 val process_genintros   : ?cf:bool -> ttenv -> introgenpattern list -> backward
 val process_generalize  : ?doeq:bool -> genpattern list -> backward
 val process_move        : ?doeq:bool -> ppterm list -> prevert -> backward
-val process_clear       : psymbol list -> backward
+val process_clear       : clear_info -> backward
 val process_smt         : ?loc:EcLocation.t -> ttenv -> pprover_infos option -> backward
 val process_coq         : loc:EcLocation.t -> name:string -> ttenv -> EcProvers.coq_mode option -> pprover_infos -> backward
 val process_apply       : implicits:bool -> apply_t * prevert option -> backward
