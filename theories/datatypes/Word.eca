@@ -64,13 +64,17 @@ by rewrite -(@ofwordK s1) // -(@ofwordK s2) // eq_mkword.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op "_.[_]" (w : word) (i : int): t =
-  if 0 <= i < n then nth witness (ofword w) i else dchar
-axiomatized by getE.
+op [opaque] "_.[_]" (w : word) (i : int): t =
+  if 0 <= i < n then nth witness (ofword w) i else dchar.
+lemma getE w i: 
+  w.[i] = if 0 <= i < n then nth witness (ofword w) i else dchar.
+proof. by rewrite/"_.[_]". qed.
 
-op "_.[_<-_]" (w : word) (i : int) (x : t) : word =
-  mkword (mkseq (fun k => if i = k then x else w.[k]) n)
-axiomatized by setE.
+op [opaque] "_.[_<-_]" (w : word) (i : int) (x : t) : word =
+  mkword (mkseq (fun k => if i = k then x else w.[k]) n).
+lemma setE w i x: 
+  w.[i<-x] = mkword (mkseq (fun k => if i = k then x else w.[k]) n).
+proof. by rewrite/"_.[_<-_]". qed.
 
 (* -------------------------------------------------------------------- *)
 lemma wordP (w1 w2 : word):
