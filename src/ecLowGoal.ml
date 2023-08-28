@@ -323,8 +323,10 @@ let t_change ?ri ?target f tc =
   FApi.tcenv_of_tcenv1 (t_change1 ?ri ?target f tc)
 
 (* -------------------------------------------------------------------- *)
+type opmode = EcReduction.deltap
+
 type simplify_t =
-  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
+  ?target:ident -> ?delta:opmode -> ?logic:rlogic_info -> FApi.backward
 
 type simplify_with_info_t =
   ?target:ident -> reduction_info -> FApi.backward
@@ -335,8 +337,8 @@ let t_cbv_with_info ?target (ri : reduction_info) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let t_cbv ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
-  let ri = if delta then full_red else nodelta in
+let t_cbv ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) =
+  let ri = { nodelta with delta_p = fun _ -> delta } in
   let ri = { ri with logic } in
   t_cbv_with_info ?target ri tc
 
@@ -346,8 +348,8 @@ let t_cbn_with_info ?target (ri : reduction_info) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let t_cbn ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
-  let ri = if delta then full_red else nodelta in
+let t_cbn ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) =
+  let ri = { nodelta with delta_p = fun _ -> delta } in
   let ri = { ri with logic } in
   t_cbv_with_info ?target ri tc
 
@@ -2093,7 +2095,7 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     else ti in
 
   (* Entry of progress: simplify goal, and chain with progress *)
-  let rec entry tc = FApi.t_seq (t_simplify ~delta:false) aux0 tc
+  let rec entry tc = FApi.t_seq (t_simplify ~delta:`No) aux0 tc
 
   (* Progress (level 0): try to apply user tactic, chain with level 1. *)
   and aux0 tc = FApi.t_seq (FApi.t_try tt) aux1 tc
@@ -2195,7 +2197,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
     t tc in *)
 
   (* Entry of progress: simplify goal, and chain with progress *)
-  let rec entry (st : cstate) = t_simplify ~delta:false @! aux0 st
+  let rec entry (st : cstate) = t_simplify ~delta:`No @! aux0 st
 
   (* Progress (level 0): try to apply user tactic. *)
   and aux0 (st : cstate) = FApi.t_try tt @! aux1 st

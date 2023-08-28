@@ -328,10 +328,12 @@ and reduce_user_delta st f1 p tys args =
   | f -> f
   | exception NotReducible ->
     let mode = st.st_ri.delta_p p in
-    if mode <> `No && Op.reducible ~force:(mode = `Force) st.st_env p then
-      let f = Op.reduce ~force:(mode = `Force) st.st_env p tys in
+    let nargs = List.length args.stack in
+    match mode with
+    | #Op.redmode as mode when Op.reducible ~mode ~nargs st.st_env p ->
+      let f = Op.reduce ~mode ~nargs st.st_env p tys in
       cbv st Subst.subst_id f args
-    else f2
+    | _ -> f2
 
 (* -------------------------------------------------------------------- *)
 and reduce_logic st f =

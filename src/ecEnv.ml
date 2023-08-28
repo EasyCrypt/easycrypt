@@ -2833,6 +2833,8 @@ let ty_hnorm = Ty.ty_hnorm
 module Op = struct
   type t = EcDecl.operator
 
+  type redmode = [`Force | `IfTransparent | `IfApplied]
+
   let by_path_opt (p : EcPath.path) (env : env) =
     omap
       check_not_suspended
@@ -2873,27 +2875,39 @@ module Op = struct
   let rebind name op env =
     MC.bind_operator name op env
 
-  let reducible ?(force = false) env p =
-    try
-      let op = by_path p env in
-        match op.op_kind with
-        | OB_oper (Some (OP_Plain _))
-        | OB_pred (Some _) when force || not op.op_opaque -> true
-        | _ -> false
-
-    with LookupFailure _ -> false
-
-  let reduce ?(force = false) env p tys =
+  let core_reduce ?(mode = `IfTransparent) ?(nargs = 0) env p =
     let op = oget (by_path_opt p env) in
-    let f  =
-      match op.op_kind with
-      | OB_oper (Some (OP_Plain (f, _)))
-      | OB_pred (Some (PR_Plain f)) when force || not op.op_opaque ->
-          f
-      | _ -> raise NotReducible
-    in
-      EcCoreFol.Fsubst.subst_tvar
-        (EcTypes.Tvar.init (List.map fst op.op_tparams) tys) f
+
+    match op.op_kind with
+    | OB_oper (Some (OP_Plain (f, _)))
+    | OB_pred (Some (PR_Plain f)) -> begin
+        let f =
+          match mode with
+          | `Force ->
+             f
+          | `IfTransparent when not op.op_opaque ->
+             f
+          | `IfApplied when nargs >= odfl max_int op.op_unfold ->
+             f
+          | _ ->
+             raise NotReducible
+      in (op, f)
+    end
+
+    | _ -> raise NotReducible
+
+  let reducible ?mode ?nargs env p =
+    if Option.is_some (by_path_opt p env) then
+      try
+        ignore (core_reduce ?mode ?nargs env p : _ * form);
+        true
+      with NotReducible -> false
+    else false
+
+  let reduce ?mode ?nargs env p tys =
+    let op, f = core_reduce ?mode ?nargs env p in
+    EcCoreFol.Fsubst.subst_tvar
+      (EcTypes.Tvar.init (List.map fst op.op_tparams) tys) f
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)

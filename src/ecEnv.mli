@@ -314,6 +314,8 @@ end
 module Op : sig
   type t = operator
 
+  type redmode = [`Force | `IfTransparent | `IfApplied]
+
   val by_path     : path -> env -> t
   val by_path_opt : path -> env -> t option
   val lookup      : qsymbol -> env -> path * t
@@ -323,8 +325,8 @@ module Op : sig
   val add  : path -> env -> env
   val bind : ?import:import -> symbol -> operator -> env -> env
 
-  val reducible : ?force:bool -> env -> path -> bool
-  val reduce    : ?force:bool -> env -> path -> ty list -> form
+  val reducible : ?mode:redmode -> ?nargs:int -> env -> path -> bool
+  val reduce    : ?mode:redmode -> ?nargs:int -> env -> path -> ty list -> form
 
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool

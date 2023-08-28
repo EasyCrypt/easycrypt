@@ -1085,6 +1085,13 @@ ptybindings_decl:
 | x=ptybinding1+
     { List.flatten x }
 
+ptybindings_opdecl:
+| x=ptybinding1+
+    { (List.flatten x, None) }
+
+| x=ptybinding1* SLASH y=ptybinding1*
+    { (List.flatten x, Some (List.flatten y)) }
+
 (* -------------------------------------------------------------------- *)
 sc_var_ty:
 | x=ident+ COLON ty=loc(type_exp)
@@ -1938,7 +1945,7 @@ op_or_const:
 
 operator:
 | locality=locality k=op_or_const st=nosmt tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl?
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
     sty=prefix(COLON, loc(type_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
 
   { let gloc = EcLocation.make $startpos $endpos in
@@ -1950,14 +1957,14 @@ operator:
       po_aliases  = List.tl x;
       po_tags     = odfl [] tags;
       po_tyvars   = tyvars;
-      po_args     = odfl [] args;
+      po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (omap (unloc |- fst) b);
       po_ax       = obind snd b;
       po_nosmt    = st;
       po_locality = locality; } }
 
 | locality=locality k=op_or_const st=nosmt tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl?
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
 
   { { po_kind     = k;
@@ -1965,7 +1972,7 @@ operator:
       po_aliases  = List.tl x;
       po_tags     = odfl [] tags;
       po_tyvars   = tyvars;
-      po_args     = odfl [] args;
+      po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (Some (`Reft (rname, reft)));
       po_ax       = None;
       po_nosmt    = st;

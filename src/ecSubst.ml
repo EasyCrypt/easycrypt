@@ -1021,7 +1021,8 @@ let subst_op (s : subst) (op : operator) =
     op_kind     = kind          ;
     op_loca     = op.op_loca    ;
     op_opaque   = op.op_opaque  ;
-    op_clinline = op.op_clinline; }
+    op_clinline = op.op_clinline;
+    op_unfold   = op.op_unfold  ; }
 
 (* -------------------------------------------------------------------- *)
 let subst_ax (s : subst) (ax : axiom) =

@@ -127,6 +127,7 @@ type operator = {
   op_loca     : locality;
   op_opaque   : bool;
   op_clinline : bool;
+  op_unfold   : int option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -239,23 +240,24 @@ let is_prind op =
   | OB_pred (Some (PR_Ind _)) -> true
   | _ -> false
 
-let gen_op ?(clinline = false) ~opaque tparams ty kind lc = {
+let gen_op ?(clinline = false) ?unfold ~opaque tparams ty kind lc = {
   op_tparams  = tparams;
   op_ty       = ty;
   op_kind     = kind;
   op_loca     = lc;
   op_opaque   = opaque;
   op_clinline = clinline;
+  op_unfold   = unfold;
 }
 
-let mk_pred ?clinline ~opaque tparams dom body lc =
+let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
   let kind = OB_pred body in
   let ty   =  (EcTypes.toarrow dom EcTypes.tbool) in
-  gen_op ?clinline ~opaque tparams ty kind lc
+  gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
-let mk_op ?clinline ~opaque tparams ty body lc =
+let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
   let kind = OB_oper body in
-  gen_op ?clinline ~opaque tparams ty kind lc
+  gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {
