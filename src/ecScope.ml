@@ -1140,30 +1140,31 @@ module Op = struct
     let eenv = env scope in
     let ue = TT.transtyvars eenv (loc, op.po_tyvars) in
     let lc = op.po_locality in
+    let args = fst op.po_args @ odfl [] (snd op.po_args) in
     let (ty, body, refts) =
       match op.po_def with
       | PO_abstr pty ->
           let codom = TT.transty TT.tp_relax eenv ue pty in
-          let xs    = snd (TT.trans_binding eenv ue op.po_args) in
+          let xs    = snd (TT.trans_binding eenv ue args) in
           (EcTypes.toarrow (List.map snd xs) codom, `Abstract, [])
 
       | PO_concr (pty, pf) ->
           let codom   = TT.transty TT.tp_relax eenv ue pty in
-          let env, xs = TT.trans_binding eenv ue op.po_args in
+          let env, xs = TT.trans_binding eenv ue args in
           let body    = TT.trans_form env ue pf codom in
           let lam     = f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) xs) body in
           (lam.f_ty, `Plain lam, [])
 
       | PO_case (pty, pbs) -> begin
           let name = { pl_loc = loc; pl_desc = unloc op.po_name } in
-          match EHI.trans_matchfix eenv ue name (op.po_args, pty, pbs) with
+          match EHI.trans_matchfix eenv ue name (args, pty, pbs) with
           | (ty, opinfo) -> (ty, `Fix opinfo, [])
         end
 
       | PO_reft (pty, (rname, reft)) ->
           let env      = env scope in
           let codom    = TT.transty TT.tp_relax eenv ue pty in
-          let _env, xs = TT.trans_binding eenv ue op.po_args in
+          let _env, xs = TT.trans_binding eenv ue args in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
           let opabs    = EcDecl.mk_op ~opaque:false [] codom None lc in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
@@ -1209,7 +1210,12 @@ module Op = struct
 
     let tags   = Sstr.of_list (List.map unloc op.po_tags) in
     let opaque = Sstr.mem "opaque" tags in
-    let tyop   = EcDecl.mk_op ~opaque tparams ty body lc in
+    let unfold =
+      match op.po_args with
+      | (a, Some _) -> Some (List.length a)
+      | (_, None) -> None in
+
+    let tyop   = EcDecl.mk_op ~opaque ?unfold tparams ty body lc in
     let opname = EcPath.pqname (EcEnv.root eenv) (unloc op.po_name) in
 
     if op.po_kind = `Const then begin
@@ -1235,7 +1241,7 @@ module Op = struct
               let path  = EcPath.pqname (path scope) (unloc op.po_name) in
               let axop  =
                 let nosmt = op.po_nosmt in
-                let nargs = List.sum (List.map (List.length |- fst) op.po_args) in
+                let nargs = List.sum (List.map (List.length |- fst) args) in
                   EcDecl.axiomatized_op ~nargs ~nosmt path (tyop.op_tparams, bd) lc in
               let tyop  = { tyop with op_opaque = true; } in
               let scope = bind scope (unloc op.po_name, tyop) in
@@ -1404,6 +1410,7 @@ module Op = struct
       op_loca     = op.ppo_locality;
       op_opaque   = false;
       op_clinline = false;
+      op_unfold   = None;
     } in
 
     bind scope (unloc op.ppo_name, opdecl)

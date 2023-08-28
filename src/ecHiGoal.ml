@@ -109,7 +109,7 @@ let process_simplify_info ri (tc : tcenv1) =
     ri.pdelta
       |> omap (List.fold_left do1 (Sp.empty, Sid.empty))
       |> omap (fun (x, y) -> (fun p -> if Sp.mem p x then `Force else `No), (Sid.mem^~ y))
-      |> odfl ((fun _ -> `Yes), predT)
+      |> odfl ((fun _ -> `IfTransparent), predT)
   in
 
   {
@@ -142,10 +142,10 @@ let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
       t_admit tc
 
   | (`Standard | `Strict) as mode ->
-      t_seq (t_simplify ~delta:false) (t_smt ~mode pi) tc
+      t_seq (t_simplify ~delta:`No) (t_smt ~mode pi) tc
 
   | `Report ->
-      t_seq (t_simplify ~delta:false) (t_smt ~mode:(`Report loc) pi) tc
+      t_seq (t_simplify ~delta:`No) (t_smt ~mode:(`Report loc) pi) tc
 
 (* -------------------------------------------------------------------- *)
 let process_clear symbols tc =
@@ -635,7 +635,7 @@ let process_delta ~und_delta ?target (s, o, p) tc =
   in
 
   let ri = { EcReduction.full_red with
-               delta_p = (fun p -> if Some p = dp then `Force else `Yes)} in
+               delta_p = (fun p -> if Some p = dp then `Force else `IfTransparent)} in
   let na = List.length args in
 
   match s with
@@ -734,14 +734,14 @@ let process_rewrite1_r ttenv ?target ri tc =
         | Some logic ->
            let hyps   = FApi.tc1_hyps tc in
            let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
-           t_simplify_lg ?target ~delta:false (ttenv, logic)
+           t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic)
         | None -> t_id
       in FApi.t_seq tt process_trivial tc
 
   | RWSimpl logic ->
       let hyps   = FApi.tc1_hyps tc in
       let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
-      t_simplify_lg ?target ~delta:false (ttenv, logic) tc
+      t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic) tc
 
   | RWDelta ((s, r, o, px), p) -> begin
       if Option.is_some px then
@@ -1552,7 +1552,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     let t =
       match simplify with
       | Some x ->
-         t_seq (t_simplify_lg ~delta:false (ttenv, x)) process_trivial
+         t_seq (t_simplify_lg ~delta:`No (ttenv, x)) process_trivial
       | None -> process_trivial
     in t tc
 
@@ -1562,7 +1562,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     else process_smt ttenv pi tc
 
   and intro1_simplify (_ : ST.state) logic tc =
-    t_simplify_lg ~delta:false (ttenv, logic) tc
+    t_simplify_lg ~delta:`IfApplied (ttenv, logic) tc
 
   and intro1_clear (_ : ST.state) xs tc =
     process_clear xs tc

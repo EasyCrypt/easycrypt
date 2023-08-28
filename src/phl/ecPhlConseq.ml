@@ -707,7 +707,7 @@ let t_bdHoareF_conseq_equiv f2 p q p2 q2 tc =
 
 (* -------------------------------------------------------------------- *)
 let rec t_hi_conseq notmod f1 f2 f3 tc =
-  let t_mytrivial = fun tc -> t_simplify ?target:None ~delta:false tc in
+  let t_mytrivial = fun tc -> t_simplify ?target:None ~delta:`No tc in
   let t_mytrivial = [t_mytrivial; t_split; t_fail] in
   let t_mytrivial = FApi.t_try (FApi.t_seqs t_mytrivial) in
   let t_on1       = FApi.t_on1 ~ttout:t_mytrivial in

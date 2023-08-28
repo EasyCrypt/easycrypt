@@ -586,7 +586,8 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopr) =
                 op_kind     = OB_pred (Some (PR_Plain body));
                 op_opaque   = oopr.op_opaque;
                 op_clinline = prmode <> `Alias;
-                op_loca     = refpr.op_loca; } in
+                op_loca     = refpr.op_loca;
+                op_unfold   = refpr.op_unfold; } in
             (newpr, body)
 
         | `ByPath p -> begin

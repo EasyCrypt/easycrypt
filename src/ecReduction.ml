@@ -659,13 +659,13 @@ type reduction_info = {
   cost    : bool;
 }
 
-and deltap      = [`Yes | `No | `Force]
+and deltap      = [Op.redmode | `No]
 and rlogic_info = [`Full | `ProductCompat] option
 
 (* -------------------------------------------------------------------- *)
 let full_red = {
   beta    = true;
-  delta_p = (fun _ -> `Yes);
+  delta_p = (fun _ -> `IfTransparent);
   delta_h = EcUtils.predT;
   zeta    = true;
   iota    = true;
@@ -697,7 +697,7 @@ let nodelta =
       delta_h = EcUtils.pred0;
       delta_p = (fun _ -> `No); }
 
-let delta = { no_red with delta_p = (fun _ -> `Yes); }
+let delta = { no_red with delta_p = (fun _ -> `IfTransparent); }
 
 let full_compat = { full_red with logic = Some `ProductCompat; }
 
@@ -715,12 +715,15 @@ let reduce_local ri hyps x  =
   then try LDecl.unfold x hyps with NotReducible -> raise nohead
   else raise nohead
 
-let reduce_op ri env p tys =
-  if ri.delta_p p <> `No then
-    try
-      Op.reduce ~force:(ri.delta_p p = `Force) env p tys
-    with NotReducible -> raise nohead
-  else raise nohead
+let reduce_op ri env nargs p tys =
+  match ri.delta_p p with
+  | `No ->
+     raise nohead
+
+  | #Op.redmode as mode ->
+     try
+       Op.reduce ~mode ~nargs env p tys
+     with NotReducible -> raise nohead
 
 let is_record env f =
   match EcFol.destr_app f with
@@ -1034,10 +1037,10 @@ let reduce_logic ri env hyps f p args =
 let reduce_delta ri env _hyps f =
   match f.f_node with
   | Fop (p, tys) when ri.delta_p p <> `No ->
-      reduce_op ri env p tys
+      reduce_op ri env 0 p tys
 
   | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p <> `No ->
-      let op = reduce_op ri env p tys in
+      let op = reduce_op ri env (List.length args) p tys in
       f_app_simpl op args f.f_ty
 
   | _ -> raise nohead

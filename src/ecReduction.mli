@@ -75,7 +75,7 @@ type reduction_info = {
   cost    : bool;              (* reduce trivial cost statements *)
 }
 
-and deltap      = [`Yes | `No | `Force]
+and deltap      = [EcEnv.Op.redmode | `No]
 and rlogic_info = [`Full | `ProductCompat] option
 
 val full_red     : reduction_info

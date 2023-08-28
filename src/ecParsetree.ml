@@ -400,7 +400,7 @@ type poperator = {
   po_aliases: psymbol list;
   po_tags   : psymbol list;
   po_tyvars : ptyvardecls option;
-  po_args   : ptybindings;
+  po_args   : ptybindings * ptybindings option;
   po_def    : pop_def;
   po_ax     : osymbol_r;
   po_nosmt  : bool;

@@ -43,8 +43,10 @@ val t_trivial          :
   ?subtc:FApi.backward -> ?keep:bool -> ?conv:[`Alpha | `Conv] -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+type opmode = EcReduction.deltap
+
 type simplify_t =
-  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
+  ?target:ident -> ?delta:opmode -> ?logic:rlogic_info -> FApi.backward
 
 type simplify_with_info_t =
   ?target:ident -> reduction_info -> FApi.backward

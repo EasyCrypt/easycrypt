@@ -949,7 +949,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
             op_kind     = OB_pred (Some body);
             op_loca     = `Global;
             op_opaque   = false;
-            op_clinline = operator.op_clinline; } in
+            op_clinline = operator.op_clinline;
+            op_unfold   = operator.op_unfold; } in
         tg_subst, operator
 
       | OB_nott nott ->
@@ -964,7 +965,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
             op_kind     = OB_nott nott;
             op_loca     = `Global;
             op_opaque   = false;
-            op_clinline = operator.op_clinline; }
+            op_clinline = operator.op_clinline;
+            op_unfold   = operator.op_unfold; }
     in
     let to_gen = {to_gen with tg_subst} in
     to_gen, Some (Th_operator (name, operator))
