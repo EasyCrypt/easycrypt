@@ -24,7 +24,7 @@
   let opdef_of_opbody ty b =
     match b with
     | None            -> PO_abstr ty
-    | Some (`Expr e ) -> PO_concr (ty, e)
+    | Some (`Form f ) -> PO_concr (ty, f)
     | Some (`Case bs) -> PO_case  (ty, bs)
     | Some (`Reft rt) -> PO_reft  (ty, rt)
 
@@ -1972,7 +1972,7 @@ operator:
       po_locality = locality; } }
 
 opbody:
-| e=expr   { `Expr e  }
+| f=form   { `Form f  }
 | bs=opbr+ { `Case bs }
 
 opax:
@@ -3785,14 +3785,14 @@ clone_override:
 
 | OP st=nosmt x=qoident tyvars=bracket(tident*)?
     p=ptybinding1* sty=ioption(prefix(COLON, loc(type_exp)))
-    mode=loc(opclmode) e=expr
+    mode=loc(opclmode) f=form
 
    { let ov = {
        opov_nosmt  = st;
        opov_tyvars = tyvars;
        opov_args   = List.flatten p;
        opov_retty  = odfl (mk_loc mode.pl_loc PTunivar) sty;
-       opov_body   = e;
+       opov_body   = f;
      } in
 
      (x, PTHO_Op (`BySyntax ov, unloc mode)) }

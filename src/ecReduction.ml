@@ -2037,15 +2037,12 @@ let check_bindings exn tparams env s bd1 bd2 =
 
 let rec conv_oper env ob1 ob2 =
   match ob1, ob2 with
-  | OP_Plain(e1,_), OP_Plain(e2,_)  ->
-    Format.eprintf "[W]: ICI1@.";
-    conv_expr env EcSubst.empty e1 e2
-  | OP_Plain({e_node = Eop(p,tys)},_), _ ->
-    Format.eprintf "[W]: ICI2@.";
+  | OP_Plain(f1,_), OP_Plain(f2,_)  ->
+    error_body (is_conv (LDecl.init env []) f1 f2)
+  | OP_Plain({f_node = Fop(p,tys)},_), _ ->
     let ob1 = get_open_oper env p tys  in
     conv_oper env ob1 ob2
-  | _, OP_Plain({e_node = Eop(p,tys)}, _) ->
-    Format.eprintf "[W]: ICI3@.";
+  | _, OP_Plain({f_node = Fop(p,tys)}, _) ->
     let ob2 = get_open_oper env p tys in
     conv_oper env ob1 ob2
   | OP_Constr(p1,i1), OP_Constr(p2,i2) ->

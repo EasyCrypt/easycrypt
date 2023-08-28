@@ -380,7 +380,7 @@ type ptyvardecls =
 
 type pop_def =
   | PO_abstr of pty
-  | PO_concr of pty * pexpr
+  | PO_concr of pty * pformula
   | PO_case  of pty * pop_branch list
   | PO_reft  of pty * (psymbol * pformula)
 
@@ -1197,7 +1197,7 @@ and op_override_def = {
   opov_tyvars : psymbol list option;
   opov_args   : ptybinding list;
   opov_retty  : pty;
-  opov_body   : pexpr;
+  opov_body   : pformula;
 }
 
 and pr_override_def = {

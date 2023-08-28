@@ -434,7 +434,7 @@ let on_opdecl (cb : cb) (opdecl : operator) =
      match b with
      | OP_Constr _ | OP_Record _ | OP_Proj   _ -> assert false
      | OP_TC -> assert false
-     | OP_Plain  (e, _) -> on_expr cb e
+     | OP_Plain  (f, _) -> on_form cb f
      | OP_Fix    f ->
        let rec on_mpath_branches br =
          match br with
@@ -715,7 +715,7 @@ let tydecl_fv tyd =
 let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
   match body with
-  | OP_Plain (e, _) -> EcIdent.fv_union fv (fv_and_tvar_e e)
+  | OP_Plain (f, _) -> EcIdent.fv_union fv (fv_and_tvar_f f)
   | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> fv
   | OP_Fix opfix ->
     let fv =
@@ -902,8 +902,8 @@ let generalize_opdecl to_gen prefix (name, operator) =
           match body with
           | OP_Constr _ | OP_Record _ | OP_Proj _ -> assert false
           | OP_TC -> assert false (* ??? *)
-          | OP_Plain (e,nosmt) ->
-            OP_Plain (e_lam extra_a e, nosmt)
+          | OP_Plain (f,nosmt) ->
+            OP_Plain (f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) extra_a) f, nosmt)
           | OP_Fix opfix ->
             let subst = EcSubst.add_opdef EcSubst.empty path tosubst in
             let nb_extra = List.length extra_a in

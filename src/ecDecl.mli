@@ -49,7 +49,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcTypes.expr * bool (* nosmt? *)
+  | OP_Plain  of EcCoreFol.form * bool (* nosmt? *)
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -169,7 +169,7 @@ val axiomatized_op :
      ?nargs: int
   -> ?nosmt:bool
   -> EcPath.path
-  -> (ty_params * expr)
+  -> (ty_params * form)
   -> locality
   -> axiom
 
