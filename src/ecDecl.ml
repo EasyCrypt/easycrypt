@@ -74,7 +74,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcTypes.expr * bool  (* nosmt? *)
+  | OP_Plain  of EcCoreFol.form * bool  (* nosmt? *)
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -294,8 +294,7 @@ let operator_as_prind (op : operator) =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) lc =
-  let axbd = EcCoreFol.form_of_expr EcCoreFol.mhr bd in
+let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, axbd) lc =
   let axbd, axpm =
     let bdpm = List.map fst tparams in
     let axpm = List.map EcIdent.fresh bdpm in

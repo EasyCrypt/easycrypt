@@ -54,7 +54,6 @@ let destr_rint f =
 
   | _ -> destr_error "destr_rint"
 
-
 (* -------------------------------------------------------------------- *)
 let fop_int_le     = f_op CI.CI_Int .p_int_le    [] (toarrow [tint ; tint ] tbool)
 let fop_int_lt     = f_op CI.CI_Int .p_int_lt    [] (toarrow [tint ; tint ] tbool)

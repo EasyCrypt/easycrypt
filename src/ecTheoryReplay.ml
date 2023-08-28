@@ -132,12 +132,12 @@ let get_open_oper exn env p tys =
 
 let rec oper_compatible exn env ob1 ob2 =
   match ob1, ob2 with
-  | OP_Plain(e1,_), OP_Plain(e2,_)  ->
-    expr_compatible exn env EcSubst.empty e1 e2
-  | OP_Plain({e_node = Eop(p,tys)},_), _ ->
+  | OP_Plain(f1,_), OP_Plain(f2,_)  ->
+    error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 f2)
+  | OP_Plain({f_node = Fop(p,tys)},_), _ ->
     let ob1 = get_open_oper exn env p tys  in
     oper_compatible exn env ob1 ob2
-  | _, OP_Plain({e_node = Eop(p,tys)}, _) ->
+  | _, OP_Plain({f_node = Fop(p,tys)}, _) ->
     let ob2 = get_open_oper exn env p tys in
     oper_compatible exn env ob1 ob2
   | OP_Constr(p1,i1), OP_Constr(p2,i2) ->
@@ -445,9 +445,9 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
               let (ty, body) =
                 let codom   = EcTyping.transty tp env ue opov.opov_retty in
                 let env, xs = EcTyping.trans_binding env ue opov.opov_args in
-                let body    = EcTyping.transexpcast env `InOp ue codom opov.opov_body in
-                let lam     = EcTypes.e_lam xs body in
-                (lam.EcTypes.e_ty, lam)
+                let body    = EcTyping.trans_form env ue opov.opov_body codom in
+                let lam     = EcFol.f_lambda (List.map (fun (x, ty) -> (x, EcFol.GTty ty)) xs) body in
+                (lam.f_ty, lam)
               in
               begin
                 try ty_compatible env ue
@@ -462,7 +462,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                   ~loc "this operator body contains free type variables";
 
               let sty     = Tuni.subst (EcUnify.UniEnv.close ue) in
-              let body    = e_subst { e_subst_id with es_ty = sty } body in
+              let body    = EcFol.Fsubst.f_subst (EcFol.Fsubst.f_subst_init ~sty ()) body in
               let ty      = ty_subst sty ty in
               let tparams = EcUnify.UniEnv.tparams ue in
               let newop   =
@@ -480,7 +480,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
                     (match refop.op_kind with
                     | OB_oper (Some (OP_Plain (body, _))) -> body
                     | _ -> assert false)
-                  else EcTypes.e_op p tyargs refop.op_ty in
+                  else EcFol.f_op p tyargs refop.op_ty in
                 let decl   =
                   { refop with
                       op_kind = OB_oper (Some (OP_Plain (body, nosmt)));
@@ -496,6 +496,12 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, oopd) =
               (newop, subst, x, true)
 
           | `Inline _ ->
+              let body =
+                try
+                  EcFol.expr_of_form EcFol.mhr body
+                with EcFol.CannotTranslate ->
+                  clone_error env (CE_InlinedOpIsForm (snd ove.ovre_prefix, x))
+              in
               let subst1 = (List.map fst newop.op_tparams, body) in
               let subst  = EcSubst.add_opdef subst (xpath ove x) subst1
               in  (newop, subst, x, false)
@@ -919,9 +925,9 @@ and replay_instance
                 | OB_oper (Some (OP_Fix    _))
                 | OB_oper (Some (OP_TC      )) ->
                     Some (EcPath.pappend npath q)
-                | OB_oper (Some (OP_Plain (e, _))) ->
-                    match e.EcTypes.e_node with
-                    | EcTypes.Eop (r, _) -> Some r
+                | OB_oper (Some (OP_Plain (f, _))) ->
+                    match f.f_node with
+                    | Fop (r, _) -> Some r
                     | _ -> raise E.InvInstPath
   in
 

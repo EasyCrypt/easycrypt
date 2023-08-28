@@ -1147,12 +1147,12 @@ module Op = struct
           let xs    = snd (TT.trans_binding eenv ue op.po_args) in
           (EcTypes.toarrow (List.map snd xs) codom, `Abstract, [])
 
-      | PO_concr (pty, pe) ->
+      | PO_concr (pty, pf) ->
           let codom   = TT.transty TT.tp_relax eenv ue pty in
           let env, xs = TT.trans_binding eenv ue op.po_args in
-          let body    = TT.transexpcast env `InOp ue codom pe in
-          let lam     = EcTypes.e_lam xs body in
-          (lam.EcTypes.e_ty, `Plain lam, [])
+          let body    = TT.trans_form env ue pf codom in
+          let lam     = f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) xs) body in
+          (lam.f_ty, `Plain lam, [])
 
       | PO_case (pty, pbs) -> begin
           let name = { pl_loc = loc; pl_desc = unloc op.po_name } in
@@ -1189,13 +1189,13 @@ module Op = struct
 
     let uidmap  = EcUnify.UniEnv.close ue in
     let ts      = Tuni.subst uidmap in
-    let es      = e_subst { e_subst_id with es_ty = ts } in
+    let fs      = Fsubst.f_subst (Fsubst.f_subst_init ~sty:ts ()) in
     let ty      = ty_subst ts ty in
     let tparams = EcUnify.UniEnv.tparams ue in
     let body    =
       match body with
       | `Abstract -> None
-      | `Plain e  -> Some (OP_Plain (es e, nosmt))
+      | `Plain e  -> Some (OP_Plain (fs e, nosmt))
       | `Fix opfx ->
           Some (OP_Fix {
             opf_args     = opfx.EHI.mf_args;
@@ -1394,11 +1394,12 @@ module Op = struct
       (`Det, Sem.translate_e env ret) in
 
     let _, aout = Sem.translate_s env cont body.f_body in
-    let aout = e_lam (List.map2 (fun (_, ty) x -> (x, ty)) params ids) aout in
+    let aout = form_of_expr mhr aout in (* FIXME: translate to forms directly? *)
+    let aout = f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids) aout in
 
     let opdecl = EcDecl.{
       op_tparams  = [];
-      op_ty       = aout.e_ty;
+      op_ty       = aout.f_ty;
       op_kind     = OB_oper (Some (OP_Plain (aout, false)));
       op_loca     = op.ppo_locality;
       op_opaque   = false;

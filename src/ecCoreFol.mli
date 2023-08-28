@@ -338,6 +338,10 @@ val f_int_pow   : form -> form -> form
 val f_int_edivz : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
+val f_none : ty -> form
+val f_some : form -> form
+
+(* -------------------------------------------------------------------- *)
 val f_is_inf : form -> form
 val f_is_int : form -> form
 
@@ -466,7 +470,7 @@ type f_subst = private {
   fs_freshen  : bool; (* true means realloc local *)
   fs_loc      : form Mid.t;
   fs_esloc    : expr Mid.t;
-  fs_ty      : ty_subst;
+  fs_ty       : ty_subst;
   fs_mem      : EcIdent.t Mid.t;
   fs_memtype  : EcMemory.memtype option; (* Only substituted in Fcoe *)
   fs_mempred  : mem_pr Mid.t;  (* For predicates over memories,

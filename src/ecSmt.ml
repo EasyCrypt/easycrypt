@@ -1091,7 +1091,6 @@ and create_op ?(body = false) (genv : tenv) p =
     let decl =
       match body, op.op_kind with
       | true, OB_oper (Some (OP_Plain (body, false))) ->
-          let body = EcFol.form_of_expr EcFol.mhr body in
           let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
@@ -1449,8 +1448,8 @@ module Frequency = struct
     match EcEnv.Op.by_path_opt p env with
     | Some {op_kind = OB_pred (Some (PR_Plain f)) } ->
       r_union rs (f_ops unwanted_op f)
-    | Some {op_kind = OB_oper (Some (OP_Plain (e, false))) } ->
-      r_union rs (f_ops unwanted_op (form_of_expr mhr e))
+    | Some {op_kind = OB_oper (Some (OP_Plain (f, false))) } ->
+      r_union rs (f_ops unwanted_op f)
     | Some {op_kind = OB_oper (Some (OP_Fix ({ opf_nosmt = false } as e))) } ->
       let rec aux rs = function
         | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))

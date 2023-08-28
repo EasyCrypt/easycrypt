@@ -948,6 +948,14 @@ let f_xmuli_simpl f1 f2 =
   f_xmul_simpl (f_N f1) f2
 
 (* -------------------------------------------------------------------- *)
+let f_none (ty : ty) : form =
+  f_op EcCoreLib.CI_Option.p_none [ty] (toption ty)
+
+let f_some ({ f_ty = ty } as f : form) : form =
+  let op = f_op EcCoreLib.CI_Option.p_some [ty] (tfun ty (toption ty)) in
+  f_app op [f] (toption ty)
+
+(* -------------------------------------------------------------------- *)
 let cost_map g cost =
   let calls =
     EcPath.Mx.map (fun cb ->

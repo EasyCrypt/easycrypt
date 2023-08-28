@@ -752,15 +752,22 @@ end = struct
     | CE_TyIncompatible (x, err) ->
         msg "type `%s` %a"
           (string_of_qsymbol x) (pp_incompatible env) err
+
     | CE_ModTyIncompatible x ->
         msg "module type `%s` is incompatible"
           (string_of_qsymbol x)
+
     | CE_ModIncompatible x ->
         msg "module `%s` is incompatible"
           (string_of_qsymbol x)
 
     | CE_InvalidRE x ->
         msg "invalid regexp: `%s'" x
+
+    | CE_InlinedOpIsForm x ->
+        msg
+          "inlined operator's body must be an expression-like formula: `%s'"
+          (string_of_qsymbol x)
 end
 
 (* -------------------------------------------------------------------- *)

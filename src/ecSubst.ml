@@ -30,7 +30,7 @@ type subst = {
   sb_flocal   : EcCoreFol.form Mid.t;
   sb_fmem     : EcIdent.t Mid.t;
   sb_tydef    : (EcIdent.t list * ty) Mp.t;
-  sb_def      : (EcIdent.t list * [`Expr of expr | `Form of EcCoreFol.form]) Mp.t;
+  sb_def      : (EcIdent.t list * [`Op of  expr | `Pred of form]) Mp.t;
   sb_moddef   : EcPath.path Mp.t;
 }
 
@@ -100,7 +100,7 @@ let subst_mem (s : subst) (m : EcIdent.t) =
 (* -------------------------------------------------------------------- *)
 let get_opdef (s : subst) (p : EcPath.path) =
   match Mp.find_opt p s.sb_def with
-  | Some (ids, `Expr e) -> Some (ids, e) | _ -> None
+  | Some (ids, `Op f) -> Some (ids, f) | _ -> None
 
 (* -------------------------------------------------------------------- *)
 let has_opdef (s : subst) (p : EcPath.path) =
@@ -112,8 +112,8 @@ let get_def (s : subst) (p : EcPath.path) =
   | Some (ids, body) ->
      let body =
        match body with
-       | `Expr e -> form_of_expr mhr e
-       | `Form f -> f in
+       | `Op   e -> form_of_expr mhr e
+       | `Pred f -> f in
      Some (ids, body)
 
   | None -> None
@@ -257,13 +257,13 @@ let add_tydef (s : subst) p (ids, ty) =
   assert (Mp.find_opt p s.sb_tydef = None);
   { s with sb_tydef = Mp.add p (ids, ty) s.sb_tydef }
 
-let add_opdef (s : subst) p (ids, e) =
+let add_opdef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_def = None);
-  { s with sb_def = Mp.add p (ids, (`Expr e)) s.sb_def }
+  { s with sb_def = Mp.add p (ids, (`Op f)) s.sb_def }
 
 let add_pddef (s : subst) p (ids, f) =
   assert (Mp.find_opt p s.sb_def = None);
-  { s with sb_def = Mp.add p (ids, `Form f) s.sb_def }
+  { s with sb_def = Mp.add p (ids, `Pred f) s.sb_def }
 
 let add_moddef (s : subst) ~(src : EcPath.path) ~(dst : EcPath.path) =
   assert (Mp.find_opt src s.sb_moddef = None);
@@ -962,7 +962,7 @@ and subst_notation (s : subst) (nott : notation) =
 and subst_op_body (s : subst) (bd : opbody) =
   match bd with
   | OP_Plain (body, nosmt) ->
-      OP_Plain (subst_expr s body, nosmt)
+      OP_Plain (subst_form s body, nosmt)
 
   | OP_Constr (p, i)  -> OP_Constr (subst_path s p, i)
   | OP_Record p       -> OP_Record (subst_path s p)
