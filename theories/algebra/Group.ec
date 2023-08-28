@@ -456,11 +456,11 @@ type exp = ZModE.exp.
 import ZModE.
 
 (* -------------------------------------------------------------------- *)
-op (^)  (x : group) (k : exp) = x ^ (asint k)
-axiomatized by expE.
+op [opaque] (^)  (x : group) (k : exp) = x ^ (asint k).
+lemma expE x (k: exp): (^) x k = x ^ (asint k) by rewrite /(^).
 
-op loge (x : group) : exp = inzmod (log x)
-axiomatized by logE.
+op [opaque] loge (x : group) : exp = inzmod (log x).
+lemma logE (x: group) : loge x = inzmod (log x) by rewrite /loge.
 
 (* -------------------------------------------------------------------- *)
 abbrev root (k : exp) (x : group) = x ^ (inv k).

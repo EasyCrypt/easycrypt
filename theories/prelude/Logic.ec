@@ -1,3 +1,6 @@
+(* This theory is in the prelude, so it cannot be checked directly      *)
+(* Run easycrypt via the commandline with a `-boot` flag instead        *)
+
 (* -------------------------------------------------------------------- *)
 require import Tactics.
 
@@ -91,8 +94,8 @@ abbrev [-printing] transpose ['a 'b 'c] (f : 'a -> 'b -> 'c) (y : 'b) =
 lemma transposeP ['a, 'b, 'c] (f : 'a -> 'b -> 'c) (x : 'a) (y : 'b) : f x y = transpose f y x by done.
 
 (* -------------------------------------------------------------------- *)
-op eta_ (f : 'a -> 'b) = fun x => f x
-  axiomatized by etaE.
+op [opaque] eta_ (f : 'a -> 'b) = fun x => f x.
+lemma etaE (f : 'a -> 'b): eta_ f = fun x => f x by rewrite/eta_.
 
 (* -------------------------------------------------------------------- *)
 op (\o) ['a 'b 'c] (g : 'b -> 'c) (f : 'a -> 'b) =
@@ -690,5 +693,6 @@ lemma semptyNP ['a] (E : 'a -> bool) :
 proof. by rewrite /sempty -negb_exists. qed.
 
 (* Locking (use with `rewrite [...]lock /= unlock`) *)
-op locked (x : 'a) = x axiomatized by unlock.
+op [opaque] locked (x : 'a) = x. 
+lemma unlock (x : 'a) : locked x = x by rewrite/locked.
 lemma lock (x : 'a) : x = locked x by rewrite unlock.

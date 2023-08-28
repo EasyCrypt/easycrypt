@@ -22,15 +22,19 @@ lemma ofarray_inj: injective ofarray<:'a>.
 proof. by apply/(can_inj _ _ mkarrayK). qed.
 
 (* -------------------------------------------------------------------- *)
-op size (arr : 'a array) = size (ofarray arr)
-axiomatized by sizeE.
+op [opaque] size (arr : 'a array) = size (ofarray arr).
+lemma sizeE (arr: 'a array): size arr = size (ofarray arr).
+proof. by rewrite/size. qed.
 
-op "_.[_]" (arr : 'a array) (i : int) = nth witness (ofarray arr) i
-axiomatized by getE.
+op [opaque] "_.[_]" (arr : 'a array) i = nth witness (ofarray arr) i.
+lemma getE (arr: 'a array) i: arr.[i] = nth witness (ofarray arr) i.
+proof. by rewrite/"_.[_]". qed.
 
-op "_.[_<-_]" (arr : 'a array) (i : int) (x : 'a) =
-  mkarray (mkseq (fun k => if i = k then x else arr.[k]) (size arr))
-axiomatized by setE.
+op [opaque] "_.[_<-_]" (arr : 'a array) (i : int) (x : 'a) =
+  mkarray (mkseq (fun k => if i = k then x else arr.[k]) (size arr)).
+lemma setE (arr : 'a array) (i : int) (x : 'a): arr.[i<-x] =
+  mkarray (mkseq (fun k => if i = k then x else arr.[k]) (size arr)).
+proof. by rewrite /"_.[_<-_]". qed.
 
 (* -------------------------------------------------------------------- *)
 lemma size_ge0 (arr : 'a array): 0 <= size arr.
