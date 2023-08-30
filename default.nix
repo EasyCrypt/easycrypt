@@ -2,26 +2,23 @@
 
 with import <nixpkgs> {};
 
-let alt-ergo-pin =
-  alt-ergo.overrideAttrs (o : rec {
-    version = "2.4.2";
-    src = fetchFromGitHub {
-      owner = "OCamlPro";
-      repo = "alt-ergo";
-      rev = version;
-      hash = "sha256-8pJ/1UAbheQaLFs5Uubmmf5D0oFJiPxF6e2WTZgRyAc=";
-    };
-  });
+let alt-ergo-pin = callPackage scripts/nix/alt-ergo/default.nix { nixpkgs = <nixpkgs>; };
 in
 
-let cvc4-pin = cvc4; in
+let cvc4-pin = callPackage scripts/nix/cvc4/default.nix { nixpkgs = <nixpkgs>; };
+in
 
-let z3-pin = z3_4_12; in
+let cvc5-pin = callPackage scripts/nix/cvc5/default.nix { nixpkgs = <nixpkgs>; };
+in
+
+let z3-pin = callPackage scripts/nix/z3/default.nix { nixpkgs = <nixpkgs>; };
+in
 
 let provers =
   if withProvers then [
     alt-ergo-pin
     cvc4-pin
+    cvc5-pin
     z3-pin
   ] else []; in
 
