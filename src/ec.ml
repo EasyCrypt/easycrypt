@@ -1,12 +1,5 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
+open EcLib
 open EcUtils
 open EcOptions
 
@@ -39,6 +32,7 @@ let why3dflconf = Filename.concat XDG.home "why3.conf"
 (* -------------------------------------------------------------------- *)
 type pconfig = {
   pc_why3     : string option;
+  pc_ini      : string option;
   pc_loadpath : (EcLoader.namespace option * string) list;
 }
 
@@ -63,6 +57,12 @@ let print_config config =
   Format.eprintf "why3 configuration file@\n%!";
   begin match config.pc_why3 with
   | None   -> Format.eprintf "  <why3 default>@\n%!"
+  | Some f -> Format.eprintf "  %s@\n%!" f end;
+
+  (* Print EC configuration file location *)
+  Format.eprintf "EasyCrypt configuration file@\n%!";
+  begin match config.pc_ini with
+  | None   -> Format.eprintf "  <none>@\n%!"
   | Some f -> Format.eprintf "  %s@\n%!" f end;
 
   (* Print list of known provers *)
@@ -100,26 +100,29 @@ let print_config config =
 
 (* -------------------------------------------------------------------- *)
 let main () =
-  let theories =
-    match EcRelocate.sourceroot with
-    | None -> EcRelocate.Sites.theories
-    | Some src -> [Filename.concat src "theories"] in
+  (* When started from Emacs28 on Apple M1, the set of blocks signals *
+   * disallows Why3 server to detect external provers completion      *)
+  let _ : int list = Unix.sigprocmask Unix.SIG_SETMASK [] in
+
+  let theories = EcRelocate.Sites.theories in
 
   (* Parse command line arguments *)
-  let options =
-    let ini =
+  let conffile, options =
+    let conffile =
       let xdgini =
         XDG.Config.file
           ~exists:true ~mode:`All ~appname:EcVersion.app
           confname in
       let localini =
-        Option.map
-          (fun src -> List.fold_left Filename.concat src ["etc"; "easycrypt.conf"])
-          EcRelocate.sourceroot in
-      List.Exceptionless.hd (xdgini @ Option.to_list localini) in
+        Option.bind
+          EcRelocate.sourceroot
+          (fun src ->
+            let conffile = List.fold_left Filename.concat src ["etc"; confname] in
+            if Sys.file_exists conffile then Some conffile else None) in
+      List.Exceptionless.hd (Option.to_list localini @ xdgini) in
 
     let ini =
-      Option.bind ini (fun ini ->
+      Option.bind conffile (fun ini ->
         try  Some (EcOptions.read_ini_file ini)
         with
         | Sys_error _ -> None
@@ -128,7 +131,26 @@ let main () =
             exit 1
       )
 
-    in EcOptions.parse_cmdline ?ini Sys.argv in
+    in (conffile, EcOptions.parse_cmdline ?ini Sys.argv) in
+
+  (* Execution of eager commands *)
+  begin
+    match options.o_command with
+    | `Runtest input -> begin
+        let root =
+          match EcRelocate.sourceroot with
+          | Some root ->
+              List.fold_left Filename.concat root ["scripts"; "testing"]
+          | None ->
+              EcRelocate.resource ["commands"] in
+        let cmd  = Filename.concat root "runtest" in
+        let args = ["runtest"; input.runo_input] @ input.runo_scenarios in
+        Format.eprintf "Executing: %s@." (String.concat " " (cmd :: args));
+        Unix.execv cmd (Array.of_list args)
+      end
+
+    | _ -> ()
+  end;
 
   (* chrdir_$PATH if in reloc mode (FIXME / HACK) *)
   let relocdir =
@@ -189,6 +211,9 @@ let main () =
       ldropts.ldro_idirs;
   end;
 
+  (* Initialize printer *)
+  EcCorePrinting.Registry.register (module EcPrinting);
+
   (* Register user messages printers *)
   begin let open EcUserMessages in register () end;
 
@@ -198,6 +223,7 @@ let main () =
     | `Config ->
         let config = {
           pc_why3     = why3conf;
+          pc_ini      = conffile;
           pc_loadpath = EcCommands.loadpath ();
         } in
 
@@ -205,6 +231,9 @@ let main () =
 
     | `Why3Config -> begin
         let conf = cp_why3conf ~exists:false ~mode:`User in
+
+        conf |> Option.iter (fun conf ->
+          EcUtils.makedirs (Filename.dirname conf));
 
         let () =
           let ulnk = conf |> odfl why3dflconf in
@@ -230,8 +259,8 @@ let main () =
     | `Cli cliopts -> begin
         let terminal =
           if   cliopts.clio_emacs
-          then lazy (EcTerminal.from_emacs ())
-          else lazy (EcTerminal.from_tty ())
+          then lazy (T.from_emacs ())
+          else lazy (T.from_tty ())
 
         in (cliopts.clio_provers, None, terminal, true, false)
     end
@@ -249,13 +278,18 @@ let main () =
 
 
         let gcstats  = cmpopts.cmpo_gcstats in
+        let progress = if cmpopts.cmpo_script then `Script else `Human in
         let terminal =
-          lazy (EcTerminal.from_channel ~name ~gcstats (open_in name))
+          lazy (T.from_channel ~name ~gcstats ~progress (open_in name))
         in
           ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false, cmpopts.cmpo_noeco)
 
-    end
+      end
+
+    | `Runtest _ ->
+        (* Eagerly executed *)
+        assert false
   in
 
   (match input with
@@ -323,12 +357,20 @@ let main () =
   (* Initialize PRNG *)
   Random.self_init ();
 
+  (* Connect to external Why3 server if requested *)
+  prvopts.prvo_why3server |> oiter (fun server ->
+    try
+      Why3.Prove_client.connect_external server
+    with Why3.Prove_client.ConnectionError e ->
+      Format.eprintf "cannot connect to Why3 server `%s': %s" server e;
+      exit 1);
+
   (* Display Copyright *)
-  if EcTerminal.interactive terminal then
-    EcTerminal.notice ~immediate:true `Warning copyright terminal;
+  if T.interactive terminal then
+    T.notice ~immediate:true `Warning copyright terminal;
 
   try
-    if EcTerminal.interactive terminal then Sys.catch_break true;
+    if T.interactive terminal then Sys.catch_break true;
 
     (* Interaction loop *)
     let first = ref `Init in
@@ -360,7 +402,7 @@ let main () =
                EcScope.hierror "invalid pragma: `%s'\n%!" x);
 
             let notifier (lvl : EcGState.loglevel) (lazy msg) =
-              EcTerminal.notice ~immediate:true lvl msg terminal
+              T.notice ~immediate:true lvl msg terminal
             in
 
             EcCommands.addnotifier notifier;
@@ -373,28 +415,30 @@ let main () =
         | `Loop -> ()
         end;
 
-        oiter (EcTerminal.setwidth terminal)
+        oiter (T.setwidth terminal)
           (let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
            match EcGState.getvalue "PP:width" gs with
            | Some (`Int i) -> Some i | _ -> None);
 
         begin
-          match EcLocation.unloc (EcTerminal.next terminal) with
+          match EcLocation.unloc (T.next terminal) with
           | EP.P_Prog (commands, locterm) ->
               terminate := locterm;
               List.iter
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
+                   let timed = p.EP.gl_debug = Some `Timed in
+                   let break = p.EP.gl_debug = Some `Break in
                      try
                        let tdelta =
-                         EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
+                         EcCommands.process ~timed ~break p.EP.gl_action
                        in tstats loc tdelta
                      with
                      | EcCommands.Restart ->
                          raise EcCommands.Restart
                      | e -> begin
                        if Printexc.backtrace_status () then begin
-                         if not (EcTerminal.interactive terminal) then
+                         if not (T.interactive terminal) then
                            Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace
                        end;
                        raise (EcScope.toperror_of_exn ~gloc:loc e)
@@ -403,10 +447,12 @@ let main () =
 
           | EP.P_Undo i ->
               EcCommands.undo i
+          | EP.P_Exit ->
+              terminate := true
         end;
-        EcTerminal.finish `ST_Ok terminal;
+        T.finish `ST_Ok terminal;
         if !terminate then begin
-            EcTerminal.finalize terminal;
+            T.finalize terminal;
             if not eco then
               finalize_input input (EcCommands.current ());
             exit 0
@@ -416,15 +462,15 @@ let main () =
           first := `Restart
 
       | e -> begin
-          EcTerminal.finish
+          T.finish
             (`ST_Failure (EcScope.toperror_of_exn e))
             terminal;
-          if (!first = `Init) || not (EcTerminal.interactive terminal) then
+          if (!first = `Init) || not (T.interactive terminal) then
             exit 1
         end
     done
   with e ->
-    (try EcTerminal.finalize terminal with _ -> ());
+    (try T.finalize terminal with _ -> ());
     raise e
 
 (* -------------------------------------------------------------------- *)

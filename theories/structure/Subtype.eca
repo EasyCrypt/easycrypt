@@ -1,58 +1,111 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 pragma +implicits.
+
 
 (* -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 (* This theory defines the subtype [sT] of [T] defined as {x : T | P x} *)
-(* where P is a predicate over T. This subtype is defined via an        *)
-(* axiomatization of an inversible partial projection from [T] to [sT]  *)
-(* that respects [P].                                                   *)
+(* where P is a nonempty predicate over T. This subtype is defined      *)
+(* using [choiceb] through a global axiom asserting the existence of    *)
+(* the injection from [sT] to [T].                                      *)
 (*                                                                      *)
 (* Injection from [sT] to [T] and (partial) projection of [T] to [sT]   *)
-(*    val   == generic injection from [sT] to [T]                       *)
-(*    insub == generic partial projection from [T] to [sT]              *)
+(*    val    == generic injection from [sT] to [T]                      *)
+(*    insub  == generic partial projection from [T] to [sT]             *)
+(*    insubd == odflt witness (insub x)                                 *)
 (*                                                                      *)
 (*    {x : T | P x} and [sT] are in bijection via val/insub.            *)
 (*       1. insub x = None                  if !(P x)                   *)
 (*       2. insub x = Some y with val y = x if  (P x)                   *)
 (* -------------------------------------------------------------------- *)
 
-require import Core.
+require import AllCore.
 
-type T, sT.
-pred P : T.
+(* These three parameters are to be instantiated by the user. *)
+type T.
+op P : T -> bool.
+axiom inhabited: exists x, P x.
 
-op insub : T  -> sT option.
-op val   : sT -> T.
+(* This parameter must never be instantiated upon cloning, otherwise
+   unsoundness may ensure. Hence the name. *)
+type do_not_instantiate_this_type.
+(* TODO: we want a tag to make abstract types uninstantiable *)
 
-axiom insubN (x : T): !P x => insub x = None.
-axiom insubT (x : T):  P x => omap val (insub x) = Some x.
+(* The lemma below is justified by the axiom [inhabited] and the fact
+  that the type [do_not_instantiate_this_type] is unspecified. It says
+  that there is an injective function [f] with range [P]
 
-axiom valP (x : sT): P (val x).
-axiom valK: pcancel val insub.
+  The proof is admitted, essentially turning it into a global axiom
+  asserting the existence of subtypes. We cannot use [axiom] here,
+  because this would make the lemma a parameter of the theory *)
+
+lemma nosmt subtype_injection:
+  exists (f : do_not_instantiate_this_type -> T),
+    injective f /\ (forall x, P x <=> exists y, x = f y).
+admitted.
+(* TODO: together with uninstantiable abstract types, we also want
+   global axioms in (abstract) theories.that do not show up in [proof*] *)
+
+(* This is the subtype that the user sees. By making it a type-copy of
+   [do_not_instantiate_this_type], we make sure that the user cannot
+   do `type sT <- ...` when cloning. *)
+type sT = do_not_instantiate_this_type wrapped.
+
+(* We define `val` in two steps so that `print val` does not show the
+   ugly internal stuff *)
+op nosmt [opaque] internal_val = choiceb
+   (fun (f : do_not_instantiate_this_type -> T),
+     injective f /\ (forall (x:T), ((P x) <=> exists y, x = f y))) witness.
 
 (* -------------------------------------------------------------------- *)
-(* EasyCrypt types cannot be empty. We here explicitely provide the     *)
-(* inverse element of default inhabitant of [sT]                        *)
-op wsT : T.
 
-axiom insubW: insub wsT = Some witness<:sT>.
+(* Injection from [sT] to [T] *)
+op nosmt [opaque] val (x : sT) : T = with x = Wrap x' => internal_val x'.
+
+lemma val_range x: P x <=> exists y, x = val y.
+proof.
+have /= := choicebP _ witness subtype_injection; rewrite -/internal_val.
+move => [ival_inj ival_range].
+split => [Px|[[y] ->]]; 2: smt().
+have := ival_range x; rewrite Px /= => -[z ?].
+by exists (Wrap z); smt().
+qed.
+
+lemma val_inj: injective val.
+proof.
+have /= := choicebP _ witness subtype_injection; rewrite -/internal_val.
+by move => [ival_inj _] [x] [y] /#.
+qed.
+
+lemma valP (x : sT): P (val x) by smt (val_range).
+
+(* -------------------------------------------------------------------- *)
+
+op nosmt [opaque] insub : T -> sT option = pinv val.
+
+lemma insubN (x : T): !P x => insub x = None.
+proof. by rewrite /insub => not; apply pinvN; smt(val_range). qed.
+
+lemma valK: pcancel val insub.
+proof. by rewrite /insub; apply/pcancel_pinv/val_inj. qed.
+
+lemma insubT (x : T):  P x => omap val (insub x) = Some x.
+proof. by move => Px @/insub; apply pinv_inv; smt(val_range). qed.
+
+(* -------------------------------------------------------------------- *)
+
+(* TODO: Maybe this could be removed, it seems relatively
+pointless. It's here for compatibility with the previous Subtype
+implementation *)
+op nosmt wsT = val witness.
+
+lemma insubW: insub wsT = Some witness<:sT>.
+proof. by rewrite /wsT; smt (valK). qed.
 
 (* -------------------------------------------------------------------- *)
 op insubd (x : T) = odflt witness (insub x).
 
 (* -------------------------------------------------------------------- *)
-lemma val_inj: injective val.
-proof. by apply/(pcan_inj _ _ valK). qed.
-
 lemma valKd: cancel val insubd.
 proof. by move=> u; rewrite /insubd valK. qed.
 

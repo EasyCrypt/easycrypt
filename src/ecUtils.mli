@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 module Enum = BatEnum
 
@@ -13,6 +5,9 @@ module Enum = BatEnum
 exception Unexpected
 
 val unexpected : unit -> 'a
+
+(* -------------------------------------------------------------------- *)
+val makedirs : string -> unit
 
 (* -------------------------------------------------------------------- *)
 type 'data cb = Cb : 'a * ('data -> 'a -> unit) -> 'data cb
@@ -293,6 +288,8 @@ module List : sig
   val rev_pmap   : ('a -> 'b option) -> 'a list -> 'b list
   val rotate     : [`Left|`Right] -> int -> 'a list -> int * 'a list
   val reduce1    : ('a list -> 'a) -> 'a list -> 'a
+  val find_dup   : ?cmp:('a -> 'a -> int) -> 'a list -> 'a option
+  val has_dup    : ?cmp:('a -> 'a -> int) -> 'a list -> bool
 
   (* ------------------------------------------------------------------ *)
   val ksort:

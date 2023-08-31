@@ -1,6 +1,6 @@
-FROM easycryptpa/ec-build-box:latest
+FROM ghcr.io/easycrypt/ec-build-box:latest
 
-ARG SOURCE_BRANCH=1.0
+ARG SOURCE_BRANCH=r2022.04
 
 RUN \
 	opam pin --dev-repo add -n easycrypt https://github.com/EasyCrypt/easycrypt.git#${SOURCE_BRANCH} && \

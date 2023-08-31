@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcBigInt
 open EcMaps
@@ -61,8 +53,10 @@ val ty_fv_and_tvar : ty -> int Mid.t
 val tunit   : ty
 val tbool   : ty
 val tint    : ty
+val txint   : ty
 val treal   : ty
 val tdistr  : ty -> ty
+val toption : ty -> ty
 val tcpred  : ty -> ty
 val toarrow : ty list -> ty -> ty
 
@@ -81,7 +75,7 @@ val ty_check_uni : ty -> unit
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
-  ts_mp  : EcPath.mpath -> EcPath.mpath;
+  ts_mp  : EcPath.smsubst;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
   ts_u   : (uid -> ty option);
   ts_v   : ty Mid.t;
@@ -139,18 +133,40 @@ val lp_ids   : lpattern -> EcIdent.t list
 val lp_fv    : lpattern -> EcIdent.Sid.t
 
 (* -------------------------------------------------------------------- *)
-type pvar_kind =
-  | PVglob
-  | PVloc
-
-type prog_var = private {
-  pv_name : EcPath.xpath;
-  pv_kind : pvar_kind;
+type ovariable = {
+  ov_name : symbol option;
+  ov_type : ty;
 }
+val ov_name  : ovariable -> symbol option
+val ov_type  : ovariable -> ty
+val ov_hash  : ovariable -> int
+val ov_equal : ovariable -> ovariable -> bool
+
+type variable = {
+    v_name : symbol;   (* can be "_" *)
+    v_type : ty;
+  }
+val v_name  : variable -> symbol
+val v_type  : variable -> ty
+val v_hash  : variable -> int
+val v_equal : variable -> variable -> bool
+
+val ovar_of_var: variable -> ovariable
+
+(* -------------------------------------------------------------------- *)
+type pvar_kind =
+  | PVKglob
+  | PVKloc
+
+type prog_var = private
+  | PVglob of EcPath.xpath
+  | PVloc of EcSymbols.symbol
 
 val pv_equal       : prog_var -> prog_var -> bool
 val pv_compare     : prog_var -> prog_var -> int
 val pv_ntr_compare : prog_var -> prog_var -> int
+
+val pv_kind : prog_var -> pvar_kind
 
 (* work only if the prog_var has been normalized *)
 val pv_compare_p : prog_var -> prog_var -> int
@@ -159,17 +175,23 @@ val pv_fv      : prog_var -> int EcIdent.Mid.t
 val is_loc     : prog_var -> bool
 val is_glob    : prog_var -> bool
 
+val get_loc     : prog_var -> EcSymbols.symbol
+val get_glob    : prog_var -> EcPath.xpath
+
 val symbol_of_pv   : prog_var -> symbol
 val string_of_pvar : prog_var -> string
+val name_of_pvar   : prog_var -> string
 
 val pv_subst : (EcPath.xpath -> EcPath.xpath) -> prog_var -> prog_var
 
-val pv_loc  : EcPath.xpath -> symbol -> prog_var
+val pv_loc  : EcSymbols.symbol -> prog_var
 val pv_glob : EcPath.xpath -> prog_var
 val xp_glob : EcPath.xpath -> EcPath.xpath
-val pv_res  : EcPath.xpath -> prog_var
-val pv_arg  : EcPath.xpath -> prog_var
-val pv      : EcPath.xpath -> pvar_kind -> prog_var
+
+val arg_symbol : symbol
+val res_symbol : symbol
+val pv_res  : prog_var
+val pv_arg  : prog_var
 
 (* -------------------------------------------------------------------- *)
 type expr = private {
@@ -236,6 +258,9 @@ val e_quantif  : equantif -> ebindings -> expr -> expr
 val e_forall   : ebindings -> expr -> expr
 val e_exists   : ebindings -> expr -> expr
 val e_proj     : expr -> int -> ty -> expr
+val e_none     : ty -> expr
+val e_some     : expr -> expr
+val e_oget     : expr -> ty -> expr
 
 val e_proj_simpl : expr -> int -> ty -> expr
 
@@ -246,6 +271,7 @@ val is_tuple_var : expr -> bool
 
 val destr_local     : expr -> EcIdent.t
 val destr_var       : expr -> prog_var
+val destr_app       : expr -> expr * expr list
 val destr_tuple_var : expr -> prog_var list
 
 (* -------------------------------------------------------------------- *)
@@ -261,14 +287,15 @@ val e_map :
 val e_fold :
   ('state -> expr -> 'state) -> 'state -> expr -> 'state
 
+val e_iter : (expr -> unit) -> expr -> unit
+
 (* -------------------------------------------------------------------- *)
 type e_subst = {
   es_freshen : bool; (* true means realloc local *)
   es_p       : EcPath.path -> EcPath.path;
   es_ty      : ty -> ty;
   es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
-  es_mp      : EcPath.mpath -> EcPath.mpath;
-  es_xp      : EcPath.xpath -> EcPath.xpath;
+  es_mp      : EcPath.smsubst;
   es_loc     : expr Mid.t;
 }
 
@@ -281,7 +308,7 @@ val e_subst_init :
   -> (EcPath.path -> EcPath.path)
   -> (ty -> ty)
   -> (EcIdent.t list * expr) EcPath.Mp.t
-  -> EcPath.mpath EcIdent.Mid.t
+  -> EcPath.smsubst
   -> expr Mid.t
   -> e_subst
 

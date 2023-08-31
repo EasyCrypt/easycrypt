@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcIdent
@@ -28,17 +20,8 @@ type dterror =
 | DTE_Empty
 
 type fxerror =
-| FXE_TypeError of EcTyping.tyerror
-| FXE_EmptyMatch
-| FXE_MatchParamsMixed
-| FXE_MatchParamsDup
-| FXE_MatchParamsUnk
-| FXE_MatchNonLinear
-| FXE_MatchDupBranches
-| FXE_MatchPartial
-| FXE_CtorUnk
-| FXE_CtorAmbiguous
-| FXE_CtorInvalidArity of (symbol * int * int)
+| FXLowError of EcTyping.tyerror
+| FXError    of EcTyping.fxerror
 
 (* -------------------------------------------------------------------- *)
 exception RcError of EcLocation.t * EcEnv.env * rcerror
@@ -48,7 +31,7 @@ exception FxError of EcLocation.t * EcEnv.env * fxerror
 (* -------------------------------------------------------------------- *)
 val rcerror : EcLocation.t -> EcEnv.env -> rcerror -> 'a
 val dterror : EcLocation.t -> EcEnv.env -> dterror -> 'a
-val fxerror : EcLocation.t -> EcEnv.env -> fxerror -> 'a
+val fxerror : EcLocation.t -> EcEnv.env -> EcTyping.fxerror -> 'a
 
 (* -------------------------------------------------------------------- *)
 val trans_record : env -> ptydname -> precord -> record

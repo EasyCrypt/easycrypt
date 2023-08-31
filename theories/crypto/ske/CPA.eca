@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import Bool Core.
 require (*--*) DBool NewSKE.
 
@@ -31,8 +23,8 @@ module IND_CPA ( S : SKE, A : Adv_CPA) = {
     (p0,p1) <@ A.choose();
     b       <$ {0,1};
     p       <- b ? p1 : p0; (* FIXME: need to check whether plaintexts are both valid or both invalid *)
-    c       <- O.enc(p);
-    b'      <- A.guess(oget c);
+    c       <@ O.enc(p);
+    b'      <@ A.guess(oget c);
     return b = b';
   }
 }.

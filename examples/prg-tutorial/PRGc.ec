@@ -151,7 +151,7 @@ module D_PRF (D:PRGa.Distinguisher,F:PRFA) = {
 section Fact1.
   (* Lemmas in this section are true forall PRG distinguisher D
      that do not share memory with SRG, PRFr, PRFi, or D_PRF. *)
-  declare module D <: PRGa.Distinguisher {SRG,PRFr,PRFi,D_PRF}.
+  declare module D <: PRGa.Distinguisher {-SRG,-PRFr,-PRFi,-D_PRF}.
 
   local lemma SRG_PRGp &m:
     Pr[IND_PRG(SRG,D).main() @ &m: res] = Pr[IND_PRF(PRFc,D_PRF(D)).main() @ &m: res].
@@ -245,16 +245,16 @@ module C_D_PRG(D:PRGa.Distinguisher,G:PRGa.RGA) = {
   }
 }.
 
-equiv Count_PRG_equiv (G <: PRGa.RG {C_PRG}) (D <: PRGa.Distinguisher {G,C_PRG}):
+equiv Count_PRG_equiv (G <: PRGa.RG {-C_PRG}) (D <: PRGa.Distinguisher {-G,-C_PRG}):
   IND_PRG(C_PRG(G),D).main ~ IND_PRG(G,C_D_PRG(D)).main:
     ={glob D, glob G} ==> ={glob D, glob C_PRG(G), res}.
 proof. by proc; inline *; swap{2} 2 -1; sim. qed.
 
-lemma Count_PRG (G <: PRGa.RG {C_PRG}) (D <: PRGa.Distinguisher {G,C_PRG}) &m:
+lemma Count_PRG (G <: PRGa.RG {-C_PRG}) (D <: PRGa.Distinguisher {-G,-C_PRG}) &m:
   Pr[IND_PRG(C_PRG(G),D).main() @ &m: res] = Pr[IND_PRG(G,C_D_PRG(D)).main() @ &m: res]
 by byequiv (Count_PRG_equiv G D).
 
-lemma Count_PRG_noop (G <: PRGa.RG {C_PRG}) (D <: PRGa.Distinguisher {G,C_PRG}) &m:
+lemma Count_PRG_noop (G <: PRGa.RG {-C_PRG}) (D <: PRGa.Distinguisher {-G,-C_PRG}) &m:
   Pr[IND_PRG(G,D).main() @ &m: res] = Pr[IND_PRG(C_PRG(G),D).main() @ &m: res].
 proof.
 byequiv=> //=; proc; inline *; sim (: ={glob G}): (={b}).
@@ -300,16 +300,16 @@ module C_D_PRF(D:PRFa.Distinguisher,F:PRFa.PRFA) = {
   }  
 }.
 
-equiv Count_PRF_equiv (F <: PRFa.PRF {C_PRF}) (D <: PRFa.Distinguisher {F,C_PRF}):
+equiv Count_PRF_equiv (F <: PRFa.PRF {-C_PRF}) (D <: PRFa.Distinguisher {-F,-C_PRF}):
   IND_PRF(C_PRF(F),D).main ~ IND_PRF(F,C_D_PRF(D)).main:
     ={glob D, glob F} ==> ={glob D, glob C_PRF(F), res}.
 proof. by proc; inline *; swap{2} 2 -1; sim. qed.
 
-lemma Count_PRF (F <: PRFa.PRF {C_PRF}) (D <: PRFa.Distinguisher {F,C_PRF}) &m:
+lemma Count_PRF (F <: PRFa.PRF {-C_PRF}) (D <: PRFa.Distinguisher {-F,-C_PRF}) &m:
   Pr[IND_PRF(C_PRF(F),D).main() @ &m: res] = Pr[IND_PRF(F,C_D_PRF(D)).main() @ &m: res]
 by byequiv (Count_PRF_equiv F D).
 
-lemma Count_PRF_noop (F <: PRFa.PRF {C_PRF}) (D <: PRFa.Distinguisher {F,C_PRF}) &m:
+lemma Count_PRF_noop (F <: PRFa.PRF {-C_PRF}) (D <: PRFa.Distinguisher {-F,-C_PRF}) &m:
   Pr[IND_PRF(F,D).main() @ &m: res] = Pr[IND_PRF(C_PRF(F),D).main() @ &m: res].
 proof.
 byequiv=> //=; proc; inline *; sim (: ={glob F}): (={b}).
@@ -317,8 +317,8 @@ by proc *; inline *; sim.
 qed.
 
 (* -------------------------------------------------------------------- *)
-equiv Count_AdvQueries_PRF (F <: PRFa.PRF {SRG,D_PRF,C_PRF,C_PRG})
-                           (D <: PRGa.Distinguisher {SRG,D_PRF,F,C_PRF,C_PRG}):
+equiv Count_AdvQueries_PRF (F <: PRFa.PRF {-SRG,-D_PRF,-C_PRF,-C_PRG})
+                           (D <: PRGa.Distinguisher {-SRG,-D_PRF,-F,-C_PRF,-C_PRG}):
   IND_PRF(F,D_PRF(C_D_PRG(D))).main ~ IND_PRF(C_PRF(F),D_PRF(D)).main:
     ={glob F, glob D} ==> ={glob F, glob D, res} /\ ={c}(C_PRG,C_PRF).
 proof.
@@ -333,8 +333,8 @@ qed.
   *   Pr[IND^PRF_PRFi(D^PRF_D): res] - Pr[IND^PRF_PRGi(D): res]
   *   <= Pr[IND^PRF_PRFi(D^PRF_D): !uniq D^PRF_D.log]                  **)
 section Fact2.
-  declare module D <: PRGa.Distinguisher {SRG,PRFr,PRFi,D_PRF}.
-  declare axiom D_distinguish_ll (G <: RGA {D}): islossless G.next => islossless D(G).distinguish.
+  declare module D <: PRGa.Distinguisher {-SRG,-PRFr,-PRFi,-D_PRF}.
+  declare axiom D_distinguish_ll (G <: RGA {-D}): islossless G.next => islossless D(G).distinguish.
 
   inductive inv (m : ('a,'b) fmap) (logP : 'a list) =
     | EqQueries of (dom m = mem logP).
@@ -411,8 +411,8 @@ section Fact2.
 end section Fact2.
   
 (* This concludes the proof of Theorem 1. *)
-lemma Theorem1 (D <: PRGa.Distinguisher {SRG,PRFc,PRFi,D_PRF}) &m:
-  (forall (G <: RGA {D}), islossless G.next => islossless D(G).distinguish) =>
+lemma Theorem1 (D <: PRGa.Distinguisher {-SRG,-PRFc,-PRFi,-D_PRF}) &m:
+  (forall (G <: RGA {-D}), islossless G.next => islossless D(G).distinguish) =>
   Pr[IND_PRG(SRG,D).main() @ &m: res] - Pr[IND_PRG(PRGi,D).main() @ &m: res]
   <= (Pr[IND_PRF(PRFc,D_PRF(D)).main() @ &m: res]
       - Pr[IND_PRF(PRFi,D_PRF(D)).main() @ &m: res])
@@ -426,8 +426,8 @@ qed.
 (* -------------------------------------------------------------------- *)
 (** Lemma 2: Forall q \geq 0, and forall D that calls next at most q
              times, D_PRF(D) calls f at most q times. **)
-lemma Lemma2 q (D <: PRGa.Distinguisher {SRG,PRFc,C_PRG,C_PRF,D_PRF}):
-  (forall (G <: PRGa.RG {D,C_PRG}) &m,
+lemma Lemma2 q (D <: PRGa.Distinguisher {-SRG,-PRFc,-C_PRG,-C_PRF,-D_PRF}):
+  (forall (G <: PRGa.RG {-D,-C_PRG}) &m,
     islossless G.init =>
     islossless G.next =>
     Pr[IND_PRG(C_PRG(G),D).main() @ &m: C_PRG.c <= q] = 1%r) =>
@@ -451,18 +451,18 @@ qed.
 op     qN : { int | 0 <= qN } as ge0_qN.
 
 section Lemma1.
-  declare module D <: PRGa.Distinguisher {SRG,PRFc,PRFi,C_PRG,C_PRF,D_PRF}.
+  declare module D <: PRGa.Distinguisher {-SRG,-PRFc,-PRFi,-C_PRG,-C_PRF,-D_PRF}.
 
-  declare axiom D_distinguish_ll (G <: PRGa.RGA {D}):
+  declare axiom D_distinguish_ll (G <: PRGa.RGA {-D}):
     islossless G.next => islossless D(G).distinguish.
 
-  declare axiom D_bounded (G <: PRGa.RG {D,C_PRG}) &m:
+  declare axiom D_bounded (G <: PRGa.RG {-D,-C_PRG}) &m:
     islossless G.init => islossless G.next =>
     Pr[IND_PRG(C_PRG(G),D).main() @ &m: C_PRG.c <= qN] = 1%r.
 
   (* We express the adversary assumption in Hoare form for use with
      conseq. This requires some gymnastics. *)
-  lemma D_bounded_hoare (G <: RG {D,C_PRG}):
+  lemma D_bounded_hoare (G <: RG {-D,-C_PRG}):
     islossless G.init =>
     islossless G.next =>
     hoare [IND_PRG(C_PRG(G),D).main: true ==> C_PRG.c <= qN].
@@ -532,9 +532,9 @@ end section Lemma1.
       ii) D makes at most qN calls to its next oracle,
     we have:
       Adv^PRG_SRG(D) <= Adv^PRF_PRFc(D_PRF(D)) + qN^2/|state|.        **)
-lemma Security (D <: PRGa.Distinguisher {SRG,PRFc,PRFi,C_PRG,C_PRF,D_PRF}) &m:
-  (forall (G <: PRGa.RGA {D}), islossless G.next => islossless D(G).distinguish) =>
-  (forall (G <: PRGa.RG {D,C_PRG}) &m,
+lemma Security (D <: PRGa.Distinguisher {-SRG,-PRFc,-PRFi,-C_PRG,-C_PRF,-D_PRF}) &m:
+  (forall (G <: PRGa.RGA {-D}), islossless G.next => islossless D(G).distinguish) =>
+  (forall (G <: PRGa.RG {-D,-C_PRG}) &m,
     islossless G.init => islossless G.next =>
     Pr[IND_PRG(C_PRG(G),D).main() @ &m: C_PRG.c <= qN] = 1%r) =>
   Pr[IND_PRG(SRG,D).main() @ &m: res] - Pr[IND_PRG(PRGi,D).main() @ &m: res]
@@ -549,7 +549,7 @@ move=> D_distinguish_ll D_bounded.
 rewrite (Count_PRG_noop SRG D &m) (Count_PRG_noop PRGi D &m).
 rewrite (Count_PRF_noop PRFc (D_PRF(D)) &m) (Count_PRF_noop PRFi (D_PRF(D)) &m).
 have:= PRGsi_Bad_bound D _ _ &m=> //.
-have C_D_PRG_ll: forall (G <: PRGa.RGA {C_D_PRG(D)}),
+have C_D_PRG_ll: forall (G <: PRGa.RGA {-C_D_PRG(D)}),
                    islossless G.next => islossless C_D_PRG(D,G).distinguish.
   move=> G G_next_ll; proc.
   call (_: true)=> //; first by proc; wp; call G_next_ll; wp.

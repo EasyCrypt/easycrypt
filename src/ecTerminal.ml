@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 
@@ -151,60 +143,108 @@ end
 let from_tty () = new from_tty ()
 
 (* -------------------------------------------------------------------- *)
-class from_channel ~name ?(gcstats = true) (stream : in_channel) : terminal =
-object(self)
+type progress = [ `Human | `Script | `Silent ]
+
+class from_channel
+  ?(gcstats  : bool = true)
+  ?(progress : progress option)
+  ~(name     : string)
+   (stream   : in_channel)
+  : terminal
+
+= object(self)
   val ticks = "-\\|/"
 
   val (*---*) iparser = EcIo.from_channel ~name stream
-  val mutable sz    = -1
-  val mutable tick  = -1
-  val mutable loc   = LC._dummy
-  val mutable gc    = None
-  val mutable doprg =
-    (Sys.os_type = "Unix") &&
-    (Unix.isatty (Unix.descr_of_out_channel stderr))
+  val mutable sz       = -1
+  val mutable tick     = -1
+  val mutable loc      = LC._dummy
+  val mutable gc       = None
+  val mutable progress =
+    progress |> ofdfl (fun () ->
+      if
+        (Sys.os_type = "Unix") &&
+        (Unix.isatty (Unix.descr_of_out_channel stderr))
+      then `Human else `Silent)
+
+  method private _do_update_progress =
+    match progress with
+    | (`Human | `Script) as progress -> begin
+        let lineno   = fst (loc.LC.loc_end) in
+        let position = loc.LC.loc_echar in
+        let ratio    =
+          match sz with
+          | _ when sz < 0 -> None
+          | _ when sz = 0 -> Some 1.0
+          | _ -> Some ((float_of_int position) /. (float_of_int sz)) in
+
+        let mem, unu =
+          if not gcstats then -1., -1. else
+          match gc with
+          | Some (mem, unu, btick) when btick > tick-20 ->
+             (mem, unu)
+          | _ ->
+             let mem = (Gc.stat ()).Gc.live_words in
+             let mem = (float_of_int mem) *. (float_of_int (Sys.word_size / 8)) in
+             let unu = (Gc.stat ()).Gc.fragments  in
+             let unu = (float_of_int unu) *. (float_of_int (Sys.word_size / 8)) in
+             gc <- Some (mem, unu, tick); (mem, unu)
+        in
+
+        tick <- tick + 1;
+
+        match progress with
+        | `Human -> begin
+            let rec human x st all =
+              match all with
+              | [] -> (x, st)
+              | _ when x < 1024.-> (x, st)
+              | st' :: all -> human (x /. 1024.) st' all in
+
+            let mem, memst = human mem "B" ["kB"; "MB"; "GB"] in
+            let unu, unust = human unu "B" ["kB"; "MB"; "GB"] in
+            let ratio = ratio
+               |> omap (( *. ) 100.)
+               |> omap (Format.sprintf "%.1f")
+               |> odfl "?.?" in
+
+            Format.eprintf "[%c] [%.4d] %s%% (%.1f%s / [frag %.1f%s])\r%!"
+              ticks.[tick mod (String.length ticks)] lineno
+              ratio mem memst unu unust
+          end
+
+        | `Script -> begin
+            let lineno   = fst (loc.LC.loc_end) in
+            let position = loc.LC.loc_echar in
+            let ratio    =
+              ratio
+              |> omap (fun x -> Format.sprintf "%.5f" x)
+              |> odfl "-" in
+
+            Format.eprintf
+              "P %d %d %s %.2f %.2f@."
+              lineno position ratio mem unu
+          end
+      end
+
+    | _ -> ()
 
   method private _update_progress =
-    if sz >= 0 && doprg then begin
-      let lineno   = fst (loc.LC.loc_end) in
-      let position = loc.LC.loc_echar in
+    if loc !=(*phy*) LC._dummy then
+      self#_do_update_progress
 
-      let mem, unu =
-        if not gcstats then -1., -1. else
-        match gc with
-        | Some (mem, unu, btick) when btick > tick-20 ->
-           (mem, unu)
-        | _ ->
-           let mem = (Gc.stat ()).Gc.live_words in
-           let mem = (float_of_int mem) *. (float_of_int (Sys.word_size / 8)) in
-           let unu = (Gc.stat ()).Gc.fragments  in
-           let unu = (float_of_int unu) *. (float_of_int (Sys.word_size / 8)) in
-           gc <- Some (mem, unu, tick); (mem, unu)
-      in
+  method private _clean_progress_line ?(erase = true) () =
+    match progress with
+    | `Human when erase ->
+       if sz >= 0 then
+         let fmt = "[*] [----] ---.- (------.-?B% - [---- ------.-?B%])" in
+         Format.eprintf "%*s\r%!" (String.length fmt) ""
 
-      let rec human x st all =
-        match all with
-        | [] -> (x, st)
-        | _ when x < 1024.-> (x, st)
-        | st' :: all -> human (x /. 1024.) st' all in
+    | `Human ->
+       Format.eprintf "\n%!"
 
-      let mem, memst = human mem "B" ["kB"; "MB"; "GB"] in
-      let unu, unust = human unu "B" ["kB"; "MB"; "GB"] in
-
-      tick <- tick + 1;
-      Format.eprintf "[%c] [%.4d] %.1f %% (%.1f%s / [frag %.1f%s])\r%!"
-        ticks.[tick mod (String.length ticks)] lineno
-        (100. *. ((float_of_int position) /. (float_of_int sz)))
-        mem memst unu unust
-    end
-
-  method private _clear_update ?(erase = true) ~final () =
-    if erase then begin
-      let fmt = "[*] [----] ---.- (------.-?B% - [---- ------.-?B%])" in
-        if sz >= 0 && doprg then
-          Format.eprintf "%*s\r%!" (String.length fmt) ""
-    end else Format.eprintf "\n%!";
-    doprg <- doprg && not final
+    | `Script | `Silent ->
+       ()
 
   method private _notice ?subloc ~immediate (lvl : loglevel) (msg : string) =
     let (_ : unit) = ignore immediate in
@@ -216,8 +256,15 @@ object(self)
         | None -> Format.sprintf "%s:%d" name (fst (loc.LC.loc_end))
         | Some loc -> LC.tostring loc
       in
-        self#_clear_update ~final:false ();
-        Format.eprintf "[%s] [%s] %s\n%!" prefix strloc msg;
+        self#_clean_progress_line ();
+        begin match progress with
+        | `Human ->
+           Format.eprintf "[%s] [%s] %s\n%!" prefix strloc msg;
+        | `Script ->
+           Format.eprintf "E %s %s %s\n%!" prefix strloc (String.escaped msg)
+        | `Silent ->
+           ()
+        end;
         self#_update_progress
 
   method interactive = false
@@ -241,21 +288,23 @@ object(self)
           | _ -> (None, e) in
         let msg = String.strip (EcPException.tostring e) in
 
-        self#_clear_update ~final:false ();
+        self#_clean_progress_line ();
         self#_notice ?subloc ~immediate:true `Critical msg;
         self#_update_progress;
-        self#_clear_update ~erase:false ~final:true ()
+        self#_clean_progress_line ~erase:false ();
+        progress <- `Silent
       end
 
   method finalize =
-    self#_clear_update ~final:true ();
-    EcIo.finalize iparser;
+    self#_clean_progress_line ();
+    progress <- `Silent;
+    EcIo.finalize iparser
 
   initializer begin
     try
       let fd   = Unix.descr_of_in_channel stream in
       let stat = Unix.fstat fd in
-        sz <- stat.Unix.st_size
+      sz <- stat.Unix.st_size
     with Unix.Unix_error _ -> ()
   end
 
@@ -264,5 +313,5 @@ object(self)
     Format.pp_set_margin Format.err_formatter i
 end
 
-let from_channel ?gcstats ~name stream =
-  new from_channel ?gcstats ~name stream
+let from_channel ?gcstats ?progress ~name stream =
+  new from_channel ?gcstats ?progress ~name stream

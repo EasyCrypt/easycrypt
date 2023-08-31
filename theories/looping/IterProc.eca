@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import Core List.
 
 type t.
@@ -242,4 +234,19 @@ while (={l} /\ (forall x, mem l{1} x => P x) /\ Inv (glob O){1} (glob O){2});aut
 call Hf;auto=> ??[#]-> HP HI Hl _ /=;split.
 + by rewrite HI HP // <@ Hl=>/head_behead /(_ witness) {1}<-.
 by move=>_ ??->/= x Hx;apply/HP/(mem_drop 1).
+qed.
+
+lemma iter_inv_HL (O<:Orcl) (P:t -> bool) (Inv: glob O -> bool):
+  hoare [ O.f :
+          P x /\ Inv (glob O) ==>
+          Inv (glob O) ] =>
+  hoare [ Iter(O).iter :
+          (forall x, mem l x => P x) /\ Inv (glob O) ==>
+          Inv (glob O) ].
+proof.
+move=> Hf;proc.
+while ((forall x, mem l x => P x) /\ Inv (glob O));auto.
+call Hf;auto => ? [[HP HI] Hl]; split.
++ by rewrite HI HP // <@ Hl=>/head_behead /(_ witness) {1}<-.
+by move=>_ ?->/= x Hx;apply/HP/(mem_drop 1).
 qed.

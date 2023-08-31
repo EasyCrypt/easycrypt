@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
@@ -47,7 +39,8 @@ type w3ty = WTy.tysymbol
 
 type w3op_ho =
   [ `HO_DONE of WTerm.lsymbol
-  | `HO_TODO of string * WTy.ty list * WTy.ty option ]
+  | `HO_TODO of string * WTy.ty list * WTy.ty option
+  | `HO_FIX  of WTerm.lsymbol * WDecl.decl * WDecl.decl * bool ref ]
 
 type w3op = {
   (*---*) w3op_fo : w3op_fo;
@@ -87,8 +80,8 @@ type tenv = {
   (*---*) te_lc         : w3op Hid.t;
   mutable te_lam        : WTerm.term Mta.t;
   (*---*) te_gen        : WTerm.term Hf.t;
-  (*---*) te_xpath      : WTerm.lsymbol Hx.t; (* proc and var *)
-  (*---*) te_absmod     : w3absmod Hid.t;     (* abstract module *)
+  (*---*) te_xpath      : WTerm.lsymbol Hx.t;  (* proc and global var *)
+  (*---*) te_absmod     : w3absmod Hid.t;      (* abstract module     *)
 }
 
 let empty_tenv env task (kwty, kw, kwk) =
@@ -110,10 +103,14 @@ let empty_tenv env task (kwty, kw, kwk) =
 type lenv = {
   le_lv : WTerm.vsymbol Mid.t;
   le_tv : WTy.ty Mid.t;
+  le_mt : EcMemory.memtype Mid.t;
 }
 
 let empty_lenv : lenv =
-  { le_tv = Mid.empty; le_lv = Mid.empty; }
+  { le_tv = Mid.empty; le_lv = Mid.empty; le_mt = Mid.empty }
+
+let get_memtype lenv m =
+  try Mid.find m lenv.le_mt with Not_found -> assert false
 
 (* -------------------------------------------------------------------- *)
 let str_p p =
@@ -123,6 +120,16 @@ let preid    id = WIdent.id_fresh (EcIdent.name id)
 let preid_p  p  = str_p (EcPath.tostring p)
 let preid_mp mp = str_p (EcPath.m_tostring mp)
 let preid_xp xp = str_p (EcPath.x_tostring xp)
+
+
+(* -------------------------------------------------------------------- *)
+let dump_tasks (tasks : WTask.task) (filename : string) =
+  let stream = open_out filename in
+    EcUtils.try_finally
+      (fun () -> Format.fprintf
+        (Format.formatter_of_out_channel stream)
+        "%a@." Why3.Pretty.print_task tasks)
+      (fun () -> close_out stream)
 
 (* -------------------------------------------------------------------- *)
 module Cast = struct
@@ -179,19 +186,18 @@ module Cast = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let load_wtheory genv th =
+let load_wtheory (genv : tenv) (th : WTheory.theory) : unit =
   genv.te_task <- WTask.use_export genv.te_task th
 
 (* -------------------------------------------------------------------- *)
 (* Create why3 tuple theory with projector                              *)
 
 module Tuples = struct
-
   let ts = Hint.memo 17 (fun n ->
     let vl = ref [] in
-    for _i = 1 to n do
+    for _ = 1 to n do
       vl := WTy.create_tvsymbol (WIdent.id_fresh "a") :: !vl done;
-    WTy.create_tysymbol (WIdent.id_fresh ("tuple" ^ string_of_int n)) !vl WTy.NoDef)
+    WTy.create_tysymbol (WIdent.id_fresh (Format.sprintf "tuple%d" n)) !vl WTy.NoDef)
 
   let proj = Hdint.memo 17 (fun (n, k) ->
     assert (0 <= k && k < n);
@@ -199,24 +205,23 @@ module Tuples = struct
     let tl = List.map WTy.ty_var ts.WTy.ts_args in
     let ta = WTy.ty_app ts tl in
     let tr = List.nth tl k in
-    let id =
-      WIdent.id_fresh ("proj" ^ string_of_int n ^ "_" ^ string_of_int k) in
-    WTerm.create_fsymbol id [ta] tr)
+    let id = WIdent.id_fresh (Format.sprintf "proj%d_%d" n k) in
+    WTerm.create_fsymbol ~proj:true id [ta] tr)
 
   let fs = Hint.memo 17 (fun n ->
     let ts = ts n in
     let tl = List.map WTy.ty_var ts.WTy.ts_args in
     let ty = WTy.ty_app ts tl in
-    let id = WIdent.id_fresh ("Tuple" ^ string_of_int n) in
+    let id = WIdent.id_fresh (Format.sprintf "Tuple%d" n) in
     WTerm.create_fsymbol ~constr:1 id tl ty)
 
   let theory = Hint.memo 17 (fun n ->
     let ts = ts n and fs = fs n in
     let pl = List.mapi (fun i _ -> Some (proj (n, i))) ts.WTy.ts_args in
     let uc =
-      WTheory.create_theory ~path:["Easycrypt"]
-        (WIdent.id_fresh ("Tuple" ^ string_of_int n))  in
-    let uc = WTheory.add_data_decl uc [ts, [fs,pl]] in
+      let name = Format.sprintf "Tuple%d" n in
+      WTheory.create_theory ~path:["Easycrypt"] (WIdent.id_fresh name)  in
+    let uc = WTheory.add_data_decl uc [ts, [fs, pl]] in
     WTheory.close_theory uc)
 
 end
@@ -243,11 +248,17 @@ let wproj_tuple genv arg i =
   let wty  = oget (arg.WTerm.t_ty) in
   let n =
     match wty.WTy.ty_node with
-    | WTy.Tyapp (_, targs) -> List.length targs
+    | WTy.Tyapp (s, targs) ->
+      let n = List.length targs in
+      assert (Why3.Ty.ts_equal s (Tuples.ts n));
+      n
     | _ -> assert false in
   load_tuple genv n;
   let fs = Tuples.proj (n,i) in
   WTerm.t_app_infer fs [arg]
+
+let wfst genv arg = wproj_tuple genv arg 0
+let wsnd genv arg = wproj_tuple genv arg 1
 
 (* -------------------------------------------------------------------- *)
 let trans_tv lenv id = oget (Mid.find_opt id lenv.le_tv)
@@ -325,8 +336,6 @@ let ts_distr, fs_mu, distr_theory =
   tdistr, mu, WTheory.close_theory th
 
 let ty_distr t = WTy.ty_app ts_distr [t]
-
-let ty_mem_distr = ty_distr ty_mem
 
 (* -------------------------------------------------------------------- *)
 let fs_witness, witness_theory =
@@ -439,7 +448,7 @@ and trans_tydecl genv (p, tydecl) =
         let for_field (fname, fty) =
           let wfid  = pqoname (prefix p) fname in
           let wfty  = trans_ty (genv, lenv) fty in
-          let wcls  = WTerm.create_lsymbol (preid_p wfid) [wdom] (Some wfty) in
+          let wcls  = WTerm.create_lsymbol ~proj:true (preid_p wfid) [wdom] (Some wfty) in
           let w3op  = plain_w3op ~name:fname tparams wcls in
           ((wfid, w3op), wcls)
         in
@@ -462,21 +471,25 @@ and trans_tydecl genv (p, tydecl) =
   ts
 
 (* -------------------------------------------------------------------- *)
-let rm_mp_args mp =
-  EcPath.mpath mp.EcPath.m_top []
-
-let rm_xp_args xp =
-  let mp = rm_mp_args xp.EcPath.x_top in
-  EcPath.xpath mp xp.EcPath.x_sub
+let trans_memtype ((genv, _) as env) mt =
+  match EcMemory.local_type mt with
+  | None -> ty_mem
+  | Some ty ->
+    let ty = trans_ty env ty in
+    wty_tuple genv [ty; ty_mem]
 
 (* -------------------------------------------------------------------- *)
 exception CanNotTranslate
 let trans_binding genv lenv (x, xty) =
-  let wty =
+  let lenv, wty =
     match xty with
-    | GTty ty -> trans_ty (genv, lenv) ty
-    | GTmem _ -> ty_mem
-    | _ -> raise CanNotTranslate in
+    | GTty ty ->
+      lenv, trans_ty (genv, lenv) ty
+    | GTmem mt ->
+      { lenv with le_mt = Mid.add x mt lenv.le_mt }, trans_memtype (genv, lenv) mt
+
+    | _ -> raise CanNotTranslate
+  in
   let wvs = WTerm.create_vsymbol (preid x) wty in
   ({ lenv with le_lv = Mid.add x wvs lenv.le_lv }, wvs)
 
@@ -490,10 +503,13 @@ let trans_lvars genv lenv bds =
 
 (* -------------------------------------------------------------------- *)
 (* build the higher-order symbol and add the corresponding axiom.       *)
-let mk_highorder_func ids dom codom mk =
+let mk_highorder_symb ids dom codom =
   let pid = WIdent.id_fresh (ids ^ "_ho") in
   let ty = List.fold_right WTy.ty_func dom (odfl WTy.ty_bool codom) in
-  let ls' = WTerm.create_fsymbol pid [] ty in
+  WTerm.create_fsymbol pid [] ty, ty
+
+let mk_highorder_func ids dom codom mk =
+  let ls', ty = mk_highorder_symb ids dom codom in
   let decl' = WDecl.create_param_decl ls' in
   let pid_spec = WIdent.id_fresh (ids ^ "_ho_spec") in
   let pr = WDecl.create_prsymbol pid_spec in
@@ -521,6 +537,9 @@ let w3op_ho_lsymbol genv wop =
       genv.te_task <- WTask.add_decl genv.te_task decl;
       genv.te_task <- WTask.add_decl genv.te_task decl_s;
       wop.w3op_ho <- `HO_DONE ls; ls
+
+  | `HO_FIX (ls, _, _, r) ->
+      r := true; ls
 
 (* -------------------------------------------------------------------- *)
 let rec highorder_type targs tres =
@@ -683,8 +702,11 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   | Fglob (m,mem) -> trans_glob env m mem
 
   | Fpr pr        -> trans_pr env pr
+
+  | Fcoe _
   | FeagerF _
-  | FhoareF   _ | FhoareS   _
+  | FhoareF  _  | FhoareS   _
+  | FcHoareF  _ | FcHoareS   _
   | FbdHoareF _ | FbdHoareS _
   | FequivF   _ | FequivS   _
     -> trans_gen env fp
@@ -720,8 +742,15 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
       let wt, wf = Cast.merge_if wt wf in
       WTerm.t_if_simp (Cast.force_prop wb) wt wf
 
-  | Fmatch _ ->
-       failwith "not implemented yet"
+  | Fmatch (fb, bs, _ty) ->
+      let p, dty, tvs = oget (EcEnv.Ty.get_top_decl fb.f_ty genv.te_env) in
+      let dty = oget (EcDecl.tydecl_as_datatype dty) in
+      let bs = List.combine bs dty.tydt_ctors in
+
+      let wfb = trans_form env fb in
+      let wbs = List.map (trans_branch env (p, dty, tvs)) bs in
+      let wbs = Cast.merge_branches wbs in
+      WTerm.t_case_close_simp wfb wbs
 
   | Fapp (f, args') ->
       let args' = List.map (trans_form env) args' in
@@ -729,6 +758,28 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
 
   | _ ->
       apply_highorder (trans_form env f) args
+
+(* -------------------------------------------------------------------- *)
+and trans_branch (genv, lenv) (p, _dty, tvs) (f, (cname, argsty)) =
+  let nargs = List.length argsty in
+  let xs, f =
+    let xs, f = decompose_lambda f in
+    let xs1, xs2 = List.split_at nargs xs in
+    let xs1 = List.map (snd_map gty_as_ty) xs1 in
+    (xs1, f_lambda xs2 f) in
+  let csymb = EcPath.pqoname (EcPath.prefix p) cname in
+  let csymb =
+    match (trans_op genv csymb).w3op_fo with
+    | `LDecl csymb -> csymb | _ -> assert false
+  in
+
+  let lenv, ws = trans_lvars genv lenv xs in
+  let wcty = trans_ty (genv, lenv) (tconstr p tvs) in
+  let ws = List.map WTerm.pat_var ws in
+  let ws = WTerm.pat_app csymb ws wcty in
+  let wf = trans_app (genv, lenv) f [] in
+
+  (ws, wf)
 
 (* -------------------------------------------------------------------- *)
 and trans_fun (genv, lenv) bds body args =
@@ -782,24 +833,30 @@ and trans_op (genv:tenv) p =
   try Hp.find genv.te_op p with Not_found -> create_op ~body:true genv p
 
 (* -------------------------------------------------------------------- *)
-and trans_pvar ((genv, _) as env) pv ty mem =
+and trans_pvar ((genv, lenv) as env) pv ty mem =
   let pv = NormMp.norm_pvar genv.te_env pv in
-  let xp =
-    if   is_loc pv
-    then pv.pv_name
-    else rm_xp_args pv.pv_name in
-
-  let ls =
-    match Hx.find_opt genv.te_xpath xp with
-    | Some ls -> ls
-    | None ->
+  let mt = get_memtype lenv mem in
+  match pv with
+  | PVloc x ->
+    let m = trans_mem env ~forglobal:false mem in
+    begin match EcMemory.lookup x mt with
+    | Some (_,_,Some i) -> wproj_tuple genv m i
+    | Some (_,_,None)   -> m
+    | None              -> assert false
+    end
+  | PVglob xp ->
+    let m =  trans_mem env ~forglobal:true mem in
+    let ls =
+      match Hx.find_opt genv.te_xpath xp with
+      | Some ls -> ls
+      | None ->
         let ty = Some (trans_ty env ty) in
         let pid = preid_xp xp in
         let ls = WTerm.create_lsymbol pid [ty_mem] ty in
         genv.te_task <- WTask.add_param_decl genv.te_task ls;
         Hx.add genv.te_xpath xp ls; ls
-
-  in WTerm.t_app_infer ls [trans_mem env mem]
+    in
+    WTerm.t_app_infer ls [m]
 
 (* -------------------------------------------------------------------- *)
 and trans_glob ((genv, _) as env) mp mem =
@@ -809,7 +866,7 @@ and trans_glob ((genv, _) as env) mp mem =
       assert (mp.EcPath.m_args = []);
 
       let id   = EcPath.mget_ident mp in
-      let wmem = trans_mem env mem in
+      let wmem = trans_mem env ~forglobal:true mem in
       let w3op =
         match Hid.find_opt genv.te_lc id with
         | Some w3op -> w3op
@@ -829,22 +886,33 @@ and trans_glob ((genv, _) as env) mp mem =
   | _ -> trans_form env f
 
 (* -------------------------------------------------------------------- *)
-and trans_mem (genv,lenv) mem =
-  match Hid.find_opt genv.te_lc mem with
-  | Some w3op -> apply_wop genv w3op [] []
-  | None -> WTerm.t_var (oget (Mid.find_opt mem lenv.le_lv))
+and trans_mem (genv,lenv) ~forglobal mem =
+  let wmem =
+    match Hid.find_opt genv.te_lc mem with
+    | Some w3op -> apply_wop genv w3op [] []
+    | None -> WTerm.t_var (oget (Mid.find_opt mem lenv.le_lv)) in
+  let mt = get_memtype lenv mem in
+  let has_locals = EcMemory.has_locals mt in
+  if forglobal then
+    if has_locals then wsnd genv wmem
+    else wmem
+  else
+    (assert has_locals; wfst genv wmem)
 
 (* -------------------------------------------------------------------- *)
 and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
-  let wmem = trans_mem env pr_mem in
+  let wmem = trans_mem env ~forglobal:true pr_mem in
   let warg = trans_form_b env pr_args in
 
   (* Translate the procedure *)
   let xp = NormMp.norm_xfun genv.te_env pr_fun in
+  let _, mt = EcEnv.Fun.prF_memenv mhr pr_fun genv.te_env in
+  let mty = trans_memtype env mt in
+  let tyr = ty_distr mty in
   let ls =
     let trans () =
       let tya = oget warg.WTerm.t_ty in
-      let tyr = Some ty_mem_distr in
+      let tyr = Some tyr in
       let pid = preid_xp xp in
       let ls  = WTerm.create_lsymbol pid [tya; ty_mem] tyr in
       genv.te_task <- WTask.add_param_decl genv.te_task ls;
@@ -853,9 +921,10 @@ and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} =
     in Hx.find_opt genv.te_xpath xp |> ofdfl trans
   in
 
-  let d = WTerm.t_app ls [warg; wmem] (Some ty_mem_distr) in
+  let d = WTerm.t_app ls [warg; wmem] (Some tyr) in
+
   let wev =
-    let lenv, wbd = trans_binding genv lenv (mhr, GTmem None) in
+    let lenv, wbd = trans_binding genv lenv (mhr, GTmem mt) in
     let wbody = trans_form_b (genv,lenv) pr_event in
     trans_lambda genv [wbd] wbody
 
@@ -1001,9 +1070,18 @@ and create_op ?(body = false) (genv : tenv) p =
 
   let w3op =
     let name = ls.WTerm.ls_name.WIdent.id_string in
+    let w3op_ho =
+      if EcDecl.is_fix op then
+        let ls, decl, decl_s =
+          mk_highorder_func name (textra@wdom) wcodom (WTerm.t_app ls)
+        in
+          `HO_FIX (ls, decl, decl_s, ref false)
+      else
+        `HO_TODO (name, textra@wdom, wcodom) in
+
     { w3op_fo = `LDecl ls;
       w3op_ta = instantiate wparams ~textra wdom wcodom;
-      w3op_ho = `HO_TODO (name, textra@wdom, wcodom); }
+      w3op_ho = w3op_ho; }
   in
 
   let register = OneShot.mk (fun () -> Hp.add genv.te_op p w3op) in
@@ -1028,11 +1106,28 @@ and create_op ?(body = false) (genv : tenv) p =
           let wparams, wbody = trans_body (genv, lenv) wdom None body in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls (wextra@wparams) wbody]
 
-      | _, _ -> WDecl.create_param_decl ls
+      | _, _ ->
+          WDecl.create_param_decl ls
 
     in
       OneShot.now register;
-      genv.te_task <- WTask.add_decl genv.te_task decl
+
+      match w3op.w3op_ho with
+      | `HO_FIX (ls, ho_decl, ho_decl_s, r) -> begin
+          if !r then begin
+            List.iter
+              (fun d -> genv.te_task <- WTask.add_decl genv.te_task d)
+              [ho_decl; decl; ho_decl_s];
+            w3op.w3op_ho <- `HO_DONE ls
+          end else begin
+            genv.te_task <- WTask.add_decl genv.te_task decl;
+            w3op.w3op_ho <-
+              let name = ls.WTerm.ls_name.WIdent.id_string in
+              `HO_TODO (name, textra@wdom, wcodom)
+          end
+        end
+      | _ ->
+          genv.te_task <- WTask.add_decl genv.te_task decl
   end;
 
   w3op
@@ -1045,7 +1140,7 @@ let add_axiom ((genv, _) as env) preid form =
   genv.te_task <- WTask.add_decl genv.te_task decl
 
 (* -------------------------------------------------------------------- *)
-let trans_hyp ((genv, _) as env) (x, ty) =
+let trans_hyp ((genv, lenv) as env) (x, ty) =
   match ty with
   | LD_var (ty, body) ->
     let dom, codom = EcEnv.Ty.signature genv.te_env ty in
@@ -1071,15 +1166,19 @@ let trans_hyp ((genv, _) as env) (x, ty) =
         WDecl.create_logic_decl [ld]
 
     in
-      genv.te_task <- WTask.add_decl genv.te_task decl;
-      Hid.add genv.te_lc x w3op
+    genv.te_task <- WTask.add_decl genv.te_task decl;
+    Hid.add genv.te_lc x w3op;
+    env
 
   | LD_hyp f ->
       (* FIXME: Selection of hypothesis *)
-      add_axiom env (preid x) f
+    add_axiom env (preid x) f;
+    env
 
-  | LD_mem    _ ->
-      let wcodom = Some ty_mem in
+  | LD_mem    mt ->
+    let wty = trans_memtype env mt in
+    let lenv = { lenv with le_mt = Mid.add x mt lenv.le_mt } in
+    let wcodom = Some wty in
       let ls =  WTerm.create_lsymbol (preid x) [] wcodom in
       let w3op = {
         w3op_fo = `LDecl ls;
@@ -1088,16 +1187,17 @@ let trans_hyp ((genv, _) as env) (x, ty) =
       } in
 
       genv.te_task <- WTask.add_param_decl genv.te_task ls;
-      Hid.add genv.te_lc x w3op
+      Hid.add genv.te_lc x w3op;
+      (genv, lenv)
 
-  | LD_modty  _ -> ()
+  | LD_modty  _ -> env
 
-  | LD_abs_st _ -> ()
+  | LD_abs_st _ -> env
 
 (* -------------------------------------------------------------------- *)
 let lenv_of_hyps genv (hyps : hyps) : lenv =
   let lenv = fst (lenv_of_tparams_for_hyp genv hyps.h_tvar) in
-  List.iter (trans_hyp (genv, lenv)) (List.rev hyps.h_local); lenv
+  snd (List.fold_left trans_hyp (genv, lenv) (List.rev hyps.h_local))
 
 (* -------------------------------------------------------------------- *)
 let trans_axiom genv (p, ax) =
@@ -1314,8 +1414,13 @@ module Frequency = struct
       | Ftuple   es           -> List.iter doit es
       | Fproj    (e, _)       -> doit e
 
-      | FhoareF _ | FhoareS _ | FbdHoareF _ | FbdHoareS _
-      | FequivF _ | FequivS _ | FeagerF _  -> ()
+      | FhoareF _   | FhoareS _
+      | FcHoareF _  | FcHoareS _
+      | FbdHoareF _ | FbdHoareS _
+      | FequivF _   | FequivS _
+      | FeagerF _
+      | Fcoe _ -> ()
+
       | Fpr pr ->
         sf := Sx.add pr.pr_fun !sf;
         doit pr.pr_event; doit pr.pr_args in
@@ -1368,7 +1473,7 @@ module Frequency = struct
     f_tabf : int Hx.t;
   }
 
-  let add fr ax =
+  let add fr form =
     let addp p =
       if not (Sp.mem p fr.f_unwanted_op) then
         let n = Hp.find_def fr.f_tabp 0 p in
@@ -1390,7 +1495,7 @@ module Frequency = struct
       | Fproj    (e, _)       -> add e
       | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event;add pr.pr_args
       | _ -> () in
-    add ax.ax_spec
+    add form
 
   let create unwanted_op : frequency =
     { f_unwanted_op = unwanted_op;
@@ -1442,7 +1547,7 @@ let init_relevant env pi rs =
   let do1 p ax =
     let wanted = wanted_ax p in
     if wanted || (ax.ax_visibility = `Visible && not (unwanted_ax p)) then begin
-      Frequency.add fr ax;
+      Frequency.add fr ax.ax_spec;
       let used = Frequency.f_ops unwanted_ops ax.ax_spec in
       let paxu = (p,ax), used in
       if wanted then push paxu rel else push paxu other
@@ -1506,25 +1611,18 @@ let create_global_task () =
   let task  = WTask.use_export task thmap in
   task
 
-(* -------------------------------------------------------------------- *)
 let dump_why3 (env : EcEnv.env) (filename : string) =
   let known = Lazy.force core_theories in
   let tenv  = empty_tenv env (create_global_task ()) known in
   let ()    = add_core_bindings tenv in
 
   List.iter (trans_axiom tenv) (EcEnv.Ax.all env);
-
-  let stream = open_out filename in
-    EcUtils.try_finally
-      (fun () -> Format.fprintf
-        (Format.formatter_of_out_channel stream)
-        "%a@." Why3.Pretty.print_task tenv.te_task)
-      (fun () -> close_out stream)
+  dump_tasks tenv.te_task filename
 
 (* -------------------------------------------------------------------- *)
 let cnt = Counter.create ()
 
-let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
+let check ?notify (pi : P.prover_infos) (hyps : LDecl.hyps) (concl : form) =
   let out_task filename task =
     let stream = open_out filename in
     EcUtils.try_finally
@@ -1560,7 +1658,13 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
     let task = WTask.add_decl tenv.te_task decl in
     let tkid = Counter.next cnt in
 
-    (Os.getenv "EC_WHY3" |> oiter (fun filename ->
+    let dumpin_opt =
+      match pi.pr_dumpin with
+      | None -> Os.getenv "EC_WHY3"
+      | Some filename -> Some (EcLocation.unloc filename)
+    in
+    ( dumpin_opt |> oiter (fun filename ->
+          Format.eprintf "dumping in %s" filename;
       let filename = Printf.sprintf "%.4d-%s" tkid filename in
       out_task filename task));
     let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in

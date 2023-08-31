@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore Bool StdRing StdOrder.
 (*---*) import RField RealOrder.
@@ -84,4 +76,44 @@ move=> hlE ub_Ez; rewrite lerNgt &(negP) => lt_zlE.
 case: (lub_adherent _ hlE (lub E - z) _); 1: by rewrite subr_gt0.
 move=> e [eE]; rewrite opprB addrCA subrr addr0.
 by rewrite ltrNge /=; apply: ub_Ez.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma lub1 x : lub (pred1 x) = x.
+proof.
+apply eqr_le; split; [apply lub_le_ub => /#|move => _].
+apply lub_upper_bound; smt().
+qed.
+
+(* -------------------------------------------------------------------- *)
+
+(* used to prove linearity of [flub], where the lub may be a limit *)
+op scale_rset (E: real -> bool) c x = exists x0, E x0 /\ c * x0 = x.
+
+lemma lub_scale0 E : nonempty E => lub (scale_rset E 0%r) = 0%r.
+proof.
+move => [x x_E]; have -> : scale_rset E 0%r = pred1 0%r. 
+- (* CD: locally smt() does the job in a fraction of a sectiond *)
+  apply/fun_ext => z @/scale_rset @/pred1. 
+  by apply/eq_iff; split => />; exists x.
+by rewrite lub1.
+qed.
+
+lemma has_lub_scale E c : 0%r <= c =>
+  has_lub E => has_lub (scale_rset E c).
+proof.
+move => c_ge0 [[x Ex] ?]; split; 1: smt().
+exists (c * lub E) => cx; smt(lub_upper_bound).
+qed.
+
+lemma lub_scale E c : has_lub E =>
+  c >= 0%r => lub (scale_rset E c) = c * lub E.
+proof.
+move => has_lubE ge0_c.
+case (c > 0%r) => [gt0_c|]; last by smt(lub_scale0).
+apply eqr_le; split => [|_].
+- apply lub_le_ub; first by apply has_lub_scale.
+  smt(lub_upper_bound).
+rewrite -ler_pdivl_mull //; apply lub_le_ub => // x Ex.
+by rewrite ler_pdivl_mull //; smt(lub_upper_bound has_lub_scale). 
 qed.

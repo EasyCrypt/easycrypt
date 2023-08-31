@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore List Distr StdOrder.
 require import FinType.
@@ -158,6 +150,12 @@ qed.
 lemma offunE f i: 0 <= i < n => (offun f).[i] = f i.
 proof. by move=> lt_in; rewrite offunifE lt_in. qed.
 
+lemma ofwordKmkseq (f : int -> t):
+  ofword (offun f) = mkseq f n.
+proof.
+by rewrite ofwordK 1:size_mkseq 1:StdOrder.IntOrder.ler_maxr 1:ge0_n.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op map (f : t -> t) (w : word) : word = mkword (map f (ofword w)).
 
@@ -197,3 +195,31 @@ clone MFinite as DWord with
   op   Support.enum = List.map mkword (Enum.wordn n),
   op   Support.card <- card
 proof Support.enum_spec by exact/enum_spec.
+
+(* -------------------------------------------------------------------- *)
+theory ListSample.
+require import DList.
+
+clone MFinite as DAlphabet with
+  type         t <= Alphabet.t,
+  theory Support <= Alphabet
+proof *.
+
+lemma dword_is_dlist:
+  dmap (dlist DAlphabet.dunifin n) mkword = DWord.dunifin.
+proof.
+apply: eq_funi_ll.
++ apply: is_full_funiform.
+  + apply: dmap_fu_in=> w; exists (ofword w).
+    rewrite mkwordK //= (supp_dlist _ _ _ ge0_n) size_word //=.
+    by apply: allP=> l _; exact: DAlphabet.supp_dunifin.
+  apply: dmap_uni_in_inj.
+  + move=> ls ls'; rewrite !(supp_dlist _ _ _ ge0_n)=> /> + _ + _.
+    by move=> /ofwordK {2}<- /ofwordK {2}<- ->.
+  exact/dlist_uni/DAlphabet.dunifin_uni.
++ exact/dmap_ll/dlist_ll/DAlphabet.dunifin_ll.
++ exact/DWord.dunifin_funi.
+exact/DWord.dunifin_ll.
+qed.
+
+end ListSample.

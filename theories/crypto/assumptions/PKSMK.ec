@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore Distr DInterval FSet List SmtMap.
 require PROM PlugAndPray.
 
@@ -188,7 +180,7 @@ module (MkAdvUF(A:AdvInd):AdvUF) (O:OrclUF) = {
 
 section.
 
-  declare module A <: AdvInd { RealSigServ, OrclUF }.
+  declare module A <: AdvInd { -RealSigServ, -OrclUF }.
 
   local module Wrap (O:FullSigService) = {
     include OrclUF [+init]
@@ -245,7 +237,7 @@ section.
        exists sk, (pk,sk) \in keygen /\ s \in sign(sk,m)).
 
   lemma ind_uf &m : 
-    (forall (O <: OrclInd{A}),
+    (forall (O <: OrclInd{-A}),
        islossless O.keygen => islossless O.sign =>
        islossless O.pkeys => islossless O.verify => islossless A(O).main) =>
     `| Pr[IndSig(RealSigServ, A).main() @ &m : res] -
@@ -429,7 +421,7 @@ abstract theory UF1_UF.
 
   section.
 
-    declare module A <: AdvUF { RealSigServ, OrclUF, UF1, UF, WAkg, MkAdvUF1 }.
+    declare module A <: AdvUF { -RealSigServ, -OrclUF, -UF1, -UF, -WAkg, -MkAdvUF1 }.
 
     local module Aux (O:OrclUF) = {
       var forged : int option
@@ -645,7 +637,7 @@ abstract theory UF1_UF.
           inline *. 
         + rcondt{2} 3; 1: by auto; smt().
         auto => /> &m1 &m2 hpki _ hpk _ _ h.
-        have := hpk pk{m2}; rewrite h /= => -[->> ->] /=; rewrite /oget /= /= => s -> /=.
+        have := hpk pk{m2}; rewrite h /= => -[->> ->] /=; rewrite /= => s -> /=.
           split; first by smt(emptyE get_setE).
           by rewrite imageU image1 /= fsetUA.
         inline *. sp 0 3. 
@@ -676,8 +668,8 @@ abstract theory UF1_UF.
 
   end section.
 
-  lemma ind_uf1 (A <: AdvInd{RealSigServ, OrclUF, UF1, UF, WAkg, MkAdvUF1}) &m : 
-    (forall (O <: OrclInd{A}),
+  lemma ind_uf1 (A <: AdvInd{-RealSigServ, -OrclUF, -UF1, -UF, -WAkg, -MkAdvUF1}) &m : 
+    (forall (O <: OrclInd{-A}),
        islossless O.keygen => islossless O.sign =>
        islossless O.pkeys => islossless O.verify => islossless A(O).main) =>
     `| Pr[IndSig(RealSigServ, A).main() @ &m : res] -

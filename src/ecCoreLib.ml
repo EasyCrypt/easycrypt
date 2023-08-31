@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 let s_get  = "_.[_]"
 let s_set  = "_.[_<-_]"
@@ -57,6 +49,19 @@ module CI_Bool = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Option = struct
+  let i_Option  = "Logic"
+  let p_Option  = EcPath.pqname p_top i_Option
+
+  let _Option x = EcPath.pqname p_Option x
+
+  let p_option = _Option "option"
+  let p_none   = _Option "None"
+  let p_some   = _Option "Some"
+  let p_oget   = _Option "oget"
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Int = struct
   let i_Int = "CoreInt"
   let p_Int = EcPath.pqname p_top i_Int
@@ -76,6 +81,32 @@ module CI_Int = struct
   let p_int_le    = _Int "le"
   let p_int_lt    = _Int "lt"
   let p_int_edivz = _IntDiv "edivz"
+  let p_int_max   = _IntDiv "max"
+  let p_iteri     = EcPath.extend p_top ["Int"; "IterOp"; "iteri"]
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_xint = struct
+  let i_Xint  = "Xint"
+  let p_Xint  = EcPath.pqname p_top i_Xint
+  let _Xint   = fun x -> EcPath.pqname p_Xint x
+  let mk_Xint = _Xint
+
+  let p_xint   = mk_Xint "xint"
+  let p_N      = mk_Xint "N"
+  let p_inf    = mk_Xint "Inf"
+  let p_xopp   = mk_Xint "xopp"
+  let p_xadd   = mk_Xint "xadd"
+  let p_xmul   = mk_Xint "xmul"
+  let p_is_inf = mk_Xint "is_inf"
+  let p_is_int = mk_Xint "is_int"
+
+  let p_choaretac = EcPath.pqname p_top "CHoareTactic"
+
+  let p_xle     = EcPath.pqname p_choaretac "xle"
+  let p_xmax    = EcPath.pqname p_choaretac "xmax"
+  let p_bigxint = EcPath.pqname p_choaretac "Bigxint"
+  let p_big     = EcPath.pqname p_bigxint "big"
 end
 
 (* -------------------------------------------------------------------- *)
@@ -103,8 +134,16 @@ module CI_Real = struct
   let p_real_lt     = _Real "lt"
   let p_real_of_int = _Real "from_int"
   let p_real_abs    = EcPath.extend p_top ["Real"; "`|_|"]
+
+  let real_lemma name =
+    EcPath.pqname p_RealExtra name
+
+  let real_order_lemma name =
+    EcPath.pqname p_RealOrder name
+
 end
 
+(* -------------------------------------------------------------------- *)
 module CI_Pred = struct
   let i_Pred  = "Logic"
   let p_Pred  = EcPath.pqname p_top i_Pred
@@ -124,12 +163,24 @@ module CI_Distr = struct
   let p_dbool      = EcPath.extend p_top ["DBool"; "dbool"]
   let p_dbitstring = EcPath.extend p_Distr ["Dbitstring"; "dbitstring"]
   let p_dinter     = EcPath.extend p_top ["DInterval"; "dinter"]
+  let p_dunit      = EcPath.extend p_Distr ["MUnit"; "dunit"]
+  let p_dmap       = EcPath.extend p_Distr ["dmap"]
+  let p_dlet       = EcPath.extend p_Distr ["dlet"]
 
   let p_support  = _Distr "support"
   let p_mu       = _Pervasive "mu"
   let p_lossless = _Distr "is_lossless"
   let p_uniform  = _Distr "is_uniform"
   let p_full     = _Distr "is_full"
+  let p_dfold    = _Distr "dfold"
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_Sum = struct
+  let i_Sum = "RealSeries"
+  let p_Sum = EcPath.pqname p_top i_Sum
+
+  let p_sum = EcPath.extend p_Sum ["sum"]
 end
 
 (* -------------------------------------------------------------------- *)

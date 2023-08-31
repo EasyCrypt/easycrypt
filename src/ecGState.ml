@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcMaps
 
@@ -65,6 +57,12 @@ let getvalue (name : string) (g : gstate) =
 (* -------------------------------------------------------------------- *)
 let setvalue (name : string) (value : value) (g : gstate) =
   g.gs_values <- Mstr.add name value g.gs_values
+
+(* -------------------------------------------------------------------- *)
+let old_mem_restr = "old_mem_restr"
+
+let get_old_mem_restr (g : gstate) : bool =
+  getflag ~default:false old_mem_restr g
 
 (* -------------------------------------------------------------------- *)
 let add_notifier (notifier : loglevel -> string Lazy.t -> unit) (gs : gstate) =

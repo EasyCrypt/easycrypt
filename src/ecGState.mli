@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 
 (* Global / mutable EasyCrypt state that can be attached to an
@@ -31,6 +23,10 @@ val setvalue : string -> value -> gstate -> unit
 (* -------------------------------------------------------------------- *)
 val getflag : ?default:bool -> string -> gstate -> bool
 val setflag : string -> bool -> gstate -> unit
+
+(* --------------------------------------------------------------------- *)
+val old_mem_restr : string
+val get_old_mem_restr : gstate -> bool
 
 (* --------------------------------------------------------------------- *)
 type nid_t

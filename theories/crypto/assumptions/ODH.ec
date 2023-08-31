@@ -1,17 +1,21 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
-require import CyclicGroup DBool SmtMap FSet DList Int List.
+require import DBool SmtMap FSet DList Int List.
+require (****) Group.
 
 (* Multiple Oracle-DH *)
 
+clone Group.CyclicGroup as G.
+
+axiom prime_p : IntDiv.prime G.order.
+
+clone G.PowZMod as GP with
+  lemma prime_order <- prime_p.
+
+clone import GP.FDistr as FD.
+
+import G GP FD.
+
 type range.
-type secret = t.
+type secret = exp.
 
 (* A hash function with domain consistent with group type *)
 op hash : group -> range.
@@ -45,21 +49,21 @@ module ODH_Orcl : ODH_OrclT = {
 
   proc init(bval : bool) = {
     b <- bval;
-    genMap <- empty;
-    rorList <- fset0;
+    genMap    <- empty;
+    rorList   <- fset0;
     count_gen <- 0;
     count_ror <- 0;
  }
 
  proc gen() = {
     var y,gy;
-    
-    y <$FDistr.dt;
+
+    y  <$ FD.dt;
     gy <- witness;
 
     if (count_gen < q_gen) {
        gy <- g ^ y;
- 
+
        if (! gy \in genMap) {
           genMap.[gy] <- y;
        }
@@ -78,18 +82,18 @@ module ODH_Orcl : ODH_OrclT = {
    gylist <- elems gys;
    n_keys <- size gylist;
 
-   x <$ FDistr.dt;
+   x    <$ dt;
    keys <$ dlist genRange n_keys;
 
    gx <- g ^ x;
 
    if (count_ror < q_ror) {
      if (gys \subset (fdom genMap)) {
-        gygxlist <- map (fun gy => (gy,gx)) gylist;
-        rorList <- rorList `|` oflist gygxlist;
-        hs <- amap (fun k v => if b then (gx, v) else (gx, hash (k^x)))
-                   (zip gylist keys);
-        rhs <- Some hs;
+        gygxlist <- map (fun gy => (gy, gx)) gylist;
+        rorList  <- rorList `|` oflist gygxlist;
+        hs       <- amap (fun k v => if b then (gx, v) else (gx, hash (k ^ x)))
+                         (zip gylist keys);
+        rhs      <- Some hs;
      }
      count_ror <- count_ror + 1;
    }
@@ -102,7 +106,7 @@ module ODH_Orcl : ODH_OrclT = {
 
    if (gy \in genMap /\ (!(gy,val) \in rorList)) {
      y <- oget genMap.[gy];
-     h <- Some (hash (val^y));
+     h <- Some (hash (val ^ y));
    }
    return h;
  }
@@ -116,14 +120,14 @@ module ODH_Sec (A : ODH_Adv) = {
 
     O.init(b);
     b' <@ A(O).guess();
-    
+
     return (b = b');
   }
 
   proc main () : bool = {
     var b, b';
 
-    b <$ {0,1};
+    b  <$ {0,1}; (* This syntax does not allow b <$ {0, 1}; *)
     b' <@ game(b);
 
     return (b');

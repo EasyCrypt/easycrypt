@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require CoreInt.
 
@@ -255,6 +247,12 @@ theory IterOp.
   axiom iteriS ['a] n opr (x : 'a):
     0 <= n => iteri (n+1) opr x = opr n (iteri n opr x).
 
+  lemma iteriS_rw ['a] (n : int) (opr : int -> 'a -> 'a) (x : 'a) :
+    0 < n => iteri n opr x = opr (n - 1) (iteri (n - 1) opr x).
+  proof.
+  by move=> gt0_n; rewrite {1}[n](_ : n = n - 1 + 1) // iteriS //#.
+  qed.
+
   lemma eq_iteri (f1 f2 : int -> 'a -> 'a) k a:
        (forall i a, 0 <= i < k => f1 i a = f2 i a)
     => iteri k f1 a = iteri k f2 a.
@@ -315,9 +313,9 @@ lemma odd0 : !odd 0. proof. by rewrite /odd iter0. qed.
 lemma odd1 :  odd 1. proof. by rewrite /odd iter1. qed.
 lemma odd2 : !odd 2. proof. by rewrite /odd iter2. qed.
 
-lemma oddN z : odd (-z) = odd z by [].
-lemma odd_abs z : odd `|z| = odd z by [].
-lemma oddS z : odd (z + 1) = !(odd z) by [].
+lemma oddN z : odd (-z) = odd z by smt().
+lemma odd_abs z : odd `|z| = odd z by smt().
+lemma oddS z : odd (z + 1) = !(odd z) by smt(iterS).
 
 lemma odd3 : odd 3.
 proof. by rewrite (oddS 2) odd2. qed.
@@ -330,60 +328,6 @@ proof.
 elim/intwlog: z1 => [z1 /#| |z1] /=; 1: by rewrite odd0.
 by move=> ge0_z1 ih; rewrite mulzDl /= oddS oddD ih /#.
 qed.
-
-(* -------------------------------------------------------------------- *)
-op argmin (f : int -> 'a) (p : 'a -> bool) =
-  choiceb (fun j => 0 <= j /\ p (f j) /\ forall i, 0 <= i < j => !p (f i)) 0.
-
-lemma argmin_out (f : int -> 'a) p: (forall i, !p (f i)) => argmin f p = 0.
-proof. by move=> pN; rewrite /argmin choiceb_dfl => //= x; rewrite pN. qed.
-
-lemma nosmt argminP_r (f : int -> 'a) p i: 0 <= i => p (f i) =>
-     0 <= argmin f p
-  /\ p (f (argmin f p))
-  /\ forall i, 0 <= i < (argmin f p) => !p (f i).
-proof.
-pose F := fun i0 => forall j, 0 <= j < i0 => !p (f j).
-move=> ge0_i pi; have: exists j, 0 <= j /\ p (f j) /\ F j.
-  elim/sintind: i ge0_i pi => i ge0_i ih pi.
-  case: (exists j, (0 <= j < i) /\ p (f j)).
-    by case=> j [/ih {ih} ih/ih]; apply.
-  move=> h; exists i; rewrite pi ge0_i => j lt_ji; apply/negP.
-  by move=> pj; apply/h; exists j; rewrite pj.
-by move/choicebP/(_ 0); apply.
-qed.
-
-lemma argminP (f : int -> 'a) p i: 0 <= i => p (f i) => p (f (argmin f p)).
-proof. by move=> ge0_i/(argminP_r _ _ _ ge0_i). qed.
-
-lemma ge0_argmin (f : int -> 'a) p: 0 <= argmin f p.
-proof.                          (* FIXME: choice_spec *)
-case: (exists i, 0 <= i /\ p (f i)); first by case=> i [] /(argminP_r f p) h /h.
-move=> h; rewrite /argmin choiceb_dfl ?lez_lt_asym //=.
-by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
-qed.
-
-lemma argmin_min (f : int -> 'a) p: forall j, 0 <= j < argmin f p => !p (f j).
-proof.                          (* FIXME: choice_spec *)
-case: (exists i, 0 <= i /\ p (f i)); first by case=> i [] /(argminP_r f p) h /h.
-move=> h j; rewrite /argmin choiceb_dfl ?lez_lt_asym //=.
-by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
-qed.
-
-lemma argmin_eq ['a] f p i :
-  0 <= i => p (f i) => (forall j, 0 <= j < i => !p (f j)) => argmin<:'a> f p = i.
-proof.
-move=> ge0_i pfi Npfj @/argmin.
-pose Q j := 0 <= j /\ p (f j) /\ forall i, 0 <= i < j => !p (f i).
-have /# := choicebP Q 0 _; first by exists i.
-qed.
-
-lemma argmin_le ['a] f p q :
-  (forall j, p j => q j) => argmin<:'a> f q <= argmin<:'a> f p.
-proof. move=> le_pq. admitted.
-
-(* -------------------------------------------------------------------- *)
-abbrev minz = argmin (fun (i : int) => i).
 
 (* -------------------------------------------------------------------- *)
 (* TO BE REMOVED                                                        *)
@@ -407,3 +351,22 @@ proof. elim/intind: n1; smt(fold0 foldS). qed.
 (* -------------------------------------------------------------------- *)
 op min (a b:int) = if (a < b) then a else b.
 op max (a b:int) = if (a < b) then b else a.
+
+lemma lez_minl a b :
+  a <= b => min a b = a.
+proof. by smt(). qed.
+
+lemma lez_minr a b :
+  b <= a => min a b = b.
+proof. by smt(). qed.
+
+lemma lez_maxl a b :
+  b <= a => max a b = a.
+proof. by smt(). qed.
+
+lemma lez_maxr a b :
+  a <= b => max a b = b.
+proof. by smt(). qed.
+
+lemma maxzz : idempotent max by smt().
+lemma minzz : idempotent min by smt().

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require Subtype.
 
 pragma +implicits.
@@ -95,13 +87,15 @@ apply/(eqv_trans (canon x)); first by apply/eqv_canon.
 by rewrite eq &(eqv_refl).
 qed.
 
-type qT.
-
 clone import Subtype with
   type T  <- T,
-  type sT <- qT,
-  pred P  <- iscanon,
-  op  wsT <- canon witness.
+  op P  <- iscanon
+proof *.
+realize inhabited.
+smt(canonK).
+qed.
+    
+type qT = sT.
 
 clone include CoreQuotient with
   type T     <- T,

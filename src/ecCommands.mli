@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcLocation
 
@@ -40,7 +32,8 @@ val current     : unit -> EcScope.scope
 val addnotifier : notifier -> unit
 
 (* -------------------------------------------------------------------- *)
-val process : ?timed:bool -> EcParsetree.global_action located -> float option
+val process : ?timed:bool -> ?break:bool ->
+  EcParsetree.global_action located -> float option
 
 val undo  : int  -> unit
 val reset : unit -> unit

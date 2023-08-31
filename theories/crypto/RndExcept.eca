@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore List Distr Dexcepted FelTactic.
 require import StdOrder StdBigop.
 import RealOrder Bigreal.
@@ -123,8 +115,7 @@ abstract theory Adversary.
 
 
   section PROOFS.
-
-  declare module A <: AdvRndE { SampleB }.
+  declare module A <: AdvRndE { -SampleB }.
 
   equiv A_sampleE_sampleEB : Main(R(SampleE),A).main ~ Main(R(SampleEB),A).main :
     ={glob A} ==> ={res, glob A}.
@@ -142,7 +133,7 @@ abstract theory Adversary.
     inline*;auto.
   qed.
 
-  declare axiom A_ll : (forall (O <: SAMPLE_ADV{A}), islossless O.sample => islossless A(O).main).
+  declare axiom A_ll : (forall (O <: SAMPLE_ADV{-A}), islossless O.sample => islossless A(O).main).
 
   equiv A_upto :
      Main(R(SampleEB),A).main ~ Main(R(SampleB),A).main :
@@ -273,12 +264,11 @@ abstract theory AdversaryN.
   }.
 
   section PROOFS.
-
-  declare module A <: AdvRndE { Count }.
+  declare module A <: AdvRndE { -Count }.
 
   local clone import Bad as Bad1.
 
-  declare axiom A_ll : (forall (O <: SAMPLE_ADV{A}), islossless O.sample => islossless A(O).main).
+  declare axiom A_ll : (forall (O <: SAMPLE_ADV{-A}), islossless O.sample => islossless A(O).main).
 
   local lemma pr_bad &m :
     Pr[Main(CountI(R(SampleB)),A).main() @ &m : SampleB.bad /\ 0 <= Count.c <= q ] <= q%r * p%r / n%r .
@@ -525,3 +515,5 @@ abstract theory Adversary1_1.
   end section PROOFS.
 
 end  Adversary1_1.
+ 
+ 

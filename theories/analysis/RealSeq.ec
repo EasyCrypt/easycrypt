@@ -1,13 +1,5 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
-require import AllCore Bool Ring StdRing StdOrder StdBigop List.
+require import AllCore Bool Ring StdRing StdOrder StdBigop List RealExp.
 (*---*) import IterOp Bigreal.BRA IntID RField IntOrder RealOrder.
 
 pragma +implicits.
@@ -196,6 +188,28 @@ move=> @/a1; apply/cnvtoM_boundedr; first by apply/cnvtoBlim.
 by apply/(@bounded_cnvto l2).
 qed.
 
+lemma cnvto_pow p : -1%r < p < 1%r => convergeto (fun (n : int) => p ^ n) 0%r.
+proof.
+move=> [h0p hp1] eps he /=.
+case: (p = 0%r) => [-> | ?].
++ by exists 1 => n hn; rewrite RField.expr0n /#.
+pose P := `|p|.
+have [# 4?] : 0%r < P < 1%r /\ P <> 0%r /\ 0%r <= P by smt().  
+case: (1%r <= eps) => h1e.
++  exists 1 => n hn; apply (ler_lt_trans (`|p|^1)).
+   + rewrite normrX; smt(ler_wiexpn2l expr_ge0).
+   smt(RField.expr1).
+pose N := ceil (-log (inv P) eps) + 1; exists N => n hn.
+rewrite normrX -/P.
+have ? : 1%r < inv P by apply invr_gt1.
+have ? : 0 < N by smt (log_le0 ceil_bound).
+apply (ler_lt_trans (P ^ N)); 1: by apply ler_wiexpn2l => /#. 
+rewrite -(RField.invrK P) -RField.exprN1 -RField.exprM /= mulN1r.
+rewrite -(@log_mono_ltr (inv P)) //; 1: by apply/expr_gt0/invr_gt0.
+rewrite -rpow_int 1:invr_ge0 // logK 1:invr_gt0 1:// 1:/#.
+smt(ceil_bound). 
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma le_cnvto_from s1 s2 l1 l2:
      (exists N, forall n, (N <= n)%Int => (s1 n <= s2 n)%Real)
@@ -208,7 +222,7 @@ have gt0_e: 0%r < e by rewrite /e divr_gt0 ?subr_gt0.
 have [N' lte] := cvF _ gt0_e; pose n := max N N'.
 have /subr_le0 le0_s12 := le_s12 n _; first by rewrite /n maxrl.
 have := lte n _; first by rewrite /n maxrr.
-rewrite ltr_norml => -[+ _] @/F; rewrite ltr_subr_addl /F.
+rewrite ltr_norml => -[+ _]; rewrite ltr_subr_addl /F.
 move/ltr_le_trans/(_ _ le0_s12); rewrite -(@mulr1 (l1-l2)) /e.
 rewrite -mulrBr pmulr_llt0 1:subr_gt0 1:invr_lt1 //.
 by rewrite subr_lt0 ltrNge (ltrW lt_l21).
@@ -241,6 +255,9 @@ by apply/(@cnvto_lub_bmono_from _ M N).
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma cnvC (x:real) : converge (fun _ => x).
+proof. by exists x => eps he; exists 0. qed.
+
 lemma cnvD (s1 s2 : int -> real) :
   converge s1 => converge s2 => converge (fun x => s1 x + s2 x).
 proof. by case=> [l1 h1] [l2 h2]; exists (l1 + l2); apply/cnvtoD. qed.
@@ -263,6 +280,9 @@ proof. by move/(@cnvZ (-1)%r) => /#. qed.
 lemma cnvB s1 s2 :
   converge s1 => converge s2 => converge (fun x => s1 x - s2 x).
 proof.  by move=> h1 h2; rewrite cnvD // cnvN. qed.
+
+lemma cnv_pow p : -1%r < p < 1%r => converge (fun (n : int) => p ^ n).
+proof. by move=> ?; exists 0%r; apply cnvto_pow. qed.
 
 (* -------------------------------------------------------------------- *)
 op lim (s : int -> real) =
@@ -289,6 +309,30 @@ case: (converge s1) => ^cv1; rewrite (@eq_cnv_fromP N _ s2) // => cv2;
   last by rewrite !lim_Ncnv.
 apply/lim_cnvto; case: cv2 => [l2 ^c2 /lim_cnvto ->]; move: c2.
 by apply/(@eq_cnvto_from N)=> n leNn; apply/eq_sym/eq.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma geC_lim_from (N : int) (s : int -> real) (c : real) :
+     (forall n, N <= n => c <= s n)
+  => converge s
+  => c <= lim s.
+proof.
+move=> le cvg; apply: (@le_cnvto_from (fun _ => c) s c (lim s)).
+- by exists N.
+- by apply: cnvtoC.
+- by apply/limP.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma leC_lim_from (N : int) (s : int -> real) (c : real) :
+     (forall n, N <= n => s n <= c)
+  => converge s
+  => lim s <= c.
+proof.
+move=> le cvg; apply: (@le_cnvto_from s (fun _ => c) (lim s) c).
+- by exists N.
+- by apply/limP.
+- by apply: cnvtoC.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -327,3 +371,66 @@ lemma limB (s1 s2 : int -> real) :
   converge s1 => converge s2 =>
     lim (fun x => s1 x - s2 x) = lim s1 - lim s2.
 proof. by move=> h1 h2; rewrite limD // 1:cnvN // limN. qed.
+
+lemma limM (s1 s2 : int -> real) :
+  converge s1 => converge s2 =>
+    lim (fun x => s1 x * s2 x) = lim s1 * lim s2.
+proof.
+case=> [l1 h1] [l2 h2]; rewrite (lim_cnvto h1) (lim_cnvto h2).
+by have := cnvtoM _ _ _ _ h1 h2 => /lim_cnvto ->.
+qed.
+
+lemma lim_pow p : -1%r < p < 1%r => lim (fun (n:int) => p ^ n) = 0%r.
+proof. by move=> h; apply/lim_cnvto/cnvto_pow. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma convergeto_sum
+  (P : 'a -> bool)
+  (F : 'a -> int -> real)
+  (l : 'a -> real)
+  (s : 'a list)
+:
+     (forall x, P x => convergeto (F x) (l x))
+  => convergeto
+       (fun n => big P (fun x => (F x n)) s)
+       (big P (fun x => l x) s).
+proof.
+move=> cvg; elim: s => /= [|x s ih].
+- by rewrite !big_nil &(@eq_cnvto (fun _ => 0%r)) //= &(cnvtoC).
+rewrite big_cons; case: (P x) => [Px|NPx]; last first.
+- rewrite &(@eq_cnvto (fun n => big P (fun y => F y n) s)) /=.
+  - by move=> n; rewrite big_cons NPx.
+  - apply: ih.
+pose G (n : int) := F x n + big P (fun y => F y n) s.
+rewrite &(eq_cnvto G) => /= [n|].
+- by rewrite /G big_cons Px.
+by apply: cnvtoD => //; apply: cvg.
+qed.
+
+lemma converge_sum
+  (P : 'a -> bool)
+  (F : 'a -> int -> real)
+  (s : 'a list)
+:
+     (forall x, P x => converge (F x))
+  => converge (fun n => big P (fun x => (F x n)) s).
+proof.
+move=> cvg; pose l := big P (fun x => lim (F x)) s.
+apply/(cnvP l)/convergeto_sum => /= x Px.
+by apply/limP/cvg.
+qed.
+
+lemma lim_sum 
+  (P : 'a -> bool)
+  (F : 'a -> int -> real)
+  (s : 'a list)
+:
+     (forall x, P x => converge (F x))
+  => big P (fun x => lim (F x)) s
+     = lim (fun n => big P (fun x => F x n) s).
+proof.
+move=> cvg; pose l := fun x => lim (F x).
+have {cvg}cvg: forall x, P x => convergeto (F x) (l x).
+- by move=> x Px; apply/limP/cvg.
+by move/convergeto_sum: cvg => /(_ s) /lim_cnvto => <-.
+qed.

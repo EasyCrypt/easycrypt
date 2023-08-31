@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 module Enum = BatEnum
 
@@ -13,6 +5,13 @@ module Enum = BatEnum
 exception Unexpected
 
 let unexpected () = raise Unexpected
+
+(* -------------------------------------------------------------------- *)
+let rec makedirs (x : string) =
+  if not (Sys.file_exists x) then begin
+    makedirs (Filename.dirname x);
+    Unix.mkdir x 0o755
+  end
 
 (* -------------------------------------------------------------------- *)
 type 'data cb = Cb : 'a * ('data -> 'a -> unit) -> 'data cb
@@ -574,6 +573,16 @@ module List = struct
   (* ------------------------------------------------------------------ *)
   let reduce1 (f : 'a list -> 'a) : 'a list -> 'a =
     function [x] -> x | xs  -> f xs
+
+  (* ------------------------------------------------------------------ *)
+  let rec find_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
+    match xs with
+    | []      -> None
+    | x :: xs ->
+        if BatList.mem_cmp cmp x xs then Some x else find_dup ~cmp xs
+
+  let has_dup ?(cmp = Stdlib.compare) (xs : 'a list) =
+    Option.is_some (find_dup ~cmp xs)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -624,12 +633,6 @@ module String = struct
   include BatString
 
   let split_lines = split_on_string ~by:"\n"
-
-  let trim (s : string) =
-    let aout = BatString.trim s in
-    if s == aout then BatString.copy aout else s
-
-  let rev (s:string) = init (length s) (fun i -> s.[length s - 1 - i])
 
   (* ------------------------------------------------------------------ *)
   module OptionMatching = struct

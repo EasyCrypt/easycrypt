@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import Int Ring AlgTactic CoreReal.
 
@@ -15,6 +7,7 @@ abbrev ( + ) = CoreReal.add.
 abbrev ([-]) = CoreReal.opp.
 abbrev ( * ) = CoreReal.mul.
 abbrev inv   = CoreReal.inv.
+abbrev (%r)  = CoreReal.from_int.
 
 abbrev ( - ) (x y : real) = x + (-y).
 abbrev ( / ) (x y : real) = x * (inv y).
@@ -30,24 +23,28 @@ abbrev b2r (b:bool) = if b then from_int 1 else from_int 0.
 lemma nosmt fromint0 : 0%r = CoreReal.zero by [].
 lemma nosmt fromint1 : 1%r = CoreReal.one  by [].
 
-lemma nosmt fromintN (z     : int) : (-z)%r = - z%r by [].
-lemma nosmt fromintD (z1 z2 : int) : (z1 + z2)%r = z1%r + z2%r by [].
-lemma nosmt fromintB (z1 z2 : int) : (z1 - z2)%r = z1%r - z2%r by [].
-lemma nosmt fromintM (z1 z2 : int) : (z1 * z2)%r = z1%r * z2%r by [].
+lemma nosmt fromintN (z     : int) : (-z)%r = - z%r by smt().
+
+lemma nosmt fromintD (z1 z2 : int) : (z1 + z2)%r = z1%r + z2%r by smt().
+
+lemma nosmt fromintB (z1 z2 : int) : (z1 - z2)%r = z1%r - z2%r.
+proof. by rewrite fromintD fromintN. qed.
+
+lemma nosmt fromintM (z1 z2 : int) : (z1 * z2)%r = z1%r * z2%r by smt().
 
 lemma nosmt eq_fromint (z1 z2 : int) :
   (z1%r = z2%r) <=> (z1 = z2)
-by [].
+by smt().
 
 lemma nosmt le_fromint (z1 z2 : int) :
   (z1%r <= z2%r) <=> (z1 <= z2)
-by smt ml=0.
+by smt().
 
 lemma nosmt lt_fromint (z1 z2 : int) :
   (z1%r < z2%r) <=> (z1 < z2)
-by smt ml=0.
+by smt().
 
-lemma nosmt fromint_abs  (z : int) : `|z|%r = `|z%r| by smt ml=0.
+lemma nosmt fromint_abs  (z : int) : `|z|%r = `|z%r| by smt().
 
 hint rewrite lte_fromint : le_fromint lt_fromint.
 
@@ -93,7 +90,7 @@ theory RField.
         by rewrite mulr0z.
       by rewrite mulrS // ih fromintD mulrDr mulr1 addrC.
     case: (lezWP c 0) => [le0c|_ /h //].
-    rewrite -{2}(@oppzK c) fromintN mulrN -h 1:#smt.
+    rewrite -{2}(@oppzK c) fromintN mulrN -h 1:/#.
     by rewrite mulrNz opprK.
   qed.
 
@@ -113,6 +110,9 @@ abbrev ( ^ ) = RField.exp.
 
 (* -------------------------------------------------------------------- *)
 lemma divr0: forall x, x / 0%r = 0%r by done.
+
+lemma divrK (u v : real) : v <> 0%r => u = u / v * v.
+proof. by move => neqv0; rewrite -mulrA mulVf. qed.
 
 lemma invr0: inv 0%r = 0%r by done.
 
@@ -221,7 +221,7 @@ op floor : real -> int.
 op ceil  : real -> int.
 
 axiom floor_bound (x:real) : x - 1%r < (floor x)%r <= x.
-axiom  ceil_bound (x:real) : x <= (ceil x)%r < x + 1%r.
+axiom ceil_bound  (x:real) : x <= (ceil x)%r < x + 1%r.
 axiom from_int_floor n : floor n%r = n.
 axiom from_int_ceil  n : ceil  n%r = n.
 
@@ -237,6 +237,18 @@ proof. by case: (ceil_bound x). qed.
 lemma ceil_lt x : (ceil x)%r < x + 1%r.
 proof. by case: (ceil_bound x). qed.
 
+lemma floorP x n : floor x = n <=> n%r <= x < n%r + 1%r.
+proof. smt(floor_bound). qed.
+
+lemma from_int_floor_addl n x : floor (n%r + x) = n + floor x.
+proof. smt(floor_bound). qed.
+
+lemma from_int_floor_addr n x : floor (x + n%r) = floor x + n.
+proof. smt(floor_bound). qed.
+
+lemma floor_mono (x y : real) : x <= y => floor x <= floor y.
+proof. smt(floor_bound). qed.
+
 (* -------------------------------------------------------------------- *)
 (* WARNING Lemmas used by tactics: *)
 lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
@@ -245,22 +257,44 @@ lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
    x1 <= x5 =>
    x3 <= x5 =>
    x2 = x4 =>
-   `|x1 + x2 - (x3 + x4)| <= x5 by [].
+   `|x1 + x2 - (x3 + x4)| <= x5 by smt().
 
 lemma nosmt upto2_notbad (ev1 ev2 bad1 bad2:bool) :
   ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
-  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by [].
+  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by smt().
 
 lemma nosmt upto2_imp_bad (ev1 ev2 bad1 bad2:bool) :
   ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
   (ev1 /\ bad1) => bad2 by [].
 
 lemma nosmt upto_bad_false (ev bad2:bool) :
-  !((ev /\ !bad2) /\ bad2) by [].
+  !((ev /\ !bad2) /\ bad2) by smt().
 
 lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
    (!bad2 => ev1 => ev2) => ev1 =>
-    ev2 /\ !bad2 \/ bad2 by [].
+    ev2 /\ !bad2 \/ bad2 by smt().
 
 lemma nosmt upto_bad_sub (ev bad:bool) :
   ev /\ ! bad => ev by [].
+
+lemma eq_upto (E1 E1b E1nb E2 E2b E2nb: real) :
+  E1 = E1b + E1nb =>
+  E2 = E2b + E2nb =>
+  E1nb = E2nb =>
+  E1 - E2 = E1b - E2b.
+proof. smt(). qed.
+
+lemma upto_abs (E1 E1b E1nb E2 E2b E2nb: real) :
+  E1 = E1b + E1nb =>
+  E2 = E2b + E2nb =>
+  E1nb = E2nb =>
+  `| E1 - E2 | <= `|E1b - E2b|.
+proof. by move=> h1 h2 h3; rewrite (eq_upto _ _ _ _ _ _ h1 h2 h3). qed.
+
+lemma upto_le (E1 E1b E1nb E2nb E2nb' E1b' : real) : 
+  E1 = E1b + E1nb =>
+  E1nb = E2nb =>
+  E1b <= E1b' => 
+  E2nb <= E2nb' => 
+  E1 <= E2nb' + E1b'.
+proof. smt(). qed.

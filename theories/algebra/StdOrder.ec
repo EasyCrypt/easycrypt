@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore Ring StdRing.
 require (*--*) Number.
@@ -34,7 +26,7 @@ clone include Number.RealDomain
   op   ( <= ) <- Int.(<=),
   op   ( <  ) <- Int.(< )
 
-  proof Domain.* by smt, Axioms.* by smt
+  proof Domain.* by smt(invr0), Axioms.* by smt()
 
   remove abbrev Domain.(-)
   remove abbrev Domain.(/).
@@ -79,10 +71,12 @@ move=> nz_0; rewrite b2i1 /= -{1}(mul1r `|z|); congr.
 rewrite -exprD_nneg ?b2i_ge0 -signr_odd ?addr_ge0 ?b2i_ge0.
 by rewrite -mul1r2z oddM /ofint_id intmulz odd2 expr0.
 qed.
+
 end IntOrder.
 
 (* -------------------------------------------------------------------- *)
-clone Number.RealField as RealOrder
+theory RealOrder. 
+clone include Number.RealField
   with type Field.t <- real,
 
   op   Field.zeror  <- 0%r,
@@ -102,7 +96,26 @@ clone Number.RealField as RealOrder
   op   ( <= ) <- Real.(<=),
   op   ( <  ) <- Real.(< )
 
-  proof Field.* by smt, Axioms.* by smt full
+  proof Field.* by smt(RField.invr0), Axioms.* by smt()
 
   remove abbrev Field.(-)
   remove abbrev Field.(/).
+
+(* This is used by the upto tactic *)
+lemma upto_maxr (E1 E1b E1nb E2 E2b E2nb E1b' E2b' : real) :
+  E1 = E1b + E1nb =>
+  E2 = E2b + E2nb =>
+  E1nb = E2nb =>
+  0.0 <= E1b => 
+  E1b <= E1b' =>
+  0.0 <= E2b => 
+  E2b <= E2b' =>
+  `| E1 - E2 | <= maxr E1b' E2b'.
+proof. 
+  move=> h1 h2 h3 h4 h5 h6 h7.
+  apply (ler_trans `|E1b - E2b|); 1: by apply (upto_abs _ _ _ _ _ _ h1 h2 h3).
+  apply (ler_trans (maxr E1b E2b)); 1: by apply (ler_norm_maxr _ _ h4 h6).
+  by apply ler_maxr_trans.
+qed.
+
+end RealOrder.

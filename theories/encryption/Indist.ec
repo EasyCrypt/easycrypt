@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore FSet Distr SampleBool.
 require DBool Hybrid.
 
@@ -49,7 +41,7 @@ module OrclR (O:Orcl) = {
 }.
 
 module type Adv (O : Orcl) (LR : LR) = {
-  proc main(): bool { O.leaks O.orcl LR.orcl }
+  proc main(): bool { O.leaks, O.orcl, LR.orcl }
 }.
 
 module INDL (O : Orcl) (A : Adv) = {
@@ -109,7 +101,7 @@ module HybGame2(A:Adv) (O:Orcl) (LR:LR) = {
   proc main():bool = {
     var b':bool;
 
-    HybOrcl.l0 <$ [0..q-1];
+    HybOrcl.l0 <$ [0..max 0 (q-1)];
     HybOrcl.l  <- 0;
     b'         <@ A(O,HybOrcl2(O,LR)).main();
     return b';
@@ -117,12 +109,12 @@ module HybGame2(A:Adv) (O:Orcl) (LR:LR) = {
 }.
 
 section.
-declare module O <: Orcl {Count, HybOrcl}.
-declare module A <: Adv  {Count, O, HybOrcl}.
+declare module O <: Orcl {-Count, -HybOrcl}.
+declare module A <: Adv  {-Count, -O, -HybOrcl}.
 
 declare axiom losslessL: islossless O.leaks.
 declare axiom losslessO: islossless O.orcl.
-declare axiom losslessA (O <: Orcl{A}) (LR <: LR{A}):
+declare axiom losslessA (O <: Orcl{-A}) (LR <: LR{-A}):
   islossless LR.orcl =>
   islossless O.leaks => islossless O.orcl =>
   islossless A(O, LR).main.
@@ -193,7 +185,8 @@ have ->:   Pr[INDL(O, HybGame2(A)).main() @ &m:
       + inline OrclL(O).orcl Count.incr.
         by wp; call (: true); auto.
       by wp; call (: true); auto.
-    by wp;rnd.
+  by wp;rnd;auto; smt(q_pos).
+
   by inline *; auto.
 have ->:   Pr[INDR(O, HybGame2(A)).main() @ &m:
                 res /\ p (glob A) (glob O) HybOrcl.l /\ HybOrcl.l <= q /\ Count.c <= 1]
@@ -218,7 +211,7 @@ have ->:   Pr[INDR(O, HybGame2(A)).main() @ &m:
       + inline OrclR(O).orcl Count.incr.
         by wp; call (: true); auto.
       by wp; call (: true); auto.
-    by wp;rnd.
+  by wp;rnd;auto; smt(q_pos).
   by inline *; auto.
 have ->:   Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Count.c <= q]
          = Pr[Ln(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) Count.c) /\ Count.c <= q].
@@ -226,7 +219,7 @@ have ->:   Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Cou
              ==> ={res,glob A,glob O, Count.c})=> //.
   proc.
   call (: ={glob A,glob O, Count.c} ==> ={glob A,glob O,Count.c,res}).
-  + proc *; inline A'(Orcl2(O), OrclCount(L(Orcl2(O)))).main; sim.
+  + proc *; inline A'(Orcl2(O), OrclCount(L(Orcl2(O)))).main; wp.
     call (: ={glob O, Count.c})=> //.
     + by proc *; wp; call (: true); wp.
     + proc *; inline A'(Orcl2(O), OrclCount(L(Orcl2(O)))).O.orcl Orcl2(O).orclL; wp.
@@ -240,7 +233,7 @@ have ->:   Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Cou
              ==> ={res,glob A,glob O, Count.c})=> //.
   proc.
   call (: ={glob A,glob O, Count.c} ==> ={glob A,glob O,Count.c,res}).
-  + proc *; inline A'(Orcl2(O), OrclCount(R(Orcl2(O)))).main; sim.
+  + proc *; inline A'(Orcl2(O), OrclCount(R(Orcl2(O)))).main; wp.
     call (: ={glob O, Count.c})=> //.
     + by proc *; wp; call (: true); wp.
     + proc *; inline A'(Orcl2(O), OrclCount(R(Orcl2(O)))).O.orcl Orcl2(O).orclL; wp.
@@ -248,13 +241,14 @@ have ->:   Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\ Cou
     proc; inline OrclCount(R(Orcl2(O))).orcl R(Orcl2(O)).orcl Orcl2(O).orclR Count.incr.
     by wp; call(: true); wp.
   by inline *; auto.
-apply: (Hybrid (Orcl2(O)) A' losslessL _ _ _ &m (fun ga go c b, b /\ p ga go c)).
+apply: (Hybrid_div (Orcl2(O)) A' losslessL _ _ _ &m (fun ga go c b, b /\ p ga go c)).
 + by proc; call losslessO.
 + by proc; call losslessO.
 move=> Ob LR Hlr Hl Ho1 Ho2; proc.
 call (losslessA (<: A'(Ob,LR).O) (<: A'(Ob,LR).LR') _ _ _)=> //.
 + by proc; call Hlr.
-by proc; call Ho1.
++ by proc; call Ho1.
++ smt(q_pos).
 qed.
 end section.
 
@@ -286,8 +280,8 @@ module INDb(O:Orcl) (A:Adv) = {
 }.
 
 section.
-declare module O <: Orcl {Count, Orclb}.
-declare module A <: Adv  {Count, O, Orclb}.
+declare module O <: Orcl {-Count, -Orclb}.
+declare module A <: Adv  {-Count, -O, -Orclb}.
 
 local module WA = {
   proc work(x : bool) : bool = {
@@ -313,7 +307,7 @@ have ->:   Pr[INDb(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c]
              ==>    ={glob A,glob O, Count.c}
                  /\ res{1} = (fst res = snd res){2})=> //.
   proc.
-  inline Count.init WA.work=> @/fst @/snd //=.
+  inline Count.init WA.work=> //=.
   by swap{1} 2 -1; sim; proc (={Orclb.b, Count.c}).
 have He: equiv [INDR(O, A).main ~ WA.work:
                      x{2} = false

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
@@ -99,7 +91,7 @@ let trans_abbrev_r (env : env) (at : pabbrev located) =
   let tyat    = EcDecl.mk_abbrev ~ponly
                   tparams xs (codom, body) (at.ab_local :> locality) in
 
-  if EcTypes.is_local body then
+  if not ponly && EcTypes.is_local body then
     nterror gloc env NTE_AbbrevIsVar;
 
   (unloc at.ab_name, tyat)

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 {
   open EcUtils
@@ -53,9 +45,12 @@
     "var"         , VAR        ;        (* KW: prog *)
     "proc"        , PROC       ;        (* KW: prog *)
     "if"          , IF         ;        (* KW: prog *)
+    "is"          , IS         ;        (* KW: prog *)
+    "match"       , MATCH      ;        (* KW: prog *)
     "then"        , THEN       ;        (* KW: prog *)
     "else"        , ELSE       ;        (* KW: prog *)
     "elif"        , ELIF       ;        (* KW: prog *)
+    "match"       , MATCH      ;        (* KW: prog *)
     "for"         , FOR        ;        (* KW: prog *)
     "while"       , WHILE      ;        (* KW: prog *)
     "assert"      , ASSERT     ;        (* KW: prog *)
@@ -63,6 +58,8 @@
     "res"         , RES        ;        (* KW: prog *)
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
+    "choare"      , CHOARE     ;        (* KW: prog *)
+    "cost"        , COST       ;        (* KW: prog *)
     "phoare"      , PHOARE     ;        (* KW: prog *)
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
     "async"       , ASYNC      ;        (* KW: prog *)
@@ -144,10 +141,12 @@
     "swap"        , SWAP       ;        (* KW: tactic *)
     "cfold"       , CFOLD      ;        (* KW: tactic *)
     "rnd"         , RND        ;        (* KW: tactic *)
+    "rndsem"      , RNDSEM     ;        (* KW: tactic *)
     "pr_bounded"  , PRBOUNDED  ;        (* KW: tactic *)
     "bypr"        , BYPR       ;        (* KW: tactic *)
     "byphoare"    , BYPHOARE   ;        (* KW: tactic *)
     "byequiv"     , BYEQUIV    ;        (* KW: tactic *)
+    "byupto"      , BYUPTO     ;        (* KW: tactic *)
     "fel"         , FEL        ;        (* KW: tactic *)
 
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
@@ -163,6 +162,7 @@
     "eager"       , EAGER      ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
+    "schema"      , SCHEMA     ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "realize"     , REALIZE    ;        (* KW: global *)
@@ -194,6 +194,7 @@
     "type"        , TYPE       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
+    "instantiate" , INSTANTIATE;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "search"      , SEARCH     ;        (* KW: global *)
     "locate"      , LOCATE     ;        (* KW: global *)
@@ -207,6 +208,7 @@
     "why3"        , WHY3       ;        (* KW: global *)
     "dump"        , DUMP       ;        (* KW: global *)
     "remove"      , REMOVE     ;        (* KW: global *)
+    "exit"        , EXIT       ;        (* KW: global *)
 
     "time"        , TIME       ;        (* KW: internal *)
     "undo"        , UNDO       ;        (* KW: internal *)
@@ -343,6 +345,7 @@ let nop = '\\' ichar+
 let uniop = nop | ['-' '+']+ | '!'
 let binop = sop | nop
 let numop = '\'' digit+
+let pstop = '%' lident
 
 (* -------------------------------------------------------------------- *)
 rule main = parse
@@ -362,6 +365,7 @@ rule main = parse
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { [PBINOP s] }
   | '(' blank* (numop as s) blank* ')' { [PNUMOP s] }
+  | '(' blank* (pstop as s) blank* ')' { [PPSTOP s] }
 
   | '[' blank* (uniop as s) blank* ']' {
       let name = Printf.sprintf "[%s]" s in
@@ -398,6 +402,8 @@ rule main = parse
   | "{|"  { [LPBRACE   ] }
   | "|}"  { [RPBRACE   ] }
   | "`|"  { [TICKPIPE  ] }
+  | "`{"  { [TICKBRACE ] }
+  | "`("  { [TICKPAREN ] }
   | "<$"  { [LESAMPLE  ] }
   | "<@"  { [LEAT      ] }
   | ":~"  { [COLONTILD ] }

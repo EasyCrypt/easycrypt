@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
@@ -300,7 +292,7 @@ let rec pp_m fmt mp =
 (* -------------------------------------------------------------------- *)
 type xpath = {
   x_top : mpath;
-  x_sub : path;
+  x_sub : symbol;
   x_tag : int;
 }
 
@@ -310,7 +302,7 @@ let x_compare = fun p1 p2 -> x_hash p1 - x_hash p2
 
 let x_equal_na x1 x2 =
      mt_equal x1.x_top.m_top x2.x_top.m_top
-  && p_equal x1.x_sub x2.x_sub
+  && EcSymbols.sym_equal x1.x_sub x2.x_sub
 
 let x_compare_na x1 x2 =
   x_compare x1 x2 (* FIXME: doc says something about x_top being normalized *)
@@ -319,10 +311,10 @@ module Hsxpath = Why3.Hashcons.Make (struct
   type t = xpath
 
   let equal m1 m2 =
-    m_equal m1.x_top m2.x_top && p_equal m1.x_sub m2.x_sub
+    m_equal m1.x_top m2.x_top && EcSymbols.sym_equal m1.x_sub m2.x_sub
 
   let hash m =
-    Why3.Hashcons.combine (m_hash m.x_top) (p_hash m.x_sub)
+    Why3.Hashcons.combine (m_hash m.x_top) (Hashtbl.hash m.x_sub)
 
   let tag n p = { p with x_tag = n }
 end)
@@ -334,7 +326,7 @@ end)
 
 let x_ntr_compare (xp1 : xpath) (xp2 : xpath) =
   match m_ntr_compare xp1.x_top xp2.x_top with
-  | 0 -> p_ntr_compare xp1.x_sub xp2.x_sub
+  | 0 -> String.compare xp1.x_sub xp2.x_sub
   | n -> n
 
 let xpath top sub =
@@ -342,10 +334,8 @@ let xpath top sub =
 
 let x_fv fv xp = m_fv fv xp.x_top
 
-let xpath_fun mp f = xpath mp (psymbol f)
-let xqname x s = xpath x.x_top (pqname x.x_sub s)
 let xastrip x = { x with x_top = mastrip x.x_top }
-let xbasename xp = basename xp.x_sub
+let xbasename xp = xp.x_sub
 
 (* -------------------------------------------------------------------- *)
 module Mx = XPath.M
@@ -383,50 +373,62 @@ let rec m_tostring (m : mpath) =
 
 let x_tostring x =
   Printf.sprintf "%s./%s"
-    (m_tostring x.x_top) (tostring x.x_sub)
+    (m_tostring x.x_top) x.x_sub
+
+(* -------------------------------------------------------------------- *)
+type smsubst = {
+  sms_crt : path Mp.t;
+  sms_id  : mpath Mid.t;
+}
+
+(* -------------------------------------------------------------------- *)
+let sms_identity : smsubst =
+  { sms_crt = Mp.empty; sms_id = Mid.empty; }
+
+(* -------------------------------------------------------------------- *)
+let sms_is_identity (s : smsubst) =
+  Mp.is_empty s.sms_crt && Mid.is_empty s.sms_id
+
+(* -------------------------------------------------------------------- *)
+let sms_bind_abs (x : ident) (mp : mpath) (s : smsubst) =
+  { s with sms_id = Mid.add x mp s.sms_id }
 
 (* -------------------------------------------------------------------- *)
 let p_subst (s : path Mp.t) =
-  if Mp.is_empty s then identity
-  else
-    let p_subst aux p =
-      try  Mp.find p s
-      with Not_found ->
-        match p.p_node with
-        | Psymbol _ -> p
-        | Pqname(p1, id) ->
-          let p1' = aux p1 in
-          if p1 == p1' then p else pqname p1' id in
-    Hp.memo_rec 107 p_subst
+  if Mp.is_empty s then identity else
+
+  let doit (aux : path -> path) (p : path) =
+    match p.p_node with
+    | Psymbol _ -> p
+    | Pqname(q, x) -> pqname (aux q) x in
+
+  let p_subst (aux : path -> path) (p : path) =
+    ofdfl (fun () -> doit aux p) (Mp.find_opt p s)
+
+  in Hp.memo_rec 107 p_subst
 
 (* -------------------------------------------------------------------- *)
-let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
-  let args = List.Smart.map (m_subst sp sm) m.m_args in
-  match m.m_top with
-  | `Concrete(p,sub) ->
-    let p' = sp p in
-    let top = if p == p' then m.m_top else `Concrete(p',sub) in
-    if m.m_top == top && m.m_args == args then m else
-      mpath top args
-  | `Local id ->
-    try
-      let m' = EcIdent.Mid.find id sm in
-      m_apply m' args
-    with Not_found ->
-      if m.m_args == args then m else
-        mpath m.m_top args
+let m_subst (s : smsubst) =
+  let doit (aux : mpath -> mpath) (mp : mpath) =
+    match mp.m_top with
+    | `Concrete (p, sub) ->
+        let p'    = p_subst s.sms_crt p in
+        let args' = List.Smart.map aux mp.m_args in
+        mpath_crt p' args' sub
 
-let m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) =
-  if sp == identity && EcIdent.Mid.is_empty sm then identity
-  else m_subst sp sm
+    | `Local id ->
+        let args' = List.Smart.map aux mp.m_args in
+        match Mid.find_opt id s.sms_id with
+        | None -> mpath_abs id args'
+        | Some mp' -> m_apply mp' args'
+  in Hm.memo_rec 127 doit
+
+let m_subst (s : smsubst) =
+  if sms_is_identity s then identity else m_subst s
 
 (* -------------------------------------------------------------------- *)
-let x_subst (sm : mpath -> mpath) =
-  if sm == identity then identity
-  else fun x ->
-    let top = sm x.x_top in
-    if x.x_top == top then x
-    else xpath top x.x_sub
+let x_subst (s : smsubst) (xp : xpath) =
+  xpath (m_subst s xp.x_top) xp.x_sub
 
-let x_substm sp sm =
-  x_subst (m_subst sp sm)
+let x_subst (s : smsubst) =
+  if sms_is_identity s then identity else x_subst s

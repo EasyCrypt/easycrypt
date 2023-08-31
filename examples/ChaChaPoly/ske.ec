@@ -7,7 +7,7 @@ type plaintext.
 type ciphertext.
 
 module type SKE = {
-  proc * init(): unit {}
+  proc init(): unit {}
   proc kg(): key
   proc enc(k:key,p:plaintext): ciphertext 
   proc dec(k:key,c:ciphertext): plaintext option
@@ -31,7 +31,7 @@ abstract theory SKE_RND.
 clone include SKE.
 
 module type Oracles = {
-  proc * init() : unit
+  proc init() : unit
   proc enc(p:plaintext): ciphertext 
   proc dec(c:ciphertext): plaintext option
 }.
@@ -137,7 +137,7 @@ axiom dec_enc :
     forall gs p, dec gs k (enc gs k p) = Some p.
 
 module type StLOrcls = {
-  proc * init () : globS
+  proc init () : globS
   proc kg () : key
 }.
 
@@ -145,7 +145,7 @@ module StLSke (StL:StLOrcls) : SKE = {
   var gs : globS
 
   proc init () = { 
-    gs <- StL.init();
+    gs <@ StL.init();
   }
  
   proc kg = StL.kg
@@ -166,13 +166,15 @@ module UFCMA(A:CCA_Adv, StL:StLOrcls) =
 
 section PROOFS.
 
-  declare module St <: StLOrcls { StLSke, Mem }.
+  declare module St <: StLOrcls { -StLSke, -Mem }.
 
+  declare axiom st_init_is_init :
+    equiv [ St.init ~ St.init: true ==> ={glob St, res} ].
   declare axiom valid_kg : hoare [St.kg : true ==> valid_key res].
 
-  declare module A <: CCA_Adv { StLSke, Mem, St }.
+  declare module A <: CCA_Adv { -StLSke, -Mem, -St }.
 
-  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{-A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   equiv eqv_CCA_UFCMA : CCA_game(A, RealOrcls(StLSke(St))).main ~ UFCMA(A, St).main :
      ={glob A} ==> !(exists c, c \in Mem.lc /\ dec StLSke.gs Mem.k c <> None){2} => ={res}.
@@ -193,7 +195,7 @@ section PROOFS.
     wp; conseq (_: ={glob A} ==> ={glob A, StLSke.gs, Mem.k}) (_: true ==> valid_key Mem.k) _ => />.
     + smt (mem_empty).
     + by call valid_kg.
-    by sim.
+    by call (: true); call st_init_is_init.
   qed.
 
   lemma CCA_CPA_UFCMA &m : 

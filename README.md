@@ -30,11 +30,11 @@ EasyCrypt uses the following third-party tools/libraries:
 
  * OCaml (>= 4.08)
 
-     Available at http://caml.inria.fr/
+     Available at https://ocaml.org/
 
  * OCamlbuild
 
- * Why3 (>= 1.3)
+ * Why3 (= 1.6.x)
 
      Available at <http://why3.lri.fr/>
 
@@ -117,7 +117,7 @@ packages manager.
   2. Optionally, use opam to install the system dependencies:
 
       ```
-      $> opam install depext
+      $> opam install opam-depext
       $> opam depext easycrypt
       ```
 
@@ -195,29 +195,6 @@ run:
     
 to compile EasyCrypt.
 
-Configuring Why3
-====================================================================
-
-Before running EasyCrypt and after the installation/removal/update
-of an SMT prover, you need to (re)configure Why3.
-
-```
-$> why3 config detect
-```
-
-EasyCrypt is using the default Why3 location, i.e. ~/.why3.conf.
-If you have several versions of Why3 installed, it may be impossible
-to share the same configuration file among them. EasyCrypt via the
-option -why3, allows you to load a Why3 configuration file from a
-custom location. For instance:
-
-```
-$> why3 config --detect -C $WHY3CONF.conf
-$> ./ec.native -why3 $WHY3CONF.conf
-```
-
-where `$WHY3CONF` must be replaced by some custom location.
-
 Note on Prover Versions
 --------------------------------------------------------------------
 
@@ -225,13 +202,20 @@ Why3 and SMT solvers are independent pieces of software with their
 own version-specific interactions. Obtaining a working SMT setup may
 require installing specific versions of some of the provers.
 
-At the time of writing, we depend on Why3 1.4.x, which supports the
-following versions (and some versions below):
+At the time of writing, we depend on Why3 1.6.x, which supports the
+following prover versions:
 
- * Alt-Ergo 2.4.0 (if you install alt-ergo using opam, you can
-   prevent upgrades using `opam pin alt-ergo 2.4.0`)
+ * Alt-Ergo 2.4.2
  * CVC4 1.8
- * Z3 4.8.10
+ * Z3 4.12.1
+
+`alt-ergo` can be installed using opam, if you do you can use pins to
+select a specific version (e.g, `opam pin alt-ergo 2.4.1`).
+
+Development branches use `dune-3.x` and which is incompatible with
+`alt-ergo-2.4.1`. In this case, you can use `alt-ergo-2.4.2`. The
+warning "Prover Alt-Ergo version 2.4.2 is not recognized." upon
+configuration (see below) can be [safely ignored](https://gitlab.inria.fr/why3/why3/-/commit/f2863d84f65824f21afd75546117becbf453efcc).
 
 Installing/Compiling EasyCrypt
 ====================================================================
@@ -248,13 +232,6 @@ assuming that all dependencies have been successfully installed. If
 you choose not to install EasyCrypt system wide, you can use the
 binary `ec.native` that is located at the root of the source tree.
 
-It is possible to change the installation prefix by setting the
-environment variable PREFIX:
-
-```
-$> make PREFIX=/my/prefix install
-```
-
 EasyCrypt comes also with an opam package. Running
 
 ```
@@ -264,9 +241,42 @@ $> opam install easycrypt
 installs EasyCrypt and its dependencies via opam. In that case, the
 EasyCrypt binary is named `easycrypt`.
 
+Configuring Why3
+====================================================================
+
+Initially, and after the installation/removal/update of SMT provers,
+you need to (re)configure Why3 via the following `easycrypt` command:
+
+```
+$> easycrypt why3config
+```
+
+EasyCrypt stores the Why3 configuration file under
+
+```
+$XDG_CONFIG_HOME/easycrypt/why3.conf
+```
+
+EasyCrypt allows you, via the option -why3, to load a Why3
+configuration file from a custom location. For instance:
+
+```
+$> easycrypt why3config -why3 $WHY3CONF.conf
+$> easycrypt -why3 $WHY3CONF.conf
+```
+
+where `$WHY3CONF` must be replaced by some custom location.
 
 Proof General Front-End
 ====================================================================
 
 EasyCrypt mode has been integrated upstream. Please, go
 to <https://github.com/ProofGeneral/PG> and follow the instructions.
+
+Examples
+====================================================================
+
+Examples of how to use EasyCrypt are in the `examples` directory. You
+will find basic examples at the root of this directory, as well as a
+more advanced example in the `MEE-CBC` sub-directory and a tutorial on
+how to use the complexity system in `cost` sub-directory.

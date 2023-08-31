@@ -1,40 +1,56 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
-require import AllCore StdRing StdOrder Distr List FSet.
+require import AllCore StdRing StdOrder Distr List FSet CHoareTactic Group.
 (*---*) import RField RealOrder.
-require (*  *) CyclicGroup.
 
-clone export CyclicGroup as G.
+clone CyclicGroup as G.
+axiom prime_p : IntDiv.prime G.order.
+
+clone G.PowZMod as GP with
+  lemma prime_order <- prime_p.
+
+clone GP.FDistr as FD.
+
+import G GP FD GP.ZModE.
 
 theory DDH.
 
   module type Adversary = {
-    proc guess(gx gy gz:G.group): bool
+    proc guess(gx gy gz : group) : bool
   }.
 
-  module DDH0 (A:Adversary) = {
+(* no matching operator, named `*', for the following parameters' type:
+  [1]: exp
+  [2]: exp
+when writing
+      b <@ A.guess(g ^ x, g ^ y, g ^ (x * y));
+so it is replaced with
+      b <@ A.guess(g ^ x, g ^ y, g ^ (P.ZModE.( * ) x y));
+*)
+
+  module DDH0 (A : Adversary) = {
     proc main() : bool = {
       var b, x, y;
-      x <$ FDistr.dt;
-      y <$ FDistr.dt;
-      b <@ A.guess(g ^ x, g ^ y, g ^ (x*y));
+      (*
+      x <$ dZp;
+      y <$ dZp;
+      *)
+      (*
+      x <$ FD.dt;
+      y <$ FD.dt;
+      *)
+      x <$ dt;
+      y <$ dt;
+      b <@ A.guess(g ^ x, g ^ y, g ^ (x * y));
       return b;
     }
   }.
 
-  module DDH1 (A:Adversary) = {
+  module DDH1 (A : Adversary) = {
     proc main() : bool = {
       var b, x, y, z;
 
-      x <$ FDistr.dt;
-      y <$ FDistr.dt;
-      z <$ FDistr.dt;
+      x <$ dt;
+      y <$ dt;
+      z <$ dt;
       b <@ A.guess(g ^ x, g ^ y, g ^ z);
       return b;
     }
@@ -46,42 +62,44 @@ end DDH.
 theory CDH.
 
   module type Adversary = {
-    proc solve(gx gy:group): group
+    proc solve(gx gy : group) : group
   }.
 
-  module CDH (A:Adversary) = {
+  module CDH (A : Adversary) = {
     proc main(): bool = {
       var x, y, r;
 
-      x <$ FDistr.dt;
-      y <$ FDistr.dt;
+      x <$ dt;
+      y <$ dt;
       r <@ A.solve(g ^ x, g ^ y);
       return (r = g ^ (x * y));
     }
   }.
+
 end CDH.
 
 theory List_CDH.
 
   const n: int.
+  axiom gt0_n :  0 < n.
 
   module type Adversary = {
-    proc solve(gx:group, gy:group): group list
+    proc solve(gx : group, gy : group): group list
   }.
 
-  module LCDH (B:Adversary) = {
-    proc main(): bool = {
+  module LCDH (B : Adversary) = {
+    proc main() : bool = {
       var x, y, s;
 
-      x <$ FDistr.dt;
-      y <$ FDistr.dt;
+      x <$ dt;
+      y <$ dt;
       s <@ B.solve(g ^ x, g ^ y);
       return (mem s (g ^ (x * y)) /\ size s <= n);
     }
   }.
 
-  module CDH_from_LCDH (A:Adversary): CDH.Adversary = {
-    proc solve(gx:group, gy:group): group = {
+  module CDH_from_LCDH (A : Adversary): CDH.Adversary = {
+    proc solve(gx : group, gy : group) : group = {
       var s, x;
 
       s <@ A.solve(gx, gy);
@@ -95,13 +113,13 @@ theory List_CDH.
     declare module A <: Adversary.
 
     local module LCDH' = {
-      var x, y: F.t
+      var x, y: exp
 
       proc aux(): group list = {
         var s;
 
-        x <$ FDistr.dt;
-        y <$ FDistr.dt;
+        x <$ dt;
+        y <$ dt;
         s <@ A.solve(g ^ x, g ^ y);
         return s;
       }
@@ -116,12 +134,9 @@ theory List_CDH.
     }.
 
     lemma Reduction &m:
-      0 < n =>
       1%r / n%r * Pr[LCDH(A).main() @ &m: res]
       <= Pr[CDH.CDH(CDH_from_LCDH(A)).main() @ &m: res].
     proof.
-      (* Move "0 < n" into the context *)
-      move=> n_pos.
       (* We prove the inequality by transitivity:
            1%r/n%r * Pr[LCDH(A).main() @ &m: res]
            <= Pr[LCDH'.main() @ &m: res]
@@ -136,7 +151,6 @@ theory List_CDH.
       (* We do this one using a combination of phoare (to deal with the final sampling of z)
          and equiv (to show that LCDH'.aux and CDH.CDH are equivalent in context). *)
       byphoare (_: (glob A) = (glob A){m} ==> _)=> //.
-      (* This line is due to a bug in proc *) pose d:= 1%r/n%r * Pr[LCDH(A).main() @ &m: res].
       pose p:= Pr[LCDH(A).main() @ &m: res]. (* notation for ease of writing below *)
       proc.
       (* We split the probability computation into:
@@ -146,19 +160,48 @@ theory List_CDH.
       seq  1: (mem s (g ^ (LCDH'.x * LCDH'.y)) /\ size s <= n) p (1%r/n%r) _ 0%r => //.
         (* The first part is dealt with by equivalence with LCDH. *)
         conseq (_: _: =p). (* strengthening >= into = for simplicity*)
-        call (_: (glob A) = (glob A){m}  ==> 
-                   mem res (g^(LCDH'.x * LCDH'.y)) /\ size res <= n)=> //.
+        call (_: (glob A) = (glob A){m}  ==>
+                   mem res (g ^ (LCDH'.x * LCDH'.y)) /\ size res <= n)=> //.
         bypr; progress; rewrite /p.
         byequiv (_: )=> //.
         by proc *; inline *; wp; call (_: true); auto.
       (* The second part is just arithmetic, but smt needs some help. *)
-      rnd (pred1 (g^(LCDH'.x * LCDH'.y))).
-      skip=> /> ? Hin Hle.
-      rewrite /pred1 MUniform.duniform1E Hin /= lef_pinv 2:/#.
+      rnd (pred1 (g ^ (LCDH'.x * LCDH'.y))).
+      wp; skip=> /> ? Hin Hle /=.
+      rewrite /pred1 MUniform.duniform1E Hin /= lef_pinv; [2:smt (gt0_n)].
       + by move: Hin;rewrite -mem_undup -index_mem;smt (index_ge0).
       smt (size_undup).
     qed.
   end section.
+
+  abstract theory Cost.
+
+    op cduniform_n : { int | 0 <= cduniform_n } as ge0_cduniform_n.
+
+    schema cost_duniform `{P} {s : group list} :
+       cost [P /\ size s <= n : duniform s] <= cost [P : s] + N cduniform_n.
+
+    lemma ex_reduction (cs:int) (A<:Adversary) &m :
+      choare[A.solve : true ==> 0 < size res <= n] time [N cs] =>
+      exists (B <:CDH.Adversary [solve : `{N(cduniform_n + cs)} ] {+A}),
+      Pr[LCDH(A).main() @ &m: res] <= n%r * Pr[CDH.CDH(B).main() @ &m: res].
+    proof.
+      move=> hcA;exists (CDH_from_LCDH(A));split; last first.
+      + have /= h1 := Reduction A &m.
+        rewrite -ler_pdivr_mull; smt(lt_fromint gt0_n).
+      proc => //.
+      instantiate /= h := (cost_duniform {gx, gy, x : group, s : group list}
+                        `(true) s).
+      rnd (size s <= n).
+      + by apply: (is_int_le _ _ h).
+      call hcA; skip => />; split.
+      + move=> *; apply duniform_ll;rewrite -size_eq0 /#.
+      move: h; pose t :=
+        cost(&hr: {gx, gy, x : group, s : group list})[size s <= n : duniform s].
+      by case: t => // ? /#.
+    qed.
+
+  end Cost.
 
 end List_CDH.
 
@@ -166,60 +209,61 @@ end List_CDH.
 theory Set_CDH.
 
   const n: int.
+  axiom gt0_n :  0 < n.
 
   module type Adversary = {
-    proc solve(gx:group, gy:group): group fset
+    proc solve(gx : group, gy : group): group fset
   }.
 
   module SCDH (B:Adversary) = {
     proc main(): bool = {
       var x, y, s;
 
-      x <$ FDistr.dt;
-      y <$ FDistr.dt;
+      x <$ dt;
+      y <$ FD.dt;
       s <@ B.solve(g ^ x, g ^ y);
       return (mem s (g ^ (x * y)) /\ card s <= n);
     }
   }.
 
-  module CDH_from_SCDH (A:Adversary): CDH.Adversary = {
-    proc solve(gx:group, gy:group): group = {
-      var s, x;
+  clone List_CDH as LCDH with
+    op n <- n
+    proof gt0_n by apply gt0_n.
 
-      s <@ A.solve(gx, gy);
-      x <$ MUniform.duniform (elems s);
-      return x;
+  module CDH_from_SCDH (A:Adversary): CDH.Adversary = {
+    module AL = {
+      proc solve(gx : group, gy:group): group list = {
+        var s;
+        s <@ A.solve(gx, gy);
+        return elems s;
+      }
     }
+    proc solve = LCDH.CDH_from_LCDH(AL).solve
   }.
 
   (** Naive reduction to CDH **)
   section.
     declare module A <: Adversary.
 
-    local module AL = {
-      proc solve(gx:group, gy:group) = {
-        var s;
-        s <@ A.solve(gx, gy);
-        return elems s;
-      }
-    }.
-
-    local clone List_CDH as LCDH with op n <- n.
+    (* FIXME: schemas cannot be declared in sections *)
+    (* local clone List_CDH as LCDH with op n <- n. *)
 
     lemma Reduction &m:
-      0 < n =>
       1%r / n%r * Pr[SCDH(A).main() @ &m: res]
       <= Pr[CDH.CDH(CDH_from_SCDH(A)).main() @ &m: res].
     proof.
-      move=> Hn.
-      have := LCDH.Reduction AL &m Hn.
-      have -> : Pr[LCDH.LCDH(AL).main() @ &m : res] = Pr[SCDH(A).main() @ &m : res].
-      + by byequiv=> //;proc;inline *;wp;call (_:true);auto => /> ?????;rewrite memE cardE.
-      have -> //: Pr[CDH.CDH(LCDH.CDH_from_LCDH(AL)).main() @ &m : res] =
-                Pr[CDH.CDH(CDH_from_SCDH(A)).main() @ &m : res].
-      by byequiv=> //;proc;inline *;auto=> /=;call (_:true);auto.
+      have h0 := LCDH.Reduction (<:CDH_from_SCDH(A).AL) &m.
+      have h1 : Pr[SCDH(A).main() @ &m : res] <=
+                Pr[LCDH.LCDH(CDH_from_SCDH(A).AL).main() @ &m : res].
+      + byequiv=> //;proc;inline *;wp;call (_:true);auto => /> 5?.
+        by rewrite memE cardE.
+      have -> : Pr[CDH.CDH(CDH_from_SCDH(A)).main() @ &m : res] =
+                Pr[CDH.CDH(LCDH.CDH_from_LCDH(CDH_from_SCDH(A).AL)).main() @ &m : res].
+      + by byequiv=> //;proc;inline *;auto=> /=;call (_:true);auto.
+      apply: ler_trans h0 => /=.
+      by apply ler_wpmul2r => //; rewrite invr_ge0 le_fromint; smt(gt0_n).
     qed.
-  
+
   end section.
 
 end Set_CDH.

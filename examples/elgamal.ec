@@ -8,12 +8,14 @@ pragma +implicits.
 (* ---------------------- Let's Get Started --------------------------- *)
 (** Assumption: set DDH *)
 (*** WARNING: DiffieHellman is really out of date ***)
-clone import DiffieHellman as DH.
-import DDH FDistr.
+clone DiffieHellman as DH.
+import DH.DDH DH.G DH.GP DH.FD DH.GP.ZModE.
+
+clone DH.GP.ZModE.ZModpField as ZPF.
 
 (** Construction: a PKE **)
 type pkey = group.
-type skey = F.t.
+type skey = exp.
 type ptxt = group.
 type ctxt = group * group.
 
@@ -24,6 +26,7 @@ clone import PKE_CPA as PKE with
   type ctxt <- ctxt.
 
 (** Concrete Construction: Hashed ElGammal **)
+
 module ElGamal : Scheme = {
   proc kg(): pkey * skey = {
     var sk;
@@ -43,7 +46,7 @@ module ElGamal : Scheme = {
     var gy, gm;
 
     (gy, gm) <- c;
-    return Some (gm * gy^(-sk));
+    return Some (gm * gy ^ (-sk));
   }
 }.
 
@@ -51,7 +54,8 @@ module ElGamal : Scheme = {
 module DDHAdv (A:Adversary) = {
   proc guess (gx, gy, gz) : bool = {
     var m0, m1, b, b';
-    (m0, m1) <- A.choose(gx);
+
+    (m0, m1) <@ A.choose(gx);
     b        <$ {0,1};
     b'       <@ A.guess(gy, gz * (b?m1:m0));
     return b' = b;
@@ -75,17 +79,18 @@ section Security.
   swap{1} 7 -5.
   auto; call (_:true).
   auto; call (_:true).
-  by auto=> /> sk _ y _ r b _; rewrite pow_pow.
+  by auto=> /> sk _ y _ r b _; rewrite expM.
   qed.
 
   local module Gb = {
     proc main () : bool = {
       var x, y, z, m0, m1, b, b';
-      x       <$ FDistr.dt;
-      y       <$ FDistr.dt;
-      (m0,m1) <@ A.choose(g^x);
-      z       <$ FDistr.dt;
-      b'      <@ A.guess(g^y, g^z);
+
+      x       <$ dt;
+      y       <$ dt;
+      (m0,m1) <@ A.choose(g ^ x);
+      z       <$ dt;
+      b'      <@ A.guess(g ^ y, g ^ z);
       b       <$ {0,1};
       return b' = b;
     }
@@ -98,10 +103,13 @@ section Security.
   byequiv=> //; proc; inline *.
   swap{1} 3 2; swap{1} [5..6] 2; swap{2} 6 -2.
   auto; call (_:true); wp.
-  rnd (fun z, z + log (if b then m1 else m0){2})
-      (fun z, z - log (if b then m1 else m0){2}).
+  rnd (fun z, z + loge (if b then m1 else m0){2})
+      (fun z, z - loge (if b then m1 else m0){2}).
   auto; call (_:true).
-  by auto; progress; algebra.
+  auto; progress.
+  - by rewrite ZPF.addrAC -ZPF.addrA ZPF.subrr ZPF.addr0.
+  - by rewrite  -ZPF.addrA ZPF.subrr ZPF.addr0.
+  - by rewrite expD expgK.
   qed.
 
   local lemma Gb_half &m:

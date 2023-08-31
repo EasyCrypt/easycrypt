@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcLocation
@@ -97,6 +89,8 @@ end
 (* -------------------------------------------------------------------- *)
 module Op : sig
   val add : scope -> poperator located -> EcDecl.operator * string list * scope
+
+  val add_opsem : scope -> pprocop located -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -202,6 +196,7 @@ module Prover : sig
     pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
+    pl_dumpin     : string located option;
     pl_selected   : bool option;
     gn_debug      : bool option;
   }

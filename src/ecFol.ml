@@ -1,16 +1,7 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcUtils
 open EcTypes
-open EcModules
 open EcMemory
 open EcBigInt.Notations
 
@@ -21,34 +12,23 @@ module CI = EcCoreLib
 include EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-let f_eqparams f1 ty1 vs1 m1 f2 ty2 vs2 m2 =
-  let f_pvlocs f ty vs m =
-    let arg = f_pvarg f ty m in
+let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
+  let f_pvlocs ty vs m =
+    let arg = f_pvarg ty m in
     if List.length vs = 1 then [arg]
     else
       let t = Array.of_list vs in
-      let t = Array.mapi (fun i vd -> f_proj arg i vd.v_type) t in
+      let t = Array.mapi (fun i vd -> f_proj arg i vd.ov_type) t in
       Array.to_list t
   in
 
-  match vs1, vs2 with
-  | Some vs1, Some vs2 ->
-      if   List.length vs1 = List.length vs2
-      then f_eqs (f_pvlocs f1 ty1 vs1 m1) (f_pvlocs f2 ty2 vs2 m2)
-      else f_eq  (f_tuple (f_pvlocs f1 ty1 vs1 m1))
-                 (f_tuple (f_pvlocs f2 ty2 vs2 m2))
+  if   List.length vs1 = List.length vs2
+  then f_eqs (f_pvlocs ty1 vs1 m1) (f_pvlocs ty2 vs2 m2)
+  else f_eq  (f_tuple (f_pvlocs ty1 vs1 m1))
+             (f_tuple (f_pvlocs ty2 vs2 m2))
 
-  | Some vs1, None ->
-      f_eq (f_tuple (f_pvlocs f1 ty1 vs1 m1)) (f_pvarg f2 ty2 m2)
-
-  | None, Some vs2 ->
-      f_eq (f_pvarg f1 ty1 m1) (f_tuple (f_pvlocs f2 ty2 vs2 m2))
-
-  | None, None ->
-      f_eq (f_pvarg f1 ty1 m1) (f_pvarg f2 ty2 m2)
-
-let f_eqres f1 ty1 m1 f2 ty2 m2 =
-  f_eq (f_pvar (pv_res f1) ty1 m1) (f_pvar (pv_res f2) ty2 m2)
+let f_eqres ty1 m1 ty2 m2 =
+  f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
 
 let f_eqglob mp1 m1 mp2 m2 =
   f_eq (f_glob mp1 m1) (f_glob mp2 m2)
@@ -73,6 +53,7 @@ let destr_rint f =
   | Fop (p, _) when EcPath.p_equal p CI.CI_Real.p_real1 -> BI.one
 
   | _ -> destr_error "destr_rint"
+
 
 (* -------------------------------------------------------------------- *)
 let fop_int_le     = f_op CI.CI_Int .p_int_le    [] (toarrow [tint ; tint ] tbool)
@@ -173,6 +154,29 @@ let f_weight ty d =
 
 let f_lossless ty d =
   f_app (fop_lossless ty) [d] tbool
+
+(* -------------------------------------------------------------------- *)
+let fop_dunit ty =
+  f_op EcCoreLib.CI_Distr.p_dunit [ty] (tfun ty (tdistr ty))
+
+let f_dunit f =
+  f_app (fop_dunit f.f_ty) [f] (tdistr f.f_ty)
+
+(* -------------------------------------------------------------------- *)
+let fop_dmap tya tyb =
+  f_op EcCoreLib.CI_Distr.p_dmap [tya; tyb]
+    (toarrow [tdistr tya; tfun tya tyb] (tdistr tyb))
+
+let f_dmap tya tyb d f =
+  f_app (fop_dmap tya tyb) [d; f] (tdistr tyb)
+
+(* -------------------------------------------------------------------- *)
+let fop_dlet tya tyb =
+  f_op EcCoreLib.CI_Distr.p_dlet [tya; tyb]
+    (toarrow [tdistr tya; tfun tya (tdistr tyb)] (tdistr tyb))
+
+let f_dlet tya tyb d f =
+  f_app (fop_dlet tya tyb) [d; f] (tdistr tyb)
 
 (* -------------------------------------------------------------------- *)
 let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
@@ -506,8 +510,11 @@ let rec f_let_simpl lp f1 f2 =
       | None   -> f2
       | Some i ->
           if   i = 1 || can_subst f1
-          then Fsubst.f_subst_local id f1 f2
-          else f_let lp f1 f2
+          then
+            let s = Fsubst.f_bind_local Fsubst.f_subst_id id f1 in
+            Fsubst.f_subst s f2
+          else
+            f_let lp f1 f2
     end
 
   | LTuple ids -> begin
@@ -519,13 +526,13 @@ let rec f_let_simpl lp f1 f2 =
               | None   -> (d, s)
               | Some i ->
                   if   i = 1 || can_subst f1
-                  then (d, Mid.add id f1 s)
+                  then (d, Fsubst.f_bind_local s id f1)
                   else (((id, ty), f1) :: d, s))
-              ([], Mid.empty) ids fs
+              ([], Fsubst.f_subst_id) ids fs
           in
             List.fold_left
               (fun f2 (id, f1) -> f_let (LSymbol id) f1 f2)
-              (Fsubst.subst_locals s f2) d
+              (Fsubst.f_subst s f2) d
       | _ ->
         let x = EcIdent.create "tpl" in
         let ty = ttuple (List.map snd ids) in
@@ -691,7 +698,7 @@ let rec f_eq_simpl f1 f2 =
     -> f_false
 
   | Ftuple fs1, Ftuple fs2 when List.length fs1 = List.length fs2 ->
-      f_andas_simpl (List.map2 f_eq_simpl fs1 fs2) f_true
+      f_ands_simpl (List.map2 f_eq_simpl fs1 fs2) f_true
 
   | _ -> f_eq f1 f2
 
@@ -799,8 +806,10 @@ type sform =
   | SFeq    of form * form
   | SFop    of (EcPath.path * etyarg list) * (form list)
 
-  | SFhoareF   of hoareF
-  | SFhoareS   of hoareS
+  | SFhoareF  of sHoareF
+  | SFhoareS  of sHoareS
+  | SFcHoareF  of cHoareF
+  | SFcHoareS  of cHoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
@@ -839,8 +848,10 @@ let rec sform_of_form fp =
   | Fquant (q, [b]  , f) -> SFquant (q, b, lazy f)
   | Fquant (q, b::bs, f) -> SFquant (q, b, lazy (f_quant q bs f))
 
-  | FhoareF   hf -> SFhoareF   hf
-  | FhoareS   hs -> SFhoareS   hs
+  | FhoareF  hf -> SFhoareF  hf
+  | FhoareS  hs -> SFhoareS  hs
+  | FcHoareF  hf -> SFcHoareF  hf
+  | FcHoareS  hs -> SFcHoareS  hs
   | FbdHoareF hf -> SFbdHoareF hf
   | FbdHoareS hs -> SFbdHoareS hs
   | FequivF   ef -> SFequivF   ef
@@ -917,6 +928,20 @@ let f_real_lt_simpl f1 f2 =
   | _ -> f_real_lt f1 f2
 
 (* -------------------------------------------------------------------- *)
+let f_dlet_simpl tya tyb d f =
+  match f.f_node with
+  | Fquant (Llambda, ([(_, GTty _)] as bd), f') -> begin
+     match sform_of_form f' with
+     | SFop ((p, _), [body])
+          when EcPath.p_equal p EcCoreLib.CI_Distr.p_dunit ->
+        f_dmap tya tyb d (f_lambda bd body)
+     | _ ->
+        f_dlet tya tyb d f
+    end
+  | _ ->
+     f_dlet tya tyb d f
+
+(* -------------------------------------------------------------------- *)
 (* destr_exists_prenex destructs recursively existentials in a formula
  *  whenever possible.
  * For instance:
@@ -979,3 +1004,59 @@ let destr_ands ~deep =
     with DestrError _ -> [f]
 
   in fun f -> doit f
+
+
+(*---------------------------------------------*)
+
+let rec one_sided mem fp =
+  match fp.f_node with
+  | Fint   _      -> true
+  | Flocal _      -> true
+  | Fpvar (_, me) -> EcIdent.id_equal mem me
+  | Fglob (_, me) -> EcIdent.id_equal mem me
+
+  | Fif    (c, f1, f2)  -> one_sided mem c && one_sided mem f1 && one_sided mem f2
+  | Fmatch (b, fs, _)  -> one_sided mem b && List.for_all (one_sided mem) fs
+  | Flet   (_, f1, f2) -> one_sided mem f1 && one_sided mem f2
+  | Ftuple fs           -> List.for_all (one_sided mem) fs
+  | Fproj (f, _)        -> one_sided mem f
+
+  | Fquant (_, _, f) -> one_sided mem f
+
+  | Fop _ -> true
+  | Fapp (f, args) -> one_sided mem f && List.for_all (one_sided mem) args
+  | _ -> false
+
+let rec split_sided mem fp =
+  if one_sided mem fp then
+    Some fp
+  else
+    if is_and fp then
+      let (l, r) = destr_and fp in
+      let fl = split_sided mem l in
+      let fr = split_sided mem r in
+      if is_none fr then
+        fl
+      else
+        (match fl with
+        | Some f -> Some (f_and f (oget fr))
+        | None -> fr
+        )
+    else
+      None
+
+let rec one_sided_vs mem fp =
+  match fp.f_node with
+  | Fpvar (_, me) -> if EcIdent.id_equal mem me then [fp] else []
+  | Fglob (_, me) -> if EcIdent.id_equal mem me then [fp] else []
+
+  | Fif    (c, f1, f2)  -> one_sided_vs mem c @ one_sided_vs mem f1 @ one_sided_vs mem f2
+  | Fmatch (b, fs, _)  -> one_sided_vs mem b @ List.concat_map (one_sided_vs mem) fs
+  | Flet   (_, f1, f2) -> one_sided_vs mem f1 @ one_sided_vs mem f2
+  | Ftuple fs           -> List.concat_map (one_sided_vs mem) fs
+  | Fproj (f, _)        -> one_sided_vs mem f
+
+  | Fquant (_, _, f) -> one_sided_vs mem f
+
+  | Fapp (f, args) -> one_sided_vs mem f @ List.concat_map (one_sided_vs mem) args
+  | _ -> []

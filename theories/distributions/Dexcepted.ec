@@ -1,30 +1,24 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
-require import AllCore Distr FSet Dfilter StdRing.
+require import AllCore Distr FSet StdRing.
 (*---*) import RField StdOrder.RealOrder.
 
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-op (\) (d : 'a distr) (P : 'a -> bool) : 'a distr = dscale (dfilter d P).
+op (\) (d : 'a distr) (P : 'a -> bool) : 'a distr = dscale (drestrict d (predC P)).
 
 lemma supp_dexcepted (x:'a) d P :
   support (d \ P) x <=> (support d x /\ !P x).
-proof. by rewrite supp_dscale supp_dfilter /predI /predC. qed.
+proof. by rewrite supp_dscale supp_drestrict. qed.
 
 lemma dexcepted1E d P (x : 'a) :
   mu1 (d \ P) x
   = if   P x
     then 0%r
     else (mu1 d x / (weight d - mu d (P))).
-proof. by rewrite dscale1E weight_dfilter dfilter1E; case: (P x). qed.
+proof. 
+by rewrite dscale1E weight_drestrict drestrict1E mu_not /predC; case: (P x). 
+qed.
 
 lemma nosmt dexcepted1E_notin (d : 'a distr) P x:
   !P x => mu1 (d \ P) x = (mu1 d x / (weight d - mu d (P))).
@@ -36,14 +30,13 @@ proof. by rewrite dexcepted1E => ->. qed.
 
 lemma dexceptedE d P (E : 'a -> bool) :
   mu (d \ P) E
-  = mu d (predI E (predC (P))) / (weight d - mu d (P)).
-proof. by rewrite dscaleE weight_dfilter dfilterE. qed.
+  = mu d (predI E (predC P)) / (weight d - mu d P).
+proof. by rewrite dscaleE weight_drestrict drestrictE predIC mu_not. qed.
 
 lemma nosmt weight_dexcepted (d:'a distr) P :
-  weight (d \ P) = b2r (weight d <> mu d (P)).
+  weight (d \ P) = b2r (weight d <> mu d P).
 proof.
-rewrite weight_dscale weight_dfilter /b2r subr_eq0.
-by case: (weight d = mu d (P)).
+by rewrite weight_dscale weight_drestrict mu_not /#.
 qed.
 
 lemma dexcepted_ll (d : 'a distr) P:
@@ -64,14 +57,10 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma dexcepted_dscale (dt : 'a distr) X: dt \ X = (dscale dt) \ X.
 proof.
-case: (weight dt = 0%r)=> [dt_is_null|dt_not_null].
-+ apply/eq_distr=> x; rewrite !dexcepted1E !dscaleE dt_is_null /=.
-  rewrite (@ler_anti (mu1 dt x) 0%r _) //.
-  by rewrite ge0_mu /= -{1}dt_is_null mu_sub /#.
-apply/eq_distr=> x; rewrite !dexcepted1E; case: (X x)=> // x_notin_X.
-rewrite dscale1E -mulrA -invfM !dscaleE; congr; congr.
-by rewrite mulrDr -mulNr (@mulrCA _ (-mu dt X)) divrr.
+apply eq_distr => a; rewrite !dexcepted1E !dscaleE; congr.
+smt(mu_bounded invr0 mu_le_weight).
 qed.
+
 
 (* -------------------------------------------------------------------- *)
 abstract theory TwoStepSampling.
@@ -304,33 +293,38 @@ case @[ambient]: (mu (dt x) (X x) = weight (dt x))=> Hpt.
   while (X x r /\ i = x /\ test = X)=> //=.
   auto=> &m' [#] _ -> -> _ r; move: (mu_in_weight (X x) (dt x) r).
   by rewrite Hpt.
+conseq (: _: =(if X x r then mu (dt x \ X x) P else b2r (P r))).
++ by move=> />; rewrite y_in_Xx.
+conseq (_ : i = x /\ test = X ==> _) => //.
 while (i = x /\ test = X) (if test x r then 1 else 0) 1 (mu (dt x) (predC (X x)))=> //=.
++ smt().
 + smt().
 + move=> ih. alias 2 r0 = r.
   (** TRANSITIVITY FOR PHOARE!! **)
   phoare split (mu (dt x) (predI P (predC (X x))))
                (mu (dt x) (X x) * mu (dt x \ X x) P)
                : (P r0 /\ !X x r0).
-  + move=> &m' [#] -> -> _ /=; rewrite dexceptedE.
+  + move=> &m' [#] -> -> -> /=; rewrite dexceptedE.
     rewrite -{1}(mulr1 (mu (dt x) (predI _ _))).
     rewrite -(@divrr (weight (dt x) - mu (dt x) (X x))).
     + smt().
     rewrite mulrA mulrA -mulrDl; congr.
-    by rewrite mulrDr mulrC mulrN (mulrC (_ _ (X x))) subrK dt_ll. (* dt_ll *)
+    by rewrite mulrDr mulrC mulrN (mulrC (_ _ (X x))) subrK dt_ll. 
   + seq  2: (P r0 /\ !X x r0)
             (mu (dt x) (predI P (predC (X x)))) 1%r
                                               _ 0%r
             (r0 = r /\ i = x /\ test = X)=> //=.
     + by auto.
     + by wp; rnd (predI P (predC (X x))); auto=> />.
-    + by rcondf 1.
+    + by conseq ih=> />.
     by hoare; conseq (: _ ==> true)=> // /#.
   seq 2: (!X x r0)
                          _ 0%r
          (mu (dt x) (X x)) (mu (dt x \ X x) P)
          (r0 = r /\ i = x /\ test = X)=> //=.
   + by auto.
-  + by hoare; rcondf 1=> //; auto=> /#.
+  + case: (P r0); last by conseq ih=> />.
+    by hoare; conseq (: true)=> />.
   + by wp; rnd.
   by conseq ih=> &m' />; rewrite dexceptedE.
 + by auto.

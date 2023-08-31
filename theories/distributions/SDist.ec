@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore List FSet Distr DProd DList StdBigop StdOrder RealFLub.
 require import Hybrid.
 (*---*) import Bigreal RealSeries RealOrder RField BRA MRat.
@@ -33,8 +25,8 @@ op sdist (d1 d2 : 'a distr) = flub (fun E => `|mu d1 E - mu d2 E|).
 lemma sdist_upper_bound (d1 d2 : 'a distr) E : 
   `|mu d1 E - mu d2 E| <= sdist d1 d2.
 proof.
-apply (flub_upper_bound 1%r (fun E => `|mu d1 E - mu d2 E|)).
-move => {E} E /=; smt(mu_bounded).
+apply (flub_upper_bound (fun E => `|mu d1 E - mu d2 E|)).
+by exists 1%r; smt(mu_bounded).
 qed.
  
 lemma sdist_le_ub (d1 d2 : 'a distr) r :
@@ -129,7 +121,8 @@ have <- : `| Sp - Sn | = `|weight d1 - weight d2|.
   by congr; apply eq_sum => x /= /#.
 suff : flub F = Sp by rewrite /sdist -/F; smt(ler_def).
 apply ler_anti; split => [|_]; last first. 
-- apply (ler_trans (F pos)); 2: by apply (flub_upper_bound 1%r); smt(mu_bounded).
+- apply (ler_trans (F pos)); last first.
+  + by apply (flub_upper_bound); exists 1%r; rewrite /is_fub; smt(mu_bounded).
   rewrite /Sp /F /f !muE -sumB /=; 1,2: exact summable_mu1_cond.
   apply (ler_trans _ _ _ _ (ler_norm _)). 
   apply ler_sum;  [smt()|apply/summable_cond/summable_sdist|].
@@ -244,6 +237,14 @@ apply (ler_trans _ _ _ (sdist_dmap _ _ _)).
 apply (ler_trans _ _ _ (sdist_dprod _ _ _ _ )); smt().
 qed.
 
+lemma sdist_dopt (d1 d2 : 'a distr) : 
+  sdist (dopt d1) (dopt d2) = sdist d1 d2.
+proof.
+rewrite !sdist_tvd !dopt_ll normr0 /=; congr.
+rewrite sumD1_None ?summable_sdist addrC /=; congr; 2: by rewrite !dopt1E /= /#.
+by apply eq_sum => x /=; rewrite /(\o) !dopt1E.
+qed.
+
 (*----------------------------------------------------------------------------*)
 
 (* Generic Distinguishers and their output distributions *)
@@ -355,13 +356,12 @@ lemma distinguisher_ll (A <: Distinguisher) &m x :
   islossless A.guess => 
   is_lossless (mk (fun (z : bool) => Pr[A.guess(x) @ &m : res = z])).
 proof.
-move => A_ll; rewrite /F /is_lossless muE {1}/predT /=. 
+move => A_ll; rewrite /is_lossless muE {1}/predT /=. 
 have <- : Pr[A.guess(x) @ &m : res = true \/ res = false] = 1%r. 
   by byphoare => //; conseq (:_ ==> true) => // /#.  
 rewrite (eq_sum _ (fun (z : bool) => Pr[A.guess(x) @ &m : res = z])) => [z /=|].
   by rewrite muK; 1: exact: (adv_isdistr A).
-rewrite (sumE_fin _ [true; false]) // 1:/# !big_cons big_nil /predT/=.
-by rewrite Pr[mu_disjoint] 1:/#. 
+by rewrite sum_bool /= Pr[mu_disjoint] // /#.
 qed.
 
 lemma adv_sdist (A <: Distinguisher) &m d1 d2 : 
@@ -446,10 +446,10 @@ module Os : Oracle_i = {
 
 section. (* Reduction from single oracle call to sampling game *)
 
-declare module A <: Adversary {B1,Os,Count}.
+declare module A <: Adversary {-B1,-Os,-Count}.
 
 declare axiom A_ll :
-  forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
+  forall (O <: Oracle{-A}), islossless O.get => islossless A(O).main.
 
 (* global variables for eager/lazy proof *)
 local module Var = { 
@@ -518,7 +518,7 @@ logic. *)
 
 lemma sdist_oracle1 &m (d1 d2 : a distr) : 
    is_lossless d1 => is_lossless d2 =>
-  (forall (O <: Oracle_i{Count,A}), 
+  (forall (O <: Oracle_i{-Count,-A}), 
      hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= 1]) =>
   `| Pr[Game(A,Os).main(d1) @ &m : res] - Pr[Game(A,Os).main(d2) @ &m : res] | 
   <= sdist d1 d2.
@@ -532,24 +532,22 @@ suff <-: Pr[Game(A, O1).main(d') @ &m : res] = Pr[Game(A, Os).main(d') @ &m : re
 + byequiv => //; proc; inline *; wp. 
   by call(: Var.x{1} = B1.x'{2}); [proc; inline *|]; auto. 
 byequiv => //.
-transitivity Game(A,O1e).main 
-  (={arg,glob A} /\ d{1} = d' ==> ={res}) 
-  (={arg,glob A} /\ d{1} = d' ==> ={res}); 1,2: smt().
-  by proc; inline *; rcondt{2} 7; auto; call(: ={Var.x}); 1: sim; auto => />.
-transitivity Gr(O1l).main 
-  (={arg,glob A} /\ d{1} = d' ==> ={res}) 
-  (={arg,glob A} /\ d{1} = d' ==> ={res}); 1,2: smt().
-  proc; inline *.
-  seq 6 6 : (={glob Var, glob A}); 1: by auto.
-  eager (H : if (Var.b) Var.x <$ Var.d; ~  if (Var.b) Var.x <$ Var.d; 
+have eq_main_O1e_O1l: equiv[Game(A, O1e).main ~ Gr(O1l).main:
+  ={arg, glob A} /\ arg{1} = d' ==> ={res}].
++ proc; inline *.
+    seq 6 6 : (={glob Var, glob A}); 1: by auto.
+    eager (H : if (Var.b) Var.x <$ Var.d; ~  if (Var.b) Var.x <$ Var.d; 
     : ={glob Var} ==> ={glob Var} )
     : (={glob A,glob Var} ) => //; 1: by sim. 
-  eager proc H (={glob Var}) => //; 2: by sim.
-  proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
-proc; inline*. 
-seq 7 5 : (={r} /\ Var.d{1} = d'); last by if{1}; auto => />.
+eager proc H (={glob Var}) => //; 2: by sim.
+    proc*; inline *; rcondf{2} 6; [ by auto | by sp; if; auto].
+proc.
+rewrite equiv [{1} eq_main_O1e_O1l (d) r (d) r].
++ inline *; rcondt{2} 8; auto; call(: ={Var.x}); 1: sim; auto => />.
+inline*. 
+seq 8 5 : (r0{1} = r{2} /\ Var.d{1} = d'); last by if{1}; auto => />.
 conseq (_ : _ ==> Count.n{1} <= 1 /\ Count.n{2} <= 1 => 
-                  ={Count.n,r} /\ Var.d{1} = d')
+                  ={Count.n} /\ r0{1} = r{2} /\ Var.d{1} = d' /\ ={d, glob A})
        (_ : _ ==> Count.n <= 1) (_ : _ ==> Count.n <= 1); 1: smt().
 + by call (A_bound O1l); auto.
 + by call (A_bound Os); auto.
@@ -572,16 +570,16 @@ abstract theory N1.
 (* We need operators, because we need to define modules that use them *)
 op [lossless] d1 : a distr.
 op [lossless] d2 : a distr.
-op N : { int | 0 < N } as N_pos.
+op N : { int | 0 <= N } as N_ge0.
 
 section. 
 
-declare module A <: Adversary {B1,Os,Count}.
+declare module A <: Adversary {-B1,-Os,-Count}.
 
 declare axiom A_ll :
-  forall (O <: Oracle{A}), islossless O.get => islossless A(O).main.
+  forall (O <: Oracle{-A}), islossless O.get => islossless A(O).main.
 
-declare axiom A_bound : (forall (O <: Oracle_i{A,Count}), 
+declare axiom A_bound : (forall (O <: Oracle_i{-A,-Count}), 
   hoare[ A(Count(O)).main : Count.n = 0 ==> Count.n <= N]).
 
 local clone Hybrid as Hyb with
@@ -591,7 +589,7 @@ local clone Hybrid as Hyb with
   type outleaks <- unit,
   type outputA <- bool,
   op q <- N,
-  lemma q_pos <- N_pos
+  lemma q_ge0 <- N_ge0
   proof*.
 
 local module Ob : Hyb.Orclb = {
@@ -663,9 +661,8 @@ lemma sdist_oracleN &m :
   `| Pr[Game(A,Os).main(d1) @ &m : res] - Pr[Game(A,Os).main(d2) @ &m : res] | 
   <= N%r * sdist d1 d2.
 proof.
-rewrite -ler_pdivr_mull -?normrZ; 1,2: smt(N_pos). 
 rewrite Osd1_Hyb Osd2_Hyb. 
-have /= <- := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
+have /= -> := Hyb.Hybrid_restr (<: Ob) (<: B) _ _ _ _ _ &m (fun _ _ _ r => r).
 - move => O; proc; inline *; sp; wp. 
   inline *.
   conseq (: Hyb.Count.c = Count.n) (: Count.n = 0 ==> Count.n <= N) => //. 
@@ -691,8 +688,9 @@ have -> : Pr[Hyb.HybGame(B, Ob, Hyb.R(Ob)).main() @ &m : res] =
   proc; inline *; sp.
   if; [smt() | by auto |].
   if; [smt()| by auto | by auto].
+rewrite normrZ /= 2:ler_wpmul2l; 1,2: smt(N_ge0).
 apply (sdist_oracle1 C);[|exact d1_ll|exact d2_ll|].
-- move => O O_ll; islossless; 2: by rewrite DInterval.weight_dinter; smt(N_pos).
+- move => O O_ll; islossless; 2: by rewrite DInterval.weight_dinter; smt(N_ge0).
   by apply (A_ll (<: B'(Ob, Hyb.HybOrcl(Ob, C(O).O')).O')); islossless. 
 move => O; proc.
 call(: if Hyb.HybOrcl.l <= Hyb.HybOrcl.l0 then Count.n = 0 else Count.n = 1).
@@ -712,7 +710,7 @@ import SmtMap.
 type in_t.
 op [lossless] d1 : a distr.
 op [lossless] d2 : a distr.
-op N : { int | 0 < N } as N_pos.
+op N : { int | 0 <= N } as N_ge0.
 
 clone PROM.FullRO as R1 with 
   type in_t <- in_t, 
@@ -737,7 +735,7 @@ module O2 = R2.RO.
 infrastructure (e.g., for splitting into muliple oracles *) 
 
 module type Distinguisher (O : R1.RO) = {
-  proc distinguish(_ : unit) : bool {O.get O.set O.sample}
+  proc distinguish(_ : unit) : bool {O.get, O.set, O.sample}
 }.
 
 (* TOTHINK: Calls to [sample] and [get] do not actually provide any
@@ -773,9 +771,9 @@ module Wrap (O : R1.RO) : R1.RO = {
 
 section.
 
-declare module D <: Distinguisher {Os, O1,O2, Count, B1, Wrap}.
+declare module D <: Distinguisher {-Os, -O1, -O2, -Count, -B1, -Wrap}.
 
-declare axiom D_ll : forall (O <: R1.RO{D}), 
+declare axiom D_ll : forall (O <: R1.RO{-D}), 
   islossless O.get => islossless D(O).distinguish.
 
 local module Cache (O : Oracle) : R1.RO = {
@@ -823,11 +821,11 @@ local clone N1 as N1 with
   axiom d1_ll <- d1_ll,
   axiom d2_ll <- d2_ll,
   op N <- N,
-  axiom N_pos <- N_pos
+  axiom N_ge0 <- N_ge0
   proof*.
 
 lemma sdist_ROM  &m : 
- (forall (O <: R1.RO{Wrap,D}), 
+ (forall (O <: R1.RO{-Wrap,-D}), 
    hoare [ D(Wrap(O)).distinguish : Wrap.dom = fset0 ==> card Wrap.dom <= N]) =>
   `| Pr [R1.MainD(D,O1).distinguish() @ &m : res] - 
      Pr [R1.MainD(D,O2).distinguish() @ &m : res] |

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
@@ -243,6 +235,9 @@ abstract theory ComRing.
   lemma nosmt mulrACA: interchange ( * ) ( * ).
   proof. by move=> x y z t; rewrite -!mulrA (mulrCA y). qed.
 
+  lemma nosmt mulrSl x y : (x + oner) * y = x * y + y.
+  proof. by rewrite mulrDl mul1r. qed.
+
   lemma nosmt mulrDr: right_distributive ( * ) (+).
   proof. by move=> x y z; rewrite mulrC mulrDl !(@mulrC _ x). qed.
 
@@ -468,6 +463,9 @@ abstract theory ComRing.
     by rewrite !MulMonoid.iteropE iterS.
   qed.
 
+  lemma expr_pred (x : t) i : 0 < i => exp x i = x * (exp x (i - 1)).
+  proof. smt(exprS). qed.
+
   lemma exprSr (x : t) i: 0 <= i => exp x (i+1) = (exp x i) * x.
   proof. by move=> ge0_i; rewrite exprS // mulrC. qed.
 
@@ -653,6 +651,29 @@ abstract theory ComRing.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
+abstract theory ComRingDflInv.
+  clone include ComRing with
+    pred unit (x : t) = exists y, y * x = oner,
+    op   invr (x : t) = choiceb (fun y => y * x = oner) x
+
+    proof mulVr, unitP, unitout.
+
+  realize mulVr.
+  proof.
+  move=> x ^ un_x [y ^ -> <-] @/invr_.
+  by have /= -> := choicebP _ x un_x.
+  qed.
+
+  realize unitP.
+  proof. by move=> x y eq; exists y. qed.
+
+  realize unitout.
+  proof.
+  by move=> x; rewrite /unit_ negb_exists => /choiceb_dfl /(_ x).
+  qed.
+end ComRingDflInv.
+
+(* -------------------------------------------------------------------- *)
 abstract theory BoolRing.
   clone include ComRing.
 
@@ -673,7 +694,7 @@ abstract theory IDomain.
     forall (x y : t), x * y = zeror <=> x = zeror \/ y = zeror.
 
   lemma mulf_neq0 (x y : t): x <> zeror => y <> zeror => x * y <> zeror.
-  proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0; smt. qed.
+  proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0 /#. qed.
 
   lemma expf_eq0 x n : (exp x n = zeror) <=> (n <> 0 /\ x = zeror).
   proof.
@@ -697,6 +718,18 @@ abstract theory IDomain.
 
   lemma lregP x : lreg x <=> x <> zeror.
   proof. by split=> [/lreg_neq0//|/mulfI]. qed.
+
+  lemma eqr_div (x1 y1 x2 y2 : t) : unit y1 => unit y2 =>
+    (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
+  proof.
+  move=> Nut1 Nut2; rewrite -{1}(@mulrK y2 _ x1) //.
+  rewrite  -{1}(@mulrK y1 _ x2) // -!mulrA (@mulrC (invr y1)) !mulrA.
+  split=> [|->] //;
+    (have nz_Vy1: unit (invr y1) by rewrite unitrV);
+    (have nz_Vy2: unit (invr y2) by rewrite unitrV).
+  by move/(mulIr _ nz_Vy1)/(mulIr _ nz_Vy2).
+  qed.
+
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
@@ -724,14 +757,7 @@ abstract theory Field.
 
   lemma eqf_div (x1 y1 x2 y2 : t) : y1 <> zeror => y2 <> zeror =>
     (x1 / y1 = x2 / y2) <=> (x1 * y2 = x2 * y1).
-  proof.                          (* FIXME: views *)
-  move=> nz_y1 nz_y2; rewrite -{1}(@mulrK y2 _ x1) //.
-  rewrite  -{1}(@mulrK y1 _ x2) // -!mulrA (@mulrC (invr y1)) !mulrA.
-  split=> [|->] //;
-    (have nz_Vy1: invr y1 <> zeror by rewrite invr_eq0);
-    (have nz_Vy2: invr y2 <> zeror by rewrite invr_eq0).
-  by move/(mulIf _ nz_Vy1)/(mulIf _ nz_Vy2).
-  qed.
+  proof. by apply: eqr_div. qed.
 
   lemma expfM x y n : exp (x * y) n = exp x n * exp y n.
   proof.
@@ -806,10 +832,9 @@ abbrev (^) = exp.
 lemma intmulz z c : intmul z c = z * c.
 proof.
 have h: forall cp, 0 <= cp => intmul z cp = z * cp.
-  elim=> /= [|cp ge0_cp ih].
-    by rewrite mulr0z.
+  elim=> /= [|cp ge0_cp ih]; first by rewrite mulr0z.
   by rewrite mulrS // ih mulrDr /= addrC.
-case: (c < 0); 1: rewrite -opprK mulrNz opprK; smt.
+smt(opprK mulrNz opprK).
 qed.
 
 lemma poddX n x : 0 < n => odd (exp x n) = odd x.

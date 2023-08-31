@@ -2,13 +2,19 @@ name: EasyCrypt compilation & check
 
 on: [push,pull_request]
 
+env:
+  HOME: /home/charlie
+  OPAMYES: true
+  OPAMJOBS: 2
+
 jobs:
-  compile:
-    name: EasyCrypt compilation
+  compile-opam:
+    name: EasyCrypt compilation (opam)
     runs-on: ubuntu-20.04
-    container: easycryptpa/ec-build-box
+    container:
+      image: ghcr.io/easycrypt/ec-build-box
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Update OPAM & EasyCrypt dependencies
       run: |
         opam update
@@ -17,17 +23,38 @@ jobs:
     - name: Compile EasyCrypt
       run: opam config exec -- make
 
+  compile-nix:
+    name: EasyCrypt compilation (nix)
+    env:
+      HOME: /home/runner
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Nix
+      uses: cachix/install-nix-action@v20
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    - name: Setup Cachix
+      uses: cachix/cachix-action@v12
+      with:
+        name: formosa-crypto
+        authToken: '${{ secrets.CACHIX_WRITE_TOKEN }}'
+    - name: Build and cache EasyCrypt and dependencies
+      run: |
+        nix-build
+
   check:
     name: Check EasyCrypt Libraries
-    needs: compile
+    needs: compile-opam
     runs-on: ubuntu-20.04
-    container: easycryptpa/ec-build-box
+    container:
+      image: ghcr.io/easycrypt/ec-build-box
     strategy:
       fail-fast: false
       matrix:
         target: [stdlib, examples]
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: Update OPAM & EasyCrypt dependencies
       run: |
         opam update
@@ -43,7 +70,7 @@ jobs:
       env:
         TARGET: ${{ matrix.target }}
       run: opam config exec -- make $TARGET
-    - uses: actions/upload-artifact@v2
+    - uses: actions/upload-artifact@v3
       name: Upload report.log
       if: always()
       with:
@@ -51,19 +78,66 @@ jobs:
         path: report.log
         if-no-files-found: ignore
 
-  slack:
-    name: Slack
-    needs: [compile, check]
+  external:
+    name: Check EasyCrypt External Projects
+    needs: compile-opam
+    runs-on: ubuntu-20.04
+    container:
+      image: ghcr.io/easycrypt/ec-build-box
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [ [ 'jasmin-eclib', 'jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin' ] ]
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        path: 'easycrypt'
+    - uses: actions/checkout@v3
+      with:
+        path: 'project'
+        repository: ${{ matrix.target[1] }}
+    - name: Update OPAM & EasyCrypt dependencies
+      run: |
+        opam update
+        opam pin add -n easycrypt easycrypt
+        opam install --deps-only easycrypt
+    - name: Compile & Install EasyCrypt
+      run: opam config exec -- make -C easycrypt build install
+    - name: Detect SMT provers
+      run: |
+        rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
+        opam config exec -- easycrypt why3config
+    - name: Compile project
+      working-directory: project/${{ matrix.target[2] }}
+      run: opam config exec -- ec-runtest ${{ matrix.target[3] }} ${{ matrix.target[4] }}
+    - uses: actions/upload-artifact@v3
+      name: Upload report.log
+      if: always()
+      with:
+        name: report.log (${{ matrix.target[0] }})
+        path: report.log
+        if-no-files-found: ignore
+
+  notification:
+    name: Notification
+    needs: [compile-opam, compile-nix, check, external]
     if: |
       (github.event_name == 'push') ||
       (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-20.04
     steps:
-    - uses: technote-space/workflow-conclusion-action@v2
-    - uses: rtCamp/action-slack-notify@v2
-      env:
-        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
-        SLACK_ICON: https://raw.githubusercontent.com/EasyCrypt/easycrypt/1.0/easycrypt.png 
-        SLACK_USERNAME: "CI/CD"
-        SLACK_COLOR: ${{ env.WORKFLOW_CONCLUSION }}
-        SLACK_TITLE: "CI (${{ env.WORKFLOW_CONCLUSION }})"
+    - uses: technote-space/workflow-conclusion-action@v3
+    - uses: zulip/github-actions-zulip/send-message@v1
+      with:
+        api-key: ${{ secrets.ZULIP_APIKEY }}
+        email: ${{ secrets.ZULIP_EMAIL }}
+        organization-url: 'https://formosa-crypto.zulipchat.com'
+        type: 'stream'
+        to: 'GitHub notifications'
+        topic: 'EasyCrypt / CI'
+        content: |
+          **Build status**: ${{ env.WORKFLOW_CONCLUSION }} ${{ env.WORKFLOW_CONCLUSION == 'success' && ':check_mark:' || ':cross_mark:' }}
+          **Author**: [${{ github.actor }}](${{ github.server_url }}/${{ github.actor }})
+          **Event**: ${{ github.event_name }} on ${{ github.ref }}
+          **Commit**: [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          **Details**: [Build log](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}/checks)

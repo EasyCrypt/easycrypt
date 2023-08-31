@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore Distr.
 
 pragma +implicits.
@@ -205,7 +197,7 @@ move=> dD_fu.
 proc; if=> //=; auto=> /> &m h.
 have [] x0 x0_notinr_m:= endo_dom_rng RP.m{m} _.
 + by exists x{m}.
-rewrite -/predT weight_dexcepted /b2r.
+rewrite -/predT weight_dexcepted.
 case: {-1}(mu _ _ = mu _ _)
         (eq_refl (mu dD predT = mu dD (rng RP.m{m})))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.
@@ -223,7 +215,7 @@ move=> dD_fu.
 proc; if=> //=; auto=> /> &m h.
 have [] y0 y0_notinr_mi:= endo_dom_rng RP.mi{m} _.
 + by exists y{m}.
-rewrite -/predT weight_dexcepted /b2r.
+rewrite -/predT weight_dexcepted.
 case: {-1}(mu _ _ = mu _ _)
         (eq_refl (mu dD predT = mu dD (rng RP.mi{m})))=> //=.
 rewrite eqT -subr_eq0 ltr0_neq0 //.
@@ -301,8 +293,8 @@ qed.
 lemma collision_stable (m:(D,D) fmap) y y':
   collision m =>
   y \notin m =>
-  collision m.[y <- y']
-by [].
+  collision m.[y <- y'].
+proof. by move=> h /collision_add /= ->; rewrite h. qed.
 
 (** To factor out the difficult step, we parameterize the PRP by a
     procedure that samples its output, and provide two instantiations
@@ -409,8 +401,8 @@ qed.
          = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
  **)
 section Upto.
-  declare module D <: PRFt.Distinguisher {RP, PRFi}.
-  declare axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+  declare module D <: PRFt.Distinguisher {-RP, -PRFi}.
+  declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
 
   local module PRP_indirect_bad = {
     var bad : bool
@@ -471,8 +463,8 @@ section Upto.
       smt (rngE get_setE).
     sp; if{1}.
     + conseq (_: _ ==> collision PRFi.m{2} /\ PRP_indirect_bad.bad{1})=> //.
-      auto=> /> &1 &2 x_notin_m coll_def rng_m_r; smt.
-    by auto; smt. (** FIXME: Investigate **)
+      auto=> /> &1 &2 x_notin_m coll_def rng_m_r; smt(dD_ll excepted_lossless).
+    by auto=> /> /#.
     move=> &2 bad; conseq (_: true ==> true: =1%r) (_: PRP_indirect_bad.bad ==> PRP_indirect_bad.bad)=> //=.
     + by proc; if=> //=; inline *; seq  2: PRP_indirect_bad.bad; [auto|if=> //=; auto].
     proc; if=> //=; inline *.
@@ -502,13 +494,10 @@ section PRPi_PRPi'_Indirect.
        forall a, Pr[Direct.sample: res = a] = Pr[Indirect.sample: res = a]. *)
   equiv eq_Direct_Indirect: Direct.sample ~ Indirect.sample: ={X} ==> ={res}.
   proof.
-  transitivity S.direct (X{2} = fun _=> X{1} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
-  + by move=> &2; exists ((),fun _=> X{2}).
-  + by proc; rnd.
-  transitivity S.indirect (={x,X} ==> ={res}) (X{1} = fun _=> X{2} ==> ={res})=> //>.
-  + by move=> &1 &2 ->; exists ((),fun _=> X{2}).
-  + by conseq (@ll_direct_indirect_eq); rewrite dD_ll.
-  proc. seq 1 1: (#pre /\ ={r}); auto.
+  proc.
+  rewrite equiv [{1} ll_direct_indirect_eq ((), fun _ => X) r ((), fun _ => X) r].
+  + move=> />; exact dD_ll.
+  sp; seq 1 1: ((X0 = fun _ => X){1} /\ ={X} /\ r0{1} = r{2}); auto.
   by if; auto.
   qed.
 
@@ -523,7 +512,7 @@ section PRPi_PRPi'_Indirect.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
   qed.
 
-  declare module D <: Distinguisher { RP }.
+  declare module D <: Distinguisher { -RP }.
 
   lemma pr_PRPi_PRPi'_Indirect &m:
     Pr[IND(RP,D).main() @ &m: res] = Pr[IND(PRPi'(Indirect),D).main() @ &m: res].
@@ -537,9 +526,9 @@ section PRPi_PRPi'_Indirect.
 end section PRPi_PRPi'_Indirect.
 
 section CollisionProbability.
-  declare module D <: Distinguisher {RP, PRFi}.
+  declare module D <: Distinguisher {-RP, -PRFi}.
 
-  declare axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+  declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
   declare axiom D_bounded  : hoare [D(PRFi).distinguish : PRFi.m = empty ==> card (fdom PRFi.m) <= q].
 
   local clone import Birthday as BBound with
@@ -581,7 +570,7 @@ section CollisionProbability.
     }
   }.
 
-  local lemma A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
+  local lemma A_ll (S <: ASampler {-A}): islossless S.s => islossless A(S).a.
   proof.
   move=> S_ll; proc; inline*; wp.
   call (_: true).
@@ -603,8 +592,8 @@ section CollisionProbability.
   + proc; inline*.
     if => //=.
     auto => /> &1 &2 h1 h2 h3 h4 r _.
-    rewrite fdom_set fcardUI_indep 2:fcard1; 1: by rewrite fsetI1 mem_fdom h4. 
-    smt (get_setE mem_frng rngE collision_add).
+    rewrite fdom_set fcardUI_indep 2:fcard1; 1: by rewrite fsetI1 mem_fdom h4.
+    smt(get_setE mem_frng rngE collision_add).
   auto; smt (size_eq0 fdom0 fcards0 frng0 in_fset0 mem_empty).
   qed.
 
@@ -658,10 +647,10 @@ module DBounder (D : Distinguisher) (F : PRF_Oracles) = {
 
 section BOUNDER.
 
-declare module D <: Distinguisher {RP, PRFi, DBounder}.
-declare axiom D_ll (O <: PRF_Oracles {D}): islossless O.f => islossless D(O).distinguish.
+declare module D <: Distinguisher {-RP, -PRFi, -DBounder}.
+declare axiom D_ll (O <: PRF_Oracles {-D}): islossless O.f => islossless D(O).distinguish.
 
-lemma DBounder_ll (O <: PRF_Oracles{DBounder(D)}): 
+lemma DBounder_ll (O <: PRF_Oracles{-DBounder(D)}): 
   islossless O.f => islossless DBounder(D, O).distinguish.
 proof.
   move=> hll; islossless.

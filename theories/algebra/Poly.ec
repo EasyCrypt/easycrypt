@@ -1,20 +1,12 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore Finite Distr DList List.
-require import Ring Bigalg StdBigop StdOrder.
+require import Ring IntMin Bigalg StdBigop StdOrder.
 require (*--*) Subtype.
 (*---*) import Bigint IntID IntOrder.
 
 (* ==================================================================== *)
 abstract theory PolyComRing.
-type coeff, poly.
+type coeff.
 
 clone import ComRing as Coeff with type t <= coeff.
 
@@ -27,18 +19,22 @@ clone import BigComRing as BigCf
 (* -------------------------------------------------------------------- *)
 type prepoly = int -> coeff.
 
-inductive ispoly (p : prepoly) =
-| IsPoly of
+op ispoly (p : prepoly) =
       (forall c, c < 0 => p c = zeror)
-    & (exists d, forall c, (d < c)%Int => p c = zeror).
+    /\ (exists d, forall c, (d < c)%Int => p c = zeror).
 
 clone include Subtype
   with type T   <- prepoly,
-       type sT  <- poly,
-       pred P   <- ispoly,
-         op wsT <- (fun _ => zeror)
+       op P   <- ispoly
   rename "insub" as "to_poly"
-  rename "val"   as "of_poly".
+  rename "val"   as "of_poly"
+proof *.
+realize inhabited.
+  exists (fun _, zeror).
+  rewrite /ispoly.
+  auto.
+qed.
+type poly = sT.
 
 op "_.[_]" (p : poly) (i : int) = (of_poly p) i.
 
@@ -55,7 +51,7 @@ lemma degP p c :
   => (forall i, c <= i => p.[i] = zeror)
   => deg p = c.
 proof.
-move=> ge0_c nz_p_cB1 degc @/deg; apply: argmin_eq => @/idfun /=.
+move=> ge0_c nz_p_cB1 degc @/deg; apply: argmin_eq => /=.
 - by apply/ltrW. - by apply: degc.
 move=> j [ge0_j lt_jc]; rewrite negb_forall /=.
 by exists (c-1); apply/negP => /(_ _); first by move=> /#.
@@ -72,7 +68,7 @@ lemma gedeg_coeff (p : poly) (c : int) : deg p <= c => p.[c] = zeror.
 proof.
 move=> le_p_c; pose P p i := forall j, (i <= j)%Int => p.[j] = zeror.
 case: (of_polyP p) => [wf_p [d hd]]; move: (argminP idfun (P p)).
-move/(_ (max (d+1) 0) _ _) => @/P @/idfun /=; first exact: maxrr.
+move/(_ (max (d+1) 0) _ _) => /=; first exact: maxrr.
 - by move=> j le_d_j; apply: hd => /#.
 by apply; apply: le_p_c.
 qed.
@@ -298,7 +294,7 @@ proof.
 case: (c = zeror) => [->|nz_c]; last first.
 - apply: degP => //=; first by rewrite polyCE.
   by move=> i ge1_i; rewrite polyCE gtr_eqF //#.
-rewrite /deg; apply: argmin_eq => @/idfun //=.
+rewrite /deg; apply: argmin_eq => //=.
 - by move=> j _; rewrite poly0E.
 - by move=> j; apply: contraL => _ /#.
 qed.
@@ -848,13 +844,12 @@ end PolyComRing.
 
 (* ==================================================================== *)
 abstract theory Poly.
-type coeff, poly.
+type coeff.
 
 clone import IDomain as IDCoeff with type t <= coeff.
 
 clone include PolyComRing with
   type coeff        <- coeff,
-  type poly         <- poly,
   theory Coeff      <- IDCoeff.
   
 clear [PolyComRing.* PolyComRing.AddMonoid.* PolyComRing.MulMonoid.*].

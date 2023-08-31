@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcLocation
 open EcSymbols
@@ -22,16 +14,18 @@ type ttenv = {
   tt_implicits : bool;
   tt_oldip     : bool;
   tt_redlogic  : bool;
+  tt_und_delta : bool;
 }
 
 type engine  = ptactic_core -> backward
 
 (* -------------------------------------------------------------------- *)
-type cut_t    = intropattern * pformula * (ptactics located) option
-type cutdef_t = intropattern * pcutdef
-type apply_t  = EcParsetree.apply_info
-type focus_t  = EcParsetree.tfocus
-type cutmode  = [`Have | `Suff]
+type cut_t       = intropattern * pformula * (ptactics located) option
+type cutdef_t    = intropattern * pcutdef
+type cutdef_sc_t = intropattern * pcutdef_schema
+type apply_t     = EcParsetree.apply_info
+type focus_t     = EcParsetree.tfocus
+type cutmode     = [`Have | `Suff]
 
 (* -------------------------------------------------------------------- *)
 val process_tfocus : tcenv -> focus_t -> tfocus
@@ -81,11 +75,12 @@ val process_move        : ?doeq:bool -> ppterm list -> prevert -> backward
 val process_clear       : psymbol list -> backward
 val process_smt         : ?loc:EcLocation.t -> ttenv -> pprover_infos -> backward
 val process_apply       : implicits:bool -> apply_t * prevert option -> backward
-val process_delta       : ?target:psymbol -> (rwside * rwocc * pformula) -> backward
+val process_delta       : und_delta:bool -> ?target:psymbol -> (rwside * rwocc * pformula) -> backward
 val process_rewrite     : ttenv -> ?target:psymbol -> rwarg list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : ?mode:cutmode -> engine -> ttenv -> cut_t -> backward
 val process_cutdef      : ttenv -> cutdef_t -> backward
+val process_cutdef_sc   : ttenv -> cutdef_sc_t -> backward
 val process_left        : backward
 val process_right       : backward
 val process_split       : backward
@@ -99,6 +94,7 @@ val process_change      : pformula -> backward
 val process_simplify    : preduction -> backward
 val process_cbv         : preduction -> backward
 val process_pose        : psymbol -> ptybindings -> rwocc -> pformula -> backward
+val process_memory      : psymbol -> backward
 val process_done        : backward
 val process_wlog        : suff:bool -> psymbol list -> pformula -> backward
 val process_genhave     : ttenv -> pgenhave -> backward

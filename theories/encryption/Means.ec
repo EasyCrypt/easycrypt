@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import AllCore List Distr.
 require import Finite.
 require (*--*) StdBigop.
@@ -45,7 +37,7 @@ seq 1: (v = x) (mu1 d v) pr 1%r 0%r ((glob A) = (glob A){m})=> //.
           ==> ev v (glob A) res)=> //.
   rewrite /pr; bypr=> /> &0 eqGlob <<-.
   by byequiv (: ={glob A, x} ==> ={res, glob A})=> //; proc true.
-by hoare; rewrite /fst /snd /=; call (: true); auto=> /#.
+by hoare => /=; call (: true); auto=> /#.
 qed.
 
 lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):

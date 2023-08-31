@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 (* Expressions / formulas matching for tactics                          *)
 (* -------------------------------------------------------------------- *)
@@ -401,12 +393,9 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
     in
 
     let default () =
-      if opts.fm_conv then begin
-        let subject = Fsubst.f_subst subst subject in
-        let ptn = Fsubst.f_subst (MEV.assubst ue !ev) ptn in
-          if not (conv ptn subject) then
-            failure ()
-      end else failure ()
+      let subject = Fsubst.f_subst subst subject in
+      let ptn = Fsubst.f_subst (MEV.assubst ue !ev) ptn in
+      if not (conv ptn subject) then failure ()
     in
 
     try
@@ -426,12 +415,14 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       | Flocal x, _ -> begin
           match EV.get x !ev.evm_form with
           | None ->
+            (* TODO: bug? why not failure ()?*)
               raise MatchFailure
 
           | Some `Unset ->
               let ssbj = Fsubst.f_subst subst subject in
               let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) ssbj in
               if not (Mid.set_disjoint mxs ssbj.f_fv) then
+                (* TODO: bug? why not failure ()?*)
                 raise MatchFailure;
               begin
                 try  EcUnify.unify env ue ptn.f_ty subject.f_ty
@@ -587,6 +578,29 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             [hf2.bhf_pr; hf2.bhf_po; hf2.bhf_bd]
       end
 
+      | FcHoareF hf1, FcHoareF hf2 -> begin
+          let x2 = EcFol.Fsubst.subst_xpath subst hf2.chf_f in
+
+          if not (EcReduction.EqTest.for_xp env hf1.chf_f x2) then
+            failure ();
+          let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
+
+          let calls2 = EcPath.Mx.translate (EcFol.Fsubst.subst_xpath subst) hf2.chf_co.c_calls in
+
+          EcPath.Mx.fold2_union (fun _ cb1 cb2 () ->
+              match cb1, cb2 with
+              | None, None -> assert false
+              | None, Some _ | Some _, None -> failure ()
+              | Some cb1, Some cb2 ->
+                List.iter2 (doit env (subst, mxs))
+                  [cb1.cb_cost; cb1.cb_called]
+                  [cb2.cb_cost; cb2.cb_called]
+            ) hf1.chf_co.c_calls calls2 ();
+          List.iter2 (doit env (subst, mxs))
+            [hf1.chf_pr; hf1.chf_po; hf1.chf_co.c_self]
+            [hf2.chf_pr; hf2.chf_po; hf2.chf_co.c_self];
+        end
+
       | FequivF hf1, FequivF hf2 -> begin
           if not (EcReduction.EqTest.for_xp env hf1.ef_fl hf2.ef_fl) then
             failure ();
@@ -603,10 +617,9 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           if not (EcReduction.EqTest.for_xp env pr1.pr_fun pr2.pr_fun) then
             failure ();
           doit_mem env mxs pr1.pr_mem pr2.pr_mem;
+          doit env (subst, mxs) pr1.pr_args pr2.pr_args;
           let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
-          List.iter2
-            (doit env (subst, mxs))
-            [pr1.pr_args; pr1.pr_event] [pr2.pr_args; pr2.pr_event]
+          doit env (subst, mxs) pr1.pr_event pr2.pr_event;
       end
 
       | _, _ -> default ()
@@ -681,7 +694,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
   and doit_bindings env (subst, mxs) q1 q2 =
     let doit_binding (env, subst, mxs) (x1, gty1) (x2, gty2) =
-      let gty2 = Fsubst.gty_subst subst gty2 in
+      let gty2 = Fsubst.subst_gty subst gty2 in
 
       assert (not (Mid.mem x1 mxs) && not (Mid.mem x2 mxs));
 
@@ -702,38 +715,27 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
             (env, subst)
 
-        | GTmem None, GTmem None ->
-            (env, subst)
-
-        | GTmem (Some m1), GTmem (Some m2) ->
-            let xp1 = EcMemory.lmt_xpath m1 in
-            let xp2 = EcMemory.lmt_xpath m2 in
-            let m1  = EcMemory.lmt_bindings m1 in
-            let m2  = EcMemory.lmt_bindings m2 in
-
-            if not (EcPath.x_equal xp1 xp2) then
-              raise MatchFailure;
-            if not (
-              try
-                EcSymbols.Msym.equal
-                  (fun (p1,ty1) (p2,ty2) ->
-                    if p1 <> p2 then raise MatchFailure;
-                    EcUnify.unify env ue ty1 ty2; true)
-                  m1 m2
-              with EcUnify.UnificationFailure _ -> raise MatchFailure)
-            then
-              raise MatchFailure;
-
+        | GTmem mt1, GTmem mt2 ->
+            let on_ty ty1 ty2 =
+              try EcUnify.unify env ue ty1 ty2; true
+              with EcUnify.UnificationFailure _ -> false in
+            if not (EcMemory.mt_equal_gen on_ty mt1 mt2) then raise MatchFailure;
             let subst =
               if   id_equal x1 x2
               then subst
               else Fsubst.f_bind_mem subst x2 x1
             in (env, subst)
 
-        | GTmodty (p1, r1), GTmodty (p2, r2) ->
-            if not (ModTy.mod_type_equiv env p1 p2) then
-              raise MatchFailure;
-            if not (NormMp.equal_restr env r1 r2) then
+        | GTmodty p1, GTmodty p2 ->
+          let f_equiv f1 f2 =
+            try doit env (subst, mxs) f1 f2; true with
+            | MatchFailure ->
+                Format.eprintf "match failure:@\n%a@\n%a@."
+                  (!EcEnv.pp_debug_form env) f1
+                  (!EcEnv.pp_debug_form env) f2;
+                false in
+
+            if not (ModTy.mod_type_equiv f_equiv env p1 p2) then
               raise MatchFailure;
 
             let subst =
@@ -741,7 +743,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               then subst
               else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
 
-            and env = EcEnv.Mod.bind_local x1 p1 r1 env in
+            and env = EcEnv.Mod.bind_local x1 p1 env in
 
             (env, subst)
 
@@ -871,6 +873,22 @@ module FPosition = struct
           | FhoareF hs ->
               doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
 
+          | FcHoareF chs ->
+            let subctxt = Sid.add EcFol.mhr ctxt in
+            let calls =
+              List.map (fun (_,cb) -> ctxt,cb.cb_called)
+                (EcPath.Mx.bindings chs.chf_co.c_calls) in
+            doit pos (`WithSubCtxt ((subctxt, chs.chf_pr) ::
+                                    (subctxt, chs.chf_po) ::
+                                    (ctxt, chs.chf_co.c_self) ::
+                                    calls))
+
+          | Fcoe coe ->
+            let subctxt = Sid.add (fst coe.coe_mem) ctxt in
+            doit pos (`WithSubCtxt [subctxt, coe.coe_pre])
+
+          (* TODO: A: From what I undertand, there is an error there:
+             it should be  (subctxt, hs.bhf_bd) *)
           | FbdHoareF hs ->
               let subctxt = Sid.add EcFol.mhr ctxt in
               doit pos (`WithSubCtxt ([(subctxt, hs.bhf_pr);
@@ -982,33 +1000,33 @@ module FPosition = struct
 
           | Fquant (q, b, f) ->
               let f' = as_seq1 (doit p [f]) in
-              FSmart.f_quant (fp, (q, b, f)) (q, b, f')
+              f_quant q b f'
 
           | Fif (c, f1, f2)  ->
               let (c', f1', f2') = as_seq3 (doit p [c; f1; f2]) in
-              FSmart.f_if (fp, (c, f1, f2)) (c', f1', f2')
+              f_if c' f1' f2'
 
           | Fmatch (b, fs, ty) ->
               let bfs = doit p (b :: fs) in
-              FSmart.f_match (fp, (b, fs, ty)) (List.hd bfs, List.tl bfs, ty)
+              EcCoreFol.f_match (List.hd bfs) (List.tl bfs) ty
 
           | Fapp (f, fs) -> begin
               match doit p (f :: fs) with
               | [] -> assert false
               | f' :: fs' ->
-                FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', fp.f_ty)
+                f_app f' fs' (fp.f_ty)
           end
 
           | Ftuple fs ->
               let fs' = doit p fs in
-              FSmart.f_tuple (fp, fs) fs'
+              f_tuple fs'
 
           | Fproj (f, i) ->
-              FSmart.f_proj (fp, (f, fp.f_ty)) (as_seq1 (doit p [f]), fp.f_ty) i
+              f_proj (as_seq1 (doit p [f])) i fp.f_ty
 
           | Flet (lv, f1, f2) ->
               let (f1', f2') = as_seq2 (doit p [f1; f2]) in
-              FSmart.f_let (fp, (lv, f1, f2)) (lv, f1', f2')
+              f_let lv f1' f2'
 
           | Fpr pr ->
               let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in
@@ -1017,6 +1035,28 @@ module FPosition = struct
           | FhoareF hf ->
               let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
               f_hoareF_r { hf with hf_pr; hf_po; }
+
+          | FcHoareF chf ->
+            let fkeys, calls = EcPath.Mx.bindings chf.chf_co.c_calls
+                               |> List.map (fun (f,cb) -> ((f,cb.cb_cost),
+                                                           cb.cb_called))
+                               |> List.split in
+            let sub = doit p (chf.chf_pr ::
+                              chf.chf_po ::
+                              chf.chf_co.c_self ::
+                              calls) in
+            begin match sub with
+              | chf_pr :: chf_po :: c_self :: calls ->
+                let c_calls = List.fold_left2 (fun acc (f,cb_cost) cb_called ->
+                    EcPath.Mx.change
+                      (fun old ->
+                         assert (old = None);
+                         Some (call_bound_r cb_cost cb_called)) f acc
+                  ) EcPath.Mx.empty fkeys calls in
+                let cost = cost_r c_self c_calls in
+                f_cHoareF_r { chf with chf_pr; chf_po;
+                                       chf_co = cost; }
+              | _ -> assert false end
 
           | FbdHoareF hf ->
               let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
@@ -1027,7 +1067,13 @@ module FPosition = struct
               let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
               f_equivF_r { ef with ef_pr; ef_po; }
 
+          | Fcoe coe ->
+              let sub = doit p [coe.coe_pre] in
+              let pre = as_seq1 sub in
+              f_coe_r { coe with coe_pre = pre }
+
           | FhoareS   _ -> raise InvalidPosition
+          | FcHoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
           | FeagerF   _ -> raise InvalidPosition

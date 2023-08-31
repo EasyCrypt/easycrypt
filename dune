@@ -1,1 +1,9 @@
-(dirs src theories examples)
+(dirs src theories examples scripts)
+
+(install
+  (section (site (easycrypt commands)))
+  (files (scripts/testing/runtest as runtest)))
+
+(install
+  (section (bin))
+  (files (scripts/testing/bin-ec-runtest as ec-runtest)))

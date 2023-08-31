@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcLocation
 open EcParsetree
@@ -243,17 +235,23 @@ type inames = [`Symbol of symbol list | `Ident of EcIdent.t list]
 
 val t_intros   : ident mloc list -> FApi.backward
 val t_intro_i  : ident -> FApi.backward
+val t_intro_sx : iname -> tcenv1 -> tcenv * ident
 val t_intro_s  : iname -> FApi.backward
 
-val t_intros_i : ident list -> FApi.backward
-val t_intros_s : inames -> FApi.backward
+val t_intros_i  : ident list -> FApi.backward
+val t_intros_sx : inames -> tcenv1 -> tcenv * ident list
+val t_intros_s  : inames -> FApi.backward
 
 val t_intros_i_1 : ident list -> tcenv1 -> tcenv1
+val t_intros_s_1 : inames -> tcenv1 -> tcenv1
 
-val t_intros_i_seq : ?clear:bool -> ident list -> FApi.backward -> FApi.backward
-val t_intros_s_seq : inames -> FApi.backward -> FApi.backward
+val t_intro_sx_seq : iname -> (ident -> FApi.backward) -> FApi.backward
 
-val t_intros_n : int -> FApi.backward
+val t_intros_i_seq  : ?clear:bool -> ident list -> FApi.backward -> FApi.backward
+val t_intros_sx_seq : inames -> (ident list -> FApi.backward) -> FApi.backward
+val t_intros_s_seq  : inames -> FApi.backward -> FApi.backward
+
+val t_intros_n : ?clear:bool -> int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 type genclear = [`Clear | `TryClear | `NoClear]
@@ -321,4 +319,9 @@ type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
 val t_smt: mode:smtmode -> prover_infos -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_solve : ?canfail:bool -> ?bases:symbol list -> ?depth:int -> FApi.backward
+val t_solve :
+     ?canfail:bool
+  -> ?bases:symbol list
+  -> ?mode:EcMatching.fmoptions
+  -> ?depth:int
+  -> FApi.backward

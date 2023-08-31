@@ -1,6 +1,8 @@
-(lang dune 2.8)
+(lang dune 3.6)
 (using menhir 2.0)
 (using dune_site 0.1)
+
+(wrapped_executables false)
 
 (name easycrypt)
 
@@ -8,16 +10,18 @@
 
 (package
  (name easycrypt)
- (sites (lib theories))
+ (sites (lib theories) (libexec commands))
  (depends
   (ocaml (>= 4.08.0))
   (batteries (>= 3))
+  (camlp-streams (>= 5))
   camlzip
+  (dune (>= 3.6))
   dune-build-info
   dune-site
   (ocaml-inifiles (>= 1.2))
   (pcre (>= 7))
-  (why3 (and (>= 1.4.0) (< 1.5)))
+  (why3 (and (>= 1.6.0) (< 1.7)))
   yojson
   (zarith (>= 1.10))
 ))

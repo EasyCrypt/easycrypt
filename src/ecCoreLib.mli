@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcPath
@@ -49,6 +41,14 @@ module CI_Witness : sig
   val p_witness : path
 end
 
+(* -------------------------------------------------------------------- *)
+module CI_Option : sig
+  val p_option : path
+  val p_none   : path
+  val p_some   : path
+  val p_oget   : path
+end
+
 (*-------------------------------------------------------------------- *)
 module CI_Bool : sig
   val i_Bool : symbol
@@ -83,6 +83,25 @@ module CI_Int : sig
   val p_int_lt    : path
   val p_int_pow   : path
   val p_int_edivz : path
+  val p_iteri     : path
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_xint : sig
+  val p_Xint      : path
+  val p_xint      : path
+  val p_N         : path
+  val p_inf       : path
+  val p_xopp      : path
+  val p_xadd      : path
+  val p_xmul      : path
+  val p_xle       : path
+  val p_xmax      : path
+  val p_is_int    : path
+  val p_is_inf    : path
+  val p_choaretac : path
+  val p_bigxint   : path
+  val p_big       : path
 end
 
 (* -------------------------------------------------------------------- *)
@@ -105,6 +124,10 @@ module CI_Real : sig
   val p_real_lt     : path
   val p_real_of_int : path
   val p_real_abs    : path
+
+  val real_lemma    : string -> path
+  val real_order_lemma : string -> path
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -125,12 +148,24 @@ module CI_Distr : sig
   val p_dbool      : path
   val p_dbitstring : path
   val p_dinter     : path
+  val p_dunit      : path
+  val p_dlet       : path
+  val p_dmap       : path
 
   val p_support : path
   val p_mu      : path
   val p_lossless: path
   val p_uniform : path
   val p_full    : path
+  val p_dfold   : path
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_Sum : sig
+  val i_Sum : symbol
+  val p_Sum : path
+
+  val p_sum : path
 end
 
 (* -------------------------------------------------------------------- *)

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcCoreGoal.FApi
@@ -25,6 +17,20 @@ open EcCoreGoal.FApi
  *
  * The actual rule is in this core rule + conseq.
  *)
+
+
+(* -------------------------------------------------------------------- *)
+val t_equivS_trans :
+     EcMemory.memtype * EcModules.stmt
+  -> EcFol.form * EcFol.form
+  -> EcFol.form * EcFol.form
+  -> EcCoreGoal.FApi.backward
+
+val t_equivF_trans :
+     EcPath.xpath
+  -> EcFol.form * EcFol.form
+  -> EcFol.form * EcFol.form
+  -> EcCoreGoal.FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val process_equiv_trans :

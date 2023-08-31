@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* ------------------------------------------------------------------ *)
 open EcUtils
 open EcSymbols
@@ -336,9 +328,7 @@ end = struct
   (* ------------------------------------------------------------------ *)
   let ax_ovrd _oc ((proofs, evc) : state) name ((axd, mode) : ax_override) =
     let loc = axd.pl_loc in
-    let tc = FPNamed (axd, None) in
-    let tc = { fp_mode = `Explicit; fp_head = tc; fp_args = []; } in
-    let tc = Papply (`Apply ([tc], `Exact), None) in
+    let tc = Papply (`ExactType axd, None) in
     let tc = mk_loc loc (Plogic tc) in
     let pr = { pthp_mode   = `Named (name, mode);
                pthp_tactic = Some tc; } in
@@ -432,6 +422,9 @@ end = struct
         let axd = loced (thd @ prefix, x) in
         let name = (loced (xdth @ prefix, x)) in
         ax_ovrd oc (proofs, evc) name  (axd, mode)
+
+      | Th_schema _ ->
+          (proofs, evc)
 
       | Th_theory (x, dth) when dth.cth_mode = `Concrete ->
          List.fold_left (doit (prefix @ [x])) (proofs, evc) dth.cth_items

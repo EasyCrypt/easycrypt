@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 require import FSet.
 
 type key.
@@ -13,7 +5,7 @@ type message.
 type tag.
 
 module type Scheme = {
-  proc * init(): unit {}
+  proc init(): unit {}
   proc keygen(): key
   proc mac(k:key,m:message): tag
   proc verify(k:key,m:message,t:tag): bool

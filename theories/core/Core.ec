@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 lemma nosmt pw_eq ['a 'b] (x x' : 'a) (y y' : 'b):
   x = x' => y = y' => (x, y) = (x', y').
@@ -42,8 +34,12 @@ proof. by case: ox. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt frefl  (f     : 'a -> 'b): f == f by [].
-lemma nosmt fsym   (f g   : 'a -> 'b): f == g => g == f by [].
-lemma nosmt ftrans (f g h : 'a -> 'b): f == g => g == h => f == h by [].
+
+lemma nosmt fsym   (f g   : 'a -> 'b): f == g => g == f.
+proof. by move=> + x - /(_ x) ->. qed.
+
+lemma nosmt ftrans (f g h : 'a -> 'b): f == g => g == h => f == h.
+proof. by move=> + + x - /(_ x) -> /(_ x). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma econgr1 ['a 'b] (f g : 'a -> 'b) x y: f == g => x = y => f x = g y.
@@ -51,8 +47,12 @@ proof. by move/fun_ext=> -> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt f2refl  (f     : 'a -> 'b -> 'c): f === f by [].
-lemma nosmt f2sym   (f g   : 'a -> 'b -> 'c): f === g => g === f by [].
-lemma nosmt f2trans (f g h : 'a -> 'b -> 'c): f === g => g === h => f === h by [].
+
+lemma nosmt f2sym   (f g   : 'a -> 'b -> 'c): f === g => g === f.
+proof. by move=> + x y - /(_ x y) ->. qed.
+
+lemma nosmt f2trans (f g h : 'a -> 'b -> 'c): f === g => g === h => f === h.
+proof. by move=> + + x y - /(_ x y) -> /(_ x y). qed.
 
 lemma rel_ext (f g : 'a -> 'b -> 'c) : f = g <=> f === g.
 proof.
@@ -74,6 +74,43 @@ proof. by apply/fun_ext; rewrite etaE. qed.
 lemma comp_eqE ['a 'b 'c] (f f' : 'b -> 'a) (g g' : 'c -> 'b):
   f == f' => g == g' => (f \o g) == (f' \o g').
 proof. by do 2! (move/fun_ext=> ->). qed.
+
+(* -------------------------------------------------------------------- *)
+op fixfinfun ['t 'u] (dom : 't -> bool) (codom : 'u -> bool) (f : 't -> 'u) =
+  forall x, (if dom x then codom (f x) else f x = witness).
+
+lemma fixfinfun0 ['t 'u] (codom : 'u -> bool) (f : 't -> 'u) :
+  fixfinfun pred0 codom f => forall x, f x = witness.
+proof. by move=> + x - /(_ x). qed.
+
+lemma eqL_fixfinfun ['t 'u] r1 r2 s (f : 't -> 'u) :
+  r1 == r2 => fixfinfun r2 s f <=> fixfinfun r1 s f.
+proof. by move/fun_ext => ->. qed.
+
+lemma eqR_fixfinfun ['t 'u] r s1 s2 (f : 't -> 'u) :
+  s1 == s2 => fixfinfun r s1 f <=> fixfinfun r s2 f.
+proof. by move/fun_ext => ->. qed.
+
+(* -------------------------------------------------------------------- *)
+op swap_codom ['t 'u] x y1 y2 (f : 't -> 'u) =
+  fun x' => if x = x' then
+    (if f x = y1 then y2 else if f x = y2 then y1 else f x)
+  else f x'.
+
+lemma swap_codom_neq ['t 'u] x y1 y2 (f : 't -> 'u) z :
+  x <> z => swap_codom x y1 y2 f z = f z.
+proof. by move=> ne_xz @/swap_codom; rewrite ne_xz. qed.
+
+lemma bij_swap_codom ['t 'u] x y1 y2 :
+  bijective (swap_codom<:'t, 'u> x y1 y2).
+proof.
+exists (swap_codom x y1 y2); rewrite andbb => f.
+apply/fun_ext=> x' @/swap_codom /=.
+case: (x = x') => // <<-; case: (f x = y1) => /= [->|].
+- by case: (y2 = y1).
+- move=> ne_fx_y1; case: (f x = y2) => //=.
+  by move/negbTE=> ->; move/negbTE: ne_fx_y1=> ->.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt can_pcan (f:'a -> 'b) g: cancel f g => pcancel f (Some \o g).
@@ -204,39 +241,40 @@ pred (< ) (p q:'a -> bool) = (* proper *)
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt subpred_eqP (p1 p2 : 'a -> bool):
-  (forall x, p1 x <=> p2 x) <=> (p1 <= p2 /\ p2 <= p1)
-by [].
+  (forall x, p1 x <=> p2 x) <=> (p1 <= p2 /\ p2 <= p1).
+proof.
+split=> [PQ|[] + + x].
++ by split=> x /PQ.
+by move=> /(_ x) + /(_ x).
+qed.
 
 lemma nosmt subpred_refl (X : 'a -> bool): X <= X
 by [].
 
 lemma nosmt subpred_asym (X Y:'a -> bool):
-  X <= Y => Y <= X => X = Y
-by (rewrite fun_ext; smt).
+  X <= Y => Y <= X => X = Y.
+proof. by rewrite pred_ext subpred_eqP. qed.
 
 lemma nosmt subpred_trans (X Y Z:'a -> bool):
-  X <= Y => Y <= Z => X <= Z
-by [].
+  X <= Y => Y <= Z => X <= Z.
+proof. by move=> + + x - /(_ x) Xx /(_ x) Yx /Xx /Yx. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt pred1E (c : 'a) : pred1 c = ((=) c).
 proof. by apply fun_ext=> x; rewrite (eq_sym c). qed.
 
 lemma nosmt predU1l (x y : 'a) b : x = y => (x = y) \/ b by [].
-lemma nosmt predU1r (x y : 'a) b : b => (x = y) \/ b by [].
-lemma nosmt eqVneq (x y : 'a) : x = y \/ x <> y by [].
+lemma nosmt predU1r (x y : 'a) b : b => (x = y) \/ b by case: b.
+lemma nosmt eqVneq (x y : 'a) : x = y \/ x <> y by case: (x = y).
 
-lemma nosmt predT_comp ['a 'b] (p : 'a -> 'b) : predT \o p = predT.
-proof. by []. qed.
+lemma nosmt predT_comp ['a 'b] (p : 'a -> 'b) : predT \o p = predT by [].
 
 lemma nosmt predIC (p1 p2 : 'a -> bool) : predI p1 p2 = predI p2 p1.
 proof. by apply fun_ext=> x; rewrite /predI andbC. qed.
 
-lemma nosmt predIT ['a] p : predI<:'a> p predT = p.
-proof. by []. qed.
+lemma nosmt predIT ['a] p : predI<:'a> p predT = p by [].
 
-lemma nosmt predTI ['a] p : predI<:'a> predT p = p.
-proof. by []. qed.
+lemma nosmt predTI ['a] p : predI<:'a> predT p = p by [].
 
 lemma nosmt predCI (p : 'a -> bool) : predI (predC p) p = pred0.
 proof. by apply/fun_ext=> x /=; delta => /=; rewrite andNb. qed.
@@ -245,20 +283,22 @@ lemma nosmt predCU (p : 'a -> bool) : predU (predC p) p = predT.
 proof. by apply/fun_ext=> x /=; delta => /=; case: (p x). qed.
 
 lemma nosmt subpredUl (p1 p2 : 'a -> bool):
-  p1 <= predU p1 p2
-by [].
+  p1 <= predU p1 p2.
+proof. by move=> x @/predU ->. qed.
 
 lemma nosmt subpredUr (p1 p2 : 'a -> bool):
-  p2 <= predU p1 p2
-by [].
+  p2 <= predU p1 p2.
+proof. by move=> x @/predU ->. qed.
 
 lemma nosmt predIsubpredl (p1 p2 : 'a -> bool):
-  predI p1 p2 <= p1
-by [].
+  predI p1 p2 <= p1.
+proof. by move=> x @/predI [] ->. qed.
 
 lemma nosmt predIsubpredr (p1 p2 : 'a -> bool):
-  predI p1 p2 <= p2
-by [].
+  predI p1 p2 <= p2.
+proof. by move=> x @/predI [] _ ->. qed.
 
 lemma nosmt predTofV (f : 'a -> 'b): predT \o f = predT.
 proof. by apply/fun_ext=> x. qed.
+
+lemma pred_0Vmem (p : 'a -> bool) : p = pred0 \/ exists x, p x by smt().

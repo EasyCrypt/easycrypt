@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 require import AllCore List StdOrder Distr StdOrder.
 (*---*) import RealOrder RealSeries StdBigop.Bigreal BRA.
@@ -36,13 +28,8 @@ module S = {
 (* -------------------------------------------------------------------- *)
 equiv sample_sample2 : S.sample ~ S.sample2 : ={d1, d2} ==> ={res}.
 proof.
-bypr (res{1}) (res{2}) => // &m1 &m2 a [<- <-].
-have ->: Pr[S.sample(d1{m1}, d2{m1}) @ &m1 : res = a] = mu1 (d1{m1} `*` d2{m1}) a.
-+ by byphoare (_ : d1{m1} = d1 /\ d2{m1} = d2 ==> _) => //=; proc; rnd; skip.
-case: a => a1 a2; rewrite dprod1E.
-byphoare (_ : d1{m1} = d1 /\ d2{m1} = d2 ==> _) => //=.
-proc; seq  1: (r1 = a1) (mu1 d1 a1) (mu1 d2 a2) _ 0%r true=> //=.
-+ by rnd. + by rnd. + by hoare; auto=> /> ? ->.
+proc=> /=; rnd : 0 0; auto => /> &2.
+by rewrite -dprod_dlet dmap_id => />; case.
 qed.
 end ProdSampling.
 
@@ -85,25 +72,19 @@ module SampleDLet = {
 }.
 
 (* -------------------------------------------------------------------- *)
+lemma dletdepE ['a 'b] (da : 'a distr) (db : 'a -> 'b distr) :
+  dlet da (fun a => dmap (db a) (fun b => (a, b))) =
+  dlet da (fun a => dunit a `*` db a).
+proof.
+apply: eq_dlet => // a; rewrite dprodC dprod_dlet dmap_dlet.
+by apply: eq_dlet => // b /=; rewrite dlet_unit /= dmap_dunit.
+qed.
+
 equiv SampleDepDLet2 :
   SampleDep.sample2 ~ SampleDLet.sample2 : ={dt, du} ==> ={res}.
 proof.
-pose F dt du := mu1 (dlet<:t, t * u> dt (fun t => dunit t `*` du t)).
-bypr (res{1}) (res{2}) => // &m1 &m2 x [<- <-].
-have ->: Pr[SampleDLet.sample2(dt{m1}, du{m1}) @ &m2 : res = x] = F dt{m1} du{m1} x.
-+ by byphoare (_ : dt{m1} = dt /\ du{m1} = du ==> _) => //=; proc; rnd; skip. 
-case: x => x1 x2; have -> :
-  F dt{m1} du{m1} (x1, x2) = mu1 dt{m1} x1 * mu1 (du{m1} x1) x2.
-+ rewrite /F dlet1E /= 1?(@sumD1 _ x1) /=.
-  * apply: (@summable_le (mu1 dt{m1})) => /=; first by apply: summable_mu1.
-    by move=> x; rewrite normrM ler_pimulr ?normr_ge0 ?ger0_norm.
-  rewrite dprod1E dunit1E /= sum0_eq //= => x; case: (x = x1) => //=.
-  by move=> ne_x_x1; rewrite dprod1E dunit1E ne_x_x1.
-byphoare(_ : dt{m1} = dt /\ du{m1} = du ==> _) => //=; proc; seq 1:
-  (t = x1) (mu1 dt x1) (mu1 (du x1) x2) _ 0%r true=> //=.
-+ by rnd.  
-+ by rnd.
-+ by hoare; auto=> /> ? ->.
+proc; rnd : 0 0; auto => /> &2.
+by rewrite -dletdepE dmap_id => />; case.
 qed.
 
 (* --------------------------------------------------------------------- *)
@@ -135,19 +116,12 @@ qed.
 equiv SampleDepDLet :
   SampleDep.sample ~ SampleDLet.sample : ={dt, du} ==> ={res}.
 proof.
-transitivity SampleDep.sample2
-  (={dt, du} ==> res{1} = res{2}.`2)
-  (={dt, du} ==> res{2} = res{1}.`2) => //.
-+ by move=> &1 &2 [<- <-]; exists (dt{1}, du{1}).
-+ exact SampleDep.
-transitivity SampleDLet.sample2
-  (={dt, du} ==> ={res})
-  (={dt, du} ==> res{2} = res{1}.`2) => //.
-+ by move=> &1 &2 [<- <-]; exists (dt{1}, du{1}).
-+ exact SampleDepDLet2.
-+ symmetry.
-conseq (_ : ={dt, du} ==> _); 1: by move=> ?? [<- <-].
-exact SampleDLet.
+proc; rnd : *0 *0 => /=; auto=> /> &2.
+suff ->:
+    dlet dt{2} (fun (t : t) => dmap (du{2} t) (fun (u0 : u) => u0))
+  = dlet dt{2} du{2}
+  by rewrite dmap_id => />.
+by apply: eq_dlet => // t; rewrite dmap_id.
 qed.
 
 end DLetSampling.

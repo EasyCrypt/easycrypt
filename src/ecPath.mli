@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcMaps
@@ -92,13 +84,11 @@ val pp_m : Format.formatter -> mpath -> unit
 (* -------------------------------------------------------------------- *)
 type xpath = private {
   x_top : mpath;
-  x_sub : path;
+  x_sub : symbol;
   x_tag : int;
 }
 
-val xpath     : mpath -> path -> xpath
-val xpath_fun : mpath -> symbol -> xpath
-val xqname    : xpath -> symbol -> xpath
+val xpath     : mpath -> symbol -> xpath
 val xastrip   : xpath -> xpath
 
 val x_equal       : xpath -> xpath -> bool
@@ -140,8 +130,16 @@ module Sx : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val p_subst : path Mp.t -> path -> path
+type smsubst = {
+  sms_crt : path Mp.t;
+  sms_id  : mpath Mid.t;
+}
 
-val m_subst : (path -> path) -> mpath Mid.t -> mpath -> mpath
-val x_subst : (mpath -> mpath) -> xpath -> xpath
-val x_substm : (path -> path) -> mpath Mid.t -> xpath -> xpath
+val sms_identity : smsubst
+val sms_is_identity : smsubst -> bool
+
+val sms_bind_abs : ident -> mpath -> smsubst -> smsubst
+
+val p_subst : path Mp.t -> path -> path
+val m_subst : smsubst -> mpath -> mpath
+val x_subst : smsubst -> xpath -> xpath

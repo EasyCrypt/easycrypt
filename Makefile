@@ -4,7 +4,7 @@
 DUNE      ?= dune
 ECARGS    ?=
 ECTOUT    ?= 10
-ECJOBS    ?= 1
+ECJOBS    ?= 0
 ECEXTRA   ?= --report=report.log
 ECPROVERS ?= Alt-Ergo Z3 CVC4
 CHECKPY   ?=
@@ -14,20 +14,29 @@ CHECK     += --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
 CHECK     += $(ECEXTRA) config/tests.config
 
 # --------------------------------------------------------------------
+UNAME_P = $(shell uname -p)
+UNAME_S = $(shell uname -s)
+
+# --------------------------------------------------------------------
 .PHONY: default build byte native tests check examples
-.PHONY: clean install uninstall license
+.PHONY: clean install uninstall
 
 default: build
 	@true
 
 build:
-	rm -f ec.native && $(DUNE) build && ln -sf src/ec.exe ec.native
+	rm -f src/ec.exe ec.native
+	dune build -p easycrypt
+	ln -sf src/ec.exe ec.native
+ifeq ($(UNAME_P)-$(UNAME_S),arm-Darwin)
+	-codesign -f -s - src/ec.exe
+endif
 
 install: build
-	dune install
+	$(DUNE) install
 
 uninstall:
-	dune uninstall
+	$(DUNE) uninstall
 
 check: stdlib examples
 
@@ -41,14 +50,8 @@ check: stdlib examples
 	@true
 
 clean:
-	rm -f ec.native && dune clean
+	rm -f ec.native && $(DUNE) clean
 	find theories examples -name '*.eco' -exec rm '{}' ';'
 
 clean_eco:
 	find theories examples -name '*.eco' -exec rm '{}' ';'
-
-license:
-	scripts/srctx/license COPYRIGHT.yaml \
-	  $(shell find src -name '*.ml' -o -name '*.ml[a-z]') \
-	  $(shell find theories -name '*.ec' -o -name '*.ec[a-z]') \
-	  $(shell find proofgeneral/easycrypt -name '*.el')

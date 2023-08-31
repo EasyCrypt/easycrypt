@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcPath
@@ -17,10 +9,12 @@ open EcEnv
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
+exception IncompatibleExpr of env * (expr * expr)
 
 (* -------------------------------------------------------------------- *)
 type 'a eqtest = env -> 'a -> 'a -> bool
 type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
+type 'a eqantest = env -> ?alpha:(EcIdent.t * ty) Mid.t -> ?norm:bool -> 'a -> 'a -> bool
 
 module EqTest : sig
   val for_type_exn : env -> ty -> ty -> unit
@@ -28,13 +22,14 @@ module EqTest : sig
   val for_type   : ty          eqtest
   val for_etyarg : etyarg      eqtest
   val for_pv     : prog_var    eqntest
+  val for_lv     : lvalue      eqntest
   val for_xp     : xpath       eqntest
   val for_mp     : mpath       eqntest
-  val for_instr  : instr       eqntest
-  val for_stmt   : stmt        eqntest
-  val for_expr   : expr        eqntest
+  val for_instr  : instr       eqantest
+  val for_stmt   : stmt        eqantest
+  val for_expr   : expr        eqantest
   val for_msig   : module_sig  eqntest
-  val for_mexpr  : module_expr eqntest
+  val for_mexpr  : env -> ?norm:bool -> ?body:bool -> module_expr -> module_expr -> bool
 
   val is_unit : env -> ty -> bool
   val is_bool : env -> ty -> bool
@@ -49,7 +44,9 @@ module User : sig
 
   type error =
     | MissingVarInLhs   of EcIdent.t
+    | MissingEVarInLhs  of EcIdent.t
     | MissingTyVarInLhs of EcIdent.t
+    | MissingPVarInLhs  of EcIdent.t
     | NotAnEq
     | NotFirstOrder
     | RuleDependsOnMemOrModule
@@ -59,7 +56,7 @@ module User : sig
 
   type rule = EcEnv.Reduction.rule
 
-  val compile : opts:options -> prio:int -> EcEnv.env -> EcPath.path -> rule
+  val compile : opts:options -> prio:int -> EcEnv.env -> [`Ax | `Sc] -> EcPath.path -> rule
 end
 
 (* -------------------------------------------------------------------- *)
@@ -75,7 +72,8 @@ type reduction_info = {
   eta     : bool;              (* reduce eta-expansion *)
   logic   : rlogic_info;       (* perform logical simplification *)
   modpath : bool;              (* reduce module path *)
-  user    : bool               (* reduce user defined rules *)
+  user    : bool;              (* reduce user defined rules *)
+  cost    : bool;              (* reduce trivial cost statements *)
 }
 
 and deltap      = [`Yes | `No | `Force]
@@ -89,8 +87,12 @@ val betaiota_red : reduction_info
 val nodelta      : reduction_info
 val delta        : reduction_info
 
+val reduce_logic : reduction_info -> env -> LDecl.hyps -> form -> form
+
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form
+
+val reduce_cost : reduction_info -> env -> coe -> form
 
 val reduce_user_gen :
   (EcFol.form -> EcFol.form) ->
@@ -103,7 +105,7 @@ val is_conv    : ?ri:reduction_info -> LDecl.hyps -> form -> form -> bool
 val check_conv : ?ri:reduction_info -> LDecl.hyps -> form -> form -> unit
 
 val check_bindings :
-  exn -> EcEnv.env -> EcFol.f_subst ->
+  exn -> EcDecl.ty_params -> EcEnv.env -> EcFol.f_subst ->
   (EcIdent.t * EcFol.gty) list -> (EcIdent.t * EcFol.gty) list ->
   EcEnv.env * EcFol.f_subst
 (* -------------------------------------------------------------------- *)

@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open Why3
@@ -138,6 +130,8 @@ module Config : sig
 
   val w3_env   : unit -> Env.env
   val provers  : unit -> why3prover list
+  val config   : unit -> Whyconf.config
+  val main     : unit -> Whyconf.main
   val known    : evicted:bool -> prover list
 end = struct
   let theconfig  : (Whyconf.config option) ref = ref None
@@ -157,7 +151,7 @@ end = struct
       let load_prover p config =
         let name    = p.Whyconf.prover_name in
         let version = p.Whyconf.prover_version in
-        let driver  = Whyconf.load_driver_raw main w3_env config.Whyconf.driver [] in
+        let driver  = Driver.load_driver_for_prover main w3_env config in
 
         { pr_prover  =
             { pr_name    = name;
@@ -194,6 +188,12 @@ end = struct
 
   let provers () =
     load (); !theprovers
+
+  let config () =
+    load (); EcUtils.oget !theconfig
+
+  let main () =
+    load (); EcUtils.oget !themain
 
   let known ~evicted =
     let test p =
@@ -322,6 +322,7 @@ type prover_infos = {
   pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
+  pr_dumpin    : string EcLocation.located option;
   pr_selected  : bool;
   gn_debug     : bool;
 }
@@ -339,6 +340,7 @@ let dft_prover_infos = {
   pr_max       = 50;
   pr_wanted    = Hints.empty;
   pr_unwanted  = Hints.empty;
+  pr_dumpin    = None;
   pr_selected  = false;
   gn_debug     = false;
 }
@@ -351,7 +353,7 @@ type notify = EcGState.loglevel -> string Lazy.t -> unit
 let run_prover
   ?(notify : notify option) (pi : prover_infos) (prover : string) task
 =
-  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in
+(*  let sigdef = Sys.signal Sys.sigint Sys.Signal_ignore in*)
 
   EcUtils.try_finally (fun () ->
     try
@@ -362,11 +364,14 @@ let run_prover
         let limit = { Call_provers.empty_limit with
           Call_provers.limit_time =
             let limit = pi.pr_timelimit * pi.pr_cpufactor in
-            if limit <= 0 then 0 else limit;
+            if limit <= 0 then 0. else float_of_int limit;
         } in
 
         let rec doit gcdone =
-          try  Driver.prove_task ~command ~limit dr task
+          try
+            Driver.prove_task
+              ~config:(Config.main ())
+              ~command ~limit dr task
           with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
             Gc.compact (); doit true
         in
@@ -393,8 +398,8 @@ let run_prover
         Buffer.contents buf)));
       None)
 
-  (fun () ->
-     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ())
+  (fun () -> ()) (*
+     let _ : Sys.signal_behavior = Sys.signal Sys.sigint sigdef in ()) *)
 
 (* -------------------------------------------------------------------- *)
 let execute_task ?(notify : notify option) (pi : prover_infos) task =
@@ -442,9 +447,10 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
           match pcs.(i) with
           | None -> ()
           | Some (prover, pc) ->
-              let myinfos = List.pmap
-                (fun (pc', upd) -> if pc = pc' then Some upd else None)
-                infos in
+              let myinfos =
+                List.pmap
+                  (fun (pc', upd) -> if pc = pc' then Some upd else None)
+                  infos in
 
               let handle_answer = function
                 | CP.Valid   ->
@@ -455,10 +461,16 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
                         Format.fprintf fmt "success: %s%!" prover;
                       Buffer.contents buf)))
                     end;
-                    incr status
+                    if (0 <= !status) then incr status
 
 
-                | CP.Invalid -> status := (-1)
+                | CP.Invalid ->
+                    status := (-1);
+                    notify |> oiter (fun notify -> notify `Warning (lazy (
+                      let buf = Buffer.create 0 in
+                      let fmt = Format.formatter_of_buffer buf in
+                      Format.fprintf fmt "prover %s disproved this goal." prover;
+                    Buffer.contents buf)));
                 | (CP.Failure _ | CP.HighFailure) as answer->
                   notify |> oiter (fun notify -> notify `Warning (lazy (
                     let buf = Buffer.create 0 in
@@ -507,6 +519,6 @@ let execute_task ?(notify : notify option) (pi : prover_infos) task =
         match pcs.(i) with
         | None -> ()
         | Some (_prover, pc) ->
-            CP.interrupt_call pc;
+            CP.interrupt_call ~config:(Config.main ()) pc;
             (try ignore (CP.wait_on_call pc : CP.prover_result) with _ -> ());
       done)

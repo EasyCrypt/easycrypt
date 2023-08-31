@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 
@@ -139,7 +131,7 @@ let parseall (ecreader : 'a ecreader_g) =
     | EcParsetree.P_Prog (commands, terminate) ->
         let acc = List.rev_append commands acc in
           if terminate then List.rev acc else aux acc
-    | EcParsetree.P_Undo _ ->
+    | EcParsetree.P_Undo _ | EcParsetree.P_Exit ->
         assert false                    (* FIXME *)
   in
     aux []

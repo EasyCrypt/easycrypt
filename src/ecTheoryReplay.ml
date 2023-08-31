@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* ------------------------------------------------------------------ *)
 open EcSymbols
 open EcUtils
@@ -83,9 +75,7 @@ let constr_compatible exn env cs1 cs2 =
 
 let datatype_compatible exn hyps ty1 ty2 =
   let env = EcEnv.LDecl.toenv hyps in
-  constr_compatible exn env ty1.tydt_ctors ty2.tydt_ctors;
-  error_body exn (EcReduction.is_conv hyps ty1.tydt_schcase ty2.tydt_schcase);
-  error_body exn (EcReduction.is_conv hyps ty1.tydt_schelim ty2.tydt_schelim)
+  constr_compatible exn env ty1.tydt_ctors ty2.tydt_ctors
 
 let record_compatible exn hyps f1 pr1 f2 pr2 =
   error_body exn (EcReduction.is_conv hyps f1 f2);
@@ -126,12 +116,12 @@ let tydecl_compatible env tyd1 tyd2 =
   | `Abstract _, _ -> () (* FIXME Sp.t *)
   | _, _ -> tybody_compatible exn hyps ty_body1 ty_body2
 
-
 (* -------------------------------------------------------------------- *)
 let expr_compatible exn env s e1 e2 =
   let f1 = EcFol.form_of_expr EcFol.mhr e1 in
   let f2 = EcFol.Fsubst.f_subst s (EcFol.form_of_expr EcFol.mhr e2) in
-  error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 f2)
+  let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
+  error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
 
 let get_open_oper exn env p tys =
   let oper = EcEnv.Op.by_path p env in
@@ -219,7 +209,7 @@ and ind_compatible exn env pi1 pi2 =
 
 and prctor_compatible exn env s prc1 prc2 =
   error_body exn (EcSymbols.sym_equal prc1.prc_ctor prc2.prc_ctor);
-  let env, s = EcReduction.check_bindings exn env s prc1.prc_bds prc2.prc_bds in
+  let env, s = EcReduction.check_bindings exn [] env s prc1.prc_bds prc2.prc_bds in
   error_body exn (List.length prc1.prc_spec = List.length prc2.prc_spec);
   let doit f1 f2 =
     error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 (EcFol.Fsubst.f_subst s f2)) in
@@ -378,10 +368,17 @@ let rec replay_tyd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, otyd
             | `Datatype { tydt_ctors = octors }, Tconstr (np, _) -> begin
                 match (EcEnv.Ty.by_path np env).tyd_type with
                 | `Datatype { tydt_ctors = _ } ->
-                  List.fold_left (fun subst (name, _) ->
-                      EcSubst.add_path subst
-                        ~src:(xpath ove name)
-                        ~dst:(EcPath.pqoname (EcPath.prefix np) name))
+                  let newtparams = List.fst newtyd.tyd_params in
+                  let newtparams_ty = List.map tvar newtparams in
+                  let newdtype = tconstr np newtparams_ty in
+                  let tysubst = EcTypes.Tvar.init (List.fst otyd.tyd_params) newtparams_ty in
+
+                  List.fold_left (fun subst (name, tyargs) ->
+                      let np = EcPath.pqoname (EcPath.prefix np) name in
+                      let newtyargs = List.map (Tvar.subst tysubst) tyargs in
+                      EcSubst.add_opdef subst
+                        (xpath ove name)
+                        (newtparams, e_op np newtparams_ty (toarrow newtyargs newdtype)))
                     subst octors
                 | _ -> subst
               end
@@ -707,6 +704,14 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, ax) =
   in (subst, ops, proofs, scope)
 
 (* -------------------------------------------------------------------- *)
+and replay_scd (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, sc) =
+  let subst, x = rename ove subst (`Lemma, x) in
+  let sc = EcSubst.subst_schema subst sc in
+  let item = Th_schema (x, sc) in
+  let scope = ove.ovre_hooks.hadd_item scope import item in
+  (subst, ops, proofs, scope)
+
+(* -------------------------------------------------------------------- *)
 and replay_modtype
   (ove : _ ovrenv) (subst, ops, proofs, scope) (import, x, modty)
 =
@@ -724,7 +729,7 @@ and replay_modtype
         match mode with
         | `Alias -> rename ove subst (`Module, x)
         | `Inline _ ->
-          let subst = EcSubst.add_path subst ~src:(xpath ove x) ~dst:np in
+          let subst = EcSubst.add_modtydef subst ~src:(xpath ove x) ~dst:np in
           subst, x in
 
       let modty = EcSubst.subst_top_modsig subst modty in
@@ -757,23 +762,21 @@ and replay_mod
 
       let mp, (newme, newlc) = EcEnv.Mod.lookup (unloc newname) env in
 
-      assert (newlc = None);    (* FIXME: error message *)
-
       let np =
         match mp.m_top with
         | `Concrete (p, None) -> p
         | _ -> assert false
       in
 
-      let substme = EcSubst.add_path subst ~src:(xpath ove name) ~dst:np in
+      let substme = EcSubst.add_moddef subst ~src:(xpath ove name) ~dst:np in
 
-      let me    = EcSubst.subst_top_module subst me in
+      let me    = EcSubst.subst_top_module substme me in
       let me    = { me with tme_expr = { me.tme_expr with me_name = name } } in
       let newme = { newme with me_name = name } in
       let newme = { tme_expr = newme; tme_loca = Option.get newlc; } in
 
-      if not (EcReduction.EqTest.for_mexpr env me.tme_expr newme.tme_expr) then
-          clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
+      if not (EcReduction.EqTest.for_mexpr ~body:false env me.tme_expr newme.tme_expr) then
+        clone_error env (CE_ModIncompatible (snd ove.ovre_prefix, name));
 
       let (subst, _) =
         match mode with
@@ -783,9 +786,14 @@ and replay_mod
           substme, EcPath.basename np in
 
       let newme =
-        if mode = `Alias then
-          { newme with tme_expr = { newme.tme_expr with
-              me_body = ME_Alias (List.length newme.tme_expr.me_sig.mis_params, mp) } }
+        if mode = `Alias || mode = `Inline `Keep then
+          let alias = ME_Alias (
+              List.length newme.tme_expr.me_params,
+              EcPath.m_apply
+                mp
+                (List.map (fun (id, _) -> EcPath.mident id) newme.tme_expr.me_params)
+          )
+          in { newme with tme_expr = { newme.tme_expr with me_body = alias } }
         else newme in
 
       let scope =
@@ -841,14 +849,27 @@ and replay_reduction
   (import, rules : _ * (EcPath.path * EcTheory.rule_option * EcTheory.rule option) list)
 =
   let for1 (p, opts, rule) =
+    let exception Removed in
+
     let p = EcSubst.subst_path subst p in
 
+    (* TODO: A: schema are not replayed for now, but reduction rules can use a
+       schema. Fix this. *)
     let rule =
       obind (fun rule ->
+        let env = EcSection.env (ove.ovre_hooks.henv scope) in
+
         try
+          if not (
+            match opts.ur_mode with
+            | `Ax -> is_some (EcEnv.Ax.by_path_opt p env)
+            | `Sc -> is_some (EcEnv.Schema.by_path_opt p env)
+          ) then raise Removed;
+
           Some (EcReduction.User.compile
-                 ~opts ~prio:rule.rl_prio (EcSection.env (ove.ovre_hooks.henv scope)) p)
-        with EcReduction.User.InvalidUserRule _ -> None) rule
+                  ~opts ~prio:rule.rl_prio
+                  env opts.ur_mode p)
+        with EcReduction.User.InvalidUserRule _ | Removed -> None) rule
 
     in (p, opts, rule) in
 
@@ -964,6 +985,9 @@ and replay1 (ove : _ ovrenv) (subst, ops, proofs, scope) item =
 
   | Th_axiom (x, ax) ->
      replay_axd ove (subst, ops, proofs, scope) (item.ti_import, x, ax)
+
+  | Th_schema (x, schema) ->
+     replay_scd ove (subst, ops, proofs, scope) (item.ti_import, x, schema)
 
   | Th_modtype (x, modty) ->
      replay_modtype ove (subst, ops, proofs, scope) (item.ti_import, x, modty)

@@ -82,9 +82,12 @@ theory C.
 
   clone include Subtype with 
     type T <- int,
-    pred P <- fun (i:int) => 0 <= i < max_counter + 1
-    rename [type] "sT" as "counter"
-           [op] "insubd" as "ofint".
+    op P <- fun (i:int) => 0 <= i < max_counter + 1
+    rename (* [type] "sT" as "counter" *) (* Gives error. *)
+           [op] "insubd" as "ofint"
+  proof *.
+  realize inhabited. exists 0. smt(gt0_max_counter). qed.
+  type counter = sT.
 
   clone FinType with 
     type t  = counter,
@@ -110,15 +113,19 @@ clone FinProdType as NonceCount with
 (* -------------------------------------------------------------------------- *)
 
 abstract theory GenBlock.
-  type block.
   op block_size : int.
   axiom ge0_block_size : 0 <= block_size.
 
   clone include Subtype with
     type T <- bytes, 
-    type sT <- block,
-    pred P <- fun (l:bytes) => size l = block_size
-    rename [op] "val" as "bytes_of_block".
+    op P <- fun (l:bytes) => size l = block_size
+    rename [op] "val" as "bytes_of_block"
+  proof *.
+  realize inhabited.
+    exists (nseq block_size witness).
+    smt(size_nseq ge0_block_size).
+  qed.
+  type block = sT.
 
   op dblock =  dmap (dlist dbyte block_size) insubd.
 
@@ -415,7 +422,7 @@ module type CC = {
 }.
 
 module type FCC = {
-  proc * init () : unit
+  proc init () : unit
   include CC
 }.
 
@@ -551,8 +558,8 @@ abstract theory OpCC.
 
   section PROOFS.
   
-    declare module I <: Init { OCC }.
-    declare module A <: Adv { OCC, I}.
+    declare module I <: Init { -OCC }.
+    declare module A <: Adv { -OCC, -I}.
    
     phoare chacha_spec k0 n0 p0 gs0 : 
       [ChaCha(OCC(I)).enc : 
@@ -935,10 +942,10 @@ proof.
   move=> /(congr1 bytes_of_poly_in); rewrite insubdK=> // ->.
   move=> /(congr1 bytes_of_poly_out); rewrite insubdK=> // ->.
   rewrite insubdK.
-  + rewrite size_drop 1:ge0_poly_in_size valP /block_size /poly_size.
+  + rewrite size_drop 1:ge0_poly_in_size valP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
   rewrite insubdK.
-  + rewrite size_take 1:ge0_poly_in_size valP /poly_size /block_size.
+  + rewrite size_take 1:ge0_poly_in_size valP /poly_size.
     smt(ge0_poly_in_size ge0_poly_out_size ge0_extra_block_size).
   by rewrite cat_take_drop valKd.
 qed.
@@ -1016,11 +1023,11 @@ module G9 (A:CCA_Adv, RO1:SplitC1.I1.RO) = {
 
 section PROOFS.
 
-  declare module A <: CCA_Adv { RO, FRO, OpCCinit.OCC, OpCCRO.OCC, IndBlock, Mem, StLSke,
-                               Split0.IdealAll.RO, ROT.RO, ROF.RO, SplitC1.I1.RO, SplitC1.I2.RO,
-                               Split1.IdealAll.RO, SplitC2.I1.RO, SplitC2.I2.RO }.
+  declare module A <: CCA_Adv { -RO, -FRO, -OpCCinit.OCC, -OpCCRO.OCC, -IndBlock, -Mem, -StLSke,
+                               -Split0.IdealAll.RO, -ROT.RO, -ROF.RO, -SplitC1.I1.RO, -SplitC1.I2.RO,
+                               -Split1.IdealAll.RO, -SplitC2.I1.RO, -SplitC2.I2.RO }.
 
-  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{-A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   local module G1 (S:SKE) = CCA_game(A, RealOrcls(S)).
 
@@ -1104,7 +1111,9 @@ section PROOFS.
       + by proc; inline *; auto => /> &2; case: (p{2}).
       proc; inline *; auto => /> &2; case: (c{2}) => /> n a c t.
       by rewrite /dec /get /= => ->.
-    by apply (CCA_CPA_UFCMA St _ A _ &m) => //; apply A_ll.
+    apply (CCA_CPA_UFCMA St _ _ A _ &m) => //.
+    + by proc *; inline *; sim.
+    by apply A_ll.
   qed.
 
   local module G3 (S:SKE) = CPA_game(CCA_CPA_Adv(A), RealOrcls(S)).
@@ -1155,7 +1164,7 @@ section PROOFS.
     case: (mk_rs (oget RO.m{2}.[(n, C.ofint 0)])) => r s /=.
     case: (t = poly1305 r s (topol a c)) => // heq _.
     apply List.hasP; exists (topol a c, t) => /=;split; 2:by rewrite heq.
-    by apply mapP; exists (n, a, c, t) => /=; apply mem_filter.
+    by apply mapP; exists (n, a, c, t) => /=; apply List.mem_filter.
   qed.
 
   local lemma step2_3 &m : 
@@ -1249,7 +1258,7 @@ proof.
   case: (valid_topol a m) => hv /=;last by rewrite mu0; smt (ge0_qdec size_ge0 ge0_pr_zeropol).
   pose lc' := List.map _ _; apply (ler_trans ((size lc')%r*pr_zeropol));
    last by rewrite size_map size_filter //= ler_wpmul2r //= 1: ge0_pr_zeropol; smt (count_size size_ge0).
-  apply mu_has_leM => /= ? /mapP [] [n' a' m' t'] /> /mem_filter |> ??.
+  apply mu_has_leM => /= ? /mapP [] [n' a' m' t'] /> /List.mem_filter |> ??.
   case: (topol a' m' <> topol a m) => ? /=; last by rewrite mu0; smt (ge0_pr_zeropol).
   by apply pr_zeropol_spec.
 qed.
@@ -1355,9 +1364,9 @@ module EncRnd = {
 }.
 
 section PROOFS.
-  declare module A <: CCA_Adv { BNR, Mem, IndBlock, RO, FRO}.
+  declare module A <: CCA_Adv { -BNR, -Mem, -IndBlock, -RO, -FRO}.
 
-  declare axiom A_ll : forall (O <: CCA_Oracles{A}), islossless O.enc => islossless O.dec => islossless A(O).main.
+  declare axiom A_ll : forall (O <: CCA_Oracles{-A}), islossless O.enc => islossless O.dec => islossless A(O).main.
 
   local clone import Step1_2 as Step1_2'.
 
@@ -1676,13 +1685,15 @@ section PROOFS.
       + move=> &2 _; islossless.
         while true (size p).
         + move=> z; wp; conseq (_: true) => />; 2: by islossless.
+          move => &hr; elim (p{hr}) => //.
           smt (size_drop size_eq0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0).         
       + move=> _; proc; inline *; sp; if => //.
         swap 13 9; wp; conseq (_: true) => />; 1: smt(); islossless.
         while true (size p2).
         + move=> z; wp; conseq (_: true) => //=; 2: by islossless.
-          move=> &h.
+          move => &hr; elim (p2{hr}) => //. 
+          clear &hr.
           smt (size_drop size_eq0 gt0_block_size).
         by auto; smt (size_ge0 size_eq0 dpoly_out_ll). 
       + by proc; inline *; sp 1 1; if; auto => /> *; smt(get_setE mem_set).
@@ -1777,7 +1788,7 @@ section PROOFS.
     + case: (forged{2}) => //; case: ((UFCMA.bad1\/UFCMA.bad2){2}) => //= H12 H13.
       - have[|]->//=:=H12.
       have:=H12; rewrite negb_or => /> *.
-      rewrite /test_poly /= /poly1305 /= /test_bad.
+      rewrite /test_poly /= /poly1305 /=.
       pose f := fun (c : ciphertext) => c.`4 - poly1305_eval r3 (topol c.`2 c.`3).
       pose m := List.filter _ _.
       rewrite  hasP /=.
@@ -2163,10 +2174,10 @@ section PROOFS.
   have->:Pr[UFCMA(ROIN.RO).distinguish() @ &m : res \/ UFCMA.bad2] = 
          Pr[UFCMA3(ROIN.RO).distinguish() @ &m : res] by byequiv equiv_step4.
   have->:Pr[UFCMA3(ROIN.RO).distinguish() @ &m : res] =
-         Pr[UFCMA3(ROIN.FullEager.LRO).distinguish() @ &m : res].
+         Pr[UFCMA3(ROIN.LRO).distinguish() @ &m : res].
   + byequiv (ROIN.FullEager.RO_LRO_D UFCMA3 _)=> //=; exact: dpoly_in_ll.
-  have->:Pr[UFCMA3(ROIN.FullEager.LRO).distinguish() @ &m : res] = 
-         Pr[UFCMA4(ROIN.FullEager.LRO).distinguish() @ &m : UF.forged \/ UFCMA.bad2].
+  have->:Pr[UFCMA3(ROIN.LRO).distinguish() @ &m : res] = 
+         Pr[UFCMA4(ROIN.LRO).distinguish() @ &m : UF.forged \/ UFCMA.bad2].
   + byequiv=> //=; proc; inline*; sim; sp.
     seq 5 5 : (={glob UFCMA3, RO.m} /\ (UF.forged,UFCMA.bad2,UFCMA.cbad2, RO.m){2} = (false,false,0, empty)).
     + by wp; conseq/>; sim.
@@ -2224,7 +2235,7 @@ section PROOFS.
                                         (* the probability of bad occuring during ith query *)
         (size l1)                       (* the bound on the counter (after which we stop caring) *)
         UF.forged                       (* the bad event *)
-        [UFCMA4(FullEager.LRO).set_forged : (UFCMA4.cforged < size l1) ]
+        [UFCMA4(LRO).set_forged : (UFCMA4.cforged < size l1) ]
                                         (* condition(s) under which the oracle(s) do not respond *)
         (ROout.m = roout /\ Mem.lc = l /\ UFCMA4.cforged <= size l1)
                                         (* general unconditional invariants *);
@@ -2242,7 +2253,7 @@ section PROOFS.
       + by rewrite /n1 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r 1:ge0_pr_zeropol -sumr_ofint le_fromint IntOrder.lerr_eq.
       rewrite hn1 eq_sym  -big_count -BIA.big_filter /= /l1 //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
-      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 /transpose //==> [#] * /=.
+      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 //==> [#] * /=.
       by rewrite count_map.
 
     case: (0 < size l2)=> * />; last first.
@@ -2256,7 +2267,7 @@ section PROOFS.
                                         (* the probability of bad occuring during ith query *)
         (size l2)                       (* the bound on the counter (after which we stop caring) *)
         UFCMA.bad2                      (* the bad event *)
-        [UFCMA4(FullEager.LRO).set_bad2 : (UFCMA.cbad2 < size l2) ]
+        [UFCMA4(LRO).set_bad2 : (UFCMA.cbad2 < size l2) ]
                                         (* condition(s) under which the oracle(s) do not respond *)
         (ROout.m = roout /\ Mem.lc = l /\ UFCMA.cbad2 <= size l2)
                                         (* general unconditional invariants *);
@@ -2277,8 +2288,8 @@ section PROOFS.
       + by rewrite /n2 !size_filter count_map /preim.
       rewrite -BRA.mulr_suml ler_wpmul2r; 1:smt(mu_bounded).
       rewrite -sumr_ofint le_fromint IntOrder.lerr_eq.
-      rewrite hn2 eq_sym  -big_count -BIA.big_filter /= /l1 //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
-      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 /transpose //==> [#] * /=.
+      rewrite hn2 eq_sym  -big_count -BIA.big_filter /= //= (BIA.big_nth witness); apply BIA.congr_big_seq=> />.
+      move=> x; rewrite /(\o) /predT /= mem_range !size_filter /pred1 //==> [#] * /=.
       by rewrite count_map.
 
   move=> &h /> ? H0 *.
@@ -2401,7 +2412,7 @@ section PROOFS.
   smt(count_eq0 has_pred1).
   qed.
 
-  lemma make_lbad1_size_cons3 log lc lenc n a c t:
+  lemma make_lbad1_size_cons3 (log : (_, _) fmap) lc lenc n a c t:
       uniq lenc =>
       ! n \in lenc =>
       size (make_lbad1 log.[n <- (a,c,t)] lc (n::lenc)) =
@@ -2463,8 +2474,10 @@ section PROOFS.
     - by conseq(:_==> true)=> />; while(true); auto.
     rcondf{2} 5; 1: auto=> />.
     - by conseq(:_==> true)=> />; while(true); auto.
-    wp -7 -7=> />; 1: smt(get_setE).
-    conseq(:_==> ={c1, t, RO.m, Mem.log, t, c1}); 2:(sim=> /#).
+    wp -7 -7=> />.
+    move => />; smt (get_setE).
+    conseq (: ={c1, t, RO.m, Mem.log}); [2:sim=> /> /#].
+    move => />.
     smt(get_setE leq_make_lbad1 make_lbad1_size_cons3 size_ge0).
   inline*; sp.
   rcondt{1} 5; 1: auto=> />.
@@ -2475,7 +2488,7 @@ section PROOFS.
     by while(true); auto.
   swap 3 1; swap [4..6] 12; wp -10 -10=> /=.
   swap 4 4; wp -1 -1.
-  conseq(:_==> ={c1, t0, RO.m, Mem.log, Mem.lc}); 2:(sim=> /#).
+  conseq(:_==> ={c1, t0, RO.m, Mem.log, Mem.lc}); [2:sim=> /> /#].
   move=> /> &1 &2 *; do ! split => />.
   - smt().  
   - smt().  
@@ -2488,7 +2501,7 @@ section PROOFS.
     have:= H16; rewrite mapP /= => [#][] t2 [#] h <<- <<-; have:=h.
     rewrite mapP /==> [#] [][] x1 x2 x3 x4 /=; rewrite mem_filter /= => [#] <<- ? ->>.
     smt(get_setE).
-  smt(mem_filter mem_cat mapP).
+  smt(List.mem_filter mem_cat mapP).
   qed.
 
   local clone EventPartitioning as EP with 
@@ -2625,13 +2638,13 @@ section PROOFS.
     - rcondf{1} 9; 1: by auto=> />; while(true); auto.
       rcondf{2} 9; 1: by auto=> />; while(true); auto.
       wp -9 -9=> /> /=.
-      by conseq(:_==> ={c1, t0, RO.m}); 2:(sim=> /#); 1: smt(make_lbad1_size_cons3 leq_make_lbad1 size_ge0).
+      by conseq(:_==> ={c1, t0, RO.m}); [2:sim=> /> /#]; 1: smt(make_lbad1_size_cons3 leq_make_lbad1 size_ge0).
     rcondt{1} 9; 1: by auto=> />; while(true); auto.
     rcondt{2} 9; 1: by auto=> />; while(true); auto.
     case: (size UFCMA_l.lbad1{2} + size lt{2} <= UFCMA_li.i{2}).
     + rcondf{2} 9; 1: by auto=> />; while(true); auto; smt().
       wp -11 -11=> /> /=.
-      conseq(:_==> ={c1, t0, RO.m}); 2: (sim=> /#).
+      conseq(:_==> ={c1, t0, RO.m}); [2:sim=> /> /#].
       move=> &1 &2 /> *.
       rewrite !size_cat !size_map //= => {&1}; split; 1: smt(size_map size_ge0).
       rewrite nth_cat; split. 
@@ -2648,7 +2661,7 @@ section PROOFS.
     case: (size UFCMA_l.lbad1{2} <= UFCMA_li.i{2}); last first.
     + rcondf{2} 9; 1: by auto=> />; while(true); auto; smt().
       wp -11 -11=> /> /=.
-      conseq(:_==> ={c1, t0, RO.m}); 2: (sim=> /#).
+      conseq(:_==> ={c1, t0, RO.m}); [2:sim=> /> /#].
       move=> &1 &2 /> *.
       rewrite !size_cat !size_map //= => {&1}; split; 1: smt(size_map size_ge0).
       rewrite nth_cat; split. 

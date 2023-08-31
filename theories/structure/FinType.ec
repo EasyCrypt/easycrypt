@@ -1,13 +1,5 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-B-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
-require import AllCore List.
+require import AllCore List Finite.
 
 (* ==================================================================== *)
 abstract theory FinType.
@@ -41,6 +33,23 @@ proof.
 move=> eq_xs; rewrite count_swap // 1:&(enum_uniq).
 by rewrite count_predT_eq // &(enumP).
 qed.
+
+lemma is_finite_for : is_finite_for predT enum.
+proof. by split=> [|x]; [apply: enum_uniq | rewrite enumP]. qed.
+
+lemma is_finite : finite_type<:t>.
+proof. exact: (finite_for_finite _ _ is_finite_for). qed.
+
+lemma perm_eq_enum_to_seq : perm_eq enum (Finite.to_seq predT).
+proof.
+apply: uniq_perm_eq.
+- by apply: enum_uniq.
+- by apply/uniq_to_seq/is_finite.
+- by move=> x; rewrite mem_to_seq 1:&(is_finite) enumP.
+qed.
+
+lemma card_size_to_seq : card = size (Finite.to_seq<:t> predT).
+proof. by apply/perm_eq_size/perm_eq_enum_to_seq. qed.
 end FinType.
 
 (* ==================================================================== *)

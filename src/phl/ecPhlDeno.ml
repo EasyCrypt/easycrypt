@@ -1,11 +1,3 @@
-(* --------------------------------------------------------------------
- * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2021 - Inria
- * Copyright (c) - 2012--2021 - Ecole Polytechnique
- *
- * Distributed under the terms of the CeCILL-C-V1 license
- * -------------------------------------------------------------------- *)
-
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
@@ -25,21 +17,15 @@ module PT  = EcProofTerm
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let real_lemma name =
-  EcPath.pqname EcCoreLib.CI_Real.p_RealExtra name
-
-let real_order_lemma name =
-  EcPath.pqname EcCoreLib.CI_Real.p_RealOrder name
-
-let real_le_trans     = real_order_lemma "ler_trans"
-let real_ler_add      = real_order_lemma "ler_add"
-let real_eq_le        = real_order_lemma "lerr_eq"
-let real_upto         = real_lemma "upto2_abs"
-let real_upto_notbad  = real_lemma "upto2_notbad"
-let real_upto_imp_bad = real_lemma "upto2_imp_bad"
-let real_upto_false   = real_lemma "upto_bad_false"
-let real_upto_or      = real_lemma "upto_bad_or"
-let real_upto_sub     = real_lemma "upto_bad_sub"
+let real_le_trans     = EcCoreLib.CI_Real.real_order_lemma "ler_trans"
+let real_ler_add      = EcCoreLib.CI_Real.real_order_lemma "ler_add"
+let real_eq_le        = EcCoreLib.CI_Real.real_order_lemma "lerr_eq"
+let real_upto         = EcCoreLib.CI_Real.real_lemma "upto2_abs"
+let real_upto_notbad  = EcCoreLib.CI_Real.real_lemma "upto2_notbad"
+let real_upto_imp_bad = EcCoreLib.CI_Real.real_lemma "upto2_imp_bad"
+let real_upto_false   = EcCoreLib.CI_Real.real_lemma "upto_bad_false"
+let real_upto_or      = EcCoreLib.CI_Real.real_lemma "upto_bad_or"
+let real_upto_sub     = EcCoreLib.CI_Real.real_lemma "upto_bad_sub"
 
 (* -------------------------------------------------------------------- *)
 let t_real_le_trans f2 tc =
@@ -71,7 +57,7 @@ let t_core_phoare_deno pre post tc =
   let fun_ = EcEnv.Fun.by_xpath pr.pr_fun env in
 
   (* building the substitution for the pre *)
-  let sargs = PVM.add env (pv_arg pr.pr_fun) mhr pr.pr_args PVM.empty in
+  let sargs = PVM.add env pv_arg mhr pr.pr_args PVM.empty in
   let smem = Fsubst.f_bind_mem Fsubst.f_subst_id mhr pr.pr_mem in
   let concl_pr = Fsubst.f_subst smem (PVM.subst env sargs pre) in
 
@@ -79,7 +65,7 @@ let t_core_phoare_deno pre post tc =
   (* FIXME:
    * let smem_ = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mhr in
    * let ev   = Fsubst.f_subst smem_ ev in *)
-  let me = EcEnv.Fun.actmem_post mhr pr.pr_fun fun_ in
+  let me = EcEnv.Fun.actmem_post mhr fun_ in
   let concl_po = f_forall_mems [me] (concl_post pr.pr_event) in
 
   FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
@@ -99,8 +85,8 @@ let t_phoare_deno_r pre post tc =
 let cond_pre env prl prr pre =
   (* building the substitution for the pre *)
   (* we substitute param by args and left by ml and right by mr *)
-  let sargs = PVM.add env (pv_arg prl.pr_fun) mleft  prl.pr_args PVM.empty in
-  let sargs = PVM.add env (pv_arg prr.pr_fun) mright prr.pr_args sargs in
+  let sargs = PVM.add env pv_arg mleft  prl.pr_args PVM.empty in
+  let sargs = PVM.add env pv_arg mright prr.pr_args sargs in
   let smem  = Fsubst.f_subst_id in
   let smem  = Fsubst.f_bind_mem smem mleft  prl.pr_mem in
   let smem  = Fsubst.f_bind_mem smem mright prr.pr_mem in
@@ -145,8 +131,8 @@ let t_equiv_deno_r pre post tc =
     | `Le -> f_imp evl evr
     | `Ge -> f_imp evr evl in
 
-  let mel = EcEnv.Fun.actmem_post mleft  prl.pr_fun funl in
-  let mer = EcEnv.Fun.actmem_post mright prr.pr_fun funr in
+  let mel = EcEnv.Fun.actmem_post mleft  funl in
+  let mer = EcEnv.Fun.actmem_post mright funr in
   let concl_po = f_forall_mems [mel; mer] (f_imp post cmp) in
 
   FApi.xmutate1 tc `HlDeno [concl_e; concl_pr; concl_po]
@@ -359,10 +345,10 @@ let process_pre tc hyps prl prr pre post =
     let doglob m mi g = push (f_eq (f_glob g m) (f_glob g mi)) in
     let dof f a m mi =
       try
-        let fv = PV.remove env (pv_res f) (PV.fv env m post) in
+        let fv = PV.remove env pv_res (PV.fv env m post) in
         PV.iter (dopv m mi) (doglob m mi) (eqobs_inF_refl env f fv);
         if not (EcReduction.EqTest.for_type env a.f_ty tunit) then
-          push (f_eq (f_pvarg f a.f_ty m) a)
+          push (f_eq (f_pvarg a.f_ty m) a)
       with EcCoreGoal.TcError _ | EqObsInError -> () in
 
     dof fl al mleft ml; dof fr ar mright mr;
