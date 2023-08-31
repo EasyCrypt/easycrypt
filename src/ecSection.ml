@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcMaps
 open EcPath
 open EcTypes
 open EcDecl
@@ -47,10 +48,11 @@ let pp_cbarg env fmt (who : cbarg) =
       | _ -> ppe in
     Format.fprintf fmt "module %a" (EcPrinting.pp_topmod ppe) mp
   | `ModuleType p ->
-    let mty = EcEnv.ModTy.modtype p env in
-    Format.fprintf fmt "module type %a" (EcPrinting.pp_modtype1 ppe) mty
+      Format.fprintf fmt "module type %a"
+        (EcPrinting.pp_modtype1 ppe)
+        (EcEnv.ModTy.modtype p env)
   | `Typeclass p ->
-    Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tcname ppe) p
+      Format.fprintf fmt "typeclass %a" (EcPrinting.pp_tyname ppe) p
   | `Instance tci ->
     match tci with
     | `Ring _ -> Format.fprintf fmt "ring instance"
@@ -399,7 +401,7 @@ let on_typeclasses cb tcs =
   List.iter (on_typeclass cb) tcs
 
 let on_typarams cb typarams =
-  List.iter (fun (_,tc) -> on_typeclasses cb tc) typarams
+  List.iter (fun (_, tc) -> on_typeclasses cb tc) typarams
 
 (* -------------------------------------------------------------------- *)
 let on_tydecl (cb : cb) (tyd : tydecl) =
@@ -445,7 +447,7 @@ let on_opdecl (cb : cb) (opdecl : operator) =
    | OB_oper Some b ->
      match b with
      | OP_Constr _ | OP_Record _ | OP_Proj   _ -> assert false
-     | OP_TC -> assert false
+     | OP_TC _ -> assert false
      | OP_Plain  (e, _) -> on_expr cb e
      | OP_Fix    f ->
        let rec on_mpath_branches br =
@@ -500,9 +502,14 @@ let on_instance cb ty tci =
   on_ty cb (snd ty);
   (* FIXME section: ring/field use type class that do not exists *)
   match tci with
-  | `Ring r      -> on_ring  cb r
-  | `Field f     -> on_field cb f
-  | `General tci -> on_typeclass cb tci
+  | `Ring  r -> on_ring  cb r
+  | `Field f -> on_field cb f
+
+  | `General (tci, syms) ->
+     on_typeclass cb tci;
+     Option.iter
+       (Mstr.iter (fun _ (p, tys) -> cb (`Op p); List.iter (on_ty cb) tys))
+       syms
 
 (* -------------------------------------------------------------------- *)
 
@@ -744,7 +751,7 @@ let op_body_fv body ty =
   let fv = ty_fv_and_tvar ty in
   match body with
   | OP_Plain (e, _) -> EcIdent.fv_union fv (fv_and_tvar_e e)
-  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC -> fv
+  | OP_Constr _ | OP_Record _ | OP_Proj _ | OP_TC _ -> fv
   | OP_Fix opfix ->
     let fv =
       List.fold_left (fun fv (_, ty) -> EcIdent.fv_union fv (ty_fv_and_tvar ty))
@@ -929,7 +936,7 @@ let generalize_opdecl to_gen prefix (name, operator) =
         let body =
           match body with
           | OP_Constr _ | OP_Record _ | OP_Proj _ -> assert false
-          | OP_TC -> assert false (* ??? *)
+          | OP_TC _ -> assert false (* FIXME:TC *)
           | OP_Plain (e,nosmt) ->
             OP_Plain (e_lam extra_a e, nosmt)
           | OP_Fix opfix ->

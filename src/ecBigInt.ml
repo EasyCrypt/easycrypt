@@ -71,6 +71,7 @@ module ZImpl : EcBigIntCore.TheInterface = struct
     with Failure _ -> raise InvalidString
 
   let pp_print  = (Z.pp_print : Format.formatter -> zint -> unit)
+  let pp_zint = pp_print
 
   let to_why3 (x : zint) =
     Why3.BigInt.of_string (to_string x)
@@ -147,6 +148,8 @@ module BigNumImpl : EcBigIntCore.TheInterface = struct
 
   let pp_print fmt x =
     Format.fprintf fmt "%s" (B.string_of_big_int x)
+
+  let pp_zint = pp_print
 
   let to_why3 (x : zint) =
     Why3.BigInt.of_string (to_string x)

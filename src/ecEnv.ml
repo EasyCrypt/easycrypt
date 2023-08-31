@@ -205,12 +205,6 @@ and scope = [
   | `Fun    of EcPath.xpath
 ]
 
-and tcinstance = [
-  | `Ring    of EcDecl.ring
-  | `Field   of EcDecl.field
-  | `General of typeclass
-]
-
 and redinfo =
   { ri_priomap : (EcTheory.rule list) Mint.t;
     ri_list    : (EcTheory.rule list) Lazy.t; }
@@ -920,9 +914,10 @@ module MC = struct
           let opname = EcIdent.name opid in
           let optype = ty_subst tsubst optype in
           let tcargs = List.map (fun (a, _) -> tvar a) tc.tc_tparams in
-          let opargs = (self, [{tc_name = mypath; tc_args = tcargs}]) in
+          let opargs = (self, [{tc_name = mypath; tc_args = tcargs;}]) in
           let opargs = tc.tc_tparams @ [opargs] in
-          let opdecl = mk_op ~opaque:false opargs optype (Some OP_TC) loca in
+          let opdecl = OP_TC (mypath, opname) in
+          let opdecl = mk_op ~opaque:false opargs optype (Some opdecl) loca in
             (opid, xpath opname, optype, opdecl)
         in
           List.map on1 tc.tc_ops
@@ -2706,7 +2701,7 @@ module Ty = struct
         let env_tci =
           List.fold
             (fun inst (tc : typeclass) ->
-               TypeClass.bind_instance myty (`General tc) inst)
+               TypeClass.bind_instance myty (`General (tc, None)) inst) (* FIXME: TC *)
             env.env_tci tcs
         in
           { env with env_tci }
@@ -2906,6 +2901,10 @@ module Op = struct
 
   let is_record_ctor env p =
     try  EcDecl.is_rcrd (by_path p env)
+    with LookupFailure _ -> false
+
+  let is_tc_op env p =
+    try  EcDecl.is_tc_op (by_path p env)
     with LookupFailure _ -> false
 
   let is_dtype_ctor ?nargs env p =
@@ -3154,13 +3153,14 @@ module Theory = struct
 
     | Th_type (x, tyd) -> begin
         match tyd.tyd_type with
-        | `Abstract tcs ->      (* FIXME: this code is a duplicate *)
+        | `Abstract tcs ->      (* FIXME:TC this code is a duplicate *)
             let myty =
               let typ = List.map (fst_map EcIdent.fresh) tyd.tyd_params in
               (typ, EcTypes.tconstr (xpath x) (List.map (tvar |- fst) typ))
             in
               List.fold
-                (fun inst tc -> TypeClass.bind_instance myty (`General tc) inst)
+                (fun inst tc ->
+                  TypeClass.bind_instance myty (`General (tc, None)) inst)
                 inst tcs
 
         | _ -> inst

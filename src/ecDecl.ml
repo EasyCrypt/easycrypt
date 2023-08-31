@@ -86,7 +86,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
-  | OP_TC
+  | OP_TC     of EcPath.path * string
 
 and prbody =
   | PR_Plain of form
@@ -230,6 +230,11 @@ let is_rcrd op =
   | OB_oper (Some (OP_Record _)) -> true
   | _ -> false
 
+let is_tc_op op =
+  match op.op_kind with
+  | OB_oper (Some (OP_TC _)) -> true
+  | _ -> false
+
 let is_fix op =
   match op.op_kind with
   | OB_oper (Some (OP_Fix _)) -> true
@@ -297,6 +302,11 @@ let operator_as_fix (op : operator) =
 let operator_as_prind (op : operator) =
   match op.op_kind with
   | OB_pred (Some (PR_Ind pri)) -> pri
+  | _ -> assert false
+
+let operator_as_tc (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some OP_TC (tcpath, name)) -> (tcpath, name)
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)

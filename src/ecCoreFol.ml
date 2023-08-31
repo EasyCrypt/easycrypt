@@ -6,6 +6,7 @@ open EcTypes
 open EcCoreModules
 
 type memory = EcMemory.memory
+[@@deriving show]
 
 module BI = EcBigInt
 module Mp = EcPath.Mp
@@ -20,23 +21,28 @@ type quantif =
   | Lforall
   | Lexists
   | Llambda
+[@@deriving show]
 
 type hoarecmp = FHle | FHeq | FHge
 
 type gty =
   | GTty    of EcTypes.ty
-  | GTmodty of module_type
-  | GTmem   of EcMemory.memtype
+  | GTmodty of (module_type [@opaque])
+  | GTmem   of (EcMemory.memtype [@opaque])
+[@@deriving show]
 
 and binding  = (EcIdent.t * gty)
+[@@deriving show]
 and bindings = binding list
+[@@deriving show]
 
 and form = {
   f_node : f_node;
   f_ty   : ty;
-  f_fv   : int EcIdent.Mid.t; (* local, memory, module ident *)
-  f_tag  : int;
+  f_fv   : (int EcIdent.Mid.t [@opaque]); (* local, memory, module ident *)
+  f_tag  : (int [@opaque]);
 }
+[@@deriving show]
 
 and f_node =
   | Fquant  of quantif * bindings * form
@@ -76,7 +82,7 @@ and eagerF = {
   eg_fl : EcPath.xpath;
   eg_fr : EcPath.xpath;
   eg_sr : stmt;  (* No local program variables *)
-  eg_po : form
+  eg_po : form;
 }
 
 and equivF = {
@@ -92,7 +98,8 @@ and equivS = {
   es_pr  : form;
   es_sl  : stmt;
   es_sr  : stmt;
-  es_po  : form; }
+  es_po  : form;
+}
 
 and sHoareF = {
   hf_pr : form;
@@ -104,7 +111,8 @@ and sHoareS = {
   hs_m  : EcMemory.memenv;
   hs_pr : form;
   hs_s  : stmt;
-  hs_po : form; }
+  hs_po : form;
+}
 
 and cHoareF = {
   chf_pr : form;
@@ -118,7 +126,8 @@ and cHoareS = {
   chs_pr : form;
   chs_s  : stmt;
   chs_po : form;
-  chs_co : cost; }
+  chs_co : cost;
+}
 
 and bdHoareF = {
   bhf_pr  : form;
@@ -161,7 +170,7 @@ and cost = {
    [cb_cost] is here to properly handle substsitution when instantiating an
    abstract module by a concrete one. *)
 and call_bound = {
-  cb_cost  : form;   (* of type xint *)
+  cb_cost   : form;   (* of type xint *)
   cb_called : form;  (* of type int  *)
 }
 
@@ -2136,14 +2145,13 @@ module Fsubst = struct
     subst_locals (Mid.singleton id f1) f2
 
   (* ------------------------------------------------------------------ *)
-  let init_subst_tvar s =
+  let init_subst_tvar ?es_loc s =
     let sty = { ty_subst_id with ts_v = s } in
-
     { f_subst_id with
       fs_freshen = true;
       fs_sty = sty;
       fs_ty = ty_subst sty;
-      fs_esloc = Mid.empty; }
+      fs_esloc = odfl Mid.empty es_loc; }
 
   let subst_tvar ?es_loc s =
     f_subst (init_subst_tvar s)

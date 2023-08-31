@@ -128,7 +128,7 @@ type locality = [`Declare | `Local | `Global]
 type pmodule_type = pqsymbol
 
 (* -------------------------------------------------------------------- *)
-type ptcparam = pqsymbol * pty list
+type ptcparam  = pqsymbol * pty list
 type ptyparam  = psymbol * ptcparam list
 type ptyparams = ptyparam list
 type ptydname  = (ptyparams * psymbol) located
@@ -497,6 +497,7 @@ type pcutdef_schema = {
 type preduction = {
   pbeta    : bool;                      (* β-reduction *)
   pdelta   : pqsymbol list option;      (* definition unfolding *)
+  pdeltatc : bool;
   pzeta    : bool;                      (* let-reduction *)
   piota    : bool;                      (* case/if-reduction *)
   peta     : bool;                      (* η-reduction *)

@@ -25,13 +25,13 @@ type gty =
   | GTmodty of module_type
   | GTmem   of EcMemory.memtype
 
-and binding  = (EcIdent.t * gty)
+and binding  = EcIdent.t * gty
 and bindings = binding list
 
 and form = private {
   f_node : f_node;
   f_ty   : ty;
-  f_fv   : int Mid.t;
+  f_fv   : int EcIdent.Mid.t; (* local, memory, module ident *)
   f_tag  : int;
 }
 
@@ -56,10 +56,10 @@ and f_node =
   | FcHoareS of cHoareS
 
   | FbdHoareF of bdHoareF (* $hr / $hr *)
-  | FbdHoareS of bdHoareS (* $hr  / $hr   *)
+  | FbdHoareS of bdHoareS
 
   | FequivF of equivF (* $left,$right / $left,$right *)
-  | FequivS of equivS (* $left,$right / $left,$right *)
+  | FequivS of equivS
 
   | FeagerF of eagerF
 
@@ -70,26 +70,26 @@ and f_node =
 and eagerF = {
   eg_pr : form;
   eg_sl : stmt;  (* No local program variables *)
-  eg_fl : xpath;
-  eg_fr : xpath;
+  eg_fl : EcPath.xpath;
+  eg_fr : EcPath.xpath;
   eg_sr : stmt;  (* No local program variables *)
-  eg_po : form
+  eg_po : form;
 }
 
 and equivF = {
   ef_pr : form;
-  ef_fl : xpath;
-  ef_fr : xpath;
+  ef_fl : EcPath.xpath;
+  ef_fr : EcPath.xpath;
   ef_po : form;
 }
 
 and equivS = {
-  es_ml : EcMemory.memenv;
-  es_mr : EcMemory.memenv;
-  es_pr : form;
-  es_sl : stmt;
-  es_sr : stmt;
-  es_po : form;
+  es_ml  : EcMemory.memenv;
+  es_mr  : EcMemory.memenv;
+  es_pr  : form;
+  es_sl  : stmt;
+  es_sr  : stmt;
+  es_po  : form;
 }
 
 and sHoareF = {
@@ -102,7 +102,8 @@ and sHoareS = {
   hs_m  : EcMemory.memenv;
   hs_pr : form;
   hs_s  : stmt;
-  hs_po : form; }
+  hs_po : form;
+}
 
 and cHoareF = {
   chf_pr : form;
@@ -116,11 +117,12 @@ and cHoareS = {
   chs_pr : form;
   chs_s  : stmt;
   chs_po : form;
-  chs_co : cost; }
+  chs_co : cost;
+}
 
 and bdHoareF = {
   bhf_pr  : form;
-  bhf_f   : xpath;
+  bhf_f   : EcPath.xpath;
   bhf_po  : form;
   bhf_cmp : hoarecmp;
   bhf_bd  : form;
@@ -143,16 +145,15 @@ and coe = {
 
 and pr = {
   pr_mem   : memory;
-  pr_fun   : xpath;
+  pr_fun   : EcPath.xpath;
   pr_args  : form;
   pr_event : form;
 }
 
-
 (* Invariant: keys of c_calls are functions of local modules,
    with no arguments. *)
 and cost = private {
-  c_self  : form;
+  c_self  : form;    (* of type xint *)
   c_calls : call_bound EcPath.Mx.t;
 }
 
@@ -160,7 +161,7 @@ and cost = private {
    [cb_cost] is here to properly handle substsitution when instantiating an
    abstract module by a concrete one. *)
 and call_bound = private {
-  cb_cost  : form;
+  cb_cost   : form;
   cb_called : form;
 }
 

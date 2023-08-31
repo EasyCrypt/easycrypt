@@ -94,18 +94,23 @@
 
   let mk_simplify l =
     if l = [] then
-      { pbeta  = true; pzeta  = true;
-        piota  = true; peta   = true;
-        plogic = true; pdelta = None;
-        pmodpath = true; puser = true;
-	pcost = false; }
+      { pbeta     = true;
+        pzeta     = true;
+        piota     = true;
+        peta      = true;
+        plogic    = true;
+        pdelta    = None;
+        pdeltatc  = true;
+        pmodpath  = true;
+        puser     = true;
+	      pcost     = false; }
     else
       let doarg acc = function
         | `Delta l ->
             if   l = [] || acc.pdelta = None
             then { acc with pdelta = None }
             else { acc with pdelta = Some (oget acc.pdelta @ l) }
-
+        | `DeltaTC -> { acc with pdeltatc = true }
         | `Zeta    -> { acc with pzeta    = true }
         | `Iota    -> { acc with piota    = true }
         | `Beta    -> { acc with pbeta    = true }
@@ -116,11 +121,16 @@
 	| `Cost    -> { acc with pcost    = true }
       in
         List.fold_left doarg
-          { pbeta  = false; pzeta  = false;
-            piota  = false; peta   = false;
-            plogic = false; pdelta = Some [];
-            pmodpath = false; puser = false;
-	    pcost = false; } l
+          { pbeta     = false;
+            pzeta     = false;
+            piota     = false;
+            peta      = false;
+            plogic    = false;
+            pdelta    = Some [];
+            pdeltatc  = false;
+            pmodpath  = false;
+            puser     = false;
+	          pcost     = false; } l
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath; `User; `Cost]
 
@@ -2660,6 +2670,7 @@ genpattern:
 
 simplify_arg:
 | DELTA l=qoident* { `Delta l }
+| CLASS            { `DeltaTC }
 | ZETA             { `Zeta }
 | IOTA             { `Iota }
 | BETA             { `Beta }

@@ -1,5 +1,6 @@
 (* ------------------------------------------------------------------ *)
 open EcSymbols
+open EcMaps
 open EcUtils
 open EcLocation
 open EcParsetree
@@ -120,7 +121,7 @@ let tydecl_compatible env tyd1 tyd2 =
 let expr_compatible exn env s e1 e2 =
   let f1 = EcFol.form_of_expr EcFol.mhr e1 in
   let f2 = EcFol.Fsubst.f_subst s (EcFol.form_of_expr EcFol.mhr e2) in
-  let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
+  let ri = EcReduction.full_red ~opaque:true in
   error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
 
 let get_open_oper exn env p tys =
@@ -131,6 +132,7 @@ let get_open_oper exn env p tys =
   | _ -> raise exn
 
 let rec oper_compatible exn env ob1 ob2 =
+  (* FIXME: duplicated code *)
   match ob1, ob2 with
   | OP_Plain(e1,_), OP_Plain(e2,_)  ->
     expr_compatible exn env EcFol.Fsubst.f_subst_id e1 e2
@@ -148,7 +150,8 @@ let rec oper_compatible exn env ob1 ob2 =
     error_body exn (EcPath.p_equal p1 p2 && i11 = i21 && i12 = i22)
   | OP_Fix f1, OP_Fix f2 ->
     opfix_compatible exn env f1 f2
-  | OP_TC, OP_TC -> ()
+  | OP_TC (p1, n1), OP_TC (p2, n2) ->
+     error_body exn (EcPath.p_equal p1 p2 && n1 = n2)
   | _, _ -> raise exn
 
 and opfix_compatible exn env f1 f2 =
@@ -916,7 +919,7 @@ and replay_instance
                 | OB_oper (Some (OP_Record _))
                 | OB_oper (Some (OP_Proj   _))
                 | OB_oper (Some (OP_Fix    _))
-                | OB_oper (Some (OP_TC      )) ->
+                | OB_oper (Some (OP_TC     _)) ->
                     Some (EcPath.pappend npath q)
                 | OB_oper (Some (OP_Plain (e, _))) ->
                     match e.EcTypes.e_node with
@@ -957,13 +960,22 @@ and replay_instance
           f_div  = cr.f_div |> omap forpath; }
       in
         match tc with
-        | `Ring    cr -> `Ring  (doring  cr)
-        | `Field   cr -> `Field (dofield cr)
-        | `General p  -> `General (fortypeclass p)
+        | `Ring  cr -> `Ring  (doring  cr)
+        | `Field cr -> `Field (dofield cr)
+
+        | `General (tc, syms) ->
+           let tc   = fortypeclass tc in
+           let syms =
+             Option.map
+               (Mstr.map (fun (p, tys) ->
+                    (forpath p, List.map (EcSubst.subst_ty subst) tys)))
+               syms in
+           `General (tc, syms)
     in
 
-    let scope = ove.ovre_hooks.hadd_item scope import (Th_instance ((typ, ty), tc, lc)) in
-    (subst, ops, proofs, scope)
+    let scope =
+      ove.ovre_hooks.hadd_item scope import (Th_instance ((typ, ty), tc, lc))
+    in (subst, ops, proofs, scope)
 
   with E.InvInstPath ->
     (subst, ops, proofs, scope)

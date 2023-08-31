@@ -620,59 +620,65 @@ let is_alpha_eq hyps f1 f2 =
 
 (* -------------------------------------------------------------------- *)
 type reduction_info = {
-  beta    : bool;
-  delta_p : (path  -> deltap); (* reduce operators *)
-  delta_h : (ident -> bool);   (* reduce local definitions *)
-  zeta    : bool;
-  iota    : bool;
-  eta     : bool;
-  logic   : rlogic_info;
-  modpath : bool;
-  user    : bool;
-  cost    : bool;
+  beta     : bool;
+  delta_p  : (path  -> deltap); (* reduce operators *)
+  delta_h  : (ident -> bool);   (* reduce local definitions *)
+  delta_tc : bool;
+  zeta     : bool;
+  iota     : bool;
+  eta      : bool;
+  logic    : rlogic_info;
+  modpath  : bool;
+  user     : bool;
+  cost     : bool;
 }
 
 and deltap      = [`Yes | `No | `Force]
 and rlogic_info = [`Full | `ProductCompat] option
 
 (* -------------------------------------------------------------------- *)
-let full_red = {
-  beta    = true;
-  delta_p = (fun _ -> `Yes);
-  delta_h = EcUtils.predT;
-  zeta    = true;
-  iota    = true;
-  eta     = true;
-  logic   = Some `Full;
-  modpath = true;
-  user    = true;
-  cost    = true;
+let full_red ~opaque = {
+  beta     = true;
+  delta_p  = (fun _ -> if opaque then `Force else `Yes);
+  delta_h  = EcUtils.predT;
+  delta_tc = true;
+  zeta     = true;
+  iota     = true;
+  eta      = true;
+  logic    = Some `Full;
+  modpath  = true;
+  user     = true;
+  cost     = true;
 }
 
 let no_red = {
-  beta    = false;
-  delta_p = (fun _ -> `No);
-  delta_h = EcUtils.pred0;
-  zeta    = false;
-  iota    = false;
-  eta     = false;
-  logic   = None;
-  modpath = false;
-  user    = false;
-  cost    = false;
+  beta     = false;
+  delta_p  = (fun _ -> `No);
+  delta_h  = EcUtils.pred0;
+  delta_tc = false;
+  zeta     = false;
+  iota     = false;
+  eta      = false;
+  logic    = None;
+  modpath  = false;
+  user     = false;
+  cost     = false;
 }
 
 let beta_red     = { no_red with beta = true; }
 let betaiota_red = { no_red with beta = true; iota = true; }
 
 let nodelta =
-  { full_red with
-      delta_h = EcUtils.pred0;
-      delta_p = (fun _ -> `No); }
+  { (full_red ~opaque:false) with
+      delta_h  = EcUtils.pred0;
+      delta_p  = (fun _ -> `No);
+      delta_tc = false; }
 
 let delta = { no_red with delta_p = (fun _ -> `Yes); }
 
-let full_compat = { full_red with logic = Some `ProductCompat; }
+let full_compat = {
+  (full_red ~opaque:false) with
+    logic = Some `ProductCompat; }
 
 (* -------------------------------------------------------------------- *)
 type not_reducible = NoHead | NeedSubTerm
@@ -694,6 +700,30 @@ let reduce_op ri env p tys =
       Op.reduce ~force:(ri.delta_p p = `Force) env p tys
     with NotReducible -> raise nohead
   else raise nohead
+
+let reduce_tc ?params env p tys =
+  if not (EcEnv.Op.is_tc_op env p) then None else
+
+  let tys = List.rev tys in
+  let tcty, tys = List.hd tys, List.rev (List.tl tys) in
+  let (tcp, opname) = EcDecl.operator_as_tc (EcEnv.Op.by_path p env) in
+  let ue = EcUnify.UniEnv.create params in
+  let syms = oget (EcUnify.hastc env ue tcty { tc_name = tcp; tc_args = tys }) in
+
+  match syms with None -> None | Some syms ->
+
+  let optg, opargs = EcMaps.Mstr.find opname syms in
+  let opargs = List.map (Tuni.offun (EcUnify.UniEnv.assubst ue)) opargs in
+  let optg_decl = EcEnv.Op.by_path optg env in
+  let tysubst = Tvar.init (List.fst optg_decl.op_tparams) opargs in
+
+  Some (EcFol.f_op optg opargs (Tvar.subst tysubst optg_decl.op_ty))
+
+let may_reduce_tc ri ?params env p tys =
+  if ri.delta_tc then
+    oget ~exn:nohead (reduce_tc ?params env p tys)
+  else
+    raise nohead
 
 let is_record env f =
   match EcFol.destr_app f with
@@ -1006,8 +1036,11 @@ let reduce_logic ri env hyps f p args =
   check_reduced hyps needsubterm f f'
 
 (* -------------------------------------------------------------------- *)
-let reduce_delta ri env _hyps f =
+let reduce_delta ri env hyps f =
   match f.f_node with
+  | Fop (p, tys) when ri.delta_tc && EcEnv.Op.is_tc_op env p ->
+     may_reduce_tc ri ~params:(LDecl.tohyps hyps).h_tvar env p (List.fst tys) (* FIXME: TC *)
+
   | Fop (p, tys) when ri.delta_p p <> `No ->
       reduce_op ri env p tys
 
@@ -1046,8 +1079,6 @@ let reduce_cost ri env coe =
       f_xadd f_x1 (EcCHoare.cost_of_expr coe.coe_pre coe.coe_mem e)
 
     | _ -> raise nohead
-
-
 
 (* -------------------------------------------------------------------- *)
 (* Perform one step of head reduction                                   *)
@@ -1757,7 +1788,7 @@ let reduce_cost ri env coe =
   | NotRed _ -> raise NotReducible
 
 (* -------------------------------------------------------------------- *)
-let is_conv ?(ri = full_red) hyps f1 f2 =
+let is_conv ?(ri = full_red ~opaque:false) hyps f1 f2 =
   if f_equal f1 f2 then true
   else
     let ri, env = init_redinfo ri hyps in
@@ -2031,7 +2062,8 @@ let rec conv_oper env ob1 ob2 =
     error_body (EcPath.p_equal p1 p2 && i11 = i21 && i12 = i22)
   | OP_Fix f1, OP_Fix f2 ->
     conv_opfix env f1 f2
-  | OP_TC, OP_TC -> ()
+  | OP_TC (p1, n1), OP_TC (p2, n2) ->
+     error_body (EcPath.p_equal p1 p2 && n1 = n2)
   | _, _ -> raise OpNotConv
 
 and conv_opfix env f1 f2 =

@@ -18,9 +18,10 @@ let local_of_locality = function
 (* -------------------------------------------------------------------- *)
 type ty = {
   ty_node : ty_node;
-  ty_fv   : int EcIdent.Mid.t; (* only ident appearing in path *)
-  ty_tag  : int;
+  ty_fv   : (int EcIdent.Mid.t [@opaque]); (* only ident appearing in path *)
+  ty_tag  : (int [@opaque]);
 }
+[@@deriving show]
 
 and ty_node =
   | Tglob   of EcPath.mpath (* The tuple of global variable of the module *)
@@ -29,6 +30,7 @@ and ty_node =
   | Ttuple  of ty list
   | Tconstr of EcPath.path * ty list
   | Tfun    of ty * ty
+[@@deriving show]
 
 type dom = ty list
 
@@ -388,10 +390,12 @@ let ty_fv_and_tvar (ty : ty) =
 type pvar_kind =
   | PVKglob
   | PVKloc
+[@@deriving show]
 
 type prog_var =
   | PVglob of EcPath.xpath
   | PVloc of EcSymbols.symbol
+[@@deriving show]
 
 let pv_equal v1 v2 = match v1, v2 with
   | PVglob x1, PVglob x2 ->
@@ -483,6 +487,7 @@ type lpattern =
   | LSymbol of (EcIdent.t * ty)
   | LTuple  of (EcIdent.t * ty) list
   | LRecord of EcPath.path * (EcIdent.t option * ty) list
+[@@deriving show]
 
 let idty_equal (x1,t1) (x2,t2) =
   EcIdent.id_equal x1 x2 && ty_equal t1 t2

@@ -282,21 +282,26 @@ module TypeClass = struct
 
     let instances =
       List.filter_map
-        (function (x, `General y) -> Some (x, y) | _ -> None)
+        (function (x, `General (y, syms)) -> Some (x, y, syms) | _ -> None)
         instances in
 
     let instances =
       (* FIXME:TC *)
-      let ring = EcPath.fromqsymbol ([EcCoreLib.i_top], "Ring") in
+      let ring  = EcPath.fromqsymbol ([EcCoreLib.i_top], "Ring" ) in
+      let field = EcPath.fromqsymbol ([EcCoreLib.i_top], "Field") in
+
       List.filter
-        (fun (_, tc) -> not (EcPath.isprefix ring tc.tc_name))
+        (fun (_, tc, _) ->
+          List.for_all
+            (fun p -> not (EcPath.isprefix p tc.tc_name))
+            [ring; field])
         instances in
 
     let instances =
       let tvinst =
         List.map
           (fun (tv, tcs) ->
-             List.map (fun tc -> (([], tvar tv), tc)) tcs)
+             List.map (fun tc -> (([], tvar tv), tc, None)) tcs)
           (Mid.bindings tvtc)
       in List.flatten tvinst @ instances in
 
@@ -311,7 +316,7 @@ module TypeClass = struct
           let acc = (tcdecl.tc_tparams, tginst.tc_args) :: acc in
           find_tc_in_parent acc prt) in
 
-    let for1 ((tgparams, tgty), tginst) =
+    let for1 ((tgparams, tgty), tginst, (opsyms : (EcPath.path * ty list) Mstr.t option)) =
       let tgi_args, tgparams_prt  =
         oget ~exn:Bailout (find_tc_in_parent [] tginst) in
 
@@ -324,7 +329,7 @@ module TypeClass = struct
       let subst =
         Mid.of_list (List.map (snd_map fst) tvinfo) in
 
-      let subst =
+      let subst as subst0 =
         let tcsubst =
           List.fold_left
             (fun subst (tparams, args) ->
@@ -354,15 +359,24 @@ module TypeClass = struct
         uf := UnifyCore.unify_core env Mid.empty !uf (`TyUni (ty, tgty))
       with UnifyCore.UnificationFailure _ -> raise Bailout end;
 
-      assert (UnifyCore.UF.closed !uf);
-
       let subst = UnifyCore.subst_of_uf !uf in
       let subst = Tuni.offun subst in
 
-      List.flatten (List.map
-        (fun (_, (ty, tcs)) ->
-          List.map (fun tc -> (subst ty, tc)) tcs)
-        tvinfo)
+      (* assert (UnifyCore.UF.closed !uf); *)
+
+      let opsyms = opsyms |> Option.map (
+          Mstr.map
+            (fun (p, tys) ->
+              (p, List.map (fun ty -> subst (Tvar.subst subst0 ty)) tys))
+        ) in
+
+      let effects =
+        List.flatten (List.map
+          (fun (_, (ty, tcs)) ->
+            List.map (fun tc -> (subst ty, tc)) tcs)
+          tvinfo)
+
+      in (effects, opsyms)
 
     in
 
@@ -373,12 +387,16 @@ module TypeClass = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type tcproblem = [
+  `TcCtt of ty * typeclass * ((EcPath.path * ty list) Mstr.t) option ref
+]
+
 module UnifyExtraForTC :
   UnifyExtra with type state   = typeclass list
-              and type problem = [ `TcCtt of ty * typeclass ] =
+              and type problem = tcproblem =
 struct
   type state   = typeclass list
-  type problem = [ `TcCtt of ty * typeclass ]
+  type problem = tcproblem
   type uparam  = state * ty option
 
   exception Failure
@@ -397,7 +415,7 @@ struct
 
       | (tc1, None   ), (tc2, Some ty)
       | (tc2, Some ty), (tc1, None   ) ->
-          (tc1 @ tc2), List.map (fun tc -> `TcCtt (ty, tc)) tc1
+          (tc1 @ tc2), List.map (fun tc -> `TcCtt (ty, tc, ref None)) tc1
   end
 
   module Problem = struct
@@ -406,12 +424,14 @@ struct
               with type t    = uf
                and type item = uid
                and type data = uparam)
-      (uf              : uf ref)
-      (env             : EcEnv.env)
-      (tvtc            : state Mid.t)
-      (`TcCtt (ty, tc) : problem)
+      (uf   : uf ref)
+      (env  : EcEnv.env)
+      (tvtc : state Mid.t)
+      (pb   : problem)
       : problem list
     =
+      let `TcCtt (ty, tc, tcrec) = pb in
+
       let tytc, ty =
         match ty.ty_node with
         | Tunivar i -> snd_map (odfl ty) (UF.data i !uf)
@@ -426,8 +446,9 @@ struct
             match TypeClass.hastc env tvtc ty tc with
             | None ->
                 raise Failure
-            | Some effects ->
-                List.map (fun (ty, tc) -> `TcCtt (ty, tc)) effects
+            | Some (effects, opsyms) ->
+                tcrec := opsyms;
+                List.map (fun (ty, tc) -> `TcCtt (ty, tc, ref None)) effects
         end
   end
 end
@@ -523,7 +544,13 @@ module UniEnv = struct
       ) Mid.empty tvi
 
   let subst_tv subst params =
-    List.map (fun (tv, _) -> subst (tvar tv)) params
+    List.map (fun (tv, tcs) ->
+      let tv = subst (tvar tv) in
+      let tcs =
+        List.map
+          (fun tc -> { tc with tc_args = List.map subst tc.tc_args })
+          tcs
+      in (tv, tcs)) params
 
   let openty_r ue params tvi =
     let subst = Tvar.subst (opentvi ue params tvi) in
@@ -565,7 +592,7 @@ let unify_core env ue pb =
       match pb with
       | `TyUni (ty1, ty2) ->
           raise (UnificationFailure (`TyUni (ty1, ty2)))
-      | `Other (`TcCtt (ty, tc)) ->
+      | `Other (`TcCtt (ty, tc, _)) ->
           raise (UnificationFailure (`TcCtt (ty, tc)))
       end
   in ue := { !ue with ue_uf = uf; }
@@ -574,16 +601,24 @@ let unify_core env ue pb =
 let unify env ue t1 t2 =
   unify_core env ue (`TyUni (t1, t2))
 
+let xhastc_r env ue ty tc =
+  let instance = ref None in
+  unify_core env ue (`Other (`TcCtt (ty, tc, instance)));
+  !instance
+
 let hastc_r env ue ty tc =
-  unify_core env ue (`Other (`TcCtt (ty, tc)))
+  ignore (xhastc_r env ue ty tc : _ option)
+
+let xhastcs_r env ue ty tcs =
+  List.map (hastc_r env ue ty) tcs
 
 let hastcs_r env ue ty tcs =
   List.iter (hastc_r env ue ty) tcs
 
 (* -------------------------------------------------------------------- *)
 let hastc env ue ty tc =
-  try  hastc_r env ue ty tc; true
-  with UnificationFailure _ -> false
+  try  Some (xhastc_r env ue ty tc)
+  with UnificationFailure _ -> None
 
 (* -------------------------------------------------------------------- *)
 let tfun_expected ue psig =
@@ -626,27 +661,14 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
     let subue = UniEnv.copy ue in
 
     try
-      begin try
-        match tvi with
-        | None ->
-            ()
+      let (tip, tvtcs) = UniEnv.openty_r subue op.D.op_tparams tvi in
 
-        | Some (TVIunamed lt) ->
-            List.iter2
-              (fun ty (_, tc) -> hastcs_r env subue ty tc)
-              lt op.D.op_tparams
+      List.iter
+        (fun (tv, tcs) ->
+          try  hastcs_r env subue tv tcs
+          with UnificationFailure _ -> raise E.Failure)
+        tvtcs;
 
-        | Some (TVInamed ls) ->
-            let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in
-            let tparams = Msym.of_list tparams in
-            List.iter (fun (x, ty) ->
-              hastcs_r env subue ty (oget (Msym.find_opt x tparams)))
-              ls
-
-        with UnificationFailure _ -> raise E.Failure
-      end;
-
-      let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
       let top = tip op.D.op_ty in
       let texpected = tfun_expected subue psig in
 
@@ -664,7 +686,7 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
 
         | _ -> None
 
-      in Some ((path, tvs), top, subue, bd)
+      in Some ((path, List.fst tvtcs), top, subue, bd)
 
     with E.Failure -> None
 

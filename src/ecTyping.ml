@@ -378,7 +378,7 @@ let gen_select_op
 
   and by_tc ((p, _), _, _, _) =
     match oget (EcEnv.Op.by_path_opt p env) with
-    | { op_kind = OB_oper (Some OP_TC) } -> false
+    | { op_kind = OB_oper (Some (OP_TC _)) } -> false
     | _ -> true
 
   in
@@ -1207,7 +1207,7 @@ let transtc (env : EcEnv.env) ue ((tc_name, args) : ptcparam) : typeclass =
      List.iter2
        (fun (_, tcs) ty ->
           List.iter (fun tc ->
-            if not (EcUnify.hastc env ue ty tc) then
+            if Option.is_none (EcUnify.hastc env ue ty tc) then
               tyerror (loc tc_name) env (CannotInferTC (ty, tc))) tcs)
        decl.tc_tparams args;
      { tc_name = p; tc_args = args; }
@@ -1279,6 +1279,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
       let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
       let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
       let reccty, rectvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
+      let rectvi = List.fst rectvi in (* FIXME:TC *)
       let fields =
         List.fold_left
           (fun map (((_, idx), _, _) as field) ->
@@ -1419,7 +1420,8 @@ let trans_record env ue (subtt, proj) (loc, b, fields) =
   let rec_   = snd (oget (EcDecl.tydecl_as_record recty)) in
   let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
   let reccty, rtvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
-  let tysopn = Tvar.init (List.map fst recty.tyd_params) rtvi in
+  let rtvi = List.fst rtvi in   (* FIXME:TC *)
+  let tysopn = Tvar.init (List.fst recty.tyd_params) rtvi in
 
   let fields =
     List.fold_left
@@ -1572,7 +1574,6 @@ let trans_if_match ~loc env ue (gindty, gind) (c, b1, b2) =
     gind.tydt_ctors
 
 (*-------------------------------------------------------------------- *)
-
 let var_or_proj fvar fproj pv ty =
   match pv with
   | `Var pv -> fvar pv ty

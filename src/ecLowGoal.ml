@@ -42,7 +42,7 @@ let (@~+) (tt : FApi.tactical) (ts : FApi.backward list) =
 exception InvalidProofTerm
 
 type side    = [`Left|`Right]
-type lazyred = [`Full | `NoDelta | `None]
+type lazyred = [`Full of bool | `NoDelta | `None]
 
 (* -------------------------------------------------------------------- *)
 module LowApply = struct
@@ -336,7 +336,7 @@ let t_cbv_with_info ?target (ri : reduction_info) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_cbv ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
-  let ri = if delta then full_red else nodelta in
+  let ri = if delta then full_red ~opaque:false else nodelta in
   let ri = { ri with logic } in
   t_cbv_with_info ?target ri tc
 
@@ -347,7 +347,7 @@ let t_cbn_with_info ?target (ri : reduction_info) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_cbn ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
-  let ri = if delta then full_red else nodelta in
+  let ri = if delta then full_red ~opaque:false else nodelta in
   let ri = { ri with logic } in
   t_cbv_with_info ?target ri tc
 
@@ -357,16 +357,16 @@ let t_hred_with_info ?target (ri : reduction_info) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change_r ~fail:true ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let rec t_lazy_match ?(reduce = `Full) (tx : form -> FApi.backward)
+let rec t_lazy_match ?(reduce = `Full false) (tx : form -> FApi.backward)
   (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
   try tx concl tc
   with TTC.NoMatch ->
     let strategy =
       match reduce with
-      | `None    -> raise InvalidGoalShape
-      | `Full    -> EcReduction.full_red
-      | `NoDelta -> EcReduction.nodelta in
+      | `None     -> raise InvalidGoalShape
+      | `Full b   -> EcReduction.full_red ~opaque:b
+      | `NoDelta  -> EcReduction.nodelta in
     FApi.t_seq (t_hred_with_info strategy) (t_lazy_match ~reduce tx) tc
 
 (* -------------------------------------------------------------------- *)
@@ -511,7 +511,7 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
         intro1 ((hyps, concl), Fsubst.f_subst_id) id
 
     | _ ->
-        match h_red_opt full_red hyps concl with
+        match h_red_opt (full_red ~opaque:false) hyps concl with
         | None       -> LowIntro.tc_no_product !!tc ?loc:(tg_tag id) ()
         | Some concl -> intro1 ((hyps, concl), sbt) id
   in
@@ -1072,7 +1072,7 @@ let t_tuple_intro ?reduce (tc : tcenv1) =
     t_lazy_match ?reduce t_tuple_intro_r tc
 
 (* -------------------------------------------------------------------- *)
-let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
+let t_elim_r ?(reduce = (`Full false : lazyred)) txs tc =
   match sform_of_form (FApi.tc1_goal tc) with
   | SFimp (f1, f2) ->
       let rec aux f1 =
@@ -1088,9 +1088,9 @@ let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
         | None    -> begin
           let strategy =
             match reduce with
-            | `None    -> raise InvalidGoalShape
-            | `Full    -> EcReduction.full_red
-            | `NoDelta -> EcReduction.nodelta in
+            | `None     -> raise InvalidGoalShape
+            | `Full b   -> EcReduction.full_red ~opaque:b
+            | `NoDelta  -> EcReduction.nodelta in
 
             match h_red_opt strategy (FApi.tc1_hyps tc) f1 with
             | None    -> raise InvalidGoalShape
@@ -2146,7 +2146,7 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
           in
 
           let reduce =
-            if options.pgo_delta.pgod_case then `Full else `NoDelta in
+            if options.pgo_delta.pgod_case then `Full false else `NoDelta in
 
           FApi.t_switch ~on:`All (t_elim_r ~reduce elims) ~ifok:aux0 ~iffail tc
     end
@@ -2154,11 +2154,11 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     | _ when options.pgo_split ->
        let thesplit =
          match options.pgo_delta.pgod_split with
-         | true  -> t_split ~closeonly:false ~reduce:`Full
+         | true  -> t_split ~closeonly:false ~reduce:(`Full false)
          | false ->
              FApi.t_or
                (t_split ~reduce:`NoDelta)
-               (t_split ~closeonly:true ~reduce:`Full) in
+               (t_split ~closeonly:true ~reduce:(`Full false)) in
 
         FApi.t_try (FApi.t_seq thesplit aux0) tc
 
@@ -2244,7 +2244,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
 
           let iffail = t_crush_subst st id1 in
           let elims  = PGInternals.pg_cnj_elims in
-          let reduce = if delta then `Full else `NoDelta in
+          let reduce = if delta then `Full false else `NoDelta in
 
           FApi.t_onall
             (FApi.t_switch ~on:`All ~ifok:(aux0 st) ~iffail (t_elim_r ~reduce elims))
@@ -2252,7 +2252,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
     end
 
     | _ ->
-       let reduce = if delta then `Full else `NoDelta in
+       let reduce = if delta then `Full false else `NoDelta in
        let thesplit tc = t_split ~closeonly:false ~reduce tc in
        let hyps0 = FApi.tc1_hyps tc in
        let shuffle = List.rev_map fst (LDecl.tohyps (FApi.tc1_hyps tc)).h_local in
@@ -2526,7 +2526,7 @@ let t_crush_fwd ?(delta = true) nb_intros (tc : tcenv1) =
           (tc, aux0 (incr n)) in
 
         let elims  = [ t_elim_false_r; t_elim_and_r; t_elim_eq_tuple_r; ] in
-        let reduce = if delta then `Full else `NoDelta in
+        let reduce = if delta then `Full false else `NoDelta in
 
         FApi.t_onall
           (FApi.t_xswitch ~on:`All ~iffail (t_elim_r ~reduce elims))

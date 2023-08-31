@@ -329,6 +329,7 @@ module Op : sig
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
   val is_dtype_ctor  : ?nargs:int -> env -> path -> bool
+  val is_tc_op       : env -> path -> bool
   val is_fix_def     : env -> path -> bool
   val is_abbrev      : env -> path -> bool
   val is_prind       : env -> path -> bool
