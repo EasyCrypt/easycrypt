@@ -78,6 +78,7 @@ val m_fv          : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 val m_functor : mpath -> mpath
 
 val mget_ident : mpath -> ident
+val mget_ident_opt : mpath -> ident option
 
 val pp_m : Format.formatter -> mpath -> unit
 
@@ -143,3 +144,6 @@ val sms_bind_abs : ident -> mpath -> smsubst -> smsubst
 val p_subst : path Mp.t -> path -> path
 val m_subst : smsubst -> mpath -> mpath
 val x_subst : smsubst -> xpath -> xpath
+
+val m_subst_abs : mpath Mid.t -> mpath -> mpath
+val x_subst_abs : mpath Mid.t -> xpath -> xpath

@@ -433,12 +433,12 @@ let generalize_subst_ env m uelts uglob =
         Mpv.add env pv (f_local id ty) s)
       Mpv.empty uelts b
   in
-  let create mp = id_of_mp mp m, GTty (tglob mp) in
+  let create mp = id_of_mp mp m, GTty (tglob (EcPath.mget_ident mp)) in
   let b' = List.map create uglob in
   let s  =
     List.fold_left2
       (fun s mp (id, _) ->
-        Mpv.add_glob env mp (f_local id (tglob mp)) s)
+        Mpv.add_glob env mp (f_local id (tglob (EcPath.mget_ident mp))) s)
       s uglob b'
   in
     (b', b, s)

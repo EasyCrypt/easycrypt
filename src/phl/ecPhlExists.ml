@@ -19,7 +19,6 @@ let get_to_gens fs =
     let id =
       match f.f_node with
       | Fpvar (pv, m) -> id_of_pv pv m
-      | Fglob (mp, m) -> id_of_mp mp m
       | _             -> EcIdent.create "f" in
     id, f in
   List.map do_id fs

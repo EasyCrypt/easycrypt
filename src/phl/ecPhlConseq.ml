@@ -230,9 +230,9 @@ let t_conseq pre post tc =
 
 (* -------------------------------------------------------------------- *)
 let mk_bind_pvar m (id,_) (x, ty) = id, f_pvar x ty m
-let mk_bind_glob m (id,_) x  = id, f_glob x m
+let mk_bind_glob env m (id,_) x = id, NormMp.norm_glob env m x
 let mk_bind_pvars m (bd1,bd2) = List.map2 (mk_bind_pvar m) bd1 bd2
-let mk_bind_globs m (bd1,bd2) = List.map2 (mk_bind_glob m) bd1 bd2
+let mk_bind_globs env m (bd1,bd2) = List.map2 (mk_bind_glob env m) bd1 bd2
 
 let cond_equivF_notmod ?(mk_other=false) tc cond =
   let (env, hyps, _) = FApi.tc1_eflat tc in
@@ -264,8 +264,8 @@ let cond_equivF_notmod ?(mk_other=false) tc cond =
     if mk_other then
       mk_bind_pvar ml (vresl,()) (pvresl, fsigl.fs_ret) ::
       mk_bind_pvar mr (vresr,()) (pvresr, fsigr.fs_ret) ::
-      List.flatten [mk_bind_globs ml bdgl; mk_bind_pvars ml bdel;
-                    mk_bind_globs mr bdgr; mk_bind_pvars mr bder]
+      List.flatten [mk_bind_globs env ml bdgl; mk_bind_pvars ml bdel;
+                    mk_bind_globs env mr bdgr; mk_bind_pvars mr bder]
     else [] in
   cond, bmem, bother
 
@@ -288,8 +288,8 @@ let cond_equivS_notmod ?(mk_other=false) tc cond =
   let bmem = [ml;mr] in
   let bother =
     if mk_other then
-      List.flatten [mk_bind_globs ml bdgl; mk_bind_pvars ml bdel;
-                    mk_bind_globs mr bdgr; mk_bind_pvars mr bder]
+      List.flatten [mk_bind_globs env ml bdgl; mk_bind_pvars ml bdel;
+                    mk_bind_globs env mr bdgr; mk_bind_pvars mr bder]
     else [] in
   cond, bmem, bother
 
@@ -321,7 +321,7 @@ let cond_hoareF_notmod ?(mk_other=false) tc cond =
   let bother =
     if mk_other then
       mk_bind_pvar m (vres,()) (pvres, fsig.fs_ret) ::
-      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
     else [] in
   cond, bmem, bother
 
@@ -343,7 +343,7 @@ let cond_hoareS_notmod ?(mk_other=false) tc cond =
   let bmem = [m] in
   let bother =
     if mk_other then
-      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
     else [] in
   cond, bmem, bother
 
@@ -375,7 +375,7 @@ let cond_cHoareF_notmod ?(mk_other=false) tc cond =
   let bother =
     if mk_other then
       mk_bind_pvar m (vres,()) (pvres, fsig.fs_ret) ::
-      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
     else [] in
   cond, bmem, bother
 
@@ -397,7 +397,7 @@ let cond_cHoareS_notmod ?(mk_other=false) tc cond =
   let bmem = [m] in
   let bother =
     if mk_other then
-      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
     else [] in
   cond, bmem, bother
 
@@ -431,7 +431,7 @@ let cond_bdHoareF_notmod ?(mk_other=false) tc cond =
   let bother =
     if mk_other then
       mk_bind_pvar m (vres,()) (pvres, fsig.fs_ret) ::
-      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
     else [] in
   cond, bmem, bother
 
@@ -456,7 +456,7 @@ let cond_bdHoareS_notmod ?(mk_other=false) tc cond =
   let bmem = [m] in
   let bother =
     if mk_other then
-      List.flatten [mk_bind_globs m bdg; mk_bind_pvars m bde]
+      List.flatten [mk_bind_globs env m bdg; mk_bind_pvars m bde]
     else [] in
   cond, bmem, bother
 

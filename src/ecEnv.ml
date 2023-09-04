@@ -2457,7 +2457,7 @@ module NormMp = struct
   let globals env m mp =
     let us = mod_use env mp in
     let l =
-      Sid.fold (fun id l -> f_glob (EcPath.mident id) m :: l) us.us_gl [] in
+      Sid.fold (fun id l -> f_glob id m :: l) us.us_gl [] in
     let l =
       Mx.fold
         (fun xp ty l -> f_pvar (EcTypes.pv_glob xp) ty m :: l) us.us_pv l in
@@ -2469,29 +2469,7 @@ module NormMp = struct
     let g = (norm_glob env mhr mp) in
     g.f_ty
 
-  let tglob_reducible env mp =
-    match (norm_tglob env mp).ty_node with
-    | Tglob mp' -> not (EcPath.m_equal mp mp')
-    | _ -> true
-
-  let norm_ty env =
-    EcTypes.Hty.memo_rec 107 (
-      fun aux ty ->
-        match ty.ty_node with
-        | Tglob mp -> norm_tglob env mp
-        | _ -> ty_map aux ty)
-
   let rec norm_form env =
-    let norm_ty1 : ty -> ty = norm_ty env in
-
-    let norm_gty env (id,gty) =
-      let gty =
-        match gty with
-        | GTty ty -> GTty (norm_ty env ty)
-        | GTmodty _ -> gty
-        | GTmem mt -> GTmem (mt_subst (norm_ty env) mt) in
-      id,gty in
-
     let has_mod b =
       List.exists (fun (_,gty) ->
         match gty with GTmodty _ -> true | _ -> false) b in
@@ -2502,18 +2480,14 @@ module NormMp = struct
         | Fquant(q,bd,f) ->
           if has_mod bd then
             let env = Mod.add_mod_binding bd env in
-            let bd = List.map (norm_gty env) bd in
             f_quant q bd (norm_form env f)
           else
-          let bd = List.map (norm_gty env) bd in
           f_quant q bd (aux f)
 
         | Fpvar(p,m) ->
           let p' = norm_pvar env p in
           if p == p' then f else
             f_pvar p' f.f_ty m
-
-        | Fglob(p,m) -> norm_glob env m p
 
         | FhoareF hf ->
           let pre' = aux hf.hf_pr and p' = norm_xfun env hf.hf_f
@@ -2561,8 +2535,8 @@ module NormMp = struct
             pr_event = aux pr.pr_event;
           } in f_pr_r pr'
 
-        | _ ->
-          EcCoreFol.f_map norm_ty1 aux f) in
+        | _ -> f)
+          in
     norm_form
 
   let norm_op env op =
@@ -2582,7 +2556,7 @@ module NormMp = struct
     in
     { op with
         op_kind = kind;
-        op_ty   = norm_ty env op.op_ty; }
+        op_ty   = op.op_ty; }
 
   let norm_ax env ax =
     { ax with ax_spec = norm_form env ax.ax_spec }
@@ -2755,7 +2729,6 @@ module Ty = struct
   let rec ty_hnorm (ty : ty) (env : env) =
     match ty.ty_node with
     | Tconstr (p, tys) when defined p env -> ty_hnorm (unfold p tys env) env
-    | Tglob p -> NormMp.norm_tglob env p
     | _ -> ty
 
 

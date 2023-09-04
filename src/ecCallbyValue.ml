@@ -439,14 +439,7 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
 
   | Flocal _ -> app_red st (Subst.subst s f) args
 
-  (* μ-reduction *)
-  | Fglob _ ->
-    let mp, m = destr_glob (Subst.subst s f) in
-    let f =
-      if   st.st_ri.modpath
-      then EcEnv.NormMp.norm_glob st.st_env m mp
-      else f_glob mp m in
-    app_red st f args
+  | Fglob _ -> app_red st (Subst.subst s f) args
 
   (* μ-reduction *)
   | Fpvar _ ->

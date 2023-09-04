@@ -109,7 +109,7 @@ let can_concretize (pt : pt_env) =
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
-  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev))
+  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev) (LDecl.toenv pe.pte_hy))
 
 (* -------------------------------------------------------------------- *)
 let concretize_e_form (CPTEnv subst) f =
@@ -812,8 +812,9 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
       | PVAModule (mp, mt) -> begin
           try
             let obl = EcTyping.check_modtype env mp mt emt in
-            let ms = EcSubst.add_module EcSubst.empty x mp in
-            let f = EcSubst.subst_form ms f in
+            Fsubst.f_norm_mod := NormMp.norm_glob env;
+            let ms = Fsubst.f_bind_mod Fsubst.f_subst_id x mp in
+            let f = Fsubst.f_subst ms f in
             let f = match obl with
               | `Ok ->  f
               | `ProofObligation obl -> f_imps obl f in
