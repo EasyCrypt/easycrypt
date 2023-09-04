@@ -1200,7 +1200,7 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
     end
   | PTglob gp ->
     let m,_ = trans_msymbol env gp in
-    tglob m
+    EcEnv.NormMp.norm_tglob env m
 
 and transtys tp (env : EcEnv.env) ue tys =
   List.map (transty tp env ue) tys
@@ -1756,35 +1756,7 @@ let transexp (env : EcEnv.env) mode ue e =
       let sube, ety = transexp env sube in
       match select_proj env osc (unloc x) ue None ety with
       | [] ->
-        let uidmap = EcUnify.UniEnv.assubst ue in
-        let ty = ty_subst (Tuni.subst uidmap) ety in
-        let me = EcFol.mhr in
-        let mp =
-          match ty.ty_node with
-          | Tglob mp -> mp
-          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
-        let f = NormMp.norm_glob env me mp in
-        let lf =
-          match f.f_node with
-          | Ftuple l -> l
-          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
-        let vx,ty =
-          match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
-          | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
-          | Some (x1, ty) ->
-              match x1 with
-              | `Var x -> NormMp.norm_pvar env x, ty
-              | _ -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, [])) in
-        let find f1 =
-           match f1.f_node with
-            | Fpvar (x1, _) -> EcTypes.pv_equal vx (NormMp.norm_pvar env x1)
-            | _ -> false in
-        let i =
-          match List.oindex find lf with
-          | None -> tyerror x.pl_loc env (UnknownProj (unloc x))
-          | Some i -> i in
-        e_proj sube i ty, ty
-
+         tyerror x.pl_loc env (UnknownProj (unloc x))
 
       | _::_::_ ->
          tyerror x.pl_loc env (AmbiguousProj (unloc x))
@@ -3191,7 +3163,7 @@ and trans_form_or_pattern
                     with EcMatching.MatchFailure ->
                       tyerror ppt.pl_loc env FilterMatchFailure in
 
-                  let subst = EcMatching.MEV.assubst ue ev in
+                  let subst = EcMatching.MEV.assubst ue ev env in
                   Fsubst.f_subst subst (f_local x tbool)
 
               | PFMatchBuild (deep, xs, ptg, ppt) ->
@@ -3212,7 +3184,7 @@ and trans_form_or_pattern
                     with EcMatching.MatchFailure ->
                       tyerror ppt.pl_loc env FilterMatchFailure in
 
-                  let subst = EcMatching.MEV.assubst ue ev in
+                  let subst = EcMatching.MEV.assubst ue ev env in
                   Fsubst.f_subst subst tg
 
               | PFKeep (deep, rooted, exclude, ppt) ->
@@ -3304,7 +3276,8 @@ and trans_form_or_pattern
           match EcEnv.Memory.current env with
           | None -> tyerror f.pl_loc env NoActiveMemory
           | Some me -> EcMemory.memory me
-        in PFS.set_memused state; f_glob mp me
+        in PFS.set_memused state;
+           EcEnv.NormMp.norm_glob env me mp
 
     | PFint n ->
         f_int n
@@ -3402,13 +3375,15 @@ and trans_form_or_pattern
                 List.for_all for1 ex in
 
               let create mem =
-                if List.is_empty ex then f_glob m mem else
+                if List.is_empty ex then
+                  EcEnv.NormMp.norm_glob env mem m
+                else
 
                 let use = EcEnv.NormMp.mod_use env m in
                 let gl  = Sid.elements use.us_gl in
                 let pv  = List.filter filter_pv (Mx.bindings use.us_pv) in
                 let res =
-                    List.map (fun mid -> f_glob (EcPath.mident mid) mem) gl
+                    List.map (fun mid -> f_glob mid mem) gl
                   @ List.map (fun (xp, ty) -> f_pvar (EcTypes.pv_glob xp) ty mem) pv in
 
                 f_tuple res in
@@ -3559,39 +3534,7 @@ and trans_form_or_pattern
 
       match select_proj env opsc (unloc x) ue None subf.f_ty with
       | [] ->
-        let ts = Tuni.subst (UE.assubst ue) in
-        let ty = ty_subst ts subf.f_ty in
-        let lf =
-          let mp =
-            match ty.ty_node with
-            | Tglob mp -> mp
-            | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
-
-          match NormMp.norm_glob env EcFol.mhr mp with
-          | { f_node = Ftuple xs } -> xs
-          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x))
-        in
-
-        let (vx, ty) =
-          match EcEnv.Var.lookup_progvar_opt ~side:EcFol.mhr (unloc x) env with
-          | None ->
-              tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
-          | Some (`Var x, ty) ->
-              (NormMp.norm_pvar env x, ty)
-          | Some (_, _) ->
-              tyerror x.pl_loc env (UnknownVarOrOp (unloc x, [])) in
-
-        let find = function
-          | { f_node = Fpvar (x, _) } ->
-              EcTypes.pv_equal vx (NormMp.norm_pvar env x)
-          | _ -> false in
-
-        let i =
-          match List.oindex find lf with
-          | None   -> tyerror x.pl_loc env (UnknownProj (unloc x))
-          | Some i -> i
-
-        in f_proj subf i ty
+         tyerror x.pl_loc env (UnknownProj (unloc x))
 
       | _ :: _ :: _ ->
           tyerror x.pl_loc env (AmbiguousProj (unloc x))

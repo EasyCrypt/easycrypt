@@ -191,7 +191,7 @@ val t_cutdef : proofterm -> form -> FApi.backward
 (* -------------------------------------------------------------------- *)
 type vsubst = [
   | `Local of EcIdent.t
-  | `Glob  of EcPath.mpath * EcMemory.memory
+  | `Glob  of EcIdent.t * EcMemory.memory
   | `PVar  of EcTypes.prog_var * EcMemory.memory
 ]
 

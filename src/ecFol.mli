@@ -176,7 +176,7 @@ type sform =
   | SFint   of zint
   | SFlocal of EcIdent.t
   | SFpvar  of EcTypes.prog_var * memory
-  | SFglob  of mpath * memory
+  | SFglob  of EcIdent.t * memory
 
   | SFif    of form * form * form
   | SFmatch of form * form list * ty

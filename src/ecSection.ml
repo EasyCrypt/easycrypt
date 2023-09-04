@@ -104,7 +104,7 @@ let rec on_ty (cb : cb) (ty : ty) =
   match ty.ty_node with
   | Tunivar _        -> ()
   | Tvar    _        -> ()
-  | Tglob mp         -> on_mp cb mp
+  | Tglob   _        -> ()
   | Ttuple tys       -> List.iter (on_ty cb) tys
   | Tconstr (p, tys) -> cb (`Type p); List.iter (on_ty cb) tys
   | Tfun (ty1, ty2)  -> List.iter (on_ty cb) [ty1; ty2]
@@ -207,7 +207,7 @@ let rec on_form (cb : cb) (f : EcFol.form) =
     | EcFol.Ftuple    fs           -> List.iter cbrec fs
     | EcFol.Fproj     (f, _)       -> cbrec f
     | EcFol.Fpvar     (pv, _)      -> on_pv  cb pv
-    | EcFol.Fglob     (mp, _)      -> on_mp  cb mp
+    | EcFol.Fglob     _            -> ()
     | EcFol.FhoareF   hf           -> on_hf  cb hf
     | EcFol.FhoareS   hs           -> on_hs  cb hs
     | EcFol.FcHoareF  chf          -> on_chf cb chf

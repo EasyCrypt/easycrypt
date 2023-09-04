@@ -46,7 +46,7 @@ and f_node =
   | Fint    of BI.zint
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
-  | Fglob   of EcPath.mpath     * memory
+  | Fglob   of EcIdent.t     * memory
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
@@ -173,7 +173,6 @@ type mod_restr = form p_mod_restr
 let mhr    = EcIdent.create "&hr"
 let mleft  = EcIdent.create "&1"
 let mright = EcIdent.create "&2"
-
 
 (*-------------------------------------------------------------------- *)
 let qt_equal : quantif -> quantif -> bool = (==)
@@ -478,7 +477,7 @@ module Hsform = Why3.Hashcons.Make (struct
         EcIdent.id_equal s1 s2 && EcTypes.pv_equal pv1 pv2
 
     | Fglob(mp1,m1), Fglob(mp2,m2) ->
-      EcPath.m_equal mp1 mp2 && EcIdent.id_equal m1 m2
+      EcIdent.id_equal mp1 mp2 && EcIdent.id_equal m1 m2
 
     | Fop(p1,lty1), Fop(p2,lty2) ->
         EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
@@ -534,7 +533,7 @@ module Hsform = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine (EcTypes.pv_hash pv) (EcIdent.id_hash m)
 
     | Fglob(mp, m) ->
-        Why3.Hashcons.combine (EcPath.m_hash mp) (EcIdent.id_hash m)
+        Why3.Hashcons.combine (EcIdent.id_hash mp) (EcIdent.id_hash m)
 
     | Fop(p, lty) ->
         Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
@@ -581,7 +580,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fop (_, tys)        -> union (fun a -> a.ty_fv) tys
     | Fpvar (PVglob pv,m) -> EcPath.x_fv (fv_add m Mid.empty) pv
     | Fpvar (PVloc _,m)   -> fv_add m Mid.empty
-    | Fglob (mp,m)        -> EcPath.m_fv (fv_add m Mid.empty) mp
+    | Fglob (mp,m)        -> fv_add mp (fv_add m Mid.empty)
     | Flocal id           -> fv_singleton id
     | Fapp (f, args)      -> union f_fv (f :: args)
     | Ftuple args         -> union f_fv args
@@ -716,7 +715,7 @@ let f_pvloc  v  m = f_pvar (pv_loc v.v_name) v.v_type m
 let f_pvarg  ty m = f_pvar pv_arg ty m
 
 let f_pvlocs vs menv = List.map (fun v -> f_pvloc v menv) vs
-let f_glob   mp m   = mk_form (Fglob (mp, m)) (tglob mp)
+let f_glob   m mem   = mk_form (Fglob (m, mem)) (tglob m)
 
 (* -------------------------------------------------------------------- *)
 let f_tt     = f_op EcCoreLib.CI_Unit.p_tt    [] tunit
@@ -1316,7 +1315,7 @@ let destr_pvar f =
 
 let destr_glob f =
   match f.f_node with
-  | Fglob(p,m) -> (p,m)
+  | Fglob(m , mem) -> (m, mem)
   | _ -> destr_error "destr_glob"
 
 (* -------------------------------------------------------------------- *)
@@ -1411,6 +1410,7 @@ let is_tuple     f = is_from_destr destr_tuple     f
 let is_op        f = is_from_destr destr_op        f
 let is_local     f = is_from_destr destr_local     f
 let is_pvar      f = is_from_destr destr_pvar      f
+let is_glob      f = is_from_destr destr_glob      f
 let is_proj      f = is_from_destr destr_proj      f
 let is_and       f = is_from_destr destr_and       f
 let is_or        f = is_from_destr destr_or        f
@@ -1560,8 +1560,9 @@ type f_subst = {
   fs_freshen  : bool; (* true means freshen locals *)
   fs_loc      : form Mid.t;
   fs_esloc    : expr Mid.t;
-  fs_ty      : ty_subst;
+  fs_ty       : ty_subst;
   fs_mem      : EcIdent.t Mid.t;
+  fs_modglob  : (EcIdent.t -> form) Mid.t; (* Mappings between abstract modules and their globals *)
   fs_memtype  : EcMemory.memtype option; (* Only substituted in Fcoe *)
   fs_mempred  : mem_pr Mid.t;  (* For predicates over memories,
                                  only substituted in Fcoe *)
@@ -1569,12 +1570,14 @@ type f_subst = {
 
 (* -------------------------------------------------------------------- *)
 module Fsubst = struct
+
   let f_subst_id = {
     fs_freshen  = false;
     fs_loc      = Mid.empty;
     fs_esloc    = Mid.empty;
-    fs_ty      = ty_subst_id;
+    fs_ty       = ty_subst_id;
     fs_mem      = Mid.empty;
+    fs_modglob  = Mid.empty;
     fs_memtype  = None;
     fs_mempred  = Mid.empty;
   }
@@ -1584,6 +1587,7 @@ module Fsubst = struct
     && is_ty_subst_id s.fs_ty
     && Mid.is_empty   s.fs_loc
     && Mid.is_empty   s.fs_mem
+    && Mid.is_empty   s.fs_modglob
     && Mid.is_empty   s.fs_esloc
     && s.fs_memtype = None
 
@@ -1595,6 +1599,8 @@ module Fsubst = struct
              fs_esloc    = odfl Mid.empty esloc;
              fs_mempred  = odfl Mid.empty mempred;
              fs_memtype  = mt; }
+
+  let f_norm_mod = ref (fun _ _ -> failwith "Module normalization function not set")
 
   (* ------------------------------------------------------------------ *)
   let f_bind_local s x t =
@@ -1609,11 +1615,26 @@ module Fsubst = struct
     let merger _ = Some m2 in
     { s with fs_mem = Mid.change merger m1 s.fs_mem }
 
-  let f_bind_mod s x mp =
-    assert (not (Mid.mem x s.fs_ty.ts_mp.sms_id));
-    let sms = EcPath.sms_bind_abs x mp s.fs_ty.ts_mp in
-    let sty = { s.fs_ty with ts_mp = sms } in
+  let f_bind_absmod s m1 m2 =
+    let merger o = assert (o = None); Some m2 in
+    let sty = { s.fs_ty with ts_absmod = Mid.change merger m1 s.fs_ty.ts_absmod } in
+    let sty = { sty with ts_cmod = Mid.add m1 (EcPath.mident m2) s.fs_ty.ts_cmod } in
     { s with fs_ty = sty }
+
+  let f_bind_cmod s m mp =
+    let merger o = assert (o = None); Some mp in
+    let sty = { s.fs_ty with ts_cmod = Mid.change merger m s.fs_ty.ts_cmod } in
+    { s with fs_ty = sty }
+
+  let f_bind_mod s x mp =
+    match EcPath.mget_ident_opt mp with
+    | Some id ->
+         f_bind_absmod s x id
+    | None ->
+       let nm = !f_norm_mod mhr mp in (* Only used to get a type, memory doesn't matter *)
+       let s = f_bind_cmod s x mp in
+       let sty = { s.fs_ty with ts_modtglob = Mid.add x nm.f_ty s.fs_ty.ts_modtglob } in
+       { s with fs_ty = sty; fs_modglob = Mid.add x (fun m -> !f_norm_mod m mp) s.fs_modglob }
 
   let f_bind_rename s xfrom xto ty =
     let xf = f_local xto ty in
@@ -1666,7 +1687,7 @@ module Fsubst = struct
 
   (* ------------------------------------------------------------------ *)
   let subst_xpath s f =
-    EcPath.x_subst s.fs_ty.ts_mp f
+    EcPath.x_subst_abs s.fs_ty.ts_cmod f
 
   let subst_stmt s c =
     let es =
@@ -1717,10 +1738,15 @@ module Fsubst = struct
         let ty' = ty_subst s.fs_ty fp.f_ty in
         f_pvar pv' ty' m'
 
-    | Fglob (mp, m) ->
+    | Fglob (mid, m) ->
         let m'  = Mid.find_def m m s.fs_mem in
-        let mp' = EcPath.m_subst s.fs_ty.ts_mp mp in
-        f_glob mp' m'
+        let mid = Mid.find_def mid mid s.fs_ty.ts_absmod in
+        begin
+          (* Have we computed the globals for this module *)
+          match Mid.find_opt mid s.fs_modglob with
+          | None -> f_glob mid m'
+          | Some f -> f m'
+        end
 
     | FhoareF hf ->
       let pr', po' =
@@ -1939,7 +1965,7 @@ module Fsubst = struct
 
   and mr_subst ~tx s mr : form p_mod_restr =
     let sx = subst_xpath s in
-    let sm = EcPath.m_subst s.fs_ty.ts_mp in
+    let sm = EcPath.m_subst_abs s.fs_ty.ts_cmod in
     { mr_xpaths = ur_app (fun s -> Sx.fold (fun m rx ->
           Sx.add (sx m) rx) s Sx.empty) mr.mr_xpaths;
       mr_mpaths = ur_app (fun s -> Sm.fold (fun m r ->
@@ -1948,7 +1974,7 @@ module Fsubst = struct
     }
 
   and subst_mty ~tx s mty =
-    let sm = EcPath.m_subst s.fs_ty.ts_mp in
+    let sm = EcPath.m_subst_abs s.fs_ty.ts_cmod in
 
     let mt_params = List.map (snd_map (subst_mty ~tx s)) mty.mt_params in
     let mt_name   = mty.mt_name in
@@ -1984,7 +2010,7 @@ module Fsubst = struct
     else
       let s = match gty' with
         | GTty   ty -> f_bind_rename s x x' ty
-        | GTmodty _ -> f_bind_mod s x (EcPath.mident x')
+        | GTmodty _ -> f_bind_absmod s x x'
         | GTmem   _ -> f_bind_mem s x x'
       in
         (s, (x', gty'))

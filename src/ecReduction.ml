@@ -37,11 +37,7 @@ module EqTest_base = struct
     | Tfun (t1, t2), Tfun (t1', t2') ->
         for_type env t1 t1' && for_type env t2 t2'
 
-    | Tglob mp, _ when EcEnv.NormMp.tglob_reducible env mp ->
-        for_type env (EcEnv.NormMp.norm_tglob env mp) t2
-
-    | _, Tglob mp when EcEnv.NormMp.tglob_reducible env mp ->
-        for_type env t1 (EcEnv.NormMp.norm_tglob env mp)
+    | Tglob m1, Tglob m2 -> EcIdent.id_equal m1 m2
 
     | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
         if
@@ -499,9 +495,9 @@ let is_alpha_eq hyps f1 f2 =
     let pv2 = EcSubst.subst_progvar subst pv2 in
     ensure (EqTest_i.for_pv env pv1 pv2) in
 
-  let check_mp env subst mp1 mp2 =
-    let mp2 = EcSubst.subst_mpath subst mp2 in
-    ensure (EqTest_i.for_mp env mp1 mp2) in
+  let check_mod subst m1 m2 =
+    let m2 = EcPath.mget_ident (EcSubst.subst_mpath subst (EcPath.mident m2)) in
+    ensure (EcIdent.id_equal m1 m2) in
 
   let check_xp env subst xp1 xp2 =
     let xp2 = EcSubst.subst_xpath subst xp2 in
@@ -544,9 +540,9 @@ let is_alpha_eq hyps f1 f2 =
       check_mem subst m1 m2;
       check_pv env subst p1 p2
 
-    | Fglob(p1,m1), Fglob(p2,m2) ->
-      check_mem subst m1 m2;
-      check_mp env subst p1 p2
+    | Fglob(m1,mem1), Fglob(m2,mem2) ->
+      check_mem subst mem1 mem2;
+      check_mod subst m1 m2
 
     | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 ->
       List.iter2 (check_ty env subst) ty1 ty2
@@ -1218,9 +1214,7 @@ let reduce_head simplify ri env hyps f =
       f_app (Fsubst.f_subst subst body) eargs f.f_ty
 
     (* μ-reduction *)
-  | Fglob (mp, m) when ri.modpath ->
-    let f' = NormMp.norm_glob env m mp in
-    if f_equal f f' then raise nohead else f'
+  | Fglob (_, _) when ri.modpath -> raise nohead
 
     (* μ-reduction *)
   | Fpvar (pv, m) when ri.modpath ->
@@ -1621,9 +1615,7 @@ let rec conv ri env f1 f2 stk =
 
   | Fglob (m1, mem1), Fglob (m2, mem2)
       when
-        EcPath.m_equal
-          (EcEnv.NormMp.norm_mpath env m1)
-          (EcEnv.NormMp.norm_mpath env m2)
+        EcIdent.id_equal m1 m2
         && EcMemory.mem_equal mem1 mem2 ->
       conv_next ri env f1 stk
 

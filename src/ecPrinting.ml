@@ -671,7 +671,7 @@ let is_pstop name =
 (* -------------------------------------------------------------------- *)
 let rec pp_type_r ppe outer fmt ty =
   match ty.ty_node with
-  | Tglob m -> Format.fprintf fmt "(glob %a)" (pp_topmod ppe) m
+  | Tglob m -> Format.fprintf fmt "(glob %a)" EcIdent.pp_ident m
 
   | Tunivar x -> pp_tyunivar ppe fmt x
   | Tvar    x -> pp_tyvar ppe fmt x
@@ -1468,8 +1468,8 @@ and try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
           && (EcMemory.mem_equal me2 EcFol.mright)
         ->
 
-      let pv1 = (PPEnv.mod_symb ppe x1) in
-      let pv2 = (PPEnv.mod_symb ppe x2) in
+      let pv1 = (PPEnv.mod_symb ppe (EcPath.mident x1)) in
+      let pv2 = (PPEnv.mod_symb ppe (EcPath.mident x2)) in
 
       if pv1 = pv2 then Some (`Glob pv1) else None
 
@@ -1605,7 +1605,7 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
         let args = List.map (curry f_local |- snd_map ti) nt.ont_args in
         let f    = f_op p tv (toarrow tv rty) in
         let f    = f_app f args rty in
-        let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev) f in
+        let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev ppe.ppe_env) f in
         let f    = f_app f a oty in
         pp_form_core_r ppe outer fmt f; true
 
@@ -1674,10 +1674,10 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Fglob (mp, i) -> begin
     match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
     | Some i' when EcMemory.mem_equal i i' ->
-        Format.fprintf fmt "(glob %a)" (pp_topmod ppe) mp
+        Format.fprintf fmt "(glob %a)" (pp_topmod ppe) (EcPath.mident mp)
     | _ ->
         let ppe = PPEnv.enter_by_memid ppe i in
-        Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_mem ppe) i
+        Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) (EcPath.mident mp) (pp_mem ppe) i
     end
 
   | Fquant (q, bd, f) ->

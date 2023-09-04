@@ -139,7 +139,7 @@ let add_tyvars (s : subst) (xs : EcIdent.t list) (tys : ty list) =
 let rec subst_ty (s : subst) (ty : ty) =
   match ty.ty_node with
   | Tglob mp ->
-     tglob (subst_mpath s mp)
+     tglob (EcPath.mget_ident (subst_mpath s (EcPath.mident mp)))
 
   | Tunivar _ ->
      ty                         (* FIXME *)
@@ -491,7 +491,7 @@ let rec subst_form (s : subst) (f : form) =
      f_pvar pv ty m
 
   | Fglob (mp, m) ->
-     let mp = subst_mpath s mp in
+     let mp = EcPath.mget_ident (subst_mpath s (EcPath.mident mp)) in
      let m = subst_mem s m in
      f_glob mp m
 

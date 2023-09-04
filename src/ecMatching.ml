@@ -315,7 +315,8 @@ module MEV = struct
     let v = EV.fold (fun x k v -> f x (`Mod  k) v) m.evm_mod  v in
     v
 
-  let assubst ue ev =
+  let assubst ue ev env =
+    Fsubst.f_norm_mod := EcEnv.NormMp.norm_glob env;
     let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.assubst ue } in
     let subst = Fsubst.f_subst_init ~sty:tysubst () in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
@@ -394,7 +395,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
     let default () =
       let subject = Fsubst.f_subst subst subject in
-      let ptn = Fsubst.f_subst (MEV.assubst ue !ev) ptn in
+      let ptn = Fsubst.f_subst (MEV.assubst ue !ev env) ptn in
       if not (conv ptn subject) then failure ()
     in
 
@@ -420,7 +421,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
           | Some `Unset ->
               let ssbj = Fsubst.f_subst subst subject in
-              let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) ssbj in
+              let ssbj = Fsubst.f_subst (MEV.assubst ue !ev env) ssbj in
               if not (Mid.set_disjoint mxs ssbj.f_fv) then
                 (* TODO: bug? why not failure ()?*)
                 raise MatchFailure;
@@ -434,7 +435,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               let ssbj = Fsubst.f_subst subst subject in
 
               if not (conv ssbj a) then
-                let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) subject in
+                let ssbj = Fsubst.f_subst (MEV.assubst ue !ev env) subject in
                 if not (conv ssbj a) then
                   doit env ilc a ssbj
                 else
@@ -536,9 +537,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           if not (EcBigInt.equal i1 i2) then failure ();
 
       | Fglob (mp1, me1), Fglob (mp2, me2) ->
-          let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
-          let mp2 = EcEnv.NormMp.norm_mpath env mp2 in
-            if not (EcPath.m_equal mp1 mp2) then
+            if not (EcIdent.id_equal mp1 mp2) then
               failure ();
             doit_mem env mxs me1 me2
 
@@ -739,7 +738,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             let subst =
               if   id_equal x1 x2
               then subst
-              else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
+              else Fsubst.f_bind_absmod subst x2 x1
 
             and env = EcEnv.Mod.bind_local x1 p1 env in
 

@@ -21,7 +21,7 @@ type ty = private {
 }
 
 and ty_node =
-  | Tglob   of EcPath.mpath (* The tuple of global variable of the module *)
+  | Tglob   of EcIdent.t (* The tuple of global variable of the module *)
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
@@ -44,7 +44,7 @@ val tvar    : EcIdent.t -> ty
 val ttuple  : ty list -> ty
 val tconstr : EcPath.path -> ty list -> ty
 val tfun    : ty -> ty -> ty
-val tglob   : EcPath.mpath -> ty
+val tglob   : EcIdent.t -> ty
 val tpred   : ty -> ty
 
 val ty_fv_and_tvar : ty -> int Mid.t
@@ -74,7 +74,9 @@ val ty_check_uni : ty -> unit
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_mp  : EcPath.smsubst;
+  ts_absmod    : EcIdent.t Mid.t;
+  ts_cmod      : EcPath.mpath Mid.t;
+  ts_modtglob  : ty Mid.t;
   ts_u  : ty Muid.t;
   ts_v  : ty Mid.t;
 }
