@@ -164,7 +164,8 @@ module LowMatch = struct
             else EcIdent.fresh x
           in (x, xty)) cvars in
       let vars = List.map (curry f_local) names in
-      let po = f_op cname (List.snd tyinst) f.f_ty in
+      let cty = toarrow (List.snd names) f.f_ty in
+      let po = f_op cname (List.snd tyinst) cty in
       let po = f_app po vars f.f_ty in
       f_exists (List.map (snd_map gtty) names) (f_eq f po) in
 
