@@ -9,7 +9,8 @@ ECEXTRA   ?= --report=report.log
 ECPROVERS ?= Alt-Ergo Z3 CVC4
 CHECKPY   ?=
 CHECK     := $(CHECKPY) scripts/testing/runtest
-CHECK     += --bin-args="$(ECARGS)" --bin-args="$(ECPROVERS:%=-p %)"
+CHECK     += --bin=./ec.native --bin-args="$(ECARGS)"
+CHECK     += --bin-args="$(ECPROVERS:%=-p %)"
 CHECK     += --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
 CHECK     += $(ECEXTRA) config/tests.config
 

@@ -144,7 +144,12 @@ let main () =
           | None ->
               EcRelocate.resource ["commands"] in
         let cmd  = Filename.concat root "runtest" in
-        let args = ["runtest"; input.runo_input] @ input.runo_scenarios in
+        let args = [
+            "runtest";
+            Format.sprintf "--bin=%s" Sys.executable_name;
+            input.runo_input
+          ] @ input.runo_scenarios
+        in
         Format.eprintf "Executing: %s@." (String.concat " " (cmd :: args));
         Unix.execv cmd (Array.of_list args)
       end
