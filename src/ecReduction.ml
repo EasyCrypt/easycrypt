@@ -1880,6 +1880,7 @@ module User = struct
         let rec doit conds f =
           match sform_of_form (simp f) with
           | SFimp (f1, f2) -> doit (f1 :: conds) f2
+          | SFiff (f1, f2)
           | SFeq  (f1, f2) -> (f1, f2, List.rev conds)
           | _ when ty_equal tbool (EcEnv.ty_hnorm f.f_ty env) ->
             (f, f_true, List.rev conds)
