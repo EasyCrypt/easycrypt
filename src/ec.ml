@@ -218,7 +218,7 @@ let main () =
   begin let open EcUserMessages in register () end;
 
   (* Initialize I/O + interaction module *)
-  let (prvopts, input, terminal, interactive, eco) =
+  let (prvopts, input, terminal, interactive, eco, gendoc) =
     match options.o_command with
     | `Config ->
         let config = {
@@ -262,7 +262,7 @@ let main () =
           then lazy (T.from_emacs ())
           else lazy (T.from_tty ())
 
-        in (cliopts.clio_provers, None, terminal, true, false)
+        in (cliopts.clio_provers, None, terminal, true, false, false)
     end
 
     | `Compile cmpopts -> begin
@@ -283,13 +283,14 @@ let main () =
           lazy (T.from_channel ~name ~gcstats ~progress (open_in name))
         in
           ({cmpopts.cmpo_provers with prvo_iterate = true},
-           Some name, terminal, false, cmpopts.cmpo_noeco)
+           Some name, terminal, false, cmpopts.cmpo_noeco, cmpopts.cmpo_doc)
 
       end
 
     | `Runtest _ ->
         (* Eagerly executed *)
         assert false
+
   in
 
   (match input with
@@ -418,11 +419,13 @@ let main () =
         oiter (T.setwidth terminal)
           (let gs = EcEnv.gstate (EcScope.env (EcCommands.current ())) in
            match EcGState.getvalue "PP:width" gs with
-           | Some (`Int i) -> Some i | _ -> None);
+           | Some (`Int i) -> Some i | _ -> None);    
 
         begin
-          match EcLocation.unloc (T.next terminal) with
-          | EP.P_Prog (commands, locterm) ->
+          match snd_map EcLocation.unloc (T.next terminal) with
+          | (src, EP.P_Prog (commands, locterm)) ->
+              let src = String.strip src in
+              (* TODO REMOVE Format.eprintf "@.@.[W]%s@.@." src; *)
               terminate := locterm;
               List.iter
                 (fun p ->
@@ -431,7 +434,7 @@ let main () =
                    let break = p.EP.gl_debug = Some `Break in
                      try
                        let tdelta =
-                         EcCommands.process ~timed ~break p.EP.gl_action
+                         EcCommands.process ~src ~timed ~break p.EP.gl_action
                        in tstats loc tdelta
                      with
                      | EcCommands.Restart ->
@@ -445,16 +448,22 @@ let main () =
                    end)
                 commands
 
-          | EP.P_Undo i ->
+          | _, EP.P_DocComment doc ->
+             EcCommands.doc_comment doc
+
+          | _, EP.P_Undo i ->
               EcCommands.undo i
-          | EP.P_Exit ->
+          | _, EP.P_Exit ->
               terminate := true
         end;
+        
         T.finish `ST_Ok terminal;
         if !terminate then begin
             T.finalize terminal;
             if not eco then
               finalize_input input (EcCommands.current ());
+            if gendoc then
+              EcDoc.generate_html input (EcCommands.current ());
             exit 0
           end;
       with

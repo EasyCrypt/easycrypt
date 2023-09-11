@@ -606,7 +606,8 @@
 %token ZETA
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4 NUMOP
 %token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
-%token < Lexing.position> FINAL
+%token <Lexing.position> FINAL
+%token <EcParsetree.dockind * string> DOCCOMMENT
 
 %nonassoc prec_below_comma
 %nonassoc COMMA ELSE
@@ -4011,6 +4012,9 @@ prog_r:
 
 | EXIT FINAL
    { P_Exit }
+
+| d=DOCCOMMENT
+   { P_DocComment d }
 
 | error
    { parse_error (EcLocation.make $startpos $endpos) None }

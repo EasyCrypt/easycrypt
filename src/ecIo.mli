@@ -8,6 +8,7 @@ val from_string  : string -> ecreader
 
 (* -------------------------------------------------------------------- *)
 val finalize : ecreader -> unit
+val xparse   : ecreader -> string * EcParsetree.prog
 val parse    : ecreader -> EcParsetree.prog
 val parseall : ecreader -> EcParsetree.global list
 val drain    : ecreader -> unit
