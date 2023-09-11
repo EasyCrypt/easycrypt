@@ -1399,7 +1399,7 @@ module Op = struct
     let cont (env : Sem.senv) =
       (`Det, Sem.translate_e env ret) in
 
-    let _, aout = Sem.translate_s env cont body.f_body in
+    let mode, aout = Sem.translate_s env cont body.f_body in
     let aout = form_of_expr mhr aout in (* FIXME: translate to forms directly? *)
     let aout = f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids) aout in
 
@@ -1413,7 +1413,93 @@ module Op = struct
       op_unfold   = None;
     } in
 
-    bind scope (unloc op.ppo_name, opdecl)
+    let oppath = EcPath.pqname (path scope) (unloc op.ppo_name) in
+
+    let scope = bind scope (unloc op.ppo_name, opdecl) in
+
+    let scope =
+      let prax =
+        let locs  = List.map (fun (x, ty) -> (EcIdent.create x, ty)) params in
+        let res   = f_pvar pv_res sig_.fs_ret mhr in
+        let resx  = EcIdent.create "v" in
+        let resv  = f_local resx sig_.fs_ret in
+        let prmem = EcIdent.create "&m" in
+
+        let mu =
+          let sem =
+            f_app
+              (f_op oppath [] opdecl.op_ty)
+              (List.map (fun (x, ty) -> f_local x ty) locs)
+              (match mode with `Det -> sig_.fs_ret | `Distr -> tdistr sig_.fs_ret) in
+
+          match mode with
+          | `Det ->
+             f_if (f_eq sem resv) f_r1 f_r0
+
+          | `Distr ->
+             f_mu_x sem resv
+        in
+
+        f_forall
+          [(prmem, GTmem EcMemory.abstract_mt)]
+          (f_forall
+             (List.map (fun (x, ty) -> (x, GTty ty)) ((resx, sig_.fs_ret) :: locs))
+             (f_eq
+                (f_pr prmem
+                   f
+                   (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs))
+                   (f_eq res resv))
+                mu))
+      in
+
+      let prax = EcDecl.{
+        ax_tparams    = [];
+        ax_spec       = prax;
+        ax_kind       = `Lemma;
+        ax_loca       = op.ppo_locality;
+        ax_visibility = `Visible;
+      } in
+
+      Ax.bind scope (unloc op.ppo_name ^ "_opsem", prax) in
+
+    let scope =
+      match mode with
+      | `Det ->
+         let hax =
+           let locs  = List.map (fun (x, ty) -> (EcIdent.create x, ty)) params in
+           let res   = f_pvar pv_res sig_.fs_ret mhr in
+           let args  = f_pvar pv_arg sig_.fs_arg mhr in
+
+           f_forall
+             (List.map (fun (x, ty) -> (x, GTty ty)) locs)
+             (f_hoareF
+                (f_eq
+                   args
+                   (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs)))
+                f
+                (f_eq
+                   res
+                   (f_app
+                      (f_op oppath [] opdecl.op_ty)
+                      (List.map (fun (x, ty) -> f_local x ty) locs)
+                      sig_.fs_ret)))
+         in
+
+         let prax = EcDecl.{
+           ax_tparams    = [];
+           ax_spec       = hax;
+           ax_kind       = `Lemma;
+           ax_loca       = op.ppo_locality;
+           ax_visibility = `Visible;
+         } in
+
+         Ax.bind scope (unloc op.ppo_name ^ "_opsem_det", prax)
+
+      | `Distr ->
+         scope
+    in
+
+    scope
 end
 
 (* -------------------------------------------------------------------- *)
