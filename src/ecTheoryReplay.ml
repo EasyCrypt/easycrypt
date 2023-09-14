@@ -133,7 +133,8 @@ let get_open_oper exn env p tys =
 let rec oper_compatible exn env ob1 ob2 =
   match ob1, ob2 with
   | OP_Plain(f1,_), OP_Plain(f2,_)  ->
-    error_body exn (EcReduction.is_conv (EcEnv.LDecl.init env []) f1 f2)
+    let ri = { EcReduction.full_red with delta_p = fun _-> `Force; } in
+    error_body exn (EcReduction.is_conv ~ri:ri (EcEnv.LDecl.init env []) f1 f2)
   | OP_Plain({f_node = Fop(p,tys)},_), _ ->
     let ob1 = get_open_oper exn env p tys  in
     oper_compatible exn env ob1 ob2
