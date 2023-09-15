@@ -2263,13 +2263,13 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
         Format.fprintf fmt ": %a" (pp_type ppe) ty
 
     | Some (OP_Plain (f, _)) ->
-        let ((subppe, pp_vds), e, has_vds) =
-          let (vds, e) =
+        let ((subppe, pp_vds), f, has_vds) =
+          let (vds, f) =
             match f.f_node with
             | Fquant (Llambda, vds, f) ->
                (List.map (snd_map gty_as_ty) vds, f)
             | _ -> ([], f) in
-          (pp_locbinds ppe ~fv:f.f_fv vds, e,
+          (pp_locbinds ppe ~fv:f.f_fv vds, f,
            match vds with [] -> false | _ -> true)
         in
           if has_vds then
@@ -2277,7 +2277,8 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
               (pp_type ppe) f.f_ty (pp_form subppe) f
           else
             Format.fprintf fmt ":@ %a =@ %a"
-              (pp_type ppe) e.f_ty (pp_form subppe) f
+              (pp_type ppe) f.f_ty (pp_form subppe) f
+
     | Some (OP_Constr (indp, i)) ->
         Format.fprintf fmt
           ": %a =@ < %d-th constructor of %a >"
