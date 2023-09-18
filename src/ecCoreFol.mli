@@ -476,7 +476,6 @@ type f_subst = private {
 
 (* -------------------------------------------------------------------- *)
 module Fsubst : sig
-  val f_norm_mod  : (EcIdent.t -> EcPath.mpath -> form) ref
   val f_subst_id  : f_subst
   val is_subst_id : f_subst -> bool
 
@@ -491,7 +490,7 @@ module Fsubst : sig
   val f_bind_local  : f_subst -> EcIdent.t -> form -> f_subst
   val f_bind_mem    : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
   val f_bind_absmod : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
-  val f_bind_mod    : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
+  val f_bind_mod    : f_subst -> EcIdent.t -> EcPath.mpath -> (EcIdent.t -> form) -> f_subst
   val f_bind_rename : f_subst -> EcIdent.t -> EcIdent.t -> ty -> f_subst
 
   val f_subst   : ?tx:(form -> form -> form) -> f_subst -> form -> form

@@ -1587,12 +1587,10 @@ module Fsubst = struct
     let sty = odfl ty_subst_id sty in
     { f_subst_id
         with fs_freshen  = odfl false freshen;
-             fs_ty      = sty;
+             fs_ty       = sty;
              fs_esloc    = odfl Mid.empty esloc;
              fs_mempred  = odfl Mid.empty mempred;
              fs_memtype  = mt; }
-
-  let f_norm_mod = ref (fun _ _ -> failwith "Module normalization function not set")
 
   (* ------------------------------------------------------------------ *)
   let f_bind_local s x t =
@@ -1618,15 +1616,15 @@ module Fsubst = struct
     let sty = { s.fs_ty with ts_cmod = Mid.change merger m s.fs_ty.ts_cmod } in
     { s with fs_ty = sty }
 
-  let f_bind_mod s x mp =
+  let f_bind_mod s x mp norm_mod =
     match EcPath.mget_ident_opt mp with
     | Some id ->
          f_bind_absmod s x id
     | None ->
-       let nm = !f_norm_mod mhr mp in (* Only used to get a type, memory doesn't matter *)
+       let nm_ty = (norm_mod mhr).f_ty in
        let s = f_bind_cmod s x mp in
-       let sty = { s.fs_ty with ts_modtglob = Mid.add x nm.f_ty s.fs_ty.ts_modtglob } in
-       { s with fs_ty = sty; fs_modglob = Mid.add x (fun m -> !f_norm_mod m mp) s.fs_modglob }
+       let sty = { s.fs_ty with ts_modtglob = Mid.add x nm_ty s.fs_ty.ts_modtglob } in
+       { s with fs_ty = sty; fs_modglob = Mid.add x norm_mod s.fs_modglob }
 
   let f_bind_rename s xfrom xto ty =
     let xf = f_local xto ty in
