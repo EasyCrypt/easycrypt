@@ -316,11 +316,10 @@ module MEV = struct
     v
 
   let assubst ue ev env =
-    Fsubst.f_norm_mod := EcEnv.NormMp.norm_glob env;
     let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.assubst ue } in
     let subst = Fsubst.f_subst_init ~sty:tysubst () in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
-    let subst = EV.fold (fun x m s -> Fsubst.f_bind_mod s x m) ev.evm_mod subst in
+    let subst = EV.fold (fun x mp s -> EcFol.f_bind_mod s x mp env) ev.evm_mod subst in
     let seen  = ref Sid.empty in
 
     let rec for_ident x binding subst =

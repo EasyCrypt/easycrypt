@@ -142,7 +142,6 @@ module LowApply = struct
   and check (mode : [`Intro | `Elim]) (pt : proofterm) (tc : ckenv) =
     let hyps = hyps_of_ckenv tc in
     let env  = LDecl.toenv hyps in
-    Fsubst.f_norm_mod := NormMp.norm_glob env;
 
     let rec check_args (sbt, ax, nargs) args =
       match args with
@@ -176,7 +175,7 @@ module LowApply = struct
                 if mode = `Elim then f_imps obl f
                 else f_and (f_ands obl) f
             in
-            (Fsubst.f_bind_mod sbt x mp, f)
+            (EcFol.f_bind_mod sbt x mp env, f)
           with _ -> raise InvalidProofTerm
         end
 
@@ -1669,7 +1668,7 @@ module LowSubst = struct
 
     (* Substitution of globs *)
     | Fglob (mp, m), None when kind.sk_glob -> Some (`Glob (mp, m))
-    | Fglob (mp, m), Some (`Glob (mp', m')) when kind.sk_glob ->
+    | Fglob (mp, m), Some (`Glob (mp', _)) when kind.sk_glob ->
         if   EcIdent.id_equal mp mp'
         then Some (`Glob (mp, m))
         else None

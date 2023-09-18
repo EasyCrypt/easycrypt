@@ -12,6 +12,9 @@ module CI = EcCoreLib
 include EcCoreFol
 
 (* -------------------------------------------------------------------- *)
+let f_bind_mod s x mp env = Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
+
+(* -------------------------------------------------------------------- *)
 let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
   let f_pvlocs ty vs m =
     let arg = f_pvarg ty m in

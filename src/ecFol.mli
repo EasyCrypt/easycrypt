@@ -8,6 +8,9 @@ open EcMemory
 include module type of struct include EcCoreFol end
 
 (* -------------------------------------------------------------------- *)
+val f_bind_mod : f_subst -> EcIdent.t -> EcPath.mpath -> EcEnv.env -> f_subst
+
+(* -------------------------------------------------------------------- *)
 val f_losslessF: xpath -> form
 
 val f_eqparams:
