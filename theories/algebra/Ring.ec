@@ -448,6 +448,14 @@ abstract theory ComRing.
   lemma mulr_intr x z : x * (ofint z) = intmul x z.
   proof. by rewrite mulrzAr mulr1. qed.
 
+  lemma fracrDE (n1 n2 d1 d2 : t):
+    unit d1 => unit d2 =>
+      n1 / d1 + n2 / d2 = (n1 * d2 + n2 * d1) / (d1 * d2).
+  proof.
+  move=> inv_d1 inv_d2; rewrite mulrDl [n1 * d2]mulrC.
+  by rewrite !invrM //; congr; rewrite mulrACA divrr // ?(mul1r, mulr1).
+  qed.
+
   op exp (x : t) (n : int) =
     if   n < 0
     then invr (iterop (-n) ComRing.( * ) x oner)

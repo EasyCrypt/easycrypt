@@ -103,6 +103,21 @@ by apply/(@eq_cnvto_from N)=> n leNn; apply/eq_sym/eq.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nz_cnvto l (s : int -> real) :
+  l <> 0%r => convergeto s l => exists N, forall n, (N <= n)%Int => s n <> 0%r.
+proof.
+move=> nz_l /(_ (`|l| / 2%r) _).
+- by rewrite mulr_gt0 ?invr_gt0 // normr_gt0.
+case=> N cnv; exists N => n ge_N_n; rewrite -normr_gt0.
+apply: (@ltr_trans (`|l| / 2%r)); first by rewrite divr_gt0 // normr_gt0.
+have ->: `|l| / 2%r = `|l| - `|l| / 2%r by field.
+apply: (@ltr_le_trans (`|l| - `|s n - l|)).
+- by rewrite ltr_add2l ltr_opp2 &(cnv).
+have /ler_trans := ler_sub_norm_add l (s n - l); apply.
+by apply: lerr_eq; congr; ring.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma cnvtoC c: convergeto (fun x => c) c.
 proof. by move=> e gt0e; exists 0 => n _; rewrite subrr. qed.
 
@@ -208,6 +223,44 @@ rewrite -(RField.invrK P) -RField.exprN1 -RField.exprM /= mulN1r.
 rewrite -(@log_mono_ltr (inv P)) //; 1: by apply/expr_gt0/invr_gt0.
 rewrite -rpow_int 1:invr_ge0 // logK 1:invr_gt0 1:// 1:/#.
 smt(ceil_bound). 
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma cnvtoV_nz l (s : int -> real) :
+     l <> 0%r
+  => convergeto s l
+  => convergeto (fun (n : int) => inv (s n)) (inv l).
+proof.
+move=> nz_l cnv e gt0_e; case: (nz_cnvto l s nz_l cnv) => N1 nz_s.
+have eq_un: forall n, (N1 <= n)%Int =>
+  `|inv (s n) - inv l| = `|s n - l| / (`|s n| * `|l|).
+- move=> n /nz_s => nz_sn; rewrite -(@div1r (s n)) -(@div1r l).
+  rewrite -mulNr fracrDE //= mulN1r distrC.
+  by rewrite !(normrM, normrV) //= mulf_neq0.
+case: (cnv (`|l| / 2%r) _) => [|N2 bd_snBl].
+- by rewrite divr_gt0 // normr_gt0.
+have bd_halfl: forall n, N2 <= n => `|l| / 2%r < `|s n|.
+- move=> n /bd_snBl bd; apply (@ltr_le_trans (`|l| - `|s n - l|)).
+  - have ->: `|l| / 2%r = `|l| - `|l| / 2%r by field.
+    by apply/ltr_add2l/ltr_opp2.
+  by rewrite distrC {2}(_ : s n = l - (l - s n)) 1:#ring &(ler_sub_dist).
+have bd_un: forall n, N1 <= n => N2 <= n =>
+  `|inv (s n) - inv l| <= (2%r / `|l| ^ 2) * `|s n - l|.
+- move=> n ^/eq_un -> /nz_s nz_sn le_N2_n.
+  rewrite mulrC &(ler_wpmul2r); first by apply: normr_ge0.  
+  rewrite expr2 !invrM ?normr0P // mulrCA.
+  apply: ler_wpmul2l; first by rewrite invr_ge0 normr_ge0.
+  rewrite -invf_div lef_pinv 1?divr_gt0 ?normr_gt0 //.
+  by apply/ltrW/bd_halfl.
+have := cnv (`|l| ^ 2 / 2%r * e) _.
+- by rewrite mulr_gt0 // divr_gt0 // expr_gt0 normr_gt0.
+case=> N3 bde; exists (max (max N1 N2) N3) => n.
+case/IntOrder.ler_maxrP=> /IntOrder.ler_maxrP [] 3?.
+have /ler_lt_trans := bd_un n _ _ => //; apply.
+rewrite -invf_div; have := bde n _ => //; pose d := _ / _.
+have gt0_d: 0%r < d by rewrite divr_gt0 // expr_gt0 normr_gt0.
+rewrite -(@ltr_pmul2l (inv d)) 1:&(invr_gt0) //.
+by move/ltr_le_trans; apply; apply/lerr_eq; field; apply/gtr_eqF.
 qed.
 
 (* -------------------------------------------------------------------- *)
