@@ -317,6 +317,16 @@ let parse_idir s =
   | Some (nm, s) -> (Some (expand nm), expand s)
 
 (* -------------------------------------------------------------------- *)
+let dirs_of_env =
+  let parse_ecpath s =
+    s |> String.split_on_char ';' |> List.map parse_idir
+  in
+  fun var ->
+  match Sys.getenv var with
+  | exception Not_found -> []
+  | s -> parse_ecpath s
+
+(* -------------------------------------------------------------------- *)
 let ldr_options_of_values ?ini values =
   if get_flag "boot" values then
     { ldro_idirs = []; ldro_boot = true; }
@@ -325,9 +335,11 @@ let ldr_options_of_values ?ini values =
       (nm, x, fl) in
 
     let idirs   = omap_dfl (fun x -> x.ini_idirs) [] ini in
+    let idirs = idirs @ dirs_of_env "EC_IDIRS" in
     let idirs   = List.map (add_rec false) idirs in
     let idirs_I = List.map (add_rec false) (List.map parse_idir (get_strings "I" values)) in
     let rdirs   = omap_dfl (fun x -> x.ini_rdirs) [] ini in
+    let rdirs = rdirs @ dirs_of_env "EC_RDIRS" in
     let rdirs   = List.map (add_rec true) rdirs in
     let idirs_R = List.map (add_rec true)  (List.map parse_idir (get_strings "R" values)) in
 
