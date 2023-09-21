@@ -225,6 +225,37 @@ rewrite -rpow_int 1:invr_ge0 // logK 1:invr_gt0 1:// 1:/#.
 smt(ceil_bound). 
 qed.
 
+lemma cnvtoV0 (f : int -> real):
+  (forall x, exists (N:int), forall n, N <= n => x < `|f n|) => 
+  convergeto (fun n => inv (f n)) 0%r.
+proof.
+  move=> h e he /=.
+  have [N hN]:= h (inv e).
+  exists N => n hn.
+  case (f n = 0%r) => [-> //| h0].
+  by rewrite normrV // -ltf_pinv // 1:/# RField.invrK hN.
+qed.
+
+lemma cnvtoVn :
+  convergeto (fun (n:int) => inv n%r) 0%r.
+proof. apply cnvtoV0 => x; exists (ceil x + 1); smt(ceil_ge). qed.
+
+lemma cnvtoVn2 :
+  convergeto (fun (n:int) => inv (n%r^2)) 0%r.
+proof. apply cnvtoV0 => x; exists (`|ceil x| + 1); smt(ler_eexpr ceil_ge). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma squeeze_cnvto (F1 F2 : int -> real) N (G : int -> real) l : 
+  (forall (x:int), N <= x => F1 x <= G x <= F2 x) =>
+  convergeto F1 l =>
+  convergeto F2 l =>
+  convergeto G l.
+proof.
+move=> hb h1 h2 e he.
+have [N1 hN1] := h1 e he; have [N2 hN2] := h2 e he.
+exists (max N (max N1 N2)) => /#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma cnvtoV_nz l (s : int -> real) :
      l <> 0%r
