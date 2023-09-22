@@ -1253,18 +1253,18 @@ module Op = struct
 
     let scope =
       List.fold_left (fun scope (rname, xs, ax, codom) ->
-          let ax = f_forall (List.map (snd_map gtty) xs) ax in
           let ax =
             let opargs  = List.map (fun (x, xty) -> e_local x xty) xs in
             let opapp   = List.map (tvar |- fst) tparams in
             let opapp   = e_app (e_op opname opapp ty) opargs codom in
 
             let subst   = EcSubst.add_opdef EcSubst.empty opname ([], opapp) in
-            let ax = EcSubst.subst_form subst ax in
+            let ax      = EcSubst.subst_form subst ax in
+            let ax      = f_forall (List.map (snd_map gtty) xs) ax in
 
             let uidmap  = EcUnify.UniEnv.close ue in
             let subst   = Fsubst.f_subst_init ~sty:(Tuni.subst uidmap) () in
-            let ax = Fsubst.f_subst subst ax in
+            let ax      = Fsubst.f_subst subst ax in
 
             ax
           in
