@@ -82,6 +82,26 @@ by move=> x; rewrite !mem_filter mem_undup andbC.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma summable_from_bounded (s : 'a -> real) :
+  forall (J : int -> 'a option),
+       enumerate J (support s)
+    => (exists M, forall n, big predT (fun a => `|s a|) (pmap J (range 0 n)) <= M)
+    => summable s.
+proof.
+move=> J enm [M hb]; exists M => l hl.
+have [n hn] := enumerate_pmap_range J l (support s) enm.
+pose I := pmap J (range 0 n).
+apply: (ler_trans (big predT (fun (a : 'a) => `|s a|) I)); last by apply hb.
+rewrite (@big_eq_idm_filter (support s)); 1:smt().
+rewrite (@partition_big (fun x => x) _ predT _ _ I).
++ apply: pmap_inj_in_uniq; last by apply range_uniq.
+  by move=> i j v _ _; case: enm => h _; apply/h.
++ by move=> a hin hs /=; rewrite /predT /=; apply /hn.
+apply: sub_ler_sum => // a /= _.
+by rewrite (@bigD1_cond_if _ _ _ a) //= big1 /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma eq_summable (s1 s2 : 'a -> real):
   (forall x, s1 x = s2 x) => summable s1 <=> summable s2.
 proof. by move=> /fun_ext ->. qed.
