@@ -1643,8 +1643,20 @@ module Fsubst = struct
     { s with fs_esloc = Mid.change merger xfrom s.fs_esloc }
 
   (* ------------------------------------------------------------------ *)
+  let f_rem_local s x =
+    { s with fs_loc = Mid.remove x s.fs_loc;
+             fs_esloc = Mid.remove x s.fs_esloc; }
+
   let f_rem_mem s m =
     { s with fs_mem = Mid.remove m s.fs_mem }
+
+  let f_rem_mod s x =
+    { s with
+        fs_ty = { (s.fs_ty) with
+          ts_absmod = Mid.remove x s.fs_ty.ts_absmod;
+          ts_modtglob = Mid.remove x s.fs_ty.ts_modtglob;
+          ts_cmod = Mid.remove x s.fs_ty.ts_cmod; };
+        fs_modglob = Mid.remove x s.fs_modglob; }
 
   (* ------------------------------------------------------------------ *)
   let add_local s (x,t as xt) =
@@ -1999,12 +2011,17 @@ module Fsubst = struct
         let mt' = EcMemory.mt_subst (ty_subst s.fs_ty) mt in
         if mt == mt' then gty else GTmem mt'
 
-  and add_binding ~tx s (x, gty) =
+  and add_binding ~tx s (x, gty as xt) =
     let gty' = subst_gty ~tx s gty in
     let x'   = if s.fs_freshen then EcIdent.fresh x else x in
 
-    if x == x' then
-      (s, (x, gty'))
+    if x == x' && gty == gty' then
+      let s = match gty with
+        | GTty    _ -> f_rem_local s x
+        | GTmodty _ -> f_rem_mod   s x
+        | GTmem   _ -> f_rem_mem   s x
+      in
+        (s, xt)
     else
       let s = match gty' with
         | GTty   ty -> f_bind_rename s x x' ty
