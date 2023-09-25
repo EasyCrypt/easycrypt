@@ -46,7 +46,7 @@ and f_node =
   | Fint    of BI.zint
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
-  | Fglob   of EcIdent.t     * memory
+  | Fglob   of EcTypes.tglob * memory
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
@@ -476,8 +476,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fpvar(pv1,s1), Fpvar(pv2,s2) ->
         EcIdent.id_equal s1 s2 && EcTypes.pv_equal pv1 pv2
 
-    | Fglob(mp1,m1), Fglob(mp2,m2) ->
-      EcIdent.id_equal mp1 mp2 && EcIdent.id_equal m1 m2
+    | Fglob(tg1,m1), Fglob(tg2,m2) ->
+        EcTypes.tglob_equal tg1 tg2 && EcIdent.id_equal m1 m2
 
     | Fop(p1,lty1), Fop(p2,lty2) ->
         EcPath.p_equal p1 p2 && List.all2 ty_equal lty1 lty2
@@ -532,8 +532,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fpvar(pv, m) ->
         Why3.Hashcons.combine (EcTypes.pv_hash pv) (EcIdent.id_hash m)
 
-    | Fglob(mp, m) ->
-        Why3.Hashcons.combine (EcIdent.id_hash mp) (EcIdent.id_hash m)
+    | Fglob(tg, m) ->
+        Why3.Hashcons.combine (EcTypes.tglob_hash tg) (EcIdent.id_hash m)
 
     | Fop(p, lty) ->
         Why3.Hashcons.combine_list ty_hash (EcPath.p_hash p) lty
@@ -580,7 +580,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fop (_, tys)        -> union (fun a -> a.ty_fv) tys
     | Fpvar (PVglob pv,m) -> EcPath.x_fv (fv_add m Mid.empty) pv
     | Fpvar (PVloc _,m)   -> fv_add m Mid.empty
-    | Fglob (mp,m)        -> fv_add mp (fv_add m Mid.empty)
+    | Fglob (tg,m)        -> fv_add m (EcTypes.tglob_fv tg)
     | Flocal id           -> fv_singleton id
     | Fapp (f, args)      -> union f_fv (f :: args)
     | Ftuple args         -> union f_fv args

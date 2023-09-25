@@ -43,7 +43,7 @@ and f_node =
   | Fint    of zint
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
-  | Fglob   of EcIdent.t * memory
+  | Fglob   of EcTypes.tglob * memory
   | Fop     of path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list

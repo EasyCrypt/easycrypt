@@ -14,14 +14,22 @@ type is_local  =           [ `Local | `Global ]
 val local_of_locality : locality -> is_local
 
 (* -------------------------------------------------------------------- *)
-type ty = private {
+type tglob1 =
+  | TG_mod of EcPath.mpath             (* The globals of the module *)
+  | TG_fun of EcPath.xpath             (* The globals of the procedure *)
+  | TG_var of EcPath.xpath             (* A concrete variable *)
+
+type tglob = tglob1 list
+
+(* -------------------------------------------------------------------- *)
+type ty = {
   ty_node : ty_node;
-  ty_fv   : int Mid.t;
+  ty_fv   : int EcIdent.Mid.t; (* only ident appearing in path *)
   ty_tag  : int;
 }
 
 and ty_node =
-  | Tglob   of EcIdent.t (* The tuple of global variable of the module *)
+  | Tglob   of tglob
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
@@ -36,6 +44,14 @@ type dom = ty list
 
 val dump_ty : ty -> string
 
+val tglob1_equal : tglob1 -> tglob1 -> bool
+val tglob1_hash  : tglob1 -> int
+val tglob1_fv    : tglob1 -> int Mid.t
+
+val tglob_equal : tglob -> tglob -> bool
+val tglob_hash  : tglob -> int
+val tglob_fv    : tglob -> int Mid.t
+
 val ty_equal : ty -> ty -> bool
 val ty_hash  : ty -> int
 
@@ -44,7 +60,7 @@ val tvar    : EcIdent.t -> ty
 val ttuple  : ty list -> ty
 val tconstr : EcPath.path -> ty list -> ty
 val tfun    : ty -> ty -> ty
-val tglob   : EcIdent.t -> ty
+val tglob   : tglob -> ty
 val tpred   : ty -> ty
 
 val ty_fv_and_tvar : ty -> int Mid.t
@@ -74,11 +90,10 @@ val ty_check_uni : ty -> unit
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_absmod    : EcIdent.t Mid.t;
-  ts_cmod      : EcPath.mpath Mid.t;
-  ts_modtglob  : ty Mid.t;
-  ts_u  : ty Muid.t;
-  ts_v  : ty Mid.t;
+  ts_absmod : EcPath.mpath Mid.t;
+  ts_cmod   : EcPath.mpath Mid.t; (* FIXME: what is the difference between these two maps? *)
+  ts_u      : ty Muid.t;
+  ts_v      : ty Mid.t;
 }
 
 val ty_subst_id    : ty_subst

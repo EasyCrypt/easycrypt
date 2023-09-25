@@ -16,6 +16,14 @@ let local_of_locality = function
   | `Declare -> `Local
 
 (* -------------------------------------------------------------------- *)
+type tglob1 =
+  | TG_mod of mpath             (* The globals of the module *)
+  | TG_fun of xpath             (* The globals of the procedure *)
+  | TG_var of xpath             (* A concrete variable *)
+
+type tglob = tglob1 list
+
+(* -------------------------------------------------------------------- *)
 type ty = {
   ty_node : ty_node;
   ty_fv   : int EcIdent.Mid.t; (* only ident appearing in path *)
@@ -23,7 +31,7 @@ type ty = {
 }
 
 and ty_node =
-  | Tglob   of EcIdent.t (* The tuple of global variable of the module *)
+  | Tglob   of tglob
   | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t
   | Ttuple  of ty list
@@ -32,6 +40,48 @@ and ty_node =
 
 type dom = ty list
 
+(* -------------------------------------------------------------------- *)
+let tglob1_equal (tg1 : tglob1) (tg2 : tglob1) =
+  match tg1, tg2  with
+  | TG_mod m1, TG_mod m2 ->
+     EcPath.m_equal m1 m2
+  | TG_fun f1, TG_fun f2 ->
+     EcPath.x_equal f1 f2
+  | TG_var x1, TG_var x2 ->
+     EcPath.x_equal x1 x2
+  | _, _ ->
+     false
+
+let tglob_equal (tg1 : tglob) (tg2 : tglob) =
+  List.for_all2 tglob1_equal tg1 tg2
+
+(* -------------------------------------------------------------------- *)
+let tglob1_hash (tg : tglob1) =
+  match tg with
+  | TG_mod m ->
+     EcPath.m_hash m
+  | TG_fun f ->
+      EcPath.x_hash f
+  | TG_var x ->
+     EcPath.x_hash x
+
+let tglob_hash (tg : tglob) =
+  Why3.Hashcons.combine_list tglob1_hash 0 tg
+
+(* -------------------------------------------------------------------- *)
+let tglob1_fv (tg : tglob1) =
+  match tg with
+  | TG_mod { m_top = `Local id } ->
+     EcIdent.fv_add id Mid.empty
+
+  | _ ->
+     Mid.empty
+
+(* -------------------------------------------------------------------- *)
+let tglob_fv (tg : tglob) =
+  List.fold_left (fun s x -> fv_union s (tglob1_fv x)) Mid.empty tg
+
+(* -------------------------------------------------------------------- *)
 let ty_equal : ty -> ty -> bool = (==)
 let ty_hash ty = ty.ty_tag
 
@@ -40,8 +90,8 @@ module Hsty = Why3.Hashcons.Make (struct
 
   let equal ty1 ty2 =
     match ty1.ty_node, ty2.ty_node with
-    | Tglob m1, Tglob m2 ->
-        EcIdent.id_equal m1 m2
+    | Tglob g1, Tglob g2 ->
+       tglob_equal g1 g2
 
     | Tunivar u1, Tunivar u2 ->
         uid_equal u1 u2
@@ -62,7 +112,7 @@ module Hsty = Why3.Hashcons.Make (struct
 
   let hash ty =
     match ty.ty_node with
-    | Tglob m          -> EcIdent.id_hash m
+    | Tglob   tg       -> tglob_hash tg
     | Tunivar u        -> u
     | Tvar    id       -> EcIdent.tag id
     | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
@@ -74,7 +124,7 @@ module Hsty = Why3.Hashcons.Make (struct
       List.fold_left (fun s a -> fv_union s (ex a)) Mid.empty in
 
     match ty with
-    | Tglob m          -> EcIdent.fv_add m Mid.empty
+    | Tglob   tg       -> union tglob1_fv tg
     | Tunivar _        -> Mid.empty
     | Tvar    _        -> Mid.empty (* FIXME: section *)
     | Ttuple  tys      -> union (fun a -> a.ty_fv) tys
@@ -99,8 +149,8 @@ module Hty = MSHty.H
 (* -------------------------------------------------------------------- *)
 let rec dump_ty ty =
   match ty.ty_node with
-  | Tglob p ->
-      EcIdent.tostring p
+  | Tglob _ ->                  (* FIXME *)
+      "glob"
 
   | Tunivar i ->
       Printf.sprintf "#%d" i
@@ -236,41 +286,42 @@ let fresh_id_of_ty (ty : ty) =
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_absmod    : EcIdent.t Mid.t;
-  ts_cmod      : EcPath.mpath Mid.t;
-  ts_modtglob  : ty Mid.t;
-  ts_u         : ty Muid.t;
-  ts_v         : ty Mid.t;
+  ts_absmod : EcPath.mpath Mid.t;
+  ts_cmod   : EcPath.mpath Mid.t; (* FIXME: what is the difference between these two maps? *)
+  ts_u      : ty Muid.t;
+  ts_v      : ty Mid.t;
 }
 
 let ty_subst_id =
   { ts_absmod = Mid.empty;
     ts_cmod = Mid.empty;
-    ts_modtglob = Mid.empty;
-    ts_u  = Muid.empty;
-    ts_v  = Mid.empty;
+    ts_u = Muid.empty;
+    ts_v = Mid.empty;
   }
 
 let is_ty_subst_id s =
   Mid.is_empty s.ts_absmod
   && Mid.is_empty s.ts_cmod
-  && Mid.is_empty s.ts_modtglob
   && Muid.is_empty s.ts_u
   && Mid.is_empty s.ts_v
+
+let tg1_subst (s : ty_subst) (tg : tglob1) =
+  let s = { sms_identity with sms_id = s.ts_absmod } in
+
+  match tg with
+  | TG_mod m ->
+     TG_mod (EcPath.m_subst s m)
+  | TG_fun f ->
+     TG_fun (EcPath.x_subst s f)
+  | TG_var x ->
+     TG_var (EcPath.x_subst s x)
 
 let rec ty_subst s =
   if is_ty_subst_id s then identity
   else
     fun ty ->
       match ty.ty_node with
-      | Tglob m -> begin
-          let m' = Mid.find_def m m s.ts_absmod in
-          begin
-            match Mid.find_opt m' s.ts_modtglob with
-            | None -> tglob m'
-            | Some ty -> ty_subst s ty
-          end
-        end
+      | Tglob tg -> tglob (List.map (tg1_subst s) tg)
       | Tunivar id    -> Muid.find_def ty id s.ts_u
       | Tvar id       -> Mid.find_def ty id s.ts_v
       | _ -> ty_map (ty_subst s) ty
