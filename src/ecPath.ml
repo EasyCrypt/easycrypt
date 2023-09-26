@@ -264,8 +264,8 @@ let mget_ident mp =
   | _ -> assert false
 
 let mget_ident_opt mp =
-  match mp.m_top with
-  | `Local id -> Some id
+  match mp.m_top, mp.m_args with
+  | `Local id, [] -> Some id
   | _ -> None
 
 let rec m_fv fv mp =
