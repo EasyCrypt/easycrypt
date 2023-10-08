@@ -367,3 +367,6 @@ proof. by smt(). qed.
 lemma lez_maxr a b :
   a <= b => max a b = b.
 proof. by smt(). qed.
+
+lemma maxzz : idempotent max by smt().
+lemma minzz : idempotent min by smt().

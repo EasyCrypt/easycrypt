@@ -193,37 +193,35 @@ let load_wtheory (genv : tenv) (th : WTheory.theory) : unit =
 (* Create why3 tuple theory with projector                              *)
 
 module Tuples = struct
-
   let ts = Hint.memo 17 (fun n ->
     let vl = ref [] in
-    for _i = 1 to n do
+    for _ = 1 to n do
       vl := WTy.create_tvsymbol (WIdent.id_fresh "a") :: !vl done;
-    WTy.create_tysymbol (WIdent.id_fresh ("tuple" ^ string_of_int n)) !vl WTy.NoDef)
+    WTy.create_tysymbol (WIdent.id_fresh (Format.sprintf "tuple%d" n)) !vl WTy.NoDef)
 
   let proj = Hdint.memo 17 (fun (n, k) ->
-    if not (0 <= k && k < n) then (Format.eprintf " k = %i; n = %i@." k n; assert false);
+    assert (0 <= k && k < n);
     let ts = ts n in
     let tl = List.map WTy.ty_var ts.WTy.ts_args in
     let ta = WTy.ty_app ts tl in
     let tr = List.nth tl k in
-    let id =
-      WIdent.id_fresh ("proj" ^ string_of_int n ^ "_" ^ string_of_int k) in
-    WTerm.create_fsymbol id [ta] tr)
+    let id = WIdent.id_fresh (Format.sprintf "proj%d_%d" n k) in
+    WTerm.create_fsymbol ~proj:true id [ta] tr)
 
   let fs = Hint.memo 17 (fun n ->
     let ts = ts n in
     let tl = List.map WTy.ty_var ts.WTy.ts_args in
     let ty = WTy.ty_app ts tl in
-    let id = WIdent.id_fresh ("Tuple" ^ string_of_int n) in
+    let id = WIdent.id_fresh (Format.sprintf "Tuple%d" n) in
     WTerm.create_fsymbol ~constr:1 id tl ty)
 
   let theory = Hint.memo 17 (fun n ->
     let ts = ts n and fs = fs n in
     let pl = List.mapi (fun i _ -> Some (proj (n, i))) ts.WTy.ts_args in
     let uc =
-      WTheory.create_theory ~path:["Easycrypt"]
-        (WIdent.id_fresh ("Tuple" ^ string_of_int n))  in
-    let uc = WTheory.add_data_decl uc [ts, [fs,pl]] in
+      let name = Format.sprintf "Tuple%d" n in
+      WTheory.create_theory ~path:["Easycrypt"] (WIdent.id_fresh name)  in
+    let uc = WTheory.add_data_decl uc [ts, [fs, pl]] in
     WTheory.close_theory uc)
 
 end
@@ -450,7 +448,7 @@ and trans_tydecl genv (p, tydecl) =
         let for_field (fname, fty) =
           let wfid  = pqoname (prefix p) fname in
           let wfty  = trans_ty (genv, lenv) fty in
-          let wcls  = WTerm.create_lsymbol (preid_p wfid) [wdom] (Some wfty) in
+          let wcls  = WTerm.create_lsymbol ~proj:true (preid_p wfid) [wdom] (Some wfty) in
           let w3op  = plain_w3op ~name:fname tparams wcls in
           ((wfid, w3op), wcls)
         in

@@ -653,3 +653,7 @@ op sempty ['a] (E : 'a -> bool) =
 lemma semptyNP ['a] (E : 'a -> bool) :
   !sempty E <=> exists x, E x.
 proof. by rewrite /sempty -negb_exists. qed.
+
+(* Locking (use with `rewrite [...]lock /= unlock`) *)
+op locked (x : 'a) = x axiomatized by unlock.
+lemma lock (x : 'a) : x = locked x by rewrite unlock.

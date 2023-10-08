@@ -1,6 +1,4 @@
-{ withProvers ? false, devDeps ? [] }:
-
-with import <nixpkgs> {};
+{ withProvers ? true, devDeps ? [] }:
 
 let why3_local =
   why3.overrideAttrs (o : rec {
@@ -13,18 +11,16 @@ let why3_local =
 in
 let why3 = why3_local; in
 
+with import <nixpkgs> {};
+
 let provers =
   if withProvers then [
     alt-ergo
     z3
   ] else []; in
 
-stdenv.mkDerivation {
-  pname = "easycrypt";
-  version = "git";
-  src = ./.;
-
-  buildInputs = [ git ] ++ (with ocamlPackages; [
+pkgs.mkShell {
+  buildInputs = devDeps ++ [ git ] ++ (with ocamlPackages; [
     ocaml
     findlib
     batteries
@@ -35,18 +31,11 @@ stdenv.mkDerivation {
     inifiles
     menhir
     menhirLib
+    merlin
     yojson
     why3
     zarith
+  ]) ++ (with python3Packages; [
+    pyyaml
   ]);
-
-  propagatedBuildInputs = [ why3 ]
-    ++ devDeps
-    ++ provers;
-
-  installPhase = ''
-    runHook preInstall
-    dune install --prefix $out -p $pname
-    runHook postInstall
-  '';
 }

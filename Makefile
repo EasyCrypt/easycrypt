@@ -26,7 +26,7 @@ default: build
 
 build:
 	rm -f src/ec.exe ec.native
-	$(DUNE) build
+	dune build -p easycrypt
 	ln -sf src/ec.exe ec.native
 ifeq ($(UNAME_P)-$(UNAME_S),arm-Darwin)
 	-codesign -f -s - src/ec.exe
