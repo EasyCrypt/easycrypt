@@ -81,7 +81,8 @@ lemma dmap_pred (d: 'a distr) (p: 'a -> bool) :
 proof.
 move => d_ll; apply eq_distr => x.
 rewrite dbiased1E clamp_id; first by smt(ge0_mu le1_mu).
-rewrite dmap1E /(\o) /pred1; smt(mu_not).
+rewrite dmap1E /(\o) /pred1 /=. 
+by move : (mu_not d p) => /#.
 qed.
 
 lemma dbiased1 : dbiased 1%r = dunit true.
