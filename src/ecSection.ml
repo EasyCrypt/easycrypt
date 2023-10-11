@@ -212,6 +212,8 @@ let rec on_form (cb : cb) (f : EcFol.form) =
     | EcFol.FhoareS   hs           -> on_hs  cb hs
     | EcFol.FcHoareF  chf          -> on_chf cb chf
     | EcFol.FcHoareS  chs          -> on_chs cb chs
+    | EcFol.FeHoareF  hf           -> on_ehf  cb hf
+    | EcFol.FeHoareS  hs           -> on_ehs  cb hs
     | EcFol.FequivF   ef           -> on_ef  cb ef
     | EcFol.FequivS   es           -> on_es  cb es
     | EcFol.FeagerF   eg           -> on_eg  cb eg
@@ -265,6 +267,17 @@ let rec on_form (cb : cb) (f : EcFol.form) =
     on_cost cb chs.EcFol.chs_co;
     on_stmt cb chs.EcFol.chs_s;
     on_memenv cb chs.EcFol.chs_m
+
+  and on_ehf cb hf =
+    on_form cb hf.EcFol.ehf_pr;
+    on_form cb hf.EcFol.ehf_po;
+    on_xp cb hf.EcFol.ehf_f
+
+  and on_ehs cb hs =
+    on_form cb hs.EcFol.ehs_pr;
+    on_form cb hs.EcFol.ehs_po;
+    on_stmt cb hs.EcFol.ehs_s;
+    on_memenv cb hs.EcFol.ehs_m
 
   and on_bhf cb bhf =
     on_form cb bhf.EcFol.bhf_pr;

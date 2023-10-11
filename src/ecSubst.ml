@@ -572,6 +572,24 @@ let rec subst_form (s : subst) (f : form) =
      let bhs_s = subst_stmt s bhs_s in
      f_bdHoareS bhs_m bhs_pr bhs_s bhs_po bhs_cmp bhs_bd
 
+   | FeHoareF { ehf_pr; ehf_f; ehf_po } ->
+     let ehf_pr, ehf_po =
+       let s = add_memory s mhr mhr in
+       let ehf_pr = subst_form s ehf_pr in
+       let ehf_po = subst_form s ehf_po in
+       (ehf_pr, ehf_po) in
+     let ehf_f  = subst_xpath s ehf_f in
+     f_eHoareF ehf_pr ehf_f ehf_po
+
+  | FeHoareS { ehs_m; ehs_pr; ehs_s; ehs_po } ->
+     let ehs_m, (ehs_pr, ehs_po) =
+       let s, ehs_m = subst_memtype s ehs_m in
+       let ehs_pr = subst_form s ehs_pr in
+       let ehs_po = subst_form s ehs_po in
+       ehs_m, (ehs_pr, ehs_po) in
+     let ehs_s = subst_stmt s ehs_s in
+     f_eHoareS ehs_m ehs_pr ehs_s ehs_po
+
   | FequivF { ef_pr; ef_fl; ef_fr; ef_po } ->
      let ef_pr, ef_po =
        let s = add_memory s mleft mleft in

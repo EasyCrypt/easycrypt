@@ -39,6 +39,21 @@ module Low = struct
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
+
+  let t_ehoare_rcond_r b at_pos tc =
+    let hs = tc1_as_ehoareS tc in
+    let m  = EcMemory.memory hs.ehs_m in
+    let hd,_,e,s = gen_rcond !!tc b m at_pos hs.ehs_s in
+    let pre =
+      match destr_app hs.ehs_pr with
+      | o, pre :: _ when f_equal o fop_interp_ehoare_form -> pre
+      | _ -> tc_error !!tc "the pre should have the form \"_ `|` _\"" in
+
+    let concl1  = f_hoareS hs.ehs_m pre hd e in
+    let concl2  = f_eHoareS_r { hs with ehs_s = s } in
+    FApi.xmutate1 tc `RCond [concl1; concl2]
+
+  (* ------------------------------------------------------------------ *)
   let t_choare_rcond_r b at_pos c tc =
     let c = EcUtils.odfl f_true c in
 
@@ -86,6 +101,7 @@ module Low = struct
 
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond   = FApi.t_low2 "hoare-rcond"   t_hoare_rcond_r
+  let t_ehoare_rcond  = FApi.t_low2 "ehoare-rcond"  t_ehoare_rcond_r
   let t_choare_rcond  = FApi.t_low3 "choare-rcond"  t_choare_rcond_r
   let t_bdhoare_rcond = FApi.t_low2 "bdhoare-rcond" t_bdhoare_rcond_r
   let t_equiv_rcond   = FApi.t_low3 "equiv-rcond"   t_equiv_rcond_r
@@ -102,8 +118,11 @@ let t_rcond side b at_pos c tc =
   | None when is_bdHoareS concl ->
     check_none (); Low.t_bdhoare_rcond b at_pos tc
   | None when is_cHoareS concl  -> Low.t_choare_rcond b at_pos c tc
-  | None ->
+  | None when is_hoareS concl ->
     check_none (); Low.t_hoare_rcond b at_pos tc
+  | None ->
+    check_none (); Low.t_ehoare_rcond b at_pos tc
+
   | Some side ->
     check_none (); Low.t_equiv_rcond side b at_pos tc
 
@@ -231,6 +250,19 @@ module LowMatch = struct
     FApi.xmutate1 tc `RCondMatch [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
+  let t_ehoare_rcond_match_r c at_pos tc =
+    let hs = tc1_as_ehoareS tc in
+    let (epr, hd, po1, _), (me, full) =
+      gen_rcond_full (!!tc, FApi.tc1_env tc) c hs.ehs_m at_pos hs.ehs_s in
+
+    let pr = ofold f_and hs.ehs_pr epr in
+
+    let concl1  = f_eHoareS_r { hs with ehs_s = hd; ehs_po = po1; } in
+    let concl2  = f_eHoareS_r { hs with ehs_pr = pr; ehs_m = me; ehs_s = full; } in
+
+    FApi.xmutate1 tc `RCondMatch [concl1; concl2]
+
+  (* ------------------------------------------------------------------ *)
   let t_bdhoare_rcond_match_r c at_pos tc =
     let bhs = tc1_as_bdhoareS tc in
     let (epr, hd, po1, _), (me, full) =
@@ -315,6 +347,9 @@ module LowMatch = struct
   let t_hoare_rcond_match =
     FApi.t_low2 "hoare-rcond-match" t_hoare_rcond_match_r
 
+  let t_ehoare_rcond_match =
+    FApi.t_low2 "hoare-rcond-match" t_ehoare_rcond_match_r
+
   let t_bdhoare_rcond_match =
     FApi.t_low2 "hoare-rcond-match" t_bdhoare_rcond_match_r
 
@@ -332,5 +367,6 @@ let t_rcond_match side c at_pos tc =
   match side with
   | None when is_bdHoareS concl -> LowMatch.t_bdhoare_rcond_match c at_pos tc
   | None when is_cHoareS concl -> LowMatch.t_choare_rcond_match c at_pos tc
+  | None when is_eHoareS concl -> LowMatch.t_ehoare_rcond_match c at_pos tc
   | None -> LowMatch.t_hoare_rcond_match c at_pos tc
   | Some side -> LowMatch.t_equiv_rcond_match side c at_pos tc

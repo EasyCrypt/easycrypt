@@ -203,9 +203,11 @@ and norm_lambda (st : state) (f : form) =
 
   | Fquant  _ | Fif     _ | Fmatch    _ | Flet _ | Fint _ | Flocal _
   | Fglob   _ | Fpvar   _ | Fop       _
+
   | FhoareF _   | FhoareS _
   | FcHoareF _  | FcHoareS _
   | FbdHoareF _ | FbdHoareS _
+  | FeHoareF _ | FeHoareS _
   | FequivF _   | FequivS _
   | FeagerF   _ | Fpr _ | Fcoe _
 
@@ -486,6 +488,23 @@ and cbv (st : state) (s : subst) (f : form) (args : args) : form =
     let hs_s  = norm_stmt s hs.hs_s in
     let hs_m  = norm_me s hs.hs_m in
     f_hoareS_r { hs_pr; hs_po; hs_s; hs_m }
+
+  | FeHoareF hf ->
+    assert (Args.isempty args);
+    assert (not (Subst.has_mem s mhr));
+    let ehf_pr  = norm st s hf.ehf_pr  in
+    let ehf_po  = norm st s hf.ehf_po  in
+    let ehf_f   = norm_xfun st s hf.ehf_f in
+    f_eHoareF_r { ehf_pr; ehf_f; ehf_po; }
+
+  | FeHoareS hs ->
+    assert (Args.isempty args);
+    assert (not (Subst.has_mem s (fst hs.ehs_m)));
+    let ehs_pr  = norm st s hs.ehs_pr in
+    let ehs_po  = norm st s hs.ehs_po in
+    let ehs_s   = norm_stmt s hs.ehs_s in
+    let ehs_m   = norm_me s hs.ehs_m in
+    f_eHoareS_r { ehs_pr; ehs_po; ehs_s; ehs_m }
 
   | FcHoareF chf ->
     assert (Args.isempty args);

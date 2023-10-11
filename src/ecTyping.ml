@@ -2051,6 +2051,7 @@ let top_is_mem_binding pf = match pf with
   | PFprob     _
   | PFBDhoareF _
   | PFChoareF  _
+  | PFehoareF  _
   | PFCoe      _ -> true
 
   | PFhole -> true
@@ -3578,6 +3579,14 @@ and trans_form_or_pattern
           unify_or_fail penv ue pre.pl_loc  ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           f_hoareF pre' fpath post'
+    | PFehoareF (pre, gp, post) ->
+        let fpath = trans_gamepath env gp in
+        let penv, qenv = EcEnv.Fun.hoareF fpath env in
+        let pre'  = transf penv pre in
+        let post' = transf qenv post in
+          unify_or_fail penv ue pre.pl_loc  ~expct:txreal pre'.f_ty;
+          unify_or_fail qenv ue post.pl_loc ~expct:txreal post'.f_ty;
+          f_eHoareF pre' fpath post'
 
     | PFBDhoareF (pre, gp, post, hcmp, bd) ->
         let fpath = trans_gamepath env gp in

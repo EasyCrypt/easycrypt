@@ -58,6 +58,9 @@ and f_node =
   | FbdHoareF of bdHoareF (* $hr / $hr *)
   | FbdHoareS of bdHoareS (* $hr  / $hr   *)
 
+  | FeHoareF of eHoareF (* $hr / $hr *)
+  | FeHoareS of eHoareS
+
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS (* $left,$right / $left,$right *)
 
@@ -117,6 +120,18 @@ and cHoareS = {
   chs_s  : stmt;
   chs_po : form;
   chs_co : cost; }
+
+and eHoareF = {
+  ehf_pr  : form;
+  ehf_f   : EcPath.xpath;
+  ehf_po  : form;
+}
+and eHoareS = {
+  ehs_m   : EcMemory.memenv;
+  ehs_pr  : form;
+  ehs_s   : stmt;
+  ehs_po  : form;
+}
 
 and bdHoareF = {
   bhf_pr  : form;
@@ -257,6 +272,13 @@ val f_cHoareS_r : cHoareS -> form
 
 val f_cHoareF : form -> xpath -> form -> cost -> form
 val f_cHoareS : memenv -> form -> stmt -> form -> cost -> form
+
+(* soft-constructors - expected hoare *)
+val f_eHoareF_r : eHoareF -> form
+val f_eHoareS_r : eHoareS -> form
+
+val f_eHoareF : form -> xpath -> form -> form
+val f_eHoareS : memenv -> form -> EcCoreModules.stmt -> form -> form
 
 (* soft-constructors - bd hoare *)
 val hoarecmp_opp : hoarecmp -> hoarecmp
@@ -408,6 +430,8 @@ val destr_hoareF    : form -> sHoareF
 val destr_hoareS    : form -> sHoareS
 val destr_cHoareF   : form -> cHoareF
 val destr_cHoareS   : form -> cHoareS
+val destr_eHoareF   : form -> eHoareF
+val destr_eHoareS   : form -> eHoareS
 val destr_bdHoareF  : form -> bdHoareF
 val destr_bdHoareS  : form -> bdHoareS
 val destr_coe       : form -> coe
@@ -441,6 +465,8 @@ val is_equivS    : form -> bool
 val is_eagerF    : form -> bool
 val is_hoareF    : form -> bool
 val is_hoareS    : form -> bool
+val is_eHoareF   : form -> bool
+val is_eHoareS   : form -> bool
 val is_cHoareF   : form -> bool
 val is_cHoareS   : form -> bool
 val is_bdHoareF  : form -> bool
