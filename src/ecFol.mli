@@ -8,9 +8,6 @@ open EcMemory
 include module type of struct include EcCoreFol end
 
 (* -------------------------------------------------------------------- *)
-val f_bind_mod : f_subst -> EcIdent.t -> EcPath.mpath -> EcEnv.env -> f_subst
-
-(* -------------------------------------------------------------------- *)
 val f_losslessF: xpath -> form
 
 val f_eqparams:
@@ -179,7 +176,7 @@ type sform =
   | SFint   of zint
   | SFlocal of EcIdent.t
   | SFpvar  of EcTypes.prog_var * memory
-  | SFglob  of EcIdent.t * memory
+  | SFglob  of EcTypes.tglob * memory
 
   | SFif    of form * form * form
   | SFmatch of form * form list * ty

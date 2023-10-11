@@ -12,9 +12,6 @@ module CI = EcCoreLib
 include EcCoreFol
 
 (* -------------------------------------------------------------------- *)
-let f_bind_mod s x mp env = Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
-
-(* -------------------------------------------------------------------- *)
 let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
   let f_pvlocs ty vs m =
     let arg = f_pvarg ty m in
@@ -34,9 +31,7 @@ let f_eqres ty1 m1 ty2 m2 =
   f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
 
 let f_eqglob mp1 m1 mp2 m2 =
-  let mp1 = EcPath.mget_ident mp1 in
-  let mp2 = EcPath.mget_ident mp2 in
-  f_eq (f_glob mp1 m1) (f_glob mp2 m2)
+  f_eq (f_glob [TG_mod mp1] m1) (f_glob [TG_mod mp2] m2)
 
 (* -------------------------------------------------------------------- *)
 let f_op_real_of_int = (* CORELIB *)
@@ -792,7 +787,7 @@ type sform =
   | SFint   of BI.zint
   | SFlocal of EcIdent.t
   | SFpvar  of EcTypes.prog_var * memory
-  | SFglob  of EcIdent.t * memory
+  | SFglob  of EcTypes.tglob * memory
 
   | SFif    of form * form * form
   | SFmatch of form * form list * ty
@@ -1081,7 +1076,7 @@ let rec dump_f f =
   | Fint    x -> BI.to_string x
   | Flocal  x -> EcIdent.tostring x
   | Fpvar   (pv, x) -> EcTypes.string_of_pvar pv ^ "{" ^ EcIdent.tostring x ^ "}"
-  | Fglob   (mp, x) -> EcIdent.tostring mp ^ "{" ^ EcIdent.tostring x ^ "}"
+  | Fglob   (mp, x) -> "glob{" ^ EcIdent.tostring x ^ "}"
   | Fop     (p, _) -> EcPath.tostring p
   | Fapp    (f, a) -> "APP " ^ dump_f f ^ " ( " ^ String.concat ", " (List.map dump_f a) ^ " )"
   | Ftuple  f -> " ( " ^ String.concat ", " (List.map dump_f f) ^ " )"

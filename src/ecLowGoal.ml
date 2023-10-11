@@ -175,7 +175,7 @@ module LowApply = struct
                 if mode = `Elim then f_imps obl f
                 else f_and (f_ands obl) f
             in
-            (EcFol.f_bind_mod sbt x mp env, f)
+            (EcFol.Fsubst.f_bind_mod sbt x mp, f)
           with _ -> raise InvalidProofTerm
         end
 
@@ -1648,6 +1648,7 @@ module LowSubst = struct
     let kind = odfl default_subst_kind kind in
     let env = LDecl.toenv hyps in
     let is_let x = match LDecl.by_id x hyps with LD_var (_, Some _) -> true | _ -> false in
+
     match f.f_node, var with
     (* Substitution of logical variables *)
     | Flocal x, None when kind.sk_local && not (is_let x) ->
@@ -1667,11 +1668,13 @@ module LowSubst = struct
         else None
 
     (* Substitution of globs *)
-    | Fglob (mp, m), None when kind.sk_glob -> Some (`Glob (mp, m))
-    | Fglob (mp, m), Some (`Glob (mp', _)) when kind.sk_glob ->
-        if   EcIdent.id_equal mp mp'
-        then Some (`Glob (mp, m))
-        else None
+    | Fglob ([TG_mod { m_top = `Local x; m_args = [] }], m), None when kind.sk_glob ->
+       Some (`Glob (x, m))
+
+    | Fglob ([TG_mod { m_top = `Local x; m_args = [] }], m), Some (`Glob (y, _)) when kind.sk_glob ->
+       if   id_equal x y
+       then Some (`Glob (x, m))
+       else None
 
     | _, _ -> None
 
@@ -1723,7 +1726,11 @@ module LowSubst = struct
       | Some ((_, `Glob (mp, m), f) as aout) ->
         let f  = simplify { no_red with delta_h = predT } hyps f in
         let fv = EcPV.PV.fv env m f in
-        if EcPV.PV.mem_glob env (EcPath.mident mp) fv then None else Some aout in
+
+        if   EcPV.PV.mem_glob env (EcPath.mident mp) fv
+        then None
+        else Some aout in
+
     match aout with
     | None -> None
     | Some(side,v,f) ->

@@ -351,7 +351,11 @@ let w_witness ty =
   WTerm.fs_app fs_witness [] ty
 
 (* -------------------------------------------------------------------- *)
-let mk_tglob genv m =
+let mk_tglob genv tg =
+  let _ = EcEnv.NormMp.tglob_norm genv.te_env tg in
+  assert false                  (* FIXME *)
+
+(*
   match Hid.find_opt genv.te_absmod m with
   | Some { w3am_ty } -> w3am_ty
   | None ->
@@ -362,14 +366,14 @@ let mk_tglob genv m =
     let ty = WTy.ty_app ts [] in
     Hid.add genv.te_absmod m { w3am_ty = ty };
     ty
+*)
 
 (* -------------------------------------------------------------------- *)
 let rec trans_ty ((genv, lenv) as env) ty =
   match ty.ty_node with
-  | Tglob   mp ->
-    mk_tglob genv mp
-  | Tunivar _ -> assert false
-  | Tvar    x -> trans_tv lenv x
+  | Tglob   tg -> mk_tglob genv tg
+  | Tunivar _  -> assert false
+  | Tvar    x  -> trans_tv lenv x
 
   | Ttuple  ts-> wty_tuple genv (trans_tys env ts)
 
@@ -849,7 +853,10 @@ and trans_pvar ((genv, lenv) as env) pv ty mem =
     WTerm.t_app_infer ls [m]
 
 (* -------------------------------------------------------------------- *)
-and trans_glob ((genv, _) as env) m mem =
+and trans_glob _ _ _ (* ((genv, _) as env) m mem*) =
+  assert false                  (* FIXME *)
+
+(*
   let wmem = trans_mem env ~forglobal:true mem in
   let w3op =
     match Hid.find_opt genv.te_lc m with
@@ -866,6 +873,7 @@ and trans_glob ((genv, _) as env) m mem =
        Hid.add genv.te_lc m w3op;
        w3op
   in apply_wop genv w3op [] [wmem]
+*)
 
 (* -------------------------------------------------------------------- *)
 and trans_mem (genv,lenv) ~forglobal mem =

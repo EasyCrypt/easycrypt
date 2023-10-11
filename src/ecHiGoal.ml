@@ -2050,9 +2050,14 @@ let process_subst syms (tc : tcenv1) =
     let sym = TTC.tc1_process_form_opt tc None symp in
 
     match sym.f_node with
-    | Flocal id        -> `Local id
-    | Fglob  (mp, mem) -> `Glob  (mp, mem)
-    | Fpvar  (pv, mem) -> `PVar  (pv, mem)
+    | Flocal id ->
+       `Local id
+
+    | Fglob  ([TG_mod { m_top = `Local x; m_args = []; } ], mem) ->
+       `Glob  (x, mem)
+
+    | Fpvar  (pv, mem) ->
+       `PVar  (pv, mem)
 
     | _ ->
       tc_error !!tc ~loc:symp.pl_loc

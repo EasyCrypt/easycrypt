@@ -279,6 +279,9 @@ module NormMp : sig
   val is_abstract_fun : xpath -> env -> bool
   val x_equal         : env -> xpath -> xpath -> bool
   val pv_equal        : env -> EcTypes.prog_var -> EcTypes.prog_var -> bool
+
+  val tglob_equal : env -> EcTypes.tglob -> EcTypes.tglob -> bool
+  val tglob_norm  : env -> EcTypes.tglob -> EcTypes.tglob
 end
 
 (* -------------------------------------------------------------------- *)

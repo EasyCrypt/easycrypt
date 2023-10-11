@@ -2456,12 +2456,15 @@ module NormMp = struct
 
   let globals env m mp =
     let us = mod_use env mp in
-    let l =
-      Sid.fold (fun id l -> f_glob id m :: l) us.us_gl [] in
-    let l =
-      Mx.fold
-        (fun xp ty l -> f_pvar (EcTypes.pv_glob xp) ty m :: l) us.us_pv l in
-    f_tuple l
+    let l1 =
+      List.map
+        (fun id -> TG_mod (mpath_abs id []))
+        (Sid.elements us.us_gl) in
+    let l2 =
+      List.map
+        (fun (xp, _) -> TG_var xp)
+        (Mx.bindings us.us_pv) in
+    f_glob (l1 @ l2) m
 
   let norm_glob env m mp = globals env m mp
 
@@ -2575,6 +2578,12 @@ module NormMp = struct
 
   let pv_equal env pv1 pv2 =
     EcTypes.pv_equal (norm_pvar env pv1) (norm_pvar env pv2)
+
+  let tglob_equal env tg1 tg2 =
+    EcTypes.tglob_equal tg1 tg2
+
+  let tglob_norm env tg =
+    tg
 end
 
 (* -------------------------------------------------------------------- *)

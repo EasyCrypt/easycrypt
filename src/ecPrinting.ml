@@ -669,9 +669,27 @@ let is_pstop name =
   String.length name > 0 && name.[0] = '%'
 
 (* -------------------------------------------------------------------- *)
+let pp_tglob1 ppe fmt tg =
+  match tg with
+  | TG_mod m ->
+     ()                         (* FIXME *)
+
+  | TG_fun f ->
+     ()                         (* FIXME *)
+
+  | TG_var x ->
+     ()                         (* FIXME *)
+
+(* -------------------------------------------------------------------- *)
+let pp_tglob ppe fmt tg =
+  Format.fprintf fmt "{{%a}}"
+    (pp_list ";@ " (pp_tglob1 ppe)) tg
+
+(* -------------------------------------------------------------------- *)
 let rec pp_type_r ppe outer fmt ty =
   match ty.ty_node with
-  | Tglob m -> Format.fprintf fmt "(glob %a)" EcIdent.pp_ident m
+  | Tglob tg ->
+     pp_tglob ppe fmt tg
 
   | Tunivar x -> pp_tyunivar ppe fmt x
   | Tvar    x -> pp_tyvar ppe fmt x
@@ -1462,16 +1480,16 @@ and try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
 
       if pv1 = pv2 then Some (`Var pv1) else None
 
-    | SFeq ({ f_node = Fglob (x1, me1) },
-            { f_node = Fglob (x2, me2) })
+    | SFeq ({ f_node = Fglob ([TG_mod m1], me1) },
+            { f_node = Fglob ([TG_mod m2], me2) })
         when (EcMemory.mem_equal me1 EcFol.mleft )
           && (EcMemory.mem_equal me2 EcFol.mright)
         ->
 
-      let pv1 = (PPEnv.mod_symb ppe (EcPath.mident x1)) in
-      let pv2 = (PPEnv.mod_symb ppe (EcPath.mident x2)) in
+      let pv1 = PPEnv.mod_symb ppe m1 in
+      let pv2 = PPEnv.mod_symb ppe m2 in
 
-      if pv1 = pv2 then Some (`Glob pv1) else None
+      if pv1 = pv2 then Some (`Glob pv1) else None (* FIXME *)
 
     | SFeq ({ f_node = Fproj (f1, i1); f_ty = ty1 },
             { f_node = Fproj (f2, i2); f_ty = ty2 }) -> begin
@@ -1671,13 +1689,13 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
     end
 
-  | Fglob (mp, i) -> begin
+  | Fglob (tg, i) -> begin
     match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
     | Some i' when EcMemory.mem_equal i i' ->
-        Format.fprintf fmt "(glob %a)" (pp_topmod ppe) (EcPath.mident mp)
+        Format.fprintf fmt "(glob %a)" (pp_tglob ppe) tg
     | _ ->
         let ppe = PPEnv.enter_by_memid ppe i in
-        Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) (EcPath.mident mp) (pp_mem ppe) i
+        Format.fprintf fmt "(glob %a){%a}" (pp_tglob ppe) tg (pp_mem ppe) i
     end
 
   | Fquant (q, bd, f) ->

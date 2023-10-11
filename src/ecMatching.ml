@@ -319,7 +319,7 @@ module MEV = struct
     let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.assubst ue } in
     let subst = Fsubst.f_subst_init ~sty:tysubst () in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
-    let subst = EV.fold (fun x mp s -> EcFol.f_bind_mod s x mp env) ev.evm_mod subst in
+    let subst = EV.fold (fun x mp s -> Fsubst.f_bind_mod s x mp) ev.evm_mod subst in
     let seen  = ref Sid.empty in
 
     let rec for_ident x binding subst =
@@ -535,10 +535,10 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       | Fint i1, Fint i2 ->
           if not (EcBigInt.equal i1 i2) then failure ();
 
-      | Fglob (mp1, me1), Fglob (mp2, me2) ->
-            if not (EcIdent.id_equal mp1 mp2) then
-              failure ();
-            doit_mem env mxs me1 me2
+      | Fglob (tg1, me1), Fglob (tg2, me2) ->
+          if not (EcEnv.NormMp.tglob_equal env tg1 tg2) then
+            failure ();
+          doit_mem env mxs me1 me2
 
       | Ftuple fs1, Ftuple fs2 ->
           if List.length fs1 <> List.length fs2 then

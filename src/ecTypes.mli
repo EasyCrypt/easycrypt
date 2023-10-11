@@ -90,10 +90,9 @@ val ty_check_uni : ty -> unit
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_absmod : EcPath.mpath Mid.t;
-  ts_cmod   : EcPath.mpath Mid.t; (* FIXME: what is the difference between these two maps? *)
-  ts_u      : ty Muid.t;
-  ts_v      : ty Mid.t;
+  ts_cmod : EcPath.mpath Mid.t;
+  ts_u    : ty Muid.t;
+  ts_v    : ty Mid.t;
 }
 
 val ty_subst_id    : ty_subst

@@ -37,7 +37,7 @@ module EqTest_base = struct
     | Tfun (t1, t2), Tfun (t1', t2') ->
         for_type env t1 t1' && for_type env t2 t2'
 
-    | Tglob m1, Tglob m2 -> EcIdent.id_equal m1 m2
+    | Tglob tg1, Tglob tg2 -> EcEnv.NormMp.tglob_equal env tg1 tg2
 
     | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
         if
@@ -87,6 +87,10 @@ module EqTest_base = struct
        let p1 = NormMp.norm_mpath env p1 in
        let p2 = NormMp.norm_mpath env p2 in
        EcPath.m_equal p1 p2)
+
+  (* ------------------------------------------------------------------ *)
+  let for_tglob env ~norm tg1 tg2 =
+    EcTypes.tglob_equal tg1 tg2 (* FIXME: norm *)
 
   (* ------------------------------------------------------------------ *)
   let for_expr env ~norm =
@@ -387,6 +391,7 @@ module EqTest_i = struct
   let for_pv    = fun env ?(norm = true) -> for_pv    env ~norm
   let for_xp    = fun env ?(norm = true) -> for_xp    env ~norm
   let for_mp    = fun env ?(norm = true) -> for_mp    env ~norm
+  let for_tglob = fun env ?(norm = true) -> for_tglob env ~norm
   let for_instr = fun env ?(norm = true) -> for_instr env Mid.empty ~norm
   let for_stmt  = fun env ?(norm = true) -> for_stmt  env Mid.empty ~norm
   let for_expr  = fun env ?(norm = true) -> for_expr  env Mid.empty ~norm
@@ -495,9 +500,9 @@ let is_alpha_eq hyps f1 f2 =
     let pv2 = EcSubst.subst_progvar subst pv2 in
     ensure (EqTest_i.for_pv env pv1 pv2) in
 
-  let check_mod subst m1 m2 =
-    let m2 = EcPath.mget_ident (EcSubst.subst_mpath subst (EcPath.mident m2)) in
-    ensure (EcIdent.id_equal m1 m2) in
+  let check_tglob env subst tg1 tg2 =
+    let tg2 = EcSubst.subst_tglob subst tg2 in
+    ensure (EqTest_i.for_tglob env tg1 tg2) in
 
   let check_xp env subst xp1 xp2 =
     let xp2 = EcSubst.subst_xpath subst xp2 in
@@ -540,9 +545,9 @@ let is_alpha_eq hyps f1 f2 =
       check_mem subst m1 m2;
       check_pv env subst p1 p2
 
-    | Fglob(m1,mem1), Fglob(m2,mem2) ->
+    | Fglob(tg1,mem1), Fglob(tg2,mem2) ->
       check_mem subst mem1 mem2;
-      check_mod subst m1 m2
+      check_tglob env subst tg1 tg2
 
     | Fop(p1, ty1), Fop(p2, ty2) when EcPath.p_equal p1 p2 ->
       List.iter2 (check_ty env subst) ty1 ty2
@@ -1613,9 +1618,9 @@ let rec conv ri env f1 f2 stk =
       when EcEnv.NormMp.pv_equal env pv1 pv2 && EcMemory.mem_equal m1 m2 ->
       conv_next ri env f1 stk
 
-  | Fglob (m1, mem1), Fglob (m2, mem2)
+  | Fglob (tg1, mem1), Fglob (tg2, mem2)
       when
-        EcIdent.id_equal m1 m2
+           EcEnv.NormMp.tglob_equal env tg1 tg2
         && EcMemory.mem_equal mem1 mem2 ->
       conv_next ri env f1 stk
 

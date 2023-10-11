@@ -3383,10 +3383,10 @@ and trans_form_or_pattern
                 let gl  = Sid.elements use.us_gl in
                 let pv  = List.filter filter_pv (Mx.bindings use.us_pv) in
                 let res =
-                    List.map (fun mid -> f_glob mid mem) gl
-                  @ List.map (fun (xp, ty) -> f_pvar (EcTypes.pv_glob xp) ty mem) pv in
+                    List.map (fun mid -> TG_mod (mpath_abs mid [])) gl
+                  @ List.map (fun (xp, _) -> TG_var xp) pv in
 
-                f_tuple res in
+                f_glob res mem in
 
               let x1 = create EcFol.mleft  in
               let x2 = create EcFol.mright in

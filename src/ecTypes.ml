@@ -286,27 +286,23 @@ let fresh_id_of_ty (ty : ty) =
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_absmod : EcPath.mpath Mid.t;
-  ts_cmod   : EcPath.mpath Mid.t; (* FIXME: what is the difference between these two maps? *)
-  ts_u      : ty Muid.t;
-  ts_v      : ty Mid.t;
+  ts_cmod : EcPath.mpath Mid.t;
+  ts_u    : ty Muid.t;
+  ts_v    : ty Mid.t;
 }
 
 let ty_subst_id =
-  { ts_absmod = Mid.empty;
-    ts_cmod = Mid.empty;
+  { ts_cmod = Mid.empty;
     ts_u = Muid.empty;
-    ts_v = Mid.empty;
-  }
+    ts_v = Mid.empty; }
 
 let is_ty_subst_id s =
-  Mid.is_empty s.ts_absmod
-  && Mid.is_empty s.ts_cmod
+     Mid.is_empty s.ts_cmod
   && Muid.is_empty s.ts_u
   && Mid.is_empty s.ts_v
 
 let tg1_subst (s : ty_subst) (tg : tglob1) =
-  let s = { sms_identity with sms_id = s.ts_absmod } in
+  let s = { sms_identity with sms_id = s.ts_cmod } in
 
   match tg with
   | TG_mod m ->
