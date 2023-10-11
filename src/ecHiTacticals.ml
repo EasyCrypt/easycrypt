@@ -80,7 +80,7 @@ and process1_case (_ : ttenv) (doeq, opts, gp) (tc : tcenv1) =
     | _ -> tc_error !!tc "must give exactly one boolean formula"
   in
     match (FApi.tc1_goal tc).f_node with
-    | FbdHoareS _ | FcHoareS _ | FhoareS _ when not opts.cod_ambient ->
+    | FbdHoareS _ | FcHoareS _ | FhoareS _ | FeHoareS _ when not opts.cod_ambient ->
         let fp = TTC.tc1_process_Xhl_formula tc (form_of_gp ()) in
         EcPhlCase.t_hl_case fp tc
 
@@ -187,6 +187,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Punroll info              -> EcPhlLoopTx.process_unroll info
     | Psplitwhile info          -> EcPhlLoopTx.process_splitwhile info
     | Pcall (side, info)        -> EcPhlCall.process_call side info
+    | Pcallconcave info         -> EcPhlCall.process_call_concave info
     | Pswap sw                  -> EcPhlSwap.process_swap sw
     | Pinline info              -> EcPhlInline.process_inline info
     | Pinterleave info          -> EcPhlSwap.process_interleave info
@@ -198,6 +199,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Prndsem (side, pos)       -> EcPhlRnd.process_rndsem side pos
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
     | Pconseqauto cm            -> process_conseqauto cm
+    | Pconcave info             -> EcPhlConseq.process_concave info
     | Phrex_elim                -> EcPhlExists.t_hr_exists_elim
     | Phrex_intro (fs, b)       -> EcPhlExists.process_exists_intro ~elim:b fs
     | Phecall (oside, x)        -> EcPhlExists.process_ecall oside x

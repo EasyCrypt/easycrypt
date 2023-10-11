@@ -109,6 +109,43 @@ module CI_xint = struct
   let p_big     = EcPath.pqname p_bigxint "big"
 end
 
+module CI_Xreal = struct
+
+  let i_Xreal  = "Xreal"
+  let p_Xreal  = EcPath.pqname p_top i_Xreal
+  let _Xreal   = fun x -> EcPath.pqname p_Xreal x
+  let mk_Xreal = _Xreal
+
+  let p_Rp     = _Xreal "Rp"
+  let mk_Rp    = fun x -> EcPath.pqname p_Rp x
+
+  let p_Rpbar  = _Xreal "Rpbar"
+  let mk_Rpbar = fun x -> EcPath.pqname p_Rpbar x
+
+  let p_realp   = mk_Rp "realp"
+  let p_of_real = mk_Rp "of_real"
+
+  let p_xreal   = mk_Rpbar "xreal"
+  let p_rp      = mk_Rpbar "rp"
+  let p_inf     = mk_Rpbar "oo"
+  let p_xadd    = mk_Rpbar "xadd"
+  let p_xmul    = mk_Rpbar "xmul"
+  let p_xsmul   = mk_Rpbar "(**)"
+
+  let p_is_inf  = mk_Rpbar "is_inf"
+  let p_is_real = mk_Rpbar "is_real"
+
+  let p_xle     = mk_Rpbar "xle"
+  let p_interp_form = mk_Xreal "`|`"
+  let p_Ep      = mk_Xreal "Ep"
+  let p_concave_incr = mk_Xreal "concave_incr"
+
+  let p_xle_cxr_l = mk_Xreal "xle_cxr_l"
+  let p_xle_cxr_r = mk_Xreal "xle_cxr_r"
+
+
+end
+
 (* -------------------------------------------------------------------- *)
 module CI_Real = struct
   let i_Real = "CoreReal"

@@ -37,6 +37,21 @@ module Core = struct
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
+  let t_ehoare_rnd_r tc =
+    let env = FApi.tc1_env tc in
+    let hs = tc1_as_ehoareS tc in
+    let (lv, distr), s = tc1_last_rnd tc hs.ehs_s in
+    let ty_distr = proj_distr_ty env (e_ty distr) in
+    let x_id = EcIdent.create (symbol_of_lv lv) in
+    let x = f_local x_id ty_distr in
+    let mem = EcMemory.memory hs.ehs_m in
+    let distr = EcFol.form_of_expr mem distr in
+    let post = subst_form_lv env mem lv x hs.ehs_po in
+    let post = f_Ep ty_distr distr (f_lambda [(x_id,GTty ty_distr)] post) in
+    let concl = f_eHoareS_r {hs with ehs_s=s; ehs_po=post } in
+    FApi.xmutate1 tc `Rnd [concl]
+
+  (* -------------------------------------------------------------------- *)
   let t_choare_rnd_r (tac_info : chl_infos_t) tc =
     let env = FApi.tc1_env tc in
     let chs = tc1_as_choareS tc in
@@ -606,6 +621,7 @@ let wp_equiv_rnd      = FApi.t_low1 "wp-equiv-rnd" wp_equiv_rnd_r
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_rnd   = FApi.t_low0 "hoare-rnd"   Core.t_hoare_rnd_r
+let t_ehoare_rnd   = FApi.t_low0 "ehoare-rnd"   Core.t_ehoare_rnd_r
 let t_choare_rnd  = FApi.t_low1 "choare-rnd"  Core.t_choare_rnd_r
 let t_bdhoare_rnd = FApi.t_low1 "bdhoare-rnd" Core.t_bdhoare_rnd_r
 
@@ -619,6 +635,9 @@ let process_rnd side pos tac_info tc =
   match side, pos, tac_info with
   | None, None, PNoRndParams when is_hoareS concl ->
       t_hoare_rnd tc
+
+  | None, None, PNoRndParams when is_eHoareS concl ->
+      t_ehoare_rnd tc
 
   | None, None, _ when is_cHoareS concl ->
     let tac_info =

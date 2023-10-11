@@ -36,6 +36,17 @@ let process_form ?mv hyps pf ty =
 let process_formula ?mv hyps pf =
   process_form hyps ?mv pf tbool
 
+let process_xreal ?mv hyps pf =
+  process_form hyps ?mv pf txreal
+
+let process_dformula ?mv hyps pf =
+  match pf with
+  | Single pf -> Single(process_formula ?mv hyps pf)
+  | Double(pp,pf) ->
+    let p = process_formula ?mv hyps pp in
+    let f = process_xreal ?mv hyps pf in
+    Double(p,f)
+
 let process_cost ?mv hyps (EcParsetree.PC_costs (self, calls)) tys =
   let env = LDecl.toenv hyps in
   let self = process_form_opt ?mv hyps self (Some (toarrow tys txint)) in
@@ -72,6 +83,12 @@ let pf_process_cost pe ?mv hyps tys pcost =
 
 let pf_process_formula pe ?mv hyps pf =
   Exn.recast_pe pe hyps (fun () -> process_formula ?mv hyps pf)
+
+let pf_process_xreal pe ?mv hyps pf =
+  Exn.recast_pe pe hyps (fun () -> process_xreal ?mv hyps pf)
+
+let pf_process_dformula pe ?mv hyps pf =
+  Exn.recast_pe pe hyps (fun () -> process_dformula ?mv hyps pf)
 
 let pf_process_exp pe hyps mode oty e =
   Exn.recast_pe pe hyps (fun () -> process_exp hyps mode oty e)
@@ -149,7 +166,8 @@ let tc1_process_Xhl_form ?side tc ty pf =
 
   let memory, mv =
     match concl.f_node, side with
-    | FhoareS  hs, None        -> (hs.hs_m, Some (hs.hs_pr, hs.hs_po ))
+    | FhoareS  hs, None         -> (hs.hs_m, Some (hs.hs_pr, hs.hs_po ))
+    | FeHoareS  hs, None        -> (hs.ehs_m , Some (hs.ehs_pr , hs.ehs_po))
     | FcHoareS  hs, None        -> (hs.chs_m, Some (hs.chs_pr, hs.chs_po ))
     | FbdHoareS hs, None        -> (hs.bhs_m, Some (hs.bhs_pr, hs.bhs_po))
     | FequivS   es, Some `Left  -> ((mhr, snd es.es_ml), None)
@@ -167,6 +185,10 @@ let tc1_process_Xhl_form ?side tc ty pf =
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_formula ?side tc pf =
   tc1_process_Xhl_form ?side tc tbool pf
+
+(* ------------------------------------------------------------------ *)
+let tc1_process_Xhl_formula_xreal tc pf =
+  tc1_process_Xhl_form tc txreal pf
 
 (* ------------------------------------------------------------------ *)
 (* FIXME: factor out to typing module                                 *)

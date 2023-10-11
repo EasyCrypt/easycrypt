@@ -343,6 +343,12 @@ module PV = struct
       | FhoareS hs ->
           in_mem_scope env fv [fst hs.hs_m] [hs.hs_pr; hs.hs_po]
 
+      | FeHoareF hf ->
+          in_mem_scope env fv [mhr] [hf.ehf_pr; hf.ehf_po]
+
+      | FeHoareS hs ->
+          in_mem_scope env fv [fst hs.ehs_m] [hs.ehs_pr; hs.ehs_po]
+
       | FcHoareF chf ->
           let fv = in_mem_scope env fv [mhr] [chf.chf_pr; chf.chf_po] in
           fv_cost env fv chf.chf_co

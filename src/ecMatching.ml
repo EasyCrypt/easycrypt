@@ -1032,6 +1032,12 @@ module FPosition = struct
               let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
               f_hoareF_r { hf with hf_pr; hf_po; }
 
+          | FeHoareF hf ->
+              let (ehf_pr, ehf_po) =
+                as_seq2 (doit p [hf.ehf_pr; hf.ehf_po;])
+              in
+              f_eHoareF_r { hf with ehf_pr; ehf_po; }
+
           | FcHoareF chf ->
             let fkeys, calls = EcPath.Mx.bindings chf.chf_co.c_calls
                                |> List.map (fun (f,cb) -> ((f,cb.cb_cost),
@@ -1069,6 +1075,7 @@ module FPosition = struct
               f_coe_r { coe with coe_pre = pre }
 
           | FhoareS   _ -> raise InvalidPosition
+          | FeHoareS  _ -> raise InvalidPosition
           | FcHoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition

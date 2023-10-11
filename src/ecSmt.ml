@@ -698,6 +698,7 @@ and trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   | FeagerF _
   | FhoareF  _  | FhoareS   _
   | FcHoareF  _ | FcHoareS   _
+  | FeHoareF   _ | FeHoareS   _
   | FbdHoareF _ | FbdHoareS _
   | FequivF   _ | FequivS   _
     -> trans_gen env fp
@@ -1397,6 +1398,7 @@ module Frequency = struct
 
       | FhoareF _   | FhoareS _
       | FcHoareF _  | FcHoareS _
+      | FeHoareF _ | FeHoareS _
       | FbdHoareF _ | FbdHoareS _
       | FequivF _   | FequivS _
       | FeagerF _

@@ -16,6 +16,7 @@ let process_cond info tc =
   | `Head (side) ->
     t_hS_or_chS_or_bhS_or_eS
       ~th:t_hoare_cond
+      ~teh:t_ehoare_cond
       ~tch:(t_choare_cond None)
       ~tbh:t_bdhoare_cond
       ~te:(t_equiv_cond side) tc

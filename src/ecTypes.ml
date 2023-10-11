@@ -136,6 +136,9 @@ let toption ty = tconstr EcCoreLib.CI_Option.p_option [ty]
 let treal      = tconstr EcCoreLib.CI_Real .p_real    []
 let tcpred ty  = tfun ty tbool
 
+let trealp    = tconstr EcCoreLib.CI_Xreal.p_realp []
+let txreal    = tconstr EcCoreLib.CI_Xreal.p_xreal []
+
 let ttuple lt    =
   match lt with
   | []  -> tunit

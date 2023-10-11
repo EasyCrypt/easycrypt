@@ -75,6 +75,12 @@ let t_choare_cond c tc =
       [t_id; t_trivial; t] tc
 
 (* -------------------------------------------------------------------- *)
+let t_ehoare_cond tc =
+  let hs = tc1_as_ehoareS tc in
+  let (e,_,_) = fst (tc1_first_if tc hs.ehs_s) in
+  LowInternal.t_gen_cond None (form_of_expr (EcMemory.memory hs.ehs_m) e) None tc
+
+(* -------------------------------------------------------------------- *)
 let t_bdhoare_cond tc =
   let bhs = tc1_as_bdhoareS tc in
   let (e,_,_) = fst (tc1_first_if tc bhs.bhs_s) in

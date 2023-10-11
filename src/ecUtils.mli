@@ -142,6 +142,11 @@ module OSmart : sig
 end
 
 (* -------------------------------------------------------------------- *)
+type 'a doption =
+  | Single of 'a
+  | Double of ('a * 'a)
+
+(* -------------------------------------------------------------------- *)
 type ('a, 'b) tagged = Tagged of ('a * 'b option)
 
 val tg_val : ('a, 'b) tagged -> 'a

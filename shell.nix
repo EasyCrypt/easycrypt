@@ -8,6 +8,9 @@ in
 pkgs.mkShell {
   buildInputs = ec.buildInputs
   ++ ec.propagatedBuildInputs
+  ++ (with ocamlPackages; [
+    merlin
+  ])
   ++ (with python3Packages; [
     pyyaml
   ]);

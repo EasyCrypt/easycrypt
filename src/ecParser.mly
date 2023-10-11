@@ -402,6 +402,7 @@
 %token BY
 %token BYEQUIV
 %token BYPHOARE
+%token BYEHOARE
 %token BYPR
 %token BYUPTO
 %token CALL
@@ -434,6 +435,7 @@
 %token DUMP
 %token EAGER
 %token ECALL
+%token EHOARE
 %token ELIF
 %token ELIM
 %token ELSE
@@ -1267,6 +1269,8 @@ sform_u(P):
 
 | HOARE LBRACKET hb=hoare_body(P) RBRACKET { hb }
 
+| EHOARE LBRACKET hb=ehoare_body(P) RBRACKET { hb }
+
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
@@ -1376,6 +1380,11 @@ hoare_bd_cmp :
 hoare_body(P):
   mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFhoareF (pre, mp, post) }
+
+ehoare_body(P):
+  mp=loc(fident) COLON pre=form_r(P) LONGARROW
+                       post=form_r(P)
+    { PFehoareF (pre, mp, post) }
 
 phoare_body(P):
   LBRACKET mp=loc(fident) COLON
@@ -2164,6 +2173,7 @@ axiom:
 
 | l=locality  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
 | l=locality  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
+| l=locality EHOARE x=ident pd=pgtybindings? COLON p=loc( ehoare_body(none)) ao=axiom_tc
 | l=locality PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
 | l=locality CHOARE x=ident pd=pgtybindings? COLON p=loc(choare_body(none)) ao=axiom_tc
     { mk_axiom ~locality:l (x, None, None, None, pd, p) ao }
@@ -2695,8 +2705,8 @@ cbv:
 | CBV DELTA      { `Delta [] :: simplify_red }
 
 conseq:
-| empty                           { None, None }
-| UNDERSCORE LONGARROW UNDERSCORE { None, None }
+| empty                            { None, None }
+| UNDERSCORE LONGARROW UNDERSCORE  { None, None }
 | f1=form LONGARROW               { Some f1, None }
 | f1=form LONGARROW UNDERSCORE    { Some f1, None }
 | f2=form                         { None, Some f2 }
@@ -3062,7 +3072,7 @@ form_or_double_form:
 | f=sform
     { Single f }
 
-| LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
+| LPAREN UNDERSCORE? COLON f1=form LONGARROW f2=form RPAREN
     { Double (f1, f2) }
 
 %inline if_cost_option:
@@ -3157,6 +3167,9 @@ phltactic:
 | CALL s=side? info=gpterm(call_info)
     { Pcall (s, info) }
 
+| CALL SLASH fc=sform info=gpterm(call_info)
+    { Pcallconcave (fc,info) }
+
 | RCONDT s=side? i=codepos1 cost=option(if_cost_option)
     { Prcond (s, true, i, cost) }
 
@@ -3243,6 +3256,9 @@ phltactic:
 | BYPHOARE info=gpterm(conseq)?
     { Pbydeno (`PHoare, (mk_rel_pterm info, true, None)) }
 
+| BYEHOARE info=gpterm(conseq)?
+    { Pbydeno (`EHoare, (mk_rel_pterm info, true, None)) }
+
 | BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)?
     { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, None)) }
 
@@ -3251,6 +3267,9 @@ phltactic:
 
 | BYUPTO
     { Pbyupto }
+
+| CONSEQ SLASH fc=sform info=gpterm(conseq)
+    { Pconcave (info, fc) }
 
 | CONSEQ cq=cqoptions?
     { Pconseq (odfl [] cq, (None, None, None)) }
