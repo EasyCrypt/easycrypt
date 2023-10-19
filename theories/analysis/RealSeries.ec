@@ -581,7 +581,7 @@ lemma fin_sum_type (s : 'a -> real) :
   is_finite predT<:'a> => 
   sum s = big predT s (to_seq predT<:'a>).
 proof.
-move=> fint; rewrite &(sumE_fin) 1:uniq_to_seq 1:fint.
+move=> fint; rewrite &(sumE_fin) 1:uniq_to_seq.
 by move=> x _; rewrite mem_to_seq. 
 qed.
 
