@@ -1,0 +1,398 @@
+require import AllCore Distr List DInterval StdOrder.
+require import Array.
+
+(* type of elemements *)
+type elem.
+
+op (<) : elem -> elem -> bool.
+
+axiom lt_trans y x z : x < y => y < z => x < z.
+
+op (<=) (x y : elem) = x < y \/ x = y.
+
+axiom lt_nle x y : x < y = !y <= x.
+
+axiom le_total x y : x <= y \/ y <= x.
+
+lemma le_trans y x z : x <= y => y <= z => x <= z.
+proof. smt(lt_trans). qed.
+
+op list_sindex ['a] (e : 'a -> 'a -> bool) (l : 'a list) p = 
+  index (nth witness l p) (sort e l).
+
+op list_sindex_inv ['a] (e : 'a -> 'a -> bool) (l : 'a list) p = 
+  index (nth witness (sort e l) p) l.
+
+lemma list_sindex_inv_sindex e (l : 'a list) p : 
+  0 <= p < size l =>
+  uniq l => 
+  list_sindex_inv e l (list_sindex e l p) = p.
+proof.
+  rewrite /list_sindex /list_sindex_inv => hp hu.
+  by rewrite nth_index 1:mem_sort 1:mem_nth 1:// index_uniq.
+qed.
+
+lemma list_sindex_sindex_inv e (l : 'a list) p : 
+  0 <= p < size l =>
+  uniq l => 
+  list_sindex e l (list_sindex_inv e l p) = p.
+proof.
+  rewrite /list_sindex /list_sindex_inv => hp hu.
+  rewrite nth_index.
+  + by rewrite -(mem_sort e) mem_nth size_sort.
+  by rewrite index_uniq 1:size_sort // sort_uniq.
+qed.
+
+op array_sub (t : 'a array) (lo hi : int) =
+  Array.offun (fun i => t.[lo + i]) (hi - lo + 1).
+
+lemma get_array_sub (t : 'a array) (lo hi p : int) : 
+  lo <= p <= hi => (array_sub t lo hi).[p - lo] = t.[p].
+proof. smt (offunE). qed.
+
+lemma get_sub (t : 'a array) (lo hi p : int) : 
+  0 <= p <= hi - lo => (array_sub t lo hi).[p] = t.[lo + p].
+proof. smt(get_array_sub). qed.
+ 
+lemma size_array_sub (t : 'a array) (lo hi : int) :
+  size (array_sub t lo hi) = if (lo <= hi) then hi - lo + 1 else 0.
+proof. smt(size_offun). qed.
+
+lemma mem_array_sub (t : 'a array) (lo hi p : int) : 
+   lo <= p <= hi => t.[p] \in ofarray (array_sub t lo hi).
+proof. move=> hp; rewrite -(get_array_sub t lo hi p hp) getE; smt(mem_nth size_array_sub). qed.
+
+op uniq_on (t: 'a array) lo hi = List.uniq (ofarray (array_sub t lo hi)).
+
+op sindex (e : 'a -> 'a -> bool) (t : 'a array) (lo hi p : int) = 
+  lo + list_sindex e (ofarray (array_sub t lo hi)) (p - lo).
+
+op sindex_inv (e : 'a -> 'a -> bool) (t: 'a array) (lo hi p : int) = 
+  lo + list_sindex_inv e (ofarray (array_sub t lo hi)) (p - lo).
+
+lemma sindex_inv_sindex e (t : 'a array) (lo hi p : int) :
+  lo <= p <= hi =>
+  uniq_on t lo hi => 
+  sindex_inv e t lo hi (sindex e t lo hi p) = p.
+proof.
+  rewrite /sindex /sindex_inv => hp hu.
+  pose l := ofarray (array_sub t lo hi).
+  have -> : (lo + list_sindex e l (p - lo) - lo) = list_sindex e l (p - lo) by ring.
+  by rewrite list_sindex_inv_sindex //;1: smt(size_array_sub); ring.
+qed.
+
+lemma sindex_sindex_inv e (t : 'a array) (lo hi p : int) :
+  lo <= p <= hi =>
+  uniq_on t lo hi => 
+  sindex e t lo hi (sindex_inv e t lo hi p) = p.
+proof.
+  rewrite /sindex /sindex_inv => hp hu.
+  pose l := ofarray (array_sub t lo hi).
+  have -> : (lo + list_sindex_inv e l (p - lo) - lo) = list_sindex_inv e l (p - lo) by ring.
+  rewrite list_sindex_sindex_inv //; 1: smt(size_array_sub); ring.
+qed.
+
+op sindex_count (t: elem array) (lo hi p : int) = 
+  let s = ofarray (array_sub t lo hi) in
+  lo + count (fun x => x < t.[p]) s.
+
+lemma index_count x l: sorted (<=) l => uniq l => x \in l => index x l = count (fun y => y < x) l.
+proof.
+  elim: l => // y l hrec /> hp hnin hu.
+  case: (x = y) => [<<- _ | hne /= hin] /=.
+  + by rewrite index_cons /= count_pred0_eq_in //=; smt (order_path_min allP le_trans lt_nle).
+  rewrite index_cons hne /= hrec //; 1: by apply: path_sorted hp.
+  smt (order_path_min allP le_trans).
+qed.
+
+lemma sindex_countP (t: elem array) (lo hi p : int) : 
+  uniq_on t lo hi => 
+  lo <= p <= hi =>
+  sindex (<=) t lo hi p = sindex_count t lo hi p.
+proof.
+  move=> hu hp; rewrite /sindex /list_sindex /sindex_count /= eq_sym.
+  pose l := ofarray _.
+  have hperm := perm_sort (<=) l.
+  rewrite index_count.
+  + by apply/sort_sorted/le_total. 
+  + by rewrite (perm_eq_uniq _ _ hperm).
+  + by rewrite (perm_eq_mem _ _ hperm) mem_nth; smt(size_array_sub). 
+  congr; rewrite -getE (get_array_sub t lo hi p) 1://.
+  by apply/perm_eqP/perm_eq_sym.
+qed.
+
+op swapP (t1 t2 : 'a array) i j = 
+  size t1 = size t2 /\
+  (forall k, k <> i => k <> j => t1.[k] = t2.[k]) /\
+  (t1.[i] = t2.[j] /\ t1.[j] = t2.[i]).
+
+op perm_eq_on (t1 t2 : 'a array) lo hi = 
+  perm_eq (ofarray (array_sub t1 lo hi)) (ofarray (array_sub t2 lo hi)).
+
+op partition_on (t : elem array) lo p hi = 
+  (forall k, (lo <= k < p)%Int => t.[k] < t.[p]) /\
+  (forall k, (p < k <= hi)%Int => t.[p] <= t.[k]).
+
+lemma perm_eq_on_trans (y x z : 'a array) lo hi : 
+  perm_eq_on x y lo hi => perm_eq_on y z lo hi => perm_eq_on x z lo hi.
+proof. smt(perm_eq_trans). qed.
+
+lemma ofarray_split (t : 'a array) i : 
+  0 <= i < size t =>
+  ofarray t = ofarray (array_sub t 0 (i - 1)) ++ t.[i] :: ofarray (array_sub t (i + 1) (size t - 1)).
+proof.
+  move=> hi; apply (eq_from_nth witness).
+  + smt(size_cat size_array_sub sizeE).
+  move=> k hk; rewrite -getE nth_cat -sizeE size_array_sub /= -!getE; smt(get_array_sub).
+qed.
+
+lemma array_sub_sub (t : 'a array) (lo1 hi1 lo2 hi2 : int) : 
+  0 <= lo2 => hi2 <= hi1 - lo1 =>
+  array_sub (array_sub t lo1 hi1) lo2 hi2 = array_sub t (lo1 + lo2) (lo1 + hi2).
+proof.
+  by move=> hpos hbound; apply eq_from_get; smt(get_sub size_array_sub).
+qed.
+
+lemma swapP_perm_eq_on (x y : 'a array) (lo hi i j : int) : 
+  lo <= i <= hi => lo <= j <= hi =>
+  swapP x y i j => perm_eq_on x y lo hi.
+proof.
+  move=> h_i hj hp; rewrite /perm_eq_on.
+  wlog : i j h_i hj hp / i <= j. 
+  + move=> h; case: (i <= j) => hij; 1: by apply (h i j).
+    apply (h j i) => // /#.
+  move=> hij; pose s1 := array_sub x _ _; pose s2 := array_sub y _ _.
+  case: (i = j) => [<<- | hne].
+  + have -> : ofarray s1 = ofarray s2 by smt(eq_from_get).
+    by apply perm_eq_refl.
+  rewrite (ofarray_split s1 (i - lo)); 1: smt(size_array_sub).
+  rewrite (ofarray_split s2 (i - lo)); 1: smt(size_array_sub).
+  have H1 : i - lo - 1 <= hi - lo by smt().
+  have H2 : 0 <= i - lo + 1 by smt().
+  have H3 : size (array_sub x lo hi) - 1 <= hi - lo by smt(size_array_sub).
+  rewrite !array_sub_sub //; 1: smt(size_array_sub). 
+  rewrite !get_array_sub 1,2:// !size_array_sub (_: lo <= hi) 1:/# /=.
+  have -> : lo + (i - lo - 1) = i - 1 by ring.
+  have -> : lo + (i - lo + 1) = i + 1 by ring.
+  have -> : lo + (hi - lo) = hi by ring.
+  have -> : array_sub x lo (i - 1) = array_sub y lo (i - 1).
+  + by apply eq_from_get; smt (size_array_sub get_sub).
+  apply perm_cat2l => {s1 s2}.
+  pose s1 := array_sub x _ _; pose s2 := array_sub y _ _.
+  rewrite (ofarray_split s1 (j - (i + 1))); 1: smt(size_array_sub).
+  rewrite (ofarray_split s2 (j - (i + 1))); 1: smt(size_array_sub).
+  have H4 : j - (i + 1) - 1 <= hi - (i + 1) by smt().
+  have H5 : 0 <= j - (i + 1) + 1 by smt().
+  rewrite !array_sub_sub //=; 1,2: smt(size_array_sub).
+  have -> : i + 1 + (j - (i + 1) - 1) = j - 1 by ring.
+  have -> : i + 1 + (j - (i + 1) + 1) = j + 1 by ring.
+  have H6 : 0 <= j - (i + 1) && j - (i + 1) <= hi - (i + 1) by smt().
+  rewrite /s1 /s2 !get_sub //.
+  have -> : i + 1 + (j - (i + 1)) = j by ring.
+  rewrite !size_array_sub (_: i+ 1 <= hi) 1:/# /=.
+  have -> : i + 1 + (hi - (i + 1)) = hi by ring.
+  have -> : array_sub x (i + 1) (j - 1) = array_sub y (i + 1) (j - 1).
+  + by apply eq_from_get; smt(size_array_sub get_sub).
+  have -> : array_sub x (j + 1) hi = array_sub y (j + 1) hi.
+  + by apply eq_from_get; smt(size_array_sub get_sub).
+  rewrite -(cat1s x.[i]) -(cat1s x.[j]) -(cat1s y.[i]) -(cat1s y.[j]) !catA.  
+  apply perm_cat2r => {s1 s2}.
+  case hp => ? [] ? [-> ->].
+  by rewrite perm_catCl -!catA perm_cat2l perm_catC.
+qed.
+
+lemma sindex_inv_in e (t : 'a array) (lo hi p : int) : 
+  lo <= p <= hi => lo <= sindex_inv e t lo hi p <= hi.
+proof. 
+  move=> h; rewrite /sindex_inv /list_sindex_inv; split; 1: smt (index_ge0).
+  move=> _. pose l := ofarray _.
+  have := index_mem (nth witness (sort e l) (p - lo)) l.
+  rewrite -sizeE size_array_sub -(mem_sort e l) mem_nth 2:/#.
+  rewrite size_sort -sizeE size_array_sub /#.
+qed.
+
+lemma sindex_in e (t : 'a array) (lo hi p : int) : 
+  lo <= p <= hi => lo <= sindex e t lo hi p <= hi.
+proof. 
+  move=> h; rewrite /sindex /list_sindex; split; 1: smt (index_ge0).
+  move=> _. pose l := ofarray _.
+  have := index_mem (nth witness l (p - lo)) (sort e l).
+  rewrite size_sort -sizeE size_array_sub mem_sort mem_nth 2:/#.
+  rewrite -sizeE size_array_sub /#.
+qed.
+  
+lemma perm_uniq_on (t1 t2 : 'a array) lo hi : perm_eq_on t1 t2 lo hi => uniq_on t1 lo hi <=> uniq_on t2 lo hi.
+proof. by apply perm_eq_uniq. qed.
+
+
+lemma perm_sindex (t1 t2 : elem array) (lo hi p1 p2 : int) :
+  lo <= p1 <= hi => lo <= p2 <= hi => t1.[p1] = t2.[p2] => 
+  perm_eq_on t1 t2 lo hi => sindex (<=) t1 lo hi p1 = sindex (<=) t2 lo hi p2.
+proof.
+  rewrite /perm_eq_on /sindex /list_sindex => hp1 hp2 heq.
+  rewrite -!getE !get_array_sub // heq; move: (ofarray _) (ofarray _) => l1 l2 hp; congr.
+  rewrite (perm_sortP (<=)) in hp.
+  + by apply le_total. + by apply le_trans. + smt (lt_nle).
+  by rewrite hp.
+qed.
+
+lemma in_ofarray x (t : 'a array) : x \in ofarray t => exists i, 0 <= i < size t /\ x = t.[i].
+proof.
+  move=> hx; exists (index x (ofarray t)).
+  by rewrite getE index_ge0 nth_index //= sizeE index_mem.
+qed.
+
+lemma partition_on_sindex (t : _ array) lo hi p : 
+  0 <= lo <= p <= hi <= size t =>
+  partition_on t lo p hi => sindex_count t lo hi p = p.
+proof.
+  rewrite /sindex_count /= => hle -[hlt hge].
+  have {2}-> : p = lo + (p - lo) by ring.
+  congr; pose t':= array_sub _ _ _. 
+  have -> : ofarray t' = ofarray (array_sub t' 0 (p - lo - 1)) ++ ofarray (array_sub t' (p - lo) (size t' - 1)).
+  + apply (eq_from_nth witness); 1: by rewrite size_cat -!sizeE !size_array_sub /#.
+    move=> i; rewrite -sizeE size_array_sub => h_i.
+    by rewrite nth_cat -sizeE size_array_sub -!getE; smt(get_sub).
+  rewrite count_cat count_predT_eq_in.
+  + by move=> x /in_ofarray [xi] []; rewrite size_array_sub => hxi ->; smt (get_sub).
+  rewrite -sizeE size_array_sub count_pred0_eq_in 2:/#.
+  move=> x /in_ofarray [xi] []; rewrite !size_array_sub => hxi ->; smt (get_sub lt_nle).
+qed.
+
+lemma uniq_on_sub (t: 'a array) (lo1 lo2 hi1 hi2 : int) :  
+  lo1 <= lo2 <= hi2 <= hi1 => uniq_on t lo1 hi1 => uniq_on t lo2 hi2.
+proof.
+  move=> hle; rewrite /uniq_on.
+  suff : ofarray (array_sub t lo1 hi1) = 
+         ofarray (array_sub t lo1 (lo2-1)) ++ 
+         ofarray (array_sub t lo2 hi2) ++ 
+         ofarray (array_sub t (hi2 + 1) hi1) by smt(cat_uniq).
+  apply (eq_from_nth witness).
+  + by rewrite !size_cat -!sizeE !size_array_sub /#.
+  move=> i;rewrite !nth_cat size_cat -!sizeE !size_array_sub -!getE => ?.
+  smt(get_sub).
+qed.
+
+lemma sorted_cat_cons (x:elem) (l1 l2: elem list) : 
+  sorted (<=) l1 => sorted (<=) l2 => 
+  (forall y, y \in l1 => y <= x) =>
+  (forall y, y \in l2 => x <= y) =>
+  sorted (<=) (l1 ++ x :: l2).
+proof.
+  move=> hs1 hs2 hle hge.
+  elim: l1 hs1 hle => [ | y1 l1 hrec /= ^/path_sorted hs1 hp hle] /=.
+  + by case: l2 hs2 hge => //= y2 l2 -> /=; apply.
+  have {hrec hs1} := hrec hs1 _; 1: by move=> ? h;apply hle; rewrite h.
+  smt().
+qed.
+
+lemma sorted_cat (l1 l2: elem list) : 
+  sorted (<=) l1 => sorted (<=) l2 => 
+  (forall x1 x2, x1 \in l1 => x2 \in l2 => x1 <= x2) =>
+  sorted (<=) (l1 ++ l2).
+proof.
+  case: l2 => [ | x l2]; 1: by rewrite cats0.
+  move=> h1 /= h2 hx; apply sorted_cat_cons => //.
+  + by apply: path_sorted h2. 
+  + smt().
+  by have /allP := order_path_min _ le_trans _ _ h2.
+qed.
+
+lemma perm_cat ['a] (s1 s2 s3 s4 : 'a list) : 
+   perm_eq s1 s2 => perm_eq s3 s4 => perm_eq (s1 ++ s3) (s2 ++ s4).
+proof.
+  by move=> h1 h2; apply (perm_eq_trans (s1 ++ s4));[ apply perm_cat2l | apply perm_cat2r].
+qed.
+
+lemma sort_cat (l1 l2: elem list) : 
+  (forall x1 x2, x1 \in l1 => x2 \in l2 => x1 <= x2) =>
+  sort (<=) (l1 ++ l2) = sort (<=) l1 ++ sort (<=) l2.
+proof.
+  move=> h; apply (eq_sorted (<=)).
+  + by apply le_trans. + smt (lt_nle). + by apply/sort_sorted/le_total.
+  apply sorted_cat; 1,2: by apply/sort_sorted/le_total.
+  + by move=> x1 x2 /mem_sort h1 /mem_sort h2; apply h.
+  apply (perm_eq_trans (l1 ++ l2)); 1: by apply perm_sort.
+  by apply/perm_cat; apply/perm_eq_sym/perm_sort.
+qed.
+
+lemma array_sub_full (t : 'a array) : array_sub t 0 (size t - 1) = t.
+proof.
+  apply arrayP; rewrite size_array_sub /=.
+  smt(size_ge0 get_array_sub). 
+qed.
+
+lemma ofarray_split3 lo hi (t:'a array) : 
+  0 <= lo <= hi < size t => 
+  ofarray t = 
+    ofarray (array_sub t 0 (lo-1)) ++ ofarray (array_sub t lo hi) ++ ofarray (array_sub t (hi+1) (size t -1)).
+proof.
+  move=> hp; apply (eq_from_nth witness).
+  + by rewrite !size_cat -!sizeE !size_array_sub /#.
+  move=> i; rewrite sizeE => h_i.
+  rewrite -getE !nth_cat size_cat -!sizeE !size_array_sub -!getE /=.
+  smt(get_array_sub).
+qed.
+
+op eq_except (t1 t2: 'a array) (lo hi: int) =
+  size t1 = size t2 /\
+  forall i, 0 <= i < lo \/ hi < i < size t1 => t1.[i] = t2.[i].
+
+lemma perm_eq_on_eq_except (t1 t2 : 'a array) lo hi: 
+  0 <= lo <= hi < size t1 => 
+  perm_eq_on t1 t2 lo hi =>
+  eq_except t1 t2 lo hi =>
+  perm_eq_on t1 t2 0 (size t1 - 1).
+proof.
+  rewrite /perm_eq_on => hb hp [hsz heqe].
+  rewrite {2}hsz !array_sub_full (ofarray_split3 lo hi t1 hb).
+  rewrite (ofarray_split3 lo hi t2) 1:-hsz 1://.
+  have -> : ofarray (array_sub t1 (hi + 1) (size t1 - 1)) = 
+            ofarray (array_sub t2 (hi + 1) (size t2 - 1)).
+  + congr; apply arrayP; rewrite !size_array_sub; split; 1: smt().
+    move=> i h_i.
+    have -> : i = (hi+1 + i - (hi+1)) by ring.
+    rewrite !get_array_sub /#. 
+  have -> : ofarray (array_sub t1 0 (lo - 1)) = 
+            ofarray (array_sub t2 0 (lo - 1)).
+  + congr; apply arrayP; rewrite !size_array_sub; split; 1: smt().
+    move=> i h_i; smt(get_sub).
+  by apply/perm_cat2r/perm_cat2l. 
+qed.
+
+lemma sorted_cat_inv (l1 l2: elem list) : 
+  sorted (<=) (l1 ++ l2) => 
+  (forall x1 x2, x1 \in l1 => x2 \in l2 => x1 <= x2) /\ 
+  sorted (<=) l1 /\ sorted (<=) l2.
+proof.
+  elim l1 => [// | y1 l1 hrec /= hp].
+  have /hrec [#hcmp h1 -> /=]:= path_sorted _ _ _ hp; split.
+  + move=> x1 x2 [->>|hx1] hx2.
+    + have /allP /(_ x2) := order_path_min _ le_trans _ _ hp.
+      by apply; rewrite mem_cat hx2.
+    by apply hcmp.
+  apply:subseq_order_path hp; 1: by apply le_trans.
+  by rewrite -{1}cats0; apply cat_subseq; [apply subseq_refl | apply sub0seq].
+qed.
+
+lemma mem_sub (t:'a array) lo hi y : 
+  y \in (ofarray (array_sub t lo hi)) => 
+  exists j, lo <= j <= hi /\ y = t.[j].
+proof.
+  move=> /in_ofarray [j]; rewrite size_array_sub => -[? ->].
+  rewrite get_sub 1:/#; exists (j+lo) => /#.
+qed.
+
+lemma mem_sort_sub (t:elem array) lo hi y : 
+  y \in sort (<=) (ofarray (array_sub t lo hi)) => 
+  exists j, lo <= j <= hi /\ y = t.[j].
+proof. by move=> /mem_sort/mem_sub. qed.
+
+lemma ofarray_sub1 (t:'a array) (p:int) : 
+  0 <= p < size t =>
+  ofarray (array_sub t p p) = [t.[p]].
+proof.
+  move=> ?; apply (eq_from_nth witness); rewrite -sizeE size_array_sub //=.
+  move=> i h_i; have ->> /= : i = 0 by smt(). 
+  by rewrite -getE get_sub.
+qed.
