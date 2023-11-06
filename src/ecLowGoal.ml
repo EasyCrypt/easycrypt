@@ -1606,13 +1606,16 @@ let t_rewrite
       RApi.close tc (VRewrite (hd, rwpt));
       RApi.tcenv_of_rtcenv tc
 
-  | Some (h : ident) ->
-      let hyps = oget (LDecl.hyp_convert h (fun _ _ -> tgfp) (RApi.tc_hyps tc)) in
-      let hd   = RApi.newgoal tc ~hyps (RApi.tc_goal tc) in
-      let rwpt = { rpt_proof = pt; rpt_occrs = pos; rpt_lc = Some h; } in
+  | Some (h : ident) -> begin
+      match LDecl.hyp_convert h (fun _ _ -> tgfp) (RApi.tc_hyps tc) with
+      | Some hyps ->
+         let hd   = RApi.newgoal tc ~hyps (RApi.tc_goal tc) in
+         let rwpt = { rpt_proof = pt; rpt_occrs = pos; rpt_lc = Some h; } in
+         RApi.close tc (VRewrite (hd, rwpt))
 
-      RApi.close tc (VRewrite (hd, rwpt));
-      RApi.tcenv_of_rtcenv tc
+      | None -> ()
+    end;
+    RApi.tcenv_of_rtcenv tc
 
 (* -------------------------------------------------------------------- *)
 let t_rewrite_hyp ?xconv ?mode ?donot (id : EcIdent.t) pos (tc : tcenv1) =
