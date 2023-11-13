@@ -94,6 +94,17 @@ let subst_xpath (s : subst) (xp : EcPath.xpath) =
   EcPath.xpath (subst_mpath s xp.x_top) xp.x_sub
 
 (* -------------------------------------------------------------------- *)
+let subst_tglob1 (s : subst) (tg : tglob1) =
+  match tg with
+  | TG_mod mp -> TG_mod (subst_mpath s mp)
+  | TG_fun f  -> TG_fun (subst_xpath s f)
+  | TG_var x  -> TG_var (subst_xpath s x)
+
+(* -------------------------------------------------------------------- *)
+let subst_tglob (s : subst) (tg : tglob) =
+  List.map (subst_tglob1 s) tg
+
+(* -------------------------------------------------------------------- *)
 let subst_mem (s : subst) (m : EcIdent.t) =
   Mid.find_def m m s.sb_fmem
 
@@ -138,8 +149,8 @@ let add_tyvars (s : subst) (xs : EcIdent.t list) (tys : ty list) =
 (* -------------------------------------------------------------------- *)
 let rec subst_ty (s : subst) (ty : ty) =
   match ty.ty_node with
-  | Tglob mp ->
-     tglob (EcPath.mget_ident (subst_mpath s (EcPath.mident mp)))
+  | Tglob tg ->
+     tglob (subst_tglob s tg)
 
   | Tunivar _ ->
      ty                         (* FIXME *)
@@ -490,10 +501,10 @@ let rec subst_form (s : subst) (f : form) =
      let m = subst_mem s m in
      f_pvar pv ty m
 
-  | Fglob (mp, m) ->
-     let mp = EcPath.mget_ident (subst_mpath s (EcPath.mident mp)) in
-     let m = subst_mem s m in
-     f_glob mp m
+  | Fglob (tg, m) ->
+     let tg = subst_tglob s tg in
+     let m  = subst_mem s m in
+     f_glob tg m
 
   | Fapp ({ f_node = Fop (p, tys) }, args) when has_def s p ->
       let tys  = subst_tys s tys in

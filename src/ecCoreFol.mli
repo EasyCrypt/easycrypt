@@ -43,7 +43,7 @@ and f_node =
   | Fint    of zint
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
-  | Fglob   of EcIdent.t * memory
+  | Fglob   of EcTypes.tglob * memory
   | Fop     of path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
@@ -238,7 +238,7 @@ val f_local : EcIdent.t -> EcTypes.ty -> form
 val f_pvar  : EcTypes.prog_var -> EcTypes.ty -> memory -> form
 val f_pvarg : EcTypes.ty -> memory -> form
 val f_pvloc : variable -> memory -> form
-val f_glob  : EcIdent.t -> memory -> form
+val f_glob  : EcTypes.tglob -> memory -> form
 
 (* soft-constructors - common formulas constructors *)
 val f_op     : path -> EcTypes.ty list -> EcTypes.ty -> form
@@ -439,7 +439,7 @@ val destr_pr        : form -> pr
 val destr_programS  : [`Left | `Right] option -> form -> memenv * stmt
 val destr_int       : form -> zint
 
-val destr_glob      : form -> EcIdent.t        * memory
+val destr_glob      : form -> EcTypes.tglob * memory
 val destr_pvar      : form -> EcTypes.prog_var * memory
 
 (* -------------------------------------------------------------------- *)
@@ -498,7 +498,6 @@ type f_subst = private {
   fs_esloc    : expr Mid.t;
   fs_ty       : ty_subst;
   fs_mem      : EcIdent.t Mid.t;
-  fs_modglob  : (EcIdent.t -> form) Mid.t;
   fs_memtype  : EcMemory.memtype option; (* Only substituted in Fcoe *)
   fs_mempred  : mem_pr Mid.t;  (* For predicates over memories,
                                  only substituted in Fcoe *)
@@ -520,7 +519,7 @@ module Fsubst : sig
   val f_bind_local  : f_subst -> EcIdent.t -> form -> f_subst
   val f_bind_mem    : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
   val f_bind_absmod : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
-  val f_bind_mod    : f_subst -> EcIdent.t -> EcPath.mpath -> (EcIdent.t -> form) -> f_subst
+  val f_bind_mod    : f_subst -> EcIdent.t -> EcPath.mpath -> f_subst
   val f_bind_rename : f_subst -> EcIdent.t -> EcIdent.t -> ty -> f_subst
 
   val f_subst   : ?tx:(form -> form -> form) -> f_subst -> form -> form

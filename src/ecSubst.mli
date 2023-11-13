@@ -51,6 +51,8 @@ val subst_branches : subst -> opbranches -> opbranches
 val subst_path         : subst -> path  -> path
 val subst_mpath        : subst -> mpath -> mpath
 val subst_xpath        : subst -> xpath -> xpath
+val subst_tglob1       : subst -> tglob1 -> tglob1
+val subst_tglob        : subst -> tglob -> tglob
 val subst_function     : subst -> function_ -> function_
 val subst_module       : subst -> module_expr -> module_expr
 val subst_top_module   : subst -> top_module_expr -> top_module_expr

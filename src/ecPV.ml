@@ -155,7 +155,6 @@ module PVM = struct
     try Mpv.find_glob env mp (Mid.find m s)
     with AliasClash (env,c) -> uerror env c
 
-
   let check_binding m s =
     if (Mid.mem m s) then raise MemoryClash
 
@@ -214,13 +213,10 @@ module PVM = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 module PV = struct
-
   type t =
     { s_pv : ty Mnpv.t;
-      s_gl : Sm.t;  (* only abstract module *)
-    }
+      s_gl : Sm.t;  (* only abstract module *) }
 
   let empty = { s_pv = Mnpv.empty; s_gl = Sm.empty }
 
@@ -246,17 +242,23 @@ module PV = struct
   let add env pv ty fv =
     { fv with s_pv = Mnpv.add (pvm env pv) ty fv.s_pv }
 
-  let add_glob env mp fv =
-    let f = NormMp.norm_glob env mhr mp in
-    let rec aux fv f =
-      match f.f_node with
-      | Ftuple fs -> List.fold_left aux fv fs
-      | Fpvar(pv,_) ->
-        { fv with s_pv = Mnpv.add (pvm env pv) f.f_ty fv.s_pv }
-      | Fglob(mp,_) ->
-        { fv with s_gl = Sm.add (EcPath.mident mp) fv.s_gl}
-      | _ -> assert false in
-    aux fv f
+  let add_glob env tg fv =
+    let tg = NormMp.tglob_norm env tg in
+
+    let aux fv tg =
+      match tg with
+      | TG_mod ({ m_top = `Local _ } as mp) -> (* FIXME *)
+         { fv with s_gl = Sm.add mp fv.s_gl}
+
+      | TG_var pv ->
+         let ty = EcEnv.Var.by_xpath pv env in
+         let pv = pv_glob pv in
+         { fv with s_pv = Mnpv.add (pvm env pv) ty fv.s_pv }
+
+      | _ ->                    (* FIXME *)
+         fv
+
+    in List.fold_left aux fv tg
 
   let remove env pv fv =
     { fv with s_pv = Mnpv.remove (pvm env pv) fv.s_pv }
@@ -319,12 +321,10 @@ module PV = struct
           aux env (aux env fv f1) f2
 
       | Fpvar (x, m') ->
-        if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
+          if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
 
-      | Fglob (mp, m') ->
-        if EcIdent.id_equal m m' then
-          add_glob env (EcPath.mident mp) fv
-        else fv
+      | Fglob (tg, m') ->
+          if EcIdent.id_equal m m' then add_glob env tg fv else fv
 
       | Fint _ | Flocal _ | Fop _ -> fv
 
