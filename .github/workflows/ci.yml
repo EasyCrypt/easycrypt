@@ -87,15 +87,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [ [ 'jasmin-eclib', 'jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin' ] ]
+        target: [ [ 'jasmin-eclib', 'https://github.com/jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin' ]
+                , [ 'sha3', 'https://gitlab.com/easycrypt/sha3', '', 'config/tests.config', 'sponge' ] ]
     steps:
     - uses: actions/checkout@v3
       with:
         path: 'easycrypt'
-    - uses: actions/checkout@v3
-      with:
-        path: 'project'
-        repository: ${{ matrix.target[1] }}
+    - name: Checkout External Project
+      run: |
+        git clone ${{ matrix.target[1] }} ${{ matrix.target[0] }}
     - name: Update OPAM & EasyCrypt dependencies
       run: |
         opam update
@@ -108,8 +108,8 @@ jobs:
         rm -f ~/.why3.conf ~/.config/easycrypt/why3.conf
         opam config exec -- easycrypt why3config
     - name: Compile project
-      working-directory: project/${{ matrix.target[2] }}
-      run: opam config exec -- ec-runtest ${{ matrix.target[3] }} ${{ matrix.target[4] }}
+      working-directory: ${{ matrix.target[0] }}/${{ matrix.target[2] }}
+      run: opam config exec -- easycrypt runtest ${{ matrix.target[3] }} ${{ matrix.target[4] }}
     - uses: actions/upload-artifact@v3
       name: Upload report.log
       if: always()
