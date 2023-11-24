@@ -27,6 +27,7 @@ let psep = match Sys.os_type with "Win32" -> ";" | _ -> ":"
 
 (* -------------------------------------------------------------------- *)
 let confname    = "easycrypt.conf"
+let projname    = "easycrypt.project"
 let why3dflconf = Filename.concat XDG.home "why3.conf"
 
 (* -------------------------------------------------------------------- *)
@@ -121,17 +122,64 @@ let main () =
             if Sys.file_exists conffile then Some conffile else None) in
       List.Exceptionless.hd (Option.to_list localini @ xdgini) in
 
-    let ini =
-      Option.bind conffile (fun ini ->
-        try  Some (EcOptions.read_ini_file ini)
-        with
-        | Sys_error _ -> None
-        | EcOptions.InvalidIniFile (lineno, file) ->
-            Format.eprintf "%s:%l: cannot read INI file@." file lineno;
-            exit 1
-      )
+    let projfile (path : string option) =
+      let rec find (path : string) : string option =
+        let projfile = Filename.concat path projname in
+        if Sys.file_exists projfile then
+          Some projfile
+        else
+          if Filename.dirname path = path then
+            None
+          else
+            find (Filename.dirname path)
+      in
 
-    in (conffile, EcOptions.parse_cmdline ?ini Sys.argv) in
+      let root =
+        match path with
+        | Some path ->
+           Filename.dirname path
+        | None ->
+           Unix.getcwd () in
+
+      let root =
+        if   Filename.is_relative root
+        then Filename.concat (Unix.getcwd ()) root
+        else root in
+
+      find root in
+
+    let read_ini_file ini =
+      try  Some (EcOptions.read_ini_file ini)
+      with
+      | Sys_error _ -> None
+      | EcOptions.InvalidIniFile (lineno, file) ->
+          Format.eprintf "%s:%l: cannot read INI file@." file lineno;
+          exit 1
+    in
+
+    let getini (path : string option) =
+      let inisys =
+        Option.bind conffile (fun conffile ->
+          Option.map
+            (fun ini -> { inic_ini = ini; inic_root = None; })
+            (read_ini_file conffile)
+        )
+      in
+
+      let iniproj =
+        Option.bind (projfile path) (fun conffile ->
+          Option.map
+            (fun ini -> {
+               inic_ini  = ini;
+               inic_root = Some (Filename.dirname conffile);
+            })
+            (read_ini_file conffile)
+        )
+      in
+
+      List.filter_map identity [iniproj; inisys] in
+
+    (conffile, EcOptions.parse_cmdline ~ini:getini Sys.argv) in
 
   (* Execution of eager commands *)
   begin
