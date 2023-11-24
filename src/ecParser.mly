@@ -398,6 +398,7 @@
 %token AXIOMATIZED
 %token BACKS
 %token BACKSLASH
+%token BDEP
 %token BETA
 %token BY
 %token BYEQUIV
@@ -3998,6 +3999,9 @@ global_action:
 | SEARCH x=search+ { Gsearch      x  }
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
+
+| BDEP f=loc(fident)
+    { Gbdep f }
 
 | PRAGMA       x=pragma { Gpragma x }
 | PRAGMA PLUS  x=pragma { Goption (x, `Bool true ) }

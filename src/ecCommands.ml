@@ -635,6 +635,10 @@ and process_dump scope (source, tc) =
   scope
 
 (* -------------------------------------------------------------------- *)
+and process_bdep (scope : EcScope.scope) (p : pgamepath) =
+  EcBDep.bdep (EcScope.env scope) p
+
+(* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
@@ -676,6 +680,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Greduction   red  -> `Fct   (fun scope -> process_reduction  scope red)
       | Ghint        hint -> `Fct   (fun scope -> process_hint       scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
+      | Gbdep        proc -> `State (fun scope -> process_bdep       scope proc)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None

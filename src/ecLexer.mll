@@ -163,6 +163,7 @@
     "kill"        , KILL       ;        (* KW: tactic *)
     "eager"       , EAGER      ;        (* KW: tactic *)
 
+    "bdep"        , BDEP       ;        (* KW: global *)
     "axiom"       , AXIOM      ;        (* KW: global *)
     "schema"      , SCHEMA     ;        (* KW: global *)
     "axiomatized" , AXIOMATIZED;        (* KW: global *)

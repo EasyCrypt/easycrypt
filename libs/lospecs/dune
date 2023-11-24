@@ -1,0 +1,20 @@
+(library 
+ (name lospecs)
+ (public_name easycrypt.lospecs)
+ (flags (:standard -open Batteries))
+ (modules :standard \ lospecs_test)
+ (libraries batteries menhirLib)
+)
+
+(executable
+ (name lospecs_test)
+ (flags (:standard -open Batteries))
+ (modules lospecs_test)
+ (promote (until-clean))
+ (libraries batteries lospecs))
+
+(ocamllex lexer)
+
+(menhir
+ (modules parser)
+ (flags --table --explain))
