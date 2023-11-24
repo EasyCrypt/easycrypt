@@ -62,6 +62,7 @@ type ini_options = {
   ini_why3     : string option;
   ini_ovrevict : string list;
   ini_provers  : string list;
+  ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
 }

@@ -66,6 +66,7 @@ type ini_options = {
   ini_why3     : string option;
   ini_ovrevict : string list;
   ini_provers  : string list;
+  ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
 }
@@ -86,6 +87,8 @@ module Ini : sig
 
   val get_provers : ini_context -> string list
 
+  val get_timeout : ini_context -> int option
+
   val get_idirs : ini_context -> (string option * string) list
 
   val get_rdirs : ini_context -> (string option * string) list
@@ -98,6 +101,8 @@ module Ini : sig
   val get_all_ovrevict : ini_context list -> string list
 
   val get_all_provers : ini_context list -> string list
+
+  val get_all_timeout : ini_context list -> int option
 
   val get_all_idirs : ini_context list -> (string option * string) list
 
@@ -128,6 +133,9 @@ end = struct
   let get_provers (ini : ini_context) =
     ini.inic_ini.ini_provers
 
+  let get_timeout (ini : ini_context) =
+    ini.inic_ini.ini_timeout
+
   let get_idirs (ini : ini_context) =
     List.map
       (snd_map (absolute ?root:ini.inic_root))
@@ -150,6 +158,9 @@ end = struct
 
   let get_all_provers (ini : ini_context list) =
     List.flatten (List.map get_provers ini)
+
+  let get_all_timeout (ini : ini_context list) =
+    List.find_map_opt get_timeout ini
 
   let get_all_idirs (ini : ini_context list) =
     List.flatten (List.map get_idirs ini)
@@ -454,7 +465,11 @@ let prv_options_of_values ini values =
     in match provers with [] -> None | provers -> Some provers
   in
     { prvo_maxjobs   = odfl 4 (get_int "max-provers" values);
-      prvo_timeout   = odfl 3 (get_int "timeout" values);
+      prvo_timeout   = begin
+        match get_int "timeout" values with
+        | None -> odfl 3 (Ini.get_all_timeout ini)
+        | Some i -> i
+      end;
       prvo_cpufactor = odfl 1 (get_int "cpu-factor" values);
       prvo_provers   = provers;
       prvo_pragmas   = get_string_list "pragmas" values;
@@ -615,6 +630,7 @@ let read_ini_file (filename : string) =
       ini_why3     = tryget  "why3conf";
       ini_ovrevict = trylist "no-evict";
       ini_provers  = trylist "provers" ;
+      ini_timeout  = tryint  "timeout" ;
       ini_idirs    = List.map parse_idir (trylist "idirs");
       ini_rdirs    = List.map parse_idir (trylist "rdirs"); } in
 
@@ -622,5 +638,6 @@ let read_ini_file (filename : string) =
     ini_why3     = omap expand ini.ini_why3;
     ini_ovrevict = ini.ini_ovrevict;
     ini_provers  = ini.ini_provers;
+    ini_timeout  = ini.ini_timeout;
     ini_idirs    = ini.ini_idirs;
     ini_rdirs    = ini.ini_rdirs; }
