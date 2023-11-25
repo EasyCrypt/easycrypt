@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcUtils
+open EcAst
 open EcTypes
 open EcMemory
 open EcBigInt.Notations

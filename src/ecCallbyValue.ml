@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcIdent
+open EcAst
 open EcTypes
 open EcEnv
 open EcFol

@@ -4,9 +4,7 @@ open EcPath
 open EcTypes
 
 (* -------------------------------------------------------------------- *)
-type lvalue =
-  | LvVar   of (prog_var * ty)
-  | LvTuple of (prog_var * ty) list
+type lvalue = EcAst.lvalue
 
 val lv_equal     : lvalue -> lvalue -> bool
 val symbol_of_lv : lvalue -> symbol
@@ -16,27 +14,11 @@ val lv_to_list   : lvalue -> prog_var list
 val name_of_lv   : lvalue -> string
 
 (* --------------------------------------------------------------------- *)
-type instr = private {
-  i_node : instr_node;
-  i_fv   : int EcIdent.Mid.t;
-  i_tag  : int;
-}
+type instr = EcAst.instr
 
-and instr_node =
-  | Sasgn     of lvalue * expr
-  | Srnd      of lvalue * expr
-  | Scall     of lvalue option * xpath * expr list
-  | Sif       of expr * stmt * stmt
-  | Swhile    of expr * stmt
-  | Smatch    of expr * ((EcIdent.t * EcTypes.ty) list * stmt) list
-  | Sassert   of expr
-  | Sabstract of EcIdent.t
+type instr_node = EcAst.instr_node
 
-and stmt = private {
-  s_node : instr list;
-  s_fv   : int EcIdent.Mid.t;
-  s_tag  : int;
-}
+type stmt = EcAst.stmt
 
 (* -------------------------------------------------------------------- *)
 val i_equal   : instr -> instr -> bool
@@ -106,10 +88,7 @@ type funsig = {
 val fs_equal : funsig -> funsig -> bool
 
 (* -------------------------------------------------------------------- *)
-type 'a use_restr = {
-  ur_pos : 'a option;   (* If not None, can use only element in this set. *)
-  ur_neg : 'a;          (* Cannot use element in this set. *)
-}
+type 'a use_restr = 'a EcAst.use_restr
 
 val ur_empty : 'a -> 'a use_restr
 val ur_full  : 'a -> 'a use_restr
@@ -126,82 +105,71 @@ val ur_union :
 (* -------------------------------------------------------------------- *)
 (* Oracle information of a procedure [M.f]. *)
 module PreOI : sig
-  type 'a t
+  type t = EcAst.oracle_info
 
-  val hash : ('a -> int) -> 'a t -> int
-  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+  val hash : t -> int
+  val equal : (EcAst.form -> EcAst.form -> bool) -> t -> t -> bool
 
-  val cost_self : 'a t -> [`Bounded of 'a | `Unbounded]
-  val cost : 'a t -> xpath -> [`Bounded of 'a | `Zero | `Unbounded]
-  val cost_calls : 'a t -> [`Bounded of 'a Mx.t | `Unbounded]
-  val costs : 'a t -> [`Bounded of 'a * 'a Mx.t | `Unbounded]
+  val cost_self : t -> [`Bounded of EcAst.form | `Unbounded]
+  val cost : t -> xpath -> [`Bounded of EcAst.form | `Zero | `Unbounded]
+  val cost_calls : t -> [`Bounded of EcAst.form Mx.t | `Unbounded]
+  val costs : t -> [`Bounded of EcAst.form * EcAst.form Mx.t | `Unbounded]
 
-  val allowed : 'a t -> xpath list
-  val allowed_s : 'a t -> Sx.t
+  val allowed : t -> xpath list
+  val allowed_s : t -> Sx.t
 
-  val mk : xpath list -> [`Bounded of 'a * 'a Mx.t | `Unbounded] -> 'a t
-  (* val change_calls : 'a t -> xpath list -> 'a t *)
-  val filter : (xpath -> bool) -> 'a t -> 'a t
+  val mk : xpath list -> [`Bounded of EcAst.form * EcAst.form Mx.t | `Unbounded] -> t
+  val filter : (xpath -> bool) -> t -> t
 end
 
 (* -------------------------------------------------------------------- *)
-type mr_xpaths = EcPath.Sx.t use_restr
+type mr_xpaths = EcAst.mr_xpaths
 
-type mr_mpaths = EcPath.Sm.t use_restr
+type mr_mpaths = EcAst.mr_mpaths
 
-type 'a p_mod_restr = {
-  mr_xpaths : mr_xpaths;
-  mr_mpaths : mr_mpaths;
-  mr_oinfos : 'a PreOI.t Msym.t;
-}
+type mod_restr = EcAst.mod_restr
 
-val p_mr_equal :
-  ('a -> 'a -> bool) ->
-  'a p_mod_restr ->
-  'a p_mod_restr ->
+val mr_equal :
+  mod_restr ->
+  mod_restr ->
   bool
 
-val p_mr_hash : ('a -> int) -> 'a p_mod_restr -> int
+val mr_hash : mod_restr -> int
 
-val has_compl_restriction : 'a p_mod_restr -> bool
+val has_compl_restriction : mod_restr -> bool
 
-val mr_is_empty : 'a p_mod_restr -> bool
+val mr_is_empty : mod_restr -> bool
 
 val mr_xpaths_fv : mr_xpaths -> int EcIdent.Mid.t
 val mr_mpaths_fv : mr_mpaths -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)
-type 'a p_module_type = {          (* Always in eta-normal form *)
-  mt_params : (EcIdent.t * 'a p_module_type) list;
-  mt_name   : EcPath.path;
-  mt_args   : EcPath.mpath list;
-  mt_restr  : 'a p_mod_restr;
-}
+type module_type = EcAst.module_type
 
 type module_sig_body_item = Tys_function of funsig
 
 type module_sig_body = module_sig_body_item list
 
-type 'a p_module_sig = {
-  mis_params : (EcIdent.t * 'a p_module_type) list;
+type module_sig = {
+  mis_params : (EcIdent.t * module_type) list;
   mis_body   : module_sig_body;
-  mis_restr  : 'a p_mod_restr;
+  mis_restr  : mod_restr;
 }
 
-type 'a p_top_module_sig = {
-  tms_sig  : 'a p_module_sig;
+type top_module_sig = {
+  tms_sig  : module_sig;
   tms_loca : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
 (* Simple module signature, without restrictions. *)
-type 'a p_module_smpl_sig = {
-  miss_params : (EcIdent.t * 'a p_module_type) list;
+type module_smpl_sig = {
+  miss_params : (EcIdent.t * module_type) list;
   miss_body   : module_sig_body;
 }
 
-val sig_smpl_sig_coincide : 'a p_module_sig -> 'b p_module_smpl_sig -> bool
+val sig_smpl_sig_coincide : module_sig -> module_smpl_sig -> bool
 
 (* -------------------------------------------------------------------- *)
 type uses = {
@@ -223,15 +191,15 @@ val fd_equal : function_def -> function_def -> bool
 val fd_hash  : function_def -> int
 
 (* -------------------------------------------------------------------- *)
-type 'a p_function_body =
+type function_body =
 | FBdef   of function_def
 | FBalias of xpath
-| FBabs   of 'a PreOI.t
+| FBabs   of PreOI.t
 
-type 'a p_function_ = {
+type function_ = {
   f_name   : symbol;
   f_sig    : funsig;
-  f_def    : 'a p_function_body;
+  f_def    : function_body;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -241,51 +209,50 @@ type abs_uses = {
   aus_writes : (EcTypes.prog_var * EcTypes.ty) list;
 }
 
-type 'a p_module_expr = {
+type module_expr = {
   me_name     : symbol;
-  me_body     : 'a p_module_body;
-  me_comps    : 'a p_module_comps;
+  me_body     : module_body;
+  me_comps    : module_comps;
   me_sig_body : module_sig_body;
-  me_params   : (EcIdent.t * 'a p_module_type) list;
+  me_params   : (EcIdent.t * module_type) list;
 }
 
 (* Invariant:
    In an abstract module [ME_Decl mt], [mt] must not be a functor, i.e. it must
    be fully applied. Therefore, we must have:
    [List.length mp.mt_params = List.length mp.mt_args]  *)
-and 'a p_module_body =
+and module_body =
   | ME_Alias       of int * EcPath.mpath
-  | ME_Structure   of 'a p_module_structure       (* Concrete modules. *)
-  | ME_Decl        of 'a p_module_type         (* Abstract modules. *)
+  | ME_Structure   of module_structure       (* Concrete modules. *)
+  | ME_Decl        of module_type         (* Abstract modules. *)
 
-and 'a p_module_structure = {
-  ms_body      : 'a p_module_item list;
+and module_structure = {
+  ms_body      : module_item list;
 }
 
-and 'a p_module_item =
-  | MI_Module   of 'a p_module_expr
+and module_item =
+  | MI_Module   of module_expr
   | MI_Variable of variable
-  | MI_Function of 'a p_function_
+  | MI_Function of function_
 
-and 'a p_module_comps = 'a p_module_comps_item list
+and module_comps = module_comps_item list
 
-and 'a p_module_comps_item = 'a p_module_item
+and module_comps_item = module_item
 
-type 'a p_top_module_expr = {
-  tme_expr : 'a p_module_expr;
+type top_module_expr = {
+  tme_expr : module_expr;
   tme_loca : locality;
 }
 
 (* -------------------------------------------------------------------- *)
-val p_mty_equal :
-  ('a -> 'a -> bool) ->
-  'a p_module_type ->
-  'a p_module_type ->
+val mty_equal :
+  module_type ->
+  module_type ->
   bool
 
-val p_mty_hash : ('a -> int) -> 'a p_module_type -> int
+val mty_hash : module_type -> int
 
 (* -------------------------------------------------------------------- *)
 val get_uninit_read : stmt -> Ssym.t
-val get_uninit_read_of_fun : _ p_function_ -> Ssym.t
-val get_uninit_read_of_module : path -> _ p_module_expr -> (xpath * Ssym.t) list
+val get_uninit_read_of_fun : function_ -> Ssym.t
+val get_uninit_read_of_module : path -> module_expr -> (xpath * Ssym.t) list

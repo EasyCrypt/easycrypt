@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcFol
 open EcEnv
 

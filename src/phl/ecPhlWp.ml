@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcModules
 open EcFol
 

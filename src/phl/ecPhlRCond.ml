@@ -2,6 +2,7 @@
 open EcUtils
 open EcIdent
 open EcSymbols
+open EcAst
 open EcTypes
 open EcDecl
 open EcModules

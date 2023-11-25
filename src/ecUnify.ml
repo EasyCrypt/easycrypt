@@ -4,6 +4,7 @@ open EcIdent
 open EcMaps
 open EcUtils
 open EcUid
+open EcAst
 open EcTypes
 open EcDecl
 

@@ -54,7 +54,7 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
         let env, xs = TT.trans_binding env ue bd in
         let body = TT.trans_prop env ue pe in
         let dom = List.map snd xs in
-        let xs = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
+        let xs = List.map (fun (x,ty) -> x, EcAst.GTty ty) xs in
         let lam = EcFol.f_lambda xs body in
         (dom, Some (PR_Plain lam))
 

@@ -1,7 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcPath
-open EcCoreFol
+open EcAst
 
 module Sid = EcIdent.Sid
 module Mid = EcIdent.Mid
@@ -11,53 +11,12 @@ include EcCoreModules
 
 (* -------------------------------------------------------------------- *)
 (* Instantiation of EcCoreModules.PreOI on EcCoreFol.form. *)
-module OI : sig
-  type t = form PreOI.t
-
-  val hash : t -> int
-  val equal : t -> t -> bool
-
-  val cost_self : t -> [`Bounded of form | `Unbounded]
-  val cost : t -> xpath -> [`Bounded of form | `Zero | `Unbounded]
-  val cost_calls : t -> [`Bounded of form Mx.t | `Unbounded]
-  val costs : t -> [`Bounded of form * form Mx.t | `Unbounded]
-
-  val allowed : t -> xpath list
-  val allowed_s : t -> Sx.t
-
-  val mk : xpath list -> [`Bounded of form * form Mx.t | `Unbounded] -> t
-  (* val change_calls : t -> xpath list -> t *)
-  val filter : (xpath -> bool) -> t -> t
-end = struct
-  type t = EcCoreFol.form PreOI.t
-
-  let allowed      = PreOI.allowed
-  let allowed_s    = PreOI.allowed_s
-  let cost_self    = PreOI.cost_self
-  let cost         = PreOI.cost
-  let cost_calls   = PreOI.cost_calls
-  let costs        = PreOI.costs
-  let mk           = PreOI.mk
-  let filter       = PreOI.filter
-  let equal        = PreOI.equal EcCoreFol.f_equal
-  let hash         = PreOI.hash EcCoreFol.f_hash
+module OI = struct
+  include PreOI
+  let equal = PreOI.equal f_equal
 end
 
 (* -------------------------------------------------------------------- *)
-type module_type       = EcCoreFol.module_type
-type mod_restr         = EcCoreFol.mod_restr
-type module_sig        = form p_module_sig
-type module_smpl_sig   = form p_module_smpl_sig
-type function_body     = form p_function_body
-type function_         = form p_function_
-type module_expr       = form p_module_expr
-type module_body       = form p_module_body
-type module_structure  = form p_module_structure
-type module_item       = form p_module_item
-type module_comps      = form p_module_comps
-type module_comps_item = form p_module_comps_item
-type top_module_sig    = form p_top_module_sig
-type top_module_expr   = form p_top_module_expr
 
 let mr_empty = {
   mr_xpaths = ur_empty EcPath.Sx.empty;

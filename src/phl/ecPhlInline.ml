@@ -4,6 +4,7 @@ open EcUtils
 open EcMaps
 open EcLocation
 open EcPath
+open EcAst
 open EcTypes
 open EcModules
 open EcFol

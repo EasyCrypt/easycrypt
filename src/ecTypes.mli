@@ -14,19 +14,8 @@ type is_local  =           [ `Local | `Global ]
 val local_of_locality : locality -> is_local
 
 (* -------------------------------------------------------------------- *)
-type ty = private {
-  ty_node : ty_node;
-  ty_fv   : int Mid.t;
-  ty_tag  : int;
-}
-
-and ty_node =
-  | Tglob   of EcIdent.t (* The tuple of global variable of the module *)
-  | Tunivar of EcUid.uid
-  | Tvar    of EcIdent.t
-  | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list
-  | Tfun    of ty * ty
+type ty = EcAst.ty
+type ty_node = EcAst.ty_node
 
 module Mty : Map.S with type key = ty
 module Sty : Set.S with module M = Map.MakeBase(Mty)
@@ -121,10 +110,7 @@ val symbol_of_ty   : ty -> string
 val fresh_id_of_ty : ty -> EcIdent.t
 
 (* -------------------------------------------------------------------- *)
-type lpattern =
-  | LSymbol of (EcIdent.t * ty)
-  | LTuple  of (EcIdent.t * ty) list
-  | LRecord of EcPath.path * (EcIdent.t option * ty) list
+type lpattern = EcAst.lpattern
 
 val lp_equal : lpattern -> lpattern -> bool
 val lp_hash  : lpattern -> int
@@ -133,19 +119,15 @@ val lp_ids   : lpattern -> EcIdent.t list
 val lp_fv    : lpattern -> EcIdent.Sid.t
 
 (* -------------------------------------------------------------------- *)
-type ovariable = {
-  ov_name : symbol option;
-  ov_type : ty;
-}
+type ovariable = EcAst.ovariable
+
 val ov_name  : ovariable -> symbol option
 val ov_type  : ovariable -> ty
 val ov_hash  : ovariable -> int
 val ov_equal : ovariable -> ovariable -> bool
 
-type variable = {
-    v_name : symbol;   (* can be "_" *)
-    v_type : ty;
-  }
+type variable = EcAst.variable
+
 val v_name  : variable -> symbol
 val v_type  : variable -> ty
 val v_hash  : variable -> int
@@ -154,13 +136,9 @@ val v_equal : variable -> variable -> bool
 val ovar_of_var: variable -> ovariable
 
 (* -------------------------------------------------------------------- *)
-type pvar_kind =
-  | PVKglob
-  | PVKloc
+type pvar_kind = EcAst.pvar_kind
 
-type prog_var = private
-  | PVglob of EcPath.xpath
-  | PVloc of EcSymbols.symbol
+type prog_var = EcAst.prog_var
 
 val pv_equal       : prog_var -> prog_var -> bool
 val pv_compare     : prog_var -> prog_var -> int
@@ -194,34 +172,17 @@ val pv_res  : prog_var
 val pv_arg  : prog_var
 
 (* -------------------------------------------------------------------- *)
-type expr = private {
-  e_node : expr_node;
-  e_ty   : ty;
-  e_fv   : int Mid.t;    (* module idents, locals *)
-  e_tag  : int;
-}
+type expr = EcAst.expr
+type expr_node = EcAst.expr_node
 
-and expr_node =
-  | Eint   of zint                         (* int. literal          *)
-  | Elocal of EcIdent.t                    (* let-variables         *)
-  | Evar   of prog_var                     (* module variable       *)
-  | Eop    of EcPath.path * ty list        (* op apply to type args *)
-  | Eapp   of expr * expr list             (* op. application       *)
-  | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
-  | Elet   of lpattern * expr * expr       (* let binding           *)
-  | Etuple of expr list                    (* tuple constructor     *)
-  | Eif    of expr * expr * expr           (* _ ? _ : _             *)
-  | Ematch of expr * expr list * ty        (* match _ with _        *)
-  | Eproj  of expr * int                   (* projection of a tuple *)
-
-and equantif  = [ `ELambda | `EForall | `EExists ]
-and ebinding  = EcIdent.t * ty
-and ebindings = ebinding list
+type equantif  = EcAst.equantif
+type ebinding  = EcAst.ebinding
+type ebindings = EcAst.ebindings
 
 type closure = (EcIdent.t * ty) list * expr
 
 (* -------------------------------------------------------------------- *)
-val qt_equal : equantif -> equantif -> bool
+val eqt_equal : equantif -> equantif -> bool
 
 (* -------------------------------------------------------------------- *)
 val e_equal   : expr -> expr -> bool

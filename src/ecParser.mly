@@ -1373,9 +1373,9 @@ form_chained_orderings(P):
          f2) }
 
 hoare_bd_cmp :
-| LE { EcFol.FHle }
-| EQ { EcFol.FHeq }
-| GE { EcFol.FHge }
+| LE { EcAst.FHle }
+| EQ { EcAst.FHeq }
+| GE { EcAst.FHge }
 
 hoare_body(P):
   mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
