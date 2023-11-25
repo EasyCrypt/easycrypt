@@ -2,7 +2,6 @@
 open EcUtils
 open EcLocation
 open EcParsetree
-open EcFol
 
 open EcCoreGoal
 open EcCoreGoal.FApi

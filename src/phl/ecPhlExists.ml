@@ -1,8 +1,8 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcFol
 open EcEnv
-open EcModules
 
 open EcCoreGoal
 open EcLowGoal

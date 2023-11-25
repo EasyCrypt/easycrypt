@@ -3,6 +3,7 @@ open EcUtils
 open EcLocation
 open EcParsetree
 open EcIdent
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv

@@ -2,6 +2,7 @@
 open EcMaps
 open EcSymbols
 open EcUtils
+open EcAst
 open EcTypes
 open EcModules
 open EcDecl
@@ -1557,7 +1558,7 @@ and try_pp_lossless (ppe : PPEnv.t) outer fmt f =
            EcFol.f_equal EcFol.f_true hbd.bhf_pr
         && EcFol.f_equal EcFol.f_true hbd.bhf_po
         && EcFol.f_equal EcFol.f_r1   hbd.bhf_bd
-        && hbd.bhf_cmp = EcFol.FHeq
+        && hbd.bhf_cmp = FHeq
       in
         match isls with
         | false -> false
@@ -3725,13 +3726,13 @@ let pp_use_restr env ~print_abstract fmt ur =
   let open EcEnv in
   let ppe = PPEnv.ofenv env in
 
-  let sm_p = omap (fun x -> sm_of_mid x.us_gl) ur.EcModules.ur_pos
-  and sm_n = sm_of_mid ur.EcModules.ur_neg.us_gl in
+  let sm_p = omap (fun x -> sm_of_mid x.us_gl) ur.ur_pos
+  and sm_n = sm_of_mid ur.ur_neg.us_gl in
 
   let sx_p =
-    omap (fun x -> EcPath.Mx.map (fun _ -> ())x.us_pv) ur.EcModules.ur_pos
+    omap (fun x -> EcPath.Mx.map (fun _ -> ())x.us_pv) ur.ur_pos
   and sx_n =
-    EcPath.Mx.map (fun _ -> ()) ur.EcModules.ur_neg.us_pv in
+    EcPath.Mx.map (fun _ -> ()) ur.ur_neg.us_pv in
 
   Format.fprintf fmt "@[<v 0>Abstract modules:@ @[<h>%a@]@ @[<h>%a@]@;"
     (fun fmt opt -> match opt with

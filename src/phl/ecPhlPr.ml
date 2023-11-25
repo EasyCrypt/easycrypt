@@ -3,7 +3,7 @@ open EcUtils
 open EcModules
 open EcFol
 open EcEnv
-open EcTypes
+open EcAst
 open EcCoreGoal
 open EcLowPhlGoal
 

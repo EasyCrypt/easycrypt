@@ -5,6 +5,7 @@ open EcSymbols
 open EcLocation
 open EcPath
 open EcParsetree
+open EcAst
 open EcTypes
 open EcDecl
 open EcModules

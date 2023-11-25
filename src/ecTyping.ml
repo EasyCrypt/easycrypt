@@ -5,6 +5,7 @@ open EcMaps
 open EcSymbols
 open EcLocation
 open EcParsetree
+open EcAst
 open EcTypes
 open EcDecl
 open EcMemory

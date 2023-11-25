@@ -3,6 +3,7 @@ open EcUtils
 open EcMaps
 open EcIdent
 open EcPath
+open EcAst
 open EcTypes
 open EcDecl
 open EcFol

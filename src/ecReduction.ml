@@ -2,6 +2,7 @@
 open EcUtils
 open EcIdent
 open EcPath
+open EcAst
 open EcTypes
 open EcDecl
 open EcModules
@@ -136,7 +137,7 @@ module EqTest_base = struct
       | Eop(o1,ty1), Eop(o2,ty2) ->
           p_equal o1 o2 && List.all2 (for_type env) ty1 ty2
 
-      | Equant(q1,b1,e1), Equant(q2,b2,e2) when qt_equal q1 q2 ->
+      | Equant(q1,b1,e1), Equant(q2,b2,e2) when eqt_equal q1 q2 ->
           let alpha = check_bindings env alpha b1 b2 in
           noconv (aux alpha) e1 e2
 
@@ -258,7 +259,7 @@ end) = struct
         env, EcSubst.add_module s id1 (EcPath.mident id2)) (env, EcSubst.empty) p1 p2
 
   (* ------------------------------------------------------------------ *)
-  let rec for_module_type env ~norm mt1 mt2 =
+  let rec for_module_type env ~norm (mt1:module_type) (mt2:module_type) =
     if EcPath.p_equal mt1.mt_name mt2.mt_name then
       let p1 = mt1.mt_params in
       let p2 = mt2.mt_params in

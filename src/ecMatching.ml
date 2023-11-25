@@ -8,6 +8,7 @@ open EcMaps
 open EcIdent
 open EcParsetree
 open EcEnv
+open EcAst
 open EcTypes
 open EcModules
 open EcFol

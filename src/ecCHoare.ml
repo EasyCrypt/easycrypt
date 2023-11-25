@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 (* Function for cost                                                    *)
 open EcUtils
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv
