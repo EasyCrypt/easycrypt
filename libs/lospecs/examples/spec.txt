@@ -29,7 +29,12 @@ VPAND_256_ALT(w1@256, w2@256) -> @256 =
   )
 
 # REF: https://www.felixcloutier.com/x86/vpbroadcast
+# Might be problematic?
 VPBROADCAST_16u16(w1@256) -> @256 = 
+  map<16, 16>(
+    fun x@16 . w1[0:15],
+    w1
+  )
     
 # REF: https://www.felixcloutier.com/x86/pmaddubsw
 VPMADDUBSW_256(w1@256, w2@256) -> @256 =
@@ -43,21 +48,20 @@ VPMULH_16u16(w1@256, w2@256) -> @256 =
   )
 
 # Need to implement sign extend (intrinsic?)
-# TODO: CHECK IF 16:1 for MSBs is correct
+# TODO: Check indexing here
 VPMULHRS_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
     fun x@16 y@16 . add<32>(
                       rshift<32>(
                         mult<32>(sext<32>(x), sext<32>(y)), 
                         14),
-                      1)[16:1],
+                      1)[0:15],
     w1,
     w2)
-                      
 
 ## TODO:
 ## VPACKUS_16u16
-## VPBROADCAST_16u16
+## VPBROADCAST_16u16 *
 ## VPMADDUBSW_256
 ## VPMULHRS_16u16 *
 ## VPSRA_16u16
