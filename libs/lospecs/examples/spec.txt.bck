@@ -1,0 +1,83 @@
+VPERMD(w@256, widx@256) -> @256 =
+  map<32, 8>(
+    fun idx@32 . let i = (unsigned) idx[0:2] in w[i:1:32],
+    widx
+  )
+
+VPSUB_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(
+    fun x@16 y@16 . sub<16>(x, y),
+    w1,
+    w2
+  )
+
+VPADD_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(
+    fun x@16 y@16 . add<16>(x, y),
+    w1,
+    w2
+  )
+
+VPAND_256(w1@256, w2@256) -> @256 = 
+  and<256>(w1, w2)
+
+## TODO:
+## VPACKUS_16u16
+## VPAND_256 *
+## VPBROADCAST_16u16
+## VPMADDUBSW_256
+## VPMULH_16u16
+## VPMULHRS_16u16
+## VPSRA_16u16
+
+
+Fq / <X^256 + 1>
+
+zeta : Fq = 17
+
+zeta^128 = -1
+
+P mod (X^256 - zeta^128)
+Q mod (X^256 - zeta^128)
+
+PQ mod (X^256 - zeta^128)
+
+P1 mod (X^128 - zeta^64)
+
+P mod (X^128 - zeta^64)
+
+P = sum_(i < 256) X^i * ai
+  = sum_(i < 128) X^i * (ai + a_(i+128) * zeta^64)
+
+P mod (X^128 + zeta^64)
+
+P = sum_(i < 256) X^i * ai
+  = sum_(i < 128) X^i * (ai - a_(i+128) * zeta^64)
+
+
+
+P2 mod (X^128 + zeta^64)
+
+P1 mod (X^128 - zeta^64)
+P2 mod (X^128 - zeta^192)
+
+P0 mod (X^2 - zeta^r0)
+P1 mod (X^2 - zeta^r1)
+.
+.
+.
+P127 mod (X^2 - zeta^r127)
+
+Q1 mod (X^128 - zeta^64)
+Q2 mod (X^128 + zeta^64)
+
+Q1 mod (X^128 - zeta^64)
+Q2 mod (X^128 - zeta^192)
+
+Q0 mod (X^2 - zeta^r0)
+Q1 mod (X^2 - zeta^r1)
+.
+.
+.
+Q127 mod (X^2 - zeta^r127)
+

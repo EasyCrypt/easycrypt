@@ -11,53 +11,53 @@ VPSUB_16u16(w1@256, w2@256) -> @256 =
     w2
   )
 
-Fq / <X^256 + 1>
+VPADD_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(
+    fun x@16 y@16 . add<16>(x, y),
+    w1,
+    w2
+  )
 
-zeta : Fq = 17
+VPAND_256(w1@256, w2@256) -> @256 = 
+  and<256>(w1, w2)
 
-zeta^128 = -1
+VPAND_256_ALT(w1@256, w2@256) -> @256 = 
+  map<1, 256>(
+    fun a@1 b@1 . and<1>(a, b),
+    w1,
+    w2
+  )
 
-P mod (X^256 - zeta^128)
-Q mod (X^256 - zeta^128)
+# REF: https://www.felixcloutier.com/x86/vpbroadcast
+VPBROADCAST_16u16(w1@256) -> @256 = 
+    
+# REF: https://www.felixcloutier.com/x86/pmaddubsw
+VPMADDUBSW_256(w1@256, w2@256) -> @256 =
+  
+# REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4774&text=vpmulh
+VPMULH_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(
+    fun x@16 y@16 . mult<16>(x, y),
+    w1,
+    w2
+  )
 
-PQ mod (X^256 - zeta^128)
+# Need to implement sign extend (intrinsic?)
+# TODO: CHECK IF 16:1 for MSBs is correct
+VPMULHRS_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(
+    fun x@16 y@16 . add<32>(
+                      rshift<32>(
+                        mult<32>(sext<32>(x), sext<32>(y)), 
+                        14),
+                      1)[16:1],
+    w1,
+    w2)
+                      
 
-P1 mod (X^128 - zeta^64)
-
-P mod (X^128 - zeta^64)
-
-P = sum_(i < 256) X^i * ai
-  = sum_(i < 128) X^i * (ai + a_(i+128) * zeta^64)
-
-P mod (X^128 + zeta^64)
-
-P = sum_(i < 256) X^i * ai
-  = sum_(i < 128) X^i * (ai - a_(i+128) * zeta^64)
-
-
-
-P2 mod (X^128 + zeta^64)
-
-P1 mod (X^128 - zeta^64)
-P2 mod (X^128 - zeta^192)
-
-P0 mod (X^2 - zeta^r0)
-P1 mod (X^2 - zeta^r1)
-.
-.
-.
-P127 mod (X^2 - zeta^r127)
-
-Q1 mod (X^128 - zeta^64)
-Q2 mod (X^128 + zeta^64)
-
-Q1 mod (X^128 - zeta^64)
-Q2 mod (X^128 - zeta^192)
-
-Q0 mod (X^2 - zeta^r0)
-Q1 mod (X^2 - zeta^r1)
-.
-.
-.
-Q127 mod (X^2 - zeta^r127)
-
+## TODO:
+## VPACKUS_16u16
+## VPBROADCAST_16u16
+## VPMADDUBSW_256
+## VPMULHRS_16u16 *
+## VPSRA_16u16

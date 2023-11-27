@@ -3,8 +3,8 @@ open Lospecs
 
 (* -------------------------------------------------------------------- *)
 let _ =
-  let p = Io.parse IO.stdin in
-  Typing.tt_program Typing.Env.empty p
+  Io.parse IO.stdin
+ 
 
 (* -------------------------------------------------------------------- *)
 module List : sig
