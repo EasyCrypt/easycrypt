@@ -50,7 +50,7 @@ rule main = parse
   | whitespace+
       { main lexbuf }
 
-  | '#' _* ['\r' '\n']*
+  | '#' [^'\r' '\n']* ['\r' '\n']*
       { main lexbuf }
 
   | eof
