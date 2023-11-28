@@ -5,8 +5,6 @@ open EcAst
 open EcTypes
 open EcCoreModules
 
-type memory = EcMemory.memory
-
 module BI = EcBigInt
 module Mp = EcPath.Mp
 module Sp = EcPath.Sp

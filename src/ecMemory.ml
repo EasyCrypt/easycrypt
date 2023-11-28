@@ -14,8 +14,6 @@ let mem_equal = EcAst.mem_equal
 (* -------------------------------------------------------------------- *)
 type proj_arg = EcAst.proj_arg
 
-type local_memtype = EcAst.local_memtype
-
 let mk_lmt lmt_name lmt_decl lmt_proj =
   { lmt_name;
     lmt_decl;
