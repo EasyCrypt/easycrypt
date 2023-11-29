@@ -43,6 +43,14 @@ let name_of_lv lv =
   | LvTuple pvs ->
      String.concat "_" (List.map (EcTypes.name_of_pvar |- fst) pvs)
 
+let lv_of_expr e =
+  match e.e_node with
+  | Evar pv ->
+     LvVar (pv, e_ty e)
+  | Etuple pvs ->
+     LvTuple (List.map (fun e -> EcTypes.destr_var e, e_ty e) pvs)
+  | _ -> failwith "failed to construct lv from expr"
+
 (* -------------------------------------------------------------------- *)
 type instr = EcAst.instr
 

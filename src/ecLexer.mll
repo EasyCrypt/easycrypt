@@ -154,6 +154,7 @@
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
     "exfalso"     , EXFALSO    ;        (* KW: tactic *)
     "inline"      , INLINE     ;        (* KW: tactic *)
+    "outline"     , OUTLINE    ;        (* KW: tactic *)
     "interleave"  , INTERLEAVE ;        (* KW: tactic *)
     "alias"       , ALIAS      ;        (* KW: tactic *)
     "weakmem"     , WEAKMEM    ;        (* KW: tactic *)
