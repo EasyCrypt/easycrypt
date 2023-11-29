@@ -26,7 +26,9 @@ VPAND_256_ALT(w1@256, w2@256) -> @256 =
     fun a@1 b@1 . and<1>(a, b),
     w1,
     w2
-  )
+)
+
+
 
 # REF: https://www.felixcloutier.com/x86/vpbroadcast
 # Might be problematic?
@@ -35,18 +37,17 @@ VPBROADCAST_16u16(w1@256) -> @256 =
     fun x@16 . w1[0:15],
     w1
   )
-    
-# REF: https://www.felixcloutier.com/x86/pmaddubsw
-VPMADDUBSW_256(w1@256, w2@256) -> @256 =
+     
   
 # REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4774&text=vpmulh
-# mu
+# We want to get the high 16 bits of product, check endianness later
 VPMULH_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
-    fun x@16 y@16 . mult<16>(x, y)[,
+    fun x@16 y@16 . mult<16>(x, y)[0:15],
     w1,
     w2
   )
+
 
 # Need to implement sign extend (intrinsic?)
 # TODO: Check indexing here
@@ -57,11 +58,15 @@ VPMULHRS_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
     fun x@16 y@16 . add<32>(
                       rshift<32>(
-                        mult<32>(sext<32>(x), sext<32>(y)), 
+                        mult<32>(sext<32>(x), 
+                                 sext<32>(y)
+                                 ), 
                         14),
-                      1)[0:15],
+                      1)[16:31],
     w1,
     w2)
+
+
 
 # REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4774,4785,6371&text=vpsra
 # TODO?: Might need to be expanded here 
@@ -69,12 +74,13 @@ VPMULHRS_16u16(w1@256, w2@256) -> @256 =
 # shift_rigbt_ar(x,y): shift right arithmetic, x >> y
 VPSRA_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
-    fun x@16 y@16 . shift_right_ar<16>(x, y)
+    fun x@16 y@16 . sra<16>(x, y),
     w1,
     w2
   )
 
 
+# REF: https://www.felixcloutier.com/x86/pmaddubsw
 # SatToSW<n>: SaturateToSignedWord<bit_len>
 VPMADDUBSW_256(w1@256, w2@256) -> @256 =
   map<16, 16>(
@@ -93,18 +99,41 @@ VPMADDUBSW_256(w1@256, w2@256) -> @256 =
 # REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4785,4906&text=vpackus
 # Might need different implementation
 # probably needs some kind of fold/accumulation combinator
-# TODO: FINISH THIS
-VPACKUS_16u16(w1@256, w2@256) -> @256 =
-  map<128, 2>(
-    fun v1@128 v2@128 . or<128>(
-                          
-    w1,
-    w2,
-  )
+# Temp version assuming that:
+# map<n, x> has type: ((...(a -> b) -> ...) -> c) -> d) -> a[x] -> b[x] -> ... -> c[x] -> d[x]
+#                    | Function that takes args      | | Lists of said args        |   | List of ret type |
+# where if a is a type then a[x] is the type of lists of length x with elements with type a
+#PACKUS_16u16(w1@256, w2@256) -> @256 =
+# map<128, 2>(
+#   fun v1@128 v2@128 . or<128>(
+#                             map<16,8>(
+#                               fun a@16 . SatToUW<8>(a),
+#                                 v1
+#                             ),
+#                    sla<128>(map<16,8>(
+#                               fun a@16 . SatToUW<8>(a),
+#                                 v2
+#                             ),
+#                             64
+#                         )
+#                       )            
+#   w1,
+#   w2,
+# )
+
+# TODO:
+# Extend map to take in existing functions
+# Rather than needing a funtion def as an argument
+# Specifically, this call should be valid:
+# map<16,8>(
+#   SatToUW<8>,
+#   v2
+# ),
+
                       
 
 ## TODO:
-## VPACKUS_16u16
+## VPACKUS_16u16 *
 ## VPBROADCAST_16u16 *
 ## VPMADDUBSW_256 *
 ## VPMULHRS_16u16 *

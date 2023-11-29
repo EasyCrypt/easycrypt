@@ -53,6 +53,11 @@ rule main = parse
   | '#' [^'\r' '\n']* ['\r' '\n']*
       { main lexbuf }
 
+(* DEBUG FEATURE: for binary searching for syntax errors
+   to be switched for better error output *)
+  | '^' _* 
+      { main lexbuf }
+
   | eof
       { EOF }
 
