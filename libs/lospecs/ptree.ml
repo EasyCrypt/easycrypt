@@ -76,4 +76,4 @@ type pprogram =
   pdef list
 
 let pp_program (fmt: Format.formatter) (prog: pprogram) = 
-    Format.pp_print_list ~pp_sep:(fun out () -> Format.fprintf out "@.") pp_def fmt prog
+    Format.pp_print_list ~pp_sep:(fun out () -> Format.fprintf out "@.@.") pp_def fmt prog

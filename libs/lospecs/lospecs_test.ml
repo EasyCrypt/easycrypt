@@ -3,8 +3,7 @@ open Lospecs
 
 (* -------------------------------------------------------------------- *)
 let _ =
-  Io.parse IO.stdin
- 
+    Format.printf "%a@." Ptree.pp_program (Io.parse IO.stdin)
 
 (* -------------------------------------------------------------------- *)
 module List : sig
