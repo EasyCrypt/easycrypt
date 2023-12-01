@@ -122,6 +122,13 @@ def _options():
         help    = 'Add a prover to the set of activated provers')
 
     parser.add_option(
+        '', '--why3',
+        action  = 'store',
+        metavar = 'WHY3',
+        default = None,
+        help    = 'Why3 configuration file')
+
+    parser.add_option(
         '', '--report',
         action  = 'store',
         default = None,
@@ -144,6 +151,7 @@ def _options():
     options = Object(scenarios = dict())
     options.timeout  = cmdopt.timeout
     options.timing   = cmdopt.timing
+    options.why3     = cmdopt.why3
     options.jobs     = cmdopt.jobs
     options.provers  = cmdopt.provers
     options.report   = cmdopt.report
@@ -692,6 +700,8 @@ async def _run_all(options, allscripts, listener : Listener):
             if options.provers:
                 for prover in options.provers:
                     command.extend(['-p', prover])
+            if options.why3:
+                command.extend(['-why3', options.why3])
             if options.timing:
                 tfilename = os.path.join(
                     TIMING_DIR, os.path.splitext(config.filename)[0] + '.stats')

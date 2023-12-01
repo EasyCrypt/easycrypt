@@ -195,12 +195,13 @@ let main () =
         let args =
             [
               "runtest";
-               Format.sprintf "--bin=%s" Sys.executable_name;
+              Format.sprintf "--bin=%s" Sys.executable_name;
             ]
           @ (List.flatten
                (List.map
                   (fun x -> ["-p"; x])
                   (odfl [] input.runo_provers)))
+          @ (otolist (omap (Format.sprintf "--why3=%s") options.o_options.o_why3))
           @ [input.runo_input]
           @ input.runo_scenarios
         in
