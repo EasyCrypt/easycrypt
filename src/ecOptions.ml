@@ -33,6 +33,7 @@ and cli_option = {
 and run_option = {
   runo_input     : string;
   runo_scenarios : string list;
+  runo_provers   : string list option;
 }
 
 and prv_options = {
@@ -344,7 +345,9 @@ let specs = {
 
     ("config", "Print EasyCrypt configuration", []);
 
-    ("runtest", "Run a test-suite", []);
+    ("runtest", "Run a test-suite", [
+      `Spec ("p", `String, "Add a prover to the set of provers");
+    ]);
 
     ("why3config", "Configure why3", []);
   ];
@@ -496,6 +499,13 @@ let cmp_options_of_values ini values input =
     cmpo_noeco   = get_flag "no-eco" values;
     cmpo_script  = get_flag "script" values; }
 
+let runtest_options_of_values values (input, scenarios) =
+  { runo_input     = input;
+    runo_scenarios = scenarios;
+    runo_provers   =
+      match get_strings "p" values with
+      | [] -> None | provers -> Some provers }
+
 (* -------------------------------------------------------------------- *)
 let parse getini argv =
   let (command, values, anons) = parse specs argv in
@@ -532,9 +542,9 @@ let parse getini argv =
 
     | "runtest" -> begin
         match anons with
-        | runo_input :: runo_scenarios ->
+        | input :: scenarios ->
            let ini = getini None in
-           let cmd = `Runtest { runo_input; runo_scenarios; } in
+           let cmd = `Runtest (runtest_options_of_values values (input, scenarios)) in
 
            (cmd, ini)
 
