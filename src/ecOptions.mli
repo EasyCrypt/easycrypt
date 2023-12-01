@@ -29,6 +29,7 @@ and cli_option = {
 and run_option = {
   runo_input     : string;
   runo_scenarios : string list;
+  runo_provers   : string list option;
 }
 
 and prv_options = {

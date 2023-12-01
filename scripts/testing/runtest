@@ -115,6 +115,13 @@ def _options():
         help    = 'add timing statistics')
 
     parser.add_option(
+        '-p', '--provers',
+        action  = 'append',
+        metavar = 'PROVERS',
+        default = None,
+        help    = 'Add a prover to the set of activated provers')
+
+    parser.add_option(
         '', '--report',
         action  = 'store',
         default = None,
@@ -138,6 +145,7 @@ def _options():
     options.timeout  = cmdopt.timeout
     options.timing   = cmdopt.timing
     options.jobs     = cmdopt.jobs
+    options.provers  = cmdopt.provers
     options.report   = cmdopt.report
 
     defaults = dict(
@@ -681,6 +689,9 @@ async def _run_all(options, allscripts, listener : Listener):
             command = [options.bin] + options.args + config.args
             if options.timeout:
                 command.extend(['-timeout', str(options.timeout)])
+            if options.provers:
+                for prover in options.provers:
+                    command.extend(['-p', prover])
             if options.timing:
                 tfilename = os.path.join(
                     TIMING_DIR, os.path.splitext(config.filename)[0] + '.stats')
