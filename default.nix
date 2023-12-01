@@ -2,23 +2,12 @@
 
 with import <nixpkgs> {};
 
-let alt-ergo-pin = callPackage scripts/nix/alt-ergo/default.nix { nixpkgs = <nixpkgs>; };
-in
-
-let cvc4-pin = callPackage scripts/nix/cvc4/default.nix { nixpkgs = <nixpkgs>; };
-in
-
-let cvc5-pin = callPackage scripts/nix/cvc5/default.nix { nixpkgs = <nixpkgs>; };
-in
-
-let z3-pin = callPackage scripts/nix/z3/default.nix { nixpkgs = <nixpkgs>; };
-in
-
 let provers =
   if withProvers then [
-    cvc4-pin
-    cvc5-pin
-    z3-pin
+    alt-ergo
+    cvc4
+    cvc5
+    z3
   ] else []; in
 
 let why3-pin =
