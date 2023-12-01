@@ -72,7 +72,7 @@ let print_config config =
       let fullname =
         Printf.sprintf "%s@%s"
           prover.EcProvers.pr_name
-          prover.EcProvers.pr_version in
+          (EcProvers.Version.to_string prover.EcProvers.pr_version) in
 
       match prover.EcProvers.pr_evicted with
       | None -> fullname
