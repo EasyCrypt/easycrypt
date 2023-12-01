@@ -20,22 +20,28 @@ import socket
 import sys
 import termios
 import time
-import yaml
 
 # --------------------------------------------------------------------
-class folded_unicode(str):
-    pass
+try:
+    import yaml
 
-class literal_unicode(str):
-    pass
+except ModuleNotFoundError:
+    yaml = None
 
-def folded_unicode_representer(dumper, data):
-    return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='>')
-def literal_unicode_representer(dumper, data):
-    return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
+else:
+    class folded_unicode(str):
+        pass
 
-yaml.add_representer(folded_unicode , folded_unicode_representer)
-yaml.add_representer(literal_unicode, literal_unicode_representer)
+    class literal_unicode(str):
+        pass
+
+    def folded_unicode_representer(dumper, data):
+        return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='>')
+    def literal_unicode_representer(dumper, data):
+        return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
+
+    yaml.add_representer(folded_unicode , folded_unicode_representer)
+    yaml.add_representer(literal_unicode, literal_unicode_representer)
 
 # --------------------------------------------------------------------
 @clib.asynccontextmanager
@@ -800,7 +806,16 @@ async def _main():
     mainconfig.hostname  = socket.gethostname()
     mainconfig.timestamp = datetime.datetime.utcnow()
 
-    options    = _options()
+    options = _options()
+
+    if options.report is not None:
+        if yaml is None:
+            print(
+                'reporting needs the yaml Python module',
+                file = sys.stderr
+            )
+            exit(1)
+
     allscripts = Gather.gatherall(options.scenarios, options.targets)
 
     listener = None
