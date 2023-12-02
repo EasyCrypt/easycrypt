@@ -16,7 +16,6 @@ in
 
 let provers =
   if withProvers then [
-    alt-ergo-pin
     cvc4-pin
     cvc5-pin
     z3-pin

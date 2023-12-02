@@ -20,7 +20,7 @@ all:
 	cd $*-test-box && docker build -t $(DNAME)/ec-$*-test-box .
 
 %-build: __force__
-	cd $* && docker build -t $(DNAME)/ec-$* .
+	cd $* && docker build --platform linux/amd64 -t $(DNAME)/ec-$* .
 
 %-publish: __force__
 	cd $* && docker push $(DNAME)/ec-$*:latest
