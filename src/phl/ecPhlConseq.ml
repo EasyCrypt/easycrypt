@@ -600,7 +600,7 @@ let t_concave_incr =
        (t_solve ~bases:["concave_incr"] ~mode:EcMatching.fmrigid ~canfail:true ~depth:20))
 
 (* -------------------------------------------------------------------- *)
-let t_ehoare_conseq_nm_end hyps =
+let t_ehoare_conseq_nm_end =
   [ t_concave_incr;
     t_id;
     t_id;
@@ -630,11 +630,11 @@ let t_ehoareF_conseq_nm pre post tc =
     let x = EcIdent.create "x" in
     f_lambda [x,GTty txreal] (f_interp_ehoare_form cond (f_local x txreal)) in
 
-  (t_ehoareF_concave fc pre post @+ t_ehoare_conseq_nm_end hyps) tc
+  (t_ehoareF_concave fc pre post @+ t_ehoare_conseq_nm_end) tc
 
 (* -------------------------------------------------------------------- *)
 let t_ehoareS_conseq_nm pre post tc =
-  let (env, hyps, _) = FApi.tc1_eflat tc in
+  let env = FApi.tc1_env tc in
   let hs = tc1_as_ehoareS tc in
   let s = hs.ehs_s in
   let m = fst hs.ehs_m in
@@ -646,7 +646,7 @@ let t_ehoareS_conseq_nm pre post tc =
     let x = EcIdent.create "x" in
     f_lambda [x,GTty txreal] (f_interp_ehoare_form cond (f_local x txreal)) in
 
-  (t_ehoareS_concave fc pre post @+ t_ehoare_conseq_nm_end hyps) tc
+  (t_ehoareS_concave fc pre post @+ t_ehoare_conseq_nm_end) tc
 
 
 (* -------------------------------------------------------------------- *)
