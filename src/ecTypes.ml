@@ -214,8 +214,15 @@ let rec ty_subst s =
             | Some ty -> ty_subst s ty
           end
         end
-      | Tunivar id    -> Muid.find_def ty id s.ts_u
-      | Tvar id       -> Mid.find_def ty id s.ts_v
+      | Tunivar id -> begin
+          match Muid.find_opt id s.ts_u with
+          | None ->
+            ty
+          | Some ty ->
+            ty_subst s ty
+        end
+
+      | Tvar id -> Mid.find_def ty id s.ts_v
       | _ -> ty_map (ty_subst s) ty
 
 (* -------------------------------------------------------------------- *)
