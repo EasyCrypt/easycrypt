@@ -28,7 +28,7 @@ VPAND_256(w1@256, w2@256) -> @256 =
 # Might be problematic?
 VPBROADCAST_16u16(w1@256) -> @256 = 
   map<16, 16>(
-    fun x@16 . w1[0:15],
+    fun x@16 . w1[0:1:16],
     w1
   )
      
@@ -59,7 +59,7 @@ VPMULHRS_16u16(w1@256, w2@256) -> @256 =
                       srl<32>(
                         mult<16>(x, y), 
                         14),
-                      1)[1:16],
+                      1)[15:1:16], # Should get the 16 MSBs (except *the* most significant bit)
     w1,
     w2)
 
@@ -83,8 +83,8 @@ VPMADDUBSW_256(w1@256, w2@256) -> @256 =
   map<16, 16>(
     fun x@16 y@16 . SatToSW<16, 8>(
                       add<16>(
-                        mult<8>(x[0:7], y[0:7]),
-                        mult<8>(x[8:15], y[8:15])
+                        mult<8>(x[0:1:8], y[0:1:8]),
+                        mult<8>(x[8:1:8], y[8:1:8])
                       )
                     ),
     w1,

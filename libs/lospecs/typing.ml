@@ -97,9 +97,9 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
   (* will need to add typecast compatibility check, unnecessary for now *)
   (* TODO: Make types compatible across files*)
   | PECast (t, _e) -> let t = (match t with 
-                                | Ptree.(`W x) -> `W x 
-                                | Ptree.(`Unsigned) -> `Unsigned
-                                | Ptree.(`Signed) -> `Signed )
+                                | (`W x) -> `W x 
+                                | (`Unsigned) -> `Unsigned
+                                | (`Signed) -> `Signed )
                                in (match check with
                                     | Some _t -> if t = _t then (env, t) else failwith "Bad typecast"
                                     | None -> (env, t)  )
