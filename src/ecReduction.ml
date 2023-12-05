@@ -653,8 +653,7 @@ let is_alpha_eq hyps f1 f2 =
     | NotConv -> false
   in
 
-  try aux env EcSubst.empty f1 f2; true
-  with NotConv -> false
+  test env EcSubst.empty f1 f2
 
 (* -------------------------------------------------------------------- *)
 type reduction_info = {

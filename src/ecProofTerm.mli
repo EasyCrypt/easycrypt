@@ -138,10 +138,12 @@ val pattern_form :
 val can_concretize  : pt_env -> bool
 val concretize_env  : pt_env -> cptenv
 val concretize      : pt_ev  -> proofterm * form
+val concretize_gen  : pt_ev  -> bindings -> proofterm * form
 val concretize_form : pt_env -> form -> form
 
-val concretize_e_form : cptenv -> form -> form
-val concretize_e_arg  : cptenv -> pt_arg -> pt_arg
+val concretize_e_form     : cptenv -> form -> form
+val concretize_e_form_gen : cptenv -> bindings -> form -> form
+val concretize_e_arg      : cptenv -> pt_arg -> pt_arg
 
 (* PTEnv constructor *)
 val ptenv_of_penv : LDecl.hyps -> proofenv -> pt_env
