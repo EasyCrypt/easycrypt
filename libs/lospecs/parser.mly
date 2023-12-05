@@ -45,24 +45,24 @@
 
 %inline wtype:
 | AT x=NUMBER
-    { W x }
+    { `W x }
 
 type_:
 | x=wtype
-    { let W x = x in Word x }
+    { let `W x = x in `W x }
 
 | UNSIGNED
-    { Unsigned }
+    { `Unsigned }
 
 | SIGNED
-    { Signed }
+    { `Signed }
 
 fname:
 | f=IDENT
     { (f, None) }
 
 | f=IDENT p=angled(list0(NUMBER, COMMA))
-    { (f, Some (List.map (fun x -> W x) p)) }
+    { (f, Some (List.map (fun x -> `W x) p)) }
 
 sexpr:
 | x=vname

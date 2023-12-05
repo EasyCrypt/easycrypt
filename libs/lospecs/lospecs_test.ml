@@ -3,7 +3,27 @@ open Lospecs
 
 (* -------------------------------------------------------------------- *)
 let _ =
-    Format.printf "%a@." Ptree.pp_pprogram (Io.parse IO.stdin)
+    let prog = (Io.parse IO.stdin) in 
+    let (_env,vars) = Typing.tt_program (Typing.Env.empty) prog in
+    Format.printf "%a@.%a@.%a@." 
+                  Ptree.pp_pprogram prog 
+                  (fun fmt a (* print vars *)
+                    -> Format.pp_print_list 
+                        ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.")
+                        (fun fmt (a, b) 
+                         -> Format.fprintf fmt "%s: %a" a Typing.pp_atype b) 
+                        fmt a) vars
+                  (fun fmt a 
+                    -> Format.pp_print_list
+                       ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.")
+                       (fun fmt (a, b)
+                         -> Format.fprintf fmt "%s -> %a" a 
+                                (fun fmt (a,b) -> Format.fprintf fmt "(%s, %d): %a"
+                                                  (Typing.Ident.name a)
+                                                  (Typing.Ident.id a)
+                                                  Typing.pp_atype b) b)
+                       fmt a
+                  ) (Map.bindings (Typing.Env.export _env))
 
 (* -------------------------------------------------------------------- *)
 module List : sig

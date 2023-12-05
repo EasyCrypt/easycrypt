@@ -5,13 +5,11 @@ type symbol =
   [@@deriving show]
 
 type pword =
-  W of int
+  [`W of int]
   [@@deriving show]
 
 type ptype =
-  | Unsigned
-  | Signed
-  | Word of int
+  [ `Unsigned | `Signed | pword ]
   [@@deriving show]
 
 type parg =
