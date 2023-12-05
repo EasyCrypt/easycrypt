@@ -3,6 +3,7 @@
  (public_name easycrypt.lospecs)
  (flags (:standard -open Batteries))
  (modules :standard \ lospecs_test)
+ (preprocess (pps ppx_deriving.show))
  (libraries batteries menhirLib)
 )
 

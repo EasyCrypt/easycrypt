@@ -35,8 +35,12 @@
 | (* empty *) { () }
 *)
 
+%inline vname:
+| x=IDENT
+    { x }
+
 %inline wname:
-| x=IDENT t=wtype
+| x=vname t=wtype
     { (x, t) }
 
 %inline wtype:
@@ -61,8 +65,11 @@ fname:
     { (f, Some (List.map (fun x -> W x) p)) }
 
 sexpr:
-| f=fname args=parens(list0(expr, COMMA))?
-    { PEApp (f, Option.default [] args) }
+| x=vname
+    { PEVar x }
+
+| f=fname args=parens(list0(expr, COMMA))
+    { PEApp (f, args) }
 
 | e=parens(expr)
     { PEParens e }

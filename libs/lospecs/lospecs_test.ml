@@ -3,7 +3,7 @@ open Lospecs
 
 (* -------------------------------------------------------------------- *)
 let _ =
-    Format.printf "%a@." Ptree.pp_program (Io.parse IO.stdin)
+    Format.printf "%a@." Ptree.pp_pprogram (Io.parse IO.stdin)
 
 (* -------------------------------------------------------------------- *)
 module List : sig
@@ -45,7 +45,7 @@ end
 
 
 (* -------------------------------------------------------------------- *)
-let () =
+let main () =
   let open Deps in
 
   let f0 = copy ~offset:(0 * 256) ~size:256 "a" in (* f0 = a[u256 4*i    ]; *)
