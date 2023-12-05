@@ -113,8 +113,14 @@ let concretize_env pe =
   CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev) (LDecl.toenv pe.pte_hy))
 
 (* -------------------------------------------------------------------- *)
-let concretize_e_form (CPTEnv subst) f =
-  Fsubst.f_subst subst f
+let concretize_e_form_gen (CPTEnv subst) ids f =
+  let f = Fsubst.f_subst subst f in
+  let ids = List.map (snd_map (Fsubst.subst_gty subst)) ids in
+  f_forall ids f
+
+(* -------------------------------------------------------------------- *)
+let concretize_e_form cptenv f =
+   concretize_e_form_gen cptenv [] f
 
 (* -------------------------------------------------------------------- *)
 let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
@@ -140,6 +146,12 @@ and concretize_e_pt cptenv { pt_head; pt_args } =
 (* -------------------------------------------------------------------- *)
 let concretize_form pe f =
   concretize_e_form (concretize_env pe) f
+
+(* -------------------------------------------------------------------- *)
+let concretize_gen ({ ptev_env = pe } as pt) ids =
+  let cptenv = concretize_env pe in
+  (concretize_e_pt cptenv pt.ptev_pt,
+   concretize_e_form_gen cptenv ids pt.ptev_ax)
 
 (* -------------------------------------------------------------------- *)
 let concretize ({ ptev_env = pe } as pt) =
