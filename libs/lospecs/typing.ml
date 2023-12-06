@@ -140,7 +140,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
 
                      
   (* needs function types to actually make sense for now just gets an unsigned integer *)
-  (* TODO: Implement function types so this makes sense *)
+  (* TODO: Implement function types so this makes sense ? *)
   
   | PEApp (("add",      _wl), _eal) -> (match _wl with
                                        | Some [`W n] -> 
@@ -151,9 +151,9 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                 | [(`W n1); (`W n2)] -> 
                                                         if n1 == n2 && n2 == n then (env, `W n)
                                                         else failwith "bad inputs for add"
-                                                | _ -> failwith "bad inputs for add")
+                                                | _ -> (env, `W n)) (* automatic conversion of ints to words *)
                                        | _ -> (env, `Unsigned))
-  | PEApp (("and",      _wl), _eal) ->  (match _wl with
+  | PEApp (("and",      _wl), _eal) ->(match _wl with
                                        | Some [`W n] -> 
                                                (match (List.map 
                                                        (fun a -> let _, x = tt_expr env a in x)
@@ -161,8 +161,8 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                 with
                                                 | [(`W n1); (`W n2)] -> 
                                                         if n1 == n2 && n2 == n then (env, `W n)
-                                                        else failwith "bad inputs for add"
-                                                | _ -> failwith "bad inputs for add")
+                                                        else failwith "bad inputs for and"
+                                                | _ -> (env, `W n)) (* automatic conversion of ints to words *)
                                        | _ -> (env, `Unsigned))
   | PEApp (("mult",     _wl), _eal) -> (match _wl with
                                        | Some [`W n] -> 
@@ -171,11 +171,11 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                        _eal) 
                                                 with
                                                 | [(`W n1); (`W n2)] -> 
-                                                        if n1 == n2 && n2 == n then (env, `W n)
-                                                        else failwith "bad inputs for add"
-                                                | _ -> failwith "bad inputs for add")
+                                                        if n1 == n2 && n2 == n then (env, `W (2*n))
+                                                        else failwith "bad inputs for mult"
+                                                | _ -> (env, `W (2*n)))
                                        | _ -> (env, `Unsigned))
-  | PEApp (("or",       _wl), _eal) -> (match _wl with
+  | PEApp (("or",       _wl), _eal) ->(match _wl with
                                        | Some [`W n] -> 
                                                (match (List.map 
                                                        (fun a -> let _, x = tt_expr env a in x)
@@ -183,11 +183,13 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                 with
                                                 | [(`W n1); (`W n2)] -> 
                                                         if n1 == n2 && n2 == n then (env, `W n)
-                                                        else failwith "bad inputs for add"
-                                                | _ -> failwith "bad inputs for add")
+                                                        else failwith "bad inputs for or"
+                                                | _ -> (env, `W n)) (* automatic conversion of ints to words *)
                                        | _ -> (env, `Unsigned))
-  | PEApp (("SatToUW",  _wl), _eal) -> (env, `Unsigned)
-  | PEApp (("sla",      _wl), _eal) -> (match _wl with
+  | PEApp (("SatToUW",  _wl), _eal) -> (match _wl with 
+                                       (* | Some [`W n] -> (env, `W n) *)
+                                        | _ -> failwith "SattoUW needs bit length input in <n>")
+  | PEApp (("sla",      _wl), _eal) ->(match _wl with
                                        | Some [`W n] -> 
                                                (match (List.map 
                                                        (fun a -> let _, x = tt_expr env a in x)
@@ -195,10 +197,10 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                 with
                                                 | [(`W n1); (`W n2)] -> 
                                                         if n1 == n2 && n2 == n then (env, `W n)
-                                                        else failwith "bad inputs for add"
-                                                | _ -> failwith "bad inputs for add")
+                                                        else failwith "bad inputs for sla"
+                                                | _ -> (env, `W n)) (* automatic conversion of ints to words *)
                                        | _ -> (env, `Unsigned))
-  | PEApp (("sra",      _wl), _eal) -> (match _wl with
+  | PEApp (("sra",      _wl), _eal) ->(match _wl with
                                        | Some [`W n] -> 
                                                (match (List.map 
                                                        (fun a -> let _, x = tt_expr env a in x)
@@ -206,8 +208,8 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                 with
                                                 | [(`W n1); (`W n2)] -> 
                                                         if n1 == n2 && n2 == n then (env, `W n)
-                                                        else failwith "bad inputs for add"
-                                                | _ -> failwith "bad inputs for add")
+                                                        else failwith "bad inputs for sra"
+                                                | _ -> (env, `W n)) (* automatic conversion of ints to words *)
                                        | _ -> (env, `Unsigned))
   | PEApp (("srl",      _wl), _eal) -> (match _wl with
                                        | Some [`W n] -> 
@@ -217,9 +219,9 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                 with
                                                 | [(`W n1); (`W n2)] -> 
                                                         if n1 == n2 && n2 == n then (env, `W n)
-                                                        else failwith "bad inputs for add"
-                                                | _ -> failwith "bad inputs for add")
-                                       | _ -> (env, `Unsigned))
+                                                        else failwith "bad inputs for srl"
+                                                | _ -> (env, `W n)) (* automatic conversion of ints to words *)
+                                       | _ -> (env, `Unsigned)) 
   | PEApp (("sub",      _wl), _eal) -> (match _wl with
                                        | Some [`W n] -> 
                                                (match (List.map 
@@ -228,32 +230,36 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                 with
                                                 | [(`W n1); (`W n2)] -> 
                                                         if n1 == n2 && n2 == n then (env, `W n)
-                                                        else failwith "bad inputs for add"
-                                                | _ -> failwith "bad inputs for add")
+                                                        else failwith "bad inputs for sub"
+                                                | _ -> (env, `W n)) (* automatic conversion of ints to words *)
                                        | _ -> (env, `Unsigned))
   | PEApp (("map",      _wl), _eal) -> (match _eal with 
-                                        | (PEFun (_aargs, _aexpr))::(_eal) ->
+                                        | (PEFun (_aargs, _abodyexp))::(_eal) ->
                                             if (List.length _eal) != (List.length _aargs) 
                                             then failwith "Incorrect number of arguments to map"
-                                            else let _taargs = (List.map 
-                                                (fun (_,a) -> a)  
-                                                (let _, __z = (tt_args env _aargs) in __z)
-                                            ) in let _tal = (List.map
+                                            else let _fbenv, _taargs = (tt_args env _aargs)
+                                              in let _taargs = (List.map (fun (_, x) -> x) _taargs)
+                                              in let _tal = (List.map
                                                 (fun a -> let _, x = (tt_expr env) a in x)
                                                 _eal) in
                                            (match _wl with
-                                           | Some [`W n; `W m] -> ( 
+                                           | Some [`W (n); `W (m)] -> ( 
                                                if true || (List.fold_left (* TODO: Fix this and remove ShortCir *)
                                                     (fun a b -> a && (b == `W n)) true
                                                     _taargs) &&
                                                   (List.fold_left
                                                     (fun a b -> a && (b == `W (n*m))) true
                                                     _tal)
-                                               then (env, `W (n*m))
+                                               then (match (tt_expr _fbenv _abodyexp) with
+                                                   | _, (`W br) -> (env, `W (br*m))
+                                                   | _, (`Unsigned) -> (env, `W (n*m))
+                                                   | _, (`Signed) -> (env, `W (n*m))
+                                                   | _ -> failwith "Bad anon function body ret type"
+                                                   )
                                                else failwith "Bad argument size to map"
                                             )
-                                           | _ -> (env, `Unsigned))
-                                        | _ -> failwith "First argument to map should be function")
+                                           | _ -> failwith "Map needs mapping size params")
+                                        | _ -> failwith "First argument to map should be function") 
   | PEApp ((n, _), _eal) -> failwith (String.concat " " ["Unknown combinator:"; n])
 
 
