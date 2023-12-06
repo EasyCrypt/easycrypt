@@ -143,32 +143,94 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
   (* TODO: Implement function types so this makes sense *)
   
   | PEApp (("add",      _wl), _eal) -> (match _wl with
-                                       | Some [`W n] -> (env, `W n)
+                                       | Some [`W n] -> 
+                                               (match (List.map 
+                                                       (fun a -> let _, x = tt_expr env a in x)
+                                                       _eal) 
+                                                with
+                                                | [(`W n1); (`W n2)] -> 
+                                                        if n1 == n2 && n2 == n then (env, `W n)
+                                                        else failwith "bad inputs for add"
+                                                | _ -> failwith "bad inputs for add")
                                        | _ -> (env, `Unsigned))
-  | PEApp (("and",      _wl), _eal) -> (match _wl with
-                                       | Some [`W n] -> (env, `W n)
-                                       | _ -> (env, `Unsigned)) 
+  | PEApp (("and",      _wl), _eal) ->  (match _wl with
+                                       | Some [`W n] -> 
+                                               (match (List.map 
+                                                       (fun a -> let _, x = tt_expr env a in x)
+                                                       _eal) 
+                                                with
+                                                | [(`W n1); (`W n2)] -> 
+                                                        if n1 == n2 && n2 == n then (env, `W n)
+                                                        else failwith "bad inputs for add"
+                                                | _ -> failwith "bad inputs for add")
+                                       | _ -> (env, `Unsigned))
   | PEApp (("mult",     _wl), _eal) -> (match _wl with
-                                       | Some [`W n] -> (env, `W n)
-                                       | _ -> (env, `Unsigned)) 
+                                       | Some [`W n] -> 
+                                               (match (List.map 
+                                                       (fun a -> let _, x = tt_expr env a in x)
+                                                       _eal) 
+                                                with
+                                                | [(`W n1); (`W n2)] -> 
+                                                        if n1 == n2 && n2 == n then (env, `W n)
+                                                        else failwith "bad inputs for add"
+                                                | _ -> failwith "bad inputs for add")
+                                       | _ -> (env, `Unsigned))
   | PEApp (("or",       _wl), _eal) -> (match _wl with
-                                       | Some [`W n] -> (env, `W n)
-                                       | _ -> (env, `Unsigned)) 
-  | PEApp (("SatToUW",  _wl), _eal) -> (match _wl with
-                                       | Some [`W n] -> (env, `W n)
-                                       | _ -> (env, `Unsigned)) 
+                                       | Some [`W n] -> 
+                                               (match (List.map 
+                                                       (fun a -> let _, x = tt_expr env a in x)
+                                                       _eal) 
+                                                with
+                                                | [(`W n1); (`W n2)] -> 
+                                                        if n1 == n2 && n2 == n then (env, `W n)
+                                                        else failwith "bad inputs for add"
+                                                | _ -> failwith "bad inputs for add")
+                                       | _ -> (env, `Unsigned))
+  | PEApp (("SatToUW",  _wl), _eal) -> (env, `Unsigned)
   | PEApp (("sla",      _wl), _eal) -> (match _wl with
-                                       | Some [`W n] -> (env, `W n)
-                                       | _ -> (env, `Unsigned)) 
+                                       | Some [`W n] -> 
+                                               (match (List.map 
+                                                       (fun a -> let _, x = tt_expr env a in x)
+                                                       _eal) 
+                                                with
+                                                | [(`W n1); (`W n2)] -> 
+                                                        if n1 == n2 && n2 == n then (env, `W n)
+                                                        else failwith "bad inputs for add"
+                                                | _ -> failwith "bad inputs for add")
+                                       | _ -> (env, `Unsigned))
   | PEApp (("sra",      _wl), _eal) -> (match _wl with
-                                       | Some [`W n] -> (env, `W n)
-                                       | _ -> (env, `Unsigned)) 
+                                       | Some [`W n] -> 
+                                               (match (List.map 
+                                                       (fun a -> let _, x = tt_expr env a in x)
+                                                       _eal) 
+                                                with
+                                                | [(`W n1); (`W n2)] -> 
+                                                        if n1 == n2 && n2 == n then (env, `W n)
+                                                        else failwith "bad inputs for add"
+                                                | _ -> failwith "bad inputs for add")
+                                       | _ -> (env, `Unsigned))
   | PEApp (("srl",      _wl), _eal) -> (match _wl with
-                                       | Some [`W n] -> (env, `W n)
-                                       | _ -> (env, `Unsigned)) 
+                                       | Some [`W n] -> 
+                                               (match (List.map 
+                                                       (fun a -> let _, x = tt_expr env a in x)
+                                                       _eal) 
+                                                with
+                                                | [(`W n1); (`W n2)] -> 
+                                                        if n1 == n2 && n2 == n then (env, `W n)
+                                                        else failwith "bad inputs for add"
+                                                | _ -> failwith "bad inputs for add")
+                                       | _ -> (env, `Unsigned))
   | PEApp (("sub",      _wl), _eal) -> (match _wl with
-                                       | Some [`W n] -> (env, `W n)
-                                       | _ -> (env, `Unsigned)) 
+                                       | Some [`W n] -> 
+                                               (match (List.map 
+                                                       (fun a -> let _, x = tt_expr env a in x)
+                                                       _eal) 
+                                                with
+                                                | [(`W n1); (`W n2)] -> 
+                                                        if n1 == n2 && n2 == n then (env, `W n)
+                                                        else failwith "bad inputs for add"
+                                                | _ -> failwith "bad inputs for add")
+                                       | _ -> (env, `Unsigned))
   | PEApp (("map",      _wl), _eal) -> (match _eal with 
                                         | (PEFun (_aargs, _aexpr))::(_eal) ->
                                             if (List.length _eal) != (List.length _aargs) 
