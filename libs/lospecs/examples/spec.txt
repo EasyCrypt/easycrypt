@@ -82,9 +82,10 @@ VPSRA_16u16(w1@256, w2@256) -> @256 =
 
 # REF: https://www.felixcloutier.com/x86/pmaddubsw
 # SatToSW<n>: SaturateToSignedWord<bit_len>
+# TODO: Check if this works correctly, need to be careful with sat overflows and such
 VPMADDUBSW_256(w1@256, w2@256) -> @256 =
   map<16, 16>(
-    fun x@16 y@16 . SatToSW<16, 8>(
+    fun x@16 y@16 . SatToSW<16>(
                       add<16>(
                         mult<8>(x[0:1:8], y[0:1:8]),
                         mult<8>(x[8:1:8], y[8:1:8])

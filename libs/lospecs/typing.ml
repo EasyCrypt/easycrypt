@@ -187,8 +187,12 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                 | _ -> (env, `W n)) (* automatic conversion of ints to words *)
                                        | _ -> (env, `Unsigned))
   | PEApp (("SatToUW",  _wl), _eal) -> (match _wl with 
-                                       (* | Some [`W n] -> (env, `W n) *)
-                                        | _ -> failwith "SattoUW needs bit length input in <n>")
+                                        | Some [`W n] -> (env, `W n) 
+                                        | _ -> failwith "SatToUW needs bit length input in <n>")
+
+  | PEApp (("SatToSW",  _wl), _eal) -> (match _wl with 
+                                        | Some [`W n] -> (env, `W n) 
+                                        | _ -> failwith "SatToSW needs bit length input in <n>")
   | PEApp (("sla",      _wl), _eal) ->(match _wl with
                                        | Some [`W n] -> 
                                                (match (List.map 
