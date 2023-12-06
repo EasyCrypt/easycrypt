@@ -14,3 +14,6 @@ val process_kill  : oside * codepos * int option -> backward
 val process_alias : oside * codepos * psymbol option -> backward
 val process_set   : oside * codepos * bool * psymbol * pexpr -> backward
 val process_cfold : oside * codepos * int option -> backward
+
+(* -------------------------------------------------------------------- *)
+val process_weakmem : (psymbol * fun_params) -> backward

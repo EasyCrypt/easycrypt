@@ -232,3 +232,37 @@ let process_alias (side, cpos, id) tc =
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
   t_set side cpos (fresh, id) e tc
+
+
+(* -------------------------------------------------------------------- *)
+
+let process_weakmem (id, params) tc =
+  let open EcLocation in
+  let hyps = FApi.tc1_hyps tc in
+  let env = FApi.tc1_env tc in
+  let _, f =
+    try LDecl.hyp_by_name (unloc id) hyps
+    with LDecl.LdeclError _ ->
+      tc_lookup_error !!tc ~loc:id.pl_loc `Local ([], unloc id)
+  in
+
+  let process_decl (x, ty) =
+    let ty = EcTyping.transty EcTyping.tp_tydecl env (EcUnify.UniEnv.create None) ty in
+    let x = omap unloc (unloc x) in
+    { ov_name = x; ov_type = ty } in
+
+  let decls = List.map process_decl params in
+
+  let bind me =
+    try EcMemory.bindall decls me
+    with EcMemory.DuplicatedMemoryBinding x ->
+      tc_error ~loc:id.pl_loc !!tc "variable %s already declared" x in
+
+  match f.f_node with
+  | FbdHoareS hs ->
+      let me = bind hs.bhs_m in
+      let hs = { hs with bhs_m = me } in
+      let concl = f_imp (f_bdHoareS_r hs) (FApi.tc1_goal tc) in
+      FApi.xmutate1 tc `WeakenMem [concl]
+  | _ ->
+      tc_error ~loc:id.pl_loc !!tc "the hypothesis need to be a phoare"

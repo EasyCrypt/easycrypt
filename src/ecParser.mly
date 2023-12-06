@@ -600,6 +600,7 @@
 %token UNDO
 %token UNROLL
 %token VAR
+%token WEAKMEM
 %token WHILE
 %token WHY3
 %token WITH
@@ -3234,6 +3235,9 @@ phltactic:
 
 | ALIAS s=side? o=codepos x=lident EQ e=expr
     { Pset (s, o, false, x,e) }
+
+| WEAKMEM h=lident p=param_decl
+    { Pweakmem(h, p) }
 
 | FISSION s=side? o=codepos AT d1=word COMMA d2=word
     { Pfission (s, o, (1, (d1, d2))) }

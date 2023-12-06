@@ -194,6 +194,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pkill info                -> EcPhlCodeTx.process_kill info
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
+    | Pweakmem info             -> EcPhlCodeTx.process_weakmem info
     | Prnd (side, pos, info)    -> EcPhlRnd.process_rnd side pos info
     | Prndsem (side, pos)       -> EcPhlRnd.process_rndsem side pos
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
