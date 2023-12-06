@@ -261,7 +261,7 @@ let () = EcTyping.wp := Some typing_wp
 (* -------------------------------------------------------------------- *)
 let process_wp k cost_pre tc =
   let cost_pre  = match cost_pre with
-    | Some pre -> Some (EcProofTyping.tc1_process_Xhl_formula tc pre)
+    | Some pre -> Some (snd (EcProofTyping.tc1_process_Xhl_formula tc pre))
     | None -> None in
   let t_after =
     match (FApi.tc1_goal tc).f_node with

@@ -7,6 +7,7 @@ open EcDecl
 open EcModules
 open EcEnv
 open EcCoreGoal
+open EcMemory
 
 (* -------------------------------------------------------------------- *)
 type ptnenv = ty Mid.t * EcUnify.unienv
@@ -47,9 +48,9 @@ val tc1_process_exp      : tcenv1 -> [`InProc|`InOp] -> ty option -> pexpr -> ex
 val tc1_process_pattern  : tcenv1 -> pformula -> ptnenv * form
 
 (* Same as previous functions, but for *HL contexts *)
-val tc1_process_Xhl_form     : ?side:side -> tcenv1 -> ty -> pformula -> form
-val tc1_process_Xhl_formula  : ?side:side -> tcenv1 -> pformula -> form
-val tc1_process_Xhl_formula_xreal : tcenv1 -> pformula -> form
+val tc1_process_Xhl_form     : ?side:side -> tcenv1 -> ty -> pformula -> memenv * form
+val tc1_process_Xhl_formula  : ?side:side -> tcenv1 -> pformula -> memenv * form
+val tc1_process_Xhl_formula_xreal : tcenv1 -> pformula -> memenv * form
 
 val tc1_process_Xhl_exp      : tcenv1 -> oside -> ty option -> pexpr -> expr
 
