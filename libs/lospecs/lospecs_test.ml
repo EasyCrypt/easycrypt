@@ -3,7 +3,11 @@ open Lospecs
 
 (* -------------------------------------------------------------------- *)
 let _ =
+    let dont_type = false in
     let prog = (Io.parse IO.stdin) in 
+    if dont_type then
+        Format.printf "%a@." Ptree.pp_pprogram prog
+    else
     let (_env,vars) = Typing.tt_program (Typing.Env.empty) prog in
     Format.printf "%a@.%a@.%a@." 
                   Ptree.pp_pprogram prog 
@@ -24,6 +28,7 @@ let _ =
                                                   Typing.pp_atype b) b)
                        fmt a
                   ) (Map.bindings (Typing.Env.export _env))
+
 
 (* -------------------------------------------------------------------- *)
 module List : sig

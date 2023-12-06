@@ -1,9 +1,12 @@
+# TODO: FIX Sat syntax + use concat on stuff + use repeat on stuff?
+
 # [a:b:c] means take b numbers of length c bits starting from a
 VPERMD(w@256, widx@256) -> @256 =
   map<32, 8>(
     fun idx@32 . let i = (unsigned) idx[0:2] in w[i:1:32],
     widx
   )
+
 
 VPSUB_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(

@@ -108,6 +108,11 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
   (* for now, anonymous functions have type equal to their return type *)
   | PEFun (_args, _e) -> let _env, _args = tt_args env _args in  
                             tt_expr _env ?check _e
+
+  | PEVar _v -> (match (Env.lookup env _v) with
+                 | Some (_, _t) -> (env, _t)
+                 | None -> failwith (String.concat " " ["Bad reference to variable"; _v]))
+  
   | PELet ((v, _e1), _e2) -> let _env, _ = (let env, _t = tt_expr env _e1 
                                             in Env.push env v _t)
                              in tt_expr _env ?check _e2
@@ -164,9 +169,29 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
   | PEApp (("sub",      _wl), _eal) -> (match _wl with
                                        | Some [`W n] -> (env, `W n)
                                        | _ -> (env, `Unsigned)) 
-  | PEApp (("map",      _wl), _eal) -> (match _wl with
-                                       | Some [`W n; `W m] -> (env, `W (n*m))
-                                       | _ -> (env, `Unsigned))
+  | PEApp (("map",      _wl), _eal) -> (match _eal with 
+                                        | (PEFun (_aargs, _aexpr))::(_eal) ->
+                                            if (List.length _eal) != (List.length _aargs) 
+                                            then failwith "Incorrect number of arguments to map"
+                                            else let _taargs = (List.map 
+                                                (fun (_,a) -> a)  
+                                                (let _, __z = (tt_args env _aargs) in __z)
+                                            ) in let _tal = (List.map
+                                                (fun a -> let _, x = (tt_expr env) a in x)
+                                                _eal) in
+                                           (match _wl with
+                                           | Some [`W n; `W m] -> ( 
+                                               if true || (List.fold_left (* TODO: Fix this and remove ShortCir *)
+                                                    (fun a b -> a && (b == `W n)) true
+                                                    _taargs) &&
+                                                  (List.fold_left
+                                                    (fun a b -> a && (b == `W (n*m))) true
+                                                    _tal)
+                                               then (env, `W (n*m))
+                                               else failwith "Bad argument size to map"
+                                            )
+                                           | _ -> (env, `Unsigned))
+                                        | _ -> failwith "First argument to map should be function")
   | PEApp ((n, _), _eal) -> failwith (String.concat " " ["Unknown combinator:"; n])
 
 
