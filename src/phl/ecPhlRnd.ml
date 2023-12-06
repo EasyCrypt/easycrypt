@@ -696,19 +696,19 @@ let process_rnd side pos tac_info tc =
   | _ -> tc_error !!tc "invalid arguments"
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_rndsem   = FApi.t_low1 "hoare-rndsem"   (Core.t_hoare_rndsem_r   false)
-let t_bdhoare_rndsem = FApi.t_low1 "bdhoare-rndsem" (Core.t_bdhoare_rndsem_r false)
-let t_equiv_rndsem   = FApi.t_low2 "equiv-rndsem"   (Core.t_equiv_rndsem_r   false)
+let t_hoare_rndsem   = FApi.t_low2 "hoare-rndsem"   Core.t_hoare_rndsem_r
+let t_bdhoare_rndsem = FApi.t_low2 "bdhoare-rndsem" Core.t_bdhoare_rndsem_r
+let t_equiv_rndsem   = FApi.t_low3 "equiv-rndsem"   Core.t_equiv_rndsem_r
 
 (* -------------------------------------------------------------------- *)
-let process_rndsem side pos tc =
+let process_rndsem ~reduce side pos tc =
   let concl = FApi.tc1_goal tc in
 
   match side with
   | None when is_hoareS concl ->
-     t_hoare_rndsem pos tc
+     t_hoare_rndsem reduce pos tc
   | None when is_bdHoareS concl ->
-     t_bdhoare_rndsem pos tc
+     t_bdhoare_rndsem reduce pos tc
   | Some side when is_equivS concl ->
-     t_equiv_rndsem side pos tc
+     t_equiv_rndsem reduce side pos tc
   | _ -> tc_error !!tc "invalid arguments"

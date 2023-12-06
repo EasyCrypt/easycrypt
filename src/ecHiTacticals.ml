@@ -195,7 +195,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
     | Prnd (side, pos, info)    -> EcPhlRnd.process_rnd side pos info
-    | Prndsem (side, pos)       -> EcPhlRnd.process_rndsem side pos
+    | Prndsem (red, side, pos)  -> EcPhlRnd.process_rndsem ~reduce:red side pos
     | Pconseq (opt, info)       -> EcPhlConseq.process_conseq_opt opt info
     | Pconseqauto cm            -> process_conseqauto cm
     | Pconcave info             -> EcPhlConseq.process_concave info

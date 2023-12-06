@@ -3205,8 +3205,8 @@ phltactic:
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
 
-| RNDSEM s=side? c=codepos1
-    { Prndsem (s, c) }
+| RNDSEM red=boption(STAR) s=side? c=codepos1
+    { Prndsem (red, s, c) }
 
 | INLINE s=side? u=inlineopt? o=occurences?
   { Pinline (`ByName(s, u, ([], o))) }
