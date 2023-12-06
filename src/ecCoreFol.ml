@@ -805,7 +805,8 @@ let destr_pr f =
 
 let destr_programS side f =
   match side, f.f_node with
-  | None  , FhoareS   hs -> (hs.hs_m, hs.hs_s)
+  | None  , FhoareS   hs  -> (hs.hs_m, hs.hs_s)
+  | None  , FeHoareS  ehs -> (ehs.ehs_m, ehs.ehs_s)
   | None  , FcHoareS  chs -> (chs.chs_m, chs.chs_s)
   | None  , FbdHoareS bhs -> (bhs.bhs_m, bhs.bhs_s)
   | Some b, FequivS   es  -> begin

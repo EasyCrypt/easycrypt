@@ -128,8 +128,11 @@ let t_rcond side b at_pos c tc =
     check_none (); Low.t_equiv_rcond side b at_pos tc
 
 let process_rcond side b at_pos c tc =
-  let c = EcUtils.omap (fun c ->
-      EcProofTyping.tc1_process_Xhl_formula tc c) c in
+  let c =
+    EcUtils.omap
+      (fun c ->
+         snd (EcProofTyping.tc1_process_Xhl_formula tc c))
+      c in
 
   t_rcond side b at_pos c tc
 

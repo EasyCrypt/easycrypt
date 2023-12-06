@@ -444,24 +444,24 @@ let process_while side winfos tc =
       match vrnt with
       | None ->
         t_hoare_while
-          (TTC.tc1_process_Xhl_formula tc phi)
+          (snd (TTC.tc1_process_Xhl_formula tc phi))
           tc
       | _    -> tc_error !!tc "invalid arguments"
     end
 
   | FeHoareS _ ->
-      let inv = TTC.tc1_process_Xhl_formula_xreal tc phi in
+      let _, inv = TTC.tc1_process_Xhl_formula_xreal tc phi in
       t_ehoare_while inv tc
 
   | FcHoareS _ -> begin
       match vrnt, bds with
       | Some vrnt, Some (`Cost (n, cost)) ->
-        t_choare_while
-          (TTC.tc1_process_Xhl_formula tc         phi)
-          (TTC.tc1_process_Xhl_form    tc tint    vrnt)
-          (TTC.tc1_process_Xhl_form    tc tint    n)
-          (TTC.tc1_process_cost        tc [tint]  cost)
-          tc
+        let _, phi = TTC.tc1_process_Xhl_formula tc phi in
+        let _, vrnt = TTC.tc1_process_Xhl_form tc tint vrnt in
+        let _, n = TTC.tc1_process_Xhl_form tc tint n in
+        let cost = TTC.tc1_process_cost tc [tint] cost in
+
+        t_choare_while phi vrnt n cost tc
 
       | _    -> tc_error !!tc "@[<v 2>invalid arguments, you must supply :@;\
                                I (invariant),@ \
@@ -473,21 +473,22 @@ let process_while side winfos tc =
   | FbdHoareS _ -> begin
       match vrnt, bds with
       | Some vrnt, None ->
-          t_bdhoare_while
-            (TTC.tc1_process_Xhl_formula tc phi)
-            (TTC.tc1_process_Xhl_form tc tint vrnt)
-            tc
+          let _, phi = TTC.tc1_process_Xhl_formula tc phi in
+          let _, vrnt = TTC.tc1_process_Xhl_form tc tint vrnt in
+
+          t_bdhoare_while phi vrnt tc
 
       | Some vrnt, Some (`Bd (k, eps)) ->
-        t_bdhoare_while_rev_geq
-          (TTC.tc1_process_Xhl_formula tc phi)
-          (TTC.tc1_process_Xhl_form    tc tint vrnt)
-          (TTC.tc1_process_Xhl_form    tc tint k)
-          (TTC.tc1_process_Xhl_form    tc treal eps)
-          tc
+        let _, phi = TTC.tc1_process_Xhl_formula tc phi in
+        let _, vrnt = TTC.tc1_process_Xhl_form tc tint vrnt in
+        let _, k = TTC.tc1_process_Xhl_form tc tint k in
+        let _, eps = TTC.tc1_process_Xhl_form tc treal eps in
+
+        t_bdhoare_while_rev_geq phi vrnt k eps tc
 
       | None, None ->
-          t_bdhoare_while_rev (TTC.tc1_process_Xhl_formula tc phi) tc
+          let _, phi = TTC.tc1_process_Xhl_formula tc phi in
+          t_bdhoare_while_rev phi tc
 
       | Some _, Some (`Cost _) | None, Some _ ->
         tc_error !!tc "invalid arguments"
