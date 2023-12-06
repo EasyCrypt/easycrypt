@@ -443,6 +443,14 @@ let check_binding test (env, subst) (x1, gty1) (x2, gty2) =
 let check_bindings test env subst bd1 bd2 =
     List.fold_left2 (check_binding test) (env,subst) bd1 bd2
 
+let check_me_binding env subst (x1,mt1) (x2,mt2) =
+  check_memtype env mt1 mt2;
+  if id_equal x1 x2 then subst
+  else EcSubst.add_memory subst x2 x1
+
+let check_me_bindings env =
+  List.fold_left2 (check_me_binding env)
+
 let check_cost_l env subst co1 co2 =
     let calls1 =
       EcPath.Mx.fold (fun f c calls ->
@@ -569,7 +577,7 @@ let is_alpha_eq hyps f1 f2 =
 
     | FhoareS hs1, FhoareS hs2 ->
       check_s env subst hs1.hs_s hs2.hs_s;
-      (* FIXME should check the memenv *)
+      let subst = check_me_binding env subst hs1.hs_m hs2.hs_m in
       aux env subst hs1.hs_pr hs2.hs_pr;
       aux env subst hs1.hs_po hs2.hs_po
 
@@ -580,7 +588,7 @@ let is_alpha_eq hyps f1 f2 =
 
     | FeHoareS hs1, FeHoareS hs2 ->
       check_s env subst hs1.ehs_s hs2.ehs_s;
-      (* FIXME should check the memenv *)
+      let subst = check_me_binding env subst hs1.ehs_m hs2.ehs_m in
       aux env subst hs1.ehs_pr hs2.ehs_pr;
       aux env subst hs1.ehs_po hs2.ehs_po
 
@@ -594,7 +602,7 @@ let is_alpha_eq hyps f1 f2 =
     | FbdHoareS hs1, FbdHoareS hs2 ->
       ensure (hs1.bhs_cmp = hs2.bhs_cmp);
       check_s env subst hs1.bhs_s hs2.bhs_s;
-      (* FIXME should check the memenv *)
+      let subst = check_me_binding env subst hs1.bhs_m hs2.bhs_m in
       aux env subst hs1.bhs_pr hs2.bhs_pr;
       aux env subst hs1.bhs_po hs2.bhs_po;
       aux env subst hs1.bhs_bd hs2.bhs_bd
@@ -607,7 +615,7 @@ let is_alpha_eq hyps f1 f2 =
 
     | FcHoareS chs1, FcHoareS chs2 ->
       check_s env subst chs1.chs_s chs2.chs_s;
-      (* FIXME should check the memenv *)
+      let subst = check_me_binding env subst chs1.chs_m chs2.chs_m in
       aux env subst chs1.chs_pr chs2.chs_pr;
       aux env subst chs1.chs_po chs2.chs_po;
       check_cost aux env subst chs1.chs_co chs2.chs_co
@@ -621,7 +629,8 @@ let is_alpha_eq hyps f1 f2 =
     | FequivS es1, FequivS es2 ->
       check_s env subst es1.es_sl es2.es_sl;
       check_s env subst es1.es_sr es2.es_sr;
-      (* FIXME should check the memenv *)
+      let subst = check_me_binding env subst es1.es_ml es2.es_ml in
+      let subst = check_me_binding env subst es1.es_mr es2.es_mr in
       aux env subst es1.es_pr es2.es_pr;
       aux env subst es1.es_po es2.es_po
 
@@ -641,9 +650,7 @@ let is_alpha_eq hyps f1 f2 =
 
     | Fcoe coe1, Fcoe coe2 ->
       check_e env subst coe1.coe_e coe2.coe_e;
-      let bd1 = fst coe1.coe_mem, GTmem (snd coe1.coe_mem) in
-      let bd2 = fst coe2.coe_mem, GTmem (snd coe2.coe_mem) in
-      let env, subst = check_bindings test env subst [bd1] [bd2] in
+      let subst = check_me_binding env subst coe1.coe_mem coe2.coe_mem in
       aux env subst coe1.coe_pre coe2.coe_pre;
 
     | _, _ -> error ()
@@ -1601,7 +1608,7 @@ let rec conv ri env f1 f2 stk =
   | Flet(lp1,f11,f12), Flet(lp2,f21,f22) -> begin
     match check_lpattern env EcSubst.empty lp1 lp2 with
     | env, subst ->
-      let f21, f22 = EcSubst.subst_form subst f21, EcSubst.subst_form subst f22 in
+      let f22 = EcSubst.subst_form subst f22 in
       conv ri env f11 f21 (zlet lp1 f12 f22 stk)
     | exception NotConv -> force_head ri env f1 f2 stk
     end
@@ -1646,14 +1653,24 @@ let rec conv ri env f1 f2 stk =
 
   | FhoareS hs1, FhoareS hs2
       when EqTest_i.for_stmt env hs1.hs_s hs2.hs_s ->
-    conv ri env hs1.hs_pr hs2.hs_pr (zhl f1 [hs1.hs_po] [hs2.hs_po] stk)
+    begin match check_me_binding env EcSubst.empty hs1.hs_m hs2.hs_m with
+    | subst ->
+      let subst = EcSubst.subst_form subst in
+      conv ri env hs1.hs_pr (subst hs2.hs_pr) (zhl f1 [hs1.hs_po] [subst hs2.hs_po] stk)
+    | exception NotConv -> force_head ri env f1 f2 stk
+    end
 
   | FeHoareF hf1, FeHoareF hf2 when EqTest_i.for_xp env hf1.ehf_f hf2.ehf_f ->
     conv ri env hf1.ehf_pr hf2.ehf_pr (zhl f1 [hf1.ehf_po] [hf2.ehf_po] stk)
 
   | FeHoareS hs1, FeHoareS hs2
       when EqTest_i.for_stmt env hs1.ehs_s hs2.ehs_s ->
-    conv ri env hs1.ehs_pr hs2.ehs_pr (zhl f1 [hs1.ehs_po] [hs2.ehs_po] stk)
+    begin match check_me_binding env EcSubst.empty hs1.ehs_m hs2.ehs_m with
+    | subst ->
+        let subst = EcSubst.subst_form subst in
+        conv ri env hs1.ehs_pr (subst hs2.ehs_pr) (zhl f1 [hs1.ehs_po] [subst hs2.ehs_po] stk)
+    | exception NotConv -> force_head ri env f1 f2 stk
+    end
 
   | FbdHoareF hf1, FbdHoareF hf2
       when EqTest_i.for_xp env hf1.bhf_f hf2.bhf_f && hf1.bhf_cmp = hf2.bhf_cmp  ->
@@ -1663,27 +1680,35 @@ let rec conv ri env f1 f2 stk =
   | FbdHoareS hs1, FbdHoareS hs2
       when EqTest_i.for_stmt env hs1.bhs_s hs2.bhs_s
         && hs1.bhs_cmp = hs2.bhs_cmp ->
-    conv ri env hs1.bhs_pr hs2.bhs_pr
-      (zhl f1 [hs1.bhs_po;hs1.bhs_bd] [hs2.bhs_po; hs2.bhs_bd] stk)
+    begin match check_me_binding env EcSubst.empty hs1.bhs_m hs2.bhs_m with
+    | subst ->
+      let subst = EcSubst.subst_form subst in
+      conv ri env hs1.bhs_pr (subst hs2.bhs_pr)
+        (zhl f1 [hs1.bhs_po;hs1.bhs_bd] (List.map subst [hs2.bhs_po; hs2.bhs_bd]) stk)
+    | exception NotConv -> force_head ri env f1 f2 stk
+    end
 
   | FcHoareF chf1, FcHoareF chf2
      when EqTest_i.for_xp env chf1.chf_f chf2.chf_f ->
      begin match check_cost_l env EcSubst.empty chf1.chf_co chf2.chf_co with
-       | fs ->
-         let fs1, fs2 = List.split fs in
-         conv ri env chf1.chf_pr chf2.chf_pr
-           (zhl f1 (chf1.chf_po :: fs1) (chf2.chf_po :: fs2) stk)
-       | exception NotConv -> force_head ri env f1 f2 stk
+     | fs ->
+       let fs1, fs2 = List.split fs in
+       conv ri env chf1.chf_pr chf2.chf_pr
+         (zhl f1 (chf1.chf_po :: fs1) (chf2.chf_po :: fs2) stk)
+     | exception NotConv -> force_head ri env f1 f2 stk
      end
 
   | FcHoareS chs1, FcHoareS chs2
      when EqTest_i.for_stmt env chs1.chs_s chs2.chs_s ->
-     begin match check_cost_l env EcSubst.empty chs1.chs_co chs2.chs_co with
-       | fs ->
-         let fs1, fs2 = List.split fs in
-         conv ri env chs1.chs_pr chs2.chs_pr
-           (zhl f1 (chs1.chs_po :: fs1) (chs2.chs_po :: fs2) stk)
-       | exception NotConv -> force_head ri env f1 f2 stk
+     begin match check_cost_l env EcSubst.empty chs1.chs_co chs2.chs_co,
+                 check_me_binding env EcSubst.empty chs1.chs_m chs2.chs_m
+                 with
+     | fs, subst ->
+       let subst = EcSubst.subst_form subst in
+       let fs1, fs2 = List.split fs in
+       conv ri env chs1.chs_pr (subst chs2.chs_pr)
+         (zhl f1 (chs1.chs_po :: fs1) (List.map subst (chs2.chs_po :: fs2)) stk)
+     | exception NotConv -> force_head ri env f1 f2 stk
      end
 
   | FequivF ef1, FequivF ef2
@@ -1694,7 +1719,12 @@ let rec conv ri env f1 f2 stk =
   | FequivS es1, FequivS es2
       when EqTest_i.for_stmt env es1.es_sl es2.es_sl
         && EqTest_i.for_stmt env es1.es_sr es2.es_sr ->
-    conv ri env es1.es_pr es2.es_pr (zhl f1 [es1.es_po] [es2.es_po] stk)
+    begin match check_me_bindings env EcSubst.empty [es1.es_ml; es1.es_mr] [es2.es_ml; es2.es_mr] with
+    | subst ->
+      let subst = EcSubst.subst_form subst in
+      conv ri env es1.es_pr (subst es2.es_pr) (zhl f1 [es1.es_po] [subst es2.es_po] stk)
+    | exception NotConv -> force_head ri env f1 f2 stk
+    end
 
   | FeagerF eg1, FeagerF eg2 ->
     if    EqTest_i.for_xp env eg1.eg_fl eg2.eg_fl
@@ -1713,16 +1743,14 @@ let rec conv ri env f1 f2 stk =
       force_head ri env f1 f2 stk
 
   | Fcoe coe1, Fcoe coe2 when is_alpha_eq_e env coe1.coe_e coe2.coe_e ->
-    let bd1 = fst coe1.coe_mem, GTmem (snd coe1.coe_mem) in
-    let bd2 = fst coe2.coe_mem, GTmem (snd coe2.coe_mem) in
-    let env, bd, f1', f2' =
-      check_bindings_conv ri env Lforall [bd1] [bd2] coe1.coe_pre coe2.coe_pre
-    in
-    if bd = [] then force_head ri env f1 f2 stk
-    else conv ri env f1' f2' (zhl f1 [] [] stk)
+    begin match check_me_binding env EcSubst.empty coe1.coe_mem coe2.coe_mem with
+    | subst ->
+      let subst = EcSubst.subst_form subst in
+      conv ri env coe1.coe_pre (subst coe2.coe_pre) (zhl f1 [] [] stk)
+    | exception NotConv -> force_head ri env f1 f2 stk
+    end
 
   | _, _ -> force_head ri env f1 f2 stk
-
 
 and check_bindings_conv ri env q bd1 bd2 f1 f2 =
   let test env subst f1 f2 =
