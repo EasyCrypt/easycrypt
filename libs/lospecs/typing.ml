@@ -164,6 +164,14 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                         else failwith "bad inputs for and"
                                                 | _ -> (env, `W n)) (* automatic conversion of ints to words *)
                                        | _ -> (env, `Unsigned))
+  | PEApp (("concat",   _wl), _eal) -> (match _wl with
+                                        | Some [`W n] ->
+                                            let _tal = (List.map (fun a -> let _, x = tt_expr env a in x) _eal) in
+                                           (match _tal with
+                                            | [`W k; `W l] -> if k == l && k == n then (env, `W (k*2))
+                                                              else failwith "Wrong size args for concat"
+                                            | _ -> (env, `W (n*2)) )
+                                        | _ -> failwith "width required for concat")
   | PEApp (("mult",     _wl), _eal) -> (match _wl with
                                        | Some [`W n] -> 
                                                (match (List.map 
@@ -175,6 +183,15 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                         else failwith "bad inputs for mult"
                                                 | _ -> (env, `W (2*n)))
                                        | _ -> (env, `Unsigned))
+  | PEApp(("repeat",    _wl), _eal) -> (match _wl with
+                                        | Some [`W n] -> (match _eal with
+                                            | [_e1; PEInt k] -> ( match (tt_expr env _e1) with
+                                                | _, `W m -> if n == m then (env, `W (n*k))
+                                                                    else failwith "Wrong length input for repeat"
+                                                | _ -> ( env, `W (n*k) ) )
+                                            | _ -> failwith "only fixed repeat allowed")
+                                        | _ -> failwith "width is required for repeat")
+
   | PEApp (("or",       _wl), _eal) ->(match _wl with
                                        | Some [`W n] -> 
                                                (match (List.map 
@@ -187,11 +204,21 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                                                 | _ -> (env, `W n)) (* automatic conversion of ints to words *)
                                        | _ -> (env, `Unsigned))
   | PEApp (("SatToUW",  _wl), _eal) -> (match _wl with 
-                                        | Some [`W n] -> (env, `W n) 
+                                        | Some [`W n] -> (match _eal with 
+                                            | [_e1; PEInt k] -> (match (tt_expr env _e1) with
+                                                | _, `W m -> if n == m then (env, `W n)
+                                                             else failwith "Bad input size to SatToUW"
+                                                | _ -> (env, `W n) ) 
+                                            | _ -> failwith "Second argument to SatToUW must be constant" ) 
                                         | _ -> failwith "SatToUW needs bit length input in <n>")
 
   | PEApp (("SatToSW",  _wl), _eal) -> (match _wl with 
-                                        | Some [`W n] -> (env, `W n) 
+                                        | Some [`W n] -> (match _eal with 
+                                            | [_e1; PEInt k] -> (match (tt_expr env _e1) with
+                                                | _, `W m -> if n == m then (env, `W n)
+                                                             else failwith "Bad input size to SatToUW"
+                                                | _ -> (env, `W n) ) 
+                                            | _ -> failwith "Second argument to SatToSW must be constant" ) 
                                         | _ -> failwith "SatToSW needs bit length input in <n>")
   | PEApp (("sla",      _wl), _eal) ->(match _wl with
                                        | Some [`W n] -> 

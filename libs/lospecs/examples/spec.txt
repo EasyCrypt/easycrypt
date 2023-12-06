@@ -30,10 +30,11 @@ VPAND_256(w1@256, w2@256) -> @256 =
 # REF: https://www.felixcloutier.com/x86/vpbroadcast
 # Might be problematic?
 VPBROADCAST_16u16(w1@256) -> @256 = 
-  map<16, 16>(
-    fun x@16 . w1[0:1:16],
-    w1
-  )
+  repeat<16>(w1[0:1:16], 16)
+# map<16, 16>(
+#   fun x@16 . w1[0:1:16],
+#   w1
+# )
      
   
 # REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4774&text=vpmulh
@@ -89,7 +90,8 @@ VPMADDUBSW_256(w1@256, w2@256) -> @256 =
                       add<16>(
                         mult<8>(x[0:1:8], y[0:1:8]),
                         mult<8>(x[8:1:8], y[8:1:8])
-                      )
+                      ), 
+                      16
                     ),
     w1,
     w2
@@ -104,23 +106,38 @@ VPMADDUBSW_256(w1@256, w2@256) -> @256 =
 # map<n, x> has type: ((...(a -> b) -> ...) -> c) -> d) -> a[x] -> b[x] -> ... -> c[x] -> d[x]
 #                    | Function that takes args      | | Lists of said args        |   | List of ret type |
 # where if a is a type then a[x] is the type of lists of length x with elements with type a
+# TODO: Fix Sat here
 PACKUS_16u16(w1@256, w2@256) -> @256 =
  map<128, 2>(
-   fun v1@128 v2@128 . or<128>(
+  fun v1@128 v2@128 . concat<64>( 
                              map<16,8>(
-                               fun a@16 . SatToUW<16>(a),
+                               fun a@16 . SatToUW<16>(a, 8)[0:1:8],
                                  v1
-                             ),
-                             sla<128>(map<16,8>(
-                               fun a@16 . SatToUW<8>(a),
+                             )[0:1:64],
+                             map<16,8>(
+                               fun a@16 . SatToUW<16>(a, 8)[0:1:8],
                                  v2
-                             ),
-                             64
-                            )
-                       ),            
+                             )[0:1:64]
+                       ),
    w1,
    w2
- )
+   )            
+
+#  fun v1@128 v2@128 . or<128>(
+#                            map<16,8>(
+#                              fun a@16 . SatToUW<16>(a),
+#                                v1
+#                            ),
+#                            sla<128>(map<16,8>(
+#                              fun a@16 . SatToUW<8>(a),
+#                                v2
+#                            ),
+#                            64
+#                           )
+#                      ),            
+#  w1,
+#  w2
+#)
 
 # TODO:
 # Extend map to take in existing functions
