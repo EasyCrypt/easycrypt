@@ -156,6 +156,7 @@
     "inline"      , INLINE     ;        (* KW: tactic *)
     "interleave"  , INTERLEAVE ;        (* KW: tactic *)
     "alias"       , ALIAS      ;        (* KW: tactic *)
+    "weakmem"     , WEAKMEM    ;        (* KW: tactic *)
     "fission"     , FISSION    ;        (* KW: tactic *)
     "fusion"      , FUSION     ;        (* KW: tactic *)
     "unroll"      , UNROLL     ;        (* KW: tactic *)
