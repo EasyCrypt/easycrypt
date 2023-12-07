@@ -736,7 +736,7 @@ type phltactic =
   | Prnd           of oside * semrndpos option * rnd_tac_info_f
   | Prndsem        of bool * oside * codepos1
   | Palias         of (oside * codepos * osymbol_r)
-  | Pweakmem       of (psymbol * fun_params)
+  | Pweakmem       of (oside * psymbol * fun_params)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
   | Pconseqauto    of crushmode
