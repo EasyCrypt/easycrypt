@@ -167,6 +167,8 @@ module FPosition : sig
 
   val is_empty : ptnpos -> bool
 
+  val reroot : int list -> ptnpos -> ptnpos
+
   val tostring : ptnpos -> string
 
   val select : ?o:occ -> (Sid.t -> form -> select) -> form -> ptnpos
