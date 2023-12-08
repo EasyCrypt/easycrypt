@@ -3375,6 +3375,9 @@ phltactic:
 | PROC CHANGE side=side? pos=codepos COLON f=sform
     { Pprocchange (side, pos, f) }
 
+| PROC REWRITE side=side? pos=codepos f=pterm
+    { Pprocrewrite (side, pos, f) }
+
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
     { BDH_split_bop (b1,b2,b3) }
