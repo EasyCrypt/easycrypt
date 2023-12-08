@@ -746,8 +746,10 @@ let f_match opts hyps (ue, ev) ~ptn subject =
       (ue, clue, ev)
 
 (* -------------------------------------------------------------------- *)
-type ptnpos = [`Select of int | `Sub of ptnpos] Mint.t
-type occ    = [`Inclusive | `Exclusive] * Sint.t
+type ptnpos1 = [`Select of int | `Sub of ptnpos]
+and  ptnpos  = ptnpos1 Mint.t
+
+type occ = [`Inclusive | `Exclusive] * Sint.t
 
 exception InvalidPosition
 exception InvalidOccurence
@@ -1036,6 +1038,19 @@ module FPosition = struct
 
     in
       as_seq1 (doit p [f])
+
+  (* ------------------------------------------------------------------ *)
+  let reroot (root : int list) (p : ptnpos) =
+    if Mint.is_empty p then
+      Mint.empty
+    else begin
+      assert (Mint.mem 0 p && Mint.cardinal p = 1);
+      Mint.singleton 0 (
+        List.fold_right
+          (fun i (p : ptnpos1) -> (`Sub (Mint.singleton i p) :> ptnpos1))
+          root (Mint.find 0 p)
+      )
+    end
 
   (* ------------------------------------------------------------------ *)
   let topattern ?x (p : ptnpos) (f : form) =

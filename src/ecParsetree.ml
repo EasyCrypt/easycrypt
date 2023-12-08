@@ -749,7 +749,8 @@ type phltactic =
   | Prw_equiv      of rw_eqv_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
-  | Pprocchange    of side option * codepos * pformula
+  | Pprocchange    of side option * codepos * pexpr
+  | Pprocrewrite   of side option * codepos * ppterm
 
     (* Eager *)
   | Peager_seq       of (eager_info * codepos1 pair * pformula)

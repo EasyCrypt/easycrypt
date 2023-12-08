@@ -1591,6 +1591,7 @@ let t_rewrite
     | None     -> FPosition.select_form ?keyed ?xconv hyps None left tgfp
     | Some pos -> pos in
 
+
   let tgfp =
     try  FPosition.map npos change tgfp
     with InvalidPosition -> raise InvalidGoalShape
