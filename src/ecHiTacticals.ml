@@ -226,6 +226,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Plossless                 -> EcPhlHiAuto.t_lossless
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
     | Pprocchange (s, p, f)     -> EcPhlRewrite.process_change s p f
+    | Pprocrewrite (s, p, f)    -> EcPhlRewrite.process_rewrite s p f
   in
 
   try  tx tc
