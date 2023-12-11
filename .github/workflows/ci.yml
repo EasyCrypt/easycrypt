@@ -18,7 +18,7 @@ jobs:
       id: skip_check
       with:
         concurrent_skipping: 'same_content_newer'
-        skip_after_successful_duplicate: 'true'
+        skip_after_successful_duplicate: 'false'
 
   compile-opam:
     name: EasyCrypt compilation (opam)
