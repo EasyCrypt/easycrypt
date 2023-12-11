@@ -1280,6 +1280,7 @@ type global_action =
 
 type global = {
   gl_action : global_action located;
+  gl_fail   : bool;
   gl_debug  : [`Timed | `Break] option;
 }
 

@@ -451,6 +451,7 @@
 %token EXLIM
 %token EXPECT
 %token EXPORT
+%token FAIL
 %token FEL
 %token FIRST
 %token FISSION
@@ -4024,9 +4025,11 @@ stop:
 | DROP DOT { }
 
 global:
-| db=debug_global? g=global_action ep=FINAL
+| db=debug_global? fail=boption(FAIL) g=global_action ep=FINAL
   { let lc = EcLocation.make $startpos ep in
-    { gl_action = EcLocation.mk_loc lc g; gl_debug = db; } }
+    { gl_action = EcLocation.mk_loc lc g;
+      gl_fail   = fail;
+      gl_debug  = db; } }
 
 debug_global:
 | TIME  { `Timed }
