@@ -622,6 +622,9 @@ and i_read_r env r i =
 (* -------------------------------------------------------------------- *)
 type 'a pvaccess0 = env -> 'a -> PV.t
 
+let lp_write env lp =
+  lp_write_r env PV.empty lp
+
 let i_write  ?(except=Sx.empty) env i  = i_write_r  ~except env PV.empty i
 let is_write ?(except=Sx.empty) env is = is_write_r ~except env PV.empty is
 let s_write  ?(except=Sx.empty) env s  = s_write_r  ~except env PV.empty s

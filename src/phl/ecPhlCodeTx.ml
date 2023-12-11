@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcParsetree
 open EcAst
 open EcTypes
 open EcModules
@@ -293,3 +294,42 @@ let process_weakmem (side, id, params) tc =
   in
   let concl = f_imp h (FApi.tc1_goal tc) in
   FApi.xmutate1 tc `WeakenMem [concl]
+
+(* -------------------------------------------------------------------- *)
+let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
+  let (env, _, concl) = FApi.tc1_eflat tc in
+
+  let change (i : instr) =
+    if not (is_asgn i) then
+      tc_error !!tc "the code position should target an assignment";
+
+    let lv, e = destr_asgn i in
+
+    let pvl = EcPV.lp_write env lv in
+    let pve = EcPV.e_read env e in
+    let lv  = lv_to_list lv in
+
+    if not (EcPV.PV.indep env pvl pve) then
+      assert false;
+
+    let e =
+      match lv, e.e_node with
+      | [_], _         -> [e]
+      | _  , Etuple es -> es
+      | _  ,_          -> assert false in
+
+    let s = List.map2 (fun pv e -> i_asgn (LvVar (pv, e.e_ty), e)) lv e in
+
+    ([], s)
+  in
+
+  let kinds = [`Hoare `Stmt; `EHoare `Stmt; `PHoare `Stmt; `Equiv `Stmt] in
+
+  if not (EcLowPhlGoal.is_program_logic concl kinds) then
+    assert false;
+
+  let s = EcLowPhlGoal.tc1_get_stmt side tc in
+  let goals, s = EcMatching.Zipper.map pos change s in
+  let concl = EcLowPhlGoal.hl_set_stmt side concl s in
+
+  FApi.xmutate1 tc `ProcCase (goals @ [concl])

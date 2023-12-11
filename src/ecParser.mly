@@ -3233,6 +3233,9 @@ phltactic:
 | KILL s=side? o=codepos NOT STAR
     { Pkill (s, o, None) }
 
+| CASE LARROW s=side? o=codepos
+    { Pasgncase (s, o) }
+
 | ALIAS s=side? o=codepos
     { Palias (s, o, None) }
 
