@@ -755,6 +755,7 @@ type phltactic =
   | Poutline       of outline_info
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
+  | Pasgncase      of (oside * codepos)
   | Prnd           of oside * semrndpos option * rnd_tac_info_f
   | Prndsem        of bool * oside * codepos1
   | Palias         of (oside * codepos * osymbol_r)
