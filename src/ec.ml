@@ -489,19 +489,32 @@ let main () =
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in
+                   let ignore_fail = ref false in
                      try
-                       let tdelta =
-                         EcCommands.process ~timed ~break p.EP.gl_action
-                       in tstats loc tdelta
+                       let tdelta = EcCommands.process ~timed ~break p.EP.gl_action in
+                       if p.EP.gl_fail then begin
+                         ignore_fail := true;
+                         raise (EcScope.HiScopeError (None, "this command is expected to fail"))
+                       end;
+                       tstats loc tdelta
                      with
                      | EcCommands.Restart ->
                          raise EcCommands.Restart
                      | e -> begin
-                       if Printexc.backtrace_status () then begin
-                         if not (T.interactive terminal) then
-                           Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace
+                       if !ignore_fail || not p.EP.gl_fail then begin
+                         if Printexc.backtrace_status () then begin
+                           if not (T.interactive terminal) then
+                             Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace
+                         end;
+                         raise (EcScope.toperror_of_exn ~gloc:loc e)
                        end;
-                       raise (EcScope.toperror_of_exn ~gloc:loc e)
+                       if T.interactive terminal then begin
+                         let error =
+                           Format.asprintf
+                             "The following error has been ignored:@.@.@%a"
+                             EcPException.exn_printer e in
+                         T.notice ~immediate:true `Info error terminal
+                       end
                    end)
                 commands
 

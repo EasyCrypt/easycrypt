@@ -213,6 +213,7 @@
     "remove"      , REMOVE     ;        (* KW: global *)
     "exit"        , EXIT       ;        (* KW: global *)
 
+    "fail"        , FAIL       ;        (* KW: internal *)
     "time"        , TIME       ;        (* KW: internal *)
     "undo"        , UNDO       ;        (* KW: internal *)
     "debug"       , DEBUG      ;        (* KW: internal *)
