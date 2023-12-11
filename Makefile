@@ -39,7 +39,8 @@ install: build
 uninstall:
 	$(DUNE) uninstall
 
-check: stdlib examples
+unit: build
+	$(CHECK) unit
 
 stdlib: build
 	$(CHECK) prelude stdlib
@@ -47,7 +48,7 @@ stdlib: build
 examples: build
 	$(CHECK) examples mee-cbc
 
-check: stdlib examples
+check: unit stdlib examples
 	@true
 
 clean:
