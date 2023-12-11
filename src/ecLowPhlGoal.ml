@@ -177,6 +177,26 @@ let tc1_as_equivS   tc = pf_as_equivS   !!tc (FApi.tc1_goal tc)
 let tc1_as_eagerF   tc = pf_as_eagerF   !!tc (FApi.tc1_goal tc)
 
 (* -------------------------------------------------------------------- *)
+let is_program_logic (f : form) (ks : hlkind list) =
+  let do1 (k : hlkind) =
+    match f.f_node, k with
+    | FhoareF   _, `Hoare  (`Any | `Pred) -> true
+    | FeHoareF  _, `EHoare (`Any | `Pred) -> true
+    | FcHoareF  _, `CHoare (`Any | `Pred) -> true
+    | FbdHoareF _, `PHoare (`Any | `Pred) -> true
+    | FequivF   _, `Equiv  (`Any | `Pred) -> true
+    | FhoareS   _, `Hoare  (`Any | `Stmt) -> true
+    | FeHoareS  _, `EHoare (`Any | `Stmt) -> true
+    | FcHoareS  _, `CHoare (`Any | `Stmt) -> true
+    | FbdHoareS _, `PHoare (`Any | `Stmt) -> true
+    | FequivS   _, `Equiv  (`Any | `Stmt) -> true
+    | FeagerF   _, `Eager                 -> true
+    | _          , _                      -> false
+  in
+
+  List.exists do1 ks
+
+(* -------------------------------------------------------------------- *)
 let tc1_get_stmt side tc =
   let concl = FApi.tc1_goal tc in
   match side, concl.f_node with
@@ -192,6 +212,17 @@ let tc1_get_stmt side tc =
       tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
   | _            ->
       tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
+
+(* -------------------------------------------------------------------- *)
+let hl_set_stmt (side : side option) (f : form) (s : stmt) =
+  match side, f.f_node with
+  | None       , FhoareS   hs -> f_hoareS_r   { hs with hs_s  = s }
+  | None       , FeHoareS  hs -> f_eHoareS_r  { hs with ehs_s = s }
+  | None       , FcHoareS  hs -> f_cHoareS_r  { hs with chs_s = s }
+  | None       , FbdHoareS hs -> f_bdHoareS_r { hs with bhs_s = s }
+  | Some `Left , FequivS   es -> f_equivS_r   { es with es_sl = s }
+  | Some `Right, FequivS   es -> f_equivS_r   { es with es_sr = s }
+  | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
 let get_pre f =
