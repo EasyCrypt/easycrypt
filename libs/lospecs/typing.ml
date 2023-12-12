@@ -2,6 +2,14 @@
 open Ptree
 
 (* -------------------------------------------------------------------- *)
+let as_seq1 (type t) (xs : t list) : t =
+  match xs with [ x ] -> x | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let as_seq2 (type t) (xs : t list) : t * t =
+  match xs with [ x; y ] -> (x, y) | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
 module Ident : sig
   type ident
 
@@ -63,274 +71,171 @@ let tt_pword (_ : env) (`W ty : pword) : atype = `W ty
 exception TypingError of string
 
 (* -------------------------------------------------------------------- *)
-let tyerror msg =
+let mk_tyerror_r f msg =
   let buf = Buffer.create 0 in
   let fbuf = Format.formatter_of_buffer buf in
   Format.kfprintf
     (fun _ ->
       Format.pp_print_flush fbuf ();
-      raise (TypingError (Buffer.contents buf)))
+      f (TypingError (Buffer.contents buf)))
     fbuf msg
 
 (* -------------------------------------------------------------------- *)
+let mk_tyerror msg = mk_tyerror_r identity msg
+
+(* -------------------------------------------------------------------- *)
+let tyerror msg = mk_tyerror_r (fun e -> raise e) msg
+
+(* -------------------------------------------------------------------- *)
+let tt_type (t : ptype) : atype = (t :> atype)
+
+(* -------------------------------------------------------------------- *)
+let check_cast ~(from : atype) ~(to_ : atype) =
+  match (from, to_) with
+  | `W _, (`Unsigned | `Signed) -> ()
+  | _, _ when from = to_ -> ()
+  | _, _ -> tyerror "invalid cast"
+
+(* -------------------------------------------------------------------- *)
+let can_promote ~(from : atype) ~(to_ : atype) =
+  match (from, to_) with
+  | (`Unsigned | `Signed), `W _ -> true
+  | _, _ -> from = to_
+
+(* -------------------------------------------------------------------- *)
+let atype_as_aword (t : atype) : aword =
+  match t with #aword as t -> t | _ -> tyerror "word type expected"
+
+(* -------------------------------------------------------------------- *)
+let tt_type_parameters ~(expected : int) (tp : pword list option) =
+  match tp with
+  | None -> tyerror "missing type parameters annotation"
+  | Some tp ->
+      let tplen = List.length tp in
+      if expected <> tplen then
+        tyerror "invalid number of type parameters: %d / %d" tplen expected;
+      (tp :> aword list)
+
+(* -------------------------------------------------------------------- *)
+let check_arguments_count ~(expected : int) (args : pexpr list) =
+  if List.length args <> expected then tyerror "invalid number of arguments";
+  args
+
+(* -------------------------------------------------------------------- *)
+let as_int_constant (e : pexpr) : int =
+  match e with PEInt i -> i | _ -> tyerror "integer constant expected"
+
+(* -------------------------------------------------------------------- *)
+let destruct_fun (e : pexpr) : pargs * pexpr =
+  let rec doit (acc : pargs) (e : pexpr) =
+    match e with
+    | PEFun (args, e) -> doit (List.rev_append args acc) e
+    | _ -> (List.rev acc, e)
+  in
+  doit [] e
+
+(* -------------------------------------------------------------------- *)
 (* Get type of expr, fail if different from check (if check is given)   *)
-let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
+let rec tt_expr_ (env : env) (e : pexpr) : atype =
   match e with
-  | PEParens _e -> tt_expr env ?check _e
-  (* defaults to unsigned *)
-  | PEInt _i -> (env, `Unsigned)
-  (* will need to add typecast compatibility check, unnecessary for now *)
-  (* TODO: Make types compatible across files*)
-  | PECast (t, _e) -> (
-      let t =
-        match t with
-        | `W x -> `W x
-        | `Unsigned -> `Unsigned
-        | `Signed -> `Signed
-      in
-      match check with
-      | Some _t -> if t = _t then (env, t) else tyerror "Bad typecast"
-      | None -> (env, t))
-  (* to be changed later when introducing more types, such as function types *)
-  (* for now, anonymous functions have type equal to their return type *)
-  | PEFun (_args, _e) ->
-      let _env, _args = tt_args env _args in
-      tt_expr _env ?check _e
-  | PEVar _v -> (
-      match Env.lookup env _v with
-      | Some (_, _t) -> (env, _t)
-      | None -> tyerror "Bad reference to variable: %s" _v)
-  | PELet ((v, _e1), _e2) ->
-      let _env, _ =
-        let env, _t = tt_expr env _e1 in
-        Env.push env v _t
-      in
-      tt_expr _env ?check _e2
+  | PEParens e -> tt_expr env e
+  | PEInt i -> `Unsigned
+  | PECast (t, e) ->
+      let tt = tt_type t in
+      let te = tt_expr env e in
+
+      check_cast ~from:te ~to_:tt;
+      tt
+  (* FIXME: to be changed later when introducing more types, such as
+     function types for now, anonymous functions have type equal to
+     their return type *)
+  | PEFun (args, body) ->
+      let ebody, args = tt_args env args in
+      tt_expr ebody body
+  | PEVar v ->
+      Option.get_exn
+        (Option.map snd (Env.lookup env v))
+        (mk_tyerror "unknown variable: %s" v)
+  | PELet ((v, e1), e2) ->
+      let ebody, _ = Env.push env v (tt_expr env e1) in
+      tt_expr ebody e2
   (* TODO: add bounds checking? maybe change slice notation to allow for easier parsing *)
   (*       when beginning is variable but length is fixed                               *)
   (* slice is also short circuiting all checks right now                                *)
   (* [a:b] = [a:b:1].     [a:b:c] = starting from a, get c bits b times                 *)
   (* If resulting word length is fixed then return Word of that size                    *)
   (* Otherwise return type of thing being sliced                                        *)
-  | PESlice (_ev, (_eib, _eic, _eil)) -> (
-      let env, _tv = tt_expr env _ev in
-      let env, _tib = tt_expr env _eib in
-      let env, _tic = tt_expr env _eic in
-      match _eil with
-      | Some (PEInt m) -> (
-          match _eic with PEInt n -> (env, `W (n * m)) | _ -> (env, _tv))
-      | Some _eil ->
-          let env, _ = tt_expr env _eil in
-          (env, _tv)
-      | _ -> ( match _eic with PEInt n -> (env, `W n) | _ -> (env, _tv)))
-  (* needs function types to actually make sense for now just gets an unsigned integer *)
-  (* TODO: Implement function types so this makes sense ? *)
-  | PEApp (("add", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match
-            List.map
-              (fun a ->
-                let _, x = tt_expr env a in
-                x)
-              _eal
-          with
-          | [ `W n1; `W n2 ] ->
-              if n1 == n2 && n2 == n then (env, `W n)
-              else tyerror "bad inputs for add"
-          | _ -> (env, `W n) (* automatic conversion of ints to words *))
-      | _ -> (env, `Unsigned))
-  | PEApp (("and", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match
-            List.map
-              (fun a ->
-                let _, x = tt_expr env a in
-                x)
-              _eal
-          with
-          | [ `W n1; `W n2 ] ->
-              if n1 == n2 && n2 == n then (env, `W n)
-              else tyerror "bad inputs for and"
-          | _ -> (env, `W n) (* automatic conversion of ints to words *))
-      | _ -> (env, `Unsigned))
-  | PEApp (("concat", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          let _tal =
-            List.map
-              (fun a ->
-                let _, x = tt_expr env a in
-                x)
-              _eal
-          in
-          match _tal with
-          | [ `W k; `W l ] ->
-              if k == l && k == n then (env, `W (k * 2))
-              else tyerror "Wrong size args for concat"
-          | _ -> (env, `W (n * 2)))
-      | _ -> tyerror "width required for concat")
-  | PEApp (("mult", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match
-            List.map
-              (fun a ->
-                let _, x = tt_expr env a in
-                x)
-              _eal
-          with
-          | [ `W n1; `W n2 ] ->
-              if n1 == n2 && n2 == n then (env, `W (2 * n))
-              else tyerror "bad inputs for mult"
-          | _ -> (env, `W (2 * n)))
-      | _ -> (env, `Unsigned))
-  | PEApp (("repeat", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match _eal with
-          | [ _e1; PEInt k ] -> (
-              match tt_expr env _e1 with
-              | _, `W m ->
-                  if n == m then (env, `W (n * k))
-                  else tyerror "Wrong length input for repeat"
-              | _ -> (env, `W (n * k)))
-          | _ -> tyerror "only fixed repeat allowed")
-      | _ -> tyerror "width is required for repeat")
-  | PEApp (("or", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match
-            List.map
-              (fun a ->
-                let _, x = tt_expr env a in
-                x)
-              _eal
-          with
-          | [ `W n1; `W n2 ] ->
-              if n1 == n2 && n2 == n then (env, `W n)
-              else tyerror "bad inputs for or"
-          | _ -> (env, `W n) (* automatic conversion of ints to words *))
-      | _ -> (env, `Unsigned))
-  | PEApp (("SatToUW", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match _eal with
-          | [ _e1; PEInt k ] -> (
-              match tt_expr env _e1 with
-              | _, `W m ->
-                  if n == m then (env, `W n)
-                  else tyerror "Bad input size to SatToUW"
-              | _ -> (env, `W n))
-          | _ -> tyerror "Second argument to SatToUW must be constant")
-      | _ -> tyerror "SatToUW needs bit length input in <n>")
-  | PEApp (("SatToSW", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match _eal with
-          | [ _e1; PEInt k ] -> (
-              match tt_expr env _e1 with
-              | _, `W m ->
-                  if n == m then (env, `W n)
-                  else tyerror "Bad input size to SatToUW"
-              | _ -> (env, `W n))
-          | _ -> tyerror "Second argument to SatToSW must be constant")
-      | _ -> tyerror "SatToSW needs bit length input in <n>")
-  | PEApp (("sla", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match
-            List.map
-              (fun a ->
-                let _, x = tt_expr env a in
-                x)
-              _eal
-          with
-          | [ `W n1; `W n2 ] ->
-              if n1 == n2 && n2 == n then (env, `W n)
-              else tyerror "bad inputs for sla"
-          | _ -> (env, `W n) (* automatic conversion of ints to words *))
-      | _ -> (env, `Unsigned))
-  | PEApp (("sra", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match
-            List.map
-              (fun a ->
-                let _, x = tt_expr env a in
-                x)
-              _eal
-          with
-          | [ `W n1; `W n2 ] ->
-              if n1 == n2 && n2 == n then (env, `W n)
-              else tyerror "bad inputs for sra"
-          | _ -> (env, `W n) (* automatic conversion of ints to words *))
-      | _ -> (env, `Unsigned))
-  | PEApp (("srl", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match
-            List.map
-              (fun a ->
-                let _, x = tt_expr env a in
-                x)
-              _eal
-          with
-          | [ `W n1; `W n2 ] ->
-              if n1 == n2 && n2 == n then (env, `W n)
-              else tyerror "bad inputs for srl"
-          | _ -> (env, `W n) (* automatic conversion of ints to words *))
-      | _ -> (env, `Unsigned))
-  | PEApp (("sub", _wl), _eal) -> (
-      match _wl with
-      | Some [ `W n ] -> (
-          match
-            List.map
-              (fun a ->
-                let _, x = tt_expr env a in
-                x)
-              _eal
-          with
-          | [ `W n1; `W n2 ] ->
-              if n1 == n2 && n2 == n then (env, `W n)
-              else tyerror "bad inputs for sub"
-          | _ -> (env, `W n) (* automatic conversion of ints to words *))
-      | _ -> (env, `Unsigned))
-  | PEApp (("map", _wl), _eal) -> (
-      match _eal with
-      | PEFun (_aargs, _abodyexp) :: _eal -> (
-          if List.length _eal != List.length _aargs then
-            tyerror "Incorrect number of arguments to map"
-          else
-            let _fbenv, _taargs = tt_args env _aargs in
-            let _taargs = List.map (fun (_, x) -> x) _taargs in
-            let _tal =
-              List.map
-                (fun a ->
-                  let _, x = (tt_expr env) a in
-                  x)
-                _eal
-            in
-            match _wl with
-            | Some [ `W n; `W m ] ->
-                if
-                  true
-                  || List.fold_left (* TODO: Fix this and remove ShortCir *)
-                       (fun a b -> a && b == `W n)
-                       true _taargs
-                     && List.fold_left
-                          (fun a b -> a && b == `W (n * m))
-                          true _tal
-                then
-                  match tt_expr _fbenv _abodyexp with
-                  | _, `W br -> (env, `W (br * m))
-                  | _, `Unsigned -> (env, `W (n * m))
-                  | _, `Signed -> (env, `W (n * m))
-                else tyerror "Bad argument size to map"
-            | _ -> tyerror "Map needs mapping size params")
-      | _ -> tyerror "First argument to map should be function")
-  | PEApp ((n, _), _eal) -> tyerror "Unknown combinator: %s" n
+  | PESlice (ev, (eib, eic, eil)) ->
+      let _ = tt_expr env ev in
+      (* This should be a word *)
+      let _ = tt_expr env ~check:`Unsigned eib in
+      let c = as_int_constant eic in
+      let l = Option.default 1 (Option.map as_int_constant eil) in
+
+      `W (c * l)
+  | PEApp ((("and" | "or" | "add" | "sub"), w), args) ->
+      let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
+      let _ = tt_exprs env ~expected:[ `W w; `W w ] args in
+      `W w
+  | PEApp (("mult", w), args) ->
+      let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
+      let _ = tt_exprs env ~expected:[ `W w; `W w ] args in
+      `W (2 * w)
+  | PEApp ((("sla" | "sll" | "sra" | "srl"), w), args) ->
+      let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
+      let _ = tt_exprs env ~expected:[ `W w; `W w ] args in
+      `W w
+  | PEApp (("concat", w), args) ->
+      let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
+      let targs = List.map (tt_expr env ~check:(`W w)) args in
+      `W (w * List.length targs)
+  | PEApp (("repeat", w), args) ->
+      let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
+      let e, n = as_seq2 (check_arguments_count ~expected:2 args) in
+      let n = as_int_constant n in
+      let _ = tt_expr env ~check:(`W w) e in
+      `W (w * n)
+  | PEApp ((("SatToUW" | "SatToSW"), w), args) ->
+      let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
+      let e, n = as_seq2 (check_arguments_count ~expected:2 args) in
+      let _ = as_int_constant n in
+      let _ = tt_expr env ~check:(`W w) e in
+      `W w
+  | PEApp (("map", w), args) ->
+      let `W w, `W n = as_seq2 (tt_type_parameters ~expected:2 w) in
+
+      if List.is_empty args then tyerror "invalid number of arguments";
+
+      let f, args = (List.hd args, List.tl args) in
+      let _ = List.map (tt_expr ~check:(`W (w * n)) env) args in
+
+      let fargs, f = destruct_fun f in
+
+      let env, targs = tt_args env fargs in
+      let targs = List.map snd targs in
+
+      if targs <> List.make (List.length args) (`W w) then
+        tyerror "invalid argument types / count";
+
+      let m =
+        match tt_expr env f with
+        | `W m -> m
+        | _ -> tyerror "function should return a word"
+      in
+
+      `W (m * n)
+  | PEApp ((name, _), _) -> tyerror "Unknown combinator: %s" name
+
+(* -------------------------------------------------------------------- *)
+and tt_expr (env : env) ?(check : atype option) (p : pexpr) =
+  let t = tt_expr_ env p in
+
+  Option.may
+    (fun t' ->
+      if not (can_promote ~from:t ~to_:t') then
+        tyerror "invalid type: %a / %a" pp_atype t pp_atype t')
+    check;
+  Option.default t check
 
 (* -------------------------------------------------------------------- *)
 and tt_arg (env : env) ((x, `W ty) : parg) : env * aarg =
@@ -342,11 +247,20 @@ and tt_args (env : env) (args : pargs) : env * aargs =
   List.fold_left_map tt_arg env args
 
 (* -------------------------------------------------------------------- *)
-let tt_def (env : env) (p : pdef) : env * (symbol * atype) =
-  let _env, _args = tt_args env p.args in
-  let _benv, _btype = tt_expr _env ~check:(tt_pword env p.rty) p.body in
-  (_benv, (p.name, _btype))
+and tt_exprs (env : env) ~(expected : atype list) (es : pexpr list) =
+  let eslen = List.length es in
+  let exlen = List.length expected in
+
+  if eslen <> exlen then tyerror "invalid tuple size: %d / %d" exlen eslen;
+  List.map2 (fun e t -> tt_expr env ~check:t e) es expected
 
 (* -------------------------------------------------------------------- *)
-let tt_program (env : env) (p : pprogram) : env * (symbol * atype) list =
-  List.fold_left_map tt_def env p
+let tt_def (env : env) (p : pdef) : symbol * atype =
+  Format.eprintf "%s@." p.name;
+  let env, args = tt_args env p.args in
+  let type_ = tt_expr env ~check:(tt_pword env p.rty) p.body in
+  (p.name, type_)
+
+(* -------------------------------------------------------------------- *)
+let tt_program (env : env) (p : pprogram) : (symbol * atype) list =
+  List.map (tt_def env) p

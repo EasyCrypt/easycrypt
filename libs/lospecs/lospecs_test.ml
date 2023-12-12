@@ -5,27 +5,16 @@ open Lospecs
 let _ =
   let dont_type = false in
   let prog = Io.parse IO.stdin in
-  if dont_type then Format.printf "%a@." Ptree.pp_pprogram prog
+  if dont_type then Format.eprintf "%a@." Ptree.pp_pprogram prog
   else
-    let _env, vars = Typing.tt_program Typing.Env.empty prog in
-    Format.printf "%a@.%a@.%a@." Ptree.pp_pprogram prog
+    let vars = Typing.tt_program Typing.Env.empty prog in
+    Format.eprintf "%a@.%a@." Ptree.pp_pprogram prog
       (fun fmt a (* print vars *) ->
         Format.pp_print_list
           ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.")
           (fun fmt (a, b) -> Format.fprintf fmt "%s: %a" a Typing.pp_atype b)
           fmt a)
       vars
-      (fun fmt a ->
-        Format.pp_print_list
-          ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.")
-          (fun fmt (a, b) ->
-            Format.fprintf fmt "%s -> %a" a
-              (fun fmt (a, b) ->
-                Format.fprintf fmt "(%s, %d): %a" (Typing.Ident.name a)
-                  (Typing.Ident.id a) Typing.pp_atype b)
-              b)
-          fmt a)
-      (Map.bindings (Typing.Env.export _env))
 
 (* -------------------------------------------------------------------- *)
 module List : sig
