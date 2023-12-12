@@ -6,7 +6,8 @@ let _ =
   let dont_type = false in
   let prog = Io.parse IO.stdin in
   if dont_type then Format.eprintf "%a@." Ptree.pp_pprogram prog
-  else
+  else Typing.tt_program Typing.Env.empty prog |> (fun _ -> ())
+  (*
     let vars = Typing.tt_program Typing.Env.empty prog in
     Format.eprintf "%a@.%a@." Ptree.pp_pprogram prog
       (fun fmt a (* print vars *) ->
@@ -15,7 +16,7 @@ let _ =
           (fun fmt (a, b) -> Format.fprintf fmt "%s: %a" a Typing.pp_atype b)
           fmt a)
       vars
-
+*)
 (* -------------------------------------------------------------------- *)
 module List : sig
   include module type of List

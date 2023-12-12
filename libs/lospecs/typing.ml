@@ -159,72 +159,90 @@ let destruct_fun (e : pexpr) : pargs * pexpr =
 
 (* -------------------------------------------------------------------- *)
 (* Get type of expr, fail if different from check (if check is given)   *)
-let rec tt_expr_ (env : env) (e : pexpr) : atype =
+let rec tt_expr_ (env : env) (e : pexpr) : aexpr =
   match e with
   | PEParens e -> tt_expr env e
-  | PEInt i -> `Unsigned
+  | PEInt i -> { node = EInt i; type_ = `Unsigned; }
   | PECast (t, e) ->
       let tt = tt_type t in
-      let te = tt_expr env e in
+      let { node = ne; type_= te} = tt_expr env e in
 
       check_cast ~from:te ~to_:tt;
-      tt
-  (* FIXME: to be changed later when introducing more types, such as
-     function types for now, anonymous functions have type equal to
-     their return type *)
+      { node = ECast ({ node = ne; type_ = te}, tt); type_ = tt; }
+  (* functions are, for now, type equivalent to their return type *)
   | PEFun (args, body) ->
       let ebody, args = tt_args env args in
       tt_expr ebody body
   | PEVar v ->
-      Option.get_exn
-        (Option.map snd (Env.lookup env v))
-        (mk_tyerror "unknown variable: %s" v)
+      let (vid, vt) = Option.get_exn
+        (Env.lookup env v)
+        (mk_tyerror "unknown variable: %s" v) in
+      { node = EVar vid; type_ = vt; }
   | PELet ((v, e1), e2) ->
-      let ebody, _ = Env.push env v (tt_expr env e1) in
-      tt_expr ebody e2
-  (* TODO: add bounds checking? maybe change slice notation to allow for easier parsing *)
-  (*       when beginning is variable but length is fixed                               *)
-  (* slice is also short circuiting all checks right now                                *)
-  (* [a:b] = [a:b:1].     [a:b:c] = starting from a, get c bits b times                 *)
-  (* If resulting word length is fixed then return Word of that size                    *)
-  (* Otherwise return type of thing being sliced                                        *)
+      let { node = nld; type_ =  tld; } as nld_ = tt_expr env e1 in
+      let ebody, _ = Env.push env v tld in
+      let { node = nlb; type_ =  tlb; } as nlb_ = tt_expr ebody e2 in
+      let vid = Option.get_exn
+      (Option.map fst (Env.lookup env v))
+      (mk_tyerror "unknown variable: %s" v) in
+      { node = ELet ((vid, nld_), nlb_); type_ = tlb; }
+  (* Slices only accept eic and eil being fixed integers            *)
   | PESlice (ev, (eib, eic, eil)) ->
-      let _ = tt_expr env ev in
+      let { node = ne; type_ = te; } as ne_ = tt_expr env ev in
       (* This should be a word *)
-      let _ = tt_expr env ~check:`Unsigned eib in
+      let { node = neb; type_ = teb;} as neb_ = tt_expr env ~check:`Unsigned eib in
       let c = as_int_constant eic in
       let l = Option.default 1 (Option.map as_int_constant eil) in
-
-      `W (c * l)
-  | PEApp ((("and" | "or" | "add" | "sub"), w), args) ->
+      { node = ESlide (ne_,(neb_,c,l)); type_ = `W (c * l);} (* might be typo in AST, Slide -> Slice, check *)
+  | PEApp ((("and" | "or" | "add" | "sub") as op, w), args) ->
       let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
-      let _ = tt_exprs env ~expected:[ `W w; `W w ] args in
-      `W w
+      let (na1, na2) = as_seq2 (tt_exprs env ~expected:[ `W w; `W w ] args) in
+      { node = (match op with
+        | "and" -> EAnd (`W w, (na1, na2))
+        | "or"  -> EOr  (`W w, (na1, na2))
+        | "add" -> EAdd (`W w, (na1, na2))
+        | "sub" -> ESub (`W w, (na1, na2)));
+        type_ = `W w; }
   | PEApp (("mult", w), args) ->
       let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
-      let _ = tt_exprs env ~expected:[ `W w; `W w ] args in
-      `W (2 * w)
-  | PEApp ((("sla" | "sll" | "sra" | "srl"), w), args) ->
+      let (na1, na2) = as_seq2 (tt_exprs env ~expected:[ `W w; `W w ] args) in
+      { node = EMul (`W (2 * w), (na1, na2)); type_ = `W (2 * w); }
+  (* Implementing as implied by AST: Fixed shifts only *)
+  | PEApp ((("sla" | "sll" | "sra" | "srl") as op, w), args) ->
       let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
-      let _ = tt_exprs env ~expected:[ `W w; `W w ] args in
-      `W w
+      let (e1, e2) = as_seq2 args in
+      let na = tt_expr env ~check:(`W w) e1 in
+      let c = as_int_constant e2 in
+      { node = (match op with 
+        | "sla" -> EShift (`L,`A, na, c)
+        | "sll" -> EShift (`L,`L, na, c)
+        | "sra" -> EShift (`R,`A, na, c)
+        | "srl" -> EShift (`R,`L, na, c));
+        type_ = `W w; }
   | PEApp (("concat", w), args) ->
       let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
       let targs = List.map (tt_expr env ~check:(`W w)) args in
-      `W (w * List.length targs)
+      let wsz = `W (w * List.length targs) in
+      { node = EConcat (wsz, targs); type_ = wsz; }
   | PEApp (("repeat", w), args) ->
       let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
       let e, n = as_seq2 (check_arguments_count ~expected:2 args) in
       let n = as_int_constant n in
-      let _ = tt_expr env ~check:(`W w) e in
-      `W (w * n)
-  | PEApp ((("SatToUW" | "SatToSW"), w), args) ->
+      let ne = tt_expr env ~check:(`W w) e in
+      { node = ERepeat (`W (w * n),(ne,n)); type_ = `W (w * n); }
+  | PEApp ((("SatToUW" | "SatToSW") as op, w), args) ->
       let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
       let e, n = as_seq2 (check_arguments_count ~expected:2 args) in
-      let _ = as_int_constant n in
-      let _ = tt_expr env ~check:(`W w) e in
-      `W w
-  | PEApp (("map", w), args) ->
+      let n = as_int_constant n in
+      let ne = tt_expr env ~check:(`W w) e in
+      { 
+        node = (match op with
+        | "SatToUW" -> ESat (`U, ne, n)
+        | "SatToSW" -> ESat (`S, ne, n));
+        type_ = `W w; 
+      }
+  | PEApp (("map", w), args) -> failwith "Not yet done"
+  (*
       let `W w, `W n = as_seq2 (tt_type_parameters ~expected:2 w) in
 
       if List.is_empty args then tyerror "invalid number of arguments";
@@ -240,25 +258,27 @@ let rec tt_expr_ (env : env) (e : pexpr) : atype =
       if targs <> List.make (List.length args) (`W w) then
         tyerror "invalid argument types / count";
 
+      let (nf, tf) = tt_expr env f in
       let m =
-        match tt_expr env f with
+        match tf with
         | `W m -> m
         | _ -> tyerror "function should return a word"
       in
 
-      `W (m * n)
+      (EMap ((`W w, `W n) , ( ,nf)), `W (m * n))
+      *)
   | PEApp ((name, _), _) -> tyerror "Unknown combinator: %s" name
 
 (* -------------------------------------------------------------------- *)
-and tt_expr (env : env) ?(check : atype option) (p : pexpr) =
-  let t = tt_expr_ env p in
+and tt_expr (env : env) ?(check : atype option) (p : pexpr) : aexpr =
+    let {node = n_; type_ = t;} = tt_expr_ env p in
 
   Option.may
     (fun t' ->
       if not (can_promote ~from:t ~to_:t') then
         tyerror "invalid type: %a / %a" pp_atype t pp_atype t')
     check;
-  Option.default t check
+  {node = n_; type_ = Option.default t check; }
 
 (* -------------------------------------------------------------------- *)
 and tt_arg (env : env) ((x, `W ty) : parg) : env * aarg =
@@ -278,12 +298,12 @@ and tt_exprs (env : env) ~(expected : atype list) (es : pexpr list) =
   List.map2 (fun e t -> tt_expr env ~check:t e) es expected
 
 (* -------------------------------------------------------------------- *)
-let tt_def (env : env) (p : pdef) : symbol * atype =
+let tt_def (env : env) (p : pdef) : symbol * adef =
   Format.eprintf "%s@." p.name;
   let env, args = tt_args env p.args in
-  let type_ = tt_expr env ~check:(tt_pword env p.rty) p.body in
-  (p.name, type_)
+  let bod = tt_expr env ~check:(tt_pword env p.rty) p.body in
+  (p.name, { arguments = args; body = bod; rettype = p.rty; })
 
 (* -------------------------------------------------------------------- *)
-let tt_program (env : env) (p : pprogram) : (symbol * atype) list =
+let tt_program (env : env) (p : pprogram) : (symbol * adef) list =
   List.map (tt_def env) p
