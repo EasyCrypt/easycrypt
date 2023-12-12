@@ -10,16 +10,6 @@ let provers =
     z3
   ] else []; in
 
-let why3-pin =
-  why3.overrideAttrs (o : rec {
-    version = "1.6.0";
-    src = fetchurl {
-      url = "https://why3.gitlabpages.inria.fr/releases/${o.pname}-${version}.tar.gz";
-      sha256 = "sha256-hFvM6kHScaCtcHCc6Vezl9CR7BFbiKPoTEh7kj0ZJxw=";
-    };
-  });
-in
-
 stdenv.mkDerivation {
   pname = "easycrypt";
   version = "git";
@@ -37,12 +27,11 @@ stdenv.mkDerivation {
     menhir
     menhirLib
     yojson
+    why3
     zarith
   ]);
 
-  propagatedBuildInputs = [ why3-pin ]
-    ++ devDeps
-    ++ provers;
+  propagatedBuildInputs = devDeps ++ provers;
 
   installPhase = ''
     runHook preInstall
