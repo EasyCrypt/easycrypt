@@ -27,4 +27,4 @@ WORKDIR /home/$user
 ENV OPAMYES=true OPAMVERBOSE=0 OPAMJOBS=4
 
 RUN \
-	opam init --disable-sandboxing
+	opam init --disable-sandboxing --switch=ocaml-base-compiler.5.1.0
