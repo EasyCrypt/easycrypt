@@ -26,7 +26,7 @@ let process_cond info tc =
       if side <> None || i1 <> None || i2 <> None then
         tc_error !!tc "cannot supply side or code position when goal is a choare"
       else
-        let f = EcProofTyping.tc1_process_Xhl_formula tc f in
+        let _, f = EcProofTyping.tc1_process_Xhl_formula tc f in
         t_choare_cond (Some f) tc
     else
       let es = tc1_as_equivS tc in
@@ -39,8 +39,8 @@ let process_cond info tc =
   | `SeqOne (s, i, f1, f2) ->
     let es = tc1_as_equivS tc in
     let n = default_if i (match s with `Left -> es.es_sl | `Right -> es.es_sr) in
-    let f1 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f1 in
-    let f2 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f2 in
+    let _, f1 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f1 in
+    let _, f2 = EcProofTyping.tc1_process_Xhl_formula ~side:s tc f2 in
     FApi.t_seqsub
       (EcPhlApp.t_equiv_app_onesided s n f1 f2)
       [ t_id; t_bdhoare_cond] tc

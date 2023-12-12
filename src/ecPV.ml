@@ -2,6 +2,7 @@
 open EcUtils
 open EcIdent
 open EcPath
+open EcAst
 open EcTypes
 open EcModules
 open EcFol
@@ -955,7 +956,7 @@ module Mpv2 = struct
    equality of e1 and e2 *)
   let rec add_eqs_loc env local eqs e1 e2 =
     match e1.e_node, e2.e_node with
-    | Equant(qt1,bds1,e1), Equant(qt2,bds2,e2) when qt_equal qt1 qt2 ->
+    | Equant(qt1,bds1,e1), Equant(qt2,bds2,e2) when eqt_equal qt1 qt2 ->
       let local = enter_local env local bds1 bds2 in
       add_eqs_loc env local eqs e1 e2
     | Eint i1, Eint i2 when EcBigInt.equal i1 i2 -> eqs

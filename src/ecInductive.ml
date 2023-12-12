@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcAst
 open EcTypes
 open EcDecl
 open EcCoreFol
@@ -49,13 +50,13 @@ let indsc_of_record (rc : record) =
   let prem   =
     let ids  = List.map (fun (_, fty) -> (fresh_id_of_ty fty, fty)) rc.rc_fields in
     let vars = List.map (fun (x, xty) -> FL.f_local x xty) ids in
-    let bds  = List.map (fun (x, xty) -> (x, FL.GTty xty)) ids in
+    let bds  = List.map (fun (x, xty) -> (x, GTty xty)) ids in
     let recv = FL.f_app ctor vars recty in
     FL.f_forall bds (FL.f_app pred [recv] tbool) in
   let form   = FL.f_app pred [recfm] tbool in
-  let form   = FL.f_forall [recx, FL.GTty recty] form in
+  let form   = FL.f_forall [recx, GTty recty] form in
   let form   = FL.f_imp prem form in
-  let form   = FL.f_forall [predx, FL.GTty predty] form in
+  let form   = FL.f_forall [predx, GTty predty] form in
 
   form
 
@@ -111,7 +112,7 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
         if occurs p ty1 then raise NonPositive;
         let x = fresh_id_of_ty ty1 in
           scheme1 p (pred, FL.f_app fac [FL.f_local x ty1] ty2) ty2
-            |> omap (FL.f_forall [x, FL.GTty ty1])
+            |> omap (FL.f_forall [x, GTty ty1])
 
   and schemec mode (targs, p) pred (ctor, tys) =
     let indty = tconstr p (List.map tvar targs) in
@@ -131,7 +132,7 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
     in
 
     let form  =
-      let bds = List.map (fun (x, xty) -> (x, FL.GTty xty)) xs in
+      let bds = List.map (fun (x, xty) -> (x, GTty xty)) xs in
         FL.f_forall bds form
 
     in
@@ -146,9 +147,9 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
     let pred   = FL.f_local predx predty in
     let scs    = List.map (schemec mode (targs, p) pred) ctors in
     let form   = FL.f_app pred [indfm] tbool in
-    let form   = FL.f_forall [indx, FL.GTty indty] form in
+    let form   = FL.f_forall [indx, GTty indty] form in
     let form   = FL.f_imps scs form in
-    let form   = FL.f_forall [predx, FL.GTty predty] form in
+    let form   = FL.f_forall [predx, GTty predty] form in
       form
 
   and occurs p t =

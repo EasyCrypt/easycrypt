@@ -2,6 +2,7 @@
 open EcMaps
 open EcSymbols
 open EcUtils
+open EcAst
 open EcTypes
 open EcModules
 open EcDecl
@@ -540,7 +541,7 @@ type opprec = int * fixity
 (* -------------------------------------------------------------------- *)
 (* precondition: fst inner_left <= fst inner *)
 let maybe_paren_gen (onm, (outer, side)) (inm, inner, inner_left) pp =
-  let noparens ((pi : int), fi) (pil, fil) (po, fo) side =
+  let noparens ((pi : int), fi) (pil, _fil) (po, fo) side =
     pil > po ||  (* pi > po is too strong *)
       match fi, side with
       | `Postfix     , `Left     -> true
@@ -570,7 +571,7 @@ let maybe_paren_nosc outer inner pp =
 (* when a construct is bracketed with words, e.g., `match ... end`,
    only introduce explicit parentheses in an application *)
 let maybe_paren_bracketed_with_words (_, (_, side)) pp =
-  let parens outer =
+  let parens _outer =
     (match side with
      | `ILeft | `IRight -> true
      | _                -> false)
@@ -1347,7 +1348,7 @@ let lower_left (ppe : PPEnv.t) (t_ty : form -> EcTypes.ty) (f : form)
     | Fquant _ -> Some (fst e_bin_prio_lambda)
     | Fif _    -> Some (fst e_bin_prio_if)
     | Flet _   -> Some (fst e_bin_prio_letin)
-    | Fapp ({f_node = Fop (op, _)}, [f1; f2])
+    | Fapp ({f_node = Fop (op, _)}, [_; f2])
         when EcPath.basename op = EcCoreLib.s_cons ->
         if fst e_bin_prio_rop4 < fst opprec
         then None
@@ -1557,7 +1558,7 @@ and try_pp_lossless (ppe : PPEnv.t) outer fmt f =
            EcFol.f_equal EcFol.f_true hbd.bhf_pr
         && EcFol.f_equal EcFol.f_true hbd.bhf_po
         && EcFol.f_equal EcFol.f_r1   hbd.bhf_bd
-        && hbd.bhf_cmp = EcFol.FHeq
+        && hbd.bhf_cmp = FHeq
       in
         match isls with
         | false -> false
@@ -3725,13 +3726,13 @@ let pp_use_restr env ~print_abstract fmt ur =
   let open EcEnv in
   let ppe = PPEnv.ofenv env in
 
-  let sm_p = omap (fun x -> sm_of_mid x.us_gl) ur.EcModules.ur_pos
-  and sm_n = sm_of_mid ur.EcModules.ur_neg.us_gl in
+  let sm_p = omap (fun x -> sm_of_mid x.us_gl) ur.ur_pos
+  and sm_n = sm_of_mid ur.ur_neg.us_gl in
 
   let sx_p =
-    omap (fun x -> EcPath.Mx.map (fun _ -> ())x.us_pv) ur.EcModules.ur_pos
+    omap (fun x -> EcPath.Mx.map (fun _ -> ())x.us_pv) ur.ur_pos
   and sx_n =
-    EcPath.Mx.map (fun _ -> ()) ur.EcModules.ur_neg.us_pv in
+    EcPath.Mx.map (fun _ -> ()) ur.ur_neg.us_pv in
 
   Format.fprintf fmt "@[<v 0>Abstract modules:@ @[<h>%a@]@ @[<h>%a@]@;"
     (fun fmt opt -> match opt with

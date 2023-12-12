@@ -163,24 +163,26 @@ let tc1_process_Xhl_exp tc side ty e =
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_form ?side tc ty pf =
   let hyps, concl = FApi.tc1_flat tc in
+  let m = fst (EcFol.destr_programS side concl) in
 
-  let memory, mv =
-    match concl.f_node, side with
-    | FhoareS  hs, None         -> (hs.hs_m, Some (hs.hs_pr, hs.hs_po ))
-    | FeHoareS  hs, None        -> (hs.ehs_m , Some (hs.ehs_pr , hs.ehs_po))
-    | FcHoareS  hs, None        -> (hs.chs_m, Some (hs.chs_pr, hs.chs_po ))
-    | FbdHoareS hs, None        -> (hs.bhs_m, Some (hs.bhs_pr, hs.bhs_po))
-    | FequivS   es, Some `Left  -> ((mhr, snd es.es_ml), None)
-    | FequivS   es, Some `Right -> ((mhr, snd es.es_mr), None)
-
-    | _, _ -> raise (DestrError "destr_programS")
+  let mv =
+    match concl.f_node with
+    | FhoareS   hs -> Some (hs.hs_pr , hs.hs_po )
+    | FeHoareS  hs -> Some (hs.ehs_pr, hs.ehs_po)
+    | FcHoareS  hs -> Some (hs.chs_pr, hs.chs_po)
+    | FbdHoareS hs -> Some (hs.bhs_pr, hs.bhs_po)
+    | _            -> None
   in
 
-  let hyps = LDecl.push_active memory hyps in
-  let mv = mv |> omap
-   (fun (pr, po) -> Msym.of_list [("pre", pr); ("post", po)]) in
+  let hyps = LDecl.push_active m hyps in
 
-  pf_process_form ?mv !!tc hyps ty pf
+  let mv =
+    Option.map
+      (fun (pr, po) -> Msym.of_list [("pre", pr); ("post", po)])
+      mv
+  in
+
+  (m, pf_process_form ?mv !!tc hyps ty pf)
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_formula ?side tc pf =

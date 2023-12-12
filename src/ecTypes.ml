@@ -3,6 +3,7 @@ open EcUtils
 open EcIdent
 open EcPath
 open EcUid
+open EcAst
 
 module BI = EcBigInt
 
@@ -16,76 +17,15 @@ let local_of_locality = function
   | `Declare -> `Local
 
 (* -------------------------------------------------------------------- *)
-type ty = {
-  ty_node : ty_node;
-  ty_fv   : int EcIdent.Mid.t; (* only ident appearing in path *)
-  ty_tag  : int;
-}
-
-and ty_node =
-  | Tglob   of EcIdent.t (* The tuple of global variable of the module *)
-  | Tunivar of EcUid.uid
-  | Tvar    of EcIdent.t
-  | Ttuple  of ty list
-  | Tconstr of EcPath.path * ty list
-  | Tfun    of ty * ty
+type ty = EcAst.ty
+type ty_node = EcAst.ty_node
 
 type dom = ty list
 
-let ty_equal : ty -> ty -> bool = (==)
-let ty_hash ty = ty.ty_tag
+let ty_equal = EcAst.ty_equal
+let ty_hash = EcAst.ty_hash
 
-module Hsty = Why3.Hashcons.Make (struct
-  type t = ty
-
-  let equal ty1 ty2 =
-    match ty1.ty_node, ty2.ty_node with
-    | Tglob m1, Tglob m2 ->
-        EcIdent.id_equal m1 m2
-
-    | Tunivar u1, Tunivar u2 ->
-        uid_equal u1 u2
-
-    | Tvar v1, Tvar v2 ->
-        id_equal v1 v2
-
-    | Ttuple lt1, Ttuple lt2 ->
-        List.all2 ty_equal lt1 lt2
-
-    | Tconstr (p1, lt1), Tconstr (p2, lt2) ->
-        EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
-
-    | Tfun (d1, c1), Tfun (d2, c2)->
-        ty_equal d1 d2 && ty_equal c1 c2
-
-    | _, _ -> false
-
-  let hash ty =
-    match ty.ty_node with
-    | Tglob m          -> EcIdent.id_hash m
-    | Tunivar u        -> u
-    | Tvar    id       -> EcIdent.tag id
-    | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
-    | Tconstr (p, tl)  -> Why3.Hashcons.combine_list ty_hash p.p_tag tl
-    | Tfun    (t1, t2) -> Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
-
-  let fv ty =
-    let union ex =
-      List.fold_left (fun s a -> fv_union s (ex a)) Mid.empty in
-
-    match ty with
-    | Tglob m          -> EcIdent.fv_add m Mid.empty
-    | Tunivar _        -> Mid.empty
-    | Tvar    _        -> Mid.empty (* FIXME: section *)
-    | Ttuple  tys      -> union (fun a -> a.ty_fv) tys
-    | Tconstr (_, tys) -> union (fun a -> a.ty_fv) tys
-    | Tfun    (t1, t2) -> union (fun a -> a.ty_fv) [t1; t2]
-
-  let tag n ty = { ty with ty_tag = n; ty_fv = fv ty.ty_node; }
-end)
-
-let mk_ty node =
-  Hsty.hashcons { ty_node = node; ty_tag = -1; ty_fv = Mid.empty }
+let mk_ty = EcAst.mk_ty
 
 module MSHty = EcMaps.MakeMSH(struct
   type t = ty
@@ -274,8 +214,15 @@ let rec ty_subst s =
             | Some ty -> ty_subst s ty
           end
         end
-      | Tunivar id    -> Muid.find_def ty id s.ts_u
-      | Tvar id       -> Mid.find_def ty id s.ts_v
+      | Tunivar id -> begin
+          match Muid.find_opt id s.ts_u with
+          | None ->
+            ty
+          | Some ty ->
+            ty_subst s ty
+        end
+
+      | Tvar id -> Mid.find_def ty id s.ts_v
       | _ -> ty_map (ty_subst s) ty
 
 (* -------------------------------------------------------------------- *)
@@ -334,39 +281,21 @@ module Tvar = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type ovariable = {
-  ov_name : EcSymbols.symbol option;
-  ov_type : ty;
-}
+type ovariable = EcAst.ovariable
 
 let ov_name { ov_name = x } = x
 let ov_type { ov_type = x } = x
 
-let ov_hash v =
-  Why3.Hashcons.combine
-    (Hashtbl.hash v.ov_name)
-    (ty_hash v.ov_type)
+let ov_hash = EcAst.ov_hash
+let ov_equal = EcAst.ov_equal
 
-let ov_equal vd1 vd2 =
-  EcUtils.opt_equal (=) vd1.ov_name vd2.ov_name &&
-  ty_equal vd1.ov_type vd2.ov_type
-
-type variable = {
-  v_name : EcSymbols.symbol;   (* can be "_" *)
-  v_type : ty;
-}
+type variable = EcAst.variable
 
 let v_name { v_name = x } = x
 let v_type { v_type = x } = x
 
-let v_hash v =
-  Why3.Hashcons.combine
-    (Hashtbl.hash v.v_name)
-    (ty_hash v.v_type)
-
-let v_equal vd1 vd2 =
-  vd1.v_name = vd2.v_name &&
-  ty_equal vd1.v_type vd2.v_type
+let v_hash = EcAst.v_hash
+let v_equal = EcAst.v_equal
 
 let ovar_of_var { v_name = n; v_type = t } =
   { ov_name = Some n; ov_type = t }
@@ -375,31 +304,15 @@ let ty_fv_and_tvar (ty : ty) =
   EcIdent.fv_union ty.ty_fv (Mid.map (fun () -> 1) (Tvar.fv ty))
 
 (* -------------------------------------------------------------------- *)
-type pvar_kind =
-  | PVKglob
-  | PVKloc
+type pvar_kind = EcAst.pvar_kind
 
-type prog_var =
-  | PVglob of EcPath.xpath
-  | PVloc of EcSymbols.symbol
+type prog_var = EcAst.prog_var
 
-let pv_equal v1 v2 = match v1, v2 with
-  | PVglob x1, PVglob x2 ->
-    EcPath.x_equal x1 x2
-  | PVloc i1, PVloc i2 -> EcSymbols.sym_equal i1 i2
-  | PVloc _, PVglob _ | PVglob _, PVloc _ -> false
+let pv_equal = EcAst.pv_equal
 
-let pv_kind = function
-  | PVglob _ -> PVKglob
-  | PVloc _ -> PVKloc
+let pv_kind = EcAst.pv_kind
 
-let pv_hash v =
-  let h = match v with
-    | PVglob x -> EcPath.x_hash x
-    | PVloc i -> Hashtbl.hash i in
-
-  Why3.Hashcons.combine
-    h (if pv_kind v = PVKglob then 1 else 0)
+let pv_hash = EcAst.pv_hash
 
 let pv_compare v1 v2 =
   match v1, v2 with
@@ -469,32 +382,15 @@ let pv_subst m_subst px = match px with
   | PVloc _ -> px
 
 (* -------------------------------------------------------------------- *)
-type lpattern =
-  | LSymbol of (EcIdent.t * ty)
-  | LTuple  of (EcIdent.t * ty) list
-  | LRecord of EcPath.path * (EcIdent.t option * ty) list
+type lpattern = EcAst.lpattern
 
-let idty_equal (x1,t1) (x2,t2) =
-  EcIdent.id_equal x1 x2 && ty_equal t1 t2
+let idty_equal = EcAst.idty_equal
 
-let lp_equal p1 p2 =
-  match p1, p2 with
-  | LSymbol xt1, LSymbol xt2 -> idty_equal xt1 xt2
-  | LTuple lx1, LTuple lx2 -> List.all2 idty_equal lx1 lx2
-  | _ -> false
+let lp_equal = EcAst.lp_equal
 
-let idty_hash (x,t) = Why3.Hashcons.combine (EcIdent.id_hash x) (ty_hash t)
+let idty_hash = EcAst.idty_hash
 
-let lp_hash = function
-  | LSymbol  x -> idty_hash x
-  | LTuple  lx -> Why3.Hashcons.combine_list idty_hash 0 lx
-
-  | LRecord (p, lx) ->
-      let for1 (x, ty) =
-        Why3.Hashcons.combine (ty_hash ty)
-          (Why3.Hashcons.combine_option EcIdent.id_hash x)
-      in
-        Why3.Hashcons.combine_list for1 (p_hash p) lx
+let lp_hash = EcAst.lp_hash
 
 let lp_ids = function
   | LSymbol (id,_)  -> [id]
@@ -508,175 +404,32 @@ let lp_bind = function
       List.pmap (fun (x, ty) -> omap (fun x -> (x, ty)) x) b
 
 (* -------------------------------------------------------------------- *)
-type expr = {
-  e_node : expr_node;
-  e_ty   : ty;
-  e_fv   : int Mid.t;
-  e_tag  : int;
-}
+type expr = EcAst.expr
 
-and expr_node =
-  | Eint   of BI.zint                      (* int. literal          *)
-  | Elocal of EcIdent.t                    (* let-variables         *)
-  | Evar   of prog_var                     (* module variable       *)
-  | Eop    of EcPath.path * ty list        (* op apply to type args *)
-  | Eapp   of expr * expr list             (* op. application       *)
-  | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
-  | Elet   of lpattern * expr * expr       (* let binding           *)
-  | Etuple of expr list                    (* tuple constructor     *)
-  | Eif    of expr * expr * expr           (* _ ? _ : _             *)
-  | Ematch of expr * expr list * ty        (* match _ with _        *)
-  | Eproj  of expr * int                   (* projection of a tuple *)
+type expr_node = EcAst.expr_node
 
-and equantif  = [ `ELambda | `EForall | `EExists ]
-and ebinding  = EcIdent.t * ty
-and ebindings = ebinding list
+type equantif  = EcAst.equantif
+type ebinding  = EcAst.ebinding
+type ebindings = EcAst.ebindings
 
 type closure = (EcIdent.t * ty) list * expr
 
 (* -------------------------------------------------------------------- *)
-let e_equal   = ((==) : expr -> expr -> bool)
-let e_hash    = fun e -> e.e_tag
+let e_equal   = EcAst.e_equal
+let e_hash    = EcAst.e_hash
 let e_compare = fun e1 e2 -> e_hash e1 - e_hash e2
-let e_fv e    = e.e_fv
-let e_ty e    = e.e_ty
+let e_fv      = EcAst.e_fv
+let e_ty  e   = e.e_ty
 
 (* -------------------------------------------------------------------- *)
-let lp_fv = function
-  | LSymbol (id, _) ->
-      Sid.singleton id
+let lp_fv = EcAst.lp_fv
 
-  | LTuple ids ->
-      List.fold_left (fun s (id, _) -> Sid.add id s) Sid.empty ids
-
-  | LRecord (_, ids) ->
-      List.fold_left
-        (fun s (id, _) -> ofold Sid.add s id)
-        Sid.empty ids
-
-let pv_fv = function
-  | PVglob x -> EcPath.x_fv Mid.empty x
-  | PVloc _ -> Mid.empty
-
-let fv_node e =
-  let union ex =
-    List.fold_left (fun s e -> fv_union s (ex e)) Mid.empty
-  in
-
-  match e with
-  | Eint _            -> Mid.empty
-  | Eop (_, tys)      -> union (fun a -> a.ty_fv) tys
-  | Evar v            -> pv_fv v
-  | Elocal id         -> fv_singleton id
-  | Eapp (e, es)      -> union e_fv (e :: es)
-  | Elet (lp, e1, e2) -> fv_union (e_fv e1) (fv_diff (e_fv e2) (lp_fv lp))
-  | Etuple es         -> union e_fv es
-  | Eif (e1, e2, e3)  -> union e_fv [e1; e2; e3]
-  | Ematch (e, es, _) -> union e_fv (e :: es)
-  | Equant (_, b, e)  -> List.fold_left (fun s (id, _) -> Mid.remove id s) (e_fv e) b
-  | Eproj (e, _)      -> e_fv e
+let pv_fv = EcAst.pv_fv
 
 (* -------------------------------------------------------------------- *)
-let qt_equal : equantif -> equantif -> bool = (==)
-let qt_hash  : equantif -> int = Hashtbl.hash
+let eqt_equal = EcAst.eqt_equal
 
 (* -------------------------------------------------------------------- *)
-module Hexpr = Why3.Hashcons.Make (struct
-  type t = expr
-
-  let b_equal b1 b2 =
-    let b1_equal (x1, ty1) (x2, ty2) =
-      EcIdent.id_equal x1 x2 && ty_equal ty1 ty2 in
-    List.all2 b1_equal b1 b2
-
-  let equal_node e1 e2 =
-    match e1, e2 with
-    | Eint   i1, Eint   i2 -> BI.equal i1 i2
-    | Elocal x1, Elocal x2 -> EcIdent.id_equal x1 x2
-    | Evar   x1, Evar   x2 -> pv_equal x1 x2
-
-    | Eop (p1, tys1), Eop (p2, tys2) ->
-           (EcPath.p_equal p1 p2)
-        && (List.all2 ty_equal tys1 tys2)
-
-    | Eapp (e1, es1), Eapp (e2, es2) ->
-           (e_equal e1 e2)
-        && (List.all2 e_equal es1 es2)
-
-    | Elet (lp1, e1, f1), Elet (lp2, e2, f2) ->
-        (lp_equal lp1 lp2) && (e_equal e1 e2) && (e_equal f1 f2)
-
-    | Etuple es1, Etuple es2 ->
-        List.all2 e_equal es1 es2
-
-    | Eif (c1, e1, f1), Eif (c2, e2, f2) ->
-        (e_equal c1 c2) && (e_equal e1 e2) && (e_equal f1 f2)
-
-    | Ematch (e1, es1, ty1), Ematch (e2, es2, ty2) ->
-           List.all2 e_equal (e1 :: es1) (e2 :: es2)
-        && ty_equal ty1 ty2
-
-    | Equant (q1, b1, e1), Equant (q2, b2, e2) ->
-        qt_equal q1 q2 && e_equal e1 e2 && b_equal b1 b2
-
-    | Eproj(e1, i1), Eproj(e2, i2) ->
-        i1 = i2 && e_equal e1 e2
-
-    | _, _ -> false
-
-  let equal e1 e2 =
-    equal_node e1.e_node e2.e_node &&
-    ty_equal e1.e_ty e2.e_ty
-
-  let b_hash bs =
-    let b1_hash (x, ty) =
-      Why3.Hashcons.combine (EcIdent.tag x) (ty_hash ty)
-    in
-    Why3.Hashcons.combine_list b1_hash 0 bs
-
-  let hash e =
-    match e.e_node with
-    | Eint   i -> BI.hash i
-    | Elocal x -> Hashtbl.hash x
-    | Evar   x -> pv_hash x
-
-    | Eop (p, tys) ->
-        Why3.Hashcons.combine_list ty_hash
-          (EcPath.p_hash p) tys
-
-    | Eapp (e, es) ->
-        Why3.Hashcons.combine_list e_hash (e_hash e) es
-
-    | Elet (p, e1, e2) ->
-        Why3.Hashcons.combine2
-          (lp_hash p) (e_hash e1) (e_hash e2)
-
-    | Etuple es ->
-        Why3.Hashcons.combine_list e_hash 0 es
-
-    | Eif (c, e1, e2) ->
-        Why3.Hashcons.combine2
-          (e_hash c) (e_hash e1) (e_hash e2)
-
-    | Ematch (e, es, ty) ->
-        Why3.Hashcons.combine_list e_hash
-          (Why3.Hashcons.combine (e_hash e) (ty_hash ty))
-          es
-
-    | Equant (q, b, e) ->
-        Why3.Hashcons.combine2 (qt_hash q) (e_hash e) (b_hash b)
-
-    | Eproj (e, i) ->
-        Why3.Hashcons.combine (e_hash e) i
-
-  let tag n e =
-    let fv = fv_union (fv_node e.e_node) e.e_ty.ty_fv in
-      { e with e_tag = n; e_fv = fv; }
-end)
-
-(* -------------------------------------------------------------------- *)
-let mk_expr e ty =
-  Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = Mid.empty; e_ty = ty }
 
 let e_tt    = mk_expr (Eop (EcCoreLib.CI_Unit.p_tt, [])) tunit
 let e_int   = fun i -> mk_expr (Eint i) tint
@@ -704,7 +457,7 @@ let e_quantif q b e =
 
   let b, e =
     match e.e_node with
-    | Equant (q', b', e) when qt_equal q q' -> (b@b', e)
+    | Equant (q', b', e) when eqt_equal q q' -> (b@b', e)
     | _ -> b, e in
 
   let ty =

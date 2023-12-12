@@ -300,6 +300,7 @@ while (i = x /\ test = X) (if test x r then 1 else 0) 1 (mu (dt x) (predC (X x))
 + smt().
 + smt().
 + move=> ih. alias 2 r0 = r.
+  weakmem ih (r0:t) => {ih} ih.
   (** TRANSITIVITY FOR PHOARE!! **)
   phoare split (mu (dt x) (predI P (predC (X x))))
                (mu (dt x) (X x) * mu (dt x \ X x) P)

@@ -33,6 +33,7 @@ and cli_option = {
 and run_option = {
   runo_input     : string;
   runo_scenarios : string list;
+  runo_provers   : string list option;
 }
 
 and prv_options = {
@@ -66,9 +67,108 @@ type ini_options = {
   ini_why3     : string option;
   ini_ovrevict : string list;
   ini_provers  : string list;
+  ini_timeout  : int option;
   ini_idirs    : (string option * string) list;
   ini_rdirs    : (string option * string) list;
 }
+
+type ini_context = {
+  inic_ini  : ini_options;
+  inic_root : string option;
+}
+
+(* -------------------------------------------------------------------- *)
+module Ini : sig
+  (* ------------------------------------------------------------------ *)
+  val get_ppwidth : ini_context -> int option
+
+  val get_why3 : ini_context -> string option
+
+  val get_ovrevict : ini_context -> string list
+
+  val get_provers : ini_context -> string list
+
+  val get_timeout : ini_context -> int option
+
+  val get_idirs : ini_context -> (string option * string) list
+
+  val get_rdirs : ini_context -> (string option * string) list
+
+  (* ------------------------------------------------------------------ *)
+  val get_all_ppwidth : ini_context list -> int option
+
+  val get_all_why3 : ini_context list -> string option
+
+  val get_all_ovrevict : ini_context list -> string list
+
+  val get_all_provers : ini_context list -> string list
+
+  val get_all_timeout : ini_context list -> int option
+
+  val get_all_idirs : ini_context list -> (string option * string) list
+
+  val get_all_rdirs : ini_context list -> (string option * string) list
+end = struct
+  (* ------------------------------------------------------------------ *)
+  let absolute ?(root : string option) (filename : string) =
+    match root with
+    | None ->
+       filename
+    | Some root ->
+       if Filename.is_relative filename then
+         Filename.concat root filename
+       else
+         filename
+
+  let get_ppwidth (ini : ini_context) =
+    ini.inic_ini.ini_ppwidth
+
+  let get_why3 (ini : ini_context) =
+    Option.map
+      (absolute ?root:ini.inic_root)
+      (ini.inic_ini.ini_why3)
+
+  let get_ovrevict (ini : ini_context) =
+    ini.inic_ini.ini_ovrevict
+
+  let get_provers (ini : ini_context) =
+    ini.inic_ini.ini_provers
+
+  let get_timeout (ini : ini_context) =
+    ini.inic_ini.ini_timeout
+
+  let get_idirs (ini : ini_context) =
+    List.map
+      (snd_map (absolute ?root:ini.inic_root))
+      ini.inic_ini.ini_idirs
+
+  let get_rdirs (ini : ini_context) =
+    List.map
+      (snd_map (absolute ?root:ini.inic_root))
+      ini.inic_ini.ini_rdirs
+
+  (* ------------------------------------------------------------------ *)
+  let get_all_ppwidth (ini : ini_context list) =
+    List.find_map_opt get_ppwidth ini
+
+  let get_all_why3 (ini : ini_context list) =
+    List.find_map_opt get_why3 ini
+
+  let get_all_ovrevict (ini : ini_context list) =
+    List.flatten (List.map get_ovrevict ini)
+
+  let get_all_provers (ini : ini_context list) =
+    List.flatten (List.map get_provers ini)
+
+  let get_all_timeout (ini : ini_context list) =
+    List.find_map_opt get_timeout ini
+
+  let get_all_idirs (ini : ini_context list) =
+    List.flatten (List.map get_idirs ini)
+
+  let get_all_rdirs (ini : ini_context list) =
+    List.flatten (List.map get_rdirs ini)
+end
 
 (* -------------------------------------------------------------------- *)
 type xoptions = {
@@ -245,7 +345,9 @@ let specs = {
 
     ("config", "Print EasyCrypt configuration", []);
 
-    ("runtest", "Run a test-suite", []);
+    ("runtest", "Run a test-suite", [
+      `Spec ("p", `String, "Add a prover to the set of provers");
+    ]);
 
     ("why3config", "Configure why3", []);
   ];
@@ -327,53 +429,56 @@ let dirs_of_env =
   | s -> parse_ecpath s
 
 (* -------------------------------------------------------------------- *)
-let ldr_options_of_values ?ini values =
+let ldr_options_of_values ?(ini = []) values =
   if get_flag "boot" values then
     { ldro_idirs = []; ldro_boot = true; }
   else
     let add_rec (fl : bool) ((nm, x) : string option * string) =
       (nm, x, fl) in
 
-    let idirs   = omap_dfl (fun x -> x.ini_idirs) [] ini in
-    let idirs = idirs @ dirs_of_env "EC_IDIRS" in
+    let idirs   = Ini.get_all_idirs ini in
+    let idirs   = idirs @ dirs_of_env "EC_IDIRS" in
     let idirs   = List.map (add_rec false) idirs in
     let idirs_I = List.map (add_rec false) (List.map parse_idir (get_strings "I" values)) in
-    let rdirs   = omap_dfl (fun x -> x.ini_rdirs) [] ini in
-    let rdirs = rdirs @ dirs_of_env "EC_RDIRS" in
+    let rdirs   = Ini.get_all_rdirs ini in
+    let rdirs   = rdirs @ dirs_of_env "EC_RDIRS" in
     let rdirs   = List.map (add_rec true) rdirs in
     let idirs_R = List.map (add_rec true)  (List.map parse_idir (get_strings "R" values)) in
 
     { ldro_idirs = idirs @ idirs_I @ rdirs @ idirs_R;
       ldro_boot  = false; }
 
-let glb_options_of_values ?ini values =
+let glb_options_of_values ini values =
   let why3 =
     match get_string "why3" values with
-    | None -> obind (fun x -> x.ini_why3) ini
+    | None -> Ini.get_all_why3 ini
     | why3 -> why3 in
 
-  let ovrevict = omap_dfl (fun x -> x.ini_ovrevict) [] ini in
+  let ovrevict = Ini.get_all_ovrevict ini in
 
   { o_why3     = why3;
     o_reloc    = get_flag "reloc" values;
     o_ovrevict = ovrevict @ (get_strings "no-evict" values);
-    o_loader   = ldr_options_of_values ?ini values; }
+    o_loader   = ldr_options_of_values ~ini values; }
 
-let prv_options_of_values ?ini values =
+let prv_options_of_values ini values =
   let provers =
     let provers =
-      (omap_dfl (fun x -> x.ini_provers) [] ini) @
-      (get_strings "p" values)
+      (Ini.get_all_provers ini) @ (get_strings "p" values)
     in match provers with [] -> None | provers -> Some provers
   in
     { prvo_maxjobs   = odfl 4 (get_int "max-provers" values);
-      prvo_timeout   = odfl 3 (get_int "timeout" values);
+      prvo_timeout   = begin
+        match get_int "timeout" values with
+        | None -> odfl 3 (Ini.get_all_timeout ini)
+        | Some i -> i
+      end;
       prvo_cpufactor = odfl 1 (get_int "cpu-factor" values);
       prvo_provers   = provers;
       prvo_pragmas   = get_string_list "pragmas" values;
       prvo_ppwidth   = begin
         match get_int "pp-width" values with
-        | None -> obind (fun x -> x.ini_ppwidth) ini
+        | None -> Ini.get_all_ppwidth ini
         | Some i -> Some i
       end;
       prvo_checkall   = get_flag "check-all" values;
@@ -382,54 +487,86 @@ let prv_options_of_values ?ini values =
       prvo_why3server = get_string "why3server" values;
     }
 
-let cli_options_of_values ?ini values =
+let cli_options_of_values ini values =
   { clio_emacs   = get_flag "emacs" values;
-    clio_provers = prv_options_of_values ?ini values; }
+    clio_provers = prv_options_of_values ini values; }
 
-let cmp_options_of_values ?ini values input =
+let cmp_options_of_values ini values input =
   { cmpo_input   = input;
-    cmpo_provers = prv_options_of_values ?ini values;
+    cmpo_provers = prv_options_of_values ini values;
     cmpo_gcstats = get_flag "gcstats" values;
     cmpo_tstats  = get_string "tstats" values;
     cmpo_noeco   = get_flag "no-eco" values;
     cmpo_script  = get_flag "script" values; }
 
+let runtest_options_of_values values (input, scenarios) =
+  { runo_input     = input;
+    runo_scenarios = scenarios;
+    runo_provers   =
+      match get_strings "p" values with
+      | [] -> None | provers -> Some provers }
+
 (* -------------------------------------------------------------------- *)
-let parse ?ini argv =
+let parse getini argv =
   let (command, values, anons) = parse specs argv in
-  let command =
+  let command, ini =
     match command with
     | "compile" -> begin
         match anons with
-        | [input] -> `Compile (cmp_options_of_values ?ini values input)
-        | _ -> raise (Arg.Bad "this command takes a single argument")
+        | [input] ->
+           let ini = getini (Some input) in
+           let cmd = `Compile (cmp_options_of_values ini values input) in
+           (cmd, ini)
+
+        | _ ->
+           raise (Arg.Bad "this command takes a single argument")
     end
 
     | "cli" ->
         if not (List.is_empty anons) then
           raise (Arg.Bad "this command does not take arguments");
-        `Cli (cli_options_of_values ?ini values)
+
+        let ini = getini None in
+        let cmd = `Cli (cli_options_of_values ini values) in
+
+        (cmd, ini)
 
     | "config" ->
         if not (List.is_empty anons) then
           raise (Arg.Bad "this command does not take arguments");
-        `Config
+
+        let ini = getini None in
+        let cmd = `Config in
+
+        (cmd, ini)
 
     | "runtest" -> begin
         match anons with
-        | runo_input :: runo_scenarios -> `Runtest { runo_input; runo_scenarios; }
-        | _ -> raise (Arg.Bad "this command expects at least one positional argument")
+        | input :: scenarios ->
+           let ini = getini None in
+           let cmd = `Runtest (runtest_options_of_values values (input, scenarios)) in
+
+           (cmd, ini)
+
+        | _ ->
+           raise (Arg.Bad "this command expects at least one positional argument")
       end
 
     | "why3config" ->
         if not (List.is_empty anons) then
           raise (Arg.Bad "this command does not take arguments");
-        `Why3Config
+
+        let ini = getini None in
+        let cmd = `Why3Config in
+
+        (cmd, ini)
 
     | _ -> assert false
-  in
-    { o_options = glb_options_of_values ?ini values;
-      o_command = command; }
+
+  in {
+    o_options = glb_options_of_values ini values;
+    o_command = command;
+  }
 
 (* -------------------------------------------------------------------- *)
 let parse_cmdline ?ini argv =
@@ -464,7 +601,8 @@ let parse_cmdline ?ini argv =
          | 1 -> cmd
          | i -> argv.(i-1))
   in
-    try parse ?ini argv
+    try
+      parse (Option.value ~default:(fun _ -> []) ini) argv
     with
     | Arg.Bad  msg -> print_usage ~msg specs; exit 1
     | Arg.Help _   -> print_usage specs; exit 1
@@ -502,6 +640,7 @@ let read_ini_file (filename : string) =
       ini_why3     = tryget  "why3conf";
       ini_ovrevict = trylist "no-evict";
       ini_provers  = trylist "provers" ;
+      ini_timeout  = tryint  "timeout" ;
       ini_idirs    = List.map parse_idir (trylist "idirs");
       ini_rdirs    = List.map parse_idir (trylist "rdirs"); } in
 
@@ -509,5 +648,6 @@ let read_ini_file (filename : string) =
     ini_why3     = omap expand ini.ini_why3;
     ini_ovrevict = ini.ini_ovrevict;
     ini_provers  = ini.ini_provers;
+    ini_timeout  = ini.ini_timeout;
     ini_idirs    = ini.ini_idirs;
     ini_rdirs    = ini.ini_rdirs; }

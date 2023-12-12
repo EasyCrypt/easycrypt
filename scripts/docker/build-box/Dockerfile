@@ -5,31 +5,60 @@ MAINTAINER Pierre-Yves Strub <pierre-yves@strub.nu>
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN \
-	sudo apt-get -q -y install wget curl python3 python3-pip && \
-	sudo apt-get -q -y clean && \
-	sudo pip3 install --no-cache-dir pyyaml
+	sudo apt-get -q -y install wget curl python3 python3-pip python3-yaml && \
+	sudo apt-get -q -y clean
 
 RUN \
 	opam pin add -n easycrypt https://github.com/EasyCrypt/easycrypt.git && \
-	opam install depext && opam depext easycrypt && \
-	opam install --deps-only easycrypt && \
+	opam install --deps-only --confirm-level=unsafe-yes easycrypt && \
 	opam clean
 
-ENV ALTERGO=2.4.2 CVC4V=1.8 Z3V=4.8.10 Z3SV= Z3A=ubuntu-18.04
+RUN \
+	version=1.8 && \
+	wget -O cvc4 https://github.com/cvc5/cvc5/releases/download/${version}/cvc4-${version}-x86_64-linux-opt && \
+	sudo install -m 0755 cvc4 /usr/local/bin/cvc4-${version} && \
+	rm -f cvc4
 
 RUN \
-	opam pin add -n alt-ergo ${ALTERGO} && \
-        opam depext alt-ergo && opam install alt-ergo && opam clean
+	version=1.0.6 && \
+	wget -O cvc5 https://github.com/cvc5/cvc5/releases/download/cvc5-${version}/cvc5-Linux && \
+	sudo install -m 0755 cvc5 /usr/local/bin/cvc5-${version} && \
+	rm -f cvc5
 
 RUN \
-        wget -O cvc4 https://github.com/cvc5/cvc5/releases/download/${CVC4V}/cvc4-${CVC4V}-x86_64-linux-opt && \
-        sudo mv cvc4 /usr/local/bin/ && sudo chmod 755 /usr/local/bin/cvc4
+	version=4.12.2 && glibc=2.35 && \
+	wget -O z3.zip https://github.com/Z3Prover/z3/releases/download/z3-${version}/z3-${version}-x64-glibc-${glibc}.zip && \
+	unzip -j z3.zip z3-${version}-x64-glibc-${glibc}/bin/z3 && \
+	sudo install -m 0755 z3 /usr/local/bin/z3-${version} && \
+	rm -f z3 z3.zip
+RUN \
+	version=4.8.10 && glibc=ubuntu-18.04 && \
+	wget -O z3.zip https://github.com/Z3Prover/z3/releases/download/z3-${version}/z3-${version}-x64-${glibc}.zip && \
+	unzip -j z3.zip z3-${version}-x64-${glibc}/bin/z3 && \
+	sudo install -m 0755 z3 /usr/local/bin/z3-${version} && \
+	rm -f z3 z3.zip
+
+COPY --chmod=0755 --chown=1001:0 alt-ergo bin/run-alt-ergo
 
 RUN \
-        wget https://github.com/Z3Prover/z3/releases/download/z3-${Z3V}/z3-${Z3V}${Z3SV}-x64-${Z3A}.zip && \
-        unzip -j z3-${Z3V}${Z3SV}-x64-${Z3A}.zip z3-${Z3V}${Z3SV}-x64-${Z3A}/bin/z3 && \
-        sudo cp z3 /usr/local/bin/ && sudo chmod 755 /usr/local/bin/z3 && \
-	rm -rf z3 z3-${Z3V}${Z3SV}-x64-${Z3A}.zip
+	version=2.5.2 && \
+	opam switch create --no-switch alt-ergo-${version} ocaml-system && \
+	opam pin     --switch=alt-ergo-${version} add -n alt-ergo ${version} && \
+	opam install --switch=alt-ergo-${version} --deps-only --confirm-level=unsafe-yes alt-ergo && \
+	opam install --switch=alt-ergo-${version} alt-ergo && \
+	opam clean   --switch=alt-ergo-${version} && \
+	ln -s run-alt-ergo ~/bin/alt-ergo-${version}
 
 RUN \
-	opam config exec -- why3 config detect
+	version=2.4.2 && \
+	opam switch create --no-switch alt-ergo-${version} ocaml-system && \
+	opam pin     --switch=alt-ergo-${version} add -n alt-ergo ${version} && \
+	opam install --switch=alt-ergo-${version} --deps-only --confirm-level=unsafe-yes alt-ergo && \
+	opam install --switch=alt-ergo-${version} alt-ergo && \
+	opam clean   --switch=alt-ergo-${version} && \
+	ln -s run-alt-ergo ~/bin/alt-ergo-${version}
+
+ENV PATH="/home/charlie/bin:$PATH"
+
+RUN \
+	opam exec -- why3 config detect

@@ -179,7 +179,7 @@ let process_phl_bd_info dir bd_info tc =
 
   | PAppSingle f ->
       let hs = tc1_as_bdhoareS tc in
-      let f  = TTC.tc1_process_Xhl_form tc treal f in
+      let f  = snd (TTC.tc1_process_Xhl_form tc treal f) in
       let f1, f2 =
         match dir with
         | Backs  -> (f_real_div hs.bhs_bd f, f)
@@ -189,7 +189,7 @@ let process_phl_bd_info dir bd_info tc =
 
   | PAppMult (phi, f1, f2, g1, g2) ->
       let phi =
-        phi |> omap (TTC.tc1_process_Xhl_formula tc)
+        phi |> omap (fun f -> snd (TTC.tc1_process_Xhl_formula tc f))
             |> odfl f_true in
 
       let check_0 f =
@@ -201,16 +201,17 @@ let process_phl_bd_info dir bd_info tc =
         | None, None -> assert false
 
         | Some fp, None ->
-            let f = TTC.tc1_process_Xhl_form tc treal fp in
+            let _, f = TTC.tc1_process_Xhl_form tc treal fp in
             reloc fp.pl_loc check_0 f; (f, f_r1)
 
         | None, Some fp ->
-            let f = TTC.tc1_process_Xhl_form tc treal fp in
+            let _, f = TTC.tc1_process_Xhl_form tc treal fp in
             reloc fp.pl_loc check_0 f; (f_r1, f)
 
         | Some f1, Some f2 ->
-            (TTC.tc1_process_Xhl_form tc treal f1,
-             TTC.tc1_process_Xhl_form tc treal f2)
+            let _, f1 = TTC.tc1_process_Xhl_form tc treal f1 in
+            let _, f2 = TTC.tc1_process_Xhl_form tc treal f2 in
+            (f1, f2)
       in
 
       let f1, f2 = process_f (f1, f2) in
@@ -238,12 +239,12 @@ let process_app (side, dir, k, phi, bd_info) tc =
   match k, bd_info with
   | Single i, PAppNone when is_hoareS concl ->
     check_side side;
-    let phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+    let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
     t_hoare_app i phi tc
 
   | Single i, PAppNone when is_eHoareS concl ->
     check_side side;
-    let phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
+    let _, phi = TTC.tc1_process_Xhl_formula_xreal tc (get_single phi) in
     t_ehoare_app i phi tc
 
   | Single i, PAppNone when is_equivS concl ->
@@ -251,8 +252,9 @@ let process_app (side, dir, k, phi, bd_info) tc =
       match phi with
       | Single _ -> tc_error !!tc "seq onsided: a pre and a post is expected"
       | Double (pre, post) ->
-        TTC.tc1_process_Xhl_formula ?side tc pre,
-        TTC.tc1_process_Xhl_formula ?side tc post in
+        let _, pre  = TTC.tc1_process_Xhl_formula ?side tc pre in
+        let _, post = TTC.tc1_process_Xhl_formula ?side tc post in
+        (pre, post) in
     let side =
       match side with
       | None -> tc_error !!tc "seq onsided: side information expected"
@@ -261,12 +263,12 @@ let process_app (side, dir, k, phi, bd_info) tc =
 
   | Single i, _ when is_cHoareS concl ->
     check_side side;
-    let phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+    let _, phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
     let cost = process_phl_c_info bd_info tc in
     t_choare_app i phi cost tc
 
   | Single i, _ when is_bdHoareS concl ->
-      let pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+      let _, pia = TTC.tc1_process_Xhl_formula tc (get_single phi) in
       let (ra, f1, f2, f3, f4) = process_phl_bd_info dir bd_info tc in
       t_bdhoare_app i (ra, pia, f1, f2, f3, f4) tc
 

@@ -734,8 +734,9 @@ type phltactic =
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
   | Prnd           of oside * semrndpos option * rnd_tac_info_f
-  | Prndsem        of oside * codepos1
+  | Prndsem        of bool * oside * codepos1
   | Palias         of (oside * codepos * osymbol_r)
+  | Pweakmem       of (oside * psymbol * fun_params)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
   | Pconseqauto    of crushmode
@@ -1280,6 +1281,7 @@ type global_action =
 
 type global = {
   gl_action : global_action located;
+  gl_fail   : bool;
   gl_debug  : [`Timed | `Break] option;
 }
 

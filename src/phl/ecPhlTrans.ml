@@ -7,7 +7,6 @@ open EcEnv
 open EcPV
 open EcMatching
 open EcTransMatching
-open EcModules
 open EcMaps
 
 open EcCoreGoal

@@ -4,6 +4,7 @@ open EcLocation
 open EcIdent
 open EcSymbols
 open EcPath
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv

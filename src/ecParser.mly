@@ -452,6 +452,7 @@
 %token EXLIM
 %token EXPECT
 %token EXPORT
+%token FAIL
 %token FEL
 %token FIRST
 %token FISSION
@@ -601,6 +602,7 @@
 %token UNDO
 %token UNROLL
 %token VAR
+%token WEAKMEM
 %token WHILE
 %token WHY3
 %token WITH
@@ -1374,9 +1376,9 @@ form_chained_orderings(P):
          f2) }
 
 hoare_bd_cmp :
-| LE { EcFol.FHle }
-| EQ { EcFol.FHeq }
-| GE { EcFol.FHge }
+| LE { EcAst.FHle }
+| EQ { EcAst.FHeq }
+| GE { EcAst.FHge }
 
 hoare_body(P):
   mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
@@ -3206,8 +3208,8 @@ phltactic:
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
 
-| RNDSEM s=side? c=codepos1
-    { Prndsem (s, c) }
+| RNDSEM red=boption(STAR) s=side? c=codepos1
+    { Prndsem (red, s, c) }
 
 | INLINE s=side? u=inlineopt? o=occurences?
   { Pinline (`ByName(s, u, ([], o))) }
@@ -3235,6 +3237,9 @@ phltactic:
 
 | ALIAS s=side? o=codepos x=lident EQ e=expr
     { Pset (s, o, false, x,e) }
+
+| WEAKMEM s=side? h=loc(ipcore_name) p=param_decl
+    { Pweakmem(s, h, p) }
 
 | FISSION s=side? o=codepos AT d1=word COMMA d2=word
     { Pfission (s, o, (1, (d1, d2))) }
@@ -4024,9 +4029,11 @@ stop:
 | DROP DOT { }
 
 global:
-| db=debug_global? g=global_action ep=FINAL
+| db=debug_global? fail=boption(FAIL) g=global_action ep=FINAL
   { let lc = EcLocation.make $startpos ep in
-    { gl_action = EcLocation.mk_loc lc g; gl_debug = db; } }
+    { gl_action = EcLocation.mk_loc lc g;
+      gl_fail   = fail;
+      gl_debug  = db; } }
 
 debug_global:
 | TIME  { `Timed }

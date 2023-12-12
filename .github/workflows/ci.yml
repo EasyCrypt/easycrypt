@@ -8,8 +8,22 @@ env:
   OPAMJOBS: 2
 
 jobs:
+  pre_job:
+    name: Check for Duplicates Jobs
+    runs-on: ubuntu-20.04
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+    - uses: fkirc/skip-duplicate-actions@v5
+      id: skip_check
+      with:
+        concurrent_skipping: 'same_content_newer'
+        skip_after_successful_duplicate: 'false'
+
   compile-opam:
     name: EasyCrypt compilation (opam)
+    needs: pre_job
+    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-20.04
     container:
       image: ghcr.io/easycrypt/ec-build-box
@@ -25,6 +39,8 @@ jobs:
 
   compile-nix:
     name: EasyCrypt compilation (nix)
+    needs: pre_job
+    if: needs.pre_job.outputs.should_skip != 'true'
     env:
       HOME: /home/runner
     runs-on: ubuntu-20.04
@@ -45,14 +61,15 @@ jobs:
 
   check:
     name: Check EasyCrypt Libraries
-    needs: compile-opam
+    needs: [pre_job, compile-opam]
+    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-20.04
     container:
       image: ghcr.io/easycrypt/ec-build-box
     strategy:
       fail-fast: false
       matrix:
-        target: [stdlib, examples]
+        target: [unit, stdlib, examples]
     steps:
     - uses: actions/checkout@v3
     - name: Update OPAM & EasyCrypt dependencies
@@ -80,14 +97,15 @@ jobs:
 
   external:
     name: Check EasyCrypt External Projects
-    needs: compile-opam
+    needs: [pre_job, compile-opam]
+    if: needs.pre_job.outputs.should_skip != 'true'
     runs-on: ubuntu-20.04
     container:
       image: ghcr.io/easycrypt/ec-build-box
     strategy:
       fail-fast: false
       matrix:
-        target: [ [ 'jasmin-eclib', 'jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin' ] ]
+        target: [ [ 'jasmin-eclib', 'jasmin-lang/jasmin', 'eclib', 'tests.config', 'jasmin', '-p Z3@4.8 -p Alt-Ergo@2.4' ] ]
     steps:
     - uses: actions/checkout@v3
       with:
@@ -109,7 +127,7 @@ jobs:
         opam config exec -- easycrypt why3config
     - name: Compile project
       working-directory: project/${{ matrix.target[2] }}
-      run: opam config exec -- ec-runtest ${{ matrix.target[3] }} ${{ matrix.target[4] }}
+      run: opam config exec -- ec-runtest ${{ matrix.target[5] }} ${{ matrix.target[3] }} ${{ matrix.target[4] }}
     - uses: actions/upload-artifact@v3
       name: Upload report.log
       if: always()

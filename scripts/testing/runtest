@@ -20,22 +20,28 @@ import socket
 import sys
 import termios
 import time
-import yaml
 
 # --------------------------------------------------------------------
-class folded_unicode(str):
-    pass
+try:
+    import yaml
 
-class literal_unicode(str):
-    pass
+except ModuleNotFoundError:
+    yaml = None
 
-def folded_unicode_representer(dumper, data):
-    return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='>')
-def literal_unicode_representer(dumper, data):
-    return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
+else:
+    class folded_unicode(str):
+        pass
 
-yaml.add_representer(folded_unicode , folded_unicode_representer)
-yaml.add_representer(literal_unicode, literal_unicode_representer)
+    class literal_unicode(str):
+        pass
+
+    def folded_unicode_representer(dumper, data):
+        return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='>')
+    def literal_unicode_representer(dumper, data):
+        return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
+
+    yaml.add_representer(folded_unicode , folded_unicode_representer)
+    yaml.add_representer(literal_unicode, literal_unicode_representer)
 
 # --------------------------------------------------------------------
 @clib.asynccontextmanager
@@ -109,6 +115,20 @@ def _options():
         help    = 'add timing statistics')
 
     parser.add_option(
+        '-p', '--provers',
+        action  = 'append',
+        metavar = 'PROVERS',
+        default = None,
+        help    = 'Add a prover to the set of activated provers')
+
+    parser.add_option(
+        '', '--why3',
+        action  = 'store',
+        metavar = 'WHY3',
+        default = None,
+        help    = 'Why3 configuration file')
+
+    parser.add_option(
         '', '--report',
         action  = 'store',
         default = None,
@@ -131,7 +151,9 @@ def _options():
     options = Object(scenarios = dict())
     options.timeout  = cmdopt.timeout
     options.timing   = cmdopt.timing
+    options.why3     = cmdopt.why3
     options.jobs     = cmdopt.jobs
+    options.provers  = cmdopt.provers
     options.report   = cmdopt.report
 
     defaults = dict(
@@ -675,6 +697,11 @@ async def _run_all(options, allscripts, listener : Listener):
             command = [options.bin] + options.args + config.args
             if options.timeout:
                 command.extend(['-timeout', str(options.timeout)])
+            if options.provers:
+                for prover in options.provers:
+                    command.extend(['-p', prover])
+            if options.why3:
+                command.extend(['-why3', options.why3])
             if options.timing:
                 tfilename = os.path.join(
                     TIMING_DIR, os.path.splitext(config.filename)[0] + '.stats')
@@ -800,7 +827,16 @@ async def _main():
     mainconfig.hostname  = socket.gethostname()
     mainconfig.timestamp = datetime.datetime.utcnow()
 
-    options    = _options()
+    options = _options()
+
+    if options.report is not None:
+        if yaml is None:
+            print(
+                'reporting needs the yaml Python module',
+                file = sys.stderr
+            )
+            exit(1)
+
     allscripts = Gather.gatherall(options.scenarios, options.targets)
 
     listener = None

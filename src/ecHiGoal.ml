@@ -3,6 +3,7 @@ open EcUtils
 open EcLocation
 open EcSymbols
 open EcParsetree
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv
@@ -912,9 +913,9 @@ let process_rewrite1_r ttenv ?target ri tc =
 
         match res.e_node with
         | Evar pv ->
-          EcModules.LvVar (pv, e_ty res)
+          LvVar (pv, e_ty res)
         | Etuple pvs ->
-          EcModules.LvTuple (List.map as_pvar pvs)
+          LvTuple (List.map as_pvar pvs)
         | _ -> assert false
       in
 
@@ -1241,7 +1242,7 @@ let process_view1 pe tc =
             if not (PT.can_concretize pe.PT.ptev_env) then
               tc_error !!tc "cannot infer all placeholders";
 
-            let pt, ax = snd_map (f_forall bds) (PT.concretize pe) in
+            let pt, ax = PT.concretize_gen pe bds in
             t_first (fun subtc ->
               let regen = List.fst regen in
               let ttcut tc =
@@ -1294,9 +1295,9 @@ let process_view1 pe tc =
           if not (PT.can_concretize ptenv) then
             tc_error !!tc "cannot infer all type variables";
 
-          PT.concretize_e_form
+          PT.concretize_e_form_gen
             (PT.concretize_env ptenv)
-            (f_forall (List.map snd ids) cutf)
+            (List.snd ids) cutf
         in
 
         let discharge tc =

@@ -156,6 +156,7 @@
     "inline"      , INLINE     ;        (* KW: tactic *)
     "interleave"  , INTERLEAVE ;        (* KW: tactic *)
     "alias"       , ALIAS      ;        (* KW: tactic *)
+    "weakmem"     , WEAKMEM    ;        (* KW: tactic *)
     "fission"     , FISSION    ;        (* KW: tactic *)
     "fusion"      , FUSION     ;        (* KW: tactic *)
     "unroll"      , UNROLL     ;        (* KW: tactic *)
@@ -213,6 +214,7 @@
     "remove"      , REMOVE     ;        (* KW: global *)
     "exit"        , EXIT       ;        (* KW: global *)
 
+    "fail"        , FAIL       ;        (* KW: internal *)
     "time"        , TIME       ;        (* KW: internal *)
     "undo"        , UNDO       ;        (* KW: internal *)
     "debug"       , DEBUG      ;        (* KW: internal *)

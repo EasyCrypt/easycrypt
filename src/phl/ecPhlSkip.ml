@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcModules
 open EcFol
 
 open EcCoreGoal
