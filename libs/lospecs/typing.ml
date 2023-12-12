@@ -64,7 +64,7 @@ exception TypingError of string
 
 (* -------------------------------------------------------------------- *)
 let tyerror msg =
-  let buf  = Buffer.create 0 in
+  let buf = Buffer.create 0 in
   let fbuf = Format.formatter_of_buffer buf in
   Format.kfprintf
     (fun _ ->
@@ -99,8 +99,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
   | PEVar _v -> (
       match Env.lookup env _v with
       | Some (_, _t) -> (env, _t)
-      | None -> tyerror "Bad reference to variable: %s" _v
-      )
+      | None -> tyerror "Bad reference to variable: %s" _v)
   | PELet ((v, _e1), _e2) ->
       let _env, _ =
         let env, _t = tt_expr env _e1 in
@@ -331,8 +330,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                 else tyerror "Bad argument size to map"
             | _ -> tyerror "Map needs mapping size params")
       | _ -> tyerror "First argument to map should be function")
-  | PEApp ((n, _), _eal) ->
-      tyerror "Unknown combinator: %s" n
+  | PEApp ((n, _), _eal) -> tyerror "Unknown combinator: %s" n
 
 (* -------------------------------------------------------------------- *)
 and tt_arg (env : env) ((x, `W ty) : parg) : env * aarg =
