@@ -6,7 +6,7 @@ ECARGS    ?=
 ECTOUT    ?= 10
 ECJOBS    ?= 0
 ECEXTRA   ?= --report=report.log
-ECPROVERS ?= Alt-Ergo@2.4 Z3@4.8 CVC4@1.8
+ECPROVERS ?= Alt-Ergo@2.4 Z3@4.12 CVC5@1.0
 CHECKPY   ?=
 CHECK     := $(CHECKPY) scripts/testing/runtest
 CHECK     += --bin=./ec.native --bin-args="$(ECARGS)"
