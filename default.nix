@@ -36,6 +36,8 @@ stdenv.mkDerivation {
     inifiles
     menhir
     menhirLib
+    ppxlib
+    ppx_deriving
     yojson
     zarith
   ]);
