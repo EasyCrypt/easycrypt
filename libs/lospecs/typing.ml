@@ -328,13 +328,11 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                   | _, `W br -> (env, `W (br * m))
                   | _, `Unsigned -> (env, `W (n * m))
                   | _, `Signed -> (env, `W (n * m))
-                  | _ -> tyerror "Bad anon function body ret type"
                 else tyerror "Bad argument size to map"
             | _ -> tyerror "Map needs mapping size params")
       | _ -> tyerror "First argument to map should be function")
   | PEApp ((n, _), _eal) ->
       tyerror "Unknown combinator: %s" n
-  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 and tt_arg (env : env) ((x, `W ty) : parg) : env * aarg =
