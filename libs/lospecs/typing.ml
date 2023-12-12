@@ -60,6 +60,19 @@ type env = Env.env
 let tt_pword (_ : env) (`W ty : pword) : atype = `W ty
 
 (* -------------------------------------------------------------------- *)
+exception TypingError of string
+
+(* -------------------------------------------------------------------- *)
+let tyerror msg =
+  let buf  = Buffer.create 0 in
+  let fbuf = Format.formatter_of_buffer buf in
+  Format.kfprintf
+    (fun _ ->
+      Format.pp_print_flush fbuf ();
+      raise (TypingError (Buffer.contents buf)))
+    fbuf msg
+
+(* -------------------------------------------------------------------- *)
 (* Get type of expr, fail if different from check (if check is given)   *)
 let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
   match e with
@@ -76,7 +89,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
         | `Signed -> `Signed
       in
       match check with
-      | Some _t -> if t = _t then (env, t) else failwith "Bad typecast"
+      | Some _t -> if t = _t then (env, t) else tyerror "Bad typecast"
       | None -> (env, t))
   (* to be changed later when introducing more types, such as function types *)
   (* for now, anonymous functions have type equal to their return type *)
@@ -86,7 +99,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
   | PEVar _v -> (
       match Env.lookup env _v with
       | Some (_, _t) -> (env, _t)
-      | None -> failwith (String.concat " " [ "Bad reference to variable"; _v ])
+      | None -> tyerror "Bad reference to variable: %s" _v
       )
   | PELet ((v, _e1), _e2) ->
       let _env, _ =
@@ -125,7 +138,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
           with
           | [ `W n1; `W n2 ] ->
               if n1 == n2 && n2 == n then (env, `W n)
-              else failwith "bad inputs for add"
+              else tyerror "bad inputs for add"
           | _ -> (env, `W n) (* automatic conversion of ints to words *))
       | _ -> (env, `Unsigned))
   | PEApp (("and", _wl), _eal) -> (
@@ -140,7 +153,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
           with
           | [ `W n1; `W n2 ] ->
               if n1 == n2 && n2 == n then (env, `W n)
-              else failwith "bad inputs for and"
+              else tyerror "bad inputs for and"
           | _ -> (env, `W n) (* automatic conversion of ints to words *))
       | _ -> (env, `Unsigned))
   | PEApp (("concat", _wl), _eal) -> (
@@ -156,9 +169,9 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
           match _tal with
           | [ `W k; `W l ] ->
               if k == l && k == n then (env, `W (k * 2))
-              else failwith "Wrong size args for concat"
+              else tyerror "Wrong size args for concat"
           | _ -> (env, `W (n * 2)))
-      | _ -> failwith "width required for concat")
+      | _ -> tyerror "width required for concat")
   | PEApp (("mult", _wl), _eal) -> (
       match _wl with
       | Some [ `W n ] -> (
@@ -171,7 +184,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
           with
           | [ `W n1; `W n2 ] ->
               if n1 == n2 && n2 == n then (env, `W (2 * n))
-              else failwith "bad inputs for mult"
+              else tyerror "bad inputs for mult"
           | _ -> (env, `W (2 * n)))
       | _ -> (env, `Unsigned))
   | PEApp (("repeat", _wl), _eal) -> (
@@ -182,10 +195,10 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
               match tt_expr env _e1 with
               | _, `W m ->
                   if n == m then (env, `W (n * k))
-                  else failwith "Wrong length input for repeat"
+                  else tyerror "Wrong length input for repeat"
               | _ -> (env, `W (n * k)))
-          | _ -> failwith "only fixed repeat allowed")
-      | _ -> failwith "width is required for repeat")
+          | _ -> tyerror "only fixed repeat allowed")
+      | _ -> tyerror "width is required for repeat")
   | PEApp (("or", _wl), _eal) -> (
       match _wl with
       | Some [ `W n ] -> (
@@ -198,7 +211,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
           with
           | [ `W n1; `W n2 ] ->
               if n1 == n2 && n2 == n then (env, `W n)
-              else failwith "bad inputs for or"
+              else tyerror "bad inputs for or"
           | _ -> (env, `W n) (* automatic conversion of ints to words *))
       | _ -> (env, `Unsigned))
   | PEApp (("SatToUW", _wl), _eal) -> (
@@ -209,10 +222,10 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
               match tt_expr env _e1 with
               | _, `W m ->
                   if n == m then (env, `W n)
-                  else failwith "Bad input size to SatToUW"
+                  else tyerror "Bad input size to SatToUW"
               | _ -> (env, `W n))
-          | _ -> failwith "Second argument to SatToUW must be constant")
-      | _ -> failwith "SatToUW needs bit length input in <n>")
+          | _ -> tyerror "Second argument to SatToUW must be constant")
+      | _ -> tyerror "SatToUW needs bit length input in <n>")
   | PEApp (("SatToSW", _wl), _eal) -> (
       match _wl with
       | Some [ `W n ] -> (
@@ -221,10 +234,10 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
               match tt_expr env _e1 with
               | _, `W m ->
                   if n == m then (env, `W n)
-                  else failwith "Bad input size to SatToUW"
+                  else tyerror "Bad input size to SatToUW"
               | _ -> (env, `W n))
-          | _ -> failwith "Second argument to SatToSW must be constant")
-      | _ -> failwith "SatToSW needs bit length input in <n>")
+          | _ -> tyerror "Second argument to SatToSW must be constant")
+      | _ -> tyerror "SatToSW needs bit length input in <n>")
   | PEApp (("sla", _wl), _eal) -> (
       match _wl with
       | Some [ `W n ] -> (
@@ -237,7 +250,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
           with
           | [ `W n1; `W n2 ] ->
               if n1 == n2 && n2 == n then (env, `W n)
-              else failwith "bad inputs for sla"
+              else tyerror "bad inputs for sla"
           | _ -> (env, `W n) (* automatic conversion of ints to words *))
       | _ -> (env, `Unsigned))
   | PEApp (("sra", _wl), _eal) -> (
@@ -252,7 +265,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
           with
           | [ `W n1; `W n2 ] ->
               if n1 == n2 && n2 == n then (env, `W n)
-              else failwith "bad inputs for sra"
+              else tyerror "bad inputs for sra"
           | _ -> (env, `W n) (* automatic conversion of ints to words *))
       | _ -> (env, `Unsigned))
   | PEApp (("srl", _wl), _eal) -> (
@@ -267,7 +280,7 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
           with
           | [ `W n1; `W n2 ] ->
               if n1 == n2 && n2 == n then (env, `W n)
-              else failwith "bad inputs for srl"
+              else tyerror "bad inputs for srl"
           | _ -> (env, `W n) (* automatic conversion of ints to words *))
       | _ -> (env, `Unsigned))
   | PEApp (("sub", _wl), _eal) -> (
@@ -282,14 +295,14 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
           with
           | [ `W n1; `W n2 ] ->
               if n1 == n2 && n2 == n then (env, `W n)
-              else failwith "bad inputs for sub"
+              else tyerror "bad inputs for sub"
           | _ -> (env, `W n) (* automatic conversion of ints to words *))
       | _ -> (env, `Unsigned))
   | PEApp (("map", _wl), _eal) -> (
       match _eal with
       | PEFun (_aargs, _abodyexp) :: _eal -> (
           if List.length _eal != List.length _aargs then
-            failwith "Incorrect number of arguments to map"
+            tyerror "Incorrect number of arguments to map"
           else
             let _fbenv, _taargs = tt_args env _aargs in
             let _taargs = List.map (fun (_, x) -> x) _taargs in
@@ -315,12 +328,12 @@ let rec tt_expr (env : env) ?(check : atype option) (e : pexpr) : env * atype =
                   | _, `W br -> (env, `W (br * m))
                   | _, `Unsigned -> (env, `W (n * m))
                   | _, `Signed -> (env, `W (n * m))
-                  | _ -> failwith "Bad anon function body ret type"
-                else failwith "Bad argument size to map"
-            | _ -> failwith "Map needs mapping size params")
-      | _ -> failwith "First argument to map should be function")
+                  | _ -> tyerror "Bad anon function body ret type"
+                else tyerror "Bad argument size to map"
+            | _ -> tyerror "Map needs mapping size params")
+      | _ -> tyerror "First argument to map should be function")
   | PEApp ((n, _), _eal) ->
-      failwith (String.concat " " [ "Unknown combinator:"; n ])
+      tyerror "Unknown combinator: %s" n
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
