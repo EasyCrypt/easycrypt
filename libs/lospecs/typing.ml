@@ -40,6 +40,29 @@ type aarg = ident * aword
 type aargs = aarg list
 
 (* -------------------------------------------------------------------- *)
+type aexpr_ =
+  | ECast of aexpr * atype
+  | EVar of ident
+  | EInt of int
+  | ESlide of aexpr * (aexpr * int * int)
+  | EMap of (aword * aword) * (aargs * aexpr)
+  | EConcat of aword * aexpr list
+  | ERepeat of aword * (aexpr * int)
+  | EShift of [ `L | `R ] * [ `L | `A ] * aexpr * int
+  | ESat of [ `U | `S ] * aexpr * int
+  | ELet of (ident * aexpr) * aexpr
+  | EAdd of aword * (aexpr * aexpr)
+  | ESub of aword * (aexpr * aexpr)
+  | EOr of aword * (aexpr * aexpr)
+  | EAnd of aword * (aexpr * aexpr)
+  | EMul of aword * (aexpr * aexpr)
+
+and aexpr = { node : aexpr_; type_ : atype }
+
+(* -------------------------------------------------------------------- *)
+type adef = { arguments : aargs; body : aexpr; rettype : aword }
+
+(* -------------------------------------------------------------------- *)
 module Env : sig
   type env
 
