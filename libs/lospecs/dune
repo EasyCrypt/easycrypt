@@ -1,15 +1,17 @@
-(library 
+(library
  (name lospecs)
  (public_name easycrypt.lospecs)
- (flags (:standard -open Batteries))
+ (flags
+  (:standard -open Batteries))
  (modules :standard \ lospecs_test)
- (preprocess (pps ppx_deriving.show))
- (libraries batteries menhirLib)
-)
+ (preprocess
+  (pps ppx_deriving.show))
+ (libraries batteries menhirLib))
 
 (executable
  (name lospecs_test)
- (flags (:standard -open Batteries))
+ (flags
+  (:standard -open Batteries))
  (modules lospecs_test)
  (promote (until-clean))
  (libraries batteries lospecs))
