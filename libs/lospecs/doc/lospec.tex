@@ -88,8 +88,8 @@
   the spec file (might change later). There are no function types.
   \subsection{Deduction Rules}
   \begin{itemize}
-  \item Typecasts: Just convert the type into the new type (* should be checked
-    ? *)
+  \item Typecasts: If cast is from a Word to any integer, or a from a type to
+    itself typed as the new type. Otherwise, throw a type error
   \item Anonymous functions: Typed as the return type, checked if the body
     evaluates to the return type assuming the arguments are the declared types
   \item Variable reference: Typed as variable type 
@@ -108,6 +108,19 @@
     function. The bit lengths of both the function parameters and the word
     inputs must be consistent with the map angled bracket parameters. Returns a
     Word of bit length dependent on the parameters.
+  \end{itemize}
+  \subsection{Typing AST}
+  The typer returns an AST representing the typed program. The AST is composed
+  of a list of (top-level) function definitions (at the moment not
+  cross-reference-able), each of which consists of a name, a list of arguments
+  and expression body.
+  This body corresponds to the AST for the function, in which each node is
+  augmented with its type. It has some differences from the program AST:
+  \begin{itemize}
+  \item Anonymous functions are not nodes, as we do not implement function
+    types. Instead, they are semantically a part of map, as far as the type
+    system is concerned.
+  \item Combinators each have their own node type, so there is no function application.
   \end{itemize}
 \end{document}
 
