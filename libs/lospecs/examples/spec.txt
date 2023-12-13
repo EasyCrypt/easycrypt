@@ -40,9 +40,10 @@ VPBROADCAST_16u16(w1@256) -> @256 =
 # REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4774&text=vpmulh
 # We want to get the high 16 bits of product, check endianness later
 # Lower index = LSB
+# Assuming unsigned multiplication without rounding
 VPMULH_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
-    fun x@16 y@16 . mult<16>(x, y)[16:1:16],
+    fun x@16 y@16 . humult<16>(x, y),
     w1,
     w2
   )
@@ -61,7 +62,7 @@ VPMULHRS_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
     fun x@16 y@16 . add<32>(
                       srl<32>(
-                        mult<16>(x, y), 
+                        smult<16>(x, y), 
                         14),
                       1)[15:1:16], # Should get the 16 MSBs (except *the* most significant bit)
     w1,
@@ -73,11 +74,10 @@ VPMULHRS_16u16(w1@256, w2@256) -> @256 =
 # TODO?: Might need to be expanded here 
 # to match the intrinsics guide pseudocode at this level
 # shift_right_ar(x,y): shift right arithmetic, x >> y
-VPSRA_16u16(w1@256, w2@256) -> @256 =
+VPSRA_16u16(w@256, count@8) -> @256 =
   map<16, 16>(
-    fun x@16 y@16 . sra<16>(x, y),
-    w1,
-    w2
+    fun x@16 . sra<16>(x, count),
+    w
   )
 
 
@@ -86,13 +86,13 @@ VPSRA_16u16(w1@256, w2@256) -> @256 =
 # TODO: Check if this works correctly, need to be careful with sat overflows and such
 VPMADDUBSW_256(w1@256, w2@256) -> @256 =
   map<16, 16>(
-    fun x@16 y@16 . SatToSW<16>(
-                      add<16>(
-                        mult<8>(x[0:1:8], y[0:1:8]),
-                        mult<8>(x[8:1:8], y[8:1:8])
+    fun x@16 y@16 . SatToSW<17>(
+                      addc<16>(
+                        smult<8>(x[0:1:8], y[0:1:8]),
+                        smult<8>(x[8:1:8], y[8:1:8])
                       ), 
                       16
-                    ),
+                    )[0:1:16],
     w1,
     w2
   )

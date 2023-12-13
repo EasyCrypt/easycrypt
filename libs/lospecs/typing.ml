@@ -52,11 +52,11 @@ type aexpr_ =
   | EShift of [ `L | `R ] * [ `L | `A ] * aexpr * aexpr 
   | ESat of [ `U | `S ] * aexpr * int
   | ELet of (ident * aexpr) * aexpr
-  | EAdd of aword * (aexpr * aexpr)
+  | EAdd of [ `C | `NC] * aword * (aexpr * aexpr)
   | ESub of aword * (aexpr * aexpr)
   | EOr of aword * (aexpr * aexpr)
   | EAnd of aword * (aexpr * aexpr)
-  | EMul of aword * (aexpr * aexpr)
+  | EMul of [ `U | `S] * [`D | `H | `L ] * aword * (aexpr * aexpr)
 [@@deriving show]
 
 and aexpr = { node : aexpr_; type_ : atype } [@@deriving show]
@@ -194,20 +194,34 @@ let rec tt_expr_ (env : env) (e : pexpr) : aexpr =
       let c = as_int_constant eic in
       let l = Option.default 1 (Option.map as_int_constant eil) in
       { node = ESlide (ne_,(neb_,c,l)); type_ = `W (c * l);} (* might be typo in AST, Slide -> Slice, check *)
-  | PEApp ((("and" | "or" | "add" | "sub") as op, w), args) ->
+  | PEApp ((("and" | "or" | "sub") as op, w), args) ->
       let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
       let (na1, na2) = as_seq2 (tt_exprs env ~expected:[ `W w; `W w ] args) in
       { node = (match op with
         | "and" -> EAnd (`W w, (na1, na2))
         | "or"  -> EOr  (`W w, (na1, na2))
-        | "add" -> EAdd (`W w, (na1, na2))
         | "sub" -> ESub (`W w, (na1, na2))
         | _ -> tyerror "Unknown combinator %s" op);
         type_ = `W w; }
-  | PEApp (("mult", w), args) ->
+  | PEApp ((("add" | "addc") as op, w), args) ->
       let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
       let (na1, na2) = as_seq2 (tt_exprs env ~expected:[ `W w; `W w ] args) in
-      { node = EMul (`W (2 * w), (na1, na2)); type_ = `W (2 * w); }
+      (match op with
+        | "add"  -> { node = EAdd (`NC, `W w, (na1, na2)); type_ = `W w;      }
+        | "addc" -> { node = EAdd (`C,  `W w, (na1, na2)); type_ = `W (w+1);  }
+        | _ -> tyerror "Invalid operator: %s" op)
+
+  | PEApp ((("umult" | "smult" | "humult" | "hsmult" | "lumult" | "lsmult") as op, w), args) ->
+      let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
+      let (na1, na2) = as_seq2 (tt_exprs env ~expected:[ `W w; `W w ] args) in
+     (match op with
+      | "umult"  -> { node = EMul (`U, `D, `W (2 * w), (na1, na2)); type_ = `W (2 * w); }
+      | "smult"  -> { node = EMul (`S, `D, `W (2 * w), (na1, na2)); type_ = `W (2 * w); }
+      | "humult" -> { node = EMul (`U, `H, `W w, (na1, na2)); type_ = `W w; }
+      | "hsmult" -> { node = EMul (`S, `H, `W w, (na1, na2)); type_ = `W w; }
+      | "lumult" -> { node = EMul (`U, `L, `W w, (na1, na2)); type_ = `W w; }
+      | "lsmult" -> { node = EMul (`S, `L, `W w, (na1, na2)); type_ = `W w; }
+      | _ -> tyerror "Invalid operator: %s" op)
   (* Implementing as implied by AST: Fixed shifts only *)
   | PEApp ((("sla" | "sll" | "sra" | "srl") as op, w), args) ->
       let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
