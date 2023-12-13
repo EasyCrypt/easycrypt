@@ -6,7 +6,16 @@ let _ =
   let dont_type = false in
   let prog = Io.parse IO.stdin in
   if dont_type then Format.eprintf "%a@." Ptree.pp_pprogram prog
-  else Typing.tt_program Typing.Env.empty prog |> (fun _ -> ())
+  else let ast = Typing.tt_program Typing.Env.empty prog in
+  Format.eprintf "%a@." 
+  (fun fmt ast_ -> 
+    Format.pp_print_list 
+    ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.")
+    (fun fmt (sym, ad) -> Format.fprintf fmt "%a = %a" Ptree.pp_symbol sym Typing.pp_adef ad)
+    fmt
+    ast_) ast
+
+
   (*
     let vars = Typing.tt_program Typing.Env.empty prog in
     Format.eprintf "%a@.%a@." Ptree.pp_pprogram prog

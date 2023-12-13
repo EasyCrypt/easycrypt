@@ -11,13 +11,14 @@ let as_seq2 (type t) (xs : t list) : t * t =
 
 (* -------------------------------------------------------------------- *)
 module Ident : sig
-  type ident
+  type ident [@@deriving show]
 
   val create : string -> ident
   val name : ident -> string
   val id : ident -> int
 end = struct
   type ident = symbol * int
+  [@@deriving show]
 
   let create (x : string) : ident = (x, Oo.id (object end))
   let name ((x, _) : ident) : string = x
@@ -25,7 +26,7 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type ident = Ident.ident
+type ident = Ident.ident [@@deriving show]
 
 (* -------------------------------------------------------------------- *)
 type aword = [ `W of int ] [@@deriving show]
@@ -34,10 +35,10 @@ type aword = [ `W of int ] [@@deriving show]
 type atype = [ aword | `Signed | `Unsigned ] [@@deriving show]
 
 (* -------------------------------------------------------------------- *)
-type aarg = ident * aword
+type aarg = ident * aword [@@deriving show]
 
 (* -------------------------------------------------------------------- *)
-type aargs = aarg list
+type aargs = aarg list [@@deriving show]
 
 (* -------------------------------------------------------------------- *)
 type aexpr_ =
@@ -56,11 +57,12 @@ type aexpr_ =
   | EOr of aword * (aexpr * aexpr)
   | EAnd of aword * (aexpr * aexpr)
   | EMul of aword * (aexpr * aexpr)
+[@@deriving show]
 
-and aexpr = { node : aexpr_; type_ : atype }
+and aexpr = { node : aexpr_; type_ : atype } [@@deriving show]
 
 (* -------------------------------------------------------------------- *)
-type adef = { arguments : aargs; body : aexpr; rettype : aword }
+type adef = { arguments : aargs; body : aexpr; rettype : aword } [@@deriving show]
 
 (* -------------------------------------------------------------------- *)
 module Env : sig
