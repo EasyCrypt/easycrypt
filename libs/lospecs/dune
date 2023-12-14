@@ -3,10 +3,10 @@
  (public_name easycrypt.lospecs)
  (flags
   (:standard -open Batteries))
- (modules :standard \ lospecs_test)
+ (modules :standard \ lospecs_test circuit_test)
  (preprocess
   (pps ppx_deriving.show))
- (libraries batteries menhirLib))
+ (libraries batteries menhirLib zarith))
 
 (executable
  (name lospecs_test)
@@ -15,6 +15,14 @@
  (modules lospecs_test)
  (promote (until-clean))
  (libraries batteries lospecs))
+
+(executable
+ (name circuit_test)
+ (flags
+  (:standard -open Batteries))
+ (modules circuit_test)
+ (promote (until-clean))
+ (libraries batteries iter lospecs progress))
 
 (ocamllex lexer)
 

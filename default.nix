@@ -34,10 +34,12 @@ stdenv.mkDerivation {
     dune-build-info
     dune-site
     inifiles
+    iter
     menhir
     menhirLib
     ppxlib
     ppx_deriving
+    progress
     yojson
     zarith
   ]);
