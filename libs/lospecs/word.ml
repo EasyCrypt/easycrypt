@@ -152,3 +152,9 @@ let sword ~(size : int) : (module S) =
 (* -------------------------------------------------------------------- *)
 let uword ~(size : int) : (module S) =
   (module UWord(struct let nbits = size end))
+
+(* -------------------------------------------------------------------- *)
+let word ~(sign : [`U | `S]) ~(size : int) : (module S) =
+  match sign with
+  | `U -> uword ~size
+  | `S -> sword ~size

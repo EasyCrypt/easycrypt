@@ -126,6 +126,15 @@ module HCache = Hashtbl.Make(struct
 end)
 
 (* -------------------------------------------------------------------- *)
+let get_bit (b : bytes) (i : int) =
+  Char.code (Bytes.get b (i / 8)) lsr (i mod 8) land 0b1 <> 0
+
+(* -------------------------------------------------------------------- *)
+let env_of_regs (rs : bytes list) =
+  let rs = Array.of_list rs in
+  fun ((n, i) : var) -> get_bit rs.(n) i
+
+(* -------------------------------------------------------------------- *)
 let eval (env : var -> bool) =
   let cache : bool HCache.t = HCache.create 0 in
 
@@ -147,6 +156,10 @@ let eval (env : var -> bool) =
     | And (n1, n2) -> for_node n1 && for_node n2
 
   in fun (n : node) -> for_node n
+
+(* -------------------------------------------------------------------- *)
+let evals (env : var -> bool) =
+  List.map (eval env)
 
 (* -------------------------------------------------------------------- *)
 let eval0 (n : node) =
@@ -313,6 +326,25 @@ let int32_of_bools (bs : bool list) : int32 =
          v)
     0l bs
 
+(* -------------------------------------------------------------------- *)
+let explode (type t) ~(size : int) (r : t list) =
+  assert (List.length r mod size == 0);
+
+  let rec doit (acc : t list list) (r : t list) =
+    if List.is_empty r then
+      List.rev acc
+    else
+      let r1, r = List.split_nth size r in
+      doit (r1 :: acc) r
+
+  in doit [] r
+
+(* -------------------------------------------------------------------- *)
+let bytes_of_bools (bs : bool list) : bytes =
+  let bs = List.to_seq (explode ~size:8 bs) in
+  let bs = Seq.map (uint_of_bools %> Char.chr) bs in
+  Bytes.of_seq bs
+
 (* ==================================================================== *)
 module Arith : sig
   val of_int : size:int -> int -> reg
@@ -355,6 +387,8 @@ module Arith : sig
 
   val ands : node list -> node
 
+  val arshift : offset:int -> reg -> reg
+
   val lsl_ : reg -> reg -> reg
 
   val lsr_ : reg -> reg -> reg
@@ -362,6 +396,8 @@ module Arith : sig
   val asl_ : reg -> reg -> reg
 
   val asr_ : reg -> reg -> reg
+
+  val shift : side:[`L | `R] -> sign:[`U | `S] -> reg -> reg -> reg
 
   val incr : reg -> node * reg
 
@@ -464,7 +500,7 @@ end = struct
     List.make offset false_ @ r
 
   let uextend ~(size : int) (r : reg) : reg =
-    r @ List.make (max 0 (List.length r - size)) false_
+    r @ List.make (max 0 (size - List.length r)) false_
 
   let sextend ~(size : int) (r : reg) : reg =
     let lr = List.length r in
@@ -493,6 +529,11 @@ end = struct
     let s = List.drop offset r @ List.make (min offset l) sign in
     List.map2 (fun r1 s1 -> mux2 r1 s1 c) r s
 
+  let arshift ~(offset : int) (r : reg) =
+    let sign = Option.default false_ (List.Exceptionless.last r) in
+    let l = List.length r in
+    List.drop offset r @ List.make (min offset l) sign
+
   let lsr_ (r : reg) (s : reg) : reg =
     let _, r =
       List.fold_left (fun (i, r) c ->
@@ -503,10 +544,10 @@ end = struct
   let lsl_ (r : reg) (s : reg) : reg =
     List.rev (lsr_ (List.rev r) s)
 
-  let asr_ (r : reg) (s : reg) : reg =
-    lsr_ r s
-
   let asl_ (r : reg) (s : reg) : reg =
+    lsl_ r s
+
+  let asr_ (r : reg) (s : reg) : reg =
     let sign =
       Option.default false_ (List.Exceptionless.last r) in
 
@@ -515,6 +556,13 @@ end = struct
         (i+1, c_rshift ~offset:(1 lsl i) ~sign c r)
       ) (0, r) s
     in r
+
+  let shift ~(side : [`L | `R]) ~(sign : [`U | `S]) =
+    match side, sign with
+    | `L, `U -> lsl_
+    | `R, `U -> lsr_
+    | `L, `S -> asl_
+    | `R, `S -> asr_
 
   let halfadder (a : node) (b : node) : node * node =
     (and_ a b, xor a b)
@@ -659,19 +707,6 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let explode (type t) ~(size : int) (r : t list) =
-  assert (List.length r mod size == 0);
-
-  let rec doit (acc : t list list) (r : t list) =
-    if List.is_empty r then
-      List.rev acc
-    else
-      let r1, r = List.split_nth size r in
-      doit (r1 :: acc) r
-
-  in doit [] r
-
-(* -------------------------------------------------------------------- *)
 let pp_reg ~(size : int) (fmt : Format.formatter) (r : bool list) =
   assert (List.length r mod (size * 4) = 0);
 
@@ -685,7 +720,7 @@ let pp_reg ~(size : int) (fmt : Format.formatter) (r : bool list) =
     r
 
 (* -------------------------------------------------------------------- *)
-let vpermd (r : reg) (i : reg) =
+let vpermd (i : reg) (r : reg) =
   assert (List.length r = 256);
   assert (List.length i = 256);
 
@@ -716,11 +751,10 @@ let vpsub_16u16 (r1 : reg) (r2 : reg) : reg =
   List.flatten (List.map2 Arith.sub_dropc r1 r2)
 
 (* -------------------------------------------------------------------- *)
-let vpsra_16u16 (r1 : reg) (r2 : reg) : reg =
-  assert (List.length r1 = 256);
-  assert (List.length r2 = 8);
-  let r1 = explode ~size:16 r1 in
-  List.flatten (List.map (fun r1 -> Arith.asr_ r1 r2) r1)
+let vpsra_16u16 (r : reg) (i : int) : reg =
+  assert (List.length r = 256);
+  let r = explode ~size:16 r in
+  List.flatten (List.map (fun r -> Arith.arshift ~offset:i r) r)
 
 (* -------------------------------------------------------------------- *)
 let vpand_256 (r1 : reg) (r2 : reg) : reg =
@@ -752,7 +786,7 @@ let vpmulhrs_16u16 (r1 : reg) (r2 : reg) : reg =
     let r1 = Arith.sextend ~size:32 r1 in
     let r2 = Arith.sextend ~size:32 r2 in
     let r = Arith.smull r1 r2 in
-    let r = Arith.lsl_ r (Arith.w8 14) in
+    let r = Arith.lsr_ r (Arith.w8 14) in
     let r = Arith.incr_dropc r in
 
     List.take 16 (List.drop 1 r)
@@ -791,10 +825,9 @@ let vpmaddubsw_256 (r1 : reg) (r2 : reg) : reg =
   let out = List.map2 (fun r1 r2 ->
     let r1l, r1h = List.split_nth 8 r1 in
     let r2l, r2h = List.split_nth 8 r2 in
-    let out =
-      Arith.addc
-        (Arith.smull (Arith.uextend ~size:16 r1l) (Arith.sextend ~size:16 r2l))
-        (Arith.smull (Arith.uextend ~size:16 r1h) (Arith.sextend ~size:16 r2h)) in
+    let x1 = Arith.smull (Arith.uextend ~size:16 r1l) (Arith.sextend ~size:16 r2l) in
+    let x2 = Arith.smull (Arith.uextend ~size:16 r1h) (Arith.sextend ~size:16 r2h) in
+    let out = Arith.add_dropc (Arith.sextend ~size:17 x1) (Arith.sextend ~size:17 x2) in
     Arith.sat ~signed:true ~size:16 out
   ) r1 r2 in
 
@@ -849,97 +882,97 @@ module PolyCompress() = struct
     let qx16 = jqx16 in
     let r = a_0 in
     let r_0 = vpsub_16u16 r qx16 in
-    let t = vpsra_16u16 r_0 (Arith.w8 0x0f) in
+    let t = vpsra_16u16 r_0 0x0f in
     let t_0 = vpand_256 t qx16 in
     let r_1 = vpadd_16u16 t_0 r_0 in
     let a_0_0 = r_1 in
     let r_2 = a_1 in
     let r_3 = vpsub_16u16 r_2 qx16 in
-    let t_1 = vpsra_16u16 r_3 (Arith.w8 0x0f) in
+    let t_1 = vpsra_16u16 r_3 0x0f in
     let t_2 = vpand_256 t_1 qx16 in
     let r_4 = vpadd_16u16 t_2 r_3 in
     let a_1_0 = r_4 in
     let r_5 = a_2 in
     let r_6 = vpsub_16u16 r_5 qx16 in
-    let t_3 = vpsra_16u16 r_6 (Arith.w8 0x0f) in
+    let t_3 = vpsra_16u16 r_6 0x0f in
     let t_4 = vpand_256 t_3 qx16 in
     let r_7 = vpadd_16u16 t_4 r_6 in
     let a_2_0 = r_7 in
     let r_8 = a_3 in
     let r_9 = vpsub_16u16 r_8 qx16 in
-    let t_5 = vpsra_16u16 r_9 (Arith.w8 0x0f) in
+    let t_5 = vpsra_16u16 r_9 0x0f in
     let t_6 = vpand_256 t_5 qx16 in
     let r_10 = vpadd_16u16 t_6 r_9 in
     let a_3_0 = r_10 in
     let r_11 = a_4 in
     let r_12 = vpsub_16u16 r_11 qx16 in
-    let t_7 = vpsra_16u16 r_12 (Arith.w8 0x0f) in
+    let t_7 = vpsra_16u16 r_12 0x0f in
     let t_8 = vpand_256 t_7 qx16 in
     let r_13 = vpadd_16u16 t_8 r_12 in
     let a_4_0 = r_13 in
     let r_14 = a_5 in
     let r_15 = vpsub_16u16 r_14 qx16 in
-    let t_9 = vpsra_16u16 r_15 (Arith.w8 0x0f) in
+    let t_9 = vpsra_16u16 r_15 0x0f in
     let t_10 = vpand_256 t_9 qx16 in
     let r_16 = vpadd_16u16 t_10 r_15 in
     let a_5_0 = r_16 in
     let r_17 = a_6 in
     let r_18 = vpsub_16u16 r_17 qx16 in
-    let t_11 = vpsra_16u16 r_18 (Arith.w8 0x0f) in
+    let t_11 = vpsra_16u16 r_18 0x0f in
     let t_12 = vpand_256 t_11 qx16 in
     let r_19 = vpadd_16u16 t_12 r_18 in
     let a_6_0 = r_19 in
     let r_20 = a_7 in
     let r_21 = vpsub_16u16 r_20 qx16 in
-    let t_13 = vpsra_16u16 r_21 (Arith.w8 0x0f) in
+    let t_13 = vpsra_16u16 r_21 0x0f in
     let t_14 = vpand_256 t_13 qx16 in
     let r_22 = vpadd_16u16 t_14 r_21 in
     let a_7_0 = r_22 in
     let r_23 = a_8 in
     let r_24 = vpsub_16u16 r_23 qx16 in
-    let t_15 = vpsra_16u16 r_24 (Arith.w8 0x0f) in
+    let t_15 = vpsra_16u16 r_24 0x0f in
     let t_16 = vpand_256 t_15 qx16 in
     let r_25 = vpadd_16u16 t_16 r_24 in
     let a_8_0 = r_25 in
     let r_26 = a_9 in
     let r_27 = vpsub_16u16 r_26 qx16 in
-    let t_17 = vpsra_16u16 r_27 (Arith.w8 0x0f) in
+    let t_17 = vpsra_16u16 r_27 0x0f in
     let t_18 = vpand_256 t_17 qx16 in
     let r_28 = vpadd_16u16 t_18 r_27 in
     let a_9_0 = r_28 in
     let r_29 = a_10 in
     let r_30 = vpsub_16u16 r_29 qx16 in
-    let t_19 = vpsra_16u16 r_30 (Arith.w8 0x0f) in
+    let t_19 = vpsra_16u16 r_30 0x0f in
     let t_20 = vpand_256 t_19 qx16 in
     let r_31 = vpadd_16u16 t_20 r_30 in
     let a_10_0 = r_31 in
     let r_32 = a_11 in
     let r_33 = vpsub_16u16 r_32 qx16 in
-    let t_21 = vpsra_16u16 r_33 (Arith.w8 0x0f) in
+    let t_21 = vpsra_16u16 r_33 0x0f in
     let t_22 = vpand_256 t_21 qx16 in
     let r_34 = vpadd_16u16 t_22 r_33 in
     let a_11_0 = r_34 in
     let r_35 = a_12 in
     let r_36 = vpsub_16u16 r_35 qx16 in
-    let t_23 = vpsra_16u16 r_36 (Arith.w8 0x0f) in
+    let t_23 = vpsra_16u16 r_36 0x0f in
     let t_24 = vpand_256 t_23 qx16 in
     let r_37 = vpadd_16u16 t_24 r_36 in
     let a_12_0 = r_37 in
     let r_38 = a_13 in
     let r_39 = vpsub_16u16 r_38 qx16 in
-    let t_25 = vpsra_16u16 r_39 (Arith.w8 0x0f) in
+    let t_25 = vpsra_16u16 r_39 0x0f in
     let t_26 = vpand_256 t_25 qx16 in
     let r_40 = vpadd_16u16 t_26 r_39 in
     let a_13_0 = r_40 in
     let r_41 = a_14 in
     let r_42 = vpsub_16u16 r_41 qx16 in
-    let t_27 = vpsra_16u16 r_42 (Arith.w8 0x0f) in
+    let t_27 = vpsra_16u16 r_42 0x0f in
     let t_28 = vpand_256 t_27 qx16 in
     let r_43 = vpadd_16u16 t_28 r_42 in
     let a_14_0 = r_43 in
     let r_44 = a_15 in
     let r_45 = vpsub_16u16 r_44 qx16 in
-    let t_29 = vpsra_16u16 r_45 (Arith.w8 0x0f) in
+    let t_29 = vpsra_16u16 r_45 0x0f in
     let t_30 = vpand_256 t_29 qx16 in
     let r_46 = vpadd_16u16 t_30 r_45 in
     let a_15_0 = r_46 in

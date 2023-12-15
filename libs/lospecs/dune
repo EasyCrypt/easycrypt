@@ -6,6 +6,10 @@
  (modules :standard \ lospecs_test circuit_test)
  (preprocess
   (pps ppx_deriving.show))
+ (foreign_stubs
+  (language c)
+  (flags :standard -mavx -mavx2 -mavx512vl)
+  (names avx2_runtime))
  (libraries batteries menhirLib zarith))
 
 (executable
@@ -22,7 +26,7 @@
   (:standard -open Batteries))
  (modules circuit_test)
  (promote (until-clean))
- (libraries batteries iter lospecs progress))
+ (libraries batteries hex iter lospecs progress))
 
 (ocamllex lexer)
 

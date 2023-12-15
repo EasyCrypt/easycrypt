@@ -19,6 +19,7 @@
   (dune (>= 3.6))
   dune-build-info
   dune-site
+  hex
   iter
   (ocaml-inifiles (>= 1.2))
   (pcre (>= 7))
