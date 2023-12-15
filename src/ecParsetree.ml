@@ -671,6 +671,18 @@ type inline_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type outline_kind =
+  | OKstmt of pstmt
+  | OKproc of pgamepath * pexpr option
+
+type outline_info = {
+    outline_side: side;
+    outline_start: codepos1;
+    outline_end: codepos1;
+    outline_kind: outline_kind;
+}
+
+(* -------------------------------------------------------------------- *)
 type fel_info = {
   pfel_cntr  : pformula;
   pfel_asg   : pformula;
@@ -731,6 +743,7 @@ type phltactic =
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
   | Pinline        of inline_info
+  | Poutline       of outline_info
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
   | Prnd           of oside * semrndpos option * rnd_tac_info_f

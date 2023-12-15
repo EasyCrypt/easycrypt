@@ -12,6 +12,7 @@ val ty_of_lv     : lvalue -> EcTypes.ty
 val lv_of_list   : (prog_var * ty) list -> lvalue option
 val lv_to_list   : lvalue -> prog_var list
 val name_of_lv   : lvalue -> string
+val lv_of_expr   : expr -> lvalue
 
 (* --------------------------------------------------------------------- *)
 type instr = EcAst.instr
