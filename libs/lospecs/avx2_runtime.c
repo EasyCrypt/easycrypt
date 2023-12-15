@@ -1,14 +1,14 @@
 /* -------------------------------------------------------------------- */
+#include <stdint.h>
+
+/* -------------------------------------------------------------------- */
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
 #include <caml/alloc.h>
 #include <caml/custom.h>
+#include <caml/fail.h>
 
-/* -------------------------------------------------------------------- */
-#include <stdint.h>
-#include <immintrin.h>
-
-/* -------------------------------------------------------------------- */
+/* ==================================================================== */
 CAMLprim value m64_of_32x2(value lohi) {
   CAMLparam1(lohi);
 
@@ -94,6 +94,11 @@ CAMLprim value m16_to_8x2(value lohi) {
 
   CAMLreturn(out);
 }
+
+/* ==================================================================== */
+#if defined(__x86_64__) || defined(_M_X64)
+
+# include <immintrin.h>
 
 /* -------------------------------------------------------------------- */
 static value value_of_w256(__m256i x) {
@@ -211,3 +216,71 @@ CAMLprim value caml_mm256_srai_epi16(value a, value b) {
 
   CAMLreturn(value_of_w256(_mm256_srai_epi16(av, Int_val(b))));
 }
+
+/* ==================================================================== */
+#else
+
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_mm256_add_epi16(value a, value b) {
+  CAMLparam2(a, b);
+  caml_failwith("mm256_add_epi16: not implemented");
+  CAMLreturn(Val_unit);
+}
+
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_mm256_sub_epi16(value a, value b) {
+  CAMLparam2(a, b);
+  caml_failwith("mm256_sub_epi16: not implemented");
+  CAMLreturn(Val_unit);
+}
+
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_mm256_and_si256(value a, value b) {
+  CAMLparam2(a, b);
+  caml_failwith("mm256_and_si256: not implemented");
+  CAMLreturn(Val_unit);
+}
+
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_mm256_mulhi_epu16(value a, value b) {
+  CAMLparam2(a, b);
+  caml_failwith("mm256_mulhi_epu16: not implemented");
+  CAMLreturn(Val_unit);
+}
+
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_mm256_mulhrs_epi16(value a, value b) {
+  CAMLparam2(a, b);
+  caml_failwith("mm256_mulhrs_epi16: not implemented");
+  CAMLreturn(Val_unit);
+}
+
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_mm256_packus_epi16(value a, value b) {
+  CAMLparam2(a, b);
+  caml_failwith("mm256_packus_epi16: not implemented");
+  CAMLreturn(Val_unit);
+}
+
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_mm256_maddubs_epi16(value a, value b) {
+  CAMLparam2(a, b);
+  caml_failwith("mm256_maddubs_epi16: not implemented");
+  CAMLreturn(Val_unit);
+}
+
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_mm256_permutexvar_epi32(value a, value b) {
+  CAMLparam2(a, b);
+  caml_failwith("mm256_permutexvar_epi32: not implemented");
+  CAMLreturn(Val_unit);
+}
+
+/* -------------------------------------------------------------------- */
+CAMLprim value caml_mm256_srai_epi16(value a, value b) {
+  CAMLparam2(a, b);
+  caml_failwith("mm256_srai_epi16: not implemented");
+  CAMLreturn(Val_unit);
+}
+
+#endif
