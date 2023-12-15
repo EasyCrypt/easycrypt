@@ -8,7 +8,7 @@
   (pps ppx_deriving.show))
  (foreign_stubs
   (language c)
-  (flags :standard -mavx -mavx2 -mavx512vl)
+  (flags :standard -Wno-unused-command-line-argument -mavx -mavx2 -mavx512vl)
   (names avx2_runtime))
  (libraries batteries menhirLib zarith))
 
