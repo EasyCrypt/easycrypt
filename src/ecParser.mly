@@ -513,6 +513,7 @@
 %token NOTATION
 %token OF
 %token OP
+%token OUTLINE
 %token PCENT
 %token PHOARE
 %token PIPE
@@ -3130,6 +3131,10 @@ interleave_info:
 | s=side? c1=interleavepos c2=interleavepos c3=interleavepos* k=word
    { (s, c1, c2 :: c3, k) }
 
+%inline outline_kind:
+| s=brace(stmt) { OKstmt(s) }
+| r=sexpr? LEAT f=loc(fident) { OKproc(f, r) }
+
 phltactic:
 | PROC
    { Pfun `Def }
@@ -3219,6 +3224,14 @@ phltactic:
 
 | INLINE s=side? u=inlineopt? p=codepos
     { Pinline (`CodePos (s, u, p)) }
+
+| OUTLINE s=side LBRACKET st=codepos1 e=option(MINUS e=codepos1 {e}) RBRACKET k=outline_kind
+    { Poutline {
+	  outline_side  = s; 
+	  outline_start = st; 
+	  outline_end   = odfl st e; 
+	  outline_kind  = k }
+    }
 
 | KILL s=side? o=codepos
     { Pkill (s, o, Some 1) }
