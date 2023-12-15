@@ -148,7 +148,7 @@ let test_shift ~(side : [`L | `R]) ~(sign : [`U | `S]) =
 
     let sim (v : int) (i : int) =
       M.to_int (match side with
-        | `L -> M.shiftl (M.of_int v) i 
+        | `L -> M.shiftl (M.of_int v) i
         | `R -> M.shiftr (M.of_int v) i
       )
     in
@@ -161,7 +161,7 @@ let test_shift ~(side : [`L | `R]) ~(sign : [`U | `S]) =
     }
 
   in
-  
+
   test (op 8);
   test (op 14)
 
@@ -313,7 +313,7 @@ type vpop = {
   name : string;
   acount : int;
   mk : reg list -> reg;
-  reff : Avx2.m256 list -> Avx2.m256; 
+  reff : Avx2.m256 list -> Avx2.m256;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -575,6 +575,7 @@ let poly_compress () =
     "a_14";
     "a_15";
   ] in
+
 
   Format.eprintf "%s@." "Computing dependencies...";
 

@@ -12,67 +12,81 @@ type node_r =
 
 and node = {
   gate : node_r;
-  sign : bool;
+  id   : int;
   neg  : node;
 }
+
+(* -------------------------------------------------------------------- *)
+let fresh =
+  let counter = ref 0 in
+  fun () -> incr counter; !counter
 
 (* -------------------------------------------------------------------- *)
 type reg = node list
 
 (* -------------------------------------------------------------------- *)
-module HCons = Hashtbl.Make(struct
-  type t = node_r
+module HCons : sig
+  val hashcons : node_r -> node
+end = struct
+  module H = Weak.Make(struct
+    type t = node
 
-  let hash = (Hashtbl.hash : t -> int)
+    let hash (x : t) : int =
+      match x.gate with
+      | False ->
+         Hashtbl.hash False
+      | Input v ->
+         Hashtbl.hash v
+      | And (n1, n2) ->
+         Hashtbl.hash (abs n1.id, abs n2.id)
 
-  let equal (n1 : node_r) (n2 : node_r) =
-    match n1, n2 with
-    | False, False ->
-      true
+    let equal (n1 : node) (n2 : node) =
+      match n1.gate, n2.gate with
+      | False, False ->
+         true
+      | Input v1, Input v2 ->
+         v1 = v2
+      | And (n1, m1), And (n2, m2) ->
+         n1 == n2 && m1 == m2
+      | _, _ ->
+         false
+  end)
 
-    | Input v1, Input v2 ->
-      v1 = v2
+  let tag = ref 1
 
-    | And (n1, m1), And (n2, m2) ->
-      n1 == n2 && m1 == m2
+  let htable = H.create 5003
 
-    | _, _ ->
-      false
-end)
+  let hashcons (n : node_r) =
+    let rec pos = { gate = n; id =   !tag; neg = neg; }
+    and     neg = { gate = n; id = - !tag; neg = pos; } in
+
+    let o = H.merge htable pos in
+
+    if o == pos then incr tag; o
+end
 
 (* -------------------------------------------------------------------- *)
 let rec pp_node (fmt : Format.formatter) (n : node) =
   match n with
-  | { gate = False; sign = true; } ->
+  | { gate = False; id } when 0 < id ->
     Format.fprintf fmt "⊥"
 
-  | { gate = False; sign = false; } ->
+  | { gate = False; } ->
     Format.fprintf fmt "⊤"
 
-  | { gate = Input (n, i); sign; } ->
+  | { gate = Input (n, i); id; } ->
     Format.fprintf fmt "%s%d#%0.4x"
-      (if sign then "" else "¬") n i
+      (if 0 < id then "" else "¬") n i
 
-  | { gate = And (n1, n2); sign = true; } ->
+  | { gate = And (n1, n2); id; } when 0 < id ->
     Format.fprintf fmt "(%a) ∧ (%a)" pp_node n1 pp_node n2
 
-  | { gate = And (n1, n2); sign = false; } ->
+  | { gate = And (n1, n2); } ->
     Format.fprintf fmt "¬((%a) ∧ (%a))" pp_node n1 pp_node n2
 
 (* -------------------------------------------------------------------- *)
-let hcons : node HCons.t = HCons.create 0
-
-(* -------------------------------------------------------------------- *)
 let mk (n : node_r) : node =
-  match HCons.find_option hcons n with
-  | None ->
-    let rec pos = { gate = n; sign = true ; neg = neg; }
-    and     neg = { gate = n; sign = false; neg = pos; } in
-
-    HCons.add hcons n pos; pos
-
-  | Some pos ->
-    pos
+  HCons.hashcons n
 
 (* -------------------------------------------------------------------- *)
 let false_ : node =
@@ -118,14 +132,6 @@ let xor (n1 : node) (n2 : node) : node =
   let n = nand n1 n2 in nand (nand n1 n) (nand n2 n)
 
 (* -------------------------------------------------------------------- *)
-module HCache = Hashtbl.Make(struct
-  type t = node_r
-
-  let hash = (Hashtbl.hash : t -> int)
-  let equal = ((==) : t -> t -> bool)
-end)
-
-(* -------------------------------------------------------------------- *)
 let get_bit (b : bytes) (i : int) =
   Char.code (Bytes.get b (i / 8)) lsr (i mod 8) land 0b1 <> 0
 
@@ -136,20 +142,21 @@ let env_of_regs (rs : bytes list) =
 
 (* -------------------------------------------------------------------- *)
 let eval (env : var -> bool) =
-  let cache : bool HCache.t = HCache.create 0 in
+  let cache : (int, bool) Hashtbl.t = Hashtbl.create 0 in
 
   let rec for_node (n : node) =
-    if n.sign then for_node_r n.gate else not (for_node_r n.gate)
+    let value =
+      match Hashtbl.find_option cache (abs n.id) with
+      | None ->
+         let value = for_node_r n.gate in
+         Hashtbl.add cache (abs n.id) value;
+         value
+      | Some value ->
+         value
+
+    in if 0 < n.id then value else not value
 
   and for_node_r (n : node_r) =
-    match HCache.find_option cache n with
-    | Some value ->
-      value
-    | None ->
-      let value = for_node_force n in
-      HCache.add cache n value; value
-
-  and for_node_force (n : node_r) =
     match n with
     | False -> false
     | Input x -> env x
@@ -250,7 +257,7 @@ end
 
 (* ==================================================================== *)
 let deps_ () =
-  let cache : var Set.t HCache.t = HCache.create 0 in
+  let cache : (int, var Set.t) Hashtbl.t = Hashtbl.create 0 in
 
   let rec doit_force (n : node) =
     match n.gate with
@@ -259,12 +266,12 @@ let deps_ () =
     | And (n1, n2) -> Set.union (doit n1) (doit n2)
 
   and doit (n : node) =
-    match HCache.find_option cache n.gate with
+    match Hashtbl.find_option cache (abs n.id) with
     | Some value ->
       value
     | None ->
       let value = doit_force n in
-      HCache.add cache n.gate value; value
+      Hashtbl.add cache (abs n.id) value; value
 
   in fun (n : node) -> doit n
 
