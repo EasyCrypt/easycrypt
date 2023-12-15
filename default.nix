@@ -33,6 +33,7 @@ stdenv.mkDerivation {
     dune_3
     dune-build-info
     dune-site
+    hex
     inifiles
     iter
     menhir
