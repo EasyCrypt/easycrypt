@@ -234,6 +234,30 @@ proof. by rewrite -inzmod_mod inzmodB. qed.
 lemma zmodcgrP (i j : int) : zmodcgr i j <=> p %| (i - j).
 proof. by rewrite dvdzE -[0](mod0z p) !eq_inzmod inzmodB subr_eq0. qed.
 
+lemma zmodcgr_trans b a c :
+  zmodcgr a b => zmodcgr b c => zmodcgr a c.
+proof. smt(). qed.
+
+lemma zmodcgrD a b x y :
+  zmodcgr a x => zmodcgr b y => zmodcgr (a + b) (x + y).
+proof.
+by rewrite !zmodcgrP !dvdzP => [[s ?] [t ?]]; exists (s + t) => /#.
+qed.
+
+lemma zmodcgrMr a b c :
+  zmodcgr a b => zmodcgr (a * c) (b * c).
+proof.
+by rewrite !zmodcgrP !dvdzP => [[s H]]; exists (s * c) => /#.
+qed.
+
+lemma zmodcgrMl a b c :
+  zmodcgr a b => zmodcgr (c * a) (c * b).
+proof. smt(zmodcgrMr). qed.
+
+lemma zmodcgr_reflexive a b :
+  zmodcgr a b => zmodcgr b a.
+proof. by rewrite eq_sym. qed.
+
 lemma inzmod_eq0P (i : int) : inzmod i = zero <=> p %| i.
 proof. by rewrite -[zero]asintK zeroE -eq_inzmod zmodcgrP. qed.
 
@@ -249,6 +273,145 @@ qed.
 lemma inzmodW (P : zmod -> bool) :
   (forall i, 0 <= i < p => P (inzmod i)) => forall n, P n.
 proof. by move=> ih n; rewrite -(asintK n) &(ih) rg_asint. qed.
+
+(* -------------------------------------------------------------------- *)
+
+op to_crepr x = let y = x %% p in
+  if y <= p %/ 2 then y else y - p.
+
+lemma to_crepr_idempotent :
+  to_crepr \o to_crepr = to_crepr.
+proof. rewrite fun_ext /(\o); smt(ge2_p). qed.
+
+lemma rg_to_crepr x :
+  - p %/ 2 <= to_crepr x <= p %/ 2.
+proof. smt(ge2_p rg_asint). qed.
+
+lemma to_crepr_cgr x :
+  zmodcgr x (to_crepr x).
+proof. smt(ge2_p). qed.
+
+lemma to_crepr_eq x y :
+  to_crepr x = to_crepr y <=> zmodcgr x y.
+proof. smt(). qed.
+
+lemma to_crepr_id x :
+  p %/ 2 - p < x <= p %/ 2 =>
+  to_crepr x = x.
+proof. smt(). qed.
+
+op crepr x = to_crepr (asint x).
+
+lemma rg_crepr x :
+  - p %/ 2 <= crepr x <= p %/ 2.
+proof. smt(rg_to_crepr). qed.
+
+lemma crepr_eq x y :
+  crepr x = crepr y <=> x = y.
+proof. smt(rg_asint asint_eq). qed.
+
+lemma asint_crepr x :
+  asint x = (crepr x) %% p.
+proof. smt(modz_small rg_asint modzDr). qed.
+
+lemma crepr_cgr x :
+  zmodcgr (asint x) (crepr x).
+proof. smt(ge2_p). qed.
+
+lemma creprK x :
+   inzmod (crepr x) = x.
+proof.
+rewrite /crepr /to_crepr /=.
+case (asint x %% p <= p %/ 2) => _.
+- by rewrite -inzmod_mod asintK.
+- rewrite inzmodB -inzmod_mod asintK.
+  by rewrite inzmod_mod modzz subr0.
+qed.
+
+lemma inzmodK_crepr x :
+  p %/ 2 - p < x <= p %/ 2 =>
+  crepr (inzmod x) = x.
+proof. smt(rg_asint inzmodK). qed.
+
+lemma creprD (a b : zmod) :
+  crepr (a + b) = to_crepr (crepr a + crepr b).
+proof.
+suff: zmodcgr (crepr (a + b)) (crepr a + crepr b) by smt(to_crepr_cgr).
+rewrite /crepr addE /=.
+apply (zmodcgr_trans (asint a + asint b)); first smt(modzMDr rg_asint).
+by apply zmodcgrD; apply crepr_cgr.
+qed.
+
+lemma creprN a :
+  p %% 2 = 1 \/ crepr a <> p %/ 2 =>
+  crepr (-a) = - crepr a.
+proof. smt(rg_asint inzmodK). qed.
+
+lemma creprND (a b : zmod) :
+  p %% 2 = 1 \/ crepr b <> p %/ 2 =>
+  crepr (a - b) = to_crepr (crepr a - crepr b).
+proof. smt(creprD creprN). qed.
+
+lemma creprM x y :
+  crepr (x * y) = to_crepr ((crepr x * crepr y)).
+proof.
+suff: zmodcgr (crepr (x * y)) (crepr x * crepr y).
+- smt(rg_to_crepr to_crepr_cgr rg_crepr).
+rewrite /crepr.
+apply (zmodcgr_trans (asint (x * y))).
+- apply zmodcgr_reflexive; exact to_crepr_cgr.
+apply (zmodcgr_trans (asint x * asint y)).
+- rewrite mulE zmodcgrP dvdzP.
+  exists (- asint x * asint y %/ p); smt(divz_eq).
+apply (zmodcgr_trans (asint x * (to_crepr (asint y)))).
+- apply zmodcgrMl; exact to_crepr_cgr.
+by apply zmodcgrMr; exact to_crepr_cgr.
+qed.
+
+(* -------------------------------------------------------------------- *)
+
+op "`|_|" x = `|crepr x|.
+
+lemma abs_zp_small (x: int) :
+  in_cmod p x =>
+  `|inzmod x| = `|x|.
+proof. smt(inzmodK). qed.
+
+lemma abs_zp_triangle (x y : zmod) :
+  `|x + y| <= `|x| + `|y|.
+proof. smt(rg_asint inzmodK). qed.
+
+lemma abs_zp0 :
+  `|zero| = 0.
+proof. smt(zeroE ge2_p). qed.
+
+lemma abs_zp1 : `|one| = 1.
+proof. smt(oneE ge2_p). qed.
+
+lemma ge0_abs_zp (x : zmod) :
+  0 <= `|x|.
+proof. smt(). qed.
+
+lemma abs_zp_ub (x : zmod) :
+  `|x| <= p %/ 2.
+proof. smt(rg_asint). qed.
+
+lemma to_crepr_abs x :
+  `|to_crepr x| <= `|x|.
+proof. smt(rg_to_crepr). qed.
+
+lemma abs_zpN (x : zmod) :
+  `|x| = `|-x|.
+proof.
+case (x = zero) => ?; first by smt(ZModpRing.oppr0).
+rewrite /"`|_|" /crepr /= oppE -modzDl modz_small.
+- smt(rg_asint asintK).
+smt(rg_asint).
+qed.
+
+lemma abs_zp_prod (x y : zmod) :
+  `|x * y| <= `|x| * `|y|.
+proof. rewrite /"`|_|" creprM; smt(to_crepr_abs). qed.
 
 (* -------------------------------------------------------------------- *)
 theory DZmodP.
@@ -281,6 +444,91 @@ rewrite -(mu_eq_support _ (pred1 i)) => /= [j /supp_dinter|].
   by rewrite -eq_inzmod !pmod_small.
 - by rewrite dinter1E ler_subr_addl (addzC 1) -ltzE rgi.
 qed.
+
+(* -------------------------------------------------------------------- *)
+
+op dinter_zp i j = dmap [i..j] inzmod.
+
+lemma dinter_zp_ll (i j : int) :
+  i <= j => is_lossless (dinter_zp i j).
+proof. by move => ?; rewrite dmap_ll dinter_ll. qed.
+
+lemma dinter_zp_uni (i j : int) :
+  i <= j =>
+  j - i < p =>
+  is_uniform (dinter_zp i j).
+proof.
+rewrite /dinter_zp => ??.
+rewrite dmap_uni_in_inj =>[x y|]; last smt(supp_dinter1E).
+rewrite !supp_dinter => rg_x rg_y H.
+move:rg_x rg_y H; wlog: x y / (y <= x) => [/#| le_yx rg_x rg_y ?].
+have ?: asint (inzmod (x - y)) = 0 by smt(zeroE inzmodD).
+suff: asint (inzmod (x - y)) = x - y by smt().
+by rewrite inzmodK modz_small => /#.
+qed.
+
+lemma dinter_zp_supp (i j : int) (x : zmod):
+  i <= j =>
+  j - i < p =>
+  ((x \in dinter_zp i j) <=>
+  (exists xi, x = inzmod xi /\ i <= xi /\ xi <= j)).
+proof. smt(supp_dmap supp_dinter). qed.
+
+lemma dinter_zp_null (i j : int) :
+  j < i => dinter_zp i j = dnull.
+proof.
+move => *.
+apply weight_eq0_dnull.
+by rewrite weight_dmap weight_dinter /#.
+qed.
+
+op dball_zp (i: int) = dinter_zp (-i) i.
+
+lemma dball_zp_ll i :
+  0 <= i => is_lossless (dball_zp i).
+proof. smt(dinter_zp_ll). qed.
+
+lemma dball_zp_null i :
+  i < 0 => dball_zp i = dnull.
+proof. smt(dinter_zp_null). qed.
+
+lemma dball_zp_uni i :
+  i < p %/ 2 => is_uniform (dball_zp i).
+proof.
+move => rg_i; case (0 <= i) => ?; first smt(dinter_zp_uni).
+smt(dball_zp_null dnull_uni).
+qed.
+
+lemma dball_zp_supp i x :
+  x \in dball_zp i <=> `|x| <= i.
+proof.
+case (i < p %/ 2) => ?.
+- case (0 <= i) => ?; last smt(dball_zp_null supp_dnull).
+  rewrite /dball_zp => *.
+  by rewrite dinter_zp_supp; smt(abs_zp_small creprK).
+- have -> /=: `|x| <= i by smt(rg_crepr).
+  rewrite /dball_zp /dinter_zp supp_dmap.
+  by exists (crepr x); smt(creprK rg_crepr supp_dinter).
+qed.
+
+op dopenball_zp (i : int) = dball_zp (i - 1).
+
+lemma dopenball_zp_ll i :
+  1 <= i => is_lossless (dopenball_zp i).
+proof. smt(dball_zp_ll). qed.
+
+lemma dopenball_zp_null i :
+  i < 1 => dopenball_zp i = dnull.
+proof. smt(dball_zp_null). qed.
+
+lemma dopenball_zp_uni i :
+  i < p %/ 2 => is_uniform (dopenball_zp i).
+proof. smt(dball_zp_uni). qed.
+
+lemma dopenball_zp_supp i x :
+  x \in dopenball_zp i <=> `|x| < i.
+proof. smt(dball_zp_supp). qed.
+
 end DZmodP.
 
 end ZModRing.
