@@ -126,9 +126,6 @@ op ( ** ) (c : coeff) (p : polyXnD1) =
   pinject (c ** (repr p)).
 
 (* -------------------------------------------------------------------- *)
-op pevalX (p : polyXnD1) (c : coeff) =
-  peval (repr p) c.
-
 op polyLX (a : coeff list) : polyXnD1 = pinject (polyL a).
 
 op polyCX (c : coeff) = pinject (polyC c).
@@ -350,6 +347,13 @@ elim/polyXnD1W: p => p rdp; elim/polyXnD1W: q => q rdq.
 by rewrite addE !piK 1:&(reducedD) // polyDE.
 qed.
 
+lemma creprD (f g : polyXnD1):
+  crepr (f + g) = crepr f + crepr g.
+proof.
+apply poly_eqP => i ge0_i.
+by rewrite rcoeffD polyDE.
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma reduced_sum ['a] (P : 'a -> bool) (F : 'a -> poly) (r : 'a list) :
   (forall i, P i => reduced (F i)) => reduced (PCA.big P F r).
@@ -463,10 +467,29 @@ rewrite addrC BCA.big_seq BCA.big1 ?addr0 /=.
 by rewrite add0r &(BCA.eq_bigr) => i; rewrite !piK.
 qed.
 
+(* -------------------------------------------------------------------- *)
 lemma polyLXE coeffs i :
   size coeffs <= n =>
   (polyLX coeffs).[i] = nth Coeff.zeror coeffs i.
 proof. by move=> h; rewrite piK 1:reduced_polyL // &(polyLE). qed.
+
+(* -------------------------------------------------------------------- *)
+op pevalX (p : polyXnD1) (c : coeff) =
+  peval (crepr p) c.
+
+lemma pevalXD (f g : polyXnD1) x :
+  pevalX (f + g) x =
+  pevalX f x + pevalX g x.
+proof.
+by rewrite /pevalX creprD pevalD.
+qed.
+
+lemma pevalXE p x :
+  pevalX p x = BigCf.BCA.bigi predT (fun i => p.[i] * exp x i) 0 n.
+proof.
+rewrite /pevalX (pevalE (crepr p) x n) //.
+exact deg_crepr.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma finite_for_polyXnD1 s :
