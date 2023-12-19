@@ -38,16 +38,22 @@ let rec bd_aexpr (e: aexpr) : deps =
       | _ -> failwith "Variable shifts not implemented yet")
   | EAdd (c, `W n, (e1, e2)) -> 
       let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
-      d1 |> merge d2 
-      |> merge (offset ~offset:(1) d1) 
-      |> merge (offset ~offset:(1) d2)
+      1 --^ n |> Enum.fold (fun d i -> d 
+        |> merge (offset ~offset:(i) d1) 
+        |> merge (offset ~offset:(i) d2)) (merge d1 d2)
       |> (match c with | `C -> (fun a -> a) | `NC -> restrict ~min:(0) ~max:(n))
   | ESub (`W n, (e1, e2)) -> merge (bd_aexpr e1) (bd_aexpr e2) (* still not implemented, FIXTHIS *)
   | EOr  (`W n, (e1, e2)) -> merge (bd_aexpr e1) (bd_aexpr e2)
   | EAnd (`W n, (e1, e2)) -> merge (bd_aexpr e1) (bd_aexpr e2)
   | EMul (su, dhl, `W n, (e1, e2)) -> 
-    let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
-    failwith "mult not done"
+      let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
+      1 --^ (match dhl with |`D -> n | _ -> 2*n) |> Enum.fold (fun d i -> d 
+        |> merge (offset ~offset:(i) d1) 
+        |> merge (offset ~offset:(i) d2)) (merge d1 d2)
+      |> (match dhl with 
+      | `D -> restrict ~min:(0) ~max:(n) 
+      | `H -> (fun d -> d |> restrict ~min:(n) ~max:(2*n) |> offset ~offset:(-n))
+      | `L -> restrict ~min:(0) ~max:(n))
   | _ -> failwith "Not implemented yet"
 
 let bd_adef (df: adef) =
