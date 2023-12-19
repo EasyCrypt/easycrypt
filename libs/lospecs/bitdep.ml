@@ -2,6 +2,8 @@
 open Deps
 open Typing
 
+(* WIP: Not capable of running the full example yet *)
+(* and some things do not work/ have incorrect semantics *)
 let rec bd_aexpr (e: aexpr) : deps =
   let { node = e_; type_ = t_; } = e in
   match e_ with 
