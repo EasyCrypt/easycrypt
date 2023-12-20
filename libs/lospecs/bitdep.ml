@@ -8,7 +8,9 @@ let rec bd_aexpr (e: aexpr) : deps =
   let { node = e_; type_ = t_; } = e in
   match e_ with 
   | ECast (e_, t_) -> bd_aexpr e_ (* fix semantic for non identity casts *)
-  | EVar v -> (match t_ with | `W n -> (copy ~offset:(0) ~size:(n) (Ident.name v)) | _ -> failwith "Vars should be words") 
+  | EVar v -> (match t_ with 
+    | `W n -> (copy ~offset:(0) ~size:(n) (Ident.name v)) 
+    | _ -> (copy ~offset:0 ~size:256 (Ident.name v))) (* assuming integers have 256 bits *) 
   | EInt i -> empty ~size:(256) (* Need to know how to handle this case, probably good enough for now *)
   | ESlide (eb, (eo, cnt, sz)) -> (* verify indianess on this *)
       (match eo.node with
@@ -23,7 +25,7 @@ let rec bd_aexpr (e: aexpr) : deps =
           |> (let rec bitlen (m:int) = (match m with | 1 -> 1 | m -> 1 + bitlen (m/2)) in
           collapse ~csize:(bitlen n) ~count:(1)) |> Map.Int.find 0 |> constant ~size:(n) 
           (* Best guess without specific knowledge, result depends on ceil(log2(base_size)) bits of index *)
-        in merge bdb bdo) (* Need to check how to handle variable offsets *)
+        in merge bdb bdo |> restrict ~min:0 ~max:(cnt*sz)) (* Need to check how to handle variable offsets *)
   (* Map should gen deps for params in terms of fb and then chunk those and sub params for args *)
   (* temp sol is to just chunk full dep *)
   | EMap ((`W n, `W m), (params, fb), args) -> 
@@ -56,6 +58,9 @@ let rec bd_aexpr (e: aexpr) : deps =
           | (`R, `A) -> Option.default (empty ~size:(0)) (Option.map (fun d1 -> constant ~size:(n) d1 |> restrict ~max:(n) ~min:(n-i)) (Map.Int.find_opt (n-1) bd)) |> merge d
           | _ -> d)
       | _ -> failwith "Variable shifts not implemented yet")
+  | ELet ((v, e1), e2) -> 
+      let bd1, bd2 = (bd_aexpr e1, bd_aexpr e2) in
+      propagate ~offset:0 (Ident.name v) bd1 bd2
   | EAdd (c, `W n, (e1, e2)) -> 
       let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
       1 --^ n |> Enum.fold (fun d i -> d 
@@ -82,7 +87,7 @@ and propagate ~(offset:int) (v: symbol) (t: deps) (d: deps) : deps =
     match (Map.String.find_opt v d1) with
     | None -> d1
     | Some si -> si |> Set.Int.enum 
-      |> Enum.fold (fun acc i -> merge1 acc (Option.default (Map.String.empty) (Map.Int.find_opt (i + offset) t))) (Map.String.empty)) d
+      |> Enum.fold (fun acc i -> merge1 acc (Option.default (Map.String.empty) (Map.Int.find_opt (i + offset) t))) (Map.String.remove v d1)) d
 
 let bd_adef (df: adef) =
   bd_aexpr df.body
