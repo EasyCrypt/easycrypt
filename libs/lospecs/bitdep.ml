@@ -26,8 +26,6 @@ let rec bd_aexpr (e: aexpr) : deps =
           collapse ~csize:(bitlen n) ~count:(1)) |> Map.Int.find 0 |> constant ~size:(n) 
           (* Best guess without specific knowledge, result depends on ceil(log2(base_size)) bits of index *)
         in merge bdb bdo |> restrict ~min:0 ~max:(cnt*sz)) (* Need to check how to handle variable offsets *)
-  (* Map should gen deps for params in terms of fb and then chunk those and sub params for args *)
-  (* temp sol is to just chunk full dep *)
   | EMap ((`W n, `W m), (params, fb), args) -> 
       let bdfb = bd_aexpr fb in
       let bdargs = List.map bd_aexpr args in
@@ -47,7 +45,7 @@ let rec bd_aexpr (e: aexpr) : deps =
         | 0 -> acc
         | _ -> doit (d::acc) d (i-1)
       in aggregate ~csize:(n/i) (List.enum (doit [] (bd_aexpr e) i)))
-  | EShift (lr, la, eb, es) -> (* need to add arith right sign bit dependency *)
+  | EShift (lr, la, eb, es) -> 
       let bd = bd_aexpr eb in
       (match (es.node, eb.type_) with
       | (EInt i, `W n) -> 
@@ -61,13 +59,18 @@ let rec bd_aexpr (e: aexpr) : deps =
   | ELet ((v, e1), e2) -> 
       let bd1, bd2 = (bd_aexpr e1, bd_aexpr e2) in
       propagate ~offset:0 (Ident.name v) bd1 bd2
-  | EAdd (c, `W n, (e1, e2)) -> 
+  | EAdd (c, `W n, (e1, e2)) -> (* add and sub assuming no overflow *)
       let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
       1 --^ n |> Enum.fold (fun d i -> d 
         |> merge (offset ~offset:(i) d1) 
         |> merge (offset ~offset:(i) d2)) (merge d1 d2)
       |> (match c with | `C -> (fun a -> a) | `NC -> restrict ~min:(0) ~max:(n))
-  | ESub (`W n, (e1, e2)) -> merge (bd_aexpr e1) (bd_aexpr e2) (* still not implemented, FIXTHIS *)
+  | ESub (`W n, (e1, e2)) -> 
+      let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
+      1 --^ n |> Enum.fold (fun d i -> d 
+        |> merge (offset ~offset:(i) d1) 
+        |> merge (offset ~offset:(i) d2)) (merge d1 d2)
+      |> restrict ~min:(0) ~max:(n)
   | EOr  (`W n, (e1, e2)) -> merge (bd_aexpr e1) (bd_aexpr e2)
   | EAnd (`W n, (e1, e2)) -> merge (bd_aexpr e1) (bd_aexpr e2)
   | EMul (su, dhl, `W n, (e1, e2)) -> 

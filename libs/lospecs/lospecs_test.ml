@@ -16,7 +16,12 @@ let _ =
       (fun fmt (sym, ad) -> Format.fprintf fmt "%a = %a" Ptree.pp_symbol sym Typing.pp_adef ad)
       fmt
       ast_) ast
-    else Format.eprintf "%a@." Deps.pp_deps (Bitdep.bd_adef (ast |> List.hd |> snd))
+    else Format.eprintf "%a@." 
+    (fun fmt () -> Format.pp_print_list 
+      ~pp_sep:(fun fmt () -> Format.fprintf fmt "@.---------------------------@.")
+      (fun fmt (_, def) -> Format.eprintf "%a@." Deps.pp_deps (Bitdep.bd_adef def))
+      fmt
+      ast) ()
 
 
   (*
