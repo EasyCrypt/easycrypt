@@ -30,14 +30,15 @@ let rec bd_aexpr (e: aexpr) : deps =
       let bdfb = bd_aexpr fb in
       let bdargs = List.map bd_aexpr args in
       let subs = List.combine params bdargs in
+      let k = (match fb.type_ with | `W k -> k | _ -> failwith "anon fun in map should ret word") in
       0 --^ m 
         |> Enum.map (fun i ->
           List.fold_left (fun d (v, t) -> propagate ~offset:(i*n) (v |> fst |> Ident.name) t d) bdfb subs 
-          |> offset ~offset:(i*n))
+          |> offset ~offset:(i*k))
         |> Enum.fold merge (empty ~size:0)
   | EConcat (`W n, args) -> 
       (match (List.hd args).type_ with
-      | `W m -> aggregate ~csize:(m) (Enum.map bd_aexpr (List.enum (List.rev args)))
+      | `W m -> aggregate ~csize:(m) (Enum.map bd_aexpr (List.enum args))
       | _ -> failwith "Cannot concat words (typing should catch this)")
   | ERepeat (`W n, (e, i)) -> (
       let rec doit (acc: deps list) (d: deps) (i: int) =
@@ -55,7 +56,23 @@ let rec bd_aexpr (e: aexpr) : deps =
         in (match (lr, la) with
           | (`R, `A) -> Option.default (empty ~size:(0)) (Option.map (fun d1 -> constant ~size:(n) d1 |> restrict ~max:(n) ~min:(n-i)) (Map.Int.find_opt (n-1) bd)) |> merge d
           | _ -> d)
-      | _ -> failwith "Variable shifts not implemented yet")
+      | (_, `W n) -> 
+          let (db, ds) = (bd_aexpr eb, bd_aexpr es) in
+          let rec bitlen (m:int) = (match m with | 1 -> 1 | m -> 1 + bitlen (m/2)) in
+          merge (chunk ~csize:n ~count:1 db) (ds |> chunk ~csize:(bitlen n + 1) ~count:1 |> restrict ~min:0 ~max:1 |> (fun d -> Option.default Map.String.empty (Map.Int.find_opt 0 d)) |> constant ~size:n)
+      | _ -> failwith "Cant slice non-word")
+  | ESat (su, e, n) -> (* first sat approximation: sat-length bits depend on everything *)
+      (match e.type_ with
+      | `W m -> 
+        let d = bd_aexpr e in
+        let hd = d 
+          |> restrict ~min:n ~max:m 
+          |> offset ~offset:(-n) 
+          |> chunk ~csize:(m-n) ~count:1
+          |> (fun d -> Option.default Map.String.empty (Map.Int.find_opt 0 d))
+          |> constant ~size:m
+        in merge d hd
+      | _ -> failwith "Cannot saturate/clamp integers, convert to word first")
   | ELet ((v, e1), e2) -> 
       let bd1, bd2 = (bd_aexpr e1, bd_aexpr e2) in
       propagate ~offset:0 (Ident.name v) bd1 bd2
@@ -82,7 +99,6 @@ let rec bd_aexpr (e: aexpr) : deps =
       | `D -> restrict ~min:(0) ~max:(n) 
       | `H -> (fun d -> d |> restrict ~min:(n) ~max:(2*n) |> offset ~offset:(-n))
       | `L -> restrict ~min:(0) ~max:(n))
-  | _ -> failwith "Not implemented yet"
 
   (* propagate v deps to t deps in d *)
 and propagate ~(offset:int) (v: symbol) (t: deps) (d: deps) : deps =
