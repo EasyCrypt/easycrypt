@@ -58,8 +58,7 @@ let rec bd_aexpr (e: aexpr) : deps =
           | _ -> d)
       | (_, `W n) -> 
           let (db, ds) = (bd_aexpr eb, bd_aexpr es) in
-          let rec bitlen (m:int) = (match m with | 1 -> 1 | m -> 1 + bitlen (m/2)) in
-          merge (chunk ~csize:n ~count:1 db) (ds |> chunk ~csize:(bitlen n + 1) ~count:1 |> restrict ~min:0 ~max:1 |> (fun d -> Option.default Map.String.empty (Map.Int.find_opt 0 d)) |> constant ~size:n)
+          merge (chunk ~csize:n ~count:1 db) (ds |> enlarge ~min:0 ~max:n |> chunk ~csize:n ~count:1)
       | _ -> failwith "Cant slice non-word")
   | ESat (su, e, n) -> (* first sat approximation: sat-length bits depend on everything *)
       (match e.type_ with
