@@ -249,9 +249,7 @@ let t_pr_rewrite_low (s,dof) tc =
 
   in
 
-  let rwpt =
-    { pt_head = PTCut lemma;
-      pt_args = List.make args (PASub None); } in
+  let rwpt = EcCoreGoal.ptcut ~args:(List.make args (PASub None)) lemma in
 
   FApi.t_first
     (t_pr_lemma lemma)
