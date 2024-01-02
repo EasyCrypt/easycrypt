@@ -254,6 +254,7 @@ val t_intros_sx_seq : inames -> (ident list -> FApi.backward) -> FApi.backward
 val t_intros_s_seq  : inames -> FApi.backward -> FApi.backward
 
 val t_intros_n : ?clear:bool -> int -> FApi.backward
+val t_intros_n_x : int -> tcenv1 -> tcenv * ident list
 
 (* -------------------------------------------------------------------- *)
 type genclear = [`Clear | `TryClear | `NoClear]
