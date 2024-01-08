@@ -1,5 +1,10 @@
 %{
   open Ptree
+
+  let string_of_position ((p1, p2) : Lexing.position * Lexing.position) =
+    Format.sprintf "%d.%d:%d.%d"
+      p1.pos_lnum (p1.pos_cnum - p1.pos_bol + 1)
+      p2.pos_lnum (p2.pos_cnum - p2.pos_bol + 1)
 %}
 
 %token AT
@@ -15,11 +20,10 @@
 %token LPAREN
 %token LT
 %token IN
+%token PIPE
 %token RARROW
 %token RBRACKET
 %token RPAREN
-%token SIGNED
-%token UNSIGNED
 
 %token<string> IDENT
 %token<int>    NUMBER
@@ -29,11 +33,6 @@
 %start program
 
 %%
-
-(*
-%inline empty:
-| (* empty *) { () }
-*)
 
 %inline vname:
 | x=IDENT
@@ -47,16 +46,6 @@
 | AT x=NUMBER
     { `W x }
 
-type_:
-| x=wtype
-    { let `W x = x in `W x }
-
-| UNSIGNED
-    { `Unsigned }
-
-| SIGNED
-    { `Signed }
-
 fname:
 | f=IDENT
     { (f, None) }
@@ -65,10 +54,10 @@ fname:
     { (f, Some (List.map (fun x -> `W x) p)) }
 
 sexpr:
-| x=vname
-    { PEVar x }
+| f=fname
+    { PEFName f }
 
-| f=fname args=parens(list0(expr, COMMA))
+| f=fname args=parens(list0(earg, COMMA))
     { PEApp (f, args) }
 
 | e=parens(expr)
@@ -84,17 +73,20 @@ expr:
 | FUN args=wname* DOT body=expr
     { PEFun (args, body) }
 
-| LET x=IDENT EQUAL e1=expr IN e2=expr
-    { PELet ((x, e1), e2) }
+| LET x=IDENT args=parens(wname*)? EQUAL e1=expr IN e2=expr
+    { PELet ((x, args, e1), e2) }
 
-| e=sexpr LBRACKET i1=expr COLON i2=expr RBRACKET
-    { PESlice (e, (i1, i2, None)) }
+| e=sexpr LBRACKET
+    s=option(AT s=expr PIPE { s }) i=expr j=prefix(COLON, expr)?
+  RBRACKET
+    { PESlice (e, (i, j, s)) }
 
-| e=sexpr LBRACKET i1=expr COLON i2=expr COLON i3=expr RBRACKET
-    { PESlice (e, (i1, i2, Some i3)) }
+earg:
+| DOT
+    { None }
 
-| LPAREN t=type_ RPAREN e=expr
-    { PECast (t, e) }
+| e=expr
+    { Some e }
 
 def:
 | name=IDENT args=parens(list0(wname, COMMA)) RARROW rty=wtype EQUAL body=expr
@@ -104,6 +96,9 @@ program:
 | defs=def* EOF
     { defs }
 
+| error
+    { failwith (string_of_position $loc) }
+
 %inline parens(X):
 | LPAREN x=X RPAREN { x }
 
@@ -112,3 +107,6 @@ program:
 
 %inline list0(X, S):
 | x=separated_list(S, X) { x }
+
+%inline prefix(S, X):
+| S x=X { x }

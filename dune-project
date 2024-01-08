@@ -24,6 +24,7 @@
   (ocaml-inifiles (>= 1.2))
   (pcre (>= 7))
   ppx_deriving
+  ppx_deriving_yojson
   (progress (>= 0.2))
   (why3 (and (>= 1.7.0) (< 1.8)))
   yojson

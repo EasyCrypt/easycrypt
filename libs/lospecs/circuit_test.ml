@@ -459,46 +459,6 @@ let test_vpermd () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let _test_vpermd () =
-  let i = [0x00l; 0x04l; 0x01l; 0x05l; 0x02l; 0x06l; 0x03l; 0x07l] in
-  let i = Arith.of_int32s i in
-
-  let r = List.init 8 (fun _ -> Random.bits32 ()) in
-  let r = Arith.of_int32s r in
-
-  let env =
-    let i = Array.of_list (List.map eval0 i) in
-    let r = Array.of_list (List.map eval0 r) in
-
-    fun ((n, k) : var) ->
-      match n with
-      | 0 when 0 <= k && k < 256 -> i.(k)
-      | 1 when 0 <= k && k < 256 -> r.(k)
-      | _ -> assert false
-  in
-
-  let o = vpermd i (Arith.reg ~size:256 ~name:1) in
-
-  List.iteri (fun i o ->
-    Format.eprintf "%0.4x: %a@." i pp_node o
-  ) o;
-
-(*
-  let o =
-    vpermd
-      (Arith.reg ~size:256 ~name:0)
-      (Arith.reg ~size:256 ~name:1) in
-*)
-
-  let i = List.map (eval env) i in
-  let r = List.map (eval env) r in
-  let o = List.map (eval env) o in
-
-  List.iter (fun v ->
-    Format.eprintf "%a@." (pp_reg ~size:8) v
-  ) [i; r; o]
-
-(* -------------------------------------------------------------------- *)
 let tests = [
   ("opp" , test_opp );
   ("incr", test_incr);
@@ -597,4 +557,4 @@ let poly_compress () =
   ) deps
 
 (* -------------------------------------------------------------------- *)
-let () = poly_compress ()
+let () = main ()

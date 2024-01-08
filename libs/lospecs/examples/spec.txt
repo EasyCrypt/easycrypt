@@ -1,160 +1,68 @@
-# TODO: FIX Sat syntax + use concat on stuff + use repeat on stuff?
-
-# [a:b:c] means take b numbers of length c bits starting from a
+# Intel intrinsic: _mm256_permutexvar_epi32
 VPERMD(w@256, widx@256) -> @256 =
   map<32, 8>(
-    fun idx@32 . let i = (unsigned) idx[0:2] in w[i:1:32],
+    fun idx@32 . let i = idx[0:2] in w[@32|i],
     widx
   )
 
-
-VPSUB_16u16(w1@256, w2@256) -> @256 =
-  map<16, 16>(
-    fun x@16 y@16 . sub<16>(x, y),
-    w1,
-    w2
-  )
-
+# Intel intrisic: _mm256_add_epi16
 VPADD_16u16(w1@256, w2@256) -> @256 =
-  map<16, 16>(
-    fun x@16 y@16 . add<16>(x, y),
-    w1,
-    w2
-  )
+  map<16, 16>(add<16>, w1, w2)
 
+# Intel intrisic: _mm256_sub_epi16
+VPSUB_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(sub<16>, w1, w2)
+
+# Intel intrisic: _mm256_and_si256
 VPAND_256(w1@256, w2@256) -> @256 = 
   and<256>(w1, w2)
 
+# Intel intrisic: _mm256_andnot_si256
+VPNAND_256(w1@256, w2@256) -> @256 = 
+  not<256>(and<256>(w1, w2))
 
-
-# REF: https://www.felixcloutier.com/x86/vpbroadcast
-# Might be problematic?
-VPBROADCAST_16u16(w1@256) -> @256 = 
-  repeat<16>(w1[0:1:16], 16)
-# map<16, 16>(
-#   fun x@16 . w1[0:1:16],
-#   w1
-# )
-     
+# Intel intrisic: _mm256_broadcastw_epi16
+VPBROADCAST_16u16(w1@128) -> @256 = 
+  repeat<16>(w1[@16|0], 16)
   
-# REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4774&text=vpmulh
-# We want to get the high 16 bits of product, check endianness later
-# Lower index = LSB
-# Assuming unsigned multiplication without rounding
+# Intel intrisic: _mm256_mulhi_epu16
 VPMULH_16u16(w1@256, w2@256) -> @256 =
-  map<16, 16>(
-    fun x@16 y@16 . humult<16>(x, y),
-    w1,
-    w2
-  )
+  map<16, 16>(umulhi<16>, w1, w2)
 
-
-# Need to implement sign extend (intrinsic?)
-# TODO: Check indexing here
-# rshift<n>(x,y): right shift logical x by y (x >> y) as n-bit ints
-# sext<n>(x): sign extend x to n bits
-# Can be implemented differently from this
-# REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4774,4785&text=vpmulhrs
-# REF: https://www.felixcloutier.com/x86/pmulhrsw
-# Need to check mult here
-# mult<16> : 16, 16 -> 32
+# Intel intrinsic: _mm256_mulhrs_epi16
 VPMULHRS_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
-    fun x@16 y@16 . add<32>(
-                      srl<32>(
-                        smult<16>(x, y), 
-                        14),
-                      1)[15:1:16], # Should get the 16 MSBs (except *the* most significant bit)
-    w1,
-    w2)
-
-
-
-# REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4774,4785,6371&text=vpsra
-# TODO?: Might need to be expanded here 
-# to match the intrinsics guide pseudocode at this level
-# shift_right_ar(x,y): shift right arithmetic, x >> y
-VPSRA_16u16(w@256, count@8) -> @256 =
-  map<16, 16>(
-    fun x@16 . sra<16>(x, count),
-    w
-  )
-
-
-# REF: https://www.felixcloutier.com/x86/pmaddubsw
-# SatToSW<n>: SaturateToSignedWord<bit_len>
-# TODO: Check if this works correctly, need to be careful with sat overflows and such
-VPMADDUBSW_256(w1@256, w2@256) -> @256 =
-  map<16, 16>(
-    fun x@16 y@16 . SatToSW<17>(
-                      addc<16>(
-                        smult<8>(x[0:1:8], y[0:1:8]),
-                        smult<8>(x[8:1:8], y[8:1:8])
-                      ), 
-                      16
-                    )[0:1:16],
+    fun x@16 y@16 .
+      let w = srl<32>(smul<16>(x, y), 14) in
+      let w = incr<32>(srl<32>(w, 14)) in
+      w[1:16],
     w1,
     w2
   )
 
+# Intel intrinsic: _mm256_srai_epi16
+VPSRA_16u16(w@256, count@8) -> @256 =
+  map<16, 16>(sra<16>(., count), w)
 
+# Intel intrisic: _mm256_maddubs_epi16
+VPMADDUBSW_256(w1@256, w2@256) -> @256 =
+  map<16, 16>(
+    fun x@16 y@16 .
+      ssat<17, 16>(addc<16>(
+        smul<8>(x[@8|0], y[@8|0]),
+        smul<8>(x[@8|1], y[@8|1])
+      )),
+    w1,
+    w2
+  )
 
-# REF: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#techs=MMX,SSE_ALL,AVX_ALL&ig_expand=324,324,101,6663,4785,4906&text=vpackus
-# Might need different implementation
-# probably needs some kind of fold/accumulation combinator
-# Temp version assuming that:
-# map<n, x> has type: ((...(a -> b) -> ...) -> c) -> d) -> a[x] -> b[x] -> ... -> c[x] -> d[x]
-#                    | Function that takes args      | | Lists of said args        |   | List of ret type |
-# where if a is a type then a[x] is the type of lists of length x with elements with type a
-# TODO: Fix Sat here
+# Intel intrinsic: _mm256_packus_epi16
 PACKUS_16u16(w1@256, w2@256) -> @256 =
- map<128, 2>(
-  fun v1@128 v2@128 . concat<64>( 
-                             map<16,8>(
-                               fun a@16 . SatToUW<16>(a, 8)[0:1:8],
-                                 v1
-                             )[0:1:64],
-                             map<16,8>(
-                               fun a@16 . SatToUW<16>(a, 8)[0:1:8],
-                                 v2
-                             )[0:1:64]
-                       ),
-   w1,
-   w2
-   )            
+  let pack (w@128) = map<16, 8>(usat<16, 8>, w) in
 
-#  fun v1@128 v2@128 . or<128>(
-#                            map<16,8>(
-#                              fun a@16 . SatToUW<16>(a),
-#                                v1
-#                            ),
-#                            sla<128>(map<16,8>(
-#                              fun a@16 . SatToUW<8>(a),
-#                                v2
-#                            ),
-#                            64
-#                           )
-#                      ),            
-#  w1,
-#  w2
-#)
-
-# TODO:
-# Extend map to take in existing functions
-# Rather than needing a funtion def as an argument
-# Specifically, this call should be valid:
-# map<16,8>(
-#   SatToUW<8>,
-#   v2
-# ),
-
-                      
-
-## TODO:
-## VPACKUS_16u16 *
-## VPBROADCAST_16u16 *
-## VPMADDUBSW_256 *
-## VPMULHRS_16u16 *
-## VPSRA_16u16 *
-## Check for mult bit handling consistency
-## Check for bit addressing order consistency (endianness)
+  concat<128>(
+    pack(w1[@128|0]),
+    pack(w2[@128|0]),
+    pack(w1[@128|1]),
+    pack(w2[@128|1])
+  )

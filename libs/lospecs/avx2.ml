@@ -144,9 +144,10 @@ let random () : m256 =
   oftuple_64 (w0, w1, w2, w3)
 
 (* -------------------------------------------------------------- *)
+external mm256_and_si256 : m256 -> m256 -> m256 = "caml_mm256_and_si256"
+external mm256_andnot_si256 : m256 -> m256 -> m256 = "caml_mm256_andnot_si256"
 external mm256_add_epi16 : m256 -> m256 -> m256 = "caml_mm256_add_epi16"
 external mm256_sub_epi16 : m256 -> m256 -> m256 = "caml_mm256_sub_epi16"
-external mm256_and_si256 : m256 -> m256 -> m256 = "caml_mm256_and_si256"
 external mm256_mulhi_epu16 : m256 -> m256 -> m256 = "caml_mm256_mulhi_epu16"
 external mm256_mulhrs_epi16 : m256 -> m256 -> m256 = "caml_mm256_mulhrs_epi16"
 external mm256_packus_epi16 : m256 -> m256 -> m256 = "caml_mm256_packus_epi16"

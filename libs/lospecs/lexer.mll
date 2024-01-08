@@ -5,8 +5,6 @@
     ("fun"     , FUN     );
     ("let"     , LET     );
     ("in"      , IN      );
-    ("signed"  , SIGNED  );
-    ("unsigned", UNSIGNED);
   ]
 
   let keywords =
@@ -25,7 +23,7 @@ let ident = (alpha | '_') (alnum | '_')*
 
 let decnum = digit+
 
-let whitespace = [' ' '\t' '\r' '\n']
+let whitespace = [' ' '\t' '\r']
 
 rule main = parse
   | '<'  { LT       }
@@ -40,6 +38,7 @@ rule main = parse
   | '='  { EQUAL    }
   | ':'  { COLON    }
   | '.'  { DOT      }
+  | '|'  { PIPE     }
 
   | ident as x
       { Hashtbl.find_default keywords x (IDENT x) }
@@ -50,7 +49,10 @@ rule main = parse
   | whitespace+
       { main lexbuf }
 
-  | '#' [^'\r' '\n']* ['\r' '\n']*
+  | '\n'
+      { Lexing.new_line lexbuf; main lexbuf }
+
+  | '#' [^'\n']*
       { main lexbuf }
 
 (* DEBUG FEATURE: for binary searching for syntax errors

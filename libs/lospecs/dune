@@ -5,12 +5,16 @@
   (:standard -open Batteries))
  (modules :standard \ lospecs_test circuit_test)
  (preprocess
-  (pps ppx_deriving.show))
+  (pps ppx_deriving_yojson))
  (foreign_stubs
-  (language c)
-  (flags :standard -Wno-unused-command-line-argument -mavx -mavx2 -mavx512vl)
+  (language cxx)
+  (flags :standard -std=c++17 -mavx -mavx2)
   (names avx2_runtime))
- (libraries batteries menhirLib zarith))
+ (foreign_stubs
+  (language cxx)
+  (flags :standard -std=c++17 -mavx -mavx2 -mavx512f -mavx512vl)
+  (names avx512_runtime))
+ (libraries batteries menhirLib zarith ppx_deriving_yojson.runtime))
 
 (executable
  (name lospecs_test)

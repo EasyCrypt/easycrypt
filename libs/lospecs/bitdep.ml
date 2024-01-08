@@ -12,7 +12,7 @@ let rec bd_aexpr (e: aexpr) : deps =
     | `W n -> (copy ~offset:(0) ~size:(n) (Ident.name v)) 
     | _ -> (copy ~offset:0 ~size:256 (Ident.name v))) (* assuming integers have 256 bits *) 
   | EInt i -> empty ~size:(256) (* Need to know how to handle this case, probably good enough for now *)
-  | ESlide (eb, (eo, cnt, sz)) -> (* verify indianess on this *)
+  | ESlice (eb, (eo, cnt, sz)) -> (* verify indianess on this *)
       (match eo.node with
       | EInt i -> eb |> bd_aexpr |> offset ~offset:(-i) |> restrict ~min:(0) ~max:(cnt*sz)
       | _ -> 
@@ -60,7 +60,7 @@ let rec bd_aexpr (e: aexpr) : deps =
           let (db, ds) = (bd_aexpr eb, bd_aexpr es) in
           merge (chunk ~csize:n ~count:1 db) (ds |> enlarge ~min:0 ~max:n |> chunk ~csize:n ~count:1)
       | _ -> failwith "Cant slice non-word")
-  | ESat (su, e, n) -> (* first sat approximation: sat-length bits depend on everything *)
+  | ESat (su, `W n, e) -> (* first sat approximation: sat-length bits depend on everything *)
       (match e.type_ with
       | `W m -> 
         let d = bd_aexpr e in
@@ -72,15 +72,15 @@ let rec bd_aexpr (e: aexpr) : deps =
           |> constant ~size:m
         in merge d hd
       | _ -> failwith "Cannot saturate/clamp integers, convert to word first")
-  | ELet ((v, e1), e2) -> 
+  | ELet ((v, _, e1), e2) -> 
       let bd1, bd2 = (bd_aexpr e1, bd_aexpr e2) in
       propagate ~offset:0 (Ident.name v) bd1 bd2
-  | EAdd (c, `W n, (e1, e2)) -> (* add and sub assuming no overflow *)
+  | EAdd (`W n, c, (e1, e2)) -> (* add and sub assuming no overflow *)
       let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
       1 --^ n |> Enum.fold (fun d i -> d 
         |> merge (offset ~offset:(i) d1) 
         |> merge (offset ~offset:(i) d2)) (merge d1 d2)
-      |> (match c with | `C -> (fun a -> a) | `NC -> restrict ~min:(0) ~max:(n))
+      |> (match c with | true -> (fun a -> a) | false -> restrict ~min:(0) ~max:(n))
   | ESub (`W n, (e1, e2)) -> 
       let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
       1 --^ n |> Enum.fold (fun d i -> d 

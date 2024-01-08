@@ -52,9 +52,10 @@ val of_bytes : endianess:endianess -> bytes -> m256
 val random : unit -> m256
 
 (* -------------------------------------------------------------- *)
+val mm256_and_si256 : m256 -> m256 -> m256
+val mm256_andnot_si256 : m256 -> m256 -> m256
 val mm256_add_epi16 : m256 -> m256 -> m256
 val mm256_sub_epi16 : m256 -> m256 -> m256
-val mm256_and_si256 : m256 -> m256 -> m256
 val mm256_mulhi_epu16 : m256 -> m256 -> m256
 val mm256_mulhrs_epi16 : m256 -> m256 -> m256
 val mm256_packus_epi16 : m256 -> m256 -> m256
