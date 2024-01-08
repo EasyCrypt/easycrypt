@@ -1,7 +1,12 @@
 (* -------------------------------------------------------------------- *)
 open Lospecs
-open Lospecs.Circuit
 
+(* -------------------------------------------------------------------- *)
+module C = struct
+  include Lospecs.Aig
+  include Lospecs.Circuit
+  include Lospecs.Circuit_avx2.HandMade
+end
 (* -------------------------------------------------------------------- *)
 let as_seq1 (type t) (xs : t list) =
   match xs with [x] -> x | _ -> assert false
@@ -50,7 +55,7 @@ type op = {
   name  : string;
   args  : (int * [`U | `S]) list;
   out   : [`U | `S];
-  mk    : reg list -> reg;
+  mk    : C.reg list -> C.reg;
   reff  : int list -> int;
 }
 
@@ -68,7 +73,7 @@ let bar (name : string) (total : int) =
 let test (op : op) =
   let rs, vs =
     let reg_of_arg (name : int) ((sz, s) : int * [`U | `S]) =
-      let r = Arith.reg ~size:sz ~name in
+      let r = C.reg ~size:sz ~name in
       let v = match s with `U -> urange sz | `S -> srange sz in
       (r, v)
     in List.split (List.mapi reg_of_arg op.args)
@@ -85,12 +90,12 @@ let test (op : op) =
 
   let test (vs : int list) =
     let vsa = Array.of_list vs in
-    let env ((n, k) : var) = (vsa.(n) lsr k) land 0b1 <> 0 in
-    let out = List.map (eval env) circuit in
+    let env ((n, k) : C.var) = (vsa.(n) lsr k) land 0b1 <> 0 in
+    let out = List.map (C.eval env) circuit in
     let out =
       match op.out with
-      | `S -> sint_of_bools out
-      | `U -> uint_of_bools out in
+      | `S -> C.sint_of_bools out
+      | `U -> C.uint_of_bools out in
     let exp = op.reff vs in
 
     if out <> exp then begin
@@ -120,7 +125,7 @@ let test_uextend () =
     { name = (Printf.sprintf "uextend<%d,%d>" isize osize)
     ; args = [(isize, `U)]
     ; out  = `U
-    ; mk   = (fun rs -> Arith.uextend ~size:osize (as_seq1 rs))
+    ; mk   = (fun rs -> C.uextend ~size:osize (as_seq1 rs))
     ; reff = (fun vs -> as_seq1 vs)
     }
 
@@ -132,7 +137,7 @@ let test_sextend () =
     { name = (Printf.sprintf "sextend<%d,%d>" isize osize)
     ; args = [(isize, `S)]
     ; out  = `S
-    ; mk   = (fun rs -> Arith.sextend ~size:osize (as_seq1 rs))
+    ; mk   = (fun rs -> C.sextend ~size:osize (as_seq1 rs))
     ; reff = (fun vs -> as_seq1 vs)
     }
 
@@ -156,7 +161,7 @@ let test_shift ~(side : [`L | `R]) ~(sign : [`U | `S]) =
     { name = (Printf.sprintf "shift<%s,%s,%d>" str_side str_sign size)
     ; args = [(size, sign); (4, `U)]
     ; out  = sign
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in Arith.shift ~side ~sign x y)
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.shift ~side ~sign x y)
     ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
     }
 
@@ -176,7 +181,7 @@ let test_opp () =
     { name = (Printf.sprintf "opp<%d>" size)
     ; args = [(size, `S)]
     ; out  = `S
-    ; mk   = (fun rs -> Arith.opp (as_seq1 rs))
+    ; mk   = (fun rs -> C.opp (as_seq1 rs))
     ; reff = (fun vs -> sim (as_seq1 vs))
     }
 
@@ -193,7 +198,7 @@ let test_add () =
     { name = (Printf.sprintf "add<%d>" size)
     ; args = List.make 2 (size, `S)
     ; out  = `S
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in Arith.add_dropc x y)
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.add_dropc x y)
     ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
     }
 
@@ -210,7 +215,7 @@ let test_incr () =
     { name = (Printf.sprintf "incr<%d>" size)
     ; args = [(size, `U)]
     ; out  = `U
-    ; mk   = (fun rs -> Arith.incr_dropc (as_seq1 rs))
+    ; mk   = (fun rs -> C.incr_dropc (as_seq1 rs))
     ; reff = (fun vs -> sim (as_seq1 vs));
   }
 
@@ -227,7 +232,7 @@ let test_sub () =
     { name = (Printf.sprintf "sub<%d>" size)
     ; args = List.make 2 (size, `S)
     ; out  = `S
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in Arith.sub_dropc x y)
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.sub_dropc x y)
     ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
     }
 
@@ -239,7 +244,7 @@ let test_umul () =
     name = (Printf.sprintf "umul<%d,%d>" sz1 sz2);
     args = [(sz1, `U); (sz2, `U)];
     out  = `U;
-    mk   = (fun rs -> let x, y = as_seq2 rs in Arith.umul x y);
+    mk   = (fun rs -> let x, y = as_seq2 rs in C.umul x y);
     reff = (fun vs -> let x, y = as_seq2 vs in (x * y));
   } in
 
@@ -251,7 +256,7 @@ let test_smul () =
     name = (Printf.sprintf "smul<%d,%d>" sz1 sz2);
     args = [(sz1, `S); (sz2, `S)];
     out  = `S;
-    mk   = (fun rs -> let x, y = as_seq2 rs in Arith.smul x y);
+    mk   = (fun rs -> let x, y = as_seq2 rs in C.smul x y);
     reff = (fun vs -> let x, y = as_seq2 vs in (x * y));
   } in
 
@@ -265,9 +270,9 @@ let test_smul_u8_s8 () =
     out  = `S;
     mk   = (fun rs ->
               let x, y = as_seq2 rs in
-              Arith.smul
-                (Arith.uextend ~size:16 x)
-                (Arith.sextend ~size:16 y));
+              C.smul
+                (C.uextend ~size:16 x)
+                (C.sextend ~size:16 y));
     reff = (fun vs -> let x, y = as_seq2 vs in (x * y));
   } in
 
@@ -284,7 +289,7 @@ let test_ssat () =
  {  name = (Printf.sprintf "ssat<%d,%d>" isize osize);
     args = [(isize, `S)];
     out  = `S;
-    mk   = (fun rs -> Arith.sat ~signed:true ~size:osize (as_seq1 rs));
+    mk   = (fun rs -> C.sat ~signed:true ~size:osize (as_seq1 rs));
     reff = (fun vs -> saturate (as_seq1 vs)); } in
 
   test (op 10 4);
@@ -302,7 +307,7 @@ let test_usat () =
  {  name = (Printf.sprintf "usat<%d,%d>" isize osize);
     args = [(isize, `S)];
     out  = `U;
-    mk   = (fun rs -> Arith.sat ~signed:false ~size:osize (as_seq1 rs));
+    mk   = (fun rs -> C.sat ~signed:false ~size:osize (as_seq1 rs));
     reff = (fun vs -> saturate (as_seq1 vs)); } in
 
   test (op 10 4);
@@ -312,13 +317,13 @@ let test_usat () =
 type vpop = {
   name : string;
   acount : int;
-  mk : reg list -> reg;
+  mk : C.reg list -> C.reg;
   reff : Avx2.m256 list -> Avx2.m256;
 }
 
 (* -------------------------------------------------------------------- *)
 let test_vp (total : int) (op : vpop) =
-  let rs = List.init op.acount (fun i -> Arith.reg ~size:256 ~name:i) in
+  let rs = List.init op.acount (fun i -> C.reg ~size:256 ~name:i) in
 
   let circuit = op.mk rs in
 
@@ -327,13 +332,13 @@ let test_vp (total : int) (op : vpop) =
     let avs = Array.of_list vs in
     let avs = Array.map (Avx2.to_bytes ~endianess:`Little) avs in
 
-    let env ((n, i) : var) = get_bit avs.(n) i in
+    let env ((n, i) : C.var) = C.get_bit avs.(n) i in
 
     let o = op.reff vs in
     let o = Avx2.to_bytes ~endianess:`Little o in
 
-    let o' = List.map (eval env) circuit in
-    let o' = bytes_of_bools o' in
+    let o' = List.map (C.eval env) circuit in
+    let o' = C.bytes_of_bools o' in
 
     if o <> o' then begin
       Progress.interject_with (fun () ->
@@ -364,7 +369,7 @@ let test_vpadd_16u16 () =
   let op = {
     name = "vpadd_16u16";
     acount = 2;
-    mk = (fun rs -> let x, y = as_seq2 rs in Circuit.vpadd_16u16 x y);
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpadd_16u16 x y);
     reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_add_epi16 x y);
   } in
 
@@ -375,7 +380,7 @@ let test_vpsub_16u16 () =
   let op = {
     name = "vpsub_16u16";
     acount = 2;
-    mk = (fun rs -> let x, y = as_seq2 rs in Circuit.vpsub_16u16 x y);
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpsub_16u16 x y);
     reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_sub_epi16 x y);
   } in
 
@@ -386,7 +391,7 @@ let test_vpsra_16u16 () =
   let op (offset : int) = {
     name = Format.sprintf "vpsra_16u16<%d>" offset;
     acount = 1;
-    mk = (fun rs -> Circuit.vpsra_16u16 (as_seq1 rs) offset);
+    mk = (fun rs -> C.vpsra_16u16 (as_seq1 rs) offset);
     reff = (fun vs -> Avx2.mm256_srai_epi16 (as_seq1 vs) offset);
   } in
 
@@ -397,7 +402,7 @@ let test_vpand_256 () =
   let op = {
     name = "vpand_256";
     acount = 2;
-    mk = (fun rs -> let x, y = as_seq2 rs in Circuit.vpand_256 x y);
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpand_256 x y);
     reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_and_si256 x y);
   } in
 
@@ -408,7 +413,7 @@ let test_vpmulh_16u16 () =
   let op = {
     name = "vpmulh_16u16";
     acount = 2;
-    mk = (fun rs -> let x, y = as_seq2 rs in Circuit.vpmulh_16u16 x y);
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpmulh_16u16 x y);
     reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_mulhi_epu16 x y);
   } in
 
@@ -419,7 +424,7 @@ let test_vpmulhrs_16u16 () =
   let op = {
     name = "vpmulhrs_16u16";
     acount = 2;
-    mk = (fun rs -> let x, y = as_seq2 rs in Circuit.vpmulhrs_16u16 x y);
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpmulhrs_16u16 x y);
     reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_mulhrs_epi16 x y);
   } in
 
@@ -430,7 +435,7 @@ let test_vpackus_16u16 () =
   let op = {
     name = "vpackus_16u16";
     acount = 2;
-    mk = (fun rs -> let x, y = as_seq2 rs in Circuit.vpackus_16u16 x y);
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpackus_16u16 x y);
     reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_packus_epi16 x y);
   } in
 
@@ -441,7 +446,7 @@ let test_vpmaddubsw_256 () =
   let op = {
     name = "vpmaddubsw_256";
     acount = 2;
-    mk = (fun rs -> let x, y = as_seq2 rs in Circuit.vpmaddubsw_256 x y);
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpmaddubsw_256 x y);
     reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_maddubs_epi16 x y);
   } in
 
@@ -452,7 +457,7 @@ let test_vpermd () =
   let op = {
     name = "vpermd";
     acount = 2;
-    mk = (fun rs -> let x, y = as_seq2 rs in Circuit.vpermd x y);
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpermd x y);
     reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_permutexvar_epi32 x y);
   } in
 
@@ -507,11 +512,298 @@ let main () =
 
   List.iter (fun f -> f ()) tests
 
+(* ==================================================================== *)
+module PolyCompress() = struct
+  let pc_permidx_s =
+    C.w256
+      "0x00000000_00000004_00000001_00000005_00000002_00000006_00000003_00000007"
+
+  let pc_shift2_s =
+    C.w16 0x1001
+
+  let pc_mask_s =
+    C.w16 0x000f
+
+  let pc_shift1_s =
+    C.w16 0x0200
+
+  let jvx16 =
+    C.w256
+      "0x4ebf4ebf_4ebf4ebf_4ebf4ebf_4ebf4ebf_4ebf4ebf_4ebf4ebf_4ebf4ebf_4ebf4ebf"
+
+  let jqx16 =
+    C.w256
+      "0xd010d010_d010d010_d010d010_d010d010_d010d010_d010d010_d010d010_d010d01"
+
+  let poly_compress
+    (rp_0 : C.reg)
+    (rp_1 : C.reg)
+    (rp_2 : C.reg)
+    (rp_3 : C.reg)
+    (a_0  : C.reg)
+    (a_1  : C.reg)
+    (a_2  : C.reg)
+    (a_3  : C.reg)
+    (a_4  : C.reg)
+    (a_5  : C.reg)
+    (a_6  : C.reg)
+    (a_7  : C.reg)
+    (a_8  : C.reg)
+    (a_9  : C.reg)
+    (a_10 : C.reg)
+    (a_11 : C.reg)
+    (a_12 : C.reg)
+    (a_13 : C.reg)
+    (a_14 : C.reg)
+    (a_15 : C.reg)
+  : C.reg
+  =
+    let open C in
+
+    let qx16 = jqx16 in
+    let r = a_0 in
+    let r_0 = vpsub_16u16 r qx16 in
+    let t = vpsra_16u16 r_0 0x0f in
+    let t_0 = vpand_256 t qx16 in
+    let r_1 = vpadd_16u16 t_0 r_0 in
+    let a_0_0 = r_1 in
+    let r_2 = a_1 in
+    let r_3 = vpsub_16u16 r_2 qx16 in
+    let t_1 = vpsra_16u16 r_3 0x0f in
+    let t_2 = vpand_256 t_1 qx16 in
+    let r_4 = vpadd_16u16 t_2 r_3 in
+    let a_1_0 = r_4 in
+    let r_5 = a_2 in
+    let r_6 = vpsub_16u16 r_5 qx16 in
+    let t_3 = vpsra_16u16 r_6 0x0f in
+    let t_4 = vpand_256 t_3 qx16 in
+    let r_7 = vpadd_16u16 t_4 r_6 in
+    let a_2_0 = r_7 in
+    let r_8 = a_3 in
+    let r_9 = vpsub_16u16 r_8 qx16 in
+    let t_5 = vpsra_16u16 r_9 0x0f in
+    let t_6 = vpand_256 t_5 qx16 in
+    let r_10 = vpadd_16u16 t_6 r_9 in
+    let a_3_0 = r_10 in
+    let r_11 = a_4 in
+    let r_12 = vpsub_16u16 r_11 qx16 in
+    let t_7 = vpsra_16u16 r_12 0x0f in
+    let t_8 = vpand_256 t_7 qx16 in
+    let r_13 = vpadd_16u16 t_8 r_12 in
+    let a_4_0 = r_13 in
+    let r_14 = a_5 in
+    let r_15 = vpsub_16u16 r_14 qx16 in
+    let t_9 = vpsra_16u16 r_15 0x0f in
+    let t_10 = vpand_256 t_9 qx16 in
+    let r_16 = vpadd_16u16 t_10 r_15 in
+    let a_5_0 = r_16 in
+    let r_17 = a_6 in
+    let r_18 = vpsub_16u16 r_17 qx16 in
+    let t_11 = vpsra_16u16 r_18 0x0f in
+    let t_12 = vpand_256 t_11 qx16 in
+    let r_19 = vpadd_16u16 t_12 r_18 in
+    let a_6_0 = r_19 in
+    let r_20 = a_7 in
+    let r_21 = vpsub_16u16 r_20 qx16 in
+    let t_13 = vpsra_16u16 r_21 0x0f in
+    let t_14 = vpand_256 t_13 qx16 in
+    let r_22 = vpadd_16u16 t_14 r_21 in
+    let a_7_0 = r_22 in
+    let r_23 = a_8 in
+    let r_24 = vpsub_16u16 r_23 qx16 in
+    let t_15 = vpsra_16u16 r_24 0x0f in
+    let t_16 = vpand_256 t_15 qx16 in
+    let r_25 = vpadd_16u16 t_16 r_24 in
+    let a_8_0 = r_25 in
+    let r_26 = a_9 in
+    let r_27 = vpsub_16u16 r_26 qx16 in
+    let t_17 = vpsra_16u16 r_27 0x0f in
+    let t_18 = vpand_256 t_17 qx16 in
+    let r_28 = vpadd_16u16 t_18 r_27 in
+    let a_9_0 = r_28 in
+    let r_29 = a_10 in
+    let r_30 = vpsub_16u16 r_29 qx16 in
+    let t_19 = vpsra_16u16 r_30 0x0f in
+    let t_20 = vpand_256 t_19 qx16 in
+    let r_31 = vpadd_16u16 t_20 r_30 in
+    let a_10_0 = r_31 in
+    let r_32 = a_11 in
+    let r_33 = vpsub_16u16 r_32 qx16 in
+    let t_21 = vpsra_16u16 r_33 0x0f in
+    let t_22 = vpand_256 t_21 qx16 in
+    let r_34 = vpadd_16u16 t_22 r_33 in
+    let a_11_0 = r_34 in
+    let r_35 = a_12 in
+    let r_36 = vpsub_16u16 r_35 qx16 in
+    let t_23 = vpsra_16u16 r_36 0x0f in
+    let t_24 = vpand_256 t_23 qx16 in
+    let r_37 = vpadd_16u16 t_24 r_36 in
+    let a_12_0 = r_37 in
+    let r_38 = a_13 in
+    let r_39 = vpsub_16u16 r_38 qx16 in
+    let t_25 = vpsra_16u16 r_39 0x0f in
+    let t_26 = vpand_256 t_25 qx16 in
+    let r_40 = vpadd_16u16 t_26 r_39 in
+    let a_13_0 = r_40 in
+    let r_41 = a_14 in
+    let r_42 = vpsub_16u16 r_41 qx16 in
+    let t_27 = vpsra_16u16 r_42 0x0f in
+    let t_28 = vpand_256 t_27 qx16 in
+    let r_43 = vpadd_16u16 t_28 r_42 in
+    let a_14_0 = r_43 in
+    let r_44 = a_15 in
+    let r_45 = vpsub_16u16 r_44 qx16 in
+    let t_29 = vpsra_16u16 r_45 0x0f in
+    let t_30 = vpand_256 t_29 qx16 in
+    let r_46 = vpadd_16u16 t_30 r_45 in
+    let a_15_0 = r_46 in
+    let x16p = jvx16 in
+    let v = x16p in
+    let shift1 = vpbroadcast_16u16 pc_shift1_s in
+    let mask = vpbroadcast_16u16 pc_mask_s in
+    let shift2 = vpbroadcast_16u16 pc_shift2_s in
+    let permidx = pc_permidx_s in
+    let f0 = a_0_0 in
+    let f1 = a_1_0 in
+    let f2 = a_2_0 in
+    let f3 = a_3_0 in
+    let f0_0 = vpmulh_16u16 f0 v in
+    let f1_0 = vpmulh_16u16 f1 v in
+    let f2_0 = vpmulh_16u16 f2 v in
+    let f3_0 = vpmulh_16u16 f3 v in
+    let f0_1 = vpmulhrs_16u16 f0_0 shift1 in
+    let f1_1 = vpmulhrs_16u16 f1_0 shift1 in
+    let f2_1 = vpmulhrs_16u16 f2_0 shift1 in
+    let f3_1 = vpmulhrs_16u16 f3_0 shift1 in
+    let f0_2 = vpand_256 f0_1 mask in
+    let f1_2 = vpand_256 f1_1 mask in
+    let f2_2 = vpand_256 f2_1 mask in
+    let f3_2 = vpand_256 f3_1 mask in
+    let f0_3 = vpackus_16u16 f0_2 f1_2 in
+    let f2_3 = vpackus_16u16 f2_2 f3_2 in
+    let f0_4 = vpmaddubsw_256 f0_3 shift2 in
+    let f2_4 = vpmaddubsw_256 f2_3 shift2 in
+    let f0_5 = vpackus_16u16 f0_4 f2_4 in
+    let f0_6 = vpermd permidx f0_5 in
+    let rp_0_0 = f0_6 in
+    let f0_7 = a_4_0 in
+    let f1_3 = a_5_0 in
+    let f2_5 = a_6_0 in
+    let f3_3 = a_7_0 in
+    let f0_8 = vpmulh_16u16 f0_7 v in
+    let f1_4 = vpmulh_16u16 f1_3 v in
+    let f2_6 = vpmulh_16u16 f2_5 v in
+    let f3_4 = vpmulh_16u16 f3_3 v in
+    let f0_9 = vpmulhrs_16u16 f0_8 shift1 in
+    let f1_5 = vpmulhrs_16u16 f1_4 shift1 in
+    let f2_7 = vpmulhrs_16u16 f2_6 shift1 in
+    let f3_5 = vpmulhrs_16u16 f3_4 shift1 in
+    let f0_10 = vpand_256 f0_9 mask in
+    let f1_6 = vpand_256 f1_5 mask in
+    let f2_8 = vpand_256 f2_7 mask in
+    let f3_6 = vpand_256 f3_5 mask in
+    let f0_11 = vpackus_16u16 f0_10 f1_6 in
+    let f2_9 = vpackus_16u16 f2_8 f3_6 in
+    let f0_12 = vpmaddubsw_256 f0_11 shift2 in
+    let f2_10 = vpmaddubsw_256 f2_9 shift2 in
+    let f0_13 = vpackus_16u16 f0_12 f2_10 in
+    let f0_14 = vpermd permidx f0_13 in
+    let rp_1_0 = f0_14 in
+    let f0_15 = a_8_0 in
+    let f1_7 = a_9_0 in
+    let f2_11 = a_10_0 in
+    let f3_7 = a_11_0 in
+    let f0_16 = vpmulh_16u16 f0_15 v in
+    let f1_8 = vpmulh_16u16 f1_7 v in
+    let f2_12 = vpmulh_16u16 f2_11 v in
+    let f3_8 = vpmulh_16u16 f3_7 v in
+    let f0_17 = vpmulhrs_16u16 f0_16 shift1 in
+    let f1_9 = vpmulhrs_16u16 f1_8 shift1 in
+    let f2_13 = vpmulhrs_16u16 f2_12 shift1 in
+    let f3_9 = vpmulhrs_16u16 f3_8 shift1 in
+    let f0_18 = vpand_256 f0_17 mask in
+    let f1_10 = vpand_256 f1_9 mask in
+    let f2_14 = vpand_256 f2_13 mask in
+    let f3_10 = vpand_256 f3_9 mask in
+    let f0_19 = vpackus_16u16 f0_18 f1_10 in
+    let f2_15 = vpackus_16u16 f2_14 f3_10 in
+    let f0_20 = vpmaddubsw_256 f0_19 shift2 in
+    let f2_16 = vpmaddubsw_256 f2_15 shift2 in
+    let f0_21 = vpackus_16u16 f0_20 f2_16 in
+    let f0_22 = vpermd permidx f0_21 in
+    let rp_2_0 = f0_22 in
+    let f0_23 = a_12_0 in
+    let f1_11 = a_13_0 in
+    let f2_17 = a_14_0 in
+    let f3_11 = a_15_0 in
+    let f0_24 = vpmulh_16u16 f0_23 v in
+    let f1_12 = vpmulh_16u16 f1_11 v in
+    let f2_18 = vpmulh_16u16 f2_17 v in
+    let f3_12 = vpmulh_16u16 f3_11 v in
+    let f0_25 = vpmulhrs_16u16 f0_24 shift1 in
+    let f1_13 = vpmulhrs_16u16 f1_12 shift1 in
+    let f2_19 = vpmulhrs_16u16 f2_18 shift1 in
+    let f3_13 = vpmulhrs_16u16 f3_12 shift1 in
+    let f0_26 = vpand_256 f0_25 mask in
+    let f1_14 = vpand_256 f1_13 mask in
+    let f2_20 = vpand_256 f2_19 mask in
+    let f3_14 = vpand_256 f3_13 mask in
+    let f0_27 = vpackus_16u16 f0_26 f1_14 in
+    let f2_21 = vpackus_16u16 f2_20 f3_14 in
+    let f0_28 = vpmaddubsw_256 f0_27 shift2 in
+    let f2_22 = vpmaddubsw_256 f2_21 shift2 in
+    let f0_29 = vpackus_16u16 f0_28 f2_22 in
+    let f0_30 = vpermd permidx f0_29 in
+    let rp_3_0 = f0_30 in
+
+    let out = [
+      rp_0_0; rp_1_0; rp_2_0; rp_3_0;
+       a_0_0;  a_1_0;  a_2_0;  a_3_0;
+       a_4_0;  a_5_0;  a_6_0;  a_7_0;
+       a_8_0;  a_9_0; a_10_0; a_11_0;
+      a_12_0; a_13_0; a_14_0; a_15_0;
+    ] in
+
+    List.flatten out
+end
+
+(* -------------------------------------------------------------------- *)
+let poly_compress () : C.reg =
+  let module M = PolyCompress() in
+
+  let rp_0 = C.reg ~size:256 ~name:0x00 in
+  let rp_1 = C.reg ~size:256 ~name:0x01 in
+  let rp_2 = C.reg ~size:256 ~name:0x02 in
+  let rp_3 = C.reg ~size:256 ~name:0x03 in
+  let a_0  = C.reg ~size:256 ~name:0x04 in
+  let a_1  = C.reg ~size:256 ~name:0x05 in
+  let a_2  = C.reg ~size:256 ~name:0x06 in
+  let a_3  = C.reg ~size:256 ~name:0x07 in
+  let a_4  = C.reg ~size:256 ~name:0x08 in
+  let a_5  = C.reg ~size:256 ~name:0x09 in
+  let a_6  = C.reg ~size:256 ~name:0x0a in
+  let a_7  = C.reg ~size:256 ~name:0x0b in
+  let a_8  = C.reg ~size:256 ~name:0x0c in
+  let a_9  = C.reg ~size:256 ~name:0x0d in
+  let a_10 = C.reg ~size:256 ~name:0x0e in
+  let a_11 = C.reg ~size:256 ~name:0x0f in
+  let a_12 = C.reg ~size:256 ~name:0x10 in
+  let a_13 = C.reg ~size:256 ~name:0x11 in
+  let a_14 = C.reg ~size:256 ~name:0x12 in
+  let a_15 = C.reg ~size:256 ~name:0x13 in
+
+  M.poly_compress
+    (rp_0 : C.reg) (rp_1 : C.reg) (rp_2 : C.reg) (rp_3 : C.reg)
+    (a_0  : C.reg) (a_1  : C.reg) (a_2  : C.reg) (a_3  : C.reg)
+    (a_4  : C.reg) (a_5  : C.reg) (a_6  : C.reg) (a_7  : C.reg)
+    (a_8  : C.reg) (a_9  : C.reg) (a_10 : C.reg) (a_11 : C.reg)
+    (a_12 : C.reg) (a_13 : C.reg) (a_14 : C.reg) (a_15 : C.reg)
+
 (* -------------------------------------------------------------------- *)
 let poly_compress () =
   Format.eprintf "%s@." "Constructing circuit...";
 
-  let circuit = Circuit.poly_compress () in
+  let circuit = poly_compress () in
 
   let names = Array.of_list [
     "rp_0";
@@ -539,22 +831,22 @@ let poly_compress () =
 
   Format.eprintf "%s@." "Computing dependencies...";
 
-  let deps = deps circuit in
+  let deps = C.deps circuit in
 
   List.iter (fun ((lo, hi), deps) ->
     let vs =
          Iter.(--) lo hi
       |> Iter.fold (fun vs i ->
            let name = Format.sprintf "out_%03d" (i / 256) in
-           VarRange.push vs (name, i mod 256)
-         ) VarRange.empty in
+           C.VarRange.push vs (name, i mod 256)
+         ) C.VarRange.empty in
 
     Format.eprintf "%a: %a@."
-      (VarRange.pp Format.pp_print_string) vs
-      (VarRange.pp
+      (C.VarRange.pp Format.pp_print_string) vs
+      (C.VarRange.pp
          (fun fmt i -> Format.fprintf fmt "%s" names.(i)))
       deps
   ) deps
 
 (* -------------------------------------------------------------------- *)
-let () = main ()
+let () = poly_compress ()
