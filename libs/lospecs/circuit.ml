@@ -230,12 +230,12 @@ let asr_ (r : reg) (s : reg) : reg =
   in r
 
 (* -------------------------------------------------------------------- *)
-let shift ~(side : [`L | `R]) ~(sign : [`U | `S]) =
+let shift ~(side : [`L | `R]) ~(sign : [`L | `A]) =
   match side, sign with
-  | `L, `U -> lsl_
-  | `R, `U -> lsr_
-  | `L, `S -> asl_
-  | `R, `S -> asr_
+  | `L, `L -> lsl_
+  | `R, `L -> lsr_
+  | `L, `A -> asl_
+  | `R, `A -> asr_
 
 (* -------------------------------------------------------------------- *)
 let halfadder (a : node) (b : node) : node * node =
@@ -361,6 +361,10 @@ let smull (r1 : reg) (r2 : reg) : reg =
   fst (smul_ r1 r2)
 
 (* -------------------------------------------------------------------- *)
+let smulh (r1 : reg) (r2 : reg) : reg =
+  snd (smul_ r1 r2)
+
+  (* -------------------------------------------------------------------- *)
 let ssat ~(size : int) (r : reg) : reg =
   assert (0 < size);
   assert (size < List.length r);

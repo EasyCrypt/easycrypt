@@ -158,10 +158,12 @@ let test_shift ~(side : [`L | `R]) ~(sign : [`U | `S]) =
       )
     in
 
+    let asign = match sign with `U -> `L | `S -> `A in
+
     { name = (Printf.sprintf "shift<%s,%s,%d>" str_side str_sign size)
     ; args = [(size, sign); (4, `U)]
     ; out  = sign
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.shift ~side ~sign x y)
+    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.shift ~side ~sign:asign x y)
     ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
     }
 

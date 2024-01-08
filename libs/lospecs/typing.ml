@@ -57,7 +57,7 @@ type aexpr_ =
   | EMap of (aword * aword) * (aargs * aexpr) * aexpr list
   | EConcat of aword * aexpr list
   | ERepeat of aword * (aexpr * int)
-  | EShift of lr * la * aexpr * aexpr 
+  | EShift of lr * la * (aexpr * aexpr) 
   | ESat of us * aword * aexpr
   | ELet of (ident * aargs option * aexpr) * aexpr
   | ENot of aword * aexpr
@@ -227,7 +227,7 @@ end = struct
     s_ntyparams = 1;
     s_argsty = (fun ws -> [as_seq1 ws; `W 16]);
     s_retty = (fun ws -> as_seq1 ws);
-    s_mk = (fun _ -> mk2 (fun x y -> EShift (`L, `A, x, y)));
+    s_mk = (fun _ -> mk2 (fun x y -> EShift (`L, `A, (x, y))));
   }
 
   let mulop ?ret ~(name : string) (s : us) (k : hld) =
@@ -449,7 +449,7 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
       let e, n = as_seq2 (check_arguments_count ~expected:2 args) in
       let n = as_int_constant n in
       let ne = tt_expr env ~check:(`W w) e in
-      (None, { node = ERepeat (`W (w * n),(ne,n)); type_ = `W (w * n); })
+      (None, { node = ERepeat (`W (w * n), (ne, n)); type_ = `W (w * n); })
 
   | PEApp (("map", w), args) ->
     let `W w, `W n = as_seq2 (tt_type_parameters ~expected:2 w) in

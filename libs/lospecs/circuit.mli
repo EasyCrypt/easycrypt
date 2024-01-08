@@ -68,7 +68,7 @@ val asl_ : reg -> reg -> reg
 
 val asr_ : reg -> reg -> reg
 
-val shift : side:[`L | `R] -> sign:[`U | `S] -> reg -> reg -> reg
+val shift : side:[`L | `R] -> sign:[`L | `A] -> reg -> reg -> reg
 
 (* ==================================================================== *)
 val incr : reg -> node * reg
@@ -101,6 +101,8 @@ val umulh : reg -> reg -> reg
 val smul : reg -> reg -> reg
 
 val smull : reg -> reg -> reg
+
+val smulh : reg -> reg -> reg
 
 (* ==================================================================== *)
 val sat : signed:bool -> size:int -> reg -> reg

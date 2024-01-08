@@ -46,7 +46,7 @@ let rec bd_aexpr (e: aexpr) : deps =
         | 0 -> acc
         | _ -> doit (d::acc) d (i-1)
       in aggregate ~csize:(n/i) (List.enum (doit [] (bd_aexpr e) i)))
-  | EShift (lr, la, eb, es) -> 
+  | EShift (lr, la, (eb, es)) -> 
       let bd = bd_aexpr eb in
       (match (es.node, eb.type_) with
       | (EInt i, `W n) -> 
@@ -98,6 +98,7 @@ let rec bd_aexpr (e: aexpr) : deps =
       | `D -> restrict ~min:(0) ~max:(n) 
       | `H -> (fun d -> d |> restrict ~min:(n) ~max:(2*n) |> offset ~offset:(-n))
       | `L -> restrict ~min:(0) ~max:(n))
+  | _ -> assert false
 
   (* propagate v deps to t deps in d *)
 and propagate ~(offset:int) (v: symbol) (t: deps) (d: deps) : deps =
