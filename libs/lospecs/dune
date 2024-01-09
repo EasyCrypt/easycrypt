@@ -26,7 +26,7 @@
   (:standard -open Batteries))
  (modules lospecs_test)
  (promote (until-clean))
- (libraries batteries lospecs))
+ (libraries batteries cmdliner lospecs))
 
 (executable
  (name circuit_test)
