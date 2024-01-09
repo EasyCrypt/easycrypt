@@ -137,7 +137,7 @@ module FromSpec () = struct
   (* ------------------------------------------------------------------ *)
   let specs =
     let spec = Filename.concat (List.hd Config.Sites.specs) "avx2.spec" in
-    let spec = File.with_file_in spec Io.parse in
+    let spec = File.with_file_in spec (Io.parse spec) in
     let spec = Typing.tt_program Typing.Env.empty spec in
 
     (*

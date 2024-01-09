@@ -10,7 +10,7 @@ type options = {
 
 (* -------------------------------------------------------------------- *)
 let entry (options : options) =
-  let prog = File.with_file_in options.input Io.parse in
+  let prog = File.with_file_in options.input (Io.parse options.input) in
 
   if options.pp_pst then begin
     Format.eprintf "%a@."
@@ -18,7 +18,16 @@ let entry (options : options) =
       (Ptree.pprogram_to_yojson prog)
   end;
 
-  let ast = Typing.tt_program Typing.Env.empty prog in
+  let ast =
+    try
+      Typing.tt_program Typing.Env.empty prog
+
+    with Typing.TypingError (range, msg) ->
+      Format.eprintf "%a: %s@." Ptree.Lc.pp_range range msg;
+      Format.eprintf "@.";
+      Io.print_source_for_range Format.err_formatter range options.input;
+      exit 1
+    in
 
   if options.pp_ast then begin
     List.iter (fun (_, def) ->
@@ -28,7 +37,7 @@ let entry (options : options) =
     ) ast
   end;
 
-  let _dep = List.map Bitdep.bd_adef (List.map snd ast) in
+  (* let _dep = List.map Bitdep.bd_adef (List.map snd ast) in *)
 
   ()
 
@@ -51,7 +60,7 @@ let main () : unit =
 
     let input =
       let doc = "The specification file" in
-      Arg.(value & pos 0 string "" & info [] ~docv:"SPEC" ~doc) in
+      Arg.(required & pos 0 (some string) None & info [] ~docv:"SPEC" ~doc) in
 
     let info = Cmd.info "lospec" in
     Cmd.v info Term.(const mk $ print_pst $ print_ast $ input)

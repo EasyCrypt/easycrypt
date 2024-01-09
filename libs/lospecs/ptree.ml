@@ -47,6 +47,24 @@ module Lc = struct
 
   let map (f : 'a -> 'b) (x : 'a loced) : 'b loced =
     { x with data = f x.data }
+
+  let string_of_range (range : range) =
+    let spos =
+      if range.rg_begin = range.rg_end then
+        Printf.sprintf "line %d (%d)"
+          (fst range.rg_begin) (snd range.rg_begin + 1)
+      else if fst range.rg_begin = fst range.rg_end then
+        Printf.sprintf "line %d (%d-%d)"
+          (fst range.rg_begin) (snd range.rg_begin + 1) (snd range.rg_end + 1)
+      else
+        Printf.sprintf "line %d (%d) to line %d (%d)"
+          (fst range.rg_begin) (snd range.rg_begin + 1)
+          (fst range.rg_end  ) (snd range.rg_end   + 1)
+    in
+      Printf.sprintf "%s: %s" range.rg_fname spos
+
+  let pp_range (fmt : Format.formatter) (range : range) =
+    Format.fprintf fmt "%s" (string_of_range range)
 end
 
 (* -------------------------------------------------------------------- *)
