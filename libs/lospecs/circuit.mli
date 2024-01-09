@@ -84,6 +84,10 @@ val addc : reg -> reg -> reg
 
 val add_dropc : reg -> reg -> reg
 
+val ssadd : reg -> reg -> reg
+
+val usadd : reg -> reg -> reg
+
 (* ==================================================================== *)
 val opp : reg -> reg
 
@@ -103,6 +107,8 @@ val smul : reg -> reg -> reg
 val smull : reg -> reg -> reg
 
 val smulh : reg -> reg -> reg
+
+val usmul : reg -> reg -> reg
 
 (* ==================================================================== *)
 val sat : signed:bool -> size:int -> reg -> reg

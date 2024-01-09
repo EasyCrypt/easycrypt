@@ -404,3 +404,30 @@ let sat ~(signed : bool) ~(size : int) (r : reg) : reg =
   match signed with
   | true  -> ssat ~size r
   | false -> usat ~size r
+
+(* -------------------------------------------------------------------- *)
+let ssadd (r1 : reg) (r2 : reg) : reg =
+  let n1 = List.length r1 in
+  let n2 = List.length r2 in
+  let n = max n1 n2 in
+
+  let r1 = sextend ~size:(n+1) r1 in
+  let r2 = sextend ~size:(n+1) r2 in
+
+  ssat ~size:n (add_dropc r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let usadd (r1 : reg) (r2 : reg) : reg =
+  let r = addc r1 r2 in
+  usat ~size:(List.length r - 1) r
+
+(* -------------------------------------------------------------------- *)
+let usmul (r1 : reg) (r2 : reg) : reg =
+  let n1 = List.length r1 in
+  let n2 = List.length r2 in
+  let nm = max n1 n2 in
+
+  let r1 = uextend ~size:(2*nm) r1 in
+  let r2 = sextend ~size:(2*nm) r2 in
+
+  smull r1 r2

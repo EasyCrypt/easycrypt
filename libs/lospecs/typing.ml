@@ -46,10 +46,10 @@ type la = [`L | `A] [@@deriving yojson]
 type us = [`U | `S] [@@deriving yojson]
 type hl = [`H | `L] [@@deriving yojson]
 type hld = [hl | `D] [@@deriving yojson]
+type mulk = [`U of hld | `S of hld | `US] [@@deriving yojson]
 
 (* -------------------------------------------------------------------- *)
 type aexpr_ =
-  | ECast of aexpr * atype
   | EVar of ident
   | EInt of int
   | ESlice of aexpr * (aexpr * int * int)
@@ -62,17 +62,22 @@ type aexpr_ =
   | ELet of (ident * aargs option * aexpr) * aexpr
   | ENot of aword * aexpr
   | EIncr of aword * aexpr
-  | EAdd of aword * bool * (aexpr * aexpr)
+  | EAdd of aword * [`Sat of us | `Word] * (aexpr * aexpr)
   | ESub of aword * (aexpr * aexpr)
   | EOr of aword * (aexpr * aexpr)
   | EAnd of aword * (aexpr * aexpr)
-  | EMul of us * hld * aword * (aexpr * aexpr)
+  | EMul of mulk * aword * (aexpr * aexpr)
 [@@deriving yojson]
 
 and aexpr = { node : aexpr_; type_ : atype } [@@deriving yojson]
 
 (* -------------------------------------------------------------------- *)
-type adef = { arguments : aargs; body : aexpr; rettype : aword } [@@deriving yojson]
+type adef = {
+  name: string;
+  arguments : aargs;
+  body : aexpr;
+  rettype : aword
+} [@@deriving yojson]
 
 (* -------------------------------------------------------------------- *)
 let get_size (`W w : aword) : int =
@@ -181,7 +186,8 @@ module Sigs : sig
   val not : sig_
   val incr : sig_
   val add : sig_
-  val addc : sig_
+  val ssadd : sig_
+  val usadd : sig_
   val sub : sig_
   val and_ : sig_
   val or_ : sig_
@@ -191,6 +197,7 @@ module Sigs : sig
   val smul : sig_
   val smullo : sig_
   val smulhi : sig_
+  val usmul : sig_
 end = struct
   let mk1 (f : aexpr -> aexpr_) (a : aexpr list) =
     f (as_seq1 a)
@@ -219,21 +226,21 @@ end = struct
     s_ntyparams = 2;
     s_argsty = (fun ws -> [fst (as_seq2 ws)]);
     s_retty = (fun ws -> snd (as_seq2 ws));
-    s_mk = (fun ws -> mk1 (fun x -> ESat (k, fst (as_seq2 ws), x)));
+    s_mk = (fun ws -> mk1 (fun x -> ESat (k, snd (as_seq2 ws), x)));
   }
 
   let shiftop ~(name : string) (d : lr) (k : la) = {
     s_name = name;
     s_ntyparams = 1;
-    s_argsty = (fun ws -> [as_seq1 ws; `W 16]);
+    s_argsty = (fun ws -> [as_seq1 ws; `W 8]);
     s_retty = (fun ws -> as_seq1 ws);
-    s_mk = (fun _ -> mk2 (fun x y -> EShift (`L, `A, (x, y))));
+    s_mk = (fun _ -> mk2 (fun x y -> EShift (d, k, (x, y))));
   }
 
-  let mulop ?ret ~(name : string) (s : us) (k : hld) =
+  let mulop ?ret ~(name : string) (k : mulk) =
     let mk = fun ws x y ->
       let w = as_seq1 ws in
-      EMul (s, k, w, (x, y))
+      EMul (k, w, (x, y))
     in
     binop ?ret ~name mk
 
@@ -264,12 +271,16 @@ end = struct
     uniop ~name:"incr" mk
 
   let add : sig_ =
-    let mk = fun ws x y -> EAdd (as_seq1 ws, false, (x, y)) in
+    let mk = fun ws x y -> EAdd (as_seq1 ws, `Word, (x, y)) in
     binop ~name:"add" mk
 
-  let addc : sig_ =
-    let mk = fun ws x y -> EAdd (as_seq1 ws, true, (x, y)) in
-    binop ~ret:(fun n -> n + 1) ~name:"addc" mk
+  let ssadd : sig_ =
+    let mk = fun ws x y -> EAdd (as_seq1 ws, `Sat `S, (x, y)) in
+    binop ~name:"ssadd" mk
+
+  let usadd : sig_ =
+    let mk = fun ws x y -> EAdd (as_seq1 ws, `Sat `U, (x, y)) in
+    binop ~name:"usadd" mk
 
   let sub : sig_ =
     let mk = fun ws x y -> ESub (as_seq1 ws, (x, y)) in
@@ -284,22 +295,25 @@ end = struct
     binop ~name:"or" mk
 
   let umul : sig_ =
-    mulop ~ret:(fun n -> 2 * n) ~name:"umul" `U `D
+    mulop ~ret:(fun n -> 2 * n) ~name:"umul" (`U `D)
 
   let umulhi : sig_ =
-    mulop ~name:"umulhi" `U `H
+    mulop ~name:"umulhi" (`U `H)
   
   let umullo : sig_ =
-    mulop ~name:"umullo" `U `L  
+    mulop ~name:"umullo" (`U `L)  
 
   let smul : sig_ =
-    mulop ~ret:(fun n -> 2 * n) ~name:"smul" `S `D
+    mulop ~ret:(fun n -> 2 * n) ~name:"smul" (`S `D)
 
   let smulhi : sig_ =
-    mulop ~name:"smulhi" `S `H
+    mulop ~name:"smulhi" (`S `H)
 
   let smullo : sig_ =
-    mulop ~name:"smullo" `S `L  
+    mulop ~name:"smullo" (`S `L)  
+
+  let usmul : sig_ =
+    mulop ~ret:(fun n -> 2 * n) ~name:"usmul" `US
 end
 
 (* -------------------------------------------------------------------- *)
@@ -313,7 +327,8 @@ let sigs : sig_ list = [
   Sigs.not;
   Sigs.incr;
   Sigs.add;
-  Sigs.addc;
+  Sigs.ssadd;
+  Sigs.usadd;
   Sigs.sub;
   Sigs.and_;
   Sigs.or_;
@@ -323,11 +338,18 @@ let sigs : sig_ list = [
   Sigs.smul;
   Sigs.smullo;
   Sigs.smulhi;  
+  Sigs.usmul;  
 ]
 
 (* -------------------------------------------------------------------- *)
 let get_sig_of_name (name : string) : sig_ option =
   List.find_opt (fun x -> x.s_name = name) sigs
+
+(* -------------------------------------------------------------------- *)
+let ty_compatible ~(src : atype) ~(dst : atype) : bool =
+  match src, dst with
+  | (`Signed | `Unsigned), `W _ -> true
+  | _, _ -> src = dst
 
 (* -------------------------------------------------------------------- *)
 let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
@@ -461,6 +483,11 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
     let nargs = List.map (tt_expr ~check:(`W (w * n)) env) args in
 
     let ftargs, ftbody = tt_expr_ env f in
+  
+    let ftype =
+      match ftbody.type_ with
+      | `W k -> k
+      | _ -> tyerror "mapped function should return a word" in
 
     let ftargs =
       Option.get_exn
@@ -472,14 +499,8 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
     if targs <> List.make (List.length args) (`W w) then
       tyerror "invalid argument types / count";
 
-    let m =
-      match ftbody.type_ with
-      | `W m -> m
-      | _ -> tyerror "function should return a word"
-    in
-
     let node = EMap ((`W w, `W n), (ftargs, ftbody), nargs)
-    and type_ = `W (m * n) in
+    and type_ = `W (n * ftype) in
     (None, { node; type_; })
 
   | PEApp ((f, Some w), args) ->
@@ -524,6 +545,7 @@ and tt_expr (env : env) ?(check : atype option) (p : pexpr) : aexpr =
   let (args, {node = n_; type_ = t;}) = tt_expr_ env p in
   if not (Option.is_none args) then
     tyerror "high-order functions not allowed here";
+  Option.may (fun dst -> assert (ty_compatible ~src:t ~dst)) check;
   { node = n_; type_ = Option.default t check; }
 
 (* -------------------------------------------------------------------- *)
@@ -545,10 +567,9 @@ and tt_exprs (env : env) ~(expected : atype list) (es : pexpr list) : aexpr list
 
 (* -------------------------------------------------------------------- *)
 let tt_def (env : env) (p : pdef) : symbol * adef =
-  Format.eprintf "%s@." p.name;
   let env, args = tt_args env p.args in
   let bod = tt_expr env ~check:(tt_pword env p.rty) p.body in
-  (p.name, { arguments = args; body = bod; rettype = p.rty; })
+  (p.name, { name = p.name; arguments = args; body = bod; rettype = p.rty; })
 
 (* -------------------------------------------------------------------- *)
 let tt_program (env : env) (p : pprogram) : (symbol * adef) list =

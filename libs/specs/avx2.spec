@@ -1,7 +1,7 @@
 # Intel intrinsic: _mm256_permutexvar_epi32
-VPERMD(w@256, widx@256) -> @256 =
+VPERMD(widx@256, w@256) -> @256 =
   map<32, 8>(
-    fun idx@32 . let i = idx[0:2] in w[@32|i],
+    fun idx@32 . let i = idx[0:3] in w[@32|i],
     widx
   )
 
@@ -22,8 +22,8 @@ VPNAND_256(w1@256, w2@256) -> @256 =
   not<256>(and<256>(w1, w2))
 
 # Intel intrisic: _mm256_broadcastw_epi16
-VPBROADCAST_16u16(w1@128) -> @256 = 
-  repeat<16>(w1[@16|0], 16)
+VPBROADCAST_16u16(w@16) -> @256 = 
+  repeat<16>(w[@16|0], 16)
   
 # Intel intrisic: _mm256_mulhi_epu16
 VPMULH_16u16(w1@256, w2@256) -> @256 =
@@ -33,7 +33,7 @@ VPMULH_16u16(w1@256, w2@256) -> @256 =
 VPMULHRS_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(
     fun x@16 y@16 .
-      let w = srl<32>(smul<16>(x, y), 14) in
+      let w = smul<16>(x, y) in
       let w = incr<32>(srl<32>(w, 14)) in
       w[1:16],
     w1,
@@ -48,10 +48,10 @@ VPSRA_16u16(w@256, count@8) -> @256 =
 VPMADDUBSW_256(w1@256, w2@256) -> @256 =
   map<16, 16>(
     fun x@16 y@16 .
-      ssat<17, 16>(addc<16>(
-        smul<8>(x[@8|0], y[@8|0]),
-        smul<8>(x[@8|1], y[@8|1])
-      )),
+      ssadd<16>(
+        usmul<8>(x[@8|0], y[@8|0]),
+        usmul<8>(x[@8|1], y[@8|1])
+      ),
     w1,
     w2
   )
@@ -60,7 +60,7 @@ VPMADDUBSW_256(w1@256, w2@256) -> @256 =
 PACKUS_16u16(w1@256, w2@256) -> @256 =
   let pack (w@128) = map<16, 8>(usat<16, 8>, w) in
 
-  concat<128>(
+  concat<64>(
     pack(w1[@128|0]),
     pack(w2[@128|0]),
     pack(w1[@128|1]),

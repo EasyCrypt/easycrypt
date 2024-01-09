@@ -5,7 +5,7 @@ open Lospecs
 module C = struct
   include Lospecs.Aig
   include Lospecs.Circuit
-  include Lospecs.Circuit_avx2.HandMade
+  include Lospecs.Circuit_avx2.FromSpec ()
 end
 (* -------------------------------------------------------------------- *)
 let as_seq1 (type t) (xs : t list) =
@@ -851,4 +851,4 @@ let poly_compress () =
   ) deps
 
 (* -------------------------------------------------------------------- *)
-let () = poly_compress ()
+let () = main ()

@@ -7,7 +7,6 @@ open Typing
 let rec bd_aexpr (e: aexpr) : deps =
   let { node = e_; type_ = t_; } = e in
   match e_ with 
-  | ECast (e_, t_) -> bd_aexpr e_ (* fix semantic for non identity casts *)
   | EVar v -> (match t_ with 
     | `W n -> (copy ~offset:(0) ~size:(n) (Ident.name v)) 
     | _ -> (copy ~offset:0 ~size:256 (Ident.name v))) (* assuming integers have 256 bits *) 
@@ -75,12 +74,12 @@ let rec bd_aexpr (e: aexpr) : deps =
   | ELet ((v, _, e1), e2) -> 
       let bd1, bd2 = (bd_aexpr e1, bd_aexpr e2) in
       propagate ~offset:0 (Ident.name v) bd1 bd2
-  | EAdd (`W n, c, (e1, e2)) -> (* add and sub assuming no overflow *)
+  | EAdd (`W n, _, (e1, e2)) -> (* add and sub assuming no overflow *)
       let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
       1 --^ n |> Enum.fold (fun d i -> d 
         |> merge (offset ~offset:(i) d1) 
         |> merge (offset ~offset:(i) d2)) (merge d1 d2)
-      |> (match c with | true -> (fun a -> a) | false -> restrict ~min:(0) ~max:(n))
+      |> restrict ~min:(0) ~max:(n)
   | ESub (`W n, (e1, e2)) -> 
       let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
       1 --^ n |> Enum.fold (fun d i -> d 
@@ -89,15 +88,16 @@ let rec bd_aexpr (e: aexpr) : deps =
       |> restrict ~min:(0) ~max:(n)
   | EOr  (`W n, (e1, e2)) -> merge (bd_aexpr e1) (bd_aexpr e2)
   | EAnd (`W n, (e1, e2)) -> merge (bd_aexpr e1) (bd_aexpr e2)
-  | EMul (su, dhl, `W n, (e1, e2)) -> 
+  | EMul (k, `W n, (e1, e2)) -> 
       let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
-      1 --^ (match dhl with |`D -> n | _ -> 2*n) |> Enum.fold (fun d i -> d 
+      1 --^ (match k with | `U `D | `S `D -> n | _ -> 2*n) |> Enum.fold (fun d i -> d 
         |> merge (offset ~offset:(i) d1) 
         |> merge (offset ~offset:(i) d2)) (merge d1 d2)
-      |> (match dhl with 
-      | `D -> restrict ~min:(0) ~max:(n) 
-      | `H -> (fun d -> d |> restrict ~min:(n) ~max:(2*n) |> offset ~offset:(-n))
-      | `L -> restrict ~min:(0) ~max:(n))
+      |> (match k with 
+      | `U `D | `S `D -> restrict ~min:(0) ~max:(2*n) 
+      | `U `H | `S `H -> (fun d -> d |> restrict ~min:(n) ~max:(2*n) |> offset ~offset:(-n))
+      | `U `L | `S `L -> restrict ~min:(0) ~max:(n)
+      | _ -> assert false)
   | _ -> assert false
 
   (* propagate v deps to t deps in d *)

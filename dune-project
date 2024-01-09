@@ -10,7 +10,7 @@
 
 (package
  (name easycrypt)
- (sites (lib theories) (libexec commands))
+ (sites (lib theories) (lib specs) (libexec commands))
  (depends
   (ocaml (>= 4.08.0))
   (batteries (>= 3))

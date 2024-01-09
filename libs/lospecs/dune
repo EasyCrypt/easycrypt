@@ -1,9 +1,13 @@
+(generate_sites_module
+ (module config)
+ (sites easycrypt))
+
 (library
  (name lospecs)
  (public_name easycrypt.lospecs)
  (flags
   (:standard -open Batteries))
- (modules :standard \ lospecs_test circuit_test)
+ (modules :standard config \ lospecs_test circuit_test)
  (preprocess
   (pps ppx_deriving_yojson))
  (foreign_stubs
@@ -14,7 +18,7 @@
   (language cxx)
   (flags :standard -std=c++17 -mavx -mavx2 -mavx512f -mavx512vl)
   (names avx512_runtime))
- (libraries batteries menhirLib zarith ppx_deriving_yojson.runtime))
+ (libraries batteries dune-site menhirLib zarith ppx_deriving_yojson.runtime))
 
 (executable
  (name lospecs_test)
