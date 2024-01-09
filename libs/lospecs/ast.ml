@@ -73,3 +73,14 @@ type adef = {
 (* -------------------------------------------------------------------- *)
 let get_size (`W w : aword) : int =
   w
+
+(* -------------------------------------------------------------------- *)
+let pp_aword (fmt : Format.formatter) (`W n : aword) =
+  Format.fprintf fmt "@%d" n
+
+(* -------------------------------------------------------------------- *)
+let pp_atype (fmt : Format.formatter) (t : atype) =
+  match t with
+  | `W _ as w -> Format.fprintf fmt "%a" pp_aword w
+  | `Unsigned -> Format.fprintf fmt "%s" "unsigned"
+  | `Signed -> Format.fprintf fmt "%s" "signed"

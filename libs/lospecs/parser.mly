@@ -49,12 +49,15 @@
 %inline wtype:
 | w=loc(wtype_) { w }
 
-fname:
+fname_:
 | f=loc(IDENT)
     { (f, None) }
 
 | f=loc(IDENT) p=angled(list0(loc(NUMBER), COMMA))
     { (f, Some (List.map (Lc.map (fun x -> `W x)) p)) }
+
+%inline fname:
+| f=loc(fname_) { f }
 
 sexpr_:
 | f=fname

@@ -25,8 +25,25 @@ module Lc = struct
     let p2 = Lexing.lexeme_end_p lx in
     of_positions p1 p2
 
+  let merge (p1 : range) (p2 : range) =
+    assert (p1.rg_fname = p2.rg_fname);
+    { rg_fname = p1.rg_fname;
+      rg_begin = min p1.rg_begin p2.rg_begin;
+      rg_end   = max p1.rg_end   p2.rg_end; }
+  
+  let mergeall (p : range list) =
+    match p with
+    | [] -> assert false
+    | t :: ts -> List.fold_left merge t ts
+
   let unloc (x : 'a loced) : 'a =
     x.data
+
+  let range (x : 'a loced) : range =
+    x.range
+
+  let mk (range : range) (data : 'a) : 'a loced =
+    { range; data; }
 
   let map (f : 'a -> 'b) (x : 'a loced) : 'b loced =
     { x with data = f x.data }
@@ -43,7 +60,7 @@ type pword = word loced [@@deriving yojson]
 type ptype = type_ loced [@@deriving yojson]
 type parg = psymbol * pword [@@deriving yojson]
 type pargs = parg list [@@deriving yojson]
-type pfname = psymbol * pword list option [@@deriving yojson]
+type pfname = (psymbol * pword list option) loced [@@deriving yojson]
 
 (* -------------------------------------------------------------------- *)
 type pexpr_ =

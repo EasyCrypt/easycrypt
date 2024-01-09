@@ -44,46 +44,71 @@ type env = Env.env
 let tt_pword (_ : env) ({ data = `W ty } : pword) : aword = `W ty
 
 (* -------------------------------------------------------------------- *)
-exception TypingError of string
+exception TypingError of range * string
 
 (* -------------------------------------------------------------------- *)
-let mk_tyerror_r f msg =
+let mk_tyerror_r (rg : range) (f : exn -> 'a) msg =
   let buf = Buffer.create 0 in
   let fbuf = Format.formatter_of_buffer buf in
   Format.kfprintf
     (fun _ ->
       Format.pp_print_flush fbuf ();
-      f (TypingError (Buffer.contents buf)))
+      f (TypingError (rg, Buffer.contents buf)))
     fbuf msg
 
 (* -------------------------------------------------------------------- *)
-let mk_tyerror msg = mk_tyerror_r identity msg
+let mk_tyerror (range : range) msg =
+  mk_tyerror_r range identity msg
 
 (* -------------------------------------------------------------------- *)
-let tyerror msg = mk_tyerror_r (fun e -> raise e) msg
+let tyerror (range : range) msg =
+  mk_tyerror_r range (fun e -> raise e) msg
 
 (* -------------------------------------------------------------------- *)
 let tt_type (_ : env) (t : ptype) : atype =
   (t.data :> atype)
 
 (* -------------------------------------------------------------------- *)
-let tt_type_parameters (env : env) ~(expected : int) (tp : pword list option) =
+let tt_type_parameters
+  (env : env)
+  (range : range)
+  (who : symbol)
+  ~(expected : int)
+  (tp : pword list option)
+=
   match tp with
-  | None -> tyerror "missing type parameters annotation"
+  | None -> tyerror range "missing type parameters annotation"
   | Some tp ->
       let tplen = List.length tp in
-      if expected <> tplen then
-        tyerror "invalid number of type parameters: %d / %d" tplen expected;
+      if expected <> tplen then begin
+        tyerror range
+          "invalid number of type parameters for `%s': expected %d, got %d"
+          who expected tplen
+      end;
       (List.map (tt_pword env) tp)
 
 (* -------------------------------------------------------------------- *)
-let check_arguments_count ~(expected : int) (args : pexpr list) =
-  if List.length args <> expected then tyerror "invalid number of arguments";
+let check_arguments_count (range : range) ~(expected : int) (args : pexpr list) =
+  if List.length args <> expected then
+    tyerror range "invalid number of arguments";
   args
 
 (* -------------------------------------------------------------------- *)
+let check_plain_arg (_ : env) (arg : pexpr option loced) =
+  match arg.data with
+  | None -> begin
+      tyerror
+        arg.range
+        "this argument cannot be generalized (not in a higher-order context)"
+    end
+  | Some arg ->
+    arg
+
+(* -------------------------------------------------------------------- *)
 let as_int_constant (e : pexpr) : int =
-  match e.data with PEInt i -> i | _ -> tyerror "integer constant expected"
+  match e.data with
+  | PEInt i -> i
+  | _ -> tyerror e.range "integer constant expected"
 
 (* -------------------------------------------------------------------- *)
 type sig_ = {
@@ -284,10 +309,10 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
       let benv, args = tt_args env fargs in
       (Some args, tt_expr benv f)
   
-  | PEFName (v, None) -> begin
+  | PEFName { data = (v, None) } -> begin
     let (vid, (targs, vt)) = Option.get_exn
       (Env.lookup env (Lc.unloc v))
-      (mk_tyerror "unknown variable: %s" (Lc.unloc v)) in
+      (mk_tyerror v.range "unknown variable: %s" (Lc.unloc v)) in
 
     match targs with
     | None ->
@@ -303,8 +328,13 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
       (Some ftargs, { node = EApp (vid, args); type_ = vt; })
     end
 
-  | PEFName (v, Some ws) ->
-      let sig_ = Option.get (get_sig_of_name (Lc.unloc v)) in
+  | PEFName { data = (v, Some ws) } ->
+      let sig_ =
+        Option.get_exn
+          (get_sig_of_name (Lc.unloc v))
+          (mk_tyerror v.range "unkown symbol: %s" (Lc.unloc v))
+      in
+
       let ws = List.map (tt_pword env) ws in
       let args = sig_.s_argsty ws in
       let retty = sig_.s_retty ws in
@@ -349,18 +379,21 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
       and type_ = `W (len * scale) in
       (None, { node; type_; })
 
-  | PEApp ((f, None), args) ->
+  | PEApp ({ data = (f, None) }, args) ->
     let (vid, (targs, vt)) = Option.get_exn
       (Env.lookup env (Lc.unloc f))
-      (mk_tyerror "unknown symbol: %s" (Lc.unloc f)) in
+      (mk_tyerror f.range "unknown symbol: %s" (Lc.unloc f)) in
 
     let targs =
       Option.get_exn
         targs
-        (mk_tyerror "this symbol cannot be applied") in
+        (mk_tyerror f.range "the symbol `%s' cannot be applied" (Lc.unloc f)) in
 
-    if List.length args <> List.length targs then
-      tyerror "invalid argument count";
+    if List.length args <> List.length targs then begin
+      tyerror e.range
+        "invalid number of arguments: expected %d, got %d"
+        (List.length targs) (List.length args)
+    end;
   
     let bds, args = List.fold_left_map (fun bds (a, ety) ->
         match a.data with
@@ -378,26 +411,27 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
   
     (bds, { node; type_ = vt; })
     
-  | PEApp (({ data = "concat" }, w), args) ->
-      let (`W w) = as_seq1 (tt_type_parameters env ~expected:1 w) in
-      let args = List.map (Lc.unloc %> Option.get) args in
+  | PEApp ({ data = ({ data = "concat" as f }, w) } as fn, args) ->
+      let (`W w) = as_seq1 (tt_type_parameters env fn.range f ~expected:1 w) in
+      let args = List.map (check_plain_arg env) args in
       let targs = List.map (tt_expr env ~check:(`W w)) args in
       let wsz = `W (w * List.length targs) in
       (None, { node = EConcat (wsz, targs); type_ = wsz; })
 
-  | PEApp (({ data = "repeat" }, w), args) ->
-      let (`W w) = as_seq1 (tt_type_parameters env ~expected:1 w) in
-      let args = List.map (Lc.unloc %> Option.get) args in
-      let e, n = as_seq2 (check_arguments_count ~expected:2 args) in
+  | PEApp ({ data = ({ data = "repeat" as f }, w) } as fn, args) ->
+      let (`W w) = as_seq1 (tt_type_parameters env fn.range f ~expected:1 w) in
+      let args = List.map (check_plain_arg env) args in
+      let e, n = as_seq2 (check_arguments_count e.range ~expected:2 args) in
       let n = as_int_constant n in
       let ne = tt_expr env ~check:(`W w) e in
       (None, { node = ERepeat (`W (w * n), (ne, n)); type_ = `W (w * n); })
 
-  | PEApp (({ data = "map" }, w), args) ->
-    let `W w, `W n = as_seq2 (tt_type_parameters env ~expected:2 w) in
-    let args = List.map (Lc.unloc %> Option.get) args in
+  | PEApp ({ data = ({ data = "map" as c }, w) } as cn, args) ->
+    let `W w, `W n = as_seq2 (tt_type_parameters env cn.range c ~expected:2 w) in
+    let args = List.map (check_plain_arg env) args in
 
-    if List.is_empty args then tyerror "invalid number of arguments";
+    if List.is_empty args then
+      tyerror e.range "the combinator `map' takes at least one argument";
 
     let f, args = (List.hd args, List.tl args) in
     let nargs = List.map (tt_expr ~check:(`W (w * n)) env) args in
@@ -407,39 +441,54 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
     let ftype =
       match ftbody.type_ with
       | `W k -> k
-      | _ -> tyerror "mapped function should return a word" in
+      | _ -> tyerror f.range "the mapped function should return a word" in
 
     let ftargs =
       Option.get_exn
         ftargs
-        (mk_tyerror "this expression must be higher-order") in
+        (mk_tyerror f.range "this expression must be higher-order") in
 
     let targs = List.map snd ftargs in
 
-    if targs <> List.make (List.length args) (`W w) then
-      tyerror "invalid argument types / count";
+    if targs <> List.make (List.length args) (`W w) then begin
+      tyerror e.range
+        "the mapped function must take exactly %d arguments of type @%d"
+        (List.length targs) w
+    end;
 
     let node = EMap ((`W w, `W n), (ftargs, ftbody), nargs)
     and type_ = `W (n * ftype) in
     (None, { node; type_; })
 
-  | PEApp ((f, Some w), args) ->
-      let sig_ = Option.get (get_sig_of_name (Lc.unloc f)) in
-      tt_fname_app env sig_ w args
+  | PEApp ({ data = (f, Some ws) } as fn, args) ->
+      let sig_ =
+        Option.get_exn
+          (get_sig_of_name (Lc.unloc f))
+          (mk_tyerror f.range "unknown symbol: %s" (Lc.unloc f))
+      in
+      tt_fname_app env e.range sig_ (Lc.mk fn.range ws) args
 
 (* -------------------------------------------------------------------- *)
 and tt_fname_app
   (env : env)
+  (range : range)
   (sig_ : sig_)
-  (ws : pword list)
+  (ws : pword list loced)
   (args : pexpr option loced list)
 =
-  let ws = tt_type_parameters env ~expected:sig_.s_ntyparams (Some ws) in
+  let ws =
+    tt_type_parameters
+      env ws.range sig_.s_name ~expected:sig_.s_ntyparams
+      (Some ws.data)
+  in
 
   let targs = sig_.s_argsty ws in
 
-  if List.length args <> List.length targs then
-    tyerror "invalid argument count: %s" sig_.s_name;
+  if List.length args <> List.length targs then begin
+    tyerror range 
+      "invalid number of arguments for `%s': expected %d, get %d"
+      sig_.s_name (List.length targs) (List.length args)
+  end;
 
   let bds, args = List.fold_left_map (fun bds (a, ety) ->
       match a.data with
@@ -463,8 +512,13 @@ and tt_fname_app
 and tt_expr (env : env) ?(check : atype option) (p : pexpr) : aexpr =
   let (args, {node = n_; type_ = t;}) = tt_expr_ env p in
   if not (Option.is_none args) then
-    tyerror "high-order functions not allowed here";
-  Option.may (fun dst -> assert (ty_compatible ~src:t ~dst)) check;
+    tyerror p.range "high-order functions not allowed here";
+  check |> Option.may (fun dst ->
+    if not (ty_compatible ~src:t ~dst) then begin
+      tyerror p.range
+        "this expression has type %a but is expected to have type %a"
+        pp_atype t pp_atype dst
+    end);
   { node = n_; type_ = Option.default t check; }
 
 (* -------------------------------------------------------------------- *)
@@ -475,14 +529,6 @@ and tt_arg (env : env) ((x, { data = `W ty }) : parg) : env * aarg =
 (* -------------------------------------------------------------------- *)
 and tt_args (env : env) (args : pargs) : env * aargs =
   List.fold_left_map tt_arg env args
-
-(* -------------------------------------------------------------------- *)
-and tt_exprs (env : env) ~(expected : atype list) (es : pexpr list) : aexpr list =
-  let eslen = List.length es in
-  let exlen = List.length expected in
-
-  if eslen <> exlen then tyerror "invalid tuple size: %d / %d" exlen eslen;
-  List.map2 (fun e t -> tt_expr env ~check:t e) es expected
 
 (* -------------------------------------------------------------------- *)
 let tt_def (env : env) (p : pdef) : symbol * adef =
