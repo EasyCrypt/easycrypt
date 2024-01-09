@@ -41,7 +41,7 @@ end
 type env = Env.env
 
 (* -------------------------------------------------------------------- *)
-let tt_pword (_ : env) (`W ty : pword) : atype = `W ty
+let tt_pword (_ : env) ({ data = `W ty } : pword) : aword = `W ty
 
 (* -------------------------------------------------------------------- *)
 exception TypingError of string
@@ -63,17 +63,18 @@ let mk_tyerror msg = mk_tyerror_r identity msg
 let tyerror msg = mk_tyerror_r (fun e -> raise e) msg
 
 (* -------------------------------------------------------------------- *)
-let tt_type (t : ptype) : atype = (t :> atype)
+let tt_type (_ : env) (t : ptype) : atype =
+  (t.data :> atype)
 
 (* -------------------------------------------------------------------- *)
-let tt_type_parameters ~(expected : int) (tp : pword list option) =
+let tt_type_parameters (env : env) ~(expected : int) (tp : pword list option) =
   match tp with
   | None -> tyerror "missing type parameters annotation"
   | Some tp ->
       let tplen = List.length tp in
       if expected <> tplen then
         tyerror "invalid number of type parameters: %d / %d" tplen expected;
-      (tp :> aword list)
+      (List.map (tt_pword env) tp)
 
 (* -------------------------------------------------------------------- *)
 let check_arguments_count ~(expected : int) (args : pexpr list) =
@@ -82,16 +83,7 @@ let check_arguments_count ~(expected : int) (args : pexpr list) =
 
 (* -------------------------------------------------------------------- *)
 let as_int_constant (e : pexpr) : int =
-  match e with PEInt i -> i | _ -> tyerror "integer constant expected"
-
-(* -------------------------------------------------------------------- *)
-let destruct_fun (e : pexpr) : pargs * pexpr =
-  let rec doit (acc : pargs) (e : pexpr) =
-    match e with
-    | PEFun (args, e) -> doit (List.rev_append args acc) e
-    | _ -> (List.rev acc, e)
-  in
-  doit [] e
+  match e.data with PEInt i -> i | _ -> tyerror "integer constant expected"
 
 (* -------------------------------------------------------------------- *)
 type sig_ = {
@@ -280,7 +272,7 @@ let ty_compatible ~(src : atype) ~(dst : atype) : bool =
 
 (* -------------------------------------------------------------------- *)
 let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
-  match e with
+  match e.data with
   | PEParens e ->
       (None, tt_expr env e)
 
@@ -294,8 +286,8 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
   
   | PEFName (v, None) -> begin
     let (vid, (targs, vt)) = Option.get_exn
-      (Env.lookup env v)
-      (mk_tyerror "unknown variable: %s" v) in
+      (Env.lookup env (Lc.unloc v))
+      (mk_tyerror "unknown variable: %s" (Lc.unloc v)) in
 
     match targs with
     | None ->
@@ -312,7 +304,8 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
     end
 
   | PEFName (v, Some ws) ->
-      let sig_ = Option.get (get_sig_of_name v) in
+      let sig_ = Option.get (get_sig_of_name (Lc.unloc v)) in
+      let ws = List.map (tt_pword env) ws in
       let args = sig_.s_argsty ws in
       let retty = sig_.s_retty ws in
       let args = List.map (fun ty -> (Ident.create "_", ty)) args in
@@ -338,7 +331,7 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
 
       let ebody, vid =
         let targs = Option.map (List.map snd) args in
-        Env.push env v (targs, e1.type_) in
+        Env.push env (Lc.unloc v) (targs, e1.type_) in
 
       let e2 = tt_expr ebody e2 in
 
@@ -358,8 +351,8 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
 
   | PEApp ((f, None), args) ->
     let (vid, (targs, vt)) = Option.get_exn
-      (Env.lookup env f)
-      (mk_tyerror "unknown symbol: %s" f) in
+      (Env.lookup env (Lc.unloc f))
+      (mk_tyerror "unknown symbol: %s" (Lc.unloc f)) in
 
     let targs =
       Option.get_exn
@@ -370,7 +363,7 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
       tyerror "invalid argument count";
   
     let bds, args = List.fold_left_map (fun bds (a, ety) ->
-        match a with
+        match a.data with
         | None ->
           let x = Ident.create "_" in
           let a = { node = EVar x; type_ = (ety :> atype); }  in
@@ -385,24 +378,24 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
   
     (bds, { node; type_ = vt; })
     
-  | PEApp (("concat", w), args) ->
-      let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
-      let args = List.map Option.get args in
+  | PEApp (({ data = "concat" }, w), args) ->
+      let (`W w) = as_seq1 (tt_type_parameters env ~expected:1 w) in
+      let args = List.map (Lc.unloc %> Option.get) args in
       let targs = List.map (tt_expr env ~check:(`W w)) args in
       let wsz = `W (w * List.length targs) in
       (None, { node = EConcat (wsz, targs); type_ = wsz; })
 
-  | PEApp (("repeat", w), args) ->
-      let (`W w) = as_seq1 (tt_type_parameters ~expected:1 w) in
-      let args = List.map Option.get args in
+  | PEApp (({ data = "repeat" }, w), args) ->
+      let (`W w) = as_seq1 (tt_type_parameters env ~expected:1 w) in
+      let args = List.map (Lc.unloc %> Option.get) args in
       let e, n = as_seq2 (check_arguments_count ~expected:2 args) in
       let n = as_int_constant n in
       let ne = tt_expr env ~check:(`W w) e in
       (None, { node = ERepeat (`W (w * n), (ne, n)); type_ = `W (w * n); })
 
-  | PEApp (("map", w), args) ->
-    let `W w, `W n = as_seq2 (tt_type_parameters ~expected:2 w) in
-    let args = List.map Option.get args in
+  | PEApp (({ data = "map" }, w), args) ->
+    let `W w, `W n = as_seq2 (tt_type_parameters env ~expected:2 w) in
+    let args = List.map (Lc.unloc %> Option.get) args in
 
     if List.is_empty args then tyerror "invalid number of arguments";
 
@@ -431,7 +424,7 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
     (None, { node; type_; })
 
   | PEApp ((f, Some w), args) ->
-      let sig_ = Option.get (get_sig_of_name f) in
+      let sig_ = Option.get (get_sig_of_name (Lc.unloc f)) in
       tt_fname_app env sig_ w args
 
 (* -------------------------------------------------------------------- *)
@@ -439,10 +432,9 @@ and tt_fname_app
   (env : env)
   (sig_ : sig_)
   (ws : pword list)
-  (args : pexpr option list)
+  (args : pexpr option loced list)
 =
-  let ws =
-    tt_type_parameters ~expected:sig_.s_ntyparams (Some ws) in
+  let ws = tt_type_parameters env ~expected:sig_.s_ntyparams (Some ws) in
 
   let targs = sig_.s_argsty ws in
 
@@ -450,7 +442,7 @@ and tt_fname_app
     tyerror "invalid argument count: %s" sig_.s_name;
 
   let bds, args = List.fold_left_map (fun bds (a, ety) ->
-      match a with
+      match a.data with
       | None ->
         let x = Ident.create "_" in
         let a = { node = EVar x; type_ = (ety :> atype); }  in
@@ -476,8 +468,8 @@ and tt_expr (env : env) ?(check : atype option) (p : pexpr) : aexpr =
   { node = n_; type_ = Option.default t check; }
 
 (* -------------------------------------------------------------------- *)
-and tt_arg (env : env) ((x, `W ty) : parg) : env * aarg =
-  let env, idx = Env.push env x (None, `W ty) in
+and tt_arg (env : env) ((x, { data = `W ty }) : parg) : env * aarg =
+  let env, idx = Env.push env (Lc.unloc x) (None, `W ty) in
   (env, (idx, `W ty))
 
 (* -------------------------------------------------------------------- *)
@@ -495,8 +487,9 @@ and tt_exprs (env : env) ~(expected : atype list) (es : pexpr list) : aexpr list
 (* -------------------------------------------------------------------- *)
 let tt_def (env : env) (p : pdef) : symbol * adef =
   let env, args = tt_args env p.args in
-  let bod = tt_expr env ~check:(tt_pword env p.rty) p.body in
-  (p.name, { name = p.name; arguments = args; body = bod; rettype = p.rty; })
+  let rty = tt_pword env p.rty in
+  let bod = tt_expr env ~check:(rty :> atype) p.body in
+  (p.name, { name = p.name; arguments = args; body = bod; rettype = rty; })
 
 (* -------------------------------------------------------------------- *)
 let tt_program (env : env) (p : pprogram) : (symbol * adef) list =

@@ -35,29 +35,32 @@
 %%
 
 %inline vname:
-| x=IDENT
+| x=loc(IDENT)
     { x }
 
 %inline wname:
 | x=vname t=wtype
     { (x, t) }
 
-%inline wtype:
+%inline wtype_:
 | AT x=NUMBER
     { `W x }
 
+%inline wtype:
+| w=loc(wtype_) { w }
+
 fname:
-| f=IDENT
+| f=loc(IDENT)
     { (f, None) }
 
-| f=IDENT p=angled(list0(NUMBER, COMMA))
-    { (f, Some (List.map (fun x -> `W x) p)) }
+| f=loc(IDENT) p=angled(list0(loc(NUMBER), COMMA))
+    { (f, Some (List.map (Lc.map (fun x -> `W x)) p)) }
 
-sexpr:
+sexpr_:
 | f=fname
     { PEFName f }
 
-| f=fname args=parens(list0(earg, COMMA))
+| f=fname args=parens(list0(loc(earg), COMMA))
     { PEApp (f, args) }
 
 | e=parens(expr)
@@ -66,20 +69,26 @@ sexpr:
 | i=NUMBER
     { PEInt i }
 
-expr:
-| e=sexpr
+%inline sexpr:
+| e=loc(sexpr_) { e }
+
+expr_:
+| e=sexpr_
     { e }
 
 | FUN args=wname* DOT body=expr
     { PEFun (args, body) }
 
-| LET x=IDENT args=parens(wname*)? EQUAL e1=expr IN e2=expr
+| LET x=loc(IDENT) args=parens(wname*)? EQUAL e1=expr IN e2=expr
     { PELet ((x, args, e1), e2) }
 
 | e=sexpr LBRACKET
     s=option(AT s=expr PIPE { s }) i=expr j=prefix(COLON, expr)?
   RBRACKET
     { PESlice (e, (i, j, s)) }
+
+%inline expr:
+| e=loc(expr_) { e }
 
 earg:
 | DOT
@@ -110,3 +119,9 @@ program:
 
 %inline prefix(S, X):
 | S x=X { x }
+
+%inline loc(X):
+| data=X {
+    let range = Lc.of_positions $startpos $endpos in
+    { range; data; }
+  }

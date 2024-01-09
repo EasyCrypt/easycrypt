@@ -67,7 +67,7 @@ type adef = {
   name: string;
   arguments : aargs;
   body : aexpr;
-  rettype : aword
+  rettype : aword;
 } [@@deriving yojson]
 
 (* -------------------------------------------------------------------- *)
