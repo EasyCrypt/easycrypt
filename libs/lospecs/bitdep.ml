@@ -1,6 +1,6 @@
 (* ---------------------------------------------------------------- *)
 open Deps
-open Typing
+open Ast
 
 (* WIP: Not capable of running the full example yet *)
 (* and some things do not work/ have incorrect semantics *)

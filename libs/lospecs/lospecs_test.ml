@@ -24,7 +24,7 @@ let entry (options : options) =
     List.iter (fun (_, def) ->
       Format.eprintf "%a@."
         (Yojson.Safe.pretty_print ~std:true)
-        (Typing.adef_to_yojson def)
+        (Ast.adef_to_yojson def)
     ) ast
   end;
 

@@ -1,5 +1,5 @@
 (* ==================================================================== *)
-open Typing
+open Ast
 open Aig
 
 (* ==================================================================== *)
@@ -193,7 +193,7 @@ let circuit_of_spec (rs : reg list) (p : adef) : reg =
           Format.eprintf "%d %d@." (List.length r) n;
           Format.eprintf "%a@."
             (Yojson.Safe.pretty_print ~std:true)
-            (Typing.aexpr_to_yojson e);
+            (Ast.aexpr_to_yojson e);
           assert false
         end
       | _ -> ()
