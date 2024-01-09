@@ -20,6 +20,7 @@ stdenv.mkDerivation {
     findlib
     batteries
     camlp-streams
+    cmdliner
     dune_3
     dune-build-info
     dune-site
@@ -30,6 +31,7 @@ stdenv.mkDerivation {
     menhirLib
     ppxlib
     ppx_deriving
+    ppx_deriving_yojson
     progress
     yojson
     why3

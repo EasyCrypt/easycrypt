@@ -16,6 +16,7 @@
   (batteries (>= 3))
   (camlp-streams (>= 5))
   camlzip
+  cmdliner
   (dune (>= 3.6))
   dune-build-info
   dune-site
