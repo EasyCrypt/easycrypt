@@ -5,27 +5,27 @@ VPERMD(widx@256, w@256) -> @256 =
     widx
   )
 
-# Intel intrisic: _mm256_add_epi16
+# Intel intrinsic: _mm256_add_epi16
 VPADD_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(add<16>, w1, w2)
 
-# Intel intrisic: _mm256_sub_epi16
+# Intel intrinsic: _mm256_sub_epi16
 VPSUB_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(sub<16>, w1, w2)
 
-# Intel intrisic: _mm256_and_si256
+# Intel intrinsic: _mm256_and_si256
 VPAND_256(w1@256, w2@256) -> @256 = 
   and<256>(w1, w2)
 
-# Intel intrisic: _mm256_andnot_si256
+# Intel intrinsic: _mm256_andnot_si256
 VPNAND_256(w1@256, w2@256) -> @256 = 
   not<256>(and<256>(w1, w2))
 
-# Intel intrisic: _mm256_broadcastw_epi16
+# Intel intrinsic: _mm256_broadcastw_epi16
 VPBROADCAST_16u16(w@16) -> @256 = 
   repeat<16>(w[@16|0], 16)
   
-# Intel intrisic: _mm256_mulhi_epu16
+# Intel intrinsic: _mm256_mulhi_epu16
 VPMULH_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(umulhi<16>, w1, w2)
 
@@ -44,7 +44,7 @@ VPMULHRS_16u16(w1@256, w2@256) -> @256 =
 VPSRA_16u16(w@256, count@8) -> @256 =
   map<16, 16>(sra<16>(., count), w)
 
-# Intel intrisic: _mm256_maddubs_epi16
+# Intel intrinsic: _mm256_maddubs_epi16
 VPMADDUBSW_256(w1@256, w2@256) -> @256 =
   map<16, 16>(
     fun x@16 y@16 .
