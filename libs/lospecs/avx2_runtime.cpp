@@ -138,6 +138,7 @@ BIND_256x2_256(mm256_maddubs_epi16);
 BIND_256x2_256(mm256_packus_epi16);
 BIND_256x2_256(mm256_mulhi_epu16);
 BIND_256x2_256(mm256_mulhrs_epi16);
+BIND_256x2_256(mm256_permutevar8x32_epi32);
 
 BIND2(mm256_srai_epi16, M256i, M256i, Long);
 }

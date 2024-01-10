@@ -460,7 +460,7 @@ let test_vpermd () =
     name = "vpermd";
     acount = 2;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpermd x y);
-    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_permutexvar_epi32 x y);
+    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_permutevar8x32_epi32 y x);
   } in
 
   test_vp 10000 op
@@ -851,4 +851,4 @@ let poly_compress () =
   ) deps
 
 (* -------------------------------------------------------------------- *)
-let () = main ()
+let () = poly_compress ()

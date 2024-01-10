@@ -1,5 +1,5 @@
 # Intel intrinsic: _mm256_permutexvar_epi32
-VPERMD(widx@256, w@256) -> @256 =
+VPERMD(w@256, widx@256) -> @256 =
   map<32, 8>(
     fun idx@32 . let i = idx[0:3] in w[@32|i],
     widx

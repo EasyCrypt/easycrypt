@@ -60,5 +60,5 @@ val mm256_mulhi_epu16 : m256 -> m256 -> m256
 val mm256_mulhrs_epi16 : m256 -> m256 -> m256
 val mm256_packus_epi16 : m256 -> m256 -> m256
 val mm256_maddubs_epi16 : m256 -> m256 -> m256
-val mm256_permutexvar_epi32 : m256 -> m256 -> m256
+val mm256_permutevar8x32_epi32 : m256 -> m256 -> m256
 val mm256_srai_epi16 : m256 -> int -> m256

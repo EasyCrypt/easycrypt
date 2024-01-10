@@ -31,7 +31,7 @@ CAMLprim value caml_mm256_maddubs_epi16(value, value);
 CAMLprim value caml_mm256_packus_epi16(value, value);
 CAMLprim value caml_mm256_mulhi_epu16(value, value);
 CAMLprim value caml_mm256_mulhrs_epi16(value, value);
-CAMLprim value caml_mm256_permutexvar_epi32(value, value);
+CAMLprim value caml_mm256_permutevar8x32_epi32(value, value);
 }
 
 /* ==================================================================== */
