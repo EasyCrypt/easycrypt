@@ -15,12 +15,14 @@
 %token EQUAL
 %token FUN
 %token GT
+%token LARROW
 %token LBRACKET
 %token LET
 %token LPAREN
 %token LT
 %token IN
 %token PIPE
+%token QMARK
 %token RARROW
 %token RBRACKET
 %token RPAREN
@@ -31,6 +33,10 @@
 %type <Ptree.pprogram> program
 
 %start program
+
+%nonassoc below_TERNARY
+%left QMARK
+%left COLON
 
 %%
 
@@ -70,7 +76,10 @@ sexpr_:
     { PEParens e }
 
 | i=NUMBER
-    { PEInt i }
+    { PEInt (i, None) }
+
+| i=NUMBER w=wtype
+    { PEInt (i, Some w) }
 
 %inline sexpr:
 | e=loc(sexpr_) { e }
@@ -79,16 +88,25 @@ expr_:
 | e=sexpr_
     { e }
 
-| FUN args=wname* DOT body=expr
+| FUN args=wname* DOT body=expr %prec below_TERNARY
     { PEFun (args, body) }
 
-| LET x=loc(IDENT) args=parens(wname*)? EQUAL e1=expr IN e2=expr
+| LET x=loc(IDENT) args=parens(list0(wname, COMMA))? EQUAL e1=expr IN e2=expr %prec below_TERNARY
     { PELet ((x, args, e1), e2) }
 
 | e=sexpr LBRACKET
-    s=option(AT s=expr PIPE { s }) i=expr j=prefix(COLON, expr)?
+    s=ioption(AT s=expr PIPE { s }) i=expr j=prefix(COLON, expr)?
   RBRACKET
     { PESlice (e, (i, j, s)) }
+
+| e=sexpr LBRACKET
+    s=ioption(AT s=expr PIPE { s }) i=expr j=prefix(COLON, expr)?
+    LARROW r=expr
+  RBRACKET
+    { PEAssign (e, (i, j, s), r) }
+
+| c=expr QMARK e1=expr COLON e2=expr
+    { PECond (c, (e1, e2)) }
 
 %inline expr:
 | e=loc(expr_) { e }
@@ -109,7 +127,7 @@ program:
     { defs }
 
 | error
-    { failwith (string_of_position $loc) }
+    { raise (ParseError (Lc.of_positions (fst $loc) (snd $loc))) }
 
 %inline parens(X):
 | LPAREN x=X RPAREN { x }

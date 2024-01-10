@@ -316,28 +316,171 @@ let test_usat () =
   test (op 15 7)
 
 (* -------------------------------------------------------------------- *)
+let test_sgt () =
+  let op (size : int) =
+    {  name = Printf.sprintf "sgt<%d>" size;
+        args = [(size, `S); (size, `S)];
+        out  = `U;
+        mk   = (fun rs -> let x, y = as_seq2 rs in [C.sgt x y]);
+        reff = (fun vs -> let x, y = as_seq2 vs in if x > y then 1 else 0); }
+
+  in
+  test (op 10)
+
+(* -------------------------------------------------------------------- *)
+let test_sge () =
+  let op (size : int) =
+    {  name = Printf.sprintf "sge<%d>" size;
+        args = [(size, `S); (size, `S)];
+        out  = `U;
+        mk   = (fun rs -> let x, y = as_seq2 rs in [C.sge x y]);
+        reff = (fun vs -> let x, y = as_seq2 vs in if x >= y then 1 else 0); }
+
+  in
+  test (op 10)
+
+(* -------------------------------------------------------------------- *)
+let test_ugt () =
+  let op (size : int) =
+    {  name = Printf.sprintf "ugt<%d>" size;
+        args = [(size, `U); (size, `U)];
+        out  = `U;
+        mk   = (fun rs -> let x, y = as_seq2 rs in [C.ugt x y]);
+        reff = (fun vs -> let x, y = as_seq2 vs in if x > y then 1 else 0); }
+
+  in
+  test (op 10)
+
+(* -------------------------------------------------------------------- *)
+let test_uge () =
+  let op (size : int) =
+    {  name = Printf.sprintf "uge<%d>" size;
+        args = [(size, `U); (size, `U)];
+        out  = `U;
+        mk   = (fun rs -> let x, y = as_seq2 rs in [C.uge x y]);
+        reff = (fun vs -> let x, y = as_seq2 vs in if x >= y then 1 else 0); }
+
+  in
+  test (op 10)
+
+(* -------------------------------------------------------------------- *)
+type mvalue = M256 of Avx2.m256 | M128 of Avx2.m128
+
+module MValue : sig
+  type kind = [`M256 | `M128]  
+
+  val random : kind -> mvalue
+
+  val to_bytes : endianess:Avx2.endianess -> mvalue -> bytes
+
+  val of_bytes : endianess:Avx2.endianess -> bytes -> mvalue
+
+  val pp :
+    endianess:Avx2.endianess ->
+    size:Avx2.size ->
+    Format.formatter ->
+    mvalue ->
+    unit
+end = struct
+  type kind = [`M256 | `M128]  
+
+  let random (k : kind) =
+    match k with
+    | `M256 -> M256 (Avx2.M256.random ())
+    | `M128 -> M128 (Avx2.M128.random ())
+
+  let to_bytes ~(endianess : Avx2.endianess) (m : mvalue) =
+    match m with
+    | M256 v -> Avx2.M256.to_bytes ~endianess:`Little v
+    | M128 v -> Avx2.M128.to_bytes ~endianess:`Little v
+
+  let of_bytes ~(endianess : Avx2.endianess) (m : bytes) =
+    match Bytes.length m with
+    | 32 -> M256 (Avx2.M256.of_bytes ~endianess m)
+    | 16 -> M128 (Avx2.M128.of_bytes ~endianess m)
+    | _  -> assert false
+
+    let pp
+    ~(endianess : Avx2.endianess)
+    ~(size : Avx2.size)
+    (fmt : Format.formatter)
+    (m : mvalue)
+  =
+    match m with
+    | M256 v -> Avx2.M256.pp ~endianess ~size fmt v
+    | M128 v -> Avx2.M128.pp ~endianess ~size fmt v
+end
+
+(* -------------------------------------------------------------------- *)
 type vpop = {
   name : string;
-  acount : int;
+  args : MValue.kind list;
   mk : C.reg list -> C.reg;
-  reff : Avx2.m256 list -> Avx2.m256;
+  reff : mvalue list -> mvalue;
 }
 
 (* -------------------------------------------------------------------- *)
+let call_m256_m256
+  (f  : Avx2.m256 -> Avx2.m256)
+  (vs : mvalue list)
+  : mvalue
+=
+  match vs with
+  | [M256 v] -> M256 (f v)
+  | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let call_m256_m128
+  (f  : Avx2.m256 -> Avx2.m128)
+  (vs : mvalue list)
+  : mvalue
+=
+  match vs with
+  | [M256 v] -> M128 (f v)
+  | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let call_m256_m128_m256
+  (f  : Avx2.m256 -> Avx2.m128 -> Avx2.m256)
+  (vs : mvalue list)
+  : mvalue
+=
+  match vs with
+  | [M256 v1; M128 v2] -> M256 (f v1 v2)
+  | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let call_m256x2_m256
+  (f  : Avx2.m256 -> Avx2.m256 -> Avx2.m256)
+  (vs : mvalue list)
+  : mvalue
+=
+  match vs with
+  | [M256 v1; M256 v2] -> M256 (f v1 v2)
+  | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
 let test_vp (total : int) (op : vpop) =
-  let rs = List.init op.acount (fun i -> C.reg ~size:256 ~name:i) in
+  let rs = op.args |> List.mapi (fun i arg ->
+    match arg with
+    | `M256 -> C.reg ~size:256 ~name:i
+    | `M128 -> C.reg ~size:128 ~name:i
+  ) in
 
   let circuit = op.mk rs in
 
   let test () =
-    let vs = List.init op.acount (fun _ -> Avx2.random ()) in
+    let vs = List.map MValue.random op.args in
     let avs = Array.of_list vs in
-    let avs = Array.map (Avx2.to_bytes ~endianess:`Little) avs in
+    let avs = Array.map (MValue.to_bytes ~endianess:`Little) avs in
 
     let env ((n, i) : C.var) = C.get_bit avs.(n) i in
 
-    let o = op.reff vs in
-    let o = Avx2.to_bytes ~endianess:`Little o in
+    let o =
+      match op.reff vs with
+      | M256 v -> Avx2.M256.to_bytes ~endianess:`Little v
+      | M128 v -> Avx2.M128.to_bytes ~endianess:`Little v
+    in
 
     let o' = List.map (C.eval env) circuit in
     let o' = C.bytes_of_bools o' in
@@ -346,15 +489,15 @@ let test_vp (total : int) (op : vpop) =
       Progress.interject_with (fun () ->
         vs |> List.iter (fun v ->
           Format.eprintf "%a@."
-          (Avx2.pp ~endianess:`Big ~size:`U32)
+          (MValue.pp ~endianess:`Big ~size:`U32)
           v
         );
         Format.eprintf "%a@."
-          (Avx2.pp ~endianess:`Big ~size:`U32)
-          (Avx2.of_bytes ~endianess:`Little o);
+          (MValue.pp ~endianess:`Big ~size:`U32)
+          (MValue.of_bytes ~endianess:`Little o);
         Format.eprintf "%a@."
-          (Avx2.pp ~endianess:`Big ~size:`U32)
-          (Avx2.of_bytes ~endianess:`Little o')
+          (MValue.pp ~endianess:`Big ~size:`U32)
+          (MValue.of_bytes ~endianess:`Little o')
       );
       assert false
     end
@@ -370,9 +513,20 @@ let test_vp (total : int) (op : vpop) =
 let test_vpadd_16u16 () =
   let op = {
     name = "vpadd_16u16";
-    acount = 2;
+    args = List.make 2 `M256;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpadd_16u16 x y);
-    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_add_epi16 x y);
+    reff = call_m256x2_m256 Avx2.mm256_add_epi16;
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vpadd_32u8 () =
+  let op = {
+    name = "vpadd_32u8";
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpadd_32u8 x y);
+    reff = call_m256x2_m256 Avx2.mm256_add_epi8;
   } in
 
   test_vp 10000 op
@@ -381,9 +535,20 @@ let test_vpadd_16u16 () =
 let test_vpsub_16u16 () =
   let op = {
     name = "vpsub_16u16";
-    acount = 2;
+    args = List.make 2 `M256;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpsub_16u16 x y);
-    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_sub_epi16 x y);
+    reff = call_m256x2_m256 Avx2.mm256_sub_epi16;
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vpsub_32u8 () =
+  let op = {
+    name = "vpsub_32u8";
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpsub_32u8 x y);
+    reff = call_m256x2_m256 Avx2.mm256_sub_epi8;
   } in
 
   test_vp 10000 op
@@ -392,9 +557,20 @@ let test_vpsub_16u16 () =
 let test_vpsra_16u16 () =
   let op (offset : int) = {
     name = Format.sprintf "vpsra_16u16<%d>" offset;
-    acount = 1;
+    args = [`M256];
     mk = (fun rs -> C.vpsra_16u16 (as_seq1 rs) offset);
-    reff = (fun vs -> Avx2.mm256_srai_epi16 (as_seq1 vs) offset);
+    reff = call_m256_m256 (fun x -> Avx2.mm256_srai_epi16 x offset);
+  } in
+
+  Iter.iter (fun i -> test_vp 10000 (op i)) (Iter.(--) 0x00 0x10)
+
+(* -------------------------------------------------------------------- *)
+let test_vpsrl_16u16 () =
+  let op (offset : int) = {
+    name = Format.sprintf "vpsrl_16u16<%d>" offset;
+    args = [`M256];
+    mk = (fun rs -> C.vpsrl_16u16 (as_seq1 rs) offset);
+    reff = call_m256_m256 (fun x -> Avx2.mm256_srli_epi16 x offset);
   } in
 
   Iter.iter (fun i -> test_vp 10000 (op i)) (Iter.(--) 0x00 0x10)
@@ -403,9 +579,9 @@ let test_vpsra_16u16 () =
 let test_vpand_256 () =
   let op = {
     name = "vpand_256";
-    acount = 2;
+    args = List.make 2 `M256;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpand_256 x y);
-    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_and_si256 x y);
+    reff = call_m256x2_m256 Avx2.mm256_and_si256;
   } in
 
   test_vp 10000 op
@@ -414,9 +590,9 @@ let test_vpand_256 () =
 let test_vpmulh_16u16 () =
   let op = {
     name = "vpmulh_16u16";
-    acount = 2;
+    args = List.make 2 `M256;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpmulh_16u16 x y);
-    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_mulhi_epu16 x y);
+    reff = call_m256x2_m256 Avx2.mm256_mulhi_epu16;
   } in
 
   test_vp 200 op
@@ -425,9 +601,9 @@ let test_vpmulh_16u16 () =
 let test_vpmulhrs_16u16 () =
   let op = {
     name = "vpmulhrs_16u16";
-    acount = 2;
+    args = List.make 2 `M256;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpmulhrs_16u16 x y);
-    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_mulhrs_epi16 x y);
+    reff = call_m256x2_m256 Avx2.mm256_mulhrs_epi16;
   } in
 
   test_vp 200 op
@@ -436,9 +612,20 @@ let test_vpmulhrs_16u16 () =
 let test_vpackus_16u16 () =
   let op = {
     name = "vpackus_16u16";
-    acount = 2;
+    args = List.make 2 `M256;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpackus_16u16 x y);
-    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_packus_epi16 x y);
+    reff = call_m256x2_m256 Avx2.mm256_packus_epi16;
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vpackss_16u16 () =
+  let op = {
+    name = "vpackss_16u16";
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpackss_16u16 x y);
+    reff = call_m256x2_m256 Avx2.mm256_packs_epi16;
   } in
 
   test_vp 10000 op
@@ -447,9 +634,9 @@ let test_vpackus_16u16 () =
 let test_vpmaddubsw_256 () =
   let op = {
     name = "vpmaddubsw_256";
-    acount = 2;
+    args = List.make 2 `M256;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpmaddubsw_256 x y);
-    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_maddubs_epi16 x y);
+    reff = call_m256x2_m256 Avx2.mm256_maddubs_epi16;
   } in
 
   test_vp 200 op
@@ -458,12 +645,102 @@ let test_vpmaddubsw_256 () =
 let test_vpermd () =
   let op = {
     name = "vpermd";
-    acount = 2;
+    args = List.make 2 `M256;
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpermd x y);
-    reff = (fun vs -> let x, y = as_seq2 vs in Avx2.mm256_permutevar8x32_epi32 y x);
+    reff = call_m256x2_m256 (fun x y -> Avx2.mm256_permutevar8x32_epi32 y x);
   } in
 
   test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vbshufb_256 () =
+  let op = {
+    name = "vbshufb_256";
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpshufb_256 x y);
+    reff = call_m256x2_m256 Avx2.mm256_shuffle_epi8;
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vpcmpgt_16u16 () =
+  let op = {
+    name = "vpcmpgt_16u16";
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpcmpgt_16u16 x y);
+    reff = call_m256x2_m256 Avx2.mm256_cmpgt_epi16;
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vpmovmskb_u256u64 () =
+  let op = {
+    name = "vpmovmskb_u256u64";
+    args = [`M256];
+    mk = (fun rs -> C.uextend ~size:256 (C.vpmovmskb_u256u64 (as_seq1 rs)));
+    reff = (fun vs ->
+      match vs with
+      | [M256 v] ->
+        let out = Avx2.mm256_movemask_epi8 v in
+        let out = Int64.logand (Int64.of_int32 out) 0xffffffffL in
+        M256 (Avx2.M256.oftuple_64 (out, 0L, 0L, 0L))
+      | _ ->
+        assert false
+    )
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vpunpckl_32u8 () =
+  let op = {
+    name = "test_vpunpckl_32u8";
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpunpckl_32u8 x y);
+    reff = call_m256x2_m256 Avx2.mm256_unpacklo_epi8;
+  } in
+
+  test_vp 10000 op
+
+(* -------------------------------------------------------------------- *)
+let test_vpblend_16u16 () =
+  let op (imm8 : int) = {
+    name = Format.sprintf "test_vpblend_16u16<%d>" imm8;
+    args = List.make 2 `M256;
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpblend_16u16 x y imm8);
+    reff = call_m256x2_m256 (fun x y -> Avx2.mm256_blend_epi16 x y imm8);
+  } in
+  
+  test_vp 10000 (op 0x00);
+  test_vp 10000 (op 0x3f);
+  test_vp 10000 (op 0xaa)
+
+(* -------------------------------------------------------------------- *)
+let test_extracti128 () =
+  let op (i : int) = {
+    name = Printf.sprintf "test_extracti128<%d>" i;
+    args = [`M256];
+    mk = (fun rs -> C.vpextracti128 (as_seq1 rs) i);
+    reff = call_m256_m128 (fun x -> Avx2.mm256_extracti128_si256 x i);
+  } in
+
+  test_vp 10000 (op 0);
+  test_vp 10000 (op 1)
+
+(* -------------------------------------------------------------------- *)
+let test_inserti128 () =
+  let op (i : int) = {
+    name = Printf.sprintf "test_inserti128<%d>" i;
+    args = [`M256; `M128];
+    mk = (fun rs -> let x, y = as_seq2 rs in C.vpinserti128 x y i);
+    reff = call_m256_m128_m256 (fun x y -> Avx2.mm256_inserti128_si256 x y i);
+  } in
+
+  test_vp 10000 (op 0);
+  test_vp 10000 (op 1)
+
 
 (* -------------------------------------------------------------------- *)
 let tests = [
@@ -476,6 +753,12 @@ let tests = [
   ("ssat", test_ssat);
   ("usat", test_usat);
 
+  ("sgt", test_sgt);
+  ("sge", test_sge);
+
+  ("ugt", test_ugt);
+  ("uge", test_uge);
+
   ("lsl", (fun () -> test_shift ~side:`L ~sign:`U));
   ("lsr", (fun () -> test_shift ~side:`R ~sign:`U));
 
@@ -487,15 +770,26 @@ let tests = [
   ("uextend", test_uextend);
   ("sextend", test_sextend);
 
-  ("vpadd_16u16"   , test_vpadd_16u16   );
-  ("vpsub_16u16"   , test_vpsub_16u16   );
-  ("vpsra_16u16"   , test_vpsra_16u16   );
-  ("vpand_256"     , test_vpand_256     );
-  ("vpmulh_16u16"  , test_vpmulh_16u16  );
-  ("vpmulhrs_16u16", test_vpmulhrs_16u16);
-  ("vpackus_16u16" , test_vpackus_16u16 );
-  ("vpmaddubsw_256", test_vpmaddubsw_256);
-  ("vpermd"        , test_vpermd        );
+  ("vpadd_16u16"      , test_vpadd_16u16      );
+  ("vpadd_32u8"       , test_vpadd_32u8       );
+  ("vpsub_16u16"      , test_vpsub_16u16      );
+  ("vpsub_32u8"       , test_vpsub_32u8       );
+  ("vpsra_16u16"      , test_vpsra_16u16      );
+  ("vpsrl_16u16"      , test_vpsrl_16u16      );
+  ("vpand_256"        , test_vpand_256        );
+  ("vpmulh_16u16"     , test_vpmulh_16u16     );
+  ("vpmulhrs_16u16"   , test_vpmulhrs_16u16   );
+  ("vpackus_16u16"    , test_vpackus_16u16    );
+  ("vpackss_16u16"    , test_vpackss_16u16    );
+  ("vpmaddubsw_256"   , test_vpmaddubsw_256   );
+  ("vpermd"           , test_vpermd           );
+  ("vbshufb_256"      , test_vbshufb_256      );
+  ("vpcmpgt_16u16"    , test_vpcmpgt_16u16    );
+  ("vpmovmskb_u256u64", test_vpmovmskb_u256u64);
+  ("vpunpckl_32u8"    , test_vpunpckl_32u8    );
+  ("vpblend_16u16"    , test_vpblend_16u16    );
+  ("vpextracti128"    , test_extracti128      );
+  ("vpinserti128"     , test_inserti128       );
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -851,4 +1145,4 @@ let poly_compress () =
   ) deps
 
 (* -------------------------------------------------------------------- *)
-let () = poly_compress ()
+let () = main ()

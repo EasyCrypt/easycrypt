@@ -1,3 +1,5 @@
+# See: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html
+
 # Intel intrinsic: _mm256_permutexvar_epi32
 VPERMD(w@256, widx@256) -> @256 =
   map<32, 8>(
@@ -9,9 +11,17 @@ VPERMD(w@256, widx@256) -> @256 =
 VPADD_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(add<16>, w1, w2)
 
+# Intel intrinsic: _mm256_add_epi8
+VPADD_32u8(w1@256, w2@256) -> @256 =
+  map<8, 32>(add<8>, w1, w2)
+
 # Intel intrinsic: _mm256_sub_epi16
 VPSUB_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(sub<16>, w1, w2)
+
+# Intel intrinsic: _mm256_sub_epi16
+VPSUB_32u8(w1@256, w2@256) -> @256 =
+  map<8, 32>(sub<8>, w1, w2)
 
 # Intel intrinsic: _mm256_and_si256
 VPAND_256(w1@256, w2@256) -> @256 = 
@@ -44,6 +54,10 @@ VPMULHRS_16u16(w1@256, w2@256) -> @256 =
 VPSRA_16u16(w@256, count@8) -> @256 =
   map<16, 16>(sra<16>(., count), w)
 
+# Intel intrinsic: _mm256_srli_epi16
+VPSRL_16u16(w@256, count@8) -> @256 =
+  map<16, 16>(srl<16>(., count), w)
+
 # Intel intrinsic: _mm256_maddubs_epi16
 VPMADDUBSW_256(w1@256, w2@256) -> @256 =
   map<16, 16>(
@@ -57,7 +71,7 @@ VPMADDUBSW_256(w1@256, w2@256) -> @256 =
   )
 
 # Intel intrinsic: _mm256_packus_epi16
-PACKUS_16u16(w1@256, w2@256) -> @256 =
+VPACKUS_16u16(w1@256, w2@256) -> @256 =
   let pack (w@128) = map<16, 8>(usat<16, 8>, w) in
 
   concat<64>(
@@ -66,3 +80,74 @@ PACKUS_16u16(w1@256, w2@256) -> @256 =
     pack(w1[@128|1]),
     pack(w2[@128|1])
   )
+
+# Intel intrincis: _mm256_packs_epi16
+VPACKSS_16u16(w1@256, w2@256) -> @256 =
+  let pack (w@128) = map<16, 8>(ssat<16, 8>, w) in
+
+  concat<64>(
+    pack(w1[@128|0]),
+    pack(w2[@128|0]),
+    pack(w1[@128|1]),
+    pack(w2[@128|1])
+  )
+
+# Intel intrinsic: _mm256_shuffle_epi8
+VPSHUFB_256(w@256, widx@256) -> @256 =
+  map<128, 2>(
+    fun w@128 widx@128 .
+      map<8, 16>(
+        fun idx@8 . idx[7] ? 0 : w[@8|idx[0:4]],
+        widx
+      ),
+    w,
+    widx
+  )
+
+# Intel intrinsic: _mm256_blend_epi16
+# FIXME: we need an heterogeneous `map' combinator
+VPBLEND_16u16(w1@256, w2@256, c@8) -> @256 =
+  let c = repeat<8>(c, 2) in
+  let c = map<1, 16>(uextend<1, 16>, c) in
+
+  map<16, 16>(
+    fun c@16 w1@16 w2@16 . c[0] ? w2 : w1,
+    c,
+    w1,
+    w2
+  )
+
+# Intel intrinsic: _mm256_cmpgt_epi16
+VPCMPGT_16u16(w1@256, w2@256) -> @256 =
+  map<16, 16>(
+    fun w1@16 w2@16 . sgt<16>(w1, w2) ? 0xffff@16 : 0x0000@16,
+    w1,
+    w2
+  )
+
+# Intel intrincis: _mm256_movemask_epi8
+VPMOVMSKB_u256u64(w@256) -> @32 =
+  map<8, 32>(fun i@8 . i[7], w)
+
+# Intel intrinsic: _mm256_unpacklo_epi8
+VPUNPCKL_32u8(w1@256, w2@256) -> @256 =
+  let interleave (w1@64, w2@64) =
+    map<8, 8>(
+      fun w1@8 w2@8 . concat<8>(w1, w2),
+      w1,
+      w2
+    )
+  in
+
+  concat<128>(
+    interleave(w1[@64|0], w2[@64|0]),
+    interleave(w1[@64|2], w2[@64|2])
+  )
+
+# Intel intrinsic: _mm256_extracti128_si256
+VPEXTRACTI128(w@256, i@8) -> @128 =
+  w[@128|i[0]]
+
+# Intel intrinsic: _mm256_inserti128_si256
+VPINSERTI128(w@256, m@128, i@8) -> @256 =
+  w[@128|i[0] <- m]

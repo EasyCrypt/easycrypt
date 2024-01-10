@@ -97,6 +97,17 @@ let circuit_of_spec (rs : reg list) (p : adef) : reg =
       | `US   -> Circuit.usmul e1 e2
       end
 
+    | ECmp (`W _, us, k, (e1, e2)) ->
+      let e1 = of_expr env e1 in
+      let e2 = of_expr env e2 in
+      let c =
+        match us, k with
+        | `S, `Gt -> Circuit.sgt e1 e2
+        | `S, `Ge -> Circuit.sge e1 e2
+        | `U, `Gt -> Circuit.ugt e1 e2
+        | `U, `Ge -> Circuit.uge e1 e2
+      in [c]
+
     | ENot (_, e) ->
       Circuit.lnot_ (of_expr env e)
 
@@ -122,6 +133,13 @@ let circuit_of_spec (rs : reg list) (p : adef) : reg =
       | `S -> Circuit.sat ~signed:true ~size e
       end
 
+    | EExtend (us, `W size, e) -> begin
+      let e = of_expr env e in
+      match us with
+      | `U -> Circuit.uextend ~size e
+      | `S -> Circuit.sextend ~size e
+      end
+
     | ESlice (e, ({ node = EInt offset }, size, scale)) ->
       let e = of_expr env e in
       let offset = offset * scale in
@@ -139,6 +157,37 @@ let circuit_of_spec (rs : reg list) (p : adef) : reg =
       let size = size * scale in
 
       List.take size (Circuit.lsr_ e offset)
+
+    | EAssign (e, ({ node = EInt offset }, size, scale), v) ->
+      let e = of_expr env e in
+      let v = of_expr env v in
+      let offset = offset * scale in
+      let size = size * scale in
+      let pre, e = List.split_at offset e in
+      let e, post = List.split_at size e in
+      pre @ v @ post
+
+    | EAssign (e, (offset, size, scale), v) ->
+      let esz = atype_as_aword e.type_ in
+
+      let lgscale = log2 scale in
+      assert (1 lsl lgscale = scale);
+
+      let e = of_expr env e in
+      let offset = of_expr env offset in
+      let v = of_expr env v in
+
+      let offset = List.make lgscale Aig.false_ @ offset in
+      let size = size * scale in
+
+      let m = List.make size Aig.true_ in
+      let m = Circuit.uextend ~size:esz m in
+      let m = Circuit.lnot_ (Circuit.lsl_ m offset) in
+
+      let v = Circuit.uextend ~size:esz v in
+      let v = Circuit.lsl_ v offset in
+
+      Circuit.lor_ (Circuit.land_ e m) v
 
     | EConcat (_, es) ->
       List.flatten (List.map (of_expr env) es)
@@ -173,6 +222,13 @@ let circuit_of_spec (rs : reg list) (p : adef) : reg =
     | ELet ((x, Some a, v), e) ->
       let env = Env.Fun.bind env x (a, v) in
       of_expr env e
+
+    | ECond (c, (e1, e2)) ->
+      let c = of_expr env c in
+      let e1 = of_expr env e1 in
+      let e2 = of_expr env e2 in
+
+      Circuit.mux2_reg e2 e1 (Circuit.ors c)
 
     | EVar x ->
       Env.Var.get env x

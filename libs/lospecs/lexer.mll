@@ -13,15 +13,17 @@
     table
 }
 
-let lower = ['a'-'z']
-let upper = ['A'-'Z']
-let alpha = lower | upper
-let digit = ['0'-'9']
-let alnum = alpha | digit
+let lower    = ['a'-'z']
+let upper    = ['A'-'Z']
+let alpha    = lower | upper
+let digit    = ['0'-'9']
+let hexdigit = digit | ['a'-'f'] | ['A'-'F']
+let alnum    = alpha | digit
 
 let ident = (alpha | '_') (alnum | '_')*
 
 let decnum = digit+
+let hexnum = "0x" hexdigit+
 
 let whitespace = [' ' '\t' '\r']
 
@@ -33,17 +35,22 @@ rule main = parse
   | '['  { LBRACKET }
   | ']'  { RBRACKET }
   | '@'  { AT       }
+  | "<-" { LARROW   }
   | "->" { RARROW   }
   | ','  { COMMA    }
   | '='  { EQUAL    }
   | ':'  { COLON    }
   | '.'  { DOT      }
   | '|'  { PIPE     }
+  | '?'  { QMARK    }
 
   | ident as x
       { Hashtbl.find_default keywords x (IDENT x) }
 
   | decnum as d
+      { NUMBER (int_of_string d) }
+
+  | hexnum as d
       { NUMBER (int_of_string d) }
 
   | whitespace+
@@ -63,7 +70,6 @@ rule main = parse
   | eof
       { EOF }
 
-  | _ as c {
-      Format.eprintf "%c@." c;
-      assert false
+  | _ {
+        raise (Ptree.ParseError (Ptree.Lc.of_lexbuf lexbuf))
     }

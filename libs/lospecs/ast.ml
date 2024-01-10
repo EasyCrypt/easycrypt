@@ -44,13 +44,16 @@ type aexpr_ =
   | EVar of ident
   | EInt of int
   | ESlice of aexpr * (aexpr * int * int)
+  | EAssign of aexpr * (aexpr * int * int) * aexpr
   | EApp of ident * aexpr list
   | EMap of (aword * aword) * (aargs * aexpr) * aexpr list
   | EConcat of aword * aexpr list
   | ERepeat of aword * (aexpr * int)
-  | EShift of lr * la * (aexpr * aexpr) 
+  | EShift of lr * la * (aexpr * aexpr)
+  | EExtend of us * aword * aexpr
   | ESat of us * aword * aexpr
   | ELet of (ident * aargs option * aexpr) * aexpr
+  | ECond of aexpr * (aexpr * aexpr)
   | ENot of aword * aexpr
   | EIncr of aword * aexpr
   | EAdd of aword * [`Sat of us | `Word] * (aexpr * aexpr)
@@ -58,6 +61,7 @@ type aexpr_ =
   | EOr of aword * (aexpr * aexpr)
   | EAnd of aword * (aexpr * aexpr)
   | EMul of mulk * aword * (aexpr * aexpr)
+  | ECmp of aword * us * [`Gt | `Ge] * (aexpr * aexpr)
 [@@deriving yojson]
 
 and aexpr = { node : aexpr_; type_ : atype } [@@deriving yojson]
@@ -69,6 +73,10 @@ type adef = {
   body : aexpr;
   rettype : aword;
 } [@@deriving yojson]
+
+(* -------------------------------------------------------------------- *)
+let atype_as_aword (ty : atype) =
+  match ty with `W n -> n | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let get_size (`W w : aword) : int =

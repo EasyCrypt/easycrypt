@@ -137,6 +137,13 @@ let reg ~(size : int) ~(name : int) : reg =
   List.init size (fun i -> input (name, i))
 
 (* ==================================================================== *)
+let split_msb (r : reg) : node * reg =
+  let n = List.length r in
+  let r, msb = List.split_nth (n-1) r in
+  let msb = List.hd msb in
+  msb, r
+
+(* ==================================================================== *)
 let lnot_ (r : reg) : reg =
   List.map neg r
 
@@ -185,6 +192,19 @@ let mux2 (n1 : node) (n2 : node) (c : node) =
 let mux2_reg (r1 : reg) (r2 : reg) (c : node) =
   assert (List.length r1 = List.length r2);
   List.map2 (fun n1 n2 -> mux2 n1 n2 c) r1 r2
+
+(* -------------------------------------------------------------------- *)
+let mux2_2
+  ~(k00 : node)
+  ~(k01 : node)
+  ~(k10 : node)
+  ~(k11 : node)
+  ((c1, c2) : node * node)
+=
+  mux2
+    (mux2 k00 k01 c2)
+    (mux2 k10 k11 c2)
+    c1
 
 (* -------------------------------------------------------------------- *)
 let mux_reg (cr : (node * reg) list) (r : reg) : reg =
@@ -431,3 +451,46 @@ let usmul (r1 : reg) (r2 : reg) : reg =
   let r2 = sextend ~size:(2*nm) r2 in
 
   smull r1 r2
+
+(* -------------------------------------------------------------------- *)
+let ugte (eq : node) (r1 : reg) (r2 : reg) : node =
+  let n1 = List.length r1 in
+  let n2 = List.length r2 in
+  let n = max n1 n2 in
+  let r1 = uextend ~size:n r1 in
+  let r2 = uextend ~size:n r2 in
+
+  List.fold_left2 (fun ct c1 c2 ->
+    mux2_2 (c1, c2)
+      ~k00:ct
+      ~k01:Aig.false_
+      ~k10:Aig.true_
+      ~k11:ct
+  ) eq r1 r2
+
+(* -------------------------------------------------------------------- *)
+let sgte (eq : node) (r1 : reg) (r2 : reg) : node =
+  let msb1, r1 = split_msb r1 in
+  let msb2, r2 = split_msb r2 in
+
+  mux2_2 (msb1, msb2)
+    ~k00:(ugte eq r1 r2)
+    ~k01:Aig.true_
+    ~k10:Aig.false_
+    ~k11:(ugte eq r1 r2)
+
+(* -------------------------------------------------------------------- *)
+let ugt (r1 : reg) (r2 : reg) : node =
+  ugte Aig.false_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let uge (r1 : reg) (r2 : reg) : node =
+  ugte Aig.true_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let sgt (r1 : reg) (r2 : reg) : node =
+  sgte Aig.false_ r1 r2
+
+(* -------------------------------------------------------------------- *)
+let sge (r1 : reg) (r2 : reg) : node =
+  sgte Aig.true_ r1 r2

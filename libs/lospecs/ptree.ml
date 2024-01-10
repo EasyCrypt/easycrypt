@@ -68,6 +68,9 @@ module Lc = struct
 end
 
 (* -------------------------------------------------------------------- *)
+exception ParseError of range
+
+(* -------------------------------------------------------------------- *)
 type symbol = string [@@deriving yojson]
 type word = [ `W of int ] [@@deriving yojson]
 type type_ = [ `Unsigned | `Signed | word ] [@@deriving yojson]
@@ -84,14 +87,18 @@ type pfname = (psymbol * pword list option) loced [@@deriving yojson]
 type pexpr_ =
   | PEParens of pexpr 
   | PEFName of pfname
-  | PEInt of int
+  | PEInt of int * pword option
+  | PECond of pexpr * (pexpr * pexpr)
   | PEFun of pargs * pexpr
   | PELet of (psymbol * pargs option * pexpr) * pexpr
-  | PESlice of pexpr * (pexpr * pexpr option * pexpr option)
+  | PESlice of pexpr * pslice
+  | PEAssign of pexpr * pslice * pexpr
   | PEApp of pfname * pexpr option loced list
 [@@deriving yojson]
 
 and pexpr = pexpr_ loced [@@deriving yojson]
+
+and pslice = (pexpr * pexpr option * pexpr option) [@@deriving yojson]
 
 type pdef = { name : symbol; args : pargs; rty : pword; body : pexpr }
 [@@deriving yojson]

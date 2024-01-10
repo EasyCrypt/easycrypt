@@ -10,36 +10,40 @@ type options = {
 
 (* -------------------------------------------------------------------- *)
 let entry (options : options) =
-  let prog = File.with_file_in options.input (Io.parse options.input) in
+  try
+    let prog = File.with_file_in options.input (Io.parse options.input) in
 
-  if options.pp_pst then begin
-    Format.eprintf "%a@."
-      (Yojson.Safe.pretty_print ~std:true)
-      (Ptree.pprogram_to_yojson prog)
-  end;
+    if options.pp_pst then begin
+      Format.eprintf "%a@."
+        (Yojson.Safe.pretty_print ~std:true)
+        (Ptree.pprogram_to_yojson prog)
+    end;
+  
+    let ast = Typing.tt_program Typing.Env.empty prog in
 
-  let ast =
-    try
-      Typing.tt_program Typing.Env.empty prog
+    if options.pp_ast then begin
+      List.iter (fun (_, def) ->
+        Format.eprintf "%a@."
+          (Yojson.Safe.pretty_print ~std:true)
+          (Ast.adef_to_yojson def)
+      ) ast
+    end;
 
-    with Typing.TypingError (range, msg) ->
+    (* let _dep = List.map Bitdep.bd_adef (List.map snd ast) in *)
+
+    ()
+
+  with
+  | Typing.TypingError (range, msg) ->
       Format.eprintf "%a: %s@." Ptree.Lc.pp_range range msg;
       Format.eprintf "@.";
       Io.print_source_for_range Format.err_formatter range options.input;
       exit 1
-    in
-
-  if options.pp_ast then begin
-    List.iter (fun (_, def) ->
-      Format.eprintf "%a@."
-        (Yojson.Safe.pretty_print ~std:true)
-        (Ast.adef_to_yojson def)
-    ) ast
-  end;
-
-  (* let _dep = List.map Bitdep.bd_adef (List.map snd ast) in *)
-
-  ()
+  | Ptree.ParseError range ->
+      Format.eprintf "%a: %s@." Ptree.Lc.pp_range range "parse error";
+      Format.eprintf "@.";
+      Io.print_source_for_range Format.err_formatter range options.input;
+      exit 1
 
 (* -------------------------------------------------------------------- *)
 let main () : unit =

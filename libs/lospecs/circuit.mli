@@ -111,4 +111,17 @@ val smulh : reg -> reg -> reg
 val usmul : reg -> reg -> reg
 
 (* ==================================================================== *)
+val ugte : node -> reg -> reg -> node
+
+val ugt : reg -> reg -> node
+
+val uge : reg -> reg -> node
+
+val sgte : node -> reg -> reg -> node
+
+val sgt : reg -> reg -> node
+
+val sge : reg -> reg -> node
+
+(* ==================================================================== *)
 val sat : signed:bool -> size:int -> reg -> reg

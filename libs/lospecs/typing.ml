@@ -107,7 +107,7 @@ let check_plain_arg (_ : env) (arg : pexpr option loced) =
 (* -------------------------------------------------------------------- *)
 let as_int_constant (e : pexpr) : int =
   match e.data with
-  | PEInt i -> i
+  | PEInt (i, None) -> i
   | _ -> tyerror e.range "integer constant expected"
 
 (* -------------------------------------------------------------------- *)
@@ -127,6 +127,8 @@ module Sigs : sig
   val srl : sig_
   val usat : sig_
   val ssat : sig_
+  val uextend : sig_
+  val sextend : sig_
   val not : sig_
   val incr : sig_
   val add : sig_
@@ -142,6 +144,10 @@ module Sigs : sig
   val smullo : sig_
   val smulhi : sig_
   val usmul : sig_
+  val sgt : sig_
+  val sge : sig_
+  val ugt : sig_
+  val uge : sig_
 end = struct
   let mk1 (f : aexpr -> aexpr_) (a : aexpr list) =
     f (as_seq1 a)
@@ -165,12 +171,20 @@ end = struct
     s_mk = fun ws -> mk2 (mk ws);
   }
 
-  let castop ~(name : string) (k : us) = {
+  let satop ~(name : string) (k : us) = {
     s_name = name;
     s_ntyparams = 2;
     s_argsty = (fun ws -> [fst (as_seq2 ws)]);
     s_retty = (fun ws -> snd (as_seq2 ws));
     s_mk = (fun ws -> mk1 (fun x -> ESat (k, snd (as_seq2 ws), x)));
+  }
+
+  let extendop ~(name : string) (k : us) = {
+    s_name = name;
+    s_ntyparams = 2;
+    s_argsty = (fun ws -> [fst (as_seq2 ws)]);
+    s_retty = (fun ws -> snd (as_seq2 ws));
+    s_mk = (fun ws -> mk1 (fun x -> EExtend (k, snd (as_seq2 ws), x)));
   }
 
   let shiftop ~(name : string) (d : lr) (k : la) = {
@@ -201,10 +215,16 @@ end = struct
     shiftop ~name:"srl" `R `L
     
   let usat : sig_ =
-    castop ~name:"usat" `U
+    satop ~name:"usat" `U
 
   let ssat : sig_ =
-    castop ~name:"ssat" `S
+    satop ~name:"ssat" `S
+
+  let uextend : sig_ =
+    extendop ~name:"uextend" `U
+  
+  let sextend : sig_ =
+    extendop ~name:"sextend" `S
 
   let not : sig_ =
     let mk = fun ws x -> ENot (as_seq1 ws, x) in
@@ -258,6 +278,22 @@ end = struct
 
   let usmul : sig_ =
     mulop ~ret:(fun n -> 2 * n) ~name:"usmul" `US
+
+  let sgt : sig_ =
+    let mk = fun ws x y -> ECmp (as_seq1 ws, `S, `Gt, (x, y)) in
+    binop ~ret:(fun _ -> 1) ~name:"sgt" mk
+
+  let sge : sig_ =
+    let mk = fun ws x y -> ECmp (as_seq1 ws, `S, `Ge, (x, y)) in
+    binop ~ret:(fun _ -> 1) ~name:"sge" mk
+
+  let ugt : sig_ =
+    let mk = fun ws x y -> ECmp (as_seq1 ws, `U, `Gt, (x, y)) in
+    binop ~ret:(fun _ -> 1) ~name:"ugt" mk
+
+  let uge : sig_ =
+    let mk = fun ws x y -> ECmp (as_seq1 ws, `U, `Ge, (x, y)) in
+    binop ~ret:(fun _ -> 1) ~name:"uge" mk
 end
 
 (* -------------------------------------------------------------------- *)
@@ -268,6 +304,8 @@ let sigs : sig_ list = [
   Sigs.srl;
   Sigs.usat;
   Sigs.ssat;
+  Sigs.uextend;
+  Sigs.sextend;
   Sigs.not;
   Sigs.incr;
   Sigs.add;
@@ -282,7 +320,11 @@ let sigs : sig_ list = [
   Sigs.smul;
   Sigs.smullo;
   Sigs.smulhi;  
-  Sigs.usmul;  
+  Sigs.usmul;
+  Sigs.sgt;
+  Sigs.sge;
+  Sigs.ugt;
+  Sigs.uge;
 ]
 
 (* -------------------------------------------------------------------- *)
@@ -296,13 +338,28 @@ let ty_compatible ~(src : atype) ~(dst : atype) : bool =
   | _, _ -> src = dst
 
 (* -------------------------------------------------------------------- *)
+let join_types (ty1 : atype loced) (ty2 : atype loced) =
+  match ty1.data, ty2.data with
+  | `Unsigned, `W n -> `W n
+  | `W n, `Unsigned -> `W n
+  | _, _ ->
+    if ty1.data <> ty2.data then
+      tyerror
+        (Lc.merge ty1.range ty2.range)
+        "the branches of the conditional have incompatible types: %a / %a"
+        pp_atype ty1.data pp_atype ty2.data
+    else ty1.data
+
+(* -------------------------------------------------------------------- *)
 let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
   match e.data with
   | PEParens e ->
       (None, tt_expr env e)
 
-  | PEInt i ->
-      let e = { node = EInt i; type_ = `Unsigned; } in
+  | PEInt (i, w) ->
+      let w = Option.map (tt_pword env) w in
+      let type_ = Option.default `Unsigned (w :> atype option) in
+      let e = { node = EInt i; type_; } in
       (None, e)
 
   | PEFun (fargs, f) -> 
@@ -370,6 +427,24 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
 
       (None, { node; type_; })
 
+  | PECond (c, (pe1, pe2)) -> 
+    let c = tt_expr env c in (* FIXME: must be a word *)
+    let e1 = tt_expr env pe1 in
+    let e2 = tt_expr env pe2 in
+
+    let type_ =
+      join_types
+        (Lc.mk pe1.range e1.type_)
+        (Lc.mk pe2.range e2.type_)
+    in
+
+    let e1 = { e1 with type_ } in
+    let e2 = { e2 with type_ } in
+
+    let node = ECond (c, (e1, e2)) in
+
+    (None, { node; type_; })
+
   | PESlice (ev, (start, len, scale)) ->
       let ev = tt_expr env ev in
       let start = tt_expr env start in
@@ -378,6 +453,15 @@ let rec tt_expr_ (env : env) (e : pexpr) : aargs option * aexpr =
       let node = ESlice (ev, (start, len, scale))
       and type_ = `W (len * scale) in
       (None, { node; type_; })
+
+  | PEAssign (ev, (start, len, scale), v) ->
+    let ev = tt_expr env ev in
+    let start = tt_expr env start in
+    let len = Option.default 1 (Option.map as_int_constant len) in
+    let scale = Option.default 1 (Option.map as_int_constant scale) in
+    let v = tt_expr env ~check:(`W (len * scale)) v in
+    let node = EAssign (ev, (start, len, scale), v) in
+    (None, { node; type_ = ev.type_; })
 
   | PEApp ({ data = (f, None) }, args) ->
     let (vid, (targs, vt)) = Option.get_exn
