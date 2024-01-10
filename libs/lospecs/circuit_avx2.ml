@@ -4,6 +4,7 @@ open Aig
 (* ==================================================================== *)
 module type S = sig
   val vpermd : reg -> reg -> reg
+  val vpermq : reg -> int -> reg
   val vpbroadcast_16u16 : reg -> reg
   val vpadd_16u16 : reg -> reg -> reg
   val vpadd_32u8 : reg -> reg -> reg
@@ -49,6 +50,12 @@ module FromSpec () : S = struct
 
   let vpermd (r1 : reg) (r2 : reg) : reg =
     Circuit_spec.circuit_of_spec [r2; r1] vpermd
+
+  (* ------------------------------------------------------------------ *)
+  let vpermq = List.assoc "VPERMQ" specs
+
+  let vpermq (r : reg) (i : int) : reg =
+    Circuit_spec.circuit_of_spec [r; Circuit.w8 i] vpermq
 
   (* ------------------------------------------------------------------ *)
   let vpbroadcast_16u16 = List.assoc "VPBROADCAST_16u16" specs

@@ -35,6 +35,7 @@ CAMLprim value caml_mm256_packs_epi16(value, value);
 CAMLprim value caml_mm256_mulhi_epu16(value, value);
 CAMLprim value caml_mm256_mulhrs_epi16(value, value);
 CAMLprim value caml_mm256_permutevar8x32_epi32(value, value);
+CAMLprim value caml_mm256_permute4x64_epi64_dyn(value, value);
 CAMLprim value caml_mm256_shuffle_epi8(value, value);
 CAMLprim value caml_mm256_srai_epi16(value, value);
 CAMLprim value caml_mm256_srli_epi16(value, value);

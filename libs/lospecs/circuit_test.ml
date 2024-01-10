@@ -122,7 +122,7 @@ let test (op : op) =
 (* -------------------------------------------------------------------- *)
 let test_uextend () =
   let op (isize : int) (osize : int) : op =
-    { name = (Printf.sprintf "uextend<%d,%d>" isize osize)
+    { name = (Format.sprintf "uextend<%d,%d>" isize osize)
     ; args = [(isize, `U)]
     ; out  = `U
     ; mk   = (fun rs -> C.uextend ~size:osize (as_seq1 rs))
@@ -134,7 +134,7 @@ let test_uextend () =
 (* -------------------------------------------------------------------- *)
 let test_sextend () =
   let op (isize : int) (osize : int) : op =
-    { name = (Printf.sprintf "sextend<%d,%d>" isize osize)
+    { name = (Format.sprintf "sextend<%d,%d>" isize osize)
     ; args = [(isize, `S)]
     ; out  = `S
     ; mk   = (fun rs -> C.sextend ~size:osize (as_seq1 rs))
@@ -160,7 +160,7 @@ let test_shift ~(side : [`L | `R]) ~(sign : [`U | `S]) =
 
     let asign = match sign with `U -> `L | `S -> `A in
 
-    { name = (Printf.sprintf "shift<%s,%s,%d>" str_side str_sign size)
+    { name = (Format.sprintf "shift<%s,%s,%d>" str_side str_sign size)
     ; args = [(size, sign); (4, `U)]
     ; out  = sign
     ; mk   = (fun rs -> let x, y = as_seq2 rs in C.shift ~side ~sign:asign x y)
@@ -180,7 +180,7 @@ let test_opp () =
     let sim (x : int) : int =
       M.to_int (M.neg (M.of_int x)) in
 
-    { name = (Printf.sprintf "opp<%d>" size)
+    { name = (Format.sprintf "opp<%d>" size)
     ; args = [(size, `S)]
     ; out  = `S
     ; mk   = (fun rs -> C.opp (as_seq1 rs))
@@ -197,7 +197,7 @@ let test_add () =
     let sim (x : int) (y : int) : int =
       M.to_int (M.add (M.of_int x) (M.of_int y)) in
 
-    { name = (Printf.sprintf "add<%d>" size)
+    { name = (Format.sprintf "add<%d>" size)
     ; args = List.make 2 (size, `S)
     ; out  = `S
     ; mk   = (fun rs -> let x, y = as_seq2 rs in C.add_dropc x y)
@@ -214,7 +214,7 @@ let test_incr () =
     let sim (x : int) : int =
       M.to_int (M.add (M.of_int x) M.one) in
 
-    { name = (Printf.sprintf "incr<%d>" size)
+    { name = (Format.sprintf "incr<%d>" size)
     ; args = [(size, `U)]
     ; out  = `U
     ; mk   = (fun rs -> C.incr_dropc (as_seq1 rs))
@@ -231,7 +231,7 @@ let test_sub () =
     let sim (x : int) (y : int) : int =
       M.to_int (M.sub (M.of_int x) (M.of_int y)) in
 
-    { name = (Printf.sprintf "sub<%d>" size)
+    { name = (Format.sprintf "sub<%d>" size)
     ; args = List.make 2 (size, `S)
     ; out  = `S
     ; mk   = (fun rs -> let x, y = as_seq2 rs in C.sub_dropc x y)
@@ -243,7 +243,7 @@ let test_sub () =
 (* -------------------------------------------------------------------- *)
 let test_umul () =
   let op (sz1 : int) (sz2 : int) : op = {
-    name = (Printf.sprintf "umul<%d,%d>" sz1 sz2);
+    name = (Format.sprintf "umul<%d,%d>" sz1 sz2);
     args = [(sz1, `U); (sz2, `U)];
     out  = `U;
     mk   = (fun rs -> let x, y = as_seq2 rs in C.umul x y);
@@ -255,7 +255,7 @@ let test_umul () =
 (* -------------------------------------------------------------------- *)
 let test_smul () =
   let op (sz1 : int) (sz2 : int) : op = {
-    name = (Printf.sprintf "smul<%d,%d>" sz1 sz2);
+    name = (Format.sprintf "smul<%d,%d>" sz1 sz2);
     args = [(sz1, `S); (sz2, `S)];
     out  = `S;
     mk   = (fun rs -> let x, y = as_seq2 rs in C.smul x y);
@@ -288,7 +288,7 @@ let test_ssat () =
       fun (i : int) -> min vM (max vm i)
     in
 
- {  name = (Printf.sprintf "ssat<%d,%d>" isize osize);
+ {  name = (Format.sprintf "ssat<%d,%d>" isize osize);
     args = [(isize, `S)];
     out  = `S;
     mk   = (fun rs -> C.sat ~signed:true ~size:osize (as_seq1 rs));
@@ -306,7 +306,7 @@ let test_usat () =
       fun (i : int) -> min vM (max vm i)
     in
 
- {  name = (Printf.sprintf "usat<%d,%d>" isize osize);
+ {  name = (Format.sprintf "usat<%d,%d>" isize osize);
     args = [(isize, `S)];
     out  = `U;
     mk   = (fun rs -> C.sat ~signed:false ~size:osize (as_seq1 rs));
@@ -318,7 +318,7 @@ let test_usat () =
 (* -------------------------------------------------------------------- *)
 let test_sgt () =
   let op (size : int) =
-    {  name = Printf.sprintf "sgt<%d>" size;
+    {  name = Format.sprintf "sgt<%d>" size;
         args = [(size, `S); (size, `S)];
         out  = `U;
         mk   = (fun rs -> let x, y = as_seq2 rs in [C.sgt x y]);
@@ -330,7 +330,7 @@ let test_sgt () =
 (* -------------------------------------------------------------------- *)
 let test_sge () =
   let op (size : int) =
-    {  name = Printf.sprintf "sge<%d>" size;
+    {  name = Format.sprintf "sge<%d>" size;
         args = [(size, `S); (size, `S)];
         out  = `U;
         mk   = (fun rs -> let x, y = as_seq2 rs in [C.sge x y]);
@@ -342,7 +342,7 @@ let test_sge () =
 (* -------------------------------------------------------------------- *)
 let test_ugt () =
   let op (size : int) =
-    {  name = Printf.sprintf "ugt<%d>" size;
+    {  name = Format.sprintf "ugt<%d>" size;
         args = [(size, `U); (size, `U)];
         out  = `U;
         mk   = (fun rs -> let x, y = as_seq2 rs in [C.ugt x y]);
@@ -354,7 +354,7 @@ let test_ugt () =
 (* -------------------------------------------------------------------- *)
 let test_uge () =
   let op (size : int) =
-    {  name = Printf.sprintf "uge<%d>" size;
+    {  name = Format.sprintf "uge<%d>" size;
         args = [(size, `U); (size, `U)];
         out  = `U;
         mk   = (fun rs -> let x, y = as_seq2 rs in [C.uge x y]);
@@ -653,6 +653,18 @@ let test_vpermd () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
+let test_vpermq () =
+  let op (imm8 : int) = {
+    name = Format.sprintf "vpermq<%d>" imm8;
+    args = [`M256];
+    mk = (fun rs -> C.vpermq (as_seq1 rs) imm8);
+    reff = call_m256_m256 (fun x -> Avx2.mm256_permute4x64_epi64 x imm8);
+  } in
+
+  test_vp 10000 (op 0x23);
+  test_vp 10000 (op 0xf7)
+
+(* -------------------------------------------------------------------- *)
 let test_vbshufb_256 () =
   let op = {
     name = "vbshufb_256";
@@ -720,7 +732,7 @@ let test_vpblend_16u16 () =
 (* -------------------------------------------------------------------- *)
 let test_extracti128 () =
   let op (i : int) = {
-    name = Printf.sprintf "test_extracti128<%d>" i;
+    name = Format.sprintf "test_extracti128<%d>" i;
     args = [`M256];
     mk = (fun rs -> C.vpextracti128 (as_seq1 rs) i);
     reff = call_m256_m128 (fun x -> Avx2.mm256_extracti128_si256 x i);
@@ -732,7 +744,7 @@ let test_extracti128 () =
 (* -------------------------------------------------------------------- *)
 let test_inserti128 () =
   let op (i : int) = {
-    name = Printf.sprintf "test_inserti128<%d>" i;
+    name = Format.sprintf "test_inserti128<%d>" i;
     args = [`M256; `M128];
     mk = (fun rs -> let x, y = as_seq2 rs in C.vpinserti128 x y i);
     reff = call_m256_m128_m256 (fun x y -> Avx2.mm256_inserti128_si256 x y i);
@@ -783,6 +795,7 @@ let tests = [
   ("vpackss_16u16"    , test_vpackss_16u16    );
   ("vpmaddubsw_256"   , test_vpmaddubsw_256   );
   ("vpermd"           , test_vpermd           );
+  ("vpermq"           , test_vpermq           );
   ("vbshufb_256"      , test_vbshufb_256      );
   ("vpcmpgt_16u16"    , test_vpcmpgt_16u16    );
   ("vpmovmskb_u256u64", test_vpmovmskb_u256u64);

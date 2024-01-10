@@ -7,6 +7,17 @@ VPERMD(w@256, widx@256) -> @256 =
     widx
   )
 
+# Intel intrinsic: _mm256_permute4x64_epi64
+VPERMQ(w@256, i@8) -> @256 =
+  let permute (i@2) = w[@64|i] in
+
+  concat<64>(
+    permute(i[@2|0]),
+    permute(i[@2|1]),
+    permute(i[@2|2]),
+    permute(i[@2|3])
+  )
+
 # Intel intrinsic: _mm256_add_epi16
 VPADD_16u16(w1@256, w2@256) -> @256 =
   map<16, 16>(add<16>, w1, w2)
