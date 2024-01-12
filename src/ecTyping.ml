@@ -11,6 +11,7 @@ open EcDecl
 open EcMemory
 open EcModules
 open EcFol
+open EcMatching.Position
 
 module MMsym = EcSymbols.MMsym
 module Sid   = EcIdent.Sid
@@ -3439,6 +3440,43 @@ and trans_prop env ?mv ue pf =
 (* -------------------------------------------------------------------- *)
 and trans_pattern env ps ue pf =
   trans_form_or_pattern env ~ps ue pf None
+
+(* -------------------------------------------------------------------- *)
+let trans_lv_match ?(memory : memory option) (env : EcEnv.env) (p : plvmatch) : lvmatch =
+  match p with
+  | `LvmNone as p -> (p :> lvmatch)
+  | `LvmVar pv -> begin
+    match memory with
+    | None ->
+      `LvmVar (fst (trans_pv env pv))
+    | Some m ->
+      `LvmVar (transpvar env m pv)
+    end
+(* -------------------------------------------------------------------- *)
+let trans_cp_match ?(memory : memory option) (env : EcEnv.env) (p : pcp_match) : cp_match =
+  match p with
+  | (`Sample | `While | `Call | `If) as p ->
+    (p :> cp_match)
+  | `Assign lv ->
+    `Assign (trans_lv_match ?memory env lv)
+(* -------------------------------------------------------------------- *)
+let trans_cp_base ?(memory : memory option) (env : EcEnv.env) (p : pcp_base) : cp_base =
+  match p with
+  | `ByPos _ as p -> (p :> cp_base)
+  | `ByMatch (i, p) -> `ByMatch (i, trans_cp_match ?memory env p)
+(* -------------------------------------------------------------------- *)
+let trans_codepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1) : codepos1 =
+  snd_map (trans_cp_base ?memory env) p
+
+(* -------------------------------------------------------------------- *)
+let trans_codepos ?(memory : memory option) (env : EcEnv.env) ((nm, p) : pcodepos) : codepos =
+  let nm = List.map (fst_map (trans_codepos1 ?memory env)) nm in
+  let p = trans_codepos1 ?memory env p in
+  (nm, p)
+
+(* -------------------------------------------------------------------- *)
+let trans_dcodepos1 ?(memory : memory option) (env : EcEnv.env) (p : pcodepos1 doption) : codepos1 doption =
+  DOption.map (trans_codepos1 ?memory env) p
 
 (* -------------------------------------------------------------------- *)
 let get_instances (tvi, bty) env =

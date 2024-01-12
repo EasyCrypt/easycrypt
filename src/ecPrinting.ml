@@ -1316,7 +1316,7 @@ let pp_locality fmt lc =
   Format.fprintf fmt "%s" (odfl "" (string_of_locality lc))
 
 (* -------------------------------------------------------------------- *)
-let string_of_cpos1 ((off, cp) : EcParsetree.codepos1) =
+let string_of_cpos1 ((off, cp) : EcMatching.Position.codepos1) =
   let s =
     match cp with
     | `ByPos i ->
@@ -1326,11 +1326,11 @@ let string_of_cpos1 ((off, cp) : EcParsetree.codepos1) =
         let s =
           let k =
             match k with
-            | `If     -> "if"
-            | `While  -> "while"
-            | `Assign -> "<-"
-            | `Sample -> "<$"
-            | `Call   -> "<@"
+            | `If       -> "if"
+            | `While    -> "while"
+            | `Assign _ -> "<-"
+            | `Sample   -> "<$"
+            | `Call     -> "<@"
           in Printf.sprintf "^%s" k in
 
         match i with

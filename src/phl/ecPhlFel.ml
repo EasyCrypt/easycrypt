@@ -133,7 +133,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     with _ -> tc_error !!tc "not applicable to abstract functions"
   in
 
-  let s_hd, s_tl = EcLowPhlGoal.s_split at_pos fdef.f_body in
+  let s_hd, s_tl = EcLowPhlGoal.s_split env at_pos fdef.f_body in
   let fve        = PV.fv env mhr f_event in
   let fvc        = PV.fv env mhr cntr in
   let fvi        = PV.fv env mhr inv in
@@ -256,6 +256,7 @@ let process_fel at_pos (infos : fel_info) tc =
       -> destr_pr pr
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required" in
 
+  let at_pos  = EcTyping.trans_codepos1 env at_pos in
   let hyps    = LDecl.inv_memenv1 hyps1 in
   let cntr    = TTC.pf_process_form !!tc hyps tint infos.pfel_cntr in
   let ash     = TTC.pf_process_form !!tc hyps (tfun tint treal) infos.pfel_asg in
