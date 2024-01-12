@@ -174,9 +174,9 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pskip                     -> EcPhlSkip.t_skip
     | Papp info                 -> EcPhlApp.process_app info
     | Pwp (wp,cost_pre)         -> EcPhlWp.process_wp wp cost_pre
-    | Psp sp                    -> EcPhlSp.t_sp sp
+    | Psp sp                    -> EcPhlSp.process_sp sp
     | Prcond (side, b, i, c)    -> EcPhlRCond.process_rcond side b i c
-    | Prmatch (side, c, i)      -> EcPhlRCond.t_rcond_match side c i
+    | Prmatch (side, c, i)      -> EcPhlRCond.process_rcond_match side c i
     | Pcond info                -> EcPhlHiCond.process_cond info
     | Pmatch infos              -> EcPhlHiCond.process_match infos
     | Pwhile (side, info)       -> EcPhlWhile.process_while side info
@@ -226,6 +226,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pauto                     -> EcPhlAuto.t_auto ~conv:`Conv
     | Plossless                 -> EcPhlHiAuto.t_lossless
     | Prepl_stmt infos          -> EcPhlTrans.process_equiv_trans infos
+    | Prwprgm infos             -> EcPhlRwPrgm.process_rw_prgm infos
   in
 
   try  tx tc

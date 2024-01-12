@@ -2,6 +2,7 @@
 open EcSymbols
 open EcParsetree
 open EcCoreGoal.FApi
+open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 module Low : sig
@@ -21,5 +22,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 val t_rcond       : oside -> bool -> codepos1 -> EcFol.form option -> backward
-val process_rcond : oside -> bool -> codepos1 -> pformula option -> backward
-val t_rcond_match : oside -> symbol -> codepos1 -> backward
+val process_rcond : oside -> bool -> pcodepos1 -> pformula option -> backward
+
+(* -------------------------------------------------------------------- *)
+val process_rcond_match : oside -> symbol -> pcodepos1 -> backward

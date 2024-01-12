@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
+open EcMatching.Position
 
 open EcCoreGoal.FApi
 
@@ -15,4 +16,4 @@ val t_wp :
   ?uselet:bool -> ?cost_pre:EcFol.form ->
   (codepos1 doption) option -> backward
 
-val process_wp : (codepos1 doption) option -> pformula option -> backward
+val process_wp : (pcodepos1 doption) option -> pformula option -> backward

@@ -7,6 +7,7 @@ open EcModules
 open EcFol
 open EcPV
 
+open EcMatching.Position
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
@@ -18,6 +19,7 @@ type chl_infos_t = (form, form option, form) rnd_tac_info
 type bhl_infos_t = (form, ty -> form option, ty -> form) rnd_tac_info
 type rnd_infos_t = (pformula, pformula option, pformula) rnd_tac_info
 type mkbij_t     = EcTypes.ty -> EcTypes.ty -> EcFol.form
+type semrndpos   = (bool * codepos1) doption
 
 (* -------------------------------------------------------------------- *)
 module Core = struct
@@ -402,8 +404,9 @@ module Core = struct
 
   (* -------------------------------------------------------------------- *)
   let t_hoare_rndsem_r reduce pos tc =
+    let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
-    let s1, s2 = o_split (Some pos) hs.hs_s in
+    let s1, s2 = o_split env (Some pos) hs.hs_s in
     let fv =
       if reduce then
         Some (PV.fv (FApi.tc1_env tc) (fst hs.hs_m) hs.hs_po)
@@ -414,8 +417,9 @@ module Core = struct
 
  (* -------------------------------------------------------------------- *)
   let t_bdhoare_rndsem_r reduce pos tc =
+    let env = FApi.tc1_env tc in
     let bhs = tc1_as_bdhoareS tc in
-    let s1, s2 = o_split (Some pos) bhs.bhs_s in
+    let s1, s2 = o_split env (Some pos) bhs.bhs_s in
     let fv =
       if reduce then
         Some (PV.fv (FApi.tc1_env tc) (fst bhs.bhs_m) bhs.bhs_po)
@@ -426,12 +430,13 @@ module Core = struct
 
  (* -------------------------------------------------------------------- *)
   let t_equiv_rndsem_r reduce side pos tc =
+    let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
     let s, m =
       match side with
       | `Left  -> es.es_sl, es.es_ml
       | `Right -> es.es_sr, es.es_mr in
-    let s1, s2 = o_split (Some pos) s in
+    let s1, s2 = o_split env (Some pos) s in
     let fv =
       if reduce then
         Some (PV.fv (FApi.tc1_env tc) (fst m) es.es_po)
@@ -680,6 +685,8 @@ let process_rnd side pos tac_info tc =
       t_bdhoare_rnd tac_info tc
 
   | _, _, _ when is_equivS concl ->
+    let env = FApi.tc1_env tc in
+
     let process_form f ty1 ty2 =
       TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
 
@@ -689,9 +696,19 @@ let process_rnd side pos tac_info tc =
       | PSingleRndParam f -> Some (process_form f), None
       | PTwoRndParams (f, finv) -> Some (process_form f), Some (process_form finv)
       | _ -> tc_error !!tc "invalid arguments"
-
     in
-      t_equiv_rnd side ?pos bij_info tc
+
+    let pos = pos |>Option.map (function
+        | Single (b, p) ->
+            Single (b, EcTyping.trans_codepos1 env p)
+        | Double ((b1, p1), (b2, p2)) ->
+            let p1 = EcTyping.trans_codepos1 env p1 in
+            let p2 = EcTyping.trans_codepos1 env p2 in
+            Double ((b1, p1), (b2, p2))
+      )
+    in
+    
+    t_equiv_rnd side ?pos bij_info tc
 
   | _ -> tc_error !!tc "invalid arguments"
 
@@ -702,7 +719,8 @@ let t_equiv_rndsem   = FApi.t_low3 "equiv-rndsem"   Core.t_equiv_rndsem_r
 
 (* -------------------------------------------------------------------- *)
 let process_rndsem ~reduce side pos tc =
-  let concl = FApi.tc1_goal tc in
+  let env, _, concl = FApi.tc1_eflat tc in
+  let pos = EcTyping.trans_codepos1 env pos in
 
   match side with
   | None when is_hoareS concl ->

@@ -148,3 +148,9 @@ module M = {
      *)
   }
 }.
+
+hoare H : M.gen_matrix_sample_iterate_x3_fast_filter48 : true ==> false.
+proof.
+proc.
+
+idassign ^t0_0<-{2} t0_0.

@@ -146,6 +146,10 @@ type 'a doption =
   | Single of 'a
   | Double of ('a * 'a)
 
+module DOption : sig
+  val map : ('a -> 'b) -> 'a doption -> 'b doption
+end
+
 (* -------------------------------------------------------------------- *)
 type ('a, 'b) tagged = Tagged of ('a * 'b option)
 

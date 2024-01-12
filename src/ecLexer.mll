@@ -100,6 +100,8 @@
     "clear"       , CLEAR      ;        (* KW: tactic *)
     "wlog"        , WLOG       ;        (* KW: tactic *)
 
+    "idassign"    , IDASSIGN   ;        (* KW: tactic *)
+
     (* Auto tactics *)
     "apply"       , APPLY      ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)

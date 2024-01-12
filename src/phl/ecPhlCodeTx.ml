@@ -221,18 +221,21 @@ let t_cfold = FApi.t_low3 "code-tx-cfold" t_cfold_r
 
 (* -------------------------------------------------------------------- *)
 let process_cfold (side, cpos, olen) tc =
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_cfold side cpos olen tc
 
 let process_kill (side, cpos, len) tc =
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_kill side cpos len tc
 
 let process_alias (side, cpos, id) tc =
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_alias side cpos id tc
 
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
+  let cpos = EcTyping.trans_codepos (FApi.tc1_env tc) cpos in
   t_set side cpos (fresh, id) e tc
-
 
 (* -------------------------------------------------------------------- *)
 

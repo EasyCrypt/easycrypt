@@ -1,4 +1,5 @@
 open EcCoreGoal.FApi
+open EcMatching.Position
 open EcParsetree
 open EcModules
 open EcPath
