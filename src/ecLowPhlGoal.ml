@@ -178,21 +178,56 @@ let tc1_as_equivS   tc = pf_as_equivS   !!tc (FApi.tc1_goal tc)
 let tc1_as_eagerF   tc = pf_as_eagerF   !!tc (FApi.tc1_goal tc)
 
 (* -------------------------------------------------------------------- *)
-let tc1_get_stmt side tc =
+let is_program_logic (f : form) (ks : hlkind list) =
+  let do1 (k : hlkind) =
+    match f.f_node, k with
+    | FhoareF   _, `Hoare  (`Any | `Pred) -> true
+    | FeHoareF  _, `EHoare (`Any | `Pred) -> true
+    | FcHoareF  _, `CHoare (`Any | `Pred) -> true
+    | FbdHoareF _, `PHoare (`Any | `Pred) -> true
+    | FequivF   _, `Equiv  (`Any | `Pred) -> true
+    | FhoareS   _, `Hoare  (`Any | `Stmt) -> true
+    | FeHoareS  _, `EHoare (`Any | `Stmt) -> true
+    | FcHoareS  _, `CHoare (`Any | `Stmt) -> true
+    | FbdHoareS _, `PHoare (`Any | `Stmt) -> true
+    | FequivS   _, `Equiv  (`Any | `Stmt) -> true
+    | FeagerF   _, `Eager                 -> true
+    | _          , _                      -> false
+  in
+
+  List.exists do1 ks
+
+(* -------------------------------------------------------------------- *)
+let tc1_get_stmt_with_memory side tc =
   let concl = FApi.tc1_goal tc in
   match side, concl.f_node with
-  | None, FhoareS hs -> hs.hs_s
-  | None, FeHoareS hs -> hs.ehs_s
-  | None, FcHoareS hs -> hs.chs_s
-  | None, FbdHoareS hs -> hs.bhs_s
+  | None, FhoareS hs -> (hs.hs_m, hs.hs_s)
+  | None, FeHoareS hs -> (hs.ehs_m, hs.ehs_s)
+  | None, FcHoareS hs -> (hs.chs_m, hs.chs_s)
+  | None, FbdHoareS hs -> (hs.bhs_m, hs.bhs_s)
   | Some _ , (FhoareS _ | FcHoareS _ | FbdHoareS _) ->
       tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
-  | Some `Left, FequivS es   -> es.es_sl
-  | Some `Right, FequivS es  -> es.es_sr
+  | Some `Left, FequivS es   -> (es.es_ml, es.es_sl)
+  | Some `Right, FequivS es  -> (es.es_mr, es.es_sr)
   | None, FequivS _ ->
       tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
-  | _            ->
+  | _ ->
       tc_error_noXhl ~kinds:(hlkinds_Xhl_r `Stmt) !!tc
+
+(* -------------------------------------------------------------------- *)
+let tc1_get_stmt side tc =
+  snd (tc1_get_stmt_with_memory side tc)
+
+(* -------------------------------------------------------------------- *)
+let hl_set_stmt (side : side option) (f : form) (s : stmt) =
+  match side, f.f_node with
+  | None       , FhoareS   hs -> f_hoareS_r   { hs with hs_s  = s }
+  | None       , FeHoareS  hs -> f_eHoareS_r  { hs with ehs_s = s }
+  | None       , FcHoareS  hs -> f_cHoareS_r  { hs with chs_s = s }
+  | None       , FbdHoareS hs -> f_bdHoareS_r { hs with bhs_s = s }
+  | Some `Left , FequivS   es -> f_equivS_r   { es with es_sl = s }
+  | Some `Right, FequivS   es -> f_equivS_r   { es with es_sr = s }
+  | _          , _            -> assert false
 
 (* -------------------------------------------------------------------- *)
 let get_pre f =

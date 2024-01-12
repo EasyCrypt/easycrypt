@@ -223,6 +223,11 @@ module Zipper = struct
           | (state', [i']) when i == i' && state == state' -> (state, s)
           | (state', si  ) -> (state', zip { zpr with z_tail = si @ tl })
       end
+
+  let map env cpos f s =
+    fst_map
+      Option.get
+      (fold env () cpos (fun () _ i -> fst_map some (f i)) None s)
 end
 
 (* -------------------------------------------------------------------- *)

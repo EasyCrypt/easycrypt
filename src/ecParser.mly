@@ -3394,6 +3394,12 @@ phltactic:
 | LOSSLESS
     { Plossless }
 
+| PROC CHANGE side=side? pos=codepos COLON f=sform
+    { Pprocchange (side, pos, f) }
+
+| PROC REWRITE side=side? pos=codepos f=pterm
+    { Pprocrewrite (side, pos, f) }
+
 | IDASSIGN o=codepos x=lvalue_var
     { Prwprgm (`IdAssign (o, x)) }
 
