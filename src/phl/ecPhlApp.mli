@@ -3,6 +3,7 @@ open EcUtils
 open EcParsetree
 open EcFol
 open EcCoreGoal.FApi
+open EcMatching.Position
 
 (* -------------------------------------------------------------------- *)
 val t_hoare_app   : codepos1 -> form -> backward

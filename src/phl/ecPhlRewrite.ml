@@ -19,7 +19,7 @@ let get_expression_of_instruction (i : instr) =
 (* -------------------------------------------------------------------- *)
 let t_change
     (side : side option)
-    (pos  : codepos)
+    (pos  : EcMatching.Position.codepos)
     (expr : expr -> LDecl.hyps * memenv -> 'a * expr)
     (tc   : tcenv1)
 =
@@ -52,7 +52,8 @@ let t_change
       (hoare | ehoare | phoare | equiv)";
 
   let m, s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let (data, goals), s = EcMatching.Zipper.map pos (change m) s in
+  let (data, goals), s =
+    EcMatching.Zipper.map (FApi.tc1_env tc) pos (change m) s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   data, FApi.xmutate1 tc `ProcChange (goals @ [concl])
@@ -60,10 +61,12 @@ let t_change
 (* -------------------------------------------------------------------- *)
 let process_change
     (side : side option)
-    (pos  : codepos)
+    (pos  : pcodepos)
     (form : pexpr)
     (tc   : tcenv1)
 =
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+
   let expr (e : expr) ((hyps, m) : LDecl.hyps * memenv) =
     let hyps = LDecl.push_active m hyps in
     let e =
@@ -77,7 +80,7 @@ let process_change
 (* -------------------------------------------------------------------- *)
 let process_rewrite_rw
     (side : side option)
-    (pos  : codepos)
+    (pos  : pcodepos)
     (pt   : ppterm)
     (tc   : tcenv1)
 =
@@ -124,8 +127,8 @@ let process_rewrite_rw
     (m, data), expr_of_form (fst m) e
   in
 
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
   let (m, (pt, mode, cpos)), tc = t_change side pos change tc in
-
   let cpos = EcMatching.FPosition.reroot [1] cpos in
 
   let discharge (tc : tcenv1) =
@@ -141,7 +144,7 @@ let process_rewrite_rw
 (* -------------------------------------------------------------------- *)
 let process_rewrite_simpl
   (side : side option)
-  (pos  : codepos)
+  (pos  : pcodepos)
   (tc   : tcenv1)
 =
 let ri = EcReduction.nodelta in
@@ -153,6 +156,7 @@ let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
     (fst me, f), e
   in
 
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
   let (m, f), tc = t_change side pos change tc in
 
   FApi.t_first (
@@ -166,7 +170,7 @@ let change (e : expr) ((hyps, me) : LDecl.hyps * memenv) =
 (* -------------------------------------------------------------------- *)
 let process_rewrite
   (side : side option)
-  (pos  : codepos)
+  (pos  : pcodepos)
   (rw   : prrewrite)
   (tc   : tcenv1)
 =

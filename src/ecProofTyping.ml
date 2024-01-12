@@ -174,6 +174,19 @@ let tc1_process_Xhl_formula_xreal tc pf =
   tc1_process_Xhl_form tc txreal pf
 
 (* ------------------------------------------------------------------ *)
+let tc1_process_codepos tc (side, cpos) =
+  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
+  let env = FApi.tc1_env tc in
+  let env = EcEnv.Memory.push_active me env in
+  EcTyping.trans_codepos env cpos
+(* ------------------------------------------------------------------ *)
+let tc1_process_codepos1 tc (side, cpos) =
+  let me, _ = EcLowPhlGoal.tc1_get_stmt side tc in
+  let env = FApi.tc1_env tc in
+  let env = EcEnv.Memory.push_active me env in
+  EcTyping.trans_codepos1 env cpos
+  
+(* ------------------------------------------------------------------ *)
 (* FIXME: factor out to typing module                                 *)
 (* FIXME: TC HOOK - check parameter constraints                       *)
 (* ------------------------------------------------------------------ *)

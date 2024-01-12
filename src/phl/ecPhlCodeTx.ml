@@ -293,16 +293,20 @@ let t_cfold = FApi.t_low3 "code-tx-cfold" t_cfold_r
 
 (* -------------------------------------------------------------------- *)
 let process_cfold (side, cpos, olen) tc =
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_cfold side cpos olen tc
 
 let process_kill (side, cpos, len) tc =
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_kill side cpos len tc
 
 let process_alias (side, cpos, id) tc =
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_alias side cpos id tc
 
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
+  let cpos = EcProofTyping.tc1_process_codepos tc (side, cpos) in
   t_set side cpos (fresh, id) e tc
 
 (* -------------------------------------------------------------------- *)
@@ -363,7 +367,7 @@ let process_weakmem (side, id, params) tc =
   FApi.xmutate1 tc `WeakenMem [concl]
 
 (* -------------------------------------------------------------------- *)
-let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
+let process_case ((side, pos) : side option * pcodepos) (tc : tcenv1) =
   let (env, _, concl) = FApi.tc1_eflat tc in
 
   let change (i : instr) =
@@ -396,8 +400,8 @@ let process_case ((side, pos) : side option * codepos) (tc : tcenv1) =
     assert false;
 
   let _, s = EcLowPhlGoal.tc1_get_stmt side tc in
-  let goals, s = EcMatching.Zipper.map pos change s in
+  let pos = EcProofTyping.tc1_process_codepos tc (side, pos) in
+  let goals, s = EcMatching.Zipper.map env pos change s in
   let concl = EcLowPhlGoal.hl_set_stmt side concl s in
 
   FApi.xmutate1 tc `ProcCase (goals @ [concl])
-

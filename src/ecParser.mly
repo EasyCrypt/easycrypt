@@ -1434,19 +1434,21 @@ param_decl:
 (* -------------------------------------------------------------------- *)
 (* Statements                                                           *)
 
-lvalue_u:
+lvalue_var:
 | x=loc(fident)
    { match lqident_of_fident x.pl_desc with
      | None   -> parse_error x.pl_loc None
-     | Some v -> PLvSymbol (mk_loc x.pl_loc v) }
+     | Some v -> mk_loc x.pl_loc v }
+
+lvalue_u:
+| x=lvalue_var
+   { PLvSymbol x }
 
 | LPAREN p=plist2(qident, COMMA) RPAREN
    { PLvTuple p }
 
-| x=loc(fident) DLBRACKET ti=tvars_app? es=plist1(expr, COMMA) RBRACKET
-   { match lqident_of_fident x.pl_desc with
-     | None   -> parse_error x.pl_loc None
-     | Some v -> PLvMap (mk_loc x.pl_loc v, ti, es) }
+| x=lvalue_var DLBRACKET ti=tvars_app? e=plist1(expr, COMMA) RBRACKET
+   { PLvMap (x, ti, e) }
 
 %inline lvalue:
 | x=loc(lvalue_u) { x }
@@ -2602,21 +2604,26 @@ tac_dir:
 | empty { Backs }
 
 icodepos_r:
-| IF       { (`If     :> cp_match) }
-| WHILE    { (`While  :> cp_match) }
-| LARROW   { (`Assign :> cp_match) }
-| LESAMPLE { (`Sample :> cp_match) }
-| LEAT     { (`Call   :> cp_match) }
+| IF       { (`If     :> pcp_match) }
+| WHILE    { (`While  :> pcp_match) }
+| LESAMPLE { (`Sample :> pcp_match) }
+| LEAT     { (`Call   :> pcp_match) }
+
+| lvm=lvmatch LARROW { (`Assign lvm :> pcp_match) }
+
+lvmatch:
+| empty        { (`LvmNone  :> plvmatch) }
+| x=lvalue_var { (`LvmVar x :> plvmatch) }
 
 %inline icodepos:
  | HAT x=icodepos_r { x }
 
 codepos1_wo_off:
 | i=sword
-    { (`ByPos i :> cp_base) }
+    { (`ByPos i :> pcp_base) }
 
 | k=icodepos i=option(brace(sword))
-    { (`ByMatch (i, k) :> cp_base) }
+    { (`ByMatch (i, k) :> pcp_base) }
 
 codepos1:
 | cp=codepos1_wo_off { (0, cp) }

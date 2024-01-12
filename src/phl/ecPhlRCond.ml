@@ -13,8 +13,8 @@ open EcLowPhlGoal
 (* -------------------------------------------------------------------- *)
 module Low = struct
   (* ------------------------------------------------------------------ *)
-  let gen_rcond pf b m at_pos s =
-    let head, i, tail = s_split_i at_pos s in
+  let gen_rcond (pf, env) b m at_pos s =
+    let head, i, tail = s_split_i env at_pos s in
     let e, s =
       match i.i_node with
       | Sif(e,s1,s2) -> e, if b then s1.s_node else s2.s_node
@@ -31,18 +31,20 @@ module Low = struct
 
   (* ------------------------------------------------------------------ *)
   let t_hoare_rcond_r b at_pos tc =
+    let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
     let m  = EcMemory.memory hs.hs_m in
-    let hd,_,e,s = gen_rcond !!tc b m at_pos hs.hs_s in
+    let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos hs.hs_s in
     let concl1  = f_hoareS_r { hs with hs_s = hd; hs_po = e } in
     let concl2  = f_hoareS_r { hs with hs_s = s } in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
   let t_ehoare_rcond_r b at_pos tc =
+    let env = FApi.tc1_env tc in
     let hs = tc1_as_ehoareS tc in
     let m  = EcMemory.memory hs.ehs_m in
-    let hd,_,e,s = gen_rcond !!tc b m at_pos hs.ehs_s in
+    let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos hs.ehs_s in
     let pre =
       match destr_app hs.ehs_pr with
       | o, pre :: _ when f_equal o fop_interp_ehoare_form -> pre
@@ -54,21 +56,23 @@ module Low = struct
 
   (* ------------------------------------------------------------------ *)
   let t_bdhoare_rcond_r b at_pos tc =
+    let env = FApi.tc1_env tc in
     let bhs = tc1_as_bdhoareS tc in
     let m  = EcMemory.memory bhs.bhs_m in
-    let hd,_,e,s = gen_rcond !!tc b m at_pos bhs.bhs_s in
+    let hd,_,e,s = gen_rcond (!!tc, env) b m at_pos bhs.bhs_s in
     let concl1  = f_hoareS bhs.bhs_m bhs.bhs_pr hd e in
     let concl2  = f_bdHoareS_r { bhs with bhs_s = s } in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
   let t_equiv_rcond_r side b at_pos tc =
+    let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
     let m,mo,s =
       match side with
       | `Left  -> es.es_ml,es.es_mr, es.es_sl
       | `Right -> es.es_mr,es.es_ml, es.es_sr in
-    let hd,_,e,s = gen_rcond !!tc b EcFol.mhr at_pos s in
+    let hd,_,e,s = gen_rcond (!!tc, env) b EcFol.mhr at_pos s in
     let mo' = EcIdent.create "&m" in
     let s1 = Fsubst.f_subst_id in
     let s1 = Fsubst.f_bind_mem s1 (EcMemory.memory m) EcFol.mhr in
@@ -103,13 +107,14 @@ let t_rcond side b at_pos tc =
     Low.t_equiv_rcond side b at_pos tc
 
 let process_rcond side b at_pos tc =
+  let at_pos = EcProofTyping.tc1_process_codepos1 tc (side, at_pos) in
   t_rcond side b at_pos tc
 
 (* -------------------------------------------------------------------- *)
 module LowMatch = struct
   (* ------------------------------------------------------------------ *)
   let gen_rcond (pf, env) c m at_pos s =
-    let head, i, tail = s_split_i at_pos s in
+    let head, i, tail = s_split_i env at_pos s in
     let e, infos, (cvars, subs) =
       match i.i_node with
       | Smatch (e, bs) -> begin
@@ -309,3 +314,8 @@ let t_rcond_match side c at_pos tc =
   | None when is_eHoareS concl -> LowMatch.t_ehoare_rcond_match c at_pos tc
   | None -> LowMatch.t_hoare_rcond_match c at_pos tc
   | Some side -> LowMatch.t_equiv_rcond_match side c at_pos tc
+
+(* -------------------------------------------------------------------- *)
+let process_rcond_match side c at_pos tc =
+  let at_pos = EcProofTyping.tc1_process_codepos1 tc (side, at_pos) in
+  t_rcond_match side c at_pos tc
