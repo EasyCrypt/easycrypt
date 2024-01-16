@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcTypes
 open EcModules
 open EcFol
@@ -231,3 +232,64 @@ let process_alias (side, cpos, id) tc =
 let process_set (side, cpos, fresh, id, e) tc =
   let e = TTC.tc1_process_Xhl_exp tc side None e in
   t_set side cpos (fresh, id) e tc
+
+
+(* -------------------------------------------------------------------- *)
+
+let process_weakmem (side, id, params) tc =
+  let open EcLocation in
+  let hyps = FApi.tc1_hyps tc in
+  let env = FApi.tc1_env tc in
+  let _, f =
+    try LDecl.hyp_by_name (unloc id) hyps
+    with LDecl.LdeclError _ ->
+      tc_lookup_error !!tc ~loc:id.pl_loc `Local ([], unloc id)
+  in
+
+  let process_decl (x, ty) =
+    let ty = EcTyping.transty EcTyping.tp_tydecl env (EcUnify.UniEnv.create None) ty in
+    let x = omap unloc (unloc x) in
+    { ov_name = x; ov_type = ty }
+  in
+
+  let decls = List.map process_decl params in
+
+  let bind me =
+    try EcMemory.bindall decls me
+    with EcMemory.DuplicatedMemoryBinding x ->
+      tc_error ~loc:id.pl_loc !!tc "variable %s already declared" x in
+
+  let h =
+    match f.f_node with
+    | FhoareS hs ->
+      let me = bind hs.hs_m in
+      f_hoareS_r { hs with hs_m = me }
+
+    | FeHoareS hs ->
+      let me = bind hs.ehs_m in
+      f_eHoareS_r { hs with ehs_m = me }
+
+    | FbdHoareS hs ->
+      let me = bind hs.bhs_m in
+      f_bdHoareS_r { hs with bhs_m = me }
+
+    | FcHoareS hs ->
+      let me = bind hs.chs_m in
+      f_cHoareS_r { hs with chs_m = me }
+
+    | FequivS es ->
+      let do_side side es =
+        let es_ml, es_mr = if side = `Left then bind es.es_ml, es.es_mr else es.es_ml, bind es.es_mr in
+        {es with es_ml; es_mr}
+      in
+      let es =
+        match side with
+        | None -> do_side `Left (do_side `Right es)
+        | Some side -> do_side side es in
+      f_equivS_r es
+
+    | _ ->
+      tc_error ~loc:id.pl_loc !!tc "the hypothesis need to be a hoare/choare/phoare/ehoare/equiv on statement"
+  in
+  let concl = f_imp h (FApi.tc1_goal tc) in
+  FApi.xmutate1 tc `WeakenMem [concl]

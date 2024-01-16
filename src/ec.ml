@@ -27,6 +27,7 @@ let psep = match Sys.os_type with "Win32" -> ";" | _ -> ":"
 
 (* -------------------------------------------------------------------- *)
 let confname    = "easycrypt.conf"
+let projname    = "easycrypt.project"
 let why3dflconf = Filename.concat XDG.home "why3.conf"
 
 (* -------------------------------------------------------------------- *)
@@ -71,7 +72,7 @@ let print_config config =
       let fullname =
         Printf.sprintf "%s@%s"
           prover.EcProvers.pr_name
-          prover.EcProvers.pr_version in
+          (EcProvers.Version.to_string prover.EcProvers.pr_version) in
 
       match prover.EcProvers.pr_evicted with
       | None -> fullname
@@ -121,17 +122,64 @@ let main () =
             if Sys.file_exists conffile then Some conffile else None) in
       List.Exceptionless.hd (Option.to_list localini @ xdgini) in
 
-    let ini =
-      Option.bind conffile (fun ini ->
-        try  Some (EcOptions.read_ini_file ini)
-        with
-        | Sys_error _ -> None
-        | EcOptions.InvalidIniFile (lineno, file) ->
-            Format.eprintf "%s:%l: cannot read INI file@." file lineno;
-            exit 1
-      )
+    let projfile (path : string option) =
+      let rec find (path : string) : string option =
+        let projfile = Filename.concat path projname in
+        if Sys.file_exists projfile then
+          Some projfile
+        else
+          if Filename.dirname path = path then
+            None
+          else
+            find (Filename.dirname path)
+      in
 
-    in (conffile, EcOptions.parse_cmdline ?ini Sys.argv) in
+      let root =
+        match path with
+        | Some path ->
+           Filename.dirname path
+        | None ->
+           Unix.getcwd () in
+
+      let root =
+        if   Filename.is_relative root
+        then Filename.concat (Unix.getcwd ()) root
+        else root in
+
+      find root in
+
+    let read_ini_file ini =
+      try  Some (EcOptions.read_ini_file ini)
+      with
+      | Sys_error _ -> None
+      | EcOptions.InvalidIniFile (lineno, file) ->
+          Format.eprintf "%s:%l: cannot read INI file@." file lineno;
+          exit 1
+    in
+
+    let getini (path : string option) =
+      let inisys =
+        Option.bind conffile (fun conffile ->
+          Option.map
+            (fun ini -> { inic_ini = ini; inic_root = None; })
+            (read_ini_file conffile)
+        )
+      in
+
+      let iniproj =
+        Option.bind (projfile path) (fun conffile ->
+          Option.map
+            (fun ini -> {
+               inic_ini  = ini;
+               inic_root = Some (Filename.dirname conffile);
+            })
+            (read_ini_file conffile)
+        )
+      in
+
+      List.filter_map identity [iniproj; inisys] in
+
+    (conffile, EcOptions.parse_cmdline ~ini:getini Sys.argv) in
 
   (* Execution of eager commands *)
   begin
@@ -144,7 +192,19 @@ let main () =
           | None ->
               EcRelocate.resource ["commands"] in
         let cmd  = Filename.concat root "runtest" in
-        let args = ["runtest"; input.runo_input] @ input.runo_scenarios in
+        let args =
+            [
+              "runtest";
+              Format.sprintf "--bin=%s" Sys.executable_name;
+            ]
+          @ (List.flatten
+               (List.map
+                  (fun x -> ["-p"; x])
+                  (odfl [] input.runo_provers)))
+          @ (otolist (omap (Format.sprintf "--why3=%s") options.o_options.o_why3))
+          @ [input.runo_input]
+          @ input.runo_scenarios
+        in
         Format.eprintf "Executing: %s@." (String.concat " " (cmd :: args));
         Unix.execv cmd (Array.of_list args)
       end
@@ -429,19 +489,32 @@ let main () =
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
                    let timed = p.EP.gl_debug = Some `Timed in
                    let break = p.EP.gl_debug = Some `Break in
+                   let ignore_fail = ref false in
                      try
-                       let tdelta =
-                         EcCommands.process ~timed ~break p.EP.gl_action
-                       in tstats loc tdelta
+                       let tdelta = EcCommands.process ~timed ~break p.EP.gl_action in
+                       if p.EP.gl_fail then begin
+                         ignore_fail := true;
+                         raise (EcScope.HiScopeError (None, "this command is expected to fail"))
+                       end;
+                       tstats loc tdelta
                      with
                      | EcCommands.Restart ->
                          raise EcCommands.Restart
                      | e -> begin
-                       if Printexc.backtrace_status () then begin
-                         if not (T.interactive terminal) then
-                           Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace
+                       if !ignore_fail || not p.EP.gl_fail then begin
+                         if Printexc.backtrace_status () then begin
+                           if not (T.interactive terminal) then
+                             Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace
+                         end;
+                         raise (EcScope.toperror_of_exn ~gloc:loc e)
                        end;
-                       raise (EcScope.toperror_of_exn ~gloc:loc e)
+                       if T.interactive terminal then begin
+                         let error =
+                           Format.asprintf
+                             "The following error has been ignored:@.@.@%a"
+                             EcPException.exn_printer e in
+                         T.notice ~immediate:true `Info error terminal
+                       end
                    end)
                 commands
 

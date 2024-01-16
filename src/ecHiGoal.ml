@@ -3,6 +3,7 @@ open EcUtils
 open EcLocation
 open EcSymbols
 open EcParsetree
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv
@@ -109,7 +110,7 @@ let process_simplify_info ri (tc : tcenv1) =
     ri.pdelta
       |> omap (List.fold_left do1 (Sp.empty, Sid.empty))
       |> omap (fun (x, y) -> (fun p -> if Sp.mem p x then `Force else `No), (Sid.mem^~ y))
-      |> odfl ((fun _ -> `Yes), predT)
+      |> odfl ((fun _ -> `IfTransparent), predT)
   in
 
   {
@@ -143,10 +144,10 @@ let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
       t_admit tc
 
   | (`Standard | `Strict) as mode ->
-      t_seq (t_simplify ~delta:false) (t_smt ~mode pi) tc
+      t_seq (t_simplify ~delta:`No) (t_smt ~mode pi) tc
 
   | `Report ->
-      t_seq (t_simplify ~delta:false) (t_smt ~mode:(`Report loc) pi) tc
+      t_seq (t_simplify ~delta:`No) (t_smt ~mode:(`Report loc) pi) tc
 
 (* -------------------------------------------------------------------- *)
 let process_clear symbols tc =
@@ -286,7 +287,7 @@ module LowRewrite = struct
             else None
           else None
         and pt3 = omap base
-          (EcReduction.h_red_opt (EcReduction.full_red ~opaque:false) hyps ax)
+          (EcReduction.h_red_opt EcReduction.full_red hyps ax)
         in pt1 @ (otolist pt2) @ (odfl [] pt3)) in
 
         let rec doit reduce =
@@ -616,8 +617,8 @@ let process_delta ~und_delta ?target (s, o, p) tc =
         let op = EcEnv.Op.by_path (fst p) env in
 
         match op.EcDecl.op_kind with
-        | EcDecl.OB_oper (Some (EcDecl.OP_Plain (e, _))) ->
-            (snd p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args, Some (fst p))
+        | EcDecl.OB_oper (Some (EcDecl.OP_Plain (f, _))) ->
+            (snd p, op.EcDecl.op_tparams, f, args, Some (fst p))
         | EcDecl.OB_pred (Some (EcDecl.PR_Plain f)) ->
             (snd p, op.EcDecl.op_tparams, f, args, Some (fst p))
         | _ ->
@@ -636,8 +637,9 @@ let process_delta ~und_delta ?target (s, o, p) tc =
   in
 
   let ri =
-    let delta_p p = if Some p = dp then `Force else `Yes in
-    { (EcReduction.full_red ~opaque:false) with delta_p } in
+    let delta_p p =
+      if Some p = dp then `Force else `IfTransparent
+    in  { EcReduction.full_red with delta_p } in
   let na = List.length args in
 
   match s with
@@ -736,14 +738,14 @@ let process_rewrite1_r ttenv ?target ri tc =
         | Some logic ->
            let hyps   = FApi.tc1_hyps tc in
            let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
-           t_simplify_lg ?target ~delta:false (ttenv, logic)
+           t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic)
         | None -> t_id
       in FApi.t_seq tt process_trivial tc
 
   | RWSimpl logic ->
       let hyps   = FApi.tc1_hyps tc in
       let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
-      t_simplify_lg ?target ~delta:false (ttenv, logic) tc
+      t_simplify_lg ?target ~delta:`IfApplied (ttenv, logic) tc
 
   | RWDelta ((s, r, o, px), p) -> begin
       if Option.is_some px then
@@ -900,7 +902,9 @@ let process_rewrite1_r ttenv ?target ri tc =
           | EcUnify.UninstanciateUni ->
             EcTyping.tyerror ri.pl_loc env EcTyping.FreeTypeVariables in
 
-        (List.map (EcTypes.e_uni subs) args, EcTypes.e_uni subs res)
+        let sty = { ty_subst_id with ts_u = subs } in
+        let es = e_subst { e_subst_id with es_ty = sty } in
+        (List.map es args, es res)
       in
 
       (* Construct a left value from an expression *)
@@ -912,9 +916,9 @@ let process_rewrite1_r ttenv ?target ri tc =
 
         match res.e_node with
         | Evar pv ->
-          EcModules.LvVar (pv, e_ty res)
+          LvVar (pv, e_ty res)
         | Etuple pvs ->
-          EcModules.LvTuple (List.map as_pvar pvs)
+          LvTuple (List.map as_pvar pvs)
         | _ -> assert false
       in
 
@@ -1220,7 +1224,7 @@ let process_view1 pe tc =
 
                         let y, yty =
                           let CPTEnv subst = PT.concretize_env pe.PT.ptev_env in
-                          snd_map subst.fs_ty (oget pre) in
+                          snd_map (ty_subst subst.fs_ty) (oget pre) in
                         let fy = EcIdent.fresh y in
 
                         pe.PT.ptev_env.pte_ev := MEV.set
@@ -1241,7 +1245,7 @@ let process_view1 pe tc =
             if not (PT.can_concretize pe.PT.ptev_env) then
               tc_error !!tc "cannot infer all placeholders";
 
-            let pt, ax = snd_map (f_forall bds) (PT.concretize pe) in
+            let pt, ax = PT.concretize_gen pe bds in
             t_first (fun subtc ->
               let regen = List.fst regen in
               let ttcut tc =
@@ -1294,9 +1298,9 @@ let process_view1 pe tc =
           if not (PT.can_concretize ptenv) then
             tc_error !!tc "cannot infer all type variables";
 
-          PT.concretize_e_form
+          PT.concretize_e_form_gen
             (PT.concretize_env ptenv)
-            (f_forall (List.map snd ids) cutf)
+            (List.snd ids) cutf
         in
 
         let discharge tc =
@@ -1427,7 +1431,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
           | SFimp (_, fp) ->
               ("H", None, `Hyp, fp)
           | _ -> begin
-            match EcReduction.h_red_opt (EcReduction.full_red ~opaque:false) hyps fp with
+            match EcReduction.h_red_opt EcReduction.full_red hyps fp with
             | None   -> ("_", None, `None, f_true)
             | Some f -> destruct f
           end
@@ -1552,7 +1556,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     let t =
       match simplify with
       | Some x ->
-         t_seq (t_simplify_lg ~delta:false (ttenv, x)) process_trivial
+         t_seq (t_simplify_lg ~delta:`No (ttenv, x)) process_trivial
       | None -> process_trivial
     in t tc
 
@@ -1562,7 +1566,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     else process_smt ttenv pi tc
 
   and intro1_simplify (_ : ST.state) logic tc =
-    t_simplify_lg ~delta:false (ttenv, logic) tc
+    t_simplify_lg ~delta:`IfApplied (ttenv, logic) tc
 
   and intro1_clear (_ : ST.state) xs tc =
     process_clear xs tc
@@ -1579,9 +1583,9 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     in
 
     let tc = t_ors [
-        t_elimT_ind ~reduce:(`Full true) `Case;
-        t_elim ~reduce:(`Full true);
-        t_elim_prind ~reduce:(`Full true) `Case] in
+        t_elimT_ind ~reduce:`Full `Case;
+        t_elim ~reduce:`Full;
+        t_elim_prind ~reduce:`Full `Case] in
     let tc =
       fun g ->
         try  tc g
@@ -1599,7 +1603,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     ((prind, delta), withor, (cnt : icasemode_full option)) pis tc
   =
     let cnt = cnt |> odfl (`AtMost 1) in
-    let red = if delta then `Full true else `NoDelta in
+    let red = if delta then `Full else `NoDelta in
 
     let t_case =
       let t_and, t_or =
@@ -2147,8 +2151,8 @@ let process_elim (pe, qs) tc =
     match qs with
     | None ->
         t_or
-          (t_elimT_ind ~reduce:(`Full true) `Ind)
-          (t_elim ~reduce:(`Full true))
+          (t_elimT_ind ~reduce:`Full `Ind)
+          (t_elim ~reduce:`Full)
           tc
     | Some qs ->
         let qs = {
@@ -2196,9 +2200,9 @@ let process_case ?(doeq = false) gp tc =
     try
       FApi.t_last
         (t_ors [
-          t_elimT_ind ~reduce:(`Full true) `Case;
-          t_elim ~reduce:(`Full true);
-          t_elim_prind ~reduce:(`Full true) `Case])
+          t_elimT_ind ~reduce:`Full `Case;
+          t_elim ~reduce:`Full;
+          t_elim_prind ~reduce:`Full `Case])
         (process_move ~doeq gp.pr_view gp.pr_rev tc)
 
     with EcCoreGoal.InvalidGoalShape ->

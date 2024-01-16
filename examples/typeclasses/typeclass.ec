@@ -206,6 +206,7 @@ proof. by case. qed.
 (* -------------------------------------------------------------------- *)
 (* Advanced algebraic structures *)
 
+(*
 op izero = 0.
 
 instance comgroup with int

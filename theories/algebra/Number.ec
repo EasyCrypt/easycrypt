@@ -219,18 +219,6 @@ proof. by move=> n_0ge; rewrite ger0_norm // ler0n. qed.
 lemma nosmt normr0P (x : t): (`|x| = zeror) <=> (x = zeror).
 proof. by split=> [/normr0_eq0|->] //; rewrite normr0. qed.
 
-lemma nosmt normr_unit : forall x, unit x => unit `|x|.
-proof.
-move=> x /unitrP [y yx]; apply/unitrP; exists `|y|.
-by rewrite -normrM yx normr1.
-qed.
-
-lemma nosmt normrV : forall x, unit x => `|invr x| = invr `|x|.
-proof.
-move=>x ux; apply/(@mulrI `|x|); first by apply/normr_unit.
-by rewrite -normrM !mulrV ?normr_unit // normr1.
-qed.
-
 lemma nosmt normrX_nat n (x : t) : 0 <= n => `|exp x n| = exp `|x| n.
 proof.
 elim: n=> [|n ge0_n ih]; first by rewrite !expr0 normr1.
@@ -257,6 +245,35 @@ proof. by rewrite -opprB normrN. qed.
 lemma nosmt ler0_def (x : t): (x <= zeror) <=> (`|x| = - x).
 proof. by rewrite ler_def sub0r normrN. qed.
 
+lemma nosmt normr_unit : forall x, unit x => unit `|x|.
+proof.
+move=> x; rewrite !unitrP => -[y yx].
+by exists `|y|; rewrite -normrM yx normr1.
+qed.
+
+lemma nosmt ler0_norm (x : t): x <= zeror => `|x| = - x.
+proof.
+move=> x_le0; rewrite eq_sym -(@ger0_norm (-x)).
+  by rewrite oppr_ge0. by rewrite normrN.
+qed.
+
+lemma nosmt unit_normr (x : t): unit (`|x|) => unit x.
+proof.
+case: (real_axiom x) => [le0n|len0].
+  by move: (normr_idP x); rewrite le0n /= => ->.
+by rewrite ler0_norm // unitrN.
+qed.
+
+lemma nosmt normrV : forall x, `|invr x| = invr `|x|.
+proof.
+move=>x.
+case: (unit x) => ux.
++ apply/(@mulrI `|x|); 1: by apply/normr_unit.
+  by rewrite -normrM !mulrV ?normr_unit // normr1.
+rewrite !unitout //; apply: contra ux.
+by apply unit_normr.
+qed.
+
 lemma nosmt normr_id (x : t): `| `|x| | = `|x|.
 proof.
 have nz2: ofint 2 <> zeror by rewrite pnatr_eq0.
@@ -267,12 +284,6 @@ qed.
 
 lemma nosmt normr_ge0 (x : t): zeror <= `|x|.
 proof. by rewrite ger0_def normr_id. qed.
-
-lemma nosmt ler0_norm (x : t): x <= zeror => `|x| = - x.
-proof.
-move=> x_le0; rewrite eq_sym -(@ger0_norm (-x)).
-  by rewrite oppr_ge0. by rewrite normrN.
-qed.
 
 lemma nosmt gtr0_norm (x : t): zeror < x => `|x| = x.
 proof. by move/ltrW/ger0_norm. qed.
@@ -350,12 +361,6 @@ proof. by rewrite ltr_neqAle normr_le0 normr0P; case: (_ = _). qed.
 lemma nosmt normr_gt0 (x : t): (zeror < `|x|) <=> (x <> zeror).
 proof. by rewrite ltr_def normr0P normr_ge0; case: (_ = _). qed.
 
-lemma nosmt unit_normr (x : t): unit (`|x|) => unit x.
-proof.
-case: (real_axiom x) => [le0n|len0].
-  by move: (normr_idP x); rewrite le0n /= => ->.
-by rewrite ler0_norm // unitrN.
-qed.
 
 lemma nosmt normrX n (x : t) : `|exp x n| = exp `|x| n.
 proof.

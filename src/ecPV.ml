@@ -2,6 +2,7 @@
 open EcUtils
 open EcIdent
 open EcPath
+open EcAst
 open EcTypes
 open EcModules
 open EcFol
@@ -168,10 +169,7 @@ module PVM = struct
       | Fpvar(pv,m) ->
           (try find env pv m s with Not_found -> f)
       | Fglob(mp,m) ->
-        let f' = EcEnv.NormMp.norm_glob env m mp in
-        if f_equal f f' then
-          (try find_glob env mp m s with Not_found -> f)
-        else aux f'
+          (try find_glob env (EcPath.mident mp) m s with Not_found -> f)
       | FequivF _ ->
         check_binding EcFol.mleft s;
         check_binding EcFol.mright s;
@@ -257,7 +255,7 @@ module PV = struct
       | Fpvar(pv,_) ->
         { fv with s_pv = Mnpv.add (pvm env pv) f.f_ty fv.s_pv }
       | Fglob(mp,_) ->
-        { fv with s_gl = Sm.add mp fv.s_gl}
+        { fv with s_gl = Sm.add (EcPath.mident mp) fv.s_gl}
       | _ -> assert false in
     aux fv f
 
@@ -326,10 +324,7 @@ module PV = struct
 
       | Fglob (mp, m') ->
         if EcIdent.id_equal m m' then
-          let f' = NormMp.norm_glob env m mp in
-          if   f_equal f f'
-          then add_glob env mp fv
-          else aux env fv f'
+          add_glob env (EcPath.mident mp) fv
         else fv
 
       | Fint _ | Flocal _ | Fop _ -> fv
@@ -348,6 +343,12 @@ module PV = struct
 
       | FhoareS hs ->
           in_mem_scope env fv [fst hs.hs_m] [hs.hs_pr; hs.hs_po]
+
+      | FeHoareF hf ->
+          in_mem_scope env fv [mhr] [hf.ehf_pr; hf.ehf_po]
+
+      | FeHoareS hs ->
+          in_mem_scope env fv [fst hs.ehs_m] [hs.ehs_pr; hs.ehs_po]
 
       | FcHoareF chf ->
           let fv = in_mem_scope env fv [mhr] [chf.chf_pr; chf.chf_po] in
@@ -812,20 +813,14 @@ module Mpv2 = struct
       | SFeq ({ f_node = Fpvar(pvr,mr')},{f_node = Fpvar(pvl,ml');f_ty = ty})
           when EcIdent.id_equal ml ml' && EcIdent.id_equal mr mr' ->
         add env ty pvl pvr eqs
-      | SFeq(({f_node = Fglob(mpl, ml')} as f1),
-             ({f_node = Fglob(mpr, mr')} as f2))
+      | SFeq(({f_node = Fglob(mpl, ml')}),
+             ({f_node = Fglob(mpr, mr')}))
           when EcIdent.id_equal ml ml' && EcIdent.id_equal mr mr' ->
-        let f1' = NormMp.norm_glob env ml mpl in
-        let f2' = NormMp.norm_glob env mr mpr in
-        if f_equal f1 f1' && f_equal f2 f2' then add_glob env mpl mpr eqs
-        else aux (f_eq f1' f2') eqs
-      | SFeq(({f_node = Fglob(mpr, mr')} as f2),
-             ({f_node = Fglob(mpl, ml')} as f1))
+          add_glob env (EcPath.mident mpl) (EcPath.mident mpr) eqs
+      | SFeq(({f_node = Fglob(mpr, mr')}),
+             ({f_node = Fglob(mpl, ml')}))
           when EcIdent.id_equal ml ml' && EcIdent.id_equal mr mr' ->
-        let f1' = NormMp.norm_glob env ml mpl in
-        let f2' = NormMp.norm_glob env mr mpr in
-        if f_equal f1 f1' && f_equal f2 f2' then add_glob env mpl mpr eqs
-        else aux (f_eq f1' f2') eqs
+          add_glob env (EcPath.mident mpl) (EcPath.mident mpr) eqs
       | SFeq({f_node = Ftuple fs1}, {f_node = Ftuple fs2}) ->
         List.fold_left2 (fun eqs f1 f2 -> aux (f_eq f1 f2) eqs) eqs fs1 fs2
       | SFand(_, (f1, f2)) -> aux f1 (aux f2 eqs)
@@ -873,10 +868,7 @@ module Mpv2 = struct
         add_eq local eqs f2 f1
       | Fglob(mp1,m1), Fglob(mp2,m2)
         when EcIdent.id_equal ml m1 && EcIdent.id_equal mr m2 ->
-        let f1' = NormMp.norm_glob env ml mp1 in
-        let f2' = NormMp.norm_glob env mr mp2 in
-        if f_equal f1 f1' && f_equal f2 f2' then add_glob env mp1 mp2 eqs
-        else add_eq local eqs f1' f2'
+          add_glob env (EcPath.mident mp1) (EcPath.mident mp2) eqs
       | Fop(op1,tys1), Fop(op2,tys2) when EcPath.p_equal op1 op2 &&
           List.all2 (EcReduction.EqTest.for_etyarg env) tys1 tys2 -> eqs
       | Fapp(f1,a1), Fapp(f2,a2) ->
@@ -964,7 +956,7 @@ module Mpv2 = struct
    equality of e1 and e2 *)
   let rec add_eqs_loc env local eqs e1 e2 =
     match e1.e_node, e2.e_node with
-    | Equant(qt1,bds1,e1), Equant(qt2,bds2,e2) when qt_equal qt1 qt2 ->
+    | Equant(qt1,bds1,e1), Equant(qt2,bds2,e2) when eqt_equal qt1 qt2 ->
       let local = enter_local env local bds1 bds2 in
       add_eqs_loc env local eqs e1 e2
     | Eint i1, Eint i2 when EcBigInt.equal i1 i2 -> eqs

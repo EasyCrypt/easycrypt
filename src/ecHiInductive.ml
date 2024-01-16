@@ -393,22 +393,22 @@ let trans_matchfix
 
   let aout =
     if close then
-      let uni      = Tuni.offun (EcUnify.UniEnv.assubst ue) in
+      let ts = Tuni.subst (EcUnify.UniEnv.assubst ue) in
       let tparams  = EcUnify.UniEnv.tparams ue in
-      let codom    = uni codom in
+      let codom    = ty_subst ts codom in
       let opexpr   = EcPath.pqname (EcEnv.root env) name in
-      let args     = List.map (snd_map uni) args in
+      let args     = List.map (snd_map (ty_subst ts)) args in
       let opexpr   = e_op opexpr (List.map (tvar |- fst) tparams)
                        (toarrow (List.map snd args) codom) in
       let ebsubst  =
         let lcmap = Mid.add opname opexpr e_subst_id.es_loc in
-        { e_subst_id with es_freshen = false; es_ty = uni; es_loc = lcmap; }
+        { e_subst_id with es_freshen = false; es_ty = ts; es_loc = lcmap; }
       in
 
       let branches =
         let rec uni_branches = function
           | OPB_Leaf (locals, e) ->
-              OPB_Leaf (List.map (List.map (snd_map uni)) locals, e_subst ebsubst e)
+              OPB_Leaf (List.map (List.map (snd_map (ty_subst ts))) locals, e_subst ebsubst e)
 
           | OPB_Branch bs ->
             let for1 b =

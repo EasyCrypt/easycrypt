@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
+open EcAst
 open EcTypes
 open EcModules
 open EcFol
@@ -265,7 +266,7 @@ let process_unroll_for side cpos tc =
     let fincr = form_of_expr mhr eincr in
     fun z0 ->
       let f = PVM.subst1 env x mhr (f_int z0) fincr in
-      match (simplify (full_red ~opaque:false) hyps f).f_node with
+      match (simplify full_red hyps f).f_node with
       | Fint z0 -> z0
       | _       -> tc_error !!tc "loop increment does not reduce to a constant" in
 
@@ -274,7 +275,7 @@ let process_unroll_for side cpos tc =
     let ftest = form_of_expr mhr t in
     fun z0 ->
       let cond = PVM.subst1 env x mhr (f_int z0) ftest in
-      match sform_of_form (simplify (full_red ~opaque:false) hyps cond) with
+      match sform_of_form (simplify full_red hyps cond) with
       | SFtrue  -> true
       | SFfalse -> false
       | _       -> tc_error !!tc "while loop condition does not reduce to a constant" in

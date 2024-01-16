@@ -4,6 +4,7 @@ open EcLocation
 open EcIdent
 open EcSymbols
 open EcPath
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv
@@ -42,7 +43,7 @@ let (@~+) (tt : FApi.tactical) (ts : FApi.backward list) =
 exception InvalidProofTerm
 
 type side    = [`Left|`Right]
-type lazyred = [`Full of bool | `NoDelta | `None]
+type lazyred = [`Full | `NoDelta | `None]
 
 (* -------------------------------------------------------------------- *)
 module LowApply = struct
@@ -175,8 +176,7 @@ module LowApply = struct
                 if mode = `Elim then f_imps obl f
                 else f_and (f_ands obl) f
             in
-
-            (Fsubst.f_bind_mod sbt x mp, f)
+            (EcFol.f_bind_mod sbt x mp env, f)
           with _ -> raise InvalidProofTerm
         end
 
@@ -323,8 +323,10 @@ let t_change ?ri ?target f tc =
   FApi.tcenv_of_tcenv1 (t_change1 ?ri ?target f tc)
 
 (* -------------------------------------------------------------------- *)
+type opmode = EcReduction.deltap
+
 type simplify_t =
-  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
+  ?target:ident -> ?delta:opmode -> ?logic:rlogic_info -> FApi.backward
 
 type simplify_with_info_t =
   ?target:ident -> reduction_info -> FApi.backward
@@ -335,8 +337,8 @@ let t_cbv_with_info ?target (ri : reduction_info) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let t_cbv ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
-  let ri = if delta then full_red ~opaque:false else nodelta in
+let t_cbv ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) =
+  let ri = { nodelta with delta_p = fun _ -> delta } in
   let ri = { ri with logic } in
   t_cbv_with_info ?target ri tc
 
@@ -346,8 +348,8 @@ let t_cbn_with_info ?target (ri : reduction_info) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let t_cbn ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
-  let ri = if delta then full_red ~opaque:false else nodelta in
+let t_cbn ?target ?(delta = `IfTransparent) ?(logic = Some `Full) (tc : tcenv1) =
+  let ri = { nodelta with delta_p = fun _ -> delta } in
   let ri = { ri with logic } in
   t_cbv_with_info ?target ri tc
 
@@ -357,7 +359,7 @@ let t_hred_with_info ?target (ri : reduction_info) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change_r ~fail:true ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let rec t_lazy_match ?(reduce = `Full false) (tx : form -> FApi.backward)
+let rec t_lazy_match ?(reduce = `Full) (tx : form -> FApi.backward)
   (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
   try tx concl tc
@@ -365,7 +367,7 @@ let rec t_lazy_match ?(reduce = `Full false) (tx : form -> FApi.backward)
     let strategy =
       match reduce with
       | `None     -> raise InvalidGoalShape
-      | `Full b   -> EcReduction.full_red ~opaque:b
+      | `Full     -> EcReduction.full_red
       | `NoDelta  -> EcReduction.nodelta in
     FApi.t_seq (t_hred_with_info strategy) (t_lazy_match ~reduce tx) tc
 
@@ -472,7 +474,7 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
         (id, LD_mem me, Fsubst.f_bind_mem sbt x (tg_val id))
     | GTmodty i ->
         LowIntro.check_name_validity !!tc `Module name;
-        (id, LD_modty i, Fsubst.f_bind_mod sbt x (EcPath.mident (tg_val id)))
+        (id, LD_modty i, Fsubst.f_bind_absmod sbt x (tg_val id))
   in
 
   let add_ld id ld hyps =
@@ -500,7 +502,7 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
         let id = tg_map (function
           | None    -> EcEnv.LDecl.fresh_id hyps (EcIdent.name x)
           | Some id -> id) id in
-        let xty  = sbt.fs_ty xty in
+        let xty  = ty_subst sbt.fs_ty xty in
         let xe   = Fsubst.f_subst sbt xe in
         let sbt  = Fsubst.f_bind_rename sbt x (tg_val id) xty in
         let hyps = add_ld id (LD_var (xty, Some xe)) hyps in
@@ -511,7 +513,7 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
         intro1 ((hyps, concl), Fsubst.f_subst_id) id
 
     | _ ->
-        match h_red_opt (full_red ~opaque:false) hyps concl with
+        match h_red_opt full_red hyps concl with
         | None       -> LowIntro.tc_no_product !!tc ?loc:(tg_tag id) ()
         | Some concl -> intro1 ((hyps, concl), sbt) id
   in
@@ -815,7 +817,7 @@ let t_generalize_hyps_x ?(missing = false) ?naming ?(letin = false) ids tc =
 
       | LD_modty mt ->
         let x    = fresh id in
-        let s    = Fsubst.f_bind_mod s id (EcPath.mident x) in
+        let s    = Fsubst.f_bind_absmod s id x in
         let mp   = EcPath.mident id in
         let sig_ = EcEnv.NormMp.sig_of_mp env mp in
         let bds  = `Forall (x, GTmodty mt) :: bds in
@@ -1072,7 +1074,7 @@ let t_tuple_intro ?reduce (tc : tcenv1) =
     t_lazy_match ?reduce t_tuple_intro_r tc
 
 (* -------------------------------------------------------------------- *)
-let t_elim_r ?(reduce = (`Full false : lazyred)) txs tc =
+let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
   match sform_of_form (FApi.tc1_goal tc) with
   | SFimp (f1, f2) ->
       let rec aux f1 =
@@ -1089,7 +1091,7 @@ let t_elim_r ?(reduce = (`Full false : lazyred)) txs tc =
           let strategy =
             match reduce with
             | `None     -> raise InvalidGoalShape
-            | `Full b   -> EcReduction.full_red ~opaque:b
+            | `Full     -> EcReduction.full_red
             | `NoDelta  -> EcReduction.nodelta in
 
             match h_red_opt strategy (FApi.tc1_hyps tc) f1 with
@@ -1609,13 +1611,16 @@ let t_rewrite
       RApi.close tc (VRewrite (hd, rwpt));
       RApi.tcenv_of_rtcenv tc
 
-  | Some (h : ident) ->
-      let hyps = oget (LDecl.hyp_convert h (fun _ _ -> tgfp) (RApi.tc_hyps tc)) in
-      let hd   = RApi.newgoal tc ~hyps (RApi.tc_goal tc) in
-      let rwpt = { rpt_proof = pt; rpt_occrs = pos; rpt_lc = Some h; } in
+  | Some (h : ident) -> begin
+      match LDecl.hyp_convert h (fun _ _ -> tgfp) (RApi.tc_hyps tc) with
+      | Some hyps ->
+         let hd   = RApi.newgoal tc ~hyps (RApi.tc_goal tc) in
+         let rwpt = { rpt_proof = pt; rpt_occrs = pos; rpt_lc = Some h; } in
+         RApi.close tc (VRewrite (hd, rwpt))
 
-      RApi.close tc (VRewrite (hd, rwpt));
-      RApi.tcenv_of_rtcenv tc
+      | None -> ()
+    end;
+    RApi.tcenv_of_rtcenv tc
 
 (* -------------------------------------------------------------------- *)
 let t_rewrite_hyp ?xconv ?mode ?donot (id : EcIdent.t) pos (tc : tcenv1) =
@@ -1625,7 +1630,7 @@ let t_rewrite_hyp ?xconv ?mode ?donot (id : EcIdent.t) pos (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 type vsubst = [
   | `Local of EcIdent.t
-  | `Glob  of EcPath.mpath * EcMemory.memory
+  | `Glob  of EcIdent.t * EcMemory.memory
   | `PVar  of EcTypes.prog_var * EcMemory.memory
 ]
 
@@ -1671,11 +1676,8 @@ module LowSubst = struct
 
     (* Substitution of globs *)
     | Fglob (mp, m), None when kind.sk_glob -> Some (`Glob (mp, m))
-    | Fglob (mp, m), Some (`Glob (mp', m')) when kind.sk_glob ->
-        let gl  = EcEnv.NormMp.norm_glob env m  mp  in
-        let gl' = EcEnv.NormMp.norm_glob env m' mp' in
-
-        if   EcFol.f_equal gl gl'
+    | Fglob (mp, m), Some (`Glob (mp', _)) when kind.sk_glob ->
+        if   EcIdent.id_equal mp mp'
         then Some (`Glob (mp, m))
         else None
 
@@ -1729,7 +1731,7 @@ module LowSubst = struct
       | Some ((_, `Glob (mp, m), f) as aout) ->
         let f  = simplify { no_red with delta_h = predT } hyps f in
         let fv = EcPV.PV.fv env m f in
-        if EcPV.PV.mem_glob env mp fv then None else Some aout in
+        if EcPV.PV.mem_glob env (EcPath.mident mp) fv then None else Some aout in
     match aout with
     | None -> None
     | Some(side,v,f) ->
@@ -1761,7 +1763,7 @@ module LowSubst = struct
         (subst f, check)
 
     | `Glob (mp, m) ->
-        let subst f = EcPV.PVM.subst env (EcPV.PVM.add_glob env mp m f EcPV.PVM.empty) in
+        let subst f = EcPV.PVM.subst env (EcPV.PVM.add_glob env (EcPath.mident mp) m f EcPV.PVM.empty) in
         (* FIXME *)
         let check _tg = true in
         (subst f, check)
@@ -1792,13 +1794,6 @@ let gen_hyps post gG =
     | LD_hyp f                -> f_imp f gG
     | LD_abs_st _             -> raise InvalidGoalShape in
   List.fold_left do1 gG post
-
-let build_var var ty =
-  match var with
-  | `Glob (mp,m) -> f_glob mp m
-  | `Local x     -> f_local x ty
-  | `PVar(x,m)   -> f_pvar x ty m
-
 
 let t_rw_for_subst y togen concl side eqid tc =
   let hyps = FApi.tc1_hyps tc in
@@ -2097,7 +2092,7 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     else ti in
 
   (* Entry of progress: simplify goal, and chain with progress *)
-  let rec entry tc = FApi.t_seq (t_simplify ~delta:false) aux0 tc
+  let rec entry tc = FApi.t_seq (t_simplify ~delta:`No) aux0 tc
 
   (* Progress (level 0): try to apply user tactic, chain with level 1. *)
   and aux0 tc = FApi.t_seq (FApi.t_try tt) aux1 tc
@@ -2145,8 +2140,7 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
             else elims
           in
 
-          let reduce =
-            if options.pgo_delta.pgod_case then `Full false else `NoDelta in
+          let reduce = if options.pgo_delta.pgod_case then `Full else `NoDelta in
 
           FApi.t_switch ~on:`All (t_elim_r ~reduce elims) ~ifok:aux0 ~iffail tc
     end
@@ -2154,11 +2148,11 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     | _ when options.pgo_split ->
        let thesplit =
          match options.pgo_delta.pgod_split with
-         | true  -> t_split ~closeonly:false ~reduce:(`Full false)
+         | true  -> t_split ~closeonly:false ~reduce:`Full
          | false ->
              FApi.t_or
                (t_split ~reduce:`NoDelta)
-               (t_split ~closeonly:true ~reduce:(`Full false)) in
+               (t_split ~closeonly:true ~reduce:`Full) in
 
         FApi.t_try (FApi.t_seq thesplit aux0) tc
 
@@ -2199,7 +2193,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
     t tc in *)
 
   (* Entry of progress: simplify goal, and chain with progress *)
-  let rec entry (st : cstate) = t_simplify ~delta:false @! aux0 st
+  let rec entry (st : cstate) = t_simplify ~delta:`No @! aux0 st
 
   (* Progress (level 0): try to apply user tactic. *)
   and aux0 (st : cstate) = FApi.t_try tt @! aux1 st
@@ -2244,7 +2238,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
 
           let iffail = t_crush_subst st id1 in
           let elims  = PGInternals.pg_cnj_elims in
-          let reduce = if delta then `Full false else `NoDelta in
+          let reduce = if delta then `Full else `NoDelta in
 
           FApi.t_onall
             (FApi.t_switch ~on:`All ~ifok:(aux0 st) ~iffail (t_elim_r ~reduce elims))
@@ -2252,7 +2246,7 @@ let t_crush ?(delta = true) ?tsolve (tc : tcenv1) =
     end
 
     | _ ->
-       let reduce = if delta then `Full false else `NoDelta in
+       let reduce = if delta then `Full else `NoDelta in
        let thesplit tc = t_split ~closeonly:false ~reduce tc in
        let hyps0 = FApi.tc1_hyps tc in
        let shuffle = List.rev_map fst (LDecl.tohyps (FApi.tc1_hyps tc)).h_local in
@@ -2526,7 +2520,7 @@ let t_crush_fwd ?(delta = true) nb_intros (tc : tcenv1) =
           (tc, aux0 (incr n)) in
 
         let elims  = [ t_elim_false_r; t_elim_and_r; t_elim_eq_tuple_r; ] in
-        let reduce = if delta then `Full false else `NoDelta in
+        let reduce = if delta then `Full else `NoDelta in
 
         FApi.t_onall
           (FApi.t_xswitch ~on:`All ~iffail (t_elim_r ~reduce elims))

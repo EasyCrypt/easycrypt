@@ -2,6 +2,7 @@
 open EcUtils
 open EcSymbols
 open EcPath
+open EcAst
 open EcTypes
 open EcCoreFol
 open EcMemory
@@ -904,15 +905,12 @@ module MC = struct
 
       let self = EcIdent.create "'self" in
 
-      let tsubst =
-        { ty_subst_id with
-            ts_def = Mp.add mypath ([], tvar self) Mp.empty }
-      in
+      let tsubst =EcSubst.add_tydef EcSubst.empty mypath ([], tvar self) in
 
       let operators =
         let on1 (opid, optype) =
           let opname = EcIdent.name opid in
-          let optype = ty_subst tsubst optype in
+          let optype = EcSubst.subst_ty tsubst optype in
           let tcargs = List.map (fun (a, _) -> tvar a) tc.tc_tparams in
           let opargs = (self, [{tc_name = mypath; tc_args = tcargs;}]) in
           let opargs = tc.tc_tparams @ [opargs] in
@@ -927,8 +925,8 @@ module MC = struct
         List.fold_left
           (fun s (x, xp, xty, _) ->
             let fop = EcCoreFol.f_op xp [tvar self] xty in
-              Fsubst.f_bind_local s x fop)
-          (Fsubst.f_subst_init ~sty:tsubst ())
+              EcSubst.add_flocal s x fop)
+          tsubst
           operators
       in
 
@@ -938,7 +936,7 @@ module MC = struct
             let tcargs = List.map (fun (a, _) -> tvar a) tc.tc_tparams in
             let axargs = (self, [{tc_name = mypath; tc_args = tcargs}]) in
             let axargs = tc.tc_tparams @ [axargs] in
-            let ax = Fsubst.f_subst fsubst ax in
+            let ax = EcSubst.subst_form fsubst ax in
               (x, { ax_tparams    = axargs;
                     ax_spec       = ax;
                     ax_kind       = `Axiom (Ssym.empty, false);
@@ -1597,7 +1595,7 @@ module Fun = struct
              let s =
                List.fold_left2
                  (fun s (x, _) a -> EcSubst.add_module s x a)
-                 (EcSubst.empty ()) params args
+                 EcSubst.empty params args
              in
              EcSubst.subst_function s o
       end
@@ -1836,7 +1834,7 @@ module Mod = struct
     let s =
       List.fold_left2
         (fun s (x, _) a -> EcSubst.add_module s x a)
-        (EcSubst.empty ()) params args
+        EcSubst.empty params args
     in
       f s o
 
@@ -1984,7 +1982,7 @@ module Mod = struct
         | Some x -> x
       in
       EcSubst.subst_modsig
-        ~params:(List.map fst modty.mt_params) (EcSubst.empty ()) modsig.tms_sig
+        ~params:(List.map fst modty.mt_params) EcSubst.empty modsig.tms_sig
     in
     module_expr_of_module_sig name modty modsig
 
@@ -2124,7 +2122,7 @@ module NormMp = struct
           let s =
             List.fold_left2
               (fun s (x, _) a -> EcSubst.add_module s x a)
-              (EcSubst.empty ()) params args in
+              EcSubst.empty params args in
           let mp = EcSubst.subst_mpath s mp in
           let args' = mp.EcPath.m_args in
           let args2 = if extra = [] then args' else args' @ extra in
@@ -2454,7 +2452,7 @@ module NormMp = struct
   let globals env m mp =
     let us = mod_use env mp in
     let l =
-      Sid.fold (fun id l -> f_glob (EcPath.mident id) m :: l) us.us_gl [] in
+      Sid.fold (fun id l -> f_glob id m :: l) us.us_gl [] in
     let l =
       Mx.fold
         (fun xp ty l -> f_pvar (EcTypes.pv_glob xp) ty m :: l) us.us_pv l in
@@ -2466,29 +2464,7 @@ module NormMp = struct
     let g = (norm_glob env mhr mp) in
     g.f_ty
 
-  let tglob_reducible env mp =
-    match (norm_tglob env mp).ty_node with
-    | Tglob mp' -> not (EcPath.m_equal mp mp')
-    | _ -> true
-
-  let norm_ty env =
-    EcTypes.Hty.memo_rec 107 (
-      fun aux ty ->
-        match ty.ty_node with
-        | Tglob mp -> norm_tglob env mp
-        | _ -> ty_map aux ty)
-
   let rec norm_form env =
-    let norm_ty1 : ty -> ty = norm_ty env in
-
-    let norm_gty env (id,gty) =
-      let gty =
-        match gty with
-        | GTty ty -> GTty (norm_ty env ty)
-        | GTmodty _ -> gty
-        | GTmem mt -> GTmem (mt_subst (norm_ty env) mt) in
-      id,gty in
-
     let has_mod b =
       List.exists (fun (_,gty) ->
         match gty with GTmodty _ -> true | _ -> false) b in
@@ -2499,18 +2475,14 @@ module NormMp = struct
         | Fquant(q,bd,f) ->
           if has_mod bd then
             let env = Mod.add_mod_binding bd env in
-            let bd = List.map (norm_gty env) bd in
             f_quant q bd (norm_form env f)
           else
-          let bd = List.map (norm_gty env) bd in
           f_quant q bd (aux f)
 
         | Fpvar(p,m) ->
           let p' = norm_pvar env p in
           if p == p' then f else
             f_pvar p' f.f_ty m
-
-        | Fglob(p,m) -> norm_glob env m p
 
         | FhoareF hf ->
           let pre' = aux hf.hf_pr and p' = norm_xfun env hf.hf_f
@@ -2558,8 +2530,8 @@ module NormMp = struct
             pr_event = aux pr.pr_event;
           } in f_pr_r pr'
 
-        | _ ->
-          EcCoreFol.f_map norm_ty1 aux f) in
+        | _ -> f)
+          in
     norm_form
 
   let norm_op env op =
@@ -2579,7 +2551,7 @@ module NormMp = struct
     in
     { op with
         op_kind = kind;
-        op_ty   = norm_ty env op.op_ty; }
+        op_ty   = op.op_ty; }
 
   let norm_ax env ax =
     { ax with ax_spec = norm_form env ax.ax_spec }
@@ -2598,6 +2570,109 @@ module NormMp = struct
 
   let pv_equal env pv1 pv2 =
     EcTypes.pv_equal (norm_pvar env pv1) (norm_pvar env pv2)
+end
+
+(* -------------------------------------------------------------------- *)
+module ModTy = struct
+  type t = top_module_sig
+
+  let by_path_opt (p : EcPath.path) (env : env) =
+    omap
+      check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_modsigs) (IPPath p) env)
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_modty p obj env
+
+  let lookup qname (env : env) =
+    MC.lookup_modty qname env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path name env =
+    fst (lookup name env)
+
+  let modtype p env =
+    let { tms_sig = sig_ } = by_path p env in
+    (* eta-normal form *)
+    { mt_params = sig_.mis_params;
+      mt_name   = p;
+      mt_args   = List.map (EcPath.mident -| fst) sig_.mis_params;
+      mt_restr  = sig_.mis_restr; }
+
+  let bind ?(import = import0) name modty env =
+    let env = if import.im_immediate then MC.bind_modty name modty env else env in
+      { env with
+          env_item = mkitem import (Th_modtype (name, modty)) :: env.env_item }
+
+  exception ModTypeNotEquiv
+
+  let rec mod_type_equiv (f_equiv : form -> form -> bool) env mty1 mty2 =
+    if not (EcPath.p_equal mty1.mt_name mty2.mt_name) then
+      raise ModTypeNotEquiv;
+
+    if List.length mty1.mt_params <> List.length mty2.mt_params then
+      raise ModTypeNotEquiv;
+    if List.length mty1.mt_args <> List.length mty2.mt_args then
+      raise ModTypeNotEquiv;
+
+    if not (NormMp.equal_restr f_equiv env mty1.mt_restr mty2.mt_restr) then
+      raise ModTypeNotEquiv;
+
+    let subst =
+      List.fold_left2
+        (fun subst (x1, p1) (x2, p2) ->
+          let p1 = EcSubst.subst_modtype subst p1 in
+          let p2 = EcSubst.subst_modtype subst p2 in
+            mod_type_equiv f_equiv env p1 p2;
+            EcSubst.add_module subst x1 (EcPath.mident x2))
+        EcSubst.empty mty1.mt_params mty2.mt_params
+    in
+
+    if not (
+         List.all2
+           (fun m1 m2 ->
+             let m1 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m1) in
+             let m2 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m2) in
+               EcPath.m_equal m1 m2)
+            mty1.mt_args mty2.mt_args) then
+      raise ModTypeNotEquiv
+
+  let mod_type_equiv (f_equiv : form -> form -> bool) env mty1 mty2 =
+    try  mod_type_equiv f_equiv env mty1 mty2; true
+    with ModTypeNotEquiv -> false
+
+  let has_mod_type (env : env) (dst : module_type list) (src : module_type) =
+    List.exists (mod_type_equiv f_equal env src) dst
+
+  let sig_of_mt env (mt:module_type) =
+    let { tms_sig = sig_ } = by_path mt.mt_name env in
+    let subst =
+      List.fold_left2 (fun s (x1,_) a ->
+        EcSubst.add_module s x1 a) EcSubst.empty sig_.mis_params mt.mt_args in
+    let items =
+      EcSubst.subst_modsig_body subst sig_.mis_body in
+    let params = mt.mt_params in
+
+    let keep =
+      List.fold_left (fun k (x,_) ->
+        EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
+    let keep_info f =
+      EcPath.Sm.mem (f.EcPath.x_top) keep in
+    let do1 oi = OI.filter keep_info oi in
+    let restr = { mt.mt_restr with
+                  mr_oinfos = Msym.map do1 mt.mt_restr.mr_oinfos } in
+
+    { mis_params = params;
+      mis_body   = items;
+      mis_restr  = restr; }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2645,11 +2720,12 @@ module Ty = struct
     | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
     | _ -> ty
 
+
   let rec ty_hnorm (ty : ty) (env : env) =
     match ty.ty_node with
     | Tconstr (p, tys) when defined p env -> ty_hnorm (unfold p tys env) env
-    | Tglob p -> NormMp.norm_tglob env p
     | _ -> ty
+
 
   let rec decompose_fun (ty : ty) (env : env) : dom * ty =
     match (hnorm ty env).ty_node with
@@ -2724,111 +2800,10 @@ end
 let ty_hnorm = Ty.ty_hnorm
 
 (* -------------------------------------------------------------------- *)
-module ModTy = struct
-  type t = top_module_sig
-
-  let by_path_opt (p : EcPath.path) (env : env) =
-    omap
-      check_not_suspended
-      (MC.by_path (fun mc -> mc.mc_modsigs) (IPPath p) env)
-
-  let by_path (p : EcPath.path) (env : env) =
-    match by_path_opt p env with
-    | None -> lookup_error (`Path p)
-    | Some obj -> obj
-
-  let add (p : EcPath.path) (env : env) =
-    let obj = by_path p env in
-      MC.import_modty p obj env
-
-  let lookup qname (env : env) =
-    MC.lookup_modty qname env
-
-  let lookup_opt name env =
-    try_lf (fun () -> lookup name env)
-
-  let lookup_path name env =
-    fst (lookup name env)
-
-  let modtype p env =
-    let { tms_sig = sig_ } = by_path p env in
-    (* eta-normal form *)
-    { mt_params = sig_.mis_params;
-      mt_name   = p;
-      mt_args   = List.map (EcPath.mident -| fst) sig_.mis_params;
-      mt_restr  = sig_.mis_restr; }
-
-  let bind ?(import = import0) name modty env =
-    let env = if import.im_immediate then MC.bind_modty name modty env else env in
-      { env with
-          env_item = mkitem import (Th_modtype (name, modty)) :: env.env_item }
-
-  exception ModTypeNotEquiv
-
-  let rec mod_type_equiv (f_equiv : form -> form -> bool) env mty1 mty2 =
-    if not (EcPath.p_equal mty1.mt_name mty2.mt_name) then
-      raise ModTypeNotEquiv;
-
-    if List.length mty1.mt_params <> List.length mty2.mt_params then
-      raise ModTypeNotEquiv;
-    if List.length mty1.mt_args <> List.length mty2.mt_args then
-      raise ModTypeNotEquiv;
-
-    if not (NormMp.equal_restr f_equiv env mty1.mt_restr mty2.mt_restr) then
-      raise ModTypeNotEquiv;
-
-    let subst =
-      List.fold_left2
-        (fun subst (x1, p1) (x2, p2) ->
-          let p1 = EcSubst.subst_modtype subst p1 in
-          let p2 = EcSubst.subst_modtype subst p2 in
-            mod_type_equiv f_equiv env p1 p2;
-            EcSubst.add_module subst x1 (EcPath.mident x2))
-        (EcSubst.empty ()) mty1.mt_params mty2.mt_params
-    in
-
-    if not (
-         List.all2
-           (fun m1 m2 ->
-             let m1 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m1) in
-             let m2 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m2) in
-               EcPath.m_equal m1 m2)
-            mty1.mt_args mty2.mt_args) then
-      raise ModTypeNotEquiv
-
-  let mod_type_equiv (f_equiv : form -> form -> bool) env mty1 mty2 =
-    try  mod_type_equiv f_equiv env mty1 mty2; true
-    with ModTypeNotEquiv -> false
-
-  let has_mod_type (env : env) (dst : module_type list) (src : module_type) =
-    List.exists (mod_type_equiv f_equal env src) dst
-
-  let sig_of_mt env (mt:module_type) =
-    let { tms_sig = sig_ } = by_path mt.mt_name env in
-    let subst =
-      List.fold_left2 (fun s (x1,_) a ->
-        EcSubst.add_module s x1 a) (EcSubst.empty ()) sig_.mis_params mt.mt_args in
-    let items =
-      EcSubst.subst_modsig_body subst sig_.mis_body in
-    let params = mt.mt_params in
-
-    let keep =
-      List.fold_left (fun k (x,_) ->
-        EcPath.Sm.add (EcPath.mident x) k) EcPath.Sm.empty params in
-    let keep_info f =
-      EcPath.Sm.mem (f.EcPath.x_top) keep in
-    let do1 oi = OI.filter keep_info oi in
-    let restr = { mt.mt_restr with
-                  mr_oinfos = Msym.map do1 mt.mt_restr.mr_oinfos } in
-
-    { mis_params = params;
-      mis_body   = items;
-      mis_restr  = restr; }
-end
-
-(* -------------------------------------------------------------------- *)
 module Op = struct
   type t = EcDecl.operator
+
+  type redmode = [`Force | `IfTransparent | `IfApplied]
 
   let by_path_opt (p : EcPath.path) (env : env) =
     omap
@@ -2870,30 +2845,38 @@ module Op = struct
   let rebind name op env =
     MC.bind_operator name op env
 
-  let reducible ?(force = false) env p =
-    try
-      let op = by_path p env in
-        match op.op_kind with
-        | OB_oper (Some (OP_Plain _))
-        | OB_pred (Some _) when force || not op.op_opaque -> true
-        | _ -> false
-
-    with LookupFailure _ -> false
-
-  let reduce ?(force = false) env p tys =
+  let core_reduce ?(mode = `IfTransparent) ?(nargs = 0) env p =
     let op = oget (by_path_opt p env) in
-    let f  =
-      match op.op_kind with
-      | OB_oper (Some (OP_Plain (e, _))) when force || not op.op_opaque ->
-          form_of_expr EcCoreFol.mhr e
-      | OB_pred (Some (PR_Plain f)) when force || not op.op_opaque ->
-          f
-      | _ -> raise NotReducible
-    in
-      EcCoreFol.Fsubst.subst_tvar
-        (EcTypes.Tvar.init
-           (List.fst op.op_tparams)
-           (List.fst tys) (* FIXM:TC *)) f
+    match op.op_kind with
+    | OB_oper (Some (OP_Plain (f, _)))
+    | OB_pred (Some (PR_Plain f)) -> begin
+        let f =
+          match mode with
+          | `Force ->
+             f
+          | `IfTransparent when not op.op_opaque ->
+             f
+          | `IfApplied when nargs >= odfl max_int op.op_unfold ->
+             f
+          | _ ->
+             raise NotReducible
+      in (op, f)
+    end
+
+    | _ -> raise NotReducible
+
+  let reducible ?mode ?nargs env p =
+    if Option.is_some (by_path_opt p env) then
+      try
+        ignore (core_reduce ?mode ?nargs env p : _ * form);
+        true
+      with NotReducible -> false
+    else false
+
+  let reduce ?mode ?nargs env p tys =
+    let op, f = core_reduce ?mode ?nargs env p in
+    EcCoreFol.Fsubst.subst_tvar
+      (EcTypes.Tvar.init (List.map fst op.op_tparams) (List.fst tys)) f
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)
@@ -3527,10 +3510,10 @@ module LDecl = struct
   let ld_subst s ld =
     match ld with
     | LD_var (ty, body) ->
-        LD_var (s.fs_ty ty, body |> omap (Fsubst.f_subst s))
+        LD_var (ty_subst s.fs_ty ty, body |> omap (Fsubst.f_subst s))
 
     | LD_mem mt ->
-        let mt = EcMemory.mt_subst s.fs_ty mt
+        let mt = EcMemory.mt_subst (ty_subst s.fs_ty) mt
         in LD_mem mt
 
     | LD_modty p ->

@@ -16,6 +16,22 @@ lemma nosmt eq_enumerate ['a] E1 E2 (C : int -> 'a option) :
   (forall x, E1 x = E2 x) => enumerate C E1 => enumerate C E2.
 proof. by move/fun_ext=> ->. qed.
 
+(*-------------------------------------------------------------------- *)
+lemma nosmt enumerate_pmap_range
+     (J : int -> 'a option) (s : 'a list) (p : 'a -> bool) 
+  :
+     enumerate J p
+  => exists n, forall x, p x => x \in s => x \in pmap J (range 0 n).
+proof.
+move=> enm; elim: s => [|a s [n hn]]; first by exists 0.
+case: enm => [_] hex; case: (p a) => pa; last first.
++ by exists n => a' + [->> | ]; [rewrite pa | apply hn].
+have [i [h0i hi]] := hex a pa.
+exists (max (i+1) n) => a' pa' [->> | hin].
++ by apply/pmapP; exists i; rewrite hi /= mem_range /#.
++ by have := hn a' pa' hin; rewrite !pmapP; smt(mem_range).
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt enum_uniq_pmap_range (J : int -> 'a option) p n:
   enumerate J p => uniq (pmap J (range 0 n)).

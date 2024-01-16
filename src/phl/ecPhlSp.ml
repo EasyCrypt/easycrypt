@@ -1,9 +1,9 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcTypes
 open EcModules
 open EcFol
-open EcParsetree
 open EcEnv
 open EcCoreGoal
 open EcLowPhlGoal

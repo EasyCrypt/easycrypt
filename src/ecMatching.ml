@@ -8,6 +8,7 @@ open EcMaps
 open EcIdent
 open EcParsetree
 open EcEnv
+open EcAst
 open EcTypes
 open EcModules
 open EcFol
@@ -315,11 +316,11 @@ module MEV = struct
     let v = EV.fold (fun x k v -> f x (`Mod  k) v) m.evm_mod  v in
     v
 
-  let assubst ue ev =
+  let assubst ue ev env =
     let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.assubst ue } in
     let subst = Fsubst.f_subst_init ~sty:tysubst () in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
-    let subst = EV.fold (fun x m s -> Fsubst.f_bind_mod s x m) ev.evm_mod subst in
+    let subst = EV.fold (fun x mp s -> EcFol.f_bind_mod s x mp env) ev.evm_mod subst in
     let seen  = ref Sid.empty in
 
     let rec for_ident x binding subst =
@@ -394,7 +395,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
     let default () =
       let subject = Fsubst.f_subst subst subject in
-      let ptn = Fsubst.f_subst (MEV.assubst ue !ev) ptn in
+      let ptn = Fsubst.f_subst (MEV.assubst ue !ev env) ptn in
       if not (conv ptn subject) then failure ()
     in
 
@@ -420,7 +421,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
           | Some `Unset ->
               let ssbj = Fsubst.f_subst subst subject in
-              let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) ssbj in
+              let ssbj = Fsubst.f_subst (MEV.assubst ue !ev env) ssbj in
               if not (Mid.set_disjoint mxs ssbj.f_fv) then
                 (* TODO: bug? why not failure ()?*)
                 raise MatchFailure;
@@ -434,7 +435,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               let ssbj = Fsubst.f_subst subst subject in
 
               if not (conv ssbj a) then
-                let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) subject in
+                let ssbj = Fsubst.f_subst (MEV.assubst ue !ev env) subject in
                 if not (conv ssbj a) then
                   doit env ilc a ssbj
                 else
@@ -536,9 +537,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           if not (EcBigInt.equal i1 i2) then failure ();
 
       | Fglob (mp1, me1), Fglob (mp2, me2) ->
-          let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
-          let mp2 = EcEnv.NormMp.norm_mpath env mp2 in
-            if not (EcPath.m_equal mp1 mp2) then
+            if not (EcIdent.id_equal mp1 mp2) then
               failure ();
             doit_mem env mxs me1 me2
 
@@ -741,7 +740,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             let subst =
               if   id_equal x1 x2
               then subst
-              else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
+              else Fsubst.f_bind_absmod subst x2 x1
 
             and env = EcEnv.Mod.bind_local x1 p1 env in
 
@@ -1036,6 +1035,12 @@ module FPosition = struct
               let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
               f_hoareF_r { hf with hf_pr; hf_po; }
 
+          | FeHoareF hf ->
+              let (ehf_pr, ehf_po) =
+                as_seq2 (doit p [hf.ehf_pr; hf.ehf_po;])
+              in
+              f_eHoareF_r { hf with ehf_pr; ehf_po; }
+
           | FcHoareF chf ->
             let fkeys, calls = EcPath.Mx.bindings chf.chf_co.c_calls
                                |> List.map (fun (f,cb) -> ((f,cb.cb_cost),
@@ -1073,6 +1078,7 @@ module FPosition = struct
               f_coe_r { coe with coe_pre = pre }
 
           | FhoareS   _ -> raise InvalidPosition
+          | FeHoareS  _ -> raise InvalidPosition
           | FcHoareS  _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition

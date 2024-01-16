@@ -114,7 +114,7 @@ module MEV : sig
   val get    : ident -> kind -> mevmap -> [`Unset | `Set of item] option
   val filled : mevmap -> bool
   val fold   : (ident -> item -> 'a -> 'a) -> mevmap -> 'a -> 'a
-  val assubst: EcUnify.unienv -> mevmap -> EcFol.f_subst
+  val assubst: EcUnify.unienv -> mevmap -> env -> EcFol.f_subst
 end
 
 (* -------------------------------------------------------------------- *)
@@ -145,7 +145,7 @@ val f_match :
   -> unienv * mevmap
   -> ptn:form
   -> form
-  -> unienv * (uid -> ty option) * mevmap
+  -> unienv * (ty Muid.t) * mevmap
 
 (* -------------------------------------------------------------------- *)
 type ptnpos = private [`Select of int | `Sub of ptnpos] Mint.t

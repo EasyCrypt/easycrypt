@@ -417,7 +417,8 @@ end = struct
         msg "@\n";
 
         let pp_op fmt ((op, inst), subue) =
-          let inst = Tuni.offun_dom (EcUnify.UniEnv.assubst subue) inst in
+          let uidmap = EcUnify.UniEnv.assubst subue in
+          let inst = Tuni.subst_dom uidmap inst in
 
           begin match inst with
           | [] ->
@@ -433,7 +434,8 @@ end = struct
           let myuvars = List.fold_left Suid.union uvars myuvars in
           let myuvars = Suid.elements myuvars in
 
-          let tysubst = Tuni.offun (EcUnify.UniEnv.assubst subue) in
+          let uidmap = EcUnify.UniEnv.assubst subue in
+          let tysubst = ty_subst (Tuni.subst uidmap) in
           let myuvars = List.pmap
             (fun uid ->
               match tysubst (tuni uid) with
@@ -758,15 +760,22 @@ end = struct
     | CE_TyIncompatible (x, err) ->
         msg "type `%s` %a"
           (string_of_qsymbol x) (pp_incompatible env) err
+
     | CE_ModTyIncompatible x ->
         msg "module type `%s` is incompatible"
           (string_of_qsymbol x)
+
     | CE_ModIncompatible x ->
         msg "module `%s` is incompatible"
           (string_of_qsymbol x)
 
     | CE_InvalidRE x ->
         msg "invalid regexp: `%s'" x
+
+    | CE_InlinedOpIsForm x ->
+        msg
+          "inlined operator's body must be an expression-like formula: `%s'"
+          (string_of_qsymbol x)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -800,7 +809,8 @@ end = struct
 
     | AE_InvalidArgForm (IAF_Mismatch (src, dst)) ->
        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
-       let dst = Tuni.offun (EcUnify.UniEnv.assubst ue) dst in
+       let uidmap = EcUnify.UniEnv.assubst ue in
+       let dst = ty_subst (Tuni.subst uidmap) dst in
 
        msg "This expression has type@\n";
        msg "  @[<hov 2>%a@]@\n@\n" (EcPrinting.pp_type ppe) src;
@@ -818,7 +828,7 @@ end = struct
 
     | AE_InvalidArgProof (src, dst) ->
        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
-       let sb  = EcMatching.CPTEnv (EcMatching.MEV.assubst ue ev) in
+       let sb  = EcMatching.CPTEnv (EcMatching.MEV.assubst ue ev (LDecl.toenv hyps)) in
        let src = concretize_e_form sb src in
        let dst = concretize_e_form sb dst in
 

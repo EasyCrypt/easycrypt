@@ -238,7 +238,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 op principal (I : t -> bool) =
-  exists a : t, forall x, (I x <=> exists b, x = b * a).
+  exists (a : t), forall x, (I x <=> exists b, x = b * a).
 
 lemma principal_ideal I : principal I => ideal I.
 proof.

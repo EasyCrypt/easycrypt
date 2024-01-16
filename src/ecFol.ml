@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcIdent
 open EcUtils
+open EcAst
 open EcTypes
 open EcMemory
 open EcBigInt.Notations
@@ -10,6 +11,9 @@ module CI = EcCoreLib
 
 (* -------------------------------------------------------------------- *)
 include EcCoreFol
+
+(* -------------------------------------------------------------------- *)
+let f_bind_mod s x mp env = Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
 
 (* -------------------------------------------------------------------- *)
 let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
@@ -31,6 +35,8 @@ let f_eqres ty1 m1 ty2 m2 =
   f_eq (f_pvar pv_res ty1 m1) (f_pvar pv_res ty2 m2)
 
 let f_eqglob mp1 m1 mp2 m2 =
+  let mp1 = EcPath.mget_ident mp1 in
+  let mp2 = EcPath.mget_ident mp2 in
   f_eq (f_glob mp1 m1) (f_glob mp2 m2)
 
 (* -------------------------------------------------------------------- *)
@@ -53,7 +59,6 @@ let destr_rint f =
   | Fop (p, _) when EcPath.p_equal p CI.CI_Real.p_real1 -> BI.one
 
   | _ -> destr_error "destr_rint"
-
 
 (* -------------------------------------------------------------------- *)
 let fop_int_le     = f_op CI.CI_Int .p_int_le    [] (toarrow [tint ; tint ] tbool)
@@ -98,6 +103,36 @@ let f_decimal (n, (l, f)) =
   if   EcBigInt.equal n EcBigInt.zero
   then fct
   else f_real_add (f_real_of_int (f_int n)) fct
+
+(* soft-constructor - xreal *)
+let fop_xreal_le = f_op CI.CI_Xreal.p_xle [] (toarrow [txreal; txreal] tbool)
+let fop_interp_ehoare_form =
+  f_op CI.CI_Xreal.p_interp_form [] (toarrow [tbool; txreal] txreal)
+
+let is_interp_ehoare_form_op (p, tys) = EcPath.p_equal p CI.CI_Xreal.p_interp_form && tys = []
+
+let fop_Ep ty =
+  f_op CI.CI_Xreal.p_Ep [ty] (toarrow [tdistr ty; toarrow [ty] txreal] txreal)
+
+let f_xreal_le f1 f2 = f_app fop_xreal_le [f1; f2] tbool
+let f_interp_ehoare_form f1 f2 = f_app fop_interp_ehoare_form [f1; f2] txreal
+let f_Ep ty d f = f_app (fop_Ep ty) [d; f] txreal
+
+
+let fop_concave_incr = f_op CI.CI_Xreal.p_concave_incr [] (tfun (tfun txreal txreal) tbool)
+let f_concave_incr f = f_app fop_concave_incr [f] tbool
+
+let f_op_rp2xr = f_op CI.CI_Xreal.p_rp [] (tfun trealp txreal)
+let f_op_of_real  = f_op CI.CI_Xreal.p_of_real [] (tfun treal trealp)
+
+let f_rp2xr f = f_app f_op_rp2xr [f] txreal
+let f_r2rp  f = f_app f_op_of_real [f] trealp
+let f_r2xr  f = f_rp2xr (f_r2rp f)
+let f_b2r   b = f_if b f_r1 f_r0
+let f_b2xr  b = f_r2xr (f_b2r b)
+
+
+let f_xreal_inf = f_op CI.CI_Xreal.p_inf [] txreal
 
 (* -------------------------------------------------------------------- *)
 let tmap aty bty =
@@ -788,7 +823,7 @@ type sform =
   | SFint   of BI.zint
   | SFlocal of EcIdent.t
   | SFpvar  of EcTypes.prog_var * memory
-  | SFglob  of EcPath.mpath * memory
+  | SFglob  of EcIdent.t * memory
 
   | SFif    of form * form * form
   | SFmatch of form * form list * ty
@@ -951,49 +986,45 @@ let f_dlet_simpl tya tyb d f =
  * - E x p1 => p2 -> [] (E x p1 => p2)
  *)
 let destr_exists_prenex f =
-  let disjoint bds1 bds2 =
-    List.for_all
-      (fun (id1, _) -> List.for_all (fun (id2, _) -> id1 <> id2) bds2)
-      bds1
-  in
-
   let rec prenex_exists bds p =
     match sform_of_form p with
     | SFand (`Sym, (f1, f2)) ->
-        let (bds1, f1) = prenex_exists [] f1 in
-        let (bds2, f2) = prenex_exists [] f2 in
-          if   disjoint bds1 bds2
-          then (bds1@bds2@bds, f_and f1 f2)
-          else (bds, p)
+      let (bds, f2) = prenex_exists bds f2 in
+      let (bds, f1) = prenex_exists bds f1 in
+      (bds, f_and f1 f2)
 
     | SFor (`Sym, (f1, f2)) ->
-        let (bds1, f1) = prenex_exists [] f1 in
-        let (bds2, f2) = prenex_exists [] f2 in
-          if   disjoint bds1 bds2
-          then (bds1@bds2@bds, f_or f1 f2)
-          else (bds, p)
+      let (bds, f2) = prenex_exists bds f2 in
+      let (bds, f1) = prenex_exists bds f1 in
+      (bds, f_or f1 f2)
 
     | SFimp (f1, f2) ->
-        let (bds2, f2) = prenex_exists bds f2 in
-          (bds2@bds, f_imp f1 f2)
+      let (bds, f2) = prenex_exists bds f2 in
+      (bds, f_imp f1 f2)
 
     | SFquant (Lexists, bd, lazy p) ->
-        let (bds, p) = prenex_exists bds p in
-          (bd::bds, p)
+      let bd, p   =
+        let s = Fsubst.f_subst_init ~freshen:true () in
+        let s, bd = Fsubst.add_binding s bd in
+        bd, Fsubst.f_subst s p in
+      let bds = bd::bds in
+      prenex_exists bds p
 
-    | SFif (f, ft, fe) ->
-        let (bds1, f1) = prenex_exists [] ft in
-        let (bds2, f2) = prenex_exists [] fe in
-          if   disjoint bds1 bds2
-          then (bds1@bds2@bds, f_if f f1 f2)
-          else (bds, p)
+    | SFif (f, f1, f2) ->
+      let (bds, f2) = prenex_exists bds f2 in
+      let (bds, f1) = prenex_exists bds f1 in
+      (bds, f_if f f1 f2)
+
+    | SFop (op, [f1; f2]) when is_interp_ehoare_form_op op ->
+      let (bds, f1) = prenex_exists bds f1 in
+      (bds, f_interp_ehoare_form f1 f2)
 
     | _ -> (bds, p)
   in
     (* Make it fail as with destr_exists *)
     match prenex_exists [] f with
     | [] , _ -> destr_error "exists"
-    | bds, f -> (bds, f)
+    | bds, f -> (List.rev bds, f)
 
 (* -------------------------------------------------------------------- *)
 let destr_ands ~deep =
@@ -1060,3 +1091,47 @@ let rec one_sided_vs mem fp =
 
   | Fapp (f, args) -> one_sided_vs mem f @ List.concat_map (one_sided_vs mem) args
   | _ -> []
+
+let rec dump_f f =
+  let dump_quant q =
+    match q with
+    | Lforall -> "ALL"
+    | Lexists -> "EXI"
+    | Llambda -> "LAM"
+  in
+
+  match f.f_node with
+  | Fquant (q, bs, f) -> dump_quant q ^ " ( " ^ String.concat ", " (List.map EcIdent.tostring (List.fst bs)) ^ " )" ^ "." ^ dump_f f (* of quantif * bindings * form *)
+  | Fif    (c, t, f) -> "IF " ^ dump_f c ^ " THEN " ^ dump_f t ^ " ELSE " ^ dump_f f
+  | Fmatch _ -> "MATCH"
+  | Flet   (_, f, g) -> "LET _ = " ^ dump_f f ^ " IN " ^ dump_f g
+  | Fint    x -> BI.to_string x
+  | Flocal  x -> EcIdent.tostring x
+  | Fpvar   (pv, x) -> EcTypes.string_of_pvar pv ^ "{" ^ EcIdent.tostring x ^ "}"
+  | Fglob   (mp, x) -> EcIdent.tostring mp ^ "{" ^ EcIdent.tostring x ^ "}"
+  | Fop     (p, _) -> EcPath.tostring p
+  | Fapp    (f, a) -> "APP " ^ dump_f f ^ " ( " ^ String.concat ", " (List.map dump_f a) ^ " )"
+  | Ftuple  f -> " ( " ^ String.concat ", " (List.map dump_f f) ^ " )"
+  | Fproj   (f, x) -> dump_f f ^ "." ^ string_of_int x
+  | Fpr {pr_args = a; pr_event = e} -> "PR [ARG = " ^ dump_f a ^ " ; EV = " ^ dump_f e ^ "]"
+  | FhoareF _ -> "HoareF"
+  | FhoareS _ -> "HoareS"
+  | FcHoareF _ -> "cHoareF"
+  | FcHoareS _ -> "cHoareS"
+  | FbdHoareF _ -> "bdHoareF"
+  | FbdHoareS {bhs_pr = pr; bhs_po = po; bhs_bd = bd; bhs_m = (m, _)} ->
+     "bdHoareS [ ME = " ^ EcIdent.tostring m
+     ^ "; PR = " ^ dump_f pr
+     ^ "; PO = " ^ dump_f po
+     ^ "; BD = " ^ dump_f bd ^ "]"
+  | FeHoareS _ -> "eHoareS"
+  | FeHoareF _ -> "eHoareF"
+  | FequivF _ -> "equivF"
+  | FequivS {es_ml = (ml, _); es_mr = (mr, _); es_po = po; es_pr = pr } ->
+     "equivS [ ML = " ^ EcIdent.tostring ml
+     ^ "; MR = " ^ EcIdent.tostring mr
+     ^ "; PR = " ^ dump_f pr
+     ^ "; PO = " ^ dump_f po
+     ^ "]"
+  | FeagerF _ -> "eagerF"
+  | Fcoe _ -> "Fcoe"

@@ -53,7 +53,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcTypes.expr * bool (* nosmt? *)
+  | OP_Plain  of EcCoreFol.form * bool (* nosmt? *)
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -106,6 +106,7 @@ type operator = {
   op_loca     : locality;
   op_opaque   : bool;
   op_clinline : bool;
+  op_unfold   : int option;
 }
 
 val op_ty     : operator -> ty
@@ -119,8 +120,8 @@ val is_fix    : operator -> bool
 val is_abbrev : operator -> bool
 val is_prind  : operator -> bool
 
-val mk_op   : ?clinline:bool -> opaque:bool -> ty_params -> ty -> opbody option -> locality -> operator
-val mk_pred : ?clinline:bool -> opaque:bool -> ty_params -> ty list -> prbody option -> locality -> operator
+val mk_op   : ?clinline:bool -> ?unfold:int -> opaque:bool -> ty_params -> ty -> opbody option -> locality -> operator
+val mk_pred : ?clinline:bool -> ?unfold:int -> opaque:bool -> ty_params -> ty list -> prbody option -> locality -> operator
 
 val mk_abbrev :
      ?ponly:bool -> ty_params -> (EcIdent.ident * ty) list
@@ -175,7 +176,7 @@ val axiomatized_op :
      ?nargs: int
   -> ?nosmt:bool
   -> EcPath.path
-  -> (ty_params * expr)
+  -> (ty_params * form)
   -> locality
   -> axiom
 

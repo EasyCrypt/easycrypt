@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcParsetree
 
 open EcCoreGoal.FApi

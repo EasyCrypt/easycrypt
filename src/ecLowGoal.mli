@@ -16,7 +16,7 @@ open EcCoreGoal
 exception InvalidProofTerm         (* invalid proof term *)
 
 type side    = [`Left|`Right]
-type lazyred = [`Full of bool | `NoDelta | `None]
+type lazyred = [`Full | `NoDelta | `None]
 
 (* -------------------------------------------------------------------- *)
 val (@!) : FApi.backward -> FApi.backward -> FApi.backward
@@ -42,8 +42,10 @@ val t_trivial          :
   ?subtc:FApi.backward -> ?keep:bool -> ?conv:[`Alpha | `Conv] -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+type opmode = EcReduction.deltap
+
 type simplify_t =
-  ?target:ident -> ?delta:bool -> ?logic:rlogic_info -> FApi.backward
+  ?target:ident -> ?delta:opmode -> ?logic:rlogic_info -> FApi.backward
 
 type simplify_with_info_t =
   ?target:ident -> reduction_info -> FApi.backward
@@ -188,7 +190,7 @@ val t_cutdef : proofterm -> form -> FApi.backward
 (* -------------------------------------------------------------------- *)
 type vsubst = [
   | `Local of EcIdent.t
-  | `Glob  of EcPath.mpath * EcMemory.memory
+  | `Glob  of EcIdent.t * EcMemory.memory
   | `PVar  of EcTypes.prog_var * EcMemory.memory
 ]
 

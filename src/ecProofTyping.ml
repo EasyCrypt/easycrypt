@@ -22,7 +22,9 @@ let process_form_opt ?mv hyps pf oty =
   try
     let ue  = unienv_of_hyps hyps in
     let ff  = EcTyping.trans_form_opt ?mv (LDecl.toenv hyps) ue pf oty in
-    EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
+    let ts = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let fs = EcFol.Fsubst.f_subst_init ~sty:ts () in
+    EcFol.Fsubst.f_subst fs ff
 
   with EcUnify.UninstanciateUni ->
     EcTyping.tyerror pf.EcLocation.pl_loc
@@ -33,6 +35,17 @@ let process_form ?mv hyps pf ty =
 
 let process_formula ?mv hyps pf =
   process_form hyps ?mv pf tbool
+
+let process_xreal ?mv hyps pf =
+  process_form hyps ?mv pf txreal
+
+let process_dformula ?mv hyps pf =
+  match pf with
+  | Single pf -> Single(process_formula ?mv hyps pf)
+  | Double(pp,pf) ->
+    let p = process_formula ?mv hyps pp in
+    let f = process_xreal ?mv hyps pf in
+    Double(p,f)
 
 let process_cost ?mv hyps (EcParsetree.PC_costs (self, calls)) tys =
   let env = LDecl.toenv hyps in
@@ -47,8 +60,10 @@ let process_cost ?mv hyps (EcParsetree.PC_costs (self, calls)) tys =
 let process_exp hyps mode oty e =
   let env = LDecl.toenv hyps in
   let ue  = unienv_of_hyps hyps in
-  let e   =  EcTyping.transexpcast_opt env mode ue oty e in
-    EcTypes.e_uni (EcUnify.UniEnv.close ue) e
+  let e   = EcTyping.transexpcast_opt env mode ue oty e in
+  let ts  = Tuni.subst (EcUnify.UniEnv.close ue)  in
+  let es  = e_subst { e_subst_id with es_ty = ts } in
+    es e
 
 let process_pattern hyps fp =
   let ps = ref Mid.empty in
@@ -68,6 +83,12 @@ let pf_process_cost pe ?mv hyps tys pcost =
 
 let pf_process_formula pe ?mv hyps pf =
   Exn.recast_pe pe hyps (fun () -> process_formula ?mv hyps pf)
+
+let pf_process_xreal pe ?mv hyps pf =
+  Exn.recast_pe pe hyps (fun () -> process_xreal ?mv hyps pf)
+
+let pf_process_dformula pe ?mv hyps pf =
+  Exn.recast_pe pe hyps (fun () -> process_dformula ?mv hyps pf)
 
 let pf_process_exp pe hyps mode oty e =
   Exn.recast_pe pe hyps (fun () -> process_exp hyps mode oty e)
@@ -115,14 +136,14 @@ let tc1_process_prhl_formula tc pf =
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_stmt  ?map tc mt c =
-  let hyps = FApi.tc1_hyps tc in
-  let hyps = LDecl.push_active (mhr,mt) hyps in
-  let env  = LDecl.toenv hyps in
-  let ue   = unienv_of_hyps hyps in
-  let c    = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt ?map env ue c) in
-  let esub = Exn.recast_pe !!tc hyps (fun () -> Tuni.offun (EcUnify.UniEnv.close ue)) in
-  let esub = { e_subst_id with es_ty = esub; } in
-  EcModules.s_subst esub c
+  let hyps   = FApi.tc1_hyps tc in
+  let hyps   = LDecl.push_active (mhr,mt) hyps in
+  let env    = LDecl.toenv hyps in
+  let ue     = unienv_of_hyps hyps in
+  let c      = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt ?map env ue c) in
+  let uidmap = Exn.recast_pe !!tc hyps (fun () -> EcUnify.UniEnv.close ue) in
+  let es     = { e_subst_id with es_ty = Tuni.subst uidmap } in
+  EcModules.s_subst es c
 
 
 let tc1_process_prhl_stmt ?map tc side c =
@@ -142,27 +163,34 @@ let tc1_process_Xhl_exp tc side ty e =
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_form ?side tc ty pf =
   let hyps, concl = FApi.tc1_flat tc in
+  let m = fst (EcFol.destr_programS side concl) in
 
-  let memory, mv =
-    match concl.f_node, side with
-    | FhoareS  hs, None        -> (hs.hs_m, Some (hs.hs_pr, hs.hs_po ))
-    | FcHoareS  hs, None        -> (hs.chs_m, Some (hs.chs_pr, hs.chs_po ))
-    | FbdHoareS hs, None        -> (hs.bhs_m, Some (hs.bhs_pr, hs.bhs_po))
-    | FequivS   es, Some `Left  -> ((mhr, snd es.es_ml), None)
-    | FequivS   es, Some `Right -> ((mhr, snd es.es_mr), None)
-
-    | _, _ -> raise (DestrError "destr_programS")
+  let mv =
+    match concl.f_node with
+    | FhoareS   hs -> Some (hs.hs_pr , hs.hs_po )
+    | FeHoareS  hs -> Some (hs.ehs_pr, hs.ehs_po)
+    | FcHoareS  hs -> Some (hs.chs_pr, hs.chs_po)
+    | FbdHoareS hs -> Some (hs.bhs_pr, hs.bhs_po)
+    | _            -> None
   in
 
-  let hyps = LDecl.push_active memory hyps in
-  let mv = mv |> omap
-   (fun (pr, po) -> Msym.of_list [("pre", pr); ("post", po)]) in
+  let hyps = LDecl.push_active m hyps in
 
-  pf_process_form ?mv !!tc hyps ty pf
+  let mv =
+    Option.map
+      (fun (pr, po) -> Msym.of_list [("pre", pr); ("post", po)])
+      mv
+  in
+
+  (m, pf_process_form ?mv !!tc hyps ty pf)
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_formula ?side tc pf =
   tc1_process_Xhl_form ?side tc tbool pf
+
+(* ------------------------------------------------------------------ *)
+let tc1_process_Xhl_formula_xreal tc pf =
+  tc1_process_Xhl_form tc txreal pf
 
 (* ------------------------------------------------------------------ *)
 (* FIXME: factor out to typing module                                 *)
@@ -195,7 +223,7 @@ let rec lazy_destruct ?(reduce = true) hyps tx fp =
   with
   | NoMatch when not reduce -> None
   | NoMatch ->
-      match EcReduction.h_red_opt (EcReduction.full_red ~opaque:false) hyps fp with
+      match EcReduction.h_red_opt EcReduction.full_red hyps fp with
       | None    -> None
       | Some fp -> lazy_destruct ~reduce hyps tx fp
 

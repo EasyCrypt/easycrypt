@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcAst
 open EcTypes
 open EcPath
 
@@ -8,33 +9,12 @@ module Sid = EcIdent.Sid
 module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
-type lvalue =
-  | LvVar   of (EcTypes.prog_var * EcTypes.ty)
-  | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
+type lvalue = EcAst.lvalue
 
-let lv_equal lv1 lv2 =
-  match lv1, lv2 with
-  | LvVar (pv1, ty1), LvVar (pv2, ty2) ->
-         (EcTypes.pv_equal pv1 pv2)
-      && (EcTypes.ty_equal ty1 ty2)
-
-  | LvTuple tu1, LvTuple tu2 ->
-      List.all2
-        (fun (pv1, ty1) (pv2, ty2) ->
-             (EcTypes.pv_equal pv1 pv2)
-          && (EcTypes.ty_equal ty1 ty2))
-        tu1 tu2
-
-  | _, _ -> false
+let lv_equal = EcAst.lv_equal
 
 (* -------------------------------------------------------------------- *)
-let lv_fv = function
-  | LvVar (pv, _) ->
-      EcTypes.pv_fv pv
-
-  | LvTuple pvs ->
-      let add s (pv, _) = EcIdent.fv_union s (EcTypes.pv_fv pv) in
-      List.fold_left add Mid.empty pvs
+let lv_fv = EcAst.lv_fv
 
 let symbol_of_lv = function
   | LvVar (pv, _) ->
@@ -63,176 +43,32 @@ let name_of_lv lv =
   | LvTuple pvs ->
      String.concat "_" (List.map (EcTypes.name_of_pvar |- fst) pvs)
 
-(* -------------------------------------------------------------------- *)
-type instr = {
-  i_node : instr_node;
-  i_fv : int Mid.t;
-  i_tag  : int;
-}
-
-and instr_node =
-  | Sasgn     of lvalue * EcTypes.expr
-  | Srnd      of lvalue * EcTypes.expr
-  | Scall     of lvalue option * EcPath.xpath * EcTypes.expr list
-  | Sif       of EcTypes.expr * stmt * stmt
-  | Swhile    of EcTypes.expr * stmt
-  | Smatch    of expr * ((EcIdent.t * EcTypes.ty) list * stmt) list
-  | Sassert   of EcTypes.expr
-  | Sabstract of EcIdent.t
-
-and stmt = {
-  s_node : instr list;
-  s_fv   : int Mid.t;
-  s_tag  : int;
-}
+let lv_of_expr e =
+  match e.e_node with
+  | Evar pv ->
+     LvVar (pv, e_ty e)
+  | Etuple pvs ->
+     LvTuple (List.map (fun e -> EcTypes.destr_var e, e_ty e) pvs)
+  | _ -> failwith "failed to construct lv from expr"
 
 (* -------------------------------------------------------------------- *)
-let i_equal   = ((==) : instr -> instr -> bool)
-let i_hash    = fun i -> i.i_tag
+type instr = EcAst.instr
+
+type instr_node = EcAst.instr_node
+
+type stmt = EcAst.stmt
+
+(* -------------------------------------------------------------------- *)
+let i_equal   = EcAst.i_equal
+let i_hash    = EcAst.i_hash
 let i_compare = fun i1 i2 -> i_hash i1 - i_hash i2
-let i_fv i    = i.i_fv
+let i_fv      = EcAst.i_fv
 let i_node i  = i.i_node
 
-let s_equal   = ((==) : stmt -> stmt -> bool)
-let s_hash    = fun s -> s.s_tag
+let s_equal   = EcAst.s_equal
+let s_hash    = EcAst.s_hash
 let s_compare = fun s1 s2 -> s_hash s1 - s_hash s2
-let s_fv      = fun s -> s.s_fv
-
-(* -------------------------------------------------------------------- *)
-module Hinstr = Why3.Hashcons.Make (struct
-  type t = instr
-
-  let equal_node i1 i2 =
-    match i1, i2 with
-    | Sasgn (lv1, e1), Sasgn (lv2, e2) ->
-        (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
-
-    | Srnd (lv1, e1), Srnd (lv2, e2) ->
-        (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
-
-    | Scall (lv1, f1, es1), Scall (lv2, f2, es2) ->
-           (EcUtils.opt_equal lv_equal lv1 lv2)
-        && (EcPath.x_equal f1 f2)
-        && (List.all2 EcTypes.e_equal es1 es2)
-
-    | Sif (c1, s1, r1), Sif (c2, s2, r2) ->
-           (EcTypes.e_equal c1 c2)
-        && (s_equal s1 s2)
-        && (s_equal r1 r2)
-
-    | Swhile (c1, s1), Swhile (c2, s2) ->
-           (EcTypes.e_equal c1 c2)
-        && (s_equal s1 s2)
-
-    | Smatch (e1, b1), Smatch (e2, b2) when List.length b1 = List.length b2 ->
-        let forb (bs1, s1) (bs2, s2) =
-          let forbs (x1, ty1) (x2, ty2) =
-               EcIdent.id_equal x1  x2
-            && EcTypes.ty_equal ty1 ty2
-          in List.all2 forbs bs1 bs2 && s_equal s1 s2
-        in EcTypes.e_equal e1 e2 && List.all2 forb b1 b2
-
-    | Sassert e1, Sassert e2 ->
-        (EcTypes.e_equal e1 e2)
-
-    | Sabstract id1, Sabstract id2 -> EcIdent.id_equal id1 id2
-
-    | _, _ -> false
-
-  let equal i1 i2 = equal_node i1.i_node i2.i_node
-
-  let hash p =
-    match p.i_node with
-    | Sasgn (lv, e) ->
-        Why3.Hashcons.combine
-          (Hashtbl.hash lv) (EcTypes.e_hash e)
-
-    | Srnd (lv, e) ->
-        Why3.Hashcons.combine
-          (Hashtbl.hash lv) (EcTypes.e_hash e)
-
-    | Scall (lv, f, tys) ->
-        Why3.Hashcons.combine_list EcTypes.e_hash
-          (Why3.Hashcons.combine
-             (Hashtbl.hash lv) (EcPath.x_hash f))
-          tys
-
-    | Sif (c, s1, s2) ->
-        Why3.Hashcons.combine2
-          (EcTypes.e_hash c) (s_hash s1) (s_hash s2)
-
-    | Swhile (c, s) ->
-        Why3.Hashcons.combine (EcTypes.e_hash c) (s_hash s)
-
-    | Smatch (e, b) ->
-        let forb (bds, s) =
-          let forbs (x, ty) =
-            Why3.Hashcons.combine (EcIdent.id_hash x) (EcTypes.ty_hash ty)
-          in Why3.Hashcons.combine_list forbs (s_hash s) bds
-        in Why3.Hashcons.combine_list forb (EcTypes.e_hash e) b
-
-    | Sassert e -> EcTypes.e_hash e
-
-    | Sabstract id -> EcIdent.id_hash id
-
-  let i_fv   = function
-    | Sasgn (lv, e) ->
-        EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
-
-    | Srnd (lv, e) ->
-        EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
-
-    | Scall (olv, f, args) ->
-        let ffv = EcPath.x_fv Mid.empty f in
-        let ofv = olv |> omap lv_fv |> odfl Mid.empty in
-        List.fold_left
-          (fun s a -> EcIdent.fv_union s (EcTypes.e_fv a))
-          (EcIdent.fv_union ffv ofv) args
-
-    | Sif (e, s1, s2) ->
-        List.fold_left EcIdent.fv_union Mid.empty
-          [EcTypes.e_fv e; s_fv s1; s_fv s2]
-
-    | Swhile (e, s)  ->
-        EcIdent.fv_union (EcTypes.e_fv e) (s_fv s)
-
-    | Smatch (e, b) ->
-        let forb (bs, s) =
-          let bs = Sid.of_list (List.map fst bs) in
-          EcIdent.fv_diff (s_fv s) bs
-
-        in List.fold_left
-             (fun s b -> EcIdent.fv_union s (forb b))
-             (EcTypes.e_fv e) b
-
-    | Sassert e    ->
-        EcTypes.e_fv e
-
-    | Sabstract id ->
-        EcIdent.fv_singleton id
-
-  let tag n p = { p with i_tag = n; i_fv = i_fv p.i_node }
-end)
-
-(* -------------------------------------------------------------------- *)
-module Hstmt = Why3.Hashcons.Make (struct
-  type t = stmt
-
-  let equal_node s1 s2 =
-    List.all2 i_equal s1 s2
-
-  let equal s1 s2 = equal_node s1.s_node s2.s_node
-
-  let hash p =
-    Why3.Hashcons.combine_list i_hash 0 p.s_node
-
-  let tag n p =
-    let fv =
-      List.fold_left
-        (fun s i -> EcIdent.fv_union s (i_fv i))
-        Mid.empty p.s_node
-    in { p with s_tag = n; s_fv = fv; }
-end)
+let s_fv      = EcAst.s_fv
 
 (* -------------------------------------------------------------------- *)
 module MSHi = EcMaps.MakeMSH(struct type t = instr let tag i = i.i_tag end)
@@ -241,11 +77,8 @@ module Mi   = MSHi.M
 module Hi   = MSHi.H
 
 (* -------------------------------------------------------------------- *)
-let mk_instr i = Hinstr.hashcons
-  { i_node = i; i_tag = -1; i_fv = Mid.empty }
 
-let stmt s = Hstmt.hashcons
-  { s_node = s; s_tag = -1; s_fv = Mid.empty}
+let stmt = EcAst.stmt
 
 let rstmt s = stmt (List.rev s)
 
@@ -331,8 +164,8 @@ let rec s_subst_top (s : EcTypes.e_subst) =
   if e_subst == identity then identity else
 
   let pvt_subst (pv,ty as p) =
-    let pv' = EcTypes.pv_subst (EcPath.x_subst s.es_mp) pv in
-    let ty' = s.EcTypes.es_ty ty in
+    let pv' = EcTypes.pv_subst (EcPath.x_subst_abs s.es_ty.ts_cmod) pv in
+    let ty' = EcTypes.ty_subst s.EcTypes.es_ty ty in
 
     if pv == pv' && ty == ty' then p else (pv', ty') in
 
@@ -357,7 +190,7 @@ let rec s_subst_top (s : EcTypes.e_subst) =
 
     | Scall (olv, mp, args) ->
         let olv'  = olv |> OSmart.omap lv_subst in
-        let mp'   = EcPath.x_subst s.es_mp mp in
+        let mp'   = EcPath.x_subst_abs s.es_ty.ts_cmod mp in
         let args' = List.Smart.map e_subst args in
 
         i_call (olv', mp', args')
@@ -462,10 +295,7 @@ let get_uninit_read (s : stmt) =
   snd (s_get_uninit_read Ssym.empty s)
 
 (* -------------------------------------------------------------------- *)
-type 'a use_restr = {
-  ur_pos : 'a option;   (* If not None, can use only element in this set. *)
-  ur_neg : 'a;          (* Cannot use element in this set. *)
-}
+type 'a use_restr = 'a EcAst.use_restr
 
 let ur_app f a =
   { ur_pos = (omap f) a.ur_pos;
@@ -482,9 +312,7 @@ let ur_pos_subset subset ur1 ur2 = match ur1,ur2 with
   | None, Some _ -> false
   | Some s1, Some s2 -> subset s1 s2
 
-let ur_equal (equal : 'a -> 'a -> bool) ur1 ur2 =
-  equal ur1.ur_neg ur2.ur_neg
-  && (opt_equal equal) ur1.ur_pos ur2.ur_pos
+let ur_equal = EcAst.ur_equal
 
 (* Union for negative restrictions, intersection for positive ones.
    [None] stands for everybody. *)
@@ -509,22 +337,21 @@ let ur_inter union inter ur1 ur2 =
 (* -------------------------------------------------------------------- *)
 (* Oracle information of a procedure [M.f]. *)
 module PreOI : sig
-  type 'a t
+  type t = EcAst.oracle_info
 
-  val hash : ('a -> int) -> 'a t -> int
-  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+  val hash : t -> int
+  val equal : (form -> form -> bool) -> t -> t -> bool
 
-  val cost_self : 'a t -> [`Bounded of 'a | `Unbounded]
-  val cost : 'a t -> xpath -> [`Bounded of 'a | `Zero | `Unbounded]
-  val cost_calls : 'a t -> [`Bounded of 'a Mx.t | `Unbounded]
-  val costs : 'a t -> [`Bounded of 'a * 'a Mx.t | `Unbounded]
+  val cost_self : t -> [`Bounded of form | `Unbounded]
+  val cost : t -> xpath -> [`Bounded of form| `Zero | `Unbounded]
+  val cost_calls : t -> [`Bounded of form Mx.t | `Unbounded]
+  val costs : t -> [`Bounded of form * form Mx.t | `Unbounded]
 
-  val allowed : 'a t -> xpath list
-  val allowed_s : 'a t -> Sx.t
+  val allowed : t -> xpath list
+  val allowed_s : t -> Sx.t
 
-  val mk : xpath list -> [`Bounded of 'a * 'a Mx.t | `Unbounded] -> 'a t
-  (* val change_calls : 'a t -> xpath list -> 'a t *)
-  val filter : (xpath -> bool) -> 'a t -> 'a t
+  val mk : xpath list -> [`Bounded of form * form Mx.t | `Unbounded] -> t
+  val filter : (xpath -> bool) -> t -> t
 end = struct
   (* Oracle information of a procedure [M.f]:
    * - oi_calls : list of oracles that can be called by [M.f].
@@ -535,19 +362,16 @@ end = struct
    * zero times. No restrictio of [None]
    *
    * Remark: there is redundancy between oi_calls and oi_costs. *)
-  type 'a t = {
-    oi_calls : xpath list;
-    oi_costs : ('a * 'a Mx.t) option;
-  }
+  type t = EcAst.oracle_info
 
   let allowed oi = oi.oi_calls
 
   let allowed_s oi = allowed oi |> Sx.of_list
 
-  let cost_self (oi : 'a t) =
+  let cost_self (oi : t) =
     omap_dfl (fun (self,_) -> `Bounded self) `Unbounded oi.oi_costs
 
-  let cost (oi : 'a t) (x : xpath) =
+  let cost (oi : t) (x : xpath) =
     omap_dfl (fun (_,oi) ->
         let c = Mx.find_opt x oi in
         omap_dfl (fun c -> `Bounded c) `Zero c)
@@ -573,52 +397,21 @@ end = struct
       | None -> `Unbounded in
     mk (List.filter f oi.oi_calls) costs
 
-  let equal a_equal oi1 oi2 =
-    let check_costs_eq c1 c2 =
-      match c1,c2 with
-      | None, None -> true
-      | Some _, None | None, Some _ -> false
-      | Some (s1,c1), Some (s2,c2) ->
-        let exception Not_equal in
-        try Mx.fold2_union (fun _ a b () -> match a, b with
-            | Some _, None | None, Some _ -> raise Not_equal
-            | None, None -> ()
-            | Some a, Some b -> if a_equal a b then () else raise Not_equal
-          ) c1 c2 ();
-          a_equal s1 s2
-        with Not_equal -> false in
+  let equal = EcAst.oi_equal
 
-    List.all2 EcPath.x_equal oi1.oi_calls oi1.oi_calls
-    && check_costs_eq oi1.oi_costs oi2.oi_costs
+  let hash = EcAst.oi_hash
 
-  let hash ahash oi =
-    let costs_hash =
-      Why3.Hashcons.combine_option (fun (self,costs) ->
-          (Why3.Hashcons.combine_list
-             (Why3.Hashcons.combine_pair EcPath.x_hash ahash)
-             (ahash self) (Mx.bindings costs))) oi.oi_costs in
-
-    Why3.Hashcons.combine
-      (Why3.Hashcons.combine_list EcPath.x_hash 0
-         (List.sort EcPath.x_compare oi.oi_calls))
-      costs_hash
 end
 
 (* -------------------------------------------------------------------- *)
-type mr_xpaths = EcPath.Sx.t use_restr
+type mr_xpaths = EcAst.mr_xpaths
 
-type mr_mpaths = EcPath.Sm.t use_restr
+type mr_mpaths = EcAst.mr_mpaths
 
-type 'a p_mod_restr = {
-  mr_xpaths : mr_xpaths;
-  mr_mpaths : mr_mpaths;
-  mr_oinfos : 'a PreOI.t Msym.t;
-}
+type mod_restr = EcAst.mod_restr
 
-let p_mr_equal a_equal mr1 mr2 =
-  ur_equal EcPath.Sx.equal mr1.mr_xpaths mr2.mr_xpaths
-  && ur_equal EcPath.Sm.equal mr1.mr_mpaths mr2.mr_mpaths
-  && Msym.equal (PreOI.equal a_equal) mr1.mr_oinfos mr2.mr_oinfos
+let mr_equal = EcAst.mr_equal
+let mr_hash  = EcAst.mr_hash
 
 let has_compl_restriction mr =
   Msym.exists (fun _ oi -> (PreOI.costs oi) <> `Unbounded) mr.mr_oinfos
@@ -658,32 +451,27 @@ let fs_equal f1 f2 =
     && (EcSymbols.sym_equal f1.fs_name f2.fs_name)
 
 (* -------------------------------------------------------------------- *)
-type 'a p_module_type = {
-  mt_params : (EcIdent.t * 'a p_module_type) list;
-  mt_name   : EcPath.path;
-  mt_args   : EcPath.mpath list;
-  mt_restr  : 'a p_mod_restr;
-}
+type module_type = EcAst.module_type
 
 type module_sig_body_item = Tys_function of funsig
 
 type module_sig_body = module_sig_body_item list
 
-type 'a p_module_sig = {
-  mis_params : (EcIdent.t * 'a p_module_type) list;
+type module_sig = {
+  mis_params : (EcIdent.t * module_type) list;
   mis_body   : module_sig_body;
-  mis_restr  : 'a p_mod_restr;
+  mis_restr  : mod_restr;
 }
 
-type 'a p_top_module_sig = {
-  tms_sig  : 'a p_module_sig;
+type top_module_sig = {
+  tms_sig  : module_sig;
   tms_loca : is_local;
 }
 
 (* -------------------------------------------------------------------- *)
 (* Simple module signature, without restrictions. *)
-type 'a p_module_smpl_sig = {
-  miss_params : (EcIdent.t * 'a p_module_type) list;
+type module_smpl_sig = {
+  miss_params : (EcIdent.t * module_type) list;
   miss_body   : module_sig_body;
 }
 
@@ -740,15 +528,15 @@ let fd_hash f =
     (Why3.Hashcons.combine_list EcTypes.v_hash 0 f.f_locals)
 
 (* -------------------------------------------------------------------- *)
-type 'a p_function_body =
+type function_body =
 | FBdef   of function_def
 | FBalias of xpath
-| FBabs   of 'a PreOI.t
+| FBabs   of PreOI.t
 
-type 'a p_function_ = {
+type function_ = {
   f_name   : symbol;
   f_sig    : funsig;
-  f_def    : 'a p_function_body;
+  f_def    : function_body;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -758,77 +546,49 @@ type abs_uses = {
   aus_writes : (EcTypes.prog_var * EcTypes.ty) list;
 }
 
-type 'a p_module_expr = {
+type module_expr = {
   me_name     : symbol;
-  me_body     : 'a p_module_body;
-  me_comps    : 'a p_module_comps;
+  me_body     : module_body;
+  me_comps    : module_comps;
   me_sig_body : module_sig_body;
-  me_params   : (EcIdent.t * 'a p_module_type) list;
+  me_params   : (EcIdent.t * module_type) list;
 }
 
 (* Invariant:
    In an abstract module [ME_Decl mt], [mt] must not be a functor, i.e. it must
    be fully applied. Therefore, we must have:
    [List.length mp.mt_params = List.length mp.mt_args]  *)
-and 'a p_module_body =
+and module_body =
   | ME_Alias       of int * EcPath.mpath
-  | ME_Structure   of 'a p_module_structure       (* Concrete modules. *)
-  | ME_Decl        of 'a p_module_type         (* Abstract modules. *)
+  | ME_Structure   of module_structure       (* Concrete modules. *)
+  | ME_Decl        of module_type         (* Abstract modules. *)
 
-and 'a p_module_structure = {
-  ms_body      : 'a p_module_item list;
+and module_structure = {
+  ms_body      : module_item list;
 }
 
-and 'a p_module_item =
-  | MI_Module   of 'a p_module_expr
+and module_item =
+  | MI_Module   of module_expr
   | MI_Variable of variable
-  | MI_Function of 'a p_function_
+  | MI_Function of function_
 
-and 'a p_module_comps = 'a p_module_comps_item list
+and module_comps = module_comps_item list
 
-and 'a p_module_comps_item = 'a p_module_item
+and module_comps_item = module_item
 
-type 'a p_top_module_expr = {
-  tme_expr : 'a p_module_expr;
+type top_module_expr = {
+  tme_expr : module_expr;
   tme_loca : locality;
 }
 
 (* -------------------------------------------------------------------- *)
-let ur_hash elems el_hash ur =
-  Why3.Hashcons.combine
-    (Why3.Hashcons.combine_option
-       (fun l -> Why3.Hashcons.combine_list el_hash 0 (elems l))
-       ur.ur_pos)
-    (Why3.Hashcons.combine_list el_hash 0
-       (elems ur.ur_neg))
+let ur_hash = EcAst.ur_hash
 
-let p_mr_hash a_hash mr =
-  Why3.Hashcons.combine2
-    (ur_hash EcPath.Sx.ntr_elements EcPath.x_hash mr.mr_xpaths)
-    (ur_hash EcPath.Sm.ntr_elements EcPath.m_hash mr.mr_mpaths)
-    (Why3.Hashcons.combine_list
-       (Why3.Hashcons.combine_pair Hashtbl.hash (PreOI.hash a_hash)) 0
-       (EcSymbols.Msym.bindings mr.mr_oinfos
-        |> List.sort (fun (s,_) (s',_) -> EcSymbols.sym_compare s s')))
-
-let p_mty_hash a_hash mty =
-  Why3.Hashcons.combine3
-    (EcPath.p_hash mty.mt_name)
-    (Why3.Hashcons.combine_list
-       (fun (x, _) -> EcIdent.id_hash x)
-       0 mty.mt_params)
-    (Why3.Hashcons.combine_list EcPath.m_hash 0 mty.mt_args)
-    (p_mr_hash a_hash mty.mt_restr)
-
-let rec p_mty_equal a_equal mty1 mty2 =
-     (EcPath.p_equal mty1.mt_name mty2.mt_name)
-  && (List.all2 EcPath.m_equal mty1.mt_args mty2.mt_args)
-  && (List.all2 (pair_equal EcIdent.id_equal (p_mty_equal a_equal))
-        mty1.mt_params mty2.mt_params)
-  && (p_mr_equal a_equal mty1.mt_restr mty2.mt_restr)
+let mty_hash = EcAst.mty_hash
+let mty_equal = EcAst.mty_equal
 
 (* -------------------------------------------------------------------- *)
-let get_uninit_read_of_fun (f : _ p_function_) =
+let get_uninit_read_of_fun (f : function_) =
   match f.f_def with
   | FBalias _ | FBabs _ -> Ssym.empty
 
@@ -849,7 +609,7 @@ let get_uninit_read_of_fun (f : _ p_function_) =
       Ssym.union r raout
 
 (* -------------------------------------------------------------------- *)
-let get_uninit_read_of_module (p : path) (me : _ p_module_expr) =
+let get_uninit_read_of_module (p : path) (me : module_expr) =
   let rec doit_me acc (mp, me) =
     match me.me_body with
     | ME_Alias     _  -> acc

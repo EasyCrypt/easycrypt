@@ -5,6 +5,7 @@ open EcSymbols
 open EcLocation
 open EcPath
 open EcParsetree
+open EcAst
 open EcTypes
 open EcDecl
 open EcModules
@@ -909,7 +910,9 @@ module Ax = struct
     if not (EcUnify.UniEnv.closed ue) then
       hierror "the formula contains free type variables";
 
-    let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
+    let uidmap = EcUnify.UniEnv.close ue in
+    let fs = EcFol.Fsubst.f_subst_init ~sty:(Tuni.subst uidmap) () in
+    let concl   = EcFol.Fsubst.f_subst fs concl in
     let tparams = EcUnify.UniEnv.tparams ue in
 
     if ax.pa_kind <> PSchema then
@@ -1138,30 +1141,31 @@ module Op = struct
     let eenv = env scope in
     let ue = TT.transtyvars eenv (loc, op.po_tyvars) in
     let lc = op.po_locality in
+    let args = fst op.po_args @ odfl [] (snd op.po_args) in
     let (ty, body, refts) =
       match op.po_def with
       | PO_abstr pty ->
           let codom = TT.transty TT.tp_relax eenv ue pty in
-          let xs    = snd (TT.trans_binding eenv ue op.po_args) in
+          let xs    = snd (TT.trans_binding eenv ue args) in
           (EcTypes.toarrow (List.map snd xs) codom, `Abstract, [])
 
-      | PO_concr (pty, pe) ->
+      | PO_concr (pty, pf) ->
           let codom   = TT.transty TT.tp_relax eenv ue pty in
-          let env, xs = TT.trans_binding eenv ue op.po_args in
-          let body    = TT.transexpcast env `InOp ue codom pe in
-          let lam     = EcTypes.e_lam xs body in
-          (lam.EcTypes.e_ty, `Plain lam, [])
+          let env, xs = TT.trans_binding eenv ue args in
+          let body    = TT.trans_form env ue pf codom in
+          let lam     = f_lambda (List.map (fun (x, ty) -> (x, GTty ty)) xs) body in
+          (lam.f_ty, `Plain lam, [])
 
       | PO_case (pty, pbs) -> begin
           let name = { pl_loc = loc; pl_desc = unloc op.po_name } in
-          match EHI.trans_matchfix eenv ue name (op.po_args, pty, pbs) with
+          match EHI.trans_matchfix eenv ue name (args, pty, pbs) with
           | (ty, opinfo) -> (ty, `Fix opinfo, [])
         end
 
       | PO_reft (pty, (rname, reft)) ->
           let env      = env scope in
           let codom    = TT.transty TT.tp_relax eenv ue pty in
-          let _env, xs = TT.trans_binding eenv ue op.po_args in
+          let _env, xs = TT.trans_binding eenv ue args in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
           let opabs    = EcDecl.mk_op ~opaque:false [] codom None lc in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
@@ -1185,13 +1189,15 @@ module Op = struct
             | _  -> false) then
       hierror ~loc ("[nosmt] is not supported for pure abstract operators");
 
-    let uni     = Tuni.offun (EcUnify.UniEnv.close ue) in
-    let ty      = uni ty in
+    let uidmap  = EcUnify.UniEnv.close ue in
+    let ts      = Tuni.subst uidmap in
+    let fs      = Fsubst.f_subst (Fsubst.f_subst_init ~sty:ts ()) in
+    let ty      = ty_subst ts ty in
     let tparams = EcUnify.UniEnv.tparams ue in
     let body    =
       match body with
       | `Abstract -> None
-      | `Plain e  -> Some (OP_Plain (e_mapty uni e, nosmt))
+      | `Plain e  -> Some (OP_Plain (fs e, nosmt))
       | `Fix opfx ->
           Some (OP_Fix {
             opf_args     = opfx.EHI.mf_args;
@@ -1205,7 +1211,12 @@ module Op = struct
 
     let tags   = Sstr.of_list (List.map unloc op.po_tags) in
     let opaque = Sstr.mem "opaque" tags in
-    let tyop   = EcDecl.mk_op ~opaque tparams ty body lc in
+    let unfold =
+      match op.po_args with
+      | (a, Some _) -> Some (List.length a)
+      | (_, None) -> None in
+
+    let tyop   = EcDecl.mk_op ~opaque ?unfold tparams ty body lc in
     let opname = EcPath.pqname (EcEnv.root eenv) (unloc op.po_name) in
 
     if op.po_kind = `Const then begin
@@ -1231,7 +1242,7 @@ module Op = struct
               let path  = EcPath.pqname (path scope) (unloc op.po_name) in
               let axop  =
                 let nosmt = op.po_nosmt in
-                let nargs = List.sum (List.map (List.length |- fst) op.po_args) in
+                let nargs = List.sum (List.map (List.length |- fst) args) in
                   EcDecl.axiomatized_op ~nargs ~nosmt path (tyop.op_tparams, bd) lc in
               let tyop  = { tyop with op_opaque = true; } in
               let scope = bind scope (unloc op.po_name, tyop) in
@@ -1243,15 +1254,20 @@ module Op = struct
 
     let scope =
       List.fold_left (fun scope (rname, xs, ax, codom) ->
-          let ax = f_forall (List.map (snd_map gtty) xs) ax in
           let ax =
             let opargs  = List.map (fun (x, xty) -> e_local x xty) xs in
             let opapp   = List.map (tvar |- fst) tparams in
             let opapp   = e_app (e_op opname opapp ty) opargs codom in
-            let tyuni   = { ty_subst_id with ts_u = EcUnify.UniEnv.close ue } in
-            let subst   = Mp.singleton opname ([], opapp) in
-            let subst   = Fsubst.f_subst_init ~sty:tyuni ~opdef:subst () in
-            Fsubst.f_subst subst ax
+
+            let subst   = EcSubst.add_opdef EcSubst.empty opname ([], opapp) in
+            let ax      = EcSubst.subst_form subst ax in
+            let ax      = f_forall (List.map (snd_map gtty) xs) ax in
+
+            let uidmap  = EcUnify.UniEnv.close ue in
+            let subst   = Fsubst.f_subst_init ~sty:(Tuni.subst uidmap) () in
+            let ax      = Fsubst.f_subst subst ax in
+
+            ax
           in
 
           let ax, axpm =
@@ -1384,19 +1400,107 @@ module Op = struct
     let cont (env : Sem.senv) =
       (`Det, Sem.translate_e env ret) in
 
-    let _, aout = Sem.translate_s env cont body.f_body in
-    let aout = e_lam (List.map2 (fun (_, ty) x -> (x, ty)) params ids) aout in
+    let mode, aout = Sem.translate_s env cont body.f_body in
+    let aout = form_of_expr mhr aout in (* FIXME: translate to forms directly? *)
+    let aout = f_lambda (List.map2 (fun (_, ty) x -> (x, GTty ty)) params ids) aout in
 
     let opdecl = EcDecl.{
       op_tparams  = [];
-      op_ty       = aout.e_ty;
+      op_ty       = aout.f_ty;
       op_kind     = OB_oper (Some (OP_Plain (aout, false)));
       op_loca     = op.ppo_locality;
       op_opaque   = false;
       op_clinline = false;
+      op_unfold   = None;
     } in
 
-    bind scope (unloc op.ppo_name, opdecl)
+    let oppath = EcPath.pqname (path scope) (unloc op.ppo_name) in
+
+    let scope = bind scope (unloc op.ppo_name, opdecl) in
+
+    let scope =
+      let prax =
+        let locs  = List.map (fun (x, ty) -> (EcIdent.create x, ty)) params in
+        let res   = f_pvar pv_res sig_.fs_ret mhr in
+        let resx  = EcIdent.create "v" in
+        let resv  = f_local resx sig_.fs_ret in
+        let prmem = EcIdent.create "&m" in
+
+        let mu =
+          let sem =
+            f_app
+              (f_op oppath [] opdecl.op_ty)
+              (List.map (fun (x, ty) -> f_local x ty) locs)
+              (match mode with `Det -> sig_.fs_ret | `Distr -> tdistr sig_.fs_ret) in
+
+          match mode with
+          | `Det ->
+             f_if (f_eq sem resv) f_r1 f_r0
+
+          | `Distr ->
+             f_mu_x sem resv
+        in
+
+        f_forall
+          [(prmem, GTmem EcMemory.abstract_mt)]
+          (f_forall
+             (List.map (fun (x, ty) -> (x, GTty ty)) ((resx, sig_.fs_ret) :: locs))
+             (f_eq
+                (f_pr prmem
+                   f
+                   (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs))
+                   (f_eq res resv))
+                mu))
+      in
+
+      let prax = EcDecl.{
+        ax_tparams    = [];
+        ax_spec       = prax;
+        ax_kind       = `Lemma;
+        ax_loca       = op.ppo_locality;
+        ax_visibility = `Visible;
+      } in
+
+      Ax.bind scope (unloc op.ppo_name ^ "_opsem", prax) in
+
+    let scope =
+      match mode with
+      | `Det ->
+         let hax =
+           let locs  = List.map (fun (x, ty) -> (EcIdent.create x, ty)) params in
+           let res   = f_pvar pv_res sig_.fs_ret mhr in
+           let args  = f_pvar pv_arg sig_.fs_arg mhr in
+
+           f_forall
+             (List.map (fun (x, ty) -> (x, GTty ty)) locs)
+             (f_hoareF
+                (f_eq
+                   args
+                   (f_tuple (List.map (fun (x, ty) -> f_local x ty) locs)))
+                f
+                (f_eq
+                   res
+                   (f_app
+                      (f_op oppath [] opdecl.op_ty)
+                      (List.map (fun (x, ty) -> f_local x ty) locs)
+                      sig_.fs_ret)))
+         in
+
+         let prax = EcDecl.{
+           ax_tparams    = [];
+           ax_spec       = hax;
+           ax_kind       = `Lemma;
+           ax_loca       = op.ppo_locality;
+           ax_visibility = `Visible;
+         } in
+
+         Ax.bind scope (unloc op.ppo_name ^ "_opsem_det", prax)
+
+      | `Distr ->
+         scope
+    in
+
+    scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1627,7 +1731,8 @@ module Ty = struct
         let check1 (x, ty) =
           let ue = EcUnify.UniEnv.copy ue in
           let ty = transty tp_tydecl scenv ue ty in
-          let ty = Tuni.offun (EcUnify.UniEnv.close ue) ty in
+          let uidmap = EcUnify.UniEnv.close ue in
+          let ty = ty_subst (Tuni.subst uidmap) ty in
             (EcIdent.create (unloc x), ty)
         in
           tcd.ptc_ops |> List.map check1 in
@@ -1638,7 +1743,9 @@ module Ty = struct
         let check1 (x, ax) =
           let ue = EcUnify.UniEnv.copy ue in
           let ax = trans_prop scenv ue ax in
-          let ax = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ax in
+          let uidmap = EcUnify.UniEnv.close ue in
+          let fs = EcFol.Fsubst.f_subst_init ~sty:(Tuni.subst uidmap) () in
+          let ax = EcFol.Fsubst.f_subst fs ax in
             (unloc x, ax)
         in
           tcd.ptc_axs |> List.map check1 in
@@ -1672,7 +1779,8 @@ module Ty = struct
                 (EcPath.tostring (fst (proj4_1 op1)))
                 (EcPath.tostring (fst (proj4_1 op2)))
           | [((p, opparams), opty, subue, _)] ->
-              let subst    = Tuni.offun (EcUnify.UniEnv.assubst subue) in
+              let subst    = Tuni.subst (EcUnify.UniEnv.assubst subue) in
+              let subst    = ty_subst subst in
               let opty     = subst opty in
               let opparams = List.map subst opparams in
               ((p, opparams), opty)
@@ -1796,8 +1904,9 @@ module Ty = struct
     let ty =
       let ue = TT.transtyvars env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl env ue (snd tci.pti_type) in
-        assert (EcUnify.UniEnv.closed ue);
-        (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
+      assert (EcUnify.UniEnv.closed ue);
+      let uidmap = EcUnify.UniEnv.close ue in
+        (EcUnify.UniEnv.tparams ue, ty_subst (Tuni.subst uidmap) ty)
     in
 
     if not (List.is_empty (fst ty)) then
@@ -1842,8 +1951,9 @@ module Ty = struct
     let ty =
       let ue = TT.transtyvars env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl env ue (snd tci.pti_type) in
-        assert (EcUnify.UniEnv.closed ue);
-        (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
+      assert (EcUnify.UniEnv.closed ue);
+      let uidmap = EcUnify.UniEnv.close ue in
+        (EcUnify.UniEnv.tparams ue, ty_subst (Tuni.subst uidmap) ty)
     in
 
     if not (List.is_empty (fst ty)) then
@@ -1877,15 +1987,17 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
-    let subst = { ty_subst_id with
-       ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
-       ts_v   =
-         let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
-         Mid.of_list vsubst;
+    let subst = {
+      ty_subst_id with
+        ts_def = Mp.of_list [tcp.tc_name, ([], snd ty)];
+        ts_v   =
+          let vsubst = List.combine (List.fst tc.tc_tparams) tcp.tc_args in
+          Mid.of_list vsubst;
     } in
-      List.map (fun (x, opty) ->
-        (EcIdent.name x, (true, ty_subst subst opty)))
-        tc.tc_ops
+
+    List.map (fun (x, opty) ->
+      (EcIdent.name x, (true, ty_subst subst opty)))
+      tc.tc_ops
 
   (* ------------------------------------------------------------------ *)
   (*TODOTC: we have to consider the operators of the parent typeclass instance, and also the types.
@@ -1896,8 +2008,11 @@ module Ty = struct
     let (typarams, _) as ty =
       let ue = TT.transtyvars (env scope) (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl (env scope) ue (snd tci.pti_type) in
-        assert (EcUnify.UniEnv.closed ue);
-        (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
+      assert (EcUnify.UniEnv.closed ue);
+      (
+        EcUnify.UniEnv.tparams ue,
+        ty_subst (Tuni.subst (EcUnify.UniEnv.close ue)) ty
+      )
     in
 
     let tcp =
@@ -1920,7 +2035,7 @@ module Ty = struct
         tc.tc_prt in
 *)
 
-    let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in
+    let tcsyms  = symbols_of_tc (env scope) ty (tcp, tc) in (* FIXME: TC *)
     let tcsyms  = Mstr.of_list tcsyms in
     let symbols = check_tci_operators (env scope) ty tci.pti_ops tcsyms in
 
@@ -2367,9 +2482,10 @@ module Search = struct
                     let ps  = ref Mid.empty in
                     let ue  = EcUnify.UniEnv.create None in
                     let tip = EcUnify.UniEnv.opentvi ue decl.op_tparams None in
-                    let tip = Tvar.subst tip in
-                    let xs  = List.map (snd_map tip) nt.ont_args in
-                    let bd  = EcFol.form_of_expr EcFol.mhr (EcTypes.e_mapty tip nt.ont_body) in
+                    let tip = {ty_subst_id with ts_v = tip} in
+                    let es = e_subst {e_subst_id with es_ty = tip } in
+                    let xs  = List.map (snd_map (ty_subst tip)) nt.ont_args in
+                    let bd  = EcFol.form_of_expr EcFol.mhr (es nt.ont_body) in
                     let fp  = EcFol.f_lambda (List.map (snd_map EcFol.gtty) xs) bd in
 
                     match fp.f_node with

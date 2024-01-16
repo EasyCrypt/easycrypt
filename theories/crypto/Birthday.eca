@@ -4,15 +4,20 @@ require import StdRing StdOrder StdBigop FelTactic.
 require (*--*) Mu_mem.
 (*---*) import RField IntOrder RealOrder.
 
-(** A non-negative integer q **)
-op q : { int | 0 <= q } as ge0_q.
-
-(** A type T equipped with its full uniform distribution **)
+(* Clone Parameters *)
+(** A type T equipped with a distribution **)
 type T.
 
 op uT: T distr.
-op maxu : T.
-axiom maxuP x: mu1 uT x <= mu1 uT maxu.
+
+(* -------------------------------------------------------------------- *)
+
+(** A non-negative integer q **)
+op q : { int | 0 <= q } as ge0_q.
+
+op maxu : T = mode uT.
+
+lemma maxuP x: mu1 uT x <= mu1 uT maxu by apply mode_ge.
 
 (** A module that samples in uT on queries to s **)
 module Sample = {
@@ -173,7 +178,8 @@ section.
       by proc;sp;if;auto;call HS.     
     proc; call (_: size Sample.l <= Bounder.c <= q).
     + proc;sp;if=>//;inline *;auto=> /#.
-    auto;smt w=ge0_q.
+    auto; smt(ge0_q).
   qed.
 
 end section.
+

@@ -38,6 +38,7 @@ type clone_error =
 | CE_ModTyIncompatible of qsymbol
 | CE_ModIncompatible   of qsymbol
 | CE_InvalidRE         of string
+| CE_InlinedOpIsForm   of qsymbol
 
 exception CloneError of EcEnv.env * clone_error
 

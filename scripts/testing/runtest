@@ -20,22 +20,28 @@ import socket
 import sys
 import termios
 import time
-import yaml
 
 # --------------------------------------------------------------------
-class folded_unicode(str):
-    pass
+try:
+    import yaml
 
-class literal_unicode(str):
-    pass
+except ModuleNotFoundError:
+    yaml = None
 
-def folded_unicode_representer(dumper, data):
-    return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='>')
-def literal_unicode_representer(dumper, data):
-    return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
+else:
+    class folded_unicode(str):
+        pass
 
-yaml.add_representer(folded_unicode , folded_unicode_representer)
-yaml.add_representer(literal_unicode, literal_unicode_representer)
+    class literal_unicode(str):
+        pass
+
+    def folded_unicode_representer(dumper, data):
+        return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='>')
+    def literal_unicode_representer(dumper, data):
+        return dumper.represent_scalar(u'tag:yaml.org,2002:str', data, style='|')
+
+    yaml.add_representer(folded_unicode , folded_unicode_representer)
+    yaml.add_representer(literal_unicode, literal_unicode_representer)
 
 # --------------------------------------------------------------------
 @clib.asynccontextmanager
@@ -73,6 +79,13 @@ def _options():
     parser = OptionParser()
 
     parser.add_option(
+        '', '--bin',
+        action  = 'store',
+        metavar = 'BIN',
+        default = None,
+        help    = 'EasyCrypt binary to use')
+
+    parser.add_option(
         '', '--bin-args',
         action  = 'append',
         metavar = 'ARGS',
@@ -102,6 +115,20 @@ def _options():
         help    = 'add timing statistics')
 
     parser.add_option(
+        '-p', '--provers',
+        action  = 'append',
+        metavar = 'PROVERS',
+        default = None,
+        help    = 'Add a prover to the set of activated provers')
+
+    parser.add_option(
+        '', '--why3',
+        action  = 'store',
+        metavar = 'WHY3',
+        default = None,
+        help    = 'Why3 configuration file')
+
+    parser.add_option(
         '', '--report',
         action  = 'store',
         default = None,
@@ -124,7 +151,9 @@ def _options():
     options = Object(scenarios = dict())
     options.timeout  = cmdopt.timeout
     options.timing   = cmdopt.timing
+    options.why3     = cmdopt.why3
     options.jobs     = cmdopt.jobs
+    options.provers  = cmdopt.provers
     options.report   = cmdopt.report
 
     defaults = dict(
@@ -148,9 +177,16 @@ def _options():
                     targets.append(name)
         return targets
 
-    options.bin     = config.get('default', 'bin')
-    options.args    = config.get('default', 'args').split()
+    options.bin = cmdopt.bin
+
+    if options.bin is None:
+        options.bin = config.get('default', 'bin', fallback = 'easycrypt')
+
+    options.args    = config.get('default', 'args', fallback = '').split()
     options.targets = resolve_targets(args[1:])
+
+    if options.report is None:
+        options.report = config.get('default', 'report', fallback = None)
 
     if cmdopt.bin_args:
         options.args.extend(itertools.chain.from_iterable( \
@@ -378,7 +414,7 @@ class Gather:
 def format_delta(delta, hprec=2, prec=0, subprec=0):
     if prec > 0:
         frac, delta = math.modf(delta)
-        delta, frac = int(delta), int(10 ** prec * frac)        
+        delta, frac = int(delta), int(10 ** prec * frac)
         if subprec > 0:
             subprec = 10 ** prec // subprec
             frac = frac // subprec * subprec
@@ -661,6 +697,11 @@ async def _run_all(options, allscripts, listener : Listener):
             command = [options.bin] + options.args + config.args
             if options.timeout:
                 command.extend(['-timeout', str(options.timeout)])
+            if options.provers:
+                for prover in options.provers:
+                    command.extend(['-p', prover])
+            if options.why3:
+                command.extend(['-why3', options.why3])
             if options.timing:
                 tfilename = os.path.join(
                     TIMING_DIR, os.path.splitext(config.filename)[0] + '.stats')
@@ -668,14 +709,14 @@ async def _run_all(options, allscripts, listener : Listener):
                 command.extend(['-tstats', tfilename])
 
             handle = listener.file_check_start(config.filename)
-                
+
             command.extend(['-script', '-no-eco', config.filename])
-    
+
             args = dict(
                 stdout = asyncio.subprocess.DEVNULL,
                 stderr = asyncio.subprocess.PIPE,
             )
-    
+
             time0  = time.time()
             proc   = await asyncio.create_subprocess_exec(*command, **args)
             errors = []
@@ -695,7 +736,7 @@ async def _run_all(options, allscripts, listener : Listener):
                                 code = None
                             listener.error(handle, code, error)
                             errors.append(error)
-    
+
             finally:
                 try:
                     status = await asyncio.wait_for(proc.wait(), 2.0)
@@ -706,7 +747,7 @@ async def _run_all(options, allscripts, listener : Listener):
                 success = (bool(status) != bool(config.isvalid))
 
                 listener.file_check_done(handle, status, success)
-        
+
             return Object(success  = success,
                           config   = config ,
                           errors   = errors ,
@@ -786,7 +827,16 @@ async def _main():
     mainconfig.hostname  = socket.gethostname()
     mainconfig.timestamp = datetime.datetime.utcnow()
 
-    options    = _options()
+    options = _options()
+
+    if options.report is not None:
+        if yaml is None:
+            print(
+                'reporting needs the yaml Python module',
+                file = sys.stderr
+            )
+            exit(1)
+
     allscripts = Gather.gatherall(options.scenarios, options.targets)
 
     listener = None

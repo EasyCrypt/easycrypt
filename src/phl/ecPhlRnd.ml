@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcParsetree
+open EcAst
 open EcTypes
 open EcModules
 open EcFol
@@ -34,6 +35,21 @@ module Core = struct
     let post = f_imp (f_in_supp x distr) post in
     let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
     let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
+    FApi.xmutate1 tc `Rnd [concl]
+
+  (* -------------------------------------------------------------------- *)
+  let t_ehoare_rnd_r tc =
+    let env = FApi.tc1_env tc in
+    let hs = tc1_as_ehoareS tc in
+    let (lv, distr), s = tc1_last_rnd tc hs.ehs_s in
+    let ty_distr = proj_distr_ty env (e_ty distr) in
+    let x_id = EcIdent.create (symbol_of_lv lv) in
+    let x = f_local x_id ty_distr in
+    let mem = EcMemory.memory hs.ehs_m in
+    let distr = EcFol.form_of_expr mem distr in
+    let post = subst_form_lv env mem lv x hs.ehs_po in
+    let post = f_Ep ty_distr distr (f_lambda [(x_id,GTty ty_distr)] post) in
+    let concl = f_eHoareS_r {hs with ehs_s=s; ehs_po=post } in
     FApi.xmutate1 tc `Rnd [concl]
 
   (* -------------------------------------------------------------------- *)
@@ -606,6 +622,7 @@ let wp_equiv_rnd      = FApi.t_low1 "wp-equiv-rnd" wp_equiv_rnd_r
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_rnd   = FApi.t_low0 "hoare-rnd"   Core.t_hoare_rnd_r
+let t_ehoare_rnd   = FApi.t_low0 "ehoare-rnd"   Core.t_ehoare_rnd_r
 let t_choare_rnd  = FApi.t_low1 "choare-rnd"  Core.t_choare_rnd_r
 let t_bdhoare_rnd = FApi.t_low1 "bdhoare-rnd" Core.t_bdhoare_rnd_r
 
@@ -620,6 +637,9 @@ let process_rnd side pos tac_info tc =
   | None, None, PNoRndParams when is_hoareS concl ->
       t_hoare_rnd tc
 
+  | None, None, PNoRndParams when is_eHoareS concl ->
+      t_ehoare_rnd tc
+
   | None, None, _ when is_cHoareS concl ->
     let tac_info =
       match tac_info with
@@ -627,8 +647,8 @@ let process_rnd side pos tac_info tc =
         PNoRndParams
 
       | PSingleRndParam fp ->
-        PSingleRndParam
-          (TTC.tc1_process_Xhl_form tc tbool fp)
+        let _, fp = TTC.tc1_process_Xhl_form tc tbool fp in
+        PSingleRndParam fp
 
       | _ -> tc_error !!tc "invalid arguments" in
 
@@ -644,15 +664,15 @@ let process_rnd side pos tac_info tc =
 
       | PSingleRndParam fp ->
           PSingleRndParam
-            (fun t -> TTC.tc1_process_Xhl_form tc (tfun t tbool) fp)
+            (fun t -> snd (TTC.tc1_process_Xhl_form tc (tfun t tbool) fp))
 
       | PMultRndParams ((phi, d1, d2, d3, d4), p) ->
-          let p t = p |> omap (TTC.tc1_process_Xhl_form tc (tfun t tbool)) in
-          let phi = TTC.tc1_process_Xhl_form tc tbool phi in
-          let d1  = TTC.tc1_process_Xhl_form tc treal d1 in
-          let d2  = TTC.tc1_process_Xhl_form tc treal d2 in
-          let d3  = TTC.tc1_process_Xhl_form tc treal d3 in
-          let d4  = TTC.tc1_process_Xhl_form tc treal d4 in
+          let p t = p |> omap (fun p -> snd (TTC.tc1_process_Xhl_form tc (tfun t tbool) p)) in
+          let _, phi = TTC.tc1_process_Xhl_form tc tbool phi in
+          let _, d1  = TTC.tc1_process_Xhl_form tc treal d1 in
+          let _, d2  = TTC.tc1_process_Xhl_form tc treal d2 in
+          let _, d3  = TTC.tc1_process_Xhl_form tc treal d3 in
+          let _, d4  = TTC.tc1_process_Xhl_form tc treal d4 in
           PMultRndParams ((phi, d1, d2, d3, d4), p)
 
       | _ -> tc_error !!tc "invalid arguments"
@@ -676,19 +696,19 @@ let process_rnd side pos tac_info tc =
   | _ -> tc_error !!tc "invalid arguments"
 
 (* -------------------------------------------------------------------- *)
-let t_hoare_rndsem   = FApi.t_low1 "hoare-rndsem"   (Core.t_hoare_rndsem_r   false)
-let t_bdhoare_rndsem = FApi.t_low1 "bdhoare-rndsem" (Core.t_bdhoare_rndsem_r false)
-let t_equiv_rndsem   = FApi.t_low2 "equiv-rndsem"   (Core.t_equiv_rndsem_r   false)
+let t_hoare_rndsem   = FApi.t_low2 "hoare-rndsem"   Core.t_hoare_rndsem_r
+let t_bdhoare_rndsem = FApi.t_low2 "bdhoare-rndsem" Core.t_bdhoare_rndsem_r
+let t_equiv_rndsem   = FApi.t_low3 "equiv-rndsem"   Core.t_equiv_rndsem_r
 
 (* -------------------------------------------------------------------- *)
-let process_rndsem side pos tc =
+let process_rndsem ~reduce side pos tc =
   let concl = FApi.tc1_goal tc in
 
   match side with
   | None when is_hoareS concl ->
-     t_hoare_rndsem pos tc
+     t_hoare_rndsem reduce pos tc
   | None when is_bdHoareS concl ->
-     t_bdhoare_rndsem pos tc
+     t_bdhoare_rndsem reduce pos tc
   | Some side when is_equivS concl ->
-     t_equiv_rndsem side pos tc
+     t_equiv_rndsem reduce side pos tc
   | _ -> tc_error !!tc "invalid arguments"

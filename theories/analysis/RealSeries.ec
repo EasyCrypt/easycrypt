@@ -82,6 +82,26 @@ by move=> x; rewrite !mem_filter mem_undup andbC.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma summable_from_bounded (s : 'a -> real) :
+  forall (J : int -> 'a option),
+       enumerate J (support s)
+    => (exists M, forall n, big predT (fun a => `|s a|) (pmap J (range 0 n)) <= M)
+    => summable s.
+proof.
+move=> J enm [M hb]; exists M => l hl.
+have [n hn] := enumerate_pmap_range J l (support s) enm.
+pose I := pmap J (range 0 n).
+apply: (ler_trans (big predT (fun (a : 'a) => `|s a|) I)); last by apply hb.
+rewrite (@big_eq_idm_filter (support s)); 1:smt().
+rewrite (@partition_big (fun x => x) _ predT _ _ I).
++ apply: pmap_inj_in_uniq; last by apply range_uniq.
+  by move=> i j v _ _; case: enm => h _; apply/h.
++ by move=> a hin hs /=; rewrite /predT /=; apply /hn.
+apply: sub_ler_sum => // a /= _.
+by rewrite (@bigD1_cond_if _ _ _ a) //= big1 /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma eq_summable (s1 s2 : 'a -> real):
   (forall x, s1 x = s2 x) => summable s1 <=> summable s2.
 proof. by move=> /fun_ext ->. qed.
@@ -557,6 +577,14 @@ move=> P_finite.
 by rewrite fin_sum_cond // sumr_const RField.intmulr count_predT RField.mulrC.
 qed.
 
+lemma fin_sum_type (s : 'a -> real) :
+  is_finite predT<:'a> => 
+  sum s = big predT s (to_seq predT<:'a>).
+proof.
+move=> fint; rewrite &(sumE_fin) 1:uniq_to_seq.
+by move=> x _; rewrite mem_to_seq. 
+qed.
+
 (* -------------------------------------------------------------------- *)
 lemma sum0 ['a]: sum<:'a> (fun _ => 0%r) = 0%r.
 proof. by rewrite (@sumE_fin _ []). qed.
@@ -1019,6 +1047,70 @@ qed.
 lemma summable_pswap ['a 'b] (s : 'a * 'b -> real) :
   summable s => summable (s \o pswap).
 proof. by apply/summable_bij/bij_pswap. qed.
+
+lemma summable_swap ['a 'b] (fa : 'a -> real) (fb : 'b -> real) (F : 'a -> 'b -> real) :
+     (forall x, 0%r <= fa x)
+  => (forall y, 0%r <= fb y)
+  => (forall x y, 0%r <= F x y)
+  => summable (fun y => sum (fun x => fa x * F x y) * fb y)
+  => (forall y, fb y <> 0%r => summable (fun x => fa x * F x y))
+  => summable (fun x => fa x * sum (fun y => F x y * fb y))
+  /\ (forall x, fa x <> 0%r => summable (fun y => F x y * fb y)).
+proof.
+move=> ge0_fa ge0_fb ge0_F smb subsmb; rewrite andbC &(andaE); split.
+- move=> x nz_fax; pose S := fun y => sum (fun x => fa x * F x y) * fb y.
+  rewrite (@summableZ_iff _ (fa x)) //; move/summable_le_pos: smb.
+  apply => y /=; split.
+  - by apply/mulr_ge0/mulr_ge0/ge0_fb/ge0_F/ge0_fa.
+  move=> _; case: (fb y = 0%r) => [-> // | nz_fb_y].
+  rewrite mulrA; apply: ler_wpmul2r; first exact/ge0_fb.
+  have := ler_big_sum (fun x => fa x * F x y) [x] _ _ _ => //=.
+  - move=> x'; apply: mulr_ge0; [exact/ge0_fa | exact/ge0_F].
+    by apply: subsmb.
+move=> subsmb2; pose S := fun y => sum (fun x => fa x * F x y) * fb y.
+exists (sum S) => J uqJ. pose G y x := fa x * (F x y * fb y).
+have ge0_G: forall x y, 0%r <= G y x.
+- by move=> x y; rewrite mulr_ge0 1?ge0_fa mulr_ge0 (ge0_fb, ge0_F).
+rewrite (@BRA.eq_bigr _ _ (fun x => sum (fun y => G y x))) /=.
+- move=> x _ @/G; rewrite ger0_norm.
+  - apply: mulr_ge0; [exact/ge0_fa | apply: ge0_sum => y /=].
+    by apply: mulr_ge0; [exact/ge0_F | exact/ge0_fb].
+  by rewrite -sumZ /= &(eq_sum) => y /=.
+rewrite -sum_big => [y _ @/G|].
+- case: (fa y = 0%r) => [-> /=|]; first exact/summable0.
+  by move/subsmb2; apply/summableZ.
+apply: ler_sum_pos => /= [y|]; [split | exact/smb].
+- by rewrite Bigreal.sumr_ge0 => x _ @/G; exact/ge0_G.
+move=> _ @/S @/G; case: (fb y = 0%r) => [-> /= | nz_fb_y].
+- by rewrite BRA.big1_eq.
+rewrite -sumZr -(@BRA.eq_bigr _ (fun x => (fa x * F x y) * fb y)) /=.
+- by move=> x _; ring.
+rewrite -BRA.mulr_suml sumZr &(ler_wpmul2r) 1:&ge0_fb.
+apply: ler_big_sum => //=.
+- by move=> x; apply: mulr_ge0; [exact/ge0_fa | exact/ge0_F].
+- by apply: subsmb.
+qed.
+
+lemma summable_swapR ['a 'b] (fa : 'a -> real) (fb : 'b -> real) (F : 'a -> 'b -> real) :
+     (forall x, 0%r <= fa x)
+  => (forall y, 0%r <= fb y)
+  => (forall x y, 0%r <= F x y)
+  => summable (fun x => fa x * sum (fun y => F x y * fb y))
+  => (forall x, fa x <> 0%r => summable (fun y => F x y * fb y))
+  => summable (fun y => sum (fun x => fa x * F x y) * fb y)
+  /\ (forall y, fb y <> 0%r => summable (fun x => fa x * F x y)).
+proof.
+move=> ge0_fa gr0_fb ge0_F smb subsmb.
+have := summable_swap fb fa (fun y x => F x y) _ _ _ _ _ => //=.
+- by move=> y x; apply: ge0_F.
+- apply: eq_summable smb => x /=; rewrite RField.mulrC.
+  by congr; apply: eq_sum => y /=; ring.
+- by move=> x /subsmb; apply: eq_summable => y /=; ring.
+case=> smb2 subsmb2; split.
+- apply: eq_summable smb2 => y /=; rewrite RField.mulrC.
+  by congr; apply: eq_sum => x /=; ring.
+- by move=> y /subsmb2; apply: eq_summable => x /=; ring.
+qed.
 
 lemma pswap_summable (s : 'a * 'b -> real) : 
   summable (s \o pswap) => summable s.

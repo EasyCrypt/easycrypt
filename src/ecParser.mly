@@ -24,7 +24,7 @@
   let opdef_of_opbody ty b =
     match b with
     | None            -> PO_abstr ty
-    | Some (`Expr e ) -> PO_concr (ty, e)
+    | Some (`Form f ) -> PO_concr (ty, f)
     | Some (`Case bs) -> PO_case  (ty, bs)
     | Some (`Reft rt) -> PO_reft  (ty, rt)
 
@@ -412,6 +412,7 @@
 %token BY
 %token BYEQUIV
 %token BYPHOARE
+%token BYEHOARE
 %token BYPR
 %token BYUPTO
 %token CALL
@@ -444,6 +445,7 @@
 %token DUMP
 %token EAGER
 %token ECALL
+%token EHOARE
 %token ELIF
 %token ELIM
 %token ELSE
@@ -459,6 +461,7 @@
 %token EXLIM
 %token EXPECT
 %token EXPORT
+%token FAIL
 %token FEL
 %token FIRST
 %token FISSION
@@ -519,6 +522,7 @@
 %token NOTATION
 %token OF
 %token OP
+%token OUTLINE
 %token PCENT
 %token PHOARE
 %token PIPE
@@ -608,6 +612,7 @@
 %token UNDO
 %token UNROLL
 %token VAR
+%token WEAKMEM
 %token WHILE
 %token WHY3
 %token WITH
@@ -1095,6 +1100,13 @@ ptybindings_decl:
 | x=ptybinding1+
     { List.flatten x }
 
+ptybindings_opdecl:
+| x=ptybinding1+
+    { (List.flatten x, None) }
+
+| x=ptybinding1* SLASH y=ptybinding1*
+    { (List.flatten x, Some (List.flatten y)) }
+
 (* -------------------------------------------------------------------- *)
 sc_var_ty:
 | x=ident+ COLON ty=loc(type_exp)
@@ -1270,6 +1282,8 @@ sform_u(P):
 
 | HOARE LBRACKET hb=hoare_body(P) RBRACKET { hb }
 
+| EHOARE LBRACKET hb=ehoare_body(P) RBRACKET { hb }
+
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
@@ -1372,13 +1386,18 @@ form_chained_orderings(P):
          f2) }
 
 hoare_bd_cmp :
-| LE { EcFol.FHle }
-| EQ { EcFol.FHeq }
-| GE { EcFol.FHge }
+| LE { EcAst.FHle }
+| EQ { EcAst.FHeq }
+| GE { EcAst.FHge }
 
 hoare_body(P):
   mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFhoareF (pre, mp, post) }
+
+ehoare_body(P):
+  mp=loc(fident) COLON pre=form_r(P) LONGARROW
+                       post=form_r(P)
+    { PFehoareF (pre, mp, post) }
 
 phoare_body(P):
   LBRACKET mp=loc(fident) COLON
@@ -1940,7 +1959,7 @@ op_or_const:
 
 operator:
 | locality=locality k=op_or_const st=nosmt tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl?
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
     sty=prefix(COLON, loc(type_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
 
   { let gloc = EcLocation.make $startpos $endpos in
@@ -1952,14 +1971,14 @@ operator:
       po_aliases  = List.tl x;
       po_tags     = odfl [] tags;
       po_tyvars   = tyvars;
-      po_args     = odfl [] args;
+      po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (omap (unloc |- fst) b);
       po_ax       = obind snd b;
       po_nosmt    = st;
       po_locality = locality; } }
 
 | locality=locality k=op_or_const st=nosmt tags=bracket(ident*)?
-    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl?
+    x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_opdecl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
 
   { { po_kind     = k;
@@ -1967,14 +1986,14 @@ operator:
       po_aliases  = List.tl x;
       po_tags     = odfl [] tags;
       po_tyvars   = tyvars;
-      po_args     = odfl [] args;
+      po_args     = odfl ([], None) args;
       po_def      = opdef_of_opbody sty (Some (`Reft (rname, reft)));
       po_ax       = None;
       po_nosmt    = st;
       po_locality = locality; } }
 
 opbody:
-| e=expr   { `Expr e  }
+| f=form   { `Form f  }
 | bs=opbr+ { `Case bs }
 
 opax:
@@ -2159,6 +2178,7 @@ axiom:
 
 | l=locality  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
 | l=locality  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
+| l=locality EHOARE x=ident pd=pgtybindings? COLON p=loc( ehoare_body(none)) ao=axiom_tc
 | l=locality PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
 | l=locality CHOARE x=ident pd=pgtybindings? COLON p=loc(choare_body(none)) ao=axiom_tc
     { mk_axiom ~locality:l (x, None, None, None, pd, p) ao }
@@ -2691,8 +2711,8 @@ cbv:
 | CBV DELTA      { `Delta [] :: simplify_red }
 
 conseq:
-| empty                           { None, None }
-| UNDERSCORE LONGARROW UNDERSCORE { None, None }
+| empty                            { None, None }
+| UNDERSCORE LONGARROW UNDERSCORE  { None, None }
 | f1=form LONGARROW               { Some f1, None }
 | f1=form LONGARROW UNDERSCORE    { Some f1, None }
 | f2=form                         { None, Some f2 }
@@ -3058,7 +3078,7 @@ form_or_double_form:
 | f=sform
     { Single f }
 
-| LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
+| LPAREN UNDERSCORE? COLON f1=form LONGARROW f2=form RPAREN
     { Double (f1, f2) }
 
 %inline if_cost_option:
@@ -3113,6 +3133,10 @@ interleave_info:
 | s=side? c1=interleavepos c2=interleavepos c3=interleavepos* k=word
    { (s, c1, c2 :: c3, k) }
 
+%inline outline_kind:
+| s=brace(stmt) { OKstmt(s) }
+| r=sexpr? LEAT f=loc(fident) { OKproc(f, r) }
+
 phltactic:
 | PROC
    { Pfun `Def }
@@ -3153,6 +3177,9 @@ phltactic:
 | CALL s=side? info=gpterm(call_info)
     { Pcall (s, info) }
 
+| CALL SLASH fc=sform info=gpterm(call_info)
+    { Pcallconcave (fc,info) }
+
 | RCONDT s=side? i=codepos1 cost=option(if_cost_option)
     { Prcond (s, true, i, cost) }
 
@@ -3188,8 +3215,8 @@ phltactic:
 | RND s=side? info=rnd_info c=prefix(COLON, semrndpos)?
     { Prnd (s, c, info) }
 
-| RNDSEM s=side? c=codepos1
-    { Prndsem (s, c) }
+| RNDSEM red=boption(STAR) s=side? c=codepos1
+    { Prndsem (red, s, c) }
 
 | INLINE s=side? u=inlineopt? o=occurences?
   { Pinline (`ByName(s, u, ([], o))) }
@@ -3199,6 +3226,14 @@ phltactic:
 
 | INLINE s=side? u=inlineopt? p=codepos
     { Pinline (`CodePos (s, u, p)) }
+
+| OUTLINE s=side LBRACKET st=codepos1 e=option(MINUS e=codepos1 {e}) RBRACKET k=outline_kind
+    { Poutline {
+	  outline_side  = s; 
+	  outline_start = st; 
+	  outline_end   = odfl st e; 
+	  outline_kind  = k }
+    }
 
 | KILL s=side? o=codepos
     { Pkill (s, o, Some 1) }
@@ -3217,6 +3252,9 @@ phltactic:
 
 | ALIAS s=side? o=codepos x=lident EQ e=expr
     { Pset (s, o, false, x,e) }
+
+| WEAKMEM s=side? h=loc(ipcore_name) p=param_decl
+    { Pweakmem(s, h, p) }
 
 | FISSION s=side? o=codepos AT d1=word COMMA d2=word
     { Pfission (s, o, (1, (d1, d2))) }
@@ -3239,6 +3277,9 @@ phltactic:
 | BYPHOARE info=gpterm(conseq)?
     { Pbydeno (`PHoare, (mk_rel_pterm info, true, None)) }
 
+| BYEHOARE info=gpterm(conseq)?
+    { Pbydeno (`EHoare, (mk_rel_pterm info, true, None)) }
+
 | BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)?
     { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, None)) }
 
@@ -3247,6 +3288,9 @@ phltactic:
 
 | BYUPTO
     { Pbyupto }
+
+| CONSEQ SLASH fc=sform info=gpterm(conseq)
+    { Pconcave (info, fc) }
 
 | CONSEQ cq=cqoptions?
     { Pconseq (odfl [] cq, (None, None, None)) }
@@ -3788,14 +3832,14 @@ clone_override:
 
 | OP st=nosmt x=qoident tyvars=bracket(tident*)?
     p=ptybinding1* sty=ioption(prefix(COLON, loc(type_exp)))
-    mode=loc(opclmode) e=expr
+    mode=loc(opclmode) f=form
 
    { let ov = {
        opov_nosmt  = st;
        opov_tyvars = tyvars;
        opov_args   = List.flatten p;
        opov_retty  = odfl (mk_loc mode.pl_loc PTunivar) sty;
-       opov_body   = e;
+       opov_body   = f;
      } in
 
      (x, PTHO_Op (`BySyntax ov, unloc mode)) }
@@ -3997,9 +4041,11 @@ stop:
 | DROP DOT { }
 
 global:
-| db=debug_global? g=global_action ep=FINAL
+| db=debug_global? fail=boption(FAIL) g=global_action ep=FINAL
   { let lc = EcLocation.make $startpos ep in
-    { gl_action = EcLocation.mk_loc lc g; gl_debug = db; } }
+    { gl_action = EcLocation.mk_loc lc g;
+      gl_fail   = fail;
+      gl_debug  = db; } }
 
 debug_global:
 | TIME  { `Timed }

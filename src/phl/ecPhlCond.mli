@@ -4,6 +4,7 @@ open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
 val t_hoare_cond   : backward
+val t_ehoare_cond  : backward
 val t_choare_cond  : EcFol.form option -> backward
 val t_bdhoare_cond : backward
 val t_equiv_cond   : oside -> backward

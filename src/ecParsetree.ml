@@ -201,6 +201,7 @@ and pformula_r =
   | PFscope   of pqsymbol * pformula
 
   | PFhoareF   of pformula * pgamepath * pformula
+  | PFehoareF  of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
@@ -379,7 +380,7 @@ let rec pf_ident ?(raw = false) f =
 (* -------------------------------------------------------------------- *)
 type pop_def =
   | PO_abstr of pty
-  | PO_concr of pty * pexpr
+  | PO_concr of pty * pformula
   | PO_case  of pty * pop_branch list
   | PO_reft  of pty * (psymbol * pformula)
 
@@ -399,7 +400,7 @@ type poperator = {
   po_aliases: psymbol list;
   po_tags   : psymbol list;
   po_tyvars : ptyparams option;
-  po_args   : ptybindings;
+  po_args   : ptybindings * ptybindings option;
   po_def    : pop_def;
   po_ax     : osymbol_r;
   po_nosmt  : bool;
@@ -508,17 +509,11 @@ type preduction = {
 }
 
 (* -------------------------------------------------------------------- *)
-type 'a doption =
-  | Single of 'a
-  | Double of ('a * 'a)
-
-(* -------------------------------------------------------------------- *)
 type cp_match = [ `If | `While | `Assign | `Sample | `Call ]
 type cp_base  = [ `ByPos of int | `ByMatch of int option * cp_match ]
 
 type codepos1 = int * cp_base
 type codepos  = (codepos1 * int) list * codepos1
-
 type docodepos1 = codepos1 doption option
 
 (* -------------------------------------------------------------------- *)
@@ -676,6 +671,18 @@ type inline_info = [
 ]
 
 (* -------------------------------------------------------------------- *)
+type outline_kind =
+  | OKstmt of pstmt
+  | OKproc of pgamepath * pexpr option
+
+type outline_info = {
+    outline_side: side;
+    outline_start: codepos1;
+    outline_end: codepos1;
+    outline_kind: outline_kind;
+}
+
+(* -------------------------------------------------------------------- *)
 type fel_info = {
   pfel_cntr  : pformula;
   pfel_asg   : pformula;
@@ -728,6 +735,7 @@ type phltactic =
   | Punroll        of (oside * codepos * bool)
   | Psplitwhile    of (pexpr * oside * codepos)
   | Pcall          of oside * call_info gppterm
+  | Pcallconcave   of (pformula * call_info gppterm)
   | Prcond         of (oside * bool * codepos1 * pformula option)
   | Prmatch        of (oside * symbol * codepos1)
   | Pcond          of pcond_info
@@ -735,19 +743,22 @@ type phltactic =
   | Pswap          of ((oside * swap_kind) located list)
   | Pcfold         of (oside * codepos * int option)
   | Pinline        of inline_info
+  | Poutline       of outline_info
   | Pinterleave    of interleave_info located
   | Pkill          of (oside * codepos * int option)
   | Prnd           of oside * semrndpos option * rnd_tac_info_f
-  | Prndsem        of oside * codepos1
+  | Prndsem        of bool * oside * codepos1
   | Palias         of (oside * codepos * osymbol_r)
+  | Pweakmem       of (oside * psymbol * fun_params)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
   | Pconseqauto    of crushmode
+  | Pconcave       of (pformula option tuple2 gppterm * pformula)
   | Phrex_elim
   | Phrex_intro    of (pformula list * bool)
   | Phecall        of (oside * (pqsymbol * ptyannot option * pformula list))
   | Pexfalso
-  | Pbydeno        of ([`PHoare | `Equiv ] * (deno_ppterm * bool * pformula option))
+  | Pbydeno        of ([`PHoare | `Equiv | `EHoare ] * (deno_ppterm * bool * pformula option))
   | PPr            of (pformula * pformula) option
   | Pbyupto
   | Pfel           of (codepos1 * fel_info)
@@ -1198,7 +1209,7 @@ and op_override_def = {
   opov_tyvars : psymbol list option;
   opov_args   : ptybinding list;
   opov_retty  : pty;
-  opov_body   : pexpr;
+  opov_body   : pformula;
 }
 
 and pr_override_def = {
@@ -1283,6 +1294,7 @@ type global_action =
 
 type global = {
   gl_action : global_action located;
+  gl_fail   : bool;
   gl_debug  : [`Timed | `Break] option;
 }
 

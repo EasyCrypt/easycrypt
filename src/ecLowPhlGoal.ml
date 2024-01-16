@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
 open EcUtils
+open EcAst
 open EcTypes
 open EcModules
 open EcMemory
@@ -19,6 +20,7 @@ type hlform = [`Any | `Pred | `Stmt]
 
 type hlkind = [
   | `Hoare  of hlform
+  | `EHoare of hlform
   | `CHoare of hlform
   | `PHoare of hlform
   | `Equiv  of hlform
@@ -28,12 +30,12 @@ type hlkind = [
 and hlkinds = hlkind list
 
 let hlkinds_Xhl_r (form : hlform) : hlkinds =
-  [`Hoare form; `PHoare form; `Equiv form]
+  [`Hoare form; `EHoare form; `PHoare form; `Equiv form]
 
 let hlkinds_Xhl = hlkinds_Xhl_r `Any
 
 let hlkinds_all : hlkinds =
-  [`Hoare `Any; `PHoare `Any; `Equiv `Any; `Eager]
+  [`Hoare `Any; `EHoare `Any; `PHoare `Any; `Equiv `Any; `Eager]
 
 (* -------------------------------------------------------------------- *)
 let tc_error_noXhl ?(kinds : hlkinds option) pf =
@@ -44,6 +46,7 @@ let tc_error_noXhl ?(kinds : hlkinds option) pf =
     let kind, fm =
       match kind with
       | `Hoare  fm -> ("hoare" , fm)
+      | `EHoare fm -> ("ehoare", fm)
       | `CHoare fm -> ("choare", fm)
       | `PHoare fm -> ("phoare", fm)
       | `Equiv  fm -> ("equiv" , fm)
@@ -150,6 +153,8 @@ let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s
 (* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe
 let pf_as_hoareS   pe c = as_phl (`Hoare  `Stmt) (fun () -> destr_hoareS   c) pe
+let pf_as_ehoareF  pe c = as_phl (`Hoare  `Pred) (fun () -> destr_eHoareF  c) pe
+let pf_as_ehoareS  pe c = as_phl (`Hoare  `Stmt) (fun () -> destr_eHoareS  c) pe
 let pf_as_choareF  pe c = as_phl (`CHoare `Pred) (fun () -> destr_cHoareF  c) pe
 let pf_as_choareS  pe c = as_phl (`CHoare `Stmt) (fun () -> destr_cHoareS  c) pe
 let pf_as_bdhoareF pe c = as_phl (`PHoare `Pred) (fun () -> destr_bdHoareF c) pe
@@ -161,6 +166,8 @@ let pf_as_eagerF   pe c = as_phl `Eager          (fun () -> destr_eagerF   c) pe
 (* -------------------------------------------------------------------- *)
 let tc1_as_hoareF   tc = pf_as_hoareF   !!tc (FApi.tc1_goal tc)
 let tc1_as_hoareS   tc = pf_as_hoareS   !!tc (FApi.tc1_goal tc)
+let tc1_as_ehoareF  tc = pf_as_ehoareF  !!tc (FApi.tc1_goal tc)
+let tc1_as_ehoareS  tc = pf_as_ehoareS  !!tc (FApi.tc1_goal tc)
 let tc1_as_choareF  tc = pf_as_choareF  !!tc (FApi.tc1_goal tc)
 let tc1_as_choareS  tc = pf_as_choareS  !!tc (FApi.tc1_goal tc)
 let tc1_as_bdhoareF tc = pf_as_bdhoareF !!tc (FApi.tc1_goal tc)
@@ -174,6 +181,7 @@ let tc1_get_stmt side tc =
   let concl = FApi.tc1_goal tc in
   match side, concl.f_node with
   | None, FhoareS hs -> hs.hs_s
+  | None, FeHoareS hs -> hs.ehs_s
   | None, FcHoareS hs -> hs.chs_s
   | None, FbdHoareS hs -> hs.bhs_s
   | Some _ , (FhoareS _ | FcHoareS _ | FbdHoareS _) ->
@@ -188,10 +196,12 @@ let tc1_get_stmt side tc =
 (* -------------------------------------------------------------------- *)
 let get_pre f =
   match f.f_node with
-  | FhoareF hf  -> Some (hf.hf_pr)
-  | FhoareS hs  -> Some (hs.hs_pr)
+  | FhoareF hf   -> Some (hf.hf_pr )
+  | FhoareS hs   -> Some (hs.hs_pr )
   | FcHoareF hf  -> Some (hf.chf_pr)
   | FcHoareS hs  -> Some (hs.chs_pr)
+  | FeHoareF hf  -> Some (hf.ehf_pr)
+  | FeHoareS hs  -> Some (hs.ehs_pr)
   | FbdHoareF hf -> Some (hf.bhf_pr)
   | FbdHoareS hs -> Some (hs.bhs_pr)
   | FequivF ef   -> Some (ef.ef_pr )
@@ -206,10 +216,12 @@ let tc1_get_pre tc =
 (* -------------------------------------------------------------------- *)
 let get_post f =
   match f.f_node with
-  | FhoareF hf  -> Some (hf.hf_po )
-  | FhoareS hs  -> Some (hs.hs_po )
-  | FcHoareF hf  -> Some (hf.chf_po )
-  | FcHoareS hs  -> Some (hs.chs_po )
+  | FhoareF hf   -> Some (hf.hf_po )
+  | FhoareS hs   -> Some (hs.hs_po )
+  | FcHoareF hf  -> Some (hf.chf_po)
+  | FcHoareS hs  -> Some (hs.chs_po)
+  | FeHoareF hf  -> Some (hf.ehf_po)
+  | FeHoareS hs  -> Some (hs.ehs_po)
   | FbdHoareF hf -> Some (hf.bhf_po)
   | FbdHoareS hs -> Some (hs.bhs_po)
   | FequivF ef   -> Some (ef.ef_po )
@@ -224,8 +236,10 @@ let tc1_get_post tc =
 (* -------------------------------------------------------------------- *)
 let set_pre ~pre f =
   match f.f_node with
- | FhoareF hf  -> f_hoareF pre hf.hf_f hf.hf_po
- | FhoareS hs  -> f_hoareS_r { hs with hs_pr = pre }
+ | FhoareF hf   -> f_hoareF pre hf.hf_f hf.hf_po
+ | FhoareS hs   -> f_hoareS_r { hs with hs_pr = pre }
+ | FeHoareF hf  -> f_eHoareF_r { hf with ehf_pr = pre }
+ | FeHoareS hs  -> f_eHoareS_r { hs with ehs_pr = pre }
  | FcHoareF hf  -> f_cHoareF pre hf.chf_f hf.chf_po hf.chf_co
  | FcHoareS hs  -> f_cHoareS_r { hs with chs_pr = pre }
  | FbdHoareF hf -> f_bdHoareF pre hf.bhf_f hf.bhf_po hf.bhf_cmp hf.bhf_bd
@@ -253,26 +267,29 @@ let o_split ?rev i s =
   with Zpr.InvalidCPos -> raise (InvalidSplit (oget i))
 
 (* -------------------------------------------------------------------- *)
-let t_hS_or_chS_or_bhS_or_eS ?th ?tch ?tbh ?te tc =
+let t_hS_or_chS_or_bhS_or_eS ?th ?teh ?tch ?tbh ?te tc =
   match (FApi.tc1_goal tc).f_node with
   | FhoareS  _ when EcUtils.is_some th  -> (oget th ) tc
   | FcHoareS  _ when EcUtils.is_some tch -> (oget tch) tc
+  | FeHoareS  _ when EcUtils.is_some teh -> (oget teh) tc
   | FbdHoareS _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivS   _ when EcUtils.is_some te  -> (oget te ) tc
 
   | _ ->
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
+         if EcUtils.is_some teh then [`EHoare `Stmt] else [];
          if EcUtils.is_some tch then [`CHoare `Stmt] else [];
          if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
          if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
 
     in tc_error_noXhl ~kinds !!tc
 
-let t_hF_or_chF_or_bhF_or_eF ?th ?tch ?tbh ?te ?teg tc =
+let t_hF_or_chF_or_bhF_or_eF ?th ?teh ?tch ?tbh ?te ?teg tc =
   match (FApi.tc1_goal tc).f_node with
   | FhoareF  _ when EcUtils.is_some th  -> (oget th ) tc
   | FcHoareF  _ when EcUtils.is_some tch -> (oget tch) tc
+  | FeHoareF  _ when EcUtils.is_some teh -> (oget teh) tc
   | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
   | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
@@ -280,6 +297,7 @@ let t_hF_or_chF_or_bhF_or_eF ?th ?tch ?tbh ?te ?teg tc =
   | _ ->
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Pred] else [];
+         if EcUtils.is_some teh then [`EHoare `Pred] else [];
          if EcUtils.is_some tch then [`CHoare `Pred] else [];
          if EcUtils.is_some tbh then [`PHoare `Pred] else [];
          if EcUtils.is_some te  then [`Equiv  `Pred] else [];
@@ -433,12 +451,12 @@ let generalize_subst_ env m uelts uglob =
         Mpv.add env pv (f_local id ty) s)
       Mpv.empty uelts b
   in
-  let create mp = id_of_mp mp m, GTty (tglob mp) in
+  let create mp = id_of_mp mp m, GTty (tglob (EcPath.mget_ident mp)) in
   let b' = List.map create uglob in
   let s  =
     List.fold_left2
       (fun s mp (id, _) ->
-        Mpv.add_glob env mp (f_local id (tglob mp)) s)
+        Mpv.add_glob env mp (f_local id (tglob (EcPath.mget_ident mp))) s)
       s uglob b'
   in
     (b', b, s)
@@ -618,3 +636,12 @@ let t_code_transform
       in
 
       FApi.xmutate1 tc (tr (Some side)) (cs @ [concl])
+
+(* -------------------------------------------------------------------- *)
+let get_single tc = function
+  | Single f -> f
+  | Double _ -> tc_error !!tc "a single formula is expected here, can't use \"p | f\""
+
+let get_double tc = function
+  | Single _ -> tc_error !!tc "a double formula is expected here, use \"p | f\""
+  | Double (p, f) -> p, f

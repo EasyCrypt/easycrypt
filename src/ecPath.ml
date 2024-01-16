@@ -266,6 +266,11 @@ let mget_ident mp =
   | `Local id -> id
   | _ -> assert false
 
+let mget_ident_opt mp =
+  match mp.m_top, mp.m_args with
+  | `Local id, [] -> Some id
+  | _ -> None
+
 let rec m_fv fv mp =
   let fv =
     match mp.m_top with
@@ -441,3 +446,29 @@ let x_subst (s : smsubst) (xp : xpath) =
 
 let x_subst (s : smsubst) =
   if sms_is_identity s then identity else x_subst s
+
+(* -------------------------------------------------------------------- *)
+
+(*
+  The following substitutions are used only for replacing
+  abstract modules with concrete ones.
+*)
+
+let rec m_subst_abs (s : mpath Mid.t) mp =
+    let args' = List.map (m_subst_abs s) mp.m_args in
+    match mp.m_top with
+    | `Concrete (p, sub) ->
+        mpath_crt p args' sub
+    | `Local id ->
+        match Mid.find_opt id s with
+        | None -> mpath_abs id args'
+        | Some mp' -> m_apply mp' args'
+
+let m_subst_abs (s : mpath Mid.t) =
+  if Mid.is_empty s then identity else m_subst_abs s
+
+let x_subst_abs (s : mpath Mid.t) (xp : xpath) =
+  xpath (m_subst_abs s xp.x_top) xp.x_sub
+
+let x_subst_abs (s : mpath Mid.t) =
+  if Mid.is_empty s then identity else x_subst_abs s

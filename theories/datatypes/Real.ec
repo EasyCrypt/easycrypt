@@ -172,21 +172,21 @@ instance ring with real
   op expr  = RField.exp
   op ofint = CoreReal.from_int
 
-  proof oner_neq0 by smt ml=0
-  proof addr0     by smt ml=0
-  proof addrA     by smt ml=0
-  proof addrC     by smt ml=0
-  proof addrN     by smt ml=0
-  proof mulr1     by smt ml=0
-  proof mulrA     by smt ml=0
-  proof mulrC     by smt ml=0
-  proof mulrDl    by smt ml=0
-  proof expr0     by smt w=(expr0 exprS exprN)
-  proof exprS     by smt w=(expr0 exprS exprN)
-  proof ofint0    by smt ml=0
-  proof ofint1    by smt ml=0
-  proof ofintS    by smt ml=0
-  proof ofintN    by smt ml=0.
+  proof oner_neq0 by smt()
+  proof addr0     by smt()
+  proof addrA     by smt()
+  proof addrC     by smt()
+  proof addrN     by smt()
+  proof mulr1     by smt()
+  proof mulrA     by smt()
+  proof mulrC     by smt()
+  proof mulrDl    by smt()
+  proof expr0     by smt(expr0 exprS exprN)
+  proof exprS     by smt(expr0 exprS exprN)
+  proof ofint0    by smt()
+  proof ofint1    by smt()
+  proof ofintS    by smt()
+  proof ofintN    by smt().
 
 instance field with real
   op rzero = CoreReal.zero
@@ -198,23 +198,23 @@ instance field with real
   op ofint = CoreReal.from_int
   op inv   = CoreReal.inv
 
-  proof oner_neq0 by smt ml=0
-  proof addr0     by smt ml=0
-  proof addrA     by smt ml=0
-  proof addrC     by smt ml=0
-  proof addrN     by smt ml=0
-  proof mulr1     by smt ml=0
-  proof mulrA     by smt ml=0
-  proof mulrC     by smt ml=0
-  proof mulrDl    by smt ml=0
-  proof mulrV     by smt ml=0
-  proof expr0     by smt w=(expr0 exprS exprN)
-  proof exprS     by smt w=(expr0 exprS exprN)
-  proof exprN     by smt w=(expr0 exprS exprN)
-  proof ofint0    by smt ml=0
-  proof ofint1    by smt ml=0
-  proof ofintS    by smt ml=0
-  proof ofintN    by smt ml=0.
+  proof oner_neq0 by smt()
+  proof addr0     by smt()
+  proof addrA     by smt()
+  proof addrC     by smt()
+  proof addrN     by smt()
+  proof mulr1     by smt()
+  proof mulrA     by smt()
+  proof mulrC     by smt()
+  proof mulrDl    by smt()
+  proof mulrV     by smt()
+  proof expr0     by smt(expr0 exprS exprN)
+  proof exprS     by smt(expr0 exprS exprN)
+  proof exprN     by smt(expr0 exprS exprN)
+  proof ofint0    by smt()
+  proof ofint1    by smt()
+  proof ofintS    by smt()
+  proof ofintN    by smt().
 
 (* -------------------------------------------------------------------- *)
 op floor : real -> int.

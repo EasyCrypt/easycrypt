@@ -3,6 +3,7 @@ open EcUtils
 open EcLocation
 open EcParsetree
 open EcIdent
+open EcAst
 open EcTypes
 open EcFol
 open EcEnv
@@ -109,11 +110,17 @@ let can_concretize (pt : pt_env) =
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
-  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev))
+  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev) (LDecl.toenv pe.pte_hy))
 
 (* -------------------------------------------------------------------- *)
-let concretize_e_form (CPTEnv subst) f =
-  Fsubst.f_subst subst f
+let concretize_e_form_gen (CPTEnv subst) ids f =
+  let f = Fsubst.f_subst subst f in
+  let ids = List.map (snd_map (Fsubst.subst_gty subst)) ids in
+  f_forall ids f
+
+(* -------------------------------------------------------------------- *)
+let concretize_e_form cptenv f =
+   concretize_e_form_gen cptenv [] f
 
 (* -------------------------------------------------------------------- *)
 let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
@@ -129,7 +136,7 @@ and concretize_e_head (CPTEnv subst) head =
   | PTCut    f        -> PTCut    (Fsubst.f_subst subst f)
   | PTHandle h        -> PTHandle h
   | PTLocal  x        -> PTLocal  x
-  | PTGlobal (p, tys) -> PTGlobal (p, List.map subst.fs_ty tys)
+  | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst subst.fs_ty) tys)
   | PTSchema _ -> assert false
 
 and concretize_e_pt cptenv { pt_head; pt_args } =
@@ -139,6 +146,12 @@ and concretize_e_pt cptenv { pt_head; pt_args } =
 (* -------------------------------------------------------------------- *)
 let concretize_form pe f =
   concretize_e_form (concretize_env pe) f
+
+(* -------------------------------------------------------------------- *)
+let concretize_gen ({ ptev_env = pe } as pt) ids =
+  let cptenv = concretize_env pe in
+  (concretize_e_pt cptenv pt.ptev_pt,
+   concretize_e_form_gen cptenv ids pt.ptev_ax)
 
 (* -------------------------------------------------------------------- *)
 let concretize ({ ptev_env = pe } as pt) =
@@ -575,17 +588,17 @@ let process_sc_instantiation pe inst =
   if not (EcUnify.UniEnv.closed pe.pte_ue) then
     assert false;
 
-  let eus = EcUnify.UniEnv.close pe.pte_ue in
-  let sty = { ty_subst_id with ts_u = eus } in
-  let se = EcTypes.e_uni eus in
+  let uidmap = EcUnify.UniEnv.assubst pe.pte_ue in
+  let ts = Tuni.subst uidmap in
+  let es = e_subst { e_subst_id with es_ty = ts } in
 
-  let typ = List.map (EcTypes.ty_subst sty) typ in
-  let memtype = EcMemory.mt_subst (EcTypes.ty_subst sty) memtype in
+  let typ = List.map (ty_subst ts) typ in
+  let memtype = EcMemory.mt_subst (ty_subst ts) memtype in
   let mpreds = List.map (fun (id, (m,p)) ->
-      let fs = Fsubst.f_subst_init ~sty () in
+      let fs = Fsubst.f_subst_init ~sty:ts () in
       let p = Fsubst.f_subst fs p in
       id, (m,p)) mpreds in
-  let exprs = List.map (fun (id, e) -> id, se e) exprs in
+  let exprs = List.map (fun (id, e) -> id, es e) exprs in
 
   (* We instantiate the schema. *)
   (* FIXME: instantiating and substituting in schema is ugly. *)
@@ -604,7 +617,7 @@ let process_sc_instantiation pe inst =
     | _ -> f_new in
 
   let fs =
-    Fsubst.f_subst_init ~sty
+    Fsubst.f_subst_init ~sty:ts
       ~esloc:(Mid.of_list exprs)
       ~mempred:(Mid.of_list mpreds)
       ~mt:memtype () in
@@ -812,8 +825,8 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
       | PVAModule (mp, mt) -> begin
           try
             let obl = EcTyping.check_modtype env mp mt emt in
-
-            let f = Fsubst.f_subst_mod x mp f in
+            let ms = EcFol.f_bind_mod Fsubst.f_subst_id x mp env in
+            let f = Fsubst.f_subst ms f in
             let f = match obl with
               | `Ok ->  f
               | `ProofObligation obl -> f_imps obl f in

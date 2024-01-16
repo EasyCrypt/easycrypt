@@ -302,3 +302,15 @@ lemma nosmt predTofV (f : 'a -> 'b): predT \o f = predT.
 proof. by apply/fun_ext=> x. qed.
 
 lemma pred_0Vmem (p : 'a -> bool) : p = pred0 \/ exists x, p x by smt().
+
+(* -------------------------------------------------------------------- *)
+lemma choicebW (P : 'a -> bool) (x0 : 'a) (I : 'a -> bool) :
+     ((exists x, P x) => forall x, P x => I x)
+  => ((forall x, !P x) => I x0)
+  => I (choiceb P x0).
+proof.
+rewrite -negb_exists; case: (exists x, P x) => /=.
+- by move/choicebP=> /(_ x0) ?; apply.
+- by rewrite negb_exists => /choiceb_dfl ->.
+qed.
+

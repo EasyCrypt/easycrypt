@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcAst
 open EcTypes
 open EcCoreFol
 
@@ -81,7 +82,7 @@ type operator_kind =
   | OB_nott of notation
 
 and opbody =
-  | OP_Plain  of EcTypes.expr * bool  (* nosmt? *)
+  | OP_Plain  of EcCoreFol.form * bool  (* nosmt? *)
   | OP_Constr of EcPath.path * int
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
@@ -134,6 +135,7 @@ type operator = {
   op_loca     : locality;
   op_opaque   : bool;
   op_clinline : bool;
+  op_unfold   : int option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -250,23 +252,24 @@ let is_prind op =
   | OB_pred (Some (PR_Ind _)) -> true
   | _ -> false
 
-let gen_op ?(clinline = false) ~opaque tparams ty kind lc = {
+let gen_op ?(clinline = false) ?unfold ~opaque tparams ty kind lc = {
   op_tparams  = tparams;
   op_ty       = ty;
   op_kind     = kind;
   op_loca     = lc;
   op_opaque   = opaque;
   op_clinline = clinline;
+  op_unfold   = unfold;
 }
 
-let mk_pred ?clinline ~opaque tparams dom body lc =
+let mk_pred ?clinline ?unfold ~opaque tparams dom body lc =
   let kind = OB_pred body in
   let ty   =  (EcTypes.toarrow dom EcTypes.tbool) in
-  gen_op ?clinline ~opaque tparams ty kind lc
+  gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
-let mk_op ?clinline ~opaque tparams ty body lc =
+let mk_op ?clinline ?unfold ~opaque tparams ty body lc =
   let kind = OB_oper body in
-  gen_op ?clinline ~opaque tparams ty kind lc
+  gen_op ?clinline ?unfold ~opaque tparams ty kind lc
 
 let mk_abbrev ?(ponly = false) tparams xs (codom, body) lc =
   let kind = {
@@ -310,8 +313,7 @@ let operator_as_tc (op : operator) =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) lc =
-  let axbd = EcCoreFol.form_of_expr EcCoreFol.mhr bd in
+let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, axbd) lc =
   let axbd, axpm =
     let bdpm = List.map fst tparams in
     let axpm = List.map EcIdent.fresh bdpm in
@@ -331,7 +333,7 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) lc =
 
   let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
   let tyargs = List.map (EcTypes.tvar |- fst) axpm in
-  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcCoreFol.f_ty) in
+  let op     = f_op path tyargs (toarrow (List.map f_ty opargs) axbd.EcAst.f_ty) in
   let op     = f_app op opargs axbd.f_ty in
   let axspec = f_forall args (f_eq op axbd) in
 

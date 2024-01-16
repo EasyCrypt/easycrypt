@@ -689,7 +689,7 @@ qed.
 lemma supp_drat (s : 'a list) x : x \in (drat s) <=> x \in s.
 proof.
 rewrite /support dratE -has_pred1 has_count.
-case: (count (pred1 x) s <= 0); [smt w=count_ge0|].
+case: (count (pred1 x) s <= 0); [smt(count_ge0)|].
 move=> /IntOrder.ltrNge ^ + -> /=; rewrite -lt_fromint; case: s=> //=.
 move=> ? s /(@mulr_gt0 _ (inv (1 + size s)%r)) -> //.
 by rewrite invr_gt0 lt_fromint #smt:(size_ge0).
@@ -924,6 +924,15 @@ have [L memL] := mu_pos_fin d (mu1 d x) _; 1: smt(ge0_mu).
 have [y /= [y_L y_max]] := maxr_seq (mu1 d) L x _; 1: smt().
 exists y; rewrite eqr_le pmax_upper_bound /=.
 by apply flub_le_ub => z /#.
+qed.
+
+(* one of the elements with the highest probability *)
+op mode (d: 'a distr) = choiceb (fun x => p_max d = mu1 d x) witness.
+
+lemma mode_ge (d: 'a distr) x: mu1 d x <= mu1 d (mode d). 
+proof. 
+  suff <-: p_max d = mu1 d (mode d) by apply pmax_upper_bound.
+  have /choicebP /= /#: exists x, p_max d = mu1 d x by apply pmaxE.
 qed.
 
 (* -------------------------------------------------------------------- *)

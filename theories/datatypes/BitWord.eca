@@ -92,52 +92,35 @@ lemma andwK: idempotent andw.
 proof. by move=> x; apply/wordP=> i h; rewrite !bwordE andbb. qed.
 
 (* -------------------------------------------------------------------- *)
-instance bring with word
-  op rzero = zerow
-  op rone  = onew
-  op add   = Self.(+^)
-  op mul   = andw
-  op opp   = oppw
-
-  proof oner_neq0 by apply/onew_neq0
-  proof addr0     by apply/xorw0
-  proof addrA     by (move=> w1 w2 w3; rewrite xorwA)
-  proof addrC     by apply/xorwC
-  proof addrK     by apply/xorwK
-  proof mulr1     by apply andw1
-  proof mulrA     by (move=> w1 w2 w3; rewrite andwA)
-  proof mulrC     by apply/andwC
-  proof mulrDl    by apply/andwDl
-  proof mulrK     by apply/andwK
-  proof oppr_id   by trivial.
 
 pred unitw (w:word) = w = onew.
-op iandw (w:word) = if w = onew then onew else w.
+op iandw (w:word) = w.
 
-clone import Ring.ComRing as WRing with 
+clone import Ring.BoolRing as WRing with
    type t = word,
    op zeror <- zerow,
    op ( + ) <- (+^),
    op [ - ] <- oppw,
    op oner  <- onew,
-   op ( * ) <- andw, 
+   op ( * ) <- andw,
    op invr  <- iandw,
    pred unit <- unitw
 proof *.
 realize addrA.     proof. apply xorwA. qed.
 realize addrC.     proof. apply xorwC. qed.
-realize add0r.     proof. move=> ?;ring. qed.
-realize addNr.     proof. move=> ?;ring. qed.
+realize add0r.     proof. move => ?; rewrite addrC; apply xorw0. qed.
+realize addNr.     proof. by smt(oppwE xorwE xorK zerowE). qed.
 realize oner_neq0. proof. apply onew_neq0. qed.
 realize mulrA.     proof. apply andwA. qed.
 realize mulrC.     proof. apply andwC. qed.
-realize mul1r.     proof. move=> ?;ring. qed. 
-realize mulrDl.    proof. apply andwDl. qed. 
-realize mulVr.     proof. move=> ?;rewrite /unitw /iandw => -> /=;ring. qed.
-realize unitout.   proof. by move=> x;rewrite /unitw /iandw => ->. qed.
+realize mul1r.     proof. by move=> ?; rewrite andwC andw1. qed.
+realize mulrDl.    proof. apply andwDl. qed.
+realize mulVr.     proof. by smt(andw1). qed.
+realize unitout.   proof. by move=> x; rewrite /unitw /iandw. qed.
+realize mulrr.     proof. by smt(andwK). qed.
 
-realize unitP. 
-proof. 
+realize unitP.
+proof.
 move=> x y; rewrite /unitw !wordP => + i Hi -/(_ i Hi).
 by rewrite andwE onewE Hi /#.
 qed.
@@ -153,8 +136,12 @@ proof. by rewrite ofwordKmkseq mkseq_nseq bs2int_nseq_true 1:ge0_n. qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory Cost.
+
   op cxor : {int | 0 <= cxor } as ge0_cxor.
-  schema cost_cxor `{P} {w1 w2: word} : 
+
+  schema cost_cxor `{P} {w1 w2: word} :
     cost [P: w1 +^ w2] = cost[P:w1] + cost[P:w2] + N cxor.
+
   hint simplify cost_cxor.
+
 end Cost.

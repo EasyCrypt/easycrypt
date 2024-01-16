@@ -2,6 +2,7 @@
 open EcUtils
 open EcParsetree
 open EcPath
+open EcAst
 open EcTypes
 open EcFol
 open EcMemory
@@ -88,6 +89,20 @@ let t_hoareF_fun_def_r tc =
   FApi.xmutate1 tc `FunDef [concl']
 
 (* ------------------------------------------------------------------ *)
+let t_ehoareF_fun_def_r tc =
+  let env = FApi.tc1_env tc in
+  let hf = tc1_as_ehoareF tc in
+  let f = NormMp.norm_xfun env hf.ehf_f in
+  check_concrete !!tc env f;
+  let (memenv, (fsig, fdef), env) = Fun.hoareS f env in
+  let m = EcMemory.memory memenv in
+  let fres  = odfl f_tt (omap (form_of_expr m) fdef.f_ret) in
+  let post  = PVM.subst1 env pv_res m fres hf.ehf_po in
+  let pre   = PVM.subst env (subst_pre env fsig m PVM.empty) hf.ehf_pr in
+  let concl' = f_eHoareS memenv pre fdef.f_body post in
+  FApi.xmutate1 tc `FunDef [concl']
+
+(* ------------------------------------------------------------------ *)
 let t_choareF_fun_def_r tc =
   let env = FApi.tc1_env tc in
   let chf = tc1_as_choareF tc in
@@ -152,6 +167,7 @@ let t_equivF_fun_def_r tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_fun_def   = FApi.t_low0 "hoare-fun-def"   t_hoareF_fun_def_r
+let t_ehoareF_fun_def  = FApi.t_low0 "ehoare-fun-def"  t_ehoareF_fun_def_r
 let t_choareF_fun_def  = FApi.t_low0 "choare-fun-def"  t_choareF_fun_def_r
 let t_bdhoareF_fun_def = FApi.t_low0 "bdhoare-fun-def" t_bdhoareF_fun_def_r
 let t_equivF_fun_def   = FApi.t_low0 "equiv-fun-def"   t_equivF_fun_def_r
@@ -159,11 +175,12 @@ let t_equivF_fun_def   = FApi.t_low0 "equiv-fun-def"   t_equivF_fun_def_r
 (* -------------------------------------------------------------------- *)
 let t_fun_def_r tc =
   let th  = t_hoareF_fun_def
+  and teh = t_ehoareF_fun_def
   and tch = t_choareF_fun_def
   and tbh = t_bdhoareF_fun_def
   and te  = t_equivF_fun_def in
 
-  t_hF_or_chF_or_bhF_or_eF ~th ~tch ~tbh ~te tc
+  t_hF_or_chF_or_bhF_or_eF ~th ~teh ~tch ~tbh ~te tc
 
 let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 
@@ -223,6 +240,15 @@ module FunAbsLow = struct
     let fv = PV.fv env mhr inv in
     PV.check_depend env fv top;
     let ospec o = f_hoareF inv o inv in
+    let sg = List.map ospec (OI.allowed oi) in
+    (inv, inv, sg)
+
+  (* ------------------------------------------------------------------ *)
+  let ehoareF_abs_spec _pf env f inv =
+    let (top, _, oi, _) = EcLowPhlGoal.abstract_info env f in
+    let fv = PV.fv env mhr inv in
+    PV.check_depend env fv top;
+    let ospec o = f_eHoareF inv o inv in
     let sg = List.map ospec (OI.allowed oi) in
     (inv, inv, sg)
 
@@ -413,6 +439,14 @@ let t_hoareF_abs_r inv tc =
   let tactic tc = FApi.xmutate1 tc `FunAbs sg in
   FApi.t_last tactic (EcPhlConseq.t_hoareF_conseq pre post tc)
 
+let t_ehoareF_abs_r inv tc =
+  let env = FApi.tc1_env tc in
+  let hf = tc1_as_ehoareF tc in
+  let pre, post, sg = FunAbsLow.ehoareF_abs_spec !!tc env hf.ehf_f inv in
+
+  let tactic tc = FApi.xmutate1 tc `FunAbs sg in
+  FApi.t_last tactic (EcPhlConseq.t_ehoareF_conseq pre post tc)
+
 (* ------------------------------------------------------------------ *)
 let t_choareF_abs_r inv inv_inf tc =
   let env = FApi.tc1_env tc in
@@ -452,6 +486,7 @@ let t_equivF_abs_r inv tc =
 
 (* -------------------------------------------------------------------- *)
 let t_hoareF_abs   = FApi.t_low1 "hoare-fun-abs"   t_hoareF_abs_r
+let t_ehoareF_abs  = FApi.t_low1 "ehoare-fun-abs"  t_ehoareF_abs_r
 let t_choareF_abs  = FApi.t_low2 "choare-fun-abs"  t_choareF_abs_r
 let t_bdhoareF_abs = FApi.t_low1 "bdhoare-fun-abs" t_bdhoareF_abs_r
 let t_equivF_abs   = FApi.t_low1 "equiv-fun-abs"   t_equivF_abs_r
@@ -610,6 +645,23 @@ let t_fun_to_code_choare_r tc =
   FApi.xmutate1 tc `FunToCode [concl]
 
 (* -------------------------------------------------------------------- *)
+let t_fun_to_code_ehoare_r tc =
+  let env = FApi.tc1_env tc in
+  let hf = tc1_as_ehoareF tc in
+  let f = hf.ehf_f in
+  let m, st, r, a = ToCodeLow.to_code env f mhr in
+  let spr = ToCodeLow.add_var_tuple env pv_arg mhr a m PVM.empty in
+  let spo = ToCodeLow.add_var env pv_res mhr r m PVM.empty in
+
+  let pre = PVM.subst env spr hf.ehf_pr in
+
+  let post = PVM.subst env spo hf.ehf_po in
+
+  let concl = f_eHoareS m pre st post in
+
+  FApi.xmutate1 tc `FunToCode [concl]
+
+(* -------------------------------------------------------------------- *)
 let t_fun_to_code_bdhoare_r tc =
   let env = FApi.tc1_env tc in
   let hf = tc1_as_bdhoareF tc in
@@ -670,6 +722,7 @@ let t_fun_to_code_eager_r tc =
 
 (* -------------------------------------------------------------------- *)
 let t_fun_to_code_hoare   = FApi.t_low0 "hoare-fun-to-code"   t_fun_to_code_hoare_r
+let t_fun_to_code_ehoare  = FApi.t_low0 "ehoare-fun-to-code"  t_fun_to_code_ehoare_r
 let t_fun_to_code_choare  = FApi.t_low0 "choare-fun-to-code"  t_fun_to_code_choare_r
 let t_fun_to_code_bdhoare = FApi.t_low0 "bdhoare-fun-to-code" t_fun_to_code_bdhoare_r
 let t_fun_to_code_equiv   = FApi.t_low0 "equiv-fun-to-code"   t_fun_to_code_equiv_r
@@ -678,11 +731,12 @@ let t_fun_to_code_eager   = FApi.t_low0 "eager-fun-to-code"   t_fun_to_code_eage
 (* -------------------------------------------------------------------- *)
 let t_fun_to_code_r tc =
   let th  = t_fun_to_code_hoare in
+  let teh = t_fun_to_code_ehoare in
   let tch = t_fun_to_code_choare in
   let tbh = t_fun_to_code_bdhoare in
   let te  = t_fun_to_code_equiv in
   let teg = t_fun_to_code_eager in
-  t_hF_or_chF_or_bhF_or_eF ~th ~tch ~tbh ~te ~teg tc
+  t_hF_or_chF_or_bhF_or_eF ~th ~teh ~tch ~tbh ~te ~teg tc
 
 let t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
 
@@ -704,6 +758,14 @@ let t_fun_r inv inv_inf tc =
       if   NormMp.is_abstract_fun h.hf_f env
       then t_hoareF_abs inv tc
       else t_hoareF_fun_def tc
+
+  and teh tc =
+    assert (inv_inf = None);
+    let env = FApi.tc1_env tc in
+    let h   = destr_eHoareF (FApi.tc1_goal tc) in
+      if   NormMp.is_abstract_fun h.ehf_f env
+      then t_ehoareF_abs inv tc
+      else t_ehoareF_fun_def tc
 
   and tch tc =
     let env = FApi.tc1_env tc in
@@ -730,7 +792,7 @@ let t_fun_r inv inv_inf tc =
       else t_equivF_fun_def tc
 
   in
-    t_hF_or_chF_or_bhF_or_eF ~th ~tch ~tbh ~te tc
+    t_hF_or_chF_or_bhF_or_eF ~th ~teh ~tch ~tbh ~te tc
 
 let t_fun = FApi.t_low2 "fun" t_fun_r
 
@@ -792,6 +854,13 @@ let process_fun_abs inv p_abs_inv_inf tc =
     let inv  = TTC.pf_process_form !!tc env' tbool inv in
     t_hoareF_abs inv tc
 
+  and t_ehoare tc =
+    ensure_none tc p_abs_inv_inf;
+    let hyps = FApi.tc1_hyps tc in
+    let env' = LDecl.inv_memenv1 hyps in
+    let inv  = TTC.pf_process_xreal !!tc env' inv in
+    t_ehoareF_abs inv tc
+
   and t_choare tc =
     if p_abs_inv_inf = None then
       tc_error !!tc "for calls to abstract procedures in choare judgements, \
@@ -816,4 +885,4 @@ let process_fun_abs inv p_abs_inv_inf tc =
 
   in
   t_hF_or_chF_or_bhF_or_eF
-    ~th:t_hoare ~tch:t_choare ~tbh:t_bdhoare ~te:t_equiv tc
+    ~th:t_hoare ~teh:t_ehoare ~tch:t_choare ~tbh:t_bdhoare ~te:t_equiv tc

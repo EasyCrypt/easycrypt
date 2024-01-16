@@ -32,11 +32,7 @@ and for_type_r env t1 t2 =
   | Tfun (t1, t2), Tfun (t1', t2') ->
       for_type env t1 t1' && for_type env t2 t2'
 
-  | Tglob mp, _ when EcEnv.NormMp.tglob_reducible env mp ->
-      for_type env (EcEnv.NormMp.norm_tglob env mp) t2
-
-  | _, Tglob mp when EcEnv.NormMp.tglob_reducible env mp ->
-      for_type env t1 (EcEnv.NormMp.norm_tglob env mp)
+  | Tglob m1, Tglob m2 -> EcIdent.id_equal m1 m2
 
   | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
       if

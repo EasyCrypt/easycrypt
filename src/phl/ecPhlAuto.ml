@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcTypes
 open EcFol
 open EcModules
 
@@ -95,6 +94,7 @@ let t_auto_r ?conv tc =
     FApi.t_ors [ EcPhlTAuto.t_hoare_true;
                  EcPhlTAuto.t_core_exfalso;
                  EcPhlPr.t_prbounded false;
+                 EcPhlTAuto.t_ehoare_zero;
                  t_auto_phl ]
   in t_trivial ?conv ~subtc ~keep:true tc
 
@@ -106,6 +106,7 @@ let t_phl_trivial_r tc =
     FApi.t_ors [ EcPhlTAuto.t_hoare_true;
                  EcPhlTAuto.t_core_exfalso;
                  EcPhlPr.t_prbounded false;
+                 EcPhlTAuto.t_ehoare_zero;
                  EcPhlSkip.t_skip ]
   in FApi.t_try subtc tc
 

@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcPath
+open EcAst
 open EcTypes
 open EcModules
 
@@ -174,9 +175,9 @@ let t_uptobad_r tc =
   in
   if not (EcMemory.mem_equal pr1.pr_mem pr2.pr_mem) then
     tc_error !!tc ~who:"byupto" "the initial memories should be equal";
-  if not (is_conv ~ri:(full_red ~opaque:false) hyps pr1.pr_args pr2.pr_args) then
+  if not (is_conv ~ri:full_red hyps pr1.pr_args pr2.pr_args) then
     tc_error !!tc ~who:"byupto" "the initial arguments should be equal";
-  if not (is_conv ~ri:(full_red ~opaque:false) hyps pr1.pr_event pr2.pr_event) then
+  if not (is_conv ~ri:full_red hyps pr1.pr_event pr2.pr_event) then
     tc_error !!tc ~who:"byupto" "the events should be equal";
   let bad =
     try destr_event pr1.pr_event

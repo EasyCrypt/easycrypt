@@ -4,6 +4,7 @@ open EcIdent
 open EcMaps
 open EcUtils
 open EcUid
+open EcAst
 open EcTypes
 open EcDecl
 
@@ -189,12 +190,6 @@ module UnifyGen(X : UnifyExtra) = struct
               | _, Tconstr (p, lt) when EcEnv.Ty.defined p env ->
                   Queue.push (`TyUni (t1, EcEnv.Ty.unfold p lt env)) pb
 
-              | Tglob mp, _ when EcEnv.NormMp.tglob_reducible env mp ->
-                  Queue.push (`TyUni (EcEnv.NormMp.norm_tglob env mp, t2)) pb
-
-              | _, Tglob mp when EcEnv.NormMp.tglob_reducible env mp ->
-                  Queue.push (`TyUni (t1, EcEnv.NormMp.norm_tglob env mp)) pb
-
               | _, _ -> failure ()
           end
         end
@@ -209,7 +204,7 @@ module UnifyGen(X : UnifyExtra) = struct
     in
       doit (); !uf
 
-  (* ------------------------------------------------------------------ *)
+  (* -------------------------------------------------------------------- *)
   let close (uf : UF.t) =
     let map = Hint.create 0 in
 
@@ -235,10 +230,12 @@ module UnifyGen(X : UnifyExtra) = struct
   (* ------------------------------------------------------------------ *)
   let subst_of_uf (uf : UF.t) =
     let close = close uf in
-      fun id ->
-        match close (tuni id) with
-        | { ty_node = Tunivar id' } when uid_equal id id' -> None
-        | t -> Some t
+    List.fold_left (fun m uid ->
+      match close (tuni uid) with
+      | { ty_node = Tunivar uid' } when uid_equal uid uid' -> m
+      | t -> Muid.add uid t m
+    )
+    Muid.empty (UF.domain uf)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -360,7 +357,7 @@ module TypeClass = struct
       with UnifyCore.UnificationFailure _ -> raise Bailout end;
 
       let subst = UnifyCore.subst_of_uf !uf in
-      let subst = Tuni.offun subst in
+      let subst = ty_subst (Tuni.subst subst) in
 
       (* assert (UnifyCore.UF.closed !uf); *)
 
@@ -553,16 +550,16 @@ module UniEnv = struct
       in (tv, tcs)) params
 
   let openty_r ue params tvi =
-    let subst = Tvar.subst (opentvi ue params tvi) in
-    (subst, subst_tv subst params)
+    let subst = { ty_subst_id with ts_v = (opentvi ue params tvi) } in
+    (subst, subst_tv (ty_subst subst) params)
 
   let opentys ue params tvi tys =
     let (subst, tvs) = openty_r ue params tvi in
-    (List.map subst tys, tvs)
+    (List.map (ty_subst subst) tys, tvs)
 
   let openty ue params tvi ty =
     let (subst, tvs) = openty_r ue params tvi in
-    (subst ty, tvs)
+    (ty_subst subst ty, tvs)
 
   let repr (ue : unienv) (t : ty) : ty =
     match t.ty_node with
@@ -649,7 +646,7 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
       | Some (TVInamed ls) -> fun op ->
           let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in
           let tparams = Msym.of_list tparams in
-            List.for_all (fun (x, _) -> Msym.mem x tparams) ls
+          List.for_all (fun (x, _) -> Msym.mem x tparams) ls
 
     in
       filter oppath op && filter_on_tvi op
@@ -669,7 +666,7 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
           with UnificationFailure _ -> raise E.Failure)
         tvtcs;
 
-      let top = tip op.D.op_ty in
+      let top = ty_subst tip op.D.op_ty in
       let texpected = tfun_expected subue psig in
 
       (try  unify env subue top texpected
@@ -679,8 +676,9 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
         match op.D.op_kind with
         | OB_nott nt ->
            let substnt () =
-             let xs = List.map (snd_map tip) nt.D.ont_args in
-             let bd = EcTypes.e_mapty tip nt.D.ont_body in
+             let xs = List.map (snd_map (ty_subst tip)) nt.D.ont_args in
+             let es = e_subst { e_subst_id with es_ty = tip } in
+             let bd = es nt.D.ont_body in
              (xs, bd)
            in Some (Lazy.from_fun substnt)
 
