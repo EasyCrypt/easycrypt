@@ -11,7 +11,7 @@ let rec bd_aexpr (e: aexpr) : deps =
     | `W n -> (copy ~offset:(0) ~size:(n) (Ident.name v)) 
     | _ -> (copy ~offset:0 ~size:256 (Ident.name v))) (* assuming integers have 256 bits *) 
   | EInt i -> empty ~size:(256) (* Need to know how to handle this case, probably good enough for now *)
-  | ESlice (eb, (eo, cnt, sz)) -> (* verify indianess on this *)
+  | ESlice (eb, (eo, cnt, sz)) -> (* verify indianess on this & check new syntax *)
       (match eo.node with
       | EInt i -> eb |> bd_aexpr |> offset ~offset:(-i) |> restrict ~min:(0) ~max:(cnt*sz)
       | _ -> 
@@ -59,8 +59,14 @@ let rec bd_aexpr (e: aexpr) : deps =
           let (db, ds) = (bd_aexpr eb, bd_aexpr es) in
           merge (chunk ~csize:n ~count:1 db) (ds |> enlarge ~min:0 ~max:n |> chunk ~csize:n ~count:1)
       | _ -> failwith "Cant slice non-word")
-  | ESat (su, `W n, e) -> (* first sat approximation: sat-length bits depend on everything *)
+  | EExtend (us, `W n, e) ->
       (match e.type_ with
+      | `W m -> 
+          let d = bd_aexpr e in
+          enlarge ~min:0 ~max:n d
+      | _ -> failwith "Cannot extend integers, only words" (* check this *)
+  | ESat (us, `W n, e) -> (* first sat approximation: sat-length bits depend on everything *)
+      (match e.type_ with (* check this *)
       | `W m -> 
         let d = bd_aexpr e in
         let hd = d 
@@ -74,6 +80,16 @@ let rec bd_aexpr (e: aexpr) : deps =
   | ELet ((v, _, e1), e2) -> 
       let bd1, bd2 = (bd_aexpr e1, bd_aexpr e2) in
       propagate ~offset:0 (Ident.name v) bd1 bd2
+  | ECond (ec, (ect, ecf)) ->
+      let bd, bdt, bdf = (bd_aexpr ec, bd_aexpr ect, bd_aexpr ecf) in
+      bd |> merge bdt |> merge bdf (* check this also *)
+  | ENot (`W n, e) ->
+      bd_aexpr e (* bits depend on bits in the same pos *)
+  | EIncr (`W n, e) -> (* semantics = e + 1 *)
+      let d = bd_aexpr e in
+      1 --^ n |> Enum.fold (fun d_ i -> d_
+        |> merge (offset ~offset:(i) d)) d
+      |> restrict ~min:(0) ~max:(n) 
   | EAdd (`W n, _, (e1, e2)) -> (* add and sub assuming no overflow *)
       let (d1, d2) = (bd_aexpr e1, bd_aexpr e2) in
       1 --^ n |> Enum.fold (fun d i -> d 
@@ -98,6 +114,12 @@ let rec bd_aexpr (e: aexpr) : deps =
       | `U `H | `S `H -> (fun d -> d |> restrict ~min:(n) ~max:(2*n) |> offset ~offset:(-n))
       | `U `L | `S `L -> restrict ~min:(0) ~max:(n)
       | _ -> assert false)
+  | ECmp (`W n, us, gte, (e1, e2)) -> (* check this *)
+      let d = merge (bd_aexpr e1) (bd_aexpr e2) in
+        d |> chunk ~csize:n ~count:1
+          |> (fun d -> Option.default Map.String.empty (Map.Int.find_opt 0 d))
+          |> constant ~size:1
+          (* Alternative for last two lines is |> restrict ~min:0 ~max:1 *)
   | _ -> assert false
 
   (* propagate v deps to t deps in d *)
