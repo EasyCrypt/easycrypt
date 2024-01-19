@@ -2641,14 +2641,6 @@ rwarg1:
         parse_error (loc x) (Some msg)
   }
 
-| EQUIV aout=bracket(
-    s=side x=qident
-    argsl=paren(loc(plist0(expr, COMMA))) resl=sexpr
-    argsr=paren(loc(plist0(expr, COMMA))) resr=sexpr {
-      RWEquiv (s, x, (argsl, resl), (argsr, resr))
-    }
-  ) { aout }
-
 rwpterms:
 | f=pterm
     { [(`LtoR, f)] }
@@ -3226,9 +3218,9 @@ phltactic:
 
 | OUTLINE s=side LBRACKET st=codepos1 e=option(MINUS e=codepos1 {e}) RBRACKET k=outline_kind
     { Poutline {
-	  outline_side  = s; 
-	  outline_start = st; 
-	  outline_end   = odfl st e; 
+	  outline_side  = s;
+	  outline_start = st;
+	  outline_end   = odfl st e;
 	  outline_kind  = k }
     }
 
@@ -3361,6 +3353,21 @@ phltactic:
 | TRANSITIVITY STAR tk=trans_kind
     { Ptrans_stmt (tk, TFeq) }
 
+| REWRITE EQUIV LBRACKET
+    s=side cp=codepos1 rws=rwside x=pterm proc=rweqv_proc?
+  RBRACKET
+    {
+      let info = {
+          rw_eqv_side  = s;
+          rw_eqv_dir   = rws;
+          rw_eqv_pos   = cp;
+          rw_eqv_lemma = x;
+          rw_eqv_proc = proc;
+        }
+      in
+      Prw_equiv info
+    }
+
 | SYMMETRY
     { Psymmetry }
 
@@ -3404,6 +3411,12 @@ bdhoare_split:
 
 %inline trans_hyp:
 | LPAREN p=form LONGARROW q=form RPAREN { (p,q) }
+
+%inline rweqv_res:
+| COLON AT res=sexpr { res }
+
+%inline rweqv_proc:
+| p=paren(args=loc(plist0(expr, COMMA)) res=rweqv_res? {args, res}) {p}
 
 %inline repl_kind:
 | s=side p=im_block BY c=brace(stmt)

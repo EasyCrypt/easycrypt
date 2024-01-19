@@ -214,6 +214,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pprbounded                -> EcPhlPr.t_prbounded true
     | Psim (cm, info)           -> EcPhlEqobs.process_eqobs_in cm info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
+    | Prw_equiv info            -> EcPhlRwEquiv.process_rewrite_equiv info
     | Psymmetry                 -> EcPhlSym.t_equiv_sym
     | Peager_seq infos          -> curry3 EcPhlEager.process_seq infos
     | Peager_if                 -> EcPhlEager.process_if
