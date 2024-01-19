@@ -149,17 +149,9 @@ call(: map_prod ROab.RO.m{1} ROa.RO.m{2} ROb.RO.m{2}); auto.
     rewrite -3!mem_fdom -eqa -eqb=> />.
     rewrite mem_fdom 3!get_setE/= 3!fdom_set -eqa -eqb /=.
     smt(mem_set get_setE).
-  transitivity{1} {
-      r <@ PS.S.sample(da,db);
-    }
-  (true ==> ={r}) (true ==> r{1} = (r{2}, r0{2}))=> //=.
-  + by inline*; auto.
-  transitivity{1} {
-      r <@ PS.S.sample2(da,db);
-    }
-    (true ==> ={r}) (true ==> r{1} = (r{2}, r0{2}))=> //=; last first.
-  + by inline*; auto. 
-  by call PS.sample_sample2; auto.
+  outline {2} [1-2] (r, r0) <@ PS.S.sample2.
+  rewrite equiv[{2} 1 -PS.sample_sample2].
+  by inline*; auto; rewrite /dab //= => _ _ _ [].
 + proc; inline*.
   sp; swap{2} 6 -4.
   wp; conseq(:_==> r{1} = (r,r0){2})=> />. 
@@ -167,17 +159,9 @@ call(: map_prod ROab.RO.m{1} ROa.RO.m{2} ROb.RO.m{2}); auto.
     rewrite -3!mem_fdom -eqa -eqb=> />.
     rewrite mem_fdom 2!get_setE/= 3!fdom_set -eqa -eqb /=.
     smt(mem_set get_setE).
-  transitivity{1} {
-      r <@ PS.S.sample(da,db);
-    }
-  (true ==> ={r}) (true ==> r{1} = (r{2}, r0{2}))=> //=.
-  + by inline*; auto.
-  transitivity{1} {
-      r <@ PS.S.sample2(da,db);
-    }
-    (true ==> ={r}) (true ==> r{1} = (r{2}, r0{2}))=> //=; last first.
-  + by inline*; auto. 
-  by call PS.sample_sample2; auto.
+  outline {2} [1-2] (r, r0) <@ PS.S.sample2.
+  rewrite equiv[{2} 1 -PS.sample_sample2].
+  by inline*; auto; rewrite /dab //= => _ _ _ [].
 + proc; inline*.
   sp; swap{2} 6 -5.
   wp; conseq(:_==> r{1} = (r0,r){2})=> />. 
@@ -185,17 +169,9 @@ call(: map_prod ROab.RO.m{1} ROa.RO.m{2} ROb.RO.m{2}); auto.
     rewrite -3!mem_fdom -eqa -eqb=> />.
     rewrite mem_fdom 2!get_setE/= 3!fdom_set -eqa -eqb /=.
     smt(mem_set get_setE).
-  transitivity{1} {
-      r <@ PS.S.sample(da,db);
-    }
-  (true ==> ={r}) (true ==> r{1} = (r0{2}, r{2}))=> //=.
-  + by inline*; auto.
-  transitivity{1} {
-      r <@ PS.S.sample2(da,db);
-    }
-    (true ==> ={r}) (true ==> r{1} = (r0{2}, r{2}))=> //=; last first.
-  + by inline*; auto. 
-  by call PS.sample_sample2; auto.
+  outline {2} [1-2] (r0, r) <@ PS.S.sample2.
+  rewrite equiv[{2} 1 -PS.sample_sample2].
+  by inline*; auto; rewrite /dab //= => _ _ _ [].
 smt(mem_empty fdom0).
 qed.
 

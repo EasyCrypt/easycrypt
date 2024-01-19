@@ -69,12 +69,11 @@ transitivity D4.sample (true ==> res{1} = finv res{2})
     by apply: dinter_uni; rewrite supp_dinter /#.
   by rewrite !supp_dinter /#.
 proc *.
-rewrite equiv [{1} D4_Sample () r () r].
-rewrite equiv [{1} D4_6.sampleE_sampleWi () r ((), 5) r].
-+ by auto=> />; exact: dinter_ll.
-rewrite equiv [{2} D6_Sample () r ((), 5) r]; sim.
+rewrite equiv[{1} 1 D4_Sample].
+rewrite equiv[{1} 1 D4_6.sampleE_sampleWi ((), 5 :@ r)].
++ by auto; rewrite dinter_ll.
+rewrite equiv[{1} 1 -D6_Sample ( :@ r)]; sim.
 qed.
-
 lemma prD6 : forall k &m, Pr[D6.sample() @ &m : res = k] =
       if 1 <= k <= 4 then 1%r/4%r else 0%r.
 proof.

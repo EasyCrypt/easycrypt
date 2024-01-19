@@ -708,6 +708,15 @@ type sim_info = {
 }
 
 (* -------------------------------------------------------------------- *)
+type rw_eqv_info = {
+  rw_eqv_side  : side;
+  rw_eqv_dir   : [`LtoR | `RtoL];
+  rw_eqv_pos   : codepos1;
+  rw_eqv_lemma : ppterm;
+  rw_eqv_proc  : (pexpr list located * pexpr option) option;
+}
+
+(* -------------------------------------------------------------------- *)
 type pcqoption  = [ `Frame ]
 type pcqoptions = (bool * pcqoption) list
 
@@ -766,6 +775,7 @@ type phltactic =
   | Pprbounded
   | Psim           of crushmode option* sim_info
   | Ptrans_stmt    of trans_info
+  | Prw_equiv      of rw_eqv_info
   | Psymmetry
   | Pbdhoare_split of bdh_split
 
@@ -858,7 +868,6 @@ and rwarg1 =
   | RWSmt    of (bool * pprover_infos)
   | RWApp    of ppterm
   | RWTactic of rwtactic
-  | RWEquiv  of (side * pqsymbol * (pexpr list located * pexpr) * (pexpr list located * pexpr))
 
 and rwoptions = rwside * trepeat option * rwocc * pformula option
 and rwside    = [`LtoR | `RtoL]
