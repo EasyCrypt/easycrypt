@@ -71,7 +71,7 @@ let chunk ~(csize : int) ~(count : int) (d : deps) : deps =
          let d1 =
            0 --^ csize
            |> Enum.map (fun i -> i + (ci * csize))
-           |> Enum.map (fun i -> Map.Int.find i d)
+           |> Enum.map (fun i -> Map.Int.find_opt i d |> Option.default Map.String.empty)
            |> merge1_all
          in
          0 --^ csize |> Enum.map (fun i -> (i + (ci * csize), d1)))
@@ -82,7 +82,7 @@ let perm ~(csize : int) ~(perm : int list) (d : deps) : deps =
   List.enum perm
   |> Enum.mapi (fun ci x ->
          Enum.map
-           (fun i -> (i + (ci * csize), Map.Int.find (i + (x * csize)) d))
+           (fun i -> (i + (ci * csize), Map.Int.find_opt (i + (x * csize)) d |> Option.default Map.String.empty))
            (0 --^ csize))
   |> Enum.flatten |> Map.Int.of_enum
 
@@ -93,7 +93,7 @@ let collapse ~(csize : int) ~(count : int) (d : deps) : deps =
          let d1 =
            0 --^ csize
            |> Enum.map (fun i -> i + (ci * csize))
-           |> Enum.map (fun i -> Map.Int.find i d)
+           |> Enum.map (fun i -> Map.Int.find_opt i d |> Option.default Map.String.empty)
            |> merge1_all
          in
          (ci, d1))

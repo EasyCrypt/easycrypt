@@ -5,7 +5,8 @@ open Lospecs
 type options = {
   pp_pst : bool;
   pp_ast : bool;
-  input : string;
+  pp_bd  : bool;
+  input  : string;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -22,10 +23,20 @@ let entry (options : options) =
     let ast = Typing.tt_program Typing.Env.empty prog in
 
     if options.pp_ast then begin
-      List.iter (fun (_, def) ->
-        Format.eprintf "%a@."
+      List.iter (fun (name, def) ->
+        Format.eprintf "%s:@.%a@."
+        name
           (Yojson.Safe.pretty_print ~std:true)
           (Ast.adef_to_yojson def)
+      ) ast
+    end;
+
+    if options.pp_bd then begin
+      List.iter (fun (name, def) ->
+        Format.eprintf "%s:@.%a@."
+        name
+        Deps.pp_deps
+        (Bitdep.bd_adef def) 
       ) ast
     end;
 
@@ -44,14 +55,16 @@ let entry (options : options) =
       Format.eprintf "@.";
       Io.print_source_for_range Format.err_formatter range options.input;
       exit 1
+  | Not_found ->
+      Format.eprintf "Something is missing"
 
 (* -------------------------------------------------------------------- *)
 let main () : unit =
   let open Cmdliner in
 
   let cmd =
-    let mk (pp_pst : bool) (pp_ast : bool) (input : string) =
-      entry { pp_pst; pp_ast; input; }
+    let mk (pp_pst : bool) (pp_ast : bool) (pp_bd : bool ) (input : string) =
+      entry { pp_pst; pp_ast; pp_bd; input; }
     in
 
     let print_pst =
@@ -62,12 +75,16 @@ let main () : unit =
       let doc = "Print the abstract syntax tree" in
       Arg.(value & flag & info ["print-ast"] ~doc) in
 
+    let print_bd =
+      let doc = "Print the bit level dependency" in
+      Arg.(value & flag & info ["print-bd"] ~doc) in
+
     let input =
       let doc = "The specification file" in
       Arg.(required & pos 0 (some string) None & info [] ~docv:"SPEC" ~doc) in
 
     let info = Cmd.info "lospec" in
-    Cmd.v info Term.(const mk $ print_pst $ print_ast $ input)
+    Cmd.v info Term.(const mk $ print_pst $ print_ast $ print_bd $ input)
   in
 
   exit (Cmd.eval cmd)
