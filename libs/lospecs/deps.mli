@@ -1,6 +1,8 @@
+open Ast
+
 (* -------------------------------------------------------------------- *)
 type symbol = string
-type dep1 = Set.Int.t Map.String.t
+type dep1 = Set.Int.t IdentMap.t
 type deps = dep1 Map.Int.t
 
 (* -------------------------------------------------------------------- *)
@@ -13,7 +15,7 @@ val merge1 : dep1 -> dep1 -> dep1
 val merge : deps -> deps -> deps
 val merge1_all : dep1 Enum.t -> dep1
 val merge_all : deps Enum.t -> deps
-val copy : offset:int -> size:int -> symbol -> deps
+val copy : offset:int -> size:int -> ident -> deps
 val chunk : csize:int -> count:int -> deps -> deps
 val perm : csize:int -> perm:int list -> deps -> deps
 val collapse : csize:int -> count:int -> deps -> deps

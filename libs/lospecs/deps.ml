@@ -1,31 +1,34 @@
 (* -------------------------------------------------------------------- *)
+open Ast
+
+(* -------------------------------------------------------------------- *)
 type symbol = string
 
 (* -------------------------------------------------------------------- *)
-type dep1 = Set.Int.t Map.String.t
+type dep1 = Set.Int.t IdentMap.t
 type deps = dep1 Map.Int.t
 
 (* -------------------------------------------------------------------- *)
 let eq_dep1 (d1 : dep1) (d2 : dep1) : bool =
-  Map.String.equal Set.Int.equal d1 d2
+  IdentMap.equal Set.Int.equal d1 d2
 
 (* -------------------------------------------------------------------- *)
 let eq_deps (d1 : deps) (d2 : deps) : bool = Map.Int.equal eq_dep1 d1 d2
 
 (* -------------------------------------------------------------------- *)
 let empty ~(size : int) : deps =
-  0 --^ size |> Enum.map (fun i -> (i, Map.String.empty)) |> Map.Int.of_enum
+  0 --^ size |> Enum.map (fun i -> (i, IdentMap.empty)) |> Map.Int.of_enum
 
 (* -------------------------------------------------------------------- *)
 let enlarge ~(min : int) ~(max : int) (d : deps) : deps =
-  let change = function None -> Some Map.String.empty | Some _ as v -> v in
+  let change = function None -> Some IdentMap.empty | Some _ as v -> v in
 
   min --^ max |> Enum.fold (fun d i -> Map.Int.modify_opt i change d) d
 
 (* -------------------------------------------------------------------- *)
 let clearout ~(min : int) ~(max : int) (d : deps) : deps =
   Map.Int.filter_map
-    (fun i d1 -> Some (if min <= i && i < max then d1 else Map.String.empty))
+    (fun i d1 -> Some (if min <= i && i < max then d1 else IdentMap.empty))
     d
 
 (* -------------------------------------------------------------------- *)
@@ -38,7 +41,7 @@ let recast ~(min : int) ~(max : int) (d : deps) : deps =
 
 (* -------------------------------------------------------------------- *)
 let merge1 (d1 : dep1) (d2 : dep1) : dep1 =
-  Map.String.merge
+  IdentMap.merge
     (fun _ i1 i2 ->
       Some (Set.Int.union (i1 |? Set.Int.empty) (i2 |? Set.Int.empty)))
     d1 d2
@@ -47,7 +50,7 @@ let merge1 (d1 : dep1) (d2 : dep1) : dep1 =
 let merge (d1 : deps) (d2 : deps) : deps =
   Map.Int.merge
     (fun _ m1 m2 ->
-      Some (merge1 (m1 |? Map.String.empty) (m2 |? Map.String.empty)))
+      Some (merge1 (m1 |? IdentMap.empty) (m2 |? IdentMap.empty)))
     d1 d2
 
 (* -------------------------------------------------------------------- *)
@@ -57,10 +60,10 @@ let merge1_all (ds : dep1 Enum.t) : dep1 = Enum.reduce merge1 ds
 let merge_all (ds : deps Enum.t) : deps = Enum.reduce merge ds
 
 (* -------------------------------------------------------------------- *)
-let copy ~(offset : int) ~(size : int) (x : symbol) : deps =
+let copy ~(offset : int) ~(size : int) (x : ident) : deps =
   0 --^ size
   |> Enum.map (fun i ->
-         let di = Map.String.singleton x (Set.Int.singleton (i + offset)) in
+         let di = IdentMap.singleton x (Set.Int.singleton (i + offset)) in
          (i, di))
   |> Map.Int.of_enum
 
@@ -71,7 +74,7 @@ let chunk ~(csize : int) ~(count : int) (d : deps) : deps =
          let d1 =
            0 --^ csize
            |> Enum.map (fun i -> i + (ci * csize))
-           |> Enum.map (fun i -> Map.Int.find_opt i d |> Option.default Map.String.empty)
+           |> Enum.map (fun i -> Map.Int.find_opt i d |> Option.default IdentMap.empty)
            |> merge1_all
          in
          0 --^ csize |> Enum.map (fun i -> (i + (ci * csize), d1)))
@@ -82,7 +85,7 @@ let perm ~(csize : int) ~(perm : int list) (d : deps) : deps =
   List.enum perm
   |> Enum.mapi (fun ci x ->
          Enum.map
-           (fun i -> (i + (ci * csize), Map.Int.find_opt (i + (x * csize)) d |> Option.default Map.String.empty))
+           (fun i -> (i + (ci * csize), Map.Int.find_opt (i + (x * csize)) d |> Option.default IdentMap.empty))
            (0 --^ csize))
   |> Enum.flatten |> Map.Int.of_enum
 
@@ -93,7 +96,7 @@ let collapse ~(csize : int) ~(count : int) (d : deps) : deps =
          let d1 =
            0 --^ csize
            |> Enum.map (fun i -> i + (ci * csize))
-           |> Enum.map (fun i -> Map.Int.find_opt i d |> Option.default Map.String.empty)
+           |> Enum.map (fun i -> Map.Int.find_opt i d |> Option.default IdentMap.empty)
            |> merge1_all
          in
          (ci, d1))
@@ -164,9 +167,9 @@ let bitintv_of_bitset (d : Set.Int.t) =
 
 (* -------------------------------------------------------------------- *)
 let pp_dep1 (fmt : Format.formatter) (d : dep1) =
-  Map.String.iter
+  IdentMap.iter
     (fun x bits ->
-      Format.fprintf fmt "%s -> %a@\n" x pp_bitintv (bitintv_of_bitset bits))
+      Format.fprintf fmt "%s.%d -> %a@\n" (Ident.name x) (Ident.id x) pp_bitintv (bitintv_of_bitset bits))
     d
 
 (* -------------------------------------------------------------------- *)

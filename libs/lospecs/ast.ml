@@ -16,6 +16,8 @@ end = struct
   let id ((_, i) : ident) : int = i
 end
 
+module IdentMap = Map.Make(struct type t = Ident.ident let compare a b = (Ident.id a) - (Ident.id b) end) 
+
 (* -------------------------------------------------------------------- *)
 type ident = Ident.ident [@@deriving yojson]
 

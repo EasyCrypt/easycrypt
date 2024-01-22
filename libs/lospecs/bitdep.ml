@@ -2,29 +2,34 @@
 open Deps
 open Ast
 
+let rec log2 n =
+  if n <= 1 then 0 else 1 + log2 (n asr 1)
+
 (* WIP: Not capable of running the full example yet *)
 (* and some things do not work/ have incorrect semantics *)
-let rec bd_aexpr (ctxt: (aargs * deps) Map.String.t) (e: aexpr) : deps =
+let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
   let { node = e_; type_ = t_; } = e in
   match e_ with 
   | EVar v -> (match t_ with 
-    | `W n -> copy ~offset:(0) ~size:(n) (Ident.name v) 
-    | _ -> copy ~offset:0 ~size:256 (Ident.name v)) (* assuming integers have 256 bits *) 
+    | `W n -> copy ~offset:(0) ~size:(n) v 
+    | _ -> copy ~offset:0 ~size:256 v) (* assuming integers have 256 bits *) 
   | EInt i -> empty ~size:(256) (* Need to know how to handle this case, probably good enough for now *)
-  | ESlice (eb, (eo, cnt, sz)) -> (* verify indianess on this & check new syntax *)
-      (match eo.node with
-      | EInt i -> eb |> (bd_aexpr ctxt) |> offset ~offset:(-i) |> restrict ~min:(0) ~max:(cnt*sz)
+  | ESlice (eb, (es, len, scale)) -> (* verify indianess on this & check new syntax *)
+      (match es.node with
+      | EInt i -> eb |> (bd_aexpr ctxt) |> offset ~offset:(-i*scale) |> restrict ~min:(0) ~max:(len*scale)
       | _ -> 
         let n = (match eb.type_ with | `W n -> n | _ -> failwith "cant var slice int") 
         in let bdb = eb 
           |> (bd_aexpr ctxt) 
           |> chunk ~csize:(n) ~count:(1) 
-        in let bdo = eo
+        in let bdo = es
           |> (bd_aexpr ctxt) (* |> (fun d -> if Map.Int.is_empty d then empty ~size:(1) else d) *)
-          |> (let rec bitlen (m:int) = (match m with | 1 -> 1 | m -> 1 + bitlen (m/2)) in
-          collapse ~csize:(bitlen n) ~count:(1)) |> (fun d -> Map.Int.find_opt 0 d |> Option.default Map.String.empty) |> constant ~size:(n) 
+          |> collapse ~csize:(log2 n + 1) ~count:(1) 
+          |> (fun d -> Map.Int.find_opt 0 d 
+          |> Option.default IdentMap.empty) 
+          |> constant ~size:(n) 
           (* Best guess without specific knowledge, result depends on ceil(log2(base_size)) bits of index *)
-        in merge bdb bdo |> restrict ~min:0 ~max:(cnt*sz)) (* Need to check how to handle variable offsets *)
+        in merge bdb bdo |> restrict ~min:0 ~max:(len*scale)) (* Need to check how to handle variable offsets *)
   | EMap ((`W n, `W m), (params, fb), args) -> 
       let bdfb = (bd_aexpr ctxt) fb in
       let bdargs = List.map (bd_aexpr ctxt) args in
@@ -32,7 +37,7 @@ let rec bd_aexpr (ctxt: (aargs * deps) Map.String.t) (e: aexpr) : deps =
       let k = (match fb.type_ with | `W k -> k | _ -> failwith "anon fun in map should ret word") in
       0 --^ m 
         |> Enum.map (fun i ->
-          List.fold_left (fun d (v, t) -> propagate ~offset:(i*n) (v |> fst |> Ident.name) t d) bdfb subs 
+          List.fold_left (fun d (v, t) -> propagate ~offset:(i*n) (v |> fst) t d) bdfb subs 
           |> offset ~offset:(i*k))
         |> Enum.fold merge (empty ~size:0)
   | EConcat (`W n, args) -> 
@@ -73,16 +78,16 @@ let rec bd_aexpr (ctxt: (aargs * deps) Map.String.t) (e: aexpr) : deps =
           |> restrict ~min:n ~max:m 
           |> offset ~offset:(-n) 
           |> chunk ~csize:(m-n) ~count:1
-          |> (fun d -> Option.default Map.String.empty (Map.Int.find_opt 0 d))
-          |> constant ~size:m
-        in merge d hd
+          |> (fun d -> Option.default IdentMap.empty (Map.Int.find_opt 0 d))
+          |> constant ~size:n
+        in restrict ~min:0 ~max:n d |> merge hd
       | _ -> failwith "Cannot saturate/clamp integers, convert to word first")
   | EApp (f, es) -> 
-    (match Map.String.find_opt (Ident.name f) ctxt with
+    (match IdentMap.find_opt f ctxt with
       | None -> failwith (String.concat " " [(Ident.name f); "function binding not found"])
       | Some (args, d) -> 
         let subs = List.combine 
-                  (List.map (fun arg -> arg |> fst |> Ident.name) args) 
+                  (List.map (fun arg -> arg |> fst) args) 
                   (List.map (bd_aexpr ctxt) es) in
         List.fold_left (fun d sub -> propagate ~offset:0 (fst sub) (snd sub) d) d subs
     )
@@ -90,9 +95,9 @@ let rec bd_aexpr (ctxt: (aargs * deps) Map.String.t) (e: aexpr) : deps =
       (match args with
         | None | Some [] ->
           let bd1, bd2 = ((bd_aexpr ctxt) e1, (bd_aexpr ctxt) e2) in
-          propagate ~offset:0 (Ident.name v) bd1 bd2
+          propagate ~offset:0 v bd1 bd2
         | Some args -> 
-          bd_aexpr (Map.String.add (Ident.name v) (args, ((bd_aexpr ctxt) e1)) ctxt) e2
+          bd_aexpr (IdentMap.add v (args, ((bd_aexpr ctxt) e1)) ctxt) e2
       )
   | ECond (ec, (ect, ecf)) ->
       let bd, bdt, bdf = ((bd_aexpr ctxt) ec, (bd_aexpr ctxt) ect, (bd_aexpr ctxt) ecf) in
@@ -118,7 +123,7 @@ let rec bd_aexpr (ctxt: (aargs * deps) Map.String.t) (e: aexpr) : deps =
       |> restrict ~min:(0) ~max:(n)
   | EOr  (`W n, (e1, e2)) -> merge ((bd_aexpr ctxt) e1) ((bd_aexpr ctxt) e2)
   | EAnd (`W n, (e1, e2)) -> merge ((bd_aexpr ctxt) e1) ((bd_aexpr ctxt) e2)
-  | EMul (mulk, `W n, (e1, e2)) -> 
+  | EMul (mulk, `W n, (e1, e2)) -> (* recheck n bounds for consistency *)
       let (d1, d2) = ((bd_aexpr ctxt) e1, (bd_aexpr ctxt) e2) in
       1 --^ (match mulk with | `U `D | `S `D | `US -> n | _ -> 2*n) |> Enum.fold (fun d i -> d 
         |> merge (offset ~offset:(i) d1) 
@@ -131,7 +136,7 @@ let rec bd_aexpr (ctxt: (aargs * deps) Map.String.t) (e: aexpr) : deps =
   | ECmp (`W n, us, gte, (e1, e2)) -> (* check this *)
       let d = merge ((bd_aexpr ctxt) e1) ((bd_aexpr ctxt) e2) in
         d |> chunk ~csize:n ~count:1
-          |> (fun d -> Option.default Map.String.empty (Map.Int.find_opt 0 d))
+          |> (fun d -> Option.default IdentMap.empty (Map.Int.find_opt 0 d))
           |> constant ~size:1
           (* Alternative for last two lines is |> restrict ~min:0 ~max:1 *)
   | EAssign (eb, (eo, _, sz), er) -> 
@@ -144,12 +149,12 @@ let rec bd_aexpr (ctxt: (aargs * deps) Map.String.t) (e: aexpr) : deps =
       |> merge rd |> merge bd |> merge (chunk ~csize:k ~count:1 od) 
 
   (* propagate v deps to t deps in d *)
-and propagate ~(offset:int) (v: symbol) (t: deps) (d: deps) : deps =
+and propagate ~(offset:int) (v: ident) (t: deps) (d: deps) : deps =
   Map.Int.map (fun d1 -> 
-    match (Map.String.find_opt v d1) with
+    match (IdentMap.find_opt v d1) with
     | None -> d1
     | Some si -> si |> Set.Int.enum 
-      |> Enum.fold (fun acc i -> merge1 acc (Option.default (Map.String.empty) (Map.Int.find_opt (i + offset) t))) (Map.String.remove v d1)) d
+      |> Enum.fold (fun acc i -> merge1 acc (Option.default (IdentMap.empty) (Map.Int.find_opt (i + offset) t))) (IdentMap.remove v d1)) d
 
 let bd_adef (df: adef) =
-  bd_aexpr Map.String.empty df.body 
+  bd_aexpr IdentMap.empty df.body 
