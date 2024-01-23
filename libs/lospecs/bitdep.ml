@@ -13,7 +13,9 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
   | EVar v -> (match t_ with 
     | `W n -> copy ~offset:(0) ~size:(n) v 
     | _ -> copy ~offset:0 ~size:256 v) (* assuming integers have 256 bits *) 
+
   | EInt i -> empty ~size:(256) (* Need to know how to handle this case, probably good enough for now *)
+
   | ESlice (eb, (es, len, scale)) -> (* verify indianess on this & check new syntax *)
       (match es.node with
       | EInt i -> eb |> (bd_aexpr ctxt) |> offset ~offset:(-i*scale) |> restrict ~min:(0) ~max:(len*scale)
@@ -30,6 +32,7 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
           |> constant ~size:(n) 
           (* Best guess without specific knowledge, result depends on ceil(log2(base_size)) bits of index *)
         in merge bdb bdo |> restrict ~min:0 ~max:(len*scale)) (* Need to check how to handle variable offsets *)
+
   | EMap ((`W n, `W m), (params, fb), args) -> 
       let bdfb = (bd_aexpr ctxt) fb in
       let bdargs = List.map (bd_aexpr ctxt) args in
@@ -40,16 +43,19 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
           List.fold_left (fun d (v, t) -> propagate ~offset:(i*n) (v |> fst) t d) bdfb subs 
           |> offset ~offset:(i*k))
         |> Enum.fold merge (empty ~size:0)
+
   | EConcat (`W n, args) -> 
       (match (List.hd args).type_ with
       | `W m -> aggregate ~csize:(m) (Enum.map (bd_aexpr ctxt) (List.enum args))
       | _ -> failwith "Cannot concat words (typing should catch this)")
+
   | ERepeat (`W n, (e, i)) -> (
       let rec doit (acc: deps list) (d: deps) (i: int) =
         match i with
         | 0 -> acc
         | _ -> doit (d::acc) d (i-1)
       in aggregate ~csize:(n/i) (List.enum (doit [] ((bd_aexpr ctxt) e) i)))
+
   | EShift (lr, la, (eb, es)) -> 
       let bd = (bd_aexpr ctxt) eb in
       (match (es.node, eb.type_) with
@@ -64,12 +70,14 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
           let (db, ds) = ((bd_aexpr ctxt) eb, (bd_aexpr ctxt) es) in
           merge (chunk ~csize:n ~count:1 db) (ds |> enlarge ~min:0 ~max:n |> chunk ~csize:n ~count:1)
       | _ -> failwith "Cant slice non-word")
+
   | EExtend (us, `W n, e) ->
       (match e.type_ with
       | `W m -> 
           let d = (bd_aexpr ctxt) e in
           enlarge ~min:0 ~max:n d
       | _ -> failwith "Cannot extend integers, only words") (* check this *)
+
   | ESat (us, `W n, e) -> (* first sat approximation: sat-length bits depend on everything *)
       (match e.type_ with (* check this *)
       | `W m -> 
@@ -82,6 +90,7 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
           |> constant ~size:n
         in restrict ~min:0 ~max:n d |> merge hd
       | _ -> failwith "Cannot saturate/clamp integers, convert to word first")
+
   | EApp (f, es) -> 
     (match IdentMap.find_opt f ctxt with
       | None -> failwith (String.concat " " [(Ident.name f); "function binding not found"])
@@ -91,6 +100,7 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
                   (List.map (bd_aexpr ctxt) es) in
         List.fold_left (fun d sub -> propagate ~offset:0 (fst sub) (snd sub) d) d subs
     )
+
   | ELet ((v, args, e1), e2) -> (* expand this *)
       (match args with
         | None | Some [] ->
@@ -99,30 +109,41 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
         | Some args -> 
           bd_aexpr (IdentMap.add v (args, ((bd_aexpr ctxt) e1)) ctxt) e2
       )
+
   | ECond (ec, (ect, ecf)) ->
       let bd, bdt, bdf = ((bd_aexpr ctxt) ec, (bd_aexpr ctxt) ect, (bd_aexpr ctxt) ecf) in
-      bd |> merge bdt |> merge bdf (* check this also *)
+      (match ect.type_ with
+      | `W n -> chunk ~csize:n ~count:1 bd |> merge bdt |> merge bdf
+      | _ -> failwith "Should return word"
+      )
+
   | ENot (`W n, e) ->
       (bd_aexpr ctxt) e (* bits depend on bits in the same pos *)
+
   | EIncr (`W n, e) -> (* semantics = e + 1 *)
       let d = (bd_aexpr ctxt) e in
       1 --^ n |> Enum.fold (fun d_ i -> d_
         |> merge (offset ~offset:(i) d)) d
       |> restrict ~min:(0) ~max:(n) 
+
   | EAdd (`W n, _, (e1, e2)) -> (* add and sub assuming no overflow *)
       let (d1, d2) = ((bd_aexpr ctxt) e1, (bd_aexpr ctxt) e2) in
       1 --^ n |> Enum.fold (fun d i -> d 
         |> merge (offset ~offset:(i) d1) 
         |> merge (offset ~offset:(i) d2)) (merge d1 d2)
       |> restrict ~min:(0) ~max:(n)
+
   | ESub (`W n, (e1, e2)) -> 
       let (d1, d2) = ((bd_aexpr ctxt) e1, (bd_aexpr ctxt) e2) in
       1 --^ n |> Enum.fold (fun d i -> d 
         |> merge (offset ~offset:(i) d1) 
         |> merge (offset ~offset:(i) d2)) (merge d1 d2)
       |> restrict ~min:(0) ~max:(n)
+
   | EOr  (`W n, (e1, e2)) -> merge ((bd_aexpr ctxt) e1) ((bd_aexpr ctxt) e2)
+
   | EAnd (`W n, (e1, e2)) -> merge ((bd_aexpr ctxt) e1) ((bd_aexpr ctxt) e2)
+
   | EMul (mulk, `W n, (e1, e2)) -> (* recheck n bounds for consistency *)
       let (d1, d2) = ((bd_aexpr ctxt) e1, (bd_aexpr ctxt) e2) in
       1 --^ (match mulk with | `U `D | `S `D | `US -> n | _ -> 2*n) |> Enum.fold (fun d i -> d 
@@ -133,12 +154,14 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
       | `U `H | `S `H       -> (fun d -> d |> restrict ~min:(n) ~max:(2*n) |> offset ~offset:(-n))
       | `U `L | `S `L       -> restrict ~min:(0) ~max:(n)
       )
+
   | ECmp (`W n, us, gte, (e1, e2)) -> (* check this *)
       let d = merge ((bd_aexpr ctxt) e1) ((bd_aexpr ctxt) e2) in
         d |> chunk ~csize:n ~count:1
           |> (fun d -> Option.default IdentMap.empty (Map.Int.find_opt 0 d))
           |> constant ~size:1
           (* Alternative for last two lines is |> restrict ~min:0 ~max:1 *)
+
   | EAssign (eb, (eo, _, sz), er) -> 
       let bd = bd_aexpr ctxt eb in
       let od = bd_aexpr ctxt eo in
@@ -147,6 +170,8 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
       1 --^ (k/sz) |> Enum.fold (fun d i -> 
         merge (offset ~offset:(sz*i) rd) d) rd
       |> merge rd |> merge bd |> merge (chunk ~csize:k ~count:1 od) 
+
+
 
   (* propagate v deps to t deps in d *)
 and propagate ~(offset:int) (v: ident) (t: deps) (d: deps) : deps =
