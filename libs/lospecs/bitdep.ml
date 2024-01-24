@@ -21,9 +21,11 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
       | EInt i -> eb |> (bd_aexpr ctxt) |> offset ~offset:(-i*scale) |> restrict ~min:(0) ~max:(len*scale)
       | _ -> 
         let n = (match eb.type_ with | `W n -> n | _ -> failwith "cant var slice int") 
-        in let bdb = eb 
-          |> (bd_aexpr ctxt) 
-          |> chunk ~csize:(n) ~count:(1) 
+        in let bdb_ = bd_aexpr ctxt eb
+        in let bdb = 
+          0 --^ n / scale 
+          |> Enum.fold (fun d i -> offset bdb_ ~offset:(-i*scale) |> merge d) bdb_
+          |> restrict ~min:(0) ~max:(len*scale)
         in let bdo = es
           |> (bd_aexpr ctxt) (* |> (fun d -> if Map.Int.is_empty d then empty ~size:(1) else d) *)
           |> collapse ~csize:(log2 n + 1) ~count:(1) 
@@ -74,8 +76,16 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
   | EExtend (us, `W n, e) ->
       (match e.type_ with
       | `W m -> 
-          let d = (bd_aexpr ctxt) e in
-          enlarge ~min:0 ~max:n d
+          (match us with
+          | `U -> 
+            let d = (bd_aexpr ctxt) e in
+            enlarge ~min:0 ~max:n d
+          | `S -> 
+            let d = (bd_aexpr ctxt) e in
+            constant ~size:(n-m) (Option.default IdentMap.empty (Map.Int.find_opt (m-1) d))
+            |> offset ~offset:m
+            |> merge (enlarge ~min:0 ~max:n d)
+          )
       | _ -> failwith "Cannot extend integers, only words") (* check this *)
 
   | ESat (us, `W n, e) -> (* first sat approximation: sat-length bits depend on everything *)
