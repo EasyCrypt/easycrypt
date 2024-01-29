@@ -136,12 +136,16 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
         |> merge (offset ~offset:(i) d)) d
       |> restrict ~min:(0) ~max:(n) 
 
-  | EAdd (`W n, _, (e1, e2)) -> (* add and sub assuming no overflow *)
+  | EAdd (`W n, us, (e1, e2)) -> (* add and sub assuming no overflow *)
       let (d1, d2) = ((bd_aexpr ctxt) e1, (bd_aexpr ctxt) e2) in
-      1 --^ n |> Enum.fold (fun d i -> d 
-        |> merge (offset ~offset:(i) d1) 
-        |> merge (offset ~offset:(i) d2)) (merge d1 d2)
-      |> restrict ~min:(0) ~max:(n)
+      (match us with
+      | `Word -> 
+        1 --^ n |> Enum.fold (fun d i -> d 
+          |> merge (offset ~offset:(i) d1) 
+          |> merge (offset ~offset:(i) d2)) (merge d1 d2)
+        |> restrict ~min:(0) ~max:(n)
+      | `Sat _ -> merge (chunk ~csize:(n) ~count:1 d1) (chunk ~csize:(n) ~count:1 d2)
+      )
 
   | ESub (`W n, (e1, e2)) -> 
       let (d1, d2) = ((bd_aexpr ctxt) e1, (bd_aexpr ctxt) e2) in
@@ -154,6 +158,7 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
 
   | EAnd (`W n, (e1, e2)) -> merge ((bd_aexpr ctxt) e1) ((bd_aexpr ctxt) e2)
 
+  (* check this, maybe sub for a worse bound *)
   | EMul (mulk, `W n, (e1, e2)) -> (* recheck n bounds for consistency *)
       let (d1, d2) = ((bd_aexpr ctxt) e1, (bd_aexpr ctxt) e2) in
       1 --^ (match mulk with | `U `D | `S `D | `US -> n | _ -> 2*n) |> Enum.fold (fun d i -> d 

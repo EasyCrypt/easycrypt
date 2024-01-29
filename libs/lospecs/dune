@@ -7,7 +7,7 @@
  (public_name easycrypt.lospecs)
  (flags
   (:standard -open Batteries))
- (modules :standard config \ lospecs_test circuit_test bitdep_test)
+ (modules :standard config \ lospecs_test circuit_test bitdep_test evaluator_test)
  (preprocess
   (pps ppx_deriving_yojson))
  (foreign_stubs
@@ -39,6 +39,15 @@
  (modules bitdep_test)
  (promote (until-clean))
  (libraries batteries hex iter lospecs progress))
+
+(executable
+ (name evaluator_test)
+ (flags
+  (:standard -open Batteries))
+ (modules evaluator_test)
+ (promote (until-clean))
+ (libraries batteries hex iter lospecs progress))
+
 
 (ocamllex lexer)
 
