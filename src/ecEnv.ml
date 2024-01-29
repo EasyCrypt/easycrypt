@@ -5,6 +5,7 @@ open EcPath
 open EcAst
 open EcTypes
 open EcCoreFol
+open EcCoreSubst
 open EcMemory
 open EcDecl
 open EcModules
@@ -2629,9 +2630,6 @@ module ModTy = struct
     if List.length mty1.mt_args <> List.length mty2.mt_args then
       raise ModTypeNotEquiv;
 
-    if not (NormMp.equal_restr f_equiv env mty1.mt_restr mty2.mt_restr) then
-      raise ModTypeNotEquiv;
-
     let subst =
       List.fold_left2
         (fun subst (x1, p1) (x2, p2) ->
@@ -2642,12 +2640,19 @@ module ModTy = struct
         EcSubst.empty mty1.mt_params mty2.mt_params
     in
 
+    let mr1 = EcSubst.subst_mod_restr subst mty1.mt_restr in
+    let mr2 = EcSubst.subst_mod_restr subst mty2.mt_restr in
+
+    if not (NormMp.equal_restr f_equiv env mr1 mr2) then begin
+      raise ModTypeNotEquiv
+    end;
+
     if not (
          List.all2
            (fun m1 m2 ->
-             let m1 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m1) in
-             let m2 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m2) in
-               EcPath.m_equal m1 m2)
+              let m1 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m1) in
+              let m2 = NormMp.norm_mpath env (EcSubst.subst_mpath subst m2) in
+              EcPath.m_equal m1 m2)
             mty1.mt_args mty2.mt_args) then
       raise ModTypeNotEquiv
 
@@ -2716,8 +2721,8 @@ module Ty = struct
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     match by_path_opt name env with
     | Some ({ tyd_type = `Concrete body } as tyd) ->
-        EcTypes.Tvar.subst
-          (EcTypes.Tvar.init (List.map fst tyd.tyd_params) args)
+        Tvar.subst
+          (Tvar.init (List.map fst tyd.tyd_params) args)
           body
     | _ -> raise (LookupFailure (`Path name))
 
@@ -2880,8 +2885,7 @@ module Op = struct
 
   let reduce ?mode ?nargs env p tys =
     let op, f = core_reduce ?mode ?nargs env p in
-    EcCoreFol.Fsubst.subst_tvar
-      (EcTypes.Tvar.init (List.map fst op.op_tparams) tys) f
+    Tvar.f_subst ~freshen:true (List.map fst op.op_tparams) tys f
 
   let is_projection env p =
     try  EcDecl.is_proj (by_path p env)
@@ -2975,8 +2979,7 @@ module Ax = struct
   let instanciate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = f } as ax) ->
-        Fsubst.subst_tvar
-          (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
+        Tvar.f_subst ~freshen:true (List.map fst ax.ax_tparams) tys f
     | _ -> raise (LookupFailure (`Path p))
 
   let iter ?name f (env : env) =
@@ -3511,14 +3514,14 @@ module LDecl = struct
   let ld_subst s ld =
     match ld with
     | LD_var (ty, body) ->
-        LD_var (ty_subst s.fs_ty ty, body |> omap (Fsubst.f_subst s))
+        LD_var (ty_subst s ty, body |> omap (Fsubst.f_subst s))
 
     | LD_mem mt ->
-        let mt = EcMemory.mt_subst (ty_subst s.fs_ty) mt
+        let mt = EcMemory.mt_subst (ty_subst s) mt
         in LD_mem mt
 
     | LD_modty p ->
-        let p = gty_as_mod (Fsubst.subst_gty s (GTmodty p))
+        let p = gty_as_mod (Fsubst.gty_subst s (GTmodty p))
         in LD_modty p
 
     | LD_hyp f ->

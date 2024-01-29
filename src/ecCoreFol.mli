@@ -356,65 +356,6 @@ val expr_of_form : EcMemory.memory -> form -> EcTypes.expr
 type mem_pr = EcMemory.memory * form
 
 (* -------------------------------------------------------------------- *)
-type f_subst = private {
-  fs_freshen  : bool; (* true means realloc local *)
-  fs_loc      : form Mid.t;
-  fs_esloc    : expr Mid.t;
-  fs_ty       : ty_subst;
-  fs_mem      : EcIdent.t Mid.t;
-  fs_modglob  : (EcIdent.t -> form) Mid.t;
-  fs_memtype  : EcMemory.memtype option; (* Only substituted in Fcoe *)
-  fs_mempred  : mem_pr Mid.t;  (* For predicates over memories,
-                                 only substituted in Fcoe *)
-}
-
-(* -------------------------------------------------------------------- *)
-module Fsubst : sig
-  val f_subst_id  : f_subst
-  val is_subst_id : f_subst -> bool
-
-  val f_subst_init :
-       ?freshen:bool
-    -> ?sty:ty_subst
-    -> ?esloc:expr Mid.t
-    -> ?mt:EcMemory.memtype
-    -> ?mempred:(mem_pr Mid.t)
-    -> unit -> f_subst
-
-  val f_bind_local  : f_subst -> EcIdent.t -> form -> f_subst
-  val f_bind_mem    : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
-  val f_bind_absmod : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
-  val f_bind_mod    : f_subst -> EcIdent.t -> EcPath.mpath -> (EcIdent.t -> form) -> f_subst
-  val f_bind_rename : f_subst -> EcIdent.t -> EcIdent.t -> ty -> f_subst
-
-  val f_subst   : ?tx:(form -> form -> form) -> f_subst -> form -> form
-
-  val f_subst_local : EcIdent.t -> form -> form -> form
-  val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form
-
-  (* val uni_subst : (EcUid.uid -> ty option) -> f_subst *)
-  (* val uni : (EcUid.uid -> ty option) -> form -> form *)
-  val subst_tvar :
-    ?es_loc:(EcTypes.expr EcIdent.Mid.t) ->
-    EcTypes.ty EcIdent.Mid.t ->
-    form -> form
-
-  val add_binding  : f_subst -> binding  -> f_subst * binding
-  val add_bindings : f_subst -> bindings -> f_subst * bindings
-
-  val subst_lpattern : f_subst -> lpattern -> f_subst * lpattern
-  val subst_xpath    : f_subst -> xpath -> xpath
-  val subst_stmt     : f_subst -> stmt  -> stmt
-  val subst_e        : f_subst -> expr  -> expr
-  val subst_me       : f_subst -> EcMemory.memenv -> EcMemory.memenv
-  val subst_m        : f_subst -> EcIdent.t -> EcIdent.t
-  val subst_ty       : f_subst -> ty -> ty
-  val subst_mty      : f_subst -> module_type -> module_type
-  val subst_oi       : f_subst -> PreOI.t -> PreOI.t
-  val subst_gty      : f_subst -> gty -> gty
-end
-
-(* -------------------------------------------------------------------- *)
 val can_subst : form -> bool
 
 (* -------------------------------------------------------------------- *)

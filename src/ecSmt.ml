@@ -1028,7 +1028,7 @@ and create_op ?(body = false) (genv : tenv) p =
   let lenv, wparams = lenv_of_tparams op.op_tparams in
   let dom, codom = EcEnv.Ty.signature genv.te_env op.op_ty in
   let textra =
-    List.filter (fun (tv,_) -> not (Mid.mem tv (Tvar.fv op.op_ty))) op.op_tparams in
+    List.filter (fun (tv,_) -> not (Mid.mem tv (EcTypes.Tvar.fv op.op_ty))) op.op_tparams in
   let textra =
     List.map (fun (tv,_) -> trans_ty (genv,lenv) (tvar tv)) textra in
   let wdom   = trans_tys (genv, lenv) dom in

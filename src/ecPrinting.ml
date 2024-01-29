@@ -1591,7 +1591,7 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
       let hy   = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
       let mr   = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
       let bd   = form_of_expr mr nt.ont_body in
-      let bd   = Fsubst.subst_tvar ov bd in
+      let bd   = Fsubst.f_subst_tvar ~freshen:true ov bd in
 
       try
         let (ue, ev) =

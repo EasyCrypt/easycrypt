@@ -32,7 +32,6 @@ val s_equal   : stmt -> stmt -> bool
 val s_compare : stmt -> stmt -> int
 val s_hash    : stmt -> int
 val s_fv      : stmt -> int EcIdent.Mid.t
-val s_subst   : e_subst -> stmt -> stmt
 
 (* -------------------------------------------------------------------- *)
 val i_asgn     : lvalue * expr -> instr
