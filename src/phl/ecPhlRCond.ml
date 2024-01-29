@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcIdent
 open EcSymbols
 open EcAst
 open EcTypes
@@ -200,13 +199,14 @@ module LowMatch = struct
       EcMemory.bindall_fresh cvars me0 in
 
     let subst, pvs =
+      let s = Fsubst.f_subst_id in
       let s, pvs =
         List.fold_left_map (fun s ((x, xty), name) ->
             let pv = pv_loc (oget name.ov_name) in
-            let s  = Mid.add x (e_var pv xty) s in
+            let s  = bind_elocal s x (e_var pv xty) in
             (s, (pv, xty)))
-          Mid.empty (List.combine cvars pvs) in
-      ({ e_subst_id with es_loc = s; }, pvs) in
+          s (List.combine cvars pvs) in
+      (s, pvs) in
 
     let frame =
       EcPV.PV.indep env

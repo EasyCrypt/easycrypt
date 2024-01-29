@@ -44,6 +44,13 @@ type mr_xpaths = EcPath.Sx.t use_restr
 type mr_mpaths = EcPath.Sm.t use_restr
 
 (* -------------------------------------------------------------------- *)
+let ur_tostring (type a) (pp : a -> string) (mu : a use_restr) : string =
+  let pos = Option.value ~default:"<none>" (Option.map pp mu.ur_pos) in
+  let neg = pp mu.ur_neg in
+
+  Format.sprintf "{%s, %s}" pos neg
+
+(* -------------------------------------------------------------------- *)
 type ty = {
   ty_node : ty_node;
   ty_fv   : int Mid.t; (* only ident appearing in path *)
@@ -127,7 +134,6 @@ and stmt = {
 }
 
 (* -------------------------------------------------------------------- *)
-
 and oracle_info = {
   oi_calls : xpath list;
   oi_costs : (form * form Mx.t) option;
@@ -602,6 +608,31 @@ let rec mty_equal mty1 mty2 =
   && (List.all2 (pair_equal EcIdent.id_equal mty_equal)
         mty1.mt_params mty2.mt_params)
   && (mr_equal mty1.mt_restr mty2.mt_restr)
+
+(* -------------------------------------------------------------------- *)
+let oi_tostring (oi : oracle_info) : string =
+  let calls = List.map EcPath.x_tostring oi.oi_calls in
+  Format.sprintf "{calls = %s, cost = ?}" (String.concat ", " calls)
+
+(* -------------------------------------------------------------------- *)
+let mr_tostring (mr : mod_restr) : string =
+  let xp =
+    let pp (xps : Sx.t) =
+      String.concat ", " (List.map EcPath.x_tostring (Sx.elements xps))
+    in ur_tostring pp mr.mr_xpaths
+  in
+
+  let mp =
+    let pp (mps : Sm.t) =
+      String.concat ", " (List.map EcPath.m_tostring (Sm.elements mps))
+    in ur_tostring pp mr.mr_mpaths
+  in
+
+  let oi =
+    let do1 (x, oi) = Format.sprintf "%s -> %s" x (oi_tostring oi) in
+    String.concat ", " (List.map do1 (Msym.bindings mr.mr_oinfos)) in
+
+  Format.sprintf "{%s, %s, %s}" xp mp oi
 
 (* -------------------------------------------------------------------- *)
 let lmt_hash lmem =

@@ -409,6 +409,8 @@ val mr_fv    : mod_restr fv
 val mty_equal : module_type equality
 val mty_hash  : module_type hash
 
+val mr_tostring : mod_restr -> string
+
 (* -------------------------------------------------------------------- *)
 val lmt_equal : ty equality -> local_memtype equality
 val lmt_hash : local_memtype hash

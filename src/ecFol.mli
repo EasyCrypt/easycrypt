@@ -7,6 +7,8 @@ open EcMemory
 (* -------------------------------------------------------------------- *)
 include module type of struct include EcCoreFol end
 
+include module type of struct include EcCoreSubst end
+
 (* -------------------------------------------------------------------- *)
 val f_bind_mod : f_subst -> EcIdent.t -> EcPath.mpath -> EcEnv.env -> f_subst
 

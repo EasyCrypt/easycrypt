@@ -317,8 +317,7 @@ module MEV = struct
     v
 
   let assubst ue ev env =
-    let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.assubst ue } in
-    let subst = Fsubst.f_subst_init ~sty:tysubst () in
+    let subst = f_subst_init ~tu:(EcUnify.UniEnv.assubst ue) () in
     let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
     let subst = EV.fold (fun x mp s -> EcFol.f_bind_mod s x mp env) ev.evm_mod subst in
     let seen  = ref Sid.empty in
@@ -576,13 +575,13 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       end
 
       | FcHoareF hf1, FcHoareF hf2 -> begin
-          let x2 = EcFol.Fsubst.subst_xpath subst hf2.chf_f in
+          let x2 = Fsubst.x_subst subst hf2.chf_f in
 
           if not (EcReduction.EqTest.for_xp env hf1.chf_f x2) then
             failure ();
           let mxs = Mid.add EcFol.mhr EcFol.mhr mxs in
 
-          let calls2 = EcPath.Mx.translate (EcFol.Fsubst.subst_xpath subst) hf2.chf_co.c_calls in
+          let calls2 = EcPath.Mx.translate (Fsubst.x_subst subst) hf2.chf_co.c_calls in
 
           EcPath.Mx.fold2_union (fun _ cb1 cb2 () ->
               match cb1, cb2 with
@@ -691,7 +690,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
   and doit_bindings env (subst, mxs) q1 q2 =
     let doit_binding (env, subst, mxs) (x1, gty1) (x2, gty2) =
-      let gty2 = Fsubst.subst_gty subst gty2 in
+      let gty2 = Fsubst.gty_subst subst gty2 in
 
       assert (not (Mid.mem x1 mxs) && not (Mid.mem x2 mxs));
 

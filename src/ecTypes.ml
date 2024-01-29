@@ -2,7 +2,6 @@
 open EcUtils
 open EcIdent
 open EcPath
-open EcUid
 open EcAst
 
 module BI = EcBigInt
@@ -178,109 +177,6 @@ let fresh_id_of_ty (ty : ty) =
   EcIdent.create (symbol_of_ty ty)
 
 (* -------------------------------------------------------------------- *)
-type ty_subst = {
-  ts_absmod    : EcIdent.t Mid.t;
-  ts_cmod      : EcPath.mpath Mid.t;
-  ts_modtglob  : ty Mid.t;
-  ts_u         : ty Muid.t;
-  ts_v         : ty Mid.t;
-}
-
-let ty_subst_id =
-  { ts_absmod = Mid.empty;
-    ts_cmod = Mid.empty;
-    ts_modtglob = Mid.empty;
-    ts_u  = Muid.empty;
-    ts_v  = Mid.empty;
-  }
-
-let is_ty_subst_id s =
-  Mid.is_empty s.ts_absmod
-  && Mid.is_empty s.ts_cmod
-  && Mid.is_empty s.ts_modtglob
-  && Muid.is_empty s.ts_u
-  && Mid.is_empty s.ts_v
-
-let rec ty_subst s =
-  if is_ty_subst_id s then identity
-  else
-    fun ty ->
-      match ty.ty_node with
-      | Tglob m -> begin
-          let m' = Mid.find_def m m s.ts_absmod in
-          begin
-            match Mid.find_opt m' s.ts_modtglob with
-            | None -> tglob m'
-            | Some ty -> ty_subst s ty
-          end
-        end
-      | Tunivar id -> begin
-          match Muid.find_opt id s.ts_u with
-          | None ->
-            ty
-          | Some ty ->
-            ty_subst s ty
-        end
-
-      | Tvar id -> Mid.find_def ty id s.ts_v
-      | _ -> ty_map (ty_subst s) ty
-
-(* -------------------------------------------------------------------- *)
-module Tuni = struct
-
-  let subst (uidmap : ty Muid.t) =
-    { ty_subst_id with ts_u = uidmap }
-
-  let subst1 ((id, t) : uid * ty) =
-    subst (Muid.singleton id t)
-
-  let subst_dom uidmap dom =
-    List.map (ty_subst (subst uidmap)) dom
-
-  let occurs u =
-    let rec aux t =
-      match t.ty_node with
-      | Tunivar u' -> uid_equal u u'
-      | _ -> ty_sub_exists aux t in
-    aux
-
-  let univars =
-    let rec doit univars t =
-      match t.ty_node with
-      | Tunivar uid -> Suid.add uid univars
-      | _ -> ty_fold doit univars t
-
-    in fun t -> doit Suid.empty t
-
-  let rec fv_rec fv t =
-    match t.ty_node with
-    | Tunivar id -> Suid.add id fv
-    | _ -> ty_fold fv_rec fv t
-
-  let fv = fv_rec Suid.empty
-end
-
-(* -------------------------------------------------------------------- *)
-module Tvar = struct
-  let subst (s : ty Mid.t) =
-    ty_subst { ty_subst_id with ts_v = s}
-
-  let subst1 (id,t) =
-    subst (Mid.singleton id t)
-
-  let init lv lt =
-    assert (List.length lv = List.length lt);
-    List.fold_left2 (fun s v t -> Mid.add v t s) Mid.empty lv lt
-
-  let rec fv_rec fv t =
-    match t.ty_node with
-    | Tvar id -> Sid.add id fv
-    | _ -> ty_fold fv_rec fv t
-
-  let fv = fv_rec Sid.empty
-end
-
-(* -------------------------------------------------------------------- *)
 type ovariable = EcAst.ovariable
 
 let ov_name { ov_name = x } = x
@@ -299,6 +195,16 @@ let v_equal = EcAst.v_equal
 
 let ovar_of_var { v_name = n; v_type = t } =
   { ov_name = Some n; ov_type = t }
+
+module Tvar = struct
+
+  let rec fv_rec fv t =
+    match t.ty_node with
+    | Tvar id -> Sid.add id fv
+    | _ -> ty_fold fv_rec fv t
+
+  let fv = fv_rec Sid.empty
+end
 
 let ty_fv_and_tvar (ty : ty) =
   EcIdent.fv_union ty.ty_fv (Mid.map (fun () -> 1) (Tvar.fv ty))
@@ -602,120 +508,6 @@ module MSHe = EcMaps.MakeMSH(struct type t = expr let tag e = e.e_tag end)
 module Me = MSHe.M
 module Se = MSHe.S
 module He = MSHe.H
-
-(* -------------------------------------------------------------------- *)
-type e_subst = {
-    es_freshen : bool; (* true means realloc local *)
-    es_ty      : ty_subst;
-    es_loc     : expr Mid.t;
-}
-
-let e_subst_id = {
-    es_freshen = false;
-    es_ty     = ty_subst_id;
-    es_loc     = Mid.empty;
-}
-
-(* -------------------------------------------------------------------- *)
-let is_e_subst_id s =
-     not s.es_freshen
-  && is_ty_subst_id s.es_ty
-  && Mid.is_empty s.es_loc
-
-(* -------------------------------------------------------------------- *)
-let e_subst_init freshen on_ty esloc =
-  { es_freshen = freshen;
-    es_ty      = on_ty;
-    es_loc     = esloc; }
-
-(* -------------------------------------------------------------------- *)
-let add_local s ((x, t) as xt) =
-  let x' = if s.es_freshen then EcIdent.fresh x else x in
-  let t' = ty_subst s.es_ty t in
-
-    if   x == x' && t == t'
-    then (s, xt)
-    else
-      let merger o = assert (o = None); Some (e_local x' t') in
-        ({ s with es_loc = Mid.change merger x s.es_loc }, (x', t'))
-
-(* -------------------------------------------------------------------- *)
-let add_locals = List.Smart.map_fold add_local
-
-(* -------------------------------------------------------------------- *)
-let subst_lpattern (s: e_subst) (lp:lpattern) =
-  match lp with
-  | LSymbol x ->
-      let (s, x') = add_local s x in
-        (s, LSymbol x')
-
-  | LTuple xs ->
-      let (s, xs') = add_locals s xs in
-        (s, LTuple xs')
-
-  | LRecord (p, xs) ->
-      let (s, xs') =
-        List.Smart.map_fold
-          (fun s ((x, t) as xt) ->
-            match x with
-            | None ->
-                let t' = ty_subst s.es_ty t in
-                  if t == t' then (s, xt) else (s, (x, t'))
-            | Some x ->
-                let (s, (x', t')) = add_local s (x, t) in
-                  if   x == x' && t == t'
-                  then (s, xt)
-                  else (s, (Some x', t')))
-          s xs
-      in
-        (s, LRecord (p, xs'))
-
-(* -------------------------------------------------------------------- *)
-let rec e_subst (s: e_subst) e =
-  match e.e_node with
-  | Elocal id -> begin
-      match Mid.find_opt id s.es_loc with
-      | Some e' -> e'
-      | None    ->
-(* FIXME schema *)
-(*        assert (not s.es_freshen); *)
-        e_local id (ty_subst s.es_ty e.e_ty)
-  end
-
-  | Evar pv ->
-      let pv' = pv_subst (x_subst_abs s.es_ty.ts_cmod) pv in
-      let ty' = ty_subst s.es_ty e.e_ty in
-        e_var pv' ty'
-
-  | Eop (p, tys) ->
-      let tys' = List.Smart.map (ty_subst s.es_ty) tys in
-      let ty'  = ty_subst s.es_ty e.e_ty in
-        e_op p tys' ty'
-
-  | Elet (lp, e1, e2) ->
-      let e1' = e_subst s e1 in
-      let s, lp' = subst_lpattern s lp in
-      let e2' = e_subst s e2 in
-        e_let lp' e1' e2'
-
-  | Equant (q, b, e1) ->
-      let s, b' = add_locals s b in
-      let e1' = e_subst s e1 in
-        e_quantif q b' e1'
-
-  | _ -> e_map (ty_subst s.es_ty) (e_subst s) e
-
-(* -------------------------------------------------------------------- *)
-let e_subst_closure s (args, e) =
-  let (s, args) = add_locals s args in
-    (args, e_subst s e)
-
-(* -------------------------------------------------------------------- *)
-let e_subst s =
-  if is_e_subst_id s then identity
-  else
-    if s.es_freshen then e_subst s
-    else He.memo 107 (e_subst s)
 
 (* -------------------------------------------------------------------- *)
 let is_local e =

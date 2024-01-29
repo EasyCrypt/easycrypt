@@ -11,9 +11,11 @@ module CI = EcCoreLib
 
 (* -------------------------------------------------------------------- *)
 include EcCoreFol
+include EcCoreSubst
 
 (* -------------------------------------------------------------------- *)
-let f_bind_mod s x mp env = Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
+let f_bind_mod s x mp env =
+  Fsubst.f_bind_mod s x mp (fun mem -> EcEnv.NormMp.norm_glob env mem mp)
 
 (* -------------------------------------------------------------------- *)
 let f_eqparams ty1 vs1 m1 ty2 vs2 m2 =
@@ -590,7 +592,8 @@ let rec f_app_simpl f args ty =
   f_betared (f_app f args ty)
 
 and f_betared f =
-  let tx fo fp = if f_equal fo fp || can_betared fo then fp else f_betared fp in
+  let tx ~before:fo ~after:fp =
+    if f_equal fo fp || can_betared fo then fp else f_betared fp in
 
   match f.f_node with
   | Fapp ({ f_node = Fquant (Llambda, bds, body)}, args) ->

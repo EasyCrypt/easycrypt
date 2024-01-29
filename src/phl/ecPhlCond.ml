@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcIdent
 open EcTypes
 open EcModules
 open EcFol
@@ -159,7 +158,7 @@ let t_hoare_match tc =
 
   let do1 ((ids, b), (cname, _)) =
     let subst, lvars =
-      add_locals e_subst_id ids in
+      add_elocals Fsubst.f_subst_id ids in
 
     let cop = EcPath.pqoname (EcPath.prefix indp) cname in
     let cop = f_op cop tyinst (toarrow (List.snd ids) f.f_ty) in
@@ -203,7 +202,7 @@ let t_equiv_match s tc =
 
   let do1 ((ids, b), (cname, _)) =
     let subst, lvars =
-      add_locals e_subst_id ids in
+      add_elocals Fsubst.f_subst_id ids in
 
     let cop = EcPath.pqoname (EcPath.prefix indp) cname in
     let cop = f_op cop tyinst (toarrow (List.snd ids) f.f_ty) in
@@ -259,9 +258,9 @@ let t_equiv_match_same_constr tc =
     f_forall_mems [es.es_ml; es.es_mr] (f_imp_simpl es.es_pr (f_iff lhs rhs)) in
 
   let get_eqv_goal ((c, _), ((cl, bl), (cr, br))) =
-    let sb      = EcTypes.e_subst_id in
-    let sb, bhl = EcTypes.add_locals sb cl in
-    let sb, bhr = EcTypes.add_locals sb cr in
+    let sb      = Fsubst.f_subst_id in
+    let sb, bhl = add_elocals sb cl in
+    let sb, bhr = add_elocals sb cr in
     let cop     = EcPath.pqoname (EcPath.prefix pl) c in
     let copl    = f_op cop tyl (toarrow (List.snd cl) fl.f_ty) in
     let copr    = f_op cop tyr (toarrow (List.snd cr) fr.f_ty) in
@@ -316,14 +315,13 @@ let t_equiv_match_eq tc =
       (f_imp_simpl es.es_pr (f_eq fl fr)) in
 
   let get_eqv_goal ((c, _), ((cl, bl), (cr, br))) =
-    let sb     = { EcTypes.e_subst_id with es_freshen = true; } in
-    let sb, bh = EcTypes.add_locals sb cl in
+    let sb     = f_subst_init () in
+    let sb, bh = add_elocals sb cl in
 
     let sb =
       List.fold_left2
-        (fun sb (x, _) (y, _) ->
-          { sb with es_loc =
-              Mid.add y (oget (Mid.find_opt x sb.es_loc)) sb.es_loc })
+        (fun sb (x, xty) (y, _) ->
+          bind_elocal sb y (e_subst sb (e_local x xty)))
         sb cl cr in
 
     let cop    = EcPath.pqoname (EcPath.prefix pl) c in

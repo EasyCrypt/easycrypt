@@ -5,6 +5,7 @@ open EcTypes
 open EcMemory
 open EcDecl
 open EcCoreFol
+open EcCoreSubst
 open EcModules
 open EcTheory
 

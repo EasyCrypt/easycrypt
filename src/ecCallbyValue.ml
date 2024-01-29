@@ -42,13 +42,13 @@ end = struct
 
   let subst_id       = Fsubst.f_subst_id
   let subst          = Fsubst.f_subst ?tx:None
-  let subst_ty       = Fsubst.subst_ty
-  let subst_xpath    = Fsubst.subst_xpath
-  let subst_m        = Fsubst.subst_m
-  let subst_me       = Fsubst.subst_me
-  let subst_lpattern = Fsubst.subst_lpattern
-  let subst_stmt     = Fsubst.subst_stmt
-  let subst_e        = Fsubst.subst_e
+  let subst_ty       = ty_subst
+  let subst_xpath    = Fsubst.x_subst
+  let subst_m        = Fsubst.m_subst
+  let subst_me       = Fsubst.me_subst
+  let subst_lpattern = Fsubst.lp_subst
+  let subst_stmt     = Fsubst.s_subst
+  let subst_e        = Fsubst.e_subst
   let bind_local     = Fsubst.f_bind_local
   let add_binding    = Fsubst.add_binding
   let add_bindings   = Fsubst.add_bindings
@@ -56,8 +56,8 @@ end = struct
   let bind_locals (s : subst) xs =
     List.fold_left (fun s (x, e) -> bind_local s x e) s xs
 
-  let has_mem (s : subst) (x : ident) =
-    Mid.mem x s.fs_mem
+  let has_mem = Fsubst.has_mem
+
 end
 
 type subst = Subst.subst
@@ -309,8 +309,7 @@ and app_red st f1 args =
 
       let body = EcFol.form_of_expr EcFol.mhr body in
       let body =
-        EcFol.Fsubst.subst_tvar
-          (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
+        Tvar.f_subst ~freshen:true (List.map fst op.EcDecl.op_tparams) tys body in
 
       cbv st subst body (Args.create ty eargs)
     with E.NoCtor ->

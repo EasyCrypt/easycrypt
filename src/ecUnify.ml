@@ -6,6 +6,7 @@ open EcUtils
 open EcUid
 open EcAst
 open EcTypes
+open EcCoreSubst
 open EcDecl
 
 module Sp = EcPath.Sp
@@ -355,7 +356,7 @@ module UniEnv = struct
     List.map (fun (tv, _) -> subst (tvar tv)) params
 
   let openty_r ue params tvi =
-    let subst = { ty_subst_id with ts_v = (opentvi ue params tvi) } in
+    let subst = f_subst_init ~tv:(opentvi ue params tvi) () in
       (subst, subst_tv (ty_subst subst) params)
 
   let opentys ue params tvi tys =
@@ -466,7 +467,7 @@ let select_op ?(hidden = false) ?(filter = fun _ _ -> true) tvi env name ue psig
         | OB_nott nt ->
            let substnt () =
              let xs = List.map (snd_map (ty_subst tip)) nt.D.ont_args in
-             let es = e_subst { e_subst_id with es_ty = tip } in
+             let es = e_subst tip in
              let bd = es nt.D.ont_body in
              (xs, bd)
            in Some (Lazy.from_fun substnt)

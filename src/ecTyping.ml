@@ -1583,9 +1583,8 @@ let expr_of_opselect
              let xs = List.map (fst_map EcIdent.fresh) xs in
              ((args @ List.map (curry e_local) xs, []), xs) in
          let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
-         let subst = { EcTypes.e_subst_id with es_freshen = true; } in
-         let subst = { subst with es_loc = Mid.of_list lcmap; } in
-         let body  = EcTypes.e_subst subst body in
+         let subst = f_subst_init ~freshen:true ~esloc:(Mid.of_list lcmap) () in
+         let body  = e_subst subst body in
          (e_lam elam body, args)
 
     | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
@@ -2211,8 +2210,7 @@ let rec trans_restr_compl env env_in (params : Sm.t) (r_compl : pcompl option) =
     let subs = try EcUnify.UniEnv.close ue with
       | EcUnify.UninstanciateUni ->
         tyerror (loc form) env FreeTypeVariables in
-    let sty = { ty_subst_id with ts_u = subs } in
-    let fs = EcFol.Fsubst.f_subst_init ~sty:sty () in
+    let fs = f_subst_init ~tu:subs () in
     EcFol.Fsubst.f_subst fs tform in
 
   match r_compl with
@@ -2620,7 +2618,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       if not (UE.closed ue) then
         tyerror st.pl_loc env (OnlyMonoTypeAllowed None);
 
-      let clsubst = { EcTypes.e_subst_id with es_ty = ts } in
+      let clsubst = ts in
       let stmt    = s_subst clsubst stmt
       and result  = result |> omap (e_subst clsubst) in
       let stmt    = EcModules.stmt (List.flatten prelude @ stmt.s_node) in
@@ -2810,7 +2808,7 @@ and fundef_check_iasgn subst_uni env ((mode, pl), init, loc) =
     | `Tuple  -> [LvTuple pl]
   in
 
-  let clsubst = { EcTypes.e_subst_id with es_ty = subst_uni } in
+  let clsubst = subst_uni in
   let init    = e_subst clsubst init in
 
     List.map (fun lv -> i_asgn (lv, init)) pl
