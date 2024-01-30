@@ -703,7 +703,6 @@ end = struct
     | OVK_Abbrev    -> "abbreviation"
     | OVK_Theory    -> "theory"
     | OVK_Lemma     -> "lemma/axiom"
-    | OVK_ModExpr   -> "module"
     | OVK_ModType   -> "module type"
 
   let pp_incompatible env fmt = function
@@ -734,6 +733,10 @@ end = struct
     | CE_UnkOverride (kd, x) ->
         msg "unknown %s `%s'"
           (string_of_ovkind kd) (string_of_qsymbol x)
+
+    | CE_ThyOverride x ->
+        msg "Cannot override theory `%s`: contains module"
+          (string_of_qsymbol x)
 
     | CE_UnkAbbrev x ->
         msg "unknown abbreviation: `%s'" (string_of_qsymbol x)

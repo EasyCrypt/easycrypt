@@ -1191,7 +1191,6 @@ and theory_override =
 | PTHO_Op     of op_override
 | PTHO_Pred   of pr_override
 | PTHO_Axiom  of ax_override
-| PTHO_Module of me_override
 | PTHO_ModTyp of mt_override
 | PTHO_Theory of th_override
 

@@ -23,13 +23,13 @@ type ovkind =
 | OVK_Abbrev
 | OVK_Theory
 | OVK_Lemma
-| OVK_ModExpr
 | OVK_ModType
 
 type clone_error =
 | CE_UnkTheory         of qsymbol
 | CE_DupOverride       of ovkind * qsymbol
 | CE_UnkOverride       of ovkind * qsymbol
+| CE_ThyOverride       of qsymbol
 | CE_UnkAbbrev         of qsymbol
 | CE_TypeArgMism       of ovkind * qsymbol
 | CE_OpIncompatible    of qsymbol * incompatible
@@ -336,26 +336,6 @@ end = struct
     (pr :: proofs, evc)
 
   (* ------------------------------------------------------------------ *)
-  let modexpr_ovrd oc ((proofs, evc) : state) name (med : me_override) =
-    let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
-
-    let () =
-      match find_modexpr oc.oc_oth name with
-      | None ->
-         clone_error oc.oc_env (CE_UnkOverride (OVK_ModExpr, name));
-      | _ -> () in
-
-    let evc =
-      evc_update
-        (fun evc ->
-         if Msym.mem x evc.evc_modexprs then
-           clone_error oc.oc_env (CE_DupOverride (OVK_ModExpr, name));
-         { evc with evc_modexprs = Msym.add x (mk_loc lc med) evc.evc_modexprs })
-        nm evc
-
-    in (proofs, evc)
-
-  (* ------------------------------------------------------------------ *)
   let modtype_ovrd oc ((proofs, evc) : state) name (mtd : mt_override) =
     let { pl_loc = lc; pl_desc = ((nm, x) as name) } = name in
 
@@ -387,6 +367,18 @@ end = struct
          clone_error oc.oc_env (CE_UnkOverride (OVK_Theory, name))
       | Some ({cth_mode = `Concrete} as th) -> th
     in
+
+    let rec contains_module cth =
+      let doit it =
+        match it.ti_item with
+        | Th_module _ -> true
+        | Th_theory (_, cth) -> contains_module cth
+        | _ -> false
+      in
+      List.exists doit cth.cth_items
+    in
+    if contains_module dth then
+      clone_error oc.oc_env (CE_ThyOverride name);
 
     let sp =
       match EcEnv.Theory.lookup_opt (unloc thd) oc.oc_env with
@@ -436,10 +428,8 @@ end = struct
       | Th_export _ ->
          (proofs, evc)
 
-      | Th_module m ->
-         modexpr_ovrd
-           oc (proofs, evc) (loced (xdth @ prefix, m.tme_expr.me_name))
-           (loced (thd @ prefix, m.tme_expr.me_name), mode)
+      | Th_module _ ->
+         (proofs, evc)
 
       | Th_modtype (x, _) ->
          modtype_ovrd
@@ -473,9 +463,6 @@ end = struct
 
      | PTHO_Axiom axd ->
         ax_ovrd oc state name axd
-
-     | PTHO_Module med ->
-       modexpr_ovrd oc state name med
 
      | PTHO_ModTyp mtd ->
        modtype_ovrd oc state name mtd
