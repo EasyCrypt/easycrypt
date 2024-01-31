@@ -177,13 +177,14 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
           |> constant ~size:1
           (* Alternative for last two lines is |> restrict ~min:0 ~max:1 *)
 
-  | EAssign (eb, (eo, _, sz), er) -> 
+  | EAssign (eb, (eo, len, scale), er) ->
+      let () = assert (len == 1) in
       let bd = bd_aexpr ctxt eb in
       let od = bd_aexpr ctxt eo in
       let rd = bd_aexpr ctxt er in
       let k = (match eb.type_ with | `W n -> n | _ -> failwith "Cant slice assign an int") in
-      1 --^ (k/sz) |> Enum.fold (fun d i -> 
-        merge (offset ~offset:(sz*i) rd) d) rd
+      1 --^ (k/scale) |> Enum.fold (fun d i -> 
+        merge (offset ~offset:(scale*i) rd) d) rd
       |> merge rd |> merge bd |> merge (chunk ~csize:k ~count:1 od) 
 
 
