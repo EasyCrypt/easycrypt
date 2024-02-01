@@ -1,6 +1,6 @@
 open Ast
 
-type bitword = Z.t * int
+type bitword = Z.t * int 
 
 let default_int_size = 256
 
@@ -38,7 +38,7 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
         List.map fst bwargs
       end in
       let subs = List.combine (List.map fst params) bwargs in
-      let k = (match fb.type_ with | `W k -> k | _ -> failwith "anon fun in map should ret word") in
+(*      let k = (match fb.type_ with | `W k -> k | _ -> failwith "anon fun in map should ret word") in *)
       let res = 0 --^ m 
         |> Enum.map (fun i -> 
           let map_ctxt = List.fold_left (fun acc x -> IdentMap.add (fst x) (Z.((snd x asr (Int.mul i n)) land (full_bitmask n)), n) acc) ctxt subs
@@ -194,20 +194,34 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
       (Z.((fst b1) land (fst b2)), n)
     end
 
-(*
+
+  (* need to check semantics later *)
   | EMul (mulk, `W n, (e1, e2)) -> (* recheck n bounds for consistency *)
       let bw1 = eval_aexpr fctxt ctxt e1 in
       let bw2 = eval_aexpr fctxt ctxt e2 in
       begin
-        assert (n == snd bw1);
-        assert (snd b1 == snd bw2);
-        (match mulk with
-        | `U hld ->
-        let res = Z.((fst b1) * (fst b2)) in
-
+        assert (snd bw1 == n); 
+        assert (snd bw1 == snd bw2);
+        (match mulk with 
+        | `US -> let sbw2 = if (fst bw2) < Z.(one lsl (Int.sub n 1)) then (fst bw2) else Z.((fst bw2) + (one lsl n)) in
+                 let res = Z.((fst bw1) * sbw2) in
+                 (Z.( (if res < zero then res + (one lsl (Int.mul 2 n)) else res) land (full_bitmask (Int.mul 2 n ))), 2*n)
+        | `U hld -> let res = Z.((fst bw1) * (fst bw2)) in 
+        (match hld with
+          | `H -> (Z.((res asr n) land (full_bitmask n)), n)
+          | `L -> (Z.( res land (full_bitmask n)), n)
+          | `D -> (Z.( res land (full_bitmask (Int.mul 2 n))), 2*n))
+        | `S hld -> 
+          let sbw1 = if (fst bw1) < Z.(one lsl (Int.sub n 1)) then (fst bw1) else Z.((fst bw1) + (one lsl n)) in
+          let sbw2 = if (fst bw2) < Z.(one lsl (Int.sub n 1)) then (fst bw2) else Z.((fst bw2) + (one lsl n)) in
+          let res = Z.(sbw1 * sbw2) in
+          (match hld with
+          | `H -> (Z.((res asr n) land (full_bitmask n)), n)
+          | `L -> (Z.( res land (full_bitmask n)), n)
+          | `D -> (Z.( res land (full_bitmask (Int.mul 2 n))), 2*n))
         )
       end
-*)
+
 
  
   | ECmp (`W n, us, gte, (e1, e2)) -> (* check this *)
@@ -229,7 +243,7 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
     let (wb, nb) = eval_aexpr fctxt ctxt eb in
     let (wo, no) = eval_aexpr fctxt ctxt eo in
     let (wr, nr) = eval_aexpr fctxt ctxt er in
-    let k = (match eb.type_ with | `W n -> n | _ -> failwith "Cant slice assign an int") in
+(*    let k = (match eb.type_ with | `W n -> n | _ -> failwith "Cant slice assign an int") in *)
     let mask = Z.((full_bitmask nr) lsl (Int.mul (to_int wo) scale)) in
     let arr_mask = Z.((full_bitmask nb) lxor mask) in
     (Z.((wb land arr_mask) lor ((wr lsl (Int.mul (to_int wo) scale)) land mask)), nb)
