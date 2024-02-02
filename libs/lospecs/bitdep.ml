@@ -51,12 +51,14 @@ let rec bd_aexpr (ctxt: (aargs * deps) IdentMap.t) (e: aexpr) : deps =
       | `W m -> aggregate ~csize:(m) (Enum.map (bd_aexpr ctxt) (List.enum args))
       | _ -> failwith "Cannot concat words (typing should catch this)")
 
-  | ERepeat (`W n, (e, i)) -> (
-      let rec doit (acc: deps list) (d: deps) (i: int) =
+  | ERepeat (`W n, (e, i)) ->
+      (*let rec doit (acc: deps list) (d: deps) (i: int) =
         match i with
         | 0 -> acc
         | _ -> doit (d::acc) d (i-1)
-      in aggregate ~csize:(n/i) (List.enum (doit [] ((bd_aexpr ctxt) e) i)))
+      in aggregate ~csize:(n/i) (List.enum (doit [] ((bd_aexpr ctxt) e) i))) *)
+      let bd = bd_aexpr ctxt e 
+      in aggregate ~csize:(n/i) (List.init i (fun _ -> bd) |> List.enum)
 
   | EShift (lr, la, (eb, es)) -> 
       let bd = (bd_aexpr ctxt) eb in
