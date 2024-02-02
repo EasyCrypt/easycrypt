@@ -7,6 +7,28 @@ let default_int_size = 256
 let full_bitmask (n:int) : Z.t = 
   Z.((one lsl n) - one)
 
+let from_int_list (lst: int list) (n: int) : bitword =
+  (List.fold_left (fun acc x -> Z.((acc lsl n) + ((of_int x) land (full_bitmask n)))) Z.zero lst,
+  n* (List.length lst))
+
+let usat ((bw, bn): bitword) (n: int) : bitword = 
+  if (bw < Z.(one lsl n)) then (bw, n) else (full_bitmask n, n)
+
+let sbw_to_sbint ((bw, bn): bitword) : Z.t = 
+  if (bw < Z.(one lsl (Int.sub bn 1))) then bw else Z.(bw - one lsl bn)
+
+(* TODO: finish this function 
+let sbint_to_sbw (i: Z.t) (n: int) : bitword =
+  if i >= 0 then (Z.(i land (full_bitmask (Int.sub n 1))), n)
+  else (Z.((-i
+  *)
+
+let ssat ((bw, bn): bitword) (n: int) : bitword =
+  let v = sbw_to_sbint (bw, bn) in
+  if v >= Z.(one lsl (Int.sub n 1)) then (full_bitmask (n-1), n) else
+  if v < Z.(- ( one lsl (Int.sub n 1))) then (Z.(one lsl (Int.sub n 1)), n)
+  else ((if v >= Z.zero then v else Z.(v + (one lsl n))), n)
+
 let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t) (e: aexpr) : bitword =
   let { node = e_; type_ = t_; } = e in
   match e_ with 
@@ -25,7 +47,7 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
       let sz = len*scale in
       let sa = (match es.node with
       | EInt sa -> sa
-      | _       -> eval_aexpr fctxt ctxt es |> fst |> Z.to_int)
+      | _       -> eval_aexpr fctxt ctxt es |> fst |> Z.to_int) * scale
       in begin 
         assert (sa + sz <= snd bw);
         (Z.(((fst bw) asr sa) land ((one lsl (sz)) - one)), sz)
@@ -59,12 +81,12 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
     end
 
   | ERepeat (`W n, (e, i)) -> 
-    let bw = eval_aexpr fctxt ctxt e in
+    let (bw, bn) = eval_aexpr fctxt ctxt e in
     begin
-      assert (snd bw == n);
+      assert (bn*i == n);
       let v = (0 --^ i |> Enum.fold (fun acc x -> 
-      Z.((acc lsl (n)) + (fst bw))) (Z.of_int 0))
-      in (v, n*i)
+      Z.((acc lsl (bn)) + bw)) (Z.of_int 0))
+      in (v, n)
     end
 
   (* might need refactoring *)
@@ -95,14 +117,11 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
 
 
 
-  | ESat (us, `W n, e) -> (* first sat approximation: sat-length bits depend on everything *)
+  | ESat (us, `W n, e) -> 
     let bw = eval_aexpr fctxt ctxt e in
-    ((match us with
-     | `U -> if Z.((fst bw) < (one lsl n)) then (fst bw) else (full_bitmask (n))
-     | `S -> if Z.((fst bw) < (one lsl (Int.sub n 1))) then (fst bw) 
-             else (if Z.(((fst bw) - (one lsl (snd bw))) < -(one lsl (Int.sub n 1)))
-             then Z.(one lsl (Int.sub n 1)) else full_bitmask (n-1))), (snd bw))
-
+    (match us with
+     | `U -> usat bw n 
+     | `S -> ssat bw n)
  
   | EApp (f, es) -> 
     (match IdentMap.find_opt f fctxt with
@@ -146,23 +165,16 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
       (Z.(((fst bw) + one) land (full_bitmask n)), n)
     end
 
-  (* ignoring overflow for now *)
-  | EAdd (`W n, us, (e1, e2)) -> (* add and sub assuming no overflow *)
+    (* TEST THIS *)
+  | EAdd (`W n, us, (e1, e2)) -> 
     let bw1 = eval_aexpr fctxt ctxt e1 in
     let bw2 = eval_aexpr fctxt ctxt e2 in
     let () = (assert (snd bw1 == snd bw2 && snd bw1 == n)) in
     let res = Z.( (fst bw1) + (fst bw2)) in
     (match us with
     | `Word ->   (Z.(res land (full_bitmask n)), n)
-    | `Sat `U -> ((if Z.(res > (one lsl n)) 
-                  then full_bitmask n 
-                  else res), n)
-    | `Sat `S -> (if Z.(res < (one lsl (Int.sub n 1))) 
-                  then res
-                  else (if Z.((res - (one lsl n)) < -(one lsl (Int.sub n 1)))
-                        then Z.(one lsl (Int.sub n 1)) 
-                        else full_bitmask (n-1)))
-                  , n)
+    | `Sat `U -> usat (res, n+1) n 
+    | `Sat `S -> ssat (res, n+1) n) (* check this *) 
  
   | ESub (`W n, (e1, e2)) -> 
       let b1 = eval_aexpr fctxt ctxt e1 in
@@ -261,4 +273,5 @@ and propagate ~(offset:int) (v: ident) (t: deps) (d: deps) : deps =
 
 let eval_adef (df: adef) (args: bitword list) =
   assert (List.compare_lengths df.arguments args == 0);
+  assert (List.fold (&&) true (List.map (fun ((_, bsz), (_, `W n)) -> bsz == n) (List.combine args df.arguments)));
   eval_aexpr (IdentMap.empty) (List.combine (List.map fst df.arguments) args |> List.enum |> IdentMap.of_enum) df.body
