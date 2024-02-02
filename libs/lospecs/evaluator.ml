@@ -76,8 +76,8 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
   | EConcat (`W n, args) -> 
     let args = List.map (eval_aexpr fctxt ctxt) args in
     begin 
-      assert (List.hd args |> snd == n);
-      (List.fold_left (fun acc x -> Z.((acc lsl n) + (fst x))) (Z.of_int 0) args, n*(List.length args))
+      assert (List.map snd args |> List.fold_left (+) 0 == n);
+      (List.fold_left (fun acc (bw, bn) -> Z.((acc lsl bn) + bw)) (Z.of_int 0) args, n)
     end
 
   | ERepeat (`W n, (e, i)) -> 
