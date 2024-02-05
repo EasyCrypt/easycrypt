@@ -14,6 +14,30 @@ SRA8(w@8, i@4) -> @8 =
 SRL8(w@8, i@4) -> @8 = 
   srl<8>(w, uextend<4, 8>(i))
 
+SLL14(w@14, i@4) -> @14 = 
+  sll<14>(w, uextend<4, 8>(i))
+
+SRA14(w@14, i@4) -> @14 = 
+  sra<14>(w, uextend<4, 8>(i))
+
+SRL14(w@14, i@4) -> @14 = 
+  srl<14>(w, uextend<4, 8>(i))
+
+ADD(w1@9, w2@9) -> @9 =
+  add<9>(w1, w2)
+
+INCR(w@11) -> @11 =
+  incr<11>(w)
+
+SUB(w1@9, w2@9) -> @9 =
+  sub<9>(w1, w2)
+
+UMUL(w1@10, w2@10) -> @20 =
+  umul<10>(w1, w2)
+
+SMUL(w1@10, w2@10) -> @20 =
+  smul<10>(w1, w2)
+
 ## Intel intrinsic: _mm256_permutexvar_epi32
 #VPERMD(w@256, widx@256) -> @256 =
 #  map<32, 8>(

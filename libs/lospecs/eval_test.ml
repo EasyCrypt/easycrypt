@@ -205,7 +205,7 @@ let test_shift14 (ast: (Ast.symbol * Ast.adef) list) ~(side : [`L | `R]) ~(sign 
 
 (*
 (* -------------------------------------------------------------------- *)
-let test_opp () =
+let test_opp  (ast: (Ast.symbol * Ast.adef) list) =
   let op (size : int) : op =
     let module M = (val Word.sword ~size) in
 
@@ -220,9 +220,10 @@ let test_opp () =
     }
 
   in test (op 13)
-
+*)
 (* -------------------------------------------------------------------- *)
-let test_add () =
+
+let test_add (ast: (Ast.symbol * Ast.adef) list) =
   let op (size : int) : op =
     let module M = (val Word.sword ~size) in
 
@@ -232,14 +233,14 @@ let test_add () =
     { name = (Format.sprintf "add<%d>" size)
     ; args = List.make 2 (size, `S)
     ; out  = `S
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.add_dropc x y)
+    ; def  = List.find (fun x -> (compare (fst x) "ADD") == 0) ast |> snd
     ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
     }
 
   in test (op 9)
 
 (* -------------------------------------------------------------------- *)
-let test_incr () =
+let test_incr  (ast: (Ast.symbol * Ast.adef) list) =
   let op (size : int) : op =
     let module M = (val Word.uword ~size) in
 
@@ -249,14 +250,14 @@ let test_incr () =
     { name = (Format.sprintf "incr<%d>" size)
     ; args = [(size, `U)]
     ; out  = `U
-    ; mk   = (fun rs -> C.incr_dropc (as_seq1 rs))
+    ; def  = List.find (fun x -> (compare (fst x) "INCR") == 0) ast |> snd
     ; reff = (fun vs -> sim (as_seq1 vs));
   }
 
   in test (op 11)
 
 (* -------------------------------------------------------------------- *)
-let test_sub () =
+let test_sub  (ast: (Ast.symbol * Ast.adef) list) =
   let op (size : int) : op =
     let module M = (val Word.sword ~size) in
 
@@ -266,38 +267,38 @@ let test_sub () =
     { name = (Format.sprintf "sub<%d>" size)
     ; args = List.make 2 (size, `S)
     ; out  = `S
-    ; mk   = (fun rs -> let x, y = as_seq2 rs in C.sub_dropc x y)
+    ; def  = List.find (fun x -> (compare (fst x) "SUB") == 0) ast |> snd
     ; reff = (fun vs -> let x, y = as_seq2 vs in sim x y)
     }
 
   in test (op 9)
 
 (* -------------------------------------------------------------------- *)
-let test_umul () =
+let test_umul  (ast: (Ast.symbol * Ast.adef) list) =
   let op (sz1 : int) (sz2 : int) : op = {
     name = (Format.sprintf "umul<%d,%d>" sz1 sz2);
     args = [(sz1, `U); (sz2, `U)];
     out  = `U;
-    mk   = (fun rs -> let x, y = as_seq2 rs in C.umul x y);
+    def  = List.find (fun x -> (compare (fst x) "UMUL") == 0) ast |> snd;
     reff = (fun vs -> let x, y = as_seq2 vs in (x * y));
   } in
 
-  test (op 10 8)
+  test (op 10 10)
 
 (* -------------------------------------------------------------------- *)
-let test_smul () =
+let test_smul  (ast: (Ast.symbol * Ast.adef) list) =
   let op (sz1 : int) (sz2 : int) : op = {
     name = (Format.sprintf "smul<%d,%d>" sz1 sz2);
     args = [(sz1, `S); (sz2, `S)];
     out  = `S;
-    mk   = (fun rs -> let x, y = as_seq2 rs in C.smul x y);
+    def  = List.find (fun x -> (compare (fst x) "SMUL") == 0) ast |> snd;
     reff = (fun vs -> let x, y = as_seq2 vs in (x * y));
   } in
 
-  test (op 10 8)
-
+  test (op 10 10)
+(*
 (* -------------------------------------------------------------------- *)
-let test_smul_u8_s8 () =
+let test_smul_u8_s8  (ast: (Ast.symbol * Ast.adef) list) =
   let op () : op = {
     name = "smul_u8_s8";
     args = [(8, `U); (8, `S)];
@@ -313,7 +314,7 @@ let test_smul_u8_s8 () =
   test (op ())
 
   (* -------------------------------------------------------------------- *)
-let test_ssat () =
+let test_ssat  (ast: (Ast.symbol * Ast.adef) list) =
   let op (isize : int) (osize: int) : op =
     let saturate =
       let vm, vM = srange_ osize in
@@ -331,7 +332,7 @@ let test_ssat () =
   test (op 17 16)
 
 (* -------------------------------------------------------------------- *)
-let test_usat () =
+let test_usat  (ast: (Ast.symbol * Ast.adef) list) =
   let op (isize : int) (osize: int) : op =
     let saturate =
       let vm, vM = urange_ osize in
@@ -348,7 +349,7 @@ let test_usat () =
   test (op 15 7)
 
 (* -------------------------------------------------------------------- *)
-let test_sgt () =
+let test_sgt  (ast: (Ast.symbol * Ast.adef) list) =
   let op (size : int) =
     {  name = Format.sprintf "sgt<%d>" size;
         args = [(size, `S); (size, `S)];
@@ -360,7 +361,7 @@ let test_sgt () =
   test (op 10)
 
 (* -------------------------------------------------------------------- *)
-let test_sge () =
+let test_sge  (ast: (Ast.symbol * Ast.adef) list) =
   let op (size : int) =
     {  name = Format.sprintf "sge<%d>" size;
         args = [(size, `S); (size, `S)];
@@ -372,7 +373,7 @@ let test_sge () =
   test (op 10)
 
 (* -------------------------------------------------------------------- *)
-let test_ugt () =
+let test_ugt  (ast: (Ast.symbol * Ast.adef) list) =
   let op (size : int) =
     {  name = Format.sprintf "ugt<%d>" size;
         args = [(size, `U); (size, `U)];
@@ -384,7 +385,7 @@ let test_ugt () =
   test (op 10)
 
 (* -------------------------------------------------------------------- *)
-let test_uge () =
+let test_uge  (ast: (Ast.symbol * Ast.adef) list) =
   let op (size : int) =
     {  name = Format.sprintf "uge<%d>" size;
         args = [(size, `U); (size, `U)];
@@ -542,7 +543,7 @@ let test_vp (total : int) (op : vpop) =
   )
 
 (* -------------------------------------------------------------------- *)
-let test_vpadd_16u16 () =
+let test_vpadd_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpadd_16u16";
     args = List.make 2 `M256;
@@ -553,7 +554,7 @@ let test_vpadd_16u16 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpadd_32u8 () =
+let test_vpadd_32u8  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpadd_32u8";
     args = List.make 2 `M256;
@@ -564,7 +565,7 @@ let test_vpadd_32u8 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpsub_16u16 () =
+let test_vpsub_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpsub_16u16";
     args = List.make 2 `M256;
@@ -575,7 +576,7 @@ let test_vpsub_16u16 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpsub_32u8 () =
+let test_vpsub_32u8  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpsub_32u8";
     args = List.make 2 `M256;
@@ -586,7 +587,7 @@ let test_vpsub_32u8 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpsra_16u16 () =
+let test_vpsra_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op (offset : int) = {
     name = Format.sprintf "vpsra_16u16<%d>" offset;
     args = [`M256];
@@ -597,7 +598,7 @@ let test_vpsra_16u16 () =
   Iter.iter (fun i -> test_vp 10000 (op i)) (Iter.(--) 0x00 0x10)
 
 (* -------------------------------------------------------------------- *)
-let test_vpsrl_16u16 () =
+let test_vpsrl_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op (offset : int) = {
     name = Format.sprintf "vpsrl_16u16<%d>" offset;
     args = [`M256];
@@ -608,7 +609,7 @@ let test_vpsrl_16u16 () =
   Iter.iter (fun i -> test_vp 10000 (op i)) (Iter.(--) 0x00 0x10)
 
 (* -------------------------------------------------------------------- *)
-let test_vpand_256 () =
+let test_vpand_256  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpand_256";
     args = List.make 2 `M256;
@@ -619,7 +620,7 @@ let test_vpand_256 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpmulh_16u16 () =
+let test_vpmulh_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpmulh_16u16";
     args = List.make 2 `M256;
@@ -630,7 +631,7 @@ let test_vpmulh_16u16 () =
   test_vp 200 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpmulhrs_16u16 () =
+let test_vpmulhrs_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpmulhrs_16u16";
     args = List.make 2 `M256;
@@ -641,7 +642,7 @@ let test_vpmulhrs_16u16 () =
   test_vp 200 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpackus_16u16 () =
+let test_vpackus_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpackus_16u16";
     args = List.make 2 `M256;
@@ -652,7 +653,7 @@ let test_vpackus_16u16 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpackss_16u16 () =
+let test_vpackss_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpackss_16u16";
     args = List.make 2 `M256;
@@ -663,7 +664,7 @@ let test_vpackss_16u16 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpmaddubsw_256 () =
+let test_vpmaddubsw_256  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpmaddubsw_256";
     args = List.make 2 `M256;
@@ -674,7 +675,7 @@ let test_vpmaddubsw_256 () =
   test_vp 200 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpermd () =
+let test_vpermd  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpermd";
     args = List.make 2 `M256;
@@ -685,7 +686,7 @@ let test_vpermd () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpermq () =
+let test_vpermq  (ast: (Ast.symbol * Ast.adef) list) =
   let op (imm8 : int) = {
     name = Format.sprintf "vpermq<%d>" imm8;
     args = [`M256];
@@ -697,7 +698,7 @@ let test_vpermq () =
   test_vp 10000 (op 0xf7)
 
 (* -------------------------------------------------------------------- *)
-let test_vbshufb_256 () =
+let test_vbshufb_256  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vbshufb_256";
     args = List.make 2 `M256;
@@ -708,7 +709,7 @@ let test_vbshufb_256 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpcmpgt_16u16 () =
+let test_vpcmpgt_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpcmpgt_16u16";
     args = List.make 2 `M256;
@@ -719,7 +720,7 @@ let test_vpcmpgt_16u16 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpmovmskb_u256u64 () =
+let test_vpmovmskb_u256u64  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "vpmovmskb_u256u64";
     args = [`M256];
@@ -738,7 +739,7 @@ let test_vpmovmskb_u256u64 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpunpckl_32u8 () =
+let test_vpunpckl_32u8  (ast: (Ast.symbol * Ast.adef) list) =
   let op = {
     name = "test_vpunpckl_32u8";
     args = List.make 2 `M256;
@@ -749,7 +750,7 @@ let test_vpunpckl_32u8 () =
   test_vp 10000 op
 
 (* -------------------------------------------------------------------- *)
-let test_vpblend_16u16 () =
+let test_vpblend_16u16  (ast: (Ast.symbol * Ast.adef) list) =
   let op (imm8 : int) = {
     name = Format.sprintf "test_vpblend_16u16<%d>" imm8;
     args = List.make 2 `M256;
@@ -762,7 +763,7 @@ let test_vpblend_16u16 () =
   test_vp 10000 (op 0xaa)
 
 (* -------------------------------------------------------------------- *)
-let test_extracti128 () =
+let test_extracti128 (ast: (Ast.symbol * Ast.adef) list) =
   let op (i : int) = {
     name = Format.sprintf "test_extracti128<%d>" i;
     args = [`M256];
@@ -774,7 +775,7 @@ let test_extracti128 () =
   test_vp 10000 (op 1)
 
 (* -------------------------------------------------------------------- *)
-let test_inserti128 () =
+let test_inserti128 (ast: (Ast.symbol * Ast.adef) list) =
   let op (i : int) = {
     name = Format.sprintf "test_inserti128<%d>" i;
     args = [`M256; `M128];
@@ -789,27 +790,31 @@ let test_inserti128 () =
 (* -------------------------------------------------------------------- *)
 let tests = [
 (*  ("opp" , test_opp ); *)
-(*  ("incr", test_incr);
+  ("incr", test_incr); 
   ("add" , test_add );
   ("sub" , test_sub );
-  ("umul", test_umul);
-  ("smul", test_smul);
-  ("ssat", test_ssat);
-  ("usat", test_usat);
+  ("umul", test_umul); 
+  ("smul", test_smul); 
+(*  ("ssat", test_ssat); *)
+(*  ("usat", test_usat); *)
 
-  ("sgt", test_sgt);
-  ("sge", test_sge);
+(*  ("sgt", test_sgt); *)
+(*  ("sge", test_sge); *)
 
-  ("ugt", test_ugt);
-  ("uge", test_uge);
+(*  ("ugt", test_ugt); *)
+(*  ("uge", test_uge); *)
 
+  ("lsl8", (fun ast -> test_shift8 ast ~side:`L ~sign:`U));
+  ("lsr8", (fun ast -> test_shift8 ast ~side:`R ~sign:`U));
 
-  *)
-  ("lsl", (fun ast -> test_shift8 ast ~side:`L ~sign:`U));
-  ("lsr", (fun ast -> test_shift8 ast ~side:`R ~sign:`U));
+  ("asl8", (fun ast -> test_shift8 ast ~side:`L ~sign:`S));
+  ("asr8", (fun ast -> test_shift8 ast ~side:`R ~sign:`S));
 
-  ("asl", (fun ast -> test_shift8 ast ~side:`L ~sign:`S));
-  ("asr", (fun ast -> test_shift8 ast ~side:`R ~sign:`S));
+  ("lsl14", (fun ast -> test_shift14 ast ~side:`L ~sign:`U));
+  ("lsr14", (fun ast -> test_shift14 ast ~side:`R ~sign:`U));
+
+  ("asl14", (fun ast -> test_shift14 ast ~side:`L ~sign:`S));
+  ("asr14", (fun ast -> test_shift14 ast ~side:`R ~sign:`S));
 (*
   ("smul_u8_s8", test_smul_u8_s8);
 *)

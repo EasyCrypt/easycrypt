@@ -227,9 +227,10 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
           | `L -> (Z.( res land (full_bitmask n)), n)
           | `D -> (Z.( res land (full_bitmask (Int.mul 2 n))), 2*n))
         | `S hld -> 
-          let sbw1 = if (fst bw1) < Z.(one lsl (Int.sub n 1)) then (fst bw1) else Z.((fst bw1) + (one lsl n)) in
-          let sbw2 = if (fst bw2) < Z.(one lsl (Int.sub n 1)) then (fst bw2) else Z.((fst bw2) + (one lsl n)) in
+          let sbw1 = if (fst bw1) < Z.(one lsl (Int.sub n 1)) then (fst bw1) else Z.((fst bw1) - (one lsl n)) in
+          let sbw2 = if (fst bw2) < Z.(one lsl (Int.sub n 1)) then (fst bw2) else Z.((fst bw2) - (one lsl n)) in
           let res = Z.(sbw1 * sbw2) in
+          let res = (if Z.(res < zero) then Z.(erem res (one lsl (Int.mul n 2))) else res) in
           (match hld with
           | `H -> (Z.((res asr n) land (full_bitmask n)), n)
           | `L -> (Z.( res land (full_bitmask n)), n)
