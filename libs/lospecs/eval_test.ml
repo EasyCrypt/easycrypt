@@ -296,25 +296,21 @@ let test_smul  (ast: (Ast.symbol * Ast.adef) list) =
   } in
 
   test (op 10 10)
-(*
+
 (* -------------------------------------------------------------------- *)
 let test_smul_u8_s8  (ast: (Ast.symbol * Ast.adef) list) =
   let op () : op = {
     name = "smul_u8_s8";
     args = [(8, `U); (8, `S)];
     out  = `S;
-    mk   = (fun rs ->
-              let x, y = as_seq2 rs in
-              C.smul
-                (C.uextend ~size:16 x)
-                (C.sextend ~size:16 y));
+    def  = List.find (fun x -> (compare (fst x) "USMUL") == 0) ast |> snd;
     reff = (fun vs -> let x, y = as_seq2 vs in (x * y));
   } in
 
   test (op ())
 
-  (* -------------------------------------------------------------------- *)
-let test_ssat  (ast: (Ast.symbol * Ast.adef) list) =
+(* -------------------------------------------------------------------- *)
+let test_ssat10_4 (ast: (Ast.symbol * Ast.adef) list) =
   let op (isize : int) (osize: int) : op =
     let saturate =
       let vm, vM = srange_ osize in
@@ -324,15 +320,43 @@ let test_ssat  (ast: (Ast.symbol * Ast.adef) list) =
  {  name = (Format.sprintf "ssat<%d,%d>" isize osize);
     args = [(isize, `S)];
     out  = `S;
-    mk   = (fun rs -> C.sat ~signed:true ~size:osize (as_seq1 rs));
+    def  = List.find (fun x -> (compare (fst x) "SSAT10_4") == 0) ast |> snd;
     reff = (fun vs -> saturate (as_seq1 vs)); } in
 
-  test (op 10 4);
-  test (op 15 7);
+  test (op 10 4)
+
+let test_ssat15_7 (ast: (Ast.symbol * Ast.adef) list) =
+  let op (isize : int) (osize: int) : op =
+    let saturate =
+      let vm, vM = srange_ osize in
+      fun (i : int) -> min vM (max vm i)
+    in
+
+ {  name = (Format.sprintf "ssat<%d,%d>" isize osize);
+    args = [(isize, `S)];
+    out  = `S;
+    def  = List.find (fun x -> (compare (fst x) "SSAT15_7") == 0) ast |> snd;
+    reff = (fun vs -> saturate (as_seq1 vs)); } in
+
+  test (op 15 7)
+
+let test_ssat17_16 (ast: (Ast.symbol * Ast.adef) list) =
+  let op (isize : int) (osize: int) : op =
+    let saturate =
+      let vm, vM = srange_ osize in
+      fun (i : int) -> min vM (max vm i)
+    in
+
+ {  name = (Format.sprintf "ssat<%d,%d>" isize osize);
+    args = [(isize, `S)];
+    out  = `S;
+    def  = List.find (fun x -> (compare (fst x) "SSAT17_16") == 0) ast |> snd;
+    reff = (fun vs -> saturate (as_seq1 vs)); } in
+
   test (op 17 16)
 
 (* -------------------------------------------------------------------- *)
-let test_usat  (ast: (Ast.symbol * Ast.adef) list) =
+let test_usat10_4  (ast: (Ast.symbol * Ast.adef) list) =
   let op (isize : int) (osize: int) : op =
     let saturate =
       let vm, vM = urange_ osize in
@@ -342,11 +366,26 @@ let test_usat  (ast: (Ast.symbol * Ast.adef) list) =
  {  name = (Format.sprintf "usat<%d,%d>" isize osize);
     args = [(isize, `S)];
     out  = `U;
-    mk   = (fun rs -> C.sat ~signed:false ~size:osize (as_seq1 rs));
+    def  = List.find (fun x -> (compare (fst x) "USAT10_4") == 0) ast |> snd;
     reff = (fun vs -> saturate (as_seq1 vs)); } in
 
-  test (op 10 4);
+  test (op 10 4)
+
+let test_usat15_7  (ast: (Ast.symbol * Ast.adef) list) =
+  let op (isize : int) (osize: int) : op =
+    let saturate =
+      let vm, vM = urange_ osize in
+      fun (i : int) -> min vM (max vm i)
+    in
+
+ {  name = (Format.sprintf "usat<%d,%d>" isize osize);
+    args = [(isize, `S)];
+    out  = `U;
+    def  = List.find (fun x -> (compare (fst x) "USAT15_7") == 0) ast |> snd;
+    reff = (fun vs -> saturate (as_seq1 vs)); } in
+
   test (op 15 7)
+
 
 (* -------------------------------------------------------------------- *)
 let test_sgt  (ast: (Ast.symbol * Ast.adef) list) =
@@ -354,7 +393,7 @@ let test_sgt  (ast: (Ast.symbol * Ast.adef) list) =
     {  name = Format.sprintf "sgt<%d>" size;
         args = [(size, `S); (size, `S)];
         out  = `U;
-        mk   = (fun rs -> let x, y = as_seq2 rs in [C.sgt x y]);
+        def  = List.find (fun x -> (compare (fst x) "SGT") == 0) ast |> snd;
         reff = (fun vs -> let x, y = as_seq2 vs in if x > y then 1 else 0); }
 
   in
@@ -366,7 +405,7 @@ let test_sge  (ast: (Ast.symbol * Ast.adef) list) =
     {  name = Format.sprintf "sge<%d>" size;
         args = [(size, `S); (size, `S)];
         out  = `U;
-        mk   = (fun rs -> let x, y = as_seq2 rs in [C.sge x y]);
+        def  = List.find (fun x -> (compare (fst x) "SGE") == 0) ast |> snd;
         reff = (fun vs -> let x, y = as_seq2 vs in if x >= y then 1 else 0); }
 
   in
@@ -378,7 +417,7 @@ let test_ugt  (ast: (Ast.symbol * Ast.adef) list) =
     {  name = Format.sprintf "ugt<%d>" size;
         args = [(size, `U); (size, `U)];
         out  = `U;
-        mk   = (fun rs -> let x, y = as_seq2 rs in [C.ugt x y]);
+        def  = List.find (fun x -> (compare (fst x) "UGT") == 0) ast |> snd;
         reff = (fun vs -> let x, y = as_seq2 vs in if x > y then 1 else 0); }
 
   in
@@ -389,8 +428,8 @@ let test_uge  (ast: (Ast.symbol * Ast.adef) list) =
   let op (size : int) =
     {  name = Format.sprintf "uge<%d>" size;
         args = [(size, `U); (size, `U)];
-        out  = `U;
-        mk   = (fun rs -> let x, y = as_seq2 rs in [C.uge x y]);
+        out  = `U; 
+        def  = List.find (fun x -> (compare (fst x) "UGE") == 0) ast |> snd;
         reff = (fun vs -> let x, y = as_seq2 vs in if x >= y then 1 else 0); }
 
   in
@@ -795,14 +834,17 @@ let tests = [
   ("sub" , test_sub );
   ("umul", test_umul); 
   ("smul", test_smul); 
-(*  ("ssat", test_ssat); *)
-(*  ("usat", test_usat); *)
+  ("ssat10_4",  test_ssat10_4 ); 
+  ("ssat15_7",  test_ssat15_7 ); 
+  ("ssat17_16", test_ssat17_16); 
+  ("usat10_4",  test_usat10_4 ); 
+  ("usat15_7",  test_usat15_7 ); 
 
-(*  ("sgt", test_sgt); *)
-(*  ("sge", test_sge); *)
+  ("sgt", test_sgt); 
+  ("sge", test_sge); 
 
-(*  ("ugt", test_ugt); *)
-(*  ("uge", test_uge); *)
+  ("ugt", test_ugt); 
+  ("uge", test_uge); 
 
   ("lsl8", (fun ast -> test_shift8 ast ~side:`L ~sign:`U));
   ("lsr8", (fun ast -> test_shift8 ast ~side:`R ~sign:`U));
@@ -815,9 +857,9 @@ let tests = [
 
   ("asl14", (fun ast -> test_shift14 ast ~side:`L ~sign:`S));
   ("asr14", (fun ast -> test_shift14 ast ~side:`R ~sign:`S));
-(*
+
   ("smul_u8_s8", test_smul_u8_s8);
-*)
+
   ("uextend", test_uextend);
   ("sextend", test_sextend);
 (*

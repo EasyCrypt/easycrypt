@@ -11,9 +11,6 @@ let from_int_list (lst: int list) (n: int) : bitword =
   (List.fold_left (fun acc x -> Z.((acc lsl n) + ((of_int x) land (full_bitmask n)))) Z.zero lst,
   n* (List.length lst))
 
-let usat ((bw, bn): bitword) (n: int) : bitword = 
-  if (bw < Z.(one lsl n)) then (bw, n) else (full_bitmask n, n)
-
 let sbw_to_sbint ((bw, bn): bitword) : Z.t = 
   if (bw < Z.(one lsl (Int.sub bn 1))) then bw else Z.(bw - (one lsl bn))
 
@@ -25,6 +22,13 @@ let sbint_to_sbw (i: Z.t) (n: int) : bitword =
 let from_int (i: int) (n:int) ~(signed: bool) =
   if signed then sbint_to_sbw (Z.of_int i) n else
   (Z.((of_int i) land (full_bitmask n)), n)
+
+(* assuming argument is signed *)
+let usat ((bw, bn): bitword) (n: int) : bitword = 
+  let k = sbw_to_sbint (bw, bn) in
+  if (k < Z.(one lsl n)) then 
+    if (k >= Z.zero) then (bw, n) else (Z.zero, n) 
+  else (full_bitmask n, n)
 
 let ssat ((bw, bn): bitword) (n: int) : bitword =
   let v = sbw_to_sbint (bw, bn) in
@@ -218,7 +222,7 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
         assert (snd bw1 == n); 
         assert (snd bw1 == snd bw2);
         (match mulk with 
-        | `US -> let sbw2 = if (fst bw2) < Z.(one lsl (Int.sub n 1)) then (fst bw2) else Z.((fst bw2) + (one lsl n)) in
+        | `US -> let sbw2 = if (fst bw2) < Z.(one lsl (Int.sub n 1)) then (fst bw2) else Z.((fst bw2) - (one lsl n)) in
                  let res = Z.((fst bw1) * sbw2) in
                  (Z.( (if res < zero then res + (one lsl (Int.mul 2 n)) else res) land (full_bitmask (Int.mul 2 n ))), 2*n)
         | `U hld -> let res = Z.((fst bw1) * (fst bw2)) in 
