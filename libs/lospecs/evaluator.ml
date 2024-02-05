@@ -15,13 +15,16 @@ let usat ((bw, bn): bitword) (n: int) : bitword =
   if (bw < Z.(one lsl n)) then (bw, n) else (full_bitmask n, n)
 
 let sbw_to_sbint ((bw, bn): bitword) : Z.t = 
-  if (bw < Z.(one lsl (Int.sub bn 1))) then bw else Z.(bw - one lsl bn)
+  if (bw < Z.(one lsl (Int.sub bn 1))) then bw else Z.(bw - (one lsl bn))
 
-(* TODO: finish this function 
+(* needs to be tested *)
 let sbint_to_sbw (i: Z.t) (n: int) : bitword =
-  if i >= 0 then (Z.(i land (full_bitmask (Int.sub n 1))), n)
-  else (Z.((-i
-  *)
+  if i >= Z.zero then (Z.(i land (full_bitmask (Int.sub n 1))), n)
+  else (Z.(erem i (one lsl n)), n)
+
+let from_int (i: int) (n:int) ~(signed: bool) =
+  if signed then sbint_to_sbw (Z.of_int i) n else
+  (Z.((of_int i) land (full_bitmask n)), n)
 
 let ssat ((bw, bn): bitword) (n: int) : bitword =
   let v = sbw_to_sbint (bw, bn) in
@@ -94,11 +97,11 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
       let (bb, sz) = eval_aexpr fctxt ctxt eb in
       let bs = eval_aexpr fctxt ctxt es |> fst |> Z.to_int in
       ((match (lr, la) with
-      | (`L,  _) -> Z.(bb lsl bs)
+      | (`L,  _) -> Z.((bb lsl bs) land (full_bitmask sz))
       | (`R, `L) -> Z.(bb asr bs)
       | (`R, `A) -> Z.(bb asr bs +
                     (if bb land (one lsl (Int.sub sz 1)) <> zero
-                    then (one lsl sz) - (one lsl (Int.sub sz bs))
+                    then (one lsl sz) - (one lsl (Int.max (Int.sub sz bs) 0))
                     else zero
                     ))
       ), sz)
@@ -271,7 +274,7 @@ and propagate ~(offset:int) (v: ident) (t: deps) (d: deps) : deps =
       |> Enum.fold (fun acc i -> merge1 acc (Option.default (IdentMap.empty) (Map.Int.find_opt (i + offset) t))) (IdentMap.remove v d1)) d
 *)
 
-let eval_adef (df: adef) (args: bitword list) =
+let eval_adef (df: adef) (args: bitword list) : bitword =
   assert (List.compare_lengths df.arguments args == 0);
   assert (List.fold (&&) true (List.map (fun ((_, bsz), (_, `W n)) -> bsz == n) (List.combine args df.arguments)));
   eval_aexpr (IdentMap.empty) (List.combine (List.map fst df.arguments) args |> List.enum |> IdentMap.of_enum) df.body
