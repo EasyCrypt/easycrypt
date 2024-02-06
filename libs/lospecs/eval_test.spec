@@ -176,7 +176,7 @@ VPSHUFB_256(w@256, widx@256) -> @256 =
   map<128, 2>(
     fun w@128 widx@128 .
       map<8, 16>(
-        fun idx@8 . idx[7] ? 0 : w[@8|idx[0:4]],
+        fun idx@8 . idx[7] ? 0 : w[@8|idx[0:4]], # 
         widx
       ),
     w,

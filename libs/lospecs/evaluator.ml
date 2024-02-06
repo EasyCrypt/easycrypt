@@ -14,6 +14,13 @@ let from_int_list (lst: int list) (n: int) : bitword =
 let sbw_to_sbint ((bw, bn): bitword) : Z.t = 
   if (bw < Z.(one lsl (Int.sub bn 1))) then bw else Z.(bw - (one lsl bn))
 
+(* change endianness *)
+let bs_bw ((bw, bn): bitword) : bitword =
+  assert (bn mod 8 == 0);
+  let bw_list = List.fold_left_map (fun acc x -> (Z.(acc asr 8), Z.(acc land (full_bitmask 8)))) bw (List.init (bn / 8) (fun _ -> ())) |> snd in
+  let bw_list = List.rev bw_list in
+  (List.fold_left (fun acc x -> Z.(acc lsl 8 + x)) Z.zero bw_list, bn)
+
 (* needs to be tested *)
 let sbint_to_sbw (i: Z.t) (n: int) : bitword =
   if i >= Z.zero then (Z.(i land (full_bitmask (Int.sub n 1))), n)
@@ -22,6 +29,20 @@ let sbint_to_sbw (i: Z.t) (n: int) : bitword =
 let from_int (i: int) (n:int) ~(signed: bool) =
   if signed then sbint_to_sbw (Z.of_int i) n else
   (Z.((of_int i) land (full_bitmask n)), n)
+
+(* Currently only for 128 and 256 bit words *)
+let from_bytes (bs: bytes) ~(lit_end: bool) =
+  let n = Bytes.length bs in 
+  let bs = Bytes.to_seq bs |> List.of_seq in
+  begin
+    assert ((n == 16) || (n == 32));
+    let bs = if lit_end then List.rev bs else bs in
+    (List.fold_left (fun acc x -> Z.((acc lsl 8) + (Char.code x |> of_int))) Z.zero bs, 8*n)
+  end
+
+let to_bytes ((bw, bn): bitword) ~(lit_end: bool) : bytes =
+  assert ((bn mod 8) == 0);
+  List.fold_left_map (fun acc x -> (Z.(acc asr 8), Z.((acc land (full_bitmask 8)) |> to_int |> Char.chr))) bw (0 --^ (bn/8) |> List.of_enum) |> snd |> String.of_list |> Bytes.of_string
 
 (* assuming argument is signed *)
 let usat ((bw, bn): bitword) (n: int) : bitword = 
@@ -36,6 +57,16 @@ let ssat ((bw, bn): bitword) (n: int) : bitword =
   if v < Z.(- ( one lsl (Int.sub n 1))) then (Z.(one lsl (Int.sub n 1)), n)
   else ((if v >= Z.zero then v else Z.(v + (one lsl n))), n)
 
+let bi_usat (z: Z.t) (n: int) : Z.t =
+  if z < Z.zero then Z.zero else
+  if z >= Z.(one lsl n) then full_bitmask n
+  else z
+
+let bi_ssat (z: Z.t) (n: int) : Z.t = 
+  if z < Z.(-(one lsl (Int.sub n 1))) then Z.(-(one lsl (Int.sub n 1)))
+  else if z >= Z.(one lsl (Int.sub n 1)) then full_bitmask (n-1)
+  else z
+
 let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t) (e: aexpr) : bitword =
   let { node = e_; type_ = t_; } = e in
   match e_ with 
@@ -46,7 +77,9 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
     | _ -> failwith "vars shouldn't be integers?") (* assuming integers have 256 bits *) 
 
 
-  | EInt i -> (Z.of_int i, default_int_size) 
+  | EInt i -> (match t_ with
+    | `W n -> (Z.((of_int i) land (full_bitmask n)), n)
+    | _ -> (Z.of_int i, default_int_size) )
   (* Need to know how to handle this case, probably good enough for now *)
 
   | ESlice (eb, (es, len, scale)) -> (* verify indianess on this & check new syntax *)
@@ -60,6 +93,7 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
         (Z.(((fst bw) asr sa) land ((one lsl (sz)) - one)), sz)
       end
 
+  (* FIXME: Make sure map is correct, maybe refactor *)
   | EMap ((`W n, `W m), (params, fb), args) -> 
       let bwargs = List.map (eval_aexpr fctxt ctxt) args in
       let bwargs = begin 
@@ -68,20 +102,26 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
       end in
       let subs = List.combine (List.map fst params) bwargs in
 (*      let k = (match fb.type_ with | `W k -> k | _ -> failwith "anon fun in map should ret word") in *)
-      let res = 0 --^ m 
+      let (res, n_) = 0 --^ m 
         |> Enum.map (fun i -> 
           let map_ctxt = List.fold_left (fun acc x -> IdentMap.add (fst x) (Z.((snd x asr (Int.mul i n)) land (full_bitmask n)), n) acc) ctxt subs
           in let (res, n_) = eval_aexpr fctxt (map_ctxt) fb 
           in begin
-            assert (n_ == n);
-            assert (Z.(res < (one lsl n)));
-            (Z.(res lsl (Int.mul i n)))
+            assert (Z.(res < (one lsl n_)));
+            (Z.(res lsl (Int.mul i n_)), n_)
           end
-        ) |> Enum.fold Z.(lor) Z.zero
-      in (res, n*m)
+        ) |> Enum.fold 
+            (fun (bw, n_) (acc_bw, acc_n) -> 
+              (Z.(bw lor acc_bw), 
+               (if acc_n == -1 
+                then n_ 
+                else (acc_n)))) (* assert(acc_n == n_); *)
+        (Z.zero, -1)
+      in (res, n_*m)
 
   | EConcat (`W n, args) -> 
     let args = List.map (eval_aexpr fctxt ctxt) args in
+    let args = List.rev args in (* change order *)
     begin 
       assert (List.map snd args |> List.fold_left (+) 0 == n);
       (List.fold_left (fun acc (bw, bn) -> Z.((acc lsl bn) + bw)) (Z.of_int 0) args, n)
@@ -177,11 +217,11 @@ let rec eval_aexpr (fctxt: (aargs * aexpr) IdentMap.t) (ctxt: bitword IdentMap.t
     let bw1 = eval_aexpr fctxt ctxt e1 in
     let bw2 = eval_aexpr fctxt ctxt e2 in
     let () = (assert (snd bw1 == snd bw2 && snd bw1 == n)) in
-    let res = Z.( (fst bw1) + (fst bw2)) in
+    let res = Z.( (sbw_to_sbint bw1) + (sbw_to_sbint bw2)) in
     (match us with
-    | `Word ->   (Z.(res land (full_bitmask n)), n)
-    | `Sat `U -> usat (res, n+1) n 
-    | `Sat `S -> ssat (res, n+1) n) (* check this *) 
+    | `Word   -> (Z.(res land (full_bitmask n)), n) (* FIXME: Fix sat add *)
+    | `Sat `U -> sbint_to_sbw (bi_usat res n) n
+    | `Sat `S -> sbint_to_sbw (bi_ssat res n) n) (* check this *)
  
   | ESub (`W n, (e1, e2)) -> 
       let b1 = eval_aexpr fctxt ctxt e1 in
