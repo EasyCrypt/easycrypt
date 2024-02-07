@@ -341,7 +341,7 @@ module Op : sig
 
   type notation = ty_params * EcDecl.notation
 
-  val get_notations : env -> (path * notation) list
+  val get_notations : head:path option -> env -> (path * notation) list
 
   val iter : ?name:qsymbol -> (path -> t -> unit) -> env -> unit
   val all  : ?check:(path -> t -> bool) -> ?name:qsymbol -> env -> (path * t) list

@@ -1618,7 +1618,13 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
      not nt.ont_ponly && try_notation args
   in
 
-  let nts = EcEnv.Op.get_notations ppe.PPEnv.ppe_env in
+  let head =
+    try
+      Some (fst (destr_op (fst (destr_app f))))
+    with DestrError _ -> None
+  in
+
+  let nts = EcEnv.Op.get_notations ~head ppe.PPEnv.ppe_env in
 
   List.exists try_notation nts
 
