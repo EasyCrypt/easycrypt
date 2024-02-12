@@ -7,6 +7,64 @@ open EcParsetree
 open EcEnv
 open EcTypes
 open EcModules
+open Batteries
+
+module C = struct
+  include Lospecs.Aig
+  include Lospecs.Circuit
+  include Lospecs.Circuit_avx2.FromSpec ()
+  include Lospecs.Circuit_spec
+end
+
+module IdentMap = Lospecs.Ast.IdentMap
+module Ident = Lospecs.Ast.Ident
+
+type ident = Ident.ident
+
+module CircEnv : sig
+  type env
+
+  val empty : env
+  val lookup : env -> symbol -> ident option
+  val push : env -> symbol -> env * ident
+  val bind : env -> ident -> C.reg -> env
+  val get : env -> ident -> C.reg option
+  val bind_s : env -> symbol -> C.reg -> env
+  val get_s : env -> symbol -> C.reg option
+end = struct
+  type env = { vars : (symbol, ident) Map.t;
+               bindings : C.reg IdentMap.t }
+  
+  let empty : env = { vars = Map.empty;
+                      bindings = IdentMap.empty }
+  let lookup (env : env) (x: symbol) = Map.find_opt x env.vars
+
+  let push (env : env) (x : symbol) =
+    let idx = Ident.create x in
+    let env = { vars = Map.add x idx env.vars ; bindings = env.bindings } in
+    (env, idx)
+
+  let bind (env: env) (x : ident) (r : C.reg) =
+    let env = { 
+      vars = (match Map.find_opt (Ident.name x) env.vars with
+              | Some _ -> env.vars
+              | None -> Map.add (Ident.name x) x env.vars);
+      bindings = IdentMap.add x r env.bindings} in
+    env
+
+  let get (env: env) (x: ident) = 
+    IdentMap.find_opt x env.bindings
+
+  let bind_s (env: env) (x : symbol) (r : C.reg) =
+    match lookup env x with
+    | Some idx -> bind env idx r
+    | None -> bind env (Ident.create x) r
+
+  let get_s (env: env) (x : symbol) =
+    match lookup env x with
+    | Some idx -> get env idx
+    | None -> failwith ("No variable named " ^ x)
+end
 
 (* -------------------------------------------------------------------- *)
 type width = int
@@ -28,6 +86,8 @@ and brhs =
 and barg =
   | Const of width * zint
   | Var   of vsymbol
+
+type cp_env = CircEnv.env 
 
 (* -------------------------------------------------------------------- *)
 let pp_barg (fmt : Format.formatter) (b : barg) =
@@ -62,6 +122,30 @@ let pp_bstmt (fmt : Format.formatter) (((x, w), rhs) : bstmt) =
 let pp_bprgm (fmt : Format.formatter) (bprgm : bprgm) =
   List.iter (Format.fprintf fmt "%a;@." pp_bstmt) bprgm
 
+
+let circuit_from_bstmt (env: cp_env) (((x, w), rhs) : bstmt) : cp_env * C.reg =
+  let (env, idx) = CircEnv.push env x
+  in let r = 
+    (match rhs with
+    | Const (w, i)     -> C.of_bigint ~size:w (EcBigInt.to_zt i)
+    | Copy  (x, i)     -> C.reg ~size:i ~name:(Ident.id idx)
+    | Op    (op, args) -> C.circuit_of_spec (args |> (parse_circ_args (env, idm)) |> Array.of_list) (List.assoc op C.specs))
+  in let env = CircEnv.bind idx r env
+  in (env, r)
+
+and parse_circ_args (env: cp_env) (args: barg list) : C.reg list =
+  List.map 
+  (fun arg -> 
+    match arg with
+    | Const (w, i) -> C.of_bigint ~size:w i
+    | Var (x, i) -> 
+      (match CircEnv.get_s env x with
+      | None -> failwith ("No var named " ^ x)
+      | Some r -> r))
+  args
+
+let circuit_from_bprgm (prg: bprgm) = 
+  List.fold_left_map circuit_from_bstmt (Env.empty, IdentMap.empty) prg
 (* -------------------------------------------------------------------- *)
 exception BDepError
 
