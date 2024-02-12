@@ -122,6 +122,16 @@ let pp_bstmt (fmt : Format.formatter) (((x, w), rhs) : bstmt) =
 let pp_bprgm (fmt : Format.formatter) (bprgm : bprgm) =
   List.iter (Format.fprintf fmt "%a;@." pp_bstmt) bprgm
 
+and parse_circ_args (env: cp_env) (args: barg list) : C.reg list =
+  List.map 
+  (fun (arg: barg) -> 
+    match arg with
+    | Const (w, i) -> C.of_bigint ~size:w (EcBigInt.to_zt i)
+    | Var (x, i) -> 
+      (match CircEnv.get_s env x with
+      | None -> failwith ("No var named " ^ x)
+      | Some r -> r))
+  args
 
 let circuit_from_bstmt (env: cp_env) (((x, w), rhs) : bstmt) : cp_env * C.reg =
   let (env, idx) = CircEnv.push env x
@@ -129,23 +139,13 @@ let circuit_from_bstmt (env: cp_env) (((x, w), rhs) : bstmt) : cp_env * C.reg =
     (match rhs with
     | Const (w, i)     -> C.of_bigint ~size:w (EcBigInt.to_zt i)
     | Copy  (x, i)     -> C.reg ~size:i ~name:(Ident.id idx)
-    | Op    (op, args) -> C.circuit_of_spec (args |> (parse_circ_args (env, idm)) |> Array.of_list) (List.assoc op C.specs))
-  in let env = CircEnv.bind idx r env
+    | Op    (op, args) -> args |> (parse_circ_args env) |> (C.func_from_spec op))
+
+  in let env = CircEnv.bind env idx r 
   in (env, r)
 
-and parse_circ_args (env: cp_env) (args: barg list) : C.reg list =
-  List.map 
-  (fun arg -> 
-    match arg with
-    | Const (w, i) -> C.of_bigint ~size:w i
-    | Var (x, i) -> 
-      (match CircEnv.get_s env x with
-      | None -> failwith ("No var named " ^ x)
-      | Some r -> r))
-  args
-
 let circuit_from_bprgm (prg: bprgm) = 
-  List.fold_left_map circuit_from_bstmt (Env.empty, IdentMap.empty) prg
+  List.fold_left_map circuit_from_bstmt CircEnv.empty prg
 (* -------------------------------------------------------------------- *)
 exception BDepError
 
@@ -253,8 +253,13 @@ let bdep (env : env) (p : pgamepath) : unit =
 
   let body : bprgm = List.map trans_instr pdef.f_body.s_node in
 
-  if not (List.is_unique (List.fst body)) then
+(*  if not (List.is_unique (List.fst body)) then
     raise BDepError;
+*)
+  (*if not (List.equal (body |> List.fst |> List.unique) (body |> List.fst)) then
+    raise BDepError;*)
+
+  let circ = circuit_from_bprgm body |> snd |> List.rev |> List.hd in
 
   (*
    * TODO
@@ -266,4 +271,5 @@ let bdep (env : env) (p : pgamepath) : unit =
    *  6: check that (Pri /\ Ci) => Poi by computation
    *)
 
-  Format.eprintf "%a" pp_bprgm body
+  Format.eprintf "%a@." pp_bprgm body;
+  Format.eprintf "%a@." (Yojson.Safe.pretty_print ~std:true) (C.reg_to_yojson circ)

@@ -1,8 +1,11 @@
 (* ==================================================================== *)
 open Aig
 
+type symbol = string
+
 (* ==================================================================== *)
 module type S = sig
+  val func_from_spec : symbol -> (reg list -> reg)
   val vpermd : reg -> reg -> reg
   val vpermq : reg -> int -> reg
   val vpbroadcast_16u16 : reg -> reg
@@ -44,6 +47,9 @@ module FromSpec () : S = struct
       spec;
     *)
     spec
+
+  let func_from_spec (f: symbol) : (reg list) -> reg =
+    (fun regs -> Circuit_spec.circuit_of_spec regs (List.assoc f specs))
  
   (* ------------------------------------------------------------------ *)
   let vpermd = List.assoc "VPERMD" specs
@@ -75,7 +81,7 @@ module FromSpec () : S = struct
   let vpadd_32u8 (r1 : reg) (r2 : reg) : reg =
     Circuit_spec.circuit_of_spec [r1; r2] vpadd_32u8
 
-  (* ------------------------------------------------------------------ *)
+  (* ----------------------------------------------------------------- *)
   let vpsub_16u16 = List.assoc "VPSUB_16u16" specs
 
   let vpsub_16u16 (r1 : reg) (r2 : reg) : reg =
