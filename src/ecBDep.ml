@@ -15,17 +15,19 @@ type bprgm =
   bstmt list
 
 and bstmt =
-  symbol * brhs
+  vsymbol * brhs
+
+and vsymbol =
+  symbol * width
 
 and brhs =
   | Const of width * zint
-  | Copy  of symbol
+  | Copy  of vsymbol
   | Op    of symbol * barg list
-
 
 and barg =
   | Const of width * zint
-  | Var   of symbol
+  | Var   of vsymbol
 
 (* -------------------------------------------------------------------- *)
 let pp_barg (fmt : Format.formatter) (b : barg) =
@@ -33,8 +35,8 @@ let pp_barg (fmt : Format.formatter) (b : barg) =
   | Const (w, i) ->
      Format.fprintf fmt "%a@%d" EcBigInt.pp_print i w
 
-  | Var x ->
-     Format.fprintf fmt "%s" x
+  | Var (x, w) ->
+     Format.fprintf fmt "%s@%d" x w
 
 (* -------------------------------------------------------------------- *)
 let pp_brhs (fmt : Format.formatter) (rhs : brhs) =
@@ -42,8 +44,8 @@ let pp_brhs (fmt : Format.formatter) (rhs : brhs) =
   | Const (w, i) ->
      Format.fprintf fmt "%a@%d" EcBigInt.pp_print i w
 
-  | Copy x ->
-     Format.fprintf fmt "%s" x
+  | Copy (x, w) ->
+     Format.fprintf fmt "%s@%d" x w
 
   | Op (op, args) ->
      Format.fprintf fmt "%s%a"
@@ -53,8 +55,8 @@ let pp_brhs (fmt : Format.formatter) (rhs : brhs) =
        args
 
 (* -------------------------------------------------------------------- *)
-let pp_bstmt (fmt : Format.formatter) ((x, rhs) : bstmt) =
-  Format.fprintf fmt "%s = %a" x pp_brhs rhs
+let pp_bstmt (fmt : Format.formatter) (((x, w), rhs) : bstmt) =
+  Format.fprintf fmt "%s@%d = %a" x w pp_brhs rhs
 
 (* -------------------------------------------------------------------- *)
 let pp_bprgm (fmt : Format.formatter) (bprgm : bprgm) =
@@ -122,7 +124,7 @@ let bdep (env : env) (p : pgamepath) : unit =
   let trans_arg (e : expr) : barg =
     match e.e_node with
     | Evar (PVloc y) ->
-       Var y
+       Var (y, trans_wtype e.e_ty)
 
      | Eapp ({ e_node = Eop (p, []) }, [{ e_node = Eint i }]) ->
         Const (trans_int p, i)
@@ -136,11 +138,11 @@ let bdep (env : env) (p : pgamepath) : unit =
 
   let trans_instr (i : instr) : bstmt =
     match i.i_node with
-    | Sasgn (LvVar (PVloc x, _), e) ->
+    | Sasgn (LvVar (PVloc x, xty), e) ->
        let rhs =
          match e.e_node with
          | Evar (PVloc y) ->
-            Copy y
+            Copy (y, trans_wtype e.e_ty)
 
          | Eapp ({ e_node = Eop (p, []) }, [{ e_node = Eint i }]) ->
             Const (trans_int p, i)
@@ -151,7 +153,7 @@ let bdep (env : env) (p : pgamepath) : unit =
          | _ ->
             raise BDepError
 
-       in (x, rhs)
+       in ((x, trans_wtype xty), rhs)
 
     | _ -> raise BDepError in
 
@@ -165,9 +167,19 @@ let bdep (env : env) (p : pgamepath) : unit =
     (List.map trans_arg proc.f_sig.fs_anames) @
     (List.map trans_local pdef.f_locals) in
 
-  let body = List.map trans_instr pdef.f_body.s_node in
+  let body : bprgm = List.map trans_instr pdef.f_body.s_node in
 
   if not (List.is_unique (List.fst body)) then
     raise BDepError;
+
+  (*
+   * TODO
+   *  1: generator the circuit C from the program `body`
+   *  2: compute the dependencies and infer sub-circuits C1...Cn
+   *  3: check equivalence between the different boolean functions C1...Cn
+   *  4: generate a circuit Pr encoding the pre-condition (partial)
+   *  5: generate a circuit Po encoding the post-condition
+   *  6: check that (Pri /\ Ci) => Poi by computation
+   *)
 
   Format.eprintf "%a" pp_bprgm body
