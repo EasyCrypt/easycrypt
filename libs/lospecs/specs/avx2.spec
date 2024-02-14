@@ -1,4 +1,7 @@
 # See: https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html
+# 256 bit logical and (maybe change in ecBDep to VPAND)
+AND_u256(a@256, b@256) -> @256 =
+ and<256>(a, b) 
 
 # Intel intrinsic: _mm256_permutexvar_epi32
 VPERMD(w@256, widx@256) -> @256 =

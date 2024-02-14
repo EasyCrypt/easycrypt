@@ -9,6 +9,7 @@ open EcTypes
 open EcModules
 open Batteries
 
+(* -------------------------------------------------------------------- *)
 module C = struct
   include Lospecs.Aig
   include Lospecs.Circuit
@@ -16,16 +17,19 @@ module C = struct
   include Lospecs.Circuit_spec
 end
 
+(* -------------------------------------------------------------------- *)
 module IdentMap = Lospecs.Ast.IdentMap
 module Ident = Lospecs.Ast.Ident
 
 type ident = Ident.ident
 
+(* -------------------------------------------------------------------- *)
 module CircEnv : sig
   type env
 
   val empty : env
   val lookup : env -> symbol -> ident option
+  val lookup_id : env -> int -> ident option
   val push : env -> symbol -> env * ident
   val bind : env -> ident -> C.reg -> env
   val get : env -> ident -> C.reg option
@@ -33,37 +37,63 @@ module CircEnv : sig
   val get_s : env -> symbol -> C.reg option
 end = struct
   type env = { vars : (symbol, ident) Map.t;
-               bindings : C.reg IdentMap.t }
+               bindings : C.reg IdentMap.t;
+               ids : (int, ident) Map.t }
   
+(* -------------------------------------------------------------------- *)
   let empty : env = { vars = Map.empty;
-                      bindings = IdentMap.empty }
+                      bindings = IdentMap.empty;
+                      ids = Map.empty }
+
+(* -------------------------------------------------------------------- *)
   let lookup (env : env) (x: symbol) = Map.find_opt x env.vars
 
+(* -------------------------------------------------------------------- *)
+  let lookup_id (env: env) (i: int) = Map.find_opt i env.ids
+
+(* -------------------------------------------------------------------- *)
   let push (env : env) (x : symbol) =
     let idx = Ident.create x in
-    let env = { vars = Map.add x idx env.vars ; bindings = env.bindings } in
+    let env = { vars = Map.add x idx env.vars ; 
+                bindings = env.bindings; 
+                ids  = Map.add (Ident.id idx) idx env.ids } in
     (env, idx)
 
-  let bind (env: env) (x : ident) (r : C.reg) =
-    let env = { 
-      vars = (match Map.find_opt (Ident.name x) env.vars with
-              | Some _ -> env.vars
-              | None -> Map.add (Ident.name x) x env.vars);
-      bindings = IdentMap.add x r env.bindings} in
+(* -------------------------------------------------------------------- *)
+  let push_ident (env: env) (idx: ident) : env = 
+    let (name, id) = (Ident.name idx, Ident.id idx) in
+    let env = { vars = Map.add name idx env.vars ; 
+                bindings = env.bindings; 
+                ids  = Map.add id idx env.ids } in
     env
 
+(* -------------------------------------------------------------------- *)
+  let bind (env: env) (x : ident) (r : C.reg) =
+    let env =
+      match Map.find_opt (Ident.name x) env.vars with
+              | Some _ -> env
+              | None -> push_ident env x 
+    in let env = {
+      vars = env.vars;
+      ids  = env.ids;
+      bindings = IdentMap.add x r env.bindings; } 
+    in env
+
+(* -------------------------------------------------------------------- *)
   let get (env: env) (x: ident) = 
     IdentMap.find_opt x env.bindings
 
+(* -------------------------------------------------------------------- *)
   let bind_s (env: env) (x : symbol) (r : C.reg) =
     match lookup env x with
     | Some idx -> bind env idx r
     | None -> bind env (Ident.create x) r
 
+(* -------------------------------------------------------------------- *)
   let get_s (env: env) (x : symbol) =
     match lookup env x with
     | Some idx -> get env idx
-    | None -> failwith ("No variable named " ^ x)
+    | None -> None 
 end
 
 (* -------------------------------------------------------------------- *)
@@ -122,6 +152,7 @@ let pp_bstmt (fmt : Format.formatter) (((x, w), rhs) : bstmt) =
 let pp_bprgm (fmt : Format.formatter) (bprgm : bprgm) =
   List.iter (Format.fprintf fmt "%a;@." pp_bstmt) bprgm
 
+(* -------------------------------------------------------------------- *)
 and parse_circ_args (env: cp_env) (args: barg list) : C.reg list =
   List.map 
   (fun (arg: barg) -> 
@@ -133,19 +164,56 @@ and parse_circ_args (env: cp_env) (args: barg list) : C.reg list =
       | Some r -> r))
   args
 
+(* -------------------------------------------------------------------- *)
 let circuit_from_bstmt (env: cp_env) (((x, w), rhs) : bstmt) : cp_env * C.reg =
   let (env, idx) = CircEnv.push env x
   in let r = 
     (match rhs with
     | Const (w, i)     -> C.of_bigint ~size:w (EcBigInt.to_zt i)
-    | Copy  (x, i)     -> C.reg ~size:i ~name:(Ident.id idx)
+    | Copy  (x, i)     -> (match CircEnv.get_s env x with
+                           | None -> C.reg ~size:i ~name:(Ident.id idx) (* FIXME: need to add check to see if it as argument *)
+                           | Some r -> r) 
     | Op    (op, args) -> args |> (parse_circ_args env) |> (C.func_from_spec op))
 
   in let env = CircEnv.bind env idx r 
   in (env, r)
 
+(* -------------------------------------------------------------------- *)
 let circuit_from_bprgm (prg: bprgm) = 
   List.fold_left_map circuit_from_bstmt CircEnv.empty prg
+
+(* -------------------------------------------------------------------- *)
+let print_deps_ric (env: cp_env) (r: string) =
+  let circ = (match CircEnv.get_s env r with
+              | None -> failwith ("Register " ^ r ^ " does not exist")
+              | Some r -> r) in
+  let deps = C.deps circ in
+
+  (*
+   * TODO
+   *  1: generator the circuit C from the program `body`
+   *  2: compute the dependencies and infer sub-circuits C1...Cn
+   *  3: check equivalence between the different boolean functions C1...Cn
+   *  4: generate a circuit Pr encoding the pre-condition (partial)
+   *  5: generate a circuit Po encoding the post-condition
+   *  6: check that (Pri /\ Ci) => Poi by computation
+   *)
+
+  List.iter (fun ((lo, hi), deps) ->
+    let vs =
+         Enum.(--) lo hi
+      |> Enum.fold (fun vs i ->
+           let name = Format.sprintf "%s_%03d" r (i / 256) in
+           C.VarRange.push vs (name, i mod 256)
+         ) C.VarRange.empty in
+
+    Format.eprintf "%a: %a@."
+      (C.VarRange.pp Format.pp_print_string) vs
+      (C.VarRange.pp
+         (fun fmt i -> Format.fprintf fmt "%s" (CircEnv.lookup_id env i |> Option.map Ident.name |> Option.default "???")))
+      deps
+  ) deps
+
 (* -------------------------------------------------------------------- *)
 exception BDepError
 
@@ -259,7 +327,7 @@ let bdep (env : env) (p : pgamepath) : unit =
   (*if not (List.equal (body |> List.fst |> List.unique) (body |> List.fst)) then
     raise BDepError;*)
 
-  let circ = circuit_from_bprgm body |> snd |> List.rev |> List.hd in
+  let (cenv, circs) = circuit_from_bprgm body in
 
   (*
    * TODO
@@ -272,4 +340,7 @@ let bdep (env : env) (p : pgamepath) : unit =
    *)
 
   Format.eprintf "%a@." pp_bprgm body;
-  Format.eprintf "%a@." (Yojson.Safe.pretty_print ~std:true) (C.reg_to_yojson circ)
+  print_deps_ric cenv "rp_0_0";
+  print_deps_ric cenv "rp_1_0";
+  print_deps_ric cenv "rp_2_0";
+  print_deps_ric cenv "rp_3_0"
