@@ -55,7 +55,7 @@ module FromSpec () : S = struct
   let vpermd = List.assoc "VPERMD" specs
 
   let vpermd (r1 : reg) (r2 : reg) : reg =
-    Circuit_spec.circuit_of_spec [r2; r1] vpermd
+    Circuit_spec.circuit_of_spec [r1; r2] vpermd
 
   (* ------------------------------------------------------------------ *)
   let vpermq = List.assoc "VPERMQ" specs

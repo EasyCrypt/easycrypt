@@ -165,15 +165,23 @@ and parse_circ_args (env: cp_env) (args: barg list) : C.reg list =
   args
 
 (* -------------------------------------------------------------------- *)
-let circuit_from_bstmt (env: cp_env) (((x, w), rhs) : bstmt) : cp_env * C.reg =
-  let (env, idx) = CircEnv.push env x
-  in let r = 
+let circuit_from_bstmt (env: cp_env) (((v, s), rhs) : bstmt) : cp_env * C.reg =
+  let (env, idx) = CircEnv.push env v
+  in let (r, env) = 
     (match rhs with
-    | Const (w, i)     -> C.of_bigint ~size:w (EcBigInt.to_zt i)
-    | Copy  (x, i)     -> (match CircEnv.get_s env x with
-                           | None -> C.reg ~size:i ~name:(Ident.id idx) (* FIXME: need to add check to see if it as argument *)
-                           | Some r -> r) 
-    | Op    (op, args) -> args |> (parse_circ_args env) |> (C.func_from_spec op))
+    | Const (w, i)     -> (C.of_bigint ~size:w (EcBigInt.to_zt i), env)
+
+    | Copy  (x, w)     -> (match CircEnv.get_s env x with
+                            | Some r -> (r, env) 
+                            | None -> 
+                              (match CircEnv.lookup env x with
+                                | Some id -> let r_ = C.reg ~size:w ~name:(Ident.id id) 
+                                  in (r_, CircEnv.bind env id r_)
+                                | None -> let (env, id) = CircEnv.push env x 
+                                in let r_ = C.reg ~size:w ~name:(Ident.id id) 
+                                in (r_, CircEnv.bind env id r_)))
+                    
+    | Op    (op, args) -> (args |> (parse_circ_args env) |> (C.func_from_spec op), env))
 
   in let env = CircEnv.bind env idx r 
   in (env, r)

@@ -4,7 +4,7 @@ AND_u256(a@256, b@256) -> @256 =
  and<256>(a, b) 
 
 # Intel intrinsic: _mm256_permutexvar_epi32
-VPERMD(w@256, widx@256) -> @256 =
+VPERMD(widx@256, w@256) -> @256 =
   map<32, 8>(
     fun idx@32 . let i = idx[0:3] in w[@32|i],
     widx
