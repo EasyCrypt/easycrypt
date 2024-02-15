@@ -191,27 +191,14 @@ let circuit_from_bprgm (prg: bprgm) =
   List.fold_left_map circuit_from_bstmt CircEnv.empty prg
 
 (* -------------------------------------------------------------------- *)
-let print_deps_ric (env: cp_env) (r: string) =
-  let circ = (match CircEnv.get_s env r with
-              | None -> failwith ("Register " ^ r ^ " does not exist")
-              | Some r -> r) in
-  let deps = C.deps circ in
-
-  (*
-   * TODO
-   *  1: generator the circuit C from the program `body`
-   *  2: compute the dependencies and infer sub-circuits C1...Cn
-   *  3: check equivalence between the different boolean functions C1...Cn
-   *  4: generate a circuit Pr encoding the pre-condition (partial)
-   *  5: generate a circuit Po encoding the post-condition
-   *  6: check that (Pri /\ Ci) => Poi by computation
-   *)
+let print_deps ?(name = "???") (env: cp_env) (r: C.reg)  =
+  let deps = C.deps r in
 
   List.iter (fun ((lo, hi), deps) ->
     let vs =
          Enum.(--) lo hi
       |> Enum.fold (fun vs i ->
-           let name = Format.sprintf "%s_%03d" r (i / 256) in
+           let name = Format.sprintf "%s_%03d" name (i / 256) in
            C.VarRange.push vs (name, i mod 256)
          ) C.VarRange.empty in
 
@@ -221,6 +208,28 @@ let print_deps_ric (env: cp_env) (r: string) =
          (fun fmt i -> Format.fprintf fmt "%s" (CircEnv.lookup_id env i |> Option.map Ident.name |> Option.default "???")))
       deps
   ) deps
+
+(* -------------------------------------------------------------------- *)
+let print_deps_ric (env: cp_env) (r: string) =
+  let circ = (match CircEnv.get_s env r with
+              | None -> failwith ("Register " ^ r ^ " does not exist")
+              | Some r -> r) in
+  print_deps env circ ~name:r
+
+
+(* -------------------------------------------------------------------- *)
+let circ_dep_split (r: C.reg) : C.reg list =
+  let rec split (l: 'a list) (n: int) =
+    match (l,n) with
+    | (l, 0) -> ([], l)
+    | (h::l, n) -> let (a,b) = split l (n-1) in (h::a, b)
+    | ([], _) -> failwith "Split index out of bounds" in
+
+  let deps = C.deps r in
+  List.fold_left_map (fun acc ((lo, hi), _) -> 
+    let (c, n) = split acc (hi - lo + 1) in
+    (n, c)) r deps |> snd
+
 
 (* -------------------------------------------------------------------- *)
 exception BDepError
@@ -351,4 +360,10 @@ let bdep (env : env) (p : pgamepath) : unit =
   print_deps_ric cenv "rp_0_0";
   print_deps_ric cenv "rp_1_0";
   print_deps_ric cenv "rp_2_0";
-  print_deps_ric cenv "rp_3_0"
+  print_deps_ric cenv "rp_3_0";
+  let r = "rp_0_0" in
+  let rs = circ_dep_split (match CircEnv.get_s cenv r with
+              | None -> failwith ("Register " ^ r ^ " does not exist")
+              | Some r -> r) in
+  List.iteri (fun i r_ -> print_deps ~name:(r ^ (string_of_int (i*4))) cenv r_) rs
+
