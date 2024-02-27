@@ -173,29 +173,15 @@ let registers_of_bargs (env : cp_env) (args : bargs) : C.reg list =
 let circuit_of_bstmt (env : cp_env) (((v, s), rhs) : bstmt) : cp_env * C.reg =
   let (env, idx) = CircEnv.push env v in
 
-  let (r, env) =
+  let r =
     match rhs with
     | Const (w, i) ->
-      (C.of_bigint ~size:w (EcBigInt.to_zt i), env)
+      C.of_bigint ~size:w (EcBigInt.to_zt i)
 
-    | Copy (x, w) -> begin
-        match CircEnv.get_s env x with
-        | Some r ->
-          (r, env)
-        | None -> begin
-            match CircEnv.lookup env x with
-            | Some id ->
-              let r_ = C.reg ~size:w ~name:(Ident.id id) in
-              (r_, CircEnv.bind env id r_)
-            | None ->
-              let (env, id) = CircEnv.push env x in
-              let r_ = C.reg ~size:w ~name:(Ident.id id) in
-              (r_, CircEnv.bind env id r_)
-          end
-      end
+    | Copy (x, w) -> Option.get (CircEnv.get_s env x)
 
     | Op (op, args) ->
-      (args |> registers_of_bargs env |> (C.func_from_spec op), env)
+      args |> registers_of_bargs env |> (C.func_from_spec op)
   in
 
   let env = CircEnv.bind env idx r in
@@ -203,8 +189,8 @@ let circuit_of_bstmt (env : cp_env) (((v, s), rhs) : bstmt) : cp_env * C.reg =
   (env, r)
 
 (* -------------------------------------------------------------------- *)
-let circuit_from_bprgm (prg : bprgm) =
-  List.fold_left_map circuit_of_bstmt CircEnv.empty prg
+let circuit_from_bprgm (env: cp_env) (prg : bprgm) =
+  List.fold_left_map circuit_of_bstmt env prg
 
 (* -------------------------------------------------------------------- *)
 let print_deps ~name (env : cp_env) (r : C.reg)  =
@@ -336,7 +322,7 @@ let bdep (env : env) (p : pgamepath) : unit =
     | _ -> raise BDepError in
 
   let trans_arg (x : ovariable) =
-    (oget ~exn:BDepError x.ov_name, trans_wtype x.ov_type) in
+   (oget ~exn:BDepError x.ov_name, trans_wtype x.ov_type) in
 
   let trans_local (x : variable) =
     (x.v_name, trans_wtype x.v_type) in
@@ -349,7 +335,12 @@ let bdep (env : env) (p : pgamepath) : unit =
   if not (List.is_unique (List.fst body)) then
     raise BDepError;
 
-  let (cenv, circs) = circuit_from_bprgm body in
+  let cenv = List.fold_left 
+    (fun env (s,w) -> 
+      let (env, idn) = CircEnv.push env s in
+      CircEnv.bind  env idn (C.reg ~size:w ~name:(Ident.id idn)))
+    CircEnv.empty arguments in
+  let (cenv, circs) = circuit_from_bprgm cenv body in
 
   (*
    * TODO
