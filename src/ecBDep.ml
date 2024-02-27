@@ -7,7 +7,9 @@ open EcParsetree
 open EcEnv
 open EcTypes
 open EcModules
-open Batteries
+
+(* -------------------------------------------------------------------- *)
+module Map = Batteries.Map
 
 (* -------------------------------------------------------------------- *)
 module C = struct
@@ -39,7 +41,7 @@ end = struct
   type env = { vars : (symbol, ident) Map.t;
                bindings : C.reg IdentMap.t;
                ids : (int, ident) Map.t }
-  
+
 (* -------------------------------------------------------------------- *)
   let empty : env = { vars = Map.empty;
                       bindings = IdentMap.empty;
@@ -54,16 +56,16 @@ end = struct
 (* -------------------------------------------------------------------- *)
   let push (env : env) (x : symbol) =
     let idx = Ident.create x in
-    let env = { vars = Map.add x idx env.vars ; 
-                bindings = env.bindings; 
+    let env = { vars = Map.add x idx env.vars ;
+                bindings = env.bindings;
                 ids  = Map.add (Ident.id idx) idx env.ids } in
     (env, idx)
 
 (* -------------------------------------------------------------------- *)
-  let push_ident (env: env) (idx: ident) : env = 
+  let push_ident (env: env) (idx: ident) : env =
     let (name, id) = (Ident.name idx, Ident.id idx) in
-    let env = { vars = Map.add name idx env.vars ; 
-                bindings = env.bindings; 
+    let env = { vars = Map.add name idx env.vars ;
+                bindings = env.bindings;
                 ids  = Map.add id idx env.ids } in
     env
 
@@ -72,15 +74,15 @@ end = struct
     let env =
       match Map.find_opt (Ident.name x) env.vars with
               | Some _ -> env
-              | None -> push_ident env x 
+              | None -> push_ident env x
     in let env = {
       vars = env.vars;
       ids  = env.ids;
-      bindings = IdentMap.add x r env.bindings; } 
+      bindings = IdentMap.add x r env.bindings; }
     in env
 
 (* -------------------------------------------------------------------- *)
-  let get (env: env) (x: ident) = 
+  let get (env: env) (x: ident) =
     IdentMap.find_opt x env.bindings
 
 (* -------------------------------------------------------------------- *)
@@ -93,7 +95,7 @@ end = struct
   let get_s (env: env) (x : symbol) =
     match lookup env x with
     | Some idx -> get env idx
-    | None -> None 
+    | None -> None
 end
 
 (* -------------------------------------------------------------------- *)
@@ -111,13 +113,15 @@ and vsymbol =
 and brhs =
   | Const of width * zint
   | Copy  of vsymbol
-  | Op    of symbol * barg list
+  | Op    of symbol * bargs
 
 and barg =
   | Const of width * zint
   | Var   of vsymbol
 
-type cp_env = CircEnv.env 
+and bargs = barg list
+
+type cp_env = CircEnv.env
 
 (* -------------------------------------------------------------------- *)
 let pp_barg (fmt : Format.formatter) (b : barg) =
@@ -153,45 +157,57 @@ let pp_bprgm (fmt : Format.formatter) (bprgm : bprgm) =
   List.iter (Format.fprintf fmt "%a;@." pp_bstmt) bprgm
 
 (* -------------------------------------------------------------------- *)
-and parse_circ_args (env: cp_env) (args: barg list) : C.reg list =
-  List.map 
-  (fun (arg: barg) -> 
-    match arg with
-    | Const (w, i) -> C.of_bigint ~size:w (EcBigInt.to_zt i)
-    | Var (x, i) -> 
-      (match CircEnv.get_s env x with
-      | None -> failwith ("No var named " ^ x)
-      | Some r -> r))
-  args
+let register_of_barg (env : cp_env) (arg : barg) : C.reg =
+  match arg with
+  | Const (w, i) ->
+    C.of_bigint ~size:w (EcBigInt.to_zt i)
+
+  | Var (x, i) ->
+    Option.get (CircEnv.get_s env x)
 
 (* -------------------------------------------------------------------- *)
-let circuit_from_bstmt (env: cp_env) (((v, s), rhs) : bstmt) : cp_env * C.reg =
-  let (env, idx) = CircEnv.push env v
-  in let (r, env) = 
-    (match rhs with
-    | Const (w, i)     -> (C.of_bigint ~size:w (EcBigInt.to_zt i), env)
-
-    | Copy  (x, w)     -> (match CircEnv.get_s env x with
-                            | Some r -> (r, env) 
-                            | None -> 
-                              (match CircEnv.lookup env x with
-                                | Some id -> let r_ = C.reg ~size:w ~name:(Ident.id id) 
-                                  in (r_, CircEnv.bind env id r_)
-                                | None -> let (env, id) = CircEnv.push env x 
-                                in let r_ = C.reg ~size:w ~name:(Ident.id id) 
-                                in (r_, CircEnv.bind env id r_)))
-                    
-    | Op    (op, args) -> (args |> (parse_circ_args env) |> (C.func_from_spec op), env))
-
-  in let env = CircEnv.bind env idx r 
-  in (env, r)
+let registers_of_bargs (env : cp_env) (args : bargs) : C.reg list =
+  List.map (register_of_barg env) args
 
 (* -------------------------------------------------------------------- *)
-let circuit_from_bprgm (prg: bprgm) = 
-  List.fold_left_map circuit_from_bstmt CircEnv.empty prg
+let circuit_of_bstmt (env : cp_env) (((v, s), rhs) : bstmt) : cp_env * C.reg =
+  let (env, idx) = CircEnv.push env v in
+
+  let (r, env) =
+    match rhs with
+    | Const (w, i) ->
+      (C.of_bigint ~size:w (EcBigInt.to_zt i), env)
+
+    | Copy (x, w) -> begin
+        match CircEnv.get_s env x with
+        | Some r ->
+          (r, env)
+        | None -> begin
+            match CircEnv.lookup env x with
+            | Some id ->
+              let r_ = C.reg ~size:w ~name:(Ident.id id) in
+              (r_, CircEnv.bind env id r_)
+            | None ->
+              let (env, id) = CircEnv.push env x in
+              let r_ = C.reg ~size:w ~name:(Ident.id id) in
+              (r_, CircEnv.bind env id r_)
+          end
+      end
+
+    | Op (op, args) ->
+      (args |> registers_of_bargs env |> (C.func_from_spec op), env)
+  in
+
+  let env = CircEnv.bind env idx r in
+
+  (env, r)
 
 (* -------------------------------------------------------------------- *)
-let print_deps ?(name = "???") (env: cp_env) (r: C.reg)  =
+let circuit_from_bprgm (prg : bprgm) =
+  List.fold_left_map circuit_of_bstmt CircEnv.empty prg
+
+(* -------------------------------------------------------------------- *)
+let print_deps ~name (env : cp_env) (r : C.reg)  =
   let deps = C.deps r in
 
   List.iter (fun ((lo, hi), deps) ->
@@ -205,31 +221,24 @@ let print_deps ?(name = "???") (env: cp_env) (r: C.reg)  =
     Format.eprintf "%a: %a@."
       (C.VarRange.pp Format.pp_print_string) vs
       (C.VarRange.pp
-         (fun fmt i -> Format.fprintf fmt "%s" (CircEnv.lookup_id env i |> Option.map Ident.name |> Option.default "???")))
+         (fun fmt i ->
+            let name = Ident.name (Option.get (CircEnv.lookup_id env i)) in
+            Format.fprintf fmt "%s" name))
       deps
   ) deps
 
 (* -------------------------------------------------------------------- *)
-let print_deps_ric (env: cp_env) (r: string) =
-  let circ = (match CircEnv.get_s env r with
-              | None -> failwith ("Register " ^ r ^ " does not exist")
-              | Some r -> r) in
+let print_deps_ric (env : cp_env) (r : string) =
+  let circ = Option.get (CircEnv.get_s env r) in
   print_deps env circ ~name:r
 
-
 (* -------------------------------------------------------------------- *)
-let circ_dep_split (r: C.reg) : C.reg list =
-  let rec split (l: 'a list) (n: int) =
-    match (l,n) with
-    | (l, 0) -> ([], l)
-    | (h::l, n) -> let (a,b) = split l (n-1) in (h::a, b)
-    | ([], _) -> failwith "Split index out of bounds" in
-
+let circ_dep_split (r : C.reg) : C.reg list =
   let deps = C.deps r in
-  List.fold_left_map (fun acc ((lo, hi), _) -> 
-    let (c, n) = split acc (hi - lo + 1) in
-    (n, c)) r deps |> snd
 
+  List.fold_left_map (fun acc ((lo, hi), _) ->
+    swap (List.split_nth (hi - lo + 1) acc)
+  ) r deps |> snd
 
 (* -------------------------------------------------------------------- *)
 exception BDepError
@@ -295,8 +304,8 @@ let bdep (env : env) (p : pgamepath) : unit =
     | Evar (PVloc y) ->
        Var (y, trans_wtype e.e_ty)
 
-     | Eapp ({ e_node = Eop (p, []) }, [{ e_node = Eint i }]) ->
-        Const (trans_int p, i)
+    | Eapp ({ e_node = Eop (p, []) }, [{ e_node = Eint i }]) ->
+      Const (trans_int p, i)
 
     | _ ->
        let ppe = EcPrinting.PPEnv.ofenv env in
@@ -332,17 +341,13 @@ let bdep (env : env) (p : pgamepath) : unit =
   let trans_local (x : variable) =
     (x.v_name, trans_wtype x.v_type) in
 
-  let _locals =
-    (List.map trans_arg proc.f_sig.fs_anames) @
-    (List.map trans_local pdef.f_locals) in
+  let arguments = List.map trans_arg proc.f_sig.fs_anames in
+  let _locals = List.map trans_local pdef.f_locals in
 
   let body : bprgm = List.map trans_instr pdef.f_body.s_node in
 
-(*  if not (List.is_unique (List.fst body)) then
+  if not (List.is_unique (List.fst body)) then
     raise BDepError;
-*)
-  (*if not (List.equal (body |> List.fst |> List.unique) (body |> List.fst)) then
-    raise BDepError;*)
 
   let (cenv, circs) = circuit_from_bprgm body in
 
@@ -357,13 +362,14 @@ let bdep (env : env) (p : pgamepath) : unit =
    *)
 
   Format.eprintf "%a@." pp_bprgm body;
+
   print_deps_ric cenv "rp_0_0";
   print_deps_ric cenv "rp_1_0";
   print_deps_ric cenv "rp_2_0";
   print_deps_ric cenv "rp_3_0";
-  let r = "rp_0_0" in
-  let rs = circ_dep_split (match CircEnv.get_s cenv r with
-              | None -> failwith ("Register " ^ r ^ " does not exist")
-              | Some r -> r) in
-  List.iteri (fun i r_ -> print_deps ~name:(r ^ (string_of_int (i*4))) cenv r_) rs
 
+  let r = "rp_0_0" in
+  let rs = Option.get (CircEnv.get_s cenv r) in
+  let rs = circ_dep_split rs in
+
+  List.iteri (fun i r_ -> print_deps ~name:(r ^ (string_of_int (i*4))) cenv r_) rs
