@@ -145,7 +145,44 @@ let env_of_regs (rs : bytes list) =
   let rs = Array.of_list rs in
   fun ((n, i) : var) -> get_bit rs.(n) i
 
+(* ==================================================================== *)
+let map (env : var -> node option) : node -> node =
+  let cache : (int, node) Hashtbl.t = Hashtbl.create 0 in
+
+  let rec doit (n : node) : node =
+    let mn =
+      match Hashtbl.find_option cache (abs n.id) with
+      | None ->
+        let mn = doit_r n.gate in
+        Hashtbl.add cache (abs n.id) mn;
+        mn
+      | Some mn ->
+        mn
+    in
+      if 0 < n.id then mn else neg mn
+
+  and doit_r (n : node_r) =
+    match n with
+    | False ->
+      false_
+    | Input v ->
+      Option.default (input v) (env v)
+    | And (n1, n2) ->
+      and_ (doit n1) (doit n2)
+
+  in fun (n : node) -> doit n
+
 (* -------------------------------------------------------------------- *)
+let maps (env : var -> node option) : reg -> reg =
+  fun r -> List.map (map env) r
+
+(* ==================================================================== *)
+let equivs (inputs : (var * var) list) (c1 : reg) (c2 : reg) : bool =
+  let inputs = Map.of_seq (List.to_seq inputs) in
+  let env (v : var) = Option.map input (Map.find_opt v inputs) in
+  List.for_all2 (==) (maps env c1) c2
+
+(* ==================================================================== *)
 let eval (env : var -> bool) =
   let cache : (int, bool) Hashtbl.t = Hashtbl.create 0 in
 
