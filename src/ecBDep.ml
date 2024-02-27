@@ -349,6 +349,16 @@ let bdep (env : env) (p : pgamepath) : unit =
 
   in
 
+  let rec trans_ret (e : expr) : barg list =
+    match e.e_node with
+    | Evar (PVloc y) ->
+        [Var (y, trans_wtype e.e_ty)]
+    | Etuple es ->
+        List.fold_left (fun acc x -> List.append (trans_ret x) acc) [] es
+    | _ -> failwith "Not valid return type"
+
+  in
+
   let trans_instr (i : instr) : bstmt =
     match i.i_node with
     | Sasgn (LvVar (PVloc x, xty), e) ->
@@ -370,13 +380,14 @@ let bdep (env : env) (p : pgamepath) : unit =
 
     | _ -> raise BDepError in
 
-  let trans_arg (x : ovariable) =
+  let trans_arg_ (x : ovariable) =
    (oget ~exn:BDepError x.ov_name, trans_wtype x.ov_type) in
 
   let trans_local (x : variable) =
     (x.v_name, trans_wtype x.v_type) in
 
-  let arguments = List.map trans_arg proc.f_sig.fs_anames in
+  let arguments = List.map trans_arg_ proc.f_sig.fs_anames in
+  let ret_vars = Option.map trans_ret pdef.f_ret |> Option.map List.rev in
   let _locals = List.map trans_local pdef.f_locals in
 
   let body : bprgm = List.map trans_instr pdef.f_body.s_node in
@@ -403,14 +414,20 @@ let bdep (env : env) (p : pgamepath) : unit =
 
   Format.eprintf "%a@." pp_bprgm body;
 
+  (*
   print_deps_ric cenv "rp_0_0";
   print_deps_ric cenv "rp_1_0";
   print_deps_ric cenv "rp_2_0";
-  print_deps_ric cenv "rp_3_0";
+  print_deps_ric cenv "rp_3_0";*)
 
-  let r = "rp_0_0" in
-  let rs = Option.get (CircEnv.get_s cenv r) in
-  let rs = circ_dep_split rs in
-  let () = assert (circ_equiv (List.hd rs) (List.hd (List.tl rs))) in
-  let () = assert (List.for_all (circ_equiv (List.hd rs)) (List.tl rs)) in 
-  List.iteri (fun i r_ -> print_deps ~name:(r ^ (string_of_int (i*4))) cenv r_) rs
+  let process (r: symbol) : unit = 
+    let rs = Option.get (CircEnv.get_s cenv r) in
+    let rs = circ_dep_split rs in
+    let () = assert (circ_equiv (List.hd rs) (List.hd (List.tl rs))) in
+    let () = assert (List.for_all (circ_equiv (List.hd rs)) (List.tl rs)) in 
+    List.iteri (fun i r_ -> print_deps ~name:(r ^ (string_of_int (i*(List.length r_)))) cenv r_) rs
+
+  in match ret_vars with
+  | None -> ()
+  | Some vs ->
+      List.iter process (List.map (fun x -> match x with | Var (v,_) -> v | _ -> failwith "Wrong") vs)
