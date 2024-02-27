@@ -10,6 +10,8 @@ open EcModules
 
 (* -------------------------------------------------------------------- *)
 module Map = Batteries.Map
+module Hashtbl = Batteries.Hashtbl
+module Set = Batteries.Set
 
 (* -------------------------------------------------------------------- *)
 module C = struct
@@ -24,6 +26,7 @@ module IdentMap = Lospecs.Ast.IdentMap
 module Ident = Lospecs.Ast.Ident
 
 type ident = Ident.ident
+type deps = ((int * int) * int C.VarRange.t) list
 
 (* -------------------------------------------------------------------- *)
 module CircEnv : sig
@@ -226,6 +229,52 @@ let circ_dep_split (r : C.reg) : C.reg list =
     swap (List.split_nth (hi - lo + 1) acc)
   ) r deps |> snd
 
+let compare_deps (d1: deps) (d2: deps) : bool =
+  List.for_all2 (fun ((lo1, hi1), deps1) ((lo2, hi2), deps2) ->
+    (hi1 - lo1 == hi2 - lo2) && 
+    (List.for_all2 (fun (_, l1) (_, l2) -> 
+      List.for_all2 
+        (fun (a1, b1) (a2, b2) -> b1 - a1 == b2 - a2) 
+        l1 
+        l2) 
+      (C.VarRange.contents deps1)
+      (C.VarRange.contents deps1)))
+    d1
+    d2
+
+let rec inputs_of_node (n : C.node) : C.var Set.t =
+  let cache : (int, C.var Set.t) Hashtbl.t = Hashtbl.create 0 in
+  
+  let rec doit (n : C.node) : C.var Set.t =
+    match Hashtbl.find_option cache (Int.abs n.id) with
+    | None -> let mn = doit_r n.gate in
+      Hashtbl.add cache (Int.abs n.id) mn;
+      mn
+    | Some mn -> 
+      mn
+
+  and doit_r (n : C.node_r) = 
+    match n with
+    | False -> Set.empty
+    | Input v -> Set.singleton v
+    | And (n1, n2) -> Set.union (doit n1) (doit n2)
+
+  in doit n
+
+let inputs_of_reg (r : C.reg) : C.var Set.t =
+  List.fold_left (fun acc x -> Set.union acc (inputs_of_node x)) Set.empty r
+
+let circ_equiv (r1 : C.reg) (r2 : C.reg) : bool = 
+  if List.compare_lengths r1 r2 <> 0 then false 
+  else 
+    let d1 = C.deps r1 in 
+    let d2 = C.deps r2 in
+    if not (compare_deps d1 d2) then false
+    else 
+      let inps = List.combine (inputs_of_reg r1 |> Set.to_list) (inputs_of_reg r2 |> Set.to_list) in
+      C.equivs inps r1 r2
+
+
 (* -------------------------------------------------------------------- *)
 exception BDepError
 
@@ -362,5 +411,6 @@ let bdep (env : env) (p : pgamepath) : unit =
   let r = "rp_0_0" in
   let rs = Option.get (CircEnv.get_s cenv r) in
   let rs = circ_dep_split rs in
-
+  let () = assert (circ_equiv (List.hd rs) (List.hd (List.tl rs))) in
+  let () = assert (List.for_all (circ_equiv (List.hd rs)) (List.tl rs)) in 
   List.iteri (fun i r_ -> print_deps ~name:(r ^ (string_of_int (i*4))) cenv r_) rs
