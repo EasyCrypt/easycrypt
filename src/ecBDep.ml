@@ -274,7 +274,15 @@ let circ_equiv (r1 : C.reg) (r2 : C.reg) : bool =
       let inps = List.combine (inputs_of_reg r1 |> Set.to_list) (inputs_of_reg r2 |> Set.to_list) in
       C.equivs inps r1 r2
 
+let bruteforce (r : C.reg) (vars : C.var list) : unit = 
+  let rec doit (acc : bool list) (n : int) : unit =
+    match n with
+    | 0 -> let eval = ((List.combine vars acc) |> List.to_seq |> Map.of_seq) in
+           let eval = C.eval (fun x -> Map.find x eval) in 
+           List.map eval r |> C.uint_of_bools |> Format.eprintf "%d: %d@." (C.uint_of_bools acc) 
+    | n -> doit (true::acc) (n-1); doit (false::acc) (n-1)
 
+  in doit [] (List.length vars)
 (* -------------------------------------------------------------------- *)
 exception BDepError
 
@@ -423,11 +431,13 @@ let bdep (env : env) (p : pgamepath) : unit =
   let process (r: symbol) : unit = 
     let rs = Option.get (CircEnv.get_s cenv r) in
     let rs = circ_dep_split rs in
-    let () = assert (circ_equiv (List.hd rs) (List.hd (List.tl rs))) in
     let () = assert (List.for_all (circ_equiv (List.hd rs)) (List.tl rs)) in 
     List.iteri (fun i r_ -> print_deps ~name:(r ^ (string_of_int (i*(List.length r_)))) cenv r_) rs
 
   in match ret_vars with
   | None -> ()
-  | Some vs ->
-      List.iter process (List.map (fun x -> match x with | Var (v,_) -> v | _ -> failwith "Wrong") vs)
+  | Some ((Var (v, _))::_) ->
+    (*List.iter process (List.map (fun x -> match x with | Var (v,_) -> v | _ -> failwith "Wrong") vs)*)
+    let rs = Option.get (CircEnv.get_s cenv v) in
+    let rs = circ_dep_split rs |> List.hd in
+    bruteforce rs (inputs_of_reg rs |> Set.to_list)
