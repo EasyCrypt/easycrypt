@@ -165,3 +165,12 @@ VPEXTRACTI128(w@256, i@8) -> @128 =
 # Intel intrinsic: _mm256_inserti128_si256
 VPINSERTI128(w@256, m@128, i@8) -> @256 =
   w[@128|i[0] <- m]
+
+
+## Auxiliary stuff
+COMPRESS(w@16) -> @4 =
+  srl<32>(umul<16>(
+    add<16>(
+      sll<16>(w, 4), 
+      1665)
+  , 80635), 28)[@4|0]

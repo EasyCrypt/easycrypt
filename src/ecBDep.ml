@@ -281,10 +281,24 @@ let bruteforce (r : C.reg) (vars : C.var list) : unit =
     match n with
     | 0 -> let eval = ((List.combine vars acc) |> List.to_seq |> Map.of_seq) in
            let eval = C.eval (fun x -> Map.find x eval) in 
-           List.map eval r |> C.uint_of_bools |> Format.eprintf "%d: %d@." (C.uint_of_bools acc) 
+           List.map eval r |> C.uint_of_bools |> Format.eprintf "@.@.ERROR: -> %d: %d@." (C.uint_of_bools acc) 
     | n -> doit (false::acc) (n-1); doit (true::acc) (n-1)
 
   in doit [] (List.length vars)
+
+let bools_of_int (n : int) ~(size: int) : bool list =
+  List.init size (fun i -> ((n lsl i) land 1) <> 0) 
+
+let bruteforce_equiv (r1 : C.reg) (r2 : C.reg) (range: int) : bool = 
+  let eval (r : C.reg) (n: int) : int =
+    let inp = inputs_of_reg r |> Set.to_list in
+    let vals = bools_of_int n ~size:(List.length inp) in
+    let env = List.combine inp vals |> List.to_seq |> Map.of_seq in
+    let eval = C.eval (fun x -> Map.find x env) in
+    List.map eval r |> C.uint_of_bools
+  in
+  Enum.(--^) 0 range |> Enum.map (fun i -> (eval r1 i) == (eval r2 i)) |> Enum.fold (&&) true
+
 (* -------------------------------------------------------------------- *)
 exception BDepError
 
@@ -445,10 +459,15 @@ let bdep (env : env) (p : pgamepath) : unit =
   | _ -> ()
     *)
 
+  let comp_circ = C.func_from_spec "COMPRESS" [C.reg ~size:16 ~name:0] in
+
   match ret_vars with
   | Some ((Var (v, _))::_) ->
     let rs = Option.get (CircEnv.get_s cenv v) in
     let rs = circ_dep_split rs |> List.hd in
     let inputs = inputs_of_reg rs in
+    assert (bruteforce_equiv rs comp_circ 65536);
+    Format.eprintf "Success@.";
+    exit 0;
     bruteforce rs (Set.to_list inputs)
   | _ -> ()
