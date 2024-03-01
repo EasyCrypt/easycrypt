@@ -242,12 +242,13 @@ let compare_deps (d1: deps) (d2: deps) : bool =
     d1
     d2
 
-let rec inputs_of_node (n : C.node) : C.var Set.t =
+let rec inputs_of_node : _ -> C.var Set.t =
   let cache : (int, C.var Set.t) Hashtbl.t = Hashtbl.create 0 in
   
   let rec doit (n : C.node) : C.var Set.t =
     match Hashtbl.find_option cache (Int.abs n.id) with
-    | None -> let mn = doit_r n.gate in
+    | None ->
+      let mn = doit_r n.gate in
       Hashtbl.add cache (Int.abs n.id) mn;
       mn
     | Some mn -> 
@@ -259,7 +260,7 @@ let rec inputs_of_node (n : C.node) : C.var Set.t =
     | Input v -> Set.singleton v
     | And (n1, n2) -> Set.union (doit n1) (doit n2)
 
-  in doit n
+  in fun n -> doit n
 
 let inputs_of_reg (r : C.reg) : C.var Set.t =
   List.fold_left (fun acc x -> Set.union acc (inputs_of_node x)) Set.empty r
@@ -271,6 +272,7 @@ let circ_equiv (r1 : C.reg) (r2 : C.reg) : bool =
     let d2 = C.deps r2 in
     if not (compare_deps d1 d2) then false
     else 
+
       let inps = List.combine (inputs_of_reg r1 |> Set.to_list) (inputs_of_reg r2 |> Set.to_list) in
       C.equivs inps r1 r2
 
@@ -280,7 +282,7 @@ let bruteforce (r : C.reg) (vars : C.var list) : unit =
     | 0 -> let eval = ((List.combine vars acc) |> List.to_seq |> Map.of_seq) in
            let eval = C.eval (fun x -> Map.find x eval) in 
            List.map eval r |> C.uint_of_bools |> Format.eprintf "%d: %d@." (C.uint_of_bools acc) 
-    | n -> doit (true::acc) (n-1); doit (false::acc) (n-1)
+    | n -> doit (false::acc) (n-1); doit (true::acc) (n-1)
 
   in doit [] (List.length vars)
 (* -------------------------------------------------------------------- *)
@@ -428,16 +430,25 @@ let bdep (env : env) (p : pgamepath) : unit =
   print_deps_ric cenv "rp_2_0";
   print_deps_ric cenv "rp_3_0";*)
 
-  let process (r: symbol) : unit = 
+    (*
+  let process (r : symbol) : unit = 
     let rs = Option.get (CircEnv.get_s cenv r) in
     let rs = circ_dep_split rs in
     let () = assert (List.for_all (circ_equiv (List.hd rs)) (List.tl rs)) in 
     List.iteri (fun i r_ -> print_deps ~name:(r ^ (string_of_int (i*(List.length r_)))) cenv r_) rs
 
   in match ret_vars with
-  | None -> ()
+  | Some vs ->
+      List.iter
+        process
+        (List.map (fun x -> match x with | Var (v,_) -> v | _ -> failwith "Wrong") vs)
+  | _ -> ()
+    *)
+
+  match ret_vars with
   | Some ((Var (v, _))::_) ->
-    (*List.iter process (List.map (fun x -> match x with | Var (v,_) -> v | _ -> failwith "Wrong") vs)*)
     let rs = Option.get (CircEnv.get_s cenv v) in
     let rs = circ_dep_split rs |> List.hd in
-    bruteforce rs (inputs_of_reg rs |> Set.to_list)
+    let inputs = inputs_of_reg rs in
+    bruteforce rs (Set.to_list inputs)
+  | _ -> ()
