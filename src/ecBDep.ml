@@ -471,3 +471,26 @@ let bdep (env : env) (p : pgamepath) : unit =
     exit 0;
     bruteforce rs (Set.to_list inputs)
   | _ -> ()
+
+
+  (*
+
+    Take {rp_0, rp_1, rp_2, rp_3} e.g, flatten it as one bit array
+    partition into array of n-bit words 
+    these can be computed each from m-bit input words
+    by operator f
+
+    Args to bdep: {rp_0, ..., rp_3} as a list
+                  n, m -> bit sizes
+                  f -> operator
+
+  1) Circuit from procedure -> done
+  2) Flatten array of the variables we want
+  3) Join by each m bits
+  4) Check that each block depends on (exactly) n bits
+  5) Check that circuits are equivalent for each pair of blocks
+  6) Generate circuit for operator
+    -> 
+  7) Check it is equivalent to first block
+
+  *)
