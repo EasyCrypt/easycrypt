@@ -13,6 +13,7 @@ CHECK     += --bin=./ec.native --bin-args="$(ECARGS)"
 CHECK     += --bin-args="$(ECPROVERS:%=-p %)"
 CHECK     += --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
 CHECK     += $(ECEXTRA) config/tests.config
+NIX       ?= nix --extra-experimental-features "nix-command flakes"
 
 # --------------------------------------------------------------------
 UNAME_P = $(shell uname -p)
@@ -20,6 +21,7 @@ UNAME_S = $(shell uname -s)
 
 # --------------------------------------------------------------------
 .PHONY: default build byte native tests check examples
+.PHONY: nix-build nix-build-with-provers nix-develop
 .PHONY: clean install uninstall
 
 default: build
@@ -50,6 +52,15 @@ examples: build
 
 check: unit stdlib examples
 	@true
+
+nix-build:
+	$(NIX) build
+
+nix-build-with-provers:
+	$(NIX) build .#with_provers
+
+nix-develop:
+	$(NIX) develop
 
 clean:
 	rm -f ec.native && $(DUNE) clean

@@ -57,7 +57,7 @@ jobs:
         authToken: '${{ secrets.CACHIX_WRITE_TOKEN }}'
     - name: Build and cache EasyCrypt and dependencies
       run: |
-        nix-build
+        make nix-build-with-provers
 
   check:
     name: Check EasyCrypt Libraries
