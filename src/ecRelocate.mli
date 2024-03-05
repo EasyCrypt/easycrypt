@@ -1,6 +1,11 @@
+(* -------------------------------------------------------------------- *)
 val sourceroot : string option
-val resource : string list -> string
 
-module Sites : sig
+(* -------------------------------------------------------------------- *)
+module type Sites = sig
+  val commands : string
   val theories : string list
 end
+
+(* -------------------------------------------------------------------- *)
+val sites : (module Sites)
