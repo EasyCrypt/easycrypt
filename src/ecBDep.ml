@@ -362,6 +362,7 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
         | (["Top"; "JWord"; "W32" ], "t") ->  32
         | (["Top"; "JWord"; "W16" ], "t") ->  16
         | (["Top"; "JWord"; "W8"  ], "t") ->   8
+        | (["Top"; "Pervasive"], "int") -> 256
         | (qs, q) -> List.iter (Format.eprintf "%s ") qs; Format.eprintf "@. %s@." q; raise BDepError
         | _ -> raise BDepError
       end
@@ -370,18 +371,83 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
        raise BDepError in
 
   let trans_jops (pth: qsymbol) : C.reg list -> C.reg =
+    (* TODO: Check if we need regs to be of correct size or not *)
     match pth with
+    | (["Top"; "JWord"; "W32"], "to_uint") -> 
+        fun rs ->
+        assert (List.length rs == 1); 
+        (List.hd rs)
+    | (["Top"; "JWord"; "W16"], "to_uint") -> 
+        fun rs ->
+        assert (List.length rs == 1); 
+        (List.hd rs)
+    | (["Top"; "JWord"; "W8"], "to_uint") -> 
+        fun rs ->
+        assert (List.length rs == 1); 
+        (List.hd rs)
+    | (["Top"; "JWord"; "W32"], "of_int") -> 
+        fun rs ->
+        assert (List.length rs == 1); 
+        (rs |> List.hd |> List.take 32)
     | (["Top"; "JWord"; "W16"], "of_int") -> 
-        (fun rs -> assert (List.length rs == 1); 
-          (rs |> List.hd |> List.take 16))
+        fun rs ->
+        assert (List.length rs == 1); 
+        (rs |> List.hd |> List.take 16)
     | (["Top"; "JWord"; "W8"], "of_int") -> 
-        (fun rs -> assert (List.length rs == 1); 
-          (rs |> List.hd |> List.take 16))
+        fun rs ->
+        assert (List.length rs == 1); 
+        (rs |> List.hd |> List.take 16)
+    | (["Top"; "JWord"; "W32"], "*") 
     | (["Top"; "JWord"; "W16"], "*") -> 
-        (fun rs -> assert (List.length rs == 2); C.umull (List.hd rs) (rs |> List.tl |> List.hd) )
+        fun rs ->
+        assert (List.length rs == 2); 
+        let a = List.hd rs in 
+        let b = (rs |> List.tl |> List.hd) in
+        C.umull a b 
+    | (["Top"; "JWord"; "W32"], "+") 
     | (["Top"; "JWord"; "W16"], "+") -> 
-        (fun rs -> assert (List.length rs == 2); C.add (List.hd rs) (rs |> List.tl |> List.hd) |> snd)
-    | _ -> failwith "Not implemented yet?"
+        fun rs ->
+        assert (List.length rs == 2); 
+        let a = List.hd rs in 
+        let b = (rs |> List.tl |> List.hd) in
+        C.add a b |> snd
+    | (["Top"; "JWord"; "W32"], "[-]") ->
+        fun rs -> begin
+          match List.length rs with
+          | 2 ->
+            let a = List.hd rs in
+            let b = (rs |> List.tl |> List.hd) in
+            C.sub_dropc a b
+          | n -> Format.eprintf "Got %d args for sub" n; failwith "Wrong args"
+        end
+    | (["Top"; "JWord"; "W32"], "`<<`") 
+    | (["Top"; "JWord"; "W16"], "`<<`") -> 
+        fun rs ->
+        assert (List.length rs == 2);
+        let a = List.hd rs in 
+        let b = (rs |> List.tl |> List.hd) in
+        C.shift ~side:`L ~sign:`L a b 
+    | (["Top"; "JWord"; "W32"], "`>>`")     (*  assuming logical shift right for words   *)
+    | (["Top"; "JWord"; "W16"], "`>>`") ->  (* TODO: need to check if this is correct or *)  
+        fun rs ->                           (* if we need to apply a mask                *)
+        assert (List.length rs == 2);
+        let a = List.hd rs in 
+        let b = (rs |> List.tl |> List.hd) in
+        C.shift ~side:`R ~sign:`L a b 
+    | (["Top"; "JWord"; "W32"], "`&`") 
+    | (["Top"; "JWord"; "W32"], "andw")  
+    | (["Top"; "JWord"; "W16"], "`&`") 
+    | (["Top"; "JWord"; "W16"], "andw") -> 
+        fun rs ->
+        assert (List.length rs == 2);
+        let a = List.hd rs in 
+        let b = (rs |> List.tl |> List.hd) in
+        C.land_ a b 
+
+
+    | _ -> List.iter (Format.eprintf "%s ") (fst pth);
+        Format.eprintf "%s@." (snd pth);
+        failwith "Operator not implemented yet?"
   in
 
   match f.f_node with
@@ -396,9 +462,8 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
       C.mux2_reg f_c t_c c_c
   (* hardcoding size for now FIXME *)
   | Flocal idn -> 
-      (* C.reg ~size:(trans_wtype f.f_ty) ~name:idn.id_tag *)
-      C.reg ~size:256 ~name:idn.id_tag 
-      (* Check name after *)
+      C.reg ~size:(trans_wtype f.f_ty) ~name:idn.id_tag 
+      (* TODO: Check name after *)
   | Fop (pth, _) -> 
     let (pth, pth2) = EcPath.toqsymbol pth in
     let () = List.iter (Format.eprintf "%s ") pth in
@@ -421,14 +486,57 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
       begin match f.f_node with
       | Ftuple tp ->
         circuit_of_form env (tp |> List.drop (i-1) |> List.hd)
-      | _ -> circuit_of_form env f (* FIXME: for testing, to allow easycrypt to ignore flags on Jasmin operators *) 
+      | _ -> circuit_of_form env f 
+      (* FIXME^: for testing, to allow easycrypt to ignore flags on Jasmin operators *) 
       end
   | Fmatch _ -> failwith "fmatch"
   | Flet _ -> failwith "flet"
   | Fpvar _ -> failwith "fpvar"
   | _ -> failwith "Not yet implemented"
     
+(* V might not be necessary V *)
+and int_of_form (env: env) (f: EcAst.form) : int =
+  let trans_jops (pth: qsymbol) : int list -> int =
+    match pth with
+    | (["Top"; "JWord"; "W16"], "of_int") -> 
+        (fun rs -> assert (List.length rs == 1); 
+        (List.hd rs) land ((1 lsl 16) - 1))
+    | (["Top"; "JWord"; "W8"], "of_int") -> 
+        (fun rs -> assert (List.length rs == 1); 
+        (List.hd rs) land ((1 lsl 8) - 1))
+    | (["Top"; "JWord"; "W16"], "*") -> 
+        (fun rs -> assert (List.length rs == 2); 
+        let a = List.hd rs in
+        let b = rs |> List.tl |> List.hd in
+        (a * b) land ((1 lsl 16) - 1))
+    | (["Top"; "JWord"; "W16"], "+") -> 
+        (fun rs -> assert (List.length rs == 2); 
+        let a = List.hd rs in
+        let b = rs |> List.tl |> List.hd in
+        (a + b) land ((1 lsl 16) - 1))
+    | (["Top"; "JWord"; "W16"], "`<<`") ->
+        (fun rs -> assert (List.length rs == 2); 
+        let a = List.hd rs in
+        let b = rs |> List.tl |> List.hd in
+        (a lsl (b mod 16)) land ((1 lsl 16) - 1))
+        
+    | _ -> List.iter (Format.eprintf "%s ") (fst pth);
+        Format.eprintf "%s@." (snd pth);
+        failwith "Operator not implemented yet?"
+  in
 
+  match f.f_node with
+  | Fint z -> EcAst.BI.to_int z
+  | Fapp _ as f_ -> 
+    let (f, fs) = EcCoreFol.destr_app f in
+    let fs_c = List.map (int_of_form env) fs in
+    begin match f.f_node with
+      | Fop (pth, _) ->
+          trans_jops (EcPath.toqsymbol pth) fs_c
+      | _ -> failwith "Cant apply to non op"
+    end 
+
+  | _ -> failwith "Form cannot be converted to int"
 
 (* -------------------------------------------------------------------- *)
 let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : string list) : unit =
@@ -442,8 +550,8 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   let fc = circuit_of_form env f in
   let () = Format.eprintf "len %d @." (List.length fc) in
   let () = inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
-  let d = C.deps fc in
-  print_deps_alt ~name:"test_out" fc
+  print_deps_alt ~name:"test_out" fc;
+  Format.eprintf "@. YAAAAAA @."
  
   (* Working with:
     op compress_alt (d: int, c: JWord.W16.t) : JWord.W16.t = (c * (JWord.W16.of_int 16) + (JWord.W16.of_int 1665)).
