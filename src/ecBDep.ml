@@ -216,6 +216,29 @@ let print_deps ~name (env : cp_env) (r : C.reg)  =
       deps
   ) deps
 
+
+(* FIXME: TEMPORARY DEV FUNCTION, TO BE DELETED *)
+let print_deps_alt ~name (r : C.reg)  =
+  let deps = C.deps r in
+
+  List.iter (fun ((lo, hi), deps) ->
+    let vs =
+         Enum.(--) lo hi
+      |> Enum.fold (fun vs i ->
+           let name = Format.sprintf "%s_%03d" name (i / 256) in
+           C.VarRange.push vs (name, i mod 256)
+         ) C.VarRange.empty in
+
+    Format.eprintf "%a: %a@."
+      (C.VarRange.pp Format.pp_print_string) vs
+      (C.VarRange.pp
+         (fun fmt i ->
+            Format.fprintf fmt "%d" i))
+      deps
+  ) deps
+
+
+
 (* -------------------------------------------------------------------- *)
 let print_deps_ric (env : cp_env) (r : string) =
   let circ = Option.get (CircEnv.get_s env r) in
@@ -326,11 +349,107 @@ let decode_op (p : path) : symbol =
      Format.eprintf "%s@." (EcPath.tostring p);
      raise BDepError
 
+
+
+let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
+  let trans_wtype (ty : ty) : width =
+    match (EcEnv.Ty.hnorm ty env).ty_node with
+    | Tconstr (p, []) -> begin
+        match EcPath.toqsymbol p with
+        | (["Top"; "JWord"; "W256"], "t") -> 256
+        | (["Top"; "JWord"; "W128"], "t") -> 128
+        | (["Top"; "JWord"; "W64" ], "t") ->  64
+        | (["Top"; "JWord"; "W32" ], "t") ->  32
+        | (["Top"; "JWord"; "W16" ], "t") ->  16
+        | (["Top"; "JWord"; "W8"  ], "t") ->   8
+        | (qs, q) -> List.iter (Format.eprintf "%s ") qs; Format.eprintf "@. %s@." q; raise BDepError
+        | _ -> raise BDepError
+      end
+
+    | _ ->
+       raise BDepError in
+
+  let trans_jops (pth: qsymbol) : C.reg list -> C.reg =
+    match pth with
+    | (["Top"; "JWord"; "W16"], "of_int") -> 
+        (fun rs -> assert (List.length rs == 1); 
+          (rs |> List.hd |> List.take 16))
+    | (["Top"; "JWord"; "W8"], "of_int") -> 
+        (fun rs -> assert (List.length rs == 1); 
+          (rs |> List.hd |> List.take 16))
+    | (["Top"; "JWord"; "W16"], "*") -> 
+        (fun rs -> assert (List.length rs == 2); C.umull (List.hd rs) (rs |> List.tl |> List.hd) )
+    | (["Top"; "JWord"; "W16"], "+") -> 
+        (fun rs -> assert (List.length rs == 2); C.add (List.hd rs) (rs |> List.tl |> List.hd) |> snd)
+    | _ -> failwith "Not implemented yet?"
+  in
+
+  match f.f_node with
+  (* hardcoding size for now FIXME *)
+  | Fint z -> C.of_bigint ~size:256 (EcAst.BI.to_zt z) 
+  | Fif (c_f, t_f, f_f) -> 
+      let c_c = circuit_of_form env c_f in
+      let t_c = circuit_of_form env t_f in
+      let f_c = circuit_of_form env f_f in
+      let () = assert (List.length c_c == 1) in
+      let c_c = List.hd c_c in
+      C.mux2_reg f_c t_c c_c
+  (* hardcoding size for now FIXME *)
+  | Flocal idn -> 
+      (* C.reg ~size:(trans_wtype f.f_ty) ~name:idn.id_tag *)
+      C.reg ~size:256 ~name:idn.id_tag 
+      (* Check name after *)
+  | Fop (pth, _) -> 
+    let (pth, pth2) = EcPath.toqsymbol pth in
+    let () = List.iter (Format.eprintf "%s ") pth in
+    let () = Format.eprintf "@.%s@.------------@." pth2 in
+
+    C.reg ~size:0 ~name:0
+  | Fapp _ as f_ -> 
+    let (f, fs) = EcCoreFol.destr_app f in
+    let fs_c = List.map (circuit_of_form env) fs in
+    begin match f.f_node with
+      | Fop (pth, _) ->
+          trans_jops (EcPath.toqsymbol pth) fs_c
+      | _ -> failwith "Cant apply to non op"
+    end 
+(*    let f = circuit_of_form env f in *)
+  | Fquant (_, binds, f) -> 
+      (* maybe add bindings to some env here? *)
+      circuit_of_form env f (* FIXME *) 
+  | Fproj (f, i) ->
+      begin match f.f_node with
+      | Ftuple tp ->
+        circuit_of_form env (tp |> List.drop (i-1) |> List.hd)
+      | _ -> circuit_of_form env f (* FIXME: for testing, to allow easycrypt to ignore flags on Jasmin operators *) 
+      end
+  | Fmatch _ -> failwith "fmatch"
+  | Flet _ -> failwith "flet"
+  | Fpvar _ -> failwith "fpvar"
+  | _ -> failwith "Not yet implemented"
+    
+
+
 (* -------------------------------------------------------------------- *)
-let bdep (env : env) (p : pgamepath) : unit =
+let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : string list) : unit =
   let proc = EcTyping.trans_gamepath env p in
   let proc = EcEnv.Fun.by_xpath proc env in
   let pdef = match proc.f_def with FBdef def -> def | _ -> assert false in
+  let f = EcEnv.Op.lookup ([], f.pl_desc) env |> snd in
+  let f = match f.op_kind with
+  | OB_oper (Some (OP_Plain (f, _))) -> f
+  | _ -> failwith "Invalid operator type" in
+  let fc = circuit_of_form env f in
+  let () = Format.eprintf "len %d @." (List.length fc) in
+  let () = inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
+  let d = C.deps fc in
+  print_deps_alt ~name:"test_out" fc
+ 
+  (* Working with:
+    op compress_alt (d: int, c: JWord.W16.t) : JWord.W16.t = (c * (JWord.W16.of_int 16) + (JWord.W16.of_int 1665)).
+  *)
+
+(*
 
   let trans_int (p : path) : width =
     match EcPath.toqsymbol p with
@@ -459,8 +578,7 @@ let bdep (env : env) (p : pgamepath) : unit =
   | _ -> ()
     *)
 
-  let comp_circ = C.func_from_spec "COMPRESS" [C.reg ~size:16 ~name:0] in
-
+  (*
   match ret_vars with
   | Some ((Var (v, _))::_) ->
     let rs = Option.get (CircEnv.get_s cenv v) in
@@ -471,26 +589,62 @@ let bdep (env : env) (p : pgamepath) : unit =
     exit 0;
     bruteforce rs (Set.to_list inputs)
   | _ -> ()
+*)
+
+  let comp_circ = C.func_from_spec "COMPRESS" [C.reg ~size:16 ~name:0] in
+  begin 
+    let circ = List.map (fun v -> Option.get (CircEnv.get_s cenv v)) vs |> List.flatten in
+    let () = assert ((List.length circ) mod m == 0) in
+    let rec part (l : 'a list) (n : int) : 'a list list = (* assumes above assertion for correctness *)
+      match l with
+      | [] -> []
+      | v -> (List.take n l)::(part (List.drop n l) n) in
+    let circs = part circ m in
+    (* DEBUG PRINT DEPS FOR PARTITIONED CIRCUITS: *)
+    let () = 
+    List.iteri (fun i c ->
+      Format.eprintf "@.%d: " i;
+      print_deps ~name:"TEST_" cenv c) circs
+    in
+    
+    let () = assert (List.for_all (fun c ->
+      let d = C.deps c in
+      List.for_all (fun (_, deps) -> 
+        List.for_all (fun (_, l) ->
+          List.for_all (fun (a,b) ->
+          b - a + 1 == n) l)
+        (C.VarRange.contents deps)
+      ) d) 
+    circs) in
+    let () = assert (List.for_all (circ_equiv (List.hd circs)) (List.tl circs)) in
+    Format.eprintf "Success@."
+  end 
+
 
 
   (*
 
     Take {rp_0, rp_1, rp_2, rp_3} e.g, flatten it as one bit array
-    partition into array of n-bit words 
+    partition into array of m-bit words 
     these can be computed each from m-bit input words
     by operator f
 
     Args to bdep: {rp_0, ..., rp_3} as a list
-                  n, m -> bit sizes
-                  f -> operator
+                  n -> input words size
+                  m -> output word size
+                  f : `W n => `W m -> operator
+
+    Args -> Semi done -> Need to check type still
 
   1) Circuit from procedure -> done
-  2) Flatten array of the variables we want
-  3) Join by each m bits
-  4) Check that each block depends on (exactly) n bits
-  5) Check that circuits are equivalent for each pair of blocks
+  2) Flatten array of the variables we want -> Done
+  3) Join by each m bits -> Done
+  4) Check that each block depends on (exactly) n bits -> Done
+  5) Check that circuits are equivalent for each pair of blocks -> Done
   6) Generate circuit for operator
     -> 
-  7) Check it is equivalent to first block
+  7) Check it is equivalent to first block -> Done*
 
   *)
+
+*)

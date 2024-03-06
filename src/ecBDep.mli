@@ -3,4 +3,4 @@ open EcParsetree
 open EcEnv
 
 (* -------------------------------------------------------------------- *)
-val bdep : env -> pgamepath -> unit
+val bdep : env -> pgamepath -> psymbol -> int -> int-> string list -> unit
