@@ -554,7 +554,7 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   Format.eprintf "@. YAAAAAA @."
  
   (* Working with:
-    op compress_alt (d: int, c: JWord.W16.t) : JWord.W16.t = (c * (JWord.W16.of_int 16) + (JWord.W16.of_int 1665)).
+   op compress_alt (d: int, c: W16.t) : W16.t = (((c * ((W16.of_int 1) `<<` (W8.of_int d)) + (W16.of_int qh)) * (W16.of_int two_eight)) `>>` (W8.of_int 28)) `&` ((W16.of_int 1) `<<` (W8.of_int d)). 
   *)
 
 (*
