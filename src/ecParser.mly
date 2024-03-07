@@ -4035,8 +4035,8 @@ global_action:
 | LOCATE x=qident  { Glocate      x  }
 | WHY3 x=STRING    { GdumpWhy3    x  }
 
-| BDEP p=loc(fident) f=oident n=uint m=uint LBRACKET vl=plist0(STRING, SEMICOLON) RBRACKET
-    { Gbdep (p, f, (BI.to_int n), (BI.to_int m), vl) }
+| BDEP p=loc(fident) f=oident n=uint m=uint LBRACKET vl=plist0(STRING, SEMICOLON) RBRACKET b=uint
+    { Gbdep (p, f, (BI.to_int n), (BI.to_int m), vl, (BI.to_int b)) }
 
 | PRAGMA       x=pragma { Gpragma x }
 | PRAGMA PLUS  x=pragma { Goption (x, `Bool true ) }

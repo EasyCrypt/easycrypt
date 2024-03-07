@@ -254,10 +254,10 @@ let circ_dep_split (r : C.reg) : C.reg list =
 
 let compare_deps (d1: deps) (d2: deps) : bool =
   List.for_all2 (fun ((lo1, hi1), deps1) ((lo2, hi2), deps2) ->
-    (hi1 - lo1 == hi2 - lo2) && 
+    (hi1 - lo1 = hi2 - lo2) && 
     (List.for_all2 (fun (_, l1) (_, l2) -> 
       List.for_all2 
-        (fun (a1, b1) (a2, b2) -> b1 - a1 == b2 - a2) 
+        (fun (a1, b1) (a2, b2) -> b1 - a1 = b2 - a2) 
         l1 
         l2) 
       (C.VarRange.contents deps1)
@@ -320,7 +320,7 @@ let bruteforce_equiv (r1 : C.reg) (r2 : C.reg) (range: int) : bool =
     let eval = C.eval (fun x -> Map.find x env) in
     List.map eval r |> C.uint_of_bools
   in
-  Enum.(--^) 0 range |> Enum.map (fun i -> (eval r1 i) == (eval r2 i)) |> Enum.fold (&&) true
+  Enum.(--^) 0 range |> Enum.map (fun i -> (eval r1 i) = (eval r2 i)) |> Enum.fold (&&) true
 
 (* -------------------------------------------------------------------- *)
 exception BDepError
@@ -375,39 +375,39 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
     match pth with
     | (["Top"; "JWord"; "W32"], "to_uint") -> 
         fun rs ->
-        assert (List.length rs == 1); 
+        assert (List.length rs = 1); 
         (List.hd rs)
     | (["Top"; "JWord"; "W16"], "to_uint") -> 
         fun rs ->
-        assert (List.length rs == 1); 
+        assert (List.length rs = 1); 
         (List.hd rs)
     | (["Top"; "JWord"; "W8"], "to_uint") -> 
         fun rs ->
-        assert (List.length rs == 1); 
+        assert (List.length rs = 1); 
         (List.hd rs)
     | (["Top"; "JWord"; "W32"], "of_int") -> 
         fun rs ->
-        assert (List.length rs == 1); 
+        assert (List.length rs = 1); 
         (rs |> List.hd |> List.take 32)
     | (["Top"; "JWord"; "W16"], "of_int") -> 
         fun rs ->
-        assert (List.length rs == 1); 
+        assert (List.length rs = 1); 
         (rs |> List.hd |> List.take 16)
     | (["Top"; "JWord"; "W8"], "of_int") -> 
         fun rs ->
-        assert (List.length rs == 1); 
+        assert (List.length rs = 1); 
         (rs |> List.hd |> List.take 16)
     | (["Top"; "JWord"; "W32"], "*") 
     | (["Top"; "JWord"; "W16"], "*") -> 
         fun rs ->
-        assert (List.length rs == 2); 
+        assert (List.length rs = 2); 
         let a = List.hd rs in 
         let b = (rs |> List.tl |> List.hd) in
         C.umull a b 
     | (["Top"; "JWord"; "W32"], "+") 
     | (["Top"; "JWord"; "W16"], "+") -> 
         fun rs ->
-        assert (List.length rs == 2); 
+        assert (List.length rs = 2); 
         let a = List.hd rs in 
         let b = (rs |> List.tl |> List.hd) in
         C.add a b |> snd
@@ -423,14 +423,14 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
     | (["Top"; "JWord"; "W32"], "`<<`") 
     | (["Top"; "JWord"; "W16"], "`<<`") -> 
         fun rs ->
-        assert (List.length rs == 2);
+        assert (List.length rs = 2);
         let a = List.hd rs in 
         let b = (rs |> List.tl |> List.hd) in
         C.shift ~side:`L ~sign:`L a b 
     | (["Top"; "JWord"; "W32"], "`>>`")     (*  assuming logical shift right for words   *)
     | (["Top"; "JWord"; "W16"], "`>>`") ->  (* TODO: need to check if this is correct or *)  
         fun rs ->                           (* if we need to apply a mask                *)
-        assert (List.length rs == 2);
+        assert (List.length rs = 2);
         let a = List.hd rs in 
         let b = (rs |> List.tl |> List.hd) in
         C.shift ~side:`R ~sign:`L a b 
@@ -439,7 +439,7 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
     | (["Top"; "JWord"; "W16"], "`&`") 
     | (["Top"; "JWord"; "W16"], "andw") -> 
         fun rs ->
-        assert (List.length rs == 2);
+        assert (List.length rs = 2);
         let a = List.hd rs in 
         let b = (rs |> List.tl |> List.hd) in
         C.land_ a b 
@@ -457,7 +457,7 @@ let rec circuit_of_form (env: env) (f : EcAst.form) : C.reg =
       let c_c = circuit_of_form env c_f in
       let t_c = circuit_of_form env t_f in
       let f_c = circuit_of_form env f_f in
-      let () = assert (List.length c_c == 1) in
+      let () = assert (List.length c_c = 1) in
       let c_c = List.hd c_c in
       C.mux2_reg f_c t_c c_c
   (* hardcoding size for now FIXME *)
@@ -499,23 +499,23 @@ and int_of_form (env: env) (f: EcAst.form) : int =
   let trans_jops (pth: qsymbol) : int list -> int =
     match pth with
     | (["Top"; "JWord"; "W16"], "of_int") -> 
-        (fun rs -> assert (List.length rs == 1); 
+        (fun rs -> assert (List.length rs = 1); 
         (List.hd rs) land ((1 lsl 16) - 1))
     | (["Top"; "JWord"; "W8"], "of_int") -> 
-        (fun rs -> assert (List.length rs == 1); 
+        (fun rs -> assert (List.length rs = 1); 
         (List.hd rs) land ((1 lsl 8) - 1))
     | (["Top"; "JWord"; "W16"], "*") -> 
-        (fun rs -> assert (List.length rs == 2); 
+        (fun rs -> assert (List.length rs = 2); 
         let a = List.hd rs in
         let b = rs |> List.tl |> List.hd in
         (a * b) land ((1 lsl 16) - 1))
     | (["Top"; "JWord"; "W16"], "+") -> 
-        (fun rs -> assert (List.length rs == 2); 
+        (fun rs -> assert (List.length rs = 2); 
         let a = List.hd rs in
         let b = rs |> List.tl |> List.hd in
         (a + b) land ((1 lsl 16) - 1))
     | (["Top"; "JWord"; "W16"], "`<<`") ->
-        (fun rs -> assert (List.length rs == 2); 
+        (fun rs -> assert (List.length rs = 2); 
         let a = List.hd rs in
         let b = rs |> List.tl |> List.hd in
         (a lsl (b mod 16)) land ((1 lsl 16) - 1))
@@ -539,7 +539,7 @@ and int_of_form (env: env) (f: EcAst.form) : int =
   | _ -> failwith "Form cannot be converted to int"
 
 (* -------------------------------------------------------------------- *)
-let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : string list) : unit =
+let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : string list) (b_bound: int) : unit =
   let proc = EcTyping.trans_gamepath env p in
   let proc = EcEnv.Fun.by_xpath proc env in
   let pdef = match proc.f_def with FBdef def -> def | _ -> assert false in
@@ -548,16 +548,15 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   | OB_oper (Some (OP_Plain (f, _))) -> f
   | _ -> failwith "Invalid operator type" in
   let fc = circuit_of_form env f in
-  let () = Format.eprintf "len %d @." (List.length fc) in
+(*  let () = Format.eprintf "len %d @." (List.length fc) in
   let () = inputs_of_reg fc |> Set.to_list |> List.iter (fun x -> Format.eprintf "%d %d@." (fst x) (snd x)) in
-  print_deps_alt ~name:"test_out" fc;
-  Format.eprintf "@. YAAAAAA @."
+  print_deps_alt ~name:"test_out" fc;*)
  
   (* Working with:
    op compress_alt (d: int, c: W16.t) : W16.t = (((c * ((W16.of_int 1) `<<` (W8.of_int d)) + (W16.of_int qh)) * (W16.of_int two_eight)) `>>` (W8.of_int 28)) `&` ((W16.of_int 1) `<<` (W8.of_int d)). 
   *)
 
-(*
+
 
   let trans_int (p : path) : width =
     match EcPath.toqsymbol p with
@@ -699,10 +698,10 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
   | _ -> ()
 *)
 
-  let comp_circ = C.func_from_spec "COMPRESS" [C.reg ~size:16 ~name:0] in
+(*  let comp_circ = C.func_from_spec "COMPRESS" [C.reg ~size:16 ~name:0] in *)
   begin 
     let circ = List.map (fun v -> Option.get (CircEnv.get_s cenv v)) vs |> List.flatten in
-    let () = assert ((List.length circ) mod m == 0) in
+    let () = assert ((List.length circ) mod m = 0) in
     let rec part (l : 'a list) (n : int) : 'a list list = (* assumes above assertion for correctness *)
       match l with
       | [] -> []
@@ -720,11 +719,12 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
       List.for_all (fun (_, deps) -> 
         List.for_all (fun (_, l) ->
           List.for_all (fun (a,b) ->
-          b - a + 1 == n) l)
+          b - a + 1 = n) l)
         (C.VarRange.contents deps)
       ) d) 
     circs) in
     let () = assert (List.for_all (circ_equiv (List.hd circs)) (List.tl circs)) in
+    let () = assert (bruteforce_equiv (List.hd circs) fc b_bound) in
     Format.eprintf "Success@."
   end 
 
@@ -755,4 +755,4 @@ let bdep (env : env) (p : pgamepath) (f: psymbol) (n : int) (m : int) (vs : stri
 
   *)
 
-*)
+

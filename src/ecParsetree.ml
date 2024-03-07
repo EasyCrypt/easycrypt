@@ -1308,7 +1308,7 @@ type global_action =
   | Gpragma      of psymbol
   | Goption      of (psymbol * [`Bool of bool | `Int of int])
   | GdumpWhy3    of string
-  | Gbdep        of pgamepath * psymbol * int * int * (string list)
+  | Gbdep        of pgamepath * psymbol * int * int * (string list) * int
 
 type global = {
   gl_action : global_action located;
