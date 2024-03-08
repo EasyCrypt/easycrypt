@@ -67,16 +67,14 @@ lemma wf_ind (rel : 'a rel, P : 'a -> bool) :
 proof.
 move => wf_rel H.
 case (forall x, P x) => //.
-rewrite negb_forall => [[z not_P_z]].
-have [x [#] not_P_x not_ex] := wf_rel (predC P) _.
+rewrite negb_forall => [[x not_P_x]].
+have [z [#] not_P_z not_ex] := wf_rel (predC P) _.
   rewrite is_nonempty.
-  by exists z.
-have P_x : P x.
-  apply (H x) => y rel_y_x.
+  by exists x.
+have // : P z.
+  apply (H z) => y rel_y_z.
   case (P y) => [// | not_P_y].
-  have // : exists y, predC P y /\ rel y x.
-    by exists y.
-by rewrite /predC in not_P_x.
+  have // : exists y, predC P y /\ rel y z by exists y.
 qed.
 
 (* ---------------- constructing well-founded relations --------------- *)
@@ -86,7 +84,7 @@ qed.
 op lt_nat (x y : int) = 0 <= x < y.
 
 lemma wf_lt_nat : wf lt_nat.
-proof.  
+proof.
 move => xs is_ne_xs.
 have H :
   forall n,
@@ -98,18 +96,15 @@ have H :
   rewrite /lt_nat => [[ge0_y lt_y_i]].
   by apply (IH y).
   by exists i.
-have [x xs_x] : exists x, xs x.
-  by apply is_nonempty.
+have [x xs_x] : exists x, xs x by apply is_nonempty.
 case (0 <= x) => [ge0_x | lt0_x].
 by apply (H x).
 rewrite -ltzNge in lt0_x.
 exists x; split => //.
 case (exists y, xs y /\ lt_nat y x) => [[y [xs_y]] | //].
 rewrite /lt_nat => [[ge0_y lt_y_x]].
-have lt0_y : y < 0.
-  by rewrite (ltz_trans x).
-have // : y < y.
-  by rewrite (ltr_le_trans 0).
+have lt0_y : y < 0 by rewrite (ltz_trans x).
+have // : y < y by rewrite (ltr_le_trans 0).
 qed.
 
 (* lexicographic orderings *)
@@ -164,14 +159,12 @@ lemma wf_restr (wfr : 'a rel, rel : 'a rel) :
 proof.
 move => wf_wfr.
 rewrite /wf /wf_restr => xs ne_xs.
-have [x [xs_x not_ex_x_pred]] := wf_wfr xs _.
-  trivial.
+have [x [xs_x not_ex_x_pred]] := wf_wfr xs _; first trivial.
 exists x.
 rewrite xs_x /=.
 case (exists y, xs y /\ wfr y x /\ rel y x) =>
   [[y [#] xs_y wfr_y_x rel_y_x] | //].
-have // : exists y, xs y /\ wfr y x.
-by exists y.
+have // : exists y, xs y /\ wfr y x by exists y.
 qed.
 
 (* precomposing well-founded relation with function *)
@@ -243,19 +236,15 @@ move => dom_grel1_xs dom_grel2_xs grel1_grel2_agree_dom.
 apply fun_ext => x.
 case (xs x) => [xs_x | not_xs_x].
 by apply grel1_grel2_agree_dom.
-have @/grel_dom not_grel1_x : ! grel_dom grel1 x.
-  by rewrite dom_grel1_xs.
-have @/grel_dom not_grel2_x : ! grel_dom grel2 x.
-  by rewrite dom_grel2_xs.
+have @/grel_dom not_grel1_x : ! grel_dom grel1 x by rewrite dom_grel1_xs.
+have @/grel_dom not_grel2_x : ! grel_dom grel2 x by rewrite dom_grel2_xs.
 apply fun_ext => y.
 have -> : grel1 x y = false.
   case (grel1 x y) => [grel1_x_y | //].
-  have // : exists y, grel1 x y.
-    by exists y.
+  have // : exists y, grel1 x y by exists y.
 have -> // : grel2 x y = false.
   case (grel2 x y) => [grel2_x_y | //].
-  have // : exists y, grel2 x y.
-    by exists y.
+  have // : exists y, grel2 x y by exists y.
 qed.
 
 lemma grel_funs_eq_on_first (grel1 grel2 : ('a, 'b) grel, x : 'a, y : 'b) :
@@ -268,12 +257,10 @@ case (y' = y) => [-> | ne_y'_y].
 by rewrite grel1_x_y grel2_x_y.
 have -> : grel1 x y' = false.
   case (grel1 x y') => [grel1_x_y' | //].
-  have // : y' = y.
-    by apply (is_fun_grel1 x).
+  have // : y' = y by apply (is_fun_grel1 x).
 have -> // : grel2 x y' = false.
   case (grel2 x y') => [grel2_x_y' | //].
-  have // : y' = y.
-    by apply (is_fun_grel2 x).
+  have // : y' = y by apply (is_fun_grel2 x).
 qed.
 
 op grel_restr (grel : ('a, 'b) grel, xs : 'a predi) : ('a, 'b) grel =
@@ -307,8 +294,7 @@ lemma grel_restr_dom (grel : ('a, 'b) grel, xs : 'a predi) :
   grel_dom (grel_restr grel xs) = xs.
 proof.
 move => sub_xs_dom_grel.
-have // := grel_restr grel xs _.
-  trivial.
+have // := grel_restr grel xs _; first trivial.
 qed.
 
 lemma grel_restr_is_fun (grel : ('a, 'b) grel, xs : 'a predi) :
@@ -323,6 +309,15 @@ qed.
 
 op grel_to_fun (def : 'b, grel : ('a, 'b) grel) : 'a -> 'b =
   fun (x : 'a) => choiceb (grel x) def.
+
+lemma choiceb_grel_fun (grel : ('a, 'b) grel, x : 'a, y, def : 'b) :
+  grel_is_fun grel => grel x y => grel_to_fun def grel x = y.
+proof.
+move => grel_is_fun_grel grel_x_y; rewrite /grel_to_fun.
+have grel_x_choice_grel_x := choicebP (grel x) def _.
+  by exists y.
+by apply (grel_is_fun_grel x).
+qed.
 
 op grel_choose_sub_fun (grel : ('a, 'b) grel) : ('a, 'b) grel =
   fun (x : 'a, y : 'b) =>
@@ -477,7 +472,7 @@ rewrite /wfc_least => grel_closed.
 by apply grels_inter_sub.
 qed.
 
-op wfc_least_char_aux
+op wfc_least_inversion_aux
    (wfr : 'a rel, def : 'b, wfrd : ('a, 'b) wf_rec_def) : ('a, 'b) grel =
  fun (x : 'a, y : 'b) =>
    wfc_least wfr def wfrd x y /\
@@ -485,7 +480,7 @@ op wfc_least_char_aux
     grel_sub grel' (wfc_least wfr def wfrd) /\ grel_is_fun grel' /\
     grel_dom grel' = predecs wfr x /\ y = wfrd x (grel_to_fun def grel').
 
-lemma wfc_least_char
+lemma wfc_least_inversion
       (wfr : 'a rel, def : 'b, wfrd : ('a, 'b) wf_rec_def,
        x : 'a, y : 'b) :
   wfc_least wfr def wfrd x y =>
@@ -494,21 +489,21 @@ lemma wfc_least_char
   grel_dom grel' = predecs wfr x /\ y = wfrd x (grel_to_fun def grel').
 proof.
 have aux_closed :
-     wf_closed wfr def wfrd (wfc_least_char_aux wfr def wfrd).
+     wf_closed wfr def wfrd (wfc_least_inversion_aux wfr def wfrd).
   rewrite /wf_closed =>
     x' grel' sub_grel'_aux is_fun_grel' dom_grel'_preds_x.
-  rewrite /wfc_least_char_aux.
+  rewrite /wfc_least_inversion_aux.
   have sub_grel'_least : grel_sub grel' (wfc_least wfr def wfrd).
-    rewrite (grel_sub_trans (wfc_least_char_aux wfr def wfrd)) //
-            /wfc_least_char_aux => x'' y'' //.
+    rewrite (grel_sub_trans (wfc_least_inversion_aux wfr def wfrd)) //
+            /wfc_least_inversion_aux => x'' y'' //.
   split.
   by apply wfc_least_closed.
   by exists grel'.
 move => least_x_y.
-have @/wfc_least_char_aux [_ ->] // :
-     wfc_least_char_aux wfr def wfrd x y.
+have @/wfc_least_inversion_aux [_ ->] // :
+     wfc_least_inversion_aux wfr def wfrd x y.
   by rewrite (wfc_least_least wfr def wfrd
-              (wfc_least_char_aux wfr def wfrd)).
+              (wfc_least_inversion_aux wfr def wfrd)).
 qed.
 
 op wfc_least_is_fun_aux
@@ -531,10 +526,10 @@ have aux_closed :
                /wfc_least_is_fun_aux => x'' y''.
   have -> /= z' least_x'_z' :
        wfc_least wfr def wfrd x' (wfrd x' (grel_to_fun def grel')).
-    by apply wfc_least_closed.    
+    by apply wfc_least_closed.
   have [grel'' [#] sub_grel''_least is_fun_grel''
         dom_grel''_preds_x' ->]
-       := wfc_least_char wfr def wfrd x' z' _.
+       := wfc_least_inversion wfr def wfrd x' z' _.
     trivial.
   congr; congr.
   rewrite (grel_eq_same_dom grel' grel'' (predecs wfr x')) // =>
@@ -556,7 +551,7 @@ have @/wfc_least_is_fun_aux [_ least_x_uniq_y] :
      wfc_least_is_fun_aux wfr def wfrd x y.
   by rewrite (wfc_least_least wfr def wfrd
               (wfc_least_is_fun_aux wfr def wfrd)).
-  by apply least_x_uniq_y.
+by apply least_x_uniq_y.
 qed.
 
 lemma wfc_least_result
@@ -568,8 +563,7 @@ lemma wfc_least_result
          (grel_restr (wfc_least wfr def wfrd) (predecs wfr x)))).
 proof.
 move => wf_wfr.
-apply (wfc_least_closed wfr def wfrd x
-       (grel_restr (wfc_least wfr def wfrd) (predecs wfr x))).
+apply (wfc_least_closed wfr def wfrd).
 apply grel_restr_grel_sub.
 apply grel_restr_is_fun.
 by rewrite wfc_least_dom_predT.
@@ -584,15 +578,6 @@ op nosmt wf_recur
    (wfr : 'a rel, def : 'b, wfrd : ('a, 'b) wf_rec_def) : 'a -> 'b =
   grel_to_fun def (wfc_least wfr def wfrd).
 
-lemma choiceb_grel_fun (grel : ('a, 'b) grel, x : 'a, y, def : 'b) :
-  grel_is_fun grel => grel x y => choiceb (grel x) def = y.
-proof.
-move => grel_is_fun_grel grel_x_y.
-have grel_x_choice_grel_x := choicebP (grel x) def _.
-  by exists y.
-by apply (grel_is_fun_grel x).
-qed.
-
 (* the recursion lemma *)
 
 lemma wf_recur
@@ -605,15 +590,13 @@ lemma wf_recur
           then wf_recur wfr def wfrd y
           else def).
 proof.
-move => wf_wfr.
-rewrite /wf_recur /grel_to_fun.
+move => wf_wfr; rewrite /wf_recur.
 apply (choiceb_grel_fun (wfc_least wfr def wfrd) x).
 apply wfc_least_is_fun.
-have least_result := wfc_least_result wfr def wfrd x _.
-  trivial.
 have -> :
   (fun (y : 'a) =>
-   if wfr y x then choiceb (wfc_least wfr def wfrd y) def
+   if wfr y x
+   then choiceb (wfc_least wfr def wfrd y) def
    else def) =
   (grel_to_fun def (grel_restr (wfc_least wfr def wfrd) (predecs wfr x))).
   rewrite /grel_to_fun.
@@ -621,6 +604,6 @@ have -> :
   case (wfr y x) => [wfr_y_x | not_wfr_y_x].
   by rewrite /grel_restr /predecs wfr_y_x.
   rewrite eq_sym choiceb_dfl //.
-  - by rewrite /grel_restr /predecs 1:not_wfr_y_x.
-  - by rewrite least_result.
+  by rewrite /grel_restr /predecs 1:not_wfr_y_x.
+by rewrite wfc_least_result.
 qed.
